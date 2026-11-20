@@ -277,7 +277,19 @@ def infinitePlaceRealPower (v : InfinitePlace F) (r : ℝ) : ℝ≥0ˣ →* v.Co
 is the positive real power itself, including at a complex place. -/
 theorem infinitePlaceRealPower_apply (v : InfinitePlace F) (r : ℝ) (t : ℝ≥0ˣ) :
     extensionEmbedding v (infinitePlaceRealPower F v r t).val = (((t.val : ℝ) ^ r : ℝ) : ℂ) := by
-  sorry
+  let x : ℝ := (t.val : ℝ) ^ r
+  let y := algebraMap ℝ (mixedEmbedding.mixedSpace F) x
+  let e := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  change extensionEmbedding v (e.symm y v) = (x : ℂ)
+  have h := e.apply_symm_apply y
+  by_cases hv : v.IsReal
+  · simpa only [e, InfiniteAdeleRing.ringEquiv_mixedSpace_apply, y, Prod.algebraMap_apply,
+      Pi.algebraMap_apply, Algebra.algebraMap_self_apply, extensionEmbeddingOfIsReal_apply] using
+      congrArg (fun z : mixedEmbedding.mixedSpace F => (z.1 ⟨v, hv⟩ : ℂ)) h
+  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    simpa only [e, InfiniteAdeleRing.ringEquiv_mixedSpace_apply, y, Prod.algebraMap_apply,
+      Pi.algebraMap_apply] using!
+      congrArg (fun z : mixedEmbedding.mixedSpace F => z.2 ⟨v, hc⟩) h
 
 /-- Paper: Definition A.2.2.5, p. 547. The single-place section inserts the positive
 root of order the local degree at the chosen infinite place and one elsewhere. -/
