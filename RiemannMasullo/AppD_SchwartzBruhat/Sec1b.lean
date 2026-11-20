@@ -146,7 +146,8 @@ theorem mem_lcaAnnihilator_iff (H : Subgroup G) (χ : PontryaginDual G) :
 /-- Paper: Definition D.1.4.5, p. 758. A group element is in the dual annihilator
 exactly when every character of the subgroup takes value one there. -/
 theorem mem_lcaDualAnnihilator_iff (J : Subgroup (PontryaginDual G)) (x : G) :
-    x ∈ lcaDualAnnihilator J ↔ ∀ χ : J, χ.val x = 1 := by sorry
+    x ∈ lcaDualAnnihilator J ↔ ∀ χ : J, χ.val x = 1 :=
+  Subgroup.mem_iInf
 
 /-- Paper: Lemma D.1.4.6(1), p. 758. Taking the annihilator twice recovers a
 closed subgroup under the evaluation pairing. -/
