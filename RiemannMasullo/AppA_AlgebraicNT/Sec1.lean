@@ -438,6 +438,61 @@ theorem ideleClassGroup_description :
 -- to A.1.3.4(3). Existence of a continuous splitting does not imply this. The compactness
 -- assertion has its own proof obligation in Theorem A.1.4.3.
 
+/-- Paper: Lemma A.1.2.1, p. 540. The diagonal field is discrete and closed in the adeles. -/
+private theorem principalAdeles_closed_discrete :
+    IsClosed (Set.range (algebraMap F 𝔸[F])) ∧ IsDiscrete (Set.range (algebraMap F 𝔸[F])) := by
+  have : T2Space 𝔸[F] := inferInstanceAs (T2Space (((w : InfinitePlace F) → w.Completion) ×
+    (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F])))
+  have : IsTopologicalAddGroup 𝔸[F] :=
+    inferInstanceAs (IsTopologicalAddGroup (InfiniteAdeleRing F × 𝔸ᶠ[𝓞 F, F]))
+  let A := AdeleRing.principalSubgroup (𝓞 F) F
+  suffices h : IsDiscrete (A : Set 𝔸[F]) from ⟨A.isClosed_of_isDiscrete h, h⟩
+  let archNorm (a : InfiniteAdeleRing F) : ℝ := ∏ w : InfinitePlace F, ‖a w‖ ^ w.mult
+  have harch : Continuous archNorm :=
+    continuous_finsetProd _ fun w _ ↦ (continuous_apply w).norm.pow _
+  let U : Set 𝔸[F] := {a | archNorm a.1 < 1} ∩
+    {a | ∀ v : Primes(F), a.2 v ∈ v.adicCompletionIntegers F}
+  have hU : IsOpen U := (isOpen_lt (harch.comp continuous_fst) continuous_const).inter
+    ((RestrictedProduct.isOpen_forall_mem fun v : Primes(F) ↦
+      Valued.isOpen_valuationSubring (v.adicCompletion F)).preimage continuous_snd)
+  apply isDiscrete_iff_discreteTopology.mpr
+  change DiscreteTopology A
+  apply discreteTopology_of_isOpen_singleton_zero
+  have hpre : (Subtype.val : A → 𝔸[F]) ⁻¹' U = {0} := by
+    ext a
+    change a.val ∈ U ↔ a = 0
+    constructor
+    · rintro ⟨hinf, hfin⟩
+      obtain ⟨x, hx⟩ := a.property
+      by_contra ha
+      have hx₀ : x ≠ 0 := by
+        rintro rfl
+        exact ha (Subtype.ext (hx.symm.trans (map_zero _)))
+      have haUnit : IsUnit a.val := hx ▸ (isUnit_iff_ne_zero.mpr hx₀).map (algebraMap F 𝔸[F])
+      have hprod : (∏ᶠ v : Primes(F), ‖a.val.2 v‖) ≤ 1 := by
+        refine (finprod_induction (fun r : ℝ ↦ 0 ≤ r ∧ r ≤ 1) ⟨zero_le_one, le_rfl⟩
+          (fun _ _ hr hs ↦ ⟨mul_nonneg hr.1 hs.1, (mul_le_of_le_one_right hr.1 hs.2).trans hr.2⟩)
+          (fun v ↦ ⟨norm_nonneg _, Valued.toNormedField.norm_le_one_iff.mpr (hfin v)⟩)).2
+      have hnorm : ‖a.val‖ = 1 := hx ▸ AdeleRing.norm_algebraMap_eq_one_of_ne_zero hx₀
+      rw [AdeleRing.norm_apply_of_isUnit haUnit] at hnorm
+      have hnonneg : 0 ≤ archNorm a.val.1 :=
+        Finset.prod_nonneg fun w _ ↦ pow_nonneg (norm_nonneg _) _
+      have hlt : archNorm a.val.1 * (∏ᶠ v : Primes(F), ‖a.val.2 v‖) < 1 :=
+        (mul_le_of_le_one_right hnonneg hprod).trans_lt hinf
+      exact hlt.ne hnorm
+    · rintro rfl
+      refine ⟨?_, fun v ↦ (v.adicCompletionIntegers F).zero_mem⟩
+      change archNorm 0 < 1
+      obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      have hw : archNorm 0 = 0 := by
+        apply Finset.prod_eq_zero (Finset.mem_univ w)
+        change ‖(0 : w.Completion)‖ ^ w.mult = 0
+        simp [InfinitePlace.mult_ne_zero]
+      rw [hw]
+      exact zero_lt_one
+  rw [← hpre]
+  exact hU.preimage continuous_subtype_val
+
 /-- Paper: Remark A.1.4.2, p. 542. Restricting the quotient map to the norm-one subgroups
 gives a strict short exact sequence and the corresponding topological group isomorphism. -/
 theorem normOne_idele_quotient :
@@ -449,7 +504,53 @@ theorem normOne_idele_quotient :
       MulExact i p ∧ IsOpenQuotientMap p ∧
       ∃ e : ((ideleNorm F).ker ⧸ i.range) ≃ₜ* (ideleClassNorm F).ker,
         ∀ x, e (QuotientGroup.mk x) = p x := by
-  sorry
+  dsimp only
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let q := QuotientGroup.mk' P
+  let i : Fˣ →* (ideleNorm F).ker := d.codRestrict _ (fun x ↦ (ideleNorm_spec F).2 ⟨x, rfl⟩)
+  let p : (ideleNorm F).ker →* (ideleClassNorm F).ker :=
+    (q.comp (ideleNorm F).ker.subtype).codRestrict _ (fun x ↦ x.property)
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  have hp : IsOpenQuotientMap p := hq.restrictPreimage ((ideleClassNorm F).ker : Set C[F])
+  have hd : Injective d := Units.map_injective (AdeleRing.algebraMap_injective (𝓞 F) F)
+  have hi : Injective i := fun _ _ h ↦ hd (congrArg Subtype.val h)
+  have hexact : MulExact i p := by
+    intro x
+    change p x = 1 ↔ ∃ y, i y = x
+    rw [← Subtype.coe_inj]
+    change q x.val = 1 ↔ ∃ y, i y = x
+    rw [← MonoidHom.mem_ker, QuotientGroup.ker_mk']
+    exact exists_congr fun y ↦ ⟨fun h ↦ Subtype.ext h, congrArg Subtype.val⟩
+  let val : (ideleNorm F).ker → 𝔸[F] := fun x ↦ x.val.val
+  have hrange : Set.range i = val ⁻¹' Set.range (algebraMap F 𝔸[F]) := by
+    ext x
+    constructor
+    · rintro ⟨y, rfl⟩
+      exact ⟨y.val, rfl⟩
+    · rintro ⟨y, hy⟩
+      have hy₀ : y ≠ 0 := by
+        rintro rfl
+        have : Nontrivial 𝔸[F] := (AdeleRing.algebraMap_injective (𝓞 F) F).nontrivial
+        exact x.val.ne_zero (hy.symm.trans (map_zero _))
+      exact ⟨Units.mk0 y hy₀, Subtype.ext (Units.ext hy)⟩
+  have hval : Continuous val := Units.continuous_val.comp continuous_subtype_val
+  obtain ⟨hclosed, hdiscrete⟩ := principalAdeles_closed_discrete F
+  refine ⟨i, p, fun _ ↦ rfl, fun _ ↦ rfl, hi, ?_, ?_, hexact, hp, ?_⟩
+  · rw [hrange]
+    exact hclosed.preimage hval
+  · rw [hrange]
+    exact hdiscrete.preimage hval.continuousOn (Units.val_injective.comp Subtype.val_injective)
+  · have hker := MonoidHom.mulExact_iff.mp hexact
+    let e := (QuotientGroup.quotientMulEquivOfEq hker.symm).trans
+      (QuotientGroup.quotientKerEquivOfSurjective p hp.surjective)
+    have he (x : (ideleNorm F).ker) : e (QuotientGroup.mk x) = p x := rfl
+    have hmk : IsOpenQuotientMap (QuotientGroup.mk : (ideleNorm F).ker → _ ⧸ i.range) :=
+      QuotientGroup.isOpenQuotientMap_mk
+    have heOpen : IsOpenQuotientMap e := hmk.of_comp_iff.mp
+      (show IsOpenQuotientMap (e ∘ QuotientGroup.mk) by simpa only [Function.comp_def, he] using hp)
+    exact ⟨ContinuousMulEquiv.mk'
+      (e.toEquiv.toHomeomorphOfContinuousOpen heOpen.continuous heOpen.isOpenMap) (map_mul e), he⟩
 
 /-- Paper: Theorem A.1.4.3, p. 542. The norm-one idele classes form a compact Hausdorff
 closed subgroup. The units are finitely generated of rank the number of infinite places
