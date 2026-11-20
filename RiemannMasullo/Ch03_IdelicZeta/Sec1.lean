@@ -151,7 +151,7 @@ theorem one_mem_relativeRightHalfPlane (hm : IsProperMap m) (hne : ∃ g, m g �
 the trivial component exactly when the interval contains zero. -/
 theorem one_mem_componentVerticalStrip (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) (I : Set ℝ) :
     1 ∈ componentVerticalStrip m hm hne 1 I ↔ 0 ∈ I := by
-  sorry
+  simp [componentVerticalStrip, relativeVerticalStrip, quasiCharacterAbscissa, normOneRestriction]
 
 /-- Paper: Equation (3.1.1.4), p. 119. The dual quasi-character is the module times
 the inverse character, evaluated by composing the original character with inversion. -/
