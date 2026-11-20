@@ -49,7 +49,52 @@ theorem restrictedProduct_description :
     (𝓝 (1 : Πʳ i, [G i, K i])).HasBasis
       (fun U : (i : ι) → Set (G i) ↦ (∀ i, U i ∈ 𝓝 1) ∧ ∀ᶠ i in cofinite, U i = K i)
       (fun U ↦ {x | ∀ i, x i ∈ U i}) := by
-  sorry
+  classical
+  refine ⟨RestrictedProduct.range_coe G _, hasBasis_iff.mpr fun T ↦ ⟨?_, ?_⟩⟩
+  · intro hT
+    let S : Set ι := {i | i ∉ I₀}
+    have hS : cofinite ≤ 𝓟 S := le_principal_iff.mpr I₀.eventually_cofinite_notMem
+    let f := RestrictedProduct.inclusion G (fun i ↦ (K i : Set (G i))) hS
+    have hT' : f ⁻¹' T ∈ 𝓝 (1 : Πʳ i, [G i, K i]_[𝓟 S]) :=
+      (RestrictedProduct.continuous_inclusion hS).continuousAt hT
+    rw [RestrictedProduct.isEmbedding_coe_of_principal.isInducing.nhds_eq_comap] at hT'
+    obtain ⟨W, hW, hWT⟩ := mem_comap.mp hT'
+    rw [nhds_pi, Filter.mem_pi'] at hW
+    obtain ⟨J, V, hV, hVW⟩ := hW
+    let U (i : ι) := (if i ∈ J then V i else Set.univ) ∩
+      (if i ∈ I₀ then Set.univ else (K i : Set (G i)))
+    refine ⟨U, ⟨fun i ↦ inter_mem ?_ ?_, ?_⟩, ?_⟩
+    · by_cases hi : i ∈ J
+      · simpa only [ite_eq_left hi, RestrictedProduct.one_apply] using hV i
+      · simp [hi]
+    · by_cases hi : i ∈ I₀
+      · simp [hi]
+      · simpa [hi] using (h₁ i hi).2.mem_nhds (K i).one_mem
+    · filter_upwards [J.eventually_cofinite_notMem, I₀.eventually_cofinite_notMem] with i hiJ hi₀
+      simp [U, hiJ, hi₀]
+    · intro x hx
+      let y : Πʳ i, [G i, K i]_[𝓟 S] :=
+        ⟨x, fun i hi ↦ by simpa [U, show i ∉ I₀ from hi] using (hx i).2⟩
+      have hy : (fun i ↦ y i) ∈ (J : Set ι).pi V := by
+        intro i hi
+        change x i ∈ V i
+        simpa [U, Finset.mem_coe.mp hi] using (hx i).1
+      exact hWT (hVW hy)
+  · rintro ⟨U, ⟨hU, hUK⟩, hUT⟩
+    let S : Set ι := {i | i ∉ I₀ ∧ U i = K i}
+    have hS : S ∈ (cofinite : Filter ι) := I₀.eventually_cofinite_notMem.and hUK
+    have hTail := (isOpen_restrictedProduct_forall_mem S (fun i hi ↦ (h₁ i hi.1).2)).mem_nhds
+      (x := (1 : Πʳ i, [G i, K i])) (fun i _ ↦ (K i).one_mem)
+    have hFinite : Sᶜ.pi U ∈ 𝓝 (fun i ↦ (1 : G i)) :=
+      set_pi_mem_nhds (mem_cofinite.mp hS) (fun i _ ↦ hU i)
+    refine mem_of_superset (inter_mem hTail
+      (RestrictedProduct.continuous_coe.continuousAt hFinite)) ?_
+    intro x hx
+    apply hUT
+    intro i
+    by_cases hi : i ∈ S
+    · exact hi.2.symm ▸ hx.1 i hi
+    · exact hx.2 i hi
 
 include h₀ h₁ in
 /-- Paper: Lemma A.1.1.2, p. 539. The restricted product is a locally compact Hausdorff
