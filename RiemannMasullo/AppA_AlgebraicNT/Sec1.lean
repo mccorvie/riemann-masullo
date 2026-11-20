@@ -11,6 +11,10 @@ public import Mathlib.Topology.Algebra.Module.ModuleTopology
 public import Mathlib.Topology.Maps.Proper.Basic
 public import RiemannMasullo.ForMathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 
+import Mathlib.Topology.Algebra.Group.Units
+import Mathlib.Topology.Algebra.IsOpenUnits
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-!
 # The topology of adeles, ideles and their class groups
 
@@ -351,7 +355,17 @@ theorem sIdeleGroup_description :
     ∃ e : (SAdeleRing F S)ˣ ≃ₜ* (((w : InfinitePlace F) → w.Completionˣ) ×
       ((v : S) → (v.val.adicCompletion F)ˣ)),
       ∀ g, (∀ w, ((e g).1 w).val = g.val.1 w) ∧ ∀ v, ((e g).2 v).val = g.val.2 v := by
-  sorry
+  have (v : S) : LocallyCompactSpace (v.val.adicCompletion F) :=
+    locallyCompactSpace_adicCompletion v.val
+  have hOpen := IsOpenUnits.isOpenEmbedding_unitsVal
+    (M := ((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F))
+  let eInf := ContinuousMulEquiv.piUnits (M := fun w : InfinitePlace F ↦ w.Completion)
+  let eS := ContinuousMulEquiv.piUnits (M := fun v : S ↦ v.val.adicCompletion F)
+  let e := (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) _).trans
+    (ContinuousMulEquiv.mk' (eInf.toHomeomorph.prodCongr eS.toHomeomorph)
+      (fun x y ↦ Prod.ext (map_mul eInf x.1 y.1) (map_mul eS x.2 y.2)))
+  exact ⟨hOpen.isInducing, hOpen.isEmbedding.t2Space, hOpen.locallyCompactSpace, e,
+    fun _ ↦ ⟨fun _ ↦ rfl, fun _ ↦ rfl⟩⟩
 
 /-- Paper: Lemma A.1.5.1, p. 543. With its adelic subspace topology, the ring integral
 outside S is the product of the S-adeles and the local integer rings outside S. -/
