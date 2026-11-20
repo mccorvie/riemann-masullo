@@ -214,7 +214,8 @@ theorem sIdeleQuotient_mk_eq_one (g : (SAdeleRing F S)ˣ) :
       ∃ u : ((S : Set (Primes(F))).integer F)ˣ, g = Units.map
         ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom
         (Units.map (integralAdeleDiagonal F S).toMonoidHom u) := by
-  sorry
+  rw [QuotientGroup.eq_one_iff, MonoidHom.map_range, MonoidHom.mem_range]
+  exact exists_congr fun _ ↦ eq_comm
 
 /-- Paper: Equation (3.1.2.1), p. 120. The product of normalized absolute values in S
 descends to J_{F,S} by the S-unit product formula. -/
