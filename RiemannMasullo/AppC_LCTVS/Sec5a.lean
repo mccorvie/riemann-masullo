@@ -64,7 +64,10 @@ variable [T2Space X] [LocallyCompactSpace X] [T2Space E] [PolynormableSpace ℂ 
 /-- Paper: Definition C.5.1.1, p. 721. For a compact set in a Hausdorff space, vanishing
 off the set is equivalent to having topological support contained in it. -/
 theorem mem_compactSupportStage_iff (K : Compacts X) (f : C_c(X, E)) :
-    f ∈ compactSupportStage K ↔ tsupport (f : X → E) ⊆ (K : Set X) := by sorry
+    f ∈ compactSupportStage K ↔ tsupport (f : X → E) ⊆ (K : Set X) := by
+  rw [tsupport, K.isCompact.isClosed.closure_subset_iff, Function.support_subset_iff']
+  simp only [compactSupportStage, Submodule.mem_iInf, LinearMap.mem_ker]
+  rfl
 
 /-- Paper: Definition C.5.1.1, p. 721. Whole-space restriction on a compact domain
 identifies the fixed-support topology with the topology on continuous maps. -/
