@@ -7,6 +7,8 @@ public import Mathlib.Analysis.LocallyConvex.PointwiseConvergence
 public import Mathlib.Analysis.LocallyConvex.WeakSpace
 public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
+import Mathlib.Analysis.Normed.Lp.lpSpace
+import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 
@@ -210,6 +212,205 @@ theorem isFrechetTVS_quotient {E : Type*} [AddCommGroup E] [Module ℂ E] [Topol
     (hE : IsFrechetTVS E) (M : Submodule ℂ E) (hM : IsClosed (M : Set E)) :
     IsFrechetTVS (E ⧸ M) := by sorry
 
+section IncompleteQuotient
+
+open scoped ENNReal ZeroAtInfty
+
+-- The source pairs a product of null rows with a closed space of weighted tests.
+-- Arbitrarily large weights detect a matrix with infinitely many nonzero rows.
+
+local notation "Row" => ℕ → ℂ
+local notation "NullRow" => C₀(ℕ, ℂ)
+local notation "RowTests" => ((ℕ → ℂ) × (ℕ → ℕ)) → lp (fun _ : ℕ ↦ ℂ) ∞
+
+/-- Evaluate a weighted row test at one row. -/
+private def rowTestEntry (a : (ℕ → ℂ) × (ℕ → ℕ)) (i : ℕ) : RowTests →L[ℂ] ℂ :=
+  (lp.evalCLM ℂ (fun _ : ℕ ↦ ℂ) ∞ i).comp (ContinuousLinearMap.proj a)
+
+/-- The compatible families of row tests. Each test reads column `a.2 i` in row `i`
+and multiplies it by `a.1 i`. The unweighted constant-column tests recover the matrix. -/
+private def compatibleRowTests : Submodule ℂ RowTests :=
+  ⨅ a : (ℕ → ℂ) × (ℕ → ℕ), ⨅ i : ℕ,
+    (rowTestEntry a i).eqLocus (a.1 i • rowTestEntry (1, fun _ ↦ a.2 i) i)
+
+local notation "MatrixSource" => (ℕ → NullRow) × compatibleRowTests
+
+/-- Compatibility is a closed condition on the tested entries. -/
+private theorem isClosed_compatibleRowTests : IsClosed (compatibleRowTests : Set RowTests) := by
+  simp only [compatibleRowTests, Submodule.coe_iInf]
+  exact isClosed_iInter fun a ↦ isClosed_iInter fun i ↦
+    (rowTestEntry a i).isClosed_eqLocus (a.1 i • rowTestEntry (1, fun _ ↦ a.2 i) i)
+
+/-- A compatible test is the corresponding weighted entry of the recovered matrix. -/
+private theorem compatibleRowTests_entry (x : compatibleRowTests)
+    (a : (ℕ → ℂ) × (ℕ → ℕ)) (i : ℕ) :
+    x.val a i = a.1 i * x.val (1, fun _ ↦ a.2 i) i := by
+  exact ((Submodule.mem_iInf _).mp ((Submodule.mem_iInf _).mp x.property a)) i
+
+/-- Insert one row into the family of weighted tests. -/
+private def singleTestRow (i : ℕ) : Row →L[ℂ] compatibleRowTests := by
+  let f : Row →L[ℂ] RowTests := ContinuousLinearMap.pi fun a ↦
+    (lp.singleContinuousLinearMap ℂ (fun _ : ℕ ↦ ℂ) ∞ i).comp
+      (a.1 i • ContinuousLinearMap.proj (a.2 i))
+  refine f.codRestrict _ fun r ↦ (Submodule.mem_iInf _).mpr fun a ↦
+    (Submodule.mem_iInf _).mpr fun k ↦ ?_
+  change lp.single (E := fun _ : ℕ ↦ ℂ) ∞ i (a.1 i * r (a.2 i)) k =
+    a.1 k * lp.single (E := fun _ : ℕ ↦ ℂ) ∞ i (1 * r (a.2 k)) k
+  by_cases h : k = i
+  · subst k
+    simp
+  · simp [Pi.single_eq_of_ne h]
+
+/-- Recover a matrix entry from the compatible tests. -/
+private def testMatrixEntry (i j : ℕ) : compatibleRowTests →L[ℂ] ℂ :=
+  (rowTestEntry (1, fun _ ↦ j) i).comp compatibleRowTests.subtypeL
+
+/-- Insert the same row in every row with index below the cutoff. -/
+private def initialTestRows (n : ℕ) : Row →L[ℂ] compatibleRowTests :=
+  ∑ i ∈ Finset.range n, singleTestRow i
+
+/-- Recovering an entry after the initial-row insertion gives the supplied row or zero. -/
+private theorem testMatrixEntry_initialTestRows (m i j : ℕ) (r : Row) :
+    testMatrixEntry i j (initialTestRows m r) = if i < m then r j else 0 := by
+  classical
+  simp only [initialTestRows, sum_apply, map_sum]
+  have h (k : ℕ) : testMatrixEntry i j (singleTestRow k r) = if i = k then r j else 0 := by
+    change lp.single (E := fun _ : ℕ ↦ ℂ) ∞ k (1 * r j) i = _
+    by_cases h : i = k
+    · subst k
+      simp
+    · simp [h]
+  simp only [h]
+  rw [Finset.sum_ite_eq]
+  simp
+
+/-- Recover the matrix formed by adding the null rows and the rows encoded by tests. -/
+private def quotientMatrix :
+    MatrixSource →L[ℂ] (ℕ → Row) := by
+  let entry (i j : ℕ) : MatrixSource →L[ℂ] ℂ :=
+    { toFun := fun x ↦ x.1 i j
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      cont := (BoundedContinuousFunction.lipschitz_eval_const j).continuous.comp
+        (ZeroAtInftyContinuousMap.isometry_toBCF.continuous.comp
+          ((continuous_apply i).comp continuous_fst)) }
+  exact ContinuousLinearMap.pi fun i ↦ ContinuousLinearMap.pi fun j ↦
+    entry i j + (testMatrixEntry i j).comp (ContinuousLinearMap.snd ℂ _ _)
+
+/-- A test family with a nonzero entry in every row would admit an unbounded test.
+In particular, the constant-one matrix cannot be recovered from the source. -/
+private theorem quotientMatrix_ne_one (x : MatrixSource) :
+    quotientMatrix x ≠ (fun _ _ ↦ 1) := by
+  intro hx
+  have hrow (i : ℕ) : ∃ j, testMatrixEntry i j x.2 ≠ 0 := by
+    by_contra! h
+    have hconst (j : ℕ) : x.1 i j = 1 := by
+      have hxij := congrFun (congrFun hx i) j
+      change x.1 i j + testMatrixEntry i j x.2 = 1 at hxij
+      simpa only [h j, add_zero] using hxij
+    have hz := zero_at_infty (x.1 i)
+    rw [show (⇑(x.1 i)) = (fun _ ↦ 1) from funext hconst] at hz
+    exact one_ne_zero (tendsto_nhds_unique tendsto_const_nhds hz)
+  choose c hc using hrow
+  let a : (ℕ → ℂ) × (ℕ → ℕ) := (fun i ↦ (i : ℂ) / testMatrixEntry i (c i) x.2, c)
+  obtain ⟨i, hi⟩ := exists_nat_gt ‖x.2.val a‖
+  have heq : x.2.val a i = (i : ℂ) := by
+    rw [compatibleRowTests_entry]
+    exact div_mul_cancel₀ _ (hc i)
+  apply (not_lt_of_ge ?_) hi
+  calc
+    (i : ℝ) = ‖(i : ℂ)‖ := (Complex.norm_natCast i).symm
+    _ = ‖x.2.val a i‖ := congrArg norm heq.symm
+    _ ≤ ‖x.2.val a‖ := lp.norm_apply_le_norm ENNReal.top_ne_zero (x.2.val a) i
+
+/-- The first `n` entries of the constant-one row define a null row. -/
+private def truncatedOneRow (n : ℕ) : NullRow where
+  toFun j := if j < n then 1 else 0
+  continuous_toFun := continuous_of_discreteTopology
+  zero_at_infty' := by
+    rw [cocompact_eq_cofinite, Nat.cofinite_eq_atTop]
+    apply tendsto_atTop_of_eventually_const (i₀ := n)
+    intro j hj
+    simp [not_lt.mpr hj]
+
+/-- The quotient of the matrix source by the kernel of matrix recovery is incomplete. -/
+private theorem incomplete_matrix_quotient :
+    ¬ @CompleteSpace (MatrixSource ⧸ quotientMatrix.ker)
+      (IsTopologicalAddGroup.rightUniformSpace (MatrixSource ⧸ quotientMatrix.ker)) := by
+  let E := MatrixSource
+  let M : Submodule ℂ E := quotientMatrix.ker
+  let Q := E ⧸ M
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  let : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+  let q : E →L[ℂ] Q := M.mkQL
+  let recover : Q →L[ℂ] (ℕ → Row) := M.liftQL quotientMatrix le_rfl
+  let parts (n : ℕ) (r : Row) : E := (0, initialTestRows n r)
+  let y (n : ℕ) : Q := q (parts n 1)
+  have htruncate : Tendsto (fun k ↦ (truncatedOneRow k : Row)) atTop (𝓝 1) := by
+    apply tendsto_pi_nhds.mpr
+    intro j
+    apply tendsto_atTop_of_eventually_const (i₀ := j + 1)
+    intro k hk
+    change (if j < k then (1 : ℂ) else 0) = 1
+    exact ite_eq_left (show j < k from hk)
+  -- Finitely truncated rows can be supplied by either factor of the source.
+  have hexchange (m k : ℕ) :
+      q (parts m (truncatedOneRow k)) =
+        q (fun i ↦ if i < m then truncatedOneRow k else 0, 0) := by
+    change M.mkQ _ = M.mkQ _
+    simp only [Submodule.mkQ_apply, Submodule.Quotient.eq]
+    change quotientMatrix (_ - _) = 0
+    rw [map_sub, sub_eq_zero]
+    funext i j
+    change 0 + testMatrixEntry i j (initialTestRows m (truncatedOneRow k)) =
+      (if i < m then truncatedOneRow k else 0) j + 0
+    rw [testMatrixEntry_initialTestRows, zero_add, add_zero]
+    split <;> rfl
+  have hy : CauchySeq y := by
+    rw [cauchySeq_iff_sub_mem]
+    intro U hU
+    obtain ⟨V, hV, hclosed, hVU⟩ := exists_mem_nhds_isClosed_subset hU
+    have hpre : (fun a : ℕ → NullRow ↦ q (a, 0)) ⁻¹' V ∈ 𝓝 0 := by
+      have hcont : Continuous (fun a : ℕ → NullRow ↦ q (a, 0)) :=
+        q.continuous.comp (continuous_id.prodMk continuous_const)
+      apply hcont.tendsto 0
+      simpa only [← Prod.zero_eq_mk, map_zero] using hV
+    -- The preimage of a zero-neighborhood controls only finitely many null rows.
+    rw [nhds_pi, Filter.mem_pi'] at hpre
+    obtain ⟨s, W, hW, hsub⟩ := hpre
+    refine ⟨s.sup id + 1, fun m hm n hn ↦ hVU ?_⟩
+    have hlim (l : ℕ) : Tendsto (fun k ↦ q (parts l (truncatedOneRow k))) atTop (𝓝 (y l)) :=
+      (q.continuous.comp (continuous_const.prodMk
+        (initialTestRows l).continuous)).tendsto 1 |>.comp htruncate
+    apply hclosed.mem_of_tendsto ((hlim m).sub (hlim n))
+    filter_upwards with k
+    rw [hexchange, hexchange, ← map_sub, Prod.mk_sub_mk, sub_self]
+    apply hsub
+    intro i hi
+    have hi' : i ≤ s.sup id := Finset.le_sup (f := id) hi
+    have hm' : i < m := by omega
+    have hn' : i < n := by omega
+    change ((if i < m then truncatedOneRow k else 0) -
+      (if i < n then truncatedOneRow k else 0)) ∈ W i
+    rw [ite_eq_left hm', ite_eq_left hn', sub_self]
+    exact mem_of_mem_nhds (hW i)
+  intro hcomplete
+  have : CompleteSpace Q := hcomplete
+  -- Every entry of a putative limit must be one.
+  obtain ⟨z, hz⟩ := cauchySeq_tendsto_of_complete hy
+  obtain ⟨x, rfl⟩ := M.mkQ_surjective z
+  apply quotientMatrix_ne_one x
+  funext i j
+  have hentry : Tendsto (fun n ↦ recover (y n) i j) atTop
+      (𝓝 (quotientMatrix x i j)) :=
+    (((continuous_apply j).comp ((continuous_apply i).comp recover.continuous)).tendsto
+      (M.mkQ x)).comp hz
+  refine tendsto_nhds_unique hentry (tendsto_atTop_of_eventually_const (i₀ := i + 1) ?_)
+  intro n hn
+  change 0 + testMatrixEntry i j (initialTestRows n 1) = _
+  rw [testMatrixEntry_initialTestRows, zero_add, ite_eq_left (show i < n from hn)]
+  rfl
+
 /-- Paper: Remark C.1.3.4, p. 660. A complete Hausdorff locally convex space can have
 an incomplete quotient by a closed subspace. Both completeness predicates use the
 additive uniformity. -/
@@ -218,7 +419,16 @@ theorem exists_incomplete_quotient :
       (_ : IsTopologicalAddGroup E) (_ : PolynormableSpace ℂ E) (_ : T2Space E),
       @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E) ∧
         ∃ M : Submodule ℂ E, IsClosed (M : Set E) ∧
-          ¬ @CompleteSpace (E ⧸ M) (IsTopologicalAddGroup.rightUniformSpace (E ⧸ M)) := by sorry
+          ¬ @CompleteSpace (E ⧸ M) (IsTopologicalAddGroup.rightUniformSpace (E ⧸ M)) := by
+  let E := MatrixSource
+  refine ⟨E, inferInstance, inferInstance, inferInstance, inferInstance, inferInstance,
+    inferInstance, ?_, quotientMatrix.ker, quotientMatrix.isClosed_ker, incomplete_matrix_quotient⟩
+  have : IsClosed (compatibleRowTests : Set RowTests) := isClosed_compatibleRowTests
+  have : IsUniformAddGroup compatibleRowTests := compatibleRowTests.toAddSubgroup.isUniformAddGroup
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := E)]
+  infer_instance
+
+end IncompleteQuotient
 
 /-- Paper: §C.1.4, p. 660. A set is bounded when a nonzero complex multiple of it
 fits inside every prescribed zero-neighborhood. -/
