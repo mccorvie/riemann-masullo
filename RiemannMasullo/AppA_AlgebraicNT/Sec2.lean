@@ -184,7 +184,37 @@ theorem adeleFundamentalDomain_interior : (interior (adeleFundamentalDomain F b)
 domain off itself, including its half-open boundary. -/
 theorem adeleFundamentalDomain_disjoint (x : F) (hx : x ≠ 0) :
     Disjoint (algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b) (adeleFundamentalDomain F b) := by
-  sorry
+  rw [Set.disjoint_left]
+  intro y hy hyDomain
+  obtain ⟨a, ha, rfl⟩ := Set.mem_vadd_set.mp hy
+  have hxFin : algebraMap F 𝔸[F] x ∈ integralAdelesOutside F ∅ := by
+    have h := (integralAdelesOutside F ∅).sub_mem hyDomain.2 ha.2
+    change (algebraMap F 𝔸[F] x + a) - a ∈ integralAdelesOutside F ∅ at h
+    rwa [add_sub_cancel_right] at h
+  have hxInt := (diagonal_mem_integralAdelesOutside F ∅ x).mp hxFin
+  simp only [Finset.coe_empty, integer_empty, Algebra.mem_bot] at hxInt
+  obtain ⟨r, rfl⟩ := hxInt
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let e := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map e).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  let : Fintype ι := FiniteDimensional.fintypeBasisIndex B
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let z := mixedEmbedding F (algebraMap (𝓞 F) F r)
+  have hz : z ∈ Submodule.span ℤ (Set.range B) := by
+    rw [(b.map e).ofZLatticeBasis_span ℝ]
+    exact ⟨r, rfl⟩
+  have haInf : m a.1 ∈ ZSpan.fundamentalDomain B := ha.1
+  have hyInf : z + m a.1 ∈ ZSpan.fundamentalDomain B := by
+    have h := hyDomain.1
+    change m ((algebraMap F 𝔸[F] (algebraMap (𝓞 F) F r)).1 + a.1) ∈
+      ZSpan.fundamentalDomain B at h
+    rwa [map_add, AdeleRing.algebraMap_fst_def,
+      ← InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp] at h
+  have h := ZSpan.fract_eq_self.mpr hyInf
+  rw [ZSpan.fract_zSpan_add B _ hz, ZSpan.fract_eq_self.mpr haInf] at h
+  apply hx (mixedEmbedding_injective F ?_)
+  rw [map_zero]
+  exact add_eq_right.mp h.symm
 
 /-- Paper: Lemma A.2.1.2, p. 545. The additive translates by field elements
 of the adelic fundamental domain cover the adele ring. -/
