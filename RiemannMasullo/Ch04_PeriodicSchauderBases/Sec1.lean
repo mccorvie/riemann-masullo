@@ -212,7 +212,12 @@ theorem pi_coeff_not_equicontinuousAt :
 /-- Paper: Remark 4.1.2.2, p. 159. A Schauder basis with equicontinuous
 coefficient functionals is regular. -/
 theorem isRegular_of_equicontinuous_coeff (hb : IsSchauderBasis x f)
-    (hf : EquicontinuousAt (fun m ↦ (f m : E → ℂ)) 0) : IsRegular x := by sorry
+    (hf : EquicontinuousAt (fun m ↦ (f m : E → ℂ)) 0) : IsRegular x := by
+  refine ⟨{u | ∀ n, dist (f n 0) (f n u) < 1},
+    Metric.equicontinuousAt_iff_right.mp hf 1 zero_lt_one, ?_⟩
+  intro n hn
+  have hdiag : f n (x n) = 1 := by simpa using hb.1 n n
+  simpa [hdiag] using hn n
 
 /-- Paper: Remark 4.1.2.2, p. 159. A regular Schauder basis has equicontinuous
 coefficient functionals if the space has its Mackey topology and the Mackey
