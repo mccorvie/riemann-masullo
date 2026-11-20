@@ -5,6 +5,8 @@ public import Mathlib.LinearAlgebra.Contraction
 public import Mathlib.LinearAlgebra.DirectSum.TensorProduct
 public import Mathlib.LinearAlgebra.TensorProduct.DirectLimit
 public import Mathlib.Topology.Algebra.LinearMapCompletion
+import Mathlib.Analysis.LocallyConvex.WeakDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
 # Topological tensor products
@@ -73,6 +75,135 @@ theorem tensorDualForm_tmul (φ : StrongDual ℂ E) (ψ : StrongDual ℂ F) (x :
     tensorDualForm φ ψ (x ⊗ₜ[ℂ] y) = φ x * ψ y :=
   TensorProduct.dualDistrib_apply φ.toLinearMap ψ.toLinearMap x y
 
+/-- Joint continuity forces the first variable to depend on finitely many evaluations. -/
+private theorem tensorDualForm_finite_evaluations
+    (B : WeakDual ℂ E →ₗ[ℂ] WeakDual ℂ F →ₗ[ℂ] ℂ)
+    (hB : Continuous (fun p : WeakDual ℂ E × WeakDual ℂ F ↦ B p.1 p.2)) :
+    ∃ s : Finset E, ∀ φ : WeakDual ℂ E, (∀ x ∈ s, φ x = 0) → B φ = 0 := by
+  classical
+  have hprod : {p : WeakDual ℂ E × WeakDual ℂ F | ‖B p.1 p.2‖ < 1} ∈
+      𝓝 ((0 : WeakDual ℂ E), (0 : WeakDual ℂ F)) := by
+    have hc := hB.continuousAt (x := ((0 : WeakDual ℂ E), (0 : WeakDual ℂ F)))
+    have hzero : B (0 : WeakDual ℂ E) (0 : WeakDual ℂ F) = 0 := by simp
+    have hb : Metric.ball (0 : ℂ) 1 ∈ 𝓝 (B 0 0) := by
+      rw [hzero]
+      exact Metric.ball_mem_nhds 0 one_pos
+    simpa only [Metric.ball, dist_zero_right, Set.preimage_ofPred_eq] using hc.preimage_mem_nhds hb
+  obtain ⟨U, hU, V, hV, hUV⟩ := mem_nhds_prod_iff.mp hprod
+  let p := (topDualPairing ℂ E).toSeminormFamily
+  change U ∈ 𝓝 (0 : WeakBilin (topDualPairing ℂ E)) at hU
+  obtain ⟨⟨s, r⟩, hr, hWU⟩ :=
+    (topDualPairing ℂ E).weakBilin_withSeminorms.hasBasis_zero_ball.mem_iff.mp hU
+  refine ⟨s, fun φ hφ ↦ LinearMap.ext fun ψ ↦ ?_⟩
+  change B φ ψ = 0
+  -- Scale the second variable into the neighborhood. The first can be scaled arbitrarily.
+  have hsmul : Continuous (fun c : ℂ ↦ c • ψ) := continuous_id.smul continuous_const
+  have hscaled : (fun c : ℂ ↦ c • ψ) ⁻¹' V ∈ 𝓝 (0 : ℂ) := by
+    have hV' : V ∈ 𝓝 ((0 : ℂ) • ψ) := by rwa [zero_smul]
+    exact (hsmul.continuousAt (x := 0)).preimage_mem_nhds hV'
+  obtain ⟨ε, hε, hεV⟩ := Metric.mem_nhds_iff.mp hscaled
+  obtain ⟨c, hc, hcε⟩ := NormedField.exists_norm_lt ℂ hε
+  have hcV : c • ψ ∈ V := hεV (mem_ball_zero_iff.mpr hcε)
+  have hzero : B φ (c • ψ) = 0 := by
+    by_contra hn
+    let d : ℂ := (B φ (c • ψ))⁻¹
+    have hdU : d • φ ∈ U := by
+      apply hWU
+      change (d • φ).toStrongDual ∈ (s.sup p).ball 0 r
+      rw [Seminorm.mem_ball_zero]
+      refine Seminorm.finset_sup_apply_lt hr fun x hx ↦ ?_
+      change ‖(d • φ).toStrongDual x‖ < r
+      simpa [hφ x hx] using hr
+    have hnrm : ‖B (d • φ) (c • ψ)‖ < 1 :=
+      hUV (show (d • φ, c • ψ) ∈ U ×ˢ V from ⟨hdU, hcV⟩)
+    rw [show B (d • φ) = d • B φ from map_smul B d φ,
+      LinearMap.smul_apply, smul_eq_mul] at hnrm
+    change ‖(B φ (c • ψ))⁻¹ * B φ (c • ψ)‖ < 1 at hnrm
+    rw [inv_mul_cancel₀ hn, norm_one] at hnrm
+    exact lt_irrefl _ hnrm
+  have hc0 : c ≠ 0 := by intro h; simp [h] at hc
+  exact (mul_eq_zero.mp (by simpa using hzero : c * B φ ψ = 0)).resolve_left hc0
+
+/-- A jointly continuous weak-dual form is represented by a finite sum of pure tensors. -/
+private theorem tensorDualForm_exists
+    (B : WeakDual ℂ E →ₗ[ℂ] WeakDual ℂ F →ₗ[ℂ] ℂ)
+    (hB : Continuous (fun p : WeakDual ℂ E × WeakDual ℂ F ↦ B p.1 p.2)) :
+    ∃ z : E ⊗[ℂ] F, ∀ φ ψ, B φ ψ = tensorDualForm φ ψ z := by
+  classical
+  obtain ⟨s, hs⟩ := tensorDualForm_finite_evaluations B hB
+  let a : WeakDual ℂ E →ₗ[ℂ] (s → ℂ) :=
+    LinearMap.pi fun i : s ↦ (topDualPairing ℂ E).flip (i : E)
+  have ha (φ : WeakDual ℂ E) (i : s) : a φ i = φ i := rfl
+  have hker : a.ker ≤ B.ker := by
+    intro φ hφ
+    exact hs φ (fun x hx ↦ congrFun (LinearMap.mem_ker.mp hφ) ⟨x, hx⟩)
+  obtain ⟨sectionMap, hsection⟩ :=
+    a.rangeRestrict.exists_rightInverse_of_surjective a.range_rangeRestrict
+  let project := a.range.subtype.leftInverse
+  let liftEval := sectionMap.comp project
+  have hlift (φ : WeakDual ℂ E) : a (liftEval (a φ)) = a φ := by
+    have hp := LinearMap.leftInverse_apply_of_inj a.range.ker_subtype (a.rangeRestrict φ)
+    have h := DFunLike.congr_fun hsection (a.rangeRestrict φ)
+    change a.rangeRestrict (sectionMap (a.rangeRestrict φ)) = a.rangeRestrict φ at h
+    change a (sectionMap (project (a φ))) = a φ
+    rw [show project (a φ) = a.rangeRestrict φ from hp]
+    exact congrArg Subtype.val h
+  let b := Pi.basisFun ℂ s
+  let φs (i : s) := liftEval (b i)
+  have hslices (i : s) : Continuous (B (φs i)) :=
+    hB.comp (continuous_const.prodMk continuous_id)
+  choose y hy using fun i : s ↦
+    (topDualPairing ℂ F).dualEmbedding_surjective
+      (⟨B (φs i), hslices i⟩ : StrongDual ℂ (WeakDual ℂ F))
+  have hy' (i : s) (ψ : WeakDual ℂ F) : B (φs i) ψ = ψ (y i) :=
+    (DFunLike.congr_fun (hy i) ψ).symm
+  refine ⟨∑ i : s, (i : E) ⊗ₜ[ℂ] y i, fun φ ψ ↦ ?_⟩
+  have hsum : (∑ i : s, φ i • φs i) = liftEval (a φ) := by
+    have hb := b.sum_repr (a φ)
+    simp only [b, Pi.basisFun_repr, ha] at hb
+    simpa only [map_sum, map_smul, RingHom.id_apply, φs] using congrArg liftEval hb
+  have hφ : B φ = B (liftEval (a φ)) := by
+    apply sub_eq_zero.mp
+    rw [← map_sub]
+    apply hker
+    rw [LinearMap.mem_ker, map_sub, hlift, sub_self]
+  change B φ ψ = tensorDualForm φ.toStrongDual ψ.toStrongDual _
+  rw [hφ, ← hsum, map_sum, map_sum]
+  simp [tensorDualForm_tmul, hy']
+
+/-- Two tensors are equal if they agree on all pairs of continuous functionals. -/
+private theorem tensorDualForm_ext [SeparatingDual ℂ E] [SeparatingDual ℂ F]
+    {z w : E ⊗[ℂ] F} (h : ∀ φ ψ, tensorDualForm φ ψ z = tensorDualForm φ ψ w) : z = w := by
+  classical
+  let b := Module.Free.chooseBasis ℂ F
+  let e := TensorProduct.equivFinsuppOfBasisRight (M := E) b
+  have hcontract (φ : StrongDual ℂ E) :
+      (TensorProduct.lid ℂ F) (TensorProduct.map φ.toLinearMap LinearMap.id z) =
+      (TensorProduct.lid ℂ F) (TensorProduct.map φ.toLinearMap LinearMap.id w) := by
+    let L := (TensorProduct.lid ℂ F).toLinearMap.comp
+      (TensorProduct.map φ.toLinearMap LinearMap.id)
+    change L z = L w
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    intro ψ
+    have hL : ψ.toLinearMap.comp L = tensorDualForm φ ψ := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [L, tensorDualForm_tmul]
+    exact (DFunLike.congr_fun hL z).trans ((h φ ψ).trans (DFunLike.congr_fun hL w).symm)
+  apply e.injective
+  ext i
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+  intro φ
+  let L := (TensorProduct.lid ℂ F).toLinearMap.comp
+    (TensorProduct.map φ.toLinearMap LinearMap.id)
+  let coord : (E ⊗[ℂ] F) →ₗ[ℂ] E := (Finsupp.lapply i).comp e.toLinearMap
+  have hL : φ.toLinearMap.comp coord = (b.coord i).comp L := by
+    apply TensorProduct.ext'
+    intro x y
+    simp [coord, e, L, Module.Basis.coord_apply, mul_comm]
+  exact (DFunLike.congr_fun hL z).trans
+    ((congrArg (b.coord i) (hcontract φ)).trans (DFunLike.congr_fun hL w).symm)
+
 variable [hE : PolynormableSpace ℂ E] [sE : T2Space E]
   [hF : PolynormableSpace ℂ F] [sF : T2Space F]
 
@@ -81,7 +212,27 @@ include hE sE hF sF in
 are exactly the forms represented by a unique algebraic tensor. -/
 theorem tensorDualForm_represents_iff (B : WeakDual ℂ E →ₗ[ℂ] WeakDual ℂ F →ₗ[ℂ] ℂ) :
     Continuous (fun p : WeakDual ℂ E × WeakDual ℂ F ↦ B p.1 p.2) ↔
-      ∃! z : E ⊗[ℂ] F, ∀ φ ψ, B φ ψ = tensorDualForm φ ψ z := by sorry
+      ∃! z : E ⊗[ℂ] F, ∀ φ ψ, B φ ψ = tensorDualForm φ ψ z := by
+  constructor
+  · intro hB
+    let := polynormableSpace_separatingDual ℂ E
+    let := polynormableSpace_separatingDual ℂ F
+    obtain ⟨z, hz⟩ := tensorDualForm_exists B hB
+    exact ⟨z, hz, fun w hw ↦ tensorDualForm_ext fun φ ψ ↦ (hw φ ψ).symm.trans (hz φ ψ)⟩
+  · rintro ⟨z, hz, huniq⟩
+    have heq : (fun p : WeakDual ℂ E × WeakDual ℂ F ↦ B p.1 p.2) =
+        fun p ↦ tensorDualForm p.1.toStrongDual p.2.toStrongDual z :=
+      funext fun p ↦ hz p.1 p.2
+    rw [heq]
+    clear heq hz huniq
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+        simp only [tensorDualForm_tmul]
+        exact ((WeakDual.eval_continuous x).comp continuous_fst).mul
+          ((WeakDual.eval_continuous y).comp continuous_snd)
+    | add z w hz hw =>
+        simp only [map_add]
+        exact hz.add hw
 
 /-- Paper: Remark C.2.3.1, p. 676. If closed bounded sets are compact, the Mackey
 topology on the dual is the topology of precompact convergence. -/
