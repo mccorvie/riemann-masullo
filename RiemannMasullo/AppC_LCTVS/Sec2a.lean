@@ -135,7 +135,7 @@ theorem sDual_finite_eq_weak :
 strong dual topology. -/
 theorem sDual_bounded_eq_strong :
     (inferInstance : TopologicalSpace (SDual E {T | IsVonNBounded ℂ T})) =
-      (inferInstance : TopologicalSpace (StrongDual ℂ E)) := by sorry
+      (inferInstance : TopologicalSpace (StrongDual ℂ E)) := rfl
 
 -- The convex-closure identity recalled on p. 671 is Mathlib's `Convex.toWeakSpace_closure`.
 
