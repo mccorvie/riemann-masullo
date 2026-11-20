@@ -173,7 +173,8 @@ theorem adele_additive_quotient :
 by the map recording both an idele and its inverse as adeles. -/
 theorem ideleTopology_induced :
     IsInducing (fun x : 𝕀[F] ↦ ((x : 𝔸[F]), (↑x⁻¹ : 𝔸[F]))) := by
-  sorry
+  exact (IsInducing.id.prodMap MulOpposite.opHomeomorph.symm.isInducing).comp
+    Units.isInducing_embedProduct
 
 -- Remark A.1.3.2 is historical and gives references for adelization.
 
