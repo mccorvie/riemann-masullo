@@ -87,7 +87,15 @@ def EquivalentCauchyNets (f : J → E) (g : K → E) : Prop :=
 are equivalent exactly when their limits coincide. -/
 theorem equivalentCauchyNets_iff_of_tendsto [T2Space E] {f : J → E} {g : K → E} {x y : E}
     (hf : Tendsto f atTop (𝓝 x)) (hg : Tendsto g atTop (𝓝 y)) :
-    EquivalentCauchyNets f g ↔ x = y := by sorry
+    EquivalentCauchyNets f g ↔ x = y := by
+  rw [EquivalentCauchyNets, ← prod_atTop_atTop_eq]
+  have hsub : Tendsto (fun p : J × K ↦ f p.1 - g p.2) (atTop ×ˢ atTop) (𝓝 (x - y)) :=
+    (hf.comp tendsto_fst).sub (hg.comp tendsto_snd)
+  constructor
+  · rintro ⟨_, _, hzero⟩
+    exact sub_eq_zero.mp (tendsto_nhds_unique hsub hzero)
+  · rintro rfl
+    exact ⟨hf.cauchy_map, hg.cauchy_map, by simpa only [sub_self] using hsub⟩
 
 /-- Paper: Definition C.1.3.1(4), p. 659. For a Hausdorff subset, uniform completeness
 means that every Cauchy net with values in it has a limit in it.
