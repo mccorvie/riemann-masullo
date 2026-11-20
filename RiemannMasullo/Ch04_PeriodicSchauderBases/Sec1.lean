@@ -200,7 +200,8 @@ variable {x : ℕ → E} {f : ℕ → StrongDual ℂ E}
 written as the sum of the coefficient norms times the seminorms of the basis vectors. -/
 theorem tsum_seminorm_coordinates (q : Seminorm ℂ E) (u : E)
     (h : Summable (fun m ↦ q (f m u • x m))) :
-    (∑' m, q (f m u • x m)) = ∑' m, ‖f m u‖ * q (x m) := by sorry
+    (∑' m, q (f m u • x m)) = ∑' m, ‖f m u‖ * q (x m) := by
+  simp only [map_smul_eq_mul]
 
 /-- Paper: Remark 4.1.2.2, p. 159. The coordinate basis of the complex sequence
 space has equicontinuous basic projections and fails equicontinuity for its
