@@ -160,7 +160,8 @@ def IsPrecompactInCompletion {E : Type*} [UniformSpace E] (A : Set E) : Prop :=
 /-- Paper: Definition C.1.4.2, p. 661. Relative compactness of a closed subset of a
 Hausdorff space agrees with compactness. -/
 theorem isRelativelyCompact_iff_of_isClosed {E : Type*} [TopologicalSpace E] [T2Space E]
-    {A : Set E} (hA : IsClosed A) : IsRelativelyCompact A ↔ IsCompact A := by sorry
+    {A : Set E} (hA : IsClosed A) : IsRelativelyCompact A ↔ IsCompact A := by
+  rw [IsRelativelyCompact, hA.closure_eq]
 
 /-- Paper: Remark C.1.4.3, p. 661. Compactness of the closure in the completion is
 equivalent to total boundedness in the original space. -/
