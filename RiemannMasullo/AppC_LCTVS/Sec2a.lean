@@ -127,7 +127,9 @@ abbrev SDual (E : Type*) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
 /-- Paper: Definition C.2.1.4, p. 671. Testing on finite subsets gives the weak dual topology. -/
 theorem sDual_finite_eq_weak :
     (inferInstance : TopologicalSpace (SDual E {T | T.Finite})) =
-      (inferInstance : TopologicalSpace (WeakDual ℂ E)) := by sorry
+      (inferInstance : TopologicalSpace (WeakDual ℂ E)) := by
+  have h := (PointwiseConvergenceCLM.equivWeakDual ℂ E).toHomeomorph.isInducing.eq_induced
+  exact h.trans (@induced_id (WeakDual ℂ E) inferInstance)
 
 /-- Paper: Definition C.2.1.4, p. 671. Testing on all von Neumann bounded sets gives the
 strong dual topology. -/
