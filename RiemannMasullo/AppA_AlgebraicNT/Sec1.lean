@@ -1039,7 +1039,66 @@ theorem integralAdelesOutside_factors :
         (SAdeleRing F S × ((v : {v : Primes(F) // v ∉ S}) → v.val.adicCompletionIntegers F)),
       Continuous e ∧ Continuous e.symm ∧ ∀ a,
         (e a).1 = adeleProjection F S a.val ∧ ∀ v, ((e a).2 v).val = a.val.2 v.val := by
-  sorry
+  classical
+  let Outside := {v : Primes(F) // v ∉ S}
+  let Factors := SAdeleRing F S × ((v : Outside) → v.val.adicCompletionIntegers F)
+  have hmem (a : 𝔸[F]) :
+      a ∈ integralAdelesOutside F S ↔
+        ∀ v : Primes(F), v ∉ S → a.2 v ∈ v.adicCompletionIntegers F := by
+    simp only [integralAdelesOutside, Subring.mem_iInf]
+    rfl
+  let glue (a : Factors) (v : Primes(F)) : v.adicCompletion F :=
+    if hv : v ∈ S then a.1.2 ⟨v, hv⟩ else (a.2 ⟨v, hv⟩).val
+  have hglue (a : Factors) (v : Primes(F)) (hv : v ∉ S) :
+      glue a v ∈ v.adicCompletionIntegers F := by
+    simpa only [glue, dite_eq_right hv] using (a.2 ⟨v, hv⟩).property
+  let joinFinite (a : Factors) : 𝔸ᶠ[𝓞 F, F] :=
+    ⟨glue a, S.eventually_cofinite_notMem.mono (hglue a)⟩
+  let e : integralAdelesOutside F S ≃+* Factors :=
+    { toFun := fun a ↦ (adeleProjection F S a.val, fun v ↦
+        ⟨a.val.2 v.val, (hmem a.val).mp a.property v.val v.property⟩)
+      invFun := fun a ↦ ⟨(a.1.1, joinFinite a), (hmem _).mpr (hglue a)⟩
+      left_inv := by
+        intro a
+        apply Subtype.ext
+        refine Prod.ext rfl ?_
+        apply RestrictedProduct.ext
+        intro v
+        change glue _ v = a.val.2 v
+        by_cases hv : v ∈ S
+        · simp only [glue, dite_eq_left hv]
+          rfl
+        · simp only [glue, dite_eq_right hv]
+      right_inv := by
+        intro a
+        refine Prod.ext (Prod.ext rfl (funext fun v ↦ ?_)) (funext ?_)
+        · change glue a v.val = a.1.2 v
+          simp only [glue, dite_eq_left v.property]
+        · rintro ⟨v, hv⟩
+          apply Subtype.ext
+          change glue a v = (a.2 ⟨v, hv⟩).val
+          simp only [glue, dite_eq_right hv]
+      map_mul' := fun _ _ ↦ rfl
+      map_add' := fun _ _ ↦ rfl }
+  have hEval (v : Primes(F)) :
+      Continuous (fun a : integralAdelesOutside F S ↦ a.val.2 v) :=
+    (RestrictedProduct.continuous_eval v).comp (continuous_snd.comp continuous_subtype_val)
+  refine ⟨e, ?_, ?_, fun _ ↦ ⟨rfl, fun _ ↦ rfl⟩⟩
+  · exact ((continuous_fst.comp continuous_subtype_val).prodMk
+      (continuous_pi fun v : S ↦ hEval v.val)).prodMk
+      (continuous_pi fun v : Outside ↦ (hEval v.val).subtype_mk _)
+  · refine (Continuous.prodMk (continuous_fst.comp continuous_fst)
+      (show Continuous joinFinite from ?_)).subtype_mk _
+    apply continuous_restrictedProduct_of_uniform
+    · intro v
+      change Continuous fun a : Factors ↦ glue a v
+      by_cases hv : v ∈ S
+      · simp only [glue, dite_eq_left hv]
+        exact (continuous_apply (⟨v, hv⟩ : S)).comp (continuous_snd.comp continuous_fst)
+      · simp only [glue, dite_eq_right hv]
+        exact continuous_subtype_val.comp
+          ((continuous_apply (⟨v, hv⟩ : Outside)).comp continuous_snd)
+    · exact S.eventually_cofinite_notMem.mono fun v hv a ↦ hglue a v hv
 
 /-- Paper: Lemma A.1.5.1, p. 543. The diagonal S-integers are closed and discrete with
 compact Hausdorff quotient. Forgetting the outside integral coordinates induces a proper
