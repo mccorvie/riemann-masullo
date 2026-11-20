@@ -41,7 +41,18 @@ def IsBanachNuclear (A : E →L[ℂ] F) : Prop :=
 /-- Paper: §C.3.1, p. 693. A rank-one map has a nuclear series.
 Deviation: This is a check of the series definition in the rank-one case. -/
 theorem isBanachNuclear_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
-    IsBanachNuclear (φ.smulRight y) := by sorry
+    IsBanachNuclear (φ.smulRight y) := by
+  have hne := eventually_ne_atTop (0 : ℕ)
+  refine ⟨fun n ↦ if n = 0 then 1 else 0, fun n ↦ if n = 0 then φ else 0,
+    fun n ↦ if n = 0 then y else 0, ?_, ?_, ?_, ?_⟩
+  · simpa only [apply_ite, norm_one, norm_zero] using (hasSum_ite_eq (0 : ℕ) (1 : ℝ)).summable
+  · exact tendsto_const_nhds.congr' (hne.mono fun _ hn ↦ (ite_eq_right hn).symm)
+  · exact tendsto_const_nhds.congr' (hne.mono fun _ hn ↦ (ite_eq_right hn).symm)
+  · intro x
+    rw [ContinuousLinearMap.smulRight_apply]
+    refine (hasSum_ite_eq (0 : ℕ) (φ x • y)).congr_fun ?_
+    intro n
+    by_cases hn : n = 0 <;> simp [hn]
 
 end BanachOperators
 
