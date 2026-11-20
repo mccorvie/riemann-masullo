@@ -67,4 +67,15 @@ theorem locallyCompactSpace_adicCompletion (v : HeightOneSpectrum R) :
       (Γ₀ := ℤᵐ⁰)).2 ⟨inferInstance, ‹_›, finite_residueField_adicCompletion v⟩
   infer_instance
 
+/-- The integers of an adic completion are compact when the base Dedekind domain has finite
+quotients. -/
+theorem compactSpace_adicCompletionIntegers (v : HeightOneSpectrum R) :
+    CompactSpace (v.adicCompletionIntegers K) := by
+  have : IsClosed (v.adicCompletionIntegers K : Set (v.adicCompletion K)) :=
+    Valued.isClosed_valuationSubring _
+  have hcomplete : CompleteSpace (v.adicCompletionIntegers K) := IsClosed.completeSpace_coe
+  exact Valued.integer.compactSpace_iff_completeSpace_and_isDiscreteValuationRing_and_finite_residueField.mpr
+    ⟨hcomplete, inferInstanceAs (IsDiscreteValuationRing (v.adicCompletionIntegers K)),
+      finite_residueField_adicCompletion v⟩
+
 end RiemannMasullo

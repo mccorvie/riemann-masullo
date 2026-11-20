@@ -6,6 +6,10 @@ public import Mathlib.Geometry.Manifold.LocalDiffeomorph
 public import Mathlib.NumberTheory.NumberField.HeckeLFunction
 public import Mathlib.Topology.Algebra.PontryaginDual
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.Algebra.Group.CompactOpen
+import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Units
+
 /-!
 # Riemann surfaces of continuous quasi-characters
 
@@ -374,11 +378,113 @@ charts on the space of quasi-characters of J_{F,S}. -/
 theorem sIdeleQuotient_hasNormTwistCharts : HasNormTwistCharts (sIdeleQuotientNorm F S) := by
   sorry
 
+local notation "LocalIntegers(" v ")" => HeightOneSpectrum.adicCompletionIntegers F v
+local notation "LocalUnits(" v ")" => (HeightOneSpectrum.adicCompletionIntegers F v)ˣ
+
+open scoped NumberField.AdeleRing in
+/-- Send a family of local integer units to its idele class, with all infinite
+coordinates equal to one. -/
+private def finiteIntegerUnitInsertion : (∀ v : Primes(F), LocalUnits(v)) →ₜ* IdeleClassGroup (𝓞 F) F :=
+  let f : (∀ v : Primes(F), LocalIntegers(v)) →* AdeleRing (𝓞 F) F :=
+    (1 : _ →* InfiniteAdeleRing F).prod
+      { toFun := RestrictedProduct.structureMap (fun v : Primes(F) => v.adicCompletion F)
+          (fun v => (LocalIntegers(v) : Set (v.adicCompletion F))) Filter.cofinite
+        map_one' := rfl
+        map_mul' := fun _ _ => rfl }
+  ⟨(QuotientGroup.mk' _).comp ((Units.map f).comp
+    (ContinuousMulEquiv.piUnits.symm : (∀ v : Primes(F), LocalUnits(v)) ≃ₜ* _).toMonoidHom),
+    QuotientGroup.continuous_mk.comp
+      ((continuous_const.prodMk RestrictedProduct.isEmbedding_structureMap.continuous).units_map f
+        |>.comp (ContinuousMulEquiv.piUnits.symm : (∀ v : Primes(F), LocalUnits(v)) ≃ₜ* _).continuous)⟩
+
+/-- On a family supported at one finite place, the product insertion agrees with
+Mathlib's insertion at that place. -/
+private theorem finiteIntegerUnitInsertion_mulSingle (v : Primes(F)) (u : LocalUnits(v)) :
+    letI := Classical.decEq (Primes(F))
+    finiteIntegerUnitInsertion F (Pi.mulSingle v u) =
+      IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+        (Units.map (LocalIntegers(v)).subtype.toMonoidHom u) := by
+  let _ := Classical.decEq (Primes(F))
+  apply congrArg (QuotientGroup.mk : IdeleGroup (𝓞 F) F → IdeleClassGroup (𝓞 F) F)
+  apply Units.ext
+  refine Prod.ext rfl ?_
+  apply RestrictedProduct.ext
+  intro w
+  change (((Pi.mulSingle v u : ∀ w : Primes(F), LocalUnits(w)) w).val : w.adicCompletion F) =
+    RestrictedProduct.mulSingle (fun w : Primes(F) => LocalIntegers(w)) v
+      (u.val : v.adicCompletion F) w
+  rcases eq_or_ne w v with rfl | hw
+  · rw [Pi.mulSingle_eq_same]
+    exact (RestrictedProduct.mulSingle_eq_same _ _ _).symm
+  · rw [Pi.mulSingle_eq_of_ne hw]
+    exact (RestrictedProduct.mulSingle_eq_of_ne _ _ hw).symm
+
 /-- Paper: Equation (3.1.2.6), p. 121. The global quasi-characters trivial on the
 local integer units at every finite place outside S form an open set. -/
 theorem isOpen_unramifiedOutside :
     IsOpen {c : HeckeCharacter (𝓞 F) F | ∀ v ∉ S, c.IsUnramifiedAt v} := by
-  sorry
+  classical
+  have (v : Primes(F)) : CompactSpace (LocalUnits(v)) := by
+    have := compactSpace_adicCompletionIntegers (K := F) v
+    exact compactSpace_units_of_compactSpace _
+  let cut : (∀ v : Primes(F), LocalUnits(v)) →ₜ* (∀ v : Primes(F), LocalUnits(v)) :=
+    ⟨{ toFun := fun u v => if v ∈ S then 1 else u v
+       map_one' := by
+         funext v
+         simp
+       map_mul' := fun u w => by
+         funext v
+         by_cases hv : v ∈ S <;> simp [hv] },
+      continuous_pi fun v => by
+        by_cases hv : v ∈ S
+        · simpa only [hv, ite_true] using continuous_const
+        · simpa only [hv, ite_false] using continuous_apply v⟩
+  let i := (finiteIntegerUnitInsertion F).comp cut
+  have hl (c : HeckeCharacter (𝓞 F) F) (v : Primes(F)) :
+      c.IsUnramifiedAt v ↔
+        ∀ u : LocalUnits(v), c (finiteIntegerUnitInsertion F (Pi.mulSingle v u)) = 1 := by
+    simp only [HeckeCharacter.isUnramifiedAt_iff, finiteIntegerUnitInsertion_mulSingle]
+    refine forall_congr' fun u => ?_
+    change c.restrict v ↑(Units.map (LocalIntegers(v)).subtype.toMonoidHom u) = 1 ↔ _
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    rfl
+  have hsingle (v : Primes(F)) (u : LocalUnits(v)) :
+      cut (Pi.mulSingle v u) = if v ∈ S then 1 else (Pi.mulSingle v u : ∀ w : Primes(F), LocalUnits(w)) := by
+    funext w
+    change (if w ∈ S then 1 else (Pi.mulSingle v u : ∀ w : Primes(F), LocalUnits(w)) w) = _
+    rcases eq_or_ne w v with rfl | h
+    · by_cases hv : w ∈ S <;> simp [hv]
+    · by_cases hv : v ∈ S <;> simp [hv, Pi.mulSingle_eq_of_ne h]
+  have hset : {c : HeckeCharacter (𝓞 F) F | ∀ v ∉ S, c.IsUnramifiedAt v} =
+      (fun c => c.comp i) ⁻¹' {1} := by
+    ext c
+    change (∀ v ∉ S, c.IsUnramifiedAt v) ↔ c.comp i = 1
+    simp only [hl]
+    constructor
+    · intro hc
+      ext1 u
+      change c (i u) = 1
+      -- Finite products of the single-coordinate families converge to the full family.
+      have hp : HasProd (fun v => Pi.mulSingle v (u v)) u := by
+        refine Pi.hasProd.mpr fun w => ?_
+        convert hasProd_ite_eq w (u w) using 1
+        funext v
+        rcases eq_or_ne v w with rfl | hv
+        · simp
+        · simp [hv]
+      have hmap := hp.map (c.comp i) (c.comp i).continuous
+      refine hmap.unique (hasProd_one.congr_fun fun v => ?_)
+      change c (finiteIntegerUnitInsertion F (cut (Pi.mulSingle v (u v)))) = 1
+      rw [hsingle]
+      by_cases hv : v ∈ S
+      · simp [hv]
+      · simpa [hv] using hc v hv (u v)
+    · intro hc v hv u
+      have h := DFunLike.congr_fun hc (Pi.mulSingle v u)
+      change c (finiteIntegerUnitInsertion F (cut (Pi.mulSingle v u))) = 1 at h
+      simpa [hsingle, hv] using h
+  rw [hset]
+  exact isOpen_singleton_one_complex.preimage i.continuous_comp_left
 
 /-- Paper: Equation (3.1.2.6), p. 121. The open subspace Ω_S(C_F) consists of the
 Hecke characters unramified at every finite place outside S. -/
