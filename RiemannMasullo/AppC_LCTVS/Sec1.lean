@@ -142,7 +142,18 @@ theorem exists_incomplete_quotient :
 fits inside every prescribed zero-neighborhood. -/
 theorem isVonNBounded_iff_rescale {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (B : Set E) :
-    IsVonNBounded ℂ B ↔ ∀ U ∈ 𝓝 (0 : E), ∃ c : ℂ, c ≠ 0 ∧ c • B ⊆ U := by sorry
+    IsVonNBounded ℂ B ↔ ∀ U ∈ 𝓝 (0 : E), ∃ c : ℂ, c ≠ 0 ∧ c • B ⊆ U := by
+  constructor
+  · intro hB U hU
+    obtain ⟨c, hc, hmaps⟩ :=
+      (eventually_mem_nhdsWithin.and (hB hU).eventually_nhdsNE_zero).exists
+    exact ⟨c, hc, hmaps.image_subset⟩
+  · intro hB
+    apply (nhds_basis_balanced ℂ E).isVonNBounded_iff.mpr
+    rintro U ⟨hU, hbal⟩
+    obtain ⟨c, hc, hsub⟩ := hB U hU
+    have hinv : B ⊆ c⁻¹ • U := (smul_set_subset_iff₀ hc).mp hsub
+    exact Absorbs.of_norm ⟨‖c⁻¹‖, fun d hd ↦ hinv.trans (hbal.smul_mono hd)⟩
 
 /-- Paper: Proposition C.1.4.1, p. 661. A subset of a Hausdorff locally convex space is
 bounded exactly when its image under every continuous linear functional is bounded. -/
