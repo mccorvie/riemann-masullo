@@ -79,7 +79,16 @@ variable (hb : ∀ f ∈ L, ∀ T ∈ S, IsVonNBounded ℂ (UniformOnFun.toFun S
 include hne hdir hdense hc hb in
 /-- Paper: Lemma C.2.1.1, p. 670. Uniform convergence on the given sets separates the
 continuous functions in the subspace when the union is dense. -/
-theorem uniformOnFun_submodule_t2 : T2Space L := by sorry
+theorem uniformOnFun_submodule_t2 : T2Space L := by
+  -- Restriction to the dense union is injective on continuous functions.
+  let restrict : L → (⋃₀ S → F) := fun f ↦ (⋃₀ S).domRestrict (UniformOnFun.toFun S f)
+  apply T2Space.of_injective_continuous (f := restrict)
+  · intro f g hfg
+    apply Subtype.ext
+    refine Continuous.ext_on hdense (hc f f.property) (hc g g.property) ?_
+    intro x hx
+    exact congrFun hfg ⟨x, hx⟩
+  · exact UniformOnFun.uniformContinuous_restrict_toFun.continuous.comp continuous_subtype_val
 
 include hne hdir hdense hc hb in
 /-- Paper: Lemma C.2.1.1, p. 670. The induced topology on the subspace is a locally convex
