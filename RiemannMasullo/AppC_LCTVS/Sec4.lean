@@ -68,7 +68,10 @@ variable [IsTopologicalAddGroup F] [ContinuousSMul ℂ F] [PolynormableSpace ℂ
 is continuous between the continuous duals with their weak-star topologies. -/
 theorem continuous_weakDual_precomp (T : E →L[ℂ] F) :
     Continuous (fun φ : WeakDual ℂ F ↦
-      StrongDual.toWeakDual ((WeakDual.toStrongDual φ).comp T)) := by sorry
+      StrongDual.toWeakDual ((WeakDual.toStrongDual φ).comp T)) := by
+  apply WeakDual.continuous_of_continuous_eval
+  intro x
+  exact WeakDual.eval_continuous (T x)
 
 -- TODO(paper-gap): The pointwise topology on the target tests against E₂′.
 
