@@ -197,7 +197,7 @@ theorem IsDPrimeSequence.prod (hU : IsDPrimeSequence μ₁ U) (hV : IsDPrimeSequ
 
 /-- Paper: Lemma A.5.2.5, p. 570. The product of two open members is open. -/
 theorem isOpen_prod_sequence (k : ℕ) (hU : IsOpen (U k)) (hV : IsOpen (V k)) :
-    IsOpen (U k ×ˢ V k) := by sorry
+    IsOpen (U k ×ˢ V k) := hU.prod hV
 
 /-- Paper: Lemma A.5.2.5, p. 570. The product of two symmetric members is symmetric. -/
 theorem inv_eq_prod_sequence (k : ℕ) (hU : (U k)⁻¹ = U k) (hV : (V k)⁻¹ = V k) :
