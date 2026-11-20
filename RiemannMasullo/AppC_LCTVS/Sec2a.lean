@@ -42,7 +42,14 @@ include hne hdir in
 uniform convergence unchanged. -/
 theorem uniformOnFun_topology_eq_of_cofinal (S' : Set (Set X)) (hsub : S' ⊆ S)
     (hcof : ∀ T ∈ S, ∃ T' ∈ S', T ⊆ T') :
-    UniformOnFun.topologicalSpace X F S' = UniformOnFun.topologicalSpace X F S := by sorry
+    UniformOnFun.topologicalSpace X F S' = UniformOnFun.topologicalSpace X F S := by
+  apply le_antisymm
+  · apply continuous_id_iff_le.mp
+    exact (UniformOnFun.uniformContinuous_ofFun_toFun F S S' fun T hT ↦ by
+      obtain ⟨T', hT', hTT'⟩ := hcof T hT
+      exact ⟨{T'}, singleton_subset_iff.mpr hT', finite_singleton T', by simpa using hTT'⟩).continuous
+  · exact continuous_id_iff_le.mp
+      (UniformOnFun.uniformContinuous_ofFun_toFun_of_subset F S' S hsub).continuous
 
 include hne hdir in
 /-- Paper: §C.2.1, p. 670. The induced topology makes a subspace a topological vector
