@@ -90,10 +90,32 @@ theorem uniformOnFun_submodule_t2 : T2Space L := by
     exact congrFun hfg ⟨x, hx⟩
   · exact UniformOnFun.uniformContinuous_restrict_toFun.continuous.comp continuous_subtype_val
 
+open scoped ComplexOrder in
 include hne hdir hdense hc hb in
 /-- Paper: Lemma C.2.1.1, p. 670. The induced topology on the subspace is a locally convex
 vector topology when each of its functions has bounded image on each test set. -/
-theorem uniformOnFun_submodule_polynormable : PolynormableSpace ℂ L := by sorry
+theorem uniformOnFun_submodule_polynormable : PolynormableSpace ℂ L := by
+  let : Module ℝ F := Module.restrictScalars ℝ ℂ F
+  let : IsScalarTower ℝ ℂ F := IsScalarTower.restrictScalars ℝ ℂ F
+  let : Module ℝ L := Module.restrictScalars ℝ ℂ L
+  let : IsScalarTower ℝ ℂ L := IsScalarTower.restrictScalars ℝ ℂ L
+  have : ContinuousSMul ℂ L := UniformOnFun.continuousSMul_submodule_of_image_bounded ℂ X F L hb
+  have hRealSMul : ContinuousSMul ℝ L := IsScalarTower.continuousSMul ℂ
+  have : LocallyConvexSpace ℝ F := (PolynormableSpace.withSeminorms ℂ F).toLocallyConvexSpace
+  have : LocallyConvexSpace ℂ L := by
+    have hBasis := (uniformOnFun_zero_basis S hne hdir
+      (LocallyConvexSpace.convex_basis_zero ℝ F)).comap (Subtype.val : L → X →ᵤ[S] F)
+    have hZero : 𝓝 (0 : L) = comap (Subtype.val : L → X →ᵤ[S] F) (𝓝 0) := by
+      rw [nhds_subtype]
+      rfl
+    rw [← hZero] at hBasis
+    refine LocallyConvexSpace.ofBasisZero ℂ L _ _ hBasis ?_
+    rintro ⟨T, V⟩ ⟨_, _, hV⟩
+    apply convex_of_nonneg_surjective_algebraMap ℂ
+      (fun z hz ↦ RCLike.nonneg_iff_exists_ofReal.mp (show 0 ≤ z from hz))
+    intro f hf g hg a b ha hb' hab x hx
+    exact hV (hf hx) (hg hx) ha hb' hab
+  exact @LocallyConvexSpace.toPolynormableSpace ℂ L _ _ _ _ ‹Module ℝ L› _ hRealSMul _ _ _
 
 end Functions
 
