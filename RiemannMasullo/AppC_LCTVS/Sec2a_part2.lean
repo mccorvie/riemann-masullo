@@ -6,7 +6,9 @@ public import Mathlib.LinearAlgebra.DirectSum.TensorProduct
 public import Mathlib.LinearAlgebra.TensorProduct.DirectLimit
 public import Mathlib.Topology.Algebra.LinearMapCompletion
 import Mathlib.Analysis.LocallyConvex.WeakDual
+import Mathlib.Analysis.RCLike.Lemmas
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 
 /-!
 # Topological tensor products
@@ -234,13 +236,60 @@ theorem tensorDualForm_represents_iff (B : WeakDual ℂ E →ₗ[ℂ] WeakDual �
         simp only [map_add]
         exact hz.add hw
 
+/-- A family that contains a superset of each test set induces a finer polar topology. -/
+private theorem polarTopology_le_of_cofinal {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] {S T : Set (Set X)}
+    (h : ∀ A ∈ T, ∃ D ∈ S, A ⊆ D) :
+    polarTopology (topDualPairing ℂ X) S ≤ polarTopology (topDualPairing ℂ X) T := by
+  have hc := (UniformOnFun.uniformContinuous_ofFun_toFun (β := ℂ) T S fun A hA ↦ by
+    obtain ⟨D, hD, hAD⟩ := h A hA
+    exact ⟨{D}, singleton_subset_iff.mpr hD, finite_singleton D, by simpa using hAD⟩).continuous
+  let : TopologicalSpace (StrongDual ℂ X) := polarTopology (topDualPairing ℂ X) S
+  have hi : Continuous (fun f : StrongDual ℂ X ↦ UniformOnFun.ofFun S (fun x ↦ f x)) :=
+    continuous_induced_dom
+  exact (hc.comp hi).le_induced
+
 /-- Paper: Remark C.2.3.1, p. 676. If closed bounded sets are compact, the Mackey
 topology on the dual is the topology of precompact convergence. -/
 theorem mackeyDual_eq_precompact {X : Type*} [AddCommGroup X] [Module ℂ X]
     [UniformSpace X] [IsUniformAddGroup X] [PolynormableSpace ℂ X] [T2Space X]
     (h : ∀ A : Set X, IsClosed A → IsVonNBounded ℂ A → IsCompact A) :
     mackeyTopology (topDualPairing ℂ X) =
-      polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by sorry
+      polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by
+  let : SeparatingDual ℂ X := polynormableSpace_separatingDual ℂ X
+  let : Module ℝ X := Module.restrictScalars ℝ ℂ X
+  let : IsScalarTower ℝ ℂ X := IsScalarTower.restrictScalars ℝ ℂ X
+  refine le_antisymm (polarTopology_le_of_cofinal ?_) (polarTopology_le_of_cofinal ?_)
+  · intro A hA
+    change TotallyBounded A at hA
+    let D := closedAbsConvexHull ℂ A
+    have hD : AbsConvex ℂ D := absConvex_convexClosedHull
+    have hb : IsVonNBounded ℂ D := by
+      let hp := PolynormableSpace.withSeminorms ℂ X
+      refine hp.isVonNBounded_iff_seminorm_bddAbove.mpr fun p ↦ ?_
+      obtain ⟨r, hr⟩ := hp.isVonNBounded_iff_seminorm_bddAbove.mp (hA.isVonNBounded ℂ) p
+      have hsub : D ⊆ p.val.closedBall 0 r := by
+        refine closedAbsConvexHull_min (fun x hx ↦ p.val.mem_closedBall_zero.mpr ?_)
+          ⟨p.val.balanced_closedBall_zero r, convex_RCLike_iff_convex_real.mpr
+            (p.val.convex_closedBall 0 r)⟩ ?_
+        · exact hr (mem_image_of_mem _ hx)
+        · rw [Seminorm.closedBall_zero_eq]
+          exact isClosed_le p.property continuous_const
+      refine ⟨r, ?_⟩
+      rintro _ ⟨x, hx, rfl⟩
+      exact p.val.mem_closedBall_zero.mp (hsub hx)
+    have hcompact := (h D isClosed_closedAbsConvexHull hb).image (toWeakSpaceCLM ℂ X).continuous
+    exact ⟨D, ⟨hD, image_id D ▸ hcompact⟩, subset_closedAbsConvexHull⟩
+  · intro A hA
+    obtain ⟨_, hcompact⟩ := hA
+    change IsCompact (X := WeakSpace ℂ X) A at hcompact
+    have hclosed : IsClosed A := hcompact.isClosed.preimage (toWeakSpaceCLM ℂ X).continuous
+    have hbounded : IsVonNBounded ℂ A := by
+      apply isVonNBounded_of_dual_bounded
+      intro f
+      exact (NormedSpace.image_isVonNBounded_iff ℂ).mp
+        ((hcompact.isVonNBounded ℂ).image (WeakBilin.eval (topDualPairing ℂ X).flip f))
+    exact ⟨A, (h A hclosed hbounded).totallyBounded, Subset.rfl⟩
 
 -- TODO(later): needs §C.2.4 for the nuclear Montel assertion of Remark C.2.3.1.
 -- TODO(later): needs §D.1 for its adelic Schwartz–Bruhat space examples.
