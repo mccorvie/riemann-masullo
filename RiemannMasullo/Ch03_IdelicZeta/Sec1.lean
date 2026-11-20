@@ -11,6 +11,7 @@ import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.CompactOpen
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Units
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 
 /-!
 # Riemann surfaces of continuous quasi-characters
@@ -47,20 +48,28 @@ def normOneRestriction : C(QuasiCharacter G, QuasiCharacter m.ker) :=
   let i : m.ker →ₜ* G := ⟨m.ker.subtype, continuous_subtype_val⟩
   ⟨fun c => c.comp i, i.continuous_comp_left⟩
 
+/-- The positive real units have the order topology and compact closed intervals. -/
+private theorem nonnegRealUnits_orderTopology_and_compactIccSpace :
+    OrderTopology ℝ≥0ˣ ∧ CompactIccSpace ℝ≥0ˣ := by
+  let e := Nonneg.unitsHomeomorphPos ℝ
+  let f : ℝ≥0ˣ ↪o ℝ := OrderEmbedding.ofStrictMono (Subtype.val ∘ e) (fun _ _ h => h)
+  have hi : IsInducing f := (IsInducing.subtypeVal (t := Set.Ioi (0 : ℝ))).comp e.isInducing
+  have hr : Set.range f = Set.Ioi 0 := by
+    change Set.range ((Subtype.val : Set.Ioi (0 : ℝ) → ℝ) ∘ e) = _
+    rw [Set.range_comp, e.surjective.range_eq, Set.image_univ, Subtype.range_coe]
+  have ho : Set.OrdConnected (Set.range f) := hr.symm ▸ Set.ordConnected_Ioi
+  refine ⟨⟨hi.eq_induced.trans (f.strictMono.induced_topology_eq_preorder ho)⟩, ⟨?_⟩⟩
+  intro a b
+  apply hi.isCompact_iff.mpr
+  rw [f.image_Icc ho]
+  exact isCompact_Icc
+
 /-- Paper: Equation (3.1.1.1), p. 119. Every quasi-character of a closed nontrivial subgroup
 of the positive reals can be joined to the trivial character by a continuous family. -/
 private theorem exists_quasiCharacter_deformation (H : Subgroup ℝ≥0ˣ)
     (hH : IsClosed (H : Set ℝ≥0ˣ)) [Nontrivial H] (χ : QuasiCharacter H) :
     ∃ f : ℝ → QuasiCharacter H, Continuous f ∧ f 0 = 1 ∧ f 1 = χ := by
-  have : OrderTopology ℝ≥0ˣ := by
-    let e := Nonneg.unitsHomeomorphPos ℝ
-    let f : ℝ≥0ˣ → ℝ := Subtype.val ∘ e
-    have hf : StrictMono f := fun _ _ h => h
-    have hi : IsInducing f := (IsInducing.subtypeVal (t := Set.Ioi (0 : ℝ))).comp e.isInducing
-    have hr : Set.range f = Set.Ioi 0 := by
-      change Set.range ((Subtype.val : Set.Ioi (0 : ℝ) → ℝ) ∘ e) = _
-      rw [Set.range_comp, e.surjective.range_eq, Set.image_univ, Subtype.range_coe]
-    exact ⟨hi.eq_induced.trans (hf.induced_topology_eq_preorder (hr.symm ▸ Set.ordConnected_Ioi))⟩
+  have := nonnegRealUnits_orderTopology_and_compactIccSpace.1
   rcases H.dense_or_isCyclic with hd | hc
   · have htop : H = ⊤ :=
       Subgroup.coe_eq_univ.mp (hH.closure_eq ▸ hd.closure_eq)
@@ -214,7 +223,79 @@ theorem range_normOneRestriction [IsTopologicalGroup G] [T2Space G] [LocallyComp
     (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) :
     Set.range (normOneRestriction m) = Set.range (fun χ : PontryaginDual m.ker =>
       (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) := by
-  sorry
+  let : CompactSpace m.ker :=
+    isCompact_iff_compactSpace.mp (hm.isCompact_preimage (isCompact_singleton (x := 1)))
+  apply Set.Subset.antisymm
+  · rintro _ ⟨c, rfl⟩
+    let q := normOneRestriction m c
+    obtain ⟨x, -, hx⟩ := isCompact_univ.exists_isMaxOn (Set.univ_nonempty (α := m.ker))
+      q.continuous.norm.continuousOn
+    have hmax (y : m.ker) : ‖q y‖ ≤ ‖q x‖ := isMaxOn_univ_iff.mp hx y
+    have hpos : 0 < ‖q x‖ := zero_lt_one.trans_le (by simpa using hmax 1)
+    have hsq := hmax (x * x)
+    rw [map_mul, norm_mul] at hsq
+    have hle (y : m.ker) : ‖q y‖ ≤ 1 :=
+      (hmax y).trans ((mul_le_iff_le_one_right hpos).mp hsq)
+    have hnorm (y : m.ker) : ‖q y‖ = 1 := by
+      have h := hle y⁻¹
+      rw [map_inv, norm_inv] at h
+      exact (hle y).antisymm ((inv_le_one₀ (norm_pos_iff.mpr
+        ((Group.isUnit y).map q).ne_zero)).mp h)
+    let χ : PontryaginDual m.ker :=
+      { toFun := fun y => ⟨q y, mem_sphere_zero_iff_norm.mpr (hnorm y)⟩
+        map_one' := Circle.ext (map_one q)
+        map_mul' := fun y z => Circle.ext (map_mul q y z)
+        continuous_toFun := q.continuous.subtype_mk _ }
+    exact ⟨χ, ContinuousMonoidHom.ext fun _ => rfl⟩
+  · rintro _ ⟨χ, rfl⟩
+    obtain ⟨g, hg⟩ : ∃ g, 1 < m g := by
+      obtain ⟨g, hg⟩ := hne
+      rcases lt_or_gt_of_ne hg with h | h
+      · exact ⟨g⁻¹, by simpa only [map_inv, one_lt_inv'] using h⟩
+      · exact ⟨g, h⟩
+    have := nonnegRealUnits_orderTopology_and_compactIccSpace.1
+    have := nonnegRealUnits_orderTopology_and_compactIccSpace.2
+    let Z := Subgroup.zpowers g
+    -- The module embeds this cyclic subgroup into a discrete subgroup of the positive reals.
+    have hmZ : Set.InjOn m (Z : Set G) := by
+      intro x hx y hy h
+      obtain ⟨j, rfl⟩ := Subgroup.mem_zpowers_iff.mp hx
+      obtain ⟨k, rfl⟩ := Subgroup.mem_zpowers_iff.mp hy
+      exact congrArg (g ^ ·) ((zpow_right_strictMono hg).injective (by simpa only [map_zpow] using h))
+    let : DiscreteTopology (Z.map m) := by
+      change DiscreteTopology ((Subgroup.zpowers g).map m)
+      rw [MonoidHom.map_zpowers]
+      exact Subgroup.isCyclic_iff_discreteTopology.mp inferInstance
+    let : DiscreteTopology Z := .of_continuous_injective
+      (f := m.subgroupMap Z) ((hm.continuous.comp continuous_subtype_val).subtype_mk _)
+      (fun x y h => Subtype.ext (hmZ x.property y.property (congrArg Subtype.val h)))
+    let : IsClosed (Z : Set G) := Subgroup.isClosed_of_discreteTopology
+    let p : G →ₜ* G ⧸ Z := ⟨QuotientGroup.mk' Z, QuotientGroup.continuous_mk⟩
+    -- Each quotient class has a representative with module between one and `m g`.
+    have huniv : p '' (m ⁻¹' Set.Icc 1 (m g)) = Set.univ := by
+      refine Set.eq_univ_of_forall fun x => ?_
+      obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective x
+      obtain ⟨n, hn, -⟩ := existsUnique_zpow_near_of_one_lt' hg (m y)
+      refine ⟨y / g ^ n, ?_, ?_⟩
+      · change m (y / g ^ n) ∈ Set.Icc 1 (m g)
+        simpa only [map_div, map_zpow, Set.mem_Icc] using ⟨hn.1, hn.2.le⟩
+      · have hpow : p (g ^ n) = 1 :=
+          (QuotientGroup.eq_one_iff _).mpr (Subgroup.zpow_mem_zpowers g n)
+        rw [map_div, hpow, div_one]
+        rfl
+    let : CompactSpace (G ⧸ Z) := isCompact_univ_iff.mp
+      (huniv ▸ (hm.isCompact_preimage isCompact_Icc).image p.continuous)
+    let i : m.ker →ₜ* G := ⟨m.ker.subtype, continuous_subtype_val⟩
+    have hi : Injective (p.comp i) := by
+      apply (MonoidHom.ker_eq_bot_iff (p.comp i).toMonoidHom).mp
+      apply le_antisymm ?_ bot_le
+      intro x hx
+      have hxZ : (x : G) ∈ Z := (QuotientGroup.eq_one_iff _).mp hx
+      exact Subgroup.mem_bot.mpr (Subtype.ext (hmZ hxZ Z.one_mem (x.property.trans (map_one m).symm)))
+    obtain ⟨ψ, hψ⟩ := exists_pontryaginDual_extension_of_compact (p.comp i) hi χ
+    let coeCircle : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    exact ⟨(coeCircle.comp ψ).comp p,
+      ContinuousMonoidHom.ext fun x => congrArg (fun z : Circle => (z : ℂ)) (hψ x)⟩
 
 /-- Paper: §3.1.1, p. 119. Near each quasi-character the complex exponent is a coordinate
 centered at zero. Its inverse sends z to the character twisted by the z-th power of the module. -/
