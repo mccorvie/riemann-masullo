@@ -333,7 +333,18 @@ def polarSeminorm (A : {A : Set F // IsVonNBounded (E := WeakBilin B.flip) ℂ A
 is exactly its absolute polar. -/
 theorem polarSeminorm_closedUnitBall
     (A : {A : Set F // IsVonNBounded (E := WeakBilin B.flip) ℂ A}) :
-    (polarSeminorm B A).closedBall 0 1 = B.flip.polar A.val := by sorry
+    (polarSeminorm B A).closedBall 0 1 = B.flip.polar A.val := by
+  have hbounded : BddAbove (range fun y : A.val ↦ (normSeminorm ℂ ℂ).comp (B.flip (y : F))) := by
+    apply Seminorm.bddAbove_range_iff.mpr
+    intro x
+    obtain ⟨r, hr⟩ := (NormedSpace.image_isVonNBounded_iff ℂ).mp
+      (A.property.image (WeakBilin.eval B.flip x))
+    exact ⟨r, forall_mem_range.mpr fun y ↦ hr (y : F) y.property⟩
+  rw [polarSeminorm, Seminorm.closedBall_iSup hbounded 0 one_pos]
+  ext x
+  simp only [mem_iInter, Seminorm.mem_closedBall_zero, LinearMap.polar_mem_iff,
+    Seminorm.comp_apply, coe_normSeminorm]
+  exact ⟨fun h y hy ↦ h ⟨y, hy⟩, fun h y ↦ h y y.property⟩
 
 /-- Paper: §C.2.2.1, p. 674. The polar topology on E tests the functions
 y ↦ B(x,y) for uniform convergence on the chosen subsets of F. -/
