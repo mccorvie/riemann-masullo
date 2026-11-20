@@ -177,7 +177,24 @@ theorem ideleTopology_induced :
 multiplicative on units, so it defines a homomorphism to the positive reals. -/
 theorem adeleNorm_unit_laws :
     (∀ g : 𝕀[F], 0 < ‖g.val‖) ∧ ∀ g h : 𝕀[F], ‖(g * h).val‖ = ‖g.val‖ * ‖h.val‖ := by
-  sorry
+  constructor
+  · intro g
+    obtain ⟨hinf, hfin, _⟩ := AdeleRing.isUnit_iff.mp g.isUnit
+    rw [AdeleRing.norm_apply_of_isUnit g.isUnit]
+    apply mul_pos
+    · exact Finset.prod_pos fun w _ ↦ pow_pos (norm_pos_iff.mpr (hinf w)) _
+    · exact finprod_induction (0 < ·) zero_lt_one (fun _ _ ↦ mul_pos)
+        fun v ↦ norm_pos_iff.mpr (hfin v)
+  · intro g h
+    have hs (u : 𝕀[F]) : (fun v : Primes(F) ↦ ‖u.val.2 v‖).HasFiniteMulSupport :=
+      FiniteAdeleRing.hasFiniteMulSupport_norm (MulEquiv.prodUnits u).2
+    rw [AdeleRing.norm_apply_of_isUnit (g * h).isUnit, AdeleRing.norm_apply_of_isUnit g.isUnit,
+      AdeleRing.norm_apply_of_isUnit h.isUnit]
+    change (∏ w : InfinitePlace F, ‖g.val.1 w * h.val.1 w‖ ^ w.mult) *
+      (∏ᶠ v : Primes(F), ‖g.val.2 v * h.val.2 v‖) = _
+    simp only [norm_mul, mul_pow, Finset.prod_mul_distrib]
+    rw [finprod_mul_distrib (hs g) (hs h)]
+    ac_rfl
 
 /-- Paper: Equation (A.1.3.3), p. 541. The idelic norm is the adelic norm restricted
 to units, with values in the multiplicative group of positive real numbers. -/
