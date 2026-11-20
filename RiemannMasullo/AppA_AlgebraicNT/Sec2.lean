@@ -250,7 +250,20 @@ theorem canonicalIdeleNormSection_infinite (t : ℝ≥0ˣ) (v : InfinitePlace F)
 /-- Paper: Lemma A.2.2.4, p. 547. The finite part of the canonical section is one. -/
 theorem canonicalIdeleNormSection_finite (t : ℝ≥0ˣ) :
     (canonicalIdeleNormSection F t).val.2 = 1 := by
-  sorry
+  apply FiniteAdeleRing.ext
+  intro w
+  let v := w.under (𝓞 ℚ)
+  let a : 𝔸[ℚ] := (ratIdeleNormSection
+    (Units.map (NNReal.rpowMonoidHom (Module.finrank ℚ F : ℝ)⁻¹) t)).val
+  let f := (RestrictedProduct.evalRingHom (fun u : HeightOneSpectrum (𝓞 F) ↦
+    u.adicCompletion F) w).comp ((RingHom.snd _ _).comp (rationalAdeleEmbedding F))
+  have ha : (a - 1).2 v = 0 := by
+    change (1 : v.adicCompletion ℚ) - 1 = 0
+    exact sub_self 1
+  have h := (rationalAdeleEmbedding_spec F).2.2.2 v w rfl (a - 1) ha
+  change f (a - 1) = 0 at h
+  change f a = 1
+  simpa only [map_sub, map_one, sub_eq_zero] using h
 
 /-- Paper: Definition A.2.2.5, p. 547. This local homomorphism sends a positive real
 to its specified real power inside the completion at an infinite place. -/
