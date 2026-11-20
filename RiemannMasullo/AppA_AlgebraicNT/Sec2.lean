@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.Topology.Algebra.Group.Units
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Orbital structures on adeles and ideles
@@ -109,7 +110,35 @@ theorem diagonal_mem_adeleFundamentalDomain (x : F) :
 
 /-- Paper: §A.2.1, p. 545. The adelic fundamental domain has compact closure. -/
 theorem adeleFundamentalDomain_precompact : IsCompact (closure (adeleFundamentalDomain F b)) := by
-  sorry
+  classical
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let e := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map e).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  let : Fintype ι := FiniteDimensional.fintypeBasisIndex B
+  let h : InfiniteAdeleRing F ≃ₜ mixedEmbedding.mixedSpace F :=
+    (Homeomorph.piEquivPiSubtypeProd InfinitePlace.IsReal
+      (fun w : InfinitePlace F ↦ w.Completion)).trans
+      ((Homeomorph.piCongrRight fun w ↦ (isometryEquivRealOfIsReal w.2).toHomeomorph).prodCongr
+        ((Homeomorph.piCongrRight fun w ↦
+          (isometryEquivComplexOfIsComplex
+            (InfinitePlace.not_isReal_iff_isComplex.mp w.2)).toHomeomorph).trans
+          (Homeomorph.piCongrLeft (Y := fun _ ↦ ℂ)
+            (Equiv.subtypeEquivRight fun _ ↦ InfinitePlace.not_isReal_iff_isComplex))))
+  have (v : HeightOneSpectrum (𝓞 F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  let integral (x : ∀ v : HeightOneSpectrum (𝓞 F), v.adicCompletionIntegers F) : 𝔸ᶠ[F] :=
+    ⟨fun v ↦ x v, Filter.Eventually.of_forall fun v ↦ (x v).property⟩
+  have hIntegral : Continuous integral :=
+    continuous_restrictedProduct_of_uniform
+      (fun v ↦ continuous_subtype_val.comp (continuous_apply v))
+      (Filter.Eventually.of_forall fun v x ↦ (x v).property)
+  apply ((B.parallelepiped.isCompact.image h.symm.continuous).prod
+    (isCompact_range hIntegral)).closure_of_subset
+  rintro a ⟨haInf, haf⟩
+  refine ⟨⟨h a.1, ZSpan.fundamentalDomain_subset_parallelepiped B haInf, h.symm_apply_apply _⟩, ?_⟩
+  simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+    true_implies] at haf
+  exact ⟨fun v ↦ ⟨a.2 v, haf v⟩, rfl⟩
 
 /-- Paper: §A.2.1, p. 545. The adelic fundamental domain has nonempty interior. -/
 theorem adeleFundamentalDomain_interior : (interior (adeleFundamentalDomain F b)).Nonempty := by
