@@ -117,7 +117,10 @@ def integralAdelesOutside (S : Finset (Primes(F))) : Subring 𝔸[F] :=
 set precisely when it is an S-integer. -/
 theorem diagonal_mem_integralAdelesOutside (S : Finset (Primes(F))) (x : F) :
     algebraMap F 𝔸[F] x ∈ integralAdelesOutside F S ↔ x ∈ (S : Set (Primes(F))).integer F := by
-  sorry
+  simp only [integralAdelesOutside, Subring.mem_iInf]
+  change (∀ v : Primes(F), v ∉ S → Valued.v (x : v.adicCompletion F) ≤ 1) ↔
+    ∀ v : Primes(F), v ∉ S → v.valuation F x ≤ 1
+  simp only [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
 
 /-- Paper: Lemma A.1.2.1, p. 541. The diagonal map on S-integers takes values in the
 adeles integral outside S. For empty finite part its domain identifies with the integers. -/
