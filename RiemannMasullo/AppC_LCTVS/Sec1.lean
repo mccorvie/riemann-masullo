@@ -430,7 +430,9 @@ theorem hasBoundedLift_iff_image (f : E →L[ℂ] F) (B : Set F) :
     HasBoundedLift f B ↔ ∃ A : Set E, IsVonNBounded ℂ A ∧ f '' A = B := by sorry
 
 /-- Paper: Definition C.1.5.9, p. 667. The identity map lifts bounded subsets. -/
-theorem liftsBoundedSets_id : LiftsBoundedSets (ContinuousLinearMap.id ℂ E) := by sorry
+theorem liftsBoundedSets_id : LiftsBoundedSets (ContinuousLinearMap.id ℂ E) := by
+  intro B hB
+  exact ⟨B, hB, fun x hx ↦ ⟨x, hx, rfl⟩⟩
 
 end Lifting
 
