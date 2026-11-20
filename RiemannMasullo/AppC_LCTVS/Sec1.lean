@@ -204,11 +204,38 @@ theorem exists_equivalentCauchyNets_powerset {E J : Type*} [AddCommGroup E] [Uni
 
 -- TODO(paper-gap): The arithmetic Schwartz–Bruhat spaces of Remark C.1.3.3 require Appendix D.
 
+open scoped ComplexOrder in
 /-- Paper: Remark C.1.3.4, p. 660. The quotient of a Fréchet space by a closed linear
 subspace is Fréchet in the quotient topology. -/
 theorem isFrechetTVS_quotient {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     (hE : IsFrechetTVS E) (M : Submodule ℂ E) (hM : IsClosed (M : Set E)) :
-    IsFrechetTVS (E ⧸ M) := by sorry
+    IsFrechetTVS (E ⧸ M) := by
+  obtain ⟨hadd, hpoly, hmetr, hcomplete⟩ := hE
+  have hzero : map M.mkQ (𝓝 (0 : E)) = 𝓝 0 := by
+    simpa only [map_zero] using M.isOpenQuotientMap_mkQ.map_nhds_eq 0
+  refine ⟨inferInstance, ?_, ?_, QuotientAddGroup.completeSpace_right' E M.toAddSubgroup⟩
+  · let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+    let : Module ℝ (E ⧸ M) := Module.restrictScalars ℝ ℂ (E ⧸ M)
+    let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+    let : IsScalarTower ℝ ℂ (E ⧸ M) := IsScalarTower.restrictScalars ℝ ℂ (E ⧸ M)
+    have : LocallyConvexSpace ℝ E :=
+      (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+    have : LocallyConvexSpace ℂ (E ⧸ M) := by
+      apply LocallyConvexSpace.ofBasisZero ℂ (E ⧸ M)
+        (fun s : Set E ↦ M.mkQ '' s) (fun s ↦ s ∈ 𝓝 0 ∧ Convex ℝ s)
+      · rw [← hzero]
+        exact (LocallyConvexSpace.convex_basis_zero ℝ E).map M.mkQ
+      · intro s hs
+        exact convex_of_nonneg_surjective_algebraMap ℂ
+          (fun z hz ↦ RCLike.nonneg_iff_exists_ofReal.mp (show 0 ≤ z from hz))
+          (hs.2.linear_image (M.mkQ.restrictScalars ℝ))
+    have : ContinuousSMul ℝ (E ⧸ M) := IsScalarTower.continuousSMul ℂ
+    infer_instance
+  · let : UniformSpace (E ⧸ M) := IsTopologicalAddGroup.rightUniformSpace (E ⧸ M)
+    have : (𝓝 (0 : E ⧸ M)).IsCountablyGenerated :=
+      hzero ▸ Filter.map.isCountablyGenerated (𝓝 (0 : E)) M.mkQ
+    have : (uniformity (E ⧸ M)).IsCountablyGenerated := Filter.comap.isCountablyGenerated _ _
+    exact UniformSpace.metrizableSpace
 
 /-- Paper: Remark C.1.3.4, p. 660. A complete Hausdorff locally convex space can have
 an incomplete quotient by a closed subspace. Both completeness predicates use the
