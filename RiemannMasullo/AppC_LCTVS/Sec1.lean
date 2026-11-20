@@ -434,7 +434,28 @@ def directSumDifference (j : ∀ k, X k →L[ℂ] X (k+1)) : (⨁ k, X k) →ₗ
 coordinate k+1 subtracts the image of coordinate k under the kth transition map. -/
 theorem directSumDifference_apply (j : ∀ k, X k →L[ℂ] X (k+1)) (x : ⨁ k, X k) :
     directSumDifference j x 0 = x 0 ∧
-      ∀ k, directSumDifference j x (k+1) = x (k+1) - j k (x k) := by sorry
+      ∀ k, directSumDifference j x (k+1) = x (k+1) - j k (x k) := by
+  let shift := DirectSum.toModule ℂ ℕ (⨁ k, X k) (fun k ↦
+    (DirectSum.lof ℂ ℕ X (k+1)).comp (j k).toLinearMap)
+  have hzero : shift x 0 = 0 := by
+    suffices (DirectSum.component ℂ ℕ X 0).comp shift = 0 from LinearMap.congr_fun this x
+    apply DirectSum.linearMap_ext
+    intro i
+    ext y : 1
+    simp [shift, DirectSum.component.of]
+  have hsucc (k : ℕ) : shift x (k+1) = j k (x k) := by
+    suffices (DirectSum.component ℂ ℕ X (k+1)).comp shift =
+        (j k).toLinearMap.comp (DirectSum.component ℂ ℕ X k) from LinearMap.congr_fun this x
+    apply DirectSum.linearMap_ext
+    intro i
+    ext y : 1
+    by_cases h : i = k
+    · subst i
+      simp [shift]
+    · simp [shift, DirectSum.component.of, h]
+  change (x - shift x) 0 = x 0 ∧
+    ∀ k, (x - shift x) (k+1) = x (k+1) - j k (x k)
+  simp [DirectSum.sub_apply, hzero, hsucc]
 
 /-- Paper: Definition C.1.5.8, p. 667. A countable system of Hausdorff locally convex
 spaces is acyclic when σ is a closed topological embedding of its locally convex direct sum. -/
