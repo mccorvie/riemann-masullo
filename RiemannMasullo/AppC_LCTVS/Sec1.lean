@@ -42,7 +42,75 @@ theorem balancedHull_hyperbola :
     let A : Set (ℝ × ℝ) := {p | p.1 * p.2 = 1}
     balancedHull ℝ (closure A) = balancedHull ℝ A ∧
       balancedHull ℝ A = {p | 0 < p.1 * p.2 ∧ p.1 * p.2 ≤ 1} ∪ {0} ∧
-      closure (balancedHull ℝ A) = {p | 0 ≤ p.1 * p.2 ∧ p.1 * p.2 ≤ 1} := by sorry
+      closure (balancedHull ℝ A) = {p | 0 ≤ p.1 * p.2 ∧ p.1 * p.2 ≤ 1} := by
+  intro A
+  have hmul : Continuous (fun p : ℝ × ℝ ↦ p.1 * p.2) := continuous_fst.mul continuous_snd
+  have hA : IsClosed A := isClosed_eq hmul continuous_const
+  let B : Set (ℝ × ℝ) := {p | 0 < p.1 * p.2 ∧ p.1 * p.2 ≤ 1} ∪ {0}
+  have hHull : balancedHull ℝ A = B := by
+    ext p
+    rw [mem_balancedHull_iff]
+    constructor
+    · rintro ⟨r, hr, q, hq, rfl⟩
+      obtain rfl | hr₀ := eq_or_ne r 0
+      · exact Or.inr (zero_smul ℝ q)
+      · change q.1 * q.2 = 1 at hq
+        have hprod : (r • q).1 * (r • q).2 = r ^ 2 := by
+          change (r * q.1) * (r * q.2) = r ^ 2
+          rw [mul_mul_mul_comm, hq, mul_one, pow_two]
+        refine Or.inl ⟨hprod ▸ ?_, ?_⟩
+        · exact sq_pos_of_ne_zero hr₀
+        · rw [hprod, sq_le_one_iff_abs_le_one]
+          exact hr
+    · rintro (⟨hp, hp'⟩ | hp)
+      · -- Rescale the point by the inverse square root of its coordinate product.
+        let r := Real.sqrt (p.1 * p.2)
+        have hr : 0 < r := Real.sqrt_pos.2 hp
+        have hr_sq : r ^ 2 = p.1 * p.2 := Real.sq_sqrt hp.le
+        refine ⟨r, ?_, r⁻¹ • p, ?_, smul_inv_smul₀ hr.ne' p⟩
+        · rw [Real.norm_eq_abs, abs_of_pos hr]
+          exact Real.sqrt_le_one.2 hp'
+        · change (r⁻¹ * p.1) * (r⁻¹ * p.2) = 1
+          rw [mul_mul_mul_comm, ← pow_two, inv_pow, hr_sq, inv_mul_cancel₀ hp.ne']
+      · rw [mem_singleton_iff] at hp
+        subst p
+        refine ⟨0, by simp, (1, 1), ?_, zero_smul ℝ _⟩
+        change (1 : ℝ) * 1 = 1
+        exact one_mul 1
+  refine ⟨by rw [hA.closure_eq], hHull, ?_⟩
+  rw [hHull]
+  apply Subset.antisymm
+  · apply closure_minimal _ (isClosed_Icc.preimage hmul)
+    rintro p (⟨hp, hp'⟩ | hp)
+    · exact ⟨hp.le, hp'⟩
+    · rw [mem_singleton_iff] at hp
+      subst p
+      exact ⟨by simp, by simp⟩
+  · rintro ⟨x, y⟩ ⟨hxy, hxy'⟩
+    obtain hxy | hxy := hxy.eq_or_lt
+    · -- Approach each nonzero axis point along a path with coordinate product t.
+      have hzero : (0 : ℝ) ∈ closure (Ioc 0 1) := by
+        rw [closure_Ioc zero_ne_one]
+        exact ⟨le_rfl, zero_le_one⟩
+      have approach (f : ℝ → ℝ × ℝ) (hf : Continuous f)
+          (hprod : ∀ t, (f t).1 * (f t).2 = t) : f 0 ∈ closure B := by
+        have hmaps : MapsTo f (Ioc 0 1) B := fun t ht ↦
+          Or.inl ⟨(hprod t).symm ▸ ht.1, (hprod t).symm ▸ ht.2⟩
+        exact hmaps.closure hf hzero
+      by_cases hx : x = 0
+      · subst x
+        by_cases hy : y = 0
+        · subst y
+          exact subset_closure (Or.inr rfl)
+        · simpa only [zero_div] using
+            approach (fun t ↦ (t / y, y)) ((continuous_id.div_const y).prodMk continuous_const)
+              (fun t ↦ div_mul_cancel₀ t hy)
+      · have hy : y = 0 := (mul_eq_zero.mp hxy.symm).resolve_left hx
+        subst y
+        simpa only [zero_div] using
+          approach (fun t ↦ (x, t / x)) (continuous_const.prodMk (continuous_id.div_const x))
+            (fun t ↦ (mul_div_assoc x t x).symm.trans (mul_div_cancel_left₀ t hx))
+    · exact subset_closure (Or.inl ⟨hxy, hxy'⟩)
 
 /-- Paper: Remark C.1.2.1, p. 658. The uniformity of a uniform additive group is the
 canonical additive uniformity of its topology. -/
