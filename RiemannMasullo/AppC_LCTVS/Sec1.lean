@@ -632,7 +632,11 @@ theorem isRelativelyCompact_iff_of_isClosed {E : Type*} [TopologicalSpace E] [T2
 /-- Paper: Remark C.1.4.3, p. 661. Compactness of the closure in the completion is
 equivalent to total boundedness in the original space. -/
 theorem isPrecompactInCompletion_iff_totallyBounded {E : Type*} [UniformSpace E] [T2Space E]
-    (A : Set E) : IsPrecompactInCompletion A ↔ TotallyBounded A := by sorry
+    (A : Set E) : IsPrecompactInCompletion A ↔ TotallyBounded A := by
+  unfold IsPrecompactInCompletion IsRelativelyCompact
+  rw [← totallyBounded_image_iff (UniformSpace.Completion.isUniformInducing_coe E),
+    ← totallyBounded_closure]
+  exact ⟨IsCompact.totallyBounded, fun h ↦ h.isCompact_of_isClosed isClosed_closure⟩
 
 section Hilbert
 
