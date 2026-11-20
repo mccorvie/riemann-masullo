@@ -142,7 +142,43 @@ theorem adeleFundamentalDomain_precompact : IsCompact (closure (adeleFundamental
 
 /-- Paper: §A.2.1, p. 545. The adelic fundamental domain has nonempty interior. -/
 theorem adeleFundamentalDomain_interior : (interior (adeleFundamentalDomain F b)).Nonempty := by
-  sorry
+  classical
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let e := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map e).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  let : Fintype ι := FiniteDimensional.fintypeBasisIndex B
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have hm : Continuous m := by
+    change Continuous (fun x : InfiniteAdeleRing F ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+    simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+      (continuous_apply v.1)).prodMk
+      (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+        (continuous_apply v.1))
+  have hIntegral : IsOpen (integralAdelesOutside F ∅ : Set 𝔸[F]) := by
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred, Finset.notMem_empty,
+      not_false_eq_true, true_implies]
+    exact (RestrictedProduct.isOpen_forall_mem (fun v : HeightOneSpectrum (𝓞 F) ↦
+      Valued.isOpen_integer (v.adicCompletion F))).preimage continuous_snd
+  let coords : 𝔸[F] → ι → ℝ := fun a ↦ B.equivFun (m a.1)
+  let cube := Set.pi Set.univ (fun _ : ι ↦ Set.Ioo (0 : ℝ) 1)
+  let U := (coords ⁻¹' cube) ∩ (integralAdelesOutside F ∅ : Set 𝔸[F])
+  have hU : IsOpen U :=
+    ((isOpen_set_pi Set.finite_univ fun _ _ ↦ isOpen_Ioo).preimage
+      ((continuous_equivFun_basis B).comp (hm.comp continuous_fst))).inter hIntegral
+  let a : 𝔸[F] := (m.symm (B.equivFun.symm fun _ ↦ 1 / 2), 0)
+  refine ⟨a, mem_interior.mpr ⟨U, ?_, hU, ?_⟩⟩
+  · rintro x ⟨hx, hInt⟩
+    refine ⟨(ZSpan.mem_fundamentalDomain B).mpr fun i ↦ ?_, hInt⟩
+    exact Set.Ioo_subset_Ico_self (hx i (Set.mem_univ i))
+  · refine ⟨?_, ?_⟩
+    · change B.equivFun (m (m.symm (B.equivFun.symm fun _ ↦ 1 / 2))) ∈ cube
+      rw [RingEquiv.apply_symm_apply, LinearEquiv.apply_symm_apply]
+      exact fun _ _ ↦ ⟨by norm_num, by norm_num⟩
+    · change a ∈ integralAdelesOutside F ∅
+      simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+        true_implies]
+      exact fun v ↦ (v.adicCompletionIntegers F).zero_mem
 
 /-- Paper: §A.2.1, p. 545. Every nonzero diagonal translation moves the fundamental
 domain off itself, including its half-open boundary. -/
