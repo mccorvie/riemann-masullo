@@ -97,7 +97,15 @@ def mappingSeminorm (T : {T : Set E // IsVonNBounded ℂ T})
 p(f(x)) on the test set. -/
 theorem mappingSeminorm_apply (T : {T : Set E // IsVonNBounded ℂ T})
     (p : {p : Seminorm ℂ F // Continuous p}) (f : E →L[ℂ] F) :
-    mappingSeminorm T p f = ⨆ x : T.val, p.val (f x) := by sorry
+    mappingSeminorm T p f = ⨆ x : T.val, p.val (f x) := by
+  unfold mappingSeminorm
+  apply Seminorm.iSup_apply
+  apply Seminorm.bddAbove_range_iff.mpr
+  intro g
+  obtain ⟨r, _, hr⟩ :=
+    ((PolynormableSpace.withSeminorms ℂ F).image_isVonNBounded_iff_seminorm_bounded g).mp
+      (T.2.image g) p
+  exact ⟨r, forall_mem_range.mpr fun x ↦ (hr x x.2).le⟩
 
 include hb hdense in
 /-- Paper: (C.2.1.4), p. 671. The seminorms indexed by test sets and generating target
