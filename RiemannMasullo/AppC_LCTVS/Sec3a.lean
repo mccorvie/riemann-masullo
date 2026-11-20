@@ -1,0 +1,436 @@
+module
+
+public import RiemannMasullo.AppC_LCTVS.Sec2b
+public import Mathlib.Analysis.CStarAlgebra.ContinuousLinearMap
+public import Mathlib.Analysis.InnerProductSpace.StarOrder
+public import Mathlib.Analysis.InnerProductSpace.l2Space
+public import Mathlib.Analysis.Normed.Operator.Compact.Basic
+public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
+
+/-!
+# Nuclear operators and the trace on Hilbert spaces
+
+Masullo, Appendix C, §§C.3.1–C.3.4.
+-/
+
+@[expose] public noncomputable section
+
+open Bornology Filter Function Set Topology TopologicalSpace UniformSpace
+open scoped CStarAlgebra InnerProductSpace TensorProduct UniformConvergence UniformConvergenceCLM
+
+namespace RiemannMasullo
+
+attribute [local instance] uniformContinuousConstSMul_of_continuousConstSMul
+
+local instance {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [ContinuousSMul ℂ E] : ContinuousSMul ℝ E :=
+  MulAction.continuousSMul_compHom (f := (algebraMap ℝ ℂ).toMonoidHom) Complex.continuous_ofReal
+
+section BanachOperators
+
+variable {E F : Type*} [SeminormedAddCommGroup E] [NormedSpace ℂ E]
+  [SeminormedAddCommGroup F] [NormedSpace ℂ F]
+
+/-- Paper: §C.3.1, p. 693. The series criterion of (C.2.4.2) expresses nuclearity
+between Banach spaces using summable coefficients and two norm-null sequences. -/
+def IsBanachNuclear (A : E →L[ℂ] F) : Prop :=
+  ∃ (c : ℕ → ℂ) (φ : ℕ → E →L[ℂ] ℂ) (y : ℕ → F),
+    Summable (fun n ↦ ‖c n‖) ∧ Tendsto φ atTop (𝓝 0) ∧ Tendsto y atTop (𝓝 0) ∧
+      ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (A x)
+
+/-- Paper: §C.3.1, p. 693. A rank-one map has a nuclear series.
+Deviation: This is a check of the series definition in the rank-one case. -/
+theorem isBanachNuclear_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
+    IsBanachNuclear (φ.smulRight y) := by sorry
+
+end BanachOperators
+
+section LocallyConvexOperators
+
+variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+  [PolynormableSpace ℂ E] [T2Space E]
+  [AddCommGroup F] [Module ℂ F] [UniformSpace F] [IsUniformAddGroup F]
+  [PolynormableSpace ℂ F] [T2Space F]
+
+local notation:25 X " →Lᵦ " Y => X →Lᵤ[ℂ, Set.ofPred (fun s : Set X ↦ IsVonNBounded ℂ s)] Y
+
+/-- Paper: (C.3.1.1), p. 693. The algebraic tensor-to-finite-rank map is continuous
+for the projective tensor topology and uniform convergence on bounded sets. -/
+theorem continuous_tensorToFiniteRank_bounded :
+    Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
+      (tensorToFiniteRank z : E →Lᵦ F)) := by sorry
+
+/-- Paper: (C.3.1.1), p. 693. The projective tensor of the strong dual and the
+target maps continuously to operators with the bounded convergence topology. -/
+def projectiveTensorToOperators :
+    ProjectiveTensor (StrongDual ℂ E) F →L[ℂ] (E →Lᵦ F) :=
+  ⟨tensorToFiniteRank, continuous_tensorToFiniteRank_bounded⟩
+
+/-- Paper: (C.3.1.1), p. 693. On elementary tensors this map evaluates the functional
+and scales the target vector. -/
+theorem projectiveTensorToOperators_tmul (φ : StrongDual ℂ E) (y : F) (x : E) :
+    projectiveTensorToOperators (φ ⊗ₜ[ℂ] y) x = φ x • y := by sorry
+
+/-- Paper: Remark C.3.1.1, p. 693. For complete spaces, with barrelled source
+and complete nuclear strong dual, the completed projective tensor is linearly
+homeomorphic to the bounded convergence operator space by the canonical map. -/
+theorem completedProjectiveTensorToOperators_equiv [CompleteSpace E] [CompleteSpace F]
+    [BarrelledSpace ℂ E] [CompleteSpace (StrongDual ℂ E)] (h : IsNuclearTVS (StrongDual ℂ E)) :
+    CompleteSpace (E →Lᵦ F) ∧
+      ∃ e : Completion (ProjectiveTensor (StrongDual ℂ E) F) ≃L[ℂ] (E →Lᵦ F),
+        ∀ z : ProjectiveTensor (StrongDual ℂ E) F, e z = projectiveTensorToOperators z := by sorry
+
+/-- Paper: §C.3.1, p. 693. A Banach disc is a bounded balanced convex set whose
+linear span, equipped with the Minkowski seminorm of the disc, is separated and complete.
+In the paper's Hausdorff setting, boundedness implies the separation condition. -/
+structure IsBanachDisc (B : Set F) : Prop where
+  bounded : IsVonNBounded ℂ B
+  balanced : Balanced ℂ ((↑) ⁻¹' B : Set (Submodule.span ℂ B))
+  convex : Convex ℝ ((↑) ⁻¹' B : Set (Submodule.span ℂ B))
+  absorbent : Absorbent ℝ ((↑) ⁻¹' B : Set (Submodule.span ℂ B))
+  separated : T2Space (WithLocalSeminorm (gaugeSeminorm balanced convex absorbent))
+  complete : CompleteSpace (WithLocalSeminorm (gaugeSeminorm balanced convex absorbent))
+
+/-- Paper: §C.3.1, p. 693. The closed unit ball of a Banach space is a Banach disc.
+Deviation: This is a check of the disc definition. -/
+theorem isBanachDisc_closedUnitBall {X : Type*} [NormedAddCommGroup X] [NormedSpace ℂ X]
+    [CompleteSpace X] : IsBanachDisc (Metric.closedBall (0 : X) 1) := by sorry
+
+/-- Paper: §C.3.1, p. 694. Nuclearity means that some balanced convex zero-neighborhood
+maps into a Banach disc and that the induced operator from the local Banach space
+to the disc span, equipped with its Minkowski norm, has a nuclear series. -/
+def IsNuclearOperator (A : E →L[ℂ] F) : Prop :=
+  ∃ (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U)
+    (B : Set F) (hB : IsBanachDisc B),
+    MapsTo A U B ∧
+      ∃ T : LocalBanach (gaugeSeminorm bU cU (absorbent_nhds_zero hU)) →L[ℂ]
+        WithLocalSeminorm (gaugeSeminorm hB.balanced hB.convex hB.absorbent),
+        IsBanachNuclear T ∧ ∀ x : E,
+          let xU : WithLocalSeminorm (gaugeSeminorm bU cU (absorbent_nhds_zero hU)) := x
+          let yB : Submodule.span ℂ B := T xU
+          (yB : F) = A x
+
+/-- Paper: §C.3.1, p. 694. A continuous rank-one operator is nuclear.
+Deviation: This is a check of the local factorization definition. -/
+theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
+    IsNuclearOperator (φ.smulRight y) := by sorry
+
+/-- Paper: (C.3.1.3), p. 694. A nuclear presentation is a pointwise operator sum
+of rank-one maps with summable coefficients, equicontinuous functionals and
+vectors in a common Banach disc.
+Deviation: All three families use the same summation index, starting at zero. -/
+structure NuclearPresentation (A : E →L[ℂ] F) where
+  coeff : ℕ → ℂ
+  functional : ℕ → E →L[ℂ] ℂ
+  disc : Set F
+  isBanachDisc : IsBanachDisc disc
+  vector : ℕ → Submodule.span ℂ disc
+  vector_mem : ∀ n, (vector n : F) ∈ disc
+  summable_coeff : Summable (fun n ↦ ‖coeff n‖)
+  equicontinuous : EquicontinuousAt (fun n x ↦ functional n x) 0
+  hasSum : ∀ x, HasSum (fun n ↦ (coeff n * functional n x) • (vector n : F)) (A x)
+
+/-- Paper: (C.3.1.3), p. 694. A rank-one map can be presented with one term and
+the given functional, with any prescribed nonzero coefficient for that term.
+Deviation: This is a check of the normalization in the presentation definition. -/
+theorem nuclearPresentation_smulRight (φ : E →L[ℂ] ℂ) (y : F) (c : ℂ) (hc : c ≠ 0) :
+    ∃ r : NuclearPresentation (φ.smulRight y),
+      r.coeff 0 = c ∧ r.functional 0 = φ ∧ (r.vector 0 : F) = c⁻¹ • y ∧
+        ∀ n, r.coeff (n + 1) = 0 := by sorry
+
+/-- Paper: Lemma C.3.1.2, p. 694. A continuous linear operator is nuclear exactly
+when it has a nuclear presentation. -/
+theorem isNuclearOperator_iff_nonempty_presentation (A : E →L[ℂ] F) :
+    IsNuclearOperator A ↔ Nonempty (NuclearPresentation A) := by sorry
+
+/-- Paper: Lemma C.3.1.2, p. 694. A nuclear operator admits a presentation with
+functionals tending to zero uniformly on one zero-neighborhood and vectors
+tending to zero for the gauge norm of their disc. -/
+theorem exists_nuclearPresentation_tendsto_zero (A : E →L[ℂ] F) (hA : IsNuclearOperator A) :
+    ∃ (r : NuclearPresentation A) (U : Set E), U ∈ 𝓝 0 ∧
+      TendstoUniformlyOn (fun n x ↦ r.functional n x) 0 atTop U ∧
+      Tendsto (fun n ↦ gauge ((↑) ⁻¹' r.disc : Set (Submodule.span ℂ r.disc)) (r.vector n))
+        atTop (𝓝 0) := by sorry
+
+end LocallyConvexOperators
+
+section BanachTensor
+
+variable {E F : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
+  [NormedAddCommGroup F] [NormedSpace ℂ F] [CompleteSpace F]
+
+/-- Paper: (C.3.1.2), p. 693. On Banach spaces the canonical tensor map is continuous
+for the operator norm on its target. -/
+theorem continuous_tensorToFiniteRank_opNorm :
+    Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
+      (tensorToFiniteRank z : E →L[ℂ] F)) := by sorry
+
+/-- Paper: (C.3.1.2), p. 693. The canonical map extends to the completed
+projective tensor of the dual and the target Banach space. -/
+def completedProjectiveTensorToOperators :
+    Completion (ProjectiveTensor (StrongDual ℂ E) F) →L[ℂ] (E →L[ℂ] F) :=
+  (show ProjectiveTensor (StrongDual ℂ E) F →L[ℂ] (E →L[ℂ] F) from
+    ⟨tensorToFiniteRank, continuous_tensorToFiniteRank_opNorm⟩).fromCompletion
+
+/-- Paper: (C.3.1.2), p. 693. On the image of an algebraic tensor the extended
+map agrees with the original finite-rank map. -/
+theorem completedProjectiveTensorToOperators_coe (z : ProjectiveTensor (StrongDual ℂ E) F) :
+    completedProjectiveTensorToOperators z = tensorToFiniteRank z := by sorry
+
+/-- Paper: §C.3.1, p. 693. Nuclear operators between Banach spaces are the
+image of the completed projective tensor. -/
+theorem isBanachNuclear_iff_mem_range (A : E →L[ℂ] F) :
+    IsBanachNuclear A ↔ A ∈ range completedProjectiveTensorToOperators := by sorry
+
+/-- Paper: §C.3.1, p. 694. The local and Banach-space definitions of a
+nuclear operator agree for Banach spaces. -/
+theorem isNuclearOperator_iff_isBanachNuclear (A : E →L[ℂ] F) :
+    IsNuclearOperator A ↔ IsBanachNuclear A := by sorry
+
+end BanachTensor
+
+section NuclearTrace
+
+variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+  [PolynormableSpace ℂ E] [T2Space E]
+  [AddCommGroup F] [Module ℂ F] [UniformSpace F] [IsUniformAddGroup F]
+  [PolynormableSpace ℂ F] [T2Space F]
+
+local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
+  StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
+
+/-- Paper: Proposition C.3.2.1, p. 694. On a space with the approximation property,
+every presentation of the same nuclear endomorphism gives an absolutely convergent
+scalar series with the same sum. -/
+theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
+    (hA : IsNuclearOperator A) :
+    ∃! z : ℂ, ∀ r : NuclearPresentation A,
+      Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
+      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by sorry
+
+/-- Paper: (C.3.2.2), p. 694. The nuclear trace is the sum of the scalar series
+from any nuclear presentation on a space with the approximation property. -/
+def nuclearTrace (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A) : ℂ :=
+  (exists_nuclearTrace_hasSum hE A hA).exists.choose
+
+/-- Paper: (C.3.2.2), p. 694. The trace of a rank-one operator is the value
+of its functional at its spanning vector.
+Deviation: This is a check of the trace formula on one term. -/
+theorem nuclearTrace_smulRight (hE : ApproxProp E) (φ : E →L[ℂ] ℂ) (y : E) :
+    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by sorry
+
+/-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
+conjugation by a continuous linear automorphism. -/
+theorem isNuclearOperator_conj (A : E →L[ℂ] E) (hA : IsNuclearOperator A) (T : E ≃L[ℂ] E) :
+    IsNuclearOperator (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)) := by sorry
+
+/-- Paper: Proposition C.3.2.1, p. 694. The nuclear trace is invariant
+under conjugation by a continuous linear automorphism. -/
+theorem nuclearTrace_conj (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A)
+    (T : E ≃L[ℂ] E) :
+    nuclearTrace hE A hA =
+      nuclearTrace hE _ (isNuclearOperator_conj A hA T) := by sorry
+
+/-- Paper: Lemma C.3.2.2, p. 695. Both compositions of a nuclear map and
+a continuous linear injection in the opposite direction are nuclear.
+Deviation: The right-hand composition's nuclearity is made explicit to type its trace.
+The two approximation-property hypotheses are needed for the trace assertion. -/
+theorem isNuclearOperator_factor_comps (T : E →L[ℂ] F) (hT : Injective T)
+    (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
+    IsNuclearOperator (A₀.comp T) ∧ IsNuclearOperator (T.comp A₀) := by sorry
+
+/-- Paper: Lemma C.3.2.2, p. 695. A nuclear map followed by an injection has
+the same trace as the reverse composition when both spaces have the approximation property.
+Deviation: The given endomorphism is written as its factorization. -/
+theorem nuclearTrace_factor_comps (hE : ApproxProp E) (hF : ApproxProp F)
+    (T : E →L[ℂ] F) (hT : Injective T) (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
+    nuclearTrace hE (A₀.comp T) (isNuclearOperator_factor_comps T hT A₀ hA₀).1 =
+      nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by sorry
+
+end NuclearTrace
+
+section HilbertOperators
+
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+
+/-- Paper: Lemma C.3.3.1(1), p. 697. Every subset bounded in the strong operator
+topology on a separable Hilbert space is metrizable with its subspace topology. -/
+theorem metrizableSpace_bounded_pointwiseOperators [SeparableSpace H]
+    (S : Set (H →Lₚₜ[ℂ] H)) (hS : IsVonNBounded ℂ S) : MetrizableSpace S := by sorry
+
+-- Lemma C.3.3.1(2): Hausdorffness is Mathlib's PointwiseConvergenceCLM instance.
+-- Local convexity and quasi-completeness are already stated in Sec2a as
+-- pointwiseConvergenceCLM_withSeminorms and hilbert_pointwiseOperators_quasiComplete.
+
+/-- Paper: §C.3.4, p. 697. Hilbert spaces have the approximation property. -/
+theorem hilbert_approximationProperty :
+    DenseRange (tensorToFiniteRank (E := H) (F := H) :
+      StrongDual ℂ H ⊗[ℂ] H → PrecompactConvergenceCLM H H) := by sorry
+
+/-- Paper: Lemma C.3.4.1(1), p. 697. The diagonal of a nuclear endomorphism
+is absolutely summable in any Hilbert basis, including an uncountable basis.
+Deviation: Mathlib's inner product is linear in the second argument. -/
+theorem summable_norm_hilbertDiagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : H →L[ℂ] H) (hT : IsNuclearOperator T) :
+    Summable (fun i ↦ ‖⟪b i, T (b i)⟫_ℂ‖) := by sorry
+
+-- TODO(paper-gap): Lemma C.3.4.1(2) is false. For diag(1, -1) on ℂ², the sum
+-- of absolute diagonal entries is 2 in the coordinate basis and 0 in the
+-- orthonormal basis formed by the normalized sum and difference of its vectors.
+
+/-- Paper: Lemma C.3.4.1(3), p. 697. The sum of the diagonal entries of a
+nuclear endomorphism is independent of the Hilbert basis.
+Deviation: Mathlib's inner product is linear in the second argument. -/
+theorem tsum_hilbertDiagonal_eq {ι κ : Type*} (b : HilbertBasis ι ℂ H) (c : HilbertBasis κ ℂ H)
+    (T : H →L[ℂ] H) (hT : IsNuclearOperator T) :
+    (∑' i, ⟪b i, T (b i)⟫_ℂ) = ∑' j, ⟪c j, T (c j)⟫_ℂ := by sorry
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. The nuclear endomorphisms of a Hilbert space
+contain zero and are closed under addition and complex scalar multiplication. -/
+theorem nuclearEndomorphisms_submodule_axioms :
+    IsNuclearOperator (0 : H →L[ℂ] H) ∧
+      (∀ {A B : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator B → IsNuclearOperator (A + B)) ∧
+      (∀ (c : ℂ) {A : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator (c • A)) := by sorry
+
+variable (H) in
+/-- Paper: Definition C.3.4.2, p. 697. The space of nuclear endomorphisms is
+the complex submodule of bounded endomorphisms satisfying nuclearity. -/
+def nuclearEndomorphisms : Submodule ℂ (H →L[ℂ] H) where
+  carrier := {T | IsNuclearOperator T}
+  zero_mem' := nuclearEndomorphisms_submodule_axioms.1
+  add_mem' := nuclearEndomorphisms_submodule_axioms.2.1
+  smul_mem' := nuclearEndomorphisms_submodule_axioms.2.2
+
+/-- Paper: Definition C.3.4.2, p. 697. The rank-one map from a functional
+and a vector belongs to the submodule of nuclear endomorphisms.
+Deviation: This is a check of the submodule's carrier. -/
+theorem smulRight_mem_nuclearEndomorphisms (φ : H →L[ℂ] ℂ) (y : H) :
+    φ.smulRight y ∈ nuclearEndomorphisms H := by sorry
+
+/-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace sums the
+diagonal entries of a nuclear operator using a choice of Hilbert basis.
+Deviation: Mathlib's inner product is linear in the second argument. -/
+def hilbertTrace (T : nuclearEndomorphisms H) : ℂ :=
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  ∑' i, ⟪b i, T.val (b i)⟫_ℂ
+
+/-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace of a rank-one
+operator evaluates its functional at its spanning vector.
+Deviation: This is a check of the trace formula and inner-product convention. -/
+theorem hilbertTrace_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
+    hilbertTrace ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = φ y := by sorry
+
+/-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace is the
+nuclear trace from Proposition C.3.2.1 on the same endomorphism. -/
+theorem hilbertTrace_eq_nuclearTrace (T : nuclearEndomorphisms H) :
+    hilbertTrace T = nuclearTrace hilbert_approximationProperty T.val T.property := by sorry
+
+/-- Paper: Definition C.3.4.2(2), p. 697. The trace norm of a nuclear operator
+sums the real diagonal entries of the positive square root of its adjoint
+times itself, using a choice of Hilbert basis. -/
+def traceNorm (T : nuclearEndomorphisms H) : ℝ :=
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  ∑' i, (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re
+
+/-- Paper: Definition C.3.4.2(2), p. 697. The trace norm is the sum of the
+diagonal series for the positive square root in every Hilbert basis. -/
+theorem hasSum_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) :
+    HasSum (fun i ↦ (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re) (traceNorm T) := by sorry
+
+/-- Paper: Definition C.3.4.2(2), p. 697. Nuclearity is equivalent to finiteness
+of the positive-square-root diagonal sum in any given Hilbert basis. -/
+theorem isNuclearOperator_iff_summable_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : H →L[ℂ] H) :
+    IsNuclearOperator T ↔
+      Summable (fun i ↦ (⟪b i, CFC.sqrt (T.adjoint * T) (b i)⟫_ℂ).re) := by sorry
+
+/-- Paper: Definition C.3.4.2(2), p. 697. A rank-one map has trace norm equal
+to the product of the functional and vector norms.
+Deviation: This is a check of the square root and trace norm normalization. -/
+theorem traceNorm_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
+    traceNorm ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = ‖φ‖ * ‖y‖ := by sorry
+
+/-- Paper: Lemma C.3.4.3, p. 698. Composing a strongly convergent sequence of
+endomorphisms on the right by a fixed compact operator gives convergence
+in operator norm. -/
+theorem tendsto_compact_comp_of_pointwise {A Q : H →L[ℂ] H} {Qm : ℕ → H →L[ℂ] H}
+    (hA : IsCompactOperator A) (hQ : ∀ x, Tendsto (fun m ↦ Qm m x) atTop (𝓝 (Q x))) :
+    Tendsto (fun m ↦ (Qm m).comp A) atTop (𝓝 (Q.comp A)) := by sorry
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. Left multiplication by a bounded operator
+preserves nuclearity. -/
+theorem mul_mem_nuclearEndomorphisms_left (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
+    A * T.val ∈ nuclearEndomorphisms H := by sorry
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. Right multiplication by a bounded operator
+preserves nuclearity. -/
+theorem mul_mem_nuclearEndomorphisms_right (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
+    T.val * A ∈ nuclearEndomorphisms H := by sorry
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. The trace norm satisfies the normed-space
+axioms on the complex vector space of nuclear endomorphisms. -/
+theorem traceNorm_normedSpaceCore :
+    letI : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+    NormedSpace.Core ℂ (nuclearEndomorphisms H) := by sorry
+
+-- TODO(paper-gap): The equality in (C.3.4.3) is false. For A = diag(1, 0) and
+-- T swapping the first coordinate into the second and killing the second, AT = 0
+-- while TA = T has trace norm 1. The two separate upper bounds hold.
+
+/-- Paper: Lemma C.3.4.4(2), p. 698. The trace norm of a left product is at
+most the operator norm of the left factor times the trace norm of the right factor.
+Deviation: The invalid equality in (C.3.4.3) is recorded above. -/
+theorem traceNorm_mul_left_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
+    traceNorm ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ ≤ ‖A‖ * traceNorm T := by sorry
+
+/-- Paper: Lemma C.3.4.4(2), p. 698. The trace norm of a right product is at
+most the operator norm of the right factor times the trace norm of the left factor.
+Deviation: The invalid equality in (C.3.4.3) is recorded above. -/
+theorem traceNorm_mul_right_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
+    traceNorm ⟨T.val * A, mul_mem_nuclearEndomorphisms_right A T⟩ ≤ ‖A‖ * traceNorm T := by sorry
+
+/-- Paper: Lemma C.3.4.4(3), p. 698. The trace is complex linear. -/
+theorem hilbertTrace_linear :
+    ∃ f : nuclearEndomorphisms H →ₗ[ℂ] ℂ, ∀ T, f T = hilbertTrace T := by sorry
+
+/-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by
+the trace norm, which gives continuity for the trace norm. -/
+theorem norm_hilbertTrace_le (T : nuclearEndomorphisms H) :
+    ‖hilbertTrace T‖ ≤ traceNorm T := by sorry
+
+/-- Paper: Lemma C.3.4.4(4), p. 698. The canonical image of the algebraic tensor
+of the dual and the Hilbert space consists of nuclear operators. -/
+theorem tensorToFiniteRank_mem_nuclearEndomorphisms (z : StrongDual ℂ H ⊗[ℂ] H) :
+    tensorToFiniteRank z ∈ nuclearEndomorphisms H := by sorry
+
+/-- Paper: Lemma C.3.4.4(4), p. 698. Finite-rank operators from the canonical
+tensor map approximate every nuclear endomorphism in trace norm. -/
+theorem exists_tensorToFiniteRank_traceNorm_sub_lt (T : nuclearEndomorphisms H)
+    {ε : ℝ} (hε : 0 < ε) :
+    ∃ z : StrongDual ℂ H ⊗[ℂ] H,
+      traceNorm (T - ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩) < ε :=
+  by sorry
+
+/-- Paper: Lemma C.3.4.4(4), p. 698. On a separable Hilbert space there is a
+countable trace-norm dense set of nuclear endomorphisms.
+Deviation: Density is expressed by approximation in every positive trace-norm radius. -/
+theorem exists_countable_traceNorm_dense [SeparableSpace H] :
+    ∃ S : Set (nuclearEndomorphisms H), S.Countable ∧
+      ∀ (T : nuclearEndomorphisms H) (ε : ℝ), 0 < ε → ∃ A ∈ S, traceNorm (T - A) < ε := by sorry
+
+-- TODO(paper-gap): The proof on p. 699 sums distinct eigenvalues to compute the
+-- trace norm. Multiplicities are required, as shown by the identity on ℂ².
+
+/-- Paper: Lemma C.3.4.4(5), p. 698. The products of a strongly null net and
+a fixed finite-rank right factor are nuclear and tend to zero in trace norm.
+Deviation: A net is indexed by a nonempty directed preorder. -/
+theorem tendsto_traceNorm_mul_finiteRank {ι : Type*} [Preorder ι] [IsDirectedOrder ι]
+    [Nonempty ι] (P : ι → H →L[ℂ] H) (hP : ∀ x, Tendsto (fun i ↦ P i x) atTop (𝓝 0))
+    (F : H →L[ℂ] H) (hF : FiniteDimensional ℂ F.toLinearMap.range) :
+    ∃ hm : ∀ i, P i * F ∈ nuclearEndomorphisms H,
+      Tendsto (fun i ↦ traceNorm ⟨P i * F, hm i⟩) atTop (𝓝 0) := by sorry
+
+end HilbertOperators
+
+end RiemannMasullo
