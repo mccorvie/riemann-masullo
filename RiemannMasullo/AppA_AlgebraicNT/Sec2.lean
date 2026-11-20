@@ -48,7 +48,22 @@ Deviation: This checks the coordinate convention given on p. 554. -/
 theorem infiniteAdeleFundamentalDomain_basis_line (i : ι) (t : ℝ) :
     (InfiniteAdeleRing.ringEquiv_mixedSpace F).symm (t • mixedEmbedding F (b i : F)) ∈
       infiniteAdeleFundamentalDomain F b ↔ t ∈ Set.Ico 0 1 := by
-  sorry
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let e := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map e).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  have hB : B i = mixedEmbedding F (b i : F) := by
+    simp only [B, Module.Basis.ofZLatticeBasis_apply, Module.Basis.map_apply]
+    rfl
+  simp only [infiniteAdeleFundamentalDomain, Set.mem_preimage, RingEquiv.apply_symm_apply]
+  change t • mixedEmbedding F (b i : F) ∈ ZSpan.fundamentalDomain B ↔ _
+  rw [← hB, ZSpan.mem_fundamentalDomain, map_smul, Module.Basis.repr_self,
+    Finsupp.smul_single', mul_one]
+  refine ⟨fun h ↦ ?_, fun ht k ↦ ?_⟩
+  · simpa only [Finsupp.single_eq_same] using h i
+  · by_cases h : k = i
+    · simpa only [h, Finsupp.single_eq_same] using ht
+    · rw [Finsupp.single_eq_of_ne h]
+      exact ⟨le_rfl, zero_lt_one⟩
 
 /-- Paper: Definition A.2.1.1, p. 545. The adelic fundamental domain consists of the
 adeles in the infinite parallelepiped whose finite components are all integral.
