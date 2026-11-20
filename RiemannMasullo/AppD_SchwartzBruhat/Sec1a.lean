@@ -27,11 +27,14 @@ section Pontryagin
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G]
 
+-- Retain `T2Space G` in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem D.1.1.1(1), p. 746. The Pontryagin dual is Hausdorff and locally compact.
 Mathlib supplies its abelian topological group structure and precomposition functor
 `PontryaginDual.map`, with `PontryaginDual.map_one` and `PontryaginDual.map_comp`. -/
 theorem pontryaginDual_basic : T2Space (PontryaginDual G) ∧
-    LocallyCompactSpace (PontryaginDual G) := by sorry
+    LocallyCompactSpace (PontryaginDual G) := by
+  exact ⟨inferInstance, inferInstance⟩
 
 /-- Paper: Theorem D.1.1.1(2), p. 746. Characters separate points of the group, and
 evaluation separates characters. -/
