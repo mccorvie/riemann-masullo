@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppC_LCTVS.Sec1
 public import Mathlib.Analysis.LocallyConvex.Barrelled
 public import Mathlib.Analysis.LocallyConvex.Polar
+import Mathlib.Topology.Algebra.Module.UniformConvergence
 
 /-!
 # Mapping spaces and topologies of a duality
@@ -57,7 +58,18 @@ space precisely when every member maps each test set into a bounded subset of F.
 Addition is already continuous for the induced additive uniformity. -/
 theorem uniformOnFun_submodule_continuousSMul_iff [ContinuousSMul ℂ F]
     (L : Submodule ℂ (X →ᵤ[S] F)) :
-    ContinuousSMul ℂ L ↔ ∀ f ∈ L, ∀ T ∈ S, IsVonNBounded ℂ (UniformOnFun.toFun S f '' T) := by sorry
+    ContinuousSMul ℂ L ↔ ∀ f ∈ L, ∀ T ∈ S, IsVonNBounded ℂ (UniformOnFun.toFun S f '' T) := by
+  refine ⟨?_, UniformOnFun.continuousSMul_submodule_of_image_bounded ℂ X F L⟩
+  intro hL f hf T hT V hV
+  have hTV : {g : X →ᵤ[S] F | MapsTo (UniformOnFun.toFun S g) T V} ∈ 𝓝 0 :=
+    (uniformOnFun_zero_basis S hne hdir (𝓝 (0 : F)).basis_sets).mem_of_mem (i := (T, V))
+      ⟨hT, hV⟩
+  have hsmul : Tendsto (fun c : ℂ ↦ ((c • (⟨f, hf⟩ : L) : L) : X →ᵤ[S] F)) (𝓝 0) (𝓝 0) :=
+    (continuous_subtype_val.comp (continuous_id.smul continuous_const)).tendsto' _ _ (by simp)
+  apply (absorbs_iff_eventually_nhds_zero (mem_of_mem_nhds hV)).2
+  filter_upwards [hsmul.eventually_mem hTV] with c hc
+  rintro _ ⟨x, hx, rfl⟩
+  exact hc hx
 
 variable [TopologicalSpace X] [PolynormableSpace ℂ F] [T2Space F]
 variable (L : Submodule ℂ (X →ᵤ[S] F)) (hdense : Dense (⋃₀ S))
