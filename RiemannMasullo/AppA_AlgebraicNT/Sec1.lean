@@ -406,7 +406,41 @@ theorem sIdeleNorm_spec :
     (∀ g, ideleNorm F (Units.map i.toMonoidHom g) = sIdeleNorm F S (Units.map p.toMonoidHom g)) ∧
     (Units.map (integralAdeleDiagonal F S).toMonoidHom).range ≤
       ((sIdeleNorm F S).comp (Units.map p.toMonoidHom)).ker := by
-  sorry
+  let i := (integralAdelesOutside F S).subtype
+  let p := (adeleProjection F S).comp i
+  have hnorm (g : (integralAdelesOutside F S)ˣ) :
+      ideleNorm F (Units.map i.toMonoidHom g) = sIdeleNorm F S (Units.map p.toMonoidHom g) := by
+    let a := Units.map i.toMonoidHom g
+    have hmem (x : integralAdelesOutside F S) (v : Primes(F)) (hv : v ∉ S) :
+        x.val.2 v ∈ v.adicCompletionIntegers F := by
+      have hx := x.property
+      simp only [integralAdelesOutside, Subring.mem_iInf] at hx
+      exact hx v hv
+    have hS : (fun v : Primes(F) ↦ ‖a.val.2 v‖).mulSupport ⊆ (S : Set (Primes(F))) := by
+      intro v hv
+      by_contra hvS
+      let ev := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+        (RingHom.snd (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+      apply hv
+      apply Valued.toNormedField.norm_eq_one_iff.mpr
+      exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+        (a := Units.map ev.toMonoidHom a)).mp ⟨hmem g.val v hvS, hmem g.inv v hvS⟩
+    apply Units.ext
+    apply NNReal.coe_injective
+    let evaluate : ((SAdeleRing F S)ˣ →* ℝ≥0ˣ) →* ℝ :=
+      NNReal.toRealHom.toMonoidHom.comp
+        ((Units.coeHom ℝ≥0).comp (MonoidHom.eval (Units.map p.toMonoidHom g)))
+    change ((ideleNorm F a).val : ℝ) = evaluate (sIdeleNorm F S)
+    rw [((ideleNorm_spec F).1 a).2, finprod_eq_prod_of_mulSupport_subset _ hS,
+      ← Finset.prod_coe_sort S (fun v ↦ ‖a.val.2 v‖)]
+    simp only [sIdeleNorm, map_mul, map_prod, map_pow]
+    rfl
+  refine ⟨hnorm, ?_⟩
+  rintro _ ⟨u, rfl⟩
+  rw [MonoidHom.mem_ker, MonoidHom.comp_apply, ← hnorm]
+  apply MonoidHom.mem_ker.mp
+  apply (ideleNorm_spec F).2
+  exact ⟨Units.map (Oₛ(F, S)).val.toRingHom.toMonoidHom u, Units.ext rfl⟩
 
 /-- Paper: Equation (A.1.5.8), p. 544. The class norm is the quotient lift of the S-idelic
 norm after projection to the coordinates in S. Its kernel is the norm-one S-idele class group. -/
