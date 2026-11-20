@@ -7,7 +7,10 @@ public import Mathlib.Analysis.LocallyConvex.PointwiseConvergence
 public import Mathlib.Analysis.LocallyConvex.WeakSpace
 public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
+import Mathlib.Algebra.Module.ULift
 import Mathlib.Analysis.Normed.Lp.lpSpace
+import Mathlib.Analysis.Normed.Module.DoubleDual
+import Mathlib.Analysis.Normed.Operator.BanachSteinhaus
 import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
@@ -581,7 +584,34 @@ theorem isVonNBounded_iff_rescale {E : Type*} [AddCommGroup E] [Module ℂ E] [T
 bounded exactly when its image under every continuous linear functional is bounded. -/
 theorem isVonNBounded_iff_dual_image {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E] (B : Set E) :
-    IsVonNBounded ℂ B ↔ ∀ l : StrongDual ℂ E, IsBounded (l '' B) := by sorry
+    IsVonNBounded ℂ B ↔ ∀ l : StrongDual ℂ E, IsBounded (l '' B) := by
+  constructor
+  · intro h l
+    exact (NormedSpace.isVonNBounded_iff ℂ).mp (h.image l)
+  · intro h
+    refine (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mpr ?_
+    rintro ⟨p, hp⟩
+    let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+    -- Equip a copy of E with the topology of the single seminorm p.
+    let F := ULift.{0} E
+    let e : F ≃ₗ[ℂ] E := ULift.moduleEquiv
+    let q := p.comp e.toLinearMap
+    let : SeminormedAddCommGroup F := q.toAddGroupSeminorm.toSeminormedAddCommGroup
+    let : TopologicalSpace F := PseudoMetricSpace.toUniformSpace.toTopologicalSpace
+    let : NormedSpace ℂ F := ⟨fun c x ↦ (map_smul_eq_mul q c x).le⟩
+    let j : E →L[ℂ] F :=
+      ⟨e.symm.toLinearMap, (norm_withSeminorms ℂ F).continuous_of_continuous_comp
+        e.symm.toLinearMap (fun _ ↦ hp)⟩
+    -- Evaluation at the points of B is pointwise bounded on the Banach dual of F.
+    obtain ⟨C, hC⟩ := banach_steinhaus
+        (g := fun x : B ↦ NormedSpace.inclusionInDoubleDual ℂ F (j x)) (fun l ↦ by
+      obtain ⟨M, hM⟩ := isBounded_iff_forall_norm_le.mp (h (l.comp j))
+      exact ⟨M, fun x ↦ hM _ ⟨x, x.property, rfl⟩⟩)
+    refine ⟨C, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    change ‖j x‖ ≤ C
+    rw [← (NormedSpace.inclusionInDoubleDualLi (𝕜 := ℂ) (E := F)).norm_map (j x)]
+    exact hC ⟨x, hx⟩
 
 /-- Paper: Definition C.1.4.2, p. 661. A set is relatively compact if its closure in
 the ambient space is compact. -/
