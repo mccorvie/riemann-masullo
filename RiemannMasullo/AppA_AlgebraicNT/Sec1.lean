@@ -118,7 +118,47 @@ theorem adeleRing_factors :
     IsHomeomorph (fun a : 𝔸[F] ↦ (a.1, a.2) : 𝔸[F] → InfiniteAdeleRing F × 𝔸ᶠ[𝓞 F, F]) ∧
     ∀ x : F, (∀ w, (algebraMap F 𝔸[F] x).1 w = algebraMap F w.Completion x) ∧
       ∀ v : Primes(F), (algebraMap F 𝔸[F] x).2 v = algebraMap F (v.adicCompletion F) x := by
-  sorry
+  classical
+  let _ := moduleTopology ℝ (ℝ ⊗[ℚ] F)
+  refine ⟨?_, IsHomeomorph.id, IsHomeomorph.id, ?_⟩
+  · let f : (ℝ ⊗[ℚ] F) →ₐ[ℝ] mixedEmbedding.mixedSpace F :=
+      AlgHom.liftEquiv ℚ ℝ F _ (mixedEmbedding F).toRatAlgHom
+    have hf (x : F) : f (1 ⊗ₜ[ℚ] x) = mixedEmbedding F x := by
+      simp [f]
+    let b := (integralBasis F).baseChange ℝ
+    let l := b.equiv (mixedEmbedding.latticeBasis F) (Equiv.refl _)
+    have hfl : f.toLinearMap = l.toLinearMap := by
+      apply b.ext
+      intro i
+      change f (b i) = l (b i)
+      rw [show l (b i) = mixedEmbedding.latticeBasis F i from
+        Module.Basis.equiv_apply .., mixedEmbedding.latticeBasis_apply]
+      simpa only [b, Module.Basis.baseChange_apply] using hf (integralBasis F i)
+    let e := AlgEquiv.ofBijective f (show Bijective f.toLinearMap from hfl ▸ l.bijective)
+    let h : InfiniteAdeleRing F ≃ₜ mixedEmbedding.mixedSpace F :=
+      (Homeomorph.piEquivPiSubtypeProd InfinitePlace.IsReal
+        (fun w : InfinitePlace F ↦ w.Completion)).trans
+        (Homeomorph.prodCongr
+          (Homeomorph.piCongrRight fun w ↦
+            (InfinitePlace.Completion.isometryEquivRealOfIsReal w.2).toHomeomorph)
+          ((Homeomorph.piCongrRight fun w ↦
+            (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+              (InfinitePlace.not_isReal_iff_isComplex.mp w.2)).toHomeomorph).trans
+            (Homeomorph.piCongrLeft (Y := fun _ ↦ ℂ)
+              (Equiv.subtypeEquivRight fun _ ↦ InfinitePlace.not_isReal_iff_isComplex))))
+    let g := InfiniteAdeleRing.ringEquiv_mixedSpace F
+    have : ContinuousAdd (ℝ ⊗[ℚ] F) := IsModuleTopology.toContinuousAdd ℝ _
+    have : IsModuleTopology ℝ (mixedEmbedding.mixedSpace F) := isModuleTopologyOfFiniteDimensional
+    refine ⟨e.toRingEquiv.trans g.symm, ?_, ?_, ?_⟩
+    · exact h.symm.continuous.comp (IsModuleTopology.continuous_of_linearMap e.toLinearMap)
+    · exact (IsModuleTopology.continuous_of_linearMap e.symm.toLinearMap).comp h.continuous
+    · intro x
+      change g.symm (f (1 ⊗ₜ[ℚ] x)) = _
+      rw [hf, InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp, RingEquiv.symm_apply_apply]
+  · intro x
+    refine ⟨fun w ↦ ?_, fun _ ↦ rfl⟩
+    rw [AdeleRing.algebraMap_fst_apply, AbsoluteValue.Completion.algebraMap_def,
+      WithAbs.algebraMap_right_apply, Algebra.algebraMap_self_apply]
 
 -- TODO(paper-gap): The completion in the introduction to A.1.2 allows every proper ideal.
 -- Including the zero ideal gives the discrete topology. The integral factors used in
