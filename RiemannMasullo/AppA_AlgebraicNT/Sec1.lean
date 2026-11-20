@@ -12,9 +12,11 @@ public import Mathlib.Topology.Maps.Proper.Basic
 public import RiemannMasullo.ForMathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 
 import Mathlib.Analysis.Normed.Field.ProperSpace
+import Mathlib.LinearAlgebra.Dimension.RankNullity
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.NormLeOne
 import Mathlib.NumberTheory.NumberField.ClassNumber
 import Mathlib.RingTheory.ClassGroup.ExtendedHom
+import Mathlib.RingTheory.DedekindDomain.SelmerGroup
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Algebra.Valued.LocallyCompact
@@ -2160,6 +2162,513 @@ theorem sIdeleClassNorm_descent :
       (hmk.continuous_comp_iff.mp hk.continuous) (hmk.isOpenMap_iff.mpr hk.isOpenMap))
       e.map_mul, fun x ↦ congrArg Subtype.val (he x)⟩
 
+open scoped nonZeroDivisors in
+/-- Paper: Theorem A.1.5.2(3), p. 544. The Picard group of the S-integers is finite
+because every ideal of the localization extends an ideal of the ring of integers. -/
+private theorem finite_sInteger_picard : Finite (CommRing.Pic (Oₛ(F, S))) := by
+  let R := 𝓞 F
+  let A := Oₛ(F, S)
+  let f : R →+* A := algebraMap R A
+  have hf : Injective f := fun x y h ↦
+    IsFractionRing.injective R F (congrArg (fun a : Oₛ(F, S) ↦ (a : F)) h)
+  apply Finite.of_surjective ((ClassGroup.equivPic A).toMonoidHom.comp (ClassGroup.map f hf))
+  intro c
+  obtain ⟨J, hJ⟩ := ClassGroup.mk0_surjective ((ClassGroup.equivPic A).symm c)
+  let I : Ideal R := J.val.under R
+  have hmap : I.map f = J.val :=
+    IsLocalization.map_under (Localization.submonoid (S : Set (Primes(F)))) A J.val
+  have hI : I ≠ ⊥ := by
+    intro he
+    rw [he, Ideal.map_bot] at hmap
+    exact (nonZeroDivisors.ne_zero J.property) hmap.symm
+  refine ⟨ClassGroup.mk0 ⟨I, mem_nonZeroDivisors_iff_ne_zero.mpr hI⟩, ?_⟩
+  rw [MonoidHom.comp_apply, ClassGroup.map_mk0]
+  change ClassGroup.equivPic A (ClassGroup.mk0 _) = c
+  rw [show (⟨I.map f, _⟩ : (Ideal A)⁰) = J from Subtype.ext hmap, hJ, MulEquiv.apply_symm_apply]
+
+open scoped Classical nonZeroDivisors in
+/-- Every prime ideal has a principal power with exponent the class number.
+A generator has valuation `exp (-classNumber F)` there and valuation one elsewhere. -/
+private theorem exists_prime_power_generator (v : Primes(F)) :
+    ∃ x : Fˣ, ∀ w : Primes(F),
+      w.valuation F (x : F) = if w = v then WithZero.exp (-(classNumber F : ℤ)) else 1 := by
+  classical
+  let n := classNumber F
+  have hv : v.asIdeal ∈ (Ideal (𝓞 F))⁰ := mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot
+  have hpow : (ClassGroup.mk0 ⟨v.asIdeal, hv⟩) ^ n = 1 := pow_card_eq_one
+  have hp : (v.asIdeal ^ n).IsPrincipal := by
+    rw [← ClassGroup.mk0_eq_one_iff (pow_mem hv n), ← hpow, ← map_pow]
+    rfl
+  obtain ⟨a, ha⟩ := hp
+  change v.asIdeal ^ n = Ideal.span {a} at ha
+  have ha₀ : a ≠ 0 := by
+    rintro rfl
+    exact (pow_ne_zero n v.ne_bot) (by simpa using ha)
+  have haF : algebraMap (𝓞 F) F a ≠ 0 := fun h ↦
+    ha₀ (IsFractionRing.injective (𝓞 F) F (h.trans (map_zero _).symm))
+  refine ⟨Units.mk0 _ haF, fun w ↦ ?_⟩
+  change w.valuation F (algebraMap (𝓞 F) F a) = _
+  rw [w.valuation_of_algebraMap]
+  by_cases h : w = v
+  · subst w
+    rw [ite_eq_left rfl, v.intValuation_eq_exp_neg_multiplicity ha₀]
+    have hmult : multiplicity v.asIdeal (Ideal.span {a}) = n := by
+      rw [← ha]
+      refine multiplicity_eq_of_dvd_of_not_dvd dvd_rfl ?_
+      rw [pow_dvd_pow_iff v.ne_bot (mt Ideal.isUnit_iff.mp v.isPrime.ne_top)]
+      exact Nat.not_succ_le_self n
+    rw [hmult]
+  · rw [ite_eq_right h, w.intValuation_eq_one_iff]
+    intro hd
+    have hw : w.asIdeal ∣ v.asIdeal ^ n := ha.symm ▸ (Ideal.dvd_span_singleton.mpr hd)
+    have hle : v.asIdeal ≤ w.asIdeal :=
+      w.isPrime.le_of_pow_le (Ideal.dvd_iff_le.mp hw)
+    exact h (HeightOneSpectrum.ext (v.isMaximal.eq_of_le w.isPrime.ne_top hle).symm)
+
+/-- Paper: Theorem A.1.5.2(2), p. 544. The S-unit group is finitely generated and its
+rank is the ordinary unit rank plus the number of finite places in S. -/
+private theorem sInteger_units_finiteness :
+    Group.FG (Oₛ(F, S))ˣ ∧ Module.finrank ℤ (Additive (Oₛ(F, S))ˣ) =
+      Fintype.card (InfinitePlace F) + S.card - 1 := by
+  classical
+  let i := Units.map (algebraMap (𝓞 F) (Oₛ(F, S))).toMonoidHom
+  let d := Units.map (Oₛ(F, S)).val.toRingHom.toMonoidHom
+  let f := i.toAdditive.toIntLinearMap
+  let ord : Additive (Oₛ(F, S))ˣ →ₗ[ℤ] (S → ℤ) :=
+    LinearMap.pi fun v ↦ ((v.val.valuationOfNeZero : Fˣ →* Multiplicative ℤ).comp d)
+      |>.toAdditive |>.toIntLinearMap
+  have hfi : Injective f := Units.map_injective (fun x y h ↦
+    IsFractionRing.injective (𝓞 F) F (congrArg (fun a : Oₛ(F, S) ↦ (a : F)) h))
+  have hval (u : (Oₛ(F, S))ˣ) (v : S) :
+      WithZero.exp (ord (.ofMul u) v) = v.val.valuation F ((u.val : Oₛ(F, S)) : F) :=
+    v.val.valuationOfNeZero_eq (d u)
+  have hexact : Exact f ord := by
+    intro a
+    change ord a = 0 ↔ ∃ b : Additive (𝓞 F)ˣ, i b.toMul = a.toMul
+    constructor
+    · intro h
+      let u := a.toMul
+      have hu (v : Primes(F)) : v.valuation F (u.val : F) = 1 := by
+        by_cases hv : v ∈ S
+        · have hu := hval u ⟨v, hv⟩
+          change WithZero.exp (ord a _) = _ at hu
+          simpa [h] using hu.symm
+        · exact (Set.unitEquivUnitsInteger _ F).symm u |>.property v hv
+      obtain ⟨x, hx⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (u.val : F)
+        (fun v ↦ (hu v).le)
+      have hinv : (u.inv : F) = (u.val : F)⁻¹ :=
+        Units.val_inv_eq_inv_val (d u)
+      obtain ⟨y, hy⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (u.inv : F)
+        (fun v ↦ by rw [hinv, map_inv₀, hu, inv_one])
+      have hxy : x * y = 1 := (IsFractionRing.injective (𝓞 F) F) (by
+        rw [map_mul, hx, hy, map_one]
+        exact congrArg Subtype.val u.val_inv)
+      let b : (𝓞 F)ˣ := ⟨x, y, hxy, (mul_comm y x).trans hxy⟩
+      exact ⟨.ofMul b, Units.ext (Subtype.ext hx)⟩
+    · rintro ⟨b, hb⟩
+      have hfb : f b = a := hb
+      rw [← hfb]
+      funext v
+      apply WithZero.exp_inj.mp
+      change WithZero.exp (ord (.ofMul (i b.toMul)) v) = WithZero.exp ((0 : S → ℤ) v)
+      rw [hval, Pi.zero_apply, WithZero.exp_zero]
+      change v.val.valuation F (algebraMap (𝓞 F) F b.toMul.val) = 1
+      rw [v.val.valuation_of_algebraMap]
+      apply eq_one_of_one_le_mul_left (v.val.intValuation_le_one _)
+        (v.val.intValuation_le_one b.toMul.inv)
+      rw [← map_mul, Units.val_inv, map_one]
+  have hrange : Module.finrank ℤ ord.range = S.card := by
+    let n : ℤ := classNumber F
+    have hn : n ≠ 0 := Int.natCast_ne_zero.mpr (classNumber_ne_zero F)
+    let m : (S → ℤ) →ₗ[ℤ] (S → ℤ) := DistribSMul.toLinearMap ℤ _ (-n)
+    have hm : Injective m := fun x y h ↦ funext fun v ↦ by
+      have hv : -n * x v = -n * y v := congrFun h v
+      exact mul_left_cancel₀ (neg_ne_zero.mpr hn) hv
+    have hsingle (v : S) : Pi.single v (-n) ∈ ord.range := by
+      obtain ⟨x, hx⟩ := exists_prime_power_generator F v.val
+      let u : (S : Set (Primes(F))).unit F := ⟨x, fun w hw ↦ by
+        change w.valuation F (x : F) = 1
+        rw [hx, ite_eq_right (show w ≠ v.val from fun e ↦ hw (e.symm ▸ v.property))]⟩
+      refine ⟨.ofMul (Set.unitEquivUnitsInteger _ F u), ?_⟩
+      funext w
+      apply WithZero.exp_inj.mp
+      rw [hval]
+      change w.val.valuation F (x : F) = _
+      rw [hx]
+      by_cases h : w = v
+      · subst w
+        simp [n]
+      · rw [ite_eq_right (fun e ↦ h (Subtype.ext e)), Pi.single_eq_of_ne h, WithZero.exp_zero]
+    have hle : m.range ≤ ord.range := by
+      rintro _ ⟨x, rfl⟩
+      rw [show m x = ∑ v : S, x v • Pi.single v (-n) from by
+        funext w
+        simp [m, Finset.sum_apply, Pi.single_apply, mul_comm]]
+      exact Submodule.sum_mem _ fun v _ ↦ Submodule.smul_mem _ _ (hsingle v)
+    have hcard : Module.finrank ℤ (S → ℤ) = S.card := by
+      simp
+    apply le_antisymm ((Submodule.finrank_le _).trans_eq hcard)
+    rw [← hcard, ← LinearMap.finrank_range_of_inj hm]
+    exact Submodule.finrank_mono hle
+  have hk : ord.ker = f.range := hexact.linearMap_ker_eq
+  have : Module.Finite ℤ ord.ker := hk ▸ inferInstanceAs (Module.Finite ℤ f.range)
+  have : Module.Finite ℤ (_ ⧸ ord.ker) := Module.Finite.equiv ord.quotKerEquivRange.symm
+  have : Module.Finite ℤ (Additive (Oₛ(F, S))ˣ) := Module.Finite.of_submodule_quotient ord.ker
+  have hr := ord.ker.finrank_quotient_add_finrank
+  rw [ord.quotKerEquivRange.finrank_eq, hk, LinearMap.finrank_range_of_inj hfi,
+    NumberField.Units.finrank_eq, NumberField.Units.rank, hrange] at hr
+  have hfg : AddGroup.FG (Additive (Oₛ(F, S))ˣ) :=
+    Module.Finite.iff_addGroup_fg.mp inferInstance
+  refine ⟨AddGroup.fg_iff_mul_fg.mp hfg, ?_⟩
+  have hpos : 0 < Fintype.card (InfinitePlace F) := Fintype.card_pos
+  omega
+
+/-- The S-idele classes embed as an open subgroup of the global idele class group,
+and this embedding preserves the norm. -/
+private theorem sIdeleClassGroup_openEmbedding :
+    ∃ j : SIdeleClassGroup F S →* C[F], IsOpenEmbedding j ∧
+      (∀ c, ideleClassNorm F (j c) = sIdeleClassNorm F S c) ∧
+      ∀ u : (integralAdelesOutside F S)ˣ, j (QuotientGroup.mk u) =
+        QuotientGroup.mk (Units.map (integralAdelesOutside F S).subtype.toMonoidHom u) := by
+  let A := integralAdelesOutside F S
+  let i := Units.map A.subtype.toMonoidHom
+  let d := Units.map (integralAdeleDiagonal F S).toMonoidHom
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let q := QuotientGroup.mk' P
+  let qS := QuotientGroup.mk' d.range
+  have hA : IsOpen (A : Set 𝔸[F]) := by
+    have h := isOpen_restrictedProduct_forall_mem (G := fun v : Primes(F) ↦ v.adicCompletion F)
+      (A := fun v ↦ v.adicCompletionIntegers F) (↑S : Set (Primes(F)))ᶜ
+      (fun v _ ↦ Valued.isOpen_valuationSubring (v.adicCompletion F))
+    have he : (A : Set 𝔸[F]) = Prod.snd ⁻¹'
+        {a : 𝔸ᶠ[𝓞 F, F] | ∀ v ∈ (↑S : Set (Primes(F)))ᶜ,
+          a v ∈ v.adicCompletionIntegers F} := by
+      ext x
+      change x ∈ A ↔ _
+      simp only [A, integralAdelesOutside, Subring.mem_iInf]
+      rfl
+    rw [he]
+    exact h.preimage continuous_snd
+  have hiVal : IsEmbedding (A.subtype : A → 𝔸[F]) := IsEmbedding.subtypeVal
+  have hiEmb : IsEmbedding i := by
+    refine IsEmbedding.of_comp
+      (hiVal.continuous.units_map A.subtype.toMonoidHom) Units.isEmbedding_embedProduct.continuous ?_
+    exact (hiVal.prodMap (MulOpposite.opHomeomorph.isEmbedding.comp
+      (hiVal.comp MulOpposite.opHomeomorph.symm.isEmbedding))).comp Units.isEmbedding_embedProduct
+  have hrange : Set.range i = {g : 𝕀[F] | g.val ∈ A ∧ g.inv ∈ A} := by
+    ext g
+    constructor
+    · rintro ⟨u, rfl⟩
+      exact ⟨u.val.property, u.inv.property⟩
+    · rintro ⟨hg, hg'⟩
+      exact ⟨⟨⟨g.val, hg⟩, ⟨g.inv, hg'⟩, Subtype.ext g.val_inv, Subtype.ext g.inv_val⟩,
+        Units.ext rfl⟩
+  have hiOpen : IsOpenEmbedding i :=
+    ⟨hiEmb, hrange ▸ (hA.preimage Units.continuous_val).inter
+      (hA.preimage Units.continuous_coe_inv)⟩
+  have hker : (q.comp i).ker = d.range := by
+    ext u
+    change QuotientGroup.mk (i u) = (1 : C[F]) ↔ u ∈ d.range
+    rw [QuotientGroup.eq_one_iff]
+    constructor
+    · rintro ⟨x, hx⟩
+      have hxVal : algebraMap F 𝔸[F] x.val = u.val.val := congrArg Units.val hx
+      have hxInv : algebraMap F 𝔸[F] x.inv = u.inv.val := congrArg Units.inv hx
+      let y : Oₛ(F, S)ˣ :=
+        ⟨⟨x.val, (diagonal_mem_integralAdelesOutside F S x.val).mp (hxVal ▸ u.val.property)⟩,
+         ⟨x.inv, (diagonal_mem_integralAdelesOutside F S x.inv).mp (hxInv ▸ u.inv.property)⟩,
+         Subtype.ext x.val_inv, Subtype.ext x.inv_val⟩
+      exact ⟨y, Units.ext (Subtype.ext hxVal)⟩
+    · rintro ⟨x, rfl⟩
+      exact ⟨Units.map (Oₛ(F, S)).val.toRingHom.toMonoidHom x, Units.ext rfl⟩
+  let j := QuotientGroup.lift d.range (q.comp i) hker.ge
+  have hj (u : Aˣ) : j (qS u) = q (i u) := rfl
+  have hqS : IsOpenQuotientMap qS := QuotientGroup.isOpenQuotientMap_mk
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  have hji : Injective j := by
+    apply (MonoidHom.ker_eq_bot_iff j).mp
+    rw [Subgroup.eq_bot_iff_forall]
+    intro c hc
+    obtain ⟨u, rfl⟩ := hqS.surjective c
+    rw [MonoidHom.mem_ker, hj] at hc
+    have hu : u ∈ (q.comp i).ker := hc
+    rw [hker] at hu
+    exact (QuotientGroup.eq_one_iff u).mpr hu
+  refine ⟨j, .of_continuous_injective_isOpenMap
+    (hqS.continuous_comp_iff.mp (hq.continuous.comp hiOpen.continuous)) hji
+    (hqS.isOpenMap_iff.mpr (hq.isOpenMap.comp hiOpen.isOpenMap)), ?_, hj⟩
+  intro c
+  obtain ⟨u, rfl⟩ := hqS.surjective c
+  exact (sIdeleNorm_spec F S).1 u
+
+open NumberField.Units.dirichletUnitTheorem in
+/-- The norm-one classes of ideles that are local units at every finite place lie in a
+compact set. Ordinary units reduce the archimedean logarithms to a bounded domain. -/
+private theorem exists_compact_integralIdeleClass_cover :
+    ∃ K : Set C[F], IsCompact K ∧ ∀ g : 𝕀[F], ideleNorm F g = 1 →
+      (∀ v : Primes(F), Valued.v (g.val.2 v) = 1) →
+      QuotientGroup.mk g ∈ K := by
+  classical
+  let b := (NumberField.Units.basisUnitLattice F).ofZLatticeBasis ℝ
+  obtain ⟨r, hr⟩ := (ZSpan.fundamentalDomain_isBounded b).subset_closedBall 0
+  let R : ℝ := Real.exp ((Fintype.card (InfinitePlace F) + 1 : ℝ) * max r 0)
+  obtain ⟨_, _, _, ⟨e, he⟩, _, _⟩ := ideleGroup_topology F
+  let finiteBox : Set (Πʳ v : Primes(F), [(v.adicCompletion F)ˣ,
+      (v.adicCompletionIntegers F).units]) := {x | ∀ v, x v ∈ (v.adicCompletionIntegers F).units}
+  have hLocal (v : Primes(F)) :
+      IsCompact ((v.adicCompletionIntegers F).units : Set (v.adicCompletion F)ˣ) := by
+    have : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+    apply Submonoid.units_isCompact
+    change IsCompact (v.adicCompletionIntegers F : Set (v.adicCompletion F))
+    convert isCompact_closedBall (0 : v.adicCompletion F) 1 using 1
+    ext x
+    simp only [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+      Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_one_iff]
+  have hfiniteBox : IsCompact (closure finiteBox) :=
+    (isCompact_closure_restrictedProduct_iff
+      (Filter.Eventually.of_forall fun v ↦ ⟨hLocal v,
+        Submonoid.isOpen_units (Valued.isOpen_valuationSubring (v.adicCompletion F))⟩) finiteBox).mpr
+      ⟨_, hLocal, Filter.Eventually.of_forall fun _ ↦ rfl, fun _ hx ↦ hx⟩
+  let arch (w : InfinitePlace F) : Set w.Completionˣ :=
+    {u | ‖u.val‖ ≤ R ∧ ‖u.inv‖ ≤ R}
+  have hArch (w : InfinitePlace F) : IsCompact (arch w) := by
+    have he := InfinitePlace.Completion.isometry_extensionEmbedding w
+    have hBall : IsCompact (Metric.closedBall (0 : w.Completion) R) := by
+      have h := he.isClosedEmbedding.isCompact_preimage
+        (isCompact_closedBall (InfinitePlace.Completion.extensionEmbedding w 0) R)
+      convert h using 1
+      ext z
+      simp only [Set.mem_preimage, Metric.mem_closedBall, he.dist_eq]
+    have h := hBall.prod (MulOpposite.opHomeomorph.symm.isCompact_preimage.mpr hBall)
+    convert (Units.isClosedEmbedding_embedProduct (α := w.Completion)).isCompact_preimage h using 1
+    ext u
+    simp only [arch, Set.mem_ofPred_eq, Set.mem_preimage, Set.mem_prod,
+      Metric.mem_closedBall, dist_zero_right]
+    rfl
+  let B := (Set.univ.pi arch) ×ˢ closure finiteBox
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  refine ⟨q '' (e ⁻¹' B),
+    (e.toHomeomorph.isCompact_preimage.mpr ((isCompact_univ_pi hArch).prod hfiniteBox)).image
+      QuotientGroup.continuous_mk, ?_⟩
+  intro g hg hgFin
+  let L (a : 𝕀[F]) (w : InfinitePlace F) := (w.mult : ℝ) * Real.log ‖a.val.1 w‖
+  have hnz (a : 𝕀[F]) (w : InfinitePlace F) : a.val.1 w ≠ 0 := by
+    let ev := (Pi.evalRingHom _ w).comp (RingHom.fst (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+    exact (Units.map ev.toMonoidHom a).ne_zero
+  have hLmul (a t : 𝕀[F]) (w : InfinitePlace F) : L (a * t) w = L a w + L t w := by
+    change (w.mult : ℝ) * Real.log ‖a.val.1 w * t.val.1 w‖ = _
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hnz a w))
+      (norm_ne_zero_iff.mpr (hnz t w)), mul_add]
+  let x : logSpace F := fun w ↦ L g w.val
+  obtain ⟨l, hl, _⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain b x
+  have hl' : l.val ∈ NumberField.Units.unitLattice F := by
+    rw [← (NumberField.Units.basisUnitLattice F).ofZLatticeBasis_span ℝ]
+    exact l.property
+  obtain ⟨u, _, hu⟩ := hl'
+  let uF := Units.map (algebraMap (𝓞 F) F).toMonoidHom u.toMul
+  let t := IdeleGroup.unitEmbedding (𝓞 F) F uF
+  let a := g * t
+  have ht : ideleNorm F t = 1 := (ideleNorm_spec F).2 ⟨uF, rfl⟩
+  have ha : ideleNorm F a = 1 := by rw [show a = g * t from rfl, map_mul, hg, ht, mul_one]
+  have haFin (v : Primes(F)) : Valued.v (a.val.2 v) = 1 := by
+    change Valued.v (g.val.2 v * (algebraMap (𝓞 F) F u.toMul.val : v.adicCompletion F)) = 1
+    rw [Valuation.map_mul, hgFin, one_mul, HeightOneSpectrum.valuedAdicCompletion_eq_valuation',
+      v.valuation_of_algebraMap]
+    apply eq_one_of_one_le_mul_left (v.intValuation_le_one _) (v.intValuation_le_one u.toMul.inv)
+    rw [← map_mul, Units.val_inv, map_one]
+  have hrest : (fun w : {w : InfinitePlace F // w ≠ w₀} ↦ L a w.val)
+      ∈ ZSpan.fundamentalDomain b := by
+    convert hl using 1
+    funext w
+    rw [hLmul]
+    change L g w.val + L t w.val = l.val w + x w
+    rw [add_comm, show x w = L g w.val from rfl, ← hu]
+    congr 1
+    change (w.val.mult : ℝ) * Real.log ‖(algebraMap F 𝔸[F] (uF : F)).1 w.val‖ =
+      NumberField.Units.logEmbedding F u w
+    rw [AdeleRing.algebraMap_fst_apply, AbsoluteValue.Completion.norm_coe]
+    rfl
+  have hsum : ∑ w, L a w = 0 := by
+    have hprod := (ideleNorm_spec F).1 a |>.2
+    have hfin : (∏ᶠ v : Primes(F), ‖a.val.2 v‖) = 1 :=
+      finprod_eq_one_of_forall_eq_one fun v ↦ Valued.toNormedField.norm_eq_one_iff.mpr (haFin v)
+    rw [ha, hfin, mul_one] at hprod
+    have h' := congrArg Real.log hprod.symm
+    simpa [L, Real.log_prod (fun w _ ↦ pow_ne_zero _ (norm_ne_zero_iff.mpr (hnz a w))),
+      Real.log_pow] using h'
+  have hrestBound (w : {w : InfinitePlace F // w ≠ w₀}) :
+      |L a w.val| ≤ max r 0 :=
+    (norm_le_pi_norm _ w).trans ((mem_closedBall_zero_iff.mp (hr hrest)).trans (le_max_left _ _))
+  have hbound (w : InfinitePlace F) :
+      |L a w| ≤ (Fintype.card (InfinitePlace F) + 1 : ℝ) * max r 0 := by
+    have hr₀ : 0 ≤ max r 0 := le_max_right _ _
+    by_cases hw : w = w₀
+    · subst w
+      rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀,
+        add_eq_zero_iff_eq_neg] at hsum
+      rw [hsum, abs_neg]
+      apply (Finset.abs_sum_le_sum_abs _ _).trans
+      apply (Finset.sum_le_sum fun j _ ↦ hrestBound j).trans
+      rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+      gcongr
+      exact_mod_cast (Fintype.card_subtype_le
+        (fun w : InfinitePlace F ↦ w ≠ w₀) |>.trans (Nat.le_succ _))
+    · refine (hrestBound ⟨w, hw⟩).trans ?_
+      exact le_mul_of_one_le_left hr₀ (le_add_of_nonneg_left (Nat.cast_nonneg _))
+  have hArchMem (w : InfinitePlace F) : (e a).1 w ∈ arch w := by
+    have hlog : |Real.log ‖((e a).1 w).val‖| ≤
+        (Fintype.card (InfinitePlace F) + 1 : ℝ) * max r 0 := by
+      rw [(he a).1 w]
+      apply le_trans _ (hbound w)
+      dsimp only [L]
+      rw [abs_mul, abs_of_nonneg (Nat.cast_nonneg w.mult : 0 ≤ (w.mult : ℝ))]
+      exact le_mul_of_one_le_left (abs_nonneg _) (by exact_mod_cast w.mult_pos)
+    have hpos : 0 < ‖((e a).1 w).val‖ := norm_pos_iff.mpr ((e a).1 w).ne_zero
+    refine ⟨(Real.log_le_iff_le_exp hpos).mp ((le_abs_self _).trans hlog), ?_⟩
+    change ‖(((e a).1 w)⁻¹).val‖ ≤ R
+    rw [Units.val_inv_eq_inv_val, norm_inv]
+    exact (Real.log_le_iff_le_exp (inv_pos.mpr hpos)).mp
+      (by rw [Real.log_inv]; exact (neg_le_abs _).trans hlog)
+  refine ⟨a, ⟨fun w _ ↦ hArchMem w, subset_closure ?_⟩, ?_⟩
+  · intro v
+    rw [HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one, (he a).2 v]
+    exact haFin v
+  · change q (g * t) = q g
+    simp only [map_mul, show q t = 1 from (QuotientGroup.eq_one_iff t).mpr ⟨uF, rfl⟩]
+    exact mul_one (q g)
+
+/-- The valuation vectors at the places in S, reduced modulo the class number, give
+finitely many representatives up to principal ideles and ideles that are local units
+at every finite place. The representatives can all be taken to have norm one. -/
+private theorem exists_finite_normOne_sIdele_representatives :
+    ∃ T : Set 𝕀[F], T.Finite ∧ ∀ g : 𝕀[F], ideleNorm F g = 1 →
+      (∀ v : Primes(F), v ∉ S → Valued.v (g.val.2 v) = 1) →
+      ∃ r ∈ T, ∃ h : 𝕀[F], ideleNorm F h = 1 ∧
+        (∀ v : Primes(F), Valued.v (h.val.2 v) = 1) ∧
+        (QuotientGroup.mk g : C[F]) = QuotientGroup.mk r * QuotientGroup.mk h := by
+  classical
+  let n := classNumber F
+  have : NeZero n := ⟨classNumber_ne_zero F⟩
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let q := QuotientGroup.mk' P
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  have hne (v : Primes(F)) (g : 𝕀[F]) : Valued.v (g.val.2 v) ≠ 0 := by
+    let ev := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+    exact (map_ne_zero _).mpr (Units.map ev.toMonoidHom g).ne_zero
+  let ν (v : Primes(F)) : 𝕀[F] →* Multiplicative ℤ :=
+    { toFun := fun g ↦ .ofAdd (WithZero.log (Valued.v (g.val.2 v)))
+      map_one' := by
+        change Multiplicative.ofAdd (WithZero.log (Valued.v (1 : v.adicCompletion F))) = 1
+        rw [map_one, WithZero.log_one]
+        rfl
+      map_mul' := fun g h ↦ by
+        change Multiplicative.ofAdd (WithZero.log (Valued.v (g.val.2 v * h.val.2 v))) =
+          Multiplicative.ofAdd (WithZero.log (Valued.v (g.val.2 v)) +
+            WithZero.log (Valued.v (h.val.2 v)))
+        rw [Valuation.map_mul, WithZero.log_mul (hne v g) (hne v h)] }
+  have hν (v : Primes(F)) (g : 𝕀[F]) :
+      WithZero.exp (ν v g).toAdd = Valued.v (g.val.2 v) := WithZero.exp_log (hne v g)
+  let α (g : 𝕀[F]) (v : S) : ZMod n := ((ν v.val g).toAdd : ℤ)
+  let U (k : S → ZMod n) := {g : 𝕀[F] | ideleNorm F g = 1 ∧
+    (∀ v : Primes(F), v ∉ S → Valued.v (g.val.2 v) = 1) ∧ α g = k}
+  let rep (k : S → ZMod n) : 𝕀[F] := if h : (U k).Nonempty then h.choose else 1
+  refine ⟨Set.range rep, Set.finite_range rep, ?_⟩
+  intro g hg hgS
+  let r := rep (α g)
+  have hr : r ∈ U (α g) := by
+    have h : (U (α g)).Nonempty := ⟨g, hg, hgS, rfl⟩
+    simpa only [r, rep, dite_eq_left h] using h.choose_spec
+  let x := g / r
+  have hxNorm : ideleNorm F x = 1 := by
+    change ideleNorm F (g / r) = 1
+    rw [map_div, hg, hr.1, div_one]
+  have hxOut (w : Primes(F)) (hw : w ∉ S) : (ν w x).toAdd = 0 := by
+    change (ν w (g / r)).toAdd = 0
+    rw [map_div]
+    change WithZero.log (Valued.v (g.val.2 w)) - WithZero.log (Valued.v (r.val.2 w)) = 0
+    rw [hgS w hw, hr.2.1 w hw, sub_self]
+  have hdiv (v : S) : (n : ℤ) ∣ (ν v.val x).toAdd := by
+    apply (ZMod.intCast_zmod_eq_zero_iff_dvd _ _).mp
+    change ((ν v.val (g / r)).toAdd : ZMod n) = 0
+    rw [map_div, toAdd_div, Int.cast_sub]
+    exact sub_eq_zero.mpr (congrFun hr.2.2 v).symm
+  choose z hz using hdiv
+  choose gen hval using fun v : S ↦ exists_prime_power_generator F v.val
+  have hgen (w : Primes(F)) (v : S) :
+      (ν w (d (gen v))).toAdd = if w = v.val then -(n : ℤ) else 0 := by
+    apply WithZero.exp_inj.mp
+    rw [hν]
+    change Valued.v ((gen v : F) : w.adicCompletion F) = _
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation', hval]
+    split_ifs <;> rfl
+  let u : Fˣ := ∏ v : S, gen v ^ (-z v)
+  have hu (w : Primes(F)) : (ν w (d u)).toAdd = (ν w x).toAdd := by
+    change (ν w (d (∏ v : S, gen v ^ (-z v)))).toAdd = _
+    simp only [map_prod, map_zpow, toAdd_prod, toAdd_zpow, hgen]
+    by_cases hw : w ∈ S
+    · let v : S := ⟨w, hw⟩
+      rw [Finset.sum_eq_single_of_mem v (Finset.mem_univ v)]
+      · simpa [v, mul_comm] using (hz v).symm
+      · intro j _ hj
+        simp [ite_eq_right (show w ≠ j.val from fun h ↦ hj (Subtype.ext h.symm))]
+    · rw [hxOut w hw]
+      exact Finset.sum_eq_zero fun v _ ↦ by simp [show w ≠ v.val from fun h ↦ hw (h ▸ v.property)]
+  let y := x / d u
+  have hdu : d u ∈ P := ⟨u, rfl⟩
+  have hy : ideleNorm F y = 1 := by
+    change ideleNorm F (x / d u) = 1
+    rw [map_div, hxNorm, show ideleNorm F (d u) = 1 from (ideleNorm_spec F).2 hdu, div_one]
+  refine ⟨r, ⟨_, rfl⟩, y, hy, ?_, ?_⟩
+  · intro w
+    rw [← hν w y]
+    change WithZero.exp (ν w (x / d u)).toAdd = 1
+    rw [map_div, toAdd_div, hu, sub_self, WithZero.exp_zero]
+  · change q g = q r * q (g / r / d u)
+    rw [map_div, map_div, show q (d u) = 1 from (QuotientGroup.eq_one_iff _).mpr hdu, div_one,
+      mul_comm (q r), div_mul_cancel]
+
+/-- Paper: Theorem A.1.5.2(1), p. 544. Norm-one S-idele classes form a closed compact
+Hausdorff subgroup. Their image in the global classes is closed and lies in finitely
+many translates of a compact set coming from ideles that are local units at all finite places. -/
+private theorem sIdeleClassGroup_normOne_topology :
+    IsClosed ((sIdeleClassNorm F S).ker : Set (SIdeleClassGroup F S)) ∧
+      CompactSpace (sIdeleClassNorm F S).ker ∧ T2Space (sIdeleClassNorm F S).ker := by
+  obtain ⟨j, hj, hnorm, hmk⟩ := sIdeleClassGroup_openEmbedding F S
+  obtain ⟨_, _, _, _, _, hHausdorff, _, _, hcont, _⟩ := ideleGroup_quotient.{_, 0} F
+  have : T2Space C[F] := hHausdorff
+  have : T2Space (SIdeleClassGroup F S) := hj.isEmbedding.t2Space
+  have hScont : Continuous (sIdeleClassNorm F S) := by
+    simpa only [Function.comp_def, hnorm] using hcont.comp hj.continuous
+  have hClosed : IsClosed ((sIdeleClassNorm F S).ker : Set (SIdeleClassGroup F S)) := by
+    rw [MonoidHom.coe_ker]
+    exact isClosed_singleton.preimage hScont
+  have hj' : IsClosedEmbedding j :=
+    ⟨hj.isEmbedding, j.range.isClosed_of_isOpen hj.isOpen_range⟩
+  refine ⟨hClosed, isCompact_iff_compactSpace.mp (hj.isEmbedding.isCompact_iff.mpr ?_), inferInstance⟩
+  obtain ⟨K, hK, hKmem⟩ := exists_compact_integralIdeleClass_cover F
+  obtain ⟨T, hT, hTmem⟩ := exists_finite_normOne_sIdele_representatives F S
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hCover : IsCompact (⋃ r ∈ T, (fun c ↦ q r * c) '' K) :=
+    hT.isCompact_biUnion fun r _ ↦ hK.image (continuous_const_mul (q r))
+  refine hCover.of_isClosed_subset (hj'.isClosedMap _ hClosed) ?_
+  rintro _ ⟨c, hc, rfl⟩
+  obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective c
+  let g := Units.map (integralAdelesOutside F S).subtype.toMonoidHom u
+  have hg : ideleNorm F g = 1 := (sIdeleNorm_spec F S).1 u |>.trans hc
+  have hgS (v : Primes(F)) (hv : v ∉ S) : Valued.v (g.val.2 v) = 1 := by
+    let ev := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+    have hmem (x : integralAdelesOutside F S) : x.val.2 v ∈ v.adicCompletionIntegers F := by
+      have hx := x.property
+      simp only [integralAdelesOutside, Subring.mem_iInf] at hx
+      exact hx v hv
+    exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := Units.map ev.toMonoidHom g)).mp ⟨hmem u.val, hmem u.inv⟩
+  obtain ⟨r, hr, h, hh, hhFin, heq⟩ := hTmem g hg hgS
+  rw [hmk, heq]
+  exact Set.mem_iUnion₂.mpr ⟨r, hr, _, hKmem h hh hhFin, rfl⟩
+
 /-- Paper: Theorem A.1.5.2, p. 544. The norm-one S-idele classes form a closed compact
 Hausdorff subgroup. The S-units are finitely generated of rank the total number of places
 in S minus one, and the Picard group of the S-integers is finite. -/
@@ -2168,7 +2677,9 @@ theorem sIdeleClassGroup_finiteness :
     CompactSpace (sIdeleClassNorm F S).ker ∧ T2Space (sIdeleClassNorm F S).ker ∧
     Group.FG (Oₛ(F, S))ˣ ∧ Module.finrank ℤ (Additive (Oₛ(F, S))ˣ) =
       Fintype.card (InfinitePlace F) + S.card - 1 ∧ Finite (CommRing.Pic (Oₛ(F, S))) := by
-  sorry
+  obtain ⟨hClosed, hCompact, hHausdorff⟩ := sIdeleClassGroup_normOne_topology F S
+  obtain ⟨hFG, hRank⟩ := sInteger_units_finiteness F S
+  exact ⟨hClosed, hCompact, hHausdorff, hFG, hRank, finite_sInteger_picard F S⟩
 
 end SAdeles
 
