@@ -145,7 +145,13 @@ def ratIdeleNormSection : ℝ≥0ˣ →* 𝕀[ℚ] :=
 
 /-- Paper: Lemma A.2.2.1, p. 546. Insertion at the real place is continuous. -/
 theorem ratIdeleNormSection_continuous : Continuous ratIdeleNormSection := by
-  sorry
+  unfold ratIdeleNormSection IdeleGroup.ofCompletion
+  simp only [MonoidHom.coe_comp]
+  apply Continuous.comp <;> apply Continuous.units_map
+  · exact (continuous_mulSingle (A := InfinitePlace.Completion) Rat.infinitePlace).prodMk
+      continuous_const
+  · exact (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).symm.continuous.comp
+      NNReal.continuous_coe
 
 /-- Paper: Lemma A.2.2.1, p. 546. The rational section is a right inverse to the
 idelic norm before passage to classes. -/
