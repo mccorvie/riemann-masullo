@@ -241,7 +241,14 @@ def locallyConvexFinalTopology (i : ∀ k, X k →ₗ[ℂ] E) : TopologicalSpace
 /-- Paper: §C.1.5, p. 663. For the identity map from a locally convex space the final
 locally convex topology recovers the given topology. -/
 theorem locallyConvexFinalTopology_id [t : TopologicalSpace E] [PolynormableSpace ℂ E] :
-    locallyConvexFinalTopology (X := fun _ : Unit ↦ E) (fun _ ↦ LinearMap.id) = t := by sorry
+    locallyConvexFinalTopology (X := fun _ : Unit ↦ E) (fun _ ↦ LinearMap.id) = t := by
+  change (SeminormFamily.moduleFilterBasis
+    (Subtype.val : {p : Seminorm ℂ E // ∀ _ : Unit, Continuous p} → Seminorm ℂ E)).topology = t
+  have h : (fun p : Seminorm ℂ E ↦ ∀ _ : Unit, Continuous p) =
+      (fun p : Seminorm ℂ E ↦ Continuous p) := by
+    simp only [forall_const]
+  rw [h]
+  exact (PolynormableSpace.withSeminorms ℂ E).withSeminorms_eq.symm
 
 /-- Paper: Proposition C.1.5.1, p. 664. In a countable locally convex direct sum of
 normed spaces, the intersection of suitably rescaled zero-neighborhoods is a zero-neighborhood.
