@@ -1230,6 +1230,123 @@ theorem integralAdelesOutside_factors :
         (e a).1 = adeleProjection F S a.val ∧ ∀ v, ((e a).2 v).val = a.val.2 v.val := by
   sorry
 
+/-- Paper: Lemma A.1.5.1, p. 543. Projection from the adeles integral outside S is
+continuous, surjective, and closed.
+The omitted coordinates range over a compact product of local integer rings. -/
+private theorem integralAdelesOutside_projection :
+    let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
+    Continuous p ∧ Surjective p ∧ IsClosedMap p := by
+  classical
+  dsimp only
+  let K := fun v : Primes(F) ↦ v.adicCompletion F
+  let B := (v : {v : Primes(F) // v ∉ S}) → v.val.adicCompletionIntegers F
+  have (v : {v : Primes(F) // v ∉ S}) :
+      CompactSpace (v.val.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v.val
+  let coords (x : SAdeleRing F S × B) (v : Primes(F)) : K v :=
+    if hv : v ∈ S then x.1.2 ⟨v, hv⟩ else (x.2 ⟨v, hv⟩).val
+  have hInt (x : SAdeleRing F S × B) (v : Primes(F)) (hv : v ∉ S) :
+      coords x v ∈ v.adicCompletionIntegers F := by
+    simpa only [coords, dite_eq_right hv] using (x.2 ⟨v, hv⟩).property
+  let finite (x : SAdeleRing F S × B) : 𝔸ᶠ[𝓞 F, F] :=
+    ⟨coords x, S.eventually_cofinite_notMem.mono (hInt x)⟩
+  let j (x : SAdeleRing F S × B) : integralAdelesOutside F S :=
+    ⟨(x.1.1, finite x), by
+      simp only [integralAdelesOutside, Subring.mem_iInf]
+      exact hInt x⟩
+  have hj : Continuous j := by
+    apply Continuous.subtype_mk
+    refine (continuous_fst.comp continuous_fst).prodMk
+      (continuous_restrictedProduct_of_uniform (f := finite) (fun v ↦ ?_)
+        (S.eventually_cofinite_notMem.mono fun v hv x ↦ hInt x v hv))
+    change Continuous (fun x ↦ coords x v)
+    by_cases hv : v ∈ S
+    · simp only [coords, dite_eq_left hv]
+      exact (continuous_apply (⟨v, hv⟩ : S)).comp (continuous_snd.comp continuous_fst)
+    · simp only [coords, dite_eq_right hv]
+      exact continuous_subtype_val.comp
+        ((continuous_apply (⟨v, hv⟩ : {v : Primes(F) // v ∉ S})).comp continuous_snd)
+  let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
+  have hpj (x : SAdeleRing F S × B) : p (j x) = x.1 := by
+    refine Prod.ext rfl (funext fun v ↦ ?_)
+    change coords x v = x.1.2 v
+    simp only [coords, dite_eq_left v.property]
+  have hs : Surjective j := by
+    intro a
+    have ha := a.property
+    simp only [integralAdelesOutside, Subring.mem_iInf] at ha
+    refine ⟨(p a, fun v ↦ ⟨a.val.2 v, ha v v.property⟩), Subtype.ext (Prod.ext rfl ?_)⟩
+    apply DFunLike.ext
+    intro v
+    change coords _ v = a.val.2 v
+    by_cases hv : v ∈ S
+    · simp only [coords, dite_eq_left hv]
+      rfl
+    · simp only [coords, dite_eq_right hv]
+  refine ⟨(continuous_fst.prodMk (continuous_pi fun v ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).comp continuous_subtype_val,
+    fun x ↦ ⟨j (x, 0), hpj _⟩, ?_⟩
+  intro C hC
+  have h : p '' C = Prod.fst '' (j ⁻¹' C) := by
+    rw [show (Prod.fst : SAdeleRing F S × B → SAdeleRing F S) =
+      p ∘ j from (funext hpj).symm, Set.image_comp, hs.image_preimage]
+  rw [h]
+  exact isClosedMap_fst_of_compactSpace _ (hC.preimage hj)
+
+/-- Paper: Lemma A.1.5.1, p. 543. The principal adeles in the integral-outside-S model
+are exactly the diagonal S-integers. -/
+private theorem principalSubgroup_comap_integralAdelesOutside :
+    (AdeleRing.principalSubgroup (𝓞 F) F).comap
+        (integralAdelesOutside F S).subtype.toAddMonoidHom =
+      (integralAdeleDiagonal F S).toAddMonoidHom.range := by
+  ext a
+  constructor
+  · rintro ⟨x, hx⟩
+    exact ⟨⟨x, (diagonal_mem_integralAdelesOutside F S x).mp (hx ▸ a.property)⟩,
+      Subtype.ext hx⟩
+  · rintro ⟨x, rfl⟩
+    exact ⟨x, rfl⟩
+
+/-- Paper: Lemma A.1.5.1, p. 543. Inclusion identifies the quotient of the open
+integral-outside-S model by its diagonal S-integers with the full additive adelic quotient. -/
+private theorem integralAdeleQuotientOutside_equiv :
+    ∃ e : IQuot(F, S) ≃ₜ+ AQuot(F), ∀ x,
+      e (QuotientAddGroup.mk' (integralAdeleDiagonal F S).toAddMonoidHom.range x) =
+        QuotientAddGroup.mk' (AdeleRing.principalSubgroup (𝓞 F) F) x.val := by
+  let I := integralAdelesOutside F S
+  let i := I.subtype.toAddMonoidHom
+  let P := AdeleRing.principalSubgroup (𝓞 F) F
+  let D := (integralAdeleDiagonal F S).toAddMonoidHom.range
+  have hOpen : IsOpen (I : Set 𝔸[F]) := by
+    change IsOpen (integralAdelesOutside F S : Set 𝔸[F])
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+    exact (isOpen_restrictedProduct_forall_mem (↑S : Set (Primes(F)))ᶜ
+      (fun v _ ↦ Valued.isOpen_integer (v.adicCompletion F))).preimage continuous_snd
+  have hD : P.comap i = D := principalSubgroup_comap_integralAdelesOutside F S
+  have hs : Surjective (QuotientAddGroup.mk ∘ i : I → AQuot(F)) := by
+    intro y
+    induction y using QuotientAddGroup.induction_on with
+    | H a =>
+      obtain ⟨x, hx⟩ := exists_sub_diagonal_mem_integralAdeles F a
+      have ha : a - algebraMap F 𝔸[F] x ∈ I := by
+        simp only [I, integralAdelesOutside, Subring.mem_iInf]
+        exact fun v _ ↦ (mem_integralAdeles_iff F _).mp hx v
+      refine ⟨⟨_, ha⟩, QuotientAddGroup.eq_iff_sub_mem.mpr ?_⟩
+      change a - algebraMap F 𝔸[F] x - a ∈ P
+      rw [sub_right_comm, sub_self, zero_sub, ← map_neg]
+      exact ⟨-x, rfl⟩
+  let e₀ := QuotientAddGroup.map D P i hD.ge
+  let e := AddEquiv.ofBijective e₀ ⟨(QuotientAddGroup.map_injective_iff D P i _).2 hD.le,
+    QuotientAddGroup.map_surjective_of_surjective D P i hs _⟩
+  have hq := QuotientAddGroup.isOpenQuotientMap_mk (N := P)
+  have hq₀ := QuotientAddGroup.isOpenQuotientMap_mk (N := D)
+  have hc : Continuous e := hq₀.continuous_comp_iff.mp
+    (hq.continuous.comp continuous_subtype_val)
+  have ho : IsOpenMap e := hq₀.isOpenMap_iff.mpr
+    (hq.isOpenMap.comp hOpen.isOpenMap_subtype_val)
+  exact ⟨ContinuousAddEquiv.mk' (e.toEquiv.toHomeomorphOfContinuousOpen hc ho) e.map_add,
+    fun _ ↦ rfl⟩
+
 /-- Paper: Lemma A.1.5.1, p. 543. The diagonal S-integers are closed and discrete with
 compact Hausdorff quotient. Forgetting the outside integral coordinates induces a proper
 quotient map, and inclusion identifies its source with the global additive quotient.
@@ -1247,7 +1364,67 @@ theorem sAdele_additive_quotient :
       IsProperMap π ∧ IsQuotientMap π ∧ ∀ x, π (q' x) = q (p x.val)) ∧
     ∃ e : IQuot(F, S) ≃ₜ+ (AQuot(F)), ∀ x, e (q' x) =
       QuotientAddGroup.mk' (AdeleRing.principalSubgroup (𝓞 F) F) x.val := by
-  sorry
+  dsimp only
+  let I := integralAdelesOutside F S
+  let p := (adeleProjection F S).comp I.subtype
+  let i := integralAdeleDiagonal F S
+  let d := p.comp i
+  let P := AdeleRing.principalSubgroup (𝓞 F) F
+  let D := i.toAddMonoidHom.range
+  let Q := d.toAddMonoidHom.range
+  have hd : Injective d := by
+    obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    intro x y h
+    exact Subtype.ext ((algebraMap F w.Completion).injective
+      (congrArg (fun a : SAdeleRing F S ↦ a.1 w) h))
+  obtain ⟨hp, hps, hpClosed⟩ := integralAdelesOutside_projection F S
+  -- Pull back the closed discrete principal subgroup, then project it injectively.
+  have : T2Space 𝔸[F] := by
+    change T2Space (((w : InfinitePlace F) → w.Completion) ×
+      (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  have hP := isDiscrete_principalAdeles F
+  have hPClosed : IsClosed (P : Set 𝔸[F]) := P.isClosed_of_isDiscrete hP
+  have : DiscreteTopology P := SetLike.isDiscrete_iff_discreteTopology.mp hP
+  have hD : (D : Set I) = Subtype.val ⁻¹' (P : Set 𝔸[F]) := by
+    change (D : Set I) = ((P.comap I.subtype.toAddMonoidHom : AddSubgroup I) : Set I)
+    rw [principalSubgroup_comap_integralAdelesOutside F S]
+  have hDClosed : IsClosed (D : Set I) := hD ▸ hPClosed.preimage continuous_subtype_val
+  let j (x : D) : P := ⟨x.val.val, Set.mem_preimage.mp (hD ▸ x.property)⟩
+  have : DiscreteTopology D := DiscreteTopology.of_continuous_injective
+    ((continuous_subtype_val.comp continuous_subtype_val).subtype_mk _ : Continuous j)
+    (fun _ _ h ↦ Subtype.ext (Subtype.ext (congrArg (fun a : P ↦ a.val) h)))
+  let f : D → SAdeleRing F S := p ∘ Subtype.val
+  have hf : IsClosedEmbedding f := .of_continuous_injective_isClosedMap
+    (hp.comp continuous_subtype_val) (by
+      rintro ⟨_, ⟨x, rfl⟩⟩ ⟨_, ⟨y, rfl⟩⟩ h
+      exact Subtype.ext (congrArg i (hd h))) (hpClosed.comp hDClosed.isClosedMap_subtype_val)
+  have hRange : Set.range f = Set.range d := by
+    ext a
+    exact ⟨fun ⟨⟨_, ⟨x, rfl⟩⟩, hx⟩ ↦ ⟨x, hx⟩, fun ⟨x, hx⟩ ↦ ⟨⟨i x, ⟨x, rfl⟩⟩, hx⟩⟩
+  have hClosed : IsClosed (Q : Set (SAdeleRing F S)) := by
+    change IsClosed (Set.range d)
+    rw [← hRange]
+    exact hf.isClosed_range
+  have hDiscrete : IsDiscrete (Set.range d) := hRange ▸ hf.isInducing.isDiscrete_range
+  have : T2Space (SAdeleRing F S ⧸ Q) := inferInstance
+  -- The global quotient supplies compactness of the source of the induced projection.
+  obtain ⟨e, he⟩ := integralAdeleQuotientOutside_equiv F S
+  have : CompactSpace (AQuot(F)) := compactSpace_adeleQuotient F
+  have : CompactSpace (IQuot(F, S)) := e.toHomeomorph.symm.surjective.compactSpace
+    e.toHomeomorph.symm.continuous
+  have hmap : D ≤ Q.comap p.toAddMonoidHom := by
+    rintro _ ⟨x, rfl⟩
+    exact ⟨x, rfl⟩
+  let π := QuotientAddGroup.map D Q p.toAddMonoidHom hmap
+  have hq := QuotientAddGroup.isOpenQuotientMap_mk (N := Q)
+  have hπ : Continuous π := (QuotientAddGroup.isOpenQuotientMap_mk (N := D)).continuous_comp_iff.mp
+    (hq.continuous.comp hp)
+  have hπs : Surjective π := QuotientAddGroup.map_surjective_of_surjective D Q p.toAddMonoidHom
+    (hq.surjective.comp hps) hmap
+  exact ⟨hd, hClosed, hDiscrete, fun a ↦ QuotientAddGroup.eq_zero_iff a, hq,
+    hπs.compactSpace hπ, inferInstance,
+    ⟨π, hπ.isProperMap, IsQuotientMap.of_surjective_continuous hπs hπ, fun _ ↦ rfl⟩, e, he⟩
 
 -- TODO(paper-gap): For F = ℚ and S = {∞}, A_{F,S}/O_{F,S} = ℝ/ℤ.
 -- The class of 1/2 has order two, which rules out a ℚ-vector space structure.
