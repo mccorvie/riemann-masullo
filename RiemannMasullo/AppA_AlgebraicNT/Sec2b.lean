@@ -83,7 +83,26 @@ def infiniteIdeleLog (g : 𝕀∞) (v : InfinitePlace F) : ℝ :=
 /-- Paper: Definition A.2.3.1, p. 548. Every real tuple is the logarithm of an
 archimedean idele. -/
 theorem infiniteIdeleLog_surjective : Surjective (infiniteIdeleLog F) := by
-  sorry
+  intro x
+  let r (v : InfinitePlace F) := Real.exp (x v / v.mult)
+  have hnorm (v : InfinitePlace F) : ∃ z : v.Completion, ‖z‖ = r v := by
+    by_cases hv : v.IsReal
+    · obtain ⟨z, hz⟩ := surjective_extensionEmbeddingOfIsReal hv (r v)
+      refine ⟨z, ?_⟩
+      rw [← (isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) z,
+        hz, Real.norm_eq_abs, abs_of_pos (Real.exp_pos _)]
+    · obtain ⟨z, hz⟩ := surjective_extensionEmbedding_of_isComplex
+        (InfinitePlace.not_isReal_iff_isComplex.mp hv) (r v : ℂ)
+      refine ⟨z, ?_⟩
+      rw [← (isometry_extensionEmbedding v).norm_map_of_map_zero (map_zero _) z,
+        hz, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (Real.exp_pos _)]
+  choose z hz using hnorm
+  let g : 𝕀∞ := MulEquiv.piUnits.symm fun v =>
+    Units.mk0 (z v) (norm_ne_zero_iff.mp ((hz v).trans_ne (Real.exp_pos _).ne'))
+  refine ⟨g, ?_⟩
+  funext v
+  change (v.mult : ℝ) * Real.log ‖z v‖ = x v
+  rw [hz, Real.log_exp, mul_div_cancel₀ _ InfinitePlace.mult_coe_ne_zero]
 
 /-- Paper: Lemma A.2.3.2(1), p. 548. The logarithm takes products to sums. -/
 theorem infiniteIdeleLog_mul (g h : 𝕀∞) :
