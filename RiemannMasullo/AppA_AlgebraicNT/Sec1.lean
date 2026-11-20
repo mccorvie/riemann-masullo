@@ -14,6 +14,7 @@ public import RiemannMasullo.ForMathlib.Topology.Algebra.RestrictedProduct.Topol
 import Mathlib.Analysis.Normed.Field.ProperSpace
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.NormLeOne
 import Mathlib.NumberTheory.NumberField.ClassNumber
+import Mathlib.RingTheory.ClassGroup.ExtendedHom
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Algebra.Valued.LocallyCompact
@@ -2254,6 +2255,197 @@ theorem picard_localization_exact (S T : Finset (Primes(F))) (h : S ⊆ T) :
           CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (∏ v, localIdealClass F v.val (x v)) := by
   sorry
 
+open scoped nonZeroDivisors in
+/-- Any finitely supported collection of finite orders is realized by a norm-one idele. -/
+private theorem exists_normOne_idele_with_exponents (n : Primes(F) → ℤ)
+    (hn : ∀ᶠ v in cofinite, n v = 0) :
+    ∃ g : (ideleNorm F).ker, ∀ v, ideleExponent F g.val v = n v := by
+  choose x hx using fun v : Primes(F) ↦ v.valuedAdicCompletion_surjective F (WithZero.exp (-n v))
+  have hval : ∀ᶠ v in cofinite, Valued.v (x v) = 1 := hn.mono fun v hv ↦ by simp [hx, hv]
+  let a : 𝔸[F] := (1, ⟨x, hval.mono fun v hv ↦ hv.le⟩)
+  have ha : IsUnit a := AdeleRing.isUnit_iff.mpr
+    ⟨fun _ ↦ one_ne_zero, fun v ↦ (Valuation.ne_zero_iff Valued.v).mp (by
+      change Valued.v (x v) ≠ 0
+      rw [hx]
+      exact WithZero.exp_ne_zero),
+      hval⟩
+  obtain ⟨s, _, hs, hsfin⟩ := exists_ideleNorm_section_finite_one F
+  let g := ha.unit / s (ideleNorm F ha.unit)
+  have hg : g ∈ (ideleNorm F).ker := by
+    change ideleNorm F g = 1
+    rw [map_div, hs _, div_self']
+  refine ⟨⟨g, hg⟩, fun v ↦ ?_⟩
+  have hfin : g.val.2 = a.2 := by
+    change ha.unit.val.2 * (s (ideleNorm F ha.unit)).inv.2 = _
+    have h := hsfin ((ideleNorm F ha.unit)⁻¹)
+    rw [map_inv] at h
+    rw [show (s (ideleNorm F ha.unit)).inv.2 = 1 from h, mul_one, IsUnit.unit_spec]
+  unfold ideleExponent
+  rw [hfin]
+  change -WithZero.log (Valued.v (x v)) = _
+  simp [hx]
+
+open scoped WithZero in
+/-- An idele is a unit in the integral adele model exactly when every finite order is zero. -/
+private theorem mem_integralIdeleRange_iff (g : 𝕀[F]) :
+    g ∈ (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range ↔
+      ∀ v : Primes(F), Valued.v (g.val.2 v) = (1 : ℤᵐ⁰) := by
+  have hval (a : 𝕀[F]) (v : Primes(F)) :
+      Valued.v (a.val.2 v) * Valued.v (a.inv.2 v) = (1 : ℤᵐ⁰) := by
+    let f := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+    change Valued.v (f a.val) * Valued.v (f a.inv) = 1
+    rw [← map_mul, ← map_mul, a.val_inv, map_one, map_one]
+  constructor
+  · rintro ⟨u, rfl⟩ v
+    let a := Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom u
+    exact eq_one_of_one_le_mul_left ((mem_integralAdeles_iff F _).mp u.val.property v)
+      ((mem_integralAdeles_iff F _).mp u.inv.property v) (hval a v).ge
+  · intro hg
+    have hinv (v : Primes(F)) : Valued.v (g.inv.2 v) = (1 : ℤᵐ⁰) := by
+      simpa only [hg v, one_mul] using hval g v
+    let u : (integralAdelesOutside F ∅)ˣ :=
+      ⟨⟨g.val, (mem_integralAdeles_iff F _).mpr fun v ↦ (hg v).le⟩,
+        ⟨g.inv, (mem_integralAdeles_iff F _).mpr fun v ↦ (hinv v).le⟩,
+        Subtype.ext g.val_inv, Subtype.ext g.inv_val⟩
+    exact ⟨u, Units.ext rfl⟩
+
+open scoped nonZeroDivisors in
+/-- Paper: Remark A.1.5.3, pp. 544–545. Taking the finite fractional ideal identifies the
+norm-one ideles modulo principal ideles and integral idelic units with the Picard group. -/
+private theorem picard_uniformization_ideles :
+    let N := (ideleNorm F).ker
+    let U := (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range
+    let H := (IdeleGroup.principalSubgroup (𝓞 F) F ⊔ U).comap N.subtype
+    ∃ e : (N ⧸ H) ≃* CommRing.Pic (𝓞 F), ∀ g : N, e (QuotientGroup.mk g) =
+      ∏ᶠ v : Primes(F), localIdealClass F v (Units.map
+        ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+          (RingHom.snd _ _)).toMonoidHom g.val) := by
+  classical
+  dsimp only
+  let N := (ideleNorm F).ker
+  let U := (Units.map (integralAdelesOutside F ∅).subtype.toMonoidHom).range
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let f := (ClassGroup.mk F).comp (ideleFractionalIdeal F)
+  let p := f.comp N.subtype
+  have hP : P ≤ f.ker := by
+    rintro _ ⟨x, rfl⟩
+    change ClassGroup.mk F (ideleFractionalIdeal F _) = 1
+    rw [ideleFractionalIdeal_principal]
+    exact ClassGroup.mk_eq_one_iff.mpr ⟨⟨x, by rw [coe_toPrincipalIdeal,
+      FractionalIdeal.coeToSubmodule_spanSingleton]⟩⟩
+  have hU : U ≤ f.ker := by
+    intro a ha
+    have ha' := (mem_integralIdeleRange_iff F a).mp ha
+    have hI : ideleFractionalIdeal F a = 1 := by
+      apply Units.ext
+      rw [coe_ideleFractionalIdeal]
+      exact finprod_eq_one_of_forall_eq_one fun v ↦ by simp [ideleExponent, ha' v]
+    change ClassGroup.mk F (ideleFractionalIdeal F a) = 1
+    rw [hI, map_one]
+  have hker : (P ⊔ U).comap N.subtype = p.ker := by
+    ext g
+    change g.val ∈ P ⊔ U ↔ f g.val = 1
+    refine ⟨fun hg ↦ (sup_le hP hU) hg, fun hg ↦ ?_⟩
+    obtain ⟨x, hx⟩ := exists_integral_fin_idele F g.val hg
+    exact Subgroup.mem_sup.mpr ⟨_, ⟨x, rfl⟩, _, (mem_integralIdeleRange_iff F _).mpr hx,
+      mul_div_cancel _ _⟩
+  have hsurj : Surjective p := by
+    intro c
+    obtain ⟨I, rfl⟩ := ClassGroup.mk0_surjective c
+    let J := FractionalIdeal.mk0 F I
+    obtain ⟨g, hg⟩ := exists_normOne_idele_with_exponents F
+      (fun v ↦ FractionalIdeal.count F v J) (FractionalIdeal.finite_factors J.val)
+    refine ⟨g, ?_⟩
+    change ClassGroup.mk F (ideleFractionalIdeal F g.val) = _
+    have hJ : ideleFractionalIdeal F g.val = J := by
+      apply Units.ext
+      rw [coe_ideleFractionalIdeal]
+      simpa only [hg] using FractionalIdeal.finprod_heightOneSpectrum_factorization' F J.ne_zero
+    rw [hJ, ClassGroup.mk_mk0]
+  let e := (QuotientGroup.quotientMulEquivOfEq hker).trans
+    ((QuotientGroup.quotientKerEquivOfSurjective p hsurj).trans (ClassGroup.equivPic (𝓞 F)))
+  refine ⟨e, fun g ↦ ?_⟩
+  let c := (ClassGroup.equivPic (𝓞 F)).toMonoidHom.comp (ClassGroup.mk F)
+  let P' (v : Primes(F)) := FractionalIdeal.mk0 F
+    ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩
+  have hI : ideleFractionalIdeal F g.val = ∏ᶠ v : Primes(F), P' v ^ ideleExponent F g.val v :=
+    rfl
+  change c (ideleFractionalIdeal F g.val) = _
+  rw [hI, map_finprod]
+  · apply finprod_congr
+    intro v
+    rw [map_zpow]
+    change _ = _ ^ ideleExponent F g.val v
+    rw [MonoidHom.comp_apply, ClassGroup.mk_mk0]
+    rfl
+  · exact eventually_cofinite.mp ((eventually_ideleExponent_eq_zero F g.val).mono
+      fun v hv ↦ by simp [hv])
+
+open scoped nonZeroDivisors in
+/-- Paper: Remark A.1.5.3, p. 544. One can invert a nonzero element of an integral
+representative of each ideal class by adding the primes dividing that element. -/
+private theorem exists_trivial_sInteger_picard (S : Finset (Primes(F))) :
+    ∃ T : Finset (Primes(F)), S ⊆ T ∧ Subsingleton (CommRing.Pic (Oₛ(F, T))) := by
+  classical
+  let R := 𝓞 F
+  let := Fintype.ofFinite (ClassGroup R)
+  choose I hI using (ClassGroup.mk0_surjective (R := R))
+  have hnonzero (c : ClassGroup R) : ∃ a : R, a ∈ (I c).val ∧ a ≠ 0 :=
+    Submodule.exists_mem_ne_zero_of_ne_bot (mem_nonZeroDivisors_iff_ne_zero.mp (I c).property)
+  choose a ha ha₀ using hnonzero
+  let support (c : ClassGroup R) :=
+    (Ideal.finite_factors (I := Ideal.span {a c}) (by simp [ha₀ c])).toFinset
+  let T := S ∪ Finset.univ.biUnion support
+  let A := Oₛ(F, T)
+  let M := Localization.submonoid (T : Set (Primes(F)))
+  have hu (c : ClassGroup R) : a c ∈ M := by
+    change a c ∈ Localization.submonoid (T : Set (Primes(F)))
+    rw [Localization.mem_submonoid_iff]
+    refine ⟨fun v hv h ↦ ?_,
+      mem_nonZeroDivisors_iff_ne_zero.mpr (ha₀ c)⟩
+    apply hv
+    apply Finset.mem_union_right
+    exact Finset.mem_biUnion.mpr ⟨c, Finset.mem_univ _, by
+      simpa [support] using (Ideal.dvd_span_singleton.mpr h : v.asIdeal ∣ Ideal.span {a c})⟩
+  have hone (c : ClassGroup R) : ClassGroup.extendedHom R A c = 1 := by
+    rw [← hI c, ClassGroup.extendedHom_mk0]
+    apply (ClassGroup.mk0_eq_one_iff _).mpr
+    have htop : (I c).val.map (algebraMap R A) = ⊤ :=
+      Ideal.eq_top_of_isUnit_mem _ (Ideal.mem_map_of_mem _ (ha c))
+        (IsLocalization.map_units A (⟨a c, hu c⟩ : M))
+    change ((I c).val.map (algebraMap R A)).IsPrincipal
+    rw [htop]
+    infer_instance
+  have hsurj : Surjective (ClassGroup.extendedHom R A) := by
+    intro c
+    obtain ⟨J, rfl⟩ := ClassGroup.mk0_surjective c
+    have hJ := IsLocalization.map_under M A J.val
+    have hJ' : J.val.under R ≠ ⊥ := by
+      intro hz
+      rw [hz, Ideal.map_bot] at hJ
+      exact (mem_nonZeroDivisors_iff_ne_zero.mp J.property) hJ.symm
+    refine ⟨ClassGroup.mk0 ⟨_, mem_nonZeroDivisors_iff_ne_zero.mpr hJ'⟩, ?_⟩
+    rw [ClassGroup.extendedHom_mk0]
+    exact congrArg ClassGroup.mk0 (Subtype.ext hJ)
+  have : Subsingleton (ClassGroup A) := ⟨fun x y ↦ by
+    obtain ⟨x, rfl⟩ := hsurj x
+    obtain ⟨y, rfl⟩ := hsurj y
+    rw [hone, hone]⟩
+  exact ⟨T, Finset.subset_union_left, (ClassGroup.equivPic A).symm.toEquiv.subsingleton⟩
+
+/-- Paper: Remark A.1.5.3, p. 544. The injection in the localization sequence is
+surjective whenever the Picard group on the right is trivial. -/
+private theorem picard_uniformization_finite (S T : Finset (Primes(F))) (h : S ⊆ T)
+    (hT : Subsingleton (CommRing.Pic (Oₛ(F, T)))) :
+    let D := T \ S
+    ∃ e : LocalQuot(F, T, D) ≃* CommRing.Pic (Oₛ(F, S)),
+      ∀ x : (v : D) → (v.val.adicCompletion F)ˣ,
+        e (QuotientGroup.mk (fun v ↦ QuotientGroup.mk (x v))) =
+          CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (∏ v, localIdealClass F v.val (x v)) := by
+  obtain ⟨j, hinj, hexact, _, hj⟩ := picard_localization_exact F S T h
+  exact ⟨MulEquiv.ofBijective j ⟨hinj, fun y ↦ (hexact y).mp (hT.elim _ _)⟩, hj⟩
+
 /-- Paper: Remark A.1.5.3, p. 544. Enlarging S can kill the Picard group. In that case
 the local presentation is an isomorphism. For the ordinary integers the finite-place and
 norm-one idelic presentations give the same ideal class by the product of local contributions. -/
@@ -2277,7 +2469,41 @@ theorem picard_uniformization (S : Finset (Primes(F))) :
        ∏ᶠ v : Primes(F), localIdealClass F v (Units.map
          ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
            (RingHom.snd _ _)).toMonoidHom g.val)) := by
-  sorry
+  refine ⟨exists_trivial_sInteger_picard F S, picard_uniformization_finite F S, ?_,
+    picard_uniformization_ideles F⟩
+  intro T hT
+  have h := picard_uniformization_finite F ∅ T (Finset.empty_subset T) hT
+  dsimp only at h
+  rw [Finset.sdiff_empty] at h
+  obtain ⟨e, he⟩ := h
+  let A := Oₛ(F, (∅ : Finset (Primes(F))))
+  have hA : A = ⊥ := by
+    change ((↑(∅ : Finset (Primes(F))) : Set (Primes(F))).integer F) = ⊥
+    rw [Finset.coe_empty, integer_empty]
+  let a : A ≃ₐ[𝓞 F] 𝓞 F :=
+    (Subalgebra.equivOfEq _ _ hA).trans
+      (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 F) F))
+  let r := a.toRingEquiv
+  let q : CommRing.Pic A ≃* CommRing.Pic (𝓞 F) :=
+    { CommRing.Pic.mapRingHom r.toRingHom with
+      invFun := CommRing.Pic.mapRingHom r.symm.toRingHom
+      left_inv := fun x ↦ by
+        change CommRing.Pic.mapRingHom r.symm.toRingHom (CommRing.Pic.mapRingHom r.toRingHom x) = x
+        rw [CommRing.Pic.mapRingHom_mapRingHom, r.symm_toRingHom_comp_toRingHom,
+          CommRing.Pic.mapRingHom_id_apply]
+      right_inv := fun x ↦ by
+        change CommRing.Pic.mapRingHom r.toRingHom (CommRing.Pic.mapRingHom r.symm.toRingHom x) = x
+        rw [CommRing.Pic.mapRingHom_mapRingHom, r.toRingHom_comp_symm_toRingHom,
+          CommRing.Pic.mapRingHom_id_apply] }
+  refine ⟨e.trans q, fun x ↦ ?_⟩
+  rw [MulEquiv.trans_apply, he]
+  change CommRing.Pic.mapRingHom r.toRingHom (CommRing.Pic.mapAlgebra (𝓞 F) A _) = _
+  rw [← CommRing.Pic.mapRingHom_algebraMap, CommRing.Pic.mapRingHom_mapRingHom]
+  have ha : r.toRingHom.comp (algebraMap (𝓞 F) A) = RingHom.id (𝓞 F) := by
+    apply RingHom.ext
+    intro z
+    exact (a.commutes z).trans (Algebra.algebraMap_self_apply z)
+  rw [ha, CommRing.Pic.mapRingHom_id_apply]
 
 end PicardGroups
 
