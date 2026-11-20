@@ -141,7 +141,11 @@ def IsAdeleExtension {L : Type*} [Field L] [NumberField L] (σ : F →+* L) (f :
 
 /-- Paper: Lemma A.1.2.1, p. 541. The identity embedding acts by identity on adeles. -/
 theorem isAdeleExtension_id : IsAdeleExtension F (RingHom.id F) (RingHom.id 𝔸[F]) := by
-  sorry
+  refine ⟨continuous_id, fun _ ↦ rfl, fun _ _ h ↦ h, ?_⟩
+  intro v w h
+  have hvw : v = w := HeightOneSpectrum.ext (h.trans w.asIdeal.comap_id)
+  subst w
+  exact fun _ ha ↦ ha
 
 /-- Paper: Lemma A.1.2.1, p. 540. The diagonal has closed discrete image, the additive
 quotient is compact Hausdorff and uniquely divisible, and inclusion of the integral model
