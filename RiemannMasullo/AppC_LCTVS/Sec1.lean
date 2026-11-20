@@ -783,7 +783,8 @@ theorem strongOperator_exists_unbounded_cauchy (hinf : ¬ FiniteDimensional ℂ 
 space of bounded endomorphisms of any Hilbert space are quasi-complete. -/
 theorem hilbert_quasiComplete_examples :
     (SeparableSpace H → IsFrechetTVS H ∧ QuasiCompleteSpace ℂ H) ∧
-      CompleteSpace (H →L[ℂ] H) ∧ QuasiCompleteSpace ℂ (H →L[ℂ] H) := by sorry
+      CompleteSpace (H →L[ℂ] H) ∧ QuasiCompleteSpace ℂ (H →L[ℂ] H) := by
+  exact ⟨fun _ ↦ ⟨isFrechetTVS_of_banach H, inferInstance⟩, inferInstance, inferInstance⟩
 
 end Hilbert
 
