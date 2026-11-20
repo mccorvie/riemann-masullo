@@ -42,7 +42,7 @@ instance : TopologicalSpace (WithGeneratingSeminorms X p) := p.moduleFilterBasis
 /-- Paper: §C.2.3, p. 676. The specified seminorms generate the topology on the synonym. -/
 theorem withGeneratingSeminorms_spec :
     @WithSeminorms ℂ (WithGeneratingSeminorms X p) ι inferInstance inferInstance inferInstance p
-      inferInstance := by sorry
+      inferInstance := ⟨rfl⟩
 
 instance : PolynormableSpace ℂ (WithGeneratingSeminorms X p) :=
   (withGeneratingSeminorms_spec X p).toPolynormableSpace
