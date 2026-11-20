@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
+import Mathlib.Topology.Algebra.Group.Units
 
 /-!
 # Orbital structures on adeles and ideles
@@ -299,7 +300,19 @@ def singlePlaceIdeleNormSection (v : InfinitePlace F) : ℝ≥0ˣ →* 𝕀[F] :
 /-- Paper: Lemma A.2.2.6, p. 547. The section at one infinite place is continuous. -/
 theorem singlePlaceIdeleNormSection_continuous (v : InfinitePlace F) :
     Continuous (singlePlaceIdeleNormSection F v) := by
-  sorry
+  unfold singlePlaceIdeleNormSection IdeleGroup.ofCompletion
+  simp only [MonoidHom.coe_comp]
+  apply Continuous.comp
+  · apply Continuous.units_map
+    exact (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  · apply Continuous.of_coeHom_comp
+    apply (isometry_extensionEmbedding v).isEmbedding.continuous_iff.mpr
+    change Continuous (fun t : ℝ≥0ˣ ↦
+      extensionEmbedding v (infinitePlaceRealPower F v (v.mult : ℝ)⁻¹ t).val)
+    simp only [infinitePlaceRealPower_apply]
+    exact Complex.continuous_ofReal.comp
+      ((Real.continuous_rpow_const (by positivity : 0 ≤ (v.mult : ℝ)⁻¹)).comp
+        (NNReal.continuous_coe.comp Units.continuous_val))
 
 /-- Paper: Lemma A.2.2.6, p. 547. The section at one infinite place splits the idelic norm. -/
 theorem singlePlaceIdeleNormSection_rightInverse (v : InfinitePlace F) :
