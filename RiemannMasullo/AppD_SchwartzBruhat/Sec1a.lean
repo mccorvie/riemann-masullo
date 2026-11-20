@@ -8,6 +8,7 @@ public import Mathlib.MeasureTheory.Measure.Haar.Quotient
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -40,7 +41,14 @@ theorem pontryaginDual_basic : T2Space (PontryaginDual G) ∧
 evaluation separates characters. -/
 theorem pontryaginDual_pairing_separates :
     Function.Injective (fun (x : G) (χ : PontryaginDual G) ↦ χ x) ∧
-    Function.Injective (fun (χ : PontryaginDual G) (x : G) ↦ χ x) := by sorry
+    Function.Injective (fun (χ : PontryaginDual G) (x : G) ↦ χ x) := by
+  constructor
+  · intro x y h
+    by_contra hxy
+    obtain ⟨χ, hχ⟩ := exists_pontryaginDual_apply_ne_one (div_ne_one.mpr hxy)
+    exact hχ (by simp [map_div, congrFun h χ])
+  · intro χ ψ h
+    exact PontryaginDual.ext (congrFun h)
 
 /-- Paper: Theorem D.1.1.1(2), p. 746. Evaluation gives the canonical topological
 group isomorphism with the double dual. -/
