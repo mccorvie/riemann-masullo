@@ -31,7 +31,8 @@ universe u
 /-- Paper: Remark C.1.1.1, p. 657. A circled set is stable under each complex scalar
 in the closed unit disc. -/
 theorem balanced_iff_closedUnitDisc {E : Type*} [AddCommGroup E] [Module ℂ E] (A : Set E) :
-    Balanced ℂ A ↔ ∀ z : ℂ, ‖z‖ ≤ 1 → ∀ x ∈ A, z • x ∈ A := by sorry
+    Balanced ℂ A ↔ ∀ z : ℂ, ‖z‖ ≤ 1 → ∀ x ∈ A, z • x ∈ A :=
+  balanced_iff_smul_mem
 
 /-- Paper: Remark C.1.1.2, p. 658. The balanced hull of the closed real hyperbola
 has just the origin on the axes, whereas its closure contains both axes. -/
