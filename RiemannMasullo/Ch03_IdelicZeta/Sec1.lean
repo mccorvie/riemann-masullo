@@ -304,11 +304,142 @@ def HasNormTwistCharts : Prop :=
     c ∈ e.source ∧ e c = 0 ∧
       ∀ z ∈ e.target, ∀ g, e.symm z g = c g * (modℝ g : ℂ) ^ z
 
+/-- A quasi-character trivial at an element of module greater than one is trivial
+if its values stay in the open unit ball about one on the corresponding norm interval. -/
+private theorem quasiCharacter_eq_one_of_normInterval {g : G}
+    (hK : IsCompact (m ⁻¹' Set.Icc 1 (m g)))
+    (hg : 1 < m g) (q : QuasiCharacter G) (hqg : q g = 1)
+    (hq : Set.MapsTo q (m ⁻¹' Set.Icc 1 (m g)) (Metric.ball 1 1)) : q = 1 := by
+  let K := m ⁻¹' Set.Icc 1 (m g)
+  -- Multiplying by powers of g moves any element into K without changing its value.
+  have himage : Set.range (q : G → ℂ) = q '' K := by
+    refine Set.Subset.antisymm (Set.range_subset_iff.mpr fun y => ?_) (Set.image_subset_range _ _)
+    obtain ⟨n, hn, -⟩ := existsUnique_zpow_near_of_one_lt' hg (m y)
+    refine ⟨y / g ^ n, ?_, by rw [map_div, map_zpow, hqg, one_zpow, div_one]⟩
+    simpa only [K, Set.mem_preimage, map_div, map_zpow, Set.mem_Icc] using ⟨hn.1, hn.2.le⟩
+  have heq := monoidHom_eq_one_of_compact_range_subset_ball q.toMonoidHom
+    (himage ▸ hK.image q.continuous) (himage ▸ hq.image_subset)
+  exact ContinuousMonoidHom.ext fun x => DFunLike.congr_fun heq x
+
 /-- Paper: §3.1.1, p. 119. Every modulated group admits local norm-twist coordinates,
 including when the complex exponent is defined globally only modulo a period. -/
 theorem hasNormTwistCharts_of_proper [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
     (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) : HasNormTwistCharts m := by
-  sorry
+  intro c
+  obtain ⟨g, hg⟩ : ∃ g, 1 < m g := by
+    obtain ⟨g, hg⟩ := hne
+    rcases lt_or_gt_of_ne hg with h | h
+    · exact ⟨g⁻¹, by simpa only [map_inv, one_lt_inv'] using h⟩
+    · exact ⟨g, h⟩
+  have hpos (x : G) : 0 < modℝ x :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (m x).ne_zero)
+  let L (x : G) : ℂ := Real.log (modℝ x)
+  have hLg : L g ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (Real.log_ne_zero_of_pos_of_ne_one (hpos g) fun h =>
+      hg.ne (Units.val_inj.mp (NNReal.coe_inj.mp h)).symm)
+  have hL : Continuous L := Complex.continuous_ofReal.comp
+    ((NNReal.continuous_coe.comp (Units.continuous_val.comp hm.continuous)).log
+      fun x => (hpos x).ne')
+  let twist (z : ℂ) : QuasiCharacter G :=
+    c * { toFun := fun x => Complex.exp (L x * z)
+          map_one' := by simp [L]
+          map_mul' := by
+            intro x y
+            simp only [L, map_mul, Units.val_mul, NNReal.coe_mul,
+              Real.log_mul (hpos x).ne' (hpos y).ne', Complex.ofReal_add, add_mul, Complex.exp_add]
+          continuous_toFun := (hL.mul continuous_const).cexp }
+  have htwist (z : ℂ) (x : G) : twist z x = c x * Complex.exp (L x * z) := rfl
+  have htwist_cont : Continuous twist := by
+    apply ContinuousMonoidHom.continuous_of_continuous_uncurry
+    exact (c.continuous.comp continuous_snd).mul
+      (((hL.comp continuous_snd).mul continuous_fst).cexp)
+  have hneval (d : QuasiCharacter G) (x : G) : d x ≠ 0 := ((Group.isUnit x).map d).ne_zero
+  -- Evaluation at g recovers the exponent using the principal logarithm.
+  let ratio (d : QuasiCharacter G) : ℂ := d g / c g
+  let expChart := Complex.expOpenPartialHomeomorph
+  let coord (d : QuasiCharacter G) : ℂ := expChart.symm (ratio d) / L g
+  let U := ratio ⁻¹' expChart.target
+  let T := (L g * ·) ⁻¹' expChart.source
+  have hratio : Continuous ratio := (continuous_eval_const g).div_const (c g)
+  have hU : IsOpen U := expChart.open_target.preimage hratio
+  have hcoord : ContinuousOn coord U :=
+    (expChart.continuousOn_invFun.comp hratio.continuousOn (fun _ h => h)).div_const _
+  have hscale (d : QuasiCharacter G) : L g * coord d = expChart.symm (ratio d) := by
+    change L g * (expChart.symm (ratio d) / L g) = _
+    rw [mul_comm, div_mul_cancel₀ _ hLg]
+  let residual (d : QuasiCharacter G) :=
+    d * (twist (coord d)).comp (ContinuousMonoidHom.inv G)
+  have hresidual (d : QuasiCharacter G) (x : G) : residual d x = d x / twist (coord d) x := by
+    change d x * twist (coord d) x⁻¹ = _
+    rw [map_inv, div_eq_mul_inv]
+  have hresidual_cont : ContinuousOn (fun d => (residual d).toContinuousMap) U := by
+    have hforget : Continuous (ContinuousMonoidHom.toContinuousMap : QuasiCharacter G → C(G, ℂ)) :=
+      (ContinuousMonoidHom.isInducing_toContinuousMap _ _).continuous
+    have hinv := (ContinuousMonoidHom.inv G).continuous_comp_left (C := ℂ)
+    exact hforget.continuousOn.mul
+      ((hforget.comp hinv).comp_continuousOn' (htwist_cont.comp_continuousOn' hcoord))
+  -- On the chart source the residual stays close to one on a compact norm interval.
+  let K := m ⁻¹' Set.Icc 1 (m g)
+  let V : Set C(G, ℂ) := {f | Set.MapsTo f K (Metric.ball 1 1)}
+  let S := U ∩ (fun d => (residual d).toContinuousMap) ⁻¹' V
+  have := nonnegRealUnits_orderTopology_and_compactIccSpace.2
+  have hK : IsCompact K := hm.isCompact_preimage isCompact_Icc
+  have hS : IsOpen S := hresidual_cont.isOpen_inter_preimage hU
+    (ContinuousMap.isOpen_setOfPred_mapsTo hK Metric.isOpen_ball)
+  have hratio_twist (z : ℂ) : ratio (twist z) = expChart (L g * z) := by
+    change twist z g / c g = Complex.exp (L g * z)
+    rw [htwist, mul_div_cancel_left₀ _ (hneval c g)]
+  have hright (z : ℂ) (hz : z ∈ T) : coord (twist z) = z := by
+    change expChart.symm (ratio (twist z)) / L g = z
+    rw [hratio_twist, expChart.left_inv hz, mul_div_cancel_left₀ _ hLg]
+  have hleft (d : QuasiCharacter G) (hd : d ∈ S) : twist (coord d) = d := by
+    have hrg : residual d g = 1 := by
+      have hval : twist (coord d) g = d g := by
+        rw [htwist, hscale]
+        change c g * expChart (expChart.symm (ratio d)) = d g
+        rw [expChart.right_inv hd.1, mul_comm]
+        exact div_mul_cancel₀ _ (hneval c g)
+      rw [hresidual, hval, div_self (hneval d g)]
+    have h := quasiCharacter_eq_one_of_normInterval m hK hg (residual d) hrg hd.2
+    ext1 x
+    have hx : residual d x = 1 := DFunLike.congr_fun h x
+    exact ((div_eq_one_iff_eq (hneval _ x)).mp (hresidual d x ▸ hx)).symm
+  let e : OpenPartialHomeomorph (QuasiCharacter G) ℂ := {
+    toFun := coord
+    invFun := twist
+    source := S
+    target := T
+    map_source' d hd := by
+      change L g * coord d ∈ expChart.source
+      rw [hscale]
+      exact expChart.map_target hd.1
+    map_target' z hz := by
+      refine ⟨?_, ?_⟩
+      · change ratio (twist z) ∈ expChart.target
+        rw [hratio_twist]
+        exact expChart.map_source hz
+      · intro x _
+        change residual (twist z) x ∈ Metric.ball 1 1
+        rw [hresidual, hright z hz, div_self (hneval _ x)]
+        exact Metric.mem_ball_self zero_lt_one
+    left_inv' := hleft
+    right_inv' := hright
+    open_source := hS
+    open_target := expChart.open_source.preimage (continuous_const.mul continuous_id)
+    continuousOn_toFun := hcoord.mono Set.inter_subset_left
+    continuousOn_invFun := htwist_cont.continuousOn }
+  have hzero : (0 : ℂ) ∈ T := by
+    change L g * 0 ∈ expChart.source
+    simp [expChart, Complex.expOpenPartialHomeomorph, Real.pi_pos]
+  have htwist_zero : twist 0 = c := by
+    ext1 x
+    simp [htwist]
+  refine ⟨e, htwist_zero ▸ e.map_target hzero, ?_, fun z _ x => ?_⟩
+  · change coord c = 0
+    rw [← htwist_zero, hright 0 hzero]
+  · change twist z x = _
+    rw [htwist, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (hpos x).ne'),
+      ← Complex.ofReal_log (hpos x).le]
 
 /-- Paper: §3.1.1, p. 119. Choose one norm-twist chart around each point. These charts form
 an atlas on the existing compact-open space. -/
