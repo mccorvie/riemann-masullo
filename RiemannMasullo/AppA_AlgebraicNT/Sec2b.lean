@@ -86,7 +86,15 @@ theorem infiniteIdeleLog_continuous : Continuous (infiniteIdeleLog F) := by
 /-- Paper: Lemma A.2.3.2(1), p. 548. The coordinates of the logarithm of a norm-one
 idele sum to zero, the defining equation of the logarithmic hyperplane. -/
 theorem infiniteIdeleLog_sum_zero (g : N∞) : ∑ v, infiniteIdeleLog F g.val v = 0 := by
-  sorry
+  have hne (v : InfinitePlace F) : g.val.val v ≠ 0 :=
+    (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g.val).ne_zero
+  have hprod := congrArg (fun u : ℝ≥0ˣ ↦ ((u : ℝ≥0) : ℝ))
+    (show infiniteIdeleNorm F g.val = 1 from g.property)
+  simp [infiniteIdeleNorm, Units.coe_prod] at hprod
+  change ∏ v : InfinitePlace F, ‖g.val.val v‖ ^ v.mult = 1 at hprod
+  have hlog := congrArg Real.log hprod
+  rw [Real.log_prod (fun v _ ↦ pow_ne_zero v.mult (norm_ne_zero_iff.mpr (hne v)))] at hlog
+  simpa only [infiniteIdeleLog, Real.log_pow, Real.log_one] using hlog
 
 local notation "mixedUnits" => Units.mapEquiv (RingEquiv.toMulEquiv (InfiniteAdeleRing.ringEquiv_mixedSpace F))
 
