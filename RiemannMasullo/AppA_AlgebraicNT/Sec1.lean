@@ -1056,10 +1056,11 @@ private theorem continuous_idelicNorm : Continuous (ideleNorm F) := by
       (a := Units.map eval.toMonoidHom g)).mp ⟨hg v, hginv v⟩
   simp [hfinite]
 
-/-- Paper: Lemma A.2.2.6, p. 547. Inserting a positive real root at one infinite place
-gives a continuous homomorphic section of the idele norm. -/
-private theorem exists_ideleNorm_section :
-    ∃ s : ℝ≥0ˣ →* 𝕀[F], Continuous s ∧ RightInverse s (ideleNorm F) := by
+/-- Paper: Lemma A.2.2.6, p. 547. The section of the idelic norm obtained from one infinite
+place has finite part one. -/
+private theorem exists_ideleNorm_section_finite_one :
+    ∃ s : ℝ≥0ˣ →* 𝕀[F], Continuous s ∧ RightInverse s (ideleNorm F) ∧
+      ∀ t, (s t).val.2 = 1 := by
   classical
   let v : InfinitePlace F := Classical.choice inferInstance
   let r := (v.mult : ℝ)⁻¹
@@ -1078,7 +1079,7 @@ private theorem exists_ideleNorm_section :
   let p : ℝ≥0ˣ →* v.Completionˣ :=
     Units.map ((f.comp NNReal.toRealHom).toMonoidHom.comp (NNReal.rpowMonoidHom r))
   let s := (IdeleGroup.ofCompletion (𝓞 F) F v).comp p
-  refine ⟨s, ?_, ?_⟩
+  refine ⟨s, ?_, ?_, fun _ ↦ rfl⟩
   · change Continuous ((IdeleGroup.ofCompletion (𝓞 F) F v) ∘ p)
     apply Continuous.comp
     · apply Continuous.units_map
@@ -1100,6 +1101,13 @@ private theorem exists_ideleNorm_section :
         Real.rpow_one]
     · intro w _ hw
       simp only [Pi.mulSingle_eq_of_ne hw, norm_one, one_pow]
+
+/-- Paper: Lemma A.2.2.6, p. 547. Inserting a positive real root at one infinite place
+gives a continuous homomorphic section of the idele norm. -/
+private theorem exists_ideleNorm_section :
+    ∃ s : ℝ≥0ˣ →* 𝕀[F], Continuous s ∧ RightInverse s (ideleNorm F) := by
+  obtain ⟨s, hs, hright, _⟩ := exists_ideleNorm_section_finite_one F
+  exact ⟨s, hs, hright⟩
 
 /-- Paper: Lemma A.1.3.4, p. 542. Principal ideles form a closed discrete subgroup,
 the class group is locally compact Hausdorff, and the descended norm admits a continuous
@@ -1317,6 +1325,38 @@ def sIdeleClassNorm : SIdeleClassGroup F S →* ℝ≥0ˣ :=
     ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom))
     (sIdeleNorm_spec F S).2
 
+/-- The adeles integral outside the chosen finite set form an open subring. -/
+private theorem isOpen_integralAdelesOutside : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+  have h : (integralAdelesOutside F S : Set 𝔸[F]) =
+      Prod.snd ⁻¹' {a : 𝔸ᶠ[𝓞 F, F] | ∀ v ∈ (S : Set (Primes(F)))ᶜ,
+        a v ∈ v.adicCompletionIntegers F} := by
+    ext a
+    simp only [SetLike.mem_coe, integralAdelesOutside, Subring.mem_iInf]
+    rfl
+  rw [h]
+  exact (isOpen_restrictedProduct_forall_mem (G := fun v : Primes(F) ↦ v.adicCompletion F)
+    (A := fun v ↦ v.adicCompletionIntegers F) ((S : Set (Primes(F)))ᶜ)
+    (fun _ _ ↦ Valued.isOpen_valuationSubring _)).preimage continuous_snd
+
+/-- The units of the integral adelic model form an open subgroup of the ideles. -/
+private theorem isOpenEmbedding_integralAdeleUnits :
+    IsOpenEmbedding (Units.map (integralAdelesOutside F S).subtype.toMonoidHom) := by
+  let A := integralAdelesOutside F S
+  let j := Units.map A.subtype.toMonoidHom
+  refine ⟨⟨(ideleTopology_induced F).of_comp_iff.mp ?_,
+    Units.map_injective Subtype.val_injective⟩, ?_⟩
+  · have hi : IsInducing (Subtype.val : A → 𝔸[F]) := IsInducing.subtypeVal
+    exact (hi.prodMap hi).comp
+      ((IsInducing.id.prodMap MulOpposite.opHomeomorph.symm.isInducing).comp
+        Units.isInducing_embedProduct)
+  · change IsOpen (Set.range j)
+    have hrange : Set.range j = (A.toSubmonoid.units : Set 𝕀[F]) := by
+      ext g
+      exact ⟨fun ⟨x, hx⟩ ↦ hx ▸ ⟨x.val.property, x.inv.property⟩,
+        fun hg ↦ ⟨A.toSubmonoid.unitsEquivUnitsType ⟨g, hg⟩, Units.ext rfl⟩⟩
+    rw [hrange]
+    exact Submonoid.isOpen_units (isOpen_integralAdelesOutside F S)
+
 /-- Paper: Equation (A.1.5.8), p. 544. The S-class norm is the unique descent of the
 product norm. It is continuous and surjective, and the norm-one classes are the quotient
 of the norm-one representatives by diagonal S-units. -/
@@ -1330,7 +1370,79 @@ theorem sIdeleClassNorm_descent :
     (∀ g, sIdeleClassNorm F S (q g) = n g) ∧
     ∃ e : (n.ker ⧸ d.range.comap n.ker.subtype) ≃ₜ* (sIdeleClassNorm F S).ker,
       ∀ x : n.ker, (e (QuotientGroup.mk x)).val = q x.val := by
-  sorry
+  dsimp only
+  let A := integralAdelesOutside F S
+  let j := Units.map A.subtype.toMonoidHom
+  let d := Units.map (integralAdeleDiagonal F S).toMonoidHom
+  let q := QuotientGroup.mk' d.range
+  let n := (sIdeleNorm F S).comp (Units.map ((adeleProjection F S).comp A.subtype).toMonoidHom)
+  let c := sIdeleClassNorm F S
+  let D := IdeleGroup.principalSubgroup (𝓞 F) F
+  have hj : IsOpenEmbedding j := isOpenEmbedding_integralAdeleUnits F S
+  have : T2Space 𝔸[F] := (adeleHausdorff_ideleLocallyCompact F).1
+  have : LocallyCompactSpace 𝕀[F] := (adeleHausdorff_ideleLocallyCompact F).2
+  have : LocallyCompactSpace Aˣ := hj.locallyCompactSpace
+  have hD : (d.range : Set Aˣ) = j ⁻¹' (D : Set 𝕀[F]) := by
+    ext g
+    constructor
+    · rintro ⟨u, rfl⟩
+      exact ⟨Units.map (Oₛ(F, S)).val.toRingHom.toMonoidHom u, Units.ext rfl⟩
+    · rintro ⟨u, hu⟩
+      have huval : u.val ∈ Oₛ(F, S) := by
+        apply (diagonal_mem_integralAdelesOutside F S _).mp
+        change ((IdeleGroup.unitEmbedding (𝓞 F) F) u).val ∈ A
+        rw [hu]
+        exact g.val.property
+      have huinv : u.inv ∈ Oₛ(F, S) := by
+        apply (diagonal_mem_integralAdelesOutside F S _).mp
+        change ((IdeleGroup.unitEmbedding (𝓞 F) F) u).inv ∈ A
+        rw [hu]
+        exact g.inv.property
+      let uS := (Oₛ(F, S)).toSubmonoid.unitsEquivUnitsType ⟨u, huval, huinv⟩
+      exact ⟨uS, hj.injective ((Units.ext rfl : j (d uS) = _).trans hu)⟩
+  have : IsClosed (d.range : Set Aˣ) := by
+    rw [hD]
+    exact (D.isClosed_of_isDiscrete (isDiscrete_principalIdeles F)).preimage hj.continuous
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  have hn : n = (ideleNorm F).comp j := MonoidHom.ext fun g ↦ ((sIdeleNorm_spec F S).1 g).symm
+  have hcont : Continuous n := by
+    rw [hn]
+    exact (continuous_idelicNorm F).comp hj.continuous
+  have hsurj : Surjective n := by
+    obtain ⟨s, _, hs, hsfin⟩ := exists_ideleNorm_section_finite_one F
+    intro t
+    have hmem (a : 𝔸[F]) (ha : a.2 = 1) : a ∈ A := by
+      simp only [A, integralAdelesOutside, Subring.mem_iInf]
+      intro v _
+      change a.2 v ∈ v.adicCompletionIntegers F
+      rw [ha]
+      exact (v.adicCompletionIntegers F).one_mem
+    have ht : s t ∈ A.toSubmonoid.units :=
+      ⟨hmem _ (hsfin t), hmem _ (by
+        change ((s t)⁻¹ : 𝕀[F]).val.2 = 1
+        rw [← map_inv]
+        exact hsfin _)⟩
+    let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
+    exact ⟨g, by rw [hn]; exact hs t⟩
+  refine ⟨inferInstance, inferInstance, hq.continuous_comp_iff.mp hcont,
+    fun t ↦ ?_, fun _ ↦ rfl, ?_⟩
+  · obtain ⟨g, hg⟩ := hsurj t
+    exact ⟨q g, hg⟩
+  · let k : n.ker →* c.ker := (q.comp n.ker.subtype).codRestrict c.ker fun x ↦ x.property
+    have hk : IsOpenQuotientMap k := hq.restrictPreimage (c.ker : Set (SIdeleClassGroup F S))
+    let N := d.range.comap n.ker.subtype
+    have hker : N = k.ker := by
+      ext x
+      change x.val ∈ d.range ↔ k x = 1
+      rw [← QuotientGroup.eq_one_iff, Subtype.ext_iff]
+      rfl
+    let e := QuotientGroup.liftEquiv N hk.surjective hker
+    have he (x : n.ker) : e (QuotientGroup.mk x) = k x := rfl
+    have hmk : IsOpenQuotientMap (QuotientGroup.mk : n.ker → n.ker ⧸ N) :=
+      QuotientGroup.isOpenQuotientMap_mk
+    exact ⟨ContinuousMulEquiv.mk' (e.toEquiv.toHomeomorphOfContinuousOpen
+      (hmk.continuous_comp_iff.mp hk.continuous) (hmk.isOpenMap_iff.mpr hk.isOpenMap))
+      e.map_mul, fun x ↦ congrArg Subtype.val (he x)⟩
 
 /-- Paper: Theorem A.1.5.2, p. 544. The norm-one S-idele classes form a closed compact
 Hausdorff subgroup. The S-units are finitely generated of rank the total number of places
