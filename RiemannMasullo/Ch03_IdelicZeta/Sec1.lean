@@ -110,7 +110,10 @@ theorem norm_quasiCharacter_eq_rpow_abscissa [IsTopologicalGroup G] [T2Space G]
 /-- Paper: Equation (3.1.1.2), p. 119. The abscissa is continuous in the compact-open topology. -/
 theorem continuous_quasiCharacterAbscissa (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) :
     Continuous (quasiCharacterAbscissa m hm hne) := by
-  sorry
+  have hev : Continuous (fun c : QuasiCharacter G => c hne.choose) := continuous_eval_const _
+  have hneval (c : QuasiCharacter G) : c hne.choose ≠ 0 :=
+    ((Group.isUnit hne.choose).map c).ne_zero
+  exact (hev.norm.log fun c => norm_ne_zero_iff.mpr (hneval c)).div_const _
 
 /-- Paper: Equation (3.1.1.2), p. 119. Every real number occurs as an abscissa. -/
 theorem surjective_quasiCharacterAbscissa (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) :
@@ -141,7 +144,8 @@ def componentVerticalStrip (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1)
 right half-plane precisely when its boundary is strictly negative. -/
 theorem one_mem_relativeRightHalfPlane (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) (a : ℝ) :
     1 ∈ relativeRightHalfPlane m hm hne a ↔ a < 0 := by
-  sorry
+  change a < quasiCharacterAbscissa m hm hne 1 ↔ a < 0
+  simp [quasiCharacterAbscissa]
 
 /-- Paper: Definition 3.1.1.2, p. 119. The trivial character belongs to the strip in
 the trivial component exactly when the interval contains zero. -/
