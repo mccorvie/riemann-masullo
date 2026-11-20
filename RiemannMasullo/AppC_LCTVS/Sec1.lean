@@ -200,7 +200,46 @@ theorem exists_equivalentCauchyNets_powerset {E J : Type*} [AddCommGroup E] [Uni
     [IsUniformAddGroup E] [Preorder J] [Nonempty J] [IsDirectedOrder J] (f : J → E)
     (hf : CauchySeq f) :
     ∃ (S : Set (Set E)) (_ : Nonempty Sᵒᵈ) (_ : IsDirectedOrder Sᵒᵈ) (g : Sᵒᵈ → E),
-      EquivalentCauchyNets f g := by sorry
+      EquivalentCauchyNets f g := by
+  classical
+  let tail (j : J) : Set E := f '' Ici j
+  let S := range tail
+  let tailIndex (j : J) : Sᵒᵈ := OrderDual.toDual ⟨tail j, mem_range_self j⟩
+  let : Nonempty Sᵒᵈ := ⟨tailIndex (Classical.choice ‹Nonempty J›)⟩
+  let : IsDirectedOrder Sᵒᵈ := by
+    constructor
+    intro s t
+    obtain ⟨j, hj⟩ := (OrderDual.ofDual s).2
+    obtain ⟨k, hk⟩ := (OrderDual.ofDual t).2
+    obtain ⟨l, hjl, hkl⟩ := exists_ge_ge j k
+    refine ⟨tailIndex l, ?_, ?_⟩
+    · change tail l ⊆ (OrderDual.ofDual s).1
+      rw [← hj]
+      exact image_mono (Ici_subset_Ici.mpr hjl)
+    · change tail l ⊆ (OrderDual.ofDual t).1
+      rw [← hk]
+      exact image_mono (Ici_subset_Ici.mpr hkl)
+  have hnonempty (s : Sᵒᵈ) : ((OrderDual.ofDual s).1 : Set E).Nonempty := by
+    obtain ⟨j, hj⟩ := (OrderDual.ofDual s).2
+    rw [← hj]
+    exact ⟨f j, mem_image_of_mem f le_rfl⟩
+  choose g hg using hnonempty
+  have hsmallTail (U : Set E) (hU : U ∈ 𝓝 (0 : E)) :
+      ∃ j, ∀ x ∈ tail j, ∀ y ∈ tail j, x - y ∈ U := by
+    obtain ⟨j, hj⟩ := (cauchySeq_iff_sub_mem f).mp hf U hU
+    refine ⟨j, ?_⟩
+    rintro _ ⟨k, hk, rfl⟩ _ ⟨l, hl, rfl⟩
+    exact hj k hk l hl
+  refine ⟨S, inferInstance, inferInstance, g, hf, ?_, ?_⟩
+  · rw [cauchySeq_iff_sub_mem]
+    intro U hU
+    obtain ⟨j, hj⟩ := hsmallTail U hU
+    exact ⟨tailIndex j, fun s hs t ht ↦ hj (g s) (hs (hg s)) (g t) (ht (hg t))⟩
+  · rw [← prod_atTop_atTop_eq, tendsto_iff_forall_eventually_mem]
+    intro U hU
+    obtain ⟨j, hj⟩ := hsmallTail U hU
+    refine ((eventually_ge_atTop j).prod_mk (eventually_ge_atTop (tailIndex j))).mono fun p hp ↦ ?_
+    exact hj (f p.1) (mem_image_of_mem f hp.1) (g p.2) (hp.2 (hg p.2))
 
 -- TODO(paper-gap): The arithmetic Schwartz–Bruhat spaces of Remark C.1.3.3 require Appendix D.
 
