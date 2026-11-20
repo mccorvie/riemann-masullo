@@ -31,7 +31,8 @@ that map one member of the directed family into a basic zero-neighborhood in the
 theorem uniformOnFun_zero_basis {ι : Type*} {p : ι → Prop} {V : ι → Set F}
     (hV : (𝓝 0).HasBasis p V) :
     (𝓝 (0 : X →ᵤ[S] F)).HasBasis (fun a : Set X × ι ↦ a.1 ∈ S ∧ p a.2)
-      (fun a ↦ {f | MapsTo (UniformOnFun.toFun S f) a.1 (V a.2)}) := by sorry
+      (fun a ↦ {f | MapsTo (UniformOnFun.toFun S f) a.1 (V a.2)}) := by
+  exact UniformOnFun.hasBasis_nhds_zero_of_basis S hne hdir hV
 
 -- TODO(paper-gap): Uniqueness on p. 670 needs translations by all functions in F^X.
 -- Invariance under just the constant translations by F does not determine the topology.
