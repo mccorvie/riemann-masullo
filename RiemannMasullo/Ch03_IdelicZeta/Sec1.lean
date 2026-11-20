@@ -454,7 +454,49 @@ an atlas on the existing compact-open space. -/
 theorem quasiCharacter_isManifold (h : HasNormTwistCharts m) :
     letI := quasiCharacterChartedSpace m h
     IsManifold 𝓘(ℂ) ω (QuasiCharacter G) := by
-  sorry
+  let := quasiCharacterChartedSpace m h
+  apply isManifold_of_contDiffOn
+  intro e e' he he'
+  change e ∈ Set.range (fun c => (h c).choose) at he
+  change e' ∈ Set.range (fun c => (h c).choose) at he'
+  obtain ⟨c, rfl⟩ := he
+  obtain ⟨d, rfl⟩ := he'
+  let e := (h c).choose
+  let e' := (h d).choose
+  have hc := (h c).choose_spec.2.2
+  have hd := (h d).choose_spec.2.2
+  change ContDiffOn ℂ ω (e.symm.trans e') ((e.symm.trans e').source ∩ Set.range id)
+  rw [Set.range_id, Set.inter_univ]
+  intro z hz
+  have hz' : z ∈ e.target ∧ e.symm z ∈ e'.source := by
+    simpa only [OpenPartialHomeomorph.trans_source, OpenPartialHomeomorph.symm_source,
+      Set.mem_inter_iff, Set.mem_preimage] using hz
+  let w := e' (e.symm z)
+  have hw : w ∈ e'.target := e'.map_source hz'.2
+  have hbase (g : G) : c g * (modℝ g : ℂ) ^ z = d g * (modℝ g : ℂ) ^ w := by
+    rw [← hc z hz'.1 g, ← hd w hw g]
+    exact congrArg (fun q : QuasiCharacter G => q g) (e'.left_inv hz'.2).symm
+  -- Adding the same increment to both coordinates twists both characters by the same power.
+  let translate (y : ℂ) := w + (y - z)
+  have hsmooth : ContDiff ℂ ω translate := contDiff_const.add (contDiff_id.sub contDiff_const)
+  have hnear : translate ⁻¹' e'.target ∈ 𝓝 z :=
+    (e'.open_target.preimage hsmooth.continuous).mem_nhds (by simpa [translate] using hw)
+  refine hsmooth.contDiffWithinAt.congr_of_eventuallyEq_of_mem ?_ hz
+  filter_upwards [self_mem_nhdsWithin, eventually_nhdsWithin_of_eventually_nhds hnear]
+    with y hy htranslate
+  have hy' : y ∈ e.target := by
+    rw [OpenPartialHomeomorph.trans_source] at hy
+    exact hy.1
+  have heq : e.symm y = e'.symm (translate y) := by
+    ext1 g
+    have hmod : (modℝ g : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (m g).ne_zero)
+    rw [hc y hy' g, hd (translate y) htranslate g]
+    change c g * (modℝ g : ℂ) ^ y = d g * (modℝ g : ℂ) ^ (w + (y - z))
+    rw [Complex.cpow_add _ _ hmod, ← mul_assoc, ← hbase g, mul_assoc,
+      ← Complex.cpow_add _ _ hmod, show z + (y - z) = y by abel]
+  change e' (e.symm y) = translate y
+  rw [heq, e'.right_inv htranslate]
 
 /-- Paper: Definition 3.1.1.1, p. 119. The abscissa is the real exponent in the modulus of
 a quasi-character. We evaluate the ratio of logarithms at a point where the module differs from one.
