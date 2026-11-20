@@ -478,7 +478,12 @@ theorem localIdealClass_normalization (v : Primes(F)) (x : (v.adicCompletion F)�
     (Valued.v x.val = WithZero.exp (-1 : ℤ) → localIdealClass F v x =
       ClassGroup.equivPic (𝓞 F) (ClassGroup.mk0
         ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩)) := by
-  sorry
+  constructor
+  · intro hx
+    rw [HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one] at hx
+    simp [localIdealClass, hx]
+  · intro hx
+    simp [localIdealClass, hx]
 
 local notation "LocalQuot(" F ", " T ", " D ")" =>
   _ ⧸ MonoidHom.range (sUnitLocalClasses F T D)
