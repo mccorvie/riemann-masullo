@@ -328,7 +328,20 @@ def diagonalIdeleNormSection : ℝ≥0ˣ →* 𝕀[F] :=
 
 /-- Paper: Lemma A.2.2.8, p. 547. The diagonal homomorphism is continuous. -/
 theorem diagonalIdeleNormSection_continuous : Continuous (diagonalIdeleNormSection F) := by
-  sorry
+  simp only [diagonalIdeleNormSection, MonoidHom.coe_finsetProd, Finset.prod_fn,
+    MonoidHom.coe_comp]
+  refine continuous_finsetProd _ fun v _ ↦ ?_
+  apply Continuous.comp
+  · unfold IdeleGroup.ofCompletion
+    apply Continuous.units_map
+    exact (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+  · apply Continuous.of_coeHom_comp
+    apply (isometry_extensionEmbedding v).isEmbedding.continuous_iff.mpr
+    change Continuous (fun t : ℝ≥0ˣ ↦ extensionEmbedding v (infinitePlaceRealPower F v _ t).val)
+    simp only [infinitePlaceRealPower_apply]
+    exact Complex.continuous_ofReal.comp
+      ((Real.continuous_rpow_const (by positivity)).comp
+        (NNReal.continuous_coe.comp Units.continuous_val))
 
 /-- Paper: Lemma A.2.2.8, p. 547. The diagonal homomorphism splits the idelic norm. -/
 theorem diagonalIdeleNormSection_rightInverse :
