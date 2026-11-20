@@ -72,7 +72,8 @@ theorem infiniteIdeleNorm_continuous : Continuous (infiniteIdeleNorm F) := by
 
 /-- Paper: Definition A.2.3.1, p. 548. The norm-one archimedean ideles form a closed subgroup. -/
 theorem infiniteIdeleNorm_ker_closed : IsClosed (N∞ : Set 𝕀∞) := by
-  sorry
+  rw [MonoidHom.coe_ker]
+  exact isClosed_singleton.preimage (infiniteIdeleNorm_continuous F)
 
 /-- Paper: Definition A.2.3.1, p. 548. The full logarithm records the logarithm of
 the normalized absolute value at every archimedean place. -/
