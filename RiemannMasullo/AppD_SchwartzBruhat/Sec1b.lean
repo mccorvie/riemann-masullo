@@ -136,7 +136,12 @@ def lcaDualAnnihilator (J : Subgroup (PontryaginDual G)) : Subgroup G :=
 /-- Paper: Definition D.1.4.5, p. 758. A character is in the annihilator exactly
 when its value on every element of the subgroup is one. -/
 theorem mem_lcaAnnihilator_iff (H : Subgroup G) (χ : PontryaginDual G) :
-    χ ∈ lcaAnnihilator H ↔ ∀ x : H, χ x.val = 1 := by sorry
+    χ ∈ lcaAnnihilator H ↔ ∀ x : H, χ x.val = 1 := by
+  rw [lcaAnnihilator, MonoidHom.mem_ker]
+  constructor
+  · intro h x
+    exact congrArg (fun ψ : PontryaginDual H ↦ ψ x) h
+  · exact fun h ↦ PontryaginDual.ext h
 
 /-- Paper: Definition D.1.4.5, p. 758. A group element is in the dual annihilator
 exactly when every character of the subgroup takes value one there. -/
