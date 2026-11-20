@@ -290,7 +290,9 @@ def localBanachMap (p q : Seminorm ℂ E) (h : q ≤ p) : LocalBanach p →L[ℂ
 /-- Paper: Theorem C.2.4.2(2), p. 686. The comparison of local Banach spaces sends
 the canonical image of each vector to its canonical image for the smaller seminorm. -/
 theorem localBanachMap_coe (p q : Seminorm ℂ E) (h : q ≤ p) (x : WithLocalSeminorm p) :
-    localBanachMap p q h x = ((show WithLocalSeminorm q from x) : LocalBanach q) := by sorry
+    localBanachMap p q h x = ((show WithLocalSeminorm q from x) : LocalBanach q) := by
+  rw [localBanachMap, ContinuousLinearMap.completion_apply_coe]
+  rfl
 
 end LocalBanach
 
