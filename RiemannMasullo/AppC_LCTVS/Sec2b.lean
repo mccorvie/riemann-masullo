@@ -532,7 +532,7 @@ def tensorToFiniteRank : StrongDual ℂ E ⊗[ℂ] F →ₗ[ℂ] E →L[ℂ] F :
 /-- Paper: (C.2.4.7), p. 689. On a pure tensor the canonical map evaluates the
 dual factor on the input and scales the target factor by the result. -/
 theorem tensorToFiniteRank_tmul (φ : StrongDual ℂ E) (y : F) (x : E) :
-    tensorToFiniteRank (φ ⊗ₜ[ℂ] y) x = φ x • y := by sorry
+    tensorToFiniteRank (φ ⊗ₜ[ℂ] y) x = φ x • y := rfl
 
 /-- Paper: (C.2.4.6), p. 689. The canonical map from the dual tensor is injective. -/
 theorem tensorToFiniteRank_injective :
