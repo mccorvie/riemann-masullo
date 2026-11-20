@@ -75,7 +75,37 @@ def adeleFundamentalDomain : Set 𝔸[F] :=
 diagonal element of the number field, namely zero. -/
 theorem diagonal_mem_adeleFundamentalDomain (x : F) :
     algebraMap F 𝔸[F] x ∈ adeleFundamentalDomain F b ↔ x = 0 := by
-  sorry
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let e := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map e).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  simp only [adeleFundamentalDomain, Set.mem_ofPred_eq, AdeleRing.algebraMap_fst_def,
+    infiniteAdeleFundamentalDomain, Set.mem_preimage,
+    ← InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp]
+  change mixedEmbedding F x ∈ ZSpan.fundamentalDomain B ∧ _ ↔ _
+  constructor
+  · rintro ⟨hinf, hfin⟩
+    have hx := (diagonal_mem_integralAdelesOutside F ∅ x).mp hfin
+    simp only [Finset.coe_empty, integer_empty, Algebra.mem_bot] at hx
+    obtain ⟨r, rfl⟩ := hx
+    apply mixedEmbedding_injective F
+    rw [map_zero]
+    apply B.ext_elem
+    intro i
+    have hi := (ZSpan.mem_fundamentalDomain B).mp hinf i
+    change B.repr (e r : mixedEmbedding.mixedSpace F) i ∈ Set.Ico 0 1 at hi
+    rw [Module.Basis.ofZLatticeBasis_repr_apply, Set.mem_Ico] at hi
+    let n := (b.map e).repr (e r) i
+    have hnonneg : 0 ≤ n := by exact_mod_cast hi.1
+    have hlt : n < 1 := by exact_mod_cast hi.2
+    have hn : n = 0 := by omega
+    change B.repr (e r : mixedEmbedding.mixedSpace F) i = B.repr 0 i
+    rw [Module.Basis.ofZLatticeBasis_repr_apply, map_zero, Finsupp.zero_apply]
+    exact_mod_cast hn
+  · rintro rfl
+    rw [map_zero, map_zero, ZSpan.mem_fundamentalDomain]
+    refine ⟨fun i ↦ ?_, (integralAdelesOutside F ∅).zero_mem⟩
+    rw [map_zero, Finsupp.zero_apply]
+    exact ⟨le_rfl, zero_lt_one⟩
 
 /-- Paper: §A.2.1, p. 545. The adelic fundamental domain has compact closure. -/
 theorem adeleFundamentalDomain_precompact : IsCompact (closure (adeleFundamentalDomain F b)) := by
