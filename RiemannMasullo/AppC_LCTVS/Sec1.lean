@@ -8,12 +8,15 @@ public import Mathlib.Analysis.LocallyConvex.WeakSpace
 public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import Mathlib.Algebra.Module.ULift
+import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Lp.lpSpace
 import Mathlib.Analysis.Normed.Module.DoubleDual
 import Mathlib.Analysis.Normed.Operator.BanachSteinhaus
+import Mathlib.Topology.Algebra.Module.Star
 import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 
 /-!
 # Locally convex topological vector spaces
@@ -646,7 +649,40 @@ variable (H : Type u) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [Complete
 weak topology is incomplete, although its closed bounded subsets are complete (p. 662). -/
 theorem weakHilbert_incomplete (hinf : ¬ FiniteDimensional ℂ H) :
     letI := IsTopologicalAddGroup.rightUniformSpace (WeakSpace ℂ H)
-    ¬ CompleteSpace (WeakSpace ℂ H) ∧ QuasiCompleteSpace ℂ (WeakSpace ℂ H) := by sorry
+    ¬ CompleteSpace (WeakSpace ℂ H) ∧ QuasiCompleteSpace ℂ (WeakSpace ℂ H) := by
+  let := IsTopologicalAddGroup.rightUniformSpace (WeakSpace ℂ H)
+  let := isUniformAddGroup_of_addCommGroup (G := WeakSpace ℂ H)
+  let := IsTopologicalAddGroup.rightUniformSpace (WeakDual ℂ (StrongDual ℂ H))
+  let := isUniformAddGroup_of_addCommGroup (G := WeakDual ℂ (StrongDual ℂ H))
+  let j := NormedSpace.inclusionInDoubleDualWeak ℂ H
+  have hj : IsEmbedding j := NormedSpace.isEmbedding_inclusionInDoubleDualWeak ℂ H
+  let d := InnerProductSpace.toDual ℂ H
+  -- Applying Riesz representation to the conjugate of a bidual functional gives its vector.
+  have hsurj : Function.Surjective j := by
+    intro l
+    let g : StrongDual ℂ H := (starL ℂ (A := ℂ)).toContinuousLinearMap.comp
+      (l.toStrongDual.comp d.toLinearIsometry.toContinuousLinearMap)
+    obtain ⟨x, hx⟩ := d.surjective g
+    refine ⟨toWeakSpace ℂ H x, DFunLike.ext _ _ fun f ↦ ?_⟩
+    obtain ⟨y, rfl⟩ := d.surjective f
+    change inner ℂ y x = l (d y)
+    rw [← inner_conj_symm]
+    change starRingEnd ℂ (d x y) = l (d y)
+    rw [hx]
+    change starRingEnd ℂ (starRingEnd ℂ (l (d y))) = l (d y)
+    simp
+  constructor
+  · have hD : ¬ FiniteDimensional ℂ (StrongDual ℂ H) := fun _ ↦
+      hinf (Module.Finite.of_surjective d.symm.toLinearEquiv.toLinearMap d.symm.surjective)
+    have hu : IsUniformInducing j :=
+      AddMonoidHom.isUniformInducing_of_isInducing (f := j.toLinearMap.toAddMonoidHom) hj.isInducing
+    exact fun hc ↦ weakDual_not_completeSpace hD ((hu.completeSpace_congr hsurj).mp hc)
+  · refine ⟨fun {s} hb hc ↦ ?_⟩
+    have hclosed : IsClosed (j '' s) :=
+      hj.isInducing.isClosedMap (hsurj.range_eq.symm ▸ isClosed_univ) s hc
+    have hcompact := WeakDual.isCompact_of_bounded_of_closed
+      (WeakDual.isBounded_iff_isVonNBounded.mpr (hb.image j)) hclosed
+    exact (hj.isCompact_iff.mpr hcompact).isComplete
 
 /-- Paper: Example C.1.4.5, p. 661. In the strong operator topology on an infinite-dimensional
 Hilbert space there is an unbounded Cauchy net without a limit. Closed bounded sets of
