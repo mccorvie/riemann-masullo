@@ -6,6 +6,7 @@ public import Mathlib.MeasureTheory.Integral.Bochner.Basic
 public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
+import Mathlib.Analysis.Normed.Module.HahnBanach
 
 /-!
 # Nuclear spaces and the finest locally convex topology
@@ -45,12 +46,214 @@ def IsNuclearTVS.{test, carrier} (E : Type carrier) [AddCommGroup E] [Module ℂ
       (_ : PolynormableSpace ℂ F) (_ : T2Space F),
       @IsHomeomorph (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id
 
+section FiniteDimensionalNuclearity
+
+open scoped Pointwise
+
+variable {E : Type*} {F : Type w} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+  [AddCommGroup F] [Module ℂ F] [TopologicalSpace F]
+  [PolynormableSpace ℂ E] [PolynormableSpace ℂ F]
+
+/-- Paper: (C.2.3.7), p. 677. Evaluations against the two polars are bounded on each
+tensor, and their supremum is the generating injective seminorm. -/
+private theorem injectiveSeminorm_eq_ciSup
+    (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0}) (z : E ⊗[ℂ] F) :
+    let D := (StrongDual.polar ℂ U.val : Type _) × (StrongDual.polar ℂ V.val : Type _)
+    BddAbove (range fun f : D ↦ ‖tensorDualForm f.1.val f.2.val z‖) ∧
+      injectiveTensorSeminorm U V z = ⨆ f : D, ‖tensorDualForm f.1.val f.2.val z‖ := by
+  intro D
+  have hbound (z : E ⊗[ℂ] F) :
+      ∃ C : ℝ, ∀ (φ : StrongDual.polar ℂ U.val) (ψ : StrongDual.polar ℂ V.val),
+        ‖tensorDualForm φ.val ψ.val z‖ ≤ C := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+        obtain ⟨a, hx⟩ : ∃ a : ℂ, x ∈ a • U.val := by
+          simpa using (absorbent_nhds_zero (𝕜 := ℂ) U.property x).exists
+        obtain ⟨b, hy⟩ : ∃ b : ℂ, y ∈ b • V.val := by
+          simpa using (absorbent_nhds_zero (𝕜 := ℂ) V.property y).exists
+        obtain ⟨x', hx', rfl⟩ := hx
+        obtain ⟨y', hy', rfl⟩ := hy
+        refine ⟨‖a‖ * ‖b‖, fun φ ψ ↦ ?_⟩
+        have hφ := (StrongDual.mem_polar_iff ℂ _).mp φ.property _ hx'
+        have hψ := (StrongDual.mem_polar_iff ℂ _).mp ψ.property _ hy'
+        simp only [tensorDualForm_tmul, map_smul, norm_mul, norm_smul]
+        gcongr
+        · exact mul_le_of_le_one_right (norm_nonneg _) hφ
+        · exact mul_le_of_le_one_right (norm_nonneg _) hψ
+    | add z₁ z₂ h₁ h₂ =>
+        obtain ⟨C₁, h₁⟩ := h₁
+        obtain ⟨C₂, h₂⟩ := h₂
+        refine ⟨C₁ + C₂, fun φ ψ ↦ ?_⟩
+        rw [map_add]
+        exact (norm_add_le _ _).trans (add_le_add (h₁ φ ψ) (h₂ φ ψ))
+  have hBdd (z : E ⊗[ℂ] F) :
+      BddAbove (range fun f : StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val ↦
+        ‖tensorDualForm f.1.val f.2.val z‖) := by
+    obtain ⟨C, hC⟩ := hbound z
+    exact ⟨C, forall_mem_range.mpr fun f ↦ hC f.1 f.2⟩
+  have hSeminorm : BddAbove (range fun f : D ↦
+      (normSeminorm ℂ ℂ).comp (tensorDualForm f.1.val f.2.val)) :=
+    Seminorm.bddAbove_range_iff.mpr hBdd
+  refine ⟨hBdd z, ?_⟩
+  unfold injectiveTensorSeminorm
+  rw [← ciSup_prod hSeminorm, Seminorm.iSup_apply hSeminorm]
+  rfl
+
+/-- Paper: §C.2.3.2, p. 679. Each injective generator is a projective generator,
+by scaling one of the two zero-neighborhoods in the polar bound. -/
+private theorem injectiveSeminorm_continuousAt_tmul
+    (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0}) :
+    ContinuousAt (fun v : E × F ↦ injectiveTensorSeminorm U V (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+  have : Nonempty (StrongDual.polar ℂ U.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  have : Nonempty (StrongDual.polar ℂ V.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  rw [ContinuousAt, show injectiveTensorSeminorm U V ((0 : E × F).1 ⊗ₜ[ℂ]
+    (0 : E × F).2) = 0 by simp, Metric.tendsto_nhds]
+  intro ε hε
+  obtain ⟨c, hc, hcε⟩ := NormedField.exists_norm_lt ℂ hε
+  have hV : c • V.val ∈ 𝓝 (0 : F) := by
+    simpa using smul_mem_nhds_smul₀ (norm_pos_iff.mp hc) V.property
+  have hUV : U.val ×ˢ (c • V.val) ∈ 𝓝 (0 : E × F) :=
+    (nhds_prod_eq (x := (0 : E)) (y := (0 : F))).symm ▸ prod_mem_prod U.property hV
+  filter_upwards [hUV] with z hz
+  rw [dist_zero_right, Real.norm_of_nonneg (apply_nonneg _ _)]
+  refine lt_of_le_of_lt ?_ hcε
+  rw [(injectiveSeminorm_eq_ciSup U V _).2]
+  apply ciSup_le
+  rintro ⟨φ, ψ⟩
+  obtain ⟨y, hy, hcy⟩ := hz.2
+  have hφ := (StrongDual.mem_polar_iff ℂ _).mp φ.property _ hz.1
+  have hψ := (StrongDual.mem_polar_iff ℂ _).mp ψ.property _ hy
+  rw [tensorDualForm_tmul, ← hcy, map_smul, norm_mul, norm_smul]
+  calc
+    _ ≤ 1 * (‖c‖ * 1) := by gcongr
+    _ = ‖c‖ := by simp
+
+/-- Paper: §C.2.3.2, p. 679. Tensoring with a fixed vector is continuous for the
+projective topology. -/
+private theorem continuous_projectiveTensor_tmul_left (x : E) :
+    Continuous (show F → ProjectiveTensor E F from TensorProduct.mk ℂ E F x) := by
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+      ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+  refine hP.continuous_of_continuous_comp (TensorProduct.mk ℂ E F x) fun ⟨p, hp⟩ ↦ ?_
+  have h : {z : E × F | p (z.1 ⊗ₜ[ℂ] z.2) < 1} ∈ 𝓝 0 :=
+    hp.preimage_mem_nhds (show Iio (1 : ℝ) ∈ 𝓝 (p ((0 : E × F).1 ⊗ₜ[ℂ]
+      (0 : E × F).2)) by simpa using Iio_mem_nhds one_pos)
+  rw [show (0 : E × F) = ((0 : E), (0 : F)) from rfl, nhds_prod_eq] at h
+  obtain ⟨U, hU, V, hV, hUV⟩ := Filter.mem_prod_iff.mp h
+  obtain ⟨a, ha⟩ : ∃ a : ℂ, x ∈ a • U := by
+    simpa using (absorbent_nhds_zero (𝕜 := ℂ) hU x).exists
+  obtain ⟨x', hx', rfl⟩ := ha
+  apply Seminorm.continuous' (r := ‖a‖)
+  refine Filter.mem_of_superset hV fun y hy ↦ ?_
+  rw [Seminorm.mem_closedBall_zero]
+  change p ((a • x') ⊗ₜ[ℂ] y) ≤ ‖a‖
+  rw [← smul_tmul', map_smul_eq_mul]
+  have hp' : p (x' ⊗ₜ[ℂ] y) < 1 := hUV (a := (x', y)) ⟨hx', hy⟩
+  exact mul_le_of_le_one_right (norm_nonneg _) hp'.le
+
+/-- Paper: (C.2.3.6), p. 677. Contracting the first factor with a continuous
+functional is continuous for the injective topology. -/
+private theorem continuous_injectiveTensor_contract (φ : StrongDual ℂ E) :
+    Continuous (show InjectiveTensor E F → F from
+      (TensorProduct.lid ℂ F).toLinearMap.comp (φ.toLinearMap.rTensor F)) := by
+  let T : E ⊗[ℂ] F →ₗ[ℂ] F :=
+    (TensorProduct.lid ℂ F).toLinearMap.comp (φ.toLinearMap.rTensor F)
+  have hT (ψ : StrongDual ℂ F) (z : E ⊗[ℂ] F) :
+      ψ (T z) = tensorDualForm φ ψ z := by
+    have hEq : ψ.toLinearMap.comp T = tensorDualForm φ ψ := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [T, LinearMap.comp_apply, tensorDualForm_tmul, smul_eq_mul]
+    exact DFunLike.congr_fun hEq z
+  refine (PolynormableSpace.withSeminorms ℂ F).continuous_of_continuous_comp
+    (show InjectiveTensor E F →ₗ[ℂ] F from T) fun ⟨q, hq⟩ ↦ ?_
+  let p := (normSeminorm ℂ ℂ).comp φ.toLinearMap
+  let U : {U : Set E // U ∈ 𝓝 0} :=
+    ⟨p.closedBall 0 1, Filter.mem_of_superset (p.ball_mem_nhds φ.continuous.norm one_pos)
+      (p.ball_subset_closedBall _ _)⟩
+  let V : {V : Set F // V ∈ 𝓝 0} :=
+    ⟨q.closedBall 0 1, Filter.mem_of_superset (q.ball_mem_nhds hq one_pos)
+      (q.ball_subset_closedBall _ _)⟩
+  have hφ : φ ∈ StrongDual.polar ℂ U.val :=
+    (StrongDual.mem_polar_iff ℂ _).mpr fun _ hx ↦ (Seminorm.mem_closedBall_zero _).mp hx
+  refine Seminorm.continuous_of_le
+    ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U, V)) fun z ↦ ?_
+  change E ⊗[ℂ] F at z
+  change q (T z) ≤ injectiveTensorSeminorm U V z
+  have norming (G : Type w) [AddCommGroup G] [Module ℂ G] (p : Seminorm ℂ G) (x : G) :
+      ∃ g : G →ₗ[ℂ] ℂ, (∀ y, ‖g y‖ ≤ p y) ∧ ‖g x‖ = p x := by
+    let : SeminormedAddCommGroup G := p.toSeminormedAddCommGroup
+    let : NormedSpace ℂ G := ⟨fun c y ↦ (map_smul_eq_mul p c y).le⟩
+    obtain ⟨g, hg, hgx⟩ := exists_dual_vector'' ℂ x
+    refine ⟨g.toLinearMap, fun y ↦ (g.le_opNorm y).trans
+      (mul_le_of_le_one_left (apply_nonneg p y) hg), ?_⟩
+    change ‖g x‖ = p x
+    rw [hgx]
+    change ‖(p x : ℂ)‖ = p x
+    rw [Complex.norm_real, Real.norm_of_nonneg (apply_nonneg p x)]
+  obtain ⟨g, hg, hgz⟩ := norming F q (T z)
+  have hgcont : Continuous g :=
+    (PolynormableSpace.withSeminorms ℂ F).continuous_normedSpace_rng ℂ g
+      ⟨{⟨q, hq⟩}, 1, by simpa using (show (normSeminorm ℂ ℂ).comp g ≤ q from hg)⟩
+  let ψ : StrongDual ℂ F := ⟨g, hgcont⟩
+  have hψ : ψ ∈ StrongDual.polar ℂ V.val :=
+    (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦ (hg y).trans ((q.mem_closedBall_zero).mp hy)
+  obtain ⟨hBdd, hSup⟩ := injectiveSeminorm_eq_ciSup U V z
+  rw [← hgz, show g (T z) = ψ (T z) from rfl, hT ψ z, hSup]
+  exact le_ciSup hBdd (⟨φ, hφ⟩, ⟨ψ, hψ⟩)
+
+end FiniteDimensionalNuclearity
+
 /-- Paper: Definition C.2.4.1, p. 685. A finite-dimensional Hausdorff locally convex
 space is nuclear.
 Deviation: This is a check against the finite-dimensional case used on p. 692. -/
 theorem isNuclearTVS_of_finiteDimensional (E : Type u) [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [T2Space E] [PolynormableSpace ℂ E] [FiniteDimensional ℂ E] :
-    IsNuclearTVS.{v, u} E := by sorry
+    IsNuclearTVS.{v, u} E := by
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let b := Module.finBasis ℂ E
+  let φ i : StrongDual ℂ E := (b.coord i).toContinuousLinearMap
+  let T i : E ⊗[ℂ] F →ₗ[ℂ] F :=
+    (TensorProduct.lid ℂ F).toLinearMap.comp ((φ i).toLinearMap.rTensor F)
+  -- Reconstruct the tensor from its finitely many basis coordinates.
+  have hback : Continuous (show InjectiveTensor E F → ProjectiveTensor E F from id) := by
+    let S i : E ⊗[ℂ] F →ₗ[ℂ] E ⊗[ℂ] F :=
+      (TensorProduct.mk ℂ E F (b i)).comp (T i)
+    have hS : (∑ i, S i) = (LinearMap.id : E ⊗[ℂ] F →ₗ[ℂ] E ⊗[ℂ] F) := by
+      apply TensorProduct.ext'
+      intro x y
+      simp only [LinearMap.sum_apply, S, LinearMap.comp_apply, T, LinearMap.rTensor_tmul,
+        LinearEquiv.coe_coe, TensorProduct.lid_tmul, TensorProduct.mk_apply, LinearMap.id_coe, id_eq]
+      change (∑ i, b i ⊗ₜ[ℂ] (b.repr x i • y)) = x ⊗ₜ[ℂ] y
+      simp_rw [tmul_smul, smul_tmul']
+      rw [← sum_tmul, b.sum_repr]
+    have hc : Continuous (show InjectiveTensor E F → ProjectiveTensor E F from
+        fun z ↦ ∑ i, S i z) :=
+      continuous_finsetSum _ fun i _ ↦
+        (continuous_projectiveTensor_tmul_left (F := F) (b i)).comp
+          (continuous_injectiveTensor_contract (F := F) (φ i))
+    refine hc.congr fun z ↦ ?_
+    change E ⊗[ℂ] F at z
+    change (∑ i, S i z) = z
+    rw [← LinearMap.sum_apply, hS]
+    rfl
+  -- Each injective seminorm occurs in the projective generating family.
+  have hfwd : Continuous (show ProjectiveTensor E F → InjectiveTensor E F from id) := by
+    let hI := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+      (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+        injectiveTensorSeminorm UV.1 UV.2)
+    let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+      (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+        ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+    exact hI.continuous_of_continuous_comp (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F)
+      (fun ⟨U, V⟩ ↦ hP.continuous_seminorm ⟨_, injectiveSeminorm_continuousAt_tmul U V⟩)
+  let e : ProjectiveTensor E F ≃ₜ InjectiveTensor E F :=
+    ⟨Equiv.refl (E ⊗[ℂ] F), hfwd, hback⟩
+  exact e.isHomeomorph
 
 section LocalBanach
 
