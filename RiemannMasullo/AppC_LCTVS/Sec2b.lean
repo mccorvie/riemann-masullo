@@ -279,7 +279,8 @@ abbrev LocalBanach (p : Seminorm ℂ E) := Completion (WithLocalSeminorm p)
 /-- Paper: §C.2.4.2, p. 686. The canonical image in the local Banach space has norm
 given by the chosen seminorm. -/
 theorem localBanach_norm_coe (p : Seminorm ℂ E) (x : WithLocalSeminorm p) :
-    ‖(x : LocalBanach p)‖ = p x := by sorry
+    ‖(x : LocalBanach p)‖ = p x :=
+  Completion.norm_coe x
 
 /-- Paper: Theorem C.2.4.2(2), p. 686. When the target seminorm is dominated by the
 source seminorm, the linear identity extends to a map of the two local Banach spaces. -/
