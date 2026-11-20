@@ -165,7 +165,10 @@ function are additive in the continuous functional. -/
 theorem pettisScalarIntegral_add (μ : PettisMeasure X) (f : X → E)
     (hf : PettisWeaklyIntegrable μ f) (φ ψ : StrongDual ℂ E) :
     μ.scalarIntegral (fun x ↦ (φ + ψ) (f x)) =
-      μ.scalarIntegral (fun x ↦ φ (f x)) + μ.scalarIntegral (fun x ↦ ψ (f x)) := by sorry
+      μ.scalarIntegral (fun x ↦ φ (f x)) + μ.scalarIntegral (fun x ↦ ψ (f x)) := by
+  cases μ with
+  | positive ν => exact integral_add (hf φ) (hf ψ)
+  | complex ν => exact VectorMeasure.integral_fun_add (hf φ) (hf ψ)
 
 /-- Paper: (C.4.2.1), p. 710. The scalar integrals of a weakly integrable
 function are complex homogeneous in the continuous functional. -/
