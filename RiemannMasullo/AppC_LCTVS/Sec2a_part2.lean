@@ -70,7 +70,8 @@ def tensorDualForm (φ : StrongDual ℂ E) (ψ : StrongDual ℂ F) : Module.Dual
 
 /-- Paper: (C.2.3.2), p. 676. Evaluation on a pure tensor is the product of its two evaluations. -/
 theorem tensorDualForm_tmul (φ : StrongDual ℂ E) (ψ : StrongDual ℂ F) (x : E) (y : F) :
-    tensorDualForm φ ψ (x ⊗ₜ[ℂ] y) = φ x * ψ y := by sorry
+    tensorDualForm φ ψ (x ⊗ₜ[ℂ] y) = φ x * ψ y :=
+  TensorProduct.dualDistrib_apply φ.toLinearMap ψ.toLinearMap x y
 
 variable [hE : PolynormableSpace ℂ E] [sE : T2Space E]
   [hF : PolynormableSpace ℂ F] [sF : T2Space F]
