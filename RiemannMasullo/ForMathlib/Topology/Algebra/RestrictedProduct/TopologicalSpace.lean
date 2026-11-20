@@ -2,6 +2,7 @@ module
 
 public import Mathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 public import Mathlib.Topology.Algebra.ContinuousMonoidHom
+public import Mathlib.Topology.Algebra.RestrictedProduct.Units
 
 /-!
 # Finite changes and compact subsets of restricted products
@@ -44,6 +45,42 @@ theorem isOpen_restrictedProduct_forall_mem {A : (i : ι) → Set (G i)} (t : Se
   ext x
   exact ⟨fun hx i hi ↦ hx i hi.2, fun hx i hi ↦
     if h : i ∈ S then x.2 h else hx i ⟨h, hi⟩⟩
+
+/-- The units of a restricted product with open distinguished submonoids are
+homeomorphic, coordinate by coordinate, to the restricted product of local units. -/
+def restrictedProductUnitsEquiv [∀ i, Monoid (G i)] {S : ι → Type*}
+    [∀ i, SetLike (S i) (G i)] [∀ i, SubmonoidClass (S i) (G i)]
+    (B : (i : ι) → S i) (hB : ∀ i, IsOpen (B i : Set (G i))) :
+    (Πʳ i, [G i, B i])ˣ ≃ₜ* (Πʳ i, [(G i)ˣ, (Submonoid.ofClass (B i)).units]) where
+  __ := RestrictedProduct.unitsEquiv G (B := B)
+  continuous_toFun := by
+    apply continuous_iff_continuousAt.mpr
+    intro x
+    let s := {i | x.val i ∈ B i ∧ x.inv i ∈ B i}
+    let V := {y : (Πʳ i, [G i, B i])ˣ | ∀ i ∈ s, y.val i ∈ B i ∧ y.inv i ∈ B i}
+    have hs := isOpen_restrictedProduct_forall_mem s (fun i _ ↦ hB i)
+    have hV : IsOpen V := by
+      convert (hs.preimage Units.continuous_val).inter
+        (hs.preimage Units.continuous_coe_inv) using 1
+      ext y
+      exact ⟨fun h ↦ ⟨fun i hi ↦ (h i hi).1, fun i hi ↦ (h i hi).2⟩,
+        fun h i hi ↦ ⟨h.1 i hi, h.2 i hi⟩⟩
+    apply ContinuousOn.continuousAt (s := V) _ (hV.mem_nhds fun _ hi ↦ hi)
+    apply continuousOn_iff_continuous_domRestrict.mpr
+    apply continuous_restrictedProduct_of_uniform
+    · intro i
+      exact Units.continuous_iff.mpr
+        ⟨(continuous_eval i).comp (Units.continuous_val.comp continuous_subtype_val),
+          (continuous_eval i).comp (Units.continuous_coe_inv.comp continuous_subtype_val)⟩
+    · exact (x.val.2.and x.inv.2).mono fun i hi y ↦ y.2 i hi
+  continuous_invFun := by
+    apply Units.continuous_iff.mpr
+    exact ⟨mapAlong_continuous (fun i ↦ (G i)ˣ) G id tendsto_id
+        (A₁ := fun i ↦ (Submonoid.ofClass (B i)).units) (A₂ := fun i ↦ B i) (fun _ ↦ Units.val)
+        (.of_forall fun _ _ hx ↦ hx.1) (fun _ ↦ Units.continuous_val),
+      mapAlong_continuous (fun i ↦ (G i)ˣ) G id tendsto_id
+        (A₁ := fun i ↦ (Submonoid.ofClass (B i)).units) (A₂ := fun i ↦ B i) (fun _ ↦ Units.inv)
+        (.of_forall fun _ _ hx ↦ hx.2) (fun _ ↦ Units.continuous_coe_inv)⟩
 
 /-- Paper: Lemma A.1.1.2(3), p. 539. A subset of the restricted product has compact closure
 exactly when it fits in a compact box whose factors eventually equal the distinguished sets.

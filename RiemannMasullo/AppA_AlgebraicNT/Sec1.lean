@@ -11,6 +11,7 @@ public import Mathlib.Topology.Algebra.Module.ModuleTopology
 public import Mathlib.Topology.Maps.Proper.Basic
 public import RiemannMasullo.ForMathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 
+import Mathlib.Analysis.Normed.Field.ProperSpace
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -260,7 +261,62 @@ theorem ideleGroup_topology :
       (Πʳ v : Primes(F), [(v.adicCompletion F)ˣ, (v.adicCompletionIntegers F).units])),
       ∀ g, (∀ v, ((e g).1 v).val = g.val.1 v) ∧ ∀ v, ((e g).2 v).val = g.val.2 v) ∧
     Continuous (ideleNorm F) ∧ IsClosed ((ideleNorm F).ker : Set 𝕀[F]) := by
-  sorry
+  have hOpen (v : Primes(F)) : IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F)) :=
+    Valued.isOpen_valuationSubring _
+  have hUnits : Fact (∀ v : Primes(F), IsOpen
+      ((v.adicCompletionIntegers F).units : Set (v.adicCompletion F)ˣ)) :=
+    ⟨fun v ↦ Submonoid.isOpen_units (hOpen v)⟩
+  have (v : Primes(F)) : LocallyCompactSpace (v.adicCompletion F) :=
+    locallyCompactSpace_adicCompletion v
+  have hCompact (v : Primes(F)) : IsCompact
+      ((v.adicCompletionIntegers F).units : Set (v.adicCompletion F)ˣ) := by
+    let := Valued.toNontriviallyNormedField (v.adicCompletion F) _
+    have : ProperSpace (v.adicCompletion F) :=
+      .of_nontriviallyNormedField_of_weaklyLocallyCompactSpace _
+    apply Submonoid.units_isCompact
+    change IsCompact (v.adicCompletionIntegers F : Set (v.adicCompletion F))
+    convert isCompact_closedBall (0 : v.adicCompletion F) 1 using 1
+    ext x
+    simp only [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+      Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_one_iff]
+  have : LocallyCompactSpace
+      (Πʳ v : Primes(F), [(v.adicCompletion F)ˣ, (v.adicCompletionIntegers F).units]) :=
+    RestrictedProduct.locallyCompactSpace_of_group _ (.of_forall hCompact)
+  let eInf := ContinuousMulEquiv.piUnits (M := fun v : InfinitePlace F ↦ v.Completion)
+  let eFin : (𝔸ᶠ[𝓞 F, F])ˣ ≃ₜ*
+      (Πʳ v : Primes(F), [(v.adicCompletion F)ˣ, (v.adicCompletionIntegers F).units]) :=
+    restrictedProductUnitsEquiv (fun v : Primes(F) ↦ v.adicCompletionIntegers F) hOpen
+  let e := (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) (𝔸ᶠ[𝓞 F, F])).trans
+    (ContinuousMulEquiv.mk' (eInf.toHomeomorph.prodCongr eFin.toHomeomorph)
+      (fun x y ↦ Prod.ext (map_mul eInf x.1 y.1) (map_mul eFin x.2 y.2)))
+  have hNorm : Continuous (ideleNorm F) := by
+    apply Continuous.of_coeHom_comp
+    apply continuous_of_continuousAt_one
+    have hInf : Continuous (fun g : 𝕀[F] ↦ Real.toNNReal (∏ w : InfinitePlace F,
+        ‖g.val.1 w‖ ^ w.mult)) :=
+      continuous_real_toNNReal.comp (continuous_finsetProd _ fun w _ ↦
+        ((continuous_apply w).comp (continuous_fst.comp Units.continuous_val)).norm.pow _)
+    apply hInf.continuousAt.congr
+    -- On the open subgroup integral at every finite place, every finite norm is one.
+    have hU : {g : 𝕀[F] | ∀ v, (e g).2 v ∈ (v.adicCompletionIntegers F).units} ∈ 𝓝 1 :=
+      ((RestrictedProduct.isOpen_forall_mem hUnits.out).preimage e.continuous.snd).mem_nhds
+        (by
+          change ∀ v : Primes(F), (e (1 : 𝕀[F])).2 v ∈ (v.adicCompletionIntegers F).units
+          rw [map_one]
+          exact fun v ↦ one_mem (v.adicCompletionIntegers F).units)
+    filter_upwards [hU] with g hg
+    have hfin : (∏ᶠ v : Primes(F), ‖g.val.2 v‖) = 1 := by
+      apply finprod_eq_one_of_forall_eq_one
+      intro v
+      exact Valued.toNormedField.norm_eq_one_iff.mpr
+        (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp (hg v))
+    change Real.toNNReal _ = Real.toNNReal ‖g.val‖
+    rw [AdeleRing.norm_apply_of_isUnit g.isUnit, hfin, mul_one]
+  refine ⟨e.toHomeomorph.isEmbedding.t2Space, e.toHomeomorph.isOpenEmbedding.locallyCompactSpace,
+    inferInstance,
+    ⟨e, fun _ ↦ ⟨fun _ ↦ rfl, fun _ ↦ rfl⟩⟩, hNorm, ?_⟩
+  rw [MonoidHom.coe_ker]
+  exact isClosed_singleton.preimage hNorm
 
 /-- Paper: Equation (A.1.3.6), p. 542. The norm on idele classes is the quotient lift
 of the product of the normalized local norms. -/
