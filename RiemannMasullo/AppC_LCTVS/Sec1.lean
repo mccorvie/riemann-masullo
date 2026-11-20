@@ -108,7 +108,10 @@ def IsFrechetTVS (E : Type*) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E
 
 /-- Paper: Definition C.1.3.1(5), p. 659. Every complex Banach space is Fréchet. -/
 theorem isFrechetTVS_of_banach (E : Type*) [NormedAddCommGroup E] [NormedSpace ℂ E]
-    [CompleteSpace E] : IsFrechetTVS E := by sorry
+    [CompleteSpace E] : IsFrechetTVS E := by
+  refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := E)]
+  infer_instance
 
 -- TODO(paper-gap): The reference for construction of the completion by Cauchy nets is “[?]”.
 
