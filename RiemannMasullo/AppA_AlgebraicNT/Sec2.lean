@@ -156,7 +156,18 @@ theorem ratIdeleNormSection_continuous : Continuous ratIdeleNormSection := by
 /-- Paper: Lemma A.2.2.1, p. 546. The rational section is a right inverse to the
 idelic norm before passage to classes. -/
 theorem ratIdeleNormSection_rightInverse : RightInverse ratIdeleNormSection (ideleNorm ℚ) := by
-  sorry
+  intro t
+  apply Units.ext
+  change Real.toNNReal ‖(ratIdeleNormSection t).val‖ = t.val
+  rw [AdeleRing.norm_apply_of_isUnit (ratIdeleNormSection t).isUnit,
+    Fintype.prod_subsingleton _ Rat.infinitePlace]
+  have hfin (v : HeightOneSpectrum (𝓞 ℚ)) : (ratIdeleNormSection t).val.2 v = 1 := rfl
+  simp only [hfin, norm_one, finprod_one, mul_one]
+  have hnorm : ‖(ringEquivRealOfIsReal Rat.isReal_infinitePlace).symm (t.val : ℝ)‖ =
+      ‖(t.val : ℝ)‖ :=
+    (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).symm.isometry.norm_map_of_map_zero
+      (map_zero (ringEquivRealOfIsReal Rat.isReal_infinitePlace).symm) _
+  simp [ratIdeleNormSection, InfinitePlace.mult, Rat.isReal_infinitePlace, hnorm]
 
 /-- Paper: Lemma A.2.2.1, p. 546. The class of the rational section has the
 prescribed class norm.
