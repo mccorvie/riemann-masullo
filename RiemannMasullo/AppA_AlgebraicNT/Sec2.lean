@@ -220,7 +220,43 @@ theorem adeleFundamentalDomain_disjoint (x : F) (hx : x ≠ 0) :
 of the adelic fundamental domain cover the adele ring. -/
 theorem adeleFundamentalDomain_cover :
     (⋃ x : F, algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b) = Set.univ := by
-  sorry
+  apply Set.eq_univ_of_forall
+  intro a
+  -- Choose a representative of the adelic class that is integral at all finite places.
+  let P := AdeleRing.principalSubgroup (𝓞 F) F
+  let q := QuotientAddGroup.mk' P
+  obtain ⟨-, -, -, -, -, -, -, -, ⟨e, he⟩, -⟩ := adele_additive_quotient.{_, 0} F
+  obtain ⟨a₀, ha₀⟩ := QuotientAddGroup.mk'_surjective _ (e.symm (q a))
+  have hq : q a = q a₀.val := by
+    rw [← he, ha₀, e.apply_symm_apply]
+  obtain ⟨x, hx⟩ : a - a₀.val ∈ P := QuotientAddGroup.eq_iff_sub_mem.mp hq
+  -- Translate by an integer to put the archimedean component in the parallelepiped.
+  let j := ((mixedEmbedding F).comp (algebraMap (𝓞 F) F)).toIntAlgHom.toLinearMap
+  let i := LinearEquiv.ofInjective j ((mixedEmbedding_injective F).comp RingOfIntegers.coe_injective)
+  let B := (b.map i).ofZLatticeBasis ℝ (mixedEmbedding.integerLattice F)
+  let : Fintype ι := FiniteDimensional.fintypeBasisIndex B
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  obtain ⟨z, hz, -⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain B (m a₀.val.1)
+  have hspan : Submodule.span ℤ (Set.range B) = mixedEmbedding.integerLattice F :=
+    (b.map i).ofZLatticeBasis_span ℝ
+  have hz' : z.val ∈ mixedEmbedding.integerLattice F := hspan ▸ z.property
+  obtain ⟨r, hr⟩ : ∃ r : 𝓞 F, mixedEmbedding F (r : F) = z.val := hz'
+  let d := algebraMap F 𝔸[F] (r : F)
+  refine Set.mem_iUnion.mpr ⟨x - (r : F), Set.mem_vadd_set.mpr
+    ⟨a₀.val + d, ⟨?_, ?_⟩, ?_⟩⟩
+  · change m (a₀.val.1 + d.1) ∈ ZSpan.fundamentalDomain B
+    rw [map_add, show d.1 = algebraMap F (InfiniteAdeleRing F) (r : F) from rfl,
+      ← InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp, hr, add_comm]
+    exact hz
+  · have hd : d ∈ integralAdelesOutside F ∅ := by
+      apply (diagonal_mem_integralAdelesOutside F ∅ _).mpr
+      simp only [Finset.coe_empty, integer_empty, Algebra.mem_bot]
+      exact ⟨r, rfl⟩
+    exact (integralAdelesOutside F ∅).add_mem a₀.property hd
+  · change algebraMap F 𝔸[F] (x - (r : F)) + (a₀.val + d) = a
+    change algebraMap F 𝔸[F] x = a - a₀.val at hx
+    rw [map_sub, hx, show algebraMap F 𝔸[F] (r : F) = d from rfl]
+    abel
 
 /-- Paper: Lemma A.2.1.2, p. 545. Only finitely many field translates of the
 closure of the fundamental domain meet a given compact subset of the adeles. -/
