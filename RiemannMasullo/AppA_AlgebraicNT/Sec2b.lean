@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Complex.Circle
 public import Mathlib.Analysis.SpecialFunctions.Complex.Arg
 public import Mathlib.Geometry.Manifold.Instances.UnitsOfNormedAlgebra
 public import Mathlib.Geometry.Manifold.Submersion
+import Mathlib.Topology.Algebra.Group.Units
 
 /-!
 # Logarithmic coordinates and idelic fundamental domains
@@ -64,7 +65,10 @@ theorem infiniteIdeleNorm_eq_global (g : 𝕀∞) :
 
 /-- Paper: Definition A.2.3.1, p. 548. The archimedean norm is continuous. -/
 theorem infiniteIdeleNorm_continuous : Continuous (infiniteIdeleNorm F) := by
-  sorry
+  apply Continuous.of_coeHom_comp
+  change Continuous (fun g : 𝕀∞ ↦ (infiniteIdeleNorm F g).val)
+  simp only [infiniteIdeleNorm, MonoidHom.finsetProd_apply, Units.coe_prod, MonoidHom.pow_apply]
+  exact continuous_finsetProd _ fun v _ ↦ ((continuous_apply v).comp Units.continuous_val).nnNorm.pow _
 
 /-- Paper: Definition A.2.3.1, p. 548. The norm-one archimedean ideles form a closed subgroup. -/
 theorem infiniteIdeleNorm_ker_closed : IsClosed (N∞ : Set 𝕀∞) := by
