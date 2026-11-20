@@ -9,6 +9,7 @@ public import Mathlib.Topology.Algebra.ContinuousMonoidHom
 public import Mathlib.Topology.Algebra.Group.Quotient
 public import Mathlib.Topology.Algebra.Module.ModuleTopology
 public import Mathlib.Topology.Maps.Proper.Basic
+public import RiemannMasullo.ForMathlib.Topology.Algebra.RestrictedProduct.TopologicalSpace
 
 /-!
 # The topology of adeles, ideles and their class groups
@@ -72,7 +73,22 @@ theorem restrictedProduct_topology :
     (∀ J : Finset ι, (∀ i ∉ J, IsOpen (K i : Set (G i))) →
       ∀ U : (i : ι) → Set (G i), (∀ i ∈ J, IsOpen (U i)) →
       IsOpen {x : P | (∀ i ∈ J, x i ∈ U i) ∧ ∀ i ∉ J, x i ∈ K i}) := by
-  sorry
+  dsimp only
+  have hK := I₀.eventually_cofinite_notMem.mono h₁
+  have hOpen := hK.mono fun _ hi ↦ hi.2
+  refine ⟨?_, fun K' _ _ heq ↦ ⟨restrictedProductCongr heq, fun _ _ ↦ rfl⟩,
+    isCompact_closure_restrictedProduct_iff hK,
+    fun J ↦ ⟨restrictedProductSplitFinset hOpen J, fun _ ↦ ⟨fun _ ↦ rfl, fun _ ↦ rfl⟩⟩, ?_⟩
+  · let e := restrictedProductSplitFinset hOpen I₀
+    have : Fact (∀ j : {i // i ∉ I₀}, IsOpen (K j : Set (G j))) :=
+      ⟨fun j ↦ (h₁ j j.2).2⟩
+    have : LocallyCompactSpace (Πʳ j : {i // i ∉ I₀}, [G j, K j]) :=
+      RestrictedProduct.locallyCompactSpace_of_group _ (.of_forall fun j ↦ (h₁ j j.2).1)
+    exact ⟨inferInstance, e.toHomeomorph.isOpenEmbedding.locallyCompactSpace,
+      e.toHomeomorph.isInducing.isTopologicalGroup e⟩
+  · intro J hJ U hU
+    exact ((isOpen_set_pi J.finite_toSet hU).preimage RestrictedProduct.continuous_coe).inter
+      (isOpen_restrictedProduct_forall_mem (↑J : Set ι)ᶜ hJ)
 
 -- TODO(paper-gap): A.1.1.2(5) allows J₁ to omit a nondiscrete exceptional factor with Kᵢ = 1.
 -- With just that factor and J₁ empty the claimed open box is a non-open singleton.
