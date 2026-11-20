@@ -227,7 +227,7 @@ def sIdeleQuotientNorm : SIdeleQuotient F S →* ℝ≥0ˣ :=
 any representative. -/
 theorem sIdeleQuotientNorm_mk (g : (SAdeleRing F S)ˣ) :
     sIdeleQuotientNorm F S (QuotientGroup.mk g) = sIdeleNorm F S g := by
-  sorry
+  rfl
 
 -- TODO(paper-gap): Theorem A.1.5.2 gives compactness for the norm-one part of C_{F,S}.
 -- Applying it to J_{F,S} requires projecting away the integer units outside S.
