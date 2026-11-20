@@ -220,7 +220,16 @@ theorem ideleNorm_spec :
       ((ideleNorm F g : ℝ≥0) : ℝ) = (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) *
         ∏ᶠ v : Primes(F), ‖g.val.2 v‖) ∧
     IdeleGroup.principalSubgroup (𝓞 F) F ≤ (ideleNorm F).ker := by
-  sorry
+  constructor
+  · intro g
+    refine ⟨FiniteAdeleRing.hasFiniteMulSupport_norm (MulEquiv.prodUnits g).2, ?_⟩
+    change (Real.toNNReal ‖g.val‖ : ℝ) = _
+    rw [Real.coe_toNNReal _ ((adeleNorm_unit_laws F).1 g).le,
+      AdeleRing.norm_apply_of_isUnit g.isUnit]
+  · rintro _ ⟨x, rfl⟩
+    apply Units.ext
+    change Real.toNNReal ‖algebraMap F 𝔸[F] (x : F)‖ = 1
+    rw [AdeleRing.norm_algebraMap_eq_one_of_ne_zero x.ne_zero, Real.toNNReal_one]
 
 /-- Paper: Lemma A.1.3.3, p. 541. The ideles are locally compact Hausdorff and split
 coordinatewise into the infinite local unit groups and the restricted product of the finite

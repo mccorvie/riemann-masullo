@@ -175,7 +175,7 @@ Deviation: The paper's class-valued statement requires composition with the quot
 theorem ratIdeleNormSection_class_rightInverse :
     RightInverse ((QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 ℚ) ℚ)).comp
       ratIdeleNormSection) (ideleClassNorm ℚ) := by
-  sorry
+  exact ratIdeleNormSection_rightInverse
 
 /-- Paper: Lemma A.2.2.2, p. 546. Scalar extension from the rational adeles is the
 unique adelic extension of the rational embedding supplied by Lemma A.1.2.1. -/
