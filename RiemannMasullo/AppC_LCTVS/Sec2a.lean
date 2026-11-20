@@ -274,7 +274,21 @@ theorem isPolarBornology_finite : IsPolarBornology {T : Set E | T.Finite} := by
 
 /-- Paper: §C.2.2.1, p. 673. The precompact subsets form a bornology. -/
 theorem isPolarBornology_precompact :
-    IsPolarBornology {T : Set E | IsPrecompactInCompletion T} := by sorry
+    IsPolarBornology {T : Set E | IsPrecompactInCompletion T} := by
+  have hprecompact (T : Set E) : IsPrecompactInCompletion T ↔ TotallyBounded T := by
+    have hcoe := (UniformSpace.Completion.isUniformEmbedding_coe E).isUniformInducing
+    unfold IsPrecompactInCompletion IsRelativelyCompact
+    rw [← totallyBounded_image_iff hcoe, ← totallyBounded_closure]
+    exact ⟨IsCompact.totallyBounded, fun h ↦ h.isCompact_of_isClosed isClosed_closure⟩
+  simp_rw [hprecompact]
+  refine ⟨⟨∅, totallyBounded_empty⟩, directedOn_of_sup_mem (fun _ _ ↦ TotallyBounded.union),
+    ?_, ?_⟩
+  · intro T hT
+    exact (TotallyBounded.isVonNBounded ℂ hT).image (toWeakSpaceCLM ℂ E)
+  · intro T hT c _
+    have hc :=
+      (uniformContinuousConstSMul_of_continuousConstSMul ℂ E).uniformContinuous_const_smul c
+    exact ⟨c • T, TotallyBounded.image hT hc, Subset.rfl⟩
 
 /-- Paper: §C.2.2.1, p. 673. The von Neumann bounded subsets form a bornology. -/
 theorem isPolarBornology_bounded : IsPolarBornology {T : Set E | IsVonNBounded ℂ T} := by sorry
