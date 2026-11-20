@@ -363,7 +363,30 @@ theorem diagonalIdeleNormSection_continuous : Continuous (diagonalIdeleNormSecti
 /-- Paper: Lemma A.2.2.8, p. 547. The diagonal homomorphism splits the idelic norm. -/
 theorem diagonalIdeleNormSection_rightInverse :
     RightInverse (diagonalIdeleNormSection F) (ideleNorm F) := by
-  sorry
+  intro t
+  let n := Fintype.card (InfinitePlace F)
+  let root := Units.map (NNReal.rpowMonoidHom (n : ℝ)⁻¹) t
+  have hpower (v : InfinitePlace F) :
+      infinitePlaceRealPower F v ((v.mult : ℝ) * n)⁻¹ t =
+        infinitePlaceRealPower F v (v.mult : ℝ)⁻¹ root := by
+    apply Units.ext
+    apply (isometry_extensionEmbedding v).injective
+    rw [infinitePlaceRealPower_apply, infinitePlaceRealPower_apply]
+    apply congrArg Complex.ofReal
+    change ((t.val : ℝ) ^ ((v.mult : ℝ) * n)⁻¹ : ℝ) =
+      (((t.val ^ (n : ℝ)⁻¹ : ℝ≥0) : ℝ) ^ (v.mult : ℝ)⁻¹ : ℝ)
+    rw [NNReal.coe_rpow, ← Real.rpow_mul t.val.coe_nonneg, mul_inv_rev]
+  have hsection : diagonalIdeleNormSection F t =
+      ∏ v : InfinitePlace F, singlePlaceIdeleNormSection F v root := by
+    simp only [diagonalIdeleNormSection, MonoidHom.finsetProd_apply, MonoidHom.comp_apply,
+      singlePlaceIdeleNormSection]
+    exact Finset.prod_congr rfl fun v _ ↦ congrArg _ (hpower v)
+  have hnorm (v : InfinitePlace F) : ideleNorm F (singlePlaceIdeleNormSection F v root) = root :=
+    singlePlaceIdeleNormSection_rightInverse F v root
+  rw [hsection, map_prod]
+  simp only [hnorm, Finset.prod_const, Finset.card_univ]
+  apply Units.ext
+  exact NNReal.rpow_inv_natCast_pow t.val Fintype.card_ne_zero
 
 -- TODO(paper-gap): The hypothesis of A.2.2.9 says only "continuous section". A
 -- continuous right inverse need not even preserve one. The start of §A.2.2 specifies homomorphisms.
