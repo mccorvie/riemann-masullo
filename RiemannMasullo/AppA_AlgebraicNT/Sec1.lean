@@ -18,6 +18,7 @@ import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Algebra.Valued.LocallyCompact
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.RingTheory.PicardGroup
 
 /-!
 # The topology of adeles, ideles and their class groups
@@ -2126,6 +2127,138 @@ theorem localIdealClass_normalization (v : Primes(F)) (x : (v.adicCompletion F)�
 local notation "LocalQuot(" F ", " T ", " D ")" =>
   _ ⧸ MonoidHom.range (sUnitLocalClasses F T D)
 
+/-- The class of the divisor given by finitely many prime exponents. -/
+private def divisorPic : Multiplicative (Primes(F) →₀ ℤ) →* CommRing.Pic (𝓞 F) where
+  toFun n := n.toAdd.prod fun v k ↦
+    ClassGroup.equivPic (𝓞 F)
+      (ClassGroup.mk0 ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩) ^ k
+  map_one' := Finsupp.prod_zero_index
+  map_mul' _ _ := Finsupp.prod_add_index' (fun _ ↦ zpow_zero _) (fun _ _ _ ↦ zpow_add ..)
+
+open scoped nonZeroDivisors in
+/-- Prime ideal factorization represents every Picard class of the ring of integers
+by a divisor. -/
+private theorem divisorPic_surjective : Surjective (divisorPic F) := by
+  intro y
+  obtain ⟨I, hI⟩ := ClassGroup.mk0_surjective ((ClassGroup.equivPic (𝓞 F)).symm y)
+  let J := FractionalIdeal.mk0 F I
+  have hfin : (Function.support fun v : Primes(F) ↦ FractionalIdeal.count F v J.val).Finite := by
+    simpa only [Filter.eventually_cofinite, Function.support] using FractionalIdeal.finite_factors J.val
+  let n := Finsupp.ofSupportFinite (fun v : Primes(F) ↦ FractionalIdeal.count F v J.val) hfin
+  let prime (v : Primes(F)) : (FractionalIdeal (𝓞 F)⁰ F)ˣ :=
+    FractionalIdeal.mk0 F ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩
+  have hprod : (∏ v ∈ n.support, prime v ^ n v) = J := by
+    apply Units.ext
+    change (Units.coeHom _) (∏ v ∈ n.support, prime v ^ n v) = _
+    rw [map_prod]
+    simp only [Units.coeHom_apply, Units.val_zpow_eq_zpow_val, prime, FractionalIdeal.coe_mk0]
+    have hsupport : (Function.mulSupport fun v : Primes(F) ↦
+        (v.asIdeal : FractionalIdeal (𝓞 F)⁰ F) ^ n v) ⊆ ↑n.support := by
+      intro v hv
+      simpa only [Finset.mem_coe, Finsupp.mem_support_iff] using
+        (show n v ≠ 0 from fun h ↦ hv (by simp [h]))
+    rw [← finprod_eq_finsetProd_of_mulSupport_subset _ hsupport]
+    exact FractionalIdeal.finprod_heightOneSpectrum_factorization' F J.ne_zero
+  refine ⟨Multiplicative.ofAdd n, ?_⟩
+  let c := (ClassGroup.equivPic (𝓞 F)).toMonoidHom.comp (ClassGroup.mk F)
+  calc
+    _ = ∏ v ∈ n.support, c (prime v ^ n v) := by
+      apply Finset.prod_congr rfl
+      intro v _
+      rw [map_zpow]
+      change _ = ClassGroup.equivPic (𝓞 F) (ClassGroup.mk F (prime v)) ^ n v
+      rw [ClassGroup.mk_mk0]
+      rfl
+    _ = c J := by rw [← map_prod, hprod]
+    _ = y := by
+      change ClassGroup.equivPic (𝓞 F) (ClassGroup.mk F (FractionalIdeal.mk0 F I)) = y
+      rw [ClassGroup.mk_mk0, hI, MulEquiv.apply_symm_apply]
+
+/-- The class map from divisors of the ring of integers onto the Picard group of
+the S-integers is surjective. -/
+private theorem sInteger_divisorPic_surjective (S : Finset (Primes(F))) :
+    Surjective ((CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S))).comp (divisorPic F)) :=
+  (picMapAlgebra_surjective_of_isLocalization (Localization.submonoid (S : Set (Primes(F))))
+    (Oₛ(F, S))).comp (divisorPic_surjective F)
+
+/-- Paper: Equation (A.1.5.9), p. 544. A divisor becomes principal over the S-integers
+precisely when its exponents away from S agree with the orders of a single nonzero field
+element. The exponents at the primes in S disappear under localization. -/
+private theorem sInteger_divisorPic_eq_one_iff (S : Finset (Primes(F))) (n : Primes(F) →₀ ℤ) :
+    CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (divisorPic F (Multiplicative.ofAdd n)) = 1 ↔
+      ∃ a : Fˣ, ∀ v ∉ S, n v = -WithZero.log (v.valuation F (a : F)) := by
+  sorry
+
+/-- The additive order identifies the local multiplicative classes with the integers. -/
+private def localClassOrder (v : Primes(F)) : LocalClass(F, v) ≃* Multiplicative ℤ := by
+  let order : (v.adicCompletion F)ˣ →* Multiplicative ℤ :=
+    { toFun := fun x ↦ Multiplicative.ofAdd (-WithZero.log (Valued.v x.val))
+      map_one' := by change Multiplicative.ofAdd (-WithZero.log (Valued.v 1)) = 1; simp
+      map_mul' := by
+        intro x y
+        change -WithZero.log (Valued.v (x.val * y.val)) =
+          -WithZero.log (Valued.v x.val) + -WithZero.log (Valued.v y.val)
+        rw [map_mul, WithZero.log_mul (by simp [x.ne_zero]) (by simp [y.ne_zero]), neg_add] }
+  have hker : order.ker = (v.adicCompletionIntegers F).units := by
+    ext x
+    rw [MonoidHom.mem_ker, HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one]
+    change -WithZero.log (Valued.v x.val) = 0 ↔ _
+    rw [neg_eq_zero, ← WithZero.exp_eq_one, WithZero.exp_log (by simp [x.ne_zero])]
+  have hsurj : Surjective order := by
+    intro k
+    obtain ⟨x, hx⟩ := v.valuedAdicCompletion_surjective F (WithZero.exp (-k.toAdd))
+    have hx₀ : x ≠ 0 := fun h ↦ WithZero.exp_ne_zero (hx.symm.trans (by simp [h]))
+    refine ⟨Units.mk0 x hx₀, ?_⟩
+    change -WithZero.log (Valued.v x) = k.toAdd
+    simp [hx]
+  exact (QuotientGroup.congr _ _ (MulEquiv.refl _) (by rw [hker]; exact Subgroup.map_id _)).trans
+    (QuotientGroup.quotientKerEquivOfSurjective order hsurj)
+
+/-- The order of a local class represented by a completion unit is minus its valuation logarithm. -/
+private theorem localClassOrder_mk (v : Primes(F)) (x : (v.adicCompletion F)ˣ) :
+    (localClassOrder F v (QuotientGroup.mk x)).toAdd = -WithZero.log (Valued.v x.val) := rfl
+
+/-- The product of local classes at D maps to divisors by extending orders by zero. -/
+private def localClassDivisor (D : Finset (Primes(F))) :
+    ((v : D) → LocalClass(F, v.val)) →* Multiplicative (Primes(F) →₀ ℤ) where
+  toFun x := Multiplicative.ofAdd
+    ((Finsupp.equivFunOnFinite.symm (fun v : D ↦ (localClassOrder F v.val (x v)).toAdd)).extendDomain)
+  map_one' := by
+    change (Finsupp.equivFunOnFinite.symm fun v : D ↦ (localClassOrder F v.val 1).toAdd).extendDomain = 0
+    ext v
+    by_cases hv : v ∈ D <;> simp [Finsupp.extendDomain_apply, hv]
+  map_mul' x y := by
+    change (Finsupp.equivFunOnFinite.symm fun v : D ↦
+      (localClassOrder F v.val (x v * y v)).toAdd).extendDomain =
+      (Finsupp.equivFunOnFinite.symm fun v : D ↦ (localClassOrder F v.val (x v)).toAdd).extendDomain +
+      (Finsupp.equivFunOnFinite.symm fun v : D ↦ (localClassOrder F v.val (y v)).toAdd).extendDomain
+    ext v
+    by_cases hv : v ∈ D <;> simp [Finsupp.extendDomain_apply, hv]
+
+/-- On D the extended divisor records the order of the corresponding local class. -/
+private theorem localClassDivisor_apply (D : Finset (Primes(F)))
+    (x : (v : D) → LocalClass(F, v.val)) (v : D) :
+    (localClassDivisor F D x).toAdd v.val = (localClassOrder F v.val (x v)).toAdd := by
+  simp [localClassDivisor, Finsupp.extendDomain_apply, v.property]
+
+/-- The extended divisor vanishes outside D. -/
+private theorem localClassDivisor_apply_of_notMem (D : Finset (Primes(F)))
+    (x : (v : D) → LocalClass(F, v.val)) {v : Primes(F)} (hv : v ∉ D) :
+    (localClassDivisor F D x).toAdd v = 0 := by
+  simp [localClassDivisor, Finsupp.extendDomain_apply, hv]
+
+/-- The local order of a diagonal unit is its valuation order in the field. -/
+private theorem localClassOrder_sUnit (T D : Finset (Primes(F)))
+    (a : (T : Set (Primes(F))).unit F) (v : D) :
+    (localClassOrder F v.val (sUnitLocalClasses F T D a v)).toAdd =
+      -WithZero.log (v.val.valuation F (a.val : F)) := by
+  rw [show sUnitLocalClasses F T D a v =
+    QuotientGroup.mk (Units.map (algebraMap F (v.val.adicCompletion F)).toMonoidHom a.val)
+    from rfl, localClassOrder_mk]
+  rw [Units.coe_map]
+  change -WithZero.log (Valued.v ((a.val : F) : v.val.adicCompletion F)) = _
+  rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+
 /-- Paper: Equation (A.1.5.9), p. 544. Enlarging S to T gives a surjection of Picard
 groups. Its kernel is the product of the new local multiplicative classes modulo T-units,
 embedded by sending a uniformizer to the corresponding prime ideal class. -/
@@ -2140,7 +2273,102 @@ theorem picard_localization_exact (S T : Finset (Primes(F))) (h : S ⊆ T) :
       ∀ x : (v : D) → (v.val.adicCompletion F)ˣ,
         j (QuotientGroup.mk (fun v ↦ QuotientGroup.mk (x v))) =
           CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (∏ v, localIdealClass F v.val (x v)) := by
-  sorry
+  intro D i p
+  let q := (CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S))).comp (divisorPic F)
+  let qT := (CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, T))).comp (divisorPic F)
+  let f := q.comp (localClassDivisor F D)
+  have hp (n : Multiplicative (Primes(F) →₀ ℤ)) : p (q n) = qT n := by
+    change CommRing.Pic.mapRingHom i
+      (CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (divisorPic F n)) = _
+    rw [← CommRing.Pic.mapRingHom_algebraMap, CommRing.Pic.mapRingHom_mapRingHom]
+    exact CommRing.Pic.mapRingHom_algebraMap (R := 𝓞 F) (A := Oₛ(F, T)) ▸ rfl
+  -- A principal divisor supported on D away from S comes from a T-unit.
+  have hf : f.ker = (sUnitLocalClasses F T D).range := by
+    ext x
+    change q (localClassDivisor F D x) = 1 ↔ _
+    rw [show q (localClassDivisor F D x) = 1 ↔ _ from
+      sInteger_divisorPic_eq_one_iff F S (localClassDivisor F D x).toAdd]
+    constructor
+    · rintro ⟨a, ha⟩
+      have hau : a ∈ (T : Set (Primes(F))).unit F := by
+        intro v hv
+        have hvT : v ∉ T := hv
+        have hn := ha v (fun hvS ↦ hvT (h hvS))
+        rw [localClassDivisor_apply_of_notMem F D x (fun hvD ↦ hvT (Finset.mem_sdiff.mp hvD).1),
+          zero_eq_neg] at hn
+        rw [← WithZero.exp_eq_one, WithZero.exp_log (by simp [a.ne_zero])] at hn
+        exact hn
+      refine ⟨⟨a, hau⟩, ?_⟩
+      funext v
+      apply (localClassOrder F v.val).injective
+      apply Multiplicative.toAdd.injective
+      rw [localClassOrder_sUnit, ← ha v.val (Finset.mem_sdiff.mp v.property).2,
+        localClassDivisor_apply]
+    · rintro ⟨a, rfl⟩
+      refine ⟨a.val, fun v hvS ↦ ?_⟩
+      by_cases hvT : v ∈ T
+      · let w : D := ⟨v, Finset.mem_sdiff.mpr ⟨hvT, hvS⟩⟩
+        rw [localClassDivisor_apply F D _ w, localClassOrder_sUnit]
+      · rw [localClassDivisor_apply_of_notMem F D _ (fun hvD ↦ hvT (Finset.mem_sdiff.mp hvD).1)]
+        simp [show v.valuation F (a.val : F) = 1 from a.property v hvT]
+  let j := QuotientGroup.lift _ f hf.ge
+  refine ⟨j, ?_, ?_, ?_, ?_⟩
+  · apply (MonoidHom.ker_eq_bot_iff j).mp
+    ext z
+    induction z using QuotientGroup.induction_on with
+    | H x =>
+      change f x = 1 ↔ _
+      rw [← MonoidHom.mem_ker, hf, Subgroup.mem_bot, QuotientGroup.eq_one_iff]
+  · intro y
+    constructor
+    · intro hy
+      obtain ⟨n, hn⟩ := sInteger_divisorPic_surjective F S y
+      change q n = y at hn
+      have hqT : qT n = 1 := by rwa [← hp, hn]
+      obtain ⟨a, ha⟩ := (sInteger_divisorPic_eq_one_iff F T n.toAdd).mp hqT
+      -- Subtract the principal divisor to leave only the new primes away from S.
+      let m (v : Primes(F)) := -WithZero.log (v.valuation F (a : F))
+      let x : (v : D) → LocalClass(F, v.val) :=
+        fun v ↦ (localClassOrder F v.val).symm (Multiplicative.ofAdd (n.toAdd v.val - m v.val))
+      let k := localClassDivisor F D x
+      have hnk : q (n / k) = 1 := (sInteger_divisorPic_eq_one_iff F S (n / k).toAdd).mpr
+        ⟨a, fun v hvS ↦ by
+          change n.toAdd v - k.toAdd v = m v
+          by_cases hvT : v ∈ T
+          · let w : D := ⟨v, Finset.mem_sdiff.mpr ⟨hvT, hvS⟩⟩
+            rw [localClassDivisor_apply F D x w]
+            dsimp only [x]
+            rw [MulEquiv.apply_symm_apply]
+            exact sub_sub_cancel ..
+          · rw [localClassDivisor_apply_of_notMem F D x
+                (fun hvD ↦ hvT (Finset.mem_sdiff.mp hvD).1), sub_zero]
+            exact ha v hvT⟩
+      refine ⟨QuotientGroup.mk x, ?_⟩
+      change q k = y
+      rw [map_div, div_eq_one] at hnk
+      exact hnk.symm.trans hn
+    · rintro ⟨z, rfl⟩
+      induction z using QuotientGroup.induction_on with
+      | H x =>
+        change p (q (localClassDivisor F D x)) = 1
+        rw [hp]
+        apply (sInteger_divisorPic_eq_one_iff F T _).mpr
+        refine ⟨1, fun v hv ↦ ?_⟩
+        change (localClassDivisor F D x).toAdd v = _
+        rw [localClassDivisor_apply_of_notMem F D x (fun hvD ↦ hv (Finset.mem_sdiff.mp hvD).1)]
+        simp
+  · intro y
+    obtain ⟨n, hn⟩ := sInteger_divisorPic_surjective F T y
+    exact ⟨q n, (hp n).trans hn⟩
+  · intro x
+    change CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S))
+      (divisorPic F (localClassDivisor F D (fun v ↦ QuotientGroup.mk (x v)))) = _
+    apply congrArg (CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)))
+    change (Finsupp.extendDomain (Finsupp.equivFunOnFinite.symm fun v : D ↦
+      (localClassOrder F v.val (QuotientGroup.mk (x v))).toAdd)).prod _ = _
+    rw [Finsupp.extendDomain_eq_embDomain_subtype, Finsupp.prod_embDomain, Finsupp.prod_fintype]
+    · simp [localClassOrder_mk, localIdealClass]
+    · exact fun _ ↦ zpow_zero _
 
 /-- Paper: Remark A.1.5.3, p. 544. Enlarging S can kill the Picard group. In that case
 the local presentation is an isomorphism. For the ordinary integers the finite-place and
