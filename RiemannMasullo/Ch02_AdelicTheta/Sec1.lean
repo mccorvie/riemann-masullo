@@ -54,8 +54,13 @@ reduces to twice the norm of the original value. -/
 theorem euclideanSchwartzWeightedDeriv_zero {m : ℕ}
     (f : EuclideanSpace ℝ (Fin m) → ℂ) (x : EuclideanSpace ℝ (Fin m)) :
     euclideanSchwartzWeightedDeriv 0 0 f x = 2 * ‖f x‖ := by
-  have h : (List.finRange m).flatMap (fun _ ↦ ([] : List (Fin m))) = [] := by simp
-  simp [euclideanSchwartzWeightedDeriv, h, one_add_one_eq_two]
+  have zeroDeriv (dirs : List (Fin m)) (h : dirs = []) :
+      iteratedFDeriv ℝ dirs.length f x (fun j ↦ EuclideanSpace.single (dirs.get j) 1) = f x := by
+    subst dirs
+    rfl
+  unfold euclideanSchwartzWeightedDeriv
+  rw [zeroDeriv ((List.finRange m).flatMap fun i ↦ List.replicate ((0 : Fin m → ℕ) i) i) (by simp)]
+  simp [one_add_one_eq_two]
 
 /-- Paper: Definition 2.1.1.4, p. 60. A smooth function is Schwartz exactly when
 each coordinate-monomial-weighted mixed partial derivative is bounded.
