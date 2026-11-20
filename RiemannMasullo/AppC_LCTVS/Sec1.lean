@@ -47,7 +47,8 @@ theorem balancedHull_hyperbola :
 /-- Paper: Remark C.1.2.1, p. 658. The uniformity of a uniform additive group is the
 canonical additive uniformity of its topology. -/
 theorem uniformSpace_eq_additiveUniformity (E : Type*) [AddCommGroup E] [uE : UniformSpace E]
-    [IsUniformAddGroup E] : uE = IsTopologicalAddGroup.rightUniformSpace E := by sorry
+    [IsUniformAddGroup E] : uE = IsTopologicalAddGroup.rightUniformSpace E :=
+  IsUniformAddGroup.rightUniformSpace_eq.symm
 
 /-- Paper: §C.1.2.1, p. 658. In a topology defined by seminorms, positive integer
 rescalings of finite intersections of their closed unit balls give a basis at zero.
