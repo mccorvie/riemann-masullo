@@ -54,7 +54,13 @@ local notation "N₁" => MonoidHom.ker (ideleNorm F)
 equal to one preserves its norm. -/
 theorem infiniteIdeleNorm_eq_global (g : 𝕀∞) :
     infiniteIdeleNorm F g = ideleNorm F (fromInfinity g) := by
-  sorry
+  apply Units.ext
+  apply NNReal.coe_injective
+  rw [((ideleNorm_spec F).1 (fromInfinity g)).2]
+  have hfin (v : Primes(F)) : (fromInfinity g).val.2 v = 1 := rfl
+  simp only [hfin, norm_one, finprod_one, mul_one]
+  simp [infiniteIdeleNorm, Units.coe_prod]
+  rfl
 
 /-- Paper: Definition A.2.3.1, p. 548. The archimedean norm is continuous. -/
 theorem infiniteIdeleNorm_continuous : Continuous (infiniteIdeleNorm F) := by
