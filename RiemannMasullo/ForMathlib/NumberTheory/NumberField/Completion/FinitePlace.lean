@@ -57,14 +57,19 @@ private theorem finite_residueField_adicCompletion (v : HeightOneSpectrum R) :
   simpa only [sub_add_sub_cancel] using ν.map_add_lt hr' ha
 
 open Valued.integer in
+/-- Closed balls in the completion at a height-one prime are compact when the base
+Dedekind domain has finite quotients. -/
+theorem properSpace_adicCompletion (v : HeightOneSpectrum R) :
+    ProperSpace (v.adicCompletion K) := by
+  have : IsDiscreteValuationRing (v.adicCompletionIntegers K) := inferInstance
+  exact (properSpace_iff_completeSpace_and_isDiscreteValuationRing_integer_and_finite_residueField
+    (Γ₀ := ℤᵐ⁰)).2 ⟨inferInstance, ‹_›, finite_residueField_adicCompletion v⟩
+
 /-- The completion of the fraction field at a height-one prime is locally compact when the
 base Dedekind domain has finite quotients. -/
 theorem locallyCompactSpace_adicCompletion (v : HeightOneSpectrum R) :
     LocallyCompactSpace (v.adicCompletion K) := by
-  have : IsDiscreteValuationRing (v.adicCompletionIntegers K) := inferInstance
-  have : ProperSpace (v.adicCompletion K) :=
-    (properSpace_iff_completeSpace_and_isDiscreteValuationRing_integer_and_finite_residueField
-      (Γ₀ := ℤᵐ⁰)).2 ⟨inferInstance, ‹_›, finite_residueField_adicCompletion v⟩
+  let := properSpace_adicCompletion v (K := K)
   infer_instance
 
 end RiemannMasullo

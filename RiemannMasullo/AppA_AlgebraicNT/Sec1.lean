@@ -312,6 +312,175 @@ of the product of the normalized local norms. -/
 def ideleClassNorm : C[F] →* ℝ≥0ˣ :=
   QuotientGroup.lift _ (ideleNorm F) (ideleNorm_spec F).2
 
+/-- The finite adeles integral at every place form an open subset. -/
+private theorem isOpen_finiteAdeles_integral :
+    IsOpen {a : 𝔸ᶠ[𝓞 F, F] | ∀ v : Primes(F), a v ∈ v.adicCompletionIntegers F} := by
+  change IsOpen {a : Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F] |
+    ∀ v : Primes(F), a v ∈ v.adicCompletionIntegers F}
+  convert isOpen_restrictedProduct_forall_mem (G := fun v : Primes(F) ↦ v.adicCompletion F)
+    (A := fun v ↦ v.adicCompletionIntegers F) Set.univ
+    (fun _ _ ↦ Valued.isOpen_valuationSubring _) using 1
+  ext a
+  exact ⟨fun ha v _ ↦ ha v, fun ha v ↦ ha v (Set.mem_univ v)⟩
+
+/-- The infinite adelic norm is a continuous finite product of powers of local norms. -/
+private theorem continuous_infiniteAdeleNorm :
+    Continuous (fun a : InfiniteAdeleRing F ↦ ‖a‖) := by
+  simp only [InfiniteAdeleRing.norm_def]
+  fun_prop
+
+/-- Paper: Lemma A.1.3.4(1), p. 542. The principal ideles are discrete by the product
+formula, using the additive neighborhood of infinite norm less than one and finite integrality. -/
+private theorem isDiscrete_principalIdeles :
+    IsDiscrete (Set.range (IdeleGroup.unitEmbedding (𝓞 F) F)) := by
+  let N := AdeleRing.principalSubgroup (𝓞 F) F
+  let U : Set 𝔸[F] := {a | ‖a.1‖ < 1 ∧ ∀ v : Primes(F), a.2 v ∈ v.adicCompletionIntegers F}
+  have hU : IsOpen U :=
+    (isOpen_lt ((continuous_infiniteAdeleNorm F).comp continuous_fst) continuous_const).inter
+      ((isOpen_finiteAdeles_integral F).preimage continuous_snd)
+  have hzero : (0 : 𝔸[F]) ∈ U := by
+    refine ⟨?_, fun v ↦ (v.adicCompletionIntegers F).zero_mem⟩
+    change ‖(0 : InfiniteAdeleRing F)‖ < 1
+    rw [InfiniteAdeleRing.norm_eq_zero_of_not_isUnit (by simp)]
+    exact zero_lt_one
+  have hN : DiscreteTopology N := by
+    apply discreteTopology_of_isOpen_singleton_zero
+    convert hU.preimage (continuous_subtype_val : Continuous ((↑) : N → 𝔸[F])) using 1
+    ext a
+    obtain ⟨x, hx⟩ := a.property
+    have hax : a.val = algebraMap F 𝔸[F] x := hx.symm
+    change a = 0 ↔ a.val ∈ U
+    refine ⟨fun h ↦ h.symm ▸ hzero, fun h ↦ ?_⟩
+    by_contra ha
+    have hx₀ : x ≠ 0 := by
+      intro h
+      apply ha
+      apply Subtype.ext
+      simp [hax, h]
+    rw [hax] at h
+    have hu : IsUnit (algebraMap F 𝔸[F] x) := (isUnit_iff_ne_zero.mpr hx₀).map _
+    have hfin : ‖(algebraMap F 𝔸[F] x).2‖ ≤ 1 := by
+      rw [FiniteAdeleRing.norm_eq_finprod_of_isUnit (Prod.isUnit_iff.mp hu).2,
+        ← finprod_one (α := Primes(F))]
+      exact finprod_le_finprod₀
+        (FiniteAdeleRing.hasFiniteMulSupport_norm (MulEquiv.prodUnits hu.unit).2)
+        (fun _ ↦ norm_nonneg _) hasFiniteMulSupport_one
+        (fun v ↦ Valued.toNormedField.norm_le_one_iff.mpr (h.2 v))
+    have hnorm : ‖algebraMap F 𝔸[F] x‖ < 1 := by
+      rw [AdeleRing.norm_def]
+      exact (mul_le_of_le_one_right (by rw [InfiniteAdeleRing.norm_def]; positivity) hfin).trans_lt h.1
+    exact (AdeleRing.norm_algebraMap_eq_one_of_ne_zero hx₀).not_lt hnorm
+  have hrange : Set.range (IdeleGroup.unitEmbedding (𝓞 F) F) =
+      Units.val ⁻¹' (N : Set 𝔸[F]) := by
+    ext g
+    constructor
+    · rintro ⟨x, rfl⟩
+      exact ⟨x.val, rfl⟩
+    · rintro ⟨x, hx⟩
+      have hx₀ : x ≠ 0 := by
+        intro h
+        have : Nontrivial 𝔸[F] := (AdeleRing.algebraMap_injective (𝓞 F) F).nontrivial
+        exact g.ne_zero (by simpa [h] using hx.symm)
+      exact ⟨Units.mk0 x hx₀, Units.ext hx⟩
+  rw [hrange]
+  exact (isDiscrete_iff_discreteTopology.mpr hN).preimage
+    Units.continuous_val.continuousOn Units.val_injective
+
+/-- Paper: Lemma A.1.3.3, p. 541. The ideles are locally compact because the adele ring
+is Hausdorff locally compact and its unit group is closed in the product with its opposite. -/
+private theorem adeleHausdorff_ideleLocallyCompact :
+    T2Space 𝔸[F] ∧ LocallyCompactSpace 𝕀[F] := by
+  have : T2Space 𝔸[F] := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  have (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  have : Fact (∀ v : Primes(F), IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  have (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) := by
+    apply isCompact_iff_compactSpace.mp
+    convert isCompact_closedBall (0 : v.adicCompletion F) 1 using 1
+    ext x
+    rw [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+      Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_one_iff]
+  have : LocallyCompactSpace 𝔸ᶠ[𝓞 F, F] := by
+    change LocallyCompactSpace (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F])
+    infer_instance
+  have : LocallyCompactSpace 𝔸[F] := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × 𝔸ᶠ[𝓞 F, F])
+    infer_instance
+  exact ⟨inferInstance, inferInstance⟩
+
+/-- Paper: Lemma A.1.3.3, p. 541. The idelic norm is continuous. Near the identity,
+finite components and their inverses are all integral, so only the infinite norm contributes. -/
+private theorem continuous_idelicNorm : Continuous (ideleNorm F) := by
+  apply Continuous.of_coeHom_comp
+  apply continuous_of_continuousAt_one
+  let U : Set 𝔸ᶠ[𝓞 F, F] := {a | ∀ v : Primes(F), a v ∈ v.adicCompletionIntegers F}
+  have hU : IsOpen U := isOpen_finiteAdeles_integral F
+  have h₁ : (1 : 𝔸ᶠ[𝓞 F, F]) ∈ U := fun v ↦ (v.adicCompletionIntegers F).one_mem
+  have hval : Continuous (fun g : 𝕀[F] ↦ g.val.2) := continuous_snd.comp Units.continuous_val
+  have hinv : Continuous (fun g : 𝕀[F] ↦ g.inv.2) := continuous_snd.comp Units.continuous_coe_inv
+  refine ((continuous_real_toNNReal.comp ((continuous_infiniteAdeleNorm F).comp
+    (continuous_fst.comp Units.continuous_val))).continuousAt (x := (1 : 𝕀[F]))).congr ?_
+  filter_upwards [hval.continuousAt (hU.mem_nhds h₁), hinv.continuousAt (hU.mem_nhds h₁)]
+    with g hg hginv
+  change Real.toNNReal ‖g.val.1‖ = Real.toNNReal ‖g.val‖
+  rw [AdeleRing.norm_def, FiniteAdeleRing.norm_eq_finprod_of_isUnit
+    (Prod.isUnit_iff.mp g.isUnit).2]
+  have hfinite (v : Primes(F)) : ‖g.val.2 v‖ = 1 := by
+    apply Valued.toNormedField.norm_eq_one_iff.mpr
+    let eval := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) 𝔸ᶠ[𝓞 F, F])
+    exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := Units.map eval.toMonoidHom g)).mp ⟨hg v, hginv v⟩
+  simp [hfinite]
+
+/-- Paper: Lemma A.2.2.6, p. 547. Inserting a positive real root at one infinite place
+gives a continuous homomorphic section of the idele norm. -/
+private theorem exists_ideleNorm_section :
+    ∃ s : ℝ≥0ˣ →* 𝕀[F], Continuous s ∧ RightInverse s (ideleNorm F) := by
+  classical
+  let v : InfinitePlace F := Classical.choice inferInstance
+  let r := (v.mult : ℝ)⁻¹
+  have hscalar : ∃ f : ℝ →+* v.Completion, Continuous f ∧ ∀ x, ‖f x‖ = ‖x‖ := by
+    open InfinitePlace.Completion in
+    by_cases hv : v.IsReal
+    · let e := ringEquivRealOfIsReal hv
+      have hi : Isometry e.symm := (isometryEquivRealOfIsReal hv).symm.isometry
+      exact ⟨e.symm, hi.continuous, hi.norm_map_of_map_zero (map_zero e.symm)⟩
+    · have hv' := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      let e := ringEquivComplexOfIsComplex hv'
+      have hi : Isometry e.symm := (isometryEquivComplexOfIsComplex hv').symm.isometry
+      exact ⟨e.symm.toRingHom.comp Complex.ofRealHom, hi.continuous.comp Complex.continuous_ofReal,
+        fun x ↦ (hi.norm_map_of_map_zero (map_zero e.symm) (x : ℂ)).trans (Complex.norm_real x)⟩
+  obtain ⟨f, hf, hfnorm⟩ := hscalar
+  let p : ℝ≥0ˣ →* v.Completionˣ :=
+    Units.map ((f.comp NNReal.toRealHom).toMonoidHom.comp (NNReal.rpowMonoidHom r))
+  let s := (IdeleGroup.ofCompletion (𝓞 F) F v).comp p
+  refine ⟨s, ?_, ?_⟩
+  · change Continuous ((IdeleGroup.ofCompletion (𝓞 F) F v) ∘ p)
+    apply Continuous.comp
+    · apply Continuous.units_map
+      exact (continuous_mulSingle (A := InfinitePlace.Completion) v).prodMk continuous_const
+    · apply Continuous.of_coeHom_comp
+      exact hf.comp ((Real.continuous_rpow_const (by positivity : 0 ≤ r)).comp
+        (NNReal.continuous_coe.comp Units.continuous_val))
+  · intro t
+    apply Units.ext
+    apply NNReal.eq
+    rw [((ideleNorm_spec F).1 (s t)).2]
+    change (∏ w : InfinitePlace F, ‖Pi.mulSingle v (p t).val w‖ ^ w.mult) *
+      (∏ᶠ w : Primes(F), ‖(1 : w.adicCompletion F)‖) = (t.val : ℝ)
+    simp only [norm_one, finprod_one, mul_one]
+    rw [Finset.prod_eq_single_of_mem v (Finset.mem_univ _), Pi.mulSingle_eq_same]
+    · change ‖f ((t.val : ℝ) ^ r)‖ ^ v.mult = (t.val : ℝ)
+      rw [hfnorm, Real.norm_of_nonneg (Real.rpow_nonneg t.val.coe_nonneg r),
+        ← Real.rpow_mul_natCast t.val.coe_nonneg, inv_mul_cancel₀ v.mult_coe_ne_zero,
+        Real.rpow_one]
+    · intro w _ hw
+      simp only [Pi.mulSingle_eq_of_ne hw, norm_one, one_pow]
+
 /-- Paper: Lemma A.1.3.4, p. 542. Principal ideles form a closed discrete subgroup,
 the class group is locally compact Hausdorff, and the descended norm admits a continuous
 homomorphic section. Extension along a field embedding commutes with the quotient maps. -/
@@ -326,7 +495,27 @@ theorem ideleGroup_quotient :
     (∀ (L : Type*) [Field L] [NumberField L] (σ : F →+* L) (f : 𝔸[F] →+* 𝔸[L]),
       IsAdeleExtension F σ f → ∃ c : C[F] →* C[L], Continuous c ∧
         ∀ g, c (q g) = QuotientGroup.mk (Units.map f.toMonoidHom g)) := by
-  sorry
+  dsimp only
+  let N := IdeleGroup.principalSubgroup (𝓞 F) F
+  obtain ⟨hHausdorff, hLocallyCompact⟩ := adeleHausdorff_ideleLocallyCompact F
+  have hdiscrete := isDiscrete_principalIdeles F
+  have hclosed : IsClosed (N : Set 𝕀[F]) := N.isClosed_of_isDiscrete hdiscrete
+  have hq : IsOpenQuotientMap (QuotientGroup.mk' N) := QuotientGroup.isOpenQuotientMap_mk
+  obtain ⟨s, hs, hright⟩ := exists_ideleNorm_section F
+  have hsection : RightInverse ((QuotientGroup.mk' N).comp s) (ideleClassNorm F) := hright
+  refine ⟨Units.map_injective (AdeleRing.algebraMap_injective (𝓞 F) F), hclosed, hdiscrete,
+    QuotientGroup.eq_one_iff, hq, inferInstance, inferInstance, fun _ ↦ rfl,
+    hq.continuous_comp_iff.mp (continuous_idelicNorm F), hsection.surjective,
+    ⟨_, hq.continuous.comp hs, hsection⟩, ?_⟩
+  intro L _ _ σ f hf
+  let j := (QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 L) L)).comp
+    (Units.map f.toMonoidHom)
+  have hj : N ≤ j.ker := by
+    rintro _ ⟨x, rfl⟩
+    apply (QuotientGroup.eq_one_iff _).mpr
+    exact ⟨Units.map σ.toMonoidHom x, Units.ext (hf.2.1 x.val).symm⟩
+  refine ⟨QuotientGroup.lift N j hj, hq.continuous_comp_iff.mp ?_, fun _ ↦ rfl⟩
+  exact QuotientGroup.continuous_mk.comp (hf.1.units_map f.toMonoidHom)
 
 /-- Paper: Definition A.1.4.1, p. 542. The idele class group carries the quotient
 topology, and two ideles represent the same class precisely when they differ by a
