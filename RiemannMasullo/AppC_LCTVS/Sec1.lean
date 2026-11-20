@@ -692,7 +692,92 @@ theorem strongOperator_exists_unbounded_cauchy (hinf : ¬ FiniteDimensional ℂ 
     letI := IsTopologicalAddGroup.rightUniformSpace B
     QuasiCompleteSpace ℂ B ∧ ∃ (J : Type u) (_ : Preorder J) (_ : Nonempty J)
       (_ : IsDirectedOrder J) (f : J → B), CauchySeq f ∧ ¬ IsVonNBounded ℂ (range f) ∧
-        ¬ ∃ T, Tendsto f atTop (𝓝 T) := by sorry
+        ¬ ∃ T, Tendsto f atTop (𝓝 T) := by
+  classical
+  let B := H →Lₚₜ[ℂ] H
+  let : UniformSpace B := IsTopologicalAddGroup.rightUniformSpace B
+  let : IsUniformAddGroup B := isUniformAddGroup_of_addCommGroup
+  let embed := PointwiseConvergenceCLM.inducingFn (RingHom.id ℂ) H H
+  have hembed : IsUniformInducing embed :=
+    AddMonoidHom.isUniformInducing_of_isInducing
+      (PointwiseConvergenceCLM.isInducing_inducingFn (RingHom.id ℂ) H H)
+  let op := UniformConvergenceCLM.ofFun (RingHom.id ℂ) H {s : Set H | s.Finite}
+  have hcomplete : QuasiCompleteSpace ℂ B := by
+    refine ⟨fun {s} hb hc ↦ hembed.isComplete_iff.mp (IsClosed.isComplete ?_)⟩
+    -- Uniform boundedness gives an operator norm bound that passes to pointwise limits.
+    obtain ⟨C, hC⟩ := banach_steinhaus (g := fun T : s ↦ op.symm T.1) (fun x ↦ by
+      let ev := PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H x
+      obtain ⟨M, hM⟩ := isBounded_iff_forall_norm_le.mp
+        ((NormedSpace.isVonNBounded_iff ℂ).mp (hb.image ev))
+      exact ⟨M, fun T ↦ hM (ev T.1) ⟨T.1, T.2, rfl⟩⟩)
+    apply isClosed_of_closure_subset
+    intro g hg
+    have hlin : g ∈ closure (range ((↑) : (H →ₗ[ℂ] H) → H → H)) :=
+      closure_mono (by rintro _ ⟨T, _, rfl⟩; exact ⟨(op.symm T).toLinearMap, rfl⟩) hg
+    have hbound (x : H) : ‖g x‖ ≤ C * ‖x‖ := by
+      have hclosed : IsClosed {a : H → H | ‖a x‖ ≤ C * ‖x‖} :=
+        isClosed_le (continuous_apply x).norm continuous_const
+      refine hclosed.closure_subset_iff.mpr ?_ hg
+      rintro _ ⟨T, hT, rfl⟩
+      exact (op.symm T).le_of_opNorm_le (hC ⟨T, hT⟩) x
+    let T : B := op ((linearMapOfMemClosureRangeCoe g hlin).mkContinuous C hbound)
+    have heq : embed T = g := rfl
+    refine ⟨T, ?_, heq⟩
+    rw [← hc.closure_eq, hembed.isInducing.closure_eq_preimage_closure_image, mem_preimage, heq]
+    exact hg
+  refine ⟨hcomplete, ?_⟩
+  -- Incompleteness of the weak dual provides a discontinuous linear functional.
+  let : UniformSpace (WeakDual ℂ H) := IsTopologicalAddGroup.rightUniformSpace (WeakDual ℂ H)
+  let : IsUniformAddGroup (WeakDual ℂ H) := isUniformAddGroup_of_addCommGroup
+  let eval : WeakDual ℂ H →+ (H → ℂ) := ⟨⟨fun l x ↦ l x, rfl⟩, fun _ _ ↦ rfl⟩
+  have heval : IsUniformInducing eval :=
+    AddMonoidHom.isUniformInducing_of_isInducing (f := eval) ⟨rfl⟩
+  have hnclosed : ¬ IsClosed (range eval) := fun h ↦
+    weakDual_not_completeSpace hinf ((completeSpace_iff_isComplete_range heval).mpr h.isComplete)
+  have hgap : ¬ closure (range eval) ⊆ range eval := fun h ↦ hnclosed (isClosed_of_closure_subset h)
+  obtain ⟨g, hg, hg'⟩ := not_subset.mp hgap
+  have hlin : g ∈ closure (range ((↑) : (H →ₗ[ℂ] ℂ) → H → ℂ)) :=
+    closure_mono (by rintro _ ⟨l, rfl⟩; exact ⟨(WeakDual.toStrongDual l).toLinearMap, rfl⟩) hg
+  let φ := linearMapOfMemClosureRangeCoe g hlin
+  have hφ : ¬ Continuous φ := fun h ↦ hg' ⟨StrongDual.toWeakDual ⟨φ, h⟩, rfl⟩
+  -- Extend the restriction to each finite-dimensional span by orthogonal projection.
+  let l (s : Finset H) : StrongDual ℂ H :=
+    let V := Submodule.span ℂ (s : Set H)
+    let φV : StrongDual ℂ V := (φ.comp V.subtype).toContinuousLinearMap
+    φV.comp V.orthogonalProjectionOnto
+  have hl (s : Finset H) (x : H) (hx : x ∈ s) : l s x = φ x := by
+    let V := Submodule.span ℂ (s : Set H)
+    let y : V := ⟨x, Submodule.subset_span hx⟩
+    change φ (V.orthogonalProjectionOnto (y : H) : H) = φ (y : H)
+    rw [V.orthogonalProjectionOnto_mem_subspace_eq_self y]
+  have : Nontrivial H := not_subsingleton_iff_nontrivial.mp fun _ ↦ hinf inferInstance
+  obtain ⟨v, hv⟩ := exists_ne (0 : H)
+  let f (s : Finset H) : B := op ((l s).smulRight v)
+  have hpoint (x : H) : Tendsto (fun s ↦ f s x) atTop (𝓝 (φ x • v)) := by
+    apply tendsto_atTop_of_eventually_const (i₀ := {x})
+    intro s hs
+    change l s x • v = φ x • v
+    rw [hl s x (Finset.singleton_subset_iff.mp hs)]
+  have hlim : Tendsto (fun s ↦ embed (f s)) atTop (𝓝 fun x ↦ φ x • v) :=
+    tendsto_pi_nhds.mpr hpoint
+  have hf : CauchySeq f := hembed.cauchy_map_iff.mp (by
+    rw [Filter.map_map]
+    exact hlim.cauchySeq)
+  have hnlim : ¬ ∃ T, Tendsto f atTop (𝓝 T) := by
+    rintro ⟨T, hT⟩
+    have hTv (x : H) : T x = φ x • v :=
+      tendsto_nhds_unique (PointwiseConvergenceCLM.tendsto_iff_forall_tendsto.mp hT x) (hpoint x)
+    apply hφ ((isClosedEmbedding_smul_left (𝕜 := ℂ) hv).isEmbedding.isInducing.continuous_iff.mpr ?_)
+    have hrecover : (fun x ↦ φ x • v) = (op.symm T : H → H) := funext fun x ↦ (hTv x).symm
+    change Continuous (fun x ↦ φ x • v)
+    rw [hrecover]
+    exact (op.symm T).continuous
+  refine ⟨Finset H, inferInstance, inferInstance, inferInstance, f, hf, ?_, hnlim⟩
+  intro hb
+  obtain ⟨T, -, hT⟩ := cauchySeq_tendsto_of_isComplete
+    (hcomplete.quasiComplete hb.closure isClosed_closure)
+    (fun s ↦ subset_closure (mem_range_self s)) hf
+  exact hnlim ⟨T, hT⟩
 
 /-- Paper: Example C.1.4.6(1–2), p. 662. A separable Hilbert space and the operator-norm
 space of bounded endomorphisms of any Hilbert space are quasi-complete. -/
