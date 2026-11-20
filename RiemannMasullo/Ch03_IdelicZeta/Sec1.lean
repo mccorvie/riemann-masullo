@@ -383,7 +383,12 @@ of the continuous local restrictions on all integer units outside S. -/
 theorem mem_unramifiedOutside_iff (c : HeckeCharacter (𝓞 F) F) :
     c ∈ unramifiedOutside F S ↔ ∀ v ∉ S, ∀ u : (v.adicCompletionIntegers F)ˣ,
       finitePlaceRestriction F v c (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1 := by
-  sorry
+  change (∀ v ∉ S, c.IsUnramifiedAt v) ↔ _
+  simp only [HeckeCharacter.isUnramifiedAt_iff]
+  refine forall_congr' fun v => imp_congr_right fun _ => forall_congr' fun u => ?_
+  change c.restrict v ↑(Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1 ↔ _
+  rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+  rfl
 
 /-- Paper: Equations (3.1.2.7)–(3.1.2.8), p. 121. Insert an S-idele into the full idele
 group by multiplying its single-coordinate insertions over S, including all infinite places. -/
