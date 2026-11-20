@@ -97,7 +97,14 @@ theorem quasiCharacterAbscissa_of_unitary_twist (hm : IsProperMap m) (hne : ∃ 
     (c : QuasiCharacter G) (χ : PontryaginDual G) (s : ℂ)
     (hc : ∀ g, c g = (χ g : ℂ) * (modℝ g : ℂ) ^ s) :
     quasiCharacterAbscissa m hm hne c = s.re := by
-  sorry
+  let g := hne.choose
+  have hmod : 0 < modℝ g := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (m g).ne_zero)
+  have hmod_one : modℝ g ≠ 1 := fun h =>
+    hne.choose_spec (Units.val_inj.mp (NNReal.coe_inj.mp h))
+  have hlog := Real.log_ne_zero_of_pos_of_ne_one hmod hmod_one
+  change Real.log ‖c g‖ / Real.log (modℝ g) = s.re
+  rw [hc g, norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hmod,
+    Real.log_rpow hmod, mul_div_cancel_right₀ _ hlog]
 
 /-- Paper: Equation (3.1.1.2), p. 119. At every element of a modulated group, the modulus
 of a quasi-character equals the module raised to its abscissa. -/
