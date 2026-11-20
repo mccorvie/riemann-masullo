@@ -263,7 +263,12 @@ def IsPolarBornology {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpa
     ∀ T ∈ S, ∀ c : ℂ, c ≠ 0 → ∃ U ∈ S, c • T ⊆ U
 
 /-- Paper: §C.2.2.1, p. 673. The finite subsets form a bornology in the sense of the paper. -/
-theorem isPolarBornology_finite : IsPolarBornology {T : Set E | T.Finite} := by sorry
+theorem isPolarBornology_finite : IsPolarBornology {T : Set E | T.Finite} := by
+  refine ⟨⟨∅, Set.finite_empty⟩, directedOn_of_sup_mem (fun _ _ ↦ Set.Finite.union), ?_, ?_⟩
+  · intro T hT
+    exact (Set.Finite.image (toWeakSpace ℂ E) hT).isVonNBounded
+  · intro T hT c _
+    exact ⟨c • T, Set.Finite.smul_set hT, Subset.rfl⟩
 
 /-- Paper: §C.2.2.1, p. 673. The precompact subsets form a bornology. -/
 theorem isPolarBornology_precompact :
