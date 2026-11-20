@@ -168,13 +168,49 @@ theorem equivalentCauchyNets_iff_of_tendsto [T2Space E] {f : J → E} {g : K →
   · rintro rfl
     exact ⟨hf.cauchy_map, hg.cauchy_map, by simpa only [sub_self] using hsub⟩
 
+-- Retain the additive group instances in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Definition C.1.3.1(4), p. 659. For a Hausdorff subset, uniform completeness
 means that every Cauchy net with values in it has a limit in it.
 Deviation: Nets indexed in the universe of the ambient space suffice to test completeness. -/
 theorem isComplete_iff_cauchyNets (A : Set E) [T2Space A] :
     IsComplete A ↔ ∀ (I : Type u) [Preorder I] [Nonempty I] [IsDirectedOrder I]
       (f : I → A), CauchySeq (fun i ↦ (f i : E)) →
-        ∃ x ∈ A, Tendsto (fun i ↦ (f i : E)) atTop (𝓝 x) := by sorry
+        ∃ x ∈ A, Tendsto (fun i ↦ (f i : E)) atTop (𝓝 x) := by
+  constructor
+  · intro hA I _ _ _ f hf
+    exact hA _ hf (tendsto_principal.mpr (Eventually.of_forall fun i ↦ (f i).property))
+  · intro hA F hF hFA
+    have : F.NeBot := hF.1
+    have hmemA : A ∈ F := le_principal_iff.mp hFA
+    -- Order pairs of a filter member and a point in it by reverse inclusion of the sets.
+    let I := {p : Set E × A // p.1 ∈ F ∧ (p.2 : E) ∈ p.1}
+    let _ : Preorder I := Preorder.lift fun i ↦ OrderDual.toDual i.1.1
+    have exists_index (s : Set E) (hs : s ∈ F) : ∃ i : I, i.1.1 = s := by
+      obtain ⟨x, hx⟩ := Filter.nonempty_of_mem (inter_mem hs hmemA)
+      exact ⟨⟨(s, ⟨x, hx.2⟩), hs, hx.1⟩, rfl⟩
+    have : Nonempty I := (exists_index A hmemA).nonempty
+    have : IsDirectedOrder I := ⟨fun i j ↦ by
+      obtain ⟨k, hk⟩ := exists_index _ (inter_mem i.2.1 j.2.1)
+      refine ⟨k, ?_⟩
+      change k.1.1 ⊆ i.1.1 ∧ k.1.1 ⊆ j.1.1
+      rw [hk]
+      exact ⟨inter_subset_left, inter_subset_right⟩⟩
+    let f (i : I) : A := i.1.2
+    have hmap : map (fun i ↦ (f i : E)) atTop = F := by
+      ext s
+      change (∀ᶠ i in atTop, (f i : E) ∈ s) ↔ s ∈ F
+      rw [eventually_atTop]
+      constructor
+      · rintro ⟨i, hi⟩
+        refine mem_of_superset (inter_mem i.2.1 hmemA) fun x hx ↦ ?_
+        exact hi ⟨(i.1.1, ⟨x, hx.2⟩), i.2.1, hx.1⟩ Subset.rfl
+      · intro hs
+        obtain ⟨i, rfl⟩ := exists_index s hs
+        exact ⟨i, fun j hij ↦ (show j.1.1 ⊆ i.1.1 from hij) j.2.2⟩
+    have hf : CauchySeq (fun i ↦ (f i : E)) := by
+      rwa [CauchySeq, hmap]
+    simpa only [Tendsto, hmap] using hA I f hf
 
 end Nets
 
