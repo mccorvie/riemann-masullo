@@ -479,7 +479,19 @@ variable [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ
 
 /-- Paper: Definition C.5.1.23, p. 734. The zero map has every order of differentiability. -/
 theorem vectorContDiffOrderOn_zero (Ω : Set V) (m : ℕ) :
-    VectorContDiffOrderOn (0 : V → E) Ω m := by sorry
+    VectorContDiffOrderOn (0 : V → E) Ω m := by
+  induction m with
+  | zero =>
+    show IsVonNBounded ℂ _
+    refine (Bornology.isVonNBounded_singleton (0 : E)).subset ?_
+    rintro z ⟨x, -, y, -, -, -, rfl⟩
+    simp
+  | succ m ih =>
+    intro i
+    refine ⟨0, ?_, continuousOn_const, ih⟩
+    intro φ x
+    simp only [Pi.zero_apply, map_zero]
+    exact hasDerivWithinAt_const _ _ _
 
 /-- Paper: Definition C.5.1.23, p. 734. The order condition is preserved by addition. -/
 theorem VectorContDiffOrderOn.add {Ω : Set V} {m : ℕ} {f g : V → E}
