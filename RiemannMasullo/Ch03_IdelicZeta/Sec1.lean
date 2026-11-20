@@ -398,7 +398,33 @@ theorem sIdeleInsertion_apply (g : (SAdeleRing F S)ˣ) :
     (sIdeleInsertion F S g).val.1 = g.val.1 ∧
     (∀ v : S, (sIdeleInsertion F S g).val.2 v.val = g.val.2 v) ∧
     ∀ v ∉ S, (sIdeleInsertion F S g).val.2 v = 1 := by
-  sorry
+  classical
+  have hfinite (v : Primes(F)) :
+      (sIdeleInsertion F S g).val.2 v =
+        ∏ u : S, (FiniteAdeleRing.ofAdicCompletion F u.val (g.val.2 u)) v := by
+    let eval : FiniteAdeleRing (𝓞 F) F →+* v.adicCompletion F :=
+      RestrictedProduct.evalRingHom _ v
+    change eval (sIdeleInsertion F S g).val.2 =
+      ∏ u : S, eval (FiniteAdeleRing.ofAdicCompletion F u.val (g.val.2 u))
+    rw [← map_prod]
+    apply congrArg eval
+    simp [sIdeleInsertion, MonoidHom.finsetProd_apply, AdeleRing, Prod.snd_prod]
+  refine ⟨?_, ?_, ?_⟩
+  · simp [sIdeleInsertion, MonoidHom.finsetProd_apply, AdeleRing, Prod.fst_prod,
+      InfiniteAdeleRing.ofCompletion]
+    exact Finset.univ_prod_mulSingle g.val.1
+  · intro v
+    rw [hfinite, Finset.prod_eq_single_of_mem v (Finset.mem_univ v)]
+    · exact RestrictedProduct.mulSingle_eq_same _ _ _
+    · intro u _ huv
+      have h : v.val ≠ u.val := fun h => huv (Subtype.ext h.symm)
+      exact RestrictedProduct.mulSingle_eq_of_ne _ _ h
+  · intro v hv
+    rw [hfinite]
+    apply Finset.prod_eq_one
+    intro u _
+    have h : v ≠ u.val := fun h => hv (h ▸ u.property)
+    exact RestrictedProduct.mulSingle_eq_of_ne _ _ h
 
 /-- Paper: Equation (3.1.2.7), p. 121. Extension by one is a closed topological embedding. -/
 theorem isClosedEmbedding_sIdeleInsertion : IsClosedEmbedding (sIdeleInsertion F S) := by
