@@ -304,7 +304,24 @@ theorem singlePlaceIdeleNormSection_continuous (v : InfinitePlace F) :
 /-- Paper: Lemma A.2.2.6, p. 547. The section at one infinite place splits the idelic norm. -/
 theorem singlePlaceIdeleNormSection_rightInverse (v : InfinitePlace F) :
     RightInverse (singlePlaceIdeleNormSection F v) (ideleNorm F) := by
-  sorry
+  intro t
+  apply Units.ext
+  apply NNReal.eq
+  rw [((ideleNorm_spec F).1 (singlePlaceIdeleNormSection F v t)).2]
+  let x := (infinitePlaceRealPower F v (v.mult : ℝ)⁻¹ t).val
+  change (∏ w : InfinitePlace F, ‖Pi.mulSingle v x w‖ ^ w.mult) *
+    (∏ᶠ w : HeightOneSpectrum (𝓞 F), ‖(1 : w.adicCompletion F)‖) = (t.val : ℝ)
+  simp only [norm_one, finprod_one, mul_one]
+  rw [Finset.prod_eq_single_of_mem v (Finset.mem_univ _), Pi.mulSingle_eq_same]
+  · have ht : 0 ≤ (t.val : ℝ) := t.val.coe_nonneg
+    have hx : ‖x‖ = (t.val : ℝ) ^ (v.mult : ℝ)⁻¹ := by
+      rw [← (isometry_extensionEmbedding v).norm_map_of_map_zero (map_zero _) x]
+      change ‖extensionEmbedding v (infinitePlaceRealPower F v (v.mult : ℝ)⁻¹ t).val‖ = _
+      rw [infinitePlaceRealPower_apply, Complex.norm_real,
+        Real.norm_of_nonneg (Real.rpow_nonneg ht _)]
+    rw [hx, ← Real.rpow_mul_natCast ht, inv_mul_cancel₀ v.mult_coe_ne_zero, Real.rpow_one]
+  · intro w _ hw
+    simp only [Pi.mulSingle_eq_of_ne hw, norm_one, one_pow]
 
 /-- Paper: Definition A.2.2.7, p. 547. The diagonal section inserts a positive real
 power at every infinite place, dividing the exponent by both the local degree and the
