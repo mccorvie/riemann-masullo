@@ -65,7 +65,9 @@ variable {J K : Type*} [Preorder J] [Nonempty J] [IsDirectedOrder J]
 preorder. It converges to a point exactly when its differences from that point are
 eventually in every zero-neighborhood. -/
 theorem tendsto_net_iff_sub_mem (f : J → E) (x : E) :
-    Tendsto f atTop (𝓝 x) ↔ ∀ U ∈ 𝓝 (0 : E), ∃ j₀, ∀ j ≥ j₀, x - f j ∈ U := by sorry
+    Tendsto f atTop (𝓝 x) ↔ ∀ U ∈ 𝓝 (0 : E), ∃ j₀, ∀ j ≥ j₀, x - f j ∈ U := by
+  rw [← tendsto_const_sub_iff x, sub_self, tendsto_iff_forall_eventually_mem]
+  simp only [eventually_atTop]
 
 /-- Paper: Definition C.1.3.1(3), p. 659. A net is Cauchy when every zero-neighborhood
 contains all pairwise differences on some tail. -/
