@@ -73,7 +73,10 @@ theorem tendsto_net_iff_sub_mem (f : J → E) (x : E) :
 /-- Paper: Definition C.1.3.1(3), p. 659. A net is Cauchy when every zero-neighborhood
 contains all pairwise differences on some tail. -/
 theorem cauchySeq_iff_sub_mem (f : J → E) :
-    CauchySeq f ↔ ∀ U ∈ 𝓝 (0 : E), ∃ j₀, ∀ j ≥ j₀, ∀ k ≥ j₀, f j - f k ∈ U := by sorry
+    CauchySeq f ↔ ∀ U ∈ 𝓝 (0 : E), ∃ j₀, ∀ j ≥ j₀, ∀ k ≥ j₀, f j - f k ∈ U := by
+  rw [CauchySeq, IsUniformAddGroup.cauchy_map_iff_tendsto, and_iff_right atTop_neBot,
+    prod_atTop_atTop_eq, tendsto_iff_forall_eventually_mem]
+  simp only [eventually_atTop_prod_self']
 
 /-- Paper: Definition C.1.3.1(3), p. 659. Two Cauchy nets are equivalent when their
 difference on the product directed set converges to zero. -/
