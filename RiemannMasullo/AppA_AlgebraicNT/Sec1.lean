@@ -497,7 +497,28 @@ T outside S precisely when it is already an S-unit. -/
 theorem sUnitLocalClasses_eq_one (S T : Finset (Primes(F))) (h : S ⊆ T)
     (u : (T : Set (Primes(F))).unit F) :
     sUnitLocalClasses F T (T \ S) u = 1 ↔ u.val ∈ (S : Set (Primes(F))).unit F := by
-  sorry
+  have local_eq_one (v : ↥(T \ S)) :
+      sUnitLocalClasses F T (T \ S) u v = 1 ↔ v.val.valuation F (u.val : F) = 1 := by
+    let x := Units.map (algebraMap F (v.val.adicCompletion F)).toMonoidHom u.val
+    change (QuotientGroup.mk x : LocalClass(F, v.val)) = 1 ↔ _
+    rw [QuotientGroup.eq_one_iff]
+    refine (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := x)).trans ?_
+    change Valued.v ((u.val : F) : v.val.adicCompletion F) = 1 ↔ _
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+  change _ ↔ ∀ v : Primes(F), v ∉ S → v.valuation F (u.val : F) = 1
+  constructor
+  · intro hu v hvS
+    by_cases hv : v ∈ T \ S
+    · let w : ↥(T \ S) := ⟨v, hv⟩
+      exact (local_eq_one w).mp (congrFun hu w)
+    · apply u.property v
+      change v ∉ T
+      rw [← Finset.sdiff_union_of_subset h, Finset.mem_union]
+      exact fun hvT ↦ hvT.elim hv hvS
+  · intro hu
+    funext v
+    exact (local_eq_one v).mpr (hu v.val (Finset.mem_sdiff.mp v.property).2)
 
 /-- Paper: Equation (A.1.5.9), p. 544. The local contribution of a nonzero component
 to an ideal class is its prime ideal class raised to its additive order. -/
