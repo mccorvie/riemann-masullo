@@ -6,6 +6,8 @@ public import Mathlib.Geometry.Manifold.LocalDiffeomorph
 public import Mathlib.NumberTheory.NumberField.HeckeLFunction
 public import Mathlib.Topology.Algebra.PontryaginDual
 
+import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
+
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.CompactOpen
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Units
@@ -45,13 +47,166 @@ def normOneRestriction : C(QuasiCharacter G, QuasiCharacter m.ker) :=
   let i : m.ker →ₜ* G := ⟨m.ker.subtype, continuous_subtype_val⟩
   ⟨fun c => c.comp i, i.continuous_comp_left⟩
 
+/-- Paper: Equation (3.1.1.1), p. 119. Every quasi-character of a closed nontrivial subgroup
+of the positive reals can be joined to the trivial character by a continuous family. -/
+private theorem exists_quasiCharacter_deformation (H : Subgroup ℝ≥0ˣ)
+    (hH : IsClosed (H : Set ℝ≥0ˣ)) [Nontrivial H] (χ : QuasiCharacter H) :
+    ∃ f : ℝ → QuasiCharacter H, Continuous f ∧ f 0 = 1 ∧ f 1 = χ := by
+  have : OrderTopology ℝ≥0ˣ := by
+    let e := Nonneg.unitsHomeomorphPos ℝ
+    let f : ℝ≥0ˣ → ℝ := Subtype.val ∘ e
+    have hf : StrictMono f := fun _ _ h => h
+    have hi : IsInducing f := (IsInducing.subtypeVal (t := Set.Ioi (0 : ℝ))).comp e.isInducing
+    have hr : Set.range f = Set.Ioi 0 := by
+      change Set.range ((Subtype.val : Set.Ioi (0 : ℝ) → ℝ) ∘ e) = _
+      rw [Set.range_comp, e.surjective.range_eq, Set.image_univ, Subtype.range_coe]
+    exact ⟨hi.eq_induced.trans (hf.induced_topology_eq_preorder (hr.symm ▸ Set.ordConnected_Ioi))⟩
+  rcases H.dense_or_isCyclic with hd | hc
+  · have htop : H = ⊤ :=
+      Subgroup.coe_eq_univ.mp (hH.closure_eq ▸ hd.closure_eq)
+    subst H
+    -- Real powers interpolate between the trivial homomorphism and the identity.
+    let power (t : ℝ) (u : ↥(⊤ : Subgroup ℝ≥0ˣ)) : ↥(⊤ : Subgroup ℝ≥0ˣ) :=
+      ⟨Units.mk0 ((u.val : ℝ≥0) ^ t)
+        (ne_of_gt (NNReal.rpow_pos (pos_iff_ne_zero.mpr u.val.ne_zero))), trivial⟩
+    have hpower : Continuous (uncurry power) := by
+      apply IsInducing.subtypeVal.continuous_iff.mpr
+      apply Units.isEmbedding_val₀.continuous_iff.mpr
+      apply NNReal.isEmbedding_coe.continuous_iff.mpr
+      exact (NNReal.continuous_coe.comp
+        (Units.continuous_val.comp (continuous_subtype_val.comp continuous_snd))).rpow
+          continuous_fst (fun p => Or.inl (NNReal.coe_ne_zero.mpr p.2.val.ne_zero))
+    let f (t : ℝ) : QuasiCharacter ↥(⊤ : Subgroup ℝ≥0ˣ) :=
+      χ.comp
+        { toFun := power t
+          map_one' := by
+            apply Subtype.ext
+            apply Units.ext
+            simp [power]
+          map_mul' := by
+            intro x y
+            apply Subtype.ext
+            apply Units.ext
+            simp [power, NNReal.mul_rpow]
+          continuous_toFun := hpower.comp (continuous_const.prodMk continuous_id) }
+    refine ⟨f, ContinuousMonoidHom.continuous_of_continuous_uncurry f
+      (χ.continuous.comp hpower), ?_, ?_⟩
+    · ext1 x
+      change χ (power 0 x) = 1
+      have h : power 0 x = 1 := by
+        apply Subtype.ext
+        apply Units.ext
+        simp [power]
+      rw [h, map_one]
+    · ext1 x
+      change χ (power 1 x) = χ x
+      congr 1
+      apply Subtype.ext
+      apply Units.ext
+      simp [power]
+  · let : DiscreteTopology H := Subgroup.isCyclic_iff_discreteTopology.mp hc
+    obtain ⟨orderIso⟩ := LinearOrderedCommGroup.isCyclic_iff_nonempty_equiv_int.mp hc
+    let e := orderIso.toMulEquiv
+    -- Exponentiating a multiple of the logarithm interpolates the value on a generator.
+    let z := Complex.log (χ (e.symm (Multiplicative.ofAdd 1)))
+    let f (t : ℝ) : QuasiCharacter H := {
+      toFun x := Complex.exp (((e x).toAdd : ℂ) * ((t : ℂ) * z))
+      map_one' := by simp [show (1 : Multiplicative ℤ).toAdd = 0 from rfl]
+      map_mul' x y := by
+        rw [map_mul]
+        change Complex.exp (↑((e x).toAdd + (e y).toAdd) * _) = _
+        rw [Int.cast_add, add_mul, Complex.exp_add]
+      continuous_toFun := continuous_of_discreteTopology }
+    refine ⟨f, ContinuousMonoidHom.continuous_of_continuous_uncurry f ?_, ?_, ?_⟩
+    · apply continuous_prod_of_discrete_right.mpr
+      intro x
+      change Continuous fun t : ℝ => Complex.exp (((e x).toAdd : ℂ) * ((t : ℂ) * z))
+      exact Complex.continuous_exp.comp (continuous_const.mul
+        (Complex.continuous_ofReal.mul continuous_const))
+    · ext1 x
+      change Complex.exp (((e x).toAdd : ℂ) * ((0 : ℝ) * z)) = 1
+      simp
+    · ext1 x
+      change Complex.exp (((e x).toAdd : ℂ) * (Complex.ofReal 1 * z)) = χ x
+      have hx : e.symm (Multiplicative.ofAdd 1) ^ (e x).toAdd = x := by
+        apply e.injective
+        rw [map_zpow, e.apply_symm_apply]
+        change Multiplicative.ofAdd ((e x).toAdd • (1 : ℤ)) = e x
+        simp
+      rw [Complex.ofReal_one, one_mul, Complex.exp_int_mul, Complex.exp_log, ← map_zpow, hx]
+      exact ((Group.isUnit _).map χ).ne_zero
+
 /-- Paper: Equation (3.1.1.1), p. 119. Two quasi-characters are in the same connected
 component exactly when their restrictions to the norm-one subgroup agree. -/
 theorem mem_connectedComponent_iff_normOneRestriction [IsTopologicalGroup G] [T2Space G]
     [LocallyCompactSpace G] (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1)
     (c d : QuasiCharacter G) :
     d ∈ connectedComponent c ↔ normOneRestriction m d = normOneRestriction m c := by
-  sorry
+  let inv := c.comp (ContinuousMonoidHom.inv G)
+  have hc (x : G) : c x ≠ 0 := ((Group.isUnit x).map c).ne_zero
+  have hdiv (e : QuasiCharacter G) (x : G) : (e * inv) x = e x / c x := by
+    change e x * c x⁻¹ = e x / c x
+    rw [map_inv, div_eq_mul_inv]
+  have htranslate (q : QuasiCharacter G) : Continuous (fun e : QuasiCharacter G => e * q) := by
+    apply ContinuousMonoidHom.continuous_of_continuous_uncurry
+    exact (continuous_eval.comp (continuous_fst.prodMk continuous_snd)).mul
+      (q.continuous.comp continuous_snd)
+  have hrestrict (e : QuasiCharacter G) :
+      normOneRestriction m (e * inv) = 1 ↔ normOneRestriction m e = normOneRestriction m c := by
+    rw [DFunLike.ext_iff, DFunLike.ext_iff]
+    refine forall_congr' fun x => ?_
+    change (e * inv) x = 1 ↔ e x = c x
+    rw [hdiv, div_eq_one_iff_eq (hc x)]
+  constructor
+  · intro hd
+    let : CompactSpace m.ker :=
+      isCompact_iff_compactSpace.mp (hm.isCompact_preimage (isCompact_singleton (x := 1)))
+    have hopen : IsOpen {e | normOneRestriction m e = normOneRestriction m c} := by
+      have ho := isOpen_singleton_one_complex.preimage
+        ((normOneRestriction m).continuous.comp (htranslate inv))
+      convert ho using 1
+      ext e
+      exact (hrestrict e).symm
+    exact IsClopen.connectedComponent_subset
+      ⟨isClosed_eq (normOneRestriction m).continuous continuous_const, hopen⟩ rfl hd
+  · intro hd
+    -- The ratio is trivial on the kernel and descends to the closed norm image.
+    let q := d * inv
+    have hq (x : m.ker) : q x = 1 := DFunLike.congr_fun ((hrestrict d).mpr hd) x
+    let r : G →ₜ* m.range :=
+      ⟨m.rangeRestrict, hm.continuous.subtype_mk fun x => ⟨x, rfl⟩⟩
+    have hr : IsQuotientMap r :=
+      (hm.isClosedMap.codRestrict (s := (m.range : Set ℝ≥0ˣ)) fun x => ⟨x, rfl⟩).isQuotientMap
+        r.continuous m.rangeRestrict_surjective
+    have hqKer : m.ker ≤ q.toMonoidHom.ker := fun x hx => hq ⟨x, hx⟩
+    let qLift := (QuotientGroup.lift m.ker q.toMonoidHom hqKer).comp
+      (QuotientGroup.quotientKerEquivRange m).symm.toMonoidHom
+    have hqLift (x : G) : qLift (r x) = q x := by
+      change
+        QuotientGroup.lift m.ker q.toMonoidHom hqKer ((QuotientGroup.quotientKerEquivRange m).symm
+          ((QuotientGroup.quotientKerEquivRange m) (QuotientGroup.mk x))) = q.toMonoidHom x
+      rw [MulEquiv.symm_apply_apply, QuotientGroup.lift_mk]
+    have hqCont : Continuous qLift := hr.continuous_iff.mpr (by
+      rw [show (qLift : m.range → ℂ) ∘ r = q from funext hqLift]
+      exact q.continuous)
+    have : Nontrivial m.range := by
+      obtain ⟨x, hx⟩ := hne
+      exact ⟨⟨r x, 1, fun he => hx (congrArg Subtype.val he)⟩⟩
+    obtain ⟨f, hf, hf0, hf1⟩ :=
+      exists_quasiCharacter_deformation m.range hm.isClosed_range ⟨qLift, hqCont⟩
+    let p (t : ℝ) : QuasiCharacter G := (f t).comp r * c
+    have hp : Continuous p := (htranslate c).comp (r.continuous_comp_left.comp hf)
+    have hp0 : p 0 = c := by
+      ext1 x
+      simp [p, hf0, ContinuousMonoidHom.mul_apply]
+    have hp1 : p 1 = d := by
+      ext1 x
+      change f 1 (r x) * c x = d x
+      rw [hf1]
+      change qLift (r x) * c x = d x
+      rw [hqLift, hdiv, div_mul_cancel₀ _ (hc x)]
+    exact (isPreconnected_range hp).subset_connectedComponent
+      ⟨0, hp0⟩ ⟨1, hp1⟩
 
 /-- Paper: Equation (3.1.1.1), p. 119. The restrictions to the norm-one subgroup are
 exactly its unitary characters. In particular every such character lifts. -/
