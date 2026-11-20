@@ -168,7 +168,16 @@ theorem quasiCharacterAbscissa_dual [IsTopologicalGroup G] (hm : IsProperMap m)
     (hne : ∃ g, m g ≠ 1) (c : QuasiCharacter G) :
     quasiCharacterAbscissa m hm hne (dualQuasiCharacter m hm.continuous c) =
       1 - quasiCharacterAbscissa m hm hne c := by
-  sorry
+  let g := hne.choose
+  have hmod : 0 < modℝ g := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (m g).ne_zero)
+  have hmod_one : modℝ g ≠ 1 := fun h =>
+    hne.choose_spec (Units.val_inj.mp (NNReal.coe_inj.mp h))
+  have hlog := Real.log_ne_zero_of_pos_of_ne_one hmod hmod_one
+  have hnorm : ‖c g‖ ≠ 0 := norm_ne_zero_iff.mpr ((Group.isUnit g).map c).ne_zero
+  change Real.log ‖(modℝ g : ℂ) * c (g⁻¹)‖ / Real.log (modℝ g) =
+    1 - Real.log ‖c g‖ / Real.log (modℝ g)
+  rw [map_inv, ← div_eq_mul_inv, norm_div, Complex.norm_of_nonneg hmod.le,
+    Real.log_div hmod.ne' hnorm, sub_div, div_self hlog]
 
 /-- Paper: Equation (3.1.1.4), p. 119. The duality map is an analytic automorphism and
 serves as its own inverse. -/
