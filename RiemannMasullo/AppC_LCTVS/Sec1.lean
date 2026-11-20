@@ -125,7 +125,35 @@ theorem seminorms_nhds_basis_and_hausdorff {ι E : Type*} [AddCommGroup E] [Modu
     [TopologicalSpace E] (p : SeminormFamily ℂ E ι) (hp : WithSeminorms p) :
     (𝓝 (0 : E)).HasBasis (fun a : Finset ι × ℕ ↦ 0 < a.2)
       (fun a ↦ {x | ∀ i ∈ a.1, p i x ≤ (a.2 : ℝ)⁻¹}) ∧
-      (T2Space E ↔ ∀ x : E, (∀ i, p i x = 0) → x = 0) := by sorry
+      (T2Space E ↔ ∀ x : E, (∀ i, p i x = 0) → x = 0) := by
+  constructor
+  · refine hp.hasBasis_zero_ball.to_hasBasis ?_ ?_
+    · rintro ⟨s, r⟩ hr
+      obtain ⟨n, hn, hnr⟩ := Real.exists_nat_pos_inv_lt hr
+      refine ⟨(s, n), hn, ?_⟩
+      rw [Seminorm.ball_finset_sup_eq_iInter _ _ _ hr]
+      intro x hx
+      simp only [mem_iInter₂, Seminorm.mem_ball_zero]
+      exact fun i hi ↦ (hx i hi).trans_lt hnr
+    · rintro ⟨s, n⟩ hn
+      have hr : 0 < (n : ℝ)⁻¹ := inv_pos.mpr (Nat.cast_pos.mpr hn)
+      refine ⟨(s, (n : ℝ)⁻¹), hr, ?_⟩
+      rw [Seminorm.ball_finset_sup_eq_iInter _ _ _ hr]
+      intro x hx i hi
+      simp only [mem_iInter₂, Seminorm.mem_ball_zero] at hx
+      exact (hx i hi).le
+  · constructor
+    · intro h x hx
+      by_contra hne
+      obtain ⟨i, hi⟩ := hp.separating_of_T1 x hne
+      exact hi (hx i)
+    · intro h
+      have := hp.isTopologicalAddGroup
+      have : T1Space E := hp.T1_of_separating (by
+        intro x hx
+        contrapose! hx
+        exact h x hx)
+      infer_instance
 
 section Nets
 
