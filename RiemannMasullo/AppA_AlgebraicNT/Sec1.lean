@@ -316,7 +316,7 @@ theorem sAdele_diagonal_apply (x : Oₛ(F, S)) :
     a.val = algebraMap F 𝔸[F] x.val ∧
     (∀ w, (adeleProjection F S a.val).1 w = algebraMap F w.Completion x.val) ∧
     ∀ v : S, (adeleProjection F S a.val).2 v = algebraMap F (v.val.adicCompletion F) x.val := by
-  sorry
+  exact ⟨rfl, fun _ ↦ rfl, fun _ ↦ rfl⟩
 
 /-- Paper: Equation (A.1.5.2), p. 543. The units of the S-adele ring have the subspace
 topology and identify coordinatewise with the finite product of local unit groups. -/
