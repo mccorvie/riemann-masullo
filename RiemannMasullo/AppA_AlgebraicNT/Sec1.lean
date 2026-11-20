@@ -256,7 +256,9 @@ principal idele. -/
 theorem ideleClassGroup_description :
     let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
     IsQuotientMap q ∧ ∀ g h, q g = q h ↔ ∃ x : Fˣ, g = IdeleGroup.unitEmbedding (𝓞 F) F x * h := by
-  sorry
+  refine ⟨QuotientGroup.isQuotientMap_mk _, fun g h ↦ QuotientGroup.eq_iff_div_mem.trans ?_⟩
+  rw [IdeleGroup.principalSubgroup, MonoidHom.mem_range]
+  exact exists_congr fun x ↦ eq_div_iff_mul_eq'.trans eq_comm
 
 -- TODO(paper-gap): The sentence after (A.1.4.2) attributes compactness of the kernel
 -- to A.1.3.4(3). Existence of a continuous splitting does not imply this. The compactness
