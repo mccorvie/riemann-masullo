@@ -427,7 +427,13 @@ def LiftsBoundedSets (f : E →L[ℂ] F) : Prop :=
 /-- Paper: Definition C.1.5.9, p. 667. A bounded lift can be chosen with image exactly
 the specified set. -/
 theorem hasBoundedLift_iff_image (f : E →L[ℂ] F) (B : Set F) :
-    HasBoundedLift f B ↔ ∃ A : Set E, IsVonNBounded ℂ A ∧ f '' A = B := by sorry
+    HasBoundedLift f B ↔ ∃ A : Set E, IsVonNBounded ℂ A ∧ f '' A = B := by
+  constructor
+  · rintro ⟨A, hA, hB⟩
+    refine ⟨A ∩ f ⁻¹' B, hA.subset inter_subset_left, ?_⟩
+    rw [image_inter_preimage, inter_eq_right.mpr hB]
+  · rintro ⟨A, hA, hB⟩
+    exact ⟨A, hA, hB.ge⟩
 
 /-- Paper: Definition C.1.5.9, p. 667. The identity map lifts bounded subsets. -/
 theorem liftsBoundedSets_id : LiftsBoundedSets (ContinuousLinearMap.id ℂ E) := by
