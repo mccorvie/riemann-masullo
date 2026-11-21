@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch02_AdelicTheta.Sec3
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Analysis.SpecificLimits.Normed
+import Mathlib.NumberTheory.NumberField.InfiniteAdeleRing
 import RiemannMasullo.ForMathlib.Analysis.Normed.Ring.InfiniteSum
 
 /-!
@@ -31,32 +32,6 @@ local notation "smallNorm[" K "," V "]" => comap normℝ[K, V] (𝓝[>] (0 : ℝ
 
 -- As in §2.3, the homogeneous operator takes its Haar measure as a parameter.
 local instance : MeasurableSpace J₁ := borel _
-
-/-! ## The rational number field -/
-
-section Rat
-
-variable (S : Finset (HeightOneSpectrum (𝓞 ℚ)))
-
-/-- Paper: Proposition 2.4.1.1, p. 107. Over the rationals the theta
-function grows at most as the absolute log norm to the number of finite
-places in S, uniformly as the S-idelic norm tends to zero from above. -/
-theorem sLocalAdelicTheta_rat_log_growth (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ S))) :
-    (fun g ↦ sLocalAdelicTheta ℚ S f g) =O[smallNorm[ℚ, S]]
-      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by sorry
-
-/-- Paper: Proposition 2.4.1.1, pp. 107, 110. Over the rationals the same
-logarithmic growth bound holds for homogeneous theta for each continuous
-character of the norm-one S-idele classes.
-Deviation: As in §2.3, the Haar measure on those classes is explicit. -/
-theorem sLocalHomogeneousAdelicTheta_rat_log_growth
-    (μ : Measure ↥(MonoidHom.ker (sIdeleQuotientNorm ℚ S))) [Measure.IsHaarMeasure μ]
-    (ω : PontryaginDual ↥(MonoidHom.ker (sIdeleQuotientNorm ℚ S)))
-    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ S))) :
-    (fun g ↦ sLocalHomogeneousAdelicTheta ℚ S μ ω f (QuotientGroup.mk g)) =O[smallNorm[ℚ, S]]
-      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by sorry
-
-end Rat
 
 -- TODO(paper-gap): Lemma 2.4.1.2 prints C in (2.4.1.3) after quantifying Cφ.
 -- A coefficient depending only on T, M, N and the bases fails for
@@ -118,21 +93,14 @@ private theorem geometric_grid_factor_bound {b L : ℝ} (hb : 0 < b) (hL : 1 ≤
       rw [inv_div, one_add_mul, div_eq_inv_mul]
       linarith
 
-/-- Paper: Lemma 2.4.1.2, p. 107. For a bounded function with power decay
-at infinity, the sum of the norms over the multiplicative grid with M bases
-greater than one converges and is bounded by a constant times the Mth power
-of the absolute log near zero.
-Deviation: Equation (2.4.1.3) uses the existentially quantified constant
-`Cφ`. The real-domain function is used only at positive arguments, and
-summability is explicit. -/
-theorem summable_geometric_grid_log_bound (M N : ℕ) (hM : 1 ≤ M) (hN : 1 < N)
+/-- The geometric grid estimate, including the zero-dimensional grid. -/
+private theorem geometric_grid_log_bound (M N : ℕ) (hN : 1 < N)
     (a : Fin M → ℝ) (ha : ∀ i, 1 < a i) (φ : ℝ → ℂ)
     (hbounded : ∃ C : ℝ, 0 < C ∧ ∀ t : ℝ, 0 < t → ‖φ t‖ ≤ C)
     (hdecay : ∃ A T : ℝ, 0 < A ∧ 0 < T ∧ ∀ t : ℝ, T ≤ t → ‖φ t‖ ≤ A * (t ^ N)⁻¹) :
     ∃ T₀ Cφ : ℝ, 0 < T₀ ∧ 0 < Cφ ∧ ∀ t : ℝ, 0 < t → t < T₀ →
       let term : (Fin M → ℕ) → ℝ := fun k ↦ ‖φ ((∏ i, a i ^ k i) * t)‖
       Summable term ∧ (∑' k, term k) ≤ Cφ * |Real.log t| ^ M := by
-  clear hM -- The product estimate also holds in dimension zero.
   obtain ⟨C, hC, hb⟩ := hbounded
   obtain ⟨A, T, -, -, hd⟩ := hdecay
   obtain ⟨D, hD, hmajor⟩ := geometric_grid_decay_majorant hN.le hC hb hd
@@ -187,6 +155,275 @@ theorem summable_geometric_grid_log_bound (M N : ℕ) (hM : 1 ≤ M) (hN : 1 < N
       Finset.prod_le_prod₀ (fun i _ ↦ inv_nonneg.mpr (sub_nonneg.mpr (hq i).le))
         (fun i _ ↦ geometric_grid_factor_bound (hbpos i) hL)
     _ = P * L ^ M := by simp [P, Finset.prod_mul_distrib]
+
+/-- Paper: Lemma 2.4.1.2, p. 107. For a bounded function with power decay
+at infinity, the sum of the norms over the multiplicative grid with M bases
+greater than one converges and is bounded by a constant times the Mth power
+of the absolute log near zero.
+Deviation: Equation (2.4.1.3) uses the existentially quantified constant
+`Cφ`. The real-domain function is used only at positive arguments, and
+summability is explicit. -/
+theorem summable_geometric_grid_log_bound (M N : ℕ) (hM : 1 ≤ M) (hN : 1 < N)
+    (a : Fin M → ℝ) (ha : ∀ i, 1 < a i) (φ : ℝ → ℂ)
+    (hbounded : ∃ C : ℝ, 0 < C ∧ ∀ t : ℝ, 0 < t → ‖φ t‖ ≤ C)
+    (hdecay : ∃ A T : ℝ, 0 < A ∧ 0 < T ∧ ∀ t : ℝ, T ≤ t → ‖φ t‖ ≤ A * (t ^ N)⁻¹) :
+    ∃ T₀ Cφ : ℝ, 0 < T₀ ∧ 0 < Cφ ∧ ∀ t : ℝ, 0 < t → t < T₀ →
+      let term : (Fin M → ℕ) → ℝ := fun k ↦ ‖φ ((∏ i, a i ^ k i) * t)‖
+      Summable term ∧ (∑' k, term k) ≤ Cφ * |Real.log t| ^ M := by
+  clear hM
+  exact geometric_grid_log_bound M N hN a ha φ hbounded hdecay
+
+/-! ## The rational number field -/
+
+section Rat
+
+variable (S : Finset (HeightOneSpectrum (𝓞 ℚ)))
+
+local notation "A" => SAdeleRing ℚ S
+local notation "U" => (Set.integer (S : Set (HeightOneSpectrum (𝓞 ℚ))) ℚ)ˣ
+local notation "unitAtS" =>
+  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection ℚ S)
+    (Subring.subtype (integralAdelesOutside ℚ S)))))
+    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal ℚ S)))
+local notation "ratNorm" => fun (g : Aˣ) ↦ ((Units.val (sIdeleNorm ℚ S g) : ℝ≥0) : ℝ)
+local notation "w" => Rat.infinitePlace
+
+/-- The rational S-idelic norm uses the single real place and all finite places in S. -/
+private theorem rat_sIdeleNorm_eq (g : Aˣ) :
+    ratNorm g = ‖g.val.1 w‖ * ∏ v : S, ‖g.val.2 v‖ := by
+  classical
+  let eval : (Aˣ →* ℝ≥0ˣ) →* ℝ :=
+    NNReal.toRealHom.toMonoidHom.comp ((Units.coeHom ℝ≥0).comp (MonoidHom.eval g))
+  change eval (sIdeleNorm ℚ S) = _
+  simp only [sIdeleNorm, map_mul, map_prod]
+  rw [Fintype.prod_subsingleton _ w]
+  simp only [Rat.isReal_infinitePlace.mult_eq_one, pow_one]
+  rfl
+
+open scoped Classical in
+/-- The archimedean norm of a rational adele is the norm of its unique real coordinate. -/
+private theorem rat_arch_norm_eq (x : InfiniteAdeleRing ℚ) :
+    ‖InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x‖ = ‖x w‖ := by
+  classical
+  rw [mixedEmbedding.norm_eq_sup'_normAtPlace, Finset.sup'_univ_eq_ciSup, ciSup_unique]
+  change mixedEmbedding.normAtPlace w _ = _
+  rw [mixedEmbedding.normAtPlace_apply_of_isReal Rat.isReal_infinitePlace,
+    InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+  exact (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal Rat.isReal_infinitePlace).norm_map_of_map_zero
+    (map_zero _) _
+
+/-- Multiplying by a diagonal S-unit preserves the S-idelic norm. -/
+private theorem rat_sIdeleNorm_unit_mul (g : Aˣ) (u : U) :
+    ratNorm (unitAtS u * g) = ratNorm g := by
+  have hu : sIdeleNorm ℚ S (unitAtS u) = 1 :=
+    MonoidHom.mem_ker.mp ((sIdeleNorm_spec ℚ S).2 ⟨u, rfl⟩)
+  change ((↑↑(sIdeleNorm ℚ S (unitAtS u * g))) : ℝ) = _
+  rw [map_mul, hu, one_mul]
+
+/-- Every finite coordinate of an S-idele is nonzero. -/
+private theorem rat_sIdele_finite_ne_zero (g : Aˣ) (v : S) : g.val.2 v ≠ 0 := by
+  let ev : A →+* v.val.adicCompletion ℚ :=
+    (Pi.evalRingHom _ v).comp (RingHom.snd _ _)
+  exact (g.isUnit.map ev).ne_zero
+
+/-- Among diagonal S-unit multiples, the finite norms and the sign of the
+rational multiplier determine the multiplier. -/
+private theorem rat_sUnit_eq_of_norms (g : Aˣ) {u z : U}
+    (hfin : ∀ v : S, ‖(unitAtS u * g).val.2 v‖ = ‖(unitAtS z * g).val.2 v‖)
+    (hsign : (0 ≤ (u.val.val : ℚ)) ↔ (0 ≤ (z.val.val : ℚ))) : u = z := by
+  have hnorm := (rat_sIdeleNorm_unit_mul S g u).trans (rat_sIdeleNorm_unit_mul S g z).symm
+  rw [rat_sIdeleNorm_eq, rat_sIdeleNorm_eq] at hnorm
+  simp_rw [hfin] at hnorm
+  have hprod := Finset.prod_pos (s := Finset.univ) fun v _ ↦
+    norm_pos_iff.mpr (rat_sIdele_finite_ne_zero S (unitAtS z * g) v)
+  have hinf := (mul_right_cancel₀ hprod.ne') hnorm
+  have harch (ξ : U) :
+      ‖(unitAtS ξ * g).val.1 w‖ = |(ξ.val.val : ℚ)| * ‖g.val.1 w‖ := by
+    change ‖algebraMap ℚ Rat.infinitePlace.Completion ξ.val.val * g.val.1 w‖ = _
+    rw [norm_mul, eq_ratCast (algebraMap ℚ Rat.infinitePlace.Completion),
+      InfinitePlace.Completion.Rat.norm_infinitePlace_completion]
+  rw [harch, harch] at hinf
+  let ev : A →+* Rat.infinitePlace.Completion :=
+    (Pi.evalRingHom _ w).comp (RingHom.fst _ _)
+  have hne : g.val.1 w ≠ 0 := (g.isUnit.map ev).ne_zero
+  have habs : |u.val.val| = |z.val.val| :=
+    Rat.cast_injective (mul_right_cancel₀ (norm_ne_zero_iff.mpr hne) hinf)
+  apply Units.ext
+  apply Subtype.ext
+  by_cases hu : 0 ≤ u.val.val
+  · rwa [abs_of_nonneg hu, abs_of_nonneg (hsign.mp hu)] at habs
+  · have hz : ¬ 0 ≤ z.val.val := mt hsign.mpr hu
+    simpa [abs_of_neg (lt_of_not_ge hu), abs_of_neg (lt_of_not_ge hz)] using habs
+
+/-- A nonzero finite coordinate has norm given by an integer power of its
+residue field cardinality. -/
+private theorem rat_finite_norm_eq_zpow (v : S) (x : v.val.adicCompletion ℚ)
+    (hx : x ≠ 0) : ∃ e : ℤ, ‖x‖ = (v.val.asIdeal.absNorm : ℝ) ^ e := by
+  refine ⟨WithZero.log (Valued.v x), ?_⟩
+  rw [FinitePlace.norm_def, WithZeroMulInt.toNNReal_neg_apply _
+    (Valued.v.ne_zero_iff.mpr hx)]
+  simp
+
+
+/-- Finite norm cutoffs put the translated rational S-units into an integer
+grid with a shift independent of the idele. The sign distinguishes opposite units. -/
+private theorem rat_sUnit_grid (R : S → ℝ) (e : Fin S.card ≃ S) :
+    let q : Fin S.card → ℝ := fun i ↦ (e i).val.asIdeal.absNorm
+    ∃ Q : ℝ, 0 < Q ∧ ∀ g : Aˣ,
+      let P : Set U := {u | ∀ v, ‖(unitAtS u * g).val.2 v‖ ≤ R v}
+      ∃ index : P ↪ Bool × (Fin S.card → ℕ), ∀ u : P,
+        ‖(unitAtS u.val * g).val.1 w‖ * Q =
+          (∏ i, q i ^ (index u).2 i) * ratNorm g := by
+  classical
+  let q : Fin S.card → ℝ := fun i ↦ (e i).val.asIdeal.absNorm
+  have hq (i) : 1 < q i := by
+    simpa only [q, Nat.one_lt_cast] using NumberField.HeightOneSpectrum.one_lt_absNorm (e i).val
+  have hqpos (i) : 0 < q i := zero_lt_one.trans (hq i)
+  choose N hN using fun i ↦ pow_unbounded_of_one_lt (R (e i)) (hq i)
+  let Q := ∏ i, q i ^ N i
+  refine ⟨Q, Finset.prod_pos (fun i _ ↦ pow_pos (hqpos i) _), fun g ↦ ?_⟩
+  let P : Set U := {u | ∀ v, ‖(unitAtS u * g).val.2 v‖ ≤ R v}
+  let y (u : P) := unitAtS u.val * g
+  have hdiscrete (u : P) (i : Fin S.card) :
+      ∃ a : ℤ, ‖(y u).val.2 (e i)‖ = q i ^ a :=
+    rat_finite_norm_eq_zpow S (e i) _ (rat_sIdele_finite_ne_zero S (y u) (e i))
+  choose a ha using hdiscrete
+  let n (u : P) (i : Fin S.card) : ℕ := (↑(N i) - a u i).toNat
+  have hshift (u : P) (i : Fin S.card) :
+      ‖(y u).val.2 (e i)‖ * q i ^ n u i = q i ^ N i := by
+    have hle : a u i ≤ (N i : ℤ) := by
+      apply (zpow_right_strictMono₀ (hq i)).le_iff_le.mp
+      rw [← ha u i, zpow_natCast]
+      exact (u.property (e i)).trans (hN i).le
+    rw [ha, ← zpow_natCast (q i) (n u i), ← zpow_add₀ (hqpos i).ne',
+      Int.toNat_sub_of_le hle, add_sub_cancel, zpow_natCast]
+  let index : P ↪ Bool × (Fin S.card → ℕ) :=
+    ⟨fun u ↦ (decide (0 ≤ (u.val.val.val : ℚ)), n u), by
+      intro u z h
+      apply Subtype.ext
+      apply rat_sUnit_eq_of_norms S g
+      · intro v
+        obtain ⟨i, rfl⟩ := e.surjective v
+        have hn : n u i = n z i := congrFun (congrArg Prod.snd h) i
+        apply mul_right_cancel₀ (pow_ne_zero (n u i) (hqpos i).ne')
+        rw [hshift u i, hn, hshift z i]
+      · exact decide_eq_decide.mp (congrArg Prod.fst h)⟩
+  refine ⟨index, fun u ↦ ?_⟩
+  have hQ : (∏ v : S, ‖(y u).val.2 v‖) * (∏ i, q i ^ n u i) = Q := by
+    rw [← e.prod_comp (fun v ↦ ‖(y u).val.2 v‖), ← Finset.prod_mul_distrib]
+    exact Finset.prod_congr rfl (fun i _ ↦ hshift u i)
+  change ‖(y u).val.1 w‖ * Q = (∏ i, q i ^ n u i) * ratNorm g
+  rw [← hQ, ← mul_assoc, ← rat_sIdeleNorm_eq, rat_sIdeleNorm_unit_mul, mul_comm]
+
+/-- Compact finite support and quadratic archimedean decay suffice for the
+logarithmic growth bound on the sum over rational S-units. -/
+private theorem rat_sUnit_sum_log_growth (f : A → ℂ) (R : S → ℝ) (B₀ B₂ : ℝ)
+    (hR : ∀ x, (¬ ∀ v, ‖x.2 v‖ ≤ R v) → f x = 0)
+    (h₀ : ∀ x, ‖f x‖ ≤ B₀)
+    (h₂ : ∀ x, ‖f x‖ * ‖x.1 w‖ ^ 2 ≤ B₂) :
+    (fun g : Aˣ ↦ ∑' u : U, f (unitAtS u * g).val) =O[smallNorm[ℚ, S]]
+      (fun g ↦ |Real.log (ratNorm g)| ^ S.card) := by
+  classical
+  let e : Fin S.card ≃ S := S.equivFin.symm
+  let q : Fin S.card → ℝ := fun i ↦ (e i).val.asIdeal.absNorm
+  have hq (i) : 1 < q i := by
+    simpa only [q, Nat.one_lt_cast] using NumberField.HeightOneSpectrum.one_lt_absNorm (e i).val
+  obtain ⟨Q, _, hgrid⟩ := rat_sUnit_grid S R e
+  let D := max 1 (max B₀ (B₂ * Q ^ 2))
+  have hD : 0 < D := zero_lt_one.trans_le (le_max_left _ _)
+  let φ (t : ℝ) : ℂ := (D * ((max 1 t) ^ 2)⁻¹ : ℝ)
+  have hφ (t : ℝ) : ‖φ t‖ = D * ((max 1 t) ^ 2)⁻¹ := by
+    rw [Complex.norm_real, Real.norm_of_nonneg (by positivity)]
+  obtain ⟨T, C, hT, _, hseries⟩ := geometric_grid_log_bound S.card 2 (by decide) q hq φ
+    ⟨D, hD, fun t _ ↦ by
+      rw [hφ]
+      have hp : 1 ≤ (max 1 t) ^ 2 := one_le_pow₀ (le_max_left _ _)
+      exact mul_le_of_le_one_right hD.le ((inv_le_one₀ (zero_lt_one.trans_le hp)).mpr hp)⟩
+    ⟨D, 1, hD, zero_lt_one, fun t ht ↦ by rw [hφ, max_eq_right ht]⟩
+  refine IsBigO.of_bound (2 * C) (mem_comap.mpr ⟨Set.Ioo 0 T, Ioo_mem_nhdsGT hT, ?_⟩)
+  intro g hg
+  have hg' : ratNorm g ∈ Set.Ioo 0 T := hg
+  obtain ⟨hseriesSummable, hseriesBound⟩ := hseries (ratNorm g) hg'.1 hg'.2
+  let P : Set U := {u | ∀ v, ‖(unitAtS u * g).val.2 v‖ ≤ R v}
+  obtain ⟨index, hindex⟩ := hgrid g
+  let term (u : U) := f (unitAtS u * g).val
+  let majorant (k : Fin S.card → ℕ) := ‖φ ((∏ i, q i ^ k i) * ratNorm g)‖
+  have hpoint (u : P) : ‖term u.val‖ ≤ majorant (index u).2 := by
+    let x := (unitAtS u.val * g).val
+    change ‖f x‖ ≤ _
+    dsimp only [majorant]
+    rw [← hindex u, hφ]
+    change ‖f x‖ ≤ D * ((max 1 (‖x.1 w‖ * Q)) ^ 2)⁻¹
+    rcases le_total (‖x.1 w‖ * Q) 1 with hx | hx
+    · rw [max_eq_left hx, one_pow, inv_one, mul_one]
+      exact (h₀ x).trans
+        ((le_max_left B₀ (B₂ * Q ^ 2)).trans (le_max_right 1 _))
+    · rw [max_eq_right hx, ← div_eq_mul_inv]
+      apply (le_div_iff₀ (pow_pos (zero_lt_one.trans_le hx) _)).mpr
+      rw [mul_pow, ← mul_assoc]
+      exact (mul_le_mul_of_nonneg_right (h₂ x) (sq_nonneg Q)).trans
+        ((le_max_right B₀ (B₂ * Q ^ 2)).trans (le_max_right 1 _))
+  have hs : Summable majorant := hseriesSummable
+  have hp : Summable (fun p : Bool × (Fin S.card → ℕ) ↦ majorant p.2) := by
+    exact (summable_prod_of_nonneg (fun _ ↦ norm_nonneg _)).mpr
+      ⟨fun _ ↦ hs, Summable.of_finite⟩
+  have hsub : Summable (fun u : P ↦ ‖term u.val‖) :=
+    (hp.comp_injective index.injective).of_nonneg_of_le (fun _ ↦ norm_nonneg _) hpoint
+  have hsupport : Function.support (fun u ↦ ‖term u‖) ⊆ P :=
+    Function.support_subset_iff'.mpr fun u hu ↦
+      norm_eq_zero.mpr (hR _ hu)
+  have hall : Summable (fun u ↦ ‖term u‖) := by
+    have h := (summable_subtype_iff_indicator (s := P) (f := fun u ↦ ‖term u‖)).mp hsub
+    rwa [Set.indicator_eq_self.mpr hsupport] at h
+  change ‖∑' u, term u‖ ≤ (2 * C) * ‖|Real.log (ratNorm g)| ^ S.card‖
+  rw [Real.norm_of_nonneg (pow_nonneg (abs_nonneg _) _)]
+  calc
+    ‖∑' u, term u‖ ≤ ∑' u, ‖term u‖ := norm_tsum_le_tsum_norm hall
+    _ = ∑' u : P, ‖term u.val‖ := (tsum_subtype_eq_of_support_subset hsupport).symm
+    _ ≤ ∑' p : Bool × (Fin S.card → ℕ), majorant p.2 :=
+      hsub.tsum_le_tsum_of_inj index index.injective (fun _ _ ↦ norm_nonneg _) hpoint hp
+    _ = 2 * (∑' k, majorant k) := by
+      rw [hp.tsum_prod, tsum_fintype]
+      simp only [Finset.sum_const, Finset.card_univ, Fintype.card_bool, two_nsmul, two_mul]
+    _ ≤ (2 * C) * |Real.log (ratNorm g)| ^ S.card := by
+      rw [mul_assoc]
+      exact mul_le_mul_of_nonneg_left hseriesBound (by positivity)
+
+/-- Paper: Proposition 2.4.1.1, p. 107. Over the rationals the theta
+function grows at most as the absolute log norm to the number of finite
+places in S, uniformly as the S-idelic norm tends to zero from above. -/
+theorem sLocalAdelicTheta_rat_log_growth (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ S))) :
+    (fun g ↦ sLocalAdelicTheta ℚ S f g) =O[smallNorm[ℚ, S]]
+      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by
+  have htheta : (fun g : Aˣ ↦ sLocalAdelicTheta ℚ S f g) =
+      (fun g : Aˣ ↦ ∑' u : U, f (Multiplicative.ofAdd (unitAtS u * g).val)) :=
+    funext (sLocalAdelicTheta_apply ℚ S f)
+  rw [htheta]
+  obtain ⟨K, hK, hsupport, hdecay⟩ := sAdeleSchwartz_exists_decay_bound ℚ S f
+  have hcoord (v : S) : ∃ r : ℝ, ∀ x ∈ K, ‖x v‖ ≤ r :=
+    hK.exists_bound_of_continuousOn (continuous_apply v).continuousOn
+  choose R hR using hcoord
+  obtain ⟨B₀, _, h₀⟩ := hdecay 0
+  obtain ⟨B₂, _, h₂⟩ := hdecay 2
+  refine rat_sUnit_sum_log_growth S (fun x ↦ f (Multiplicative.ofAdd x)) R B₀ B₂ ?_ ?_ ?_
+  · exact fun x hx ↦ hsupport x (fun hxK ↦ hx (fun v ↦ hR v x.2 hxK))
+  · intro x
+    simpa only [pow_zero, mul_one] using h₀ x
+  · intro x
+    simpa only [rat_arch_norm_eq x.1] using h₂ x
+
+/-- Paper: Proposition 2.4.1.1, pp. 107, 110. Over the rationals the same
+logarithmic growth bound holds for homogeneous theta for each continuous
+character of the norm-one S-idele classes.
+Deviation: As in §2.3, the Haar measure on those classes is explicit. -/
+theorem sLocalHomogeneousAdelicTheta_rat_log_growth
+    (μ : Measure ↥(MonoidHom.ker (sIdeleQuotientNorm ℚ S))) [Measure.IsHaarMeasure μ]
+    (ω : PontryaginDual ↥(MonoidHom.ker (sIdeleQuotientNorm ℚ S)))
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ S))) :
+    (fun g ↦ sLocalHomogeneousAdelicTheta ℚ S μ ω f (QuotientGroup.mk g)) =O[smallNorm[ℚ, S]]
+      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by sorry
+
+end Rat
 
 -- TODO(paper-gap): The geometric series in (2.4.1.5) has an unrounded
 -- lower endpoint, and (2.4.1.8) loses a factor in the power of T. The

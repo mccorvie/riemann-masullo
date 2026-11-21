@@ -60,8 +60,14 @@ jobs:
             echo "::error::main has no checker (scripts/ci/) yet, so nothing can be checked. Only the pull request that adds it should see this."
             exit 1
           fi
-          git fetch --no-tags origin "+refs/pull/$PR/head:refs/remotes/origin/pr"
-          if [ "$(git rev-parse refs/remotes/origin/pr)" != "$HEAD_SHA" ]; then
+          if git fetch --no-tags origin "refs/pull/$PR/head"; then
+            fetched_head=$(git rev-parse FETCH_HEAD)
+          else
+            # GitHub sometimes exposes only its test merge, whose second parent is the PR head.
+            git fetch --no-tags origin "refs/pull/$PR/merge"
+            fetched_head=$(git rev-parse 'FETCH_HEAD^2')
+          fi
+          if [ "$fetched_head" != "$HEAD_SHA" ]; then
             echo "::error::The pull request was pushed to after this run started; a newer run checks it."
             exit 1
           fi

@@ -2549,6 +2549,260 @@ private theorem montelSpace_of_schwartz_frechet
   let : CompleteSpace E := hcomplete
   exact ⟨fun B hclosed hB ↦ hclosed.closure_eq ▸ isCompact_closure_of_schwartz hS hB⟩
 
+section MontelLimits
+
+variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+  {X : ℕ → Type*} [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)]
+  [∀ k, TopologicalSpace (X k)]
+  {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E}
+
+/-- Paper: Equation (C.1.5.2), p. 667. The image of the difference map is the
+kernel of the canonical map from the direct sum to the limit. -/
+private theorem IsInjectiveLCLimit.range_directSumDifference (h : IsInjectiveLCLimit j i) :
+    range (directSumDifference j) =
+      (DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)).ker := by
+  let D := ⨁ k, X k
+  let q : D →ₗ[ℂ] E := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  let σ := directSumDifference j
+  have hq (k : ℕ) (x : X k) : q (DirectSum.lof ℂ ℕ X k x) = i k x :=
+    DirectSum.toModule_lof _ _ _
+  refine subset_antisymm ?_ ?_
+  · have hcomp : q.comp σ = 0 := by
+      apply DirectSum.linearMap_ext
+      intro k
+      ext x : 1
+      change q (σ (DirectSum.lof ℂ ℕ X k x)) = 0
+      rw [show σ (DirectSum.lof ℂ ℕ X k x) =
+          DirectSum.lof ℂ ℕ X k x - DirectSum.lof ℂ ℕ X (k+1) (j k x) by
+        change directSumDifference j (DirectSum.lof ℂ ℕ X k x) = _
+        rw [directSumDifference, LinearMap.sub_apply, LinearMap.id_apply,
+          DirectSum.toModule_lof]
+        rfl]
+      rw [map_sub, hq, hq]
+      exact sub_eq_zero.mpr (DFunLike.congr_fun (h.compatible k) x).symm
+    rintro _ ⟨x, rfl⟩
+    exact DFunLike.congr_fun hcomp x
+  · classical
+    intro y hy
+    let s : ∀ k, X k := Nat.rec (y 0) (fun k z ↦ j k z + y (k+1))
+    have hs (k : ℕ) : i k (s k) = ∑ l ∈ Finset.range (k+1), i l (y l) := by
+      induction k with
+      | zero => simp [s]
+      | succ k ih =>
+        change i (k+1) (j k (s k) + y (k+1)) = _
+        have hcomp : i (k+1) (j k (s k)) = i k (s k) :=
+          DFunLike.congr_fun (h.compatible k) (s k)
+        rw [map_add, hcomp, ih]
+        exact (Finset.sum_range_succ (fun l ↦ i l (y l)) (k+1)).symm
+    obtain ⟨n, hn⟩ := Finset.exists_nat_subset_range y.support
+    have hsum (k : ℕ) (hk : n ≤ k) : (∑ l ∈ Finset.range (k+1), i l (y l)) = q y := by
+      have hqsum : q y = ∑ l ∈ y.support, i l (y l) := calc
+        q y = q (∑ l ∈ y.support, DirectSum.lof ℂ ℕ X l (y l)) :=
+          congrArg q (DirectSum.sum_support_of y).symm
+        _ = _ := by simp only [map_sum, hq]
+      rw [hqsum]
+      refine (Finset.sum_subset (hn.trans (Finset.range_mono (Nat.le_succ_of_le hk))) ?_).symm
+      intro l _ hl
+      rw [DFinsupp.notMem_support_iff.mp hl, map_zero]
+    have htail (k : ℕ) (hk : n ≤ k) : s k = 0 := h.injective k <| by
+      rw [hs, hsum k hk, map_zero]
+      exact hy
+    let x : D := DFinsupp.mk (Finset.range n) (fun k ↦ s k)
+    have hx (k : ℕ) : x k = s k := by
+      change (DFinsupp.mk (Finset.range n) (fun k ↦ s k)) k = _
+      rw [DFinsupp.mk_apply]
+      split
+      · rfl
+      · exact (htail k (by simpa using ‹k ∉ Finset.range n›)).symm
+    refine ⟨x, DFinsupp.ext fun k ↦ ?_⟩
+    cases k with
+    | zero => exact (directSumDifference_apply j x).1.trans (hx 0)
+    | succ k =>
+      rw [(directSumDifference_apply j x).2 k, hx, hx]
+      exact add_sub_cancel_left (j k (s k)) (y (k+1))
+
+/-- Paper: Equation (C.1.5.2), p. 667. The canonical map from the locally convex
+direct sum to the limit is a quotient map, including for a non-Hausdorff limit. -/
+private theorem IsInjectiveLCLimit.isQuotientMap_directSum (h : IsInjectiveLCLimit j i)
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)] :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    IsQuotientMap (DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)) := by
+  let D := ⨁ k, X k
+  let lof := DirectSum.lof ℂ ℕ X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  let q : D →ₗ[ℂ] E := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  have hq (k : ℕ) (x : X k) : q (lof k x) = i k x := DirectSum.toModule_lof _ _ _
+  have hsurj : Function.Surjective q := by
+    intro x
+    obtain ⟨k, y, rfl⟩ := h.exhaustive x
+    exact ⟨lof k y, hq k y⟩
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lof k)} → Seminorm ℂ D) :=
+    ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  have hqc : Continuous q := by
+    apply hE.continuous_of_continuous_comp
+    intro p
+    refine hD.continuous_seminorm (i := ⟨p.val.comp q, fun k ↦ ?_⟩)
+    simpa only [Function.comp_def, Seminorm.comp_apply, hq] using p.property k
+  let e := q.quotKerEquivOfSurjective hsurj
+  have he : Continuous e := q.ker.isQuotientMap_mkQL.continuous_iff.mpr hqc
+  have he' : Continuous e.symm := by
+    apply h.continuous_of_stages e.symm.toLinearMap
+    intro k
+    have heq (x : X k) : e.symm (i k x) = q.ker.mkQ (lof k x) := by
+      rw [← hq]
+      exact q.quotKerEquivOfSurjective_symm_apply hsurj _
+    change Continuous (fun x ↦ e.symm (i k x))
+    simp_rw [heq]
+    exact q.ker.mkQL.continuous.comp
+      (hD.continuous_of_continuous_comp (lof k) fun p ↦ p.property k)
+  let homeo : (D ⧸ q.ker) ≃ₜ E := ⟨e.toEquiv, he, he'⟩
+  change IsQuotientMap q
+  exact homeo.isQuotientMap.comp q.ker.isQuotientMap_mkQL
+
+/-- The difference map has closed range exactly when the limit is Hausdorff. -/
+private theorem IsInjectiveLCLimit.closedRange_directSumDifference_iff (h : IsInjectiveLCLimit j i)
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)] :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    IsClosed (range (directSumDifference j)) ↔ T2Space E := by
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  let : TopologicalSpace (⨁ k, X k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+  change IsClosed (range (directSumDifference j)) ↔ T2Space E
+  rw [h.range_directSumDifference, IsTopologicalAddGroup.t2Space_iff_zero_closed]
+  exact ((isQuotientMap_iff_isClosed.mp h.isQuotientMap_directSum).2 {0}).symm
+
+/-- Bounded lifting from stages forces Hausdorffness. The closure of zero is bounded,
+but its preimage in an injective stage cannot contain a nonzero line and be bounded. -/
+private theorem IsInjectiveLCLimit.t2Space_of_bounded_stage (h : IsInjectiveLCLimit j i)
+    [∀ k, PolynormableSpace ℂ (X k)] [∀ k, T2Space (X k)]
+    (hlift : ∀ B : Set E, IsVonNBounded ℂ B →
+      ∃ k, ∃ A : Set (X k), IsVonNBounded ℂ A ∧ i k '' A = B) : T2Space E := by
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  let : ContinuousSMul ℂ E := hE.continuousSMul
+  let N := (⊥ : Submodule ℂ E).topologicalClosure
+  have hN : (N : Set E) = closure ({0} : Set E) := by simp [N]
+  have hb : IsVonNBounded ℂ (N : Set E) := hE.isVonNBounded_iff_seminorm_bounded.mpr (by
+    intro p
+    refine ⟨1, zero_lt_one, fun x hx ↦ ?_⟩
+    have hzero : p.val x = 0 := by
+      rw [hN] at hx
+      have hmem := image_closure_subset_closure_image (hE.continuous_seminorm (i := p))
+        (mem_image_of_mem p.val hx)
+      simpa using hmem
+    simp [hzero])
+  obtain ⟨k, A, hA, heq⟩ := hlift N hb
+  rw [IsTopologicalAddGroup.t2Space_iff_zero_closed, ← closure_subset_iff_isClosed, ← hN]
+  intro x hx
+  obtain ⟨y, hy, rfl⟩ := heq.symm ▸ hx
+  suffices hy0 : y = 0 by simp [hy0]
+  by_contra hy0
+  let P := PolynormableSpace.withSeminorms ℂ (X k)
+  obtain ⟨p, hp⟩ := P.separating_of_T1 y hy0
+  have hpos : 0 < p.val y := lt_of_le_of_ne (apply_nonneg p.val y) hp.symm
+  obtain ⟨R, hRpos, hR⟩ := P.isVonNBounded_iff_seminorm_bounded.mp hA p
+  let c : ℂ := (R / p.val y : ℝ)
+  have hyN : i k y ∈ N := by
+    change i k y ∈ (N : Set E)
+    rw [← heq]
+    exact mem_image_of_mem (i k) hy
+  have hcN : i k (c • y) ∈ N := by
+    rw [map_smul]
+    exact N.smul_mem c hyN
+  have hc : i k (c • y) ∈ i k '' A := by
+    rw [heq]
+    exact hcN
+  obtain ⟨z, hz, hzy⟩ := hc
+  have hlt := hR z hz
+  rw [h.injective k hzy, map_smul_eq_mul, show ‖c‖ = R / p.val y by
+    exact Complex.norm_of_nonneg (div_nonneg hRpos.le hpos.le),
+    div_mul_cancel₀ _ hpos.ne'] at hlt
+  exact (lt_irrefl R) hlt
+
+/-- If each null sequence has bounded representatives in one stage, then every bounded
+set has a bounded lift to one stage. Test each stage with countably many scaled points. -/
+private theorem bounded_stage_of_nullSequence (h : IsInjectiveLCLimit j i)
+    [ContinuousSMul ℂ E] [∀ k, PolynormableSpace ℂ (X k)]
+    (hseq : ∀ u : ℕ → E, Tendsto u atTop (𝓝 0) →
+      ∃ k, ∃ v : ℕ → X k, IsVonNBounded ℂ (range v) ∧ ∀ n, i k (v n) = u n)
+    (B : Set E) (hB : IsVonNBounded ℂ B) :
+    ∃ k, ∃ A : Set (X k), IsVonNBounded ℂ A ∧ i k '' A = B := by
+  classical
+  by_contra hno
+  have hwitness (k : ℕ) :
+      ∃ p : {p : Seminorm ℂ (X k) // Continuous p}, ∀ R : ℝ,
+        ∃ x ∈ B, x ∉ i k '' p.val.ball 0 R := by
+    by_cases hk : B ⊆ range (i k)
+    · have hu : ¬ IsVonNBounded ℂ (i k ⁻¹' B) := fun hbounded ↦
+        hno ⟨k, _, hbounded, image_preimage_eq_of_subset hk⟩
+      rw [(PolynormableSpace.withSeminorms ℂ (X k)).isVonNBounded_iff_seminorm_bounded]
+        at hu
+      push Not at hu
+      obtain ⟨p, hp⟩ := hu
+      refine ⟨p, fun R ↦ ?_⟩
+      obtain ⟨z, hz, hlarge⟩ := hp (max R 1) (zero_lt_one.trans_le (le_max_right _ _))
+      refine ⟨i k z, hz, ?_⟩
+      rintro ⟨w, hw, he⟩
+      rw [h.injective k he, Seminorm.mem_ball_zero] at hw
+      exact (le_max_left _ _).not_gt (hlarge.trans_lt hw)
+    · obtain ⟨x, hxB, hx⟩ := Set.not_subset.mp hk
+      exact ⟨⟨0, continuous_zero⟩, fun _ ↦
+        ⟨x, hxB, fun hmem ↦ hx (image_subset_range _ _ hmem)⟩⟩
+  choose p hchoose using hwitness
+  let ε (n : ℕ) : ℂ := ((n : ℂ) + 1)⁻¹
+  have hε (n : ℕ) : ε n ≠ 0 := inv_ne_zero (by exact_mod_cast Nat.succ_ne_zero n)
+  have hlim : Tendsto ε atTop (𝓝 0) := by
+    simpa only [ε, one_div] using (tendsto_one_div_add_atTop_nhds_zero_nat (𝕜 := ℂ))
+  choose x hxB hx using fun n : ℕ ↦
+    hchoose (Nat.unpair n).1 ((Nat.unpair n).2 / ‖ε n‖)
+  let u (n : ℕ) := ε n • x n
+  obtain ⟨k, v, hv, he⟩ := hseq u (hB.smul_tendsto_zero (.of_forall hxB) hlim)
+  let P := PolynormableSpace.withSeminorms ℂ (X k)
+  obtain ⟨R, _, hR⟩ := P.isVonNBounded_iff_seminorm_bounded.mp hv (p k)
+  obtain ⟨m, hm⟩ := exists_nat_gt R
+  let n := Nat.pair k m
+  let S (km : ℕ × ℕ) := i km.1 '' (p km.1).val.ball 0 ((km.2 : ℝ) / ‖ε n‖)
+  have hind : S (Nat.unpair n) = S (k, m) := congrArg S (Nat.unpair_pair k m)
+  have hx' : x n ∉ S (k, m) := hind ▸ (show x n ∉ S (Nat.unpair n) from hx n)
+  apply hx'
+  refine ⟨(ε n)⁻¹ • v n, ?_, ?_⟩
+  · rw [Seminorm.mem_ball_zero, map_smul_eq_mul, norm_inv, ← div_eq_inv_mul]
+    exact div_lt_div_of_pos_right ((hR _ (mem_range_self n)).trans hm)
+      (norm_pos_iff.mpr (hε n))
+  · rw [map_smul, he n, inv_smul_smul₀ (hε n)]
+
+/-- Acyclicity of a Fréchet–Montel system gives bounded stage representatives for each
+null sequence in its Hausdorff limit. This is the null-sequence lifting part of
+Wengenroth's Theorem 3.3. -/
+private theorem IsInjectiveLCLimit.lifts_nullSequence_of_acyclic (h : IsInjectiveLCLimit j i)
+    [T2Space E] (hX : ∀ k, IsFrechetTVS (X k)) (hM : ∀ k, MontelSpace ℂ (X k))
+    (hacyclic : IsAcyclicSystem j) (u : ℕ → E) (hu : Tendsto u atTop (𝓝 0)) :
+    ∃ k, ∃ v : ℕ → X k, IsVonNBounded ℂ (range v) ∧ ∀ n, i k (v n) = u n := by
+  sorry
+
+/-- In a Fréchet–Montel system, compact lifting from the Hausdorff limit makes the
+difference map a topological embedding. This is the embedding step of Wengenroth's
+Theorem 3.3. Closedness of its range follows separately from Hausdorffness of the limit. -/
+private theorem IsInjectiveLCLimit.isEmbedding_directSumDifference_of_compact_stage
+    (h : IsInjectiveLCLimit j i) [T2Space E]
+    (hX : ∀ k, IsFrechetTVS (X k)) (hM : ∀ k, MontelSpace ℂ (X k))
+    (hlift : ∀ K : Set E, IsCompact K → ∃ k, ∃ C : Set (X k), IsCompact C ∧ i k '' C = K) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    IsEmbedding (directSumDifference j) := by
+  sorry
+
+end MontelLimits
+
 /-- A countable injective system of Fréchet–Montel spaces is acyclic exactly when each
 bounded set of its limit is the image of a bounded set of one stage. This is the
 regularity criterion in Wengenroth's Theorem 3.3. In the non-Hausdorff case the
@@ -2562,7 +2816,38 @@ private theorem isAcyclicSystem_iff_bounded_stage_of_montel
     IsAcyclicSystem j ↔
       ∀ B : Set E, IsVonNBounded ℂ B →
         ∃ k, ∃ A : Set (X k), IsVonNBounded ℂ A ∧ i k '' A = B := by
-  sorry
+  have hX' := hX
+  choose hadd hpoly hmetric _ using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hadd
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetric
+  let : ∀ k, T2Space (X k) := fun _ ↦ inferInstance
+  let : ∀ k, ContinuousSMul ℂ (X k) := fun k ↦ PolynormableSpace.continuousSMul ℂ (X k)
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  let : ContinuousSMul ℂ E := hE.continuousSMul
+  let : TopologicalSpace (⨁ k, X k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+  constructor
+  · intro hacyclic
+    have hclosed : IsClosedEmbedding (directSumDifference j) := hacyclic
+    let : T2Space E := h.closedRange_directSumDifference_iff.mp hclosed.isClosed_range
+    exact bounded_stage_of_nullSequence h (h.lifts_nullSequence_of_acyclic hX hM hacyclic)
+  · intro hlift
+    let : T2Space E := h.t2Space_of_bounded_stage hlift
+    refine ⟨h.isEmbedding_directSumDifference_of_compact_stage hX hM ?_,
+      h.closedRange_directSumDifference_iff.mpr inferInstance⟩
+    intro K hK
+    obtain ⟨k, A, hA, heq⟩ := hlift K (hK.isVonNBounded ℂ)
+    refine ⟨k, closure A, (hM k).heine_borel _ isClosed_closure hA.closure, ?_⟩
+    apply subset_antisymm
+    · calc
+        i k '' closure A ⊆ closure (i k '' A) :=
+          image_closure_subset_closure_image (i k).continuous
+        _ = K := by rw [heq, hK.isClosed.closure_eq]
+    · rw [← heq]
+      exact image_mono subset_closure
 
 /-- Paper: §C.1.5.1 (after Definition C.1.5.9), p. 667. A closed quotient of a Schwartz
 Fréchet space lifts bounded sets. Grothendieck's result gives a compact lift, by lifting

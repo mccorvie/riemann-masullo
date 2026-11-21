@@ -201,7 +201,8 @@ theorem weightedSobolev_compactSupport_dense (_hν : IsLCAPlancherelMeasure μ �
 /-- Paper: Lemma 9.1.1.2, p. 396. The weighted L² space is complete with its
 Mathlib L² inner product. -/
 theorem weightedSobolev_complete (_hν : IsLCAPlancherelMeasure μ ν) (_hw : IsSobolevWeight w) :
-    CompleteSpace (WeightedSobolev ν w s) := by sorry
+    CompleteSpace (WeightedSobolev ν w s) := by
+  infer_instance
 
 omit [μ.Regular] in
 /-- Paper: Lemma 9.1.1.2, p. 396. For a second-countable group, the Sobolev Hilbert

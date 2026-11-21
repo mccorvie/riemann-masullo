@@ -233,8 +233,9 @@ class AutoMerge(unittest.TestCase):
         self.assertFalse(self.api.artifacts)
 
     def test_main_changed_the_checker(self):
-        for path in ("scripts/lint.sh", ".github/workflows/pr_check.yml", "lean-toolchain", "lakefile.toml",
-                     "lake-manifest.json", "Main.lean", "RiemannMasullo/External/X.lean"):
+        for path in ("scripts/lint.sh", "scripts/proof_review.sh", ".github/workflows/pr_check.yml",
+                     "lean-toolchain", "lakefile.toml", "lake-manifest.json", "Main.lean",
+                     "RiemannMasullo/External/X.lean"):
             self.api = FakeApi()
             self.api.pull_request(7, {LEAN: (OLD, NEW)})
             self.api.main_files = [path]
@@ -245,6 +246,12 @@ class AutoMerge(unittest.TestCase):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
         self.api.main_files = ["RiemannMasullo/AppB/Sec2.lean", "ERRATA.md", "README.md"]
         self.assertEqual(self.drain(), {7: "merged"})
+
+    def test_main_changed_the_progress_map_and_statement_reviewer(self):
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.main_files = ["scripts/progress/template.html", "scripts/review.sh"]
+        self.assertEqual(self.drain(), {7: "merged"})
+        self.assertFalse(self.api.did("POST", r"actions/runs/\d+/rerun"))
 
     def test_two_pull_requests_for_one_file_are_not_merged_on_one_check(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})

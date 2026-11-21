@@ -203,11 +203,43 @@ theorem adelicAverage_summableUniformlyOn (f : ℬ[F])
     SummableUniformlyOn (fun (ξ : Fˣ) (p : 𝕀[F] × 𝔸[F]) ↦
       ‖f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K := by sorry
 
+/-- Paper: Lemma 2.2.2.1, pp. 77–78. At a fixed idele and adele, the
+realization of a single elementary Schwartz stage has an absolutely summable
+series over the nonzero diagonal field elements.
+Deviation: This isolates pointwise convergence on one stage of the defining submodule. -/
+theorem adelicAverage_stage_summable_norm
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F])) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) (g : 𝕀[F]) (x : 𝔸[F]) :
+    Summable (fun ξ : Fˣ ↦
+      ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + x)))‖) := by sorry
+
 /-- Paper: Lemma 2.2.2.1(1), p. 77. Adding the term at `ξ = 0` to the adelic
 average gives the sum over all field elements. -/
 theorem hasSum_adelicAverage_add_zeroTerm (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F]) :
     HasSum (fun ξ : F ↦ f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))))
-      (adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x))) := by sorry
+      (adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x))) := by
+  classical
+  let point (ξ : F) := Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))
+  let S : Submodule ℂ (Multiplicative 𝔸[F] → ℂ) :=
+    { carrier := {φ | Summable (fun ξ : Fˣ ↦ φ (point (ξ : F)))}
+      zero_mem' := summable_zero
+      add_mem' := fun hφ hψ ↦ hφ.add hψ
+      smul_mem' := fun c _ hφ ↦ hφ.const_smul c }
+  have hS : schwartzBruhatSubmodule (Multiplicative 𝔸[F]) ≤ S := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+    rintro _ ⟨s, rfl⟩
+    exact (adelicAverage_stage_summable_norm a e s g x).of_norm
+  have hs : Summable (fun ξ : Fˣ ↦ f (point (ξ : F))) :=
+    hS (show (f : Multiplicative 𝔸[F] → ℂ) ∈ schwartzBruhatSubmodule _ from
+      (show schwartzBruhatSubmodule _ from f).property)
+  let e : Fˣ ≃ {ξ : F // ξ ∉ ({0} : Finset F)} :=
+    unitsEquivNeZero.trans (Equiv.subtypeEquivRight (fun _ ↦ by simp))
+  have hne : HasSum (fun ξ : {ξ : F // ξ ∉ ({0} : Finset F)} ↦ f (point ξ.val))
+      (adelicAverage f g x) := e.hasSum_iff.mp hs.hasSum
+  simpa only [Finset.sum_singleton, point, map_zero, zero_add] using
+    (Finset.hasSum_compl_iff (f := fun ξ : F ↦ f (point ξ)) {0}).mp hne
 
 /-- Smoothness on the covering space gives continuity on each discrete fiber. -/
 private theorem continuous_elementarySchwartz {m n r k : ℕ} [AddCommGroup (Fin k)]
@@ -323,7 +355,8 @@ theorem adelicAverage_add_zeroTerm_add_principal (f : ℬ[F]) (g : 𝕀[F]) (x :
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is continuous
 as a function of the idele. -/
 theorem adelicAverage_at_zero_continuous (f : ℬ[F]) :
-    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) := by sorry
+    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) :=
+  (adelicAverage_continuous f).comp (continuous_id.prodMk continuous_const)
 
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is invariant
 under multiplication by principal ideles.

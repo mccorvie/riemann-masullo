@@ -263,7 +263,65 @@ with the corresponding subspace of homogeneous Schwartz–Bruhat functions. -/
 theorem schwartzBruhatIsotypicProjector_quotient_equiv (ω : PontryaginDual K) :
     let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
     ∃ e : (S ⧸ P.ker) ≃L[ℂ] actionIsotype ρS ω,
-      ∀ f : S, (e (P.ker.mkQ f) : S) = P f := by sorry
+      ∀ f : S, (e (P.ker.mkQ f) : S) = P f := by
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  let H := actionIsotype ρS ω
+  let integrand (f : S) (x : G) (k : K) : ℂ := star (ω k : ℂ) * f ((k : G)⁻¹ * x)
+  have hP (f : S) (x : G) : P f x = (μ₁.real univ)⁻¹ • ∫ k, integrand f x k ∂μ₁ :=
+    (schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f x).2
+  have hchar (k : K) : (ω k : ℂ) * star (ω k : ℂ) = 1 := by
+    have hconj : star (ω k : ℂ) = (ω k : ℂ)⁻¹ := (Circle.coe_inv_eq_conj (ω k)).symm
+    rw [hconj, mul_inv_cancel₀ (Circle.coe_ne_zero (ω k))]
+  have hmem (f : S) : P f ∈ H := by
+    apply (mem_actionIsotype ..).2
+    intro k
+    refine Subtype.ext (funext fun x ↦ ?_)
+    change schwartzBruhatTranslationAction (G := G) (k : G) (P f) x = (ω k : ℂ) • P f x
+    let shifted (g : K) : ℂ := (ω k : ℂ) * integrand f x g
+    have hshift : (∫ g, integrand f ((k : G)⁻¹ * x) g ∂μ₁) =
+        (ω k : ℂ) * (∫ g, integrand f x g ∂μ₁) := calc
+      _ = ∫ g, shifted (k * g) ∂μ₁ := by
+        refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+        simp only [shifted, integrand, Subgroup.coe_mul, mul_inv_rev, mul_assoc, map_mul,
+          Circle.coe_mul, star_mul']
+        rw [← mul_assoc (ω k : ℂ), hchar k, one_mul]
+      _ = ∫ g, shifted g ∂μ₁ := integral_mul_left_eq_self shifted k
+      _ = _ := integral_const_mul (ω k : ℂ) (integrand f x)
+    calc
+      _ = P f ((k : G)⁻¹ * x) := schwartzBruhatTranslationAction_apply (k : G) x (P f)
+      _ = (μ₁.real univ)⁻¹ • (∫ g, integrand f ((k : G)⁻¹ * x) g ∂μ₁) := hP f _
+      _ = (μ₁.real univ)⁻¹ • ((ω k : ℂ) • ∫ g, integrand f x g ∂μ₁) :=
+        congrArg ((μ₁.real univ)⁻¹ • ·) hshift
+      _ = (ω k : ℂ) • ((μ₁.real univ)⁻¹ • ∫ g, integrand f x g ∂μ₁) := smul_comm _ _ _
+      _ = _ := congrArg ((ω k : ℂ) • ·) (hP f x).symm
+  have hfix (f : S) (hf : f ∈ H) : P f = f := by
+    have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+    have hmass : μ₁.real univ ≠ 0 := (measureReal_univ_pos (μ := μ₁)).ne'
+    refine Subtype.ext (funext fun x ↦ ?_)
+    change P f x = f x
+    refine (hP f x).trans ?_
+    have horbit (k : K) : f ((k : G)⁻¹ * x) = (ω k : ℂ) * f x := by
+      have hk := congrArg (fun g : S ↦ g x) ((mem_actionIsotype ..).1 hf k)
+      change schwartzBruhatTranslationAction (G := G) (k : G) f x = (ω k : ℂ) * f x at hk
+      exact (schwartzBruhatTranslationAction_apply (k : G) x f).symm.trans hk
+    have hintegrand (k : K) : integrand f x k = f x := by
+      change star (ω k : ℂ) * f ((k : G)⁻¹ * x) = f x
+      rw [horbit k, ← mul_assoc, mul_comm (star (ω k : ℂ)), hchar k, one_mul]
+    calc
+      _ = (μ₁.real univ)⁻¹ • (∫ _ : K, f x ∂μ₁) :=
+        congrArg ((μ₁.real univ)⁻¹ • ·) (integral_congr_ae (ae_of_all _ hintegrand))
+      _ = f x := by rw [integral_const, smul_smul, inv_mul_cancel₀ hmass, one_smul]
+  let A := P.codRestrict H hmem
+  let F := P.ker.liftQL A (fun _ hf ↦ Subtype.ext (show P _ = 0 from hf))
+  let J := P.ker.mkQL.comp H.subtypeL
+  have hleft : LeftInverse J F := by
+    refine (P.ker.mkQ_surjective.forall (p := fun q ↦ J (F q) = q)).2 fun f ↦ ?_
+    change P.ker.mkQ (P f) = P.ker.mkQ f
+    apply (Submodule.Quotient.eq P.ker).2
+    change P (P f - f) = 0
+    exact (map_sub P (P f) f).trans (sub_eq_zero.mpr (hfix (P f) (hmem f)))
+  have hright : RightInverse J F := fun f ↦ Subtype.ext (hfix f f.property)
+  exact ⟨ContinuousLinearEquiv.equivOfInverse F J hleft hright, fun _ ↦ rfl⟩
 
 end Projector
 

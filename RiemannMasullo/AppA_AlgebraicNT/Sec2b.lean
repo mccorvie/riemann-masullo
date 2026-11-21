@@ -472,7 +472,18 @@ theorem regulator_closed : IsClosed (Set.range (Units.logEmbedding F)) := by
 /-- Paper: Lemma A.2.3.4(1), p. 548. The quotient of the hyperplane by the regulator
 image is compact. -/
 theorem regulator_cocompact : CompactSpace (logSpace F ⧸ (Units.logEmbedding F).range) := by
-  sorry
+  let q := QuotientAddGroup.mk' (Units.logEmbedding F).range
+  have hq : IsCompact (Set.range q) := by
+    refine IsZLattice.isCompact_range_of_periodic (Units.unitLattice F) q
+      QuotientAddGroup.continuous_mk ?_
+    intro z w hw
+    have hw' : w ∈ (Units.logEmbedding F).range := by
+      simpa only [Units.unitLattice, Submodule.map_top, LinearMap.mem_range,
+        AddMonoidHom.mem_range, AddMonoidHom.coe_toIntLinearMap] using hw
+    have hqw : q w = 0 := (QuotientAddGroup.eq_zero_iff w).mpr hw'
+    rw [map_add, hqw, add_zero]
+  rw [(QuotientAddGroup.mk'_surjective _).range_eq] at hq
+  exact ⟨hq⟩
 
 /-- Paper: Lemma A.2.3.4(2), p. 548. The regulator kernel is exactly the torsion subgroup. -/
 theorem regulator_kernel : (Units.logEmbedding F).ker = (Units.torsion F).toAddSubgroup :=
@@ -552,11 +563,27 @@ theorem regulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
 logarithmic hyperplane is compact.
 Deviation: We take F to be the number field of (A.2.3.5). -/
 theorem regulatorParallelotope_precompact : IsCompact (closure (regulatorParallelotope F b)) := by
-  sorry
+  rw [regulatorParallelotope]
+  exact (ZSpan.fundamentalDomain_isBounded _).isCompact_closure
 
 /-- Paper: Lemma A.2.3.5(1), p. 549. The parallelotope has nonempty relative interior. -/
 theorem regulatorParallelotope_interior : (interior (regulatorParallelotope F b)).Nonempty := by
-  sorry
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let U : Set (Fin (Units.rank F) → ℝ) := Set.pi Set.univ fun _ ↦ Set.Ioo 0 1
+  have hOpen : IsOpen (B.equivFun ⁻¹' U) :=
+    (isOpen_set_pi Set.finite_univ fun _ _ ↦ isOpen_Ioo).preimage
+      B.equivFun.toLinearMap.continuous_of_finiteDimensional
+  have hSubset : B.equivFun ⁻¹' U ⊆ regulatorParallelotope F b := by
+    intro x hx
+    change x ∈ ZSpan.fundamentalDomain B
+    rw [ZSpan.mem_fundamentalDomain, ← Module.Basis.equivFun_apply]
+    exact fun i ↦ Set.Ioo_subset_Ico_self (hx i (Set.mem_univ i))
+  refine ⟨B.equivFun.symm (fun _ ↦ 1 / 2), interior_maximal hSubset hOpen ?_⟩
+  change B.equivFun (B.equivFun.symm (fun _ ↦ 1 / 2)) ∈ U
+  rw [LinearEquiv.apply_symm_apply]
+  intro i _
+  change (1 / 2 : ℝ) ∈ Set.Ioo 0 1
+  norm_num
 
 /-- Paper: Lemma A.2.3.5(2), p. 549. Regulator translates cover the hyperplane. -/
 theorem regulatorParallelotope_cover :

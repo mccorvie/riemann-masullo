@@ -333,12 +333,65 @@ theorem pi_isTopologicalBasis :
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of the coordinate
 basis of the complex sequence space are equicontinuous in the product topology. -/
 theorem pi_isEquicontinuous :
-    IsEquicontinuous coordinateVector coordinateFunctional := by sorry
+    IsEquicontinuous coordinateVector coordinateFunctional := by
+  have hproj (k : ℕ) (u : ℕ → ℂ) (j : ℕ) :
+      partialProjection coordinateVector coordinateFunctional k u j =
+        if j ≤ k then u j else 0 := by
+    simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply,
+      Finset.sum_apply, ContinuousLinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq, Finset.mem_Iic]
+  unfold IsEquicontinuous EquicontinuousAt
+  intro U hU
+  rw [uniformity_eq_comap_nhds_zero'] at hU
+  obtain ⟨V, hV, hVU⟩ := Filter.mem_comap.mp hU
+  -- Every basic product neighborhood of zero is preserved by coordinate truncation.
+  rw [nhds_pi] at hV
+  obtain ⟨I, hI, s, hs, hsV⟩ := Filter.mem_pi.mp hV
+  filter_upwards [set_pi_mem_nhds (x := (0 : ℕ → ℂ)) hI (fun j _ ↦ hs j)] with u hu k
+  apply hVU
+  simp only [mem_preimage, map_zero, neg_zero, add_zero]
+  apply hsV
+  intro j hj
+  rw [hproj]
+  split_ifs
+  · exact hu j hj
+  · exact mem_of_mem_nhds (hs j)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/
 theorem pi_isAbsolute :
-    IsAbsolute coordinateVector coordinateFunctional := by sorry
+    IsAbsolute coordinateVector coordinateFunctional := by
+  classical
+  intro q hq
+  let p (n : ℕ) : Seminorm ℂ (ℕ → ℂ) := (normSeminorm ℂ ℂ).comp (LinearMap.proj n)
+  let e := Equiv.sigmaEquivProd ℕ Unit
+  have hp : WithSeminorms p :=
+    (withSeminorms_pi fun _ : ℕ ↦ norm_withSeminorms ℂ ℂ).congr_equiv
+      (e.trans (Equiv.prodUnique ℕ Unit)).symm
+  obtain ⟨s, C, _, hC⟩ := Seminorm.bound_sum_of_continuous hp q hq
+  let term (m : ℕ) : (ℕ → ℂ) →L[ℂ] (ℕ → ℂ) :=
+    (coordinateFunctional m).smulRight ((coordinateVector : ℕ → ℕ → ℂ) m)
+  let r (m : ℕ) := q.comp (term m).toLinearMap
+  refine ⟨∑ m ∈ s, r m,
+    Seminorm.continuous_finsetSum (fun m _ ↦ hq.comp (term m).continuous), ?_⟩
+  intro u
+  -- Outside the controlling coordinates, the seminorm of each coordinate term is zero.
+  have hz (m : ℕ) (hm : m ∉ s) : q (term m u) = 0 := by
+    have h := hC (term m u)
+    rw [smul_apply] at h
+    change q _ ≤ C • (FunLike.coeAddMonoidHom _ _ _ (∑ i ∈ s, p i)) _ at h
+    rw [map_sum, Finset.sum_apply, Finset.sum_eq_zero (fun i hi ↦ ?_), smul_zero] at h
+    · exact le_antisymm h (apply_nonneg q _)
+    · have him : i ≠ m := fun him ↦ hm (him ▸ hi)
+      change ‖term m u i‖ = 0
+      simp [term, ContinuousLinearMap.smulRight_apply, Pi.smul_apply, Pi.single_eq_of_ne him]
+  change Summable (fun m ↦ q (term m u)) ∧ (∑' m, q (term m u)) ≤ (∑ m ∈ s, r m) u
+  have hs := hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℕ) hz
+  refine ⟨hs.summable, le_of_eq ?_⟩
+  rw [hs.tsum_eq]
+  change _ = (FunLike.coeAddMonoidHom _ _ _ (∑ m ∈ s, r m)) u
+  rw [map_sum, Finset.sum_apply]
+  rfl
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/

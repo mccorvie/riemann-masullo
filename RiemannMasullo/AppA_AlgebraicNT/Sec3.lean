@@ -666,7 +666,12 @@ theorem finiteLocalAdditiveTamagawaMeasure_isAddHaar (v : Primes(F)) :
 /-- Paper: §A.3.1, p. 556. The local different contributes mass one at
 all but finitely many places, so the finite-tail products have finite support. -/
 theorem finiteLocalTamagawaMass_finite :
-    {v : Primes(F) | differentMass(F, v) ≠ 1}.Finite := by sorry
+    {v : Primes(F) | differentMass(F, v) ≠ 1}.Finite := by
+  have hDifferent : differentIdeal ℤ (𝓞 F) ≠ (0 : Ideal (𝓞 F)) := differentIdeal_ne_bot
+  refine (Ideal.finite_factors hDifferent).subset ?_
+  intro v hv
+  by_contra h
+  exact hv (by simp [multiplicity_eq_zero_of_not_dvd h])
 
 /-- Paper: Lemma A.3.1.3, p. 556. The global additive measure is the restricted
 product of the local measures, expressed on rectangles with integral tails.
