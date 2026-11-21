@@ -2126,11 +2126,52 @@ theorem isNuclearOperator_iff_summable_traceNorm_diagonal {ι : Type*} (b : Hilb
     have hSn : IsNuclearOperator S := hsq ▸ isNuclearOperator_square_of_summable_basis b B hB hb
     exact hU ▸ isNuclearOperator_postcomp_hilbert hSn U
 
+open InnerProductSpace in
 /-- Paper: Definition C.3.4.2(2), p. 697. A rank-one map has trace norm equal
 to the product of the functional and vector norms.
 Deviation: This is a check of the square root and trace norm normalization. -/
 theorem traceNorm_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
-    traceNorm ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = ‖φ‖ * ‖y‖ := by sorry
+    traceNorm ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = ‖φ‖ * ‖y‖ := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  change ∑' i, (⟪b i, CFC.sqrt ((φ.smulRight y).adjoint * φ.smulRight y) (b i)⟫_ℂ).re = _
+  by_cases hφ : φ = 0
+  · simp [hφ, CFC.sqrt_zero]
+  let u := (toDual ℂ H).symm φ
+  have hu : ‖u‖ = ‖φ‖ := (toDual ℂ H).symm.norm_map φ
+  have hu₀ : ‖u‖ ≠ 0 := hu ▸ norm_ne_zero_iff.mpr hφ
+  let c := ‖y‖ / ‖u‖
+  have hc : c * ‖u‖ = ‖y‖ := div_mul_cancel₀ _ hu₀
+  have hT : φ.smulRight y = rankOne ℂ y u := by
+    ext x
+    rw [ContinuousLinearMap.smulRight_apply, rankOne_apply, toDual_symm_apply]
+  have hmul (v w : H) :
+      rankOne ℂ v w * rankOne ℂ w v = (‖w‖ ^ 2 : ℝ) • rankOne ℂ v v := by
+    rw [ContinuousLinearMap.mul_def, comp_rankOne, rankOne_apply, inner_self_eq_norm_sq_to_K]
+    ext x
+    simp only [rankOne_apply, smul_apply]
+    change ⟪v, x⟫_ℂ • ((‖w‖ : ℂ) ^ 2 • v) = _
+    rw [← Complex.ofReal_pow, Complex.coe_smul]
+    exact smul_comm (⟪v, x⟫_ℂ) (‖w‖ ^ 2 : ℝ) v
+  have hsqrt :
+      CFC.sqrt ((φ.smulRight y).adjoint * φ.smulRight y) = c • rankOne ℂ u u := by
+    apply CFC.sqrt_unique
+    · rw [hT, adjoint_rankOne, hmul, smul_mul_assoc, mul_smul_comm, hmul,
+        smul_smul, smul_smul]
+      congr 1
+      calc
+        c * c * ‖u‖ ^ 2 = (c * ‖u‖) ^ 2 := by ring
+        _ = ‖y‖ ^ 2 := by rw [hc]
+    · exact smul_nonneg (div_nonneg (norm_nonneg _) (norm_nonneg _))
+        (ContinuousLinearMap.nonneg_iff_isPositive.mpr (isPositive_rankOne_self u))
+  rw [hsqrt]
+  have hsum := ((b.hasSum_inner_mul_inner u u).mapL Complex.reCLM).mul_left c
+  have hvalue : c * Complex.reCLM ⟪u, u⟫_ℂ = ‖φ‖ * ‖y‖ := by
+    change c * RCLike.re ⟪u, u⟫_ℂ = _
+    rw [← norm_sq_eq_re_inner, pow_two, ← mul_assoc, hc, hu, mul_comm]
+  rw [← hvalue]
+  refine (hsum.congr_fun fun i ↦ ?_).tsum_eq
+  simp only [smul_apply, rankOne_apply, ← Complex.coe_smul, inner_smul_right,
+    Complex.reCLM_apply, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero]
 
 /-- Paper: Lemma C.3.4.3, p. 698. Composing a strongly convergent sequence of
 endomorphisms on the right by a fixed compact operator gives convergence
