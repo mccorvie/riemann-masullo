@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Integrator's tool: check every open pull request from outside the project, several at a time,
-# and merge the ones that need no judgment.
+# Merger's tool (the integrator's when no merger session is running): check every open pull
+# request from outside the project, several at a time, and merge the ones that need no judgment.
 #
 #   scripts/triage_prs.sh            check and report
 #   scripts/triage_prs.sh --apply    also merge the clean ones, and tell authors what failed
@@ -11,8 +11,11 @@
 #   read    it passes, but something deserves a look first: a split (a new `sorry`), a new
 #           definition or file, an attribute, a `#` command, an import, or anything that could
 #           run code when the file is built. Read the diff, then merge it by hand.
+#           Also a docstring that cites the paper, or a new declaration outside ForMathlib/
+#           that is not `private`: if it states something from the paper it is a statement,
+#           so label it `integrator` instead of merging it.
 #   fail    it does not merge into main, build, pass the lint, or keep existing statements
-# Draft pull requests are left alone.
+# Draft pull requests, and those labelled `integrator`, are left alone.
 set -uo pipefail
 main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$main"
@@ -23,6 +26,7 @@ exec 9>.agent/pr-checks/.lock
 flock -n 9 || { echo "another triage is running; try again when it has finished"; exit 0; }
 list=$(gh api --paginate "repos/{owner}/{repo}/pulls?state=open&per_page=100" --jq \
   '.[] | select(.draft | not) | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not)
+       | select(any(.labels[]; .name == "integrator") | not)
        | "\(.number) \(.head.sha) \(.user.login)"')
 [ -n "$list" ] || { echo "no open pull requests from outside the project"; exit 0; }
 
@@ -43,6 +47,13 @@ awk '{print $1, $2}' <<<"$list" | xargs -P 6 -L 1 bash -c 'check_one "$0" "$1"'
 # Importing Mathlib or this library, and silencing a linter, are routine and are not flagged.
 eyes='^\+[[:space:]]*(#|@\[|open Lean|attribute|macro|syntax|notation|elab|initialize|unsafe|instance|def |abbrev |structure|class |inductive|axiom|opaque|noncomputable)|run_|by_elab|simproc|Lean\.|Elab|Meta\.|IO\.|extern|implemented_by|native'
 routine='^\+[[:space:]]*((public )?import (Mathlib|RiemannMasullo)\.[A-Za-z0-9_.]+[[:space:]]*$|set_option linter\.[A-Za-z0-9_.]+ (true|false) in[[:space:]]*$)'
+# A proof may add helper lemmas, but a new declaration taken from the paper is a statement, and
+# statements are the integrator's. Two signs of one are flagged for reading: a docstring that
+# cites the paper, and a declaration outside ForMathlib/ that is not `private`.
+decl='[[:space:]]*(@\[[^]]*\][[:space:]]*)*((public|protected|noncomputable|nonrec|scoped|local)[[:space:]]+)*(theorem|lemma|def|abbrev|instance|structure|class|inductive)[[:space:]]+'
+declared() {  # names declared on those diff lines of stdin that start with the sign $1
+  grep -E "^[$1]$decl" | sed -E "s/^[$1]$decl//; s/[[:space:]:({[].*//" | sort -u
+}
 merged=0
 while read -r n sha who; do
   out=".agent/pr-checks/$n-$sha.txt"
@@ -56,6 +67,12 @@ while read -r n sha who; do
     [ -z "$newfiles" ] || why="${why:+$why, }new file"
     rest=$(grep -vE "$routine" <<<"$added" || true)
     grep -qE "$eyes|^\+[[:space:]]*(import|set_option) " <<<"$rest" && why="${why:+$why, }not plain proof text"
+    grep -qE '^\+.*Paper:' <<<"$added" && why="${why:+$why, }cites the paper"
+    # A name that is also on a removed line is an existing declaration whose first line was
+    # rewritten to hold the proof, not a new one.
+    lib=$(git diff "origin/main...origin/pr-$n" -- RiemannMasullo ':(exclude)RiemannMasullo/ForMathlib')
+    newdecl=$(comm -23 <(declared + <<<"$lib") <(declared - <<<"$lib") | paste -sd' ')
+    [ -z "$newdecl" ] || why="${why:+$why, }new public declaration: $newdecl"
     if [ -z "$why" ]; then
       echo "merge  #$n  $who  $title"
       if [ $apply = 1 ]; then gh pr merge "$n" --squash >/dev/null 2>&1 && merged=$((merged+1)) || echo "       could not merge (conflict with a merge made meanwhile?)"; fi
