@@ -456,7 +456,12 @@ theorem regulator_discrete : IsDiscrete (Set.range (Units.logEmbedding F)) := by
 
 /-- Paper: Lemma A.2.3.4(1), p. 548. The regulator image is closed in the hyperplane. -/
 theorem regulator_closed : IsClosed (Set.range (Units.logEmbedding F)) := by
-  sorry
+  have : DiscreteTopology (Units.unitLattice F).toAddSubgroup :=
+    inferInstanceAs (DiscreteTopology (Units.unitLattice F))
+  have hClosed := AddSubgroup.isClosed_of_discreteTopology
+    (U := (Units.unitLattice F).toAddSubgroup)
+  simpa only [Submodule.coe_toAddSubgroup, Units.unitLattice, Submodule.map_top,
+    LinearMap.coe_range, AddMonoidHom.coe_toIntLinearMap] using hClosed
 
 /-- Paper: Lemma A.2.3.4(1), p. 548. The quotient of the hyperplane by the regulator
 image is compact. -/
