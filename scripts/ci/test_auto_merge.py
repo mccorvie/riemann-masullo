@@ -40,7 +40,7 @@ class FakeApi:
         self.common, self.heads, self.blobs = {}, {}, {}   # the merge base's files; each head's changes
         self.main_files = []          # files main changed since BASE
         self.not_on_main = set()      # commits that are not ancestors of main
-        self.merge_error = None
+        self.merge_errors = {}
         self._ids = iter(range(100, 10_000))
 
     # -- building a scenario --
@@ -128,8 +128,8 @@ class FakeApi:
         self.changes.append((method, path, body))
         if m := re.fullmatch(r"pulls/(\d+)/merge", path):
             number = int(m.group(1))
-            if self.merge_error:
-                raise auto_merge.ApiError(*self.merge_error)
+            if number in self.merge_errors:
+                raise auto_merge.ApiError(*self.merge_errors[number])
             assert body == dict(merge_method="squash", sha=self.prs[number]["head"]["sha"])
             self.prs[number]["state"] = "closed"
             # main now contains what the pull request changed
@@ -303,20 +303,39 @@ class AutoMerge(unittest.TestCase):
         self.assertEqual(self.drain(), {})          # no open pull request has that head any more
         self.api = FakeApi()
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
-        self.api.merge_error = (409, "Head branch was modified. Review and try the merge again.")
+        self.api.merge_errors[7] = (409, "Head branch was modified. Review and try the merge again.")
         self.assertIn("pushed to after the check", self.drain()[7])
 
     def test_conflict_and_branch_rules(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
-        self.api.merge_error = (405, "Pull Request is not mergeable")
+        self.api.merge_errors[7] = (405, "Pull Request is not mergeable")
         self.api.prs[7]["mergeable_state"] = "dirty"
         self.assertIn("no longer merges cleanly", self.drain()[7])
         self.api = FakeApi()
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
-        self.api.merge_error = (405, "At least 1 approving review is required by reviewers with write access.")
+        self.api.merge_errors[7] = (405, "At least 1 approving review is required by reviewers with write access.")
         self.api.prs[7]["mergeable_state"] = "blocked"
         self.assertIn("GitHub refused", self.drain()[7])
         self.assertFalse(self.api.did("POST", r"actions/runs/\d+/rerun"))
+
+    def test_one_merge_denied_to_the_workflow_token_leaves_the_next_pr_eligible(self):
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        verdict = self.api.artifacts[0]
+        self.api.pull_request(8, {LEAN: (OLD, NEW)})
+        self.api.merge_errors[7] = (403, "Resource not accessible by integration")
+        outcomes = self.drain()
+        self.assertIn("needs a project member", outcomes[7])
+        self.assertEqual(outcomes[8], "merged")
+        self.assertEqual(self.api.prs[7]["state"], "open")
+        self.assertIn(verdict, self.api.artifacts)
+
+    def test_rate_limit_on_merge_stops_the_queue(self):
+        self.api.pull_request(7, {LEAN: (OLD, NEW)})
+        self.api.pull_request(8, {LEAN: (OLD, NEW)})
+        self.api.merge_errors[7] = (403, "API rate limit exceeded")
+        outcomes = self.drain()
+        self.assertIn("rate limit", outcomes[7])
+        self.assertNotIn(8, outcomes)
 
     def test_errors_are_retried_only_when_asked(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)}, verdict="error", run=dict(conclusion="failure"))
