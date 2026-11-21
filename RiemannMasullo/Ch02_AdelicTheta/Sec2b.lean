@@ -531,8 +531,23 @@ parameter converges to the directional derivative at every adele. -/
 theorem adeleDirectionalDeriv_tendsto (f : ℬ[F]) (x : 𝔸[F]) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (f (Multiplicative.ofAdd ((γ t).val * x)) - f (Multiplicative.ofAdd x)) /
-        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) :=
-  by sorry
+        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) := by
+  have hOrbit := (adeleOrbit_differentiableAt γ f (Multiplicative.ofAdd x)).hasDerivAt
+  have hLog := hOrbit.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · have hc := NNReal.continuous_coe.comp (Units.continuous_val (M := ℝ≥0))
+      exact (hc.continuousAt (x := (1 : ℝ≥0ˣ))).continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (Eventually.of_forall fun t ↦ ?_)
+  have hExpLog : expUnit (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  have hZero : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  simp only [Function.comp_apply, slope_def_module, Real.log_one, hExpLog, hZero,
+    map_one, Units.val_one, one_mul, toAdd_ofAdd, Complex.real_smul, Complex.ofReal_inv,
+    Complex.ofReal_sub, Complex.ofReal_one, div_eq_inv_mul]
 
 -- TODO(paper-gap): The last sentence of the proof of Lemma 2.2.4.2 uses
 -- injectivity of γ∞. Lemma 2.2.4.1 only gives factorization through the infinite ideles.
