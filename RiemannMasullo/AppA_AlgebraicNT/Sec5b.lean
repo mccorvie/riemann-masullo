@@ -275,10 +275,16 @@ translate used by the set average with the mass of the original member. -/
 def dSequenceAverage (μ : Measure G) (V : Set G) (f : G → ℂ) (x : G) : ℂ :=
   ⨍ y in x • V, f y ∂μ
 
+-- Retain the stated hypotheses; the proof needs only Haar invariance.
+set_option linter.unusedSectionVars false in
 /-- Paper: (A.5.4.1), p. 582. Averaging a constant over any sequence member
 recovers the constant at every point. -/
 theorem dSequenceAverage_const [μ.IsHaarMeasure] (hU : IsDSequence μ U)
-    (c : ℂ) (k : ℕ) (x : G) : dSequenceAverage μ (U k) (fun _ ↦ c) x = c := by sorry
+    (c : ℂ) (k : ℕ) (x : G) : dSequenceAverage μ (U k) (fun _ ↦ c) x = c := by
+  -- The translate `x • U k` has the positive finite mass of `U k` by Haar invariance.
+  obtain ⟨-, -, hpos, hfin⟩ := hU.1 k
+  rw [dSequenceAverage, setAverage_const] <;> rw [measure_smul]
+  exacts [hpos.ne', hfin.ne]
 
 -- TODO(paper-gap): The uniform continuity in Theorem A.5.4.1(1) fails for f(t) = t²
 -- on the additive real line with U k = [−2⁻ᵏ, 2⁻ᵏ]. The average is x² + 2⁻²ᵏ / 3.
@@ -291,7 +297,9 @@ def dSequenceRegularSet (μ : Measure G) (U : ℕ → Set G) (f : G → ℂ) : S
 /-- Paper: Theorem A.5.4.1(3), p. 582. Every point is regular for a constant
 function. -/
 theorem dSequenceRegularSet_const [μ.IsHaarMeasure] (hU : IsDSequence μ U) (c : ℂ) :
-    dSequenceRegularSet μ U (fun _ ↦ c) = univ := by sorry
+    dSequenceRegularSet μ U (fun _ ↦ c) = univ := by
+  refine eq_univ_of_forall fun x ↦ ⟨c, ?_⟩
+  simp only [dSequenceAverage_const hU, tendsto_const_nhds]
 
 -- TODO(paper-gap): In the proof of Theorem A.5.4.1(2), the boundary of a relatively compact
 -- open set can have positive Haar mass, and an indicator's averages can diverge at a point.
