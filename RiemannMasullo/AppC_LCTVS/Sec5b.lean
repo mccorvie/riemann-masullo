@@ -21,6 +21,7 @@ import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
 import Mathlib.Topology.MetricSpace.Thickening
 import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.Integral
 
@@ -1889,12 +1890,105 @@ from the local Laurent expansion, with existence supplied as evidence. -/
 def vectorLaurentCoeff (h : ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a) (k : ℤ) : E :=
   Classical.choose h k
 
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- On a circle in the punctured disc, integrating a scalar evaluation of the
+Laurent expansion against the local coordinate to the power `-k - 1` gives
+`2πi` times the scalar evaluation of the coefficient at `k`. -/
+private theorem HasVectorLaurentSeriesAt.circleIntegral_coeff {a : ℤ → E}
+    {N : ℤ} {r R : ℝ} (hR : 0 < R) (hRr : R < r) (hzero : ∀ k < N, a k = 0)
+    (hconv : ∀ K : Set ℂ, K ⊆ Metric.ball z r \ {z} → IsCompact K →
+      TendstoUniformlyOn
+        (fun n w ↦ ∑ j ∈ Finset.range n, (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ)))
+        f atTop K)
+    (φ : StrongDual ℂ E) (k : ℤ) :
+    circleIntegral (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) z R =
+      (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+  have hne (w : ℂ) (hw : w ∈ Metric.sphere z R) : w - z ≠ 0 :=
+    sub_ne_zero.mpr (Metric.ne_of_mem_sphere hw hR.ne')
+  have hsub : Metric.sphere z R ⊆ Metric.ball z r \ {z} := by
+    intro w hw
+    exact ⟨Metric.mem_ball.mpr ((Metric.mem_sphere.mp hw).trans_lt hRr),
+      sub_ne_zero.mp (hne w hw)⟩
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : UniformSpace ℂ := PseudoMetricSpace.toUniformSpace
+  have hscalar := φ.uniformContinuous.comp_tendstoUniformlyOn
+    (hconv _ hsub (isCompact_sphere z R))
+  let term (j : ℕ) (w : ℂ) := (w - z) ^ (N + (j : ℤ) - k - 1) • φ (a (N + (j : ℤ)))
+  have hterm (j : ℕ) : ContinuousOn (term j) (Metric.sphere z R) :=
+    ((continuousOn_id.sub continuousOn_const).zpow₀ _ fun w hw ↦ Or.inl (hne w hw)).smul
+      continuousOn_const
+  have hweighted : TendstoUniformlyOn (fun n w ↦ ∑ j ∈ Finset.range n, term j w)
+      (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) atTop (Metric.sphere z R) := by
+    rw [Metric.tendstoUniformlyOn_iff] at hscalar ⊢
+    intro ε hε
+    have hbound : 0 < R ^ (-k - 1) := zpow_pos hR _
+    filter_upwards [hscalar (ε / R ^ (-k - 1)) (div_pos hε hbound)] with n hn w hw
+    have hsum :
+        ∑ j ∈ Finset.range n, term j w =
+          (w - z) ^ (-k - 1) * φ (∑ j ∈ Finset.range n,
+            (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ))) := by
+      rw [map_sum, Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j _
+      have hexp : N + (j : ℤ) - k - 1 = (-k - 1) + (N + (j : ℤ)) := by omega
+      simp [term, hexp, zpow_add₀ (hne w hw), smul_eq_mul, mul_assoc]
+    have hnorm : ‖w - z‖ = R := by simpa only [dist_eq_norm] using Metric.mem_sphere.mp hw
+    rw [hsum, dist_eq_norm, ← mul_sub, norm_mul, norm_zpow, hnorm, ← dist_eq_norm,
+      ← lt_div_iff₀' hbound]
+    exact hn w hw
+  have hlim := hweighted.tendsto_circleIntegral_of_continuousOn hR.le
+    (Eventually.of_forall fun n ↦ continuousOn_finsetSum _ fun j _ ↦ hterm j)
+  have hintegral (j : ℕ) : circleIntegral (term j) z R =
+      if N + (j : ℤ) = k then (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) else 0 := by
+    dsimp only [term]
+    rw [circleIntegral.integral_smul_const]
+    split_ifs with hj
+    · rw [hj, show k - k - 1 = (-1 : ℤ) by omega]
+      simp only [zpow_neg_one, circleIntegral.integral_sub_center_inv z hR.ne', smul_eq_mul]
+    · have hpow : N + (j : ℤ) - k - 1 ≠ -1 := by omega
+      rw [circleIntegral.integral_sub_zpow_of_ne hpow, zero_smul]
+  -- Only the summand whose exponent is shifted to minus one contributes.
+  have heventual : ∀ᶠ n : ℕ in atTop, circleIntegral (fun w ↦ ∑ j ∈ Finset.range n, term j w)
+      z R = (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+    filter_upwards [eventually_gt_atTop (k - N).toNat] with n hn
+    rw [circleIntegral.integral_fun_sum fun j _ ↦ ContinuousOn.circleIntegrable hR.le (hterm j)]
+    simp only [hintegral]
+    by_cases hk : N ≤ k
+    · have hj : N + ((k - N).toNat : ℤ) = k := by omega
+      rw [Finset.sum_eq_single (k - N).toNat]
+      · rw [ite_eq_left hj]
+      · intro j _ hj'
+        have : N + (j : ℤ) ≠ k := by omega
+        simp [this]
+      · exact fun h ↦ (h (Finset.mem_range.mpr hn)).elim
+    · have hak : a k = 0 := hzero k (lt_of_not_ge hk)
+      have hj (j : ℕ) : N + (j : ℤ) ≠ k := by omega
+      simp [hj, hak]
+  exact tendsto_nhds_unique hlim (tendsto_const_nhds.congr' (heventual.mono fun _ hn ↦ hn.symm))
+
+-- Retain the target space hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Coefficient notation in Lemma C.5.3.2, p. 740. Reading a coefficient
 from a specified expansion reproduces the coefficient at the requested exponent.
 Deviation: This is a sanity check for the coefficient operation. -/
 theorem vectorLaurentCoeff_eq {a : ℤ → E} (ha : HasVectorLaurentSeriesAt f z a)
     (h : ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a) (k : ℤ) :
-    vectorLaurentCoeff h k = a k := by sorry
+    vectorLaurentCoeff h k = a k := by
+  change Classical.choose h k = a k
+  obtain ⟨M, s, hs, hbzero, hbconv⟩ := Classical.choose_spec h
+  obtain ⟨N, r, hr, hazero, haconv⟩ := ha
+  let R := min r s / 2
+  have hR : 0 < R := half_pos (lt_min hr hs)
+  have hRmin : R < min r s := half_lt_self (lt_min hr hs)
+  have hfactor : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 :=
+    mul_ne_zero (mul_ne_zero (by norm_num) (by exact_mod_cast Real.pi_ne_zero)) Complex.I_ne_zero
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr fun φ ↦ ?_
+  have hbcoeff := HasVectorLaurentSeriesAt.circleIntegral_coeff hR
+    (hRmin.trans_le (min_le_right r s)) hbzero hbconv φ k
+  have hacoeff := HasVectorLaurentSeriesAt.circleIntegral_coeff hR
+    (hRmin.trans_le (min_le_left r s)) hazero haconv φ k
+  exact mul_left_cancel₀ hfactor (hbcoeff.symm.trans hacoeff)
 
 -- TODO(paper-gap): C.5.3.2 omits the interior-containment hypothesis of C.5.2.4.
 -- On 1 < |w| < 4, take f(w) = 1/w, z = 2, the circle |w| = 3, and k = -1.

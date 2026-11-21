@@ -186,7 +186,16 @@ spectral variable gives the compact character times the scalar multiplier. -/
 theorem modulatedMellin_shift_multiplier (b : ℝ)
     (hb : ∀ t : ℝ≥0ˣ, χ (τ t) = Circle.exp (b * Real.log (t.val : ℝ))) (s : ℂ) :
     (χ γ⁻¹ : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s + phase[b]) =
-      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) := by sorry
+      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) := by
+  have hx : 0 < ((m γ).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m γ))
+  have hx' : (((m γ).val : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hx.ne'
+  have key : (((m γ).val : ℝ) : ℂ) ^ phase[b] = (χ (τ (m γ)) : ℂ) := by
+    rw [hb, Complex.cpow_def_of_ne_zero hx', ← Complex.ofReal_log hx.le, Circle.coe_exp]
+    congr 1
+    push_cast
+    ring
+  rw [map_mul, Circle.coe_mul, Complex.cpow_add _ _ hx', key]
+  ring
 
 end Mellin
 

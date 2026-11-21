@@ -13,12 +13,16 @@ public import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 public import Mathlib.Topology.Order.Lattice
 
+import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.Complex.AbsMax
 import Mathlib.Analysis.Complex.Liouville
 import Mathlib.Analysis.Convex.Continuous
 import Mathlib.Analysis.Asymptotics.Lemmas
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.NumberTheory.LSeries.Deriv
 import Mathlib.NumberTheory.LSeries.Injectivity
+import Mathlib.Topology.Maps.Proper.CompactlyGenerated
+import RiemannMasullo.Ch03_IdelicZeta.Sec4
 import RiemannMasullo.ForMathlib.Analysis.Complex.Hadamard
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Bounds
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
@@ -1358,6 +1362,488 @@ private theorem inv_heckeGammaFactor_isBigO_exp (χ : U[F]) (a b : ℝ) :
   gcongr
   exact le_add_of_nonneg_right zero_le_one
 
+section TateBound
+
+open MeasureTheory
+open scoped NumberField.AdeleRing
+
+local notation "C[" F "]" => IdeleClassGroup (𝓞 F) F
+local notation "ℬ[" F "]" => SchwartzBruhat (Multiplicative 𝔸[F])
+local notation "classNormℝ" => fun (g : C[F]) ↦ ((ideleClassNorm F g : ℝ≥0) : ℝ)
+
+local instance instMeasurableClassTateBound : MeasurableSpace C[F] := borel _
+local instance instBorelClassTateBound : BorelSpace C[F] := ⟨rfl⟩
+
+/-- The absolute value of the theta integrand depends on the exponent only through
+its real part. -/
+private theorem norm_theta_twist (f : ℬ[F]) (χ : U[F]) (s : ℂ) (g : C[F]) :
+    ‖adelicTheta f g * ideleClassNormTwist χ s g‖ =
+      ‖adelicTheta f g‖ * classNormℝ g ^ s.re := by
+  change ‖adelicTheta f g * ((χ g : ℂ) * (classNormℝ g : ℂ) ^ s)‖ = _
+  rw [norm_mul, norm_mul, Circle.norm_coe, one_mul,
+    Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+
+/-- Paper: Equation (3.1.1.2), p. 119. A norm twist of a unitary character lies
+in the absolute convergence half-plane when the real exponent is greater than one. -/
+private theorem twist_mem_rightHalfPlane (χ : U[F]) (s : ℂ) (hs : 1 < s.re) :
+    ideleClassNormTwist χ s ∈
+      (↑(relativeRightHalfPlane (G := C[F]) (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+        (ideleClassNorm_ne_one (F := F)) 1) : Set (HeckeCharacter (𝓞 F) F)) := by
+  change 1 < quasiCharacterAbscissa (G := C[F]) (ideleClassNorm F) _ _ (ideleClassNormTwist χ s)
+  rw [quasiCharacterAbscissa_of_unitary_twist (G := C[F]) _ _ _ _ χ s (fun _ ↦ rfl)]
+  exact hs
+
+/-- Absolute convergence of the theta integral at any real exponent greater than one
+provides an integrable majorant on the large-norm domain. -/
+private theorem integrableOn_norm_theta_twist (f : ℬ[F]) (r : ℝ) (hr : 1 < r)
+    (S : Set C[F]) :
+    IntegrableOn (fun g ↦ ‖adelicTheta f g‖ * classNormℝ g ^ r) S
+      (ideleClassTamagawaMeasure F) := by
+  let c := ideleClassNormTwist (1 : U[F]) (r : ℂ)
+  have hc := twist_mem_rightHalfPlane (1 : U[F]) (r : ℂ) (by simpa using hr)
+  have h := (globalThetaMellinIntegral_integrable f c hc).norm.integrableOn (s := S)
+  simpa only [c, norm_theta_twist, Complex.ofReal_re] using h
+
+/-- Paper: Equation (3.2.2.3), p. 124. The theta Mellin integral restricted to
+a specified set of idele classes. -/
+private def thetaMellinOn (f : ℬ[F]) (χ : U[F]) (S : Set C[F]) (s : ℂ) : ℂ :=
+  ∫ g in S, adelicTheta f g * ideleClassNormTwist χ s g ∂ideleClassTamagawaMeasure F
+
+/-- Paper: Equations (3.2.2.7)–(3.2.2.9), pp. 126–127. On a domain with norm at
+least one, the theta Mellin integral is bounded uniformly when the real exponent
+is bounded above. -/
+private theorem norm_thetaMellinOn_le (f : ℬ[F]) (χ : U[F]) {S : Set C[F]}
+    (hS : MeasurableSet S) (hNorm : ∀ g ∈ S, 1 ≤ classNormℝ g)
+    {r : ℝ} (hr : 1 < r) {s : ℂ} (hs : s.re ≤ r) :
+    ‖thetaMellinOn f χ S s‖ ≤
+      ∫ g in S, ‖adelicTheta f g‖ * classNormℝ g ^ r ∂ideleClassTamagawaMeasure F := by
+  apply norm_integral_le_of_norm_le (integrableOn_norm_theta_twist f r hr S)
+  refine (ae_restrict_mem hS).mono fun g hg ↦ ?_
+  rw [norm_theta_twist]
+  exact mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le (hNorm g hg) hs)
+    (norm_nonneg _)
+
+private theorem classNormReal_pos (g : C[F]) : 0 < classNormℝ g :=
+  NNReal.coe_pos.mpr (Units.zero_lt _)
+
+private theorem continuous_classNormReal : Continuous (fun g : C[F] ↦ classNormℝ g) :=
+  NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+
+/-- The large-norm theta integral is entire. On a neighborhood of a given exponent,
+one larger real exponent dominates both the integrand and its derivative. -/
+private theorem differentiable_thetaMellinOn (f : ℬ[F]) (χ : U[F]) {S : Set C[F]}
+    (hS : MeasurableSet S) (hNorm : ∀ g ∈ S, 1 ≤ classNormℝ g) :
+    Differentiable ℂ (thetaMellinOn f χ S) := by
+  intro s
+  let μ := (ideleClassTamagawaMeasure F).restrict S
+  let W (z : ℂ) (g : C[F]) := adelicTheta f g * ideleClassNormTwist χ z g
+  let D (z : ℂ) (g : C[F]) := W z g * Complex.log (classNormℝ g : ℂ)
+  let r := max (s.re + 2) 2
+  let V := {z : ℂ | z.re < s.re + 1}
+  have hr : 1 < r := (by norm_num : (1 : ℝ) < 2).trans_le (le_max_right _ _)
+  have hV : V ∈ 𝓝 s :=
+    (isOpen_lt Complex.continuous_re continuous_const).mem_nhds (by
+      change s.re < s.re + 1
+      linarith)
+  have hW (z : ℂ) : Continuous (W z) :=
+    (adelicTheta f).continuous.mul (ideleClassNormTwist χ z).continuous
+  have hμ := ae_restrict_mem (μ := ideleClassTamagawaMeasure F) hS
+  have hMajorant := integrableOn_norm_theta_twist f r hr S
+  have hsInt : Integrable (W s) μ := by
+    refine hMajorant.mono' (hW s).aestronglyMeasurable (hμ.mono fun g hg ↦ ?_)
+    change ‖adelicTheta f g * ideleClassNormTwist χ s g‖ ≤ _
+    rw [norm_theta_twist]
+    refine mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le (hNorm g hg) ?_)
+      (norm_nonneg _)
+    exact (by linarith : s.re ≤ s.re + 2).trans (le_max_left _ _)
+  have hDMeas : AEStronglyMeasurable (D s) μ :=
+    (hW s).aestronglyMeasurable.mul
+      (Complex.measurable_log.comp
+        (Complex.continuous_ofReal.comp continuous_classNormReal).measurable).aestronglyMeasurable
+  have hDBound : ∀ᵐ g ∂μ, ∀ z ∈ V, ‖D z g‖ ≤ ‖adelicTheta f g‖ * classNormℝ g ^ r := by
+    refine hμ.mono fun g hg z hz ↦ ?_
+    have hg₁ := hNorm g hg
+    have hgPos := zero_lt_one.trans_le hg₁
+    change z.re < s.re + 1 at hz
+    change ‖(adelicTheta f g * ideleClassNormTwist χ z g) * _‖ ≤ _
+    rw [norm_mul, norm_theta_twist, ← Complex.ofReal_log hgPos.le,
+      Complex.norm_of_nonneg (Real.log_nonneg hg₁)]
+    calc
+      _ ≤ (‖adelicTheta f g‖ * classNormℝ g ^ z.re) * classNormℝ g :=
+        mul_le_mul_of_nonneg_left (Real.log_le_self hgPos.le) (by positivity)
+      _ = ‖adelicTheta f g‖ * classNormℝ g ^ (z.re + 1) := by
+        rw [Real.rpow_add hgPos, Real.rpow_one, mul_assoc]
+      _ ≤ _ := mul_le_mul_of_nonneg_left
+        (Real.rpow_le_rpow_of_exponent_le hg₁
+          ((by linarith : z.re + 1 ≤ s.re + 2).trans (le_max_left _ _))) (norm_nonneg _)
+  have hDiff : ∀ᵐ g ∂μ, ∀ z ∈ V, HasDerivAt (fun w ↦ W w g) (D z g) z := by
+    refine Eventually.of_forall fun g z _ ↦ ?_
+    have hg : (classNormℝ g : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+    change HasDerivAt (fun w : ℂ ↦ adelicTheta f g * ((χ g : ℂ) * (classNormℝ g : ℂ) ^ w))
+      ((adelicTheta f g * ((χ g : ℂ) * (classNormℝ g : ℂ) ^ z)) *
+        Complex.log (classNormℝ g : ℂ)) z
+    simpa only [id_eq, mul_assoc, mul_one] using
+      (((hasDerivAt_id z).const_cpow (Or.inl hg)).const_mul (χ g : ℂ)).const_mul (adelicTheta f g)
+  exact (hasDerivAt_integral_of_dominated_loc_of_deriv_le hV
+    (Eventually.of_forall fun z ↦ (hW z).aestronglyMeasurable) hsInt hDMeas hDBound hMajorant
+    hDiff).2.differentiableAt
+
+local notation "largeNorm[" F "]" => ((classNormℝ : C[F] → ℝ) ⁻¹' Ici 1)
+local notation "strictLargeNorm[" F "]" => ((classNormℝ : C[F] → ℝ) ⁻¹' Ioi 1)
+
+local notation "smallNorm[" F "]" => ((classNormℝ : C[F] → ℝ) ⁻¹' Iio 1)
+
+/-- The logarithmic norm sends the class Haar measure to a multiple of Lebesgue
+measure, since the class norm is proper and surjective. -/
+private theorem exists_map_logClassNorm_eq_smul_volume :
+    ∃ c : ℝ≥0, (ideleClassTamagawaMeasure F).map (fun g ↦ Real.log (classNormℝ g)) =
+      c • (volume : Measure ℝ) := by
+  let μ := ideleClassTamagawaMeasure F
+  let ν : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil (F := F)).1
+  let : ν.IsHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts ν :=
+      inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+    have : Measure.IsOpenPosMeasure ν :=
+      inferInstanceAs (Measure.IsOpenPosMeasure (volume : Measure ℝ))
+    have : ν.IsMulLeftInvariant :=
+      ⟨fun t ↦ (measurePreserving_add_left (volume : Measure ℝ) t.toAdd).map_eq⟩
+    constructor
+  let e : ℝ≥0ˣ ≃ₜ ℝ :=
+    (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have he (t : ℝ≥0ˣ) : e t = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))).symm
+  let m : C[F] →* Multiplicative ℝ :=
+    { toFun := fun g ↦ Multiplicative.ofAdd (e (ideleClassNorm F g))
+      map_one' := by
+        change e (ideleClassNorm F 1) = 0
+        simp [he]
+      map_mul' := fun g h ↦ by
+        change e (ideleClassNorm F (g * h)) = e (ideleClassNorm F g) + e (ideleClassNorm F h)
+        rw [he, map_mul, Units.val_mul, NNReal.coe_mul, he, he]
+        exact Real.log_mul (classNormReal_pos g).ne' (classNormReal_pos h).ne' }
+  have hm : IsProperMap m :=
+    e.isProperMap.comp (isProperMap_ideleClassNorm F)
+  obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+  have hsurj : Surjective m := e.surjective.comp hsurj
+  let : (μ.map m).IsHaarMeasure :=
+    Measure.isHaarMeasure_map μ m hm.continuous hsurj (isProperMap_iff_tendsto_cocompact.mp hm).2
+  refine ⟨Measure.haarScalarFactor (μ.map m) ν, ?_⟩
+  have hMap := Measure.isMulLeftInvariant_eq_smul (μ.map m) ν
+  have hFun : (m : C[F] → ℝ) = fun g ↦ Real.log (classNormℝ g) :=
+    funext fun g ↦ he (ideleClassNorm F g)
+  rw [← hFun]
+  exact hMap
+
+/-- On the norm-below-one domain a pure power has Mellin integral equal to a
+constant divided by the exponent. -/
+private theorem integral_classNorm_cpow_smallNorm :
+    ∃ c : ℝ≥0, ∀ s : ℂ, 0 < s.re →
+      IntegrableOn (fun g ↦ (classNormℝ g : ℂ) ^ s) smallNorm[F] (ideleClassTamagawaMeasure F) ∧
+      (∫ g in smallNorm[F], (classNormℝ g : ℂ) ^ s ∂ideleClassTamagawaMeasure F) =
+        (c : ℝ) / s := by
+  obtain ⟨c, hc⟩ := exists_map_logClassNorm_eq_smul_volume (F := F)
+  refine ⟨c, fun s hs ↦ ?_⟩
+  let μ := ideleClassTamagawaMeasure F
+  let l (g : C[F]) := Real.log (classNormℝ g)
+  let E (t : ℝ) := Complex.exp (s * (t : ℂ))
+  have hl : Continuous l :=
+    continuous_classNormReal.log fun g ↦ (classNormReal_pos g).ne'
+  have hSmall : l ⁻¹' Iio 0 = smallNorm[F] := by
+    ext g
+    exact Real.log_neg_iff (classNormReal_pos g)
+  have hmap : (μ.restrict smallNorm[F]).map l = c • (volume.restrict (Iio 0)) := by
+    rw [← hSmall, ← Measure.restrict_map hl.measurable measurableSet_Iio, hc, Measure.restrict_smul]
+  have hE : Continuous E := Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal)
+  have hInt : Integrable E ((μ.restrict smallNorm[F]).map l) := by
+    rw [hmap]
+    exact ((integrableOn_exp_mul_complex_Iic hs 0).mono_set Iio_subset_Iic_self).smul_measure
+      ENNReal.coe_ne_top
+  have hPow (g : C[F]) : E (l g) = (classNormℝ g : ℂ) ^ s := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (classNormReal_pos g).ne'),
+      ← Complex.ofReal_log (classNormReal_pos g).le, mul_comm]
+  refine ⟨?_, ?_⟩
+  · simpa only [Function.comp_def, hPow, IntegrableOn, μ] using
+      (integrable_map_measure hE.aestronglyMeasurable hl.measurable.aemeasurable).mp hInt
+  · simp_rw [← hPow]
+    rw [← integral_map hl.measurable.aemeasurable hE.aestronglyMeasurable, hmap,
+      integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul,
+      ← integral_Iic_eq_integral_Iio]
+    simp only [E, integral_exp_mul_complex_Iic hs, Complex.ofReal_zero, mul_zero, Complex.exp_zero,
+      div_eq_mul_inv, one_mul]
+
+/-- The Mellin transform of the cut-off quasi-character on the norm-below-one
+domain is a simple polar term. Integration over the norm-one subgroup kills a
+nontrivial restriction of the character. For a norm character, the logarithmic
+norm coordinate reduces the integral to an exponential integral on `(-∞, 0)`. -/
+private theorem integral_twist_smallNorm (χ : U[F]) :
+    ∃ p c : ℂ, p.re = 0 ∧ ∀ s : ℂ, 0 < s.re →
+      IntegrableOn (ideleClassNormTwist χ s) smallNorm[F] (ideleClassTamagawaMeasure F) ∧
+      (∫ g in smallNorm[F], ideleClassNormTwist χ s g ∂ideleClassTamagawaMeasure F) =
+        c / (s - p) := by
+  obtain ⟨c, hc⟩ := integral_classNorm_cpow_smallNorm (F := F)
+  let μ := ideleClassTamagawaMeasure F
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil (F := F)).1
+  by_cases hχ : ∃ g : C[F], ideleClassNorm F g = 1 ∧ χ g ≠ 1
+  · obtain ⟨g, hg, hne⟩ := hχ
+    refine ⟨0, 0, Complex.zero_re, fun s hs ↦ ?_⟩
+    obtain ⟨hPow, -⟩ := hc s hs
+    let W : C[F] → ℂ := ideleClassNormTwist χ s
+    have hInt : IntegrableOn W smallNorm[F] μ := by
+      refine hPow.norm.mono' (ideleClassNormTwist χ s).continuous.aestronglyMeasurable
+        (Eventually.of_forall fun x ↦ ?_)
+      change ‖(χ x : ℂ) * (classNormℝ x : ℂ) ^ s‖ ≤ ‖(classNormℝ x : ℂ) ^ s‖
+      rw [norm_mul, Circle.norm_coe, one_mul]
+    refine ⟨hInt, ?_⟩
+    have hPre : (fun x : C[F] ↦ g * x) ⁻¹' smallNorm[F] = smallNorm[F] := by
+      ext x
+      change classNormℝ (g * x) < 1 ↔ classNormℝ x < 1
+      dsimp only
+      rw [map_mul, hg, one_mul]
+    have hInv := (measurePreserving_mul_left μ g).setIntegral_preimage_emb
+      (Homeomorph.mulLeft g).toMeasurableEquiv.measurableEmbedding W smallNorm[F]
+    rw [hPre] at hInv
+    have hWg : W g = (χ g : ℂ) := by
+      change (χ g : ℂ) * (classNormℝ g : ℂ) ^ s = _
+      simp [hg]
+    change (∫ x in smallNorm[F], W (g * x) ∂μ) = (∫ x in smallNorm[F], W x ∂μ) at hInv
+    have hMul (x : C[F]) : W (g * x) = (χ g : ℂ) * W x := by
+      rw [← hWg]
+      exact (ideleClassNormTwist χ s).map_mul g x
+    simp_rw [hMul] at hInv
+    rw [integral_const_mul, ← sub_eq_zero, ← sub_one_mul] at hInv
+    have : (χ g : ℂ) - 1 ≠ 0 := sub_ne_zero.mpr fun h ↦ hne (Subtype.ext h)
+    rw [zero_div]
+    exact (mul_eq_zero.mp hInv).resolve_left this
+  · have hTriv (g : C[F]) (hg : ideleClassNorm F g = 1) : χ g = 1 := by
+      by_contra h
+      exact hχ ⟨g, hg, h⟩
+    let q : IdeleGroup (𝓞 F) F →ₜ* C[F] := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+    let σ : ℝ≥0ˣ →ₜ* C[F] := q.comp
+      ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+    have hσ : RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    obtain ⟨w, hw, -⟩ := existsUnique_complexPower (j.comp (χ.comp σ))
+    have hParam (t : ℝ≥0ˣ) : (χ (σ t) : ℂ) = ((t.val : ℝ) : ℂ) ^ w := hw t
+    have hwRe : w.re = 0 := by
+      let t := Units.mk0 (2 : ℝ≥0) (by norm_num)
+      have h := congrArg norm (hParam t)
+      rw [Circle.norm_coe, Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num [t])] at h
+      change 1 = (2 : ℝ) ^ w.re at h
+      rw [Real.rpow_def_of_pos (by norm_num), ← Real.exp_zero] at h
+      exact (mul_eq_zero.mp (Real.exp_injective h.symm)).resolve_left
+        (Real.log_pos (by norm_num : (1 : ℝ) < 2)).ne'
+    refine ⟨-w, (c : ℝ), by simpa using hwRe, fun s hs ↦ ?_⟩
+    have hTwist (g : C[F]) : ideleClassNormTwist χ s g = (classNormℝ g : ℂ) ^ (s + w) := by
+      have hn : ideleClassNorm F (g * (σ (ideleClassNorm F g))⁻¹) = 1 := by
+        rw [map_mul, map_inv, hσ _, mul_inv_cancel]
+      have h := hTriv _ hn
+      rw [map_mul, map_inv, mul_inv_eq_one] at h
+      change (χ g : ℂ) * (classNormℝ g : ℂ) ^ s = _
+      rw [h, hParam, add_comm s w, Complex.cpow_add _ _
+        (Complex.ofReal_ne_zero.mpr (classNormReal_pos g).ne')]
+    have hs' : 0 < (s + w).re := by simpa only [Complex.add_re, hwRe, add_zero] using hs
+    rw [show (ideleClassNormTwist χ s : C[F] → ℂ) = _ from funext hTwist, sub_neg_eq_add]
+    exact hc (s + w) hs'
+
+/-- Multiplication by the inverse class norm subtracts one from the twist exponent. -/
+private theorem inv_norm_mul_twist (χ : U[F]) (s : ℂ) (g : C[F]) :
+    (classNormℝ g : ℂ)⁻¹ * ideleClassNormTwist χ s g = ideleClassNormTwist χ (s - 1) g := by
+  have hn : (classNormℝ g : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  change _ * ((χ g : ℂ) * (classNormℝ g : ℂ) ^ s) =
+    (χ g : ℂ) * (classNormℝ g : ℂ) ^ (s - 1)
+  rw [Complex.cpow_sub _ _ hn, Complex.cpow_one, div_eq_mul_inv]
+  ring
+
+/-- Evaluating the reflected twist on the inverse class supplies the inverse norm
+factor in adelic Riemann–Roch. -/
+private theorem twist_inv_apply (χ : U[F]) (s : ℂ) (g : C[F]) :
+    ideleClassNormTwist χ⁻¹ (1 - s) g⁻¹ = ideleClassNormTwist χ (s - 1) g := by
+  change (((χ⁻¹) g⁻¹ : Circle) : ℂ) * (classNormℝ g⁻¹ : ℂ) ^ (1 - s) =
+    (χ g : ℂ) * (classNormℝ g : ℂ) ^ (s - 1)
+  have hχ : (χ⁻¹) g⁻¹ = χ g := by
+    rw [map_inv]
+    change (χ g)⁻¹⁻¹ = χ g
+    exact inv_inv _
+  rw [hχ]
+  simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  rw [Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (NNReal.coe_nonneg _),
+    ← Complex.cpow_neg, neg_sub]
+
+/-- Paper: Theorems 2.2.3.2 and 3.2.2.1, pp. 82 and 124. Splitting the theta
+Mellin integral at norm one and applying adelic Riemann–Roch on the small-norm
+part gives the two large-norm integrals and the simple polar terms.
+Deviation: The boundary of norm one is assigned to the original test function.
+Zero residues are allowed, including when the continuation is entire. -/
+private theorem globalIdelicZFunction_eq_thetaMellin_split (f : ℬ[F]) (χ : U[F]) :
+    ∃ p q A B : ℂ, ∀ s : ℂ, s ≠ p → s ≠ q →
+      globalIdelicZFunction f (ideleClassNormTwist χ s) =
+        thetaMellinOn f χ largeNorm[F] s +
+        thetaMellinOn (adeleSchwartzFourier f) χ⁻¹ strictLargeNorm[F] (1 - s) +
+        A / (s - p) + B / (s - q) := by
+  obtain ⟨p, c, hp, hpol⟩ := integral_twist_smallNorm χ
+  let μ := ideleClassTamagawaMeasure F
+  let f₀ := f (Multiplicative.ofAdd (0 : 𝔸[F]))
+  let fFourier := adeleSchwartzFourier f
+  let fFourier₀ := fFourier (Multiplicative.ofAdd (0 : 𝔸[F]))
+  let A := fFourier₀ * c
+  let B := -(f₀ * c)
+  let Z (s : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ s)
+  let G (s : ℂ) :=
+    thetaMellinOn f χ largeNorm[F] s + thetaMellinOn fFourier χ⁻¹ strictLargeNorm[F] (1 - s) +
+      A / (s - (1 + p)) + B / (s - p)
+  refine ⟨1 + p, p, A, B, ?_⟩
+  have hBig : MeasurableSet largeNorm[F] :=
+    measurableSet_le measurable_const continuous_classNormReal.measurable
+  have hStrictBig : MeasurableSet strictLargeNorm[F] :=
+    measurableSet_lt measurable_const continuous_classNormReal.measurable
+  have hSmall : MeasurableSet smallNorm[F] :=
+    measurableSet_lt continuous_classNormReal.measurable measurable_const
+  have hComp : (largeNorm[F])ᶜ = smallNorm[F] := by
+    ext g
+    exact not_le
+  have hInv : (fun g : C[F] ↦ g⁻¹) ⁻¹' strictLargeNorm[F] = smallNorm[F] := by
+    ext g
+    change 1 < classNormℝ g⁻¹ ↔ classNormℝ g < 1
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+    exact one_lt_inv₀ (NNReal.coe_pos.mpr (Units.zero_lt _))
+  have hWeil := ideleClassTamagawaMeasure_isWeil (F := F)
+  let : μ.IsHaarMeasure := hWeil.1
+  let : μ.Regular := hWeil.2.1
+  let : T2Space C[F] := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C[F] := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  have hAgree (s : ℂ) (hs : 1 < s.re) : Z s = G s := by
+    let W (z : ℂ) (g : C[F]) := ideleClassNormTwist χ z g
+    let D (g : C[F]) := adelicTheta fFourier g⁻¹ * W (s - 1) g
+    have hc := twist_mem_rightHalfPlane χ s hs
+    have hInt := globalThetaMellinIntegral_integrable f (ideleClassNormTwist χ s) hc
+    have hWhole : Z s = ∫ g, adelicTheta f g * W s g ∂μ :=
+      (globalIdelicZFunction_eq_integral f hc).trans
+        (globalThetaMellinIntegral_eq_idelic f hc).symm
+    have hRiemann (g : C[F]) :
+        adelicTheta f g * W s g = D g + fFourier₀ * W (s - 1) g - f₀ * W s g := by
+      change adelicTheta f g * ideleClassNormTwist χ s g =
+        adelicTheta fFourier g⁻¹ * ideleClassNormTwist χ (s - 1) g +
+          fFourier₀ * ideleClassNormTwist χ (s - 1) g - f₀ * ideleClassNormTwist χ s g
+      rw [← inv_norm_mul_twist, adelicTheta_riemannRoch]
+      simp only [Complex.real_smul, Complex.ofReal_inv]
+      ring
+    have hs' : 0 < (s - 1).re := by simpa only [Complex.sub_re, Complex.one_re, sub_pos] using hs
+    obtain ⟨hInt₀, hPolar₀⟩ := hpol s (zero_lt_one.trans hs)
+    obtain ⟨hInt₁, hPolar₁⟩ := hpol (s - 1) hs'
+    have hD : IntegrableOn D smallNorm[F] μ := by
+      refine (integrableOn_congr_fun (g := D) (fun g _ ↦ ?_) hSmall).mp
+        ((hInt.integrableOn.add (hInt₀.const_mul f₀)).sub (hInt₁.const_mul fFourier₀))
+      change adelicTheta f g * W s g + f₀ * W s g - fFourier₀ * W (s - 1) g = D g
+      rw [hRiemann]
+      ring
+    have hInvInt : (∫ g in smallNorm[F], D g ∂μ) =
+        thetaMellinOn fFourier χ⁻¹ strictLargeNorm[F] (1 - s) := by
+      have h := (Measure.measurePreserving_inv μ).setIntegral_preimage_emb
+        (Homeomorph.inv (C[F])).toMeasurableEquiv.measurableEmbedding
+        (fun g ↦ adelicTheta fFourier g * ideleClassNormTwist χ⁻¹ (1 - s) g) strictLargeNorm[F]
+      rw [hInv] at h
+      refine Eq.trans (setIntegral_congr_fun hSmall fun g _ ↦ ?_) h
+      dsimp [D, W]
+      rw [twist_inv_apply]
+    calc
+      Z s = thetaMellinOn f χ largeNorm[F] s +
+          (∫ g in smallNorm[F], adelicTheta f g * W s g ∂μ) := by
+        rw [hWhole, thetaMellinOn, ← hComp]
+        exact (integral_add_compl hBig hInt).symm
+      _ = G s := by
+        simp_rw [hRiemann]
+        have hAdd := integral_add hD (hInt₁.const_mul fFourier₀)
+        have hSub := integral_sub (hD.add (hInt₁.const_mul fFourier₀)) (hInt₀.const_mul f₀)
+        simp only [Pi.add_apply] at hSub
+        rw [hSub, hAdd, integral_const_mul, integral_const_mul, hInvInt, hPolar₁, hPolar₀]
+        dsimp only [G, W, A, B]
+        rw [show s - 1 - p = s - (1 + p) by ring]
+        ring
+  have h₁ := differentiable_thetaMellinOn f χ hBig (fun _ hg ↦ hg)
+  have h₂ := differentiable_thetaMellinOn fFourier χ⁻¹ hStrictBig (fun _ hg ↦ le_of_lt hg)
+  have hG₁ := h₁.analyticAt
+  have hG₂ (s : ℂ) :
+      AnalyticAt ℂ (fun z ↦ thetaMellinOn fFourier χ⁻¹ strictLargeNorm[F] (1 - z)) s :=
+    (h₂.analyticAt (1 - s)).comp (by fun_prop)
+  have hDen₁ (s : ℂ) : AnalyticAt ℂ (fun z : ℂ ↦ z - (1 + p)) s := by fun_prop
+  have hDen₀ (s : ℂ) : AnalyticAt ℂ (fun z : ℂ ↦ z - p) s := by fun_prop
+  have hG : MeromorphicOn G univ := by
+    intro s _
+    exact (((hG₁ s).meromorphicAt.add (hG₂ s).meromorphicAt).add
+      (analyticAt_const.meromorphicAt.div (hDen₁ s).meromorphicAt)).add
+      (analyticAt_const.meromorphicAt.div (hDen₀ s).meromorphicAt)
+  have hZ : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hAtTwo : meromorphicOrderAt (Z - G) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ s : ℂ in 𝓝 (2 : ℂ), 1 < s.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun s hs ↦ sub_eq_zero.mpr (hAgree s hs)
+  intro s hs₁ hs₀
+  have hOrd := (hZ.meromorphicOn.sub hG).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) hAtTwo
+  have hNear : Z =ᶠ[𝓝[≠] s] G :=
+    (meromorphicOrderAt_eq_top_iff.mp hOrd).mono fun _ h ↦ sub_eq_zero.mp h
+  have ha : AnalyticAt ℂ G s := by
+    exact (((hG₁ s).add (hG₂ s)).add
+      (analyticAt_const.div (hDen₁ s) (sub_ne_zero.mpr hs₁))).add
+      (analyticAt_const.div (hDen₀ s) (sub_ne_zero.mpr hs₀))
+  exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    ha.meromorphicNFAt).mp hNear).eq_of_nhds
+
+/-- A simple polar term is bounded once the absolute imaginary part exceeds the
+absolute imaginary part of its pole by at least one. -/
+private theorem norm_div_sub_le_atHeight (A p : ℂ) {s : ℂ}
+    (hs : |p.im| + 1 ≤ |s.im|) : ‖A / (s - p)‖ ≤ ‖A‖ := by
+  have hdiff := abs_sub_abs_le_abs_sub s.im p.im
+  have hden : 1 ≤ ‖s - p‖ := by
+    have h := Complex.abs_im_le_norm (s - p)
+    rw [Complex.sub_im] at h
+    linarith
+  rw [norm_div]
+  exact div_le_self (norm_nonneg _) hden
+
+/-- On each closed vertical strip the global zeta continuation is bounded at
+large absolute height by the absolute integrals at fixed real exponents and the
+norms of its two residues. -/
+private theorem globalIdelicZFunction_isBigO_one (f : ℬ[F]) (χ : U[F]) (a b : ℝ) :
+    (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s))
+      =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun _ ↦ (1 : ℝ) := by
+  obtain ⟨p, q, A, B, hSplit⟩ := globalIdelicZFunction_eq_thetaMellin_split f χ
+  let r := max b 2
+  let r' := max (1 - a) 2
+  let C₁ := ∫ g in largeNorm[F], ‖adelicTheta f g‖ * classNormℝ g ^ r ∂ideleClassTamagawaMeasure F
+  let C₂ := ∫ g in strictLargeNorm[F], ‖adelicTheta (adeleSchwartzFourier f) g‖ *
+    classNormℝ g ^ r' ∂ideleClassTamagawaMeasure F
+  have hHeight : ∀ᶠ s : ℂ in atHeight, max |p.im| |q.im| + 1 ≤ |s.im| :=
+    tendsto_comap.eventually (eventually_ge_atTop _)
+  have hStrip : ∀ᶠ s : ℂ in 𝓟 (Complex.re ⁻¹' Icc a b), s.re ∈ Icc a b :=
+    eventually_mem_principal _
+  refine Asymptotics.IsBigO.of_bound (C₁ + C₂ + ‖A‖ + ‖B‖) ?_
+  filter_upwards [hHeight.filter_mono inf_le_left, hStrip.filter_mono inf_le_right]
+    with s hsHeight hsStrip
+  have hp : |p.im| + 1 ≤ |s.im| := (add_le_add (le_max_left |p.im| |q.im|) le_rfl).trans hsHeight
+  have hq : |q.im| + 1 ≤ |s.im| := (add_le_add (le_max_right |p.im| |q.im|) le_rfl).trans hsHeight
+  have hp' : s ≠ p := fun h ↦ by subst s; linarith
+  have hq' : s ≠ q := fun h ↦ by subst s; linarith
+  have hr : 1 < r := (by norm_num : (1 : ℝ) < 2).trans_le (le_max_right _ _)
+  have hr' : 1 < r' := (by norm_num : (1 : ℝ) < 2).trans_le (le_max_right _ _)
+  have h₁ : ‖thetaMellinOn f χ largeNorm[F] s‖ ≤ C₁ :=
+    norm_thetaMellinOn_le f χ (measurableSet_le measurable_const continuous_classNormReal.measurable)
+      (fun _ hg ↦ hg) hr (hsStrip.2.trans (le_max_left _ _))
+  have h₂ : ‖thetaMellinOn (adeleSchwartzFourier f) χ⁻¹ strictLargeNorm[F] (1 - s)‖ ≤ C₂ :=
+    norm_thetaMellinOn_le _ _
+      (measurableSet_lt measurable_const continuous_classNormReal.measurable)
+      (fun _ hg ↦ le_of_lt hg) hr' (by
+        simp only [Complex.sub_re, Complex.one_re]
+        exact (sub_le_sub_left hsStrip.1 1).trans (le_max_left _ _))
+  rw [norm_one, mul_one, hSplit s hp' hq']
+  exact norm_add₄_le.trans (add_le_add
+    (add_le_add (add_le_add h₁ h₂) (norm_div_sub_le_atHeight A p hp))
+    (norm_div_sub_le_atHeight B q hq))
+
 /-- The completed Hecke continuation is uniformly bounded at large absolute height on
 each fixed closed vertical strip. In Tate's split zeta integral the two integrals over
 idele classes of norm at least one are bounded by absolute integrals at the extreme real
@@ -1366,7 +1852,41 @@ private theorem completedHeckeL_continuation_isBigO_one (χ : U[F]) (Λ : ℂ �
     (hΛ : MeromorphicNFOn Λ univ) (hSeries : ∀ s : halfPlane, Λ s = completedHeckeL χ s)
     (a b : ℝ) (hab : a < b) :
     Λ =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun _ ↦ (1 : ℝ) := by
-  sorry
+  let f := adelicStandardGaussian χ
+  let k : ℂ := ((Real.sqrt |(NumberField.discr F : ℝ)|)⁻¹ : ℝ)
+  let Z (s : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ s)
+  let H (s : ℂ) := k * Λ s
+  have hk : k ≠ 0 := by
+    have hd : (NumberField.discr F : ℝ) ≠ 0 := by
+      exact_mod_cast NumberField.discr_ne_zero F
+    exact Complex.ofReal_ne_zero.mpr (inv_ne_zero (Real.sqrt_ne_zero'.mpr (abs_pos.mpr hd)))
+  have hZ : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hH : MeromorphicNFOn H univ := fun _ hs ↦ (meromorphicNFAt_fun_const_smul_iff_meromorphicNFAt hk).mpr (hΛ hs)
+  have hAgree : ∀ s : ℂ, 1 < s.re → Z s = H s := by
+    intro s hs
+    rw [show Z s = gaussianCompletedHeckeL χ s from rfl,
+      gaussianCompletedHeckeL_eq_completedHeckeL χ s hs, ← hSeries ⟨s, hs⟩]
+  have hNearTwo : ∀ᶠ s : ℂ in 𝓝 (2 : ℂ), 1 < s.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have hOrd : meromorphicOrderAt (Z - H) (2 : ℂ) = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr
+      ((hNearTwo.filter_mono nhdsWithin_le_nhds).mono fun s hs ↦ sub_eq_zero.mpr (hAgree s hs))
+  have hEq (s : ℂ) : Z s = H s := by
+    have h := (hZ.meromorphicOn.sub hH.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+      isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) hOrd
+    have hNear : Z =ᶠ[𝓝[≠] s] H :=
+      (meromorphicOrderAt_eq_top_iff.mp h).mono fun _ hz ↦ sub_eq_zero.mp hz
+    have he := (hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hH (mem_univ s))
+    exact (he.mp hNear).eq_of_nhds
+  have hScale : Λ = fun s ↦ k⁻¹ * Z s := by
+    funext s
+    rw [hEq s]
+    change Λ s = k⁻¹ * (k * Λ s)
+    rw [← mul_assoc, inv_mul_cancel₀ hk, one_mul]
+  rw [hScale]
+  exact (globalIdelicZFunction_isBigO_one f χ a b).const_mul_left _
+
+end TateBound
 
 /-- A preliminary exponential bound for the finite continuation on a fixed strip.
 Tate's split zeta integral gives boundedness of the completed function at large height, and

@@ -232,7 +232,16 @@ theorem modulatedJumpMidpointProfile_eq_average (τ : ℝ≥0ˣ →ₜ* G) (f : 
     (t : S) (g : K) (a b : ℂ)
     (ha : Tendsto (fun u ↦ f (τ u * g.val)) (𝓝[<] t.val) (𝓝 a))
     (hb : Tendsto (fun u ↦ f (τ u * g.val)) (𝓝[>] t.val) (𝓝 b)) :
-    modulatedJumpMidpointProfile m τ f S hleft hright t.val g = (a + b) / 2 := by sorry
+    modulatedJumpMidpointProfile m τ f S hleft hright t.val g = (a + b) / 2 := by
+  unfold modulatedJumpMidpointProfile
+  rw [dif_pos t.property]
+  let e : ℝ≥0ˣ ≃ₜ Set.Ioi (0 : ℝ) := Nonneg.unitsHomeomorphPos ℝ
+  have : OrderTopology ℝ≥0ˣ := ⟨e.isInducing.eq_induced.trans
+    ((show StrictMono e from fun _ _ h ↦ h).induced_topology_eq_preorder
+      (e.surjective.range_eq ▸ Set.ordConnected_univ))⟩
+  have h1 := tendsto_nhds_unique (hleft t g).choose_spec ha
+  have h2 := tendsto_nhds_unique (hright t g).choose_spec hb
+  rw [h1, h2]
 
 -- TODO(paper-gap): Proposition D.3.5.1, (D.3.5.3), reverses the Fourier sign.
 -- For γ = e, χ₀ = 1, and a bump in log coordinates supported in (1/8, 3/8)
@@ -326,8 +335,14 @@ function submodule consists of ordinary smooth compactly supported functions.
 Deviation: Sanity check in the real-line model. -/
 theorem mem_bruhatCompactSupportSubmodule_real_iff (f : Multiplicative ℝ → ℂ) :
     f ∈ bruhatCompactSupportSubmodule (Multiplicative ℝ) ↔
-      ContDiff ℝ ∞ (f ∘ Multiplicative.ofAdd) ∧ HasCompactSupport (f ∘ Multiplicative.ofAdd) :=
-  by sorry
+      ContDiff ℝ ∞ (f ∘ Multiplicative.ofAdd) ∧ HasCompactSupport (f ∘ Multiplicative.ofAdd) := by
+  have hsm : f ∈ bruhatSmoothSubmodule ↔ ContDiff ℝ ∞ (f ∘ Multiplicative.ofAdd) := by
+    rw [mem_bruhatSmoothSubmodule_iff, contDiff_infty]
+    exact forall_congr' fun p ↦ isBruhatContDiff_real_iff p f
+  have hcs : HasCompactSupport f ↔ HasCompactSupport (f ∘ Multiplicative.ofAdd) :=
+    ⟨fun h ↦ h.comp_homeomorph (Homeomorph.ofAdd (X := ℝ)), fun h ↦ by
+      simpa [Function.comp_def] using h.comp_homeomorph (Homeomorph.ofAdd (X := ℝ)).symm⟩
+  exact and_congr hsm hcs
 
 /-- Paper: Lemma D.3.6.1, p. 819. A fixed-support stage consists of
 Schwartz functions on an elementary quotient whose realizations vanish

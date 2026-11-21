@@ -454,7 +454,14 @@ theorem sLocalHomogeneousAdelicTheta_ker_isClosed (ω : PontryaginDual (MonoidHo
 /-- Paper: Lemma 5.1.2.1(1), p. 224.
 The kernels of the global zeta and global theta transforms agree. -/
 theorem globalIdelicMellin_ker_eq :
-    LinearMap.ker (globalIdelicMellin (F := F)) = LinearMap.ker theta𝔽 := by sorry
+    LinearMap.ker (globalIdelicMellin (F := F)) = LinearMap.ker theta𝔽 := by
+  refine le_antisymm (fun f hf ↦ ?_) (globalIdelicMellin_vanishes_on_theta_kernel (F := F))
+  have hinj : Injective (globalThetaMellin (F := F)) := globalThetaMellin_injective
+  have h1 : globalThetaMellin (F := F) (Submodule.Quotient.mk f) = 0 :=
+    (globalThetaMellin_mk f).trans (LinearMap.mem_ker.mp hf)
+  have h2 : (Submodule.Quotient.mk f : GlobalAdelicThetaSpace F) = 0 :=
+    hinj (h1.trans (map_zero (globalThetaMellin (F := F))).symm)
+  exact (Submodule.Quotient.mk_eq_zero _).mp h2
 
 /-- Paper: Lemma 5.1.2.1(2), p. 224.
 Global homogeneous theta vanishes exactly when the global Z-function vanishes on

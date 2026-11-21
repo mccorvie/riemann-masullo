@@ -4,11 +4,13 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Analysis.Fourier.FourierTransformDeriv
 import Mathlib.LinearAlgebra.Basis.Prod
 import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Homotopy.Lifting
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-!
@@ -1340,7 +1342,84 @@ theorem bruhatDiffDegreeOne_frequency :
       ∀ (a : LCATopologicalLie G) (D : bruhatDiffDegreeOneReal (G := G)),
         D.val = bruhatFirstOrder a → ∀ χ (t : ℝ),
           Real.fourierChar ((σ D χ).toAdd * t) = χ (a (Multiplicative.ofAdd t)) :=
-  by sorry
+  by
+    obtain ⟨dual, hDual⟩ := lcaTopologicalLie_dual (G := G)
+    obtain ⟨realDual, hRealDual⟩ := exists_realPontryaginDualEquiv
+    have hPair (r : Multiplicative ℝ) (t : ℝ) :
+        realDual r (Multiplicative.ofAdd t) = Real.fourierChar (r.toAdd * t) :=
+      hRealDual r.toAdd t
+    let postcomp : (PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ)) ≃
+        (PontryaginDual G →ₜ* Multiplicative ℝ) :=
+      { toFun := fun b ↦ (realDual.symm : _ →ₜ* _).comp b
+        invFun := fun b ↦ (realDual : _ →ₜ* _).comp b
+        left_inv := fun b ↦ ContinuousMonoidHom.ext fun χ ↦ realDual.apply_symm_apply (b χ)
+        right_inv := fun b ↦ ContinuousMonoidHom.ext fun χ ↦ realDual.symm_apply_apply (b χ) }
+    let freq := dual.toEquiv.trans postcomp
+    have hFreq (a : LCATopologicalLie G) (χ : PontryaginDual G) (t : ℝ) :
+        Real.fourierChar ((freq a χ).toAdd * t) = χ (a (Multiplicative.ofAdd t)) := by
+      rw [← hPair]
+      change realDual (realDual.symm (dual a χ)) (Multiplicative.ofAdd t) = _
+      rw [realDual.apply_symm_apply, hDual, PontryaginDual.map_apply]
+    -- The derivative of each character at the identity determines its frequency.
+    have hDeriv (a : LCATopologicalLie G) (χ : PontryaginDual G) :
+        bruhatDirectionalDeriv a (fun x ↦ (χ x : ℂ)) 1 =
+          (freq a χ).toAdd • (2 * ↑Real.pi * Complex.I) := by
+      simp only [bruhatDirectionalDeriv, one_mul, ← hFreq a χ]
+      have hZero : deriv (fun t ↦ (Real.fourierChar t : ℂ)) 0 = 2 * ↑Real.pi * Complex.I := by
+        simpa only [Real.fourierChar_apply', mul_zero, Circle.exp_zero, Circle.coe_one, mul_one]
+          using Real.deriv_fourierChar 0
+      simpa only [mul_zero, hZero] using
+        deriv_comp_mul_left (freq a χ).toAdd (fun t ↦ (Real.fourierChar t : ℂ)) 0
+    let firstOrder (a : LCATopologicalLie G) : bruhatDiffDegreeOneReal (G := G) :=
+      ⟨bruhatFirstOrder a, Submodule.subset_span ⟨a, rfl⟩⟩
+    have hInjective : Function.Injective firstOrder := by
+      intro a b hab
+      apply freq.injective
+      apply ContinuousMonoidHom.ext
+      intro χ
+      let f : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩
+      have h := congrArg (fun D : bruhatDiffDegreeOneReal (G := G) ↦ (D.val f).val 1) hab
+      change bruhatDirectionalDeriv a (fun x ↦ (χ x : ℂ)) 1 =
+        bruhatDirectionalDeriv b (fun x ↦ (χ x : ℂ)) 1 at h
+      rw [hDeriv, hDeriv] at h
+      exact smul_left_injective ℝ (by simp [Real.pi_ne_zero]) h
+    have hSurjective : Function.Surjective firstOrder := by
+      intro D
+      obtain ⟨a, ha⟩ := (mem_bruhatDiffDegreeOneReal_iff D.val).mp D.property
+      exact ⟨a, Subtype.ext ha.symm⟩
+    let firstOrderEquiv := Equiv.ofBijective firstOrder ⟨hInjective, hSurjective⟩
+    let σ := firstOrderEquiv.symm.trans freq
+    have hσ (D : bruhatDiffDegreeOneReal (G := G)) (a : LCATopologicalLie G)
+        (ha : D.val = bruhatFirstOrder a) : σ D = freq a := by
+      have h : firstOrderEquiv a = D := Subtype.ext ha.symm
+      change freq (firstOrderEquiv.symm D) = freq a
+      rw [← h, Equiv.symm_apply_apply]
+    refine ⟨σ, ?_, ?_, fun a D ha χ t ↦ by rw [hσ D a ha, hFreq]⟩
+    · intro D E χ
+      obtain ⟨a, rfl⟩ := hSurjective D
+      obtain ⟨b, rfl⟩ := hSurjective E
+      rw [hσ _ (a * b) (bruhatFirstOrder_mul a b).symm, hσ _ a rfl, hσ _ b rfl]
+      change (realDual.symm (dual (a * b) χ)).toAdd =
+        (realDual.symm (dual a χ)).toAdd + (realDual.symm (dual b χ)).toAdd
+      rw [map_mul, ContinuousMonoidHom.mul_apply, map_mul]
+      rfl
+    · intro c D χ
+      obtain ⟨a, rfl⟩ := hSurjective D
+      let scale : LCATopologicalLie (Multiplicative ℝ) :=
+        ⟨(c • LinearMap.id (R := ℝ) (M := ℝ)).toAddMonoidHom.toMultiplicative,
+          continuous_const_mul c⟩
+      rw [hσ _ (a.comp scale) (bruhatFirstOrder_scale a c).symm, hσ _ a rfl]
+      change freq (a.comp scale) χ = Multiplicative.ofAdd (c * (freq a χ).toAdd)
+      apply realDual.injective
+      apply PontryaginDual.ext
+      intro t
+      change realDual (freq (a.comp scale) χ) (Multiplicative.ofAdd t.toAdd) =
+        realDual (Multiplicative.ofAdd (c * (freq a χ).toAdd)) (Multiplicative.ofAdd t.toAdd)
+      rw [hPair, hPair, hFreq]
+      change χ (a (Multiplicative.ofAdd (c * t.toAdd))) =
+        Real.fourierChar ((c * (freq a χ).toAdd) * t.toAdd)
+      rw [show (c * (freq a χ).toAdd) * t.toAdd = (freq a χ).toAdd * (c * t.toAdd) by ring,
+        hFreq]
 
 /-- Paper: Corollary D.1.6.15, p. 770. The first-order symbol is the real
 frequency multiplied by 2πi. The frequency is identified by the character pairing. -/

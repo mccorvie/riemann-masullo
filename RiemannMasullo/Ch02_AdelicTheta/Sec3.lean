@@ -1166,7 +1166,18 @@ Its pullback to the S-ideles has the corresponding pulled-back character. -/
 theorem sLocalHomogeneousAdelicTheta_homogeneous (ω : PontryaginDual J₁)
     (f : ℬₛ) (h : J₁) (g : Jₛ) :
     sLocalHomogeneousAdelicTheta F S μ ω f (h.val⁻¹ * g) =
-      (ω h : ℂ) * sLocalHomogeneousAdelicTheta F S μ ω f g := by sorry
+      (ω h : ℂ) * sLocalHomogeneousAdelicTheta F S μ ω f g := by
+  have : BorelSpace J₁ := ⟨rfl⟩
+  simp only [sLocalHomogeneousAdelicTheta, IsLinearMap.mk'_apply, ContinuousMap.coe_mk]
+  rw [← integral_mul_left_eq_self (μ := μ) (classIntegrand ω f (h.val⁻¹ * g)) h,
+    ← integral_const_mul]
+  refine integral_congr_ae (.of_forall fun k ↦ ?_)
+  have hproduct : (h.val⁻¹ * g) * (h * k).val = g * k.val := by
+    change (h.val⁻¹ * g) * (h.val * k.val) = g * k.val
+    rw [mul_comm h.val⁻¹ g, mul_assoc, inv_mul_cancel_left]
+  change sLocalAdelicThetaOnClasses F S f ((h.val⁻¹ * g) * (h * k).val) * (ω (h * k) : ℂ) =
+    (ω h : ℂ) * (sLocalAdelicThetaOnClasses F S f (g * k.val) * (ω k : ℂ))
+  rw [hproduct, map_mul ω h k, Circle.coe_mul (ω h) (ω k), mul_left_comm]
 
 /-- Paper: Proposition 2.3.1.4(2), p. 105. Homogeneous S-local theta decays
 at every positive inverse power as the S-idelic norm tends to infinity. -/

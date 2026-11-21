@@ -702,7 +702,10 @@ def modulatedFourierMellin (f : G → ℂ) (c : QuasiCharacter G) : ℂ :=
 Fourier–Mellin integral gives the integral of the original function.
 Deviation: This is the sanity check at abscissa zero. -/
 theorem modulatedFourierMellin_one (f : E) (h0 : (1 : QuasiCharacter G) ∈ ΩI) :
-    modulatedFourierMellin m I hm μ f.val 1 = ∫ g, f.val g ∂μ := by sorry
+    modulatedFourierMellin m I hm μ f.val 1 = ∫ g, f.val g ∂μ := by
+  unfold modulatedFourierMellin
+  rw [Set.indicator_of_mem h0]
+  simp
 
 include hSC hBorel hHaar hInt hne hOpen
 
@@ -733,7 +736,21 @@ theorem modulatedFourierMellin_equivariant (g : G) (f : E) (c : ΩI) :
     let f' : E := ⟨fun x ↦ f.val (g⁻¹ * x),
       modulatedExponentialDecaySubmodule_translate m I hm hms g f⟩
     modulatedFourierMellin m I hm μ f'.val c =
-      (c : QuasiCharacter G) g * modulatedFourierMellin m I hm μ f.val c := by sorry
+      (c : QuasiCharacter G) g * modulatedFourierMellin m I hm μ f.val c := by
+  intro f'
+  unfold modulatedFourierMellin
+  rw [Set.indicator_of_mem c.property, Set.indicator_of_mem c.property]
+  have h1 : ∀ x, f.val (g⁻¹ * x) * (c : QuasiCharacter G) x =
+      (c : QuasiCharacter G) g * (f.val (g⁻¹ * x) * (c : QuasiCharacter G) (g⁻¹ * x)) := by
+    intro x
+    have : (c : QuasiCharacter G) x = (c : QuasiCharacter G) g * (c : QuasiCharacter G) (g⁻¹ * x) := by
+      rw [← map_mul, mul_inv_cancel_left]
+    rw [this]; ring
+  show ∫ x, f.val (g⁻¹ * x) * (c : QuasiCharacter G) x ∂μ = _
+  simp_rw [h1]
+  rw [integral_const_mul]
+  congr 1
+  exact integral_mul_left_eq_self (fun x ↦ f.val x * (c : QuasiCharacter G) x) g⁻¹
 
 include hms in
 /-- Paper: Theorem D.3.3.13, p. 815. The values on the strip determine

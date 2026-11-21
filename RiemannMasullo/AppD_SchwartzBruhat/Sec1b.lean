@@ -9,6 +9,7 @@ public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
@@ -3094,7 +3095,11 @@ theorem schwartzBruhat_montel :
 /-- Paper: Theorem D.1.5.7, p. 764. Closed bounded subsets of the strong dual
 of the Schwartz–Bruhat space are compact. -/
 theorem schwartzBruhat_strongDual_montel [SecondCountableTopology G] :
-    MontelSpace ℂ (StrongDual ℂ (SchwartzBruhat G)) := by sorry
+    MontelSpace ℂ (StrongDual ℂ (SchwartzBruhat G)) := by
+  letI : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+  letI : BarrelledSpace ℂ (SchwartzBruhat G) := schwartzBruhat_barrelled
+  letI : MontelSpace ℂ (SchwartzBruhat G) := schwartzBruhat_montel
+  exact montelSpace_strongDual
 
 /-- Paper: Theorem D.1.5.7 and Remark D.1.5.8, p. 764. Evaluation gives a
 linear homeomorphism with the strong bidual, the paper's reflexivity property
