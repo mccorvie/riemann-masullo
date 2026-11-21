@@ -138,11 +138,7 @@ private theorem isBruhatContDiff_of_modulationWeight
     · dsimp only
       rw [hg]
       exact hUndo x.val
-    · -- The presentation uses the standard addition on `Fin`.
-      let finiteGroup := @Fin.addCommGroup e.finiteOrder ⟨(Fin.pos b).ne'⟩
-      have hLog := @contDiff_logHom_elementaryCover e.realDim e.torusDim e.latticeRank
-        (Fin e.finiteOrder) s.quotient finiteGroup inferInstance inferInstance inferInstance
-        e.equiv.symm lq z b (p : ℕ∞)
+    · have hLog := contDiff_logHom_elementaryCover e.equiv.symm lq z b (p : ℕ∞)
       exact (Complex.ofRealCLM.contDiff.comp ((hLog.mul (contDiff_const (c := -a))).exp)).mul
         (hSmooth e z b)
 

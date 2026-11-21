@@ -5,6 +5,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
+public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
@@ -59,24 +60,34 @@ theorem isLocallyEuclidean_of_discrete (X : Type*) [TopologicalSpace X]
   ⟨0, ⟨ChartedSpace.ofDiscreteTopology⟩⟩
 
 /-- Paper: (D.1.4.2), p. 757. A presentation identifies a group topologically
-with a product of real, torus, free discrete and finite factors.
-Deviation: The finite factor is enumerated by `Fin finiteOrder`. -/
+with a product of real, torus, free discrete and finite discrete abelian factors. -/
 structure ElementaryLCAPresentation (G : Type*) [CommGroup G] [TopologicalSpace G] where
   realDim : ℕ
   torusDim : ℕ
   latticeRank : ℕ
-  finiteOrder : ℕ
-  finiteGroup : AddCommGroup (Fin finiteOrder)
-  equiv : letI := finiteGroup
-    G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank (Fin finiteOrder))
+  finiteFactor : Type
+  [finiteGroup : AddCommGroup finiteFactor]
+  [finiteFintype : Fintype finiteFactor]
+  [finiteTopology : TopologicalSpace finiteFactor]
+  [finiteDiscrete : DiscreteTopology finiteFactor]
+  equiv : G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank finiteFactor)
+
+attribute [instance] ElementaryLCAPresentation.finiteGroup ElementaryLCAPresentation.finiteFintype
+  ElementaryLCAPresentation.finiteTopology ElementaryLCAPresentation.finiteDiscrete
+
+/-- Paper: (D.1.4.2), p. 757. The Klein four group admits an elementary presentation
+whose finite factor has order four and is noncyclic.
+Deviation: Sanity check for the finite abelian factor. -/
+theorem ElementaryLCAPresentation.exists_kleinFour :
+    ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
+      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
 
 /-- Paper: (D.1.4.2), p. 757. Two elementary presentations have the same real
 dimension, torus dimension and free lattice rank, and isomorphic finite factors.
 Deviation: The finite factors are compared up to group isomorphism. -/
 theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G) :
     e.realDim = e'.realDim ∧ e.torusDim = e'.torusDim ∧ e.latticeRank = e'.latticeRank ∧
-      Nonempty (@AddEquiv (Fin e.finiteOrder) (Fin e'.finiteOrder)
-        e.finiteGroup.toAdd e'.finiteGroup.toAdd) := by sorry
+      Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by sorry
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
@@ -1124,8 +1135,7 @@ def IsBruhatContDiff (p : ℕ) (f : G → ℂ) : Prop :=
     ∀ a : BruhatStructuralPair G, OrderDual.ofDual a.val.2 = k →
       ∃ f₀ : a.quotient → ℂ, (∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
         ∀ (e : ElementaryLCAPresentation a.quotient)
-          (z : Fin e.latticeRank → ℤ) (b : Fin e.finiteOrder),
-          letI := e.finiteGroup
+          (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor),
           ContDiff ℝ (p : ℕ∞) (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd
             (elementaryCover xt z b))))
 
@@ -1193,7 +1203,7 @@ omit hTop hT2 hLC
 is the existing elementary Schwartz space with its seminorm topology. -/
 abbrev SchwartzBruhatStage {A : Type*} [CommGroup A] [TopologicalSpace A]
     (e : ElementaryLCAPresentation A) :=
-  ElementarySchwartz e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder)
+  ElementarySchwartz e.realDim e.torusDim e.latticeRank e.finiteFactor
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. A stage function is pulled back along
@@ -1201,19 +1211,17 @@ the quotient and extended by zero outside the open subgroup.
 Deviation: The printed composition is reversed and omits restriction to the open subgroup. -/
 def schwartzBruhatStageRealization (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) : SchwartzBruhatStage e →ₗ[ℂ] (G → ℂ) :=
-  letI := e.finiteGroup
   (LinearMap.pi fun x : G ↦
     if hx : x ∈ a.val.1 then
       LinearMap.proj (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
     else 0).comp (elementarySchwartzSubmodule e.realDim e.torusDim e.latticeRank
-      (Fin e.finiteOrder)).subtype
+      e.finiteFactor).subtype
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. The realization evaluates a stage
 function at the quotient coordinate on the open subgroup and vanishes outside it. -/
 theorem schwartzBruhatStageRealization_apply (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) (x : G) :
-    letI := e.finiteGroup
     schwartzBruhatStageRealization a e f x =
       if hx : x ∈ a.val.1 then
         f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))

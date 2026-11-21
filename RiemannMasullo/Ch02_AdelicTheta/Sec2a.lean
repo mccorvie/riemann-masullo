@@ -211,14 +211,8 @@ private theorem schwartzBruhatStageRealization_apply_dite {G : Type*} [CommGroup
     schwartzBruhatStageRealization a e f x =
       if hx : x ∈ a.val.1 then
         f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
-      else 0 := by
-  change (if hx : x ∈ a.val.1 then (LinearMap.proj (R := ℂ)
-    (φ := fun _ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder) => ℂ)
-    (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))) else 0)
-    ((show elementarySchwartzSubmodule _ _ _ _ from f).val) = _
-  split_ifs with hx
-  · rfl
-  · rfl
+      else 0 :=
+  schwartzBruhatStageRealization_apply a e f x
 
 /-- A weighted bound of an elementary Schwartz function controls its pointwise size times the
 real and lattice monomials. -/
@@ -523,11 +517,6 @@ private theorem presentation_mixedSpace_bound
         A * (∑ j, |(Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).1 j| +
           ∑ k, |((Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).2.2.1 k : ℝ)|) +
           B := by
-  by_cases hk : e.finiteOrder = 0
-  · refine ⟨0, 0, le_rfl, fun y hy => ?_⟩
-    have b := (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).2.2.2
-    exact absurd b.2 (by omega)
-  have : NeZero e.finiteOrder := ⟨hk⟩
   have hgood := a.property.2.2.1
   let m : 𝔸[F] → mixedEmbedding.mixedSpace F :=
     fun z => InfiniteAdeleRing.ringEquiv_mixedSpace F z.1
@@ -553,10 +542,10 @@ private theorem presentation_mixedSpace_bound
     continuous_subtype_val))
   have hlift : Continuous lift := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr hh0
   have key : ∀ w₁ w₂ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank
-      (Fin e.finiteOrder), e.equiv.symm (Multiplicative.ofAdd (w₁ + w₂)) =
+      e.finiteFactor, e.equiv.symm (Multiplicative.ofAdd (w₁ + w₂)) =
         e.equiv.symm (Multiplicative.ofAdd w₁) * e.equiv.symm (Multiplicative.ofAdd w₂) :=
     fun w₁ w₂ => e.equiv.symm.map_mul (Multiplicative.ofAdd w₁) (Multiplicative.ofAdd w₂)
-  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder) →
+  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor →
       mixedEmbedding.mixedSpace F :=
     fun w => Multiplicative.toAdd (lift (e.equiv.symm (Multiplicative.ofAdd w)))
   have hPadd : ∀ w₁ w₂, P (w₁ + w₂) = P w₁ + P w₂ := (fun w₁ w₂ => by
@@ -570,7 +559,7 @@ private theorem presentation_mixedSpace_bound
   have hP : Continuous P := continuous_toAdd.comp (hlift.comp (e.equiv.symm.continuous.comp
     continuous_ofAdd))
   have H := elementary_additive_norm_le (m := e.realDim) (n := e.torusDim)
-    (r := e.latticeRank) (Fk := Fin e.finiteOrder) (V := mixedEmbedding.mixedSpace F) P hP hPadd
+    (r := e.latticeRank) (Fk := e.finiteFactor) (V := mixedEmbedding.mixedSpace F) P hP hPadd
   obtain ⟨A, B, hA, hAB⟩ := H
   refine ⟨A, B, hA, ?_⟩
   intro y hy
@@ -768,9 +757,8 @@ private theorem realization_decay (a : BruhatStructuralPair (Multiplicative 𝔸
         (1 + ‖InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1‖) ^ N ≤ C₀ := by
   have HAB := presentation_mixedSpace_bound a e
   obtain ⟨A, B, hA, hAB⟩ := HAB
-  let _ : AddCommGroup (Fin e.finiteOrder) := e.finiteGroup
   have HC := elementarySchwartz_decay (m := e.realDim) (n := e.torusDim)
-    (r := e.latticeRank) (Fk := Fin e.finiteOrder)
+    (r := e.latticeRank) (Fk := e.finiteFactor)
     (f := (show elementarySchwartzSubmodule _ _ _ _ from s).val)
     (show elementarySchwartzSubmodule _ _ _ _ from s).2 N
   obtain ⟨C, hC⟩ := HC
@@ -924,19 +912,20 @@ theorem hasSum_adelicAverage_add_zeroTerm (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F
     (Finset.hasSum_compl_iff (f := fun ξ : F ↦ f (point ξ)) {0}).mp hne
 
 /-- Smoothness on the covering space gives continuity on each discrete fiber. -/
-private theorem continuous_elementarySchwartz {m n r k : ℕ} [AddCommGroup (Fin k)]
-    (f : ElementarySchwartz m n r (Fin k)) : Continuous f := by
+private theorem continuous_elementarySchwartz {m n r : ℕ} {Fk : Type*}
+    [TopologicalSpace Fk] [DiscreteTopology Fk] (f : ElementarySchwartz m n r Fk) :
+    Continuous f := by
   let q : EuclideanSpace ℝ (Fin n) → (Fin n → AddCircle (1 : ℝ)) :=
     fun t i ↦ (t i : AddCircle (1 : ℝ))
   have hq : IsOpenQuotientMap q :=
     (IsOpenQuotientMap.piMap (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
       (PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin n ↦ ℝ)).toHomeomorph.isOpenQuotientMap
   rw [← (Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ))
-    ((Fin r → ℤ) × Fin k)).isOpenQuotientMap.continuous_comp_iff]
+    ((Fin r → ℤ) × Fk)).isOpenQuotientMap.continuous_comp_iff]
   refine continuous_prod_of_discrete_right.mpr fun ab ↦ ?_
   have hcover := (IsOpenQuotientMap.id (X := EuclideanSpace ℝ (Fin m))).prodMap hq
   rw [← hcover.continuous_comp_iff]
-  let fs : elementarySchwartzSubmodule m n r (Fin k) := f
+  let fs : elementarySchwartzSubmodule m n r Fk := f
   exact (fs.property.1 ab.1 ab.2).continuous
 
 /-- The Schwartz–Bruhat submodule is spanned by continuous stage functions. -/
@@ -950,7 +939,6 @@ private theorem continuous_schwartzBruhat_apply {G : Type*} [CommGroup G] [Topol
   refine Submodule.iSup_induction (motive := fun g : G → ℂ ↦ Continuous g) _ hg
     (fun e g ⟨s, hs⟩ ↦ ?_) continuous_const (fun _ _ hg hh ↦ hg.add hh)
   subst g
-  let := e.finiteGroup
   let U : OpenSubgroup G := ⟨a.val.1, a.property.1⟩
   have hu : IsClopen (U : Set G) := U.isClopen
   have hcomp : Continuous (fun x : a.val.1 ↦
