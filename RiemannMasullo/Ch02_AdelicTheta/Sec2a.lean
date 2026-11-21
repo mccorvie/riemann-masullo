@@ -4,6 +4,11 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 public import RiemannMasullo.Ch02_AdelicTheta.Sec1
 public import Mathlib.Algebra.Module.ZLattice.Basic
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
+import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
+import Mathlib.MeasureTheory.Measure.Real
+import Mathlib.Tactic.Linarith
+import Mathlib.Tactic.Positivity
+import Mathlib.Tactic.Ring
 
 /-!
 # Global adelic theta functions
@@ -41,6 +46,111 @@ theorem euclideanSupNormShell_lebesgueMeasurable {N : ℕ} (_hN : 1 ≤ N) {r : 
     (_hr : 1 ≤ r) :
     NullMeasurableSet (euclideanSupNormShell N r) volume := by sorry
 
+/-- Disjoint balls centered on lattice points fit into a thicker shell. -/
+private theorem shell_packing {N : ℕ}
+    (Γ : Submodule ℤ (Fin N → ℝ)) [DiscreteTopology Γ] :
+    ∃ d : ℝ, 0 < d ∧ d ≤ 1 ∧ ∀ r : ℝ, 2 ≤ r →
+      let S := (Γ : Set (Fin N → ℝ)) ∩ euclideanSupNormShell N r
+      S.Finite ∧ (S.ncard : ℝ) * (2 * d) ^ N ≤ (2 * (r + 1 + d)) ^ N - (2 * (r - d)) ^ N := by
+  classical
+  obtain ⟨ε, hε, hiso⟩ := Metric.isOpen_iff.mp (isOpen_discrete ({0} : Set Γ)) 0 (by simp)
+  let d := min (ε / 2) 1
+  have hd : 0 < d := lt_min (by linarith) zero_lt_one
+  have hd1 : d ≤ 1 := min_le_right _ _
+  have hdε : d + d ≤ ε := by
+    have hle := min_le_left (ε / 2) (1 : ℝ)
+    dsimp [d]
+    linarith
+  refine ⟨d, hd, hd1, ?_⟩
+  intro r hr S
+  have hb : Bornology.IsBounded (euclideanSupNormShell N r) := by
+    apply (Metric.isBounded_ball (x := (0 : Fin N → ℝ)) (r := r + 1)).subset
+    intro x hx
+    simpa only [Metric.mem_ball, dist_zero_right] using hx.2
+  have hclosed : IsClosed (Γ : Set (Fin N → ℝ)) := by
+    change IsClosed (Γ.toAddSubgroup : Set (Fin N → ℝ))
+    exact AddSubgroup.isClosed_of_discreteTopology
+  have hfin : S.Finite := by
+    simpa [S, inter_comm] using
+      Metric.finite_isBounded_inter_isClosed (s := (Γ : Set (Fin N → ℝ)))
+        DiscreteTopology.isDiscrete hb hclosed
+  refine ⟨hfin, ?_⟩
+  let := hfin.fintype
+  -- Discreteness at zero gives the same separation for every pair of lattice points.
+  let balls := fun x : S => Metric.ball x.val d
+  have hdis : Pairwise (Disjoint on balls) := by
+    intro x y hne
+    apply Metric.ball_disjoint_ball
+    apply hdε.trans
+    by_contra! h
+    let z : Γ := ⟨x.val - y.val, Γ.sub_mem x.property.1 y.property.1⟩
+    have hz : z ∈ Metric.ball (0 : Γ) ε := by
+      simpa [z, Metric.mem_ball, dist_eq_norm] using h
+    have hz0 : z = 0 := hiso hz
+    apply hne
+    exact Subtype.ext (sub_eq_zero.mp (congrArg Subtype.val hz0))
+  have hbvol (x : Fin N → ℝ) {t : ℝ} (ht : 0 < t) :
+      volume.real (Metric.ball x t) = (2 * t) ^ N := by
+    simp [measureReal_def, Real.volume_pi_ball _ ht, ENNReal.toReal_ofReal (by positivity : 0 ≤ (2 * t) ^ N)]
+  have heq : volume.real (⋃ x, balls x) = (S.ncard : ℝ) * (2 * d) ^ N := by
+    rw [measureReal_iUnion_fintype hdis (fun _ => Metric.isOpen_ball.measurableSet)
+      (fun x => by dsimp [balls]; rw [Real.volume_pi_ball _ hd]; exact ENNReal.ofReal_ne_top)]
+    simp only [balls, hbvol _ hd, Finset.sum_const, Finset.card_univ, nsmul_eq_mul,
+      ← Nat.card_eq_fintype_card, Nat.card_coe_set_eq]
+  have hi : 0 < r - d := by linarith
+  have ho : 0 < r + 1 + d := by linarith
+  let outer := Metric.ball (0 : Fin N → ℝ) (r + 1 + d)
+  let inner := Metric.ball (0 : Fin N → ℝ) (r - d)
+  have hout : volume outer ≠ ⊤ := by
+    rw [show outer = _ from rfl, Real.volume_pi_ball _ ho]
+    exact ENNReal.ofReal_ne_top
+  have hio : inner ⊆ outer := Metric.ball_subset_ball (by linarith)
+  have hsub : (⋃ x, balls x) ⊆ outer \ inner := by
+    intro y hy
+    obtain ⟨x, hx⟩ := mem_iUnion.mp hy
+    have hdxy : dist y x.val < d := hx
+    have hnorm := abs_norm_sub_norm_le y x.val
+    rw [← dist_eq_norm] at hnorm
+    obtain ⟨h₁, h₂⟩ := abs_le.mp hnorm
+    obtain ⟨hrx₁, hrx₂⟩ : r ≤ ‖x.val‖ ∧ ‖x.val‖ < r + 1 := x.property.2
+    simp only [outer, inner, Set.mem_sdiff, Metric.mem_ball, dist_zero_right, not_lt]
+    constructor <;> linarith
+  have hdiff : volume.real (outer \ inner) = volume.real outer - volume.real inner := by
+    have := measureReal_inter_add_sdiff (μ := volume) (s := outer)
+      (t := inner) Metric.isOpen_ball.measurableSet hout
+    rw [inter_eq_right.mpr hio] at this
+    linarith
+  calc
+    _ = volume.real (⋃ x, balls x) := heq.symm
+    _ ≤ volume.real (outer \ inner) :=
+      measureReal_mono hsub (measure_ne_top_of_subset sdiff_subset hout)
+    _ = _ := by rw [hdiff, hbvol _ ho, hbvol _ hi]
+
+
+/-- A shell of fixed width has volume of order at most the radius to the power N − 1. -/
+private theorem shell_pow_diff_bound (N : ℕ) (hN : 1 ≤ N) (d : ℝ)
+    (hd : 0 < d) (hd' : d ≤ 1) :
+    ∃ C : ℝ, 0 < C ∧ ∀ r : ℝ, 2 ≤ r →
+      (2 * (r + 1 + d)) ^ N - (2 * (r - d)) ^ N ≤ C * r ^ (N - 1) := by
+  have hn : (0 : ℝ) < N := by exact_mod_cast (show 0 < N from hN)
+  refine ⟨(2 + 4 * d) * N * 4 ^ (N - 1), by positivity, ?_⟩
+  intro r hr
+  let a := 2 * (r + 1 + d)
+  let b := 2 * (r - d)
+  have hb : 0 ≤ b := by dsimp [b]; linarith
+  have ha : 0 ≤ a := by dsimp [a]; linarith
+  have hba : b ≤ a := by dsimp [a, b]; linarith
+  have hdiff : a - b = 2 + 4 * d := by dsimp [a, b]; ring
+  have htop : a ≤ 4 * r := by dsimp [a]; linarith
+  calc
+    a ^ N - b ^ N ≤ |a ^ N - b ^ N| := le_abs_self _
+    _ ≤ |a - b| * N * max |a| |b| ^ (N - 1) := abs_pow_sub_pow_le a b N
+    _ = (2 + 4 * d) * N * a ^ (N - 1) := by
+      rw [abs_of_nonneg (sub_nonneg.mpr hba), hdiff, abs_of_nonneg ha, abs_of_nonneg hb, max_eq_left hba]
+    _ ≤ (2 + 4 * d) * N * (4 * r) ^ (N - 1) :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ ha htop _) (by positivity)
+    _ = _ := by rw [mul_pow]; ring
+
 /-- Paper: Lemma 2.2.1.1, p. 75. For large radii, the shell has finitely many
 lattice points and their number is at most a constant times `r ^ (N - 1)`. -/
 theorem euclideanSupNormShell_lattice_count {N : ℕ} (_hN : 1 ≤ N)
@@ -48,7 +158,16 @@ theorem euclideanSupNormShell_lattice_count {N : ℕ} (_hN : 1 ≤ N)
     ∃ C : ℝ, 0 < C ∧ ∀ᶠ r : ℝ in atTop,
       ((Γ : Set (Fin N → ℝ)) ∩ euclideanSupNormShell N r).Finite ∧
       (((Γ : Set (Fin N → ℝ)) ∩ euclideanSupNormShell N r).ncard : ℝ) ≤
-        C * r ^ (N - 1) := by sorry
+        C * r ^ (N - 1) := by
+  obtain ⟨d, hd, hd', hpack⟩ := shell_packing Γ
+  obtain ⟨C, hC, hpow⟩ := shell_pow_diff_bound N _hN d hd hd'
+  have hvol : 0 < (2 * d) ^ N := by positivity
+  refine ⟨C / (2 * d) ^ N, div_pos hC hvol, ?_⟩
+  filter_upwards [eventually_ge_atTop (2 : ℝ)] with r hr
+  obtain ⟨hfinite, hbound⟩ := hpack r hr
+  refine ⟨hfinite, ?_⟩
+  rw [div_mul_eq_mul_div]
+  exact (le_div_iff₀ hvol).mpr (hbound.trans (hpow r hr))
 
 -- TODO(paper-gap): Proposition 2.2.1.3, p. 76, excludes Γ ∩ K from the sum,
 -- but the term with ξ = -x can remain. Take Γ = ℤ, K = {1}, x = 1 and ξ = -1.
