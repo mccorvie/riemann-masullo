@@ -90,7 +90,19 @@ Deviation: The source is the full stage in (D.1.10.1), with the outside local un
 theorem integralIdeleInsertion_exhaustive :
     Monotone (fun T : Finset (HeightOneSpectrum (𝓞 F)) ↦
       range (integralIdeleInsertion F T)) ∧
-    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by sorry
+    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by
+  constructor
+  · intro U T hUT g hg
+    apply (mem_range_integralIdeleInsertion F T g).2
+    intro v hv
+    exact (mem_range_integralIdeleInsertion F U g).1 hg v (fun h ↦ hv (hUT h))
+  · intro g
+    have hfinite := Filter.eventually_cofinite.mp
+      (g.val.2.cofinite_mem_adicCompletionIntegers.and
+        g.inv.2.cofinite_mem_adicCompletionIntegers)
+    refine ⟨hfinite.toFinset, (mem_range_integralIdeleInsertion F _ g).2 ?_⟩
+    intro v hv
+    exact not_not.mp (fun h ↦ hv (hfinite.mem_toFinset.mpr h))
 
 /-- Paper: Lemma D.1.10.1(2), p. 784. The topology on the union of the full S-stages
 is final for their insertions. Their transition maps are the inclusions of the images.
