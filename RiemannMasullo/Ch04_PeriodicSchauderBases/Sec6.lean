@@ -50,7 +50,15 @@ def modulatedCyclicAnnihilatorFiber (m : G →ₜ* ℝ≥0ˣ)
 and on each element of the norm-one subgroup. -/
 theorem mem_modulatedCyclicAnnihilatorFiber_iff (ξ : PontryaginDual G) :
     ξ ∈ modulatedCyclicAnnihilatorFiber m ω γ ↔
-      ξ γ = 1 ∧ ∀ u : K, ξ u.val = ω u := by sorry
+      ξ γ = 1 ∧ ∀ u : K, ξ u.val = ω u := by
+  constructor
+  · rintro ⟨hann, hres⟩
+    exact ⟨(mem_lcaAnnihilator_iff _ ξ).mp hann ⟨γ, Subgroup.mem_zpowers γ⟩,
+      DFunLike.congr_fun hres⟩
+  · rintro ⟨hγ, hres⟩
+    refine ⟨(mem_lcaAnnihilator_iff _ ξ).mpr ?_, PontryaginDual.ext hres⟩
+    have hker : Subgroup.zpowers γ ≤ ξ.toMonoidHom.ker := Subgroup.zpowers_le.mpr hγ
+    exact fun u ↦ hker u.property
 
 include hm hSC in
 /-- Paper: Remark 4.6.1.2, p. 210. Every norm-one character has a compact
