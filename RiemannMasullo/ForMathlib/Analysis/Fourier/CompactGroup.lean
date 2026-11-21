@@ -6,13 +6,18 @@ public import Mathlib.MeasureTheory.Group.Integral
 public import Mathlib.Topology.Algebra.PontryaginDual
 
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Prod
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
+import Mathlib.Analysis.InnerProductSpace.l2Space
+import Mathlib.MeasureTheory.Function.ContinuousMapDense
+import Mathlib.MeasureTheory.Integral.DominatedConvergence
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
 
-/-! # Bessel’s inequality for characters of compact groups -/
+/-! # Bessel’s inequality and Parseval’s identity for characters of compact groups -/
 
 public noncomputable section
 
 open Filter MeasureTheory Set
-open scoped InnerProductSpace
+open scoped ENNReal InnerProductSpace Pointwise
 
 namespace RiemannMasullo
 
@@ -134,5 +139,108 @@ theorem sum_sq_character_integral_prod_le {β : Type*} [MeasurableSpace β]
       simpa only [Finset.sum_congr rfl fun χ hχ ↦ congrArg (fun z : ℂ ↦ ‖z‖ ^ 2) (hb' χ hχ)]
         using sum_sq_character_integral_le μ hb s
     _ = _ := by rw [integral_const_mul, integral_prod_symm _ hsq]
+
+section Parseval
+
+variable [T2Space K] [μ.WeaklyRegular]
+
+/-- The normalized characters form a Hilbert basis whose coordinates are the
+character integrals divided by the square root of the Haar mass. -/
+private theorem exists_character_hilbertBasis :
+    ∃ b : HilbertBasis (PontryaginDual K) ℂ (Lp ℂ 2 μ),
+      ∀ {u : K → ℂ} (hu : MemLp u 2 μ) (χ : PontryaginDual K),
+        (∫ a, star (χ a : ℂ) * u a ∂μ) =
+          (Real.sqrt (μ.real univ) : ℂ) * b.repr (hu.toLp u) χ := by
+  classical
+  let v : PontryaginDual K →* C(K, ℂ) :=
+    { toFun := fun χ ↦ ⟨fun a ↦ χ a, by fun_prop⟩
+      map_one' := rfl
+      map_mul' _ _ := rfl }
+  let T := ContinuousMap.toLp (E := ℂ) 2 μ ℂ
+  let V := T ∘ v
+  let r := Real.sqrt (μ.real univ)
+  have hr : 0 < r := Real.sqrt_pos.2 measureReal_univ_pos
+  have hr' : (r : ℂ) ≠ 0 := by exact_mod_cast hr.ne'
+  have hr2 : r ^ 2 = μ.real univ := Real.sq_sqrt measureReal_nonneg
+  let W (χ : PontryaginDual K) := ((r : ℂ)⁻¹) • V χ
+  have hW : Orthonormal ℂ W := by
+    rw [orthonormal_iff_ite]
+    intro χ ψ
+    have h : ⟪V χ, V ψ⟫_ℂ = if χ = ψ then (μ.real univ : ℂ) else 0 := by
+      change ⟪T (v χ), T (v ψ)⟫_ℂ = _
+      rw [ContinuousMap.inner_toLp]
+      change (∫ a, (ψ a : ℂ) * star (χ a : ℂ) ∂μ) = _
+      simp_rw [mul_comm (ψ _ : ℂ)]
+      exact integral_character_pair μ χ ψ
+    simp only [W, inner_smul_left, inner_smul_right, h]
+    split_ifs
+    · have hconj : starRingEnd ℂ (r : ℂ)⁻¹ = (r : ℂ)⁻¹ := by
+        rw [← Complex.ofReal_inv, Complex.conj_ofReal]
+      rw [hconj, ← hr2, Complex.ofReal_pow]
+      field_simp
+    · simp
+  have hspan : (Submodule.span ℂ (range V)).topologicalClosure = ⊤ := by
+    have hdense := ContinuousMap.toLp_denseRange ℂ μ ℂ (by simp : (2 : ℝ≥0∞) ≠ ⊤)
+    have h := hdense.topologicalClosure_map_submodule (dense_span_pontryaginDual v (fun _ _ ↦ rfl))
+    rwa [Submodule.map_span, ← range_comp] at h
+  have hspanW : (Submodule.span ℂ (range W)).topologicalClosure = ⊤ := by
+    rw [show range W = (r : ℂ)⁻¹ • range V from Set.range_smul _ V,
+      Submodule.span_smul_eq_of_isUnit _ _ (isUnit_iff_ne_zero.mpr (inv_ne_zero hr')), hspan]
+  let b := HilbertBasis.mk hW hspanW.ge
+  refine ⟨b, fun {u} hu χ ↦ ?_⟩
+  have hi : ⟪V χ, hu.toLp u⟫_ℂ = ∫ a, star (χ a : ℂ) * u a ∂μ := by
+    rw [L2.inner_def]
+    apply integral_congr_ae
+    filter_upwards [(v χ).coeFn_toLp (p := 2) (𝕜 := ℂ) μ, hu.coeFn_toLp] with a ha hb
+    change ⟪T (v χ) a, hu.toLp u a⟫_ℂ = _
+    rw [ha, hb]
+    exact mul_comm _ _
+  have hrestore : (r : ℂ) • W χ = V χ := by simp [W, smul_smul, hr']
+  rw [← hi, ← hrestore, inner_smul_left, b.repr_apply_apply]
+  simp [b, r]
+
+/-- Parseval's identity on the first factor of a product, integrated over the second factor.
+The coefficients are unnormalized, so the identity includes the mass of the first factor. -/
+theorem tsum_sq_character_integral_prod [SecondCountableTopology K]
+    {β : Type*} [MeasurableSpace β] {ν : Measure β} [SFinite ν]
+    {u : K × β → ℂ} (hu : MemLp u 2 (μ.prod ν))
+    (v : PontryaginDual K → Lp ℂ 2 ν)
+    (hv : ∀ χ, (v χ : β → ℂ) =ᵐ[ν] fun t ↦ ∫ a, star (χ a : ℂ) * u (a, t) ∂μ) :
+    ∑' χ, ‖v χ‖ ^ 2 = μ.real univ * ∫ p, ‖u p‖ ^ 2 ∂μ.prod ν := by
+  obtain ⟨b, hb⟩ := exists_character_hilbertBasis μ
+  have : Fact ((2 : ℝ≥0∞) ≠ ⊤) := ⟨by simp⟩
+  have hd : Pairwise (fun χ ψ ↦ Disjoint (Metric.ball (b χ) (1 / 2))
+      (Metric.ball (b ψ) (1 / 2))) := by
+    intro χ ψ hne
+    apply Metric.ball_disjoint_ball
+    have hsq : dist (b χ) (b ψ) ^ 2 = 2 := by
+      rw [dist_eq_norm, @norm_sub_sq ℂ, b.orthonormal.2 hne,
+        b.orthonormal.1 χ, b.orthonormal.1 ψ]
+      norm_num
+    nlinarith [dist_nonneg (x := b χ) (y := b ψ)]
+  have : Countable (PontryaginDual K) :=
+    hd.countable_of_isOpen_disjoint (fun _ ↦ Metric.isOpen_ball)
+      (fun _ ↦ Metric.nonempty_ball.mpr (by norm_num))
+  have hn (χ : PontryaginDual K) : ‖v χ‖ ^ 2 = ∫ t, ‖v χ t‖ ^ 2 ∂ν := by
+    simpa only [Lp.toLp_coeFn] using norm_sq_toLp_two (Lp.memLp (v χ))
+  have hi (χ : PontryaginDual K) := (Lp.memLp (v χ)).norm.integrable_sq
+  have hs : Summable (fun χ ↦ ‖v χ‖ ^ 2) :=
+    summable_of_sum_le (fun _ ↦ sq_nonneg _) (sum_sq_character_integral_prod_le μ hu v hv)
+  calc
+    _ = ∫ t, ∑' χ, ‖v χ t‖ ^ 2 ∂ν := by
+      simp_rw [hn]
+      apply integral_tsum_of_summable_integral_norm hi
+      simpa only [Real.norm_of_nonneg (sq_nonneg (_ : ℝ)), ← hn] using hs
+    _ = ∫ t, μ.real univ * ∫ a, ‖u (a, t)‖ ^ 2 ∂μ ∂ν := by
+      apply integral_congr_ae
+      filter_upwards [memLp_two_prod_left_ae hu, (ae_all_iff.2 hv)] with t ht hvt
+      simp_rw [hvt, hb ht, norm_mul, mul_pow, Complex.norm_real,
+        Real.norm_eq_abs, abs_of_nonneg (Real.sqrt_nonneg _), Real.sq_sqrt measureReal_nonneg]
+      rw [tsum_mul_left, ← norm_sq_toLp_two ht]
+      congr 1
+      simpa using (lp.hasSum_norm (by norm_num) (b.repr (ht.toLp (fun a ↦ u (a, t))))).tsum_eq
+    _ = _ := by rw [integral_const_mul, integral_prod_symm _ hu.norm.integrable_sq]
+
+end Parseval
 
 end RiemannMasullo

@@ -44,6 +44,14 @@ private theorem dense_span_restrictedCharacters {H K : Type*}
   exact congrArg (fun S : StarSubalgebra ℂ C(H, ℂ) ↦ S.toSubalgebra.toSubmodule)
     (ContinuousMap.starSubalgebra_topologicalClosure_eq_top_of_separatesPoints A hsep)
 
+/-- The complex linear span of the characters of a compact Hausdorff abelian group
+is dense in its continuous functions. -/
+theorem dense_span_pontryaginDual {K : Type*} [CommGroup K] [TopologicalSpace K]
+    [IsTopologicalGroup K] [T2Space K] [CompactSpace K]
+    (r : PontryaginDual K →* C(K, ℂ)) (hr : ∀ χ x, r χ x = (χ x : ℂ)) :
+    (Submodule.span ℂ (range r)).topologicalClosure = ⊤ :=
+  dense_span_restrictedCharacters (ContinuousMonoidHom.id K) Function.injective_id r hr
+
 /-- A character of a compact subgroup of a compact Hausdorff abelian group extends to the
 whole group. The subgroup is presented by an injective continuous homomorphism.
 Stone–Weierstrass gives density of the span of the restricted characters. Orthogonality

@@ -692,7 +692,47 @@ Deviation: The scaling factor accounts for the arbitrary Haar normalizations (ER
 theorem regularIsotypicTransform_norm_sq (c : ℝ≥0∞)
     (hc : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = c • ν)
     (f : RegularL2 ν) :
-    ‖regularIsotypicTransform m hm ν ν₁ τ hτ f‖ ^ 2 = ν₁.real univ * c.toReal * ‖f‖ ^ 2 := by sorry
+    ‖regularIsotypicTransform m hm ν ν₁ τ hτ f‖ ^ 2 = ν₁.real univ * c.toReal * ‖f‖ ^ 2 := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : SecondCountableTopology K := Subtype.secondCountableTopology (K : Set G)
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let logHomeo := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have : LocallyCompactSpace ℝ≥0ˣ := logHomeo.isOpenEmbedding.locallyCompactSpace
+  obtain ⟨j, hj⟩ := exists_regularIsotypic_sectionEquiv m hm τ hτ
+  let η := ν₁.prod positiveRealHaar
+  have : (η.map j).IsHaarMeasure := j.isHaarMeasure_map η
+  have hmem : MemLp (f : G → ℂ) 2 (η.map j) := by
+    rw [Measure.isMulLeftInvariant_eq_smul (η.map j) ν]
+    exact (Lp.memLp f).smul_measure_nnreal
+  have hcomp := hmem.comp_of_map j.continuous.measurable.aemeasurable
+  have hmap : η.map j = c • ν := by
+    let q (z : K × ℝ≥0ˣ) : G := (z.1 : G) * τ z.2
+    have hq : Measurable q :=
+      (continuous_subtype_val.comp continuous_fst).measurable.mul
+        (τ.continuous.measurable.comp measurable_snd)
+    have hinv : MeasurePreserving (Prod.map (Inv.inv : K → K) id) η η :=
+      (Measure.measurePreserving_inv ν₁).prod (MeasurePreserving.id positiveRealHaar)
+    rw [show (j : K × ℝ≥0ˣ → G) = q ∘ Prod.map Inv.inv id from funext hj,
+      ← Measure.map_map hq hinv.measurable, hinv.map_eq]
+    exact hc
+  let y := regularIsotypicTransform m hm ν ν₁ τ hτ f
+  have hy : HasSum (fun χ ↦ ‖y χ‖ ^ 2) (‖y‖ ^ 2) := by
+    simpa using lp.hasSum_norm (by norm_num) y
+  have hn : ‖f‖ ^ 2 = ∫ x, ‖f x‖ ^ 2 ∂ν := by
+    simpa only [Lp.toLp_coeFn] using norm_sq_toLp_two (Lp.memLp f)
+  calc
+    ‖y‖ ^ 2 = ∑' χ, ‖y χ‖ ^ 2 := hy.tsum_eq.symm
+    _ = ν₁.real univ * ∫ p, ‖f (j p)‖ ^ 2 ∂η := by
+      refine tsum_sq_character_integral_prod ν₁ hcomp y (fun χ ↦ ?_)
+      simpa only [Function.comp_apply, hj] using
+        regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ χ f
+    _ = _ := by
+      have heq : ∫ x, ‖f x‖ ^ 2 ∂η.map j = ∫ p, ‖f (j p)‖ ^ 2 ∂η :=
+        integral_map j.continuous.measurable.aemeasurable (hmem.aestronglyMeasurable.norm.pow 2)
+      rw [← heq, hmap, integral_smul_measure, hn, mul_assoc]
+      rfl
 
 -- TODO(paper-gap): Lemma 4.3.2.2's isometry and the isometry asserted on
 -- p. 180 fail for the same measure rescaling as (4.3.2.5).
