@@ -1397,7 +1397,13 @@ theorem injectiveTensorSeminorm_apply
     (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0}) (z : E ⊗[ℂ] F) :
     injectiveTensorSeminorm U V z =
       ⨆ φ : StrongDual.polar ℂ U.val, ⨆ ψ : StrongDual.polar ℂ V.val,
-        ‖tensorDualForm φ.val ψ.val z‖ := by sorry
+        ‖tensorDualForm φ.val ψ.val z‖ := by
+  let D := StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val
+  let p (v : D) := (normSeminorm ℂ ℂ).comp (tensorDualForm v.1.val v.2.val)
+  have hp : BddAbove (range p) := ⟨injectiveTensorSeminorm U V, forall_mem_range.mpr fun v w ↦
+    norm_tensorDualForm_le_injectiveTensorSeminorm U V v.1 v.2 w⟩
+  rw [injectiveTensorSeminorm, ← ciSup_prod hp, Seminorm.iSup_apply hp]
+  exact ciSup_prod (Seminorm.bddAbove_range_iff.mp hp z)
 
 end Injective
 
