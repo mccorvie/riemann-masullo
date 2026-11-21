@@ -316,7 +316,47 @@ theorem sIdeleClassInsertion_connectedComponent :
 insertion is surjective, and hence is an isomorphism by openness and injectivity. -/
 theorem sIdeleClassInsertion_eventually_surjective :
     ∃ T : Finset (HeightOneSpectrum (𝓞 F)), ∀ U, T ⊆ U →
-      Surjective (sIdeleClassInsertion F U) := by sorry
+      Surjective (sIdeleClassInsertion F U) := by
+  classical
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  let stage (U : Finset (HeightOneSpectrum (𝓞 F))) := (sIdeleClassInsertion F U).range
+  have hstage (U : Finset (HeightOneSpectrum (𝓞 F))) :
+      (stage U : Set C[F]) = q '' range (integralIdeleInsertion F U) := by
+    ext c
+    constructor
+    · rintro ⟨x, rfl⟩
+      obtain ⟨u, rfl⟩ := QuotientGroup.mk'_surjective _ x
+      exact ⟨_, ⟨u, rfl⟩, rfl⟩
+    · rintro ⟨_, ⟨u, rfl⟩, rfl⟩
+      exact ⟨QuotientGroup.mk u, rfl⟩
+  obtain ⟨hmono, hexhaust⟩ := integralIdeleInsertion_exhaustive F
+  have hmonotone : Monotone (fun U ↦ (stage U : Set C[F])) := by
+    intro U V hUV
+    change (stage U : Set C[F]) ⊆ stage V
+    rw [hstage U, hstage V]
+    exact image_mono (hmono hUV)
+  have hcover (c : C[F]) : c ∈ ⋃ U, (stage U : Set C[F]) := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk'_surjective _ c
+    obtain ⟨U, hg⟩ := hexhaust g
+    exact mem_iUnion.mpr ⟨U, (hstage U).symm ▸ mem_image_of_mem q hg⟩
+  have hcompact : IsCompact ((ideleClassNorm F).ker : Set C[F]) :=
+    isCompact_iff_compactSpace.mpr (ideleClassGroup_finiteness F).2.1
+  obtain ⟨T, hT⟩ := hcompact.elim_directed_cover (fun U ↦ (stage U : Set C[F]))
+    (fun U ↦ (sIdeleClassInsertion_isOpenEmbedding F U).isOpen_range)
+    (fun c _ ↦ hcover c)
+    (fun U V ↦ ⟨U ∪ V, hmonotone Finset.subset_union_left, hmonotone Finset.subset_union_right⟩)
+  refine ⟨T, fun U hTU c ↦ ?_⟩
+  obtain ⟨j, _, hjNorm, hjRep⟩ := sIdeleClassGroup_openEmbedding F U
+  have hj : j = sIdeleClassInsertion F U := (sIdeleClassInsertion_unique F U).2 j hjRep
+  obtain ⟨x, hx⟩ := (sIdeleClassNorm_descent F U).2.2.2.1 (ideleClassNorm F c)
+  have hxc : ideleClassNorm F (j x) = ideleClassNorm F c := (hjNorm x).trans hx
+  have hdiv : c / j x ∈ (ideleClassNorm F).ker := by
+    rw [MonoidHom.mem_ker, map_div, hxc, div_self']
+  have hmem : c / j x ∈ stage U := hmonotone hTU (hT hdiv)
+  have hxmem : j x ∈ stage U := by
+    rw [hj]
+    exact ⟨x, rfl⟩
+  exact div_mul_cancel c (j x) ▸ (stage U).mul_mem hmem hxmem
 
 end IdeleInsertion
 

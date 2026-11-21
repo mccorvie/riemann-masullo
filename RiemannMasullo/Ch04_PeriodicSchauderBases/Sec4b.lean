@@ -83,7 +83,11 @@ include hγ in
 For the trivial lift, the prescribed phase is zero. -/
 theorem positiveRealCyclic_trivialPhase :
     ∀ ω : PontryaginDual K, t₀ ω ∈ Ico 0 (2 * Real.pi / L[γ]) ∧
-      Circle.exp (t₀ ω * L[γ]) = χ₀ ω γ := by sorry
+      Circle.exp (t₀ ω * L[γ]) = χ₀ ω γ := by
+  intro ω
+  have hL : 0 < L[γ] := Real.log_pos (by exact_mod_cast hγ)
+  refine ⟨⟨le_rfl, div_pos (by positivity) hL⟩, ?_⟩
+  simp
 
 include hγ in
 /-- Paper: Definition 4.2.1.1, p. 162, and Remark 4.4.2.8, p. 194.

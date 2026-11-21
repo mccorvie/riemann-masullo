@@ -5,6 +5,7 @@ public import Mathlib.Analysis.LocallyConvex.Montel
 public import Mathlib.Analysis.LocallyConvex.AbsConvex
 import Mathlib.Analysis.RCLike.Lemmas
 public import Mathlib.Analysis.Complex.Convex
+import Mathlib.Analysis.LocallyConvex.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
 /-! # Evaluation into the strong bidual and compact absolutely convex disks -/
@@ -75,5 +76,47 @@ theorem exists_compact_absConvex_superset [MontelSpace ℂ E] {S : Set E} (hS : 
     (fun x hx ↦ p.mem_closedBall_zero.mpr (hr x hx).le)
     ⟨p.balanced_closedBall_zero r, convex_RCLike_iff_convex_real.mpr (p.convex_closedBall 0 r)⟩
   exact ⟨r, forall_mem_image.mpr fun x hx ↦ p.mem_closedBall_zero.mp (hK hx)⟩
+
+/-- In a Hausdorff polynormable Montel space, every continuous linear functional
+on the strong dual is evaluation at a vector of the original space. -/
+theorem surjective_strongBidual_eval [MontelSpace ℂ E] :
+    Surjective (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)) := by
+  let D := StrongDual ℂ E
+  let j := ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)
+  let B := topDualPairing ℂ D
+  intro l
+  have hnear : l ⁻¹' Metric.ball 0 1 ∈ 𝓝 (0 : D) :=
+    l.continuous.continuousAt.preimage_mem_nhds (by simpa using ball_mem_nhds (0 : ℂ) zero_lt_one)
+  obtain ⟨⟨S, r⟩, ⟨hS, hr⟩, hsub⟩ :=
+    (ContinuousLinearMap.hasBasis_nhds_zero_of_basis
+      (σ := RingHom.id ℂ) (Metric.nhds_basis_ball (x := (0 : ℂ)))).mem_iff.mp hnear
+  let c : ℂ := ((r / 2)⁻¹ : ℝ)
+  obtain ⟨K, hK, habs, hSK⟩ :=
+    exists_compact_absConvex_superset (hS.image (c • ContinuousLinearMap.id ℂ E))
+  let jWeak (x : E) : WeakBilin B := j x
+  let C := jWeak '' K
+  have hj : Continuous jWeak :=
+    WeakBilin.continuous_of_continuous_eval B fun φ ↦ φ.continuous
+  have hC : IsClosed C :=
+    letI : T2Space (WeakBilin B) :=
+      (WeakBilin.isEmbedding (B := B) ContinuousLinearMap.coe_injective).t2Space
+    (hK.image hj).isClosed
+  have haC : AbsConvex ℂ C := ⟨habs.1.image j, habs.2.linear_image j⟩
+  have hzC : 0 ∈ C := ⟨0, hSK (mem_insert _ _), map_zero j⟩
+  by_contra hl
+  have hnot : l ∉ C := fun ⟨x, _, hx⟩ ↦ hl ⟨x, hx⟩
+  let : PolynormableSpace ℂ (WeakBilin B) := B.weakBilin_withSeminorms.toPolynormableSpace
+  obtain ⟨f, hf, hfl⟩ := exists_dual_norm_le_one_lt_of_notMem hC haC hzC hnot
+  obtain ⟨φ, rfl⟩ := LinearMap.dualEmbedding_surjective B f
+  have hsmall : φ ∈ {g : D | ∀ x ∈ S, g x ∈ Metric.ball 0 r} := by
+    intro x hx
+    have hKx : c • x ∈ K := hSK (mem_insert_of_mem _ (mem_image_of_mem _ hx))
+    have hφ := hf _ (mem_image_of_mem jWeak hKx)
+    change ‖φ (c • x)‖ ≤ 1 at hφ
+    rw [map_smul, norm_smul, show ‖c‖ = (r / 2)⁻¹ from
+      Complex.norm_of_nonneg (inv_nonneg.mpr (half_pos hr).le),
+      ← div_eq_inv_mul, div_le_iff₀ (half_pos hr), one_mul] at hφ
+    exact mem_ball_zero_iff.mpr (hφ.trans_lt (half_lt_self hr))
+  exact (not_lt_of_ge (mem_ball_zero_iff.mp (hsub hsmall)).le) hfl
 
 end RiemannMasullo

@@ -1823,7 +1823,42 @@ include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has nonempty interior
 in the norm-one ideles. -/
 theorem ideleFundamentalDomain_interior : (interior E₁).Nonempty := by
-  sorry
+  obtain ⟨a, ha⟩ := infiniteIdeleFundamentalDomain_interior F b v₀ σ
+  obtain ⟨W, hW, hW_eq⟩ := IsInducing.subtypeVal.isOpen_iff.mp
+    (isOpen_interior (s := E∞))
+  let p : N₁ → 𝕀∞ := fun g ↦ atInfinity g.val
+  let U : Set N₁ := (Subtype.val ⁻¹' (integralUnits : Set 𝕀[F])) ∩ p ⁻¹' W
+  have hp : Continuous p :=
+    (continuous_fst.units_map _).comp continuous_subtype_val
+  have hU : IsOpen U :=
+    ((isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range.preimage
+      continuous_subtype_val).inter (hW.preimage hp)
+  have hSubset : U ⊆ E₁ := by
+    intro g hg
+    have hfin : (∏ᶠ v : Primes(F), ‖g.val.val.2 v‖) = 1 :=
+      finprod_eq_one_of_forall_eq_one fun v ↦ Valued.toNormedField.norm_eq_one_iff.mpr
+        ((mem_integralIdeleRange_iff F g.val).mp hg.1 v)
+    have hnorm : infiniteIdeleNorm F (p g) = 1 := by
+      rw [infiniteIdeleNorm_eq_global, ← show ideleNorm F g.val = 1 from g.property]
+      apply Units.ext
+      apply NNReal.coe_injective
+      rw [((ideleNorm_spec F).1 (fromInfinity (p g))).2, ((ideleNorm_spec F).1 g.val).2, hfin]
+      have h₁ (v : Primes(F)) : (fromInfinity (p g)).val.2 v = 1 := rfl
+      simp only [h₁, norm_one, finprod_one]
+      rfl
+    let x : N∞ := ⟨p g, hnorm⟩
+    have hx : x ∈ interior E∞ := hW_eq ▸ hg.2
+    refine Set.mem_iUnion.mpr ⟨1, ?_⟩
+    rw [hr₁, one_smul]
+    exact ⟨hg.1, ⟨x, interior_subset hx, rfl⟩⟩
+  let g : N₁ := ⟨fromInfinity a.val,
+    (infiniteIdeleNorm_eq_global F a.val).symm.trans a.property⟩
+  refine ⟨g, interior_maximal hSubset hU ⟨?_, ?_⟩⟩
+  · exact (mem_integralIdeleRange_iff F g.val).mpr fun v ↦
+      (show Valued.v (1 : v.adicCompletion F) = 1 from map_one _)
+  · have haW : a ∈ Subtype.val ⁻¹' W := hW_eq.symm ▸ ha
+    change a.val ∈ W
+    exact haW
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(2), p. 552. Principal translates cover the norm-one ideles. -/

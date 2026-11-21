@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.Calculus.UniformLimitsDeriv
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.LinearAlgebra.TensorProduct.Finiteness
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
@@ -18,7 +19,7 @@ Masullo, §§2.2.4–2.2.5, pp. 86–98.
 @[expose] public noncomputable section
 
 open Bornology Filter Function MeasureTheory NumberField Set Topology
-open scoped ContDiff Manifold NNReal NumberField.AdeleRing
+open scoped ContDiff Manifold NNReal NumberField.AdeleRing TensorProduct
 
 namespace RiemannMasullo
 
@@ -521,22 +522,180 @@ as in (2.2.4.4). -/
 def adeleDirectionalDeriv : ℬ[F] →ₗ[ℂ] ℬ[F] :=
   IsLinearMap.mk' _ (adeleDirectionalDeriv_isLinear γ)
 
+/-- Paper: Lemma 2.2.4.2, pp. 87–88. Differentiation of the archimedean orbit
+in the logarithmic parameter is a continuous complex-linear operator on
+archimedean Schwartz–Bruhat functions. -/
+theorem exists_archimedeanDirectionalDeriv :
+    ∃ D : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
+        SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
+      ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) (x : InfiniteAdeleRing F),
+        D f (Multiplicative.ofAdd x) =
+          deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x))) 0 := by
+  sorry
+
+/-- Tensoring a continuous endomorphism with the identity is continuous for
+the inductive tensor topology. -/
+private theorem continuous_inductiveTensorMap_id {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] (L : A →L[ℂ] A) :
+    Continuous (inductiveTensorMap L.toLinearMap (LinearMap.id (M := B))) := by
+  let T := inductiveTensorMap L.toLinearMap (LinearMap.id (M := B))
+  let hS := withGeneratingSeminorms_spec (A ⊗[ℂ] B)
+    (fun p : {p : Seminorm ℂ (A ⊗[ℂ] B) //
+      (∀ f : A, Continuous (fun g : B ↦ p (f ⊗ₜ[ℂ] g))) ∧
+      (∀ g : B, Continuous (fun f : A ↦ p (f ⊗ₜ[ℂ] g)))} ↦ p.val)
+  refine hS.continuous_of_continuous_comp T fun p ↦ ?_
+  exact hS.continuous_seminorm
+    ⟨p.val.comp T, fun f ↦ p.property.1 (L f), fun g ↦ (p.property.2 g).comp L.continuous⟩
+
 /-- Paper: Lemma 2.2.4.2, p. 87. Formation of the directional derivative
 is continuous in the Schwartz–Bruhat topology. -/
-theorem adeleDirectionalDeriv_continuous : Continuous (adeleDirectionalDeriv γ) := by sorry
+theorem adeleDirectionalDeriv_continuous : Continuous (adeleDirectionalDeriv γ) := by
+  refine Exists.elim (adeleSchwartz_inductiveTensor_equiv F) fun e he ↦ ?_
+  refine Exists.elim (exists_archimedeanDirectionalDeriv γ) fun D hD ↦ ?_
+  let I := ContinuousLinearMap.id ℂ (SchwartzBruhat (Multiplicative 𝔸ᶠ[F]))
+  let T := inductiveTensorMap D.toLinearMap I.toLinearMap
+  have hleft : (adeleDirectionalDeriv γ).comp e.toLinearEquiv.toLinearMap =
+      e.toLinearEquiv.toLinearMap.comp T := by
+    apply TensorProduct.ext'
+    intro f g
+    apply Subtype.ext
+    funext y
+    let x := Multiplicative.toAdd y
+    have hOrbit (s : ℝ) :
+        e (f ⊗ₜ[ℂ] g)
+            (Multiplicative.ofAdd ((γ (expUnit s)).val * x)) =
+          f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1)) *
+            g (Multiplicative.ofAdd x.2) := by
+      have hfinite : ((γ (expUnit s)).val * x).2 = x.2 := by
+        change (γ (expUnit s)).val.2 * x.2 = x.2
+        rw [adeleOneParameter_finite_eq_one γ (expUnit s), one_mul]
+      exact (he f g _).trans (congrArg (fun z : 𝔸ᶠ[F] ↦
+        f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1)) *
+          g (Multiplicative.ofAdd z)) hfinite)
+    change deriv (fun s : ℝ ↦ e (f ⊗ₜ[ℂ] g)
+      (Multiplicative.ofAdd ((γ (expUnit s)).val * x))) 0 =
+        e (D f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x)
+    let u (s : ℝ) := f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1))
+    let v := g (Multiplicative.ofAdd x.2)
+    exact (congrArg (fun k : ℝ → ℂ ↦ deriv k 0) (funext hOrbit)).trans
+      ((deriv_mul_const_field (u := u) v).trans
+        ((congrArg (· * v) (hD f x.1).symm).trans (he (D f) g x).symm))
+  have hcont : Continuous T :=
+    continuous_inductiveTensorMap_id (B := SchwartzBruhat (Multiplicative 𝔸ᶠ[F])) D
+  refine (e.continuous.comp (hcont.comp e.symm.continuous)).congr fun f ↦ ?_
+  change e (T (e.symm f)) = adeleDirectionalDeriv γ f
+  have h := DFunLike.congr_fun hleft (e.symm f)
+  change adeleDirectionalDeriv γ (e (e.symm f)) = e (T (e.symm f)) at h
+  simpa only [e.apply_symm_apply] using h.symm
 
 /-- Paper: Lemma 2.2.4.2, p. 87. The difference quotient in the positive real
 parameter converges to the directional derivative at every adele. -/
 theorem adeleDirectionalDeriv_tendsto (f : ℬ[F]) (x : 𝔸[F]) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (f (Multiplicative.ofAdd ((γ t).val * x)) - f (Multiplicative.ofAdd x)) /
-        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) :=
-  by sorry
+        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) := by
+  have hOrbit := (adeleOrbit_differentiableAt γ f (Multiplicative.ofAdd x)).hasDerivAt
+  have hLog := hOrbit.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · have hc := NNReal.continuous_coe.comp (Units.continuous_val (M := ℝ≥0))
+      exact (hc.continuousAt (x := (1 : ℝ≥0ˣ))).continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (Eventually.of_forall fun t ↦ ?_)
+  have hExpLog : expUnit (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  have hZero : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  simp only [Function.comp_apply, slope_def_module, Real.log_one, hExpLog, hZero,
+    map_one, Units.val_one, one_mul, toAdd_ofAdd, Complex.real_smul, Complex.ofReal_inv,
+    Complex.ofReal_sub, Complex.ofReal_one, div_eq_inv_mul]
 
 -- TODO(paper-gap): The last sentence of the proof of Lemma 2.2.4.2 uses
 -- injectivity of γ∞. Lemma 2.2.4.1 only gives factorization through the infinite ideles.
 -- TODO(paper-gap): The proof of Lemma 2.2.4.3 cites “Lemma ??” for closedness
 -- of the section image and invokes the unrestricted bound from Lemma 2.2.2.1(3).
+
+/-- If a Schwartz–Bruhat function represents the pointwise logarithmic orbit derivative,
+its theta series gives the derivative of the original theta series. -/
+private theorem adelicTheta_tendsto_of_orbitDeriv (f d : ℬ[F])
+    (hd : ∀ x : Multiplicative 𝔸[F],
+      HasDerivAt (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val * x.toAdd))) (d x) 0)
+    (g : C[F]) :
+    Tendsto (fun t : ℝ≥0ˣ ↦
+      (adelicTheta f (classOf (γ t) * g) - adelicTheta f g) / ((valueℝ t : ℂ) - 1))
+      (𝓝[≠] 1) (𝓝 (adelicTheta d g)) := by
+  obtain ⟨a, rfl⟩ := QuotientGroup.mk_surjective g
+  let E : ℝ → ℝ≥0ˣ := expUnit
+  have hE : Continuous E :=
+    (Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous
+  have hZero : E 0 = 1 := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hAdd (s t : ℝ) : E (s + t) = E s * E t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_add s t))
+  let x (ξ : Fˣ) (s : ℝ) : 𝔸[F] := (γ (E s) * a).val * algebraMap F 𝔸[F] (ξ : F)
+  let term (φ : ℬ[F]) (ξ : Fˣ) (s : ℝ) := φ (Multiplicative.ofAdd (x ξ s))
+  have hDeriv (ξ : Fˣ) (s : ℝ) : HasDerivAt (term f ξ) (term d ξ s) s := by
+    have h : HasDerivAt
+        (fun t : ℝ ↦ f (Multiplicative.ofAdd ((γ (E t)).val * x ξ s)))
+        (term d ξ s) (s - s) := by
+      simpa only [sub_self, toAdd_ofAdd] using hd (Multiplicative.ofAdd (x ξ s))
+    refine (h.comp_sub_const s s).congr_of_eventuallyEq (Eventually.of_forall fun t ↦ ?_)
+    change f (Multiplicative.ofAdd (x ξ t)) =
+      f (Multiplicative.ofAdd ((γ (E (t - s))).val * x ξ s))
+    have hMul : γ (E t) = γ (E (t - s)) * γ (E s) := by
+      rw [← map_mul γ, ← hAdd, sub_add_cancel]
+    simp only [x, hMul, Units.val_mul, mul_assoc]
+  let p (s : ℝ) : 𝕀[F] × 𝔸[F] := (γ (E s) * a, 0)
+  have hp : Continuous p :=
+    ((γ.continuous.comp hE).mul continuous_const).prodMk continuous_const
+  let K := p '' Icc (-1 : ℝ) 1
+  have hK : IsCompact K := isCompact_Icc.image hp
+  have hAbs (φ : ℬ[F]) := adelicAverage_summableUniformlyOn φ K hK
+  have hUniform : TendstoUniformlyOn (fun S s ↦ ∑ ξ ∈ S, term d ξ s)
+      (fun s ↦ ∑' ξ, term d ξ s) atTop (Ioo (-1 : ℝ) 1) := by
+    refine Metric.tendstoUniformlyOn_iff.mpr fun ε hε ↦ ?_
+    filter_upwards [Metric.tendstoUniformlyOn_iff.mp
+      (hAbs d).hasSumUniformlyOn.tendstoUniformlyOn ε hε] with S hS s hs
+    have hmem : p s ∈ K := mem_image_of_mem p (Ioo_subset_Icc_self hs)
+    have hsum : Summable (fun ξ ↦ ‖term d ξ s‖) := by
+      simpa only [term, x, p, add_zero] using (hAbs d).summable hmem
+    have htail := hS (p s) hmem
+    simp only [p, add_zero] at htail
+    change dist (∑' ξ, ‖term d ξ s‖) (∑ ξ ∈ S, ‖term d ξ s‖) < ε at htail
+    rw [dist_eq_norm, ← hsum.sum_add_tsum_subtype_compl S, add_sub_cancel_left,
+      Real.norm_eq_abs, abs_of_nonneg (tsum_nonneg fun _ ↦ norm_nonneg _)] at htail
+    rw [dist_eq_norm, ← hsum.of_norm.sum_add_tsum_subtype_compl S, add_sub_cancel_left]
+    exact (norm_tsum_le_tsum_norm (hsum.subtype fun ξ ↦ ξ ∉ S)).trans_lt htail
+  have hSeries : HasDerivAt (fun s ↦ ∑' ξ, term f ξ s) (∑' ξ, term d ξ 0) 0 := by
+    refine hasDerivAt_of_tendstoUniformlyOn isOpen_Ioo hUniform
+      (Eventually.of_forall fun S s _ ↦ HasDerivAt.fun_sum fun ξ _ ↦ hDeriv ξ s) ?_ (by simp)
+    intro s hs
+    have hmem : p s ∈ K := mem_image_of_mem p (Ioo_subset_Icc_self hs)
+    have hsum : Summable (fun ξ ↦ ‖term f ξ s‖) := by
+      simpa only [term, x, p, add_zero] using (hAbs f).summable hmem
+    exact hsum.of_norm.hasSum
+  have hTheta (φ : ℬ[F]) (s : ℝ) :
+      (∑' ξ, term φ ξ s) = adelicTheta φ (classOf (γ (E s)) * classOf a) := by
+    rw [← QuotientGroup.mk_mul, adelicTheta_mk]
+    simp only [term, x, mul_comm]
+  have hThetaZero (φ : ℬ[F]) : (∑' ξ, term φ ξ 0) = adelicTheta φ (classOf a) := by
+    rw [hTheta, ← QuotientGroup.mk_mul, hZero, map_one, one_mul]
+  have hLog := hSeries.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul, hThetaZero] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · have hc := NNReal.continuous_coe.comp (Units.continuous_val (M := ℝ≥0))
+      exact (hc.continuousAt (x := (1 : ℝ≥0ˣ))).continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (Eventually.of_forall fun t ↦ ?_)
+  have hExpLog : E (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  rw [Function.comp_apply, slope_def_module, Function.comp_apply, Function.comp_apply,
+    Real.log_one, hThetaZero, hTheta, hExpLog]
+  simp only [Complex.real_smul, Complex.ofReal_inv, Complex.ofReal_sub, Complex.ofReal_one,
+    div_eq_inv_mul]
 
 /-- Paper: Lemma 2.2.4.3, p. 88. The difference quotient of theta along the
 projected one-parameter subgroup converges to theta of the directional derivative.
@@ -544,7 +703,9 @@ The limit is continuous since it is a global theta function. -/
 theorem adelicTheta_directionalDeriv (f : ℬ[F]) (g : C[F]) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (adelicTheta f (classOf (γ t) * g) - adelicTheta f g) / ((valueℝ t : ℂ) - 1))
-      (𝓝[≠] 1) (𝓝 (adelicTheta (adeleDirectionalDeriv γ f) g)) := by sorry
+      (𝓝[≠] 1) (𝓝 (adelicTheta (adeleDirectionalDeriv γ f) g)) := by
+  exact adelicTheta_tendsto_of_orbitDeriv γ f (adeleDirectionalDeriv γ f)
+    (fun x ↦ (adeleOrbit_differentiableAt γ f x).hasDerivAt) g
 
 end DirectionalDerivatives
 
@@ -553,7 +714,17 @@ section PolarHyperplanes
 /-- Paper: Definition 2.2.4.4, p. 91. The evaluations of a test function and
 its Fourier transform at zero are complex linear. -/
 theorem adelePolarValues_isLinear :
-    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by sorry
+    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by
+  constructor
+  · intro f g
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_add (adeleSchwartzFourier_apply_zero f).1
+      (adeleSchwartzFourier_apply_zero g).1
+  · intro c f
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_smul c (fun x ↦ f (Multiplicative.ofAdd x))
 
 /-- Paper: Definition 2.2.4.4, p. 91. The two polar functionals are the
 coordinates of the map that evaluates a test function and its transform at zero. -/

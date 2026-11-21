@@ -3637,6 +3637,69 @@ theorem dense_finiteRank_iff_forall_targets :
         DenseRange (tensorToFiniteRank (E := E) (F := F) :
           StrongDual ℂ E ⊗[ℂ] F → PrecompactConvergenceCLM E F) := by sorry
 
+/-- Applying the pulled-back tensor of finite-rank maps precomposes the operator: for a
+differential `b` of the source, `λ(Σ φᵢ ⊗ yᵢ) ∘ b = λ(Σ (φᵢ ∘ b) ⊗ yᵢ)`. -/
+private theorem tensorToFiniteRank_precomp_apply {S T U : Type*} [AddCommGroup S] [Module ℂ S]
+    [TopologicalSpace S]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T] [PolynormableSpace ℂ T]
+    [IsTopologicalAddGroup T] [AddCommGroup U] [Module ℂ U]
+    [TopologicalSpace U] (b : U →L[ℂ] S) (z : StrongDual ℂ S ⊗[ℂ] T) (x : U) :
+    tensorToFiniteRank (E := U) (F := T)
+        (TensorProduct.map
+          { toFun := fun ψ : StrongDual ℂ S => ψ.comp b
+            map_add' := fun ψ χ => by ext y; simp
+            map_smul' := fun c ψ => by ext y; simp }
+          (LinearMap.id : T →ₗ[ℂ] T) z) x
+      = tensorToFiniteRank (E := S) (F := T) z (b x) := by
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+      rw [TensorProduct.map_tmul, tensorToFiniteRank_tmul, tensorToFiniteRank_tmul]
+      rfl
+  | add z w hz hw =>
+      simp only [map_add, add_apply, hz, hw]
+
+/-- An operator lies in the closure of the finite-rank operators for the bounded convergence
+(i.e., as elaborated, precompact convergence) topology iff it can be approximated uniformly on
+each bounded set by such an operator. -/
+private theorem mem_closure_finiteRank_iff {F : Type*} [AddCommGroup F] [Module ℂ F] [UniformSpace F]
+    (T : F →L[ℂ] E) :
+    (T : PrecompactConvergenceCLM F E) ∈ closure (range (tensorToFiniteRank (E := F) (F := E) :
+      StrongDual ℂ F ⊗[ℂ] E → PrecompactConvergenceCLM F E)) ↔
+      ∀ B : Set F, IsVonNBounded ℂ B → ∀ V ∈ 𝓝 (0 : E),
+        ∃ z : StrongDual ℂ F ⊗[ℂ] E,
+          ∀ x ∈ B, tensorToFiniteRank (E := F) (F := E) z x - T x ∈ V := by
+  have hpc := ContinuousLinearMap.hasBasis_nhds_zero (σ := (RingHom.id ℂ)) (E := F) (F := E)
+  have hT : (𝓝 (T : F →L[ℂ] E)).HasBasis
+      (fun BV : Set F × Set E ↦ IsVonNBounded ℂ BV.1 ∧ BV.2 ∈ 𝓝 (0 : E))
+      (fun BV ↦ {g : F →L[ℂ] E | ∀ x ∈ BV.1, g x - T x ∈ BV.2}) := by
+    have htr : 𝓝 (T : F →L[ℂ] E) = comap (fun g : F →L[ℂ] E ↦ g + -T) (𝓝 0) :=
+      (nhds_translation_add_neg T).symm
+    have hpt (g : F →L[ℂ] E) (x : F) : (g + -T) x = g x - T x := by simp [sub_eq_add_neg]
+    have hset (BV : Set F × Set E) :
+        (fun g : F →L[ℂ] E ↦ g + -T) ⁻¹' {g : F →L[ℂ] E | ∀ x ∈ BV.1, g x ∈ BV.2}
+          = {g : F →L[ℂ] E | ∀ x ∈ BV.1, g x - T x ∈ BV.2} := by
+      ext g
+      constructor
+      · intro h x hx
+        rw [← hpt]
+        exact h x hx
+      · intro h x hx
+        rw [hpt]
+        exact h x hx
+    rw [htr]
+    exact (hpc.comap fun g : F →L[ℂ] E ↦ g + -T).to_hasBasis
+      (fun BV h ↦ ⟨BV, h, by rw [hset BV]⟩) (fun BV h ↦ ⟨BV, h, by rw [hset BV]⟩)
+  constructor
+  · intro hmem B hB V hV
+    obtain ⟨w, hw, hw'⟩ := (mem_closure_iff_nhds_basis hT).mp hmem (B, V) ⟨hB, hV⟩
+    obtain ⟨z, rfl⟩ := hw
+    exact ⟨z, hw'⟩
+  · intro h
+    refine (mem_closure_iff_nhds_basis hT).mpr ?_
+    rintro ⟨B, V⟩ ⟨hB, hV⟩
+    obtain ⟨z, hz⟩ := h B hB V hV
+    exact ⟨(tensorToFiniteRank (E := F) (F := E) z : PrecompactConvergenceCLM F E), ⟨z, rfl⟩, hz⟩
+
 /-- Paper: Lemma C.2.4.15(2), (4), pp. 689–690. Density of finite-rank maps for
 the precompact convergence topology on endomorphisms is equivalent to the corresponding
 density for all sources. -/
@@ -3646,7 +3709,80 @@ theorem dense_finiteRank_iff_forall_sources :
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : UniformSpace F)
         (_ : IsUniformAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
         DenseRange (tensorToFiniteRank (E := F) (F := E) :
-          StrongDual ℂ F ⊗[ℂ] E → PrecompactConvergenceCLM F E) := by sorry
+          StrongDual ℂ F ⊗[ℂ] E → PrecompactConvergenceCLM F E) := by
+  constructor
+  · -- (2) ⟹ (4): precompose the finite-rank approximants with the source operator.
+    intro hdense F _ _ _ _ _ _
+    refine (denseRange_iff_closure_range.mpr (eq_univ_of_forall fun T ↦ ?_))
+    refine (mem_closure_finiteRank_iff E T).mpr fun B hB V hV ↦ ?_
+    obtain ⟨z, hz⟩ :=
+      (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mp
+        ((id_mem_closure_finiteRank_iff_dense (E := E)).mpr hdense) (T '' B)
+        (hB.image (T : F →L[ℂ] E)) V hV
+    exact ⟨TensorProduct.map
+      { toFun := fun ψ : StrongDual ℂ E => ψ.comp (T : F →L[ℂ] E)
+        map_add' := fun ψ χ => by ext y; simp
+        map_smul' := fun c ψ => by ext y; simp }
+      (LinearMap.id : E →ₗ[ℂ] E) z, fun x hx ↦ by
+      rw [tensorToFiniteRank_precomp_apply]
+      exact hz (T x) (mem_image_of_mem (T : F →L[ℂ] E) hx)⟩
+  · -- (4) ⟹ (2): apply the hypothesis to the universe-raised copy of `E`.
+    intro hforall
+    refine (id_mem_closure_finiteRank_iff_dense (E := E)).mp ?_
+    refine (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mpr fun B hB V hV ↦ ?_
+    classical
+    let G := ULift.{max u v, u} E
+    letI hGadd : AddCommGroup G := ULift.addCommGroup
+    letI hGmod : Module ℂ G := ULift.module'
+    letI hGunif : UniformSpace G := UniformSpace.comap (fun g : G ↦ ULift.down g) ‹UniformSpace E›
+    have hdownui : IsUniformInducing (fun g : G ↦ ULift.down g) :=
+      (isUniformEmbedding_comap (f := fun g : G ↦ ULift.down g)
+        (fun a b (h : ULift.down a = ULift.down b) => by
+          cases a with
+          | up a' =>
+          cases b with
+          | up b' =>
+          exact congrArg ULift.up h)).isUniformInducing
+    have hdowncont : Continuous (fun g : G ↦ ULift.down g) :=
+      hdownui.uniformContinuous.continuous
+    have hupcont : Continuous (fun x : E ↦ (⟨x⟩ : G)) :=
+      (uniformContinuous_comap' (f := fun g : G ↦ ULift.down g)
+        (g := fun x : E ↦ (⟨x⟩ : G))
+        (by rw [show ((fun g : G ↦ ULift.down g) ∘ fun x : E ↦ (⟨x⟩ : G)) = id from rfl]
+            exact uniformContinuous_id)).continuous
+    have hdownind : IsInducing (fun g : G ↦ ULift.down g) := hdownui.isInducing
+    letI hGuadd : IsUniformAddGroup G :=
+      IsUniformAddGroup.comap
+        (f := (⟨⟨fun g : G ↦ ULift.down g, rfl⟩, fun _ _ ↦ rfl⟩ : G →+ E))
+    have hGT2 : T2Space G := by
+      have hemb : IsEmbedding (fun g : G ↦ ULift.down g) :=
+        ⟨hdownind, fun a b (h : ULift.down a = ULift.down b) => by
+          cases a with
+          | up a' =>
+          cases b with
+          | up b' =>
+          exact congrArg ULift.up h⟩
+      exact hemb.t2Space
+    have hGpolyn : PolynormableSpace ℂ G :=
+      hdownind.polynormableSpace (f := (ULift.moduleEquiv (R := ℂ) (M := E)).toLinearMap)
+    let downCLM : G →L[ℂ] E :=
+      ⟨(ULift.moduleEquiv (R := ℂ) (M := E)).toLinearMap, hdowncont⟩
+    let hupCLM : E →L[ℂ] G := ⟨(ULift.moduleEquiv (R := ℂ) (M := E)).symm.toLinearMap, hupcont⟩
+    have hGdense := hforall G hGadd hGmod hGunif hGuadd hGpolyn hGT2
+    rw [denseRange_iff_closure_range] at hGdense
+    have hdmem : (downCLM : PrecompactConvergenceCLM G E) ∈
+        closure (range (tensorToFiniteRank (E := G) (F := E) :
+          StrongDual ℂ G ⊗[ℂ] E → PrecompactConvergenceCLM G E)) := by
+      rw [hGdense]; exact mem_univ _
+    obtain ⟨zG, hzG⟩ :=
+      (mem_closure_finiteRank_iff E downCLM).mp hdmem (hupCLM '' B) (hB.image hupCLM) V hV
+    exact ⟨TensorProduct.map
+      { toFun := fun ψ : StrongDual ℂ G => ψ.comp hupCLM
+        map_add' := fun ψ χ => by ext y; simp
+        map_smul' := fun c ψ => by ext y; simp }
+      (LinearMap.id : E →ₗ[ℂ] E) zG, fun x hx ↦ by
+      rw [tensorToFiniteRank_precomp_apply]
+      exact hzG (hupCLM x) (mem_image_of_mem hupCLM hx)⟩
 
 /-- Paper: Lemma C.2.4.16(1), p. 690. A bounded set in a nuclear space has
 compact closure in the completion. -/

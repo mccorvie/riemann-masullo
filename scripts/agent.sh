@@ -221,11 +221,11 @@ if [ $mode = all ]; then
       [ -n "$model" ] && args+=(-m "$model")
       [ -n "$effort" ] && args+=(-c "model_reasoning_effort=\"$effort\"")
       [ "$role" = scout ] && args+=(-c sandbox_workspace_write.network_access=true)
-      codex "${args[@]}" "$prompt" >"$wt/.agent/log.txt" 2>&1 ;;
+      codex "${args[@]}" "$prompt" </dev/null >"$wt/.agent/log.txt" 2>&1 ;;
     claude)
       args=(-p "$prompt" --permission-mode auto)
       [ -n "$model" ] && args+=(--model "$model")
-      claude "${args[@]}" --allowedTools Bash Read Edit Write Grep Glob WebSearch WebFetch >"$wt/.agent/log.txt" 2>&1 ;;
+      claude "${args[@]}" --allowedTools Bash Read Edit Write Grep Glob WebSearch WebFetch </dev/null >"$wt/.agent/log.txt" 2>&1 ;;
     *) echo "unknown cli $cli" >&2; exit 2 ;;
   esac
   echo "agent exited with status $?"

@@ -11,14 +11,24 @@ import RiemannMasullo.ForMathlib.Analysis.Complex.VerticalCauchyIntegral
 public import Mathlib.Analysis.MellinTransform
 import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
+import Mathlib.Analysis.InnerProductSpace.Calculus
+import Mathlib.Analysis.InnerProductSpace.Continuous
 import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
+import Mathlib.Analysis.PSeries
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Grid
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.CompactInterpolation
 import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
+import RiemannMasullo.AppC_LCTVS.Sec2a
 import RiemannMasullo.Ch02_AdelicTheta.Sec1
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 
 /-!
 # Schwartz–Bergman spaces and Schwartz–Bruhat functions with exponential decay
@@ -992,14 +1002,465 @@ theorem positiveRealExponentialDecay_strongDual_complete (hInt : OrdConnected I)
   obtain ⟨_, _, hmetric, _⟩ := positiveRealExponentialDecay_frechet I hInt hne
   infer_instance
 
+section StrongDualNuclearity
+
+/-! We use the local Banach integral criterion directly. For a bounded set of profiles, its
+closure is compact by the Montel property. Interpolating jets on a grid gives rank O(n³)
+approximations on this compact set. The sixth-power rescaled errors form another bounded set,
+so passing to a stronger seminorm on the dual makes the transposed errors O(n⁻⁶) in operator
+norm. The rank-weighted norms of the successive differences are therefore summable. -/
+
+open Module
+
+open scoped Pointwise in
+/-- A finite-rank map into a space of dimension d costs at most d times its
+operator norm in the injective-tensor bound for its evaluation form. -/
+private theorem finite_rank_evaluation_bound {X Y : Type*} [NormedAddCommGroup X]
+    [NormedSpace ℂ X] [NormedAddCommGroup Y] [NormedSpace ℂ Y] (T : X →L[ℂ] Y)
+    (V : Submodule ℂ Y) [FiniteDimensional ℂ V] (hV : ∀ x, T x ∈ V)
+    (L : X ⊗[ℂ] StrongDual ℂ Y →ₗ[ℂ] ℂ) (hL : ∀ x φ, L (x ⊗ₜ[ℂ] φ) = φ (T x))
+    (z : X ⊗[ℂ] StrongDual ℂ Y) : ‖L z‖ ≤ finrank ℂ V * ‖T‖ * injectiveTensorNorm _ _ z := by
+  classical
+  let S := Metric.closedBall (0 : V) 1
+  have hS : S ∈ 𝓝 0 := Metric.closedBall_mem_nhds 0 one_pos
+  have hspan : Submodule.span ℂ S = ⊤ := by
+    refine top_unique fun x _ ↦ ?_
+    obtain ⟨c, hc⟩ : ∃ c : ℂ, x ∈ c • S := by
+      simpa using (absorbent_nhds_zero (𝕜 := ℂ) hS x).exists
+    obtain ⟨y, hy, rfl⟩ := hc
+    exact Submodule.smul_mem _ _ (Submodule.subset_span hy)
+  obtain ⟨b, hb, hc⟩ := exists_basis_compact_coord_le (isCompact_closedBall (0 : V) 1) hspan
+  let φ (i) := (b.coord i).toContinuousLinearMap.comp (T.codRestrict V hV)
+  have hφ (i) : ‖φ i‖ ≤ ‖T‖ := by
+    have hcoord : ‖(b.coord i).toContinuousLinearMap‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_of_unit_norm zero_le_one (fun x hx ↦ hc i x
+        (mem_closedBall_zero_iff.mpr hx.le))
+    apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg _)
+    intro x
+    exact ((b.coord i).toContinuousLinearMap.le_opNorm _).trans
+      ((mul_le_of_le_one_left (norm_nonneg _) hcoord).trans (T.le_opNorm x))
+  have hb' (i) : ‖(b i : Y)‖ ≤ 1 := mem_closedBall_zero_iff.mp (hb i)
+  have heq (w : X ⊗[ℂ] StrongDual ℂ Y) : L w = ∑ i, tensorDualOperator w (φ i) (b i) := by
+    induction w using TensorProduct.inductionOn with
+    | tmul x ψ =>
+      rw [hL]
+      have hh := congrArg (fun v : V ↦ ψ v.val) (b.sum_repr ((T.codRestrict V hV) x))
+      change ψ (↑(∑ i, _ • b i) : Y) = ψ (T x) at hh
+      simp only [Submodule.coe_sum, Submodule.coe_smul_of_tower, map_sum, map_smul, smul_eq_mul] at hh
+      simpa [φ, tensorDualOperator_tmul, Basis.coord_apply] using hh.symm
+    | add u v hu hv => simp [hu, hv, Finset.sum_add_distrib]
+  obtain ⟨A, hA, hε⟩ := injectiveTensorNorm_eq_opNorm z
+  rw [heq, hε]
+  apply (norm_sum_le _ _).trans
+  apply le_trans (Finset.sum_le_sum (g := fun _ ↦ ‖A‖ * ‖T‖) ?_) (by simp; ring_nf; rfl)
+  intro i _
+  change ‖(tensorDualOperator z (φ i)) (b i)‖ ≤ _
+  rw [← hA]
+  exact ((A (φ i)).unit_le_opNorm _ (hb' i)).trans ((A.le_opNorm _).trans
+    (mul_le_mul_of_nonneg_left (hφ i) (norm_nonneg _)))
+
+/-- Norm-convergent finite-rank approximations with summable rank-weighted
+increments give an integral evaluation form. -/
+private theorem integral_evaluation_of_approximants {X Y : Type*} [NormedAddCommGroup X]
+    [NormedSpace ℂ X] [NormedAddCommGroup Y] [NormedSpace ℂ Y] (T : X →L[ℂ] Y)
+    (S : ℕ → X →L[ℂ] Y) (h0 : S 0 = 0) (hT : Tendsto S atTop (𝓝 T))
+    (V : ℕ → Submodule ℂ Y) [∀ n, FiniteDimensional ℂ (V n)]
+    (hV : ∀ n x, (S (n+1) - S n) x ∈ V n)
+    (hs : Summable fun n ↦ (finrank ℂ (V n) : ℝ) * ‖S (n+1) - S n‖) :
+    IsIntegralBilinearForm (fun x (φ : StrongDual ℂ Y) ↦ φ (T x)) := by
+  let F := StrongDual ℂ Y
+  let L (A : X →L[ℂ] Y) : X ⊗[ℂ] F →ₗ[ℂ] ℂ := TensorProduct.lift
+    (LinearMap.mk₂ ℂ (fun x (φ : F) ↦ φ (A x))
+      (by intros; simp) (by intros; simp) (by intros; rfl) (by intros; rfl))
+  have hsub (A B : X →L[ℂ] Y) : L (A - B) = L A - L B := by ext x φ; simp [L]
+  have hzero : L 0 = 0 := by ext x φ; simp [L]
+  have hc (z : X ⊗[ℂ] F) : Continuous (fun A ↦ L A z) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x φ => exact φ.continuous.comp (ContinuousLinearMap.apply ℂ Y x).continuous
+    | add z w hz hw => simp only [map_add]; exact hz.add hw
+  let ε := injectiveTensorNorm X F
+  let t (n : ℕ) : ℝ := (finrank ℂ (V n) : ℝ) * ‖S (n + 1) - S n‖
+  let C : ℝ≥0 := ⟨∑' n, t n, tsum_nonneg (fun n ↦ by dsimp only [t]; positivity)⟩
+  have hbound (z : X ⊗[ℂ] F) : ‖L T z‖ ≤ C * ε z := by
+    apply le_of_tendsto (((hc z).tendsto T).comp hT).norm
+    apply Eventually.of_forall
+    intro n
+    have heq := Finset.sum_range_sub (fun k ↦ L (S k) z) n
+    rw [h0, hzero, LinearMap.zero_apply, sub_zero] at heq
+    change ‖L (S n) z‖ ≤ _
+    rw [← heq]
+    apply (norm_sum_le _ _).trans
+    calc
+      _ ≤ ∑ k ∈ Finset.range n, t k * ε z := by
+        apply Finset.sum_le_sum
+        intro k _
+        have hh := finite_rank_evaluation_bound _ (V k) (hV k) (L (S (k+1) - S k))
+          (fun _ _ ↦ rfl) z
+        rwa [hsub, LinearMap.sub_apply] at hh
+      _ = (∑ k ∈ Finset.range n, t k) * ε z := Finset.sum_mul .. |>.symm
+      _ ≤ _ := mul_le_mul_of_nonneg_right (hs.sum_le_tsum _ (fun k _ ↦ by dsimp [t]; positivity))
+        (apply_nonneg _ _)
+  let : PolynormableSpace ℂ X := (norm_withSeminorms ℂ X).toPolynormableSpace
+  let : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+  let hI := withGeneratingSeminorms_spec (X ⊗[ℂ] F)
+    (fun UV : {U : Set X // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  have hε : Continuous (show InjectiveTensor X F → ℝ from ε) := hI.continuous_seminorm
+    (⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩,
+     ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩)
+  let L' : InjectiveTensor X F →ₗ[ℂ] ℂ := L T
+  have hL : Continuous L' := (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L' fun _ ↦
+    Seminorm.continuous_of_le (q := C • ε) (hε.const_smul C) hbound
+  exact ⟨⟨L', hL⟩, fun _ _ ↦ rfl⟩
+
+/-- Cubic rank growth and sixth-order error decay suffice for summability of the
+rank-weighted increments. -/
+private theorem integral_evaluation_of_cubic_approximation {X Y : Type*} [NormedAddCommGroup X]
+    [NormedSpace ℂ X] [NormedAddCommGroup Y] [NormedSpace ℂ Y] (T : X →L[ℂ] Y)
+    (S : ℕ → X →L[ℂ] Y) (V : ℕ → Submodule ℂ Y) [∀ n, FiniteDimensional ℂ (V n)]
+    (hV : ∀ n x, S n x ∈ V n) (hd : ∀ n, finrank ℂ (V n) ≤ (2*n^2+1)*n)
+    (K : ℝ) (hK : 0 ≤ K) (herr : ∀ n, ‖T - S n‖ ≤ K / ((n : ℝ) + 1)^6) :
+    IsIntegralBilinearForm (fun x (φ : StrongDual ℂ Y) ↦ φ (T x)) := by
+  let W (n : ℕ) := V (n+1) ⊔ V n
+  have : ∀ n, FiniteDimensional ℂ (W n) := fun n ↦ (V (n+1)).finiteDimensional_sup _
+  apply integral_evaluation_of_approximants T S _ _ W
+  · intro n x
+    exact Submodule.sub_mem _ (Submodule.mem_sup_left (hV (n+1) x))
+      (Submodule.mem_sup_right (hV n x))
+  · have hs : Summable (fun n : ℕ ↦ (((n : ℝ) + 1)^3)⁻¹) := by
+      simpa only [Function.comp_def, Nat.cast_succ] using
+        (Real.summable_nat_pow_inv.mpr (by decide : 1 < 3)).comp_injective Nat.succ_injective
+    apply (hs.mul_left (12*K)).of_nonneg_of_le (fun _ ↦ by positivity)
+    intro n
+    let a : ℝ := n + 1
+    have ha : (1 : ℝ) ≤ a := by dsimp [a]; linarith [Nat.cast_nonneg (α := ℝ) n]
+    have ha₀ : 0 < a := by linarith
+    have hdim : (finrank ℂ (W n) : ℝ) ≤ 6 * a^3 := by
+      have h₁ := ((V (n+1)).finrank_add_le_finrank_add_finrank (V n)).trans
+        (add_le_add (hd (n+1)) (hd n))
+      have h₂ : (finrank ℂ (W n) : ℝ) ≤ (2*a^2+1)*a + (2*(n:ℝ)^2+1)*n := by dsimp only [W, a]; exact_mod_cast h₁
+      have hn : (n : ℝ) ≤ a := by dsimp [a]; linarith
+      have h₃ : (2*(n:ℝ)^2+1)*n ≤ (2*a^2+1)*a := by gcongr
+      have h₄ : a ≤ a^3 := by simpa using pow_le_pow_right₀ ha (show 1 ≤ 3 by decide)
+      linarith
+    have hnorm : ‖S (n+1) - S n‖ ≤ 2 * (K / a^6) := by
+      have hn₁ : K / (((n+1 : ℕ) : ℝ) + 1)^6 ≤ K / a^6 := by
+        gcongr; dsimp [a]; push_cast; linarith
+      calc
+        _ ≤ ‖S (n+1) - T‖ + ‖T - S n‖ := by
+          simpa only [← dist_eq_norm] using dist_triangle (S (n+1)) T (S n)
+        _ ≤ K / a^6 + K / a^6 := add_le_add
+          ((norm_sub_rev ..).trans_le ((herr (n+1)).trans hn₁)) (herr n)
+        _ = _ := (two_mul _).symm
+    calc
+      _ ≤ (6*a^3) * (2 * (K / a^6)) := mul_le_mul hdim hnorm (norm_nonneg _) (by positivity)
+      _ = _ := by change _ = (12*K) * (a^3)⁻¹; field_simp; ring
+  · have hz : finrank ℂ (V 0) = 0 := Nat.eq_zero_of_le_zero (by simpa using hd 0)
+    have hbot := Submodule.finrank_eq_zero.mp hz
+    ext x
+    exact (show S 0 x ∈ (⊥ : Submodule ℂ Y) from hbot ▸ hV 0 x)
+  · rw [tendsto_iff_norm_sub_tendsto_zero]
+    have h := (tendsto_one_div_add_atTop_nhds_zero_nat (𝕜 := ℝ)).pow 6
+    have h' := h.const_mul K
+    simp only [zero_pow (by decide : 6 ≠ 0), mul_zero, one_div, inv_pow] at h'
+    apply squeeze_zero (fun _ ↦ norm_nonneg _) _ h'
+    intro n
+    rw [norm_sub_rev]
+    simpa [div_eq_mul_inv] using herr n
+
+/-- Transposing finite interpolation on a test set approximates the local
+Banach comparison of the strong dual in operator norm. -/
+private theorem dual_local_integral_of_interpolation {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] (p q : Seminorm ℂ (StrongDual ℂ X)) (hqp : q ≤ p)
+    {B : Set X} (K : ℝ) (hK : 0 ≤ K) (hq : ∀ (f : StrongDual ℂ X) (r : ℝ), 0 ≤ r →
+      (∀ x ∈ B, ‖f x‖ ≤ r) → q f ≤ K * r)
+    (d : ℕ → ℕ) (b : ∀ n, Fin (d n) → B) (c : ∀ n, Fin (d n) → StrongDual ℂ X)
+    (hd : ∀ n, d n ≤ (2*n^2+1)*n) (hb : ∀ (f : StrongDual ℂ X) (x : B), ‖f x‖ ≤ p f)
+    (hr : ∀ (f : StrongDual ℂ X) (n : ℕ) (x : B),
+      ‖f (x.val - ∑ i, c n i x.val • (b n i).val)‖ ≤ p f / ((n : ℝ) + 1)^6) :
+    IsIntegralBilinearForm (fun (v : LocalBanach p) (φ : StrongDual ℂ (LocalBanach q)) ↦
+      φ (localBanachMap p q hqp v)) := by
+  classical
+  let j : StrongDual ℂ X →ₗ[ℂ] LocalBanach q := Completion.toComplL.toLinearMap.comp
+    (show StrongDual ℂ X →ₗ[ℂ] WithLocalSeminorm q from LinearMap.id)
+  let u (x : B) : WithLocalSeminorm p →L[ℂ] ℂ :=
+    (show WithLocalSeminorm p →ₗ[ℂ] ℂ from (ContinuousLinearMap.coeLM ℂ).flip x.val).mkContinuous
+      1 (fun f ↦ by rw [one_mul]; exact hb f x)
+  let S (n : ℕ) : LocalBanach p →L[ℂ] LocalBanach q :=
+    ∑ i, (u (b n i)).fromCompletion.smulRight (j (c n i))
+  let V (n : ℕ) := Submodule.span ℂ (range fun i ↦ j (c n i))
+  have : ∀ n, FiniteDimensional ℂ (V n) := fun n ↦ FiniteDimensional.span_of_finite ℂ (finite_range _)
+  refine integral_evaluation_of_cubic_approximation _ S V ?_ ?_ K hK ?_
+  · intro n x
+    rw [show S n x = ∑ i, (u (b n i)).fromCompletion x • j (c n i) by simp [S]]
+    exact Submodule.sum_mem _ fun i _ ↦ Submodule.smul_mem _ _
+      (Submodule.subset_span (mem_range_self i))
+  · intro n
+    exact (finrank_range_le_card (R := ℂ) (fun i ↦ j (c n i))).trans (by simpa using hd n)
+  · intro n
+    apply ContinuousLinearMap.opNorm_le_bound _ (by positivity)
+    intro x
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+    | ih x =>
+      let f : StrongDual ℂ X := x
+      let g : StrongDual ℂ X := f - ∑ i, f (b n i) • c n i
+      have heq : (localBanachMap p q hqp - S n) (x : LocalBanach p) = j g := by
+        rw [sub_apply, localBanachMap_coe]
+        change j f - S n (x : LocalBanach p) = j (f - ∑ i, f (b n i) • c n i)
+        simp only [map_sub, map_sum, map_smul, S, sum_apply,
+          ContinuousLinearMap.smulRight_apply, ContinuousLinearMap.fromCompletion_apply_coe]
+        rfl
+      have hg : q g ≤ K * (p f / ((n : ℝ) + 1)^6) := by
+        apply hq _ _ (div_nonneg (apply_nonneg _ _) (by positivity))
+        intro y hy
+        have hh := hr f n ⟨y, hy⟩
+        simpa [g, sum_apply, smul_eq_mul, mul_comm] using hh
+      rw [heq, show ‖j g‖ = q g from localBanach_norm_coe q g, localBanach_norm_coe]
+      exact hg.trans_eq (by ring)
+
+/-- Changing exponential weight preserves the vanishing of a jet. -/
+private theorem decay_twist_jet_zero {I : Set ℝ} (a b : I) (f : PositiveRealExponentialDecay I)
+    (y : ℝ) (j : ℕ) (h : ∀ m ≤ j, iteratedDeriv m (logExponentialDecayTwist I a f) y = 0) :
+    iteratedDeriv j (logExponentialDecayTwist I b f) y = 0 := by
+  let w (x : ℝ) := Real.exp (((b : ℝ) - a) * x)
+  have hw : ContDiff ℝ j w := by dsimp [w]; fun_prop
+  have he : ⇑(logExponentialDecayTwist I b f) = w • ⇑(logExponentialDecayTwist I a f) := by
+    funext x
+    change _ = w x • logExponentialDecayTwist I a f x
+    rw [Complex.real_smul, logExponentialDecayTwist_apply I b f, logExponentialDecayTwist_apply I a f,
+      ← mul_assoc, ← Complex.ofReal_mul]
+    simp only [w, ← Real.exp_add, sub_mul, sub_add_cancel]
+  have hh := iteratedDerivWithin_smul (mem_univ y) uniqueDiffOn_univ hw.contDiffAt.contDiffWithinAt
+    ((logExponentialDecayTwist I a f).smooth j).contDiffAt.contDiffWithinAt
+  simp only [iteratedDerivWithin_univ] at hh
+  rw [he, hh]
+  exact Finset.sum_eq_zero fun i _ ↦ by rw [h _ (Nat.sub_le ..)]; simp
+
+/-- Each jet observation is a continuous linear functional of the profile. -/
+private theorem exists_decay_jet {I : Set ℝ} (a : I) (y : ℝ) (j : ℕ) :
+    ∃ u : StrongDual ℂ (PositiveRealExponentialDecay I),
+      ∀ f, u f = iteratedDeriv j (logExponentialDecayTwist I a f) y := by
+  let T : PositiveRealExponentialDecay I →L[ℂ] 𝓢(ℝ, ℂ) := ⟨logExponentialDecayTwist I a,
+    (continuous_apply a).comp (positiveRealExponentialDecay_isEmbedding I ⟨a, a.property⟩).continuous⟩
+  suffices H : ∃ u : StrongDual ℂ 𝓢(ℝ, ℂ), ∀ g, u g = iteratedDeriv j g y by
+    obtain ⟨u, hu⟩ := H
+    exact ⟨u.comp T, fun f ↦ hu (T f)⟩
+  induction j with
+  | zero => exact ⟨(BoundedContinuousFunction.evalCLM ℂ y).comp
+      (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ), fun _ ↦ rfl⟩
+  | succ j ih =>
+    obtain ⟨u, hu⟩ := ih
+    exact ⟨u.comp (SchwartzMap.derivCLM ℂ ℂ), fun g ↦ (hu _).trans (by rw [iteratedDeriv_succ']; rfl)⟩
+
+/-- On a compact set of profiles, interpolating its observed jets gives finite-rank
+operators of cubic rank whose errors, multiplied by the sixth power of the stage,
+still range over a bounded set. -/
+private theorem decay_compact_approximants {I : Set ℝ} (a : I)
+    {B : Set (PositiveRealExponentialDecay I)} (hB : IsCompact B) :
+    ∃ (d : ℕ → ℕ) (b : ∀ n, Fin (d n) → B) (c : ∀ n, Fin (d n) → StrongDual ℂ
+      (PositiveRealExponentialDecay I)),
+      (∀ n, d n ≤ (2 * n ^ 2 + 1) * n) ∧
+      IsVonNBounded ℂ (range fun z : ℕ × B ↦ (((z.1 : ℂ) + 1) ^ 6) •
+        (z.2.val - ∑ i, c z.1 i z.2.val • (b z.1 i).val)) := by
+  classical
+  let X := PositiveRealExponentialDecay I
+  let idx (n : ℕ) := Fin (2 * n ^ 2 + 1) × Fin n
+  choose u hu using exists_decay_jet a
+  let J (n : ℕ) : X →L[ℂ] (idx n → ℂ) := ContinuousLinearMap.pi
+    fun i ↦ u ((i.1.val : ℝ) / n - n) i.2.val
+  choose d b v hd hv hj using fun n ↦ exists_compact_interpolant hB (J n)
+  let c (n : ℕ) (i : Fin (d n)) := (v n i).comp (J n)
+  have hrank (n : ℕ) : d n ≤ (2 * n ^ 2 + 1) * n := by
+    simpa [idx, finrank_pi] using hd n
+  refine ⟨d, b, c, hrank, ?_⟩
+  let R (n : ℕ) (f : X) : X := f - ∑ i, c n i f • (b n i).val
+  have hjR (n : ℕ) (f : B) : J n (R n f.val) = 0 := by
+    simp only [R, map_sub, map_sum, map_smul, sub_eq_zero]
+    exact (hj n f f.property).symm
+  let p (i : I × ℕ × ℕ) : Seminorm ℂ X := (SchwartzMap.seminorm ℂ i.2.1 i.2.2).comp
+    (logExponentialDecayTwist I i.1)
+  have hp : WithSeminorms («E» := X) p := withGeneratingSeminorms_spec (logExponentialDecaySubmodule I) _
+  have hBb : IsVonNBounded ℂ B := hB.isVonNBounded (𝕜 := ℂ)
+  choose M hm hM using hp.isVonNBounded_iff_seminorm_bounded.mp hBb
+  have hrough (s : I × ℕ × ℕ) (n : ℕ) (f : B) :
+      p s (R n f.val) ≤ (1 + (d n : ℝ)) * M s := by
+    apply (map_sub_le_add (p s) _ _).trans
+    rw [add_mul, one_mul]
+    apply add_le_add (hM s f f.property).le
+    apply (Finset.le_sum_of_subadditive (p s) (map_zero _).le (map_add_le_add _) _ _).trans
+    apply le_trans (Finset.sum_le_sum (g := fun _ ↦ M s) ?_) (by simp)
+    intro i _
+    rw [map_smul_eq_mul]
+    exact (mul_le_of_le_one_left (apply_nonneg _ _) (hv n i f f.property)).trans
+      (hM s _ (b n i).property).le
+  apply hp.isVonNBounded_iff_seminorm_bounded.mpr
+  rintro ⟨w, k, l⟩
+  let L := l + (9 + k) + 1
+  let A := M (w, 0, l + (9 + k)) + M (w, 9 + k, l)
+  let C := ((L : ℝ) + 1) ^ 6 * ((1 + ((2 * (L : ℝ) ^ 2 + 1) * L)) * M (w, k, l))
+  have hC : 0 ≤ C := by have := hm (w,k,l); dsimp [C]; positivity
+  have hA : 0 ≤ A := add_nonneg (hm _).le (hm _).le
+  refine ⟨C + 256 * A + 1, by positivity, ?_⟩
+  rintro _ ⟨⟨n, f⟩, rfl⟩
+  change p (w, k, l) ((((n : ℂ) + 1) ^ 6) • R n f.val) < _
+  rw [map_smul_eq_mul, norm_pow, show ‖(n : ℂ) + 1‖ = (n : ℝ) + 1 by
+    exact_mod_cast Complex.norm_natCast (n + 1)]
+  have hd' : (d n : ℝ) ≤ (2 * (n : ℝ) ^ 2 + 1) * n := by exact_mod_cast hrank n
+  by_cases hn : n < L
+  · have hn' : (n : ℝ) ≤ L := by exact_mod_cast hn.le
+    have hle : ((n : ℝ) + 1) ^ 6 * p (w, k, l) (R n f.val) ≤ C := by
+      dsimp only [C]
+      gcongr
+      exact (hrough _ n f).trans (mul_le_mul_of_nonneg_right
+        (add_le_add le_rfl (hd'.trans (by gcongr))) (hm _).le)
+    linarith
+  · have hn' : 0 < n := by dsimp [L] at hn; omega
+    have h1 : (1 : ℝ) ≤ n := by exact_mod_cast hn'
+    let g := logExponentialDecayTwist I w (R n f.val)
+    have hg := schwartz_grid_estimate g n k l 9 hn' (by dsimp [L] at hn; omega) (by
+      intro i j hj'
+      apply decay_twist_jet_zero a w
+      intro t ht
+      have h := congrFun (hjR n f) (i, ⟨t, by omega⟩)
+      exact (hu _ _ _).symm.trans h)
+    change (n : ℝ) ^ 9 * p (w, k, l) (R n f.val) ≤ p (w, 0, l + (9 + k)) (R n f.val) +
+      p (w, 9 + k, l) (R n f.val) at hg
+    have hd'' : 1 + (d n : ℝ) ≤ 4 * (n : ℝ) ^ 3 := by
+      have hcub : (n : ℝ) ≤ (n : ℝ)^3 := by simpa using pow_le_pow_right₀ h1 (show 1 ≤ 3 by decide)
+      linarith
+    have hh : (n : ℝ) ^ 9 * p (w,k,l) (R n f.val) ≤ 4 * (n : ℝ) ^ 3 * A :=
+      hg.trans <| (add_le_add (hrough _ _ _) (hrough _ _ _)).trans (by
+        rw [← mul_add]; exact mul_le_mul_of_nonneg_right hd'' hA)
+    have hh' : (n : ℝ) ^ 6 * p (w,k,l) (R n f.val) ≤ 4 * A := by
+      apply le_of_mul_le_mul_left (a := (n : ℝ) ^ 3) _ (by positivity)
+      convert hh using 1 <;> ring
+    have hh'' : ((n : ℝ) + 1) ^ 6 ≤ 64 * (n : ℝ) ^ 6 := by
+      have h := pow_le_pow_left₀ (by positivity : 0 ≤ (n : ℝ) + 1)
+        (show (n : ℝ) + 1 ≤ 2 * n by linarith) 6
+      norm_num [mul_pow] at h; exact h
+    linarith [mul_le_mul_of_nonneg_right hh'' (apply_nonneg (p (w,k,l)) (R n f.val)),
+      mul_assoc (64 : ℝ) ((n : ℝ)^6) (p (w,k,l) (R n f.val))]
+
 /-- Paper: Lemma D.3.2.3(2), p. 801. The strong dual is nuclear. -/
 theorem positiveRealExponentialDecay_strongDual_nuclear (hInt : OrdConnected I) (hne : I.Nonempty) :
-    IsNuclearTVS D := by sorry
+    IsNuclearTVS D := by
+  classical
+  obtain ⟨w, hw⟩ := hne
+  let a : I := ⟨w, hw⟩
+  have : T2Space E := (positiveRealExponentialDecay_isEmbedding I ⟨w, hw⟩).t2Space
+  have : MontelSpace ℂ E := (positiveRealExponentialDecay_montel I hInt ⟨w, hw⟩).2
+  let tests : Set (Set E) := {s | IsVonNBounded ℂ s}
+  have : PolynormableSpace ℂ D := (uniformConvergenceCLM_withSeminorms tests
+    (fun _ h ↦ h) (by simp [tests, sUnion_isVonNBounded_eq_univ]) _
+    (norm_withSeminorms ℂ ℂ)).toPolynormableSpace
+  have : ContinuousSMul ℝ D := MulAction.continuousSMul_compHom
+    (f := (algebraMap ℝ ℂ).toMonoidHom) Complex.continuous_ofReal
+  apply (isNuclearTVS_iff_localBanach_integral D).mpr
+  intro U hU bU cU
+  let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  obtain ⟨⟨B₀, W⟩, ⟨hB₀, hW⟩, hWU⟩ := ContinuousLinearMap.hasBasis_nhds_zero.mem_iff.mp hU
+  obtain ⟨ε, hε, hεW⟩ := Metric.mem_nhds_iff.mp hW
+  let B := closure B₀
+  have hB : IsCompact B := MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ
+    isClosed_closure hB₀.closure
+  have hq (f : D) (r : ℝ) (hr : 0 ≤ r) (hf : ∀ x ∈ B, ‖f x‖ ≤ r) : q f ≤ ε⁻¹ * r := by
+    apply le_of_forall_gt_imp_ge_of_dense
+    intro t ht
+    have ht₀ : 0 < t := (mul_nonneg (inv_nonneg.mpr hε.le) hr).trans_lt ht
+    have ht' : r < t * ε := by rwa [← div_eq_inv_mul, div_lt_iff₀ hε] at ht
+    have hmem : (t : ℂ)⁻¹ • f ∈ U := by
+      apply hWU
+      intro x hx
+      apply hεW
+      rw [Metric.mem_ball, dist_zero_right, smul_apply, norm_smul, norm_inv,
+        Complex.norm_real, Real.norm_of_nonneg ht₀.le, inv_mul_lt_iff₀ ht₀]
+      exact (hf x (subset_closure hx)).trans_lt ht'
+    have hle : q ((t : ℂ)⁻¹ • f) ≤ 1 := gauge_le_one_of_mem hmem
+    rwa [map_smul_eq_mul, norm_inv, Complex.norm_real, Real.norm_of_nonneg ht₀.le,
+      inv_mul_le_iff₀ ht₀, mul_one] at hle
+  obtain ⟨d, b, c, hd, hz⟩ := decay_compact_approximants a hB
+  let err (n : ℕ) (x : B) : E := x.val - ∑ i, c n i x.val • (b n i).val
+  let A := B ∪ range (fun z : ℕ × B ↦ (((z.1 : ℂ) + 1)^6) • err z.1 z.2)
+  have hA : IsVonNBounded ℂ A := hB₀.closure.union hz
+  have hpol : ∀ᶠ f : D in 𝓝 0, MapsTo f A (Metric.ball 0 1) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo hA (Metric.ball_mem_nhds 0 one_pos)
+  obtain ⟨p, hp, hball⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ D).mem_iff.mp (inter_mem hU hpol)
+  let V := p.ball 0 1
+  have hV : V ∈ 𝓝 0 := p.ball_mem_nhds hp one_pos
+  have bV := p.balanced_ball_zero 1
+  have cV := p.convex_ball 0 1
+  have hVU : V ⊆ U := fun _ hx ↦ (hball hx).1
+  have hpg : gaugeSeminorm bV cV (absorbent_nhds_zero hV) = p :=
+    DFunLike.coe_injective (p.restrictScalars ℝ).gauge_ball
+  have hbound (f : D) (x : E) (hx : x ∈ A) : ‖f x‖ ≤ p f := by
+    apply le_of_forall_gt_imp_ge_of_dense
+    intro t ht
+    have ht₀ := (apply_nonneg p f).trans_lt ht
+    have hmem : (t : ℂ)⁻¹ • f ∈ V := by
+      rwa [Seminorm.mem_ball_zero, map_smul_eq_mul, norm_inv, Complex.norm_real,
+        Real.norm_of_nonneg ht₀.le, inv_mul_lt_iff₀ ht₀, mul_one]
+    have hh := (hball hmem).2 hx
+    rw [Metric.mem_ball, dist_zero_right, smul_apply, norm_smul, norm_inv, Complex.norm_real,
+      Real.norm_of_nonneg ht₀.le, inv_mul_lt_iff₀ ht₀, mul_one] at hh
+    exact hh.le
+  refine ⟨V, hV, bV, cV, hVU, ?_⟩
+  dsimp only
+  apply dual_local_integral_of_interpolation _ q _ ε⁻¹ (inv_nonneg.mpr hε.le) hq d b c hd
+  · intro f x
+    rw [hpg]
+    exact hbound f x (Or.inl x.property)
+  · intro f n x
+    rw [hpg, le_div_iff₀ (by positivity)]
+    have hh := hbound f _ (Or.inr (mem_range_self (n, x)))
+    simpa only [map_smul, norm_smul, norm_pow, show ‖(n : ℂ) + 1‖ = (n : ℝ) + 1 by
+      exact_mod_cast Complex.norm_natCast (n + 1), mul_comm] using hh
 
+end StrongDualNuclearity
+
+open scoped ComplexOrder in
 /-- Paper: Lemma D.3.2.3(2), p. 801. The strong dual has the Montel
 property and is barrelled. -/
 theorem positiveRealExponentialDecay_strongDual_montel (hInt : OrdConnected I) (hne : I.Nonempty) :
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by
+  obtain ⟨hbarrel, hmontel⟩ := positiveRealExponentialDecay_montel I hInt hne
+  let : T2Space E := (positiveRealExponentialDecay_isEmbedding I hne).t2Space
+  refine ⟨⟨fun p hp ↦ ?_⟩, montelSpace_strongDual⟩
+  let U := p.closedBall 0 1
+  let A := (topDualPairing ℂ E).polar U
+  -- The polar of the absorbing unit ball is pointwise bounded.
+  have hA : IsVonNBounded ℂ A := by
+    apply (isVonNBounded_iff_dual_image A).mpr
+    intro φ
+    obtain ⟨c, hc⟩ := (p.absorbent_closedBall_zero one_pos φ).exists
+    refine isBounded_iff_forall_norm_le.mpr ⟨‖c‖, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    obtain ⟨ψ, hψ, hφ⟩ := hc (mem_singleton φ)
+    rw [← hφ]
+    change ‖(c • ψ) x‖ ≤ ‖c‖
+    rw [smul_apply, norm_smul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (hx ψ hψ)
+  refine Seminorm.continuous' (r := 1) ?_
+  have hU : IsClosed U := by
+    rw [show U = {φ | p φ ≤ 1} from p.closedBall_zero_eq]
+    exact hp.isClosed_preimage 1
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  let : PolynormableSpace ℂ D :=
+    uniformConvergenceCLM_polynormable (F := ℂ) S (fun _ hs ↦ hs)
+      (by rw [show ⋃₀ S = univ from sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+  have haU : AbsConvex ℂ U := ⟨p.balanced_closedBall_zero 1,
+    convex_RCLike_iff_convex_real.mpr (p.convex_closedBall 0 1)⟩
+  have hzU : 0 ∈ U := p.mem_closedBall_zero.mpr (by simp)
+  -- Any separating functional would be evaluation at a point of the polar.
+  filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hA
+    (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with φ hφ
+  by_contra hnot
+  obtain ⟨l, hl, hlt⟩ := exists_dual_norm_le_one_lt_of_notMem hU haU hzU hnot
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval l
+  have hx : x ∈ A := fun ψ hψ ↦ hl ψ hψ
+  exact (not_lt_of_ge (mem_ball_zero_iff.mp (hφ hx)).le) hlt
 
 /-- Paper: Lemma D.3.2.3(3), p. 801. If zero lies in I, the zero-weight
 profile is a continuous linear inclusion into the ordinary Schwartz space. -/
@@ -1531,19 +1992,652 @@ theorem exponentialDecayL2_continuous_seminorm (a b : ℝ) (ha : 0 < a) (hb : 0 
   · rw [hp, hT f, ENNReal.ofReal_toReal]
     exact (hT f ▸ hm f).eLpNorm_ne_top
 
+/-- Integrating on the ray away from zero bounds a weighted derivative by the weighted
+L² norm of the next derivative, with one unit of spare exponential decay. -/
+private theorem decay_exp_mul_norm_le (a b : ℝ) (hb : 0 ≤ b) (hab : b + 1 ≤ a)
+    (m : ℕ) (f : PositiveRealExponentialDecay univ)
+    (hW : MemLp (exponentialDecayL2Integrand a 0 (m + 1) f) 2 volume) (x : ℝ) :
+    Real.exp (b * |x|) * ‖iteratedDeriv m f.val x‖ ≤
+      lpNorm (fun y : ℝ ↦ Real.exp (-|y|)) 2 volume *
+        lpNorm (exponentialDecayL2Integrand a 0 (m + 1) f) 2 volume := by
+  let H (y : ℝ) := Real.exp (-|y|)
+  let W := exponentialDecayL2Integrand a 0 (m + 1) f
+  let g := decayWeightedDeriv 0 m f
+  let d := decayWeightedDeriv 0 (m + 1) f
+  have hprofile (n : ℕ) : ⇑(decayWeightedDeriv 0 n f) = iteratedDeriv n f.val := by
+    simpa using decayWeightedDeriv_apply 0 n f
+  have hd (y : ℝ) : HasDerivAt g (d y) y := by
+    simpa only [g, d, hprofile, iteratedDeriv_succ] using g.hasDerivAt y
+  have hH : MemLp H 2 volume := by
+    simpa [H] using memLp_decayEnvelope 1 0 one_pos le_rfl
+  let V : ℝ → ℝ := H • (fun y ↦ ‖W y‖)
+  have hV : Integrable V volume := memLp_one_iff_integrable.mp (hH.smul (r := 1) hW.norm)
+  have hVval (y : ℝ) : V y = H y * ‖W y‖ := rfl
+  have hVnonneg (y : ℝ) : 0 ≤ V y := by
+    rw [hVval]
+    exact mul_nonneg (Real.exp_pos _).le (norm_nonneg _)
+  have htail (s : Set ℝ) (hs : MeasurableSet s) (habs : ∀ y ∈ s, |x| ≤ |y|)
+      (hg : ‖g x‖ ≤ ∫ y in s, ‖d y‖) :
+      Real.exp (b * |x|) * ‖g x‖ ≤ ∫ y, V y := by
+    calc
+      _ ≤ Real.exp (b * |x|) * ∫ y in s, ‖d y‖ :=
+        mul_le_mul_of_nonneg_left hg (Real.exp_pos _).le
+      _ = ∫ y in s, Real.exp (b * |x|) * ‖d y‖ := (integral_const_mul ..).symm
+      _ ≤ ∫ y in s, V y := by
+        apply setIntegral_mono_on (d.integrable.norm.const_mul _).integrableOn
+          hV.integrableOn hs
+        intro y hy
+        rw [hVval, show W y = exponentialDecayL2Integrand a 0 (m + 1) f y from rfl,
+          exponentialDecayL2Integrand_zero_log, norm_mul, Complex.norm_real,
+          Real.norm_of_nonneg (Real.exp_pos _).le, ← hprofile (m + 1)]
+        rw [← mul_assoc]
+        change _ ≤ (Real.exp (-|y|) * Real.exp (a * |y|)) * ‖d y‖
+        rw [← Real.exp_add]
+        apply mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr ?_) (norm_nonneg _)
+        calc
+          b * |x| ≤ b * |y| := mul_le_mul_of_nonneg_left (habs y hy) hb
+          _ ≤ -|y| + a * |y| := by
+            linarith [mul_le_mul_of_nonneg_right hab (abs_nonneg y)]
+      _ ≤ ∫ y, V y := setIntegral_le_integral hV (Eventually.of_forall hVnonneg)
+  have hx : Real.exp (b * |x|) * ‖g x‖ ≤ ∫ y, V y := by
+    rcases le_total 0 x with hx | hx
+    · apply htail (Ioi x) measurableSet_Ioi
+      · intro y hy
+        have hxy := (mem_Ioi.mp hy).le
+        rwa [abs_of_nonneg hx, abs_of_nonneg (hx.trans hxy)]
+      · have h := integral_Ioi_of_hasDerivAt_of_tendsto' (a := x) (fun y _ ↦ hd y)
+          d.integrable.integrableOn (g.tendsto_cocompact.mono_left atTop_le_cocompact)
+        simpa [h] using norm_integral_le_integral_norm (μ := volume.restrict (Ioi x)) d
+    · apply htail (Iic x) measurableSet_Iic
+      · intro y hy
+        have hxy := mem_Iic.mp hy
+        rw [abs_of_nonpos hx, abs_of_nonpos (hxy.trans hx)]
+        exact neg_le_neg hxy
+      · have h := integral_Iic_of_hasDerivAt_of_tendsto' (a := x) (fun y _ ↦ hd y)
+          d.integrable.integrableOn (g.tendsto_cocompact.mono_left atBot_le_cocompact)
+        simpa [h] using norm_integral_le_integral_norm (μ := volume.restrict (Iic x)) d
+  rw [show g x = iteratedDeriv m f.val x from congrFun (hprofile m) x] at hx
+  apply hx.trans
+  have h : eLpNorm V 1 volume ≤ eLpNorm H 2 volume * eLpNorm (fun y ↦ ‖W y‖) 2 volume :=
+    eLpNorm_smul_le_mul_eLpNorm (r := 1) hH.aestronglyMeasurable
+    hW.norm.aestronglyMeasurable
+  have hbound := ENNReal.toReal_mono
+    (ENNReal.mul_ne_top hH.eLpNorm_ne_top hW.norm.eLpNorm_ne_top) h
+  have hnorm (y : ℝ) : ‖V y‖ = V y := Real.norm_of_nonneg (hVnonneg y)
+  simpa only [ENNReal.toReal_mul, eLpNorm_norm _ hW.aestronglyMeasurable, toReal_eLpNorm,
+    lpNorm_one_eq_integral_norm hV.aestronglyMeasurable, hnorm] using hbound
+
 /-- Paper: Lemma D.3.2.7(2), p. 803. Exponential weights on an unbounded sequence
 of positive exponents generate the topology. -/
 theorem exponentialDecayL2_generates (a : ℕ → ℝ) (ha : ∀ n, 0 < a n)
     (hunbounded : ¬ BddAbove (range a)) :
     GeneratesLpSeminorms volume 2
-      (fun (i : ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) 0 i.2) := by sorry
+      (fun (i : ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) 0 i.2) := by
+  classical
+  have h (i : ℕ × ℕ) :=
+    exponentialDecayL2_continuous_seminorm (a i.1) 0 (ha i.1) le_rfl i.2
+  choose P hPc hPval using fun i ↦ (h i).2
+  refine ⟨fun i ↦ (h i).1, P, ?_, hPval⟩
+  let t : TopologicalSpace (PositiveRealExponentialDecay univ) := inferInstance
+  let u := (SeminormFamily.moduleFilterBasis P).topology
+  have hP : WithSeminorms (topology := u) P := ⟨rfl⟩
+  refine WithSeminorms.mk (topology := t) ?_
+  change t = u
+  apply le_antisymm
+  · exact le_topology_withSeminorms (t := t) hP hPc
+  have hsource := withGeneratingSeminorms_spec (logExponentialDecaySubmodule univ)
+    (fun i : ↥(univ : Set ℝ) × ℕ × ℕ ↦
+      (SchwartzMap.seminorm ℂ i.2.1 i.2.2).comp (logExponentialDecayTwist univ i.1))
+  let : TopologicalSpace (PositiveRealExponentialDecay univ) := u
+  let : IsTopologicalAddGroup (PositiveRealExponentialDecay univ) := hP.isTopologicalAddGroup
+  apply le_topology_withSeminorms (t := u) hsource
+  rintro ⟨c, k, n⟩
+  obtain ⟨_, ⟨i, rfl⟩, hi⟩ := not_bddAbove_iff.mp hunbounded (|(c : ℝ)| + 1 + 1)
+  let C : ℝ≥0 := ⟨lpNorm (fun y : ℝ ↦ Real.exp (-|y|)) 2 volume, lpNorm_nonneg⟩
+  let coeff (j : ℕ) : ℝ≥0 := (n.choose j : ℝ≥0) * ‖(c : ℝ)‖₊ ^ j
+  let Q := ((k.factorial : ℝ≥0) * C) •
+    ∑ j ∈ Finset.range (n + 1), coeff j • P (i, n - j + 1)
+  have hQ : Continuous Q :=
+    (Seminorm.continuous_finsetSum fun j _ ↦
+      (hP.continuous_seminorm (i, n - j + 1)).const_smul (coeff j)).const_smul _
+  apply Seminorm.continuous_of_le hQ
+  intro f
+  change SchwartzMap.seminorm ℂ k n (logExponentialDecayTwist univ c f) ≤ Q f
+  apply SchwartzMap.seminorm_le_bound' ℂ k n _ (apply_nonneg Q f)
+  intro x
+  have htwist : ⇑(logExponentialDecayTwist univ c f) =
+      (fun y ↦ Real.exp ((c : ℝ) * y)) • f.val := by
+    funext y
+    exact (logExponentialDecayTwist_apply univ c f y).trans Complex.real_smul.symm
+  have hexp : ContDiff ℝ n (fun y ↦ Real.exp ((c : ℝ) * y)) := by fun_prop
+  have hderiv := iteratedDerivWithin_smul (mem_univ x) uniqueDiffOn_univ
+    hexp.contDiffAt.contDiffWithinAt
+    (((decayProfile_smooth f).of_le (by exact_mod_cast (le_top : (n : ℕ∞) ≤ ⊤))).contDiffAt.contDiffWithinAt)
+  simp only [iteratedDerivWithin_univ, iteratedDeriv_exp_const_mul] at hderiv
+  rw [htwist, hderiv]
+  refine (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (pow_nonneg (abs_nonneg x) k)).trans ?_
+  have hweight : |x| ^ k * Real.exp ((c : ℝ) * x) ≤
+      k.factorial * Real.exp ((|(c : ℝ)| + 1) * |x|) := by
+    have hpow := (div_le_iff₀ (show 0 < (k.factorial : ℝ) by positivity)).mp
+      (Real.pow_div_factorial_le_exp |x| (abs_nonneg x) k)
+    have hcx : (c : ℝ) * x ≤ |(c : ℝ)| * |x| := by
+      simpa only [abs_mul] using le_abs_self ((c : ℝ) * x)
+    calc
+      _ ≤ (Real.exp |x| * k.factorial) * Real.exp (|(c : ℝ)| * |x|) :=
+        mul_le_mul hpow (Real.exp_le_exp.mpr hcx) (Real.exp_pos _).le (by positivity)
+      _ = _ := by rw [add_mul, one_mul, Real.exp_add]; ring
+  simp only [Q, smul_apply, NNReal.smul_def, NNReal.coe_mul, NNReal.coe_natCast, smul_eq_mul,
+    FunLike.coe_sum, Finset.sum_apply, Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro j _
+  rw [RCLike.norm_nsmul (K := ℝ), nsmul_eq_mul, norm_smul, norm_mul,
+    Real.norm_of_nonneg (Real.exp_pos _).le, norm_pow]
+  have hj := decay_exp_mul_norm_le (a i) (|(c : ℝ)| + 1) (by positivity) hi.le
+    (n - j) f ((h (i, n - j + 1)).1 f) x
+  have hval : lpNorm (exponentialDecayL2Integrand (a i) 0 (n - j + 1) f) 2 volume =
+      P (i, n - j + 1) f := by
+    rw [← toReal_eLpNorm, ← hPval (i, n - j + 1) f, ENNReal.toReal_ofReal (apply_nonneg _ _)]
+  rw [hval] at hj
+  change _ ≤ (C : ℝ) * P (i, n - j + 1) f at hj
+  simp only [coeff, NNReal.coe_mul, NNReal.coe_natCast, NNReal.coe_pow, coe_nnNorm]
+  calc
+    _ = ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        ((|x| ^ k * Real.exp ((c : ℝ) * x)) * ‖iteratedDeriv (n - j) f.val x‖) := by ring
+    _ ≤ ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        (k.factorial * (Real.exp ((|(c : ℝ)| + 1) * |x|) *
+          ‖iteratedDeriv (n - j) f.val x‖)) := by
+      rw [← mul_assoc (k.factorial : ℝ)]
+      exact mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hweight (norm_nonneg _))
+        (by positivity)
+    _ ≤ ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        (k.factorial * ((C : ℝ) * P (i, n - j + 1) f)) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hj (by positivity)) (by positivity)
+    _ = _ := by ring
+
+private theorem lpNorm_le_mul_lpNorm {u g : ℝ → ℂ} {c : ℝ}
+    (hc : 0 ≤ c) (hu : AEStronglyMeasurable u volume) (hg : MemLp g 2 volume)
+    (h : ∀ x, ‖u x‖ ≤ c * ‖g x‖) :
+    lpNorm u 2 volume ≤ c * lpNorm g 2 volume := by
+  have hle := eLpNorm_le_mul_eLpNorm_of_ae_le_mul hu (Eventually.of_forall h) 2
+  have htop : ENNReal.ofReal c * eLpNorm g 2 volume ≠ ⊤ :=
+    ENNReal.mul_ne_top ENNReal.ofReal_ne_top hg.eLpNorm_ne_top
+  calc lpNorm u 2 volume
+      = (eLpNorm u 2 volume).toReal := rfl
+    _ ≤ (ENNReal.ofReal c * eLpNorm g 2 volume).toReal := ENNReal.toReal_mono htop hle
+    _ = c * lpNorm g 2 volume := by
+        rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal hc, toReal_eLpNorm]
+
+private theorem lpNorm_sq_eq_integral_norm_sq (φ : 𝓢(ℝ, ℂ)) :
+    ∫ y : ℝ, ‖φ y‖ ^ 2 = (lpNorm (φ : ℝ → ℂ) 2 volume) ^ 2 := by
+  have hm : AEStronglyMeasurable (φ : ℝ → ℂ) volume := φ.continuous.aestronglyMeasurable
+  have hpow : (fun y : ℝ ↦ ‖φ y‖ ^ (2 : ℝ)) = fun y ↦ ‖φ y‖ ^ 2 := by
+    funext y
+    exact Real.rpow_natCast ‖φ y‖ 2
+  rw [lpNorm_eq_integral_norm_rpow_toReal (by norm_num : (2 : ℝ≥0∞) ≠ 0) (by norm_num) hm]
+  simp only [ENNReal.toReal_ofNat]
+  rw [hpow]
+  have hexp : ((2 : ℝ) ⁻¹) = (1 / 2 : ℝ) := by norm_num
+  rw [hexp, ← Real.sqrt_eq_rpow, Real.sq_sqrt (integral_nonneg fun _ ↦ by positivity)]
+
+/-- A Schwartz function on the line is pointwise bounded by the L² norms of itself and its derivative. -/
+private theorem schwartz_norm_le_lpNorm_add_deriv (ψ : 𝓢(ℝ, ℂ)) (x : ℝ) :
+    ‖ψ x‖ ≤ lpNorm (ψ : ℝ → ℂ) 2 volume +
+      lpNorm (SchwartzMap.derivCLM ℂ ℂ ψ : ℝ → ℂ) 2 volume := by
+  let d : ℝ → ℂ := SchwartzMap.derivCLM ℂ ℂ ψ
+  let F : ℝ → ℝ := fun t ↦ ‖ψ t‖ ^ 2
+  let F' : ℝ → ℝ := fun t ↦ 2 * inner ℝ (ψ t) (d t)
+  have hd (y : ℝ) : d y = deriv (ψ : ℝ → ℂ) y := by
+    simp [d]
+  have hF (y : ℝ) : HasDerivAt F (F' y) y := by
+    simpa [F, F', hd y] using (SchwartzMap.hasDerivAt ψ y).norm_sq
+  have hsqψ : Integrable (fun y : ℝ ↦ ‖ψ y‖ ^ 2) volume := by
+    have h := (ψ.memLp 2 volume).integrable_norm_rpow (by norm_num) (by norm_num)
+    have hfun : (fun y : ℝ ↦ ‖ψ y‖ ^ (2 : ℝ≥0∞).toReal) = fun y ↦ ‖ψ y‖ ^ 2 := by
+      funext y
+      simp only [ENNReal.toReal_ofNat]
+      exact Real.rpow_natCast ‖ψ y‖ 2
+    simpa [hfun] using h
+  have hsqd : Integrable (fun y : ℝ ↦ ‖d y‖ ^ 2) volume := by
+    have h := ((SchwartzMap.derivCLM ℂ ℂ ψ).memLp 2 volume).integrable_norm_rpow
+      (by norm_num) (by norm_num)
+    rw [show (fun y : ℝ ↦ ‖d y‖ ^ 2) =
+        fun y ↦ ‖(SchwartzMap.derivCLM ℂ ℂ ψ) y‖ ^ (2 : ℝ≥0∞).toReal by
+      funext y
+      simp only [ENNReal.toReal_ofNat, d]
+      exact (Real.rpow_natCast ‖d y‖ 2).symm]
+    exact h
+  have hsumsq : Integrable (fun y : ℝ ↦ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2) volume := hsqψ.add hsqd
+  have hcs (y : ℝ) : |inner ℝ (ψ y) (d y)| ≤ ‖ψ y‖ * ‖d y‖ :=
+    abs_real_inner_le_norm (ψ y) (d y)
+  have hdom (y : ℝ) : ‖F' y‖ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+    have hyoung : 2 * ‖ψ y‖ * ‖d y‖ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+      nlinarith [sq_nonneg (‖ψ y‖ - ‖d y‖)]
+    calc ‖F' y‖ = |2 * inner ℝ (ψ y) (d y)| := by simp [F', Real.norm_eq_abs]
+      _ = 2 * |inner ℝ (ψ y) (d y)| := by rw [abs_mul, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+      _ ≤ 2 * (‖ψ y‖ * ‖d y‖) := mul_le_mul_of_nonneg_left (hcs y) (by norm_num)
+      _ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by simpa [mul_assoc] using hyoung
+  have hFmeas : AEStronglyMeasurable F' volume := by
+    apply Continuous.aestronglyMeasurable
+    have hcψ : Continuous (fun t : ℝ ↦ (ψ t : ℂ)) := ψ.continuous
+    have hcd : Continuous d := (SchwartzMap.derivCLM ℂ ℂ ψ).continuous
+    exact continuous_const.mul (continuous_inner.comp (hcψ.prodMk hcd))
+  have hF'int : Integrable F' volume :=
+    hsumsq.mono' hFmeas (Eventually.of_forall hdom)
+  have hlim : Tendsto F atTop (𝓝 0) :=
+    tendsto_zero_of_hasDerivAt_of_integrableOn_Ioi (a := x) (f := F) (f' := F')
+      (fun y _ ↦ hF y) hF'int.integrableOn hsqψ.integrableOn
+  have heq : ∫ y in Ioi x, F' y = - F x := by
+    simpa using integral_Ioi_of_hasDerivAt_of_tendsto' (a := x) (f := F) (f' := F') (m := 0)
+      (fun y _ ↦ hF y) hF'int.integrableOn hlim
+  have hpoint (y : ℝ) : - F' y ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 :=
+    (neg_le_abs _).trans (by simpa [Real.norm_eq_abs] using hdom y)
+  have htail : ∫ y in Ioi x, - F' y ≤ ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 :=
+    setIntegral_mono hF'int.neg.integrableOn hsumsq.integrableOn hpoint
+  have hfull : ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 ≤ ∫ y, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+    have hnonneg : 0 ≤ᵐ[volume] (fun y : ℝ ↦ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2) :=
+      Eventually.of_forall fun y ↦ add_nonneg (sq_nonneg _) (sq_nonneg _)
+    simpa using integral_mono_measure (Measure.restrict_le_self (s := Ioi x))
+      hnonneg hsumsq
+  have hsqx : ‖ψ x‖ ^ 2 ≤ (lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+      (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2 := by
+    calc ‖ψ x‖ ^ 2 = - ∫ y in Ioi x, F' y := by rw [heq, neg_neg]
+      _ = ∫ y in Ioi x, - F' y := (integral_neg _).symm
+      _ ≤ ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := htail
+      _ ≤ ∫ y, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := hfull
+      _ = (lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+            (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2 := by
+          rw [integral_add hsqψ hsqd, lpNorm_sq_eq_integral_norm_sq ψ,
+            lpNorm_sq_eq_integral_norm_sq (SchwartzMap.derivCLM ℂ ℂ ψ)]
+  have hsqrt : ‖ψ x‖ ≤ Real.sqrt ((lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+      (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2) := by
+    rw [← Real.sqrt_sq (norm_nonneg _)]
+    exact Real.sqrt_le_sqrt hsqx
+  refine hsqrt.trans ?_
+  have ha0 : 0 ≤ lpNorm (ψ : ℝ → ℂ) 2 volume := lpNorm_nonneg
+  have hb0 : 0 ≤ lpNorm (d : ℝ → ℂ) 2 volume := lpNorm_nonneg
+  rw [← Real.sqrt_sq (add_nonneg ha0 hb0)]
+  refine Real.sqrt_le_sqrt ?_
+  nlinarith
+
+private theorem iteratedDeriv_expWeight (c : ℝ) (n : ℕ) (x : ℝ) :
+    iteratedDeriv n (fun y : ℝ ↦ (Real.exp (c * y) : ℂ)) x =
+      (c : ℂ) ^ n * (Real.exp (c * x) : ℂ) := by
+  induction n generalizing x with
+  | zero => simp
+  | succ n ih =>
+    rw [iteratedDeriv_succ]
+    have hfun : iteratedDeriv n (fun y : ℝ ↦ (Real.exp (c * y) : ℂ)) =
+        fun y ↦ (c : ℂ) ^ n * (Real.exp (c * y) : ℂ) := by
+      funext y
+      exact ih y
+    rw [hfun]
+    have hexp : HasDerivAt (fun y : ℝ ↦ (Real.exp (c * y) : ℂ))
+        ((c : ℂ) * (Real.exp (c * x) : ℂ)) x := by
+      have h := HasDerivAt.ofReal_comp (((hasDerivAt_id x).const_mul c).exp)
+      simpa [mul_comm] using h
+    have h := (hexp.const_mul ((c : ℂ) ^ n)).deriv
+    simpa [pow_succ, mul_assoc, mul_left_comm, mul_comm] using h
+
+private theorem deriv_decayWeightedDeriv (c : ℝ) (j : ℕ)
+    (f : PositiveRealExponentialDecay univ) (x : ℝ) :
+    deriv (decayWeightedDeriv c j f) x =
+      (c : ℂ) * decayWeightedDeriv c j f x + decayWeightedDeriv c (j + 1) f x := by
+  have hexp : HasDerivAt (fun y : ℝ ↦ (Real.exp (c * y) : ℂ))
+      ((c : ℂ) * (Real.exp (c * x) : ℂ)) x := by
+    have h := HasDerivAt.ofReal_comp (((hasDerivAt_id x).const_mul c).exp)
+    simpa [mul_comm] using h
+  have hprofile : HasDerivAt (iteratedDeriv j f.val) (iteratedDeriv (j + 1) f.val x) x := by
+    have hd := ((decayProfile_smooth f).differentiable_iteratedDeriv j
+      (by exact_mod_cast ENat.natCast_lt_top j)) x
+    simpa [iteratedDeriv_succ] using hd.hasDerivAt
+  have hmul := (hexp.mul hprofile).deriv
+  rw [decayWeightedDeriv_apply c (j + 1) f, decayWeightedDeriv_apply c j f]
+  convert hmul using 1; ring
+
+private theorem hasDerivAt_complexOfReal_pow (n : ℕ) (y : ℝ) :
+    HasDerivAt (fun t : ℝ ↦ (t : ℂ) ^ n) ((n : ℂ) * (y : ℂ) ^ (n - 1)) y := by
+  induction n with
+  | zero => simpa using hasDerivAt_const y (1 : ℂ)
+  | succ n ih =>
+    have hid : HasDerivAt (fun t : ℝ ↦ (t : ℂ)) (1 : ℂ) y := by
+      simpa using HasDerivAt.ofReal_comp (hasDerivAt_id y)
+    have hmul := ih.mul hid
+    have hfun : ((fun t : ℝ ↦ (t : ℂ) ^ n) * fun t : ℝ ↦ (t : ℂ)) =
+        fun t : ℝ ↦ (t : ℂ) ^ (n + 1) := by
+      funext t
+      simp [pow_succ, mul_comm]
+    rw [hfun] at hmul
+    refine hmul.congr_deriv ?_
+    by_cases hn : n = 0
+    · simp [hn]
+    · have hpow : (y : ℂ) ^ (n - 1) * (y : ℂ) = (y : ℂ) ^ n := by
+        rw [← pow_succ, Nat.sub_add_cancel (Nat.one_le_iff_ne_zero.mpr hn)]
+      calc (n : ℂ) * (y : ℂ) ^ (n - 1) * (y : ℂ) + (y : ℂ) ^ n * 1
+          = (n : ℂ) * ((y : ℂ) ^ (n - 1) * (y : ℂ)) + (y : ℂ) ^ n := by ring
+        _ = (n : ℂ) * (y : ℂ) ^ n + (y : ℂ) ^ n := by rw [hpow]
+        _ = ((n : ℂ) + 1) * (y : ℂ) ^ n := by ring
+        _ = (↑(n + 1) : ℂ) * (y : ℂ) ^ (n + 1 - 1) := by
+            simp [Nat.cast_add]
+
+private theorem norm_exponentialDecayL2Integrand (a b : ℝ) (m : ℕ)
+    (f : PositiveRealExponentialDecay univ) (x : ℝ) :
+    ‖exponentialDecayL2Integrand a b m f x‖ =
+      Real.exp (a * |x|) * |x| ^ b * ‖iteratedDeriv m f.val x‖ := by
+  simp only [exponentialDecayL2Integrand, norm_mul, Complex.norm_real,
+    Real.norm_of_nonneg (mul_nonneg (Real.exp_pos _).le (Real.rpow_nonneg (abs_nonneg x) b))]
+
+private theorem expMul_profile_sup_le (a0 c : ℝ) (hc : |c| < a0) (k j : ℕ)
+    (f : PositiveRealExponentialDecay univ) (x : ℝ) :
+    |x| ^ k * Real.exp (c * x) * ‖iteratedDeriv j f.val x‖ ≤
+      (1 + |c|) * lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+        (k : ℝ) * lpNorm (exponentialDecayL2Integrand a0 ((k - 1 : ℕ) : ℝ) j f) 2 volume +
+        lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) (j + 1) f) 2 volume := by
+  have ha0 : 0 < a0 := lt_of_le_of_lt (abs_nonneg c) hc
+  let g := decayWeightedDeriv c j f
+  let g1 := decayWeightedDeriv c (j + 1) f
+  have hgrowth (b : ℕ) : (fun y : ℝ ↦ (y : ℂ) ^ b).HasTemperateGrowth :=
+    (Complex.ofRealCLM.hasTemperateGrowth).pow b
+  let weighted (b : ℕ) (g0 : 𝓢(ℝ, ℂ)) : 𝓢(ℝ, ℂ) :=
+    SchwartzMap.smulLeftCLM ℂ (fun y : ℝ ↦ (y : ℂ) ^ b) g0
+  have hweighted (b : ℕ) (g0 : 𝓢(ℝ, ℂ)) (y : ℝ) :
+      weighted b g0 y = (y : ℂ) ^ b * g0 y := by
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hgrowth b)]
+    simp [smul_eq_mul]
+  have hgx (y : ℝ) : ‖g y‖ = Real.exp (c * y) * ‖iteratedDeriv j f.val y‖ := by
+    rw [congrFun (decayWeightedDeriv_apply c j f) y, norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg (Real.exp_pos _).le]
+  have hg1x (y : ℝ) : ‖g1 y‖ = Real.exp (c * y) * ‖iteratedDeriv (j + 1) f.val y‖ := by
+    rw [congrFun (decayWeightedDeriv_apply c (j + 1) f) y, norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg (Real.exp_pos _).le]
+  have hcx (y : ℝ) : Real.exp (c * y) ≤ Real.exp (a0 * |y|) := by
+    refine Real.exp_le_exp.mpr ?_
+    calc c * y ≤ |c * y| := le_abs_self _
+      _ = |c| * |y| := abs_mul _ _
+      _ ≤ a0 * |y| := mul_le_mul_of_nonneg_right hc.le (abs_nonneg _)
+  have hmem (b m : ℕ) : MemLp (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume :=
+    (exponentialDecayL2_continuous_seminorm a0 (b : ℝ) ha0 (Nat.cast_nonneg b) m).1 f
+  have hweight_lp (b m : ℕ) (g0 : 𝓢(ℝ, ℂ))
+      (hg0 : ∀ y, ‖g0 y‖ = Real.exp (c * y) * ‖iteratedDeriv m f.val y‖) :
+      lpNorm (weighted b g0 : ℝ → ℂ) 2 volume ≤
+        lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume := by
+    have hpoint (y : ℝ) :
+        ‖weighted b g0 y‖ ≤ ‖exponentialDecayL2Integrand a0 (b : ℝ) m f y‖ := by
+      rw [hweighted, norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, hg0,
+        norm_exponentialDecayL2Integrand a0 (b : ℝ) m f y,
+        Real.rpow_natCast |y| b]
+      calc |y| ^ b * (Real.exp (c * y) * ‖iteratedDeriv m f.val y‖)
+          = Real.exp (c * y) * (|y| ^ b * ‖iteratedDeriv m f.val y‖) := by ring
+        _ ≤ Real.exp (a0 * |y|) * (|y| ^ b * ‖iteratedDeriv m f.val y‖) := by
+            exact mul_le_mul_of_nonneg_right (hcx y) (mul_nonneg (by positivity) (norm_nonneg _))
+        _ = Real.exp (a0 * |y|) * |y| ^ b * ‖iteratedDeriv m f.val y‖ := by ring
+    simpa using lpNorm_le_mul_lpNorm (c := 1) (by positivity)
+      (weighted b g0).continuous.aestronglyMeasurable (hmem b m)
+      (fun y ↦ by rw [one_mul]; exact hpoint y)
+  let ψ := weighted k g
+  have hleft : |x| ^ k * Real.exp (c * x) * ‖iteratedDeriv j f.val x‖ = ‖ψ x‖ := by
+    rw [hweighted, norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, hgx]
+    ring
+  have hderiv (y : ℝ) : deriv (ψ : ℝ → ℂ) y =
+      (k : ℂ) * (y : ℂ) ^ (k - 1) * g y + (y : ℂ) ^ k * deriv (g : ℝ → ℂ) y := by
+    have hpow := hasDerivAt_complexOfReal_pow k y
+    have hmul := (hpow.mul (SchwartzMap.hasDerivAt g y)).deriv
+    have hfun : (fun t : ℝ ↦ (t : ℂ) ^ k * g t) = ψ := by
+      funext t
+      exact (hweighted k g t).symm
+    rw [← hfun]
+    exact hmul
+  have hderivg (y : ℝ) : deriv (g : ℝ → ℂ) y = (c : ℂ) * g y + g1 y :=
+    deriv_decayWeightedDeriv c j f y
+  let low := weighted (k - 1) g
+  let nxt := weighted k g1
+  have hsplit : (SchwartzMap.derivCLM ℂ ℂ ψ : ℝ → ℂ) =
+      ((k : ℂ) • (low : ℝ → ℂ)) + (((c : ℂ) • (ψ : ℝ → ℂ)) + (nxt : ℝ → ℂ)) := by
+    funext y
+    rw [SchwartzMap.derivCLM_apply (𝕜 := ℂ) (F := ℂ), hderiv y, hderivg y]
+    have hlowy : low y = (y : ℂ) ^ (k - 1) * g y := hweighted (k - 1) g y
+    have hψy : ψ y = (y : ℂ) ^ k * g y := hweighted k g y
+    have hny : nxt y = (y : ℂ) ^ k * g1 y := hweighted k g1 y
+    simp only [Pi.add_apply, Pi.smul_apply, smul_eq_mul, hlowy, hψy, hny, mul_add,
+      mul_assoc, mul_left_comm]
+  have hderlp : lpNorm (SchwartzMap.derivCLM ℂ ℂ ψ : ℝ → ℂ) 2 volume ≤
+      (k : ℝ) * lpNorm (low : ℝ → ℂ) 2 volume +
+        (|c| * lpNorm (ψ : ℝ → ℂ) 2 volume + lpNorm (nxt : ℝ → ℂ) 2 volume) := by
+    rw [hsplit]
+    have hm1 : MemLp ((k : ℂ) • (low : ℝ → ℂ)) 2 volume :=
+      (low.memLp 2 volume).const_smul (k : ℂ)
+    have hm2 : MemLp ((c : ℂ) • (ψ : ℝ → ℂ)) 2 volume :=
+      (ψ.memLp 2 volume).const_smul (c : ℂ)
+    have hm3 : MemLp (nxt : ℝ → ℂ) 2 volume := nxt.memLp 2 volume
+    calc lpNorm (((k : ℂ) • (low : ℝ → ℂ)) + (((c : ℂ) • (ψ : ℝ → ℂ)) + (nxt : ℝ → ℂ))) 2 volume
+        ≤ lpNorm ((k : ℂ) • (low : ℝ → ℂ)) 2 volume +
+            lpNorm (((c : ℂ) • (ψ : ℝ → ℂ)) + (nxt : ℝ → ℂ)) 2 volume :=
+          lpNorm_add_le hm1 (by norm_num)
+      _ ≤ lpNorm ((k : ℂ) • (low : ℝ → ℂ)) 2 volume +
+            (lpNorm ((c : ℂ) • (ψ : ℝ → ℂ)) 2 volume + lpNorm (nxt : ℝ → ℂ) 2 volume) := by
+          gcongr
+          exact lpNorm_add_le hm2 (by norm_num)
+      _ = (k : ℝ) * lpNorm (low : ℝ → ℂ) 2 volume +
+            (|c| * lpNorm (ψ : ℝ → ℂ) 2 volume + lpNorm (nxt : ℝ → ℂ) 2 volume) := by
+          rw [lpNorm_const_smul, lpNorm_const_smul]
+          simp
+  have hlow := hweight_lp (k - 1) j g hgx
+  have hψlp := hweight_lp k j g hgx
+  have hnxt := hweight_lp k (j + 1) g1 hg1x
+  calc |x| ^ k * Real.exp (c * x) * ‖iteratedDeriv j f.val x‖
+      = ‖ψ x‖ := hleft
+    _ ≤ lpNorm (ψ : ℝ → ℂ) 2 volume +
+          lpNorm (SchwartzMap.derivCLM ℂ ℂ ψ : ℝ → ℂ) 2 volume :=
+        schwartz_norm_le_lpNorm_add_deriv ψ x
+    _ ≤ lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+          ((k : ℝ) * lpNorm (low : ℝ → ℂ) 2 volume +
+            (|c| * lpNorm (ψ : ℝ → ℂ) 2 volume + lpNorm (nxt : ℝ → ℂ) 2 volume)) := by
+        gcongr
+      _ ≤ lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+          ((k : ℝ) * lpNorm (exponentialDecayL2Integrand a0 ((k - 1 : ℕ) : ℝ) j f) 2 volume +
+            (|c| * lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+              lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) (j + 1) f) 2 volume)) := by
+        gcongr
+    _ = (1 + |c|) * lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+          (k : ℝ) * lpNorm (exponentialDecayL2Integrand a0 ((k - 1 : ℕ) : ℝ) j f) 2 volume +
+          lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) (j + 1) f) 2 volume := by
+        ring
+
+private theorem twist_seminorm_le (a0 c : ℝ) (hc : |c| < a0) (k n : ℕ)
+    (f : PositiveRealExponentialDecay univ) :
+    SchwartzMap.seminorm ℂ k n (logExponentialDecayTwist univ ⟨c, mem_univ c⟩ f) ≤
+      (k + |c| + 2) * (1 + |c|) ^ n *
+        ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2),
+          lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume := by
+  let S := ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2),
+    lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume
+  have hS0 : 0 ≤ S := by
+    refine Finset.sum_nonneg fun _ _ ↦ Finset.sum_nonneg fun _ _ ↦ ?_
+    exact lpNorm_nonneg
+  have hterm (b m : ℕ) (hb : b ≤ k) (hm : m ≤ n + 1) :
+      lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume ≤ S := by
+    have hb' : b ∈ Finset.range (k + 1) := Finset.mem_range.mpr (Nat.lt_succ_of_le hb)
+    have hm' : m ∈ Finset.range (n + 2) := Finset.mem_range.mpr (Nat.lt_succ_of_le hm)
+    have hnonneg : ∀ m' ∈ Finset.range (n + 2),
+        0 ≤ lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m' f) 2 volume := by
+      intro _ _; exact lpNorm_nonneg
+    calc lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m f) 2 volume
+        ≤ ∑ m' ∈ Finset.range (n + 2),
+            lpNorm (exponentialDecayL2Integrand a0 (b : ℝ) m' f) 2 volume :=
+          Finset.single_le_sum hnonneg hm'
+      _ ≤ S := by
+        have houter : ∀ b' ∈ Finset.range (k + 1), 0 ≤
+            ∑ m' ∈ Finset.range (n + 2),
+              lpNorm (exponentialDecayL2Integrand a0 (b' : ℝ) m' f) 2 volume := by
+          intro b' hb'
+          refine Finset.sum_nonneg fun m' hm' ↦ ?_
+          exact lpNorm_nonneg
+        exact Finset.single_le_sum houter hb'
+  have hbound (j : ℕ) (hj : j ≤ n) :
+      (1 + |c|) * lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+        (k : ℝ) * lpNorm (exponentialDecayL2Integrand a0 ((k - 1 : ℕ) : ℝ) j f) 2 volume +
+        lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) (j + 1) f) 2 volume ≤
+      (k + |c| + 2) * S := by
+    have h1 := hterm k j le_rfl (hj.trans (Nat.le_succ n))
+    have h2 := hterm (k - 1) j (Nat.sub_le _ _) (hj.trans (Nat.le_succ n))
+    have h3 := hterm k (j + 1) le_rfl (Nat.succ_le_succ hj)
+    have hc0 : 0 ≤ |c| := abs_nonneg c
+    calc (1 + |c|) * lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) j f) 2 volume +
+          (k : ℝ) * lpNorm (exponentialDecayL2Integrand a0 ((k - 1 : ℕ) : ℝ) j f) 2 volume +
+          lpNorm (exponentialDecayL2Integrand a0 (k : ℝ) (j + 1) f) 2 volume
+        ≤ (1 + |c|) * S + (k : ℝ) * S + S := by
+          refine add_le_add (add_le_add ?_ ?_) h3
+          · exact mul_le_mul_of_nonneg_left h1 (by positivity)
+          · exact mul_le_mul_of_nonneg_left h2 (Nat.cast_nonneg k)
+      _ = (k + |c| + 2) * S := by ring
+  let T : ℝ → ℂ := fun y ↦ (Real.exp (c * y) : ℂ) * f.val y
+  have hT : (logExponentialDecayTwist univ ⟨c, mem_univ c⟩ f : ℝ → ℂ) = T := by
+    funext y
+    exact logExponentialDecayTwist_apply univ ⟨c, mem_univ c⟩ f y
+  have hu : ContDiff ℝ ⊤ (fun y : ℝ ↦ (Real.exp (c * y) : ℂ)) :=
+    Complex.ofRealCLM.contDiff.comp ((contDiff_const.mul contDiff_id).exp)
+  have hformula (x : ℝ) : iteratedDeriv n T x =
+      ∑ i ∈ Finset.range (n + 1), (n.choose i : ℂ) *
+        ((c : ℂ) ^ i * (Real.exp (c * x) : ℂ)) * iteratedDeriv (n - i) f.val x := by
+    have hmul := iteratedDeriv_mul
+      ((hu.of_le (show (n : ℕ∞ω) ≤ ⊤ from le_top)).contDiffAt (x := x))
+      (((decayProfile_smooth f).of_le
+        (show (n : ℕ∞ω) ≤ (⊤ : ℕ∞) from by exact_mod_cast (le_top : (n : ℕ∞) ≤ ⊤))).contDiffAt
+        (x := x))
+    have hfun : ((fun y : ℝ ↦ (Real.exp (c * y) : ℂ)) * f.val) = T := by
+      funext y
+      rfl
+    rw [hfun] at hmul
+    rw [hmul]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    rw [iteratedDeriv_expWeight]
+  have hpoint (x : ℝ) : |x| ^ k * ‖iteratedDeriv n
+      (logExponentialDecayTwist univ ⟨c, mem_univ c⟩ f) x‖ ≤
+      (k + |c| + 2) * (1 + |c|) ^ n * S := by
+    rw [hT]
+    rw [hformula]
+    calc |x| ^ k * ‖∑ i ∈ Finset.range (n + 1), (n.choose i : ℂ) *
+          ((c : ℂ) ^ i * (Real.exp (c * x) : ℂ)) * iteratedDeriv (n - i) f.val x‖
+        ≤ |x| ^ k * ∑ i ∈ Finset.range (n + 1), ‖(n.choose i : ℂ) *
+            ((c : ℂ) ^ i * (Real.exp (c * x) : ℂ)) * iteratedDeriv (n - i) f.val x‖ := by
+          gcongr
+          exact norm_sum_le _ _
+      _ = ∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ) * |c| ^ i *
+            (|x| ^ k * Real.exp (c * x) * ‖iteratedDeriv (n - i) f.val x‖) := by
+          rw [Finset.mul_sum]
+          refine Finset.sum_congr rfl fun i _ ↦ ?_
+          rw [norm_mul, norm_mul, norm_mul, Complex.norm_natCast, norm_pow,
+            Complex.norm_real, Real.norm_eq_abs, Complex.norm_real,
+            Real.norm_of_nonneg (Real.exp_pos _).le]
+          ring
+      _ ≤ ∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ) * |c| ^ i * ((k + |c| + 2) * S) := by
+          refine Finset.sum_le_sum fun i hi ↦ ?_
+          have hi' : n - i ≤ n := Nat.sub_le _ _
+          have hineq := (expMul_profile_sup_le a0 c hc k (n - i) f x).trans
+            (hbound (n - i) hi')
+          exact mul_le_mul_of_nonneg_left hineq (by positivity)
+      _ = (∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ) * |c| ^ i) * ((k + |c| + 2) * S) := by
+          rw [← Finset.sum_mul]
+      _ = (1 + |c|) ^ n * ((k + |c| + 2) * S) := by
+          have hbin : ∑ i ∈ Finset.range (n + 1), (n.choose i : ℝ) * |c| ^ i =
+              (1 + |c|) ^ n := by
+            rw [add_comm (1 : ℝ) |c|, add_pow]
+            exact Finset.sum_congr rfl fun i _ ↦ by simp [one_pow, mul_one, mul_comm]
+          rw [hbin]
+      _ = (k + |c| + 2) * (1 + |c|) ^ n * S := by ring
+  refine SchwartzMap.seminorm_le_bound' ℂ k n _ ?_ hpoint
+  positivity
+
+private theorem seminorm_double_sum_apply {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    (p : ι → κ → Seminorm ℂ (PositiveRealExponentialDecay univ)) (s : Finset ι) (t : Finset κ)
+    (f : PositiveRealExponentialDecay univ) :
+    (∑ i ∈ s, ∑ j ∈ t, p i j) f = ∑ i ∈ s, ∑ j ∈ t, (p i j) f := by
+  let E0 := PositiveRealExponentialDecay univ
+  let phi : Seminorm ℂ E0 →+ (E0 → ℝ) := FunLike.coeAddMonoidHom (Seminorm ℂ E0) E0 ℝ
+  change (phi (∑ i ∈ s, ∑ j ∈ t, p i j)) f = _
+  rw [map_sum phi (fun i => ∑ j ∈ t, p i j) s]
+  have heval : (∑ i ∈ s, phi (∑ j ∈ t, p i j)) f =
+      (Pi.evalAddMonoidHom (fun _ : E0 => ℝ) f) (∑ i ∈ s, phi (∑ j ∈ t, p i j)) := rfl
+  rw [heval, map_sum (Pi.evalAddMonoidHom (fun _ : E0 => ℝ) f)]
+  refine Finset.sum_congr rfl fun i _ ↦ ?_
+  rw [map_sum phi (fun j => p i j) t]
+  rw [map_sum (Pi.evalAddMonoidHom (fun _ : E0 => ℝ) f)]
+  rfl
 
 /-- Paper: Lemma D.3.2.7(3), p. 803. The same topology is generated by including
 all nonnegative integer logarithmic weights. -/
 theorem exponentialDecayL2_log_generates (a : ℕ → ℝ) (ha : ∀ n, 0 < a n)
     (hunbounded : ¬ BddAbove (range a)) :
     GeneratesLpSeminorms volume 2
-      (fun (i : ℕ × ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) i.2.1 i.2.2) := by sorry
+      (fun (i : ℕ × ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) i.2.1 i.2.2) := by
+  have hmem (i : ℕ × ℕ × ℕ) (f : PositiveRealExponentialDecay univ) :
+      MemLp (exponentialDecayL2Integrand (a i.1) (i.2.1 : ℝ) i.2.2 f) 2 volume :=
+    (exponentialDecayL2_continuous_seminorm (a i.1) (i.2.1 : ℝ) (ha i.1)
+      (Nat.cast_nonneg _) i.2.2).1 f
+  let P : SeminormFamily ℂ (PositiveRealExponentialDecay univ) (ℕ × ℕ × ℕ) := fun i ↦
+    Classical.choose (exponentialDecayL2_continuous_seminorm (a i.1) (i.2.1 : ℝ) (ha i.1)
+      (Nat.cast_nonneg _) i.2.2).2
+  have hPspec (i : ℕ × ℕ × ℕ) := Classical.choose_spec
+    (exponentialDecayL2_continuous_seminorm (a i.1) (i.2.1 : ℝ) (ha i.1)
+      (Nat.cast_nonneg _) i.2.2).2
+  have hPcont (i : ℕ × ℕ × ℕ) : Continuous (P i) := (hPspec i).1
+  have hPval (i : ℕ × ℕ × ℕ) (f : PositiveRealExponentialDecay univ) :
+      ENNReal.ofReal (P i f) =
+        eLpNorm (exponentialDecayL2Integrand (a i.1) (i.2.1 : ℝ) i.2.2 f) 2 volume :=
+    (hPspec i).2 f
+  have hPeq (i : ℕ × ℕ × ℕ) (f : PositiveRealExponentialDecay univ) :
+      P i f = lpNorm (exponentialDecayL2Integrand (a i.1) (i.2.1 : ℝ) i.2.2 f) 2 volume := by
+    rw [← ENNReal.toReal_ofReal (apply_nonneg (P i) f), hPval i f, toReal_eLpNorm]
+  refine ⟨hmem, P, ?_, hPval⟩
+  let t : TopologicalSpace (PositiveRealExponentialDecay univ) := inferInstance
+  let u := P.moduleFilterBasis.topology
+  have hPu : WithSeminorms (topology := u) P := ⟨rfl⟩
+  refine WithSeminorms.mk (topology := t) ?_
+  change t = u
+  apply le_antisymm
+  · exact le_topology_withSeminorms (t := t) hPu hPcont
+  · let I0 : Set ℝ := univ
+    let Q := fun (i : I0 × ℕ × ℕ) ↦
+      (SchwartzMap.seminorm ℂ i.2.1 i.2.2).comp (logExponentialDecayTwist I0 i.1)
+    have hQ := withGeneratingSeminorms_spec (logExponentialDecaySubmodule (univ : Set ℝ)) Q
+    let : TopologicalSpace (PositiveRealExponentialDecay univ) := u
+    let : IsTopologicalAddGroup (PositiveRealExponentialDecay univ) := hPu.isTopologicalAddGroup
+    apply le_topology_withSeminorms (t := u) hQ
+    rintro ⟨⟨c, hc⟩, k, n⟩
+    obtain ⟨_, ⟨n0, rfl⟩, hn0⟩ :=
+      (not_bddAbove_iff.mp (show ¬ BddAbove (range a) by assumption)) |c|
+    let C : ℝ≥0 := ⟨(k + |c| + 2) * (1 + |c|) ^ n, by positivity⟩
+    let S : Seminorm ℂ (PositiveRealExponentialDecay univ) :=
+      ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2), P (n0, b, m)
+    have hScont : Continuous (S : PositiveRealExponentialDecay univ → ℝ) := by
+      dsimp [S]
+      refine Seminorm.continuous_finsetSum ?_
+      intro b hb
+      refine Seminorm.continuous_finsetSum ?_
+      intro m hm
+      exact hPu.continuous_seminorm (n0, b, m)
+    apply Seminorm.continuous_of_le (q := C • S) (hScont.const_smul C)
+    refine (Seminorm.le_def).2 ?_
+    intro f
+    rw [Seminorm.comp_apply]
+    change (SchwartzMap.seminorm ℂ k n) (logExponentialDecayTwist I0 ⟨c, hc⟩ f) ≤
+      (C : ℝ) * S f
+    have hsum : S f = ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2),
+        P (n0, b, m) f := by
+      simpa [S] using seminorm_double_sum_apply (fun b m => P (n0, b, m))
+        (Finset.range (k + 1)) (Finset.range (n + 2)) f
+    have htwist := twist_seminorm_le (a n0) c hn0 k n f
+    rw [hsum]
+    refine le_trans (by convert htwist using 1) ?_
+    have hlp : ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2),
+        lpNorm (exponentialDecayL2Integrand (a n0) (b : ℝ) m f) 2 volume =
+        ∑ b ∈ Finset.range (k + 1), ∑ m ∈ Finset.range (n + 2), P (n0, b, m) f := by
+      refine Finset.sum_congr rfl fun b _ ↦ Finset.sum_congr rfl fun m _ ↦ ?_
+      exact (hPeq (n0, b, m) f).symm
+    rw [hlp]
+    have hC : (C : ℝ) = ((k : ℝ) + |c| + 2) * (1 + |c|) ^ n := by
+      simp only [C]
+      exact Subtype.coe_mk _ _
+    rw [hC]
 
 end PositiveReal
 

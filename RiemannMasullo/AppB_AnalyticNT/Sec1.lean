@@ -1390,6 +1390,58 @@ theorem finiteHeckeReflectionFactor_isBigO_on_strip (χ : U[F]) (L Ldual ε : �
 -- and zero-free. For F = ℚ and χ trivial, its gamma quotient has a pole at 1
 -- and a zero at 0. The explicit conductor normalization also needs an ideal conductor API.
 
+/-- On a line to the left of zero, the reflected Dirichlet series is bounded,
+so the reflection factor determines the power of the height in the upper bound. -/
+private theorem finiteHeckeL_isBigO_on_left_line (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    {u : ℝ} (hu : u < 0) :
+    L =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {u})]
+      fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - u)) := by
+  obtain ⟨Ldual, hDual, hDualSeries⟩ := finiteHeckeL_exists_continuation χ⁻¹
+  obtain ⟨ε, hε, hεNe, hEq⟩ :=
+    finiteHeckeL_continuation_functionalEquation χ L Ldual hL hSeries hDual hDualSeries
+  have hUpper : u < u / 2 := by linarith
+  let p (x : ℝ) := (Module.finrank ℚ F : ℝ) * (1 / 2 - x)
+  obtain ⟨C, hC, T, hT⟩ := (isBigO_height_iff (p := p)).mp
+    (finiteHeckeReflectionFactor_isBigO_on_strip χ L Ldual ε hL hSeries hDual hDualSeries
+      hε hεNe hEq (u - 1) (u / 2) (by linarith))
+  obtain ⟨D, hD⟩ := finiteHeckeL_continuation_boundedOn_right χ⁻¹ Ldual hDualSeries
+    (r := 1 - u / 2) (by linarith)
+  refine (isBigO_height_iff (p := fun _ ↦ p u)).mpr
+    ⟨C * max D 1, by positivity, max T 0 + 1, fun s hs ht ↦ ?_⟩
+  change s.re = u at hs
+  let B (z : ℂ) := C * max D 1 * |z.im| ^ p z.re
+  suffices h : ‖L s‖ ≤ B s by simpa [B, hs] using h
+  -- The functional equation holds on a punctured neighborhood, so take limits at regular points.
+  rcases meromorphicNFAt_iff_analyticAt_or.mp (hL (mem_univ s)) with hAnalytic | ⟨_, _, hZero⟩
+  · have hB : ContinuousAt B s := by
+      refine continuousAt_const.mul (ContinuousAt.rpow
+        Complex.continuous_im.continuousAt.abs ?_ (Or.inl ?_))
+      · dsimp [p]
+        fun_prop
+      · exact (show 0 < |s.im| by linarith [le_max_right T 0]).ne'
+    apply le_of_tendsto_of_tendsto (b := 𝓝[≠] s)
+      (hAnalytic.continuousAt.norm.tendsto.mono_left nhdsWithin_le_nhds)
+      (hB.tendsto.mono_left nhdsWithin_le_nhds)
+    have hre : ∀ᶠ z : ℂ in 𝓝 s, z.re ∈ Ioo (u - 1) (u / 2) :=
+      Complex.continuous_re.continuousAt (Ioo_mem_nhds (by rw [hs]; linarith) (by rwa [hs]))
+    have him : ∀ᶠ z : ℂ in 𝓝 s, T < |z.im| :=
+      Complex.continuous_im.continuousAt.abs (Ioi_mem_nhds (by linarith [le_max_left T 0]))
+    filter_upwards [hEq.filter_mono (nhdsNE_le_codiscrete s),
+      hre.filter_mono nhdsWithin_le_nhds, him.filter_mono nhdsWithin_le_nhds] with z hz hzr hzi
+    have hReflected : 1 - u / 2 ≤ (1 - z).re := by
+      simp only [Complex.sub_re, Complex.one_re]
+      linarith [hzr.2]
+    rw [hz, norm_mul]
+    calc
+      _ ≤ (C * |z.im| ^ p z.re) * max D 1 :=
+        mul_le_mul (hT z (Ioo_subset_Icc_self hzr) hzi.le)
+          ((hD _ hReflected).trans (le_max_left _ _)) (norm_nonneg _) (by positivity)
+      _ = B z := by dsimp [B]; ring
+  · rw [hZero, norm_zero]
+    dsimp [B]
+    positivity
+
 /-- Paper: Proposition B.1.1.3, p. 591. On the closed critical strip the
 convexity bound has a common constant for all positive ε and all real parts.
 The height from which the estimate holds may depend on ε. -/
@@ -1397,7 +1449,70 @@ theorem finiteHeckeL_continuation_convexity_bound (χ : U[F]) (L : ℂ → ℂ)
     (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
     ∃ C : ℝ, 0 < C ∧ ∀ ε > (0 : ℝ),
       Asymptotics.IsBigOWith C (atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc (0 : ℝ) 1)) L
-        (fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * ((1 - s.re) / 2) + ε)) := by sorry
+        (fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * ((1 - s.re) / 2) + ε)) := by
+  refine ⟨1, zero_lt_one, fun ε hε ↦ ?_⟩
+  let d : ℝ := Module.finrank ℚ F
+  have hd : 0 ≤ d := Nat.cast_nonneg _
+  let δ := ε / (d + 1)
+  have hδ : 0 < δ := div_pos hε (by positivity)
+  have hdδ : d * δ ≤ ε := by
+    have h := (eq_div_iff (show d + 1 ≠ 0 by positivity)).mp (rfl : δ = ε / (d + 1))
+    nlinarith
+  let u := -δ
+  let v := 1 + δ
+  have hu : u < 0 := neg_lt_zero.mpr hδ
+  have hv : 1 < v := lt_add_of_pos_right _ hδ
+  have huv : u < v := hu.trans (zero_lt_one.trans hv)
+  let heightIn (S : Set ℝ) := atHeight ⊓ 𝓟 (Complex.re ⁻¹' S)
+  have hFilter {S S' : Set ℝ} (h : S ⊆ S') : heightIn S ≤ heightIn S' :=
+    inf_le_inf_left _ (principal_mono.mpr (preimage_mono h))
+  obtain ⟨G, hG, hGL⟩ :=
+    exists_analyticOnNhd_isTheta_finiteHeckeL_continuation χ L hL hSeries (u - 1)
+  have hSub : Icc u v ⊆ Ioi (u - 1) := fun _ hs ↦
+    (sub_lt_self u zero_lt_one).trans_le hs.1
+  have hLeft := finiteHeckeL_isBigO_on_left_line χ L hL hSeries hu
+  obtain ⟨D, hD⟩ := finiteHeckeL_continuation_boundedOn_right χ L hSeries hv
+  have hRight : L =O[heightIn {v}] fun s ↦ |s.im| ^ (0 : ℝ) := by
+    refine (isBigO_height_iff (p := fun _ ↦ 0)).mpr
+      ⟨max D 1, by positivity, 0, fun s hs _ ↦ ?_⟩
+    simpa only [Real.rpow_zero, mul_one] using
+      (hD s (le_of_eq (mem_singleton_iff.mp hs).symm)).trans (le_max_left D 1)
+  obtain ⟨M, hM, hPoly⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries u v huv
+  have hθ := hGL.mono (hFilter hSub)
+  have hInterp := isBigO_height_affine (f := G) (p := d * (1 / 2 - u)) (q := 0) huv
+    hM.le (mul_nonneg hd (by linarith)) le_rfl
+    ⟨0, fun s hs _ ↦ hG s (hSub hs)⟩ (hθ.isBigO.trans hPoly)
+    ((hθ.isBigO.mono (hFilter (singleton_subset_iff.mpr (left_mem_Icc.mpr huv.le)))).trans hLeft)
+    ((hθ.isBigO.mono (hFilter (singleton_subset_iff.mpr (right_mem_Icc.mpr huv.le)))).trans hRight)
+  have hExponent (x : ℝ) :
+      (1 - (x - u) / (v - u)) * (d * (1 / 2 - u)) + (x - u) / (v - u) * 0 =
+        d * ((1 + δ - x) / 2) := by
+    have hWidth : v - u = 2 * (1 / 2 - u) := by dsimp [u, v]; ring
+    field_simp [sub_ne_zero.mpr huv.ne']
+    rw [hWidth]
+    ring
+  simp only [hExponent] at hInterp
+  have hBound := (hθ.symm.isBigO.trans hInterp).mono (hFilter (Icc_subset_Icc hu.le hv.le))
+  obtain ⟨C, _, hC⟩ := Asymptotics.isBigO_iff'.mp hBound
+  have hHeight : Tendsto (fun z : ℂ ↦ |z.im|) (heightIn (Icc 0 1)) atTop :=
+    tendsto_inf_left tendsto_comap
+  -- The remaining ε / 2 absorbs the interpolation constant at sufficiently large height.
+  apply Asymptotics.IsBigOWith.of_bound
+  filter_upwards [hC, hHeight.eventually_ge_atTop 1,
+    ((tendsto_rpow_atTop (show 0 < ε / 2 by positivity)).comp hHeight).eventually_ge_atTop C]
+    with s hs ht hLarge
+  rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _)] at hs ⊢
+  rw [one_mul]
+  calc
+    ‖L s‖ ≤ C * |s.im| ^ (d * ((1 + δ - s.re) / 2)) := hs
+    _ ≤ |s.im| ^ (d * ((1 + δ - s.re) / 2)) * |s.im| ^ (ε / 2) := by
+      rw [mul_comm C]
+      exact mul_le_mul_of_nonneg_left hLarge (Real.rpow_nonneg (abs_nonneg _) _)
+    _ ≤ _ := by
+      rw [← Real.rpow_add (zero_lt_one.trans_le ht)]
+      apply Real.rpow_le_rpow_of_exponent_le ht
+      change d * ((1 + δ - s.re) / 2) + ε / 2 ≤ d * ((1 - s.re) / 2) + ε
+      linarith only [hdδ]
 
 -- TODO(paper-gap): Footnote 2 asks for a bound on [-1, 2] without specifying
 -- an exponent there. The exponent in (B.1.1.12) fails at σ = -1 even for ζ.

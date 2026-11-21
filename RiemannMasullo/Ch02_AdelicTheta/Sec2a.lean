@@ -510,6 +510,54 @@ private theorem elementary_additive_norm_le {m n r : ℕ} {Fk : Type*} [AddCommG
     _ ≤ ‖L‖ * ∑ j, |w.1 j| + (C + A₂ * ∑ k, |(w.2.2.1 k : ℝ)|) := by gcongr
     _ ≤ _ := by nlinarith [norm_nonneg L]
 
+/-- The norm of a continuous additive projection factoring through an elementary
+quotient grows at most linearly in the real and lattice coordinates. -/
+private theorem presentation_additive_norm_bound {G V : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [NormedAddCommGroup V] [NormedSpace ℝ V]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (m : G →* Multiplicative V) (hm : Continuous m)
+    (hker : ∀ u ∈ OrderDual.ofDual a.val.2, m u = 1) :
+    ∃ A B : ℝ, 0 ≤ A ∧ ∀ (y : G) (hy : y ∈ a.val.1),
+      ‖Multiplicative.toAdd (m y)‖ ≤
+        A * (∑ j, |(Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).1 j| +
+          ∑ k, |((Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).2.2.1 k : ℝ)|) +
+          B := by
+  let h0 := m.comp a.val.1.subtype
+  let lift : a.quotient →* Multiplicative V :=
+    QuotientGroup.lift _ h0 (fun u hu ↦ hker u (Subgroup.mem_comap.mp hu))
+  have hh0 : Continuous h0 := hm.comp continuous_subtype_val
+  have hlift : Continuous lift := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr hh0
+  have key : ∀ w₁ w₂ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank
+      e.finiteFactor, e.equiv.symm (Multiplicative.ofAdd (w₁ + w₂)) =
+        e.equiv.symm (Multiplicative.ofAdd w₁) * e.equiv.symm (Multiplicative.ofAdd w₂) :=
+    fun w₁ w₂ => e.equiv.symm.map_mul (Multiplicative.ofAdd w₁) (Multiplicative.ofAdd w₂)
+  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor →
+      V :=
+    fun w => Multiplicative.toAdd (lift (e.equiv.symm (Multiplicative.ofAdd w)))
+  have hPadd : ∀ w₁ w₂, P (w₁ + w₂) = P w₁ + P w₂ := (fun w₁ w₂ => by
+        have h1 := key w₁ w₂
+        have h2 := congrArg (fun z => Multiplicative.toAdd (lift z)) h1
+        have h3 := map_mul lift (e.equiv.symm (Multiplicative.ofAdd w₁))
+          (e.equiv.symm (Multiplicative.ofAdd w₂))
+        have h4 := congrArg Multiplicative.toAdd h3
+        exact (h2.trans h4).trans (toAdd_mul _ _))
+
+  have hP : Continuous P := continuous_toAdd.comp (hlift.comp (e.equiv.symm.continuous.comp
+    continuous_ofAdd))
+  have H := elementary_additive_norm_le (m := e.realDim) (n := e.torusDim)
+    (r := e.latticeRank) (Fk := e.finiteFactor) (V := V) P hP hPadd
+  obtain ⟨A, B, hA, hAB⟩ := H
+  refine ⟨A, B, hA, ?_⟩
+  intro y hy
+  have h1 := congrArg (fun z => Multiplicative.toAdd (lift z))
+      (e.equiv.symm_apply_apply (QuotientGroup.mk ⟨y, hy⟩))
+  have h2 : lift (QuotientGroup.mk ⟨y, hy⟩) = h0 ⟨y, hy⟩ := QuotientGroup.lift_mk _ _ _
+  have hPy : P (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))) =
+      Multiplicative.toAdd (m y) :=
+    h1.trans (congrArg Multiplicative.toAdd h2)
+  exact (le_of_eq (congrArg norm hPy.symm)).trans
+    (hAB (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))))
+
 open scoped Classical in
 /-- On the open subgroup of a structural pair of the adeles, the archimedean coordinate is
 controlled linearly by the real and lattice coordinates of any elementary presentation. -/
@@ -525,58 +573,21 @@ private theorem presentation_mixedSpace_bound
   let m : 𝔸[F] → mixedEmbedding.mixedSpace F :=
     fun z => InfiniteAdeleRing.ringEquiv_mixedSpace F z.1
   have hm : Continuous m := continuous_ringEquiv_mixedSpace.comp continuous_fst
-  let h0 : a.val.1 →* Multiplicative (mixedEmbedding.mixedSpace F) :=
-    { toFun := fun u => Multiplicative.ofAdd (m (Multiplicative.toAdd u.val))
+  let φ : Multiplicative 𝔸[F] →* Multiplicative (mixedEmbedding.mixedSpace F) :=
+    { toFun := fun x ↦ Multiplicative.ofAdd (m x.toAdd)
       map_one' := by
-        show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F 0) = 1
-        rw [map_zero]; rfl
-      map_mul' := fun u v => by
-        show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F
-          ((Multiplicative.toAdd u.val).1 + (Multiplicative.toAdd v.val).1)) = _
-        rw [map_add]; rfl }
-  have hker : ∀ u ∈ (OrderDual.ofDual a.val.2).comap a.val.1.subtype, h0 u = 1 := fun u hu => by
-    have := mixedSpace_eq_zero_of_isOpen_lcaAnnihilator hgood.2.1 (Subgroup.mem_comap.mp hu)
-    show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F
-      (Multiplicative.toAdd u.val).1) = 1
-    rw [Subgroup.coe_subtype] at this
-    rw [this]; rfl
-  let lift : a.quotient →* Multiplicative (mixedEmbedding.mixedSpace F) :=
-    QuotientGroup.lift _ h0 hker
-  have hh0 : Continuous h0 := continuous_ofAdd.comp (hm.comp (continuous_toAdd.comp
-    continuous_subtype_val))
-  have hlift : Continuous lift := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr hh0
-  have key : ∀ w₁ w₂ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank
-      e.finiteFactor, e.equiv.symm (Multiplicative.ofAdd (w₁ + w₂)) =
-        e.equiv.symm (Multiplicative.ofAdd w₁) * e.equiv.symm (Multiplicative.ofAdd w₂) :=
-    fun w₁ w₂ => e.equiv.symm.map_mul (Multiplicative.ofAdd w₁) (Multiplicative.ofAdd w₂)
-  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor →
-      mixedEmbedding.mixedSpace F :=
-    fun w => Multiplicative.toAdd (lift (e.equiv.symm (Multiplicative.ofAdd w)))
-  have hPadd : ∀ w₁ w₂, P (w₁ + w₂) = P w₁ + P w₂ := (fun w₁ w₂ => by
-        have h1 := key w₁ w₂
-        have h2 := congrArg (fun z => Multiplicative.toAdd (lift z)) h1
-        have h3 := map_mul lift (e.equiv.symm (Multiplicative.ofAdd w₁))
-          (e.equiv.symm (Multiplicative.ofAdd w₂))
-        have h4 := congrArg Multiplicative.toAdd h3
-        exact (h2.trans h4).trans (toAdd_mul _ _))
-
-  have hP : Continuous P := continuous_toAdd.comp (hlift.comp (e.equiv.symm.continuous.comp
-    continuous_ofAdd))
-  have H := elementary_additive_norm_le (m := e.realDim) (n := e.torusDim)
-    (r := e.latticeRank) (Fk := e.finiteFactor) (V := mixedEmbedding.mixedSpace F) P hP hPadd
-  obtain ⟨A, B, hA, hAB⟩ := H
-  refine ⟨A, B, hA, ?_⟩
-  intro y hy
-  have h1 := congrArg (fun z => Multiplicative.toAdd (lift z))
-      (e.equiv.symm_apply_apply (QuotientGroup.mk ⟨y, hy⟩))
-  have h2 : lift (QuotientGroup.mk ⟨y, hy⟩) = h0 ⟨y, hy⟩ := QuotientGroup.lift_mk _ _ _
-  have h3 : Multiplicative.toAdd (h0 ⟨y, hy⟩) =
-      InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1 := rfl
-  have hPy : P (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))) =
-      InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1 := by
-    exact (h1.trans (congrArg Multiplicative.toAdd h2)).trans h3
-  exact (le_of_eq (congrArg norm hPy.symm)).trans
-    (hAB (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))))
+        change Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F 0) = 1
+        rw [map_zero]
+        rfl
+      map_mul' x y := by
+        change Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F
+          (x.toAdd.1 + y.toAdd.1)) = _
+        rw [map_add]
+        rfl }
+  exact presentation_additive_norm_bound a e φ
+    (continuous_ofAdd.comp (hm.comp continuous_toAdd))
+    (fun x hx ↦ congrArg Multiplicative.ofAdd
+      (mixedSpace_eq_zero_of_isOpen_lcaAnnihilator hgood.2.1 hx))
 
 /-- A compactly generated subgroup of the adeles has bounded denominators at the finite places. -/
 private theorem exists_mul_mem_adicCompletionIntegers_of_compactlyGenerated
@@ -773,6 +784,29 @@ private theorem realization_decay (a : BruhatStructuralPair (Multiplicative 𝔸
     (add_nonneg (Finset.sum_nonneg fun _ _ => abs_nonneg _)
       (Finset.sum_nonneg fun _ _ => abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) hC'
 
+/-- A Schwartz–Bruhat stage decays in the norm of any continuous additive projection
+that vanishes on the kernel of the stage quotient. -/
+theorem schwartzBruhatStage_exists_norm_decay {G V : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [NormedAddCommGroup V] [NormedSpace ℝ V]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) (m : G →* Multiplicative V) (hm : Continuous m)
+    (hker : ∀ u ∈ OrderDual.ofDual a.val.2, m u = 1) (N : ℕ) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ y : G,
+      ‖schwartzBruhatStageRealization a e s y‖ * ‖(m y).toAdd‖ ^ N ≤ C := by
+  obtain ⟨A, B, hA, hAB⟩ := presentation_additive_norm_bound a e m hm hker
+  let fs : elementarySchwartzSubmodule _ _ _ _ := s
+  obtain ⟨C, hC⟩ := elementarySchwartz_decay fs.property N
+  refine ⟨(1 + A + max B 0) ^ N * max C 0, by positivity, fun y ↦ ?_⟩
+  rw [schwartzBruhatStageRealization_apply]
+  split_ifs with hy
+  · exact (mul_le_mul_of_nonneg_left
+      (pow_le_pow_left₀ (norm_nonneg _) (le_add_of_nonneg_left zero_le_one) N)
+      (norm_nonneg _)).trans (real_decay_aux (norm_nonneg _)
+        (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+          (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) (hC _))
+  · simp only [norm_zero, zero_mul]
+    positivity
+
 open scoped Classical in
 /-- The summands of the adelic average of a stage realization admit a summable majorant on a
 compact set of ideles and adeles. -/
@@ -959,6 +993,11 @@ private theorem continuous_schwartzBruhat_apply {G : Type*} [CommGroup G] [Topol
   · refine (continuousAt_const (y := (0 : ℂ))).congr ?_
     filter_upwards [hu.1.isOpen_compl.mem_nhds hx] with y hy
     exact ((schwartzBruhatStageRealization_apply a e s y).trans (dite_eq_right hy)).symm
+
+/-- A Schwartz–Bruhat function is continuous in its argument. -/
+theorem schwartzBruhat_continuous {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] (f : SchwartzBruhat G) : Continuous f :=
+  continuous_schwartzBruhat_apply f
 
 open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Uniform absolute convergence on compact sets gives continuity of the adelic average. -/
@@ -2042,14 +2081,73 @@ terms, theta decays faster than any power of the norm as it tends to zero. -/
 theorem adelicTheta_decay_small (f : ℬ[F]) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], normℝ g < T →
       ‖adelicTheta f g - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤
-        C * (normℝ g) ^ N := by sorry
+        C * (normℝ g) ^ N := by
+  obtain ⟨C, T, hC, hT, hlarge⟩ := adelicTheta_decay_large (adeleSchwartzFourier f) (N + 1)
+  refine ⟨C, T⁻¹, hC, inv_pos.mpr hT, ?_⟩
+  intro g hg
+  have hnorm : 0 < normℝ g :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero (ideleClassNorm F g)))
+  have hinv : normℝ (g⁻¹) = (normℝ g)⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  have hg' : T < normℝ (g⁻¹) := by
+    rw [hinv]
+    exact (lt_inv_comm₀ hnorm hT).mp hg
+  have hbound : ‖adelicTheta (adeleSchwartzFourier f) g⁻¹‖ ≤ C * (normℝ g) ^ (N + 1) := by
+    simpa only [hinv, inv_pow, inv_inv] using hlarge g⁻¹ hg'
+  rw [adelicTheta_riemannRoch f g, sub_right_comm, sub_add_cancel, add_sub_cancel_right,
+    norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr hnorm.le)]
+  calc
+    _ ≤ (normℝ g)⁻¹ * (C * (normℝ g) ^ (N + 1)) :=
+      mul_le_mul_of_nonneg_left hbound (inv_nonneg.mpr hnorm.le)
+    _ = C * ((normℝ g)⁻¹ * (normℝ g * (normℝ g) ^ N)) := by
+      rw [pow_succ']
+      ac_rfl
+    _ = _ := by rw [inv_mul_cancel_left₀ hnorm.ne']
 
 /-- Paper: Theorem 2.2.3.4(3), p. 83. If both zero terms vanish, theta
 decays at both ends at every exponential rate in the absolute logarithmic norm. -/
 theorem adelicTheta_decay_both (f : ℬ[F]) (hf : f zeroAdele = 0)
     (hFourier : adeleSchwartzFourier f zeroAdele = 0) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], T < |Real.log (normℝ g)| →
-      ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by sorry
+      ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by
+  obtain ⟨C₁, T₁, hC₁, hT₁, hlarge⟩ := adelicTheta_decay_large f N
+  -- The extra power absorbs the norm factor in Riemann–Roch.
+  obtain ⟨C₂, T₂, _, hT₂, hdual⟩ := adelicTheta_decay_large (adeleSchwartzFourier f) (N + 1)
+  let T := max 1 (max (Real.log T₁) (Real.log T₂))
+  refine ⟨max C₁ C₂, T, hC₁.trans_le (le_max_left _ _),
+    zero_lt_one.trans_le (le_max_left _ _), ?_⟩
+  intro g hg
+  have hpos : 0 < normℝ g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  let r := Real.exp |Real.log (normℝ g)|
+  have hthreshold {t : ℝ} (ht : 0 < t) (hle : Real.log t ≤ T) : t < r := by
+    exact (Real.exp_log ht) ▸ Real.exp_lt_exp.mpr (hle.trans_lt hg)
+  have h₁ := hthreshold hT₁ ((le_max_left _ _).trans (le_max_right 1 _))
+  have h₂ := hthreshold hT₂ ((le_max_right _ _).trans (le_max_right 1 _))
+  rw [neg_mul, Real.exp_neg, Real.exp_nat_mul]
+  change ‖adelicTheta f g‖ ≤ max C₁ C₂ * (r ^ N)⁻¹
+  by_cases hlog : 0 ≤ Real.log (normℝ g)
+  · have hr : r = normℝ g := by
+      dsimp [r]
+      rw [abs_of_nonneg hlog, Real.exp_log hpos]
+    rw [hr] at h₁ ⊢
+    exact (hlarge g h₁).trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (by positivity))
+  · have hr : r = (normℝ g)⁻¹ := by
+      dsimp [r]
+      rw [abs_of_neg (lt_of_not_ge hlog), Real.exp_neg, Real.exp_log hpos]
+    have hinv : normℝ (g⁻¹) = r := by
+      rw [hr]
+      simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+    have hbound := hdual g⁻¹ (hinv.symm ▸ h₂)
+    rw [hinv, ← div_eq_mul_inv, le_div_iff₀ (pow_pos (Real.exp_pos _) _)] at hbound
+    have htheta : adelicTheta f g = r • adelicTheta (adeleSchwartzFourier f) g⁻¹ := by
+      simpa only [hr, hf, hFourier, smul_zero, add_zero, sub_zero]
+        using adelicTheta_riemannRoch f g
+    rw [htheta, norm_smul, Real.norm_of_nonneg (Real.exp_nonneg _), ← div_eq_mul_inv,
+      le_div_iff₀ (pow_pos (Real.exp_pos _) _)]
+    calc
+      _ = ‖adelicTheta (adeleSchwartzFourier f) g⁻¹‖ * r ^ (N + 1) := by rw [pow_succ']; ring
+      _ ≤ C₂ := hbound
+      _ ≤ max C₁ C₂ := le_max_right _ _
 
 /-- Paper: Theorem 2.2.3.4(4), p. 83. The three decay estimates admit a common
 constant and threshold uniform over a bounded set of Schwartz–Bruhat functions.
