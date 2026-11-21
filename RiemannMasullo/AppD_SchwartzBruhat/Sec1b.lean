@@ -1623,6 +1623,9 @@ theorem lcaFourier_support_subset_annihilator (_hν : IsLCAPlancherelMeasure μ 
     (H : Subgroup G) (_hH : IsClosed (H : Set G)) (hinv : ∀ h : H, ∀ x, f (h.val * x) = f x) :
     Function.support (lcaFourier μ f) ⊆ (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
 
+-- Keep the existing hypotheses on integrability and regularity in the statement.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Lemma D.1.5.2(3), p. 761. Support in the open subgroup and invariance
 under the good subgroup give the corresponding conditions for the dual pair.
 Deviation: Stated in the forward direction because pointwise support and invariance
@@ -1634,7 +1637,30 @@ theorem lcaFourier_structuralPair_imp (_hν : IsLCAPlancherelMeasure μ ν)
     (∀ χ : lcaAnnihilator a.val.1, ∀ ψ : PontryaginDual G,
       lcaFourier μ f (χ.val * ψ) = lcaFourier μ f ψ) ∧
       Function.support (lcaFourier μ f) ⊆
-        (lcaAnnihilator (OrderDual.ofDual a.val.2) : Set (PontryaginDual G)) := by sorry
+        (lcaAnnihilator (OrderDual.ofDual a.val.2) : Set (PontryaginDual G)) := by
+  constructor
+  · intro χ ψ
+    unfold lcaFourier
+    refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+    by_cases hx : x ∈ a.val.1
+    · have hχ : χ.val x = 1 := (mem_lcaAnnihilator_iff a.val.1 χ.val).mp χ.property ⟨x, hx⟩
+      change f x * star ((χ.val x * ψ x : Circle) : ℂ) = f x * star (ψ x : ℂ)
+      rw [hχ, one_mul]
+    · have hfx : f x = 0 := Function.notMem_support.mp fun hx' ↦ hx (hs hx')
+      simp only [hfx, zero_mul]
+  · intro ψ hψ
+    refine (mem_lcaAnnihilator_iff _ ψ).mpr fun h ↦ ?_
+    have hmul : lcaFourier μ f ψ * star (ψ h.val : ℂ) = lcaFourier μ f ψ := by
+      unfold lcaFourier
+      rw [← integral_mul_const]
+      calc
+        _ = ∫ x, f (h.val * x) * star (ψ (h.val * x) : ℂ) ∂μ := by
+          refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+          simp only [hinv h x, map_mul, Circle.coe_mul, star_mul, mul_assoc]
+        _ = _ := integral_mul_left_eq_self (fun x ↦ f x * star (ψ x : ℂ)) h.val
+    have hstar := (mul_eq_left₀ (Function.mem_support.mp hψ)).mp hmul
+    apply Circle.coe_injective
+    simpa only [Circle.coe_one, star_star, star_one] using congrArg star hstar
 
 end Fourier
 end StructuralPairs
