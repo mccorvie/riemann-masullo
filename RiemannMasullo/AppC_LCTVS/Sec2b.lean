@@ -1055,7 +1055,46 @@ theorem finiteDimensional_weakDual_localBanach (U : Set (WeakDual ℂ E)) (hU : 
 
 /-- Paper: Lemma C.2.4.4, p. 687. The weak dual of a Hausdorff locally convex space
 is nuclear. -/
-theorem isNuclearTVS_weakDual : IsNuclearTVS.{v, u} (WeakDual ℂ E) := by sorry
+theorem isNuclearTVS_weakDual : IsNuclearTVS.{v, u} (WeakDual ℂ E) := by
+  have : PolynormableSpace ℂ (WeakDual ℂ E) :=
+    (topDualPairing ℂ E).weakBilin_withSeminorms.toPolynormableSpace
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  have hback : Continuous (show InjectiveTensor (WeakDual ℂ E) F →
+      ProjectiveTensor (WeakDual ℂ E) F from id) := by
+    refine continuous_injectiveTensor_to_projectiveTensor_of_localSeries (WeakDual ℂ E) ?_ F
+    intro U hU bU cU
+    refine ⟨U, hU, bU, cU, Subset.rfl, ?_⟩
+    let p := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+    let T := localBanachMap p p le_rfl
+    have : FiniteDimensional ℂ (LocalBanach p) := finiteDimensional_weakDual_localBanach E U hU bU cU
+    -- Expand the comparison in a finite basis and extend the series by zero.
+    let d := Module.finrank ℂ (LocalBanach p)
+    let b := Module.finBasis ℂ (LocalBanach p)
+    let c (n : ℕ) : ℂ := if n < d then 1 else 0
+    let φ (n : ℕ) : LocalBanach p →L[ℂ] ℂ :=
+      if h : n < d then (b.coord ⟨n, h⟩).toContinuousLinearMap else 0
+    let y (n : ℕ) : LocalBanach p := if h : n < d then T (b ⟨n, h⟩) else 0
+    refine ⟨c, φ, y, ?_, ?_, ?_, fun x ↦ ?_⟩
+    · exact (hasSum_sum_of_ne_finset_zero (s := Finset.range d) fun n hn ↦ by
+        simp only [Finset.mem_range] at hn
+        simp [c, hn]).summable
+    · exact tendsto_atTop_of_eventually_const (i₀ := d) fun _ hn ↦ dite_eq_right (not_lt.mpr hn)
+    · exact tendsto_atTop_of_eventually_const (i₀ := d) fun _ hn ↦ dite_eq_right (not_lt.mpr hn)
+    change LocalBanach p at x
+    have hsum : (∑ n ∈ Finset.range d, (c n * φ n x) • y n) = T x := by
+      rw [← Fin.sum_univ_eq_sum_range (fun n ↦ (c n * φ n x) • y n)]
+      calc
+        _ = ∑ i, T (b.repr x i • b i) := by
+          exact Finset.sum_congr rfl fun i _ ↦ by simp [c, φ, y, i.isLt, Module.Basis.coord_apply]
+        _ = T x := by rw [← map_sum, b.sum_repr]
+    change HasSum (fun n ↦ (c n * φ n x) • y n) (T x)
+    rw [← hsum]
+    exact hasSum_sum_of_ne_finset_zero fun n hn ↦ by
+      simp only [Finset.mem_range] at hn
+      simp [c, hn]
+  exact (⟨Equiv.refl (WeakDual ℂ E ⊗[ℂ] F), (uniformContinuous_tensorComparison _ F).continuous,
+    hback⟩ : ProjectiveTensor (WeakDual ℂ E) F ≃ₜ InjectiveTensor (WeakDual ℂ E) F).isHomeomorph
 
 end WeakDual
 
