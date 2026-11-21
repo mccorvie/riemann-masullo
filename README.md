@@ -46,14 +46,15 @@ the roadmap below.
 about gaps in the proof of the paper's main theorem, the trace formula of Theorem 12.5.1.1. They
 come from readings of the paper discussed in the Lean Zulip thread
 [Formalising Masullo's proof of GRH](https://leanprover.zulipchat.com/#narrow/channel/113488-general/topic/Formalising.20Masullo.27s.20proof.20of.20GRH/with/642314625),
-where the details have not been posted. They did not come from this formalization, which has not
-reached that part of the paper and has not hit a roadblock. The draft is also unfinished by its
+where the details have not been posted. The draft is also unfinished by its
 author's own account: Chapter 13, which should deduce GRH from the trace formula, does not yet
 state its main theorem.
 
-**What the formalization has found.** Small errors and gaps met along the way are logged in
-[`ERRATA.md`](ERRATA.md). So far they are all in the appendices' and early chapters' accounts of
-standard material, and none touches the trace formula.
+**What the formalization has found.** In the proof of Theorem 11.3.2.1, a later cutoff is
+claimed to preserve the orbital trace. With the shell acting in the second kernel variable
+as on p. 24, Lean shows that this cutoff makes the kernel zero, while the arithmetic side is
+log 2 for an admissible test over ℚ. The uncut trace identity remains open.
+See [erratum I100](ERRATA.md#orbital-shell-cutoff).
 
 The prerequisites (adeles and ideles, Haar measures, locally convex and nuclear spaces,
 Schwartz–Bruhat functions) are standard mathematics worth having in Lean whatever becomes of the

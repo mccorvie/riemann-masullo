@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 public import Mathlib.Analysis.Distribution.TestFunction
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 
 /-!
 # Uniform Fourier–Mellin estimates, jump singularities and compactly supported tests
@@ -411,5 +412,97 @@ theorem bruhatCompactSupport_dense_modulatedExponentialDecay :
     DenseRange (bruhatCompactSupportToModulatedExponentialDecay m I hm hms) := by sorry
 
 end CompactSupport
+
+/-- The compact kernel of a split real character is a good subgroup. Its annihilator
+is open, and restriction along the section identifies it with the dual real line. -/
+private theorem isBruhatGoodSubgroup_ker_splitReal (l : G →ₜ* Multiplicative ℝ) (s : Multiplicative ℝ →ₜ* G)
+    (hs : RightInverse s l) (hc : IsCompact (l.toMonoidHom.ker : Set G)) :
+    IsBruhatGoodSubgroup l.toMonoidHom.ker := by
+  let H := l.toMonoidHom.ker
+  let A := lcaAnnihilator H
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hc
+  let restrictH := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  have hopen : IsOpen (A : Set (PontryaginDual G)) :=
+    (isOpen_discrete ({1} : Set (PontryaginDual H))).preimage restrictH.continuous
+  refine ⟨hc.isClosed, hopen, ?_⟩
+  let pull (χ : PontryaginDual (Multiplicative ℝ)) : A :=
+    ⟨PontryaginDual.map l χ, (mem_lcaAnnihilator_iff H _).2 fun h ↦ by
+      change χ (l h.val) = 1
+      rw [show l h.val = 1 from h.property, map_one]⟩
+  let back (χ : A) := PontryaginDual.map s χ.val
+  let e : PontryaginDual (Multiplicative ℝ) ≃ₜ A :=
+    { toFun := pull
+      invFun := back
+      left_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (hs x)
+      right_inv := fun χ ↦ Subtype.ext <| PontryaginDual.ext fun x ↦ by
+        have hx : x / s (l x) ∈ H := by
+          change l (x / s (l x)) = 1
+          rw [map_div, hs, div_self']
+        have hχ := (mem_lcaAnnihilator_iff H χ.val).1 χ.property ⟨_, hx⟩
+        change χ.val (x / s (l x)) = 1 at hχ
+        exact (div_eq_one.mp ((map_div χ.val _ _).symm.trans hχ)).symm
+      continuous_toFun := (PontryaginDual.map l).continuous.subtype_mk _
+      continuous_invFun := (PontryaginDual.map s).continuous.comp continuous_subtype_val }
+  obtain ⟨r, _⟩ := exists_realPontryaginDualEquiv
+  let t := r.toHomeomorph.trans e
+  let : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  let : ConnectedSpace A := t.surjective.connectedSpace t.continuous
+  let : LocallyCompactSpace A := t.symm.isOpenEmbedding.locallyCompactSpace
+  obtain ⟨U, hU, hN⟩ := exists_compact_mem_nhds (1 : A)
+  refine ⟨U, hN, hU, ?_⟩
+  have ho := (Subgroup.closure U).isOpen_of_mem_nhds
+    (Filter.mem_of_superset hN Subgroup.subset_closure)
+  exact Subgroup.coe_eq_univ.mp <| IsClopen.eq_univ
+    ⟨(Subgroup.closure U).isClosed_of_isOpen ho, ho⟩ ⟨1, (Subgroup.closure U).one_mem⟩
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- A smooth function of a real additive character is Bruhat smooth when the kernel
+is a good subgroup. Each structural quotient sees the same real character. -/
+private theorem isBruhatSmooth_comp_realCharacter (l : G →ₜ* Multiplicative ℝ)
+    (hk : IsBruhatGoodSubgroup l.toMonoidHom.ker) {f : ℝ → ℂ} (hf : ContDiff ℝ ∞ f) :
+    IsBruhatSmooth (fun x ↦ f (Multiplicative.toAdd (l x))) := by
+  intro p
+  refine ⟨l.toMonoidHom.ker, hk, ?_, ?_⟩
+  · intro y x
+    change f (Multiplicative.toAdd (l (y.val * x))) = _
+    rw [map_mul, show l y.val = 1 from y.property, one_mul]
+  · intro a ha
+    let l' := l.toMonoidHom.comp a.val.1.subtype
+    have hker : (OrderDual.ofDual a.val.2).comap a.val.1.subtype ≤ l'.ker := by
+      intro x hx
+      change x.val ∈ l.toMonoidHom.ker
+      rwa [← ha]
+    let lq : a.quotient →ₜ* Multiplicative ℝ :=
+      { toMonoidHom := QuotientGroup.lift _ l' hker
+        continuous_toFun := (QuotientGroup.isQuotientMap_mk _).continuous_iff.2
+          (l.continuous.comp continuous_subtype_val) }
+    refine ⟨fun q ↦ f (Multiplicative.toAdd (lq q)), fun _ ↦ rfl, fun e z b ↦ ?_⟩
+    let finiteGroup := @Fin.addCommGroup e.finiteOrder ⟨(Fin.pos b).ne'⟩
+    exact (hf.of_le (mod_cast le_top)).comp
+      (@contDiff_logHom_elementaryCover e.realDim e.torusDim e.latticeRank
+        (Fin e.finiteOrder) a.quotient finiteGroup inferInstance inferInstance inferInstance
+        e.equiv.symm lq z b (p : ℕ∞))
+
+/-- Pulling a smooth radial profile back along a proper, split positive-real module
+gives a Bruhat smooth function on the group. -/
+theorem isBruhatSmooth_comp_splitModulation (m : G →ₜ* ℝ≥0ˣ) (hm : IsProperMap m)
+    (s : ℝ≥0ˣ →ₜ* G) (hsn : RightInverse s m) {f : ℝ → ℂ} (hf : ContDiff ℝ ∞ f) :
+    IsBruhatSmooth (fun x ↦ f ((m x).val : ℝ)) := by
+  let e : Multiplicative ℝ ≃ₜ* ℝ≥0ˣ :=
+    { Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm with
+      map_mul' := fun x y ↦ by apply Units.ext; apply NNReal.eq; exact Real.exp_add _ _ }
+  let l := (e.symm : ℝ≥0ˣ →ₜ* Multiplicative ℝ).comp m
+  let sectionMap := s.comp (e : Multiplicative ℝ →ₜ* ℝ≥0ˣ)
+  have hl : RightInverse sectionMap l := fun x ↦ (congrArg e.symm (hsn (e x))).trans (e.symm_apply_apply x)
+  have hlproper : IsProperMap l := e.symm.toHomeomorph.isProperMap.comp hm
+  have hc : IsCompact (l.toMonoidHom.ker : Set G) :=
+    hlproper.isCompact_preimage (isCompact_singleton (x := (1 : Multiplicative ℝ)))
+  have hg := isBruhatGoodSubgroup_ker_splitReal l sectionMap hl hc
+  have hφ : ContDiff ℝ ∞ (fun t : ℝ ↦ f (Real.exp t)) := hf.comp Real.contDiff_exp
+  have hSmooth := isBruhatSmooth_comp_realCharacter l hg hφ
+  have hEq (x : G) :
+      Real.exp (Multiplicative.toAdd (l x)) = ((m x).val : ℝ) :=
+    congrArg (fun u : ℝ≥0ˣ ↦ (u.val : ℝ)) (e.apply_symm_apply (m x))
+  simpa only [hEq] using hSmooth
 
 end RiemannMasullo

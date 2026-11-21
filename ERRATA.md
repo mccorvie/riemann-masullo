@@ -10,9 +10,8 @@ means nobody has yet. No entry has been reviewed by a specialist. The
 dispute over the main theorem is described in the [README](README.md#status), not here.
 
 The author's preface says that he and Brian Conrad know of "several glitches here and there"
-still being fixed, and that the draft is unfinished. Everything below so far is in the
-appendices and early chapters that recall standard material, and none of it touches the trace
-formula.
+still being fixed, and that the draft is unfinished. Most entries concern prerequisites.
+[I100](#orbital-shell-cutoff) concerns a step in the Chapter 11 calculation of orbital traces.
 
 ## False as stated
 
@@ -140,6 +139,7 @@ formula.
 | I99 | §4.6: Corollary 4.6.3.1, pp. 219–220; Example 4.6.1.6, pp. 215, 218 | The claimed injection has source E/P_S E where the cancellation gives E/P_{S₀}E ≃ P_γE/P_SE: for S = (γ, γ) the class of P_γ f with ∫f = 1 is non-zero and is killed. The example identifies a divided Mellin value with the Fourier coefficient a_n of (4.2.1.4) without the factor 1/L and the index sign (for L = 2, n = 0, F = e^(s²): 1 against 1/2), and the first jet on p. 215 has the wrong sign. | The isotype quotient isomorphisms used in Chapter 7 are stated in the corrected form; the comparison with `cyclicFourierCoeff` is stated with its normalization. | #2718 | reviewed |
 | I13 | After (3.1.2.1), p. 120 | Compactness of the norm-one part of J_{F,S} is cited from Theorem A.1.5.2(1), which is about C_{F,S}; one has to project away the unit factors outside S first. | `SIdeleQuotient` is the quotient of (3.1.2.1); the compactness statement is for it. | #148 | reported |
 | I14 | (3.1.2.2), p. 120 | At a finite place the norm has image q^ℤ, so the "section" of the norm exists only over that subgroup and depends on a uniformizer. | The Lean formula keeps both choices and the period 2πi/log q. | #148 | reported |
+| I100 | <a name="orbital-shell-cutoff"></a>Proof of Theorem 11.3.2.1, p. 495, immediately before (11.3.2.3) | The proof says that multiplying the shell kernel by a sufficiently late stratum indicator preserves the left side of (11.3.2.1). The shell in (11.3.1.4) has an implicit argument. With the second argument $y$ specified on p. 24, the nested unit strata on p. 493 give $\alpha_j(y)(\alpha_{k+1}(y)-\alpha_k(y))=0$ for every $j\ge k+1$. The resulting kernel vanishes everywhere. | For the trivial character over ℚ, an admissible radial test supported over norms in (3/2, 5/2) takes value 1 at norm 2. Only the inverse uniformizer contributes at the prime 2, so the arithmetic side is log 2 with local unit volume 1. Any orbital evaluation sending the zero kernel to zero gives 0 after the cutoff. The uncut identity still needs a proof. See `primeTwo_laterCutoff_ne_orbitalSum` in [OrbitalCutoff.lean](RiemannMasullo/Ch11_ShellStructure/OrbitalCutoff.lean). | [#2469, item 1](https://github.com/mccorvie/riemann-masullo/issues/2469#issuecomment-7057757662), [#2885](https://github.com/mccorvie/riemann-masullo/pull/2885) | reported |
 
 ## Placeholders and missing material
 
@@ -155,14 +155,14 @@ formula.
 
 ## Reported from reading, beyond what has been formalized
 
-The scouts who surveyed existing Lean also read ahead in the paper. These two reports concern
-parts that are not stated in Lean yet, so nothing here has been tested by the formalization.
+This section records objections from readings of the paper. The targeted calculation for the
+Chapter 11 shell cutoff is recorded separately in [I100](#orbital-shell-cutoff).
 
 | # | Where | Report | Source | Checked |
 |---|---|---|---|---|
 | R1 | Proposition 8.2.0.4(1),(2), p. 386 | Uniqueness modulo the embedded local unit group is reported to fail for the full idele group as printed: for the adele that is zero at a finite place v and one elsewhere, both the identity and the idele with a uniformizer at v fix it. The proof itself computes the stabilizer in the full group as the whole local multiplicative group. Restricting to norm one is a candidate correction; Theorem 8.3.0.1(1) cites the proposition. | [`survey/geometry.md`](RiemannMasullo/External/survey/geometry.md) | scout, against the page image |
 | R2 | §1.4.3, p. 29, and §1.8.4.3, p. 54 | The bound on the archimedean terms, claimed to be uniform in the cutoff and used for a Montel extraction, is reported to fail for the printed family of test functions, already for ζ: with nonnegative approximants tending to t⁻² on t > 1, Fatou's lemma makes the archimedean contribution diverge as the cutoff neighbourhood of 1 shrinks. The report says this concerns the passage to the limit in the introduction's sketch and leaves the trace identity itself undecided. A sign discrepancy in the prime sum on p. 29 is also reported. | [`survey/endgame.md`](RiemannMasullo/External/survey/endgame.md) | scout, against the page images |
-| R3 | Chapter 11 and §12.4–12.5, pp. 475–520 (Theorem 12.5.1.1) | An outside audit of the argument, done with an AI model and not checked by a number theorist, reports that the step restricting the spectral side to zeros in a window (p. 520) is unsupported, and lists further objections with computations in small cases. A companion calculation at the prime 2 (p. 514, (12.4.1.23)) reports that removing the norm cutoff and the Fourier cutoff in the two orders gives different values. Neither has been checked here; these chapters are not yet formalized. | issue #2469, pull request #2734 | reported |
+| R3 | Chapter 11 and §12.4–12.5, pp. 475–520 (Theorem 12.5.1.1) | An outside audit of the argument, done with an AI model and not checked by a number theorist, reports that the step restricting the spectral side to zeros in a window (p. 520) is unsupported, and lists further objections with computations in small cases. A companion calculation at the prime 2 (p. 514, (12.4.1.23)) reports that removing the norm cutoff and the Fourier cutoff in the two orders gives different values. The spectral-window and order-of-limits objections remain open here. | issue #2469, pull request #2734 | reported |
 
 ## How this file is kept
 
