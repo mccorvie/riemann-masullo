@@ -1498,12 +1498,121 @@ theorem mellin_verticalLp_of_exponentialDecay
           (((∫ x : ℝ, Real.exp ((max |a| |b| + (N : ℝ)) * |x|) * ‖f x‖) ^ p +
             C ^ p * lpTail p N) ^ (1 / p)) := by sorry
 
+omit hf in
+/-- The exponential twist of an exponentially decaying profile is integrable at every
+complex exponent. -/
+private theorem integrable_cexp_mul_of_exponentialDecay (g : 𝓢(ℝ, ℂ)) (hg : ExponentialDecay g)
+    (s : ℂ) : Integrable fun x : ℝ ↦ Complex.exp (s * x) * g x := by
+  obtain ⟨G, hG⟩ := exponentialDecay_weighted_schwartz g hg s.re
+  refine (G.integrable (μ := volume)).mono
+    ((Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal)).mul
+      g.continuous).aestronglyMeasurable (Eventually.of_forall fun x ↦ ?_)
+  have hexp : ‖Complex.exp (s * x)‖ = Real.exp (s.re * x) := by
+    rw [Complex.norm_exp, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, mul_zero,
+      sub_zero]
+  rw [hG, norm_mul, norm_mul, hexp, Complex.norm_of_nonneg (Real.exp_pos _).le]
+
+omit hf in
+/-- One integration by parts against the exponential at an arbitrary complex exponent. Two-sided
+decay makes both boundary terms vanish. -/
+private theorem integral_cexp_mul_derivCLM_of_exponentialDecay (g : 𝓢(ℝ, ℂ))
+    (hg : ExponentialDecay g) (s : ℂ) :
+    ∫ x : ℝ, Complex.exp (s * x) * SchwartzMap.derivCLM ℂ ℂ g x =
+      -s * ∫ x : ℝ, Complex.exp (s * x) * g x := by
+  let u := fun x : ℝ ↦ Complex.exp (s * x)
+  let u' := fun x : ℝ ↦ s * Complex.exp (s * x)
+  have hu (x : ℝ) : HasDerivAt u (u' x) x := by
+    have hlin : HasDerivAt (fun t : ℝ ↦ s * ↑t) s x := by
+      simpa [mul_one] using ((hasDerivAt_id x).ofReal_comp.const_mul s)
+    simpa [u, u', mul_comm] using hlin.cexp
+  have hv (x : ℝ) : HasDerivAt (g : ℝ → ℂ) (SchwartzMap.derivCLM ℂ ℂ g x) x := by
+    rw [SchwartzMap.derivCLM_apply]
+    exact g.differentiableAt.hasDerivAt
+  have huv : Integrable (u * (g : ℝ → ℂ)) := integrable_cexp_mul_of_exponentialDecay g hg s
+  have huv' : Integrable (u * ⇑(SchwartzMap.derivCLM ℂ ℂ g)) :=
+    integrable_cexp_mul_of_exponentialDecay _ (hg.deriv g) s
+  have hu'v : Integrable (u' * (g : ℝ → ℂ)) := by
+    have hfun : u' * (g : ℝ → ℂ) = fun x ↦ s * (u x * g x) := by
+      funext x
+      simp only [Pi.mul_apply, u, u']
+      ring
+    rw [hfun]
+    exact huv.const_mul s
+  have hparts : ∫ x, u x * SchwartzMap.derivCLM ℂ ℂ g x = -∫ x, u' x * g x :=
+    integral_mul_deriv_eq_deriv_mul_of_integrable (fun x _ ↦ hu x) (fun x _ ↦ hv x) huv' hu'v huv
+  have hsmul : ∫ x, u' x * g x = s * ∫ x, u x * g x := by
+    have hfun : (fun x ↦ u' x * g x) = fun x ↦ s * (u x * g x) := by
+      funext x
+      simp only [u, u']
+      ring
+    rw [hfun]
+    exact integral_const_mul s fun x ↦ u x * g x
+  rw [hsmul] at hparts
+  rw [neg_mul]
+  exact hparts
+
+omit hf in
+/-- Iterating the integration by parts: the `N`th logarithmic derivative is again an
+exponentially decaying profile, with no larger support, whose exponential twist integrates to
+`(-s) ^ N` times that of the original profile. -/
+private theorem exists_derivProfile_of_exponentialDecay (g : 𝓢(ℝ, ℂ))
+    (hg : ExponentialDecay g) (N : ℕ) :
+    ∃ h : 𝓢(ℝ, ℂ), ExponentialDecay h ∧ tsupport (h : ℝ → ℂ) ⊆ tsupport (g : ℝ → ℂ) ∧
+      ∀ s : ℂ, ∫ x : ℝ, Complex.exp (s * x) * h x =
+        (-s) ^ N * ∫ x : ℝ, Complex.exp (s * x) * g x := by
+  induction N with
+  | zero => exact ⟨g, hg, subset_rfl, fun s ↦ by rw [pow_zero, one_mul]⟩
+  | succ N ih =>
+    obtain ⟨h, hh, hsupp, hint⟩ := ih
+    refine ⟨SchwartzMap.derivCLM ℂ ℂ h, hh.deriv h, ?_, fun s ↦ ?_⟩
+    · rw [show (⇑(SchwartzMap.derivCLM ℂ ℂ h) : ℝ → ℂ) = _root_.deriv h from
+        funext (SchwartzMap.derivCLM_apply ℂ h)]
+      exact (tsupport_deriv_subset (f := (h : ℝ → ℂ))).trans hsupp
+    · rw [integral_cexp_mul_derivCLM_of_exponentialDecay h hh s, hint s, pow_succ]
+      ring
+
 /-- Paper: Proposition B.2.1.9(4), p. 599. Support in t > 1 permits the
 choice of one height-decay constant for the whole left half-plane.
 Deviation: The cited estimate is (B.2.1.27). The support is tested in x = log t. -/
 theorem mellin_heightBound_left_of_exponentialDecay
     (hSupport : tsupport (f : ℝ → ℂ) ⊆ Ioi 0) (b : ℝ) (N : ℕ) (hN : 1 ≤ N) :
-    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Iic b) N C := by sorry
+    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Iic b) N C := by
+  -- Integrate by parts `N` times: `(-s) ^ N * M(s)` is the twisted integral of the `N`th
+  -- logarithmic derivative `h`, which still vanishes on the nonpositive half-line.
+  obtain ⟨h, hh, hsupp, hint⟩ := exists_derivProfile_of_exponentialDecay f hf N
+  obtain ⟨G, hG⟩ := exponentialDecay_weighted_schwartz h hh (max b 0)
+  have hGint : Integrable (fun x : ℝ ↦ ‖G x‖) := (G.integrable (μ := volume)).norm
+  refine ⟨(∫ x : ℝ, ‖G x‖) + 1,
+    add_pos_of_nonneg_of_pos (integral_nonneg fun _ ↦ norm_nonneg _) one_pos, fun σ hσ y hy ↦ ?_⟩
+  have hσb : σ ≤ b := hσ
+  set s : ℂ := (σ : ℂ) + (y : ℂ) * Complex.I with hs
+  have hre : s.re = σ := by simp [s]
+  have him : s.im = y := by simp [s]
+  -- On the support, `x > 0` and `σ ≤ b`, so the weight `exp (σ x)` is at most `exp (max b 0 * x)`.
+  have hpoint (x : ℝ) : ‖Complex.exp (s * x) * h x‖ ≤ ‖G x‖ := by
+    by_cases hx : 0 < x
+    · have hexp : ‖Complex.exp (s * x)‖ = Real.exp (σ * x) := by
+        rw [Complex.norm_exp, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, mul_zero,
+          sub_zero, hre]
+      rw [hG, norm_mul, norm_mul, hexp, Complex.norm_of_nonneg (Real.exp_pos _).le]
+      exact mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr
+        (mul_le_mul_of_nonneg_right (hσb.trans (le_max_left b 0)) hx.le)) (norm_nonneg _)
+    · have hx0 : h x = 0 :=
+        image_eq_zero_of_notMem_tsupport fun hmem ↦ hx (hSupport (hsupp hmem))
+      rw [hx0, mul_zero, norm_zero]
+      exact norm_nonneg _
+  have hbound : ‖∫ x : ℝ, Complex.exp (s * x) * h x‖ ≤ ∫ x : ℝ, ‖G x‖ :=
+    norm_integral_le_of_norm_le hGint (Eventually.of_forall hpoint)
+  rw [hint s, ← mellin_fromLog_eq_integral_exp, norm_mul, norm_pow, norm_neg] at hbound
+  have hy0 : 0 < |y| ^ N := pow_pos (abs_pos.mpr hy) N
+  have hys : |y| ^ N ≤ ‖s‖ ^ N :=
+    pow_le_pow_left₀ (abs_nonneg y) (him ▸ Complex.abs_im_le_norm s) N
+  rw [le_div_iff₀ hy0]
+  calc ‖mellin (fromLog f) s‖ * |y| ^ N
+      ≤ ‖mellin (fromLog f) s‖ * ‖s‖ ^ N := mul_le_mul_of_nonneg_left hys (norm_nonneg _)
+    _ = ‖s‖ ^ N * ‖mellin (fromLog f) s‖ := mul_comm _ _
+    _ ≤ ∫ x : ℝ, ‖G x‖ := hbound
+    _ ≤ (∫ x : ℝ, ‖G x‖) + 1 := le_add_of_nonneg_right zero_le_one
 
 /-- Paper: Proposition B.2.1.9(4), p. 599. If the function is supported in
 t > 1, its Mellin transform belongs to each left half-plane Hardy class with p ≥ 1. -/
