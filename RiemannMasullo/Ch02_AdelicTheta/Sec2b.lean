@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 
 /-!
 # Directional derivatives and homogeneous adelic theta functions
@@ -35,7 +36,20 @@ variable (γ : ℝ≥0ˣ →ₜ* 𝕀[F])
 
 /-- Paper: Lemma 2.2.4.1, p. 87. Every idele in a continuous one-parameter
 subgroup has finite component one. -/
-theorem adeleOneParameter_finite_eq_one (t : ℝ≥0ˣ) : (γ t).val.2 = 1 := by sorry
+theorem adeleOneParameter_finite_eq_one (t : ℝ≥0ˣ) : (γ t).val.2 = 1 := by
+  have : ConnectedSpace ℝ≥0ˣ :=
+    (Nonneg.unitsHomeomorphPos ℝ).connectedSpace_iff.mpr
+      (isConnected_iff_connectedSpace.mp (isConnected_Ioi (a := (0 : ℝ))))
+  have hVal : Continuous (fun s : ℝ≥0ˣ ↦ (γ s).val) :=
+    Units.continuous_val.comp γ.continuous
+  apply IsDedekindDomain.FiniteAdeleRing.ext
+  intro v
+  have hCoord : Continuous (fun s : ℝ≥0ˣ ↦ (γ s).val.2 v) :=
+    (RestrictedProduct.continuous_eval v).comp (continuous_snd.comp hVal)
+  calc
+    (γ t).val.2 v = (γ 1).val.2 v :=
+      TotallyDisconnectedSpace.eq_of_continuous _ hCoord t 1
+    _ = (1 : IsDedekindDomain.FiniteAdeleRing (𝓞 F) F) v := by rw [map_one]; rfl
 
 /-- Paper: Lemma 2.2.4.1, p. 87. The norm of a continuous one-parameter
 subgroup is a power of its positive real parameter, with unique real exponent.
