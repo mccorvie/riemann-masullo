@@ -8,6 +8,7 @@ import Mathlib.Analysis.Calculus.FDeriv.Mul
 import Mathlib.Analysis.Complex.CauchyIntegral
 import Mathlib.Analysis.Normed.Module.Completion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.Integral
 
 /-!
 # Holomorphic and meromorphic vector-valued functions
@@ -282,7 +283,119 @@ theorem exists_positiveSimpleContour_circle (z : ℂ) {r : ℝ} (hr : 0 < r) :
       (∀ t ∈ Icc (0 : ℝ) 1, γ.val.toContinuousMap t = circleMap z r (2 * Real.pi * t)) ∧
       γ.val.trace = Metric.sphere z r ∧ γ.interior = Metric.ball z r ∧ γ.val.index z = 1 ∧
       HasPettisIntegral (.complex γ.val.measure) (fun w ↦ (w - z)⁻¹)
-        (2 * (Real.pi : ℂ) * Complex.I) := by sorry
+        (2 * (Real.pi : ℂ) * Complex.I) := by
+  let p (t : ℝ) := circleMap z r (2 * Real.pi * t)
+  have hscale : ContDiff ℝ 1 (fun t : ℝ ↦ 2 * Real.pi * t) := contDiff_const.mul contDiff_id
+  have hp : ContDiff ℝ 1 p := (contDiff_circleMap z r).comp hscale
+  let γ : ComplexContour :=
+    { toContinuousMap := ⟨p, hp.continuous⟩
+      closed := by simpa [p] using periodic_circleMap z r 0
+      piecewiseContDiff := by
+        refine ⟨1, fun i ↦ (i.val : ℝ), ?_, by norm_num, by norm_num, fun _ ↦ hp.contDiffOn⟩
+        intro i j hij
+        change (i.val : ℝ) < (j.val : ℝ)
+        exact_mod_cast (show i.val < j.val from hij) }
+  have htrace : γ.trace = Metric.sphere z r := by
+    change p '' Icc 0 1 = _
+    simp only [p, ← image_image, image_mul_left_Icc' Real.two_pi_pos, mul_zero, mul_one]
+    apply le_antisymm
+    · rintro _ ⟨θ, _, rfl⟩
+      exact circleMap_mem_sphere z hr.le θ
+    · rw [← show circleMap z r '' Ioc 0 (2 * Real.pi) = Metric.sphere z r by
+        simpa only [abs_of_pos hr] using image_circleMap_Ioc z r]
+      exact image_mono Ioc_subset_Icc_self
+  have hinj : InjOn γ.toContinuousMap (Ico 0 1) := by
+    intro s hs t ht heq
+    have hmaps : MapsTo (fun x : ℝ ↦ 2 * Real.pi * x) (Ico 0 1) (Ico 0 (2 * Real.pi)) := by
+      intro x hx
+      exact ⟨mul_nonneg Real.two_pi_pos.le hx.1, by
+        simpa only [mul_one] using mul_lt_mul_of_pos_left hx.2 Real.two_pi_pos⟩
+    have hang := (injOn_circleMap_of_abs_sub_le' (c := z) hr.ne'
+      (a := 0) (b := 2 * Real.pi) (by simp)) (hmaps hs) (hmaps ht) heq
+    exact mul_left_cancel₀ Real.two_pi_pos.ne' hang
+  have hvel (t : ℝ) :
+      deriv p t = (2 * Real.pi) • deriv (circleMap z r) (2 * Real.pi * t) := by
+    rw [deriv_circleMap]
+    exact ((hasDerivAt_circleMap z r (2 * Real.pi * t)).scomp t
+      (by simpa only [mul_one] using (hasDerivAt_id' t).const_mul (2 * Real.pi))).deriv
+  have hcontVel : Continuous (deriv p) := by
+    rw [show deriv p = _ from funext hvel]
+    simp only [deriv_circleMap]
+    fun_prop
+  let μ : Measure ℝ := volume.restrict (Icc (0 : ℝ) 1)
+  let ν : ComplexMeasure ℝ := μ.withDensityᵥ (deriv p)
+  have hvelInt : Integrable (deriv p) μ :=
+    hcontVel.continuousOn.integrableOn_compact isCompact_Icc
+  have hintegral {f : ℂ → ℂ} (hfm : Measurable f) (hfc : ContinuousOn f (Metric.sphere z r)) :
+      Integrable f (PettisMeasure.complex γ.measure).variation ∧
+        (PettisMeasure.complex γ.measure).scalarIntegral f = circleIntegral f z r := by
+    have hcomp : ContinuousOn (f ∘ p) (Icc 0 1) :=
+      hfc.comp hp.continuous.continuousOn (fun t _ ↦ circleMap_mem_sphere z hr.le _)
+    have hfi : ν.Integrable (f ∘ p) := by
+      change Integrable (f ∘ p) (μ.withDensityᵥ (deriv p)).variation
+      rw [Measure.variation_withDensityᵥ hvelInt]
+      exact (integrable_withDensity_iff_integrable_smul hcontVel.nnNorm.measurable).2
+        ((hcontVel.norm.continuousOn.smul hcomp).integrableOn_compact isCompact_Icc)
+    have hfm' := hfm.aestronglyMeasurable (μ := ν.variation.map p)
+    refine ⟨hfi.map hfm', ?_⟩
+    change (ν.map p).integral f (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [VectorMeasure.integral_map hp.continuous.measurable hfm' hfi]
+    change (μ.withDensityᵥ (deriv p)).integral (f ∘ p) (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [VectorMeasure.integral_withDensityᵥ_mul hvelInt hcontVel.measurable hfi]
+    change (∫ t in Icc (0 : ℝ) 1, f (p t) * deriv p t) = _
+    rw [integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le zero_le_one]
+    simp_rw [hvel, mul_smul_comm, mul_comm (f (p _))]
+    let F (θ : ℝ) := deriv (circleMap z r) θ • f (circleMap z r θ)
+    change (∫ t in (0 : ℝ)..1, (2 * Real.pi) • F (2 * Real.pi * t)) = _
+    rw [intervalIntegral.integral_smul, intervalIntegral.smul_integral_comp_mul_left]
+    simp [circleIntegral, F]
+  have hkernel (w : ℂ) (hw : w ∉ Metric.sphere z r) :
+      Integrable (fun v ↦ (v - w)⁻¹) (PettisMeasure.complex γ.measure).variation ∧
+        (PettisMeasure.complex γ.measure).scalarIntegral (fun v ↦ (v - w)⁻¹) =
+          circleIntegral (fun v ↦ (v - w)⁻¹) z r := by
+    apply hintegral ((measurable_id.sub_const w).inv)
+    exact (continuousOn_id.sub continuousOn_const).inv₀ fun v hv ↦
+      sub_ne_zero.mpr (ne_of_mem_of_not_mem hv hw)
+  have hconst : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 :=
+    mul_ne_zero (mul_ne_zero (by norm_num) (by exact_mod_cast Real.pi_ne_zero)) Complex.I_ne_zero
+  have hnotSphere {w : ℂ} (hw : w ∈ Metric.ball z r) : w ∉ Metric.sphere z r :=
+    fun hs ↦ (Metric.mem_ball.mp hw).ne (Metric.mem_sphere.mp hs)
+  have hballIndex (w : ℂ) (hw : w ∈ Metric.ball z r) : γ.index w = 1 := by
+    rw [ComplexContour.index, (hkernel w (hnotSphere hw)).2,
+      circleIntegral.integral_sub_inv_of_mem_ball hw, inv_mul_cancel₀ hconst]
+  have houtIndex (w : ℂ) (hw : w ∉ Metric.closedBall z r) : γ.index w = 0 := by
+    have hd : DifferentiableOn ℂ (fun v : ℂ ↦ (v - w)⁻¹) (Metric.closedBall z r) :=
+      (differentiableOn_id.sub_const w).inv fun v hv ↦
+        sub_ne_zero.mpr (ne_of_mem_of_not_mem hv hw)
+    have hc : DiffContOnCl ℂ (fun v : ℂ ↦ (v - w)⁻¹) (Metric.ball z r) :=
+      (show DifferentiableOn ℂ _ (closure (Metric.ball z r)) by
+        rwa [closure_ball z hr.ne']).diffContOnCl
+    rw [ComplexContour.index, (hkernel w (fun hs ↦ hw (Metric.sphere_subset_closedBall hs))).2,
+      hc.circleIntegral_eq_zero hr.le, mul_zero]
+  have houtside {w : ℂ} (hs : w ∉ Metric.sphere z r) (hb : w ∉ Metric.ball z r) :
+      w ∉ Metric.closedBall z r := by
+    intro hc
+    apply hb
+    rw [← Metric.closedBall_sdiff_sphere]
+    exact ⟨hc, hs⟩
+  let Γ : PositiveSimpleContour := ⟨γ, hinj, fun w hw ↦ by
+    rw [htrace] at hw
+    by_cases hb : w ∈ Metric.ball z r
+    · exact Or.inr (hballIndex w hb)
+    · exact Or.inl (houtIndex w (houtside hw hb))⟩
+  have hz : z ∈ Metric.ball z r := Metric.mem_ball_self hr
+  have hzs := hnotSphere hz
+  refine ⟨Γ, fun _ _ ↦ rfl, htrace, ?_, hballIndex z hz, ?_⟩
+  · ext w
+    change w ∉ γ.trace ∧ γ.index w = 1 ↔ w ∈ Metric.ball z r
+    rw [htrace]
+    constructor
+    · rintro ⟨hs, hi⟩
+      by_contra hb
+      exact zero_ne_one ((houtIndex w (houtside hs hb)).symm.trans hi)
+    · exact fun hw ↦ ⟨hnotSphere hw, hballIndex w hw⟩
+  · refine (pettisIntegral_complex_iff _ _ _).2.2.mpr ⟨(hkernel z hzs).1, ?_⟩
+    rw [(hkernel z hzs).2, circleIntegral.integral_sub_inv_of_mem_ball hz]
 
 section Criteria
 

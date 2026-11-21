@@ -284,6 +284,9 @@ class Merger:
                     return True
                 return "GitHub did not merge it"
             except ApiError as problem:
+                if problem.status == 403 and problem.message == "Resource not accessible by integration":
+                    # The same workflow token can still merge another pull request.
+                    return "the workflow token cannot merge this pull request (needs a project member)"
                 if problem.status == 405 and "modified" in problem.message:
                     continue          # main moved under us; try again
                 if problem.status == 409:

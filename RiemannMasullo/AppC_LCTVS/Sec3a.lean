@@ -8,6 +8,7 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
 
 /-!
 # Nuclear operators and the trace on Hilbert spaces
@@ -846,16 +847,256 @@ theorem exists_nuclearPresentation_tendsto_zero (A : E →L[ℂ] F) (hA : IsNucl
 
 end LocallyConvexOperators
 
+section NormedTensor
+
+open scoped NNReal
+
+variable {X Y : Type*} [NormedAddCommGroup X] [NormedSpace ℂ X]
+  [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+
+/-- The cost of a finite decomposition is the sum of the products of the factor norms. -/
+private def tensorDecompositionCost (l : List (X × Y)) : ℝ :=
+  (l.map fun p ↦ ‖p.1‖ * ‖p.2‖).sum
+
+omit [NormedSpace ℂ X] [NormedSpace ℂ Y] in
+/-- Each term contributing to the cost of a decomposition is nonnegative. -/
+private theorem tensorDecompositionCost_nonneg (l : List (X × Y)) :
+    0 ≤ tensorDecompositionCost l := by
+  refine List.sum_nonneg fun x hx ↦ ?_
+  obtain ⟨p, _, rfl⟩ := List.mem_map.mp hx
+  positivity
+
+/-- Finite lists of pairs representing a given algebraic tensor. -/
+private def TensorDecompositions (z : X ⊗[ℂ] Y) :=
+  {l : List (X × Y) // (l.map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum = z}
+
+/-- Concatenation represents addition of tensors. -/
+private def TensorDecompositions.append {z w : X ⊗[ℂ] Y}
+    (l : TensorDecompositions z) (m : TensorDecompositions w) : TensorDecompositions (z + w) :=
+  ⟨l.val ++ m.val, by rw [List.map_append, List.sum_append, l.property, m.property]⟩
+
+/-- Every algebraic tensor has a finite pure-tensor decomposition. -/
+private instance (z : X ⊗[ℂ] Y) : Nonempty (TensorDecompositions z) := by
+  induction z using TensorProduct.inductionOn with
+  | tmul x y => exact ⟨⟨[(x, y)], by simp⟩⟩
+  | add z w hz hw => exact ⟨hz.some.append hw.some⟩
+
+/-- The costs of all decompositions of a tensor are bounded below by zero. -/
+private theorem bddBelow_tensorDecompositionCost (z : X ⊗[ℂ] Y) :
+    BddBelow (range fun l : TensorDecompositions z ↦ tensorDecompositionCost l.val) :=
+  ⟨0, forall_mem_range.mpr fun l ↦ tensorDecompositionCost_nonneg l.val⟩
+
+/-- The projective seminorm is the infimum of the costs of finite pure-tensor decompositions. -/
+private def banachProjectiveSeminorm : Seminorm ℂ (X ⊗[ℂ] Y) := by
+  refine Seminorm.ofSMulLE
+    (fun z ↦ ⨅ l : TensorDecompositions z, tensorDecompositionCost l.val) ?_ ?_ ?_
+  · refine le_antisymm (ciInf_le (bddBelow_tensorDecompositionCost 0) ⟨[], rfl⟩) ?_
+    exact le_ciInf fun l ↦ tensorDecompositionCost_nonneg l.val
+  · intro z w
+    refine le_ciInf_add_ciInf fun l m ↦ ciInf_le_of_le (bddBelow_tensorDecompositionCost (z + w))
+      (l.append m) ?_
+    simp [tensorDecompositionCost, TensorDecompositions.append]
+  · intro c z
+    rw [Real.mul_iInf_of_nonneg (norm_nonneg c)]
+    refine le_ciInf fun l ↦ ciInf_le_of_le (bddBelow_tensorDecompositionCost (c • z))
+      ⟨l.val.map (fun p ↦ (c • p.1, p.2)), ?_⟩ ?_
+    · simp only [List.map_map, Function.comp_def, ← TensorProduct.smul_tmul']
+      have hm := List.smul_sum (r := c) (l := l.val.map fun p ↦ p.1 ⊗ₜ[ℂ] p.2)
+      rw [l.property, List.map_map] at hm
+      exact hm.symm
+    · simp only [tensorDecompositionCost, List.map_map, Function.comp_def, norm_smul,
+        mul_assoc, List.sum_map_mul_left, le_refl]
+
+/-- Tensors of small projective seminorm admit finite decompositions of small cost. -/
+private theorem exists_decomposition_of_projectiveSeminorm_lt (z : X ⊗[ℂ] Y) {r : ℝ}
+    (hr : banachProjectiveSeminorm z < r) :
+    ∃ l : List (X × Y), (l.map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum = z ∧
+      tensorDecompositionCost l < r := by
+  change (⨅ l : TensorDecompositions z, tensorDecompositionCost l.val) < r at hr
+  obtain ⟨l, hl⟩ := (ciInf_lt_iff (bddBelow_tensorDecompositionCost z)).mp hr
+  exact ⟨l.val, l.property, hl⟩
+
+/-- The projective seminorm is bounded on an elementary tensor by the product of norms. -/
+private theorem projectiveSeminorm_tmul_le (x : X) (y : Y) :
+    banachProjectiveSeminorm (x ⊗ₜ[ℂ] y) ≤ ‖x‖ * ‖y‖ := by
+  change (⨅ l : TensorDecompositions (x ⊗ₜ[ℂ] y), tensorDecompositionCost l.val) ≤ _
+  simpa only [tensorDecompositionCost, List.map_cons, List.map_nil, List.sum_cons,
+    List.sum_nil, add_zero] using
+    ciInf_le (bddBelow_tensorDecompositionCost (x ⊗ₜ[ℂ] y)) ⟨[(x, y)], by simp⟩
+
+/-- A seminorm bounded on pure tensors by the product of norms is bounded by the
+projective seminorm with the same constant. -/
+private theorem seminorm_le_banachProjectiveSeminorm (q : Seminorm ℂ (X ⊗[ℂ] Y)) {C : ℝ}
+    (hC : 0 ≤ C) (hq : ∀ x y, q (x ⊗ₜ[ℂ] y) ≤ C * (‖x‖ * ‖y‖)) (z : X ⊗[ℂ] Y) :
+    q z ≤ C * banachProjectiveSeminorm z := by
+  have hlist (l : List (X × Y)) : q ((l.map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum) ≤
+      C * tensorDecompositionCost l := by
+    induction l with
+    | nil => simp [tensorDecompositionCost]
+    | cons p l ih =>
+      simp only [tensorDecompositionCost, List.map_cons, List.sum_cons, mul_add] at ih ⊢
+      exact (map_add_le_add q _ _).trans (add_le_add (hq p.1 p.2) ih)
+  change q z ≤ C * ⨅ l : TensorDecompositions z, tensorDecompositionCost l.val
+  rw [Real.mul_iInf_of_nonneg hC]
+  refine le_ciInf fun l ↦ le_of_eq_of_le (congrArg q l.property.symm) (hlist l.val)
+
+/-- A vector divided by its norm, with the zero vector mapped to zero. -/
+private def normalizedFactor (x : X) : X := (‖x‖ : ℂ)⁻¹ • x
+
+/-- A normalized factor lies in the closed unit ball. -/
+private theorem norm_normalizedFactor_le_one (x : X) : ‖normalizedFactor x‖ ≤ 1 := by
+  by_cases hx : x = 0
+  · simp [hx, normalizedFactor]
+  · rw [normalizedFactor, norm_smul, norm_inv, Complex.norm_real,
+      Real.norm_of_nonneg (norm_nonneg x), inv_mul_cancel₀ (norm_ne_zero_iff.mpr hx)]
+
+/-- Multiplying a normalized factor by the original norm restores the vector. -/
+private theorem norm_smul_normalizedFactor (x : X) : (‖x‖ : ℂ) • normalizedFactor x = x := by
+  by_cases hx : x = 0
+  · simp [hx, normalizedFactor]
+  · exact smul_inv_smul₀ (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr hx)) x
+
+/-- The projective seminorm belongs to the family defining the projective tensor topology. -/
+private theorem banachProjectiveSeminorm_continuousAt_tmul :
+    ContinuousAt (fun v : X × Y ↦ banachProjectiveSeminorm (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+  have h : Continuous (fun v : X × Y ↦ ‖v.1‖ * ‖v.2‖) :=
+    continuous_fst.norm.mul continuous_snd.norm
+  rw [ContinuousAt, Prod.fst_zero, Prod.snd_zero, TensorProduct.zero_tmul, map_zero]
+  have h' : Tendsto (fun v : X × Y ↦ ‖v.1‖ * ‖v.2‖) (𝓝 0) (𝓝 0) := by
+    simpa only [Prod.fst_zero, Prod.snd_zero, norm_zero, mul_zero] using h.tendsto (0 : X × Y)
+  exact tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds h'
+    (fun v : X × Y ↦ apply_nonneg banachProjectiveSeminorm (v.1 ⊗ₜ[ℂ] v.2))
+    (fun v ↦ projectiveSeminorm_tmul_le v.1 v.2)
+
+/-- A generating seminorm of the projective topology is bounded by a multiple of the
+projective seminorm. -/
+private theorem bound_of_projective_generator (q : Seminorm ℂ (X ⊗[ℂ] Y))
+    (hq : ContinuousAt (fun v : X × Y ↦ q (v.1 ⊗ₜ[ℂ] v.2)) 0) :
+    ∃ C : ℝ≥0, ∀ z, q z ≤ C * banachProjectiveSeminorm z := by
+  have h : {v : X × Y | q (v.1 ⊗ₜ[ℂ] v.2) < 1} ∈ 𝓝 0 :=
+    hq.preimage_mem_nhds (t := Iio 1) (by simpa using Iio_mem_nhds (α := ℝ) one_pos)
+  obtain ⟨δ, hδ, hδq⟩ := Metric.mem_nhds_iff.mp h
+  let a : ℂ := ((δ / 2 : ℝ) : ℂ)
+  have ha : ‖a‖ = δ / 2 := by simp [a, abs_of_pos hδ]
+  have ha₀ : 0 < ‖a‖ := by rw [ha]; positivity
+  refine ⟨‖a‖₊⁻¹ * ‖a‖₊⁻¹, seminorm_le_banachProjectiveSeminorm q (by positivity) ?_⟩
+  intro x y
+  let x' := normalizedFactor x
+  let y' := normalizedFactor y
+  have hball : (a • x', a • y') ∈ Metric.ball (0 : X × Y) δ := by
+    rw [mem_ball_zero_iff, Prod.norm_def, max_lt_iff, norm_smul, norm_smul, ha]
+    exact ⟨(mul_le_of_le_one_right (by positivity) (norm_normalizedFactor_le_one x)).trans_lt
+        (by linarith),
+      (mul_le_of_le_one_right (by positivity) (norm_normalizedFactor_le_one y)).trans_lt
+        (by linarith)⟩
+  have hunit : q (x' ⊗ₜ[ℂ] y') ≤ ‖a‖⁻¹ * ‖a‖⁻¹ := by
+    have hlt : q ((a • x') ⊗ₜ[ℂ] (a • y')) < 1 := hδq hball
+    rw [TensorProduct.smul_tmul_smul, map_smul_eq_mul, norm_mul] at hlt
+    calc
+      _ ≤ 1 / (‖a‖ * ‖a‖) :=
+        (le_div_iff₀ (mul_pos ha₀ ha₀)).mpr (by simpa only [mul_comm] using hlt.le)
+      _ = _ := by rw [one_div, mul_inv]
+  calc
+    q (x ⊗ₜ[ℂ] y) = (‖x‖ * ‖y‖) * q (x' ⊗ₜ[ℂ] y') := by
+      conv_lhs => rw [← norm_smul_normalizedFactor x, ← norm_smul_normalizedFactor y]
+      rw [TensorProduct.smul_tmul_smul, map_smul_eq_mul, norm_mul, Complex.norm_real,
+        Complex.norm_real, Real.norm_of_nonneg (norm_nonneg x),
+        Real.norm_of_nonneg (norm_nonneg y)]
+    _ ≤ _ := by
+      change _ ≤ (‖a‖⁻¹ * ‖a‖⁻¹) * (‖x‖ * ‖y‖)
+      rw [mul_comm (‖a‖⁻¹ * ‖a‖⁻¹)]
+      exact mul_le_mul_of_nonneg_left hunit (by positivity)
+
+/-- The identity from the projective tensor topology to the projective seminorm topology. -/
+private def toProjectiveSeminorm :
+    ProjectiveTensor X Y →L[ℂ] WithLocalSeminorm (banachProjectiveSeminorm (X := X) (Y := Y)) := by
+  let hP := withGeneratingSeminorms_spec (X ⊗[ℂ] Y)
+    (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+  let W := WithLocalSeminorm (banachProjectiveSeminorm (X := X) (Y := Y))
+  let i : ProjectiveTensor X Y →ₗ[ℂ] W := LinearMap.id
+  refine ⟨i, (norm_withSeminorms ℂ W).continuous_of_continuous_comp i fun _ ↦ ?_⟩
+  exact hP.continuous_seminorm ⟨_, banachProjectiveSeminorm_continuousAt_tmul⟩
+
+/-- The identity from the projective seminorm topology to the projective tensor topology. -/
+private def fromProjectiveSeminorm :
+    WithLocalSeminorm (banachProjectiveSeminorm (X := X) (Y := Y)) →L[ℂ] ProjectiveTensor X Y := by
+  let hP := withGeneratingSeminorms_spec (X ⊗[ℂ] Y)
+    (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+  refine ⟨LinearMap.id, hP.continuous_of_continuous_comp _ fun ⟨q, hq⟩ ↦ ?_⟩
+  obtain ⟨C, hC⟩ := bound_of_projective_generator q hq
+  let W := WithLocalSeminorm (banachProjectiveSeminorm (X := X) (Y := Y))
+  exact Seminorm.continuous_of_le (q := C • normSeminorm ℂ W)
+    ((continuous_norm (E := W)).const_smul C) hC
+
+/-- Approximate a completed tensor at geometric accuracy and decompose successive
+differences into finite lists of pure tensors with summable total cost. -/
+private theorem exists_summable_tensorDecompositions
+    (z : LocalBanach (banachProjectiveSeminorm (X := X) (Y := Y))) :
+    ∃ l : ℕ → List (X × Y), Summable (fun n ↦ tensorDecompositionCost (l n)) ∧
+      HasSum (fun n ↦ ((show WithLocalSeminorm banachProjectiveSeminorm from
+        ((l n).map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum) : LocalBanach banachProjectiveSeminorm)) z := by
+  let W := WithLocalSeminorm (banachProjectiveSeminorm (X := X) (Y := Y))
+  let ε (n : ℕ) := (1 / 2 : ℝ) ^ n
+  have hε (n : ℕ) : 0 < ε n := by dsimp [ε]; positivity
+  have hεS : Summable ε := summable_geometric_of_lt_one (by norm_num) (by norm_num)
+  choose a ha using fun n ↦ Completion.denseRange_coe.exists_dist_lt z (hε n)
+  let v : ℕ → W
+    | 0 => 0
+    | n + 1 => a n
+  have hv : Tendsto (fun n ↦ (v n : Completion W)) atTop (𝓝 z) := by
+    apply (tendsto_add_atTop_iff_nat 1).mp
+    rw [tendsto_iff_dist_tendsto_zero]
+    have hlim : Tendsto ε atTop (𝓝 0) :=
+      tendsto_pow_atTop_nhds_zero_of_lt_one (by norm_num) (by norm_num)
+    exact tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hlim
+      (fun _ ↦ dist_nonneg) (fun n ↦ (by simpa only [v, dist_comm] using (ha n).le))
+  let d (n : ℕ) := v (n + 1) - v n
+  choose l hl hlcost using fun n ↦ exists_decomposition_of_projectiveSeminorm_lt
+    (show X ⊗[ℂ] Y from d n) (lt_add_of_pos_right _ (hε n))
+  have hd (n : ℕ) : ‖d (n + 1)‖ ≤ ε n + ε (n + 1) := by
+    change ‖a (n + 1) - a n‖ ≤ _
+    rw [← Completion.norm_coe, Completion.coe_sub, ← dist_eq_norm]
+    exact (dist_triangle_right (a (n + 1) : Completion W) (a n) z).trans
+      (add_le_add (by simpa only [dist_comm] using (ha (n + 1)).le)
+        (by simpa only [dist_comm] using (ha n).le) |>.trans_eq (add_comm _ _))
+  have hshift := (summable_nat_add_iff 1).mpr hεS
+  have hs : Summable (fun n ↦ tensorDecompositionCost (l n)) := by
+    apply (summable_nat_add_iff 1).mp
+    refine (hεS.add (hshift.add hshift)).of_nonneg_of_le
+      (fun n ↦ tensorDecompositionCost_nonneg (l (n + 1))) fun n ↦ ?_
+    exact ((hlcost (n + 1)).le.trans (add_le_add_left (hd n) _)).trans_eq (add_assoc _ _ _)
+  have hdS : Summable (fun n ↦ (d n : Completion W)) :=
+    hs.of_norm_bounded fun n ↦ by
+      rw [Completion.norm_coe]
+      change banachProjectiveSeminorm (show X ⊗[ℂ] Y from d n) ≤ _
+      have hle := ciInf_le (bddBelow_tensorDecompositionCost (show X ⊗[ℂ] Y from d n))
+        ⟨l n, hl n⟩
+      exact hle
+  refine ⟨l, hs, (hdS.hasSum_iff_tendsto_nat.mpr ?_).congr_fun (fun n ↦ ?_)⟩
+  · refine hv.congr fun n ↦ ?_
+    simp only [d, Completion.coe_sub]
+    rw [Finset.sum_range_sub (fun k ↦ (v k : Completion W)), show v 0 = 0 from rfl,
+      Completion.coe_zero, sub_zero]
+  · exact congrArg (fun t : W ↦ (t : Completion W)) (hl n)
+
+end NormedTensor
+
 section BanachTensor
 
 variable {E F : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
   [NormedAddCommGroup F] [NormedSpace ℂ F] [CompleteSpace F]
 
+-- Keep the completeness hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.3.1.2), p. 693. On Banach spaces the canonical tensor map is continuous
 for the operator norm on its target. -/
 theorem continuous_tensorToFiniteRank_opNorm :
     Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
-      (tensorToFiniteRank z : E →L[ℂ] F)) := by sorry
+      (tensorToFiniteRank z : E →L[ℂ] F)) := by
+  -- Mathlib's operator norm induces the existing bounded-convergence topology.
+  exact continuous_tensorToFiniteRank_bounded
 
 /-- Paper: (C.3.1.2), p. 693. The canonical map extends to the completed
 projective tensor of the dual and the target Banach space. -/
@@ -870,15 +1111,188 @@ theorem completedProjectiveTensorToOperators_coe (z : ProjectiveTensor (StrongDu
     completedProjectiveTensorToOperators z = tensorToFiniteRank z :=
   ContinuousLinearMap.fromCompletion_apply_coe _ z
 
+local notation "D" => StrongDual ℂ E
+local notation "P" => ProjectiveTensor (StrongDual ℂ E) F
+local notation "W" => WithLocalSeminorm (banachProjectiveSeminorm (X := D) (Y := F))
+
+/-- A nuclear series lifts to a sum of elementary tensors in the completion. -/
+private theorem mem_range_of_isBanachNuclear (A : E →L[ℂ] F) (hA : IsBanachNuclear A) :
+    A ∈ range completedProjectiveTensorToOperators := by
+  obtain ⟨c, φ, y, hc, hφ, hy, hA⟩ := hA
+  obtain ⟨B, hB, hφB⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  obtain ⟨C, _, hyC⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+  let t (n : ℕ) : W := c n • (φ n ⊗ₜ[ℂ] y n)
+  have ht : Summable (fun n ↦ (t n : Completion W)) :=
+    (hc.mul_right (B * C)).of_norm_bounded (fun n ↦ by
+      rw [Completion.norm_coe]
+      change ‖c n • (show W from φ n ⊗ₜ[ℂ] y n)‖ ≤ _
+      rw [norm_smul]
+      refine mul_le_mul_of_nonneg_left ((projectiveSeminorm_tmul_le (φ n) (y n)).trans
+        (mul_le_mul (hφB _ (mem_range_self n)) (hyC _ (mem_range_self n))
+          (norm_nonneg _) hB.le)) (norm_nonneg _))
+  let j : W →L[ℂ] P := fromProjectiveSeminorm
+  refine ⟨j.completion (∑' n, (t n : Completion W)), ?_⟩
+  ext x
+  let ev := (ContinuousLinearMap.apply ℂ F) x
+  have hs := (ev.comp (completedProjectiveTensorToOperators.comp j.completion)).hasSum ht.hasSum
+  refine (hs.congr_fun fun n ↦ ?_).unique (hA x)
+  change (c n * φ n x) • y n = completedProjectiveTensorToOperators (j.completion (t n)) x
+  rw [ContinuousLinearMap.completion_apply_coe, completedProjectiveTensorToOperators_coe]
+  change (c n * φ n x) • y n = tensorToFiniteRank (c n • (φ n ⊗ₜ[ℂ] y n)) x
+  rw [map_smul, smul_apply, tensorToFiniteRank_tmul, mul_smul]
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- A series of finite pure-tensor decompositions of summable total cost flattens to
+a series of rank-one maps with summable coefficients and unit-ball factors. -/
+private theorem isBanachNuclear_of_summable_tensorDecompositions
+    (T : Completion W →L[ℂ] (E →L[ℂ] F))
+    (hT : ∀ (φ : D) (y : F) (x : E),
+      T ((show W from φ ⊗ₜ[ℂ] y) : Completion W) x = φ x • y)
+    (z : Completion W) (l : ℕ → List (D × F))
+    (hl : Summable (fun n ↦ tensorDecompositionCost (l n)))
+    (hz : HasSum (fun n ↦ ((show W from ((l n).map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum) :
+      Completion W)) z) :
+    IsBanachNuclear (T z) := by
+  classical
+  let I := Σ n : ℕ, Fin (l n).length
+  let p (i : I) : D × F := (l i.1).get i.2
+  let b (i : I) : W := (p i).1 ⊗ₜ[ℂ] (p i).2
+  let cost (i : I) : ℝ := ‖(p i).1‖ * ‖(p i).2‖
+  have hcost : Summable cost := (summable_sigma_of_nonneg
+    (fun i : I ↦ by dsimp [cost]; positivity)).mpr ⟨fun _ ↦ (hasSum_fintype _).summable, by
+      convert hl using 1
+      funext n
+      rw [tsum_fintype, ← List.sum_ofFn]
+      change (List.ofFn ((fun v : D × F ↦ ‖v.1‖ * ‖v.2‖) ∘ (l n).get)).sum = _
+      rw [← List.map_ofFn, List.ofFn_get]
+      rfl⟩
+  have hbS : Summable (fun i ↦ (b i : Completion W)) := hcost.of_norm_bounded fun i ↦
+    (Completion.norm_coe (b i)).le.trans (projectiveSeminorm_tmul_le (p i).1 (p i).2)
+  have hb : HasSum (fun i ↦ (b i : Completion W)) z :=
+    hz.sigma_of_hasSum (fun n ↦ by
+      convert hasSum_fintype (fun i : Fin (l n).length ↦ (b ⟨n, i⟩ : Completion W)) using 1
+      let coe : W →L[ℂ] Completion W := Completion.toComplL
+      change coe ((l n).map fun p ↦ p.1 ⊗ₜ[ℂ] p.2).sum =
+        ∑ i : Fin (l n).length, coe (b ⟨n, i⟩)
+      rw [← map_sum]
+      congr 1
+      symm
+      rw [← List.sum_ofFn]
+      change (List.ofFn ((fun v : D × F ↦ v.1 ⊗ₜ[ℂ] v.2) ∘ (l n).get)).sum = _
+      rw [← List.map_ofFn, List.ofFn_get]) hbS
+  obtain ⟨e, he⟩ := Countable.exists_injective_nat I
+  let r (n : ℕ) := extend e p 0 n
+  let c (n : ℕ) : ℂ := (‖(r n).1‖ : ℂ) * (‖(r n).2‖ : ℂ)
+  let φ (n : ℕ) : D := normalizedFactor (r n).1
+  let y (n : ℕ) : F := normalizedFactor (r n).2
+  refine isBanachNuclear_of_bounded_series (T z) c φ y ?_
+    ⟨1, fun n ↦ norm_normalizedFactor_le_one (r n).1⟩
+    (fun n ↦ norm_normalizedFactor_le_one (r n).2) fun x ↦ ?_
+  · have h := (summable_extend_zero he).mpr hcost
+    refine h.congr fun n ↦ ?_
+    simp only [c, norm_mul, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)]
+    by_cases h : ∃ i, e i = n
+    · obtain ⟨i, rfl⟩ := h
+      simp only [r, he.extend_apply, cost]
+    · simp only [r, extend_apply' _ _ _ h, Pi.zero_apply, Prod.fst_zero, Prod.snd_zero,
+        norm_zero, zero_mul]
+  · have hs := (((ContinuousLinearMap.apply ℂ F) x).comp T).hasSum hb
+    have hterm : HasSum (fun i : I ↦ (p i).1 x • (p i).2) (T z x) :=
+      hs.congr_fun fun i ↦ (hT (p i).1 (p i).2 x).symm
+    refine ((hasSum_extend_zero he).mpr hterm).congr_fun fun n ↦ ?_
+    have heq : extend e (fun i ↦ (p i).1 x • (p i).2) 0 n = (r n).1 x • (r n).2 := by
+      by_cases h : ∃ i, e i = n
+      · obtain ⟨i, rfl⟩ := h
+        simp only [r, he.extend_apply]
+      · simp only [r, extend_apply' _ _ _ h, Pi.zero_apply, Prod.snd_zero, smul_zero]
+    rw [heq]
+    calc
+      _ = (((‖(r n).1‖ : ℂ) • φ n) x) • ((‖(r n).2‖ : ℂ) • y n) := by
+        simp only [c, smul_apply, smul_eq_mul, smul_smul]
+        congr 1
+        ring
+      _ = _ := by
+        rw [show (‖(r n).1‖ : ℂ) • φ n = (r n).1 from norm_smul_normalizedFactor _,
+          show (‖(r n).2‖ : ℂ) • y n = (r n).2 from norm_smul_normalizedFactor _]
+
+/-- Every completed projective tensor maps to an operator with a nuclear series. -/
+private theorem isBanachNuclear_of_mem_range (A : E →L[ℂ] F)
+    (hA : A ∈ range completedProjectiveTensorToOperators) : IsBanachNuclear A := by
+  obtain ⟨z, rfl⟩ := hA
+  let i : P →L[ℂ] W := toProjectiveSeminorm
+  let j : W →L[ℂ] P := fromProjectiveSeminorm
+  have hji : j.completion (i.completion z) = z := by
+    induction z using Completion.induction_on with
+    | hp => exact isClosed_eq (j.completion.continuous.comp i.completion.continuous) continuous_id
+    | ih v => rw [ContinuousLinearMap.completion_apply_coe, ContinuousLinearMap.completion_apply_coe]; rfl
+  obtain ⟨l, hl, hz⟩ := exists_summable_tensorDecompositions (i.completion z)
+  let T := completedProjectiveTensorToOperators.comp j.completion
+  rw [← hji]
+  refine isBanachNuclear_of_summable_tensorDecompositions T (fun φ y x ↦ ?_) (i.completion z) l hl hz
+  let v : W := φ ⊗ₜ[ℂ] y
+  change completedProjectiveTensorToOperators (j.completion (v : Completion W)) x = _
+  rw [ContinuousLinearMap.completion_apply_coe, completedProjectiveTensorToOperators_coe]
+  exact tensorToFiniteRank_tmul φ y x
+
 /-- Paper: §C.3.1, p. 693. Nuclear operators between Banach spaces are the
 image of the completed projective tensor. -/
 theorem isBanachNuclear_iff_mem_range (A : E →L[ℂ] F) :
-    IsBanachNuclear A ↔ A ∈ range completedProjectiveTensorToOperators := by sorry
+    IsBanachNuclear A ↔ A ∈ range completedProjectiveTensorToOperators := by
+  exact ⟨mem_range_of_isBanachNuclear A, isBanachNuclear_of_mem_range A⟩
 
 /-- Paper: §C.3.1, p. 694. The local and Banach-space definitions of a
 nuclear operator agree for Banach spaces. -/
 theorem isNuclearOperator_iff_isBanachNuclear (A : E →L[ℂ] F) :
-    IsNuclearOperator A ↔ IsBanachNuclear A := by sorry
+    IsNuclearOperator A ↔ IsBanachNuclear A := by
+  constructor
+  · rintro ⟨U, hU, bU, cU, B, hB, _, T, ⟨c, φ, y, hc, hφ, hy, hT⟩, hA⟩
+    let p := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+    let G := WithLocalSeminorm (gaugeSeminorm hB.balanced hB.convex hB.absorbent)
+    let i₀ : E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+    let i : E →L[ℂ] LocalBanach p :=
+      ⟨i₀, (PolynormableSpace.withSeminorms ℂ E).continuous_normedSpace_rng (LocalBanach p) i₀
+        ⟨{⟨p, continuous_gauge cU hU⟩}, 1, by
+          simpa using (show (normSeminorm ℂ _).comp i₀ ≤ p from
+            fun x ↦ (localBanach_norm_coe p x).le)⟩⟩
+    let j : G →L[ℂ] F := ⟨(Submodule.span ℂ B).subtype, continuous_banachDisc_subtype hB⟩
+    let precomp := (ContinuousLinearMap.compL ℂ E (LocalBanach p) ℂ).flip i
+    refine ⟨c, ⇑precomp ∘ φ, ⇑j ∘ y, hc, ?_, ?_, ?_⟩
+    · simpa only [map_zero] using (precomp.continuous.tendsto 0).comp hφ
+    · simpa only [map_zero] using (j.continuous.tendsto 0).comp hy
+    · intro x
+      have hs := j.hasSum (hT (i x))
+      rw [show j (T (i x)) = A x from hA x] at hs
+      change HasSum (fun n ↦ (c n * φ n (i x)) • j (y n)) (A x)
+      simpa only [map_smul] using hs
+  · rintro ⟨c, φ, y, hc, hφ, hy, hA⟩
+    apply (isNuclearOperator_iff_nonempty_presentation A).mpr
+    obtain ⟨C, _, hC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+    have hφ_bound : ∃ C : ℝ, ∀ n, ‖φ n‖ ≤ C := ⟨C, fun n ↦ hC _ (mem_range_self n)⟩
+    obtain ⟨R, hR, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+    let r : ℂ := R
+    have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr hR.ne'
+    have hr_norm : ‖r‖ = R := by
+      dsimp [r]
+      rw [Complex.norm_real, Real.norm_of_nonneg hR.le]
+    let B := Metric.closedBall (0 : F) 1
+    have hyB (n : ℕ) : r⁻¹ • y n ∈ B := by
+      change dist (r⁻¹ • y n) 0 ≤ 1
+      rw [dist_zero_right, norm_smul, norm_inv, hr_norm, inv_mul_le_iff₀ hR, mul_one]
+      exact hyR _ (mem_range_self n)
+    refine ⟨{
+      coeff := fun n ↦ c n * r
+      functional := φ
+      disc := B
+      isBanachDisc := isBanachDisc_closedUnitBall
+      vector := fun n ↦ ⟨r⁻¹ • y n, Submodule.subset_span (hyB n)⟩
+      vector_mem := hyB
+      summable_coeff := by simpa only [norm_mul] using hc.mul_right ‖r‖
+      equicontinuous := ((NormedSpace.equicontinuous_tfae φ).out 6 1).mp hφ_bound
+      hasSum := ?_ }⟩
+    intro x
+    refine (hA x).congr_fun fun n ↦ ?_
+    change (c n * r * φ n x) • (r⁻¹ • y n) = (c n * φ n x) • y n
+    rw [smul_smul, mul_right_comm (c n) r, mul_inv_cancel_right₀ hr]
 
 end BanachTensor
 
@@ -892,6 +1306,91 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
 local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
   StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
 
+/-- Inserting an endomorphism on the vector side of a nuclear presentation gives an
+absolutely convergent scalar series, continuous in that endomorphism for precompact convergence. -/
+private theorem NuclearPresentation.exists_tracePairing {A : E →L[ℂ] E}
+    (r : NuclearPresentation A) :
+    ∃ L : PrecompactConvergenceCLM E E →L[ℂ] ℂ,
+      ∀ T : PrecompactConvergenceCLM E E,
+        Summable (fun n ↦ ‖r.coeff n * r.functional n (T (r.vector n))‖) ∧
+        HasSum (fun n ↦ r.coeff n * r.functional n (T (r.vector n))) (L T) := by
+  obtain ⟨d, hd, hd₀, hdiv⟩ := exists_pos_tendsto_zero_summable_div
+    r.summable_coeff (fun n ↦ norm_nonneg _)
+  let c (n : ℕ) : ℂ := r.coeff n / (d n : ℂ)
+  let y (n : ℕ) : E := (d n : ℂ) • (r.vector n : E)
+  have hc : Summable (fun n ↦ ‖c n‖) := by
+    simpa only [c, norm_div, Complex.norm_real, Real.norm_of_nonneg (hd _).le] using hdiv
+  have hy : Tendsto y atTop (𝓝 0) := r.isBanachDisc.bounded.smul_tendsto_zero
+    (Eventually.of_forall r.vector_mem) (by
+      simpa only [Function.comp_def, Complex.ofReal_zero] using
+        (Complex.continuous_ofReal.tendsto 0).comp hd₀)
+  let K := insert (0 : E) (range y)
+  have hK : IsCompact K := hy.isCompact_insert_range
+  have hyK (n : ℕ) : y n ∈ K := mem_insert_of_mem _ (mem_range_self n)
+  have hseminorm := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae
+    (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨p, hp, hφ⟩ := (hseminorm.mp r.equicontinuous) ()
+  let term (T : PrecompactConvergenceCLM E E) (n : ℕ) := c n * r.functional n (T (y n))
+  have hterm (T : PrecompactConvergenceCLM E E) (n : ℕ) :
+      ‖term T n‖ ≤ ‖c n‖ * p (T (y n)) := by
+    change ‖c n * r.functional n (T (y n))‖ ≤ _
+    rw [norm_mul]
+    exact mul_le_mul_of_nonneg_left (hφ n _) (norm_nonneg _)
+  have hs (T : PrecompactConvergenceCLM E E) : Summable (fun n ↦ ‖term T n‖) := by
+    obtain ⟨C, _, hC⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mp
+      (hK.isVonNBounded ℂ) ⟨p.comp T.toLinearMap, hp.comp T.continuous⟩
+    refine (hc.mul_right C).of_nonneg_of_le (fun n ↦ norm_nonneg _) fun n ↦ ?_
+    exact (hterm T n).trans (mul_le_mul_of_nonneg_left (hC _ (hyK n)).le (norm_nonneg _))
+  let L : PrecompactConvergenceCLM E E →ₗ[ℂ] ℂ :=
+    { toFun := fun T ↦ ∑' n, term T n
+      map_add' := fun T S ↦ by
+        change (∑' n, term (T + S) n) = (∑' n, term T n) + ∑' n, term S n
+        rw [← (hs T).of_norm.tsum_add (hs S).of_norm]
+        exact tsum_congr fun n ↦ by simp [term, mul_add]
+      map_smul' := fun a T ↦ by
+        change (∑' n, term (a • T) n) = a * ∑' n, term T n
+        rw [← tsum_mul_left]
+        exact tsum_congr fun n ↦ by simp [term, smul_eq_mul, mul_left_comm] }
+  have hL : Continuous L := by
+    refine continuous_of_continuousAt_zero L ?_
+    rw [ContinuousAt, map_zero, Metric.tendsto_nhds]
+    intro ε hε
+    let M := (∑' n, ‖c n‖) + 1
+    have hM : 0 < M := by dsimp [M]; positivity
+    have hδ : 0 < ε / M := div_pos hε hM
+    have hnear := UniformConvergenceCLM.eventually_nhds_zero_mapsTo (RingHom.id ℂ)
+      (𝔖 := {s | IsPrecompactInCompletion s})
+      ((isPrecompactInCompletion_iff_totallyBounded K).mpr hK.totallyBounded)
+      ((Seminorm.continuous_iff hδ).mp hp)
+    filter_upwards [hnear] with T hT
+    rw [dist_zero_right]
+    calc
+      ‖L T‖ ≤ ∑' n, ‖c n‖ * (ε / M) := by
+        refine tsum_of_norm_bounded (hc.mul_right (ε / M)).hasSum fun n ↦ ?_
+        exact (hterm T n).trans (mul_le_mul_of_nonneg_left
+          (p.mem_ball_zero.mp (hT (hyK n))).le (norm_nonneg _))
+      _ < ε := by
+        rw [tsum_mul_right, mul_div_left_comm]
+        simpa only [mul_one] using
+          mul_lt_mul_of_pos_left ((div_lt_one hM).mpr (lt_add_one _)) hε
+  refine ⟨⟨L, hL⟩, fun T ↦ ?_⟩
+  have heq (n : ℕ) : term T n = r.coeff n * r.functional n (T (r.vector n)) := by
+    simp only [term, c, y, map_smul, smul_eq_mul, ← mul_assoc]
+    rw [div_mul_cancel₀ _ (Complex.ofReal_ne_zero.mpr (hd n).ne')]
+  exact ⟨(hs T).congr (fun n ↦ congrArg norm (heq n)),
+    (hs T).of_norm.hasSum.congr_fun (fun n ↦ (heq n).symm)⟩
+
+omit [T2Space E] in
+/-- On a rank-one test map, the scalar series obtained by inserting it in a nuclear presentation
+depends only on the presented operator. -/
+private theorem NuclearPresentation.hasSum_tracePairing_tmul {A : E →L[ℂ] E}
+    (r : NuclearPresentation A) (φ : StrongDual ℂ E) (x : E) :
+    HasSum (fun n ↦ r.coeff n * r.functional n (tensorToFiniteRank (φ ⊗ₜ[ℂ] x) (r.vector n)))
+      (φ (A x)) := by
+  refine (φ.hasSum (r.hasSum x)).congr_fun fun n ↦ ?_
+  rw [tensorToFiniteRank_tmul, map_smul, map_smul, smul_eq_mul, smul_eq_mul]
+  ring
+
 /-- Paper: Proposition C.3.2.1, p. 694. On a space with the approximation property,
 every presentation of the same nuclear endomorphism gives an absolutely convergent
 scalar series with the same sum. -/
@@ -899,7 +1398,31 @@ theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
     (hA : IsNuclearOperator A) :
     ∃! z : ℂ, ∀ r : NuclearPresentation A,
       Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
-      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by sorry
+      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  obtain ⟨L, hL⟩ := r.exists_tracePairing
+  let I : PrecompactConvergenceCLM E E := ContinuousLinearMap.id ℂ E
+  refine ⟨L I, fun s ↦ ?_, fun z hz ↦ (hz r).2.unique (hL I).2⟩
+  obtain ⟨M, hM⟩ := s.exists_tracePairing
+  -- The coercion in `ApproxProp` makes `DenseRange` use bounded convergence.
+  let S : Set (Set E) := {U | IsPrecompactInCompletion U}
+  let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E S
+  have hj : Continuous j :=
+    ContinuousLinearMap.toUniformConvergenceCLM_continuous (RingHom.id ℂ) E S fun U hU ↦
+      ((isPrecompactInCompletion_iff_totallyBounded U).mp hU).isVonNBounded ℂ
+  have hclosed : IsClosed {T : E →L[ℂ] E | L (j T) = M (j T)} :=
+    isClosed_eq (L.continuous.comp hj) (M.continuous.comp hj)
+  have hLM : L I = M I := by
+    refine hclosed.closure_subset_iff.mpr ?_ (hE I)
+    rintro _ ⟨t, rfl⟩
+    change L (j (tensorToFiniteRank t)) = M (j (tensorToFiniteRank t))
+    induction t using TensorProduct.inductionOn with
+    | tmul φ x =>
+      exact ((hL _).2.unique (r.hasSum_tracePairing_tmul φ x)).trans
+        ((hM _).2.unique (s.hasSum_tracePairing_tmul φ x)).symm
+    | add t u ht hu => simp only [map_add, ht, hu]
+  rw [hLM]
+  exact hM I
 
 /-- Paper: (C.3.2.2), p. 694. The nuclear trace is the sum of the scalar series
 from any nuclear presentation on a space with the approximation property. -/
@@ -910,12 +1433,127 @@ def nuclearTrace (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator
 of its functional at its spanning vector.
 Deviation: This is a check of the trace formula on one term. -/
 theorem nuclearTrace_smulRight (hE : ApproxProp E) (φ : E →L[ℂ] ℂ) (y : E) :
-    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by sorry
+    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by
+  obtain ⟨r, hc, hφ, hy, htail⟩ := nuclearPresentation_smulRight φ y 1 one_ne_zero
+  have htrace := ((exists_nuclearTrace_hasSum hE (φ.smulRight y)
+    (isNuclearOperator_smulRight φ y)).exists.choose_spec r).2
+  refine htrace.unique ((hasSum_ite_eq (0 : ℕ) (φ y)).congr_fun ?_)
+  intro n
+  cases n with
+  | zero => simp [hc, hφ, hy]
+  | succ n => simp [htail]
+
+/-- The gauge of the image of a set under a complex-linear equivalence, at an image point,
+is the gauge of the set at the original point. -/
+private theorem gauge_image_linearEquiv {M N : Type*} [AddCommGroup M] [Module ℂ M]
+    [AddCommGroup N] [Module ℂ N] (φ : M ≃ₗ[ℂ] N) (s : Set M) (x : M) :
+    gauge (φ '' s) (φ x) = gauge s x := by
+  unfold gauge
+  congr 1
+  ext r
+  simp only [Set.mem_setOf_eq]
+  refine and_congr_right fun _ ↦ ?_
+  simp only [Set.mem_smul_set, Set.exists_mem_image]
+  refine exists_congr fun y ↦ and_congr_right fun _ ↦ ?_
+  rw [show r • φ y = φ (r • y) from (LinearMap.map_smul_of_tower φ.toLinearMap r y).symm]
+  exact φ.injective.eq_iff
+
+/-- The image of a Banach disc under an injective continuous linear map is a Banach disc:
+the map restricts to a linear equivalence of the spans that preserves the gauges. -/
+private theorem IsBanachDisc.image_of_injective {Y Z : Type*}
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {B : Set Y} (hB : IsBanachDisc B) (T : Y →L[ℂ] Z) (hT : Injective T) :
+    IsBanachDisc (T '' B) := by
+  let S := Submodule.span ℂ B
+  let S' := Submodule.span ℂ (T '' B)
+  have hSS : S.map T.toLinearMap = S' := (Submodule.span_image T.toLinearMap).symm
+  let φ : S ≃ₗ[ℂ] S' :=
+    (Submodule.equivMapOfInjective T.toLinearMap hT S).trans (LinearEquiv.ofEq _ _ hSS)
+  have himage : ((↑) ⁻¹' (T '' B) : Set S') = φ '' ((↑) ⁻¹' B : Set S) := by
+    ext z
+    constructor
+    · rintro ⟨b, hb, hbz⟩
+      exact ⟨⟨b, Submodule.subset_span hb⟩, hb, Subtype.ext hbz⟩
+    · rintro ⟨w, hw, rfl⟩
+      exact ⟨w, hw, rfl⟩
+  have bB : Balanced ℂ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ hB.balanced.image φ.toLinearMap
+  have cB : Convex ℝ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ hB.convex.linear_image (φ.toLinearMap.restrictScalars ℝ)
+  have aB : Absorbent ℝ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ Absorbent.image_of_surjective (f := φ.toLinearMap.restrictScalars ℝ)
+      φ.surjective hB.absorbent
+  let p := gaugeSeminorm hB.balanced hB.convex hB.absorbent
+  let p' := gaugeSeminorm bB cB aB
+  have hnorm (z : S') : p' z = p (φ.symm z) := by
+    change gauge _ z = gauge _ (φ.symm z)
+    rw [himage, ← gauge_image_linearEquiv φ, φ.apply_symm_apply]
+  let ψ : WithLocalSeminorm p' → WithLocalSeminorm p := fun z ↦ (φ.symm (show S' from z) : S)
+  have hψ : Isometry ψ := Isometry.of_dist_eq fun x y ↦ by
+    rw [dist_eq_norm, dist_eq_norm]
+    change p (φ.symm (show S' from x) - φ.symm (show S' from y)) =
+      p' ((show S' from x) - (show S' from y))
+    rw [← map_sub]
+    exact (hnorm _).symm
+  have hinj : Injective ψ := fun a b h ↦ φ.symm.injective h
+  have hsurj : Surjective ψ := fun z ↦ ⟨(φ (show S from z) : S'), φ.symm_apply_apply _⟩
+  have := hB.separated
+  exact ⟨hB.bounded.image T, bB, cB, aB,
+    T2Space.of_injective_continuous hinj hψ.continuous,
+    (hψ.isUniformInducing.completeSpace_congr hsurj).mpr hB.complete⟩
+
+/-- Precomposition acts on the functionals of a nuclear presentation, while injective
+postcomposition acts on its vectors and Banach disc. -/
+private def NuclearPresentation.comp_comp {W X Y Z : Type*}
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W]
+    [PolynormableSpace ℂ W] [T2Space W]
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {A : X →L[ℂ] Y} (r : NuclearPresentation A) (S : W →L[ℂ] X) (R : Y →L[ℂ] Z)
+    (hR : Injective R) : NuclearPresentation (R.comp (A.comp S)) where
+  coeff := r.coeff
+  functional n := (r.functional n).comp S
+  disc := R '' r.disc
+  isBanachDisc := r.isBanachDisc.image_of_injective R hR
+  vector n := ⟨R (r.vector n), Submodule.subset_span ⟨_, r.vector_mem n, rfl⟩⟩
+  vector_mem n := ⟨_, r.vector_mem n, rfl⟩
+  summable_coeff := r.summable_coeff
+  equicontinuous U hU := by
+    have h := (S.continuous.tendsto' 0 0 (map_zero S)).eventually (r.equicontinuous U hU)
+    simpa only [ContinuousLinearMap.comp_apply, map_zero] using h
+  hasSum x := by
+    simpa only [ContinuousLinearMap.comp_apply, map_smul] using R.hasSum (r.hasSum (S x))
+
+/-- Precomposing a nuclear operator with a continuous linear map and postcomposing it with
+an injective continuous linear map gives a nuclear operator. -/
+private theorem isNuclearOperator_comp_comp {W X Y Z : Type*}
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W]
+    [PolynormableSpace ℂ W] [T2Space W]
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {A : X →L[ℂ] Y} (hA : IsNuclearOperator A) (S : W →L[ℂ] X) (R : Y →L[ℂ] Z)
+    (hR : Injective R) :
+    IsNuclearOperator (R.comp (A.comp S)) := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  exact (isNuclearOperator_iff_nonempty_presentation _).mpr ⟨r.comp_comp S R hR⟩
 
 /-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
 conjugation by a continuous linear automorphism. -/
 theorem isNuclearOperator_conj (A : E →L[ℂ] E) (hA : IsNuclearOperator A) (T : E ≃L[ℂ] E) :
-    IsNuclearOperator (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)) := by sorry
+    IsNuclearOperator (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)) :=
+  isNuclearOperator_comp_comp hA T.toContinuousLinearMap T.symm.toContinuousLinearMap
+    T.symm.injective
 
 /-- Paper: Proposition C.3.2.1, p. 694. The nuclear trace is invariant
 under conjugation by a continuous linear automorphism. -/
@@ -930,7 +1568,12 @@ Deviation: The right-hand composition's nuclearity is made explicit to type its 
 The two approximation-property hypotheses are needed for the trace assertion. -/
 theorem isNuclearOperator_factor_comps (T : E →L[ℂ] F) (hT : Injective T)
     (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
-    IsNuclearOperator (A₀.comp T) ∧ IsNuclearOperator (T.comp A₀) := by sorry
+    IsNuclearOperator (A₀.comp T) ∧ IsNuclearOperator (T.comp A₀) := by
+  have h₁ := isNuclearOperator_comp_comp hA₀ T (ContinuousLinearMap.id ℂ E) injective_id
+  have h₂ := isNuclearOperator_comp_comp hA₀ (ContinuousLinearMap.id ℂ F) T hT
+  rw [ContinuousLinearMap.id_comp] at h₁
+  rw [ContinuousLinearMap.comp_id] at h₂
+  exact ⟨h₁, h₂⟩
 
 /-- Paper: Lemma C.3.2.2, p. 695. A nuclear map followed by an injection has
 the same trace as the reverse composition when both spaces have the approximation property.
@@ -938,7 +1581,15 @@ Deviation: The given endomorphism is written as its factorization. -/
 theorem nuclearTrace_factor_comps (hE : ApproxProp E) (hF : ApproxProp F)
     (T : E →L[ℂ] F) (hT : Injective T) (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
     nuclearTrace hE (A₀.comp T) (isNuclearOperator_factor_comps T hT A₀ hA₀).1 =
-      nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by sorry
+      nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A₀).mp hA₀
+  let rE : NuclearPresentation (A₀.comp T) := r.comp_comp T (ContinuousLinearMap.id ℂ E) injective_id
+  let rF : NuclearPresentation (T.comp A₀) := r.comp_comp (ContinuousLinearMap.id ℂ F) T hT
+  have h := isNuclearOperator_factor_comps T hT A₀ hA₀
+  have hsumE := ((exists_nuclearTrace_hasSum hE (A₀.comp T) h.1).exists.choose_spec rE).2
+  have hsumF := ((exists_nuclearTrace_hasSum hF (T.comp A₀) h.2).exists.choose_spec rF).2
+  -- Both series have terms `r.coeff n * r.functional n (T (r.vector n))`.
+  exact hsumE.unique hsumF
 
 end NuclearTrace
 
@@ -949,7 +1600,33 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteS
 /-- Paper: Lemma C.3.3.1(1), p. 697. Every subset bounded in the strong operator
 topology on a separable Hilbert space is metrizable with its subspace topology. -/
 theorem metrizableSpace_bounded_pointwiseOperators [SeparableSpace H]
-    (S : Set (H →Lₚₜ[ℂ] H)) (hS : IsVonNBounded ℂ S) : MetrizableSpace S := by sorry
+    (S : Set (H →Lₚₜ[ℂ] H)) (hS : IsVonNBounded ℂ S) : MetrizableSpace S := by
+  have hbounded (x : H) : IsVonNBounded ℂ (range fun T : S ↦ T.val x) := by
+    let ev := PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H x
+    change IsVonNBounded ℂ (range (ev ∘ (Subtype.val : S → _)))
+    rw [range_comp, Subtype.range_coe]
+    exact hS.image ev
+  have heq := (PolynormableSpace.banach_steinhaus
+    (𝓕 := fun T : S ↦ (T.val : H →L[ℂ] H)) hbounded).equicontinuous
+  let restrict (T : S) (n : ℕ) := T.val (denseSeq H n)
+  have hcont : Continuous restrict := continuous_pi fun n ↦
+    (PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H (denseSeq H n)).continuous.comp
+      continuous_subtype_val
+  have hind : IsInducing restrict := by
+    rw [isInducing_iff_nhds]
+    intro T
+    refine le_antisymm (hcont.tendsto T).le_comap (tendsto_id'.mp ?_)
+    apply IsInducing.subtypeVal.tendsto_nhds_iff.mpr
+    apply PointwiseConvergenceCLM.tendsto_iff_forall_tendsto.mpr
+    intro x
+    -- Equicontinuity extends convergence from the dense sequence to all vectors.
+    have hclosed := heq.isClosed_setOfPred_tendsto
+      (l := comap restrict (𝓝 (restrict T))) (T.val : H →L[ℂ] H).continuous
+    apply hclosed.closure_subset_iff.mpr ?_ (denseRange_denseSeq H x)
+    rintro _ ⟨n, rfl⟩
+    exact tendsto_pi_nhds.mp (tendsto_comap (f := restrict) (x := 𝓝 (restrict T))) n
+  let : PseudoMetrizableSpace S := hind.pseudoMetrizableSpace
+  infer_instance
 
 -- Lemma C.3.3.1(2): Hausdorffness is Mathlib's PointwiseConvergenceCLM instance.
 -- Local convexity and quasi-completeness are already stated in Sec2a as

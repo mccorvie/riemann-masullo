@@ -291,7 +291,12 @@ the original function on the torus.
 Deviation: Sanity check for the chosen lift. -/
 theorem torusSchwartzPartial_zero {n : ℕ}
     (f : ElementarySchwartz 0 n 0 PUnit) (z : Fin n → AddCircle (1 : ℝ)) :
-    torusSchwartzPartial 0 f z = f (0, z, 0, PUnit.unit) := by sorry
+    torusSchwartzPartial 0 f z = f (0, z, 0, PUnit.unit) := by
+  rw [torusSchwartzPartial, elementaryPartial_zero]
+  have hz : (fun i ↦ (((AddCircle.equivIco (1 : ℝ) 0 (z i)).val : ℝ) : AddCircle (1 : ℝ))) = z :=
+    funext fun i ↦ (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z i)
+  simp only [elementaryCover]
+  rw [hz]
 
 /-- Paper: Example D.1.10.4, p. 785. Supremum norms of the torus partials
 generate the smooth topology. -/
@@ -348,7 +353,22 @@ def bruhatDiffMonomial {d : ℕ} (a : Fin d → LCATopologicalLie G) (α : Fin d
 one direction gives the corresponding first-order operator.
 Deviation: Sanity check on repetition of directions. -/
 theorem bruhatDiffMonomial_single {d : ℕ} (a : Fin d → LCATopologicalLie G) (j : Fin d) :
-    bruhatDiffMonomial a (Pi.single j 1) = bruhatDiffGenerator (a j) := by sorry
+    bruhatDiffMonomial a (Pi.single j 1) = bruhatDiffGenerator (a j) := by
+  rw [bruhatDiffMonomial, ← bruhatDiffWord_singleton]
+  congr 1
+  rw [← List.replicate_one, List.eq_replicate_iff]
+  constructor
+  · rw [List.length_flatMap]
+    simp only [List.length_replicate]
+    rw [← Fin.sum_univ_def]
+    simp
+  · intro x hx
+    obtain ⟨i, -, hi⟩ := List.mem_flatMap.1 hx
+    have hij : i = j := by
+      by_contra h
+      simp [Pi.single_eq_of_ne h] at hi
+    subst hij
+    exact List.eq_of_mem_replicate hi
 
 /-- Paper: Proposition D.1.10.6(1)–(2), p. 787. Differentiate a Schwartz–Bruhat
 function and multiply it by the symbol of the dual operator through biduality. -/
@@ -363,7 +383,9 @@ operators returns the original function.
 Deviation: Sanity check on the symbol and application conventions. -/
 theorem bruhatDiffSymbolWeightedApply_one
     (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (f : SchwartzBruhat G) :
-    bruhatDiffSymbolWeightedApply b 1 1 f = (f : G → ℂ) := by sorry
+    bruhatDiffSymbolWeightedApply b 1 1 f = (f : G → ℂ) := by
+  funext x
+  simp [bruhatDiffSymbolWeightedApply, bruhatDiffSymbol_one]
 
 variable (e : ElementaryLCAPresentation G)
 variable (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x)
@@ -458,6 +480,14 @@ def ideleClassWeightedDeriv {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →
       Df.val (τ (Units.mk0 (Real.exp s).toNNReal
         (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos s)))) * x)) 0
 
+/-- The monomial of multi-index zero is the identity operator. -/
+theorem bruhatDiffMonomial_zero {d : ℕ} (a : Fin d → LCATopologicalLie G) :
+    bruhatDiffMonomial a 0 = 1 := by
+  have h : (List.finRange d).flatMap (fun j ↦ List.replicate ((0 : Fin d → ℕ) j) (a j)) = [] :=
+    List.flatMap_eq_nil_iff.2 (by simp)
+  rw [bruhatDiffMonomial, h]
+  rfl
+
 /-- Paper: (D.1.10.15), p. 789. At zero differential orders the result is the
 value of the original function multiplied by the weight in the absolute log norm.
 Deviation: Sanity check on the derivatives and the argument of the weight. -/
@@ -465,7 +495,14 @@ theorem ideleClassWeightedDeriv_zero {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ�
     (γ : Fin d → LCATopologicalLie n.ker) (weight : ℝ → ℝ) (f : SchwartzBruhat G)
     (t : ℝ≥0ˣ) (x : G) :
     ideleClassWeightedDeriv n τ γ 0 0 weight f t x =
-      (weight |Real.log (t.val : ℝ)| : ℂ) * f x := by sorry
+      (weight |Real.log (t.val : ℝ)| : ℂ) * f x := by
+  simp only [ideleClassWeightedDeriv, iteratedDeriv_zero, bruhatDiffMonomial_zero]
+  congr 1
+  have h1 : Units.mk0 (Real.exp 0).toNNReal
+      (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos 0))) = (1 : ℝ≥0ˣ) :=
+    Units.ext (by simp)
+  rw [h1, map_one, one_mul]
+  rfl
 
 universe u
 
@@ -523,7 +560,9 @@ and unit weight evaluation is at the idele class represented by the product char
 Deviation: Sanity check on the section and kernel factors. -/
 theorem ideleClassProductWeightedDeriv_zero {d : ℕ} (n : G →* ℝ≥0ˣ) (τ : ℝ≥0ˣ →ₜ* G)
     (γ : Fin d → LCATopologicalLie n.ker) (f : SchwartzBruhat G) (z : ℝ≥0ˣ × n.ker) :
-    ideleClassProductWeightedDeriv n τ γ 0 0 (fun _ ↦ 1) f z = f (τ z.1 * z.2.val) := by sorry
+    ideleClassProductWeightedDeriv n τ γ 0 0 (fun _ ↦ 1) f z = f (τ z.1 * z.2.val) := by
+  rw [ideleClassProductWeightedDeriv, ideleClassWeightedDeriv_zero]
+  simp
 
 section Global
 local instance : MeasurableSpace C[F] := borel _

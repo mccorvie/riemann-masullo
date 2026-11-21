@@ -6,6 +6,8 @@ import Mathlib.Analysis.Complex.CauchyIntegral
 public import Mathlib.MeasureTheory.Integral.CircleIntegral
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.MeasureTheory.Integral.Asymptotics
+import RiemannMasullo.ForMathlib.Analysis.Complex.RectangleIntegral
+import RiemannMasullo.ForMathlib.Analysis.Meromorphic.PrincipalPart
 
 /-!
 # Slow growth near poles and the asymptotic residue theorem
@@ -411,6 +413,181 @@ theorem finite_rectanglePoles {f : ℂ → ℂ} {a b σ₁ σ₂ t₁ t₂ : ℝ
   rw [MeromorphicOn.divisor_apply hmer hzK, Ne, WithTop.untop₀_eq_zero]
   exact not_or.mpr ⟨ne_of_lt hz.2.2, ne_top_of_lt (hz.2.2.trans_le le_top)⟩
 
+local notation "polarPart" =>
+  (fun (ρ : ℂ) (n : ℕ) (c : ℕ → ℂ) (z : ℂ) ↦
+    ∑ k ∈ Finset.range n, c k * (z - ρ) ^ (-(k : ℤ) - 1))
+
+/-- The term of a polar expansion with exponent `-1` determines its circle
+residue. The expression also gives zero for the empty expansion. -/
+private theorem complexResidue_eq_polar_coefficient {g H : ℂ → ℂ} {ρ : ℂ} {n : ℕ}
+    {c : ℕ → ℂ} (hH : AnalyticAt ℂ H ρ)
+    (he : g =ᶠ[𝓝[≠] ρ] (fun z ↦ H z + polarPart ρ n c z)) :
+    complexResidue g ρ = ∑ k ∈ Finset.range n, (if k = 0 then c k else 0) := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  obtain ⟨R, hR, hA⟩ := hH.exists_ball_analyticOnNhd
+  refine (tendsto_const_nhds.congr' ?_).limUnder_eq
+  filter_upwards [Ioo_mem_nhdsGT (lt_min hδ hR)] with r hr
+  have hrδ := hr.2.trans_le (min_le_left δ R)
+  have hrR := hr.2.trans_le (min_le_right δ R)
+  have hsne (z : ℂ) (hz : z ∈ Metric.sphere ρ r) : z ≠ ρ := by
+    rintro rfl
+    exact hr.1.ne (by simpa using hz)
+  have hC : ∀ k ∈ Finset.range n,
+      ContinuousOn (fun z : ℂ ↦ c k * (z - ρ) ^ (-(k : ℤ) - 1)) (Metric.sphere ρ r) := by
+    intro k _
+    exact continuousOn_const.mul ((continuousOn_id.sub continuousOn_const).zpow₀ _
+      fun z hz ↦ Or.inl (sub_ne_zero.mpr (hsne z hz)))
+  have hCi : ∀ k ∈ Finset.range n,
+      CircleIntegrable (fun z : ℂ ↦ c k * (z - ρ) ^ (-(k : ℤ) - 1)) ρ r :=
+    fun k hk ↦ (hC k hk).circleIntegrable hr.1.le
+  have hAi := hA.mono (Metric.closedBall_subset_ball hrR)
+  have hA0 : circleIntegral H ρ r = 0 :=
+    Complex.circleIntegral_eq_zero_of_differentiable_on_off_countable hr.1.le countable_empty
+      hAi.continuousOn (fun z hz ↦ (hAi z (Metric.ball_subset_closedBall hz.1)).differentiableAt)
+  have hCircle : circleIntegral g ρ r =
+      twoPiI * ∑ k ∈ Finset.range n, (if k = 0 then c k else 0) := by
+    calc
+      circleIntegral g ρ r = circleIntegral (fun z ↦ H z + polarPart ρ n c z) ρ r :=
+        circleIntegral.integral_congr hr.1.le fun z hz ↦
+          hEq ⟨Metric.mem_ball.mpr ((Metric.mem_sphere.mp hz).trans_lt hrδ),
+            mem_compl_singleton_iff.mpr (hsne z hz)⟩
+      _ = circleIntegral H ρ r + circleIntegral (polarPart ρ n c) ρ r := by
+        apply circleIntegral.integral_add
+        · exact (hAi.continuousOn.mono Metric.sphere_subset_closedBall).circleIntegrable hr.1.le
+        · exact (continuousOn_finsetSum _ hC).circleIntegrable hr.1.le
+      _ = twoPiI * ∑ k ∈ Finset.range n, (if k = 0 then c k else 0) := by
+        rw [hA0, zero_add, circleIntegral.integral_fun_sum hCi, Finset.mul_sum]
+        apply Finset.sum_congr rfl
+        intro k _
+        rw [circleIntegral.integral_const_mul]
+        by_cases hk : k = 0
+        · subst k
+          simp only [Nat.cast_zero, neg_zero, zero_sub, zpow_neg_one, ite_true]
+          rw [circleIntegral.integral_sub_center_inv ρ hr.1.ne', mul_comm]
+        · rw [circleIntegral.integral_sub_zpow_of_ne (by omega), ite_eq_right hk, mul_zero, mul_zero]
+  rw [hCircle, mul_div_cancel_left₀]
+  simp [Real.pi_ne_zero, Complex.I_ne_zero]
+
+/-- In a rectangle enclosing the center of a polar expansion, the boundary
+integral is `2πi` times its coefficient of exponent `-1`. -/
+private theorem rectangleIntegral_polarPart {z w ρ : ℂ} {n : ℕ} {c : ℕ → ℂ}
+    (hρ : ρ ∈ Ioo z.re w.re ×ℂ Ioo z.im w.im) :
+    rectangleIntegral (polarPart ρ n c) z w =
+      twoPiI * ∑ k ∈ Finset.range n, (if k = 0 then c k else 0) := by
+  rw [rectangleIntegral_finsetSum (hρ.1.1.trans hρ.1.2).le (hρ.2.1.trans hρ.2.2).le,
+    Finset.mul_sum]
+  · apply Finset.sum_congr rfl
+    intro k _
+    rw [rectangleIntegral_const_mul]
+    by_cases hk : k = 0
+    · subst k
+      simp only [Nat.cast_zero, neg_zero, zero_sub, zpow_neg_one, ite_true]
+      rw [rectangleIntegral_sub_inv hρ, mul_comm]
+    · rw [rectangleIntegral_sub_zpow_of_ne hρ (by omega), ite_eq_right hk, mul_zero, mul_zero]
+  · intro k _
+    exact continuousOn_const.mul ((continuousOn_id.sub continuousOn_const).zpow₀ _
+      fun z hz ↦ Or.inl (sub_ne_zero.mpr (ne_of_mem_of_not_mem hρ hz.2 |>.symm)))
+
+/-- Paper: Equation (B.3.2.3), p. 606. The counterclockwise boundary integral
+of a meromorphic function on a closed rectangle is `2πi` times the sum of the
+residues at its poles.
+Deviation: The finite index set may also contain regular interior points,
+whose residues vanish. -/
+theorem rectangleIntegral_eq_sum_complexResidue {g : ℂ → ℂ} {σ₁ σ₂ t₁ t₂ : ℝ}
+    (hσ : σ₁ < σ₂) (ht : t₁ < t₂) (S : Finset ℂ)
+    (hg : MeromorphicOn g (Icc σ₁ σ₂ ×ℂ Icc t₁ t₂))
+    (hInside : ∀ ρ ∈ S, ρ ∈ Ioo σ₁ σ₂ ×ℂ Ioo t₁ t₂)
+    (hOutside : ∀ ρ ∈ Icc σ₁ σ₂ ×ℂ Icc t₁ t₂, ρ ∉ S → 0 ≤ meromorphicOrderAt g ρ) :
+    (∫ x in σ₁..σ₂, g (verticalPoint x t₁)) -
+      (∫ x in σ₁..σ₂, g (verticalPoint x t₂)) +
+      Complex.I * (∫ y in t₁..t₂, g (verticalPoint σ₂ y)) -
+      Complex.I * (∫ y in t₁..t₂, g (verticalPoint σ₁ y)) =
+      twoPiI * ∑ ρ ∈ S, complexResidue g ρ := by
+  classical
+  let z : ℂ := ⟨σ₁, t₁⟩
+  let w : ℂ := ⟨σ₂, t₂⟩
+  let K := Icc σ₁ σ₂ ×ℂ Icc t₁ t₂
+  let U := Ioo σ₁ σ₂ ×ℂ Ioo t₁ t₂
+  have hUK : U ⊆ K := fun _ h ↦ ⟨Ioo_subset_Icc_self h.1, Ioo_subset_Icc_self h.2⟩
+  choose! n H c hH he using fun ρ (hρ : ρ ∈ S) ↦
+    MeromorphicAt.exists_polar_expansion (hg ρ (hUK (hInside ρ hρ)))
+  let P (ρ : ℂ) := polarPart ρ (n ρ) (c ρ)
+  let Q (x : ℂ) := ∑ ρ ∈ S, P ρ x
+  let D (x : ℂ) := g x - Q x
+  let A := toMeromorphicNFOn D K
+  have hPan : ∀ ρ x : ℂ, x ≠ ρ → AnalyticAt ℂ (P ρ) x := by
+    intro ρ x hx
+    exact (Finset.range _).analyticAt_fun_sum fun k _ ↦ analyticAt_const.mul
+      (((analyticAt_id.sub analyticAt_const).zpow (sub_ne_zero.mpr hx)))
+  have hQmero : MeromorphicOn Q K := by
+    apply MeromorphicOn.fun_sum
+    intro ρ _
+    apply MeromorphicOn.fun_sum
+    intro k _ x _
+    exact (MeromorphicAt.const (c ρ k) x).mul
+      (((analyticAt_id.sub (analyticAt_const (v := ρ))).meromorphicAt).fun_zpow _)
+  have hDmero : MeromorphicOn D K := hg.fun_sub hQmero
+  -- Subtracting all principal parts makes every point of the rectangle removable.
+  have hDorder (x : ℂ) (hx : x ∈ K) : 0 ≤ meromorphicOrderAt D x := by
+    apply (hDmero x hx).meromorphicOrderAt_nonneg_iff.mpr
+    by_cases hxS : x ∈ S
+    · let Q' (y : ℂ) := ∑ ρ ∈ S.erase x, P ρ y
+      have hQ' : AnalyticAt ℂ Q' x := (S.erase x).analyticAt_fun_sum fun ρ hρ ↦
+        hPan ρ x (Finset.mem_erase.mp hρ).1.symm
+      refine ⟨fun y ↦ H x y - Q' y, (hH x hxS).sub hQ', ?_⟩
+      filter_upwards [he x hxS] with y hy
+      have hsplit : P x y + Q' y = Q y := Finset.add_sum_erase S (fun ρ ↦ P ρ y) hxS
+      change g y - Q y = H x y - Q' y
+      rw [← hsplit, hy]
+      change H x y + P x y - (P x y + Q' y) = _
+      abel
+    · have hQan : AnalyticAt ℂ Q x := S.analyticAt_fun_sum fun ρ hρ ↦
+        hPan ρ x (fun h ↦ hxS (h.symm ▸ hρ))
+      obtain ⟨B, hB, hEq⟩ := ((hg x hx).meromorphicOrderAt_nonneg_iff).mp (hOutside x hx hxS)
+      refine ⟨fun y ↦ B y - Q y, hB.sub hQan, ?_⟩
+      filter_upwards [hEq] with y hy
+      simp only [D, hy]
+  have hAan : AnalyticOnNhd ℂ A K := by
+    intro x hx
+    exact (((hDmero x hx).meromorphicOrderAt_nonneg_iff_analyticAt_toMeromorphicNFAt).mp
+      (hDorder x hx)).congr (toMeromorphicNFOn_eq_toMeromorphicNFAt_on_nhds hDmero hx).symm
+  have hA0 : rectangleIntegral A z w = 0 := by
+    rw [rectangleIntegral_eq]
+    have hc : DifferentiableOn ℂ A (uIcc z.re w.re ×ℂ uIcc z.im w.im) := by
+      simpa only [z, w, uIcc_of_le hσ.le, uIcc_of_le ht.le] using hAan.differentiableOn
+    exact Complex.integral_boundary_rect_eq_zero_of_differentiableOn A z w hc
+  have hPbd : ∀ ρ ∈ S, ContinuousOn (P ρ) (K \ U) := fun ρ hρ x hx ↦
+    (hPan ρ x (ne_of_mem_of_not_mem (hInside ρ hρ) hx.2).symm).continuousAt.continuousWithinAt
+  -- The boundary integrals ignore the finite set where normalization can change a value.
+  let E := K \ {x | AnalyticAt ℂ g x}
+  have hE : E.Countable :=
+    ((isCompact_Icc.reProdIm isCompact_Icc).finite_sdiff_of_mem_codiscreteWithin
+      hg.analyticAt_mem_codiscreteWithin).countable
+  have hAE : EqOn g (fun x ↦ A x + Q x) ((K \ U) \ E) := by
+    intro x hx
+    have hxG : AnalyticAt ℂ g x := by
+      by_contra hn
+      exact hx.2 ⟨hx.1.1, hn⟩
+    have hxQ : AnalyticAt ℂ Q x := S.analyticAt_fun_sum fun ρ hρ ↦
+      hPan ρ x (ne_of_mem_of_not_mem (hInside ρ hρ) hx.1.2).symm
+    have hxD : AnalyticAt ℂ D x := hxG.fun_sub hxQ
+    have hDA : A x = D x := by
+      change toMeromorphicNFOn D K x = D x
+      rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hDmero hx.1.1,
+        toMeromorphicNFAt_eq_self.mpr hxD.meromorphicNFAt]
+    change g x = A x + Q x
+    rw [hDA]
+    exact (sub_add_cancel (g x) (Q x)).symm
+  rw [← show rectangleIntegral g z w = _ from rectangleIntegral_eq g z w]
+  rw [rectangleIntegral_congr_off_countable (z := z) (w := w) hσ.le ht.le hE hAE,
+    rectangleIntegral_add hσ.le ht.le (hAan.continuousOn.mono sdiff_subset)
+      (continuousOn_finsetSum S hPbd),
+    hA0, zero_add, rectangleIntegral_finsetSum hσ.le ht.le hPbd, Finset.mul_sum]
+  apply Finset.sum_congr rfl
+  intro ρ hρ
+  rw [rectangleIntegral_polarPart (hInside ρ hρ),
+    complexResidue_eq_polar_coefficient (hH ρ hρ) (he ρ hρ)]
+
 section AsymptoticResidue
 
 variable {f Φ : ℂ → ℂ} {a b a' b' σ₁ σ₂ : ℝ} {T : ℤ → ℝ}
@@ -436,7 +613,122 @@ theorem tendsto_rectangleResidueSum :
           hT.2.1 hσ₁ hσ₂).toFinset, complexResidue (fun z ↦ Φ z * f z) ρ)
       atTop
       (𝓝 ((verticalLineIntegral (fun z ↦ Φ z * f z) σ₂ -
-        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by sorry
+        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by
+  let g (z : ℂ) := Φ z * f z
+  let lower (k : ℕ) := T (-(k : ℤ))
+  let upper (k : ℕ) := T (k : ℤ)
+  let horizontal (j : ℤ) := ∫ x in σ₁..σ₂, g (verticalPoint x (T j))
+  let vertical (σ : ℝ) (k : ℕ) :=
+    Complex.I * (∫ y in lower k..upper k, g (verticalPoint σ y))
+  have hk : ∀ᶠ k : ℕ in atTop, 0 < k := eventually_gt_atTop 0
+  have hIndex : Tendsto (fun k : ℕ ↦ (k : ℤ)) atTop atAbsInfty := by
+    apply tendsto_comap_iff.mpr
+    simpa [Function.comp_def, abs_of_nonneg (Int.natCast_nonneg _)] using
+      (tendsto_natCast_atTop_atTop (R := ℤ))
+  have hNegIndex : Tendsto (fun k : ℕ ↦ -(k : ℤ)) atTop atAbsInfty := by
+    apply tendsto_comap_iff.mpr
+    simpa only [Function.comp_def, abs_neg] using (tendsto_comap_iff.mp hIndex)
+  have hUpper : Tendsto upper atTop atTop :=
+    (hT.2.2.2.2.1.comp hIndex).congr' (hk.mono fun k hk ↦
+      abs_of_pos (hHeights k hk).2)
+  have hLower : Tendsto lower atTop atBot :=
+    (tendsto_neg_atTop_atBot.comp (hT.2.2.2.2.1.comp hNegIndex)).congr'
+      (hk.mono fun k hk ↦ neg_eq_iff_eq_neg.mpr (abs_of_neg (hHeights k hk).1))
+  have hVertical (σ : ℝ) (hσab : σ ∈ Ioo a b) (hσside : σ ∈ ({σ₁, σ₂} : Set ℝ)) :
+      Tendsto (vertical σ) atTop (𝓝 (verticalLineIntegral g σ)) := by
+    obtain ⟨hcont, hgrowth⟩ := hSides σ hσside
+    have hi : Complex.VerticalIntegrable g σ :=
+      verticalIntegrable_mul_of_polynomialGrowth hΦ
+        ⟨ha.trans hσab.1, hσab.2.trans hb⟩ hcont hgrowth
+    exact (intervalIntegral_tendsto_integral hi hLower hUpper).const_mul Complex.I
+  have hHorizontal : Tendsto horizontal atAbsInfty (𝓝 0) := by
+    let ε := min (a - a') (b' - b) / 2
+    have hε : 0 < ε := half_pos (lt_min (sub_pos.mpr ha) (sub_pos.mpr hb))
+    have hLeft : a' < a - ε := by dsimp [ε]; linarith [min_le_left (a - a') (b' - b)]
+    have hRight : b + ε < b' := by dsimp [ε]; linarith [min_le_right (a - a') (b' - b)]
+    have hΦsmall : UniformlySchwartzOnStrip Φ (a - ε) (b + ε) := by
+      refine ⟨by linarith [hT.1], hΦ.2.1.mono ?_, ?_⟩
+      · exact preimage_mono (Ioo_subset_Ioo hLeft.le hRight.le)
+      · intro δ hδ hδ' N hN
+        obtain ⟨C, hC, hbound⟩ := hΦ.2.2 δ hδ
+          (by linarith : a' + δ < b' - δ) N hN
+        exact ⟨C, hC, hbound.mono fun y hy x hx ↦
+          hy x ⟨by linarith [hx.1], by linarith [hx.2]⟩⟩
+    obtain ⟨hIntegrable, hLimit⟩ :=
+      tendsto_horizontalIntegral_of_slowGrowthNearPoles hT ε hε hΦsmall
+    apply squeeze_zero_norm' _ hLimit
+    have hLarge : ∀ᶠ j : ℤ in atAbsInfty, 2 ≤ |j| :=
+      tendsto_comap.eventually (eventually_ge_atTop 2)
+    filter_upwards [hLarge] with j hj
+    exact (intervalIntegral.norm_integral_le_integral_norm hσ.le).trans
+      (intervalIntegral.integral_mono_interval hσ₁.le hσ.le hσ₂.le
+        (Eventually.of_forall (fun _ ↦ norm_nonneg _)) (hIntegrable j hj))
+  have hVerticalOrder (σ y : ℝ) (hcont : Continuous (verticalTrace f σ)) :
+      0 ≤ meromorphicOrderAt f (verticalPoint σ y) := by
+    by_contra! hpole
+    have hline : Tendsto (verticalPoint σ) (𝓝[≠] y) (𝓝[≠] verticalPoint σ y) := by
+      apply tendsto_nhdsWithin_iff.mpr
+      refine ⟨(show Continuous (verticalPoint σ) by fun_prop).continuousAt.tendsto.mono_left
+        nhdsWithin_le_nhds, ?_⟩
+      filter_upwards [self_mem_nhdsWithin (s := {y}ᶜ)] with v hv
+      exact fun heq ↦ hv (by simpa using congrArg Complex.im heq)
+    have hPoleLimit := (tendsto_cobounded_of_meromorphicOrderAt_neg hpole).comp hline
+    exact not_tendsto_atTop_of_tendsto_nhds (hcont.continuousAt.continuousWithinAt.tendsto.norm)
+      (tendsto_norm_atTop_iff_cobounded.mpr hPoleLimit)
+  have hIdentity : ∀ᶠ k : ℕ in atTop,
+      (horizontal (-(k : ℤ)) - horizontal (k : ℤ) + vertical σ₂ k - vertical σ₁ k) /
+          twoPiI =
+        ∑ ρ ∈ (finite_rectanglePoles (t₁ := lower k) (t₂ := upper k)
+          hT.2.1 hσ₁ hσ₂).toFinset, complexResidue g ρ := by
+    filter_upwards [hk] with k hpos
+    let hFinite := finite_rectanglePoles (t₁ := lower k) (t₂ := upper k) hT.2.1 hσ₁ hσ₂
+    let S := hFinite.toFinset
+    have hgΦ (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) : AnalyticAt ℂ Φ z :=
+      hΦ.2.1.analyticAt ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+        ⟨ha.trans (hσ₁.trans_le hz.1), (hz.2.trans_lt hσ₂).trans hb⟩)
+    have hf (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) : MeromorphicAt f z :=
+      hT.2.1 z ⟨hσ₁.trans_le hz.1, hz.2.trans_lt hσ₂⟩
+    have hHorizontalOrder (j : ℤ) (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) (hy : z.im = T j) :
+        0 ≤ meromorphicOrderAt f z := by
+      obtain ⟨δ, hδ, hd⟩ := hT.2.2.2.2.2.2.2.1 j
+      apply AnalyticAt.meromorphicOrderAt_nonneg
+      apply hd.analyticAt
+      apply ((isOpen_Ioo.preimage Complex.continuous_re).inter
+        (isOpen_Ioo.preimage Complex.continuous_im)).mem_nhds
+      exact ⟨⟨hσ₁.trans_le hz.1, hz.2.trans_lt hσ₂⟩, by
+        change T j - δ < z.im ∧ z.im < T j + δ
+        rw [hy]
+        exact ⟨sub_lt_self _ hδ, lt_add_of_pos_right _ hδ⟩⟩
+    have ht : lower k < upper k := (hHeights k hpos).1.trans (hHeights k hpos).2
+    have hrect := rectangleIntegral_eq_sum_complexResidue (g := g) hσ ht S
+      (fun z hz ↦ (hgΦ z hz.1).meromorphicAt.mul (hf z hz.1))
+      (fun ρ hρ ↦ ⟨(hFinite.mem_toFinset.mp hρ).1, (hFinite.mem_toFinset.mp hρ).2.1⟩) ?_
+    · have htwoPiI : twoPiI ≠ 0 := by simp [Real.pi_ne_zero, Complex.I_ne_zero]
+      change _ / twoPiI = ∑ ρ ∈ S, complexResidue g ρ
+      exact (div_eq_iff htwoPiI).mpr (by simpa only [mul_comm _ twoPiI] using hrect)
+    · intro z hz hzS
+      rw [show meromorphicOrderAt g z = meromorphicOrderAt Φ z + meromorphicOrderAt f z
+        from meromorphicOrderAt_mul (hgΦ z hz.1).meromorphicAt (hf z hz.1)]
+      apply add_nonneg (hgΦ z hz.1).meromorphicOrderAt_nonneg
+      rcases hz with ⟨⟨h₁, h₂⟩, ⟨h₃, h₄⟩⟩
+      rcases h₁.eq_or_lt with h₁ | h₁
+      · have hz' : z = verticalPoint σ₁ z.im := by rw [h₁]; exact (Complex.re_add_im z).symm
+        rw [hz']
+        exact hVerticalOrder σ₁ z.im (hSides σ₁ (by simp)).1
+      rcases h₂.eq_or_lt with h₂ | h₂
+      · have hz' : z = verticalPoint σ₂ z.im := by rw [← h₂]; exact (Complex.re_add_im z).symm
+        rw [hz']
+        exact hVerticalOrder σ₂ z.im (hSides σ₂ (by simp)).1
+      rcases h₃.eq_or_lt with h₃ | h₃
+      · exact hHorizontalOrder (-(k : ℤ)) z ⟨h₁.le, h₂.le⟩ h₃.symm
+      rcases h₄.eq_or_lt with h₄ | h₄
+      · exact hHorizontalOrder (k : ℤ) z ⟨h₁.le, h₂.le⟩ h₄
+      exact le_of_not_gt fun hzOrder ↦ hzS (hFinite.mem_toFinset.mpr
+        ⟨⟨h₁, h₂⟩, ⟨h₃, h₄⟩, hzOrder⟩)
+  have hLim := (((hHorizontal.comp hNegIndex).sub (hHorizontal.comp hIndex)).add
+    (hVertical σ₂ ⟨hσ₁.trans hσ, hσ₂⟩ (by simp))).sub
+    (hVertical σ₁ ⟨hσ₁, hσ.trans hσ₂⟩ (by simp))
+  simpa only [zero_sub, neg_zero, zero_add] using (hLim.div_const twoPiI).congr' hIdentity
 
 /-- Paper: Theorem B.3.2.1(1)–(2), p. 606. If the poles between the chosen
 lines are simple, the finite sums with weights `Φ ρ * complexResidue f ρ`

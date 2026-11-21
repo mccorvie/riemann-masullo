@@ -240,7 +240,10 @@ changed=0; git diff --cached --quiet || changed=1
 [ "$role" = scout ] && changed=0
 
 if [ $changed = 1 ]; then
-  stray=$(git diff --cached --name-only | awk '!/^RiemannMasullo\/.*\.lean$/ || /^RiemannMasullo\/External\//')
+  # Library Lean files only, plus the attribution list, which AGENTS.md asks an agent to extend
+  # when it ports a proof from another project.
+  stray=$(git diff --cached --name-only | awk '$0 == "RiemannMasullo/External/ATTRIBUTION.md" { next }
+    !/^RiemannMasullo\/.*\.lean$/ || /^RiemannMasullo\/External\//')
   [ -z "$stray" ] || fail "A $role agent ($who) changed files its role may not touch. Nothing was pushed.
 
 \`\`\`

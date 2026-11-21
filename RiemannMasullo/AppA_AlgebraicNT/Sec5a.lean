@@ -6,6 +6,10 @@ public import Mathlib.MeasureTheory.Constructions.Polish.Basic
 public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
+import Mathlib.MeasureTheory.Measure.Haar.Extension
+import Mathlib.Topology.Algebra.IsUniformGroup.Basic
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
+import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
 /-!
 # Maximal averages on the real line and D-sequences
@@ -71,15 +75,10 @@ theorem realCenteredMaximal_const (c : ℂ) (x : ℝ) :
 -- TODO(paper-gap): In Theorem A.5.1.1(1), the all-radii maximal function need not be finite
 -- anywhere. For f(x) = |x| both local hypotheses hold and the averages grow without bound.
 
--- Local integrability suffices for measurability.
-set_option linter.unusedVariables false in
-/-- Paper: Theorem A.5.1.1(1), p. 566. Under the two local integrability hypotheses,
-the centered maximal function is measurable. Input measurability is for completed
-Lebesgue measure.
-Deviation: The separate almost-everywhere finiteness claim fails for the all-radii operator. -/
-theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f volume)
-    (hlocal : LocallyIntegrable f volume)
-    (hlog : LocallyIntegrable (fun x ↦ (max (Real.log ‖f x‖) 0 : ℝ) • f x) volume) :
+/-- Paper: Proof of Theorem A.5.1.1(1), p. 566. Local integrability makes each
+fixed-radius average continuous and hence the centered maximal function measurable. -/
+private theorem realCenteredMaximal_measurable_of_locallyIntegrable {f : ℝ → ℂ}
+    (hlocal : LocallyIntegrable f volume) :
     Measurable (realCenteredMaximal f) := by
   have hint (a b : ℝ) : IntervalIntegrable (fun y ↦ ‖f y‖) volume a b :=
     (IntegrableOn.intervalIntegrable
@@ -106,6 +105,17 @@ theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f vo
     simp only [ofReal_norm]
   simp only [hlintegral]
   exact (ENNReal.continuous_const_mul (by simp [hr])).comp (ENNReal.continuous_ofReal.comp havg)
+
+set_option linter.unusedVariables false in
+/-- Paper: Theorem A.5.1.1(1), p. 566. Under the two local integrability hypotheses,
+the centered maximal function is measurable. Input measurability is for completed
+Lebesgue measure.
+Deviation: The separate almost-everywhere finiteness claim fails for the all-radii operator. -/
+theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f volume)
+    (hlocal : LocallyIntegrable f volume)
+    (hlog : LocallyIntegrable (fun x ↦ (max (Real.log ‖f x‖) 0 : ℝ) • f x) volume) :
+    Measurable (realCenteredMaximal f) :=
+  realCenteredMaximal_measurable_of_locallyIntegrable hlocal
 
 /-- Paper: Theorem A.5.1.1(2), p. 566. The level set of the centered maximal function
 has measure at most three times the L¹ norm divided by the positive level. -/
@@ -180,12 +190,152 @@ theorem realCenteredMaximal_weak_one {f : ℝ → ℂ} (hf : AEMeasurable f volu
       rw [ENNReal.tsum_mul_left, ← hnorm]
       gcongr
 
+/-- Paper: (A.5.1.8), p. 567. Truncating the input below a positive level bounds the
+measure of the maximal function's level set at twice that level by a weighted tail integral. -/
+private theorem realCenteredMaximal_tail {f : ℝ → ℂ} (hf : AEMeasurable f volume)
+    {p : ℝ} (hp : 1 < p) (hLp : MemLp f (ENNReal.ofReal p) volume) {t : ℝ} (ht : 0 < t) :
+    volume {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} ≤
+      ENNReal.ofReal (3 / t) * ∫⁻ x in {x | ENNReal.ofReal t < ‖f x‖ₑ}, ‖f x‖ₑ := by
+  classical
+  let s : Set ℝ := {x | ENNReal.ofReal t < ‖f x‖ₑ}
+  let g := s.indicator f
+  have hs : NullMeasurableSet s volume :=
+    nullMeasurableSet_lt aemeasurable_const hf.eNorm
+  have ht₀ : ENNReal.ofReal t ≠ 0 := by simp [ht]
+  have hsFin : volume s ≠ ∞ := by
+    apply (measure_mono (fun x (hx : x ∈ s) ↦ (show ENNReal.ofReal t < ‖f x‖ₑ from hx).le)).trans_lt
+      (hLp.meas_ge_lt_top'_eNorm (by positivity) ENNReal.ofReal_ne_top ht₀ (by simp)) |>.ne
+  have hp₁ : 1 ≤ ENNReal.ofReal p := by
+    simpa using ENNReal.ofReal_le_ofReal hp.le
+  have hgLp : MemLp g (ENNReal.ofReal p) volume :=
+    (memLp_indicator_iff_restrict hs).2 (hLp.restrict s)
+  have hg : Integrable g volume := memLp_one_iff_integrable.mp
+    (hgLp.mono_exponent_of_measure_support_ne_top (fun x hx ↦ indicator_of_notMem hx f) hsFin hp₁)
+  have hnorm (y : ℝ) : ‖f y‖ₑ ≤ ‖g y‖ₑ + ENNReal.ofReal t := by
+    by_cases hy : y ∈ s
+    · simp [g, hy]
+    · simpa [g, hy] using le_of_not_gt (show ¬ ENNReal.ofReal t < ‖f y‖ₑ from hy)
+  have hmax (x : ℝ) : realCenteredMaximal f x ≤ realCenteredMaximal g x + ENNReal.ofReal t := by
+    unfold realCenteredMaximal
+    refine iSup_le fun r ↦ ?_
+    let I := Ioc (x - (r : ℝ)) (x + (r : ℝ))
+    let len := ENNReal.ofReal (2 * (r : ℝ))
+    have hr : 0 < (r : ℝ) := r.property
+    have hlen : volume I = len := by
+      dsimp only [I, len]
+      rw [Real.volume_Ioc, show x + (r : ℝ) - (x - (r : ℝ)) = 2 * r by ring]
+    change len⁻¹ * (∫⁻ y in I, ‖f y‖ₑ) ≤ _
+    calc
+      _ ≤ len⁻¹ * (∫⁻ y in I, ‖g y‖ₑ + ENNReal.ofReal t) := by
+        gcongr
+        exact hnorm _
+      _ = len⁻¹ * (∫⁻ y in I, ‖g y‖ₑ) + ENNReal.ofReal t := by
+        rw [lintegral_add_left' hg.aestronglyMeasurable.eNorm.restrict,
+          setLIntegral_const, hlen, mul_add, mul_left_comm len⁻¹,
+          ENNReal.inv_mul_cancel (by simp [hr]) ENNReal.ofReal_ne_top, mul_one]
+      _ ≤ _ := by
+        gcongr
+        exact le_iSup (fun r : Ioi (0 : ℝ) ↦ (ENNReal.ofReal (2 * (r : ℝ)))⁻¹ *
+          ∫⁻ y in Ioc (x - (r : ℝ)) (x + (r : ℝ)), ‖g y‖ₑ) r
+  have hsubset : {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} ⊆
+      {x | ENNReal.ofReal t < realCenteredMaximal g x} := by
+    intro x hx
+    change ENNReal.ofReal (2 * t) < realCenteredMaximal f x at hx
+    rw [two_mul, ENNReal.ofReal_add ht.le ht.le] at hx
+    exact lt_of_not_ge fun h ↦
+      (hx.trans_le ((hmax x).trans (add_le_add_left h (ENNReal.ofReal t)))).false
+  refine (measure_mono hsubset).trans ?_
+  have hweak := realCenteredMaximal_weak_one hg.aestronglyMeasurable.aemeasurable hg ht
+  rwa [eLpNorm_one_eq_lintegral_eNorm hg.aestronglyMeasurable, show g = s.indicator f from rfl,
+    (show (fun x ↦ ‖s.indicator f x‖ₑ) = s.indicator (fun x ↦ ‖f x‖ₑ) by
+      funext x
+      exact eNorm_indicator_eq_indicator_eNorm f x), lintegral_indicator₀ hs] at hweak
+
 /-- Paper: Theorem A.5.1.1(3), p. 566. For a finite exponent p greater than one,
 the p-th moment of the centered maximal function has the displayed strong-type bound. -/
 theorem realCenteredMaximal_strong {f : ℝ → ℂ} (hf : AEMeasurable f volume) {p : ℝ}
     (hp : 1 < p) (hLp : MemLp f (ENNReal.ofReal p) volume) :
     (∫⁻ x, realCenteredMaximal f x ^ p) ≤
-      ENNReal.ofReal ((2 : ℝ) ^ p * 3 * p / (p - 1)) * ∫⁻ x, ‖f x‖ₑ ^ p := by sorry
+      ENNReal.ofReal ((2 : ℝ) ^ p * 3 * p / (p - 1)) * ∫⁻ x, ‖f x‖ₑ ^ p := by
+  have hp₀ : 0 < p := by positivity
+  have hp₁ : 0 < p - 1 := sub_pos.mpr hp
+  have hloc := hLp.locallyIntegrable (by simpa using ENNReal.ofReal_le_ofReal hp.le)
+  let M (x : ℝ) := realCenteredMaximal f x / 2
+  have hM : Measurable M :=
+    (realCenteredMaximal_measurable_of_locallyIntegrable hloc).div_const 2
+  -- Layer cake for this weighted measure accounts for the factor ‖f x‖ₑ in the tail.
+  let ν := (volume : Measure ℝ).withDensity (fun x ↦ ‖f x‖ₑ)
+  have htail (t : ℝ) (ht : 0 < t) :
+      volume {x | ENNReal.ofReal t < M x} ≤
+        ENNReal.ofReal (3 / t) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ} := by
+    have hlevel : {x | ENNReal.ofReal t < M x} =
+        {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} := by
+      ext x
+      simp only [mem_ofPred_eq, M, ENNReal.lt_div_iff_mul_lt (Or.inl two_ne_zero)
+        (Or.inl ENNReal.ofNat_ne_top), two_mul, ENNReal.ofReal_add ht.le ht.le, mul_two]
+    rw [hlevel, withDensity_apply']
+    exact realCenteredMaximal_tail hf hp hLp ht
+  have hweighted :
+      ENNReal.ofReal (p - 1) * (∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖f x‖ₑ} *
+        ENNReal.ofReal (t ^ (p - 2))) = ∫⁻ x, ‖f x‖ₑ ^ p := by
+    have hfNorm := hf.eNorm
+    have h := lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul ν
+      (hfNorm.mono_ac (withDensity_absolutelyContinuous _ _)) hp₁
+    rw [show p - 1 - 1 = p - 2 by ring] at h
+    rw [← h, lintegral_withDensity_eq_lintegral_mul₀ hfNorm (hfNorm.pow_const _)]
+    refine lintegral_congr fun x ↦ ?_
+    calc
+      _ = ‖f x‖ₑ ^ (1 : ℝ) * ‖f x‖ₑ ^ (p - 1) := by
+        rw [Pi.mul_apply, ENNReal.rpow_one]
+      _ = _ := by
+        rw [← ENNReal.rpow_add_of_nonneg 1 (p - 1) zero_le_one hp₁.le,
+          show 1 + (p - 1) = p by ring]
+  have hrescale (x : ℝ) : realCenteredMaximal f x ^ p =
+      ENNReal.ofReal ((2 : ℝ) ^ p) * M x ^ p := by
+    have h : 2 * M x = realCenteredMaximal f x := by
+      rw [mul_comm]
+      exact ENNReal.div_mul_cancel two_ne_zero ENNReal.ofNat_ne_top
+    calc
+      _ = (2 * M x) ^ p := by rw [h]
+      _ = _ := by
+        rw [ENNReal.mul_rpow_of_nonneg _ _ hp₀.le,
+          ← ENNReal.ofReal_rpow_of_nonneg (by norm_num : 0 ≤ (2 : ℝ)) hp₀.le,
+          ENNReal.ofReal_ofNat]
+  simp_rw [hrescale]
+  rw [lintegral_const_mul _ (hM.pow_const p),
+    lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul volume hM.aemeasurable hp₀, ← mul_assoc]
+  calc
+    _ ≤ (ENNReal.ofReal ((2 : ℝ) ^ p) * ENNReal.ofReal p) *
+        (3 * ∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖f x‖ₑ} *
+          ENNReal.ofReal (t ^ (p - 2))) := by
+      gcongr
+      rw [← lintegral_const_mul' _ _ ENNReal.ofNat_ne_top]
+      apply lintegral_mono_ae
+      filter_upwards [self_mem_ae_restrict (measurableSet_Ioi (a := (0 : ℝ)))] with t ht
+      have ht' : 0 < t := ht
+      have hweight : ENNReal.ofReal (3 / t) * ENNReal.ofReal (t ^ (p - 1)) =
+          (3 : ℝ≥0∞) * ENNReal.ofReal (t ^ (p - 2)) := by
+        rw [← ENNReal.ofReal_mul (by positivity : 0 ≤ 3 / t), ← ENNReal.ofReal_ofNat,
+          ← ENNReal.ofReal_mul (by norm_num : 0 ≤ (3 : ℝ))]
+        congr 1
+        rw [show t ^ (p - 2) = t ^ (p - 1) / t by
+          rw [show p - 2 = p - 1 - 1 by ring, Real.rpow_sub ht', Real.rpow_one]]
+        ring
+      calc
+        _ ≤ (ENNReal.ofReal (3 / t) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ}) *
+            ENNReal.ofReal (t ^ (p - 1)) := by gcongr; exact htail t ht'
+        _ = _ := by rw [mul_right_comm, hweight, mul_right_comm, mul_assoc]
+    _ = _ := by
+      have h := congrArg (fun a ↦ (ENNReal.ofReal (p - 1))⁻¹ * a) hweighted
+      rw [ENNReal.inv_mul_cancel_left (ENNReal.ofReal_ne_zero_iff.mpr hp₁)
+        ENNReal.ofReal_ne_top] at h
+      rw [h, show (2 : ℝ) ^ p * 3 * p / (p - 1) =
+        ((2 : ℝ) ^ p * p) * (3 * (p - 1)⁻¹) by ring,
+        ENNReal.ofReal_mul (by positivity : 0 ≤ (2 : ℝ) ^ p * p),
+        ENNReal.ofReal_mul (by positivity : 0 ≤ (2 : ℝ) ^ p),
+        ENNReal.ofReal_mul (by norm_num : 0 ≤ (3 : ℝ)), ENNReal.ofReal_ofNat,
+        ENNReal.ofReal_inv_of_pos hp₁]
+      simp only [mul_assoc]
 
 /-- Paper: Theorem A.5.1.3, p. 568. Centered averages of a locally integrable
 function converge to its value at almost every point of the real line. -/
@@ -241,7 +391,35 @@ theorem exists_isDDoublePrimeSequence_of_totallyDisconnected [FirstCountableTopo
     ∃ K : ℕ → OpenSubgroup G,
       let U : ℕ → Set G := fun k ↦ (K k : Set G)
       let V : ℕ → Set G := fun k ↦ U k * U k
-      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by sorry
+      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by
+  have hbasis : (𝓝 (1 : G)).HasBasis (fun H : OpenSubgroup G ↦ IsCompact (H : Set G))
+      (fun H ↦ (H : Set G)) := by
+    refine ⟨fun W ↦ ⟨exists_compact_openSubgroup_sub_mem_nhds, ?_⟩⟩
+    rintro ⟨H, _, hHW⟩
+    exact mem_of_superset H.mem_nhds_one hHW
+  obtain ⟨K, hcompact, hK⟩ := hbasis.exists_antitone_subbasis
+  let U : ℕ → Set G := fun k ↦ (K k : Set G)
+  have hmul (k : ℕ) : U k * U k = U k := (K k).toSubgroup.toSubmonoid.coe_mul_self_eq
+  have hdiff (k : ℕ) : U k * (U k)⁻¹ = U k := by
+    rw [show (U k)⁻¹ = U k from inv_coe_set, hmul]
+  have hmeas (k : ℕ) : NullMeasurableSet (U k) μ :=
+    (K k).isOpen.measurableSet.nullMeasurableSet
+  have hpos (k : ℕ) : 0 < μ (U k) := (K k).isOpen.measure_pos μ ⟨1, (K k).one_mem⟩
+  have hfin (k : ℕ) : μ (U k) < ∞ := (hcompact k).measure_lt_top
+  have hD : IsDSequence μ U := by
+    refine ⟨fun k ↦ ⟨(K k).one_mem, hmeas k, hpos k, hfin k⟩,
+      hK.antitone, 2, two_pos, fun k ↦ ?_⟩
+    rw [hdiff, ENNReal.ofReal_ofNat, two_mul]
+    exact ⟨hpos k, ENNReal.lt_add_right (hfin k).ne (hpos k).ne'⟩
+  refine ⟨K, ⟨⟨hD, fun _ hW ↦ hK.mem_iff.mp hW⟩, 1, one_pos, fun k ↦ ?_⟩, fun k ↦ ?_⟩
+  · change NullMeasurableSet (U k * U k) μ ∧
+      (U k * U k) * (U k * U k)⁻¹ ⊆ U k ∧
+      μ (U k) ≤ ENNReal.ofReal 1 * μ (U k * U k)
+    simp only [hmul, hdiff, ENNReal.ofReal_one, one_mul]
+    exact ⟨hmeas k, Subset.rfl, le_rfl⟩
+  · change IsCompact (U k) ∧ μ (U k) ≤ μ (U k * U k)
+    rw [hmul]
+    exact ⟨hcompact k, le_rfl⟩
 
 variable (H : OpenSubgroup G) (U : ℕ → Set H)
 
@@ -250,13 +428,42 @@ local notation "inclusion" => (fun x : H ↦ (x : G))
 /-- Paper: Proposition A.5.2.3(2), p. 570. A sequence in an open subgroup is a
 D-sequence for the restricted Haar measure exactly when its images form one in the group. -/
 theorem isDSequence_openSubgroup_iff [μ.IsHaarMeasure] :
-    IsDSequence (μ.comap inclusion) U ↔ IsDSequence μ (fun k ↦ inclusion '' U k) := by sorry
+    IsDSequence (μ.comap inclusion) U ↔ IsDSequence μ (fun k ↦ inclusion '' U k) := by
+  have hH : MeasurableSet (H : Set G) := H.isOpen.measurableSet
+  have hemb : MeasurableEmbedding inclusion := MeasurableEmbedding.subtype_coe hH
+  have hmeas (s : Set H) : μ.comap inclusion s = μ (inclusion '' s) := hemb.comap_apply μ s
+  have hnull (s : Set H) :
+      NullMeasurableSet s (μ.comap inclusion) ↔ NullMeasurableSet (inclusion '' s) μ := by
+    refine ⟨fun hs ↦ Measure.NullMeasurableSet.subtype_coe (s := (H : Set G)) hH.nullMeasurableSet hs,
+      fun hs ↦ ?_⟩
+    have hqmp : QuasiMeasurePreserving inclusion (μ.comap inclusion) μ :=
+      ⟨measurable_subtype_coe.aemeasurable, by
+        rw [hemb.map_comap]
+        exact Measure.absolutelyContinuous_of_le Measure.restrict_le_self⟩
+    simpa only [Set.preimage_image_eq _ Subtype.val_injective] using hs.preimage hqmp
+  have hone (s : Set H) : (1 : H) ∈ s ↔ (1 : G) ∈ inclusion '' s :=
+    (Subtype.val_injective.mem_set_image (a := (1 : H))).symm
+  have hdiff (s : Set H) :
+      inclusion '' (s * s⁻¹) = inclusion '' s * (inclusion '' s)⁻¹ := by
+    have h := Set.image_mul (m := (H : Subgroup G).subtype) (s := s) (t := s⁻¹)
+    rw [Set.image_inv] at h
+    exact h
+  have hanti : Antitone U ↔ Antitone (fun k ↦ inclusion '' U k) := by
+    simp only [Antitone, Set.image_subset_image_iff Subtype.val_injective]
+  unfold IsDSequence
+  simp only [hmeas, hnull, hone, hdiff, hanti]
 
 /-- Paper: Proposition A.5.2.3(2), p. 570. The D′ condition transfers in both
 directions under the inclusion of an open subgroup, with the restricted Haar measure. -/
 theorem isDPrimeSequence_openSubgroup_iff [μ.IsHaarMeasure] :
     IsDPrimeSequence (μ.comap inclusion) U ↔
-      IsDPrimeSequence μ (fun k ↦ inclusion '' U k) := by sorry
+      IsDPrimeSequence μ (fun k ↦ inclusion '' U k) := by
+  have hemb : IsOpenEmbedding inclusion := H.isOpen.isOpenEmbedding_subtypeVal
+  refine and_congr (isDSequence_openSubgroup_iff μ H U) ⟨fun h W hW ↦ ?_, fun h W hW ↦ ?_⟩
+  · obtain ⟨k, hk⟩ := h _ (continuous_subtype_val.continuousAt.preimage_mem_nhds hW)
+    exact ⟨k, Set.image_subset_iff.mpr hk⟩
+  · obtain ⟨k, hk⟩ := h _ (hemb.image_mem_nhds.mpr hW)
+    exact ⟨k, (Set.image_subset_image_iff Subtype.val_injective).mp hk⟩
 
 /-- Paper: Proposition A.5.2.3(2), p. 570. Openness agrees in the open subgroup
 and in the ambient group. -/
@@ -442,11 +649,212 @@ variable [DiscreteTopology H] (hH : IsClosed (H : Set G))
 
 local notation "lifted" => (fun k ↦ Set.inter (q ⁻¹' U k) E)
 
+include hH hν hcount hE hEc hbij in
+/-- A precompact Borel transversal computes Weil quotient mass, also for outer measures. -/
+private theorem weilQuotientMeasure_apply_of_transversal (S : Set (G ⧸ H)) :
+    ν S = μ (q ⁻¹' S ∩ E) := by
+  classical
+  let : IsClosed (H : Set G) := hH
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let : Countable H.op := H.equivOp.symm.injective.countable
+  let : ν.Regular := hν.2.1
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  let νE := (μ.restrict E).map q
+  let : IsFiniteMeasure νE := ⟨by
+    rw [Measure.map_apply hq.measurable MeasurableSet.univ, preimage_univ,
+      Measure.restrict_apply_univ]
+    exact (measure_mono subset_closure).trans_lt hEc.measure_lt_top⟩
+  have hdomain : IsFundamentalDomain H.op E μ := by
+    apply IsFundamentalDomain.mk' hE.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hbij.2 (q x)
+    let h : H := ⟨x⁻¹ * y, QuotientGroup.eq.mp hy.symm⟩
+    refine ⟨H.equivOp h, ?_, ?_⟩
+    · change x * (x⁻¹ * (y : G)) ∈ E
+      simp [y.property]
+    · intro a ha
+      apply H.equivOp.symm.injective
+      apply Subtype.ext
+      apply mul_left_cancel (a := x)
+      change a • x = x * (x⁻¹ * (y : G))
+      rw [mul_inv_cancel_left]
+      have he : (⟨a • x, ha⟩ : E) = y := hbij.1
+        ((QuotientGroup.mk_mul_of_mem x (H.equivOp.symm a).property).trans hy.symm)
+      exact congrArg Subtype.val he
+  have hsingle (h : H) : μH {h} = 1 := by
+    calc
+      μH {h} = μH ((fun x : H ↦ h * x) ⁻¹' {h}) := (measure_preimage_mul μH h _).symm
+      _ = μH {1} := by congr 1; ext x; simp
+      _ = 1 := hcount
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hperiod (f : CompactlySupportedContinuousMap G ℝ) :
+      QuotientGroup.automorphize (Γ := H) f = ses.pushforward μH f := by
+    funext z
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H z
+    rw [ses.pushforward_apply_apply, integral_countable (ses.pullback f x).integrable]
+    simp only [measureReal_def, hsingle, ENNReal.toReal_one, one_smul]
+    exact H.equivOp.symm.tsum_eq (fun h : H ↦ f (x * (h : G)))
+  have htest (f : CompactlySupportedContinuousMap G ℝ) :
+      (∫ z, ses.pushforward μH f z ∂ν) = ∫ z, ses.pushforward μH f z ∂νE := by
+    let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+    have hcoset (z : G ⧸ H) :
+        lcaCosetIntegral H μH fc z = (ses.pushforward μH f z : ℂ) := by
+      have hz : q z.out = z := Quotient.out_eq' z
+      rw [← hz, ses.pushforward_apply_apply]
+      rw [hz, lcaCosetIntegral]
+      exact integral_complex_ofReal
+    have hw := hν.2.2 fc (f.hasCompactSupport.comp_left Complex.ofReal_zero)
+    change (∫ x, (f x : ℂ) ∂μ) = ∫ z, lcaCosetIntegral H μH fc z ∂ν at hw
+    simp_rw [hcoset, integral_complex_ofReal] at hw
+    have hm : AEStronglyMeasurable (QuotientGroup.automorphize (Γ := H) f) νE :=
+      hperiod f ▸ (ses.pushforward μH f).continuous.aestronglyMeasurable
+    exact (Complex.ofReal_injective hw).symm.trans
+      (hperiod f ▸ QuotientGroup.integral_eq_integral_automorphize hdomain f.integrable hm)
+  obtain ⟨b, hb, -, hbc, hb₀⟩ :=
+    exists_continuous_one_zero_of_isCompact hEc isClosed_empty (disjoint_empty _)
+  let b₀ : CompactlySupportedContinuousMap G ℝ := ⟨b, hbc⟩
+  let c := ses.pushforward μH b₀
+  have hc (z : G ⧸ H) : 0 < c z := by
+    obtain ⟨x, rfl⟩ := hbij.2 z
+    change 0 < ses.pushforward μH b₀ (q (x : G))
+    rw [ses.pushforward_apply_apply]
+    apply (integral_pos_iff_support_of_nonneg (fun _ ↦ (hb₀ _).1)
+      (ses.pullback b₀ (x : G)).integrable).mpr
+    have hmem : (1 : H) ∈ Function.support (ses.pullback b₀ (x : G)) := by
+      rw [Function.mem_support, ses.pullback_def, Subgroup.coe_subtype,
+        Subgroup.coe_one, mul_one]
+      change b (x : G) ≠ 0
+      exact (hb (subset_closure x.property)).trans_ne one_ne_zero
+    have hle := measure_mono (μ := μH) (singleton_subset_iff.mpr hmem)
+    rw [hcount] at hle
+    exact zero_lt_one.trans_le hle
+  have hνE : ν = νE := by
+    apply Measure.ext_of_integral_eq_on_compactlySupported
+    intro g
+    let a : G → ℝ := fun x ↦ g (q x) / c (q x)
+    have ha : Continuous a :=
+      (g.continuous.comp hq).div (c.continuous.comp hq) fun x ↦ (hc (q x)).ne'
+    let f : CompactlySupportedContinuousMap G ℝ :=
+      ⟨⟨a * b₀, ha.mul b₀.continuous⟩, b₀.hasCompactSupport.mul_left⟩
+    have hf : ⇑(ses.pushforward μH f) = g := by
+      funext z
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H z
+      have hp (h : H) : ses.pullback f x h = a x * ses.pullback b₀ x h := by
+        have hh : q (x * (h : G)) = q x := QuotientGroup.mk_mul_of_mem x h.property
+        simp only [ses.pullback_def, Subgroup.coe_subtype]
+        change a (x * h) * b₀ (x * h) = a x * b₀ (x * h)
+        simp only [a, hh]
+      rw [ses.pushforward_apply_apply]
+      simp_rw [hp]
+      rw [integral_const_mul, ← ses.pushforward_apply_apply]
+      exact div_mul_cancel₀ _ (hc (q x)).ne'
+    simpa only [hf] using htest f
+  -- The measurable embedding extends the measure identity to arbitrary sets.
+  let : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+  let : IsUniformGroup G := isUniformGroup_of_commGroup
+  let : CompleteSpace G := IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace G
+  let : (uniformity G).IsCountablyGenerated := IsUniformGroup.uniformity_countably_generated
+  let : PolishSpace G := ⟨⟩
+  have hemb := ContinuousOn.measurableEmbedding hE hq.continuousOn
+    (injOn_iff_injective.mpr hbij.1)
+  have hcoe := MeasurableEmbedding.subtype_coe hE
+  rw [hνE]
+  change (μ.restrict E).map q S = _
+  rw [← Subtype.range_coe (s := E), ← hcoe.map_comap μ,
+    Measure.map_map hq.measurable hcoe.measurable]
+  change ((μ.comap (Subtype.val : E → G)).map (E.domRestrict q)) S = _
+  rw [hemb.map_apply, hcoe.comap_apply]
+  congr 1
+  ext x
+  simp [Set.mem_inter_iff, and_comm]
+
 include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 570. A decreasing Borel family on the
 quotient is a D-sequence exactly when its lifts to the fundamental domain form one. -/
 theorem isDSequence_quotient_iff :
-    IsDSequence ν U ↔ IsDSequence μ lifted := by sorry
+    IsDSequence ν U ↔ IsDSequence μ lifted := by
+  classical
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  have hmass := weilQuotientMeasure_apply_of_transversal H hH hν hcount hE hEc hbij
+  have hmassU (k : ℕ) : ν (U k) = μ (lifted k) := hmass (U k)
+  have hone : (1 : G) ∈ E := interior_subset hE₁
+  have himage (S : Set (G ⧸ H)) : q '' (q ⁻¹' S ∩ E) = S := by
+    refine subset_antisymm (image_subset_iff.mpr inter_subset_left) fun x hx ↦ ?_
+    obtain ⟨y, hy⟩ := hbij.2 x
+    change q (y : G) = x at hy
+    exact ⟨y, ⟨show q (y : G) ∈ S from hy.symm ▸ hx, y.property⟩, hy⟩
+  have himageU (k : ℕ) : q '' (lifted k) = U k := himage (U k)
+  let K : Set G := closure E * (closure E)⁻¹
+  have hK : IsCompact K := hEc.mul hEc.inv
+  have hEK : E ⊆ K :=
+    subset_closure.trans (Set.subset_mul_left _ (by simpa using subset_closure hone))
+  -- Sets inside K with the same quotient image cover one another by finitely many translates.
+  have hfin : (Subtype.val ⁻¹' (K * K⁻¹) : Set H).Finite :=
+    (hH.isClosedEmbedding_subtypeVal.isCompact_preimage (hK.mul hK.inv)).finite_of_discrete
+  let J := hfin.toFinset
+  let N : ℝ := J.card + 1
+  have hN : 0 < N := by dsimp [N]; positivity
+  have hJ : (J.card : ℝ≥0∞) ≤ ENNReal.ofReal N := by
+    rw [← ENNReal.ofReal_natCast]
+    exact ENNReal.ofReal_le_ofReal (by dsimp [N]; linarith)
+  have hcompare {A B : Set G} (hA : A ⊆ K) (hB : B ⊆ K)
+      (hAB : q '' A ⊆ q '' B) : μ A ≤ ENNReal.ofReal N * μ B := by
+    have hcover : A ⊆ ⋃ h ∈ J, (fun x : G ↦ (h : G) * x) ⁻¹' B := by
+      intro a ha
+      obtain ⟨b, hb, heq⟩ := hAB (mem_image_of_mem q ha)
+      let h : H := ⟨a⁻¹ * b, QuotientGroup.eq.mp heq.symm⟩
+      have hh : h ∈ J := hfin.mem_toFinset.mpr <| Set.mem_mul.mpr
+        ⟨b, hB hb, a⁻¹, Set.inv_mem_inv.mpr (hA ha), mul_comm _ _⟩
+      exact mem_iUnion₂.mpr ⟨h, hh, by simpa [h, mul_comm] using hb⟩
+    calc
+      μ A ≤ μ (⋃ h ∈ J, (fun x : G ↦ (h : G) * x) ⁻¹' B) := measure_mono hcover
+      _ ≤ ∑ h ∈ J, μ ((fun x : G ↦ (h : G) * x) ⁻¹' B) := measure_biUnion_finset_le _ _
+      _ = (J.card : ℝ≥0∞) * μ B := by simp [measure_preimage_mul, nsmul_eq_mul]
+      _ ≤ ENNReal.ofReal N * μ B := by gcongr
+  have hdiff (k : ℕ) :
+      μ (lifted k * (lifted k)⁻¹) ≤ ENNReal.ofReal N * ν (U k * (U k)⁻¹) ∧
+      ν (U k * (U k)⁻¹) ≤ ENNReal.ofReal N * μ (lifted k * (lifted k)⁻¹) := by
+    let S := U k * (U k)⁻¹
+    have hsub : lifted k * (lifted k)⁻¹ ⊆ K :=
+      Set.mul_subset_mul (inter_subset_right.trans subset_closure)
+        (Set.inv_subset_inv.mpr (inter_subset_right.trans subset_closure))
+    have hsub' : q ⁻¹' S ∩ E ⊆ K := inter_subset_right.trans hEK
+    have hqdiff : q '' (lifted k * (lifted k)⁻¹) = S := by
+      rw [Set.image_mul, Set.image_inv, himageU]
+    rw [hmass S]
+    exact ⟨hcompare hsub hsub' (by rw [hqdiff, himage]),
+      hcompare hsub' hsub (by rw [hqdiff, himage])⟩
+  have hscale {a b m : ℝ≥0∞} {C : ℝ}
+      (hle : a ≤ ENNReal.ofReal N * b) (hlt : b < ENNReal.ofReal C * m) :
+      a < ENNReal.ofReal (N * C) * m := by
+    rw [ENNReal.ofReal_mul hN.le, mul_assoc]
+    exact hle.trans_lt (ENNReal.mul_lt_mul_right (by simp [hN]) ENNReal.ofReal_ne_top hlt)
+  constructor
+  · rintro ⟨hbase, -, C, hC, hdouble⟩
+    have hbase' (k : ℕ) : 1 ∈ lifted k ∧ 0 < μ (lifted k) ∧ μ (lifted k) < ∞ := by
+      refine ⟨⟨by simpa using (hbase k).1, hone⟩, ?_⟩
+      rw [← hmassU k]
+      exact (hbase k).2.2
+    refine ⟨fun k ↦ ⟨(hbase' k).1, ((hq.measurable (hU k)).inter hE).nullMeasurableSet,
+        (hbase' k).2⟩, fun _ _ hij ↦ inter_subset_inter_left _ (preimage_mono (hmono hij)),
+      N * C, mul_pos hN hC, fun k ↦ ⟨?_, ?_⟩⟩
+    · exact (hbase' k).2.1.trans_le
+        (measure_mono (Set.subset_mul_left _ (by simpa using (hbase' k).1)))
+    · rw [← hmassU k]
+      exact hscale (hdiff k).1 (hdouble k).2
+  · rintro ⟨hbase, -, C, hC, hdouble⟩
+    have hbase' (k : ℕ) : 1 ∈ U k ∧ 0 < ν (U k) ∧ ν (U k) < ∞ := by
+      refine ⟨by simpa using (hbase k).1.1, ?_⟩
+      rw [hmass]
+      exact (hbase k).2.2
+    refine ⟨fun k ↦ ⟨(hbase' k).1, (hU k).nullMeasurableSet, (hbase' k).2⟩, hmono,
+      N * C, mul_pos hN hC, fun k ↦ ⟨?_, ?_⟩⟩
+    · exact (hbase' k).2.1.trans_le
+        (measure_mono (Set.subset_mul_left _ (by simpa using (hbase' k).1)))
+    · rw [hmass (U k)]
+      exact hscale (hdiff k).2 (hdouble k).2
 
 include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 571. The D′ condition is equivalent for the

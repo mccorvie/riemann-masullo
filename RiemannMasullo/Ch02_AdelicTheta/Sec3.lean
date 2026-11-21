@@ -238,7 +238,12 @@ theorem sLocalAdelicTheta_continuous (f : ℬₛ) : Continuous (thetaSum f) := b
 is complex linear in the test function. -/
 theorem sLocalAdelicTheta_isLinear :
     IsLinearMap ℂ (fun f : ℬₛ ↦ (⟨thetaSum f, sLocalAdelicTheta_continuous F S f⟩ : C(Iₛ, ℂ))) :=
-  by sorry
+  by
+  have hs : ∀ (f : ℬₛ) (x : Iₛ), Summable fun ξ : Uₛ ↦ thetaTerm f ξ x := fun f x ↦
+    ((sLocalAdelicTheta_hasSumUniformlyOn F S f {x} isCompact_singleton).hasSum rfl).summable
+  refine ⟨fun f g ↦ ContinuousMap.ext fun x ↦ ?_, fun c f ↦ ContinuousMap.ext fun x ↦ ?_⟩
+  · exact (tsum_congr fun ξ ↦ rfl).trans ((hs f x).tsum_add (hs g x))
+  · exact (tsum_congr fun ξ ↦ rfl).trans (tsum_mul_left (a := c) (f := fun ξ ↦ thetaTerm f ξ x))
 
 /-- Paper: Definition 2.3.1.1, p. 99. The S-local theta operator sums the
 test function over the diagonal S-unit multiples of each S-idele. -/
@@ -253,7 +258,17 @@ theorem sLocalAdelicTheta_apply (f : ℬₛ) (g : Iₛ) :
 /-- Paper: Proposition 2.3.1.2(1), p. 100. S-local theta is invariant under
 left translation by S-units, expressed as constancy on each class fiber. -/
 theorem sLocalAdelicTheta_factorsThrough (f : ℬₛ) :
-    FactorsThrough (sLocalAdelicTheta F S f) classOf := by sorry
+    FactorsThrough (sLocalAdelicTheta F S f) classOf := by
+  intro a b hab
+  have h := QuotientGroup.eq.mp hab
+  rw [MonoidHom.map_range, MonoidHom.mem_range] at h
+  obtain ⟨u, hu⟩ := h
+  refine Eq.trans ?_ (congrArg (sLocalAdelicTheta F S f) (inv_mul_eq_iff_eq_mul.mp hu.symm)).symm
+  change ∑' ξ : Uₛ, thetaTerm f ξ a = ∑' ξ : Uₛ, thetaTerm f ξ (a * unitAtS u)
+  refine ((Equiv.mulRight u).tsum_eq (fun ξ ↦ thetaTerm f ξ a)).symm.trans (tsum_congr fun ξ ↦ ?_)
+  change f (Multiplicative.ofAdd (Units.val (unitAtS (ξ * u) * a))) =
+    f (Multiplicative.ofAdd (Units.val (unitAtS ξ * (a * unitAtS u))))
+  rw [map_mul, mul_assoc, mul_comm (unitAtS u) a]
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit invariant theta
 function descends to a continuous function on the S-idele classes. -/
@@ -351,7 +366,11 @@ def sLocalHomogeneousAdelicTheta (ω : PontryaginDual J₁) : ℬₛ →ₗ[ℂ]
 character, homogeneous theta integrates unweighted theta on the norm-one classes. -/
 theorem sLocalHomogeneousAdelicTheta_trivial_at_one (f : ℬₛ) :
     sLocalHomogeneousAdelicTheta F S μ (1 : PontryaginDual J₁) f 1 =
-      ∫ h : J₁, sLocalAdelicThetaOnClasses F S f h.val ∂μ := by sorry
+      ∫ h : J₁, sLocalAdelicThetaOnClasses F S f h.val ∂μ := by
+  simp only [sLocalHomogeneousAdelicTheta, IsLinearMap.mk'_apply, ContinuousMap.coe_mk]
+  refine integral_congr_ae (.of_forall fun h ↦ ?_)
+  exact (congrArg₂ (· * ·) (congrArg (sLocalAdelicThetaOnClasses F S f) (one_mul h.val))
+    (congrArg Subtype.val (PontryaginDual.one_apply h))).trans (mul_one _)
 
 /-- Paper: Proposition 2.3.1.4(1), p. 105. Inverse left translation by a
 norm-one class multiplies homogeneous theta by the character at that class.

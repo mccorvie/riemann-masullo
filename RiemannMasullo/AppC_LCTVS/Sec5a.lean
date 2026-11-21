@@ -18,6 +18,7 @@ import RiemannMasullo.ForMathlib.Topology.Compactness.Paracompact
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 import Mathlib.Analysis.Calculus.Deriv.Comp
+import Mathlib.Analysis.Calculus.FDeriv.RestrictScalars
 import Mathlib.Analysis.Calculus.MeanValue
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
@@ -697,8 +698,11 @@ theorem weaklyDifferentiableOn_iff_existsUnique {Ω : Set V} (hΩ : IsOpen Ω) (
     exact hL.differentiableWithinAt
 
 /-- Paper: Definition C.5.1.6, p. 723. Weak continuous differentiability on an open
-set means continuous differentiability of each scalar evaluation. -/
-theorem weaklyContDiffOn_iff_scalar {Ω : Set V} (hΩ : IsOpen Ω) (f : V → E) :
+set means continuous differentiability of each scalar evaluation.
+The source is finite-dimensional, as in the paper (k^d): for an infinite-dimensional normed
+source, joint continuity of the scalar derivatives does not give continuity in operator norm. -/
+theorem weaklyContDiffOn_iff_scalar [FiniteDimensional k V] {Ω : Set V} (hΩ : IsOpen Ω)
+    (f : V → E) :
     WeaklyContDiffOn k f Ω ↔ ∀ φ : StrongDual ℂ E, ContDiffOn k 1 (φ ∘ f) Ω := by sorry
 
 /-- Paper: Definition C.5.1.8(1), p. 724. The continuous differential in the weak
@@ -1221,7 +1225,15 @@ theorem HasStrongDifferentialOn.hasDerivWithinAt_curve
     QuasiCompleteSpace ℂ E →
       HasDerivWithinAt (φ ∘ f ∘ γ)
         (φ (D (⟨γ t, hγU ht⟩, derivWithin γ (Ioo a₀ b₀) t)))
-        (Ioo a₀ b₀) t := by sorry
+        (Ioo a₀ b₀) t := by
+  intro _
+  -- The curve hypothesis uses the canonical real normed-space instance on V.
+  clear ‹NormedSpace ℝ V›
+  have hweak := ((hasWeakCompletionDifferentialOn_iff (k := k) hU f _).1 hD.2).1
+  obtain ⟨L, hL, heval⟩ := hweak φ ⟨γ t, hγU ht⟩
+  have hf := (hL.hasFDerivAt (hU.mem_nhds (hγU ht))).restrictScalars ℝ
+  have hcurve := (hγ t (hinterval ht)).hasDerivWithinAt
+  exact (hf.comp_hasDerivWithinAt t hcurve).congr_deriv (heval _).symm
 
 /-- Paper: Theorem C.5.1.21(1, 2), p. 732. Strong continuous differentiability
 is equivalent to a weak differential with a jointly continuous vector-valued lift. -/

@@ -72,12 +72,107 @@ local notation "K" => m.toMonoidHom.ker
 local notation "S" => SchwartzBruhat G
 local notation "ρS" => MonoidHom.comp (schwartzBruhatTranslationAction (G := G)) (Subgroup.subtype K)
 
+omit hm hμ₁ [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+  [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G] in
+/-- Point evaluation on the Schwartz–Bruhat space is continuous because its
+absolute value pulls back to a continuous seminorm on every elementary stage. -/
+private theorem continuous_schwartzBruhat_eval (x : G) : Continuous (fun f : S ↦ f x) := by
+  classical
+  let L : S →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  have hp : ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+    intro a e
+    let q := (normSeminorm ℂ ℂ).comp (L.comp (schwartzBruhatStageInclusion a e))
+    change Continuous q
+    let p₀ : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hp₀ : Continuous p₀ :=
+      (withGeneratingSeminorms_spec _ _).continuous_seminorm (0, 0, 0, 0)
+    apply Seminorm.continuous_of_le hp₀
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ p₀ f
+    let := e.finiteGroup
+    have he := schwartzBruhatStageRealization_apply a e f x
+    by_cases hx : x ∈ a.val.1
+    · rw [dite_eq_left hx] at he
+      rw [he]
+      let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f y‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+      have hb : (‖f y‖₊ : ENNReal) ≤ elementarySchwartzBound f.val (0, 0, 0, 0) :=
+        (le_iSup (fun g ↦ (‖f.val g‖₊ : ENNReal)) y).trans_eq
+          (elementarySchwartzBound_zero f.val).symm
+      exact ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne hb
+    · rw [dite_eq_right hx] at he
+      exact ((congrArg norm he).trans (norm_zero (E := ℂ))).le.trans (apply_nonneg p₀ f)
+  let i : {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (q ∘ schwartzBruhatStageInclusion a e)} := ⟨p, hp⟩
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
+
 /-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
 as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
 theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
     ∃! P : S →L[ℂ] S, ∀ (f : S) (x : G),
       P f x = (μ₁.real univ)⁻¹ •
-        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by sorry
+        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : ContinuousSMul ℂ S := (withGeneratingSeminorms_spec _ _).continuousSMul
+  have : LocallyConvexSpace ℝ S := (withGeneratingSeminorms_spec _ _).toLocallyConvexSpace
+  have : T2Space S := T2Space.of_injective_continuous
+    (f := fun f : S ↦ (f : G → ℂ)) (fun _ _ h ↦ Subtype.ext h)
+    (continuous_pi continuous_schwartzBruhat_eval)
+  have : QuasiCompleteSpace ℂ S := schwartzBruhat_quasiComplete
+  let τ : K →* (S →L[ℂ] S) := ρS
+  have hρ (k : K) (f : S) : τ k f = schwartzBruhatTranslate (k : G) f :=
+    (Classical.choose_spec (existsUnique_schwartzBruhatTranslationAction (G := G)).exists) k f
+  have hτ : Continuous (fun p : K × S ↦ τ p.1 p.2) := by
+    have hc : Continuous (fun p : K × S ↦ schwartzBruhatTranslate (p.1 : G) p.2) :=
+      (schwartzBruhatTranslate_continuous (G := G)).comp
+        ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+    exact hc.congr fun p ↦ (hρ p.1 p.2).symm
+  have hseq {E : Type _} [UniformSpace E] (T : K → E → E)
+      (hT : Continuous (fun p : K × E ↦ T p.1 p.2))
+      (u : ℕ → E) (v : E) (hu : Tendsto u atTop (𝓝 v)) :
+      TendstoUniformly (fun n k ↦ T k (u n)) (fun k ↦ T k v) atTop := by
+    intro U hU
+    have hc : Continuous (fun p : E × K ↦ T p.2 p.1) := hT.comp continuous_swap
+    obtain ⟨W, hW, h⟩ := (isCompact_univ (X := K)).mem_uniformity_of_prod
+      (f := fun f : E ↦ fun k : K ↦ T k f)
+      (s := univ) (q := v) hc.continuousOn (mem_univ v) (symm_le_uniformity hU)
+    rw [nhdsWithin_univ] at hW
+    filter_upwards [hu.eventually hW] with n hn k
+    exact h (u n) hn k (mem_univ k)
+  have hex : ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ τ ω A :=
+    (existsUnique_compactActionIsotypicAverage (E := S) μ₁ τ hτ
+      schwartzBruhat_bornological (hseq (fun k f ↦ τ k f) hτ) ω).exists
+  obtain ⟨A, hA⟩ := hex
+  let P : S →L[ℂ] S := (μ₁.real univ)⁻¹ • A
+  have hP (f : S) (x : G) :
+      P f x = (μ₁.real univ)⁻¹ •
+        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
+    let ev : StrongDual ℂ S :=
+      ⟨(LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype,
+        continuous_schwartzBruhat_eval x⟩
+    have hIntegral : HasPettisIntegral (.positive (μ₁.restrict univ))
+        (fun k : K ↦ star (ω k : ℂ) • τ k f) (A f) := hA f
+    unfold HasPettisIntegral at hIntegral
+    obtain ⟨_, h⟩ := hIntegral
+    have he := congrArg (fun z : PettisWeakCompletion S ↦
+      (show Module.Dual ℂ (StrongDual ℂ S) from z) ev) h
+    let F : K → ℂ := fun k ↦ star (ω k : ℂ) * (τ k f) x
+    change A f x = ∫ k, F k ∂(μ₁.restrict univ) at he
+    have hpointwise (k : K) : (τ k f) x = f ((k : G)⁻¹ * x) :=
+      congrArg (fun g : S ↦ g x) (hρ k f)
+    have hscalar := calc
+      A f x = ∫ k, F k ∂(μ₁.restrict univ) := he
+      _ = ∫ k, F k ∂μ₁ :=
+        congrArg (fun ν : Measure K ↦ ∫ k, F k ∂ν) Measure.restrict_univ
+      _ = ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ :=
+        integral_congr_ae (ae_of_all _ fun k ↦ congrArg (star (ω k : ℂ) * ·) (hpointwise k))
+    exact congrArg ((μ₁.real univ)⁻¹ • ·) hscalar
+  refine ⟨P, hP, fun Q hQ ↦ ContinuousLinearMap.ext fun f ↦ ?_⟩
+  exact Subtype.ext (funext fun x ↦ (hQ f x).trans (hP f x).symm)
 
 /-- Paper: (D.2.1.2), p. 792. The Schwartz–Bruhat projector is the
 continuous linear operator given by the normalized fiber integral. -/
@@ -149,14 +244,84 @@ theorem schwartzBruhatIsotypicProjector_apply (ω : PontryaginDual K) (f : S) (x
 recovers the vector. -/
 theorem schwartzBruhatIsotypicProjector_apply_isotype (ω : PontryaginDual K) (f : S)
     (hf : f ∈ actionIsotype ρS ω) :
-    schwartzBruhatIsotypicProjector m hm μ₁ ω f = f := by sorry
+    schwartzBruhatIsotypicProjector m hm μ₁ ω f = f := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  refine Subtype.ext (funext fun x ↦ ?_)
+  change schwartzBruhatIsotypicProjector m hm μ₁ ω f x = f x
+  have hconstant (k : K) : star (ω k : ℂ) * f ((k : G)⁻¹ * x) = f x := by
+    have h := congrArg (fun g : S ↦ g x) ((mem_actionIsotype ρS ω f).mp hf k)
+    change schwartzBruhatTranslationAction (G := G) (k : G) f x = (ω k : ℂ) * f x at h
+    rw [schwartzBruhatTranslationAction_apply (k : G) x f] at h
+    rw [h, ← mul_assoc]
+    simp [← Circle.coe_inv_eq_conj]
+  rw [(schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f x).2,
+    integral_congr_ae (ae_of_all μ₁ hconstant), integral_const]
+  exact inv_smul_smul₀ (measureReal_univ_ne_zero (μ := μ₁)) (f x)
 
 /-- Paper: (D.2.2.1), p. 794. Averaging identifies the Hausdorff quotient
 with the corresponding subspace of homogeneous Schwartz–Bruhat functions. -/
 theorem schwartzBruhatIsotypicProjector_quotient_equiv (ω : PontryaginDual K) :
     let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
     ∃ e : (S ⧸ P.ker) ≃L[ℂ] actionIsotype ρS ω,
-      ∀ f : S, (e (P.ker.mkQ f) : S) = P f := by sorry
+      ∀ f : S, (e (P.ker.mkQ f) : S) = P f := by
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  let H := actionIsotype ρS ω
+  let integrand (f : S) (x : G) (k : K) : ℂ := star (ω k : ℂ) * f ((k : G)⁻¹ * x)
+  have hP (f : S) (x : G) : P f x = (μ₁.real univ)⁻¹ • ∫ k, integrand f x k ∂μ₁ :=
+    (schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f x).2
+  have hchar (k : K) : (ω k : ℂ) * star (ω k : ℂ) = 1 := by
+    have hconj : star (ω k : ℂ) = (ω k : ℂ)⁻¹ := (Circle.coe_inv_eq_conj (ω k)).symm
+    rw [hconj, mul_inv_cancel₀ (Circle.coe_ne_zero (ω k))]
+  have hmem (f : S) : P f ∈ H := by
+    apply (mem_actionIsotype ..).2
+    intro k
+    refine Subtype.ext (funext fun x ↦ ?_)
+    change schwartzBruhatTranslationAction (G := G) (k : G) (P f) x = (ω k : ℂ) • P f x
+    let shifted (g : K) : ℂ := (ω k : ℂ) * integrand f x g
+    have hshift : (∫ g, integrand f ((k : G)⁻¹ * x) g ∂μ₁) =
+        (ω k : ℂ) * (∫ g, integrand f x g ∂μ₁) := calc
+      _ = ∫ g, shifted (k * g) ∂μ₁ := by
+        refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+        simp only [shifted, integrand, Subgroup.coe_mul, mul_inv_rev, mul_assoc, map_mul,
+          Circle.coe_mul, star_mul']
+        rw [← mul_assoc (ω k : ℂ), hchar k, one_mul]
+      _ = ∫ g, shifted g ∂μ₁ := integral_mul_left_eq_self shifted k
+      _ = _ := integral_const_mul (ω k : ℂ) (integrand f x)
+    calc
+      _ = P f ((k : G)⁻¹ * x) := schwartzBruhatTranslationAction_apply (k : G) x (P f)
+      _ = (μ₁.real univ)⁻¹ • (∫ g, integrand f ((k : G)⁻¹ * x) g ∂μ₁) := hP f _
+      _ = (μ₁.real univ)⁻¹ • ((ω k : ℂ) • ∫ g, integrand f x g ∂μ₁) :=
+        congrArg ((μ₁.real univ)⁻¹ • ·) hshift
+      _ = (ω k : ℂ) • ((μ₁.real univ)⁻¹ • ∫ g, integrand f x g ∂μ₁) := smul_comm _ _ _
+      _ = _ := congrArg ((ω k : ℂ) • ·) (hP f x).symm
+  have hfix (f : S) (hf : f ∈ H) : P f = f := by
+    have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+    have hmass : μ₁.real univ ≠ 0 := (measureReal_univ_pos (μ := μ₁)).ne'
+    refine Subtype.ext (funext fun x ↦ ?_)
+    change P f x = f x
+    refine (hP f x).trans ?_
+    have horbit (k : K) : f ((k : G)⁻¹ * x) = (ω k : ℂ) * f x := by
+      have hk := congrArg (fun g : S ↦ g x) ((mem_actionIsotype ..).1 hf k)
+      change schwartzBruhatTranslationAction (G := G) (k : G) f x = (ω k : ℂ) * f x at hk
+      exact (schwartzBruhatTranslationAction_apply (k : G) x f).symm.trans hk
+    have hintegrand (k : K) : integrand f x k = f x := by
+      change star (ω k : ℂ) * f ((k : G)⁻¹ * x) = f x
+      rw [horbit k, ← mul_assoc, mul_comm (star (ω k : ℂ)), hchar k, one_mul]
+    calc
+      _ = (μ₁.real univ)⁻¹ • (∫ _ : K, f x ∂μ₁) :=
+        congrArg ((μ₁.real univ)⁻¹ • ·) (integral_congr_ae (ae_of_all _ hintegrand))
+      _ = f x := by rw [integral_const, smul_smul, inv_mul_cancel₀ hmass, one_smul]
+  let A := P.codRestrict H hmem
+  let F := P.ker.liftQL A (fun _ hf ↦ Subtype.ext (show P _ = 0 from hf))
+  let J := P.ker.mkQL.comp H.subtypeL
+  have hleft : LeftInverse J F := by
+    refine (P.ker.mkQ_surjective.forall (p := fun q ↦ J (F q) = q)).2 fun f ↦ ?_
+    change P.ker.mkQ (P f) = P.ker.mkQ f
+    apply (Submodule.Quotient.eq P.ker).2
+    change P (P f - f) = 0
+    exact (map_sub P (P f) f).trans (sub_eq_zero.mpr (hfix (P f) (hmem f)))
+  have hright : RightInverse J F := fun f ↦ Subtype.ext (hfix f f.property)
+  exact ⟨ContinuousLinearEquiv.equivOfInverse F J hleft hright, fun _ ↦ rfl⟩
 
 end Projector
 
