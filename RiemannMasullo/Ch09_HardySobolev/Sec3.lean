@@ -684,6 +684,43 @@ local notation "truncation" => modulatedCutoffOperator m (weightedMeasure a b s)
 -- existence of a differentiation limit at the identity. The diagonal smoothening
 -- can fail for a bounded Borel φ oscillating on sufficiently separated annuli.
 
+/-- The Hardy–Sobolev density on a compact base interval is positive. -/
+private theorem intervalSobolevDensity_pos' (a b s t : ℝ) : 0 < intervalSobolevDensity a b s t := by
+  unfold intervalSobolevDensity
+  exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+
+/-- The Hardy–Sobolev density on a compact base interval is continuous. -/
+private theorem continuous_intervalSobolevDensity (a b s : ℝ) :
+    Continuous (intervalSobolevDensity a b s) := by
+  unfold intervalSobolevDensity
+  refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+  positivity
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+  [SecondCountableTopology G] in
+/-- The logarithm of the module is continuous. -/
+private theorem continuous_logModule' (m : G →ₜ* ℝ≥0ˣ) :
+    Continuous (fun x ↦ Real.log ((m x).val : ℝ)) :=
+  Real.continuousOn_log.comp_continuous
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous))
+    fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+  [SecondCountableTopology G] in
+/-- A modulated cutoff has compact support when the modulation is proper. -/
+private theorem IsModulatedCutoff.isCompact_tsupport' (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m)
+    {Λ ε : ℝ} {ρ : G → ℝ} (hρ : IsModulatedCutoff m Λ ε ρ) : IsCompact (tsupport ρ) := by
+  have hΛ : 0 < Λ⁻¹ := inv_pos.mpr hρ.radius_pos
+  let e := Nonneg.unitsHomeomorphPos ℝ
+  have hS : IsCompact ((Subtype.val : Ioi (0 : ℝ) → ℝ) ⁻¹' Icc Λ⁻¹ Λ) := by
+    rw [Subtype.isCompact_iff, Subtype.image_preimage_coe,
+      inter_eq_right.mpr fun t (ht : t ∈ Icc Λ⁻¹ Λ) ↦ mem_Ioi.mpr (hΛ.trans_le ht.1)]
+    exact isCompact_Icc
+  have hT := hm.1.isCompact_preimage (e.isCompact_preimage.mpr hS)
+  refine hT.of_isClosed_subset (isClosed_tsupport ρ) (hρ.support_subset.trans ?_)
+  intro x hx
+  exact hx
+
 /-- Paper: Theorem 9.3.3.5(1), p. 429. Truncated convolution is Hilbert–Schmidt
 and is represented by the displayed square-integrable kernel.
 Deviation: This retains the Hilbert–Schmidt conclusion for measurable symbols
@@ -699,7 +736,98 @@ theorem truncatedHardySobolevConvolution_hilbertSchmidt
       MemLp k 2 (ν.prod ν) ∧
       ∀ u : W a b s, ∀ᵐ x ∂ν,
         Integrable (fun y ↦ k (x, y) * u y) ν ∧
-          (truncation hρ).comp A u x = ∫ y, k (x, y) * u y ∂ν := by sorry
+          (truncation hρ).comp A u x = ∫ y, k (x, y) * u y ∂ν := by
+  intro ν k
+  -- The weight is a continuous positive density.
+  let w : G → ℝ := fun x ↦ weightDensity a b s x
+  have hwpos (x : G) : 0 < w x := intervalSobolevDensity_pos' a b s _
+  have hwcont : Continuous w :=
+    (continuous_intervalSobolevDensity a b s).comp (continuous_logModule' m)
+  let wN : G → ℝ≥0 := fun x ↦ (w x).toNNReal
+  have hwN : Measurable wN := hwcont.measurable.real_toNNReal
+  have hνdef : ν = μ.withDensity fun x ↦ (wN x : ℝ≥0∞) := rfl
+  have hwN_smul (x : G) (z : ℂ) : wN x • z = (w x : ℂ) * z := by
+    rw [NNReal.smul_def, Real.coe_toNNReal _ (hwpos x).le, Complex.real_smul]
+  have : IsLocallyFiniteMeasure ν := IsLocallyFiniteMeasure.withDensity_ofReal hwcont
+  have hνμ : ν ≪ μ := withDensity_absolutelyContinuous μ _
+  -- The kernel is supported in a compact set.
+  have hρc : IsCompact (tsupport ρ) := IsModulatedCutoff.isCompact_tsupport' m _hm hρ
+  let K₃ : Set G := (fun p : G × G ↦ p.1⁻¹ * p.2) '' (tsupport φ ×ˢ tsupport ρ)
+  have hK₃ : IsCompact K₃ := (hc.prod hρc).image (by fun_prop)
+  have hsupp (p : G × G) (hp : k p ≠ 0) : p ∈ tsupport ρ ×ˢ K₃ := by
+    have h1 : ρ p.1 ≠ 0 := fun h ↦ hp (by simp [k, h])
+    have h2 : φ (p.1 * p.2⁻¹) ≠ 0 := fun h ↦ hp (by simp [k, h])
+    refine ⟨subset_tsupport _ h1, ⟨(p.1 * p.2⁻¹, p.1), ⟨subset_tsupport _ h2, subset_tsupport _ h1⟩, ?_⟩⟩
+    simp
+  obtain ⟨B, hB⟩ := hK₃.exists_bound_of_continuousOn
+    (f := fun y ↦ (w y)⁻¹) (hwcont.inv₀ fun y ↦ (hwpos y).ne').continuousOn
+  have ⟨C, hC⟩ := hb
+  have hC0 : 0 ≤ C := (norm_nonneg _).trans (hC 1)
+  have hbound (p : G × G) : ‖k p‖ ≤ C * max B 0 := by
+    by_cases hp : k p = 0
+    · rw [hp, norm_zero]; exact mul_nonneg hC0 (le_max_right _ _)
+    obtain ⟨-, hy⟩ := hsupp p hp
+    have hρ1 : ‖(ρ p.1 : ℂ)‖ ≤ 1 := by
+      rw [Complex.norm_real, Real.norm_eq_abs]; exact hρ.abs_le_one _
+    have hw1 : ‖((w p.2 : ℂ))⁻¹‖ ≤ max B 0 := by
+      rw [norm_inv, Complex.norm_real]; exact (norm_inv (w p.2) ▸ hB _ hy).trans (le_max_left _ _)
+    change ‖(ρ p.1 : ℂ) * φ (p.1 * p.2⁻¹) / (w p.2 : ℂ)‖ ≤ _
+    rw [div_eq_mul_inv, norm_mul, norm_mul]
+    calc ‖(ρ p.1 : ℂ)‖ * ‖φ (p.1 * p.2⁻¹)‖ * ‖((w p.2 : ℂ))⁻¹‖ ≤ 1 * C * max B 0 := by
+          gcongr
+          exact hC _
+      _ = C * max B 0 := by ring
+  -- Measurability of the kernel.
+  have hkmeas : AEStronglyMeasurable k (ν.prod ν) := by
+    have hdiv : AEMeasurable (fun p : G × G ↦ φ (p.1 * p.2⁻¹)) (μ.prod μ) := by
+      simp_rw [← div_eq_mul_inv]
+      exact hφ.comp_quasiMeasurePreserving (quasiMeasurePreserving_div μ μ)
+    have hk : AEMeasurable k (μ.prod μ) :=
+      ((Complex.measurable_ofReal.comp (hρ.measurable.comp measurable_fst)).aemeasurable.mul
+        hdiv).div (Complex.measurable_ofReal.comp (hwcont.measurable.comp measurable_snd)).aemeasurable
+    exact (hk.mono_ac (hνμ.prod hνμ)).aestronglyMeasurable
+  have hkL2 : MemLp k 2 (ν.prod ν) :=
+    (memLp_top_of_bound hkmeas _ (.of_forall hbound)).mono_exponent_of_measure_support_ne_top
+      (fun p hp ↦ by_contra fun h ↦ hp (hsupp p h)) ((hρc.prod hK₃).measure_lt_top).ne le_top
+  -- The action of the truncated convolution.
+  have happly : ∀ u : W a b s, ∀ᵐ x ∂ν, Integrable (fun y ↦ k (x, y) * u y) ν ∧
+      (truncation hρ).comp A u x = ∫ y, k (x, y) * u y ∂ν := by
+    intro u
+    filter_upwards [modulatedCutoffOperator_apply m ν hρ (A u),
+      hνμ.ae_le (hardySobolevConvolution_apply μ m a b s hab hs φ hφ hc hb u)]
+      with x hx ⟨hint, hconv⟩
+    let F : G → ℂ := fun g ↦ φ g * u (g⁻¹ * x)
+    have hFx (y : G) : F (x / y) = φ (x * y⁻¹) * u y := by
+      simp [F, div_eq_mul_inv]
+    have hsmul (y : G) : wN y • (k (x, y) * u y) = (ρ x : ℂ) * (φ (x * y⁻¹) * u y) := by
+      rw [hwN_smul]
+      change (w y : ℂ) * ((ρ x : ℂ) * φ (x * y⁻¹) / (w y : ℂ) * u y) = _
+      have : (w y : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hwpos y).ne'
+      field_simp
+    have hint' : Integrable (fun y ↦ φ (x * y⁻¹) * u y) μ := by
+      have := ((Measure.measurePreserving_div_left μ x).integrable_comp_emb
+        (MeasurableEquiv.divLeft x).measurableEmbedding).mpr hint
+      exact this.congr (.of_forall fun y ↦ hFx y)
+    refine ⟨?_, ?_⟩
+    · rw [hνdef, integrable_withDensity_iff_integrable_smul hwN]
+      exact (hint'.const_mul (ρ x : ℂ)).congr (.of_forall fun y ↦ (hsmul y).symm)
+    · rw [ContinuousLinearMap.comp_apply, hx, hconv, hνdef,
+        integral_withDensity_eq_integral_smul hwN]
+      simp_rw [hsmul]
+      rw [integral_const_mul, lcaConvolution, ← integral_div_left_eq_self F μ x]
+      simp_rw [hFx]
+  refine ⟨?_, hkL2, happly⟩
+  -- Identify the operator with the integral operator of the kernel.
+  let op := integralKernelOperator ν (hkL2.toLp k)
+  have hop : (truncation hρ).comp A = op.val := by
+    refine ContinuousLinearMap.ext fun u ↦ Lp.ext ?_
+    have hk' := Measure.ae_ae_of_ae_prod hkL2.coeFn_toLp
+    filter_upwards [happly u, integralKernelOperator_apply ν (hkL2.toLp k) u, hk']
+      with x hx hopx hkx
+    rw [hx.2, hopx.2]
+    exact integral_congr_ae (hkx.mono fun y hy ↦ by simp only [hy])
+  rw [hop]
+  exact op.property
 
 /-- Paper: Theorem 9.3.3.5(2), p. 429. For smooth compactly supported symbols
 and piecewise smooth cutoffs, the truncated convolution operator is nuclear, and its trace
