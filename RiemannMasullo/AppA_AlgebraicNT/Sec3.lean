@@ -608,7 +608,29 @@ theorem infiniteLocalAdditiveTamagawaMeasure_unitBox (v : InfinitePlace F) :
       ((ringEquivRealOfIsReal h).symm '' Icc (0 : ℝ) 1) = 1) ∧
     (∀ h : v.IsComplex, infiniteLocalAdditiveTamagawaMeasure F v
       ((ringEquivComplexOfIsComplex h).symm '' {z : ℂ | z.re ∈ Icc 0 1 ∧ z.im ∈ Icc 0 1}) = 2) :=
-  by sorry
+  by
+    let : BorelSpace v.Completion := ⟨rfl⟩
+    constructor
+    · intro h
+      rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+      let e := (isometryEquivRealOfIsReal h).symm.toHomeomorph.toMeasurableEquiv
+      change (volume : Measure ℝ).map e (e '' Icc 0 1) = 1
+      rw [e.map_apply, e.injective.preimage_image]
+      simp [Real.volume_Icc]
+    · intro h
+      rw [infiniteLocalAdditiveTamagawaMeasure,
+        dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr h)]
+      let e := (isometryEquivComplexOfIsComplex h).symm.toHomeomorph.toMeasurableEquiv
+      let square := Complex.measurableEquivRealProd ⁻¹' (Icc (0 : ℝ) 1 ×ˢ Icc (0 : ℝ) 1)
+      change Measure.map e (2 • (volume : Measure ℂ)) (e '' square) = 2
+      rw [e.map_apply, e.injective.preimage_image]
+      have hvolume : volume square = 1 := by
+        dsimp only [square]
+        rw [Complex.volume_preserving_equiv_real_prod.measure_preimage_equiv,
+          Measure.volume_eq_prod, Measure.prod_prod]
+        simp [Real.volume_Icc]
+      rw [two_nsmul, add_apply, hvolume]
+      norm_num
 
 -- The exponent of v in the global different is the exponent of the local different.
 local notation "differentExp(" F ", " v ")" =>

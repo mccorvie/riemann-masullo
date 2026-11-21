@@ -5,6 +5,9 @@ public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
 import Mathlib.Analysis.Calculus.FDeriv.Mul
+import Mathlib.Analysis.Complex.CauchyIntegral
+import Mathlib.Analysis.Normed.Module.Completion
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
 /-!
 # Holomorphic and meromorphic vector-valued functions
@@ -91,11 +94,143 @@ theorem vectorHolomorphicOn_iff_tendsto (hΩ : IsOpen Ω) [IsTopologicalAddGroup
     obtain ⟨v, hv⟩ := hf z hz
     exact ⟨_, ((slope_iff z v).mpr hv).hasFDerivAt.hasFDerivWithinAt⟩
 
+omit [ContinuousSMul ℂ E] in
+/-- A continuous linear map sends the derivative of a vector-valued holomorphic
+function to the derivative of the composite. -/
+private theorem VectorHolomorphicOn.hasDerivAt_comp
+    [IsTopologicalAddGroup E] {F : Type*} [AddCommGroup F] [Module ℂ F] [TopologicalSpace F]
+    [IsTopologicalAddGroup F] [ContinuousSMul ℂ F] {f : ℂ → E}
+    (hf : VectorHolomorphicOn f Ω) (hΩ : IsOpen Ω) (j : E →L[ℂ] F) (x : Ω) :
+    HasDerivAt (j ∘ f) (j (deriv f x)) (x : ℂ) := by
+  have h := hf.hasFDerivAt (hΩ.mem_nhds x.property)
+  have hj : HasFDerivAt (j ∘ f) (j.comp (fderiv ℂ f x)) (x : ℂ) := by
+    apply HasFDerivAt.of_isLittleOTVS
+    simpa only [Function.comp_def, ContinuousLinearMap.comp_apply, map_sub]
+      using j.isBigOTVS_comp.trans_isLittleOTVS h.isLittleOTVS
+  exact hj.hasDerivAt
+
 /-- Paper: Remark C.5.2.2, p. 737. On a complex domain, holomorphy agrees with
 the strong continuous differential of §C.5.1 in one complex variable. -/
 theorem vectorHolomorphicOn_iff_vectorContDiffOn (hΩ : IsOpen Ω) (hconn : IsConnected Ω)
     [IsTopologicalAddGroup E] [T2Space E] [PolynormableSpace ℂ E] (f : ℂ → E) :
-    VectorHolomorphicOn f Ω ↔ VectorContDiffOn (k := ℂ) Ω f := by sorry
+    VectorHolomorphicOn f Ω ↔ VectorContDiffOn (k := ℂ) Ω f := by
+  clear hconn
+  have scalar_remainder (x : Ω) (v : E) (φ : StrongDual ℂ E) :
+      HasDerivWithinAt (φ ∘ f) (φ v) Ω (x : ℂ) ↔
+        Tendsto (fun y : ℂ ↦ ((‖y - (x : ℂ)‖⁻¹ : ℝ) : ℂ) *
+          (φ (f y) - φ (f x) - (y - (x : ℂ)) * φ v))
+          (𝓝[Ω \ {(x : ℂ)}] (x : ℂ)) (𝓝 0) := by
+    rw [hasDerivWithinAt_iff_hasFDerivWithinAt, ← hasFDerivWithinAt_sdiff_singleton_self,
+      ← hasDerivWithinAt_iff_hasFDerivWithinAt, hasDerivWithinAt_iff_tendsto]
+    conv_rhs => rw [tendsto_zero_iff_norm_tendsto_zero]
+    simp only [Function.comp_apply, smul_eq_mul, norm_mul, Complex.norm_real,
+      Real.norm_eq_abs, abs_inv, abs_of_nonneg (norm_nonneg _)]
+  let ev (φ : StrongDual ℂ E) : PettisWeakCompletion E →L[ℂ] ℂ := WeakBilin.eval _ φ
+  have heval (φ : StrongDual ℂ E) (v : E) : ev φ (toPettisWeakCompletion E v) = φ v := rfl
+  let remainder (D : Ω × ℂ → E) (x : Ω) (y : ℂ) : PettisWeakCompletion E :=
+    ((‖y - (x : ℂ)‖⁻¹ : ℝ) : ℂ) •
+      (toPettisWeakCompletion E (f y) - toPettisWeakCompletion E (f x) -
+        (toPettisWeakCompletion E ∘ D) (x, y - (x : ℂ)))
+  constructor
+  · intro hf
+    have hcontinuous : Continuous (fun x : Ω ↦ deriv f x) := by
+      rw [continuous_iff_continuousAt]
+      intro x
+      apply ((PolynormableSpace.withSeminorms ℂ E).tendsto_nhds _ _).2
+      intro p ε hε
+      -- Put the seminorm topology on a copy of E and pass to its Banach completion.
+      let e : ULift.{0} E ≃ₗ[ℂ] E := ULift.moduleEquiv
+      let q : Seminorm ℂ (ULift.{0} E) := p.val.comp e.toLinearMap
+      let group : SeminormedAddCommGroup (ULift.{0} E) := q.toSeminormedAddCommGroup
+      let : UniformSpace (ULift.{0} E) := group.toUniformSpace
+      let : TopologicalSpace (ULift.{0} E) := group.toUniformSpace.toTopologicalSpace
+      let : NormedSpace ℂ (ULift.{0} E) := ⟨fun c v ↦ (map_smul_eq_mul q c v).le⟩
+      let j₀ := UniformSpace.Completion.toComplL (S := ℂ) (α := ULift.{0} E)
+      have he : Continuous e.symm := by
+        rw [continuous_iff_continuousAt]
+        intro v
+        apply Metric.tendsto_nhds.mpr
+        intro r hr
+        have hp : Continuous (fun y : E ↦ p.val (y - v)) :=
+          p.property.comp (continuous_id.sub continuous_const)
+        simp only [dist_eq_norm, ← map_sub]
+        change ∀ᶠ y : E in 𝓝 v, p.val (y - v) < r
+        exact (hp.continuousAt (x := v)).eventually_lt continuousAt_const (by simpa using hr)
+      let j : E →L[ℂ] UniformSpace.Completion (ULift.{0} E) :=
+        ⟨j₀.toLinearMap.comp e.symm.toLinearMap, j₀.continuous.comp he⟩
+      have hg : DifferentiableOn ℂ (j ∘ f) Ω := fun y hy ↦
+        (hf.hasDerivAt_comp hΩ j ⟨y, hy⟩).differentiableAt.differentiableWithinAt
+      have hj (y : Ω) : deriv (j ∘ f) y = j (deriv f y) := (hf.hasDerivAt_comp hΩ j y).deriv
+      have ht : Continuous (fun y : Ω ↦ j (deriv f y)) :=
+        (continuousOn_iff_continuous_domRestrict.mp (hg.deriv hΩ).continuousOn).congr
+          fun y ↦ hj y
+      filter_upwards [Metric.tendsto_nhds.mp (ht.continuousAt (x := x)) ε hε] with y hy
+      rw [dist_eq_norm, ← map_sub] at hy
+      change ‖(↑(e.symm (deriv f y - deriv f x)) : UniformSpace.Completion (ULift.{0} E))‖ < ε at hy
+      rwa [UniformSpace.Completion.norm_coe] at hy
+    let D : Ω × ℂ → E := fun p ↦ p.2 • deriv f p.1
+    have hD : Continuous D := continuous_snd.smul (hcontinuous.comp continuous_fst)
+    refine ⟨D, hD, continuous_toPettisWeakCompletion.comp hD, fun x ↦ ?_⟩
+    refine ⟨⟨(toPettisWeakCompletion E).comp
+      ((LinearMap.id : ℂ →ₗ[ℂ] ℂ).smulRight (deriv f x)), fun _ ↦ rfl⟩, ?_⟩
+    apply (WeakBilin.tendsto_iff_forall_eval_tendsto _ injective_id).2
+    intro φ
+    change Tendsto (fun y ↦ ev φ (remainder D x y)) (𝓝[Ω \ {(x : ℂ)}] (x : ℂ)) (𝓝 (ev φ 0))
+    simpa only [remainder, D, Function.comp_apply, map_zero, map_sub, map_smul, heval,
+      smul_eq_mul] using (scalar_remainder x _ φ).mp (hf.hasDerivAt_comp hΩ φ x).hasDerivWithinAt
+  · rintro ⟨D, hD, _, hweak⟩
+    let d : Ω → E := fun x ↦ D (x, 1)
+    have hd : Continuous d := hD.comp (continuous_id.prodMk continuous_const)
+    have hscalar (φ : StrongDual ℂ E) (x : Ω) :
+        HasDerivAt (φ ∘ f) (φ (d x)) (x : ℂ) := by
+      obtain ⟨⟨L, hL⟩, hrem⟩ := hweak x
+      have hdir (w : ℂ) : ev φ (toPettisWeakCompletion E (D (x, w))) = w * φ (d x) := by
+        change ev φ ((toPettisWeakCompletion E ∘ D) (x, w)) = _
+        rw [hL w, show L w = w • L 1 by rw [← map_smul, smul_eq_mul, mul_one], ← hL 1,
+          map_smul, Function.comp_apply, heval, smul_eq_mul]
+      apply HasDerivWithinAt.hasDerivAt _ (hΩ.mem_nhds x.property)
+      apply (scalar_remainder x _ φ).mpr
+      have h := (WeakBilin.tendsto_iff_forall_eval_tendsto _ injective_id).mp hrem φ
+      change Tendsto (fun y ↦ ev φ (remainder D x y)) _ (𝓝 (ev φ 0)) at h
+      simpa only [Function.comp_apply, remainder, map_zero, map_smul, map_sub, hdir, heval,
+        smul_eq_mul] using h
+    apply (vectorHolomorphicOn_iff_tendsto hΩ f).2
+    intro z hz
+    let x : Ω := ⟨z, hz⟩
+    refine ⟨d x, ((PolynormableSpace.withSeminorms ℂ E).tendsto_nhds _ _).2 ?_⟩
+    intro p ε hε
+    have hnear : ∀ᶠ y : Ω in 𝓝 x, p.val (d y - d x) < ε / 2 :=
+      (p.property.comp (hd.sub continuous_const)).continuousAt.eventually_lt
+        continuousAt_const (by simpa [d] using half_pos hε)
+    obtain ⟨r, hr, hcontrol⟩ := Metric.eventually_nhds_iff.mp hnear
+    have hnear' : Ω ∩ Metric.ball z r ∈ 𝓝 z :=
+      inter_mem (hΩ.mem_nhds hz) (Metric.ball_mem_nhds z hr)
+    obtain ⟨δ, hδ, hball⟩ := Metric.mem_nhds_iff.mp hnear'
+    filter_upwards [mem_nhdsWithin_of_mem_nhds (Metric.ball_mem_nhds z hδ),
+      self_mem_nhdsWithin] with w hw hwz
+    have hwz' : w - z ≠ 0 := sub_ne_zero.mpr hwz
+    obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm p.val p.property
+      ((w - z)⁻¹ • (f w - f z) - d x)
+    -- Estimate the scalar remainder using a functional attaining its seminorm.
+    let g (y : ℂ) := φ (f y) - y * φ (d x)
+    have hg (y : ℂ) (hy : y ∈ Metric.ball z δ) :
+        HasDerivAt g (φ (d ⟨y, (hball hy).1⟩ - d x)) y := by
+      simpa [g, Pi.sub_def, Function.comp_apply, map_sub] using
+        (hscalar φ ⟨y, (hball hy).1⟩).sub ((hasDerivAt_id' y).mul_const (φ (d x)))
+    have hmean : ‖g w - g z‖ ≤ ε / 2 * ‖w - z‖ :=
+      (convex_ball z δ).norm_image_sub_le_of_norm_deriv_le
+        (fun y hy ↦ (hg y hy).differentiableAt) (fun y hy ↦ by
+          rw [(hg y hy).deriv]
+          exact (hφ _).trans (hcontrol (y := ⟨y, (hball hy).1⟩) (hball hy).2).le)
+        (Metric.mem_ball_self hδ) hw
+    rw [← heq]
+    have hquot : φ ((w - z)⁻¹ • (f w - f z) - d x) = (w - z)⁻¹ • (g w - g z) := by
+      simp only [g, map_sub, map_smul, smul_eq_mul]
+      field_simp [hwz']
+      ring
+    rw [hquot, norm_smul, norm_inv]
+    apply lt_of_le_of_lt _ (half_lt_self hε)
+    exact (inv_mul_le_iff₀ (norm_pos_iff.mpr hwz')).2 (by simpa [mul_comm] using hmean)
 
 end Holomorphy
 

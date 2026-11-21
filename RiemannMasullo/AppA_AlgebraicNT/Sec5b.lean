@@ -583,7 +583,15 @@ the function maximal operator is finite almost everywhere. -/
 theorem ae_dSequenceMaximal_lt_top [μ.IsHaarMeasure] (hU : IsDSequence μ U)
     (hcompact : IsCompact (closure (U 0))) {f : G → ℂ} (hf : LocallyIntegrable f μ)
     (hlog : LocallyIntegrable (fun x ↦ max (Real.log ‖f x‖) 0 • f x) μ) :
-    ∀ᵐ x ∂μ, dSequenceMaximal μ U f x < ∞ := by sorry
+    ∀ᵐ x ∂μ, dSequenceMaximal μ U f x < ∞ := by
+  have hloc := dSequenceMaximal_locallyIntegrable hU hcompact hf hlog
+  suffices h : ∀ᵐ x ∂μ.restrict (⋃ n, compactCovering G n), dSequenceMaximal μ U f x < ∞ by
+    simpa only [iUnion_compactCovering, Measure.restrict_univ] using h
+  rw [ae_restrict_iUnion_iff]
+  intro n
+  have hint := hloc.integrableOn_isCompact (isCompact_compactCovering G n)
+  refine ae_lt_top' hint.aestronglyMeasurable.aemeasurable ?_
+  exact hint.hasFiniteIntegral.ne
 
 -- TODO(paper-gap): The truncation argument in (A.5.3.15) uses the lower level set of |f|.
 -- Passing to the lower level set of M f in (A.5.3.9) needs a justification.
