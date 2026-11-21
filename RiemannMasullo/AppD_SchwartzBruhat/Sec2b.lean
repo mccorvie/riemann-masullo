@@ -23,7 +23,24 @@ include hSC in
 assemble into an action by continuous linear operators. -/
 theorem existsUnique_schwartzBruhatTranslationAction :
     ∃! ρ : G →* (SchwartzBruhat G →L[ℂ] SchwartzBruhat G),
-      ∀ g f, ρ g f = schwartzBruhatTranslate g f := by sorry
+      ∀ g f, ρ g f = schwartzBruhatTranslate g f := by
+  let T (g : G) : SchwartzBruhat G →L[ℂ] SchwartzBruhat G :=
+    { toFun := schwartzBruhatTranslate g
+      map_add' := fun f h ↦ Subtype.ext (funext fun x ↦ rfl)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun x ↦ rfl)
+      cont := (schwartzBruhatTranslate_continuous (G := G)).comp
+        (continuous_const.prodMk continuous_id) }
+  let ρ : G →* (SchwartzBruhat G →L[ℂ] SchwartzBruhat G) :=
+    { toFun := T
+      map_one' := ContinuousLinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ by
+        change f ((1 : G)⁻¹ * x) = f x
+        rw [inv_one, one_mul])
+      map_mul' := fun g h ↦ ContinuousLinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ by
+        change f ((g * h)⁻¹ * x) = f (h⁻¹ * (g⁻¹ * x))
+        rw [mul_inv_rev, mul_assoc]) }
+  refine ⟨ρ, fun _ _ ↦ rfl, ?_⟩
+  intro τ hτ
+  exact MonoidHom.ext fun g ↦ ContinuousLinearMap.ext (hτ g)
 
 /-- Paper: (D.2.1.1), p. 792. Use the continuous linear representation
 given by the left translations on the Schwartz–Bruhat space. -/
