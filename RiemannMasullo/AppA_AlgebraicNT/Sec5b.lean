@@ -123,11 +123,20 @@ theorem exists_disjoint_dSequence_translates [μ.IsHaarMeasure] (hU : IsDSequenc
 
 variable [SecondCountableTopology G]
 
+-- Retain the original hypotheses for the countable-subcover argument.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma A.5.3.3, p. 579. A set that is negligible on a neighborhood of
 every point is negligible and measurable for the completed Haar measure. -/
 theorem measure_zero_of_locally_negligible [μ.IsHaarMeasure] {A : Set G}
     (hA : ∀ x : G, ∃ V ∈ 𝓝 x, μ (A ∩ V) = 0) :
-    μ A = 0 ∧ NullMeasurableSet A μ := by sorry
+    μ A = 0 ∧ NullMeasurableSet A μ := by
+  choose V hV hnull using hA
+  obtain ⟨t, ht, hcover⟩ := LindelofSpace.elim_nhds_subcover V hV
+  have hzero : μ A = 0 := by
+    rw [← inter_univ A, ← hcover]
+    simp only [inter_iUnion]
+    exact (measure_biUnion_null_iff ht).2 fun x _ ↦ hnull x
+  exact ⟨hzero, NullMeasurableSet.of_null hzero⟩
 
 /-- Paper: (A.5.3.2), p. 579. Take the limit superior of the masses of the
 translates under `ν`, normalized by the Haar masses of the sequence members. -/
