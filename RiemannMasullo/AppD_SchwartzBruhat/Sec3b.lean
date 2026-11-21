@@ -432,10 +432,12 @@ def bruhatCompactSupportToModulatedExponentialDecay :
     BruhatCompactSupport G →ₗ[ℂ] ModulatedExponentialDecay m I :=
   Submodule.inclusion (bruhatCompactSupport_le_modulatedExponentialDecay m I hm hms)
 
+-- Avoid the unused-section-variable linter traversing the large seminorm-family types.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.3.6.1, p. 819. Applying the inclusion preserves every
 pointwise value of the test function. -/
 theorem bruhatCompactSupportToModulatedExponentialDecay_apply (f : BruhatCompactSupport G) (x : G) :
-    (bruhatCompactSupportToModulatedExponentialDecay m I hm hms f).val x = f.val x := by sorry
+    (bruhatCompactSupportToModulatedExponentialDecay m I hm hms f).val x = f.val x := rfl
 
 variable [hSC : SecondCountableTopology G] (hInt : OrdConnected I) (hne : I.Nonempty)
 

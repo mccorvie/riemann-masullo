@@ -4,11 +4,13 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Analysis.Fourier.FourierTransformDeriv
 import Mathlib.LinearAlgebra.Basis.Prod
 import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Homotopy.Lifting
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-!
@@ -1276,17 +1278,75 @@ def bruhatDiffDegree (D : bruhatDiffAlgebra G) : ℕ :=
   sInf {n : ℕ | ∃ c : List (LCATopologicalLie G) →₀ ℂ,
     c.sum (fun w z ↦ z • bruhatDiffWord w) = D ∧ n = c.support.sup List.length}
 
-/-- Paper: Remark D.1.6.9, p. 768. A nontrivial one-parameter subgroup
-gives a differential operator of degree one. -/
-theorem bruhatDiffDegree_generator (a : LCATopologicalLie G) (ha : a ≠ 1) :
-    bruhatDiffDegree (bruhatDiffGenerator a) = 1 := by sorry
-
 /-- Paper: Remark D.1.6.11, p. 768. A character gives a Bruhat smooth
 function via its circle-valued character map.
 Deviation: The global differentiability definition in §D.1.5 allows any
 good subgroup in the kernel, so the symbol can use the character itself. -/
 theorem pontryaginDual_mem_bruhatSmooth (χ : PontryaginDual G) :
     (fun x : G ↦ (χ x : ℂ)) ∈ bruhatSmoothSubmodule := by sorry
+
+/-- A scalar directional derivative must vanish on constants and hence on all
+characters. Character separation then forces its one-parameter subgroup to be trivial. -/
+private theorem bruhatDiffGenerator_ne_smul_one (a : LCATopologicalLie G) (ha : a ≠ 1)
+    (z : ℂ) : bruhatDiffGenerator a ≠ z • (1 : bruhatDiffAlgebra G) := by
+  intro h
+  have hEval (f : bruhatSmoothSubmodule (G := G)) (x : G) :
+      bruhatDirectionalDeriv a f x = z * f.val x :=
+    congrArg (fun D : bruhatDiffAlgebra G ↦ (D.val f).val x) h
+  let f₁ : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth 1⟩
+  have hz : z = 0 := by
+    simpa [f₁, bruhatDirectionalDeriv] using (hEval f₁ 1).symm
+  apply ha
+  apply ContinuousMonoidHom.ext
+  intro u
+  change a u = 1
+  apply (pontryaginDual_pairing_separates (G := G)).1
+  funext χ
+  apply Circle.coe_injective
+  let f : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩
+  let g : ℝ → ℂ := fun t ↦ f.val (a (Multiplicative.ofAdd t))
+  have hf := (mem_bruhatSmoothSubmodule_iff f.val).mp f.property 1
+  have hg (t : ℝ) : HasDerivAt (fun s ↦ g (t + s)) 0 0 := by
+    have hOrbit :
+        (fun s : ℝ ↦ f.val (a (Multiplicative.ofAdd t) * a (Multiplicative.ofAdd s))) =
+          (fun s : ℝ ↦ g (t + s)) :=
+      funext fun s ↦ congrArg f.val (a.map_mul (Multiplicative.ofAdd t) (Multiplicative.ofAdd s)).symm
+    have hDeriv := hasDerivAt_bruhatDirectionalDeriv a hf (a (Multiplicative.ofAdd t))
+    rw [hEval f, hz, zero_mul, hOrbit] at hDeriv
+    exact hDeriv
+  have hDiff : Differentiable ℝ g := fun t ↦
+    (differentiableAt_iff_comp_const_add (b := t)).mpr
+      (by simpa only [neg_add_cancel] using (hg t).differentiableAt)
+  have hZero (t : ℝ) : deriv g t = 0 := by
+    simpa only [deriv_comp_const_add, add_zero] using (hg t).deriv
+  have hConst := is_const_of_deriv_eq_zero hDiff hZero u.toAdd 0
+  change (χ (a u) : ℂ) = (χ (a 1) : ℂ) at hConst
+  rwa [map_one a] at hConst
+
+/-- Paper: Remark D.1.6.9, p. 768. A nontrivial one-parameter subgroup
+gives a differential operator of degree one. -/
+theorem bruhatDiffDegree_generator (a : LCATopologicalLie G) (ha : a ≠ 1) :
+    bruhatDiffDegree (bruhatDiffGenerator a) = 1 := by
+  classical
+  let lengths : Set ℕ := {n | ∃ c : List (LCATopologicalLie G) →₀ ℂ,
+    c.sum (fun w z ↦ z • bruhatDiffWord w) = bruhatDiffGenerator a ∧
+      n = c.support.sup List.length}
+  change sInf lengths = 1
+  have hOne : 1 ∈ lengths := by
+    refine ⟨Finsupp.single [a] 1, ?_, ?_⟩
+    · rw [Finsupp.sum_single_index (h := fun w z ↦ z • bruhatDiffWord w) (zero_smul _ _),
+        one_smul, bruhatDiffWord_singleton]
+    · rw [Finsupp.support_single _ one_ne_zero, Finset.sup_singleton, List.length_singleton]
+  refine le_antisymm (csInf_le' hOne) (le_csInf ⟨1, hOne⟩ ?_)
+  rintro n ⟨c, hc, rfl⟩
+  by_contra! h
+  have hSupport : c.support ⊆ {[]} := by
+    intro w hw
+    have hLength : w.length ≤ c.support.sup List.length := Finset.le_sup hw
+    exact Finset.mem_singleton.mpr (List.length_eq_zero_iff.mp (by omega))
+  rw [Finsupp.sum_of_support_subset c hSupport (fun w z ↦ z • bruhatDiffWord w)
+    (fun _ _ ↦ zero_smul _ _), Finset.sum_singleton] at hc
+  exact bruhatDiffGenerator_ne_smul_one a ha (c []) hc.symm
 
 /-- Paper: Definition D.1.6.10, p. 768. The symbol evaluates the differential
 operator applied to a character at the group identity. -/
@@ -1340,7 +1400,84 @@ theorem bruhatDiffDegreeOne_frequency :
       ∀ (a : LCATopologicalLie G) (D : bruhatDiffDegreeOneReal (G := G)),
         D.val = bruhatFirstOrder a → ∀ χ (t : ℝ),
           Real.fourierChar ((σ D χ).toAdd * t) = χ (a (Multiplicative.ofAdd t)) :=
-  by sorry
+  by
+    obtain ⟨dual, hDual⟩ := lcaTopologicalLie_dual (G := G)
+    obtain ⟨realDual, hRealDual⟩ := exists_realPontryaginDualEquiv
+    have hPair (r : Multiplicative ℝ) (t : ℝ) :
+        realDual r (Multiplicative.ofAdd t) = Real.fourierChar (r.toAdd * t) :=
+      hRealDual r.toAdd t
+    let postcomp : (PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ)) ≃
+        (PontryaginDual G →ₜ* Multiplicative ℝ) :=
+      { toFun := fun b ↦ (realDual.symm : _ →ₜ* _).comp b
+        invFun := fun b ↦ (realDual : _ →ₜ* _).comp b
+        left_inv := fun b ↦ ContinuousMonoidHom.ext fun χ ↦ realDual.apply_symm_apply (b χ)
+        right_inv := fun b ↦ ContinuousMonoidHom.ext fun χ ↦ realDual.symm_apply_apply (b χ) }
+    let freq := dual.toEquiv.trans postcomp
+    have hFreq (a : LCATopologicalLie G) (χ : PontryaginDual G) (t : ℝ) :
+        Real.fourierChar ((freq a χ).toAdd * t) = χ (a (Multiplicative.ofAdd t)) := by
+      rw [← hPair]
+      change realDual (realDual.symm (dual a χ)) (Multiplicative.ofAdd t) = _
+      rw [realDual.apply_symm_apply, hDual, PontryaginDual.map_apply]
+    -- The derivative of each character at the identity determines its frequency.
+    have hDeriv (a : LCATopologicalLie G) (χ : PontryaginDual G) :
+        bruhatDirectionalDeriv a (fun x ↦ (χ x : ℂ)) 1 =
+          (freq a χ).toAdd • (2 * ↑Real.pi * Complex.I) := by
+      simp only [bruhatDirectionalDeriv, one_mul, ← hFreq a χ]
+      have hZero : deriv (fun t ↦ (Real.fourierChar t : ℂ)) 0 = 2 * ↑Real.pi * Complex.I := by
+        simpa only [Real.fourierChar_apply', mul_zero, Circle.exp_zero, Circle.coe_one, mul_one]
+          using Real.deriv_fourierChar 0
+      simpa only [mul_zero, hZero] using
+        deriv_comp_mul_left (freq a χ).toAdd (fun t ↦ (Real.fourierChar t : ℂ)) 0
+    let firstOrder (a : LCATopologicalLie G) : bruhatDiffDegreeOneReal (G := G) :=
+      ⟨bruhatFirstOrder a, Submodule.subset_span ⟨a, rfl⟩⟩
+    have hInjective : Function.Injective firstOrder := by
+      intro a b hab
+      apply freq.injective
+      apply ContinuousMonoidHom.ext
+      intro χ
+      let f : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩
+      have h := congrArg (fun D : bruhatDiffDegreeOneReal (G := G) ↦ (D.val f).val 1) hab
+      change bruhatDirectionalDeriv a (fun x ↦ (χ x : ℂ)) 1 =
+        bruhatDirectionalDeriv b (fun x ↦ (χ x : ℂ)) 1 at h
+      rw [hDeriv, hDeriv] at h
+      exact smul_left_injective ℝ (by simp [Real.pi_ne_zero]) h
+    have hSurjective : Function.Surjective firstOrder := by
+      intro D
+      obtain ⟨a, ha⟩ := (mem_bruhatDiffDegreeOneReal_iff D.val).mp D.property
+      exact ⟨a, Subtype.ext ha.symm⟩
+    let firstOrderEquiv := Equiv.ofBijective firstOrder ⟨hInjective, hSurjective⟩
+    let σ := firstOrderEquiv.symm.trans freq
+    have hσ (D : bruhatDiffDegreeOneReal (G := G)) (a : LCATopologicalLie G)
+        (ha : D.val = bruhatFirstOrder a) : σ D = freq a := by
+      have h : firstOrderEquiv a = D := Subtype.ext ha.symm
+      change freq (firstOrderEquiv.symm D) = freq a
+      rw [← h, Equiv.symm_apply_apply]
+    refine ⟨σ, ?_, ?_, fun a D ha χ t ↦ by rw [hσ D a ha, hFreq]⟩
+    · intro D E χ
+      obtain ⟨a, rfl⟩ := hSurjective D
+      obtain ⟨b, rfl⟩ := hSurjective E
+      rw [hσ _ (a * b) (bruhatFirstOrder_mul a b).symm, hσ _ a rfl, hσ _ b rfl]
+      change (realDual.symm (dual (a * b) χ)).toAdd =
+        (realDual.symm (dual a χ)).toAdd + (realDual.symm (dual b χ)).toAdd
+      rw [map_mul, ContinuousMonoidHom.mul_apply, map_mul]
+      rfl
+    · intro c D χ
+      obtain ⟨a, rfl⟩ := hSurjective D
+      let scale : LCATopologicalLie (Multiplicative ℝ) :=
+        ⟨(c • LinearMap.id (R := ℝ) (M := ℝ)).toAddMonoidHom.toMultiplicative,
+          continuous_const_mul c⟩
+      rw [hσ _ (a.comp scale) (bruhatFirstOrder_scale a c).symm, hσ _ a rfl]
+      change freq (a.comp scale) χ = Multiplicative.ofAdd (c * (freq a χ).toAdd)
+      apply realDual.injective
+      apply PontryaginDual.ext
+      intro t
+      change realDual (freq (a.comp scale) χ) (Multiplicative.ofAdd t.toAdd) =
+        realDual (Multiplicative.ofAdd (c * (freq a χ).toAdd)) (Multiplicative.ofAdd t.toAdd)
+      rw [hPair, hPair, hFreq]
+      change χ (a (Multiplicative.ofAdd (c * t.toAdd))) =
+        Real.fourierChar ((c * (freq a χ).toAdd) * t.toAdd)
+      rw [show (c * (freq a χ).toAdd) * t.toAdd = (freq a χ).toAdd * (c * t.toAdd) by ring,
+        hFreq]
 
 /-- Paper: Corollary D.1.6.15, p. 770. The first-order symbol is the real
 frequency multiplied by 2πi. The frequency is identified by the character pairing. -/

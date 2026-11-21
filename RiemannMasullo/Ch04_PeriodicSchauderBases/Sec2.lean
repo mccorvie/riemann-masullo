@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
+import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 import Mathlib.Analysis.InnerProductSpace.ProdL2
 import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Baire.CompleteMetrizable
@@ -206,7 +207,12 @@ def cyclicPeriodization : E →ₗ[ℂ] S :=
 of any logarithmic lift. The statement records convergence of the series. -/
 theorem cyclicPeriodization_hasSum (f : E) (x : ℝ) :
     HasSum (fun k : ℤ ↦ f.val (x + (k : ℝ) * Real.log γ))
-      (cyclicPeriodization γ hγ f (point ((x / Real.log γ : ℝ) : T))) := by sorry
+      (cyclicPeriodization γ hγ f (point ((x / Real.log γ : ℝ) : T))) := by
+  refine (cyclicSchwartzPeriodization_hasSum γ hγ
+    (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ f) x).congr_fun fun k ↦ ?_
+  simpa only [Subtype.coe_mk, zero_mul, Real.exp_zero, Complex.ofReal_one, one_mul] using
+    (logExponentialDecayTwist_apply univ ⟨0, mem_univ _⟩ f
+      (x + (k : ℝ) * Real.log γ)).symm
 
 end Periodization
 
@@ -300,13 +306,281 @@ theorem cyclicFourierCoeff_exponential (m n : ℤ) :
   rw [fourierCoeff_fourier]
   by_cases h : m = n <;> simp [h]
 
+local notation "Cover" => EuclideanSpace ℝ (Fin 0) × EuclideanSpace ℝ (Fin 1)
+
+/-- Pull a circle Schwartz function back to its real periodic lift. -/
+private def cyclicLift (f : S) (x : ℝ) : ℂ := f (point (x : T))
+
+private theorem cyclicCover_eq_point (xt : Cover) (a : Fin 0 → ℤ) (b : PUnit) :
+    elementaryCover xt a b = point ((xt.2 0 : ℝ) : T) := by
+  refine Prod.ext (Subsingleton.elim _ _) (Prod.ext ?_ (Subsingleton.elim _ _))
+  funext j
+  have : j = 0 := Subsingleton.elim _ _
+  subst j
+  rfl
+
+private theorem cyclicLift_contDiff (f : S) : ContDiff ℝ ∞ (cyclicLift f) := by
+  let s (x : ℝ) : Cover := (0, x • EuclideanSpace.single 0 1)
+  have hs : ContDiff ℝ ∞ s := contDiff_const.prodMk (contDiff_id.smul contDiff_const)
+  have he (x : ℝ) : elementaryCover (s x) 0 PUnit.unit = point (x : T) := by
+    rw [cyclicCover_eq_point]
+    simp [s, PiLp.smul_apply]
+  unfold cyclicLift
+  simpa only [Function.comp_def, he] using (f.property.1 0 PUnit.unit).comp hs
+
+private theorem cyclicLift_periodic (f : S) : Periodic (cyclicLift f) 1 := by
+  intro x
+  simp [cyclicLift]
+
+/-- The mixed partial in the one-circle case is the ordinary iterated derivative. -/
+private theorem cyclicPartial_eq (f : S) (i : ElementarySchwartzIndex 0 1 0)
+    (xt : Cover) (a : Fin 0 → ℤ) (b : PUnit) :
+    elementaryPartial f.val i.2.1 i.2.2.1 xt a b =
+      iteratedDeriv (i.2.2.1 0) (cyclicLift f) (xt.2 0) := by
+  let L : Cover →L[ℝ] ℝ := (EuclideanSpace.proj 0).comp (ContinuousLinearMap.snd ℝ _ _)
+  let v : Cover := (0, EuclideanSpace.single 0 1)
+  have hL : L v = 1 := by simp [L, v]
+  let directions : List Cover := List.replicate (i.2.2.1 0) v
+  have hdirs :
+      (List.ofFn (fun j : Fin 0 ↦ List.replicate (i.2.1 j)
+        ((EuclideanSpace.single j 1, 0) : Cover))).flatten ++
+      (List.ofFn (fun j : Fin 1 ↦ List.replicate (i.2.2.1 j)
+        ((0, EuclideanSpace.single j 1) : Cover))).flatten = directions := by
+    simp [directions, v, List.ofFn_succ]
+  dsimp only [elementaryPartial]
+  rw [hdirs]
+  simp only [cyclicCover_eq_point]
+  change iteratedFDeriv ℝ directions.length (cyclicLift f ∘ L) xt directions.get = _
+  rw [L.iteratedFDeriv_comp_right (cyclicLift_contDiff f) xt (by simp)]
+  have hget : (fun j : Fin directions.length ↦ L (directions.get j)) = fun _ ↦ 1 := by
+    funext j
+    simp [directions, List.get_eq_getElem, hL]
+  rw [ContinuousMultilinearMap.compContinuousLinearMap_apply, hget,
+    ← iteratedDeriv_eq_iteratedFDeriv, show directions.length = i.2.2.1 0 by simp [directions]]
+  rfl
+
+/-- Bounding the derivative on a fundamental interval bounds the Schwartz seminorm. -/
+private theorem cyclicSeminorm_le (f : S) (i : ElementarySchwartzIndex 0 1 0)
+    {C : ℝ} (hC : 0 ≤ C)
+    (h : ∀ x ∈ Ico (0 : ℝ) 1, ‖iteratedDeriv (i.2.2.1 0) (cyclicLift f) x‖ ≤ C) :
+    elementarySchwartzSeminorm i f ≤ C := by
+  change (elementarySchwartzBound f.val i).toReal ≤ C
+  rw [← ENNReal.toReal_ofReal hC]
+  apply ENNReal.toReal_mono ENNReal.ofReal_ne_top
+  refine iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  obtain ⟨x, hx, he⟩ := AddCircle.eq_coe_Ico ((xt.2 0 : ℝ) : T)
+  let s : Cover := (0, x • EuclideanSpace.single 0 1)
+  have hs : s.2 0 = x := by simp [s, PiLp.smul_apply]
+  have hcover : elementaryCover s a b = elementaryCover xt a b := by
+    rw [cyclicCover_eq_point, cyclicCover_eq_point, hs, he]
+  have hD := elementaryPartial_descends f.val i.2.1 i.2.2.1 a b (f.property.1 a b)
+  simp only [Fin.prod_univ_zero, one_mul, ENNReal.coe_nnreal_eq, coe_nnNorm]
+  rw [← hD.2 s xt hcover, cyclicPartial_eq, hs]
+  exact ENNReal.ofReal_le_ofReal (h x hx)
+
+private theorem cyclicSeminorm_ge (f : S) (k : ℕ) (x : ℝ) :
+    ‖iteratedDeriv k (cyclicLift f) x‖ ≤
+      elementarySchwartzSeminorm (0, 0, fun _ ↦ k, 0) f := by
+  let i : ElementarySchwartzIndex 0 1 0 := (0, 0, fun _ ↦ k, 0)
+  let s : Cover := (0, x • EuclideanSpace.single 0 1)
+  have hs : s.2 0 = x := by simp [s, PiLp.smul_apply]
+  change (‖iteratedDeriv k (cyclicLift f) x‖₊ : ENNReal).toReal ≤
+    (elementarySchwartzBound f.val i).toReal
+  apply ENNReal.toReal_mono (f.property.2 i).ne
+  refine le_iSup_of_le s (le_iSup_of_le 0 (le_iSup_of_le PUnit.unit ?_))
+  simp only [Fin.prod_univ_zero, one_mul, cyclicPartial_eq f i s 0 PUnit.unit, hs, i, le_rfl]
+
+private theorem cyclicFourierCoeff_eq_on (f : S) (m : ℤ) :
+    cyclicFourierCoeff m f = fourierCoeffOn zero_lt_one (cyclicLift f) m := by
+  change fourierCoeff (fun z : T ↦ f (point z)) m = _
+  rw [fourierCoeff_eq_intervalIntegral _ _ 0, fourierCoeffOn_eq_integral]
+  simp [cyclicLift]
+
+/-- The net of finite Fourier sums converges in the circle Schwartz topology. -/
+private theorem cyclicFourier_hasSum (f : S) :
+    HasSum (fun m : ℤ ↦ cyclicFourierCoeff m f • cyclicExponential m) f := by
+  let P (s : Finset ℤ) : S := ∑ m ∈ s, cyclicFourierCoeff m f • cyclicExponential m
+  change Filter.Tendsto P Filter.atTop (𝓝 f)
+  rw [elementarySchwartz_withSeminorms.tendsto_nhds]
+  intro i ε hε
+  have hP (s : Finset ℤ) : cyclicLift (P s) = fun t : ℝ ↦
+      ∑ m ∈ s, fourierCoeffOn zero_lt_one (cyclicLift f) m * fourier m (t : T) := by
+    funext t
+    let ev : S →+ ℂ :=
+      (Pi.evalAddMonoidHom (fun _ : G ↦ ℂ) (point (t : T))).comp
+        (elementarySchwartzSubmodule 0 1 0 PUnit).subtype.toAddMonoidHom
+    change ev (∑ m ∈ s, cyclicFourierCoeff m f • cyclicExponential m) = _
+    rw [map_sum]
+    refine Finset.sum_congr rfl fun m _ ↦ ?_
+    rw [← cyclicFourierCoeff_eq_on]
+    rfl
+  have h := smooth_fourier_series (cyclicLift_contDiff f) (cyclicLift_periodic f) (i.2.2.1 0)
+  simp only [← hP, Metric.tendstoUniformlyOn_iff, dist_eq_norm] at h
+  filter_upwards [h (ε / 2) (by positivity)] with s hs
+  refine lt_of_le_of_lt (cyclicSeminorm_le (P s - f) i (C := ε / 2) (by positivity) fun x hx ↦ ?_)
+    (by linarith)
+  change ‖iteratedDeriv (i.2.2.1 0) (fun x ↦ cyclicLift (P s) x - cyclicLift f x) x‖ ≤ _
+  rw [iteratedDeriv_fun_sub ((cyclicLift_contDiff (P s)).of_le (by simp)).contDiffAt
+    ((cyclicLift_contDiff f).of_le (by simp)).contDiffAt]
+  rw [norm_sub_rev]
+  exact (hs x hx).le
+
+private def cyclicFrequency (m : ℤ) : ℂ := 2 * Real.pi * Complex.I * m
+
+private theorem fourierCoeffOn_iteratedDeriv_cyclic (f : S) (m : ℤ) (k : ℕ) :
+    fourierCoeffOn zero_lt_one (iteratedDeriv k (cyclicLift f)) m =
+      cyclicFrequency m ^ k * cyclicFourierCoeff m f := by
+  have hdiff (j : ℕ) : ContDiff ℝ ∞ (iteratedDeriv j (cyclicLift f)) := by
+    induction j with
+    | zero => simpa only [iteratedDeriv_zero] using cyclicLift_contDiff f
+    | succ j ih =>
+      rw [iteratedDeriv_succ]
+      exact (contDiff_infty_iff_deriv.mp ih).2
+  have hper (j : ℕ) : Periodic (iteratedDeriv j (cyclicLift f)) 1 := by
+    induction j with
+    | zero => simpa only [iteratedDeriv_zero] using cyclicLift_periodic f
+    | succ j ih =>
+      rw [iteratedDeriv_succ]
+      intro x
+      rw [← deriv_comp_add_const, show (fun y ↦ iteratedDeriv j (cyclicLift f) (y + 1)) =
+        iteratedDeriv j (cyclicLift f) from funext ih]
+  induction k with
+  | zero => simp [cyclicFourierCoeff_eq_on]
+  | succ k ih =>
+    rw [iteratedDeriv_succ, fourierCoeffOn_deriv_one_periodic (hdiff k) (hper k), ih,
+      pow_succ', cyclicFrequency]
+    ring
+
+private theorem norm_fourierCoeffOn_iteratedDeriv_cyclic (f : S) (m : ℤ) (k : ℕ) :
+    ‖fourierCoeffOn zero_lt_one (iteratedDeriv k (cyclicLift f)) m‖ ≤
+      elementarySchwartzSeminorm (0, 0, fun _ ↦ k, 0) f := by
+  rw [fourierCoeffOn_eq_integral]
+  simp only [sub_zero, div_one, one_smul]
+  have h x (_ : x ∈ uIoc (0 : ℝ) 1) :
+      ‖fourier (-m) (x : T) • iteratedDeriv k (cyclicLift f) x‖ ≤
+        elementarySchwartzSeminorm (0, 0, fun _ ↦ k, 0) f := by
+    rw [norm_smul, fourier_apply, Circle.norm_coe, one_mul]
+    exact cyclicSeminorm_ge f k x
+  simpa using intervalIntegral.norm_integral_le_of_norm_le_const h
+
+private theorem cyclicTerm_deriv (f : S) (m : ℤ) (k : ℕ) :
+    iteratedDeriv k (cyclicLift (cyclicFourierCoeff m f • cyclicExponential m)) =
+      fun x : ℝ ↦ (cyclicFrequency m ^ k * cyclicFourierCoeff m f) * fourier m (x : T) := by
+  induction k with
+  | zero =>
+    simp only [iteratedDeriv_zero, pow_zero, one_mul]
+    rfl
+  | succ k ih =>
+    rw [iteratedDeriv_succ, ih]
+    funext x
+    rw [((hasDerivAt_fourier 1 m x).const_mul
+      (cyclicFrequency m ^ k * cyclicFourierCoeff m f)).deriv]
+    simp only [Complex.ofReal_one, div_one, pow_succ', cyclicFrequency]
+    ring
+
+private def cyclicWeight (m : ℤ) : ℝ :=
+  if m = 0 then 1 else ‖cyclicFrequency m‖⁻¹ ^ 2
+
+private theorem cyclicWeight_nonneg (m : ℤ) : 0 ≤ cyclicWeight m := by
+  unfold cyclicWeight
+  split_ifs <;> positivity
+
+private theorem cyclicWeight_summable : Summable cyclicWeight := by
+  let a : ℂ := 2 * Real.pi * Complex.I
+  have h := Real.summable_one_div_int_pow.mpr (by decide : 1 < (2 : ℕ))
+  refine (h.mul_left (‖a‖⁻¹ ^ 2)).of_norm_bounded_eventually ?_
+  filter_upwards [Filter.eventually_cofinite_ne (0 : ℤ)] with m hm
+  rw [cyclicWeight, ite_eq_right hm, Real.norm_eq_abs, abs_of_nonneg (sq_nonneg _)]
+  change ‖a * (m : ℂ)‖⁻¹ ^ 2 ≤ ‖a‖⁻¹ ^ 2 * (1 / (m : ℝ) ^ 2)
+  rw [norm_mul, mul_inv, mul_pow, Complex.norm_intCast]
+  simp only [inv_pow, sq_abs, one_div, le_rfl]
+
+/-- Two extra derivatives give an inverse-square bound for every nonzero Fourier mode. -/
+private theorem cyclicTerm_seminorm_le (f : S) (i : ElementarySchwartzIndex 0 1 0) (m : ℤ) :
+    elementarySchwartzSeminorm i (cyclicFourierCoeff m f • cyclicExponential m) ≤
+      cyclicWeight m * (elementarySchwartzSeminorm (0, 0, 0, 0) f +
+        elementarySchwartzSeminorm (0, 0, fun _ ↦ i.2.2.1 0 + 2, 0) f) := by
+  let k := i.2.2.1 0
+  have hp₀ : 0 ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f := apply_nonneg _ _
+  have hp₂ : 0 ≤ elementarySchwartzSeminorm (0, 0, fun _ ↦ k + 2, 0) f := apply_nonneg _ _
+  refine cyclicSeminorm_le _ i (mul_nonneg (cyclicWeight_nonneg m) (add_nonneg hp₀ hp₂))
+    fun x _ ↦ ?_
+  rw [cyclicTerm_deriv, norm_mul, fourier_apply, Circle.norm_coe, mul_one]
+  change ‖cyclicFrequency m ^ k * cyclicFourierCoeff m f‖ ≤
+    cyclicWeight m * (elementarySchwartzSeminorm (0, 0, 0, 0) f +
+      elementarySchwartzSeminorm (0, 0, fun _ ↦ k + 2, 0) f)
+  by_cases hm : m = 0
+  · subst m
+    have h := norm_fourierCoeffOn_iteratedDeriv_cyclic f 0 0
+    rw [iteratedDeriv_zero, ← cyclicFourierCoeff_eq_on] at h
+    rw [cyclicWeight, ite_eq_left rfl, one_mul]
+    by_cases hk : k = 0
+    · rw [hk, pow_zero, one_mul]
+      exact h.trans (le_add_of_nonneg_right (apply_nonneg _ _))
+    · simpa [cyclicFrequency, zero_pow hk] using add_nonneg hp₀ hp₂
+  · rw [cyclicWeight, ite_eq_right hm]
+    have h := norm_fourierCoeffOn_iteratedDeriv_cyclic f m (k + 2)
+    rw [fourierCoeffOn_iteratedDeriv_cyclic, pow_add, mul_right_comm, norm_mul, norm_pow] at h
+    have ha : 0 < ‖cyclicFrequency m‖ ^ 2 := by
+      have hmc : (m : ℂ) ≠ 0 := by exact_mod_cast hm
+      have ha' : cyclicFrequency m ≠ 0 := by simp [cyclicFrequency, Real.pi_ne_zero, hmc]
+      exact pow_pos (norm_pos_iff.mpr ha') _
+    rw [inv_pow, ← div_eq_inv_mul, le_div_iff₀ ha]
+    exact h.trans (le_add_of_nonneg_left hp₀)
+
+/-- Dominate any continuous seminorm by finitely many of the defining seminorms. -/
+private theorem cyclicFourier_isAbsolute :
+    SchauderBasis.IsAbsolute (cyclicExponential ∘ freq) (cyclicFourierCoeff ∘ freq) := by
+  classical
+  intro q hq
+  let p (i : ElementarySchwartzIndex 0 1 0) : Seminorm ℂ S := elementarySchwartzSeminorm i
+  have hp : WithSeminorms p := elementarySchwartz_withSeminorms
+  obtain ⟨I, C, _, hdom⟩ := Seminorm.bound_sum_of_continuous hp q hq
+  let r (i : ElementarySchwartzIndex 0 1 0) : Seminorm ℂ S :=
+    p (0, 0, 0, 0) + p (0, 0, fun _ ↦ i.2.2.1 0 + 2, 0)
+  let D : NNReal := ⟨∑' m : ℤ, cyclicWeight m, tsum_nonneg cyclicWeight_nonneg⟩
+  have hsum (v : S) (g : ElementarySchwartzIndex 0 1 0 → Seminorm ℂ S) :
+      (∑ i ∈ I, g i) v = ∑ i ∈ I, g i v := by
+    change FunLike.coeAddMonoidHom (Seminorm ℂ S) S ℝ (∑ i ∈ I, g i) v = _
+    rw [map_sum, Finset.sum_apply]
+    rfl
+  have hr (i) : Continuous (r i) :=
+    (hp.continuous_seminorm _).add (hp.continuous_seminorm _)
+  have hr' := Seminorm.continuous_finsetSum (s := I) (fun i _ ↦ hr i)
+  refine ⟨(D * C) • ∑ i ∈ I, r i, hr'.const_smul (D * C), fun f ↦ ?_⟩
+  let term (m : ℤ) := cyclicFourierCoeff m f • cyclicExponential m
+  have hle (m : ℤ) : q (term m) ≤ cyclicWeight m * ((C : ℝ) * ∑ i ∈ I, r i f) := by
+    calc
+      _ ≤ (C : ℝ) * ∑ i ∈ I, p i (term m) := by
+        simpa only [smul_apply, NNReal.smul_def, smul_eq_mul, hsum]
+          using hdom (term m)
+      _ ≤ (C : ℝ) * ∑ i ∈ I, cyclicWeight m * r i f :=
+        mul_le_mul_of_nonneg_left
+          (Finset.sum_le_sum (fun i _ ↦ cyclicTerm_seminorm_le f i m)) C.coe_nonneg
+      _ = _ := by rw [← Finset.mul_sum, mul_left_comm]
+  have hmajor := cyclicWeight_summable.mul_right ((C : ℝ) * ∑ i ∈ I, r i f)
+  have hqsum := hmajor.of_nonneg_of_le (fun m ↦ apply_nonneg q (term m)) hle
+  have hbound := hqsum.tsum_le_tsum hle hmajor
+  rw [tsum_mul_right] at hbound
+  change Summable ((q ∘ term) ∘ freq) ∧
+    (∑' n, (q ∘ term) (freq n)) ≤ ((D * C) • ∑ i ∈ I, r i) f
+  refine ⟨(freq).summable_iff.mpr hqsum, ?_⟩
+  rw [(freq).tsum_eq (q ∘ term), smul_apply, NNReal.smul_def, smul_eq_mul,
+    NNReal.coe_mul, hsum, mul_assoc]
+  exact hbound
+
 /-- Paper: Lemma 4.2.1.2(1), p. 162. The circle exponentials form an absolute
 Schauder basis with the Fourier coefficient functionals.
 Deviation: The Schauder basis predicates of §4.1 use the natural-number
 enumeration of the integer frequencies. -/
 theorem cyclicExponential_absoluteBasis :
     IsSchauderBasis (cyclicExponential ∘ freq) (cyclicFourierCoeff ∘ freq) ∧
-      SchauderBasis.IsAbsolute (cyclicExponential ∘ freq) (cyclicFourierCoeff ∘ freq) := by sorry
+      SchauderBasis.IsAbsolute (cyclicExponential ∘ freq) (cyclicFourierCoeff ∘ freq) := by
+  refine ⟨⟨fun m n ↦ ?_, fun f ↦ ?_⟩, cyclicFourier_isAbsolute⟩
+  · change cyclicFourierCoeff (freq m) (cyclicExponential (freq n)) = _
+    simp [cyclicFourierCoeff_exponential]
+  · exact ((freq).hasSum_iff.mpr (cyclicFourier_hasSum f)).mono_left
+      (SummationFilter.conditional ℕ).le_atTop
 
 /-- Paper: Lemma 4.2.1.2(2), p. 162. Fourier coefficients are an unconditional
 Schauder basis of the strong dual, with coordinates given by evaluation on the monomials.

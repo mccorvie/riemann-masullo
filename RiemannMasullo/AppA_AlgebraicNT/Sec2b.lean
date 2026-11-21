@@ -2312,13 +2312,92 @@ theorem diagonal_mem_sAdeleFundamentalDomain (x : Oₛ(F, S)) : addAtS x ∈ D�
 /-- Paper: Lemma A.2.4.2(1), p. 554. S-integer translates of the additive domain
 cover the S-adeles. -/
 theorem sAdeleFundamentalDomain_cover : (⋃ x : Oₛ(F, S), addAtS x +ᵥ Dₛ) = Set.univ := by
-  sorry
+  apply Set.eq_univ_of_forall
+  intro m
+  have h := sAdele_additive_quotient F S
+  dsimp only at h
+  obtain ⟨-, -, -, -, -, -, -, ⟨π, -, hπq, hπ⟩, -, -⟩ := h
+  -- Lift the class of `m` to an adele integral outside `S`.
+  obtain ⟨c, hc⟩ := hπq.surjective
+    (QuotientAddGroup.mk' (((adeleProjection F S).comp (integralAdelesOutside F S).subtype).comp
+      (integralAdeleDiagonal F S)).toAddMonoidHom.range m)
+  obtain ⟨y, rfl⟩ := QuotientAddGroup.mk_surjective c
+  have hy := hc.symm.trans (hπ y)
+  obtain ⟨x', hx'⟩ := (QuotientAddGroup.eq_iff_sub_mem.mp hy)
+  -- Cover the global adele by field translates of the global domain.
+  have hcov : y.val ∈ ⋃ x : F, algebraMap F (AdeleRing (𝓞 F) F) x +ᵥ adeleFundamentalDomain F a :=
+    (adeleFundamentalDomain_cover F a).symm ▸ Set.mem_univ _
+  obtain ⟨x, hx⟩ := Set.mem_iUnion.mp hcov
+  obtain ⟨z, hz, hxz⟩ := Set.mem_vadd_set.mp hx
+  have hzI : z ∈ integralAdelesOutside F S := by
+    have hz' := hz.2
+    simp only [integralAdelesOutside, Subring.mem_iInf] at hz' ⊢
+    exact fun v hv ↦ hz' v (by simp)
+  have hxI : algebraMap F (AdeleRing (𝓞 F) F) x ∈ integralAdelesOutside F S := by
+    have : algebraMap F (AdeleRing (𝓞 F) F) x = y.val - z := by
+      rw [← hxz]
+      change _ = algebraMap F (AdeleRing (𝓞 F) F) x + z - z
+      rw [add_sub_cancel_right]
+    rw [this]
+    exact (integralAdelesOutside F S).sub_mem y.property hzI
+  have hxint := (diagonal_mem_integralAdelesOutside F S x).mp hxI
+  refine Set.mem_iUnion.mpr ⟨⟨x, hxint⟩ + x', Set.mem_vadd_set.mpr ⟨adeleProjection F S z, ⟨?_, ?_⟩, ?_⟩⟩
+  · exact hz.1
+  · intro v
+    have hz' := hz.2
+    simp only [integralAdelesOutside, Subring.mem_iInf] at hz'
+    exact hz' v.val (Finset.notMem_empty _)
+  · have hpy : adeleProjection F S y.val =
+        addAtS ⟨x, hxint⟩ + adeleProjection F S z := by
+      rw [← hxz]
+      exact map_add _ _ _
+    have hx'' : addAtS x' = m - adeleProjection F S y.val := hx'
+    rw [hpy] at hx''
+    change addAtS (⟨x, hxint⟩ + x') + adeleProjection F S z = m
+    rw [map_add, hx'']
+    abel
 
 /-- Paper: Lemma A.2.4.2(2), p. 554. Only finitely many diagonal S-integer translates
 of the closure meet a given compact subset of the S-adeles. -/
 theorem sAdeleFundamentalDomain_finite_translates (K : Set (SAdeleRing F S)) (hK : IsCompact K) :
     {x : Oₛ(F, S) | ((addAtS x +ᵥ closure Dₛ) ∩ K).Nonempty}.Finite := by
-  sorry
+  have h := sAdele_additive_quotient F S
+  dsimp only at h
+  obtain ⟨hinj, hclosed, hdiscrete, -⟩ := h
+  -- The closure of the S-domain is compact.
+  have : T2Space (InfiniteAdeleRing F) := by
+    change T2Space ((w : InfinitePlace F) → w.Completion)
+    infer_instance
+  have hinf : closure (infiniteAdeleFundamentalDomain F a) ⊆
+      Prod.fst '' closure (adeleFundamentalDomain F a) := by
+    refine closure_minimal ?_
+      ((adeleFundamentalDomain_precompact F a).image continuous_fst).isClosed
+    intro x hx
+    refine ⟨(x, 0), subset_closure ⟨hx, ?_⟩, rfl⟩
+    simp only [integralAdelesOutside, Subring.mem_iInf]
+    intro v _
+    exact (v.adicCompletionIntegers F).zero_mem
+  have hDcompact : IsCompact (closure Dₛ) := by
+    have hbox : IsCompact ((Prod.fst '' closure (adeleFundamentalDomain F a)) ×ˢ
+        Set.pi Set.univ (fun v : S ↦ (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)))) :=
+      ((adeleFundamentalDomain_precompact F a).image continuous_fst).prod
+        (isCompact_univ_pi fun v ↦
+          isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val))
+    refine hbox.of_isClosed_subset isClosed_closure (closure_minimal ?_ hbox.isClosed)
+    intro x hx
+    exact ⟨hinf (subset_closure hx.1), fun v _ ↦ hx.2 v⟩
+  let d := (adeleProjection F S).comp (integralAdelesOutside F S).subtype |>.comp
+    (integralAdeleDiagonal F S)
+  have hdiff : IsCompact (K - closure Dₛ) := by
+    change IsCompact (Set.image2 (· - ·) K (closure Dₛ))
+    rw [← Set.image_prod]
+    exact (hK.prod hDcompact).image (continuous_fst.sub continuous_snd)
+  have hfinite : ((K - closure Dₛ) ∩ Set.range d).Finite :=
+    (hdiff.inter_right hclosed).finite (hdiscrete.mono Set.inter_subset_right)
+  refine (hfinite.preimage hinj.injOn).subset ?_
+  rintro x ⟨y, hy, hyK⟩
+  obtain ⟨b, hb, rfl⟩ := Set.mem_vadd_set.mp hy
+  exact ⟨Set.mem_sub.mpr ⟨addAtS x +ᵥ b, hyK, b, hb, add_sub_cancel_right _ _⟩, ⟨x, rfl⟩⟩
 
 /-- Paper: Definition A.2.4.3, p. 554. The S-logarithm has one normalized log absolute
 value for each infinite place and each selected finite place, as in (A.2.4.7) on p. 555. -/

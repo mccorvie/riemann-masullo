@@ -469,7 +469,15 @@ Deviation: Sanity check tying the dual density to §9.1. -/
 theorem intervalSobolev_zero_dual_eq_sobolevMeasure {G : Type*} [CommGroup G]
     [TopologicalSpace G] [MeasurableSpace G] (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (s : ℝ) :
     (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logModule m x))⁻¹) =
-      sobolevMeasure μ (modulatedSobolevWeight m) (-s) := by sorry
+      sobolevMeasure μ (modulatedSobolevWeight m) (-s) := by
+  unfold sobolevMeasure
+  congr 1
+  funext x
+  have hw : ((modulatedSobolevWeight m x : ℝ≥0) : ℝ) ^ 2 = Real.log ((m x).val : ℝ) ^ 2 :=
+    sq_abs _
+  have h : (0 : ℝ) ≤ 1 + Real.log ((m x).val : ℝ) ^ 2 := by positivity
+  rw [hw, neg_div, Real.rpow_neg h]
+  simp [intervalSobolevDensity]
 
 /-- Paper: Definition 9.2.1.1, p. 404. The b-line density and the density of the base
 interval {b} in degree 2N bound each other, so the two spaces have the same elements and

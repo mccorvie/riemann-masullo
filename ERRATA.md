@@ -185,7 +185,7 @@ say something other than what was meant.
 | The Z-space quotient maps of §5.1 | Written with the range subtype as codomain, they used the subspace topology, not the transported one. | review of #2258 |
 | The eigendistribution weight and complex Gaussian of §3.4 | Inverse weight relative to the action on `main`; a Gaussian whose zeta integral vanishes. | review of #2289 |
 | The standard additive character | Followed the paper's signs; see F13. | statement audit |
-| The approximation property (Lemma C.2.4.15, §C.3.4): `hilbert_approximationProperty`, the hypothesis of `nuclearTrace`, `dense_finiteRank_iff_forall_targets` | A type ascription to the precompact-convergence synonym did not change the codomain Lean inferred, so density was for bounded convergence (the operator norm): false for ℓ², and too strong as a hypothesis. Repair tracked in #3146. | provers, #561, #567 and #429 |
+| The approximation property (Lemma C.2.4.15, §C.3.4): `hilbert_approximationProperty`, the hypothesis of `nuclearTrace`, `dense_finiteRank_iff_forall_targets` | A type ascription to the precompact-convergence synonym did not change the codomain Lean inferred, so density was for bounded convergence (the operator norm): false for ℓ², and too strong as a hypothesis. Repaired in #3330 with a named `HasApproximationProperty`; the review found the same in `dense_finiteRank_iff_forall_sources` and `dense_finiteRank_of_isNuclearTVS`. | provers, #561, #567 and #429 |
 
 ## How this file is kept
 
