@@ -1104,7 +1104,61 @@ theorem exists_weakDual_not_quasiComplete :
     ∃ (E : Type) (_ : AddCommGroup E) (_ : Module ℂ E) (_ : TopologicalSpace E)
       (_ : PolynormableSpace ℂ E) (_ : T2Space E),
       letI := IsTopologicalAddGroup.rightUniformSpace (WeakDual ℂ E)
-      ¬ QuasiCompleteSpace ℂ (WeakDual ℂ E) := by sorry
+      ¬ QuasiCompleteSpace ℂ (WeakDual ℂ E) := by
+  classical
+  let E := ℕ →₀ ℂ
+  let coe : E →ₗ[ℂ] (ℕ → ℂ) := Finsupp.lcoeFun
+  let : TopologicalSpace E := TopologicalSpace.induced coe inferInstance
+  have hcoe : IsEmbedding coe := ⟨⟨rfl⟩, fun _ _ h ↦ Finsupp.ext (congrFun h)⟩
+  have : PolynormableSpace ℂ E := PolynormableSpace.induced coe
+  have : T2Space E := hcoe.t2Space
+  refine ⟨E, inferInstance, inferInstance, inferInstance, inferInstance, inferInstance, ?_⟩
+  let := IsTopologicalAddGroup.rightUniformSpace (WeakDual ℂ E)
+  let : IsUniformAddGroup (WeakDual ℂ E) := isUniformAddGroup_of_addCommGroup
+  intro hq
+  let coord (i : ℕ) : StrongDual ℂ E :=
+    ⟨(LinearMap.proj i).comp coe, (continuous_apply i).comp hcoe.continuous⟩
+  let partialSum (n : ℕ) : WeakDual ℂ E := StrongDual.toWeakDual (∑ i ∈ Finset.range n, coord i)
+  have hpartial (n : ℕ) (x : E) : partialSum n x = ∑ i ∈ Finset.range n, x i := by
+    change (∑ i ∈ Finset.range n, coord i) x = _
+    rw [sum_apply]
+    rfl
+  -- The partial sums stabilize pointwise because each vector has finite support.
+  let eval : WeakDual ℂ E →+ (E → ℂ) := ⟨⟨fun f x ↦ f x, rfl⟩, fun _ _ ↦ rfl⟩
+  have heval : IsUniformInducing eval := AddMonoidHom.isUniformInducing_of_isInducing ⟨rfl⟩
+  have hpoint (x : E) : Tendsto (fun n ↦ partialSum n x) atTop
+      (𝓝 (x.sum fun _ z ↦ z)) := by
+    obtain ⟨N, hN⟩ := x.support.exists_nat_subset_range
+    refine tendsto_atTop_of_eventually_const (i₀ := N) fun n hn ↦ ?_
+    rw [hpartial, Finsupp.sum]
+    exact (Finset.sum_subset (hN.trans (Finset.range_mono hn))
+      (fun i _ hi ↦ Finsupp.notMem_support_iff.mp hi)).symm
+  have hc : CauchySeq partialSum := heval.cauchy_map_iff.mp (by
+    rw [Filter.map_map]
+    exact (tendsto_pi_nhds.mpr hpoint).cauchySeq)
+  have hb := hc.totallyBounded_range.isVonNBounded ℂ
+  obtain ⟨l, -, hl⟩ := cauchySeq_tendsto_of_isComplete
+    (hq.quasiComplete hb.closure isClosed_closure) (fun n ↦ subset_closure (mem_range_self n)) hc
+  -- The unit vectors tend to zero in the product topology, while the putative limit takes value 1.
+  let e (n : ℕ) : E := Finsupp.single n 1
+  have he : Tendsto e atTop (𝓝 0) := by
+    apply hcoe.isInducing.tendsto_nhds_iff.mpr
+    apply tendsto_pi_nhds.mpr
+    intro i
+    refine tendsto_atTop_of_eventually_const (i₀ := i + 1) fun n hn ↦ ?_
+    change Finsupp.single n (1 : ℂ) i = 0
+    exact Finsupp.single_eq_of_ne (by omega)
+  have hle (n : ℕ) : l (e n) = 1 := by
+    calc
+      l (e n) = (e n).sum (fun _ z ↦ z) :=
+        tendsto_nhds_unique ((WeakDual.eval_continuous (e n)).tendsto l |>.comp hl)
+          (hpoint (e n))
+      _ = 1 := Finsupp.sum_single_index rfl
+  have hz : Tendsto (fun n ↦ l (e n)) atTop (𝓝 0) := by
+    simpa only [Function.comp_def, WeakDual.toStrongDual_apply, map_zero] using
+      (l.toStrongDual.continuous.tendsto (0 : E)).comp he
+  simp only [hle] at hz
+  exact one_ne_zero (tendsto_nhds_unique tendsto_const_nhds hz)
 
 -- TODO(paper-gap): Footnote 15 leaves the argument for the particular strong dual
 -- of a Fréchet space cited in Remark C.2.4.5 unfinished.
