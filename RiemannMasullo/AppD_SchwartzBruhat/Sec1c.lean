@@ -256,7 +256,12 @@ rule on pairs of Bruhat C¹ functions. -/
 theorem bruhatDirectionalDeriv_mul (a : LCATopologicalLie G) {f g : G → ℂ}
     (hf : IsBruhatContDiff 1 f) (hg : IsBruhatContDiff 1 g) :
     bruhatDirectionalDeriv a (f * g) =
-      f * bruhatDirectionalDeriv a g + g * bruhatDirectionalDeriv a f := by sorry
+      f * bruhatDirectionalDeriv a g + g * bruhatDirectionalDeriv a f := by
+  funext x
+  have h := ((hasDerivAt_bruhatDirectionalDeriv a hf x).fun_mul
+    (hasDerivAt_bruhatDirectionalDeriv a hg x)).deriv
+  simpa only [bruhatDirectionalDeriv, Pi.mul_apply, Pi.add_apply,
+    ofAdd_zero, map_one, mul_one, mul_comm, add_comm] using h
 
 /-- Paper: Definition D.1.6.5, p. 766. The orbit derivative is additive on
 Bruhat C¹ functions. -/
