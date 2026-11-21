@@ -3,6 +3,10 @@ module
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
+import Mathlib.Algebra.Module.ZLattice.Summable
+import Mathlib.Analysis.Normed.Group.FunctionSeries
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-!
 # S-local adelic theta functions
 
@@ -39,10 +43,187 @@ local notation "thetaSum" => fun (f : ℬₛ) (g : Iₛ) ↦ ∑' ξ : Uₛ, the
 
 /-! ## S-local theta operators -/
 
+section Summability
+
+open scoped Classical
+
+local notation "A∞" => mixedEmbedding.mixedSpace F
+set_option quotPrecheck false in
+local notation "Aᶠₛ" => (∀ v : S, HeightOneSpectrum.adicCompletion F (Subtype.val v))
+local notation "arch" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+local notation "sDiagonal" =>
+  RingHom.comp (RingHom.comp (adeleProjection F S) (Subring.subtype (integralAdelesOutside F S)))
+    (integralAdeleDiagonal F S)
+
+omit [NumberField F] in
+/-- The real and complex coordinates give a topological embedding of the infinite adeles. -/
+private theorem isEmbedding_thetaArch : IsEmbedding (arch : InfiniteAdeleRing F → A∞) := by
+  let e : InfiniteAdeleRing F ≃ₜ A∞ :=
+    (Homeomorph.piEquivPiSubtypeProd InfinitePlace.IsReal
+      (fun w : InfinitePlace F ↦ w.Completion)).trans <|
+      Homeomorph.prodCongr
+        (Homeomorph.piCongrRight fun w ↦
+          (InfinitePlace.Completion.isometryEquivRealOfIsReal w.2).toHomeomorph)
+        ((Homeomorph.piCongrRight fun w ↦
+          (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+            (InfinitePlace.not_isReal_iff_isComplex.mp w.2)).toHomeomorph).trans
+          (Homeomorph.piCongrLeft (Y := fun _ ↦ ℂ)
+            (Equiv.subtypeEquivRight fun _ ↦ InfinitePlace.not_isReal_iff_isComplex)))
+  exact e.isEmbedding
+
+/-- A compact set of finite S-adeles fits in a compact additive subgroup. -/
+private theorem finiteSAdele_exists_compact_addSubgroup (C : Set Aᶠₛ) (hC : IsCompact C) :
+    ∃ H : AddSubgroup Aᶠₛ, IsCompact (H : Set Aᶠₛ) ∧ C ⊆ H := by
+  classical
+  have hBound (v : S) : ∃ r : ℝ, ∀ x ∈ C, ‖x v‖ ≤ r :=
+    hC.exists_bound_of_continuousOn (continuous_apply v).continuousOn
+  choose r hr using hBound
+  let H : AddSubgroup Aᶠₛ :=
+    { carrier := {x | ∀ v, ‖x v‖ ≤ max (r v) 0}
+      zero_mem' := fun v ↦ by simp
+      add_mem' := fun hx hy v ↦
+        (IsUltrametricDist.norm_add_le_max _ _).trans (max_le (hx v) (hy v))
+      neg_mem' := fun hx v ↦ by simpa only [Pi.neg_apply, norm_neg] using hx v }
+  refine ⟨H, ?_, fun x hx v ↦ (hr v x hx).trans (le_max_left _ _)⟩
+  change IsCompact {x : Aᶠₛ | ∀ v, ‖x v‖ ≤ max (r v) 0}
+  let balls (v : S) := Metric.closedBall (0 : v.val.adicCompletion F) (max (r v) 0)
+  have heq : {x : Aᶠₛ | ∀ v, ‖x v‖ ≤ max (r v) 0} = Set.univ.pi balls := by
+    ext x
+    simp only [Set.mem_setOf_eq, Set.mem_pi, Set.mem_univ, forall_const, balls,
+      Metric.mem_closedBall, dist_zero_right]
+  rw [heq]
+  exact isCompact_univ_pi fun v ↦ by
+    let := properSpace_adicCompletion v.val (K := F)
+    exact isCompact_closedBall _ _
+
+/-- Restricting the finite coordinates of diagonal S-integers to a compact additive
+subgroup puts their archimedean images in a discrete integral lattice. -/
+private theorem sInteger_arch_discrete_lattice (H : AddSubgroup Aᶠₛ)
+    (hH : IsCompact (H : Set Aᶠₛ)) :
+    ∃ L : Submodule ℤ A∞, DiscreteTopology L ∧
+      ∀ x : (S : Set (HeightOneSpectrum (𝓞 F))).integer F,
+        (sDiagonal x).2 ∈ H → arch (sDiagonal x).1 ∈ L := by
+  let d := sDiagonal
+  let D := d.toAddMonoidHom.range
+  obtain ⟨_, hClosed, hDiscrete, _⟩ := sAdele_additive_quotient F S
+  let l : InfiniteAdeleRing F × H → Aₛ := fun x ↦ (x.1, x.2.val)
+  have hl : Continuous l := continuous_fst.prodMk (continuous_subtype_val.comp continuous_snd)
+  have hli : Injective l := fun _ _ h ↦
+    Prod.ext (congrArg (Prod.fst : Aₛ → _) h) (Subtype.ext (congrArg (Prod.snd : Aₛ → _) h))
+  let D' : Set (InfiniteAdeleRing F × H) := l ⁻¹' (D : Set Aₛ)
+  have hD' : IsClosed D' := hClosed.preimage hl
+  have : DiscreteTopology D' := isDiscrete_iff_discreteTopology.mp
+    (hDiscrete.preimage hl.continuousOn hli)
+  have : CompactSpace H := isCompact_iff_compactSpace.mp hH
+  -- Projection away from the compact finite factor is closed.
+  let p : D' → InfiniteAdeleRing F := fun x ↦ x.val.1
+  have hp : IsClosedEmbedding p := .of_continuous_injective_isClosedMap
+    (continuous_fst.comp continuous_subtype_val) (by
+      intro x y hxy
+      obtain ⟨a, ha⟩ := x.property
+      obtain ⟨b, hb⟩ := y.property
+      obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      have hab : a = b := Subtype.ext ((algebraMap F w.Completion).injective
+        (show algebraMap F w.Completion a.val = algebraMap F w.Completion b.val from
+          ((congrArg (fun z : Aₛ ↦ z.1 w) ha).trans
+            ((congrFun hxy w).trans (congrArg (fun z : Aₛ ↦ z.1 w) hb).symm))))
+      exact Subtype.ext (hli (ha.symm.trans (hab ▸ hb))))
+    (isClosedMap_fst_of_compactSpace.comp hD'.isClosedMap_subtype_val)
+  let L := ((D ⊓ H.comap (AddMonoidHom.snd _ _)).map
+    ((arch).toAddMonoidHom.comp (AddMonoidHom.fst _ _))).toIntSubmodule
+  refine ⟨L, ?_, fun x hx ↦ ⟨d x, ⟨⟨x, rfl⟩, hx⟩, rfl⟩⟩
+  have hRange : Set.range (arch ∘ p) = (L : Set A∞) := by
+    ext z
+    constructor
+    · rintro ⟨⟨⟨a, b⟩, h⟩, rfl⟩
+      exact ⟨(a, b.val), ⟨h, b.property⟩, rfl⟩
+    · rintro ⟨⟨a, b⟩, ⟨h, hb⟩, rfl⟩
+      exact ⟨⟨(a, ⟨b, hb⟩), h⟩, rfl⟩
+  exact SetLike.isDiscrete_iff_discreteTopology.mp
+    (hRange ▸ ((isEmbedding_thetaArch F).comp hp.isEmbedding).isInducing.isDiscrete_range)
+
+/-- Paper: Proposition 2.3.1.2(1), p. 100. An S-adelic Schwartz–Bruhat function
+vanishes outside a compact set of finite coordinates. Its absolute value times
+any power of the archimedean norm is bounded on the whole S-adele ring. -/
+theorem sAdeleSchwartz_exists_decay_bound (f : ℬₛ) :
+    ∃ C : Set Aᶠₛ, IsCompact C ∧
+      (∀ x : Aₛ, x.2 ∉ C → f (Multiplicative.ofAdd x) = 0) ∧
+      ∀ N : ℕ, ∃ B : ℝ, 0 ≤ B ∧
+        ∀ x : Aₛ, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ N ≤ B := by
+  sorry
+
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The series of norms of the
 S-unit translates is summable uniformly on each compact set of S-ideles. -/
 theorem sLocalAdelicTheta_summableUniformlyOn_norm (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
-    SummableUniformlyOn (fun (ξ : Uₛ) (g : Iₛ) ↦ ‖thetaTerm f ξ g‖) K := by sorry
+    SummableUniformlyOn (fun (ξ : Uₛ) (g : Iₛ) ↦ ‖thetaTerm f ξ g‖) K := by
+  classical
+  obtain ⟨C, hC, hsupport, hdecay⟩ := sAdeleSchwartz_exists_decay_bound F S f
+  -- Undo the idele translates on the finite support simultaneously.
+  let T : Aᶠₛ × Iₛ → Aᶠₛ := fun p ↦ p.1 * (p.2⁻¹).val.2
+  have hT : Continuous T := continuous_fst.mul
+    (continuous_snd.comp (Units.continuous_val.comp (continuous_inv.comp continuous_snd)))
+  obtain ⟨H, hH, hTH⟩ :=
+    finiteSAdele_exists_compact_addSubgroup F S (T '' (C ×ˢ K)) ((hC.prod hK).image hT)
+  obtain ⟨L, hL, hmemL⟩ := sInteger_arch_discrete_lattice F S H hH
+  let N := Module.finrank ℤ L + 1
+  obtain ⟨B, _, hB⟩ := hdecay N
+  let d (ξ : Uₛ) : Aₛ := sDiagonal ξ.val
+  let P : Set Uₛ := {ξ | (d ξ).2 ∈ H}
+  let toL (ξ : P) : L := ⟨arch (d ξ.val).1, hmemL ξ.val.val ξ.property⟩
+  have hToL : Injective toL := by
+    intro ξ η h
+    have heq := (arch).injective (congrArg Subtype.val h)
+    obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    exact Subtype.ext (Units.ext (Subtype.ext ((algebraMap F w.Completion).injective
+      (congrFun heq w))))
+  have hs : Summable (P.indicator (fun ξ ↦ ‖arch (d ξ).1‖⁻¹ ^ N)) := by
+    apply summable_subtype_iff_indicator.mp
+    change Summable ((fun z : L ↦ ‖z‖⁻¹ ^ N) ∘ toL)
+    exact (ZLattice.summable_norm_pow_inv L N (Nat.lt_succ_self _)).comp_injective hToL
+  obtain ⟨M, hM⟩ := hK.exists_bound_of_continuousOn
+    (((isEmbedding_thetaArch F).continuous.comp
+      (continuous_fst.comp (Units.continuous_val.comp continuous_inv))).continuousOn :
+      ContinuousOn (fun g : Iₛ ↦ arch (g⁻¹).val.1) K)
+  let R := max M 1
+  have hR : 0 ≤ R := zero_le_one.trans (le_max_right _ _)
+  refine HasSumUniformlyOn.summableUniformlyOn
+    (hasSumUniformlyOn_iff_tendstoUniformlyOn.mpr
+      (tendstoUniformlyOn_tsum (hs.mul_left (B * R ^ N)) ?_))
+  intro ξ g hg
+  rw [Real.norm_of_nonneg (norm_nonneg _)]
+  let y : Aₛ := (unitAtS ξ * g).val
+  have hy : y = d ξ * g.val := rfl
+  have hd : d ξ = y * (g⁻¹).val := by
+    rw [hy, mul_assoc, ← Units.val_mul, mul_inv_cancel, Units.val_one, mul_one]
+  by_cases hξ : ξ ∈ P
+  · rw [Set.indicator_of_mem hξ, inv_pow, ← div_eq_mul_inv]
+    have hpos : 0 < ‖arch (d ξ).1‖ := by
+      apply norm_pos_iff.mpr
+      exact (Units.map ((arch).toMonoidHom.comp (RingHom.fst _ _).toMonoidHom)
+        (unitAtS ξ)).ne_zero
+    apply (le_div_iff₀ (pow_pos hpos _)).mpr
+    have hnorm : ‖arch (d ξ).1‖ ≤ ‖arch y.1‖ * R := by
+      rw [hd, Prod.fst_mul, map_mul]
+      exact (norm_mul_le _ _).trans
+        (mul_le_mul_of_nonneg_left ((hM g hg).trans (le_max_left _ _)) (norm_nonneg _))
+    calc
+      ‖f (Multiplicative.ofAdd y)‖ * ‖arch (d ξ).1‖ ^ N
+          ≤ ‖f (Multiplicative.ofAdd y)‖ * (‖arch y.1‖ * R) ^ N :=
+            mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) hnorm _) (norm_nonneg _)
+      _ = (‖f (Multiplicative.ofAdd y)‖ * ‖arch y.1‖ ^ N) * R ^ N := by
+        rw [mul_pow, mul_assoc]
+      _ ≤ B * R ^ N := mul_le_mul_of_nonneg_right (hB y) (pow_nonneg hR _)
+  · have hyC : y.2 ∉ C := by
+      intro h
+      apply hξ
+      change (d ξ).2 ∈ H
+      rw [hd]
+      exact hTH ⟨(y.2, g), ⟨h, hg⟩, rfl⟩
+    change ‖f (Multiplicative.ofAdd y)‖ ≤
+      (B * R ^ N) * P.indicator (fun ξ ↦ ‖arch (d ξ).1‖⁻¹ ^ N) ξ
+    rw [hsupport y hyC, norm_zero, Set.indicator_of_notMem hξ, mul_zero]
+
+end Summability
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit series converges
 uniformly to its sum on each compact set of S-ideles. -/
