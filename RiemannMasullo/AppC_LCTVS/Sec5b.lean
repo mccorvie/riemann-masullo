@@ -48,7 +48,13 @@ Deviation: This is a sanity check for the three weak definitions. -/
 theorem weakComplexRegularity_iff (f : ℂ → ℂ) (k : ℕ) :
     (WeaklyContinuousOn f Ω ↔ ContinuousOn f Ω) ∧
       (WeaklyContDiffOrderOn k f Ω ↔ ContDiffOn ℝ k f Ω) ∧
-      (WeaklyHolomorphicOn f Ω ↔ DifferentiableOn ℂ f Ω) := by sorry
+      (WeaklyHolomorphicOn f Ω ↔ DifferentiableOn ℂ f Ω) := by
+  refine ⟨⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩,
+    ⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩,
+    ⟨fun h ↦ h (ContinuousLinearMap.id ℂ ℂ), ?_⟩⟩
+  · exact fun hf φ ↦ φ.continuous.comp_continuousOn hf
+  · exact fun hf φ ↦ (φ.restrictScalars ℝ).contDiff.comp_contDiffOn hf
+  · exact fun hf φ ↦ φ.differentiable.comp_differentiableOn hf
 
 variable [ContinuousSMul ℂ E]
 
