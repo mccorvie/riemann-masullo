@@ -448,7 +448,11 @@ the restriction of the full idelic logarithm to diagonal units, in the coordinat
 on the sum-zero hyperplane obtained by omitting the distinguished place. -/
 theorem regulator_eq_infiniteIdeleLog (u : (𝓞 F)ˣ) (v : {w : InfinitePlace F // w ≠ w₀}) :
     Units.logEmbedding F (Additive.ofMul u) v = infiniteIdeleLog F (unitAtInfinity u) v.val := by
-  sorry
+  rw [logEmbedding_component, infiniteIdeleLog]
+  change _ = (v.val.mult : ℝ) * Real.log
+    ‖algebraMap F (InfiniteAdeleRing F) (algebraMap (𝓞 F) F u.val) v.val‖
+  rw [InfiniteAdeleRing.algebraMap_apply, AbsoluteValue.Completion.norm_coe]
+  rfl
 
 /-- Paper: Lemma A.2.3.4(1), p. 548. The regulator image is discrete in the hyperplane. -/
 theorem regulator_discrete : IsDiscrete (Set.range (Units.logEmbedding F)) := by
