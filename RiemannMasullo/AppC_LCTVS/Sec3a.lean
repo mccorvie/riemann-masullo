@@ -2224,7 +2224,8 @@ theorem tendsto_compact_comp_of_pointwise {A Q : H →L[ℂ] H} {Qm : ℕ → H 
 /-- Paper: Lemma C.3.4.4(1), p. 698. Left multiplication by a bounded operator
 preserves nuclearity. -/
 theorem mul_mem_nuclearEndomorphisms_left (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    A * T.val ∈ nuclearEndomorphisms H := by sorry
+    A * T.val ∈ nuclearEndomorphisms H :=
+  isNuclearOperator_postcomp_hilbert T.property A
 
 /-- Paper: Lemma C.3.4.4(1), p. 698. Right multiplication by a bounded operator
 preserves nuclearity. -/
