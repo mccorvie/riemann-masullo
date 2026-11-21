@@ -6,11 +6,13 @@ public import Mathlib.Analysis.SpecialFunctions.Complex.Arg
 public import Mathlib.Geometry.Manifold.Instances.UnitsOfNormedAlgebra
 public import Mathlib.Geometry.Manifold.Submersion
 import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
+import Mathlib.Analysis.InnerProductSpace.Calculus
 import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 import all RiemannMasullo.AppA_AlgebraicNT.Sec1
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -2138,6 +2140,79 @@ theorem ideleFundamentalDomain_finite_translates (K : Set N₁) (hK : IsCompact 
 
 variable (s : ℝ≥0ˣ →* (InfiniteAdeleRing F)ˣ) (hs : Continuous s) (hn : RightInverse s (infiniteIdeleNorm F))
 
+include hs in
+/-- A continuous homomorphism from positive real units has smooth mixed coordinates.
+Each complex completion coordinate is a complex power of the positive parameter. -/
+private theorem infiniteIdeleSection_smooth :
+    ∃ S : ℝ → mixedEmbedding.mixedSpace F, ContDiffOn ℝ ∞ S (Set.Ioi 0) ∧
+      ∀ t : ℝ≥0ˣ, S (t.val : ℝ) = InfiniteAdeleRing.ringEquiv_mixedSpace F (s t).val := by
+  let c (v : InfinitePlace F) : ℝ≥0ˣ →ₜ* ℂ :=
+    { toMonoidHom :=
+        (extensionEmbedding v).toMonoidHom.comp
+          ((Pi.evalRingHom _ v).toMonoidHom.comp ((Units.coeHom _).comp s))
+      continuous_toFun := (isometry_extensionEmbedding v).continuous.comp
+        ((continuous_apply v).comp (Units.continuous_val.comp hs)) }
+  choose a ha using fun v ↦ (existsUnique_complexPower (c v)).exists
+  let p (v : InfinitePlace F) (x : ℝ) := Complex.exp ((Real.log x : ℂ) * a v)
+  have hp (v : InfinitePlace F) : ContDiffOn ℝ ∞ (p v) (Set.Ioi 0) := by
+    have hlog : ContDiffOn ℝ ∞ Real.log (Set.Ioi 0) :=
+      Real.contDiffOn_log.mono fun _ hx ↦ (Set.mem_Ioi.mp hx).ne'
+    exact Complex.contDiff_exp.comp_contDiffOn
+      ((Complex.ofRealCLM.contDiff.comp_contDiffOn hlog).mul contDiffOn_const)
+  have hval (v : InfinitePlace F) (t : ℝ≥0ˣ) : p v (t.val : ℝ) = c v t := by
+    have ht := NNReal.coe_pos.mpr (Units.zero_lt t)
+    rw [ha v t, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr ht.ne'),
+      ← Complex.ofReal_log ht.le]
+  refine ⟨fun x ↦ (fun v ↦ (p v.val x).re, fun v ↦ p v.val x), ?_, ?_⟩
+  · apply ContDiffOn.prodMk
+    · exact contDiffOn_pi.mpr fun v ↦ Complex.reCLM.contDiff.comp_contDiffOn (hp v.val)
+    · exact contDiffOn_pi.mpr fun v ↦ hp v.val
+  · intro t
+    rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    refine Prod.ext (funext fun v ↦ ?_) (funext fun v ↦ ?_)
+    · change (p v.val (t.val : ℝ)).re = extensionEmbeddingOfIsReal v.property ((s t).val v.val)
+      rw [hval]
+      change (extensionEmbedding v.val ((s t).val v.val)).re = _
+      rw [← extensionEmbeddingOfIsReal_apply v.property, Complex.ofReal_re]
+    · exact hval v.val t
+
+/-- The real value of the archimedean idele norm is the norm in mixed coordinates. -/
+private theorem infiniteIdeleNorm_eq_mixedNorm (g : 𝕀∞) :
+    ((infiniteIdeleNorm F g).val : ℝ) =
+      mixedEmbedding.norm (InfiniteAdeleRing.ringEquiv_mixedSpace F g.val) := by
+  simp only [infiniteIdeleNorm, MonoidHom.finsetProd_apply, MonoidHom.pow_apply,
+    Units.coe_prod, NNReal.coe_prod, Units.val_pow_eq_pow_val, NNReal.coe_pow,
+    mixedEmbedding.norm_apply]
+  apply Finset.prod_congr rfl
+  intro v _
+  change ‖g.val v‖ ^ v.mult =
+    mixedEmbedding.normAtPlace v (InfiniteAdeleRing.ringEquiv_mixedSpace F g.val) ^ v.mult
+  congr 1
+  by_cases hv : v.IsReal
+  · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact ((isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) _).symm
+  · rw [mixedEmbedding.normAtPlace_apply_of_isComplex (InfinitePlace.not_isReal_iff_isComplex.mp hv),
+      InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact ((isometry_extensionEmbedding v).norm_map_of_map_zero (map_zero _) _).symm
+
+/-- The mixed norm is smooth on the unit locus, where each local norm is away from zero. -/
+private theorem mixedNorm_smoothOn_units :
+    ContDiffOn ℝ ∞ (fun z : mixedEmbedding.mixedSpace F ↦ mixedEmbedding.norm z) {z | IsUnit z} := by
+  simp only [mixedEmbedding.norm_apply]
+  refine contDiffOn_prod fun v _ ↦ ?_
+  by_cases hv : v.IsReal
+  · simp_rw [mixedEmbedding.normAtPlace_apply_of_isReal hv]
+    have h : ContDiff ℝ ∞ (fun z : mixedEmbedding.mixedSpace F ↦ z.1 ⟨v, hv⟩) :=
+      (contDiff_pi.mp (contDiff_fst (E := ({w : InfinitePlace F // w.IsReal} → ℝ)))) ⟨v, hv⟩
+    exact fun z hz ↦ (h.contDiffAt.norm ℝ
+      ((Prod.isUnit_iff.mp hz).1.apply ⟨v, hv⟩).ne_zero).contDiffWithinAt.pow _
+  · let hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    simp_rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc]
+    have h : ContDiff ℝ ∞ (fun z : mixedEmbedding.mixedSpace F ↦ z.2 ⟨v, hc⟩) :=
+      (contDiff_pi.mp (contDiff_snd (F := ({w : InfinitePlace F // w.IsComplex} → ℂ)))) ⟨v, hc⟩
+    exact fun z hz ↦ (h.contDiffAt.norm ℂ
+      ((Prod.isUnit_iff.mp hz).2.apply ⟨v, hc⟩).ne_zero).contDiffWithinAt.pow _
+
 include hs hn in
 /-- Paper: Lemma A.2.3.11, p. 553. Multiplication by any continuous homomorphic
 section splits the archimedean norm as a Lie group product. In mixed real and complex
@@ -2151,7 +2226,51 @@ theorem infiniteIdeleNormSection_product :
       (∃ f : mixedEmbedding.mixedSpace F → ℝ × mixedEmbedding.mixedSpace F,
         ContDiffOn ℝ ∞ f {z | IsUnit z} ∧ ∀ g : 𝕀∞, f (m g.val) =
           (((e.symm g).1.val : ℝ), m (e.symm g).2.val.val)) := by
-  sorry
+  intro m
+  let n := infiniteIdeleNorm F
+  have hres (g : 𝕀∞) : s ((n g)⁻¹) * g ∈ n.ker := by
+    rw [MonoidHom.mem_ker, map_mul, hn ((n g)⁻¹), inv_mul_cancel]
+  let e : (ℝ≥0ˣ × N∞) ≃ₜ* 𝕀∞ :=
+    { toFun := fun p ↦ s p.1 * p.2.val
+      invFun := fun g ↦ (n g, ⟨s ((n g)⁻¹) * g, hres g⟩)
+      left_inv := by
+        rintro ⟨t, g⟩
+        have ht : n (s t * g.val) = t := by
+          rw [map_mul, hn t, MonoidHom.mem_ker.mp g.property, mul_one]
+        refine Prod.ext ht (Subtype.ext ?_)
+        change s ((n (s t * g.val))⁻¹) * (s t * g.val) = g.val
+        rw [ht, map_inv, inv_mul_cancel_left]
+      right_inv := fun g ↦ by
+        change s (n g) * (s ((n g)⁻¹) * g) = g
+        rw [map_inv, mul_inv_cancel_left]
+      map_mul' := fun p q ↦ by
+        change s (p.1 * q.1) * (p.2.val * q.2.val) = (s p.1 * p.2.val) * (s q.1 * q.2.val)
+        rw [map_mul, mul_mul_mul_comm]
+      continuous_toFun := (hs.comp continuous_fst).mul (continuous_subtype_val.comp continuous_snd)
+      continuous_invFun := (infiniteIdeleNorm_continuous F).prodMk
+        (((hs.comp ((infiniteIdeleNorm_continuous F).inv)).mul continuous_id).subtype_mk hres) }
+  obtain ⟨S, hS, hSval⟩ := infiniteIdeleSection_smooth F s hs
+  refine ⟨e, fun _ _ ↦ rfl, ⟨fun z ↦ S z.1 * z.2, ?_, ?_⟩, ?_⟩
+  · exact (hS.comp contDiffOn_fst (fun _ hz ↦ hz)).mul contDiffOn_snd
+  · intro t g
+    change S (t.val : ℝ) * m g.val.val = m ((s t).val * g.val.val)
+    rw [hSval]
+    exact (map_mul m _ _).symm
+  let N : mixedEmbedding.mixedSpace F → ℝ := mixedEmbedding.norm
+  have hN : ContDiffOn ℝ ∞ N {z | IsUnit z} := mixedNorm_smoothOn_units F
+  have hpos (z : mixedEmbedding.mixedSpace F) (hz : IsUnit z) : 0 < N z :=
+    lt_of_le_of_ne (mixedEmbedding.norm_nonneg z) (hz.map (mixedEmbedding.norm (K := F))).ne_zero.symm
+  refine ⟨fun z ↦ (N z, S (N z)⁻¹ * z), ?_, ?_⟩
+  · exact hN.prodMk ((hS.comp (hN.inv fun z hz ↦ (hpos z hz).ne')
+      (fun z hz ↦ inv_pos.mpr (hpos z hz))).mul contDiffOn_id)
+  · intro g
+    have hNg : N (m g.val) = (n g).val := (infiniteIdeleNorm_eq_mixedNorm F g).symm
+    have hinv : (N (m g.val))⁻¹ = (((n g)⁻¹).val : ℝ) := by
+      rw [hNg, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+    change (N (m g.val), S (N (m g.val))⁻¹ * m g.val) =
+      (((n g).val : ℝ), m ((s ((n g)⁻¹)).val * g.val))
+    rw [hinv, hSval]
+    exact Prod.ext hNg (map_mul m _ _).symm
 
 include hr₁ hr hs hn in
 /-- Paper: Lemma A.2.3.12, p. 553. Multiplication of a principal idele, a section
