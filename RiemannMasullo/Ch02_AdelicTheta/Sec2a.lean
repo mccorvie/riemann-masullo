@@ -39,7 +39,8 @@ theorem euclideanSupNormShell_bounded {N : ℕ} (_hN : 1 ≤ N) {r : ℝ} (_hr :
 Lebesgue measure. -/
 theorem euclideanSupNormShell_lebesgueMeasurable {N : ℕ} (_hN : 1 ≤ N) {r : ℝ}
     (_hr : 1 ≤ r) :
-    NullMeasurableSet (euclideanSupNormShell N r) volume := by sorry
+    NullMeasurableSet (euclideanSupNormShell N r) volume := by
+  exact (measurableSet_Ico.preimage continuous_norm.measurable).nullMeasurableSet
 
 /-- Paper: Lemma 2.2.1.1, p. 75. For large radii, the shell has finitely many
 lattice points and their number is at most a constant times `r ^ (N - 1)`. -/
