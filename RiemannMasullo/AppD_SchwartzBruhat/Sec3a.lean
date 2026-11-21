@@ -5,6 +5,9 @@ import Mathlib.Analysis.Complex.Liouville
 public import Mathlib.Analysis.MellinTransform
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
+import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
+import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 
 /-!
 # Schwartz–Bergman spaces and Schwartz–Bruhat functions with exponential decay
@@ -322,6 +325,16 @@ Deviation: The carrier is in the logarithmic coordinate x = log t. -/
 def logExponentialDecaySubmodule (I : Set ℝ) : Submodule ℂ (ℝ → ℂ) :=
   ⨅ a : I, realSchwartzCoe.range.comap (logExponentialWeight a)
 
+/-- A compactly supported smooth profile has Schwartz decay after every real exponential twist. -/
+theorem mem_logExponentialDecaySubmodule_of_hasCompactSupport (I : Set ℝ) {f : ℝ → ℂ}
+    (hs : HasCompactSupport f) (hf : ContDiff ℝ ∞ f) : f ∈ logExponentialDecaySubmodule I := by
+  apply (Submodule.mem_iInf _).2
+  intro a
+  let w (x : ℝ) : ℂ := Real.exp ((a : ℝ) * x)
+  have hw : ContDiff ℝ ∞ w :=
+    Complex.ofRealCLM.contDiff.comp ((contDiff_const.mul contDiff_id).exp)
+  exact ⟨(hs.mul_left (f := w)).toSchwartzMap (hw.mul hf), rfl⟩
+
 /-- Paper: Definition D.3.2.1, p. 801. The multiplier Tₐ is the weighted
 profile, bundled as a Schwartz map. -/
 theorem logExponentialDecay_weight_mem_range (I : Set ℝ)
@@ -387,9 +400,172 @@ variable (I : Set ℝ)
 local notation "E" => PositiveRealExponentialDecay I
 local notation "D" => StrongDual ℂ E
 
+open scoped BoundedContinuousFunction
+
+/-- Paper: Lemma D.3.2.3(1), p. 802. The image in the product is closed because the
+compatibility equations between weighted profiles are closed pointwise conditions. -/
+private theorem isClosed_range_logExponentialDecayTwist (I : Set ℝ) (a : I) :
+    IsClosed (range (fun (f : PositiveRealExponentialDecay I) (b : I) ↦
+      logExponentialDecayTwist I b f)) := by
+  let w (b : I) (x : ℝ) : ℂ := Real.exp ((b : ℝ) * x)
+  have hw (b : I) (x : ℝ) : w b x ≠ 0 := by
+    dsimp [w]
+    exact_mod_cast (Real.exp_pos ((b : ℝ) * x)).ne'
+  have heval (b : I) (x : ℝ) : Continuous (fun g : I → 𝓢(ℝ, ℂ) ↦ g b x) :=
+    (continuous_eval_const (F := ℝ →ᵇ ℂ) x).comp
+      ((SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ).continuous.comp (continuous_apply b))
+  have hrange : range (fun (f : PositiveRealExponentialDecay I) (b : I) ↦
+      logExponentialDecayTwist I b f) =
+      ⋂ (b : I) (x : ℝ), {g : I → 𝓢(ℝ, ℂ) | w a x * g b x = w b x * g a x} := by
+    ext g
+    simp only [mem_iInter, mem_ofPred_eq, mem_range]
+    constructor
+    · rintro ⟨f, rfl⟩ b x
+      rw [logExponentialDecayTwist_apply I b f x, logExponentialDecayTwist_apply I a f x]
+      exact mul_left_comm _ _ _
+    · intro hg
+      let f (x : ℝ) := g a x / w a x
+      have hmatch (b : I) (x : ℝ) : w b x * f x = g b x := by
+        rw [show w b x * f x = (w b x * g a x) / w a x by simp [f, mul_div_assoc]]
+        exact (div_eq_iff (hw a x)).mpr ((hg b x).symm.trans (mul_comm _ _))
+      have hf : f ∈ logExponentialDecaySubmodule I := by
+        apply (Submodule.mem_iInf _).mpr
+        intro b
+        exact ⟨g b, funext fun x ↦ (hmatch b x).symm⟩
+      refine ⟨⟨f, hf⟩, ?_⟩
+      funext b
+      ext x
+      rw [logExponentialDecayTwist_apply]
+      exact hmatch b x
+  rw [hrange]
+  exact isClosed_iInter fun b ↦ isClosed_iInter fun x ↦
+    isClosed_eq (continuous_const.mul (heval b x)) (continuous_const.mul (heval a x))
+
+/-- Paper: Lemma D.3.2.3(1), p. 802. The closed embedding into the product of complete
+Schwartz spaces gives completeness for the additive uniformity. -/
+private theorem positiveRealExponentialDecay_complete (I : Set ℝ) (hne : I.Nonempty) :
+    CompleteSpace (PositiveRealExponentialDecay I) := by
+  have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
+  let T : PositiveRealExponentialDecay I →ₗ[ℂ] (I → 𝓢(ℝ, ℂ)) :=
+    LinearMap.pi (logExponentialDecayTwist I)
+  have hT : IsUniformInducing T := AddMonoidHom.isUniformInducing_of_isInducing
+    (f := T.toAddMonoidHom) (positiveRealExponentialDecay_isEmbedding I hne).isInducing
+  obtain ⟨a, ha⟩ := hne
+  exact (completeSpace_iff_isComplete_range hT).mpr
+    (isClosed_range_logExponentialDecayTwist I ⟨a, ha⟩).isComplete
+
+/-- A finite sum of Schwartz seminorms controlling the derivatives of an exponential twist
+on the half-line where that exponential is at most one. -/
+private def exponentialTwistBound (t : ℝ) (k n : ℕ) : Seminorm ℂ 𝓢(ℝ, ℂ) :=
+  ∑ i ∈ Finset.range (n + 1),
+    ((n.choose i : ℝ≥0) * ‖t‖₊ ^ i) • SchwartzMap.seminorm ℂ k (n - i)
+
+private theorem exponentialTwistBound_continuous (t : ℝ) (k n : ℕ) :
+    Continuous (exponentialTwistBound t k n) := by
+  apply Seminorm.continuous_finsetSum
+  intro i _
+  exact ((schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm (k, n - i)).const_smul _
+
+/-- Leibniz's formula bounds the weighted derivative wherever the exponential is at most one. -/
+private theorem weighted_deriv_exp_smul_le (t x : ℝ) (hx : t * x ≤ 0) (k n : ℕ) (g : 𝓢(ℝ, ℂ)) :
+    |x| ^ k * ‖iteratedDeriv n ((fun y ↦ Real.exp (t * y)) • ⇑g) x‖ ≤
+      exponentialTwistBound t k n g := by
+  have hexp : ContDiff ℝ n (fun y : ℝ ↦ Real.exp (t * y)) := by fun_prop
+  have hderiv := iteratedDerivWithin_smul (Set.mem_univ x) uniqueDiffOn_univ
+    hexp.contDiffAt.contDiffWithinAt (g.smooth n).contDiffAt.contDiffWithinAt
+  simp only [iteratedDerivWithin_univ, iteratedDeriv_exp_const_mul] at hderiv
+  rw [hderiv]
+  refine (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (pow_nonneg (abs_nonneg x) k)).trans ?_
+  rw [Finset.mul_sum]
+  simp only [exponentialTwistBound, FunLike.coe_sum, Finset.sum_apply, smul_apply, NNReal.smul_def,
+    NNReal.coe_mul, NNReal.coe_natCast, NNReal.coe_pow, coe_nnNorm, smul_eq_mul]
+  apply Finset.sum_le_sum
+  intro i hi
+  rw [RCLike.norm_nsmul (K := ℝ), nsmul_eq_mul, norm_smul, norm_mul,
+    Real.norm_of_nonneg (Real.exp_pos _).le, norm_pow]
+  have h := g.le_seminorm' ℂ k (n - i) x
+  have hcoeff : 0 ≤ (n.choose i : ℝ) * ‖t‖ ^ i := by positivity
+  calc
+    _ = ((n.choose i : ℝ) * ‖t‖ ^ i) * (Real.exp (t * x) *
+        (|x| ^ k * ‖iteratedDeriv (n - i) g x‖)) := by ring
+    _ ≤ _ := by
+      apply mul_le_mul_of_nonneg_left _ hcoeff
+      exact (mul_le_of_le_one_left (by positivity) (Real.exp_le_one_iff.mpr hx)).trans h
+
+/-- Paper: Lemma D.3.2.3(1), p. 802. On each half-line the corresponding endpoint
+controls the Schwartz seminorm of every intermediate twist. -/
+private theorem exponentialTwist_seminorm_le {I : Set ℝ} (a b c : I) (hba : b ≤ a) (hac : a ≤ c)
+    (k n : ℕ) (f : logExponentialDecaySubmodule I) :
+    SchwartzMap.seminorm ℂ k n (logExponentialDecayTwist I a f) ≤
+      exponentialTwistBound (a - b : ℝ) k n (logExponentialDecayTwist I b f) +
+      exponentialTwistBound (a - c : ℝ) k n (logExponentialDecayTwist I c f) := by
+  have changeWeight (d : I) : ⇑(logExponentialDecayTwist I a f) =
+      (fun x ↦ Real.exp (((a : ℝ) - d) * x)) • ⇑(logExponentialDecayTwist I d f) := by
+    funext x
+    change _ = Real.exp (((a : ℝ) - d) * x) • logExponentialDecayTwist I d f x
+    rw [Complex.real_smul, logExponentialDecayTwist_apply,
+      logExponentialDecayTwist_apply, ← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add]
+    congr 3
+    ring
+  apply SchwartzMap.seminorm_le_bound' ℂ k n _ (add_nonneg (apply_nonneg _ _) (apply_nonneg _ _))
+  intro x
+  rcases le_total x 0 with hx | hx
+  · rw [changeWeight b]
+    exact (weighted_deriv_exp_smul_le _ _ (mul_nonpos_of_nonneg_of_nonpos (sub_nonneg.mpr hba) hx)
+      k n _).trans (le_add_of_nonneg_right (apply_nonneg _ _))
+  · rw [changeWeight c]
+    exact (weighted_deriv_exp_smul_le _ _ (mul_nonpos_of_nonpos_of_nonneg (sub_nonpos.mpr hac) hx)
+      k n _).trans (le_add_of_nonneg_left (apply_nonneg _ _))
+
+/-- Paper: Lemma D.3.2.3(1), p. 802. Two countable sequences of exponents bracket
+every exponent of the interval and suffice to generate the topology. -/
+private theorem exponentialDecay_metrizable (I : Set ℝ) (hInt : OrdConnected I) (hne : I.Nonempty) :
+    MetrizableSpace (PositiveRealExponentialDecay I) := by
+  have : Nonempty I := hne.to_subtype
+  obtain ⟨lo, -, hlo⟩ := exists_seq_antitone_tendsto_atTop_atBot I
+  obtain ⟨hi, -, hhi⟩ := exists_seq_monotone_tendsto_atTop_atTop I
+  let d : ℕ ⊕ ℕ → I := Sum.elim lo hi
+  let p (i : I × ℕ × ℕ) :=
+    (SchwartzMap.seminorm ℂ i.2.1 i.2.2).comp (logExponentialDecayTwist I i.1)
+  let q (j : (ℕ ⊕ ℕ) × ℕ × ℕ) := p (d j.1, j.2)
+  let X := WithGeneratingSeminorms (logExponentialDecaySubmodule I) q
+  let Y := PositiveRealExponentialDecay I
+  have hp := withGeneratingSeminorms_spec (logExponentialDecaySubmodule I) p
+  have hq := withGeneratingSeminorms_spec (logExponentialDecaySubmodule I) q
+  let T (a : I) : X →ₗ[ℂ] 𝓢(ℝ, ℂ) := logExponentialDecayTwist I a
+  have hc (j : ℕ ⊕ ℕ) : Continuous (T (d j)) := by
+    apply (schwartz_withSeminorms ℂ ℝ ℂ).continuous_of_continuous_comp
+    intro i
+    exact hq.continuous_seminorm (j, i)
+  let toFull : X →ₗ[ℂ] Y := LinearMap.id
+  have hfull : Continuous toFull := by
+    apply hp.continuous_of_continuous_comp
+    rintro ⟨a, k, n⟩
+    obtain ⟨l, hl⟩ := (hlo.eventually (eventually_le_atBot a)).exists
+    obtain ⟨r, hr⟩ := (hhi.eventually (eventually_ge_atTop a)).exists
+    let B := ((exponentialTwistBound (a - lo l : ℝ) k n).comp (T (lo l))) +
+      ((exponentialTwistBound (a - hi r : ℝ) k n).comp (T (hi r)))
+    have hB : Continuous B :=
+      ((exponentialTwistBound_continuous _ _ _).comp (hc (.inl l))).add
+        ((exponentialTwistBound_continuous _ _ _).comp (hc (.inr r)))
+    exact Seminorm.continuous_of_le hB (fun f ↦ exponentialTwist_seminorm_le a _ _ hl hr k n f)
+  let toCountable : Y →ₗ[ℂ] X := LinearMap.id
+  have hcountable : Continuous toCountable := by
+    apply hq.continuous_of_continuous_comp
+    intro j
+    exact hp.continuous_seminorm (d j.1, j.2)
+  let e : Y ≃ₜ X := ⟨Equiv.refl _, hcountable, hfull⟩
+  have : FirstCountableTopology X := hq.firstCountableTopology
+  have : FirstCountableTopology Y := e.isInducing.firstCountableTopology
+  have : (uniformity Y).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : T2Space Y := (positiveRealExponentialDecay_isEmbedding I hne).t2Space
+  exact UniformSpace.metrizableSpace
+
 /-- Paper: Lemma D.3.2.3(1), p. 801. The positive-real decay space is Fréchet. -/
 theorem positiveRealExponentialDecay_frechet (hInt : OrdConnected I) (hne : I.Nonempty) :
-    IsFrechetTVS E := by sorry
+    IsFrechetTVS E := by
+  exact ⟨inferInstance, inferInstance, exponentialDecay_metrizable I hInt hne,
+    positiveRealExponentialDecay_complete I hne⟩
 
 /-- Paper: Lemma D.3.2.3(1), p. 801. The positive-real decay space is nuclear. -/
 theorem positiveRealExponentialDecay_nuclear (hInt : OrdConnected I) (hne : I.Nonempty) :
@@ -416,7 +592,19 @@ theorem positiveRealExponentialDecay_strongDual_montel (hInt : OrdConnected I) (
 /-- Paper: Lemma D.3.2.3(3), p. 801. If zero lies in I, the zero-weight
 profile is a continuous linear inclusion into the ordinary Schwartz space. -/
 theorem positiveRealExponentialDecay_continuous_inclusion (h0 : 0 ∈ I) :
-    ∃ T : E →L[ℂ] 𝓢(ℝ, ℂ), Injective T ∧ ∀ f x, T f x = f.val x := by sorry
+    ∃ T : E →L[ℂ] 𝓢(ℝ, ℂ), Injective T ∧ ∀ f x, T f x = f.val x := by
+  let a : I := ⟨0, h0⟩
+  have hc := (continuous_apply a).comp (positiveRealExponentialDecay_isEmbedding I ⟨0, h0⟩).continuous
+  let T : E →L[ℂ] 𝓢(ℝ, ℂ) := ⟨logExponentialDecayTwist I a, hc⟩
+  have hT (f : E) (x : ℝ) : T f x = f.val x := by
+    change logExponentialDecayTwist I a f x = _
+    rw [logExponentialDecayTwist_apply I a f x]
+    simp [a]
+  refine ⟨T, ?_, hT⟩
+  intro f g h
+  apply Subtype.ext
+  funext x
+  rw [← hT f x, ← hT g x, h]
 
 -- TODO(prerequisite): Lemma D.3.2.3(4–6) needs the three independently defined
 -- subspaces from §B.2.1.1, Definition B.2.1.1.

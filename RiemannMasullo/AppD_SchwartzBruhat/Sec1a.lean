@@ -14,6 +14,7 @@ import Mathlib.Topology.Algebra.IsUniformGroup.Basic
 import Mathlib.Topology.ContinuousMap.StoneWeierstrass
 import Mathlib.Topology.TietzeExtension
 import Mathlib.Analysis.Calculus.ContDiff.Comp
+import Mathlib.Analysis.Calculus.ContDiff.Operations
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -596,7 +597,30 @@ def elementaryPartial (f : ElementaryLieGroup m n r F → ℂ)
 pullback of the function to the cover. -/
 theorem elementaryPartial_zero (f : ElementaryLieGroup m n r F → ℂ)
     (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
-    elementaryPartial f 0 0 xt a b = f (elementaryCover xt a b) := by sorry
+    elementaryPartial f 0 0 xt a b = f (elementaryCover xt a b) := by
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let directions : List X :=
+    ((List.ofFn (fun _ : Fin m ↦ ([] : List X))).flatten ++
+      (List.ofFn (fun _ : Fin n ↦ ([] : List X))).flatten)
+  have hnil (k : ℕ) : (List.replicate k ([] : List X)).flatten = [] := by
+    induction k with
+    | zero => rfl
+    | succ j ih => rw [List.replicate_succ, List.flatten_cons, ih]; rfl
+  have hdir : directions = [] := by
+    dsimp [directions]
+    rw [List.ofFn_const, List.ofFn_const]
+    rw [hnil m, hnil n]
+    rfl
+  have hlen : directions.length = 0 := by rw [hdir]; rfl
+  simp only [elementaryPartial]
+  change (iteratedFDeriv ℝ directions.length (fun v ↦ f (elementaryCover v a b)) xt)
+      directions.get = f (elementaryCover xt a b)
+  have hiter (k : ℕ) (hk : k = 0) (d : Fin k → X) :
+      (iteratedFDeriv ℝ k (fun v ↦ f (elementaryCover v a b)) xt) d =
+        f (elementaryCover xt a b) := by
+    subst k
+    exact iteratedFDeriv_zero_apply d
+  exact hiter directions.length hlen directions.get
 
 /-- Paper: (D.1.3.4), p. 750. The lifted partials of a smooth fibre are smooth
 and have the same value at any two lifts of a given group point. -/
@@ -665,6 +689,29 @@ theorem elementarySchwartzSubmodule_zero_mem :
   refine ⟨fun _ _ ↦ contDiff_const, fun i ↦ ?_⟩
   simp [elementarySchwartzBound, elementaryPartial]
 
+/-- Each weighted mixed-derivative bound is subadditive on fibrewise smooth functions. -/
+theorem elementarySchwartzBound_add_le {f g : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b)))
+    (hg : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ g (elementaryCover xt a b)))
+    (i : ElementarySchwartzIndex m n r) :
+    elementarySchwartzBound (f + g) i ≤ elementarySchwartzBound f i + elementarySchwartzBound g i := by
+  refine iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  have hpartial : elementaryPartial (f + g) i.2.1 i.2.2.1 xt a b =
+      elementaryPartial f i.2.1 i.2.2.1 xt a b + elementaryPartial g i.2.1 i.2.2.1 xt a b := by
+    have hadd (n : ℕ) :
+        iteratedFDeriv ℝ n (fun v ↦ (f + g) (elementaryCover v a b)) xt =
+          iteratedFDeriv ℝ n (fun v ↦ f (elementaryCover v a b)) xt +
+          iteratedFDeriv ℝ n (fun v ↦ g (elementaryCover v a b)) xt :=
+      iteratedFDeriv_add_apply ((hf a b).of_le (by simp)).contDiffAt
+        ((hg a b).of_le (by simp)).contDiffAt
+    dsimp only [elementaryPartial]
+    rw [hadd]
+    rfl
+  rw [hpartial, mul_add]
+  refine le_trans (ENNReal.coe_le_coe.mpr (nnNorm_add_le _ _)) ?_
+  rw [ENNReal.coe_add]
+  apply add_le_add <;> exact le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl))
+
 /-- Paper: Definition D.1.3.1, p. 750. The Schwartz condition is closed under addition. -/
 theorem elementarySchwartzSubmodule_add_mem {f g : ElementaryLieGroup m n r F → ℂ}
     (hf : (∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b))) ∧
@@ -672,7 +719,32 @@ theorem elementarySchwartzSubmodule_add_mem {f g : ElementaryLieGroup m n r F �
     (hg : (∀ a b, ContDiff ℝ ∞ (fun xt ↦ g (elementaryCover xt a b))) ∧
       ∀ i, elementarySchwartzBound g i < (⊤ : ℝ≥0∞)) :
     f + g ∈ {h | (∀ a b, ContDiff ℝ ∞ (fun xt ↦ h (elementaryCover xt a b))) ∧
-      ∀ i, elementarySchwartzBound h i < (⊤ : ℝ≥0∞)} := by sorry
+      ∀ i, elementarySchwartzBound h i < (⊤ : ℝ≥0∞)} := by
+  refine ⟨fun a b ↦ (hf.1 a b).add (hg.1 a b), fun i ↦ ?_⟩
+  exact (elementarySchwartzBound_add_le hf.1 hg.1 i).trans_lt (ENNReal.add_lt_top.2 ⟨hf.2 i, hg.2 i⟩)
+
+/-- Complex scalar multiplication scales each weighted mixed-derivative bound by its norm. -/
+theorem elementarySchwartzBound_smul (c : ℂ) {f : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b)))
+    (i : ElementarySchwartzIndex m n r) :
+    elementarySchwartzBound (c • f) i = (‖c‖₊ : ℝ≥0∞) * elementarySchwartzBound f i := by
+  simp only [elementarySchwartzBound, ENNReal.mul_iSup]
+  apply iSup_congr
+  intro xt
+  apply iSup_congr
+  intro a
+  apply iSup_congr
+  intro b
+  have hpartial : elementaryPartial (c • f) i.2.1 i.2.2.1 xt a b =
+      c • elementaryPartial f i.2.1 i.2.2.1 xt a b := by
+    have hsmul (n : ℕ) :
+        iteratedFDeriv ℝ n (fun v ↦ (c • f) (elementaryCover v a b)) xt =
+          c • iteratedFDeriv ℝ n (fun v ↦ f (elementaryCover v a b)) xt :=
+      iteratedFDeriv_const_smul_apply ((hf a b).of_le (by simp)).contDiffAt
+    dsimp only [elementaryPartial]
+    rw [hsmul]
+    rfl
+  rw [hpartial, smul_eq_mul, mul_left_comm, nnNorm_mul, ENNReal.coe_mul]
 
 /-- Paper: Definition D.1.3.1, p. 750. The Schwartz condition is closed under
 complex scalar multiplication. -/
@@ -680,7 +752,10 @@ theorem elementarySchwartzSubmodule_smul_mem (c : ℂ) {f : ElementaryLieGroup m
     (hf : (∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b))) ∧
       ∀ i, elementarySchwartzBound f i < (⊤ : ℝ≥0∞)) :
     c • f ∈ {h | (∀ a b, ContDiff ℝ ∞ (fun xt ↦ h (elementaryCover xt a b))) ∧
-      ∀ i, elementarySchwartzBound h i < (⊤ : ℝ≥0∞)} := by sorry
+      ∀ i, elementarySchwartzBound h i < (⊤ : ℝ≥0∞)} := by
+  refine ⟨fun a b ↦ (hf.1 a b).const_smul c, fun i ↦ ?_⟩
+  rw [elementarySchwartzBound_smul c hf.1 i]
+  exact ENNReal.mul_lt_top ENNReal.coe_lt_top (hf.2 i)
 
 /-- Paper: Definition D.1.3.1, p. 750. A Schwartz function is smooth in the real
 and torus variables on each discrete fibre and has finite bounds for all four multi-indices. -/
@@ -878,7 +953,8 @@ theorem mem_rapidDecaySequenceSubmodule_of_finiteSupport (s : (Fin r → ℤ) �
 
 /-- Paper: (D.1.3.17), p. 752. Each weighted absolute sum vanishes on the zero sequence. -/
 theorem rapidDecaySequenceSeminorm_map_zero (j : ℕ) :
-    (rapidDecaySequenceBound j (0 : rapidDecaySequenceSubmodule r).val).toReal = 0 := by sorry
+    (rapidDecaySequenceBound j (0 : rapidDecaySequenceSubmodule r).val).toReal = 0 := by
+  simp [rapidDecaySequenceBound]
 
 /-- Paper: (D.1.3.17), p. 752. Each real-valued weighted absolute sum is subadditive
 on rapidly decreasing lattice sequences. -/

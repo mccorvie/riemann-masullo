@@ -11,6 +11,11 @@ newfiles=$(git diff --diff-filter=A --name-only "$base...$sha")
 # Added lines that make a pull request worth reading before it is merged.
 # Importing Mathlib or this library, and silencing a linter, are routine and are not flagged.
 eyes='^\+[[:space:]]*(#|@\[|open Lean|attribute|macro|syntax|notation|elab|initialize|unsafe|instance|def |abbrev |structure|class |inductive|axiom|opaque|noncomputable)|run_|by_elab|simproc|Lean\.|Elab|Meta\.|IO\.|extern|implemented_by|native'
+# Commands that change what later declarations mean or that run code, wherever they stand on the
+# line and whatever modifiers precede them: a `variable [Fact False]` makes everything after it
+# vacuous, `private def` and `local notation` hide behind their modifier, a second command can
+# follow a proof on the same line, and `admit` is `sorry` under another name.
+eyes="$eyes"'|^\+[[:space:]]*((private|protected|local|scoped|public|noncomputable|nonrec)[[:space:]]+)+(def|abbrev|instance|structure|class|inductive|notation|macro|syntax|elab|infix|infixl|infixr|prefix|postfix)\b|\b(variable|universe|admit|initialize|macro|macro_rules|syntax|elab|elab_rules|notation|axiom|opaque|unsafe|mutual|export|namespace)\b'
 routine='^\+[[:space:]]*((public )?import (Mathlib|RiemannMasullo)\.[A-Za-z0-9_.]+[[:space:]]*$|set_option linter\.[A-Za-z0-9_.]+ (true|false) in[[:space:]]*$)'
 # Flag citations and new public declarations for a reader to distinguish a proved lemma
 # from a paper definition or an admitted paper theorem.

@@ -282,7 +282,12 @@ $baddefs
   if [ -s .agent/PR.md ]; then title=$(head -n 1 .agent/PR.md | sed 's/^#* *//'); body=$(tail -n +2 .agent/PR.md); fi
   [ "$role" = prover ] && link="Closes #$n" || link="Part of #$n"
   git commit -q -m "$title" -m "$link"
-  git push -q --force -u origin "$branch"
+  # GitHub now and then rejects a push for no reason of ours ("remote rejected ... (failed)").
+  for attempt in 1 2 3; do
+    git push -q --force -u origin "$branch" && break
+    [ "$attempt" = 3 ] && exit 1
+    sleep $((20 * attempt))
+  done
   if [ -n "$(pr_number)" ]; then
     echo "updated $(gh pr view "$(pr_number)" --json url --jq .url)"
   else

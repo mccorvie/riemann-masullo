@@ -1,6 +1,8 @@
 module
 
-public import Mathlib.Topology.UniformSpace.CompactConvergence
+public import Mathlib.Topology.ContinuousMap.Algebra
+import Mathlib.Topology.Algebra.IsUniformGroup.Constructions
+import Mathlib.Topology.Algebra.UniformConvergence
 import Mathlib.Topology.UniformSpace.CompleteSeparated
 import Mathlib.Topology.UniformSpace.Completion
 
@@ -13,6 +15,17 @@ public section
 open Set Topology UniformSpace
 
 namespace RiemannMasullo
+
+/-- The uniform structure of compact convergence makes the continuous maps into a
+uniform additive group whenever their target is one. -/
+theorem isUniformAddGroup_continuousMap (X E : Type*) [TopologicalSpace X]
+    [AddGroup E] [UniformSpace E] [IsUniformAddGroup E] : IsUniformAddGroup C(X, E) := by
+  let includeMap : C(X, E) →+ UniformOnFun X E {K | IsCompact K} :=
+    { toFun := ContinuousMap.toUniformOnFunIsCompact
+      map_zero' := rfl
+      map_add' := fun _ _ ↦ rfl }
+  exact IsUniformInducing.isUniformAddGroup includeMap
+    ContinuousMap.isUniformEmbedding_toUniformOnFunIsCompact.isUniformInducing
 
 /-- A closed set of continuous maps is complete for compact convergence if the closure
 of its image under evaluation at each point is complete. -/

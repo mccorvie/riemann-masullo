@@ -239,7 +239,29 @@ partial is the original function.
 Deviation: Sanity check on the weight and derivative. -/
 theorem euclideanSchwartzMonomialPartial_zero {m : ℕ}
     (f : 𝓢(EuclideanSpace ℝ (Fin m), ℂ)) (x : EuclideanSpace ℝ (Fin m)) :
-    euclideanSchwartzMonomialPartial 0 0 f x = f x := by sorry
+    euclideanSchwartzMonomialPartial 0 0 f x = f x := by
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin 0)
+  let directions : List X :=
+    ((List.ofFn (fun _ : Fin m ↦ ([] : List X))).flatten ++
+      (List.ofFn (fun _ : Fin 0 ↦ ([] : List X))).flatten)
+  have hnil (k : ℕ) : (List.replicate k ([] : List X)).flatten = [] := by
+    induction k with
+    | zero => rfl
+    | succ j ih => rw [List.replicate_succ, List.flatten_cons, ih]; rfl
+  have hdir : directions = [] := by
+    dsimp [directions]
+    rw [List.ofFn_const, List.ofFn_const]
+    rw [hnil m, hnil 0]
+    rfl
+  have hlen : directions.length = 0 := by rw [hdir]; rfl
+  simp [euclideanSchwartzMonomialPartial, elementaryPartial]
+  change (iteratedFDeriv ℝ directions.length
+        (fun v ↦ f ((elementaryCover v ![] PUnit.unit).1)) (x, 0)) directions.get = f x
+  have hiter (k : ℕ) (hk : k = 0) (d : Fin k → X) :
+      (iteratedFDeriv ℝ k (fun v ↦ f ((elementaryCover v ![] PUnit.unit).1)) (x, 0)) d = f x := by
+    subst k
+    simp [elementaryCover]
+  exact hiter directions.length hlen directions.get
 
 /-- Paper: Example D.1.10.3, p. 785. Supremum norms of the monomial-weighted
 Euclidean partials generate the usual Schwartz topology. -/
@@ -293,7 +315,8 @@ def latticeSchwartzMonomial {r : ℕ} (γ : Fin r → ℕ)
 /-- Paper: (D.1.10.12), p. 786. The zero weight leaves the sequence unchanged.
 Deviation: Sanity check on the weight. -/
 theorem latticeSchwartzMonomial_zero {r : ℕ} (f : RapidDecaySequence r) (a : Fin r → ℤ) :
-    latticeSchwartzMonomial 0 f a = f a := by sorry
+    latticeSchwartzMonomial 0 f a = f a := by
+  simp [latticeSchwartzMonomial]
 
 /-- Paper: Example D.1.10.5, p. 786. The weighted sup norms generate the
 rapidly decreasing sequence topology on the integer lattice. -/

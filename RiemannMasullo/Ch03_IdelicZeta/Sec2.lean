@@ -8,6 +8,7 @@ public import Mathlib.Analysis.SpecialFunctions.Gamma.Deligne
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.DedekindZeta
 
 import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.NumberTheory.LSeries.Convergence
@@ -118,7 +119,16 @@ theorem realHeckeCharacter_parameters (χ : U[F]) (v : InfinitePlace F) (hv : v.
     ∃! a : ℂ × Fin 2, a.1.re = 0 ∧ ∀ x : ℝˣ,
       infinitePlaceRestriction F v χ₀(χ)
           (Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm.toMonoidHom x) =
-        (‖(x : ℝ)‖ : ℂ) ^ a.1 * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ a.2.val := by sorry
+        (‖(x : ℝ)‖ : ℂ) ^ a.1 * (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ a.2.val := by
+  let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm
+  let i : ℝˣ →ₜ* v.Completionˣ := ⟨Units.map e.toMonoidHom,
+    (InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.continuous.units_map _⟩
+  let c := (infinitePlaceRestriction F v χ₀(χ)).comp i
+  apply existsUnique_realUnits_character_parameters c
+  intro x
+  let g := IdeleClassGroup.ofCompletion (𝓞 F) F v (i x)
+  change ‖(χ g : ℂ) * (classNormℝ g : ℂ) ^ (0 : ℂ)‖ = 1
+  simp
 
 /-- Paper: Equation (3.2.1.5), p. 123. A complex local unitary character has a
 unique imaginary radial exponent and integer angular weight.
@@ -128,7 +138,16 @@ theorem complexHeckeCharacter_parameters (χ : U[F]) (v : InfinitePlace F)
     ∃! a : ℂ × ℤ, a.1.re = 0 ∧ ∀ x : ℂˣ,
       infinitePlaceRestriction F v χ₀(χ)
           (Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hv).symm.toMonoidHom x) =
-        ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ a.1 * ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ a.2 := by sorry
+        ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ a.1 * ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ a.2 := by
+  let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hv).symm
+  let i : ℂˣ →ₜ* v.Completionˣ := ⟨Units.map e.toMonoidHom,
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).symm.continuous.units_map _⟩
+  let c := (infinitePlaceRestriction F v χ₀(χ)).comp i
+  apply existsUnique_complexUnits_character_parameters c
+  intro x
+  let g := IdeleClassGroup.ofCompletion (𝓞 F) F v (i x)
+  change ‖(χ g : ℂ) * (classNormℝ g : ℂ) ^ (0 : ℂ)‖ = 1
+  simp
 
 /-- Paper: Equations (3.2.1.3)–(3.2.1.5), p. 123. The global gamma factor
 multiplies the real and complex local gamma factors, using the local radial
@@ -364,8 +383,14 @@ theorem finiteHeckeL_hasProd (χ : U[F]) (s : halfPlane) :
 /-- Paper: Definition 3.2.1.4, pp. 123–124. The finite Euler product
 converges uniformly on each compact subset of the half-plane. -/
 theorem finiteHeckeL_hasProdUniformlyOn (χ : U[F]) (K : Set halfPlane) (hK : IsCompact K) :
-    HasProdUniformlyOn (fun v (s : halfPlane) ↦ finiteHeckeEulerFactor χ v s) (finiteHeckeL χ) K :=
-  by sorry
+    HasProdUniformlyOn (fun v (s : halfPlane) ↦ finiteHeckeEulerFactor χ v s) (finiteHeckeL χ) K := by
+  apply hasProdUniformlyOn_iff_tendstoUniformlyOn.mpr
+  rcases K.eq_empty_or_nonempty with rfl | hne
+  · exact tendstoUniformlyOn_empty
+  · obtain ⟨s₀, _, hmin⟩ := hK.exists_isMinOn hne
+      (Complex.continuous_re.comp continuous_subtype_val).continuousOn
+    have h := finiteHeckeEulerProduct_tendstoUniformlyOn_halfPlane χ (a := s₀.val.re) s₀.property
+    exact (h.comp (fun s : halfPlane ↦ s.val)).mono fun s hs ↦ hmin hs
 
 /-- Paper: Definition 3.2.1.4, p. 124. The finite Hecke L-function admits
 a meromorphic continuation to the complex plane. -/
@@ -423,7 +448,8 @@ def ideleNormBand (F : Type*) [Field F] [NumberField F] (a b : ℝ) : Set 𝕀[F
 /-- Paper: §3.2.2, p. 124. The identity lies in a closed norm band precisely
 when the band contains one. -/
 theorem one_mem_ideleNormBand (a b : ℝ) :
-    (1 : 𝕀[F]) ∈ ideleNormBand F a b ↔ a ≤ 1 ∧ 1 ≤ b := by sorry
+    (1 : 𝕀[F]) ∈ ideleNormBand F a b ↔ a ≤ 1 ∧ 1 ≤ b := by
+  simp [ideleNormBand]
 
 /-- Paper: §3.2.2, p. 124. The surjective idele class norm takes values
 other than one, so its abscissa is defined. -/

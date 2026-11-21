@@ -3,7 +3,9 @@ module
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
+import Mathlib.Analysis.InnerProductSpace.ProdL2
 import Mathlib.Analysis.PSeries
+import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 
 /-!
 # Periodization and Schauder bases on the positive real axis
@@ -69,11 +71,64 @@ theorem cyclicPeriodizationValue_hasSum (f : 𝓢(ℝ, ℂ)) (x : ℝ) :
       ring
     _ = ∑' k : ℤ, a k := (Equiv.subRight ⌊x / L⌋).tsum_eq a
 
+/-- A smooth periodic lift gives an elementary Schwartz function on the circle. -/
+private theorem mem_elementarySchwartz_circle_of_contDiff {h : T → ℂ}
+    (hs : ContDiff ℝ ∞ (fun x : ℝ ↦ h (x : T))) :
+    (fun g : G ↦ h (g.2.1 0)) ∈ elementarySchwartzSubmodule 0 1 0 PUnit.{1} := by
+  let X := EuclideanSpace ℝ (Fin 0) × EuclideanSpace ℝ (Fin 1)
+  let φ : G → ℂ := fun g ↦ h (g.2.1 0)
+  let L : X →L[ℝ] ℝ := (EuclideanSpace.proj 0).comp (ContinuousLinearMap.snd ℝ _ _)
+  have hφ (a : Fin 0 → ℤ) (b : PUnit) :
+      ContDiff ℝ ∞ (fun xt ↦ φ (elementaryCover xt a b)) := hs.comp L.contDiff
+  refine ⟨hφ, fun i ↦ ?_⟩
+  let s (x : ℝ) : X := (0, x • EuclideanSpace.single 0 1)
+  have hsc : Continuous s := continuous_const.prodMk (continuous_id.smul continuous_const)
+  let D := elementaryPartial φ i.2.1 i.2.2.1
+  have hD := elementaryPartial_descends φ i.2.1 i.2.2.1 0 PUnit.unit (hφ 0 PUnit.unit)
+  obtain ⟨C, hC⟩ := (isCompact_Icc (a := (0 : ℝ)) (b := 1)).exists_bound_of_continuousOn
+    (hD.1.continuous.comp hsc).continuousOn
+  apply lt_of_le_of_lt (b := ENNReal.ofReal C) _ ENNReal.ofReal_lt_top
+  refine iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  have ha : a = 0 := Subsingleton.elim _ _
+  have hb : b = PUnit.unit := Subsingleton.elim _ _
+  subst a b
+  let r := (AddCircle.equivIco (1 : ℝ) 0) (xt.2 0 : T)
+  have hr : (r : ℝ) ∈ Icc 0 1 := Ico_subset_Icc_self (by simpa using r.property)
+  have he : elementaryCover (s r) (0 : Fin 0 → ℤ) PUnit.unit =
+      elementaryCover xt 0 PUnit.unit := by
+    refine Prod.ext (Subsingleton.elim _ _) (Prod.ext ?_ rfl)
+    funext j
+    have hj : j = 0 := Subsingleton.elim _ _
+    subst j
+    change (↑((r.val • EuclideanSpace.single (0 : Fin 1) (1 : ℝ)) 0) : T) = _
+    trans (r.val : T)
+    · simp [PiLp.smul_apply]
+    · exact AddCircle.coe_equivIco
+  have hbound : ‖D xt 0 PUnit.unit‖ ≤ C := by
+    dsimp only [D]
+    rw [← hD.2 (s r) xt he]
+    exact hC r hr
+  simp only [Fin.prod_univ_zero, one_mul, ENNReal.coe_nnreal_eq, coe_nnNorm]
+  exact ENNReal.ofReal_le_ofReal hbound
+
 /-- Paper: Lemma 4.2.1.5(1), p. 165. The orbit sum gives a smooth function
 on the circle.
 Deviation: Smoothness also holds on the ordinary Schwartz source. -/
 theorem cyclicPeriodizationValue_mem (f : 𝓢(ℝ, ℂ)) :
-    cyclicPeriodizationValue γ hγ f ∈ elementarySchwartzSubmodule 0 1 0 PUnit.{1} := by sorry
+    cyclicPeriodizationValue γ hγ f ∈ elementarySchwartzSubmodule 0 1 0 PUnit.{1} := by
+  let h (z : T) := cyclicPeriodizationValue γ hγ f (point z)
+  change (fun g : G ↦ h (g.2.1 0)) ∈ _
+  apply mem_elementarySchwartz_circle_of_contDiff
+  let L := Real.log γ
+  have hL : L ≠ 0 := (Real.log_pos hγ).ne'
+  let e := ContinuousLinearEquiv.unitsEquivAut ℝ (Units.mk0 L hL)
+  let F := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ e f
+  have he : (fun x : ℝ ↦ h (x : T)) = fun x : ℝ ↦ ∑' n : ℤ, F (x + n) := by
+    funext x
+    simpa [h, F, e, L, hL, (Real.log_pos hγ).ne', add_mul] using
+      (cyclicPeriodizationValue_hasSum γ hγ f (x * L)).tsum_eq.symm
+  rw [he]
+  exact schwartz_contDiff_periodization F
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. The orbit sum is linear and continuous
 in the Schwartz profile.
@@ -230,7 +285,19 @@ theorem quotientDual_strongEmbedding_of_nuclear (M : Submodule ℂ X) (hM : IsCl
 embeds the strong dual, with image the annihilator of the closed subspace. -/
 theorem quotientDual_strongEmbedding_of_hilbert {H : Type*} [NormedAddCommGroup H]
     [InnerProductSpace ℂ H] [CompleteSpace H] (M : Submodule ℂ H) (hM : IsClosed (M : Set H)) :
-    IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by sorry
+    IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by
+  have : CompleteSpace M := hM.completeSpace_coe
+  let s : (H ⧸ M) →L[ℂ] H :=
+    Mᗮ.subtypeL.comp M.quotientEquivOrthogonal.toLinearIsometry.toContinuousLinearMap
+  let r := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ s
+  apply Topology.IsEmbedding.of_leftInverse (f := r) _ r.continuous
+    (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL).continuous
+  intro φ
+  ext x
+  change φ (M.mkQ ((M.quotientEquivOrthogonal x : Mᗮ) : H)) = φ x
+  congr 1
+  exact (M.quotientEquivOrthogonal_symm_eq_mk _ (M.quotientEquivOrthogonal x).property).symm.trans
+    (M.quotientEquivOrthogonal.symm_apply_apply x)
 
 /-- Paper: Remark 4.2.1.4, p. 164. In a totally reflexive Fréchet space, a
 strong embedding of the quotient adjoint implies bounded lifting for the quotient. -/
@@ -361,7 +428,8 @@ local notation "symmInterval[" a ", " b "]" =>
 /-- Paper: §4.2.2, p. 170. A smooth logarithmic profile supported in a fixed
 compact set satisfies all exponential Schwartz weights. -/
 theorem compactLogProfile_mem (K : Compacts ℝ) (f : D[K]) :
-    (f : ℝ → ℂ) ∈ logExponentialDecaySubmodule univ := by sorry
+    (f : ℝ → ℂ) ∈ logExponentialDecaySubmodule univ := by
+  exact mem_logExponentialDecaySubmodule_of_hasCompactSupport univ f.hasCompactSupport f.contDiff
 
 /-- Paper: §4.2.2, p. 170. Including profiles supported in a fixed compact set
 into the exponential decay space is continuous for the uniform derivative topology. -/
@@ -411,7 +479,25 @@ Deviation: The interval and quotient map are in logarithmic coordinates. -/
 theorem cyclicQuotient_surjOn_interval (a b : ℝ) (ha : 1 < a) (hb : 0 < b)
     (hwide : Real.log γ < 2 * Real.log a) :
     SurjOn (fun x : ℝ ↦ ((x / Real.log γ : ℝ) : T))
-      (symmInterval[a, b] : Set ℝ) univ := by sorry
+      (symmInterval[a, b] : Set ℝ) univ := by
+  intro z _
+  let L := Real.log γ
+  let A := Real.log (b / a)
+  have hL : 0 < L := Real.log_pos hγ
+  have hA : A = Real.log b - Real.log a := Real.log_div hb.ne' (lt_trans zero_lt_one ha).ne'
+  let r := (AddCircle.equivIco (1 : ℝ) (A / L)) z
+  have hr : (r : ℝ) ∈ Ico (A / L) (A / L + 1) := r.property
+  refine ⟨(r : ℝ) * L, ⟨?_, ?_⟩, ?_⟩
+  · rw [← hA]
+    exact (div_le_iff₀ hL).mp hr.1
+  · have hu := mul_lt_mul_of_pos_right hr.2 hL
+    rw [add_mul, div_mul_cancel₀ _ hL.ne', one_mul] at hu
+    change _ ≤ Real.log b + Real.log a
+    dsimp only [L] at hu
+    linarith [hA]
+  · change ((↑((r : ℝ) * L / L) : T)) = z
+    rw [mul_div_cancel_right₀ _ hL.ne']
+    exact AddCircle.coe_equivIco
 
 /-- Paper: Proposition 4.2.2.2(1), p. 171. Periodization gives a continuous
 linear isomorphism from the fixed-support interval quotient to the smooth circle space.

@@ -759,7 +759,10 @@ def rationalAdeleEmbedding : 𝔸[ℚ] →+* 𝔸[F] :=
 /-- Paper: Lemma A.2.2.2, p. 546. The scalar embedding on adeles extends the
 diagonal rational embedding and respects the places below each component. -/
 theorem rationalAdeleEmbedding_spec : IsAdeleExtension ℚ (algebraMap ℚ F) (rationalAdeleEmbedding F) := by
-  sorry
+  unfold rationalAdeleEmbedding
+  split
+  rename_i extensions
+  exact (extensions F (algebraMap ℚ F)).1.exists.choose_spec
 
 /-- Paper: Lemma A.2.2.2, p. 546. The relative idelic norm to the rationals is
 the determinant of multiplication on the adele algebra, restricted to units. -/

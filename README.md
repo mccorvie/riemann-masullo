@@ -98,9 +98,9 @@ trace formula:
 | Wave | Paper | Status |
 |---|---|---|
 | 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | in progress: [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+label%3Asection), [proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
-| 2 | Chapters 5–7, with Appendix B.1–B.3 and B.6 | not yet seeded |
-| 3 | Chapters 10–12: the trace formula, with Appendix B.4 | not yet seeded |
-| later | Chapters 8 and 14, Appendix E, A.4, B.5, B.7 | only when something needs them |
+| 2 | Chapters 5–7, with Appendix B.1–B.6 | in progress: Appendix B.1–B.3 stated; the rest seeded as section issues |
+| 3 | Chapters 10–12: the trace formula | not yet seeded |
+| later | Chapters 8 and 14, Appendix E, A.4, B.7 | only when something needs them |
 
 An issue labelled `blocked` is waiting for the sections it builds on. The appendices are mostly
 standard mathematics, and several pieces already exist in other Lean projects (see

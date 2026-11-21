@@ -5,6 +5,9 @@ public import Mathlib.Analysis.Complex.Circle
 public import Mathlib.Analysis.SpecialFunctions.Complex.Arg
 public import Mathlib.Geometry.Manifold.Instances.UnitsOfNormedAlgebra
 public import Mathlib.Geometry.Manifold.Submersion
+import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
+import all Mathlib.Geometry.Manifold.Submersion
+import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.Topology.Algebra.Group.Units
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
@@ -119,7 +122,12 @@ theorem infiniteIdeleLog_mul (g h : 𝕀∞) :
 
 /-- Paper: Lemma A.2.3.2(1), p. 548. The full logarithm is continuous. -/
 theorem infiniteIdeleLog_continuous : Continuous (infiniteIdeleLog F) := by
-  sorry
+  apply continuous_pi
+  intro v
+  have hne (g : 𝕀∞) : g.val v ≠ 0 :=
+    (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
+  exact continuous_const.mul (((continuous_apply v).comp Units.continuous_val).norm.log
+    (fun g ↦ norm_ne_zero_iff.mpr (hne g)))
 
 /-- Paper: Lemma A.2.3.2(1), p. 548. The coordinates of the logarithm of a norm-one
 idele sum to zero, the defining equation of the logarithmic hyperplane. -/
@@ -136,12 +144,159 @@ theorem infiniteIdeleLog_sum_zero (g : N∞) : ∑ v, infiniteIdeleLog F g.val v
 
 local notation "mixedUnits" => Units.mapEquiv (RingEquiv.toMulEquiv (InfiniteAdeleRing.ringEquiv_mixedSpace F))
 
+section Submersion
+
+local notation "E" => mixedEmbedding.mixedSpace F
+local notation "V" => InfinitePlace F → ℝ
+local notation "C" => {w : InfinitePlace F // InfinitePlace.IsComplex w} → ℝ
+
+omit [NumberField F] in
+/-- The local absolute value of an idele agrees with the norm in mixed coordinates. -/
+private theorem infiniteIdeleLog_eq_mixed (g : Eˣ) (v : InfinitePlace F) :
+    infiniteIdeleLog F ((mixedUnits).symm g) v =
+      v.mult * Real.log (mixedEmbedding.normAtPlace v g.val) := by
+  let a := (mixedUnits).symm g
+  have ha : InfiniteAdeleRing.ringEquiv_mixedSpace F a.val = g.val :=
+    congrArg Units.val ((mixedUnits).apply_symm_apply g)
+  rw [← ha]
+  unfold infiniteIdeleLog
+  congr 2
+  by_cases hv : v.IsReal
+  · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv]
+    exact ((isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) (a.val v)).symm
+  · have hv' := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    rw [mixedEmbedding.normAtPlace_apply_of_isComplex hv']
+    exact ((isometry_extensionEmbedding v).norm_map_of_map_zero (map_zero _) (a.val v)).symm
+
 /-- Paper: Lemma A.2.3.2(2), p. 548. In the real and complex completion coordinates the
 full logarithm is a smooth submersion of real manifolds. -/
 theorem infiniteIdeleLog_submersion :
     Manifold.IsSubmersion 𝓘(ℝ, mixedEmbedding.mixedSpace F) 𝓘(ℝ, InfinitePlace F → ℝ) ∞
       (fun g : (mixedEmbedding.mixedSpace F)ˣ ↦ infiniteIdeleLog F ((mixedUnits).symm g)) := by
-  sorry
+  let f : Eˣ → V := fun g ↦ infiniteIdeleLog F ((mixedUnits).symm g)
+  -- Split the real and imaginary coordinates, weighting only the log coordinates.
+  let h := (mixedEmbedding.mixedSpaceToRealMixedSpace F).trans
+    (mixedEmbedding.homeoRealMixedSpacePolarSpace F)
+  have hfst (z : E) (v : InfinitePlace F) :
+      (h z).1 v = if hv : v.IsReal then z.1 ⟨v, hv⟩
+        else (z.2 ⟨v, InfinitePlace.not_isReal_iff_isComplex.mp hv⟩).re := by
+    rw [show h z = mixedEmbedding.homeoRealMixedSpacePolarSpace F
+      (mixedEmbedding.mixedSpaceToRealMixedSpace F z) from rfl,
+      mixedEmbedding.homeoRealMixedSpacePolarSpace_apply]
+    rfl
+  have hsnd (z : E) (v : {w : InfinitePlace F // w.IsComplex}) : (h z).2 v = (z.2 v).im := by
+    rfl
+  let e₀ : E ≃ₗ[ℝ] V × C :=
+    { h.toEquiv with
+      map_add' := by
+        intro z w
+        apply Prod.ext <;> funext v
+        · change (h (z + w)).1 v = (h z).1 v + (h w).1 v
+          simp only [hfst]
+          split_ifs <;> simp
+        · change (h (z + w)).2 v = (h z).2 v + (h w).2 v
+          simp [hsnd]
+      map_smul' := by
+        intro r z
+        apply Prod.ext <;> funext v
+        · change (h (r • z)).1 v = r * (h z).1 v
+          simp only [hfst]
+          split_ifs <;> simp
+        · change (h (r • z)).2 v = r * (h z).2 v
+          simp [hsnd] }
+  let multEquiv : V ≃L[ℝ] V :=
+    ContinuousLinearEquiv.piCongrRight fun v ↦
+      ContinuousLinearEquiv.unitsEquivAut ℝ (Units.mk0 (v.mult : ℝ) InfinitePlace.mult_coe_ne_zero)
+  let e : E ≃L[ℝ] V × C :=
+    e₀.toContinuousLinearEquiv.trans (multEquiv.prodCongr (ContinuousLinearEquiv.refl ℝ C))
+  have he (z : E) (v : InfinitePlace F) : (e z).1 v = (h z).1 v * v.mult := rfl
+  -- The real and complex logarithms are smooth charts on neighborhoods of one.
+  let logChart : OpenPartialHomeomorph E E :=
+    (OpenPartialHomeomorph.pi fun _ ↦ Real.expPartialHomeomorph.symm).prod
+      (OpenPartialHomeomorph.pi fun _ ↦ Complex.expOpenPartialHomeomorph.symm)
+  have hlogSource (z : E) (hz : z ∈ logChart.source) :
+      (∀ v, 0 < z.1 v) ∧ (∀ v, z.2 v ∈ Complex.slitPlane) :=
+    ⟨fun v ↦ hz.1 v trivial, fun v ↦ hz.2 v trivial⟩
+  have hlogSmooth : ContDiffOn ℝ ∞ logChart logChart.source := by
+    change ContDiffOn ℝ ∞ (fun z : E ↦ (fun v ↦ Real.log (z.1 v),
+      fun v ↦ Complex.log (z.2 v))) logChart.source
+    refine (contDiffOn_pi.mpr fun v ↦ ?_).prodMk (contDiffOn_pi.mpr fun v ↦ ?_)
+    · intro z hz
+      apply ContDiffAt.contDiffWithinAt
+      exact (show ContDiffAt ℝ ∞ (fun z : E ↦ z.1 v) z by fun_prop).log
+        ((hlogSource z hz).1 v).ne'
+    · intro z hz
+      apply ContDiffAt.contDiffWithinAt
+      exact ((Complex.contDiffAt_log ((hlogSource z hz).2 v)).restrict_scalars ℝ).comp z
+        (show ContDiffAt ℝ ∞ (fun z : E ↦ z.2 v) z by fun_prop)
+  have hexpSmooth : ContDiff ℝ ∞ logChart.symm := by
+    change ContDiff ℝ ∞ (fun z : E ↦ (fun v ↦ Real.exp (z.1 v),
+      fun v ↦ Complex.exp (z.2 v)))
+    fun_prop
+  apply Manifold.IsSubmersionOfComplement.isSubmersion (F := C)
+  intro g
+  -- Translate the source to one and the target to zero.
+  let a := chartAt E g
+  let m := (ContinuousAddEquiv.mulLeft g⁻¹).toHomeomorph.toOpenPartialHomeomorph
+  let φ := a.trans (m.trans logChart)
+  let ψ := (Homeomorph.addRight (-f g)).toOpenPartialHomeomorph
+  have ha : a ∈ IsManifold.maximalAtlas 𝓘(ℝ, E) ∞ Eˣ :=
+    IsManifold.chart_mem_maximalAtlas g
+  have hm : ContDiff ℝ ∞ m := by
+    change ContDiff ℝ ∞ (fun z : E ↦ (↑g⁻¹ : E) * z)
+    fun_prop
+  have hm' : ContDiff ℝ ∞ m.symm := by
+    change ContDiff ℝ ∞ (fun z : E ↦ (↑g : E) * z)
+    fun_prop
+  have hφ : φ ∈ IsManifold.maximalAtlas 𝓘(ℝ, E) ∞ Eˣ := by
+    apply φ.mem_maximalAtlas_of_contMDiffOn
+    · have hma : ContMDiffOn 𝓘(ℝ, E) 𝓘(ℝ, E) ∞ (m ∘ a) φ.source :=
+        hm.contMDiff.comp_contMDiffOn
+          ((contMDiffOn_of_mem_maximalAtlas ha).mono fun _ hx ↦ hx.1)
+      exact hlogSmooth.contMDiffOn.comp hma fun _ hx ↦ hx.2.2
+    · exact (contMDiffOn_symm_of_mem_maximalAtlas ha).comp
+        (hm'.contMDiff.comp_contMDiffOn hexpSmooth.contMDiff.contMDiffOn) fun _ hx ↦ hx.2
+  have hψ : ψ ∈ IsManifold.maximalAtlas 𝓘(ℝ, V) ∞ V := by
+    apply ψ.mem_maximalAtlas_of_contMDiffOn <;> rw [contMDiffOn_iff_contDiffOn]
+    · exact (show ContDiff ℝ ∞ (fun z : V ↦ z + -f g) by fun_prop).contDiffOn
+    · rw [show (ψ.symm : V → V) = (Homeomorph.addRight (-f g)).symm from rfl,
+        Homeomorph.addRight_symm]
+      exact (show ContDiff ℝ ∞ (fun z : V ↦ z + - -f g) by fun_prop).contDiffOn
+  have hg : g ∈ φ.source := by
+    refine ⟨mem_chart_source E g, Set.mem_univ _, ?_⟩
+    have hm1 : m (a g) = 1 := g.inv_val
+    change m (a g) ∈ logChart.source
+    rw [hm1]
+    exact ⟨fun _ _ ↦ (zero_lt_one : (0 : ℝ) < 1), fun _ _ ↦ Complex.one_mem_slitPlane⟩
+  have hform (u : Eˣ) : ψ (f u) = (e (φ u)).1 := by
+    let t := g⁻¹ * u
+    have hshift : ψ (f u) = f t := by
+      have hmul : f (g * t) = f g + f t := by
+        exact (congrArg (infiniteIdeleLog F) (map_mul (mixedUnits).symm g t)).trans
+          (infiniteIdeleLog_mul F _ _)
+      rw [show g * t = u by simp [t]] at hmul
+      change f u + -f g = f t
+      rw [hmul]
+      abel
+    rw [hshift]
+    funext v
+    change infiniteIdeleLog F ((mixedUnits).symm t) v = _
+    rw [infiniteIdeleLog_eq_mixed, he, hfst]
+    change _ = (if hv : v.IsReal then Real.log (t.val.1 ⟨v, hv⟩)
+      else (Complex.log (t.val.2 ⟨v, InfinitePlace.not_isReal_iff_isComplex.mp hv⟩)).re) * _
+    by_cases hv : v.IsReal
+    · rw [dite_eq_left hv, mixedEmbedding.normAtPlace_apply_of_isReal hv, Real.norm_eq_abs,
+        Real.log_abs, mul_comm]
+    · rw [dite_eq_right hv, mixedEmbedding.normAtPlace_apply_of_isComplex
+        (InfinitePlace.not_isReal_iff_isComplex.mp hv), Complex.log_re, mul_comm]
+  refine Manifold.IsSubmersionAtOfComplement.mk_of_charts e φ ψ hg (Set.mem_univ _)
+    hφ hψ (fun _ _ ↦ Set.mem_univ _) ?_
+  intro z hz
+  have hz' : z ∈ φ.target := by simpa using hz
+  change ψ (f (φ.symm z)) = (e z).1
+  rw [hform, φ.right_inv hz']
+
+end Submersion
 
 /-- Paper: Lemma A.2.3.2(2), p. 548. The logarithm kernel is the product of the real
 sign groups and the complex circles. The equivalence is the identity in the ambient
