@@ -723,7 +723,6 @@ private theorem finitePlace_bruhatSubgroup_compact (a : BruhatStructuralPair G) 
 /-- Every elementary quotient in a structural pair for the additive completion is discrete. -/
 private theorem finitePlace_bruhatQuotient_discrete (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) : DiscreteTopology a.quotient := by
-  let := e.finiteGroup
   -- Pull back the neighborhood, then send an open subgroup inside it to the quotient.
   let : NonarchimedeanGroup a.quotient := {
     is_nonarchimedean := fun U hU ↦ by
@@ -748,9 +747,9 @@ private theorem finitePlace_bruhatQuotient_discrete (a : BruhatStructuralPair G)
   let : LocallyConnectedSpace (AddCircle (1 : ℝ)) :=
     (QuotientAddGroup.isQuotientMap_mk _).isCoinducing.locallyConnectedSpace
   let : LocallyConnectedSpace (Multiplicative
-      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder))) := by
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)) := by
     change LocallyConnectedSpace
-      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder))
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)
     infer_instance
   let : LocallyConnectedSpace a.quotient :=
     e.equiv.symm.toHomeomorph.isQuotientMap.isCoinducing.locallyConnectedSpace
@@ -765,7 +764,6 @@ private theorem finitePlace_bruhatStage_locallyConstant_compactSupport
     IsLocallyConstant (schwartzBruhatStageRealization a e s) ∧
       HasCompactSupport (schwartzBruhatStageRealization a e s) := by
   classical
-  let := e.finiteGroup
   let := finitePlace_bruhatQuotient_discrete F w a e
   refine ⟨(IsLocallyConstant.iff_exists_open _).2 fun x ↦ ?_, ?_⟩
   · by_cases hx : x ∈ a.val.1
@@ -805,8 +803,9 @@ private theorem finitePlace_mem_cyclicStage (a : BruhatStructuralPair G)
     { toEquiv := (Equiv.uniqueProd _ _).trans ((Equiv.uniqueProd _ _).trans (Equiv.uniqueProd _ _))
       map_mul' := fun _ _ ↦ rfl }
   let e : ElementaryLCAPresentation a.quotient :=
-    ⟨0, 0, 0, n, Fin.addCommGroup n, (j.trans k.symm).toContinuousMulEquiv
-      (fun S ↦ iff_of_true (isOpen_discrete _) (isOpen_discrete _))⟩
+    { realDim := 0, torusDim := 0, latticeRank := 0, finiteFactor := Fin n
+      equiv := (j.trans k.symm).toContinuousMulEquiv
+        (fun S ↦ iff_of_true (isOpen_discrete _) (isOpen_discrete _)) }
   let g : ElementaryLieGroup 0 0 0 (Fin n) → ℂ := fun z ↦ f (e.equiv.symm (Multiplicative.ofAdd z))
   have hg : g ∈ elementarySchwartzSubmodule 0 0 0 (Fin n) := by
     refine ⟨fun z b ↦ ?_, fun i ↦ ?_⟩

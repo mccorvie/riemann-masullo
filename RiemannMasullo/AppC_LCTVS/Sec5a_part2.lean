@@ -14,11 +14,13 @@ import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.Analysis.Calculus.MeanValue
 import Mathlib.Analysis.Calculus.Taylor
 import RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
+import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -1077,14 +1079,159 @@ functions is locally convex. -/
 theorem vectorPeriodicSmoothSubmodule_uniformValue_polynormable :
     letI : TopologicalSpace (vectorPeriodicSmoothSubmodule d E) :=
       uniformValueTopology (vectorPeriodicSmoothSubmodule d E)
-    PolynormableSpace ℂ (vectorPeriodicSmoothSubmodule d E) := by sorry
+    PolynormableSpace ℂ (vectorPeriodicSmoothSubmodule d E) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let S := vectorPeriodicSmoothSubmodule d E
+  let Q : Set (Fin d → ℝ) := univ.pi fun _ ↦ Icc 0 1
+  let K : Set V := WithLp.toLp 2 '' Q
+  have hQ : IsCompact Q := isCompact_univ_pi fun _ ↦ isCompact_Icc
+  have : CompactSpace K := isCompact_iff_compactSpace.mp
+    (hQ.image (PiLp.continuous_toLp 2 (fun _ : Fin d ↦ ℝ)))
+  have hcont (f : S) : Continuous f.val :=
+    continuous_of_vectorContDiffOrderOn_zero
+      ((Submodule.mem_iInf _).mp (Submodule.mem_inf.mp f.property).1 0)
+  let restrict : S →ₗ[ℂ] C(K, E) :=
+    { toFun := fun f ↦ ⟨fun x ↦ f.val x, (hcont f).comp continuous_subtype_val⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  -- A single representative of each integer orbit works for every function in S.
+  have hrep (x : V) : ∃ y : K, ∀ f : S, f.val y = f.val x := by
+    let n : Fin d → ℤ := fun i ↦ ⌊x i⌋
+    have hx : (x - eucInt n) ∈ K := by
+      refine ⟨WithLp.ofLp (x - eucInt n), ?_, rfl⟩
+      intro i _
+      change x i - (⌊x i⌋ : ℝ) ∈ Icc 0 1
+      exact ⟨Int.fract_nonneg _, (Int.fract_lt_one _).le⟩
+    refine ⟨⟨x - eucInt n, hx⟩, fun f ↦ ?_⟩
+    have hn := (Submodule.mem_iInf _).mp (Submodule.mem_inf.mp f.property).2 n
+    have hy := (Submodule.mem_iInf _).mp hn (x - eucInt n)
+    simp only [LinearMap.mem_ker, LinearMap.sub_apply, LinearMap.proj_apply,
+      sub_add_cancel, sub_eq_zero] at hy
+    exact hy.symm
+  let cover : S → V →ᵤ E := fun f ↦ UniformFun.ofFun f.val
+  let cube : S → K →ᵤ E := fun f ↦ UniformFun.ofFun (restrict f)
+  have hUniform :
+      UniformSpace.comap cover inferInstance = UniformSpace.comap cube inferInstance := by
+    apply UniformSpace.ext
+    apply ((UniformFun.hasBasis_uniformity V E).comap
+      (fun fg : S × S ↦ (cover fg.1, cover fg.2))).eq_of_same_basis
+    refine ((UniformFun.hasBasis_uniformity K E).comap
+      (fun fg : S × S ↦ (cube fg.1, cube fg.2))).congr (fun _ ↦ Iff.rfl) ?_
+    intro U _
+    ext fg : 1
+    change (∀ x : K, (fg.1.val x, fg.2.val x) ∈ U) ↔
+      ∀ x : V, (fg.1.val x, fg.2.val x) ∈ U
+    refine ⟨fun h x ↦ ?_, fun h x ↦ h x⟩
+    obtain ⟨y, hy⟩ := hrep x
+    simpa only [hy] using h y
+  have hC := (ContinuousMap.isUniformEmbedding_uniformFunOfFun (α := K) (β := E)).isInducing
+  have htop : uniformValueTopology S = TopologicalSpace.induced restrict inferInstance := by
+    change uniformValueTopology S = TopologicalSpace.induced restrict
+      (inferInstance : UniformSpace C(K, E)).toTopologicalSpace
+    rw [hC.eq_induced, induced_compose]
+    exact congrArg (fun u : UniformSpace S ↦ u.toTopologicalSpace) hUniform
+  have := polynormableSpace_continuousMap ℂ K E
+  change PolynormableSpace ℂ S (topology := uniformValueTopology S)
+  rw [htop]
+  exact PolynormableSpace.induced restrict
 
 /-- Paper: Remark C.5.1.28, p. 735. The uniform value topology on the Schwartz
 submodule is locally convex. -/
 theorem vectorSchwartzSubmodule_uniformValue_polynormable :
     letI : TopologicalSpace (vectorSchwartzSubmodule d E) :=
       uniformValueTopology (vectorSchwartzSubmodule d E)
-    PolynormableSpace ℂ (vectorSchwartzSubmodule d E) := by sorry
+    PolynormableSpace ℂ (vectorSchwartzSubmodule d E) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let S : Set (Set V) := {univ}
+  have hS : (univ : Set V) ∈ S := mem_singleton _
+  let L : Submodule ℂ (V →ᵤ[S] E) := vectorSchwartzSubmodule d E
+  have hL : PolynormableSpace ℂ L := by
+    refine uniformOnFun_submodule_polynormable S ⟨_, hS⟩ (by simp [S, DirectedOn]) L
+      (by simp [S]) ?_ ?_
+    · intro f hf
+      have hf' : UniformOnFun.toFun S f ∈ vectorSchwartzSubmodule d E := hf
+      rw [vectorSchwartzSubmodule, Submodule.mem_inf, Submodule.mem_iInf] at hf'
+      exact continuous_of_vectorContDiffOrderOn_zero (hf'.1 0)
+    · intro f hf T _
+      have hf' : UniformOnFun.toFun S f ∈ vectorSchwartzSubmodule d E := hf
+      rw [vectorSchwartzSubmodule, Submodule.mem_inf] at hf'
+      have hdecay : HasVectorSchwartzDecay (UniformOnFun.toFun S f) := hf'.2
+      obtain ⟨g, hg, hb⟩ := hdecay 0 1
+      rw [← (hasVectorMultiPartial_zero_iff _ _).mp hg] at hb
+      have hbounded : IsVonNBounded ℂ (range (UniformOnFun.toFun S f)) := by simpa using hb
+      exact hbounded.subset (image_subset_range _ _)
+  let e := UniformOnFun.uniformEquivUniformFun E S hS
+  have htop : (inferInstance : TopologicalSpace L) =
+      uniformValueTopology (vectorSchwartzSubmodule d E) :=
+    (e.toHomeomorph.isInducing.comp IsInducing.subtypeVal).eq_induced
+  exact htop ▸ hL
+
+omit hAdd hSMul hSemi hT2 in
+/-- The continuous dual separates points, so a chain of weak coordinate derivatives
+has a unique vector-valued endpoint. -/
+private theorem hasPartials_unique [SeparatingDual ℂ E] (l : List (Fin d)) {f g₁ g₂ : V → E}
+    (h₁ : HasVectorMultiPartial.hasPartials g₁ f l)
+    (h₂ : HasVectorMultiPartial.hasPartials g₂ f l) : g₁ = g₂ := by
+  induction l generalizing f with
+  | nil => exact (show f = g₁ from h₁).symm.trans (show f = g₂ from h₂)
+  | cons i l ih =>
+    obtain ⟨f₁, hd₁, hr₁⟩ := h₁
+    obtain ⟨f₂, hd₂, hr₂⟩ := h₂
+    have heq : f₁ = f₂ := funext fun x ↦ SeparatingDual.eq_iff_forall_dual_eq.mpr fun φ ↦
+      (hd₁.hasLineDerivAt_eval φ x).unique (hd₂.hasLineDerivAt_eval φ x)
+    rw [← heq] at hr₂
+    exact ih hr₁ hr₂
+
+omit hAdd hSMul hSemi hT2 in
+/-- A continuous integer-periodic map takes all its values on the compact unit cube,
+so each continuous seminorm on its range is bounded above. -/
+private theorem bddAbove_seminorm_of_continuous_integer_periodic (q : Seminorm ℂ E)
+    (hq : Continuous q) {g : V → E} (hg : Continuous g)
+    (hp : ∀ n : Fin d → ℤ, Periodic g (eucInt n)) : BddAbove (range (q ∘ g)) := by
+  let Q : Set (Fin d → ℝ) := univ.pi fun _ ↦ Icc 0 1
+  have hQ : IsCompact Q := isCompact_univ_pi fun _ ↦ isCompact_Icc
+  have hCube := hQ.image (PiLp.continuous_toLp 2 (fun _ : Fin d ↦ ℝ))
+  apply (hCube.bddAbove_image (hq.comp hg).continuousOn).mono
+  rintro _ ⟨x, rfl⟩
+  let n : Fin d → ℤ := fun i ↦ ⌊x i⌋
+  have hx : (x - eucInt n) ∈ WithLp.toLp 2 '' Q := by
+    refine ⟨WithLp.ofLp (x - eucInt n), ?_, rfl⟩
+    intro i _
+    change x i - (⌊x i⌋ : ℝ) ∈ Icc 0 1
+    exact ⟨Int.fract_nonneg _, (Int.fract_lt_one _).le⟩
+  refine ⟨x - eucInt n, hx, congrArg q ?_⟩
+  have heq := hp n (x - eucInt n)
+  rw [sub_add_cancel] at heq
+  exact heq.symm
+
+omit hAdd hSMul hSemi hT2 in
+/-- A differentiability order matching the chain length supplies continuous lifts
+throughout the chain. A separating dual transfers all periods to those lifts. -/
+private theorem exists_continuous_integer_periodic_hasPartials [SeparatingDual ℂ E]
+    (l : List (Fin d)) {f : V → E} (hf : VectorContDiffOrderOn f univ l.length)
+    (hc : Continuous f)
+    (hp : ∀ n : Fin d → ℤ, Periodic f (eucInt n)) :
+    ∃ g : V → E, HasVectorMultiPartial.hasPartials g f l ∧ Continuous g ∧
+      ∀ n : Fin d → ℤ, Periodic g (eucInt n) := by
+  induction l generalizing f with
+  | nil => exact ⟨f, rfl, hc, hp⟩
+  | cons i l ih =>
+    obtain ⟨f', hd, hc', ho⟩ := hf i
+    have hp' (n : Fin d → ℤ) : Periodic f' (eucInt n) := by
+      intro x
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+      intro φ
+      have hline (t : ℝ) : φ (f ((x + eucInt n) + t • EuclideanSpace.single i 1)) =
+          φ (f (x + t • EuclideanSpace.single i 1)) := by
+        rw [add_right_comm x, hp n]
+      have h' : HasDerivAt (fun t : ℝ ↦ φ (f ((x + eucInt n) +
+          t • EuclideanSpace.single i 1))) (φ (f' (x + eucInt n))) 0 :=
+        hd.hasLineDerivAt_eval φ (x + eucInt n)
+      rw [funext hline] at h'
+      exact h'.unique (hd.hasLineDerivAt_eval φ x)
+    obtain ⟨g, hg, hgc, hgp⟩ := ih ho (continuousOn_univ.mp hc') hp'
+    exact ⟨g, ⟨f', hd, hg⟩, hgc, hgp⟩
 
 /-- Paper: (C.5.1.45), p. 735. The supremum of a continuous seminorm on a mixed
 derivative of a periodic smooth function is finite and defines a seminorm.
@@ -1094,7 +1241,28 @@ theorem exists_vectorPeriodicSmoothDerivativeSeminorm (q : Seminorm ℂ E) (hq :
     ∃ s : Seminorm ℂ (vectorPeriodicSmoothSubmodule d E),
       ∀ f : vectorPeriodicSmoothSubmodule d E, ∃ g : V → E,
         HasVectorMultiPartial α f.val g ∧ BddAbove (range (q ∘ g)) ∧
-          s f = ⨆ x : V, q (g x) := by sorry
+          s f = ⨆ x : V, q (g x) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let l := (List.finRange d).flatMap fun i ↦ List.replicate (α i) i
+  have hderiv (f : vectorPeriodicSmoothSubmodule d E) :
+      ∃ g : V → E, HasVectorMultiPartial.hasPartials g f.val l ∧
+        BddAbove (range (q ∘ g)) := by
+    have hf := f.property
+    simp only [vectorPeriodicSmoothSubmodule, Submodule.mem_inf, Submodule.mem_iInf,
+      LinearMap.mem_ker, LinearMap.sub_apply, LinearMap.proj_apply, sub_eq_zero] at hf
+    obtain ⟨g, hg, hc, hp⟩ := exists_continuous_integer_periodic_hasPartials l
+      (hf.1 l.length) (continuous_of_vectorContDiffOrderOn_zero (hf.1 0)) hf.2
+    exact ⟨g, hg, bddAbove_seminorm_of_continuous_integer_periodic q hq hc hp⟩
+  choose g hg hb using hderiv
+  let D : vectorPeriodicSmoothSubmodule d E →ₗ[ℂ] (V → E) :=
+    { toFun := g
+      map_add' := fun f₁ f₂ ↦ hasPartials_unique l (hg (f₁ + f₂))
+        (hasPartials_add (g f₁) (g f₂) l f₁.val f₂.val (hg f₁) (hg f₂))
+      map_smul' := fun c f ↦ hasPartials_unique l (hg (c • f))
+        (hasPartials_smul c (g f) l f.val (hg f)) }
+  let p (x : V) := q.comp ((LinearMap.proj x).comp D)
+  have hp : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr hb
+  exact ⟨⨆ x, p x, fun f ↦ ⟨g f, hg f, hb f, Seminorm.iSup_apply hp⟩⟩
 
 /-- Paper: (C.5.1.46), p. 735. The supremum of a continuous seminorm on
 a polynomially weighted mixed derivative is finite and defines a seminorm. -/

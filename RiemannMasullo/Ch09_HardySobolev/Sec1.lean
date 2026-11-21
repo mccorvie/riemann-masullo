@@ -218,7 +218,44 @@ theorem weightedSobolev_toL2 (hν : IsLCAPlancherelMeasure μ ν)
     let U := Classical.choose (lcaFourier_unitary μ ν hν).exists
     ∃ J : WeightedSobolev ν w s →L[ℂ] Lp ℂ 2 μ,
       Function.Injective J ∧ ‖J‖ ≤ 1 ∧
-        ∀ f, (U (J f) : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by sorry
+        ∀ f, (U (J f) : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by
+  intro U
+  let νw := sobolevMeasure ν w s
+  have hle : ν ≤ νw := calc
+    ν = ν.withDensity 1 := withDensity_one.symm
+    _ ≤ νw := by
+      apply withDensity_mono
+      refine ae_of_all _ fun χ ↦ ?_
+      simpa only [Pi.one_apply, ENNReal.ofReal_one] using
+        ENNReal.ofReal_le_ofReal (Real.one_le_rpow (le_add_of_nonneg_right (sq_nonneg (w χ : ℝ)))
+          (div_nonneg _hs (by norm_num)))
+  have hνw : νw ≪ ν := withDensity_absolutelyContinuous _ _
+  have mem (f : WeightedSobolev ν w s) : MemLp (f : PontryaginDual G → ℂ) 2 ν :=
+    (Lp.memLp f).mono_measure hle
+  let I : WeightedSobolev ν w s →ₗ[ℂ] Lp ℂ 2 ν :=
+    { toFun := fun f ↦ (mem f).toLp f
+      map_add' f g :=
+        (MemLp.toLp_congr (mem (f + g)) ((mem f).add (mem g))
+          (ae_mono hle (Lp.coeFn_add f g))).trans (MemLp.toLp_add (mem f) (mem g))
+      map_smul' c f :=
+        (MemLp.toLp_congr (mem (c • f)) ((mem f).const_smul c)
+          (ae_mono hle (Lp.coeFn_smul c f))).trans (MemLp.toLp_const_smul c (mem f)) }
+  let K := U.symm.toLinearEquiv.toLinearMap.comp I
+  have hK (f : WeightedSobolev ν w s) : ‖K f‖ ≤ 1 * ‖f‖ := by
+    change ‖U.symm (I f)‖ ≤ _
+    rw [U.symm.norm_map, one_mul]
+    change ‖(mem f).toLp f‖ ≤ ‖f‖
+    rw [Lp.norm_toLp, Lp.norm_def]
+    exact ENNReal.toReal_mono (Lp.memLp f).eLpNorm_lt_top.ne (eLpNorm_mono_measure _ hle)
+  let J := K.mkContinuous 1 hK
+  have hJ (f : WeightedSobolev ν w s) :
+      (U (J f) : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by
+    change (U (U.symm (I f)) : PontryaginDual G → ℂ) =ᵐ[ν] _
+    rw [U.apply_symm_apply]
+    exact (mem f).coeFn_toLp
+  refine ⟨J, ?_, K.mkContinuous_norm_le zero_le_one hK, hJ⟩
+  intro f g hfg
+  exact Lp.ext (hνw.ae_eq ((hJ f).symm.trans (hfg ▸ hJ g)))
 
 -- TODO(paper-gap): In (9.1.1.6) the lower-degree input is printed where the inclusion
 -- requires a higher-degree input. Elements of the lower-degree space can have infinite
