@@ -13,6 +13,7 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalHom
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
@@ -43,6 +44,210 @@ open Bornology Filter MeasureTheory Set Topology TopologicalSpace
 open scoped Cardinal ContDiff DirectSum Topology
 
 namespace RiemannMasullo
+
+section TorusHom
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G]
+  [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+
+/-- A neighborhood containing no nontrivial cyclic subgroup gives finitely many characters
+whose joint kernel is discrete. -/
+theorem exists_torusHom_of_noSmallCyclicSubgroups
+    {W : Set G} (hW : W ∈ 𝓝 (1 : G))
+    (hPow : ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1) :
+    ∃ (t : Finset (PontryaginDual G)) (f : G →ₜ* (t → Circle)),
+      (∀ x (χ : t), f x χ = χ.val x) ∧ DiscreteTopology f.toMonoidHom.ker := by
+  classical
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (1 : G)
+  obtain ⟨V, hV, hOne, hVV⟩ := exists_open_nhds_one_mul_subset (inter_mem hKnhds hW)
+  have hVW : V ⊆ W := fun x hx ↦ (hVV (mul_one x ▸ Set.mul_mem_mul hx hOne)).2
+  let S (χ : PontryaginDual G) : Set G := {x | χ x ≠ 1}
+  have hCover : K \ V ⊆ ⋃ χ, S χ := by
+    intro x hx
+    have hx1 : x ≠ 1 := fun h ↦ hx.2 (h ▸ hOne)
+    have hSep := (pontryaginDual_pairing_separates (G := G)).1
+    obtain ⟨χ, hχ⟩ : ∃ χ : PontryaginDual G, χ x ≠ 1 := by
+      by_contra! hn
+      exact hx1 (hSep (funext fun χ ↦ (hn χ).trans (map_one χ).symm))
+    exact mem_iUnion.mpr ⟨χ, hχ⟩
+  obtain ⟨t, ht⟩ := (hK.diff hV).elim_finite_subcover S
+    (fun χ ↦ (isClosed_eq χ.continuous continuous_const).isOpen_compl) hCover
+  let f : G →ₜ* (t → Circle) :=
+    { toFun := fun x χ ↦ χ.val x
+      map_one' := funext fun χ ↦ map_one χ.val
+      map_mul' := fun x y ↦ funext fun χ ↦ map_mul χ.val x y
+      continuous_toFun := continuous_pi fun χ ↦ χ.val.continuous }
+  refine ⟨t, f, fun _ _ ↦ rfl, discreteTopology_of_isOpen_singleton_one ?_⟩
+  have hKer (x : f.toMonoidHom.ker) (hx : (x : G) ∈ V) : x = 1 := by
+    have hr (k : ℕ) : (x : G) ^ k ∈ V := by
+      induction k with
+      | zero => simpa using hOne
+      | succ k ih =>
+        have hKmem : (x : G) ^ (k + 1) ∈ K :=
+          (hVV (pow_succ (x : G) k ▸ Set.mul_mem_mul ih hx)).1
+        by_contra hn
+        obtain ⟨χ, hχt, hχ⟩ := mem_iUnion₂.mp (ht ⟨hKmem, hn⟩)
+        have hχx : χ (x : G) = 1 :=
+          congrFun (MonoidHom.mem_ker.mp x.property) ⟨χ, hχt⟩
+        exact hχ (by rw [map_pow, hχx, one_pow])
+    exact Subtype.ext (hPow x fun k ↦ hVW (hr k))
+  have hPreimage : (Subtype.val : f.toMonoidHom.ker → G) ⁻¹' V = {1} := by
+    ext x
+    exact ⟨fun hx ↦ mem_singleton_iff.mpr (hKer x hx), by
+      rintro (rfl : x = 1)
+      exact hOne⟩
+  exact hPreimage ▸ hV.preimage continuous_subtype_val
+
+omit [T2Space G] in
+open scoped Pointwise in
+/-- A continuous homomorphism to a finite-dimensional torus with discrete kernel has a
+continuous local section over a ball in a linear subspace of the logarithm space. The
+section is a local homomorphism, and the images of small balls are identity neighborhoods. -/
+theorem exists_localSection_of_discrete_torusKernel {ι : Type*} [Fintype ι]
+    (f : G →ₜ* (ι → Circle)) (hf : DiscreteTopology f.toMonoidHom.ker) :
+    ∃ (L : Submodule ℝ (EuclideanSpace ℝ ι)) (ρ : ℝ) (σ : L → G), 0 < ρ ∧ ρ ≤ 1 ∧
+      (∀ v : L, ‖v‖ < ρ → ∀ i, f (σ v) i = Circle.exp ((v : EuclideanSpace ℝ ι) i)) ∧
+      ContinuousOn σ (Metric.ball 0 ρ) ∧
+      (∀ v w : L, ‖v‖ < ρ → ‖w‖ < ρ → ‖v + w‖ < ρ → σ (v + w) = σ v * σ w) ∧
+      (∀ ε > 0, σ '' Metric.ball 0 ε ∈ 𝓝 1) := by
+  classical
+  let ex : EuclideanSpace ℝ ι → (ι → Circle) := fun v i ↦ Circle.exp (v i)
+  have hex : Continuous ex := continuous_pi fun i ↦ Circle.exp.continuous.comp (by fun_prop)
+  have hex0 : ex 0 = 1 := funext fun i ↦ by simp [ex]
+  have hexadd : ∀ v w, ex (v + w) = ex v * ex w := fun v w ↦ funext fun i ↦ by
+    simp [ex, Circle.exp_add]
+  have hexneg : ∀ v, ex (-v) = (ex v)⁻¹ := fun v ↦ funext fun i ↦ by simp [ex]
+  -- A neighborhood meeting the kernel only at the identity.
+  obtain ⟨O, hO, h1O, hOker⟩ : ∃ O : Set G, IsOpen O ∧ (1 : G) ∈ O ∧
+      ∀ x ∈ O, f x = 1 → x = 1 := by
+    have hopen1 : IsOpen ({1} : Set f.toMonoidHom.ker) := isOpen_discrete _
+    obtain ⟨U0, hU0o, hpre⟩ := isOpen_induced_iff.mp hopen1
+    refine ⟨U0, hU0o, ?_, ?_⟩
+    · have : (1 : f.toMonoidHom.ker) ∈ Subtype.val ⁻¹' U0 := by rw [hpre]; rfl
+      simpa using this
+    · intro x hx hfx
+      have hmem : (⟨x, MonoidHom.mem_ker.mpr hfx⟩ : f.toMonoidHom.ker) ∈
+          Subtype.val ⁻¹' U0 := hx
+      rw [hpre] at hmem
+      exact congrArg Subtype.val (Set.mem_singleton_iff.mp hmem)
+  obtain ⟨W, hW, h1W, hWW⟩ := exists_open_nhds_one_mul_subset (hO.mem_nhds h1O)
+  have hWW' : W ∩ W⁻¹ ∈ 𝓝 (1 : G) :=
+    inter_mem (hW.mem_nhds h1W) (inv_mem_nhds_one G (hW.mem_nhds h1W))
+  obtain ⟨V, hV, hVW, hVc⟩ := local_compact_nhds hWW'
+  have hinj : ∀ x ∈ V, ∀ y ∈ V, f x = f y → x = y := by
+    intro x hx y hy hxy
+    have hy' : y⁻¹ ∈ W := (hVW hy).2
+    have hm : x * y⁻¹ ∈ O := hWW (Set.mul_mem_mul (hVW hx).1 hy')
+    have : f (x * y⁻¹) = 1 := by rw [map_mul, map_inv, hxy, mul_inv_cancel]
+    exact mul_inv_eq_one.mp (hOker _ hm this)
+  obtain ⟨C, hC, -, hCinv, hCC⟩ := exists_closed_nhds_one_inv_eq_mul_subset hV
+  have h1C : (1 : G) ∈ C := mem_of_mem_nhds hC
+  have hCV : C ⊆ V := fun x hx ↦ by simpa using hCC (Set.mul_mem_mul hx h1C)
+  -- Small logarithms of values on `V` come from `C`.
+  have hD : IsCompact (f '' (V \ interior C)) :=
+    (hVc.diff isOpen_interior).image f.continuous
+  have h1D : (1 : ι → Circle) ∉ f '' (V \ interior C) := by
+    rintro ⟨x, ⟨hxV, hxC⟩, hfx⟩
+    have : x = 1 := hinj x hxV 1 (mem_of_mem_nhds hV) (by rw [hfx, map_one])
+    exact hxC (this ▸ mem_interior_iff_mem_nhds.mpr hC)
+  obtain ⟨ε, hε, hεD⟩ : ∃ ε > 0, ∀ v : EuclideanSpace ℝ ι, ‖v‖ < ε →
+      ex v ∉ f '' (V \ interior C) := by
+    have hnhds : (f '' (V \ interior C))ᶜ ∈ 𝓝 (ex 0) := by
+      rw [hex0]; exact hD.isClosed.isOpen_compl.mem_nhds h1D
+    obtain ⟨ε, hε, H⟩ := Metric.mem_nhds_iff.mp (hex.continuousAt hnhds)
+    exact ⟨ε, hε, fun v hv ↦ H (by simpa using hv)⟩
+  have hlift : ∀ v : EuclideanSpace ℝ ι, ‖v‖ < ε → ∀ x ∈ V, f x = ex v → x ∈ C := by
+    intro v hv x hx hfx
+    by_contra hxC
+    exact hεD v hv ⟨x, ⟨hx, fun h ↦ hxC (interior_subset h)⟩, hfx⟩
+  -- The logarithms of the image form a closed local subgroup.
+  set R := min (ε / 2) 1 with hRdef
+  have hR : 0 < R := lt_min (half_pos hε) one_pos
+  have hRε : R < ε := (min_le_left _ _).trans_lt (half_lt_self hε)
+  have hR1 : R ≤ 1 := min_le_right _ _
+  let A : Set (EuclideanSpace ℝ ι) := {v | ‖v‖ ≤ R ∧ ex v ∈ f '' V}
+  have hAc : IsClosed A :=
+    (isClosed_le continuous_norm continuous_const).inter
+      ((hVc.image f.continuous).isClosed.preimage hex)
+  have hA0 : (0 : EuclideanSpace ℝ ι) ∈ A :=
+    ⟨by simp [hR.le], ⟨1, mem_of_mem_nhds hV, by rw [map_one, hex0]⟩⟩
+  have hAmemC : ∀ v ∈ A, ∃ x ∈ C, f x = ex v := by
+    rintro v ⟨hv, x, hx, hfx⟩
+    exact ⟨x, hlift v (hv.trans_lt hRε) x hx hfx, hfx⟩
+  have hAsym : ∀ v ∈ A, -v ∈ A := by
+    intro v hvA
+    obtain ⟨x, hxC, hfx⟩ := hAmemC v hvA
+    have hxC' : x⁻¹ ∈ C := by rw [← hCinv]; simpa using hxC
+    exact ⟨by simpa using hvA.1, x⁻¹, hCV hxC', by rw [map_inv, hfx, hexneg]⟩
+  have hAadd : ∀ v ∈ A, ∀ w ∈ A, ‖v + w‖ ≤ R → v + w ∈ A := by
+    intro v hv w hw hvw
+    obtain ⟨x, hxC, hfx⟩ := hAmemC v hv
+    obtain ⟨y, hyC, hfy⟩ := hAmemC w hw
+    exact ⟨hvw, x * y, hCC (Set.mul_mem_mul hxC hyC), by rw [map_mul, hfx, hfy, hexadd]⟩
+  obtain ⟨L, ε₁, hε₁, hε₁R, hAL⟩ :=
+    exists_subspace_ball_eq_of_localSubgroup hR hAc hA0 hAsym hAadd
+  have hLA : ∀ v : EuclideanSpace ℝ ι, v ∈ L → ‖v‖ ≤ ε₁ → v ∈ A := by
+    intro v hvL hv
+    have : v ∈ (L : Set (EuclideanSpace ℝ ι)) ∩ Metric.closedBall 0 ε₁ :=
+      ⟨hvL, by simpa using hv⟩
+    rw [← hAL] at this
+    exact this.1
+  have hAL' : ∀ v ∈ A, ‖v‖ ≤ ε₁ → v ∈ L := by
+    intro v hvA hv
+    have : v ∈ A ∩ Metric.closedBall 0 ε₁ := ⟨hvA, by simpa using hv⟩
+    rw [hAL] at this
+    exact this.1
+  let σ : L → G := fun v ↦ Function.invFunOn f C (ex v)
+  have hσ : ∀ v : L, ‖v‖ < ε₁ → σ v ∈ C ∧ f (σ v) = ex v := by
+    intro v hv
+    exact Function.invFunOn_pos (hAmemC _ (hLA _ v.2 hv.le))
+  refine ⟨L, ε₁, σ, hε₁, hε₁R.trans hR1, ?_, ?_, ?_, ?_⟩
+  · intro v hv i
+    exact congrFun (hσ v hv).2 i
+  · rw [continuousOn_iff_continuous_domRestrict]
+    let gV : V → (ι → Circle) := fun x ↦ f x
+    have : CompactSpace V := isCompact_iff_compactSpace.mp hVc
+    have hgV : IsClosedEmbedding gV :=
+      (f.continuous.comp continuous_subtype_val).isClosedEmbedding
+        (fun x y hxy ↦ Subtype.ext (hinj x x.2 y y.2 hxy))
+    let σ' : Metric.ball (0 : L) ε₁ → V := fun v ↦
+      ⟨σ v, hCV (hσ v (mem_ball_zero_iff.mp v.2)).1⟩
+    have hσ' : Continuous σ' := by
+      rw [hgV.isInducing.continuous_iff]
+      have e : gV ∘ σ' = fun v : Metric.ball (0 : L) ε₁ ↦ ex ((v : L) : EuclideanSpace ℝ ι) :=
+        funext fun v ↦ (hσ v (mem_ball_zero_iff.mp v.2)).2
+      rw [e]
+      exact hex.comp (continuous_subtype_val.comp continuous_subtype_val)
+    exact continuous_subtype_val.comp hσ'
+  · intro v w hv hw hvw
+    have h1 := hσ v hv
+    have h2 := hσ w hw
+    have h3 := hσ (v + w) hvw
+    refine hinj _ (hCV h3.1) _ (hCC (Set.mul_mem_mul h1.1 h2.1)) ?_
+    rw [map_mul, h1.2, h2.2, h3.2, ← hexadd]
+    rfl
+  · intro ε' hε'
+    set ε'' := min ε' ε₁ with hε''def
+    have hε'' : 0 < ε'' := lt_min hε' hε₁
+    have hnear : ∀ᶠ x in 𝓝 (1 : G), x ∈ interior C ∧
+        ∃ u : EuclideanSpace ℝ ι, ‖u‖ < ε'' ∧ ∀ i, Circle.exp (u i) = f x i := by
+      refine Filter.Eventually.and (show ∀ᶠ x in 𝓝 (1 : G), x ∈ interior C from
+        isOpen_interior.mem_nhds (mem_interior_iff_mem_nhds.mpr hC)) ?_
+      have ht : Tendsto f (𝓝 (1 : G)) (𝓝 1) := by
+        have := (map_continuous f).tendsto (1 : G)
+        rwa [map_one] at this
+      exact ht.eventually (eventually_exists_small_circleLog hε'')
+    apply Filter.mem_of_superset hnear
+    rintro x ⟨hxC, u, hu, hux⟩
+    have hfx : f x = ex u := funext fun i ↦ (hux i).symm
+    have hu1 : ‖u‖ < ε₁ := hu.trans_le (min_le_right _ _)
+    have huA : u ∈ A := ⟨hu1.le.trans hε₁R, x, hCV (interior_subset hxC), hfx⟩
+    have huL : u ∈ L := hAL' u huA hu1.le
+    refine ⟨⟨u, huL⟩, by simpa using hu.trans_le (min_le_left _ _), ?_⟩
+    have hs := hσ ⟨u, huL⟩ (by simpa using hu1)
+    exact hinj _ (hCV hs.1) _ (hCV (interior_subset hxC)) (by rw [hs.2, hfx])
+
+end TorusHom
 
 section Structure
 
@@ -234,6 +439,87 @@ theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
+open scoped Pointwise in
+/-- Circle-valued characters lift to real logarithms on a simply connected chart.
+These logarithms rule out nontrivial cyclic subgroups in a smaller neighborhood. -/
+private theorem exists_nhds_one_of_isLocallyEuclidean (hG : IsLocallyEuclidean G) :
+    ∃ W ∈ 𝓝 (1 : G), ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1 := by
+  obtain ⟨n, ⟨charts⟩⟩ := hG
+  let E := EuclideanSpace ℝ (Fin n)
+  let e := chartAt E (1 : G)
+  have he : (1 : G) ∈ e.source := mem_chart_source E 1
+  obtain ⟨r, hr, hrb⟩ := Metric.mem_nhds_iff.mp (e.open_target.mem_nhds (e.map_source he))
+  -- Pull back a ball to obtain a simply connected identity neighborhood.
+  let B := Metric.ball (e 1) r
+  let U := e.symm '' B
+  have hU : IsOpen U := (e.symm.isOpen_image_iff_of_subset_source hrb).mpr Metric.isOpen_ball
+  have h1U : (1 : G) ∈ U :=
+    ⟨e 1, Metric.mem_ball_self hr, e.left_inv he⟩
+  let b : B ≃ₜ U := e.symm.homeomorphOfImageSubsetSource hrb rfl
+  let : ContractibleSpace B := (convex_ball _ _).contractibleSpace ⟨_, Metric.mem_ball_self hr⟩
+  let : SimplyConnectedSpace U := b.symm.toHomotopyEquiv.simplyConnectedSpace
+  let : LocallyPathConnectedSpace B := Metric.isOpen_ball.locallyPathConnectedSpace
+  let : LocallyPathConnectedSpace U := b.locallyPathConnectedSpace
+  let : LocallyConnectedSpace G := ChartedSpace.locallyConnectedSpace E G
+  obtain ⟨V₀, hV₀, h1V₀, hprod⟩ := exists_open_nhds_one_mul_subset (hU.mem_nhds h1U)
+  obtain ⟨V, ⟨hV, h1V, hVconn⟩, hVsub⟩ :=
+    (LocallyConnectedSpace.open_connected_basis (1 : G)).mem_iff.mp (hV₀.mem_nhds h1V₀)
+  have hVV : V * V ⊆ U := (Set.mul_subset_mul hVsub hVsub).trans hprod
+  have hVU : V ⊆ U := fun x hx ↦ hVV (mul_one x ▸ Set.mul_mem_mul hx h1V)
+  obtain ⟨K, hK, hKV, hKc⟩ := local_compact_nhds (hV.mem_nhds h1V)
+  refine ⟨K, hK, fun x hx ↦ ?_⟩
+  apply (pontryaginDual_pairing_separates (G := G)).1
+  funext χ
+  let χU : C(U, Circle) := ⟨fun u ↦ χ u, χ.continuous.comp continuous_subtype_val⟩
+  let oneU : U := ⟨1, h1U⟩
+  let oneV : V := ⟨1, h1V⟩
+  obtain ⟨L, ⟨hL0, hL⟩, _⟩ := Circle.isCoveringMap_exp.existsUnique_continuousMap_lifts
+    χU oneU 0 (Circle.exp_zero.trans (map_one χ).symm)
+  have hl (u : U) : Circle.exp (L u) = χ u := congrFun hL u
+  let incl (v : V) : U := ⟨v, hVU v.property⟩
+  let mul (p : V × V) : U := ⟨p.1 * p.2, hVV (Set.mul_mem_mul p.1.property p.2.property)⟩
+  let : ConnectedSpace V := isConnected_iff_connectedSpace.mp hVconn
+  -- Uniqueness of lifts makes the logarithm additive on pairs from the smaller neighborhood.
+  have hAdd (a b : V) : L (mul (a, b)) = L (incl a) + L (incl b) := by
+    have hMul : Continuous mul :=
+      (continuous_subtype_val.comp continuous_fst).mul
+        (continuous_subtype_val.comp continuous_snd) |>.subtype_mk _
+    have hIncl : Continuous incl := continuous_subtype_val.subtype_mk _
+    have hAgree : Circle.exp ∘ (fun p : V × V ↦ L (mul p)) =
+        Circle.exp ∘ (fun p : V × V ↦ L (incl p.1) + L (incl p.2)) := by
+      funext p
+      simp [Circle.exp_add, hl, mul, incl, map_mul]
+    have hStart : L (mul (oneV, oneV)) = L (incl oneV) + L (incl oneV) := by
+      have hmul : mul (oneV, oneV) = oneU := Subtype.ext (one_mul 1)
+      have hincl : incl oneV = oneU := rfl
+      simp [hmul, hincl, hL0]
+    exact congrFun (Circle.isCoveringMap_exp.eq_of_comp_eq (L.continuous.comp hMul)
+      ((L.continuous.comp (hIncl.comp continuous_fst)).add
+        (L.continuous.comp (hIncl.comp continuous_snd))) hAgree (oneV, oneV) hStart) (a, b)
+  -- A nonzero logarithm would grow without bound along the powers inside the compact set.
+  let z (k : ℕ) : V := ⟨x ^ k, hKV (hx k)⟩
+  have hPow (k : ℕ) : L (incl (z k)) = k * L (incl (z 1)) := by
+    induction k with
+    | zero =>
+      have hz : incl (z 0) = oneU := Subtype.ext (pow_zero x)
+      simpa [hz] using hL0
+    | succ k ih =>
+      have hz : incl (z (k + 1)) = mul (z k, z 1) := Subtype.ext (by simp [incl, mul, z, pow_succ])
+      rw [hz, hAdd, ih, Nat.cast_succ, add_mul, one_mul]
+  have hKb : IsCompact (Subtype.val ⁻¹' K : Set U) := by
+    exact IsEmbedding.subtypeVal.isInducing.isCompact_preimage' hKc
+      (Subtype.range_coe.symm ▸ hKV.trans hVU)
+  obtain ⟨M, hM⟩ := (hKb.image L.continuous).isBounded.exists_norm_le
+  have hZero : L (incl (z 1)) = 0 := by
+    by_contra hNe
+    obtain ⟨k, hk⟩ := exists_nat_gt (M / ‖L (incl (z 1))‖)
+    have hLe := hM _ (mem_image_of_mem L (show incl (z k) ∈ Subtype.val ⁻¹' K from hx k))
+    rw [hPow, norm_mul, Real.norm_natCast] at hLe
+    exact (not_lt_of_ge hLe) ((div_lt_iff₀ (norm_pos_iff.mpr hNe)).mp hk)
+  have hValue := hl (incl (z 1))
+  rw [hZero, Circle.exp_zero] at hValue
+  simpa [incl, z] using hValue.symm
+
 /-- Paper: Theorem D.1.4.2, p. 757. A connected, locally Euclidean abelian
 topological group admits an additive homomorphism from a finite-dimensional real vector
 group that is a local homeomorphism.
@@ -244,7 +530,51 @@ theorem exists_euclidean_localHomeomorph {A : Type*} [AddCommGroup A] [Topologic
     [IsTopologicalAddGroup A] [T2Space A] [LocallyCompactSpace A] [ConnectedSpace A]
     (hA : IsLocallyEuclidean A) :
     ∃ (k : ℕ) (f : EuclideanSpace ℝ (Fin k) →+ A), IsLocalHomeomorph f := by
-  sorry
+  let : T2Space (Multiplicative A) := ‹T2Space A›
+  obtain ⟨W, hW, hPow⟩ := exists_nhds_one_of_isLocallyEuclidean (G := Multiplicative A) hA
+  obtain ⟨t, g, -, hker⟩ := exists_torusHom_of_noSmallCyclicSubgroups hW hPow
+  obtain ⟨L, ρ, σ, hρ, hρ1, hgσ, hσc, hσmul, hσnhds⟩ :=
+    exists_localSection_of_discrete_torusKernel g hker
+  obtain ⟨f, hf⟩ := exists_addMonoidHom_eqOn_ball_of_local_additive hρ
+    (fun v ↦ Multiplicative.toAdd (σ v)) (fun v w hv hw hvw ↦ hσmul v w hv hw hvw)
+  have hcont : Continuous f := continuous_of_continuousAt_zero f <|
+    ((continuousOn_congr hf).mpr hσc).continuousAt (Metric.ball_mem_nhds 0 hρ)
+  have hopen : IsOpenMap f := by
+    apply IsTopologicalAddGroup.isOpenMap_iff_nhds_zero.mpr
+    rw [Filter.le_map_iff]
+    intro U hU
+    obtain ⟨ε, hε, hεU⟩ := Metric.mem_nhds_iff.mp hU
+    have hδ : 0 < min ε ρ := lt_min hε hρ
+    refine mem_of_superset (hσnhds _ hδ) ?_
+    rintro _ ⟨v, hv, rfl⟩
+    have hvε := Metric.ball_subset_ball (min_le_left ε ρ) hv
+    have hvρ := Metric.ball_subset_ball (min_le_right ε ρ) hv
+    exact ⟨v, hεU hvε, hf hvρ⟩
+  have hinj : Set.InjOn f (Metric.ball 0 ρ) := by
+    intro v hv w hw hvw
+    have hv' := mem_ball_zero_iff.mp hv
+    have hw' := mem_ball_zero_iff.mp hw
+    have hσ : σ v = σ w := (hf hv).symm.trans (hvw.trans (hf hw))
+    apply Subtype.ext
+    refine circleExp_coord_injective (hv'.le.trans hρ1) (hw'.le.trans hρ1) fun i ↦ ?_
+    rw [← hgσ v hv' i, ← hgσ w hw' i, hσ]
+  have hlocal : IsLocalHomeomorph f := by
+    refine isLocalHomeomorph_iff_isOpenEmbedding_restrict.mpr fun x ↦
+      ⟨Metric.ball x ρ, Metric.ball_mem_nhds x hρ, ?_⟩
+    refine IsOpenEmbedding.of_continuous_injective_isOpenMap
+      (hcont.comp continuous_subtype_val) ?_
+      (hopen.comp Metric.isOpen_ball.isOpenEmbedding_subtypeVal.isOpenMap)
+    intro v w hvw
+    have hv : (v : L) - x ∈ Metric.ball 0 ρ := by
+      simpa only [mem_ball_zero_iff, ← dist_eq_norm] using Metric.mem_ball.mp v.property
+    have hw : (w : L) - x ∈ Metric.ball 0 ρ := by
+      simpa only [mem_ball_zero_iff, ← dist_eq_norm] using Metric.mem_ball.mp w.property
+    change f (v : L) = f (w : L) at hvw
+    apply Subtype.ext
+    exact sub_left_inj.mp (hinj hv hw (by rw [map_sub, map_sub, hvw]))
+  let e := (stdOrthonormalBasis ℝ L).repr.symm
+  exact ⟨Module.finrank ℝ L, f.comp e.toLinearEquiv.toAddMonoidHom,
+    hlocal.comp e.toHomeomorph.isLocalHomeomorph⟩
 
 /-- Paper: Theorem D.1.4.2, p. 757. A locally Euclidean LCA group is a product
 of real and torus factors and a discrete abelian group. -/
@@ -396,87 +726,6 @@ private theorem isLocallyEuclidean_of_noSmallCyclicSubgroups
       rintro (rfl : x = 1)
       exact hOne⟩
   exact hPreimage ▸ hV.preimage continuous_subtype_val
-
-open scoped Pointwise in
-/-- Circle-valued characters lift to real logarithms on a simply connected chart.
-These logarithms rule out nontrivial cyclic subgroups in a smaller neighborhood. -/
-private theorem exists_nhds_one_of_isLocallyEuclidean (hG : IsLocallyEuclidean G) :
-    ∃ W ∈ 𝓝 (1 : G), ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1 := by
-  obtain ⟨n, ⟨charts⟩⟩ := hG
-  let E := EuclideanSpace ℝ (Fin n)
-  let e := chartAt E (1 : G)
-  have he : (1 : G) ∈ e.source := mem_chart_source E 1
-  obtain ⟨r, hr, hrb⟩ := Metric.mem_nhds_iff.mp (e.open_target.mem_nhds (e.map_source he))
-  -- Pull back a ball to obtain a simply connected identity neighborhood.
-  let B := Metric.ball (e 1) r
-  let U := e.symm '' B
-  have hU : IsOpen U := (e.symm.isOpen_image_iff_of_subset_source hrb).mpr Metric.isOpen_ball
-  have h1U : (1 : G) ∈ U :=
-    ⟨e 1, Metric.mem_ball_self hr, e.left_inv he⟩
-  let b : B ≃ₜ U := e.symm.homeomorphOfImageSubsetSource hrb rfl
-  let : ContractibleSpace B := (convex_ball _ _).contractibleSpace ⟨_, Metric.mem_ball_self hr⟩
-  let : SimplyConnectedSpace U := b.symm.toHomotopyEquiv.simplyConnectedSpace
-  let : LocallyPathConnectedSpace B := Metric.isOpen_ball.locallyPathConnectedSpace
-  let : LocallyPathConnectedSpace U := b.locallyPathConnectedSpace
-  let : LocallyConnectedSpace G := ChartedSpace.locallyConnectedSpace E G
-  obtain ⟨V₀, hV₀, h1V₀, hprod⟩ := exists_open_nhds_one_mul_subset (hU.mem_nhds h1U)
-  obtain ⟨V, ⟨hV, h1V, hVconn⟩, hVsub⟩ :=
-    (LocallyConnectedSpace.open_connected_basis (1 : G)).mem_iff.mp (hV₀.mem_nhds h1V₀)
-  have hVV : V * V ⊆ U := (Set.mul_subset_mul hVsub hVsub).trans hprod
-  have hVU : V ⊆ U := fun x hx ↦ hVV (mul_one x ▸ Set.mul_mem_mul hx h1V)
-  obtain ⟨K, hK, hKV, hKc⟩ := local_compact_nhds (hV.mem_nhds h1V)
-  refine ⟨K, hK, fun x hx ↦ ?_⟩
-  apply (pontryaginDual_pairing_separates (G := G)).1
-  funext χ
-  let χU : C(U, Circle) := ⟨fun u ↦ χ u, χ.continuous.comp continuous_subtype_val⟩
-  let oneU : U := ⟨1, h1U⟩
-  let oneV : V := ⟨1, h1V⟩
-  obtain ⟨L, ⟨hL0, hL⟩, _⟩ := Circle.isCoveringMap_exp.existsUnique_continuousMap_lifts
-    χU oneU 0 (Circle.exp_zero.trans (map_one χ).symm)
-  have hl (u : U) : Circle.exp (L u) = χ u := congrFun hL u
-  let incl (v : V) : U := ⟨v, hVU v.property⟩
-  let mul (p : V × V) : U := ⟨p.1 * p.2, hVV (Set.mul_mem_mul p.1.property p.2.property)⟩
-  let : ConnectedSpace V := isConnected_iff_connectedSpace.mp hVconn
-  -- Uniqueness of lifts makes the logarithm additive on pairs from the smaller neighborhood.
-  have hAdd (a b : V) : L (mul (a, b)) = L (incl a) + L (incl b) := by
-    have hMul : Continuous mul :=
-      (continuous_subtype_val.comp continuous_fst).mul
-        (continuous_subtype_val.comp continuous_snd) |>.subtype_mk _
-    have hIncl : Continuous incl := continuous_subtype_val.subtype_mk _
-    have hAgree : Circle.exp ∘ (fun p : V × V ↦ L (mul p)) =
-        Circle.exp ∘ (fun p : V × V ↦ L (incl p.1) + L (incl p.2)) := by
-      funext p
-      simp [Circle.exp_add, hl, mul, incl, map_mul]
-    have hStart : L (mul (oneV, oneV)) = L (incl oneV) + L (incl oneV) := by
-      have hmul : mul (oneV, oneV) = oneU := Subtype.ext (one_mul 1)
-      have hincl : incl oneV = oneU := rfl
-      simp [hmul, hincl, hL0]
-    exact congrFun (Circle.isCoveringMap_exp.eq_of_comp_eq (L.continuous.comp hMul)
-      ((L.continuous.comp (hIncl.comp continuous_fst)).add
-        (L.continuous.comp (hIncl.comp continuous_snd))) hAgree (oneV, oneV) hStart) (a, b)
-  -- A nonzero logarithm would grow without bound along the powers inside the compact set.
-  let z (k : ℕ) : V := ⟨x ^ k, hKV (hx k)⟩
-  have hPow (k : ℕ) : L (incl (z k)) = k * L (incl (z 1)) := by
-    induction k with
-    | zero =>
-      have hz : incl (z 0) = oneU := Subtype.ext (pow_zero x)
-      simpa [hz] using hL0
-    | succ k ih =>
-      have hz : incl (z (k + 1)) = mul (z k, z 1) := Subtype.ext (by simp [incl, mul, z, pow_succ])
-      rw [hz, hAdd, ih, Nat.cast_succ, add_mul, one_mul]
-  have hKb : IsCompact (Subtype.val ⁻¹' K : Set U) := by
-    exact IsEmbedding.subtypeVal.isInducing.isCompact_preimage' hKc
-      (Subtype.range_coe.symm ▸ hKV.trans hVU)
-  obtain ⟨M, hM⟩ := (hKb.image L.continuous).isBounded.exists_norm_le
-  have hZero : L (incl (z 1)) = 0 := by
-    by_contra hNe
-    obtain ⟨k, hk⟩ := exists_nat_gt (M / ‖L (incl (z 1))‖)
-    have hLe := hM _ (mem_image_of_mem L (show incl (z k) ∈ Subtype.val ⁻¹' K from hx k))
-    rw [hPow, norm_mul, Real.norm_natCast] at hLe
-    exact (not_lt_of_ge hLe) ((div_lt_iff₀ (norm_pos_iff.mpr hNe)).mp hk)
-  have hValue := hl (incl (z 1))
-  rw [hZero, Circle.exp_zero] at hValue
-  simpa [incl, z] using hValue.symm
 
 omit [T2Space G] in
 /-- If the dual is locally Euclidean, the subgroup generated by a suitable compact
@@ -1503,155 +1752,6 @@ theorem BruhatStructuralPair.quotient_mk_eq_one (p : BruhatStructuralPair G) (x 
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
-omit [T2Space G] in
-open scoped Pointwise in
-/-- A continuous homomorphism to a finite-dimensional torus with discrete kernel has a
-continuous local section over a ball in a linear subspace of the logarithm space. The
-section is a local homomorphism, and the images of small balls are identity neighborhoods. -/
-theorem exists_localSection_of_discrete_torusKernel {ι : Type*} [Fintype ι]
-    (f : G →ₜ* (ι → Circle)) (hf : DiscreteTopology f.toMonoidHom.ker) :
-    ∃ (L : Submodule ℝ (EuclideanSpace ℝ ι)) (ρ : ℝ) (σ : L → G), 0 < ρ ∧ ρ ≤ 1 ∧
-      (∀ v : L, ‖v‖ < ρ → ∀ i, f (σ v) i = Circle.exp ((v : EuclideanSpace ℝ ι) i)) ∧
-      ContinuousOn σ (Metric.ball 0 ρ) ∧
-      (∀ v w : L, ‖v‖ < ρ → ‖w‖ < ρ → ‖v + w‖ < ρ → σ (v + w) = σ v * σ w) ∧
-      (∀ ε > 0, σ '' Metric.ball 0 ε ∈ 𝓝 1) := by
-  classical
-  let ex : EuclideanSpace ℝ ι → (ι → Circle) := fun v i ↦ Circle.exp (v i)
-  have hex : Continuous ex := continuous_pi fun i ↦ Circle.exp.continuous.comp (by fun_prop)
-  have hex0 : ex 0 = 1 := funext fun i ↦ by simp [ex]
-  have hexadd : ∀ v w, ex (v + w) = ex v * ex w := fun v w ↦ funext fun i ↦ by
-    simp [ex, Circle.exp_add]
-  have hexneg : ∀ v, ex (-v) = (ex v)⁻¹ := fun v ↦ funext fun i ↦ by simp [ex]
-  -- A neighborhood meeting the kernel only at the identity.
-  obtain ⟨O, hO, h1O, hOker⟩ : ∃ O : Set G, IsOpen O ∧ (1 : G) ∈ O ∧
-      ∀ x ∈ O, f x = 1 → x = 1 := by
-    have hopen1 : IsOpen ({1} : Set f.toMonoidHom.ker) := isOpen_discrete _
-    obtain ⟨U0, hU0o, hpre⟩ := isOpen_induced_iff.mp hopen1
-    refine ⟨U0, hU0o, ?_, ?_⟩
-    · have : (1 : f.toMonoidHom.ker) ∈ Subtype.val ⁻¹' U0 := by rw [hpre]; rfl
-      simpa using this
-    · intro x hx hfx
-      have hmem : (⟨x, MonoidHom.mem_ker.mpr hfx⟩ : f.toMonoidHom.ker) ∈
-          Subtype.val ⁻¹' U0 := hx
-      rw [hpre] at hmem
-      exact congrArg Subtype.val (Set.mem_singleton_iff.mp hmem)
-  obtain ⟨W, hW, h1W, hWW⟩ := exists_open_nhds_one_mul_subset (hO.mem_nhds h1O)
-  have hWW' : W ∩ W⁻¹ ∈ 𝓝 (1 : G) :=
-    inter_mem (hW.mem_nhds h1W) (inv_mem_nhds_one G (hW.mem_nhds h1W))
-  obtain ⟨V, hV, hVW, hVc⟩ := local_compact_nhds hWW'
-  have hinj : ∀ x ∈ V, ∀ y ∈ V, f x = f y → x = y := by
-    intro x hx y hy hxy
-    have hy' : y⁻¹ ∈ W := (hVW hy).2
-    have hm : x * y⁻¹ ∈ O := hWW (Set.mul_mem_mul (hVW hx).1 hy')
-    have : f (x * y⁻¹) = 1 := by rw [map_mul, map_inv, hxy, mul_inv_cancel]
-    exact mul_inv_eq_one.mp (hOker _ hm this)
-  obtain ⟨C, hC, -, hCinv, hCC⟩ := exists_closed_nhds_one_inv_eq_mul_subset hV
-  have h1C : (1 : G) ∈ C := mem_of_mem_nhds hC
-  have hCV : C ⊆ V := fun x hx ↦ by simpa using hCC (Set.mul_mem_mul hx h1C)
-  -- Small logarithms of values on `V` come from `C`.
-  have hD : IsCompact (f '' (V \ interior C)) :=
-    (hVc.diff isOpen_interior).image f.continuous
-  have h1D : (1 : ι → Circle) ∉ f '' (V \ interior C) := by
-    rintro ⟨x, ⟨hxV, hxC⟩, hfx⟩
-    have : x = 1 := hinj x hxV 1 (mem_of_mem_nhds hV) (by rw [hfx, map_one])
-    exact hxC (this ▸ mem_interior_iff_mem_nhds.mpr hC)
-  obtain ⟨ε, hε, hεD⟩ : ∃ ε > 0, ∀ v : EuclideanSpace ℝ ι, ‖v‖ < ε →
-      ex v ∉ f '' (V \ interior C) := by
-    have hnhds : (f '' (V \ interior C))ᶜ ∈ 𝓝 (ex 0) := by
-      rw [hex0]; exact hD.isClosed.isOpen_compl.mem_nhds h1D
-    obtain ⟨ε, hε, H⟩ := Metric.mem_nhds_iff.mp (hex.continuousAt hnhds)
-    exact ⟨ε, hε, fun v hv ↦ H (by simpa using hv)⟩
-  have hlift : ∀ v : EuclideanSpace ℝ ι, ‖v‖ < ε → ∀ x ∈ V, f x = ex v → x ∈ C := by
-    intro v hv x hx hfx
-    by_contra hxC
-    exact hεD v hv ⟨x, ⟨hx, fun h ↦ hxC (interior_subset h)⟩, hfx⟩
-  -- The logarithms of the image form a closed local subgroup.
-  set R := min (ε / 2) 1 with hRdef
-  have hR : 0 < R := lt_min (half_pos hε) one_pos
-  have hRε : R < ε := (min_le_left _ _).trans_lt (half_lt_self hε)
-  have hR1 : R ≤ 1 := min_le_right _ _
-  let A : Set (EuclideanSpace ℝ ι) := {v | ‖v‖ ≤ R ∧ ex v ∈ f '' V}
-  have hAc : IsClosed A :=
-    (isClosed_le continuous_norm continuous_const).inter
-      ((hVc.image f.continuous).isClosed.preimage hex)
-  have hA0 : (0 : EuclideanSpace ℝ ι) ∈ A :=
-    ⟨by simp [hR.le], ⟨1, mem_of_mem_nhds hV, by rw [map_one, hex0]⟩⟩
-  have hAmemC : ∀ v ∈ A, ∃ x ∈ C, f x = ex v := by
-    rintro v ⟨hv, x, hx, hfx⟩
-    exact ⟨x, hlift v (hv.trans_lt hRε) x hx hfx, hfx⟩
-  have hAsym : ∀ v ∈ A, -v ∈ A := by
-    intro v hvA
-    obtain ⟨x, hxC, hfx⟩ := hAmemC v hvA
-    have hxC' : x⁻¹ ∈ C := by rw [← hCinv]; simpa using hxC
-    exact ⟨by simpa using hvA.1, x⁻¹, hCV hxC', by rw [map_inv, hfx, hexneg]⟩
-  have hAadd : ∀ v ∈ A, ∀ w ∈ A, ‖v + w‖ ≤ R → v + w ∈ A := by
-    intro v hv w hw hvw
-    obtain ⟨x, hxC, hfx⟩ := hAmemC v hv
-    obtain ⟨y, hyC, hfy⟩ := hAmemC w hw
-    exact ⟨hvw, x * y, hCC (Set.mul_mem_mul hxC hyC), by rw [map_mul, hfx, hfy, hexadd]⟩
-  obtain ⟨L, ε₁, hε₁, hε₁R, hAL⟩ :=
-    exists_subspace_ball_eq_of_localSubgroup hR hAc hA0 hAsym hAadd
-  have hLA : ∀ v : EuclideanSpace ℝ ι, v ∈ L → ‖v‖ ≤ ε₁ → v ∈ A := by
-    intro v hvL hv
-    have : v ∈ (L : Set (EuclideanSpace ℝ ι)) ∩ Metric.closedBall 0 ε₁ :=
-      ⟨hvL, by simpa using hv⟩
-    rw [← hAL] at this
-    exact this.1
-  have hAL' : ∀ v ∈ A, ‖v‖ ≤ ε₁ → v ∈ L := by
-    intro v hvA hv
-    have : v ∈ A ∩ Metric.closedBall 0 ε₁ := ⟨hvA, by simpa using hv⟩
-    rw [hAL] at this
-    exact this.1
-  let σ : L → G := fun v ↦ Function.invFunOn f C (ex v)
-  have hσ : ∀ v : L, ‖v‖ < ε₁ → σ v ∈ C ∧ f (σ v) = ex v := by
-    intro v hv
-    exact Function.invFunOn_pos (hAmemC _ (hLA _ v.2 hv.le))
-  refine ⟨L, ε₁, σ, hε₁, hε₁R.trans hR1, ?_, ?_, ?_, ?_⟩
-  · intro v hv i
-    exact congrFun (hσ v hv).2 i
-  · rw [continuousOn_iff_continuous_domRestrict]
-    let gV : V → (ι → Circle) := fun x ↦ f x
-    have : CompactSpace V := isCompact_iff_compactSpace.mp hVc
-    have hgV : IsClosedEmbedding gV :=
-      (f.continuous.comp continuous_subtype_val).isClosedEmbedding
-        (fun x y hxy ↦ Subtype.ext (hinj x x.2 y y.2 hxy))
-    let σ' : Metric.ball (0 : L) ε₁ → V := fun v ↦
-      ⟨σ v, hCV (hσ v (mem_ball_zero_iff.mp v.2)).1⟩
-    have hσ' : Continuous σ' := by
-      rw [hgV.isInducing.continuous_iff]
-      have e : gV ∘ σ' = fun v : Metric.ball (0 : L) ε₁ ↦ ex ((v : L) : EuclideanSpace ℝ ι) :=
-        funext fun v ↦ (hσ v (mem_ball_zero_iff.mp v.2)).2
-      rw [e]
-      exact hex.comp (continuous_subtype_val.comp continuous_subtype_val)
-    exact continuous_subtype_val.comp hσ'
-  · intro v w hv hw hvw
-    have h1 := hσ v hv
-    have h2 := hσ w hw
-    have h3 := hσ (v + w) hvw
-    refine hinj _ (hCV h3.1) _ (hCC (Set.mul_mem_mul h1.1 h2.1)) ?_
-    rw [map_mul, h1.2, h2.2, h3.2, ← hexadd]
-    rfl
-  · intro ε' hε'
-    set ε'' := min ε' ε₁ with hε''def
-    have hε'' : 0 < ε'' := lt_min hε' hε₁
-    have hnear : ∀ᶠ x in 𝓝 (1 : G), x ∈ interior C ∧
-        ∃ u : EuclideanSpace ℝ ι, ‖u‖ < ε'' ∧ ∀ i, Circle.exp (u i) = f x i := by
-      refine Filter.Eventually.and (show ∀ᶠ x in 𝓝 (1 : G), x ∈ interior C from
-        isOpen_interior.mem_nhds (mem_interior_iff_mem_nhds.mpr hC)) ?_
-      have ht : Tendsto f (𝓝 (1 : G)) (𝓝 1) := by
-        have := (map_continuous f).tendsto (1 : G)
-        rwa [map_one] at this
-      exact ht.eventually (eventually_exists_small_circleLog hε'')
-    apply Filter.mem_of_superset hnear
-    rintro x ⟨hxC, u, hu, hux⟩
-    have hfx : f x = ex u := funext fun i ↦ (hux i).symm
-    have hu1 : ‖u‖ < ε₁ := hu.trans_le (min_le_right _ _)
-    have huA : u ∈ A := ⟨hu1.le.trans hε₁R, x, hCV (interior_subset hxC), hfx⟩
-    have huL : u ∈ L := hAL' u huA hu1.le
-    refine ⟨⟨u, huL⟩, by simpa using hu.trans_le (min_le_left _ _), ?_⟩
-    have hs := hσ ⟨u, huL⟩ (by simpa using hu1)
-    exact hinj _ (hCV hs.1) _ (hCV (interior_subset hxC)) (by rw [hs.2, hfx])
-
 omit [T2Space G] [LocallyCompactSpace G] in
 /-- Translating a chart at the identity gives charts everywhere. -/
 theorem isLocallyEuclidean_of_chart_at_one {k : ℕ}
@@ -1729,54 +1829,6 @@ theorem isLocallyEuclidean_of_torusHom_discreteKernel {ι : Type*} [Fintype ι]
       IsOpenEmbedding.toOpenPartialHomeomorph_source, preimage_univ, inter_univ]
     exact ⟨⟨0, Metric.mem_ball_self hρ⟩, hσ0⟩
   exact isLocallyEuclidean_of_chart_at_one e he
-
-/-- A neighborhood containing no nontrivial cyclic subgroup gives finitely many characters
-whose joint kernel is discrete. -/
-theorem exists_torusHom_of_noSmallCyclicSubgroups
-    {W : Set G} (hW : W ∈ 𝓝 (1 : G))
-    (hPow : ∀ x : G, (∀ k : ℕ, x ^ k ∈ W) → x = 1) :
-    ∃ (t : Finset (PontryaginDual G)) (f : G →ₜ* (t → Circle)),
-      (∀ x (χ : t), f x χ = χ.val x) ∧ DiscreteTopology f.toMonoidHom.ker := by
-  classical
-  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (1 : G)
-  obtain ⟨V, hV, hOne, hVV⟩ := exists_open_nhds_one_mul_subset (inter_mem hKnhds hW)
-  have hVW : V ⊆ W := fun x hx ↦ (hVV (mul_one x ▸ Set.mul_mem_mul hx hOne)).2
-  let S (χ : PontryaginDual G) : Set G := {x | χ x ≠ 1}
-  have hCover : K \ V ⊆ ⋃ χ, S χ := by
-    intro x hx
-    have hx1 : x ≠ 1 := fun h ↦ hx.2 (h ▸ hOne)
-    have hSep := (pontryaginDual_pairing_separates (G := G)).1
-    obtain ⟨χ, hχ⟩ : ∃ χ : PontryaginDual G, χ x ≠ 1 := by
-      by_contra! hn
-      exact hx1 (hSep (funext fun χ ↦ (hn χ).trans (map_one χ).symm))
-    exact mem_iUnion.mpr ⟨χ, hχ⟩
-  obtain ⟨t, ht⟩ := (hK.diff hV).elim_finite_subcover S
-    (fun χ ↦ (isClosed_eq χ.continuous continuous_const).isOpen_compl) hCover
-  let f : G →ₜ* (t → Circle) :=
-    { toFun := fun x χ ↦ χ.val x
-      map_one' := funext fun χ ↦ map_one χ.val
-      map_mul' := fun x y ↦ funext fun χ ↦ map_mul χ.val x y
-      continuous_toFun := continuous_pi fun χ ↦ χ.val.continuous }
-  refine ⟨t, f, fun _ _ ↦ rfl, discreteTopology_of_isOpen_singleton_one ?_⟩
-  have hKer (x : f.toMonoidHom.ker) (hx : (x : G) ∈ V) : x = 1 := by
-    have hr (k : ℕ) : (x : G) ^ k ∈ V := by
-      induction k with
-      | zero => simpa using hOne
-      | succ k ih =>
-        have hKmem : (x : G) ^ (k + 1) ∈ K :=
-          (hVV (pow_succ (x : G) k ▸ Set.mul_mem_mul ih hx)).1
-        by_contra hn
-        obtain ⟨χ, hχt, hχ⟩ := mem_iUnion₂.mp (ht ⟨hKmem, hn⟩)
-        have hχx : χ (x : G) = 1 :=
-          congrFun (MonoidHom.mem_ker.mp x.property) ⟨χ, hχt⟩
-        exact hχ (by rw [map_pow, hχx, one_pow])
-    exact Subtype.ext (hPow x fun k ↦ hVW (hr k))
-  have hPreimage : (Subtype.val : f.toMonoidHom.ker → G) ⁻¹' V = {1} := by
-    ext x
-    exact ⟨fun hx ↦ mem_singleton_iff.mpr (hKer x hx), by
-      rintro (rfl : x = 1)
-      exact hOne⟩
-  exact hPreimage ▸ hV.preimage continuous_subtype_val
 
 /-- The dual of a locally Euclidean LCA group is compactly generated: the characters
 from a torus homomorphism with discrete kernel, together with a compact polar
