@@ -9,6 +9,7 @@ import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.NatInt
 
 /-!
@@ -962,9 +963,38 @@ theorem isShrinking_of_isAbsolute : IsShrinking x f := by
   rw [heval]
   simpa only [Metric.mem_ball, dist_zero_right, sub_apply, hs u, zero_sub, norm_neg] using h
 
+-- Retain the section hypotheses in the theorem's signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
 barrelled reflexive space is boundedly complete. -/
-theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by sorry
+theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by
+  intro a haBounded
+  let s (k : ℕ) : E := ∑ m ∈ Finset.Iic k, a m • x m
+  let S : ℕ → WeakDual ℂ (StrongDual ℂ E) := fun k ↦
+    StrongDual.toWeakDual (ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (s k))
+  -- Boundedness puts the evaluated partial sums in a weak-star compact polar.
+  let U : Set (StrongDual ℂ E) := {g | MapsTo g (range s) (Metric.ball 0 1)}
+  have hU : U ∈ 𝓝 (0 : StrongDual ℂ E) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo haBounded (Metric.ball_mem_nhds _ zero_lt_one)
+  have hS (k : ℕ) : S k ∈ WeakDual.polar ℂ U := fun g hg ↦
+    (mem_ball_zero_iff.mp (hg (mem_range_self k))).le
+  have hfilter : Filter.map S atTop ≤ 𝓟 (WeakDual.polar ℂ U) := by
+    rw [Filter.le_principal_iff, Filter.mem_map]
+    exact Eventually.of_forall hS
+  obtain ⟨φ, _, hφ⟩ := (isCompact_weakDual_polar hU).exists_mapClusterPt hfilter
+  obtain ⟨u, hu⟩ := hReflexive.surjective φ.toStrongDual
+  -- Each coordinate stabilizes, so the vector representing the cluster point has coefficients a.
+  have hcoeff (m : ℕ) : f m u = a m := by
+    have hcl := hφ.continuousAt_comp (WeakDual.eval_continuous (f m)).continuousAt
+    have heq : ∀ᶠ k : ℕ in atTop, S k (f m) = a m := by
+      filter_upwards [eventually_ge_atTop m] with k hk
+      change f m (s k) = a m
+      have horth (n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+      simp [s, map_sum, map_smul, horth, smul_eq_mul, mul_ite, Finset.mem_Iic, hk]
+    have hval : φ (f m) ∈ ({a m} : Set ℂ) :=
+      isClosed_singleton.mem_of_mapClusterPt hcl heq
+    exact (congrArg (fun g : StrongDual ℂ (StrongDual ℂ E) ↦ g (f m)) hu).trans hval
+  exact ⟨u, by simpa only [ContinuousLinearMap.coe_coe, hcoeff] using hb.2 u⟩
 
 /-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
 unconditional, with coefficients given by evaluation at the original basis vectors. -/
