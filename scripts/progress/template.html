@@ -53,11 +53,14 @@
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.5 var(--font-ui); }
 .page {
-  max-width: 1240px; margin: 0 auto; padding-block: 28px 56px;
+  margin: 0 auto; padding-block: 28px 56px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   display: flex; flex-direction: column; gap: 28px;
 }
+/* Text stays at a readable width; the section map may use the whole window. */
+.page > * { width: 100%; max-width: 1208px; margin-inline: auto; }
+.page > .mapbox { max-width: none; }
 a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
 a:hover { text-decoration-thickness: 2px; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
@@ -134,6 +137,16 @@ button { font: inherit; color: inherit; }
 
 /* Grid diagrams */
 .dg-wrap { overflow-x: auto; padding-bottom: 4px; }
+/* Section map: a box no taller than the window, so both scrollbars stay on screen. */
+.mapbox { display: flex; flex-direction: column; gap: 8px; }
+.map-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12px; color: var(--ink-3); }
+.map-tools button { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 12px; }
+.map-tools button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.map-tools .hint { margin-left: 6px; }
+.mapbox .dg-wrap { overflow: auto; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px);
+  border: 1px solid var(--line); border-radius: 10px; padding: 4px 0; cursor: grab; }
+.mapbox .dg-wrap.dragging { cursor: grabbing; }
+.mapbox .dg { margin-inline: auto; user-select: none; -webkit-user-select: none; }
 .dg { position: relative; }
 .dg svg.edges { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .dg .e path.l { fill: none; stroke: var(--edge); stroke-width: 1.2; opacity: .75; }
@@ -508,6 +521,7 @@ function diagram(opts) {
       edgeEls.push({ el: g, t: t.key, f: f.key });
     });
     highlight(pinned);
+    if (api.onDraw) api.onDraw();
   }
 
   function rounded(pts, r) {
@@ -551,6 +565,61 @@ function diagram(opts) {
   if (window.ResizeObserver) new ResizeObserver(later).observe(wrap); else window.addEventListener('resize', later);
   later();
   return api;
+}
+
+/* ---------- section map box: zoom presets and drag to pan ---------- */
+function mapBox(dg) {
+  const wrap = dg.el, root = wrap.firstChild;
+  const MODES = [['actual', '100%'], ['width', 'Fit width'], ['all', 'Whole map']];
+  let mode = 'actual';
+  try { const m = localStorage.getItem('progress-map-zoom'); if (MODES.some(x => x[0] === m)) mode = m; } catch (e) { /* no storage */ }
+  const btns = {};
+  function apply() {
+    const w = parseFloat(root.style.width), ht = parseFloat(root.style.height);
+    let z = 1;
+    if (w && ht && mode !== 'actual') {
+      const fitW = (wrap.clientWidth - 2) / w;
+      z = mode === 'width' ? fitW : Math.min(fitW, (window.innerHeight - 40) / ht);
+    }
+    z = Math.min(1, Math.max(0.2, z));
+    root.style.zoom = z === 1 ? '' : String(z);
+    for (const k in btns) btns[k].setAttribute('aria-pressed', String(k === mode));
+  }
+  const tools = h('div', { class: 'map-tools' }, 'Zoom',
+    MODES.map(([k, label]) => (btns[k] = h('button', { type: 'button', onclick: () => {
+      mode = k; try { localStorage.setItem('progress-map-zoom', k); } catch (e) { /* no storage */ }
+      apply();
+    } }, label))),
+    h('span', { class: 'hint' }, 'Drag the map to pan.'));
+  dg.onDraw = apply;
+  window.addEventListener('resize', () => requestAnimationFrame(apply));
+
+  // Drag to pan with the mouse; a drag never counts as a click on a card.
+  let drag = null, moved = false;
+  wrap.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const r = wrap.getBoundingClientRect();
+    // Leave the scrollbars to the browser.
+    if (e.clientX - r.left - wrap.clientLeft >= wrap.clientWidth || e.clientY - r.top - wrap.clientTop >= wrap.clientHeight) return;
+    drag = { x: e.clientX, y: e.clientY, l: wrap.scrollLeft, t: wrap.scrollTop, id: e.pointerId };
+    moved = false;
+  });
+  wrap.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!moved) {
+      if (Math.hypot(dx, dy) < 5) return;
+      moved = true; wrap.classList.add('dragging'); wrap.setPointerCapture(drag.id);
+    }
+    wrap.scrollLeft = drag.l - dx; wrap.scrollTop = drag.t - dy;
+  });
+  const end = () => { if (drag) { drag = null; wrap.classList.remove('dragging'); } };
+  wrap.addEventListener('pointerup', end);
+  wrap.addEventListener('pointercancel', end);
+  wrap.addEventListener('click', e => { if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; } }, true);
+  wrap.addEventListener('dragstart', e => e.preventDefault());
+  apply();
+  return h('div', { class: 'mapbox' }, tools, wrap);
 }
 
 /* ---------- shared pieces ---------- */
@@ -636,8 +705,8 @@ function overview() {
     el.appendChild(h('span', { class: 'r1' }, stateIcon(st), h('span', { class: 'n' }, g.num)));
     el.appendChild(h('span', { class: 't' }, g.title));
     el.appendChild(g.thms ?
-      h('span', { class: 'r3' }, st === 'complete' ? h('span', { class: 'word complete' }, 'complete') : null,
-        progressBar(g), h('span', { class: 'num' }, g.proved + '/' + g.thms)) :
+      h('span', { class: 'r3' }, st === 'complete' ? h('span', { class: 'word complete', style: 'flex:1' }, 'complete') : progressBar(g),
+        h('span', { class: 'num' }, g.proved + '/' + g.thms)) :
       g.defs ? h('span', { class: 'r3' }, plural(g.defs, 'definition')) :
       h('span', { class: 'r3' }, h('span', { class: 'word ' + g.state }, STATE_WORD[g.state]),
         g.state === 'digesting' ? null : h('span', { class: 'pp' }, fmtPages(g.pages))));
@@ -665,7 +734,7 @@ function overview() {
     h('h2', null, 'Sections'),
     h('p', null, 'One card per section issue, in a lane per chapter. A section sits below everything it needs, so work flows downward. Select a card to see its items and declarations.'),
     legend));
-  frag.push(dg.el);
+  frag.push(mapBox(dg));
 
   /* extras: ForMathlib and unplaced files */
   const extras = D.groups.filter(g => g.id == null);
