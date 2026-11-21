@@ -5,6 +5,8 @@ public import Mathlib.Analysis.LocallyConvex.Barrelled
 public import Mathlib.Analysis.LocallyConvex.Polar
 import Mathlib.Analysis.LocallyConvex.WeakDual
 import Mathlib.Analysis.Normed.Module.Dual
+import Mathlib.Analysis.Normed.Operator.BanachSteinhaus
+import Mathlib.Analysis.Normed.Operator.Completeness
 import Mathlib.Topology.Algebra.Module.UniformConvergence
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.BanachSteinhaus
 
@@ -363,7 +365,24 @@ variable (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteS
 
 /-- Paper: Remark C.2.1.8, p. 672. The strong operator topology on the bounded operators
 of any Hilbert space is quasi-complete. -/
-theorem hilbert_pointwiseOperators_quasiComplete : QuasiCompleteSpace ℂ (H →Lₚₜ[ℂ] H) := by sorry
+theorem hilbert_pointwiseOperators_quasiComplete : QuasiCompleteSpace ℂ (H →Lₚₜ[ℂ] H) := by
+  constructor
+  intro s hs hclosed
+  -- Uniform boundedness turns the bounds on evaluations into an operator-norm bound.
+  have hnorm : Bornology.IsBounded (α := H →L[ℂ] H) s := by
+    obtain ⟨C, hC⟩ := banach_steinhaus (g := fun f : s ↦ (f.val : H →L[ℂ] H)) fun x ↦ by
+      let ev := PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H x
+      obtain ⟨M, hM⟩ := isBounded_iff_forall_norm_le.mp ((NormedSpace.isVonNBounded_iff ℂ).mp
+        (hs.image ev))
+      exact ⟨M, fun f ↦ hM (ev f.val) (mem_image_of_mem ev f.property)⟩
+    exact isBounded_iff_forall_norm_le.mpr ⟨C, fun f hf ↦ hC ⟨f, hf⟩⟩
+  -- The image is closed in the complete product of copies of H.
+  have hcoe := PointwiseConvergenceCLM.isUniformEmbedding_coeFn (RingHom.id ℂ) H H
+  apply hcoe.isUniformInducing.isComplete_iff.mp
+  apply IsClosed.isComplete
+  apply ContinuousLinearMap.isClosed_image_coe_of_bounded_of_weak_closed hnorm
+  rw [hcoe.isEmbedding.isInducing.eq_induced] at hclosed
+  exact isClosed_induced_iff'.mp hclosed
 
 -- The operator-norm completeness and quasi-completeness in Remark C.2.1.8 are already
 -- stated in §C.1 as the last two conclusions of `hilbert_quasiComplete_examples`.
