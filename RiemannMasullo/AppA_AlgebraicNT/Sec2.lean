@@ -262,7 +262,20 @@ theorem adeleFundamentalDomain_cover :
 closure of the fundamental domain meet a given compact subset of the adeles. -/
 theorem adeleFundamentalDomain_finite_translates (K : Set 𝔸[F]) (hK : IsCompact K) :
     {x : F | ((algebraMap F 𝔸[F] x +ᵥ closure (adeleFundamentalDomain F b)) ∩ K).Nonempty}.Finite := by
-  sorry
+  let d := algebraMap F 𝔸[F]
+  let D := closure (adeleFundamentalDomain F b)
+  obtain ⟨hinj, hclosed, hdiscrete, -⟩ := adele_additive_quotient.{_, 0} F
+  have hdiff : IsCompact (K - D) := by
+    change IsCompact (Set.image2 (· - ·) K D)
+    rw [← Set.image_prod]
+    exact (hK.prod (adeleFundamentalDomain_precompact F b)).image
+      (continuous_fst.sub continuous_snd)
+  have hfinite : ((K - D) ∩ Set.range d).Finite :=
+    (hdiff.inter_right hclosed).finite (hdiscrete.mono Set.inter_subset_right)
+  refine (hfinite.preimage hinj.injOn).subset ?_
+  rintro x ⟨y, hy, hyK⟩
+  obtain ⟨a, ha, rfl⟩ := Set.mem_vadd_set.mp hy
+  exact ⟨Set.mem_sub.mpr ⟨d x + a, hyK, a, ha, add_sub_cancel_right _ _⟩, ⟨x, rfl⟩⟩
 
 /-- Paper: Example A.2.1.3, p. 545. For the rational field the domain is the interval
 from zero inclusive to one exclusive times the product of the finite local integer rings. -/
