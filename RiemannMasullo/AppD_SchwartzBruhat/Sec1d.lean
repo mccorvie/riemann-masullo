@@ -285,7 +285,32 @@ group isomorphism between the identity components. -/
 theorem sIdeleClassInsertion_connectedComponent :
     ∃ e : Subgroup.connectedComponentOfOne (SIdeleClassGroup F S) ≃ₜ*
         Subgroup.connectedComponentOfOne C[F],
-      ∀ x, (e x).val = sIdeleClassInsertion F S x.val := by sorry
+      ∀ x, (e x).val = sIdeleClassInsertion F S x.val := by
+  let f := sIdeleClassInsertion F S
+  let A := Subgroup.connectedComponentOfOne (SIdeleClassGroup F S)
+  let B := Subgroup.connectedComponentOfOne C[F]
+  have hf : IsOpenEmbedding f := sIdeleClassInsertion_isOpenEmbedding F S
+  have hrange : IsClopen (f.range : Set C[F]) :=
+    ⟨f.range.isClosed_of_isOpen hf.isOpen_range, hf.isOpen_range⟩
+  have hB : (B : Set C[F]) ⊆ range f := hrange.connectedComponent_subset f.range.one_mem
+  have hpre : IsPreconnected (f ⁻¹' (B : Set C[F])) := by
+    apply hf.isEmbedding.isInducing.isPreconnected_image.mp
+    rw [image_preimage_eq_of_subset hB]
+    exact isPreconnected_connectedComponent
+  have hpreA : f ⁻¹' (B : Set C[F]) ⊆ A :=
+    hpre.subset_connectedComponent (show f 1 ∈ B from (map_one f).symm ▸ B.one_mem)
+  have hmap (x : A) : f x.val ∈ B := by
+    change f x.val ∈ connectedComponent (1 : C[F])
+    simpa only [map_one] using hf.continuous.mapsTo_connectedComponent 1 x.property
+  let g : A →* B := (f.comp A.subtype).codRestrict B hmap
+  have hg : IsEmbedding g :=
+    (hf.isEmbedding.comp IsEmbedding.subtypeVal).codRestrict (B : Set C[F]) hmap
+  have hsurj : Surjective g := by
+    intro y
+    obtain ⟨x, hx⟩ := hB y.property
+    exact ⟨⟨x, hpreA (show f x ∈ B from hx.symm ▸ y.property)⟩, Subtype.ext hx⟩
+  let e := MulEquiv.ofBijective g ⟨hg.injective, hsurj⟩
+  exact ⟨{ e, e.toEquiv.toHomeomorphOfIsInducing hg.isInducing with }, fun _ ↦ rfl⟩
 
 /-- Paper: Lemma D.1.10.1(3), p. 784. For all sufficiently large finite sets the
 insertion is surjective, and hence is an isomorphism by openness and injectivity. -/

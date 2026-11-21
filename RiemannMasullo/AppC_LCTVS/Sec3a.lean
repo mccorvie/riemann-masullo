@@ -2245,12 +2245,16 @@ theorem tendsto_compact_comp_of_pointwise {A Q : H →L[ℂ] H} {Qm : ℕ → H 
 /-- Paper: Lemma C.3.4.4(1), p. 698. Left multiplication by a bounded operator
 preserves nuclearity. -/
 theorem mul_mem_nuclearEndomorphisms_left (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    A * T.val ∈ nuclearEndomorphisms H := by sorry
+    A * T.val ∈ nuclearEndomorphisms H :=
+  isNuclearOperator_postcomp_hilbert T.property A
 
 /-- Paper: Lemma C.3.4.4(1), p. 698. Right multiplication by a bounded operator
 preserves nuclearity. -/
 theorem mul_mem_nuclearEndomorphisms_right (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    T.val * A ∈ nuclearEndomorphisms H := by sorry
+    T.val * A ∈ nuclearEndomorphisms H := by
+  change IsNuclearOperator (T.val.comp A)
+  simpa only [ContinuousLinearMap.id_comp] using
+    isNuclearOperator_comp_comp T.property A (ContinuousLinearMap.id ℂ H) injective_id
 
 /-- Paper: Lemma C.3.4.4(1), p. 698. The trace norm satisfies the normed-space
 axioms on the complex vector space of nuclear endomorphisms. -/

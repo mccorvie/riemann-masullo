@@ -1,13 +1,16 @@
 module
 
 public import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
+public import Mathlib.Analysis.Normed.Module.Basic
 public import Mathlib.Topology.Connected.LocallyPathConnected
 public import Mathlib.Topology.Covering.AddCircle
 public import Mathlib.Topology.Instances.AddCircle.Real
+public import Mathlib.Topology.Instances.RealVectorSpace
+import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Analysis.LocallyConvex.WithSeminorms
 import Mathlib.Analysis.Normed.Module.Connected
 import Mathlib.Topology.Algebra.Module.LocallyConvex
 import Mathlib.Topology.Homotopy.Lifting
-import Mathlib.Topology.Instances.RealVectorSpace
 
 public section
 
@@ -36,6 +39,15 @@ theorem exists_addCircle_addMonoidHom_lift {A : Type*} [AddGroup A] [Topological
       ((L.continuous.comp continuous_fst).add (L.continuous.comp continuous_snd))
       hAgree (0, 0) (by simp [hL0])) (s, t)
   exact ⟨{ toFun := L, map_zero' := hL0, map_add' := hAdd }, L.continuous, hLift⟩
+
+/-- A continuous homomorphism from a real normed vector space to the additive
+circle lifts to a continuous real-linear functional. -/
+theorem exists_addCircle_coe_linearMap_eq
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (a : E →+ AddCircle (1 : ℝ)) (ha : Continuous a) :
+    ∃ l : E →L[ℝ] ℝ, ∀ y, (l y : AddCircle (1 : ℝ)) = a y := by
+  obtain ⟨L, hL, hLift⟩ := exists_addCircle_addMonoidHom_lift a ha
+  exact ⟨L.toRealLinearMap hL, hLift⟩
 
 /-- A continuous homomorphism from the real line to the additive circle lifts to
 multiplication by a real scalar. -/

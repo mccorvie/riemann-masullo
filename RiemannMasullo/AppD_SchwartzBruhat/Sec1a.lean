@@ -1827,7 +1827,49 @@ include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. The integral on the quotient
 equals the integral of its pullback over a Borel fundamental domain. -/
 theorem weilFundamentalDomain_integral {f : G ⧸ H → ℂ} (hf : Integrable f ν) :
-    (∫ q, f q ∂ν) = ∫ x in Δ, f (QuotientGroup.mk x) ∂μ := by sorry
+    (∫ q, f q ∂ν) = ∫ x in Δ, f (QuotientGroup.mk x) ∂μ := by
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  let : IsClosed (H : Set G) := hH
+  let : (Measure.count : Measure H).IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let π : G → G ⧸ H := QuotientGroup.mk
+  have hπ : Measurable π := QuotientGroup.continuous_mk.measurable
+  let tr (q : G ⧸ H) (h : H) : G := q.out * (h : G)
+  let κ (q : G ⧸ H) : Measure G := Measure.count.map (tr q)
+  have hκ : Measurable κ ∧ ν.bind κ = μ :=
+    weilMeasure_eq_bind H hH μ Measure.count ν hν
+  have hmap : (μ.restrict Δ).map π = ν := by
+    ext S hS
+    have hSΔ := (hπ hS).inter hΔ
+    rw [Measure.map_apply hπ hS, Measure.restrict_apply (hπ hS), ← hκ.2,
+      Measure.bind_apply hSΔ hκ.1.aemeasurable, ← lintegral_indicator_one hS]
+    congr with q
+    have htr : Measurable (tr q) := (continuous_const.mul continuous_subtype_val).measurable
+    have hq (h : H) : π (tr q h) = q :=
+      (QuotientGroup.mk_mul_of_mem q.out h.property).trans (Quotient.out_eq' q)
+    change Measure.count.map (tr q) (π ⁻¹' S ∩ Δ) = S.indicator 1 q
+    rw [Measure.map_apply htr hSΔ]
+    by_cases hqS : q ∈ S
+    · obtain ⟨a, ha⟩ := hbij.2 q
+      let k : H := ⟨q.out⁻¹ * (a : G), QuotientGroup.eq.mp ((Quotient.out_eq' q).trans ha.symm)⟩
+      have hk : tr q k = a := mul_inv_cancel_left _ _
+      have hsingleton : tr q ⁻¹' (π ⁻¹' S ∩ Δ) = {k} := by
+        ext h
+        change (π (tr q h) ∈ S ∧ tr q h ∈ Δ) ↔ h = k
+        constructor
+        · rintro ⟨_, hh⟩
+          have heq : (⟨tr q h, hh⟩ : Δ) = a := hbij.1 ((hq h).trans ha.symm)
+          apply Subtype.ext
+          exact mul_left_cancel ((congrArg Subtype.val heq).trans hk.symm)
+        · rintro rfl
+          exact ⟨(hq k).symm ▸ hqS, hk.symm ▸ a.property⟩
+      rw [hsingleton, Measure.count_singleton, indicator_of_mem hqS, Pi.one_apply]
+    · have hempty : tr q ⁻¹' (π ⁻¹' S ∩ Δ) = ∅ :=
+        eq_empty_iff_forall_notMem.mpr fun h hh ↦ hqS ((hq h) ▸ hh.1)
+      rw [hempty, measure_empty, indicator_of_notMem hqS]
+  rw [← hmap] at hf ⊢
+  exact integral_map hπ.aemeasurable hf.aestronglyMeasurable
 
 include hH hΔ hbij in
 /-- Paper: Corollary D.1.2.5, p. 748. The integral of a subgroup-invariant function

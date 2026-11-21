@@ -856,6 +856,34 @@ theorem weaklyHolomorphicOn_iff_taylor :
         TendstoUniformlyOn (fun n w ↦ ∑ k ∈ Finset.range n, (w - z) ^ k • a k)
           f atTop (Metric.closedBall z r) := by sorry
 
+omit hΩ hconn in
+/-- The Taylor series of a Banach-valued holomorphic function converges uniformly
+on every smaller open disc. -/
+private theorem taylor_uniformlyOn_normed {F : Type*} [NormedAddCommGroup F]
+    [NormedSpace ℂ F] [CompleteSpace F] {g : ℂ → F} {z : ℂ} {R r : NNReal} (hr : r < R)
+    (hg : DifferentiableOn ℂ g (Metric.closedBall z R)) :
+    TendstoUniformlyOn
+      (fun n w ↦ ∑ k ∈ Finset.range n,
+        ((w - z) ^ k / (k.factorial : ℂ)) • iteratedDeriv k g z)
+      g atTop (Metric.ball z r) := by
+  have hR : 0 < R := lt_of_le_of_lt zero_le hr
+  have hs := hg.hasFPowerSeriesOnBall hR
+  have hu := hs.tendstoUniformlyOn' (show (r : ENNReal) < R from by exact_mod_cast hr)
+  convert hu using 1
+  funext n w
+  simp only [FormalMultilinearSeries.partialSum]
+  apply Finset.sum_congr rfl
+  intro k hk
+  have he := hs.factorial_smul (w - z) k
+  rw [iteratedDeriv_eq_iteratedFDeriv]
+  have hm := ((iteratedFDeriv ℂ k g z).map_smul_univ (fun _ ↦ w - z) (fun _ ↦ 1))
+  simp only [smul_eq_mul, mul_one, Finset.prod_const, Finset.card_fin] at hm
+  rw [hm] at he
+  have hn : (k.factorial : ℂ) ≠ 0 := by exact_mod_cast Nat.factorial_ne_zero k
+  apply (smul_right_injective F hn)
+  rw [← Nat.cast_smul_eq_nsmul ℂ] at he
+  simpa [div_eq_mul_inv, smul_smul, mul_comm, mul_left_comm, mul_assoc, hn] using he.symm
+
 /-- Paper: (C.5.2.5), p. 738. The Taylor coefficients are the vector derivatives
 at the center divided by the corresponding factorials. -/
 theorem tendstoUniformlyOn_taylor_derivatives (hf : ∀ k : ℕ,
@@ -864,7 +892,72 @@ theorem tendstoUniformlyOn_taylor_derivatives (hf : ∀ k : ℕ,
     TendstoUniformlyOn
       (fun n w ↦ ∑ k ∈ Finset.range n,
         ((w - z) ^ k / (k.factorial : ℂ)) • (deriv^[k] f) z)
-      f atTop (Metric.closedBall z r) := by sorry
+      f atTop (Metric.closedBall z r) := by
+  obtain ⟨δ, hδ, hδsub⟩ := (isCompact_closedBall z r).exists_thickening_subset_open hΩ hdisc
+  rw [thickening_closedBall hδ hr.le z] at hδsub
+  let R : NNReal := ⟨r + δ / 2, by positivity⟩
+  let R' : NNReal := ⟨r + δ / 4, by positivity⟩
+  have hRR : R' < R := by change r + δ / 4 < r + δ / 2; linarith
+  have hball : Metric.closedBall z (R : ℝ) ⊆ Ω :=
+    (Metric.closedBall_subset_ball (by change r + δ / 2 < δ + r; linarith)).trans hδsub
+  have hball' : Metric.closedBall z r ⊆ Metric.ball z (R' : ℝ) :=
+    Metric.closedBall_subset_ball (by change r < r + δ / 4; linarith)
+  rw [IsTopologicalAddGroup.tendstoUniformlyOn_iff _ _ _ _ rfl]
+  intro u hu
+  obtain ⟨p, hp, hpu⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hu
+  -- Pass to the Banach completion of the seminormed quotient associated to p.
+  let e : ULift.{0} E ≃ₗ[ℂ] E := ULift.moduleEquiv
+  let q : Seminorm ℂ (ULift.{0} E) := p.comp e.toLinearMap
+  let group : SeminormedAddCommGroup (ULift.{0} E) := q.toSeminormedAddCommGroup
+  let : UniformSpace (ULift.{0} E) := group.toUniformSpace
+  let : TopologicalSpace (ULift.{0} E) := group.toUniformSpace.toTopologicalSpace
+  let : NormedSpace ℂ (ULift.{0} E) := ⟨fun c v ↦ (map_smul_eq_mul q c v).le⟩
+  let j₀ := UniformSpace.Completion.toComplL (S := ℂ) (α := ULift.{0} E)
+  have he : Continuous e.symm := by
+    rw [continuous_iff_continuousAt]
+    intro v
+    apply Metric.tendsto_nhds.mpr
+    intro a ha
+    have hp' : Continuous (fun y : E ↦ p (y - v)) :=
+      hp.comp (continuous_id.sub continuous_const)
+    simp only [dist_eq_norm, ← map_sub]
+    change ∀ᶠ y : E in 𝓝 v, p (y - v) < a
+    exact (hp'.continuousAt (x := v)).eventually_lt continuousAt_const (by simpa using ha)
+  let j : E →L[ℂ] UniformSpace.Completion (ULift.{0} E) :=
+    ⟨j₀.toLinearMap.comp e.symm.toLinearMap, j₀.continuous.comp he⟩
+  have hcomp (k : ℕ) (w : Ω) :
+      HasDerivAt (j ∘ deriv^[k] f) (j (deriv (deriv^[k] f) w)) (w : ℂ) := by
+    have h := (hf k).hasFDerivAt (hΩ.mem_nhds w.property)
+    have hj : HasFDerivAt (j ∘ deriv^[k] f) (j.comp (fderiv ℂ (deriv^[k] f) w)) (w : ℂ) := by
+      apply HasFDerivAt.of_isLittleOTVS
+      simpa only [Function.comp_def, ContinuousLinearMap.comp_apply, map_sub]
+        using j.isBigOTVS_comp.trans_isLittleOTVS h.isLittleOTVS
+    exact hj.hasDerivAt
+  have hiter (k : ℕ) (w : Ω) : iteratedDeriv k (j ∘ f) w = j ((deriv^[k] f) w) := by
+    induction k generalizing w with
+    | zero => simp
+    | succ k ih =>
+      rw [iteratedDeriv_succ, Function.iterate_succ_apply']
+      have heq : iteratedDeriv k (j ∘ f) =ᶠ[𝓝 (w : ℂ)] (j ∘ deriv^[k] f) := by
+        filter_upwards [hΩ.mem_nhds w.property] with x hx
+        exact ih ⟨x, hx⟩
+      rw [heq.deriv_eq]
+      exact (hcomp k w).deriv
+  have hdiff : DifferentiableOn ℂ (j ∘ f) (Metric.closedBall z R) := by
+    intro w hw
+    exact (hcomp 0 ⟨w, hball hw⟩).differentiableAt.differentiableWithinAt
+  have huni := (taylor_uniformlyOn_normed hRR hdiff).mono hball'
+  have hmetric := Metric.tendstoUniformlyOn_iff.mp huni 1 zero_lt_one
+  filter_upwards [hmetric] with n hn w hw
+  apply hpu
+  rw [Seminorm.mem_ball_zero]
+  have hw' := hn w hw
+  rw [dist_comm, dist_eq_norm] at hw'
+  have hz : z ∈ Ω := hdisc (Metric.mem_closedBall_self hr.le)
+  simp only [hiter _ ⟨z, hz⟩, ← map_smul, ← map_sum, Function.comp_apply, ← map_sub] at hw'
+  change ‖(↑(e.symm ((∑ k ∈ Finset.range n, ((w - z) ^ k / (k.factorial : ℂ)) •
+    (deriv^[k] f) z) - f w)) : UniformSpace.Completion (ULift.{0} E))‖ < 1 at hw'
+  rwa [UniformSpace.Completion.norm_coe] at hw'
 
 /-- Paper: Theorem C.5.2.6, p. 738. In the quasi-complete case weak holomorphy
 implies holomorphy in the target topology. -/

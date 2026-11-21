@@ -4,10 +4,12 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.TestFunction
 public import Mathlib.LinearAlgebra.PiTensorProduct.Basic
 import Mathlib.Algebra.BigOperators.Fin
+import Mathlib.Algebra.Group.Pointwise.Set.Scalar
 import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.Analysis.PSeries
 import Mathlib.Data.List.FinRange
 import Mathlib.Data.List.OfFn
+import Mathlib.Data.Set.FiniteExhaustion
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
@@ -15,14 +17,25 @@ import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.Topology.Instances.RealVectorSpace
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import Mathlib.Analysis.LocallyConvex.WeakDual
+import Mathlib.Analysis.LocallyConvex.AbsConvex
+import Mathlib.Analysis.LocallyConvex.Polar
+import Mathlib.Analysis.LocallyConvex.Separation
+import Mathlib.Analysis.LocallyConvex.StrongTopology
+import Mathlib.Analysis.RCLike.Lemmas
+import Mathlib.Analysis.SpecificLimits.Basic
+import Mathlib.Topology.Algebra.InfiniteSum.NatInt
+import Mathlib.Topology.Algebra.Module.Spaces.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
 import Mathlib.Analysis.Normed.Group.Ultra
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import Mathlib.Topology.Connected.LocallyConnected
+import Mathlib.Topology.Compactness.Bases
+import Mathlib.Topology.LocallyConstant.Algebra
 
 /-!
 # Schwartz–Bruhat functions
@@ -672,11 +685,527 @@ theorem euclideanSchwartz_strongDual_nuclear (m : ℕ) :
   exact (isNuclearTVS_strongDual_iff (euclideanSchwartz_frechet m)).2
     (euclideanSchwartz_nuclear m)
 
+section StrongDualMontel
+
+open Bornology Metric Set Topology Filter
+open scoped Pointwise ComplexOrder
+
+/-- Paper: Proposition 2.1.1.6, p. 61 (first half). By Banach-Steinhaus, every strongly bounded
+family of continuous linear functionals on a polynormable space is dominated by a fixed continuous
+seminorm. -/
+theorem strongDual_bounded_in_polar {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
+    [PolynormableSpace ℂ E] [T2Space E] [BarrelledSpace ℂ E] {S : Set (StrongDual ℂ E)}
+    (hS : IsVonNBounded ℂ S) :
+    ∃ p : Seminorm ℂ E, Continuous p ∧ ∃ C : ℝ, 0 ≤ C ∧
+      ∀ φ ∈ S, ∀ x, ‖φ x‖ ≤ C * p x := by
+  classical
+  let 𝓕 : S → (E →SL[RingHom.id ℂ] ℂ) := fun φ ↦ φ.1
+  have hb : ∀ x, IsVonNBounded ℂ (range fun φ : S ↦ 𝓕 φ x) := fun x ↦
+    IsVonNBounded.subset (fun y hy ↦ by
+      obtain ⟨φ, rfl⟩ := Set.mem_range.mp hy
+      exact ⟨φ, φ.2, by simp [𝓕]⟩)
+      (hS.image (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ) x))
+  have hEqui : UniformEquicontinuous ((↑) ∘ (fun φ : S ↦ (𝓕 φ : E →ₗ[ℂ] ℂ))) :=
+    PolynormableSpace.banach_steinhaus (𝓕 := 𝓕) hb
+  -- Convert uniform equicontinuity into a seminorm bound via the defining seminorm family.
+  have hsm :=
+    ((norm_withSeminorms ℂ ℂ).uniformEquicontinuous_iff_exists_continuous_seminorm
+      (fun φ : S ↦ (𝓕 φ : E →ₗ[ℂ] ℂ))).mp hEqui
+  obtain ⟨p, hp, hle⟩ := hsm ()
+  refine ⟨p, hp, 1, zero_le_one, fun φ hφ x ↦ ?_⟩
+  simpa using hle ⟨φ, hφ⟩ x
+
+section DualMontelHelpers
+
+variable {E : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+  [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+
+open ContinuousLinearMap
+open scoped NNReal
+
+private structure DualBoundData (q : Seminorm ℂ E) (r : ℝ) (s : Set E) (n : ℕ) where
+  prev : StrongDual ℂ E
+  φ : StrongDual ℂ E
+  x : E
+  ψ : StrongDual ℂ E
+  M : ℝ
+  hx : x ∈ s
+  hdom : ∀ y, ‖φ y‖ ≤ q y
+  hat : φ x = (q x : ℂ)
+  hM : 0 ≤ M
+  hprev : ∀ z ∈ s, ‖prev z‖ ≤ M
+  hbig : 2 * (3 : ℝ) ^ n * (M + (n : ℝ) + 1) < q x
+  hψ : ψ = prev + (r ^ n : ℂ) • φ
+
+private theorem isVonNBounded_of_dual_pointwise_bounded {s : Set E}
+    (hs : ∀ φ : StrongDual ℂ E, ∃ C : ℝ, ∀ x ∈ s, ‖φ x‖ ≤ C) :
+    IsVonNBounded ℂ s := by
+  classical
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  apply (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mpr
+  intro q
+  by_contra hnb
+  have hunb : ∀ a : ℝ, ∃ x ∈ s, a < q.1 x := by
+    simpa [not_bddAbove_iff, forall_mem_image] using hnb
+  let r : ℝ := 1 / 3
+  have hr0 : 0 ≤ r := by norm_num
+  have hr1 : r < 1 := by norm_num
+  have hrpos : 0 < r := by norm_num
+  have hgeom : Summable (fun n : ℕ => r ^ n) := summable_geometric_of_lt_one hr0 hr1
+  have htsum : ∑' n : ℕ, r ^ n = (1 - r)⁻¹ := tsum_geometric_of_lt_one hr0 hr1
+  have htsum_val : ∑' n : ℕ, r ^ n = 3 / 2 := by
+    rw [htsum]; simp only [r]; norm_num
+  let build (n : ℕ) (prev : StrongDual ℂ E) : DualBoundData q.1 r s n :=
+    let C := Classical.choose (hs prev)
+    let hC := Classical.choose_spec (hs prev)
+    let M : ℝ := max C 0
+    let target := 2 * (3 : ℝ) ^ n * (M + (n : ℝ) + 1)
+    let x := Classical.choose (hunb target)
+    let hx := Classical.choose_spec (hunb target)
+    let φ0 := Classical.choose (RiemannMasullo.exists_dual_norm_eq_seminorm q.1 q.2 x)
+    let hφ0 := Classical.choose_spec (RiemannMasullo.exists_dual_norm_eq_seminorm q.1 q.2 x)
+    let c := Classical.choose (RCLike.exists_norm_eq_mul_self (φ0 x))
+    let hc := Classical.choose_spec (RCLike.exists_norm_eq_mul_self (φ0 x))
+    let φ : StrongDual ℂ E := c • φ0
+    let hdom : ∀ y, ‖φ y‖ ≤ q.1 y := fun y => by
+      have h : ‖(c • φ0) y‖ = ‖φ0 y‖ := by
+        rw [smul_apply, smul_eq_mul, norm_mul, hc.1, one_mul]
+      rw [h]
+      exact hφ0.1 y
+    let hat : φ x = (q.1 x : ℂ) := by
+      rw [smul_apply, smul_eq_mul, ← hc.2]
+      exact congrArg Complex.ofReal hφ0.2
+    let hprev : ∀ z ∈ s, ‖prev z‖ ≤ M := fun z hz => (hC z hz).trans (le_max_left _ _)
+    ⟨prev, φ, x, prev + (r ^ n : ℂ) • φ, M, hx.1, hdom, hat, le_max_right _ _, hprev, hx.2, rfl⟩
+  let seq : (n : ℕ) → DualBoundData q.1 r s n :=
+    Nat.rec (motive := fun n => DualBoundData q.1 r s n) (build 0 0)
+      (fun n d => build (n + 1) d.ψ)
+  have hseq0 : (seq 0).prev = 0 := by
+    change (build 0 0).prev = 0
+    rfl
+  have hsucc (n : ℕ) : (seq (n + 1)).prev = (seq n).ψ := by
+    change (build (n + 1) (seq n).ψ).prev = (seq n).ψ
+    rfl
+  have hpartial (n : ℕ) (x : E) :
+      (seq n).ψ x = ∑ k ∈ Finset.range (n + 1), (r ^ k : ℂ) * (seq k).φ x := by
+    induction n with
+    | zero =>
+        rw [(seq 0).hψ, hseq0, zero_add, smul_apply, pow_zero, one_smul]
+        simp [Finset.range_one]
+    | succ n ih =>
+        rw [(seq (n + 1)).hψ, hsucc n, add_apply, ih, smul_apply, smul_eq_mul]
+        conv_rhs => rw [Finset.sum_range_succ]
+  let term (x : E) (n : ℕ) : ℂ := (r : ℂ) ^ n * (seq n).φ x
+  have hterm_norm (x : E) (n : ℕ) : ‖term x n‖ ≤ r ^ n * q.1 x := by
+    unfold term
+    rw [norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hr0]
+    exact mul_le_mul_of_nonneg_left ((seq n).hdom x) (pow_nonneg hr0 n)
+  have hterm_sum (x : E) : Summable (term x) :=
+    Summable.of_norm_bounded (hgeom.mul_right (q.1 x)) (hterm_norm x)
+  let f (x : E) : ℂ := ∑' n, term x n
+  have hsplit (n : ℕ) (x : E) :
+      f x = (seq n).ψ x + ∑' k, term x (k + (n + 1)) := by
+    have h := (hterm_sum x).sum_add_tsum_nat_add (n + 1)
+    unfold f
+    rw [← h, hpartial]
+  have htail_coeff (n : ℕ) : ∑' k : ℕ, r ^ (k + (n + 1)) = r ^ n / 2 := by
+    have hshift : ∑' k : ℕ, r ^ (k + (n + 1)) = r ^ (n + 1) * ∑' k : ℕ, r ^ k := by
+      rw [eq_comm, ← tsum_mul_left]
+      congr
+      ext k
+      simp [pow_add, mul_comm]
+    rw [hshift, htsum_val, pow_succ]
+    simp only [r]
+    ring
+  have htail_summable (n : ℕ) (x : E) : Summable fun k => term x (k + (n + 1)) :=
+    ((summable_nat_add_iff (n + 1)).2 (hterm_sum x))
+  have htail (n : ℕ) :
+      ‖∑' k, term (seq n).x (k + (n + 1))‖ ≤ (r ^ n / 2) * q.1 (seq n).x := by
+    have hle : ∀ k, ‖term (seq n).x (k + (n + 1))‖ ≤ r ^ (k + (n + 1)) * q.1 (seq n).x :=
+      fun k => hterm_norm _ _
+    have hsum : Summable fun k => r ^ (k + (n + 1)) * q.1 (seq n).x :=
+      ((summable_nat_add_iff (n + 1)).2 hgeom).mul_right _
+    have hn : Summable fun k => ‖term (seq n).x (k + (n + 1))‖ :=
+      Summable.of_norm_bounded hsum fun k => by
+        rw [Real.norm_eq_abs, abs_of_nonneg (norm_nonneg _)]
+        exact hle k
+    refine (norm_tsum_le_tsum_norm hn).trans ?_
+    refine (hn.tsum_le_tsum hle hsum).trans ?_
+    rw [tsum_mul_right, htail_coeff]
+  have hgt (n : ℕ) : (n : ℝ) + 1 < ‖f (seq n).x‖ := by
+    have hx := (seq n).hx
+    have hsplitx := hsplit n (seq n).x
+    have hmain : (r : ℂ) ^ n * (seq n).φ (seq n).x = ↑(r ^ n * q.1 (seq n).x) := by
+      rw [(seq n).hat, ← Complex.ofReal_pow, ← Complex.ofReal_mul]
+    have hmain_norm : ‖(r ^ n : ℂ) * (seq n).φ (seq n).x‖ = r ^ n * q.1 (seq n).x := by
+      rw [hmain, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg]
+      exact mul_nonneg (pow_nonneg hr0 n) (apply_nonneg _ _)
+    have hprev_norm : ‖(seq n).prev (seq n).x‖ ≤ (seq n).M := (seq n).hprev _ (seq n).hx
+    have hdecomp :
+        f (seq n).x = (seq n).prev (seq n).x + (r ^ n : ℂ) * (seq n).φ (seq n).x +
+          ∑' k, term (seq n).x (k + (n + 1)) := by
+      rw [hsplitx, (seq n).hψ, add_apply, smul_apply, smul_eq_mul]
+    set a : ℂ := (seq n).prev (seq n).x
+    set b : ℂ := (r ^ n : ℂ) * (seq n).φ (seq n).x
+    set c : ℂ := ∑' k, term (seq n).x (k + (n + 1))
+    have hbc : b = a + b + c - a - c := by ring
+    have htri : ‖b‖ ≤ ‖a + b + c‖ + ‖a‖ + ‖c‖ := by
+      calc ‖b‖ = ‖a + b + c + (-a) + (-c)‖ := by simpa [sub_eq_add_neg] using congrArg norm hbc
+        _ ≤ ‖a + b + c + (-a)‖ + ‖-c‖ := norm_add_le _ _
+        _ ≤ ‖a + b + c‖ + ‖-a‖ + ‖-c‖ := by
+          gcongr
+          exact norm_add_le _ _
+        _ = ‖a + b + c‖ + ‖a‖ + ‖c‖ := by simp [norm_neg]
+    have hcnorm : ‖c‖ ≤ (r ^ n / 2) * q.1 (seq n).x := by simpa [c] using htail n
+    have hbnorm : ‖b‖ = r ^ n * q.1 (seq n).x := by simpa [b] using hmain_norm
+    have hanorm : ‖a‖ ≤ (seq n).M := by simpa [a] using hprev_norm
+    have hf : f (seq n).x = a + b + c := by simpa [a, b, c] using hdecomp
+    have hlow : (r ^ n / 2) * q.1 (seq n).x - (seq n).M ≤ ‖f (seq n).x‖ := by
+      have htri' : ‖b‖ ≤ ‖f (seq n).x‖ + ‖a‖ + ‖c‖ := by simpa [hf] using htri
+      linarith
+    have hcalc : (n : ℝ) + 1 < (r ^ n / 2) * q.1 (seq n).x - (seq n).M := by
+      have hpow : r ^ n * (3 : ℝ) ^ n = 1 := by simp [r]
+      have hmul : r ^ n / 2 * (2 * (3 : ℝ) ^ n * ((seq n).M + (n : ℝ) + 1)) =
+          (seq n).M + (n : ℝ) + 1 := by
+        calc r ^ n / 2 * (2 * (3 : ℝ) ^ n * ((seq n).M + (n : ℝ) + 1))
+            = (r ^ n * (3 : ℝ) ^ n) * ((seq n).M + (n : ℝ) + 1) := by ring
+          _ = (seq n).M + (n : ℝ) + 1 := by rw [hpow, one_mul]
+      have hpos : 0 < r ^ n / 2 := by positivity
+      have hlt := mul_lt_mul_of_pos_left (seq n).hbig hpos
+      rw [hmul] at hlt
+      linarith
+    linarith [hlow, hcalc]
+  let ℓ : E →ₗ[ℂ] ℂ :=
+    { toFun := f
+      map_add' := fun x y => by
+        unfold f term
+        simp only [map_add, mul_add]
+        change ∑' n, ((r : ℂ) ^ n * (seq n).φ x + (r : ℂ) ^ n * (seq n).φ y) =
+          ∑' n, (r : ℂ) ^ n * (seq n).φ x + ∑' n, (r : ℂ) ^ n * (seq n).φ y
+        exact (hterm_sum x).tsum_add (hterm_sum y)
+      map_smul' := fun a x => by
+        change f (a • x) = a * f x
+        unfold f
+        have hterm : ∀ n, term (a • x) n = a * term x n := fun n => by
+          unfold term
+          rw [map_smul, smul_eq_mul]
+          ring
+        simp_rw [hterm]
+        rw [tsum_mul_left] }
+  have hcont : Continuous ℓ := by
+    apply WithSeminorms.continuous_of_continuous_comp (norm_withSeminorms ℂ ℂ) ℓ
+    intro _
+    let c : ℝ≥0 := ⟨3 / 2, by norm_num⟩
+    refine Seminorm.continuous_of_le (p := (normSeminorm ℂ ℂ).comp ℓ) (q := c • q.1) ?_ ?_
+    · have hpt : ∀ x, (c • q.1) x = (c : ℝ) * q.1 x := fun x => by
+        rw [smul_apply, NNReal.smul_def, smul_eq_mul]
+      exact (q.2.const_mul (c : ℝ)).congr hpt
+    · intro x
+      have hn : Summable fun n => ‖term x n‖ :=
+        Summable.of_norm_bounded (hgeom.mul_right (q.1 x)) fun n => by
+          rw [Real.norm_eq_abs, abs_of_nonneg (norm_nonneg _)]
+          exact hterm_norm x n
+      calc ‖ℓ x‖ = ‖f x‖ := rfl
+        _ ≤ ∑' n, ‖term x n‖ := norm_tsum_le_tsum_norm hn
+        _ ≤ ∑' n, r ^ n * q.1 x := hn.tsum_le_tsum (hterm_norm x) (hgeom.mul_right _)
+        _ = (∑' n, r ^ n) * q.1 x := tsum_mul_right
+        _ = (3 / 2) * q.1 x := by rw [htsum_val]
+        _ = (c • q.1) x := by rw [smul_apply, NNReal.smul_def, smul_eq_mul]; rfl
+  obtain ⟨C, hC⟩ := hs ⟨ℓ, hcont⟩
+  obtain ⟨n, hn⟩ := exists_nat_gt C
+  have hbad := hC (seq n).x (seq n).hx
+  have hbig := hgt n
+  have hnorm : ‖ℓ (seq n).x‖ = ‖f (seq n).x‖ := rfl
+  have hn' : C < (n : ℝ) := by exact_mod_cast hn
+  have hleC : ‖f (seq n).x‖ ≤ C := by simpa [hnorm] using hbad
+  linarith
+
+private theorem isCompact_weakPolar (p : Seminorm ℂ E) (hp : Continuous p) (C : ℝ) (hC : 0 ≤ C) :
+    IsCompact {φ : WeakDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} := by
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let D : Set (E → ℂ) := univ.pi fun x => Metric.closedBall 0 (C * p x)
+  let ev : WeakDual ℂ E → E → ℂ := fun φ x => φ x
+  have hD : IsCompact D := isCompact_univ_pi fun _ => isCompact_closedBall _ _
+  have hev : IsEmbedding ev := WeakBilin.isEmbedding ContinuousLinearMap.coe_injective
+  rw [hev.isCompact_iff]
+  have himage : ev '' {φ : WeakDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} =
+      D ∩ range ((↑) : (E →ₗ[ℂ] ℂ) → E → ℂ) := by
+    ext f
+    constructor
+    · rintro ⟨φ, hφ, rfl⟩
+      exact ⟨fun x _ => mem_closedBall_zero_iff.mpr (hφ x), ⟨(φ : E →ₗ[ℂ] ℂ), rfl⟩⟩
+    · rintro ⟨hf, l, rfl⟩
+      have hb : ∀ x, ‖l x‖ ≤ C * p x := fun x =>
+        mem_closedBall_zero_iff.mp (hf x (mem_univ x))
+      have hl : Continuous l := by
+        apply WithSeminorms.continuous_of_continuous_comp (norm_withSeminorms ℂ ℂ) l
+        intro _
+        let c : ℝ≥0 := ⟨C, hC⟩
+        have hpt : ∀ x, (c • p) x = C * p x := fun x => by
+          rw [smul_apply, NNReal.smul_def, smul_eq_mul]
+          congr 1
+        have hqc : Continuous (⇑(c • p)) := (hp.const_mul C).congr hpt
+        exact Seminorm.continuous_of_le hqc fun x => by rw [hpt]; exact hb x
+      exact ⟨(⟨l, hl⟩ : StrongDual ℂ E), hb, rfl⟩
+  rw [himage]
+  exact hD.inter_right (LinearMap.isClosed_range_coe E ℂ (RingHom.id ℂ))
+
+private theorem strongDual_polar_isCompact_aux [MontelSpace ℂ E]
+    (p : Seminorm ℂ E) (hp : Continuous p) (C : ℝ) (hC : 0 ≤ C) :
+    IsCompact {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} := by
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let Kw : Set (WeakDual ℂ E) := {φ | ∀ x, ‖φ x‖ ≤ C * p x}
+  have hKw : IsCompact Kw := isCompact_weakPolar p hp C hC
+  have hcont : ContinuousOn (fun φ : WeakDual ℂ E => (φ.toStrongDual : StrongDual ℂ E)) Kw := by
+    rw [continuousOn_iff_continuous_restrict]
+    rw [continuous_iff_continuousAt]
+    intro φ₀
+    have hbasis := ContinuousLinearMap.hasBasis_nhds_zero_of_basis
+      (σ := RingHom.id ℂ) (E := E) (F := ℂ) Metric.nhds_basis_ball
+    suffices hdiff : Tendsto (fun ψ : Kw => (ψ.1.toStrongDual - φ₀.1.toStrongDual : StrongDual ℂ E))
+        (𝓝 φ₀) (𝓝 0) by
+      have hconst : Tendsto (fun _ : Kw => φ₀.1.toStrongDual) (𝓝 φ₀) (𝓝 φ₀.1.toStrongDual) :=
+        tendsto_const_nhds
+      change Tendsto (fun ψ : Kw => ψ.1.toStrongDual) (𝓝 φ₀) (𝓝 φ₀.1.toStrongDual)
+      simpa [zero_add] using hdiff.add hconst
+    apply hbasis.tendsto_right_iff.mpr
+    rintro ⟨S, ε⟩ ⟨hS, hε⟩
+    let V : Set E := {z | C * p z < ε / 3}
+    have hV : V ∈ 𝓝 (0 : E) := by
+      have hc : Continuous fun z : E => C * p z := hp.const_mul C
+      have htend : Tendsto (fun z : E => C * p z) (𝓝 0) (𝓝 (0 : ℝ)) := by
+        simpa [map_zero p, mul_zero] using hc.tendsto 0
+      have hε3 : 0 < ε / 3 := by positivity
+      have hmem : Iio (ε / 3) ∈ Filter.map (fun z : E => C * p z) (𝓝 0) :=
+        htend (Iio_mem_nhds hε3)
+      rw [Filter.mem_map] at hmem
+      rw [show (fun z : E => C * p z) ⁻¹' Iio (ε / 3) = V by
+        ext z; simp [V, mem_Iio]] at hmem
+      exact hmem
+    have hT : IsCompact (closure S) :=
+      MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ isClosed_closure hS.closure
+    obtain ⟨t, -, hcover⟩ := hT.elim_nhds_subcover (fun y => {z | z - y ∈ V}) fun y hy => by
+      have hf : Continuous (fun z : E => z - y) := continuous_id.sub continuous_const
+      have hpre := hf.tendsto y
+      simp only [sub_self] at hpre
+      exact hpre hV
+    let W : Set (WeakDual ℂ E) := {ψ | ∀ y ∈ t, ‖ψ y - φ₀.1 y‖ < ε / 3}
+    have hW : W ∈ 𝓝 (φ₀.1 : WeakDual ℂ E) := by
+      rw [show W = ⋂ y ∈ (t : Set E), {ψ : WeakDual ℂ E | ‖ψ y - φ₀.1 y‖ < ε / 3} by
+        ext ψ; simp [W]]
+      rw [biInter_mem t.finite_toSet]
+      intro y hy
+      have hε3 : 0 < ε / 3 := by positivity
+      have : {ψ : WeakDual ℂ E | ψ y ∈ ball (φ₀.1 y) (ε / 3)} ∈ 𝓝 φ₀.1 :=
+        (WeakDual.eval_continuous y).continuousAt.preimage_mem_nhds (ball_mem_nhds _ hε3)
+      simpa [Metric.mem_ball, dist_eq_norm] using this
+    refine mem_of_superset (continuous_subtype_val.continuousAt.preimage_mem_nhds hW) ?_
+    intro ψ hψ
+    intro x hx
+    have hxT : x ∈ closure S := subset_closure hx
+    have hxU : x ∈ ⋃ y ∈ t, {z | z - y ∈ V} := hcover hxT
+    simp only [mem_iUnion, mem_setOf] at hxU
+    obtain ⟨y, hy, hdiff⟩ := hxU
+    have h1 : ‖ψ.1 (x - y)‖ < ε / 3 :=
+      lt_of_le_of_lt (ψ.2 (x - y)) hdiff
+    have h2 : ‖φ₀.1 (x - y)‖ < ε / 3 :=
+      lt_of_le_of_lt (φ₀.2 (x - y)) hdiff
+    have h3 : ‖ψ.1 y - φ₀.1 y‖ < ε / 3 := by
+      have : ψ.1 ∈ W := hψ
+      exact this y hy
+    have hsplit : ψ.1 x - φ₀.1 x =
+        ψ.1 (x - y) + (ψ.1 y - φ₀.1 y) - φ₀.1 (x - y) := by
+      simp [map_sub, sub_eq_add_neg, add_comm, add_left_comm, add_assoc]
+    have hnorm : ‖ψ.1.toStrongDual x - φ₀.1.toStrongDual x‖ < ε := by
+      rw [WeakDual.toStrongDual_apply, WeakDual.toStrongDual_apply, hsplit]
+      have hneg : ‖-φ₀.1 (x - y)‖ = ‖φ₀.1 (x - y)‖ := norm_neg _
+      calc ‖ψ.1 (x - y) + (ψ.1 y - φ₀.1 y) + -φ₀.1 (x - y)‖
+          ≤ ‖ψ.1 (x - y) + (ψ.1 y - φ₀.1 y)‖ + ‖-φ₀.1 (x - y)‖ := norm_add_le _ _
+        _ = ‖ψ.1 (x - y) + (ψ.1 y - φ₀.1 y)‖ + ‖φ₀.1 (x - y)‖ := by rw [hneg]
+        _ ≤ ‖ψ.1 (x - y)‖ + ‖ψ.1 y - φ₀.1 y‖ + ‖φ₀.1 (x - y)‖ := by
+            linarith [norm_add_le (ψ.1 (x - y)) (ψ.1 y - φ₀.1 y)]
+        _ < ε / 3 + ε / 3 + ε / 3 := by linarith
+        _ = ε := by ring
+    simpa [mem_ball_zero_iff, sub_apply] using hnorm
+  have himage : (fun φ : WeakDual ℂ E => (φ.toStrongDual : StrongDual ℂ E)) '' Kw =
+      {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} := by
+    ext ψ
+    constructor
+    · rintro ⟨φ, hφ, rfl⟩
+      intro x
+      simpa [WeakDual.toStrongDual_apply] using hφ x
+    · intro hψ
+      refine ⟨ψ.toWeakDual, hψ, ?_⟩
+      simp
+  rw [← himage]
+  exact hKw.image_of_continuousOn hcont
+
+private theorem strongDual_barrel_nbhd_aux
+    (hE : ∀ l : StrongDual ℂ (StrongDual ℂ E), ∃ f : E, ∀ φ : StrongDual ℂ E, l φ = φ f)
+    (B : Set (StrongDual ℂ E)) (hBclosed : IsClosed B) (hBabs : AbsConvex ℂ B)
+    (hBabsorb : ∀ φ : StrongDual ℂ E, ∃ r : ℝ, 0 < r ∧ φ ∈ (algebraMap ℝ ℂ r) • B) :
+    B ∈ 𝓝 (0 : StrongDual ℂ E) := by
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have h0 : (0 : StrongDual ℂ E) ∈ B := by
+    obtain ⟨r, hr, hmem⟩ := hBabsorb 0
+    rw [mem_smul_set] at hmem
+    obtain ⟨ψ, hψ, hψ0⟩ := hmem
+    have hr0 : algebraMap ℝ ℂ r ≠ 0 := by simp [hr.ne']
+    have : ψ = 0 := by
+      let c : ℂ := algebraMap ℝ ℂ r
+      have hc : c ≠ 0 := hr0
+      calc ψ = c⁻¹ • (c • ψ) := by rw [smul_smul, inv_mul_cancel₀ hc, one_smul]
+        _ = c⁻¹ • (0 : StrongDual ℂ E) := by rw [hψ0]
+        _ = 0 := by ext x; simp [smul_apply, smul_eq_mul]
+    simpa [this] using hψ
+  let A : Set E := {x | ∀ φ ∈ B, ‖φ x‖ ≤ 1}
+  have hweak : ∀ φ : StrongDual ℂ E, ∃ M : ℝ, ∀ x ∈ A, ‖φ x‖ ≤ M := by
+    intro φ
+    obtain ⟨r, hr, hmem⟩ := hBabsorb φ
+    rw [mem_smul_set] at hmem
+    obtain ⟨ψ, hψ, rfl⟩ := hmem
+    refine ⟨r, fun x hx => ?_⟩
+    rw [smul_apply, smul_eq_mul, norm_mul, norm_algebraMap, norm_one, mul_one, Real.norm_eq_abs,
+      abs_of_pos hr]
+    simpa using mul_le_mul_of_nonneg_left (hx _ hψ) hr.le
+  have hA : IsVonNBounded ℂ A := isVonNBounded_of_dual_pointwise_bounded hweak
+  have hpolar_eq : StrongDual.polar ℂ A = B := by
+    apply Subset.antisymm
+    · intro φ hφ
+      by_contra hnot
+      have hconv : Convex ℝ B := (convex_RCLike_iff_convex_real).mp hBabs.2
+      have : LocallyConvexSpace ℝ (StrongDual ℂ E) := inferInstance
+      obtain ⟨l, u, hlu, hlφ⟩ :=
+        RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ) hconv hBclosed hnot
+      obtain ⟨x, hx⟩ := hE l
+      have hu : 0 < u := by simpa [hx, map_zero] using hlu 0 h0
+      have hnormψ : ∀ ψ ∈ B, ‖ψ x‖ < u := by
+        intro ψ hψ
+        obtain ⟨c, hc, hcψ⟩ := RCLike.exists_norm_eq_mul_self (ψ x)
+        have hψc : c • ψ ∈ B := (balanced_iff_smul_mem.mp hBabs.1) (by simpa [hc] using le_of_eq hc) hψ
+        have hre : RCLike.re ((c • ψ) x) = ‖ψ x‖ := by
+          rw [smul_apply, smul_eq_mul, ← hcψ, RCLike.ofReal_re]
+        rw [← hre, ← hx]
+        exact hlu _ hψc
+      have hφbig : u < ‖φ x‖ := by
+        have : u < RCLike.re (φ x) := by simpa [hx] using hlφ
+        exact this.trans_le (RCLike.re_le_norm _)
+      let y : E := (u : ℂ)⁻¹ • x
+      have hyA : y ∈ A := by
+        intro ψ hψ
+        rw [map_smul, smul_eq_mul, norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs,
+          abs_of_pos hu, mul_comm]
+        exact ((div_lt_one hu).mpr (hnormψ ψ hψ)).le
+      have hyφ : ¬ ‖φ y‖ ≤ 1 := by
+        rw [map_smul, smul_eq_mul, norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs,
+          abs_of_pos hu, mul_comm, ← div_eq_mul_inv]
+        exact not_le.mpr ((one_lt_div hu).mpr hφbig)
+      exact hyφ (hφ y hyA)
+    · intro ψ hψ x hx
+      exact hx ψ hψ
+  have hnhds : {φ : StrongDual ℂ E | MapsTo φ A (ball (0 : ℂ) 1)} ∈ 𝓝 0 :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hA
+      (ball_mem_nhds (0 : ℂ) zero_lt_one)
+  refine mem_of_superset hnhds ?_
+  intro φ hφ
+  have : φ ∈ StrongDual.polar ℂ A := fun x hx => (mem_ball_zero_iff.mp (hφ hx)).le
+  simpa [hpolar_eq] using this
+
+end DualMontelHelpers
+
+/-- Paper: Proposition 2.1.1.6, p. 61 (first half). In a polynormable Montel space, each fixed
+seminorm bound on the strong dual is compact: on such equicontinuous families the strong topology
+agrees with the topology of pointwise convergence, and Tychonoff gives compactness. -/
+
+theorem strongDual_polar_isCompact {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
+    [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E]
+    (p : Seminorm ℂ E) (hp : Continuous p) (C : ℝ) (hC : 0 ≤ C) :
+    IsCompact {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} :=
+  strongDual_polar_isCompact_aux p hp C hC
+
+/-- Paper: Proposition 2.1.1.6, p. 61 (first half). The strong dual of a Montel polynormable
+space has the Heine-Borel property: closed bounded sets are compact. -/
+theorem strongDual_montel_heineBorel {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
+    [PolynormableSpace ℂ E] [T2Space E] [MontelSpace ℂ E] [BarrelledSpace ℂ E] :
+    MontelSpace ℂ (StrongDual ℂ E) := by
+  constructor
+  intro S hclosed hS
+  obtain ⟨p, hp, C, hC, hbound⟩ := strongDual_bounded_in_polar hS
+  have hsub : S ⊆ {φ : StrongDual ℂ E | ∀ x, ‖φ x‖ ≤ C * p x} := fun φ hφ x ↦ hbound φ hφ x
+  exact (strongDual_polar_isCompact p hp C hC).of_isClosed_subset hclosed hsub
+
+/-- Paper: Proposition 2.1.1.6, p. 61 (second half). Every barrel in the strong dual is a
+neighborhood of zero: its polar in the base space is weakly closed, absolutely convex and
+bounded (each functional is bounded on it by definition of the polar), hence its bipolar,
+which contains the barrel by Hahn-Banach separation, is the polar of a bounded set. -/
+theorem strongDual_barrel_nbhd {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E]
+    [PolynormableSpace ℂ E] [T2Space E]
+    (hE : ∀ l : StrongDual ℂ (StrongDual ℂ E), ∃ f : E, ∀ φ : StrongDual ℂ E, l φ = φ f)
+    (B : Set (StrongDual ℂ E)) (hBclosed : IsClosed B) (hBabs : AbsConvex ℂ B)
+    (hBabsorb : ∀ φ : StrongDual ℂ E, ∃ r : ℝ, 0 < r ∧ φ ∈ (algebraMap ℝ ℂ r) • B) :
+    B ∈ 𝓝 (0 : StrongDual ℂ E) :=
+  strongDual_barrel_nbhd_aux hE B hBclosed hBabs hBabsorb
+
+/-- Paper: Proposition 2.1.1.6, p. 61 (second half). If every barrel in a locally convex space
+is a neighborhood of zero, the space is barrelled: the unit closed ball of a lower semicontinuous
+seminorm is a closed absolutely convex absorbing set. -/
+theorem barrelled_of_barrel_nbhd {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    (h : ∀ B : Set E, IsClosed B → AbsConvex ℂ B →
+      (∀ x : E, ∃ r : ℝ, 0 < r ∧ x ∈ (algebraMap ℝ ℂ r) • B) → B ∈ 𝓝 (0 : E)) :
+    BarrelledSpace ℂ E := by
+  constructor
+  intro q hq
+  refine q.continuous' (r := 1) ?_
+  refine h (q.closedBall 0 1) ?_ ?_ ?_
+  · rw [q.closedBall_zero_eq]
+    exact hq.isClosed_preimage 1
+  · exact ⟨q.balanced_closedBall_zero 1, convex_RCLike_iff_convex_real.mpr (q.convex_closedBall 0 1)⟩
+  · intro x
+    have hpos : (0 : ℝ) < q x + 1 := by positivity
+    have hcnorm : ‖algebraMap ℝ ℂ (q x + 1)‖ = q x + 1 := by
+      rw [norm_algebraMap, norm_one, mul_one, Real.norm_eq_abs, abs_of_nonneg hpos.le]
+    refine ⟨q x + 1, hpos, ?_⟩
+    rw [Set.mem_smul_set]
+    refine ⟨(algebraMap ℝ ℂ (q x + 1))⁻¹ • x, ?_, ?_⟩
+    · rw [Seminorm.mem_closedBall_zero, map_smul_eq_mul, norm_inv, hcnorm]
+      exact inv_mul_le_iff₀ hpos |>.mpr (by linarith)
+    · have hcne : algebraMap ℝ ℂ (q x + 1) ≠ 0 := by
+        intro hzero
+        have hnorm : ‖algebraMap ℝ ℂ (q x + 1)‖ = 0 := by rw [hzero]; exact norm_zero
+        rw [hcnorm] at hnorm
+        exact absurd hnorm (by linarith)
+      rw [smul_smul, mul_inv_cancel₀ hcne, one_smul]
+
+end StrongDualMontel
+
+
 /-- Paper: Proposition 2.1.1.6, p. 61. The strong dual is Montel, meaning it is
 barrelled and its closed bounded subsets are compact. -/
 theorem euclideanSchwartz_strongDual_montel (m : ℕ) :
     let D := StrongDual ℂ (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ)
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by
+  let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+  have hpE : PolynormableSpace ℂ E := (schwartz_withSeminorms ℂ _ _).toPolynormableSpace
+  have hME : MontelSpace ℂ E := montel_euclideanSchwartz m
+  have hBE : BarrelledSpace ℂ E := isFrechetTVS_barrelled (euclideanSchwartz_frechet m)
+  have hT2E : T2Space E := inferInstance
+  have heval : ∀ l : StrongDual ℂ (StrongDual ℂ E), ∃ f : E, ∀ φ : StrongDual ℂ E, l φ = φ f := by
+    obtain ⟨e, he⟩ := euclideanSchwartz_reflexive m
+    intro l
+    have hl : ∀ φ, l φ = φ (e.symm l) := by
+      intro φ
+      have hle : l = e (e.symm l) := (ContinuousLinearEquiv.apply_symm_apply e l).symm
+      have hh := he (e.symm l) φ
+      rw [← hle] at hh
+      exact hh
+    exact ⟨e.symm l, hl⟩
+  exact ⟨barrelled_of_barrel_nbhd (strongDual_barrel_nbhd heval),
+    strongDual_montel_heineBorel (E := E)⟩
 
 -- TODO(paper-gap): §2.1.1.3 cites Theorem D.1.5.7 with separability in place of
 -- second countability. A separable non-second-countable compact abelian group
@@ -1407,10 +1936,132 @@ theorem finitePlaceSchwartz_finestTopology (w : Places(F)) :
   have hall : tF = ⨅ q, t q := hfinest.topologicalSpace_eq_iInf
   exact hstage.trans ((hsurj.iInf_comp t).trans hall.symm)
 
+open TopologicalSpace in
+/-- The local Schwartz–Bruhat space is spanned by the countable family of indicators
+of compact open subsets of the completion. -/
+private theorem finitePlaceSchwartz_countableSpanningSet (w : Places(F)) :
+    ∃ s : Set (schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F))),
+      s.Countable ∧ Submodule.span ℂ s = ⊤ := by
+  classical
+  let K := w.adicCompletion F
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative K))
+  let : ProperSpace K := properSpace_adicCompletion w (K := F)
+  let compactOpens : Set (Set K) := {U | IsCompact U ∧ IsOpen U}
+  let C := ↥compactOpens
+  let : Countable (countableBasis K) := countable_countableBasis K
+  -- Every compact open set is a finite union of basic open sets.
+  let unionBasis (t : Finset (countableBasis K)) : Set K := (t : Set (countableBasis K)).sUnion
+  let : Countable C := (countable_range unionBasis).mono fun U hU ↦ by
+    obtain ⟨t, ht⟩ := eq_sUnion_finset_of_isTopologicalBasis_of_isCompact_open _
+      (isBasis_countableBasis K) U hU.1 hU.2
+    exact ⟨t, ht.symm⟩
+  have hχ (U : C) : ∃ g : E, ∀ x : K,
+      g.val (Multiplicative.ofAdd x) = U.val.indicator (1 : K → ℂ) x := by
+    have hcl : IsClopen U.val := ⟨U.property.1.isClosed, U.property.2⟩
+    apply (mem_finitePlaceSchwartz_iff F w _).2
+    refine ⟨(LocallyConstant.charFn ℂ hcl).isLocallyConstant, ?_⟩
+    exact U.property.1.of_isClosed_subset isClosed_closure
+      (closure_minimal support_indicator_subset hcl.1)
+  let χ (U : C) : E := (hχ U).choose
+  have hχ_apply (U : C) (x : K) :
+      (χ U).val (Multiplicative.ofAdd x) = U.val.indicator (1 : K → ℂ) x :=
+    (hχ U).choose_spec x
+  have hcount : (range χ).Countable := countable_range χ
+  refine ⟨range χ, hcount, ?_⟩
+  apply top_unique
+  intro g _
+  let f : K → ℂ := fun x ↦ g.val (Multiplicative.ofAdd x)
+  obtain ⟨hf, hc⟩ := (mem_finitePlaceSchwartz_iff F w f).1 ⟨g, fun _ ↦ rfl⟩
+  have hfinite : (f '' tsupport f).Finite := by
+    let : CompactSpace (tsupport f) := isCompact_iff_compactSpace.mp hc
+    rw [← range_domRestrict]
+    exact (hf.comp_continuous continuous_subtype_val).range_finite
+  let A := hfinite.toFinset.erase 0
+  have h₀ (a : A) : a.val ≠ 0 := (Finset.mem_erase.mp a.property).1
+  let U (a : A) : C := ⟨{x | f x = a.val},
+    hc.of_isClosed_subset (hf.isClosed_fiber a.val)
+      (fun x hx ↦ subset_tsupport f (mem_support.mpr (fun h ↦ h₀ a (hx.symm.trans h)))),
+    hf.isOpen_fiber a.val⟩
+  have hsum : (∑ a : A, a.val • χ (U a)) = g := by
+    apply Subtype.ext
+    funext x
+    let y : K := Multiplicative.toAdd x
+    let ev : E →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule (Multiplicative K)).subtype
+    change ev (∑ a : A, a.val • χ (U a)) = f y
+    simp only [map_sum, map_smul]
+    have hterm (a : A) : ev (χ (U a)) = if f y = a.val then 1 else 0 := by
+      change (χ (U a)).val (Multiplicative.ofAdd y) = _
+      rw [hχ_apply]
+      rfl
+    simp only [hterm]
+    by_cases hy : f y = 0
+    · rw [hy]
+      apply Finset.sum_eq_zero
+      intro a _
+      rw [ite_eq_right (h₀ a).symm, smul_zero]
+    · have hmem : f y ∈ A := Finset.mem_erase.mpr
+        ⟨hy, hfinite.mem_toFinset.mpr ⟨y, subset_tsupport f (mem_support.mpr hy), rfl⟩⟩
+      let a : A := ⟨f y, hmem⟩
+      rw [Finset.sum_eq_single_of_mem a (Finset.mem_univ _) (fun b _ hb ↦ ?_)]
+      · simp [a]
+      · have hne : f y ≠ b.val := fun h ↦ hb (Subtype.ext h.symm)
+        simp [hne]
+  rw [← hsum]
+  exact Submodule.sum_mem _ fun a _ ↦ Submodule.smul_mem _ _
+    (Submodule.subset_span (mem_range_self (U a)))
+
+/-- Finite spans of a countable generating set give a strict LF presentation
+for the finest locally convex topology. -/
+private theorem finestLocallyConvex_strictLF_of_countable_span
+    (E : Type u) [AddCommGroup E] [Module ℂ E]
+    {s : Set E} (hs : s.Countable) (hspan : Submodule.span ℂ s = ⊤) :
+    IsStrictLFSpace (FinestLocallyConvex E) := by
+  let W := FinestLocallyConvex E
+  let : T2Space W := finestLocallyConvex_t2 E
+  have hfinest := finestLocallyConvex_withSeminorms E
+  let A := hs.finiteExhaustion
+  let S (n : ℕ) : Submodule ℂ W := Submodule.span ℂ (A n)
+  have hmono : Monotone S := fun _ _ h ↦ Submodule.span_mono (A.mono h)
+  have hFinite (n : ℕ) : FiniteDimensional ℂ (S n) :=
+    FiniteDimensional.span_of_finite ℂ (A.finite n)
+  refine ⟨inferInstance, S, hmono, ?_, ?_, ?_⟩
+  · intro n
+    let : FiniteDimensional ℂ (S n) := hFinite n
+    let e := (Module.finBasis ℂ (S n)).equivFun.toContinuousLinearEquiv
+    refine ⟨inferInstance, inferInstance, e.toHomeomorph.isEmbedding.metrizableSpace, ?_⟩
+    let : UniformSpace (S n) := IsTopologicalAddGroup.rightUniformSpace (S n)
+    let : IsUniformAddGroup (S n) := isUniformAddGroup_of_addCommGroup
+    exact FiniteDimensional.completeSpace ℂ (S n)
+  · intro g
+    apply (Submodule.mem_iSup_of_directed S hmono.directed_le).mp
+    have hSup : (⨆ n, S n) = ⊤ := by
+      change (⨆ n, Submodule.span ℂ (A n)) = ⊤
+      rw [Submodule.iSup_span, A.iUnion_eq, hspan]
+    exact hSup.symm ▸ Submodule.mem_top
+  · let P : SeminormFamily ℂ W {p : Seminorm ℂ W // ∀ n, Continuous (p ∘ (S n).subtype)} :=
+      Subtype.val
+    have hP : Surjective P := by
+      intro p
+      refine ⟨⟨p, fun n ↦ ?_⟩, rfl⟩
+      let : FiniteDimensional ℂ (S n) := hFinite n
+      exact (hfinest.continuous_seminorm p).comp (S n).subtype.continuous_of_finiteDimensional
+    let t (p : Seminorm ℂ W) : TopologicalSpace W :=
+      p.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+    have hfinal := (withGeneratingSeminorms_spec W P).topologicalSpace_eq_iInf
+    exact hfinest.topologicalSpace_eq_iInf.trans ((hP.iInf_comp t).symm.trans hfinal.symm)
+
 /-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space is a strict
 LF-space. -/
 theorem finitePlaceSchwartz_strictLF (w : Places(F)) :
-    IsStrictLFSpace ℬ(w.adicCompletion F) := by sorry
+    IsStrictLFSpace ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  change @IsStrictLFSpace E _ _ tS
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  refine Eq.mpr (congrArg (fun t ↦ @IsStrictLFSpace E _ _ t) htop) ?_
+  exact (finitePlaceSchwartz_countableSpanningSet F w).elim fun s hs ↦
+    finestLocallyConvex_strictLF_of_countable_span E hs.1 hs.2
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is complete. -/
 theorem finitePlaceSchwartz_complete (w : Places(F)) :
