@@ -2515,6 +2515,30 @@ abbrev ProjectiveTensor :=
     (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
       ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
 
+/-- The seminorms with jointly continuous pullback at zero generate the projective topology. -/
+private theorem projectiveTensor_withSeminorms (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
+
+/-- Pure tensors depend jointly continuously on their factors at zero in the projective topology. -/
+private theorem continuousAt_projectiveTensor_tmul_zero (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
+  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
+  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
+  rw [hzero,
+    (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp (projectiveTensor_withSeminorms X Y),
+    tendsto_iInf]
+  intro p
+  rw [tendsto_comap_iff]
+  have hp := p.property.tendsto
+  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
+  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
+
 variable {E F} [lcE : PolynormableSpace ℂ E] [sE : T2Space E]
   [lcF : PolynormableSpace ℂ F] [sF : T2Space F]
 
@@ -2524,12 +2548,99 @@ theorem continuous_projectiveTensor_iff {G : Type*} [AddCommGroup G] [Module ℂ
     [TopologicalSpace G] [PolynormableSpace ℂ G] (T : ProjectiveTensor E F →ₗ[ℂ] G) :
     Continuous T ↔ Continuous (fun v : E × F ↦ T (v.1 ⊗ₜ[ℂ] v.2)) := by sorry
 
+omit lcE sE lcF sF in
+open scoped Pointwise in
+/-- The absolutely convex hull of pure tensors from two zero-neighborhoods contains
+the unit ball of its gauge, a defining seminorm of the projective topology. -/
+private theorem projectiveTensor_hull_mem_nhds [ContinuousSMul ℂ E] [ContinuousSMul ℂ F]
+    {U : Set E} {V : Set F} (hU : U ∈ 𝓝 0) (hV : V ∈ 𝓝 0) :
+    absConvexHull ℂ (image2 (TensorProduct.tmul ℂ) U V) ∈ 𝓝 (0 : ProjectiveTensor E F) := by
+  let C := absConvexHull ℂ (image2 (TensorProduct.tmul ℂ) U V)
+  have htensor {x : E} {y : F} (hx : x ∈ U) (hy : y ∈ V) : x ⊗ₜ[ℂ] y ∈ C :=
+    subset_absConvexHull (mem_image2_of_mem hx hy)
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : Module ℝ F := Module.restrictScalars ℝ ℂ F
+  let : Module ℝ (E ⊗[ℂ] F) := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ F := IsScalarTower.restrictScalars ℝ ℂ F
+  let : IsScalarTower ℝ ℂ (E ⊗[ℂ] F) := IsScalarTower.restrictScalars ℝ ℂ _
+  let : ContinuousSMul ℝ E := IsScalarTower.continuousSMul ℂ
+  let : ContinuousSMul ℝ F := IsScalarTower.continuousSMul ℂ
+  have hconvex : Convex ℝ C := convex_absConvexHull.lift ℝ
+  have habsorb : Absorbent ℝ C := by
+    have hscalar : Tendsto (fun r : ℝ ↦ r) (𝓝 0) (𝓝 0) := tendsto_id
+    have hscale (z : E ⊗[ℂ] F) : ∀ᶠ r : ℝ in 𝓝 0, r • z ∈ C := by
+      induction z using TensorProduct.inductionOn with
+      | tmul x y =>
+        obtain ⟨t, ht, ht₀⟩ := ((absorbent_nhds_zero (𝕜 := ℝ) hV).eventually_nhdsNE_zero y
+          |>.and eventually_mem_nhdsWithin).exists
+        have hx : Tendsto (fun r : ℝ ↦ r / t) (𝓝 0) (𝓝 0) := by
+          simpa only [zero_div] using hscalar.div_const t
+        filter_upwards [(hx.zero_smul_const x).eventually hU] with r hr
+        convert htensor hr ht using 1
+        rw [← smul_tmul', tmul_smul, smul_smul, div_mul_cancel₀ _ ht₀]
+      | add z w hz hw =>
+        have hdouble : Tendsto (fun r : ℝ ↦ 2 * r) (𝓝 0) (𝓝 0) := by
+          simpa only [mul_zero] using hscalar.const_mul 2
+        filter_upwards [hdouble.eventually hz, hdouble.eventually hw] with r hrz hrw
+        have h := hconvex hrz hrw (a := 1 / 2) (b := 1 / 2)
+          (by norm_num) (by norm_num) (by norm_num)
+        have hhalf : (1 / 2 : ℝ) * (2 * r) = r := by ring
+        simpa only [smul_smul, hhalf, ← smul_add] using h
+    exact absorbent_iff_eventually_nhdsNE_zero.mpr fun z ↦ (hscale z).filter_mono nhdsWithin_le_nhds
+  let p := gaugeSeminorm (𝕜 := ℂ) balanced_absConvexHull hconvex habsorb
+  have hp : ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+    change Tendsto (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2))
+      (𝓝 0) (𝓝 (p ((0 : E) ⊗ₜ[ℂ] (0 : F))))
+    rw [zero_tmul, map_zero, Metric.tendsto_nhds]
+    intro ε hε
+    obtain ⟨c, hc, hcε⟩ := NormedField.exists_norm_lt ℂ hε
+    have hc₀ : c ≠ 0 := norm_pos_iff.mp hc
+    have hUV : (c • U) ×ˢ V ∈ 𝓝 (0 : E × F) := by
+      change _ ∈ 𝓝 ((0 : E), (0 : F))
+      rw [nhds_prod_eq]
+      exact Filter.prod_mem_prod (by simpa using smul_mem_nhds_smul₀ hc₀ hU) hV
+    refine mem_of_superset hUV ?_
+    rintro ⟨_, y⟩ ⟨⟨x, hx, rfl⟩, hy⟩
+    have hle : p (x ⊗ₜ[ℂ] y) ≤ 1 := gauge_le_one_of_mem (htensor hx hy)
+    change dist (p ((c • x) ⊗ₜ[ℂ] y)) 0 < ε
+    rw [dist_zero_right, Real.norm_of_nonneg (apply_nonneg p _), ← smul_tmul', map_smul_eq_mul]
+    exact (mul_le_of_le_one_right (norm_nonneg c) hle).trans_lt hcε
+  refine mem_of_superset (Seminorm.ball_mem_nhds
+    ((projectiveTensor_withSeminorms E F).continuous_seminorm ⟨p, hp⟩) one_pos) ?_
+  exact fun _ hz ↦
+    setOfPred_gauge_lt_one_subset_self hconvex habsorb.zero_mem habsorb (p.mem_ball_zero.mp hz)
+
+-- Retain the Hausdorff assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.2.3.15), p. 679. The convex circled hulls of pure tensors from pairs
 of basic zero-neighborhoods form a zero-neighborhood basis. -/
 theorem projectiveTensor_zero_basis {I J : Type*} {a : I → Prop} {b : J → Prop}
     {U : I → Set E} {V : J → Set F} (hU : (𝓝 0).HasBasis a U) (hV : (𝓝 0).HasBasis b V) :
     (𝓝 (0 : ProjectiveTensor E F)).HasBasis (fun ij : I × J ↦ a ij.1 ∧ b ij.2)
-      (fun ij ↦ absConvexHull ℂ (image2 (TensorProduct.tmul ℂ) (U ij.1) (V ij.2))) := by sorry
+      (fun ij ↦ absConvexHull ℂ (image2 (TensorProduct.tmul ℂ) (U ij.1) (V ij.2))) := by
+  let : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  let : ContinuousSMul ℂ F := PolynormableSpace.continuousSMul ℂ F
+  have hprod : (𝓝 (0 : E × F)).HasBasis (fun ij : I × J ↦ a ij.1 ∧ b ij.2)
+      (fun ij ↦ (U ij.1) ×ˢ (V ij.2)) := by
+    change (𝓝 ((0 : E), (0 : F))).HasBasis _ _
+    rw [nhds_prod_eq]
+    exact hU.prod hV
+  let tmul : E × F → ProjectiveTensor E F := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have htmul : Tendsto tmul (𝓝 0) (𝓝 0) := by
+    have h := (continuousAt_projectiveTensor_tmul_zero E F).tendsto
+    change Tendsto tmul (𝓝 0) (𝓝 (tmul 0)) at h
+    rwa [show tmul 0 = 0 from zero_tmul _ _] at h
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ (ProjectiveTensor E F)).to_hasBasis ?_ ?_
+  · intro p hp
+    obtain ⟨ij, hij, hsub⟩ := hprod.mem_iff.mp (htmul.eventually (p.ball_mem_nhds hp one_pos))
+    refine ⟨ij, hij, absConvexHull_min ?_
+      ⟨p.balanced_ball_zero 1, convex_RCLike_iff_convex_real.mpr (p.convex_ball 0 1)⟩⟩
+    rintro _ ⟨x, hx, y, hy, rfl⟩
+    exact hsub (a := (x, y)) ⟨hx, hy⟩
+  · intro ij hij
+    exact (PolynormableSpace.hasBasis_zero_ball ℂ (ProjectiveTensor E F)).mem_iff.mp
+      (projectiveTensor_hull_mem_nhds (hU.mem_of_mem hij.1) (hV.mem_of_mem hij.2))
 
 /-- Paper: §C.2.3.2, p. 679. Rebracketing the projective tensor product is a linear
 topological isomorphism. -/
@@ -2682,30 +2793,6 @@ theorem injectiveTensor_equicontinuous_iff (D : Set (StrongDual ℂ (InjectiveTe
 end Comparison
 
 section DirectSums
-
-/-- The seminorms with jointly continuous pullback at zero generate the projective topology. -/
-private theorem projectiveTensor_withSeminorms (X Y : Type*)
-    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
-    WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
-      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
-
-/-- Pure tensors depend jointly continuously on their factors at zero in the projective topology. -/
-private theorem continuousAt_projectiveTensor_tmul_zero (X Y : Type*)
-    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
-    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
-  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
-  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
-  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
-  rw [hzero,
-    (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp (projectiveTensor_withSeminorms X Y),
-    tendsto_iInf]
-  intro p
-  rw [tendsto_comap_iff]
-  have hp := p.property.tendsto
-  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
-  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
 
 /-- A generating projective seminorm, tested on the unit ball in the normed factor, is bounded
 by a single continuous seminorm on the other factor. -/
