@@ -192,7 +192,19 @@ include hAdd hSMul hT2 in
 /-- Paper: Definition C.5.1.26(2), p. 735. In positive dimension a nonzero constant
 fails the bound with a linear coordinate weight. -/
 theorem not_hasVectorSchwartzDecay_const (hd : 0 < d) {z : E} (hz : z ≠ 0) :
-    ¬ HasVectorSchwartzDecay (fun _ : V ↦ z) := by sorry
+    ¬ HasVectorSchwartzDecay (fun _ : V ↦ z) := by
+  intro h
+  let i : Fin d := ⟨0, hd⟩
+  obtain ⟨g, hg, hb⟩ := h 0 (MvPolynomial.X i)
+  rw [← (hasVectorMultiPartial_zero_iff _ _).mp hg] at hb
+  obtain ⟨r, hr, hsub⟩ := (hb (compl_singleton_mem_nhds hz.symm)).exists_pos
+  have hmem : (r : ℂ) • z ∈ range (fun x : V ↦
+      (MvPolynomial.X i).eval (fun j ↦ (x j : ℂ)) • z) := by
+    exact ⟨EuclideanSpace.single i r, by simp [PiLp.single_apply]⟩
+  have hnorm : r ≤ ‖(r : ℂ)‖ := by simp [abs_of_pos hr]
+  have hzU := (Set.smul_mem_smul_set_iff₀ (Complex.ofReal_ne_zero.mpr hr.ne') _ _).mp
+    (hsub (r : ℂ) hnorm hmem)
+  exact hzU (mem_singleton z)
 
 /-- Paper: Definition C.5.1.26(2), p. 735. For scalar-valued functions, the carrier
 of the Schwartz submodule agrees with Mathlib's Schwartz functions. -/
