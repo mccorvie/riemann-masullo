@@ -2235,9 +2235,68 @@ theorem finitePlaceSchwartz_montel (w : Places(F)) :
 theorem finitePlaceSchwartz_strongDual_frechet (w : Places(F)) :
     IsFrechetTVS (StrongDual ℂ ℬ(w.adicCompletion F)) := by sorry
 
+/-- Paper: Proposition C.2.5.1(6), p. 692. The strong dual of a space with its finest
+locally convex topology is nuclear. Each bounded set of the primal space lies in a
+finite-dimensional subspace, so uniform convergence on that set follows from
+convergence on finitely many basis vectors.
+Deviation: Nuclearity of the strong dual holds without the countability hypothesis. -/
+private theorem finestLocallyConvex_strongDual_nuclear
+    (E : Type u) [AddCommGroup E] [Module ℂ E] :
+    IsNuclearTVS.{v} (StrongDual ℂ (FinestLocallyConvex E)) := by
+  let W := FinestLocallyConvex E
+  let D := StrongDual ℂ W
+  let Dweak := WeakDual ℂ W
+  have hW := finestLocallyConvex_withSeminorms E
+  let : IsTopologicalAddGroup W := hW.isTopologicalAddGroup
+  let : ContinuousSMul ℂ W := hW.continuousSMul
+  let : PolynormableSpace ℂ W := hW.toPolynormableSpace
+  let : T2Space W := finestLocallyConvex_t2 E
+  have hweak : Continuous (StrongDual.toWeakDual : D → Dweak) :=
+    WeakDual.continuous_of_continuous_eval (fun x : W ↦ continuous_eval_const x)
+  have hstrong : Continuous (WeakDual.toStrongDual : Dweak → D) := by
+    apply continuous_of_tendsto_nhds_zero (WeakDual.toStrongDual : Dweak ≃ₗ[ℂ] D)
+    apply ContinuousLinearMap.hasBasis_nhds_zero.tendsto_right_iff.mpr
+    rintro ⟨B, U⟩ ⟨hB, hU⟩
+    obtain ⟨S, hdim, hBS, hbounded⟩ := (finestLocallyConvex_isVonNBounded_iff B).mp hB
+    -- Restrict to S by recording the evaluations on its basis.
+    let b := Module.finBasis ℂ S
+    let e := (b.constr ℂ).trans
+      (LinearMap.toContinuousLinearMap : (S →ₗ[ℂ] ℂ) ≃ₗ[ℂ] StrongDual ℂ S)
+    let r (f : Dweak) : StrongDual ℂ S := e (fun i ↦ f (b i : W))
+    have hr : Continuous r := e.toLinearMap.continuous_of_finiteDimensional.comp
+      (continuous_pi fun i ↦ WeakDual.eval_continuous (b i : W))
+    have hr_zero : r 0 = 0 := e.map_zero
+    have ht : Tendsto r (𝓝 0) (𝓝 0) := hr_zero ▸ hr.continuousAt
+    filter_upwards [ht.eventually (ContinuousLinearMap.eventually_nhds_zero_mapsTo hbounded hU)]
+      with f hf
+    intro x hx
+    let y : S := ⟨x, hBS hx⟩
+    have hy : r f y = f x := by
+      have heq : (r f).toLinearMap = f.toStrongDual.toLinearMap.comp S.subtype := by
+        apply b.ext
+        intro i
+        exact b.constr_basis ℂ (fun i ↦ f (b i : W)) i
+      exact LinearMap.congr_fun heq y
+    exact hy ▸ hf (show y ∈ Subtype.val ⁻¹' B from hx)
+  let tS : TopologicalSpace D := inferInstance
+  let tW : TopologicalSpace D := (inferInstance : TopologicalSpace Dweak)
+  have htop : tS = tW :=
+    le_antisymm (continuous_id_iff_le.mp hweak) (continuous_id_iff_le.mp hstrong)
+  change @IsNuclearTVS.{v} D _ _ tS
+  rw [htop]
+  exact isNuclearTVS_weakDual W
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is nuclear. -/
 theorem finitePlaceSchwartz_strongDual_nuclear (w : Places(F)) :
-    IsNuclearTVS.{v} (StrongDual ℂ ℬ(w.adicCompletion F)) := by sorry
+    IsNuclearTVS.{v} (StrongDual ℂ ℬ(w.adicCompletion F)) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  let P (t : TopologicalSpace E) := IsNuclearTVS.{v} (@StrongDual ℂ _ _ E t _ _)
+  change P tS
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  rw [htop]
+  exact finestLocallyConvex_strongDual_nuclear E
 
 /-- Paper: Proposition 2.1.2.4(3), p. 64. Every linear subspace of the local Schwartz–Bruhat
 space has a continuous linear retraction. -/
