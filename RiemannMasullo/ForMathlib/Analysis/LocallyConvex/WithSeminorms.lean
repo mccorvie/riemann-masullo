@@ -1,6 +1,9 @@
 module
 
 public import Mathlib.Analysis.LocallyConvex.WithSeminorms
+public import Mathlib.Analysis.RCLike.Basic
+import Mathlib.Analysis.LocallyConvex.AbsConvexOpen
+import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 
 @[expose] public section
 
@@ -40,5 +43,35 @@ theorem exists_seminorm_extension {f : E →ₗ[𝕜] F} (hf : IsInducing f)
   refine le_antisymm (by simpa [cost] using hr_le (f x) x) (le_ciInf fun w ↦ ?_)
   exact (le_map_add_map_sub p x w).trans (add_le_add_right (by
     simpa only [Seminorm.comp_apply, map_sub] using hpq (x - w)) _)
+
+end RiemannMasullo
+
+namespace RiemannMasullo
+
+open scoped ComplexOrder
+
+/-- A quotient of a polynormable real or complex vector space is polynormable. -/
+theorem polynormableSpace_quotient {𝕜 E : Type*} [RCLike 𝕜] [AddCommGroup E]
+    [Module 𝕜 E] [TopologicalSpace E] [PolynormableSpace 𝕜 E] (M : Submodule 𝕜 E) :
+    PolynormableSpace 𝕜 (E ⧸ M) := by
+  have := PolynormableSpace.isTopologicalAddGroup 𝕜 E
+  let : Module ℝ E := Module.restrictScalars ℝ 𝕜 E
+  let : Module ℝ (E ⧸ M) := Module.restrictScalars ℝ 𝕜 (E ⧸ M)
+  let : IsScalarTower ℝ 𝕜 E := IsScalarTower.restrictScalars ℝ 𝕜 E
+  let : IsScalarTower ℝ 𝕜 (E ⧸ M) := IsScalarTower.restrictScalars ℝ 𝕜 (E ⧸ M)
+  have : LocallyConvexSpace ℝ E :=
+    (PolynormableSpace.withSeminorms 𝕜 E).toLocallyConvexSpace
+  have : LocallyConvexSpace 𝕜 (E ⧸ M) := by
+    apply LocallyConvexSpace.ofBasisZero 𝕜 (E ⧸ M)
+      (fun s : Set E ↦ M.mkQ '' s) (fun s ↦ s ∈ 𝓝 0 ∧ Convex ℝ s)
+    · rw [← show Filter.map M.mkQ (𝓝 (0 : E)) = 𝓝 0 by
+        simpa only [map_zero] using M.isOpenQuotientMap_mkQ.map_nhds_eq 0]
+      exact (LocallyConvexSpace.convex_basis_zero ℝ E).map M.mkQ
+    · intro s hs
+      exact convex_of_nonneg_surjective_algebraMap 𝕜
+        (fun _ hz ↦ RCLike.nonneg_iff_exists_ofReal.mp hz)
+        (hs.2.linear_image (M.mkQ.restrictScalars ℝ))
+  have : ContinuousSMul ℝ (E ⧸ M) := IsScalarTower.continuousSMul 𝕜
+  infer_instance
 
 end RiemannMasullo
