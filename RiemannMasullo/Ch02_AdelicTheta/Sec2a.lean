@@ -1044,7 +1044,21 @@ theorem adelicAverage_at_zero_continuous (f : ℬ[F]) :
 under multiplication by principal ideles.
 Deviation: Invariance is expressed as constancy on the fibers of the quotient map. -/
 theorem adelicAverage_at_zero_factorsThrough (f : ℬ[F]) :
-    FactorsThrough (fun g : 𝕀[F] ↦ adelicAverage f g 0) classOf := by sorry
+    FactorsThrough (fun g : 𝕀[F] ↦ adelicAverage f g 0) classOf := by
+  intro a b hab
+  obtain ⟨u, hu⟩ := QuotientGroup.eq.mp hab
+  have hb : b = a * IdeleGroup.unitEmbedding (𝓞 F) F u :=
+    inv_mul_eq_iff_eq_mul.mp hu.symm
+  subst b
+  simp only [adelicAverage, add_zero]
+  rw [← (Equiv.mulRight u).tsum_eq
+    (fun ξ : Fˣ ↦ f (Multiplicative.ofAdd (a.val * algebraMap F 𝔸[F] (ξ : F))))]
+  apply tsum_congr
+  intro ξ
+  change f (Multiplicative.ofAdd (a.val * algebraMap F 𝔸[F] (↑(ξ * u) : F))) =
+    f (Multiplicative.ofAdd ((a.val * algebraMap F 𝔸[F] (u : F)) *
+      algebraMap F 𝔸[F] (ξ : F)))
+  rw [Units.val_mul, map_mul (algebraMap F 𝔸[F]), ← mul_assoc, mul_right_comm a.val]
 
 -- ERRATA I65: With the Archimedean component fixed at one over ℚ, the
 -- p-component p^m and test function 1_Ẑ give contributing rationals in
@@ -1089,7 +1103,13 @@ def adelicTheta (f : ℬ[F]) : C(C[F], ℂ) :=
 the test function over its nonzero principal multiples. -/
 theorem adelicTheta_mk (f : ℬ[F]) (g : 𝕀[F]) :
     adelicTheta f (classOf g) =
-      ∑' ξ : Fˣ, f (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * g.val)) := by sorry
+      ∑' ξ : Fˣ, f (Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * g.val)) := by
+  calc
+    adelicTheta f (classOf g) = adelicAverage f g 0 :=
+      DFunLike.congr_fun (IsQuotientMap.lift_comp (f := ⟨classOf, QuotientGroup.continuous_mk⟩)
+        (QuotientGroup.isQuotientMap_mk _) ⟨_, adelicAverage_at_zero_continuous f⟩
+        (adelicAverage_at_zero_factorsThrough f)) g
+    _ = _ := by simp only [adelicAverage, add_zero, mul_comm g.val]
 
 /-- Paper: Definition 2.2.3.1, p. 82. Formation of the global adelic theta
 function is complex linear. -/
