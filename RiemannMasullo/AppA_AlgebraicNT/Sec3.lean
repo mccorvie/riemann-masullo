@@ -14,6 +14,8 @@ public import Mathlib.Topology.Algebra.Group.Units
 
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
 import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
+import Mathlib.MeasureTheory.Measure.Haar.Extension
+import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
@@ -72,13 +74,108 @@ local instance : MeasurableSpace (SAdeleRing F S) :=
 local instance : MeasurableSpace (Multiplicative (SAdeleRing F S) ⧸ Aₛ) := borel _
 local instance : MeasurableSpace (𝕀ₛ ⧸ Nₛ) := borel _
 
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Definition A.3.1.1, p. 555. Exactly one regular additive Haar measure on
 the adeles gives the additive quotient mass one when the diagonal has counting measure. -/
 theorem additiveTamagawaMeasure_existsUnique :
     ∃! μ : Measure 𝔸[F], μ.IsAddHaarMeasure ∧ μ.Regular ∧
       ∃ ν : Measure (Multiplicative 𝔸[F] ⧸ A[F]),
         IsWeilQuotientMeasure A[F] (show Measure (Multiplicative 𝔸[F]) from μ)
-          Measure.count ν ∧ ν univ = 1 := by sorry
+          Measure.count ν ∧ ν univ = 1 := by
+  classical
+  let G := Multiplicative 𝔸[F]
+  let H := A[F]
+  let Q := G ⧸ H
+  obtain ⟨-, hclosed, hdiscrete, -, -, hcompact, -, -⟩ := adele_additive_quotient.{_, 0} F
+  let : CompactSpace Q := hcompact
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : Primes(F), IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace 𝔸ᶠ[𝓞 F, F] := by
+    change LocallyCompactSpace (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F])
+    infer_instance
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × 𝔸ᶠ[𝓞 F, F])
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : IsClosed (H : Set G) := hclosed
+  let : BorelSpace G := ⟨rfl⟩
+  let : BorelSpace Q := ⟨rfl⟩
+  let : (Measure.count : Measure H).IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hclosed
+  let count : Measure H := Measure.count
+  let : count.IsHaarMeasure := inferInstanceAs (Measure.count : Measure H).IsHaarMeasure
+  -- Normalize Haar measure on the compact quotient using the whole space.
+  let K : TopologicalSpace.PositiveCompacts Q := ⟨⟨univ, isCompact_univ⟩, by simp⟩
+  let ν : Measure Q := Measure.haarMeasure K
+  have hν : ν univ = 1 := Measure.haarMeasure_self (K₀ := K)
+  let μ := ses.inducedMeasure count ν
+  let : μ.Regular := ses.inducedMeasure_regular count ν
+  have hμ : ∀ f : C(G, ℂ), HasCompactSupport f →
+      (∫ x, f x ∂μ) = ∫ q, lcaCosetIntegral H count f q ∂ν := by
+    intro f hf
+    let fc : CompactlySupportedContinuousMap G ℂ := ⟨f, hf⟩
+    have hfiber (q : Q) : ses.pushforward count fc q = lcaCosetIntegral H count f q := by
+      calc
+        ses.pushforward count fc q =
+            ses.pushforward count fc (QuotientGroup.mk' H q.out) :=
+          congrArg (ses.pushforward count fc) (QuotientGroup.out_eq' q).symm
+        _ = lcaCosetIntegral H count f q := ses.pushforward_apply_apply count fc q.out
+    -- The induced measure formula for real functions applies to both complex coordinates.
+    have hcoord (L : ℂ →L[ℝ] ℝ) :
+        L (∫ x, f x ∂μ) = L (∫ q, ses.pushforward count fc q ∂ν) := by
+      let g : CompactlySupportedContinuousMap G ℝ :=
+        ⟨⟨fun x ↦ L (f x), L.continuous.comp f.continuous⟩, hf.comp_left L.map_zero⟩
+      change L (∫ x, fc x ∂μ) = _
+      rw [← L.integral_comp_comm (fc.integrable (μ := μ)),
+        ← L.integral_comp_comm ((ses.pushforward count fc).integrable (μ := ν))]
+      change (∫ x, g x ∂μ) = ∫ q, L (ses.pushforward count fc q) ∂ν
+      rw [ses.integral_inducedMeasure, ses.integrate_apply]
+      congr with q
+      obtain ⟨x, rfl⟩ := ses.isOpenQuotientMap.surjective q
+      rw [ses.pushforward_apply_apply, ses.pushforward_apply_apply,
+        ← L.integral_comp_comm (ses.pullback fc x).integrable]
+      rfl
+    simp_rw [← hfiber]
+    exact Complex.ext (hcoord Complex.reCLM) (hcoord Complex.imCLM)
+  refine ⟨μ, ⟨?_, ses.inducedMeasure_regular count ν, ν, ⟨inferInstance, inferInstance, hμ⟩, hν⟩,
+    ?_⟩
+  · have hhaar := ses.isHaarMeasure_inducedMeasure count ν
+    exact
+      { toIsFiniteMeasureOnCompacts := hhaar.toIsFiniteMeasureOnCompacts
+        toIsOpenPosMeasure := hhaar.toIsOpenPosMeasure
+        map_add_left_eq_self := fun x ↦ hhaar.map_mul_left_eq_self (Multiplicative.ofAdd x) }
+  rintro μ' ⟨-, hregular, ν', ⟨hhaar', hregular', hweil⟩, hν'⟩
+  let : (show Measure G from μ').Regular := hregular
+  let : ν'.IsHaarMeasure := hhaar'
+  let : ν'.Regular := hregular'
+  have heq : ν' = ν := by
+    have hscale := Measure.isMulLeftInvariant_eq_smul_of_regular ν' ν
+    have hmass := congrArg (fun m : Measure Q ↦ m univ) hscale
+    change ν' univ = (ν'.haarScalarFactor ν : ℝ≥0∞) * ν univ at hmass
+    have hfactor : ν'.haarScalarFactor ν = 1 := by
+      rw [hν', hν, mul_one] at hmass
+      exact ENNReal.coe_inj.mp hmass.symm
+    rw [hscale, hfactor, one_smul]
+  subst ν'
+  apply Measure.ext_of_integral_eq_on_compactlySupported (X := G)
+  intro f
+  let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+  have hc : HasCompactSupport fc := f.hasCompactSupport.comp_left Complex.ofReal_zero
+  have heq := (hweil fc hc).trans (hμ fc hc).symm
+  apply Complex.ofReal_injective
+  calc
+    Complex.ofReal (∫ x : G, f x ∂(show Measure G from μ')) =
+        ∫ x : G, (f x : ℂ) ∂(show Measure G from μ') := integral_complex_ofReal.symm
+    _ = ∫ x : G, (f x : ℂ) ∂μ := heq
+    _ = Complex.ofReal (∫ x : G, f x ∂μ) := integral_complex_ofReal
 
 /-- Paper: Definition A.3.1.1, p. 555. The additive Tamagawa measure is the
 adelic Haar measure normalized to give the quotient by the diagonal mass one. -/
