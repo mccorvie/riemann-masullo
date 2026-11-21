@@ -19,6 +19,7 @@ import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
+import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -1077,7 +1078,61 @@ functions is locally convex. -/
 theorem vectorPeriodicSmoothSubmodule_uniformValue_polynormable :
     letI : TopologicalSpace (vectorPeriodicSmoothSubmodule d E) :=
       uniformValueTopology (vectorPeriodicSmoothSubmodule d E)
-    PolynormableSpace ℂ (vectorPeriodicSmoothSubmodule d E) := by sorry
+    PolynormableSpace ℂ (vectorPeriodicSmoothSubmodule d E) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let S := vectorPeriodicSmoothSubmodule d E
+  let Q : Set (Fin d → ℝ) := univ.pi fun _ ↦ Icc 0 1
+  let K : Set V := WithLp.toLp 2 '' Q
+  have hQ : IsCompact Q := isCompact_univ_pi fun _ ↦ isCompact_Icc
+  have : CompactSpace K := isCompact_iff_compactSpace.mp
+    (hQ.image (PiLp.continuous_toLp 2 (fun _ : Fin d ↦ ℝ)))
+  have hcont (f : S) : Continuous f.val :=
+    continuous_of_vectorContDiffOrderOn_zero
+      ((Submodule.mem_iInf _).mp (Submodule.mem_inf.mp f.property).1 0)
+  let restrict : S →ₗ[ℂ] C(K, E) :=
+    { toFun := fun f ↦ ⟨fun x ↦ f.val x, (hcont f).comp continuous_subtype_val⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  -- A single representative of each integer orbit works for every function in S.
+  have hrep (x : V) : ∃ y : K, ∀ f : S, f.val y = f.val x := by
+    let n : Fin d → ℤ := fun i ↦ ⌊x i⌋
+    have hx : (x - eucInt n) ∈ K := by
+      refine ⟨WithLp.ofLp (x - eucInt n), ?_, rfl⟩
+      intro i _
+      change x i - (⌊x i⌋ : ℝ) ∈ Icc 0 1
+      exact ⟨Int.fract_nonneg _, (Int.fract_lt_one _).le⟩
+    refine ⟨⟨x - eucInt n, hx⟩, fun f ↦ ?_⟩
+    have hn := (Submodule.mem_iInf _).mp (Submodule.mem_inf.mp f.property).2 n
+    have hy := (Submodule.mem_iInf _).mp hn (x - eucInt n)
+    simp only [LinearMap.mem_ker, LinearMap.sub_apply, LinearMap.proj_apply,
+      sub_add_cancel, sub_eq_zero] at hy
+    exact hy.symm
+  let cover : S → V →ᵤ E := fun f ↦ UniformFun.ofFun f.val
+  let cube : S → K →ᵤ E := fun f ↦ UniformFun.ofFun (restrict f)
+  have hUniform :
+      UniformSpace.comap cover inferInstance = UniformSpace.comap cube inferInstance := by
+    apply UniformSpace.ext
+    apply ((UniformFun.hasBasis_uniformity V E).comap
+      (fun fg : S × S ↦ (cover fg.1, cover fg.2))).eq_of_same_basis
+    refine ((UniformFun.hasBasis_uniformity K E).comap
+      (fun fg : S × S ↦ (cube fg.1, cube fg.2))).congr (fun _ ↦ Iff.rfl) ?_
+    intro U _
+    ext fg : 1
+    change (∀ x : K, (fg.1.val x, fg.2.val x) ∈ U) ↔
+      ∀ x : V, (fg.1.val x, fg.2.val x) ∈ U
+    refine ⟨fun h x ↦ ?_, fun h x ↦ h x⟩
+    obtain ⟨y, hy⟩ := hrep x
+    simpa only [hy] using h y
+  have hC := (ContinuousMap.isUniformEmbedding_uniformFunOfFun (α := K) (β := E)).isInducing
+  have htop : uniformValueTopology S = TopologicalSpace.induced restrict inferInstance := by
+    change uniformValueTopology S = TopologicalSpace.induced restrict
+      (inferInstance : UniformSpace C(K, E)).toTopologicalSpace
+    rw [hC.eq_induced, induced_compose]
+    exact congrArg (fun u : UniformSpace S ↦ u.toTopologicalSpace) hUniform
+  have := polynormableSpace_continuousMap ℂ K E
+  change PolynormableSpace ℂ S (topology := uniformValueTopology S)
+  rw [htop]
+  exact PolynormableSpace.induced restrict
 
 /-- Paper: Remark C.5.1.28, p. 735. The uniform value topology on the Schwartz
 submodule is locally convex. -/
