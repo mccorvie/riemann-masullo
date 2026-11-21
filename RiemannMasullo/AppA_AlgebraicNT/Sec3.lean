@@ -1936,10 +1936,82 @@ theorem padicTamagawaFourier_integerUnits :
         ({x : ℚ_[p] | ‖x‖ = 1}.indicator (fun _ ↦ (1 : ℂ))) =
       ((ℤₚ).indicator (fun _ ↦ (1 : ℂ))) - ((p : ℂ)⁻¹) • ((((p : ℚ_[p])⁻¹ * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) := by sorry
 
+/-- Paper: Example A.3.1.6, p. 557. Multiplication followed by the standard character
+identifies the additive group of the p-adic field with its Pontryagin dual. -/
+theorem exists_padicPontryaginDualEquiv :
+    ∃ e : Multiplicative ℚ_[p] ≃ₜ* PontryaginDual (Multiplicative ℚ_[p]),
+      ∀ x y : ℚ_[p], e (Multiplicative.ofAdd x) (Multiplicative.ofAdd y) =
+        padicStandardCharacter p (x * y) := by
+  sorry
+
 /-- Paper: Example A.3.1.7, p. 558. The standard additive measure on the p-adic field
 is self-dual under the standard character. -/
 theorem padicTamagawaMeasure_selfDual :
-    IsTamagawaSelfDual (padicTamagawaMeasure p) (padicStandardCharacter p) := by sorry
+    IsTamagawaSelfDual (padicTamagawaMeasure p) (padicStandardCharacter p) := by
+  obtain ⟨e, he⟩ := exists_padicPontryaginDualEquiv p
+  refine ⟨e, he, ?_⟩
+  let G := Multiplicative ℚ_[p]
+  let μ : Measure G := padicTamagawaMeasure p
+  let : MeasurableSpace (PontryaginDual G) := borel _
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  obtain ⟨hHaar, hRegular, hMass⟩ :=
+    Classical.choose_spec (padicTamagawaMeasure_existsUnique p).exists
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hHaar.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hHaar.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hHaar.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := hRegular
+  let ν₀ : Measure (PontryaginDual G) := μ.map e
+  let : ν₀.IsHaarMeasure := e.isHaarMeasure_map μ
+  let : ν₀.Regular := Measure.Regular.map e.toHomeomorph
+  obtain ⟨ν, hν, -⟩ := lcaPlancherelMeasure_existsUnique μ
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  let K : Set G := ℤₚ
+  let f : G → ℂ := K.indicator (fun _ ↦ 1)
+  have hK : MeasurableSet K := Metric.isClosed_closedBall.measurableSet
+  have hKMass : μ K = 1 := hMass
+  have hKFinite : μ K ≠ ⊤ := by rw [hKMass]; exact ENNReal.one_ne_top
+  have hf₁ : Integrable f μ :=
+    memLp_one_iff_integrable.mp (memLp_indicator_const 1 hK.nullMeasurableSet 1 (Or.inr hKFinite))
+  have hf₂ : MemLp f 2 μ := memLp_indicator_const 2 hK.nullMeasurableSet 1 (Or.inr hKFinite)
+  -- The unit ball indicator is fixed by Fourier transform in the pairing coordinates.
+  have hFourier : lcaFourier μ f ∘ e = f := by
+    have h := padicTamagawaFourier_scaledIntegers p 0
+    simp only [zpow_zero, neg_zero, one_mul, image_id', one_smul] at h
+    funext y
+    change lcaFourier μ f (e y) = f y
+    have hy := tamagawaFourier_eq_lcaFourier (padicTamagawaMeasure p)
+      (padicStandardCharacter p) ((ℤₚ).indicator (fun _ ↦ (1 : ℂ))) y.toAdd (e y)
+      (fun x ↦ (he y.toAdd x).trans (congrArg _ (mul_comm _ _)))
+    exact hy.symm.trans (congrFun h y.toAdd)
+  have hScale := Measure.isMulLeftInvariant_eq_smul_of_regular ν ν₀
+  have hNorm := (hν.2.2 f hf₁ hf₂).2
+  have hMeas : StronglyMeasurable (lcaFourier μ f) := by
+    have hf : StronglyMeasurable f := stronglyMeasurable_const.indicator hK
+    convert hf.comp_measurable e.symm.continuous.measurable using 1
+    funext χ
+    change lcaFourier μ f χ = f (e.symm χ)
+    simpa only [Function.comp_apply, e.apply_symm_apply] using congrFun hFourier (e.symm χ)
+  have hEmb : MeasurableEmbedding (e : G → PontryaginDual G) :=
+    e.toHomeomorph.measurableEmbedding
+  have hMap : eLpNorm (lcaFourier μ f) 2 ν₀ = eLpNorm f 2 μ := by
+    exact (hEmb.eLpNorm_map_measure).trans (congrArg (fun g ↦ eLpNorm g 2 μ) hFourier)
+  rw [hScale, eLpNorm_smul_measure_of_ne_top' (by simp : (2 : ℝ≥0∞) ≠ ⊤) _ _
+      hMeas.aestronglyMeasurable, hMap] at hNorm
+  have hfNorm : eLpNorm f 2 μ = 1 := by
+    rw [eLpNorm_indicator_const hK.nullMeasurableSet (by simp) (by simp), hKMass]
+    simp
+  rw [hfNorm] at hNorm
+  change (↑(ν.haarScalarFactor ν₀ ^ ((2 : ℝ≥0∞).toReal)⁻¹) : ℝ≥0∞) * 1 = 1 at hNorm
+  rw [mul_one] at hNorm
+  have hFactor : ν.haarScalarFactor ν₀ = 1 := by
+    apply ENNReal.coe_injective
+    apply (ENNReal.strictMono_rpow_of_pos (by norm_num : 0 < ((2 : ℝ≥0∞).toReal)⁻¹)).injective
+    simpa [ENNReal.coe_rpow_of_nonneg] using hNorm
+  rw [hFactor, one_smul] at hScale
+  change IsLCAPlancherelMeasure μ ν₀
+  exact hScale ▸ hν
 
 end Padic
 
