@@ -556,7 +556,22 @@ theorem regulatorParallelotope_precompact : IsCompact (closure (regulatorParalle
 
 /-- Paper: Lemma A.2.3.5(1), p. 549. The parallelotope has nonempty relative interior. -/
 theorem regulatorParallelotope_interior : (interior (regulatorParallelotope F b)).Nonempty := by
-  sorry
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let U : Set (Fin (Units.rank F) → ℝ) := Set.pi Set.univ fun _ ↦ Set.Ioo 0 1
+  have hOpen : IsOpen (B.equivFun ⁻¹' U) :=
+    (isOpen_set_pi Set.finite_univ fun _ _ ↦ isOpen_Ioo).preimage
+      B.equivFun.toLinearMap.continuous_of_finiteDimensional
+  have hSubset : B.equivFun ⁻¹' U ⊆ regulatorParallelotope F b := by
+    intro x hx
+    change x ∈ ZSpan.fundamentalDomain B
+    rw [ZSpan.mem_fundamentalDomain, ← Module.Basis.equivFun_apply]
+    exact fun i ↦ Set.Ioo_subset_Ico_self (hx i (Set.mem_univ i))
+  refine ⟨B.equivFun.symm (fun _ ↦ 1 / 2), interior_maximal hSubset hOpen ?_⟩
+  change B.equivFun (B.equivFun.symm (fun _ ↦ 1 / 2)) ∈ U
+  rw [LinearEquiv.apply_symm_apply]
+  intro i _
+  change (1 / 2 : ℝ) ∈ Set.Ioo 0 1
+  norm_num
 
 /-- Paper: Lemma A.2.3.5(2), p. 549. Regulator translates cover the hyperplane. -/
 theorem regulatorParallelotope_cover :
