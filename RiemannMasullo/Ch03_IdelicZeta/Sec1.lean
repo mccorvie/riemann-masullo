@@ -1013,7 +1013,70 @@ local notation "pullbackS(" c ")" => MonoidHom.comp (ContinuousMonoidHom.toMonoi
 along insertion kills the projected diagonal S-units. -/
 theorem sIdeleRestriction_descent (c : unramifiedOutside F S) :
     projectedDiagonal ≤ (pullbackS(c.val)).ker := by
-  sorry
+  classical
+  rw [MonoidHom.map_range]
+  rintro _ ⟨u, rfl⟩
+  let g := Units.map (integralAdeleDiagonal F S).toMonoidHom u
+  let i := (integralAdelesOutside F S).subtype
+  let a := Units.map i.toMonoidHom g
+  let s := Units.map ((adeleProjection F S).comp i).toMonoidHom g
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  let localEval (v : Primes(F)) (hv : v ∉ S) : integralAdelesOutside F S →+* LocalIntegers(v) :=
+    (((RestrictedProduct.evalRingHom _ v).comp (RingHom.snd _ _)).comp i).codRestrict _
+      (fun x => by
+        have hx := x.property
+        simp only [integralAdelesOutside, Subring.mem_iInf] at hx
+        exact hx v hv)
+  let outsideUnits (v : Primes(F)) : LocalUnits(v) :=
+    if hv : v ∈ S then 1 else Units.map (localEval v hv).toMonoidHom g
+  -- Continuity extends triviality on the single-coordinate factors to the whole family.
+  have hb : c.val (finiteIntegerUnitInsertion F outsideUnits) = 1 := by
+    let χ := c.val.comp (finiteIntegerUnitInsertion F)
+    have hp : HasProd (fun v => Pi.mulSingle v (outsideUnits v)) outsideUnits := by
+      refine Pi.hasProd.mpr fun w => ?_
+      convert hasProd_pi_single w (outsideUnits w) using 1
+      funext v
+      rcases eq_or_ne v w with rfl | hv
+      · simp
+      · simp [hv, hv.symm]
+    refine (hp.map χ χ.continuous).unique (hasProd_one.congr_fun fun v => ?_)
+    change c.val (finiteIntegerUnitInsertion F (Pi.mulSingle v (outsideUnits v))) = 1
+    by_cases hv : v ∈ S
+    · simp [outsideUnits, hv]
+    · rw [finiteIntegerUnitInsertion_mulSingle]
+      have hc : ∀ v ∉ S, c.val.IsUnramifiedAt v := c.property
+      have h := (hc v hv).restrict_apply_unit_eq_one (outsideUnits v)
+      change c.val.restrict v ↑(Units.map (LocalIntegers(v)).subtype.toMonoidHom (outsideUnits v)) = 1 at h
+      rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at h
+      exact h
+  have hfactor : q a = q (sIdeleInsertion F S s) * finiteIntegerUnitInsertion F outsideUnits := by
+    change q a = q (sIdeleInsertion F S s) * q _
+    rw [← map_mul]
+    apply congrArg q
+    apply Units.ext
+    obtain ⟨hinf, hin, hout⟩ := sIdeleInsertion_apply F S s
+    refine Prod.ext ?_ ?_
+    · change a.val.1 = (sIdeleInsertion F S s).val.1 * 1
+      rw [mul_one, hinf]
+      rfl
+    · apply RestrictedProduct.ext
+      intro v
+      change a.val.2 v =
+        (sIdeleInsertion F S s).val.2 v * ((outsideUnits v).val : v.adicCompletion F)
+      by_cases hv : v ∈ S
+      · rw [hin ⟨v, hv⟩]
+        change a.val.2 v = a.val.2 v * ((outsideUnits v).val : v.adicCompletion F)
+        simp [outsideUnits, hv]
+      · rw [hout v hv, one_mul]
+        dsimp [outsideUnits]
+        rw [dite_eq_right hv]
+        rfl
+  have ha : q a = 1 := (QuotientGroup.eq_one_iff a).mpr
+    ⟨Units.map ((S : Set (Primes(F))).integer F).val.toRingHom.toMonoidHom u, Units.ext rfl⟩
+  change c.val (q (sIdeleInsertion F S s)) = 1
+  have h := congrArg c.val hfactor
+  rw [map_mul, hb, mul_one, ha, map_one] at h
+  exact h.symm
 
 /-- Paper: Equation (3.1.2.9), p. 121. The S-local restriction is the quotient lift of
 the pullback from idele classes. Its domain carries the open subspace topology. -/
