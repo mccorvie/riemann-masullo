@@ -1537,11 +1537,128 @@ theorem measure_compl_dSequenceRegularSet [μ.IsHaarMeasure] (hU : IsDPrimeSeque
 -- TODO(paper-gap): In the proof of Theorem A.5.4.1(3), compact support does not imply Lᵖ
 -- integrability, and the Lᑫ norm of the normalized kernel is μ(U k)^(1/q - 1).
 
+/-- For a Borel D′-sequence and a measurable, locally integrable function, almost every
+point whose value is within `r` of `c` eventually has averages within `3 * r` of `c`. -/
+private theorem ae_dSequenceAverage_close_of_borel [μ.IsHaarMeasure]
+    (hU : IsDPrimeSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
+    {f : G → ℂ} (hfm : Measurable f) (hf : LocallyIntegrable f μ) (c : ℂ)
+    {r : ℝ} (hr : 0 < r) :
+    ∀ᵐ x ∂μ, ‖f x - c‖ ≤ r →
+      ∀ᶠ k in atTop, ‖dSequenceAverage μ (U k) f x - c‖ < 3 * r := by
+  let s : Set G := {x | ‖f x - c‖ ≤ r}
+  let g : G → ℂ := sᶜ.indicator (fun y ↦ f y - c)
+  let ν := μ.withDensity (fun y ↦ ‖g y‖ₑ)
+  have hs : MeasurableSet s := measurableSet_le (hfm.sub_const c).norm measurable_const
+  have hnorm (y : G) : ‖g y‖ₑ ≤ ‖f y - c‖ₑ := by
+    by_cases hy : y ∈ s
+    · simp [g, hy]
+    · simp [g, hy]
+  have : IsFiniteMeasureOnCompacts ν := ⟨fun K hK ↦ by
+    rw [withDensity_apply _ hK.isClosed.measurableSet]
+    exact (lintegral_mono hnorm).trans_lt
+      ((hf.sub (locallyIntegrable_const c)).integrableOn_isCompact hK).hasFiniteIntegral⟩
+  have hratio (x : G) (k : ℕ) :
+      (⨍⁻ y in x • U k, ‖g y‖ₑ ∂μ) = ν (x • U k) / μ (U k) := by
+    rw [setLAverage_eq, measure_smul, withDensity_apply _ ((hBorel k).const_smul x)]
+  have hmax (x : G) : dSequenceMaximal μ U g x = dSequenceMeasureMaximal μ ν U x := by
+    simp only [dSequenceMaximal, dSequenceMeasureMaximal, hratio]
+  -- The truncation vanishes on s, so the compact maximal inequality makes its
+  -- large maximal values a null set inside s.
+  let E := s ∩ {x | ENNReal.ofReal r < dSequenceMaximal μ U g x}
+  have hE : MeasurableSet E :=
+    hs.inter (measurableSet_lt measurable_const (measurable_dSequenceMaximal_of_borel hBorel g))
+  have hnull : μ E = 0 := by
+    rw [hE.measure_eq_iSup_isCompact μ]
+    refine le_antisymm (iSup_le fun K ↦ iSup_le fun hsub ↦ iSup_le fun hK ↦ ?_) bot_le
+    have hνK : ν K = 0 := by
+      rw [withDensity_apply _ hK.isClosed.measurableSet]
+      exact setLIntegral_eq_zero hK.isClosed.measurableSet fun y hy ↦ by
+        simp [g, (hsub hy).1]
+    obtain ⟨C, hC, hbound⟩ := hU.1.2.2
+    have hweak := dSequenceMeasureMaximal_weak_compact (ν := ν) hU hC
+      (fun k ↦ (hbound k).2) hK hr
+    rw [hνK, mul_zero] at hweak
+    have hKsub : K ⊆ K ∩ {y | ENNReal.ofReal r < dSequenceMeasureMaximal μ ν U y} := by
+      intro y hy
+      refine ⟨hy, ?_⟩
+      change ENNReal.ofReal r < dSequenceMeasureMaximal μ ν U y
+      rw [← hmax]
+      exact (hsub hy).2
+    exact (measure_mono hKsub).trans hweak
+  have hae : ∀ᵐ x ∂μ, x ∉ E := by
+    rw [ae_iff]
+    simpa only [not_not, ofPred_mem_eq] using hnull
+  filter_upwards [hae] with x hx hxs
+  have hlim : dSequenceMaximal μ U g x ≤ ENNReal.ofReal r :=
+    le_of_not_gt fun h ↦ hx ⟨hxs, h⟩
+  have hsmall : ∀ᶠ k in atTop, (⨍⁻ y in x • U k, ‖g y‖ₑ ∂μ) < ENNReal.ofReal (2 * r) :=
+    eventually_lt_of_limsup_lt
+      (hlim.trans_lt ((ENNReal.ofReal_lt_ofReal_iff (by positivity)).2 (by linarith)))
+  obtain ⟨W, hW, hWf⟩ := hf x
+  obtain ⟨N, hN⟩ := hU.2 ((fun y : G ↦ x * y) ⁻¹' W) (by
+    apply (continuous_const_mul x).continuousAt.preimage_mem_nhds
+    simpa only [mul_one] using hW)
+  filter_upwards [hsmall, eventually_ge_atTop N] with k hk hkN
+  have hfk : IntegrableOn f (x • U k) μ := hWf.mono_set (by
+    rintro _ ⟨y, hy, rfl⟩
+    exact hN (hU.1.2.1 hkN hy))
+  have hfin : μ (x • U k) ≠ ∞ := by rw [measure_smul]; exact (hU.1.1 k).2.2.2.ne
+  have hpoint (y : G) : ‖f y - c‖ₑ ≤ ENNReal.ofReal r + ‖g y‖ₑ := by
+    by_cases hy : y ∈ s
+    · simpa [g, hy, ← ofReal_norm] using ENNReal.ofReal_le_ofReal (show ‖f y - c‖ ≤ r from hy)
+    · simp [g, hy]
+  have hsub :
+      dSequenceAverage μ (U k) f x - c = ⨍ y in x • U k, (f y - c) ∂μ := by
+    rw [setAverage_fun_sub hfk (integrableOn_const hfin)]
+    exact congrArg (dSequenceAverage μ (U k) f x - ·) (dSequenceAverage_const hU.1 c k x).symm
+  have hbound : ‖dSequenceAverage μ (U k) f x - c‖ₑ ≤
+      ENNReal.ofReal r + (⨍⁻ y in x • U k, ‖g y‖ₑ ∂μ) := by
+    calc
+      _ ≤ ⨍⁻ y in x • U k, ‖f y - c‖ₑ ∂μ := by
+        rw [hsub, setAverage_eq', setLAverage_eq']
+        exact eNorm_integral_le_lintegral_eNorm _
+      _ ≤ ⨍⁻ y in x • U k, ENNReal.ofReal r + ‖g y‖ₑ ∂μ :=
+        lintegral_mono hpoint
+      _ = _ := by
+        rw [setLAverage_eq, setLAverage_eq, lintegral_add_left measurable_const, setLIntegral_const,
+          measure_smul, ENNReal.add_div,
+          ENNReal.mul_div_cancel_right (hU.1.1 k).2.2.1.ne' (hU.1.1 k).2.2.2.ne]
+  have hlt := hbound.trans_lt ((ENNReal.add_lt_add_iff_left ENNReal.ofReal_ne_top).2 hk)
+  rw [← ofReal_norm, ← ENNReal.ofReal_add hr.le (by positivity),
+    show r + 2 * r = 3 * r by ring] at hlt
+  exact (ENNReal.ofReal_lt_ofReal_iff (by positivity)).1 hlt
+
 /-- Paper: Theorem A.5.4.1(3), p. 583. The averages tend to the value of the
 function almost everywhere, which also gives the identity almost everywhere on the regular set. -/
 theorem ae_tendsto_dSequenceAverage [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
     {f : G → ℂ} (hf : LocallyIntegrable f μ) :
-    ∀ᵐ x ∂μ, Tendsto (fun k ↦ dSequenceAverage μ (U k) f x) atTop (𝓝 (f x)) := by sorry
+    ∀ᵐ x ∂μ, Tendsto (fun k ↦ dSequenceAverage μ (U k) f x) atTop (𝓝 (f x)) := by
+  obtain ⟨V, hV, hVm, hVU, hVae⟩ := exists_borel_dSequence hU.1
+  have hV' : IsDPrimeSequence μ V := ⟨hV, fun W hW ↦ by
+    obtain ⟨k, hk⟩ := hU.2 W hW
+    exact ⟨k, (hVU k).trans hk⟩⟩
+  obtain ⟨g, hgm, hfg⟩ := hf.aestronglyMeasurable.aemeasurable
+  have havg (x : G) (k : ℕ) : dSequenceAverage μ (U k) f x = dSequenceAverage μ (V k) g x := by
+    rw [dSequenceAverage, dSequenceAverage, setAverage_congr ((smul_set_ae_eq x).mpr (hVae k).symm),
+      setAverage_eq, setAverage_eq, integral_congr_ae (ae_restrict_of_ae hfg)]
+  obtain ⟨c, hc⟩ := TopologicalSpace.exists_dense_seq ℂ
+  have hae : ∀ᵐ x ∂μ, ∀ (n : ℕ) (q : ℚ), 0 < (q : ℝ) → ‖g x - c n‖ ≤ (q : ℝ) →
+      ∀ᶠ k in atTop, ‖dSequenceAverage μ (V k) g x - c n‖ < 3 * (q : ℝ) := by
+    refine ae_all_iff.2 fun n ↦ ae_all_iff.2 fun q ↦ ?_
+    by_cases hq : 0 < (q : ℝ)
+    · exact (ae_dSequenceAverage_close_of_borel hV' hVm hgm (hf.congr hfg) (c n) hq).mono
+        fun _ hx _ ↦ hx
+    · exact Eventually.of_forall fun _ h ↦ (hq h).elim
+  filter_upwards [hae, hfg] with x hx hxfg
+  simp only [havg, hxfg]
+  refine Metric.tendsto_nhds.2 fun ε hε ↦ ?_
+  obtain ⟨q, hq, hqε⟩ := exists_rat_btwn (show (0 : ℝ) < ε / 4 by positivity)
+  obtain ⟨n, hn⟩ := hc.exists_dist_lt (g x) hq
+  rw [dist_eq_norm] at hn
+  filter_upwards [hx n q hq hn.le] with k hk
+  refine (dist_triangle _ (c n) _).trans_lt ?_
+  rw [dist_comm (c n), dist_eq_norm, dist_eq_norm]
+  linarith
 
 /-- Paper: Terminology A.5.4.1, p. 583. The smoothening at a regular point
 is the complex limit of the sequence of averages. -/
