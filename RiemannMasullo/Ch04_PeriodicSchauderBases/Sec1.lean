@@ -1233,10 +1233,21 @@ theorem strongDual_isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete f := 
   change HasSum (fun m ↦ φ (x m) • f m) φ.toStrongDual (SummationFilter.conditional ℕ) at hsum
   exact ⟨φ.toStrongDual, by simpa only [hcoeff] using hsum⟩
 
+-- Retain the paper's hypotheses although reflexivity and the basis expansion suffice.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Lemma 4.1.2.4, p. 159. If the original space is also nuclear, the
 coefficient basis of the strong dual is shrinking. -/
 theorem strongDual_isShrinking_of_isAbsolute (hNuclear : IsNuclearTVS.{v, u} E) :
-    IsShrinking f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by sorry
+    IsShrinking f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by
+  let ev : E →L[ℂ] StrongDual ℂ (StrongDual ℂ E) :=
+    ⟨ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ), hReflexive.continuous⟩
+  refine ⟨fun m n ↦ ?_, fun φ ↦ ?_⟩
+  · change f m (x n) = _
+    exact hb.1 m n
+  · obtain ⟨u, rfl⟩ := hReflexive.surjective φ
+    change HasSum (fun m ↦ f m u • ev (x m)) (ev u) (SummationFilter.conditional ℕ)
+    simpa only [map_smul, ContinuousLinearMap.coe_coe] using (hb.2 u).mapL ev
 
 end AbsoluteDuality
 
