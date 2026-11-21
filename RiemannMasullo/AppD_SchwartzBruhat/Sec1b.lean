@@ -5,6 +5,9 @@ public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
+import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
+import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
+import Mathlib.Geometry.Manifold.HasGroupoid
 
 /-!
 # Structure of locally compact abelian groups and their Schwartz–Bruhat spaces
@@ -70,13 +73,96 @@ theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
+/-- Paper: Theorem D.1.4.2, p. 757. A connected, locally Euclidean abelian
+topological group admits an additive homomorphism from a finite-dimensional real vector
+group that is a local homeomorphism.
+Deviation: This isolates the local exponential map. After equipping the group with a
+compatible Lie group structure, its exponential is a homomorphism by commutativity
+and is a local homeomorphism by the inverse function theorem and translation. -/
+theorem exists_euclidean_localHomeomorph {A : Type*} [AddCommGroup A] [TopologicalSpace A]
+    [IsTopologicalAddGroup A] [T2Space A] [LocallyCompactSpace A] [ConnectedSpace A]
+    (hA : IsLocallyEuclidean A) :
+    ∃ (k : ℕ) (f : EuclideanSpace ℝ (Fin k) →+ A), IsLocalHomeomorph f := by
+  sorry
+
 /-- Paper: Theorem D.1.4.2, p. 757. A locally Euclidean LCA group is a product
 of real and torus factors and a discrete abelian group. -/
 theorem lca_equiv_real_torus_discrete (hG : IsLocallyEuclidean G) :
     ∃ (m n : ℕ) (D : Type u) (_ : AddCommGroup D) (_ : TopologicalSpace D)
       (_ : DiscreteTopology D),
       Nonempty (G ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin m) ×
-        (Fin n → AddCircle (1 : ℝ)) × D)) := by sorry
+        (Fin n → AddCircle (1 : ℝ)) × D)) := by
+  let A := Additive G
+  have : T2Space A := ‹T2Space G›
+  have : LocallyCompactSpace A := ‹LocallyCompactSpace G›
+  let H := AddSubgroup.connectedComponentOfZero A
+  obtain ⟨k, ⟨charts⟩⟩ := hG
+  let : ChartedSpace (EuclideanSpace ℝ (Fin k)) A := charts
+  have : LocallyConnectedSpace A := ChartedSpace.locallyConnectedSpace (EuclideanSpace ℝ (Fin k)) A
+  have hH : IsOpen (H : Set A) := isOpen_connectedComponent
+  have : ConnectedSpace H := isConnected_iff_connectedSpace.mp isConnected_connectedComponent
+  have : LocallyCompactSpace H := hH.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨d, f, hf⟩ := exists_euclidean_localHomeomorph (A := H)
+    ⟨k, ⟨TopologicalSpace.Opens.instChartedSpace (⟨H, hH⟩ : TopologicalSpace.Opens A)⟩⟩
+  have hRange : IsOpen (f.range : Set H) := by
+    rw [AddMonoidHom.coe_range, ← Set.image_univ]
+    exact hf.isOpenMap _ isOpen_univ
+  let U : OpenAddSubgroup H := ⟨f.range, hRange⟩
+  have hSurj : Function.Surjective f := by
+    have hTop := U.isClopen.eq_univ ⟨0, U.zero_mem⟩
+    exact Set.range_eq_univ.mp (by
+      change (f.range : Set H) = Set.univ at hTop
+      simpa only [AddMonoidHom.coe_range] using hTop)
+  have hF : IsOpenQuotientMap f := ⟨hSurj, hf.continuous, hf.isOpenMap⟩
+  have hKer : DiscreteTopology f.ker := by
+    obtain ⟨V, hV, h0, hinj⟩ := hf.isLocallyInjective 0
+    rw [discreteTopology_iff_isOpen_singleton_zero]
+    have hs : (Subtype.val : f.ker → EuclideanSpace ℝ (Fin d)) ⁻¹' V = {0} := by
+      ext x
+      exact ⟨fun hx ↦ Set.mem_singleton_iff.mpr
+        (Subtype.ext (hinj hx h0 (x.property.trans (map_zero f).symm))),
+        fun hx ↦ by
+          obtain rfl := Set.mem_singleton_iff.mp hx
+          exact h0⟩
+    exact hs ▸ hV.preimage continuous_subtype_val
+  let : DivisibleBy H ℤ := divisibleByOfSMulRightSurj H ℤ (fun {z} hz y ↦ by
+    obtain ⟨x, rfl⟩ := hSurj y
+    have hzR : (z : ℝ) ≠ 0 := Int.cast_ne_zero.mpr hz
+    refine ⟨f ((z : ℝ)⁻¹ • x), ?_⟩
+    change z • f ((z : ℝ)⁻¹ • x) = f x
+    rw [← map_zsmul, ← Int.cast_smul_eq_zsmul ℝ, smul_smul, mul_inv_cancel₀ hzR, one_smul])
+  have : DiscreteTopology f.ker.toIntSubmodule := hKer
+  -- Both quotient maps have the same kernel, so they induce a topological isomorphism.
+  obtain ⟨m, n, q, hQ, hQker⟩ := exists_euclidean_torus_quotient f.ker.toIntSubmodule
+  have hSameKer : f.ker = q.ker := hQker.symm
+  let eF := QuotientAddGroup.quotientKerEquivOfSurjective f hF.surjective
+  let eQ := QuotientAddGroup.quotientKerEquivOfSurjective q hQ.surjective
+  let eKer := QuotientAddGroup.quotientAddEquivOfEq hSameKer
+  let e := eF.symm.trans (eKer.trans eQ)
+  have he (x : EuclideanSpace ℝ (Fin d)) : e (f x) = q x := by
+    have hfmk : eF (QuotientAddGroup.mk x) = f x := rfl
+    rw [← hfmk]
+    change eQ (eKer (eF.symm (eF _))) = _
+    rw [eF.symm_apply_apply]
+    rfl
+  have eH : H ≃ₜ+ EuclideanSpace ℝ (Fin m) × (Fin n → AddCircle (1 : ℝ)) :=
+    { e with
+      continuous_toFun := hF.continuous_comp_iff.mp
+        (show Continuous (e ∘ f) from (funext he : e ∘ f = q) ▸ hQ.continuous)
+      continuous_invFun := hQ.continuous_comp_iff.mp
+        (show Continuous (e.symm ∘ q) from
+          (funext fun x ↦ e.symm_apply_eq.mpr (he x).symm : e.symm ∘ q = f) ▸ hF.continuous) }
+  obtain ⟨split⟩ := exists_continuousAddEquiv_prod_quotient_of_open H hH
+  let D := A ⧸ H
+  have : DiscreteTopology D := QuotientAddGroup.discreteTopology hH
+  let product := split.toAddEquiv.trans (AddEquiv.prodCongr eH.toAddEquiv (AddEquiv.refl D))
+  let assoc := Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ)) D
+  refine ⟨m, n, D, inferInstance, inferInstance, inferInstance, ⟨{
+    AddEquiv.toMultiplicativeRight (product.trans AddEquiv.prodAssoc) with
+    continuous_toFun := assoc.continuous.comp
+      ((eH.continuous_toFun.prodMap continuous_id).comp split.continuous_toFun)
+    continuous_invFun := split.continuous_invFun.comp
+      ((eH.continuous_invFun.prodMap continuous_id).comp assoc.symm.continuous) }⟩⟩
 
 /-- Paper: Theorem D.1.4.3(1), p. 757. An LCA group is compactly generated
 exactly when its dual is locally Euclidean. -/
