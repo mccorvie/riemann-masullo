@@ -2063,9 +2063,29 @@ theorem finitePlaceSchwartz_strictLF (w : Places(F)) :
   exact (finitePlaceSchwartz_countableSpanningSet F w).elim fun s hs ↦
     finestLocallyConvex_strictLF_of_countable_span E hs.1 hs.2
 
+/-- A strict LF presentation gives completeness for the compatible additive uniformity. -/
+private theorem completeSpace_of_strictLF {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] (h : IsStrictLFSpace E) : CompleteSpace E := by
+  obtain ⟨_, S, hmono, hFrechet, hcover, htop⟩ := h
+  choose hadd hpoly hmetr hcomplete using hFrechet
+  let := hadd
+  let := hpoly
+  let := hmetr
+  let : ∀ n, T2Space (S n) := fun _ ↦ inferInstance
+  let j (n : ℕ) : S n →L[ℂ] S (n + 1) :=
+    (S n).subtypeL.codRestrict (S (n + 1)) fun x ↦ hmono n.le_succ x.property
+  have hlim : IsInjectiveLCLimit j (fun n ↦ (S n).subtypeL) := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ ?_, htop⟩
+    obtain ⟨n, hn⟩ := hcover x
+    exact ⟨n, ⟨⟨x, hn⟩, rfl⟩⟩
+  rw [← IsUniformAddGroup.rightUniformSpace_eq (G := E)]
+  exact (strictLCLimit_complete_nonmetrizable hcomplete hlim fun n ↦
+    IsEmbedding.of_comp (j n).continuous continuous_subtype_val IsEmbedding.subtypeVal).1
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is complete. -/
 theorem finitePlaceSchwartz_complete (w : Places(F)) :
-    CompleteSpace ℬ(w.adicCompletion F) := by sorry
+    CompleteSpace ℬ(w.adicCompletion F) :=
+  completeSpace_of_strictLF (finitePlaceSchwartz_strictLF F w)
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Hausdorff
 locally convex and nuclear. -/
