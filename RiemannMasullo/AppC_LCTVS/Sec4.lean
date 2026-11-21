@@ -16,6 +16,7 @@ import Mathlib.MeasureTheory.Function.ConvergenceInMeasure
 import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
@@ -710,7 +711,46 @@ theorem tendsto_pettisIntegral_of_tendstoUniformly
     letI := IsTopologicalAddGroup.rightUniformSpace E
     TendstoUniformly f g atTop →
       Tendsto (fun i ↦ pettisIntegral (.complex μ) (f i) (hfi i)) atTop
-        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by sorry
+        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  intro hfg
+  let a (i : ι) := pettisIntegral (.complex μ) (f i) (hfi i)
+  let b := pettisIntegral (.complex μ) g hgi
+  change Tendsto a atTop (𝓝 b)
+  have eval_integral {u : X → E} {z : E} {hu : PettisWeaklyIntegrable (.complex μ) u}
+      (h : toPettisWeakCompletion E z = pettisWeakIntegral (.complex μ) u hu)
+      (φ : StrongDual ℂ E) :
+      φ z = μ.integral (fun x ↦ φ (u x)) (ContinuousLinearMap.mul ℝ ℂ) :=
+    congrArg (fun w : PettisWeakCompletion E ↦
+      (show Module.Dual ℂ (StrongDual ℂ E) from w) φ) h
+  obtain ⟨hweakg, hrepg⟩ := hasPettisIntegral_pettisIntegral (.complex μ) g hgi
+  rw [← tendsto_sub_nhds_zero_iff]
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).tendsto_right_iff.mpr ?_
+  intro p hp
+  -- Use the total variation mass to choose a uniform bound on the integrands.
+  let mass := μ.variation.real univ
+  have hmass : 0 < mass + 1 := add_pos_of_nonneg_of_pos measureReal_nonneg one_pos
+  let δ := (mass + 1)⁻¹
+  have hδ : 0 < δ := inv_pos.mpr hmass
+  have huniform := (IsTopologicalAddGroup.tendstoUniformly_iff f g atTop rfl).mp hfg
+    (p.ball 0 δ) (Seminorm.ball_mem_nhds hp hδ)
+  filter_upwards [huniform] with i hi
+  obtain ⟨hweakf, hrepf⟩ := hasPettisIntegral_pettisIntegral (.complex μ) (f i) (hfi i)
+  -- Test the difference of the integrals with a functional that attains the seminorm.
+  obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm p hp (a i - b)
+  have hbound := VectorMeasure.norm_integral_le_of_norm_le_const
+    (B := ContinuousLinearMap.mul ℝ ℂ) (f := fun x ↦ φ (f i x) - φ (g x))
+    (ae_of_all μ.variation fun x ↦ by
+      rw [← map_sub]
+      exact (hφ _).trans (p.mem_ball_zero.mp (hi x)).le)
+  rw [VectorMeasure.integral_fun_sub (hweakf φ) (hweakg φ),
+    ← eval_integral hrepf φ, ← eval_integral hrepg φ, ← map_sub] at hbound
+  apply p.mem_ball_zero.mpr
+  calc
+    p (a i - b) = ‖φ (a i - b)‖ := heq.symm
+    _ ≤ δ * mass := by simpa only [ContinuousLinearMap.opNorm_mul, mul_one] using hbound
+    _ < δ * (mass + 1) := mul_lt_mul_of_pos_left (lt_add_one mass) hδ
+    _ = 1 := inv_mul_cancel₀ hmass.ne'
 
 end Criteria
 
