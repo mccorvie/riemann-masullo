@@ -858,12 +858,59 @@ include hε
 -- In (2.4.3.3) the supremum is unweighted since |g′| = 1. It can be
 -- infinite, as for the Gaussian example at (2.4.2.3).
 
+/-- A logarithmic majorant for theta gives boundedness after weighting by
+a positive power of the norm, as the norm tends to zero. -/
+private theorem isBigO_norm_pow_of_log_bound {G : Type*} (ν : G → ℝ) (θ : G → ℂ)
+    (n : ℕ) {C₁ C₂ : ℝ} (hC₁ : 0 < C₁) (hC₂ : 0 < C₂)
+    (htheta : ∀ g, ν g < 1 → ‖θ g‖ ≤ C₁ * |Real.log (ν g)| ^ n + C₂) :
+    (fun g ↦ (ν g ^ ε) • θ g) =O[comap ν (𝓝[>] (0 : ℝ))] (fun _ : G ↦ (1 : ℝ)) := by
+  have hsmall : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ), t ∈ Set.Ioo 0 1 := Ioo_mem_nhdsGT zero_lt_one
+  have hlog : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ), ‖|Real.log t| ^ (n : ℝ)‖ ≤ 1 * ‖t ^ (-ε)‖ :=
+    (isLittleO_abs_log_rpow_rpow_nhdsGT_zero (n : ℝ) (neg_neg_of_pos hε)).bound zero_lt_one
+  have hreal : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ),
+      t < 1 ∧ 0 ≤ t ^ ε ∧ t ^ ε * (C₁ * |Real.log t| ^ n + C₂) ≤ C₁ + C₂ := by
+    filter_upwards [hsmall, hlog] with t ht hlogt
+    have hp : 0 ≤ t ^ ε := Real.rpow_nonneg ht.1.le _
+    have hlogle : |Real.log t| ^ n ≤ t ^ (-ε) := by
+      rwa [Real.rpow_natCast, Real.norm_of_nonneg (pow_nonneg (abs_nonneg (Real.log t)) n),
+        Real.norm_of_nonneg (Real.rpow_nonneg ht.1.le (-ε)), one_mul] at hlogt
+    have hweighted : t ^ ε * |Real.log t| ^ n ≤ 1 := calc
+      _ ≤ t ^ ε * t ^ (-ε) := mul_le_mul_of_nonneg_left hlogle hp
+      _ = 1 := by rw [← Real.rpow_add ht.1, add_neg_cancel, Real.rpow_zero]
+    refine ⟨ht.2, hp, ?_⟩
+    calc
+      t ^ ε * (C₁ * |Real.log t| ^ n + C₂)
+          = C₁ * (t ^ ε * |Real.log t| ^ n) + C₂ * t ^ ε := by ring
+      _ ≤ C₁ * 1 + C₂ * 1 :=
+        add_le_add (mul_le_mul_of_nonneg_left hweighted hC₁.le)
+          (mul_le_mul_of_nonneg_left (Real.rpow_le_one ht.1.le ht.2.le hε.le) hC₂.le)
+      _ = C₁ + C₂ := by rw [mul_one, mul_one]
+  have hν : Tendsto ν (comap ν (𝓝[>] (0 : ℝ))) (𝓝[>] (0 : ℝ)) := tendsto_comap
+  refine IsBigO.of_bound (C₁ + C₂) ((hν.eventually hreal).mono fun g ⟨hlt, hp, hb⟩ ↦ ?_)
+  rw [norm_smul, Real.norm_of_nonneg hp, norm_one, mul_one]
+  exact (mul_le_mul_of_nonneg_left (htheta g hlt) hp).trans hb
+
+/-- A bound uniform on bounded sets applies to each individual theta input. -/
+private theorem isBigO_norm_pow_of_uniform_log_bound
+    {G E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [ContinuousSMul ℂ E]
+    (ν : G → ℝ) (θ : E → G → ℂ) (n : ℕ)
+    (hlog : ∀ B : Set E, IsVonNBounded ℂ B →
+      ∃ C₁ C₂ : ℝ, 0 < C₁ ∧ 0 < C₂ ∧ ∀ f ∈ B, ∀ g, ν g < 1 →
+        ‖θ f g‖ ≤ C₁ * |Real.log (ν g)| ^ n + C₂)
+    (f : E) :
+    (fun g ↦ (ν g ^ ε) • θ f g) =O[comap ν (𝓝[>] (0 : ℝ))] (fun _ : G ↦ (1 : ℝ)) := by
+  obtain ⟨C₁, C₂, hC₁, hC₂, htheta⟩ := hlog {f} (isVonNBounded_singleton (𝕜 := ℂ) f)
+  exact isBigO_norm_pow_of_log_bound ε hε ν (θ f) n hC₁ hC₂ (htheta f (Set.mem_singleton f))
+
 /-- Paper: Proposition 2.4.3.1(1), p. 113. Multiplying S-local theta by
 any positive real power of the S-idelic norm gives a bounded function
 as the norm tends to zero from above. -/
 theorem sLocalAdelicTheta_norm_pow_isBigO (f : ℬₛ) :
     (fun g ↦ (normℝ g ^ ε) • sLocalAdelicTheta F S f g) =O[smallNorm]
-      (fun _ : Iₛ ↦ (1 : ℝ)) := by sorry
+      (fun _ : Iₛ ↦ (1 : ℝ)) := by
+  exact isBigO_norm_pow_of_uniform_log_bound (G := Iₛ) (E := ℬₛ) ε hε normℝ
+    (fun f g ↦ sLocalAdelicTheta F S f g) (Fintype.card (InfinitePlace F) + S.card - 1)
+    (sLocalAdelicTheta_log_growth_bounded F S) f
 
 /-- Paper: Proposition 2.4.3.1(1), p. 113. The same small-norm bound
 holds for homogeneous theta multiplied by a positive norm power.
