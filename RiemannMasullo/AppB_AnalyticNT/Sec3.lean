@@ -1,5 +1,6 @@
 module
 
+import Mathlib.Analysis.Meromorphic.Divisor
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.Complex.CauchyIntegral
 public import Mathlib.MeasureTheory.Integral.CircleIntegral
@@ -399,7 +400,16 @@ are interior to the strip contains only finitely many poles.
 Deviation: Makes the finiteness implicit in the rectangle sum explicit. -/
 theorem finite_rectanglePoles {f : ℂ → ℂ} {a b σ₁ σ₂ t₁ t₂ : ℝ}
     (hf : MeromorphicOn f (openStrip a b)) (hσ₁ : a < σ₁) (hσ₂ : σ₂ < b) :
-    (rectanglePoles f σ₁ σ₂ t₁ t₂).Finite := by sorry
+    (rectanglePoles f σ₁ σ₂ t₁ t₂).Finite := by
+  let K := (Icc σ₁ σ₂) ×ℂ (Icc t₁ t₂)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  have hmer : MeromorphicOn f K := fun z hz ↦ hf z ⟨hσ₁.trans_le hz.1.1, hz.1.2.trans_lt hσ₂⟩
+  apply ((MeromorphicOn.divisor f K).finiteSupport hK).subset
+  intro z hz
+  have hzK : z ∈ K := ⟨⟨hz.1.1.le, hz.1.2.le⟩, ⟨hz.2.1.1.le, hz.2.1.2.le⟩⟩
+  change (MeromorphicOn.divisor f K z) ≠ 0
+  rw [MeromorphicOn.divisor_apply hmer hzK, Ne, WithTop.untop₀_eq_zero]
+  exact not_or.mpr ⟨ne_of_lt hz.2.2, ne_top_of_lt (hz.2.2.trans_le le_top)⟩
 
 section AsymptoticResidue
 

@@ -125,7 +125,14 @@ theorem sLocalIdelicZetaIntegral_integrable (f : ℬ(Aₛ)) (c : Xₛ) (hc : c �
 is the test function times the S-idelic norm. -/
 theorem sLocalIdelicZetaIntegral_norm (f : ℬ(Aₛ)) :
     sLocalIdelicZetaIntegral f (chartₛ((1 : PontryaginDual Jₛ)) 1) =
-      ∫ g : Iₛ, f (Multiplicative.ofAdd g.val) * modℂ[sIdeleNorm F S, g] ∂μₛ := by sorry
+      ∫ g : Iₛ, f (Multiplicative.ofAdd g.val) * modℂ[sIdeleNorm F S, g] ∂μₛ := by
+  unfold sLocalIdelicZetaIntegral
+  congr 1
+  funext g
+  congr 1
+  change (((1 : PontryaginDual Jₛ) (classOf g) : Circle) : ℂ) *
+    (modℂ[mₛ, classOf g]) ^ (1 : ℂ) = _
+  rw [Complex.cpow_one, sIdeleQuotientNorm_mk, PontryaginDual.one_apply, Circle.coe_one, one_mul]
 
 /-- Paper: Theorem 3.3.1.1(1) and Remark 3.3.1.2, p. 129. Closed norm-band
 truncations of the zeta integral converge uniformly on compact subsets.
@@ -302,17 +309,59 @@ def sLocalFiniteRestriction (v : S) (c : Xₛ) : QuasiCharacter (v.val.adicCompl
   let h := sLocalFiniteInsertion_properties v
   c.comp ⟨{ toFun := finAt(v), map_one' := h.1, map_mul' := h.2.1 }, h.2.2⟩
 
+/-- Paper: Equation (3.3.1.3), p. 129. Restriction of a norm twist of the trivial
+S-local character to an archimedean place is the same power of the normalized local module. -/
+theorem sLocalInfiniteRestriction_normTwist (w : InfinitePlace F) (s : ℂ) (g : w.Completionˣ) :
+    sLocalInfiniteRestriction w (chartₛ((1 : PontryaginDual Jₛ)) s) g =
+      (modℂ[infiniteNorm(w), g]) ^ s := by
+  change (((1 : PontryaginDual Jₛ) (archAt(w) g) : Circle) : ℂ) *
+    (modℂ[mₛ, archAt(w) g]) ^ s = _
+  rw [PontryaginDual.one_apply, Circle.coe_one, one_mul, sIdeleQuotientNorm_mk]
+  congr 2
+  let x : Iₛ := (eProd).symm ((eArch).symm (@Pi.mulSingle _ _ _ (Classical.decEq _) w g), 1)
+  let ev : (Iₛ →* ℝ≥0ˣ) →* ℝ :=
+    NNReal.toRealHom.toMonoidHom.comp ((Units.coeHom ℝ≥0).comp (MonoidHom.eval x))
+  change ev (sIdeleNorm F S) = _
+  simp only [sIdeleNorm, map_mul, map_prod, map_pow]
+  change (∏ w' : InfinitePlace F,
+      ‖(((@Pi.mulSingle (InfinitePlace F) (fun u ↦ u.Completionˣ) _ (Classical.decEq _) w g) w' :
+        w'.Completionˣ) : w'.Completion)‖ ^
+        w'.mult) * ∏ v : S, ‖((1 : (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F)‖ = _
+  classical
+  rw [Finset.prod_eq_single w (fun w' _ hw' ↦ by rw [Pi.mulSingle_eq_of_ne hw', Units.val_one,
+      norm_one, one_pow]) (fun h ↦ absurd (Finset.mem_univ w) h), Pi.mulSingle_eq_same]
+  simp
+
 /-- Paper: Equation (3.3.1.3), p. 129. Restriction of the S-idelic norm character
 to an archimedean place is the normalized local module. -/
 theorem sLocalInfiniteRestriction_norm (w : InfinitePlace F) (g : w.Completionˣ) :
     sLocalInfiniteRestriction w (chartₛ((1 : PontryaginDual Jₛ)) 1) g =
-      modℂ[infiniteNorm(w), g] := by sorry
+      modℂ[infiniteNorm(w), g] := by
+  rw [sLocalInfiniteRestriction_normTwist, Complex.cpow_one]
 
 /-- Paper: Equation (3.3.1.3), p. 129. Restriction of the S-idelic norm character
 to a finite place is the normalized local module. -/
 theorem sLocalFiniteRestriction_norm (v : S) (g : (v.val.adicCompletion F)ˣ) :
     sLocalFiniteRestriction v (chartₛ((1 : PontryaginDual Jₛ)) 1) g =
-      modℂ[finiteNorm(v.val), g] := by sorry
+      modℂ[finiteNorm(v.val), g] := by
+  change (((1 : PontryaginDual Jₛ) (finAt(v) g) : Circle) : ℂ) *
+    (modℂ[mₛ, finAt(v) g]) ^ (1 : ℂ) = _
+  rw [Complex.cpow_one, PontryaginDual.one_apply, Circle.coe_one, one_mul, sIdeleQuotientNorm_mk]
+  congr 1
+  let x : Iₛ := (eProd).symm (1, (eFin).symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v g))
+  let ev : (Iₛ →* ℝ≥0ˣ) →* ℝ :=
+    NNReal.toRealHom.toMonoidHom.comp ((Units.coeHom ℝ≥0).comp (MonoidHom.eval x))
+  change ev (sIdeleNorm F S) = _
+  simp only [sIdeleNorm, map_mul, map_prod, map_pow]
+  change (∏ w : InfinitePlace F,
+      ‖((1 : w.Completionˣ) : w.Completion)‖ ^ w.mult) * ∏ v' : S,
+      ‖(((@Pi.mulSingle S (fun u ↦ (u.val.adicCompletion F)ˣ) _ (Classical.decEq _) v g) v' :
+        (v'.val.adicCompletion F)ˣ) :
+        v'.val.adicCompletion F)‖ = _
+  let : DecidableEq S := Classical.decEq _
+  rw [Finset.prod_eq_single v (fun v' _ hv' ↦ by rw [Pi.mulSingle_eq_of_ne hv', Units.val_one,
+      norm_one]) (fun h ↦ absurd (Finset.mem_univ v) h), Pi.mulSingle_eq_same]
+  simp
 
 /-- Paper: Equation (3.3.1.3), p. 129. The S-local correcting factor multiplies
 the local Tate factors on the restricted quasi-characters. -/
@@ -443,7 +492,9 @@ local notation "μJ₁" => sLocalNormOneQuotientMeasure F S
 section pushes the product with dt/t to the quotient Tamagawa measure. -/
 theorem sLocalNormOneQuotientMeasure_normProduct :
     (μJ₁).IsHaarMeasure ∧ ∀ τ : ℝ≥0ˣ →ₜ* Iₛ, RightInverse τ (sIdeleNorm F S) →
-      ((μJ₁).prod positiveRealHaar).map (normProduct(τ)) = μJ := by sorry
+      ((μJ₁).prod positiveRealHaar).map (normProduct(τ)) = μJ :=
+  have h := (sLocalNormOneQuotientMeasure_existsUnique (F := F) (S := S)).exists.choose_spec
+  ⟨h.1, h.2.2⟩
 
 section Homogeneous
 

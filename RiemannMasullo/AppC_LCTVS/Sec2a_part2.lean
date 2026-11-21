@@ -1156,7 +1156,22 @@ theorem tensorDualOperator_injective : Function.Injective (tensorDualOperator (E
 /-- Paper: Remark C.2.3.2, p. 677. The operator associated to each tensor has
 finite-dimensional image. -/
 theorem tensorDualOperator_finiteRank (z : E ⊗[ℂ] F) :
-    FiniteDimensional ℂ (LinearMap.range (tensorDualOperator z)) := by sorry
+    FiniteDimensional ℂ (LinearMap.range (tensorDualOperator z)) := by
+  induction z using TensorProduct.induction_on with
+  | zero =>
+    rw [map_zero, LinearMap.range_zero]
+    infer_instance
+  | tmul x y =>
+    refine Submodule.finiteDimensional_of_le (S₂ := ℂ ∙ y) ?_
+    rintro _ ⟨φ, rfl⟩
+    rw [tensorDualOperator_tmul]
+    exact Submodule.smul_mem _ _ (Submodule.mem_span_singleton_self y)
+  | add z w hz hw =>
+    refine Submodule.finiteDimensional_of_le
+      (S₂ := LinearMap.range (tensorDualOperator z) ⊔ LinearMap.range (tensorDualOperator w)) ?_
+    rintro _ ⟨φ, rfl⟩
+    rw [map_add, LinearMap.add_apply]
+    exact Submodule.add_mem_sup ⟨φ, rfl⟩ ⟨φ, rfl⟩
 
 omit hE sE hF sF in
 /-- A scalar evaluation of a contracted tensor is the corresponding dual form. -/
@@ -1685,10 +1700,31 @@ theorem projectiveTensorMap_tmul (x : E) (y : F) :
     projectiveTensorMap f.toLinearMap g.toLinearMap (x ⊗ₜ[ℂ] y) = f x ⊗ₜ[ℂ] g y :=
   TensorProduct.map_tmul _ _ x y
 
+omit [PolynormableSpace ℂ E] [T2Space E] [PolynormableSpace ℂ F] [T2Space F]
+  [PolynormableSpace ℂ G] [T2Space G] [PolynormableSpace ℂ H] [T2Space H] in
+/-- A linear map between two spaces with generating seminorms is continuous when each
+generating seminorm of the target pulls back to a generating seminorm of the source. -/
+private theorem continuous_withGeneratingSeminorms_of_comp {X Y : Type*} [AddCommGroup X] [Module ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] {ι ι' : Type*} {p : SeminormFamily ℂ X ι}
+    {q : SeminormFamily ℂ Y ι'} (T : X →ₗ[ℂ] Y) (h : ∀ j, ∃ i, (q j).comp T = p i) :
+    @Continuous (WithGeneratingSeminorms X p) (WithGeneratingSeminorms Y q) _ _ T := by
+  let T' : WithGeneratingSeminorms X p →ₗ[ℂ] WithGeneratingSeminorms Y q := T
+  refine (withGeneratingSeminorms_spec Y q).continuous_of_continuous_comp T' fun j ↦ ?_
+  obtain ⟨i, hi⟩ := h j
+  refine (continuous_congr fun x ↦ ?_).mp ((withGeneratingSeminorms_spec X p).continuous_seminorm i)
+  show p i x = q j (T x)
+  rw [← hi]
+  rfl
+
 /-- Paper: §C.2.3.2, p. 679. Tensoring continuous linear maps gives a continuous
 projective tensor map, hence a map of additive completions. -/
 theorem projectiveTensorMap_continuous :
-    Continuous (projectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    Continuous (projectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  refine continuous_withGeneratingSeminorms_of_comp (TensorProduct.map f.toLinearMap g.toLinearMap)
+    fun q ↦ ⟨⟨q.val.comp (TensorProduct.map f.toLinearMap g.toLinearMap), ?_⟩, rfl⟩
+  have hfg : Continuous (fun v : E × F ↦ (f v.1, g v.2)) := by fun_prop
+  change ContinuousAt ((fun w : G × H ↦ q.val (w.1 ⊗ₜ[ℂ] w.2)) ∘ fun v : E × F ↦ (f v.1, g v.2)) 0
+  exact ContinuousAt.comp_of_eq q.property hfg.continuousAt (by simp)
 
 include hf hg
 
@@ -2020,10 +2056,46 @@ theorem continuous_inductiveTensor_iff {G : Type*} [AddCommGroup G] [Module ℂ 
     Continuous T ↔ (∀ x : E, Continuous (fun y : F ↦ T (x ⊗ₜ[ℂ] y))) ∧
       (∀ y : F, Continuous (fun x : E ↦ T (x ⊗ₜ[ℂ] y))) := by sorry
 
+omit [T2Space E] [T2Space F] in
+/-- A seminorm on the tensor product whose values on pure tensors are jointly continuous
+at zero is continuous in each factor separately. -/
+private theorem separatelyContinuous_of_continuousAt_tmul {q : Seminorm ℂ (E ⊗[ℂ] F)}
+    (hq : ContinuousAt (fun v : E × F ↦ q (v.1 ⊗ₜ[ℂ] v.2)) 0) :
+    (∀ x : E, Continuous (fun y : F ↦ q (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : F, Continuous (fun x : E ↦ q (x ⊗ₜ[ℂ] y))) := by
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have h0 : (fun v : E × F ↦ q (v.1 ⊗ₜ[ℂ] v.2)) ⁻¹' Iio 1 ∈ 𝓝 ((0 : E), (0 : F)) :=
+    hq.preimage_mem_nhds (Iio_mem_nhds (by simp))
+  obtain ⟨U, hU, V, hV, hUV⟩ := mem_nhds_prod_iff.1 h0
+  constructor
+  · intro x
+    obtain ⟨c, hc⟩ := ((absorbent_nhds_zero (𝕜 := ℂ) hU) x).eventually.exists
+    obtain ⟨a, ha, rfl⟩ := Set.mem_smul_set.1 (hc (mem_singleton x))
+    have hcont := Seminorm.continuous' (p := q.comp (TensorProduct.mk ℂ E F (c • a)))
+      (r := ‖c‖) (Filter.mem_of_superset hV fun y hy ↦ ?_)
+    · exact hcont
+    have h1 : q (a ⊗ₜ[ℂ] y) < 1 := hUV (Set.mk_mem_prod ha hy)
+    simp only [Seminorm.mem_closedBall_zero, Seminorm.comp_apply, TensorProduct.mk_apply,
+      ← TensorProduct.smul_tmul', map_smul_eq_mul]
+    exact mul_le_of_le_one_right (norm_nonneg c) h1.le
+  · intro y
+    obtain ⟨c, hc⟩ := ((absorbent_nhds_zero (𝕜 := ℂ) hV) y).eventually.exists
+    obtain ⟨b, hb, rfl⟩ := Set.mem_smul_set.1 (hc (mem_singleton y))
+    have hcont := Seminorm.continuous' (p := q.comp ((TensorProduct.mk ℂ E F).flip (c • b)))
+      (r := ‖c‖) (Filter.mem_of_superset hU fun x hx ↦ ?_)
+    · exact hcont
+    have h1 : q (x ⊗ₜ[ℂ] b) < 1 := hUV (Set.mk_mem_prod hx hb)
+    simp only [Seminorm.mem_closedBall_zero, Seminorm.comp_apply, LinearMap.flip_apply,
+      TensorProduct.mk_apply, TensorProduct.tmul_smul, map_smul_eq_mul]
+    exact mul_le_of_le_one_right (norm_nonneg c) h1.le
+
 /-- Paper: §C.2.3.4, p. 682. The identity from the inductive to the projective tensor
 product is continuous. -/
 theorem continuous_inductiveTensor_to_projectiveTensor :
-    @Continuous (InductiveTensor E F) (ProjectiveTensor E F) _ _ id := by sorry
+    @Continuous (InductiveTensor E F) (ProjectiveTensor E F) _ _ id :=
+  continuous_withGeneratingSeminorms_of_comp (LinearMap.id : E ⊗[ℂ] F →ₗ[ℂ] E ⊗[ℂ] F)
+    fun q ↦ ⟨⟨q.val, separatelyContinuous_of_continuousAt_tmul q.property⟩, rfl⟩
 
 /-- Paper: (C.2.3.23), p. 682. The inductive tensor topology of Hausdorff factors is Hausdorff. -/
 @[instance]
@@ -2067,7 +2139,11 @@ theorem inductiveTensorMap_tmul (x : E) (y : F) :
 /-- Paper: (C.2.3.25)–(C.2.3.27), p. 683. The inductive tensor map is continuous
 whenever its two factors are, so it induces the indicated maps of completions. -/
 theorem inductiveTensorMap_continuous :
-    Continuous (inductiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    Continuous (inductiveTensorMap f.toLinearMap g.toLinearMap) :=
+  continuous_withGeneratingSeminorms_of_comp (TensorProduct.map f.toLinearMap g.toLinearMap)
+    fun q ↦ ⟨⟨q.val.comp (TensorProduct.map f.toLinearMap g.toLinearMap),
+      fun x ↦ (q.property.1 (f x)).comp g.continuous,
+      fun y ↦ (q.property.2 (g y)).comp f.continuous⟩, rfl⟩
 
 end InductiveMaps
 

@@ -108,7 +108,20 @@ def infiniteLocalEulerFactor (w : InfinitePlace F) (c : QuasiCharacter w.Complet
 at a real place is the unshifted real gamma factor. -/
 theorem infiniteLocalEulerFactor_real_norm (w : InfinitePlace F) (_hw : w.IsReal) (s : ℂ) :
     infiniteLocalEulerFactor w (chart∞[w, (1 : PontryaginDual w.Completionˣ)] s) =
-      Complex.Gammaℝ s := by sorry
+      Complex.Gammaℝ s := by
+  have hshape : realShape[_hw, (chart∞[w, (1 : PontryaginDual w.Completionˣ)] s), s,
+      (0 : Fin 2)] := by
+    intro x
+    have hn : ‖((realModel(_hw)).symm (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal _hw).symm.isometry.norm_map_of_map_zero
+        (map_zero (realModel(_hw)).symm) (x : ℝ)
+    change (((1 : PontryaginDual w.Completionˣ)
+      (Units.map (realModel(_hw)).symm.toMonoidHom x) : Circle) : ℂ) *
+      (((m∞(w) (Units.map (realModel(_hw)).symm.toMonoidHom x) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    simp [InfinitePlace.mult, _hw, hn]
+  have h := (realLocalEulerParameters w _hw _).unique
+    (realLocalEulerParameters w _hw _).exists.choose_spec (y₂ := (s, 0)) hshape
+  simp only [infiniteLocalEulerFactor, _hw, ↓reduceDIte, h, Fin.val_zero, Nat.cast_zero, add_zero]
 
 /-- Paper: Equation (3.3.1.25), p. 134. The finite local Euler factor of an
 unramified character is the reciprocal of one minus its value at a uniformizer.
@@ -257,7 +270,10 @@ the constant epsilon factor i with the existing Fourier transform.
 Deviation: The printed phase is conjugated. -/
 theorem infiniteLocalEpsilonFactor_real_odd (w : InfinitePlace F) (hw : w.IsReal)
     (c : QuasiCharacter w.Completionˣ) (s : ℂ) (hc : realShape[hw, c, s, 1]) :
-    infiniteLocalEpsilonFactor w c = Complex.I := by sorry
+    infiniteLocalEpsilonFactor w c = Complex.I := by
+  have h := (realLocalEulerParameters w hw c).unique
+    (realLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s, 1)) hc
+  simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h, Fin.val_one, pow_one]
 
 /-- Paper: Lemma 3.3.1.7(3)(a)(iii), pp. 135–136. The finite epsilon factor
 is the local Tate factor with the two local Euler factors removed.
@@ -299,7 +315,60 @@ theorem finiteLocalEpsilonFactor_ramified (v : Primes)
 /-- Paper: Lemma 3.3.1.7(3)(a), p. 135. The infinite local epsilon factor
 is entire in each norm-twist chart. -/
 theorem infiniteLocalEpsilonFactor_entire (w : InfinitePlace F) (χ : PontryaginDual w.Completionˣ) :
-    AnalyticOnNhd ℂ (infiniteLocalEpsilonFactor w ∘ chart∞[w, χ]) univ := by sorry
+    AnalyticOnNhd ℂ (infiniteLocalEpsilonFactor w ∘ chart∞[w, χ]) univ := by
+  suffices h : ∀ s, infiniteLocalEpsilonFactor w (chart∞[w, χ] s) =
+      infiniteLocalEpsilonFactor w (chart∞[w, χ] 0) by
+    rw [show infiniteLocalEpsilonFactor w ∘ chart∞[w, χ] =
+      fun _ ↦ infiniteLocalEpsilonFactor w (chart∞[w, χ] 0) from funext h]
+    exact fun _ _ ↦ analyticAt_const
+  intro s
+  have hval (t : ℂ) (g : w.Completionˣ) : chart∞[w, χ] t g =
+      (χ g : ℂ) * ((((m∞(w) g : ℝ≥0) : ℝ)) : ℂ) ^ t := rfl
+  by_cases hw : w.IsReal
+  · have hp := (realLocalEulerParameters w hw (chart∞[w, χ] 0)).exists.choose_spec
+    have hshape : realShape[hw, (chart∞[w, χ] s),
+        (realLocalEulerParameters w hw (chart∞[w, χ] 0)).exists.choose.1 + s,
+        (realLocalEulerParameters w hw (chart∞[w, χ] 0)).exists.choose.2] := by
+      intro x
+      have hn : ‖((realModel(hw)).symm (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+        (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+          (map_zero (realModel(hw)).symm) (x : ℝ)
+      have h0 := hp x
+      rw [hval, Complex.cpow_zero, mul_one] at h0
+      have hm : (((m∞(w) (Units.map (realModel(hw)).symm.toMonoidHom x) : ℝ≥0) : ℝ)) =
+          ‖(x : ℝ)‖ := by
+        simp [InfinitePlace.mult, hw, hn]
+      have hx : ((‖(x : ℝ)‖ : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+      rw [hval, h0, hm, Complex.cpow_add _ _ hx]
+      ring
+    have h := (realLocalEulerParameters w hw (chart∞[w, χ] s)).unique
+      (realLocalEulerParameters w hw (chart∞[w, χ] s)).exists.choose_spec
+      (y₂ := ((realLocalEulerParameters w hw (chart∞[w, χ] 0)).exists.choose.1 + s,
+        (realLocalEulerParameters w hw (chart∞[w, χ] 0)).exists.choose.2)) hshape
+    simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h]
+  · have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    have hp := (complexLocalEulerParameters w hc (chart∞[w, χ] 0)).exists.choose_spec
+    have hshape : complexShape[hc, (chart∞[w, χ] s),
+        (complexLocalEulerParameters w hc (chart∞[w, χ] 0)).exists.choose.1 + s,
+        (complexLocalEulerParameters w hc (chart∞[w, χ] 0)).exists.choose.2] := by
+      intro x
+      have hn : ‖((complexModel(hc)).symm (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+        (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+          (map_zero (complexModel(hc)).symm) (x : ℂ)
+      have h0 := hp x
+      rw [hval, Complex.cpow_zero, mul_one] at h0
+      have hm : (((m∞(w) (Units.map (complexModel(hc)).symm.toMonoidHom x) : ℝ≥0) : ℝ)) =
+          ‖(x : ℂ)‖ ^ 2 := by
+        simp [InfinitePlace.mult, hw, hn]
+      have hx : (((‖(x : ℂ)‖ ^ 2 : ℝ)) : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr x.ne_zero))
+      rw [hval, h0, hm, Complex.cpow_add _ _ hx]
+      ring
+    have h := (complexLocalEulerParameters w hc (chart∞[w, χ] s)).unique
+      (complexLocalEulerParameters w hc (chart∞[w, χ] s)).exists.choose_spec
+      (y₂ := ((complexLocalEulerParameters w hc (chart∞[w, χ] 0)).exists.choose.1 + s,
+        (complexLocalEulerParameters w hc (chart∞[w, χ] 0)).exists.choose.2)) hshape
+    simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h]
 
 /-- Paper: Lemma 3.3.1.7(3)(a), p. 135. The finite local epsilon factor
 is entire in each norm-twist chart. -/
@@ -315,7 +384,34 @@ def sLocalEpsilonFactor (c : QuasiCharacter Jₛ) : ℂ :=
 /-- Paper: Equation (3.3.1.28), p. 135. With only archimedean places, the
 trivial component has epsilon factor one. -/
 theorem sLocalEpsilonFactor_archimedean_trivial (s : ℂ) :
-    sLocalEpsilonFactor (emptyChart s) = 1 := by sorry
+    sLocalEpsilonFactor (emptyChart s) = 1 := by
+  rw [sLocalEpsilonFactor, Finset.univ_eq_attach, Finset.attach_empty, Finset.prod_empty, mul_one]
+  refine Finset.prod_eq_one fun w _ ↦ ?_
+  have hval (g : w.Completionˣ) : sLocalInfiniteRestriction w (emptyChart s) g =
+      (((m∞(w) g : ℝ≥0) : ℝ) : ℂ) ^ s :=
+    sLocalInfiniteRestriction_normTwist (S := ∅) w s g
+  by_cases hw : w.IsReal
+  · have hshape : realShape[hw, (sLocalInfiniteRestriction w (emptyChart s)), s, (0 : Fin 2)] := by
+      intro x
+      have hn : ‖((realModel(hw)).symm (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+        (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+          (map_zero (realModel(hw)).symm) (x : ℝ)
+      rw [hval]
+      simp [InfinitePlace.mult, hw, hn]
+    have h := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (emptyChart s))).unique
+      (realLocalEulerParameters w hw _).exists.choose_spec (y₂ := (s, 0)) hshape
+    simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h, Fin.val_zero, pow_zero]
+  · have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    have hshape : complexShape[hc, (sLocalInfiniteRestriction w (emptyChart s)), s, (0 : ℤ)] := by
+      intro x
+      have hn : ‖((complexModel(hc)).symm (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+        (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+          (map_zero (complexModel(hc)).symm) (x : ℂ)
+      rw [hval]
+      simp [InfinitePlace.mult, hw, hn]
+    have h := (complexLocalEulerParameters w hc (sLocalInfiniteRestriction w (emptyChart s))).unique
+      (complexLocalEulerParameters w hc _).exists.choose_spec (y₂ := (s, 0)) hshape
+    simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h, Int.natAbs_zero, pow_zero]
 
 /-- Paper: Lemma 3.3.1.7(3)(b), p. 136. The S-local epsilon factor is entire. -/
 theorem sLocalEpsilonFactor_entire (χ : PontryaginDual Jₛ) :
@@ -412,7 +508,8 @@ archimedean Z-function gives the integral using the multiplicative Tamagawa meas
 theorem infiniteLocalIdelicZFunction_eq_integral (w : InfinitePlace F) (f : ℬ(w.Completion))
     (χ : PontryaginDual w.Completionˣ) {s : ℂ} (hs : s ∈ rightHalf) :
     infiniteLocalIdelicZFunction w f (chart∞[w, χ] s) =
-      localIdelicZetaIntegral μ∞(w) test(f) (chart∞[w, χ] s) := by sorry
+      localIdelicZetaIntegral μ∞(w) test(f) (chart∞[w, χ] s) :=
+  ((infiniteLocalIdelicZFunction_existsUnique w f).exists.choose_spec χ).2 hs
 
 /-- Paper: §3.3.2, p. 137. The finite local integral (3.3.2.1) has a unique
 meromorphic continuation, in normal form in every norm-twist chart. -/
@@ -433,7 +530,8 @@ finite local Z-function gives the integral using the multiplicative Tamagawa mea
 theorem finiteLocalIdelicZFunction_eq_integral (v : Primes) (f : ℬ(v.adicCompletion F))
     (χ : PontryaginDual (v.adicCompletion F)ˣ) {s : ℂ} (hs : s ∈ rightHalf) :
     finiteLocalIdelicZFunction v f (chart𝔭[v, χ] s) =
-      localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s) := by sorry
+      localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s) :=
+  ((finiteLocalIdelicZFunction_existsUnique v f).exists.choose_spec χ).2 hs
 
 /-- Paper: §3.3.2, p. 137. In each archimedean chart the local zeta function
 is meromorphic with values in the strong dual of the test space.

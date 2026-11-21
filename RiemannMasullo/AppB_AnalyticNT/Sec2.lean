@@ -284,7 +284,8 @@ theorem BackwardSemiExponentialDecay.deriv (f : 𝓢(ℝ, ℂ)) (hf : BackwardSe
 /-- Paper: Lemma B.2.1.4(4), p. 593. Logarithmic differentiation preserves
 exponential decay. -/
 theorem ExponentialDecay.deriv (f : 𝓢(ℝ, ℂ)) (hf : ExponentialDecay f) :
-    ExponentialDecay (SchwartzMap.derivCLM ℂ ℂ f) := by sorry
+    ExponentialDecay (SchwartzMap.derivCLM ℂ ℂ f) := by
+  exact ⟨hf.1.deriv f, hf.2.deriv f⟩
 
 private theorem fromLog_locallyIntegrable (f : 𝓢(ℝ, ℂ)) :
     LocallyIntegrableOn (fromLog f) (Ioi 0) volume :=

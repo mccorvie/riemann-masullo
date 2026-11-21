@@ -203,7 +203,22 @@ theorem approximationNumber_adjoint (A : H →L[ℂ] H) (hA : IsCompactOperator 
 endomorphism equals its operator norm.
 Deviation: The first approximation number has index zero. -/
 theorem approximationNumber_zero_eq_opNorm (A : H →L[ℂ] H) (hA : IsCompactOperator A) :
-    approximationNumber A 0 = ‖A‖ := by sorry
+    approximationNumber A 0 = ‖A‖ := by
+  have hset : {r | ∃ S : H →L[ℂ] H, Module.rank ℂ S.toLinearMap.range ≤ ((0 : ℕ) : Cardinal) ∧
+      r = ‖S - A‖} = {‖A‖} := by
+    ext r
+    constructor
+    · rintro ⟨S, hS, rfl⟩
+      have h0 : Module.rank ℂ S.toLinearMap.range = 0 := by
+        rw [Nat.cast_zero] at hS
+        exact le_zero_iff.mp hS
+      rw [Submodule.rank_eq_zero, LinearMap.range_eq_bot] at h0
+      have hS0 : S = 0 := ContinuousLinearMap.coe_injective h0
+      simp [hS0]
+    · rintro rfl
+      exact ⟨0, by simp, by simp⟩
+  unfold approximationNumber
+  rw [hset, csInf_singleton]
 
 -- TODO(paper-gap): The proof of (C.3.5.4) uses global weak continuity of the
 -- quadratic form of a compact operator and weak compactness of the unit sphere.
@@ -436,7 +451,24 @@ variable {G : Type*} [NormedAddCommGroup G] [InnerProductSpace ℂ G] [CompleteS
 by at most the operator norm of the difference of the two operators.
 Deviation: The approximation-number index starts at zero. -/
 theorem abs_approximationNumber_sub_le (A B : E →L[ℂ] F) (n : ℕ) :
-    |approximationNumber A n - approximationNumber B n| ≤ ‖A - B‖ := by sorry
+    |approximationNumber A n - approximationNumber B n| ≤ ‖A - B‖ := by
+  have key (A B : E →L[ℂ] F) :
+      approximationNumber A n ≤ approximationNumber B n + ‖A - B‖ := by
+    have hz : Module.rank ℂ (0 : E →L[ℂ] F).toLinearMap.range ≤ (n : Cardinal) := by simp
+    rw [← sub_le_iff_le_add]
+    unfold approximationNumber
+    refine le_csInf (by exact ⟨_, 0, hz, rfl⟩) ?_
+    rintro _ ⟨S, hS, rfl⟩
+    rw [sub_le_iff_le_add]
+    calc
+      approximationNumber A n ≤ ‖S - A‖ :=
+        csInf_le ⟨0, fun r ⟨S, _, h⟩ ↦ h ▸ norm_nonneg _⟩ ⟨S, hS, rfl⟩
+      _ = ‖(S - B) + (B - A)‖ := by rw [sub_add_sub_cancel]
+      _ ≤ ‖S - B‖ + ‖A - B‖ := (norm_add_le _ _).trans_eq (by rw [norm_sub_rev B A])
+  rw [abs_sub_le_iff]
+  constructor
+  · linarith [key A B]
+  · linarith [key B A, norm_sub_rev A B]
 
 /-- Every strict upper bound for an approximation number is realized as a strict error bound
 by some approximant of the prescribed rank. -/
@@ -532,7 +564,10 @@ the parallelogram identity.
 Deviation: This supplies the compatible inner product on the dual factor. -/
 theorem strongDual_parallelogram (φ ψ : StrongDual ℂ E) :
     ‖φ + ψ‖ * ‖φ + ψ‖ + ‖φ - ψ‖ * ‖φ - ψ‖ =
-      2 * (‖φ‖ * ‖φ‖ + ‖ψ‖ * ‖ψ‖) := by sorry
+      2 * (‖φ‖ * ‖φ‖ + ‖ψ‖ * ‖ψ‖) := by
+  let R := (InnerProductSpace.toDual ℂ E).symm
+  have h := parallelogram_law_with_norm_mul ℂ (R φ) (R ψ)
+  simpa only [← map_add, ← map_sub, LinearIsometryEquiv.norm_map] using h
 
 /-- Paper: (C.3.6.8), p. 705. The continuous dual of a Hilbert space has the
 inner product compatible with its operator norm. -/
@@ -547,7 +582,27 @@ the arguments under the conjugate-linear Riesz identification.
 Deviation: This checks the dual inner product convention. -/
 theorem strongDual_inner_eq (φ ψ : StrongDual ℂ E) :
     ⟪φ, ψ⟫_ℂ = ⟪(InnerProductSpace.toDual ℂ E).symm ψ,
-      (InnerProductSpace.toDual ℂ E).symm φ⟫_ℂ := by sorry
+      (InnerProductSpace.toDual ℂ E).symm φ⟫_ℂ := by
+  let R := (InnerProductSpace.toDual ℂ E).symm
+  have hI : ‖(Complex.I : ℂ)‖ = 1 := Complex.norm_I
+  have h1 : ‖R ψ + R φ‖ = ‖φ + ψ‖ := by
+    rw [← map_add, LinearIsometryEquiv.norm_map, add_comm]
+  have h2 : ‖R ψ - R φ‖ = ‖φ - ψ‖ := by
+    rw [← map_sub, LinearIsometryEquiv.norm_map, norm_sub_rev]
+  have h3 : ‖R ψ - Complex.I • R φ‖ = ‖φ - Complex.I • ψ‖ := by
+    have e : R ψ - Complex.I • R φ = R (Complex.I • (φ - Complex.I • ψ)) := by
+      simp only [map_smulₛₗ, map_sub, Complex.conj_I, smul_sub, smul_smul]
+      simp
+      abel
+    rw [e, LinearIsometryEquiv.norm_map, norm_smul, hI, one_mul]
+  have h4 : ‖R ψ + Complex.I • R φ‖ = ‖φ + Complex.I • ψ‖ := by
+    have e : R ψ + Complex.I • R φ = R ((-Complex.I) • (φ + Complex.I • ψ)) := by
+      simp only [map_smulₛₗ, map_add, map_neg, Complex.conj_I, neg_neg, smul_add, smul_smul]
+      simp [add_comm]
+    rw [e, LinearIsometryEquiv.norm_map, norm_smul, norm_neg, hI, one_mul]
+  rw [inner_eq_sum_norm_sq_div_four (𝕜 := ℂ) φ ψ, inner_eq_sum_norm_sq_div_four (𝕜 := ℂ) (R ψ) (R φ)]
+  simp only [RCLike.I_to_complex]
+  rw [h1, h2, h3, h4]
 
 /-- Paper: Proposition C.3.6.4(2), p. 705. The canonical image of an algebraic
 tensor has Hilbert-Schmidt norm equal to the norm from the tensor inner product

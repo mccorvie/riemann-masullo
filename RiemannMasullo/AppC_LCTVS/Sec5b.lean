@@ -409,7 +409,10 @@ Deviation: This is a sanity check for the cycle operations. -/
 theorem complexContourCycle_single (γ : PositiveSimpleContour) {n : ℤ} (hn : n ≠ 0) (z : ℂ) :
     let Γ : ComplexContourCycle := Finsupp.single γ n
     Γ.trace = γ.val.trace ∧ Γ.measure = n • γ.val.measure ∧ Γ.index z = n • γ.val.index z := by
-  sorry
+  refine ⟨?_, ?_, ?_⟩
+  · simp [ComplexContourCycle.trace, Finsupp.support_single_ne_zero γ hn]
+  · simp [ComplexContourCycle.measure, Finsupp.sum_single_index]
+  · simp [ComplexContourCycle.index, Finsupp.sum_single_index]
 
 section ResidueTheorem
 

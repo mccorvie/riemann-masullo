@@ -445,7 +445,27 @@ def centeredRegulatorParallelotope : Set (logSpace F) :=
 parallelotope includes coefficients from minus one half up to one half, excluding the latter. -/
 theorem centeredRegulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
     t • Units.logEmbeddingQuot F (b i) ∈ centeredRegulatorParallelotope F b ↔
-      t ∈ Ico (-1 / 2 : ℝ) (1 / 2) := by sorry
+      t ∈ Ico (-1 / 2 : ℝ) (1 / 2) := by
+  classical
+  obtain ⟨B, hP, hB⟩ : ∃ B : Module.Basis (Fin (Units.rank F)) ℝ (logSpace F),
+      regulatorParallelotope F b = ZSpan.fundamentalDomain B ∧
+        ∀ j, Units.logEmbeddingQuot F (b j) = B j := by
+    refine ⟨_, rfl, fun j ↦ ?_⟩
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  simp only [centeredRegulatorParallelotope, hP, hB]
+  rw [Set.mem_vadd_set_iff_neg_vadd_mem, neg_neg, vadd_eq_add, ZSpan.mem_fundamentalDomain]
+  simp only [map_add, map_sum, map_smul, Module.Basis.repr_self, Finsupp.coe_add,
+    Finsupp.finsetSum_apply, Finsupp.smul_apply, Finsupp.coe_smul, Pi.add_apply, Pi.smul_apply,
+    Finsupp.single_apply, smul_eq_mul, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq',
+    Finset.mem_univ, ite_true, Set.mem_Ico]
+  constructor
+  · intro h
+    have := h i
+    simp only [ite_true] at this
+    constructor <;> linarith [this.1, this.2]
+  · intro ht j
+    split_ifs <;> constructor <;> linarith [ht.1, ht.2]
 
 variable (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
 
@@ -462,7 +482,25 @@ def inCenteredTorsionSector (x : v₀.Completionˣ) : Prop :=
 /-- Paper: (A.5.2.14), p. 575. At a real place the centered angular sector
 picks out the positive component. -/
 theorem inCenteredTorsionSector_real (hv : v₀.IsReal) (x : v₀.Completionˣ) :
-    inCenteredTorsionSector F v₀ σ x ↔ 0 < extensionEmbeddingOfIsReal hv x.val := by sorry
+    inCenteredTorsionSector F v₀ σ x ↔ 0 < extensionEmbeddingOfIsReal hv x.val := by
+  have hn : (0 : ℝ) < Units.torsionOrder F := by exact_mod_cast Units.torsionOrder_pos F
+  have hr : extensionEmbeddingOfIsReal hv x.val ≠ 0 := (x.isUnit.map _).ne_zero
+  have hσ : σ (extensionEmbedding v₀ x.val) = (extensionEmbeddingOfIsReal hv x.val : ℂ) := by
+    rw [← extensionEmbeddingOfIsReal_apply hv]
+    exact σ.commutes _
+  unfold inCenteredTorsionSector
+  rw [hσ]
+  rcases hr.lt_or_gt with h | h
+  · rw [Complex.arg_ofReal_of_neg h]
+    have hle : Real.pi / Units.torsionOrder F ≤ Real.pi := by
+      rw [div_le_iff₀ hn]
+      have : (1 : ℝ) ≤ Units.torsionOrder F := by exact_mod_cast Units.torsionOrder_pos F
+      nlinarith [Real.pi_pos]
+    exact iff_of_false (fun h' ↦ absurd h'.2 (not_lt.mpr hle)) (not_lt.mpr h.le)
+  · rw [Complex.arg_ofReal_of_nonneg h.le]
+    refine iff_of_true ⟨?_, by positivity⟩ h
+    rw [neg_div]
+    exact neg_nonpos.mpr (by positivity)
 
 /-- Paper: (A.5.2.14), p. 575. The centered archimedean domain is cut out by
 the centered regulator parallelotope and the centered angular sector. -/
@@ -478,7 +516,35 @@ def centeredIntegralIdeleDomain : Set N₁ :=
 
 /-- Paper: (A.5.2.13), p. 575. The identity idele belongs to the centered integral domain. -/
 theorem one_mem_centeredIntegralIdeleDomain :
-    1 ∈ centeredIntegralIdeleDomain F b v₀ σ := by sorry
+    1 ∈ centeredIntegralIdeleDomain F b v₀ σ := by
+  classical
+  obtain ⟨B, hP, hB⟩ : ∃ B : Module.Basis (Fin (Units.rank F)) ℝ (logSpace F),
+      regulatorParallelotope F b = ZSpan.fundamentalDomain B ∧
+        ∀ j, Units.logEmbeddingQuot F (b j) = B j := by
+    refine ⟨_, rfl, fun j ↦ ?_⟩
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  have hn : (0 : ℝ) < Units.torsionOrder F := by exact_mod_cast Units.torsionOrder_pos F
+  have hlog : (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F (1 : N∞).val w.val) = 0 := by
+    funext w
+    show (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = 0
+    simp
+  have hdom : (1 : N∞) ∈ centeredInfiniteIdeleDomain F b v₀ σ := by
+    refine ⟨?_, ?_⟩
+    · rw [hlog]
+      simp only [centeredRegulatorParallelotope, hP, hB]
+      rw [Set.mem_vadd_set_iff_neg_vadd_mem, neg_neg, vadd_eq_add, add_zero,
+        ZSpan.mem_fundamentalDomain]
+      intro j
+      simp only [map_sum, map_smul, Module.Basis.repr_self, Finsupp.finsetSum_apply,
+        Finsupp.smul_apply, Finsupp.single_apply, smul_eq_mul, mul_ite, mul_one, mul_zero,
+        Finset.sum_ite_eq', Finset.mem_univ, ite_true, Set.mem_Ico]
+      norm_num
+    · show (σ (extensionEmbedding v₀ (1 : v₀.Completion))).arg ∈ _
+      rw [map_one, map_one, Complex.arg_one, Set.mem_Ico, neg_div]
+      exact ⟨neg_nonpos.mpr (by positivity), by positivity⟩
+  exact ⟨⟨1, map_one _⟩, 1, hdom, by simp⟩
 
 variable (S : Finset (HeightOneSpectrum (𝓞 F)))
 
@@ -512,7 +578,19 @@ def centeredSLocalIdeleDomain : Set Nₛ :=
 
 /-- Paper: (A.5.2.15), p. 575. The identity S-idele belongs to the centered S-local domain. -/
 theorem one_mem_centeredSLocalIdeleDomain :
-    1 ∈ centeredSLocalIdeleDomain F v₀ σ S bₛ := by sorry
+    1 ∈ centeredSLocalIdeleDomain F v₀ σ S bₛ := by
+  have hn : (0 : ℝ) < Units.torsionOrder F := by exact_mod_cast Units.torsionOrder_pos F
+  have hlog : sIdeleLog F S 1 = 0 := by
+    funext v
+    rcases v with v | v
+    · show (v.mult : ℝ) * Real.log ‖(1 : v.Completion)‖ = 0
+      simp
+    · show Real.log ‖(1 : v.val.adicCompletion F)‖ = 0
+      simp
+  refine ⟨⟨0, fun _ ↦ by norm_num, by simp [hlog]⟩, ?_⟩
+  show (σ (extensionEmbedding v₀ (1 : v₀.Completion))).arg ∈ _
+  rw [map_one, map_one, Complex.arg_one, Set.mem_Ico, neg_div]
+  exact ⟨neg_nonpos.mpr (by positivity), by positivity⟩
 
 /-- Paper: Lemma A.5.2.12(1), p. 575. The class-representative translates of
 the centered integral domain meet every principal orbit in exactly one point. -/
@@ -602,7 +680,13 @@ def sLocalIdeleLogNeighborhood
 exactly when the selected finite set contains its identity. -/
 theorem one_mem_sLocalIdeleLogNeighborhood_iff
     (B : ℕ → Set (((v : {v : HeightOneSpectrum (𝓞 F) // v ∈ S}) → v.val.adicCompletion F)ˣ)) (k : ℕ) :
-    1 ∈ sLocalIdeleLogNeighborhood F b S B k ↔ 1 ∈ B k := by sorry
+    1 ∈ sLocalIdeleLogNeighborhood F b S B k ↔ 1 ∈ B k := by
+  have h : (1 : N∞) ∈ infiniteIdeleLogNeighborhood F b k := by
+    have hk : (0 : ℝ) < 1 / ((k : ℝ) + 1) := by positivity
+    refine ⟨0, fun _ ↦ ⟨by simpa using hk, hk⟩, fun w ↦ ?_⟩
+    show (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = _
+    simp
+  exact and_iff_right ⟨1, h, by simp⟩
 
 /-- Paper: Lemma A.5.2.14(1), p. 576. With a symmetric finite factor,
 the product neighborhood in the norm-one S-ideles is symmetric.
@@ -641,7 +725,13 @@ def ideleLogNeighborhood (B : ℕ → Set (FiniteAdeleRing (𝓞 F) F)ˣ) (k : �
 exactly when the chosen finite unit set contains its identity. -/
 theorem one_mem_ideleLogNeighborhood_iff
     (B : ℕ → Set (FiniteAdeleRing (𝓞 F) F)ˣ) (k : ℕ) :
-    1 ∈ ideleLogNeighborhood F b B k ↔ 1 ∈ B k := by sorry
+    1 ∈ ideleLogNeighborhood F b B k ↔ 1 ∈ B k := by
+  have h : (1 : N∞) ∈ infiniteIdeleLogNeighborhood F b k := by
+    have hk : (0 : ℝ) < 1 / ((k : ℝ) + 1) := by positivity
+    refine ⟨0, fun _ ↦ ⟨by simpa using hk, hk⟩, fun w ↦ ?_⟩
+    show (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = _
+    simp
+  exact and_iff_right ⟨1, h, by simp⟩
 
 /-- Paper: Lemma A.5.2.16(1), p. 577. With a symmetric finite factor,
 the product neighborhood in the global norm-one ideles is symmetric.

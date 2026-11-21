@@ -361,7 +361,26 @@ Deviation: This is a sanity check for the restricted product over the complement
 theorem finiteAdeleTail_empty :
     ∃ e : FiniteAdeleTail F ∅ ≃+* 𝔸ᶠ[F], IsHomeomorph e ∧
       ∀ (x : FiniteAdeleTail F ∅) (w : Places(F)) (hw : w ∉ (∅ : Finset (Places(F)))),
-        (e x) w = x ⟨w, hw⟩ := by sorry
+        (e x) w = x ⟨w, hw⟩ := by
+  let f : Places(F) → {w : Places(F) // w ∉ (∅ : Finset (Places(F)))} :=
+    fun w ↦ ⟨w, Finset.notMem_empty w⟩
+  have hf : Tendsto f cofinite cofinite :=
+    Injective.tendsto_cofinite (f := f) fun a b h ↦ congrArg Subtype.val h
+  have hg : Tendsto (Subtype.val : {w : Places(F) // w ∉ (∅ : Finset (Places(F)))} → Places(F))
+      cofinite cofinite := Subtype.val_injective.tendsto_cofinite
+  let φ : FiniteAdeleTail F ∅ →+* 𝔸ᶠ[F] :=
+    RestrictedProduct.mapAlongRingHom _ _ f hf (fun _ ↦ RingHom.id _)
+      (.of_forall fun _ ↦ Set.mapsTo_id _)
+  let ψ : 𝔸ᶠ[F] →+* FiniteAdeleTail F ∅ :=
+    RestrictedProduct.mapAlongRingHom (fun w : Places(F) ↦ w.adicCompletion F)
+      (fun w : {w : Places(F) // w ∉ (∅ : Finset (Places(F)))} ↦ w.val.adicCompletion F)
+      Subtype.val hg (fun _ ↦ RingHom.id _) (.of_forall fun _ ↦ Set.mapsTo_id _)
+  refine ⟨RingEquiv.ofRingHom φ ψ (by ext x w; rfl) (by ext x w; rfl), ?_, fun _ _ _ ↦ rfl⟩
+  refine isHomeomorph_iff_exists_inverse.mpr
+    ⟨RestrictedProduct.mapAlong_continuous _ _ f hf _ (.of_forall fun _ ↦ Set.mapsTo_id _)
+        fun _ ↦ continuous_id, ψ, fun _ ↦ rfl, fun _ ↦ rfl,
+      RestrictedProduct.mapAlong_continuous _ _ _ hg _ (.of_forall fun _ ↦ Set.mapsTo_id _)
+        fun _ ↦ continuous_id⟩
 
 /-- Paper: Proposition 2.1.2.8, p. 65. This product retains exactly the finite
 completions at the chosen places, with the finite product topology. -/
@@ -372,7 +391,8 @@ that place's completion by evaluation.
 Deviation: This is a sanity check on the product indexing. -/
 theorem finitePlaceProduct_singleton (w : Places(F)) :
     ∃ e : FinitePlaceProduct F {w} ≃+* w.adicCompletion F, IsHomeomorph e ∧
-      ∀ x, e x = x ⟨w, Finset.mem_singleton_self w⟩ := by sorry
+      ∀ x, e x = x ⟨w, Finset.mem_singleton_self w⟩ :=
+  ⟨RingEquiv.piUnique _, (Homeomorph.piUnique _).isHomeomorph, fun _ ↦ rfl⟩
 
 local instance (S : Finset (Places(F))) :
     Fact (∀ w : {w : Places(F) // w ∉ S},
@@ -701,7 +721,11 @@ theorem sAdeleSchwartzTransition_apply {S T : Finset (Places(F))} (hST : S ⊆ T
     sAdeleSchwartzTransition F hST f (Multiplicative.ofAdd x) =
       if ∀ w : T, w.val ∉ S → x.2 w ∈ w.val.adicCompletionIntegers F then
         f (Multiplicative.ofAdd (x.1, fun w : S ↦ x.2 ⟨w.val, hST w.property⟩))
-      else 0 := by sorry
+      else 0 := by
+  change (if _ then (1 : ℂ) else 0) • f (Multiplicative.ofAdd
+    (x.1, fun w : S ↦ x.2 ⟨w.val, hST w.property⟩)) = _
+  simp only [toAdd_ofAdd]
+  split_ifs <;> simp
 
 /-- Paper: Proposition 2.1.4.1(3)–(4), p. 71. The transition map is a topological
 embedding, so it is continuous and injective and induces the intrinsic topology. -/
@@ -723,7 +747,19 @@ theorem sAdeleSchwartzTransition_pure {S T : Finset (Places(F))} (hST : S ⊆ T)
         g ⟨w.val, hST w.property⟩ (Multiplicative.ofAdd (x.2 w)))
     (x : SAdeleRing F T) :
     sAdeleSchwartzTransition F hST f (Multiplicative.ofAdd x) =
-      a (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w)) := by sorry
+      a (Multiplicative.ofAdd x.1) * ∏ w : T, g w (Multiplicative.ofAdd (x.2 w)) := by
+  rw [sAdeleSchwartzTransition_apply]
+  split_ifs with h
+  · rw [hf]
+    congr 1
+    refine Fintype.prod_of_injective (fun w : S ↦ (⟨w.val, hST w.property⟩ : T))
+      (fun u v huv ↦ Subtype.ext (by simpa using huv)) _ _ (fun w hw ↦ ?_) fun _ ↦ rfl
+    have hwS : w.val ∉ S := fun hS ↦ hw ⟨⟨w.val, hS⟩, rfl⟩
+    rw [hg w hwS, Set.indicator_of_mem (h w hwS)]
+  · push Not at h
+    obtain ⟨w, hwS, hx⟩ := h
+    rw [Finset.prod_eq_zero (Finset.mem_univ w)
+      (by rw [hg w hwS, Set.indicator_of_notMem hx]), mul_zero]
 
 open Classical in
 /-- Paper: (2.1.4.5), p. 71. The global extension formula gives a linear map into
@@ -754,7 +790,10 @@ theorem sAdeleSchwartzToGlobal_apply (S : Finset (Places(F))) (f : 𝒮(S)) (x :
     sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x) =
       if ∀ w : Places(F), w ∉ S → x.2 w ∈ w.adicCompletionIntegers F then
         f (Multiplicative.ofAdd (adeleProjection F S x))
-      else 0 := by sorry
+      else 0 := by
+  change (if _ then (1 : ℂ) else 0) • f (Multiplicative.ofAdd (adeleProjection F S x)) = _
+  simp only [toAdd_ofAdd]
+  split_ifs <;> simp
 
 /-- Paper: Proposition 2.1.4.1(5), p. 71. Each S-local space embeds topologically
 in the global Schwartz–Bruhat space by extension with the integer indicator. -/
@@ -765,7 +804,26 @@ theorem sAdeleSchwartzToGlobal_isEmbedding (S : Finset (Places(F))) :
 with the transition maps, so they induce the canonical colimit map. -/
 theorem sAdeleSchwartzToGlobal_comp {S T : Finset (Places(F))} (hST : S ⊆ T) :
     (sAdeleSchwartzToGlobal F T).comp (sAdeleSchwartzTransition F hST) =
-      sAdeleSchwartzToGlobal F S := by sorry
+      sAdeleSchwartzToGlobal F S := by
+  refine LinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ ?_)
+  change sAdeleSchwartzToGlobal F T (sAdeleSchwartzTransition F hST f)
+      (Multiplicative.ofAdd x.toAdd) = sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd x.toAdd)
+  have hp2 : ∀ (U : Finset (Places(F))) (y : 𝔸[F]) (w : U),
+      (adeleProjection F U y).2 w = y.2 w.val := fun _ _ _ ↦ rfl
+  refine (sAdeleSchwartzToGlobal_apply F T (sAdeleSchwartzTransition F hST f) x.toAdd).trans
+    (Eq.trans ?_ (sAdeleSchwartzToGlobal_apply F S f x.toAdd).symm)
+  rw [sAdeleSchwartzTransition_apply F hST f (adeleProjection F T x.toAdd)]
+  simp only [hp2]
+  split_ifs with hT hTS h₁ h₁ h₁
+  · congr 2
+  · refine absurd (fun w hw ↦ ?_) h₁
+    by_cases hwT : w ∈ T
+    · simpa only [hp2] using hTS ⟨w, hwT⟩ hw
+    · exact hT w hwT
+  · exact absurd (fun w hw ↦ by rw [hp2]; exact h₁ w hw) hTS
+  · rfl
+  · exact absurd (fun w hw ↦ h₁ w fun h ↦ hw (hST h)) hT
+  · rfl
 
 /-- Paper: Proposition 2.1.4.1(5), p. 71. Every global Schwartz–Bruhat function
 lies in one of the embedded S-local spaces.

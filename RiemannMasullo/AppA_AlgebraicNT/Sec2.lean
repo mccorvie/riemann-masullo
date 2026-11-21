@@ -1724,7 +1724,32 @@ is the positive real root of order the field degree, viewed in the local field. 
 theorem canonicalIdeleNormSection_infinite (t : ℝ≥0ˣ) (v : InfinitePlace F) :
     extensionEmbedding v ((canonicalIdeleNormSection F t).val.1 v) =
       (((t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹ : ℝ) : ℂ) := by
-  sorry
+  let e := ringEquivRealOfIsReal Rat.isReal_infinitePlace
+  let a (x : ℝ) : 𝔸[ℚ] := (Pi.mulSingle Rat.infinitePlace (e.symm x), 1)
+  let f := rationalAdeleEmbedding F
+  have hf := rationalAdeleEmbedding_spec F
+  let j (x : ℝ) : ℂ := extensionEmbedding v ((f (a x)).1 v)
+  have ha : Continuous a :=
+    ((continuous_mulSingle (A := InfinitePlace.Completion) Rat.infinitePlace).comp
+      (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).symm.continuous).prodMk continuous_const
+  have hj : Continuous j :=
+    (isometry_extensionEmbedding v).continuous.comp
+      ((continuous_apply v).comp (continuous_fst.comp (hf.1.comp ha)))
+  have hreal : j = Complex.ofReal := by
+    apply (Rat.denseRange_cast (𝕜 := ℝ)).equalizer hj Complex.continuous_ofReal
+    funext q
+    have hdiag : (a (q : ℝ)).1 = (algebraMap ℚ 𝔸[ℚ] q).1 := by
+      funext w
+      obtain rfl := Subsingleton.elim w Rat.infinitePlace
+      change Pi.mulSingle Rat.infinitePlace (e.symm (q : ℝ)) Rat.infinitePlace =
+        algebraMap ℚ Rat.infinitePlace.Completion q
+      simp only [Pi.mulSingle_eq_same, map_ratCast, eq_ratCast]
+    change extensionEmbedding v ((f (a (q : ℝ))).1 v) = ((q : ℝ) : ℂ)
+    rw [rationalAdeleEmbedding_fst_eq F _ _ hdiag, hf.2.1]
+    change extensionEmbedding v (algebraMap F v.Completion (algebraMap ℚ F q)) = ((q : ℝ) : ℂ)
+    simp only [eq_ratCast, map_ratCast, Complex.ofReal_ratCast]
+  change j ((t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹) = _
+  exact congrFun hreal _
 
 /-- Paper: Lemma A.2.2.4, p. 547. The finite part of the canonical section is one. -/
 theorem canonicalIdeleNormSection_finite (t : ℝ≥0ˣ) :

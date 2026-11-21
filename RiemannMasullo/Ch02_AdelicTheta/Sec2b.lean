@@ -140,7 +140,8 @@ def adelePolarSubspace (F : Type*) [Field F] [NumberField F] : Submodule ℂ ℬ
 /-- Paper: Definition 2.2.4.4, p. 91. A function belongs to the polar
 subspace exactly when both it and its Fourier transform vanish at zero. -/
 theorem mem_adelePolarSubspace (f : ℬ[F]) :
-    f ∈ adelePolarSubspace F ↔ f zeroAdele = 0 ∧ adeleSchwartzFourier f zeroAdele = 0 := by sorry
+    f ∈ adelePolarSubspace F ↔ f zeroAdele = 0 ∧ adeleSchwartzFourier f zeroAdele = 0 :=
+  LinearMap.mem_ker.trans Prod.mk_eq_zero
 
 /-- Paper: Definition 2.2.4.4, p. 91. Both polar functionals are continuous,
 expressed as continuity of the pair of evaluations. -/
@@ -253,7 +254,11 @@ def homogeneousAdelicTheta (ω₁ : χ[F]) (f : ℬ[F]) : C(C[F], ℂ) :=
 /-- Paper: Definition 2.2.5.1, p. 95. For the trivial character and at the
 identity class, homogeneous theta integrates theta over the norm-one classes. -/
 theorem homogeneousAdelicTheta_trivial_at_one (f : ℬ[F]) :
-    homogeneousAdelicTheta (1 : χ[F]) f 1 = ∫ h : C₁[F], adelicTheta f h.val ∂μ̄₁ := by sorry
+    homogeneousAdelicTheta (1 : χ[F]) f 1 = ∫ h : C₁[F], adelicTheta f h.val ∂μ̄₁ := by
+  simp only [homogeneousAdelicTheta, ContinuousMap.coe_mk]
+  refine integral_congr_ae (.of_forall fun h ↦ ?_)
+  refine (congrArg₂ (· * ·) (congrArg (adelicTheta f) (mul_one h.val))
+    (congrArg Subtype.val (PontryaginDual.one_apply h))).trans (mul_one _)
 
 /-- Paper: Definition 2.2.5.1, p. 95. Formation of homogeneous theta is
 complex linear in the test function. -/
@@ -317,7 +322,8 @@ def homogeneousAdelicTheta_polarTerm (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]) : �
 character the polar term is the class volume times the difference of the evaluations. -/
 theorem homogeneousAdelicTheta_polarTerm_trivial_at_one (f : ℬ[F]) :
     homogeneousAdelicTheta_polarTerm (1 : χ[F]) f 1 =
-      (μ̄₁ univ).toReal • (adeleSchwartzFourier f zeroAdele - f zeroAdele) := by sorry
+      (μ̄₁ univ).toReal • (adeleSchwartzFourier f zeroAdele - f zeroAdele) := by
+  simp [homogeneousAdelicTheta_polarTerm]
 
 /-- Paper: Theorem 2.2.5.4(2), p. 97. After subtracting the polar term,
 homogeneous theta decays faster than every power of the norm at small norm. -/

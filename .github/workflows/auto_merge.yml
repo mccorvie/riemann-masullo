@@ -52,7 +52,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RETRY: ${{ github.event_name != 'workflow_run' && '--retry-errors' || '' }}
-        # First deployment: --dry-run. It reports what it would merge, in the run's log and
-        # summary, and changes nothing. Remove the flag once those reports have been compared
-        # with what the merger actually merged.
-        run: python3 scripts/ci/auto_merge.py --dry-run ${RETRY:+"$RETRY"}
+        run: python3 scripts/ci/auto_merge.py ${RETRY:+"$RETRY"}

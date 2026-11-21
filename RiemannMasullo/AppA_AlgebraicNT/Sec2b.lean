@@ -518,7 +518,20 @@ def regulatorParallelotope : Set (logSpace F) :=
 multiple belongs to the regulator parallelotope exactly for coefficients in [0,1). -/
 theorem regulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
     t • Units.logEmbeddingQuot F (b i) ∈ regulatorParallelotope F b ↔ t ∈ Set.Ico 0 1 := by
-  sorry
+  have hB : ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)) i =
+      Units.logEmbeddingQuot F (b i) := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  rw [regulatorParallelotope, ZSpan.mem_fundamentalDomain, ← hB]
+  simp only [map_smul, Module.Basis.repr_self, Finsupp.smul_single, smul_eq_mul, mul_one]
+  constructor
+  · intro h
+    simpa using h i
+  · intro ht j
+    rw [Finsupp.single_apply]
+    split_ifs
+    · exact ht
+    · simp
 
 -- TODO(paper-gap): Lemma A.2.3.5 calls F a hyperplane. Equations (A.2.3.5) and (A.2.3.9)
 -- define the hyperplane and parallelotope for the number field F.
@@ -582,7 +595,24 @@ def inTorsionSector (x : v₀.Completionˣ) : Prop :=
 exactly the positive component. -/
 theorem inTorsionSector_real (hv : v₀.IsReal) (x : v₀.Completionˣ) :
     inTorsionSector F v₀ σ x ↔ 0 < extensionEmbeddingOfIsReal hv x.val := by
-  sorry
+  have hn : (2 : ℝ) ≤ Units.torsionOrder F := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have := Units.torsionOrder_pos F
+    exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+  have hr : extensionEmbeddingOfIsReal hv x.val ≠ 0 := (x.isUnit.map _).ne_zero
+  have hσ : σ (extensionEmbedding v₀ x.val) = (extensionEmbeddingOfIsReal hv x.val : ℂ) := by
+    rw [← extensionEmbeddingOfIsReal_apply hv]
+    exact σ.commutes _
+  unfold inTorsionSector
+  rw [hσ]
+  rcases hr.lt_or_gt with h | h
+  · rw [Complex.arg_ofReal_of_neg h]
+    have hle : 2 * Real.pi / Units.torsionOrder F ≤ Real.pi := by
+      rw [div_le_iff₀ (by linarith)]
+      nlinarith [Real.pi_pos]
+    exact iff_of_false (fun h' ↦ absurd h'.2 (not_lt.mpr hle)) (not_lt.mpr h.le)
+  · rw [Complex.arg_ofReal_of_nonneg h.le]
+    exact iff_of_true ⟨le_rfl, by positivity⟩ h
 
 local notation "atPlace" => Units.map (RingHom.toMonoidHom (Pi.evalRingHom InfinitePlace.Completion v₀))
 local notation "inLogBox" => fun g : N∞ ↦

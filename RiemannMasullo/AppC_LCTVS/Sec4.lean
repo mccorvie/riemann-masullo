@@ -89,7 +89,11 @@ Deviation: The target pointwise topology uses the continuous dual of the target.
 theorem continuous_weakCompletion_transpose (T : E →L[ℂ] F) :
     Continuous (fun a : PettisWeakCompletion E ↦
       (show PettisWeakCompletion F from
-        a.comp (ContinuousLinearMap.precomp ℂ T : StrongDual ℂ F →L[ℂ] StrongDual ℂ E).toLinearMap)) := by sorry
+        a.comp (ContinuousLinearMap.precomp ℂ T : StrongDual ℂ F →L[ℂ] StrongDual ℂ E).toLinearMap)) := by
+  apply WeakBilin.continuous_of_continuous_eval
+  intro φ
+  exact WeakBilin.eval_continuous (B := LinearMap.id) ((ContinuousLinearMap.precomp ℂ T :
+    StrongDual ℂ F →L[ℂ] StrongDual ℂ E) φ)
 
 /-- Paper: Lemma C.4.1.1(2), p. 709. Evaluation intertwines a continuous
 linear map with the algebraic transpose of its continuous dual map. -/
@@ -214,7 +218,13 @@ Deviation: This is a sanity check for the measure representation. -/
 theorem pettisMeasure_complex_dirac [MeasurableSingletonClass X] (x : X) (c : ℂ) (f : X → ℂ) :
     let μ : PettisMeasure X := .complex (VectorMeasure.dirac x c)
     μ.variation = ENNReal.ofReal ‖c‖ • Measure.dirac x ∧
-      μ.scalarIntegral f = c * f x := by sorry
+      μ.scalarIntegral f = c * f x := by
+  refine ⟨?_, ?_⟩
+  · change (VectorMeasure.dirac x c).variation = _
+    rw [VectorMeasure.variation_dirac, ofReal_norm]
+  · change (VectorMeasure.dirac x c).integral f (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [VectorMeasure.integral_dirac]
+    simp [mul_comm]
 
 /-- Paper: Definition C.4.2.1(1), p. 710. A function is weakly measurable
 when every continuous linear functional gives a scalar measurable function.
@@ -554,14 +564,18 @@ theorem pettisWeakIntegral_comp_continuousLinearMap
         (show PettisWeakCompletion F from
           (pettisWeakIntegral (.complex μ) f hf).comp
             (ContinuousLinearMap.precomp ℂ T : StrongDual ℂ F →L[ℂ] StrongDual ℂ E).toLinearMap) :=
-  by sorry
+  ⟨fun φ ↦ hf (φ.comp T), rfl⟩
 
 /-- Paper: Lemma C.4.3.8, p. 714. A continuous linear map takes a Pettis
 integral to the Pettis integral of the composed function. -/
 theorem HasPettisIntegral.comp_continuousLinearMap
     {μ : ComplexMeasure X} [IsFiniteMeasure μ.variation] [μ.variation.Regular]
     {f : X → E} {a : E} (hf : HasPettisIntegral (.complex μ) f a) (T : E →L[ℂ] F) :
-    HasPettisIntegral (.complex μ) (T ∘ f) (T a) := by sorry
+    HasPettisIntegral (.complex μ) (T ∘ f) (T a) := by
+  obtain ⟨hf, h⟩ := hf
+  refine ⟨fun φ ↦ hf (φ.comp T), LinearMap.ext fun φ ↦ ?_⟩
+  exact congrArg (fun z : PettisWeakCompletion E ↦
+    (show Module.Dual ℂ (StrongDual ℂ E) from z) (φ.comp T)) h
 
 -- TODO(paper-gap): Lemma C.4.3.9 compares a nonnegative seminorm with an
 -- integral against a complex measure. Even for a signed measure, f = 1 and

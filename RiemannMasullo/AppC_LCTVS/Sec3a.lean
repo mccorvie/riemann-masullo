@@ -933,7 +933,8 @@ def nuclearEndomorphisms : Submodule ℂ (H →L[ℂ] H) where
 and a vector belongs to the submodule of nuclear endomorphisms.
 Deviation: This is a check of the submodule's carrier. -/
 theorem smulRight_mem_nuclearEndomorphisms (φ : H →L[ℂ] ℂ) (y : H) :
-    φ.smulRight y ∈ nuclearEndomorphisms H := by sorry
+    φ.smulRight y ∈ nuclearEndomorphisms H :=
+  isNuclearOperator_smulRight φ y
 
 /-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace sums the
 diagonal entries of a nuclear operator using a choice of Hilbert basis.
@@ -946,7 +947,13 @@ def hilbertTrace (T : nuclearEndomorphisms H) : ℂ :=
 operator evaluates its functional at its spanning vector.
 Deviation: This is a check of the trace formula and inner-product convention. -/
 theorem hilbertTrace_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
-    hilbertTrace ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = φ y := by sorry
+    hilbertTrace ⟨φ.smulRight y, smulRight_mem_nuclearEndomorphisms φ y⟩ = φ y := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  change ∑' i, ⟪b i, φ.smulRight y (b i)⟫_ℂ = φ y
+  have h := φ.hasSum (b.hasSum_repr y)
+  simp only [map_smul, smul_eq_mul, b.repr_apply_apply] at h
+  refine (h.congr_fun fun i ↦ ?_).tsum_eq
+  rw [ContinuousLinearMap.smulRight_apply, inner_smul_right, mul_comm]
 
 /-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace is the
 nuclear trace from Proposition C.3.2.1 on the same endomorphism. -/

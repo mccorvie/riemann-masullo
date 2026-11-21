@@ -191,7 +191,8 @@ def cyclicSchwartzPeriodization : 𝓢(ℝ, ℂ) →L[ℂ] S where
 has the same absolutely convergent orbit sum on a logarithmic lift. -/
 theorem cyclicSchwartzPeriodization_hasSum (f : 𝓢(ℝ, ℂ)) (x : ℝ) :
     HasSum (fun k : ℤ ↦ f (x + (k : ℝ) * Real.log γ))
-      (cyclicSchwartzPeriodization γ hγ f (point ((x / Real.log γ : ℝ) : T))) := by sorry
+      (cyclicSchwartzPeriodization γ hγ f (point ((x / Real.log γ : ℝ) : T))) := by
+  exact cyclicPeriodizationValue_hasSum γ hγ f x
 
 /-- Paper: Definition 4.2.1.1, p. 162. Periodization of an exponentially
 decaying Schwartz function sums its translates by integer powers of γ.
@@ -408,7 +409,11 @@ variable (γ : ℝ) (hγ : 1 < γ)
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. The periodization of exponential profiles
 is continuous. Smoothness in part (1) is built into its elementary Schwartz target. -/
-theorem cyclicPeriodization_continuous : Continuous (cyclicPeriodization γ hγ) := by sorry
+theorem cyclicPeriodization_continuous : Continuous (cyclicPeriodization γ hγ) := by
+  let a : (univ : Set ℝ) := ⟨0, mem_univ _⟩
+  have h : Continuous (fun f : E ↦ logExponentialDecayTwist univ a f) :=
+    continuous_pi_iff.mp (positiveRealExponentialDecay_isEmbedding (univ : Set ℝ) univ_nonempty).continuous a
+  exact (cyclicSchwartzPeriodization γ hγ).continuous.comp h
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Every smooth quotient function has an
 exponentially decaying lift under periodization. -/

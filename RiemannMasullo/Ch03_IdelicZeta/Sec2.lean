@@ -672,12 +672,14 @@ def globalIdelicZFunction (f : ℬ[F]) : 𝒳[F] → ℂ :=
 /-- Paper: Definition 3.2.2.5, p. 128. On the half-plane of convergence the
 global idelic Z-function agrees with its defining integral. -/
 theorem globalIdelicZFunction_eq_integral (f : ℬ[F]) :
-    EqOn (globalIdelicZFunction f) (globalIdelicZetaIntegral f) rightHalf := by sorry
+    EqOn (globalIdelicZFunction f) (globalIdelicZetaIntegral f) rightHalf :=
+  (globalIdelicZetaIntegral_exists_continuation f).choose_spec.2
 
 /-- Paper: Theorem 3.2.2.1(1)(a), p. 124. In every norm-twist coordinate
 the global Z-function is in meromorphic normal form. -/
 theorem globalIdelicZFunction_meromorphic (f : ℬ[F]) (χ : U[F]) :
-    MeromorphicNFOn (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) univ := by sorry
+    MeromorphicNFOn (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) univ :=
+  (globalIdelicZetaIntegral_exists_continuation f).choose_spec.1 χ
 
 /-- Paper: Theorem 3.2.2.1(1)(a), p. 124. The global Z-function is analytic
 away from the trivial character and the norm, where it has at most simple poles. -/

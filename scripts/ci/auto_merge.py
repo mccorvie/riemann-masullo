@@ -64,8 +64,11 @@ MAX_ATTEMPTS = 12         # runs of the check for one head commit
 MAX_ERROR_ATTEMPTS = 3
 MAX_MERGES = 60           # per run of this script
 # Changes on main that make a verdict stale whatever files the pull request touches.
-BUILD_FILES = ("lakefile.toml", "lakefile.lean", "lean-toolchain", "lake-manifest.json")
-BUILD_DIRS = ("scripts/", ".github/", "RiemannMasullo/External/")
+# Of scripts/, only what the check itself runs: a change to the launcher or to the integrator's
+# tools does not touch any verdict, and counting it made every pending verdict stale.
+BUILD_FILES = ("lakefile.toml", "lakefile.lean", "lean-toolchain", "lake-manifest.json",
+               "scripts/lint.sh", "scripts/proof_review.sh", "scripts/signatures.sh", "scripts/Signatures.lean")
+BUILD_DIRS = ("scripts/ci/", ".github/workflows/", "RiemannMasullo/External/")
 
 
 class ApiError(Exception):

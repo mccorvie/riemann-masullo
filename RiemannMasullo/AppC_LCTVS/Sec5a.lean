@@ -1090,12 +1090,31 @@ theorem WeakGateauxDifferentiableOn.weaklyPartialDifferentiableOn {Ω : Set V}
   intro φ x
   exact (hD.hasDerivWithinAt φ x (EuclideanSpace.single i 1)).differentiableWithinAt
 
+/-- Continuity of a weak directional derivative on the coordinate slices suffices to
+identify all its values with the scalar Fréchet differentials. -/
+theorem HasWeakDirectionalDerivativesOn.hasWeakDifferentialOn {Ω : Set V} (hΩ : IsOpen Ω)
+    (hd : 1 ≤ d) {f : V → E} {D : Ω × V → PettisWeakCompletion E}
+    (hD : HasWeakDirectionalDerivativesOn (k := k) f D)
+    (hc : ∀ i : Fin d, Continuous (fun x : Ω ↦ D (x, EuclideanSpace.single i 1))) :
+    HasWeakDifferentialOn k f D := by
+  have hf : WeaklyContDiffOn k f Ω := (weaklyContDiffOn_iff_continuous_weakPartials hΩ hd f).2
+    fun i ↦ ⟨_, fun φ x ↦ hD.hasDerivWithinAt φ x (EuclideanSpace.single i 1), hc i⟩
+  obtain ⟨_, hA, _⟩ := hf
+  intro φ x
+  obtain ⟨L, hL, _⟩ := hA φ x
+  refine ⟨L, hL, fun v ↦ ?_⟩
+  have hline : HasLineDerivWithinAt k (φ ∘ f)
+      ((show Module.Dual ℂ (StrongDual ℂ E) from D (x, v)) φ) Ω x v := hD.hasDerivWithinAt φ x v
+  exact (hline.hasLineDerivAt (hΩ.mem_nhds x.property)).unique
+    ((hL.hasFDerivAt (hΩ.mem_nhds x.property)).hasLineDerivAt v)
+
 /-- Paper: Lemma C.5.1.16(2), p. 729. A jointly continuous weak Gâteaux derivative
 is the weak differential. -/
 theorem hasWeakDifferentialOn_of_continuous_directional {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) {f : V → E} {D : Ω × V → PettisWeakCompletion E}
     (hD : HasWeakDirectionalDerivativesOn (k := k) f D) (hc : Continuous D) :
-    HasWeakDifferentialOn k f D := by sorry
+    HasWeakDifferentialOn k f D := by
+  exact hD.hasWeakDifferentialOn hΩ hd fun _ ↦ hc.comp (continuous_id.prodMk continuous_const)
 
 variable [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
 

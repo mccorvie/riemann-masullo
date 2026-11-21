@@ -18,6 +18,7 @@ import Mathlib.MeasureTheory.Measure.Haar.Extension
 import Mathlib.MeasureTheory.Measure.Haar.Quotient
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.IsOpenUnits
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # Haar measures
@@ -387,7 +388,73 @@ theorem sAdditiveCovolumeOneMeasure_existsUnique :
     ∃! μ : Measure (SAdeleRing F S), μ.IsAddHaarMeasure ∧ μ.Regular ∧
       ∃ ν : Measure (Multiplicative (SAdeleRing F S) ⧸ Aₛ),
         IsWeilQuotientMeasure Aₛ (show Measure (Multiplicative (SAdeleRing F S)) from μ)
-          Measure.count ν ∧ ν univ = 1 := by sorry
+          Measure.count ν ∧ ν univ = 1 := by
+  let G := Multiplicative (SAdeleRing F S)
+  let H := Aₛ
+  let Q := G ⧸ H
+  obtain ⟨-, hclosed, hdiscrete, -, -, hcompact, -, -⟩ := sAdele_additive_quotient F S
+  let : IsClosed (H : Set G) := hclosed
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let : CompactSpace Q := hcompact
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace G := by
+    change BorelSpace (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : BorelSpace Q := ⟨rfl⟩
+  let count : Measure H := Measure.count
+  let : count.IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hclosed
+  -- Start with Haar probability measure on the quotient and lift it using counting measure.
+  let K : TopologicalSpace.PositiveCompacts Q := ⟨⟨univ, isCompact_univ⟩, by simp⟩
+  let ν : Measure Q := Measure.haarMeasure K
+  have hν : ν univ = 1 := Measure.haarMeasure_self (K₀ := K)
+  let μ := ses.inducedMeasure count ν
+  have hweil : IsWeilQuotientMeasure H μ count ν := by
+    refine ⟨inferInstance, inferInstance, fun f hf ↦ ?_⟩
+    let fc : CompactlySupportedContinuousMap G ℂ := ⟨f, hf⟩
+    change (∫ x, fc x ∂μ) = _
+    rw [integral_inducedMeasure_complex ses count ν fc, ses.integrate_apply]
+    refine integral_congr_ae (Filter.Eventually.of_forall fun q ↦ ?_)
+    conv_lhs => rw [← QuotientGroup.out_eq' q]
+    exact ses.pushforward_apply_apply count fc q.out
+  refine ⟨μ, ⟨?_, ses.inducedMeasure_regular count ν, ν, hweil, hν⟩, ?_⟩
+  · have hhaar := ses.isHaarMeasure_inducedMeasure count ν
+    exact
+      { toIsFiniteMeasureOnCompacts := hhaar.toIsFiniteMeasureOnCompacts
+        toIsOpenPosMeasure := hhaar.toIsOpenPosMeasure
+        map_add_left_eq_self := fun x ↦ hhaar.map_mul_left_eq_self (Multiplicative.ofAdd x) }
+  rintro μ' ⟨-, hregular, ν', ⟨hhaar', hregular', hweil'⟩, hν'⟩
+  let : (show Measure G from μ').Regular := hregular
+  let : ν'.IsHaarMeasure := hhaar'
+  let : ν'.Regular := hregular'
+  have heq : ν' = ν := by
+    have hscale := Measure.isMulLeftInvariant_eq_smul_of_regular ν' ν
+    have hmass := congrArg (fun m : Measure Q ↦ m univ) hscale
+    change ν' univ = (ν'.haarScalarFactor ν : ℝ≥0∞) * ν univ at hmass
+    rw [hν', hν, mul_one] at hmass
+    rw [hscale, ENNReal.coe_inj.mp hmass.symm, one_smul]
+  subst ν'
+  apply Measure.ext_of_integral_eq_on_compactlySupported (X := G)
+  intro f
+  let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+  have hc : HasCompactSupport fc := f.hasCompactSupport.comp_left Complex.ofReal_zero
+  apply Complex.ofReal_injective
+  calc
+    Complex.ofReal (∫ x : G, f x ∂(show Measure G from μ')) =
+        ∫ x : G, (f x : ℂ) ∂(show Measure G from μ') := integral_complex_ofReal.symm
+    _ = ∫ x : G, (f x : ℂ) ∂μ := (hweil' fc hc).trans (hweil.2.2 fc hc).symm
+    _ = Complex.ofReal (∫ x : G, f x ∂μ) := integral_complex_ofReal
 
 /-- Paper: Definition A.3.1.1, p. 555. This normalization gives the additive
 quotient by the diagonal S-integers mass one.

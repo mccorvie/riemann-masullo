@@ -1041,7 +1041,15 @@ def rapidDecaySequenceBound (j : ℕ) (s : (Fin r → ℤ) → ℂ) : ℝ≥0∞
 is the norm of the mass, for every weight. -/
 theorem rapidDecaySequenceBound_singleton_zero (j : ℕ) (c : ℂ) :
     rapidDecaySequenceBound (r := r) j (({0} : Set (Fin r → ℤ)).indicator (fun _ ↦ c)) =
-      (‖c‖₊ : ℝ≥0∞) := by sorry
+      (‖c‖₊ : ℝ≥0∞) := by
+  rw [rapidDecaySequenceBound, tsum_eq_single 0]
+  · have h0 : (WithLp.toLp 2 (fun i : Fin r ↦ (((0 : Fin r → ℤ) i : ℤ) : ℝ)) :
+        EuclideanSpace ℝ (Fin r)) = 0 := by
+      ext i; simp
+    rw [h0]
+    simp
+  · intro a ha
+    simp [Set.indicator_of_notMem (show a ∉ ({0} : Set (Fin r → ℤ)) from ha)]
 
 /-- Paper: Remark D.1.3.6, p. 752. The zero lattice sequence has finite weighted
 absolute sums of all orders. -/
@@ -1050,18 +1058,44 @@ theorem rapidDecaySequenceSubmodule_zero_mem :
   intro j
   simp [rapidDecaySequenceBound]
 
+/-- The weighted absolute sum of a sum of sequences is at most the sum of the
+weighted absolute sums. -/
+theorem rapidDecaySequenceBound_add_le (j : ℕ) (s t : (Fin r → ℤ) → ℂ) :
+    rapidDecaySequenceBound j (s + t) ≤
+      rapidDecaySequenceBound j s + rapidDecaySequenceBound j t := by
+  unfold rapidDecaySequenceBound
+  rw [← tsum_add]
+  refine tsum_le_tsum fun a ↦ ?_
+  rw [← mul_add]
+  gcongr
+  simp only [Pi.add_apply]
+  exact_mod_cast nnNorm_add_le _ _
+
 /-- Paper: Remark D.1.3.6, p. 752. Rapidly decreasing lattice sequences are closed
 under addition. -/
 theorem rapidDecaySequenceSubmodule_add_mem {s t : (Fin r → ℤ) → ℂ}
     (hs : ∀ j, rapidDecaySequenceBound j s < ⊤)
     (ht : ∀ j, rapidDecaySequenceBound j t < ⊤) :
-    ∀ j, rapidDecaySequenceBound j (s + t) < ⊤ := by sorry
+    ∀ j, rapidDecaySequenceBound j (s + t) < ⊤ := fun j ↦
+  (rapidDecaySequenceBound_add_le j s t).trans_lt (ENNReal.add_lt_top.2 ⟨hs j, ht j⟩)
+
+/-- Scaling a sequence multiplies its weighted absolute sum by the norm of the scalar. -/
+theorem rapidDecaySequenceBound_smul (j : ℕ) (c : ℂ) (s : (Fin r → ℤ) → ℂ) :
+    rapidDecaySequenceBound j (c • s) = (‖c‖₊ : ℝ≥0∞) * rapidDecaySequenceBound j s := by
+  unfold rapidDecaySequenceBound
+  rw [← ENNReal.tsum_mul_left]
+  congr 1
+  ext a
+  simp only [Pi.smul_apply, smul_eq_mul, nnNorm_mul, ENNReal.coe_mul]
+  ring
 
 /-- Paper: Remark D.1.3.6, p. 752. Rapidly decreasing lattice sequences are closed
 under complex scalar multiplication. -/
 theorem rapidDecaySequenceSubmodule_smul_mem (c : ℂ) {s : (Fin r → ℤ) → ℂ}
     (hs : ∀ j, rapidDecaySequenceBound j s < ⊤) :
-    ∀ j, rapidDecaySequenceBound j (c • s) < ⊤ := by sorry
+    ∀ j, rapidDecaySequenceBound j (c • s) < ⊤ := fun j ↦ by
+  rw [rapidDecaySequenceBound_smul]
+  exact ENNReal.mul_lt_top ENNReal.coe_lt_top (hs j)
 
 /-- Paper: Remark D.1.3.6, p. 752. A rapidly decreasing lattice sequence
 has finite weighted absolute sums of all orders. -/
@@ -1075,7 +1109,13 @@ def rapidDecaySequenceSubmodule (r : ℕ) : Submodule ℂ ((Fin r → ℤ) → �
 belongs to the rapidly decreasing sequence space. -/
 theorem mem_rapidDecaySequenceSubmodule_of_finiteSupport (s : (Fin r → ℤ) → ℂ)
     (hs : (Function.support s).Finite) :
-    s ∈ rapidDecaySequenceSubmodule r := by sorry
+    s ∈ rapidDecaySequenceSubmodule r := by
+  intro j
+  rw [rapidDecaySequenceBound, tsum_eq_sum (s := hs.toFinset)]
+  · exact ENNReal.sum_lt_top.2 fun a _ ↦
+      ENNReal.mul_lt_top (ENNReal.pow_lt_top (by simp)) ENNReal.coe_lt_top
+  · intro a ha
+    simp [Function.notMem_support.1 (fun h ↦ ha (hs.mem_toFinset.2 h))]
 
 /-- Paper: (D.1.3.17), p. 752. Each weighted absolute sum vanishes on the zero sequence. -/
 theorem rapidDecaySequenceSeminorm_map_zero (j : ℕ) :
@@ -1086,20 +1126,26 @@ theorem rapidDecaySequenceSeminorm_map_zero (j : ℕ) :
 on rapidly decreasing lattice sequences. -/
 theorem rapidDecaySequenceSeminorm_add_le (j : ℕ) (s t : rapidDecaySequenceSubmodule r) :
     (rapidDecaySequenceBound j (s + t).val).toReal ≤
-      (rapidDecaySequenceBound j s.val).toReal + (rapidDecaySequenceBound j t.val).toReal :=
-  by sorry
+      (rapidDecaySequenceBound j s.val).toReal + (rapidDecaySequenceBound j t.val).toReal := by
+  have hs : rapidDecaySequenceBound j s.val < ⊤ := s.2 j
+  have ht : rapidDecaySequenceBound j t.val < ⊤ := t.2 j
+  rw [← ENNReal.toReal_add hs.ne ht.ne]
+  exact ENNReal.toReal_mono (ENNReal.add_lt_top.2 ⟨hs, ht⟩).ne
+    (rapidDecaySequenceBound_add_le j s.val t.val)
 
 /-- Paper: (D.1.3.17), p. 752. Scaling a rapidly decreasing lattice sequence
 multiplies its real-valued weighted absolute sum by the norm of the scalar. -/
 theorem rapidDecaySequenceSeminorm_smul (j : ℕ) (c : ℂ) (s : rapidDecaySequenceSubmodule r) :
     (rapidDecaySequenceBound j (c • s).val).toReal =
-      ‖c‖ * (rapidDecaySequenceBound j s.val).toReal := by sorry
+      ‖c‖ * (rapidDecaySequenceBound j s.val).toReal := by
+  rw [Submodule.coe_smul, rapidDecaySequenceBound_smul, ENNReal.toReal_mul]
+  simp
 
 /-- Paper: (D.1.3.17), p. 752. Each real-valued weighted absolute sum is invariant
 under negation on rapidly decreasing lattice sequences. -/
 theorem rapidDecaySequenceSeminorm_neg (j : ℕ) (s : rapidDecaySequenceSubmodule r) :
-    (rapidDecaySequenceBound j (-s).val).toReal = (rapidDecaySequenceBound j s.val).toReal :=
-  by sorry
+    (rapidDecaySequenceBound j (-s).val).toReal = (rapidDecaySequenceBound j s.val).toReal := by
+  simp [rapidDecaySequenceBound]
 
 /-- Paper: (D.1.3.17), p. 752. The finite weighted sums are seminorms on the
 space of rapidly decreasing sequences. -/
@@ -1121,7 +1167,10 @@ instance : CoeFun (RapidDecaySequence r) (fun _ ↦ (Fin r → ℤ) → ℂ) whe
 /-- Paper: (D.1.3.17), p. 752. On a rapidly decreasing sequence the seminorm
 of order zero is the unweighted absolute sum. -/
 theorem rapidDecaySequenceSeminorm_zero (s : RapidDecaySequence r) :
-    rapidDecaySequenceSeminorm 0 s = ∑' a, ‖s a‖ := by sorry
+    rapidDecaySequenceSeminorm 0 s = ∑' a, ‖s a‖ := by
+  change (rapidDecaySequenceBound 0 _).toReal = _
+  rw [rapidDecaySequenceBound, ENNReal.tsum_toReal_eq (fun a ↦ by simp)]
+  simp
 
 /-- Paper: Remark D.1.3.6, p. 753. The weighted sums generate the topology
 and give a Fréchet space. -/
