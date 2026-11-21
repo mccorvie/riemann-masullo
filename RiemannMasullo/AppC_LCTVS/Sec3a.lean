@@ -2253,11 +2253,173 @@ preserves nuclearity. -/
 theorem mul_mem_nuclearEndomorphisms_right (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
     T.val * A ∈ nuclearEndomorphisms H := by sorry
 
+/-- An operator and the positive square root of its Gram operator have equal pointwise norms. -/
+private theorem norm_sqrt_adjoint_mul_apply (T : H →L[ℂ] H) (x : H) :
+    ‖CFC.sqrt (T.adjoint * T) x‖ = ‖T x‖ := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : S.adjoint = S :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  have hsq : S * S = T.adjoint * T :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.isPositive_adjoint_comp_self)
+  change ‖S x‖ = ‖T x‖
+  rw [S.apply_norm_eq_sqrt_inner_adjoint_right, T.apply_norm_eq_sqrt_inner_adjoint_right, hS,
+    ← ContinuousLinearMap.mul_def, hsq, ContinuousLinearMap.mul_def]
+
+/-- Taking a second positive square root writes the trace norm as a sum of squared norms. -/
+private theorem hasSum_norm_sq_traceNorm {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) :
+    HasSum (fun i ↦ ‖CFC.sqrt (CFC.sqrt (T.val.adjoint * T.val)) (b i)‖ ^ 2) (traceNorm T) := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  let B := CFC.sqrt S
+  have hB : B.adjoint = B :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  refine (hasSum_traceNorm_diagonal b T).congr_fun fun i ↦ ?_
+  change ‖B (b i)‖ ^ 2 = (⟪b i, S (b i)⟫_ℂ).re
+  rw [B.apply_norm_sq_eq_inner_adjoint_right, hB, ← ContinuousLinearMap.mul_def,
+    CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)]
+  rfl
+
+set_option maxHeartbeats 800000 in
+/-- The real diagonal sum of a nuclear operator composed on the left by a contraction
+is bounded by its trace norm. -/
+private theorem exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) (U : H →L[ℂ] H) (hU : ‖U‖ ≤ 1) :
+    ∃ r, HasSum (fun i ↦ (⟪b i, (U * T.val) (b i)⟫_ℂ).re) r ∧ r ≤ traceNorm T := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  let B := CFC.sqrt S
+  have hB : B.adjoint = B :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  have hsq : B * B = S := CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)
+  obtain ⟨W, hW, hWT⟩ := exists_contraction_comp_eq_of_norm_le S T.val
+    (fun x ↦ (norm_sqrt_adjoint_mul_apply T.val x).ge)
+  have hWT' : W * S = T.val := hWT
+  let A := U * W
+  have hA : ‖A‖ ≤ 1 :=
+    (norm_mul_le U W).trans ((mul_le_of_le_one_left (norm_nonneg W) hU).trans hW)
+  have hT : HasSum (fun i ↦ ‖B (b i)‖ ^ 2) (traceNorm T) := hasSum_norm_sq_traceNorm b T
+  have hfactor : A * (B * B) = U * T.val := by
+    calc
+      A * (B * B) = A * S := congrArg (A * ·) hsq
+      _ = U * (W * S) := mul_assoc U W S
+      _ = U * T.val := congrArg (U * ·) hWT'
+  clear_value A B
+  have hparseval (x : H) : HasSum (fun i ↦ ‖⟪b i, x⟫_ℂ‖ ^ 2) (‖x‖ ^ 2) := by
+    simpa [b.repr_apply_apply] using
+      (lp.hasSum_norm (p := 2) (by norm_num) (b.repr x))
+  -- Summing the squared entries of A * B by columns gives the bound for its adjoint.
+  let a (j i : ι) := ‖⟪b i, A (B (b j))⟫_ℂ‖ ^ 2
+  have hcol (j : ι) : HasSum (a j) (‖A (B (b j))‖ ^ 2) := hparseval (A (B (b j)))
+  have hbound (j : ι) : ‖A (B (b j))‖ ^ 2 ≤ ‖B (b j)‖ ^ 2 := by
+    have h := (ContinuousLinearMap.opNorm_le_iff (show (0 : ℝ) ≤ 1 by norm_num)).mp hA (B (b j))
+    exact (sq_le_sq₀ (norm_nonneg _) (norm_nonneg _)).mpr (by simpa only [one_mul] using h)
+  have ha : Summable (Function.uncurry a) := by
+    refine (summable_prod_of_nonneg (fun p ↦ sq_nonneg _)).mpr ⟨fun j ↦ (hcol j).summable, ?_⟩
+    refine hT.summable.of_nonneg_of_le (fun j ↦ tsum_nonneg fun i ↦ sq_nonneg _) (fun j ↦ ?_)
+    rw [(hcol j).tsum_eq]
+    exact hbound j
+  have hrow (i : ι) : HasSum (fun j ↦ a j i) (‖B (A.adjoint (b i))‖ ^ 2) := by
+    refine (hparseval (B (A.adjoint (b i)))).congr_fun fun j ↦ ?_
+    change ‖⟪b i, A (B (b j))⟫_ℂ‖ ^ 2 = ‖⟪b j, B (A.adjoint (b i))⟫_ℂ‖ ^ 2
+    have hentry := B.adjoint_inner_right (b j) (A.adjoint (b i))
+    rw [hB] at hentry
+    rw [hentry, A.adjoint_inner_right]
+    exact congrArg (fun r : ℝ ↦ r ^ 2) (norm_inner_symm (𝕜 := ℂ) (b i) (A (B (b j))))
+  have hrow_sum : Summable (fun i ↦ ‖B (A.adjoint (b i))‖ ^ 2) :=
+    ha.prod_symm.prod.congr fun i ↦ (hrow i).tsum_eq
+  have hrow_bound : (∑' i, ‖B (A.adjoint (b i))‖ ^ 2) ≤ traceNorm T := by
+    calc
+      _ = ∑' i, ∑' j, a j i := tsum_congr fun i ↦ (hrow i).tsum_eq.symm
+      _ = ∑' j, ∑' i, a j i := ha.tsum_comm
+      _ ≤ traceNorm T := by
+        rw [hT.tsum_eq.symm]
+        exact ha.prod.tsum_le_tsum (fun j ↦ (hcol j).tsum_eq ▸ hbound j) hT.summable
+  have hdiag := (summable_norm_hilbertDiagonal b _ (mul_mem_nuclearEndomorphisms_left U T)).of_norm
+  have hreal := Complex.reCLM.hasSum hdiag.hasSum
+  simp only [Complex.reCLM_apply] at hreal
+  refine ⟨_, hreal, (hasSum_le (fun i ↦ ?_) hreal ((hT.add hrow_sum.hasSum).div_const 2)).trans ?_⟩
+  · rw [← hfactor]
+    change (⟪b i, A (B (B (b i)))⟫_ℂ).re ≤ _
+    rw [← A.adjoint_inner_left, ← B.adjoint_inner_left, hB]
+    exact (Complex.re_le_norm _).trans ((norm_inner_le_norm _ _).trans (by
+      nlinarith [sq_nonneg (‖B (b i)‖ - ‖B (A.adjoint (b i))‖)]))
+  · linarith
+
+/-- The positive square root of the Gram operator scales by the absolute value of the scalar. -/
+private theorem sqrt_adjoint_mul_smul (c : ℂ) (T : H →L[ℂ] H) :
+    CFC.sqrt ((c • T).adjoint * (c • T)) = ‖c‖ • CFC.sqrt (T.adjoint * T) := by
+  apply CFC.sqrt_unique
+  · have hT : 0 ≤ T.adjoint * T :=
+      ContinuousLinearMap.nonneg_iff_isPositive.mpr T.isPositive_adjoint_comp_self
+    rw [smul_mul_smul_comm, ← pow_two, CFC.sqrt_mul_sqrt_self _ hT]
+    change ‖c‖ ^ 2 • (T.adjoint * T) = star (c • T) * (c • T)
+    rw [star_smul, smul_mul_smul_comm, ← Complex.coe_smul, ← Complex.normSq_eq_norm_sq,
+      mul_comm]
+    change (Complex.normSq c : ℂ) • (T.adjoint * T) =
+      (c * (starRingEnd ℂ) c) • (T.adjoint * T)
+    rw [Complex.mul_conj]
+  · exact smul_nonneg (norm_nonneg _) (CFC.sqrt_nonneg _)
+
 /-- Paper: Lemma C.3.4.4(1), p. 698. The trace norm satisfies the normed-space
 axioms on the complex vector space of nuclear endomorphisms. -/
 theorem traceNorm_normedSpaceCore :
     letI : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
-    NormedSpace.Core ℂ (nuclearEndomorphisms H) := by sorry
+    NormedSpace.Core ℂ (nuclearEndomorphisms H) := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  refine ⟨⟨?_, ?_, ?_⟩, ?_⟩
+  · intro T
+    change 0 ≤ traceNorm T
+    rw [← (hasSum_norm_sq_traceNorm b T).tsum_eq]
+    exact tsum_nonneg fun i ↦ sq_nonneg _
+  · intro c T
+    change traceNorm (c • T) = ‖c‖ * traceNorm T
+    refine (hasSum_traceNorm_diagonal b (c • T)).unique
+      (((hasSum_traceNorm_diagonal b T).mul_left ‖c‖).congr_fun fun i ↦ ?_)
+    change (⟪b i, CFC.sqrt ((c • T.val).adjoint * (c • T.val)) (b i)⟫_ℂ).re =
+      ‖c‖ * (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re
+    rw [sqrt_adjoint_mul_smul]
+    simp only [smul_apply, ← Complex.coe_smul, inner_smul_right,
+      Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero]
+  · intro T D
+    change traceNorm (T + D) ≤ traceNorm T + traceNorm D
+    let X := T + D
+    let S := CFC.sqrt (X.val.adjoint * X.val)
+    obtain ⟨U, hU, hUX⟩ := exists_contraction_comp_eq_of_norm_le X.val S
+      (fun x ↦ (norm_sqrt_adjoint_mul_apply X.val x).le)
+    have hUX' : U * (T.val + D.val) = S := hUX
+    obtain ⟨r, hr, hrle⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b T U hU
+    obtain ⟨s, hs, hsle⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b D U hU
+    have hsum : HasSum (fun i ↦ (⟪b i, S (b i)⟫_ℂ).re) (r + s) := by
+      refine (hr.add hs).congr_fun fun i ↦ ?_
+      rw [← hUX', mul_add, add_apply, inner_add_right, Complex.add_re]
+    rw [(hasSum_traceNorm_diagonal b X).unique hsum]
+    exact add_le_add hrle hsle
+  · intro T
+    change traceNorm T = 0 ↔ T = 0
+    constructor
+    · intro hz
+      let S := CFC.sqrt (T.val.adjoint * T.val)
+      let B := CFC.sqrt S
+      have hsum : HasSum (fun i ↦ ‖B (b i)‖ ^ 2) 0 := hz ▸ hasSum_norm_sq_traceNorm b T
+      have hb (i) : B (b i) = 0 := by
+        have hi := hsum.summable.le_tsum i (fun j _ ↦ sq_nonneg _)
+        rw [hsum.tsum_eq] at hi
+        exact norm_eq_zero.mp (by nlinarith [norm_nonneg (B (b i))])
+      have hzero (x : H) : B x = 0 := by
+        have h := B.hasSum (b.hasSum_repr x)
+        simpa only [map_smul, hb, smul_zero, tsum_zero] using h.tsum_eq.symm
+      apply Subtype.ext
+      ext x
+      change T.val x = 0
+      apply norm_eq_zero.mp
+      rw [← norm_sqrt_adjoint_mul_apply]
+      change ‖S x‖ = 0
+      rw [show S = B * B from (CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)).symm]
+      exact norm_eq_zero.mpr (hzero _)
+    · rintro rfl
+      exact (hasSum_traceNorm_diagonal b (0 : nuclearEndomorphisms H)).unique (by
+        simp [CFC.sqrt_zero])
 
 -- TODO(paper-gap): The equality in (C.3.4.3) is false. For A = diag(1, 0) and
 -- T swapping the first coordinate into the second and killing the second, AT = 0
