@@ -7,6 +7,9 @@ public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.MeasureTheory.Integral.Bochner.ContinuousLinearMap
+import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
+import Mathlib.MeasureTheory.Measure.Prokhorov
 
 /-!
 # Nuclear spaces and the finest locally convex topology
@@ -1108,8 +1111,6 @@ theorem exists_weakDual_not_quasiComplete :
 
 -- TODO(paper-gap): Footnote 15 leaves the argument for the particular strong dual
 -- of a Fréchet space cited in Remark C.2.4.5 unfinished.
--- TODO(later): needs §C.4.1–C.4.2 for the Pettis integral in the weak completion
--- in Lemma C.2.4.6. The scalar identity in (C.2.4.4) is recorded below.
 
 /-- Paper: Lemma C.2.4.6, p. 687. A point in the closed convex hull of a compact
 set is represented on continuous functionals by a Radon probability measure on
@@ -1123,7 +1124,67 @@ theorem closedConvexHull_exists_radon_barycenter
     letI : MeasurableSpace K := borel K
     ∃ μ : Measure K, μ.Regular ∧ μ.InnerRegular ∧ μ univ = 1 ∧
       ∀ ℓ : StrongDual ℂ E,
-        Integrable (fun y : K ↦ ℓ y.val) μ ∧ ℓ x = ∫ y : K, ℓ y.val ∂μ := by sorry
+        Integrable (fun y : K ↦ ℓ y.val) μ ∧ ℓ x = ∫ y : K, ℓ y.val ∂μ := by
+  let : MeasurableSpace K := borel K
+  let : BorelSpace K := ⟨rfl⟩
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hK
+  let f (ℓ : StrongDual ℂ E) : BoundedContinuousFunction K ℂ :=
+    BoundedContinuousFunction.mkOfCompact ⟨fun y ↦ ℓ y.val, ℓ.continuous.comp continuous_subtype_val⟩
+  let moments (p : ProbabilityMeasure K) (ℓ : StrongDual ℂ E) :=
+    ∫ y, f ℓ y ∂(p : Measure K)
+  have hmoments : Continuous moments := by
+    apply continuous_pi
+    intro ℓ
+    rw [continuous_iff_continuousAt]
+    intro p
+    exact (ProbabilityMeasure.tendsto_iff_forall_integral_rclike_tendsto ℂ).mp
+      (tendsto_id (x := 𝓝 p)) (f ℓ)
+  have hconvex : Convex ℝ (range moments) := by
+    rintro _ ⟨p, rfl⟩ _ ⟨q, rfl⟩ a b ha hb hab
+    let μ := ENNReal.ofReal a • (p : Measure K)
+    let ν := ENNReal.ofReal b • (q : Measure K)
+    let r : ProbabilityMeasure K := ⟨μ + ν, ⟨by
+      simp [μ, ν, ← ENNReal.ofReal_add ha hb, hab]⟩⟩
+    refine ⟨r, ?_⟩
+    funext ℓ
+    change ∫ y, f ℓ y ∂(μ + ν) = a • moments p ℓ + b • moments q ℓ
+    rw [integral_add_measure
+      (((f ℓ).integrable (μ := (p : Measure K))).smul_measure ENNReal.ofReal_ne_top)
+      (((f ℓ).integrable (μ := (q : Measure K))).smul_measure ENNReal.ofReal_ne_top)]
+    simp [moments, ENNReal.toReal_ofReal ha, ENNReal.toReal_ofReal hb]
+  let eval : E →ₗ[ℝ] (StrongDual ℂ E → ℂ) :=
+    { toFun := fun z ℓ ↦ ℓ z
+      map_add' := fun z w ↦ funext fun ℓ ↦ ℓ.map_add z w
+      map_smul' := fun c z ↦ funext fun ℓ ↦ (ℓ.restrictScalars ℝ).map_smul c z }
+  have heval : Continuous eval := continuous_pi fun ℓ ↦ ℓ.continuous
+  -- The set of points represented by probability measures is closed and convex.
+  have hclosed : IsClosed (eval ⁻¹' range moments) :=
+    (isCompact_range hmoments).isClosed.preimage heval
+  have hsubset : K ⊆ eval ⁻¹' range moments := by
+    intro y hy
+    refine ⟨⟨Measure.dirac ⟨y, hy⟩, Measure.dirac.isProbabilityMeasure⟩, ?_⟩
+    funext ℓ
+    exact integral_dirac (f ℓ) ⟨y, hy⟩
+  obtain ⟨p, hp⟩ :=
+    closure_minimal (convexHull_min hsubset (hconvex.linear_preimage eval)) hclosed hx
+  -- Take a regular representative with the same integrals on continuous functions.
+  obtain ⟨ν, hνreg, hνfin, hν⟩ := Measure.exists_regular_eq_of_compactSpace (p : Measure K)
+  refine ⟨ν, hνreg, inferInstance, ?_, fun ℓ ↦ ?_⟩
+  · apply (ENNReal.toReal_eq_one_iff _).mp
+    simpa [measureReal_def] using (hν (1 : BoundedContinuousFunction K ℝ)).symm
+  · have hpint := (f ℓ).integrable (μ := (p : Measure K))
+    have hνint := (f ℓ).integrable (μ := ν)
+    refine ⟨hνint, ?_⟩
+    calc
+      ℓ x = ∫ y, f ℓ y ∂(p : Measure K) := (congrFun hp ℓ).symm
+      _ = ∫ y, f ℓ y ∂ν := by
+        apply Complex.ext
+        · let g := BoundedContinuousFunction.mkOfCompact
+            ⟨fun y ↦ (f ℓ y).re, Complex.continuous_re.comp (f ℓ).continuous⟩
+          exact (integral_re hpint).symm.trans ((hν g).trans (integral_re hνint))
+        · let g := BoundedContinuousFunction.mkOfCompact
+            ⟨fun y ↦ (f ℓ y).im, Complex.continuous_im.comp (f ℓ).continuous⟩
+          exact (integral_im hpint).symm.trans ((hν g).trans (integral_im hνint))
 
 /-- Paper: Remark C.2.4.7, p. 688. For a compact set in a Banach space whose span is
 infinite-dimensional, the inverse to the point-evaluation embedding cannot extend
