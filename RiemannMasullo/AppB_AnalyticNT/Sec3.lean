@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import Mathlib.MeasureTheory.Integral.CircleIntegral
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+import Mathlib.MeasureTheory.Integral.Asymptotics
 
 /-!
 # Slow growth near poles and the asymptotic residue theorem
@@ -277,7 +279,51 @@ theorem verticalIntegrable_mul_of_polynomialGrowth {f Φ : ℂ → ℂ} {a b σ 
     (hΦ : UniformlySchwartzOnStrip Φ a b) (hσ : σ ∈ Ioo a b)
     (hContinuous : Continuous (verticalTrace f σ))
     (hGrowth : ∃ γ > (0 : ℝ), verticalTrace f σ =O[atAbsInfty] (fun y : ℝ ↦ |y| ^ γ)) :
-    Complex.VerticalIntegrable (fun z ↦ Φ z * f z) σ := by sorry
+    Complex.VerticalIntegrable (fun z ↦ Φ z * f z) σ := by
+  have hΦContinuous : Continuous (verticalTrace Φ σ) := by
+    apply hΦ.2.1.continuousOn.comp_continuous
+    · fun_prop
+    · intro y
+      simpa using hσ
+  obtain ⟨γ, hγ, hGrowth⟩ := hGrowth
+  obtain ⟨A, hA, hBound⟩ := Asymptotics.isBigO_iff'.mp hGrowth
+  obtain ⟨N, hN⟩ := exists_nat_gt (γ + 2)
+  have hN₁ : 1 ≤ N := by
+    exact_mod_cast (show (1 : ℝ) ≤ N by linarith)
+  let ε := min (σ - a) (b - σ) / 2
+  have hε : 0 < ε := half_pos (lt_min (sub_pos.mpr hσ.1) (sub_pos.mpr hσ.2))
+  have hleft : a + ε < σ := by dsimp [ε]; linarith [min_le_left (σ - a) (b - σ), hσ.1]
+  have hright : σ < b - ε := by dsimp [ε]; linarith [min_le_right (σ - a) (b - σ), hσ.2]
+  obtain ⟨C, hC, hDecay⟩ := hΦ.2.2 ε hε (hleft.trans hright) N hN₁
+  unfold Complex.VerticalIntegrable
+  apply (hΦContinuous.mul hContinuous).locallyIntegrable.integrable_of_isBigO_cocompact _
+    (integrable_inv_one_add_sq.integrableAtFilter _)
+  rw [cocompact_eq_atBot_atTop, ← comap_abs_atTop]
+  apply Asymptotics.IsBigO.of_bound (2 * (C * A))
+  have hLarge : ∀ᶠ y : ℝ in atAbsInfty, 1 ≤ |y| :=
+    tendsto_comap.eventually (eventually_ge_atTop 1)
+  filter_upwards [hBound, hDecay, hLarge] with y hy hΦy hy₁
+  have hyPos : 0 < |y| := zero_lt_one.trans_le hy₁
+  have hySq : 1 ≤ y ^ 2 := by
+    rw [← sq_abs]
+    exact one_le_pow₀ hy₁
+  rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg y) _)] at hy
+  calc
+    ‖Φ (verticalPoint σ y) * f (verticalPoint σ y)‖
+        ≤ (C / |y| ^ N) * (A * |y| ^ γ) := by
+      rw [norm_mul]
+      exact mul_le_mul (hΦy σ ⟨hleft.le, hright.le⟩) hy (norm_nonneg _) (by positivity)
+    _ = (C * A) * |y| ^ (γ - (N : ℝ)) := by
+      rw [Real.rpow_sub hyPos, Real.rpow_natCast]
+      ring
+    _ ≤ (C * A) * |y| ^ (-2 : ℝ) := by
+      exact mul_le_mul_of_nonneg_left (Real.rpow_le_rpow_of_exponent_le hy₁ (by linarith))
+        (by positivity)
+    _ ≤ 2 * (C * A) * ‖(1 + y ^ 2)⁻¹‖ := by
+      rw [Real.rpow_neg (abs_nonneg y), Real.rpow_two, sq_abs,
+        Real.norm_of_nonneg (by positivity), ← div_eq_mul_inv, ← div_eq_mul_inv]
+      apply (div_le_div_iff₀ (by linarith) (by positivity)).mpr
+      nlinarith [mul_nonneg (mul_nonneg hC.le hA.le) (sub_nonneg.mpr hySq)]
 
 /-- Paper: Theorem B.3.2.1, p. 606. For a meromorphic germ, the residue is the
 normalized counterclockwise circle integral in the limit of small positive radii.
