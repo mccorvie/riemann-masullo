@@ -3446,12 +3446,47 @@ abbrev ModulatedExponentialDecay :=
     (Subtype.val : {p : Seminorm ℂ (modulatedExponentialDecaySubmodule m I) //
       ∀ k : GoodCompact, Continuous (p ∘ modulatedExponentialDecayStageInclusion m I k)} → _)
 
+-- Retain the modulation and interval hypotheses in the existing signature.
+set_option linter.unusedVariables false in
 /-- Paper: Definition D.3.3.3, p. 805. The stage inclusions exhaust the
 underlying space. -/
 theorem modulatedExponentialDecay_exists_stage (hm : IsModulation m) (hms : Surjective m)
     (hInt : OrdConnected I) (hne : I.Nonempty) :
     ∀ f : ModulatedExponentialDecay m I, ∃ k : GoodCompact,
-      f ∈ (modulatedExponentialDecayStageInclusion m I k).range := by sorry
+      f ∈ (modulatedExponentialDecayStageInclusion m I k).range := by
+  intro f
+  obtain ⟨a, ha⟩ := hne
+  let F : G → ℂ := modulationWeight m a f.val
+  have hmem : F ∈ schwartzBruhatSubmodule G :=
+    modulationWeight_mem_schwartzBruhat m I ⟨a, ha⟩ f
+  have hstage : ∃ (p : BruhatStructuralPair G) (e : ElementaryLCAPresentation p.quotient)
+      (s : SchwartzBruhatStage e), schwartzBruhatStageRealization p e s = F :=
+    (mem_schwartzBruhatSubmodule_iff F).mp hmem
+  rcases hstage with ⟨p, e, s, hs⟩
+  let k := OrderDual.ofDual p.val.2
+  have hInv (g u : G) (hu : u ∈ k) : F (g * u) = F g := by
+    have hu' : u ∈ p.val.1 := p.property.2.2.2 hu
+    rw [← hs, schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+    by_cases hg : g ∈ p.val.1
+    · rw [dite_eq_left (p.val.1.mul_mem hg hu'), dite_eq_left hg]
+      let v : p.val.1 := ⟨u, hu'⟩
+      have hv : v ∈ k.comap p.val.1.subtype := hu
+      have hq : (QuotientGroup.mk ((⟨g, hg⟩ : p.val.1) * v) : p.quotient) =
+          QuotientGroup.mk ⟨g, hg⟩ := QuotientGroup.mk_mul_of_mem _ hv
+      exact congrArg (fun x : p.quotient ↦ s (e.equiv x).toAdd) hq
+    · rw [dite_eq_right (fun h ↦ hg ((p.val.1.mul_mem_cancel_right hu').mp h)), dite_eq_right hg]
+  have hk : IsCompact (k : Set G) := isCompact_of_isBruhatGoodSubgroup_aux k p.property.2.2.1
+  let K : GoodCompact := ⟨k, hk, p.property.2.2.1.2.2⟩
+  refine ⟨K, ((modulatedExponentialDecayStageInclusion_range m I K).2 f).mpr ?_⟩
+  intro g u
+  -- The twist has the same nonzero weight at both points.
+  have hmu : m u.val = 1 := compactSubgroup_le_modulation_ker m k hk u.property
+  have hF := hInv g u.val u.property
+  change (((m (g * u.val)).val : ℝ) ^ a : ℝ) * f.val (g * u.val) =
+    (((m g).val : ℝ) ^ a : ℝ) * f.val g at hF
+  rw [map_mul, hmu, mul_one] at hF
+  exact mul_left_cancel₀ (Complex.ofReal_ne_zero.mpr
+    (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m g))) a).ne') hF
 
 end Modulated
 
