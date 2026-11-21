@@ -78,7 +78,17 @@ theorem integralIdeleInsertion_equivariant :
     Continuous (fun x : SUnits × (integralAdelesOutside F S)ˣ ↦ d x.1 * x.2) ∧
     Continuous (fun x : SUnits × 𝕀[F] ↦ e x.1 * x.2) ∧
     ∀ u g, integralIdeleInsertion F S (d u * g) =
-      e u * integralIdeleInsertion F S g := by sorry
+      e u * integralIdeleInsertion F S g := by
+  let : TopologicalSpace SUnits := ⊥
+  let : DiscreteTopology SUnits := discreteTopology_bot _
+  intro d e
+  have hd : Continuous d := continuous_of_discreteTopology
+  have he : Continuous e := continuous_of_discreteTopology
+  refine ⟨(hd.comp continuous_fst).mul continuous_snd,
+    (he.comp continuous_fst).mul continuous_snd, ?_⟩
+  intro u g
+  rw [map_mul]
+  exact congrArg (· * integralIdeleInsertion F S g) (Units.ext rfl)
 
 -- TODO(paper-gap): D.1.10.1(2) names only GL₁(A_{F,S}). With the finite-product
 -- convention of (A.1.5.1), inserting 1 off S misses ideles with infinitely many
