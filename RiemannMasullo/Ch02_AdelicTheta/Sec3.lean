@@ -902,10 +902,10 @@ private theorem sAdeleStage_arch_decay_seminorm (a : BruhatStructuralPair Gₛ)
         congrArg (fun z : ℂ ↦ ‖z‖ * ‖arch x.1‖ ^ M) hval
       _ ≤ (c • q) s := by simpa only [norm_zero, zero_mul] using apply_nonneg (c • q) s
 
-/-- Paper: Proposition 2.3.1.2(3), p. 100. The large-norm decay constant
-and threshold can be chosen uniformly for a bounded set of test functions. -/
-theorem sLocalAdelicTheta_decay_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
-    ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : Iₛ, T < normℝ g →
+/-- The uniform decay bound for a bounded set of test functions also holds at norm one. -/
+private theorem sLocalAdelicTheta_decay_bounded_of_one_le
+    (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
+    ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : Iₛ, 1 ≤ normℝ g →
       ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
   let p (g : {g : Iₛ // 1 ≤ normℝ g}) : Seminorm ℂ ℬₛ :=
     let c : NNReal := ⟨(normℝ g.val) ^ N, pow_nonneg (NNReal.coe_nonneg _) _⟩
@@ -946,19 +946,29 @@ theorem sLocalAdelicTheta_decay_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ
         Continuous (p ∘ schwartzBruhatStageInclusion a e)} := ⟨q, hstage⟩
   refine (((withGeneratingSeminorms_spec _ _).isVonNBounded_iff_seminorm_bounded.mp hB) i).elim
     fun C hC ↦ ?_
-  refine ⟨C, 1, hC.1, zero_lt_one, fun f hf g hg ↦ ?_⟩
-  have hweight := ((hp ⟨g, hg.le⟩ f).ge.trans (hq ⟨g, hg.le⟩ f)).trans (hC.2 f hf).le
+  refine ⟨C, hC.1, fun f hf g hg ↦ ?_⟩
+  have hweight := ((hp ⟨g, hg⟩ f).ge.trans (hq ⟨g, hg⟩ f)).trans (hC.2 f hf).le
   simpa only [div_eq_mul_inv] using
-    (le_div_iff₀ (pow_pos (zero_lt_one.trans hg) N)).mpr hweight
+    (le_div_iff₀ (pow_pos (zero_lt_one.trans_le hg) N)).mpr hweight
 
 end UniformDecay
+
+/-- Paper: Proposition 2.3.1.2(3), p. 100. The large-norm decay constant
+and threshold can be chosen uniformly for a bounded set of test functions. -/
+theorem sLocalAdelicTheta_decay_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
+    ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : Iₛ, T < normℝ g →
+      ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  refine (sLocalAdelicTheta_decay_bounded_of_one_le F S B hB N).elim fun C hC ↦ ?_
+  exact ⟨C, 1, hC.1, zero_lt_one, fun f hf g hg ↦ hC.2 f hf g hg.le⟩
 
 /-- Paper: Proposition 2.3.1.2(4), p. 100. The bounded-set decay estimate
 holds above S-idelic norm one with a uniform constant. -/
 theorem sLocalAdelicTheta_decay_bounded_threshold_one
     (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
     ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : Iₛ, 1 < normℝ g →
-      ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  refine (sLocalAdelicTheta_decay_bounded_of_one_le F S B hB N).elim fun C hC ↦ ?_
+  exact ⟨C, hC.1, fun f hf g hg ↦ hC.2 f hf g hg.le⟩
 
 local instance normOneSIdeleQuotientMeasurableSpace (F : Type*) [Field F] [NumberField F]
     (S : Finset (HeightOneSpectrum (𝓞 F))) :
