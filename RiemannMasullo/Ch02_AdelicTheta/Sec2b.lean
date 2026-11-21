@@ -755,7 +755,8 @@ variable (γ : ℝ≥0ˣ →ₜ* 𝕀[F])
 
 /-- Paper: Lemma 2.2.4.5(1), p. 91. The common polar kernel is closed in
 the Schwartz–Bruhat topology. -/
-theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by sorry
+theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by
+  exact isClosed_singleton.preimage (adelePolarValues_continuous (F := F))
 
 /-- Paper: Lemma 2.2.4.5(1), p. 91. Directional differentiation preserves the
 common polar kernel, so it induces a linear map on the polar quotient. -/
