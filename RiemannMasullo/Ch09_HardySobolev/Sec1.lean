@@ -45,7 +45,8 @@ def sobolevMeasure [MeasurableSpace A] (ν : Measure A) (w : A → ℝ≥0) (s :
 measure.
 Deviation: Sanity check on the normalization in (9.1.1.3). -/
 theorem sobolevMeasure_zero [MeasurableSpace A] (ν : Measure A) (w : A → ℝ≥0) :
-    sobolevMeasure ν w 0 = ν := by sorry
+    sobolevMeasure ν w 0 = ν := by
+  simp [sobolevMeasure]
 
 -- TODO(paper-gap): The input to the completion is written C_c(Ĝ) but its norm takes a
 -- Fourier transform and still evaluates on Ĝ. Use the Fourier-side interpretation below.
