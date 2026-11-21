@@ -41,7 +41,49 @@ def IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) : Prop :=
 two satisfies the jump and decay hypotheses in logarithmic coordinates.
 Deviation: Sanity check, using the test function from Remark B.4.1.4. -/
 theorem isPiecewiseSmoothMellinTest_indicator :
-    IsPiecewiseSmoothMellinTest ((Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))) := by sorry
+    IsPiecewiseSmoothMellinTest ((Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))) := by
+  let f := (Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))
+  change IsPiecewiseSmoothMellinTest f
+  have hlog : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  have hzero : EqOn f (fun _ ↦ 0) (Icc 0 (Real.log 2))ᶜ :=
+    fun _ hx ↦ indicator_of_notMem hx _
+  have hone : EqOn f (fun _ ↦ 1) (Ioo 0 (Real.log 2)) :=
+    fun _ hx ↦ indicator_of_mem (mem_Icc_of_Ioo hx) _
+  have hlimit (j : ℕ) {s : Set ℝ} {L : Filter ℝ} {c : ℂ} (hs : IsOpen s)
+      (heq : EqOn f (fun _ ↦ c) s) (hmem : s ∈ L) :
+      ∃ l, Tendsto (iteratedDeriv j f) L (𝓝 l) := by
+    refine ⟨if j = 0 then c else 0, EventuallyEq.tendsto ?_⟩
+    filter_upwards [hmem] with x hx
+    rw [(eventuallyEq_of_mem (hs.mem_nhds hx) heq).iteratedDeriv_eq j, iteratedDeriv_const]
+  constructor
+  · refine ⟨{0, Real.log 2}, ?_, ?_⟩
+    · intro x hx
+      have hends : x ≠ 0 ∧ x ≠ Real.log 2 := by simpa using hx
+      apply ContDiffAt.contDiffWithinAt
+      by_cases hxI : x ∈ Icc 0 (Real.log 2)
+      · have hx' : x ∈ Ioo 0 (Real.log 2) :=
+          ⟨lt_of_le_of_ne hxI.1 hends.1.symm, lt_of_le_of_ne hxI.2 hends.2⟩
+        exact contDiffAt_const.congr_of_eventuallyEq
+          (eventuallyEq_of_mem (isOpen_Ioo.mem_nhds hx') hone)
+      · exact contDiffAt_const.congr_of_eventuallyEq
+          (eventuallyEq_of_mem (isClosed_Icc.isOpen_compl.mem_nhds hxI) hzero)
+    · intro j x hx
+      simp only [Finset.mem_insert, Finset.mem_singleton] at hx
+      rcases hx with rfl | rfl
+      · exact ⟨hlimit j isOpen_Iio (hzero.mono fun _ hy ↦ fun h ↦ hy.not_ge h.1)
+          self_mem_nhdsWithin, hlimit j isOpen_Ioo hone (Ioo_mem_nhdsGT hlog)⟩
+      · exact ⟨hlimit j isOpen_Ioo hone (Ioo_mem_nhdsLT hlog),
+          hlimit j isOpen_Ioi (hzero.mono fun _ hy ↦ fun h ↦ hy.not_ge h.2)
+            self_mem_nhdsWithin⟩
+  · intro N
+    refine ⟨1, one_pos, Real.log 2, hlog, ?_⟩
+    intro x hx
+    have hxI : x ∈ (Icc 0 (Real.log 2))ᶜ :=
+      fun h ↦ hx.not_ge (by simpa only [abs_of_nonneg h.1] using h.2)
+    have heq := eventuallyEq_of_mem (isClosed_Icc.isOpen_compl.mem_nhds hxI) hzero
+    rw [heq.self_of_nhds, heq.deriv_eq]
+    simpa only [deriv_const, norm_zero, one_mul] using
+      And.intro (Real.exp_pos (-(N : ℝ) * |x|)) (Real.exp_pos (-(N : ℝ) * |x|))
 
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin integral (B.4.1.2) of a test
 function with finitely many jumps converges absolutely for every exponent. -/
