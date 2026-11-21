@@ -70,6 +70,8 @@ theorem realCenteredMaximal_const (c : ℂ) (x : ℝ) :
 -- TODO(paper-gap): In Theorem A.5.1.1(1), the all-radii maximal function need not be finite
 -- anywhere. For f(x) = |x| both local hypotheses hold and the averages grow without bound.
 
+-- Local integrability suffices for measurability.
+set_option linter.unusedVariables false in
 /-- Paper: Theorem A.5.1.1(1), p. 566. Under the two local integrability hypotheses,
 the centered maximal function is measurable. Input measurability is for completed
 Lebesgue measure.
@@ -77,7 +79,32 @@ Deviation: The separate almost-everywhere finiteness claim fails for the all-rad
 theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f volume)
     (hlocal : LocallyIntegrable f volume)
     (hlog : LocallyIntegrable (fun x ↦ (max (Real.log ‖f x‖) 0 : ℝ) • f x) volume) :
-    Measurable (realCenteredMaximal f) := by sorry
+    Measurable (realCenteredMaximal f) := by
+  have hint (a b : ℝ) : IntervalIntegrable (fun y ↦ ‖f y‖) volume a b :=
+    (IntegrableOn.intervalIntegrable
+      (hlocal.integrableOn_isCompact (k := uIcc a b) isCompact_uIcc)).norm
+  have hprimitive := intervalIntegral.continuous_primitive hint 0
+  apply LowerSemicontinuous.measurable
+  unfold realCenteredMaximal
+  apply lowerSemicontinuous_iSup
+  intro r
+  apply Continuous.lowerSemicontinuous
+  have hr : 0 < (r : ℝ) := r.property
+  have havg : Continuous (fun x : ℝ ↦ ∫ y in x - (r : ℝ)..x + (r : ℝ), ‖f y‖) := by
+    have hright : Continuous (fun x : ℝ ↦ x + (r : ℝ)) := continuous_id.add continuous_const
+    have hleft : Continuous (fun x : ℝ ↦ x - (r : ℝ)) := continuous_id.sub continuous_const
+    convert (hprimitive.comp hright).sub (hprimitive.comp hleft) using 1
+    ext x
+    exact (intervalIntegral.integral_interval_sub_left (hint 0 _) (hint 0 _)).symm
+  have hlintegral (x : ℝ) :
+      (∫⁻ y in Ioc (x - (r : ℝ)) (x + (r : ℝ)), ‖f y‖ₑ) =
+        ENNReal.ofReal (∫ y in x - (r : ℝ)..x + (r : ℝ), ‖f y‖) := by
+    have hab : x - (r : ℝ) ≤ x + (r : ℝ) := by linarith
+    rw [intervalIntegral.integral_of_le hab,
+      ofReal_integral_eq_lintegral_ofReal (hint _ _).1 (Eventually.of_forall fun y ↦ norm_nonneg _)]
+    simp only [ofReal_norm]
+  simp only [hlintegral]
+  exact (ENNReal.continuous_const_mul (by simp [hr])).comp (ENNReal.continuous_ofReal.comp havg)
 
 /-- Paper: Theorem A.5.1.1(2), p. 566. The level set of the centered maximal function
 has measure at most three times the L¹ norm divided by the positive level. -/
