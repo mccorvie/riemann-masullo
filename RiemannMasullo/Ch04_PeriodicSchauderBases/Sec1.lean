@@ -1587,7 +1587,21 @@ theorem isAbsolute_of_isNuclearTVS [IsTopologicalAddGroup E] [ContinuousSMul ℂ
 /-- Paper: Theorem 4.1.2.6(2), p. 161. Every Schauder basis of a nuclear Fréchet
 space is absolute. -/
 theorem isAbsolute_of_nuclear_frechet (hE : IsNuclearTVS.{v, u} E) (hFrechet : IsFrechetTVS E)
-    (hb : IsSchauderBasis x f) : IsAbsolute x f := by sorry
+    (hb : IsSchauderBasis x f) : IsAbsolute x f := by
+  let : BarrelledSpace ℂ E := isFrechetTVS_barrelled hFrechet
+  obtain ⟨hadd, hpoly, _, _⟩ := hFrechet
+  let : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have htend (z : E) : Tendsto (fun k ↦ partialProjection x f k z) atTop (𝓝 z) := by
+    have hsum := hb.2 z
+    rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+    simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, partialProjection,
+      ← Nat.range_succ_eq_Iic, sum_apply, ContinuousLinearMap.smulRight_apply]
+      using hsum.comp (tendsto_add_atTop_nat 1)
+  have heq := PolynormableSpace.banach_steinhaus (𝓕 := partialProjection x f)
+    (fun z ↦ (htend z).isVonNBounded_range ℂ)
+  exact isAbsolute_of_isNuclearTVS hE hb (heq.equicontinuous 0)
 
 /-- Paper: Theorem 4.1.2.6(3), p. 161. Every Schauder basis in a strict countable
 inductive limit of nuclear Fréchet spaces is absolute.
