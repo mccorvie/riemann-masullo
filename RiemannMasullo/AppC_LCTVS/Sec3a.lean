@@ -851,11 +851,15 @@ section BanachTensor
 variable {E F : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E] [CompleteSpace E]
   [NormedAddCommGroup F] [NormedSpace ℂ F] [CompleteSpace F]
 
+-- Keep the completeness hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.3.1.2), p. 693. On Banach spaces the canonical tensor map is continuous
 for the operator norm on its target. -/
 theorem continuous_tensorToFiniteRank_opNorm :
     Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
-      (tensorToFiniteRank z : E →L[ℂ] F)) := by sorry
+      (tensorToFiniteRank z : E →L[ℂ] F)) := by
+  -- Mathlib's operator norm induces the existing bounded-convergence topology.
+  exact continuous_tensorToFiniteRank_bounded
 
 /-- Paper: (C.3.1.2), p. 693. The canonical map extends to the completed
 projective tensor of the dual and the target Banach space. -/
