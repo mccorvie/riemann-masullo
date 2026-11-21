@@ -445,7 +445,20 @@ theorem closedConvexHull_eq_pettisWeakIntegrals_probability [CompactSpace X]
 image in the weak completion is compact. -/
 theorem isCompact_closedConvexHull_weakCompletion_range [CompactSpace X]
     (f : X → E) (hf : Continuous f) :
-    IsCompact (closedConvexHull ℝ (range (toPettisWeakCompletion E ∘ f))) := by sorry
+    IsCompact (closedConvexHull ℝ (range (toPettisWeakCompletion E ∘ f))) := by
+  let : UniformSpace (PettisWeakCompletion E) :=
+    IsTopologicalAddGroup.rightUniformSpace (PettisWeakCompletion E)
+  let : IsUniformAddGroup (PettisWeakCompletion E) := isUniformAddGroup_of_addCommGroup
+  -- The algebraic dual is a closed subspace of the complete product of scalar spaces.
+  let eval : PettisWeakCompletion E →+ (StrongDual ℂ E → ℂ) :=
+    (LinearMap.ltoFun ℂ (StrongDual ℂ E) ℂ ℂ).toAddMonoidHom
+  have hev : IsUniformInducing eval := AddMonoidHom.isUniformInducing_of_isInducing ⟨rfl⟩
+  let : CompleteSpace (PettisWeakCompletion E) :=
+    hev.completeSpace (LinearMap.isClosed_range_coe _ _ _).isComplete
+  let : ContinuousSMul ℝ (PettisWeakCompletion E) := IsScalarTower.continuousSMul ℂ
+  have hCompact := isCompact_range (continuous_toPettisWeakCompletion.comp hf)
+  rw [closedConvexHull_eq_closure_convexHull]
+  exact hCompact.totallyBounded.convexHull.closure.isCompact_of_isClosed isClosed_closure
 
 /-- Paper: Theorem C.4.3.2(2), p. 712. The closed absolutely convex hull of the
 image in the weak completion consists of the weak integrals against complex
