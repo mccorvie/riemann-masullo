@@ -661,7 +661,20 @@ theorem finiteLocalAdditiveTamagawaMeasure_integers (v : Primes(F)) :
 /-- Paper: Definition A.3.1.2, p. 556. The local additive Tamagawa measures
 are additive Haar measures on their completions. -/
 theorem finiteLocalAdditiveTamagawaMeasure_isAddHaar (v : Primes(F)) :
-    (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by sorry
+    (finiteLocalAdditiveTamagawaMeasure F v).IsAddHaarMeasure := by
+  let μ := Measure.addHaar (G := v.adicCompletion F)
+  let O := (v.adicCompletionIntegers F : Set (v.adicCompletion F))
+  have hO : IsOpen O := Valued.isOpen_valuationSubring _
+  have hK : IsCompact O := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)
+  have hmass := hO.measure_pos μ ⟨0, (v.adicCompletionIntegers F).zero_mem⟩
+  have hnorm : 0 < (v.asIdeal.absNorm : ℝ) :=
+    Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have hsqrt := Real.sqrt_pos_of_pos (pow_pos hnorm (differentExp(F, v)))
+  change ((differentMass(F, v) / μ O) • μ).IsAddHaarMeasure
+  exact Measure.IsAddHaarMeasure.smul μ
+    (ENNReal.div_ne_zero.mpr ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top,
+      hK.measure_ne_top (μ := μ)⟩)
+    (ENNReal.div_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr hsqrt).ne') hmass.ne')
 
 /-- Paper: §A.3.1, p. 556. The local different contributes mass one at
 all but finitely many places, so the finite-tail products have finite support. -/
