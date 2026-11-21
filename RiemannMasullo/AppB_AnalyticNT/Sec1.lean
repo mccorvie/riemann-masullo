@@ -78,12 +78,21 @@ variable (hf : MeromorphicNFOn f (Complex.re ⁻¹' Ioi a))
 
 include hf hFinite hSimple hGrowth
 
+-- Retain the meromorphicity and pole hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma B.1.1.1, p. 589. In the open half-plane the vertical growth
 order is finite under the uniform polynomial bound.
 Deviation: This and the other parts use meromorphic functions in normal form
 and omit the unused parameter `b > a`. -/
 theorem verticalGrowthOrder_ne_top {σ : ℝ} (hσ : a < σ) :
-    verticalGrowthOrder f σ ≠ ⊤ := by sorry
+    verticalGrowthOrder f σ ≠ ⊤ := by
+  obtain ⟨ξ, hξ, hBound⟩ := hGrowth
+  let k : ℝ≥0 := ⟨ξ, hξ.le⟩
+  have hLine : ({σ} : Set ℝ) ⊆ Ioi a := singleton_subset_iff.mpr hσ
+  refine lt_top_iff_ne_top.mp (lt_of_le_of_lt ?_ (ENNReal.coe_lt_top (r := k)))
+  unfold verticalGrowthOrder
+  refine sInf_le ⟨k, ?_, rfl⟩
+  exact hBound.mono (inf_le_inf_left _ (principal_mono.mpr (preimage_mono hLine)))
 
 -- TODO(paper-gap): The proof's equality `μ_g = μ + N` fails for `f(s) = 1/s`
 -- on `Re(s) > -1`. Clearing its one pole gives `g(s) = 1`, and both orders are zero.
