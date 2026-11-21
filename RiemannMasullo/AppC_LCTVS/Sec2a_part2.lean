@@ -605,13 +605,102 @@ theorem injectiveTensor_t2 : T2Space (InjectiveTensor E F) := by
         (map_zero (tensorDualForm φ ψ)).symm
   infer_instance
 
+/-- The weak-dual polar of a zero-neighborhood is a member of the compactology. -/
+private theorem weakDual_polar_mem_compactology {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [ContinuousConstSMul ℂ X] {U : Set X} (hU : U ∈ 𝓝 0) :
+    WeakDual.polar ℂ U ∈ equicontinuousCompactology X := by
+  let B : X →ₗ[ℂ] WeakDual ℂ X →ₗ[ℂ] ℂ :=
+    (topDualPairing ℂ X).flip.compl₂ WeakDual.toStrongDual.toLinearMap
+  refine ⟨?_, LinearMap.polar_AbsConvex (B := B) U, WeakDual.isClosed_polar _ _⟩
+  rw [Metric.equicontinuousAt_iff_right]
+  intro ε hε
+  let c : ℂ := (ε / 2 : ℝ)
+  have hc : c ≠ 0 := by dsimp [c]; exact_mod_cast (half_pos hε).ne'
+  have hnear : (fun x : X ↦ c⁻¹ • x) ⁻¹' U ∈ 𝓝 (0 : X) := by
+    apply (continuous_const_smul c⁻¹).continuousAt.preimage_mem_nhds
+    simpa only [smul_zero] using hU
+  filter_upwards [hnear] with x hx φ
+  have hφ : ‖φ.val (c⁻¹ • x)‖ ≤ 1 := φ.property _ hx
+  have hx' : x = c • (c⁻¹ • x) := by rw [smul_smul, mul_inv_cancel₀ hc, one_smul]
+  rw [map_zero, dist_zero_left, hx', map_smul, norm_smul]
+  have hnorm : ‖c‖ = ε / 2 := by
+    dsimp only [c]
+    rw [Complex.norm_real, Real.norm_of_nonneg (half_pos hε).le]
+  exact (mul_le_of_le_one_right (norm_nonneg _) hφ).trans_lt (hnorm ▸ half_lt_self hε)
+
+/-- Each member of the compactology is contained in the polar of a zero-neighborhood. -/
+private theorem subset_polar_of_mem_compactology {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] {A : Set (WeakDual ℂ X)} (hA : A ∈ equicontinuousCompactology X) :
+    ∃ U : {U : Set X // U ∈ 𝓝 0}, A ⊆ WeakDual.polar ℂ U.val := by
+  have hnear := Metric.equicontinuousAt_iff_right.mp hA.1 1 one_pos
+  refine ⟨⟨_, hnear⟩, fun φ hφ x hx ↦ ?_⟩
+  have h := hx (⟨φ, hφ⟩ : A)
+  change ‖φ x‖ ≤ 1
+  simpa only [map_zero, dist_zero_left] using h.le
+
 include hE sE hF sF in
 /-- Paper: (C.2.3.4), p. 676. Evaluation realizes the injective topology as uniform
 convergence on products from the equicontinuous compactologies. -/
 theorem injectiveTensor_isEmbedding_dualForms :
     let S := image2 Set.prod (equicontinuousCompactology E) (equicontinuousCompactology F)
     IsEmbedding (fun z : InjectiveTensor E F ↦ UniformOnFun.ofFun S
-      (fun v : WeakDual ℂ E × WeakDual ℂ F ↦ tensorDualForm v.1 v.2 z)) := by sorry
+      (fun v : WeakDual ℂ E × WeakDual ℂ F ↦ tensorDualForm v.1 v.2 z)) := by
+  classical
+  let D := WeakDual ℂ E × WeakDual ℂ F
+  let S := image2 Set.prod (equicontinuousCompactology E) (equicontinuousCompactology F)
+  let T : InjectiveTensor E F →+ (D →ᵤ[S] ℂ) :=
+    { toFun := fun z ↦ UniformOnFun.ofFun S (fun v ↦ tensorDualForm v.1 v.2 z)
+      map_zero' := funext fun v ↦ map_zero (tensorDualForm v.1 v.2)
+      map_add' := fun z w ↦ funext fun v ↦ map_add (tensorDualForm v.1 v.2) z w }
+  change IsEmbedding T
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let : SeparatingDual ℂ F := polynormableSpace_separatingDual ℂ F
+  refine ⟨IsTopologicalAddGroup.isInducing_iff_nhds_zero.mpr ?_, ?_⟩
+  swap
+  · intro z w h
+    exact tensorDualForm_ext fun φ ψ ↦ congrFun h (φ.toWeakDual, ψ.toWeakDual)
+  let p₀ (UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0}) :=
+    injectiveTensorSeminorm UV.1 UV.2
+  let p : SeminormFamily ℂ (InjectiveTensor E F) _ := p₀
+  have hp : WithSeminorms p := withGeneratingSeminorms_spec (E ⊗[ℂ] F) p₀
+  refine le_antisymm ?_ ?_
+  · rw [UniformOnFun.nhds_eq_of_basis ℂ S Metric.uniformity_basis_dist (0 : D →ᵤ[S] ℂ)]
+    simp only [Filter.comap_iInf, Filter.comap_principal, le_iInf_iff, Filter.le_principal_iff]
+    rintro _ ⟨A, hA, B, hB, rfl⟩ r hr
+    obtain ⟨U, hU⟩ := subset_polar_of_mem_compactology hA
+    obtain ⟨V, hV⟩ := subset_polar_of_mem_compactology hB
+    refine Filter.mem_of_superset ((p (U, V)).ball_mem_nhds (hp.continuous_seminorm _) hr)
+      (fun z hz v hv ↦ ?_)
+    change dist (0 : ℂ) (tensorDualForm v.1 v.2 z) < r
+    rw [dist_zero_left]
+    exact (norm_tensorDualForm_le_injectiveTensorSeminorm U V
+      ⟨v.1.toStrongDual, hU hv.1⟩ ⟨v.2.toStrongDual, hV hv.2⟩ z).trans_lt
+        ((p (U, V)).mem_ball_zero.mp hz)
+  · rw [p.withSeminorms_iff_nhds_eq_iInf.mp hp]
+    refine le_iInf fun ⟨U, V⟩ ↦ ?_
+    refine ((Metric.nhds_basis_ball (x := (0 : ℝ))).comap (p (U, V))).ge_iff.mpr fun r hr ↦ ?_
+    have hS : WeakDual.polar ℂ U.val ×ˢ WeakDual.polar ℂ V.val ∈ S :=
+      ⟨_, weakDual_polar_mem_compactology U.property, _,
+        weakDual_polar_mem_compactology V.property, rfl⟩
+    have hnear := UniformOnFun.gen_mem_nhds ℂ S (0 : D →ᵤ[S] ℂ) hS
+      (Metric.uniformity_basis_dist.mem_of_mem (half_pos hr))
+    refine Filter.mem_comap.mpr ⟨_, hnear, fun z hz ↦ ?_⟩
+    change E ⊗[ℂ] F at z
+    let P := StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val
+    let q (v : P) := (normSeminorm ℂ ℂ).comp (tensorDualForm v.1.val v.2.val)
+    have hq : BddAbove (range q) := ⟨p₀ (U, V), forall_mem_range.mpr fun v z ↦
+      norm_tensorDualForm_le_injectiveTensorSeminorm U V v.1 v.2 z⟩
+    let : Nonempty P := ⟨⟨⟨0, StrongDual.zero_mem_polar _ _⟩, ⟨0, StrongDual.zero_mem_polar _ _⟩⟩⟩
+    have hle : p₀ (U, V) z ≤ r / 2 := by
+      change injectiveTensorSeminorm U V z ≤ r / 2
+      rw [injectiveTensorSeminorm, ← ciSup_prod hq, Seminorm.iSup_apply hq]
+      refine ciSup_le fun v ↦ le_of_lt ?_
+      have hv := hz (x := (v.1.val.toWeakDual, v.2.val.toWeakDual)) ⟨v.1.property, v.2.property⟩
+      change dist (0 : ℂ) (tensorDualForm v.1.val v.2.val z) < r / 2 at hv
+      simpa only [q, Seminorm.comp_apply, coe_normSeminorm, dist_zero_left] using hv
+    change p₀ (U, V) z ∈ Metric.ball 0 r
+    rw [mem_ball_zero_iff, Real.norm_of_nonneg (apply_nonneg _ _)]
+    exact hle.trans_lt (half_lt_self hr)
 
 /-- Paper: Remark C.2.3.2, p. 677. The topology μ tests the extensions of dual
 functionals on compact subsets of the additive completion. -/
