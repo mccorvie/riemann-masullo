@@ -971,8 +971,21 @@ include hχ hf
 /-- Paper: Lemma B.4.1.7, p. 611. The two-sided series of weighted values
 at the integer powers of the prime norm converges absolutely. -/
 theorem summable_localEulerFactor_lattice :
-    Summable (fun m : ℤ ↦ (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) :=
-  by sorry
+    Summable (fun m : ℤ ↦ (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) := by
+  let L := Real.log q(v)
+  have hq : 1 < q(v) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hL : L ≠ 0 := (Real.log_pos hq).ne'
+  let e := ContinuousLinearEquiv.unitsEquivAut ℝ (Units.mk0 L hL)
+  let g := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ e f
+  have hs : Summable (fun m : ℤ ↦ g (m : ℝ)) :=
+    summable_of_isBigO (Real.summable_abs_int_rpow one_lt_two)
+      ((g.isBigO_cocompact_rpow (-2)).comp_tendsto Int.tendsto_coe_cofinite)
+  have hf' : Summable (fun m : ℤ ↦ f ((m : ℝ) * L)) := by
+    simpa [g, e, SchwartzMap.compCLMOfContinuousLinearEquiv_apply, mul_comm] using hs
+  apply hf'.norm.of_norm_bounded
+  intro m
+  simp [norm_zpow, norm_ideleClassNormTwist_zero_localValue, L]
 
 /-- Paper: Lemma B.4.1.7, p. 611. The Mellin frequency samples sum
 absolutely to the two-sided local lattice sum multiplied by the logarithm of the norm.
