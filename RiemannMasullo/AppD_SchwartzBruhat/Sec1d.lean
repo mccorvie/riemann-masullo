@@ -4,6 +4,12 @@ public import RiemannMasullo.Ch02_AdelicTheta.Sec1
 public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Periodic
+public import Mathlib.MeasureTheory.Integral.IntegralEqImproper
+public import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
+public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+public import Mathlib.Analysis.InnerProductSpace.Calculus
+
+import RiemannMasullo.ForMathlib.RingTheory.PicardGroup
 
 /-!
 # Schwartz–Bruhat topologies on elementary groups and idele class groups
@@ -273,12 +279,112 @@ theorem sIdeleClassInsertion_isOpenEmbedding : IsOpenEmbedding (sIdeleClassInser
       Subtype.ext u.val_inv, Subtype.ext u.inv_val⟩
   exact ⟨x, hinsertion.injective (Units.ext hval)⟩
 
+/-- The ideal classes of ideles that are units outside S are precisely the classes
+that become trivial over the S-integers. -/
+private theorem map_range_integralIdeleInsertion (p : 𝕀[F] →* CommRing.Pic (𝓞 F))
+    (hp : ∀ g, p g = ideleIdealClass F g) :
+    (integralIdeleInsertion F S).range.map p =
+      (CommRing.Pic.mapAlgebra (𝓞 F) (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)).ker := by
+  classical
+  let A := Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F
+  let m := CommRing.Pic.mapAlgebra (𝓞 F) A
+  ext c
+  change c ∈ (integralIdeleInsertion F S).range.map p ↔ m c = 1
+  constructor
+  · rintro ⟨_, ⟨u, rfl⟩, rfl⟩
+    rw [hp]
+    exact sIdele_ideal_class_trivial F S u
+  · intro hc
+    have h := picard_localization_exact F ∅ S (Finset.empty_subset S)
+    dsimp only at h
+    rw [Finset.sdiff_empty] at h
+    obtain ⟨j, _, hexact, _, hj⟩ := h
+    let A₀ := Set.integer
+      ((∅ : Finset (HeightOneSpectrum (𝓞 F))) : Set (HeightOneSpectrum (𝓞 F))) F
+    let m₀ := CommRing.Pic.mapAlgebra (𝓞 F) A₀
+    have hc₀ := hc
+    unfold m at hc₀
+    rw [← CommRing.Pic.mapRingHom_algebraMap] at hc₀
+    obtain ⟨z, hz⟩ := (hexact (m₀ c)).mp (by
+      rw [show m₀ c = CommRing.Pic.mapRingHom (algebraMap (𝓞 F) A₀) c by
+        rw [CommRing.Pic.mapRingHom_algebraMap],
+        CommRing.Pic.mapRingHom_mapRingHom]
+      exact hc₀)
+    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective z
+    choose x hx using fun v : S ↦ QuotientGroup.mk_surjective (y v)
+    have hy : (fun v : S ↦ QuotientGroup.mk (x v)) = y := funext hx
+    rw [← hy, hj] at hz
+    let a (v : S) := IdeleGroup.ofAdicCompletion (𝓞 F) F v.val (x v)
+    have ha (v : S) : a v ∈ (integralIdeleInsertion F S).range := by
+      apply (mem_range_integralIdeleInsertion F S _).mpr
+      intro w hw
+      have hne : w ≠ v.val := fun e ↦ hw (e.symm ▸ v.property)
+      constructor
+      · change Pi.mulSingle v.val (x v).val w ∈ w.adicCompletionIntegers F
+        rw [Pi.mulSingle_eq_of_ne hne]
+        exact one_mem _
+      · change ((a v)⁻¹).val.2 w ∈ w.adicCompletionIntegers F
+        dsimp only [a]
+        rw [← map_inv]
+        change Pi.mulSingle v.val ((x v)⁻¹).val w ∈ w.adicCompletionIntegers F
+        rw [Pi.mulSingle_eq_of_ne hne]
+        exact one_mem _
+    refine ⟨∏ v, a v, (integralIdeleInsertion F S).range.prod_mem (fun v _ ↦ ha v), ?_⟩
+    rw [map_prod]
+    calc
+      (∏ v, p (a v)) = ∏ v, localIdealClass F v.val (x v) :=
+        Finset.prod_congr rfl fun v _ ↦ (hp _).trans (ideleIdealClass_ofAdicCompletion F _ _)
+      _ = c := by
+        -- The base change to the empty stage is injective: its integer ring is the base ring.
+        have hA : A₀ = ⊥ := by simp [A₀]
+        let e := (Subalgebra.equivOfEq _ _ hA).trans
+          (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 F) F))
+        have he : e.toRingHom.comp (algebraMap (𝓞 F) _) = RingHom.id (𝓞 F) :=
+          RingHom.ext fun r ↦ (e.commutes r).trans (Algebra.algebraMap_self_apply r)
+        have hleft : LeftInverse (CommRing.Pic.mapRingHom e.toRingHom) m₀ := by
+          intro d
+          dsimp only [m₀]
+          rw [← CommRing.Pic.mapRingHom_algebraMap, CommRing.Pic.mapRingHom_mapRingHom,
+            he, CommRing.Pic.mapRingHom_id_apply]
+        exact hleft.injective hz
+
 /-- Paper: Lemma D.1.10.1(3), p. 784. The quotient by the image of the S-idele
 classes is isomorphic to the finite Picard group of the S-integer ring. -/
 theorem sIdeleClassInsertion_cokernel :
     Nonempty ((C[F] ⧸ (sIdeleClassInsertion F S).range) ≃*
       CommRing.Pic (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)) ∧
-    Finite (C[F] ⧸ (sIdeleClassInsertion F S).range) := by sorry
+    Finite (C[F] ⧸ (sIdeleClassInsertion F S).range) := by
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let U := (integralIdeleInsertion F S).range
+  let A := Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F
+  let m := CommRing.Pic.mapAlgebra (𝓞 F) A
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  obtain ⟨p, hp, _, hexact, hquot⟩ := idele_ideal_class_exact F
+  have hpker : p.ker = P ⊔ (integralIdeleInsertion F ∅).range := by
+    rw [hexact.monoidHom_ker_eq, Subgroup.range_subtype]
+    rfl
+  have hU : (integralIdeleInsertion F ∅).range ≤ U :=
+    (integralIdeleInsertion_exhaustive F).1 (Finset.empty_subset S)
+  have hk : (m.comp p).ker = P ⊔ U := by
+    rw [← MonoidHom.comap_ker, ← map_range_integralIdeleInsertion F S p hp,
+      Subgroup.comap_map_eq, hpker, ← sup_left_comm, sup_eq_left.mpr hU, sup_comm]
+  have hP : P ≤ (m.comp p).ker := hk.symm ▸ le_sup_left
+  let q := QuotientGroup.lift P (m.comp p) hP
+  have hq : Surjective q := QuotientGroup.lift_surjective_of_surjective P _
+    ((picMapAlgebra_surjective_of_isLocalization
+      (Localization.submonoid (S : Set (HeightOneSpectrum (𝓞 F)))) A).comp hquot.surjective) hP
+  have hker : (sIdeleClassInsertion F S).range = q.ker := by
+    change (sIdeleClassInsertion F S).range = (QuotientGroup.lift P (m.comp p) hP).ker
+    rw [QuotientGroup.ker_lift, hk, Subgroup.map_sup, QuotientGroup.map_mk'_self, bot_sup_eq]
+    change (sIdeleClassInsertion F S).range = (integralIdeleInsertion F S).range.map _
+    rw [← MonoidHom.range_comp]
+    change (sIdeleClassInsertion F S).range =
+      ((sIdeleClassInsertion F S).comp (QuotientGroup.mk' _)).range
+    rw [MonoidHom.range_comp, MonoidHom.range_eq_top.mpr (QuotientGroup.mk'_surjective _),
+      Subgroup.map_top]
+  let e := QuotientGroup.liftEquiv _ hq hker
+  have : Finite (CommRing.Pic A) := (sIdeleClassGroup_finiteness F S).2.2.2.2.2
+  exact ⟨⟨e⟩, Finite.of_injective e e.injective⟩
 
 /-- Paper: Lemma D.1.10.1(3), p. 784. Insertion restricts to a topological
 group isomorphism between the identity components. -/
@@ -404,7 +510,8 @@ theorem GeneratesLpSeminorms.isVonNBounded_iff
     [MeasurableSpace X] {μ : Measure X} {p : ℝ≥0∞} {u : ι → E → X → ℂ}
     (h : GeneratesLpSeminorms μ p u) (B : Set E) :
     IsVonNBounded ℂ B ↔
-      ∀ i, ∃ C : ℝ≥0, ∀ f ∈ B, eLpNorm (u i f) p μ ≤ (C : ℝ≥0∞) := by sorry
+      ∀ i, ∃ C : ℝ≥0, ∀ f ∈ B, eLpNorm (u i f) p μ ≤ (C : ℝ≥0∞) := by
+  exact h.2.isVonNBounded_iff B
 
 /-- Paper: (D.1.10.3), p. 784. Apply the nth derivative, Fourier transform,
 and then apply the mth derivative. -/
@@ -418,18 +525,887 @@ theorem realSchwartzFourierDeriv_zero (f : 𝓢(ℝ, ℂ)) :
     realSchwartzFourierDeriv 0 0 f = 𝓕 f := by
   rfl
 
+section RealSchwartzFourierLp
+
+open LineDeriv MeasureTheory.Measure SchwartzMap Complex Filter
+
+/-! ### Iterated derivative and monomial multiplication on the real Schwartz space -/
+
+/-- The `n`-th iterated derivative of a Schwartz map is the `n`-th iterated derivative
+of its underlying function. -/
+private theorem coe_derivIterate (f : 𝓢(ℝ, ℂ)) (n : ℕ) (x : ℝ) :
+    ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) x = iteratedDeriv n (f : ℝ → ℂ) x := by
+  induction n generalizing x with
+  | zero => simp
+  | succ n ih =>
+    have hfun : ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) =
+        iteratedDeriv n (f : ℝ → ℂ) := funext ih
+    rw [Function.iterate_succ_apply', SchwartzMap.derivCLM_apply, hfun, iteratedDeriv_succ]
+
+/-- Iterating the multiplication-by-`x` operator gives multiplication by `x ^ j`. -/
+private theorem smulLeftIterate (j : ℕ) (h : 𝓢(ℝ, ℂ)) :
+    (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j] h =
+      SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ) ^ j) h := by
+  induction j with
+  | zero =>
+    have h1 : (fun x : ℝ ↦ (x : ℂ) ^ 0) = (fun _ : ℝ ↦ (1 : ℂ)) := by funext x; simp
+    rw [h1, SchwartzMap.smulLeftCLM_const]
+    simp
+  | succ j ih =>
+    rw [Function.iterate_succ_apply', ih]
+    have hgrowth : (fun x : ℝ ↦ (x : ℂ) ^ j).HasTemperateGrowth := by fun_prop
+    have hgrowth1 : (fun x : ℝ ↦ (x : ℂ)).HasTemperateGrowth := by fun_prop
+    have heq : ((fun x : ℝ ↦ (x : ℂ)) * (fun x : ℝ ↦ (x : ℂ) ^ j)) =
+        fun x : ℝ ↦ (x : ℂ) ^ (j + 1) := by
+      funext x; simp [pow_succ, mul_comm]
+    rw [SchwartzMap.smulLeftCLM_smulLeftCLM_apply hgrowth1 hgrowth, heq]
+
+/-! ### The Fourier transform turns monomials into derivatives -/
+
+/-- `∂_{1}` on one real variable is the ordinary derivative. -/
+private theorem lineDerivOp_one_eq_derivCLM (u : 𝓢(ℝ, ℂ)) :
+    ∂_{(1:ℝ)} u = (SchwartzMap.derivCLM ℂ ℂ) u := by
+  ext1 x
+  have hd : Differentiable ℝ (u : ℝ → ℂ) := u.differentiable
+  have h1 : (fderiv ℝ (u : ℝ → ℂ) x) 1 = deriv (u : ℝ → ℂ) x :=
+    (hd x).hasFDerivAt.hasDerivAt.deriv
+  rw [lineDerivOp_apply_eq_fderiv]
+  show (fderiv ℝ (u : ℝ → ℂ) x) 1 = _
+  rw [h1]
+  rfl
+
+/-- Differentiating a Fourier transform is the Fourier transform of multiplication
+by `-(2 * Real.pi * I) * x`. -/
+private theorem fourier_mul_step (g : 𝓢(ℝ, ℂ)) :
+    (SchwartzMap.derivCLM ℂ ℂ) (𝓕 g) =
+      (-(2 * Real.pi * Complex.I)) • 𝓕 ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ))) g) := by
+  have hgrowth : (fun x : ℝ ↦ (x : ℂ)).HasTemperateGrowth := by fun_prop
+  have hstep := SchwartzMap.fourierInv_lineDerivOp_eq (𝓕 g) (1 : ℝ)
+  rw [lineDerivOp_one_eq_derivCLM] at hstep
+  rw [FourierTransform.fourierInv_fourier_eq] at hstep
+  have hinner : (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ inner ℝ x 1) g) =
+      (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ))) g := by
+    ext1 x
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg := by fun_prop),
+      SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth)]
+    simp
+  rw [hinner] at hstep
+  have h2 := congrArg 𝓕 hstep
+  rw [FourierTransform.fourier_fourierInv_eq, FourierTransform.fourier_smul] at h2
+  exact h2
+
+/-- One step of the commutation, in the useful direction. -/
+private theorem fourier_smulLeft_step (g : 𝓢(ℝ, ℂ)) :
+    𝓕 ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ))) g) =
+      ((-(2 * Real.pi * Complex.I))⁻¹) • ((SchwartzMap.derivCLM ℂ ℂ) (𝓕 g)) := by
+  have hc : (-(2 * Real.pi * Complex.I) : ℂ) ≠ 0 := by
+    have h2pi : (2 : ℂ) * (Real.pi : ℂ) ≠ 0 :=
+      mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.2 Real.pi_pos.ne')
+    exact neg_ne_zero.2 (mul_ne_zero h2pi Complex.I_ne_zero)
+  rw [eq_comm, inv_smul_eq_iff₀ hc]
+  exact fourier_mul_step g
+
+/-- The Fourier transform of the `j`-fold monomial multiplication is the
+`j`-fold differentiation of the Fourier transform, up to the constant
+`(-(2 * Real.pi * I))⁻¹`. -/
+private theorem fourier_smulLeftIterate (j : ℕ) (h : 𝓢(ℝ, ℂ)) :
+    𝓕 ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j] h) =
+      ((-(2 * Real.pi * Complex.I))⁻¹ ^ j) • ((SchwartzMap.derivCLM ℂ ℂ)^[j] (𝓕 h)) := by
+  induction j generalizing h with
+  | zero => simp
+  | succ j ih =>
+    rw [Function.iterate_succ_apply' (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ))) j h,
+      fourier_smulLeft_step, ih, map_smul (SchwartzMap.derivCLM ℂ ℂ), smul_smul, pow_succ',
+      Function.iterate_succ_apply']
+
+/-- The Fourier transform is an isometry for the `L²` norm on Schwartz functions
+(in `lpNorm` form). -/
+private theorem lpNorm_fourier (h : 𝓢(ℝ, ℂ)) :
+    lpNorm ((𝓕 h : 𝓢(ℝ, ℂ)) : ℝ → ℂ) 2 volume = lpNorm (h : ℝ → ℂ) 2 volume := by
+  have h2 := SchwartzMap.norm_fourier_toL2_eq h
+  rw [SchwartzMap.norm_toLp, SchwartzMap.norm_toLp] at h2
+  exact h2
+
+/-- Scalar multiplication scales the `L²` norm of a Schwartz function. -/
+private theorem lpNorm_smul (c : ℂ) (h : 𝓢(ℝ, ℂ)) :
+    lpNorm ((c • h : 𝓢(ℝ, ℂ)) : ℝ → ℂ) 2 volume = ‖c‖ * lpNorm (h : ℝ → ℂ) 2 volume := by
+  have hcoe : ((c • h : 𝓢(ℝ, ℂ)) : ℝ → ℂ) = c • (h : ℝ → ℂ) := by
+    funext x; simp
+  rw [hcoe, lpNorm, eLpNorm_const_smul, ← toReal_eLpNorm, ENNReal.toReal_mul]
+  simp
+
+/-! ### The pointwise `sup ≤ L² + L²` estimate -/
+
+private theorem lpNorm_sq_eq_integral_norm_sq (φ : 𝓢(ℝ, ℂ)) :
+    ∫ y : ℝ, ‖φ y‖ ^ 2 = (lpNorm (φ : ℝ → ℂ) 2 volume) ^ 2 := by
+  have hm : AEStronglyMeasurable (φ : ℝ → ℂ) volume := φ.continuous.aestronglyMeasurable
+  have hpow : (fun y : ℝ ↦ ‖φ y‖ ^ (2 : ℝ)) = fun y ↦ ‖φ y‖ ^ 2 := by
+    funext y
+    exact Real.rpow_natCast ‖φ y‖ 2
+  rw [lpNorm_eq_integral_norm_rpow_toReal (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+    (by norm_num : (2 : ℝ≥0∞) ≠ ∞) hm]
+  simp only [ENNReal.toReal_ofNat]
+  rw [hpow]
+  have hexp : ((2 : ℝ) ⁻¹) = (1 / 2 : ℝ) := by norm_num
+  rw [hexp, ← Real.sqrt_eq_rpow, Real.sq_sqrt (integral_nonneg fun _ ↦ by positivity)]
+
+/-- A Schwartz function on the line is pointwise bounded by the L² norms of itself
+and its derivative. -/
+private theorem schwartz_norm_le_lpNorm_add_deriv (ψ : 𝓢(ℝ, ℂ)) (x : ℝ) :
+    ‖ψ x‖ ≤ lpNorm (ψ : ℝ → ℂ) 2 volume +
+      lpNorm ((SchwartzMap.derivCLM ℂ ℂ ψ) : ℝ → ℂ) 2 volume := by
+  let d : ℝ → ℂ := SchwartzMap.derivCLM ℂ ℂ ψ
+  let F : ℝ → ℝ := fun t ↦ ‖ψ t‖ ^ 2
+  let F' : ℝ → ℝ := fun t ↦ 2 * inner ℝ (ψ t) (d t)
+  have hd (y : ℝ) : d y = deriv (ψ : ℝ → ℂ) y := by
+    simp [d]
+  have hF (y : ℝ) : HasDerivAt F (F' y) y := by
+    simpa [F, F', hd y] using (SchwartzMap.hasDerivAt ψ y).norm_sq
+  have hsqψ : Integrable (fun y : ℝ ↦ ‖ψ y‖ ^ 2) volume := by
+    have h := (ψ.memLp 2 volume).integrable_norm_rpow (by norm_num) (by norm_num)
+    have hfun : (fun y : ℝ ↦ ‖ψ y‖ ^ (2 : ℝ≥0∞).toReal) = fun y ↦ ‖ψ y‖ ^ 2 := by
+      funext y
+      simp only [ENNReal.toReal_ofNat]
+      exact Real.rpow_natCast ‖ψ y‖ 2
+    simpa [hfun] using h
+  have hsqd : Integrable (fun y : ℝ ↦ ‖d y‖ ^ 2) volume := by
+    have h := ((SchwartzMap.derivCLM ℂ ℂ ψ).memLp 2 volume).integrable_norm_rpow
+      (by norm_num) (by norm_num)
+    rw [show (fun y : ℝ ↦ ‖d y‖ ^ 2) =
+        fun y ↦ ‖(SchwartzMap.derivCLM ℂ ℂ ψ) y‖ ^ (2 : ℝ≥0∞).toReal by
+      funext y
+      simp only [ENNReal.toReal_ofNat, d]
+      exact (Real.rpow_natCast ‖d y‖ 2).symm]
+    exact h
+  have hsumsq : Integrable (fun y : ℝ ↦ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2) volume := hsqψ.add hsqd
+  have hcs (y : ℝ) : |inner ℝ (ψ y) (d y)| ≤ ‖ψ y‖ * ‖d y‖ :=
+    abs_real_inner_le_norm (ψ y) (d y)
+  have hdom (y : ℝ) : ‖F' y‖ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+    have hyoung : 2 * ‖ψ y‖ * ‖d y‖ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+      nlinarith [sq_nonneg (‖ψ y‖ - ‖d y‖)]
+    calc ‖F' y‖ = |2 * inner ℝ (ψ y) (d y)| := by simp [F', Real.norm_eq_abs]
+      _ = 2 * |inner ℝ (ψ y) (d y)| := by rw [abs_mul, abs_of_pos (by norm_num : (0 : ℝ) < 2)]
+      _ ≤ 2 * (‖ψ y‖ * ‖d y‖) := mul_le_mul_of_nonneg_left (hcs y) (by norm_num)
+      _ ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by simpa [mul_assoc] using hyoung
+  have hFmeas : AEStronglyMeasurable F' volume := by
+    apply Continuous.aestronglyMeasurable
+    have hcψ : Continuous (fun t : ℝ ↦ (ψ t : ℂ)) := ψ.continuous
+    have hcd : Continuous d := (SchwartzMap.derivCLM ℂ ℂ ψ).continuous
+    exact continuous_const.mul (continuous_inner.comp (hcψ.prodMk hcd))
+  have hF'int : Integrable F' volume :=
+    hsumsq.mono' hFmeas (Eventually.of_forall hdom)
+  have hlim : Tendsto F atTop (𝓝 0) :=
+    tendsto_zero_of_hasDerivAt_of_integrableOn_Ioi (a := x) (f := F) (f' := F')
+      (fun y _ ↦ hF y) hF'int.integrableOn hsqψ.integrableOn
+  have heq : ∫ y in Ioi x, F' y = - F x := by
+    simpa using integral_Ioi_of_hasDerivAt_of_tendsto' (a := x) (f := F) (f' := F') (m := 0)
+      (fun y _ ↦ hF y) hF'int.integrableOn hlim
+  have hpoint (y : ℝ) : - F' y ≤ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 :=
+    (neg_le_abs _).trans (by simpa [Real.norm_eq_abs] using hdom y)
+  have htail : ∫ y in Ioi x, - F' y ≤ ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 :=
+    setIntegral_mono hF'int.neg.integrableOn hsumsq.integrableOn hpoint
+  have hfull : ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 ≤ ∫ y, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := by
+    have hnonneg : 0 ≤ᵐ[volume] (fun y : ℝ ↦ ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2) :=
+      Eventually.of_forall fun y ↦ add_nonneg (sq_nonneg _) (sq_nonneg _)
+    simpa using integral_mono_measure (Measure.restrict_le_self (s := Ioi x))
+      hnonneg hsumsq
+  have hsqx : ‖ψ x‖ ^ 2 ≤ (lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+      (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2 := by
+    calc ‖ψ x‖ ^ 2 = - ∫ y in Ioi x, F' y := by rw [heq, neg_neg]
+      _ = ∫ y in Ioi x, - F' y := (integral_neg _).symm
+      _ ≤ ∫ y in Ioi x, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := htail
+      _ ≤ ∫ y, ‖ψ y‖ ^ 2 + ‖d y‖ ^ 2 := hfull
+      _ = (lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+            (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2 := by
+          rw [integral_add hsqψ hsqd, lpNorm_sq_eq_integral_norm_sq ψ,
+            lpNorm_sq_eq_integral_norm_sq (SchwartzMap.derivCLM ℂ ℂ ψ)]
+  have hsqrt : ‖ψ x‖ ≤ Real.sqrt ((lpNorm (ψ : ℝ → ℂ) 2 volume) ^ 2 +
+      (lpNorm (d : ℝ → ℂ) 2 volume) ^ 2) := by
+    rw [← Real.sqrt_sq (norm_nonneg _)]
+    exact Real.sqrt_le_sqrt hsqx
+  refine hsqrt.trans ?_
+  have ha0 : 0 ≤ lpNorm (ψ : ℝ → ℂ) 2 volume := lpNorm_nonneg
+  have hb0 : 0 ≤ lpNorm (d : ℝ → ℂ) 2 volume := lpNorm_nonneg
+  rw [← Real.sqrt_sq (add_nonneg ha0 hb0)]
+  refine Real.sqrt_le_sqrt ?_
+  nlinarith
+
+/-- Pointwise domination translates into a bound of `lpNorm` by the `√2`-multiple
+of a combination of two `lpNorm`s. -/
+private theorem lpNorm_le_add_of_pointwise {u g h : ℝ → ℂ} {c : ℝ}
+    (hc : 0 ≤ c) (hu : MemLp u 2 volume) (hg : MemLp g 2 volume) (hh : MemLp h 2 volume)
+    (hpt : ∀ y, ‖u y‖ ≤ c * ‖g y‖ + ‖h y‖) :
+    lpNorm u 2 volume ≤
+      Real.sqrt 2 * (c * lpNorm g 2 volume + lpNorm h 2 volume) := by
+  classical
+  have huI : Integrable (fun y : ℝ ↦ ‖u y‖ ^ 2) volume := by
+    simpa using hu.integrable_norm_rpow (by norm_num) (by norm_num)
+  have hgI : Integrable (fun y : ℝ ↦ ‖g y‖ ^ 2) volume := by
+    simpa using hg.integrable_norm_rpow (by norm_num) (by norm_num)
+  have hhI : Integrable (fun y : ℝ ↦ ‖h y‖ ^ 2) volume := by
+    simpa using hh.integrable_norm_rpow (by norm_num) (by norm_num)
+  set A : ℝ := ∫ y : ℝ, ‖g y‖ ^ 2 with hA
+  set B : ℝ := ∫ y : ℝ, ‖h y‖ ^ 2 with hB
+  have hA0 : 0 ≤ A := by rw [hA]; exact integral_nonneg fun y ↦ sq_nonneg _
+  have hB0 : 0 ≤ B := by rw [hB]; exact integral_nonneg fun y ↦ sq_nonneg _
+  have hwmeas : AEStronglyMeasurable (fun y : ℝ ↦ (c * ‖g y‖ + ‖h y‖) ^ 2) volume :=
+    (((hg.aestronglyMeasurable.norm).const_mul c).add
+      hh.aestronglyMeasurable.norm).pow 2
+  have hbig : Integrable (fun y : ℝ ↦ (2 * c * c) * ‖g y‖ ^ 2 + 2 * ‖h y‖ ^ 2) volume :=
+    (hgI.const_mul (2 * c * c)).add (hhI.const_mul 2)
+  have hwI : Integrable (fun y : ℝ ↦ (c * ‖g y‖ + ‖h y‖) ^ 2) volume :=
+    hbig.mono' hwmeas (Eventually.of_forall fun y ↦ by
+      have hsq := sq_nonneg (c * ‖g y‖ - ‖h y‖)
+      have hpos : (0:ℝ) ≤ 2 * c * c * ‖g y‖ ^ 2 + 2 * ‖h y‖ ^ 2 := by positivity
+      have hnn : (0:ℝ) ≤ (c * ‖g y‖ + ‖h y‖) ^ 2 := sq_nonneg _
+      simp only [Real.norm_eq_abs, abs_of_nonneg hnn]
+      nlinarith)
+  have hint : ∫ y : ℝ, ‖u y‖ ^ 2 ≤ ∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2 :=
+    integral_mono huI hwI fun y ↦ pow_le_pow_left₀ (norm_nonneg _) (hpt y) 2
+  have hsplit : ∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2 ≤ (2 * c * c) * A + 2 * B := by
+    have hpt2 : ∀ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2 ≤ (2 * c * c) * ‖g y‖ ^ 2 + 2 * ‖h y‖ ^ 2 := by
+      intro y
+      have hyoung : (2:ℝ) * (c * ‖g y‖) * ‖h y‖ ≤ (c * ‖g y‖) ^ 2 + ‖h y‖ ^ 2 := by
+        have hsq := sq_nonneg (c * ‖g y‖ - ‖h y‖)
+        nlinarith
+      nlinarith
+    calc ∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2
+        ≤ ∫ y : ℝ, (2 * c * c) * ‖g y‖ ^ 2 + 2 * ‖h y‖ ^ 2 :=
+          integral_mono hwI hbig hpt2
+      _ = (2 * c * c) * A + 2 * B := by
+          have splitEq := integral_add (hgI.const_mul (2 * c * c)) (hhI.const_mul 2)
+          simp only [splitEq, integral_const_mul, hA, hB]
+  -- convert the `lpNorm`s to square roots of integrals
+  have huN' : lpNorm u 2 volume = (∫ y : ℝ, ‖u y‖ ^ (2 : ℕ)) ^ ((2:ℝ≥0∞).toReal⁻¹) := by
+    rw [lpNorm_eq_integral_norm_rpow_toReal (by norm_num : (2:ℝ≥0∞) ≠ 0)
+      (by norm_num : (2:ℝ≥0∞) ≠ ∞) hu.aestronglyMeasurable]
+    simp
+  have hgN' : lpNorm g 2 volume = (∫ y : ℝ, ‖g y‖ ^ (2 : ℕ)) ^ ((2:ℝ≥0∞).toReal⁻¹) := by
+    rw [lpNorm_eq_integral_norm_rpow_toReal (by norm_num : (2:ℝ≥0∞) ≠ 0)
+      (by norm_num : (2:ℝ≥0∞) ≠ ∞) hg.aestronglyMeasurable]
+    simp
+  have hhN' : lpNorm h 2 volume = (∫ y : ℝ, ‖h y‖ ^ (2 : ℕ)) ^ ((2:ℝ≥0∞).toReal⁻¹) := by
+    rw [lpNorm_eq_integral_norm_rpow_toReal (by norm_num : (2:ℝ≥0∞) ≠ 0)
+      (by norm_num : (2:ℝ≥0∞) ≠ ∞) hh.aestronglyMeasurable]
+    simp
+  have hexp : ((2:ℝ≥0∞).toReal)⁻¹ = ((1 / 2 : ℝ)) := by
+    simp [ENNReal.toReal_ofNat]
+  have hexp2 : ∀ z : ℝ, z ^ ((2:ℝ≥0∞).toReal⁻¹) = Real.sqrt z := by
+    intro z
+    rw [hexp, ← Real.sqrt_eq_rpow]
+  have hint' : (∫ y : ℝ, ‖u y‖ ^ 2) ^ ((2:ℝ≥0∞).toReal⁻¹) ≤
+      (∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2) ^ ((2:ℝ≥0∞).toReal⁻¹) := by
+    rw [hexp2 (∫ y : ℝ, ‖u y‖ ^ 2), hexp2 (∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2)]
+    exact Real.sqrt_le_sqrt hint
+  have hsplit' : (∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2) ^ ((2:ℝ≥0∞).toReal⁻¹) ≤
+      ((2 * c * c) * A + 2 * B) ^ ((2:ℝ≥0∞).toReal⁻¹) := by
+    rw [hexp2 (∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ 2), hexp2 ((2 * c * c) * A + 2 * B)]
+    exact Real.sqrt_le_sqrt hsplit
+  have hfinal : ((2 * c * c) * A + 2 * B) ^ ((2:ℝ≥0∞).toReal⁻¹) ≤
+      Real.sqrt 2 * (c * A ^ ((2:ℝ≥0∞).toReal⁻¹) + B ^ ((2:ℝ≥0∞).toReal⁻¹)) := by
+    have hsplit2 : ((2 * c * c) * A + 2 * B) = 2 * (c * c * A + B) := by ring
+    have hmain : Real.sqrt (c * c * A + B) ≤ c * Real.sqrt A + Real.sqrt B := by
+      refine (Real.sqrt_le_iff (x := c * c * A + B)
+        (y := c * Real.sqrt A + Real.sqrt B)).2
+        ⟨add_nonneg (mul_nonneg hc (Real.sqrt_nonneg A)) (Real.sqrt_nonneg B), ?_⟩
+      have e1 : (Real.sqrt A) ^ 2 = A := Real.sq_sqrt hA0
+      have e2 : (Real.sqrt B) ^ 2 = B := Real.sq_sqrt hB0
+      have hsq : (c * Real.sqrt A + Real.sqrt B) ^ 2 =
+          c * c * A + 2 * (c * (Real.sqrt A * Real.sqrt B)) + B := by
+        rw [add_sq, mul_pow, e1, e2]
+        ring
+      rw [hsq]
+      linarith [mul_nonneg hc (mul_nonneg (Real.sqrt_nonneg A) (Real.sqrt_nonneg B))]
+    rw [hexp2 ((2 * c * c) * A + 2 * B),
+      show ((2 * c * c) * A + 2 * B) = 2 * (c * c * A + B) from by ring,
+      Real.sqrt_mul (by norm_num : (0:ℝ) ≤ 2), hexp2 A, hexp2 B]
+    exact mul_le_mul_of_nonneg_left hmain (Real.sqrt_nonneg 2)
+  calc lpNorm u 2 volume = (∫ y : ℝ, ‖u y‖ ^ (2 : ℕ)) ^ ((2:ℝ≥0∞).toReal⁻¹) := huN'
+    _ ≤ (∫ y : ℝ, (c * ‖g y‖ + ‖h y‖) ^ (2 : ℕ)) ^ ((2:ℝ≥0∞).toReal⁻¹) := hint'
+    _ ≤ ((2 * c * c) * A + 2 * B) ^ ((2:ℝ≥0∞).toReal⁻¹) := hsplit'
+    _ ≤ Real.sqrt 2 * (c * A ^ ((2:ℝ≥0∞).toReal⁻¹) + B ^ ((2:ℝ≥0∞).toReal⁻¹)) := hfinal
+    _ = Real.sqrt 2 * (c * lpNorm g 2 volume + lpNorm h 2 volume) := by
+        rw [hA, hB, ← hgN', ← hhN']
+
+/-! ### The core estimate -/
+
+/-- The real Schwartz seminorm `(k, n)` is bounded by the three Fourier `L²`
+seminorms with indices `(k, n), (k - 1, n), (k, n + 1)`. -/
+private theorem schwartz_seminorm_le_l2 (f : 𝓢(ℝ, ℂ)) (k n : ℕ) :
+    SchwartzMap.seminorm ℂ k n f ≤
+      lpNorm ((realSchwartzFourierDeriv k n f : ℝ → ℂ)) 2 volume +
+      Real.sqrt 2 * ((k : ℝ) * lpNorm ((realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ)) 2 volume +
+        lpNorm ((realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ)) 2 volume) := by
+  classical
+  have hgrowth : ∀ j : ℕ, (fun x : ℝ ↦ (x : ℂ) ^ j).HasTemperateGrowth := by
+    intro j; fun_prop
+  -- the underlying function of `D ^[n] f` is the iterated derivative
+  have hcoeg0 : ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) =
+      iteratedDeriv n (f : ℝ → ℂ) :=
+    funext (coe_derivIterate f n)
+  have hnormcoe : ∀ y : ℝ, ‖(y : ℂ)‖ = |y| := by
+    intro y
+    exact RCLike.norm_ofReal (K := ℂ) y
+  -- the monomially-multiplied iterated derivative
+  set ψ : 𝓢(ℝ, ℂ) := (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+      ((SchwartzMap.derivCLM ℂ ℂ)^[n] f) with hψdef
+  have hcoepsi : ((ψ : ℝ → ℂ)) =
+      fun y : ℝ ↦ (y : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) y := by
+    funext y
+    rw [hψdef, smulLeftIterate, SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth k)]
+    simp [smul_eq_mul]
+  -- the pointwise estimate on the derivative of `ψ`
+  have hdiff : ∀ y : ℝ,
+      ‖deriv (ψ : ℝ → ℂ) y‖ ≤
+        (k : ℝ) * ‖(((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+            ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ) y‖ +
+          ‖(((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+            ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)) : ℝ → ℂ) y‖ := by
+    intro y
+    have hd1 : HasDerivAt (((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ))
+        (((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f : ℝ → ℂ) y) y := by
+      have h0 := SchwartzMap.hasDerivAt ((SchwartzMap.derivCLM ℂ ℂ)^[n] f) y
+      rw [hcoeg0, ← iteratedDeriv_succ] at h0
+      rw [hcoeg0, coe_derivIterate f (n + 1)]
+      exact h0
+    have hpow : HasDerivAt (fun z : ℝ ↦ (z : ℂ) ^ k) ((k : ℂ) * ((y : ℂ) ^ (k - 1))) y :=
+      HasDerivAt.comp_ofReal (hasDerivAt_pow k (y : ℂ))
+    have hdψ := hpow.mul hd1
+    have hdψeq : deriv ((ψ : ℝ → ℂ)) y =
+        ((k : ℂ) * (y : ℂ) ^ (k - 1)) * ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) y +
+          (y : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ)^[n + 1] f : ℝ → ℂ) y := by
+      rw [hcoepsi]
+      exact hdψ.deriv
+    rw [hdψeq]
+    have hsmul1 : (((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ) y =
+        (y : ℂ) ^ (k - 1) • ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) y := by
+      rw [smulLeftIterate, SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth (k-1))]
+    have hsmul2 : (((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)) : ℝ → ℂ) y =
+        (y : ℂ) ^ k • ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f : ℝ → ℂ) y := by
+      rw [smulLeftIterate, SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth k)]
+    have hy1 : ‖((k : ℂ) * (y : ℂ) ^ (k - 1)) * ((SchwartzMap.derivCLM ℂ ℂ)^[n] f : ℝ → ℂ) y‖ ≤
+        (k : ℝ) * ‖(((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+          ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ) y‖ := by
+      rw [norm_mul, norm_mul, norm_natCast, hsmul1, norm_smul, norm_pow]
+      exact le_of_eq (by ring)
+    have hy2 : ‖(y : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ)^[n + 1] f : ℝ → ℂ) y‖ ≤
+        ‖(((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+          ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)) : ℝ → ℂ) y‖ := by
+      simp only [hsmul2, norm_mul, norm_smul, norm_pow]
+      exact le_refl _
+    exact le_trans (norm_add_le _ _) (add_le_add hy1 hy2)
+  -- the two `L²` bounds from the fundamental lemma
+  have hψbound : ∀ x : ℝ, ‖ψ x‖ ≤ lpNorm (ψ : ℝ → ℂ) 2 volume +
+      lpNorm (((SchwartzMap.derivCLM ℂ ℂ) ψ : ℝ → ℂ)) 2 volume :=
+    schwartz_norm_le_lpNorm_add_deriv ψ
+  have hψx : ∀ x : ℝ, ‖ψ x‖ = |x| ^ k * ‖iteratedDeriv n (f : ℝ → ℂ) x‖ := by
+    intro x
+    rw [hψdef, smulLeftIterate, SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth k),
+      norm_smul, norm_pow, hnormcoe x, coe_derivIterate f n]
+  -- each monomial multiplication reduces (up to a constant of norm `≤ 1`) to a
+  -- Fourier derivative, whose `L²` norm is one of the target seminorms
+  have hcoef : ∀ j : ℕ, ‖((-(2 * Real.pi * Complex.I))⁻¹ ^ j : ℂ)‖ ≤ 1 := by
+    intro j
+    have hle : ‖(-(2 * Real.pi * Complex.I))⁻¹‖ ≤ 1 := by
+      have h2 : ‖(-(2 * Real.pi * Complex.I))‖ = 2 * Real.pi := by
+        rw [norm_neg, norm_mul, norm_mul, hnormcoe Real.pi, abs_of_pos Real.pi_pos,
+          Complex.norm_I, mul_one]
+        norm_num
+      rw [norm_inv, h2, inv_eq_one_div]
+      exact (div_le_one (by linarith [Real.pi_gt_three])).2 (by linarith [Real.pi_gt_three])
+    rw [norm_pow]
+    exact (pow_le_pow_left₀ (norm_nonneg _) hle j).trans (one_pow j).le
+  have hfourier : ∀ (j i : ℕ),
+      lpNorm ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[i] f)) : ℝ → ℂ)) 2 volume ≤
+        lpNorm ((realSchwartzFourierDeriv j i f : ℝ → ℂ)) 2 volume := by
+    intro j i
+    have hE := lpNorm_fourier ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j]
+      ((SchwartzMap.derivCLM ℂ ℂ)^[i] f))
+    rw [← hE, fourier_smulLeftIterate, lpNorm_smul]
+    refine le_trans (mul_le_mul_of_nonneg_right (hcoef j) lpNorm_nonneg) ?_
+    rw [one_mul]
+    exact le_refl _
+  -- assembly of the pointwise bound
+  have h2 : lpNorm ((ψ : ℝ → ℂ)) 2 volume ≤
+      lpNorm ((realSchwartzFourierDeriv k n f : ℝ → ℂ)) 2 volume := hfourier k n
+  have h3 : lpNorm (((SchwartzMap.derivCLM ℂ ℂ) ψ : ℝ → ℂ)) 2 volume ≤
+      Real.sqrt 2 * ((k : ℝ) * lpNorm ((realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ)) 2 volume +
+        lpNorm ((realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ)) 2 volume) := by
+    have hmem1 : MemLp ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ)) 2 volume :=
+      ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)).memLp 2 volume
+    have hmem2 : MemLp ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)) : ℝ → ℂ)) 2 volume :=
+      ((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)).memLp 2 volume
+    have hu0 : MemLp (((SchwartzMap.derivCLM ℂ ℂ) ψ : ℝ → ℂ)) 2 volume :=
+      (SchwartzMap.derivCLM ℂ ℂ ψ).memLp 2 volume
+    have hbase := lpNorm_le_add_of_pointwise (Nat.cast_nonneg k) hu0 hmem1 hmem2 hdiff
+    calc lpNorm (((SchwartzMap.derivCLM ℂ ℂ) ψ : ℝ → ℂ)) 2 volume
+        ≤ Real.sqrt 2 * ((k : ℝ) * lpNorm ((((SchwartzMap.smulLeftCLM ℂ
+                (fun x : ℝ ↦ (x : ℂ)))^[k-1]
+              ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ)) 2 volume +
+            lpNorm ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+              ((SchwartzMap.derivCLM ℂ ℂ)^[n+1] f)) : ℝ → ℂ)) 2 volume) := hbase
+      _ ≤ Real.sqrt 2 * ((k : ℝ) * lpNorm ((realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ)) 2 volume +
+            lpNorm ((realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ)) 2 volume) :=
+          mul_le_mul_of_nonneg_left
+            (add_le_add (mul_le_mul_of_nonneg_left (hfourier (k - 1) n) (by norm_num : (0:ℝ) ≤ (k:ℝ)))
+              (hfourier k (n + 1))) (Real.sqrt_nonneg 2)
+  have hpoint : ∀ x : ℝ, |x| ^ k * ‖iteratedDeriv n (f : ℝ → ℂ) x‖ ≤
+      lpNorm ((realSchwartzFourierDeriv k n f : ℝ → ℂ)) 2 volume +
+      Real.sqrt 2 * ((k : ℝ) * lpNorm ((realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ)) 2 volume +
+        lpNorm ((realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ)) 2 volume) := by
+    intro x
+    have h1 := hψbound x
+    rw [hψx x] at h1
+    linarith
+  exact SchwartzMap.seminorm_le_bound' ℂ k n f
+    (add_nonneg lpNorm_nonneg (mul_nonneg (Real.sqrt_nonneg 2)
+      (add_nonneg (mul_nonneg (by norm_num : (0:ℝ) ≤ (k:ℝ)) lpNorm_nonneg)
+        lpNorm_nonneg))) hpoint
+
+private theorem iterateCLM_add (L : 𝓢(ℝ, ℂ) →L[ℂ] 𝓢(ℝ, ℂ)) (n : ℕ) (f g : 𝓢(ℝ, ℂ)) :
+    L^[n] (f + g) = L^[n] f + L^[n] g := by
+  induction n with
+  | zero => simp
+  | succ n ih => simp only [Function.iterate_succ_apply', ih, map_add]
+
+private theorem iterateCLM_smul (L : 𝓢(ℝ, ℂ) →L[ℂ] 𝓢(ℝ, ℂ)) (n : ℕ) (c : ℂ) (f : 𝓢(ℝ, ℂ)) :
+    L^[n] (c • f) = c • L^[n] f := by
+  induction n with
+  | zero => simp
+  | succ n ih => simp only [Function.iterate_succ_apply', ih, map_smul]
+
+private theorem realSchwartzFourierDeriv_add (m n : ℕ) (f g : 𝓢(ℝ, ℂ)) :
+    realSchwartzFourierDeriv m n (f + g) =
+      realSchwartzFourierDeriv m n f + realSchwartzFourierDeriv m n g := by
+  simp only [realSchwartzFourierDeriv]
+  rw [iterateCLM_add (SchwartzMap.derivCLM ℂ ℂ) n]
+  have hF (g : 𝓢(ℝ, ℂ)) : 𝓕 g = fourierTransformCLM ℂ g := rfl
+  rw [hF, (fourierTransformCLM ℂ).map_add, iterateCLM_add (SchwartzMap.derivCLM ℂ ℂ) m, hF, hF]
+
+private theorem realSchwartzFourierDeriv_smul (m n : ℕ) (c : ℂ) (f : 𝓢(ℝ, ℂ)) :
+    realSchwartzFourierDeriv m n (c • f) = c • realSchwartzFourierDeriv m n f := by
+  simp only [realSchwartzFourierDeriv]
+  rw [iterateCLM_smul (SchwartzMap.derivCLM ℂ ℂ) n]
+  have hF (g : 𝓢(ℝ, ℂ)) : 𝓕 g = fourierTransformCLM ℂ g := rfl
+  rw [hF, (fourierTransformCLM ℂ).map_smul, iterateCLM_smul (SchwartzMap.derivCLM ℂ ℂ) m, hF]
+
+private theorem lpNorm_fourierDeriv_eq (j i : ℕ) (f : 𝓢(ℝ, ℂ)) :
+    lpNorm (realSchwartzFourierDeriv j i f : ℝ → ℂ) 2 volume =
+      (2 * Real.pi) ^ j *
+        lpNorm ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j]
+          ((SchwartzMap.derivCLM ℂ ℂ)^[i] f)) : ℝ → ℂ)) 2 volume := by
+  set mono : 𝓢(ℝ, ℂ) := (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[j]
+      ((SchwartzMap.derivCLM ℂ ℂ)^[i] f)
+  have hE := lpNorm_fourier mono
+  rw [fourier_smulLeftIterate, lpNorm_smul] at hE
+  have hnorm : ‖((-(2 * Real.pi * Complex.I))⁻¹ ^ j : ℂ)‖ = (2 * Real.pi)⁻¹ ^ j := by
+    rw [norm_pow]
+    congr 1
+    rw [norm_inv, norm_neg, norm_mul, norm_mul, Complex.norm_I, mul_one]
+    simp [Complex.norm_real, Real.norm_eq_abs, abs_of_pos Real.pi_pos]
+  rw [hnorm] at hE
+  have hpos : (2 * Real.pi)⁻¹ ^ j ≠ 0 := by positivity
+  have hE' : (2 * Real.pi)⁻¹ ^ j *
+      lpNorm (realSchwartzFourierDeriv j i f : ℝ → ℂ) 2 volume =
+      lpNorm (mono : ℝ → ℂ) 2 volume := by
+    simpa [realSchwartzFourierDeriv] using hE
+  apply mul_left_cancel₀ hpos
+  calc (2 * Real.pi)⁻¹ ^ j * lpNorm (realSchwartzFourierDeriv j i f : ℝ → ℂ) 2 volume
+      = lpNorm (mono : ℝ → ℂ) 2 volume := hE'
+    _ = (2 * Real.pi)⁻¹ ^ j * ((2 * Real.pi) ^ j * lpNorm (mono : ℝ → ℂ) 2 volume) := by
+        rw [← mul_assoc, ← mul_pow, inv_mul_cancel₀ (by positivity : (2 : ℝ) * Real.pi ≠ 0),
+          one_pow, one_mul]
+
+private theorem lpNorm_monomial_le (f : 𝓢(ℝ, ℂ)) (k n : ℕ) :
+    lpNorm ((((SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)) : ℝ → ℂ)) 2 volume ≤
+      Real.sqrt Real.pi *
+        (SchwartzMap.seminorm ℂ k n f + SchwartzMap.seminorm ℂ (k + 1) n f) := by
+  set φ : 𝓢(ℝ, ℂ) := (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)))^[k]
+      ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)
+  set C : ℝ := SchwartzMap.seminorm ℂ k n f + SchwartzMap.seminorm ℂ (k + 1) n f
+  have hC : 0 ≤ C := add_nonneg (apply_nonneg _ _) (apply_nonneg _ _)
+  have hgrowth : (fun x : ℝ ↦ (x : ℂ) ^ k).HasTemperateGrowth := by fun_prop
+  have hcoe : ∀ x : ℝ, φ x = (x : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ)^[n] f) x := by
+    intro x
+    have hmap : φ = SchwartzMap.smulLeftCLM ℂ (fun y : ℝ ↦ (y : ℂ) ^ k)
+        ((SchwartzMap.derivCLM ℂ ℂ)^[n] f) := by
+      simpa [φ] using smulLeftIterate k ((SchwartzMap.derivCLM ℂ ℂ)^[n] f)
+    rw [hmap, SchwartzMap.smulLeftCLM_apply_apply (hg := hgrowth)]
+    simp [smul_eq_mul]
+  have hnorm : ∀ x : ℝ, ‖φ x‖ = |x| ^ k * ‖iteratedDeriv n (f : ℝ → ℂ) x‖ := by
+    intro x
+    rw [hcoe, norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, coe_derivIterate]
+  have hsum : ∀ x : ℝ, (1 + |x|) * ‖φ x‖ ≤ C := by
+    intro x
+    rw [show (1 + |x|) * ‖φ x‖ = ‖φ x‖ + |x| * ‖φ x‖ by ring, hnorm]
+    have h1 := SchwartzMap.le_seminorm' ℂ k n f x
+    have h2 := SchwartzMap.le_seminorm' ℂ (k + 1) n f x
+    have hx : |x| * (|x| ^ k * ‖iteratedDeriv n (f : ℝ → ℂ) x‖) =
+        |x| ^ (k + 1) * ‖iteratedDeriv n (f : ℝ → ℂ) x‖ := by
+      rw [pow_succ, mul_assoc, mul_left_comm |x| (|x| ^ k)]
+    simpa [hx] using add_le_add h1 h2
+  have hdiv : ∀ x : ℝ, ‖φ x‖ ≤ C * (1 + |x|)⁻¹ := by
+    intro x
+    have hpos : 0 < 1 + |x| := by positivity
+    have hx := hsum x
+    rw [mul_comm] at hx
+    rwa [← le_div_iff₀ hpos, div_eq_mul_inv] at hx
+  have hsq : ∀ x : ℝ, ‖φ x‖ ^ 2 ≤ C ^ 2 * (1 + x ^ 2)⁻¹ := by
+    intro x
+    have hinv : (1 + |x|)⁻¹ ^ 2 ≤ (1 + x ^ 2)⁻¹ := by
+      have hden : 1 + x ^ 2 ≤ (1 + |x|) ^ 2 := by
+        calc 1 + x ^ 2 = 1 + |x| ^ 2 := by rw [sq_abs]
+          _ ≤ 1 + 2 * |x| + |x| ^ 2 := by linarith [abs_nonneg x]
+          _ = (1 + |x|) ^ 2 := by ring
+      rw [inv_pow, ← one_div, ← one_div]
+      exact div_le_div_of_nonneg_left zero_le_one (by positivity) hden
+    calc ‖φ x‖ ^ 2 ≤ (C * (1 + |x|)⁻¹) ^ 2 :=
+          pow_le_pow_left₀ (norm_nonneg _) (hdiv x) 2
+      _ = C ^ 2 * (1 + |x|)⁻¹ ^ 2 := by ring
+      _ ≤ C ^ 2 * (1 + x ^ 2)⁻¹ := mul_le_mul_of_nonneg_left hinv (sq_nonneg _)
+  have hsqφ : Integrable (fun y : ℝ ↦ ‖φ y‖ ^ 2) volume := by
+    have h := (φ.memLp 2 volume).integrable_norm_rpow (by norm_num) (by norm_num)
+    have hfun : (fun y : ℝ ↦ ‖φ y‖ ^ (2 : ℝ≥0∞).toReal) = fun y ↦ ‖φ y‖ ^ 2 := by
+      funext y
+      simp only [ENNReal.toReal_ofNat]
+      exact Real.rpow_natCast ‖φ y‖ 2
+    simpa [hfun] using h
+  have hintC : Integrable (fun y : ℝ ↦ C ^ 2 * (1 + y ^ 2)⁻¹) volume :=
+    integrable_inv_one_add_sq.const_mul (C ^ 2)
+  have hint : ∫ y : ℝ, ‖φ y‖ ^ 2 ≤ ∫ y : ℝ, C ^ 2 * (1 + y ^ 2)⁻¹ :=
+    integral_mono hsqφ hintC hsq
+  have hrhs : ∫ y : ℝ, C ^ 2 * (1 + y ^ 2)⁻¹ = C ^ 2 * Real.pi := by
+    rw [integral_const_mul, integral_univ_inv_one_add_sq]
+  have hsqle : (lpNorm (φ : ℝ → ℂ) 2 volume) ^ 2 ≤ C ^ 2 * Real.pi := by
+    rw [← lpNorm_sq_eq_integral_norm_sq φ]
+    exact hint.trans_eq hrhs
+  calc lpNorm (φ : ℝ → ℂ) 2 volume
+      ≤ Real.sqrt (C ^ 2 * Real.pi) := by
+        rw [← Real.sqrt_sq (lpNorm_nonneg : 0 ≤ lpNorm (φ : ℝ → ℂ) 2 volume)]
+        exact Real.sqrt_le_sqrt hsqle
+    _ = Real.sqrt Real.pi * C := by
+        rw [Real.sqrt_mul (sq_nonneg C), Real.sqrt_sq hC, mul_comm]
+
+private theorem lpNorm_fourierDeriv_le_seminorm (f : 𝓢(ℝ, ℂ)) (m n : ℕ) :
+    lpNorm (realSchwartzFourierDeriv m n f : ℝ → ℂ) 2 volume ≤
+      (2 * Real.pi) ^ m * Real.sqrt Real.pi *
+        (SchwartzMap.seminorm ℂ m n f + SchwartzMap.seminorm ℂ (m + 1) n f) := by
+  rw [lpNorm_fourierDeriv_eq, mul_assoc]
+  exact mul_le_mul_of_nonneg_left (lpNorm_monomial_le f m n)
+    (pow_nonneg (by positivity : 0 ≤ 2 * Real.pi) _)
+
+private theorem lpNorm_fourierDeriv_add (i : ℕ × ℕ) (f g : 𝓢(ℝ, ℂ)) :
+    lpNorm (realSchwartzFourierDeriv i.1 i.2 (f + g) : ℝ → ℂ) 2 volume ≤
+      lpNorm (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) 2 volume +
+        lpNorm (realSchwartzFourierDeriv i.1 i.2 g : ℝ → ℂ) 2 volume := by
+  rw [realSchwartzFourierDeriv_add]
+  have hcoe :
+      ((realSchwartzFourierDeriv i.1 i.2 f + realSchwartzFourierDeriv i.1 i.2 g : 𝓢(ℝ, ℂ)) :
+        ℝ → ℂ) =
+      (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) +
+        (realSchwartzFourierDeriv i.1 i.2 g : ℝ → ℂ) := by
+    funext x; simp
+  rw [hcoe]
+  exact lpNorm_add_le ((realSchwartzFourierDeriv i.1 i.2 f).memLp 2 volume)
+    (by norm_num : (1 : ℝ≥0∞) ≤ 2)
+
+private theorem lpNorm_fourierDeriv_smul (i : ℕ × ℕ) (c : ℂ) (f : 𝓢(ℝ, ℂ)) :
+    lpNorm (realSchwartzFourierDeriv i.1 i.2 (c • f) : ℝ → ℂ) 2 volume =
+      ‖c‖ * lpNorm (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) 2 volume := by
+  rw [realSchwartzFourierDeriv_smul]
+  have hcoe : ((c • realSchwartzFourierDeriv i.1 i.2 f : 𝓢(ℝ, ℂ)) : ℝ → ℂ) =
+      c • (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) := by
+    funext x; simp
+  rw [hcoe, lpNorm_const_smul]
+  rfl
+
 /-- Paper: Proposition D.1.10.2, p. 784. L² norms of the differentiated real
 Fourier transforms in (D.1.10.3) generate the Schwartz topology. -/
 theorem realSchwartz_fourierLp_generates :
     GeneratesLpSeminorms (volume : Measure ℝ) 2
       (fun i : ℕ × ℕ ↦ fun f : 𝓢(ℝ, ℂ) ↦
-        (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ)) := by sorry
+        (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ)) := by
+  classical
+  let ν : ℕ × ℕ → 𝓢(ℝ, ℂ) → ℝ := fun i f ↦
+    lpNorm (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) 2 volume
+  let P : ℕ × ℕ → Seminorm ℂ 𝓢(ℝ, ℂ) := fun i ↦
+    Seminorm.of (ν i) (fun f g ↦ lpNorm_fourierDeriv_add i f g)
+      (fun c f ↦ lpNorm_fourierDeriv_smul i c f)
+  refine ⟨fun i f ↦ (realSchwartzFourierDeriv i.1 i.2 f).memLp 2 volume, ⟨P, ?_, ?_⟩⟩
+  · refine (schwartz_withSeminorms ℂ ℝ ℂ).congr ?_ ?_
+    · refine Seminorm.IsBounded.of_real ?_
+      rintro ⟨m, n⟩
+      let s : Finset (ℕ × ℕ) := {(m, n), (m + 1, n)}
+      refine ⟨s, (2 * Real.pi) ^ m * Real.sqrt Real.pi * 2, fun f ↦ ?_⟩
+      have hle := lpNorm_fourierDeriv_le_seminorm f m n
+      have h1 : SchwartzMap.seminorm ℂ m n f ≤ (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f := by
+        simpa [s, schwartzSeminormFamily_apply] using
+          (Seminorm.le_finset_sup_apply (p := schwartzSeminormFamily ℂ ℝ ℂ)
+            (by simp [s] : (m, n) ∈ s))
+      have h2 : SchwartzMap.seminorm ℂ (m + 1) n f ≤
+          (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f := by
+        simpa [s, schwartzSeminormFamily_apply] using
+          (Seminorm.le_finset_sup_apply (p := schwartzSeminormFamily ℂ ℝ ℂ)
+            (by simp [s] : (m + 1, n) ∈ s))
+      have hsup : SchwartzMap.seminorm ℂ m n f + SchwartzMap.seminorm ℂ (m + 1) n f ≤
+          2 * (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f := by linarith
+      have hcoef : 0 ≤ (2 * Real.pi) ^ m * Real.sqrt Real.pi := by positivity
+      calc P (m, n) f = ν (m, n) f := rfl
+        _ ≤ (2 * Real.pi) ^ m * Real.sqrt Real.pi *
+            (SchwartzMap.seminorm ℂ m n f + SchwartzMap.seminorm ℂ (m + 1) n f) := hle
+        _ ≤ (2 * Real.pi) ^ m * Real.sqrt Real.pi *
+            (2 * (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f) :=
+              mul_le_mul_of_nonneg_left hsup hcoef
+        _ = ((2 * Real.pi) ^ m * Real.sqrt Real.pi * 2) *
+            (s.sup (schwartzSeminormFamily ℂ ℝ ℂ)) f := by ring
+    · refine Seminorm.IsBounded.of_real ?_
+      rintro ⟨k, n⟩
+      let s : Finset (ℕ × ℕ) := {(k, n), (k - 1, n), (k, n + 1)}
+      refine ⟨s, 1 + Real.sqrt 2 * (k : ℝ) + Real.sqrt 2, fun f ↦ ?_⟩
+      have hle := schwartz_seminorm_le_l2 f k n
+      have hPeq (a b : ℕ) :
+          P (a, b) f = lpNorm (realSchwartzFourierDeriv a b f : ℝ → ℂ) 2 volume := rfl
+      have h1 : lpNorm (realSchwartzFourierDeriv k n f : ℝ → ℂ) 2 volume ≤ (s.sup P) f := by
+        rw [← hPeq]
+        exact Seminorm.le_finset_sup_apply (by simp [s])
+      have h2 : lpNorm (realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ) 2 volume ≤
+          (s.sup P) f := by
+        rw [← hPeq]
+        exact Seminorm.le_finset_sup_apply (by simp [s])
+      have h3 : lpNorm (realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ) 2 volume ≤
+          (s.sup P) f := by
+        rw [← hPeq]
+        exact Seminorm.le_finset_sup_apply (by simp [s])
+      have hS : 0 ≤ (s.sup P) f := apply_nonneg _ _
+      have hgoal : SchwartzMap.seminorm ℂ k n f ≤
+          (1 + Real.sqrt 2 * (k : ℝ) + Real.sqrt 2) * (s.sup P) f := by
+        set S : ℝ := (s.sup P) f
+        have hmid : lpNorm (realSchwartzFourierDeriv k n f : ℝ → ℂ) 2 volume +
+            Real.sqrt 2 * ((k : ℝ) * lpNorm (realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ) 2 volume +
+              lpNorm (realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ) 2 volume) ≤
+            S + Real.sqrt 2 * ((k : ℝ) * S + S) := by
+          have hB : (k : ℝ) * lpNorm (realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ) 2 volume ≤
+              (k : ℝ) * S := mul_le_mul_of_nonneg_left h2 (Nat.cast_nonneg k)
+          have hsum : (k : ℝ) * lpNorm (realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ) 2 volume +
+              lpNorm (realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ) 2 volume ≤
+              (k : ℝ) * S + S := add_le_add hB h3
+          exact add_le_add h1 (mul_le_mul_of_nonneg_left hsum (Real.sqrt_nonneg _))
+        calc SchwartzMap.seminorm ℂ k n f ≤
+            lpNorm (realSchwartzFourierDeriv k n f : ℝ → ℂ) 2 volume +
+              Real.sqrt 2 * ((k : ℝ) *
+                lpNorm (realSchwartzFourierDeriv (k - 1) n f : ℝ → ℂ) 2 volume +
+                lpNorm (realSchwartzFourierDeriv k (n + 1) f : ℝ → ℂ) 2 volume) := hle
+          _ ≤ S + Real.sqrt 2 * ((k : ℝ) * S + S) := hmid
+          _ = (1 + Real.sqrt 2 * (k : ℝ) + Real.sqrt 2) * S := by ring
+      simpa [schwartzSeminormFamily_apply] using hgoal
+  · intro i f
+    have hP : P i f = (eLpNorm (realSchwartzFourierDeriv i.1 i.2 f : ℝ → ℂ) 2 volume).toReal := by
+      change ν i f = _
+      rfl
+    rw [hP, ENNReal.ofReal_toReal]
+    exact ((realSchwartzFourierDeriv i.1 i.2 f).memLp 2 volume).eLpNorm_ne_top
+
+end RealSchwartzFourierLp
+
+open scoped LineDeriv in
+/-- Paper: (D.1.10.4), p. 785. Differentiating the Fourier transform corresponds
+to taking the Fourier transform after multiplication by a power of the coordinate. -/
+private theorem realSchwartz_iterate_deriv_fourier (m : ℕ) (f : 𝓢(ℝ, ℂ)) :
+    (SchwartzMap.derivCLM ℂ ℂ)^[m] (𝓕 f) =
+      𝓕 (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ ((-2 * π * Complex.I : ℂ) * x) ^ m) f) := by
+  have hweight : (fun x : ℝ ↦ (-2 * π * Complex.I : ℂ) * x).HasTemperateGrowth := by fun_prop
+  have hpow (k : ℕ) :
+      (fun x : ℝ ↦ ((-2 * π * Complex.I : ℂ) * x) ^ k).HasTemperateGrowth := by
+    exact hweight.pow k
+  have hderiv (g : 𝓢(ℝ, ℂ)) :
+      SchwartzMap.derivCLM ℂ ℂ (𝓕 g) =
+        𝓕 (SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (-2 * π * Complex.I : ℂ) * x) g) := by
+    have hline : ∂_{(1 : ℝ)} (𝓕 g) = SchwartzMap.derivCLM ℂ ℂ (𝓕 g) := by
+      ext1 x
+      let G : 𝓢(ℝ, ℂ) := 𝓕 g
+      change fderiv ℝ (⇑G) x 1 = deriv (⇑G) x
+      exact fderiv_apply_one_eq_deriv
+    rw [← hline, SchwartzMap.lineDerivOp_fourier_eq]
+    congr 1
+    ext1 x
+    have hinner : (fun y : ℝ ↦ inner ℝ y 1) = id := by
+      funext y
+      exact (Real.inner_apply y 1).trans (mul_one y)
+    rw [hinner, SchwartzMap.smulLeftCLM_apply_apply hweight]
+    have hid : (id : ℝ → ℝ).HasTemperateGrowth := by fun_prop
+    rw [smul_apply, SchwartzMap.smulLeftCLM_apply_apply hid]
+    simp [Complex.real_smul]
+    ring
+  induction m with
+  | zero =>
+    rw [Function.iterate_zero_apply]
+    congr 1
+    ext1 x
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hpow 0)]
+    simp
+  | succ m ih =>
+    rw [Function.iterate_succ_apply', ih, hderiv]
+    congr 1
+    ext1 x
+    rw [SchwartzMap.smulLeftCLM_apply_apply hweight,
+      SchwartzMap.smulLeftCLM_apply_apply (hpow m),
+      SchwartzMap.smulLeftCLM_apply_apply (hpow (m + 1))]
+    simp only [smul_smul, pow_succ']
+
+/-- The weighted derivative's L² norm is controlled by the corresponding Fourier
+seminorm via Plancherel. -/
+private theorem realSchwartz_weightedDeriv_eLpNorm (m n : ℕ) (f : 𝓢(ℝ, ℂ)) :
+    eLpNorm (fun x : ℝ ↦ ‖x‖ ^ m * ‖iteratedFDeriv ℝ n f x‖) 2 volume ≤
+      eLpNorm (realSchwartzFourierDeriv m n f : ℝ → ℂ) 2 volume := by
+  let g := (SchwartzMap.derivCLM ℂ ℂ)^[n] f
+  have hg' (k : ℕ) : ⇑((SchwartzMap.derivCLM ℂ ℂ)^[k] f) = iteratedDeriv k f := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [Function.iterate_succ_apply', iteratedDeriv_succ, ← ih]
+      rfl
+  have hg (x : ℝ) : ‖g x‖ = ‖iteratedFDeriv ℝ n f x‖ := by
+    rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv, ← hg']
+  let w (x : ℝ) := ((-2 * π * Complex.I : ℂ) * x) ^ m
+  let h := SchwartzMap.smulLeftCLM ℂ w g
+  have hw : w.HasTemperateGrowth := by dsimp [w]; fun_prop
+  have hFourier : realSchwartzFourierDeriv m n f = 𝓕 h :=
+    realSchwartz_iterate_deriv_fourier m g
+  have hPlancherel : eLpNorm ((𝓕 h : 𝓢(ℝ, ℂ)) : ℝ → ℂ) 2 volume = eLpNorm (⇑h) 2 volume := by
+    have hL2 := SchwartzMap.norm_fourier_toL2_eq h
+    simp only [SchwartzMap.norm_toLp] at hL2
+    simpa only [ENNReal.ofReal_toReal ((𝓕 h : 𝓢(ℝ, ℂ)).eLpNorm_lt_top 2 volume).ne,
+      ENNReal.ofReal_toReal (h.eLpNorm_lt_top 2 volume).ne] using congrArg ENNReal.ofReal hL2
+  rw [hFourier, hPlancherel]
+  apply eLpNorm_mono (f.integrable_pow_mul_iteratedFDeriv volume m n).aestronglyMeasurable
+  intro x
+  change ‖‖x‖ ^ m * ‖iteratedFDeriv ℝ n f x‖‖ ≤ ‖h x‖
+  rw [Real.norm_of_nonneg (by positivity)]
+  dsimp [h]
+  rw [SchwartzMap.smulLeftCLM_apply_apply hw, norm_smul]
+  change _ ≤ ‖((-2 * π * Complex.I : ℂ) * x) ^ m‖ * ‖g x‖
+  rw [hg, norm_pow, norm_mul, Complex.norm_real]
+  have hc : 1 ≤ ‖(-2 * π * Complex.I : ℂ)‖ := by
+    rw [norm_mul, norm_mul, Complex.norm_I, mul_one, Complex.norm_real,
+      Real.norm_of_nonneg Real.pi_pos.le]
+    norm_num
+    linarith [Real.pi_gt_three]
+  gcongr
+  exact le_mul_of_one_le_left (abs_nonneg x) hc
+
+/-- Bounds on Fourier L² seminorms give uniform bounds on the weighted L¹ norms
+of the original derivatives by Cauchy–Schwarz. -/
+private theorem realSchwartz_weightedDeriv_integral_bounded (B : Set (𝓢(ℝ, ℂ)))
+    (hB : ∀ m n : ℕ, ∃ C : ℝ≥0, ∀ f ∈ B,
+      eLpNorm (realSchwartzFourierDeriv m n f : ℝ → ℂ) 2 volume ≤ (C : ℝ≥0∞)) :
+    ∀ m n : ℕ, ∃ C : ℝ, 0 ≤ C ∧ ∀ f ∈ B,
+      (∫ x : ℝ, ‖x‖ ^ m * ‖iteratedFDeriv ℝ n f x‖) ≤ C := by
+  let u (m n : ℕ) (f : 𝓢(ℝ, ℂ)) (x : ℝ) := ‖x‖ ^ m * ‖iteratedFDeriv ℝ n f x‖
+  have hu (m n : ℕ) (f : 𝓢(ℝ, ℂ)) : Integrable (u m n f) :=
+    f.integrable_pow_mul_iteratedFDeriv volume m n
+  have hu_nonneg (m n : ℕ) (f : 𝓢(ℝ, ℂ)) (x : ℝ) : 0 ≤ u m n f x := by
+    dsimp [u]
+    positivity
+  obtain ⟨k, hk⟩ := Measure.HasTemperateGrowth.exists_eLpNorm_lt_top 2
+    (inferInstance : (volume : Measure ℝ).HasTemperateGrowth)
+  let w (x : ℝ) := (1 + ‖x‖) ^ (-(k : ℝ))
+  have hw : AEStronglyMeasurable w volume :=
+    (Continuous.rpow_const (by fun_prop) (fun x ↦ Or.inl (by positivity))).aestronglyMeasurable
+  let K : ℝ≥0 := (eLpNorm w 2 volume).toNNReal
+  have hK : eLpNorm w 2 volume = (K : ℝ≥0∞) := (ENNReal.coe_toNNReal hk.ne).symm
+  intro m n
+  obtain ⟨C₀, hC₀⟩ := hB 0 n
+  obtain ⟨C₁, hC₁⟩ := hB (m + k) n
+  let C : ℝ≥0 := K * (2 ^ k * (C₀ + C₁))
+  refine ⟨C, C.coe_nonneg, fun f hf ↦ ?_⟩
+  let v : ℝ → ℝ := u 0 n f + u (m + k) n f
+  have hv : AEStronglyMeasurable v volume := (hu 0 n f).aestronglyMeasurable.add
+    (hu (m + k) n f).aestronglyMeasurable
+  have hnorm : eLpNorm (u m n f) 1 volume ≤ (C : ℝ≥0∞) := calc
+    _ ≤ eLpNorm (w • ((2 : ℝ) ^ k • v)) 1 volume := by
+      refine eLpNorm_mono (hu m n f).aestronglyMeasurable fun x ↦ ?_
+      rw [Real.norm_of_nonneg (hu_nonneg m n f x)]
+      have h := pow_mul_le_of_le_of_pow_mul_le (k := m) (l := k)
+        (norm_nonneg x) (norm_nonneg (iteratedFDeriv ℝ n f x)) (le_refl _)
+        (le_refl (u (m + k) n f x))
+      change u m n f x ≤ ‖w x * ((2 : ℝ) ^ k * (u 0 n f x + u (m + k) n f x))‖
+      refine h.trans ?_
+      rw [mul_comm _ (w x), Real.norm_of_nonneg
+        (mul_nonneg (Real.rpow_nonneg (by positivity) _) (by positivity))]
+      simp [u, w]
+    _ ≤ eLpNorm w 2 volume * eLpNorm ((2 : ℝ) ^ k • v) 2 volume :=
+      eLpNorm_smul_le_mul_eLpNorm hw (hv.const_smul _)
+    _ ≤ (C : ℝ≥0∞) := by
+      have htwo : ‖(2 : ℝ)‖ₑ = 2 := by exact_mod_cast Real.eNorm_natCast 2
+      rw [hK, eLpNorm_const_smul, ENNReal.coe_mul, ENNReal.coe_mul, ENNReal.coe_pow,
+        ENNReal.coe_ofNat, ENNReal.coe_add, eNorm_pow, htwo]
+      gcongr
+      exact (eLpNorm_add_le (by norm_num : (1 : ℝ≥0∞) ≤ 2)).trans
+        (add_le_add ((realSchwartz_weightedDeriv_eLpNorm 0 n f).trans (hC₀ f hf))
+          ((realSchwartz_weightedDeriv_eLpNorm (m + k) n f).trans (hC₁ f hf)))
+  change ∫ x, u m n f x ≤ (C : ℝ)
+  calc
+    _ = ∫ x, ‖u m n f x‖ := integral_congr_ae (ae_of_all _ fun x ↦
+      (Real.norm_of_nonneg (hu_nonneg m n f x)).symm)
+    _ = (eLpNorm (u m n f) 1 volume).toReal := by
+      rw [integral_norm_eq_lintegral_eNorm (hu m n f).aestronglyMeasurable,
+        eLpNorm_one_eq_lintegral_eNorm (hu m n f).aestronglyMeasurable]
+    _ ≤ (C : ℝ) := ENNReal.toReal_le_of_le_ofReal C.coe_nonneg
+      (by simpa only [ENNReal.ofReal_coe_nnreal] using hnorm)
 
 /-- Paper: Proposition D.1.10.2, p. 784. A set of real Schwartz functions is bounded
 exactly when each Fourier L² seminorm is bounded on it. -/
 theorem realSchwartz_fourierLp_bounded_iff (B : Set (𝓢(ℝ, ℂ))) :
     IsVonNBounded ℂ B ↔ ∀ m n : ℕ, ∃ C : ℝ≥0, ∀ f ∈ B,
-      eLpNorm (realSchwartzFourierDeriv m n f : ℝ → ℂ) 2 volume ≤ (C : ℝ≥0∞) := by sorry
+      eLpNorm (realSchwartzFourierDeriv m n f : ℝ → ℂ) 2 volume ≤ (C : ℝ≥0∞) := by
+  constructor
+  · intro hB m n
+    let : Fact (1 ≤ (2 : ℝ≥0∞)) := ⟨by norm_num⟩
+    let D := SchwartzMap.derivCLM ℂ ℂ
+    let T := SchwartzMap.toLpCLM ℂ ℂ 2 (volume : Measure ℝ) ∘L
+      ((D ^ m) ∘L SchwartzMap.fourierTransformCLM ℂ) ∘L (D ^ n)
+    obtain ⟨R, hR⟩ := (NormedSpace.image_isVonNBounded_iff ℂ).1 (hB.image T)
+    refine ⟨Real.toNNReal R, fun f hf ↦ ?_⟩
+    have hTf : T f = (realSchwartzFourierDeriv m n f).toLp 2 volume := by
+      simp [T, D, realSchwartzFourierDeriv, FunLike.coe_pow_eq_iterate]
+    have hRf := hR f hf
+    rw [hTf, SchwartzMap.norm_toLp] at hRf
+    rw [← ENNReal.ofReal_toReal ((realSchwartzFourierDeriv m n f).eLpNorm_lt_top 2 volume).ne]
+    simpa only [ENNReal.ofReal_coe_nnreal] using
+      ENNReal.ofReal_le_ofReal (hRf.trans (Real.le_coe_toNNReal R))
+  · intro hB
+    choose C hCpos hC using realSchwartz_weightedDeriv_integral_bounded B hB
+    have h := (schwartz_withSeminorms ℂ ℝ ℂ).isVonNBounded_iff_seminorm_bounded
+      (s := (𝓕 · : 𝓢(ℝ, ℂ) → 𝓢(ℝ, ℂ)) '' B)
+    have hFB : IsVonNBounded ℂ ((𝓕 · : 𝓢(ℝ, ℂ) → 𝓢(ℝ, ℂ)) '' B) := h.mpr (fun (k, n) ↦ by
+      let M := (2 * π) ^ n * (2 * (n : ℝ) + 2) ^ k *
+        ∑ p ∈ Finset.range (n + 1) ×ˢ Finset.range (k + 1), C p.1 p.2
+      have hM : 0 ≤ M := by
+        dsimp [M]
+        exact mul_nonneg (by positivity) (Finset.sum_nonneg fun p _ ↦ hCpos p.1 p.2)
+      refine ⟨M + 1, by linarith, ?_⟩
+      rintro _ ⟨f, hf, rfl⟩
+      apply lt_of_le_of_lt _ (lt_add_one M)
+      apply SchwartzMap.seminorm_le_bound ℂ k n _ hM
+      intro x
+      rw [SchwartzMap.fourier_coe]
+      apply (Real.pow_mul_norm_iteratedFDeriv_fourier_le (K := ⊤) (N := ⊤) (f.smooth ⊤)
+        (fun i j _ _ ↦ f.integrable_pow_mul_iteratedFDeriv volume i j) le_top le_top x).trans
+      dsimp [M]
+      gcongr with p _
+      exact hC p.1 p.2 f hf)
+    apply (hFB.image (FourierTransform.fourierInvCLM ℂ 𝓢(ℝ, ℂ))).subset
+    intro f hf
+    refine ⟨𝓕 f, ⟨f, hf, rfl⟩, ?_⟩
+    rw [FourierTransform.fourierInvCLM_apply, FourierTransform.fourierInv_fourier_eq]
 
 -- TODO(paper-gap): The last sum in (D.1.10.5) omits the constant term k = 0.
 -- For m = n = 0 and N = 1, bumps concentrated at 0 disprove that estimate.
@@ -747,7 +1723,10 @@ theorem ideleClassComponent_weightedSup_generates
 of the norm-one idele classes has image in their identity component. -/
 theorem normOneIdeleClass_direction_mem_connectedComponent
     (γ : LCATopologicalLie C₁[F]) (t : ℝ) :
-    γ (Multiplicative.ofAdd t) ∈ Subgroup.connectedComponentOfOne C₁[F] := by sorry
+    γ (Multiplicative.ofAdd t) ∈ Subgroup.connectedComponentOfOne C₁[F] := by
+  have : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+  exact (isPreconnected_range γ.continuous).subset_connectedComponent
+    ⟨1, map_one γ⟩ ⟨_, rfl⟩
 
 -- TODO(paper-gap): In D.1.10.9 the subgroup Γ is unbound. The stage S(k,C_F) in
 -- the title and conclusion uses the full group, which is compactly generated.

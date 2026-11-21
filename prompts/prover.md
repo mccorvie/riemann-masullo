@@ -20,7 +20,9 @@ where to find your issue, and how to hand in.
 ## Three acceptable results
 
 **Proved.** The `sorry` is gone and `#print axioms` on the declaration shows only `propext`,
-`Classical.choice` and `Quot.sound`.
+`Classical.choice` and `Quot.sound`. If it also shows `sorryAx` only because the statement or
+your proof uses other declarations whose proofs are still `sorry`, that is fine and still counts
+as proved: say so in the pull request. It is not a reason to report the issue as blocked.
 
 **Split.** If the proof is too large to finish, reduce it to a few intermediate lemmas, each
 stated precisely, each with a docstring, each proved by `sorry`, and prove the original
@@ -40,6 +42,18 @@ Put helper lemmas directly above the declaration in the same file. A lemma that 
 paper's objects and that Mathlib ought to have goes in `RiemannMasullo/ForMathlib/`, at the path
 Mathlib would use. Do not edit the statement of any existing declaration, and do not touch files
 outside `RiemannMasullo/`.
+
+## Keep the build fast
+
+A proof that Lean accepts slowly costs everyone: every later build, CI check and agent recompiles
+your file and all that imports it. Time the file before and after your change
+(`time lake build RiemannMasullo.<Chapter>.<File>` after touching it). If your proof adds more
+than about a minute, find the slow step (`set_option profiler true in` on the theorem) and
+restructure: usually a unification that has to unfold a large definition or match instances on a
+quotient or subtype, which goes away when the argument is stated as a private lemma about
+abstract spaces and then applied, or when `exact`/`refine` get explicit arguments and types.
+Do not hand in a proof that takes minutes to elaborate, and do not raise `maxHeartbeats` to get
+one through.
 
 ## Before you finish
 

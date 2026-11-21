@@ -185,6 +185,12 @@ ${review:-(none)}"
   git worktree add -q -B "$branch" "$wt" "$base"
   mkdir -p "$wt/.lake" "$wt/.agent"
   ln -sfn "$main/.lake/packages" "$wt/.lake/packages"   # share the built Mathlib
+  # Start from the main checkout's build of the library, so that only the modules that differ
+  # from it are compiled here. Lake checks every module against its sources, so a stale or
+  # half-written copy costs a rebuild of that module, nothing worse.
+  if [ -d "$main/.lake/build" ] && [ ! -e "$wt/.lake/build" ]; then
+    cp -a --reflink=auto "$main/.lake/build" "$wt/.lake/build" 2>/dev/null || rm -rf "$wt/.lake/build"
+  fi
   printf '%s\n' "$prompt" >"$wt/.agent/PROMPT.md"
   # Record every declaration's signature before the agent touches anything. It is kept outside
   # the worktree so the agent cannot alter it. This also builds the project once for the agent.

@@ -730,6 +730,23 @@ theorem tendsto_rectangleResidueSum :
     (hVertical σ₁ ⟨hσ₁, hσ.trans hσ₂⟩ (by simp))
   simpa only [zero_sub, neg_zero, zero_add] using (hLim.div_const twoPiI).congr' hIdentity
 
+omit ha hb hΦ hσ hSides hHeights in
+/-- The circle residue depends only on the germ on a punctured neighborhood. -/
+private theorem complexResidue_congr {f g : ℂ → ℂ} {ρ : ℂ}
+    (h : f =ᶠ[𝓝[≠] ρ] g) : complexResidue f ρ = complexResidue g ρ := by
+  obtain ⟨R, hR, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp h
+  unfold complexResidue Filter.limUnder
+  apply congrArg Filter.lim
+  apply Filter.map_congr
+  filter_upwards [Ioo_mem_nhdsGT hR] with r hr
+  congr 1
+  apply circleIntegral.integral_congr hr.1.le
+  intro z hz
+  have hdist := Metric.mem_sphere.mp hz
+  refine hEq ⟨Metric.mem_ball.mpr (hdist.trans_lt hr.2), mem_compl_singleton_iff.mpr ?_⟩
+  rintro rfl
+  exact hr.1.ne (by simpa using hdist)
+
 /-- Paper: Theorem B.3.2.1(1)–(2), p. 606. If the poles between the chosen
 lines are simple, the finite sums with weights `Φ ρ * complexResidue f ρ`
 converge to the normalized difference of vertical integrals.
@@ -744,7 +761,31 @@ theorem tendsto_rectangleResidueSum_of_simplePoles
           hT.2.1 hσ₁ hσ₂).toFinset, Φ ρ * complexResidue f ρ)
       atTop
       (𝓝 ((verticalLineIntegral (fun z ↦ Φ z * f z) σ₂ -
-        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by sorry
+        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by
+  refine (tendsto_rectangleResidueSum hT ha hb hΦ hσ₁ hσ hσ₂ hSides hHeights).congr ?_
+  intro k
+  apply Finset.sum_congr rfl
+  intro ρ hρ
+  let hFinite := finite_rectanglePoles (t₁ := T (-(k : ℤ))) (t₂ := T (k : ℤ))
+    hT.2.1 hσ₁ hσ₂
+  have hPole := hFinite.mem_toFinset.mp hρ
+  have hLeft := hσ₁.trans hPole.1.1
+  have hRight := hPole.1.2.trans hσ₂
+  have hf : MeromorphicAt f ρ := hT.2.1 ρ ⟨hLeft, hRight⟩
+  have hΦρ : AnalyticAt ℂ Φ ρ :=
+    hΦ.2.1.analyticAt ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+      ⟨ha.trans hLeft, hRight.trans hb⟩)
+  obtain ⟨g, hg, -, he⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) hf).mp
+    (hSimple ρ hPole.1 hPole.2.2)
+  have hDiv : f =ᶠ[𝓝[≠] ρ] (fun z ↦ g z / (z - ρ)) := by
+    filter_upwards [he] with z hz
+    simpa only [zpow_neg_one, smul_eq_mul, div_eq_inv_mul] using hz
+  have hMul : (fun z ↦ Φ z * f z) =ᶠ[𝓝[≠] ρ] (fun z ↦ (Φ z * g z) / (z - ρ)) := by
+    filter_upwards [hDiv] with z hz
+    rw [hz, mul_div_assoc]
+  rw [complexResidue_congr hMul,
+    complexResidue_div_sub (g := fun z ↦ Φ z * g z) (hΦρ.mul hg),
+    complexResidue_congr hDiv, complexResidue_div_sub hg]
 
 end AsymptoticResidue
 

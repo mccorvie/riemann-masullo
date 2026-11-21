@@ -9,6 +9,9 @@ public import Mathlib.MeasureTheory.Group.Integral
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
+public import Mathlib.Topology.ContinuousMap.CompactlySupported
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
+import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SmoothFamily
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
@@ -38,6 +41,7 @@ import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Constructions.Polish.StronglyMeasurable
 import Mathlib.Analysis.Normed.Operator.Extend
 import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
+import Mathlib.MeasureTheory.Measure.WithDensity
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -1114,6 +1118,143 @@ private theorem isLCAPlancherelMeasure_of_compactSupport
   · simp_rw [h _ (hg _).1 (hg _).2]
     simpa only [Lp.eNorm_toLp] using ht.eNorm
 
+open scoped CompactlySupported in
+/-- The autocorrelation of a continuous compactly supported function is the
+Fourier–Stieltjes transform of a finite regular positive measure on the dual.
+This is the autocorrelation case of Bochner's theorem. -/
+theorem exists_lcaAutocorrelation_measure (f : C_c(G, ℂ)) :
+    ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
+      ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+        lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x := by
+  sorry
+
+open scoped CompactlySupported in
+/-- Averaging the weighted spectral measures of two autocorrelations over dual
+translations gives this identity on each measurable set. For a dual character `a`,
+the spectral measure of `f` modulated by `a` is the translate of its spectral
+measure by `a`. Weight that translate by the squared Fourier magnitude of `g`,
+or weight the spectral measure of `g` by the shifted squared Fourier magnitude
+of `f`. The two measures have the same Fourier–Stieltjes transform by
+commutativity of convolution. Integrate the resulting identity over `a`
+against the fixed Haar measure `η`. -/
+theorem lcaAutocorrelation_measure_mul_lintegral
+    (η : Measure (PontryaginDual G)) [η.IsHaarMeasure] [η.Regular]
+    (f g : C_c(G, ℂ)) (ρ σ : Measure (PontryaginDual G))
+    [IsFiniteMeasure ρ] [ρ.Regular] [IsFiniteMeasure σ] [σ.Regular]
+    (hρ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+      lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x)
+    (hσ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂σ) =
+      lcaConvolution μ g (fun y ↦ star (g y⁻¹)) x)
+    {s : Set (PontryaginDual G)} (hs : MeasurableSet s) :
+    (∫⁻ χ, ‖lcaFourier μ f χ‖ₑ ^ 2 ∂η) * σ s =
+      ρ univ * (∫⁻ χ in s, ‖lcaFourier μ g χ‖ₑ ^ 2 ∂η) := by
+  sorry
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [μ.Regular] in
+open scoped CompactlySupported in
+/-- Evaluating the Fourier–Stieltjes representation at the identity identifies
+the total mass with the integral of the squared source norm. -/
+private theorem lcaAutocorrelation_measure_univ (f : C_c(G, ℂ))
+    (ρ : Measure (PontryaginDual G)) [IsFiniteMeasure ρ]
+    (hρ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+      lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x) :
+    ρ univ = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ := by
+  have hSqC : Continuous (fun x ↦ ‖f x‖ ^ 2) := f.continuous.norm.pow 2
+  have hSqK : HasCompactSupport (fun x ↦ ‖f x‖ ^ 2) :=
+    f.hasCompactSupport.norm.comp_left (g := fun t : ℝ ↦ t ^ 2) (by simp)
+  have hAuto : lcaConvolution μ f (fun y ↦ star (f y⁻¹)) 1 =
+      ((∫ x, ‖f x‖ ^ 2 ∂μ : ℝ) : ℂ) := by
+    rw [lcaConvolution, ← integral_complex_ofReal]
+    apply integral_congr_ae
+    exact .of_forall fun x ↦ by
+      simp [Complex.mul_conj, Complex.normSq_eq_norm_sq]
+  have h := congrArg Complex.re (hρ 1)
+  simp only [map_one, Circle.coe_one, integral_const, Complex.real_smul, mul_one,
+    Complex.ofReal_re, hAuto] at h
+  rw [← ENNReal.ofReal_toReal (measure_ne_top ρ univ)]
+  change ENNReal.ofReal (ρ.real univ) = _
+  rw [h, ofReal_integral_eq_lintegral_ofReal (hSqC.integrable_of_hasCompactSupport hSqK)
+    (.of_forall fun x ↦ sq_nonneg _)]
+  exact lintegral_congr fun x ↦ by rw [ENNReal.ofReal_pow (norm_nonneg _), ofReal_norm]
+
+open scoped CompactlySupported in
+/-- A nonnegative compactly supported bump fixes the normalization of Haar measure
+on the dual. Its spectral measure gives positive mass to a compact set, so the
+averaging identity on that set ensures its squared Fourier integral is finite. -/
+private theorem exists_lcaFourier_weighted_haar
+    (ρ : C_c(G, ℂ) → Measure (PontryaginDual G))
+    (hρ : ∀ f, IsFiniteMeasure (ρ f) ∧ (ρ f).Regular ∧
+      ∀ x : G, (∫ χ, (χ x : ℂ) ∂(ρ f)) =
+        lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x) :
+    ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
+      ∀ f : C_c(G, ℂ), ν.withDensity (fun χ ↦ ‖lcaFourier μ f χ‖ₑ ^ 2) = ρ f := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let η : Measure (PontryaginDual G) := MeasureTheory.Measure.haar
+  let (g : C_c(G, ℂ)) : IsFiniteMeasure (ρ g) := (hρ g).1
+  let (g : C_c(G, ℂ)) : (ρ g).Regular := (hρ g).2.1
+  obtain ⟨b, hbK, hb₀, hb₁⟩ := exists_continuous_nonneg_pos (1 : G)
+  let f : C_c(G, ℂ) := ⟨⟨fun x ↦ (b x : ℂ), Complex.continuous_ofReal.comp b.continuous⟩,
+    hbK.comp_left Complex.ofReal_zero⟩
+  let w (g : C_c(G, ℂ)) (χ : PontryaginDual G) := ‖lcaFourier μ g χ‖ₑ ^ 2
+  have hf₁ : f 1 ≠ 0 := Complex.ofReal_ne_zero.mpr hb₁
+  have hw (g : C_c(G, ℂ)) : Continuous (w g) :=
+    ENNReal.continuous_coe.comp ((continuous_lcaFourier μ g.integrable).nnNorm.pow 2)
+  have hfSq : Continuous (fun x ↦ ‖f x‖ₑ ^ 2) :=
+    ENNReal.continuous_coe.comp (f.continuous.nnNorm.pow 2)
+  have hM : ρ f univ ≠ 0 := by
+    rw [lcaAutocorrelation_measure_univ μ f (ρ f) (hρ f).2.2]
+    apply ne_of_gt
+    apply (lintegral_pos_iff_support hfSq.measurable).2
+    exact (isOpen_ne_fun hfSq continuous_const).measure_pos μ
+      ⟨1, show ‖f 1‖ₑ ^ 2 ≠ 0 by simpa using hf₁⟩
+  have hF₁ : lcaFourier μ f 1 ≠ 0 := by
+    rw [lcaFourier_one μ f f.integrable]
+    change (∫ x, (b x : ℂ) ∂μ) ≠ 0
+    rw [integral_complex_ofReal]
+    exact Complex.ofReal_ne_zero.mpr
+      (b.continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero hbK hb₀ hb₁).ne'
+  let I : ℝ≥0∞ := ∫⁻ χ, w f χ ∂η
+  have hI₀ : I ≠ 0 := by
+    apply ne_of_gt
+    apply (lintegral_pos_iff_support (hw f).measurable).2
+    exact (isOpen_ne_fun (hw f) continuous_const).measure_pos η
+      ⟨1, show w f 1 ≠ 0 by simpa [w] using hF₁⟩
+  obtain ⟨K, -, hK, hKpos⟩ := MeasurableSet.univ.exists_lt_isCompact (pos_iff_ne_zero.mpr hM)
+  have hI_top : I ≠ ⊤ := by
+    intro h
+    have hAvg := lcaAutocorrelation_measure_mul_lintegral μ η f f (ρ f) (ρ f)
+      (hρ f).2.2 (hρ f).2.2 hK.isClosed.measurableSet
+    change I * ρ f K = ρ f univ * (∫⁻ χ in K, w f χ ∂η) at hAvg
+    rw [h, ENNReal.top_mul hKpos.ne'] at hAvg
+    have hBound (χ : PontryaginDual G) : w f χ ≤ ENNReal.ofReal (∫ x, ‖f x‖ ∂μ) ^ 2 := by
+      change ‖lcaFourier μ f χ‖ₑ ^ 2 ≤ _
+      rw [← ofReal_norm]
+      exact pow_le_pow_left' (ENNReal.ofReal_le_ofReal
+        (norm_lcaFourier_le_integral_norm μ f χ)) _
+    have hFinite : (∫⁻ χ in K, w f χ ∂η) < ⊤ := by
+      refine (lintegral_mono hBound).trans_lt ?_
+      rw [setLIntegral_const]
+      exact ENNReal.mul_lt_top (ENNReal.pow_lt_top ENNReal.ofReal_lt_top) hK.measure_lt_top
+    exact (ENNReal.mul_lt_top (measure_lt_top (ρ f) univ) hFinite).ne hAvg.symm
+  let c := ρ f univ * I⁻¹
+  have hc₀ : c ≠ 0 := mul_ne_zero hM (ENNReal.inv_ne_zero.mpr hI_top)
+  have hc_top : c ≠ ⊤ :=
+    ENNReal.mul_ne_top (measure_ne_top (ρ f) univ) (ENNReal.inv_ne_top.mpr hI₀)
+  refine ⟨c • η, Measure.IsHaarMeasure.smul η hc₀ hc_top, Measure.Regular.smul hc_top, ?_⟩
+  intro g
+  ext1 s hs
+  have hAvg := lcaAutocorrelation_measure_mul_lintegral μ η f g (ρ f) (ρ g)
+    (hρ f).2.2 (hρ g).2.2 hs
+  change I * ρ g s = ρ f univ * (∫⁻ χ in s, w g χ ∂η) at hAvg
+  change (c • η).withDensity (w g) s = _
+  rw [withDensity_apply _ hs, setLIntegral_smul_measure, smul_eq_mul]
+  calc
+    c * (∫⁻ χ in s, w g χ ∂η) = I⁻¹ * (ρ f univ * (∫⁻ χ in s, w g χ ∂η)) := by
+      dsimp [c]
+      ac_rfl
+    _ = ρ g s := by rw [← hAvg, ← mul_assoc, ENNReal.inv_mul_cancel hI₀ hI_top, one_mul]
+
+open scoped CompactlySupported in
 /-- There is a regular Haar measure on the dual for which the Fourier transform
 preserves the L² norm of every continuous compactly supported function. It suffices
 to construct this measure by Fourier inversion at the identity for autocorrelations
@@ -1122,7 +1263,25 @@ theorem exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport :
     ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
       ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
         eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ := by
-  sorry
+  choose ρ hρ using exists_lcaAutocorrelation_measure μ
+  obtain ⟨ν, hHaar, hRegular, hDensity⟩ := exists_lcaFourier_weighted_haar μ ρ hρ
+  refine ⟨ν, hHaar, hRegular, fun f hf hs ↦ ?_⟩
+  let g : C_c(G, ℂ) := ⟨⟨f, hf⟩, hs⟩
+  let : IsFiniteMeasure (ρ g) := (hρ g).1
+  have hMass : ρ g univ = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ :=
+    lcaAutocorrelation_measure_univ μ g (ρ g) (hρ g).2.2
+  have hSqEq : (∫⁻ χ, ‖lcaFourier μ f χ‖ₑ ^ 2 ∂ν) = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ := by
+    have h := congrArg (fun m : Measure (PontryaginDual G) ↦ m univ) (hDensity g)
+    change (ν.withDensity (fun χ ↦ ‖lcaFourier μ f χ‖ₑ ^ 2)) univ = ρ g univ at h
+    rwa [withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ, hMass] at h
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hFourier := continuous_lcaFourier μ (hf.integrable_of_hasCompactSupport (μ := μ) hs)
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+    hFourier.aestronglyMeasurable,
+    eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+      hf.aestronglyMeasurable]
+  simp only [ENNReal.toReal_ofNat, ENNReal.rpow_ofNat]
+  rw [hSqEq]
 
 /-- Paper: Lemma D.1.1.2(4), p. 747. There is exactly one Plancherel measure. -/
 theorem lcaPlancherelMeasure_existsUnique :
@@ -2222,11 +2381,308 @@ theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
   rw [← hsurj.image_preimage (f ⁻¹' s)]
   exact hq.measurableSet_image' (hrestrict hs)
 
+include hbij in
+/-- Every point has a unique right `H`-translate in the Borel section `Δ`. -/
+private lemma weilSection_existsUnique (x : G) : ∃! γ : H.op, γ • x ∈ Δ := by
+  obtain ⟨d, hd⟩ := hbij.2 (QuotientGroup.mk x)
+  have hmem : x⁻¹ * (d : G) ∈ H := by
+    simpa [mul_inv_rev, inv_inv] using H.inv_mem ((QuotientGroup.eq).mp hd)
+  let g : H.op := H.equivOp ⟨x⁻¹ * (d : G), hmem⟩
+  have hgx : g • x = (d : G) := by
+    have hg : (g : Gᵐᵒᵖ) = MulOpposite.op (x⁻¹ * (d : G)) := rfl
+    rw [Submonoid.smul_def, hg, MulOpposite.smul_eq_mul_unop]
+    simp
+  refine ExistsUnique.intro g (hgx ▸ d.property) ?_
+  intro g' hg'
+  have hmk (γ : H.op) :
+      QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+    rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+    simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+  let a : Δ := ⟨g • x, hgx ▸ d.property⟩
+  let b : Δ := ⟨g' • x, hg'⟩
+  have hab : a = b := hbij.1 ((hmk g).trans (hmk g').symm)
+  have hgx' : g • x = g' • x := congrArg Subtype.val hab
+  rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+    MulOpposite.smul_eq_mul_unop] at hgx'
+  exact Subtype.ext <| MulOpposite.unop_injective <| mul_left_cancel hgx'.symm
+
+include hΔ hbij in
+/-- A Borel set meeting every coset exactly once is a strict fundamental domain for the
+right action of `H`. -/
+private lemma weilSection_isFundamentalDomain :
+    IsFundamentalDomain H.op Δ μ :=
+  IsFundamentalDomain.mk' hΔ.nullMeasurableSet (weilSection_existsUnique H hbij)
+
+/-- Right multiplication by `H` does not change the coset. -/
+private lemma weilSection_mk_smul (γ : H.op) (x : G) :
+    QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+  rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+  simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Integrability on the quotient
 can be tested on the pullback restricted to a Borel fundamental domain. -/
 theorem weilFundamentalDomain_integrable_iff (f : G ⧸ H → ℂ) :
-    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by sorry
+    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by
+  haveI : IsClosed (H : Set G) := hH
+  letI : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  haveI : Countable H :=
+    (TopologicalSpace.separableSpace_iff_countable (α := H)).1 inferInstance
+  haveI : Countable H.op := Countable.of_equiv H H.equivOp
+  haveI : MeasurableConstSMul H.op G :=
+    ⟨fun γ ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measurable_mul_const _⟩
+  haveI : SMulInvariantMeasure H.op G μ :=
+    ⟨fun γ s _hs ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measure_preimage_mul_right μ _ s⟩
+  let π : G → G ⧸ H := QuotientGroup.mk
+  have hπ : Measurable π := QuotientGroup.continuous_mk.measurable
+  have hfund : IsFundamentalDomain H.op Δ μ := weilSection_isFundamentalDomain H μ hΔ hbij
+  have hfundImage (g : G) : IsFundamentalDomain H.op ((fun y ↦ g * y) '' Δ) μ := by
+    refine IsFundamentalDomain.mk'
+      ((measurableEmbedding_mulLeft g).measurableSet_image.mpr hΔ).nullMeasurableSet fun x ↦ ?_
+    obtain ⟨γ, hγ, huniq⟩ := weilSection_existsUnique H hbij (g⁻¹ * x)
+    have hcomm : γ • x = g * (γ • (g⁻¹ * x)) := by
+      rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+        MulOpposite.smul_eq_mul_unop]
+      simp [mul_assoc]
+    refine ExistsUnique.intro γ ?_ ?_
+    · rw [hcomm]
+      exact ⟨γ • (g⁻¹ * x), hγ, rfl⟩
+    · intro γ' hγ'
+      apply huniq
+      have hcomm' : γ' • (g⁻¹ * x) = g⁻¹ * (γ' • x) := by
+        rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+          MulOpposite.smul_eq_mul_unop]
+        simp [mul_assoc]
+      rw [hcomm']
+      obtain ⟨y, hy, hyx⟩ := hγ'
+      have hyx' : g⁻¹ * (γ' • x) = y := by
+        rw [← hyx]
+        simp
+      simpa [hyx'] using hy
+  have hpush (g : G) :
+      (μ.restrict ((fun y ↦ g * y) '' Δ)).map π = (μ.restrict Δ).map π := by
+    ext U hU
+    have hpre : MeasurableSet (π ⁻¹' U) := hU.preimage hπ
+    rw [Measure.map_apply hπ hU, Measure.restrict_apply hpre, Measure.map_apply hπ hU,
+      Measure.restrict_apply hpre]
+    refine (hfund.measure_set_eq (hfundImage g) hpre ?_).symm
+    intro γ
+    ext y
+    simp only [Set.mem_preimage, π]
+    rw [weilSection_mk_smul H γ y]
+  let νΔ : Measure (G ⧸ H) := (μ.restrict Δ).map π
+  haveI : νΔ.IsMulLeftInvariant := by
+    refine ⟨fun q ↦ ?_⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    let L : G → G := fun x ↦ g * x
+    let LQ : G ⧸ H → G ⧸ H := fun r ↦ π g * r
+    have hpres : MeasurePreserving L (μ.restrict Δ) (μ.restrict (L '' Δ)) :=
+      (measurePreserving_mul_left μ g).restrict_image_emb (measurableEmbedding_mulLeft g) Δ
+    have hcomp : LQ ∘ π = π ∘ L := by
+      ext x
+      simp [LQ, L, π, QuotientGroup.mk_mul]
+    calc
+      Measure.map LQ νΔ = Measure.map LQ (Measure.map π (μ.restrict Δ)) := rfl
+      _ = Measure.map (LQ ∘ π) (μ.restrict Δ) :=
+        Measure.map_map (measurable_const_mul (π g)) hπ
+      _ = Measure.map (π ∘ L) (μ.restrict Δ) := by rw [hcomp]
+      _ = Measure.map π (Measure.map L (μ.restrict Δ)) :=
+        (Measure.map_map hπ (measurable_const_mul g)).symm
+      _ = Measure.map π (μ.restrict (L '' Δ)) := by rw [hpres.map_eq]
+      _ = νΔ := by rw [hpush g]
+  have hdisc : IsDiscrete (H : Set G) :=
+    (SetLike.isDiscrete_iff_discreteTopology).2 inferInstance
+  obtain ⟨U, hU, -, hsep⟩ := hdisc.exists_nhds_eq_one_of_image_mulRight_inter_nonempty
+  obtain ⟨K0, hK0, hK0n⟩ := exists_compact_mem_nhds (1 : G)
+  have hmem : K0 ∩ U ∈ 𝓝 (1 : G) := Filter.inter_mem hK0n hU
+  obtain ⟨W, hWsub, hWo, hW1⟩ := mem_nhds_iff.mp hmem
+  have hWcl : IsCompact (closure W) :=
+    IsCompact.of_isClosed_subset hK0 isClosed_closure
+      (closure_minimal (hWsub.trans inter_subset_left) hK0.isClosed)
+  have hWlt : μ W < (⊤ : ℝ≥0∞) :=
+    lt_of_le_of_lt (measure_mono subset_closure) hWcl.measure_lt_top
+  have hWpos : 0 < μ W := hWo.measure_pos μ ⟨1, hW1⟩
+  have hWU : W ⊆ U := hWsub.trans inter_subset_right
+  let leftPiece (h : H) : Set G := W ∩ (fun x ↦ x * (h : G)) '' Δ
+  let rightPiece (h : H) : Set G := (fun x ↦ x * (h : G)) '' W ∩ Δ
+  have hleftMeas (h : H) : MeasurableSet (leftPiece h) :=
+    hWo.measurableSet.inter ((measurableEmbedding_mulRight (h : G)).measurableSet_image.mpr hΔ)
+  have hrightMeas (h : H) : MeasurableSet (rightPiece h) :=
+    ((Homeomorph.mulRight (h : G)).isOpenMap W hWo).measurableSet.inter hΔ
+  have hdisjL : Pairwise fun h₁ h₂ ↦ Disjoint (leftPiece h₁) (leftPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨-, d₁, hd₁, rfl⟩
+    rcases hz₂ with ⟨-, d₂, hd₂, hd₂eq⟩
+    have hsame : QuotientGroup.mk (s := H) d₁ = QuotientGroup.mk (s := H) d₂ := by
+      rw [QuotientGroup.eq]
+      have heq : d₂ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          d₂ * (h₂ : G) = d₁ * (h₁ : G) := hd₂eq
+          _ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have heqd : d₁ = d₂ := by
+      have hsub : (⟨d₁, hd₁⟩ : Δ) = ⟨d₂, hd₂⟩ := hbij.1 (by simpa using hsame)
+      simpa using congrArg Subtype.val hsub
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := d₁)
+      calc d₁ * (h₁ : G) = d₂ * (h₂ : G) := hd₂eq.symm
+        _ = d₁ * (h₂ : G) := by rw [heqd]
+    exact hne (Subtype.ext hh)
+  have hdisjR : Pairwise fun h₁ h₂ ↦ Disjoint (rightPiece h₁) (rightPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨⟨w₁, hw₁, rfl⟩, -⟩
+    rcases hz₂ with ⟨⟨w₂, hw₂, hw₂eq⟩, -⟩
+    have hmk : QuotientGroup.mk (s := H) w₁ = QuotientGroup.mk (s := H) w₂ := by
+      rw [QuotientGroup.eq]
+      have heq : w₂ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          w₂ * (h₂ : G) = w₁ * (h₁ : G) := hw₂eq
+          _ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have hrel : w₁⁻¹ * w₂ ∈ H := (QuotientGroup.eq).mp hmk
+    have hone : w₁⁻¹ * w₂ = 1 := by
+      apply hsep _ hrel
+      exact ⟨w₂, ⟨w₁, hWU hw₁, by simp⟩, hWU hw₂⟩
+    have hw12 : w₁ = w₂ := by
+      have : w₁ * (w₁⁻¹ * w₂) = w₁ := by simp [hone]
+      exact (by simpa using this : w₂ = w₁).symm
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := w₁)
+      calc w₁ * (h₁ : G) = w₂ * (h₂ : G) := hw₂eq.symm
+        _ = w₁ * (h₂ : G) := by rw [hw12]
+    exact hne (Subtype.ext hh)
+  have hcoverL : ⋃ h : H, leftPiece h = W := by
+    ext w
+    constructor
+    · rintro ⟨-, ⟨h, rfl⟩, hw, -⟩
+      exact hw
+    · intro hw
+      obtain ⟨d, hd⟩ := hbij.2 (π w)
+      have hh : (d : G)⁻¹ * w ∈ H := (QuotientGroup.eq).mp hd
+      refine mem_iUnion.2 ⟨⟨(d : G)⁻¹ * w, hh⟩, hw, ⟨d, d.property, ?_⟩⟩
+      exact mul_inv_cancel_left (d : G) w
+  have hcoverR : ⋃ h : H, rightPiece h = π ⁻¹' (π '' W) ∩ Δ := by
+    ext z
+    constructor
+    · rintro ⟨_, ⟨h, rfl⟩, ⟨w, hw, rfl⟩, hz⟩
+      exact ⟨⟨w, hw, by simpa [π] using (QuotientGroup.mk_mul w (h : G)).symm⟩, hz⟩
+    · rintro ⟨⟨w, hw, hwz⟩, hz⟩
+      have hh : w⁻¹ * z ∈ H := (QuotientGroup.eq).mp (by simpa [π] using hwz)
+      refine mem_iUnion.2 ⟨⟨w⁻¹ * z, hh⟩, ⟨w, hw, ?_⟩, hz⟩
+      exact mul_inv_cancel_left w z
+  have hμ (h : H) : μ (leftPiece h) = μ (rightPiece h⁻¹) := by
+    have hpre : (fun y ↦ y * (h : G)⁻¹) ⁻¹' rightPiece h⁻¹ = leftPiece h := by
+      ext y
+      constructor
+      · intro hy
+        obtain ⟨⟨w, hw, hwz⟩, hyΔ⟩ := hy
+        have hwz' : w = y := by simpa using hwz
+        have hyw : y = w := hwz'.symm
+        subst hyw
+        exact ⟨hw, y * (h : G)⁻¹, hyΔ, by simp⟩
+      · rintro ⟨hyW, d, hd, hd'⟩
+        refine ⟨⟨y, hyW, rfl⟩, ?_⟩
+        have hd'' : d * (h : G) = y := by simpa using hd'
+        rw [← hd'']
+        simpa using hd
+    rw [← hpre]
+    exact measure_preimage_mul_right μ ((h : G)⁻¹) (rightPiece h⁻¹)
+  have hmass : νΔ (π '' W) = μ W := by
+    have hopen : IsOpen (π '' W) := QuotientGroup.isOpenMap_coe W hWo
+    rw [Measure.map_apply hπ hopen.measurableSet,
+      Measure.restrict_apply (hopen.measurableSet.preimage hπ), ← hcoverR,
+      measure_iUnion hdisjR hrightMeas]
+    have hre : (∑' h : H, μ (rightPiece h)) = ∑' h : H, μ (leftPiece h) := by
+      simp_rw [fun h : H ↦ (by simpa using (hμ h⁻¹).symm : μ (rightPiece h) = μ (leftPiece h⁻¹))]
+      exact (Equiv.inv H).tsum_eq (fun h ↦ μ (leftPiece h))
+    rw [hre, ← measure_iUnion hdisjL hleftMeas, hcoverL]
+  let S (g : G) : Set (G ⧸ H) := (fun r ↦ π g * r) '' (π '' W)
+  haveI : IsFiniteMeasureOnCompacts νΔ := by
+    refine ⟨fun K hK ↦ ?_⟩
+    have hsub : K ⊆ ⋃ g : G, S g := by
+      intro q _
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+      refine mem_iUnion.2 ⟨x, ⟨1, ?_, by simp [π]⟩⟩
+      exact ⟨1, hW1, by simp [π]⟩
+    have hSopen (g : G) : IsOpen (S g) :=
+      (Homeomorph.mulLeft (π g)).isOpenMap _ (QuotientGroup.isOpenMap_coe W hWo)
+    obtain ⟨t, ht⟩ := hK.elim_finite_subcover S hSopen hsub
+    have hpiece (g : G) : νΔ (S g) = νΔ (π '' W) := by
+      have him : S g = (fun r ↦ (π g)⁻¹ * r) ⁻¹' (π '' W) := by
+        ext r
+        constructor
+        · rintro ⟨r', hr', rfl⟩
+          have : (π g)⁻¹ * (π g * r') = r' := by
+            rw [← mul_assoc, inv_mul_cancel, one_mul]
+          simpa [this] using hr'
+        · intro hr
+          refine ⟨(π g)⁻¹ * r, hr, ?_⟩
+          change π g * ((π g)⁻¹ * r) = r
+          rw [← mul_assoc, mul_inv_cancel, one_mul]
+      rw [him, measure_preimage_mul]
+    have hle : νΔ K ≤ ∑ g ∈ t, νΔ (S g) :=
+      (measure_mono ht).trans (measure_biUnion_finset_le t S)
+    have hsum : ∑ g ∈ t, νΔ (S g) = (t.card : ℝ≥0∞) * νΔ (π '' W) := by
+      simp [hpiece, Finset.sum_const, nsmul_eq_mul]
+    rw [hsum, hmass] at hle
+    exact lt_of_le_of_lt hle (ENNReal.mul_lt_top (lt_top_iff_ne_top.mpr (ENNReal.natCast_ne_top _)) hWlt)
+  haveI : Measure.IsHaarMeasure ν := hν.1
+  have hscale : νΔ = Measure.haarScalarFactor νΔ ν • ν :=
+    Measure.isMulLeftInvariant_eq_smul νΔ ν
+  have hc0 : Measure.haarScalarFactor νΔ ν ≠ 0 := by
+    intro h0
+    have hzeroμ : νΔ = (0 : Measure (G ⧸ H)) := by simpa [h0] using hscale
+    have hzero : νΔ (π '' W) = 0 := by simp [hzeroμ]
+    exact hWpos.ne' (hmass.symm.trans hzero)
+  have hiffν : Integrable f ν ↔ Integrable f νΔ := by
+    rw [hscale]
+    exact (integrable_smul_measure (c := (Measure.haarScalarFactor νΔ ν : ℝ≥0∞))
+      (by exact_mod_cast hc0) ENNReal.coe_ne_top).symm
+  haveI : PolishSpace G := by
+    letI : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+    haveI : IsUniformGroup G := isUniformGroup_of_commGroup (G := G)
+    haveI : CompleteSpace G :=
+      IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace (G := G)
+    haveI := IsUniformGroup.uniformity_countably_generated (α := G)
+    infer_instance
+  have hinj : InjOn π Δ := by
+    intro a ha b hb hab
+    have hsub : (⟨a, ha⟩ : Δ) = ⟨b, hb⟩ := hbij.1 (by simpa using hab)
+    exact congrArg Subtype.val hsub
+  have hemb : MeasurableEmbedding (Δ.domRestrict π) :=
+    ContinuousOn.measurableEmbedding (f := π) hΔ QuotientGroup.continuous_mk.continuousOn hinj
+  have hmap : νΔ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := by
+    have hsub : (μ.comap ((↑) : Δ → G)).map ((↑) : Δ → G) = μ.restrict Δ := by
+      rw [(MeasurableEmbedding.subtype_coe hΔ).map_comap, Subtype.range_coe]
+    calc
+      νΔ = Measure.map π (μ.restrict Δ) := rfl
+      _ = Measure.map π (Measure.map ((↑) : Δ → G) (μ.comap ((↑) : Δ → G))) := by rw [← hsub]
+      _ = Measure.map (π ∘ ((↑) : Δ → G)) (μ.comap ((↑) : Δ → G)) :=
+        Measure.map_map hπ continuous_subtype_val.measurable
+      _ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := rfl
+  rw [hiffν, hmap, hemb.integrable_map_iff]
+  have hfun : (fun x : Δ ↦ f (π (x : G))) = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) := rfl
+  rw [show f ∘ Δ.domRestrict π = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) from hfun]
+  rw [← integrableOn_iff_comap_subtypeVal (f := fun x ↦ f (π x)) hΔ,
+    integrable_indicator_iff hΔ]
 
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. The integral on the quotient
@@ -2276,6 +2732,8 @@ theorem weilFundamentalDomain_integral {f : G ⧸ H → ℂ} (hf : Integrable f 
   rw [← hmap] at hf ⊢
   exact integral_map hπ.aemeasurable hf.aestronglyMeasurable
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Corollary D.1.2.5, p. 748. The integral of a subgroup-invariant function
 over one Borel fundamental domain agrees with its integral over any other such domain. -/
@@ -2283,7 +2741,34 @@ theorem weilFundamentalDomain_integral_eq (hΔ' : MeasurableSet Δ')
     (hbij' : Function.Bijective (fun x : Δ' ↦ (QuotientGroup.mk x.val : G ⧸ H)))
     {f : G → ℂ} (hf : Measurable f) (hinv : ∀ (x : G) (h : H), f (x * (h : G)) = f x)
     (hint : IntegrableOn f Δ μ) :
-    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by sorry
+    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hdomain {D : Set G} (hD : MeasurableSet D)
+      (hDq : Function.Bijective (fun x : D ↦ (QuotientGroup.mk x.val : G ⧸ H))) :
+      IsFundamentalDomain H D μ := by
+    apply IsFundamentalDomain.mk' hD.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hDq.surjective (QuotientGroup.mk x)
+    let h : H := ⟨x⁻¹ * (y : G), QuotientGroup.eq.mp hy.symm⟩
+    have hh : (h : G) * x = (y : G) := by
+      change (x⁻¹ * (y : G)) * x = (y : G)
+      rw [mul_comm, mul_inv_cancel_left]
+    refine ⟨h, ?_, ?_⟩
+    · change (h : G) * x ∈ D
+      rw [hh]
+      exact y.property
+    · intro k hk
+      have hkq : (QuotientGroup.mk ((k : G) * x) : G ⧸ H) = QuotientGroup.mk x := by
+        rw [mul_comm, QuotientGroup.mk_mul_of_mem x k.property]
+      have hky : (⟨(k : G) * x, hk⟩ : D) = y := hDq.injective (hkq.trans hy.symm)
+      exact Subtype.ext (mul_right_cancel ((congrArg Subtype.val hky).trans hh.symm))
+  have hs := hdomain hΔ hbij
+  have ht := hdomain hΔ' hbij'
+  have hsmul (h : H) (x : G) : f (h • x) = f x := by
+    change f ((h : G) * x) = f x
+    rw [mul_comm, hinv]
+  exact ⟨⟨hf.aestronglyMeasurable, (hs.hasFiniteIntegral_on_iff ht hsmul).mp hint.2⟩,
+    hs.setIntegral_eq ht hsmul⟩
 
 end FundamentalDomain
 
@@ -2524,7 +3009,130 @@ theorem elementarySchwartzSubmodule_real_iff
     (f : EuclideanSpace ℝ (Fin m) → ℂ) :
     (fun g : ElementaryLieGroup m 0 0 PUnit ↦ f g.1) ∈
         elementarySchwartzSubmodule m 0 0 PUnit ↔
-      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by sorry
+      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by
+  classical
+  let E := EuclideanSpace ℝ (Fin m)
+  let X := E × EuclideanSpace ℝ (Fin 0)
+  let g : ElementaryLieGroup m 0 0 PUnit → ℂ := fun p ↦ f p.1
+  let P : X →L[ℝ] E := ContinuousLinearMap.fst ℝ E _
+  let J : E →L[ℝ] X := ContinuousLinearMap.inl ℝ E _
+  let coord (j : Fin m) : E := EuclideanSpace.single j 1
+  let liftedCoord (j : Fin m) : X := (coord j, 0)
+  let directions (β : Fin m → ℕ) := (List.ofFn fun j ↦ List.replicate (β j) (liftedCoord j)).flatten
+  let mixedPartial (β : Fin m → ℕ) (x : E) : ℂ :=
+    iteratedFDeriv ℝ (directions β).length f x (fun j ↦ ((directions β).get j).1)
+  let weight (α : Fin m → ℕ) (x : E) : ℝ := ∏ j, ‖x j‖ ^ α j
+  -- The torus and lattice indices are empty, so only the real coordinates contribute.
+  have hBound (hf : ContDiff ℝ ∞ f) (i : ElementarySchwartzIndex m 0 0) :
+      elementarySchwartzBound g i =
+        ⨆ x : E, ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖) := by
+    have hPartial (xt : X) (a : Fin 0 → ℤ) (b : PUnit) :
+        elementaryPartial g i.2.1 i.2.2.1 xt a b = mixedPartial i.2.1 xt.1 := by
+      let l : List X := directions i.2.1 ++
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten
+      have hl : l = directions i.2.1 := by simp [l]
+      change (fun v : List X ↦ iteratedFDeriv ℝ v.length (f ∘ P) xt v.get) l = _
+      rw [hl]
+      change iteratedFDeriv ℝ (directions i.2.1).length (f ∘ P) xt (directions i.2.1).get = _
+      rw [P.iteratedFDeriv_comp_right hf xt (by simp),
+        ContinuousMultilinearMap.compContinuousLinearMap_apply]
+      rfl
+    simp only [elementarySchwartzBound, hPartial, Finset.univ_eq_empty (α := Fin 0),
+      Finset.prod_empty, mul_one, ENNReal.coe_nnreal_eq, coe_nnNorm, norm_mul, norm_prod,
+      norm_pow, Complex.norm_real, iSup_const]
+    exact (show Function.Surjective (Prod.fst : X → E) from fun x ↦ ⟨(x, 0), rfl⟩).iSup_comp
+      (fun x ↦ ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖))
+  -- Group any tuple of coordinate directions by its multiplicities.
+  have hCoord (hf : ContDiff ℝ ∞ f) {n : ℕ} (t : Fin n → Fin m) (x : E) :
+      iteratedFDeriv ℝ n f x (fun j ↦ coord (t j)) = mixedPartial (fun j ↦ (List.ofFn t).count j) x := by
+    let β (j : Fin m) := (List.ofFn t).count j
+    let l := (List.finRange m).flatMap fun j ↦ List.replicate (β j) j
+    have hPerm : (List.ofFn t).Perm l := by
+      apply List.perm_iff_count.mpr
+      intro j
+      rw [List.count_flatMap, ← Fin.sum_univ_def]
+      simp [List.count_replicate, β]
+    have hDirs : l.map liftedCoord = directions β := by
+      simp [l, directions, List.ofFn_eq_map, List.flatMap, Function.comp_def]
+    have h := iteratedFDeriv_apply_list_perm hf (Prod.fst : X → E) (hPerm.map liftedCoord) x
+    rw [hDirs, List.map_ofFn] at h
+    let eval (s : Σ k, Fin k → X) := iteratedFDeriv ℝ s.1 f x (fun j ↦ (s.2 j).1)
+    exact (congrArg eval (List.equivSigmaTuple.apply_symm_apply ⟨n, liftedCoord ∘ t⟩)).symm.trans h
+  change ((∀ (a : Fin 0 → ℤ) (b : PUnit), ContDiff ℝ ∞ (f ∘ P)) ∧
+    ∀ i, elementarySchwartzBound g i < (⊤ : ℝ≥0∞)) ↔ _
+  constructor
+  · rintro ⟨hs, hb⟩
+    have hf : ContDiff ℝ ∞ f := (hs 0 PUnit.unit).comp J.contDiff
+    refine ⟨⟨f, hf, ?_⟩, rfl⟩
+    intro k n
+    let α (i : Option (Fin m)) : Fin m → ℕ := i.elim 0 (fun j ↦ Pi.single j k)
+    let β (t : Fin n → Fin m) (j : Fin m) := (List.ofFn t).count j
+    let idx (i : Option (Fin m)) (t : Fin n → Fin m) :
+        ElementarySchwartzIndex m 0 0 := (α i, β t, 0, 0)
+    obtain ⟨C, hC⟩ := Finite.bddAbove_range (fun p : Option (Fin m) × (Fin n → Fin m) ↦
+      (elementarySchwartzBound g (idx p.1 p.2)).toReal)
+    refine ⟨((m : ℝ) + 1) ^ k * (Fintype.card (Fin n → Fin m) * C), fun x ↦ ?_⟩
+    -- Include the constant weight so the maximum exists even when m = 0.
+    let c (i : Option (Fin m)) : ℝ := i.elim 1 (fun j ↦ ‖x j‖)
+    obtain ⟨i, -, hi⟩ := Finset.exists_max_image Finset.univ c Finset.univ_nonempty
+    have hsum : ‖x‖ ≤ ∑ j, ‖x j‖ := by
+      conv_lhs => rw [← (EuclideanSpace.basisFun (Fin m) ℝ).sum_repr x]
+      refine (norm_sum_le _ _).trans_eq ?_
+      simp only [norm_smul, OrthonormalBasis.norm_eq_one, EuclideanSpace.basisFun_repr, mul_one]
+    have hsize : ‖x‖ ≤ ((m : ℝ) + 1) * c i := calc
+      _ ≤ ∑ _j : Fin m, c i :=
+        hsum.trans (Finset.sum_le_sum fun j _ ↦ hi (some j) (Finset.mem_univ _))
+      _ ≤ _ := by
+        have hnonneg : 0 ≤ c i := zero_le_one.trans (hi none (Finset.mem_univ _))
+        simp [add_mul, hnonneg]
+    have hw : weight (α i) x = c i ^ k := by
+      cases i <;> simp [weight, α, c, Pi.single, Function.update, apply_ite]
+    have hpow : ‖x‖ ^ k ≤ ((m : ℝ) + 1) ^ k * weight (α i) x := by
+      rw [hw, ← mul_pow]
+      exact pow_le_pow_left₀ (norm_nonneg _) hsize k
+    let T := iteratedFDeriv ℝ n f x
+    have hpoint (t : Fin n → Fin m) : weight (α i) x * ‖T (fun j ↦ coord (t j))‖ ≤ C := by
+      rw [show T (fun j ↦ coord (t j)) = mixedPartial (β t) x from hCoord hf t x]
+      have hle : ENNReal.ofReal (weight (α i) x * ‖mixedPartial (β t) x‖) ≤
+          elementarySchwartzBound g (idx i t) := by
+        rw [hBound hf]
+        exact le_iSup (fun y ↦ ENNReal.ofReal (weight (α i) y * ‖mixedPartial (β t) y‖)) x
+      have h := ENNReal.toReal_mono (hb (idx i t)).ne hle
+      rw [ENNReal.toReal_ofReal (by dsimp [weight]; positivity)] at h
+      exact h.trans (hC (mem_range_self (i, t)))
+    calc
+      ‖x‖ ^ k * ‖T‖ ≤ (((m : ℝ) + 1) ^ k * weight (α i) x) *
+          ∑ t : Fin n → Fin m, ‖T (fun j ↦ coord (t j))‖ :=
+        mul_le_mul hpow (norm_multilinear_le_sum_euclidean_basis T) (norm_nonneg _) (by positivity)
+      _ = ((m : ℝ) + 1) ^ k * ∑ t : Fin n → Fin m, weight (α i) x * ‖T (fun j ↦ coord (t j))‖ := by
+        rw [mul_assoc, Finset.mul_sum]
+      _ ≤ ((m : ℝ) + 1) ^ k * ∑ _t : Fin n → Fin m, C :=
+        mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun t _ ↦ hpoint t) (by positivity)
+      _ = _ := by simp
+  · rintro ⟨s, rfl⟩
+    refine ⟨fun _ _ ↦ s.smooth'.comp P.contDiff, fun i ↦ ?_⟩
+    rw [hBound s.smooth']
+    obtain ⟨C, -, hC⟩ := s.decay (∑ j, i.1 j) (directions i.2.1).length
+    refine lt_of_le_of_lt (b := ENNReal.ofReal C)
+      (iSup_le fun x ↦ ENNReal.ofReal_le_ofReal ?_) ENNReal.ofReal_lt_top
+    have hw : weight i.1 x ≤ ‖x‖ ^ (∑ j, i.1 j) := calc
+      _ ≤ ∏ j, ‖x‖ ^ i.1 j :=
+        Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun j _ ↦
+          pow_le_pow_left₀ (norm_nonneg _) (PiLp.norm_apply_le x j) _
+      _ = _ := Finset.prod_pow_eq_pow_sum _ _ _
+    have he (j : Fin (directions i.2.1).length) : ‖((directions i.2.1).get j).1‖ = 1 := by
+      have hmem := List.get_mem (directions i.2.1) j
+      simp only [directions, List.mem_flatten, List.mem_ofFn] at hmem
+      obtain ⟨_, ⟨q, rfl⟩, hq⟩ := hmem
+      rw [List.eq_of_mem_replicate hq]
+      change ‖EuclideanSpace.single q (1 : ℝ)‖ = 1
+      simpa only [EuclideanSpace.basisFun_apply] using
+        (EuclideanSpace.basisFun (Fin m) ℝ).norm_eq_one q
+    have hD : ‖mixedPartial i.2.1 x‖ ≤ ‖iteratedFDeriv ℝ (directions i.2.1).length s x‖ := by
+      simpa only [mixedPartial, he, Finset.prod_const_one, mul_one] using
+        (iteratedFDeriv ℝ (directions i.2.1).length s x).le_opNorm
+          (fun j ↦ ((directions i.2.1).get j).1)
+    exact (mul_le_mul hw hD (norm_nonneg _) (by positivity)).trans (hC x)
 
 section
 
@@ -2667,6 +3275,208 @@ theorem elementarySchwartz_pullback (φ : ElementaryLieGroup m n r F ≃ₜ+ Ele
     ∃ e : ElementarySchwartz m n r F ≃L[ℂ] ElementarySchwartz m n r F,
       ∀ f g, e f g = f (φ g) := by sorry
 
+/-- `1 + ‖x‖ ^ j` is controlled by the constant term and the pure powers of the coordinates. -/
+lemma one_add_euclidean_pow_le {d : ℕ} (x : EuclideanSpace ℝ (Fin d)) (j : ℕ) :
+    1 + ‖x‖ ^ j ≤
+      (1 + (Real.sqrt (d : ℝ)) ^ j) * (1 + ∑ i : Fin d, |x i| ^ j) := by
+  cases j with
+  | zero =>
+    simp only [pow_zero]
+    have hsum : (0 : ℝ) ≤ ∑ i : Fin d, (1 : ℝ) :=
+      Finset.sum_nonneg fun _ _ => zero_le_one
+    linarith
+  | succ j =>
+    cases d with
+    | zero =>
+      have : IsEmpty (Fin 0) := ⟨Fin.elim0⟩
+      have hx0 : ‖x‖ = 0 := by
+        rw [← sq_eq_zero_iff, EuclideanSpace.real_norm_sq_eq]
+        simp [Finset.univ_eq_empty]
+      simp [hx0, Real.sqrt_zero, zero_pow (Nat.succ_ne_zero _), Finset.univ_eq_empty]
+    | succ d =>
+      have : Nonempty (Fin (Nat.succ d)) := ⟨0⟩
+      obtain ⟨i0, hi0, hmax⟩ :=
+        Finset.exists_max_image (Finset.univ : Finset (Fin (Nat.succ d)))
+          (fun i => |x i|) Finset.univ_nonempty
+      have hsq : ‖x‖ ^ 2 ≤ (Nat.succ d : ℝ) * |x i0| ^ 2 := by
+        rw [EuclideanSpace.real_norm_sq_eq]
+        calc
+          ∑ i, (x i) ^ 2 = ∑ i, |x i| ^ 2 := by
+            refine Finset.sum_congr rfl fun i _ => ?_
+            rw [← sq_abs]
+          _ ≤ ∑ i, |x i0| ^ 2 :=
+            Finset.sum_le_sum fun i hi => pow_le_pow_left₀ (abs_nonneg _) (hmax i hi) 2
+          _ = (Nat.succ d : ℝ) * |x i0| ^ 2 := by
+            simp [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+      have hnorm : ‖x‖ ≤ Real.sqrt (Nat.succ d : ℝ) * |x i0| := by
+        refine le_of_sq_le_sq ?_ (mul_nonneg (Real.sqrt_nonneg _) (abs_nonneg _))
+        rw [mul_pow, Real.sq_sqrt (Nat.cast_nonneg _)]
+        exact hsq
+      set t : ℝ := (Real.sqrt (Nat.succ d : ℝ)) ^ Nat.succ j
+      have ht : 0 ≤ t := pow_nonneg (Real.sqrt_nonneg _) _
+      have hpow : ‖x‖ ^ Nat.succ j ≤ t * |x i0| ^ Nat.succ j := by
+        calc
+          ‖x‖ ^ Nat.succ j ≤ (Real.sqrt (Nat.succ d : ℝ) * |x i0|) ^ Nat.succ j :=
+            pow_le_pow_left₀ (norm_nonneg _) hnorm _
+          _ = t * |x i0| ^ Nat.succ j := by rw [mul_pow]
+      have hi0le : |x i0| ^ Nat.succ j ≤ ∑ i, |x i| ^ Nat.succ j :=
+        Finset.single_le_sum (fun i _ => pow_nonneg (abs_nonneg (x i)) (Nat.succ j)) hi0
+      have hnormsum : ‖x‖ ^ Nat.succ j ≤ t * ∑ i, |x i| ^ Nat.succ j :=
+        hpow.trans (mul_le_mul_of_nonneg_left hi0le ht)
+      have hS : 0 ≤ ∑ i : Fin (Nat.succ d), |x i| ^ Nat.succ j :=
+        Finset.sum_nonneg fun _ _ => pow_nonneg (abs_nonneg _) _
+      calc
+        1 + ‖x‖ ^ Nat.succ j ≤ 1 + t * ∑ i, |x i| ^ Nat.succ j :=
+          add_le_add_right hnormsum 1
+        _ ≤ (1 + t) * (1 + ∑ i, |x i| ^ Nat.succ j) := by nlinarith
+
+/-- A monomial in the coordinates is at most the corresponding power of the Euclidean norm. -/
+lemma prod_abs_pow_le_norm_pow {d : ℕ} (x : EuclideanSpace ℝ (Fin d)) (α : Fin d → ℕ) :
+    ∏ k, |x k| ^ α k ≤ ‖x‖ ^ ∑ k, α k := by
+  calc
+    ∏ k, |x k| ^ α k ≤ ∏ k, ‖x‖ ^ α k := by
+      refine Finset.prod_le_prod₀ (fun _ _ => pow_nonneg (abs_nonneg _) _) fun k _ => ?_
+      exact pow_le_pow_left₀ (abs_nonneg _)
+        (by simpa [Real.norm_eq_abs] using PiLp.norm_apply_le x k) (α k)
+    _ = ‖x‖ ^ ∑ k, α k := Finset.prod_pow_eq_pow_sum _ _ _
+
+/-- Mixed partials are additive on fibrewise smooth functions. -/
+lemma elementaryPartial_add {f g : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b)))
+    (hg : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ g (elementaryCover xt a b)))
+    (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    elementaryPartial (f + g) β γ xt a b =
+      elementaryPartial f β γ xt a b + elementaryPartial g β γ xt a b := by
+  have hadd (n : ℕ) :
+      iteratedFDeriv ℝ n (fun v ↦ (f + g) (elementaryCover v a b)) xt =
+        iteratedFDeriv ℝ n (fun v ↦ f (elementaryCover v a b)) xt +
+        iteratedFDeriv ℝ n (fun v ↦ g (elementaryCover v a b)) xt :=
+    iteratedFDeriv_add_apply ((hf a b).of_le (by simp)).contDiffAt
+      ((hg a b).of_le (by simp)).contDiffAt
+  dsimp only [elementaryPartial]
+  rw [hadd]
+  rfl
+
+/-- Mixed partials are homogeneous on fibrewise smooth functions. -/
+lemma elementaryPartial_smul (c : ℂ) {f : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b)))
+    (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    elementaryPartial (c • f) β γ xt a b = c • elementaryPartial f β γ xt a b := by
+  have hsmul (n : ℕ) :
+      iteratedFDeriv ℝ n (fun v ↦ (c • f) (elementaryCover v a b)) xt =
+        c • iteratedFDeriv ℝ n (fun v ↦ f (elementaryCover v a b)) xt :=
+    iteratedFDeriv_const_smul_apply ((hf a b).of_le (by simp)).contDiffAt
+  dsimp only [elementaryPartial]
+  rw [hsmul]
+  rfl
+
+/-- A coordinate monomial times a partial is bounded by the corresponding Euclidean weight. -/
+lemma monomial_norm_le_p1 (f : ElementaryLieGroup m n r F → ℂ)
+    (α : Fin m → ℕ) (β : Fin m → ℕ) (γ : Fin n → ℕ) (δ : Fin r → ℕ)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    ‖((∏ k, (xt.1 k : ℂ) ^ α k) * (∏ k, (a k : ℂ) ^ δ k)) *
+        elementaryPartial f β γ xt a b‖ ≤
+      (1 + ‖xt.1‖ ^ ∑ k, α k) *
+        (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ ∑ k, δ k) *
+        ‖elementaryPartial f β γ xt a b‖ := by
+  let aVec : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun k ↦ (a k : ℝ))
+  have hX : ‖∏ k, (xt.1 k : ℂ) ^ α k‖ = ∏ k, |xt.1 k| ^ α k := by
+    simp [norm_prod, norm_pow, Complex.norm_real, Real.norm_eq_abs]
+  have hA : ‖∏ k, (a k : ℂ) ^ δ k‖ = ∏ k, |aVec k| ^ δ k := by
+    simp [aVec, norm_prod, norm_pow, Complex.norm_intCast]
+  rw [norm_mul, norm_mul, hX, hA]
+  have hx : ∏ k, |xt.1 k| ^ α k ≤ 1 + ‖xt.1‖ ^ ∑ k, α k :=
+    (prod_abs_pow_le_norm_pow xt.1 α).trans (le_add_of_nonneg_left zero_le_one)
+  have ha : ∏ k, |aVec k| ^ δ k ≤ 1 + ‖aVec‖ ^ ∑ k, δ k :=
+    (prod_abs_pow_le_norm_pow aVec δ).trans (le_add_of_nonneg_left zero_le_one)
+  have hprod :
+      (∏ k, |xt.1 k| ^ α k) * (∏ k, |aVec k| ^ δ k) ≤
+        (1 + ‖xt.1‖ ^ ∑ k, α k) * (1 + ‖aVec‖ ^ ∑ k, δ k) :=
+    mul_le_mul hx ha (Finset.prod_nonneg fun _ _ => pow_nonneg (abs_nonneg _) _)
+      (add_nonneg zero_le_one (pow_nonneg (norm_nonneg _) _))
+  simpa [aVec, mul_assoc] using
+    mul_le_mul_of_nonneg_right hprod (norm_nonneg (elementaryPartial f β γ xt a b))
+
+/-- A monomial times a partial is bounded by the corresponding Schwartz seminorm. -/
+lemma monomial_partial_le_seminorm (α : Fin m → ℕ) (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (δ : Fin r → ℕ) (f : ElementarySchwartz m n r F)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    ‖((∏ k, (xt.1 k : ℂ) ^ α k) * (∏ k, (a k : ℂ) ^ δ k)) *
+        elementaryPartial f β γ xt a b‖ ≤
+      elementarySchwartzSeminorm (α, β, γ, δ) f := by
+  let z : ℂ := ((∏ k, (xt.1 k : ℂ) ^ α k) * (∏ k, (a k : ℂ) ^ δ k)) *
+      elementaryPartial f β γ xt a b
+  have hcoe : (‖z‖₊ : ℝ≥0∞) ≤ elementarySchwartzBound f.val (α, β, γ, δ) :=
+    le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl))
+  change ‖z‖ ≤ (elementarySchwartzBound f.val (α, β, γ, δ)).toReal
+  rw [← toReal_coe_nnNorm z]
+  exact ENNReal.toReal_mono (f.property.2 (α, β, γ, δ)).ne hcoe
+
+lemma prod_abs_pow_single {d : ℕ} (x : Fin d → ℝ) (i : Fin d) (j : ℕ) :
+    ∏ k, |x k| ^ (Pi.single i j k) = |x i| ^ j := by
+  rw [Finset.prod_eq_single i]
+  · simp [Pi.single_eq_same]
+  · intro k _ hk
+    simp [Pi.single_eq_of_ne hk, pow_zero]
+  · intro hk
+    exact (hk (Finset.mem_univ i)).elim
+
+lemma zero_monomial_partial_le (β : Fin m → ℕ) (γ : Fin n → ℕ) (f : ElementarySchwartz m n r F)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    ‖elementaryPartial f β γ xt a b‖ ≤ elementarySchwartzSeminorm (0, β, γ, 0) f := by
+  have h := monomial_partial_le_seminorm (0 : Fin m → ℕ) β γ (0 : Fin r → ℕ) f xt a b
+  simpa only [Pi.zero_apply, pow_zero, Finset.prod_const_one, one_mul] using h
+
+lemma single_real_partial_le (i : Fin m) (j : ℕ) (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (f : ElementarySchwartz m n r F)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    |xt.1 i| ^ j * ‖elementaryPartial f β γ xt a b‖ ≤
+      elementarySchwartzSeminorm (Pi.single i j, β, γ, 0) f := by
+  have h := monomial_partial_le_seminorm (Pi.single i j) β γ (0 : Fin r → ℕ) f xt a b
+  have hnorm : ‖((∏ k, (xt.1 k : ℂ) ^ (Pi.single i j k)) * (∏ k, (a k : ℂ) ^ (0 : ℕ))) *
+        elementaryPartial f β γ xt a b‖ =
+      |xt.1 i| ^ j * ‖elementaryPartial f β γ xt a b‖ := by
+    rw [norm_mul, norm_mul]
+    simp only [norm_prod, norm_pow, Complex.norm_real, Real.norm_eq_abs, Complex.norm_intCast,
+      Pi.zero_apply, pow_zero, Finset.prod_const_one, norm_one, mul_one]
+    rw [prod_abs_pow_single (fun k => xt.1 k) i j]
+  rw [← hnorm]
+  exact h
+
+lemma single_int_partial_le (k0 : Fin r) (j' : ℕ) (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (f : ElementarySchwartz m n r F)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    |(a k0 : ℝ)| ^ j' * ‖elementaryPartial f β γ xt a b‖ ≤
+      elementarySchwartzSeminorm ((0 : Fin m → ℕ), β, γ, Pi.single k0 j') f := by
+  have h := monomial_partial_le_seminorm (0 : Fin m → ℕ) β γ (Pi.single k0 j') f xt a b
+  have hnorm : ‖((∏ k, (xt.1 k : ℂ) ^ (0 : ℕ)) * (∏ k, (a k : ℂ) ^ (Pi.single k0 j' k))) *
+        elementaryPartial f β γ xt a b‖ =
+      |(a k0 : ℝ)| ^ j' * ‖elementaryPartial f β γ xt a b‖ := by
+    rw [norm_mul, norm_mul]
+    simp only [norm_prod, norm_pow, Complex.norm_real, Real.norm_eq_abs, Complex.norm_intCast,
+      Pi.zero_apply, pow_zero, Finset.prod_const_one, norm_one, one_mul]
+    rw [prod_abs_pow_single (fun k => (a k : ℝ)) k0 j']
+  rw [← hnorm]
+  exact h
+
+lemma single_both_partial_le (i : Fin m) (k0 : Fin r) (j j' : ℕ) (β : Fin m → ℕ) (γ : Fin n → ℕ)
+    (f : ElementarySchwartz m n r F)
+    (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F) :
+    |xt.1 i| ^ j * |(a k0 : ℝ)| ^ j' * ‖elementaryPartial f β γ xt a b‖ ≤
+      elementarySchwartzSeminorm (Pi.single i j, β, γ, Pi.single k0 j') f := by
+  have h := monomial_partial_le_seminorm (Pi.single i j) β γ (Pi.single k0 j') f xt a b
+  have hnorm : ‖((∏ k, (xt.1 k : ℂ) ^ (Pi.single i j k)) *
+        (∏ k, (a k : ℂ) ^ (Pi.single k0 j' k))) * elementaryPartial f β γ xt a b‖ =
+      |xt.1 i| ^ j * |(a k0 : ℝ)| ^ j' * ‖elementaryPartial f β γ xt a b‖ := by
+    rw [norm_mul, norm_mul]
+    simp only [norm_prod, norm_pow, Complex.norm_real, Real.norm_eq_abs, Complex.norm_intCast]
+    rw [prod_abs_pow_single (fun k => xt.1 k) i j,
+      prod_abs_pow_single (fun k => (a k : ℝ)) k0 j']
+  rw [← hnorm]
+  exact h
+
 /-- Paper: Lemma D.1.3.4, p. 751. Polynomial weights in the two Euclidean lengths,
 with a fixed mixed partial for each seminorm, generate the Schwartz topology. -/
 theorem elementarySchwartz_withSeminorms_P1 :
@@ -2676,7 +3486,210 @@ theorem elementarySchwartz_withSeminorms_P1 :
         ⨆ (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F),
           ENNReal.ofReal ((1 + ‖xt.1‖ ^ i.1) *
             (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
-            ‖elementaryPartial f i.2.2.1 i.2.2.2 xt a b‖) := by sorry
+            ‖elementaryPartial f i.2.2.1 i.2.2.2 xt a b‖) := by
+  let bound (i : ℕ × ℕ × (Fin m → ℕ) × (Fin n → ℕ)) (f : ElementarySchwartz m n r F) : ℝ≥0∞ :=
+    ⨆ (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ) (b : F),
+      ENNReal.ofReal ((1 + ‖xt.1‖ ^ i.1) *
+        (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
+        ‖elementaryPartial f i.2.2.1 i.2.2.2 xt a b‖)
+  letI : DecidableEq (ElementarySchwartzIndex m n r) := Classical.decEq _
+  have hest (i : ℕ × ℕ × (Fin m → ℕ) × (Fin n → ℕ)) :
+      ∃ (s : Finset (ElementarySchwartzIndex m n r)) (C : ℝ), 0 ≤ C ∧
+        ∀ f, bound i f ≤ ENNReal.ofReal (C * ((s.sup elementarySchwartzSeminorm) f)) := by
+    let j := i.1
+    let j' := i.2.1
+    let β := i.2.2.1
+    let γ := i.2.2.2
+    let Cx : ℝ := 1 + (Real.sqrt (m : ℝ)) ^ j
+    let Ca : ℝ := 1 + (Real.sqrt (r : ℝ)) ^ j'
+    let s0 : Finset (ElementarySchwartzIndex m n r) := {(0, β, γ, (0 : Fin r → ℕ))}
+    let sx : Finset (ElementarySchwartzIndex m n r) :=
+      Finset.univ.image fun t : Fin m => (Pi.single t j, β, γ, (0 : Fin r → ℕ))
+    let sy : Finset (ElementarySchwartzIndex m n r) :=
+      Finset.univ.image fun t : Fin r => ((0 : Fin m → ℕ), β, γ, Pi.single t j')
+    let sz : Finset (ElementarySchwartzIndex m n r) :=
+      Finset.univ.image fun q : Fin m × Fin r => (Pi.single q.1 j, β, γ, Pi.single q.2 j')
+    let s := ((s0 ∪ sx) ∪ sy) ∪ sz
+    let C : ℝ := Cx * Ca * ((m + 1) * (r + 1) : ℝ)
+    refine ⟨s, C, by positivity, fun f => ?_⟩
+    refine iSup_le fun xt => iSup_le fun a => iSup_le fun b => ?_
+    let aVec := (WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))
+    let N : ℝ := ‖elementaryPartial f β γ xt a b‖
+    let Sx : ℝ := ∑ t : Fin m, |xt.1 t| ^ j
+    let Sa : ℝ := ∑ t : Fin r, |aVec t| ^ j'
+    let supS : ℝ := (s.sup elementarySchwartzSeminorm) f
+    have hx : 1 + ‖xt.1‖ ^ j ≤ Cx * (1 + Sx) := by
+      simpa only [Cx, Sx] using one_add_euclidean_pow_le xt.1 j
+    have ha : 1 + ‖aVec‖ ^ j' ≤ Ca * (1 + Sa) := by
+      simpa only [Ca, Sa] using one_add_euclidean_pow_le aVec j'
+    have hcoord (t : Fin r) : aVec t = (a t : ℝ) := by
+      simp [aVec]
+    have hmem0 : ((0 : Fin m → ℕ), β, γ, (0 : Fin r → ℕ)) ∈ s :=
+      Finset.mem_union_left sz (Finset.mem_union_left sy (Finset.mem_union_left sx
+        (Finset.mem_singleton_self _)))
+    have hmemx (t : Fin m) : (Pi.single t j, β, γ, (0 : Fin r → ℕ)) ∈ s :=
+      Finset.mem_union_left sz (Finset.mem_union_left sy (Finset.mem_union_right s0
+        (Finset.mem_image_of_mem _ (Finset.mem_univ t))))
+    have hmemy (t : Fin r) : ((0 : Fin m → ℕ), β, γ, Pi.single t j') ∈ s :=
+      Finset.mem_union_left sz (Finset.mem_union_right (s0 ∪ sx)
+        (Finset.mem_image_of_mem _ (Finset.mem_univ t)))
+    have hmemz (t : Fin m) (u : Fin r) : (Pi.single t j, β, γ, Pi.single u j') ∈ s :=
+      Finset.mem_union_right ((s0 ∪ sx) ∪ sy)
+        (Finset.mem_image_of_mem _ (Finset.mem_univ (t, u)))
+    have hN : N ≤ supS :=
+      (zero_monomial_partial_le β γ f xt a b).trans (Seminorm.le_finset_sup_apply hmem0)
+    have hxle (t : Fin m) : |xt.1 t| ^ j * N ≤ supS :=
+      (single_real_partial_le t j β γ f xt a b).trans (Seminorm.le_finset_sup_apply (hmemx t))
+    have hale (t : Fin r) : |aVec t| ^ j' * N ≤ supS := by
+      rw [hcoord t]
+      exact (single_int_partial_le t j' β γ f xt a b).trans (Seminorm.le_finset_sup_apply (hmemy t))
+    have hboth (t : Fin m) (u : Fin r) : |xt.1 t| ^ j * |aVec u| ^ j' * N ≤ supS := by
+      rw [hcoord u]
+      exact (single_both_partial_le t u j j' β γ f xt a b).trans
+        (Seminorm.le_finset_sup_apply (hmemz t u))
+    have hweights : (1 + ‖xt.1‖ ^ j) * (1 + ‖aVec‖ ^ j') * N ≤
+        Cx * Ca * ((1 + Sx) * (1 + Sa) * N) := by
+      have hmul : (1 + ‖xt.1‖ ^ j) * (1 + ‖aVec‖ ^ j') ≤ (Cx * (1 + Sx)) * (Ca * (1 + Sa)) :=
+        mul_le_mul hx ha (by positivity) (by positivity)
+      calc
+        (1 + ‖xt.1‖ ^ j) * (1 + ‖aVec‖ ^ j') * N ≤
+            ((Cx * (1 + Sx)) * (Ca * (1 + Sa))) * N :=
+          mul_le_mul_of_nonneg_right hmul (norm_nonneg _)
+        _ = Cx * Ca * ((1 + Sx) * (1 + Sa) * N) := by ring
+    have hexpand : (1 + Sx) * (1 + Sa) * N =
+        N + ∑ t : Fin m, |xt.1 t| ^ j * N + ∑ t : Fin r, |aVec t| ^ j' * N +
+          ∑ t : Fin m, ∑ u : Fin r, |xt.1 t| ^ j * |aVec u| ^ j' * N := by
+      have hSx : Sx * N = ∑ t : Fin m, |xt.1 t| ^ j * N := by simp only [Sx, Finset.sum_mul]
+      have hSa : Sa * N = ∑ t : Fin r, |aVec t| ^ j' * N := by simp only [Sa, Finset.sum_mul]
+      have hSS : Sx * Sa * N =
+          ∑ t : Fin m, ∑ u : Fin r, |xt.1 t| ^ j * |aVec u| ^ j' * N := by
+        simp only [Sx, Sa]
+        rw [mul_assoc, Finset.sum_mul, Finset.sum_mul]
+        simp_rw [Finset.mul_sum, ← mul_assoc]
+      calc
+        (1 + Sx) * (1 + Sa) * N = N + Sx * N + Sa * N + Sx * Sa * N := by ring
+        _ = N + ∑ t : Fin m, |xt.1 t| ^ j * N + ∑ t : Fin r, |aVec t| ^ j' * N +
+            ∑ t : Fin m, ∑ u : Fin r, |xt.1 t| ^ j * |aVec u| ^ j' * N := by rw [hSx, hSa, hSS]
+    have hconst : supS + ∑ _t : Fin m, supS + ∑ _t : Fin r, supS +
+        ∑ _t : Fin m, ∑ _u : Fin r, supS = ((m + 1) * (r + 1) : ℝ) * supS := by
+      simp only [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]
+      ring
+    have hsumle : (1 + Sx) * (1 + Sa) * N ≤ ((m + 1) * (r + 1) : ℝ) * supS := by
+      rw [hexpand]
+      refine (add_le_add (add_le_add (add_le_add hN ?_) ?_) ?_).trans_eq hconst
+      · exact Finset.sum_le_sum fun t _ => hxle t
+      · exact Finset.sum_le_sum fun t _ => hale t
+      · exact Finset.sum_le_sum fun t _ => Finset.sum_le_sum fun u _ => hboth t u
+    have hfinal : (1 + ‖xt.1‖ ^ j) * (1 + ‖aVec‖ ^ j') * N ≤ C * supS := by
+      calc
+        (1 + ‖xt.1‖ ^ j) * (1 + ‖aVec‖ ^ j') * N ≤
+            Cx * Ca * ((1 + Sx) * (1 + Sa) * N) := hweights
+        _ ≤ Cx * Ca * (((m + 1) * (r + 1) : ℝ) * supS) :=
+          mul_le_mul_of_nonneg_left hsumle (by positivity)
+        _ = C * supS := by ring
+    have hEnn := ENNReal.ofReal_le_ofReal hfinal
+    simpa only [j, j', β, γ, aVec, N, supS] using hEnn
+  have hfin (i) (f : ElementarySchwartz m n r F) : bound i f ≠ ⊤ := by
+    obtain ⟨_, _, _, hle⟩ := hest i
+    exact ((hle f).trans_lt ENNReal.ofReal_lt_top).ne
+  have hadd (i) (f g : ElementarySchwartz m n r F) :
+      bound i (f + g) ≤ bound i f + bound i g := by
+    refine iSup_le fun xt => iSup_le fun a => iSup_le fun b => ?_
+    have hp := elementaryPartial_add f.property.1 g.property.1 i.2.2.1 i.2.2.2 xt a b
+    set w : ℝ := (1 + ‖xt.1‖ ^ i.1) *
+      (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1)
+    have hw : 0 ≤ w := by positivity
+    have hsum : w * ‖elementaryPartial (↑(f + g)) i.2.2.1 i.2.2.2 xt a b‖ ≤
+        w * ‖elementaryPartial (↑f) i.2.2.1 i.2.2.2 xt a b‖ +
+          w * ‖elementaryPartial (↑g) i.2.2.1 i.2.2.2 xt a b‖ := by
+      calc
+        w * ‖elementaryPartial (↑(f + g)) i.2.2.1 i.2.2.2 xt a b‖ =
+            w * ‖elementaryPartial (↑f) i.2.2.1 i.2.2.2 xt a b +
+              elementaryPartial (↑g) i.2.2.1 i.2.2.2 xt a b‖ := by
+          rw [show elementaryPartial (↑(f + g)) i.2.2.1 i.2.2.2 xt a b =
+            elementaryPartial (f.val + g.val) i.2.2.1 i.2.2.2 xt a b by rfl, hp]
+        _ ≤ w * (‖elementaryPartial (↑f) i.2.2.1 i.2.2.2 xt a b‖ +
+            ‖elementaryPartial (↑g) i.2.2.1 i.2.2.2 xt a b‖) :=
+          mul_le_mul_of_nonneg_left (norm_add_le _ _) hw
+        _ = w * ‖elementaryPartial (↑f) i.2.2.1 i.2.2.2 xt a b‖ +
+            w * ‖elementaryPartial (↑g) i.2.2.1 i.2.2.2 xt a b‖ := by ring
+    refine (ENNReal.ofReal_le_ofReal hsum).trans ?_
+    rw [ENNReal.ofReal_add (mul_nonneg hw (norm_nonneg _)) (mul_nonneg hw (norm_nonneg _))]
+    exact add_le_add
+      (le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl)))
+      (le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl)))
+  have hsmul (i) (c : ℂ) (f : ElementarySchwartz m n r F) :
+      bound i (c • f) = ENNReal.ofReal ‖c‖ * bound i f := by
+    have hbody : ∀ (xt : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (a : Fin r → ℤ)
+        (b : F),
+        ENNReal.ofReal ((1 + ‖xt.1‖ ^ i.1) *
+          (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
+          ‖elementaryPartial (↑(c • f)) i.2.2.1 i.2.2.2 xt a b‖) =
+          ENNReal.ofReal ‖c‖ * ENNReal.ofReal ((1 + ‖xt.1‖ ^ i.1) *
+            (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
+            ‖elementaryPartial (↑f) i.2.2.1 i.2.2.2 xt a b‖) := by
+      intro xt a b
+      have hp := elementaryPartial_smul c f.property.1 i.2.2.1 i.2.2.2 xt a b
+      have hfun : elementaryPartial (↑(c • f)) i.2.2.1 i.2.2.2 xt a b =
+          elementaryPartial (c • f.val) i.2.2.1 i.2.2.2 xt a b := rfl
+      rw [hfun, hp, norm_smul]
+      have hcomm : (1 + ‖xt.1‖ ^ i.1) *
+          (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
+            (‖c‖ * ‖elementaryPartial f.val i.2.2.1 i.2.2.2 xt a b‖) =
+          ‖c‖ * ((1 + ‖xt.1‖ ^ i.1) *
+            (1 + ‖(WithLp.toLp 2 (fun k ↦ (a k : ℝ)) : EuclideanSpace ℝ (Fin r))‖ ^ i.2.1) *
+              ‖elementaryPartial f.val i.2.2.1 i.2.2.2 xt a b‖) := by ring
+      rw [hcomm, ENNReal.ofReal_mul (norm_nonneg _)]
+    simp_rw [bound, hbody, ENNReal.mul_iSup]
+  let p : SeminormFamily ℂ (ElementarySchwartz m n r F)
+      (ℕ × ℕ × (Fin m → ℕ) × (Fin n → ℕ)) :=
+    fun i => Seminorm.of (fun f => (bound i f).toReal)
+      (fun f g => by
+        calc
+          (bound i (f + g)).toReal ≤ (bound i f + bound i g).toReal :=
+            ENNReal.toReal_mono (ENNReal.add_ne_top.mpr ⟨hfin i f, hfin i g⟩) (hadd i f g)
+          _ = (bound i f).toReal + (bound i g).toReal :=
+            ENNReal.toReal_add (hfin i f) (hfin i g))
+      (fun c f => by
+        rw [hsmul i c f]
+        exact ENNReal.toReal_ofReal_mul ‖c‖ (bound i f) (norm_nonneg c))
+  refine ⟨p, ?_, ?_⟩
+  · refine elementarySchwartz_withSeminorms.congr
+      (Seminorm.IsBounded.of_real (f := LinearMap.id) ?_)
+      (Seminorm.IsBounded.of_real (f := LinearMap.id) ?_)
+    · intro i
+      obtain ⟨s, C, hC, hle⟩ := hest i
+      refine ⟨s, C, fun f => ?_⟩
+      have hreal : (bound i f).toReal ≤ C * ((s.sup elementarySchwartzSeminorm) f) := by
+        refine (ENNReal.toReal_mono ENNReal.ofReal_lt_top.ne (hle f)).trans_eq ?_
+        exact ENNReal.toReal_ofReal (mul_nonneg hC (apply_nonneg _ _))
+      change (bound i f).toReal ≤ C * ((s.sup elementarySchwartzSeminorm) f)
+      exact hreal
+    · intro idx
+      let iP : ℕ × ℕ × (Fin m → ℕ) × (Fin n → ℕ) :=
+        (∑ k, idx.1 k, ∑ k, idx.2.2.2 k, idx.2.1, idx.2.2.1)
+      refine ⟨{iP}, 1, fun f => ?_⟩
+      rw [Finset.sup_singleton, one_mul]
+      change elementarySchwartzSeminorm idx f ≤ (bound iP f).toReal
+      have hpt : elementarySchwartzBound f.val idx ≤ bound iP f := by
+        refine iSup_le fun xt => iSup_le fun a => iSup_le fun b => ?_
+        have hle := monomial_norm_le_p1 f.val idx.1 idx.2.1 idx.2.2.1 idx.2.2.2 xt a b
+        have hcoe : (‖((∏ k, (xt.1 k : ℂ) ^ idx.1 k) * (∏ k, (a k : ℂ) ^ idx.2.2.2 k)) *
+            elementaryPartial f.val idx.2.1 idx.2.2.1 xt a b‖₊ : ℝ≥0∞) =
+            ENNReal.ofReal ‖((∏ k, (xt.1 k : ℂ) ^ idx.1 k) * (∏ k, (a k : ℂ) ^ idx.2.2.2 k)) *
+              elementaryPartial f.val idx.2.1 idx.2.2.1 xt a b‖ := by
+          rw [show ‖((∏ k, (xt.1 k : ℂ) ^ idx.1 k) * (∏ k, (a k : ℂ) ^ idx.2.2.2 k)) *
+              elementaryPartial f.val idx.2.1 idx.2.2.1 xt a b‖ =
+              (‖((∏ k, (xt.1 k : ℂ) ^ idx.1 k) * (∏ k, (a k : ℂ) ^ idx.2.2.2 k)) *
+                elementaryPartial f.val idx.2.1 idx.2.2.1 xt a b‖₊ : ℝ) from rfl,
+            ENNReal.ofReal_coe_nnreal]
+        rw [hcoe]
+        exact (ENNReal.ofReal_le_ofReal hle).trans
+          (le_iSup_of_le xt (le_iSup_of_le a (le_iSup_of_le b le_rfl)))
+      exact ENNReal.toReal_mono (hfin iP f) hpt
+  · intro i f
+    change ENNReal.ofReal (bound i f).toReal = bound i f
+    exact ENNReal.ofReal_toReal (hfin i f)
 
 /-- Paper: Lemma D.1.3.4, p. 751. Complex polynomial weights in the real and integer
 coordinates, with a fixed mixed partial for each seminorm, generate the Schwartz topology. -/
