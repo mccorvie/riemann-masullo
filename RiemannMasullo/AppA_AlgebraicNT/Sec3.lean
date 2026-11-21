@@ -2552,7 +2552,14 @@ theorem adeleStandardCharacter_algebraMap (x : F) :
 /-- Paper: Example A.3.1.9, p. 558. The standard adelic character reduces to the
 rational adelic character for the rational field. -/
 theorem adeleStandardCharacter_rat (a : 𝔸[ℚ]) :
-    adeleStandardCharacter ℚ a = ratAdeleStandardCharacter a := by sorry
+    adeleStandardCharacter ℚ a = ratAdeleStandardCharacter a := by
+  obtain ⟨-, -, -, -, -, -, -, -, -, extensions⟩ := adele_additive_quotient ℚ
+  have h : rationalAdeleEmbedding ℚ = RingHom.id 𝔸[ℚ] :=
+    (extensions ℚ (RingHom.id ℚ)).1.unique
+      (rationalAdeleEmbedding_spec ℚ) (isAdeleExtension_id ℚ)
+  unfold adeleStandardCharacter
+  rw [h]
+  exact congrArg ratAdeleStandardCharacter (Algebra.trace_self_apply a)
 
 /-- Paper: Example A.3.1.9, p. 558. The global additive Tamagawa measure is self-dual
 under the pairing from the trace character. -/
