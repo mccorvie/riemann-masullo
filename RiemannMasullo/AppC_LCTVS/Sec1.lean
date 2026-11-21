@@ -15,9 +15,11 @@ import Mathlib.Analysis.Normed.Module.DoubleDual
 import Mathlib.Analysis.Normed.Module.FiniteDimension
 import Mathlib.Analysis.Normed.Operator.BanachSteinhaus
 import Mathlib.Topology.Algebra.Module.Star
+import Mathlib.Topology.Baire.CompleteMetrizable
 import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.Quotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 
 /-!
@@ -921,6 +923,107 @@ theorem isInjectiveLCLimit_const [PolynormableSpace ℂ E] :
   rw [h]
   exact (PolynormableSpace.withSeminorms ℂ E).withSeminorms_eq
 
+/-- A continuous seminorm on a stage of a strict system extends to the final locally convex
+topology on the limit. -/
+private theorem IsInjectiveLCLimit.seminorm_extension
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (hj : ∀ k, IsEmbedding (j k)) (n : ℕ) (p : Seminorm ℂ (X n)) (hp : Continuous p) :
+    ∃ q : Seminorm ℂ E, Continuous q ∧ q.comp (i n).toLinearMap = p := by
+  classical
+  have hstep (k : ℕ) (z : X k) : i (k+1) (j k z) = i k z :=
+    DFunLike.congr_fun (h.compatible k) z
+  have htransition (a b : ℕ) (hab : a ≤ b) :
+      ∃ f : X a →L[ℂ] X b, (i b).comp f = i a := by
+    induction b, hab using Nat.le_induction with
+    | base => exact ⟨ContinuousLinearMap.id ℂ _, rfl⟩
+    | succ b _ ih =>
+      obtain ⟨f, hf⟩ := ih
+      exact ⟨(j b).comp f, by rw [← ContinuousLinearMap.comp_assoc, h.compatible, hf]⟩
+  choose f hf using fun k hk ↦ htransition k n hk
+  let C (k : ℕ) := {s : Seminorm ℂ (X k) // Continuous s}
+  let base (k : ℕ) (hk : k ≤ n) : C k :=
+    ⟨p.comp (f k hk).toLinearMap, hp.comp (f k hk).continuous⟩
+  choose next hnext hnextcomp using fun k (s : C k) ↦
+    exists_seminorm_extension (f := (j k).toLinearMap) (hj k).isInducing s.property
+  -- Pull back to the earlier stages and extend successively to the later stages.
+  let r : ∀ k, C k := Nat.rec (base 0 (Nat.zero_le n)) fun k s ↦
+    if hk : k+1 ≤ n then base (k+1) hk else ⟨next k s, hnext k s⟩
+  have hrbase (k : ℕ) (hk : k ≤ n) : r k = base k hk := by
+    cases k with
+    | zero => rfl
+    | succ k => exact dite_eq_left hk
+  have hr (k : ℕ) (z : X k) : (r (k+1)).val (j k z) = (r k).val z := by
+    by_cases hk : k+1 ≤ n
+    · rw [hrbase _ hk, hrbase _ (Nat.le_of_succ_le hk)]
+      change p (f (k+1) hk (j k z)) = p (f k _ z)
+      congr 1
+      apply h.injective n
+      exact (DFunLike.congr_fun (hf (k+1) hk) (j k z)).trans
+        ((hstep k z).trans (DFunLike.congr_fun (hf k _) z).symm)
+    · change (if hk : k+1 ≤ n then base (k+1) hk else
+        (⟨next k (r k), hnext k (r k)⟩ : C (k+1))).val (j k z) = (r k).val z
+      rw [dite_eq_right hk]
+      exact DFunLike.congr_fun (hnextcomp k (r k)) z
+  have hlift (a : ℕ) (x : X a) (b : ℕ) (hab : a ≤ b) :
+      ∃ y : X b, i b y = i a x ∧ (r b).val y = (r a).val x := by
+    induction b, hab using Nat.le_induction with
+    | base => exact ⟨x, rfl, rfl⟩
+    | succ b _ ih =>
+      obtain ⟨y, hy, hy'⟩ := ih
+      exact ⟨j b y, (hstep b y).trans hy, (hr b y).trans hy'⟩
+  -- Compare two representatives in a stage that contains both.
+  have hagree {a b : ℕ} {x : X a} {y : X b} (he : i a x = i b y) :
+      (r a).val x = (r b).val y := by
+    obtain ⟨x', hx', hx⟩ := hlift a x (max a b) (le_max_left _ _)
+    obtain ⟨y', hy', hy⟩ := hlift b y (max a b) (le_max_right _ _)
+    have he' := h.injective (max a b) (hx'.trans (he.trans hy'.symm))
+    exact hx.symm.trans ((congrArg (r (max a b)).val he').trans hy)
+  choose stage repr hrepr using h.exhaustive
+  let s (x : E) : ℝ := (r (stage x)).val (repr x)
+  have hs (k : ℕ) (z : X k) : s (i k z) = (r k).val z := hagree (hrepr (i k z))
+  let q : Seminorm ℂ E := Seminorm.ofSMulLE s
+    (by simpa only [map_zero] using hs 0 0)
+    (fun x y ↦ by
+      let k := max (stage x) (stage y)
+      obtain ⟨u, hu, -⟩ := hlift _ (repr x) k (le_max_left _ _)
+      obtain ⟨v, hv, -⟩ := hlift _ (repr y) k (le_max_right _ _)
+      rw [← (hu.trans (hrepr x)), ← (hv.trans (hrepr y)), ← map_add, hs, hs, hs]
+      exact map_add_le_add (r k).val u v)
+    (fun a x ↦ by
+      rw [← hrepr x, ← map_smul, hs, hs, map_smul_eq_mul])
+  have hseminorms : WithSeminorms
+      (Subtype.val : {s : Seminorm ℂ E // ∀ k, Continuous (s ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  refine ⟨q, hseminorms.continuous_seminorm ⟨q, fun k ↦ ?_⟩, ?_⟩
+  · simpa only [Function.comp_def, show ∀ z, q (i k z) = (r k).val z from hs k] using
+      (r k).property
+  · ext z
+    change s (i n z) = p z
+    rw [hs, hrbase n le_rfl]
+    change p (f n le_rfl z) = p z
+    congr 1
+    exact h.injective n (DFunLike.congr_fun (hf n le_rfl) z)
+
+/-- For a strict system of polynormable stages, the final locally convex topology induces the
+original topology on each stage. -/
+private theorem IsInjectiveLCLimit.isEmbedding_stage
+    [IsTopologicalAddGroup E] [∀ k, IsTopologicalAddGroup (X k)]
+    [∀ k, PolynormableSpace ℂ (X k)]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (hj : ∀ k, IsEmbedding (j k)) (k : ℕ) : IsEmbedding (i k) := by
+  refine ⟨IsTopologicalAddGroup.isInducing_iff_nhds_zero.mpr ?_, h.injective k⟩
+  apply le_antisymm
+  · simpa only [← map_le_iff_le_comap, Tendsto, map_zero] using (i k).continuous.tendsto 0
+  · apply (PolynormableSpace.hasBasis_zero_ball ℂ (X k)).ge_iff.mpr
+    intro p hp
+    obtain ⟨q, hq, heq⟩ := h.seminorm_extension hj k p hp
+    refine Filter.mem_comap.mpr ⟨q.ball 0 1, q.ball_mem_nhds hq zero_lt_one, ?_⟩
+    intro z hz
+    have heqz : q (i k z) = p z := DFunLike.congr_fun heq z
+    rw [p.mem_ball_zero, ← heqz]
+    exact q.mem_ball_zero.mp hz
+
 /-- Paper: Remark C.1.3.3, p. 660. A strict countable limit of complete Hausdorff
 locally convex spaces is complete. If the stages are Fréchet and each inclusion
 is proper, the limit is nonmetrizable.
@@ -932,7 +1035,114 @@ theorem strictLCLimit_complete_nonmetrizable [IsTopologicalAddGroup E]
     (hj : ∀ k, IsEmbedding (j k)) :
     @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E) ∧
       ((∀ k, IsFrechetTVS (X k)) → (∀ k, ¬ Function.Surjective (j k)) → ¬ MetrizableSpace E) := by
-  sorry
+  classical
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : ∀ k, UniformSpace (X k) := fun k ↦ IsTopologicalAddGroup.rightUniformSpace (X k)
+  let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (X k) := hc
+  let S (k : ℕ) : Submodule ℂ E := (i k).toLinearMap.range
+  have hmono : Monotone S := monotone_nat_of_le_succ fun k ↦ by
+    rintro _ ⟨y, rfl⟩
+    exact ⟨j k y, DFunLike.congr_fun (h.compatible k) y⟩
+  have hcomplete (k : ℕ) : IsComplete (S k : Set E) := by
+    have hi : IsUniformInducing (i k) :=
+      AddMonoidHom.isUniformInducing_of_isInducing (h.isEmbedding_stage hj k).isInducing
+    exact hi.isComplete_range
+  have hseminorms : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : PolynormableSpace ℂ E := hseminorms.toPolynormableSpace
+  let : ContinuousSMul ℂ E := hseminorms.continuousSMul
+  have hE : CompleteSpace E := by
+    let e : E →+ UniformSpace.Completion E := UniformSpace.Completion.toCompl
+    have he : IsUniformInducing e := UniformSpace.Completion.isUniformInducing_coe E
+    have hd : DenseRange e := UniformSpace.Completion.denseRange_coe
+    suffices hs : Function.Surjective e by exact (he.completeSpace_congr hs).mpr inferInstance
+    intro x
+    by_contra hx
+    -- Separate a point outside the completion image from each complete stage.
+    have hsep (k : ℕ) : ∃ q : Seminorm ℂ E, Continuous q ∧
+        (∀ y ∈ S k, q y = 0) ∧ x ∉ closure (e '' q.ball 0 1) := by
+      have hclosed : IsClosed (e '' (S k : Set E)) :=
+        (he.isComplete_iff.mpr (hcomplete k)).isClosed
+      have hout : x ∉ e '' (S k : Set E) := fun ⟨y, _, hy⟩ ↦ hx ⟨y, hy⟩
+      rw [← hclosed.iInter_closure_add_right_eq (𝓝 (0 : UniformSpace.Completion E)).basis_sets]
+        at hout
+      simp only [mem_iInter, id_eq, not_forall] at hout
+      obtain ⟨U, hU, hxU⟩ := hout
+      have hpre : e ⁻¹' U ∈ 𝓝 (0 : E) := by
+        apply he.uniformContinuous.continuous.continuousAt.preimage_mem_nhds
+        simpa only [map_zero] using hU
+      obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hpre
+      obtain ⟨q, hqp, hzero, hqball⟩ := exists_seminorm_thickening p (S k)
+      refine ⟨q, Seminorm.continuous_of_le hp hqp, hzero, ?_⟩
+      intro hxball
+      apply hxU (closure_mono ?_ hxball)
+      rw [hqball 1]
+      rintro _ ⟨_, ⟨y, hy, z, hz, rfl⟩, rfl⟩
+      rw [map_add]
+      exact add_mem_add (mem_image_of_mem _ hy) (hpU hz)
+    choose q hq hzero hout using hsep
+    -- Each stage sees only a finite supremum of the weighted seminorms.
+    let Q (n : ℕ) : Seminorm ℂ E := ((n : NNReal) + 1) • q n
+    let M (k : ℕ) := (Finset.range k).sup (fun n ↦ (Q n).comp (i k).toLinearMap)
+    have hQ (k n : ℕ) (y : X k) : Q n (i k y) ≤ M k y := by
+      by_cases hn : n < k
+      · exact (Finset.le_sup (f := fun n ↦ (Q n).comp (i k).toLinearMap)
+          (Finset.mem_range.mpr hn) : _ ≤ M k) y
+      · have hmem : i k y ∈ S n := hmono (Nat.le_of_not_gt hn) ⟨y, rfl⟩
+        simp only [Q, smul_apply, hzero n (i k y) hmem, smul_zero]
+        exact apply_nonneg (M k) y
+    have hb : BddAbove (range Q) := Seminorm.bddAbove_range_iff.mpr fun y ↦ by
+      obtain ⟨k, z, rfl⟩ := h.exhaustive y
+      exact ⟨M k z, forall_mem_range.mpr fun n ↦ hQ k n z⟩
+    let P : Seminorm ℂ E := ⨆ n, Q n
+    have hP : Continuous P := by
+      refine hseminorms.continuous_seminorm ⟨P, fun k ↦ ?_⟩
+      have hM : Continuous (M k) := Seminorm.continuous_finsetSup fun n _ ↦
+        ((hq n).const_smul ((n : NNReal) + 1)).comp (i k).continuous
+      refine Seminorm.continuous_of_le (p := P.comp (i k).toLinearMap) hM
+        (Seminorm.le_def.mpr fun y ↦ ?_)
+      change P (i k y) ≤ M k y
+      rw [Seminorm.iSup_apply hb]
+      exact ciSup_le fun n ↦ hQ k n y
+    have hle (n : ℕ) : Q n ≤ P := le_ciSup hb n
+    have hUC : UniformContinuous P := Seminorm.uniformContinuous_of_continuousAt_zero hP.continuousAt
+    let v : UniformSpace.Completion E → ℝ := UniformSpace.Completion.extension P
+    have hv : Continuous v := UniformSpace.Completion.continuous_extension
+    have hvcoe (y : E) : v (e y) = P y := UniformSpace.Completion.extension_coe hUC y
+    obtain ⟨n, hn⟩ := exists_nat_gt (v x)
+    have hlarge : v x < (n : ℝ) + 1 := hn.trans (lt_add_one _)
+    have hnear : (closure (e '' (q n).ball 0 1))ᶜ ∩ v ⁻¹' Iio ((n : ℝ) + 1) ∈ 𝓝 x :=
+      inter_mem (isClosed_closure.isOpen_compl.mem_nhds (hout n))
+        ((isOpen_Iio.preimage hv).mem_nhds hlarge)
+    obtain ⟨_, hy, y, rfl⟩ := mem_closure_iff_nhds.mp (hd x) _ hnear
+    have hy' : P y < (n : ℝ) + 1 := by
+      simpa only [mem_preimage, mem_Iio, hvcoe] using hy.2
+    apply hy.1 (subset_closure (mem_image_of_mem _ ((q n).mem_ball_zero.mpr ?_)))
+    have hbound := (hle n y).trans_lt hy'
+    have hpos : 0 < (n : ℝ) + 1 := by positivity
+    apply (mul_lt_mul_iff_right₀ hpos).mp
+    simpa only [Q, smul_apply, NNReal.smul_def, smul_eq_mul, NNReal.coe_add, NNReal.coe_natCast, NNReal.coe_one, mul_one]
+      using hbound
+  refine ⟨hE, fun _ hproper hmetric ↦ ?_⟩
+  let : CompleteSpace E := hE
+  let : MetrizableSpace E := hmetric
+  have : (uniformity E).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have hcover : ⋃ k, (S k : Set E) = univ := by
+    ext x
+    simp only [mem_iUnion, mem_univ, iff_true]
+    obtain ⟨k, y, rfl⟩ := h.exhaustive x
+    exact ⟨k, y, rfl⟩
+  obtain ⟨k, hk⟩ := nonempty_interior_of_iUnion_of_closed
+    (fun k ↦ (hcomplete k).isClosed) hcover
+  have hk' := (S k).eq_top_of_nonempty_interior' hk
+  apply hproper k
+  intro y
+  have hy : i (k+1) y ∈ S k := hk' ▸ Submodule.mem_top
+  obtain ⟨z, hz⟩ := hy
+  exact ⟨z, h.injective (k+1) ((DFunLike.congr_fun (h.compatible k) z).trans hz)⟩
 
 /-- Paper: Definition C.1.5.2, p. 664. An LF-space is Hausdorff and is a countable
 locally convex inductive limit of Fréchet spaces.
