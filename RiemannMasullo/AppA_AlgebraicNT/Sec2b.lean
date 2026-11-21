@@ -9,6 +9,7 @@ import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
 import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.Topology.Algebra.Group.Units
+import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -312,7 +313,30 @@ theorem infiniteIdeleLog_kernel :
 
 /-- Paper: Lemma A.2.3.2(3), p. 548. The full logarithm is proper. -/
 theorem infiniteIdeleLog_proper : IsProperMap (infiniteIdeleLog F) := by
-  sorry
+  let localLog (v : InfinitePlace F) (u : v.Completionˣ) : ℝ :=
+    v.mult * Real.log ‖u.val‖
+  have hlocal (v : InfinitePlace F) : IsProperMap (localLog v) := by
+    have hNorm : IsProperMap (fun z : v.Completion ↦ ‖z‖) := by
+      have he := isometry_extensionEmbedding v
+      simpa only [Function.comp_def, dist_zero_left, he.norm_map_of_map_zero (map_zero _)] using
+        (isProperMap_dist (0 : ℂ)).comp he.isClosedEmbedding.isProperMap
+    -- Both the unit and its inverse contribute a coordinate to the topology on units.
+    let radii (x : ℝ) := (Real.exp (x / v.mult), Real.exp (-(x / v.mult)))
+    have hRadii : Continuous radii := by
+      dsimp [radii]
+      fun_prop
+    refine isProperMap_of_comp_of_t2 (by
+      exact continuous_const.mul (Units.continuous_val.norm.log
+        (fun u ↦ norm_ne_zero_iff.mpr u.ne_zero))) hRadii ?_
+    convert (hNorm.prodMap (hNorm.comp MulOpposite.opHomeomorph.symm.isProperMap)).comp
+      (Units.isClosedEmbedding_embedProduct (α := v.Completion)).isProperMap using 1
+    funext u
+    change radii (localLog v u) = (‖u.val‖, ‖u.inv‖)
+    simp only [radii, localLog, mul_div_cancel_left₀ _ v.mult_coe_ne_zero,
+      Real.exp_neg, Real.exp_log (norm_pos_iff.mpr u.ne_zero), Units.inv_eq_val_inv,
+      Units.val_inv_eq_inv_val, norm_inv]
+  exact (IsProperMap.pi_map hlocal).comp
+    (ContinuousMulEquiv.piUnits (M := InfinitePlace.Completion)).toHomeomorph.isProperMap
 
 /-- Paper: Definition A.2.3.3, p. 548. Mathlib's logarithmic embedding of units is
 the restriction of the full idelic logarithm to diagonal units, in the coordinates
