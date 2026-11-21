@@ -1409,7 +1409,14 @@ local notation "classIntegrand" => fun (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]) (
 /-- Paper: Definition 2.2.5.1, p. 95. The character-weighted theta integrand
 is integrable over the compact group of norm-one idele classes. -/
 theorem homogeneousAdelicTheta_integrable (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]) :
-    Integrable (classIntegrand ω₁ f g) μ̄₁ := by sorry
+    Integrable (classIntegrand ω₁ f g) μ̄₁ := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : CompactSpace C₁[F] := (ideleClassGroup_finiteness F).2.1
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hcont : Continuous (classIntegrand ω₁ f g) :=
+    ((adelicTheta f).continuous.comp (continuous_subtype_val.mul continuous_const)).mul
+      (continuous_subtype_val.comp ω₁.continuous)
+  exact hcont.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
 
 /-- Paper: Lemma 2.2.5.2(2), p. 95. Averaging theta against the character on
 the norm-one idele classes gives a continuous function of the ambient class. -/
