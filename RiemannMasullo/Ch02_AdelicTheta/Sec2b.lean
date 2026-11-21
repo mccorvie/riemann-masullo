@@ -1566,7 +1566,20 @@ idele by a norm-one idele multiplies the integral by the pulled-back character. 
 theorem homogeneousAdelicTheta_idele_homogeneous (ω₁ : χ[F]) (f : ℬ[F])
     (h₀ : N₁[F]) (g : 𝕀[F]) :
     (∫ h, ideleIntegrand ω₁ f (h₀.val⁻¹ * g) h ∂μ₁) =
-      (ω₁ (classOfNormOne h₀) : ℂ) * ∫ h, ideleIntegrand ω₁ f g h ∂μ₁ := by sorry
+      (ω₁ (classOfNormOne h₀) : ℂ) * ∫ h, ideleIntegrand ω₁ f g h ∂μ₁ := by
+  let : BorelSpace 𝕀[F] := ⟨rfl⟩
+  let : (normOneIdeleTamagawaMeasure F).IsHaarMeasure :=
+    (normOneIdeleTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  have : (normOneIdeleTamagawaMeasure F).IsMulRightInvariant := ⟨fun k ↦ by
+    rw [show (· * k) = (k * ·) from funext fun x ↦ mul_comm x k]
+    exact map_mul_left_eq_self μ₁ k⟩
+  rw [← integral_const_mul, ← integral_mul_right_eq_self _ h₀]
+  refine integral_congr_ae (.of_forall fun x ↦ ?_)
+  have key : (x * h₀).val * (h₀.val⁻¹ * g) = x.val * g :=
+    (mul_assoc (x.val : 𝕀[F]) h₀ _).trans (congrArg ((x.val : 𝕀[F]) * ·) (mul_inv_cancel_left _ g))
+  have hcl : classOfNormOne (x * h₀) = classOfNormOne x * classOfNormOne h₀ := rfl
+  simp only [key, hcl, map_mul, Circle.coe_mul]
+  ring
 
 /-- Paper: Lemma 2.2.5.2(2), p. 95. At an idele representative, homogeneous
 theta equals the test-function integral over the norm-one ideles. -/
