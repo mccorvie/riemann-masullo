@@ -17,6 +17,8 @@ moves or an `.olean` is missing halfway through, it starts over.
 Where the data comes from
 
 * Sections and proof issues: `gh issue list --label section|proof --state all`.
+* Contributors: the authors of merged pull requests (`gh pr list --state merged`), leaving out
+  the repository owner, whose account the project's own agents push from, and bots.
 * Which theorems still have a `sorry`: the `declaration uses sorry` warnings of
   `lake build RiemannMasullo`, as in `scripts/issues.py`, cross-checked against the terms.
 * Dependencies: `scripts/progress/Deps.lean` loads the built library with `importModules` at
@@ -106,8 +108,21 @@ def fetch_issues():
         listing = [json.loads(line) for line in out.stdout.splitlines() if line.strip()]
         return sorted({i["number"]: i for i in listing}.values(), key=lambda i: i["number"])
 
-    repo = gh_json(["repo", "view", "--json", "url,nameWithOwner"])
+    repo = gh_json(["repo", "view", "--json", "url,nameWithOwner,owner"])
     return repo, get("section", 1000), get("proof", 20000)
+
+
+def fetch_contributions(repo):
+    """Merged pull requests by people other than the repository owner, oldest first:
+    [login, merged-at in Unix seconds, number]."""
+    owner = repo["owner"]["login"]
+    pulls = gh_json(["pr", "list", "--state", "merged", "--limit", "100000",
+                     "--json", "number,author,mergedAt"])
+    stamp = lambda s: int(datetime.datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp())
+    rows = [[p["author"]["login"], stamp(p["mergedAt"]), p["number"]] for p in pulls
+            if p.get("author") and p.get("mergedAt") and not p["author"].get("is_bot")
+            and p["author"]["login"] != owner]
+    return sorted(rows, key=lambda r: (r[1], r[2]))
 
 
 def lake_build():
@@ -1041,6 +1056,7 @@ def collect(args):
     rows = lean_constants(sorted(files))
     repo, section_issues, proof_issues = fetch_issues()
     model = build_model(repo, section_issues, proof_issues, rows, files, warnings, head)
+    model["merged"] = fetch_contributions(repo)
     if git_head() != head:
         raise Retry("HEAD moved during the run")
     return model
