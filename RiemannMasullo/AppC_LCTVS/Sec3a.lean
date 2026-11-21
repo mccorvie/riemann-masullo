@@ -8,6 +8,8 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
 import Mathlib.Topology.Algebra.InfiniteSum.Module
 import Mathlib.Topology.UniformSpace.Ascoli
@@ -2270,7 +2272,24 @@ theorem traceNorm_normedSpaceCore :
 most the operator norm of the left factor times the trace norm of the right factor.
 Deviation: The invalid equality in (C.3.4.3) is recorded above. -/
 theorem traceNorm_mul_left_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    traceNorm ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ ≤ ‖A‖ * traceNorm T := by sorry
+    traceNorm ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ ≤ ‖A‖ * traceNorm T := by
+  let S : H →L[ℂ] H := (‖A‖ : ℂ) • T.val
+  have hGram : (A * T.val).adjoint * (A * T.val) ≤ S.adjoint * S := by
+    apply (ContinuousLinearMap.norm_map_le_norm_map_iff_le (A * T.val) S).mp
+    intro x
+    simpa [S, norm_smul, Complex.norm_real, abs_of_nonneg (norm_nonneg A)] using
+      A.le_opNorm (T.val x)
+  have hAbs : CFC.abs (A * T.val) ≤ ‖A‖ • CFC.abs T.val := by
+    have h := CFC.sqrt_le_sqrt _ _ hGram
+    change CFC.abs (A * T.val) ≤ CFC.abs S at h
+    simpa [S, CFC.abs_smul, Complex.norm_real, abs_of_nonneg (norm_nonneg A)] using h
+  obtain ⟨ι, b, -⟩ := exists_hilbertBasis (𝕜 := ℂ) (E := H)
+  refine hasSum_le (fun i ↦ ?_) (hasSum_traceNorm_diagonal b
+    ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩)
+    ((hasSum_traceNorm_diagonal b T).mul_left ‖A‖)
+  have h := (ContinuousLinearMap.le_def.mp hAbs).re_inner_nonneg_right (b i)
+  simpa [CFC.abs, ContinuousLinearMap.star_eq_adjoint, inner_sub_right,
+    inner_smul_right_eq_smul, sub_nonneg] using h
 
 /-- Paper: Lemma C.3.4.4(2), p. 698. The trace norm of a right product is at
 most the operator norm of the right factor times the trace norm of the left factor.
