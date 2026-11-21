@@ -776,7 +776,7 @@ Deviation: Sanity check for the direct model and its extension to real degrees. 
 theorem modulatedSobolev_norm [BorelSpace G] (s : ℝ) (f : ModulatedSobolev m μ s) :
     Integrable (fun x ↦ ‖f x‖ ^ 2 * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2)) μ ∧
     ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2) ∂μ) :=
-  by sorry
+  weightedSobolev_norm μ (modulatedSobolevWeight_subadditive m).1 s f
 
 -- Definition D.2.1.1, p. 793, defines modulated groups for second-countable `G`, and the
 -- structure lemmas for `IsModulation` assume it; the recall on p. 399 omits the word.
