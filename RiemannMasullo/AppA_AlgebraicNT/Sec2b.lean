@@ -1127,7 +1127,42 @@ Deviation: We use K as in the preceding sentence and the proof on p. 551. -/
 theorem infiniteIdeleFundamentalDomain_finite_translates (K : Set N∞) (hK : IsCompact K) :
     {u : (𝓞 F)ˣ | ((unitAtInfinity u • ((N∞).subtype '' closure E∞)) ∩
       ((N∞).subtype '' K)).Nonempty}.Finite := by
-  sorry
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let D : Set (𝕀∞ × 𝕀∞) := ((N∞).subtype '' K) ×ˢ ((N∞).subtype '' closure E∞)
+  let q : 𝕀∞ × 𝕀∞ → mixedEmbedding.mixedSpace F := fun p ↦ m (p.1 / p.2).val
+  have hm : Continuous m := by
+    change Continuous (fun x ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+    simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact (continuous_pi fun v ↦ (isometry_extensionEmbeddingOfIsReal v.2).continuous.comp
+      (continuous_apply v.val)).prodMk
+      (continuous_pi fun v ↦ (isometry_extensionEmbedding v.val).continuous.comp
+        (continuous_apply v.val))
+  have hD : IsCompact D :=
+    (hK.image continuous_subtype_val).prod
+      ((infiniteIdeleFundamentalDomain_precompact F b v₀ σ).image continuous_subtype_val)
+  have hC : IsCompact (q '' D) :=
+    hD.image (hm.comp (Units.continuous_val.comp (continuous_fst.div' continuous_snd)))
+  -- In mixed coordinates, diagonal units lie in the closed discrete integer lattice.
+  let L := (mixedEmbedding.integerLattice F).toAddSubgroup
+  have : DiscreteTopology L :=
+    inferInstanceAs (DiscreteTopology (mixedEmbedding.integerLattice F))
+  have hL : IsClosed (L : Set (mixedEmbedding.mixedSpace F)) :=
+    L.isClosed_of_discreteTopology
+  have hfin : (q '' D ∩ (L : Set (mixedEmbedding.mixedSpace F))).Finite :=
+    (hC.inter_right hL).finite (DiscreteTopology.isDiscrete.mono Set.inter_subset_right)
+  let f : (𝓞 F)ˣ → mixedEmbedding.mixedSpace F :=
+    fun u ↦ mixedEmbedding F (algebraMap (𝓞 F) F u.val)
+  have hf : Injective f :=
+    (mixedEmbedding_injective F).comp (RingOfIntegers.coe_injective.comp Units.val_injective)
+  refine (hfin.preimage hf.injOn).subset ?_
+  rintro u ⟨x, hx, hxK⟩
+  obtain ⟨y, hy, hxy⟩ := Set.mem_smul_set.mp hx
+  have hquot : x / y = unitAtInfinity u :=
+    (div_eq_iff_eq_mul).mpr hxy.symm
+  refine ⟨⟨(x, y), ⟨hxK, hy⟩, ?_⟩, ⟨u.val, rfl⟩⟩
+  change m (x / y).val = mixedEmbedding F (algebraMap (𝓞 F) F u.val)
+  rw [hquot, InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp]
+  rfl
 
 -- TODO(paper-gap): (A.2.3.20) describes a positive real ray. For complex v₀ the
 -- sector in Definition A.2.3.6 is wider, as (A.2.3.21) on p. 551 also shows.
