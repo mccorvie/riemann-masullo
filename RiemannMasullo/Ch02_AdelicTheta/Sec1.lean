@@ -256,7 +256,9 @@ theorem euclideanSchwartz_strongDual_complete (m : ℕ) :
 /-- Paper: Proposition 2.1.1.6, p. 61. The strong dual of the Euclidean Schwartz space
 is nuclear. -/
 theorem euclideanSchwartz_strongDual_nuclear (m : ℕ) :
-    IsNuclearTVS.{v} (StrongDual ℂ (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ)) := by sorry
+    IsNuclearTVS.{v} (StrongDual ℂ (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ)) := by
+  exact (isNuclearTVS_strongDual_iff (euclideanSchwartz_frechet m)).2
+    (euclideanSchwartz_nuclear m)
 
 /-- Paper: Proposition 2.1.1.6, p. 61. The strong dual is Montel, meaning it is
 barrelled and its closed bounded subsets are compact. -/
