@@ -2,9 +2,12 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.LinearAlgebra.Basis.Prod
 import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Homotopy.Lifting
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
@@ -17,7 +20,7 @@ Masullo, §§D.1.6–D.1.9, pp. 765–783.
 @[expose] public noncomputable section
 
 open Filter MeasureTheory Set Topology
-open scoped TensorProduct Topology
+open scoped ContDiff ENNReal NNReal TensorProduct Topology
 
 namespace RiemannMasullo
 
@@ -618,10 +621,98 @@ theorem bruhatFirstOrder_translate (a : LCATopologicalLie G)
     deriv (fun t : ℝ ↦ f.val ((g⁻¹ * x) * a (Multiplicative.ofAdd t))) 0
   simp only [mul_assoc]
 
+omit hTop hT2 hLC in
+/-- Translation by an elementary one-parameter subgroup lifts on each discrete fiber
+to translation by a real multiple of a fixed vector. -/
+private theorem exists_elementaryCover_translation {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
+    (c : ℝ →+ ElementaryLieGroup m n r F) (hc : Continuous c) :
+    ∃ v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n),
+      ∀ u (z : Fin r → ℤ) (b : F) (t : ℝ),
+        elementaryCover (u + t • v) z b = elementaryCover u z b + c t := by
+  let cR := (AddMonoidHom.fst _ _).comp c
+  let cT := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp c)
+  have hR (t : ℝ) : (c t).1 = t • (c 1).1 := by
+    change cR t = t • cR 1
+    simpa only [smul_eq_mul, mul_one] using map_real_smul cR hc.fst t (1 : ℝ)
+  choose w hw using fun i : Fin n ↦ exists_addCircle_coe_mul_eq
+    ((Pi.evalAddMonoidHom _ i).comp cT) ((continuous_apply i).comp hc.snd.fst)
+  have hD (t : ℝ) : (c t).2.2 = 0 := by
+    have h := hc.snd.snd.isConst_of_preconnectedSpace t 0
+    rw [map_zero c] at h
+    exact h
+  refine ⟨((c 1).1, WithLp.toLp 2 w), fun u z b t ↦ ?_⟩
+  refine Prod.ext (congrArg (u.1 + ·) (hR t).symm) (Prod.ext ?_ ?_)
+  · funext i
+    change ((u.2 i + t * w i : ℝ) : AddCircle (1 : ℝ)) =
+      (u.2 i : AddCircle (1 : ℝ)) + (c t).2.1 i
+    rw [AddCircle.coe_add, hw i t]
+    rfl
+  · change (z, b) = (z, b) + (c t).2.2
+    rw [hD, add_zero]
+
 /-- Paper: Lemma D.1.6.7(1), p. 767. First-order operators add under
 pointwise multiplication of one-parameter subgroups. -/
 theorem bruhatFirstOrder_mul (a b : LCATopologicalLie G) :
-    bruhatFirstOrder (a * b) = bruhatFirstOrder a + bruhatFirstOrder b := by sorry
+    bruhatFirstOrder (a * b) = bruhatFirstOrder a + bruhatFirstOrder b := by
+  apply LinearMap.ext
+  intro f
+  apply Subtype.ext
+  funext x
+  change bruhatDirectionalDeriv (a * b) f x =
+    bruhatDirectionalDeriv a f x + bruhatDirectionalDeriv b f x
+  -- Use a structural quotient containing the point and both subgroup images.
+  have hf : IsBruhatContDiff 1 (f : G → ℂ) := (Submodule.mem_iInf _).mp f.property 1
+  obtain ⟨k, hk, _, hDescent⟩ := hf
+  obtain ⟨p, hp, hx⟩ := exists_bruhatStructuralPair_mem k hk x
+  obtain ⟨e⟩ := p.elementary
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescent p hp
+  have hMem (c : LCATopologicalLie G) (t : Multiplicative ℝ) : c t ∈ p.val.1 := by
+    let : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+    exact (isPreconnected_range c.continuous).subset_isClopen
+      ⟨p.val.1.isClosed_of_isOpen p.property.1, p.property.1⟩
+      ⟨1, ⟨1, map_one c⟩, p.val.1.one_mem⟩ (mem_range_self t)
+  let lift (c : LCATopologicalLie G) := c.toMonoidHom.codRestrict p.val.1 (hMem c)
+  let q := e.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _ : p.val.1 →* p.quotient)
+  let cE (c : LCATopologicalLie G) := AddMonoidHom.toMultiplicative.symm (q.comp (lift c))
+  have hcE (c : LCATopologicalLie G) : Continuous (cE c) :=
+    e.equiv.continuous.comp (QuotientGroup.continuous_mk.comp (c.continuous.subtype_mk (hMem c)))
+  have hMul (t : ℝ) : cE (a * b) t = cE a t + cE b t := by
+    change (q (lift a (Multiplicative.ofAdd t) * lift b (Multiplicative.ofAdd t))).toAdd = _
+    rw [map_mul]
+    rfl
+  -- Evaluate all three derivatives in the same lift of the discrete fiber.
+  obtain ⟨va, ha⟩ := exists_elementaryCover_translation (cE a) (hcE a)
+  obtain ⟨vb, hb⟩ := exists_elementaryCover_translation (cE b) (hcE b)
+  let y := (q ⟨x, hx⟩).toAdd
+  obtain ⟨w, hw⟩ := elementaryCover_surjective y.2.2.1 y.2.2.2 y.1 y.2.1
+  let u := (y.1, w)
+  let g := fun v ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover v y.2.2.1 y.2.2.2)))
+  have hg : HasFDerivAt g (fderiv ℝ g u) u :=
+    ((hSmooth e y.2.2.1 y.2.2.2).differentiable_one u).hasFDerivAt
+  have hDeriv (c : LCATopologicalLie G) (v : EuclideanSpace ℝ (Fin e.realDim) ×
+      EuclideanSpace ℝ (Fin e.torusDim))
+      (hv : ∀ t : ℝ, elementaryCover (u + t • v) y.2.2.1 y.2.2.2 = y + cE c t) :
+      bruhatDirectionalDeriv c f x = fderiv ℝ g u v := by
+    have hLine : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+      simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+    have hOrbit (t : ℝ) : g (u + t • v) = (f : G → ℂ) (x * c (Multiplicative.ofAdd t)) := by
+      dsimp only [g]
+      rw [hv]
+      change f₀ (e.equiv.symm (q ⟨x, hx⟩ * q (lift c (Multiplicative.ofAdd t)))) = _
+      rw [← map_mul q]
+      let z := (⟨x, hx⟩ : p.val.1) * lift c (Multiplicative.ofAdd t)
+      change f₀ (e.equiv.symm (e.equiv (QuotientGroup.mk z))) = (f : G → ℂ) z.val
+      rw [e.equiv.symm_apply_apply]
+      exact hf₀ z
+    have h := hg.comp_hasDerivAt_of_eq 0 hLine (by simp)
+    simpa only [Function.comp_def, hOrbit, bruhatDirectionalDeriv] using h.deriv
+  rw [hDeriv a va (fun t ↦ (ha u _ _ t).trans (congrArg (· + cE a t) hw)),
+    hDeriv b vb (fun t ↦ (hb u _ _ t).trans (congrArg (· + cE b t) hw)),
+    hDeriv (a * b) (va + vb)]
+  · exact map_add (fderiv ℝ g u) va vb
+  · intro t
+    rw [smul_add, ← add_assoc, hb, ha, hw, add_assoc, hMul]
 
 /-- Paper: Lemma D.1.6.7(1), p. 767. Scaling the real parameter scales
 the first-order operator by the same factor. -/
@@ -629,18 +720,364 @@ theorem bruhatFirstOrder_scale (a : LCATopologicalLie G) (c : ℝ) :
     let scale : LCATopologicalLie (Multiplicative ℝ) :=
       ⟨(c • LinearMap.id (R := ℝ) (M := ℝ)).toAddMonoidHom.toMultiplicative,
         continuous_const_mul c⟩
-    bruhatFirstOrder (a.comp scale) = c • bruhatFirstOrder a := by sorry
+    bruhatFirstOrder (a.comp scale) = c • bruhatFirstOrder a := by
+  apply LinearMap.ext
+  intro f
+  apply Subtype.ext
+  funext x
+  let orbit : ℝ → ℂ := fun t ↦ f.val (x * a (Multiplicative.ofAdd t))
+  change deriv (fun t ↦ orbit (c * t)) 0 = c • deriv orbit 0
+  simpa only [mul_zero] using deriv_comp_mul_left c orbit 0
 
+omit [CommGroup G] [TopologicalSpace G] hTop hT2 hLC in
+/-- A weighted mixed partial of a fixed-direction derivative on the elementary cover
+is controlled by finitely many seminorms of the original function.
+The weights are unchanged and one derivative index is raised by one. -/
+private theorem elementarySchwartz_directional_bound {m n r : ℕ} {F : Type*}
+    (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n))
+    (i : ElementarySchwartzIndex m n r) :
+    ∃ p : Seminorm ℂ (ElementarySchwartz m n r F), Continuous p ∧
+      ∀ (f : ElementarySchwartz m n r F) (g : ElementaryLieGroup m n r F → ℂ),
+        (∀ u z b, g (elementaryCover u z b) =
+          fderiv ℝ (fun w ↦ f (elementaryCover w z b)) u v) →
+        elementarySchwartzBound g i ≤ ENNReal.ofReal (p f) := by
+  classical
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let basis : Module.Basis (Fin m ⊕ Fin n) ℝ X :=
+    (EuclideanSpace.basisFun (Fin m) ℝ).toBasis.prod (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
+  let ν : Fin m ⊕ Fin n → ElementarySchwartzIndex m n r
+    | .inl j => (i.1, i.2.1 + Pi.single j 1, i.2.2.1, i.2.2.2)
+    | .inr j => (i.1, i.2.1, i.2.2.1 + Pi.single j 1, i.2.2.2)
+  let q : Seminorm ℂ (ElementarySchwartz m n r F) :=
+    Finset.univ.sup (fun j ↦ elementarySchwartzSeminorm (ν j))
+  let C : ℝ≥0 := ∑ j, ‖basis.repr v j‖₊
+  have hq : Continuous q := Seminorm.continuous_finsetSup fun j _ ↦
+    (withGeneratingSeminorms_spec _ _).continuous_seminorm (ν j)
+  refine ⟨C • q, ?_, fun f g hg ↦ ?_⟩
+  · exact hq.const_smul (C : ℝ)
+  -- Adding a coordinate direction increments its multiplicity in the list of partials.
+  let dirs {k : ℕ} (d : Fin k → X) (α : Fin k → ℕ) : List X :=
+    (List.ofFn fun j ↦ List.replicate (α j) (d j)).flatten
+  have hInsert {k : ℕ} (d : Fin k → X) (α : Fin k → ℕ) (j : Fin k) :
+      (d j :: dirs d α).Perm (dirs d (α + Pi.single j 1)) := by
+    let indices (α : Fin k → ℕ) :=
+      (List.finRange k).flatMap fun l ↦ List.replicate (α l) l
+    have hMap (α : Fin k → ℕ) : (indices α).map d = dirs d α := by
+      simp only [indices, dirs, List.ofFn_eq_map, List.map_flatMap, List.map_replicate,
+        List.flatten_eq_flatMap, List.flatMap_map, id_eq]
+    have hCount (α : Fin k → ℕ) (l : Fin k) : (indices α).count l = α l := by
+      rw [List.count_flatMap, ← Fin.sum_univ_def]
+      simp [List.count_replicate]
+    have hPerm : (j :: indices α).Perm (indices (α + Pi.single j 1)) := by
+      rw [List.perm_iff_count]
+      intro l
+      simp only [List.count_cons, hCount, beq_iff_eq, Pi.add_apply, Pi.single_apply, eq_comm (a := j)]
+    simpa only [List.map_cons, hMap] using hPerm.map d
+  let dR (j : Fin m) : X := (EuclideanSpace.single j 1, 0)
+  let dT (j : Fin n) : X := (0, EuclideanSpace.single j 1)
+  let R := dirs dR i.2.1
+  let S := dirs dT i.2.2.1
+  let D := R ++ S
+  refine iSup_le fun u ↦ iSup_le fun z ↦ iSup_le fun b ↦ ?_
+  let l : X → ℂ := fun w ↦ f (elementaryCover w z b)
+  have hl : ContDiff ℝ ∞ l := f.property.1 z b
+  let weight : ℂ := (∏ k, (u.1 k : ℂ) ^ i.1 k) * (∏ k, (z k : ℂ) ^ i.2.2.2 k)
+  let T : X →L[ℝ] ℂ := iteratedFDeriv ℝ D.length (fderiv ℝ l) u D.get
+  have hPartial : elementaryPartial g i.2.1 i.2.2.1 u z b = T v := by
+    have hFun : (fun w ↦ g (elementaryCover w z b)) =
+        (ContinuousLinearMap.apply ℝ ℂ v) ∘ fderiv ℝ l := funext fun w ↦ hg w z b
+    change iteratedFDeriv ℝ D.length (fun w ↦ g (elementaryCover w z b)) u D.get = T v
+    rw [hFun, (ContinuousLinearMap.apply ℝ ℂ v).iteratedFDeriv_comp_left
+      (hl.fderiv_right (m := ∞) (by simp)).contDiffAt (by simp)]
+    rfl
+  have hLast (d : X) :
+      iteratedFDeriv ℝ (D ++ [d]).length l u (D ++ [d]).get = T d := by
+    let eval (s : Σ k, Fin k → X) := iteratedFDeriv ℝ s.1 l u s.2
+    have hEval := congrArg eval (List.equivSigmaTuple.apply_symm_apply
+      ⟨D.length + 1, Fin.snoc D.get d⟩)
+    change iteratedFDeriv ℝ (List.ofFn (Fin.snoc D.get d)).length l u
+      (List.ofFn (Fin.snoc D.get d)).get = iteratedFDeriv ℝ (D.length + 1) l u
+      (Fin.snoc D.get d) at hEval
+    have hList : List.ofFn (Fin.snoc D.get d) = D ++ [d] := by
+      rw [List.ofFn_succ', Fin.snoc_last, List.concat_eq_append]
+      simp only [Fin.snoc_castSucc, List.ofFn_get]
+    rw [hList] at hEval
+    rw [hEval, iteratedFDeriv_succ_apply_right, Fin.init_snoc, Fin.snoc_last]
+  have hCoord (j : Fin m ⊕ Fin n) :
+      T (basis j) = elementaryPartial f (ν j).2.1 (ν j).2.2.1 u z b := by
+    cases j with
+    | inl j =>
+      have hBasis : basis (.inl j) = dR j := by
+        apply Prod.ext
+        · exact (Module.Basis.prod_apply_inl_fst _ _ j).trans
+            (EuclideanSpace.basisFun_apply _ _ j)
+        · exact Module.Basis.prod_apply_inl_snd _ _ j
+      rw [hBasis, ← hLast]
+      have hPerm : (D ++ [dR j]).Perm (dirs dR (i.2.1 + Pi.single j 1) ++ S) :=
+        (show (D ++ [dR j]).Perm (dR j :: D) by simp).trans
+          ((hInsert dR i.2.1 j).append_right S)
+      exact iteratedFDeriv_apply_list_perm hl id hPerm u
+    | inr j =>
+      have hBasis : basis (.inr j) = dT j := by
+        apply Prod.ext
+        · exact Module.Basis.prod_apply_inr_fst _ _ j
+        · exact (Module.Basis.prod_apply_inr_snd _ _ j).trans
+            (EuclideanSpace.basisFun_apply _ _ j)
+      rw [hBasis, ← hLast]
+      have hPerm : (D ++ [dT j]).Perm (R ++ dirs dT (i.2.2.1 + Pi.single j 1)) := by
+        rw [show D = R ++ S from rfl, List.append_assoc]
+        have hMove : (S ++ [dT j]).Perm (dT j :: S) := by
+          simp
+        exact (hMove.trans (hInsert dT i.2.2.1 j)).append_left R
+      exact iteratedFDeriv_apply_list_perm hl id hPerm u
+  have hPoint (j : Fin m ⊕ Fin n) : ‖weight * T (basis j)‖ ≤ q f := by
+    rw [hCoord]
+    refine le_trans ?_ (Seminorm.le_finset_sup_apply (Finset.mem_univ j))
+    have h : (‖weight * elementaryPartial f (ν j).2.1 (ν j).2.2.1 u z b‖₊ : ℝ≥0∞) ≤
+        elementarySchwartzBound f (ν j) := by
+      cases j <;> exact le_iSup_of_le u (le_iSup_of_le z (le_iSup_of_le b le_rfl))
+    exact ENNReal.toReal_mono (f.property.2 (ν j)).ne h
+  rw [ENNReal.coe_nnreal_eq, ENNReal.ofReal_le_ofReal_iff (apply_nonneg (C • q) f)]
+  change ‖weight * elementaryPartial g i.2.1 i.2.2.1 u z b‖ ≤ _
+  rw [hPartial]
+  -- Expand the direction in the product basis and bound each term by the same seminorm.
+  have hSum : weight * T v = ∑ j, basis.repr v j • (weight * T (basis j)) := by
+    conv_lhs => rw [← basis.sum_repr v]
+    simp only [map_sum, map_smul, Finset.mul_sum, Algebra.mul_smul_comm]
+  calc
+    ‖weight * T v‖ ≤ ∑ j, ‖basis.repr v j • (weight * T (basis j))‖ := by
+      rw [hSum]
+      exact norm_sum_le _ _
+    _ ≤ ∑ j, ‖basis.repr v j‖ * q f := by
+      simp only [norm_smul]
+      exact Finset.sum_le_sum fun j _ ↦ mul_le_mul_of_nonneg_left (hPoint j) (norm_nonneg _)
+    _ = (C • q) f := by simp [C, ← Finset.sum_mul, smul_apply, NNReal.smul_def]
+
+omit [CommGroup G] [TopologicalSpace G] hTop hT2 hLC in
+/-- On every elementary stage an orbit derivative is a continuous linear operator,
+and every orbit curve of a stage function is differentiable at zero. -/
+private theorem elementarySchwartz_orbitDeriv {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (c : ℝ →+ ElementaryLieGroup m n r F) (hc : Continuous c) :
+    ∃ B : ElementarySchwartz m n r F →L[ℂ] ElementarySchwartz m n r F,
+      ∀ f y, HasDerivAt (fun t : ℝ ↦ f (y + c t)) (B f y) 0 := by
+  obtain ⟨v, hv⟩ := exists_elementaryCover_translation c hc
+  let D (f : ElementarySchwartz m n r F) (y : ElementaryLieGroup m n r F) :=
+    deriv (fun t : ℝ ↦ f (y + c t)) 0
+  have hDeriv (f : ElementarySchwartz m n r F) (u) (z) (b) :
+      HasDerivAt (fun t : ℝ ↦ f (elementaryCover u z b + c t))
+        (fderiv ℝ (fun w ↦ f (elementaryCover w z b)) u v) 0 := by
+    have hLine : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+      simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+    have h := ((f.property.1 z b).differentiable (by simp) u).hasFDerivAt
+    simpa only [Function.comp_def, hv] using h.comp_hasDerivAt_of_eq 0 hLine (by simp)
+  have hLift (f : ElementarySchwartz m n r F) (u) (z) (b) :
+      D f (elementaryCover u z b) = fderiv ℝ (fun w ↦ f (elementaryCover w z b)) u v :=
+    (hDeriv f u z b).deriv
+  have hDiff (f : ElementarySchwartz m n r F) (y : ElementaryLieGroup m n r F) :
+      HasDerivAt (fun t : ℝ ↦ f (y + c t)) (D f y) 0 := by
+    obtain ⟨w, hw⟩ := elementaryCover_surjective y.2.2.1 y.2.2.2 y.1 y.2.1
+    change elementaryCover (y.1, w) y.2.2.1 y.2.2.2 = y at hw
+    rw [← hw, hLift]
+    exact hDeriv f _ _ _
+  choose p hp hBound using elementarySchwartz_directional_bound (r := r) (F := F) v
+  have hMem (f : ElementarySchwartz m n r F) : D f ∈ elementarySchwartzSubmodule m n r F := by
+    refine ⟨fun z b ↦ ?_, fun i ↦ (hBound i f (D f) (fun u z b ↦ hLift f u z b)).trans_lt
+      ENNReal.ofReal_lt_top⟩
+    simp only [hLift]
+    exact (ContinuousLinearMap.apply ℝ ℂ v).contDiff.comp
+      ((f.property.1 z b).fderiv_right (m := ∞) (by simp))
+  let B : ElementarySchwartz m n r F →ₗ[ℂ] ElementarySchwartz m n r F :=
+    { toFun := fun f ↦ ⟨D f, hMem f⟩
+      map_add' := fun f g ↦ Subtype.ext (funext fun y ↦
+        ((hDiff f y).add (hDiff g y)).deriv)
+      map_smul' := fun d f ↦ Subtype.ext (funext fun y ↦
+        ((hDiff f y).const_smul d).deriv) }
+  refine ⟨⟨B, ?_⟩, hDiff⟩
+  apply (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp B
+  intro i
+  apply Seminorm.continuous_of_le (hp i)
+  intro f
+  change (elementarySchwartzBound (D f) i).toReal ≤ p i f
+  exact (ENNReal.toReal_mono ENNReal.ofReal_ne_top
+    (hBound i f (D f) (fun u z b ↦ hLift f u z b))).trans_eq
+      (ENNReal.toReal_ofReal (apply_nonneg (p i) f))
+
+omit hT2 hLC in
+/-- Differentiation on a structural stage agrees with differentiation on its
+elementary quotient, including the zero extension off the open subgroup. -/
+private theorem schwartzBruhatStage_orbitDeriv (a : LCATopologicalLie G)
+    (p : BruhatStructuralPair G) (e : ElementaryLCAPresentation p.quotient) :
+    ∃ B : SchwartzBruhatStage e →L[ℂ] SchwartzBruhatStage e,
+      ∀ f x, HasDerivAt (fun t : ℝ ↦ schwartzBruhatStageRealization p e f
+        (x * a (Multiplicative.ofAdd t))) (schwartzBruhatStageRealization p e (B f) x) 0 := by
+  classical
+  have hMem (t : Multiplicative ℝ) : a t ∈ p.val.1 := by
+    let : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+    exact (isPreconnected_range a.continuous).subset_isClopen
+      ⟨p.val.1.isClosed_of_isOpen p.property.1, p.property.1⟩
+      ⟨1, ⟨1, map_one a⟩, p.val.1.one_mem⟩ (mem_range_self t)
+  let aH := a.toMonoidHom.codRestrict p.val.1 hMem
+  let q := e.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _ : p.val.1 →* p.quotient)
+  let c := AddMonoidHom.toMultiplicative.symm (q.comp aH)
+  have hc : Continuous c :=
+    e.equiv.continuous.comp (QuotientGroup.continuous_mk.comp (a.continuous.subtype_mk hMem))
+  obtain ⟨B, hB⟩ := elementarySchwartz_orbitDeriv c hc
+  refine ⟨B, fun f x ↦ ?_⟩
+  rw [schwartzBruhatStageRealization_apply]
+  by_cases hx : x ∈ p.val.1
+  · rw [dite_eq_left hx]
+    let y := (q ⟨x, hx⟩).toAdd
+    have hEq (t : ℝ) : schwartzBruhatStageRealization p e f
+        (x * a (Multiplicative.ofAdd t)) = f (y + c t) := by
+      rw [schwartzBruhatStageRealization_apply, dite_eq_left (p.val.1.mul_mem hx (hMem _))]
+      change f (q (⟨x, hx⟩ * aH (Multiplicative.ofAdd t))).toAdd = f (y + c t)
+      rw [map_mul q]
+      rfl
+    simp only [hEq]
+    exact hB f y
+  · rw [dite_eq_right hx]
+    have hEq (t : ℝ) : schwartzBruhatStageRealization p e f
+        (x * a (Multiplicative.ofAdd t)) = 0 := by
+      rw [schwartzBruhatStageRealization_apply, dite_eq_right]
+      exact fun ht ↦ hx ((p.val.1.mul_mem_cancel_right (hMem _)).mp ht)
+    simp only [hEq]
+    exact hasDerivAt_const 0 (0 : ℂ)
+
+include hT2 hLC in
 /-- Paper: Lemma D.1.6.7(1), p. 767. The directional derivative restricts
 to a continuous complex linear endomorphism of the Schwartz–Bruhat space. -/
 theorem bruhatFirstOrder_schwartz :
     ∀ a : LCATopologicalLie G, ∃ A : SchwartzBruhat G →L[ℂ] SchwartzBruhat G,
-      ∀ f x, A f x = bruhatDirectionalDeriv a f x := by sorry
+      ∀ f x, A f x = bruhatDirectionalDeriv a f x := by
+  classical
+  intro a
+  choose B hB using schwartzBruhatStage_orbitDeriv a
+  have hStage (p : BruhatStructuralPair G) (e : ElementaryLCAPresentation p.quotient)
+      (f : SchwartzBruhatStage e) :
+      bruhatDirectionalDeriv a (schwartzBruhatStageRealization p e f) =
+        schwartzBruhatStageRealization p e (B p e f) :=
+    funext fun x ↦ (hB p e f x).deriv
+  let P (f : G → ℂ) : Prop :=
+    (∀ x : G, DifferentiableAt ℝ (fun t : ℝ ↦ f (x * a (Multiplicative.ofAdd t))) 0) ∧
+      bruhatDirectionalDeriv a f ∈ schwartzBruhatSubmodule G
+  have hMem (p : BruhatStructuralPair G) (e : ElementaryLCAPresentation p.quotient)
+      (g : G → ℂ) (hg : g ∈ (schwartzBruhatStageRealization p e).range) : P g := by
+    obtain ⟨s, rfl⟩ := hg
+    exact ⟨fun x ↦ (hB p e s x).differentiableAt, hStage p e s ▸
+      (schwartzBruhatStageInclusion p e (B p e s)).property⟩
+  have hZero : P 0 := by
+    refine ⟨fun _ ↦ differentiableAt_const _, ?_⟩
+    have h : bruhatDirectionalDeriv a (0 : G → ℂ) = 0 := by
+      funext x
+      exact (hasDerivAt_const 0 (0 : ℂ)).deriv
+    rw [h]
+    exact (schwartzBruhatSubmodule G).zero_mem
+  have hAdd (g h : G → ℂ) (hg : P g) (hh : P h) : P (g + h) := by
+    refine ⟨fun x ↦ (hg.1 x).add (hh.1 x), ?_⟩
+    have hEq : bruhatDirectionalDeriv a (g + h) =
+        bruhatDirectionalDeriv a g + bruhatDirectionalDeriv a h :=
+      funext fun x ↦ deriv_add (hg.1 x) (hh.1 x)
+    rw [hEq]
+    exact (schwartzBruhatSubmodule G).add_mem hg.2 hh.2
+  have hAll (f : G → ℂ) (hf : f ∈ schwartzBruhatSubmodule G) : P f :=
+    Submodule.iSup_induction _ (motive := P) hf
+      (fun p g hg ↦ Submodule.iSup_induction _ (motive := P) hg (hMem p) hZero hAdd)
+      hZero hAdd
+  let A : SchwartzBruhat G →ₗ[ℂ] SchwartzBruhat G :=
+    { toFun := fun f ↦ ⟨bruhatDirectionalDeriv a f, (hAll f.val f.property).2⟩
+      map_add' := fun f g ↦ Subtype.ext (funext fun x ↦
+        deriv_add ((hAll f.val f.property).1 x) ((hAll g.val g.property).1 x))
+      map_smul' := fun c f ↦ Subtype.ext (funext fun x ↦ by
+        change deriv (fun t : ℝ ↦ c * f (x * a (Multiplicative.ofAdd t))) 0 =
+          c * deriv (fun t : ℝ ↦ f (x * a (Multiplicative.ofAdd t))) 0
+        exact congrFun (deriv_const_mul_field' c) 0) }
+  refine ⟨⟨A, ?_⟩, fun _ _ ↦ rfl⟩
+  apply (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp A
+  intro p
+  let q := p.val.comp A
+  have hq (s : BruhatStructuralPair G) (e : ElementaryLCAPresentation s.quotient) :
+      Continuous (q ∘ schwartzBruhatStageInclusion s e) := by
+    have hEq : q ∘ schwartzBruhatStageInclusion s e =
+        (p.val ∘ schwartzBruhatStageInclusion s e) ∘ B s e := by
+      funext f
+      apply congrArg p.val
+      exact Subtype.ext (hStage s e f)
+    rw [hEq]
+    exact (p.property s e).comp (B s e).continuous
+  let q' : {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (s : BruhatStructuralPair G) (e : ElementaryLCAPresentation s.quotient),
+        Continuous (q ∘ schwartzBruhatStageInclusion s e)} := ⟨q, hq⟩
+  exact (withGeneratingSeminorms_spec (schwartzBruhatSubmodule G) Subtype.val).continuous_seminorm q'
 
 /-- Paper: Lemma D.1.6.7(2), p. 767. First-order operators commute on the
 smooth submodule. -/
 theorem bruhatFirstOrder_commute (a b : LCATopologicalLie G) :
-    Commute (bruhatFirstOrder a) (bruhatFirstOrder b) := by sorry
+    Commute (bruhatFirstOrder a) (bruhatFirstOrder b) := by
+  apply LinearMap.ext
+  intro f
+  apply Subtype.ext
+  funext x
+  change bruhatDirectionalDeriv a (bruhatDirectionalDeriv b f) x =
+    bruhatDirectionalDeriv b (bruhatDirectionalDeriv a f) x
+  -- Descend the two-parameter orbit through a structural quotient containing x.
+  have hf : IsBruhatContDiff 2 (f : G → ℂ) := (Submodule.mem_iInf _).mp f.property 2
+  obtain ⟨k, hk, _, hDescent⟩ := hf
+  obtain ⟨p, hp, hx⟩ := exists_bruhatStructuralPair_mem k hk x
+  obtain ⟨e⟩ := p.elementary
+  obtain ⟨f₀, hf₀, hCover⟩ := hDescent p hp
+  have hMem (c : LCATopologicalLie G) (t : Multiplicative ℝ) : c t ∈ p.val.1 := by
+    let : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+    exact (isPreconnected_range c.continuous).subset_isClopen
+      ⟨p.val.1.isClosed_of_isOpen p.property.1, p.property.1⟩
+      ⟨1, ⟨1, map_one c⟩, p.val.1.one_mem⟩ (mem_range_self t)
+  let lift (c : LCATopologicalLie G) := c.toMonoidHom.codRestrict p.val.1 (hMem c)
+  let q := e.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _ : p.val.1 →* p.quotient)
+  let cE (c : LCATopologicalLie G) := AddMonoidHom.toMultiplicative.symm (q.comp (lift c))
+  have hcE (c : LCATopologicalLie G) : Continuous (cE c) :=
+    e.equiv.continuous.comp (QuotientGroup.continuous_mk.comp (c.continuous.subtype_mk (hMem c)))
+  let orbit (st : ℝ × ℝ) :=
+    (f : G → ℂ) (x * a (Multiplicative.ofAdd st.1) * b (Multiplicative.ofAdd st.2))
+  have hOrbit : ContDiff ℝ 2 orbit := by
+    let c := (cE a).coprod (cE b)
+    have hc : Continuous c := ((hcE a).comp continuous_fst).add ((hcE b).comp continuous_snd)
+    let φ := fun y ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd y))
+    have hEq (st : ℝ × ℝ) : φ (c st + (q ⟨x, hx⟩).toAdd) = orbit st := by
+      let y := (⟨x, hx⟩ : p.val.1) * lift a (Multiplicative.ofAdd st.1) *
+        lift b (Multiplicative.ofAdd st.2)
+      change f₀ (e.equiv.symm ((q (lift a (Multiplicative.ofAdd st.1)) *
+        q (lift b (Multiplicative.ofAdd st.2))) * q ⟨x, hx⟩)) = f.val y.val
+      rw [mul_comm _ (q ⟨x, hx⟩), ← mul_assoc, ← map_mul, ← map_mul]
+      change f₀ (e.equiv.symm (e.equiv (QuotientGroup.mk y))) = f.val y.val
+      rw [e.equiv.symm_apply_apply]
+      exact hf₀ y
+    simpa [hEq] using
+      contDiff_comp_affine_elementary c hc (q ⟨x, hx⟩).toAdd (f := φ) (hCover e)
+  have hFirst (u v : ℝ × ℝ) :
+      deriv (fun t : ℝ ↦ orbit (u + t • v)) 0 = fderiv ℝ orbit u v := by
+    have hLine : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+      simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+    exact ((hOrbit.differentiable (by simp) u).hasFDerivAt.comp_hasDerivAt_of_eq
+      0 hLine (by simp)).deriv
+  have hSecond (u v : ℝ × ℝ) :
+      deriv (fun t : ℝ ↦ fderiv ℝ orbit (t • u) v) 0 =
+        fderiv ℝ (fderiv ℝ orbit) 0 u v := by
+    have hd := ((hOrbit.fderiv_right (m := 1) (by norm_num)).differentiable (by simp) 0).hasFDerivAt
+    have h := hd.comp_hasDerivAt_of_eq 0 ((hasDerivAt_id (0 : ℝ)).smul_const u) (by simp)
+    simpa using (h.clm_apply (hasDerivAt_const 0 v)).deriv
+  have ha (t : ℝ) : bruhatDirectionalDeriv a f (x * b (Multiplicative.ofAdd t)) =
+      fderiv ℝ orbit (0, t) (1, 0) := by
+    simpa [bruhatDirectionalDeriv, orbit, mul_right_comm] using hFirst (0, t) (1, 0)
+  have hb (s : ℝ) : bruhatDirectionalDeriv b f (x * a (Multiplicative.ofAdd s)) =
+      fderiv ℝ orbit (s, 0) (0, 1) := by
+    simpa [bruhatDirectionalDeriv, orbit] using hFirst (s, 0) (0, 1)
+  change deriv (fun s : ℝ ↦ bruhatDirectionalDeriv b f (x * a (Multiplicative.ofAdd s))) 0 =
+    deriv (fun t : ℝ ↦ bruhatDirectionalDeriv a f (x * b (Multiplicative.ofAdd t))) 0
+  simp_rw [ha, hb]
+  have hSymm := hOrbit.contDiffAt (x := 0) |>.isSymmSndFDerivAt (by simp)
+  have hMixed := (hSecond (1, 0) (0, 1)).trans
+    ((hSymm.eq (1, 0) (0, 1)).trans (hSecond (0, 1) (1, 0)).symm)
+  simpa only [Prod.smul_mk, smul_eq_mul, mul_one, mul_zero] using hMixed
 
 /-- Paper: Definition D.1.6.8(1), p. 768. Invariant differential operators
 form the unital complex subalgebra generated by the first-order operators. -/

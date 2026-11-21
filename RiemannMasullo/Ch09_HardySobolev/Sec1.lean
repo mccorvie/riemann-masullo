@@ -3,10 +3,12 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3a
 public import Mathlib.MeasureTheory.Measure.WithDensity
+import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 
 /-!
 # Sobolev spaces on locally compact abelian groups
@@ -605,7 +607,124 @@ isometrically by an element in the opposite degree. -/
 theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
     (_hw : IsSobolevWeight w) (_hs : 0 ≤ s) :
     ∃! T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s),
-      ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by sorry
+      ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let ρ (t : ℝ) (χ : PontryaginDual G) := (1 + (w χ : ℝ) ^ 2) ^ (t / 2)
+  have hρpos (t : ℝ) (χ : PontryaginDual G) : 0 < ρ t χ :=
+    Real.rpow_pos_of_pos (by positivity) _
+  have hρ (t : ℝ) : Continuous (ρ t) := by
+    have hcont : Continuous (fun χ ↦ 1 + (w χ : ℝ) ^ 2) :=
+      continuous_const.add ((NNReal.continuous_coe.comp _hw.1).pow 2)
+    exact hcont.rpow_const fun χ ↦ Or.inl (by positivity)
+  have hrecip (t : ℝ) (χ : PontryaginDual G) : ρ t χ * ρ (-t) χ = 1 := by
+    dsimp only [ρ]
+    rw [← Real.rpow_add (by positivity), neg_div, add_neg_cancel, Real.rpow_zero]
+  have hdens (t : ℝ) : Measurable (fun χ ↦ ENNReal.ofReal (ρ t χ)) :=
+    (hρ t).measurable.ennreal_ofReal
+  have hfinite (t : ℝ) : ∀ᵐ χ ∂ν, ENNReal.ofReal (ρ t χ) < ∞ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hbase (t : ℝ) : ν ≪ sobolevMeasure ν w t :=
+    withDensity_absolutelyContinuous' (hdens t).aemeasurable
+      (ae_of_all _ fun χ ↦ (ENNReal.ofReal_pos.mpr (hρpos t χ)).ne')
+  have hweighted (t : ℝ) : sobolevMeasure ν w t ≪ ν := withDensity_absolutelyContinuous _ _
+  -- Conjugation times the density interchanges the two weighted L² spaces.
+  let u (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) : ℂ :=
+    (ρ t χ : ℂ) * star (f χ)
+  have hsq (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) :
+      ‖u t f χ‖ ^ 2 * ρ (-t) χ = ‖f χ‖ ^ 2 * ρ t χ := by
+    calc
+      _ = ‖f χ‖ ^ 2 * (ρ t χ * (ρ t χ * ρ (-t) χ)) := by
+        dsimp only [u]
+        rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hρpos t χ), norm_star]
+        ring
+      _ = _ := by rw [hrecip, mul_one]
+  have hmem (t : ℝ) (f : WeightedSobolev ν w t) :
+      MemLp (u t f) 2 (sobolevMeasure ν w (-t)) := by
+    have hmeas : AEStronglyMeasurable (u t f) (sobolevMeasure ν w (-t)) :=
+      (Complex.continuous_ofReal.comp (hρ t)).aestronglyMeasurable.mul
+        (((Lp.aestronglyMeasurable f).mono_ac (hbase t)).mono_ac (hweighted (-t))).star
+    apply (memLp_two_iff_integrable_sq_norm hmeas).2
+    change Integrable (fun χ ↦ ‖u t f χ‖ ^ 2) (ν.withDensity fun χ ↦ ENNReal.ofReal (ρ (-t) χ))
+    apply (integrable_withDensity_iff (hdens (-t)) (hfinite (-t))).2
+    refine (weightedSobolev_norm ν _hw.1 t f).1.congr (ae_of_all _ fun χ ↦ ?_)
+    change ‖f χ‖ ^ 2 * ρ t χ = ‖u t f χ‖ ^ 2 * (ENNReal.ofReal (ρ (-t) χ)).toReal
+    rw [ENNReal.toReal_ofReal (hρpos (-t) χ).le, hsq]
+  let S (t : ℝ) (f : WeightedSobolev ν w t) : WeightedSobolev ν w (-t) :=
+    (hmem t f).toLp (u t f)
+  have hS (t : ℝ) (f : WeightedSobolev ν w t) :
+      (S t f : PontryaginDual G → ℂ) =ᵐ[ν] u t f :=
+    (hbase (-t)).ae_eq (hmem t f).coeFn_toLp
+  have hSnorm (t : ℝ) (f : WeightedSobolev ν w t) : ‖S t f‖ = ‖f‖ := by
+    rw [(weightedSobolev_norm ν _hw.1 (-t) (S t f)).2, (weightedSobolev_norm ν _hw.1 t f).2]
+    congr 1
+    apply integral_congr_ae
+    filter_upwards [hS t f] with χ hχ
+    change ‖S t f χ‖ ^ 2 * ρ (-t) χ = ‖f χ‖ ^ 2 * ρ t χ
+    rw [hχ, hsq]
+  let C : WeightedSobolev ν w s →ₗᵢ⋆[ℂ] WeightedSobolev ν w (-s) :=
+    { toFun := S s
+      map_add' := fun f g ↦ Lp.ext <| (hweighted (-s)).ae_eq <| by
+        filter_upwards [hS s (f + g), hS s f, hS s g,
+          (hbase s).ae_eq (Lp.coeFn_add f g),
+          (hbase (-s)).ae_eq (Lp.coeFn_add (S s f) (S s g))] with χ hfg hf hg hχ hsum
+        rw [hfg, hsum]
+        change u s (f + g) χ = S s f χ + S s g χ
+        rw [hf, hg]
+        simp only [u, hχ, Pi.add_apply, star_add, mul_add]
+      map_smul' := fun c f ↦ Lp.ext <| (hweighted (-s)).ae_eq <| by
+        filter_upwards [hS s (c • f), hS s f, (hbase s).ae_eq (Lp.coeFn_smul c f),
+          (hbase (-s)).ae_eq (Lp.coeFn_smul ((starRingEnd ℂ) c) (S s f))]
+          with χ hcf hf hχ hsmul
+        rw [hcf, hsmul]
+        change u s (c • f) χ = (starRingEnd ℂ) c • S s f χ
+        rw [hf]
+        simp only [u, hχ, Pi.smul_apply, starRingEnd_apply, smul_eq_mul, star_mul', mul_left_comm]
+      norm_map' := hSnorm s }
+  have hSurj : Function.Surjective C := by
+    intro g
+    have hs' : - -s = s := neg_neg s
+    let f : WeightedSobolev ν w s := hs' ▸ S (-s) g
+    have hf : (f : PontryaginDual G → ℂ) =ᵐ[ν] u (-s) g := by
+      have hcast (t : ℝ) (ht : - -s = t) :
+          ((ht ▸ S (-s) g : WeightedSobolev ν w t) : PontryaginDual G → ℂ) = S (-s) g := by
+        subst t
+        rfl
+      exact (hcast s hs').eventuallyEq.trans (hS (-s) g)
+    refine ⟨f, Lp.ext ((hweighted (-s)).ae_eq ?_)⟩
+    change (S s f : PontryaginDual G → ℂ) =ᵐ[ν] g
+    filter_upwards [hS s f, hf] with χ hSf hfχ
+    have hstar : star (ρ (-s) χ : ℂ) = (ρ (-s) χ : ℂ) := Complex.conj_ofReal _
+    rw [hSf]
+    simp only [u, hfχ, star_mul', hstar, star_star]
+    rw [← mul_assoc, ← Complex.ofReal_mul, hrecip, Complex.ofReal_one, one_mul]
+  let R := InnerProductSpace.toDual ℂ (WeightedSobolev ν w s)
+  let T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s) :=
+    R.symm.trans (LinearIsometryEquiv.ofSurjective C hSurj)
+  have hPair (Λ : StrongDual ℂ (WeightedSobolev ν w s)) (f : WeightedSobolev ν w s) :
+      Integrable (fun χ ↦ f χ * T Λ χ) ν ∧
+        Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
+    let g := R.symm Λ
+    have hprod : (fun χ ↦ f χ * T Λ χ) =ᵐ[ν]
+        fun χ ↦ (ENNReal.ofReal (ρ s χ)).toReal • inner ℂ (g χ) (f χ) := by
+      filter_upwards [hS s g] with χ hχ
+      change f χ * S s g χ = _
+      rw [hχ, ENNReal.toReal_ofReal (hρpos s χ).le, RCLike.inner_apply, starRingEnd_apply]
+      simp only [u, Complex.real_smul, mul_left_comm]
+    refine ⟨?_, ?_⟩
+    · exact ((integrable_withDensity_iff_integrable_smul' (hdens s) (hfinite s)).1
+        (L2.integrable_inner g f)).congr hprod.symm
+    · calc
+        Λ f = inner ℂ g f := InnerProductSpace.toDual_symm_apply.symm
+        _ = ∫ χ, inner ℂ (g χ) (f χ) ∂sobolevMeasure ν w s := L2.inner_def g f
+        _ = ∫ χ, (ENNReal.ofReal (ρ s χ)).toReal • inner ℂ (g χ) (f χ) ∂ν :=
+          integral_withDensity_eq_integral_toReal_smul (hdens s) (hfinite s) _
+        _ = ∫ χ, f χ * T Λ χ ∂ν := integral_congr_ae hprod.symm
+  refine ⟨T, hPair, fun T' hT' ↦ LinearIsometryEquiv.ext fun Λ ↦ ?_⟩
+  apply T.symm.injective
+  rw [T.symm_apply_apply]
+  apply ContinuousLinearMap.ext
+  intro f
+  rw [(hPair (T.symm (T' Λ)) f).2, T.apply_symm_apply, (hT' Λ f).2]
 
 end LCA
 
@@ -658,7 +777,7 @@ Deviation: Sanity check for the direct model and its extension to real degrees. 
 theorem modulatedSobolev_norm [BorelSpace G] (s : ℝ) (f : ModulatedSobolev m μ s) :
     Integrable (fun x ↦ ‖f x‖ ^ 2 * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2)) μ ∧
     ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2) ∂μ) :=
-  by sorry
+  weightedSobolev_norm μ (modulatedSobolevWeight_subadditive m).1 s f
 
 -- Definition D.2.1.1, p. 793, defines modulated groups for second-countable `G`, and the
 -- structure lemmas for `IsModulation` assume it; the recall on p. 399 omits the word.
@@ -666,6 +785,254 @@ variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCount
   [BorelSpace G] [μ.IsHaarMeasure]
 
 variable (ν : Measure (PontryaginDual G))
+
+omit [SecondCountableTopology G] in
+/-- The Fourier transform of an integrable square-integrable function on the dual,
+evaluated at the canonical characters of the bidual, preserves its L² norm. -/
+private theorem lcaFourier_eval_memLp [μ.Regular] (hν : IsLCAPlancherelMeasure μ ν)
+    {u : PontryaginDual G → ℂ} (hu : Integrable u ν) (hu₂ : MemLp u 2 ν) :
+    MemLp (fun x : G ↦ lcaFourier ν u (pontryaginDual_eval x)) 2 μ ∧
+      eLpNorm (fun x : G ↦ lcaFourier ν u (pontryaginDual_eval x)) 2 μ = eLpNorm u 2 ν := by
+  let U := (lcaFourier_unitary μ ν hν).exists.choose
+  let v := U.symm (hu₂.toLp u)
+  have hv : (U v : PontryaginDual G → ℂ) =ᵐ[ν] u := by
+    rw [show U v = hu₂.toLp u from U.apply_symm_apply _]
+    exact hu₂.coeFn_toLp
+  obtain ⟨F, hF, hFormula⟩ := lcaInverseFourier_zeroAtInfty μ ν hν v u hu hv
+  have hEval : (fun x : G ↦ lcaFourier ν u (pontryaginDual_eval x)) = F ∘ Inv.inv := by
+    funext x
+    rw [Function.comp_apply, hFormula, lcaFourier]
+    congr with χ
+    change u χ * star (χ x : ℂ) = u χ * (χ x⁻¹ : ℂ)
+    rw [map_inv, Circle.coe_inv_eq_conj, Complex.star_def]
+  have hMem : MemLp (F : G → ℂ) 2 μ := MemLp.ae_eq hF.symm (Lp.memLp v)
+  have hInv := Measure.measurePreserving_inv μ
+  refine ⟨hEval ▸ hMem.comp_measurePreserving hInv, ?_⟩
+  rw [hEval, eLpNorm_comp_measurePreserving hMem.aestronglyMeasurable hInv,
+    eLpNorm_congr_ae hF, ← Lp.eNorm_def, U.symm.eNorm_map]
+  exact Lp.eNorm_toLp hu₂
+
+omit [SecondCountableTopology G] in
+/-- A translation of the bidual evaluation has the same Plancherel norm, since
+translation of a Fourier transform multiplies its input by a unit-modulus character. -/
+private theorem lcaFourier_mul_eval_memLp [μ.Regular] (hν : IsLCAPlancherelMeasure μ ν)
+    (η : PontryaginDual (PontryaginDual G))
+    {u : PontryaginDual G → ℂ} (hu : Integrable u ν) (hu₂ : MemLp u 2 ν) :
+    MemLp (fun x : G ↦ lcaFourier ν u (η * pontryaginDual_eval x)) 2 μ ∧
+      eLpNorm (fun x : G ↦ lcaFourier ν u (η * pontryaginDual_eval x)) 2 μ = eLpNorm u 2 ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let c (χ : PontryaginDual G) : ℂ := star (η χ : ℂ)
+  have hc : AEStronglyMeasurable c ν :=
+    (continuous_subtype_val.comp η.continuous).star.aestronglyMeasurable
+  have hcn (χ : PontryaginDual G) : ‖c χ‖ = 1 := by simp [c]
+  have hNorm (χ : PontryaginDual G) : ‖u χ * c χ‖ = ‖u χ‖ := by
+    rw [norm_mul, hcn, mul_one]
+  have hNorm₂ : eLpNorm (u * c) 2 ν = eLpNorm u 2 ν :=
+    eLpNorm_congr_norm_ae (hu₂.aestronglyMeasurable.mul hc) hu₂.aestronglyMeasurable
+      (.of_forall hNorm)
+  have hc₂ : MemLp (u * c) 2 ν :=
+    hu₂.congr_norm (hu₂.aestronglyMeasurable.mul hc) (.of_forall fun χ ↦ (hNorm χ).symm)
+  have hEq : (fun x : G ↦ lcaFourier ν u (η * pontryaginDual_eval x)) =
+      fun x ↦ lcaFourier ν (u * c) (pontryaginDual_eval x) := by
+    funext x
+    unfold lcaFourier
+    congr with χ
+    change u χ * star (↑(η χ * pontryaginDual_eval x χ) : ℂ) =
+      (u χ * star (η χ : ℂ)) * star (pontryaginDual_eval x χ : ℂ)
+    rw [Circle.coe_mul, star_mul, mul_assoc, mul_comm (star (η χ : ℂ))]
+  rw [hEq, ← hNorm₂]
+  exact lcaFourier_eval_memLp μ ν hν (hu.mul_bdd hc (.of_forall fun χ ↦ (hcn χ).le)) hc₂
+
+/-- Paper: Theorem D.1.1.1(2), p. 746. Evaluation identifies the group with its bidual.
+Deviation: This proof assumes a second-countable group and an available Plancherel measure.
+The Fourier isometries on two distinct cosets would give a nonzero integrable
+density on their disjoint union with every character integral equal to zero. -/
+private theorem pontryaginDual_bidual_of_plancherel
+    (hν : IsLCAPlancherelMeasure μ ν) :
+    ∃ b : G ≃ₜ* PontryaginDual (PontryaginDual G), ∀ x χ, b x χ = χ x := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  let b := pontryaginDual_eval (G := G)
+  have hEmb : IsClosedEmbedding b := isClosedEmbedding_pontryaginDual_eval (G := G)
+  have hSurj : Function.Surjective b := by
+    intro η
+    by_contra hη
+    let H := PontryaginDual G
+    let D : Submodule ℂ (Lp ℂ 2 ν) :=
+      { carrier := {u | Integrable (u : H → ℂ) ν}
+        zero_mem' := (integrable_zero H ℂ ν).congr (Lp.coeFn_zero ℂ 2 ν).symm
+        add_mem' := fun {_ _} hu hv ↦ (hu.add hv).congr (Lp.coeFn_add _ _).symm
+        smul_mem' := fun c _ hu ↦ (hu.smul c).congr (Lp.coeFn_smul c _).symm }
+    let F (ψ : PontryaginDual H) (u : D) (x : G) := lcaFourier ν u (ψ * b x)
+    have hLp (ψ : PontryaginDual H) (u : D) :=
+      lcaFourier_mul_eval_memLp μ ν hν ψ u.2 (Lp.memLp u.1)
+    let J (ψ : PontryaginDual H) (u : D) : Lp ℂ 2 μ := (hLp ψ u).1.toLp (F ψ u)
+    have hJ (ψ : PontryaginDual H) (u : D) : (J ψ u : G → ℂ) =ᵐ[μ] F ψ u :=
+      MemLp.coeFn_toLp _
+    have hKernel (u : D) (ζ : PontryaginDual H) :
+        Integrable (fun χ ↦ u.val χ * star (ζ χ : ℂ)) ν :=
+      u.2.mul_bdd (c := 1) (continuous_subtype_val.comp ζ.continuous).star.aestronglyMeasurable
+        (.of_forall fun χ ↦ by simp)
+    let L (ψ : PontryaginDual H) : D →ₗᵢ[ℂ] Lp ℂ 2 μ :=
+      { toFun := J ψ
+        map_add' := fun u v ↦ by
+          apply Lp.ext
+          filter_upwards [hJ ψ (u + v), hJ ψ u, hJ ψ v, Lp.coeFn_add (J ψ u) (J ψ v)]
+            with x huv hu hv hsum
+          change J ψ (u + v) x = (J ψ u + J ψ v) x
+          rw [huv, hsum, Pi.add_apply, hu, hv]
+          unfold F lcaFourier
+          rw [← integral_add (hKernel u _) (hKernel v _)]
+          exact integral_congr_ae ((Lp.coeFn_add u.val v.val).mono fun χ hχ ↦ by
+            change (u.val + v.val) χ * _ = _
+            rw [hχ, Pi.add_apply, add_mul])
+        map_smul' := fun c u ↦ by
+          apply Lp.ext
+          filter_upwards [hJ ψ (c • u), hJ ψ u, Lp.coeFn_smul c (J ψ u)]
+            with x hcu hu hsmul
+          change J ψ (c • u) x = (c • J ψ u) x
+          rw [hcu, hsmul, Pi.smul_apply, hu]
+          unfold F lcaFourier
+          rw [← integral_smul]
+          exact integral_congr_ae ((Lp.coeFn_smul c u.val).mono fun χ hχ ↦ by
+            change (c • u.val) χ * _ = _
+            rw [hχ, Pi.smul_apply, smul_mul_assoc])
+        norm_map' := fun u ↦ by
+          change ‖(hLp ψ u).1.toLp (F ψ u)‖ = ‖u.val‖
+          rw [Lp.norm_toLp, (hLp ψ u).2, Lp.norm_def] }
+    have hInner (ψ : PontryaginDual H) (u v : D) :
+        ∫ x, F ψ v x * star (F ψ u x) ∂μ = inner ℂ u v := by
+      rw [← (L ψ).inner_map_map u v, L2.inner_def]
+      apply integral_congr_ae
+      filter_upwards [hJ ψ u, hJ ψ v] with x hu hv
+      change _ = inner ℂ (J ψ u x) (J ψ v x)
+      rw [RCLike.inner_apply, starRingEnd_apply, hu, hv]
+    -- An indicator of a compact neighborhood supplies a common nonzero input.
+    obtain ⟨K, hK, hK₁⟩ := exists_compact_mem_nhds (1 : H)
+    let u : H → ℂ := K.indicator fun _ ↦ 1
+    have hu (p : ℝ≥0∞) : MemLp u p ν :=
+      memLp_indicator_const p hK.isClosed.measurableSet.nullMeasurableSet 1
+        (.inr (hK.measure_lt_top (μ := ν)).ne)
+    let v : D := ⟨(hu 2).toLp u,
+      (memLp_one_iff_integrable.mp (hu 1)).congr (hu 2).coeFn_toLp.symm⟩
+    have hv : v ≠ 0 := by
+      intro hv
+      have hzero : u =ᵐ[ν] (0 : H → ℂ) := by
+        refine (hu 2).coeFn_toLp.symm.trans ?_
+        change (v.val : H → ℂ) =ᵐ[ν] _
+        rw [hv]
+        exact Lp.coeFn_zero ℂ 2 ν
+      have hpos : 0 < ν K := (isOpen_interior.measure_pos ν
+        ⟨1, mem_interior_iff_mem_nhds.mpr hK₁⟩).trans_le (measure_mono interior_subset)
+      apply hpos.ne'
+      have hOut : ∀ᵐ χ ∂ν, χ ∉ K :=
+        hzero.mono fun χ hχ hχK ↦ by simp [u, hχK] at hχ
+      simpa only [not_not, ofPred_mem_eq] using ae_iff.mp hOut
+    let translate (χ : H) : D :=
+      let hmp := measurePreserving_mul_left ν χ
+      ⟨Lp.compMeasurePreserving (χ * ·) hmp v.val,
+        (hmp.integrable_comp_of_integrable v.2).congr
+          (Lp.coeFn_compMeasurePreserving v.val hmp).symm⟩
+    have hMoment (ψ : PontryaginDual H) (χ : H) :
+        ∫ x, (F ψ v x * star (F ψ v x)) * ((ψ * b x) χ : ℂ) ∂μ =
+          inner ℂ v (translate χ) := by
+      let hmp := measurePreserving_mul_left ν χ
+      let t := translate χ
+      have hTranslate (ζ : PontryaginDual H) :
+          lcaFourier ν t ζ = (ζ χ : ℂ) * lcaFourier ν v ζ := by
+        calc
+          _ = lcaFourier ν (fun y ↦ v.val (χ * y)) ζ := by
+            exact integral_congr_ae ((Lp.coeFn_compMeasurePreserving v.val hmp).mono fun y hy ↦
+              congrArg (· * star (ζ y : ℂ)) hy)
+          _ = ∫ y, (ζ χ : ℂ) * (v.val (χ * y) * star (ζ (χ * y) : ℂ)) ∂ν := by
+            apply integral_congr_ae
+            exact .of_forall fun y ↦ by
+              change v.val (χ * y) * star (ζ y : ℂ) =
+                (ζ χ : ℂ) * (v.val (χ * y) * star (ζ (χ * y) : ℂ))
+              rw [map_mul, Circle.coe_mul, star_mul]
+              have hUnit : (ζ χ : ℂ) * star (ζ χ : ℂ) = 1 := by
+                simp [Complex.mul_conj, Complex.normSq_eq_norm_sq]
+              calc
+                _ = ((ζ χ : ℂ) * star (ζ χ : ℂ)) * (v.val (χ * y) * star (ζ y : ℂ)) := by
+                  rw [hUnit, one_mul]
+                _ = _ := by ring
+          _ = _ := by
+            rw [integral_const_mul]
+            exact congrArg ((ζ χ : ℂ) * ·)
+              (hmp.integral_comp (Homeomorph.mulLeft χ).toMeasurableEquiv.measurableEmbedding
+                (fun y ↦ v.val y * star (ζ y : ℂ)))
+      change _ = inner ℂ v t
+      rw [← hInner ψ v t]
+      exact integral_congr_ae (.of_forall fun x ↦ by
+        change F ψ v x * star (F ψ v x) * _ = lcaFourier ν t (ψ * b x) * star (F ψ v x)
+        rw [hTranslate]
+        ring)
+    -- Use separate copies of G for the evaluation image and its translate.
+    let p (z : Bool × G) : PontryaginDual H := if z.1 then η * b z.2 else b z.2
+    have hp : Continuous p := by
+      apply Continuous.if _ (continuous_const.mul (b.continuous.comp continuous_snd))
+        (b.continuous.comp continuous_snd)
+      have hcl : IsClopen {z : Bool × G | z.1 = true} :=
+        (isClopen_discrete {true}).preimage continuous_fst
+      simp [hcl.frontier_eq]
+    have hpinj : Function.Injective p := by
+      have hdisj (x y : G) : b x ≠ η * b y := by
+        intro h
+        exact hη ⟨x / y, by rw [map_div, h, mul_div_cancel_right]⟩
+      rintro ⟨i, x⟩ ⟨j, y⟩ h
+      cases i <;> cases j
+      · simpa [p, hEmb.injective.eq_iff] using h
+      · exact (hdisj x y h).elim
+      · exact (hdisj y x h.symm).elim
+      · simpa [p, hEmb.injective.eq_iff] using h
+    let cosetMeasure := (Measure.dirac false + Measure.dirac true).prod μ
+    have hCosetMeasure : cosetMeasure = μ.map (Prod.mk false) + μ.map (Prod.mk true) := by
+      dsimp only [cosetMeasure]
+      rw [Measure.add_prod, Measure.dirac_prod, Measure.dirac_prod]
+    let j (i : Bool) : MeasurableEmbedding (fun x : G ↦ (i, x)) :=
+      MeasurableEmbedding.id.prodMk_left i
+    let q (ψ : PontryaginDual H) (x : G) := F ψ v x * star (F ψ v x)
+    have hq (ψ : PontryaginDual H) : Integrable (q ψ) μ := by
+      refine (L2.integrable_inner (𝕜 := ℂ) (J ψ v) (J ψ v)).congr ?_
+      filter_upwards [hJ ψ v] with x hx
+      change inner ℂ (J ψ v x) (J ψ v x) = _
+      rw [RCLike.inner_apply, starRingEnd_apply, hx]
+    let g (z : Bool × G) : ℂ := if z.1 then -q η z.2 else q 1 z.2
+    have hg₀ : Integrable g (μ.map (Prod.mk false)) := (j false).integrable_map_iff.mpr (hq 1)
+    have hg₁ : Integrable g (μ.map (Prod.mk true)) := (j true).integrable_map_iff.mpr (hq η).neg
+    have hg : Integrable g cosetMeasure := hCosetMeasure ▸ hg₀.add_measure hg₁
+    let eval (z : Bool × G) := (p z).toMonoidHom
+    have heval (χ : H) : Continuous (fun z ↦ eval z χ) :=
+      ((continuous_eval_const (F := C(H, Circle)) χ).comp
+        (ContinuousMonoidHom.isInducing_toContinuousMap H Circle).continuous).comp hp
+    have hz := ae_eq_zero_of_integral_mul_circle_eq_zero eval heval
+      (fun _ _ h ↦ hpinj (PontryaginDual.ext fun χ ↦
+        congrArg (fun k : H →* Circle ↦ k χ) h)) hg (fun χ ↦ by
+        let c (z : Bool × G) : ℂ := (eval z χ : ℂ)
+        have hc (κ : Measure (Bool × G)) : AEStronglyMeasurable c κ :=
+          (continuous_subtype_val.comp (heval χ)).aestronglyMeasurable
+        have hnorm (z : Bool × G) : ‖c z‖ ≤ 1 := (Circle.norm_coe _).le
+        rw [hCosetMeasure, integral_add_measure (hg₀.mul_bdd (hc _) (.of_forall hnorm))
+          (hg₁.mul_bdd (hc _) (.of_forall hnorm)), (j false).integral_map, (j true).integral_map]
+        change (∫ x, q 1 x * (b x χ : ℂ) ∂μ) + ∫ x, -q η x * ((η * b x) χ : ℂ) ∂μ = 0
+        have hSame := (hMoment 1 χ).trans (hMoment η χ).symm
+        simp only [one_mul] at hSame
+        change (∫ x, q 1 x * (b x χ : ℂ) ∂μ) = ∫ x, q η x * ((η * b x) χ : ℂ) ∂μ at hSame
+        simp only [neg_mul, integral_neg]
+        rw [hSame, add_neg_cancel])
+    have hz₀ : q 1 =ᵐ[μ] (0 : G → ℂ) := by
+      have hzMap : ∀ᵐ z ∂μ.map (Prod.mk false), g z = 0 :=
+        (ae_add_measure_iff.mp (hCosetMeasure ▸ hz)).1
+      exact ((j false).ae_map_iff (p := fun z ↦ g z = 0)).mp hzMap
+    apply hv
+    apply inner_self_eq_zero (𝕜 := ℂ).mp
+    rw [← hInner 1 v v, show (fun x ↦ F 1 v x * star (F 1 v x)) = q 1 from rfl,
+      integral_congr_ae hz₀, Pi.zero_def, integral_zero]
+  let equiv := MulEquiv.ofBijective b.toMonoidHom ⟨hEmb.injective, hSurj⟩
+  have hOpen := hEmb.isInducing.isOpenMap (by rw [hSurj.range_eq]; exact isOpen_univ)
+  exact ⟨equiv.toContinuousMulEquiv (fun _ ↦
+    (hOpen.isQuotientMap b.continuous hSurj).isCoinducing.isOpen_preimage), fun _ _ ↦ rfl⟩
 
 /-- Paper: Definition 9.1.2.1, p. 399. Evaluation into the bidual identifies the
 group-side Sobolev space with H^s_w of the dual group. The pushed-forward Haar measure
@@ -677,8 +1044,58 @@ theorem modulatedSobolev_bidual (_hm : IsModulation m) (_hsurj : Function.Surjec
       IsLCAPlancherelMeasure ν (μ.map b) ∧
       ∃ e : ModulatedSobolev m μ s ≃ₗᵢ[ℂ]
           WeightedSobolev (μ.map b) (modulatedSobolevWeight m ∘ b.symm) s,
-        ∀ f, (e f : PontryaginDual (PontryaginDual G) → ℂ) =ᵐ[μ.map b] fun χ ↦ f (b.symm χ) :=
-  by sorry
+        ∀ f, (e f : PontryaginDual (PontryaginDual G) → ℂ) =ᵐ[μ.map b] fun χ ↦ f (b.symm χ) := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : BorelSpace (PontryaginDual (PontryaginDual G)) := ⟨rfl⟩
+  obtain ⟨b, hb⟩ := pontryaginDual_bidual_of_plancherel μ ν _hν
+  let a := b.toHomeomorph.toMeasurableEquiv
+  have ha : MeasurePreserving a μ (μ.map b) := ⟨a.measurable, rfl⟩
+  have hEval : ∀ x : G, b x = pontryaginDual_eval x :=
+    fun x ↦ PontryaginDual.ext (hb x)
+  refine ⟨b, hb, ⟨b.isHaarMeasure_map μ, Measure.Regular.map b.toHomeomorph, ?_⟩, ?_⟩
+  · intro u hu hu₂
+    obtain ⟨hMem, hNorm⟩ := lcaFourier_eval_memLp μ ν _hν hu hu₂
+    have hEq : lcaFourier ν u ∘ a = fun x ↦ lcaFourier ν u (pontryaginDual_eval x) :=
+      funext fun x ↦ congrArg (lcaFourier ν u) (hEval x)
+    have hMemComp : MemLp (lcaFourier ν u ∘ a) 2 μ := hEq.symm ▸ hMem
+    have hMem' : MemLp (lcaFourier ν u) 2 (μ.map b) := by
+      simpa only [Function.comp_def, MeasurableEquiv.apply_symm_apply] using
+        hMemComp.comp_measurePreserving (ha.symm a)
+    refine ⟨hMem', ?_⟩
+    rw [← eLpNorm_comp_measurePreserving hMem'.aestronglyMeasurable ha, hEq]
+    exact hNorm
+  · let w := modulatedSobolevWeight m
+    let ρ (x : G) : ℝ≥0∞ := ENNReal.ofReal ((1 + (w x : ℝ) ^ 2) ^ (s / 2))
+    have hpos (x : G) : 0 < 1 + (w x : ℝ) ^ 2 := by positivity
+    have hρ : Measurable ρ := (ENNReal.continuous_ofReal.comp
+      (Continuous.rpow_const (continuous_const.add ((NNReal.continuous_coe.comp
+        (modulatedSobolevWeight_subadditive m).1).pow 2)) fun x ↦ Or.inl (hpos x).ne')).measurable
+    let μw := sobolevMeasure μ w s
+    let νw := sobolevMeasure (μ.map b) (w ∘ b.symm) s
+    have hw : MeasurePreserving a μw νw := by
+      refine ⟨a.measurable, Measure.ext fun A hA ↦ ?_⟩
+      change (Measure.map a (μ.withDensity ρ)) A =
+        ((Measure.map a μ).withDensity (ρ ∘ a.symm)) A
+      rw [a.measurableEmbedding.map_apply, withDensity_apply _ (a.measurable hA),
+        withDensity_apply _ hA, ← lintegral_indicator (a.measurable hA), ← lintegral_indicator hA,
+        a.measurableEmbedding.lintegral_map]
+      exact lintegral_congr fun x ↦ by
+        simp only [indicator, Function.comp_apply, a.symm_apply_apply]
+        rfl
+    let I : Lp ℂ 2 μw →ₗᵢ[ℂ] Lp ℂ 2 νw := Lp.compMeasurePreservingₗᵢ ℂ a.symm (hw.symm a)
+    have hI : Function.Surjective I := by
+      intro f
+      refine ⟨Lp.compMeasurePreserving a hw f, ?_⟩
+      change Lp.compMeasurePreserving a.symm (hw.symm a) (Lp.compMeasurePreserving a hw f) = f
+      rw [← Lp.compMeasurePreserving_comp_apply f hw (hw.symm a)]
+      simp
+    let e := LinearIsometryEquiv.ofSurjective I hI
+    refine ⟨e, fun f ↦ ?_⟩
+    have hAC : μ.map b ≪ νw :=
+      withDensity_absolutelyContinuous' (hρ.comp a.symm.measurable).aemeasurable
+        (.of_forall fun χ ↦ (ENNReal.ofReal_pos.mpr
+          (Real.rpow_pos_of_pos (hpos (a.symm χ)) _)).ne')
+    exact hAC.ae_eq (Lp.coeFn_compMeasurePreserving f (hw.symm a))
 
 -- TODO(paper-gap): (9.1.2.9) compares a squared norm on the left with homogeneous
 -- expressions of degree one on the right. In (9.1.2.11) the sign of the exponent

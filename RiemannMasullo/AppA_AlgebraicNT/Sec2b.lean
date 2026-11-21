@@ -1593,7 +1593,53 @@ theorem idele_ideal_class_exact :
     ∃ p : 𝕀[F] →* CommRing.Pic (𝓞 F), (∀ g, p g = ideleIdealClass F g) ∧
       IsClosedEmbedding (Subgroup.subtype H) ∧ MulExact (Subgroup.subtype H) p ∧
       IsOpenQuotientMap p := by
-  sorry
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  let : DiscreteTopology (CommRing.Pic (𝓞 F)) := ⟨rfl⟩
+  let K : Subgroup 𝕀[F] := H
+  have hU : integralUnits ≤ K := le_sup_right
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  obtain ⟨s, _, hs, hsfin⟩ := exists_ideleNorm_section_finite_one F
+  -- Normalize the norm using an idele whose finite components are all one.
+  let correction := s.comp (ideleNorm F)
+  let normalize : 𝕀[F] →* 𝕀[F] := MonoidHom.id _ / correction
+  let r := normalize.codRestrict N₁ fun g ↦ by
+    change ideleNorm F (g / correction g) = 1
+    rw [map_div, show ideleNorm F (correction g) = ideleNorm F g from hs _, div_self']
+  have hfin (g : 𝕀[F]) : (normalize g).val.2 = g.val.2 := by
+    change g.val.2 * ((s (ideleNorm F g))⁻¹).val.2 = g.val.2
+    rw [← map_inv s, hsfin, mul_one]
+  let p := e.toMonoidHom.comp ((QuotientGroup.mk' _).comp r)
+  have hp (g : 𝕀[F]) : p g = ideleIdealClass F g := by
+    refine (he (r g)).trans (finprod_congr fun v ↦ ?_)
+    apply congrArg (localIdealClass F v)
+    apply Units.ext
+    change (normalize g).val.2 v = g.val.2 v
+    rw [hfin]
+  have hker (g : 𝕀[F]) : p g = 1 ↔ g ∈ K := by
+    change e (QuotientGroup.mk (r g)) = 1 ↔ g ∈ K
+    rw [← e.map_one, e.injective.eq_iff, QuotientGroup.eq_one_iff]
+    have ha : correction g ∈ K := hU <|
+      (mem_integralIdeleRange_iff F _).mpr fun v ↦ by
+        change Valued.v ((s (ideleNorm F g)).val.2 v) = 1
+        rw [hsfin]
+        exact map_one _
+    change g / correction g ∈ K ↔ g ∈ K
+    rw [div_eq_mul_inv, K.mul_mem_cancel_right (K.inv_mem ha)]
+  have hsurj : Surjective p := by
+    obtain ⟨c, _, hc⟩ := exists_normOne_class_representatives F
+    exact fun x ↦ ⟨(c x).val, (hp _).trans (hc x)⟩
+  have hK : IsOpen (K : Set 𝕀[F]) :=
+    Subgroup.isOpen_mono hU (isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range
+  refine ⟨p, hp, (K.isClosed_of_isOpen hK).isClosedEmbedding_subtypeVal, ?_,
+    ⟨hsurj, ?_, fun _ _ ↦ isOpen_discrete _⟩⟩
+  · intro g
+    change p g = 1 ↔ g ∈ Set.range (Subtype.val : K → 𝕀[F])
+    rw [Subtype.range_coe]
+    exact hker g
+  · apply continuous_of_continuousAt_one p
+    refine (continuousAt_const (y := (1 : CommRing.Pic (𝓞 F)))).congr ?_
+    filter_upwards [hK.mem_nhds K.one_mem] with g hg
+    exact ((hker g).mpr hg).symm
 
 /-- Paper: Proposition A.2.3.9, p. 552. Restriction to norm one still gives a strict
 quotient onto the discrete Picard group, with the norm-one part of the same kernel. -/
@@ -1602,7 +1648,25 @@ theorem normOne_ideal_class_exact :
     let H₁ := Subgroup.comap (Subgroup.subtype N₁) H
     ∃ p : N₁ →* CommRing.Pic (𝓞 F), (∀ g, p g = ideleIdealClass F g.val) ∧
       IsClosedEmbedding H₁.subtype ∧ MulExact H₁.subtype p ∧ IsOpenQuotientMap p := by
-  sorry
+  intro H₁
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  let : DiscreteTopology (CommRing.Pic (𝓞 F)) := ⟨rfl⟩
+  have hU : IsOpen (integralUnits : Set 𝕀[F]) :=
+    (isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range
+  have hH : IsOpen (↑(H : Subgroup 𝕀[F]) : Set 𝕀[F]) := Subgroup.isOpen_mono le_sup_right hU
+  have hH₁ : IsOpen (H₁ : Set N₁) := hH.preimage continuous_subtype_val
+  let : DiscreteTopology (N₁ ⧸ H₁) := QuotientGroup.discreteTopology hH₁
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let q : N₁ →* N₁ ⧸ H₁ := QuotientGroup.mk' H₁
+  let p := e.toMonoidHom.comp q
+  refine ⟨p, he, (H₁.isClosed_of_isOpen hH₁).isClosedEmbedding_subtypeVal, ?_, ?_⟩
+  · intro g
+    change e (QuotientGroup.mk g) = 1 ↔ g ∈ Set.range H₁.subtype
+    rw [← map_one e, e.injective.eq_iff, ← MonoidHom.coe_range, Subgroup.range_subtype]
+    exact QuotientGroup.eq_one_iff g
+  · have heCont : Continuous e := continuous_of_discreteTopology
+    exact ⟨e.surjective.comp QuotientGroup.mk_surjective, heCont.comp QuotientGroup.continuous_mk,
+      fun _ _ ↦ isOpen_discrete _⟩
 
 end ExactSequences
 
@@ -1759,7 +1823,42 @@ include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has nonempty interior
 in the norm-one ideles. -/
 theorem ideleFundamentalDomain_interior : (interior E₁).Nonempty := by
-  sorry
+  obtain ⟨a, ha⟩ := infiniteIdeleFundamentalDomain_interior F b v₀ σ
+  obtain ⟨W, hW, hW_eq⟩ := IsInducing.subtypeVal.isOpen_iff.mp
+    (isOpen_interior (s := E∞))
+  let p : N₁ → 𝕀∞ := fun g ↦ atInfinity g.val
+  let U : Set N₁ := (Subtype.val ⁻¹' (integralUnits : Set 𝕀[F])) ∩ p ⁻¹' W
+  have hp : Continuous p :=
+    (continuous_fst.units_map _).comp continuous_subtype_val
+  have hU : IsOpen U :=
+    ((isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range.preimage
+      continuous_subtype_val).inter (hW.preimage hp)
+  have hSubset : U ⊆ E₁ := by
+    intro g hg
+    have hfin : (∏ᶠ v : Primes(F), ‖g.val.val.2 v‖) = 1 :=
+      finprod_eq_one_of_forall_eq_one fun v ↦ Valued.toNormedField.norm_eq_one_iff.mpr
+        ((mem_integralIdeleRange_iff F g.val).mp hg.1 v)
+    have hnorm : infiniteIdeleNorm F (p g) = 1 := by
+      rw [infiniteIdeleNorm_eq_global, ← show ideleNorm F g.val = 1 from g.property]
+      apply Units.ext
+      apply NNReal.coe_injective
+      rw [((ideleNorm_spec F).1 (fromInfinity (p g))).2, ((ideleNorm_spec F).1 g.val).2, hfin]
+      have h₁ (v : Primes(F)) : (fromInfinity (p g)).val.2 v = 1 := rfl
+      simp only [h₁, norm_one, finprod_one]
+      rfl
+    let x : N∞ := ⟨p g, hnorm⟩
+    have hx : x ∈ interior E∞ := hW_eq ▸ hg.2
+    refine Set.mem_iUnion.mpr ⟨1, ?_⟩
+    rw [hr₁, one_smul]
+    exact ⟨hg.1, ⟨x, interior_subset hx, rfl⟩⟩
+  let g : N₁ := ⟨fromInfinity a.val,
+    (infiniteIdeleNorm_eq_global F a.val).symm.trans a.property⟩
+  refine ⟨g, interior_maximal hSubset hU ⟨?_, ?_⟩⟩
+  · exact (mem_integralIdeleRange_iff F g.val).mpr fun v ↦
+      (show Valued.v (1 : v.adicCompletion F) = 1 from map_one _)
+  · have haW : a ∈ Subtype.val ⁻¹' W := hW_eq.symm ▸ ha
+    change a.val ∈ W
+    exact haW
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(2), p. 552. Principal translates cover the norm-one ideles. -/

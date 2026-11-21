@@ -831,7 +831,36 @@ coefficients zero.
 Deviation: This checks the vectors and coefficient normalization for a rank-one map. -/
 theorem singularExpansion_smulRight (e : E) (f : F) (he : ‖e‖ = 1) (hf : ‖f‖ = 1) :
     ∃ d : SingularExpansion ((innerSL ℂ e).smulRight f),
-      d.coeff 0 = 1 ∧ ∀ n, d.coeff (n + 1) = 0 := by sorry
+      d.coeff 0 = 1 ∧ ∀ n, d.coeff (n + 1) = 0 := by
+  let c : ℕ → ℝ≥0 := fun n ↦ if n = 0 then 1 else 0
+  have hc (n : {n // c n ≠ 0}) : n.1 = 0 := by
+    by_contra h
+    exact n.2 (by simp [c, h])
+  have : Subsingleton {n // c n ≠ 0} :=
+    ⟨fun a b ↦ Subtype.ext ((hc a).trans (hc b).symm)⟩
+  refine ⟨{
+    coeff := c
+    antitone_coeff := ?_
+    tendsto_coeff := ?_
+    source := fun _ ↦ e
+    target := fun _ ↦ f
+    orthonormal_source := orthonormal_subsingleton_iff.mpr fun _ ↦ he
+    orthonormal_target := orthonormal_subsingleton_iff.mpr fun _ ↦ hf
+    hasSum_apply := ?_ }, ?_, fun n ↦ ?_⟩
+  · intro m n hmn
+    by_cases hn : n = 0
+    · subst hn
+      obtain rfl : m = 0 := Nat.le_zero.mp hmn
+      exact le_rfl
+    · simp [c, hn]
+  · exact tendsto_const_nhds.congr'
+      (eventually_atTop.mpr ⟨1, fun n hn ↦ by simp [c, Nat.pos_iff_ne_zero.mp hn]⟩)
+  · intro x
+    convert hasSum_single (⟨0, by simp [c]⟩ : {n // c n ≠ 0})
+      (fun b hb ↦ absurd (Subsingleton.elim _ _) hb) using 1
+    simp [c]
+  · simp [c]
+  · simp [c]
 
 /-- Paper: Theorem C.3.6.1(1)–(2), p. 703. A bounded operator is compact
 exactly when it admits a singular expansion.

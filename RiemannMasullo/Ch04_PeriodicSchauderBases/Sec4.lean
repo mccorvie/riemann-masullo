@@ -279,7 +279,9 @@ theorem modulatedCyclicQuasiCharacter_coordinates :
 /-- Paper: Lemma 4.4.2.5, p. 193. The cyclic subgroup is closed, so its
 quotient is Hausdorff. -/
 theorem modulatedCyclicSubgroup_closed (hγ : 1 < (m γ).val) :
-    IsClosed (Γ : Set G) := by sorry
+    IsClosed (Γ : Set G) := by
+  have := modulated_zpowers_discrete m γ hγ
+  exact Subgroup.isClosed_of_discreteTopology
 
 /-- Paper: Lemma 4.4.2.5, p. 193. The quotient by the cyclic subgroup is compact. -/
 theorem modulatedCyclicQuotient_compact (hm : IsModulation m) (hγ : 1 < (m γ).val) :

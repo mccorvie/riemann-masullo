@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import Mathlib.Topology.MetricSpace.ProperSpace.Real
+import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Extend
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Compact
 
@@ -420,16 +421,49 @@ theorem schwartzBruhatIsotype_quotient_map :
   refine ⟨(P).ker.liftQL F hker.le, ?_, fun _ ↦ rfl⟩
   exact LinearMap.ker_eq_bot.mp (Submodule.ker_liftQ_eq_bot' (P).ker F.toLinearMap hker)
 
+-- Retain the existing section hypotheses in the theorem signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(1), p. 795. The injection restricts to a
 continuous linear injection on the homogeneous subspaces. -/
 theorem schwartzBruhatIsotype_subspace_map :
     ∃ j : actionIsotype ρS ω →L[ℂ] actionIsotype ρE ω,
-      Injective j ∧ ∀ f, (j f : E) = i (f : S) := by sorry
+      Injective j ∧ ∀ f, (j f : E) = i (f : S) := by
+  have hmem : ∀ f ∈ actionIsotype ρS ω, i f ∈ actionIsotype ρE ω := by
+    intro f hf
+    apply (mem_actionIsotype ρE ω (i f)).2
+    intro k
+    calc
+      ρE k (i f) = i (ρS k f) := (hcomm (k : G) f).symm
+      _ = i ((ω k : ℂ) • f) := congrArg i ((mem_actionIsotype ρS ω f).1 hf k)
+      _ = (ω k : ℂ) • i f := map_smul i _ _
+  refine ⟨i.restrict hmem, ?_, fun _ ↦ rfl⟩
+  intro f g hfg
+  exact Subtype.ext (hi (congrArg Subtype.val hfg))
 
+omit hE hρ heq hi hcomm hQ in
+/-- An injective equivariant map pulls back each target isotype to the source isotype. -/
+private theorem actionIsotype_comap_of_injective {H X Y : Type*} [Monoid H] [TopologicalSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (σ : H →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y)) (χ : PontryaginDual H)
+    (j : X →L[ℂ] Y) (hj : Injective j) (h : ∀ k x, j (σ k x) = τ k (j x)) :
+    (actionIsotype τ χ).comap j.toLinearMap = actionIsotype σ χ := by
+  refine Submodule.ext fun x ↦ ?_
+  change j x ∈ actionIsotype τ χ ↔ x ∈ actionIsotype σ χ
+  simp only [mem_actionIsotype]
+  refine forall_congr' fun k ↦ ?_
+  rw [← h k x, ← j.map_smul]
+  exact hj.eq_iff
+
+-- Retain the existing hypotheses from the averaging setup in the signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(2), p. 795. The inverse image of the target
 isotype is the source isotype. -/
 theorem schwartzBruhatIsotype_comap : (actionIsotype ρE ω).comap i.toLinearMap =
-    actionIsotype ρS ω := by sorry
+    actionIsotype ρS ω := by
+  refine actionIsotype_comap_of_injective (H := K) (X := S) (Y := E) ρS ρE ω i hi ?_
+  intro k f
+  exact hcomm (k : G) f
 
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic quotients. -/
@@ -542,7 +576,34 @@ complete target space. -/
 theorem schwartzBruhat_dense_extension (hd : DenseRange i) (T : S →L[ℂ] S)
     (hT : @Continuous S E (TopologicalSpace.induced i inferInstance) _
       (fun f ↦ i (T f))) :
-    ∃! U : E →L[ℂ] E, ∀ f : S, U (i f) = i (T f) := by sorry
+    ∃! U : E →L[ℂ] E, ∀ f : S, U (i f) = i (T f) := by
+  let R := i.toLinearMap.range
+  let e : S ≃ₗ[ℂ] R := LinearEquiv.ofInjective i.toLinearMap hi
+  have he (f : S) : (e f : E) = i f := rfl
+  have he_cont : @Continuous R S _ (TopologicalSpace.induced i inferInstance) e.symm := by
+    apply continuous_induced_rng.mpr
+    refine continuous_subtype_val.congr fun x ↦ ?_
+    exact (congrArg Subtype.val (e.apply_symm_apply x)).symm.trans (he (e.symm x))
+  let F : R →L[ℂ] E := ⟨(i.toLinearMap.comp T.toLinearMap).comp e.symm.toLinearMap,
+    @Continuous.comp R S E _ (TopologicalSpace.induced i inferInstance) _
+      e.symm (fun f ↦ i (T f)) hT he_cont⟩
+  have hdR : DenseRange R.subtypeL := by
+    change Dense (Set.range R.subtype)
+    rw [← LinearMap.coe_range, Submodule.range_subtype]
+    exact hd
+  have huR : IsUniformInducing R.subtypeL := ⟨rfl⟩
+  have : IsUniformAddGroup R := huR.isUniformAddGroup R.subtypeL
+  have hF (f : S) : F (e f) = i (T f) := by
+    change i (T (e.symm (e f))) = i (T f)
+    exact congrArg (fun g ↦ i (T g)) (e.symm_apply_apply f)
+  refine ⟨F.extend R.subtypeL, ?_, ?_⟩
+  · intro f
+    exact (F.extend_eq hdR huR (e f)).trans (hF f)
+  · intro U hU
+    refine (F.extend_unique hdR huR U (ContinuousLinearMap.ext ?_)).symm
+    intro x
+    obtain ⟨f, rfl⟩ := e.surjective x
+    exact (hU f).trans (hF f).symm
 
 /-- Paper: Lemma D.2.2.1(4), p. 795. The extension inherits the
 intertwining relation on the norm-one subgroup. The intertwiner and
