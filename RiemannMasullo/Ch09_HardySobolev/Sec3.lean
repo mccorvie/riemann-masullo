@@ -515,7 +515,18 @@ theorem modulatedCutoffOperator_apply (ν : Measure G) {Λ ε : ℝ} {ρ : G →
 positive self-adjoint operator on weighted L². -/
 theorem modulatedCutoffOperator_isPositive (ν : Measure G) {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    (modulatedCutoffOperator m ν hρ).IsPositive := by sorry
+    (modulatedCutoffOperator m ν hρ).IsPositive := by
+  apply (ContinuousLinearMap.isPositive_iff_complex _).2
+  intro u
+  have hinner : inner ℂ (modulatedCutoffOperator m ν hρ u) u =
+      ((∫ x, ρ x * ‖u x‖ ^ 2 ∂ν : ℝ) : ℂ) := by
+    rw [L2.inner_def, ← integral_complex_ofReal]
+    apply integral_congr_ae
+    filter_upwards [modulatedCutoffOperator_apply m ν hρ u] with x hx
+    rw [hx, ← smul_eq_mul, inner_smul_left, inner_self_eq_norm_sq_to_K]
+    simp
+  rw [hinner]
+  exact ⟨rfl, integral_nonneg fun x ↦ mul_nonneg (hρ.nonneg x) (sq_nonneg _)⟩
 
 /-- Paper: Remark 9.3.3.2, p. 428. The multiplier norm is the essential
 supremum of its symbol for a sigma-finite measure.
@@ -610,7 +621,20 @@ orthogonal projection with closed range, including the zero projection. -/
 theorem modulatedAbsoluteCutoffOperator_projection (ν : Measure G) (J : Set ℝ)
     (hJ : MeasurableSet J) :
     IsStarProjection (modulatedAbsoluteCutoffOperator m ν J hJ) ∧
-      IsClosed (range (modulatedAbsoluteCutoffOperator m ν J hJ)) := by sorry
+      IsClosed (range (modulatedAbsoluteCutoffOperator m ν J hJ)) := by
+  have hU : MeasurableSet (moduleValue ⁻¹' J) :=
+    hJ.preimage (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable
+  obtain ⟨hclosed, hP⟩ := (hardySobolevCutoff_spec (μ := ν) hU).choose_spec
+  refine ⟨⟨ContinuousLinearMap.ext fun u ↦ (hP u).1, ?_⟩, hclosed⟩
+  apply ContinuousLinearMap.isSelfAdjoint_iff_isSymmetric.2
+  intro u v
+  rw [ContinuousLinearMap.coe_coe, L2.inner_def, L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [modulatedAbsoluteCutoffOperator_apply m ν J hJ u,
+    modulatedAbsoluteCutoffOperator_apply m ν J hJ v] with x hu hv
+  rw [hu, hv]
+  simp only [modulatedAbsoluteCutoff, indicator]
+  split_ifs <;> simp
 
 end Cutoffs
 
