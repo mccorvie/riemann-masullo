@@ -1870,7 +1870,46 @@ include hr₁ hr in
 disjoint from the global domain. -/
 theorem ideleFundamentalDomain_disjoint (x : Fˣ) (hx : x ≠ 1) :
     Disjoint (principal₁ x • E₁) E₁ := by
-  sorry
+  rw [Set.disjoint_left]
+  rintro _ ⟨g₀, hg₀, rfl⟩ hh₀
+  obtain ⟨c, hc⟩ := Set.mem_iUnion.mp hg₀
+  obtain ⟨g, ⟨hgInt, hgArch⟩, rfl⟩ := Set.mem_smul_set.mp hc
+  obtain ⟨c', hc'⟩ := Set.mem_iUnion.mp hh₀
+  obtain ⟨h, ⟨hhInt, hhArch⟩, hEq⟩ := Set.mem_smul_set.mp hc'
+  simp only [smul_eq_mul] at hEq
+  -- The two representatives have the same ideal class.
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let q := QuotientGroup.mk'
+    ((IdeleGroup.principalSubgroup (𝓞 F) F ⊔ integralUnits).comap (N₁).subtype)
+  have hclass (a : N₁) : e (q a) = ideleIdealClass F a.val := he a
+  have hqx : q (principal₁ x) = 1 :=
+    (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_left (Set.mem_range_self x))
+  have hqInt (a : N₁) (ha : a.val ∈ integralUnits) : q a = 1 :=
+    (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_right ha)
+  have hq : q (r c') = q (r c) := by
+    simpa only [map_mul, hqx, hqInt g hgInt, hqInt h hhInt, mul_one, one_mul] using
+      congrArg q hEq
+  have hcc : c' = c := by simpa only [hclass, hr] using congrArg e hq
+  subst c'
+  have hmul : principal₁ x * g = h := mul_left_cancel (calc
+    r c * (principal₁ x * g) = principal₁ x * (r c * g) := by ac_rfl
+    _ = r c * h := hEq.symm)
+  -- Cancelling the representative forces the principal idele to be integral.
+  have hval : (principal₁ x).val * g.val = h.val := congrArg Subtype.val hmul
+  have hxInt : (principal₁ x).val ∈ integralUnits :=
+    (Subgroup.mul_mem_cancel_right integralUnits hgInt).mp (hval.symm ▸ hhInt)
+  obtain ⟨u, hu⟩ := exists_globalUnit_of_principal_mem_integralUnits F x hxInt
+  have huNe : u ≠ 1 := by
+    rintro rfl
+    exact hx (hu.symm.trans (map_one _))
+  have hxArch : atInfinity ((principal₁ x).val) = unitAtInfinity u := by
+    rw [← hu]
+    exact Units.ext rfl
+  have hArch := congrArg (fun a : 𝕀[F] ↦ atInfinity a) hval
+  change atInfinity ((principal₁ x).val * g.val) = atInfinity h.val at hArch
+  rw [map_mul, hxArch] at hArch
+  exact Set.disjoint_left.mp (infiniteIdeleFundamentalDomain_disjoint F b v₀ σ u huNe)
+    (Set.mem_smul_set.mpr ⟨atInfinity g.val, hgArch, hArch⟩) hhArch
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(3), p. 552. Only finitely many principal translates
