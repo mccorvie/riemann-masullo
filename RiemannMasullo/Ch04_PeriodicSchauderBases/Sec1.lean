@@ -333,7 +333,29 @@ theorem pi_isTopologicalBasis :
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of the coordinate
 basis of the complex sequence space are equicontinuous in the product topology. -/
 theorem pi_isEquicontinuous :
-    IsEquicontinuous coordinateVector coordinateFunctional := by sorry
+    IsEquicontinuous coordinateVector coordinateFunctional := by
+  have hproj (k : ℕ) (u : ℕ → ℂ) (j : ℕ) :
+      partialProjection coordinateVector coordinateFunctional k u j =
+        if j ≤ k then u j else 0 := by
+    simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply,
+      Finset.sum_apply, ContinuousLinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq, Finset.mem_Iic]
+  unfold IsEquicontinuous EquicontinuousAt
+  intro U hU
+  rw [uniformity_eq_comap_nhds_zero'] at hU
+  obtain ⟨V, hV, hVU⟩ := Filter.mem_comap.mp hU
+  -- Every basic product neighborhood of zero is preserved by coordinate truncation.
+  rw [nhds_pi] at hV
+  obtain ⟨I, hI, s, hs, hsV⟩ := Filter.mem_pi.mp hV
+  filter_upwards [set_pi_mem_nhds (x := (0 : ℕ → ℂ)) hI (fun j _ ↦ hs j)] with u hu k
+  apply hVU
+  simp only [mem_preimage, map_zero, neg_zero, add_zero]
+  apply hsV
+  intro j hj
+  rw [hproj]
+  split_ifs
+  · exact hu j hj
+  · exact mem_of_mem_nhds (hs j)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/

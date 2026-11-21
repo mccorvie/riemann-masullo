@@ -323,7 +323,8 @@ theorem adelicAverage_add_zeroTerm_add_principal (f : ℬ[F]) (g : 𝕀[F]) (x :
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is continuous
 as a function of the idele. -/
 theorem adelicAverage_at_zero_continuous (f : ℬ[F]) :
-    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) := by sorry
+    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) :=
+  (adelicAverage_continuous f).comp (continuous_id.prodMk continuous_const)
 
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is invariant
 under multiplication by principal ideles.

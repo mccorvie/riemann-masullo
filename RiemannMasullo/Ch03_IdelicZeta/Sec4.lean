@@ -333,7 +333,11 @@ by zero, addition and complex scalar multiplication. -/
 theorem schwartzBruhatEigen_submodule (c : QuasiCharacter Rˣ) :
     isEigen(c, (0 : StrongDual ℂ ℬ(R))) ∧
       (∀ T U : StrongDual ℂ ℬ(R), isEigen(c, T) → isEigen(c, U) → isEigen(c, T + U)) ∧
-      (∀ (a : ℂ) (T : StrongDual ℂ ℬ(R)), isEigen(c, T) → isEigen(c, a • T)) := by sorry
+      (∀ (a : ℂ) (T : StrongDual ℂ ℬ(R)), isEigen(c, T) → isEigen(c, a • T)) := by
+  refine ⟨fun g f ↦ by simp, fun T U hT hU g f ↦ ?_, fun a T hT g f ↦ ?_⟩
+  · simp only [ContinuousLinearMap.add_apply, hT g f, hU g f, mul_add]
+  · simp only [ContinuousLinearMap.smul_apply, hT g f, smul_eq_mul]
+    ring
 
 -- TODO(paper-gap): The right-translation gloss in Definition 3.4.3.1 reverses
 -- the action of (2.1.2.2) and the weight condition recalled in Definition 5.5.1.1.
@@ -348,11 +352,56 @@ def schwartzBruhatEigendistributions (c : QuasiCharacter Rˣ) : Submodule ℂ (S
   add_mem' := (schwartzBruhatEigen_submodule c).2.1 _ _
   smul_mem' a := (schwartzBruhatEigen_submodule c).2.2 a _
 
+/-- Point evaluation on the Schwartz–Bruhat space is continuous because its
+absolute value pulls back to a continuous seminorm on every elementary stage.
+Copied from the private `continuous_schwartzBruhat_eval` in
+`AppD_SchwartzBruhat/Sec2b.lean`, which this file does not import. -/
+private theorem continuous_schwartzBruhat_eval' {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (x : G) : Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+  classical
+  let L : SchwartzBruhat G →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  have hp : ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+    intro a e
+    let q := (normSeminorm ℂ ℂ).comp (L.comp (schwartzBruhatStageInclusion a e))
+    change Continuous q
+    let p₀ : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hp₀ : Continuous p₀ :=
+      (withGeneratingSeminorms_spec _ _).continuous_seminorm (0, 0, 0, 0)
+    apply Seminorm.continuous_of_le hp₀
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ p₀ f
+    let := e.finiteGroup
+    have he := schwartzBruhatStageRealization_apply a e f x
+    by_cases hx : x ∈ a.val.1
+    · rw [dite_eq_left hx] at he
+      rw [he]
+      let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f y‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+      have hb : (‖f y‖₊ : ENNReal) ≤ elementarySchwartzBound f.val (0, 0, 0, 0) :=
+        (le_iSup (fun g ↦ (‖f.val g‖₊ : ENNReal)) y).trans_eq
+          (elementarySchwartzBound_zero f.val).symm
+      exact ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne hb
+    · rw [dite_eq_right hx] at he
+      exact ((congrArg norm he).trans (norm_zero (E := ℂ))).le.trans (apply_nonneg p₀ f)
+  let i : {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (q ∘ schwartzBruhatStageInclusion a e)} := ⟨p, hp⟩
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
+
 /-- Paper: Definition 3.4.3.1(1)–(2), p. 151. Evaluation at zero belongs
 to the weight-one subspace, since unit multiplication fixes zero. -/
 theorem schwartzBruhatEigendistributions_zeroEval :
     ∃ T : StrongDual ℂ ℬ(R), T ∈ schwartzBruhatEigendistributions (1 : QuasiCharacter Rˣ) ∧
-      ∀ f : ℬ(R), T f = f (Multiplicative.ofAdd 0) := by sorry
+      ∀ f : ℬ(R), T f = f (Multiplicative.ofAdd 0) := by
+  let L : ℬ(R) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (Multiplicative.ofAdd 0)).comp (schwartzBruhatSubmodule _).subtype
+  refine ⟨⟨L, continuous_schwartzBruhat_eval' _⟩, fun g f ↦ ?_, fun f ↦ rfl⟩
+  change schwartzBruhatUnitTranslate g f (Multiplicative.ofAdd 0) = _ * f (Multiplicative.ofAdd 0)
+  rw [schwartzBruhatUnitTranslate_apply, mul_zero]
+  exact (one_mul _).symm
 
 /-- Paper: Definition 3.4.3.1(1)–(2), p. 151. The weight subspace is
 closed in the strong topology of the continuous dual. -/

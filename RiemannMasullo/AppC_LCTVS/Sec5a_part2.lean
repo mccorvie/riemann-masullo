@@ -12,9 +12,12 @@ import Mathlib.Analysis.Calculus.Deriv.Mul
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.Analysis.Calculus.MeanValue
+import Mathlib.Analysis.Calculus.Taylor
+import RiemannMasullo.AppC_LCTVS.Sec1
 import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 
 /-!
@@ -678,14 +681,223 @@ def weakSchwartzSubmodule : Submodule ℂ (V → E) :=
 function is represented by a Mathlib Schwartz map. -/
 theorem mem_weakSchwartzSubmodule_iff (f : V → E) :
     f ∈ weakSchwartzSubmodule d E ↔
-      ∀ φ : StrongDual ℂ E, ∃ g : SchwartzMap V ℂ, (g : V → ℂ) = φ ∘ f := by sorry
+      ∀ φ : StrongDual ℂ E, ∃ g : SchwartzMap V ℂ, (g : V → ℂ) = φ ∘ f := by
+  rw [weakSchwartzSubmodule, Submodule.mem_iInf]
+  simp only [Submodule.mem_comap]
+  change (∀ φ : StrongDual ℂ E, φ ∘ f ∈ vectorSchwartzSubmodule d ℂ) ↔ _
+  exact forall_congr' fun φ ↦ mem_vectorSchwartzSubmodule_complex_iff (φ ∘ f)
+
+omit hAdd hSMul hSemi hT2 in
+/-- Scalar evaluation preserves each order of vector differentiability on the Euclidean cover. -/
+private theorem vectorContDiffOrderOn_univ_comp_dual (φ : StrongDual ℂ E) (m : ℕ) {f : V → E}
+    (hf : VectorContDiffOrderOn (k := ℝ) f univ m) :
+    VectorContDiffOrderOn (k := ℝ) (φ ∘ f) univ m := by
+  induction m generalizing f with
+  | zero =>
+    unfold VectorContDiffOrderOn at hf ⊢
+    apply (hf.image φ).subset
+    rintro _ ⟨x, hx, y, hy, hxy, hdist, rfl⟩
+    exact ⟨_, ⟨x, hx, y, hy, hxy, hdist, rfl⟩, by simp⟩
+  | succ m ih =>
+    intro i
+    obtain ⟨g, hg, hc, hm⟩ := hf i
+    refine ⟨φ ∘ g, ?_, φ.continuous.comp_continuousOn hc, ih hm⟩
+    intro ψ x
+    exact hg (ψ.comp φ) x
+
+/-- If all scalar evaluations are smooth and periodic, the vector map has bounded normalized
+differences and is continuous. -/
+private theorem periodic_order_zero_of_scalar {f : V → E}
+    (hf : ∀ φ : StrongDual ℂ E, ContDiff ℝ ∞ (φ ∘ f) ∧
+      ∀ n : Fin d → ℤ, Periodic (φ ∘ f) (eucInt n)) :
+    VectorContDiffOrderOn (k := ℝ) f univ 0 ∧ Continuous f := by
+  have hb : VectorContDiffOrderOn (k := ℝ) f univ 0 := by
+    unfold VectorContDiffOrderOn
+    apply (isVonNBounded_iff_dual_image _).mpr
+    intro φ
+    have hφ := vectorContDiffOrderOn_of_contDiff_periodic 0 (hf φ).1 (hf φ).2
+    unfold VectorContDiffOrderOn at hφ
+    apply ((NormedSpace.isVonNBounded_iff ℂ).mp hφ).subset
+    rintro _ ⟨_, ⟨x, hx, y, hy, hxy, hdist, rfl⟩, rfl⟩
+    exact ⟨x, hx, y, hy, hxy, hdist, by simp⟩
+  refine ⟨hb, continuous_iff_continuousAt.mpr fun x ↦ ?_⟩
+  change Tendsto f (𝓝 x) (𝓝 (f x))
+  apply tendsto_sub_nhds_zero_iff.mp
+  let r (y : V) : ℂ := (‖y - x‖ : ℝ)
+  let q (y : V) : E := (r y)⁻¹ • (f y - f x)
+  have hr : Tendsto r (𝓝 x) (𝓝 0) := by
+    have h : Tendsto (fun y : V ↦ ‖y - x‖) (𝓝 x) (𝓝 0) := by
+      simpa using (continuousAt_id.sub (continuousAt_const (y := x))).norm.tendsto (x := x)
+    simpa [r, Function.comp_def] using (Complex.continuous_ofReal.tendsto 0).comp h
+  unfold VectorContDiffOrderOn at hb
+  have hsmall : ∀ᶠ y in 𝓝 x, ‖y - x‖ < 1 :=
+    Metric.eventually_nhds_iff_ball.mpr ⟨1, zero_lt_one, fun y hy ↦ by
+      simpa [Metric.mem_ball, dist_eq_norm] using hy⟩
+  refine ((hb.union (isVonNBounded_singleton (0 : E))).smul_tendsto_zero
+    (x := q) (hsmall.mono fun y hy ↦ ?_) hr).congr fun y ↦ ?_
+  · by_cases h : y = x
+    · right
+      simp [q, h]
+    · left
+      exact ⟨x, mem_univ _, y, mem_univ _, Ne.symm h, hy.le, by simp [q, r]⟩
+  · change r y • ((r y)⁻¹ • (f y - f x)) = f y - f x
+    by_cases h : y = x
+    · simp [h]
+    · exact smul_inv_smul₀ (Complex.ofReal_ne_zero.mpr
+        (norm_ne_zero_iff.mpr (sub_ne_zero.mpr h))) _
+
+/-- In a quasi-complete target, a coordinate derivative has an E-valued representative if every
+scalar evaluation is twice continuously differentiable. The scalar Taylor remainder bounds the
+differences of the vector difference quotients after rescaling. -/
+private theorem exists_vector_coordinate_lift {f : V → E}
+    (hf : ∀ φ : StrongDual ℂ E, ContDiff ℝ 2 (φ ∘ f)) (i : Fin d) :
+    letI := IsTopologicalAddGroup.rightUniformSpace E
+    QuasiCompleteSpace ℂ E →
+      ∃ g : V → E, ∀ (φ : StrongDual ℂ E) (x : V),
+        φ (g x) = fderiv ℝ (φ ∘ f) x (EuclideanSpace.single i 1) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  intro hcomplete
+  have hpoint (x : V) : ∃ y : E, ∀ φ : StrongDual ℂ E,
+      φ y = fderiv ℝ (φ ∘ f) x (EuclideanSpace.single i 1) := by
+    let v : V := EuclideanSpace.single i 1
+    let F (φ : StrongDual ℂ E) (s : ℝ) := φ (f (x + s • v))
+    let t (n : ℕ) : ℝ := ((n : ℝ) + 1)⁻¹
+    let q (n : ℕ) : E := (((t n)⁻¹ : ℝ) : ℂ) • (f (x + t n • v) - f x)
+    have htpos (n : ℕ) : 0 < t n := by positivity
+    have htone (n : ℕ) : t n ≤ 1 := by
+      apply inv_le_one_of_one_le₀
+      exact le_add_of_nonneg_left (Nat.cast_nonneg n)
+    have ht : Tendsto t atTop (𝓝 0) :=
+      tendsto_inv_atTop_zero.comp (tendsto_atTop_add_const_right _ _ tendsto_natCast_atTop_atTop)
+    have hline : ContDiff ℝ 2 (fun s : ℝ ↦ x + s • v) :=
+      contDiff_const.add (contDiff_id.smul contDiff_const)
+    have hq (φ : StrongDual ℂ E) (n : ℕ) :
+        φ (q n) = (t n)⁻¹ • (F φ (t n) - F φ 0) := by
+      simp [q, F, Complex.real_smul]
+    have hderiv (φ : StrongDual ℂ E) :
+        HasDerivAt (F φ) (fderiv ℝ (φ ∘ f) x v) 0 :=
+      ((hf φ).differentiable (by simp) x).hasFDerivAt.hasLineDerivAt v
+    have hscalar (φ : StrongDual ℂ E) : Tendsto (φ ∘ q) atTop
+        (𝓝 (fderiv ℝ (φ ∘ f) x v)) := by
+      refine ((hderiv φ).tendsto_slope_zero.comp (tendsto_nhdsWithin_iff.mpr
+        ⟨ht, Eventually.of_forall fun n ↦ (htpos n).ne'⟩)).congr ?_
+      intro n
+      simpa only [zero_add, Function.comp_apply] using (hq φ n).symm
+    have hb : IsVonNBounded ℂ (range q) := by
+      apply (isVonNBounded_iff_dual_image _).mpr
+      intro φ
+      rw [← range_comp]
+      exact (NormedSpace.isVonNBounded_iff ℂ).mp ((hscalar φ).isVonNBounded_range ℂ)
+    let r (p : ℕ × ℕ) : ℝ := t p.1 + t p.2
+    let z (p : ℕ × ℕ) : E := (((r p)⁻¹ : ℝ) : ℂ) • (q p.2 - q p.1)
+    have hrpos (p : ℕ × ℕ) : 0 < r p := add_pos (htpos _) (htpos _)
+    have hz : IsVonNBounded ℂ (range z) := by
+      apply (isVonNBounded_iff_dual_image _).mpr
+      intro φ
+      have hF : ContDiffOn ℝ 2 (F φ) (Icc 0 1) := ((hf φ).comp hline).contDiffOn
+      obtain ⟨C, hC⟩ := exists_taylor_mean_remainder_bound (n := 1) hF
+      have hTaylor (s : ℝ) :
+          taylorWithinEval (F φ) 1 (Icc 0 1) 0 s =
+            F φ 0 + s • fderiv ℝ (φ ∘ f) x v := by
+        rw [show (1 : ℕ) = 0 + 1 from rfl, taylorWithinEval_succ, taylor_within_zero_eval]
+        simp [iteratedDerivWithin_one, (hderiv φ).hasDerivWithinAt.derivWithin
+          (uniqueDiffOn_Icc zero_lt_one 0 ⟨le_rfl, zero_le_one⟩)]
+      have herr (n : ℕ) :
+          ‖φ (q n) - fderiv ℝ (φ ∘ f) x v‖ ≤ C * t n := by
+        have h := hC (t n) ⟨(htpos n).le, htone n⟩
+        rw [hTaylor, sub_zero] at h
+        calc
+          ‖φ (q n) - fderiv ℝ (φ ∘ f) x v‖ =
+              (t n)⁻¹ * ‖F φ (t n) - (F φ 0 + t n • fderiv ℝ (φ ∘ f) x v)‖ := by
+            have he : (t n)⁻¹ • (F φ (t n) - (F φ 0 + t n • fderiv ℝ (φ ∘ f) x v)) =
+                φ (q n) - fderiv ℝ (φ ∘ f) x v := by
+              rw [sub_add_eq_sub_sub, smul_sub, inv_smul_smul₀ (htpos n).ne', hq φ n]
+            rw [← he, norm_smul, Real.norm_eq_abs, abs_inv, abs_of_pos (htpos n)]
+          _ ≤ C * t n := (inv_mul_le_iff₀ (htpos n)).mpr (by simpa [pow_two, mul_left_comm,
+            mul_comm, mul_assoc] using h)
+      refine isBounded_iff_forall_norm_le.mpr ⟨C, ?_⟩
+      rintro _ ⟨_, ⟨p, rfl⟩, rfl⟩
+      simp only [z, map_smul, map_sub, norm_smul, Complex.norm_real, Real.norm_eq_abs,
+        abs_inv, abs_of_pos (hrpos p)]
+      apply (inv_mul_le_iff₀ (hrpos p)).mpr
+      rw [mul_comm, show r p = t p.1 + t p.2 from rfl, add_comm (t p.1), mul_add]
+      exact (norm_sub_le_norm_sub_add_norm_sub _ _ _).trans
+        (add_le_add (herr p.2) (by simpa [norm_sub_rev] using herr p.1))
+    have hr : Tendsto (fun p : ℕ × ℕ ↦ (r p : ℂ)) (atTop ×ˢ atTop) (𝓝 0) := by
+      have h : Tendsto r (atTop ×ˢ atTop) (𝓝 0) := by
+        simpa only [r, Function.comp_apply, add_zero] using
+          (ht.comp tendsto_fst).add (ht.comp tendsto_snd)
+      change Tendsto (Complex.ofReal ∘ r) _ _
+      simpa only [Complex.ofReal_zero] using (Complex.continuous_ofReal.tendsto 0).comp h
+    have hc : Cauchy (atTop.map q) := by
+      rw [cauchy_map_iff, uniformity_eq_comap_nhds_zero, tendsto_comap_iff]
+      refine ⟨inferInstance, (hz.smul_tendsto_zero
+        (Eventually.of_forall fun p ↦ mem_range_self p) hr).congr fun p ↦ ?_⟩
+      change (r p : ℂ) • ((((r p)⁻¹ : ℝ) : ℂ) • (q p.2 - q p.1)) = _
+      rw [Complex.ofReal_inv]
+      exact smul_inv_smul₀ (Complex.ofReal_ne_zero.mpr (hrpos p).ne') _
+    have hmem : atTop.map q ≤ 𝓟 (closure (range q)) :=
+      le_principal_iff.mpr (mem_map.mpr (Eventually.of_forall fun n ↦
+        subset_closure (mem_range_self n)))
+    obtain ⟨y, _, hy⟩ := hcomplete.quasiComplete hb.closure isClosed_closure _ hc hmem
+    exact ⟨y, fun φ ↦ tendsto_nhds_unique ((φ.continuous.tendsto y).comp hy) (hscalar φ)⟩
+  choose g hg using hpoint
+  exact ⟨g, fun φ x ↦ hg x φ⟩
 
 /-- Paper: Remark C.5.1.27, p. 735. In a quasi-complete target the two
 definitions of the periodic smooth space agree. -/
 theorem vectorPeriodicSmoothSubmodule_eq_weak :
     letI := IsTopologicalAddGroup.rightUniformSpace E
     QuasiCompleteSpace ℂ E →
-      vectorPeriodicSmoothSubmodule d E = weakPeriodicSmoothSubmodule d E := by sorry
+      vectorPeriodicSmoothSubmodule d E = weakPeriodicSmoothSubmodule d E := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  intro hcomplete
+  have hweak (f : V → E) : f ∈ weakPeriodicSmoothSubmodule d E ↔
+      ∀ φ : StrongDual ℂ E, ContDiff ℝ ∞ (φ ∘ f) ∧
+        ∀ n : Fin d → ℤ, Periodic (φ ∘ f) (eucInt n) := by
+    rw [weakPeriodicSmoothSubmodule, Submodule.mem_iInf]
+    exact forall_congr' fun φ ↦ mem_vectorPeriodicSmoothSubmodule_complex_iff (φ ∘ f)
+  have hstrong (f : V → E) : f ∈ vectorPeriodicSmoothSubmodule d E ↔
+      (∀ m, VectorContDiffOrderOn (k := ℝ) f univ m) ∧
+        ∀ n : Fin d → ℤ, Periodic f (eucInt n) := by
+    unfold vectorPeriodicSmoothSubmodule
+    simp only [Submodule.mem_inf, Submodule.mem_iInf, LinearMap.mem_ker, LinearMap.sub_apply,
+      LinearMap.proj_apply, sub_eq_zero, Periodic]
+    rfl
+  apply SetLike.ext
+  intro f
+  rw [hstrong, hweak]
+  constructor
+  · rintro ⟨hm, hp⟩ φ
+    refine ⟨contDiff_infty.mpr fun m ↦ ?_, fun n x ↦ congrArg φ (hp n x)⟩
+    exact (contDiff_of_vectorContDiffOrderOn_succ m
+      (vectorContDiffOrderOn_univ_comp_dual φ (m + 1) (hm (m + 1)))).of_le (by simp)
+  · intro hf
+    refine ⟨?_, fun n x ↦ SeparatingDual.eq_iff_forall_dual_eq.mpr fun φ ↦ (hf φ).2 n x⟩
+    intro m
+    induction m generalizing f with
+    | zero => exact (periodic_order_zero_of_scalar hf).1
+    | succ m ih =>
+      intro i
+      obtain ⟨g, hg⟩ := exists_vector_coordinate_lift (fun φ ↦ (hf φ).1.of_le (by simp)) i hcomplete
+      let v : V := EuclideanSpace.single i 1
+      have heval (φ : StrongDual ℂ E) : φ ∘ g = fun x ↦ fderiv ℝ (φ ∘ f) x v :=
+        funext (hg φ)
+      have hgscalar (φ : StrongDual ℂ E) :
+          ContDiff ℝ ∞ (φ ∘ g) ∧ ∀ n : Fin d → ℤ, Periodic (φ ∘ g) (eucInt n) := by
+        rw [heval]
+        exact ⟨(contDiff_infty_iff_fderiv.mp (hf φ).1).2.clm_apply contDiff_const,
+          fun n x ↦ congrArg (fun L : V →L[ℝ] ℂ ↦ L v) (fderiv_integer_periodic (hf φ).2 n x)⟩
+      refine ⟨g, ?_, (periodic_order_zero_of_scalar hgscalar).2.continuousOn, ih g hgscalar⟩
+      intro φ x
+      change HasDerivWithinAt (fun t : ℝ ↦ φ (f ((x : V) + t • v))) (φ (g x)) _ 0
+      rw [hg φ x]
+      have h : HasDerivAt (fun t : ℝ ↦ φ (f ((x : V) + t • v)))
+          (fderiv ℝ (φ ∘ f) x v) 0 :=
+        ((hf φ).1.differentiable (by simp) (x : V)).hasFDerivAt.hasLineDerivAt v
+      exact h.hasDerivWithinAt
 
 omit hAdd hSMul hSemi hT2 in
 /-- A vector-valued weak coordinate derivative turns into the ordinary line derivative

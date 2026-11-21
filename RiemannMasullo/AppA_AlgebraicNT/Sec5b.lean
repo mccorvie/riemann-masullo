@@ -321,11 +321,93 @@ theorem dSequenceMaximal_eventually_singleton [μ.IsHaarMeasure]
       hx, ENNReal.mul_div_cancel_right h₀.ne' hfin.ne]
   rw [dSequenceMaximal, limsup_congr hev, limsup_const]
 
+set_option linter.unusedSectionVars false in
+/-- Multiplication on the left by a fixed element preserves equality of sets
+up to a null set for an invariant measure. -/
+private theorem smul_ae_eq_mul_left [μ.IsHaarMeasure] (x : G) {s t : Set G}
+    (h : s =ᵐ[μ] t) :
+    x • s =ᵐ[μ] x • t := by
+  rw [ae_eq_set, ← Set.smul_set_sdiff, ← Set.smul_set_sdiff]
+  obtain ⟨h1, h2⟩ := ae_eq_set.mp h
+  rw [measure_smul μ x, measure_smul μ x]
+  exact ⟨h1, h2⟩
+
+-- The proof only needs measurability, so some automatic section variables stay unused.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem A.5.3.6, p. 581. The local function maximal operator gives
 a function measurable for the completed Haar measure. -/
 theorem dSequenceMaximal_aemeasurable [μ.IsHaarMeasure] (hU : IsDSequence μ U)
     (hcompact : IsCompact (closure (U 0))) {f : G → ℂ} (hf : LocallyIntegrable f μ) :
-    AEMeasurable (dSequenceMaximal μ U f) μ := by sorry
+    AEMeasurable (dSequenceMaximal μ U f) μ := by
+  classical
+  -- A measurable representative of the norm of `f`.
+  obtain ⟨g, hg, hfg⟩ := hf.aestronglyMeasurable.aemeasurable
+  have hF : Measurable fun y ↦ ‖g y‖ₑ := hg.stronglyMeasurable.eNorm
+  have hnorm : (fun y ↦ ‖f y‖ₑ) =ᵐ[μ] (fun y ↦ ‖g y‖ₑ) := by
+    filter_upwards [hfg] with y hy
+    rw [hy]
+  -- Borel representatives of the sequence members.
+  have hVmeas : ∀ k, MeasurableSet (toMeasurable μ (U k)) :=
+    fun k ↦ measurableSet_toMeasurable μ _
+  have hVae : ∀ k, toMeasurable μ (U k) =ᵐ[μ] U k :=
+    fun k ↦ (hU.1 k).2.1.toMeasurable_ae_eq
+  -- Each translated averaged norm is measurable.
+  have hmeas : ∀ k : ℕ, Measurable (fun x : G ↦
+      ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ) := by
+    intro k
+    have hpre : ∀ x : G, x • toMeasurable μ (U k)
+        = (fun y : G ↦ y * x⁻¹) ⁻¹' toMeasurable μ (U k) := by
+      intro x
+      ext y
+      rw [Set.mem_smul_set_iff_inv_smul_mem, Set.mem_preimage]
+      simp only [smul_eq_mul, mul_comm]
+    have hC : Measurable (fun _ : G ↦ (1 : ℝ≥0∞)) := measurable_const
+    have hW : Measurable (Function.uncurry
+        (fun (x y : G) ↦ ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)))) := by
+      have h1 : Measurable fun p : G × G ↦ ‖g p.2‖ₑ := hF.comp measurable_snd
+      have h2 : Measurable fun p : G × G ↦ p.2 * p.1⁻¹ :=
+        (measurable_snd).mul (Measurable.inv measurable_fst)
+      have h3 : Measurable fun p : G × G ↦
+          (toMeasurable μ (U k)).indicator 1 (p.2 * p.1⁻¹) :=
+        hC.indicator (hVmeas k) |>.comp h2
+      exact h1.mul h3
+    have hint : ∀ x : G, ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ
+        = (∫⁻ y, ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)) ∂μ)
+            / μ (toMeasurable μ (U k)) := by
+      intro x
+      have hfun : ((fun z : G ↦ z * x⁻¹) ⁻¹' toMeasurable μ (U k)).indicator
+          (fun y ↦ ‖g y‖ₑ)
+          = fun y ↦ ‖g y‖ₑ * ((toMeasurable μ (U k)).indicator 1 (y * x⁻¹)) := by
+        funext y
+        have hmem : y ∈ (fun z : G ↦ z * x⁻¹) ⁻¹' toMeasurable μ (U k)
+            ↔ y * x⁻¹ ∈ toMeasurable μ (U k) := Set.mem_preimage
+        by_cases hy : y * x⁻¹ ∈ toMeasurable μ (U k)
+        · rw [Set.indicator_of_mem (hmem.mpr hy), Set.indicator_of_mem hy (1 : G → ℝ≥0∞),
+            Pi.one_apply, mul_one]
+        · rw [Set.indicator_of_notMem (fun hc ↦ hy (hmem.mp hc)),
+            Set.indicator_of_notMem hy (1 : G → ℝ≥0∞), mul_zero]
+      rw [setLAverage_eq μ (fun y ↦ ‖g y‖ₑ) _, measure_smul μ x, hpre x,
+        ← lintegral_indicator ((hVmeas k).preimage (measurable_mul_const (x⁻¹))), hfun]
+    rw [funext hint]
+    exact hW.lintegral_prod_right.div_const _
+  -- The maximal function coincides with the measurable limsup everywhere.
+  have hterm : ∀ (k : ℕ) (x : G),
+      ⨍⁻ y in x • U k, ‖f y‖ₑ ∂μ
+        = ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ := by
+    intro k x
+    have hpre : x • toMeasurable μ (U k)
+        = (fun y : G ↦ y * x⁻¹) ⁻¹' toMeasurable μ (U k) := by
+      ext y
+      rw [Set.mem_smul_set_iff_inv_smul_mem, Set.mem_preimage]
+      simp only [smul_eq_mul, mul_comm]
+    rw [setLAverage_congr (smul_ae_eq_mul_left x (hVae k)).symm, hpre]
+    exact setLAverage_congr_fun_ae ((hVmeas k).preimage (measurable_mul_const (x⁻¹)))
+      (by filter_upwards [hnorm] with y hy _; exact hy)
+  refine ⟨fun x ↦ limsup (fun k ↦ ⨍⁻ y in x • toMeasurable μ (U k), ‖g y‖ₑ ∂μ) atTop,
+    Measurable.limsup (fun k ↦ hmeas k), ?_⟩
+  filter_upwards with x
+  simp only [dSequenceMaximal]
+  exact limsup_congr (Filter.eventually_atTop.mpr ⟨0, fun k _ ↦ hterm k x⟩)
 
 -- TODO(paper-gap): The auxiliary bound (A.5.3.11) fails for f = 1 on any compact
 -- set of positive Haar mass, since the log term vanishes and the left side is μ(K).
@@ -593,8 +675,120 @@ theorem ae_dSequenceMaximal_lt_top [μ.IsHaarMeasure] (hU : IsDSequence μ U)
   refine ae_lt_top' hint.aestronglyMeasurable.aemeasurable ?_
   exact hint.hasFiniteIntegral.ne
 
--- TODO(paper-gap): The truncation argument in (A.5.3.15) uses the lower level set of |f|.
--- Passing to the lower level set of M f in (A.5.3.9) needs a justification.
+/-- A compact set on which the input norm uniformly exceeds the maximal function
+by a positive gap has zero mass. The weak measure bound controls the part of
+small translates outside the compact set by the mass of an open enlargement. -/
+private theorem measure_compact_zero_of_dSequenceMaximal_gap [μ.IsHaarMeasure]
+    (hU : IsDPrimeSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
+    (hcompact : IsCompact (closure (U 0))) {K : Set G} (hK : IsCompact K)
+    {f : G → ℂ} {t s : ℝ} (ht : 0 ≤ t) (hts : t < s)
+    (hmax : ∀ x ∈ K, dSequenceMaximal μ U f x ≤ ENNReal.ofReal t)
+    (hnorm : ∀ x ∈ K, ENNReal.ofReal s ≤ ‖f x‖ₑ) : μ K = 0 := by
+  obtain ⟨C, hC, hbound⟩ := hU.1.2.2
+  let m := (t + s) / 2
+  let p := (s - m) / s
+  let q := p / 2
+  have hs : 0 < s := ht.trans_lt hts
+  have htm : t < m := by dsimp [m]; linarith
+  have hms : m < s := by dsimp [m]; linarith
+  have hp : 0 < p := div_pos (sub_pos.mpr hms) hs
+  have hq : 0 < q := half_pos hp
+  have hsplit : ENNReal.ofReal m + ENNReal.ofReal s * ENNReal.ofReal p = ENNReal.ofReal s := by
+    rw [← ENNReal.ofReal_mul hs.le, ← ENNReal.ofReal_add (ht.trans htm.le) (mul_nonneg hs.le hp.le)]
+    congr 1
+    dsimp only [p]
+    rw [mul_div_cancel₀ _ hs.ne', add_sub_cancel]
+  by_contra hnull
+  let c := ENNReal.ofReal (C / q)
+  have hc : c ≠ 0 := (ENNReal.ofReal_pos.mpr (div_pos hC hq)).ne'
+  have hcfin : c ≠ ∞ := ENNReal.ofReal_ne_top
+  obtain ⟨O, hKO, hO, _, hsmall⟩ := hK.isClosed.measurableSet.exists_isOpen_sdiff_lt
+    (μ := μ) hK.measure_lt_top.ne (ENNReal.div_ne_zero.mpr ⟨hnull, hcfin⟩)
+  let ν := μ.restrict (O \ K)
+  have hsub : K ⊆ K ∩ {x | ENNReal.ofReal q < dSequenceMeasureMaximal μ ν U x} := by
+    intro x hx
+    have hnear : ∀ᶠ k in atTop, x • U k ⊆ O := by
+      obtain ⟨n, hn⟩ := hU.2 ((fun z ↦ x * z) ⁻¹' O)
+        ((hO.preimage (continuous_const.mul continuous_id)).mem_nhds
+          (show x * 1 ∈ O by simpa using hKO hx))
+      filter_upwards [eventually_ge_atTop n] with k hk
+      rintro y ⟨z, hz, rfl⟩
+      exact hn (hU.1.2.1 hk hz)
+    have havg : ∀ᶠ k in atTop, (⨍⁻ y in x • U k, ‖f y‖ₑ ∂μ) < ENNReal.ofReal m :=
+      eventually_lt_of_limsup_lt ((hmax x hx).trans_lt
+        ((ENNReal.ofReal_lt_ofReal_iff (ht.trans_lt htm)).mpr htm))
+    have hlarge : ∀ᶠ k in atTop, ENNReal.ofReal p ≤ ν (x • U k) / μ (U k) := by
+      filter_upwards [hnear, havg] with k hk hlt
+      let S := x • U k
+      have hSm : MeasurableSet S := (hBorel k).const_smul x
+      have hν : ν S = μ (S \ K) := by
+        rw [Measure.restrict_apply hSm, ← inter_sdiff_assoc, inter_eq_left.mpr hk]
+      have hpart : ENNReal.ofReal s * μ (S ∩ K) ≤ ∫⁻ y in S, ‖f y‖ₑ ∂μ := by
+        rw [← setLIntegral_const]
+        exact (setLIntegral_mono' (hSm.inter hK.isClosed.measurableSet)
+          (fun y hy ↦ hnorm y hy.2)).trans
+          (lintegral_mono' (Measure.restrict_mono inter_subset_left le_rfl) le_rfl)
+      have hmass : μ S = μ (U k) := measure_smul _ _ _
+      have hsum : ENNReal.ofReal s ≤ (⨍⁻ y in S, ‖f y‖ₑ ∂μ) +
+          ENNReal.ofReal s * (ν S / μ (U k)) := by
+        rw [setLAverage_eq, hmass, hν, ← mul_div_assoc, ← ENNReal.add_div]
+        apply le_trans ?_ (ENNReal.div_le_div_right (add_le_add_left hpart _) _)
+        rw [← mul_add, measure_inter_add_sdiff S hK.isClosed.measurableSet, hmass,
+          ENNReal.mul_div_cancel_right (hU.1.1 k).2.2.1.ne' (hU.1.1 k).2.2.2.ne]
+      refine le_of_not_gt fun h ↦ (not_lt_of_ge hsum) ?_
+      have hmul : ENNReal.ofReal s * (ν S / μ (U k)) < ENNReal.ofReal s * ENNReal.ofReal p := by
+        simpa only [mul_comm (ENNReal.ofReal s)] using
+          ENNReal.mul_lt_mul_left (ENNReal.ofReal_pos.mpr hs).ne' ENNReal.ofReal_ne_top h
+      calc
+        _ ≤ ENNReal.ofReal m + ENNReal.ofReal s * (ν S / μ (U k)) := add_le_add_left hlt.le _
+        _ < ENNReal.ofReal m + ENNReal.ofReal s * ENNReal.ofReal p :=
+          (ENNReal.add_lt_add_iff_left ENNReal.ofReal_ne_top).mpr hmul
+        _ = ENNReal.ofReal s := hsplit
+    refine ⟨hx, ?_⟩
+    exact ((ENNReal.ofReal_lt_ofReal_iff hp).mpr (half_lt_self hp)).trans_le
+      (le_limsup_of_frequently_le hlarge.frequently)
+  have hfin : μ (K * U 0) < ∞ :=
+    (measure_mono (Set.mul_subset_mul Subset.rfl subset_closure)).trans_lt
+      (hK.mul hcompact).measure_lt_top
+  have hweak := dSequenceMeasureMaximal_weak (ν := ν) hU.1 hBorel hC
+    (fun k ↦ (hbound k).2) hK.isClosed.measurableSet.nullMeasurableSet hfin hq
+  have hmass : μ K ≤ c * μ (O \ K) :=
+    (measure_mono hsub).trans (hweak.trans (mul_le_mul' le_rfl
+      ((measure_mono (subset_univ _)).trans_eq (Measure.restrict_apply_univ _))))
+  exact (not_lt_of_ge hmass) (by
+    simpa only [mul_comm c, ENNReal.div_mul_cancel hc hcfin] using
+      ENNReal.mul_lt_mul_left hc hcfin hsmall)
+
+/-- On a Borel D′-sequence the strict input level set is contained almost
+everywhere in the corresponding strict maximal-function level set. -/
+private theorem ae_dSequenceMaximal_level_of_borel [μ.IsHaarMeasure]
+    (hU : IsDPrimeSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
+    (hcompact : IsCompact (closure (U 0))) {f : G → ℂ} (hf : Measurable f)
+    {t : ℝ} (ht : 0 ≤ t) :
+    ∀ᵐ x ∂μ, ENNReal.ofReal t < ‖f x‖ₑ → ENNReal.ofReal t < dSequenceMaximal μ U f x := by
+  have hnull (q : ℚ) (htq : t < (q : ℝ)) :
+      μ {x | dSequenceMaximal μ U f x ≤ ENNReal.ofReal t ∧ ENNReal.ofReal (q : ℝ) ≤ ‖f x‖ₑ} = 0 := by
+    have hm : MeasurableSet
+        {x | dSequenceMaximal μ U f x ≤ ENNReal.ofReal t ∧ ENNReal.ofReal (q : ℝ) ≤ ‖f x‖ₑ} :=
+      (measurableSet_le (measurable_dSequenceMaximal_of_borel hBorel f) measurable_const).inter
+        (measurableSet_le measurable_const hf.eNorm)
+    rw [hm.measure_eq_iSup_isCompact μ]
+    refine le_antisymm (iSup_le fun K ↦ iSup_le fun hsub ↦ iSup_le fun hK ↦ ?_) bot_le
+    exact
+      (measure_compact_zero_of_dSequenceMaximal_gap hU hBorel hcompact hK ht htq
+        (fun x hx ↦ (hsub hx).1) (fun x hx ↦ (hsub hx).2)).le
+  have hae (q : ℚ) : ∀ᵐ x ∂μ, t < (q : ℝ) →
+      ¬(dSequenceMaximal μ U f x ≤ ENNReal.ofReal t ∧ ENNReal.ofReal (q : ℝ) ≤ ‖f x‖ₑ) := by
+    by_cases h : t < (q : ℝ)
+    · simp only [h, true_implies, ae_iff, not_not]
+      exact hnull q h
+    · simp [h]
+  filter_upwards [ae_all_iff.mpr hae] with x hx hnorm
+  obtain ⟨q, _, hq₁, hq₂⟩ := ENNReal.lt_iff_exists_rat_btwn.mp hnorm
+  change ENNReal.ofReal t < ENNReal.ofReal (q : ℝ) at hq₁
+  change ENNReal.ofReal (q : ℝ) < ‖f x‖ₑ at hq₂
+  exact lt_of_not_ge fun h ↦ hx q (lt_of_not_ge fun htq ↦
+    hq₁.not_ge (ENNReal.ofReal_le_ofReal htq)) ⟨h, hq₂.le⟩
 
 /-- Paper: Theorem A.5.3.6(1), p. 581. The mass of the strict level set on `B`
 is bounded by the integral of `|f|` over the lower maximal-function level set in `B * U 0`,
@@ -608,7 +802,81 @@ theorem dSequenceMaximal_weak_local [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ
     μ (B ∩ {x | ENNReal.ofReal α < dSequenceMaximal μ U f x}) ≤
       ENNReal.ofReal (C / ((1 - δ) * α)) *
         ∫⁻ x in (B * U 0) ∩ {x | ENNReal.ofReal (δ * α) < dSequenceMaximal μ U f x},
-          ‖f x‖ₑ ∂μ := by sorry
+          ‖f x‖ₑ ∂μ := by
+  obtain ⟨V, hV, hVm, hVU, hVae⟩ := exists_borel_dSequence hU.1
+  obtain ⟨g, hgm, hfg⟩ := hf.aestronglyMeasurable.aemeasurable
+  have hg := hf.congr hfg
+  have hnorm : (fun y ↦ ‖f y‖ₑ) =ᵐ[μ] (fun y ↦ ‖g y‖ₑ) :=
+    hfg.fun_comp (fun z : ℂ ↦ ‖z‖ₑ)
+  have hmax : dSequenceMaximal μ U f = dSequenceMaximal μ V g := by
+    funext x
+    unfold dSequenceMaximal
+    congr 1
+    funext k
+    have htranslate := (smul_set_ae_eq x).mpr (hVae k)
+    rw [setLAverage_eq, setLAverage_eq, Measure.restrict_congr_set htranslate,
+      measure_congr htranslate, lintegral_congr_ae (ae_restrict_of_ae hnorm)]
+  rw [hmax, lintegral_congr_ae (ae_restrict_of_ae hnorm)]
+  have hV' : IsDPrimeSequence μ V := ⟨hV, fun W hW ↦ by
+    obtain ⟨k, hk⟩ := hU.2 W hW
+    exact ⟨k, (hVU k).trans hk⟩⟩
+  have hVcompact := hcompact.of_isClosed_subset isClosed_closure (closure_mono (hVU 0))
+  have hVbound (k : ℕ) : μ (V k * (V k)⁻¹) < ENNReal.ofReal C * μ (V k) := by
+    rw [measure_congr (hVae k)]
+    exact (measure_mono (Set.mul_subset_mul (hVU k) (Set.inv_subset_inv.mpr (hVU k)))).trans_lt
+      (hbound k)
+  let t := δ * α
+  let a := (1 - δ) * α
+  have ht : 0 ≤ t := mul_nonneg hδ₀.le hα.le
+  have ha : 0 < a := mul_pos (sub_pos.mpr hδ₁) hα
+  have hsum : ENNReal.ofReal t + ENNReal.ofReal a = ENNReal.ofReal α := by
+    rw [← ENNReal.ofReal_add ht ha.le]
+    congr 1
+    dsimp [t, a]
+    ring
+  let A := {x | ENNReal.ofReal t < dSequenceMaximal μ V g x}
+  have hAm : MeasurableSet A :=
+    measurableSet_lt measurable_const (measurable_dSequenceMaximal_of_borel hVm g)
+  let w := A.indicator (fun x ↦ ‖g x‖ₑ)
+  let ν := μ.withDensity w
+  have hpoint : ∀ᵐ x ∂μ, ‖g x‖ₑ ≤ ENNReal.ofReal t + w x := by
+    filter_upwards [ae_dSequenceMaximal_level_of_borel hV' hVm hVcompact hgm ht] with x hx
+    by_cases h : x ∈ A
+    · rw [show w x = ‖g x‖ₑ from indicator_of_mem h _]
+      exact le_add_self
+    · exact (le_of_not_gt fun hlt ↦ h (hx hlt)).trans le_self_add
+  have : IsFiniteMeasureOnCompacts ν := ⟨fun K hK ↦ by
+    rw [withDensity_apply w hK.isClosed.measurableSet]
+    exact (lintegral_mono (indicator_le_self' (fun _ _ ↦ zero_le) (s := A))).trans_lt
+      (hg.integrableOn_isCompact hK).hasFiniteIntegral⟩
+  have hcompare (x : G) :
+      dSequenceMaximal μ V g x ≤ ENNReal.ofReal t + dSequenceMeasureMaximal μ ν V x := by
+    have havg (k : ℕ) : (⨍⁻ y in x • V k, ‖g y‖ₑ ∂μ) ≤
+        ENNReal.ofReal t + ν (x • V k) / μ (V k) := by
+      rw [setLAverage_eq, measure_smul]
+      calc
+        _ ≤ (∫⁻ y in x • V k, ENNReal.ofReal t + w y ∂μ) / μ (V k) :=
+          ENNReal.div_le_div_right (lintegral_mono_ae (ae_restrict_of_ae hpoint)) _
+        _ = _ := by
+          rw [lintegral_add_left measurable_const, setLIntegral_const,
+            ← withDensity_apply w ((hVm k).const_smul x), measure_smul, ENNReal.add_div,
+            ENNReal.mul_div_cancel_right (hV.1 k).2.2.1.ne' (hV.1 k).2.2.2.ne]
+    rw [add_comm, ← tsub_le_iff_right, dSequenceMaximal, ← ENNReal.limsup_sub_const,
+      dSequenceMeasureMaximal]
+    exact limsup_le_limsup (Eventually.of_forall fun k ↦ tsub_le_iff_right.mpr (by
+      simpa only [add_comm] using havg k))
+  have hsub : B ∩ {x | ENNReal.ofReal α < dSequenceMaximal μ V g x} ⊆
+      B ∩ {x | ENNReal.ofReal a < dSequenceMeasureMaximal μ ν V x} := by
+    rintro x ⟨hxB, hx⟩
+    have hlt := hx.trans_le (hcompare x)
+    rw [← hsum] at hlt
+    exact ⟨hxB, (ENNReal.add_lt_add_iff_left ENNReal.ofReal_ne_top).mp hlt⟩
+  have hprod : B * V 0 ⊆ B * U 0 := Set.mul_subset_mul Subset.rfl (hVU 0)
+  have hweak := dSequenceMeasureMaximal_weak (ν := ν) hV hVm hC hVbound hB
+    ((measure_mono hprod).trans_lt hfin) ha
+  refine (measure_mono hsub).trans (hweak.trans (mul_le_mul' le_rfl ?_))
+  refine (measure_mono ((Set.mul_subset_mul inter_subset_left Subset.rfl).trans hprod)).trans_eq ?_
+  rw [withDensity_apply₀ w hBU, lintegral_indicator hAm, Measure.restrict_restrict hAm, inter_comm]
 
 /-- Paper: Theorem A.5.3.6(2), p. 581. The `p`-th moment on `B` of the maximal
 function is bounded by the `p`-th moment of `|f|` on `B * U 0`, with the factor in (A.5.3.10).

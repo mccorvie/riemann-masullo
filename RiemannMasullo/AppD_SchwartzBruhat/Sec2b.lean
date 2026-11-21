@@ -244,7 +244,19 @@ theorem schwartzBruhatIsotypicProjector_apply (ω : PontryaginDual K) (f : S) (x
 recovers the vector. -/
 theorem schwartzBruhatIsotypicProjector_apply_isotype (ω : PontryaginDual K) (f : S)
     (hf : f ∈ actionIsotype ρS ω) :
-    schwartzBruhatIsotypicProjector m hm μ₁ ω f = f := by sorry
+    schwartzBruhatIsotypicProjector m hm μ₁ ω f = f := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  refine Subtype.ext (funext fun x ↦ ?_)
+  change schwartzBruhatIsotypicProjector m hm μ₁ ω f x = f x
+  have hconstant (k : K) : star (ω k : ℂ) * f ((k : G)⁻¹ * x) = f x := by
+    have h := congrArg (fun g : S ↦ g x) ((mem_actionIsotype ρS ω f).mp hf k)
+    change schwartzBruhatTranslationAction (G := G) (k : G) f x = (ω k : ℂ) * f x at h
+    rw [schwartzBruhatTranslationAction_apply (k : G) x f] at h
+    rw [h, ← mul_assoc]
+    simp [← Circle.coe_inv_eq_conj]
+  rw [(schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f x).2,
+    integral_congr_ae (ae_of_all μ₁ hconstant), integral_const]
+  exact inv_smul_smul₀ (measureReal_univ_ne_zero (μ := μ₁)) (f x)
 
 /-- Paper: (D.2.2.1), p. 794. Averaging identifies the Hausdorff quotient
 with the corresponding subspace of homogeneous Schwartz–Bruhat functions. -/

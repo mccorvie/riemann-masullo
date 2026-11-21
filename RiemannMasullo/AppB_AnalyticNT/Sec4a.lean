@@ -5,6 +5,8 @@ public import Mathlib.Analysis.Distribution.TemperedDistribution
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
+import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 
 /-!
 # Complements on Poisson summation and Cauchy integrals
@@ -85,17 +87,126 @@ theorem isPiecewiseSmoothMellinTest_indicator :
     simpa only [deriv_const, norm_zero, one_mul] using
       And.intro (Real.exp_pos (-(N : ℝ) * |x|)) (Real.exp_pos (-(N : ℝ) * |x|))
 
+open MeasureTheory in
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin integral (B.4.1.2) of a test
 function with finitely many jumps converges absolutely for every exponent. -/
 theorem mellinConvergent_of_piecewiseSmoothMellinTest
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) (s : ℂ) :
-    MellinConvergent (fun t ↦ f (Real.log t)) s := by sorry
+    MellinConvergent (fun t ↦ f (Real.log t)) s := by
+  obtain ⟨⟨S, hsmooth, hlimits⟩, hdecay⟩ := hf
+  apply mellinConvergent_of_integrable_logWeight
+  let w (x : ℝ) : ℂ := Real.exp (s.re * x)
+  let g (x : ℝ) := w x * f x
+  change Integrable g
+  have hw : Continuous w := by
+    dsimp [w]
+    fun_prop
+  have hcont : ContinuousOn g (S : Set ℝ)ᶜ :=
+    hw.continuousOn.mul hsmooth.continuousOn
+  have hmeas : Measurable g :=
+    measurable_of_measurable_on_compl_finite _ S.finite_toSet
+      (continuousOn_iff_continuous_domRestrict.mp hcont).measurable
+  -- The weighted profile is locally integrable even at the jumps.
+  have hloc : LocallyIntegrable g := by
+    intro x
+    by_cases hx : x ∈ S
+    · obtain ⟨⟨l, hl⟩, ⟨r, hr⟩⟩ := hlimits 0 x hx
+      simp only [iteratedDeriv_zero] at hl hr
+      rw [← nhdsNE_sup_pure x, ← nhdsLT_sup_nhdsGT x, IntegrableAtFilter.sup_iff,
+        IntegrableAtFilter.sup_iff]
+      have hside {u : Set ℝ} {a : ℂ} (hu : MeasurableSet u)
+          (ha : Tendsto f (𝓝[u] x) (𝓝 a)) : IntegrableAtFilter g (𝓝[u] x) volume := by
+        have := hu.nhdsWithin_isMeasurablyGenerated x
+        exact ((hw.continuousAt.tendsto.mono_left nhdsWithin_le_nhds).mul ha).integrableAtFilter
+          hmeas.aestronglyMeasurable.stronglyMeasurableAtFilter (volume.finiteAt_nhdsWithin x u)
+      exact ⟨⟨hside measurableSet_Iio hl, hside measurableSet_Ioi hr⟩,
+        ⟨{x}, by simp, integrableOn_singleton (hx := measure_singleton_lt_top)⟩⟩
+    · have hx' : (S : Set ℝ)ᶜ ∈ 𝓝 x :=
+        S.finite_toSet.isClosed.isOpen_compl.mem_nhds hx
+      exact ((hcont x hx).continuousAt hx').integrableAtFilter
+        hmeas.aestronglyMeasurable.stronglyMeasurableAtFilter (volume.finiteAt_nhds x)
+  -- Dominate both tails by a constant times exp (-|x|).
+  obtain ⟨N, hN⟩ := exists_nat_gt (|s.re| + 1)
+  obtain ⟨C, hC, T, hT, htail⟩ := hdecay N
+  have hbound (x : ℝ) (hx : T < |x|) : ‖g x‖ ≤ C * Real.exp (-|x|) := by
+    have hprod : s.re * x ≤ |s.re| * |x| := by
+      rw [← abs_mul]
+      exact le_abs_self _
+    have hrate : (|s.re| + 1) * |x| ≤ (N : ℝ) * |x| :=
+      mul_le_mul_of_nonneg_right hN.le (abs_nonneg x)
+    rw [show ‖g x‖ = Real.exp (s.re * x) * ‖f x‖ by
+      simp only [g, w, norm_mul, Complex.norm_of_nonneg (Real.exp_pos _).le]]
+    calc
+      _ ≤ Real.exp (s.re * x) * (C * Real.exp (-(N : ℝ) * |x|)) :=
+        mul_le_mul_of_nonneg_left (htail x hx).1.le (Real.exp_pos _).le
+      _ = C * Real.exp (s.re * x + -(N : ℝ) * |x|) := by rw [Real.exp_add]; ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr (by linarith only [hprod, hrate])) hC.le
+  refine integrable_iff_integrableAtFilter_atBot_atTop.mpr ⟨⟨?_, ?_⟩, hloc⟩
+  · refine ⟨Iio (-T), Iio_mem_atBot _, ?_⟩
+    refine (((integrableOn_exp_Iic (-T)).mono_set Iio_subset_Iic_self).const_mul C).mono'
+      hmeas.aestronglyMeasurable ?_
+    filter_upwards [ae_restrict_mem measurableSet_Iio] with x hx
+    have hx' : x < -T := hx
+    have hneg : x < 0 := hx'.trans (neg_neg_of_pos hT)
+    have hTx : T < -x := by linarith only [hx']
+    simpa only [abs_of_neg hneg, neg_neg] using
+      hbound x (by rwa [abs_of_neg hneg])
+  · refine ⟨Ioi T, Ioi_mem_atTop _, ?_⟩
+    refine ((integrableOn_exp_neg_Ioi T).const_mul C).mono'
+      hmeas.aestronglyMeasurable ?_
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with x hx
+    have hpos : 0 < x := hT.trans hx
+    simpa [abs_of_pos hpos] using hbound x (by simpa [abs_of_pos hpos] using hx)
 
+open MeasureTheory in
+open scoped Asymptotics in
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin transform of a test function
 with finitely many jumps is entire. -/
 theorem differentiable_mellin_of_piecewiseSmoothMellinTest
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) :
-    Differentiable ℂ (logMellin f) := by sorry
+    Differentiable ℂ (logMellin f) := by
+  obtain ⟨⟨S, hsmooth, hlimits⟩, hdecay⟩ := hf
+  have hcont := hsmooth.continuousOn
+  have hmeas : Measurable f :=
+    hcont.measurable_of_countable_compl (by simpa using S.finite_toSet.countable)
+  have hbounded (x : ℝ) : (𝓝 x).IsBoundedUnder (· ≤ ·) (fun y ↦ ‖f y‖) := by
+    by_cases hx : x ∈ S
+    · obtain ⟨⟨l, hl⟩, ⟨r, hr⟩⟩ := hlimits 0 x hx
+      simp only [iteratedDeriv_zero] at hl hr
+      rw [← nhdsNE_sup_pure x, ← nhdsLT_sup_nhdsGT x, IsBoundedUnder, Filter.map_sup, Filter.map_sup]
+      exact isBounded_sup (isBounded_sup hl.norm.isBoundedUnder_le hr.norm.isBoundedUnder_le)
+        ⟨‖f x‖, by simp⟩
+    · have hfx := (hcont x hx).continuousAt (S.finite_toSet.isClosed.isOpen_compl.mem_nhds hx)
+      exact hfx.tendsto.norm.isBoundedUnder_le
+  have hloc : LocallyIntegrableOn (fun t ↦ f (Real.log t)) (Ioi 0) := by
+    intro t ht
+    have ht' : 0 < t := ht
+    have hlog := (Real.continuousAt_log ht'.ne').tendsto
+    exact ((volume.finiteAt_nhds t).integrableAtFilter
+      (hmeas.comp Real.measurable_log).aestronglyMeasurable.stronglyMeasurableAtFilter
+      (hlog.isBoundedUnder_comp (hbounded (Real.log t)))).filter_mono nhdsWithin_le_nhds
+  intro s
+  obtain ⟨N, hN⟩ := exists_nat_gt |s.re|
+  obtain ⟨C, _, T, hT, hbound⟩ := hdecay N
+  have htop : f =O[atTop] (fun x ↦ Real.exp (-(N : ℝ) * x)) := by
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_gt_atTop T] with x hx
+    have hx' := hT.trans hx
+    simpa only [abs_of_pos hx', Real.norm_of_nonneg (Real.exp_pos _).le]
+      using (hbound x (by simpa only [abs_of_pos hx'] using hx)).1.le
+  have hbot : f =O[atBot] (fun x ↦ Real.exp ((N : ℝ) * x)) := by
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_lt_atBot (-T)] with x hx
+    have hx' : x < 0 := hx.trans (neg_lt_zero.mpr hT)
+    have hTx : T < |x| := by rw [abs_of_neg hx']; linarith
+    simpa only [abs_of_neg hx', neg_mul_neg, Real.norm_of_nonneg (Real.exp_pos _).le]
+      using (hbound x hTx).1.le
+  exact mellin_differentiableAt_of_isBigO_rpow hloc
+    (isBigO_comp_log_rpow_of_isBigO_exp htop Real.tendsto_log_atTop (eventually_gt_atTop 0))
+    ((le_abs_self _).trans_lt hN)
+    (isBigO_comp_log_rpow_of_isBigO_exp (by simpa only [neg_neg] using hbot)
+      Real.tendsto_log_nhdsGT_zero self_mem_nhdsWithin)
+    (neg_lt.mp ((neg_le_abs _).trans_lt hN))
 
 -- TODO(paper-gap): (B.4.1.4)–(B.4.1.5) have the wrong sign for the jump
 -- defined as the right limit minus the left limit at one.
