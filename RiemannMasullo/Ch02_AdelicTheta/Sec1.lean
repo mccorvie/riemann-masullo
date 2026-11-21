@@ -1879,11 +1879,6 @@ theorem mem_finitePlaceSchwartz_iff (w : Places(F)) (f : w.adicCompletion F → 
 -- does not characterize the finest locally convex topology. The weak topology
 -- also makes all those functionals continuous.
 
-/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
-complex dimension. -/
-theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
-    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by sorry
-
 /-- Paper: §2.1.2.2, p. 63. Each elementary Schwartz stage of the additive finite completion
 is finite-dimensional because its structural quotient is compact and discrete. -/
 private theorem finitePlace_bruhatStage_finiteDimensional (w : Places(F))
@@ -2009,6 +2004,15 @@ private theorem finitePlaceSchwartz_countableSpanningSet (w : Places(F)) :
   rw [← hsum]
   exact Submodule.sum_mem _ fun a _ ↦ Submodule.smul_mem _ _
     (Submodule.subset_span (mem_range_self (U a)))
+
+/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
+complex dimension. -/
+theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
+    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by
+  change Module.rank ℂ ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F))) ≤ ℵ₀
+  obtain ⟨s, hs, hspan⟩ := finitePlaceSchwartz_countableSpanningSet F w
+  rw [← rank_top ℂ _, ← hspan]
+  exact (rank_span_le s).trans (Cardinal.mk_le_aleph0_iff.mpr hs.to_subtype)
 
 /-- Finite spans of a countable generating set give a strict LF presentation
 for the finest locally convex topology. -/
