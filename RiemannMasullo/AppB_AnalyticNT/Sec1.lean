@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 
+import RiemannMasullo.ForMathlib.Analysis.Complex.Hadamard
+
 /-!
 # Convexity bounds for finite Hecke L-functions
 
@@ -13,7 +15,7 @@ lines and are uniform in the real part when stated on a strip.
 @[expose] public noncomputable section
 
 open Filter Function NumberField Set
-open scoped Asymptotics ENNReal NNReal
+open scoped Asymptotics ENNReal NNReal Topology
 
 namespace RiemannMasullo
 
@@ -88,10 +90,165 @@ theorem verticalGrowthOrder_ne_top {σ : ℝ} (hσ : a < σ) :
 -- TODO(paper-gap): The proof's equality `μ_g = μ + N` fails for `f(s) = 1/s`
 -- on `Re(s) > -1`. Clearing its one pole gives `g(s) = 1`, and both orders are zero.
 
+omit hf hFinite hSimple hGrowth in
+/-- Simple poles can be removed by factors tending to one at large absolute height.
+The resulting holomorphic function has the same asymptotic size on the half-plane. -/
+private theorem exists_analyticOnNhd_isTheta_atHeight {f : ℂ → ℂ} {a : ℝ}
+    (hf : MeromorphicNFOn f (Complex.re ⁻¹' Ioi a))
+    (hFinite : {s : ℂ | a < s.re ∧ meromorphicOrderAt f s < 0}.Finite)
+    (hSimple : ∀ s : ℂ, a < s.re → meromorphicOrderAt f s < 0 → meromorphicOrderAt f s = -1) :
+    ∃ g : ℂ → ℂ, AnalyticOnNhd ℂ g (Complex.re ⁻¹' Ioi a) ∧
+      g =Θ[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioi a)] f := by
+  classical
+  let poles := hFinite.toFinset
+  let factor (p z : ℂ) := (z - p) / (z - (a : ℂ))
+  let multiplier : ℂ → ℂ := ∏ p ∈ poles, factor p
+  let product : ℂ → ℂ := multiplier * f
+  let U := Complex.re ⁻¹' Ioi a
+  have hDen (z : ℂ) (hz : z ∈ U) : z - (a : ℂ) ≠ 0 := by
+    apply sub_ne_zero.mpr
+    intro h
+    have hz' : a < z.re := hz
+    simp [h] at hz'
+  have hFactor (p : ℂ) {z : ℂ} (hz : z ∈ U) : AnalyticAt ℂ (factor p) z :=
+    (show AnalyticAt ℂ (fun w : ℂ ↦ w - p) z by fun_prop).div (by fun_prop) (hDen z hz)
+  have hMultiplier : AnalyticOnNhd ℂ multiplier U := fun z hz ↦
+    Finset.analyticAt_prod _ (fun p _ ↦ hFactor p hz)
+  have hProduct : MeromorphicOn product U := fun z hz ↦
+    (hMultiplier z hz).meromorphicAt.mul (hf hz).meromorphicAt
+  have hOrder (z : ℂ) (hz : z ∈ U) : 0 ≤ meromorphicOrderAt product z := by
+    rw [meromorphicOrderAt_mul (hMultiplier z hz).meromorphicAt (hf hz).meromorphicAt]
+    by_cases hp : meromorphicOrderAt f z < 0
+    · have hmem : z ∈ poles := hFinite.mem_toFinset.mpr ⟨hz, hp⟩
+      have hsum : 1 ≤ meromorphicOrderAt multiplier z := by
+        change 1 ≤ meromorphicOrderAt (∏ p ∈ poles, factor p) z
+        rw [meromorphicOrderAt_prod (fun p _ ↦ (hFactor p hz).meromorphicAt)]
+        have hself : meromorphicOrderAt (factor z) z = 1 := by
+          have hinv : AnalyticAt ℂ (fun w : ℂ ↦ (w - (a : ℂ))⁻¹) z :=
+            (show AnalyticAt ℂ (fun w : ℂ ↦ w - (a : ℂ)) z by fun_prop).inv (hDen z hz)
+          have h := meromorphicOrderAt_mul_of_ne_zero (f := fun w ↦ w - z)
+            hinv (inv_ne_zero (hDen z hz))
+          simpa only [Pi.mul_def, ← div_eq_inv_mul, factor, meromorphicOrderAt_id_sub_const] using h
+        rw [← hself]
+        exact Finset.single_le_sum (fun p _ ↦ (hFactor p hz).meromorphicOrderAt_nonneg) hmem
+      rw [hSimple z hz hp]
+      exact (by decide : (0 : WithTop ℤ) ≤ 1 + (-1)).trans (add_le_add_left hsum _)
+    · exact add_nonneg (hMultiplier z hz).meromorphicOrderAt_nonneg (le_of_not_gt hp)
+  let g := toMeromorphicNFOn product U
+  have hg : AnalyticOnNhd ℂ g U := by
+    intro z hz
+    exact ((meromorphicNFOn_toMeromorphicNFOn product U) hz).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      (by simpa only [g, meromorphicOrderAt_toMeromorphicNFOn hProduct hz] using hOrder z hz)
+  have hHeight : Tendsto (fun z : ℂ ↦ |z.im|) atHeight atTop := tendsto_comap
+  have hNorm : Tendsto (fun z : ℂ ↦ ‖z - (a : ℂ)‖) atHeight atTop :=
+    tendsto_atTop_mono (fun z ↦ by simpa using Complex.abs_im_le_norm (z - (a : ℂ))) hHeight
+  have hFactorLimit (p : ℂ) : Tendsto (factor p) atHeight (𝓝 1) := by
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    have hLimit : Tendsto (fun z : ℂ ↦ ‖(a : ℂ) - p‖ * ‖z - (a : ℂ)‖⁻¹)
+        atHeight (𝓝 0) := by
+      simpa using (tendsto_inv_atTop_zero.comp hNorm).const_mul ‖(a : ℂ) - p‖
+    refine hLimit.congr' ?_
+    filter_upwards [hNorm.eventually_gt_atTop 0] with z hz
+    have hd := norm_pos_iff.mp hz
+    have hEq : factor p z - 1 = ((a : ℂ) - p) / (z - (a : ℂ)) := by
+      dsimp [factor]
+      field_simp
+      ring
+    rw [hEq, norm_div, div_eq_mul_inv]
+  have hLimit : Tendsto multiplier atHeight (𝓝 1) := by
+    have h := tendsto_finsetProd poles (a := fun _ ↦ (1 : ℂ)) (fun p _ ↦ hFactorLimit p)
+    rw [Finset.prod_const_one] at h
+    exact h.congr (fun z ↦ (Finset.prod_apply z poles factor).symm)
+  let heightInU := atHeight ⊓ 𝓟 U
+  have hEq : g =ᶠ[heightInU] product := by
+    have hAvoid : ∀ᶠ z in atHeight, z ∉ poles := by
+      have hAvoidEach : ∀ᶠ z in atHeight, ∀ p ∈ poles, z ≠ p := by
+        apply (Filter.eventually_all_finset poles).2
+        intro p _
+        filter_upwards [hHeight.eventually_gt_atTop |p.im|] with z hz
+        rintro rfl
+        exact (lt_irrefl _ hz)
+      exact hAvoidEach.mono fun z hz hp ↦ hz z hp rfl
+    change ∀ᶠ z in atHeight ⊓ 𝓟 U, g z = product z
+    rw [eventually_inf_principal]
+    filter_upwards [hAvoid] with z hz hzU
+    have hzNonneg : 0 ≤ meromorphicOrderAt f z :=
+      le_of_not_gt (fun hp ↦ hz (hFinite.mem_toFinset.mpr ⟨hzU, hp⟩))
+    have hprod : AnalyticAt ℂ product z :=
+      (hMultiplier z hzU).mul ((hf hzU).meromorphicOrderAt_nonneg_iff_analyticAt.mp hzNonneg)
+    dsimp only [g]
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hProduct hzU,
+      toMeromorphicNFAt_eq_self.mpr hprod.meromorphicNFAt]
+  have hT : multiplier =Θ[atHeight] (fun _ ↦ (1 : ℂ)) := by
+    refine ⟨Asymptotics.isBigO_const_of_tendsto hLimit one_ne_zero, ?_⟩
+    refine Asymptotics.IsBigO.of_bound 2 ?_
+    have hclose := (tendsto_iff_norm_sub_tendsto_zero.mp hLimit).eventually_lt_const
+      (show (0 : ℝ) < 1 / 2 by norm_num)
+    filter_upwards [hclose] with z hz
+    have H := norm_sub_norm_le (1 : ℂ) (multiplier z)
+    rw [norm_sub_rev, norm_one] at H
+    rw [norm_one]
+    linarith
+  refine ⟨g, hg, hEq.isTheta.trans ?_⟩
+  have hh := (hT.mono (show heightInU ≤ atHeight from inf_le_left)).mul
+    (Asymptotics.isTheta_refl f heightInU)
+  exact hh.trans_eventuallyEq (Eventually.of_forall fun z ↦ one_mul (f z))
+
 /-- Paper: Lemma B.1.1.1, p. 589. The finite growth order is convex as a function
 of the real part in the open half-plane. -/
 theorem convexOn_verticalGrowthOrder :
-    ConvexOn ℝ (Ioi a) (fun σ ↦ (verticalGrowthOrder f σ).toReal) := by sorry
+    ConvexOn ℝ (Ioi a) (fun σ ↦ (verticalGrowthOrder f σ).toReal) := by
+  obtain ⟨g, hg, hgf⟩ := exists_analyticOnNhd_isTheta_atHeight hf hFinite hSimple
+  obtain ⟨K, hK, hGrowth⟩ := hGrowth
+  have line_le_halfPlane {x : ℝ} (hx : a < x) :
+      atHeight ⊓ 𝓟 (Complex.re ⁻¹' {x}) ≤ atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioi a) :=
+    inf_le_inf_left _ (Filter.principal_mono.mpr (preimage_mono (singleton_subset_iff.mpr hx)))
+  have approx {x ε : ℝ} (hx : a < x) (hε : 0 < ε) :
+      ∃ k : ℝ≥0, (k : ℝ) < (verticalGrowthOrder f x).toReal + ε ∧
+        f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {x})] fun z ↦ |z.im| ^ (k : ℝ) := by
+    let k : ℝ≥0 := ⟨K, hK.le⟩
+    have hKBound : verticalGrowthOrder f x ≤ (k : ℝ≥0∞) :=
+      sInf_le ⟨k, hGrowth.mono (line_le_halfPlane hx), rfl⟩
+    have htop : verticalGrowthOrder f x ≠ ⊤ :=
+      ne_top_of_le_ne_top ENNReal.coe_ne_top hKBound
+    have hlt : verticalGrowthOrder f x < ENNReal.ofReal ((verticalGrowthOrder f x).toReal + ε) :=
+      (ENNReal.lt_ofReal_iff_toReal_lt htop).mpr (lt_add_of_pos_right _ hε)
+    unfold verticalGrowthOrder at hlt
+    obtain ⟨_, ⟨k, hk, rfl⟩, hlt⟩ := sInf_lt_iff.mp hlt
+    exact ⟨k, ENNReal.coe_lt_ofReal.mp hlt, hk⟩
+  refine convexOn_iff_pairwise_pos.mpr ⟨convex_Ioi _, ?_⟩
+  intro x hx y hy hne p q hp hq hpq
+  change (verticalGrowthOrder f (p * x + q * y)).toReal ≤
+    p * (verticalGrowthOrder f x).toReal + q * (verticalGrowthOrder f y).toReal
+  wlog hxy : x < y generalizing x y p q
+  · simpa only [add_comm] using this hy hx hne.symm hq hp (by rwa [add_comm])
+      (lt_of_le_of_ne (le_of_not_gt hxy) hne.symm)
+  have strip_sub : Complex.re ⁻¹' Icc x y ⊆ Complex.re ⁻¹' Ioi a :=
+    fun _ hz ↦ hx.trans_le hz.1
+  have hStrip := inf_le_inf_left atHeight (Filter.principal_mono.mpr strip_sub)
+  have hInt : a < p * x + q * y := by
+    have hx' : a < x := hx
+    have hprod : 0 < q * (y - x) := mul_pos hq (sub_pos.mpr hxy)
+    nlinarith [congrArg (fun t : ℝ ↦ t * x) hpq]
+  apply le_of_forall_pos_le_add
+  intro ε hε
+  obtain ⟨k₀, hk₀, h₀⟩ := approx hx hε
+  obtain ⟨k₁, hk₁, h₁⟩ := approx hy hε
+  have hInterp := isBigO_rpow_verticalStrip_interpolate hxy hK.le k₀.coe_nonneg k₁.coe_nonneg
+    hp.le hq.le hpq (hg.differentiableOn.mono strip_sub)
+    ((hgf.mono hStrip).trans_isBigO (hGrowth.mono hStrip))
+    ((hgf.mono (line_le_halfPlane hx)).trans_isBigO h₀)
+    ((hgf.mono (line_le_halfPlane hy)).trans_isBigO h₁)
+  have hBound := (hgf.symm.mono (line_le_halfPlane hInt)).trans_isBigO hInterp
+  let k : ℝ≥0 := ⟨p * (k₀ : ℝ) + q * (k₁ : ℝ), by positivity⟩
+  have hOrder : verticalGrowthOrder f (p * x + q * y) ≤ (k : ℝ≥0∞) :=
+    sInf_le ⟨k, hBound, rfl⟩
+  calc
+    _ ≤ (k : ℝ) := ENNReal.toReal_mono ENNReal.coe_ne_top hOrder
+    _ ≤ p * (verticalGrowthOrder f x).toReal + q * (verticalGrowthOrder f y).toReal + ε := by
+      change p * (k₀ : ℝ) + q * (k₁ : ℝ) ≤ _
+      nlinarith [mul_le_mul_of_nonneg_left hk₀.le hp.le, mul_le_mul_of_nonneg_left hk₁.le hq.le,
+        congrArg (fun t : ℝ ↦ t * ε) hpq]
 
 /-- Paper: Lemma B.1.1.1, p. 589. The finite growth order is continuous in the
 open half-plane. -/
