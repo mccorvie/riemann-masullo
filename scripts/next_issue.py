@@ -9,6 +9,8 @@ Proof issues are handed out bottom-up: from the library file that sits lowest in
 graph and still has a free issue, so that a section's statements are proved before work moves
 to what is built on them. At most PER_FILE proofs are in flight in one file at a time, so that
 agents running side by side rarely collide; when the lowest file is full the next one is used.
+The limit counts this checkout's own agents (and open launcher pull requests), not issues that
+outside contributors have claimed.
 Issues labelled `claimed`, `blocked` or `stuck` are not free. While the file `.agent/PAUSE` exists
 no issue is handed out.
 """
@@ -16,6 +18,7 @@ import collections, functools, json, pathlib, re, subprocess, sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PER_FILE = 3
+WORKTREES = ROOT.parent / (ROOT.name + "-wt")     # where scripts/agent.sh puts its worktrees
 MARK = re.compile(r"<!-- sorry: ([^:\s]+)::")
 IMPORT = re.compile(r"^(?:public )?import (RiemannMasullo\.[A-Za-z0-9_.]+)", re.M)
 
@@ -75,7 +78,12 @@ def main(argv):
         m = MARK.search(issue["body"] or "")
         file = m.group(1) if m else "-"
         if "claimed" in issue["labels"] or issue["number"] in taken_already:
-            busy[file] += 1
+            # Taken, so not free. Only this checkout's own agents count toward the limit per
+            # file: a file whose issues are claimed by outside contributors is not full for us,
+            # or the lowest files would wait on whoever claimed three issues there.
+            if issue["number"] in taken_already or any(
+                    (WORKTREES / f"{role}-{issue['number']}").exists() for role in ("prover", "digester")):
+                busy[file] += 1
         elif not {"blocked", "stuck"} & set(issue["labels"]):
             free.append((file, issue["number"]))
     if label != "proof":

@@ -2121,7 +2121,22 @@ theorem hilbertTrace_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
 /-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace is the
 nuclear trace from Proposition C.3.2.1 on the same endomorphism. -/
 theorem hilbertTrace_eq_nuclearTrace (T : nuclearEndomorphisms H) :
-    hilbertTrace T = nuclearTrace hilbert_approximationProperty T.val T.property := by sorry
+    hilbertTrace T = nuclearTrace hilbert_approximationProperty T.val T.property := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation T.val).mp T.property
+  obtain ⟨C, hC₀, hC⟩ :=
+    ((NormedSpace.equicontinuous_tfae r.functional).out 1 7).mp r.equicontinuous
+  obtain ⟨D, hD⟩ :=
+    ((NormedSpace.isVonNBounded_iff ℂ).mp r.isBanachDisc.bounded).exists_norm_le
+  have hcost : Summable (fun n ↦ ‖r.coeff n‖ * (‖r.functional n‖ * ‖(r.vector n : H)‖)) := by
+    refine (r.summable_coeff.mul_right (C * D)).of_nonneg_of_le (fun n ↦ by positivity) ?_
+    intro n
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hC n) (hD _ (r.vector_mem n)) (norm_nonneg _) hC₀) (norm_nonneg _)
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have htrace := ((exists_nuclearTrace_hasSum hilbert_approximationProperty
+    T.val T.property).exists.choose_spec r).2
+  exact (tsum_hilbertDiagonal_eq_series b T.val r.coeff r.functional
+    (fun n ↦ (r.vector n : H)) hcost r.hasSum).trans htrace.tsum_eq
 
 /-- Paper: Definition C.3.4.2(2), p. 697. The trace norm of a nuclear operator
 sums the real diagonal entries of the positive square root of its adjoint
@@ -2790,10 +2805,140 @@ countable trace-norm dense set of nuclear endomorphisms.
 Deviation: Density is expressed by approximation in every positive trace-norm radius. -/
 theorem exists_countable_traceNorm_dense [SeparableSpace H] :
     ∃ S : Set (nuclearEndomorphisms H), S.Countable ∧
-      ∀ (T : nuclearEndomorphisms H) (ε : ℝ), 0 < ε → ∃ A ∈ S, traceNorm (T - A) < ε := by sorry
+      ∀ (T : nuclearEndomorphisms H) (ε : ℝ), 0 < ε → ∃ A ∈ S, traceNorm (T - A) < ε := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  let : NormedAddCommGroup (nuclearEndomorphisms H) :=
+    NormedAddCommGroup.ofCore (traceNorm_normedSpaceCore (H := H))
+  let : SeminormedAddCommGroup (nuclearEndomorphisms H) :=
+    (inferInstance : NormedAddCommGroup (nuclearEndomorphisms H)).toSeminormedAddCommGroup
+  let : MetricSpace (nuclearEndomorphisms H) := NormedAddCommGroup.toMetricSpace
+  let : PseudoMetricSpace (nuclearEndomorphisms H) := MetricSpace.toPseudoMetricSpace
+  let : UniformSpace (nuclearEndomorphisms H) := PseudoMetricSpace.toUniformSpace
+  let : TopologicalSpace (nuclearEndomorphisms H) := UniformSpace.toTopologicalSpace
+  let : NormedSpace ℂ (nuclearEndomorphisms H) :=
+    NormedSpace.ofCore (traceNorm_normedSpaceCore (H := H))
+  let : SeparableSpace (StrongDual ℂ H) :=
+    (InnerProductSpace.toDual ℂ H).surjective.denseRange.separableSpace
+      (InnerProductSpace.toDual ℂ H).isometry.continuous
+  have hdist (T A : nuclearEndomorphisms H) : dist T A = traceNorm (T - A) := by
+    rw [dist_eq_norm]
+    rfl
+  let f : StrongDual ℂ H × H → nuclearEndomorphisms H := fun p =>
+    ⟨p.1.smulRight p.2, smulRight_mem_nuclearEndomorphisms p.1 p.2⟩
+  have hf : Continuous f := by
+    apply IsBoundedBilinearMap.continuous (𝕜 := ℂ)
+    refine ⟨?_, ?_, ?_, ?_, ?_⟩
+    · intro x y z
+      ext t
+      simp [f, add_smul]
+    · intro c x y
+      ext t
+      simp [f, mul_smul]
+    · intro x y z
+      ext t
+      simp [f, smul_add]
+    · intro c x y
+      ext t
+      simp only [f, Submodule.coe_smul, smul_apply, ContinuousLinearMap.smulRight_apply]
+      exact smul_comm _ _ _
+    · refine ⟨1, zero_lt_one, ?_⟩
+      intro x y
+      change traceNorm ⟨x.smulRight y, smulRight_mem_nuclearEndomorphisms x y⟩ ≤ 1 * ‖x‖ * ‖y‖
+      simpa using (traceNorm_smulRight x y).le
+  let V := Submodule.span ℂ (range f)
+  have hV : IsSeparable (V : Set (nuclearEndomorphisms H)) := (isSeparable_range hf).span
+  have hmem (z : StrongDual ℂ H ⊗[ℂ] H) :
+      (⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩ :
+        nuclearEndomorphisms H) ∈ V := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      apply Submodule.subset_span
+      refine ⟨(x, y), ?_⟩
+      ext t
+      simp [f, tensorToFiniteRank_tmul]
+    | add x y hx hy =>
+      convert V.add_mem hx hy using 1 <;> ext t <;> simp
+  have hd : Dense (V : Set (nuclearEndomorphisms H)) := by
+    rw [dense_iff_closure_eq]
+    apply Set.eq_univ_of_forall
+    intro T
+    apply Metric.mem_closure_iff.mpr
+    intro ε hε
+    obtain ⟨z, hz⟩ := exists_tensorToFiniteRank_traceNorm_sub_lt T hε
+    refine ⟨⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩, hmem z, ?_⟩
+    rw [hdist]
+    exact hz
+  obtain ⟨S, hS, hSc⟩ := hV
+  refine ⟨S, hS, ?_⟩
+  intro T ε hε
+  have hT : T ∈ closure S := closure_minimal hSc isClosed_closure (hd T)
+  obtain ⟨A, hAS, hA⟩ := Metric.mem_closure_iff.mp hT ε hε
+  rw [hdist] at hA
+  exact ⟨A, hAS, hA⟩
 
 -- TODO(paper-gap): The proof on p. 699 sums distinct eigenvalues to compute the
 -- trace norm. Multiplicities are required, as shown by the identity on ℂ².
+-- The argument below uses a rank-one expansion instead.
+
+/-- The trace norm is nonnegative. -/
+private theorem traceNorm_nonneg (T : nuclearEndomorphisms H) : 0 ≤ traceNorm T := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  simpa using (traceNorm_normedSpaceCore (H := H)).norm_nonneg T
+
+/-- The trace norm of zero is zero. -/
+private theorem traceNorm_zero : traceNorm (0 : nuclearEndomorphisms H) = 0 := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  simpa using ((traceNorm_normedSpaceCore (H := H)).norm_eq_zero_iff
+    (0 : nuclearEndomorphisms H)).mpr rfl
+
+/-- The trace norm satisfies the triangle inequality. -/
+private theorem traceNorm_add_le (T D : nuclearEndomorphisms H) :
+    traceNorm (T + D) ≤ traceNorm T + traceNorm D := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  simpa using (traceNorm_normedSpaceCore (H := H)).norm_triangle T D
+
+/-- The trace norm of a finite sum is at most the sum of the trace norms. -/
+private theorem traceNorm_sum_le {α : Type*} (s : Finset α) (T : α → nuclearEndomorphisms H) :
+    traceNorm (∑ i ∈ s, T i) ≤ ∑ i ∈ s, traceNorm (T i) := by
+  classical
+  induction s using Finset.induction with
+  | empty => simp [traceNorm_zero]
+  | insert a s ha ih =>
+    rw [Finset.sum_insert ha, Finset.sum_insert ha]
+    exact (traceNorm_add_le _ _).trans (add_le_add le_rfl ih)
+
+omit [CompleteSpace H] in
+/-- A finite-rank endomorphism is a finite sum of rank-one maps. -/
+private theorem exists_eq_sum_smulRight_of_finiteDimensional_range
+    (F : H →L[ℂ] H) (hF : FiniteDimensional ℂ F.toLinearMap.range) :
+    ∃ (n : ℕ) (φ : Fin n → H →L[ℂ] ℂ) (y : Fin n → H),
+      F = ∑ i, (φ i).smulRight (y i) := by
+  let V := F.toLinearMap.range
+  have : FiniteDimensional ℂ V := hF
+  let b := Module.finBasis ℂ V
+  let φ (i : Fin (Module.finrank ℂ V)) : H →L[ℂ] ℂ :=
+    (b.coord i).toContinuousLinearMap.comp
+      (F.codRestrict V fun x ↦ LinearMap.mem_range_self F.toLinearMap x)
+  let y (i : Fin (Module.finrank ℂ V)) : H := b i
+  refine ⟨Module.finrank ℂ V, φ, y, ?_⟩
+  ext x
+  let Fx : V := F.codRestrict V (fun z ↦ LinearMap.mem_range_self F.toLinearMap z) x
+  have hsum : ((∑ i, b.repr Fx i • b i : V) : H) = Fx :=
+    congrArg Subtype.val (b.sum_repr Fx)
+  simp only [Submodule.coe_sum, Submodule.coe_smul] at hsum
+  have hFx : (Fx : H) = F x := by
+    simp [Fx]
+  calc
+    F x = ∑ i, b.repr Fx i • (b i : H) := by rw [← hFx, ← hsum]
+    _ = ∑ i, φ i x • y i := by
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      have hcoord : φ i x = b.repr Fx i := by
+        simp only [φ, Fx, LinearMap.coe_toContinuousLinearMap',
+          ContinuousLinearMap.comp_apply]
+        rfl
+      simp [hcoord, y]
+    _ = (∑ i, (φ i).smulRight (y i)) x := by
+      simp [ContinuousLinearMap.smulRight_apply, sum_apply]
 
 /-- Paper: Lemma C.3.4.4(5), p. 698. The products of a strongly null net and
 a fixed finite-rank right factor are nuclear and tend to zero in trace norm.
@@ -2802,7 +2947,40 @@ theorem tendsto_traceNorm_mul_finiteRank {ι : Type*} [Preorder ι] [IsDirectedO
     [Nonempty ι] (P : ι → H →L[ℂ] H) (hP : ∀ x, Tendsto (fun i ↦ P i x) atTop (𝓝 0))
     (F : H →L[ℂ] H) (hF : FiniteDimensional ℂ F.toLinearMap.range) :
     ∃ hm : ∀ i, P i * F ∈ nuclearEndomorphisms H,
-      Tendsto (fun i ↦ traceNorm ⟨P i * F, hm i⟩) atTop (𝓝 0) := by sorry
+      Tendsto (fun i ↦ traceNorm ⟨P i * F, hm i⟩) atTop (𝓝 0) := by
+  obtain ⟨n, φ, y, hFeq⟩ := exists_eq_sum_smulRight_of_finiteDimensional_range F hF
+  have hmem (i : ι) (k : Fin n) :
+      (φ k).smulRight (P i (y k)) ∈ nuclearEndomorphisms H :=
+    smulRight_mem_nuclearEndomorphisms (φ k) (P i (y k))
+  let S (i : ι) : nuclearEndomorphisms H :=
+    ∑ k, ⟨(φ k).smulRight (P i (y k)), hmem i k⟩
+  have hS (i : ι) : (S i).val = P i * F := by
+    rw [hFeq, ContinuousLinearMap.mul_def]
+    ext x
+    simp only [S, Submodule.coe_sum, sum_apply, ContinuousLinearMap.smulRight_apply,
+      ContinuousLinearMap.comp_apply, map_sum, map_smul]
+  have hm (i : ι) : P i * F ∈ nuclearEndomorphisms H := by
+    rw [← hS i]
+    exact (S i).property
+  have heq (i : ι) : (⟨P i * F, hm i⟩ : nuclearEndomorphisms H) = S i :=
+    Subtype.ext (hS i).symm
+  refine ⟨hm, ?_⟩
+  -- Each rank-one cost is a constant times a strongly null orbit, so the sum tends to zero.
+  have hle (i : ι) : traceNorm ⟨P i * F, hm i⟩ ≤ ∑ k, ‖φ k‖ * ‖P i (y k)‖ := by
+    rw [heq i]
+    refine (traceNorm_sum_le _ _).trans ?_
+    refine Finset.sum_le_sum fun k _ ↦ ?_
+    rw [traceNorm_smulRight]
+  have hlim : Tendsto (fun i ↦ ∑ k, ‖φ k‖ * ‖P i (y k)‖) atTop (𝓝 0) := by
+    have hterm (k : Fin n) : Tendsto (fun i ↦ ‖φ k‖ * ‖P i (y k)‖) atTop (𝓝 0) := by
+      have hy : Tendsto (fun i ↦ ‖P i (y k)‖) atTop (𝓝 ‖(0 : H)‖) := by
+        refine Tendsto.congr ?_ ((continuous_norm.tendsto (0 : H)).comp (hP (y k)))
+        intro i
+        rfl
+      simp only [norm_zero] at hy
+      simpa using Tendsto.const_mul (‖φ k‖) hy
+    simpa using tendsto_finsetSum (Finset.univ : Finset (Fin n)) (fun k _ ↦ hterm k)
+  exact squeeze_zero (fun i ↦ traceNorm_nonneg _) hle hlim
 
 end HilbertOperators
 

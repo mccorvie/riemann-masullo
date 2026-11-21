@@ -3590,7 +3590,45 @@ variable (E F : Type*) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
 /-- Paper: §C.2.3.2, p. 679. The identity from the projective to the injective
 tensor product is continuous. -/
 theorem continuous_projectiveTensor_to_injectiveTensor :
-    @Continuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id := by sorry
+    @Continuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id := by
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have hinj := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  have hproj := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+      ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+  refine hinj.continuous_of_continuous_comp
+    (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F) fun UV ↦ ?_
+  have key : ContinuousAt (fun v : E × F ↦ injectiveTensorSeminorm UV.1 UV.2 (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+    have h0 : injectiveTensorSeminorm UV.1 UV.2 ((0 : E × F).1 ⊗ₜ[ℂ] (0 : E × F).2) = 0 := by
+      simp
+    rw [ContinuousAt, h0]
+    refine tendsto_order.2 ⟨fun a ha ↦ Eventually.of_forall fun v ↦ ha.trans_le (apply_nonneg _ _), fun a ha ↦ ?_⟩
+    let c : ℂ := ((2 / a : ℝ) : ℂ)
+    have hA : {x : E | c • x ∈ UV.1.val} ∈ 𝓝 (0 : E) :=
+      (continuous_const_smul c).continuousAt.preimage_mem_nhds (by simpa using UV.1.property)
+    rw [nhds_prod_eq]
+    refine Filter.mem_of_superset (Filter.prod_mem_prod hA UV.2.property) ?_
+    rintro ⟨x, y⟩ ⟨hx, hy⟩
+    show injectiveTensorSeminorm UV.1 UV.2 (x ⊗ₜ[ℂ] y) < a
+    have hle : injectiveTensorSeminorm UV.1 UV.2 (x ⊗ₜ[ℂ] y) ≤ a / 2 := by
+      refine (injectiveTensorSeminorm_le_iff UV.1 UV.2 _ _).2 fun φ hφ ψ hψ ↦ ?_
+      have h1 : ‖φ (c • x)‖ ≤ 1 := (StrongDual.mem_polar_iff ℂ _).1 hφ _ hx
+      have h2 : ‖ψ y‖ ≤ 1 := (StrongDual.mem_polar_iff ℂ _).1 hψ _ hy
+      have hc : ‖c‖ = 2 / a := by simp [c, abs_of_pos ha]
+      rw [tensorDualForm_tmul, norm_mul]
+      rw [map_smul, smul_eq_mul, norm_mul, hc] at h1
+      have : ‖φ x‖ ≤ a / 2 := by
+        have : 2 / a * ‖φ x‖ ≤ 1 := h1
+        rw [div_mul_eq_mul_div, div_le_iff₀ ha] at this
+        linarith
+      calc ‖φ x‖ * ‖ψ y‖ ≤ a / 2 * 1 := mul_le_mul this h2 (norm_nonneg _) (by positivity)
+        _ = a / 2 := mul_one _
+    linarith
+  exact hproj.continuous_seminorm ⟨injectiveTensorSeminorm UV.1 UV.2, key⟩
+
 
 -- TODO(later): needs §C.2.4 for equality when either factor is nuclear.
 
@@ -3891,7 +3929,30 @@ exactly when its associated bilinear map is continuous in each argument. -/
 theorem continuous_inductiveTensor_iff {G : Type*} [AddCommGroup G] [Module ℂ G]
     [TopologicalSpace G] [PolynormableSpace ℂ G] [T2Space G] (T : InductiveTensor E F →ₗ[ℂ] G) :
     Continuous T ↔ (∀ x : E, Continuous (fun y : F ↦ T (x ⊗ₜ[ℂ] y))) ∧
-      (∀ y : F, Continuous (fun x : E ↦ T (x ⊗ₜ[ℂ] y))) := by sorry
+      (∀ y : F, Continuous (fun x : E ↦ T (x ⊗ₜ[ℂ] y))) := by
+  have hsp := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+      (∀ x : E, Continuous (fun y : F ↦ p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : F, Continuous (fun x : E ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  constructor
+  · intro hT
+    constructor
+    · intro x
+      have : @Continuous F (InductiveTensor E F) _ _ (fun y : F ↦ x ⊗ₜ[ℂ] y) :=
+        hsp.continuous_of_continuous_comp (TensorProduct.mk ℂ E F x) fun p ↦ p.2.1 x
+      exact hT.comp this
+    · intro y
+      have : @Continuous E (InductiveTensor E F) _ _ (fun x : E ↦ x ⊗ₜ[ℂ] y) :=
+        hsp.continuous_of_continuous_comp ((TensorProduct.mk ℂ E F).flip y) fun p ↦ p.2.2 y
+      exact hT.comp this
+  · rintro ⟨h1, h2⟩
+    refine (PolynormableSpace.withSeminorms ℂ G).continuous_of_continuous_comp T fun q ↦ ?_
+    have hq : Continuous (fun x : InductiveTensor E F ↦ (q.1.comp T) x) :=
+      hsp.continuous_seminorm ⟨q.1.comp T, fun x ↦ (q.2.comp (h1 x)), fun y ↦ (q.2.comp (h2 y))⟩
+    exact hq
+
 
 omit [T2Space E] [T2Space F] in
 /-- A seminorm on the tensor product whose values on pure tensors are jointly continuous
@@ -3936,7 +3997,9 @@ theorem continuous_inductiveTensor_to_projectiveTensor :
 
 /-- Paper: (C.2.3.23), p. 682. The inductive tensor topology of Hausdorff factors is Hausdorff. -/
 @[instance]
-theorem inductiveTensor_t2 : T2Space (InductiveTensor E F) := by sorry
+theorem inductiveTensor_t2 : T2Space (InductiveTensor E F) :=
+  T2Space.of_injective_continuous (X := InductiveTensor E F) (Y := ProjectiveTensor E F)
+    (f := id) Function.injective_id continuous_inductiveTensor_to_projectiveTensor
 
 /-- Paper: Corollary C.2.3.12, p. 682. For Fréchet factors the identity from the inductive
 to the projective tensor product is a linear topological isomorphism. -/

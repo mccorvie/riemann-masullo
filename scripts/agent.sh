@@ -185,11 +185,32 @@ ${review:-(none)}"
   git worktree add -q -B "$branch" "$wt" "$base"
   mkdir -p "$wt/.lake" "$wt/.agent"
   ln -sfn "$main/.lake/packages" "$wt/.lake/packages"   # share the built Mathlib
-  # Start from the main checkout's build of the library, so that only the modules that differ
-  # from it are compiled here. Lake checks every module against its sources, so a stale or
-  # half-written copy costs a rebuild of that module, nothing worse.
-  if [ -d "$main/.lake/build" ] && [ ! -e "$wt/.lake/build" ]; then
-    cp -a --reflink=auto "$main/.lake/build" "$wt/.lake/build" 2>/dev/null || rm -rf "$wt/.lake/build"
+  # Start from a build of the library, so that only the modules that differ are compiled here.
+  # A change low in the import graph rebuilds everything above it, and main moves all the
+  # time, so a copy of the main checkout's build is soon stale and every agent started side
+  # by side would rebuild the same modules. Instead one shared worktree, "seed", is brought
+  # to this agent's starting commit and built under a lock: the first agent pays for what
+  # changed, the others copy the result. Lake checks every module against its sources, so a
+  # stale or half-written copy costs a rebuild of that module, nothing worse.
+  if [ ! -e "$wt/.lake/build" ]; then
+    seed="$(dirname "$wt")/seed"; from="$main/.lake/build"
+    if [ "$role" != scout ] && [ -z "$pr" ]; then
+      (
+        flock 8
+        start=$(git -C "$wt" rev-parse HEAD)
+        if [ ! -d "$seed" ]; then
+          git worktree add -q --detach "$seed" "$start" && mkdir -p "$seed/.lake" &&
+            ln -sfn "$main/.lake/packages" "$seed/.lake/packages" &&
+            { [ ! -d "$main/.lake/build" ] || cp -a --reflink=auto "$main/.lake/build" "$seed/.lake/build"; }
+        fi
+        git -C "$seed" checkout -q --detach "$start" && (cd "$seed" && lake build RiemannMasullo >/dev/null 2>&1)
+        [ ! -d "$seed/.lake/build" ] || cp -a --reflink=auto "$seed/.lake/build" "$wt/.lake/build" 2>/dev/null ||
+          rm -rf "$wt/.lake/build"
+      ) 8>"$main/.agent/seed.lock" || true
+    fi
+    if [ ! -e "$wt/.lake/build" ] && [ -d "$from" ]; then
+      cp -a --reflink=auto "$from" "$wt/.lake/build" 2>/dev/null || rm -rf "$wt/.lake/build"
+    fi
   fi
   printf '%s\n' "$prompt" >"$wt/.agent/PROMPT.md"
   # Record every declaration's signature before the agent touches anything. It is kept outside

@@ -2634,6 +2634,166 @@ theorem adelicTheta_decay_both (f : ℬ[F]) (hf : f zeroAdele = 0)
       _ ≤ C₂ := hbound
       _ ≤ max C₁ C₂ := le_max_right _ _
 
+/-- The generating seminorms of a Schwartz–Bruhat space are the stagewise continuous ones. -/
+private theorem schwartzBruhat_stageWithSeminorms (G : Type*) [CommGroup G] [TopologicalSpace G] :
+    WithSeminorms (E := SchwartzBruhat G)
+      (Subtype.val : {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+        ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+          Continuous (p ∘ schwartzBruhatStageInclusion a e)} → _) :=
+  withGeneratingSeminorms_spec _ _
+
+/-- The norm of point evaluation is a continuous seminorm on the Schwartz–Bruhat space. -/
+private theorem schwartzBruhat_evalNorm_continuous {G : Type*} [CommGroup G]
+    [TopologicalSpace G] (x : G) : Continuous (fun f : SchwartzBruhat G ↦ ‖f x‖) := by
+  classical
+  let p : Seminorm ℂ (SchwartzBruhat G) :=
+    (normSeminorm ℂ ℂ).comp ((LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype)
+  refine (schwartzBruhat_stageWithSeminorms G).continuous_seminorm ⟨p, fun a e ↦ ?_⟩
+  change Continuous (p.comp (schwartzBruhatStageInclusion a e))
+  let q : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+  have hq : Continuous (fun f : SchwartzBruhatStage e ↦ q f) :=
+    (elementarySchwartz_withSeminorms (m := e.realDim) (n := e.torusDim)
+      (r := e.latticeRank) (F := e.finiteFactor)).continuous_seminorm (0, 0, 0, 0)
+  refine Seminorm.continuous_of_le (q := q) hq fun f ↦ ?_
+  change ‖schwartzBruhatStageRealization a e f x‖ ≤ _
+  rw [schwartzBruhatStageRealization_apply]
+  split_ifs with hx
+  · change ‖f _‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f
+    rw [elementarySchwartzSeminorm_zero]
+    refine le_ciSup (f := fun y ↦ ‖f y‖) ?_ _
+    refine ⟨(elementarySchwartzBound f.val (0, 0, 0, 0)).toReal, forall_mem_range.mpr fun y ↦ ?_⟩
+    simpa only [Pi.zero_apply, pow_zero, Finset.prod_const_one, mul_one, one_mul]
+      using elementarySchwartz_monomial_bound f.property 0 0 y
+  · rw [norm_zero]
+    exact apply_nonneg q f
+
+set_option maxHeartbeats 1500000 in
+/-- Weighted partial sums along norm-section rays are dominated by a continuous seminorm. -/
+private theorem exists_adelicTheta_weighted_partialSum_seminorm
+    (K : Set 𝕀[F]) (hK : IsCompact K) (hKne : K.Nonempty) (N : ℕ) :
+    ∃ p : Seminorm ℂ ℬ[F], Continuous (fun f : ℬ[F] ↦ p f) ∧
+      ∀ (f : ℬ[F]) (t : ℝ≥0ˣ), 1 ≤ (t.val : ℝ) → ∀ k ∈ K, ∀ S : Finset Fˣ,
+        (∑ ξ ∈ S, ‖f (Multiplicative.ofAdd
+          ((canonicalIdeleNormSection F t * k).val * algebraMap F 𝔸[F] (ξ : F)))‖ *
+          (t.val : ℝ) ^ N) ≤ p f := by
+  let T := {t : ℝ≥0ˣ // 1 ≤ (t.val : ℝ)}
+  let point (t : T) (k : K) (ξ : Fˣ) :=
+    Multiplicative.ofAdd ((canonicalIdeleNormSection F t.val * k.val).val *
+      algebraMap F 𝔸[F] (ξ : F))
+  let ev (x : Multiplicative 𝔸[F]) : Seminorm ℂ ℬ[F] :=
+    (normSeminorm ℂ ℂ).comp ((LinearMap.proj x).comp (schwartzBruhatSubmodule _).subtype)
+  let partialSum (i : T × K × Finset Fˣ) : Seminorm ℂ ℬ[F] :=
+    i.1.val.val ^ N • ∑ ξ ∈ i.2.2, ev (point i.1 i.2.1 ξ)
+  have hpartial (i : T × K × Finset Fˣ) (f : ℬ[F]) :
+      partialSum i f = ∑ ξ ∈ i.2.2, ‖f (point i.1 i.2.1 ξ)‖ * (i.1.val.val : ℝ) ^ N := by
+    have hsum : (∑ ξ ∈ i.2.2, ev (point i.1 i.2.1 ξ)) f =
+        ∑ ξ ∈ i.2.2, ‖f (point i.1 i.2.1 ξ)‖ := by
+      change FunLike.coeAddMonoidHom (Seminorm ℂ ℬ[F]) ℬ[F] ℝ
+        (∑ ξ ∈ i.2.2, ev (point i.1 i.2.1 ξ)) f = _
+      rw [map_sum, Finset.sum_apply]
+      rfl
+    dsimp only [partialSum]
+    rw [smul_apply]
+    change (↑(i.1.val.val ^ N) : ℝ) * (∑ ξ ∈ i.2.2, ev (point i.1 i.2.1 ξ)) f = _
+    rw [hsum, NNReal.coe_pow, mul_comm, Finset.sum_mul]
+  have hcont (i : T × K × Finset Fˣ) : Continuous (partialSum i) :=
+    (Seminorm.continuous_finsetSum fun ξ _ ↦
+      schwartzBruhat_evalNorm_continuous (point i.1 i.2.1 ξ)).const_smul _
+  obtain ⟨k₀, hk₀⟩ := hKne
+  have hbdd : BddAbove (range partialSum) := Seminorm.bddAbove_range_iff.mpr fun f ↦ by
+    let P (φ : Multiplicative 𝔸[F] → ℂ) :=
+      ∃ C : ℝ, ∀ i : T × K × Finset Fˣ,
+        ∑ ξ ∈ i.2.2, ‖φ (point i.1 i.2.1 ξ)‖ * (i.1.val.val : ℝ) ^ N ≤ C
+    have hzero : P 0 := ⟨0, fun _ ↦ by simp⟩
+    have hadd (φ ψ : Multiplicative 𝔸[F] → ℂ) : P φ → P ψ → P (φ + ψ) := by
+      rintro ⟨C, hC⟩ ⟨D, hD⟩
+      refine ⟨C + D, fun i ↦ ?_⟩
+      refine le_trans ?_ (add_le_add (hC i) (hD i))
+      rw [← Finset.sum_add_distrib]
+      exact Finset.sum_le_sum fun ξ _ ↦ by
+        rw [← add_mul]
+        exact mul_le_mul_of_nonneg_right (norm_add_le _ _) (by positivity)
+    have hP : P f.val := by
+      refine Submodule.iSup_induction (motive := P) _ f.property ?_ hzero hadd
+      intro a φ hφ
+      refine Submodule.iSup_induction (motive := P) _ hφ ?_ hzero hadd
+      intro e ψ hψ
+      obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hψ
+      obtain ⟨u, hu, hbound⟩ := realization_normSection_summable_bound a e s K hK N
+      have hnonneg (ξ : Fˣ) : 0 ≤ u ξ :=
+        (by positivity : 0 ≤ ‖schwartzBruhatStageRealization a e s
+          (point ⟨1, by simp⟩ ⟨k₀, hk₀⟩ ξ)‖ * ((1 : ℝ≥0ˣ).val : ℝ) ^ N).trans
+          (hbound ξ 1 (by simp) k₀ hk₀)
+      exact ⟨∑' ξ, u ξ, fun i ↦
+        (Finset.sum_le_sum fun ξ _ ↦ hbound ξ i.1.val i.1.property i.2.1.val
+          i.2.1.property).trans (hu.sum_le_tsum _ fun ξ _ ↦ hnonneg ξ)⟩
+    obtain ⟨C, hC⟩ := hP
+    exact ⟨C, forall_mem_range.mpr fun i ↦ (hpartial i f).trans_le (hC i)⟩
+  -- Barrelledness upgrades the pointwise bound on partial sums to a continuous seminorm.
+  let : BarrelledSpace ℂ ℬ[F] := (adeleSchwartz_montel (F := F)).2.1
+  let p : Seminorm ℂ ℬ[F] := ⨆ i, partialSum i
+  have hcoe : (⇑p : ℬ[F] → ℝ) = ⨆ i, ⇑(partialSum i) :=
+    Seminorm.coe_iSup_eq (p := partialSum) hbdd
+  have hp : Continuous (fun f : ℬ[F] ↦ p f) :=
+    hcoe.symm ▸ Seminorm.continuous_iSup partialSum hcont hbdd
+  refine ⟨p, hp, fun f t ht k hk S ↦ ?_⟩
+  let i : T × K × Finset Fˣ := (⟨t, ht⟩, ⟨k, hk⟩, S)
+  exact (hpartial i f).ge.trans ((le_ciSup hbdd i) f)
+
+set_option maxHeartbeats 1000000 in
+/-- Paper: Theorem 2.2.3.4(5), p. 83. The inverse-power bound at norm greater
+than one has a constant uniform over a bounded set of adelic test functions. -/
+theorem adelicTheta_decay_bounded_large_threshold_one (B : Set ℬ[F])
+    (hB : IsVonNBounded ℂ B) (N : ℕ) :
+    ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : C[F], 1 < normℝ g →
+      ‖adelicTheta f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  obtain ⟨K, hK, hRep⟩ := exists_compact_idele_representatives (F := F)
+  have hKne : K.Nonempty := by
+    obtain ⟨k, hk, _⟩ := hRep 1 ((ideleClassNorm F).ker.one_mem)
+    exact ⟨k, hk⟩
+  let weighted := exists_adelicTheta_weighted_partialSum_seminorm (F := F)
+  obtain ⟨p, hp, hpartial⟩ := weighted K hK hKne N
+  have hS := schwartzBruhat_stageWithSeminorms (Multiplicative 𝔸[F])
+  have hpB : BddAbove (p '' B) :=
+    (hS.isVonNBounded_iff_seminorm_bddAbove.mp hB)
+      ⟨p, fun a e ↦ hp.comp (hS.continuous_of_continuous_comp
+        (schwartzBruhatStageInclusion a e) fun i ↦ i.property a e)⟩
+  obtain ⟨C, hC⟩ := hpB
+  refine ⟨max C 1, zero_lt_one.trans_le (le_max_right _ _), fun f hf g hg ↦ ?_⟩
+  let t := ideleClassNorm F g
+  let a := canonicalIdeleNormSection F t
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hn : ideleClassNorm F (q a) = t := canonicalIdeleNormSection_rightInverse F t
+  have hker : (q a)⁻¹ * g ∈ (ideleClassNorm F).ker := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, hn]
+    exact inv_mul_cancel t
+  obtain ⟨k, hk, hq⟩ := hRep ((q a)⁻¹ * g) hker
+  have hclass : q (a * k) = g := by
+    rw [map_mul, show q k = (q a)⁻¹ * g from hq, mul_inv_cancel_left]
+  let point (ξ : Fˣ) := Multiplicative.ofAdd ((a * k).val * algebraMap F 𝔸[F] (ξ : F))
+  have hs : Summable (fun ξ ↦ ‖f (point ξ)‖) := by
+    simpa only [point, add_zero] using
+      ((adelicAverage_summableUniformlyOn f {(a * k, 0)} isCompact_singleton).summable rfl)
+  have htheta : adelicTheta f g = ∑' ξ, f (point ξ) := by
+    rw [← hclass]
+    change adelicTheta f (classOf (a * k)) =
+      ∑' ξ : Fˣ, f (Multiplicative.ofAdd ((a * k).val * algebraMap F 𝔸[F] (ξ : F)))
+    rw [adelicTheta_mk]
+    simp only [mul_comm (a * k).val]
+  rw [htheta, ← div_eq_mul_inv, le_div_iff₀ (pow_pos (zero_lt_one.trans hg) _)]
+  calc
+    _ ≤ (∑' ξ, ‖f (point ξ)‖) * (normℝ g) ^ N :=
+      mul_le_mul_of_nonneg_right (norm_tsum_le_tsum_norm hs) (by positivity)
+    _ = ∑' ξ, ‖f (point ξ)‖ * (normℝ g) ^ N := tsum_mul_right.symm
+    _ ≤ p f := (hs.mul_right _).tsum_le_of_sum_le (hpartial f t hg.le k hk)
+    _ ≤ max C 1 := (hC (mem_image_of_mem _ hf)).trans (le_max_left _ _)
+
+/-- Paper: Proof of Theorem 2.2.3.4(4), p. 85. The adelic Fourier transform sends
+von Neumann bounded sets of Schwartz–Bruhat functions to bounded sets. -/
+theorem adeleSchwartzFourier_image_isVonNBounded (B : Set ℬ[F])
+    (hB : IsVonNBounded ℂ B) :
+    IsVonNBounded ℂ ((adeleSchwartzFourier (F := F)) '' B) := by sorry
+
 /-- Paper: Theorem 2.2.3.4(5), p. 83. The uniform estimates on a bounded set
 hold with threshold one and a common constant. -/
 theorem adelicTheta_decay_bounded_threshold_one (B : Set ℬ[F])
@@ -2645,7 +2805,45 @@ theorem adelicTheta_decay_bounded_threshold_one (B : Set ℬ[F])
           C * (normℝ g) ^ N) ∧
       (f zeroAdele = 0 → adeleSchwartzFourier f zeroAdele = 0 →
         Real.exp (-|Real.log (normℝ g)|) < 1 →
-        ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|)) := by sorry
+        ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|)) := by
+  let large := adelicTheta_decay_bounded_large_threshold_one (F := F)
+  obtain ⟨C₁, hC₁, hlarge⟩ := large B hB N
+  let Fourier := adeleSchwartzFourier (F := F)
+  let fourierBounded := adeleSchwartzFourier_image_isVonNBounded (F := F)
+  obtain ⟨C₂, _, hdual⟩ := large (Fourier '' B) (fourierBounded B hB) (N + 1)
+  refine ⟨max C₁ C₂, hC₁.trans_le (le_max_left _ _), ?_⟩
+  intro f hf g
+  have hpos : 0 < normℝ g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hbig (hg : 1 < normℝ g) :
+      ‖adelicTheta f g‖ ≤ max C₁ C₂ * ((normℝ g) ^ N)⁻¹ :=
+    (hlarge f hf g hg).trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (by positivity))
+  have hsmall (hg : normℝ g < 1) :
+      ‖adelicTheta f g - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤
+        max C₁ C₂ * (normℝ g) ^ N := by
+    have hinv : normℝ (g⁻¹) = (normℝ g)⁻¹ := by
+      simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+    have hg' : 1 < normℝ (g⁻¹) := by
+      rw [hinv]
+      exact one_lt_inv_iff₀.mpr ⟨hpos, hg⟩
+    have hbound : ‖adelicTheta (adeleSchwartzFourier f) g⁻¹‖ ≤ C₂ * (normℝ g) ^ (N + 1) := by
+      simpa only [Fourier, hinv, inv_pow, inv_inv] using hdual (Fourier f) ⟨f, hf, rfl⟩ g⁻¹ hg'
+    rw [adelicTheta_riemannRoch f g, sub_right_comm, sub_add_cancel, add_sub_cancel_right,
+      norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr hpos.le)]
+    calc
+      _ ≤ (normℝ g)⁻¹ * (C₂ * (normℝ g) ^ (N + 1)) :=
+        mul_le_mul_of_nonneg_left hbound (inv_nonneg.mpr hpos.le)
+      _ = C₂ * ((normℝ g)⁻¹ * (normℝ g * (normℝ g) ^ N)) := by rw [pow_succ']; ac_rfl
+      _ ≤ _ := by
+        rw [inv_mul_cancel_left₀ hpos.ne']
+        exact mul_le_mul_of_nonneg_right (le_max_right _ _) (pow_nonneg hpos.le _)
+  refine ⟨hbig, hsmall, fun hf₀ hF₀ hg ↦ ?_⟩
+  rw [neg_mul, Real.exp_neg, Real.exp_nat_mul]
+  rcases lt_trichotomy (normℝ g) 1 with hlt | heq | hgt
+  · rw [abs_of_neg (Real.log_neg hpos hlt), Real.exp_neg, Real.exp_log hpos, inv_pow, inv_inv]
+    simpa only [hf₀, hF₀, smul_zero, sub_zero, add_zero] using hsmall hlt
+  · simp [heq] at hg
+  · rw [abs_of_pos (Real.log_pos hgt), Real.exp_log hpos]
+    exact hbig hgt
 
 /-- Paper: Theorem 2.2.3.4(4), p. 83. The three decay estimates admit a common
 constant and threshold uniform over a bounded set of Schwartz–Bruhat functions.

@@ -4,6 +4,7 @@ import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 import Mathlib.Analysis.MellinInversion
 import RiemannMasullo.ForMathlib.Analysis.Complex.PhragmenLindelof
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeVariables
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import Mathlib.Analysis.Complex.Liouville
 import Mathlib.Analysis.Complex.RealDeriv
@@ -2963,7 +2964,7 @@ private theorem iteratedDeriv_comp_ofReal_of_differentiableOn {h : ℂ → ℂ} 
 
 /-- The weight `(e^{-αt} + e^{βt})⁻¹` is smooth with bounded derivatives of all orders,
 by Cauchy estimates on a horizontal strip. -/
-private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 < β) :
+private theorem twoSidedExpWeight_bounds_of_nonneg {α β : ℝ} (hα : 0 ≤ α) (hβ : 0 ≤ β) :
     ContDiff ℝ ∞ (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) ∧
       ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k
         (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) t‖ ≤ C := by
@@ -2974,7 +2975,7 @@ private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 <
     have h2 : ContDiff ℝ ∞ (fun t : ℝ ↦ Real.exp (β * t)) :=
       Real.contDiff_exp.comp (contDiff_const.mul contDiff_id)
     exact Complex.ofRealCLM.contDiff.comp ((h1.add h2).inv fun t ↦ (hpos t).ne')
-  set δ := 1 / (α + β) with hδdef
+  set δ := 1 / (α + β + 1) with hδdef
   have hδ : 0 < δ := by positivity
   let h : ℂ → ℂ := fun z ↦ (Complex.exp (-α * z) + Complex.exp (β * z))⁻¹
   let U : Set ℂ := Complex.im ⁻¹' Ioo (-δ) δ
@@ -2997,16 +2998,16 @@ private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 <
     have hβδ : β * δ ≤ 1 := by
       rw [hδdef, mul_one_div, div_le_one (by positivity)]; linarith
     have c1 : 1 / 2 ≤ Real.cos (-α * z.im) := hcos _ (by
-      rw [abs_mul, abs_neg, abs_of_pos hα]
-      exact (mul_le_mul_of_nonneg_left hz hα.le).trans hαδ)
+      rw [abs_mul, abs_neg, abs_of_nonneg hα]
+      exact (mul_le_mul_of_nonneg_left hz hα).trans hαδ)
     have c2 : 1 / 2 ≤ Real.cos (β * z.im) := hcos _ (by
-      rw [abs_mul, abs_of_pos hβ]
-      exact (mul_le_mul_of_nonneg_left hz hβ.le).trans hβδ)
+      rw [abs_mul, abs_of_nonneg hβ]
+      exact (mul_le_mul_of_nonneg_left hz hβ).trans hβδ)
     have hsum : 1 ≤ Real.exp (-α * z.re) + Real.exp (β * z.re) := by
       rcases le_total 0 z.re with h0 | h0
       · have := Real.one_le_exp (show 0 ≤ β * z.re by positivity)
         linarith [Real.exp_pos (-α * z.re)]
-      · have := Real.one_le_exp (show 0 ≤ -α * z.re by nlinarith)
+      · have := Real.one_le_exp (mul_nonneg_of_nonpos_of_nonpos (neg_nonpos.mpr hα) h0)
         linarith [Real.exp_pos (β * z.re)]
     nlinarith [Real.exp_pos (-α * z.re), Real.exp_pos (β * z.re)]
   have hne (z : ℂ) (hz : |z.im| ≤ δ) : Complex.exp (-α * z) + Complex.exp (β * z) ≠ 0 := by
@@ -3044,6 +3045,13 @@ private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 <
   have h1 := (Complex.abs_im_le_norm (z - t)).trans (mem_sphere_iff_norm.mp hz).le
   simp only [Complex.sub_im, Complex.ofReal_im, sub_zero] at h1
   linarith
+
+/-- The two-sided exponential weight has bounded derivatives for positive exponents. -/
+private theorem twoSidedExpWeight_bounds {α β : ℝ} (hα : 0 < α) (hβ : 0 < β) :
+    ContDiff ℝ ∞ (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) ∧
+      ∀ k, ∃ C, ∀ t, ‖iteratedFDeriv ℝ k
+        (fun t : ℝ ↦ (((Real.exp (-α * t) + Real.exp (β * t))⁻¹ : ℝ) : ℂ)) t‖ ≤ C :=
+  twoSidedExpWeight_bounds_of_nonneg hα.le hβ.le
 
 /-- A good subgroup is compact, being closed in its double annihilator. -/
 private theorem isCompact_of_isBruhatGoodSubgroup_aux (k : Subgroup G) (hk : IsBruhatGoodSubgroup k) :
@@ -3167,16 +3175,13 @@ private theorem logModulation_mul_mem_schwartzBruhat {φ : ℝ → ℂ} (hφ : C
     exact Submodule.mem_iSup_of_mem a (Submodule.mem_iSup_of_mem e ⟨s', rfl⟩)
   exact hle hF
 
-/-- Paper: Lemma D.3.3.2, p. 804. If two exponent twists are Schwartz–Bruhat,
-every intermediate exponent twist is Schwartz–Bruhat as well. -/
-theorem modulationWeight_mem_schwartzBruhat_between (hm : IsModulation m) (hms : Surjective m)
-    (f : G → ℂ) (a c b : ℝ) (hac : a < c) (hcb : c < b)
-    (ha : modulationWeight m a f ∈ schwartzBruhatSubmodule G)
-    (hb : modulationWeight m b f ∈ schwartzBruhatSubmodule G) :
-    modulationWeight m c f ∈ schwartzBruhatSubmodule G := by
-  -- `m^c = (m^(a-c) + m^(b-c))⁻¹ (m^a + m^b)`, and the prefactor has bounded derivatives in `log m`.
-  obtain ⟨hφ, hφb⟩ := twoSidedExpWeight_bounds (sub_pos.mpr hac) (sub_pos.mpr hcb)
-  convert logModulation_mul_mem_schwartzBruhat m hφ hφb (add_mem ha hb) using 1
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- An intermediate twist is the sum of the endpoint twists times a function of `log m`. -/
+private theorem modulationWeight_between_eq (f : G → ℂ) (a c b : ℝ) :
+    modulationWeight m c f = fun g ↦
+      (((Real.exp (-(c - a) * Real.log ((m g).val : ℝ)) +
+        Real.exp ((b - c) * Real.log ((m g).val : ℝ)))⁻¹ : ℝ) : ℂ) *
+        (modulationWeight m a f + modulationWeight m b f) g := by
   funext g
   simp only [modulationWeight, LinearMap.mulLeft_apply, Pi.add_apply, Pi.mul_apply]
   have hr : 0 < ((m g : ℝ≥0) : ℝ) := by
@@ -3191,6 +3196,17 @@ theorem modulationWeight_mem_schwartzBruhat_between (hm : IsModulation m) (hms :
   rw [key]
   push_cast
   ring
+
+/-- Paper: Lemma D.3.3.2, p. 804. If two exponent twists are Schwartz–Bruhat,
+every intermediate exponent twist is Schwartz–Bruhat as well. -/
+theorem modulationWeight_mem_schwartzBruhat_between (hm : IsModulation m) (hms : Surjective m)
+    (f : G → ℂ) (a c b : ℝ) (hac : a < c) (hcb : c < b)
+    (ha : modulationWeight m a f ∈ schwartzBruhatSubmodule G)
+    (hb : modulationWeight m b f ∈ schwartzBruhatSubmodule G) :
+    modulationWeight m c f ∈ schwartzBruhatSubmodule G := by
+  obtain ⟨hφ, hφb⟩ := twoSidedExpWeight_bounds (sub_pos.mpr hac) (sub_pos.mpr hcb)
+  rw [modulationWeight_between_eq m f a c b]
+  exact logModulation_mul_mem_schwartzBruhat m hφ hφb (add_mem ha hb)
 
 -- TODO(paper-gap): The finite-generation wording in Definition D.3.3.3
 -- refers to the annihilator in the dual of the norm-one subgroup. In
@@ -3490,6 +3506,376 @@ theorem modulatedExponentialDecay_exists_stage (hm : IsModulation m) (hms : Surj
 
 end Modulated
 
+section IdentityModulation
+
+open scoped BoundedContinuousFunction
+
+/-- The elementary Schwartz space with one real factor and trivial remaining
+factors is the usual Schwartz space on that real factor. -/
+private theorem elementarySchwartz_line_equiv :
+    ∃ e : 𝓢(EuclideanSpace ℝ (Fin 1), ℂ) ≃L[ℂ] ElementarySchwartz 1 0 0 PUnit,
+      ∀ f x, e f x = f x.1 := by
+  let E := EuclideanSpace ℝ (Fin 1)
+  let X := 𝓢(E, ℂ)
+  let Y := ElementarySchwartz 1 0 0 PUnit
+  let L : X →ₗ[ℂ] Y :=
+    { toFun := fun f ↦ ⟨fun x ↦ f x.1, (elementarySchwartzSubmodule_real_iff _).mpr ⟨f, rfl⟩⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hL (f : X) (x : ElementaryLieGroup 1 0 0 PUnit) : L f x = f x.1 := rfl
+  have hbij : Bijective L := by
+    constructor
+    · intro f g h
+      ext x
+      exact congrArg (fun s : Y ↦ s (x, 0, 0, 0)) h
+    · intro g
+      let f (x : E) := g (x, 0, 0, 0)
+      have heq : (fun x : ElementaryLieGroup 1 0 0 PUnit ↦ f x.1) = g.val := by
+        funext x
+        exact congrArg g (Prod.ext rfl (Subsingleton.elim _ _))
+      have hmem := (elementarySchwartzSubmodule_real_iff f).mp (heq ▸ g.property)
+      obtain ⟨s, hs⟩ := hmem
+      refine ⟨s, Subtype.ext ?_⟩
+      change (fun x : ElementaryLieGroup 1 0 0 PUnit ↦ s x.1) = g.val
+      rw [← heq]
+      exact congrArg (fun u : E → ℂ ↦ fun x : ElementaryLieGroup 1 0 0 PUnit ↦ u x.1) hs
+  have hX : IsFrechetTVS X := euclideanSchwartz_frechet 1
+  have : BarrelledSpace ℂ X := isFrechetTVS_barrelled hX
+  have hc : Continuous L := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro g
+    exact ⟨(BoundedContinuousFunction.evalCLM ℂ g.1).comp (SchwartzMap.toBoundedContinuousFunctionCLM ℂ E ℂ),
+      fun _ ↦ rfl⟩
+  obtain ⟨hTX, -, hMX, hCX⟩ := hX
+  obtain ⟨hTY, -, hMY, hCY⟩ := elementarySchwartz_isFrechet (m := 1) (n := 0) (r := 0) (F := PUnit)
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace X := hCX
+  have : CompleteSpace Y := hCY
+  have : (uniformity Y).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero Y]
+    infer_instance
+  have : BaireSpace Y := BaireSpace.of_completelyPseudoMetrizable
+  let A : X →L[ℂ] Y := ⟨L, hc⟩
+  have hopen : IsOpenMap A := by
+    apply isOpenMap_of_not_isMeagre_range A
+    change ¬ IsMeagre (range L)
+    rw [hbij.surjective.range_eq]
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+  let e := LinearEquiv.ofBijective L hbij
+  refine ⟨{ e with continuous_toFun := hc, continuous_invFun := ?_ }, hL⟩
+  exact e.toEquiv.continuous_symm_iff.mpr hopen
+
+/-- A largest Bruhat structural pair realizes every Schwartz–Bruhat function. -/
+private theorem schwartzBruhat_maxStage_surjective {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (a : BruhatStructuralPair G) (ha : ∀ b, b ≤ a) (e : ElementaryLCAPresentation a.quotient) :
+    Surjective (schwartzBruhatStageInclusion a e) := by
+  intro f
+  obtain ⟨b, e', s, hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+  exact (schwartzBruhatStage_transition (G := G) (a := b) (b := a) (ha b) e' e).elim
+    fun j hj ↦ ⟨j s, Subtype.ext ((hj.1 s).trans hs)⟩
+
+/-- A real coordinate gives a maximal structural pair with a one-dimensional
+elementary presentation. -/
+private theorem realCoordinate_bruhatPresentation {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (c : G ≃ₜ* Multiplicative ℝ) (line : EuclideanSpace ℝ (Fin 1) ≃L[ℝ] ℝ) :
+    ∃ a : BruhatStructuralPair G, (∀ b, b ≤ a) ∧
+      ∃ (hm : ∀ x : G, x ∈ a.val.1)
+        (w : a.quotient ≃ₜ* Multiplicative (ElementaryLieGroup 1 0 0 PUnit)),
+        ∀ x : G, line (w (QuotientGroup.mk ⟨x, hm x⟩)).toAdd.1 = (c x).toAdd := by
+  have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  have : ConnectedSpace G := c.symm.surjective.connectedSpace c.symm.continuous
+  let chart : EuclideanSpace ℝ (Fin 1) ≃ₜ G := line.toHomeomorph.trans c.symm.toHomeomorph
+  have hgood : IsBruhatGoodSubgroup (⊥ : Subgroup G) :=
+    isBruhatGoodSubgroup_bot_iff.mpr ⟨1, ⟨chart.chartedSpace⟩⟩
+  let H : Subgroup G := ⊤
+  let i : G ≃ₜ* H :=
+    ⟨Subgroup.topEquiv.symm, continuous_id.subtype_mk _, continuous_subtype_val⟩
+  have htop : IsOpen (H : Set G) := isOpen_univ
+  let : ConnectedSpace H := i.surjective.connectedSpace i.continuous
+  let : LocallyCompactSpace H := htop.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  have hgen : IsCompactlyGeneratedGroup H := by
+    obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : H)
+    have hOpen : IsOpen (Subgroup.closure U : Set H) :=
+      Subgroup.isOpen_of_mem_nhds _ (mem_of_superset hU Subgroup.subset_closure)
+    exact ⟨U, hU, hUc, SetLike.coe_injective
+      ((OpenSubgroup.isClopen ⟨Subgroup.closure U, hOpen⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)⟩
+  let a : BruhatStructuralPair G := ⟨(H, OrderDual.toDual ⊥), htop, hgen, hgood, bot_le⟩
+  have hmem (x : G) : x ∈ a.val.1 := Subgroup.mem_top x
+  let p := (QuotientGroup.mk' _ : H →* a.quotient).comp i.toMulEquiv.toMonoidHom
+  have hp : IsOpenQuotientMap p :=
+    QuotientGroup.isOpenQuotientMap_mk.comp i.toHomeomorph.isOpenQuotientMap
+  have hinj : Injective p := (MonoidHom.ker_eq_bot_iff p).mp (le_antisymm (fun x hx ↦ by
+    change (QuotientGroup.mk (i x) : a.quotient) = 1 at hx
+    exact (a.quotient_mk_eq_one (i x)).mp hx) bot_le)
+  let q := (MulEquiv.ofBijective p ⟨hinj, hp.surjective⟩).toContinuousMulEquiv
+    (fun _ ↦ hp.isQuotientMap.isOpen_preimage)
+  let : Unique ((Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × PUnit) := uniqueOfSubsingleton 0
+  let w : Multiplicative (ElementaryLieGroup 1 0 0 PUnit) ≃ₜ* Multiplicative ℝ :=
+    ContinuousMulEquiv.mk' ((Homeomorph.prodUnique _ _).trans line.toHomeomorph)
+      (fun x y ↦ line.map_add x.toAdd.1 y.toAdd.1)
+  have ha (b : BruhatStructuralPair G) : b ≤ a := by
+    change b.val.1 ≤ ⊤ ∧ (⊥ : Subgroup G) ≤ OrderDual.ofDual b.val.2
+    exact ⟨le_top, bot_le⟩
+  refine ⟨a, ha, hmem, q.symm.trans (c.trans w.symm), fun x ↦ ?_⟩
+  change (w (w.symm (c (q.symm (q x))))).toAdd = _
+  rw [q.symm_apply_apply, w.apply_symm_apply]
+
+/-- In real coordinates, the Schwartz–Bruhat space of the real group carries the
+usual real-line Schwartz topology. -/
+private theorem schwartzBruhat_realCoordinate_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (c : G ≃ₜ* Multiplicative ℝ) :
+    ∃ e : 𝓢(ℝ, ℂ) ≃L[ℂ] SchwartzBruhat G,
+      ∀ f x, e f x = f (c x).toAdd := by
+  have : SecondCountableTopology (Multiplicative ℝ) := inferInstanceAs (SecondCountableTopology ℝ)
+  have : SecondCountableTopology G := c.toHomeomorph.isEmbedding.secondCountableTopology
+  let line := (EuclideanSpace.equiv (Fin 1) ℝ).trans (ContinuousLinearEquiv.funUnique (Fin 1) ℝ ℝ)
+  refine (realCoordinate_bruhatPresentation (G := G) c line).elim fun a hp ↦ ?_
+  refine hp.2.elim fun hm hm' ↦ hm'.elim fun w hw ↦ ?_
+  have ha := hp.1
+  let e : ElementaryLCAPresentation a.quotient := ⟨1, 0, 0, PUnit, w⟩
+  let J : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a e
+  have hJ : IsEmbedding J := schwartzBruhatStage_isEmbedding a e
+  have hs : Surjective J := schwartzBruhat_maxStage_surjective a ha e
+  let A := LinearEquiv.ofBijective J ⟨hJ.injective, hs⟩
+  let B := ContinuousLinearEquiv.ofIsHomeomorph A
+    (isHomeomorph_iff_isEmbedding_surjective.mpr ⟨hJ, hs⟩)
+  refine elementarySchwartz_line_equiv.elim fun T hT ↦ ?_
+  let L := (schwartzChangeVariable ℂ line).trans (T.trans B)
+  refine ⟨L, fun f x ↦ ?_⟩
+  change (show SchwartzBruhat G from
+    schwartzBruhatStageInclusion a e (T (schwartzChangeVariable ℂ line f))) x = _
+  rw [schwartzBruhatStageInclusion_apply, schwartzBruhatStageRealization_apply,
+    dite_eq_left (hm x), hT]
+  exact congrArg f (hw x)
+
+private def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
+  let e : ℝ≥0ˣ ≃ₜ Multiplicative ℝ :=
+    (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he (t : ℝ≥0ˣ) : (e t).toAdd = Real.log (t.val : ℝ) :=
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt t))).symm
+  refine ContinuousMulEquiv.mk' e fun s t ↦ ?_
+  change (e (s * t)).toAdd = (e s).toAdd + (e t).toAdd
+  rw [he, he, he, Units.val_mul, NNReal.coe_mul,
+    Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt s)).ne'
+      (NNReal.coe_pos.mpr (Units.zero_lt t)).ne']
+
+private theorem positiveRealLogEquiv_apply (t : ℝ≥0ˣ) :
+    (positiveRealLogEquiv t).toAdd = Real.log (t.val : ℝ) :=
+  (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt t))).symm
+
+local notation "IdModulation" => ContinuousMonoidHom.id ℝ≥0ˣ
+local notation "PositiveRealStageIndex" => {k : Subgroup ℝ≥0ˣ // IsCompact (k : Set ℝ≥0ˣ) ∧
+  IsCompactlyGeneratedGroup (lcaAnnihilator k)}
+
+private theorem positiveRealCompact_eq_bot (k : PositiveRealStageIndex) : k.val = ⊥ := by
+  refine le_antisymm ?_ bot_le
+  intro x hx
+  exact Subgroup.mem_bot.mpr (compactSubgroup_le_modulation_ker IdModulation k.val k.property.1 hx)
+
+private def positiveRealStageEquiv (k : PositiveRealStageIndex) : (ℝ≥0ˣ ⧸ k.val) ≃ₜ* ℝ≥0ˣ := by
+  let e := (QuotientGroup.quotientMulEquivOfEq (positiveRealCompact_eq_bot k)).trans
+    QuotientGroup.quotientBot
+  apply e.toContinuousMulEquiv
+  intro s
+  exact (QuotientGroup.isQuotientMap_mk k.val).isOpen_preimage.symm
+
+private theorem positiveRealStageEquiv_mk (k : PositiveRealStageIndex) (t : ℝ≥0ˣ) :
+    positiveRealStageEquiv k (t : ℝ≥0ˣ ⧸ k.val) = t := rfl
+
+private theorem nonempty_positiveRealStage (I : Set ℝ) (hInt : OrdConnected I)
+    (hne : I.Nonempty) : Nonempty PositiveRealStageIndex := by
+  have hm : IsModulation IdModulation := ⟨isProperMap_id, ⟨(Units.mk0 2 (by norm_num) : ℝ≥0ˣ), by
+    intro h
+    have := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) h
+    norm_num at this⟩⟩
+  obtain ⟨k, _⟩ := modulatedExponentialDecay_exists_stage IdModulation I hm surjective_id hInt hne 0
+  exact ⟨k⟩
+
+/-- The real exponential weight is precisely the power weight in positive-real coordinates. -/
+private theorem identityWeight_log (a : ℝ) (t : ℝ≥0ˣ) :
+    (t.val : ℝ) ^ a = Real.exp (a * (positiveRealLogEquiv t).toAdd) := by
+  rw [positiveRealLogEquiv_apply, Real.rpow_def_of_pos (NNReal.coe_pos.mpr (Units.zero_lt t)),
+    mul_comm]
+
+/-- The power weight in a positive-real coordinate agrees with the
+exponential weight in its logarithmic coordinate. -/
+private theorem logWeight_comp {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (n : G →ₜ* ℝ≥0ˣ) (d : G ≃ₜ* ℝ≥0ˣ) (hd : ∀ x, n x = d x)
+    (a : ℝ) (f : ℝ → ℂ) (x : G) :
+    modulationWeight n a (fun t ↦ f (positiveRealLogEquiv (d t)).toAdd) x =
+      logExponentialWeight a f (positiveRealLogEquiv (d x)).toAdd := by
+  change ((((n x).val : ℝ) ^ a : ℝ) : ℂ) * _ =
+    (Real.exp (a * (positiveRealLogEquiv (d x)).toAdd) : ℂ) * _
+  rw [hd x, identityWeight_log]
+
+/-- Pullback by a real coordinate carries the Schwartz condition for each
+logarithmic twist to the corresponding modulation twist, in both directions. -/
+private theorem logDecay_mem_iff {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (n : G →ₜ* ℝ≥0ˣ) (d : G ≃ₜ* ℝ≥0ˣ) (hd : ∀ x, n x = d x) (I : Set ℝ)
+    (S : 𝓢(ℝ, ℂ) ≃L[ℂ] SchwartzBruhat G)
+    (hS : ∀ f x, S f x = f (positiveRealLogEquiv (d x)).toAdd) (f : ℝ → ℂ) :
+    f ∈ logExponentialDecaySubmodule I ↔
+      (fun x ↦ f (positiveRealLogEquiv (d x)).toAdd) ∈ modulatedExponentialDecaySubmodule n I := by
+  let c := d.trans positiveRealLogEquiv
+  let g (x : G) := f (c x).toAdd
+  change f ∈ logExponentialDecaySubmodule I ↔ g ∈ modulatedExponentialDecaySubmodule n I
+  simp only [logExponentialDecaySubmodule, modulatedExponentialDecaySubmodule,
+    Submodule.mem_iInf, Submodule.mem_comap]
+  constructor
+  · intro hf a
+    obtain ⟨s, hs⟩ := hf a
+    have hw : modulationWeight n a g = (S s).val := by
+      funext x
+      change modulationWeight n a g x = S s x
+      exact (logWeight_comp n d hd a f x).trans
+        ((congrFun hs (c x).toAdd).symm.trans (hS s x).symm)
+    exact hw.symm ▸ (S s).property
+  · intro hg a
+    let F : SchwartzBruhat G := ⟨modulationWeight n a g, hg a⟩
+    let s := S.symm F
+    refine ⟨s, funext fun y ↦ ?_⟩
+    let x := c.symm (Multiplicative.ofAdd y)
+    have hx : (c x).toAdd = y := congrArg Multiplicative.toAdd (c.apply_symm_apply _)
+    change s y = logExponentialWeight a f y
+    calc
+      s y = s (c x).toAdd := congrArg s hx.symm
+      _ = S s x := (hS s x).symm
+      _ = F x := congrArg (fun z : SchwartzBruhat G ↦ z x) (S.apply_symm_apply F)
+      _ = logExponentialWeight a f (c x).toAdd := logWeight_comp n d hd a f x
+      _ = _ := congrArg (logExponentialWeight a f) hx
+
+/-- Pullback by the logarithmic coordinate identifies the decay submodules
+and intertwines their twists. -/
+private theorem positiveRealDecay_linear_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (n : G →ₜ* ℝ≥0ˣ) (d : G ≃ₜ* ℝ≥0ˣ) (hd : ∀ x, n x = d x) (I : Set ℝ)
+    (S : 𝓢(ℝ, ℂ) ≃L[ℂ] SchwartzBruhat G)
+    (hS : ∀ f x, S f x = f (positiveRealLogEquiv (d x)).toAdd) :
+    ∃ e : logExponentialDecaySubmodule I ≃ₗ[ℂ] modulatedExponentialDecaySubmodule n I,
+      (∀ f x, (e f).val x = f.val (positiveRealLogEquiv (d x)).toAdd) ∧
+      (∀ a f, modulatedExponentialDecayTwist n I a (e f) = S (logExponentialDecayTwist I a f)) := by
+  let c := d.trans positiveRealLogEquiv
+  have hmem (f : ℝ → ℂ) : f ∈ logExponentialDecaySubmodule I ↔
+      (fun x ↦ f (c x).toAdd) ∈ modulatedExponentialDecaySubmodule n I :=
+    logDecay_mem_iff n d hd I S hS f
+  let inv (g : modulatedExponentialDecaySubmodule n I) (y : ℝ) :=
+    g.val (c.symm (Multiplicative.ofAdd y))
+  have hinv (g : modulatedExponentialDecaySubmodule n I) : inv g ∈ logExponentialDecaySubmodule I :=
+    (hmem (inv g)).mpr (show (fun x ↦ inv g (c x).toAdd) ∈ modulatedExponentialDecaySubmodule n I from by
+      have hv : (fun x ↦ inv g (c x).toAdd) = g.val :=
+        funext fun x ↦ congrArg g.val (c.symm_apply_apply x)
+      exact hv.symm ▸ g.property)
+  let e : logExponentialDecaySubmodule I ≃ₗ[ℂ] modulatedExponentialDecaySubmodule n I :=
+    { toFun := fun f ↦ ⟨fun x ↦ f.val (c x).toAdd, (hmem f.val).mp f.property⟩
+      invFun := fun g ↦ ⟨inv g, hinv g⟩
+      left_inv := fun f ↦ Subtype.ext (funext fun y ↦ congrArg (fun z : Multiplicative ℝ ↦ f.val z.toAdd)
+        (c.apply_symm_apply (Multiplicative.ofAdd y)))
+      right_inv := fun g ↦ Subtype.ext (funext fun x ↦ congrArg g.val (c.symm_apply_apply x))
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  refine ⟨e, fun _ _ ↦ rfl, fun a f ↦ Subtype.ext (funext fun x ↦ ?_)⟩
+  change modulationWeight n a (fun x ↦ f.val (c x).toAdd) x = S (logExponentialDecayTwist I a f) x
+  calc
+    _ = logExponentialWeight a f.val (c x).toAdd := logWeight_comp n d hd a f.val x
+    _ = logExponentialDecayTwist I a f (c x).toAdd :=
+      (logExponentialDecayTwist_apply I a f (c x).toAdd).symm
+    _ = _ := (hS _ x).symm
+
+/-- Intertwining the coordinate maps of two projective topologies lifts a
+linear equivalence to a continuous linear equivalence. -/
+private def projectiveEquivOfTwists
+    {ι X Y V W : Type*}
+    [AddCommGroup X] [AddCommGroup Y] [AddCommGroup V] [AddCommGroup W]
+    [Module ℂ X] [Module ℂ Y] [Module ℂ V] [Module ℂ W]
+    [TopologicalSpace X] [TopologicalSpace V] [TopologicalSpace W]
+    [IsTopologicalAddGroup X] [PolynormableSpace ℂ W]
+    (U : ι → X →ₗ[ℂ] V) (T : ι → Y →ₗ[ℂ] W)
+    (hU : IsInducing (fun (x : X) a ↦ U a x))
+    (L : X ≃ₗ[ℂ] Y) (S : V ≃L[ℂ] W) (hL : ∀ a x, T a (L x) = S (U a x)) :
+    let p := fun i : ι × {q : Seminorm ℂ W // Continuous q} ↦ i.2.val.comp (T i.1)
+    X ≃L[ℂ] WithGeneratingSeminorms Y p := by
+  let p := fun i : ι × {q : Seminorm ℂ W // Continuous q} ↦ i.2.val.comp (T i.1)
+  let F := WithGeneratingSeminorms Y p
+  let e : X ≃ₗ[ℂ] F := L
+  have hproj := withGeneratingSeminorms_spec Y p
+  let B (a : ι) : F →ₗ[ℂ] W := T a
+  have hT (a : ι) : Continuous (B a) :=
+    (PolynormableSpace.withSeminorms ℂ W).continuous_of_continuous_comp (B a)
+      fun q ↦ hproj.continuous_seminorm (a, q)
+  have he : Continuous e := by
+    apply hproj.continuous_of_continuous_comp e.toLinearMap
+    rintro ⟨a, q⟩
+    have hcoord : Continuous (U a) := (continuous_apply a).comp hU.continuous
+    have hEq : ((p (a, q)).comp e.toLinearMap : X → ℝ) = q.val ∘ S ∘ U a :=
+      funext fun x ↦ congrArg q.val (hL a x)
+    exact hEq.symm ▸ q.property.comp (S.continuous.comp hcoord)
+  refine { e with continuous_toFun := he, continuous_invFun := ?_ }
+  apply hU.continuous_iff.mpr
+  apply continuous_pi
+  intro a
+  have hEq : (fun y : F ↦ U a (e.symm y)) = S.symm ∘ B a := by
+    funext y
+    apply S.injective
+    exact (hL a (L.symm y)).symm.trans
+      ((congrArg (T a) (L.apply_symm_apply y)).trans (S.apply_symm_apply (T a y)).symm)
+  change Continuous (fun y : F ↦ U a (e.symm y))
+  exact hEq.symm ▸ S.symm.continuous.comp (hT a)
+
+/-- Exponential decay in a positive-real coordinate is the projective condition
+on the real logarithmic profile. -/
+private theorem positiveRealDecay_projective_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (d : G ≃ₜ* ℝ≥0ˣ) (n : G →ₜ* ℝ≥0ˣ) (hd : ∀ x, n x = d x)
+    (I : Set ℝ) (hne : I.Nonempty) :
+    let p := fun i : I × {q : Seminorm ℂ (SchwartzBruhat G) // Continuous q} ↦
+      i.2.val.comp (modulatedExponentialDecayTwist n I i.1)
+    ∃ e : PositiveRealExponentialDecay I ≃L[ℂ]
+        WithGeneratingSeminorms (modulatedExponentialDecaySubmodule n I) p,
+      ∀ f x, (e f).val x = f.val (positiveRealLogEquiv (d x)).toAdd := by
+  refine (schwartzBruhat_realCoordinate_equiv (G := G) (d.trans positiveRealLogEquiv)).elim
+    fun S hS ↦ ?_
+  refine (positiveRealDecay_linear_equiv n d hd I S hS).elim fun L hL ↦ ?_
+  have hU := (positiveRealExponentialDecay_isEmbedding I hne).isInducing
+  let e := projectiveEquivOfTwists (X := PositiveRealExponentialDecay I)
+    (fun a ↦ logExponentialDecayTwist I a) (modulatedExponentialDecayTwist n I)
+    hU L S hL.2
+  exact ⟨e, hL.1⟩
+
+/-- A bijective inclusion from the sole stage of a locally convex limit is a
+continuous linear equivalence for the final topology. -/
+private theorem singleStage_final_equiv
+    {κ : Type*} [Subsingleton κ] {X : κ → Type*} {Y : Type*}
+    [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    [AddCommGroup Y] [Module ℂ Y]
+    (J : ∀ k, X k →ₗ[ℂ] Y) (k₀ : κ) (hj : Bijective (J k₀)) :
+    let p := (Subtype.val : {q : Seminorm ℂ Y // ∀ k, Continuous (q ∘ J k)} → _)
+    ∃ e : X k₀ ≃L[ℂ] WithGeneratingSeminorms Y p, ∀ x, e x = J k₀ x := by
+  let p := (Subtype.val : {q : Seminorm ℂ Y // ∀ k, Continuous (q ∘ J k)} → _)
+  let F := WithGeneratingSeminorms Y p
+  let L : X k₀ →ₗ[ℂ] F := J k₀
+  let e := LinearEquiv.ofBijective L hj
+  have hF := withGeneratingSeminorms_spec Y p
+  refine ⟨{ e with continuous_toFun := ?_, continuous_invFun := ?_ }, fun _ ↦ rfl⟩
+  · exact hF.continuous_of_continuous_comp L fun q ↦ q.property k₀
+  · apply (PolynormableSpace.withSeminorms ℂ (X k₀)).continuous_of_continuous_comp e.symm.toLinearMap
+    intro q
+    have hcomp : (fun x : X k₀ ↦ q.val (e.symm (e x))) = q.val :=
+      funext fun x ↦ congrArg q.val (e.symm_apply_apply x)
+    have hbase : Continuous (q.val.comp e.symm.toLinearMap ∘ J k₀) := by
+      change Continuous (fun x : X k₀ ↦ q.val (e.symm (e x)))
+      exact Eq.mpr (congrArg (fun f : X k₀ → ℝ ↦ Continuous f) hcomp) q.property
+    let q' : {q : Seminorm ℂ Y // ∀ k, Continuous (q ∘ J k)} :=
+      ⟨q.val.comp e.symm.toLinearMap, fun k ↦
+        Eq.mp (congrArg (fun i ↦ Continuous (q.val.comp e.symm.toLinearMap ∘ J i))
+          (Subsingleton.elim k₀ k)) hbase⟩
+    exact hF.continuous_seminorm q'
+
 /-- Paper: Example D.3.3.4, p. 805. For the identity modulation, the inductive
 space agrees with the positive-real projective space in logarithmic coordinates. -/
 theorem identityModulationExponentialDecay_equiv (I : Set ℝ) (hInt : OrdConnected I)
@@ -3497,7 +3883,34 @@ theorem identityModulationExponentialDecay_equiv (I : Set ℝ) (hInt : OrdConnec
     ∃ e : PositiveRealExponentialDecay I ≃L[ℂ]
         ModulatedExponentialDecay (ContinuousMonoidHom.id ℝ≥0ˣ) I,
       ∀ (f : PositiveRealExponentialDecay I) (t : ℝ≥0ˣ),
-        (e f).val t = f.val (Real.log (t.val : ℝ)) := by sorry
+        (e f).val t = f.val (Real.log (t.val : ℝ)) := by
+  refine (nonempty_positiveRealStage I hInt hne).elim fun k ↦ ?_
+  let : IsClosed (k.val : Set ℝ≥0ˣ) := k.property.1.isClosed
+  let n := quotientModulation IdModulation k.val k.property.1
+  have hn (x : ℝ≥0ˣ ⧸ k.val) : n x = positiveRealStageEquiv k x := by
+    refine QuotientGroup.induction_on x fun t ↦ ?_
+    exact (positiveRealStageEquiv_mk k t).symm
+  refine (positiveRealDecay_projective_equiv
+    (G := ℝ≥0ˣ ⧸ k.val) (positiveRealStageEquiv k) n hn I hne).elim fun E hE ↦ ?_
+  let J := modulatedExponentialDecayStageInclusion IdModulation I
+  let : Subsingleton PositiveRealStageIndex := ⟨fun k₁ k₂ ↦ Subtype.ext
+    ((positiveRealCompact_eq_bot k₁).trans (positiveRealCompact_eq_bot k₂).symm)⟩
+  have hJ := modulatedExponentialDecayStageInclusion_range IdModulation I k
+  have hj : Bijective (J k) :=
+    ⟨hJ.1, fun f ↦ (hJ.2 f).mpr fun g u ↦ by
+      have hu : u.val = 1 := Subgroup.mem_bot.mp (positiveRealCompact_eq_bot k ▸ u.property)
+      exact congrArg f.val ((congrArg (g * ·) hu).trans (mul_one g))⟩
+  refine (singleStage_final_equiv
+    (X := ModulatedExponentialDecayStage IdModulation I) (Y := modulatedExponentialDecaySubmodule IdModulation I)
+    J k hj).elim fun B hB ↦ ?_
+  refine ⟨E.trans B, fun f t ↦ ?_⟩
+  change (B (E f)).val t = _
+  refine (congrArg (fun u : modulatedExponentialDecaySubmodule IdModulation I ↦ u.val t) (hB (E f))).trans ?_
+  change (E f).val (t : ℝ≥0ˣ ⧸ k.val) = _
+  exact (hE f _).trans (congrArg f.val ((congrArg (fun u ↦ (positiveRealLogEquiv u).toAdd)
+    (positiveRealStageEquiv_mk k t)).trans (positiveRealLogEquiv_apply t)))
+
+end IdentityModulation
 
 section ModulatedExamples
 
@@ -3508,29 +3921,579 @@ variable (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hms : Surjective m)
 local notation "GoodCompact" => {k : Subgroup G // IsCompact (k : Set G) ∧
   IsCompactlyGeneratedGroup (lcaAnnihilator k)}
 
+section WeightTranslation
+
+variable (I : Set ℝ)
+
+/-- Paper: (D.3.3.2), p. 805. The topology of a decay stage is induced by the
+joint map to the product of its Schwartz–Bruhat twists. -/
+private theorem modulatedDecayStage_twists_isInducing (k : GoodCompact) :
+    IsInducing (fun (f : ModulatedExponentialDecayStage m I k) (a : I) ↦
+      modulatedExponentialDecayTwist (quotientModulation m k.val k.property.1) I a f) := by
+  let T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (I → SchwartzBruhat (G ⧸ k.val)) :=
+    LinearMap.pi (modulatedExponentialDecayTwist (quotientModulation m k.val k.property.1) I)
+  change IsInducing T
+  have hPi := withSeminorms_pi
+    (fun _ : I ↦ PolynormableSpace.withSeminorms ℂ (SchwartzBruhat (G ⧸ k.val)))
+  have hInduced := WithSeminorms.topologicalSpace_eq_iInf (t := induced T inferInstance)
+    (T.withSeminorms_induced hPi)
+  refine ⟨(withGeneratingSeminorms_spec _ _).topologicalSpace_eq_iInf.trans
+    (Eq.trans ?_ hInduced.symm)⟩
+  exact (Equiv.sigmaEquivProd I _).symm.iInf_congr (fun _ ↦ rfl)
+
+/-- Translating the exponent set by the negative of a weight exponent makes
+multiplication by that weight a continuous linear equivalence. -/
+private theorem modulatedDecay_weightTranslation (a : ℝ) :
+    ∃ e : ModulatedExponentialDecay m I ≃L[ℂ]
+        ModulatedExponentialDecay m ((fun b : ℝ ↦ b - a) '' I),
+      ∀ f, (e f).val = modulationWeight m a f.val := by
+  have weight_add {A : Type _} [CommGroup A] [TopologicalSpace A]
+      (n : A →ₜ* ℝ≥0ˣ) (b c : ℝ) (f : A → ℂ) :
+      modulationWeight n b (modulationWeight n c f) = modulationWeight n (b + c) f := by
+    funext x
+    have hx : 0 < ((n x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (n x))
+    simp only [modulationWeight, LinearMap.mulLeft_apply, Pi.mul_apply,
+      Real.rpow_add hx, Complex.ofReal_mul, mul_assoc]
+  let shift {A : Type _} [CommGroup A] [TopologicalSpace A]
+      (n : A →ₜ* ℝ≥0ˣ) (S T : Set ℝ) (c : ℝ) (h : ∀ b ∈ T, b + c ∈ S) :
+      modulatedExponentialDecaySubmodule n S →ₗ[ℂ] modulatedExponentialDecaySubmodule n T :=
+    ((modulationWeight n c).comp (modulatedExponentialDecaySubmodule n S).subtype).codRestrict
+      (modulatedExponentialDecaySubmodule n T) (by
+        intro f
+        refine (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr ?_
+        change modulationWeight n b (modulationWeight n c f.val) ∈ schwartzBruhatSubmodule A
+        rw [weight_add]
+        exact modulationWeight_mem_schwartzBruhat n S ⟨b + c, h b b.property⟩ f)
+  let continuousShift (S T : Set ℝ) (c : ℝ) (h : ∀ b ∈ T, b + c ∈ S) :
+      ModulatedExponentialDecay m S →L[ℂ] ModulatedExponentialDecay m T := by
+    let F : ModulatedExponentialDecay m S →ₗ[ℂ] ModulatedExponentialDecay m T := shift m S T c h
+    refine ⟨F, ?_⟩
+    change Continuous F
+    let FinalSeminorms (U : Set ℝ) := {q : Seminorm ℂ (modulatedExponentialDecaySubmodule m U) //
+      ∀ k : GoodCompact, Continuous (q ∘ modulatedExponentialDecayStageInclusion m U k)}
+    have generating (U : Set ℝ) :=
+      withGeneratingSeminorms_spec _ (Subtype.val : FinalSeminorms U → _)
+    refine (generating T).continuous_of_continuous_comp F fun p ↦ ?_
+    let q : Seminorm ℂ (ModulatedExponentialDecay m S) := p.val.comp F
+    change Continuous q
+    have hq (k : GoodCompact) : Continuous (q ∘ modulatedExponentialDecayStageInclusion m S k) := by
+      let n := quotientModulation m k.val k.property.1
+      let stageShift : ModulatedExponentialDecayStage m S k →ₗ[ℂ]
+          ModulatedExponentialDecayStage m T k := shift n S T c h
+      have hstage : Continuous stageShift := by
+        apply (modulatedDecayStage_twists_isInducing m T k).continuous_iff.mpr
+        apply continuous_pi
+        intro b
+        let d : S := ⟨b + c, h b b.property⟩
+        have htwist : Continuous (fun f : ModulatedExponentialDecayStage m S k ↦
+            modulatedExponentialDecayTwist n S d f) :=
+          (continuous_apply d).comp (modulatedDecayStage_twists_isInducing m S k).continuous
+        exact htwist.congr fun f ↦ Subtype.ext (weight_add n b c f.val).symm
+      exact ((p.property k).comp hstage).congr fun f ↦ congrArg p.val (Subtype.ext rfl)
+    exact (generating S).continuous_seminorm (⟨q, hq⟩ : FinalSeminorms S)
+  let J := (fun b : ℝ ↦ b - a) '' I
+  have hforward : ∀ b ∈ J, b + a ∈ I := by
+    rintro b ⟨d, hd, rfl⟩
+    simpa only [sub_add_cancel] using hd
+  have hbackward : ∀ b ∈ I, b + -a ∈ J := by
+    intro b hb
+    exact ⟨b, hb, sub_eq_add_neg b a⟩
+  let forward : ModulatedExponentialDecay m I →L[ℂ] ModulatedExponentialDecay m J := continuousShift I J a hforward
+  let backward : ModulatedExponentialDecay m J →L[ℂ] ModulatedExponentialDecay m I := continuousShift J I (-a) hbackward
+  have hleft : LeftInverse backward forward := by
+    intro f
+    apply Subtype.ext
+    change modulationWeight m (-a) (modulationWeight m a f.val) = f.val
+    rw [weight_add, neg_add_cancel, modulationWeight_zero]
+  have hright : RightInverse backward forward := by
+    intro f
+    apply Subtype.ext
+    change modulationWeight m a (modulationWeight m (-a) f.val) = f.val
+    rw [weight_add, add_neg_cancel, modulationWeight_zero]
+  exact ⟨ContinuousLinearEquiv.equivOfInverse forward backward hleft hright, fun _ ↦ rfl⟩
+
+end WeightTranslation
+
 include hm hms
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Example D.3.3.5, p. 805. Weighting by the difference of exponents
 identifies the two singleton decay spaces.
 Deviation: This includes the ordinary Schwartz–Bruhat case at exponent zero
 via the continuous equivalence in the next declaration. -/
 theorem modulatedExponentialDecay_singleton_equiv (a b : ℝ) :
     ∃ e : ModulatedExponentialDecay m {a} ≃L[ℂ] ModulatedExponentialDecay m {b},
-      ∀ f, (e f).val = modulationWeight m (a - b) f.val := by sorry
+      ∀ f, (e f).val = modulationWeight m (a - b) f.val := by
+  have hset : (fun x : ℝ ↦ x - (a - b)) '' ({a} : Set ℝ) = {b} :=
+    Set.image_singleton.trans (congrArg (fun x : ℝ ↦ ({x} : Set ℝ)) (sub_sub_cancel a b))
+  let P (J : Set ℝ) :=
+    ∃ e : ModulatedExponentialDecay m {a} ≃L[ℂ] ModulatedExponentialDecay m J,
+      ∀ f, (e f).val = modulationWeight m (a - b) f.val
+  have h : P ((fun x : ℝ ↦ x - (a - b)) '' ({a} : Set ℝ)) :=
+    modulatedDecay_weightTranslation m {a} (a - b)
+  exact @Eq.ndrec (Set ℝ) ((fun x : ℝ ↦ x - (a - b)) '' ({a} : Set ℝ))
+    P h ({b} : Set ℝ) hset
 
+omit hm hms in
+/-- Pullback from a compact quotient is continuous because it lifts each
+structural stage with the same elementary coordinates. -/
+private theorem continuous_schwartzBruhat_compactQuotient_pullback
+    (k : Subgroup G) (hk : IsCompact (k : Set G)) :
+    ∃ P : SchwartzBruhat (G ⧸ k) →L[ℂ] SchwartzBruhat G,
+      ∀ f g, P f g = f (g : G ⧸ k) := by
+  let P : SchwartzBruhat (G ⧸ k) →ₗ[ℂ] SchwartzBruhat G :=
+    ((LinearMap.pi fun g : G ↦ LinearMap.proj (g : G ⧸ k)).comp
+      (schwartzBruhatSubmodule (G ⧸ k)).subtype).codRestrict (schwartzBruhatSubmodule G)
+        (fun f ↦ schwartzBruhatSubmodule_compactQuotient_pullback_mem k hk f.property)
+  refine ⟨⟨P, ?_⟩, fun _ _ ↦ rfl⟩
+  apply (withGeneratingSeminorms_spec (schwartzBruhatSubmodule G) Subtype.val)
+    |>.continuous_of_continuous_comp P
+  intro p
+  let q := p.val.comp P
+  refine (withGeneratingSeminorms_spec (schwartzBruhatSubmodule (G ⧸ k)) Subtype.val)
+    |>.continuous_seminorm ⟨q, ?_⟩
+  intro b e
+  obtain ⟨c, v, hc, hv⟩ := bruhatStructuralPair_lift_compactQuotient k hk b
+  let e' : ElementaryLCAPresentation c.quotient := { e with equiv := v.trans e.equiv }
+  have hstage (s : SchwartzBruhatStage e) :
+      schwartzBruhatStageInclusion c e' s = P (schwartzBruhatStageInclusion b e s) := by
+    apply Subtype.ext
+    funext g
+    change schwartzBruhatStageRealization c e' s g =
+      schwartzBruhatStageRealization b e s (g : G ⧸ k)
+    by_cases hg : g ∈ c.val.1
+    · have hqg := (hc g).mp hg
+      calc
+        _ = s (e'.equiv (QuotientGroup.mk ⟨g, hg⟩)).toAdd :=
+          (schwartzBruhatStageRealization_apply c e' s g).trans (dite_eq_left hg)
+        _ = s (e.equiv (QuotientGroup.mk ⟨(g : G ⧸ k), hqg⟩)).toAdd :=
+          congrArg (fun x : b.quotient ↦ s (e.equiv x).toAdd) (hv g hg)
+        _ = _ := ((schwartzBruhatStageRealization_apply b e s (g : G ⧸ k)).trans
+          (dite_eq_left hqg)).symm
+    · have hqg := mt (hc g).mpr hg
+      exact ((schwartzBruhatStageRealization_apply c e' s g).trans (dite_eq_right hg)).trans
+        (((schwartzBruhatStageRealization_apply b e s (g : G ⧸ k)).trans (dite_eq_right hqg)).symm)
+  exact (p.property c e').congr fun s ↦ congrArg p.val (hstage s)
+
+omit hm hms in
+/-- The singleton twist is a linear bijection, with inverse weighting at
+the opposite exponent. -/
+private theorem modulatedExponentialDecayTwist_singleton_bijective {A : Type*} [CommGroup A] [TopologicalSpace A]
+    (n : A →ₜ* ℝ≥0ˣ) (a : ℝ) :
+    Bijective (modulatedExponentialDecayTwist n {a} ⟨a, rfl⟩) := by
+  have cancel (b : ℝ) (f : A → ℂ) :
+      modulationWeight n b (modulationWeight n (-b) f) = f := by
+    funext x
+    have hx : 0 < ((n x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (n x))
+    simp only [modulationWeight, LinearMap.mulLeft_apply, Pi.mul_apply, ← mul_assoc,
+      ← Complex.ofReal_mul, ← Real.rpow_add hx, add_neg_cancel, Real.rpow_zero,
+      Complex.ofReal_one, one_mul]
+  constructor
+  · intro f g h
+    apply Subtype.ext
+    have h' : modulationWeight n a f.val = modulationWeight n a g.val := congrArg Subtype.val h
+    have hinv (u : A → ℂ) : modulationWeight n (-a) (modulationWeight n a u) = u := by
+      simpa only [neg_neg] using cancel (-a) u
+    exact (hinv f.val).symm.trans ((congrArg (modulationWeight n (-a)) h').trans (hinv g.val))
+  · intro f
+    let g := modulationWeight n (-a) (f : A → ℂ)
+    have hg : g ∈ modulatedExponentialDecaySubmodule n {a} := by
+      refine (Submodule.mem_iInf _).mpr ?_
+      intro b
+      apply Submodule.mem_comap.mpr
+      change modulationWeight n (b : ℝ) (modulationWeight n (-a) f.val) ∈ schwartzBruhatSubmodule A
+      rw [mem_singleton_iff.mp b.property, cancel]
+      exact f.property
+    exact ⟨⟨g, hg⟩, Subtype.ext (cancel a f.val)⟩
+
+omit hm hms in
+/-- A structural stage descends continuously to the quotient by its compact
+subgroup, where normalized Haar averaging recovers the descended function. -/
+private theorem schwartzBruhatStage_compactQuotient_descent (b : BruhatStructuralPair G)
+    (d : ElementaryLCAPresentation b.quotient) :
+    let k := OrderDual.ofDual b.val.2
+    ∃ P : SchwartzBruhatStage d →L[ℂ] SchwartzBruhat (G ⧸ k),
+      ∀ s (g : G), P s (g : G ⧸ k) = schwartzBruhatStageRealization b d s g := by
+  let k := OrderDual.ofDual b.val.2
+  have hk : IsCompact (k : Set G) :=
+    isCompact_of_isBruhatGoodSubgroup_aux k b.property.2.2.1
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace k := isCompact_iff_compactSpace.mp hk
+  let μ : Measure k := Measure.haarMeasure ⊤
+  let : IsProbabilityMeasure μ := ⟨Measure.haarMeasure_self⟩
+  have hint (c : ℂ) : (∫ _u : k, c ∂μ) = c :=
+    (integral_const c).trans <|
+      (congrArg (fun r : ℝ ↦ r • c) (probReal_univ (μ := μ))).trans (one_smul ℝ c)
+  have havg := schwartzBruhatCosetIntegral_continuousLinear k μ hk.isClosed
+  let P : SchwartzBruhat G →L[ℂ] SchwartzBruhat (G ⧸ k) := havg.choose
+  have hP (f : SchwartzBruhat G) : P f = schwartzBruhatCosetIntegral k μ
+      hk.isClosed f := havg.choose_spec f
+  let F : SchwartzBruhatStage d →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion b d
+  have hF : Continuous F := by
+    apply (withGeneratingSeminorms_spec (schwartzBruhatSubmodule G) Subtype.val)
+      |>.continuous_of_continuous_comp F
+    exact fun r ↦ r.property b d
+  refine ⟨P.comp ⟨F, hF⟩, fun s g ↦ ?_⟩
+  change P (F s) (g : G ⧸ k) = F s g
+  calc
+    _ = schwartzBruhatCosetIntegral k μ hk.isClosed (F s) (g : G ⧸ k) :=
+      congrArg (fun f : SchwartzBruhat (G ⧸ k) ↦ f (g : G ⧸ k)) (hP (F s))
+    _ = ∫ u : k, F s (g * u.val) ∂μ :=
+      schwartzBruhatCosetIntegral_mk k μ hk.isClosed (F s) g
+    _ = F s g := by
+      have hconst (u : k) : F s (g * u.val) = F s g := by
+        have hu : u.val ∈ b.val.1 := b.property.2.2.2 u.property
+        change schwartzBruhatStageRealization b d s (g * u.val) =
+          schwartzBruhatStageRealization b d s g
+        by_cases hg : g ∈ b.val.1
+        · have hgu := b.val.1.mul_mem hg hu
+          let v : b.val.1 := ⟨u.val, hu⟩
+          have hv : v ∈ k.comap b.val.1.subtype := u.property
+          have heq : (QuotientGroup.mk ((⟨g, hg⟩ : b.val.1) * v) : b.quotient) =
+              QuotientGroup.mk ⟨g, hg⟩ := QuotientGroup.mk_mul_of_mem _ hv
+          exact ((schwartzBruhatStageRealization_apply b d s (g * u.val)).trans
+            (dite_eq_left hgu)).trans
+            ((congrArg (fun x : b.quotient ↦ s (d.equiv x).toAdd) heq).trans
+              (((schwartzBruhatStageRealization_apply b d s g).trans (dite_eq_left hg)).symm))
+        · have hgu : g * u.val ∉ b.val.1 :=
+            fun hh ↦ hg ((b.val.1.mul_mem_cancel_right hu).mp hh)
+          exact ((schwartzBruhatStageRealization_apply b d s (g * u.val)).trans
+            (dite_eq_right hgu)).trans
+            (((schwartzBruhatStageRealization_apply b d s g).trans (dite_eq_right hg)).symm)
+      calc
+        _ = ∫ _u : k, F s g ∂μ :=
+          congrArg (fun u : k → ℂ ↦ ∫ v, u v ∂μ) (funext hconst)
+        _ = F s g := hint (F s g)
+
+set_option linter.unusedSectionVars false in
 /-- Paper: Example D.3.3.5, p. 805. Weighting by the given exponent identifies
 the singleton decay space with the ordinary Schwartz–Bruhat space. -/
 theorem modulatedExponentialDecay_singleton_schwartz (a : ℝ) :
     ∃ e : ModulatedExponentialDecay m {a} ≃L[ℂ] SchwartzBruhat G,
-      ∀ f, (e f : G → ℂ) = modulationWeight m a f.val := by sorry
+      ∀ f, (e f : G → ℂ) = modulationWeight m a f.val := by
+  let E := ModulatedExponentialDecay m {a}
+  let S (k : GoodCompact) := ModulatedExponentialDecayStage m {a} k
+  let q (k : GoodCompact) := quotientModulation m k.val k.property.1
+  let a₀ : ({a} : Set ℝ) := ⟨a, rfl⟩
+  let e : E ≃ₗ[ℂ] SchwartzBruhat G :=
+    LinearEquiv.ofBijective _ (modulatedExponentialDecayTwist_singleton_bijective m a)
+  let eₖ (k : GoodCompact) : S k ≃ₗ[ℂ] SchwartzBruhat (G ⧸ k.val) :=
+    LinearEquiv.ofBijective _ (modulatedExponentialDecayTwist_singleton_bijective (q k) a)
+  let j (k : GoodCompact) : S k →ₗ[ℂ] E := modulatedExponentialDecayStageInclusion m {a} k
+  have he (k : GoodCompact) (f : S k) (g : G) :
+      e (j k f) g = eₖ k f (g : G ⧸ k.val) := rfl
+  let Q (k : GoodCompact) :=
+    {p : Seminorm ℂ (SchwartzBruhat (G ⧸ k.val)) // Continuous p}
+  let stageFamily (k : GoodCompact) (i : ({a} : Set ℝ) × Q k) :
+      Seminorm ℂ (modulatedExponentialDecaySubmodule (q k) {a}) :=
+    i.2.val.comp (modulatedExponentialDecayTwist (q k) {a} i.1)
+  have hS (k : GoodCompact) :=
+    withGeneratingSeminorms_spec (modulatedExponentialDecaySubmodule (q k) {a}) (stageFamily k)
+  have hstage (k : GoodCompact) : Continuous (eₖ k) := by
+    refine (PolynormableSpace.withSeminorms ℂ (SchwartzBruhat (G ⧸ k.val)))
+      |>.continuous_of_continuous_comp (eₖ k).toLinearMap fun p ↦ ?_
+    exact (hS k).continuous_seminorm (a₀, p)
+  have hstageInv (k : GoodCompact) : Continuous (eₖ k).symm := by
+    refine (hS k).continuous_of_continuous_comp (eₖ k).symm.toLinearMap ?_
+    rintro ⟨b, p⟩
+    have hb : b = a₀ := Subsingleton.elim _ _
+    subst b
+    change Continuous (fun f : SchwartzBruhat (G ⧸ k.val) ↦ p.val (eₖ k ((eₖ k).symm f)))
+    have heq (f : SchwartzBruhat (G ⧸ k.val)) :
+        p.val f = p.val (eₖ k ((eₖ k).symm f)) :=
+      congrArg (fun g : SchwartzBruhat (G ⧸ k.val) ↦ p.val g) ((eₖ k).apply_symm_apply f).symm
+    exact p.property.congr heq
+  let FinalSeminorms := {p : Seminorm ℂ (modulatedExponentialDecaySubmodule m {a}) //
+    ∀ k : GoodCompact, Continuous (p ∘ j k)}
+  have hE := withGeneratingSeminorms_spec _ (Subtype.val : FinalSeminorms → _)
+  have hfwdStage (k : GoodCompact) : Continuous (fun f : S k ↦ e (j k f)) := by
+    have hh := continuous_schwartzBruhat_compactQuotient_pullback k.val k.property.1
+    let P : SchwartzBruhat (G ⧸ k.val) →L[ℂ] SchwartzBruhat G := hh.choose
+    have hP (u : SchwartzBruhat (G ⧸ k.val)) (g : G) :
+        P u g = u (g : G ⧸ k.val) := hh.choose_spec u g
+    have hc : Continuous (fun f : S k ↦ P (eₖ k f)) := P.continuous.comp (hstage k)
+    have heq : (fun f : S k ↦ P (eₖ k f)) = (fun f : S k ↦ e (j k f)) := by
+      funext f
+      apply Subtype.ext
+      funext g
+      exact (hP (eₖ k f) g).trans (he k f g).symm
+    exact Eq.mp (congrArg (fun u : S k → SchwartzBruhat G ↦ Continuous u) heq) hc
+  have hfwd : Continuous (fun f : E ↦ e f) := by
+    have hTarget := PolynormableSpace.withSeminorms ℂ (SchwartzBruhat G)
+    refine hTarget.continuous_of_continuous_comp e.toLinearMap ?_
+    intro p
+    let r : Seminorm ℂ E := p.val.comp e.toLinearMap
+    change Continuous r
+    have hr (k : GoodCompact) : Continuous (fun f : S k ↦ r (j k f)) :=
+      p.property.comp (hfwdStage k)
+    exact hE.continuous_seminorm (⟨r, hr⟩ : FinalSeminorms)
+  have hbwdStage (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) :
+      Continuous (fun f : SchwartzBruhatStage d ↦ e.symm (schwartzBruhatStageInclusion b d f)) := by
+    have hd := schwartzBruhatStage_compactQuotient_descent b d
+    let k₀ := OrderDual.ofDual b.val.2
+    let k : GoodCompact := ⟨k₀, isCompact_of_isBruhatGoodSubgroup_aux k₀ b.property.2.2.1,
+      b.property.2.2.1.2.2⟩
+    let P : SchwartzBruhatStage d →L[ℂ] SchwartzBruhat (G ⧸ k₀) := hd.choose
+    have hP (s : SchwartzBruhatStage d) (g : G) :
+        P s (g : G ⧸ k₀) = schwartzBruhatStageRealization b d s g := hd.choose_spec s g
+    let F : SchwartzBruhatStage d →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion b d
+    have hfactor (s : SchwartzBruhatStage d) : j k ((eₖ k).symm (P s)) = e.symm (F s) := by
+      apply e.injective
+      apply Subtype.ext
+      funext g
+      change e (j k ((eₖ k).symm (P s))) g = e (e.symm (F s)) g
+      calc
+        _ = eₖ k ((eₖ k).symm (P s)) (g : G ⧸ k.val) := he k _ g
+        _ = P s (g : G ⧸ k.val) :=
+          congrArg (fun f : SchwartzBruhat (G ⧸ k.val) ↦ f (g : G ⧸ k.val))
+            ((eₖ k).apply_symm_apply (P s))
+        _ = F s g := hP s g
+        _ = _ := congrArg (fun f : SchwartzBruhat G ↦ f g) (e.apply_symm_apply (F s)).symm
+    have hj : Continuous (j k) :=
+      hE.continuous_of_continuous_comp (j k) (fun p ↦ p.property k)
+    have hc : Continuous (fun s : SchwartzBruhatStage d ↦ j k ((eₖ k).symm (P s))) :=
+      hj.comp ((hstageInv k).comp P.continuous)
+    exact Eq.mp (congrArg (fun u : SchwartzBruhatStage d → E ↦ Continuous u)
+      (funext hfactor)) hc
+  let SchwartzSeminorms := {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+    ∀ (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion b d)}
+  have hB := withGeneratingSeminorms_spec _ (Subtype.val : SchwartzSeminorms → _)
+  have hbwd : Continuous (fun f : SchwartzBruhat G ↦ e.symm f) := by
+    refine hE.continuous_of_continuous_comp e.symm.toLinearMap ?_
+    intro p
+    let r : Seminorm ℂ (SchwartzBruhat G) := p.val.comp e.symm.toLinearMap
+    change Continuous r
+    have hr (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) :
+        Continuous (fun f : SchwartzBruhatStage d ↦ r (schwartzBruhatStageInclusion b d f)) :=
+      (hE.continuous_seminorm p).comp (hbwdStage b d)
+    exact hB.continuous_seminorm (⟨r, hr⟩ : SchwartzSeminorms)
 
+  let e' : E ≃L[ℂ] SchwartzBruhat G := ⟨e, hfwd, hbwd⟩
+  refine ⟨e', ?_⟩
+  intro f
+  change (e f : G → ℂ) = modulationWeight m a f.val
+  rfl
+
+omit hm hms [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- Evaluation on an elementary stage is bounded by the zeroth Schwartz seminorm. -/
+private theorem elementarySchwartz_eval_continuousLinear {d t r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (x : ElementaryLieGroup d t r F) :
+    ∃ L : ElementarySchwartz d t r F →L[ℂ] ℂ, ∀ f, L f = f x := by
+  let L : ElementarySchwartz d t r F →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (elementarySchwartzSubmodule d t r F).subtype
+  refine ⟨⟨L, (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦ ?_⟩, fun _ ↦ rfl⟩
+  let i : ElementarySchwartzIndex d t r := (0, 0, 0, 0)
+  apply Seminorm.continuous_of_le («E» := ElementarySchwartz d t r F)
+    (q := elementarySchwartzSeminorm i)
+    (elementarySchwartz_withSeminorms.continuous_seminorm i)
+  intro f
+  change (‖f.val x‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val i).toReal
+  apply ENNReal.toReal_mono (f.property.2 i).ne
+  rw [show i = (0, 0, 0, 0) from rfl, elementarySchwartzBound_zero]
+  exact le_iSup (fun y ↦ (‖f.val y‖₊ : ENNReal)) x
+
+omit hm hms [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- Evaluation on Schwartz–Bruhat functions is continuous by the stage seminorms. -/
+private theorem continuous_schwartzBruhat_eval_forEndpoints (x : G) :
+    Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+  let L : SchwartzBruhat G →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  apply (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L
+  intro _
+  change Continuous p
+  refine (withGeneratingSeminorms_spec _ _).continuous_seminorm
+    (⟨p, fun a e ↦ ?_⟩ : {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion a e)})
+  classical
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  by_cases hx : x ∈ a.val.1
+  · obtain ⟨E, hE⟩ := elementarySchwartz_eval_continuousLinear
+      (e.equiv (QuotientGroup.mk ⟨x, hx⟩)).toAdd
+    exact E.continuous.norm.congr fun f ↦ by
+      change ‖E f‖ = ‖schwartzBruhatStageRealization a e f x‖
+      rw [hE, schwartzBruhatStageRealization_apply, dite_eq_left hx]
+  · exact continuous_const.congr fun f ↦ by
+      change (0 : ℝ) = ‖schwartzBruhatStageRealization a e f x‖
+      rw [schwartzBruhatStageRealization_apply, dite_eq_right hx, norm_zero]
+
+omit hm hms in
+/-- A smooth multiplier of `log m` with bounded derivatives acts continuously
+on Schwartz–Bruhat functions, by applying it on each elementary stage. -/
+private theorem logModulation_mul_schwartzBruhat_continuousLinear {φ : ℝ → ℂ}
+    (hφ : ContDiff ℝ ∞ φ) (hφb : ∀ j, ∃ C, ∀ t, ‖iteratedFDeriv ℝ j φ t‖ ≤ C) :
+    ∃ M : SchwartzBruhat G →L[ℂ] SchwartzBruhat G,
+      ∀ f x, M f x = φ (Real.log ((m x).val : ℝ)) * f x := by
+  classical
+  let w (x : G) := φ (Real.log ((m x).val : ℝ))
+  let L : SchwartzBruhat G →ₗ[ℂ] SchwartzBruhat G :=
+    ((LinearMap.mulLeft ℂ w).comp (schwartzBruhatSubmodule G).subtype).codRestrict
+      (schwartzBruhatSubmodule G) (fun f ↦ logModulation_mul_mem_schwartzBruhat m hφ hφb f.property)
+  refine ⟨⟨L, ?_⟩, fun _ _ ↦ rfl⟩
+  let FinalSeminorms := {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+    ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion a e)}
+  have generating := withGeneratingSeminorms_spec _ (Subtype.val : FinalSeminorms → _)
+  apply generating.continuous_of_continuous_comp L
+  intro p
+  refine generating.continuous_seminorm (⟨p.val.comp L, fun a e ↦ ?_⟩ : FinalSeminorms)
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  let X := SchwartzBruhatStage e
+  let Y := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let R := schwartzBruhatStageRealization a e
+  -- Each elementary coordinate can be evaluated at a representative in the open subgroup.
+  have hrep (y : Y) : ∃ x : a.val.1, (e.equiv (QuotientGroup.mk x)).toAdd = y := by
+    obtain ⟨q, hq⟩ := e.equiv.surjective (Multiplicative.ofAdd y)
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+    exact ⟨x, congrArg Multiplicative.toAdd hq⟩
+  choose x hx using hrep
+  have heval (f : X) (y : Y) : R f (x y).val = f y := by
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left (x y).property, hx]
+  choose s hs using fun f : X ↦ stage_mul_logModulation m a e f hφ hφb
+  have hmul (f : X) (y : Y) : s f y = w (x y).val * f y := by
+    calc
+      _ = R (s f) (x y).val := (heval (s f) y).symm
+      _ = w (x y).val * R f (x y).val := congrFun (hs f) _
+      _ = _ := congrArg (w (x y).val * ·) (heval f y)
+  let A : X →ₗ[ℂ] X :=
+    { toFun := s
+      map_add' := fun f g ↦ Subtype.ext (funext fun y ↦ by
+        change s (f + g) y = s f y + s g y
+        rw [hmul, hmul, hmul]
+        exact mul_add _ _ _)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun y ↦ by
+        change s (c • f) y = c * s f y
+        rw [hmul, hmul]
+        exact mul_left_comm _ _ _) }
+  let _ : BarrelledSpace ℂ X := elementarySchwartz_barrelled
+  let _ : ContinuousSMul ℂ X := elementarySchwartz_withSeminorms.continuousSMul
+  have hA : Continuous A := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro y
+    obtain ⟨E, hE⟩ := elementarySchwartz_eval_continuousLinear y
+    exact ⟨w (x y).val • E, fun f ↦ by
+      change w (x y).val * E f = s f y
+      rw [hE, hmul]⟩
+  exact ((p.property a e).comp hA).congr fun f ↦ congrArg p.val (Subtype.ext (hs f))
+
+omit hm hms in
+/-- Every twist in a closed interval is recovered continuously from the two endpoint twists. -/
+private theorem modulationWeight_between_continuous (a c b : ℝ) (hac : a ≤ c) (hcb : c ≤ b) :
+    ∃ F : SchwartzBruhat G × SchwartzBruhat G →L[ℂ] SchwartzBruhat G,
+      ∀ (f : G → ℂ) (p : SchwartzBruhat G × SchwartzBruhat G),
+        p.1.val = modulationWeight m a f → p.2.val = modulationWeight m b f →
+        (F p).val = modulationWeight m c f := by
+  let φ (t : ℝ) : ℂ :=
+    ((Real.exp (-(c - a) * t) + Real.exp ((b - c) * t))⁻¹ : ℝ)
+  have hφ : ContDiff ℝ ∞ φ ∧ ∀ j, ∃ C, ∀ t, ‖iteratedFDeriv ℝ j φ t‖ ≤ C :=
+    twoSidedExpWeight_bounds_of_nonneg (sub_nonneg.mpr hac) (sub_nonneg.mpr hcb)
+  have hmul := logModulation_mul_schwartzBruhat_continuousLinear m hφ.1 hφ.2
+  let M := hmul.choose
+  have hM := hmul.choose_spec
+  let fst := ContinuousLinearMap.fst ℂ (SchwartzBruhat G) (SchwartzBruhat G)
+  let snd := ContinuousLinearMap.snd ℂ (SchwartzBruhat G) (SchwartzBruhat G)
+  refine ⟨M.comp (fst + snd), ?_⟩
+  intro f p ha hb
+  change (M (p.1 + p.2)).val = modulationWeight m c f
+  funext x
+  have hsum : (p.1 + p.2).val = modulationWeight m a f + modulationWeight m b f :=
+    congrArg₂ (fun u v : G → ℂ ↦ u + v) ha hb
+  calc
+    _ = φ (Real.log ((m x).val : ℝ)) * (p.1 + p.2).val x := hM (p.1 + p.2) x
+    _ = φ (Real.log ((m x).val : ℝ)) * (modulationWeight m a f + modulationWeight m b f) x :=
+      congrArg (fun g : G → ℂ ↦ φ (Real.log ((m x).val : ℝ)) * g x) hsum
+    _ = _ := (congrFun (modulationWeight_between_eq m f a c b) x).symm
+
+-- Keep the modulation hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Example D.3.3.5, p. 805. The diagonal map from a stage over a
 compact interval to the two endpoint stages is a closed topological embedding. -/
 theorem modulatedExponentialDecayStage_endpoints_closedEmbedding (k : GoodCompact)
     (a b : ℝ) (hab : a ≤ b) :
     ∃ T : ModulatedExponentialDecayStage m (Icc a b) k →L[ℂ]
         ModulatedExponentialDecayStage m {a} k × ModulatedExponentialDecayStage m {b} k,
-      IsClosedEmbedding T ∧ ∀ f, (T f).1.val = f.val ∧ (T f).2.val = f.val := by sorry
+      IsClosedEmbedding T ∧ ∀ f, (T f).1.val = f.val ∧ (T f).2.val = f.val := by
+  let Q := G ⧸ k.val
+  let n := quotientModulation m k.val k.property.1
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let X (J : Set ℝ) := ModulatedExponentialDecayStage m J k
+  let twist (J : Set ℝ) (c : J) : X J →L[ℂ] SchwartzBruhat Q :=
+    ⟨modulatedExponentialDecayTwist n J c,
+      (continuous_apply c).comp (modulatedDecayStage_twists_isInducing m J k).continuous⟩
+  let restrict (J K : Set ℝ) (h : K ⊆ J) : X J →L[ℂ] X K := by
+    let R : X J →ₗ[ℂ] X K :=
+      (modulatedExponentialDecaySubmodule n J).subtype.codRestrict
+        (modulatedExponentialDecaySubmodule n K) fun f ↦
+          (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr
+            (modulationWeight_mem_schwartzBruhat n J ⟨c, h c.property⟩ f)
+    refine ⟨R, (modulatedDecayStage_twists_isInducing m K k).continuous_iff.mpr ?_⟩
+    exact continuous_pi fun c ↦ (twist J ⟨c, h c.property⟩).continuous
+  let T : X (Icc a b) →L[ℂ] X {a} × X {b} :=
+    (restrict _ _ (singleton_subset_iff.mpr (left_mem_Icc.mpr hab))).prod
+      (restrict _ _ (singleton_subset_iff.mpr (right_mem_Icc.mpr hab)))
+  let A : X {a} →L[ℂ] SchwartzBruhat Q := twist {a} ⟨a, rfl⟩
+  let B : X {b} →L[ℂ] SchwartzBruhat Q := twist {b} ⟨b, rfl⟩
+  let endpoints : X {a} × X {b} →L[ℂ] SchwartzBruhat Q × SchwartzBruhat Q :=
+    (A.comp (ContinuousLinearMap.fst ℂ _ _)).prod (B.comp (ContinuousLinearMap.snd ℂ _ _))
+  have hfactor (c : Icc a b) :
+      ∃ F : X {a} × X {b} →L[ℂ] SchwartzBruhat Q,
+        ∀ p, p.1.val = p.2.val → (F p).val = modulationWeight n c p.1.val := by
+    have hW := modulationWeight_between_continuous n a c b
+      c.property.1 c.property.2
+    exact ⟨hW.choose.comp endpoints, fun p h ↦ hW.choose_spec p.1.val (A p.1, B p.2) rfl
+      (congrArg (modulationWeight n b) h.symm)⟩
+  let F (c : Icc a b) := (hfactor c).choose
+  have hFT (c : Icc a b) := (hfactor c).choose_spec
+  have hT : IsInducing T := by
+    let U (p : X {a} × X {b}) (c : Icc a b) := F c p
+    have hU : Continuous U := continuous_pi fun c ↦ (F c).continuous
+    have hcomp : U ∘ (T : X (Icc a b) → X {a} × X {b}) =
+        fun f c ↦ modulatedExponentialDecayTwist n (Icc a b) c f := by
+      funext f c
+      exact Subtype.ext (hFT c (T f) rfl)
+    refine IsInducing.of_comp (f := T) (g := U) T.continuous hU ?_
+    exact (congrArg (fun g : X (Icc a b) → (Icc a b → SchwartzBruhat Q) ↦ IsInducing g)
+      hcomp).mpr (modulatedDecayStage_twists_isInducing m (Icc a b) k)
+  have heval (d : ℝ) (x : Q) : Continuous (fun f : X {d} ↦ f.val x) := by
+    let w : ℂ := (((n x).val : ℝ) ^ d : ℝ)
+    have hw : w ≠ 0 := Complex.ofReal_ne_zero.mpr
+      (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n x))) d).ne'
+    have h := (continuous_schwartzBruhat_eval_forEndpoints x).comp (twist {d} ⟨d, rfl⟩).continuous
+    exact ((continuous_const (y := w⁻¹)).mul h).congr fun f ↦ by
+      change w⁻¹ * (w * f.val x) = f.val x
+      rw [← mul_assoc, inv_mul_cancel₀ hw, one_mul]
+  have hrange : range T = ⋂ x : Q, {p : X {a} × X {b} | p.1.val x = p.2.val x} := by
+    refine Set.ext fun p ↦ ⟨?_, ?_⟩
+    · intro hp
+      refine mem_iInter.mpr fun x ↦ ?_
+      refine Exists.elim hp fun f hf ↦ ?_
+      exact (congrArg (fun q : X {a} × X {b} ↦ q.1.val x = q.2.val x) hf).mp rfl
+    · intro hp
+      have heq : p.1.val = p.2.val := funext fun x ↦ mem_iInter.mp hp x
+      have hf : p.1.val ∈ modulatedExponentialDecaySubmodule n (Icc a b) := by
+        refine (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr ?_
+        exact (congrArg (fun g : Q → ℂ ↦ g ∈ schwartzBruhatSubmodule Q) (hFT c p heq)).mp
+          (F c p).property
+      exact ⟨⟨p.1.val, hf⟩, Prod.ext (Subtype.ext rfl) (Subtype.ext heq)⟩
+  have hinj : Injective T := fun _ _ h ↦
+    Subtype.ext (congrArg (fun p : X {a} × X {b} ↦ p.1.val) h)
+  have hclosed : IsClosed (⋂ x : Q, {p : X {a} × X {b} | p.1.val x = p.2.val x}) := by
+    have hfst : Continuous (Prod.fst : X {a} × X {b} → X {a}) := continuous_fst
+    have hsnd : Continuous (Prod.snd : X {a} × X {b} → X {b}) := continuous_snd
+    exact isClosed_iInter fun x ↦ isClosed_eq ((heval a x).comp hfst) ((heval b x).comp hsnd)
+  have hclosedRange : IsClosed (range T) :=
+    (congrArg (fun s : Set (X {a} × X {b}) ↦ IsClosed s) hrange).mpr hclosed
+  exact ⟨T, ⟨⟨hT, hinj⟩, hclosedRange⟩, fun _ ↦ ⟨rfl, rfl⟩⟩
 
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is Fréchet. -/
 theorem modulatedExponentialDecayStage_frechet (I : Set ℝ) (hInt : OrdConnected I)

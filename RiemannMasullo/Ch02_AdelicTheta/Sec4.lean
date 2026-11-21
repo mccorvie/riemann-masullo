@@ -415,6 +415,38 @@ theorem sLocalAdelicTheta_rat_log_growth (f : SchwartzBruhat (Multiplicative (SA
   · intro x
     simpa only [rat_arch_norm_eq x.1] using h₂ x
 
+/-- Haar measure on the norm-one S-idele classes is finite because the quotient norm is proper. -/
+private theorem normOneSIdeleQuotient_isFiniteMeasure
+    (K : Type*) [Field K] [NumberField K] (V : Finset (HeightOneSpectrum (𝓞 K)))
+    (μ : Measure ↥(MonoidHom.ker (sIdeleQuotientNorm K V))) [Measure.IsHaarMeasure μ] :
+    IsFiniteMeasure μ := by
+  have hcompact : CompactSpace ↥(MonoidHom.ker (sIdeleQuotientNorm K V)) :=
+    isCompact_iff_compactSpace.mp
+      ((isProperMap_sIdeleQuotientNorm K V).isCompact_preimage (isCompact_singleton (x := 1)))
+  exact ⟨isCompact_univ.measure_lt_top⟩
+
+/-- The homogeneous theta average inherits a bound that depends only on the norm
+when its translates by norm-one classes stay in the same norm fiber. -/
+private theorem theta_integral_log_growth {I C H : Type*} [Monoid C] [MeasurableSpace H]
+    (μ : Measure H) [IsFiniteMeasure μ] (q : I → C) (hq : Function.Surjective q)
+    (n : C →* ℝ≥0ˣ) (r : I → ℝ) (hr : ∀ g, r g = (↑↑(n (q g)) : ℝ))
+    (u : H → C) (hu : ∀ h, n (u h) = 1) (ω : H → Circle)
+    (θ : I → ℂ) (θq : C → ℂ) (hθq : ∀ g, θq (q g) = θ g) (M : ℕ)
+    (hθ : θ =O[comap r (𝓝[>] (0 : ℝ))] (fun g ↦ |Real.log (r g)| ^ M)) :
+    (fun g ↦ ∫ h, θq (q g * u h) * (ω h : ℂ) ∂μ) =O[comap r (𝓝[>] (0 : ℝ))]
+      (fun g ↦ |Real.log (r g)| ^ M) := by
+  simp only [isBigO_iff, eventually_comap] at hθ ⊢
+  obtain ⟨B, hB⟩ := hθ
+  refine ⟨B * μ.real Set.univ, ?_⟩
+  filter_upwards [hB] with t ht g hg
+  have hpoint (h : H) : ‖θq (q g * u h) * (ω h : ℂ)‖ ≤ B * ‖|Real.log (r g)| ^ M‖ := by
+    obtain ⟨k, hk⟩ := hq (q g * u h)
+    have heq : r k = r g := by rw [hr k, hr g, hk, map_mul, hu, mul_one]
+    simpa only [norm_mul, Circle.norm_coe, mul_one, ← hk, hθq, ← heq] using
+      ht k (heq.trans hg)
+  exact (norm_integral_le_of_norm_le_const (μ := μ) (.of_forall hpoint)).trans_eq
+    (mul_right_comm _ _ _)
+
 /-- Paper: Proposition 2.4.1.1, pp. 107, 110. Over the rationals the same
 logarithmic growth bound holds for homogeneous theta for each continuous
 character of the norm-one S-idele classes.
@@ -424,7 +456,15 @@ theorem sLocalHomogeneousAdelicTheta_rat_log_growth
     (ω : PontryaginDual ↥(MonoidHom.ker (sIdeleQuotientNorm ℚ S)))
     (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ S))) :
     (fun g ↦ sLocalHomogeneousAdelicTheta ℚ S μ ω f (QuotientGroup.mk g)) =O[smallNorm[ℚ, S]]
-      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by sorry
+      (fun g ↦ |Real.log (normℝ[ℚ, S] g)| ^ S.card) := by
+  have hfinite : IsFiniteMeasure μ := normOneSIdeleQuotient_isFiniteMeasure ℚ S μ
+  let q : Aˣ → SIdeleQuotient ℚ S := QuotientGroup.mk
+  have hq : Function.Surjective q := QuotientGroup.mk_surjective
+  exact theta_integral_log_growth μ q hq (sIdeleQuotientNorm ℚ S) ratNorm
+    (fun g ↦ congrArg (fun t : ℝ≥0ˣ ↦ (↑↑t : ℝ)) (sIdeleQuotientNorm_mk ℚ S g).symm)
+    Subtype.val (fun h ↦ h.property) (fun h ↦ ω h) (fun g ↦ sLocalAdelicTheta ℚ S f g)
+    (sLocalAdelicThetaOnClasses ℚ S f) (sLocalAdelicThetaOnClasses_mk ℚ S f) S.card
+    (sLocalAdelicTheta_rat_log_growth S f)
 
 end Rat
 
@@ -858,20 +898,131 @@ include hε
 -- In (2.4.3.3) the supremum is unweighted since |g′| = 1. It can be
 -- infinite, as for the Gaussian example at (2.4.2.3).
 
+/-- A logarithmic majorant for theta gives boundedness after weighting by
+a positive power of the norm, as the norm tends to zero. -/
+private theorem isBigO_norm_pow_of_log_bound {G : Type*} (ν : G → ℝ) (θ : G → ℂ)
+    (n : ℕ) {C₁ C₂ : ℝ} (hC₁ : 0 < C₁) (hC₂ : 0 < C₂)
+    (htheta : ∀ g, ν g < 1 → ‖θ g‖ ≤ C₁ * |Real.log (ν g)| ^ n + C₂) :
+    (fun g ↦ (ν g ^ ε) • θ g) =O[comap ν (𝓝[>] (0 : ℝ))] (fun _ : G ↦ (1 : ℝ)) := by
+  have hsmall : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ), t ∈ Set.Ioo 0 1 := Ioo_mem_nhdsGT zero_lt_one
+  have hlog : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ), ‖|Real.log t| ^ (n : ℝ)‖ ≤ 1 * ‖t ^ (-ε)‖ :=
+    (isLittleO_abs_log_rpow_rpow_nhdsGT_zero (n : ℝ) (neg_neg_of_pos hε)).bound zero_lt_one
+  have hreal : ∀ᶠ t : ℝ in 𝓝[>] (0 : ℝ),
+      t < 1 ∧ 0 ≤ t ^ ε ∧ t ^ ε * (C₁ * |Real.log t| ^ n + C₂) ≤ C₁ + C₂ := by
+    filter_upwards [hsmall, hlog] with t ht hlogt
+    have hp : 0 ≤ t ^ ε := Real.rpow_nonneg ht.1.le _
+    have hlogle : |Real.log t| ^ n ≤ t ^ (-ε) := by
+      rwa [Real.rpow_natCast, Real.norm_of_nonneg (pow_nonneg (abs_nonneg (Real.log t)) n),
+        Real.norm_of_nonneg (Real.rpow_nonneg ht.1.le (-ε)), one_mul] at hlogt
+    have hweighted : t ^ ε * |Real.log t| ^ n ≤ 1 := calc
+      _ ≤ t ^ ε * t ^ (-ε) := mul_le_mul_of_nonneg_left hlogle hp
+      _ = 1 := by rw [← Real.rpow_add ht.1, add_neg_cancel, Real.rpow_zero]
+    refine ⟨ht.2, hp, ?_⟩
+    calc
+      t ^ ε * (C₁ * |Real.log t| ^ n + C₂)
+          = C₁ * (t ^ ε * |Real.log t| ^ n) + C₂ * t ^ ε := by ring
+      _ ≤ C₁ * 1 + C₂ * 1 :=
+        add_le_add (mul_le_mul_of_nonneg_left hweighted hC₁.le)
+          (mul_le_mul_of_nonneg_left (Real.rpow_le_one ht.1.le ht.2.le hε.le) hC₂.le)
+      _ = C₁ + C₂ := by rw [mul_one, mul_one]
+  have hν : Tendsto ν (comap ν (𝓝[>] (0 : ℝ))) (𝓝[>] (0 : ℝ)) := tendsto_comap
+  refine IsBigO.of_bound (C₁ + C₂) ((hν.eventually hreal).mono fun g ⟨hlt, hp, hb⟩ ↦ ?_)
+  rw [norm_smul, Real.norm_of_nonneg hp, norm_one, mul_one]
+  exact (mul_le_mul_of_nonneg_left (htheta g hlt) hp).trans hb
+
+/-- A bound uniform on bounded sets applies to each individual theta input. -/
+private theorem isBigO_norm_pow_of_uniform_log_bound
+    {G E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [ContinuousSMul ℂ E]
+    (ν : G → ℝ) (θ : E → G → ℂ) (n : ℕ)
+    (hlog : ∀ B : Set E, IsVonNBounded ℂ B →
+      ∃ C₁ C₂ : ℝ, 0 < C₁ ∧ 0 < C₂ ∧ ∀ f ∈ B, ∀ g, ν g < 1 →
+        ‖θ f g‖ ≤ C₁ * |Real.log (ν g)| ^ n + C₂)
+    (f : E) :
+    (fun g ↦ (ν g ^ ε) • θ f g) =O[comap ν (𝓝[>] (0 : ℝ))] (fun _ : G ↦ (1 : ℝ)) := by
+  obtain ⟨C₁, C₂, hC₁, hC₂, htheta⟩ := hlog {f} (isVonNBounded_singleton (𝕜 := ℂ) f)
+  exact isBigO_norm_pow_of_log_bound ε hε ν (θ f) n hC₁ hC₂ (htheta f (Set.mem_singleton f))
+
 /-- Paper: Proposition 2.4.3.1(1), p. 113. Multiplying S-local theta by
 any positive real power of the S-idelic norm gives a bounded function
 as the norm tends to zero from above. -/
 theorem sLocalAdelicTheta_norm_pow_isBigO (f : ℬₛ) :
     (fun g ↦ (normℝ g ^ ε) • sLocalAdelicTheta F S f g) =O[smallNorm]
-      (fun _ : Iₛ ↦ (1 : ℝ)) := by sorry
+      (fun _ : Iₛ ↦ (1 : ℝ)) := by
+  exact isBigO_norm_pow_of_uniform_log_bound (G := Iₛ) (E := ℬₛ) ε hε normℝ
+    (fun f g ↦ sLocalAdelicTheta F S f g) (Fintype.card (InfinitePlace F) + S.card - 1)
+    (sLocalAdelicTheta_log_growth_bounded F S) f
 
+omit hε in
+/-- A norm-power bound on representatives bounds their integral when each integrand
+value has the same norm as a representative at the same norm parameter. -/
+private theorem norm_pow_isBigO_integral_of_representatives {G K : Type*} [MeasurableSpace K]
+    (μ : Measure K) [IsFiniteMeasure μ] (r : G → ℝ) (ε : ℝ) (l : Filter ℝ)
+    (θ : G → ℂ) (φ : G → K → ℂ)
+    (hθ : (fun g ↦ (r g ^ ε) • θ g) =O[comap r l] (fun _ : G ↦ (1 : ℝ)))
+    (hlift : ∀ g h, ∃ k, r k = r g ∧ ‖φ g h‖ = ‖θ k‖) :
+    (fun g ↦ (r g ^ ε) • (∫ h, φ g h ∂μ)) =O[comap r l] (fun _ : G ↦ (1 : ℝ)) := by
+  obtain ⟨C, hC⟩ := hθ.bound
+  refine IsBigO.of_bound (C * μ.real Set.univ) (eventually_comap.mpr ?_)
+  filter_upwards [eventually_comap.mp hC] with t ht g hgt
+  simp only [norm_one, mul_one, ← integral_smul]
+  apply norm_integral_le_of_norm_le_const
+  refine Eventually.of_forall fun h ↦ ?_
+  obtain ⟨k, hk, hnorm⟩ := hlift g h
+  simpa only [norm_smul, hk, ← hnorm, norm_one, mul_one] using ht k (hk.trans hgt)
+
+omit hε in
+/-- Multiplying an S-idele class by a norm-one class admits a representative
+with the original S-idelic norm. -/
+private theorem sIdele_exists_representative_mul_norm_one (g : Iₛ) (h : J₁) : ∃ k : Iₛ,
+    normℝ k = normℝ g ∧ classOf k = classOf g * h.val := by
+  obtain ⟨k, hk⟩ := (QuotientGroup.mk_surjective : Function.Surjective classOf) (classOf g * h.val)
+  have hh : sIdeleQuotientNorm F S h.val = 1 := MonoidHom.mem_ker.mp h.property
+  let n := sIdeleQuotientNorm F S
+  have hn : n (classOf k) = n (classOf g) :=
+    (congrArg n hk).trans ((map_mul n (classOf g) h.val).trans
+      ((congrArg (n (classOf g) * ·) hh).trans (mul_one _)))
+  have hnorm : sIdeleNorm F S k = sIdeleNorm F S g :=
+    (sIdeleQuotientNorm_mk F S k).symm.trans (hn.trans (sIdeleQuotientNorm_mk F S g))
+  exact ⟨k, congrArg (fun u : ℝ≥0ˣ ↦ (u.val : ℝ)) hnorm, hk⟩
+
+omit hε in
+/-- The character-weighted theta integrand has the norm of theta evaluated
+at any representative of its argument. -/
+private theorem sLocalTheta_char_norm_eq_of_representative (ω : PontryaginDual J₁) (f : ℬₛ)
+    (g k : Iₛ) (h : J₁) (hk : classOf k = classOf g * h.val) :
+    ‖sLocalAdelicThetaOnClasses F S f (classOf g * h.val) * (ω h : ℂ)‖ =
+      ‖sLocalAdelicTheta F S f k‖ := by
+  let θ : SIdeleQuotient F S → ℂ := fun c ↦ sLocalAdelicThetaOnClasses F S f c
+  let z : ℂ := θ (classOf g * h.val)
+  change ‖z * (ω h : ℂ)‖ = ‖sLocalAdelicTheta F S f k‖
+  calc
+    ‖z * (ω h : ℂ)‖ = ‖z‖ := by rw [norm_mul, Circle.norm_coe, mul_one]
+    _ = ‖sLocalAdelicTheta F S f k‖ :=
+      congrArg (fun w : ℂ ↦ ‖w‖) ((congrArg θ hk.symm).trans
+        (sLocalAdelicThetaOnClasses_mk F S f k))
+-- The section-variable linter takes minutes to traverse this proof's S-adelic instance terms.
+set_option linter.unusedSectionVars false in
 /-- Paper: Proposition 2.4.3.1(1), p. 113. The same small-norm bound
 holds for homogeneous theta multiplied by a positive norm power.
 Deviation: As in §2.3, the norm-one class Haar measure is explicit. -/
 theorem sLocalHomogeneousAdelicTheta_norm_pow_isBigO
     (μ : Measure ↥J₁) [Measure.IsHaarMeasure μ] (ω : PontryaginDual J₁) (f : ℬₛ) :
     (fun g ↦ (normℝ g ^ ε) • sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)) =O[smallNorm]
-      (fun _ : Iₛ ↦ (1 : ℝ)) := by sorry
+      (fun _ : Iₛ ↦ (1 : ℝ)) := by
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let r : Iₛ → ℝ := normℝ
+  let θ : SIdeleQuotient F S → ℂ := fun c ↦ sLocalAdelicThetaOnClasses F S f c
+  let θ₀ : Iₛ → ℂ := fun g ↦ sLocalAdelicTheta F S f g
+  let χ : J₁ → ℂ := fun h ↦ (ω h : ℂ)
+  let φ (g : Iₛ) (h : J₁) : ℂ := θ (classOf g * h.val) * χ h
+  have hrep (g : Iₛ) (h : J₁) : ∃ k, r k = r g ∧ ‖φ g h‖ = ‖θ₀ k‖ := by
+    obtain ⟨k, hn, hk⟩ := sIdele_exists_representative_mul_norm_one F S g h
+    exact ⟨k, hn, sLocalTheta_char_norm_eq_of_representative F S ω f g k h hk⟩
+  change (fun g : Iₛ ↦ (r g ^ ε) • (∫ h, φ g h ∂μ)) =O[comap r (𝓝[>] (0 : ℝ))]
+    (fun _ : Iₛ ↦ (1 : ℝ))
+  exact norm_pow_isBigO_integral_of_representatives μ r ε (𝓝[>] (0 : ℝ))
+    θ₀ φ (sLocalAdelicTheta_norm_pow_isBigO F S ε hε f) hrep
 
 /-- Paper: Proposition 2.4.3.1(2), p. 113. Below a positive norm cutoff
 the bound for theta times a positive norm power is uniform on a bounded

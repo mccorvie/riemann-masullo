@@ -6,9 +6,12 @@ import Mathlib.Analysis.Calculus.UniformLimitsDeriv
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.LinearAlgebra.TensorProduct.Finiteness
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
+import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-!
@@ -625,6 +628,263 @@ as in (2.2.4.4). -/
 def adeleDirectionalDeriv : ℬ[F] →ₗ[ℂ] ℬ[F] :=
   IsLinearMap.mk' _ (adeleDirectionalDeriv_isLinear γ)
 
+section ArchimedeanContinuity
+
+open scoped Classical Uniformity
+open TopologicalSpace (MetrizableSpace)
+
+local notation "mixed" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+
+/-- A purely real elementary presentation yields a Schwartz–Bruhat stage with
+the full group and trivial kernel. -/
+private theorem schwartzBruhat_euclidean_stage {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] {m : ℕ}
+    (w : G ≃ₜ* Multiplicative (ElementaryLieGroup m 0 0 PUnit.{1})) :
+    ∃ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      ∃ J : ElementarySchwartz m 0 0 PUnit.{1} ≃L[ℂ] SchwartzBruhatStage e,
+        ∀ s x, schwartzBruhatStageRealization a e (J s) x = s (w x).toAdd := by
+  classical
+  let p : ElementaryLCAPresentation G :=
+    { realDim := m, torusDim := 0, latticeRank := 0, finiteFactor := PUnit.{1}
+      equiv := w }
+  have hG : IsCompactlyGeneratedGroup G ∧ IsLocallyEuclidean G :=
+    (lca_elementary_iff (G := G)).mpr ⟨p⟩
+  have hcg := hG.1
+  have hloc := hG.2
+  let t : (⊤ : Subgroup G) ≃ₜ* G :=
+    { Subgroup.topEquiv with
+      continuous_toFun := continuous_subtype_val
+      continuous_invFun := continuous_id.subtype_mk _ }
+  let a : BruhatStructuralPair G := ⟨(⊤, OrderDual.toDual ⊥), by simp,
+    isCompactlyGeneratedGroup_of_continuousMulEquiv t.symm hcg,
+    isBruhatGoodSubgroup_bot_iff.mpr hloc, bot_le⟩
+  let q : a.quotient ≃* G :=
+    QuotientGroup.quotientKerEquivOfRightInverse a.val.1.subtype t.symm (fun _ ↦ rfl)
+  have hq (x : a.val.1) : q (QuotientGroup.mk x) = x.val := rfl
+  let q' : a.quotient ≃ₜ* G :=
+    { q with
+      continuous_toFun := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr
+        (continuous_subtype_val.congr fun x ↦ (hq x).symm)
+      continuous_invFun := QuotientGroup.continuous_mk.comp t.symm.continuous }
+  let e : ElementaryLCAPresentation a.quotient :=
+    { realDim := m, torusDim := 0, latticeRank := 0, finiteFactor := PUnit.{1}
+      equiv := q'.trans p.equiv }
+  refine ⟨a, e, ContinuousLinearEquiv.refl ℂ _, fun s x ↦ ?_⟩
+  rw [schwartzBruhatStageRealization_apply, dite_eq_left (Subgroup.mem_top _)]
+  rfl
+
+omit [NumberField F] in
+/-- The mixed archimedean coordinates followed by a Euclidean linear equivalence
+give a purely real elementary presentation. -/
+private theorem archimedeanMixedSpace_equiv
+    {m : ℕ} (L : mixedEmbedding.mixedSpace F ≃L[ℝ] EuclideanSpace ℝ (Fin m)) :
+    ∃ w : Multiplicative (InfiniteAdeleRing F) ≃ₜ*
+        Multiplicative (ElementaryLieGroup m 0 0 PUnit.{1}),
+      ∀ x : InfiniteAdeleRing F, (w (Multiplicative.ofAdd x)).toAdd =
+        (L (mixed x), 0, 0, 0) := by
+  classical
+  let G := Multiplicative (InfiniteAdeleRing F)
+  let E := EuclideanSpace ℝ (Fin m)
+  let P := ElementaryLieGroup m 0 0 PUnit.{1}
+  let B := (Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × PUnit.{1}
+  let : Unique B := uniqueOfSubsingleton 0
+  let M := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have hm : Continuous M := by
+    have h : ⇑M = fun x ↦
+        ((fun (v : {w : InfinitePlace F // InfinitePlace.IsReal w}) ↦
+          InfinitePlace.Completion.extensionEmbeddingOfIsReal v.2 (x v)),
+         (fun (v : {w : InfinitePlace F // InfinitePlace.IsComplex w}) ↦
+          InfinitePlace.Completion.extensionEmbedding v.1 (x v))) := by
+      funext x
+      exact InfiniteAdeleRing.ringEquiv_mixedSpace_apply F x
+    rw [h]
+    exact (continuous_pi fun v ↦
+      (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal v.2).continuous.comp
+        (continuous_apply v.1)).prodMk (continuous_pi fun v ↦
+      (InfinitePlace.Completion.isometry_extensionEmbedding v.1).continuous.comp
+        (continuous_apply v.1))
+  have hMi : Continuous M.symm := by
+    apply continuous_pi
+    intro v
+    rcases v.isReal_or_isComplex with hv | hv
+    · exact ((InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.continuous.comp
+        ((continuous_apply ⟨v, hv⟩).comp continuous_fst)).congr fun y ↦ by
+          apply (InfinitePlace.Completion.isometryEquivRealOfIsReal hv).injective
+          exact ((InfinitePlace.Completion.isometryEquivRealOfIsReal hv).apply_symm_apply
+            (y.1 ⟨v, hv⟩)).trans
+              (congrFun (congrArg Prod.fst (M.apply_symm_apply y)).symm ⟨v, hv⟩)
+    · exact ((InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).symm.continuous.comp
+        ((continuous_apply ⟨v, hv⟩).comp continuous_snd)).congr fun y ↦ by
+          apply (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).injective
+          exact ((InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).apply_symm_apply
+            (y.2 ⟨v, hv⟩)).trans
+              (congrFun (congrArg Prod.snd (M.apply_symm_apply y)).symm ⟨v, hv⟩)
+  let w : G ≃* Multiplicative P :=
+    AddEquiv.toMultiplicative
+      (M.toAddEquiv.trans (L.toLinearEquiv.toAddEquiv.trans
+        (AddEquiv.prodUnique (M := E) (N := B)).symm))
+  have hw : Continuous w := (L.continuous.comp hm).prodMk continuous_const
+  have hw' : Continuous w.symm := hMi.comp (L.symm.continuous.comp continuous_fst)
+  exact ⟨⟨w, hw, hw'⟩, fun _ ↦ rfl⟩
+
+/-- The purely real elementary Schwartz space has the classical Schwartz topology. -/
+private theorem elementarySchwartz_euclidean_equiv (m : ℕ) :
+    ∃ J : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ ≃L[ℂ] ElementarySchwartz m 0 0 PUnit.{1},
+      ∀ f x, J f x = f x.1 := by
+  classical
+  let E := EuclideanSpace ℝ (Fin m)
+  let S := SchwartzMap E ℂ
+  let T := ElementarySchwartz m 0 0 PUnit.{1}
+  let P := ElementaryLieGroup m 0 0 PUnit.{1}
+  let A : S →ₗ[ℂ] T :=
+    { toFun := fun f ↦ ⟨fun x : P ↦ f x.1,
+        (elementarySchwartzSubmodule_real_iff _).mpr ⟨f, rfl⟩⟩
+      map_add' := fun _ _ ↦ Subtype.ext rfl
+      map_smul' := fun _ _ ↦ Subtype.ext rfl }
+  have hA (f : S) (x : P) : A f x = f x.1 := rfl
+  have hSurj : Surjective A := by
+    intro s
+    have hs (x : P) : s (x.1, 0, 0, 0) = s x :=
+      congrArg s (Prod.ext rfl (Subsingleton.elim _ _))
+    obtain ⟨f, hf⟩ :=
+      (elementarySchwartzSubmodule_real_iff (fun x : E ↦ s (x, 0, 0, 0))).mp
+        (show (fun x : P ↦ s (x.1, 0, 0, 0)) ∈ elementarySchwartzSubmodule m 0 0 PUnit.{1} by
+          rw [show (fun x : P ↦ s (x.1, 0, 0, 0)) = s.val from funext hs]
+          exact s.property)
+    refine ⟨f, Subtype.ext (funext fun x ↦ ?_)⟩
+    exact (congrFun hf x.1).trans (hs x)
+  let e := LinearEquiv.ofBijective A ⟨fun f g h ↦ SchwartzMap.ext fun x ↦
+    congrArg (fun s : T ↦ s (x, 0, 0, 0)) h, hSurj⟩
+  let : BarrelledSpace ℂ S := isFrechetTVS_barrelled (euclideanSchwartz_frechet m)
+  have hc : Continuous A :=
+    continuous_toElementarySchwartz_of_eval A fun x ↦
+      ⟨(BoundedContinuousFunction.evalCLM ℂ x.1).comp
+        (SchwartzMap.toBoundedContinuousFunctionCLM ℂ E ℂ), fun _ ↦ rfl⟩
+  obtain ⟨hadd, -, hmetric, hcomplete⟩ := elementarySchwartz_isFrechet (m := m) (n := 0)
+    (r := 0) (F := PUnit.{1})
+  have : MetrizableSpace T := hmetric
+  have : CompleteSpace T := by
+    rw [← IsUniformAddGroup.rightUniformSpace_eq (G := T)]
+    exact hcomplete
+  have : (uniformity T).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero T]
+    infer_instance
+  have : CompleteSpace S := completeSpace_schwartzMap
+  have ho : IsOpenMap A := by
+    have h : ¬ IsMeagre (range (A : S → T)) := by
+      rw [hSurj.range_eq]
+      exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+    exact isOpenMap_of_not_isMeagre_range (⟨A, hc⟩ : S →L[ℂ] T) h
+  exact ⟨⟨e, hc, e.toEquiv.continuous_symm_iff.mpr ho⟩, hA⟩
+
+/-- A Euclidean stage which realizes every Schwartz–Bruhat function gives a topological
+equivalence by pointwise pullback. -/
+private theorem schwartzBruhat_equiv_of_stage
+    {G V : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    [NormedAddCommGroup V] [NormedSpace ℝ V]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (T : SchwartzMap V ℂ ≃L[ℂ] SchwartzBruhatStage e)
+    (coord : G → V)
+    (hT : ∀ f x, schwartzBruhatStageRealization a e (T f) x = f (coord x))
+    (hSchwartz : ∀ s : SchwartzBruhat G, ∃ f : SchwartzMap V ℂ, ∀ x, f (coord x) = s x) :
+    ∃ J : SchwartzMap V ℂ ≃L[ℂ] SchwartzBruhat G, ∀ f x, J f x = f (coord x) := by
+  let I : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a e
+  let A := I.comp T.toLinearEquiv.toLinearMap
+  have hA (f : SchwartzMap V ℂ) (x : G) : A f x = f (coord x) := hT f x
+  have hI : IsEmbedding I := schwartzBruhatStage_isEmbedding a e
+  have hEmb : IsEmbedding A := hI.comp T.toHomeomorph.isEmbedding
+  have hSurj : Surjective A := by
+    intro s
+    obtain ⟨f, hf⟩ := hSchwartz s
+    exact ⟨f, Subtype.ext (funext fun x ↦ (hA f x).trans (hf x))⟩
+  let B := LinearEquiv.ofBijective A ⟨hEmb.injective, hSurj⟩
+  refine ⟨⟨B, hEmb.continuous, hEmb.continuous_iff.mpr ?_⟩, hA⟩
+  exact continuous_id.congr fun f ↦ (B.apply_symm_apply f).symm
+
+/-- A real linear coordinate change identifies classical Schwartz functions with
+the corresponding purely real elementary stage. -/
+private theorem schwartz_equiv_of_euclidean_coordinates
+    {V : Type*} [NormedAddCommGroup V] [NormedSpace ℝ V] {m : ℕ}
+    (L : V ≃L[ℝ] EuclideanSpace ℝ (Fin m)) :
+    ∃ K : SchwartzMap V ℂ ≃L[ℂ] ElementarySchwartz m 0 0 PUnit.{1},
+      ∀ f x, K f (L x, 0, 0, 0) = f x := by
+  obtain ⟨K, hK⟩ := elementarySchwartz_euclidean_equiv m
+  let P := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L.symm (F := ℂ)
+  let Q := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L (F := ℂ)
+  let C := ContinuousLinearEquiv.equivOfInverse P Q
+    (fun f ↦ SchwartzMap.ext fun x ↦ congrArg f (L.symm_apply_apply x))
+    (fun f ↦ SchwartzMap.ext fun x ↦ congrArg f (L.apply_symm_apply x))
+  refine ⟨C.trans K, fun f x ↦ ?_⟩
+  change K (P f) (L x, 0, 0, 0) = _
+  rw [hK]
+  exact congrArg f (L.symm_apply_apply x)
+
+/-- Pullback in mixed coordinates identifies the classical and archimedean
+Schwartz–Bruhat spaces as topological complex vector spaces. -/
+private theorem archimedeanSchwartzBruhat_equiv :
+    ∃ J : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ ≃L[ℂ]
+        SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
+      ∀ f x, J f (Multiplicative.ofAdd x) = f (mixed x) := by
+  let V := mixedEmbedding.mixedSpace F
+  let G := Multiplicative (InfiniteAdeleRing F)
+  let m := Module.finrank ℝ V
+  let E := EuclideanSpace ℝ (Fin m)
+  let L : V ≃L[ℝ] E := ContinuousLinearEquiv.ofFinrankEq (by simp [E, m, finrank_euclideanSpace])
+  refine Exists.elim (archimedeanMixedSpace_equiv (F := F) (m := m) L) fun w hw ↦ ?_
+  have : IsTopologicalGroup G := inferInstanceAs (IsTopologicalGroup
+    (Multiplicative (InfiniteAdeleRing F)))
+  have : LocallyCompactSpace G := InfiniteAdeleRing.locallyCompactSpace F
+  have : T2Space G := w.toHomeomorph.isEmbedding.t2Space
+  have : SecondCountableTopology G := w.toHomeomorph.isEmbedding.secondCountableTopology
+  let coord : G → V := fun x ↦ mixed x.toAdd
+  refine Exists.elim (schwartzBruhat_euclidean_stage (G := G) w) fun a ha ↦ ?_
+  refine Exists.elim ha fun e he ↦ ?_
+  refine Exists.elim he fun J hJ ↦ ?_
+  refine Exists.elim (schwartz_equiv_of_euclidean_coordinates L) fun K hK ↦ ?_
+  refine schwartzBruhat_equiv_of_stage a e (K.trans J) coord (fun f x ↦ ?_) fun s ↦
+      (mem_archimedeanSchwartzBruhat_iff (fun x ↦ s (Multiplicative.ofAdd x))).mp s.property
+  change schwartzBruhatStageRealization a e (J (K f)) x = f (mixed x.toAdd)
+  exact (hJ (K f) x).trans ((congrArg (K f) (hw x.toAdd)).trans (hK f (mixed x.toAdd)))
+
+/-- The classical differential paired with the dilation velocity transports to a
+continuous directional derivative on the Schwartz–Bruhat space. -/
+private theorem schwartzBruhat_dilation_of_coordinates
+    {G V : Type*} [CommGroup G] [TopologicalSpace G] [NormedCommRing V] [NormedAlgebra ℝ V]
+    (J : SchwartzMap V ℂ ≃L[ℂ] SchwartzBruhat G)
+    (coord : G → V) (hJ : ∀ f x, J f x = f (coord x))
+    (curve : ℝ → V) (hCurve : DifferentiableAt ℝ curve 0) (hZero : curve 0 = 1)
+    (orbit : ℝ → G → G) (hOrbit : ∀ s x, coord (orbit s x) = curve s * coord x) :
+    ∃ D : SchwartzBruhat G →L[ℂ] SchwartzBruhat G,
+      ∀ f x, D f x = deriv (fun s : ℝ ↦ f (orbit s x)) 0 := by
+  let L : V →L[ℝ] V := ContinuousLinearMap.mul ℝ V (deriv curve 0)
+  let P := SchwartzMap.fderivCLM ℂ V ℂ
+  let Q := SchwartzMap.bilinLeftCLM (ContinuousLinearMap.apply ℝ ℂ).flip L.hasTemperateGrowth
+  let D : SchwartzMap V ℂ →L[ℂ] SchwartzMap V ℂ :=
+    { toFun := fun f ↦ Q (P f)
+      map_add' := fun f g ↦ by
+        change Q (P (f + g)) = _
+        rw [map_add, map_add]
+      map_smul' := fun c f ↦ by
+        change Q (P (c • f)) = c • Q (P f)
+        rw [map_smul]
+        exact SchwartzMap.ext fun _ ↦ rfl
+      cont := Q.continuous.comp P.continuous }
+  refine ⟨J.toContinuousLinearMap.comp (D.comp J.symm.toContinuousLinearMap), fun f x ↦ ?_⟩
+  let g := J.symm f
+  have hg (y : G) : g (coord y) = f y := by rw [← hJ, J.apply_symm_apply]
+  have hDeriv : HasDerivAt (fun s ↦ curve s * coord x) (L (coord x)) 0 :=
+    hCurve.hasDerivAt.mul_const (coord x)
+  have hG : HasFDerivAt g (fderiv ℝ g (coord x)) (curve 0 * coord x) := by
+    rw [hZero, one_mul]
+    exact g.hasFDerivAt _
+  have hEval : (fun s ↦ g (curve s * coord x)) = fun s ↦ f (orbit s x) := by
+    funext s
+    rw [← hg, hOrbit]
+  change J (D g) x = _
+  rw [hJ, ← hEval]
+  exact (hG.comp_hasDerivAt 0 hDeriv).deriv.symm
+
 /-- Paper: Lemma 2.2.4.2, pp. 87–88. Differentiation of the archimedean orbit
 in the logarithmic parameter is a continuous complex-linear operator on
 archimedean Schwartz–Bruhat functions. -/
@@ -634,7 +894,26 @@ theorem exists_archimedeanDirectionalDeriv :
       ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) (x : InfiniteAdeleRing F),
         D f (Multiplicative.ofAdd x) =
           deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x))) 0 := by
-  sorry
+  refine Exists.elim (archimedeanSchwartzBruhat_equiv (F := F)) fun J hJ ↦ ?_
+  let V := mixedEmbedding.mixedSpace F
+  let G := Multiplicative (InfiniteAdeleRing F)
+  let M := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let curve : ℝ → V := fun s ↦ M (γ (expUnit s)).val.1
+  have hOne : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hZero : curve 0 = 1 := by
+    have hγ : γ (expUnit (0 : ℝ)) = 1 := (congrArg γ hOne).trans (map_one γ)
+    exact (congrArg (fun u : 𝕀[F] ↦ M u.val.1) hγ).trans (map_one M)
+  let orbit (s : ℝ) (x : G) : G :=
+    Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.toAdd)
+  let coord (x : G) : V := M x.toAdd
+  have hOrbit (s : ℝ) (x : G) : coord (orbit s x) = curve s * coord x :=
+    M.map_mul _ _
+  refine Exists.elim (schwartzBruhat_dilation_of_coordinates (G := G) (V := V)
+    J coord (fun f x ↦ hJ f x.toAdd) curve
+    (adeleOneParameter_archimedean_differentiable γ) hZero orbit hOrbit) fun D hD ↦ ?_
+  exact ⟨D, fun f x ↦ hD f (Multiplicative.ofAdd x)⟩
+
+end ArchimedeanContinuity
 
 /-- Tensoring a continuous endomorphism with the identity is continuous for
 the inductive tensor topology. -/
@@ -933,10 +1212,123 @@ the Schwartz–Bruhat topology. -/
 theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by
   exact isClosed_singleton.preimage (adelePolarValues_continuous (F := F))
 
+local instance adelicThetaAdeleMeasurableSpace : MeasurableSpace 𝔸[F] := borel _
+
+open scoped ENNReal in
+/-- Integrating a function after adelic dilation scales its integral by the reciprocal norm. -/
+private theorem adeleIntegral_dilation {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (f : 𝔸[F] → E) (hf : Integrable f (additiveTamagawaMeasure F)) (g : 𝕀[F]) :
+    Integrable (fun x ↦ f (g.val * x)) (additiveTamagawaMeasure F) ∧
+      (∫ x, f (g.val * x) ∂additiveTamagawaMeasure F) =
+        (valueℝ (ideleNorm F g))⁻¹ • (∫ x, f x ∂additiveTamagawaMeasure F) := by
+  let μ := additiveTamagawaMeasure F
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let d := (Homeomorph.smul (α := 𝔸[F]) g).toMeasurableEquiv
+  have hmap : μ.map d = (↑(ideleNorm F g⁻¹).val : ℝ≥0∞) • μ := by
+    ext s hs
+    rw [Measure.map_apply d.measurable hs]
+    change μ ((fun x : 𝔸[F] ↦ g • x) ⁻¹' s) = (↑(ideleNorm F g⁻¹).val : ℝ≥0∞) * μ s
+    rw [← inv_inv g, Set.preimage_smul_inv]
+    exact adeleHaar_mul_image F μ g⁻¹ s hs
+  change Integrable (f ∘ d) μ ∧ (∫ x, f (d x) ∂μ) = _
+  refine ⟨(integrable_map_equiv d f).mp (hmap.symm ▸ hf.smul_measure ENNReal.coe_ne_top), ?_⟩
+  rw [← integral_map_equiv d f, hmap, integral_smul_measure]
+  simp only [ENNReal.coe_toReal, map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  rfl
+
+open scoped Pointwise in
+/-- The integral of a directional derivative vanishes when the original integral vanishes.
+The fundamental theorem of calculus along the dilation orbits and Fubini's theorem reduce
+this to the scaling law for the adelic Haar measure. -/
+private theorem adeleDirectionalDeriv_integral_eq_zero (f : ℬ[F])
+    (hf : (∫ x, f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F) = 0) :
+    (∫ x, adeleDirectionalDeriv γ f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F) = 0 := by
+  let μ := additiveTamagawaMeasure F
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let : SigmaCompactSpace 𝔸[F] := by
+    let : Countable F := Countable.of_moduleFinite (R := ℚ)
+    let b := RingOfIntegers.basis F
+    let D := adeleFundamentalDomain F b
+    let K (q : F) := algebraMap F 𝔸[F] q +ᵥ closure D
+    refine SigmaCompactSpace.of_countable (range K) (countable_range K) ?_ ?_
+    · rintro _ ⟨q, rfl⟩
+      exact IsCompact.vadd _ (adeleFundamentalDomain_precompact F b)
+    · rw [sUnion_range]
+      exact eq_top_mono (iUnion_mono fun _ ↦ vadd_set_mono (subset_closure (s := D)))
+        (adeleFundamentalDomain_cover F b)
+  let d := adeleDirectionalDeriv γ f
+  let g (s : ℝ) := γ (expUnit s)
+  let c (s : ℝ) := (valueℝ (ideleNorm F (g s)))⁻¹
+  have hg : Continuous g := γ.continuous.comp
+    ((Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous)
+  have hgAdd (s t : ℝ) : g (s + t) = g s * g t := by
+    have he : expUnit (s + t) = expUnit s * expUnit t :=
+      Units.ext (NNReal.coe_inj.mp (Real.exp_add s t))
+    exact (congrArg γ he).trans (map_mul γ _ _)
+  have hNormPos (s : ℝ) : 0 < valueℝ (ideleNorm F (g s)) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (ideleNorm F (g s)))
+  have hcPos (s : ℝ) : 0 < c s := inv_pos.mpr (hNormPos s)
+  have hc : Continuous c := by
+    apply Continuous.inv₀ _ (fun s ↦ (hNormPos s).ne')
+    exact NNReal.continuous_coe.comp (Units.continuous_val.comp
+      ((ideleGroup_topology F).2.2.2.2.1.comp hg))
+  let orbit (s : ℝ) (x : 𝔸[F]) := Multiplicative.ofAdd ((g s).val * x)
+  have hOrbit : Continuous (uncurry orbit) := continuous_ofAdd.comp
+    (((Units.continuous_val.comp hg).comp continuous_fst).mul continuous_snd)
+  have hDeriv (s : ℝ) (x : 𝔸[F]) :
+      HasDerivAt (fun t ↦ f (orbit t x)) (d (orbit s x)) s := by
+    have h : HasDerivAt (fun t : ℝ ↦ f (orbit t ((g s).val * x))) (d (orbit s x)) (s - s) := by
+      rw [sub_self]
+      exact (adeleOrbit_differentiableAt γ f (orbit s x)).hasDerivAt
+    refine (h.comp_sub_const s s).congr_of_eventuallyEq (Eventually.of_forall fun t ↦ ?_)
+    have hMul : g (t - s) * g s = g t := by rw [← hgAdd, sub_add_cancel]
+    simp only [orbit, ← mul_assoc, ← Units.val_mul, hMul]
+  have hFTC (x : 𝔸[F]) : (∫ s in (0 : ℝ)..1, d (orbit s x)) =
+      f (orbit 1 x) - f (orbit 0 x) :=
+    intervalIntegral.integral_eq_sub_of_hasDerivAt (fun s _ ↦ hDeriv s x)
+      (((schwartzBruhat_continuous d).comp (hOrbit.comp
+        (continuous_id.prodMk continuous_const))).intervalIntegrable 0 1)
+  have hd := (adeleSchwartzFourier_apply_zero d).1
+  have hfInt := (adeleSchwartzFourier_apply_zero f).1
+  have hProd : Integrable (uncurry (fun s x ↦ d (orbit s x)))
+      ((volume.restrict (uIoc (0 : ℝ) 1)).prod μ) := by
+    apply (integrable_prod_iff ((schwartzBruhat_continuous d).comp hOrbit).aestronglyMeasurable).mpr
+    refine ⟨Eventually.of_forall fun s ↦ (adeleIntegral_dilation _ hd (g s)).1, ?_⟩
+    have hBound : IntegrableOn (fun s ↦ c s • (∫ x, ‖d (Multiplicative.ofAdd x)‖ ∂μ))
+        (uIoc (0 : ℝ) 1) volume :=
+      (hc.smul continuous_const).integrableOn_Icc.mono_set uIoc_subset_uIcc
+    exact hBound.congr (Eventually.of_forall fun s ↦
+      (adeleIntegral_dilation _ hd.norm (g s)).2.symm)
+  have hInt : (∫ s in (0 : ℝ)..1, c s • (∫ x, d (Multiplicative.ofAdd x) ∂μ)) = 0 := by
+    calc
+      _ = ∫ s in (0 : ℝ)..1, ∫ x, d (orbit s x) ∂μ :=
+        intervalIntegral.integral_congr fun s _ ↦ (adeleIntegral_dilation _ hd (g s)).2.symm
+      _ = ∫ x, (∫ s in (0 : ℝ)..1, d (orbit s x)) ∂μ := intervalIntegral_integral_swap hProd
+      _ = 0 := by
+        simp_rw [hFTC]
+        rw [integral_sub (adeleIntegral_dilation _ hfInt (g 1)).1
+          (adeleIntegral_dilation _ hfInt (g 0)).1]
+        rw [(adeleIntegral_dilation _ hfInt (g 1)).2, (adeleIntegral_dilation _ hfInt (g 0)).2,
+          hf, smul_zero, smul_zero, sub_zero]
+  rw [intervalIntegral.integral_smul_const] at hInt
+  exact (smul_eq_zero.mp hInt).resolve_left (intervalIntegral.integral_pos zero_lt_one
+    hc.continuousOn (fun s _ ↦ (hcPos s).le) ⟨0, by simp, hcPos 0⟩).ne'
+
 /-- Paper: Lemma 2.2.4.5(1), p. 91. Directional differentiation preserves the
 common polar kernel, so it induces a linear map on the polar quotient. -/
 theorem adeleDirectionalDeriv_preserves_polarSubspace :
-    adelePolarSubspace F ≤ (adelePolarSubspace F).comap (adeleDirectionalDeriv γ) := by sorry
+    adelePolarSubspace F ≤ (adelePolarSubspace F).comap (adeleDirectionalDeriv γ) := by
+  intro f hf
+  change adeleDirectionalDeriv γ f ∈ adelePolarSubspace F
+  refine (mem_adelePolarSubspace _).mpr ⟨?_, ?_⟩
+  · change deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val * 0))) 0 = 0
+    simp only [mul_zero, deriv_const]
+  · rw [(adeleSchwartzFourier_apply_zero _).2]
+    apply adeleDirectionalDeriv_integral_eq_zero γ f
+    rw [← (adeleSchwartzFourier_apply_zero _).2]
+    exact ((mem_adelePolarSubspace f).mp hf).2
 
 /-- Paper: Equation (2.2.4.25), p. 91. The two polar evaluations are jointly
 surjective, so they identify the quotient by their common kernel with `ℂ × ℂ`. -/
@@ -953,8 +1345,6 @@ theorem adeleDirectionalDeriv_polarQuotient_diagonal (α : ℝ)
       (adelePolarSubspace F).mapQ (τ₁₂ := RingHom.id ℂ) (adelePolarSubspace F)
         (adeleDirectionalDeriv (F := F) γ) (adeleDirectionalDeriv_preserves_polarSubspace (F := F) γ)
     T.toFun (D.toFun (T.symm.toFun z)) = (0, (-α) • z.2) := by sorry
-
-local instance adelicThetaAdeleMeasurableSpace : MeasurableSpace 𝔸[F] := borel _
 
 /-- Paper: Lemma 2.2.4.5(3), p. 92. The difference quotient of the Fourier
 transform under inverse dilation, weighted by the reciprocal norm, converges
@@ -1043,7 +1433,26 @@ theorem homogeneousAdelicTheta_trivial_at_one (f : ℬ[F]) :
 /-- Paper: Definition 2.2.5.1, p. 95. Formation of homogeneous theta is
 complex linear in the test function. -/
 theorem homogeneousAdelicTheta_isLinear (ω₁ : χ[F]) :
-    IsLinearMap ℂ (homogeneousAdelicTheta ω₁) := by sorry
+    IsLinearMap ℂ (homogeneousAdelicTheta ω₁) := by
+  have hθ := adelicTheta_isLinear (F := F)
+  constructor
+  · intro f f'
+    refine ContinuousMap.ext fun g ↦ ?_
+    change ∫ h, classIntegrand ω₁ (f + f') g h ∂μ̄₁ =
+      (∫ h, classIntegrand ω₁ f g h ∂μ̄₁) + ∫ h, classIntegrand ω₁ f' g h ∂μ̄₁
+    refine (integral_congr_ae (.of_forall fun h ↦ ?_)).trans
+      (integral_add (homogeneousAdelicTheta_integrable ω₁ f g)
+        (homogeneousAdelicTheta_integrable ω₁ f' g))
+    change adelicTheta (f + f') (h.val * g) * (ω₁ h : ℂ) =
+      adelicTheta f (h.val * g) * (ω₁ h : ℂ) + adelicTheta f' (h.val * g) * (ω₁ h : ℂ)
+    rw [hθ.map_add, ContinuousMap.add_apply, add_mul]
+  · intro c f
+    refine ContinuousMap.ext fun g ↦ ?_
+    change ∫ h, classIntegrand ω₁ (c • f) g h ∂μ̄₁ = c • ∫ h, classIntegrand ω₁ f g h ∂μ̄₁
+    refine (integral_congr_ae (.of_forall fun h ↦ ?_)).trans (integral_smul c _)
+    change adelicTheta (c • f) (h.val * g) * (ω₁ h : ℂ) =
+      c • (adelicTheta f (h.val * g) * (ω₁ h : ℂ))
+    rw [hθ.map_smul, ContinuousMap.smul_apply, smul_eq_mul, smul_eq_mul, mul_assoc]
 
 local notation "classOfNormOne" => fun h : N₁[F] ↦
   (Subtype.mk (classOf (Subtype.val h)) (Subtype.property h) : C₁[F])
@@ -1172,8 +1581,19 @@ theorem homogeneousAdelicTheta_eq_idele_integral (ω₁ : χ[F]) (f : ℬ[F]) (g
 /-- Paper: Theorem 2.2.5.4(1), p. 97. Inverse translation of a class by a
 norm-one class acts on homogeneous theta by the prescribed character. -/
 theorem homogeneousAdelicTheta_homogeneous (ω₁ : χ[F]) (f : ℬ[F]) (h : C₁[F]) (g : C[F]) :
-    homogeneousAdelicTheta ω₁ f (h.val⁻¹ * g) = (ω₁ h : ℂ) * homogeneousAdelicTheta ω₁ f g :=
-  by sorry
+    homogeneousAdelicTheta ω₁ f (h.val⁻¹ * g) = (ω₁ h : ℂ) * homogeneousAdelicTheta ω₁ f g := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have : μ̄₁.IsMulRightInvariant := ⟨fun k ↦ by
+    rw [show (· * k) = (k * ·) from funext fun x ↦ mul_comm x k]
+    exact map_mul_left_eq_self μ̄₁ k⟩
+  simp only [homogeneousAdelicTheta, ContinuousMap.coe_mk]
+  rw [← integral_const_mul, ← integral_mul_right_eq_self _ h]
+  refine integral_congr_ae (.of_forall fun x ↦ ?_)
+  have key : (x : C[F]) * h * ((h : C[F])⁻¹ * g) = x * g := by
+    exact (mul_assoc (x : C[F]) h _).trans (congrArg ((x : C[F]) * ·) (mul_inv_cancel_left _ g))
+  simp only [Subgroup.coe_mul, key, map_mul, Circle.coe_mul]
+  ring
 
 /-- Paper: Theorem 2.2.5.4(2), p. 97. At large norm, homogeneous theta decays
 faster than every inverse power of the norm. -/

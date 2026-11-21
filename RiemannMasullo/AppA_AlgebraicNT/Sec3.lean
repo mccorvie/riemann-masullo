@@ -4110,6 +4110,23 @@ theorem finiteLocalAdditiveTamagawaMeasure_selfDual (v : Primes(F)) :
       rw [hPreimage, finiteLocalStandardCharacter_annihilator_integers F v]
       exact finiteLocalAdditiveTamagawaMeasure_inverseDifferentBall F v
 
+/-- Paper: Example A.3.1.10, p. 558. The trace dual of the local integer ring consists
+of the elements that pair integrally with every local integer. It is the closed ball
+of radius `qᵥ^dᵥ`, where `dᵥ` is the exponent in the global different. -/
+theorem finiteLocalTraceDual_eq_closedBall (v : Primes(F)) (u : Primes(ℚ))
+    (hu : u.asIdeal = v.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)))
+    (j : u.adicCompletion ℚ →+* v.adicCompletion F) (hj : Continuous j)
+    (hdiag : ∀ r : ℚ, j (algebraMap ℚ (u.adicCompletion ℚ) r) =
+      algebraMap F (v.adicCompletion F) (algebraMap ℚ F r)) :
+    letI := j.toAlgebra
+    Module.Finite (u.adicCompletion ℚ) (v.adicCompletion F) →
+      ∀ y : v.adicCompletion F,
+        (∀ x ∈ v.adicCompletionIntegers F,
+          Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) (x * y) ∈
+            u.adicCompletionIntegers ℚ) ↔
+        ‖y‖ ≤ (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v) := by
+  sorry
+
 /-- Paper: Example A.3.1.10, p. 558. The Fourier transform of the local integer-ring
 indicator is the inverse-different indicator multiplied by the mass of the integer ring.
 Deviation: The inverse different is the closed ball of normalized radius `qᵥ^dᵥ`. -/
@@ -4118,8 +4135,62 @@ theorem finiteLocalTamagawaFourier_integers (v : Primes(F)) :
         ((v.adicCompletionIntegers F : Set (v.adicCompletion F)).indicator (fun _ ↦ (1 : ℂ))) =
       (differentMass(F, v).toReal : ℂ) •
         ({x : v.adicCompletion F | ‖x‖ ≤ (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v)}.indicator
-          (fun _ ↦ (1 : ℂ))) :=
-  by sorry
+          (fun _ ↦ (1 : ℂ))) := by
+  let u := v.under (𝓞 ℚ)
+  obtain ⟨j, hj, hdiag, hfinite, htrace⟩ := finiteLocalStandardCharacter_trace F v u rfl
+  let := j.toAlgebra
+  let ψ := finiteLocalStandardCharacter F v
+  let t := Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F)
+  change ∀ x, ψ x = ratLocalCharacter u (t x) at htrace
+  have hadd (x z : v.adicCompletion F) : ψ (x + z) = ψ x * ψ z := by
+    simp only [htrace, ratLocalCharacter, map_add, padicStandardCharacter_add]
+  let O := v.adicCompletionIntegers F
+  let B := {y : v.adicCompletion F | ‖y‖ ≤ (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v)}
+  have hB (y : v.adicCompletion F) : y ∈ B ↔ ∀ x ∈ O, ψ (x * y) = 1 := by
+    simp_rw [htrace, ratLocalCharacter_eq_one]
+    exact (finiteLocalTraceDual_eq_closedBall F v u rfl j hj hdiag hfinite y).symm
+  let μ := finiteLocalAdditiveTamagawaMeasure F v
+  let : μ.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  have hO : MeasurableSet (O : Set (v.adicCompletion F)) :=
+    (Valued.isOpen_valuationSubring _).measurableSet
+  funext y
+  let f (x : v.adicCompletion F) : ℂ := star (ψ (x * y) : ℂ)
+  let g := (O : Set (v.adicCompletion F)).indicator f
+  change (∫ x, (O : Set (v.adicCompletion F)).indicator (fun _ ↦ (1 : ℂ)) x * f x ∂μ) =
+    (differentMass(F, v).toReal : ℂ) * B.indicator (fun _ ↦ 1) y
+  simp_rw [← Set.indicator_mul_left, one_mul]
+  by_cases hy : y ∈ B
+  · rw [Set.indicator_of_mem hy, mul_one, integral_indicator hO]
+    calc
+      (∫ x in (O : Set (v.adicCompletion F)), f x ∂μ) =
+          ∫ _ in (O : Set (v.adicCompletion F)), (1 : ℂ) ∂μ := by
+        apply setIntegral_congr_fun hO
+        intro x hx
+        simp [f, (hB y).mp hy x hx]
+      _ = _ := by
+        rw [setIntegral_const, Complex.real_smul, mul_one, measureReal_def,
+          finiteLocalAdditiveTamagawaMeasure_integers F v]
+  · obtain ⟨a, ha⟩ := not_forall.mp ((hB y).not.mp hy)
+    obtain ⟨ha, hψa⟩ := not_imp.mp ha
+    rw [Set.indicator_of_notMem hy, mul_zero]
+    change (∫ x, g x ∂μ) = 0
+    have hne : f a ≠ 1 := by
+      intro h
+      apply hψa
+      apply Circle.coe_injective
+      rw [Circle.coe_one]
+      exact star_injective (h.trans (star_one ℂ).symm)
+    have htranslate (x : v.adicCompletion F) : g (a + x) = f a * g x := by
+      have hmem : a + x ∈ O ↔ x ∈ O := O.toAddSubgroup.add_mem_cancel_left ha
+      by_cases hx : x ∈ O
+      · simp only [g, Set.indicator_of_mem hx, Set.indicator_of_mem (hmem.mpr hx),
+          f, add_mul, hadd, Circle.coe_mul, star_mul']
+      · rw [show g (a + x) = 0 from Set.indicator_of_notMem (mt hmem.mp hx) _,
+          show g x = 0 from Set.indicator_of_notMem hx _, mul_zero]
+    have h : f a * (∫ x, g x ∂μ) = 1 * (∫ x, g x ∂μ) := by
+      rw [one_mul, ← integral_const_mul, ← integral_add_left_eq_self (μ := μ) g a]
+      exact integral_congr_ae (ae_of_all _ fun x ↦ (htranslate x).symm)
+    exact (mul_eq_mul_right_iff.mp h).resolve_left hne
 
 /-- Paper: Example A.3.1.11, p. 559. The standard S-local character is the product
 over all archimedean places and the finite places in S, as in (A.3.1.9).

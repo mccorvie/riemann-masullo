@@ -15,6 +15,8 @@ import json, pathlib, re, subprocess, sys, time
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WARN = re.compile(r"warning: (RiemannMasullo/\S+?\.lean):(\d+):(\d+): declaration uses `sorry`")
 MARK = re.compile(r"<!-- sorry: (\S+) -->")
+DECL = re.compile(r"\s*(@\[[^\]]*\]\s*)*((private|protected|noncomputable|nonrec|unsafe|partial|public|meta)\s+)*"
+                  r"(theorem|lemma|def|instance|abbrev|example|structure|class|inductive|opaque)\b")
 
 
 def run(cmd, **kw):
@@ -41,6 +43,13 @@ def sorries():
     for path, line, col in WARN.findall(out.stdout + out.stderr):
         lines = (ROOT / path).read_text().splitlines()
         i = int(line) - 1
+        # The warning points into the file as Lean compiled it. If the file on disk is another
+        # version (the checkout moved during the build), the position lands on arbitrary text
+        # and everything below would be read off the wrong lines. Stop instead.
+        if i >= len(lines) or not DECL.match(lines[i]):
+            sys.exit(f"{path}:{line}: the build reports a `sorry` here, but this line of the file is "
+                     "not a declaration. The checkout does not match the build (did it change "
+                     "during the run?). Nothing was changed; update, rebuild and run again.")
         name = re.match(r"[^\s:({\[]+", lines[i][int(col):])
         name = name.group(0) if name else f"line{line}"
         top = i
@@ -97,7 +106,13 @@ def main():
     sha = run(["git", "rev-parse", "--short", "HEAD"]).stdout.strip()
     full_sha = run(["git", "rev-parse", "HEAD"]).stdout.strip()
     url = run(["gh", "repo", "view", "--json", "url", "--jq", ".url"]).stdout.strip()
+    state = lambda: (run(["git", "rev-parse", "HEAD"]).stdout.strip(),
+                     run(["git", "status", "--porcelain", "--untracked-files=no", "--", "RiemannMasullo"]).stdout)
+    before = state()
     current = sorries()
+    if state() != before:
+        sys.exit("the checkout changed while this ran (another commit was checked out, or files "
+                 "were edited). Nothing was changed; run again from a checkout nobody else is using.")
     open_issues = {}
     for issue in sorted(list_issues("open", "proof"), key=lambda i: -i["number"]):
         m = MARK.search(issue["body"] or "")
@@ -128,6 +143,11 @@ def main():
         print(f"note: {len(skipped)} left for the next run (changed on main after {sha})")
     print(f"{len(current)} sorries at {sha}; {len(open_issues)} open proof issues; "
           f"{len(new)} to open, {len(stale)} to close")
+    if apply and len(new) > 20 and len(stale) > 20 and "--force" not in sys.argv:
+        sys.exit(f"this would open {len(new)} issues and close {len(stale)} at once. That is what a "
+                 "mismatch between the build and the files looks like (2026-11-21: 110 issues with "
+                 "garbled names opened, 150 good ones closed). Look at the dry run; if it is right, "
+                 "pass --force.")
     for key in new:
         s = current[key]
         title = f"Prove `{s['name']}`" + (f" ({s['paper']})" if s["paper"] else "")

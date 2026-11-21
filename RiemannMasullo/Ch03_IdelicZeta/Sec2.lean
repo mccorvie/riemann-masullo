@@ -262,28 +262,6 @@ is the archimedean gamma factor times Mathlib's finite Hecke L-series. -/
 def completedHeckeL (χ : U[F]) (s : halfPlane) : ℂ :=
   heckeGammaFactor χ s * χ₀(χ).LSeries s
 
-/-- Paper: Proposition 3.2.1.3(1), p. 123. When the restriction to norm-one
-classes is nontrivial, the continuation is entire. -/
-theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
-    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
-    Differentiable ℂ L := by sorry
-
-/-- Paper: Proposition 3.2.1.3(2), p. 123. If the character is trivial on norm-one
-classes, there is a unique real norm-twist parameter and the two indicated poles
-are simple. The continuation is analytic elsewhere.
-Deviation: The printed residue formulas have a normalization conflict described below. -/
-theorem completedHeckeL_continuation_simplePoles (χ : U[F]) (L : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
-    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1) :
-    ∃! t : ℝ, χ₀(χ) = ideleClassNormTwist (1 : U[F]) (-Complex.I * (t : ℂ)) ∧
-      meromorphicOrderAt L (Complex.I * (t : ℂ)) = -1 ∧
-      meromorphicOrderAt L (1 + Complex.I * (t : ℂ)) = -1 ∧
-      AnalyticOnNhd ℂ L ({Complex.I * (t : ℂ), 1 + Complex.I * (t : ℂ)}ᶜ) := by sorry
-
--- TODO(paper-gap): The residues printed in Proposition 3.2.1.3(2) disagree with the
--- Euler product normalization. For the trivial character of ℚ(√5), the residue at 1
--- is already the Appendix A.3.2.1 class volume, since both real gamma factors equal 1.
 
 /-- Paper: Proposition 3.2.1.3(4), p. 123. A zero of the continuation in
 the positive half-plane lies strictly to the left of `Re(s) = 1`. -/
@@ -477,6 +455,201 @@ theorem completedHeckeL_one_eq_dedekindZeta (s : halfPlane) :
   have h := (finiteHeckeL_hasProd (1 : U[F]) s).unique
     ((dedekindZeta_hasProd F s.property).congr_fun hlocal)
   exact congrArg₂ (· * ·) (heckeGammaFactor_one s) h
+
+/-- A unitary character trivial on the norm-one subgroup is a unique imaginary power of the norm. -/
+private theorem existsUnique_ideleClassNormTwist (χ : U[F])
+    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1) :
+    ∃! t : ℝ, χ₀(χ) = ideleClassNormTwist (1 : U[F]) (-Complex.I * (t : ℂ)) := by
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, ⟨σ, hσ, hnorm⟩, _⟩ := ideleGroup_quotient.{_, 0} F
+  let c : ℝ≥0ˣ →ₜ* ℂ := χ₀(χ).comp ⟨σ, hσ⟩
+  have hunit (g : C[F]) : χ₀(χ) g = (χ g : ℂ) := by
+    change (χ g : ℂ) * _ ^ (0 : ℂ) = _
+    simp
+  obtain ⟨z, ⟨hzre, hz⟩, huniq⟩ :=
+    existsUnique_unitaryComplexPower c (fun u ↦ by
+      change ‖χ₀(χ) (σ u)‖ = 1
+      rw [hunit, Circle.norm_coe])
+  have hparam : -Complex.I * ((-z.im : ℝ) : ℂ) = z := by
+    apply Complex.ext <;> simp [Complex.mul_re, Complex.mul_im, hzre]
+  refine ⟨-z.im, ?_, ?_⟩
+  · change χ₀(χ) = ideleClassNormTwist (1 : U[F]) (-Complex.I * ((-z.im : ℝ) : ℂ))
+    rw [hparam]
+    ext1 g
+    let u := ideleClassNorm F g
+    have hk : g / σ u ∈ (ideleClassNorm F).ker := MonoidHom.mem_ker.mpr (by
+      rw [map_div, hnorm u, div_self'])
+    have hkχ : χ (g / σ u) = 1 :=
+      DFunLike.congr_fun hχ (⟨g / σ u, hk⟩ : (ideleClassNorm F).ker)
+    have he : χ₀(χ) (g / σ u) = 1 := by rw [hunit, hkχ, Circle.coe_one]
+    calc
+      χ₀(χ) g = χ₀(χ) (g / σ u) * c u := by
+        change χ₀(χ) g = χ₀(χ) (g / σ u) * χ₀(χ) (σ u)
+        rw [← map_mul, div_mul_cancel]
+      _ = ideleClassNormTwist (1 : U[F]) z g := by
+        change χ₀(χ) (g / σ u) * c u = 1 * (classNormℝ g : ℂ) ^ z
+        rw [he, hz u]
+  · intro t ht
+    have he : -Complex.I * (t : ℂ) = z := huniq _ ⟨by simp [Complex.mul_re], fun u ↦ by
+      change χ₀(χ) (σ u) = _
+      rw [ht]
+      change (1 : ℂ) * (classNormℝ (σ u) : ℂ) ^ (-Complex.I * (t : ℂ)) = _
+      dsimp only
+      rw [one_mul, hnorm u]⟩
+    apply neg_eq_iff_eq_neg.mp
+    simpa [Complex.mul_im] using congrArg Complex.im he
+
+/-- An imaginary norm twist translates the argument of the archimedean product. -/
+private theorem heckeGammaFactor_of_normTwist (χ : U[F]) (a : ℂ) (ha : a.re = 0)
+    (hχ : χ₀(χ) = ideleClassNormTwist (1 : U[F]) a) (s : ℂ) :
+    heckeGammaFactor χ s = heckeGammaFactor (1 : U[F]) (s + a) := by
+  classical
+  have hre (v : InfinitePlace F) (hv : v.IsReal) :
+      (realHeckeCharacter_parameters χ v hv).exists.choose = (a, 0) := by
+    apply (realHeckeCharacter_parameters χ v hv).unique
+      (realHeckeCharacter_parameters χ v hv).exists.choose_spec
+    refine ⟨ha, fun x ↦ ?_⟩
+    rw [hχ]
+    let u := Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm.toMonoidHom x
+    change 1 * (classNormℝ (IdeleClassGroup.ofCompletion (𝓞 F) F v u) : ℂ) ^ a =
+      (‖(x : ℝ)‖ : ℂ) ^ a * _ ^ (0 : ℕ)
+    dsimp only
+    rw [ideleClassNorm_ofCompletion, hv.mult_eq_one, pow_one]
+    have hn : ((↑(Units.map nnNormHom.toMonoidHom u) : ℝ≥0) : ℝ) = ‖(x : ℝ)‖ := by
+      let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm
+      change ‖e (x : ℝ)‖ = ‖(x : ℝ)‖
+      exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.isometry.norm_map_of_map_zero
+        (map_zero e) (x : ℝ)
+    rw [hn, one_mul, pow_zero, mul_one]
+  have hco (v : InfinitePlace F) (hv : v.IsComplex) :
+      (complexHeckeCharacter_parameters χ v hv).exists.choose = (a, 0) := by
+    apply (complexHeckeCharacter_parameters χ v hv).unique
+      (complexHeckeCharacter_parameters χ v hv).exists.choose_spec
+    refine ⟨ha, fun x ↦ ?_⟩
+    rw [hχ]
+    let u := Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hv).symm.toMonoidHom x
+    change 1 * (classNormℝ (IdeleClassGroup.ofCompletion (𝓞 F) F v u) : ℂ) ^ a =
+      ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ a * _ ^ (0 : ℤ)
+    dsimp only
+    rw [ideleClassNorm_ofCompletion, hv.mult_eq_two, Units.val_pow_eq_pow_val, NNReal.coe_pow]
+    have hn : ((↑(Units.map nnNormHom.toMonoidHom u) : ℝ≥0) : ℝ) = ‖(x : ℂ)‖ := by
+      let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hv).symm
+      change ‖e (x : ℂ)‖ = ‖(x : ℂ)‖
+      exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).symm.isometry.norm_map_of_map_zero
+        (map_zero e) (x : ℂ)
+    rw [hn, one_mul, zpow_zero, mul_one]
+  rw [heckeGammaFactor_one, heckeGammaFactor]
+  simp_rw [hre, hco]
+  simp only [Fin.val_zero, Int.natAbs_zero, Nat.cast_zero, zero_div, add_zero, dite_eq_ite]
+  rw [Finset.prod_ite]
+  simp only [Finset.prod_const, ← Fintype.card_subtype, InfinitePlace.not_isReal_iff_isComplex]
+
+/-- The finite Euler factor of a norm twist depends on the sum of the two exponents. -/
+private theorem finiteHeckeEulerFactor_of_normTwist (χ : U[F]) (a : ℂ)
+    (hχ : χ₀(χ) = ideleClassNormTwist (1 : U[F]) a)
+    (v : HeightOneSpectrum (𝓞 F)) (s : ℂ) :
+    finiteHeckeEulerFactor χ v s = finiteHeckeEulerFactor (1 : U[F]) v (s + a) := by
+  classical
+  have hval (z : ℂ) (u : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist (1 : U[F]) z).restrict v u =
+        (‖(u : v.adicCompletion F)‖ : ℂ) ^ z := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change 1 * (classNormℝ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) : ℂ) ^ z = _
+    dsimp only
+    rw [one_mul, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hu (z : ℂ) : (ideleClassNormTwist (1 : U[F]) z).IsUnramifiedAt v := by
+    apply HeckeCharacter.isUnramifiedAt_iff.mpr
+    intro x
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x
+    change (ideleClassNormTwist (1 : U[F]) z).restrict v u = 1
+    rw [hval z u, show ‖(u : v.adicCompletion F)‖ = 1 from ?_, Complex.ofReal_one, Complex.one_cpow]
+    apply Valued.toNormedField.norm_eq_one_iff.mpr
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp
+      (show u ∈ (v.adicCompletionIntegers F).units from ⟨x.val.property, x.inv.property⟩)
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+  have hnorm : ‖(u : v.adicCompletion F)‖ = (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v _ hπ
+  rw [finiteHeckeEulerFactor, finiteHeckeEulerFactor, hχ, ite_eq_left (hu a), ite_eq_left (hu 0),
+    (hu a).localValue_eq u hπ, (hu 0).localValue_eq u hπ, hval, hval, hnorm, Complex.cpow_zero,
+    one_mul, Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) a,
+    ← Complex.cpow_neg, Complex.ofReal_natCast,
+    ← Complex.cpow_add _ _ (by exact_mod_cast ((zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))).ne'),
+    neg_add, add_comm (-a)]
+
+/-- On the half-plane of convergence, twisting the trivial character shifts the
+completed L-function by the norm exponent. -/
+private theorem completedHeckeL_of_normTwist (χ : U[F]) (a : ℂ) (ha : a.re = 0)
+    (hχ : χ₀(χ) = ideleClassNormTwist (1 : U[F]) a) (s : halfPlane) :
+    completedHeckeL χ s =
+      completedHeckeL (1 : U[F]) ⟨(s : ℂ) + a, by
+        change 1 < (s : ℂ).re + a.re
+        rw [ha, add_zero]
+        exact s.property⟩ := by
+  let w : halfPlane := ⟨(s : ℂ) + a, by
+    change 1 < (s : ℂ).re + a.re
+    rw [ha, add_zero]
+    exact s.property⟩
+  have h := (finiteHeckeL_hasProd χ s).unique <|
+    (finiteHeckeL_hasProd (1 : U[F]) w).congr_fun
+      (fun v ↦ finiteHeckeEulerFactor_of_normTwist χ a hχ v s)
+  exact congrArg₂ (· * ·) (heckeGammaFactor_of_normTwist χ a ha hχ s) h
+
+/-- The class number formula gives a simple pole at one for a continuation
+of the completed L-function of the trivial character. -/
+private theorem completedHeckeL_one_order_one (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (h : ∀ s : halfPlane, L s = completedHeckeL (1 : U[F]) s) :
+    meromorphicOrderAt L 1 = -1 := by
+  let P (s : ℂ) := (s - 1) * L s
+  let γ := heckeGammaFactor (1 : U[F])
+  let c : ℂ := γ 1 * dedekindZeta_residue F
+  have hγ : DifferentiableAt ℂ γ 1 :=
+    differentiableAt_heckeGammaFactor_of_re_pos _ (by simp)
+  have hc : c ≠ 0 := mul_ne_zero
+    (heckeGammaFactor_ne_zero_of_re_pos _ (by simp))
+    (Complex.ofReal_ne_zero.mpr (dedekindZeta_residue_ne_zero F))
+  have hreal : Tendsto (fun r : ℝ ↦ (r : ℂ)) (𝓝[>] (1 : ℝ)) (𝓝[≠] (1 : ℂ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨?_, ?_⟩
+    · simpa using (Complex.continuous_ofReal.continuousAt (x := (1 : ℝ))).tendsto.mono_left
+        nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin] with r hr
+      simpa using (show 1 < r from hr).ne'
+  have hlim : Tendsto (fun r : ℝ ↦ P r) (𝓝[>] (1 : ℝ)) (𝓝 c) := by
+    apply ((hγ.continuousAt.tendsto.comp (hreal.mono_right nhdsWithin_le_nhds)).mul
+      (tendsto_sub_one_mul_dedekindZeta_nhdsGT F)).congr'
+    filter_upwards [self_mem_nhdsWithin] with r hr
+    have hr' : (r : ℂ) ∈ halfPlane := by simpa using hr
+    have he := h ⟨r, hr'⟩
+    rw [completedHeckeL_one_eq_dedekindZeta, ← heckeGammaFactor_one] at he
+    dsimp [P, γ]
+    rw [show L r = heckeGammaFactor (1 : U[F]) r * dedekindZeta F r from he]
+    ring
+  have hsub : AnalyticAt ℂ (fun s : ℂ ↦ s - 1) 1 := by fun_prop
+  have horder : meromorphicOrderAt P 1 = 0 := by
+    rcases lt_trichotomy (meromorphicOrderAt P 1) 0 with hneg | he | hpos
+    · have hinf := (tendsto_norm_atTop_iff_cobounded.mpr
+        (tendsto_cobounded_of_meromorphicOrderAt_neg hneg)).comp hreal
+      exact (not_tendsto_atTop_of_tendsto_nhds hlim.norm hinf).elim
+    · exact he
+    · exact (hc (tendsto_nhds_unique hlim
+        ((tendsto_zero_of_meromorphicOrderAt_pos hpos).comp hreal))).elim
+  have hsubOrder : meromorphicOrderAt (fun s : ℂ ↦ s - 1) 1 = 1 := by
+    exact (meromorphicOrderAt_eq_int_iff hsub.meromorphicAt (n := 1)).mpr
+      ⟨fun _ ↦ 1, analyticAt_const, one_ne_zero, by simp⟩
+  change meromorphicOrderAt ((fun s : ℂ ↦ s - 1) * L) 1 = 0 at horder
+  rw [meromorphicOrderAt_mul hsub.meromorphicAt (hL (mem_univ _)).meromorphicAt, hsubOrder]
+    at horder
+  have he : (-(1 : ℤ) : WithTop ℤ) + (1 : WithTop ℤ) = 0 := by norm_num
+  simpa [← add_assoc, he] using congrArg (fun x : WithTop ℤ ↦ (-1) + x) horder
+
+/-- Paper: Proposition 3.2.1.3(2), p. 123. A continuation of the completed
+Dedekind zeta function in the trivial Hecke character normalization is
+holomorphic away from zero and one. -/
+theorem completedHeckeL_one_analyticOnNhd (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (h : ∀ s : halfPlane, L s = completedHeckeL (1 : U[F]) s) :
+    AnalyticOnNhd ℂ L ({0, 1}ᶜ : Set ℂ) := by sorry
 
 /-- Paper: Definition 3.2.1.4, pp. 123–124. The finite Euler product
 converges uniformly on each compact subset of the half-plane. -/
@@ -872,6 +1045,71 @@ theorem completedHeckeL_continuation_functionalEquation (χ : U[F]) (L Ldual : �
   rw [dualQuasiCharacter_ideleClassNormTwist, hZ s, hZdual (1 - s)] at hEq
   rw [mul_assoc, hEq, ← mul_assoc, inv_mul_cancel₀ (hB₀ (1 - s)), one_mul]
 
+/-- At the trivial character, reflection in the functional equation transfers the
+simple pole at one to a simple pole at zero. -/
+private theorem completedHeckeL_one_order_zero (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (h : ∀ s : halfPlane, L s = completedHeckeL (1 : U[F]) s) :
+    meromorphicOrderAt L 0 = -1 := by
+  obtain ⟨ε, hε, hεne, hfun⟩ := completedHeckeL_continuation_functionalEquation
+    (1 : U[F]) L L hL h hL (by simpa using h)
+  have hcomp : meromorphicOrderAt (fun s ↦ L (1 - s)) 0 = meromorphicOrderAt L 1 := by
+    have ha : AnalyticAt ℂ (fun s : ℂ ↦ 1 - s) 0 := by fun_prop
+    have hd : deriv (fun s : ℂ ↦ 1 - s) 0 ≠ 0 := by simp
+    simpa [Function.comp_def] using meromorphicOrderAt_comp_of_deriv_ne_zero (f := L) ha hd
+  have hεan := hε.analyticAt (z := 0)
+  have hεord : meromorphicOrderAt ε 0 = 0 :=
+    (hεan.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff).mpr (hεne 0)
+  rw [show (fun s ↦ L (1 - s)) = ε * L from funext hfun,
+    meromorphicOrderAt_mul hεan.meromorphicAt (hL (mem_univ _)).meromorphicAt,
+    hεord, zero_add, completedHeckeL_one_order_one L hL h] at hcomp
+  exact hcomp
+
+/-- Paper: Proposition 3.2.1.3(2), p. 123. If the character is trivial on norm-one
+classes, there is a unique real norm-twist parameter and the two indicated poles
+are simple. The continuation is analytic elsewhere.
+Deviation: The printed residue formulas have a normalization conflict described below. -/
+theorem completedHeckeL_continuation_simplePoles (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1) :
+    ∃! t : ℝ, ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * (t : ℂ)) ∧
+      meromorphicOrderAt L (Complex.I * (t : ℂ)) = -1 ∧
+      meromorphicOrderAt L (1 + Complex.I * (t : ℂ)) = -1 ∧
+      AnalyticOnNhd ℂ L ({Complex.I * (t : ℂ), 1 + Complex.I * (t : ℂ)}ᶜ) := by
+  obtain ⟨t, ht, huniq⟩ := existsUnique_ideleClassNormTwist χ hχ
+  let b : ℂ := Complex.I * (t : ℂ)
+  have hbre : b.re = 0 := by simp [b, Complex.mul_re]
+  have hχ' : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-b) := by simpa [b] using ht
+  let L₀ (s : ℂ) := L (s + b)
+  have hL₀ : MeromorphicNFOn L₀ univ :=
+    fun _ _ ↦ meromorphicNFAt_fun_comp_add_const_iff_meromorphicNFAt.mpr (hL (mem_univ _))
+  have h₀ (s : halfPlane) : L₀ s = completedHeckeL (1 : U[F]) s := by
+    let w : halfPlane := ⟨(s : ℂ) + b, by
+      change 1 < (s : ℂ).re + b.re
+      rw [hbre, add_zero]
+      exact s.property⟩
+    change L w = _
+    rw [h w, completedHeckeL_of_normTwist χ (-b) (by simp [hbre]) hχ' w]
+    congr 1
+    apply Subtype.ext
+    change (s : ℂ) + b + -b = s
+    simp
+  refine ⟨t, ⟨ht, ?_, ?_, ?_⟩, fun u hu ↦ huniq u hu.1⟩
+  · have ho := completedHeckeL_one_order_zero L₀ hL₀ h₀
+    simpa [L₀, b, meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt] using ho
+  · have ho := completedHeckeL_one_order_one L₀ hL₀ h₀
+    simpa [L₀, b, meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt] using ho
+  · intro s hs
+    have hs₀ : s - b ∈ ({0, 1}ᶜ : Set ℂ) := by
+      simp only [mem_compl_iff, mem_insert_iff, mem_singleton_iff, not_or] at hs ⊢
+      exact ⟨fun he ↦ hs.1 (sub_eq_zero.mp he), fun he ↦ hs.2 (sub_eq_iff_eq_add.mp he)⟩
+    have ha := completedHeckeL_one_analyticOnNhd L₀ hL₀ h₀ (s - b) hs₀
+    have hb := ha.comp (f := fun z : ℂ ↦ z - b) (show AnalyticAt ℂ (fun z : ℂ ↦ z - b) s by fun_prop)
+    simpa [L₀, Function.comp_def] using hb
+
+-- TODO(paper-gap): The residues printed in Proposition 3.2.1.3(2) disagree with the
+-- Euler product normalization. For the trivial character of ℚ(√5), the residue at 1
+-- is already the Appendix A.3.2.1 class volume, since both real gamma factors equal 1.
+
 /-- Paper: Equation (3.2.2.3), p. 124. The theta Mellin integral is the idele-class
 Tamagawa integral of the global theta function against the quasi-character. -/
 def globalThetaMellinIntegral (f : ℬ[F]) (c : 𝒳[F]) : ℂ :=
@@ -936,6 +1174,69 @@ Deviation: Entireness concerns the continuation of the integral from its region 
 theorem globalIdelicZFunction_entire_of_nontrivial (f : ℬ[F]) (χ : U[F])
     (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
     Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
+
+set_option maxHeartbeats 1000000 in
+/-- Paper: §3.4.3.1, p. 152. On the half-plane of absolute convergence, the idelic
+zeta integral of a normalized adelic Gaussian gives the completed Euler product.
+Deviation: The finite Tamagawa unit masses are absorbed by scaling the test function.
+The complex Gaussian uses the opposite angular weight to the character. -/
+theorem exists_globalIdelicZetaIntegral_eq_completedHeckeL (χ : U[F]) :
+    ∃ f : ℬ[F], ∀ s : halfPlane,
+      globalIdelicZetaIntegral f (ideleClassNormTwist χ s) = completedHeckeL χ s := by
+  obtain ⟨fArch, hArch⟩ := exists_archimedeanHeckeTest χ
+  obtain ⟨f, a, ha, hf⟩ := exists_globalHeckeTest χ fArch
+  refine ⟨a⁻¹ • f, fun s ↦ ?_⟩
+  have hscale : globalIdelicZetaIntegral (a⁻¹ • f) (ideleClassNormTwist χ s) =
+      a⁻¹ * globalIdelicZetaIntegral f (ideleClassNormTwist χ s) := by
+    let integrand (g : 𝕀[F]) := f (Multiplicative.ofAdd g.val) * (ideleClassNormTwist χ s) (classOf g)
+    calc
+      _ = ∫ g, a⁻¹ * integrand g ∂multiplicativeTamagawaMeasure F := by
+        apply integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)
+        change (a⁻¹ * f (Multiplicative.ofAdd g.val)) * (ideleClassNormTwist χ s) (classOf g) =
+          a⁻¹ * (f (Multiplicative.ofAdd g.val) * (ideleClassNormTwist χ s) (classOf g))
+        exact mul_assoc _ _ _
+      _ = _ := integral_const_mul (μ := multiplicativeTamagawaMeasure F) a⁻¹ integrand
+  rw [hscale, hf s, hArch s, ← mul_assoc, inv_mul_cancel₀ ha, one_mul]
+  rfl
+
+/-- Paper: Proposition 3.2.1.3(1), p. 123. When the restriction to norm-one
+classes is nontrivial, the continuation is entire. -/
+theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
+    Differentiable ℂ L := by
+  obtain ⟨f, hf⟩ := exists_globalIdelicZetaIntegral_eq_completedHeckeL χ
+  let Z (s : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ s)
+  have hZ : Differentiable ℂ Z := globalIdelicZFunction_entire_of_nontrivial f χ hχ
+  have hZNF : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hEq : EqOn L Z halfPlane := by
+    intro s hs
+    have habs : quasiCharacterAbscissa (ideleClassNorm F)
+        (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F))
+        (ideleClassNormTwist χ s) = s.re :=
+      quasiCharacterAbscissa_of_unitary_twist (ideleClassNorm F) _ _ _ χ s (fun _ ↦ rfl)
+    have hmem : ideleClassNormTwist χ s ∈ rightHalf := by
+      change 1 < quasiCharacterAbscissa _ _ _ _
+      rwa [habs]
+    exact (h ⟨s, hs⟩).trans
+      ((globalIdelicZFunction_eq_integral f hmem).trans (hf ⟨s, hs⟩)).symm
+  have h₂ : ∀ᶠ s in 𝓝 (2 : ℂ), s ∈ halfPlane :=
+    (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num)
+  have hnear : L =ᶠ[𝓝[≠] (2 : ℂ)] Z :=
+    (h₂.mono hEq).filter_mono nhdsWithin_le_nhds
+  have htop : meromorphicOrderAt (L - Z) (2 : ℂ) = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp hnear)
+  have hsub := hL.meromorphicOn.sub hZNF.meromorphicOn
+  -- The difference vanishes as a meromorphic germ everywhere by connectedness.
+  have hident : L = Z := by
+    funext s
+    have horder := hsub.meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+      (mem_univ (2 : ℂ)) (mem_univ s) htop
+    have hlocal : L =ᶠ[𝓝[≠] s] Z :=
+      eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp horder)
+    exact (((hL (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+      (hZNF (mem_univ s))).mp hlocal).eq_of_nhds
+  rwa [hident]
 
 section HomogeneousMellin
 

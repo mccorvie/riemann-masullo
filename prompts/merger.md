@@ -82,7 +82,12 @@ git fetch -q origin && git checkout -q --detach origin/main &&
   `lake build` and `scripts/lint.sh`, push, open a pull request, merge it, and tell the owner.
 - **`scripts/issues.py --apply`** opens a proof issue for each `sorry` that has none (a split
   adds some), closes issues whose `sorry` is gone, and unblocks section issues whose
-  prerequisites are closed. It refuses to run from a checkout that is not at the tip of `main`;
+  prerequisites are closed. Run it in a checkout that nothing else touches until it has
+  finished: do not check out another commit there, or edit files, while it builds or applies.
+  (On 2026-11-21 a checkout during the run made it read declaration names off the wrong lines:
+  110 issues with garbled names were opened and 150 good ones closed.) It now stops if the
+  checkout changes under it, if a reported `sorry` is not on a declaration line, or if it is
+  about to open and close more than 20 issues each in one run; `--force` overrides the last. It refuses to run from a checkout that is not at the tip of `main`;
   if `main` moved while it ran, update and run it again. The integrator runs it too, after
   merging statements; a lock keeps the two apart.
 

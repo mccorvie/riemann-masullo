@@ -8,6 +8,9 @@ pp.unicode.fun = true
 autoImplicit = false
 relaxedAutoImplicit = false
 maxSynthPendingDepth = 3
+# Off for build time: on declarations with many section hypotheses over large types (Appendix D)
+# this linter took up to 20 minutes for one four-line proof. See #3333.
+linter.unusedSectionVars = false
 
 [[require]]
 name = "mathlib"
