@@ -2372,7 +2372,21 @@ include hK in
 positive subgroup, the product has interior in the archimedean ideles. -/
 theorem infiniteIdele_product_interior (hi : (interior K).Nonempty) :
     (interior productLocus).Nonempty := by
-  sorry
+  have hsection : Continuous placeSection := by
+    change Continuous (atInfinity ∘ singlePlaceIdeleNormSection F v₀)
+    exact (continuous_fst.units_map _).comp (singlePlaceIdeleNormSection_continuous F v₀)
+  have hsplit : RightInverse placeSection (infiniteIdeleNorm F) := by
+    intro t
+    rw [infiniteIdeleNorm_eq_global]
+    exact singlePlaceIdeleNormSection_rightInverse F v₀ t
+  obtain ⟨e, he, -⟩ := infiniteIdeleNormSection_product F placeSection hsection hsplit
+  have hE := infiniteIdeleFundamentalDomain_interior F b v₀ σ
+  refine ((hi.prod hE).image e).mono (interior_maximal ?_ ?_)
+  · rintro _ ⟨⟨t, g⟩, ⟨ht, hg⟩, rfl⟩
+    rw [he]
+    exact Set.mul_mem_mul ⟨t, interior_subset ht, rfl⟩
+      ⟨g, subset_closure (interior_subset hg), rfl⟩
+  · exact e.toHomeomorph.isOpenMap _ (isOpen_interior.prod isOpen_interior)
 
 include hK in
 /-- Paper: Lemma A.2.3.13(2), p. 553. The product in the archimedean adele ring
