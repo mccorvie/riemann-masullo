@@ -144,7 +144,13 @@ theorem tendsto_sum_hilbertTrace_orthogonalProjections_mul [SeparableSpace H]
     (T : nuclearEndomorphisms H) :
     Tendsto (fun k ↦ ∑ i ∈ s k,
       hilbertTrace ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩)
-      atTop (𝓝 (hilbertTrace T)) := by sorry
+      atTop (𝓝 (hilbertTrace T)) := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply tendsto_iff_norm_sub_tendsto_zero.mpr
+  simp only [← htr, ← map_sum, ← map_sub]
+  simp only [htr]
+  exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _)
+    (tendsto_traceNorm_sum_orthogonalProjections_mul V hV hne hSOT s hs hcofinal T)
 
 /-- Paper: Remark C.3.5.2, p. 699. The finite sums of pairwise orthogonal
 projections converge strongly to the identity exactly when the algebraic
