@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a
 public import Mathlib.MeasureTheory.Integral.Average
 import Mathlib.MeasureTheory.Covering.Vitali
+import Mathlib.MeasureTheory.Group.Prod
 
 /-!
 # Maximal theorems and Lebesgue differentiation on locally compact abelian groups
@@ -163,7 +164,63 @@ theorem dSequenceMeasureMaximal_weak [μ.IsHaarMeasure] {ν : Measure G} [ν.Reg
     {B : Set G} (hB : NullMeasurableSet B μ) (hBU : μ (B * U 0) < ∞)
     {α : ℝ} (hα : 0 < α) :
     let E := B ∩ {x | ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x}
-    μ E ≤ ENNReal.ofReal (C / α) * ν (E * U 0) := by sorry
+    μ E ≤ ENNReal.ofReal (C / α) * ν (E * U 0) := by
+  classical
+  intro E
+  obtain hE | hE := E.eq_empty_or_nonempty
+  · simp [hE]
+  have htranslate (x : G) (k : ℕ) :
+      x • U k = (fun y : G ↦ y * x⁻¹) ⁻¹' U k := by
+    ext y
+    rw [Set.mem_smul_set_iff_inv_smul_mem, Set.mem_preimage]
+    simp only [smul_eq_mul, mul_comm]
+  have hmax : Measurable (dSequenceMeasureMaximal μ ν U) := by
+    apply Measurable.limsup
+    intro k
+    simp only [htranslate]
+    exact ((measurable_measure_mul_right ν (hBorel k)).comp measurable_inv).div_const _
+  have hEm : NullMeasurableSet E μ :=
+    hB.inter (measurableSet_lt measurable_const hmax).nullMeasurableSet
+  have hEsub : E ⊆ B := inter_subset_left
+  let F : Set (Set G) :=
+    {V | (∃ (x : G) (k : ℕ), V = x • U k) ∧ ENNReal.ofReal α * μ V < ν V}
+  have hcover (x : G) (hx : x ∈ E) : ∃ k, x • U k ∈ F := by
+    have hlevel : ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x := hx.2
+    obtain ⟨k, hk⟩ := (frequently_lt_of_lt_limsup (h := hlevel)).exists
+    refine ⟨k, ⟨⟨x, k, rfl⟩, ?_⟩⟩
+    rw [measure_smul]
+    exact lt_of_not_ge fun h ↦ hk.not_ge
+      ((ENNReal.div_le_iff (hU.1 k).2.2.1.ne' (hU.1 k).2.2.2.ne).mpr
+        (by simpa only [mul_comm] using h))
+  obtain ⟨n, x, k, hx, hdisjoint, hmass⟩ :=
+    exists_disjoint_dSequence_translates hU hC hbound (F := F) (fun _ hV ↦ hV.1) hEm hE
+      ((measure_mono (Set.mul_subset_mul hEsub Subset.rfl)).trans_lt hBU) hcover
+  have hunion : (⋃ i, x i • U (k i)) ⊆ E * U 0 := by
+    refine iUnion_subset fun i ↦ ?_
+    rintro y ⟨w, hw, rfl⟩
+    exact Set.mul_mem_mul (hx i).1 (hU.2.1 (Nat.zero_le _) hw)
+  have hsum : ∑ i, ENNReal.ofReal α * μ (U (k i)) ≤ ν (E * U 0) := by
+    calc
+      _ ≤ ∑ i, ν (x i • U (k i)) := Finset.sum_le_sum fun i _ ↦ by
+        simpa only [measure_smul] using (hx i).2.2.le
+      _ = ν (⋃ i, x i • U (k i)) := by
+        rw [measure_iUnion hdisjoint, tsum_fintype]
+        intro i
+        rw [htranslate]
+        exact (hBorel (k i)).preimage (measurable_mul_const _)
+      _ ≤ ν (E * U 0) := measure_mono hunion
+  calc
+    μ E ≤ ENNReal.ofReal C * ∑ i, μ (U (k i)) := by
+      rw [mul_comm, ← ENNReal.div_le_iff (ENNReal.ofReal_pos.mpr hC).ne'
+        ENNReal.ofReal_ne_top]
+      exact hmass.le
+    _ ≤ ENNReal.ofReal C * (ν (E * U 0) / ENNReal.ofReal α) := by
+      refine mul_le_mul' le_rfl ?_
+      apply (ENNReal.le_div_iff_mul_le (Or.inl (ENNReal.ofReal_pos.mpr hα).ne')
+        (Or.inl ENNReal.ofReal_ne_top)).mpr
+      simpa only [mul_comm _ (ENNReal.ofReal α), Finset.mul_sum] using hsum
+    _ = ENNReal.ofReal (C / α) * ν (E * U 0) := by
+      rw [ENNReal.ofReal_div_of_pos hα, ENNReal.div_eq_inv_mul, ← mul_assoc, div_eq_mul_inv]
 
 /-- Paper: Theorem A.5.3.4(1), p. 579. Equality in the localized weak bound
 holds exactly when the part of the strict level set in `B` is empty.
