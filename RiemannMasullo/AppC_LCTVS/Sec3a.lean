@@ -8,6 +8,7 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
 import Mathlib.Topology.Algebra.InfiniteSum.Module
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
 
@@ -1994,11 +1995,51 @@ def traceNorm (T : nuclearEndomorphisms H) : ℝ :=
   let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
   ∑' i, (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re
 
+/-- The positive square root of `A.adjoint * A` is nuclear if `A` is nuclear. -/
+private theorem isNuclearOperator_sqrt_adjoint_mul (A : H →L[ℂ] H)
+    (hA : IsNuclearOperator A) : IsNuclearOperator (CFC.sqrt (A.adjoint * A)) := by
+  generalize hB : CFC.sqrt (A.adjoint * A) = B
+  have hB_pos : 0 ≤ B := by
+    rw [← hB]
+    exact CFC.sqrt_nonneg _
+  have hB_adj : B.adjoint = B :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp hB_pos).isSelfAdjoint.adjoint_eq
+  have hA_pos : 0 ≤ A.adjoint * A :=
+    ContinuousLinearMap.nonneg_iff_isPositive.mpr (ContinuousLinearMap.isPositive_adjoint_comp_self A)
+  have hB_sq : B * B = A.adjoint * A := by
+    simpa only [hB] using CFC.sqrt_mul_sqrt_self (A.adjoint * A) hA_pos
+  have hB_comp : B.comp B = A.adjoint.comp A :=
+    calc
+      B.comp B = B * B := (ContinuousLinearMap.mul_def B B).symm
+      _ = A.adjoint * A := hB_sq
+      _ = A.adjoint.comp A := ContinuousLinearMap.mul_def A.adjoint A
+  have hB_norm (x : H) : ‖B x‖ ≤ ‖A x‖ := by
+    have h := B.apply_norm_eq_sqrt_inner_adjoint_right x
+    rw [hB_adj, hB_comp] at h
+    exact (h.trans (A.apply_norm_eq_sqrt_inner_adjoint_right x).symm).le
+  obtain ⟨S, _, hS⟩ := exists_contraction_comp_eq_of_norm_le A B hB_norm
+  rw [← hS]
+  obtain ⟨a, φ, y, ha, hφ, hy, hseries⟩ := (isNuclearOperator_iff_isBanachNuclear A).mp hA
+  refine (isNuclearOperator_iff_isBanachNuclear _).mpr
+    ⟨a, φ, S ∘ y, ha, hφ, ?_, fun x ↦ ?_⟩
+  · simpa only [map_zero] using (S.continuous.tendsto 0).comp hy
+  · simpa only [Function.comp_apply, ContinuousLinearMap.comp_apply, map_smul] using
+      S.hasSum (hseries x)
+
 /-- Paper: Definition C.3.4.2(2), p. 697. The trace norm is the sum of the
 diagonal series for the positive square root in every Hilbert basis. -/
 theorem hasSum_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : nuclearEndomorphisms H) :
-    HasSum (fun i ↦ (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re) (traceNorm T) := by sorry
+    HasSum (fun i ↦ (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re) (traceNorm T) := by
+  let B := CFC.sqrt (T.val.adjoint * T.val)
+  have hB : IsNuclearOperator B := isNuclearOperator_sqrt_adjoint_mul T.val T.property
+  let c := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  change HasSum (fun i ↦ (⟪b i, B (b i)⟫_ℂ).re) (∑' j, (⟪c j, B (c j)⟫_ℂ).re)
+  have hc := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal c B hB).of_norm.hasSum
+  have hb := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b B hB).of_norm.hasSum
+  simp only [Complex.reCLM_apply] at hc hb
+  rw [hc.tsum_eq, ← tsum_hilbertDiagonal_eq b c B hB]
+  exact hb
 
 /-- A bounded endomorphism and the positive square root of its Gram operator
 each factor through the other by bounded postcomposition. -/

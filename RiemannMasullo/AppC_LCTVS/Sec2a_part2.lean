@@ -2186,11 +2186,120 @@ variable (E F G : Type*) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
   [TopologicalSpace G] [PolynormableSpace ℂ E] [T2Space E] [PolynormableSpace ℂ F] [T2Space F]
   [PolynormableSpace ℂ G] [T2Space G]
 
+omit [T2Space E] [T2Space F] in
+/-- Swapping the factors interchanges the two polar tests of every injective seminorm. -/
+private theorem continuous_injectiveTensor_comm :
+    @Continuous (InjectiveTensor E F) (InjectiveTensor F E) _ _ (TensorProduct.comm ℂ E F) := by
+  let C : InjectiveTensor E F →ₗ[ℂ] InjectiveTensor F E := (TensorProduct.comm ℂ E F).toLinearMap
+  refine (withGeneratingSeminorms_spec (F ⊗[ℂ] E) _).continuous_of_continuous_comp C
+    fun ⟨V, U⟩ ↦ ?_
+  refine Seminorm.continuous_of_le
+    ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U, V)) fun t ↦ ?_
+  change injectiveTensorSeminorm V U (C t) ≤ injectiveTensorSeminorm U V t
+  refine (injectiveTensorSeminorm_le_iff V U _ _).2 fun ψ hψ φ hφ ↦ ?_
+  have h : (tensorDualForm ψ φ).comp C = tensorDualForm φ ψ := by
+    apply TensorProduct.ext'
+    intro x y
+    change tensorDualForm ψ φ (y ⊗ₜ[ℂ] x) = tensorDualForm φ ψ (x ⊗ₜ[ℂ] y)
+    simp only [tensorDualForm_tmul, mul_comm]
+  rw [show tensorDualForm ψ φ (C t) = tensorDualForm φ ψ t from DFunLike.congr_fun h t]
+  exact norm_tensorDualForm_le_injectiveTensorSeminorm U V ⟨φ, hφ⟩ ⟨ψ, hψ⟩ t
+
+omit [T2Space E] [T2Space F] [T2Space G] in
+/-- A target zero-neighborhood contains a finite intersection of injective seminorm
+balls. Contracting against a functional in the first polar pulls these tests back to
+injective seminorms on the source. -/
+private theorem continuous_injectiveTensor_assoc :
+    @Continuous (InjectiveTensor (InjectiveTensor E F) G) (InjectiveTensor E (InjectiveTensor F G))
+      _ _ (TensorProduct.assoc ℂ E F G) := by
+  let P := InjectiveTensor E F
+  let Q := InjectiveTensor F G
+  let A : InjectiveTensor P G →ₗ[ℂ] InjectiveTensor E Q := (TensorProduct.assoc ℂ E F G).toLinearMap
+  refine (withGeneratingSeminorms_spec (E ⊗[ℂ] Q) _).continuous_of_continuous_comp A
+    fun ⟨U, V⟩ ↦ ?_
+  let p (YZ : {Y : Set F // Y ∈ 𝓝 0} × {Z : Set G // Z ∈ 𝓝 0}) :=
+    injectiveTensorSeminorm YZ.1 YZ.2
+  obtain ⟨⟨J, δ⟩, hδ, hJV⟩ :=
+    (withGeneratingSeminorms_spec (F ⊗[ℂ] G) p).hasBasis_zero_ball.mem_iff.mp V.property
+  let W (Y : {Y : Set F // Y ∈ 𝓝 0}) : {W : Set P // W ∈ 𝓝 0} :=
+    ⟨(injectiveTensorSeminorm U Y).ball 0 1, Seminorm.ball_mem_nhds
+      ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U, Y)) one_pos⟩
+  let c (φ : StrongDual ℂ E) : P →ₗ[ℂ] F := (LinearMap.applyₗ φ).comp tensorDualOperator
+  have hbound (φ : StrongDual ℂ E) (hφ : φ ∈ StrongDual.polar ℂ U.val)
+      (YZ : {Y : Set F // Y ∈ 𝓝 0} × {Z : Set G // Z ∈ 𝓝 0}) (t : InjectiveTensor P G) :
+      p YZ ((c φ).rTensor G t) ≤ injectiveTensorSeminorm (W YZ.1) YZ.2 t := by
+    refine (injectiveTensorSeminorm_le_iff YZ.1 YZ.2 _ _).2 fun ψ hψ χ hχ ↦ ?_
+    have htest (x : P) : ‖tensorDualForm φ ψ x‖ ≤ injectiveTensorSeminorm U YZ.1 x :=
+      norm_tensorDualForm_le_injectiveTensorSeminorm U YZ.1 ⟨φ, hφ⟩ ⟨ψ, hψ⟩ x
+    let l : StrongDual ℂ P := ⟨tensorDualForm φ ψ, by
+      refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp
+        (show P →ₗ[ℂ] ℂ from tensorDualForm φ ψ) fun _ ↦ ?_
+      exact Seminorm.continuous_of_le
+        ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U, YZ.1)) htest⟩
+    have hl : l ∈ StrongDual.polar ℂ (W YZ.1).val :=
+      (StrongDual.mem_polar_iff ℂ _).2 fun x hx ↦
+        (htest x).trans ((injectiveTensorSeminorm U YZ.1).mem_ball_zero.mp hx).le
+    have h : (tensorDualForm ψ χ).comp ((c φ).rTensor G) = tensorDualForm l χ := by
+      apply TensorProduct.ext'
+      intro x y
+      simp only [LinearMap.comp_apply, LinearMap.rTensor_tmul, tensorDualForm_tmul]
+      exact congrArg (· * χ y) (tensorDualOperator_eval x φ ψ)
+    rw [show tensorDualForm ψ χ ((c φ).rTensor G t) = tensorDualForm l χ t
+      from DFunLike.congr_fun h t]
+    exact norm_tensorDualForm_le_injectiveTensorSeminorm (W YZ.1) YZ.2 ⟨l, hl⟩ ⟨χ, hχ⟩ t
+  let s (YZ : {Y : Set F // Y ∈ 𝓝 0} × {Z : Set G // Z ∈ 𝓝 0}) :
+      Seminorm ℂ (InjectiveTensor P G) := injectiveTensorSeminorm (W YZ.1) YZ.2
+  have hs : Continuous (J.sup s : Seminorm ℂ (InjectiveTensor P G)) :=
+    Seminorm.continuous_finsetSup fun YZ _ ↦ by
+      change Continuous (fun t : InjectiveTensor P G ↦ injectiveTensorSeminorm (W YZ.1) YZ.2 t)
+      exact (withGeneratingSeminorms_spec (P ⊗[ℂ] G) _).continuous_seminorm (W YZ.1, YZ.2)
+  apply Seminorm.continuous' (r := 1)
+  refine mem_of_superset (Seminorm.ball_mem_nhds hs hδ) fun t ht ↦ ?_
+  rw [Seminorm.mem_closedBall_zero]
+  change injectiveTensorSeminorm U V (A t) ≤ 1
+  refine (injectiveTensorSeminorm_le_iff U V _ _).2 fun φ hφ l hl ↦ ?_
+  have h : (tensorDualForm φ l).comp A = l.toLinearMap.comp ((c φ).rTensor G) := by
+    apply TensorProduct.ext_threefold
+    intro x y z
+    let yz : Q := y ⊗ₜ[ℂ] z
+    change tensorDualForm φ l (x ⊗ₜ[ℂ] yz) = l (φ x • yz)
+    rw [tensorDualForm_tmul, map_smul, smul_eq_mul]
+  rw [show tensorDualForm φ l (A t) = l ((c φ).rTensor G t) from DFunLike.congr_fun h t]
+  apply (StrongDual.mem_polar_iff ℂ _).mp hl _ (hJV ?_)
+  refine (J.sup p).mem_ball_zero.mpr (Seminorm.finset_sup_apply_lt hδ fun YZ hYZ ↦ ?_)
+  calc
+    p YZ ((c φ).rTensor G t) ≤ s YZ t := hbound φ hφ YZ t
+    _ ≤ (J.sup s) t := Seminorm.le_finset_sup_apply hYZ
+    _ < δ := (J.sup s).mem_ball_zero.mp ht
+
+-- Retain the Hausdorff assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma C.2.3.5(3), p. 678. The algebraic associator is a homeomorphism
 between the two iterated injective tensor products. -/
 theorem injectiveTensor_assoc :
     @IsHomeomorph (InjectiveTensor (InjectiveTensor E F) G) (InjectiveTensor E (InjectiveTensor F G))
-      _ _ (TensorProduct.assoc ℂ E F G) := by sorry
+      _ _ (TensorProduct.assoc ℂ E F G) := by
+  let e : InjectiveTensor (InjectiveTensor E F) G ≃ₗ[ℂ] InjectiveTensor E (InjectiveTensor F G) :=
+    TensorProduct.assoc ℂ E F G
+  refine (⟨e.toEquiv, continuous_injectiveTensor_assoc E F G, ?_⟩ :
+    InjectiveTensor (InjectiveTensor E F) G ≃ₜ InjectiveTensor E (InjectiveTensor F G)).isHomeomorph
+  -- Reverse the reassociation by rotating the factors through outer swaps.
+  let C₁ := TensorProduct.comm ℂ E (InjectiveTensor F G)
+  let C₂ := TensorProduct.comm ℂ F (InjectiveTensor G E)
+  let C₃ := TensorProduct.comm ℂ G (InjectiveTensor E F)
+  let a₁ := TensorProduct.assoc ℂ F G E
+  let a₂ := TensorProduct.assoc ℂ G E F
+  let reverse := C₁.trans (a₁.trans (C₂.trans (a₂.trans C₃)))
+  have hreverse : reverse.toLinearMap = e.symm.toLinearMap := by
+    apply TensorProduct.ext_threefold'
+    intro x y z
+    rfl
+  have hc := (continuous_injectiveTensor_comm G (InjectiveTensor E F)).comp
+    ((continuous_injectiveTensor_assoc G E F).comp
+      ((continuous_injectiveTensor_comm F (InjectiveTensor G E)).comp
+        ((continuous_injectiveTensor_assoc F G E).comp
+          (continuous_injectiveTensor_comm E (InjectiveTensor F G)))))
+  exact hc.congr (DFunLike.congr_fun hreverse)
 
 end Associativity
 

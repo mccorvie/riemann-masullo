@@ -3488,7 +3488,57 @@ theorem exists_directLimit_not_t2 :
     let X := fun _ : ℕ ↦ ℕ → ℂ
     ∃ f : ∀ i j, i ≤ j → X i →ₗ[ℂ] X j,
       DirectedSystem X (f · · ·) ∧ (∀ i j h, Continuous (f i j h)) ∧
-        ¬ @T2Space _ (lcDirectLimitTopology f) := by sorry
+        ¬ @T2Space _ (lcDirectLimitTopology f) := by
+  intro X
+  -- Each transition drops one coordinate for every step between the stages.
+  let f : ∀ i j, i ≤ j → X i →ₗ[ℂ] X j :=
+    fun i j _ ↦ LinearMap.pi fun k ↦ LinearMap.proj (k + (j - i))
+  let : DirectedSystem X (f · · ·) :=
+    { map_self := fun {i} x ↦ by
+        funext k
+        change x (k + (i - i)) = x k
+        simp
+      map_map := fun {k j i} hij hjk x ↦ by
+        funext n
+        change x (n + (k - j) + (j - i)) = x (n + (k - i))
+        congr 1
+        omega }
+  refine ⟨f, inferInstance, fun i j h ↦ continuous_pi fun k ↦
+    continuous_apply (k + (j - i)), ?_⟩
+  let L := Module.DirectLimit X f
+  let stage := Module.DirectLimit.of ℂ ℕ X f
+  let : TopologicalSpace L := lcDirectLimitTopology f
+  intro hT2
+  let : T2Space L := hT2
+  let P : SeminormFamily ℂ L {p : Seminorm ℂ L // ∀ i, Continuous (p ∘ stage i)} :=
+    Subtype.val
+  have hP : WithSeminorms P := ⟨rfl⟩
+  have hstage : Continuous (stage 0) :=
+    hP.continuous_of_continuous_comp (stage 0) fun p ↦ p.property 0
+  -- The finite truncations converge to the constant sequence of ones in stage zero.
+  let u (n : ℕ) : X 0 := fun k ↦ if k < n then 1 else 0
+  let x : X 0 := fun _ ↦ 1
+  have hu : Tendsto u atTop (𝓝 x) := by
+    apply tendsto_pi_nhds.mpr
+    intro k
+    apply tendsto_atTop_of_eventually_const (i₀ := k + 1)
+    intro n hn
+    exact ite_eq_left (Nat.lt_of_succ_le hn)
+  -- Their images are already zero, since the transition to stage n drops their support.
+  have hzero (n : ℕ) : stage 0 (u n) = 0 := by
+    have hdrop : f 0 n (Nat.zero_le n) (u n) = 0 := by
+      funext k
+      change (if k + (n - 0) < n then (1 : ℂ) else 0) = 0
+      exact ite_eq_right (by omega)
+    rw [← Module.DirectLimit.of_f (hij := Nat.zero_le n), hdrop, map_zero]
+  have ht : Tendsto (fun n ↦ stage 0 (u n)) atTop (𝓝 (0 : L)) := by
+    simpa only [hzero] using
+      (tendsto_const_nhds : Tendsto (fun _ : ℕ ↦ (0 : L)) atTop (𝓝 0))
+  have heq : stage 0 x = 0 := tendsto_nhds_unique (hstage.continuousAt.tendsto.comp hu) ht
+  -- The constant sequence survives every transition.
+  obtain ⟨n, hn, hx⟩ := Module.DirectLimit.of.zero_exact heq
+  have hone : (1 : ℂ) = 0 := congrFun hx 0
+  exact one_ne_zero hone
 
 -- Remark C.2.4.14 (p. 689) gives references and explains their Hausdorff convention.
 

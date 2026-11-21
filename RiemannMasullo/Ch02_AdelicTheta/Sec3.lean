@@ -152,10 +152,10 @@ theorem sAdeleSchwartz_exists_decay_bound (f : ℬₛ) :
         ∀ x : Aₛ, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ N ≤ B := by
   sorry
 
-/-- Paper: Proposition 2.3.1.2(1), p. 100. The series of norms of the
-S-unit translates is summable uniformly on each compact set of S-ideles. -/
-theorem sLocalAdelicTheta_summableUniformlyOn_norm (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
-    SummableUniformlyOn (fun (ξ : Uₛ) (g : Iₛ) ↦ ‖thetaTerm f ξ g‖) K := by
+/-- Paper: Proposition 2.3.1.2(1), p. 100. On a compact set of S-ideles, the
+norms of the S-unit summands are bounded by a common summable family. -/
+private theorem sLocalAdelicTheta_exists_summable_bound (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
+    ∃ u : Uₛ → ℝ, Summable u ∧ ∀ ξ g, g ∈ K → ‖thetaTerm f ξ g‖ ≤ u ξ := by
   classical
   obtain ⟨C, hC, hsupport, hdecay⟩ := sAdeleSchwartz_exists_decay_bound F S f
   -- Undo the idele translates on the finite support simultaneously.
@@ -186,11 +186,7 @@ theorem sLocalAdelicTheta_summableUniformlyOn_norm (f : ℬₛ) (K : Set Iₛ) (
       ContinuousOn (fun g : Iₛ ↦ arch (g⁻¹).val.1) K)
   let R := max M 1
   have hR : 0 ≤ R := zero_le_one.trans (le_max_right _ _)
-  refine HasSumUniformlyOn.summableUniformlyOn
-    (hasSumUniformlyOn_iff_tendstoUniformlyOn.mpr
-      (tendstoUniformlyOn_tsum (hs.mul_left (B * R ^ N)) ?_))
-  intro ξ g hg
-  rw [Real.norm_of_nonneg (norm_nonneg _)]
+  refine ⟨_, hs.mul_left (B * R ^ N), fun ξ g hg ↦ ?_⟩
   let y : Aₛ := (unitAtS ξ * g).val
   have hy : y = d ξ * g.val := rfl
   have hd : d ξ = y * (g⁻¹).val := by
@@ -223,12 +219,21 @@ theorem sLocalAdelicTheta_summableUniformlyOn_norm (f : ℬₛ) (K : Set Iₛ) (
       (B * R ^ N) * P.indicator (fun ξ ↦ ‖arch (d ξ).1‖⁻¹ ^ N) ξ
     rw [hsupport y hyC, norm_zero, Set.indicator_of_notMem hξ, mul_zero]
 
+/-- Paper: Proposition 2.3.1.2(1), p. 100. The series of norms of the
+S-unit translates is summable uniformly on each compact set of S-ideles. -/
+theorem sLocalAdelicTheta_summableUniformlyOn_norm (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
+    SummableUniformlyOn (fun (ξ : Uₛ) (g : Iₛ) ↦ ‖thetaTerm f ξ g‖) K := by
+  obtain ⟨u, hu, hle⟩ := sLocalAdelicTheta_exists_summable_bound F S f K hK
+  exact summableUniformlyOn_of_ge hu fun ξ g hg ↦ by simpa only [norm_norm] using hle ξ g hg
+
 end Summability
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit series converges
 uniformly to its sum on each compact set of S-ideles. -/
 theorem sLocalAdelicTheta_hasSumUniformlyOn (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
-    HasSumUniformlyOn (thetaTerm f) (thetaSum f) K := by sorry
+    HasSumUniformlyOn (thetaTerm f) (thetaSum f) K := by
+  obtain ⟨u, hu, hle⟩ := sLocalAdelicTheta_exists_summable_bound F S f K hK
+  exact hasSumUniformlyOn_iff_tendstoUniformlyOn.mpr (tendstoUniformlyOn_tsum hu hle)
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit sum is a continuous
 function of the S-idele. -/
