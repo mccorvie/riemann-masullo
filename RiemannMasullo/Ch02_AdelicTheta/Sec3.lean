@@ -1217,7 +1217,40 @@ range is supplied by part (4) and Proposition 2.3.1.2(3). -/
 theorem sLocalHomogeneousAdelicTheta_decay_bounded (ω : PontryaginDual J₁)
     (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : Iₛ, T < normℝ g →
-      ‖sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  refine (sLocalAdelicTheta_decay_bounded F S B hB N).elim fun C hC ↦ ?_
+  refine hC.elim fun T hbound ↦ ?_
+  let : CompactSpace J₁ :=
+    isCompact_iff_compactSpace.mp
+      ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : IsFiniteMeasure μ := ⟨isCompact_univ.measure_lt_top⟩
+  have hμ : 0 < μ.real univ :=
+    ENNReal.toReal_pos (isOpen_univ.measure_pos μ univ_nonempty).ne' (measure_ne_top μ _)
+  refine ⟨C * μ.real univ, T, mul_pos hbound.1 hμ, hbound.2.1, fun f hf g hg ↦ ?_⟩
+  have hpoint (h : J₁) : ‖classIntegrand ω f (classOf g) h‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+    obtain ⟨k, hk⟩ := QuotientGroup.mk_surjective (classOf g * h.val)
+    have hh : sIdeleQuotientNorm F S h.val = 1 := h.property
+    have hnorm : sIdeleNorm F S k = sIdeleNorm F S g := by
+      rw [← sIdeleQuotientNorm_mk F S k, hk, map_mul, hh, mul_one, sIdeleQuotientNorm_mk]
+    have hnormℝ : normℝ k = normℝ g := congrArg valueℝ hnorm
+    have hkT : T < normℝ k := by rwa [hnormℝ]
+    have hvalue : sLocalAdelicThetaOnClasses F S f (classOf g * h.val) =
+        sLocalAdelicTheta F S f k :=
+      (congrArg (fun c : Jₛ ↦ sLocalAdelicThetaOnClasses F S f c) hk.symm).trans
+        (sLocalAdelicThetaOnClasses_mk F S f k)
+    calc
+      _ = ‖sLocalAdelicThetaOnClasses F S f (classOf g * h.val)‖ * ‖(ω h : ℂ)‖ :=
+        norm_mul _ _
+      _ = ‖sLocalAdelicTheta F S f k‖ :=
+        (congrArg₂ (· * ·) (congrArg (fun z : ℂ ↦ ‖z‖) hvalue)
+          (Circle.norm_coe (ω h))).trans (mul_one _)
+      _ ≤ C * ((normℝ k) ^ N)⁻¹ := hbound.2.2 f hf k hkT
+      _ = C * ((normℝ g) ^ N)⁻¹ := congrArg (fun r : ℝ ↦ C * (r ^ N)⁻¹) hnormℝ
+  change ‖∫ h, classIntegrand ω f (classOf g) h ∂μ‖ ≤ _
+  calc
+    _ ≤ (C * ((normℝ g) ^ N)⁻¹) * μ.real univ :=
+      norm_integral_le_of_norm_le_const (μ := μ) (Eventually.of_forall hpoint)
+    _ = (C * μ.real univ) * ((normℝ g) ^ N)⁻¹ := mul_right_comm _ _ _
 
 /-- Paper: Proposition 2.3.1.4(4), p. 105. The uniform decay estimate
 for homogeneous theta holds above S-idelic norm one. -/
