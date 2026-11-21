@@ -1272,7 +1272,29 @@ theorem exists_vectorSchwartzDerivativeSeminorm (q : Seminorm ℂ E) (hq : Conti
       ∀ f : vectorSchwartzSubmodule d E, ∃ g : V → E,
         HasVectorMultiPartial α f.val g ∧
           BddAbove (range fun x : V ↦ q (p.eval (fun i ↦ (x i : ℂ)) • g x)) ∧
-          s f = ⨆ x : V, q (p.eval (fun i ↦ (x i : ℂ)) • g x) := by sorry
+          s f = ⨆ x : V, q (p.eval (fun i ↦ (x i : ℂ)) • g x) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let l := (List.finRange d).flatMap fun i ↦ List.replicate (α i) i
+  let weight (x : V) : ℂ := p.eval (fun i ↦ (x i : ℂ))
+  have hderiv (f : vectorSchwartzSubmodule d E) :
+      ∃ g : V → E, HasVectorMultiPartial.hasPartials g f.val l ∧
+        BddAbove (range fun x : V ↦ q (weight x • g x)) := by
+    have hdecay : HasVectorSchwartzDecay f.val := (Submodule.mem_inf.mp f.property).2
+    obtain ⟨g, hg, hb⟩ := hdecay α p
+    refine ⟨g, hg, ?_⟩
+    rw [Set.range_comp']
+    exact (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mp
+      hb ⟨q, hq⟩
+  choose g hg hb using hderiv
+  let D : vectorSchwartzSubmodule d E →ₗ[ℂ] (V → E) :=
+    { toFun := g
+      map_add' := fun f₁ f₂ ↦ hasPartials_unique l (hg (f₁ + f₂))
+        (hasPartials_add (g f₁) (g f₂) l f₁.val f₂.val (hg f₁) (hg f₂))
+      map_smul' := fun c f ↦ hasPartials_unique l (hg (c • f))
+        (hasPartials_smul c (g f) l f.val (hg f)) }
+  let r (x : V) := q.comp (weight x • (LinearMap.proj x).comp D)
+  have hr : BddAbove (range r) := Seminorm.bddAbove_range_iff.mpr hb
+  exact ⟨⨆ x, r x, fun f ↦ ⟨g f, hg f, hb f, Seminorm.iSup_apply hr⟩⟩
 
 -- Remark C.5.1.29 on p. 736 repeats the weak definitions and equalities of Remark C.5.1.27.
 
