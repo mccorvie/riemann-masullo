@@ -6,6 +6,7 @@ import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Group.Prod
 import Mathlib.MeasureTheory.Integral.Layercake
 import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 
 /-!
 # Maximal theorems and Lebesgue differentiation on locally compact abelian groups
@@ -1205,7 +1206,108 @@ has an `Lᵖ` maximal function. -/
 theorem dSequenceMaximal_memLp [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
     (hcompact : IsCompact (closure (U 0)))
     {f : G → ℂ} {p : ℝ} (hp : 1 < p) (hf : MemLp f (ENNReal.ofReal p) μ) :
-    MemLp (dSequenceMaximal μ U f) (ENNReal.ofReal p) μ := by sorry
+    MemLp (dSequenceMaximal μ U f) (ENNReal.ofReal p) μ := by
+  have hp₀ : 0 < p := zero_lt_one.trans hp
+  have hp₁ : 0 < p - 1 := sub_pos.mpr hp
+  have hpne := (ENNReal.ofReal_pos.mpr hp₀).ne'
+  have hpge : 1 ≤ ENNReal.ofReal p := by simpa using ENNReal.ofReal_le_ofReal hp.le
+  obtain ⟨V, hV, hVm, hVU, hVae⟩ := exists_borel_dSequence hU.1
+  obtain ⟨g, hgm, hfg⟩ := hf.aestronglyMeasurable.aemeasurable
+  have hg := hf.ae_eq hfg
+  have hVcompact := hcompact.of_isClosed_subset isClosed_closure (closure_mono (hVU 0))
+  obtain ⟨C, hC, hbound⟩ := hV.2.2
+  have hmax : dSequenceMaximal μ U f = dSequenceMaximal μ V g := by
+    funext x
+    unfold dSequenceMaximal
+    congr 1
+    funext k
+    have htranslate := (smul_set_ae_eq x).mpr (hVae k)
+    have hnorm : (fun y ↦ ‖f y‖ₑ) =ᵐ[μ] (fun y ↦ ‖g y‖ₑ) :=
+      hfg.fun_comp (fun z : ℂ ↦ ‖z‖ₑ)
+    rw [setLAverage_eq, setLAverage_eq, Measure.restrict_congr_set htranslate,
+      measure_congr htranslate, lintegral_congr_ae (ae_restrict_of_ae hnorm)]
+  rw [hmax]
+  have hmaxm := measurable_dSequenceMaximal_of_borel (μ := μ) hVm g
+  apply (eLpNorm_lt_top_iff_lintegral_rpow_eNorm_lt_top hpne ENNReal.ofReal_ne_top
+    hmaxm.aestronglyMeasurable).mpr
+  simp only [eNorm_eq_self, ENNReal.toReal_ofReal hp₀.le]
+  let M (x : G) := dSequenceMaximal μ V g x / 3
+  have hM : Measurable M := hmaxm.div_const 3
+  let ν := μ.withDensity (fun x ↦ ‖g x‖ₑ)
+  -- Inner regularity extends the compact truncation estimate to each global level set.
+  have htail (t : ℝ) (ht : 0 < t) :
+      μ {x | ENNReal.ofReal t < M x} ≤ ENNReal.ofReal (C / t) *
+        ν {x | ENNReal.ofReal t < ‖g x‖ₑ} := by
+    have hlevel : {x | ENNReal.ofReal t < M x} =
+        {x | ENNReal.ofReal (3 * t) < dSequenceMaximal μ V g x} := by
+      ext x
+      simp only [mem_ofPred_eq, M, ENNReal.lt_div_iff_mul_lt (Or.inl (by norm_num : (3 : ℝ≥0∞) ≠ 0))
+        (Or.inl ENNReal.ofNat_ne_top), ENNReal.ofReal_mul (by norm_num : (0 : ℝ) ≤ 3),
+        ENNReal.ofReal_ofNat, mul_comm (ENNReal.ofReal t) 3]
+    rw [(measurableSet_lt measurable_const hM).measure_eq_iSup_isCompact μ]
+    refine iSup_le fun K ↦ iSup_le fun hsub ↦ iSup_le fun hK ↦ ?_
+    rw [hlevel] at hsub
+    have htrunc := dSequenceMaximal_tail_bound hV hVm hVcompact hC (fun k ↦ (hbound k).2)
+      hK hgm ((hg.locallyIntegrable hpge).integrableOn_isCompact (hK.mul hVcompact)) ht
+    rw [inter_eq_left.mpr hsub] at htrunc
+    refine htrunc.trans (mul_le_mul' le_rfl ?_)
+    have hcut : {x | ENNReal.ofReal t < ‖g x‖ₑ} = {x | t < ‖g x‖} := by
+      ext x
+      simp only [mem_ofPred_eq, ← ofReal_norm, ENNReal.ofReal_lt_ofReal_iff_of_nonneg ht.le]
+    rw [hcut]
+    dsimp only [ν]
+    rw [withDensity_apply _ (measurableSet_lt measurable_const hgm.norm),
+      withDensity_apply _ (measurableSet_lt measurable_const hgm.norm)]
+    exact lintegral_mono' (Measure.restrict_mono Subset.rfl Measure.restrict_le_self) le_rfl
+  -- The weighted input tail has exponent p - 1 under the density ‖g‖.
+  have hweighted :
+      ENNReal.ofReal (p - 1) *
+        (∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖g x‖ₑ} *
+          ENNReal.ofReal (t ^ (p - 2))) = ∫⁻ x, ‖g x‖ₑ ^ p ∂μ := by
+    have h := lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul ν hgm.eNorm.aemeasurable hp₁
+    rw [show p - 1 - 1 = p - 2 by ring] at h
+    rw [← h, lintegral_withDensity_eq_lintegral_mul _ hgm.eNorm (hgm.eNorm.pow_const _)]
+    refine lintegral_congr fun x ↦ ?_
+    calc
+      _ = ‖g x‖ₑ ^ (1 : ℝ) * ‖g x‖ₑ ^ (p - 1) := by
+        rw [Pi.mul_apply, ENNReal.rpow_one]
+      _ = _ := by
+        rw [← ENNReal.rpow_add_of_nonneg _ _ zero_le_one hp₁.le,
+          show 1 + (p - 1) = p by ring]
+  have hgfin : (∫⁻ x, ‖g x‖ₑ ^ p ∂μ) < ∞ := by
+    simpa only [ENNReal.toReal_ofReal hp₀.le] using
+      lintegral_rpow_eNorm_lt_top_of_eLpNorm_lt_top hpne ENNReal.ofReal_ne_top hg.eLpNorm_lt_top
+  have htailfin := ENNReal.lt_top_of_mul_ne_top_right (hweighted.trans_lt hgfin).ne
+    (ENNReal.ofReal_pos.mpr hp₁).ne'
+  have hMfin : (∫⁻ x, M x ^ p ∂μ) < ∞ := by
+    rw [lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul μ hM.aemeasurable hp₀]
+    refine ENNReal.mul_lt_top ENNReal.ofReal_lt_top ?_
+    calc
+      _ ≤ ENNReal.ofReal C *
+          ∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖g x‖ₑ} *
+            ENNReal.ofReal (t ^ (p - 2)) := by
+        rw [← lintegral_const_mul' _ _ ENNReal.ofReal_ne_top]
+        refine setLIntegral_mono' measurableSet_Ioi fun t ht ↦ ?_
+        have ht₀ : 0 < t := ht
+        have hweight : ENNReal.ofReal (C / t) * ENNReal.ofReal (t ^ (p - 1)) =
+            ENNReal.ofReal C * ENNReal.ofReal (t ^ (p - 2)) := by
+          rw [← ENNReal.ofReal_mul (div_nonneg hC.le ht₀.le), ← ENNReal.ofReal_mul hC.le,
+            show p - 2 = p - 1 - 1 by ring, Real.rpow_sub ht₀ (p - 1) 1, Real.rpow_one]
+          congr 1
+          simp only [div_eq_mul_inv]
+          ac_rfl
+        calc
+          _ ≤ (ENNReal.ofReal (C / t) * ν {x | ENNReal.ofReal t < ‖g x‖ₑ}) *
+              ENNReal.ofReal (t ^ (p - 1)) := mul_le_mul' (htail t ht₀) le_rfl
+          _ = _ := by rw [mul_right_comm, hweight, mul_right_comm, mul_assoc]
+      _ < ∞ := ENNReal.mul_lt_top ENNReal.ofReal_lt_top htailfin
+  have hscale (x : G) : dSequenceMaximal μ V g x ^ p = (3 : ℝ≥0∞) ^ p * M x ^ p := by
+    dsimp only [M]
+    rw [← ENNReal.mul_rpow_of_nonneg _ _ hp₀.le, mul_comm (3 : ℝ≥0∞),
+      ENNReal.div_mul_cancel (by norm_num) ENNReal.ofNat_ne_top]
+  simp_rw [hscale]
+  rw [lintegral_const_mul _ (hM.pow_const p)]
+  exact ENNReal.mul_lt_top (ENNReal.rpow_lt_top_of_nonneg hp₀.le ENNReal.ofNat_ne_top) hMfin
 
 /-- Paper: Theorem A.5.3.7(2), p. 582. On the entire group the `p`-th moment
 of the maximal function is bounded by the `p`-th power of the `Lᵖ` norm times the printed factor. -/
