@@ -1184,7 +1184,40 @@ at every positive inverse power as the S-idelic norm tends to infinity. -/
 theorem sLocalHomogeneousAdelicTheta_decay_large (ω : PontryaginDual J₁)
     (f : ℬₛ) (N : ℕ) (hN : 1 ≤ N) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : Iₛ, T < normℝ g →
-      ‖sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  have integralDecay {X Y H : Type _} [Group Y] [MeasurableSpace H]
+      (ν : Measure H) [IsFiniteMeasure ν] [NeZero ν]
+      (q : X → Y) (hq : Surjective q)
+      (m : Y →* ℝ≥0ˣ) (n : X → ℝ≥0ˣ) (hm : ∀ g, m (q g) = n g)
+      (p : H → Y) (hp : ∀ h, m (p h) = 1) (χ : H → ℂ) (hχ : ∀ h, ‖χ h‖ = 1)
+      (θ : X → ℂ) (φ : Y → ℂ) (hφ : ∀ g, φ (q g) = θ g)
+      (ψ : X → ℂ) (hψ : ∀ g, ψ g = ∫ h, φ (q g * p h) * χ h ∂ν)
+      (hθ : ∃ A T : ℝ, 0 < A ∧ 0 < T ∧ ∀ g, T < valueℝ (n g) →
+        ‖θ g‖ ≤ A * (valueℝ (n g) ^ N)⁻¹) :
+      ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g, T < valueℝ (n g) →
+        ‖ψ g‖ ≤ C * (valueℝ (n g) ^ N)⁻¹ := by
+    obtain ⟨A, T, hA, hT, hdecay⟩ := hθ
+    refine ⟨A * ν.real univ, T, mul_pos hA measureReal_univ_pos, hT, fun g hg ↦ ?_⟩
+    have hbound (h : H) : ‖φ (q g * p h) * χ h‖ ≤ A * (valueℝ (n g) ^ N)⁻¹ := by
+      obtain ⟨k, hk⟩ := hq (q g * p h)
+      have hnorm : n k = n g := by rw [← hm k, hk, map_mul, hp, mul_one, hm]
+      simp only [norm_mul, hχ, mul_one, ← hk, hφ, ← hnorm]
+      exact hdecay k (hnorm.symm ▸ hg)
+    rw [hψ g]
+    simpa only [mul_right_comm A (valueℝ (n g) ^ N)⁻¹ (ν.real univ)] using
+      norm_integral_le_of_norm_le_const (μ := ν) (.of_forall hbound)
+  have decay := @sLocalAdelicTheta_decay_large F ‹Field F› ‹NumberField F›
+  have decayOnS := decay (by exact S)
+  have decayForF := decayOnS (by exact f)
+  have : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  have : IsFiniteMeasure μ := CompactSpace.isFiniteMeasure (μ := μ)
+  exact integralDecay (X := Iₛ) (Y := Jₛ) (H := J₁) μ classOf QuotientGroup.mk_surjective
+    (sIdeleQuotientNorm F S) (sIdeleNorm F S) (sIdeleQuotientNorm_mk F S)
+    Subtype.val (fun h ↦ h.property) (fun h ↦ (ω h : ℂ)) (fun h ↦ Circle.norm_coe (ω h))
+    (sLocalAdelicTheta F S f) (sLocalAdelicThetaOnClasses F S f)
+    (sLocalAdelicThetaOnClasses_mk F S f)
+    (fun g ↦ sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)) (fun _ ↦ rfl) (decayForF N hN)
 
 /-- Paper: Proposition 2.3.1.4(3), p. 105. The large-norm decay constants
 for homogeneous S-local theta are uniform on a bounded set of test functions.
