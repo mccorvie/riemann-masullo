@@ -1602,7 +1602,25 @@ theorem normOne_ideal_class_exact :
     let H₁ := Subgroup.comap (Subgroup.subtype N₁) H
     ∃ p : N₁ →* CommRing.Pic (𝓞 F), (∀ g, p g = ideleIdealClass F g.val) ∧
       IsClosedEmbedding H₁.subtype ∧ MulExact H₁.subtype p ∧ IsOpenQuotientMap p := by
-  sorry
+  intro H₁
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  let : DiscreteTopology (CommRing.Pic (𝓞 F)) := ⟨rfl⟩
+  have hU : IsOpen (integralUnits : Set 𝕀[F]) :=
+    (isOpenEmbedding_integralAdeleUnits F ∅).isOpen_range
+  have hH : IsOpen (↑(H : Subgroup 𝕀[F]) : Set 𝕀[F]) := Subgroup.isOpen_mono le_sup_right hU
+  have hH₁ : IsOpen (H₁ : Set N₁) := hH.preimage continuous_subtype_val
+  let : DiscreteTopology (N₁ ⧸ H₁) := QuotientGroup.discreteTopology hH₁
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let q : N₁ →* N₁ ⧸ H₁ := QuotientGroup.mk' H₁
+  let p := e.toMonoidHom.comp q
+  refine ⟨p, he, (H₁.isClosed_of_isOpen hH₁).isClosedEmbedding_subtypeVal, ?_, ?_⟩
+  · intro g
+    change e (QuotientGroup.mk g) = 1 ↔ g ∈ Set.range H₁.subtype
+    rw [← map_one e, e.injective.eq_iff, ← MonoidHom.coe_range, Subgroup.range_subtype]
+    exact QuotientGroup.eq_one_iff g
+  · have heCont : Continuous e := continuous_of_discreteTopology
+    exact ⟨e.surjective.comp QuotientGroup.mk_surjective, heCont.comp QuotientGroup.continuous_mk,
+      fun _ _ ↦ isOpen_discrete _⟩
 
 end ExactSequences
 
