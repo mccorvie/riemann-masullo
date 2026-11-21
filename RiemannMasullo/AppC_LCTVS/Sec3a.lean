@@ -1578,7 +1578,33 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteS
 /-- Paper: Lemma C.3.3.1(1), p. 697. Every subset bounded in the strong operator
 topology on a separable Hilbert space is metrizable with its subspace topology. -/
 theorem metrizableSpace_bounded_pointwiseOperators [SeparableSpace H]
-    (S : Set (H →Lₚₜ[ℂ] H)) (hS : IsVonNBounded ℂ S) : MetrizableSpace S := by sorry
+    (S : Set (H →Lₚₜ[ℂ] H)) (hS : IsVonNBounded ℂ S) : MetrizableSpace S := by
+  have hbounded (x : H) : IsVonNBounded ℂ (range fun T : S ↦ T.val x) := by
+    let ev := PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H x
+    change IsVonNBounded ℂ (range (ev ∘ (Subtype.val : S → _)))
+    rw [range_comp, Subtype.range_coe]
+    exact hS.image ev
+  have heq := (PolynormableSpace.banach_steinhaus
+    (𝓕 := fun T : S ↦ (T.val : H →L[ℂ] H)) hbounded).equicontinuous
+  let restrict (T : S) (n : ℕ) := T.val (denseSeq H n)
+  have hcont : Continuous restrict := continuous_pi fun n ↦
+    (PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) H (denseSeq H n)).continuous.comp
+      continuous_subtype_val
+  have hind : IsInducing restrict := by
+    rw [isInducing_iff_nhds]
+    intro T
+    refine le_antisymm (hcont.tendsto T).le_comap (tendsto_id'.mp ?_)
+    apply IsInducing.subtypeVal.tendsto_nhds_iff.mpr
+    apply PointwiseConvergenceCLM.tendsto_iff_forall_tendsto.mpr
+    intro x
+    -- Equicontinuity extends convergence from the dense sequence to all vectors.
+    have hclosed := heq.isClosed_setOfPred_tendsto
+      (l := comap restrict (𝓝 (restrict T))) (T.val : H →L[ℂ] H).continuous
+    apply hclosed.closure_subset_iff.mpr ?_ (denseRange_denseSeq H x)
+    rintro _ ⟨n, rfl⟩
+    exact tendsto_pi_nhds.mp (tendsto_comap (f := restrict) (x := 𝓝 (restrict T))) n
+  let : PseudoMetrizableSpace S := hind.pseudoMetrizableSpace
+  infer_instance
 
 -- Lemma C.3.3.1(2): Hausdorffness is Mathlib's PointwiseConvergenceCLM instance.
 -- Local convexity and quasi-completeness are already stated in Sec2a as
