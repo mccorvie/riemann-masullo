@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import Mathlib.Algebra.Module.ZLattice.Summable
 import Mathlib.Analysis.Normed.Group.FunctionSeries
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -142,6 +144,141 @@ private theorem sInteger_arch_discrete_lattice (H : AddSubgroup Aᶠₛ)
   exact SetLike.isDiscrete_iff_discreteTopology.mp
     (hRange ▸ ((isEmbedding_thetaArch F).comp hp.isEmbedding).isInducing.isDiscrete_range)
 
+local notation "Gₛ" => Multiplicative (SAdeleRing F S)
+
+/-- The finite coordinates of an S-adelic stage lie in a compact additive subgroup. -/
+private theorem sAdeleStage_exists_compact_finite (a : BruhatStructuralPair Gₛ) :
+    ∃ C : Set Aᶠₛ, IsCompact C ∧ ∀ x ∈ a.val.1, (Multiplicative.toAdd x).2 ∈ C := by
+  obtain ⟨V, _, hV, hgen⟩ := a.property.2.1
+  let p : a.val.1 →* Multiplicative Aᶠₛ :=
+    (AddMonoidHom.snd (InfiniteAdeleRing F) Aᶠₛ).toMultiplicative.comp a.val.1.subtype
+  have hp : Continuous p := continuous_snd.comp continuous_subtype_val
+  obtain ⟨H, hH, hVH⟩ :=
+    finiteSAdele_exists_compact_addSubgroup F S (Multiplicative.toAdd '' (p '' V))
+      ((hV.image hp).image continuous_toAdd)
+  have hle : Subgroup.closure V ≤ H.toSubgroup.comap p :=
+    (Subgroup.closure_le _).2 fun x hx ↦ hVH ⟨p x, ⟨x, hx, rfl⟩, rfl⟩
+  rw [hgen] at hle
+  exact ⟨H, hH, fun x hx ↦ hle (Subgroup.mem_top (x := (⟨x, hx⟩ : a.val.1)))⟩
+
+/-- The compact subgroup of an S-adelic structural pair has zero archimedean projection. -/
+private theorem sAdeleStage_arch_eq_zero (a : BruhatStructuralPair Gₛ) :
+    ∀ x ∈ OrderDual.ofDual a.val.2, arch (Multiplicative.toAdd x).1 = 0 := by
+  let (v : S) : LocallyCompactSpace (v.val.adicCompletion F) :=
+    locallyCompactSpace_adicCompletion v.val
+  let : LocallyCompactSpace Gₛ := inferInstanceAs (LocallyCompactSpace
+    (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let : T2Space Gₛ := inferInstanceAs (T2Space
+    (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let k := OrderDual.ofDual a.val.2
+  have hk := isCompact_lcaDualAnnihilator (lcaAnnihilator k) a.property.2.2.1.2.1
+  rw [lcaDualAnnihilator_annihilator k a.property.2.2.1.1] at hk
+  let m : Aₛ →+ A∞ := (arch).toAddMonoidHom.comp (AddMonoidHom.fst _ _)
+  have hm : Continuous m := (isEmbedding_thetaArch F).continuous.comp continuous_fst
+  obtain ⟨B, hB⟩ := hk.exists_bound_of_continuousOn
+    (hm.comp continuous_toAdd).continuousOn
+  intro x hx
+  change m x.toAdd = 0
+  by_contra h
+  have hy : 0 < ‖m x.toAdd‖ := norm_pos_iff.mpr h
+  obtain ⟨n, hn⟩ := exists_nat_gt (B / ‖m x.toAdd‖)
+  have hn' := hB (x ^ n) (k.pow_mem hx n)
+  change ‖m (n • x.toAdd)‖ ≤ B at hn'
+  rw [map_nsmul, RCLike.norm_nsmul ℝ, nsmul_eq_mul] at hn'
+  exact (not_lt_of_ge hn') ((div_lt_iff₀ hy).mp hn)
+
+/-- A descended continuous additive coordinate has the decay of a Schwartz stage. -/
+private theorem stage_exists_decay {G V : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [NormedAddCommGroup V] [NormedSpace ℝ V]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) (N : ℕ) (m : G →* Multiplicative V) (hm : Continuous m)
+    (hk : OrderDual.ofDual a.val.2 ≤ m.ker) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ x : G, ‖schwartzBruhatStageRealization a e s x‖ *
+      ‖(m x).toAdd‖ ^ N ≤ B := by
+  classical
+  let l := m.comp a.val.1.subtype
+  have hker : (OrderDual.ofDual a.val.2).comap a.val.1.subtype ≤ l.ker :=
+    fun x hx ↦ hk hx
+  let p : a.quotient →* Multiplicative V := QuotientGroup.lift _ l hker
+  have hp : Continuous p := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr
+    (hm.comp continuous_subtype_val)
+  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor →+ V :=
+    (p.comp e.equiv.symm.toMonoidHom).toAdditive
+  have hP : Continuous P :=
+    continuous_toAdd.comp (hp.comp (e.equiv.symm.continuous.comp continuous_ofAdd))
+  obtain ⟨A, B, hA, hAB⟩ := elementary_additive_norm_le P hP P.map_add
+  obtain ⟨C, hC⟩ := elementarySchwartz_decay s.property N
+  have hB : 0 ≤ (1 + A + max B 0) ^ N * max C 0 := by positivity
+  refine ⟨_, hB, fun x ↦ ?_⟩
+  by_cases hx : x ∈ a.val.1
+  · rw [schwartzBruhatStageRealization_apply, dite_eq_left hx]
+    let q : a.quotient := QuotientGroup.mk ⟨x, hx⟩
+    let w := Multiplicative.toAdd (e.equiv q)
+    have hw : P w = (m x).toAdd := by
+      change (p (e.equiv.symm (e.equiv q))).toAdd = _
+      rw [e.equiv.symm_apply_apply]
+      rfl
+    change ‖s w‖ * ‖(m x).toAdd‖ ^ N ≤ _
+    have hbound := hAB w
+    rw [hw] at hbound
+    refine (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _)
+      (le_add_of_nonneg_left zero_le_one) _) (norm_nonneg (s w))).trans ?_
+    exact real_decay_aux (norm_nonneg _)
+      (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+        (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hA (norm_nonneg _) hbound (hC w)
+  · simpa only [schwartzBruhatStageRealization_apply, dite_eq_right hx, norm_zero, zero_mul] using hB
+
+/-- The elementary Schwartz bounds control every archimedean norm power on an S-adelic stage. -/
+private theorem sAdeleStage_exists_arch_decay (a : BruhatStructuralPair Gₛ)
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e) (N : ℕ) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ x : Aₛ,
+      ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ N ≤ B := by
+  let m : Gₛ →* Multiplicative A∞ :=
+    ((arch).toAddMonoidHom.comp (AddMonoidHom.fst _ _)).toMultiplicative
+  have hm : Continuous m := (isEmbedding_thetaArch F).continuous.comp continuous_fst
+  exact stage_exists_decay a e s N m hm (sAdeleStage_arch_eq_zero F S a)
+
+
+/-- Compact support in one coordinate and polynomial bounds persist under the sums of
+stage realizations that generate the Schwartz–Bruhat submodule. -/
+private theorem schwartzBruhat_exists_coordinate_bounds {G T : Type*} [CommGroup G]
+    [TopologicalSpace G] [TopologicalSpace T] (pr : G → T) (size : G → ℝ)
+    (hsize : ∀ x, 0 ≤ size x)
+    (hsupp : ∀ a : BruhatStructuralPair G, ∃ C : Set T, IsCompact C ∧
+      ∀ x ∈ a.val.1, pr x ∈ C)
+    (hdecay : ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+      (s : SchwartzBruhatStage e) (N : ℕ), ∃ B : ℝ, 0 ≤ B ∧
+        ∀ x, ‖schwartzBruhatStageRealization a e s x‖ * size x ^ N ≤ B)
+    (f : SchwartzBruhat G) :
+    ∃ C : Set T, IsCompact C ∧ (∀ x, pr x ∉ C → f x = 0) ∧
+      ∀ N : ℕ, ∃ B : ℝ, 0 ≤ B ∧ ∀ x, ‖f x‖ * size x ^ N ≤ B := by
+  classical
+  let P (g : G → ℂ) : Prop :=
+    ∃ C : Set T, IsCompact C ∧ (∀ x, pr x ∉ C → g x = 0) ∧
+      ∀ N : ℕ, ∃ B : ℝ, 0 ≤ B ∧ ∀ x, ‖g x‖ * size x ^ N ≤ B
+  have hzero : P 0 := ⟨∅, isCompact_empty, fun _ _ ↦ rfl, fun _ ↦ ⟨0, le_rfl, by simp⟩⟩
+  have hadd : ∀ g h, P g → P h → P (g + h) := by
+    rintro g h ⟨C, hC, hg, hCg⟩ ⟨D, hD, hh, hDh⟩
+    refine ⟨C ∪ D, hC.union hD, fun x hx ↦ ?_, fun N ↦ ?_⟩
+    · simp [hg x (fun h ↦ hx (Or.inl h)), hh x (fun h ↦ hx (Or.inr h))]
+    · obtain ⟨B, hB, hBg⟩ := hCg N
+      obtain ⟨E, hE, hEh⟩ := hDh N
+      refine ⟨B + E, add_nonneg hB hE, fun x ↦ ?_⟩
+      change ‖g x + h x‖ * size x ^ N ≤ B + E
+      refine (mul_le_mul_of_nonneg_right (norm_add_le (g x) (h x)) (pow_nonneg (hsize x) N)).trans ?_
+      rw [add_mul]
+      exact add_le_add (hBg x) (hEh x)
+  let fs : schwartzBruhatSubmodule G := f
+  change P fs.val
+  refine Submodule.iSup_induction (motive := P) _ fs.property ?_ hzero hadd
+  intro a g hg
+  refine Submodule.iSup_induction (motive := P) _ hg ?_ hzero hadd
+  intro e g hg
+  obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hg
+  obtain ⟨C, hC, hCa⟩ := hsupp a
+  refine ⟨C, hC, fun x hx ↦ ?_, hdecay a e s⟩
+  rw [schwartzBruhatStageRealization_apply, dite_eq_right (fun hy ↦ hx (hCa x hy))]
+
 /-- Paper: Proposition 2.3.1.2(1), p. 100. An S-adelic Schwartz–Bruhat function
 vanishes outside a compact set of finite coordinates. Its absolute value times
 any power of the archimedean norm is bounded on the whole S-adele ring. -/
@@ -149,8 +286,10 @@ theorem sAdeleSchwartz_exists_decay_bound (f : ℬₛ) :
     ∃ C : Set Aᶠₛ, IsCompact C ∧
       (∀ x : Aₛ, x.2 ∉ C → f (Multiplicative.ofAdd x) = 0) ∧
       ∀ N : ℕ, ∃ B : ℝ, 0 ≤ B ∧
-        ∀ x : Aₛ, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ N ≤ B := by
-  sorry
+        ∀ x : Aₛ, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ N ≤ B :=
+  schwartzBruhat_exists_coordinate_bounds (fun x : Gₛ ↦ x.toAdd.2)
+    (fun x ↦ ‖arch x.toAdd.1‖) (fun _ ↦ norm_nonneg _)
+    (sAdeleStage_exists_compact_finite F S) (sAdeleStage_exists_arch_decay F S) f
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The series of norms of the
 S-unit translates is summable uniformly on each compact set of S-ideles. -/
@@ -228,11 +367,32 @@ end Summability
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit series converges
 uniformly to its sum on each compact set of S-ideles. -/
 theorem sLocalAdelicTheta_hasSumUniformlyOn (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
-    HasSumUniformlyOn (thetaTerm f) (thetaSum f) K := by sorry
+    HasSumUniformlyOn (thetaTerm f) (thetaSum f) K := by
+  have habs := sLocalAdelicTheta_summableUniformlyOn_norm F S f K hK
+  apply hasSumUniformlyOn_iff_tendstoUniformlyOn.mpr
+  refine Metric.tendstoUniformlyOn_iff.mpr fun ε hε ↦ ?_
+  filter_upwards [Metric.tendstoUniformlyOn_iff.mp
+    habs.hasSumUniformlyOn.tendstoUniformlyOn ε hε] with t ht g hg
+  have h := habs.summable hg
+  have htail := norm_tsum_le_tsum_norm (h.subtype fun ξ ↦ ξ ∉ t)
+  rw [dist_eq_norm, ← h.of_norm.sum_add_tsum_subtype_compl t, add_sub_cancel_left]
+  apply htail.trans_lt
+  have hn := ht g hg
+  rw [dist_eq_norm, ← h.sum_add_tsum_subtype_compl t, add_sub_cancel_left,
+    Real.norm_of_nonneg (tsum_nonneg fun _ ↦ norm_nonneg _)] at hn
+  exact hn
 
 /-- Paper: Proposition 2.3.1.2(1), p. 100. The S-unit sum is a continuous
 function of the S-idele. -/
-theorem sLocalAdelicTheta_continuous (f : ℬₛ) : Continuous (thetaSum f) := by sorry
+theorem sLocalAdelicTheta_continuous (f : ℬₛ) : Continuous (thetaSum f) := by
+  let : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  have hsum : HasSumLocallyUniformly (thetaTerm f) (thetaSum f) :=
+    hasSumLocallyUniformly_of_forall_compact (sLocalAdelicTheta_hasSumUniformlyOn F S f)
+  have hterm (ξ : Uₛ) : Continuous (thetaTerm f ξ) :=
+    (continuous_schwartzBruhat_apply f).comp (continuous_ofAdd.comp
+      (Units.continuous_val.comp (continuous_const (y := unitAtS ξ) |>.mul continuous_id)))
+  exact hsum.continuous
+    (Eventually.of_forall fun t ↦ continuous_finsetSum t fun ξ _ ↦ hterm ξ).frequently
 
 /-- Paper: Definition 2.3.1.1, p. 99. Forming the continuous S-unit sum
 is complex linear in the test function. -/
