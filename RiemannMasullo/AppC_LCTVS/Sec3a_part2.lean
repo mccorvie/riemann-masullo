@@ -1055,11 +1055,247 @@ theorem singularExpansion_smulRight (e : E) (f : F) (he : ‖e‖ = 1) (hf : ‖
   · simp [c]
   · simp [c]
 
+section
+
+open InnerProductSpace
+
+omit [CompleteSpace E] in
+/-- The rank-one terms from two orthonormal families and coefficients tending to zero
+are summable in operator norm. -/
+private theorem summable_singularTerms (c : ℕ → ℝ≥0) (hc : Tendsto c atTop (𝓝 0))
+    {e : {n // c n ≠ 0} → E} {f : {n // c n ≠ 0} → F}
+    (he : Orthonormal ℂ e) (hf : Orthonormal ℂ f) :
+    Summable (fun i : {n // c n ≠ 0} ↦ ((c i : ℝ) : ℂ) • rankOne ℂ (f i) (e i)) := by
+  classical
+  let A (i : {n // c n ≠ 0}) : E →L[ℂ] F := ((c i : ℝ) : ℂ) • rankOne ℂ (f i) (e i)
+  -- Bessel's inequality bounds any finite sum by the largest coefficient in it.
+  have hbound (s : Finset {n // c n ≠ 0}) {r : ℝ} (hr : 0 ≤ r)
+      (hs : ∀ i ∈ s, (c i : ℝ) ≤ r) : ‖∑ i ∈ s, A i‖ ≤ r := by
+    refine ContinuousLinearMap.opNorm_le_bound _ hr fun x ↦ ?_
+    let a (i : {n // c n ≠ 0}) : ℂ := (c i : ℝ) * ⟪e i, x⟫_ℂ
+    have happly : (∑ i ∈ s, A i) x = ∑ i ∈ s, a i • f i := by
+      simp only [A, a, sum_apply, smul_apply, rankOne_apply, smul_smul]
+    apply le_of_sq_le_sq _ (mul_nonneg hr (norm_nonneg x))
+    rw [happly, norm_sq_eq_re_inner (𝕜 := ℂ), hf.inner_sum a a, map_sum, mul_pow]
+    calc
+      ∑ i ∈ s, RCLike.re (starRingEnd ℂ (a i) * a i) ≤ ∑ i ∈ s, r ^ 2 * ‖⟪e i, x⟫_ℂ‖ ^ 2 := by
+        refine Finset.sum_le_sum fun i hi ↦ ?_
+        rw [RCLike.conj_mul, ← RCLike.ofReal_pow, RCLike.ofReal_re]
+        have hi0 : 0 ≤ (c i : ℝ) := (c i).2
+        simp only [a, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hi0, mul_pow]
+        exact mul_le_mul_of_nonneg_right
+          ((sq_le_sq₀ (c i).2 hr).mpr (hs i hi)) (sq_nonneg _)
+      _ ≤ r ^ 2 * ‖x‖ ^ 2 := by
+        rw [← Finset.mul_sum]
+        exact mul_le_mul_of_nonneg_left (he.sum_inner_products_le x) (sq_nonneg _)
+  change Summable A
+  rw [summable_iff_cauchySeq_finset, NormedAddCommGroup.cauchySeq_iff]
+  intro ε hε
+  have hc' := NNReal.tendsto_coe.mpr hc
+  rw [NNReal.coe_zero, Metric.tendsto_atTop] at hc'
+  obtain ⟨N, hN⟩ := hc' (ε / 3) (by positivity)
+  let initial := (Finset.range N).subtype (fun n ↦ c n ≠ 0)
+  have htail (s : Finset {n // c n ≠ 0}) (hs : Disjoint s initial) :
+      ‖∑ i ∈ s, A i‖ ≤ ε / 3 := by
+    refine hbound s (by positivity) fun i hi ↦ ?_
+    have hiN : N ≤ i.val := by
+      by_contra! h
+      exact (Finset.disjoint_left.mp hs hi) (Finset.mem_subtype.mpr (Finset.mem_range.mpr h))
+    have hi0 : 0 ≤ (c i : ℝ) := (c i).2
+    simpa only [Real.dist_eq, sub_zero, abs_of_nonneg hi0] using (hN i hiN).le
+  refine ⟨initial, fun s hs t ht ↦ ?_⟩
+  rw [neg_add_eq_sub, ← Finset.sum_sdiff_sub_sum_sdiff]
+  have hts := htail (t \ s) (disjoint_sdiff_self_left.mono_right hs)
+  have hst := htail (s \ t) (disjoint_sdiff_self_left.mono_right ht)
+  exact (norm_sub_le _ _).trans_lt (by linarith)
+
+/-- Successive norm-maximizing singular vectors of a compact operator yield a singular
+expansion. Each step removes a rank-one term, and compactness forces the residual norms
+to tend to zero. -/
+private theorem nonempty_singularExpansion_of_isCompactOperator (T : E →L[ℂ] F)
+    (hT : IsCompactOperator T) : Nonempty (SingularExpansion T) := by
+  classical
+  let CompactMap := {R : E →L[ℂ] F // IsCompactOperator R}
+  have hexists (S : CompactMap) : ∃ x : E, (S.val ≠ 0 → ‖x‖ = 1) ∧
+      (S.val = 0 → x = 0) ∧ ‖S.val x‖ = ‖S.val‖ ∧
+      S.val.adjoint (S.val x) = (↑‖S.val‖ ^ 2 : ℂ) • x := by
+    by_cases hS : S.val = 0
+    · exact ⟨0, fun h ↦ (h hS).elim, fun _ ↦ rfl, by simp [hS], by simp [hS]⟩
+    have : Nontrivial E := not_subsingleton_iff_nontrivial.mp fun h ↦
+      hS (ContinuousLinearMap.ext fun x ↦ by rw [h.elim x 0]; simp)
+    obtain ⟨x, hx, hnorm, heig⟩ :=
+      exists_unit_norm_eq_opNorm_of_isCompactOperator S.val S.property
+    exact ⟨x, fun _ ↦ hx, fun h ↦ (hS h).elim, hnorm, heig⟩
+  choose vector hunit hzero hnorm heig using hexists
+  let P (x : E) : E →L[ℂ] E := 1 - rankOne ℂ x x
+  let residual : ℕ → CompactMap :=
+    Nat.rec ⟨T, hT⟩ (fun _ S ↦ ⟨S.val ∘L P (vector S), S.property.comp_clm _⟩)
+  let R (n : ℕ) : E →L[ℂ] F := (residual n).val
+  let e (n : ℕ) : E := vector (residual n)
+  let y (n : ℕ) : F := R n (e n)
+  let A (n : ℕ) : E →L[ℂ] F := rankOne ℂ (y n) (e n)
+  have hstep (n : ℕ) : R (n + 1) = R n ∘L P (e n) := rfl
+  have hsub (n : ℕ) : R (n + 1) = R n - A n := by
+    rw [hstep]
+    simp [P, A, y, ContinuousLinearMap.comp_sub, comp_rankOne,
+      show (1 : E →L[ℂ] E) = ContinuousLinearMap.id ℂ E from rfl]
+  have hproj (n : ℕ) : IsStarProjection (P (e n)) := by
+    by_cases hn : R n = 0
+    · have hz : e n = 0 := hzero (residual n) hn
+      simp [P, hz]
+    · exact (isStarProjection_rankOne_self (hunit (residual n) hn)).one_sub
+  have hproj_zero (n : ℕ) : P (e n) (e n) = 0 := by
+    by_cases hn : R n = 0
+    · rw [show e n = 0 from hzero (residual n) hn, map_zero]
+    · have hn' : ‖e n‖ = 1 := hunit (residual n) hn
+      simp [P, inner_self_eq_norm_sq_to_K, hn']
+  have horth_source (n : ℕ) (z : E) (hz : R n z = 0) : ⟪e n, z⟫_ℂ = 0 := by
+    by_cases hn : R n = 0
+    · simp [show e n = 0 from hzero (residual n) hn]
+    have h := (R n).adjoint_inner_left z (y n)
+    change ⟪(R n).adjoint (R n (e n)), z⟫_ℂ = _ at h
+    rw [heig (residual n), inner_smul_left, hz, inner_zero_right] at h
+    have hn' : (↑‖R n‖ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr hn)
+    exact (mul_eq_zero.mp h).resolve_left ((map_ne_zero (starRingEnd ℂ)).mpr (pow_ne_zero _ hn'))
+  -- Each residual and its adjoint annihilate the vectors already selected.
+  have hkill (n : ℕ) : ∀ i < n, R n (e i) = 0 ∧ (R n).adjoint (y i) = 0 := by
+    induction n with
+    | zero => simp
+    | succ n ih =>
+      have hadj : (R (n + 1)).adjoint = P (e n) ∘L (R n).adjoint := by
+        rw [hstep, ContinuousLinearMap.adjoint_comp, (hproj n).isSelfAdjoint.adjoint_eq]
+      intro i hi
+      rcases Nat.lt_succ_iff_lt_or_eq.mp hi with hi | hin
+      · obtain ⟨hRi, hRai⟩ := ih i hi
+        constructor
+        · simp [hsub, A, hRi, horth_source n (e i) hRi]
+        · simp [hadj, hRai]
+      · subst i
+        constructor
+        · simp [hstep, hproj_zero]
+        · rw [hadj, ContinuousLinearMap.comp_apply]
+          change P (e n) ((R n).adjoint (R n (e n))) = 0
+          rw [heig (residual n), map_smul, hproj_zero, smul_zero]
+  have hsource (i j : ℕ) (hij : i < j) : ⟪e i, e j⟫_ℂ = 0 :=
+    inner_eq_zero_symm.mp (horth_source j (e i) (hkill j i hij).1)
+  have htarget (i j : ℕ) (hij : i < j) : ⟪y i, y j⟫_ℂ = 0 := by
+    change ⟪y i, R j (e j)⟫_ℂ = 0
+    rw [← (R j).adjoint_inner_left, (hkill j i hij).2, inner_zero_left]
+  have hpartial (n : ℕ) : ∑ i ∈ Finset.range n, A i = T - R n := by
+    induction n with
+    | zero => simp [show R 0 = T from rfl]
+    | succ n ih => rw [Finset.sum_range_succ, ih, hsub]; abel
+  have hTy (n : ℕ) : T (e n) = y n := by
+    have hz : (∑ i ∈ Finset.range n, A i) (e n) = 0 := by
+      rw [sum_apply]
+      exact Finset.sum_eq_zero fun i hi ↦ by simp [A, hsource i n (Finset.mem_range.mp hi)]
+    rw [hpartial, sub_apply, sub_eq_zero] at hz
+    exact hz
+  have hanti : Antitone (fun n ↦ ‖R n‖) := by
+    refine antitone_nat_of_succ_le fun n ↦ ?_
+    rw [hstep]
+    exact (ContinuousLinearMap.opNorm_comp_le _ _).trans
+      (mul_le_of_le_one_right (norm_nonneg _) ((hproj n).norm_le _))
+  -- Consecutive terms of a convergent subsequence have vanishing distance,
+  -- which bounds their norms by orthogonality.
+  have hlim : Tendsto (fun n ↦ ‖R n‖) atTop (𝓝 0) := by
+    obtain ⟨z, _, φ, hφ, hz⟩ :=
+      (hT.isCompact_closure_image_closedBall 1).tendsto_subseq (x := y) fun n ↦ by
+        refine subset_closure ⟨e n, ?_, hTy n⟩
+        rw [Metric.mem_closedBall, dist_zero_right]
+        by_cases hn : R n = 0
+        · simp [show e n = 0 from hzero (residual n) hn]
+        · exact (hunit (residual n) hn).le
+    have hdist : Tendsto (fun n ↦ ‖y (φ n) - y (φ (n + 1))‖) atTop (𝓝 0) := by
+      have h := (hz.sub (hz.comp (tendsto_add_atTop_nat 1))).norm
+      simpa [Function.comp_def] using h
+    apply (tendsto_iff_tendsto_subseq_of_antitone hanti hφ.tendsto_atTop).mpr
+    refine squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦ ?_) hdist
+    change ‖R (φ n)‖ ≤ ‖y (φ n) - y (φ (n + 1))‖
+    rw [← hnorm (residual (φ n))]
+    apply le_of_sq_le_sq _ (norm_nonneg _)
+    change ‖y (φ n)‖ ^ 2 ≤ _
+    rw [@norm_sub_sq ℂ, htarget _ _ (hφ (Nat.lt_succ_self n))]
+    simp
+  let c (n : ℕ) : ℝ≥0 := ‖R n‖₊
+  let f (i : {n // c n ≠ 0}) : F := (↑(c i : ℝ) : ℂ)⁻¹ • y i
+  have hc : Tendsto c atTop (𝓝 0) := NNReal.tendsto_coe.mp (by simpa [c] using hlim)
+  have hcn (i : {n // c n ≠ 0}) : ‖R i‖ ≠ 0 :=
+    fun h ↦ i.property (NNReal.eq h)
+  have he : Orthonormal ℂ (fun i : {n // c n ≠ 0} ↦ e i) := by
+    refine ⟨fun i ↦ hunit (residual i) (norm_ne_zero_iff.mp (hcn i)), ?_⟩
+    intro i j hij
+    rcases lt_or_gt_of_ne (fun h : i.val = j.val ↦ hij (Subtype.ext h)) with h | h
+    · exact hsource i j h
+    · exact inner_eq_zero_symm.mp (hsource j i h)
+  have hf : Orthonormal ℂ f := by
+    refine ⟨fun i ↦ ?_, ?_⟩
+    · have hy : ‖y i‖ = ‖R i‖ := hnorm (residual i)
+      change ‖(↑‖R i‖ : ℂ)⁻¹ • y i‖ = 1
+      rw [← hy]
+      exact norm_smul_inv_norm (norm_ne_zero_iff.mp (hy.trans_ne (hcn i)))
+    · intro i j hij
+      have hz : ⟪y i, y j⟫_ℂ = 0 := by
+        rcases lt_or_gt_of_ne (fun h : i.val = j.val ↦ hij (Subtype.ext h)) with h | h
+        · exact htarget i j h
+        · exact inner_eq_zero_symm.mp (htarget j i h)
+      simp [f, inner_smul_left, inner_smul_right, hz]
+  have hA (i : {n // c n ≠ 0}) : ((c i : ℝ) : ℂ) • rankOne ℂ (f i) (e i) = A i := by
+    ext x
+    have hci : ((c i : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hcn i)
+    simp only [smul_apply, rankOne_apply, f, smul_smul, A]
+    rw [mul_left_comm, mul_inv_cancel₀ hci, mul_one]
+  have hsupp : Function.support A ⊆ {n | c n ≠ 0} := by
+    intro n hn h
+    have hz : R n = 0 := norm_eq_zero.mp (congrArg NNReal.toReal h)
+    exact hn (by simp [A, y, hz])
+  have hs : Summable (A ∘ (Subtype.val : {n // c n ≠ 0} → ℕ)) :=
+    (summable_singularTerms c hc he hf).congr hA
+  have hfull := (hasSum_subtype_iff_of_support_subset hsupp).mp hs.hasSum
+  have hnat : Tendsto (fun n ↦ ∑ i ∈ Finset.range n, A i) atTop (𝓝 T) := by
+    refine tendsto_iff_norm_sub_tendsto_zero.mpr (hlim.congr fun n ↦ ?_)
+    rw [hpartial, sub_right_comm, sub_self, zero_sub, norm_neg]
+  have hsum : HasSum (A ∘ (Subtype.val : {n // c n ≠ 0} → ℕ)) T :=
+    (tendsto_nhds_unique hfull.tendsto_sum_nat hnat) ▸ hs.hasSum
+  refine ⟨⟨c, hanti, hc, (fun i ↦ e i), f, he, hf, fun x ↦ ?_⟩⟩
+  have hmapped := hsum.map (ContinuousLinearMap.apply ℂ F x)
+    (ContinuousLinearMap.apply ℂ F x).continuous
+  refine hmapped.congr_fun fun i ↦ ?_
+  change _ = A i x
+  rw [← hA i]
+  simp only [smul_apply, rankOne_apply, smul_smul]
+
 /-- Paper: Theorem C.3.6.1(1)–(2), p. 703. A bounded operator is compact
 exactly when it admits a singular expansion.
 Deviation: The expansion uses orthonormal vectors only for nonzero coefficients. -/
 theorem isCompactOperator_iff_nonempty_singularExpansion (T : E →L[ℂ] F) :
-    IsCompactOperator T ↔ Nonempty (SingularExpansion T) := by sorry
+    IsCompactOperator T ↔ Nonempty (SingularExpansion T) := by
+  refine ⟨nonempty_singularExpansion_of_isCompactOperator T, ?_⟩
+  rintro ⟨d⟩
+  let A (i : {n // d.coeff n ≠ 0}) : E →L[ℂ] F :=
+    ((d.coeff i : ℝ) : ℂ) • rankOne ℂ (d.target i) (d.source i)
+  have hs : Summable A :=
+    summable_singularTerms d.coeff d.tendsto_coeff d.orthonormal_source d.orthonormal_target
+  have hT : (∑' i, A i) = T := by
+    ext x
+    have hmapped := hs.hasSum.map (ContinuousLinearMap.apply ℂ F x)
+      (ContinuousLinearMap.apply ℂ F x).continuous
+    apply hmapped.unique
+    refine (d.hasSum_apply x).congr_fun fun i ↦ ?_
+    change A i x = _
+    simp only [A, smul_apply, rankOne_apply, smul_smul]
+  have hc (i : {n // d.coeff n ≠ 0}) : IsCompactOperator (A i) := by
+    change IsCompactOperator (((d.coeff i : ℝ) : ℂ) • rankOne ℂ (d.target i) (d.source i))
+    rw [rankOne_def']
+    exact ((isCompactOperator_of_locallyCompactSpace_rng
+      (ContinuousLinearMap.toSpanSingleton ℂ (d.target i))).comp_clm
+        (innerSL ℂ (d.source i))).smul _
+  rw [← hT]
+  apply isCompactOperator_of_tendsto hs.hasSum
+  exact Eventually.of_forall fun s ↦ (compactOperator (RingHom.id ℂ) E F).sum_mem
+    (fun i _ ↦ hc i)
+
+end
 
 /-- Paper: Theorem C.3.6.1, p. 703. The series of rank-one maps in a
 singular expansion converges in operator norm. -/
