@@ -14,12 +14,12 @@ public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 public import Mathlib.Topology.Order.Lattice
 
 import Mathlib.Analysis.Complex.AbsMax
-import Mathlib.Analysis.Complex.Liouville
 import Mathlib.Analysis.Convex.Continuous
 import Mathlib.Analysis.Asymptotics.Lemmas
 import Mathlib.NumberTheory.LSeries.Deriv
 import Mathlib.NumberTheory.LSeries.Injectivity
 import RiemannMasullo.ForMathlib.Analysis.Complex.Hadamard
+import RiemannMasullo.ForMathlib.Analysis.Complex.Liouville
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gamma.Bounds
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
 
@@ -1422,6 +1422,19 @@ theorem finiteHeckeL_continuation_isBigO_exp (χ : U[F]) (L : ℂ → ℂ)
     simpa only [one_mul] using hBound
   exact hHO.congr' hAgree.symm EventuallyEq.rfl
 
+/-- Paper: Equation (B.1.1.11), p. 590. The modulus of the completed functional equation's
+epsilon factor is unchanged by imaginary translation. In Tate's local factorization the
+archimedean phases have constant modulus and the finite norm powers have positive real bases. -/
+private theorem completedHeckeL_continuation_epsilon_norm
+    (χ : U[F]) (Λ Λdual ε : ℂ → ℂ)
+    (hΛ : MeromorphicNFOn Λ univ) (hSeries : ∀ s : halfPlane, Λ s = completedHeckeL χ s)
+    (hΛdual : MeromorphicNFOn Λdual univ)
+    (hDualSeries : ∀ s : halfPlane, Λdual s = completedHeckeL χ⁻¹ s)
+    (hε : Differentiable ℂ ε) (hε₀ : ∀ s, ε s ≠ 0)
+    (hEq : ∀ s, Λdual (1 - s) = ε s * Λ s) (s : ℂ) (t : ℝ) :
+    ‖ε (s + (t : ℂ) * Complex.I)‖ = ‖ε s‖ := by
+  sorry
+
 /-- Paper: Equation (B.1.1.11), p. 590. The finite functional equation has a
 multiplier given by the archimedean gamma ratio and a nonzero constant times a
 real-scale exponential. Deviation: The conductor and phase are absorbed into
@@ -1435,7 +1448,63 @@ private theorem finiteHeckeL_functionalEquation_conductorScale (χ : U[F]) (L Ld
         (c * Complex.exp ((r : ℂ) * s) *
           toMeromorphicNFOn (fun z ↦ heckeGammaFactor χ⁻¹ (1 - z) / heckeGammaFactor χ z)
             univ s) * Ldual (1 - s) := by
-  sorry
+  obtain ⟨Λ, hΛ, hΛSeries⟩ := completedHeckeL_exists_continuation χ
+  obtain ⟨Λdual, hΛdual, hΛdualSeries⟩ := completedHeckeL_exists_continuation χ⁻¹
+  obtain ⟨ε, hε, hε₀, hEq⟩ :=
+    completedHeckeL_continuation_functionalEquation χ Λ Λdual hΛ hΛSeries hΛdual hΛdualSeries
+  have hNorm := completedHeckeL_continuation_epsilon_norm χ Λ Λdual ε
+    hΛ hΛSeries hΛdual hΛdualSeries hε hε₀ hEq
+  obtain ⟨r, hr⟩ := exists_eq_const_mul_exp_of_norm_add_mul_I (f := fun s ↦ (ε s)⁻¹) (hε.inv hε₀)
+    (fun s ↦ inv_ne_zero (hε₀ s)) (fun s t ↦ by simp only [norm_inv, hNorm s t])
+  have hContinue {f g : ℂ → ℂ} (hf : MeromorphicOn f univ) (hg : MeromorphicOn g univ)
+      (h : ∀ s : halfPlane, f s = g s) (s : ℂ) : f =ᶠ[𝓝[≠] s] g := by
+    have hTwo : meromorphicOrderAt (f - g) (2 : ℂ) = ⊤ := by
+      apply meromorphicOrderAt_eq_top_iff.mpr
+      have hn : ∀ᶠ z : ℂ in 𝓝 (2 : ℂ), 1 < z.re :=
+        (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+      filter_upwards [hn.filter_mono nhdsWithin_le_nhds] with z hz
+      exact sub_eq_zero.mpr (h ⟨z, hz⟩)
+    exact (meromorphicOrderAt_eq_top_iff.mp
+      ((hf.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+        (mem_univ (2 : ℂ)) (mem_univ s) hTwo)).mono fun _ hz ↦ sub_eq_zero.mp hz
+  have hInv := differentiable_inv_heckeGammaFactor χ
+  have hFinite (s : ℂ) : L =ᶠ[𝓝[≠] s] fun z ↦ Λ z * (heckeGammaFactor χ z)⁻¹ := by
+    refine hContinue hL.meromorphicOn (fun z hz ↦
+      (hΛ hz).meromorphicAt.mul (hInv.analyticAt z).meromorphicAt) (fun z ↦ ?_) s
+    change L z = Λ z * (heckeGammaFactor χ z)⁻¹
+    rw [hSeries z, hΛSeries z, completedHeckeL, finiteHeckeL,
+      mul_comm (heckeGammaFactor χ (z : ℂ)), mul_assoc,
+      mul_inv_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans z.property)), mul_one]
+  have hGammaDual := meromorphic_heckeGammaFactor χ⁻¹
+  have hCompletedDual (s : ℂ) :
+      Λdual =ᶠ[𝓝[≠] s] fun z ↦ heckeGammaFactor χ⁻¹ z * Ldual z := by
+    refine hContinue hΛdual.meromorphicOn (fun z hz ↦
+      (hGammaDual z).mul (hLdual hz).meromorphicAt) (fun z ↦ ?_) s
+    change Λdual z = heckeGammaFactor χ⁻¹ z * Ldual z
+    rw [hΛdualSeries z, hDualSeries z, completedHeckeL, finiteHeckeL]
+  let G (z : ℂ) := heckeGammaFactor χ⁻¹ (1 - z) / heckeGammaFactor χ z
+  have hG : MeromorphicOn G univ := fun s _ ↦
+    ((hGammaDual (1 - s)).comp_analyticAt (analyticAt_const.sub analyticAt_id)).div
+      (meromorphic_heckeGammaFactor χ s)
+  have hNF := toMeromorphicNFOn_eqOn_codiscrete hG
+  refine ⟨(ε 0)⁻¹, r, inv_ne_zero (hε₀ 0), ?_⟩
+  apply eventuallyEq_codiscrete_iff_forall_eventuallyEq_nhdsNE.mpr
+  intro s
+  have hReflect : Tendsto (fun z : ℂ ↦ 1 - z) (𝓝[≠] s) (𝓝[≠] (1 - s)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · exact (continuous_const.sub continuous_id).continuousAt.tendsto.mono_left nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin (s := ({s} : Set ℂ)ᶜ)] with z hz
+      simpa using hz
+  filter_upwards [hFinite s, hReflect.eventually (hCompletedDual (1 - s)),
+    hNF.filter_mono (nhdsNE_le_codiscrete s)] with z hLeft hRight hGamma
+  change Λdual (1 - z) = heckeGammaFactor χ⁻¹ (1 - z) * Ldual (1 - z) at hRight
+  have hUnscale : Λ z = (ε z)⁻¹ * Λdual (1 - z) := by
+    rw [hEq z, ← mul_assoc, inv_mul_cancel₀ (hε₀ z), one_mul]
+  change L z = ((ε 0)⁻¹ * Complex.exp ((r : ℂ) * z) * toMeromorphicNFOn G univ z) * Ldual (1 - z)
+  rw [hLeft, hUnscale, hRight, ← hr z, ← hGamma]
+  dsimp only [G]
+  rw [div_eq_mul_inv]
+  ac_rfl
 
 /-- At twist zero, restriction of the inverse unitary character gives reciprocal values. -/
 private theorem infinitePlaceRestriction_inv_twist_zero (χ : U[F]) (v : InfinitePlace F)
