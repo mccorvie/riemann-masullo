@@ -691,7 +691,78 @@ Deviation: This is a counterexample to the finiteness of the proposed norm. -/
 theorem scalarIntervalSobolev_enorm_Ici_eq_top (a s : ℝ) (_hs : 0 ≤ s)
     (f : PositiveRealExponentialDecay univ) (_hf : f.val ≠ 0)
     (_hcompact : HasCompactSupport f.val) (_hsupport : tsupport f.val ⊆ Ioi 0) :
-    intervalSobolevENorm volume id (Ici a) s f.val = ∞ := by sorry
+    intervalSobolevENorm volume id (Ici a) s f.val = ∞ := by
+  have hcont : Continuous f.val := by
+    have h : ⇑(logExponentialDecayTwist univ ⟨0, mem_univ 0⟩ f) = f.val := by
+      funext x
+      simpa only [Subtype.coe_mk, zero_mul, Real.exp_zero, Complex.ofReal_one, one_mul] using
+        logExponentialDecayTwist_apply univ ⟨0, mem_univ (0 : ℝ)⟩ f x
+    rw [← h]
+    exact SchwartzMap.continuous _
+  obtain ⟨x₀, hx₀⟩ : ∃ x₀, f.val x₀ ≠ 0 := by
+    by_contra h
+    exact _hf (funext fun x ↦ not_not.1 fun hx ↦ h ⟨x, hx⟩)
+  have hx₀pos : 0 < x₀ := _hsupport (subset_tsupport _ hx₀)
+  obtain ⟨c, hc, hcx⟩ : ∃ c : ℝ, 0 < c ∧ c < ‖f.val x₀‖ :=
+    ⟨_, half_pos (norm_pos_iff.2 hx₀), half_lt_self (norm_pos_iff.2 hx₀)⟩
+  -- An open set of positive measure on which `f` and the coordinate stay away from zero.
+  obtain ⟨U, hUo, hx₀U, hUc, hUx⟩ : ∃ U : Set ℝ, IsOpen U ∧ x₀ ∈ U ∧
+      (∀ x ∈ U, c < ‖f.val x‖) ∧ ∀ x ∈ U, x₀ / 2 < x :=
+    ⟨{x | c < ‖f.val x‖} ∩ Ioi (x₀ / 2), (isOpen_lt continuous_const hcont.norm).inter isOpen_Ioi,
+      ⟨hcx, half_lt_self hx₀pos⟩, fun x hx ↦ hx.1, fun x hx ↦ hx.2⟩
+  have hUpos : volume U ≠ 0 := (hUo.measure_pos volume ⟨x₀, hx₀U⟩).ne'
+  have hε : ENNReal.ofReal c ≠ 0 := (ENNReal.ofReal_pos.2 hc).ne'
+  -- Chebyshev's inequality for the pair `(a, σ)` bounds an exponential in `σ` by the supremum.
+  have hbound : ∀ σ : ℝ, max a 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * x₀)) * volume U ≤
+      (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
+        intervalSobolevENorm volume id (Ici a) s f.val ^ (2 : ℝ≥0∞).toReal := by
+    intro σ hσ
+    have hσa : a ≤ σ := (le_max_left _ _).trans hσ
+    have hσ0 : 0 ≤ σ := (le_max_right _ _).trans hσ
+    have hle : eLpNorm f.val 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a σ s x)) ≤
+        intervalSobolevENorm volume id (Ici a) s f.val := by
+      unfold intervalSobolevENorm
+      exact le_iSup₂_of_le (⟨a, self_mem_Ici⟩ : Ici a) (⟨σ, hσa⟩ : Ici a) le_rfl
+    have hdens : ∀ x ∈ U, ENNReal.ofReal (Real.exp (σ * x₀)) ≤
+        ENNReal.ofReal (intervalSobolevDensity a σ s x) := by
+      intro x hx
+      have h1 : (1 : ℝ) ≤ (1 + x ^ 2) ^ (s / 2) :=
+        Real.one_le_rpow (by nlinarith [sq_nonneg x]) (by positivity)
+      have h2 : Real.exp (σ * x₀) ≤ Real.exp (2 * σ * x) :=
+        Real.exp_le_exp.2 (by nlinarith [mul_le_mul_of_nonneg_left (hUx x hx).le hσ0])
+      refine ENNReal.ofReal_le_ofReal ?_
+      unfold intervalSobolevDensity
+      exact (h2.trans (le_max_right _ _)).trans
+        (le_mul_of_one_le_right (le_max_of_le_right (Real.exp_pos _).le) h1)
+    calc ENNReal.ofReal (Real.exp (σ * x₀)) * volume U
+        = ∫⁻ _ in U, ENNReal.ofReal (Real.exp (σ * x₀)) := (setLIntegral_const _ _).symm
+      _ ≤ ∫⁻ x in U, ENNReal.ofReal (intervalSobolevDensity a σ s x) :=
+          setLIntegral_mono' hUo.measurableSet hdens
+      _ = (volume.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity a σ s x)) U :=
+          (withDensity_apply _ hUo.measurableSet).symm
+      _ ≤ (volume.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity a σ s x))
+            {x | ENNReal.ofReal c ≤ ‖f.val x‖ₑ} := measure_mono fun x hx ↦ by
+          rw [mem_ofPred_eq, ← ofReal_norm]
+          exact ENNReal.ofReal_le_ofReal (hUc x hx).le
+      _ ≤ (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal * eLpNorm f.val 2 (volume.withDensity fun x ↦
+            ENNReal.ofReal (intervalSobolevDensity a σ s x)) ^ (2 : ℝ≥0∞).toReal :=
+          meas_ge_le_mul_pow_eLpNorm_eNorm _ two_ne_zero ENNReal.ofNat_ne_top hε
+            fun h ↦ absurd h ENNReal.ofReal_ne_top
+      _ ≤ _ := by gcongr
+  by_contra htop
+  have hBtop : (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
+      intervalSobolevENorm volume id (Ici a) s f.val ^ (2 : ℝ≥0∞).toReal ≠ ∞ :=
+    ENNReal.mul_ne_top (ENNReal.rpow_ne_top_of_nonneg (by simp) (ENNReal.inv_ne_top.2 hε))
+      (ENNReal.rpow_ne_top_of_nonneg (by simp) htop)
+  obtain ⟨K, hK, hKle⟩ : ∃ K : ℝ≥0∞, K ≠ ∞ ∧
+      ∀ σ : ℝ, max a 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * x₀)) ≤ K :=
+    ⟨_, ENNReal.div_ne_top hBtop hUpos, fun σ hσ ↦
+      (ENNReal.le_div_iff_mul_le (Or.inl hUpos) (Or.inr hBtop)).2 (hbound σ hσ)⟩
+  have hlt : K.toReal < Real.exp (max (max a 0) (K.toReal / x₀) * x₀) := by
+    have h := (div_le_iff₀ hx₀pos).1 (le_max_right (max a 0) (K.toReal / x₀))
+    linarith [Real.add_one_le_exp (max (max a 0) (K.toReal / x₀) * x₀)]
+  exact absurd (hKle _ (le_max_left _ _)) (not_le.2 ((ENNReal.lt_ofReal_iff_toReal_lt hK).2 hlt))
 
 -- TODO(paper-gap): Lemma 9.2.2.2(3) treats the infinite supremum as a finite
 -- norm and identifies it with the topology of individual line norms.
