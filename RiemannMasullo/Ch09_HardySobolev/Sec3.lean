@@ -621,7 +621,20 @@ orthogonal projection with closed range, including the zero projection. -/
 theorem modulatedAbsoluteCutoffOperator_projection (ν : Measure G) (J : Set ℝ)
     (hJ : MeasurableSet J) :
     IsStarProjection (modulatedAbsoluteCutoffOperator m ν J hJ) ∧
-      IsClosed (range (modulatedAbsoluteCutoffOperator m ν J hJ)) := by sorry
+      IsClosed (range (modulatedAbsoluteCutoffOperator m ν J hJ)) := by
+  have hU : MeasurableSet (moduleValue ⁻¹' J) :=
+    hJ.preimage (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable
+  obtain ⟨hclosed, hP⟩ := (hardySobolevCutoff_spec (μ := ν) hU).choose_spec
+  refine ⟨⟨ContinuousLinearMap.ext fun u ↦ (hP u).1, ?_⟩, hclosed⟩
+  apply ContinuousLinearMap.isSelfAdjoint_iff_isSymmetric.2
+  intro u v
+  rw [ContinuousLinearMap.coe_coe, L2.inner_def, L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [modulatedAbsoluteCutoffOperator_apply m ν J hJ u,
+    modulatedAbsoluteCutoffOperator_apply m ν J hJ v] with x hu hv
+  rw [hu, hv]
+  simp only [modulatedAbsoluteCutoff, indicator]
+  split_ifs <;> simp
 
 end Cutoffs
 
