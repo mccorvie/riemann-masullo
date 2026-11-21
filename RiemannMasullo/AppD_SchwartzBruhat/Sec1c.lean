@@ -4,8 +4,10 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Analysis.LocallyConvex.AbsConvexOpen
 import Mathlib.LinearAlgebra.Basis.Prod
 import Mathlib.Topology.Covering.AddCircle
+import Mathlib.Topology.ContinuousMap.LocallyConvex
 import Mathlib.Topology.Homotopy.Lifting
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
@@ -1641,10 +1643,129 @@ theorem schwartzBruhatTranslate_apply_mul (g x : G) (f : SchwartzBruhat G) :
   change f.val (g⁻¹ * (g * x)) = f.val x
   rw [inv_mul_cancel_left]
 
+omit hTop hT2 hLC in
+/-- Paper: Proposition D.1.9.2, p. 781. On an elementary group, shifting the argument
+by addition preserves the Schwartz space and is jointly continuous for the weighted
+derivative seminorm topology. -/
+theorem elementarySchwartz_translate_jointly {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
+    ∃ T : C(ElementaryLieGroup m n r F × ElementarySchwartz m n r F,
+        ElementarySchwartz m n r F),
+      ∀ g f x, T (g, f) x = f (g + x) := by
+  sorry
+
+omit hTop hT2 hLC in
+/-- The inclusion of a structural stage is continuous for the generating seminorms. -/
+private theorem continuous_schwartzBruhatStageInclusion (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) :
+    Continuous (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
+      schwartzBruhatStageInclusion a e) :=
+  (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _ fun p ↦ p.property a e
+
+/-- The quotient action gives translation by elements of the stage's own open subgroup. -/
+private theorem continuous_schwartzBruhatTranslate_on_subgroup (b : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation b.quotient) :
+    Continuous (fun p : b.val.1 × SchwartzBruhatStage e ↦
+      schwartzBruhatTranslate p.1.val (schwartzBruhatStageInclusion b e p.2)) := by
+  classical
+  obtain ⟨T, hT⟩ := elementarySchwartz_translate_jointly
+    (m := e.realDim) (n := e.torusDim) (r := e.latticeRank) (F := e.finiteFactor)
+  let q (h : b.val.1) := (e.equiv (QuotientGroup.mk h : b.quotient)).toAdd
+  have hq : Continuous q := continuous_toAdd.comp
+    (e.equiv.continuous.comp QuotientGroup.continuous_mk)
+  have hCont : Continuous (fun p : b.val.1 × SchwartzBruhatStage e ↦
+      (show SchwartzBruhat G from schwartzBruhatStageInclusion b e (T (q p.1⁻¹, p.2)))) :=
+    (continuous_schwartzBruhatStageInclusion b e).comp
+      (T.continuous.comp ((hq.comp continuous_fst.inv).prodMk continuous_snd))
+  refine hCont.congr fun ⟨h, s⟩ ↦ ?_
+  refine Subtype.ext (funext fun x ↦ ?_)
+  change schwartzBruhatStageRealization b e (T (q h⁻¹, s)) x =
+    schwartzBruhatStageRealization b e s ((h : G)⁻¹ * x)
+  have hmem := b.val.1.mul_mem_cancel_left (x := (h : G)⁻¹) (y := x)
+    (b.val.1.inv_mem h.property)
+  by_cases hx : x ∈ b.val.1
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_left hx, dite_eq_left (hmem.mpr hx), hT]
+    apply congrArg (fun y ↦ s y)
+    change q h⁻¹ + q ⟨x, hx⟩ = q (h⁻¹ * ⟨x, hx⟩)
+    unfold q
+    rw [QuotientGroup.mk_mul, map_mul]
+    rfl
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx, dite_eq_right (hmem.not.mpr hx)]
+
+/-- A stage can be enlarged to contain any prescribed translating element. -/
+private theorem exists_bruhatStructuralPair_le_mem (a : BruhatStructuralPair G) (g : G) :
+    ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
+  let I := OpenCompactlyGeneratedSubgroups G
+  have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
+  let : IsDirectedOrder I := hGroups.1
+  obtain ⟨J, hgJ⟩ := hGroups.2.1 g
+  let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
+  obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
+  let b : BruhatStructuralPair G := ⟨(H.val, a.val.2), H.property.1, H.property.2,
+    a.property.2.2.1, a.property.2.2.2.trans haH⟩
+  exact ⟨b, ⟨haH, le_rfl⟩, hJH hgJ⟩
+
+/-- Translation is jointly continuous when the function varies in a fixed structural stage.
+Locally the translating element and the function are handled in one larger stage. -/
+private theorem continuous_schwartzBruhatTranslate_stage (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) :
+    Continuous (fun p : G × SchwartzBruhatStage e ↦
+      schwartzBruhatTranslate p.1 (schwartzBruhatStageInclusion a e p.2)) := by
+  rw [continuous_iff_continuousAt]
+  intro ⟨g, f⟩
+  obtain ⟨b, hab, hgb⟩ := exists_bruhatStructuralPair_le_mem a g
+  obtain ⟨e'⟩ := b.elementary
+  obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition (a := a) (b := b) hab e e'
+  have hOpen : IsOpenEmbedding (Prod.map (Subtype.val : b.val.1 → G)
+      (id : SchwartzBruhatStage e → SchwartzBruhatStage e)) :=
+    b.property.1.isOpenEmbedding_subtypeVal.prodMap IsOpenEmbedding.id
+  apply (hOpen.continuousAt_iff (x := (⟨g, hgb⟩, f))).mp
+  have hCont : Continuous (fun p : b.val.1 × SchwartzBruhatStage e ↦
+      schwartzBruhatTranslate p.1.val (schwartzBruhatStageInclusion b e' (j p.2))) :=
+    (continuous_schwartzBruhatTranslate_on_subgroup b e').comp
+      (continuous_fst.prodMk (j.continuous.comp continuous_snd))
+  refine (hCont.congr fun p ↦ ?_).continuousAt
+  exact congrArg (schwartzBruhatTranslate p.1.val) (Subtype.ext (hj p.2))
+
+open scoped ComplexOrder in
 /-- Paper: Proposition D.1.9.2, p. 781. For a second-countable group, left
 translation is jointly continuous in the group element and Schwartz–Bruhat function. -/
 theorem schwartzBruhatTranslate_continuous [SecondCountableTopology G] :
-    Continuous (fun p : G × SchwartzBruhat G ↦ schwartzBruhatTranslate p.1 p.2) := by sorry
+    Continuous (fun p : G × SchwartzBruhat G ↦ schwartzBruhatTranslate p.1 p.2) := by
+  let E := SchwartzBruhat G
+  let : ContinuousSMul ℂ E := (PolynormableSpace.withSeminorms ℂ E).continuousSMul
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : ContinuousSMul ℝ E := IsScalarTower.continuousSMul ℂ
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  let : LocallyConvexSpace ℂ E := .ofBasisZero ℂ E _ _ (LocallyConvexSpace.convex_basis_zero ℝ E)
+    (fun _ hs ↦ convex_of_nonneg_surjective_algebraMap ℂ
+      (fun _ hz ↦ RCLike.nonneg_iff_exists_ofReal.mp hz) hs.2)
+  let : ContinuousSMul ℝ C(G, E) := IsScalarTower.continuousSMul ℂ
+  have hOrbit (f : E) : Continuous (fun g ↦ schwartzBruhatTranslate g f) := by
+    obtain ⟨a, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+    have hf : (show E from schwartzBruhatStageInclusion a e s) = f := Subtype.ext hs
+    rw [← hf]
+    exact (continuous_schwartzBruhatTranslate_stage a e).comp (continuous_id.prodMk continuous_const)
+  let A : E →ₗ[ℂ] C(G, E) :=
+    { toFun := fun f ↦ ⟨fun g ↦ schwartzBruhatTranslate g f, hOrbit f⟩
+      map_add' := fun f s ↦ ContinuousMap.ext fun g ↦ Subtype.ext rfl
+      map_smul' := fun c f ↦ ContinuousMap.ext fun g ↦ Subtype.ext rfl }
+  -- The linear map into the compact-open space is continuous on each stage.
+  -- Its seminorm pullbacks are therefore among the defining seminorms of E.
+  have hA : Continuous A := by
+    let P : SeminormFamily ℂ E {q : Seminorm ℂ E //
+        ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+          Continuous (q ∘ schwartzBruhatStageInclusion a e)} := Subtype.val
+    have hP : WithSeminorms P := ⟨rfl⟩
+    refine (PolynormableSpace.withSeminorms ℂ C(G, E)).continuous_of_continuous_comp A fun p ↦ ?_
+    refine hP.continuous_seminorm ⟨p.val.comp A, ?_⟩
+    intro a e
+    have hStage : Continuous (fun s : SchwartzBruhatStage e ↦ A (schwartzBruhatStageInclusion a e s)) :=
+      ContinuousMap.continuous_of_continuous_uncurry _ <|
+        (continuous_schwartzBruhatTranslate_stage a e).comp continuous_swap
+    exact p.property.comp hStage
+  exact continuous_eval.comp ((hA.comp continuous_snd).prodMk continuous_fst)
 
 /-- Paper: Proposition D.1.9.2, p. 781. Translations by a compact set of group
 elements send one common zero-neighborhood into any prescribed zero-neighborhood. -/
