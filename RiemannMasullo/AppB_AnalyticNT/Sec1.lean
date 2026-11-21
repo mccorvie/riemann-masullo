@@ -31,7 +31,41 @@ def verticalGrowthOrder (f : ℂ → ℂ) (σ : ℝ) : ℝ≥0∞ :=
 
 /-- Paper: Equation (B.1.1.2), p. 589. As a check on the definition, the identity
 function has growth order one on every vertical line. -/
-theorem verticalGrowthOrder_id (σ : ℝ) : verticalGrowthOrder (id : ℂ → ℂ) σ = 1 := by sorry
+theorem verticalGrowthOrder_id (σ : ℝ) : verticalGrowthOrder (id : ℂ → ℂ) σ = 1 := by
+  let l := atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})
+  have hHeight : Tendsto (fun z : ℂ ↦ |z.im|) l atTop := tendsto_inf_left tendsto_comap
+  unfold verticalGrowthOrder
+  apply le_antisymm
+  · refine sInf_le ⟨1, ?_, by simp⟩
+    change (id : ℂ → ℂ) =O[l] fun z ↦ |z.im| ^ ((1 : ℝ≥0) : ℝ)
+    have hRe : ∀ᶠ z in l, z.re = σ :=
+      eventually_inf_principal.mpr (Eventually.of_forall fun _ hz ↦ hz)
+    refine Asymptotics.isBigO_iff.mpr ⟨2, ?_⟩
+    filter_upwards [hRe, hHeight.eventually_ge_atTop |σ|] with z hre hσz
+    simp only [id_eq, NNReal.coe_one, Real.rpow_one, Real.norm_of_nonneg (abs_nonneg _)]
+    calc
+      ‖z‖ ≤ |z.re| + |z.im| := Complex.norm_le_abs_re_add_abs_im z
+      _ ≤ 2 * |z.im| := by
+        rw [hre, two_mul]
+        exact add_le_add_left hσz _
+  · apply le_sInf
+    rintro _ ⟨k, hk, rfl⟩
+    by_contra! hlt
+    have hklt : (k : ℝ) < 1 := by exact_mod_cast hlt
+    have hRay : Tendsto (fun t : ℝ ↦ (⟨σ, t⟩ : ℂ)) atTop l := by
+      refine tendsto_inf.mpr ⟨tendsto_comap_iff.mpr ?_, tendsto_principal.mpr (by simp)⟩
+      exact tendsto_id.congr' <| (eventually_ge_atTop (0 : ℝ)).mono fun t ht ↦
+        (abs_of_nonneg ht).symm
+    have : NeBot l := hRay.neBot
+    change (id : ℂ → ℂ) =O[l] fun z ↦ |z.im| ^ (k : ℝ) at hk
+    obtain ⟨C, hC⟩ := Asymptotics.isBigO_iff.mp hk
+    have hLarge : ∀ᶠ z in l, C < |z.im| ^ (1 - (k : ℝ)) :=
+      ((tendsto_rpow_atTop (sub_pos.mpr hklt)).comp hHeight).eventually_gt_atTop C
+    obtain ⟨z, hz, hlarge, hbound⟩ := ((hHeight.eventually_gt_atTop 0).and (hLarge.and hC)).exists
+    rw [Real.rpow_sub hz, Real.rpow_one] at hlarge
+    rw [id_eq, Real.norm_of_nonneg (Real.rpow_nonneg hz.le _)] at hbound
+    exact (not_lt_of_ge ((Complex.abs_im_le_norm z).trans hbound))
+      ((lt_div_iff₀ (Real.rpow_pos_of_pos hz _)).mp hlarge)
 
 section GrowthOrder
 
