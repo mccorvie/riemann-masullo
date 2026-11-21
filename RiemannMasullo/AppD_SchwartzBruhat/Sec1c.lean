@@ -114,7 +114,10 @@ theorem bruhatDirectionalDeriv_real
     (ha : ∀ t, a (Multiplicative.ofAdd t) = Multiplicative.ofAdd t)
     (f : Multiplicative ℝ → ℂ) (x : ℝ) :
     bruhatDirectionalDeriv a f (Multiplicative.ofAdd x) =
-      deriv (f ∘ Multiplicative.ofAdd) x := by sorry
+      deriv (f ∘ Multiplicative.ofAdd) x := by
+  simp only [bruhatDirectionalDeriv, ha]
+  change deriv (fun t : ℝ ↦ (f ∘ Multiplicative.ofAdd) (x + t)) 0 = _
+  rw [deriv_comp_const_add, add_zero]
 
 /-- Paper: Definition D.1.6.5, p. 766. For a Bruhat C¹ function the orbit
 derivative exists at time zero for every starting point. -/
