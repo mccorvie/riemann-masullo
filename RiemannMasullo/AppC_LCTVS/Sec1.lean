@@ -2782,6 +2782,189 @@ private theorem bounded_stage_of_nullSequence (h : IsInjectiveLCLimit j i)
       (norm_pos_iff.mpr (hε n))
   · rw [map_smul, he n, inv_smul_smul₀ (hε n)]
 
+/-- Paper: Equation (C.1.5.4), p. 667. The inverse difference map bounds a seminorm
+at stage `m` in terms of a finite representative through stage `m` and its image
+in stage `k > m`. -/
+private theorem IsInjectiveLCLimit.directSum_seminorm_control
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
+    (h : IsInjectiveLCLimit j i) (hacyclic : IsAcyclicSystem j)
+    (p : ∀ k, Seminorm ℂ (X k)) (hp : ∀ k, Continuous (p k)) :
+    let c := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+    ∃ q : ∀ k, Seminorm ℂ (X k), (∀ k, Continuous (q k)) ∧
+      ∀ (m k : ℕ), m < k → ∀ (z : ⨁ l, X l) (y : X m) (w : X k),
+        (∀ l, m < l → z l = 0) → c z = i m y → c z = i k w →
+        p m y ≤ directSumSeminorm q z + q k w := by
+  dsimp only
+  let D := ⨁ k, X k
+  let lof := DirectSum.lof ℂ ℕ X
+  let c := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  let σ := directSumDifference j
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD : WithSeminorms
+      (Subtype.val : {s : Seminorm ℂ D // ∀ k, Continuous (s ∘ lof k)} → Seminorm ℂ D) :=
+    ⟨rfl⟩
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  have hσ : IsClosedEmbedding σ := hacyclic
+  have hpD : Continuous (directSumSeminorm p) := by
+    refine hD.continuous_seminorm ⟨_, fun k ↦ ?_⟩
+    have he : (directSumSeminorm p : D → ℝ) ∘ lof k = p k :=
+      funext (directSumSeminorm_lof p k)
+    change Continuous ((directSumSeminorm p : D → ℝ) ∘ lof k)
+    rw [he]
+    exact hp k
+  obtain ⟨Q, hQ, hbound⟩ := Seminorm.exists_le_comp_of_isInducing hpD hσ.isInducing
+  let q (k : ℕ) := Q.comp (lof k)
+  have hQsum (z : D) : Q z ≤ directSumSeminorm q z := by
+    rw [directSumSeminorm_apply q z z.support Subset.rfl]
+    have hs := Finset.le_sum_of_subadditive Q (map_zero Q).le
+      (map_add_le_add Q) z.support (fun k ↦ lof k (z k))
+    rwa [show (∑ k ∈ z.support, lof k (z k)) = z from DirectSum.sum_support_of z] at hs
+  have hpartial (u : D) (m : ℕ) :
+      i m (u m) = ∑ l ∈ Finset.range (m+1), i l (σ u l) := by
+    induction m with
+    | zero => simp [(directSumDifference_apply j u).1, σ]
+    | succ m ih =>
+      rw [Finset.sum_range_succ, ← ih, (directSumDifference_apply j u).2 m, map_sub,
+        show i (m+1) (j m (u m)) = i m (u m) from DFunLike.congr_fun (h.compatible m) (u m)]
+      abel
+  refine ⟨q, fun k ↦ hQ.comp (hD.continuous_of_continuous_comp _ fun s ↦ s.property k), ?_⟩
+  intro m k hmk z y w hz hy hw
+  have hc (l : ℕ) (x : X l) : c (lof l x) = i l x := DirectSum.toModule_lof _ _ _
+  have hker : z - lof k w ∈ c.ker := by
+    rw [LinearMap.mem_ker, map_sub, hc, hw, sub_self]
+  have hmem : z - lof k w ∈ range σ := by
+    change _ ∈ range (directSumDifference j)
+    rw [h.range_directSumDifference]
+    exact hker
+  obtain ⟨u, hu⟩ := hmem
+  have hsum : c z = ∑ l ∈ Finset.range (m+1), i l (z l) := by
+    have hsupport : z.support ⊆ Finset.range (m+1) := by
+      intro l hl
+      exact Finset.mem_range.mpr (by
+        by_contra! hml
+        exact (DFinsupp.mem_support_iff.mp hl) (hz l (by omega)))
+    have hs : z.sum (fun l ↦ lof l) = z := DirectSum.sum_support_of z
+    rw [DFinsupp.sum_of_support_subset hsupport (fun l _ ↦ map_zero (lof l))] at hs
+    calc
+      c z = c (∑ l ∈ Finset.range (m+1), lof l (z l)) := congrArg c hs.symm
+      _ = _ := by rw [map_sum]; exact Finset.sum_congr rfl fun l _ ↦ hc l (z l)
+  have huy : u m = y := h.injective m (calc
+    i m (u m) = ∑ l ∈ Finset.range (m+1), i l (σ u l) := hpartial u m
+    _ = ∑ l ∈ Finset.range (m+1), i l (z l) := by
+      apply Finset.sum_congr rfl
+      intro l hl
+      have hkl : l ≠ k := by have := Finset.mem_range.mp hl; omega
+      rw [show σ u = z - lof k w from hu, DirectSum.sub_apply]
+      simp [lof, DirectSum.lof_eq_of, DirectSum.of_eq_of_ne, hkl]
+    _ = c z := hsum.symm
+    _ = i m y := hy)
+  have hcoord : p m (u m) ≤ directSumSeminorm p u := by
+    simpa only [Finset.sum_singleton] using sum_le_directSumSeminorm p u {m}
+  calc
+    p m y = p m (u m) := congrArg (p m) huy.symm
+    _ ≤ directSumSeminorm p u := hcoord
+    _ ≤ Q (σ u) := hbound u
+    _ ≤ Q z + Q (lof k w) := by rw [show σ u = _ from hu]; exact map_sub_le_add Q _ _
+    _ ≤ directSumSeminorm q z + q k w := add_le_add (hQsum z) le_rfl
+
+/-- Paper: Definition C.1.5.8, p. 667. For an acyclic system, one can choose
+coordinate seminorms whose unit balls on every finite block admit uniform
+comparison estimates from some stage onward. Deviation: this is the finite-block
+estimate used to deduce Retakh stabilization from the inverse in (C.1.5.4). -/
+private theorem IsInjectiveLCLimit.exists_stabilizing_seminorms
+    [∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
+    (h : IsInjectiveLCLimit j i) (hX : ∀ k, IsFrechetTVS (X k))
+    (hacyclic : IsAcyclicSystem j) :
+    let c := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+    ∃ r : ∀ k, Seminorm ℂ (X k), (∀ k, Continuous (r k)) ∧
+      ∀ n, ∃ m, n ≤ m ∧ ∀ k, m < k → ∀ p : Seminorm ℂ (X m), Continuous p →
+        ∃ q : Seminorm ℂ (X k), Continuous q ∧
+          ∀ (z : ⨁ l, X l) (y : X m) (w : X k),
+            (∀ l, n < l → z l = 0) → directSumSeminorm r z < 1 →
+            c z = i m y → c z = i k w → p y ≤ 1 + q w := by
+  classical
+  dsimp only
+  choose hgroup hpoly hmetric _ using hX
+  let : ∀ k, IsTopologicalAddGroup (X k) := hgroup
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetric
+  let D := ⨁ k, X k
+  let c := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  choose B hB using fun k ↦ (𝓝 (0 : X k)).exists_antitone_basis
+  choose b hb hbB using fun k t ↦
+    (PolynormableSpace.hasBasis_zero_ball ℂ (X k)).mem_iff.mp ((hB k).mem t)
+  -- Enumerate the finite lists of choices of coordinate seminorms.
+  let I := Σ n : ℕ, Fin (n+1) → ℕ
+  obtain ⟨e, he⟩ := Countable.exists_injective_nat I
+  let code (a : I) := Nat.pair a.1 (e a)
+  have hcode : Function.Injective code := by
+    intro a a' ha
+    apply he
+    simpa [code] using congrArg (fun m ↦ (Nat.unpair m).2) ha
+  let r₀ (a : I) (l : ℕ) : Seminorm ℂ (X l) :=
+    if hl : l < a.1+1 then b l (a.2 ⟨l, hl⟩) else 0
+  let Controls (a : I) (m : ℕ) (p : Seminorm ℂ (X m)) :=
+    ∀ k : ℕ, m < k → ∃ q : Seminorm ℂ (X k), Continuous q ∧
+      ∀ (z : D) (y : X m) (w : X k),
+        (∀ l, a.1 < l → z l = 0) → directSumSeminorm (r₀ a) z < 1 →
+        c z = i m y → c z = i k w → p y ≤ 1 + q w
+  let Good (a : I) (m : ℕ) :=
+    ∀ p : Seminorm ℂ (X m), Continuous p → Controls a m p
+  -- If a candidate fails at its assigned stage, test the estimate with a witness
+  -- to that failure. The inverse difference map must control all tests at once.
+  have htest (m : ℕ) : ∃ p : Seminorm ℂ (X m), Continuous p ∧
+      ∀ a, code a = m → ¬ Good a m → ¬ Controls a m p := by
+    by_cases hm : ∃ a, code a = m ∧ ¬ Good a m
+    · obtain ⟨a, ha, hbad⟩ := hm
+      obtain ⟨p, hp, hbad⟩ : ∃ p : Seminorm ℂ (X m), ∃ _ : Continuous p, ¬ Controls a m p := by
+        simpa only [Good, not_forall] using hbad
+      exact ⟨p, hp, fun a' ha' _ ↦ hcode (ha.trans ha'.symm) ▸ hbad⟩
+    · exact ⟨0, continuous_zero, fun a ha hbad ↦ (hm ⟨a, ha, hbad⟩).elim⟩
+  choose p hp hpTest using htest
+  obtain ⟨q, hq, hcontrol⟩ := h.directSum_seminorm_control hacyclic p hp
+  have ht (l : ℕ) : ∃ t, q l ≤ b l t := by
+    obtain ⟨t, ht⟩ := (hB l).mem_iff.mp (Seminorm.ball_mem_nhds (hq l) zero_lt_one)
+    refine ⟨t, fun x ↦ le_of_not_gt fun hx ↦ ?_⟩
+    have hpos : 0 < q l x := (apply_nonneg (b l t) x).trans_lt hx
+    have hx' := ht (hbB l t (a := ((q l x)⁻¹ : ℝ) • x) (by
+      rw [Seminorm.mem_ball_zero, ← Complex.coe_smul, map_smul_eq_mul,
+        Complex.norm_of_nonneg (inv_nonneg.mpr hpos.le)]
+      simpa [div_eq_inv_mul] using (div_lt_one hpos).mpr hx))
+    rw [Seminorm.mem_ball_zero, ← Complex.coe_smul, map_smul_eq_mul,
+      Complex.norm_of_nonneg (inv_nonneg.mpr hpos.le), inv_mul_cancel₀ hpos.ne'] at hx'
+    exact (lt_irrefl _ hx')
+  choose t ht using ht
+  let r (l : ℕ) := b l (t l)
+  refine ⟨r, fun l ↦ hb l _, fun n ↦ ?_⟩
+  let a : I := ⟨n, fun l ↦ t l⟩
+  let m := code a
+  have hnm : n ≤ m := Nat.left_le_pair _ _
+  have hsame (z : D) (hz : ∀ l, n < l → z l = 0) :
+      directSumSeminorm (r₀ a) z = directSumSeminorm r z := by
+    rw [directSumSeminorm_apply _ _ z.support Subset.rfl,
+      directSumSeminorm_apply _ _ z.support Subset.rfl]
+    apply Finset.sum_congr rfl
+    intro l hl
+    have hln : l < n+1 := by
+      by_contra! hh
+      exact (DFinsupp.mem_support_iff.mp hl) (hz l (by omega))
+    simp [r₀, a, r, Nat.le_of_lt_succ hln]
+  have ha : Good a m := by
+    by_contra hbad
+    apply hpTest m a rfl hbad
+    intro k hmk
+    refine ⟨q k, hq k, fun z y w hz hzr hy hw ↦ ?_⟩
+    have hzq : directSumSeminorm q z ≤ directSumSeminorm r z := by
+      rw [directSumSeminorm_apply _ _ z.support Subset.rfl,
+        directSumSeminorm_apply _ _ z.support Subset.rfl]
+      exact Finset.sum_le_sum fun l _ ↦ ht l (z l)
+    rw [hsame z hz] at hzr
+    exact (hcontrol m k hmk z y w (fun l hl ↦ hz l (hnm.trans_lt hl)) hy hw).trans
+      (add_le_add (hzq.trans hzr.le) le_rfl)
+  refine ⟨m, hnm, fun k hmk p hp ↦ ?_⟩
+  obtain ⟨q', hq', hqle⟩ := ha p hp k hmk
+  exact ⟨q', hq', fun z y w hz hzr ↦ hqle z y w hz ((hsame z hz).trans_lt hzr)⟩
+
 /-- Retakh's neighborhood stabilization for an acyclic Fréchet system. The disks exhaust
 the limit and contain a zero neighborhood from each corresponding stage. A disk closes
 in a later stage, and each of its closed subsets there pulls back to a closed set in
@@ -2794,7 +2977,193 @@ private theorem IsInjectiveLCLimit.exists_stagewise_stable_disks
       (∀ n, S n + S n ⊆ S (n+1)) ∧ (∀ n, i n ⁻¹' S n ∈ 𝓝 (0 : X n)) ∧
       ∀ n, ∃ m, n ≤ m ∧ S n ⊆ range (i m) ∧ IsClosed (i m ⁻¹' S n) ∧
         ∀ A : Set E, A ⊆ S n → IsClosed (i m ⁻¹' A) → ∀ k, IsClosed (i k ⁻¹' A) := by
-  sorry
+  classical
+  let _ : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0) := fun _ _ ↦ Classical.propDecidable _
+  have hX' := hX
+  choose hgroup hpoly hmetr hcomplete using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hgroup
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetr
+  let : ∀ k, UniformSpace (X k) := fun _ ↦ IsTopologicalAddGroup.rightUniformSpace _
+  let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (X k) := hcomplete
+  have htransition (a b : ℕ) (hab : a ≤ b) :
+      ∃ f : X a →L[ℂ] X b, (i b).comp f = i a := by
+    induction b, hab using Nat.le_induction with
+    | base => exact ⟨ContinuousLinearMap.id ℂ _, rfl⟩
+    | succ b _ ih =>
+      obtain ⟨f, hf⟩ := ih
+      exact ⟨(j b).comp f, by rw [← ContinuousLinearMap.comp_assoc, h.compatible, hf]⟩
+  choose f hf using htransition
+  have hfi (a b : ℕ) (hab : a ≤ b) (y : X a) : i b (f a b hab y) = i a y :=
+    DFunLike.congr_fun (hf a b hab) y
+  obtain ⟨r, hr, hcontrol⟩ := h.exists_stabilizing_seminorms hX hacyclic
+  choose m hnm hm using hcontrol
+  let D := ⨁ l, X l
+  let lof := DirectSum.lof ℂ ℕ X
+  let c := DirectSum.toModule ℂ ℕ E (fun l ↦ (i l).toLinearMap)
+  let ρ := directSumSeminorm r
+  let R (n : ℕ) := (2 : ℝ)^n
+  have hR (n : ℕ) : 0 < R n := pow_pos (by norm_num) _
+  let T (n : ℕ) := c '' {z : D | (∀ l, n < l → z l = 0) ∧ ρ z < R n}
+  let C (n : ℕ) := closure (i (m n) ⁻¹' T n)
+  let S (n : ℕ) := i (m n) '' C n
+  have hc (k : ℕ) (y : X k) : c (lof k y) = i k y := DirectSum.toModule_lof _ _ _
+  have hT_range (n : ℕ) : T n ⊆ range (i (m n)) := by
+    rintro _ ⟨z, ⟨hz, _⟩, rfl⟩
+    change c z ∈ (i (m n)).toLinearMap.range
+    rw [← show (∑ l ∈ z.support, lof l (z l)) = z from DirectSum.sum_support_of z, map_sum]
+    apply Submodule.sum_mem
+    intro l hl
+    have hln : l ≤ n := le_of_not_gt fun hnl ↦ (DFinsupp.mem_support_iff.mp hl) (hz l hnl)
+    rw [hc]
+    exact ⟨f l (m n) (hln.trans (hnm n)) (z l), hfi _ _ _ _⟩
+  have hTS (n : ℕ) : T n ⊆ S n := by
+    intro x hx
+    obtain ⟨y, hy⟩ := hT_range n hx
+    refine ⟨y, subset_closure ?_, hy⟩
+    change i (m n) y ∈ T n
+    rwa [hy]
+  have hC (n : ℕ) : i (m n) ⁻¹' S n = C n :=
+    preimage_image_eq _ (h.injective (m n))
+  have hball (n a : ℕ) (han : a ≤ n) (y : X a) (hy : r a y < R n) : i a y ∈ T n := by
+    refine ⟨lof a y, ⟨fun l hl ↦ ?_, ?_⟩, hc _ _⟩
+    · change DirectSum.lof ℂ ℕ X a y l = 0
+      rw [DirectSum.lof_eq_of, DirectSum.of_eq_of_ne]
+      omega
+    · simpa only [ρ, lof, directSumSeminorm_lof] using hy
+  have hzero (n : ℕ) : (0 : E) ∈ T n := by
+    simpa only [map_zero] using hball n n le_rfl 0 (by simpa only [map_zero] using hR n)
+  have hTadd (n : ℕ) : T n + T n ⊆ T (n+1) := by
+    rintro _ ⟨_, ⟨x, hx, rfl⟩, _, ⟨y, hy, rfl⟩, rfl⟩
+    refine ⟨x + y, ⟨fun l hl ↦ ?_, ?_⟩, map_add c _ _⟩
+    · rw [DFinsupp.add_apply, hx.1 l (by omega), hy.1 l (by omega), add_zero]
+    · calc
+        ρ (x + y) ≤ ρ x + ρ y := map_add_le_add ρ _ _
+        _ < R n + R n := add_lt_add hx.2 hy.2
+        _ = R (n+1) := by simp only [R, pow_succ]; ring
+  -- On the closure of a finite ball the later transition induces the same uniformity.
+  have hstable (n : ℕ) (A : Set E) (hA : A ⊆ S n) (hclosed : IsClosed (i (m n) ⁻¹' A))
+      (k : ℕ) : IsClosed (i k ⁻¹' A) := by
+    by_cases hkm : k ≤ m n
+    · have he : i k ⁻¹' A = f k (m n) hkm ⁻¹' (i (m n) ⁻¹' A) := by
+        ext y
+        simp only [mem_preimage, hfi]
+      rw [he]
+      exact hclosed.preimage (f k (m n) hkm).continuous
+    have hmk : m n < k := Nat.lt_of_not_ge hkm
+    let F := f (m n) k hmk.le
+    let g (y : C n) : X k := F y.val
+    have hg : IsUniformInducing g := by
+      let hmBasis := (PolynormableSpace.hasBasis_zero_ball ℂ (X (m n))).uniformity_of_nhds_zero_swapped
+      let hkBasis := (PolynormableSpace.hasBasis_zero_ball ℂ (X k)).uniformity_of_nhds_zero_swapped
+      have hsub : IsUniformInducing (Subtype.val : C n → X (m n)) :=
+        isUniformEmbedding_subtype_val.isUniformInducing
+      rw [isUniformInducing_iff']
+      refine ⟨F.uniformContinuous.comp hsub.uniformContinuous, ?_⟩
+      apply ((hkBasis.comap (Prod.map g g)).le_basis_iff (hsub.basis_uniformity hmBasis)).mpr
+      intro p hp
+      let L := R (n+1)
+      have hL : 0 < L := hR _
+      let s : ℂ := ((L⁻¹ : ℝ) : ℂ)
+      have hs : ‖s‖ = L⁻¹ := Complex.norm_of_nonneg (inv_nonneg.mpr hL.le)
+      let P := (2*L).toNNReal • p
+      have hP : Continuous P := hp.const_smul _
+      obtain ⟨q, hq, hle⟩ := hm n k hmk P hP
+      let Q := L⁻¹.toNNReal • q
+      have hQ : Continuous Q := hq.const_smul _
+      refine ⟨Q, hQ, ?_⟩
+      have hbound (y z : X (m n)) (hy : i (m n) y ∈ T n) (hz : i (m n) z ∈ T n) :
+          2 * p (y-z) ≤ 1 + Q (F y - F z) := by
+        obtain ⟨v, hv, hvy⟩ := hy
+        obtain ⟨w, hw, hwz⟩ := hz
+        have hdiff : ρ (v-w) < L := by
+          have hle := map_sub_le_add ρ v w
+          have hL' : L = R n + R n := by simp only [L, R, pow_succ]; ring
+          rw [hL']
+          exact hle.trans_lt (add_lt_add hv.2 hw.2)
+        have hsm : ρ (s • (v-w)) < 1 := by
+          rw [map_smul_eq_mul, hs, ← div_eq_inv_mul]
+          exact (div_lt_one hL).mpr hdiff
+        have heq : c (s • (v-w)) = i (m n) (s • (y-z)) := by
+          rw [map_smul, map_smul, map_sub, map_sub, hvy, hwz]
+        have heq' : c (s • (v-w)) = i k (s • (F y - F z)) := by
+          rw [heq, map_smul, map_smul, map_sub, map_sub]
+          change _ = s • (i k (f (m n) k hmk.le y) - i k (f (m n) k hmk.le z))
+          rw [hfi, hfi]
+        have htest := hle (s • (v-w)) (s • (y-z)) (s • (F y - F z))
+          (fun l hl ↦ by rw [DFinsupp.smul_apply, DFinsupp.sub_apply, hv.1 l hl, hw.1 l hl,
+            sub_self, smul_zero]) hsm heq heq'
+        change ((2*L).toNNReal : ℝ) * p (s • (y-z)) ≤ 1 + q (s • (F y - F z)) at htest
+        rw [Real.coe_toNNReal (2*L) (by positivity), map_smul_eq_mul, map_smul_eq_mul, hs,
+          ← mul_assoc, mul_assoc 2 L L⁻¹, mul_inv_cancel₀ hL.ne', mul_one] at htest
+        change 2 * p (y-z) ≤ 1 + ((L⁻¹ : ℝ).toNNReal : ℝ) * q (F y - F z)
+        rwa [Real.coe_toNNReal _ (inv_nonneg.mpr hL.le)]
+      have hbound_closed : IsClosed {yz : X (m n) × X (m n) |
+          2 * p (yz.1-yz.2) ≤ 1 + Q (F yz.1 - F yz.2)} :=
+        isClosed_le ((hp.comp (continuous_fst.sub continuous_snd)).const_mul 2)
+          (continuous_const.add (hQ.comp ((F.continuous.comp continuous_fst).sub
+            (F.continuous.comp continuous_snd))))
+      rintro ⟨y, z⟩ hyz
+      change g y - g z ∈ Q.ball 0 1 at hyz
+      change y.val - z.val ∈ p.ball 0 1
+      rw [Seminorm.mem_ball_zero] at hyz ⊢
+      have hmemb : (y.val, z.val) ∈ closure ((i (m n) ⁻¹' T n) ×ˢ (i (m n) ⁻¹' T n)) := by
+        rw [closure_prod_eq]
+        exact ⟨y.property, z.property⟩
+      have hcomp : 2 * p (y.val-z.val) ≤ 1 + Q (g y - g z) := by
+        refine hbound_closed.closure_subset_iff.mpr ?_ hmemb
+        intro uv huv
+        exact hbound uv.1 uv.2 huv.1 huv.2
+      linarith
+    let A' : Set (C n) := (Subtype.val : C n → X (m n)) ⁻¹' (i (m n) ⁻¹' A)
+    let : CompleteSpace (C n) := isClosed_closure.isComplete.completeSpace_coe
+    have hAc : IsClosed A' := hclosed.preimage continuous_subtype_val
+    have hAc' : IsClosed (g '' A') := ((isComplete_image_iff hg).mpr hAc.isComplete).isClosed
+    have hgi (y : C n) : i k (g y) = i (m n) y.val := hfi _ _ _ _
+    have hAeq : i k ⁻¹' A = g '' A' := by
+      ext x
+      constructor
+      · intro hx
+        obtain ⟨y, hyC, hy⟩ := hA hx
+        refine ⟨⟨y, hyC⟩, ?_, h.injective k ((hgi ⟨y, hyC⟩).trans hy)⟩
+        change i (m n) y ∈ A
+        rwa [hy]
+      · rintro ⟨y, hy, rfl⟩
+        change i k (g y) ∈ A
+        rw [hgi]
+        exact hy
+    rwa [hAeq]
+  have hSclosed (n k : ℕ) : IsClosed (i k ⁻¹' S n) :=
+    hstable n (S n) Subset.rfl (by rw [hC]; exact isClosed_closure) k
+  have hSadd (n : ℕ) : S n + S n ⊆ S (n+1) := by
+    rintro _ ⟨_, ⟨a, ha, rfl⟩, _, ⟨b, hb, rfl⟩, rfl⟩
+    let k := m n
+    change i k a + i k b ∈ S (n+1)
+    rw [← map_add]
+    have hmaps : MapsTo (fun z : X k × X k ↦ z.1 + z.2)
+        ((i k ⁻¹' T n) ×ˢ (i k ⁻¹' T n)) (i k ⁻¹' S (n+1)) := by
+      intro z hz
+      change i k (z.1 + z.2) ∈ S (n+1)
+      rw [map_add]
+      exact hTS _ (hTadd n (add_mem_add hz.1 hz.2))
+    have hab : (a, b) ∈ closure ((i k ⁻¹' T n) ×ˢ (i k ⁻¹' T n)) := by
+      rw [closure_prod_eq]
+      exact ⟨ha, hb⟩
+    have hab' : a + b ∈ closure (i k ⁻¹' S (n+1)) := hmaps.closure continuous_add hab
+    rwa [(hSclosed (n+1) k).closure_eq] at hab'
+  refine ⟨S, monotone_nat_of_le_succ ?_, ?_, hSadd, ?_, fun n ↦ ?_⟩
+  · intro n x hx
+    simpa only [add_zero] using hSadd n (add_mem_add hx (hTS n (hzero n)))
+  · intro x
+    obtain ⟨a, y, rfl⟩ := h.exhaustive x
+    obtain ⟨n, hn⟩ := pow_unbounded_of_one_lt (r a y) (by norm_num : (1 : ℝ) < 2)
+    refine ⟨max a n, hTS _ (hball _ a (le_max_left _ _) y ?_)⟩
+    exact hn.trans_le (pow_le_pow_right₀ (by norm_num) (le_max_right _ _))
+  · intro n
+    refine mem_of_superset ((r n).ball_mem_nhds (hr n) (hR n)) fun y hy ↦ ?_
+    exact hTS n (hball n n le_rfl y ((r n).mem_ball_zero.mp hy))
+  · exact ⟨m n, hnm n, image_subset_range _ _, hSclosed n _, hstable n⟩
 
 /-- If each coordinate belongs to a prescribed stage neighborhood, the image of
 the resulting direct-sum box under the canonical quotient contains a zero neighborhood. -/
