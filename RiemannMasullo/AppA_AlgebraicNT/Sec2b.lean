@@ -643,7 +643,17 @@ theorem ideleIdealClass_ofAdicCompletion (v : Primes(F)) (x : (v.adicCompletion 
 and the representative of the trivial class can be chosen to be one. -/
 theorem exists_normOne_class_representatives :
     ∃ r : CommRing.Pic (𝓞 F) → N₁, r 1 = 1 ∧ ∀ c, ideleIdealClass F (r c).val = c := by
-  sorry
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let p := e.toMonoidHom.comp (QuotientGroup.mk' _)
+  have hp : Surjective p := e.surjective.comp QuotientGroup.mk_surjective
+  obtain ⟨r, hr⟩ := hp.hasRightInverse
+  refine ⟨Function.update r 1 1, Function.update_self .., fun c ↦ ?_⟩
+  refine (he (Function.update r 1 1 c)).symm.trans ?_
+  change p (Function.update r 1 1 c) = c
+  by_cases hc : c = 1
+  · subst c
+    rw [Function.update_self, map_one]
+  · rw [Function.update_of_ne hc, hr c]
 
 variable (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
 
