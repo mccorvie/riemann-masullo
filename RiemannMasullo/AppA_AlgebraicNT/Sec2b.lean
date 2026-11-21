@@ -1877,7 +1877,18 @@ include hr₁ hr in
 of the closure of the global domain meet a given compact subset of the norm-one ideles. -/
 theorem ideleFundamentalDomain_finite_translates (K : Set N₁) (hK : IsCompact K) :
     {x : Fˣ | ((principal₁ x • closure E₁) ∩ K).Nonempty}.Finite := by
-  sorry
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let quotient (p : N₁ × N₁) : 𝕀[F] := (p.1 / p.2 : N₁).val
+  let C := quotient '' (K ×ˢ closure E₁)
+  obtain ⟨hinj, hclosed, hdiscrete, -⟩ := ideleGroup_quotient.{_, 0} F
+  have hC : IsCompact C :=
+    (hK.prod (ideleFundamentalDomain_precompact F b v₀ σ r hr₁ hr)).image
+      (continuous_subtype_val.comp continuous_div')
+  have hfinite : (C ∩ Set.range d).Finite :=
+    (hC.inter_right hclosed).finite (hdiscrete.mono Set.inter_subset_right)
+  refine (hfinite.preimage hinj.injOn).subset fun x hx ↦ ?_
+  obtain ⟨k, e, ⟨hk, he⟩, hke⟩ := Set.smul_inter_nonempty_iff'.mp hx
+  exact ⟨⟨(k, e), ⟨hk, he⟩, congrArg Subtype.val hke⟩, ⟨x, rfl⟩⟩
 
 variable (s : ℝ≥0ˣ →* (InfiniteAdeleRing F)ˣ) (hs : Continuous s) (hn : RightInverse s (infiniteIdeleNorm F))
 
