@@ -3,7 +3,11 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
+import all RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.AppB_AnalyticNT.Sec2
+import Mathlib.Analysis.Complex.Liouville
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -273,12 +277,324 @@ theorem sLocalHeckeL_eq_partialEulerProduct (χ : PontryaginDual Jₛ) (χ' : Po
     sLocalHeckeL (chartₛ(χ) s) =
       heckeGammaFactor χ' s * ∏ v : S, finiteHeckeEulerFactor χ' v.val s := by sorry
 
+section StripDecay
+
+open scoped ContDiff SchwartzMap
+
+local notation "Aₛ" => SAdeleRing F S
+local notation "Iₛ" => (SAdeleRing F S)ˣ
+local notation "J₁" => (sIdeleQuotientNorm F S).ker
+local notation "classOf" => (QuotientGroup.mk : Iₛ → Jₛ)
+
+local instance stripNormOneMeasurableSpace : MeasurableSpace J₁ := borel _
+local notation "μJ₁" => sLocalNormOneQuotientMeasure F S
+local instance stripNormOneIsHaarMeasure : Measure.IsHaarMeasure (μJ₁ : Measure J₁) :=
+  (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+
+/-- The exponential homeomorphism from the real line to the positive units. -/
+private def expUnit : ℝ ≃ₜ ℝ≥0ˣ :=
+  Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+local notation "radialTheta(" τ "," ψ "," f ")" =>
+  (fun x : ℝ ↦ sLocalHomogeneousAdelicTheta F S μJ₁ ψ f (classOf (τ (expUnit x))))
+
+/-- Coercing the exponential unit to a real gives the ordinary exponential. -/
+private theorem expUnit_val (x : ℝ) : ((expUnit x : ℝ≥0) : ℝ) = Real.exp x := rfl
+
+/-- Addition of logarithmic coordinates corresponds to multiplication of units. -/
+private theorem expUnit_add (x y : ℝ) : expUnit (x + y) = expUnit x * expUnit y :=
+  Units.ext (NNReal.coe_inj.mp (Real.exp_add x y))
+
+/-- The exponential of zero is the identity unit. -/
+private theorem expUnit_zero : expUnit 0 = 1 :=
+  Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+
+/-- In logarithmic coordinates the derivative of homogeneous theta is theta
+applied to the differentiated test function. -/
+private theorem radialTheta_hasDerivAt (τ : ℝ≥0ˣ →ₜ* Iₛ) (ψ : PontryaginDual J₁)
+    (f : ℬ(Aₛ)) (x : ℝ) :
+    HasDerivAt radialTheta(τ, ψ, f)
+      (radialTheta(τ, ψ, (sAdeleDirectionalDeriv F S τ f)) x) x := by
+  rw [hasDerivAt_iff_tendsto_slope_zero]
+  have hExp : Tendsto expUnit (𝓝[≠] (0 : ℝ)) (𝓝[≠] (1 : ℝ≥0ˣ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨((expUnit).continuous.tendsto' 0 1 expUnit_zero).mono_left
+      nhdsWithin_le_nhds, ?_⟩
+    filter_upwards [self_mem_nhdsWithin] with t ht
+    exact fun h ↦ ht ((expUnit).injective (h.trans expUnit_zero.symm))
+  let θ := radialTheta(τ, ψ, f)
+  change Tendsto (fun t : ℝ ↦ t⁻¹ • (θ (x + t) - θ x)) _ _
+  have hTheta : Tendsto (fun t : ℝ ↦ (θ (x + t) - θ x) / ((Real.exp t : ℂ) - 1))
+      (𝓝[≠] 0) (𝓝 (radialTheta(τ, ψ, (sAdeleDirectionalDeriv F S τ f)) x)) := by
+    apply ((sLocalHomogeneousAdelicTheta_directionalDeriv F S τ μJ₁ ψ f
+      (τ (expUnit x))).comp hExp).congr
+    intro t
+    have hmul : τ (expUnit t) * τ (expUnit x) = τ (expUnit (x + t)) := by
+      rw [expUnit_add, map_mul τ (expUnit x) (expUnit t), mul_comm]
+    change (sLocalHomogeneousAdelicTheta F S μJ₁ ψ f (classOf (τ (expUnit t) * τ (expUnit x))) -
+      θ x) / (((((expUnit t : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) - 1) = _
+    exact congrArg₂ (· / ·)
+      (congrArg (fun u : Iₛ ↦ sLocalHomogeneousAdelicTheta F S μJ₁ ψ f (classOf u) - θ x) hmul)
+      (congrArg (fun a : ℝ ↦ (a : ℂ) - 1) (expUnit_val t))
+  have hRatio : Tendsto (fun t : ℝ ↦ (t⁻¹ : ℝ) • ((Real.exp t : ℂ) - 1))
+      (𝓝[≠] 0) (𝓝 1) := by
+    simpa using (hasDerivAt_iff_tendsto_slope_zero.mp (Real.hasDerivAt_exp 0).ofReal_comp)
+  have hprod := hRatio.mul hTheta
+  rw [one_mul] at hprod
+  apply hprod.congr'
+  filter_upwards [self_mem_nhdsWithin (s := ({0} : Set ℝ)ᶜ) (a := 0)] with t ht
+  have ht' : t ≠ 0 := ht
+  have hd : (Real.exp t : ℂ) - 1 ≠ 0 := by
+    exact sub_ne_zero.mpr (fun he ↦ ht' (Real.exp_injective (by rw [Real.exp_zero]; exact_mod_cast he)))
+  rw [smul_mul_assoc, mul_div_left_comm, div_self hd, mul_one]
+
+/-- Paper: Lemma 3.3.1.7(1), p. 136. Along a homomorphic section of the
+S-idelic norm, homogeneous theta weighted by a complex exponential of positive
+real part decays exponentially at both ends of the logarithmic axis.
+The small-norm estimate uses a smaller positive weight and the large-norm
+estimate uses an inverse norm power exceeding the given weight. -/
+private theorem sLocalHomogeneousAdelicTheta_weighted_radial_bound (τ : ℝ≥0ˣ →ₜ* Iₛ)
+    (hτ : RightInverse τ (sIdeleNorm F S)) (ψ : PontryaginDual J₁) (f : ℬ(Aₛ))
+    (c : ℂ) (hc : 0 < c.re) :
+    ∃ M δ : ℝ, 0 ≤ M ∧ 0 < δ ∧ ∀ x : ℝ,
+      ‖Complex.exp (c * x) * radialTheta(τ, ψ, f) x‖ ≤ M * Real.exp (-δ * |x|) := by sorry
+
+/-- Multiplying homogeneous theta in logarithmic coordinates by a positive
+complex exponential gives a Schwartz function. -/
+private theorem exists_schwartz_weighted_radialTheta (τ : ℝ≥0ˣ →ₜ* Iₛ)
+    (hτ : RightInverse τ (sIdeleNorm F S)) (ψ : PontryaginDual J₁) (f : ℬ(Aₛ))
+    (c : ℂ) (hc : 0 < c.re) :
+    ∃ g : 𝓢(ℝ, ℂ), ∀ x : ℝ, g x = Complex.exp (c * x) * radialTheta(τ, ψ, f) x := by
+  let profile (v : ℬ(Aₛ)) (x : ℝ) := Complex.exp (c * x) * radialTheta(τ, ψ, v) x
+  let D : ℬ(Aₛ) → ℬ(Aₛ) := fun v ↦ c • v + sAdeleDirectionalDeriv F S τ v
+  have hd (v : ℬ(Aₛ)) (x : ℝ) : HasDerivAt (profile v) (profile (D v) x) x := by
+    have he := ((Complex.ofRealCLM.hasDerivAt (x := x)).const_mul c).cexp
+    let Θ : ℬ(Aₛ) →ₗ[ℂ] C(Jₛ, ℂ) := sLocalHomogeneousAdelicTheta F S μJ₁ ψ
+    let u : Jₛ := classOf (τ (expUnit x))
+    have hD : Θ (D v) u = c * Θ v u + Θ (sAdeleDirectionalDeriv F S τ v) u := by
+      have h := congrArg (fun g : C(Jₛ, ℂ) ↦ g u)
+        ((Θ.map_add (c • v) (sAdeleDirectionalDeriv F S τ v)).trans
+          (congrArg (· + Θ (sAdeleDirectionalDeriv F S τ v)) (Θ.map_smul c v)))
+      exact h
+    apply (he.mul (radialTheta_hasDerivAt τ ψ v x)).congr_deriv
+    change Complex.exp (c * x) * (c * (1 : ℂ)) * Θ v u +
+      Complex.exp (c * x) * Θ (sAdeleDirectionalDeriv F S τ v) u =
+      Complex.exp (c * x) * Θ (D v) u
+    have hfactor (u a b : ℂ) : u * (c * 1) * a + u * b = u * (c * a + b) := by ring
+    exact (hfactor _ _ _).trans (congrArg (Complex.exp (c * x) * ·) hD.symm)
+  have hi (n : ℕ) : iteratedDeriv n (profile f) = profile (D^[n] f) := by
+    induction n with
+    | zero => rfl
+    | succ n ih =>
+      rw [iteratedDeriv_succ, ih, Function.iterate_succ_apply']
+      exact funext fun x ↦ (hd _ x).deriv
+  have hs : ContDiff ℝ (∞ : ℕ∞ω) (profile f) := by
+    apply contDiff_of_differentiable_iteratedDeriv
+    intro n _
+    rw [hi]
+    exact fun x ↦ (hd _ x).differentiableAt
+  refine ⟨⟨profile f, hs, ?_⟩, fun x ↦ rfl⟩
+  intro k n
+  obtain ⟨M, δ, hM, hδ, hbound⟩ := sLocalHomogeneousAdelicTheta_weighted_radial_bound τ hτ ψ (D^[n] f) c hc
+  -- The exponential bound absorbs each Schwartz seminorm's polynomial weight.
+  obtain ⟨B, hB⟩ : ∃ B : ℝ, ∀ x : ℝ, ‖x‖ ^ k * Real.exp (-δ * |x|) ≤ B := by
+    let d := δ / (k + 1 : ℝ)
+    have hd : 0 < d := by dsimp [d]; positivity
+    refine ⟨d⁻¹ ^ k, fun x ↦ ?_⟩
+    have hx : |x| ≤ d⁻¹ * Real.exp (d * |x|) := by
+      rw [inv_mul_eq_div, le_div_iff₀ hd, mul_comm]
+      linarith [Real.add_one_le_exp (d * |x|)]
+    have he : (k : ℝ) * (d * |x|) ≤ δ * |x| := by
+      rw [← mul_assoc]
+      apply mul_le_mul_of_nonneg_right _ (abs_nonneg _)
+      dsimp [d]
+      rw [← mul_div_assoc, div_le_iff₀ (by positivity)]
+      linarith
+    rw [Real.norm_eq_abs]
+    calc
+      _ ≤ (d⁻¹ * Real.exp (d * |x|)) ^ k * Real.exp (-δ * |x|) :=
+        mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (abs_nonneg _) hx _) (Real.exp_nonneg _)
+      _ = d⁻¹ ^ k * Real.exp ((k : ℝ) * (d * |x|) + -δ * |x|) := by
+        rw [mul_pow, mul_assoc, ← Real.exp_nat_mul, ← Real.exp_add]
+      _ ≤ d⁻¹ ^ k * 1 := mul_le_mul_of_nonneg_left (Real.exp_le_one_iff.mpr (by linarith)) (by positivity)
+      _ = _ := mul_one _
+  refine ⟨M * B, fun x ↦ ?_⟩
+  rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv, hi]
+  calc
+    _ ≤ ‖x‖ ^ k * (M * Real.exp (-δ * |x|)) :=
+      mul_le_mul_of_nonneg_left (hbound x) (by positivity)
+    _ = M * (‖x‖ ^ k * Real.exp (-δ * |x|)) := mul_left_comm _ _ _
+    _ ≤ _ := mul_le_mul_of_nonneg_left (hB x) hM
+
+/-- The radial integral in logarithmic coordinates is the Mellin transform
+of the weighted theta profile, with the weight subtracted from the exponent. -/
+private theorem radialMellin_eq_mellin (τ : ℝ≥0ˣ →ₜ* Iₛ)
+    (hτ : RightInverse τ (sIdeleNorm F S)) (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ)
+    (z : ℂ) (e : ℝ)
+    (hχ : ∀ t : ℝ≥0ˣ, (χ (classOf (τ t)) : ℂ) = ((((t : ℝ≥0) : ℝ) : ℂ) ^ z))
+    (g : ℝ → ℂ)
+    (hg : ∀ x : ℝ, g x = Complex.exp (((e : ℂ) + z) * x) *
+      radialTheta(τ, (χ.comp ⟨Subgroup.subtype J₁, continuous_subtype_val⟩), f) x)
+    (s : ℂ) :
+    sLocalRadialMellinIntegral τ f χ s = mellin (fun t ↦ g (Real.log t)) (s - e) := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have hmeasure : positiveRealHaar = volume.map expUnit := by
+    apply congrArg (fun h : ℝ → ℝ≥0ˣ ↦ volume.map h)
+    funext x
+    apply Units.ext
+    apply NNReal.eq
+    exact Real.coe_toNNReal _ (Real.exp_pos x).le
+  let ψ : PontryaginDual J₁ := χ.comp ⟨Subgroup.subtype J₁, continuous_subtype_val⟩
+  let Θ (t : ℝ≥0ˣ) := sLocalHomogeneousAdelicTheta F S μJ₁ ψ f (classOf (τ t))
+  let c (t : ℝ≥0ˣ) := chartₛ(χ) s (classOf (τ t))
+  change (∫ t, Θ t * c t ∂positiveRealHaar) = _
+  have hchange : (∫ t, Θ t * c t ∂positiveRealHaar) =
+      ∫ x : ℝ, Θ (expUnit x) * c (expUnit x) :=
+    (congrArg (fun μ : Measure ℝ≥0ˣ ↦ ∫ t, Θ t * c t ∂μ) hmeasure).trans
+      (expUnit.measurableEmbedding.integral_map _)
+  rw [hchange, mellin_logProfile_eq]
+  apply integral_congr_ae
+  filter_upwards with x
+  have hpow (w : ℂ) : (Real.exp x : ℂ) ^ w = Complex.exp ((x : ℂ) * w) := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+  have hchart : c (expUnit x) = Complex.exp ((x : ℂ) * z + (x : ℂ) * s) := by
+    let unorm (t : ℝ≥0ˣ) : ℂ := (((t : ℝ≥0) : ℝ) : ℂ)
+    have hu : unorm (expUnit x) = (Real.exp x : ℂ) :=
+      congrArg Complex.ofReal (expUnit_val x)
+    have hm : mₛ (classOf (τ (expUnit x))) = expUnit x := hτ (expUnit x)
+    calc
+      c (expUnit x) = (χ (classOf (τ (expUnit x))) : ℂ) *
+          unorm (mₛ (classOf (τ (expUnit x)))) ^ s := rfl
+      _ = unorm (expUnit x) ^ z * unorm (expUnit x) ^ s :=
+        congrArg₂ (· * ·) (hχ (expUnit x)) (congrArg (fun t ↦ unorm t ^ s) hm)
+      _ = _ := by rw [hu, hpow, hpow, Complex.exp_add]
+  rw [hchart]
+  have hx : g x = Complex.exp (((e : ℂ) + z) * x) * Θ (expUnit x) := hg x
+  rw [hx, ← mul_assoc, ← Complex.exp_add, mul_comm (Θ (expUnit x))]
+  congr 2
+  ring
+
+/-- The holomorphic S-local zeta function has rapid decay uniformly on
+each closed strip in the positive half-plane. -/
+private theorem sLocalIdelicZFunction_heightBound (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ)
+    (a b : ℝ) (ha : 0 < a) (hab : a < b) (N : ℕ) (hN : 1 ≤ N) :
+    ∃ C > (0 : ℝ), ∀ᶠ y : ℝ in comap abs atTop, ∀ σ ∈ Icc a b,
+      ‖sLocalIdelicZFunction f (chartₛ(χ) (vert(σ, y)))‖ ≤ C / |y| ^ N := by
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ : ℝ≥0ˣ →ₜ* Iₛ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hτ : RightInverse τ (sIdeleNorm F S) := thetaSection_rightInverse F S
+  let q : Iₛ →ₜ* Jₛ := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  let ψ : PontryaginDual J₁ := χ.comp ⟨Subgroup.subtype J₁, continuous_subtype_val⟩
+  obtain ⟨z, ⟨hz, hχ⟩, -⟩ :=
+    existsUnique_unitaryComplexPower (((circleToComplex).comp χ).comp (q.comp τ))
+      (fun t ↦ Circle.norm_coe (χ (q (τ t))))
+  let e := a / 2
+  have he : 0 < e := half_pos ha
+  obtain ⟨g, hg⟩ := exists_schwartz_weighted_radialTheta τ hτ ψ f ((e : ℂ) + z)
+    (by simpa [hz] using he)
+  have hweight (σ : ℝ) (hσ : σ ∈ Icc (a - e) (b - e)) :
+      ∃ h : 𝓢(ℝ, ℂ), ∀ x : ℝ, h x = (Real.exp (σ * x) : ℂ) * g x := by
+    have hs : 0 < (((σ + e : ℝ) : ℂ) + z).re := by
+      simp only [Complex.add_re, Complex.ofReal_re, hz, add_zero]
+      linarith [hσ.1]
+    obtain ⟨h, hh⟩ := exists_schwartz_weighted_radialTheta τ hτ ψ f _ hs
+    refine ⟨h, fun x ↦ ?_⟩
+    let θ := radialTheta(τ, ψ, f) x
+    calc
+      h x = Complex.exp ((((σ + e : ℝ) : ℂ) + z) * x) * θ := hh x
+      _ = (Real.exp (σ * x) : ℂ) * (Complex.exp (((e : ℂ) + z) * x) * θ) := by
+        rw [Complex.ofReal_exp, Complex.ofReal_mul, ← mul_assoc, ← Complex.exp_add]
+        congr 2
+        push_cast
+        ring
+      _ = _ := congrArg ((Real.exp (σ * x) : ℂ) * ·) (hg x).symm
+  obtain ⟨C, hC, hbound⟩ :=
+    mellin_eventualHeightBound_of_weighted_schwartz g (a - e) (b - e) (by linarith) hweight N hN
+  refine ⟨C, hC, hbound.mono (fun y hy σ hσ ↦ ?_)⟩
+  have hs : vert(σ, y) ∈ rightHalf := by
+    have hpos : 0 < σ := ha.trans_le hσ.1
+    simpa [mem_preimage, mem_Ioi, Complex.mul_I_re] using hpos
+  have hc : ∃ (χ' : PontryaginDual Jₛ) (s : ℂ), s ∈ rightHalf ∧
+      chartₛ(χ) (vert(σ, y)) = chartₛ(χ') s := ⟨χ, _, hs, rfl⟩
+  rw [sLocalIdelicZFunction_eq_integral f hc, ← sLocalThetaMellinIntegral_eq_zeta f hc,
+    ← sLocalRadialMellinIntegral_eq_theta τ hτ f χ _ hs,
+    radialMellin_eq_mellin τ hτ f χ z e hχ g hg]
+  have hσ' : σ - e ∈ Icc (a - e) (b - e) :=
+    ⟨sub_le_sub_right hσ.1 _, sub_le_sub_right hσ.2 _⟩
+  have harg : vert(σ, y) - (e : ℂ) = vert((σ - e : ℝ), y) := by
+    push_cast
+    ring
+  rw [harg]
+  exact hy (σ - e) hσ'
+
 /-- Paper: Lemma 3.3.1.7(1), p. 135. On every bounded strip in the positive
 half-plane the zeta function is uniformly Schwartz in height. -/
 theorem sLocalIdelicZFunction_schwartzOnStrip (f : ℬ(SAdeleRing F S)) (χ : PontryaginDual Jₛ)
     (a b : ℝ) (ha : 0 < a) (hab : a < b) :
     ∀ k : ℕ, UniformlySchwartzOnStrip
-      (iteratedDeriv k (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s))) a b := by sorry
+      (iteratedDeriv k (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s))) a b := by
+  let Z (s : ℂ) := sLocalIdelicZFunction f (chartₛ(χ) s)
+  have hOpen : IsOpen rightHalf := isOpen_Ioi.preimage Complex.continuous_re
+  have hZ : DifferentiableOn ℂ Z rightHalf := by
+    refine (sLocalThetaMellinIntegral_analyticOn f χ).differentiableOn.congr ?_
+    intro s hs
+    have hc : ∃ (χ' : PontryaginDual Jₛ) (w : ℂ), w ∈ rightHalf ∧
+        chartₛ(χ) s = chartₛ(χ') w := ⟨χ, s, hs, rfl⟩
+    exact (sLocalIdelicZFunction_eq_integral f hc).trans
+      (sLocalThetaMellinIntegral_eq_zeta f hc).symm
+  intro k
+  refine ⟨hab, ?_, fun ε hε _ N hN ↦ ?_⟩
+  · intro s hs
+    have hpos : s ∈ rightHalf := ha.trans hs.1
+    rw [iteratedDeriv_eq_iterate]
+    exact ((hZ.analyticAt (hOpen.mem_nhds hpos)).iterated_deriv k).differentiableAt.differentiableWithinAt
+  · -- The circle stays inside the wider strip and changes the height by at most one.
+    let r := min (ε / 2) 1
+    have hr : 0 < r := lt_min (half_pos hε) zero_lt_one
+    have hrε : r ≤ ε / 2 := min_le_left _ _
+    have hr1 : r ≤ 1 := min_le_right _ _
+    obtain ⟨C, hC, hdecay⟩ := sLocalIdelicZFunction_heightBound f χ a b ha hab N hN
+    obtain ⟨T, hT⟩ := eventually_atTop.mp (eventually_comap.mp hdecay)
+    refine ⟨(k.factorial : ℝ) * (2 ^ N * C) / r ^ k, by positivity, ?_⟩
+    have hlarge : ∀ᶠ y : ℝ in comap abs atTop, max (T + 1) 2 ≤ |y| :=
+      tendsto_comap.eventually (eventually_ge_atTop _)
+    filter_upwards [hlarge] with y hy σ hσ
+    let s := vert(σ, y)
+    have hre : s.re = σ := by simp [s]
+    have him : s.im = y := by simp [s]
+    have hsub (w : ℂ) (hw : w ∈ Metric.closedBall s r) : w.re ∈ Icc a b := by
+      have h := (Complex.abs_re_le_norm (w - s)).trans (mem_closedBall_iff_norm.mp hw)
+      rw [Complex.sub_re, hre, abs_le] at h
+      exact ⟨by linarith [hσ.1, h.1], by linarith [hσ.2, h.2]⟩
+    have hdiff := hZ.diffContOnCl_ball (c := s) (R := r)
+      (fun w hw ↦ ha.trans_le (hsub w hw).1)
+    have hsphere (w : ℂ) (hw : w ∈ Metric.sphere s r) : ‖Z w‖ ≤ 2 ^ N * C / |y| ^ N := by
+      have h := (Complex.abs_im_le_norm (w - s)).trans (mem_sphere_iff_norm.mp hw).le
+      rw [Complex.sub_im, him] at h
+      have hyw : |y| ≤ |w.im| + 1 := by
+        have htriangle := abs_sub_abs_le_abs_sub y w.im
+        rw [abs_sub_comm] at htriangle
+        linarith
+      have hTy : T + 1 ≤ |y| := (le_max_left _ _).trans hy
+      have hy2 : 2 ≤ |y| := (le_max_right _ _).trans hy
+      have hT' : T ≤ |w.im| := by linarith
+      have hyw' : |y| / 2 ≤ |w.im| := by linarith
+      have hypos : 0 < |y| := by linarith
+      have hbound := hT |w.im| hT' w.im rfl w.re (hsub w (Metric.sphere_subset_closedBall hw))
+      rw [Complex.re_add_im] at hbound
+      calc
+        ‖Z w‖ ≤ C / |w.im| ^ N := hbound
+        _ ≤ C / (|y| / 2) ^ N := div_le_div_of_nonneg_left hC.le (by positivity)
+          (pow_le_pow_left₀ (by positivity) hyw' _)
+        _ = 2 ^ N * C / |y| ^ N := by rw [div_pow, div_div_eq_mul_div, mul_comm C]
+    calc
+      _ ≤ (k.factorial : ℝ) * (2 ^ N * C / |y| ^ N) / r ^ k :=
+        Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le k hr hdiff hsphere
+      _ = _ := by simp only [div_eq_mul_inv]; ring
+
+end StripDecay
 
 /-- Paper: Equation (3.3.1.26), p. 135. The normalized S-local zeta function
 is the meromorphic quotient by the local Euler product.
