@@ -14,6 +14,7 @@ public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 public import Mathlib.Topology.Order.Lattice
 
 import Mathlib.Analysis.Complex.AbsMax
+import Mathlib.Analysis.Complex.Liouville
 import Mathlib.Analysis.Convex.Continuous
 import Mathlib.NumberTheory.LSeries.Injectivity
 import RiemannMasullo.ForMathlib.Analysis.Complex.Hadamard
@@ -1634,7 +1635,65 @@ theorem finiteHeckeL_continuation_iteratedDeriv_isBigO_rpow (χ : U[F]) (L : ℂ
     (k : ℕ) (σ : ℝ) :
     ∃ M C : ℝ, 0 < M ∧ 0 < C ∧
       ∀ᶠ s in atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ}),
-        AnalyticAt ℂ L s ∧ ‖iteratedDeriv k L s‖ ≤ C * |s.im| ^ M := by sorry
+        AnalyticAt ℂ L s ∧ ‖iteratedDeriv k L s‖ ≤ C * |s.im| ^ M := by
+  obtain ⟨M, hM, hGrowth⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries
+    (σ - 2) (σ + 2) (by linarith)
+  obtain ⟨D, hD, T, hT⟩ := (isBigO_height_iff (p := fun _ ↦ M)).mp hGrowth
+  have hIm : Continuous (fun w : ℂ ↦ |w.im|) := Complex.continuous_im.abs
+  -- A pole would contradict the local bound in the interior of the strip.
+  have hAnalytic {w : ℂ} (hRe : w.re ∈ Ioo (σ - 2) (σ + 2)) (hHeight : T < |w.im|) :
+      AnalyticAt ℂ L w := by
+    apply (hL (mem_univ w)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    by_contra! hPole
+    have hNearRe : ∀ᶠ z : ℂ in 𝓝 w, z.re ∈ Ioo (σ - 2) (σ + 2) :=
+      (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hRe
+    have hNearIm : ∀ᶠ z : ℂ in 𝓝 w, |z.im| ∈ Ioo T (|w.im| + 1) :=
+      (isOpen_Ioo.preimage hIm).mem_nhds ⟨hHeight, lt_add_of_pos_right _ zero_lt_one⟩
+    have hBound : ∀ᶠ z in 𝓝 w, ‖L z‖ ≤ D * (|w.im| + 1) ^ M := by
+      filter_upwards [hNearRe, hNearIm] with z hzRe hzIm
+      exact (hT z (Ioo_subset_Icc_self hzRe) hzIm.1.le).trans
+        (mul_le_mul_of_nonneg_left (Real.rpow_le_rpow (abs_nonneg _) hzIm.2.le hM.le) hD.le)
+    have hBlowup := (tendsto_norm_cobounded_atTop.comp
+      (tendsto_cobounded_of_meromorphicOrderAt_neg hPole)).eventually_gt_atTop
+        (D * (|w.im| + 1) ^ M)
+    obtain ⟨z, hz, h'z⟩ := ((hBound.filter_mono nhdsWithin_le_nhds).and hBlowup).exists
+    exact h'z.not_ge hz
+  refine ⟨M, (k.factorial : ℝ) * (D * (2 : ℝ) ^ M), hM, by positivity, ?_⟩
+  have hLine : ∀ᶠ s in atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ}), s.re = σ :=
+    eventually_inf_principal.mpr (Eventually.of_forall fun _ hs ↦ hs)
+  have hHeight : Tendsto (fun s : ℂ ↦ |s.im|) (atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})) atTop :=
+    tendsto_inf_left tendsto_comap
+  filter_upwards [hLine, hHeight.eventually_ge_atTop (max 1 (T + 2))] with s hs hts
+  have hOne : 1 ≤ |s.im| := (le_max_left _ _).trans hts
+  have hLarge : T + 2 ≤ |s.im| := (le_max_right _ _).trans hts
+  -- The unit disk stays inside the strip and its boundary heights are at most twice the center's.
+  have hDisk {w : ℂ} (hw : w ∈ Metric.closedBall s 1) :
+      w.re ∈ Ioo (σ - 2) (σ + 2) ∧ T < |w.im| ∧ |w.im| ≤ 2 * |s.im| := by
+    have hdist := mem_closedBall_iff_norm.mp hw
+    have hre := (Complex.abs_re_le_norm (w - s)).trans hdist
+    have him := (Complex.abs_im_le_norm (w - s)).trans hdist
+    rw [Complex.sub_re, hs, abs_le] at hre
+    rw [Complex.sub_im] at him
+    refine ⟨⟨by linarith [hre.1], by linarith [hre.2]⟩, ?_, ?_⟩
+    · linarith [(abs_sub_abs_le_abs_sub s.im w.im).trans (by simpa [abs_sub_comm] using him)]
+    · linarith [(abs_sub_abs_le_abs_sub w.im s.im).trans him]
+  have hDiskAnalytic (w : ℂ) (hw : w ∈ Metric.closedBall s 1) : AnalyticAt ℂ L w :=
+    hAnalytic (hDisk hw).1 (hDisk hw).2.1
+  refine ⟨hDiskAnalytic s (Metric.mem_closedBall_self zero_le_one), ?_⟩
+  have hDiff : DiffContOnCl ℂ L (Metric.ball s 1) :=
+    (show DifferentiableOn ℂ L (Metric.closedBall s 1) from fun w hw ↦
+      (hDiskAnalytic w hw).differentiableAt.differentiableWithinAt).diffContOnCl_ball subset_rfl
+  have hCircle (w : ℂ) (hw : w ∈ Metric.sphere s 1) :
+      ‖L w‖ ≤ (D * (2 : ℝ) ^ M) * |s.im| ^ M := by
+    obtain ⟨hRe, hLow, hHigh⟩ := hDisk (Metric.sphere_subset_closedBall hw)
+    calc
+      ‖L w‖ ≤ D * |w.im| ^ M := hT w (Ioo_subset_Icc_self hRe) hLow.le
+      _ ≤ D * (2 * |s.im|) ^ M :=
+        mul_le_mul_of_nonneg_left (Real.rpow_le_rpow (abs_nonneg _) hHigh hM.le) hD.le
+      _ = (D * (2 : ℝ) ^ M) * |s.im| ^ M := by
+        rw [Real.mul_rpow (by norm_num : 0 ≤ (2 : ℝ)) (abs_nonneg _), mul_assoc]
+  simpa only [one_pow, div_one, mul_assoc] using
+    Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le k zero_lt_one hDiff hCircle
 
 -- TODO(paper-gap): Footnotes 3 and 4 leave the intended uniform derivative
 -- bounds on strips open. Proposition 3.3.1.5 is stated on fixed lines with σ > 0.
