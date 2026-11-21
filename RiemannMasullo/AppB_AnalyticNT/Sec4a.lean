@@ -237,8 +237,32 @@ The value `c` on the generator determines the character. -/
 theorem summable_mellinJumpMidpoint_lattice
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) {θ : ℝ}
     (hθ : 0 < θ) (hθ₁ : θ ≠ 1) (c : Circle) :
-    Summable (fun m : ℤ ↦ (c : ℂ) ^ m * mellinJumpMidpoint f ((m : ℝ) * Real.log θ)) :=
-  by sorry
+    Summable (fun m : ℤ ↦ (c : ℂ) ^ m * mellinJumpMidpoint f ((m : ℝ) * Real.log θ)) := by
+  obtain ⟨⟨S, hsmooth, _⟩, hdecay⟩ := hf
+  obtain ⟨C, _, T, _, htail⟩ := hdecay 1
+  have hlog := Real.log_ne_zero_of_pos_of_ne_one hθ hθ₁
+  have hgeom : Summable (fun n : ℕ ↦ Real.exp ((n : ℝ) * -|Real.log θ|)) :=
+    Real.summable_exp_nat_mul_iff.mpr (neg_lt_zero.mpr (abs_pos.mpr hlog))
+  have hsum : Summable (fun m : ℤ ↦ Real.exp (|(m : ℝ)| * -|Real.log θ|)) := by
+    apply summable_int_iff_summable_nat_and_neg.mpr
+    constructor <;> simpa [abs_of_nonneg (Nat.cast_nonneg (α := ℝ) _)] using hgeom
+  apply (hsum.mul_left C).of_norm_bounded_eventually
+  have hlattice : Tendsto (fun m : ℤ ↦ (m : ℝ) * Real.log θ) cofinite (cocompact ℝ) := by
+    have h : Tendsto (fun m : ℤ ↦ zmultiplesHom ℝ (Real.log θ) m) cofinite (cocompact ℝ) :=
+      Int.tendsto_zmultiplesHom_cofinite hlog
+    simpa only [zmultiplesHom_apply, zsmul_eq_mul] using h
+  have habs : Tendsto (fun m : ℤ ↦ |(m : ℝ) * Real.log θ|) cofinite atTop := by
+    simpa only [Function.comp_def, Real.norm_eq_abs] using
+      tendsto_norm_cocompact_atTop.comp hlattice
+  filter_upwards [hlattice.eventually S.finite_toSet.isCompact.compl_mem_cocompact,
+    habs.eventually_gt_atTop T] with m hmS hmT
+  have hcont := hsmooth.continuousOn.continuousAt
+    (S.finite_toSet.isClosed.isOpen_compl.mem_nhds hmS)
+  rw [mellinJumpMidpoint_eq_average (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+    (hcont.tendsto.mono_left nhdsWithin_le_nhds), add_self_div_two,
+    Complex.norm_mul, Complex.norm_zpow, Circle.norm_coe, one_zpow, one_mul]
+  simpa only [Nat.cast_one, neg_one_mul, abs_mul, mul_neg] using
+    (htail ((m : ℝ) * Real.log θ) hmT).1.le
 
 -- TODO(paper-gap): (B.4.1.7) has the wrong sign for 0 < θ < 1.
 -- With θ = 1/2, the trivial character and the indicator of [1, 2],
