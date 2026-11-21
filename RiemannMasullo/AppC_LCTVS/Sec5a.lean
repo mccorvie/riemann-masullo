@@ -499,7 +499,27 @@ theorem vectorContDiffOrderOn_zero (Ω : Set V) (m : ℕ) :
 /-- Paper: Definition C.5.1.23, p. 734. The order condition is preserved by addition. -/
 theorem VectorContDiffOrderOn.add {Ω : Set V} {m : ℕ} {f g : V → E}
     (hf : VectorContDiffOrderOn f Ω m) (hg : VectorContDiffOrderOn g Ω m) :
-    VectorContDiffOrderOn (f + g) Ω m := by sorry
+    VectorContDiffOrderOn (f + g) Ω m := by
+  induction m generalizing f g with
+  | zero =>
+    unfold VectorContDiffOrderOn at hf hg ⊢
+    refine (hf.add hg).subset ?_
+    rintro z ⟨x, hx, y, hy, hxy, hd, rfl⟩
+    refine ⟨_, ⟨x, hx, y, hy, hxy, hd, rfl⟩, _, ⟨x, hx, y, hy, hxy, hd, rfl⟩, ?_⟩
+    simp only [Pi.add_apply, ← smul_add]
+    congr 1
+    abel
+  | succ m ih =>
+    intro i
+    obtain ⟨gf, hgf, cf, of⟩ := hf i
+    obtain ⟨gg, hgg, cg, og⟩ := hg i
+    refine ⟨gf + gg, ?_, cf.add cg, ih of og⟩
+    intro φ x
+    simp only [Pi.add_apply, map_add]
+    convert ((hgf φ x).hasFDerivWithinAt.add (hgg φ x).hasFDerivWithinAt).hasDerivWithinAt
+      using 1
+    simp
+    rfl
 
 /-- Paper: Definition C.5.1.23, p. 734. The order condition is preserved by complex
 scalar multiplication. -/
