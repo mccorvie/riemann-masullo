@@ -441,10 +441,10 @@ def IsNuclearOperator (A : E →L[ℂ] F) : Prop :=
           let yB : Submodule.span ℂ B := T xU
           (yB : F) = A x
 
-/-- Paper: §C.3.1, p. 694. A continuous rank-one operator is nuclear.
-Deviation: This is a check of the local factorization definition. -/
-theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
-    IsNuclearOperator (φ.smulRight y) := by
+/-- The image of the scalar closed unit ball under multiplication by a fixed vector
+is a Banach disc, since its span is finite-dimensional and its gauge is a norm. -/
+private theorem isBanachDisc_toSpanSingleton (y : F) :
+    IsBanachDisc (ContinuousLinearMap.toSpanSingleton ℂ y '' Metric.closedBall (0 : ℂ) 1) := by
   let D := Metric.closedBall (0 : ℂ) 1
   let f := ContinuousLinearMap.toSpanSingleton ℂ y
   let B := f '' D
@@ -484,9 +484,15 @@ theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
     NormedAddCommGroup.ofSeparation fun z hz ↦ (gauge_eq_zero aB hb).mp hz
   let : FiniteDimensional ℂ (WithLocalSeminorm pB) :=
     Module.Finite.of_surjective (show ℂ →ₗ[ℂ] WithLocalSeminorm pB from g.toLinearMap) hg
-  have hB : IsBanachDisc B :=
-    ⟨(NormedSpace.isVonNBounded_closedBall ℂ ℂ 1).image f, bB, cB, aB,
-      inferInstance, FiniteDimensional.completeSpace ℂ (WithLocalSeminorm pB)⟩
+  exact ⟨(NormedSpace.isVonNBounded_closedBall ℂ ℂ 1).image f, bB, cB, aB,
+    inferInstance, FiniteDimensional.completeSpace ℂ (WithLocalSeminorm pB)⟩
+
+/-- Paper: §C.3.1, p. 694. A continuous rank-one operator is nuclear.
+Deviation: This is a check of the local factorization definition. -/
+theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
+    IsNuclearOperator (φ.smulRight y) := by
+  let B := ContinuousLinearMap.toSpanSingleton ℂ y '' Metric.closedBall (0 : ℂ) 1
+  have hB : IsBanachDisc B := isBanachDisc_toSpanSingleton y
   -- The source gauge is the seminorm x ↦ ‖φ x‖, so φ extends to the completion.
   let q := (normSeminorm ℂ ℂ).comp φ.toLinearMap
   let U := q.ball 0 1
@@ -498,20 +504,19 @@ theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
     change ‖φ x‖ ≤ 1 * gauge U x
     rw [one_mul]
     exact ge_of_eq (congrFun (q.restrictScalars ℝ).gauge_ball x))
-  let yB : WithLocalSeminorm pB := g 1
+  let yB : Submodule.span ℂ B :=
+    ⟨y, Submodule.subset_span ⟨1, by simp [Metric.mem_closedBall], by simp⟩⟩
   refine ⟨U, hU, q.balanced_ball_zero 1, q.convex_ball 0 1, B, hB, ?_,
     ψ.fromCompletion.smulRight yB, isBanachNuclear_smulRight _ _, ?_⟩
   · intro x hx
     refine ⟨φ x, ?_, rfl⟩
-    change φ x ∈ Metric.closedBall (0 : ℂ) 1
     rw [Metric.mem_closedBall, dist_zero_right]
     exact (show ‖φ x‖ < 1 from q.mem_ball_zero.mp hx).le
   · intro x
     let xU : WithLocalSeminorm pU := x
-    change (↑(show S from ψ.fromCompletion xU • yB) : F) = φ x • y
+    change (↑(show Submodule.span ℂ B from ψ.fromCompletion xU • yB) : F) = φ x • y
     rw [ψ.fromCompletion_apply_coe]
-    change φ x • (1 : ℂ) • y = φ x • y
-    rw [one_smul]
+    rfl
 
 /-- Paper: (C.3.1.3), p. 694. A nuclear presentation is a pointwise operator sum
 of rank-one maps with summable coefficients, equicontinuous functionals and
@@ -528,13 +533,39 @@ structure NuclearPresentation (A : E →L[ℂ] F) where
   equicontinuous : EquicontinuousAt (fun n x ↦ functional n x) 0
   hasSum : ∀ x, HasSum (fun n ↦ (coeff n * functional n x) • (vector n : F)) (A x)
 
+-- Keep the section hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.3.1.3), p. 694. A rank-one map can be presented with one term and
 the given functional, with any prescribed nonzero coefficient for that term.
 Deviation: This is a check of the normalization in the presentation definition. -/
 theorem nuclearPresentation_smulRight (φ : E →L[ℂ] ℂ) (y : F) (c : ℂ) (hc : c ≠ 0) :
     ∃ r : NuclearPresentation (φ.smulRight y),
       r.coeff 0 = c ∧ r.functional 0 = φ ∧ (r.vector 0 : F) = c⁻¹ • y ∧
-        ∀ n, r.coeff (n + 1) = 0 := by sorry
+        ∀ n, r.coeff (n + 1) = 0 := by
+  let z : F := c⁻¹ • y
+  let B := ContinuousLinearMap.toSpanSingleton ℂ z '' Metric.closedBall (0 : ℂ) 1
+  have hz : z ∈ B := ⟨1, by simp [Metric.mem_closedBall], by simp⟩
+  let r : NuclearPresentation (φ.smulRight y) :=
+    { coeff := fun n ↦ if n = 0 then c else 0
+      functional := fun _ ↦ φ
+      disc := B
+      isBanachDisc := isBanachDisc_toSpanSingleton z
+      vector := fun _ ↦ ⟨z, Submodule.subset_span hz⟩
+      vector_mem := fun _ ↦ hz
+      summable_coeff := by
+        simpa only [apply_ite, norm_zero] using (hasSum_ite_eq (0 : ℕ) ‖c‖).summable
+      equicontinuous :=
+        ((equicontinuousAt_unique (F := fun (_ : Unit) x ↦ φ x)).mpr
+          φ.continuous.continuousAt).comp (fun _ ↦ ())
+      hasSum := by
+        intro x
+        rw [ContinuousLinearMap.smulRight_apply]
+        refine (hasSum_ite_eq (0 : ℕ) (φ x • y)).congr_fun ?_
+        intro n
+        by_cases hn : n = 0
+        · simp only [hn, ite_true, z, mul_comm c, mul_smul, smul_inv_smul₀ hc]
+        · simp [hn] }
+  exact ⟨r, by simp [r], rfl, rfl, fun n ↦ by simp [r]⟩
 
 /-- Paper: Lemma C.3.1.2, p. 694. A continuous linear operator is nuclear exactly
 when it has a nuclear presentation. -/
