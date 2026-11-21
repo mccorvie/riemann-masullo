@@ -68,7 +68,9 @@ def ideleClassNormTwist (χ : U[F]) (s : ℂ) : 𝒳[F] :=
 /-- Paper: §3.2.1, p. 122. At exponent one the twist of the trivial character
 takes the value of the idele class norm. -/
 theorem ideleClassNormTwist_one_one (g : C[F]) :
-    ideleClassNormTwist (1 : U[F]) 1 g = (classNormℝ g : ℂ) := by sorry
+    ideleClassNormTwist (1 : U[F]) 1 g = (classNormℝ g : ℂ) := by
+  change (1 : ℂ) * (classNormℝ g : ℂ) ^ (1 : ℂ) = _
+  rw [one_mul, Complex.cpow_one]
 
 local notation "χ₀(" χ ")" => ideleClassNormTwist χ 0
 
