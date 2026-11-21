@@ -7,6 +7,7 @@ import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.Instances.Discrete
+import Mathlib.Topology.Instances.Matrix
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -1170,9 +1171,52 @@ theorem rationalAdeleEmbedding_hasBasis :
 
 end AdeleBasis
 
+open scoped RestrictedProduct in
 /-- Paper: Lemma A.2.2.2, p. 546. The relative norm to the rational ideles is continuous. -/
 theorem relativeIdeleNormRat_continuous : Continuous (relativeIdeleNormRat F) := by
-  sorry
+  let := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  have : SigmaCompactSpace 𝔸[ℚ] := by
+    let K (q : ℚ) := closure (algebraMap ℚ 𝔸[ℚ] q +ᵥ ratAdeleFundamentalDomain)
+    have hcover : ⋃ q, K q = Set.univ := by
+      apply Set.eq_univ_of_forall
+      intro a
+      obtain ⟨q, hq, _⟩ := ratAdeleFundamentalDomain_unique_translate a
+      exact Set.mem_iUnion.mpr ⟨q, subset_closure hq⟩
+    exact ⟨hcover ▸ isSigmaCompact_iUnion_of_isCompact K
+      ratAdeleFundamentalDomain_precompact_translate⟩
+  have (v : HeightOneSpectrum (𝓞 F)) : LocallyCompactSpace (v.adicCompletion F) :=
+    locallyCompactSpace_adicCompletion v
+  have (v : HeightOneSpectrum (𝓞 F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  have : Fact (∀ v : HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring (v.adicCompletion F)⟩
+  have : LocallyCompactSpace 𝔸[F] := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : HeightOneSpectrum (𝓞 F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  have : T2Space 𝔸[F] := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : HeightOneSpectrum (𝓞 F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  -- The finite sum map is continuous and open, so its inverse gives continuous coordinates.
+  have hsum : Continuous (fun c ↦ b.equivFun.symm c) := by
+    simp only [Module.Basis.equivFun_symm_apply, Algebra.smul_def]
+    exact continuous_finsetSum _ fun i _ ↦
+      ((rationalAdeleEmbedding_spec F).1.comp (continuous_apply i)).mul continuous_const
+  have hcoords : Continuous b.equivFun :=
+    b.equivFun.symm.toEquiv.continuous_symm_iff.mpr
+      (b.equivFun.symm.toLinearMap.toAddMonoidHom.isOpenMap_of_sigmaCompact
+        b.equivFun.symm.surjective hsum)
+  unfold relativeIdeleNormRat
+  apply Continuous.units_map
+  change Continuous (fun x : 𝔸[F] ↦ Algebra.norm 𝔸[ℚ] x)
+  simp_rw [Algebra.norm_eq_matrix_det b]
+  apply Continuous.matrix_det
+  refine continuous_matrix fun i j ↦ ?_
+  simp_rw [Algebra.leftMulMatrix_eq_repr_mul, ← Module.Basis.equivFun_apply]
+  exact (continuous_apply i).comp (hcoords.comp (continuous_id.mul continuous_const))
 
 /-- Paper: Lemma A.2.2.2, p. 546. Taking the rational idelic norm after the relative
 norm gives the idelic norm of the original idele. -/
