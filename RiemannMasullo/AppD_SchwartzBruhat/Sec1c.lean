@@ -1574,8 +1574,11 @@ theorem bruhatDiffDegreeOne_frequency :
 frequency multiplied by 2πi. The frequency is identified by the character pairing. -/
 theorem bruhatDiffSymbol_generator (a : LCATopologicalLie G) (χ : PontryaginDual G)
     (r : ℝ) (hr : ∀ t : ℝ, Real.fourierChar (r * t) = χ (a (Multiplicative.ofAdd t))) :
-    bruhatDiffSymbol (bruhatDiffGenerator a) χ = 2 * ↑Real.pi * Complex.I * (r : ℂ) :=
-  by sorry
+    bruhatDiffSymbol (bruhatDiffGenerator a) χ = 2 * ↑Real.pi * Complex.I * (r : ℂ) := by
+  have h := bruhatDiffSymbol_real r (PontryaginDual.map a χ) (fun t ↦ (hr t).symm)
+  change deriv (fun t : ℝ ↦ (PontryaginDual.map a χ (1 * Multiplicative.ofAdd t) : ℂ)) 0 = _ at h
+  change deriv (fun t : ℝ ↦ (χ (1 * a (Multiplicative.ofAdd t)) : ℂ)) 0 = _
+  simpa only [one_mul, PontryaginDual.map_apply] using h
 
 /-- Paper: Lemma D.1.6.16, p. 770. On an elementary group a smooth function
 is Schwartz exactly when each symbol times each differentiated function is
