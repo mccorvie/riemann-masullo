@@ -945,6 +945,74 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
 local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
   StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
 
+omit [T2Space E] in
+/-- The trace series of a nuclear presentation defines a continuous linear functional
+of the operator applied to its vectors, for uniform convergence on bounded sets.
+On rank-one operators this functional depends only on the presented endomorphism. -/
+private theorem NuclearPresentation.exists_traceFunctional {A : E →L[ℂ] E}
+    (r : NuclearPresentation A) :
+    ∃ tr : (E →L[ℂ] E) →L[ℂ] ℂ,
+      (∀ T, Summable (fun n ↦ ‖r.coeff n * r.functional n (T (r.vector n))‖) ∧
+        HasSum (fun n ↦ r.coeff n * r.functional n (T (r.vector n))) (tr T)) ∧
+      ∀ (φ : E →L[ℂ] ℂ) (y : E), tr (φ.smulRight y) = φ (A y) := by
+  have hseminorm := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae
+    (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨p, hp, hφ⟩ := (hseminorm.mp r.equicontinuous) ()
+  let term (T : E →L[ℂ] E) (n : ℕ) := r.coeff n * r.functional n (T (r.vector n))
+  have hterm (T : E →L[ℂ] E) (n : ℕ) : ‖term T n‖ ≤ ‖r.coeff n‖ * p (T (r.vector n)) := by
+    change ‖r.coeff n * r.functional n (T (r.vector n))‖ ≤ _
+    rw [norm_mul]
+    exact mul_le_mul_of_nonneg_left (hφ n (T (r.vector n))) (norm_nonneg _)
+  have hs (T : E →L[ℂ] E) : Summable (fun n ↦ ‖term T n‖) := by
+    obtain ⟨M, _, hM⟩ := (PolynormableSpace.withSeminorms ℂ E)
+      |>.isVonNBounded_iff_seminorm_bounded.mp (r.isBanachDisc.bounded.image T) ⟨p, hp⟩
+    exact (r.summable_coeff.mul_right M).of_nonneg_of_le (fun n ↦ norm_nonneg _) fun n ↦
+      (hterm T n).trans (mul_le_mul_of_nonneg_left
+        (hM _ (mem_image_of_mem T (r.vector_mem n))).le (norm_nonneg _))
+  let L : (E →L[ℂ] E) →ₗ[ℂ] ℂ :=
+    { toFun := fun T ↦ ∑' n, term T n
+      map_add' := fun T S ↦ by
+        have h (n : ℕ) : term (T + S) n = term T n + term S n := by
+          simp only [term, add_apply, map_add, mul_add]
+        change (∑' n, term (T + S) n) = (∑' n, term T n) + (∑' n, term S n)
+        simp_rw [h]
+        exact (hs T).of_norm.tsum_add (hs S).of_norm
+      map_smul' := fun c T ↦ by
+        have h (n : ℕ) : term (c • T) n = c * term T n := by
+          simp only [term, smul_apply, map_smul, smul_eq_mul, mul_left_comm (r.coeff n) c]
+        change (∑' n, term (c • T) n) = c * (∑' n, term T n)
+        simp_rw [h]
+        exact tsum_mul_left }
+  -- Uniform convergence on the presentation’s disc controls the entire series.
+  have hL : Continuous L := by
+    apply continuous_of_continuousAt_zero L
+    rw [ContinuousAt, map_zero, Metric.tendsto_nhds]
+    intro ε hε
+    let C := (∑' n, ‖r.coeff n‖) + 1
+    have hC : 0 < C := by dsimp [C]; positivity
+    let U := p.ball 0 (ε / C)
+    have hU : U ∈ 𝓝 0 := (Seminorm.continuous_iff (div_pos hε hC)).mp hp
+    filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ)
+      r.isBanachDisc.bounded hU] with T hT
+    rw [dist_zero_right]
+    change ‖∑' n, term T n‖ < ε
+    calc
+      _ ≤ ∑' n, ‖term T n‖ := norm_tsum_le_tsum_norm (hs T)
+      _ ≤ ∑' n, ‖r.coeff n‖ * (ε / C) :=
+        (hs T).tsum_le_tsum (fun n ↦ (hterm T n).trans (mul_le_mul_of_nonneg_left
+          (p.mem_ball_zero.mp (hT (r.vector_mem n))).le (norm_nonneg _)))
+          (r.summable_coeff.mul_right _)
+      _ < ε := by
+        rw [r.summable_coeff.tsum_mul_right, mul_comm, div_mul_eq_mul_div, div_lt_iff₀ hC]
+        exact mul_lt_mul_of_pos_left (lt_add_one _) hε
+  refine ⟨⟨L, hL⟩, fun T ↦ ⟨hs T, (hs T).of_norm.hasSum⟩, ?_⟩
+  intro φ y
+  change (∑' n, term (φ.smulRight y) n) = φ (A y)
+  refine ((hs (φ.smulRight y)).of_norm.hasSum).unique ((φ.hasSum (r.hasSum y)).congr_fun ?_)
+  intro n
+  simp only [term, ContinuousLinearMap.smulRight_apply, map_smul, smul_eq_mul]
+  ring
+
 /-- Paper: Proposition C.3.2.1, p. 694. On a space with the approximation property,
 every presentation of the same nuclear endomorphism gives an absolutely convergent
 scalar series with the same sum. -/
@@ -952,7 +1020,22 @@ theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
     (hA : IsNuclearOperator A) :
     ∃! z : ℂ, ∀ r : NuclearPresentation A,
       Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
-      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by sorry
+      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by
+  obtain ⟨r₀⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  obtain ⟨tr₀, htr₀, hRank₀⟩ := r₀.exists_traceFunctional
+  let I : E →L[ℂ] E := ContinuousLinearMap.id ℂ E
+  refine ⟨tr₀ I, ?_, fun z hz ↦ (hz r₀).2.unique (htr₀ I).2⟩
+  intro r
+  obtain ⟨tr, htr, hRank⟩ := r.exists_traceFunctional
+  -- The rank-one formula gives equality on the dense range of finite-rank maps.
+  let f : StrongDual ℂ E ⊗[ℂ] E →ₗ[ℂ] (E →L[ℂ] E) := tensorToFiniteRank
+  have hEq : (tr : (E →L[ℂ] E) → ℂ) = tr₀ :=
+    hE.equalizer (f := f) tr.continuous tr₀.continuous (funext fun z ↦ by
+      change tr (f z) = tr₀ (f z)
+      induction z using TensorProduct.inductionOn with
+      | tmul φ y => exact (hRank φ y).trans (hRank₀ φ y).symm
+      | add z w hz hw => simp only [map_add, hz, hw])
+  simpa only [hEq, I, ContinuousLinearMap.id_apply] using htr I
 
 /-- Paper: (C.3.2.2), p. 694. The nuclear trace is the sum of the scalar series
 from any nuclear presentation on a space with the approximation property. -/
@@ -963,7 +1046,15 @@ def nuclearTrace (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator
 of its functional at its spanning vector.
 Deviation: This is a check of the trace formula on one term. -/
 theorem nuclearTrace_smulRight (hE : ApproxProp E) (φ : E →L[ℂ] ℂ) (y : E) :
-    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by sorry
+    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by
+  obtain ⟨r, hc, hφ, hy, htail⟩ := nuclearPresentation_smulRight φ y 1 one_ne_zero
+  have htrace := ((exists_nuclearTrace_hasSum hE (φ.smulRight y)
+    (isNuclearOperator_smulRight φ y)).exists.choose_spec r).2
+  refine htrace.unique ((hasSum_ite_eq (0 : ℕ) (φ y)).congr_fun ?_)
+  intro n
+  cases n with
+  | zero => simp [hc, hφ, hy]
+  | succ n => simp [htail]
 
 /-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
 conjugation by a continuous linear automorphism. -/
