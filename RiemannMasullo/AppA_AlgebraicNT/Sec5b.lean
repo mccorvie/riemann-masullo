@@ -143,10 +143,16 @@ translates under `ν`, normalized by the Haar masses of the sequence members. -/
 def dSequenceMeasureMaximal (μ ν : Measure G) (U : ℕ → Set G) (x : G) : ℝ≥0∞ :=
   limsup (fun k ↦ ν (x • U k) / μ (U k)) atTop
 
+-- Preserve the existing section hypotheses.
+set_option linter.unusedSectionVars false in
 /-- Paper: (A.5.3.2), p. 579. Taking the same Haar measure in both positions
 gives the constant maximal function one. -/
 theorem dSequenceMeasureMaximal_haar [μ.IsHaarMeasure] (hU : IsDSequence μ U) (x : G) :
-    dSequenceMeasureMaximal μ μ U x = 1 := by sorry
+    dSequenceMeasureMaximal μ μ U x = 1 := by
+  have hratio (k : ℕ) : μ (x • U k) / μ (U k) = 1 := by
+    obtain ⟨_, _, hpos, hfin⟩ := hU.1 k
+    rw [measure_smul, ENNReal.div_self hpos.ne' hfin.ne]
+  simp only [dSequenceMeasureMaximal, hratio, limsup_const]
 
 /-- Paper: Theorem A.5.3.4(1), p. 579. On `B` the measure maximal function satisfies
 the localized weak bound, with the mass on the right measured by `ν`.
