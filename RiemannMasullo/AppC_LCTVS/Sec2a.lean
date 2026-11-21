@@ -298,7 +298,13 @@ single-point evaluation generates the pointwise topology on continuous linear ma
 theorem pointwiseConvergenceCLM_withSeminorms {ι : Type*} (p : SeminormFamily ℂ F ι)
     (hp : WithSeminorms p) :
     WithSeminorms (fun a : E × ι ↦ (p a.2).comp
-      (PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) F a.1).toLinearMap) := by sorry
+      (PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) F a.1).toLinearMap) := by
+  let coeToPi := LinearMap.pi fun x : E ↦
+    (PointwiseConvergenceCLM.evalCLM (RingHom.id ℂ) F x).toLinearMap
+  have hcoe : IsInducing coeToPi :=
+    (PointwiseConvergenceCLM.isEmbedding_coeFn (RingHom.id ℂ) E F).isInducing
+  have hpi := withSeminorms_pi fun _ : E ↦ hp
+  exact (hcoe.withSeminorms hpi).congr_equiv (Equiv.sigmaEquivProd E ι).symm
 
 /-- Paper: §C.2.1, p. 672. For a quasi-complete source, a pointwise bounded family of
 operators is bounded for uniform convergence on each member of a directed bounded cover. -/
