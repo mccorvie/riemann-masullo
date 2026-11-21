@@ -68,7 +68,8 @@ mkdir -p ../riemann-masullo-wt/merger/.lake
 ln -s "$main/.lake/packages" ../riemann-masullo-wt/merger/.lake/packages    # the built Mathlib
 ```
 
-For each sync, run the following from the merger worktree.
+`scripts/sync_issues.sh` does all of this in a worktree of its own (`sync`), which nothing else
+uses, and can be run from anywhere; prefer it. By hand, run the following from the merger worktree.
 
 ```sh
 git fetch -q origin && git checkout -q --detach origin/main &&

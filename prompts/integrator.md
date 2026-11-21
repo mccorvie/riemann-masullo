@@ -44,7 +44,7 @@ means what the paper means. Spend your attention accordingly.
   reviews have found a wrong sign that made two main theorems false, a definition only zero
   satisfied, and a topology picked by the wrong instance.
 - Before you log a paper error that rests on a missing bar, prime or absolute value, look at the
-  page image: the text extraction drops them.
+  page image: the transcription is not exact, and the raw text extraction drops them.
 - Look for the failure modes listed in `prompts/digester.md`: changed hypotheses, quantifier
   order, junk values, vacuous statements, wrong coercions.
 - Check that each new definition has a sanity lemma and that no definition contains `sorry`.

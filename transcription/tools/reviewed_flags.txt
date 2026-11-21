@@ -1,0 +1,111 @@
+# Flags raised by check.py that were each compared with the page image and found to be
+# false positives (reading order of limits/fractions, labels on arrows, text inside \text{}).
+p25 script: v_× in PDF, md has sup | cal O_{F_v}^\times\subset F_v^\times$ is
+p25 script: χ^v in PDF, md has sub | Z_v(1_{\mathcal O_{F_v}},\chi_v|\cdot|_v
+p29 substitution: PDF r vs md d | rior of $K$:  $$ \textcolor{red}{\text{h
+p49 script: v_× in PDF, md has sup | al{O}_{F_v}^\times\subset F_v^\times$ is
+p49 script: χ^v in PDF, md has sub | _v(1_{\mathcal{O}_{F_v}},\chi_v\lvert\cd
+p127 script: f^∞ in PDF, md has sub | =\int_{\mathbf{R}^{\times}}f_{\infty}(x)
+p132 script: ρ^S in PDF, md has sub | \partial^k}{\partial s^k}\rho_S(\chi\lve
+p132 script: ρ^S in PDF, md has sub | \partial^k}{\partial s^k}\rho_S(\chi\lve
+p133 script: ρ^S in PDF, md has sub | \partial^k}{\partial s^k}\rho_S(\chi\lve
+p133 script: ρ^v in PDF, md has sub | {i_j}}{\partial s^{i_j}}\rho_{v_j}(\chi_
+p133 script: ρ^v in PDF, md has sub | \partial^k}{\partial s^k}\rho_v(\chi_v\l
+p145 script: 1^F in PDF, md has sub | parameter space $\widehat{C^1_F}$.  Prop
+p212 substitution: PDF k vs md χ | N}1_{(\gamma_k^{\mathbf{Z}})_{\chi}^{\pe
+p213 script: L^G in PDF, md has sub | }(s) := \frac{1}{(s-z_m)^j}L_{G,S,\phi}(
+p213 script: L^S in PDF, md has sub | s) := \frac{1}{(s-z_m)^j}L_{G,S,\phi}(s)
+p213 script: L^ϕ in PDF, md has sub |  := \frac{1}{(s-z_m)^j}L_{G,S,\phi}(s) \
+p215 script: 1_1 in PDF, md has sup | amma_1})'$ of $P_{\gamma_1}^{-1}\circ\Ph
+p228 script: f^m in PDF, md has sub | rm{GL}_1(\mathbf{A}_F)^{>1}}f_m(g)\chi(g
+p299 script: Ψ_∞ in PDF, md has sup | hbf A_{F,S_\infty})/\ker(\Psi^\infty_{F,
+p299 script: Ψ_∞ in PDF, md has sup | athbf A_{F,S_\infty})$, $\Psi^\infty_{F,
+p300 script: χ^S in PDF, md has sub | mathbf A_{F,S_\infty})^1}\chi_S(g)f(g_f^
+p300 script: χ^S in PDF, md has sub | athbf A_{F,S_\infty})^1}\chi_{S,\infty}(
+p300 script: χ^∞ in PDF, md has sub | hbf A_{F,S_\infty})^1}\chi_{S,\infty}(g_
+p302 script: Ψ_∞ in PDF, md has sup | }\to 0^+$, we have:  $$ |\Psi^\infty_{F,
+p302 script: Ψ_∞ in PDF, md has sup | F,S_\infty}$ imply that $\Psi^\infty_{F,
+p329 script: t^s in PDF, md has sub | frac{\mathrm{d}t}{t}\right)|_{s=\rho} = 
+p329 script: t^= in PDF, md has sub | rac{\mathrm{d}t}{t}\right)|_{s=\rho} = \
+p329 script: t^ρ in PDF, md has sub | ac{\mathrm{d}t}{t}\right)|_{s=\rho} = \l
+p329 script: t^s in PDF, md has sub | frac{\mathrm{d}t}{t}\right)|_{s=\rho} = 
+p329 script: t^= in PDF, md has sub | rac{\mathrm{d}t}{t}\right)|_{s=\rho} = \
+p329 script: t^ρ in PDF, md has sub | ac{\mathrm{d}t}{t}\right)|_{s=\rho} = \f
+p358 script: V_A in PDF, md has sup | rators* $\mathrm{PV}^{\mathrm{ABS}}_{S',
+p358 script: V_B in PDF, md has sup | ators* $\mathrm{PV}^{\mathrm{ABS}}_{S',S
+p358 script: V_S in PDF, md has sup | tors* $\mathrm{PV}^{\mathrm{ABS}}_{S',S_
+p358 script: V^v in PDF, md has sub | '}|_{J^1_{F,S'}}}(\mathrm{PV}_v(f_0\otim
+p358 alphabet: S: PDF it, md rm | tors* $\mathrm{PV}^{\mathrm{ABS}}_{S',S_
+p363 script: χ^S in PDF, md has sub | cal O_{F_v}},\overline{\chi}_{S'}|\cdot|
+p367 script: χ_s in PDF, md has sup | d_{v \in S_p} L_v(\chi|\cdot|^s_F)^{-1}$
+p401 script: R_2 in PDF, md has sup | idean space $\mathbf{R}^{1+(s/2)}$, the 
+p431 script: K^φ in PDF, md has sub | athbf{R}_{>0}} \int_{G^1} K'_{\varphi,\r
+p431 script: K^ρ in PDF, md has sub | _{>0}} \int_{G^1} K'_{\varphi,\rho}(\tau
+p431 script: K^φ in PDF, md has sub | a+\varepsilon} \int_{G^1} K'_{\varphi,\r
+p431 script: K^ρ in PDF, md has sub | silon} \int_{G^1} K'_{\varphi,\rho}(\tau
+p431 script: K^φ in PDF, md has sub | lon}^{\Lambda} \int_{G^1} K'_{\varphi,\r
+p431 script: K^ρ in PDF, md has sub | ambda} \int_{G^1} K'_{\varphi,\rho}(\tau
+p431 script: K^φ in PDF, md has sub | a-\varepsilon} \int_{G^1} K'_{\varphi,\r
+p431 script: K^ρ in PDF, md has sub | silon} \int_{G^1} K'_{\varphi,\rho}(\tau
+p455 script: t_R in PDF, md has sup | )!}(\log(t))^{i-n} t^{\mathrm{Re}(z)}| \
+p455 script: t_e in PDF, md has sup | !}(\log(t))^{i-n} t^{\mathrm{Re}(z)}| \,
+p455 script: t_z in PDF, md has sup | \log(t))^{i-n} t^{\mathrm{Re}(z)}| \,\ma
+p492 script: v_× in PDF, md has sup | cal O_{F_v}^\times\subset F_v^\times$ is
+p492 script: χ^v in PDF, md has sub | Z_v(1_{\mathcal O_{F_v}},\chi_v\lvert\cd
+p525 script: d^W in PDF, md has sub | representation $\mathrm{Ind}_{W_E}^{W_F}
+p525 script: d^W in PDF, md has sub | ntation $\rho':=\mathrm{Ind}_{W_E}^{W_F}
+p526 script: d^W in PDF, md has sub |  finite index. $\mathrm{Ind}_{W_E}^{W_F}
+p526 script: d^W in PDF, md has sub | mal, and hence $\mathrm{Ind}_{W_E}^{W_F}
+p532 script: d^W in PDF, md has sub | uch that $\rho:=\mathrm{Ind}_{W_F}^{W_{\
+p532 script: d^W in PDF, md has sub | 1$.  Since $\dim\mathrm{Ind}_{W_F}^{W_{\
+p532 script: d^W in PDF, md has sub | f Q}}(\chi)=\dim\mathrm{Ind}_{W_F}^{W_{\
+p532 script: d^W in PDF, md has sub |  We call $\rho:=\mathrm{Ind}_{W_F}^{W_{\
+p559 script: 0^F in PDF, md has sub | athbf{R}_{>0}\overset{|\cdot|_F}{\simeq}
+p562 script: 1^O in PDF, md has sub | hcal{O}_{F_v}}) = 1_{\mathcal{O}_{F_v}} 
+p590 script: k^ε in PDF, md has sub | le\lim_{\varepsilon\to 0^+}k_{\varepsilo
+p599 script: e_x in PDF, md has sup | i(e^x)e^{\max\{|a|,|b|\}\cdot|x|}\|_{L^1
+p599 script: e_x in PDF, md has sup | i(e^x)e^{\max\{|a|,|b|\}\cdot|x|}\|_{L^1
+p605 substitution: PDF b vs md a |  $$ \lim_{|k|\to+\infty}\int_{a\pm iT_k}
+p605 substitution: PDF a vs md b | |\to+\infty}\int_{a\pm iT_k}^{b\pm iT_k}
+p605 substitution: PDF b vs md a | . 605. Labels in the figure: $a+\varepsi
+p605 substitution: PDF − vs md + |  605. Labels in the figure: $a+\varepsil
+p605 substitution: PDF a vs md b | on_2$, $a+\varepsilon_1-iT$, $b-\varepsi
+p605 substitution: PDF + vs md − | n_2$, $a+\varepsilon_1-iT$, $b-\varepsil
+p605 substitution: PDF 1 vs md 2 | epsilon_1-iT$, $b-\varepsilon_2-iT$.]*  
+p613 substitution: PDF N vs md χ | hfrak p)-\frac{1}{s-\frac{\log\chi(\math
+p613 substitution: PDF χ vs md N | c{\log\chi(\mathfrak p)}{\log N(\mathfra
+p613 substitution: PDF N vs md χ | {1}{\left|\sigma+it-\frac{\log\chi(\math
+p613 substitution: PDF χ vs md N | c{\log\chi(\mathfrak p)}{\log N(\mathfra
+p613 substitution: PDF N vs md χ | ty}\frac{\Phi(s)}{s-\frac{\log\chi(\math
+p613 substitution: PDF χ vs md N | c{\log\chi(\mathfrak p)}{\log N(\mathfra
+p624 script: G^G in PDF, md has sub | ^1 \to G \xrightarrow{|\cdot|_G} \mathbf
+p646 script: O^F in PDF, md has sub | }{T}\right) + \begin{cases} O_F\left(\fr
+p658 script: U^i in PDF, md has sub |  all finite intersections $U_{i_1} \cap 
+p658 script: U^i in PDF, md has sub |  $U_{i_1} \cap \cdots \cap U_{i_m}$ is a
+p701 script: x^F in PDF, md has sub | ATORS** · **701**  But $\max_{F\in H_m}\
+p701 script: x^∈ in PDF, md has sub | TORS** · **701**  But $\max_{F\in H_m}\m
+p701 script: x^H in PDF, md has sub | ** · **701**  But $\max_{F\in H_m}\min_{
+p701 script: ϕ^H in PDF, md has sub | \rVert_H=1}\lVert A\phi\rVert_H)^2$, as 
+p704 script: T_p in PDF, md has sup | hat $\sum_{k\ge 1}\sigma_k(T)^p$ is conv
+p733 substitution: PDF ß vs md β | ny $(\xi_1, \xi_2) \in B - \{x\beta_0\}$
+p735 script: q^i in PDF, md has sub | $ \sup_{x \in \mathbf{T}^d} q_i(\mathrm{
+p735 script: q^i in PDF, md has sub | $ \sup_{x \in \mathbf{R}^d} q_i(p \cdot 
+p745 substitution: PDF v vs md 0 | th compact support away from $0$; it inc
+p789 substitution: PDF γ vs md α | artial_{\gamma_{r_1+2r_2-1}}^{\alpha_{r_
+p790 substitution: PDF γ vs md α | artial_{\gamma_{r_1+2r_2-1}}^{\alpha_{r_
+p791 substitution: PDF γ vs md α | artial_{\gamma_{r_1+2r_2-1}}^{\alpha_{r_
+p791 substitution: PDF γ vs md α | artial_{\gamma_{r_1+2r_2-1}}^{\alpha_{r_
+p794 script: μ^S in PDF, md has sub | ,1}(J^1_{F,S})}\overline{\mu}_S. \tag{D.
+p798 substitution: PDF − vs md + | els in the figure: $c+iT$, $c'+iT$, $0$,
+p799 substitution: PDF − vs md + | int_{a_{m_1}-i\infty}^{a_{m_1}+i\infty}\
+p799 substitution: PDF − vs md + | int_{a_{m_2}-i\infty}^{a_{m_2}+i\infty}\
+p800 substitution: PDF − vs md + | int_{a_{m_j}-i\infty}^{a_{m_j}+i\infty}\
+p838 substitution: PDF − vs md i | mes_0 Y) \xrightarrow{\mathrm{id}} \math
+p838 substitution: PDF → vs md d | es_0 Y) \xrightarrow{\mathrm{id}} \mathr
+p838 substitution: PDF − vs md i | mes_0 Y) \xrightarrow{\mathrm{id}} \math
+p838 substitution: PDF → vs md d | es_0 Y) \xrightarrow{\mathrm{id}} \mathr
+p911 substitution: PDF 2 vs md ⊙ | e 2-morphisms $\gamma$ using $\odot$ wit
+p912 substitution: PDF 2 vs md ⊙ | ACKS**  PROOF. Indeed, since $\odot$ is 
+p913 substitution: PDF 2 vs md G | nterested reader to [$\mathbf{GR}$, Ch. 
+p913 substitution: PDF 1 vs md R | terested reader to [$\mathbf{GR}$, Ch. 2
+p930 alphabet: X: PDF cal, md it | d epimorphism:  $$ \underline{X} \times_

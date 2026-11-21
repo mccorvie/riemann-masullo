@@ -34,13 +34,21 @@ An attempt to autoformalize, in Lean 4 + Mathlib, the manuscript
 
 > Alessandro Maria Masullo, *The Music of the Primes* (940 pp.)
 
-The paper is in [`paper/`](paper/) (PDF plus a `pdftotext -layout` extraction for search/grep).
+The paper is in [`paper/`](paper/) (PDF plus a `pdftotext -layout` extraction for search/grep), and
+[`transcription/`](transcription/README.md) has a Markdown transcription with the formulas in
+LaTeX, contributed by [@aadrianvv](https://github.com/aadrianvv): a reading aid, checked against
+the PDF but not an exact copy.
 
 ## Status
 
-**Active: formalizing the prerequisites.** The appendices and first chapters are being stated in
-Lean section by section, and each statement's proof is an open issue that anyone can take. See
-the roadmap below.
+**Active: proving wave 1, stating wave 2.** Wave 1 is fully stated in Lean: Appendices A, C and D
+and Chapters 2–4 and 9, with the first sections of wave 2 (Appendix B.1–B.4.1 and §5.1), 52 files
+in all. Its proofs are well under way: as of 21 November 2026 about two thirds of the proof
+issues are closed, 18 of the 52 files are complete, and about 690 `sorry`s remain. Wave 2
+(Chapters 5–7 and the rest of Appendix B) is being stated now, section by section, each
+statement reviewed against the paper before it is merged. Every open `sorry` is an issue that
+anyone can take. The [progress map](https://claude.ai/artifact/CtQyX8qfYAF822bgHJHHE3) has the
+current numbers, and the roadmap below the order of work.
 
 **Concerns about the main theorem.** Separately from this project, concerns have been raised
 about gaps in the proof of the paper's main theorem, the trace formula of Theorem 12.5.1.1. They
@@ -97,8 +105,8 @@ trace formula:
 
 | Wave | Paper | Status |
 |---|---|---|
-| 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | in progress: [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+label%3Asection), [proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
-| 2 | Chapters 5–7, with Appendix B.1–B.6 | in progress: Appendix B.1–B.3 stated; the rest seeded as section issues |
+| 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | all stated; proofs about two thirds done: [open proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
+| 2 | Chapters 5–7, with Appendix B.1–B.6 | being stated: Appendix B.1–B.4.1 and §5.1 are on `main`, with their proofs open; the remaining [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection) follow in dependency order |
 | 3 | Chapters 10–12: the trace formula | not yet seeded |
 | later | Chapters 8 and 14, Appendix E, A.4, B.7 | only when something needs them |
 

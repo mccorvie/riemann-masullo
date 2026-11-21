@@ -5,7 +5,9 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Units
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.MeasureTheory.Constructions.HaarToSphere
@@ -979,11 +981,186 @@ theorem sLocalIdelicZFunction_poles (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) (
     min 0 (meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chartₛ(χ) z)) s) ≤
       meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (chartₛ(χ) z)) s := by sorry
 
+local notation "diagₛ" =>
+  Subgroup.map (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
+    (Subring.subtype (integralAdelesOutside F S)))))
+    (MonoidHom.range (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S))))
+
+/-- The product σ-algebra on the S-adeles is the Borel σ-algebra. -/
+theorem sAdeleRing_borelSpace : BorelSpace Aₛ := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+  exact inferInstanceAs (BorelSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+
+/-- The σ-algebra on the S-ideles pulled back from the S-adeles is their Borel σ-algebra,
+because the S-ideles carry the subspace topology. -/
+theorem sIdeleGroup_borelSpace : BorelSpace Iₛ := by
+  have := sAdeleRing_borelSpace (F := F) (S := S)
+  refine ⟨?_⟩
+  rw [(sIdeleGroup_description F S).1.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+  rfl
+
+/-- Paper: Equation (3.1.2.1), p. 120. The projected diagonal S-units are closed in the
+S-ideles. -/
+theorem isClosed_sProjectedDiagonal : IsClosed (diagₛ : Set Iₛ) := by
+  let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
+  let d := p.comp (integralAdeleDiagonal F S)
+  obtain ⟨hd, hc, _⟩ := sAdele_additive_quotient F S
+  rw [MonoidHom.map_range]
+  exact isClosed_range_unitsMap d.toMonoidHom hd hc
+
+/-- Paper: Equation (3.1.2.1), p. 120. The projected diagonal S-units are discrete, since
+they lie in the discrete diagonal S-integers. -/
+theorem discreteTopology_sProjectedDiagonal : DiscreteTopology (diagₛ : Subgroup Iₛ) := by
+  let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
+  let d := p.comp (integralAdeleDiagonal F S)
+  obtain ⟨hd, -, hdisc, _⟩ := sAdele_additive_quotient F S
+  let : DiscreteTopology (Set.range d) := isDiscrete_iff_discreteTopology.mp hdisc
+  let f : (diagₛ : Subgroup Iₛ) → Set.range d := fun x ↦ ⟨x.val.val, by
+    obtain ⟨_, ⟨u, rfl⟩, hx⟩ := x.prop
+    exact ⟨u.val, by rw [← hx]; rfl⟩⟩
+  exact .of_continuous_injective (f := f)
+    (continuous_induced_rng.2 (Units.continuous_val.comp continuous_subtype_val))
+    (fun x y h ↦ Subtype.ext (Units.ext (congrArg Subtype.val h)))
+
+/-- Paper: Definition A.3.2.2(2), p. 560. The finite local multiplicative Tamagawa
+measure is a Haar measure on the local unit group. -/
+theorem finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (v : Primes) :
+    (finiteLocalMultiplicativeTamagawaMeasure F v).IsHaarMeasure := by
+  let : LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+  let : LocallyCompactSpace (v.adicCompletion F)ˣ :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.adicCompletion F)).locallyCompactSpace
+  let : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let μ := Measure.haar (G := (v.adicCompletion F)ˣ)
+  let U : Set (v.adicCompletion F)ˣ := (v.adicCompletionIntegers F).units
+  have hO : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hK : IsCompact U := by
+    have : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+    apply Submonoid.units_isCompact
+    change IsCompact (v.adicCompletionIntegers F : Set (v.adicCompletion F))
+    convert isCompact_closedBall (0 : v.adicCompletion F) 1 using 1
+    ext x
+    simp only [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+      Metric.mem_closedBall, dist_zero_right, Valued.toNormedField.norm_le_one_iff]
+  have hmass := hO.measure_pos μ ⟨1, (v.adicCompletionIntegers F).units.one_mem⟩
+  have hnorm : 0 < (v.asIdeal.absNorm : ℝ) :=
+    Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have hsqrt := Real.sqrt_pos_of_pos (pow_pos hnorm
+    (multiplicity (HeightOneSpectrum.asIdeal v) (differentIdeal ℤ (𝓞 F))))
+  unfold finiteLocalMultiplicativeTamagawaMeasure
+  exact Measure.IsHaarMeasure.smul μ
+    (ENNReal.div_ne_zero.mpr ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top,
+      hK.measure_ne_top (μ := μ)⟩)
+    (ENNReal.div_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr hsqrt).ne') hmass.ne')
+
+omit [NumberField F] in
+/-- Paper: Definition A.3.2.2(1), p. 560. The archimedean local multiplicative Tamagawa
+measure `dx / |x|ᵥ` is a Haar measure on the local unit group. -/
+theorem infiniteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (w : InfinitePlace F) :
+    (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure := by
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let := infiniteLocalAdditiveTamagawaMeasure_haar F w
+  unfold infiniteLocalMultiplicativeTamagawaMeasure
+  apply isHaarMeasure_comap_units_withDensity
+  intro a ha
+  by_cases h : w.IsReal
+  · rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+    let e := (InfinitePlace.Completion.ringEquivRealOfIsReal h).symm
+    have he : Measurable e := (InfinitePlace.Completion.isometryEquivRealOfIsReal h).symm.continuous.measurable
+    rw [map_mul_left_map_ringEquiv e he volume _ real_map_mul_left_volume a ha, h.mult_eq_one]
+    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
+      ext
+      exact (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal h).norm_map_of_map_zero (map_zero _) a
+    rw [hn]
+  · have h' := InfinitePlace.not_isReal_iff_isComplex.mp h
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
+    let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex h').symm
+    have he : Measurable e := (InfinitePlace.Completion.isometryEquivComplexOfIsComplex h').symm.continuous.measurable
+    have hscale (b : ℂ) (hb : b ≠ 0) : ((2 : ℕ) • (volume : Measure ℂ)).map (b * ·) =
+        (((‖b‖₊ ^ 2 : ℝ≥0) : ENNReal))⁻¹ • ((2 : ℕ) • (volume : Measure ℂ)) := by
+      rw [Measure.map_smul, complex_map_mul_left_volume b hb, ← Nat.cast_smul_eq_nsmul ENNReal,
+        ← Nat.cast_smul_eq_nsmul ENNReal, smul_smul, smul_smul, mul_comm]
+      exact (measurable_const_mul b).aemeasurable
+    rw [map_mul_left_map_ringEquiv e he _ _ hscale a ha, h'.mult_eq_two]
+    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
+      ext
+      exact (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero (map_zero _) a
+    rw [hn]
+
+/-- Paper: Definition A.3.4.1(2), p. 561. The S-local multiplicative Tamagawa measure is a
+Haar measure on the S-ideles. -/
+theorem sMultiplicativeTamagawaMeasure_isHaarMeasure : (μₛ).IsHaarMeasure := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+  let (w : InfinitePlace F) : BorelSpace w.Completionˣ := by
+    refine ⟨?_⟩
+    rw [Units.isEmbedding_val₀.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+    rfl
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completionˣ :=
+    Units.isEmbedding_val₀.secondCountableTopology
+  let (v : S) : SecondCountableTopology (v.val.adicCompletion F)ˣ :=
+    Units.isEmbedding_val₀.secondCountableTopology
+  let (v : S) : BorelSpace (v.val.adicCompletion F)ˣ := ⟨rfl⟩
+  let (w : InfinitePlace F) := infiniteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) w
+  let (v : S) := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v.val
+  have := sIdeleGroup_borelSpace (F := F) (S := S)
+  let e := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((v : S) → v.val.adicCompletion F)
+  let eInf := ContinuousMulEquiv.piUnits (M := fun w : InfinitePlace F ↦ w.Completion)
+  let eS := ContinuousMulEquiv.piUnits (M := fun v : S ↦ v.val.adicCompletion F)
+  let E := (ContinuousMulEquiv.mk' (eInf.symm.toHomeomorph.prodCongr eS.symm.toHomeomorph)
+    (fun x y ↦ Prod.ext (map_mul eInf.symm x.1 y.1) (map_mul eS.symm x.2 y.2))).trans e.symm
+  change (Measure.map E _).IsHaarMeasure
+  have h1 : (Measure.pi (infiniteLocalMultiplicativeTamagawaMeasure F)).IsHaarMeasure :=
+    Measure.pi.isHaarMeasure _
+  have h2 : (Measure.pi (fun v : S ↦ finiteLocalMultiplicativeTamagawaMeasure F v.val)).IsHaarMeasure :=
+    Measure.pi.isHaarMeasure _
+  have h3 : ((Measure.pi (infiniteLocalMultiplicativeTamagawaMeasure F)).prod
+      (Measure.pi (fun v : S ↦ finiteLocalMultiplicativeTamagawaMeasure F v.val))).IsHaarMeasure :=
+    Measure.prod.instIsHaarMeasure _ _
+  exact E.isHaarMeasure_map _
+
+/-- Paper: Definition A.3.4.1(2), p. 561. The S-local multiplicative Tamagawa measure is
+regular. -/
+theorem sMultiplicativeTamagawaMeasure_regular : (μₛ).Regular := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  have hind := (sIdeleGroup_description F S).1
+  have hemb : Topology.IsEmbedding (Units.val : Iₛ → Aₛ) := ⟨hind, Units.val_injective⟩
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : TopologicalSpace.MetrizableSpace Aₛ := inferInstanceAs (TopologicalSpace.MetrizableSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Iₛ := hind.secondCountableTopology
+  let : TopologicalSpace.MetrizableSpace Iₛ := hemb.metrizableSpace
+  let : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  infer_instance
 
 /-- Paper: Theorem 3.3.1.1(2), p. 129. Weil's formula with counting measure
 on the diagonal S-units determines the quotient Tamagawa measure. -/
 theorem sLocalQuotientTamagawaMeasure_existsUnique :
-    ∃! ν : Measure Jₛ, IsWeilQuotientMeasure _ μₛ Measure.count ν := by sorry
+    ∃! ν : Measure Jₛ, IsWeilQuotientMeasure _ μₛ Measure.count ν := by
+  let : T2Space Iₛ := (sIdeleGroup_description F S).2.1
+  let : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  let : BorelSpace Iₛ := sIdeleGroup_borelSpace
+  let := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+  let := sMultiplicativeTamagawaMeasure_regular (F := F) (S := S)
+  let : DiscreteTopology (diagₛ : Subgroup Iₛ) := discreteTopology_sProjectedDiagonal
+  let : (Measure.count : Measure (diagₛ : Subgroup Iₛ)).IsHaarMeasure :=
+    count_isHaarMeasure_of_discreteTopology
+  let : (Measure.count : Measure (diagₛ : Subgroup Iₛ)).Regular :=
+    count_regular_of_discreteTopology
+  exact weilQuotientMeasure_existsUnique _ isClosed_sProjectedDiagonal μₛ Measure.count
 
 /-- Paper: Equation (3.3.1.4), p. 129. The measure on the S-idele quotient
 is Weil's quotient measure for the product measure and counting measure.

@@ -2750,13 +2750,176 @@ theorem sRegulatorParallelotope_sum_zero (y : InfinitePlace F ⊕ S → ℝ)
   rw [Finset.sum_comm]
   exact Finset.sum_eq_zero fun i _ ↦ by rw [← Finset.mul_sum, hu, mul_zero]
 
+/-- The logarithm on diagonal S-units, viewed as a homomorphism to an additive space. -/
+private theorem sUnitLogHom_exists :
+    ∃ L : Oₛ(F, S)ˣ →* Multiplicative (InfinitePlace F ⊕ S → ℝ),
+      ∀ u, L u = Multiplicative.ofAdd (sIdeleLog F S (unitAtS u)) := by
+  refine ⟨{ toFun := fun u ↦ Multiplicative.ofAdd (sIdeleLog F S (unitAtS u))
+            map_one' := ?_
+            map_mul' := ?_ }, fun _ ↦ rfl⟩
+  ·
+    change sIdeleLog F S (unitAtS 1) = 0
+    rw [map_one]
+    funext v
+    rcases v with v | v
+    · change (v.mult : ℝ) * Real.log ‖(1 : v.Completion)‖ = 0
+      simp
+    · change Real.log ‖(1 : v.val.adicCompletion F)‖ = 0
+      simp
+  · intro u w
+    change sIdeleLog F S (unitAtS (u * w)) =
+      sIdeleLog F S (unitAtS u) + sIdeleLog F S (unitAtS w)
+    rw [map_mul]
+    let g := unitAtS u
+    let h := unitAtS w
+    change sIdeleLog F S (g * h) = sIdeleLog F S g + sIdeleLog F S h
+    funext v
+    rcases v with v | v
+    · have hne (a : (SAdeleRing F S)ˣ) : a.val.1 v ≠ 0 :=
+        ((a.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ v)).ne_zero
+      change (v.mult : ℝ) * Real.log ‖g.val.1 v * h.val.1 v‖ =
+        v.mult * Real.log ‖g.val.1 v‖ + v.mult * Real.log ‖h.val.1 v‖
+      rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h)),
+        mul_add]
+    · have hne (a : (SAdeleRing F S)ˣ) : a.val.2 v ≠ 0 :=
+        ((a.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)).ne_zero
+      change Real.log ‖g.val.2 v * h.val.2 v‖ =
+        Real.log ‖g.val.2 v‖ + Real.log ‖h.val.2 v‖
+      rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h))]
+
+/-- Diagonal S-units with logarithms in a sufficiently small ball are finite in number. -/
+private theorem sUnitLog_finite_near_zero :
+    {u : Oₛ(F, S)ˣ | ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2}.Finite := by
+  let value (u : Oₛ(F, S)ˣ) : F := u.val.val
+  have hinj : Injective value := fun _ _ h ↦ Units.ext (Subtype.ext h)
+  let r : ℝ := Real.log 2 / 2
+  refine Set.Finite.of_finite_image ?_ hinj.injOn
+  refine (Embeddings.finite_of_norm_le F ℂ (Real.exp r)).subset ?_
+  rintro _ ⟨u, hu, rfl⟩
+  have hne : value u ≠ 0 := (u.isUnit.map (Oₛ(F, S)).val).ne_zero
+  have hcoord (v : InfinitePlace F ⊕ S) : sIdeleLog F S (unitAtS u) v ≤ r :=
+    (le_abs_self _).trans ((norm_le_pi_norm (sIdeleLog F S (unitAtS u)) v).trans hu)
+  refine ⟨?_, (InfinitePlace.le_iff_le (value u) (Real.exp r)).mp ?_⟩
+  · -- At the selected finite places a norm less than two is at most one.
+    have hval (v : HeightOneSpectrum (𝓞 F)) : v.valuation F (value u) ≤ 1 := by
+      by_cases hv : v ∈ S
+      · let x : v.adicCompletion F := algebraMap F _ (value u)
+        have hxne : x ≠ 0 := (map_ne_zero_iff _ (RingHom.injective _)).mpr hne
+        have hxlog : Real.log ‖x‖ ≤ r := hcoord (Sum.inr ⟨v, hv⟩)
+        have hxlt : ‖x‖ < 2 := (Real.log_lt_log_iff (norm_pos_iff.mpr hxne) (by norm_num)).mp
+          (hxlog.trans_lt (by dsimp [r]; linarith [Real.log_pos (by norm_num : (1 : ℝ) < 2)]))
+        have hx : ‖x‖ ≤ 1 := le_of_not_gt fun h ↦
+          (not_le_of_gt hxlt) (FinitePlace.two_le_norm_of_one_lt_norm (K := F) (v := v) x h)
+        rw [← HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+        exact Valued.toNormedField.norm_le_one_iff.mp hx
+      · exact u.val.property v hv
+    obtain ⟨a, ha⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (value u) hval
+    exact ha ▸ a.isIntegral_coe
+  · intro v
+    have hlog : (v.mult : ℝ) * Real.log (v (value u)) ≤ r := by
+      have hv := hcoord (Sum.inl v)
+      change (v.mult : ℝ) * Real.log ‖algebraMap F v.Completion (value u)‖ ≤ r at hv
+      rw [InfinitePlace.coe_apply]
+      simpa only [AbsoluteValue.Completion.algebraMap_def, AbsoluteValue.Completion.norm_coe,
+        WithAbs.algebraMap_right_apply, Algebra.algebraMap_self_apply, WithAbs.ofAbs_toAbs] using hv
+    have hr : 0 ≤ r := div_nonneg (Real.log_nonneg (by norm_num)) (by norm_num)
+    have hm : (1 : ℝ) ≤ v.mult := by exact_mod_cast v.mult_pos
+    apply (Real.log_le_iff_le_exp (v.pos_iff.mpr hne)).mp
+    rw [mul_comm, ← le_div_iff₀ (lt_of_lt_of_le (by norm_num) hm)] at hlog
+    exact hlog.trans (div_le_self hr hm)
+
+/-- The logarithms of an integral basis of the S-units modulo torsion are real-linearly
+independent. -/
+private theorem sUnitLog_basis_linearIndependent :
+    LinearIndependent ℝ (fun i ↦ sIdeleLog F S (unitAtS (bₛ i).toMul.out)) := by
+  obtain ⟨L, hL⟩ := sUnitLogHom_exists F S
+  have hr : 0 < Real.log 2 / 2 := div_pos (Real.log_pos (by norm_num)) (by norm_num)
+  have hfinite := sUnitLog_finite_near_zero F S
+  have hker : L.ker = CommGroup.torsion Oₛ(F, S)ˣ := by
+    ext u
+    change L u = 1 ↔ _
+    rw [hL]
+    exact sIdeleLog_unit_eq_zero F S u
+  let q := (QuotientGroup.kerLift L).comp (QuotientGroup.quotientMulEquivOfEq hker.symm).toMonoidHom
+  let f := q.toAdditiveLeft.toIntLinearMap
+  have hf : Injective f :=
+    (QuotientGroup.kerLift_injective L).comp (QuotientGroup.quotientMulEquivOfEq hker.symm).injective
+  have hmk (u : Oₛ(F, S)ˣ) :
+      f (Additive.ofMul (QuotientGroup.mk u)) = sIdeleLog F S (unitAtS u) := by
+    change L u = _
+    exact hL u
+  let v (i : Fin sRank(F, S)) := sIdeleLog F S (unitAtS (bₛ i).toMul.out)
+  change LinearIndependent ℝ v
+  have hv : f ∘ bₛ = v := by
+    funext i
+    have hi := hmk (bₛ i).toMul.out
+    rw [show QuotientGroup.mk (bₛ i).toMul.out = (bₛ i).toMul from Quotient.out_eq' _] at hi
+    exact hi
+  have hli : LinearIndependent ℤ v := by
+    rw [← hv]
+    exact bₛ.linearIndependent.map' f (LinearMap.ker_eq_bot.mpr hf)
+  have hspan : Submodule.span ℤ (Set.range v) = f.range := by
+    rw [← hv, Set.range_comp, ← Submodule.map_span, bₛ.span_eq, Submodule.map_top]
+  -- The finite intersection with a neighborhood of zero makes the range discrete.
+  have hdisc : DiscreteTopology (Submodule.span ℤ (Set.range v)) := by
+    rw [hspan]
+    refine discreteTopology_of_isOpen_singleton_zero
+      (isOpen_singleton_of_finite_mem_nhds 0 (s := Metric.closedBall 0 (Real.log 2 / 2))
+        (Metric.closedBall_mem_nhds _ hr) ?_)
+    refine Set.Finite.of_finite_image ?_ Subtype.val_injective.injOn
+    refine (hfinite.image (fun u ↦ sIdeleLog F S (unitAtS u))).subset ?_
+    rintro _ ⟨⟨_, ⟨a, rfl⟩⟩, ha, rfl⟩
+    obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective a.toMul
+    have heq : f a = sIdeleLog F S (unitAtS u) := by rw [← hmk, hu]; rfl
+    refine ⟨u, ?_, heq.symm⟩
+    rw [Metric.mem_closedBall, dist_zero_right] at ha
+    change ‖f a‖ ≤ Real.log 2 / 2 at ha
+    change ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2
+    rwa [heq] at ha
+  apply linearIndependent_iff_card_eq_finrank_span.mpr
+  rw [Real.finrank_eq_int_finrank_of_discrete hdisc]
+  exact linearIndependent_iff_card_eq_finrank_span.mp hli
+
 /-- Paper: Definition A.2.4.3, p. 555. Along a basis logarithm the parallelotope
 includes the coefficient zero and excludes one. Any lift of the basis unit gives the same test.
 Deviation: We use the basis modulo torsion specified for (A.2.4.8). -/
 theorem sRegulatorParallelotope_basis_line (i : Fin sRank(F, S)) (u : Oₛ(F, S)ˣ)
     (hu : QuotientGroup.mk u = (bₛ i).toMul) (t : ℝ) :
     t • sIdeleLog F S (unitAtS u) ∈ sRegulatorParallelotope F S bₛ ↔ t ∈ Set.Ico 0 1 := by
-  sorry
+  obtain ⟨L, hL⟩ := sUnitLogHom_exists F S
+  have hker : L.ker = CommGroup.torsion Oₛ(F, S)ˣ := by
+    ext u
+    change L u = 1 ↔ _
+    rw [hL]
+    exact sIdeleLog_unit_eq_zero F S u
+  let q := (QuotientGroup.kerLift L).comp (QuotientGroup.quotientMulEquivOfEq hker.symm).toMonoidHom
+  have hq (x : Oₛ(F, S)ˣ) : q (QuotientGroup.mk x) = L x := rfl
+  have heq : sIdeleLog F S (unitAtS u) =
+      sIdeleLog F S (unitAtS (bₛ i).toMul.out) := by
+    have hquot : QuotientGroup.mk u = QuotientGroup.mk (bₛ i).toMul.out :=
+      hu.trans (Quotient.out_eq' _).symm
+    have h := congrArg q hquot
+    rw [hq, hq, hL, hL] at h
+    exact h
+  rw [heq]
+  let v (j : Fin sRank(F, S)) := sIdeleLog F S (unitAtS (bₛ j).toMul.out)
+  change (∃ c : Fin sRank(F, S) → ℝ, (∀ j, c j ∈ Set.Ico 0 1) ∧
+      t • v i = ∑ j, c j • v j) ↔ _
+  have hsingle : Fintype.linearCombination ℝ v (Pi.single i t) = t • v i :=
+    Fintype.linearCombination_apply_single (R := ℝ) (v := v) i t
+  constructor
+  · rintro ⟨c, hc, heq⟩
+    have hc_eq : Pi.single i t = c :=
+      (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective
+        (hsingle.trans heq)
+    simpa only [← hc_eq, Pi.single_eq_same] using hc i
+  · intro ht
+    refine ⟨Pi.single i t, ?_, hsingle.symm⟩
+    intro j
+    by_cases h : j = i
+    · simpa [h] using ht
+    · rw [Pi.single_eq_of_ne h]
+      norm_num
 
 /-- Paper: Definition A.2.4.3, p. 554. The local norm-one domain cuts out the
 S-parallelotope in logarithmic coordinates and the torsion sector at the chosen infinite place. -/

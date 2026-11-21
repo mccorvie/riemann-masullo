@@ -3057,9 +3057,39 @@ theorem pontryaginDual_restriction_isBruhatSmooth (χ : PontryaginDual G)
     (J : OpenCompactlyGeneratedSubgroups G) :
     IsBruhatSmooth (fun x : J.val ↦ (χ x.val : ℂ)) := by sorry
 
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- Point evaluation on an elementary Schwartz stage is continuous by the
+zero-order, zero-weight seminorm. -/
+private theorem continuous_schwartzBruhatStage_eval
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) (x : G) :
+    Continuous (fun f : SchwartzBruhatStage e ↦ schwartzBruhatStageRealization a e f x) := by
+  let L := (LinearMap.proj x).comp (schwartzBruhatStageRealization a e)
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦ ?_
+  apply Seminorm.continuous_of_le (elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0))
+  intro f
+  change ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f
+  rw [schwartzBruhatStageRealization_apply]
+  split_ifs with hx
+  · change (‖f _‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+    apply ENNReal.toReal_mono (f.property.2 _).ne
+    rw [elementarySchwartzBound_zero]
+    exact le_iSup (fun y ↦ (‖f y‖₊ : ENNReal)) _
+  · exact norm_zero.trans_le (apply_nonneg _ _)
+
 /-- Paper: Lemma D.1.5.6(1), p. 763. The final locally convex topology is Hausdorff
 when the group is second countable. -/
-theorem schwartzBruhat_t2 [SecondCountableTopology G] : T2Space (SchwartzBruhat G) := by sorry
+theorem schwartzBruhat_t2 [SecondCountableTopology G] : T2Space (SchwartzBruhat G) := by
+  -- Point evaluations separate Schwartz–Bruhat functions.
+  refine T2Space.of_injective_continuous (f := fun f : SchwartzBruhat G ↦ f.val)
+    (fun _ _ h ↦ Subtype.ext h) (continuous_pi fun x ↦ ?_)
+  let ev : SchwartzBruhat G →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p : {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion a e)} :=
+    ⟨(normSeminorm ℂ ℂ).comp ev, fun a e ↦ (continuous_schwartzBruhatStage_eval a e x).norm⟩
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp («E» := SchwartzBruhat G) ev
+    fun _ ↦ (withGeneratingSeminorms_spec _ _).continuous_seminorm p
 
 /-- Paper: Lemma D.1.5.6, p. 763. A compact exhaustion controls the open subgroups,
 and shrinking identity neighborhoods control the kernels, since the elementary quotients
@@ -3292,25 +3322,6 @@ private theorem compactlyGenerated_inter_iSup_open {H : Subgroup G}
   have hgen : Subgroup.closure K ≤ (J N).comap i :=
     Subgroup.closure_le _ |>.mpr fun y hy ↦ hN (mem_image_of_mem i hy)
   exact hgen (hGen.symm ▸ Subgroup.mem_top (⟨⟨x, hx.1⟩, hx.2⟩ : M))
-
-omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
-/-- Point evaluation on an elementary Schwartz stage is continuous by the
-zero-order, zero-weight seminorm. -/
-private theorem continuous_schwartzBruhatStage_eval
-    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) (x : G) :
-    Continuous (fun f : SchwartzBruhatStage e ↦ schwartzBruhatStageRealization a e f x) := by
-  let L := (LinearMap.proj x).comp (schwartzBruhatStageRealization a e)
-  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦ ?_
-  apply Seminorm.continuous_of_le (elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0))
-  intro f
-  change ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm (0, 0, 0, 0) f
-  rw [schwartzBruhatStageRealization_apply]
-  split_ifs with hx
-  · change (‖f _‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
-    apply ENNReal.toReal_mono (f.property.2 _).ne
-    rw [elementarySchwartzBound_zero]
-    exact le_iSup (fun y ↦ (‖f y‖₊ : ENNReal)) _
-  · exact norm_zero.trans_le (apply_nonneg _ _)
 
 open Classical in
 /-- Paper: Lemma D.1.5.6, p. 763. The stage projection on functions restricts the

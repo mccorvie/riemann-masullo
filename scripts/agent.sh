@@ -290,6 +290,13 @@ $stray
 \`\`\`
 $(tail -n 25 "$wt/.agent/build.txt")
 \`\`\`"
+  # A proof that Lean accepts slowly costs every later build, check and agent: twice a few
+  # proofs made one module take over half an hour and the whole project waited on it. Compile
+  # each changed file once more on its own, and refuse work that needs more than ten minutes.
+  for f in $(git diff --cached --name-only | grep -E '^RiemannMasullo/.*\.lean$' || true); do
+    rc=0; sandboxed timeout 600 lake env lean "$f" >/dev/null 2>&1 || rc=$?
+    [ $rc != 124 ] || fail "A $role agent ($who) left \`$f\` taking more than ten minutes to compile. Nothing was pushed. Find the slow proof (\`set_option profiler true in\`, or compile the file up to each declaration in turn) and restructure it; see \"Keep the build fast\" in \`prompts/prover.md\`."
+  done
   check="Statement check: not run (no record of the starting point)."
   if [ -s "$main/.agent/base/$role-$n.txt" ]; then
     sandboxed scripts/signatures.sh >"$wt/.agent/signatures.txt" 2>>"$wt/.agent/build.txt"

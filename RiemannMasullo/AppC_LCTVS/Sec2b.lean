@@ -4391,7 +4391,43 @@ theorem precompactConvergenceCLM_eq_bounded_of_isNuclearTVS (hE : IsNuclearTVS.{
 /-- Paper: Lemma C.2.4.16(2), p. 690. Finite-rank endomorphisms of a nuclear
 space are dense for uniform convergence on precompact sets. -/
 theorem dense_finiteRank_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E) :
-    HasApproximationProperty E := by sorry
+    HasApproximationProperty E := by
+  classical
+  apply (id_mem_closure_finiteRank_iff_dense E).mp
+  refine (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mpr ?_
+  intro B hB V hV
+  obtain ⟨q, hq, hqV⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hV
+  obtain ⟨H, _, _, _, a, C, hC, ha⟩ := exists_hilbert_domination hE q hq
+  let ε : ℝ := (C + 1)⁻¹
+  have hpos : 0 < C + 1 := by positivity
+  -- Take the net inside the image so its span has basis vectors that lift to E.
+  obtain ⟨s, hs, hsf, hcover⟩ :=
+    (hB.image a.uniformContinuous).exists_subset (Metric.dist_mem_uniformity (inv_pos.mpr hpos))
+  let W := Submodule.span ℂ s
+  let : FiniteDimensional ℂ W := FiniteDimensional.span_of_finite ℂ hsf
+  let b := stdOrthonormalBasis ℂ W
+  have hW : W ≤ a.toLinearMap.range := Submodule.span_le.mpr fun y hy ↦ by
+    obtain ⟨x, _, rfl⟩ := hs hy
+    exact ⟨x, rfl⟩
+  choose lift hlift using fun i ↦ (show ∃ x, a x = (b i : H) from hW (b i).property)
+  let φ i : StrongDual ℂ E := (innerSL ℂ (b i : H)).comp a
+  let z : StrongDual ℂ E ⊗[ℂ] E := ∑ i, φ i ⊗ₜ[ℂ] lift i
+  have hproj (x : E) : a (tensorToFiniteRank z x) = W.starProjection (a x) := by
+    rw [b.starProjection_eq_sum_rankOne]
+    simp only [z, map_sum, sum_apply, tensorToFiniteRank_tmul, map_smul, hlift, φ,
+      ContinuousLinearMap.comp_apply, innerSL_apply_apply, InnerProductSpace.rankOne_apply]
+  refine ⟨z, fun x hx ↦ hqV (q.mem_ball_zero.mpr ?_)⟩
+  obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover (mem_image_of_mem a hx))
+  have hdist : dist (a x) (W.starProjection (a x)) < ε := by
+    rw [W.dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem (Submodule.subset_span hy : y ∈ W)).trans_lt hxy
+  change q (tensorToFiniteRank z x - x) < 1
+  calc
+    _ ≤ C * ‖a (tensorToFiniteRank z x - x)‖ := ha _
+    _ = C * dist (a x) (W.starProjection (a x)) := by
+      rw [map_sub, hproj, dist_comm, dist_eq_norm]
+    _ ≤ C * ε := mul_le_mul_of_nonneg_left hdist.le hC
+    _ < 1 := (mul_inv_lt_iff₀ hpos).mpr (by linarith)
 
 /-- Paper: Remark C.2.4.17, p. 690. For a nuclear source, finite-rank maps are
 dense in the strong operator space with uniform convergence on bounded sets. -/

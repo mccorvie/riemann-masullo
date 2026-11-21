@@ -12,13 +12,14 @@ spaces and multiplicative groups.
 module
 
 public import Mathlib.Topology.Algebra.PontryaginDual
+public import Mathlib.MeasureTheory.Function.L2Space
+public import Mathlib.MeasureTheory.Measure.Haar.Basic
 import Mathlib.Analysis.CStarAlgebra.GelfandDuality
 import Mathlib.Analysis.CStarAlgebra.ContinuousLinearMap
-import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Function.LpSpace.ContinuousCompMeasurePreserving
-import Mathlib.MeasureTheory.Measure.Haar.Basic
 import Mathlib.MeasureTheory.Group.Integral
+import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.Topology.UrysohnsLemma
 
 /-!
@@ -362,6 +363,53 @@ private theorem exists_compact_test_of_gelfand {A : Type*} [CommCStarAlgebra A]
       _ ≤ ε * r := by
         exact (le_div_iff₀' (by norm_num : (0 : ℝ) < 2)).mp (le_of_not_ge hω)
 
+include hU in
+/-- The adjoint of a unitary group action is the action of the inverse. -/
+private theorem unitary_apply_star (g : G) : star (U g) = U g⁻¹ := by
+  have hh := (U g).norm_map_iff_adjoint_comp_self.mp (hU g)
+  change star (U g) * U g = 1 at hh
+  calc
+    star (U g) = (star (U g) * U g) * U g⁻¹ := by
+      rw [mul_assoc, ← map_mul, mul_inv_cancel, map_one, mul_one]
+    _ = U g⁻¹ := by rw [hh, one_mul]
+
+include μ hU hc in
+open scoped IsMulCommutative Pointwise in
+/-- The double commutant of the representation is commutative and contains
+the representation and all its Haar averages. -/
+private theorem exists_commutative_algebra_with_averages :
+    ∃ A : StarSubalgebra ℂ (H →L[ℂ] H), IsClosed (A : Set (H →L[ℂ] H)) ∧
+      IsMulCommutative A ∧ (∀ g, U g ∈ A) ∧
+      (∀ f, averageOrbit μ U hU hc f ∈ A) := by
+  let B := H →L[ℂ] H
+  let S : Set B := range U
+  let A := StarSubalgebra.centralizer ℂ (StarSubalgebra.centralizer ℂ S : Set B)
+  have hS : S ∪ star S = S := by
+    apply union_eq_self_of_subset_right
+    intro T hT
+    obtain ⟨g, hg⟩ : star T ∈ range U := hT
+    exact ⟨g⁻¹, by rw [← unitary_apply_star U hU, hg, star_star]⟩
+  have hA : (A : Set B) = S.centralizer.centralizer := by
+    rw [StarSubalgebra.coe_centralizer_centralizer, hS]
+  have hcomm : S.Pairwise Commute := .of_forall₂ fun _ ha _ hb ↦ by
+    obtain ⟨g, rfl⟩ := ha
+    obtain ⟨k, rfl⟩ := hb
+    change U g * U k = U k * U g
+    rw [← map_mul, ← map_mul, mul_comm g k]
+  have hCommA : IsMulCommutative A := .of_setLike_mul_comm fun a ha b hb ↦ by
+    change a ∈ (A : Set B) at ha
+    change b ∈ (A : Set B) at hb
+    rw [hA] at ha hb
+    exact Set.centralizer_centralizer_comm_of_comm hcomm _ ha _ hb
+  refine ⟨A, hA ▸ Set.isClosed_centralizer _, hCommA, fun g ↦ ?_, fun f ↦ ?_⟩
+  · change U g ∈ (A : Set B)
+    rw [hA]
+    exact Set.subset_centralizer_centralizer (mem_range_self _)
+  · change averageOrbit μ U hU hc f ∈ (A : Set B)
+    rw [hA]
+    intro T hT
+    exact averageOrbit_commutes μ U hU hc f T (fun g ↦ hT (U g) (mem_range_self g))
+
 include μ hU hc in
 open scoped IsMulCommutative Pointwise in
 /-- A compact family of characters controls the norm of a translated Haar average. -/
@@ -371,45 +419,14 @@ private theorem exists_compact_test_of_averageOrbit (f : Lp ℂ 1 μ) {ε : ℝ}
         ‖U x * averageOrbit μ U hU hc f - averageOrbit μ U hU hc f‖ ≤ ε * ‖f‖ := by
   by_cases hf : f = 0
   · exact ⟨∅, isCompact_empty, by simp [hf]⟩
-  let B := H →L[ℂ] H
-  have hstar (g : G) : star (U g) = U g⁻¹ := by
-    have hh := (U g).norm_map_iff_adjoint_comp_self.mp (hU g)
-    change star (U g) * U g = 1 at hh
-    calc
-      star (U g) = (star (U g) * U g) * U g⁻¹ := by
-        rw [mul_assoc, ← map_mul, mul_inv_cancel, map_one, mul_one]
-      _ = U g⁻¹ := by rw [hh, one_mul]
-  let S : Set B := range U
-  let A := StarSubalgebra.centralizer ℂ (StarSubalgebra.centralizer ℂ S : Set B)
-  have hS : S ∪ star S = S := by
-    apply union_eq_self_of_subset_right
-    intro T hT
-    obtain ⟨g, hg⟩ : star T ∈ range U := hT
-    exact ⟨g⁻¹, by rw [← hstar, hg, star_star]⟩
-  have hA : (A : Set B) = S.centralizer.centralizer := by
-    rw [StarSubalgebra.coe_centralizer_centralizer, hS]
-  let : IsClosed (A : Set B) := hA ▸ Set.isClosed_centralizer _
-  have hcomm : S.Pairwise Commute := .of_forall₂ fun _ ha _ hb ↦ by
-    obtain ⟨g, rfl⟩ := ha
-    obtain ⟨k, rfl⟩ := hb
-    change U g * U k = U k * U g
-    rw [← map_mul, ← map_mul, mul_comm g k]
-  let : IsMulCommutative A := .of_setLike_mul_comm fun a ha b hb ↦ by
-    change a ∈ (A : Set B) at ha
-    change b ∈ (A : Set B) at hb
-    rw [hA] at ha hb
-    exact Set.centralizer_centralizer_comm_of_comm hcomm _ ha _ hb
+  obtain ⟨A, hClosed, hComm, hGroup, hAverage⟩ :=
+    exists_commutative_algebra_with_averages μ U hU hc
+  let : IsClosed (A : Set (H →L[ℂ] H)) := hClosed
+  let : IsMulCommutative A := hComm
   let : CommCStarAlgebra A := { }
-  let V : G →* A := U.codRestrict A.toSubmonoid fun g ↦ by
-    change U g ∈ (A : Set B)
-    rw [hA]
-    exact Set.subset_centralizer_centralizer (mem_range_self _)
-  have hVstar (g : G) : star (V g) = V g⁻¹ := Subtype.ext (hstar g)
-  let a : A := ⟨averageOrbit μ U hU hc f, by
-    change averageOrbit μ U hU hc f ∈ (A : Set B)
-    rw [hA]
-    intro T hT
-    exact averageOrbit_commutes μ U hU hc f T (fun g ↦ hT (U g) (mem_range_self g))⟩
+  let V : G →* A := U.codRestrict A.toSubmonoid hGroup
+  have hVstar (g : G) : star (V g) = V g⁻¹ := Subtype.ext (unitary_apply_star U hU g)
+  let a : A := ⟨averageOrbit μ U hU hc f, hAverage f⟩
   have hTranslate : Continuous fun g ↦ V g * a := by
     have h : Continuous fun g ↦ U g * averageOrbit μ U hU hc f := by
       simp_rw [averageOrbit_translate]
@@ -522,5 +539,299 @@ public theorem exists_compact_pontryaginDual_test {U : Set G} (hU : U ∈ 𝓝 (
   have hTriangle := (norm_add_le (T x (v - a v) + (T x * a - a) v) (a v - v)).trans
     (add_le_add (norm_add_le (T x (v - a v)) ((T x * a - a) v)) le_rfl)
   linarith
+
+open scoped CompactlySupported in
+/-- A positive functional on complex continuous functions on a compact space is integrated
+against a finite regular measure. Apply real Riesz–Markov to its real part. -/
+private theorem exists_measure_of_positive_functional
+    {X : Type*} [TopologicalSpace X] [CompactSpace X] [T2Space X]
+    [MeasurableSpace X] [BorelSpace X] (L : C(X, ℂ) →ₗ[ℂ] ℂ)
+    (hL : ∀ q, 0 ≤ (L (star q * q)).re)
+    (hStar : ∀ q, L (star q) = star (L q)) :
+    ∃ σ : Measure X, IsFiniteMeasure σ ∧ σ.Regular ∧
+      ∀ q : C(X, ℂ), (∫ x, q x ∂σ) = L q := by
+  let toComplex (f : C_c(X, ℝ)) : C(X, ℂ) :=
+    ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+  let Λ : C_c(X, ℝ) →ₚ[ℝ] ℝ :=
+    { toFun := fun f ↦ (L (toComplex f)).re
+      map_add' := fun f g ↦ by
+        have h : toComplex (f + g) = toComplex f + toComplex g := by
+          ext x
+          exact Complex.ofReal_add _ _
+        rw [h, map_add, Complex.add_re]
+      map_smul' := fun r f ↦ by
+        have h : toComplex (r • f) = (r : ℂ) • toComplex f := by
+          ext x
+          exact Complex.ofReal_mul _ _
+        rw [h, map_smul, smul_eq_mul]
+        simp [Complex.mul_re, smul_eq_mul]
+      monotone' := fun f g hfg ↦ by
+        let root : C(X, ℂ) := ⟨fun x ↦ (Real.sqrt (g x - f x) : ℂ),
+          Complex.continuous_ofReal.comp (Real.continuous_sqrt.comp
+            (g.continuous.sub f.continuous))⟩
+        have h : toComplex g - toComplex f = star root * root := by
+          ext x
+          change (g x : ℂ) - (f x : ℂ) =
+            star ((Real.sqrt (g x - f x) : ℝ) : ℂ) * (Real.sqrt (g x - f x) : ℂ)
+          rw [Complex.star_def, Complex.conj_ofReal, ← sq, ← Complex.ofReal_pow,
+            Real.sq_sqrt (sub_nonneg.mpr (hfg x)), Complex.ofReal_sub]
+        have hpos := hL root
+        rw [← h, map_sub, Complex.sub_re] at hpos
+        exact sub_nonneg.mp hpos }
+  let σ := RealRMK.rieszMeasure Λ
+  have hfinite : IsFiniteMeasure σ := ⟨isCompact_univ.measure_lt_top⟩
+  refine ⟨σ, hfinite, inferInstance, fun q ↦ ?_⟩
+  have hRe (q : C(X, ℂ)) : (∫ x, q x ∂σ).re = (L q).re := by
+    let f : C_c(X, ℝ) := ⟨⟨fun x ↦ (q x).re, Complex.continuous_re.comp q.continuous⟩,
+      HasCompactSupport.of_compactSpace _⟩
+    have hInt := Complex.reCLM.integral_comp_comm
+      (q.continuous.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+        (μ := σ))
+    calc
+      _ = ∫ x, f x ∂σ := hInt.symm
+      _ = (L (toComplex f)).re := RealRMK.integral_rieszMeasure Λ f
+      _ = _ := by
+        have h : (2 : ℂ) • toComplex f = star q + q := by
+          ext x
+          change 2 * ((q x).re : ℂ) = star (q x) + q x
+          simpa only [Complex.star_def, add_comm, Complex.ofReal_mul, Complex.ofReal_ofNat]
+            using (Complex.add_conj (q x)).symm
+        have hh := congrArg (fun p ↦ (L p).re) h
+        simp [map_smul, smul_eq_mul, Complex.mul_re, hStar] at hh
+        linarith
+  apply Complex.ext (hRe q)
+  have h := hRe (Complex.I • q)
+  simp only [ContinuousMap.smul_apply, smul_eq_mul, integral_const_mul, map_smul,
+    Complex.I_mul_re, neg_inj] at h
+  exact h
+
+open scoped InnerProductSpace in
+/-- The vector functional on a commutative algebra of operators has a finite regular
+representing measure on its Gelfand spectrum. -/
+private theorem exists_spectral_measure {A H : Type*} [CommCStarAlgebra A]
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    [MeasurableSpace (characterSpace ℂ A)] [BorelSpace (characterSpace ℂ A)]
+    (j : A →⋆ₐ[ℂ] (H →L[ℂ] H)) (v : H) :
+    ∃ σ : Measure (characterSpace ℂ A), IsFiniteMeasure σ ∧ σ.Regular ∧
+      ∀ a : A, (∫ ω, ω a ∂σ) = ⟪v, j a v⟫_ℂ := by
+  let Φ := gelfandStarTransform A
+  let T := j.comp Φ.symm.toStarAlgHom
+  let L : C(characterSpace ℂ A, ℂ) →ₗ[ℂ] ℂ :=
+    (innerSL ℂ v).toLinearMap.comp
+      ((ContinuousLinearMap.apply ℂ H v).toLinearMap.comp T.toLinearMap)
+  have hL (q : C(characterSpace ℂ A, ℂ)) : L q = ⟪v, T q v⟫_ℂ := rfl
+  obtain ⟨σ, hFinite, hRegular, hσ⟩ := exists_measure_of_positive_functional L
+    (fun q ↦ by
+      rw [hL, map_mul, map_star, mul_apply_eq_comp, ContinuousLinearMap.star_eq_adjoint,
+        ContinuousLinearMap.adjoint_inner_right, inner_self_eq_norm_sq_to_K]
+      change 0 ≤ (((‖T q v‖ : ℝ) : ℂ) ^ 2).re
+      rw [← Complex.ofReal_pow, Complex.ofReal_re]
+      positivity)
+    (fun q ↦ by
+      rw [hL, hL, map_star, ContinuousLinearMap.star_eq_adjoint,
+        ContinuousLinearMap.adjoint_inner_right, Complex.star_def, inner_conj_symm])
+  refine ⟨σ, hFinite, hRegular, fun a ↦ ?_⟩
+  change (∫ ω, Φ a ω ∂σ) = _
+  rw [hσ, hL]
+  change ⟪v, j (Φ.symm (Φ a)) v⟫_ℂ = _
+  rw [StarAlgEquiv.symm_apply_apply]
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- On the union of the sets where at least one norm-continuous translate is nonzero,
+the spectral characters restrict continuously to characters of the group. -/
+private theorem exists_continuous_dual_of_spectrum {A : Type*} [CommCStarAlgebra A]
+    (V : G →* A) (hStar : ∀ g, star (V g) = V g⁻¹) {ι : Type*}
+    (a : ι → A) (hTranslate : ∀ i, Continuous fun g ↦ V g * a i) :
+    ∃ χ : {ω : characterSpace ℂ A | ∃ i, ω (a i) ≠ 0} → PontryaginDual G,
+      Continuous χ ∧ ∀ ω g, (χ ω g : ℂ) = ω.1 (V g) := by
+  let S : Set (characterSpace ℂ A) := {ω | ∃ i, ω (a i) ≠ 0}
+  let Φ := gelfandTransform ℂ A
+  let z (ω : S) (g : G) := ω.1 (V g)
+  have hn (ω : S) (g : G) : ‖z ω g‖ = 1 := by
+    have h : star (ω.1 (V g)) * ω.1 (V g) = 1 := by
+      rw [← map_star, ← map_mul, hStar, ← map_mul, inv_mul_cancel, map_one, map_one]
+    have hNorm := congrArg norm h
+    rw [norm_mul, norm_star, norm_one, ← sq] at hNorm
+    exact (sq_eq_sq₀ (norm_nonneg _) zero_le_one).mp (hNorm.trans (by norm_num))
+  have hz : Continuous (Function.uncurry z) := by
+    rw [continuous_iff_continuousAt]
+    intro p
+    obtain ⟨i, hi⟩ := p.1.2
+    have hden : Continuous fun q : S × G ↦ Φ (a i) q.1.1 :=
+      (Φ (a i)).continuous.comp (continuous_subtype_val.comp continuous_fst)
+    have hnum : Continuous fun q : S × G ↦ Φ (V q.2 * a i) q.1.1 :=
+      continuous_eval.comp (((gelfandTransform_isometry A).continuous.comp
+        ((hTranslate i).comp continuous_snd)).prodMk
+        (continuous_subtype_val.comp continuous_fst))
+    refine (hnum.continuousAt.div hden.continuousAt hi).congr_of_eventuallyEq ?_
+    filter_upwards [hden.continuousAt.eventually_ne hi] with q hq
+    change q.1.1 (V q.2) = q.1.1 (V q.2 * a i) / q.1.1 (a i)
+    change q.1.1 (a i) ≠ 0 at hq
+    rw [map_mul, mul_div_cancel_right₀ _ hq]
+  let χ (ω : S) : PontryaginDual G :=
+    { toFun g := ⟨z ω g, mem_sphere_zero_iff_norm.mpr (hn ω g)⟩
+      map_one' := Subtype.ext (by change ω.1 (V 1) = 1; rw [map_one, map_one])
+      map_mul' g k := Circle.ext (by
+        change ω.1 (V (g * k)) = ω.1 (V g) * ω.1 (V k)
+        rw [map_mul, map_mul])
+      continuous_toFun := (hz.comp (continuous_const.prodMk continuous_id)).subtype_mk _ }
+  exact ⟨χ, ContinuousMonoidHom.continuous_of_continuous_uncurry χ (hz.subtype_mk _),
+    fun _ _ ↦ rfl⟩
+
+open scoped InnerProductSpace in
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- If the operators with norm-continuous translates approximate the vector,
+its spectral measure is carried by the open set on which they detect continuous
+characters of the group. -/
+private theorem exists_dual_measure_of_operators {A H : Type*} [CommCStarAlgebra A]
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    [MeasurableSpace (PontryaginDual G)] [BorelSpace (PontryaginDual G)]
+    (j : A →⋆ₐ[ℂ] (H →L[ℂ] H)) (v : H)
+    (V : G →* A) (hStar : ∀ g, star (V g) = V g⁻¹)
+    {ι : Type*} (a : ι → A) (hTranslate : ∀ i, Continuous fun g ↦ V g * a i)
+    (hApprox : ∀ ε > 0, ∃ i, ‖j (a i) v - v‖ < ε) :
+    ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
+      ∀ g, (∫ χ, (χ g : ℂ) ∂ρ) = ⟪v, j (V g) v⟫_ℂ := by
+  let X := characterSpace ℂ A
+  let : MeasurableSpace X := borel X
+  let : BorelSpace X := ⟨rfl⟩
+  let S : Set X := {ω | ∃ i, ω (a i) ≠ 0}
+  have hOpen : IsOpen S := by
+    rw [show S = ⋃ i, {ω : X | ω (a i) ≠ 0} by ext; simp [S]]
+    exact isOpen_iUnion fun i ↦ isOpen_ne_fun (gelfandTransform ℂ A (a i)).continuous continuous_const
+  obtain ⟨σ, hFinite, hRegular, hσ⟩ := exists_spectral_measure j v
+  have hBound (b : A) : (∫ ω, ‖ω b‖ ^ 2 ∂σ) = ‖j b v‖ ^ 2 := by
+    have hInt : Integrable (fun ω : X ↦ ω (star b * b)) σ :=
+      (gelfandTransform ℂ A (star b * b)).continuous.integrable_of_hasCompactSupport
+        (HasCompactSupport.of_compactSpace _)
+    calc
+      _ = ∫ ω, (ω (star b * b)).re ∂σ := by
+        apply integral_congr_ae
+        exact .of_forall fun ω ↦ by
+          change ‖ω b‖ ^ 2 = (ω (star b * b)).re
+          rw [map_mul, map_star, mul_comm, Complex.star_def, Complex.mul_conj,
+            Complex.ofReal_re, Complex.normSq_eq_norm_sq]
+      _ = (⟪v, j (star b * b) v⟫_ℂ).re := by
+        change (∫ ω, Complex.reCLM (ω (star b * b)) ∂σ) = _
+        rw [Complex.reCLM.integral_comp_comm hInt, hσ, Complex.reCLM_apply]
+      _ = _ := by
+        rw [map_mul, map_star, mul_apply_eq_comp, ContinuousLinearMap.star_eq_adjoint,
+          ContinuousLinearMap.adjoint_inner_right, inner_self_eq_norm_sq_to_K]
+        change (((‖j b v‖ : ℝ) : ℂ) ^ 2).re = _
+        rw [← Complex.ofReal_pow, Complex.ofReal_re]
+  have hMass : σ.real Sᶜ ≤ 0 := by
+    apply le_iff_forall_pos_le_add.mpr
+    intro ε hε
+    obtain ⟨i, hi⟩ := hApprox (Real.sqrt ε) (Real.sqrt_pos.2 hε)
+    let b := a i - 1
+    have hInt : Integrable (fun ω : X ↦ ‖ω b‖ ^ 2) σ :=
+      ((gelfandTransform ℂ A b).continuous.norm.pow 2).integrable_of_hasCompactSupport
+        (HasCompactSupport.of_compactSpace _)
+    have hInd : Sᶜ.indicator (fun _ ↦ (1 : ℝ)) ≤ fun ω : X ↦ ‖ω b‖ ^ 2 := by
+      intro ω
+      by_cases hω : ω ∈ Sᶜ
+      · have hz : ω (a i) = 0 := by
+          by_contra hn
+          exact hω ⟨i, hn⟩
+        simp [hω, b, map_sub, hz]
+      · simp [hω]
+    have hle := integral_mono
+      ((integrableOn_const (C := (1 : ℝ)) (measure_ne_top σ Sᶜ)).integrable_indicator
+        hOpen.measurableSet.compl) hInt hInd
+    change (∫ ω, Sᶜ.indicator (1 : X → ℝ) ω ∂σ) ≤ _ at hle
+    rw [integral_indicator_one hOpen.measurableSet.compl, hBound] at hle
+    refine hle.trans ?_
+    rw [show j b v = j (a i) v - v by simp [b], zero_add, ← Real.sq_sqrt hε.le]
+    gcongr
+  have hFull : σ.restrict S = σ := by
+    apply Measure.restrict_eq_self_of_ae_mem
+    apply ae_iff.mpr
+    exact ((ENNReal.toReal_eq_zero_iff _).mp
+      (le_antisymm hMass ENNReal.toReal_nonneg)).resolve_right (measure_ne_top σ _)
+  obtain ⟨χ, hχ, hEval⟩ := exists_continuous_dual_of_spectrum V hStar a hTranslate
+  let τ : Measure S := σ.comap Subtype.val
+  have hτ : IsFiniteMeasure τ := ⟨by
+    rw [hOpen.isOpenEmbedding_subtypeVal.measurableEmbedding.comap_apply]
+    exact measure_lt_top σ _⟩
+  let : σ.InnerRegular := inferInstance
+  let : τ.InnerRegular := Measure.InnerRegular.comap' σ hOpen.isOpenEmbedding_subtypeVal
+  let ρ := Measure.map χ τ
+  let : IsFiniteMeasure ρ := Measure.isFiniteMeasure_map τ χ
+  let : ρ.InnerRegular := Measure.InnerRegular.map_of_continuous hχ
+  let : ρ.WeaklyRegular :=
+    Measure.InnerRegularWRT.weaklyRegular_of_finite ρ
+      Measure.InnerRegular.innerRegularWRT_isClosed_isOpen
+  refine ⟨ρ, inferInstance, ⟨Measure.InnerRegular.innerRegular.mono
+    (fun _ h ↦ h.measurableSet) (fun _ h ↦ h)⟩, fun g ↦ ?_⟩
+  have hCont : Continuous fun ψ : PontryaginDual G ↦ (ψ g : ℂ) :=
+    continuous_subtype_val.comp
+      ((continuous_eval_const (F := C(G, Circle)) g).comp
+        (ContinuousMonoidHom.isInducing_toContinuousMap G Circle).continuous)
+  calc
+    _ = ∫ ω : S, ω.1 (V g) ∂τ := by
+      rw [integral_map hχ.measurable.aemeasurable hCont.aestronglyMeasurable]
+      exact integral_congr_ae (.of_forall fun ω ↦ hEval ω g)
+    _ = ∫ ω, ω (V g) ∂σ := by
+      exact (integral_subtype_comap hOpen.measurableSet (fun ω : X ↦ ω (V g))).trans
+        (by rw [hFull])
+    _ = _ := hσ (V g)
+
+open scoped IsMulCommutative InnerProductSpace in
+/-- Haar averaging supplies the norm-continuous translates needed by the spectral
+representation of a coefficient of a strongly continuous unitary action. -/
+private theorem exists_dual_measure_of_unitary
+    [MeasurableSpace G] [BorelSpace G] (μ : Measure G) [μ.IsHaarMeasure]
+    [μ.InnerRegularCompactLTTop] [MeasurableSpace (PontryaginDual G)]
+    [BorelSpace (PontryaginDual G)] {H : Type*} [NormedAddCommGroup H]
+    [InnerProductSpace ℂ H] [CompleteSpace H]
+    (U : G →* (H →L[ℂ] H)) (hU : ∀ g v, ‖U g v‖ = ‖v‖)
+    (hc : ∀ v, Continuous fun g ↦ U g v) (v : H) :
+    ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
+      ∀ g, (∫ χ, (χ g : ℂ) ∂ρ) = ⟪v, U g v⟫_ℂ := by
+  obtain ⟨A, hClosed, hComm, hGroup, hAverage⟩ :=
+    exists_commutative_algebra_with_averages μ U hU hc
+  let : IsClosed (A : Set (H →L[ℂ] H)) := hClosed
+  let : IsMulCommutative A := hComm
+  let : CommCStarAlgebra A := { }
+  let V : G →* A := U.codRestrict A.toSubmonoid hGroup
+  let a (f : Lp ℂ 1 μ) : A := ⟨averageOrbit μ U hU hc f, hAverage f⟩
+  have hTranslate (f : Lp ℂ 1 μ) : Continuous fun g ↦ V g * a f := by
+    have h : Continuous fun g ↦ U g * averageOrbit μ U hU hc f := by
+      simp_rw [averageOrbit_translate]
+      exact (averageOrbit μ U hU hc).continuous.comp
+        (haarTranslation_continuous μ 1 ENNReal.one_ne_top f)
+    exact h.subtype_mk _
+  have hApprox (ε : ℝ) (hε : 0 < ε) : ∃ f, ‖A.subtype (a f) v - v‖ < ε := by
+    obtain ⟨f, -, hf⟩ := exists_averageOrbit_close μ U hU hc v hε
+    refine ⟨f, ?_⟩
+    change ‖averageOrbit μ U hU hc f v - v‖ < ε
+    simpa only [dist_eq_norm] using hf
+  exact exists_dual_measure_of_operators A.subtype v V
+    (fun g ↦ Subtype.ext (unitary_apply_star U hU g)) a hTranslate hApprox
+
+/-- The autocorrelation of a square-integrable function is the Fourier–Stieltjes
+transform of a finite regular positive measure on the Pontryagin dual. -/
+public theorem exists_haar_autocorrelation_measure
+    [MeasurableSpace G] [BorelSpace G] (μ : Measure G) [μ.IsHaarMeasure]
+    [μ.InnerRegularCompactLTTop] [MeasurableSpace (PontryaginDual G)]
+    [BorelSpace (PontryaginDual G)] {f : G → ℂ} (hf : MemLp f 2 μ) :
+    ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
+      ∀ x, (∫ χ, (χ x : ℂ) ∂ρ) = ∫ y, f y * star (f (x⁻¹ * y)) ∂μ := by
+  let T := haarTranslation μ 2
+  let U := T.comp (invMonoidHom (α := G))
+  let v := hf.toLp f
+  obtain ⟨ρ, hFinite, hRegular, hρ⟩ := exists_dual_measure_of_unitary μ U
+    (fun g w ↦ haarTranslation_norm μ 2 g⁻¹ w)
+    (fun w ↦ (haarTranslation_continuous μ 2 (by simp) w).comp continuous_inv) v
+  refine ⟨ρ, hFinite, hRegular, fun x ↦ (hρ x).trans ?_⟩
+  have hTx : ⇑(U x v) =ᵐ[μ] fun y ↦ f ((x⁻¹)⁻¹ * y) :=
+    (Lp.coeFn_compMeasurePreserving v (measurePreserving_mul_left μ (x⁻¹)⁻¹)).trans
+      ((measurePreserving_mul_left μ (x⁻¹)⁻¹).quasiMeasurePreserving.ae_eq_comp hf.coeFn_toLp)
+  rw [L2.inner_def, ← integral_mul_left_eq_self (μ := μ)
+    (fun y ↦ f y * star (f (x⁻¹ * y))) x]
+  apply integral_congr_ae
+  filter_upwards [hf.coeFn_toLp, hTx] with y hy hxy
+  rw [hy, hxy, inv_inv, inv_mul_cancel_left]
+  exact RCLike.inner_apply (f y) (f (x * y))
 
 end RiemannMasullo
