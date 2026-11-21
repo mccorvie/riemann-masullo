@@ -131,7 +131,13 @@ variable (S : Set (Set E)) (hb : ∀ T ∈ S, IsVonNBounded ℂ T)
 include hb hdense in
 /-- Paper: Lemma C.2.1.2, p. 671. The topology of uniform convergence on bounded sets from
 the given family is Hausdorff if their union spans a dense subspace. -/
-theorem uniformConvergenceCLM_t2_of_dense_span : T2Space (E →Lᵤ[ℂ, S] F) := by sorry
+theorem uniformConvergenceCLM_t2_of_dense_span : T2Space (E →Lᵤ[ℂ, S] F) := by
+  let restrict : (E →Lᵤ[ℂ, S] F) → (⋃₀ S → F) := fun f ↦ (⋃₀ S).domRestrict f
+  apply T2Space.of_injective_continuous (f := restrict)
+  · intro f g hfg
+    exact ContinuousLinearMap.ext_on hdense fun x hx ↦ congrFun hfg ⟨x, hx⟩
+  · exact UniformOnFun.uniformContinuous_restrict_toFun.continuous.comp
+      (UniformConvergenceCLM.isEmbedding_coeFn (RingHom.id ℂ) F S).continuous
 
 include hb hdense in
 /-- Paper: Lemma C.2.1.2, p. 671. The same family gives a locally convex vector topology on
