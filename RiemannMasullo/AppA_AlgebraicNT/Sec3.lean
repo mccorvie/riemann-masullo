@@ -4510,7 +4510,17 @@ def finiteLocalMultiplicativeTamagawaMeasure (v : Primes(F)) : Measure (v.adicCo
 the mass in (A.3.2.2) to the integer units. -/
 theorem finiteLocalMultiplicativeTamagawaMeasure_integerUnits (v : Primes(F)) :
     finiteLocalMultiplicativeTamagawaMeasure F v (v.adicCompletionIntegers F).units =
-      differentMass(F, v) := by sorry
+      differentMass(F, v) := by
+  let μ := Measure.haar (G := (v.adicCompletion F)ˣ)
+  have hO : IsOpen ((v.adicCompletionIntegers F).units : Set (v.adicCompletion F)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hK : IsCompact ((v.adicCompletionIntegers F).units : Set (v.adicCompletion F)ˣ) :=
+    Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hpos := hO.measure_pos μ ⟨1, (v.adicCompletionIntegers F).units.one_mem⟩
+  change ((differentMass(F, v) / μ (v.adicCompletionIntegers F).units) • μ)
+    (v.adicCompletionIntegers F).units = _
+  rw [smul_apply, smul_eq_mul]
+  exact ENNReal.div_mul_cancel hpos.ne' (hK.measure_ne_top (μ := μ))
 
 /-- Paper: Lemma A.3.2.3, p. 560. At a finite place the multiplicative
 measure is the weighted additive measure times `qᵥ / (qᵥ - 1)`. -/

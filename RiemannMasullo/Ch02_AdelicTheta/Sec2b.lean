@@ -1414,7 +1414,28 @@ theorem homogeneousAdelicTheta_integrable (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]
 /-- Paper: Lemma 2.2.5.2(2), p. 95. Averaging theta against the character on
 the norm-one idele classes gives a continuous function of the ambient class. -/
 theorem homogeneousAdelicTheta_continuous (ω₁ : χ[F]) (f : ℬ[F]) :
-    Continuous (fun g ↦ ∫ h, classIntegrand ω₁ f g h ∂μ̄₁) := by sorry
+    Continuous (fun g ↦ ∫ h, classIntegrand ω₁ f g h ∂μ̄₁) := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : CompactSpace C₁[F] := (ideleClassGroup_finiteness F).2.1
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hjoint : Continuous (fun p : C[F] × C₁[F] ↦ classIntegrand ω₁ f p.1 p.2) :=
+    ((adelicTheta f).continuous.comp ((continuous_subtype_val.comp continuous_snd).mul
+      continuous_fst)).mul (continuous_subtype_val.comp (ω₁.continuous.comp continuous_snd))
+  -- The integrand, as a function of the ambient class, is continuous for the sup norm.
+  let Φ : C[F] → C(C₁[F], ℂ) := fun g ↦ ⟨classIntegrand ω₁ f g,
+    ((adelicTheta f).continuous.comp (continuous_subtype_val.mul continuous_const)).mul
+      (continuous_subtype_val.comp ω₁.continuous)⟩
+  have hΦ : Continuous Φ := ContinuousMap.continuous_of_continuous_uncurry Φ hjoint
+  -- Integration against the finite measure is Lipschitz for the sup norm.
+  have hint (u : C(C₁[F], ℂ)) : Integrable u μ̄₁ :=
+    u.continuous.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  have hlip : LipschitzWith (μ̄₁.real univ).toNNReal (fun u : C(C₁[F], ℂ) ↦ ∫ h, u h ∂μ̄₁) := by
+    refine LipschitzWith.of_dist_le_mul fun u v ↦ ?_
+    rw [dist_eq_norm, dist_eq_norm, ← integral_sub (hint u) (hint v),
+      Real.coe_toNNReal _ measureReal_nonneg, mul_comm]
+    exact norm_integral_le_of_norm_le_const
+      (.of_forall fun h ↦ (u - v).norm_coe_le_norm h)
+  exact hlip.continuous.comp hΦ
 
 /-- Paper: Definition 2.2.5.1, p. 95. Homogeneous theta is the integral of
 theta at `h * g`, weighted by `ω₁ h` against norm-one class Haar measure. -/

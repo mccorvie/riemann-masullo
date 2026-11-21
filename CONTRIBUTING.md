@@ -8,7 +8,9 @@ of them ask for one thing: prove a single Lean declaration whose statement is al
 1. Pick an [open `proof` issue that nobody has claimed](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed).
    Each one shows the Lean statement, where it is, and the passage of the paper it comes from.
 2. Comment `Claiming` on it. A workflow assigns it to you. If you stop, comment `Releasing` and
-   say what blocked you; that note helps whoever takes it next.
+   say what blocked you; that note helps whoever takes it next. A claim with no pull request
+   after eight hours is released automatically, so that issues do not sit idle; if you are
+   still working, just comment `Claiming` again.
 3. Fork and clone the repository, then run `lake exe cache get` to download the built Mathlib.
 4. Do the work. There are three good outcomes: the declaration is **proved**; it is **split**
    into smaller lemmas that are each left as `sorry`; or you show the statement is **wrong** and

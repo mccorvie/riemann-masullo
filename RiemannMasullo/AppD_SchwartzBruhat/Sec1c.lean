@@ -1450,7 +1450,14 @@ ordinary derivative at the character of frequency ξ is 2πiξ. -/
 theorem bruhatDiffSymbol_real (ξ : ℝ) (χ : PontryaginDual (Multiplicative ℝ))
     (hχ : ∀ x : ℝ, χ (Multiplicative.ofAdd x) = Real.fourierChar (ξ * x)) :
     bruhatDiffSymbol (bruhatDiffGenerator (ContinuousMonoidHom.id (Multiplicative ℝ))) χ =
-      2 * ↑Real.pi * Complex.I * (ξ : ℂ) := by sorry
+      2 * ↑Real.pi * Complex.I * (ξ : ℂ) := by
+  change deriv (fun t : ℝ ↦ (χ (1 * Multiplicative.ofAdd t) : ℂ)) 0 = _
+  simp only [one_mul, hχ]
+  have hZero : deriv (fun t ↦ (Real.fourierChar t : ℂ)) 0 = 2 * ↑Real.pi * Complex.I := by
+    simpa only [Real.fourierChar_apply', mul_zero, Circle.exp_zero, Circle.coe_one, mul_one]
+      using Real.deriv_fourierChar 0
+  simpa only [mul_zero, hZero, Complex.real_smul, mul_comm (ξ : ℂ)] using
+    deriv_comp_mul_left ξ (fun t ↦ (Real.fourierChar t : ℂ)) 0
 
 /-- Paper: Lemma D.1.6.13, p. 769. A character is an eigenfunction of a word
 of first derivatives, with eigenvalue the product of the individual symbols. -/

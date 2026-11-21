@@ -4,16 +4,37 @@ name: Claims
 # assigns it to the commenter; "Releasing" (or "Released") by the holder or a project member undoes
 # that. This lets people without write access claim issues.
 
+#
+# Once an hour, claims on proof issues that are more than eight hours old and that no open pull
+# request refers to are released (scripts/ci/stale_claims.py), so that an issue does not sit idle
+# behind a claim nobody is working on. The holder can claim it again.
+
 on:
   issue_comment:
     types: [created]
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
 
 permissions:
   issues: write
+  pull-requests: read
 
 jobs:
+  release-stale:
+    if: ${{ github.event_name != 'issue_comment' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          sparse-checkout: scripts/ci
+      - run: python3 scripts/ci/stale_claims.py --apply
+
   claim:
-    if: ${{ !github.event.issue.pull_request }}
+    if: ${{ github.event_name == 'issue_comment' && !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
