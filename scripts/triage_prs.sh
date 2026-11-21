@@ -31,13 +31,16 @@ list=$(gh api --paginate "repos/{owner}/{repo}/pulls?state=open&per_page=100" --
 [ -n "$list" ] || { echo "no open pull requests from outside the project"; exit 0; }
 
 # Fetch main and every head once, so the parallel checks do not fight over git's ref locks.
-refs=(main); while read -r n sha who; do refs+=("pull/$n/head:refs/remotes/origin/pr-$n"); done <<<"$list"
-git fetch -q origin "${refs[@]}"
+refs=(main); while read -r n sha who; do refs+=("+pull/$n/head:refs/remotes/origin/pr-$n"); done <<<"$list"
+git fetch -q origin "${refs[@]}" || exit 1
+base=$(git rev-parse --verify 'origin/main^{commit}') || exit 1
+export CHECK_PR_BASE="$base"
 
 check_one() {
   local n=$1 sha=$2 out=".agent/pr-checks/$1-$2.txt"
-  [ -s "$out" ] && return
-  CHECK_PR_NO_FETCH=1 scripts/check_pr.sh "$n" >"$out.tmp" 2>&1
+  # Older reports did not record which head was actually built.
+  if [ -s "$out" ] && grep -qF "checking $sha against " "$out"; then return; fi
+  CHECK_PR_NO_FETCH=1 CHECK_PR_HEAD="$sha" scripts/check_pr.sh "$n" >"$out.tmp" 2>&1
   echo "exit=$?" >>"$out.tmp"; mv "$out.tmp" "$out"
 }
 export -f check_one
@@ -58,8 +61,9 @@ merged=0
 while read -r n sha who; do
   out=".agent/pr-checks/$n-$sha.txt"
   title=$(gh pr view "$n" --json title --jq .title 2>/dev/null)
-  added=$(git diff "origin/main...origin/pr-$n" | grep -E '^\+[^+]' || true)
-  newfiles=$(git diff --diff-filter=A --name-only "origin/main...origin/pr-$n")
+  diff=$(git diff "$base...$sha") || { echo "error  #$n  cannot read the diff; it will be retried"; continue; }
+  added=$(grep -E '^\+[^+]' <<<"$diff" || true)
+  newfiles=$(git diff --diff-filter=A --name-only "$base...$sha") || exit 1
   if grep -q '^exit=0' "$out" && grep -q 'lint and build: pass' "$out" &&
      grep -q 'statements: none of' "$out" && grep -q 'definitions: none contains sorry' "$out"; then
     why=""
@@ -70,12 +74,12 @@ while read -r n sha who; do
     grep -qE '^\+.*Paper:' <<<"$added" && why="${why:+$why, }cites the paper"
     # A name that is also on a removed line is an existing declaration whose first line was
     # rewritten to hold the proof, not a new one.
-    lib=$(git diff "origin/main...origin/pr-$n" -- RiemannMasullo ':(exclude)RiemannMasullo/ForMathlib')
+    lib=$(git diff "$base...$sha" -- RiemannMasullo ':(exclude)RiemannMasullo/ForMathlib') || exit 1
     newdecl=$(comm -23 <(declared + <<<"$lib") <(declared - <<<"$lib") | paste -sd' ')
     [ -z "$newdecl" ] || why="${why:+$why, }new public declaration: $newdecl"
     if [ -z "$why" ]; then
       echo "merge  #$n  $who  $title"
-      if [ $apply = 1 ]; then gh pr merge "$n" --squash >/dev/null 2>&1 && merged=$((merged+1)) || echo "       could not merge (conflict with a merge made meanwhile?)"; fi
+      if [ $apply = 1 ]; then gh pr merge "$n" --squash --match-head-commit "$sha" >/dev/null 2>&1 && merged=$((merged+1)) || echo "       could not merge (head or base changed?)"; fi
     else
       echo "read   #$n  $who  ($why)  $title"
     fi

@@ -17,30 +17,33 @@ command -v bwrap >/dev/null || { echo "bwrap (bubblewrap) is required" >&2; exit
 wt="$(dirname "$main")/$(basename "$main")-wt/pr-$n"
 # CHECK_PR_NO_FETCH=1 when the caller (scripts/triage_prs.sh) has already fetched everything,
 # so that several checks can run side by side without contending for git's ref locks.
-[ -n "${CHECK_PR_NO_FETCH:-}" ] || git fetch -q origin main "pull/$n/head:refs/remotes/origin/pr-$n"
+[ -n "${CHECK_PR_NO_FETCH:-}" ] || git fetch -q origin main "+pull/$n/head:refs/remotes/origin/pr-$n"
+base=$(git rev-parse --verify "${CHECK_PR_BASE:-origin/main}^{commit}")
+head=$(git rev-parse --verify "${CHECK_PR_HEAD:-origin/pr-$n}^{commit}")
 [ -d "$wt" ] && git worktree remove --force "$wt"
 # A detached worktree: creating a branch would write to .git/config, which checks running side
 # by side would fight over.
-git worktree add -q --detach "$wt" origin/main
+git worktree add -q --detach "$wt" "$base"
 trap 'cd "$main"; git worktree remove --force "$wt" 2>/dev/null || true' EXIT
 cd "$wt"
 mkdir -p .lake .agent && ln -sfn "$main/.lake/packages" .lake/packages
 
-files=$(git diff --name-only "origin/main...origin/pr-$n")
+echo "checking $head against $base"
+files=$(git diff --name-only "$base...$head")
 echo "files changed:"; echo "$files" | sed 's/^/  /'
 stray=$(echo "$files" | awk '!/^RiemannMasullo\/.*\.lean$/ || /^RiemannMasullo\/External\//')
 [ -z "$stray" ] || { echo "REFUSED: changes outside the library; read these by hand before running anything:"; echo "$stray" | sed 's/^/  /'; exit 1; }
 
 # The starting point, built from main's own code, which is trusted. It is the same for every
 # pull request checked against one commit of main, so it is computed once and kept.
-basefile="$main/.agent/base/main-$(git rev-parse origin/main).txt"
+basefile="$main/.agent/base/pinned-main-$base.txt"
 if [ ! -s "$basefile" ]; then
   mkdir -p "$main/.agent/base"
   scripts/signatures.sh >"$basefile.$$" && mv "$basefile.$$" "$basefile"
 fi
 cp "$basefile" .agent/base.txt
-git merge -q --no-edit "origin/pr-$n" || { echo "REFUSED: does not merge cleanly into main"; exit 1; }
-echo "sorries added: $(git diff origin/main | grep -E '^\+[^+]' | grep -cw sorry || true)"
+git merge -q --no-edit "$head" || { echo "REFUSED: does not merge cleanly into main"; exit 1; }
+echo "sorries added: $(git diff "$base" HEAD | grep -E '^\+[^+]' | grep -cw sorry || true)"
 
 sandboxed() {
   bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /run --tmpfs "$HOME" \
