@@ -1,6 +1,8 @@
 module
 
+public import Mathlib.AlgebraicTopology.FundamentalGroupoid.SimplyConnected
 public import Mathlib.Analysis.Normed.Module.Basic
+public import Mathlib.Topology.Connected.LocallyPathConnected
 public import Mathlib.Topology.Covering.AddCircle
 public import Mathlib.Topology.Instances.AddCircle.Real
 public import Mathlib.Topology.Instances.RealVectorSpace
@@ -14,39 +16,47 @@ public section
 
 namespace RiemannMasullo
 
+/-- A continuous homomorphism from a simply connected, locally path-connected
+topological additive group to the circle lifts to a continuous real-valued homomorphism. -/
+theorem exists_addCircle_addMonoidHom_lift {A : Type*} [AddGroup A] [TopologicalSpace A]
+    [ContinuousAdd A] [SimplyConnectedSpace A] [LocallyPathConnectedSpace A]
+    (a : A →+ AddCircle (1 : ℝ)) (ha : Continuous a) :
+    ∃ L : A →+ ℝ, Continuous L ∧ ∀ x, (L x : AddCircle (1 : ℝ)) = a x := by
+  let q : ℝ → AddCircle (1 : ℝ) := (↑)
+  have hq : IsCoveringMap q := AddCircle.isCoveringMap_coe _
+  obtain ⟨L, ⟨hL0, hL⟩, _⟩ := hq.existsUnique_continuousMap_lifts
+    (⟨a, ha⟩ : C(A, AddCircle (1 : ℝ))) 0 0 (by simp [q])
+  have hLift (t : A) : q (L t) = a t := congrFun hL t
+  have hAdd (s t : A) : L (s + t) = L s + L t := by
+    have hAgree : q ∘ (fun p : A × A ↦ L (p.1 + p.2)) =
+        q ∘ (fun p : A × A ↦ L p.1 + L p.2) := by
+      funext p
+      change q (L (p.1 + p.2)) = ((L p.1 + L p.2 : ℝ) : AddCircle (1 : ℝ))
+      rw [AddCircle.coe_add]
+      change q (L (p.1 + p.2)) = q (L p.1) + q (L p.2)
+      simp only [hLift, map_add]
+    exact congrFun (hq.eq_of_comp_eq (L.continuous.comp (continuous_fst.add continuous_snd))
+      ((L.continuous.comp continuous_fst).add (L.continuous.comp continuous_snd))
+      hAgree (0, 0) (by simp [hL0])) (s, t)
+  exact ⟨{ toFun := L, map_zero' := hL0, map_add' := hAdd }, L.continuous, hLift⟩
+
 /-- A continuous homomorphism from a real normed vector space to the additive
 circle lifts to a continuous real-linear functional. -/
 theorem exists_addCircle_coe_linearMap_eq
     {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
     (a : E →+ AddCircle (1 : ℝ)) (ha : Continuous a) :
     ∃ l : E →L[ℝ] ℝ, ∀ y, (l y : AddCircle (1 : ℝ)) = a y := by
-  let p : ℝ → AddCircle (1 : ℝ) := (↑)
-  have hp := AddCircle.isCoveringMap_coe (1 : ℝ)
-  obtain ⟨l, ⟨hl0, hl⟩, _⟩ := hp.existsUnique_continuousMap_lifts
-    (⟨a, ha⟩ : C(E, AddCircle (1 : ℝ))) 0 0 (by simp)
-  have hLiftAt (y : E) : p (l y) = a y := congrFun hl y
-  have hAdd (y w : E) : l (y + w) = l y + l w := by
-    have hAgree : p ∘ (fun b : E × E ↦ l (b.1 + b.2)) =
-        p ∘ (fun b : E × E ↦ l b.1 + l b.2) := by
-      funext b
-      change p (l (b.1 + b.2)) = ((l b.1 + l b.2 : ℝ) : AddCircle (1 : ℝ))
-      rw [AddCircle.coe_add]
-      change p (l (b.1 + b.2)) = p (l b.1) + p (l b.2)
-      simp only [hLiftAt, map_add]
-    exact congrFun (hp.eq_of_comp_eq (l.continuous.comp (continuous_fst.add continuous_snd))
-      ((l.continuous.comp continuous_fst).add (l.continuous.comp continuous_snd))
-      hAgree (0, 0) (by simp [hl0])) (y, w)
-  let addLift : E →+ ℝ := ⟨⟨l, hl0⟩, hAdd⟩
-  exact ⟨addLift.toRealLinearMap l.continuous, hLiftAt⟩
+  obtain ⟨L, hL, hLift⟩ := exists_addCircle_addMonoidHom_lift a ha
+  exact ⟨L.toRealLinearMap hL, hLift⟩
 
 /-- A continuous homomorphism from the real line to the additive circle lifts to
 multiplication by a real scalar. -/
 theorem exists_addCircle_coe_mul_eq (a : ℝ →+ AddCircle (1 : ℝ)) (ha : Continuous a) :
     ∃ c : ℝ, ∀ t : ℝ, ((t * c : ℝ) : AddCircle (1 : ℝ)) = a t := by
-  obtain ⟨l, hl⟩ := exists_addCircle_coe_linearMap_eq a ha
-  refine ⟨l 1, fun t ↦ ?_⟩
-  have ht : l t = t * l 1 := by
-    simpa only [smul_eq_mul, mul_one] using l.map_smul t (1 : ℝ)
-  exact ht ▸ hl t
+  obtain ⟨L, hL, hLift⟩ := exists_addCircle_addMonoidHom_lift a ha
+  refine ⟨L 1, fun t ↦ ?_⟩
+  have hLinear : L t = t * L 1 := by
+    simpa only [smul_eq_mul, mul_one] using map_real_smul L hL t (1 : ℝ)
+  exact hLinear ▸ hLift t
 
 end RiemannMasullo

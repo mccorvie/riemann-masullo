@@ -14,12 +14,15 @@ import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Operator.Banach
 import Mathlib.LinearAlgebra.Dual.Lemmas
 import Mathlib.MeasureTheory.Function.ConvergenceInMeasure
+import Mathlib.MeasureTheory.Integral.Bochner.ContinuousLinearMap
 import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
 import Mathlib.Topology.Algebra.Module.Star
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.RegularDomination
+import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.WithDensityVec
 
 /-!
 # Integration in the sense of Pettis
@@ -533,6 +536,87 @@ theorem isCompact_closedConvexHull_weakCompletion_range [CompactSpace X]
   rw [closedConvexHull_eq_closure_convexHull]
   exact hCompact.totallyBounded.convexHull.closure.isCompact_of_isClosed isClosed_closure
 
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E] in
+/-- On a compact parameter space, points of the closed convex hull of the evaluations
+and zero have the same scalar moments as a regular subprobability measure. -/
+private theorem exists_pettis_subprobability_of_mem_hull {Y : Type*}
+    [TopologicalSpace Y] [T2Space Y] [CompactSpace Y] [MeasurableSpace Y] [BorelSpace Y]
+    (g : Y → E) (hg : Continuous g) {a : PettisWeakCompletion E}
+    (ha : a ∈ closure (convexHull ℝ (insert 0 (range (toPettisWeakCompletion E ∘ g))))) :
+    ∃ ν : Measure Y, ν.Regular ∧ ν univ ≤ 1 ∧ ∀ φ : StrongDual ℂ E,
+      (show Module.Dual ℂ (StrongDual ℂ E) from a) φ = ∫ y, φ (g y) ∂ν := by
+  let t (φ : StrongDual ℂ E) := BoundedContinuousFunction.mkOfCompact
+    (⟨fun y ↦ φ (g y), φ.continuous.comp hg⟩ : C(Y, ℂ))
+  let M := {p : FiniteMeasure Y | p.mass ≤ 1}
+  let moments (p : FiniteMeasure Y) (φ : StrongDual ℂ E) := ∫ y, t φ y ∂(p : Measure Y)
+  have hm : Continuous moments := by
+    apply continuous_pi
+    intro φ
+    rw [continuous_iff_continuousAt]
+    intro p
+    exact (FiniteMeasure.tendsto_iff_forall_integral_rclike_tendsto ℂ).mp
+      (tendsto_id (x := 𝓝 p)) (t φ)
+  have hcompact : IsCompact (moments '' M) :=
+    (isCompact_setOfPred_finiteMeasure_le_of_compactSpace Y 1).image hm
+  have hconv : Convex ℝ (moments '' M) := by
+    rintro _ ⟨p, hp, rfl⟩ _ ⟨q, hq, rfl⟩ b c hb hc hbc
+    let m := ENNReal.ofReal b • (p : Measure Y)
+    let n := ENNReal.ofReal c • (q : Measure Y)
+    let r : FiniteMeasure Y := ⟨m + n, ⟨by
+      simp only [m, n, add_apply, smul_apply, smul_eq_mul]
+      finiteness⟩⟩
+    refine ⟨r, ?_, ?_⟩
+    · change r.mass ≤ 1
+      rw [← ENNReal.coe_le_coe, FiniteMeasure.ennreal_mass]
+      change (m + n) univ ≤ 1
+      simp only [m, n, add_apply, smul_apply, smul_eq_mul,
+        ← FiniteMeasure.ennreal_mass]
+      calc
+        _ ≤ ENNReal.ofReal b * 1 + ENNReal.ofReal c * 1 := by
+          gcongr
+          · exact_mod_cast (show p.mass ≤ 1 from hp)
+          · exact_mod_cast (show q.mass ≤ 1 from hq)
+        _ = 1 := by simp [← ENNReal.ofReal_add hb hc, hbc]
+    · funext φ
+      change ∫ y, t φ y ∂(m + n) = b • moments p φ + c • moments q φ
+      rw [integral_add_measure (((t φ).integrable (μ := (p : Measure Y))).smul_measure
+        ENNReal.ofReal_ne_top) (((t φ).integrable (μ := (q : Measure Y))).smul_measure
+        ENNReal.ofReal_ne_top)]
+      simp [moments, ENNReal.toReal_ofReal hb, ENNReal.toReal_ofReal hc]
+  let ev : PettisWeakCompletion E →ₗ[ℝ] (StrongDual ℂ E → ℂ) :=
+    (LinearMap.ltoFun ℂ (StrongDual ℂ E) ℂ ℂ).restrictScalars ℝ
+  have hev : Continuous ev := continuous_induced_dom
+  have hsub : insert 0 (range (toPettisWeakCompletion E ∘ g)) ⊆ ev ⁻¹' (moments '' M) := by
+    rintro z (rfl | ⟨y, rfl⟩)
+    · refine ⟨0, by simp [M], funext fun φ ↦ ?_⟩
+      exact integral_zero_measure _
+    · let p : FiniteMeasure Y := ⟨Measure.dirac y, inferInstance⟩
+      refine ⟨p, ?_, funext fun φ ↦ integral_dirac (t φ) y⟩
+      change (Measure.dirac y univ).toNNReal ≤ 1
+      simp
+  obtain ⟨p, hp, heq⟩ := closure_minimal (convexHull_min hsub (hconv.linear_preimage ev))
+    (hcompact.isClosed.preimage hev) ha
+  -- Regularization preserves the mass and the real and imaginary parts of each moment.
+  obtain ⟨ν, hνreg, hνfin, hν⟩ := Measure.exists_regular_eq_of_compactSpace (p : Measure Y)
+  refine ⟨ν, hνreg, ?_, fun φ ↦ ?_⟩
+  · have hmass : (p : Measure Y) univ = ν univ := by
+      apply (ENNReal.toReal_eq_toReal_iff' (measure_ne_top _ _) (measure_ne_top _ _)).mp
+      simpa [measureReal_def] using hν (1 : BoundedContinuousFunction Y ℝ)
+    rw [← hmass, ← FiniteMeasure.ennreal_mass]
+    exact_mod_cast (show p.mass ≤ 1 from hp)
+  · calc
+      _ = ∫ y, t φ y ∂(p : Measure Y) := (congrFun heq φ).symm
+      _ = ∫ y, t φ y ∂ν := by
+        have hpint := (t φ).integrable (μ := (p : Measure Y))
+        have hνint := (t φ).integrable (μ := ν)
+        apply Complex.ext
+        · let u := BoundedContinuousFunction.mkOfCompact
+            ⟨fun y ↦ (t φ y).re, Complex.continuous_re.comp (t φ).continuous⟩
+          exact (integral_re hpint).symm.trans ((hν u).trans (integral_re hνint))
+        · let u := BoundedContinuousFunction.mkOfCompact
+            ⟨fun y ↦ (t φ y).im, Complex.continuous_im.comp (t φ).continuous⟩
+          exact (integral_im hpint).symm.trans ((hν u).trans (integral_im hνint))
+
 /-- Paper: Theorem C.4.3.2(2), p. 712. The closed absolutely convex hull of the
 image in the weak completion consists of the weak integrals against complex
 Radon measures of total variation at most one.
@@ -542,7 +626,75 @@ theorem closedAbsConvexHull_eq_pettisWeakIntegrals_unitBall [CompactSpace X]
     let hull := closure (convexHull ℝ (balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f)))))
     hull = {a | ∃ μ : ComplexMeasure X, μ.variation.Regular ∧ μ.variation univ ≤ 1 ∧
       ∃ hi : PettisWeaklyIntegrable (.complex μ) f,
-        pettisWeakIntegral (.complex μ) f hi = a} := by sorry
+        pettisWeakIntegral (.complex μ) f hi = a} := by
+  intro hull
+  apply Subset.antisymm
+  · intro a ha
+    -- Realize every balanced generator using a point of the closed complex unit disk.
+    let D := Metric.closedBall (0 : ℂ) 1
+    let Y := X × D
+    let : CompactSpace D := isCompact_iff_compactSpace.mp (isCompact_closedBall _ _)
+    let q : Y → X := Prod.fst
+    let w : Y → ℂ := fun y ↦ y.2.val
+    have hq : Continuous q := continuous_fst
+    have hw : Continuous w := continuous_subtype_val.comp continuous_snd
+    have hw1 (y : Y) : ‖w y‖ ≤ 1 := by
+      simpa only [D, Metric.mem_closedBall, dist_zero_right] using y.2.property
+    let g (y : Y) := w y • f (q y)
+    have hg : Continuous g := hw.smul (hf.comp hq)
+    have hsub : balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f))) ⊆
+        insert 0 (range (toPettisWeakCompletion E ∘ g)) := by
+      intro v hv
+      obtain ⟨c, hc, u, hu, rfl⟩ := mem_balancedHull_iff.mp hv
+      rcases hu with rfl | ⟨x, rfl⟩
+      · simp
+      · refine mem_insert_of_mem _ ⟨(x, ⟨c, by simpa [D] using hc⟩), ?_⟩
+        exact (toPettisWeakCompletion E).map_smul _ _
+    let : MeasurableSpace Y := borel Y
+    let : BorelSpace Y := ⟨rfl⟩
+    obtain ⟨ν, hνreg, hνmass, hm⟩ := exists_pettis_subprobability_of_mem_hull g hg
+      (closure_mono (convexHull_mono hsub) ha)
+    have : IsFiniteMeasure ν := ⟨hνmass.trans_lt (by simp)⟩
+    -- Weight the subprobability by its disk coordinate and project back to X.
+    have hwi : Integrable w ν := hw.integrable_of_hasCompactSupport (.of_compactSpace _)
+    let η := ν.withDensityᵥ w
+    let μ := η.map q
+    have hvar : η.variation ≤ ν := by
+      rw [show η.variation = _ from Measure.variation_withDensityᵥ hwi]
+      refine (withDensity_mono (g := 1) (ae_of_all _ fun y ↦ ?_)).trans_eq withDensity_one
+      change (↑‖w y‖₊ : ℝ≥0∞) ≤ 1
+      exact_mod_cast (show ‖w y‖₊ ≤ 1 from hw1 y)
+    have hdom : μ.variation ≤ ν.map q :=
+      VectorMeasure.variation_map_le.trans (Measure.map_mono hvar hq.measurable)
+    have : (ν.map q).InnerRegular := Measure.InnerRegular.map_of_continuous hq
+    have : IsFiniteMeasure η.variation := isFiniteMeasure_of_le ν hvar
+    have : IsFiniteMeasure μ.variation := isFiniteMeasure_of_le (ν.map q) hdom
+    have hi : PettisWeaklyIntegrable (.complex μ) f := fun φ ↦
+      show Integrable (fun x ↦ φ (f x)) μ.variation from
+        (φ.continuous.comp hf).integrable_of_hasCompactSupport (.of_compactSpace _)
+    refine ⟨μ, regular_of_le_finite_regular _ _ hdom,
+      (hdom univ).trans (by simpa [Measure.map_apply hq.measurable] using hνmass), hi, ?_⟩
+    apply LinearMap.ext
+    intro φ
+    let t := BoundedContinuousFunction.mkOfCompact
+      (⟨fun x ↦ φ (f x), φ.continuous.comp hf⟩ : C(X, ℂ))
+    have ht := t.continuous.comp hq
+    change μ.integral t (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [hm φ, VectorMeasure.integral_map hq.measurable t.continuous.aestronglyMeasurable
+      (show η.Integrable (t ∘ q) from ht.integrable_of_hasCompactSupport (.of_compactSpace _))]
+    change (ν.withDensityᵥ w).integral (t ∘ q) (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [integral_withDensityᵥ_mul hwi ht.stronglyMeasurable (norm_nonneg t)
+      (fun y ↦ t.norm_coe_le_norm (q y))]
+    apply integral_congr_ae
+    exact ae_of_all _ fun y ↦ by simp [g, t, mul_comm, smul_eq_mul]
+  · rintro a ⟨μ, hreg, hmass, hi, rfl⟩
+    have : IsFiniteMeasure μ.variation := ⟨hmass.trans_lt (by simp)⟩
+    obtain ⟨u, hu, heq⟩ := pettisWeakIntegral_mem_smul_closedAbsConvexHull μ f hf hi
+    rw [← heq]
+    have : ContinuousSMul ℝ (PettisWeakCompletion E) := IsScalarTower.continuousSMul ℂ
+    refine (convex_convexHull ℝ _).closure.smul_mem_of_zero_mem ?_ hu ?_
+    · exact subset_closure (subset_convexHull _ _ (subset_balancedHull _ (mem_insert _ _)))
+    · exact ⟨ENNReal.toReal_nonneg, by simpa using ENNReal.toReal_mono ENNReal.one_ne_top hmass⟩
 
 set_option linter.unusedSectionVars false in
 /-- Paper: Theorem C.4.3.2(2), p. 712. The closed absolutely convex hull of the

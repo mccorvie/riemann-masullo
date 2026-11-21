@@ -4,6 +4,8 @@ public import RiemannMasullo.AppC_LCTVS.Sec4
 public import Mathlib.Analysis.Calculus.ContDiff.Basic
 public import Mathlib.Analysis.Calculus.Deriv.Basic
 import Mathlib.Analysis.Calculus.Deriv.Slope
+import Mathlib.Analysis.Calculus.Deriv.Shift
+import Mathlib.Analysis.Calculus.BumpFunction.InnerProduct
 public import Mathlib.Analysis.InnerProductSpace.PiL2
 public import Mathlib.Topology.Compactness.Paracompact
 public import RiemannMasullo.ForMathlib.Topology.ContinuousMap.CompactlySupported
@@ -12,6 +14,7 @@ public import RiemannMasullo.ForMathlib.Topology.UniformSpace.CompactConvergence
 import Mathlib.Analysis.Calculus.LineDeriv.Basic
 import Mathlib.Data.Finsupp.ToDFinsupp
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
+import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Topology.Compactness.LocallyCompact
 import RiemannMasullo.ForMathlib.Topology.Compactness.Paracompact
@@ -1501,6 +1504,149 @@ theorem const_mem_vectorSmoothSpace (Ω : Set V) (z : E) :
 -- TODO(paper-gap): In C.5.1.25, the prose identifies scalar smoothness with the usual
 -- concept. Under that reading x ↦ x² on ℝ disproves the reverse implication.
 
+/-- The scalar weak partial gives the derivative along the corresponding coordinate line. -/
+private theorem hasDerivAt_coordinateLine {Ω : Set V} (hΩ : IsOpen Ω) {i : Fin d}
+    {f a : V → ℂ}
+    (ha : HasWeakPartialOn i f (fun x : Ω ↦ toPettisWeakCompletion ℂ (a x)))
+    (x : V) (t : k) (ht : x + t • EuclideanSpace.single i 1 ∈ Ω) :
+    HasDerivAt (fun s : k ↦ f (x + s • EuclideanSpace.single i 1))
+      (a (x + t • EuclideanSpace.single i 1)) t := by
+  let e : V := EuclideanSpace.single i 1
+  let y : Ω := ⟨x + t • e, ht⟩
+  have hnear : {s : k | (y : V) + s • e ∈ Ω} ∈ 𝓝 0 :=
+    (hΩ.preimage (continuous_const.add (continuous_id.smul continuous_const))).mem_nhds
+      (by
+        change (y : V) + (0 : k) • e ∈ Ω
+        simpa only [zero_smul, add_zero] using y.property)
+  have h : HasDerivAt (fun s : k ↦ f ((y : V) + s • e)) (a y) 0 :=
+    (ha (ContinuousLinearMap.id ℂ ℂ) y).hasDerivAt hnear
+  have h' : HasDerivAt (fun s : k ↦ f ((y : V) + s • e)) (a y) (-t + t) := by
+    simpa only [neg_add_cancel] using h
+  refine (h'.comp_const_add (-t) t).congr_of_eventuallyEq ?_
+  exact Eventually.of_forall fun s ↦ by
+    change f (x + s • e) = f ((x + t • e) + (-t + s) • e)
+    rw [add_assoc, ← add_smul, ← add_assoc, add_neg_cancel, zero_add]
+
+/-- Two scalar orders suffice to represent a coordinate derivative at a point in a
+quasi-complete target. -/
+private theorem exists_vector_partial_at {Ω : Set V} (hΩ : IsOpen Ω) {f : V → E}
+    (hf : ∀ φ : StrongDual ℂ E, VectorContDiffOrderOn (φ ∘ f) Ω 2)
+    (i : Fin d) (x : Ω) :
+    letI := IsTopologicalAddGroup.rightUniformSpace E
+    QuasiCompleteSpace ℂ E →
+      ∃ z : E, ∀ φ : StrongDual ℂ E,
+        HasDerivAt (fun t : k ↦ φ (f ((x : V) + t • EuclideanSpace.single i 1))) (φ z) 0 := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  intro hcomplete
+  let line (t : k) := (x : V) + t • EuclideanSpace.single i 1
+  let S := line ⁻¹' Ω
+  have hline : Continuous line := continuous_const.add (continuous_id.smul continuous_const)
+  have hS : IsOpen S := hΩ.preimage hline
+  have hzero : 0 ∈ S := by simp [S, line, x.property]
+  have hscalar (φ : StrongDual ℂ E) : ContDiffOn k 2 (φ ∘ f ∘ line) S := by
+    obtain ⟨a, ha, _, ha₁⟩ := hf φ i
+    obtain ⟨b, hb, hbc, _⟩ := ha₁ i
+    have h₁ (t : k) (ht : t ∈ S) : HasDerivAt (φ ∘ f ∘ line) (a (line t)) t :=
+      hasDerivAt_coordinateLine hΩ ha x t ht
+    have h₂ (t : k) (ht : t ∈ S) : HasDerivAt (a ∘ line) (b (line t)) t :=
+      hasDerivAt_coordinateLine hΩ hb x t ht
+    have ha' : ContDiffOn k 1 (a ∘ line) S := by
+      apply (contDiffOn_succ_iff_deriv_of_isOpen (n := 0) hS).mpr
+      refine ⟨fun t ht ↦ (h₂ t ht).differentiableAt.differentiableWithinAt, by simp, ?_⟩
+      apply contDiffOn_zero.mpr
+      exact (hbc.comp hline.continuousOn (fun _ ht ↦ ht)).congr
+        (fun t ht ↦ (h₂ t ht).deriv)
+    apply (contDiffOn_succ_iff_deriv_of_isOpen (n := 1) hS).mpr
+    exact ⟨fun t ht ↦ (h₁ t ht).differentiableAt.differentiableWithinAt, by simp,
+      ha'.congr (fun t ht ↦ (h₁ t ht).deriv)⟩
+  -- Keep the real parameter in the line's domain with a cutoff equal to one near zero.
+  obtain ⟨r, hr, hrS⟩ := Metric.mem_nhds_iff.mp (hS.mem_nhds hzero)
+  let bump : ContDiffBump (0 : ℝ) := ⟨r / 2, r, half_pos hr, half_lt_self hr⟩
+  let u (t : ℝ) : k := (t * bump t) • (1 : k)
+  have huS (t : ℝ) : u t ∈ S := by
+    by_cases ht : ‖t‖ < r
+    · apply hrS
+      rw [Metric.mem_ball, dist_zero_right, show ‖u t‖ = ‖t‖ * bump t by
+        simp [u, norm_smul, Real.norm_eq_abs, abs_of_nonneg bump.nonneg]]
+      exact (mul_le_of_le_one_right (norm_nonneg _) bump.le_one).trans_lt ht
+    · have hb : bump t = 0 := bump.zero_of_le_dist (by simpa using le_of_not_gt ht)
+      simpa only [u, hb, mul_zero, zero_smul] using hzero
+  have hu : ContDiff ℝ 2 u := (contDiff_id.mul bump.contDiff).smul contDiff_const
+  have hderiv : HasDerivAt u (1 : k) 0 := by
+    have h : HasDerivAt (fun t : ℝ ↦ t • (1 : k)) (1 : k) 0 := by
+      simpa only [one_smul] using (hasDerivAt_id' (0 : ℝ)).smul_const (1 : k)
+    apply h.congr_of_eventuallyEq
+    filter_upwards [bump.eventuallyEq_one] with t ht
+    change bump t = 1 at ht
+    simp only [u, ht, mul_one]
+  have hu0 : u 0 = 0 := by simp [u]
+  obtain ⟨z, hz⟩ := exists_hasDerivAt_eval_zero_of_contDiff (F := f ∘ line ∘ u)
+    (fun φ ↦ (hscalar φ).restrict_scalars ℝ |>.comp_contDiff hu huS) hcomplete
+  refine ⟨z, fun φ ↦ ?_⟩
+  have hφ := ((hscalar φ).differentiableOn (by simp) 0 hzero).differentiableAt (hS.mem_nhds hzero)
+  have hcomp := hφ.hasDerivAt.scomp_of_eq 0 hderiv hu0.symm
+  have heq : φ z = deriv (φ ∘ f ∘ line) 0 := by
+    simpa only [one_smul] using (hz φ).unique hcomp
+  exact hφ.hasDerivAt.congr_deriv heq.symm
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E] in
+/-- The recursive order conditions depend only on the values on the domain. -/
+private theorem vectorContDiffOrderOn_congr {Ω : Set V} {f g : V → E} {m : ℕ}
+    (hf : VectorContDiffOrderOn f Ω m) (heq : EqOn g f Ω) :
+    VectorContDiffOrderOn g Ω m := by
+  cases m with
+  | zero =>
+    refine hf.subset ?_
+    rintro _ ⟨x, hx, y, hy, hxy, hdist, rfl⟩
+    exact ⟨x, hx, y, hy, hxy, hdist, by rw [heq hx, heq hy]⟩
+  | succ m =>
+    intro i
+    obtain ⟨a, ha, hc, hm⟩ := hf i
+    refine ⟨a, fun φ x ↦ (ha φ x).congr (fun t ht ↦ congrArg φ (heq ht)) ?_, hc, hm⟩
+    simpa only [zero_smul, add_zero] using congrArg φ (heq x.property)
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] in
+/-- Order zero follows from scalar order zero by weak boundedness. -/
+private theorem vectorContDiffOrderOn_zero_of_scalar {Ω : Set V} {f : V → E}
+    (hf : ∀ φ : StrongDual ℂ E, VectorContDiffOrderOn (φ ∘ f) Ω 0) :
+    VectorContDiffOrderOn f Ω 0 := by
+  apply (isVonNBounded_iff_dual_image _).mpr
+  intro φ
+  apply ((NormedSpace.isVonNBounded_iff ℂ).mp (hf φ)).subset
+  rintro _ ⟨_, ⟨x, hx, y, hy, hxy, hdist, rfl⟩, rfl⟩
+  exact ⟨x, hx, y, hy, hxy, hdist, by simp⟩
+
+omit [PolynormableSpace ℂ E] [T2Space E] in
+/-- Bounded normalized differences imply continuity on the domain. -/
+private theorem continuousOn_of_vectorContDiffOrderOn_zero {Ω : Set V} {f : V → E}
+    (hf : VectorContDiffOrderOn f Ω 0) : ContinuousOn f Ω := by
+  intro x hx
+  apply tendsto_sub_nhds_zero_iff.mp
+  have ht : Tendsto (fun y : V ↦ (‖y - x‖ : ℂ)) (𝓝[Ω] x) (𝓝 0) := by
+    have h : Continuous fun y : V ↦ (‖y - x‖ : ℂ) :=
+      Complex.continuous_ofReal.comp (continuous_id.sub continuous_const).norm
+    simpa using (h.tendsto x).mono_left nhdsWithin_le_nhds
+  have hnear : ∀ᶠ y in 𝓝[Ω] x, ‖y - x‖ < 1 := by
+    filter_upwards [mem_nhdsWithin_of_mem_nhds (Metric.ball_mem_nhds x zero_lt_one)] with y hy
+    simpa only [Metric.mem_ball, dist_eq_norm] using hy
+  let q (y : V) := ((‖y - x‖⁻¹ : ℝ) : ℂ) • (f y - f x)
+  let B : Set E := {z | ∃ a ∈ Ω, ∃ b ∈ Ω, a ≠ b ∧ ‖b - a‖ ≤ 1 ∧
+    z = ((‖b - a‖⁻¹ : ℝ) : ℂ) • (f b - f a)}
+  have hb : IsVonNBounded ℂ (insert 0 B) := (isVonNBounded_insert (0 : E)).mpr hf
+  have hq : ∀ᶠ y in 𝓝[Ω] x, q y ∈ insert 0 B := by
+    filter_upwards [self_mem_nhdsWithin, hnear] with y hy hdist
+    rcases eq_or_ne x y with rfl | hne
+    · exact mem_insert_iff.mpr (Or.inl (by simp [q]))
+    · exact mem_insert_of_mem _ ⟨x, hx, y, hy, hne, hdist.le, rfl⟩
+  apply (hb.smul_tendsto_zero hq ht).congr
+  intro y
+  change (‖y - x‖ : ℂ) • (((‖y - x‖⁻¹ : ℝ) : ℂ) • (f y - f x)) = f y - f x
+  rcases eq_or_ne y x with rfl | hne
+  · simp
+  · rw [Complex.ofReal_inv, smul_inv_smul₀ (by simpa using sub_ne_zero.mpr hne)]
+
+-- Retain the dimension hypothesis from the paper. The proof also works in dimension zero.
+set_option linter.unusedVariables false in
 /-- Paper: Corollary C.5.1.25, p. 734. In a quasi-complete space, the all-order
 condition is equivalent to the same all-order condition on every scalar evaluation.
 Deviation: The scalar side uses Definition C.5.1.23, including its order-zero
@@ -1508,7 +1654,45 @@ boundedness condition. Ordinary scalar smoothness alone does not suffice. -/
 theorem vectorSmoothOn_iff_scalar {Ω : Set V} (hΩ : IsOpen Ω) (hd : 1 ≤ d) (f : V → E) :
     letI := IsTopologicalAddGroup.rightUniformSpace E
     QuasiCompleteSpace ℂ E →
-      (VectorSmoothOn f Ω ↔ ∀ φ : StrongDual ℂ E, VectorSmoothOn (φ ∘ f) Ω) := by sorry
+      (VectorSmoothOn f Ω ↔ ∀ φ : StrongDual ℂ E, VectorSmoothOn (φ ∘ f) Ω) := by
+  classical
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  intro hcomplete
+  constructor
+  · intro hf φ m
+    have hm := hf m
+    clear hf
+    induction m generalizing f with
+    | zero =>
+      refine (hm.image φ).subset ?_
+      rintro _ ⟨x, hx, y, hy, hxy, hdist, rfl⟩
+      exact ⟨_, ⟨x, hx, y, hy, hxy, hdist, rfl⟩, by simp⟩
+    | succ m ih =>
+      intro i
+      obtain ⟨g, hg, hc, hgₘ⟩ := hm i
+      exact ⟨φ ∘ g, fun ψ x ↦ hg (ψ.comp φ) x, φ.continuous.comp_continuousOn hc, ih g hgₘ⟩
+  · intro hf m
+    induction m generalizing f with
+    | zero => exact vectorContDiffOrderOn_zero_of_scalar (fun φ ↦ hf φ 0)
+    | succ m ih =>
+      intro i
+      choose a ha using fun x : Ω ↦ exists_vector_partial_at hΩ (fun φ ↦ hf φ 2) i x hcomplete
+      let g (x : V) := if hx : x ∈ Ω then a ⟨x, hx⟩ else 0
+      have hg (φ : StrongDual ℂ E) (x : Ω) :
+          HasDerivAt (fun t : k ↦ φ (f ((x : V) + t • EuclideanSpace.single i 1))) (φ (g x)) 0 := by
+        simpa only [g, dite_eq_left x.property] using ha x φ
+      have hgs (φ : StrongDual ℂ E) : VectorSmoothOn (φ ∘ g) Ω := by
+        intro n
+        obtain ⟨b, hb, _, hn⟩ := hf φ (n + 1) i
+        apply vectorContDiffOrderOn_congr hn
+        intro x hx
+        have hz := hasDerivAt_coordinateLine hΩ hb x 0 (by simpa using hx)
+        rw [zero_smul, add_zero] at hz
+        exact (hg φ ⟨x, hx⟩).unique hz
+      exact ⟨g, fun φ x ↦ (hg φ x).hasDerivWithinAt,
+        continuousOn_of_vectorContDiffOrderOn_zero
+          (vectorContDiffOrderOn_zero_of_scalar (fun φ ↦ hgs φ 0)),
+        ih g hgs⟩
 
 end HigherDifferentiability
 

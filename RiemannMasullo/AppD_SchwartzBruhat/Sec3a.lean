@@ -18,6 +18,7 @@ import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
+import RiemannMasullo.Ch02_AdelicTheta.Sec1
 
 /-!
 # Schwartz–Bergman spaces and Schwartz–Bruhat functions with exponential decay
@@ -912,9 +913,56 @@ theorem positiveRealExponentialDecay_frechet (hInt : OrdConnected I) (hne : I.No
   exact ⟨inferInstance, inferInstance, exponentialDecay_metrizable I hInt hne,
     positiveRealExponentialDecay_complete I hne⟩
 
+/-- A topologically embedded linear subspace inherits nuclearity through the
+continuous linear equivalence with its range. -/
+private theorem isNuclearTVS_of_linearEmbedding.{v, u} {X Y : Type u}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (f : X →ₗ[ℂ] Y) (hf : IsEmbedding f) (hY : IsNuclearTVS.{v, u} Y) :
+    IsNuclearTVS.{v, u} X := by
+  let := hY.1
+  let := hY.2.1
+  have hn := isNuclearTVS_submodule hY f.range
+  let e := LinearEquiv.ofInjective f hf.injective
+  have he : IsInducing e := IsInducing.subtypeVal.of_comp_iff.mp hf.isInducing
+  let h := e.toEquiv.toHomeomorphOfIsInducing he
+  let L : X ≃L[ℂ] f.range := ⟨e, h.continuous, h.continuous_symm⟩
+  have : T2Space X := hf.t2Space
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  let cmp := (hn.2.2 F inferInstance inferInstance inferInstance inferInstance
+    inferInstance).homeomorph
+  let idF := ContinuousLinearMap.id ℂ F
+  have hroundtrip (z : X ⊗[ℂ] F) :
+      L.symm.toLinearMap.rTensor F (L.toLinearMap.rTensor F z) = z := by
+    rw [← LinearMap.rTensor_comp_apply, show L.symm.toLinearMap.comp L.toLinearMap =
+      LinearMap.id from LinearMap.ext L.symm_apply_apply, LinearMap.rTensor_id_apply]
+  have hforward : Continuous (show ProjectiveTensor X F → InjectiveTensor X F from id) :=
+    ((injectiveTensorMap_continuous L.symm.toContinuousLinearMap idF).comp
+      (cmp.continuous.comp (projectiveTensorMap_continuous L.toContinuousLinearMap idF))).congr
+      hroundtrip
+  have hcmp : Continuous (show InjectiveTensor f.range F → ProjectiveTensor f.range F from id) :=
+    cmp.continuous_symm.congr fun z ↦ cmp.apply_symm_apply z
+  have hback : Continuous (show InjectiveTensor X F → ProjectiveTensor X F from id) :=
+    ((projectiveTensorMap_continuous L.symm.toContinuousLinearMap idF).comp
+      (hcmp.comp (injectiveTensorMap_continuous L.toContinuousLinearMap idF))).congr hroundtrip
+  exact (⟨Equiv.refl (X ⊗[ℂ] F), hforward, hback⟩ :
+    ProjectiveTensor X F ≃ₜ InjectiveTensor X F).isHomeomorph
+
+-- The nuclearity argument uses only nonemptiness of the exponent set.
+set_option linter.unusedVariables false in
 /-- Paper: Lemma D.3.2.3(1), p. 801. The positive-real decay space is nuclear. -/
 theorem positiveRealExponentialDecay_nuclear (hInt : OrdConnected I) (hne : I.Nonempty) :
-    IsNuclearTVS E := by sorry
+    IsNuclearTVS E := by
+  let e : EuclideanSpace ℝ (Fin 1) ≃L[ℝ] ℝ := PiLp.equivOfUnique 2 ℝ _
+  let S := schwartzChangeVariable ℂ (F := ℂ) e
+  have : PolynormableSpace ℂ 𝓢(ℝ, ℂ) := (schwartz_withSeminorms ℂ ℝ ℂ).toPolynormableSpace
+  have hS : IsNuclearTVS 𝓢(ℝ, ℂ) :=
+    isNuclearTVS_of_linearEmbedding S.toLinearMap S.toHomeomorph.isEmbedding
+      (euclideanSchwartz_nuclear 1)
+  let T : E →ₗ[ℂ] (I → 𝓢(ℝ, ℂ)) := LinearMap.pi (logExponentialDecayTwist I)
+  exact isNuclearTVS_of_linearEmbedding T (positiveRealExponentialDecay_isEmbedding I hne)
+    (isNuclearTVS_pi fun _ : I ↦ hS)
 
 /-- Paper: Lemma D.3.2.3(1), p. 801. The positive-real decay space has the
 Montel property and is barrelled. -/

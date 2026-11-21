@@ -789,7 +789,60 @@ theorem modulatedIntervalSobolev_norm (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 �
     let μ := canonicalModulatedHaar m hm
     let integrand := fun g ↦ ‖f g‖ ^ 2 * intervalSobolevDensity a b s (logModule m g)
     Integrable integrand μ ∧ ‖f‖ = Real.sqrt (∫ g, integrand g ∂μ) ∧
-      intervalSobolevENorm μ (logModule m) (Icc a b) s (⇑f) = ENNReal.ofReal ‖f‖ := by sorry
+      intervalSobolevENorm μ (logModule m) (Icc a b) s (⇑f) = ENNReal.ofReal ‖f‖ := by
+  intro μ integrand
+  have hDpos : ∀ x : ℝ, 0 < intervalSobolevDensity a b s x := fun x ↦
+    mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  -- Shrinking the endpoints inside `[a, b]` only lowers the density.
+  have hmono : ∀ a' ∈ Icc a b, ∀ b' ∈ Icc a b, ∀ x : ℝ,
+      intervalSobolevDensity a' b' s x ≤ intervalSobolevDensity a b s x := by
+    intro a' ha' b' hb' x
+    have key : ∀ c ∈ Icc a b,
+        Real.exp (2 * c * x) ≤ max (Real.exp (2 * a * x)) (Real.exp (2 * b * x)) := by
+      intro c hc
+      rcases le_total 0 x with hx | hx
+      · exact le_max_of_le_right (Real.exp_le_exp.2 (by nlinarith [hc.2]))
+      · exact le_max_of_le_left (Real.exp_le_exp.2 (by nlinarith [hc.1]))
+    exact mul_le_mul_of_nonneg_right (max_le (key a' ha') (key b' hb')) (by positivity)
+  have hcont : Continuous fun g : G ↦ ((m g).val : ℝ) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+  have hDmeas : Measurable fun g : G ↦ intervalSobolevDensity a b s (logModule m g) := by
+    have hlog : Measurable (logModule m) := Real.measurable_log.comp hcont.measurable
+    unfold intervalSobolevDensity
+    fun_prop
+  have hρ : AEMeasurable (fun g ↦ (intervalSobolevDensity a b s (logModule m g)).toNNReal) μ :=
+    hDmeas.real_toNNReal.aemeasurable
+  have hf2 : Integrable (fun g ↦ ‖f g‖ ^ 2)
+      (μ.withDensity fun g ↦
+        ((intervalSobolevDensity a b s (logModule m g)).toNNReal : ℝ≥0∞)) := by
+    have h := (Lp.memLp f).integrable_norm_rpow two_ne_zero ENNReal.ofNat_ne_top
+    simp only [ENNReal.toReal_ofNat, Real.rpow_two] at h
+    exact h
+  have hsmul : ∀ g, (intervalSobolevDensity a b s (logModule m g)).toNNReal • ‖f g‖ ^ 2 =
+      integrand g := fun g ↦ by
+    rw [NNReal.smul_def, smul_eq_mul, Real.coe_toNNReal _ (hDpos _).le, mul_comm]
+  have hint : ∫ g, integrand g ∂μ = ∫ g, ‖f g‖ ^ 2
+      ∂μ.withDensity fun g ↦
+        ((intervalSobolevDensity a b s (logModule m g)).toNNReal : ℝ≥0∞) := by
+    rw [integral_withDensity_eq_integral_smul₀ hρ]
+    exact integral_congr_ae (Eventually.of_forall fun g ↦ (hsmul g).symm)
+  refine ⟨?_, ?_, ?_⟩
+  · exact ((integrable_withDensity_iff_integrable_smul₀ hρ).1 hf2).congr
+      (Eventually.of_forall hsmul)
+  · rw [hint, Lp.norm_def, MemLp.eLpNorm_eq_integral_rpow_norm two_ne_zero
+      ENNReal.ofNat_ne_top (Lp.memLp f), ENNReal.toReal_ofReal (by positivity),
+      Real.sqrt_eq_rpow]
+    simp only [ENNReal.toReal_ofNat, Real.rpow_two, one_div]
+    rfl
+  · have hE : intervalSobolevENorm μ (logModule m) (Icc a b) s (⇑f) =
+        eLpNorm f 2 (μ.withDensity fun g ↦
+          ENNReal.ofReal (intervalSobolevDensity a b s (logModule m g))) := by
+      unfold intervalSobolevENorm
+      refine le_antisymm (iSup₂_le fun a' b' ↦ eLpNorm_mono_measure _ (withDensity_mono
+        (Eventually.of_forall fun g ↦ ENNReal.ofReal_le_ofReal (hmono _ a'.2 _ b'.2 _)))) ?_
+      exact le_iSup₂_of_le (⟨a, left_mem_Icc.2 _hab⟩ : Icc a b) ⟨b, right_mem_Icc.2 _hab⟩ le_rfl
+    rw [hE, Lp.norm_def, ENNReal.ofReal_toReal (Lp.eLpNorm_ne_top f)]
+    rfl
 
 /-- Paper: Lemma 9.2.2.10(3)(a), p. 417. The right half-line supremum can
 be indexed using the left endpoint and one varying abscissa.

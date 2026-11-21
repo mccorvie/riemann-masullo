@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3a
 public import Mathlib.MeasureTheory.Measure.WithDensity
+import Mathlib.MeasureTheory.Function.AEEqOfIntegral
+import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
+import Mathlib.MeasureTheory.Integral.Prod
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 
 /-!
@@ -13,7 +16,7 @@ Masullo, §9.1, pp. 395–403.
 
 @[expose] public noncomputable section
 
-open MeasureTheory Set Topology TopologicalSpace
+open Filter MeasureTheory Set Topology TopologicalSpace
 open scoped CompactlySupported ENNReal NNReal ZeroAtInfty
 
 namespace RiemannMasullo
@@ -304,6 +307,242 @@ theorem weightedSobolev_ofHigherDegree (_hν : IsLCAPlancherelMeasure μ ν)
     change ‖I‖ ≤ 1
     simpa [I] using Lp.norm_LpToLpOfMeasureLeSMul_le (E := ℂ) (p := 2) hone hle'
 
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+  [MeasurableSpace G] [BorelSpace G] in
+/-- Paper: Proposition 9.1.1.3(3), p. 397. Cauchy–Schwarz with the density and its
+reciprocal controls the unweighted integral of the norm of a Fourier-side Sobolev element. -/
+private theorem weightedSobolev_integrable
+    (hw : IsSobolevWeight w)
+    (h : Integrable (fun χ ↦ (1 + (w χ : ℝ) ^ 2) ^ (-s / 2)) ν)
+    (f : WeightedSobolev ν w s) :
+    Integrable (f : PontryaginDual G → ℂ) ν ∧
+      (∫ χ, ‖f χ‖ ∂ν) ≤ ‖f‖ * Real.sqrt (∫ χ, (1 + (w χ : ℝ) ^ 2) ^ (-s / 2) ∂ν) := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let ρ (χ : PontryaginDual G) : ℝ := (1 + (w χ : ℝ) ^ 2) ^ (s / 2)
+  have hρ (χ : PontryaginDual G) : 0 < ρ χ := Real.rpow_pos_of_pos (by positivity) _
+  have hrecip (χ : PontryaginDual G) : (1 + (w χ : ℝ) ^ 2) ^ (-s / 2) = (ρ χ)⁻¹ := by
+    rw [neg_div, Real.rpow_neg (by positivity)]
+  have hρc : Continuous ρ := by
+    have hbase : Continuous (fun χ ↦ 1 + (w χ : ℝ) ^ 2) :=
+      continuous_const.add ((NNReal.continuous_coe.comp hw.1).pow 2)
+    exact hbase.rpow_const fun χ ↦ Or.inl (by positivity)
+  have hAC : ν ≪ sobolevMeasure ν w s :=
+    withDensity_absolutelyContinuous' hρc.measurable.aemeasurable.ennreal_ofReal
+      (ae_of_all _ fun χ ↦ (ENNReal.ofReal_pos.mpr (hρ χ)).ne')
+  have hf := weightedSobolev_norm ν hw.1 s f
+  let a (χ : PontryaginDual G) := ‖f χ‖ * Real.sqrt (ρ χ)
+  let b (χ : PontryaginDual G) := Real.sqrt (ρ χ)⁻¹
+  have ha (χ : PontryaginDual G) : 0 ≤ a χ := mul_nonneg (norm_nonneg _) (Real.sqrt_nonneg _)
+  have hb (χ : PontryaginDual G) : 0 ≤ b χ := Real.sqrt_nonneg _
+  have ha_sq (χ : PontryaginDual G) : a χ ^ 2 = ‖f χ‖ ^ 2 * ρ χ := by
+    change (‖f χ‖ * Real.sqrt (ρ χ)) ^ 2 = _
+    rw [mul_pow, Real.sq_sqrt (hρ χ).le]
+  have hb_sq (χ : PontryaginDual G) : b χ ^ 2 = (1 + (w χ : ℝ) ^ 2) ^ (-s / 2) := by
+    change (Real.sqrt (ρ χ)⁻¹) ^ 2 = _
+    rw [Real.sq_sqrt (inv_nonneg.mpr (hρ χ).le), hrecip]
+  have haLp : MemLp a 2 ν := by
+    have haM : AEStronglyMeasurable a ν :=
+      ((Lp.aestronglyMeasurable f).mono_ac hAC).norm.mul hρc.sqrt.aestronglyMeasurable
+    apply (memLp_two_iff_integrable_sq_norm haM).2
+    simpa only [Real.norm_of_nonneg (ha _), ha_sq] using hf.1
+  have hbLp : MemLp b 2 ν := by
+    have hbM : AEStronglyMeasurable b ν :=
+      (hρc.inv₀ fun χ ↦ (hρ χ).ne').sqrt.aestronglyMeasurable
+    apply (memLp_two_iff_integrable_sq_norm hbM).2
+    simpa only [Real.norm_of_nonneg (hb _), hb_sq] using h
+  have hab (χ : PontryaginDual G) : a χ * b χ = ‖f χ‖ := by
+    dsimp only [a, b]
+    rw [mul_assoc, ← Real.sqrt_mul (hρ χ).le,
+      mul_inv_cancel₀ (hρ χ).ne', Real.sqrt_one, mul_one]
+  have hint : Integrable (fun χ ↦ ‖f χ‖) ν := by
+    have hm : MemLp (a * b) 1 ν := haLp.mul hbLp
+    simpa only [Pi.mul_def, hab] using memLp_one_iff_integrable.mp hm
+  refine ⟨⟨(Lp.aestronglyMeasurable f).mono_ac hAC,
+    (hasFiniteIntegral_norm_iff _).mp hint.hasFiniteIntegral⟩, ?_⟩
+  have hbound := integral_mul_norm_le_Lp_mul_Lq Real.HolderConjugate.two_two
+    (show MemLp a (ENNReal.ofReal 2) ν by simpa using haLp)
+    (show MemLp b (ENNReal.ofReal 2) ν by simpa using hbLp)
+  rw [hf.2]
+  simpa only [Real.norm_of_nonneg (ha _), Real.norm_of_nonneg (hb _), hab, Real.rpow_two,
+    ha_sq, hb_sq, ← Real.sqrt_eq_rpow] using hbound
+
+omit [μ.IsHaarMeasure] in
+/-- The inverse Fourier integral and the forward transform are adjoint on integrable
+test functions. Compactly supported approximations provide a product-measurable kernel
+even when the product topology and product σ-algebra have different Borel sets. -/
+private theorem lcaInverseFourier_integral_pairing
+    {u : PontryaginDual G → ℂ} {q : G → ℂ} (hu : Integrable u ν) (hq : Integrable q μ)
+    [ν.Regular] :
+    (∫ x, (∫ χ, u χ * (χ x : ℂ) ∂ν) * star (q x) ∂μ) =
+      ∫ χ, u χ * star (lcaFourier μ q χ) ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  obtain ⟨S, -, hqZero, hSσ⟩ := hq.aefinStronglyMeasurable.exists_set_sigmaFinite
+  obtain ⟨T, -, huZero, hTσ⟩ := hu.aefinStronglyMeasurable.exists_set_sigmaFinite
+  let := hSσ
+  let := hTσ
+  have hqZero := ae_imp_of_ae_restrict hqZero
+  have huZero := ae_imp_of_ae_restrict huZero
+  obtain ⟨Q, hQc, hQ, htQ⟩ := exists_tendsto_ae_compactSupport hq
+  obtain ⟨U, hUc, hU, htU⟩ := exists_tendsto_ae_compactSupport hu
+  let K (x : G) (χ : PontryaginDual G) := (u χ * (χ x : ℂ)) * star (q x)
+  let A (n : ℕ) (p : G × PontryaginDual G) := (U n p.2 * (p.2 p.1 : ℂ)) * star (Q n p.1)
+  have hEval : Continuous (fun p : G × PontryaginDual G ↦ (p.2 p.1 : ℂ)) :=
+    continuous_subtype_val.comp ((continuous_eval (F := C(G, Circle))).comp
+      (((ContinuousMonoidHom.isInducing_toContinuousMap G Circle).continuous.comp
+        continuous_snd).prodMk continuous_fst))
+  have hA (n : ℕ) : StronglyMeasurable (A n) := by
+    apply HasCompactSupport.stronglyMeasurable_of_prod
+      ((((hU n).comp continuous_snd).mul hEval).mul ((hQ n).comp continuous_fst).star)
+    refine HasCompactSupport.intro ((hQc n).prod (hUc n)) ?_
+    intro p hp
+    by_cases hq : p.1 ∈ tsupport (Q n)
+    · have hu : U n p.2 = 0 := image_eq_zero_of_notMem_tsupport (fun hu ↦ hp ⟨hq, hu⟩)
+      simp [hu]
+    · simp [image_eq_zero_of_notMem_tsupport hq]
+  let k (p : G × PontryaginDual G) := limUnder atTop (fun n ↦ A n p)
+  have hk : StronglyMeasurable k := StronglyMeasurable.limUnder hA
+  have hLimit : ∀ᵐ x ∂μ, ∀ᵐ χ ∂ν, k (x, χ) = K x χ := by
+    filter_upwards [htQ] with x hx
+    filter_upwards [htU] with χ hχ
+    exact ((hχ.mul tendsto_const_nhds).mul hx.star).limUnder_eq
+  have hLimit' : ∀ᵐ χ ∂ν, ∀ᵐ x ∂μ, k (x, χ) = K x χ := by
+    filter_upwards [htU] with χ hχ
+    filter_upwards [htQ] with x hx
+    exact ((hχ.mul tendsto_const_nhds).mul hx.star).limUnder_eq
+  have hChar (x : G) : AEStronglyMeasurable (fun χ : PontryaginDual G ↦ (χ x : ℂ)) ν :=
+    (hEval.comp (continuous_const.prodMk continuous_id)).aestronglyMeasurable
+  have hRow (x : G) : Integrable (K x) ν :=
+    (hu.mul_bdd (c := 1) (hChar x) (.of_forall fun χ ↦ (Circle.norm_coe (χ x)).le)).mul_const _
+  have hInt : Integrable k ((μ.restrict S).prod (ν.restrict T)) := by
+    apply (integrable_prod_iff hk.aestronglyMeasurable).2
+    have hLim : ∀ᵐ x ∂μ.restrict S, (fun χ ↦ k (x, χ)) =ᵐ[ν.restrict T] K x :=
+      ae_restrict_of_ae (hLimit.mono fun _ hx ↦ ae_restrict_of_ae hx)
+    refine ⟨hLim.mono fun x hx ↦ (hRow x).restrict.congr hx.symm, ?_⟩
+    refine (hq.norm.mul_const (∫ χ in T, ‖u χ‖ ∂ν)).restrict.congr ?_
+    filter_upwards [hLim] with x hx
+    symm
+    calc
+      _ = ∫ χ in T, ‖K x χ‖ ∂ν := integral_congr_ae (hx.mono fun χ hχ ↦ congrArg norm hχ)
+      _ = _ := by simp [K, integral_mul_const, mul_comm]
+  have hrowEq : ∀ᵐ x ∂μ, (∫ χ in T, k (x, χ) ∂ν) = ∫ χ, K x χ ∂ν := by
+    filter_upwards [hLimit] with x hx
+    rw [integral_congr_ae (ae_restrict_of_ae hx)]
+    apply setIntegral_eq_integral_of_ae_compl_eq_zero
+    exact huZero.mono fun χ hχ hmem ↦ by simp [K, hχ hmem]
+  have hcolEq : ∀ᵐ χ ∂ν, (∫ x in S, k (x, χ) ∂μ) = ∫ x, K x χ ∂μ := by
+    filter_upwards [hLimit'] with χ hχ
+    rw [integral_congr_ae (ae_restrict_of_ae hχ)]
+    apply setIntegral_eq_integral_of_ae_compl_eq_zero
+    exact hqZero.mono fun x hx hmem ↦ by simp [K, hx hmem]
+  calc
+    _ = ∫ x, ∫ χ, K x χ ∂ν ∂μ := by simp_rw [K, integral_mul_const]
+    _ = ∫ x in S, ∫ χ, K x χ ∂ν ∂μ := by
+      symm
+      exact setIntegral_eq_integral_of_ae_compl_eq_zero
+        (hqZero.mono fun x hx hmem ↦ by simp [K, hx hmem])
+    _ = ∫ x in S, ∫ χ in T, k (x, χ) ∂ν ∂μ :=
+      integral_congr_ae (ae_restrict_of_ae (hrowEq.mono fun _ hx ↦ hx.symm))
+    _ = ∫ χ in T, ∫ x in S, k (x, χ) ∂μ ∂ν := integral_integral_swap hInt
+    _ = ∫ χ in T, ∫ x, K x χ ∂μ ∂ν := integral_congr_ae (ae_restrict_of_ae hcolEq)
+    _ = ∫ χ, ∫ x, K x χ ∂μ ∂ν := setIntegral_eq_integral_of_ae_compl_eq_zero
+      (huZero.mono fun χ hχ hmem ↦ by simp [K, hχ hmem])
+    _ = _ := by
+      congr with χ
+      simp only [K, mul_assoc, integral_const_mul, lcaFourier, Complex.star_def,
+        ← integral_conj, map_mul, starRingEnd_self_apply]
+      congr 1
+      apply integral_congr_ae
+      exact .of_forall fun x ↦ mul_comm _ _
+
+/-- Paper: Proposition 9.1.1.3(3), p. 397. For an L² element whose Plancherel transform is
+integrable, the inverse Fourier integral represents that element and vanishes at infinity. -/
+private theorem lcaInverseFourier_zeroAtInfty (hν : IsLCAPlancherelMeasure μ ν)
+    (v : Lp ℂ 2 μ) (u : PontryaginDual G → ℂ) (hu : Integrable u ν)
+    (hv : ((lcaFourier_unitary μ ν hν).exists.choose v : PontryaginDual G → ℂ) =ᵐ[ν] u) :
+    ∃ F : C₀(G, ℂ), (F : G → ℂ) =ᵐ[μ] (v : G → ℂ) ∧
+      ∀ x, F x = ∫ χ, u χ * (χ x : ℂ) ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  obtain ⟨H, hH⟩ := lcaFourier_zeroAtInfty ν hu
+  let e : CocompactMap G (PontryaginDual (PontryaginDual G)) :=
+    ⟨⟨pontryaginDual_eval, pontryaginDual_eval.continuous⟩,
+      isClosedEmbedding_pontryaginDual_eval.tendsto_cocompact⟩
+  let F : C₀(G, ℂ) := (H.comp e).comp
+    ⟨⟨Inv.inv, continuous_inv⟩, (Homeomorph.inv G).isClosedEmbedding.tendsto_cocompact⟩
+  have hF (x : G) : F x = ∫ χ, u χ * (χ x : ℂ) ∂ν := by
+    change H (pontryaginDual_eval x⁻¹) = _
+    rw [hH]
+    unfold lcaFourier
+    apply integral_congr_ae
+    exact .of_forall fun χ ↦ by
+      change u χ * star (χ x⁻¹ : ℂ) = _
+      rw [map_inv, Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+  refine ⟨F, ?_, hF⟩
+  -- The nonzero set of a function in C₀ lies in a countable union of compact sets.
+  let K (n : ℕ) : Set G := {x | 1 / ((n : ℝ) + 1) ≤ ‖F x‖}
+  have hK (n : ℕ) : IsCompact (K n) := by
+    have hc : IsClosed (K n) := isClosed_le continuous_const F.continuous.norm
+    obtain ⟨L, hL, hsub⟩ := mem_cocompact.mp
+      ((Metric.tendsto_nhds.mp F.zero_at_infty') _ (by positivity : 0 < 1 / ((n : ℝ) + 1)))
+    exact hL.of_isClosed_subset hc fun x hx ↦ by
+      by_contra hxL
+      change 1 / ((n : ℝ) + 1) ≤ ‖F x‖ at hx
+      have hlt : dist (F x) 0 < 1 / ((n : ℝ) + 1) := hsub hxL
+      exact not_lt_of_ge hx (dist_zero_right (F x) ▸ hlt)
+  let S := ⋃ n, K n
+  have hS : MeasurableSet S := MeasurableSet.iUnion fun n ↦ (hK n).isClosed.measurableSet
+  have hFS : ∀ x ∈ Sᶜ, F x = 0 := by
+    intro x hx
+    by_contra hne
+    obtain ⟨n, hn⟩ := exists_nat_one_div_lt (norm_pos_iff.mpr hne)
+    exact hx (mem_iUnion.mpr ⟨n, hn.le⟩)
+  have hσ : SigmaFinite (μ.restrict S) := by
+    refine ⟨⟨⟨fun n ↦ K n ∪ Sᶜ, fun _ ↦ trivial, fun n ↦ ?_, ?_⟩⟩⟩
+    · rw [Measure.restrict_apply ((hK n).isClosed.measurableSet.union hS.compl),
+        union_inter_distrib_right, compl_inter_self, union_empty]
+      exact (measure_mono inter_subset_left).trans_lt (hK n).measure_lt_top
+    · rw [← iUnion_union]
+      exact union_compl_self S
+  have hFin : AEFinStronglyMeasurable (F : G → ℂ) μ :=
+    (F.continuous.stronglyMeasurable.finStronglyMeasurable_of_set_sigmaFinite
+      hS hFS hσ).aefinStronglyMeasurable
+  apply AEFinStronglyMeasurable.ae_eq_of_forall_setIntegral_eq _ _ _
+    hFin ((Lp.memLp v).aefinStronglyMeasurable two_ne_zero ENNReal.ofNat_ne_top)
+  · intro A _ hA
+    let : IsFiniteMeasure (μ.restrict A) := isFiniteMeasure_restrict.mpr hA.ne
+    exact Integrable.of_bound F.continuous.aestronglyMeasurable ‖F.toBCF‖
+      (.of_forall F.toBCF.norm_coe_le_norm)
+  · exact fun A _ hA ↦ integrableOn_Lp_of_measure_ne_top v (by norm_num) hA.ne
+  · intro A hA hAμ
+    let q : G → ℂ := A.indicator fun _ ↦ 1
+    have hq : Integrable q μ := memLp_one_iff_integrable.mp
+      (memLp_indicator_const 1 hA.nullMeasurableSet 1 (.inr hAμ.ne))
+    have hq₂ : MemLp q 2 μ := memLp_indicator_const 2 hA.nullMeasurableSet 1 (.inr hAμ.ne)
+    let U := (lcaFourier_unitary μ ν hν).exists.choose
+    have hU := (lcaFourier_unitary μ ν hν).exists.choose_spec q hq hq₂
+    have hIndic (g : G → ℂ) : (∫ x, g x * star (q x) ∂μ) = ∫ x in A, g x ∂μ := by
+      rw [← integral_indicator hA]
+      congr with x
+      by_cases hx : x ∈ A <;> simp [q, hx]
+    calc
+      _ = ∫ x, (∫ χ, u χ * (χ x : ℂ) ∂ν) * star (q x) ∂μ := by
+        simp_rw [← hF]
+        exact (hIndic F).symm
+      _ = ∫ χ, u χ * star (lcaFourier μ q χ) ∂ν :=
+        lcaInverseFourier_integral_pairing μ ν hu hq
+      _ = inner ℂ (U (hq₂.toLp q)) (U v) := by
+        rw [L2.inner_def]
+        apply integral_congr_ae
+        filter_upwards [hv, hU] with χ hχ hχ'
+        rw [RCLike.inner_apply, starRingEnd_apply, hχ, hχ']
+      _ = inner ℂ (hq₂.toLp q) v := U.inner_map_map _ _
+      _ = _ := by
+        rw [← hIndic v, L2.inner_def]
+        exact integral_congr_ae (hq₂.coeFn_toLp.mono fun x hx ↦ by
+          change inner ℂ ((hq₂.toLp q) x) (v x) = v x * star (q x)
+          rw [RCLike.inner_apply, starRingEnd_apply, hx])
+
 /-- Paper: Proposition 9.1.1.3(3), p. 397. When the reciprocal density is integrable,
 the inverse Plancherel class of each Sobolev element has a unique representative
 vanishing at infinity. The representative map is a bounded linear injection. -/
@@ -315,7 +554,48 @@ theorem weightedSobolev_toZeroAtInfty (hν : IsLCAPlancherelMeasure μ ν)
       (E : WeightedSobolev ν w s →L[ℂ] C₀(G, ℂ)) (C : ℝ),
       (∀ f, (U (J f) : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ)) ∧
       Function.Injective E ∧ 0 < C ∧ ‖E‖ ≤ C ∧
-      ∀ f g, g = E f ↔ (g : G → ℂ) =ᵐ[μ] (J f : G → ℂ) := by sorry
+      ∀ f g, g = E f ↔ (g : G → ℂ) =ᵐ[μ] (J f : G → ℂ) := by
+  intro U
+  obtain ⟨J, hJinj, -, hJ⟩ := weightedSobolev_toL2 μ ν hν _hw _hs
+  have hL1 (f : WeightedSobolev ν w s) := weightedSobolev_integrable ν _hw _h f
+  choose F hF hFormula using fun f ↦
+    lcaInverseFourier_zeroAtInfty μ ν hν (J f) f (hL1 f).1 (hJ f)
+  have unique (f : WeightedSobolev ν w s) (g : C₀(G, ℂ))
+      (hg : (g : G → ℂ) =ᵐ[μ] (J f : G → ℂ)) : g = F f :=
+    DFunLike.coe_injective (Measure.eq_of_ae_eq (hg.trans (hF f).symm)
+      g.continuous (F f).continuous)
+  let L : WeightedSobolev ν w s →ₗ[ℂ] C₀(G, ℂ) :=
+    { toFun := F
+      map_add' := fun f g ↦ (unique (f + g) (F f + F g) (by
+        rw [J.map_add]
+        exact ((hF f).add (hF g)).trans (Lp.coeFn_add (J f) (J g)).symm)).symm
+      map_smul' := fun c f ↦ (unique (c • f) (c • F f) (by
+        rw [J.map_smul]
+        exact ((hF f).fun_comp (c • ·)).trans (Lp.coeFn_smul c (J f)).symm)).symm }
+  let C := Real.sqrt (∫ χ, (1 + (w χ : ℝ) ^ 2) ^ (-s / 2) ∂ν) + 1
+  have hC : 0 < C := add_pos_of_nonneg_of_pos (Real.sqrt_nonneg _) one_pos
+  have hBound (f : WeightedSobolev ν w s) : ‖L f‖ ≤ C * ‖f‖ := by
+    rw [← ZeroAtInftyContinuousMap.norm_toBCF_eq_norm]
+    apply (BoundedContinuousFunction.norm_le (mul_nonneg hC.le (norm_nonneg _))).mpr
+    intro x
+    change ‖F f x‖ ≤ C * ‖f‖
+    rw [hFormula]
+    calc
+      _ ≤ ∫ χ, ‖f χ‖ ∂ν := by
+        simpa only [norm_mul, Circle.norm_coe, mul_one] using
+          norm_integral_le_integral_norm (μ := ν) (fun χ ↦ f χ * (χ x : ℂ))
+      _ ≤ C * ‖f‖ := ((hL1 f).2).trans (by
+        rw [mul_comm C]
+        exact mul_le_mul_of_nonneg_left (le_add_of_nonneg_right zero_le_one) (norm_nonneg _))
+  let E := L.mkContinuous C hBound
+  refine ⟨J, E, C, hJ, ?_, hC, L.mkContinuous_norm_le hC.le hBound, ?_⟩
+  · intro f g hfg
+    change F f = F g at hfg
+    apply hJinj
+    exact Lp.ext ((hF f).symm.trans (hfg ▸ hF g))
+  · intro f g
+    change g = F f ↔ _
+    exact ⟨fun h ↦ h ▸ hF f, unique f g⟩
 
 -- TODO(paper-gap): The bound (9.1.1.15) places an extra square root on each L² norm.
 

@@ -1221,12 +1221,42 @@ theorem strongDual_isShrinking_of_isAbsolute (hNuclear : IsNuclearTVS.{v, u} E) 
 
 end AbsoluteDuality
 
+-- The proof only needs the continuity of the coefficient maps bundled in `StrongDual`.
+set_option linter.unusedVariables false in
 /-- Paper: Remark 4.1.2.5, p. 160. On a Fréchet space, the pointwise absolute
 summability of all coordinate series under continuous seminorms is equivalent
 to the absolute basis condition with continuous seminorm bounds. -/
 theorem isAbsolute_iff_summable_of_frechet (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f) :
     IsAbsolute x f ↔
-      ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by sorry
+      ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by
+  constructor
+  · intro h q hq u
+    obtain ⟨_, _, hbound⟩ := h q hq
+    exact (hbound u).1
+  · intro hsum q hq
+    have : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+    obtain ⟨_, hpoly, _, _⟩ := hE
+    let L (m : ℕ) : E →L[ℂ] E := (f m).smulRight (x m)
+    let p (s : Finset ℕ) : Seminorm ℂ E := ∑ m ∈ s, q.comp (L m).toLinearMap
+    have hp (s : Finset ℕ) : Continuous (p s) :=
+      Seminorm.continuous_finsetSum fun m _ ↦ hq.comp (L m).continuous
+    have hp_apply (s : Finset ℕ) (u : E) : p s u = ∑ m ∈ s, q (f m u • x m) := by
+      change FunLike.coeAddMonoidHom (Seminorm ℂ E) E ℝ
+        (∑ m ∈ s, q.comp (L m).toLinearMap) u = _
+      rw [map_sum, Finset.sum_apply]
+      rfl
+    -- Pointwise summability bounds every finite partial sum.
+    have hbdd : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr fun u ↦
+      ⟨∑' m, q (f m u • x m), forall_mem_range.mpr fun s ↦ by
+        rw [hp_apply]
+        exact (hsum q hq u).sum_le_tsum s fun m _ ↦ apply_nonneg q _⟩
+    -- Barrelledness makes the supremum of these seminorms continuous.
+    refine ⟨⨆ s, p s, ?_, fun u ↦ ⟨hsum q hq u, (hsum q hq u).tsum_le_of_sum_le ?_⟩⟩
+    · rw [Seminorm.coe_iSup_eq hbdd]
+      exact Seminorm.continuous_iSup p hp hbdd
+    · intro s
+      rw [← hp_apply]
+      exact (show p s ≤ ⨆ t, p t from le_ciSup hbdd s) u
 
 /-- Paper: Remark 4.1.2.5, p. 161. The two absolute basis conditions also
 agree in a strict countable inductive limit of nuclear Fréchet spaces.
