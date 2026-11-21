@@ -473,13 +473,42 @@ theorem equicontinuous_isVonNBounded_uniformConvergenceCLM
     IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S) '' A) := by sorry
 
 include heq in
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma C.2.1.9(2), p. 672. Pointwise and precompact convergence induce the
 same topology on each equicontinuous set of operators. -/
 theorem equicontinuous_induced_pointwise_eq_precompact :
     TopologicalSpace.induced (Subtype.val : A → E →L[ℂ] F)
         (inferInstance : TopologicalSpace (E →Lₚₜ[ℂ] F)) =
       TopologicalSpace.induced (Subtype.val : A → E →L[ℂ] F)
-        (inferInstance : TopologicalSpace (PrecompactConvergenceCLM E F)) := by sorry
+        (inferInstance : TopologicalSpace (PrecompactConvergenceCLM E F)) := by
+  have hu : UniformEquicontinuous (fun f : A ↦ (f.val : E → F)) :=
+    uniformEquicontinuous_of_equicontinuousAt_zero (fun f : A ↦ f.val) heq
+  let pointwise : A → E →Lₚₜ[ℂ] F :=
+    UniformConvergenceCLM.ofFun (RingHom.id ℂ) F {s | s.Finite} ∘ Subtype.val
+  let precompact : A → PrecompactConvergenceCLM E F :=
+    UniformConvergenceCLM.ofFun (RingHom.id ℂ) F {s | IsPrecompactInCompletion s} ∘ Subtype.val
+  change TopologicalSpace.induced pointwise inferInstance =
+    TopologicalSpace.induced precompact inferInstance
+  refine TopologicalSpace.ext_nhds fun f ↦ eq_of_forall_le_iff fun l ↦ ?_
+  rw [nhds_induced, nhds_induced, ← tendsto_iff_comap, ← tendsto_iff_comap,
+    PointwiseConvergenceCLM.tendsto_iff_forall_tendsto,
+    UniformConvergenceCLM.tendsto_iff_tendstoUniformlyOn]
+  constructor
+  · intro h s hs U hU
+    have hs' := (isPrecompactInCompletion_iff_totallyBounded s).1 hs
+    obtain ⟨V, hV, hVsymm, hVU⟩ := comp_comp_symm_mem_uniformity_sets hU
+    obtain ⟨W, hW, hWV⟩ := (uniformity E).basis_sets.uniformEquicontinuous_iff_left.mp hu V hV
+    -- Pointwise convergence controls all the centers of a finite cover at once.
+    obtain ⟨t, ht, hcover⟩ := hs' W hW
+    have htend : ∀ᶠ g in l, ∀ y ∈ t, (f.val y, g.val y) ∈ V :=
+      ht.eventually_all.mpr fun y _ ↦ (Uniform.tendsto_nhds_right.mp (h y)).eventually_mem hV
+    filter_upwards [htend] with g hg x hx
+    obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover hx)
+    exact hVU (SetRel.prodMk_mem_comp (SetRel.prodMk_mem_comp (hWV x y hxy f) (hg y hy))
+      (SetRel.symm V (hWV x y hxy g)))
+  · intro h x
+    exact (h {x} ((isPrecompactInCompletion_iff_totallyBounded {x}).2
+      (totallyBounded_singleton x))).tendsto_at (mem_singleton x)
 
 end Equicontinuity
 
