@@ -182,11 +182,11 @@ theorem regulator_torsion_roots : Units.torsion F = rootsOfUnity (Units.torsionO
 
 /-- Paper: Lemma A.2.3.4(2), p. 548. The group of torsion units is finite. -/
 theorem regulator_torsion_finite : Finite (Units.torsion F) := by
-  sorry
+  infer_instance
 
 /-- Paper: Lemma A.2.3.4(2), p. 548. The group of torsion units is cyclic. -/
 theorem regulator_torsion_cyclic : IsCyclic (Units.torsion F) := by
-  sorry
+  infer_instance
 
 /-- Paper: Lemma A.2.3.4(3), p. 548. The unit group is finitely generated. -/
 theorem regulator_units_finitelyGenerated : Group.FG (𝓞 F)ˣ := by
@@ -195,7 +195,7 @@ theorem regulator_units_finitelyGenerated : Group.FG (𝓞 F)ˣ := by
 /-- Paper: Lemma A.2.3.4(3), p. 548. The units modulo torsion have an integral basis
 of cardinality the number of infinite places minus one. -/
 theorem regulator_units_mod_torsion_basis : Nonempty (Module.Basis (Fin (Units.rank F)) ℤ 𝓤) := by
-  sorry
+  exact ⟨Units.basisModTorsion F⟩
 
 variable (b : Module.Basis (Fin (Units.rank F)) ℤ (Additive ((𝓞 F)ˣ ⧸ Units.torsion F)))
 
