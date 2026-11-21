@@ -2189,12 +2189,308 @@ theorem padicTamagawaFourier_scaledIntegers (n : ℤ) :
       exact integral_congr_ae (ae_of_all _ fun x ↦ (htranslate x).symm)
     exact (mul_eq_mul_right_iff.mp h).resolve_left hne
 
+/-- The defining phase with the clearing exponent and its integrality proof supplied explicitly. -/
+private theorem padicStandardCharacter_eq_exp_of_clearingPower (x : ℚ_[p]) (n : ℕ) (hn : (-x.valuation).toNat = n)
+    (hx : ‖(p : ℚ_[p]) ^ n * x‖ ≤ 1) :
+    padicStandardCharacter p x =
+      Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow n
+        (⟨(p : ℚ_[p]) ^ n * x, hx⟩ : ℤ_[p])).val : ℝ) / (p : ℝ) ^ n)) := by
+  subst n
+  rfl
+
+/-- The standard character is trivial on the p-adic integers. -/
+private theorem padicStandardCharacter_eq_one_of_norm_le_one {x : ℚ_[p]} (hx : ‖x‖ ≤ 1) :
+    padicStandardCharacter p x = 1 := by
+  have hn : (-x.valuation).toNat = 0 := by
+    have := (Padic.norm_le_one_iff_val_nonneg x).mp hx
+    omega
+  let a : ℤ_[p] := ⟨(p : ℚ_[p]) ^ (0 : ℕ) * x, by
+    change ‖(p : ℚ_[p]) ^ (0 : ℕ) * x‖ ≤ 1
+    simpa using hx⟩
+  rw [padicStandardCharacter_eq_exp_of_clearingPower p x 0 hn a.property]
+  change Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow 0 a).val : ℝ) / (p : ℝ) ^ (0 : ℕ))) = 1
+  have : Subsingleton (ZMod (p ^ (0 : ℕ))) := by
+    simpa only [pow_zero] using (inferInstance : Subsingleton (ZMod 1))
+  have hzero (a : ℤ_[p]) : (PadicInt.toZModPow 0 a).val = 0 := by
+    have heq : PadicInt.toZModPow 0 a = 0 := Subsingleton.elim _ _
+    exact (congrArg ZMod.val heq).trans ZMod.val_zero
+  simp only [hzero, Nat.cast_zero, mul_zero, zero_div, neg_zero, Circle.exp_zero]
+
+/-- Adding an integral element preserves the clearing residue of a nonintegral element,
+and hence preserves the character. -/
+private theorem padicStandardCharacter_add_of_norm_le_one (x z : ℚ_[p]) (hz : ‖z‖ ≤ 1) :
+    padicStandardCharacter p (x + z) = padicStandardCharacter p x := by
+  by_cases hx : ‖x‖ ≤ 1
+  · rw [padicStandardCharacter_eq_one_of_norm_le_one p hx, padicStandardCharacter_eq_one_of_norm_le_one p ((Padic.nonarchimedean x z).trans (max_le hx hz))]
+  have hnorm : ‖x + z‖ = ‖x‖ := by
+    have hlt := hz.trans_lt (lt_of_not_ge hx)
+    rw [Padic.add_eq_max_of_ne hlt.ne', max_eq_left hlt.le]
+  have hx0 : x ≠ 0 := by
+    intro h
+    simp [h] at hx
+  have hxz0 : x + z ≠ 0 := by
+    intro h
+    have := norm_pos_iff.mpr hx0
+    rw [← hnorm, h, norm_zero] at this
+    exact (lt_irrefl _ this)
+  have hval : (x + z).valuation = x.valuation := by
+    rw [Padic.norm_eq_zpow_neg_valuation hxz0, Padic.norm_eq_zpow_neg_valuation hx0,
+      (zpow_right_strictMono₀ (by exact_mod_cast (Fact.out : p.Prime).one_lt : (1 : ℝ) < p)).injective.eq_iff,
+      neg_inj] at hnorm
+    exact hnorm
+  let n := (-x.valuation).toNat
+  let a : ℤ_[p] := ⟨(p : ℚ_[p]) ^ n * x, padicStandardCharacter_integral p x⟩
+  let b : ℤ_[p] := ⟨(p : ℚ_[p]) ^ n * (x + z), by
+    change ‖(p : ℚ_[p]) ^ n * (x + z)‖ ≤ 1
+    simpa only [hval] using padicStandardCharacter_integral p (x + z)⟩
+  let c : ℤ_[p] := ⟨z, hz⟩
+  have hb : b = a + (p : ℤ_[p]) ^ n * c := by
+    apply Subtype.ext
+    change (p : ℚ_[p]) ^ n * (x + z) = _
+    rw [PadicInt.coe_add, PadicInt.coe_mul, PadicInt.coe_pow, PadicInt.coe_natCast]
+    exact mul_add _ _ _
+  have hc : PadicInt.toZModPow n ((p : ℤ_[p]) ^ n * c) = 0 := by
+    change (p : ℤ_[p]) ^ n * c ∈ RingHom.ker (PadicInt.toZModPow n)
+    rw [PadicInt.ker_toZModPow, Ideal.mem_span_singleton]
+    exact dvd_mul_right _ _
+  have hres : PadicInt.toZModPow n b = PadicInt.toZModPow n a := by
+    rw [hb, map_add, hc, add_zero]
+  rw [padicStandardCharacter_eq_exp_of_clearingPower p (x + z) n (by rw [hval]) b.property,
+    padicStandardCharacter_eq_exp_of_clearingPower p x n rfl a.property]
+  change Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow n b).val : ℝ) / (p : ℝ) ^ n)) =
+    Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow n a).val : ℝ) / (p : ℝ) ^ n))
+  rw [hres]
+
+/-- The standard character is locally constant on translates of the p-adic integers. -/
+private theorem padicStandardCharacter_continuous : Continuous (padicStandardCharacter p) := by
+  refine continuous_iff_continuousAt.mpr fun x ↦ Metric.continuousAt_iff.mpr ?_
+  intro ε hε
+  refine ⟨1, zero_lt_one, fun {y} hy ↦ ?_⟩
+  rw [dist_eq_norm] at hy
+  have h := padicStandardCharacter_add_of_norm_le_one p x (y - x) hy.le
+  rw [add_comm x, sub_add_cancel] at h
+  simpa [h]
+
+/-- The inverse of p has a nontrivial standard character value. -/
+private theorem padicStandardCharacter_inv_prime_ne_one :
+    padicStandardCharacter p ((p : ℚ_[p])⁻¹) ≠ 1 := by
+  have hp : (1 : ℝ) < p := by exact_mod_cast (Fact.out : p.Prime).one_lt
+  have hphase : padicStandardCharacter p ((p : ℚ_[p])⁻¹) =
+      Circle.exp (-(2 * Real.pi * (p : ℝ)⁻¹)) := by
+    simpa [one_div] using padicStandardCharacter_div_pow p 1 1
+  rw [hphase]
+  intro h
+  obtain ⟨k, hk⟩ := Circle.exp_eq_one.mp h
+  have heq : -((p : ℝ)⁻¹) = (k : ℝ) := by
+    apply mul_left_cancel₀ (show (2 : ℝ) * Real.pi ≠ 0 by positivity)
+    nlinarith only [hk]
+  have hlo : (-1 : ℝ) < (k : ℝ) := by
+    rw [← heq]
+    linarith [inv_lt_one_of_one_lt₀ hp]
+  have hhi : (k : ℝ) < 0 := by
+    rw [← heq]
+    exact neg_lt_zero.mpr (inv_pos.mpr (zero_lt_one.trans hp))
+  have hlo' : (-1 : ℤ) < k := by exact_mod_cast hlo
+  have hhi' : k < 0 := by exact_mod_cast hhi
+  omega
+
+/-- Scaling the p-adic integer ring by a nonzero scalar gives the closed ball
+with radius equal to the norm of that scalar. -/
+private theorem padicScaledIntegers_eq_closedBall (c : ℚ_[p]) (hc : c ≠ 0) :
+    (c * ·) '' ℤₚ = Metric.closedBall 0 ‖c‖ := by
+  have hnorm (x : ℚ_[p]) : x ∈ ℤₚ ↔ ‖c * x‖ ≤ ‖c‖ := by
+    rw [Metric.mem_closedBall, dist_zero_right, norm_mul, mul_le_iff_le_one_right (norm_pos_iff.mpr hc)]
+  ext x
+  rw [Metric.mem_closedBall, dist_zero_right]
+  constructor
+  · rintro ⟨z, hz, rfl⟩
+    exact (hnorm z).mp hz
+  · intro hx
+    have heq : c * (x / c) = x := by rw [mul_comm, div_mul_cancel₀ _ hc]
+    exact ⟨x / c, (hnorm _).mpr (by rw [heq]; exact hx), heq⟩
+
+/-- The multiples of p in the p-adic integer ring form the open unit ball. -/
+private theorem padicPrimeMulIntegers_eq_ball (hp : (p : ℚ_[p]) ≠ 0) :
+    ((p : ℚ_[p]) * ·) '' ℤₚ = Metric.ball 0 1 := by
+  rw [padicScaledIntegers_eq_closedBall p _ hp, Padic.norm_p]
+  ext x
+  simpa only [Metric.mem_ball, dist_zero_right, mem_closedBall_zero_iff, zpow_zero, zero_sub,
+    zpow_neg_one] using (Padic.norm_lt_pow_iff_norm_le_pow_sub_one x 0).symm
+
+/-- The open unit ball has Tamagawa mass 1/p because it is the kernel of
+reduction of the integer ring modulo p. -/
+private theorem padicTamagawaMeasure_real_primeMulIntegers (hp : (p : ℚ_[p]) ≠ 0) :
+    (padicTamagawaMeasure p).real (((p : ℚ_[p]) * ·) '' ℤₚ) = (p : ℝ)⁻¹ := by
+  let μ := padicTamagawaMeasure p
+  have hμ := Classical.choose_spec (padicTamagawaMeasure_existsUnique p).exists
+  have : μ.IsAddHaarMeasure := hμ.1
+  let : MeasurableSpace ℤ_[p] := MeasurableSpace.comap (fun x : ℤ_[p] ↦ (x : ℚ_[p])) inferInstance
+  have : BorelSpace ℤ_[p] := ⟨borel_comap.symm⟩
+  let e : ℤ_[p] →+ ℚ_[p] :=
+    { toFun := fun x ↦ (x : ℚ_[p])
+      map_zero' := rfl
+      map_add' := fun _ _ ↦ rfl }
+  have he : MeasurableEmbedding e := by
+    change MeasurableEmbedding (Subtype.val : (PadicInt.subring p) → ℚ_[p])
+    exact MeasurableEmbedding.subtype_coe (by
+      change MeasurableSet {x : ℚ_[p] | ‖x‖ ≤ 1}
+      exact isClosed_le continuous_norm continuous_const |>.measurableSet)
+  have : (μ.comap e).IsAddLeftInvariant := Measure.IsAddLeftInvariant.comap μ he
+  let f : ℤ_[p] →+ ZMod p := PadicInt.toZMod.toAddMonoidHom
+  have hf : Surjective f := fun a ↦ ⟨(a.val : ℤ_[p]), by
+    change PadicInt.toZMod (a.val : ℤ_[p]) = a
+    rw [map_natCast, ZMod.natCast_zmod_val]⟩
+  have hindex : f.ker.index = p := by
+    rw [AddSubgroup.index_ker, AddMonoidHom.range_eq_top.mpr hf, AddSubgroup.card_top, Nat.card_eq_fintype_card, ZMod.card]
+  have : f.ker.FiniteIndex := ⟨hindex.trans_ne (Fact.out : p.Prime).ne_zero⟩
+  have hker (a : ℤ_[p]) : a ∈ f.ker ↔ ‖a‖ < 1 := by
+    change a ∈ RingHom.ker PadicInt.toZMod ↔ _
+    rw [PadicInt.ker_toZMod, PadicInt.maximalIdeal_eq_span_p, Ideal.mem_span_singleton,
+      PadicInt.norm_lt_one_iff_dvd]
+  have hmeas : MeasurableSet (f.ker : Set ℤ_[p]) := by
+    have heq : (f.ker : Set ℤ_[p]) = {a | ‖a‖ < 1} := by
+      ext a
+      exact hker a
+    rw [heq]
+    exact (isOpen_lt continuous_norm continuous_const).measurableSet
+  have himage : e '' (f.ker : Set ℤ_[p]) = ((p : ℚ_[p]) * ·) '' ℤₚ := by
+    rw [padicPrimeMulIntegers_eq_ball p hp]
+    ext x
+    rw [Metric.mem_ball, dist_zero_right]
+    constructor
+    · rintro ⟨a, ha, rfl⟩
+      exact (hker a).mp ha
+    · intro hx
+      exact ⟨⟨x, hx.le⟩, (hker _).mpr hx, rfl⟩
+  have hrange : Set.range e = ℤₚ := by
+    ext x
+    rw [mem_closedBall_zero_iff]
+    exact ⟨fun ⟨a, ha⟩ ↦ ha ▸ a.norm_le_one, fun hx ↦ ⟨⟨x, hx⟩, rfl⟩⟩
+  have hone : μ ℤₚ = 1 := hμ.2.2
+  have hm := f.ker.index_mul_measure hmeas (μ.comap e)
+  rw [hindex, he.comap_apply, he.comap_apply, himage, Set.image_univ, hrange, hone] at hm
+  have hm' := congrArg ENNReal.toReal hm
+  rw [ENNReal.toReal_mul, ENNReal.toReal_natCast, ENNReal.toReal_one] at hm'
+  change (μ (((p : ℚ_[p]) * ·) '' ℤₚ)).toReal = _
+  rw [← one_div, eq_div_iff (by exact_mod_cast (Fact.out : p.Prime).ne_zero), mul_comm]
+  exact hm'
+
+/-- The transform of the indicator of a scaled p-adic integer ball is its mass
+times the indicator of the reciprocal ball. -/
+private theorem padicTamagawaFourier_scaledIntegers_eq_measure (c : ℚ_[p]) (hc : c ≠ 0) :
+    tamagawaFourier (padicTamagawaMeasure p) (padicStandardCharacter p)
+      (((c * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) =
+    ((padicTamagawaMeasure p).real ((c * ·) '' ℤₚ) : ℂ) •
+      (((c⁻¹ * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) := by
+  let μ := padicTamagawaMeasure p
+  have : μ.IsAddHaarMeasure :=
+    (Classical.choose_spec (padicTamagawaMeasure_existsUnique p).exists).1
+  let B := Metric.closedBall (0 : ℚ_[p]) ‖c‖
+  have hB : MeasurableSet B := Metric.isClosed_closedBall.measurableSet
+  rw [padicScaledIntegers_eq_closedBall p c hc, padicScaledIntegers_eq_closedBall p c⁻¹ (inv_ne_zero hc)]
+  funext y
+  let g (x : ℚ_[p]) : ℂ := star (padicStandardCharacter p (x * y) : ℂ)
+  change (∫ x, B.indicator (fun _ ↦ (1 : ℂ)) x * g x ∂μ) = _
+  simp only [← Set.indicator_mul_left, one_mul, integral_indicator hB]
+  have hy : y ∈ Metric.closedBall (0 : ℚ_[p]) ‖c⁻¹‖ ↔ ‖y‖ * ‖c‖ ≤ 1 := by
+    rw [mem_closedBall_zero_iff, norm_inv, ← one_div, le_div_iff₀ (norm_pos_iff.mpr hc)]
+  by_cases hyc : y ∈ Metric.closedBall (0 : ℚ_[p]) ‖c⁻¹‖
+  · have hg : EqOn g (fun _ ↦ (1 : ℂ)) B := fun x hx ↦ by
+      have hx' : ‖x‖ ≤ ‖c‖ := mem_closedBall_zero_iff.mp hx
+      have hnorm : ‖x * y‖ ≤ 1 := by
+        rw [norm_mul, mul_comm]
+        exact (mul_le_mul_of_nonneg_left hx' (norm_nonneg _)).trans (hy.mp hyc)
+      simp [g, padicStandardCharacter_eq_one_of_norm_le_one p hnorm]
+    rw [setIntegral_congr_fun hB hg]
+    rw [Pi.smul_apply, indicator_of_mem hyc]
+    simp [Complex.real_smul, B, μ]
+  · have hy' := lt_of_not_ge (mt hy.mpr hyc)
+    have hy0 : y ≠ 0 := by
+      intro h
+      exact (not_lt_of_ge (by simp [h])) hy'
+    have hge : (p : ℝ) ≤ ‖y‖ * ‖c‖ := by
+      by_contra! h
+      have hlt : ‖y * c‖ < (p : ℝ) ^ (1 : ℤ) := by simpa [norm_mul] using h
+      have hle := (Padic.norm_lt_pow_iff_norm_le_pow_sub_one (y * c) 1).mp hlt
+      exact (not_le_of_gt hy') (by simpa [norm_mul] using hle)
+    -- Translation by this point stays in the ball and multiplies the integral by a nontrivial value.
+    let t : ℚ_[p] := (p : ℚ_[p])⁻¹ / y
+    have ht : ‖t‖ ≤ ‖c‖ := by
+      change ‖(p : ℚ_[p])⁻¹ / y‖ ≤ ‖c‖
+      rw [norm_div, norm_inv, Padic.norm_p, inv_inv, div_le_iff₀ (norm_pos_iff.mpr hy0), mul_comm]
+      exact hge
+    have hmem (x : ℚ_[p]) : x + t ∈ B ↔ x ∈ B := by
+      simp only [B, mem_closedBall_zero_iff]
+      refine ⟨fun h ↦ ?_, fun h ↦ (Padic.nonarchimedean x t).trans (max_le h ht)⟩
+      have h' := (Padic.nonarchimedean (x + t) (-t)).trans (max_le h (by simpa using ht))
+      simpa using h'
+    have ht_mul : t * y = (p : ℚ_[p])⁻¹ := div_mul_cancel₀ _ hy0
+    have hnontrivial : g t ≠ 1 := by
+      intro h
+      apply padicStandardCharacter_inv_prime_ne_one p
+      apply Subtype.ext
+      exact star_injective (by simpa only [g, ht_mul, Circle.coe_one, star_one] using h)
+    have hshift : (fun x ↦ B.indicator g (x + t)) =
+        fun x ↦ B.indicator g x * g t := by
+      funext x
+      by_cases hx : x ∈ B
+      · rw [indicator_of_mem hx, indicator_of_mem ((hmem x).mpr hx)]
+        simp only [g, add_mul, padicStandardCharacter_add, Circle.coe_mul, star_mul]
+        exact mul_comm _ _
+      · simp [hx, mt (hmem x).mp hx]
+    have h := integral_add_right_eq_self (μ := μ) (B.indicator g) t
+    rw [show (fun x ↦ B.indicator g (x + t)) = _ from hshift, integral_mul_const,
+      integral_indicator hB] at h
+    have hzero : (∫ x in B, g x ∂μ) = 0 := by
+      by_contra hne
+      exact hnontrivial ((mul_eq_left₀ hne).mp h)
+    rw [hzero, Pi.smul_apply, indicator_of_notMem hyc, smul_zero]
+
 /-- Paper: Example A.3.1.6, p. 557. The Fourier transform of the indicator of the
 p-adic integer units is the difference in (A.3.1.6). -/
 theorem padicTamagawaFourier_integerUnits :
     tamagawaFourier (padicTamagawaMeasure p) (padicStandardCharacter p)
         ({x : ℚ_[p] | ‖x‖ = 1}.indicator (fun _ ↦ (1 : ℂ))) =
-      ((ℤₚ).indicator (fun _ ↦ (1 : ℂ))) - ((p : ℂ)⁻¹) • ((((p : ℚ_[p])⁻¹ * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) := by sorry
+      ((ℤₚ).indicator (fun _ ↦ (1 : ℂ))) - ((p : ℂ)⁻¹) • ((((p : ℚ_[p])⁻¹ * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) := by
+  let μ := padicTamagawaMeasure p
+  have hμ := Classical.choose_spec (padicTamagawaMeasure_existsUnique p).exists
+  have : μ.IsAddHaarMeasure := hμ.1
+  have hp : (p : ℚ_[p]) ≠ 0 := by exact_mod_cast (Fact.out : p.Prime).ne_zero
+  let P := ((p : ℚ_[p]) * ·) '' ℤₚ
+  have hP : P = Metric.ball 0 1 := padicPrimeMulIntegers_eq_ball p hp
+  have hsub : P ⊆ ℤₚ := hP ▸ Metric.ball_subset_closedBall
+  have hdiff : {x : ℚ_[p] | ‖x‖ = 1} = ℤₚ \ P := by
+    ext x
+    simp only [hP, mem_ofPred_eq, mem_sdiff, mem_closedBall_zero_iff, Metric.mem_ball, dist_zero_right,
+      not_lt]
+    exact le_antisymm_iff
+  have h0 : tamagawaFourier μ (padicStandardCharacter p) ((ℤₚ).indicator (fun _ ↦ (1 : ℂ))) =
+      (ℤₚ).indicator (fun _ ↦ (1 : ℂ)) := by
+    have hone : (padicTamagawaMeasure p) ℤₚ = 1 := hμ.2.2
+    have hmass : (padicTamagawaMeasure p).real ℤₚ = 1 := by
+      rw [measureReal_def, hone, ENNReal.toReal_one]
+    simpa [hmass] using padicTamagawaFourier_scaledIntegers_eq_measure p 1 one_ne_zero
+  have h1 : tamagawaFourier μ (padicStandardCharacter p) (P.indicator (fun _ ↦ (1 : ℂ))) =
+      ((p : ℂ)⁻¹) • ((((p : ℚ_[p])⁻¹ * ·) '' ℤₚ).indicator (fun _ ↦ (1 : ℂ))) := by
+    simpa [P, padicTamagawaMeasure_real_primeMulIntegers p hp, Complex.ofReal_inv] using padicTamagawaFourier_scaledIntegers_eq_measure p p hp
+  rw [hdiff, Set.indicator_sdiff hsub]
+  conv_rhs => rw [← h0, ← h1]
+  funext y
+  let g (x : ℚ_[p]) : ℂ := star (padicStandardCharacter p (x * y) : ℂ)
+  have hg : Continuous g :=
+    (continuous_subtype_val.comp ((padicStandardCharacter_continuous p).comp (continuous_id.mul continuous_const))).star
+  have hInt (s : Set ℚ_[p]) (hs : IsCompact s) : Integrable (s.indicator g) μ :=
+    (integrable_indicator_iff hs.measurableSet).mpr (hg.continuousOn.integrableOn_compact hs)
+  unfold tamagawaFourier
+  change (∫ x, ((ℤₚ).indicator (fun _ ↦ (1 : ℂ)) x - P.indicator (fun _ ↦ (1 : ℂ)) x) * g x ∂μ) =
+    (∫ x, (ℤₚ).indicator (fun _ ↦ (1 : ℂ)) x * g x ∂μ) -
+      ∫ x, P.indicator (fun _ ↦ (1 : ℂ)) x * g x ∂μ
+  simp only [sub_mul, ← indicator_mul_left, one_mul]
+  exact integral_sub (hInt _ (isCompact_closedBall _ _))
+    (hInt _ (by
+      change IsCompact (((p : ℚ_[p]) * ·) '' ℤₚ)
+      rw [padicScaledIntegers_eq_closedBall p _ hp]
+      exact isCompact_closedBall _ _))
 
 /-- Paper: Example A.3.1.7, p. 558. The standard additive measure on the p-adic field
 is self-dual under the standard character. -/
