@@ -1458,7 +1458,27 @@ theorem bruhatDiffWord_character (w : List (LCATopologicalLie G))
     (χ : PontryaginDual G) (x : G) :
     ((bruhatDiffWord w).val ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩).val x =
       (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod * (χ x : ℂ) :=
-  by sorry
+  by
+    let f : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩
+    have hGenerator (a : LCATopologicalLie G) :
+        (bruhatDiffGenerator a).val f = bruhatDiffSymbol (bruhatDiffGenerator a) χ • f := by
+      apply Subtype.ext
+      funext y
+      change bruhatDirectionalDeriv a (fun z ↦ (χ z : ℂ)) y =
+        bruhatDirectionalDeriv a (fun z ↦ (χ z : ℂ)) 1 * (χ y : ℂ)
+      simp only [bruhatDirectionalDeriv, one_mul, map_mul, Circle.coe_mul, deriv_const_mul_field]
+      exact mul_comm _ _
+    change ((bruhatDiffWord w).val f).val x = _
+    induction w with
+    | nil => simp [bruhatDiffWord, f]
+    | cons a w ih =>
+      have hWord : bruhatDiffWord (a :: w) = bruhatDiffWord w * bruhatDiffGenerator a := by
+        simp [bruhatDiffWord, List.reverse_cons, List.prod_append]
+      rw [hWord]
+      change ((bruhatDiffWord w).val ((bruhatDiffGenerator a).val f)).val x = _
+      rw [hGenerator, map_smul]
+      change bruhatDiffSymbol (bruhatDiffGenerator a) χ * ((bruhatDiffWord w).val f).val x = _
+      rw [ih, List.map_cons, List.prod_cons, mul_assoc]
 
 /-- Paper: Lemma D.1.6.13, p. 769. The symbol of a word is the product
 of its first-order symbols. -/
