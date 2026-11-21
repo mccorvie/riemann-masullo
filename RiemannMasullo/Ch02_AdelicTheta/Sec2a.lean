@@ -1510,11 +1510,237 @@ theorem adelicTheta_riemannRoch (f : ℬ[F]) (g : C[F]) :
     adelicTheta f g = (normℝ g)⁻¹ • adelicTheta (adeleSchwartzFourier f) g⁻¹ +
       (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele - f zeroAdele := by sorry
 
+/-- Every norm-one idele class has a representative in a single compact set of ideles. -/
+private theorem exists_compact_idele_representatives :
+    ∃ K : Set 𝕀[F], IsCompact K ∧ ∀ g ∈ (ideleClassNorm F).ker,
+      ∃ k ∈ K, classOf k = g := by
+  classical
+  let : LocallyCompactSpace 𝕀[F] := (ideleGroup_topology F).2.1
+  let : CompactSpace (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.1
+  have hCompact : IsCompact ((ideleClassNorm F).ker : Set C[F]) :=
+    isCompact_iff_compactSpace.mpr inferInstance
+  choose U hUc hU using fun k : 𝕀[F] => exists_compact_mem_nhds k
+  let V (k : 𝕀[F]) := classOf '' interior (U k)
+  have hVo (k : 𝕀[F]) : IsOpen (V k) :=
+    QuotientGroup.isOpenMap_coe _ isOpen_interior
+  have hCover : (↑(ideleClassNorm F).ker : Set C[F]) ⊆ ⋃ k, V k := by
+    intro g _
+    obtain ⟨k, rfl⟩ := QuotientGroup.mk_surjective g
+    exact mem_iUnion.mpr ⟨k, mem_image_of_mem _ (mem_interior_iff_mem_nhds.mpr (hU k))⟩
+  obtain ⟨s, hs⟩ := hCompact.elim_finite_subcover V hVo hCover
+  refine ⟨⋃ k : s, U k, isCompact_iUnion (fun k => hUc k), fun g hg => ?_⟩
+  obtain ⟨i, hi⟩ := mem_iUnion.mp (hs hg)
+  obtain ⟨hi', k, hk, rfl⟩ := mem_iUnion.mp hi
+  exact ⟨k, mem_iUnion.mpr ⟨⟨i, hi'⟩, interior_subset hk⟩, rfl⟩
+
+/-- The canonical norm section dilates the mixed archimedean space by the positive
+root of order the field degree. -/
+private theorem canonicalIdeleNormSection_smul_mixedSpace (t : ℝ≥0ˣ) (x : 𝔸[F]) :
+    InfiniteAdeleRing.ringEquiv_mixedSpace F ((canonicalIdeleNormSection F t).val * x).1 =
+      ((t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹) •
+        InfiniteAdeleRing.ringEquiv_mixedSpace F x.1 := by
+  let E := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let r := (t.val : ℝ) ^ (Module.finrank ℚ F : ℝ)⁻¹
+  have h : E (canonicalIdeleNormSection F t).val.1 =
+      algebraMap ℝ (mixedEmbedding.mixedSpace F) r := by
+    rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    apply Prod.ext
+    · funext v
+      apply Complex.ofReal_injective
+      rw [InfinitePlace.Completion.extensionEmbeddingOfIsReal_apply]
+      exact canonicalIdeleNormSection_infinite F t v.val
+    · funext v
+      exact canonicalIdeleNormSection_infinite F t v.val
+  change E ((canonicalIdeleNormSection F t).val.1 * x.1) = r • E x.1
+  rw [map_mul, h, Algebra.smul_def]
+
+set_option maxHeartbeats 1800000 in
+open scoped Classical in
+open IsDedekindDomain in
+/-- After multiplication by the requested power of the idelic norm, the summands of
+a Schwartz stage have one summable majorant along all norm-section rays from a compact set. -/
+private theorem realization_normSection_summable_bound
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F]))
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e)
+    (K : Set 𝕀[F]) (hK : IsCompact K) (N : ℕ) :
+    ∃ u : Fˣ → ℝ, Summable u ∧ ∀ (ξ : Fˣ) (t : ℝ≥0ˣ), 1 ≤ (t.val : ℝ) →
+      ∀ k ∈ K, ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val *
+          algebraMap F 𝔸[F] (ξ : F)))‖ * (t.val : ℝ) ^ N ≤ u ξ := by
+  let E := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let d := Module.finrank ℚ F
+  let L := mixedEmbedding.integerLattice F
+  let M := d * N + Module.finrank ℤ L + 1
+  have HC := realization_decay (F := F) a e s M
+  obtain ⟨C, hC⟩ := HC
+  obtain ⟨b₀, hb₀, h₀⟩ :=
+    exists_mul_mem_adicCompletionIntegers_of_compactlyGenerated a.property.2.1
+  obtain ⟨b₁, hb₁, h₁⟩ := exists_mul_mem_adicCompletionIntegers_of_isCompact
+    (hK.image (continuous_snd.comp Units.continuous_coe_inv))
+  obtain ⟨A₀, hA₀⟩ := hK.exists_bound_of_continuousOn
+    ((continuous_ringEquiv_mixedSpace.comp (continuous_fst.comp
+      Units.continuous_coe_inv)).continuousOn)
+  let A := max A₀ 0
+  have hA : 0 ≤ A := le_max_right _ _
+  let b := b₀ * b₁
+  let B := ‖mixedEmbedding F (algebraMap (𝓞 F) F b)‖
+  have hb : algebraMap (𝓞 F) F b ≠ 0 := by
+    simpa [b] using mul_ne_zero hb₀ hb₁
+  let S : Set Fˣ := {ξ | algebraMap (𝓞 F) F b * (ξ : F) ∈ (algebraMap (𝓞 F) F).range}
+  let z (ξ : Fˣ) := mixedEmbedding F (algebraMap (𝓞 F) F b * (ξ : F))
+  let i (ξ : S) : L := ⟨z ξ.val, by
+    obtain ⟨c, hc⟩ := ξ.property
+    exact ⟨c, by simp [z, hc]⟩⟩
+  have hi : Injective i := by
+    intro ξ η h
+    exact Subtype.ext (Units.ext (mul_left_cancel₀ hb
+      (mixedEmbedding_injective F (congrArg Subtype.val h))))
+  have hsum : Summable (S.indicator fun ξ => (‖z ξ‖ ^ M)⁻¹) := by
+    rw [← summable_subtype_iff_indicator]
+    have hs := (ZLattice.summable_norm_pow_inv L M (by dsimp [M]; omega)).comp_injective hi
+    change Summable (fun ξ : S => ‖z ξ.val‖⁻¹ ^ M) at hs
+    simpa only [inv_pow, Function.comp_def] using hs
+  let D := (A * B) ^ M * max C 0
+  have hAB : 0 ≤ A * B := mul_nonneg hA (norm_nonneg _)
+  have hD : 0 ≤ D := mul_nonneg (pow_nonneg hAB _) (le_max_right _ _)
+  refine ⟨_, hsum.mul_left D, fun ξ t ht k hk => ?_⟩
+  let x : 𝔸[F] := k.val * algebraMap F 𝔸[F] (ξ : F)
+  let y : 𝔸[F] := (canonicalIdeleNormSection F t).val * x
+  let r := (t.val : ℝ) ^ (d : ℝ)⁻¹
+  change ‖schwartzBruhatStageRealization a e s
+    (Multiplicative.ofAdd ((canonicalIdeleNormSection F t).val * k.val *
+      algebraMap F 𝔸[F] (ξ : F)))‖ * (t.val : ℝ) ^ N ≤ _
+  rw [mul_assoc]
+  change ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd y)‖ * (t.val : ℝ) ^ N ≤ _
+  by_cases hy : Multiplicative.ofAdd y ∈ a.val.1
+  · have hf : y.2 = x.2 := by
+      change (canonicalIdeleNormSection F t).val.2 * x.2 = x.2
+      rw [canonicalIdeleNormSection_finite, one_mul]
+    have hξ : ξ ∈ S := by
+      change algebraMap (𝓞 F) F (b₀ * b₁) * (ξ : F) ∈ (algebraMap (𝓞 F) F).range
+      simpa only [mul_one] using
+        (mul_mem_integers_of_adele (b₂ := 1) k 0 (ξ : F)
+          (by
+            intro v
+            have h := h₀ _ hy v
+            change (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b₀ * y.2) v ∈
+              v.adicCompletionIntegers F at h
+            rw [hf] at h
+            simpa only [add_zero] using h)
+          (h₁ _ ⟨k, hk, rfl⟩) (fun v => by
+            change algebraMap (𝓞 F) (v.adicCompletion F) 1 * 0 ∈ v.adicCompletionIntegers F
+            rw [mul_zero]
+            exact zero_mem _))
+    have hz : 0 < ‖z ξ‖ := by
+      dsimp [z]
+      rw [norm_pos_iff, map_ne_zero_iff _ (mixedEmbedding_injective F)]
+      exact mul_ne_zero hb ξ.ne_zero
+    have hr : 1 ≤ r := Real.one_le_rpow ht (by positivity)
+    have hr0 : 0 ≤ r := zero_le_one.trans hr
+    have hp : r ^ (d * N) = (t.val : ℝ) ^ N := by
+      have hd : (d : ℝ) ≠ 0 := by exact_mod_cast (Module.finrank_pos (R := ℚ) (M := F)).ne'
+      dsimp [r]
+      rw [← Real.rpow_mul_natCast t.val.coe_nonneg, ← Real.rpow_natCast,
+        Nat.cast_mul, ← mul_assoc, inv_mul_cancel₀ hd, one_mul]
+    have hyNorm : ‖E y.1‖ = r * ‖E x.1‖ := by
+      change ‖E ((canonicalIdeleNormSection F t).val * x).1‖ = _
+      rw [canonicalIdeleNormSection_smul_mixedSpace, norm_smul,
+        Real.norm_of_nonneg hr0]
+    have hξNorm : ‖mixedEmbedding F (ξ : F)‖ ≤ A * ‖E x.1‖ := by
+      have h := norm_mixedEmbedding_le_of_adele k 0 (ξ : F)
+      rw [add_zero] at h
+      have h' : ‖mixedEmbedding F (ξ : F)‖ ≤ ‖E (k⁻¹ : 𝕀[F]).val.1‖ * ‖E x.1‖ := by
+        simpa only [E, x, Prod.fst_zero, map_zero, norm_zero, add_zero] using h
+      exact h'.trans (mul_le_mul_of_nonneg_right ((hA₀ k hk).trans (le_max_left _ _))
+        (norm_nonneg _))
+    have hscale : r * ‖z ξ‖ ≤ (A * B) * (1 + ‖E y.1‖) := by
+      have hzMul : ‖z ξ‖ ≤ B * ‖mixedEmbedding F (ξ : F)‖ := by
+        dsimp [z, B]
+        rw [map_mul]
+        exact norm_mul_le _ _
+      calc
+        r * ‖z ξ‖ ≤ r * (B * (A * ‖E x.1‖)) :=
+          mul_le_mul_of_nonneg_left
+            (hzMul.trans (mul_le_mul_of_nonneg_left hξNorm (norm_nonneg _))) hr0
+        _ = (A * B) * ‖E y.1‖ := by rw [hyNorm]; ac_rfl
+        _ ≤ (A * B) * (1 + ‖E y.1‖) :=
+          mul_le_mul_of_nonneg_left (le_add_of_nonneg_left zero_le_one) hAB
+    let w := ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd y)‖
+    have hw : 0 ≤ w := norm_nonneg _
+    have htPow : (t.val : ℝ) ^ N ≤ r ^ M :=
+      hp ▸ pow_le_pow_right₀ hr (by dsimp [M]; omega)
+    have hweighted : w * (t.val : ℝ) ^ N * ‖z ξ‖ ^ M ≤ D := calc
+      _ ≤ w * r ^ M * ‖z ξ‖ ^ M :=
+        mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left htPow hw) (pow_nonneg hz.le _)
+      _ = w * (r * ‖z ξ‖) ^ M := by rw [mul_pow, mul_assoc]
+      _ ≤ w * ((A * B) * (1 + ‖E y.1‖)) ^ M :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (mul_nonneg hr0 hz.le) hscale _) hw
+      _ = (A * B) ^ M * (w * (1 + ‖E y.1‖) ^ M) := by rw [mul_pow]; ac_rfl
+      _ ≤ D := mul_le_mul_of_nonneg_left ((hC _ hy).trans (le_max_left _ _)) (pow_nonneg hAB _)
+    calc
+      w * (t.val : ℝ) ^ N ≤ D / ‖z ξ‖ ^ M := (le_div_iff₀ (pow_pos hz _)).mpr hweighted
+      _ = D * S.indicator (fun η => (‖z η‖ ^ M)⁻¹) ξ := by
+        rw [indicator_of_mem hξ, div_eq_mul_inv]
+  · rw [schwartzBruhatStageRealization_apply_dite, dite_eq_right hy, norm_zero, zero_mul]
+    exact mul_nonneg hD (indicator_nonneg (fun _ _ => by positivity) _)
+
 /-- Paper: Theorem 2.2.3.4(1), p. 83. Theta decays faster than any inverse
 power of the idele class norm as that norm tends to infinity. -/
 theorem adelicTheta_decay_large (f : ℬ[F]) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], T < normℝ g →
-      ‖adelicTheta f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖adelicTheta f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  obtain ⟨K, hK, hRep⟩ := exists_compact_idele_representatives (F := F)
+  let point (ξ : Fˣ) (t : ℝ≥0ˣ) (k : 𝕀[F]) :=
+    Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val * algebraMap F 𝔸[F] (ξ : F))
+  let P (φ : Multiplicative 𝔸[F] → ℂ) := ∃ u : Fˣ → ℝ, Summable u ∧
+    ∀ (ξ : Fˣ) (t : ℝ≥0ˣ), 1 ≤ (t.val : ℝ) → ∀ k ∈ K,
+      ‖φ (point ξ t k)‖ * (t.val : ℝ) ^ N ≤ u ξ
+  have hzero : P 0 := ⟨0, summable_zero, fun _ _ _ _ _ => by simp⟩
+  have hadd (φ ψ : Multiplicative 𝔸[F] → ℂ) : P φ → P ψ → P (φ + ψ) := by
+    rintro ⟨u, hu, hφ⟩ ⟨v, hv, hψ⟩
+    refine ⟨u + v, hu.add hv, fun ξ t ht k hk => ?_⟩
+    change ‖φ (point ξ t k) + ψ (point ξ t k)‖ * (t.val : ℝ) ^ N ≤ u ξ + v ξ
+    calc
+      _ ≤ (‖φ (point ξ t k)‖ + ‖ψ (point ξ t k)‖) * (t.val : ℝ) ^ N :=
+        mul_le_mul_of_nonneg_right (norm_add_le _ _) (by positivity)
+      _ ≤ _ := by rw [add_mul]; exact add_le_add (hφ ξ t ht k hk) (hψ ξ t ht k hk)
+  have hP : P (show schwartzBruhatSubmodule (Multiplicative 𝔸[F]) from f).val := by
+    refine Submodule.iSup_induction (motive := P) _ f.property ?_ hzero hadd
+    intro a φ hφ
+    refine Submodule.iSup_induction (motive := P) _ hφ ?_ hzero hadd
+    intro e ψ hψ
+    obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hψ
+    exact realization_normSection_summable_bound a e s K hK N
+  obtain ⟨u, hu, hbound⟩ := hP
+  refine ⟨max (∑' ξ, u ξ) 1, 1, zero_lt_one.trans_le (le_max_right _ _), zero_lt_one, ?_⟩
+  intro g hg
+  let t := ideleClassNorm F g
+  let a := canonicalIdeleNormSection F t
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hn : ideleClassNorm F (q a) = t := canonicalIdeleNormSection_rightInverse F t
+  have hker : (q a)⁻¹ * g ∈ (ideleClassNorm F).ker := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, hn]
+    exact inv_mul_cancel t
+  obtain ⟨k, hk, hq⟩ := hRep ((q a)⁻¹ * g) hker
+  have hclass : q (a * k) = g := by
+    rw [map_mul, show q k = (q a)⁻¹ * g from hq, mul_inv_cancel_left]
+  have htheta : adelicTheta f g = ∑' ξ, f (point ξ t k) := by
+    rw [← hclass]
+    change adelicTheta f (classOf (a * k)) =
+      ∑' ξ : Fˣ, f (Multiplicative.ofAdd ((a * k).val * algebraMap F 𝔸[F] (ξ : F)))
+    rw [adelicTheta_mk]
+    simp only [mul_comm (a * k).val]
+  have hs : Summable (fun ξ => ‖f (point ξ t k)‖) := by
+    simpa only [point, add_zero] using
+      ((adelicAverage_summableUniformlyOn f {(a * k, 0)} isCompact_singleton).summable rfl)
+  rw [htheta]
+  apply (norm_tsum_le_tsum_norm hs).trans
+  change (∑' ξ, ‖f (point ξ t k)‖) ≤ max (∑' ξ, u ξ) 1 * ((t.val : ℝ) ^ N)⁻¹
+  have ht : 1 ≤ (t.val : ℝ) := hg.le
+  rw [← div_eq_mul_inv, le_div_iff₀ (pow_pos (zero_lt_one.trans_le ht) N)]
+  rw [← tsum_mul_right]
+  exact (Summable.tsum_le_tsum (fun ξ => hbound ξ t ht k hk)
+    (hs.mul_right _) hu).trans (le_max_left _ _)
 
 /-- Paper: Theorem 2.2.3.4(2), p. 83. After subtracting the explicit polar
 terms, theta decays faster than any power of the norm as it tends to zero. -/
