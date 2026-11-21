@@ -2166,8 +2166,61 @@ theorem isBruhatSmooth_real_iff (f : Multiplicative ℝ → ℂ) :
 
 variable [hTop : IsTopologicalGroup G] [hT2 : T2Space G] [hLC : LocallyCompactSpace G]
 
+/-- An LCA group has a good subgroup. The annihilator of an open compactly generated
+subgroup of the dual is compact. Evaluation gives a continuous injection from the quotient
+into a group with no small subgroups, so the quotient is locally Euclidean. -/
+private theorem exists_bruhatGoodSubgroup : ∃ k : Subgroup G, IsBruhatGoodSubgroup k := by
+  obtain ⟨H, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+  let k := lcaDualAnnihilator H.val
+  have hk := isCompact_lcaDualAnnihilator H.val H.property.1
+  refine ⟨k, hk.isClosed, isOpen_lcaAnnihilator k hk, ?_⟩
+  let : T1Space (G ⧸ k) := QuotientGroup.t1Space_iff.mpr hk.isClosed
+  let r := PontryaginDual.map (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)
+  let γ := r.comp (pontryaginDual_eval (G := G))
+  have hker : γ.toMonoidHom.ker = k := by
+    ext x
+    rw [MonoidHom.mem_ker, mem_lcaDualAnnihilator_iff]
+    exact ⟨fun h χ ↦ congrArg (fun ψ : PontryaginDual H.val ↦ ψ χ) h,
+      fun h ↦ PontryaginDual.ext h⟩
+  let f : G ⧸ k →ₜ* PontryaginDual H.val :=
+    ⟨QuotientGroup.lift k γ.toMonoidHom hker.ge,
+      (QuotientGroup.isQuotientMap_mk k).continuous_iff.mpr γ.continuous⟩
+  have hf : Function.Injective f :=
+    (QuotientGroup.injective_lift_iff k γ.toMonoidHom hker.ge).mpr hker.symm
+  obtain ⟨C, _, hC, hGen⟩ := H.property.2
+  have hArc : Circle.centeredArc (Real.pi / 2) ∈ 𝓝 (1 : Circle) := by
+    simpa using Circle.hasBasis_centeredArc_div_two_pow.mem_of_mem (i := 0) trivial
+  let W : Set (PontryaginDual H.val) := {ψ | MapsTo ψ C (Circle.centeredArc (Real.pi / 2))}
+  have hW : W ∈ 𝓝 (1 : PontryaginDual H.val) :=
+    pontryaginDual_nhds_one_hasBasis.mem_of_mem (i := (C, _)) ⟨hC, hArc⟩
+  have hW' : W ∈ 𝓝 (f 1) := by rwa [map_one]
+  have hPre : f ⁻¹' W ∈ 𝓝 (1 : G ⧸ k) :=
+    f.continuous.continuousAt.preimage_mem_nhds hW'
+  have hPow (x : G ⧸ k) (hx : ∀ n : ℕ, x ^ n ∈ f ⁻¹' W) : x = 1 := by
+    have hCker : C ⊆ (f x).toMonoidHom.ker := by
+      intro χ hχ
+      apply MonoidHom.mem_ker.mpr
+      apply Circle.eq_one_of_forall_pow_mem_centeredArc_pi_div_two
+      intro n _
+      have hn : f (x ^ n) χ ∈ Circle.centeredArc (Real.pi / 2) := hx n hχ
+      rw [map_pow] at hn
+      exact (ContinuousMonoidHom.pow_apply (f x) n χ) ▸ hn
+    have hTop : ⊤ ≤ (f x).toMonoidHom.ker := hGen ▸ (Subgroup.closure_le _).mpr hCker
+    apply hf
+    rw [map_one]
+    exact PontryaginDual.ext fun χ ↦ MonoidHom.mem_ker.mp (hTop (Subgroup.mem_top χ))
+  obtain ⟨_, φ, _, hφ⟩ := exists_torusHom_of_noSmallCyclicSubgroups hPre hPow
+  obtain ⟨e, _⟩ := lcaQuotientDual_equiv_annihilator k hk.isClosed
+  exact isCompactlyGeneratedGroup_of_continuousMulEquiv e
+    (isCompactlyGeneratedGroup_dual_of_isLocallyEuclidean
+      (isLocallyEuclidean_of_torusHom_discreteKernel φ hφ))
+
 /-- Paper: Definition D.1.5.3(1), p. 762. The zero function is of class Cᵖ. -/
-theorem isBruhatContDiff_zero (p : ℕ) : IsBruhatContDiff p (0 : G → ℂ) := by sorry
+theorem isBruhatContDiff_zero (p : ℕ) : IsBruhatContDiff p (0 : G → ℂ) := by
+  obtain ⟨k, hk⟩ := exists_bruhatGoodSubgroup (G := G)
+  refine ⟨k, hk, fun _ _ ↦ rfl, fun a _ ↦ ⟨(0 : a.quotient → ℂ), fun _ ↦ rfl, ?_⟩⟩
+  intro e z b
+  exact contDiff_const
 
 /-- Paper: Definition D.1.5.3(1), p. 762. The sum of two functions of class Cᵖ
 is of class Cᵖ. -/
