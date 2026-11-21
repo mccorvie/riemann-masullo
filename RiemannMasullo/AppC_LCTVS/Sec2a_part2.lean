@@ -11,6 +11,7 @@ import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 
 /-!
 # Topological tensor products
@@ -935,18 +936,163 @@ end Comparison
 
 section DirectSums
 
+/-- The seminorms with jointly continuous pullback at zero generate the projective topology. -/
+private theorem projectiveTensor_withSeminorms (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
+
+/-- Pure tensors depend jointly continuously on their factors at zero in the projective topology. -/
+private theorem continuousAt_projectiveTensor_tmul_zero (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
+  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
+  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
+  rw [hzero,
+    (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp (projectiveTensor_withSeminorms X Y),
+    tendsto_iInf]
+  intro p
+  rw [tendsto_comap_iff]
+  have hp := p.property.tendsto
+  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
+  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
+
+/-- A generating projective seminorm, tested on the unit ball in the normed factor, is bounded
+by a single continuous seminorm on the other factor. -/
+private theorem projectiveTensor_seminorm_unitBall_bound {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X]
+    [SeminormedAddCommGroup Y] [NormedSpace ℂ Y]
+    (p : Seminorm ℂ (X ⊗[ℂ] Y))
+    (hp : ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0) :
+    ∃ q : Seminorm ℂ X, Continuous q ∧ ∀ x y, ‖y‖ < 1 → p (x ⊗ₜ[ℂ] y) ≤ q x := by
+  have := PolynormableSpace.isTopologicalAddGroup ℂ X
+  have h : {v : X × Y | p (v.1 ⊗ₜ[ℂ] v.2) < 1} ∈ 𝓝 0 :=
+    hp.preimage_mem_nhds (show Iio (1 : ℝ) ∈ 𝓝 (p ((0 : X × Y).1 ⊗ₜ[ℂ]
+      (0 : X × Y).2)) by simpa using Iio_mem_nhds (α := ℝ) one_pos)
+  rw [show (0 : X × Y) = ((0 : X), (0 : Y)) from rfl, nhds_prod_eq] at h
+  obtain ⟨U, hU, V, hV, hUV⟩ := Filter.mem_prod_iff.mp h
+  obtain ⟨r, hr, hrV⟩ := NormedAddGroup.nhds_zero_basis_norm_lt.mem_iff.mp hV
+  obtain ⟨c, hc, hcr⟩ := NormedField.exists_norm_lt ℂ hr
+  let B := {y : Y // ‖y‖ < 1}
+  let s (y : B) : Seminorm ℂ X := p.comp ((TensorProduct.mk ℂ X Y).flip y.val)
+  have hbound (x : X) (hx : x ∈ U) (y : B) : s y x ≤ 1 / ‖c‖ := by
+    have hy : c • y.val ∈ V := hrV (by
+      change ‖c • y.val‖ < r
+      rw [norm_smul]
+      exact (mul_lt_of_lt_one_right hc y.property).trans hcr)
+    rw [le_div_iff₀' hc]
+    change ‖c‖ * p (x ⊗ₜ[ℂ] y.val) ≤ 1
+    rw [← map_smul_eq_mul, ← tmul_smul]
+    exact (hUV (a := (x, c • y.val)) ⟨hx, hy⟩).le
+  have hs : BddAbove (range s) := Seminorm.bddAbove_of_absorbent (absorbent_nhds_zero hU)
+    fun x hx ↦ ⟨1 / ‖c‖, forall_mem_range.mpr (hbound x hx)⟩
+  let q : Seminorm ℂ X := ⨆ y, s y
+  have : Nonempty B := ⟨⟨0, by simp⟩⟩
+  refine ⟨q, Seminorm.continuous' (r := 1 / ‖c‖) ?_, fun x y hy ↦ ?_⟩
+  · refine mem_of_superset hU fun x hx ↦ ?_
+    rw [Seminorm.mem_closedBall_zero, Seminorm.iSup_apply hs]
+    exact ciSup_le (hbound x hx)
+  · exact (le_ciSup hs ⟨y, hy⟩ : s ⟨y, hy⟩ ≤ q) x
+
 variable {I : Type*} [DecidableEq I] (E : I → Type*) (F : Type*)
   [∀ i, AddCommGroup (E i)] [∀ i, Module ℂ (E i)] [∀ i, TopologicalSpace (E i)]
   [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
   [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsNormableSpace ℂ F] [T2Space F]
 
+-- Retain the Hausdorff assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Proposition C.2.3.9(1), p. 680. With a normable fixed factor the canonical
 distributivity map for an arbitrary locally convex direct sum is a homeomorphism. -/
 theorem projectiveTensor_directSum :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ I E)
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ I (fun i ↦ ProjectiveTensor (E i) F))
     @IsHomeomorph (⨁ i, ProjectiveTensor (E i) F) (ProjectiveTensor (⨁ i, E i) F)
-      _ _ (TensorProduct.directSumLeft ℂ ℂ E F).symm := by sorry
+      _ _ (TensorProduct.directSumLeft ℂ ℂ E F).symm := by
+  classical
+  let X := ⨁ i, E i
+  let Y (i : I) := ProjectiveTensor (E i) F
+  let D := ⨁ i, Y i
+  let lofX := DirectSum.lof ℂ I E
+  let lofY := DirectSum.lof ℂ I Y
+  let : TopologicalSpace X := locallyConvexFinalTopology lofX
+  let : TopologicalSpace D := locallyConvexFinalTopology lofY
+  let e : ProjectiveTensor X F ≃ₗ[ℂ] D := TensorProduct.directSumLeft ℂ ℂ E F
+  have hX : WithSeminorms (E := X)
+      (Subtype.val : {p : Seminorm ℂ X // ∀ i, Continuous (p ∘ lofX i)} → Seminorm ℂ X) := ⟨rfl⟩
+  have hD : WithSeminorms (E := D)
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ lofY i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let : IsTopologicalAddGroup X := hX.isTopologicalAddGroup
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  have hlofX (i : I) : Continuous (lofX i) := by
+    have := PolynormableSpace.isTopologicalAddGroup ℂ (E i)
+    exact hX.continuous_of_continuous_comp _ fun p ↦ p.property i
+  change IsHomeomorph e.symm
+  refine e.symm.isHomeomorph_iff.mpr ⟨?_, ?_⟩
+  · refine (projectiveTensor_withSeminorms X F).continuous_of_continuous_comp
+      e.symm.toLinearMap fun p ↦ ?_
+    refine hD.continuous_seminorm ⟨p.val.comp e.symm.toLinearMap, fun i ↦ ?_⟩
+    let q : Seminorm ℂ (E i ⊗[ℂ] F) := (p.val.comp e.symm.toLinearMap).comp (lofY i)
+    have hq : ContinuousAt (fun v : E i × F ↦ q (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+      have hc : ContinuousAt (fun v : E i × F ↦ (lofX i v.1, v.2)) 0 :=
+        ((hlofX i).comp continuous_fst).continuousAt.prodMk continuous_snd.continuousAt
+      have hp := p.property.comp_of_eq hc (show (lofX i 0, (0 : F)) = 0 by simp)
+      change ContinuousAt (fun v : E i × F ↦ p.val (e.symm (lofY i (v.1 ⊗ₜ[ℂ] v.2)))) 0
+      have heq (x : E i) (y : F) : e.symm (lofY i (x ⊗ₜ[ℂ] y)) = lofX i x ⊗ₜ[ℂ] y :=
+        TensorProduct.directSumLeft_symm_lof_tmul ℂ ℂ i x y
+      simp only [heq]
+      exact hp
+    exact (projectiveTensor_withSeminorms (E i) F).continuous_seminorm ⟨q, hq⟩
+  · refine hD.continuous_of_continuous_comp e.toLinearMap fun p ↦ ?_
+    refine (projectiveTensor_withSeminorms X F).continuous_seminorm ⟨p.val.comp e.toLinearMap, ?_⟩
+    let : SeminormedAddCommGroup F := IsNormableSpace.toSeminormedAddCommGroup ℂ F
+    let : NormedSpace ℂ F := IsNormableSpace.toNormedSpace ℂ F
+    let s (i : I) : Seminorm ℂ (E i ⊗[ℂ] F) := p.val.comp (lofY i)
+    have hs (i : I) : ContinuousAt (fun v : E i × F ↦ s i (v.1 ⊗ₜ[ℂ] v.2)) 0 :=
+      (p.property i).continuousAt.comp (continuousAt_projectiveTensor_tmul_zero (E i) F)
+    choose q hq hbound using fun i ↦ projectiveTensor_seminorm_unitBall_bound (s i) (hs i)
+    let r := directSumSeminorm q
+    have hr : Continuous r := by
+      refine hX.continuous_seminorm ⟨r, fun i ↦ ?_⟩
+      change Continuous (fun x ↦ directSumSeminorm q (DirectSum.lof ℂ I E i x))
+      simpa only [directSumSeminorm_lof] using hq i
+    -- All summands are controlled on the same unit ball in the fixed factor.
+    have htotal (x : X) (y : F) (hy : ‖y‖ < 1) : p.val (e (x ⊗ₜ[ℂ] y)) ≤ r x := by
+      let f : X →ₗ[ℂ] D := e.toLinearMap.comp ((TensorProduct.mk ℂ X F).flip y)
+      have hsum : (∑ i ∈ x.support, lofX i (x i)) = x := DirectSum.sum_support_of x
+      have hsum' : f x = ∑ i ∈ x.support, f (lofX i (x i)) := by rw [← map_sum, hsum]
+      change p.val (f x) ≤ r x
+      calc
+        p.val (f x) ≤ ∑ i ∈ x.support, p.val (f (lofX i (x i))) := by
+          rw [hsum']
+          exact Finset.le_sum_of_subadditive p.val (map_zero p.val).le
+            (map_add_le_add p.val) x.support (fun i ↦ f (lofX i (x i)))
+        _ ≤ r x := by
+          rw [show r x = ∑ i ∈ x.support, q i (x i) from directSumSeminorm_apply q x _ Subset.rfl]
+          apply Finset.sum_le_sum
+          intro i _
+          change p.val (e (lofX i (x i) ⊗ₜ[ℂ] y)) ≤ q i (x i)
+          rw [show e (lofX i (x i) ⊗ₜ[ℂ] y) = lofY i (x i ⊗ₜ[ℂ] y) from
+            TensorProduct.directSumLeft_tmul_lof ℂ ℂ i (x i) y]
+          exact hbound i (x i) y hy
+    have hball : ∀ᶠ v : X × F in 𝓝 0, ‖v.2‖ < 1 := by
+      have h : {y : F | ‖y‖ < 1} ∈ 𝓝 (0 : X × F).2 :=
+        NormedAddGroup.nhds_zero_basis_norm_lt.mem_of_mem one_pos
+      exact continuous_snd.continuousAt.preimage_mem_nhds h
+    have hr0 : Tendsto (fun v : X × F ↦ r v.1) (𝓝 0) (𝓝 0) := by
+      have h : Continuous (fun v : X × F ↦ r v.1) := hr.comp continuous_fst
+      have ht := h.continuousAt.tendsto (x := (0 : X × F))
+      change Tendsto (fun v : X × F ↦ r v.1) (𝓝 0) (𝓝 (r 0)) at ht
+      rwa [map_zero] at ht
+    change ContinuousAt (fun v : X × F ↦ p.val (e (v.1 ⊗ₜ[ℂ] v.2))) 0
+    have hzero : p.val (e ((0 : X × F).1 ⊗ₜ[ℂ] (0 : X × F).2)) = 0 := by
+      rw [Prod.fst_zero, TensorProduct.zero_tmul]
+      exact (congrArg p.val e.map_zero).trans (map_zero p.val)
+    rw [ContinuousAt, hzero]
+    exact squeeze_zero' (Eventually.of_forall fun v ↦ apply_nonneg p.val _)
+      (hball.mono fun v hv ↦ htotal v.1 v.2 hv) hr0
 
 /-- Paper: Proposition C.2.3.9(1), p. 680. The direct sum of the completed tensors is
 isomorphic to the completed tensor of the direct sum. Its isomorphism extends the stage maps. -/
