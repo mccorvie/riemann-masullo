@@ -312,7 +312,13 @@ invariant under addition of a diagonal field element to the adele argument. -/
 theorem adelicAverage_add_zeroTerm_add_principal (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F]) (a : F) :
     let y := algebraMap F 𝔸[F] a + x
     adelicAverage f g y + f (Multiplicative.ofAdd (g.val * y)) =
-      adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x)) := by sorry
+      adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x)) := by
+  dsimp only
+  rw [← (hasSum_adelicAverage_add_zeroTerm f g (algebraMap F 𝔸[F] a + x)).tsum_eq,
+    ← (hasSum_adelicAverage_add_zeroTerm f g x).tsum_eq]
+  simpa only [Equiv.coe_addRight, map_add, add_assoc] using
+    (Equiv.addRight a).tsum_eq
+      (fun ξ : F ↦ f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))))
 
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is continuous
 as a function of the idele. -/
