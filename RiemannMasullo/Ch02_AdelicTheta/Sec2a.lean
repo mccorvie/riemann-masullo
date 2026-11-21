@@ -2049,7 +2049,45 @@ decays at both ends at every exponential rate in the absolute logarithmic norm. 
 theorem adelicTheta_decay_both (f : ℬ[F]) (hf : f zeroAdele = 0)
     (hFourier : adeleSchwartzFourier f zeroAdele = 0) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], T < |Real.log (normℝ g)| →
-      ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by sorry
+      ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by
+  obtain ⟨C₁, T₁, hC₁, hT₁, hlarge⟩ := adelicTheta_decay_large f N
+  -- The extra power absorbs the norm factor in Riemann–Roch.
+  obtain ⟨C₂, T₂, _, hT₂, hdual⟩ := adelicTheta_decay_large (adeleSchwartzFourier f) (N + 1)
+  let T := max 1 (max (Real.log T₁) (Real.log T₂))
+  refine ⟨max C₁ C₂, T, hC₁.trans_le (le_max_left _ _),
+    zero_lt_one.trans_le (le_max_left _ _), ?_⟩
+  intro g hg
+  have hpos : 0 < normℝ g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  let r := Real.exp |Real.log (normℝ g)|
+  have hthreshold {t : ℝ} (ht : 0 < t) (hle : Real.log t ≤ T) : t < r := by
+    exact (Real.exp_log ht) ▸ Real.exp_lt_exp.mpr (hle.trans_lt hg)
+  have h₁ := hthreshold hT₁ ((le_max_left _ _).trans (le_max_right 1 _))
+  have h₂ := hthreshold hT₂ ((le_max_right _ _).trans (le_max_right 1 _))
+  rw [neg_mul, Real.exp_neg, Real.exp_nat_mul]
+  change ‖adelicTheta f g‖ ≤ max C₁ C₂ * (r ^ N)⁻¹
+  by_cases hlog : 0 ≤ Real.log (normℝ g)
+  · have hr : r = normℝ g := by
+      dsimp [r]
+      rw [abs_of_nonneg hlog, Real.exp_log hpos]
+    rw [hr] at h₁ ⊢
+    exact (hlarge g h₁).trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (by positivity))
+  · have hr : r = (normℝ g)⁻¹ := by
+      dsimp [r]
+      rw [abs_of_neg (lt_of_not_ge hlog), Real.exp_neg, Real.exp_log hpos]
+    have hinv : normℝ (g⁻¹) = r := by
+      rw [hr]
+      simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+    have hbound := hdual g⁻¹ (hinv.symm ▸ h₂)
+    rw [hinv, ← div_eq_mul_inv, le_div_iff₀ (pow_pos (Real.exp_pos _) _)] at hbound
+    have htheta : adelicTheta f g = r • adelicTheta (adeleSchwartzFourier f) g⁻¹ := by
+      simpa only [hr, hf, hFourier, smul_zero, add_zero, sub_zero]
+        using adelicTheta_riemannRoch f g
+    rw [htheta, norm_smul, Real.norm_of_nonneg (Real.exp_nonneg _), ← div_eq_mul_inv,
+      le_div_iff₀ (pow_pos (Real.exp_pos _) _)]
+    calc
+      _ = ‖adelicTheta (adeleSchwartzFourier f) g⁻¹‖ * r ^ (N + 1) := by rw [pow_succ']; ring
+      _ ≤ C₂ := hbound
+      _ ≤ max C₁ C₂ := le_max_right _ _
 
 /-- Paper: Theorem 2.2.3.4(4), p. 83. The three decay estimates admit a common
 constant and threshold uniform over a bounded set of Schwartz–Bruhat functions.
