@@ -865,13 +865,77 @@ theorem sLocalAdelicTheta_norm_pow_isBigO (f : ℬₛ) :
     (fun g ↦ (normℝ g ^ ε) • sLocalAdelicTheta F S f g) =O[smallNorm]
       (fun _ : Iₛ ↦ (1 : ℝ)) := by sorry
 
+omit hε in
+/-- A norm-power bound on representatives bounds their integral when each integrand
+value has the same norm as a representative at the same norm parameter. -/
+private theorem norm_pow_isBigO_integral_of_representatives {G K : Type*} [MeasurableSpace K]
+    (μ : Measure K) [IsFiniteMeasure μ] (r : G → ℝ) (ε : ℝ) (l : Filter ℝ)
+    (θ : G → ℂ) (φ : G → K → ℂ)
+    (hθ : (fun g ↦ (r g ^ ε) • θ g) =O[comap r l] (fun _ : G ↦ (1 : ℝ)))
+    (hlift : ∀ g h, ∃ k, r k = r g ∧ ‖φ g h‖ = ‖θ k‖) :
+    (fun g ↦ (r g ^ ε) • (∫ h, φ g h ∂μ)) =O[comap r l] (fun _ : G ↦ (1 : ℝ)) := by
+  obtain ⟨C, hC⟩ := hθ.bound
+  refine IsBigO.of_bound (C * μ.real Set.univ) (eventually_comap.mpr ?_)
+  filter_upwards [eventually_comap.mp hC] with t ht g hgt
+  simp only [norm_one, mul_one, ← integral_smul]
+  apply norm_integral_le_of_norm_le_const
+  refine Eventually.of_forall fun h ↦ ?_
+  obtain ⟨k, hk, hnorm⟩ := hlift g h
+  simpa only [norm_smul, hk, ← hnorm, norm_one, mul_one] using ht k (hk.trans hgt)
+
+omit hε in
+/-- Multiplying an S-idele class by a norm-one class admits a representative
+with the original S-idelic norm. -/
+private theorem sIdele_exists_representative_mul_norm_one (g : Iₛ) (h : J₁) : ∃ k : Iₛ,
+    normℝ k = normℝ g ∧ classOf k = classOf g * h.val := by
+  obtain ⟨k, hk⟩ := (QuotientGroup.mk_surjective : Function.Surjective classOf) (classOf g * h.val)
+  have hh : sIdeleQuotientNorm F S h.val = 1 := MonoidHom.mem_ker.mp h.property
+  let n := sIdeleQuotientNorm F S
+  have hn : n (classOf k) = n (classOf g) :=
+    (congrArg n hk).trans ((map_mul n (classOf g) h.val).trans
+      ((congrArg (n (classOf g) * ·) hh).trans (mul_one _)))
+  have hnorm : sIdeleNorm F S k = sIdeleNorm F S g :=
+    (sIdeleQuotientNorm_mk F S k).symm.trans (hn.trans (sIdeleQuotientNorm_mk F S g))
+  exact ⟨k, congrArg (fun u : ℝ≥0ˣ ↦ (u.val : ℝ)) hnorm, hk⟩
+
+omit hε in
+/-- The character-weighted theta integrand has the norm of theta evaluated
+at any representative of its argument. -/
+private theorem sLocalTheta_char_norm_eq_of_representative (ω : PontryaginDual J₁) (f : ℬₛ)
+    (g k : Iₛ) (h : J₁) (hk : classOf k = classOf g * h.val) :
+    ‖sLocalAdelicThetaOnClasses F S f (classOf g * h.val) * (ω h : ℂ)‖ =
+      ‖sLocalAdelicTheta F S f k‖ := by
+  let θ : SIdeleQuotient F S → ℂ := fun c ↦ sLocalAdelicThetaOnClasses F S f c
+  let z : ℂ := θ (classOf g * h.val)
+  change ‖z * (ω h : ℂ)‖ = ‖sLocalAdelicTheta F S f k‖
+  calc
+    ‖z * (ω h : ℂ)‖ = ‖z‖ := by rw [norm_mul, Circle.norm_coe, mul_one]
+    _ = ‖sLocalAdelicTheta F S f k‖ :=
+      congrArg (fun w : ℂ ↦ ‖w‖) ((congrArg θ hk.symm).trans
+        (sLocalAdelicThetaOnClasses_mk F S f k))
+-- The section-variable linter takes minutes to traverse this proof's S-adelic instance terms.
+set_option linter.unusedSectionVars false in
 /-- Paper: Proposition 2.4.3.1(1), p. 113. The same small-norm bound
 holds for homogeneous theta multiplied by a positive norm power.
 Deviation: As in §2.3, the norm-one class Haar measure is explicit. -/
 theorem sLocalHomogeneousAdelicTheta_norm_pow_isBigO
     (μ : Measure ↥J₁) [Measure.IsHaarMeasure μ] (ω : PontryaginDual J₁) (f : ℬₛ) :
     (fun g ↦ (normℝ g ^ ε) • sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)) =O[smallNorm]
-      (fun _ : Iₛ ↦ (1 : ℝ)) := by sorry
+      (fun _ : Iₛ ↦ (1 : ℝ)) := by
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let r : Iₛ → ℝ := normℝ
+  let θ : SIdeleQuotient F S → ℂ := fun c ↦ sLocalAdelicThetaOnClasses F S f c
+  let θ₀ : Iₛ → ℂ := fun g ↦ sLocalAdelicTheta F S f g
+  let χ : J₁ → ℂ := fun h ↦ (ω h : ℂ)
+  let φ (g : Iₛ) (h : J₁) : ℂ := θ (classOf g * h.val) * χ h
+  have hrep (g : Iₛ) (h : J₁) : ∃ k, r k = r g ∧ ‖φ g h‖ = ‖θ₀ k‖ := by
+    obtain ⟨k, hn, hk⟩ := sIdele_exists_representative_mul_norm_one F S g h
+    exact ⟨k, hn, sLocalTheta_char_norm_eq_of_representative F S ω f g k h hk⟩
+  change (fun g : Iₛ ↦ (r g ^ ε) • (∫ h, φ g h ∂μ)) =O[comap r (𝓝[>] (0 : ℝ))]
+    (fun _ : Iₛ ↦ (1 : ℝ))
+  exact norm_pow_isBigO_integral_of_representatives μ r ε (𝓝[>] (0 : ℝ))
+    θ₀ φ (sLocalAdelicTheta_norm_pow_isBigO F S ε hε f) hrep
 
 /-- Paper: Proposition 2.4.3.1(2), p. 113. Below a positive norm cutoff
 the bound for theta times a positive norm power is uniform on a bounded
