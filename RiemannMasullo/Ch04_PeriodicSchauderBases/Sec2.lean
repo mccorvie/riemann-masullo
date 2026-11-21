@@ -612,7 +612,38 @@ theorem cyclicFourierCoeff_interval (γ : ℝ) (hγ : 1 < γ) (f : S) (m : ℤ) 
     cyclicFourierCoeff m f =
       (Real.log γ : ℂ)⁻¹ * ∫ t in (1 : ℝ)..γ,
         f (point ((Real.log t / Real.log γ : ℝ) : T)) *
-          Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) / (t : ℂ) := by sorry
+          Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) / (t : ℂ) := by
+  let F (x : ℝ) : ℂ := fourier (-m) (x : T) * cyclicLift f x
+  have hF : Continuous F :=
+    ((fourier (-m)).continuous.comp (AddCircle.continuous_mk' 1)).mul
+      (cyclicLift_contDiff f).continuous
+  have hlog : Real.log γ ≠ 0 := (Real.log_pos hγ).ne'
+  have ht : ∀ t ∈ uIcc (1 : ℝ) γ, t ≠ 0 := by
+    rw [uIcc_of_le hγ.le]
+    exact fun t ht ↦ (zero_lt_one.trans_le ht.1).ne'
+  have hderiv : ∀ t ∈ uIcc (1 : ℝ) γ,
+      HasDerivAt (fun x ↦ Real.log x / Real.log γ) (t⁻¹ / Real.log γ) t :=
+    fun t h ↦ (Real.hasDerivAt_log (ht t h)).div_const _
+  have hsub : (∫ t in (1 : ℝ)..γ, (t⁻¹ / Real.log γ) • F (Real.log t / Real.log γ)) =
+      ∫ x in (0 : ℝ)..1, F x := by
+    simpa only [Function.comp_apply, Real.log_one, zero_div, div_self hlog] using
+      intervalIntegral.integral_deriv_smul_comp hderiv
+        ((continuousOn_id.inv₀ ht).div_const (Real.log γ)) hF
+  have hphase (t : ℝ) :
+      fourier (-m) ((Real.log t / Real.log γ : ℝ) : T) =
+        Complex.exp (-phase[γ, m] * (Real.log t : ℂ)) := by
+    change cyclicExponential (-m) (point ((Real.log t / Real.log γ : ℝ) : T)) = _
+    rw [cyclicExponential_apply γ hγ]
+    simp only [Int.cast_neg, mul_neg, neg_div]
+  change fourierCoeff (fun z : T ↦ f (point z)) m = _
+  rw [fourierCoeff_eq_intervalIntegral _ _ 0]
+  simp only [div_one, one_smul, zero_add, smul_eq_mul]
+  change (∫ x in (0 : ℝ)..1, F x) = _
+  rw [← hsub, ← intervalIntegral.integral_const_mul]
+  apply intervalIntegral.integral_congr
+  intro t _
+  simp only [F, cyclicLift, hphase, Complex.real_smul, Complex.ofReal_div, Complex.ofReal_inv]
+  ring
 
 -- TODO(paper-gap): The estimate (4.2.1.7) uses m^k for negative frequencies.
 -- For f = e₋₁ and k = 1 the printed right-hand side is negative.
