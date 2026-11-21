@@ -2331,6 +2331,7 @@ theorem finitePlaceSchwartz_complemented (w : Places(F))
 -- of balls. The whole local field is open and noncompact. The assertion applies
 -- to compact open subsets, which suffice for the displayed expansion.
 
+open scoped WithZero in
 /-- Paper: Example 2.1.2.6, p. 65. A local Schwartz–Bruhat function is a finite linear
 combination of indicators of translates of nonzero powers of the maximal ideal.
 Deviation: The uniformizer is specified by its normalized valuation. -/
@@ -2342,7 +2343,93 @@ theorem finitePlaceSchwartz_sum_indicators (w : Places(F)) (f : ℬ(w.adicComple
         f (Multiplicative.ofAdd x) =
           ∑ i, c i * Set.indicator
             {y | ∃ z : w.adicCompletionIntegers F, y = a i + π ^ N i * z.val} (fun _ ↦ 1) x := by
-  sorry
+  classical
+  let K := w.adicCompletion F
+  let g : K → ℂ := fun x ↦ f (Multiplicative.ofAdd x)
+  obtain ⟨hg, hc⟩ := (mem_finitePlaceSchwartz_iff F w g).1 ⟨f, fun _ ↦ rfl⟩
+  -- Compactness gives one neighborhood of translations fixing all values on the support.
+  have hopen : IsOpen {p : K × K | g (p.1 + p.2) = g p.1} := by
+    have hloc : IsLocallyConstant (fun p : K × K ↦ g (p.1 + p.2) = g p.1) :=
+      (hg.comp_continuous continuous_add).comp₂ (hg.comp_continuous continuous_fst) Eq
+    simpa only [eq_iff_iff, iff_true] using hloc.isOpen_fiber True
+  obtain ⟨U, V, _, hV, hU, hzero, hUV⟩ :=
+    generalized_tube_lemma hc (isCompact_singleton (x := (0 : K))) hopen (by
+      rintro ⟨x, y⟩ ⟨_, hy⟩
+      obtain rfl := mem_singleton_iff.mp hy
+      change g (x + 0) = g x
+      rw [add_zero])
+  obtain ⟨γ, hγ⟩ := Valued.mem_nhds_zero.mp (hV.mem_nhds (hzero (mem_singleton 0)))
+  let ν : Valuation K ℤᵐ⁰ := Valued.v
+  let r : ℤᵐ⁰ := MonoidWithZeroHom.ValueGroup₀.embedding γ.val
+  have hr : r ≠ 0 := by simp [r]
+  let N : ℤ := max 1 (1 - WithZero.log r)
+  have hN : 0 < N := lt_of_lt_of_le zero_lt_one (le_max_left _ _)
+  have hpow : ν (π ^ N) = WithZero.exp (-N) := by
+    rw [map_zpow₀ ν, show ν π = _ from hπ, ← WithZero.exp_zsmul]
+    simp
+  have hv : ν (π ^ N) ≠ 0 := by simp [hpow]
+  have hlt : ν (π ^ N) < r := by
+    rw [hpow, ← WithZero.exp_log hr, WithZero.exp_lt_exp]
+    have h := le_max_right 1 (1 - WithZero.log r)
+    omega
+  let L := ν.leAddSubgroup (ν (π ^ N))
+  have hL : (L : Set K) ⊆ V := fun x hx ↦
+    hγ ((ν.restrict_lt_iff_lt_embedding).mpr (lt_of_le_of_lt hx hlt))
+  have hLopen : IsOpen (L : Set K) := by
+    change IsOpen {x : K | ν x ≤ ν (π ^ N)}
+    have hball : IsOpen {x : K | ν.restrict x ≤ ν.restrict (π ^ N)} :=
+      Valued.isOpen_closedBall K (fun h ↦ hv (ν.restrict_eq_zero_iff.mp h))
+    simpa only [Valuation.restrict_le_iff] using hball
+  let q : K → K ⧸ L := QuotientAddGroup.mk
+  let : DiscreteTopology (K ⧸ L) := QuotientAddGroup.discreteTopology hLopen
+  let A := q '' tsupport g
+  have hfinite : A.Finite := (hc.image QuotientAddGroup.continuous_mk).finite_of_discrete
+  let : Fintype A := hfinite.fintype
+  let e := (Fintype.equivFin A).symm
+  let a (i : Fin (Fintype.card A)) : K := (e i).property.choose
+  have ha (i : Fin (Fintype.card A)) : a i ∈ tsupport g ∧ q (a i) = (e i).val :=
+    (e i).property.choose_spec
+  -- Each quotient fiber is a translate of the scaled integer ring.
+  have hfiber (x y : K) :
+      (∃ z : w.adicCompletionIntegers F, x = y + π ^ N * z.val) ↔ q x = q y := by
+    have hp : π ^ N ≠ 0 := fun h ↦ hv (by rw [h, map_zero])
+    rw [QuotientAddGroup.eq_iff_sub_mem]
+    constructor
+    · rintro ⟨z, rfl⟩
+      change ν (y + π ^ N * z.val - y) ≤ ν (π ^ N)
+      rw [add_sub_cancel_left, map_mul]
+      exact mul_le_of_le_one_right' z.property
+    · intro hx
+      have hz : (x - y) / π ^ N ∈ w.adicCompletionIntegers F := by
+        change ν ((x - y) / π ^ N) ≤ 1
+        rw [ν.map_div, div_le_one₀ (pos_of_ne_zero hv)]
+        exact hx
+      exact ⟨⟨_, hz⟩, by
+        change x = y + π ^ N * ((x - y) / π ^ N)
+        rw [mul_comm (π ^ N), div_mul_cancel₀ _ hp, add_sub_cancel]⟩
+  refine ⟨_, fun i ↦ g (a i), a, fun _ ↦ N, fun _ ↦ hN.ne', fun x ↦ ?_⟩
+  change g x = _
+  simp only [Set.indicator, Set.mem_ofPred_eq, hfiber, fun i ↦ (ha i).2]
+  by_cases hx : q x ∈ A
+  · let i := e.symm ⟨q x, hx⟩
+    have hi : (e i).val = q x := congrArg Subtype.val (e.apply_symm_apply ⟨q x, hx⟩)
+    rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ _)]
+    · rw [ite_eq_left hi.symm, mul_one]
+      have hmem : x - a i ∈ L :=
+        QuotientAddGroup.eq_iff_sub_mem.mp (show q x = q (a i) from hi.symm.trans (ha i).2.symm)
+      have heq : g (a i + (x - a i)) = g (a i) :=
+        hUV (mk_mem_prod (hU (ha i).1) (hL hmem))
+      simpa only [add_sub_cancel] using heq
+    · intro j _ hj
+      have hne : q x ≠ (e j).val := fun h ↦ hj (e.injective (Subtype.ext (h.symm.trans hi.symm)))
+      rw [ite_eq_right hne, mul_zero]
+  · have hgx : g x = 0 := notMem_support.mp fun hs ↦ hx ⟨x, subset_tsupport g hs, rfl⟩
+    rw [hgx]
+    symm
+    apply Finset.sum_eq_zero
+    intro i _
+    have hne : q x ≠ (e i).val := fun h ↦ hx (h.symm ▸ (e i).property)
+    rw [ite_eq_right hne, mul_zero]
 
 /-- Paper: Proposition 2.1.2.8, p. 65. The finite adelic tail is the restricted product
 of the finite completions outside the chosen finite set, relative to their integer rings. -/
