@@ -1469,8 +1469,19 @@ theorem homogeneousAdelicTheta_eq_idele_integral (ω₁ : χ[F]) (f : ℬ[F]) (g
 /-- Paper: Theorem 2.2.5.4(1), p. 97. Inverse translation of a class by a
 norm-one class acts on homogeneous theta by the prescribed character. -/
 theorem homogeneousAdelicTheta_homogeneous (ω₁ : χ[F]) (f : ℬ[F]) (h : C₁[F]) (g : C[F]) :
-    homogeneousAdelicTheta ω₁ f (h.val⁻¹ * g) = (ω₁ h : ℂ) * homogeneousAdelicTheta ω₁ f g :=
-  by sorry
+    homogeneousAdelicTheta ω₁ f (h.val⁻¹ * g) = (ω₁ h : ℂ) * homogeneousAdelicTheta ω₁ f g := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have : μ̄₁.IsMulRightInvariant := ⟨fun k ↦ by
+    rw [show (· * k) = (k * ·) from funext fun x ↦ mul_comm x k]
+    exact map_mul_left_eq_self μ̄₁ k⟩
+  simp only [homogeneousAdelicTheta, ContinuousMap.coe_mk]
+  rw [← integral_const_mul, ← integral_mul_right_eq_self _ h]
+  refine integral_congr_ae (.of_forall fun x ↦ ?_)
+  have key : (x : C[F]) * h * ((h : C[F])⁻¹ * g) = x * g := by
+    exact (mul_assoc (x : C[F]) h _).trans (congrArg ((x : C[F]) * ·) (mul_inv_cancel_left _ g))
+  simp only [Subgroup.coe_mul, key, map_mul, Circle.coe_mul]
+  ring
 
 /-- Paper: Theorem 2.2.5.4(2), p. 97. At large norm, homogeneous theta decays
 faster than every inverse power of the norm. -/
