@@ -371,7 +371,8 @@ class Paths(unittest.TestCase):
             self.assertTrue(auto_merge.matters_to_everyone(path), path)
         for path in ("RiemannMasullo/AppA/Sec1.lean", "ERRATA.md", "paper/paper.pdf", "prompts/prover.md",
                      "RiemannMasullo/External/ATTRIBUTION.md", ".github/workflows/claims.yml",
-                     "scripts/ci/stale_claims.py", "scripts/ci/test_stale_claims.py"):
+                     "scripts/ci/stale_claims.py", "scripts/ci/test_stale_claims.py",
+                     "scripts/ci/auto_merge.py", "scripts/ci/test_auto_merge.py"):
             self.assertFalse(auto_merge.matters_to_everyone(path), path)
 
 

@@ -69,12 +69,15 @@ MAX_MERGES = 60           # per run of this script
 BUILD_FILES = ("lakefile.toml", "lakefile.lean", "lean-toolchain", "lake-manifest.json",
                "scripts/lint.sh", "scripts/proof_review.sh", "scripts/signatures.sh", "scripts/Signatures.lean")
 BUILD_DIRS = ("scripts/ci/", ".github/workflows/", "RiemannMasullo/External/")
-# Source credits and issue claim maintenance are independent of proof checking.
+# These files are independent of proof checking. The merge step applies its current policy
+# to the completed check, whose verdict was produced by the separate PR check workflow.
 NON_BUILD_FILES = (
     "RiemannMasullo/External/ATTRIBUTION.md",
     ".github/workflows/claims.yml",
     "scripts/ci/stale_claims.py",
     "scripts/ci/test_stale_claims.py",
+    "scripts/ci/auto_merge.py",
+    "scripts/ci/test_auto_merge.py",
 )
 
 
