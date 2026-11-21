@@ -4495,10 +4495,200 @@ theorem modulatedExponentialDecayStage_endpoints_closedEmbedding (k : GoodCompac
     (congrArg (fun s : Set (X {a} × X {b}) ↦ IsClosed s) hrange).mpr hclosed
   exact ⟨T, ⟨⟨hT, hinj⟩, hclosedRange⟩, fun _ ↦ ⟨rfl, rfl⟩⟩
 
+/-- A proper surjective modulation pulls a compact generating neighborhood back to one. -/
+private theorem compactlyGenerated_of_surjective_modulation : IsCompactlyGeneratedGroup G := by
+  have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  have : ConnectedSpace ℝ≥0ˣ := positiveRealLogEquiv.symm.toHomeomorph.surjective.connectedSpace
+    positiveRealLogEquiv.symm.continuous
+  obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : ℝ≥0ˣ)
+  have hopen : IsOpen (Subgroup.closure U : Set ℝ≥0ˣ) :=
+    Subgroup.isOpen_of_mem_nhds _ (mem_of_superset hU Subgroup.subset_closure)
+  have hgen : Subgroup.closure U = ⊤ := SetLike.coe_injective
+    ((OpenSubgroup.isClopen ⟨Subgroup.closure U, hopen⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)
+  have hpre : m ⁻¹' U ∈ 𝓝 (1 : G) :=
+    m.continuous.continuousAt.preimage_mem_nhds (show U ∈ 𝓝 (m 1) by rwa [map_one])
+  refine ⟨m ⁻¹' U, hpre, hm.1.isCompact_preimage hUc, ?_⟩
+  have hker : m.toMonoidHom.ker ≤ Subgroup.closure (m ⁻¹' U) := by
+    intro g hg
+    apply Subgroup.subset_closure
+    change m g ∈ U
+    rw [show m g = 1 from hg]
+    exact mem_of_mem_nhds hU
+  rw [← Subgroup.comap_map_eq_self hker, MonoidHom.map_closure]
+  change Subgroup.comap m.toMonoidHom (Subgroup.closure (m '' (m ⁻¹' U))) = ⊤
+  rw [hms.image_preimage, hgen, Subgroup.comap_top]
+
+/-- The Schwartz–Bruhat space of an elementary compact quotient is metrizable via
+the Schwartz space of its largest structural pair. -/
+private theorem modulatedDecayStage_schwartzBruhat_metrizable (k : GoodCompact) :
+    MetrizableSpace (SchwartzBruhat (G ⧸ k.val)) := by
+  let Q := G ⧸ k.val
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  have hgen : IsCompactlyGeneratedGroup Q :=
+    isCompactlyGeneratedGroup_quotient (compactlyGenerated_of_surjective_modulation m hm hms)
+      k.val k.property.1.isClosed
+  let d : PontryaginDual (G ⧸ k.val) ≃ₜ* lcaAnnihilator k.val :=
+    (lcaQuotientDual_equiv_annihilator k.val k.property.1.isClosed).choose
+  have hdual : IsCompactlyGeneratedGroup (PontryaginDual (G ⧸ k.val)) :=
+    isCompactlyGeneratedGroup_of_continuousMulEquiv d.symm k.property.2
+  have hlocal : IsLocallyEuclidean (G ⧸ k.val) :=
+    isLocallyEuclidean_of_isCompactlyGeneratedGroup_dual hdual
+  let e := Classical.choice ((lca_elementary_iff (G := Q)).mp ⟨hgen, hlocal⟩)
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  have : SecondCountableTopology Q := e.equiv.toHomeomorph.isEmbedding.secondCountableTopology
+  let top : (⊤ : Subgroup Q) ≃ₜ* Q :=
+    { Subgroup.topEquiv with
+      continuous_toFun := continuous_subtype_val
+      continuous_invFun := continuous_id.subtype_mk _ }
+  let a : BruhatStructuralPair Q := ⟨(⊤, OrderDual.toDual ⊥), isOpen_univ,
+    isCompactlyGeneratedGroup_of_continuousMulEquiv top.symm hgen,
+    isBruhatGoodSubgroup_bot_iff.mpr hlocal, bot_le⟩
+  let p := Classical.choice a.elementary
+  have ha (b : BruhatStructuralPair Q) : b ≤ a := by
+    change b.val.1 ≤ ⊤ ∧ (⊥ : Subgroup Q) ≤ OrderDual.ofDual b.val.2
+    exact ⟨le_top, bot_le⟩
+  let J : SchwartzBruhatStage p →ₗ[ℂ] SchwartzBruhat Q := schwartzBruhatStageInclusion a p
+  have hJ : IsEmbedding J := schwartzBruhatStage_isEmbedding a p
+  have hsurj : Surjective J := schwartzBruhat_maxStage_surjective a ha p
+  let E : SchwartzBruhatStage p ≃ₜ SchwartzBruhat Q :=
+    (Equiv.ofBijective J ⟨hJ.injective, hsurj⟩).toHomeomorphOfIsInducing hJ.isInducing
+  let _ := p.finiteGroup
+  let _ := p.finiteTopology
+  let _ := p.finiteDiscrete
+  let _ := p.finiteFintype
+  have hF : IsFrechetTVS (SchwartzBruhatStage p) :=
+    elementarySchwartz_isFrechet (m := p.realDim) (n := p.torusDim) (r := p.latticeRank)
+      (F := p.finiteFactor)
+  let _ : MetrizableSpace (SchwartzBruhatStage p) := hF.choose_spec.2.1
+  exact E.symm.isEmbedding.metrizableSpace
+
+omit hm hms in
+/-- A countable bracketing family of exponents embeds a decay stage as the closed
+space of compatible Schwartz–Bruhat twists. -/
+private theorem modulatedDecayStage_countable_closedEmbedding (I : Set ℝ) (hInt : OrdConnected I)
+    (hne : I.Nonempty) (k : GoodCompact) :
+    ∃ T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (ℕ ⊕ ℕ → SchwartzBruhat (G ⧸ k.val)),
+      IsClosedEmbedding T := by
+  let Q := G ⧸ k.val
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let n := quotientModulation m k.val k.property.1
+  let X := ModulatedExponentialDecayStage m I k
+  let S := SchwartzBruhat Q
+  let J := ℕ ⊕ ℕ
+  let Y := J → S
+  have : Nonempty I := hne.to_subtype
+  let _ : OrderTopology I := orderTopology_of_ordConnected (ht := hInt)
+  let lo := (exists_seq_antitone_tendsto_atTop_atBot I).choose
+  let hi := (exists_seq_monotone_tendsto_atTop_atTop I).choose
+  have hlo : Tendsto lo atTop atBot := (exists_seq_antitone_tendsto_atTop_atBot I).choose_spec.2
+  have hhi : Tendsto hi atTop atTop := (exists_seq_monotone_tendsto_atTop_atTop I).choose_spec.2
+  let d : J → I := Sum.elim lo hi
+  let T : X →ₗ[ℂ] Y := LinearMap.pi fun j ↦ modulatedExponentialDecayTwist n I (d j)
+  have hfactor (a : I) : ∃ F : Y →L[ℂ] S, ∀ (g : Y) (f : Q → ℂ),
+      (∀ j, (g j).val = modulationWeight n (d j) f) →
+        (F g).val = modulationWeight n a f := by
+    let left := (hlo.eventually (eventually_le_atBot a)).exists
+    let right := (hhi.eventually (eventually_ge_atTop a)).exists
+    let l := left.choose
+    let r := right.choose
+    let interpolate := modulationWeight_between_continuous n (lo l) a (hi r)
+      left.choose_spec right.choose_spec
+    let F := interpolate.choose
+    have hF := interpolate.choose_spec
+    let L : Y →L[ℂ] S := ContinuousLinearMap.proj (R := ℂ) (Sum.inl l)
+    let R : Y →L[ℂ] S := ContinuousLinearMap.proj (R := ℂ) (Sum.inr r)
+    exact ⟨F.comp (L.prod R), fun g f hg ↦ hF f (L g, R g) (hg (.inl l)) (hg (.inr r))⟩
+  let F (a : I) : Y →L[ℂ] S := (hfactor a).choose
+  have hF (a : I) := (hfactor a).choose_spec
+  let V (f : X) (a : I) : S := modulatedExponentialDecayTwist n I a f
+  have hall : IsInducing V := modulatedDecayStage_twists_isInducing m I k
+  have hT : IsInducing T := by
+    have hcont : Continuous T := continuous_pi fun j ↦
+      (continuous_apply (d j)).comp hall.continuous
+    let U (g : Y) (a : I) : S := F a g
+    have hU : Continuous U := continuous_pi fun a ↦ (F a).continuous
+    have hcomp : U ∘ (T : X → Y) = V := by
+      funext f a
+      exact Subtype.ext (hF a (T f) f.val fun _ ↦ rfl)
+    have hUV : IsInducing (U ∘ (T : X → Y)) :=
+      (congrArg (fun g : X → (I → S) ↦ IsInducing g) hcomp).mpr hall
+    exact IsInducing.of_comp (f := (T : X → Y)) (g := U) hcont hU hUV
+  let w (a : I) (x : Q) : ℂ := (((n x).val : ℝ) ^ (a : ℝ) : ℝ)
+  have hw (a : I) (x : Q) : w a x ≠ 0 := Complex.ofReal_ne_zero.mpr
+    (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n x))) _).ne'
+  let unweight (j : J) (g : Y) (x : Q) : ℂ := g j x / w (d j) x
+  have hunw (j : J) (f : X) (x : Q) : unweight j (T f) x = f.val x := by
+    change w (d j) x * f.val x / w (d j) x = f.val x
+    exact (div_eq_iff (hw (d j) x)).mpr (mul_comm _ _)
+  let j₀ : J := .inl 0
+  have hinj : Injective T := by
+    intro f g h
+    exact Subtype.ext (funext fun x ↦
+      (hunw j₀ f x).symm.trans ((congrArg (fun z ↦ unweight j₀ z x) h).trans (hunw j₀ g x)))
+  have hrange : range T = ⋂ (j : J) (x : Q), {g : Y | unweight j g x = unweight j₀ g x} := by
+    refine Set.ext fun g ↦ ⟨?_, ?_⟩
+    · rintro ⟨f, rfl⟩
+      exact mem_iInter.mpr fun j ↦ mem_iInter.mpr fun x ↦
+        (hunw j f x).trans (hunw j₀ f x).symm
+    · intro hg
+      let f := unweight j₀ g
+      have hmatch (j : J) : (g j).val = modulationWeight n (d j) f := by
+        funext x
+        have hx : unweight j g x = f x := mem_iInter.mp (mem_iInter.mp hg j) x
+        change g j x = w (d j) x * f x
+        exact ((div_eq_iff (hw (d j) x)).mp hx).trans (mul_comm _ _)
+      have hf : f ∈ modulatedExponentialDecaySubmodule n I := by
+        refine (Submodule.mem_iInf _).mpr fun a ↦ Submodule.mem_comap.mpr ?_
+        have heq := hF a g f hmatch
+        exact (congrArg (fun u : Q → ℂ ↦ u ∈ schwartzBruhatSubmodule Q) heq).mp
+          (F a g).property
+      refine ⟨⟨f, hf⟩, ?_⟩
+      funext j
+      apply Subtype.ext
+      exact (hmatch j).symm
+  have heval (x : Q) : Continuous (fun s : S ↦ s x) :=
+    continuous_schwartzBruhat_eval_forEndpoints x
+  have hproj (j : J) : Continuous (fun g : Y ↦ g j) := continuous_apply j
+  have hc (j : J) (x : Q) : Continuous (fun g : Y ↦ unweight j g x) :=
+    ((heval x).comp (hproj j)).div_const (w (d j) x)
+  have hclosed : IsClosed (⋂ (j : J) (x : Q), {g : Y | unweight j g x = unweight j₀ g x}) :=
+    isClosed_iInter fun j ↦ isClosed_iInter fun x ↦ isClosed_eq (hc j x) (hc j₀ x)
+  have hclosedRange : IsClosed (range T) :=
+    (congrArg (fun s : Set Y ↦ IsClosed s) hrange).mpr hclosed
+  exact ⟨T, ⟨⟨hT, hinj⟩, hclosedRange⟩⟩
+
+omit hm hms in
+/-- A closed linear embedding into a countable product of complete metrizable
+additive uniform spaces gives a Fréchet space. -/
+private theorem isFrechetTVS_of_closedLinearEmbedding_pi {ι X S : Type*} [Countable ι]
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [PolynormableSpace ℂ X] [AddCommGroup S] [Module ℂ S] [UniformSpace S]
+    [IsUniformAddGroup S] (hS : CompleteSpace S) (hM : MetrizableSpace S)
+    (T : X →ₗ[ℂ] (ι → S)) (hT : IsClosedEmbedding T) : IsFrechetTVS X := by
+  let _ : CompleteSpace S := hS
+  let _ : MetrizableSpace S := hM
+  have : (uniformity S).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : MetrizableSpace (ι → S) := UniformSpace.metrizableSpace
+  have hU : IsUniformInducing T :=
+    AddMonoidHom.isUniformInducing_of_isInducing (f := T.toAddMonoidHom) hT.isInducing
+  refine ⟨inferInstance, inferInstance, hT.isEmbedding.metrizableSpace, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := X)]
+  exact hU.completeSpace hT.isClosed_range.isComplete
+
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is Fréchet. -/
 theorem modulatedExponentialDecayStage_frechet (I : Set ℝ) (hInt : OrdConnected I)
     (hne : I.Nonempty) (k : GoodCompact) :
-    IsFrechetTVS (ModulatedExponentialDecayStage m I k) := by sorry
+    IsFrechetTVS (ModulatedExponentialDecayStage m I k) := by
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let X := ModulatedExponentialDecayStage m I k
+  let S := SchwartzBruhat (G ⧸ k.val)
+  have hS : CompleteSpace S := schwartzBruhat_complete
+  have hM : MetrizableSpace S := modulatedDecayStage_schwartzBruhat_metrizable m hm hms k
+  have h := modulatedDecayStage_countable_closedEmbedding m I hInt hne k
+  exact isFrechetTVS_of_closedLinearEmbedding_pi (X := X) (S := S) hS hM h.choose h.choose_spec
 
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is nuclear. -/
 theorem modulatedExponentialDecayStage_nuclear (I : Set ℝ) (hInt : OrdConnected I)
