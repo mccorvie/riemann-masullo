@@ -6,6 +6,7 @@ public import Mathlib.Analysis.InnerProductSpace.StarOrder
 public import Mathlib.Analysis.InnerProductSpace.l2Space
 public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
+import Mathlib.Analysis.LocallyConvex.StrongTopology
 
 /-!
 # Nuclear operators and the trace on Hilbert spaces
@@ -65,11 +66,45 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
 
 local notation:25 X " →Lᵦ " Y => X →Lᵤ[ℂ, Set.ofPred (fun s : Set X ↦ IsVonNBounded ℂ s)] Y
 
+-- Keep the section hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
+open scoped ComplexOrder in
 /-- Paper: (C.3.1.1), p. 693. The algebraic tensor-to-finite-rank map is continuous
 for the projective tensor topology and uniform convergence on bounded sets. -/
 theorem continuous_tensorToFiniteRank_bounded :
     Continuous (fun z : ProjectiveTensor (StrongDual ℂ E) F ↦
-      (tensorToFiniteRank z : E →Lᵦ F)) := by sorry
+      (tensorToFiniteRank z : E →Lᵦ F)) := by
+  let T : ProjectiveTensor (StrongDual ℂ E) F →ₗ[ℂ] (E →L[ℂ] F) := tensorToFiniteRank
+  change Continuous T
+  have hzero :
+      ContinuousAt (fun p : StrongDual ℂ E × F ↦ tensorToFiniteRank (p.1 ⊗ₜ[ℂ] p.2)) 0 := by
+    have hsmul : ContinuousAt (fun p : ℂ × F ↦ p.1 • p.2) 0 :=
+      (continuous_fst.smul continuous_snd).continuousAt
+    rw [ContinuousAt, Prod.fst_zero, TensorProduct.zero_tmul, map_zero,
+      ContinuousLinearMap.nhds_zero_eq]
+    rw [show (0 : StrongDual ℂ E × F) = (0, 0) from rfl, nhds_prod_eq]
+    simp only [tendsto_iInf, tendsto_principal]
+    intro s hs U hU
+    obtain ⟨V, hV, W, hW, hVW⟩ := mem_nhds_prod_iff.mp
+      (hsmul.tendsto (by simpa only [Prod.fst_zero, zero_smul] using hU))
+    exact ((ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hs hV).prod_mk
+      (show ∀ᶠ y in 𝓝 (0 : F), y ∈ W from hW)).mono fun p hp x hx ↦
+        hVW (show (p.1 x, p.2) ∈ V ×ˢ W from ⟨hp.1 hx, hp.2⟩)
+  let : Module ℝ F := Module.restrictScalars ℝ ℂ F
+  let : IsScalarTower ℝ ℂ F := IsScalarTower.restrictScalars ℝ ℂ F
+  let : LocallyConvexSpace ℂ F := LocallyConvexSpace.ofBasisZero ℂ F
+    (fun (p : Seminorm ℂ F) ↦ p.ball 0 1) (fun p ↦ Continuous p)
+    (PolynormableSpace.hasBasis_zero_ball ℂ F) fun p _ ↦
+      convex_of_nonneg_surjective_algebraMap ℂ
+        (fun z hz ↦ RCLike.nonneg_iff_exists_ofReal.mp hz) (p.convex_ball 0 1)
+  -- Pull each operator seminorm back to a generating projective tensor seminorm.
+  let hOperators := PolynormableSpace.withSeminorms ℂ (E →L[ℂ] F)
+  let hProjective := withGeneratingSeminorms_spec (StrongDual ℂ E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (StrongDual ℂ E ⊗[ℂ] F) //
+      ContinuousAt (fun v : StrongDual ℂ E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+  refine hOperators.continuous_of_continuous_comp T fun i ↦
+    hProjective.continuous_seminorm ⟨_, ?_⟩
+  exact (hOperators.continuous_seminorm i).continuousAt.comp hzero
 
 /-- Paper: (C.3.1.1), p. 693. The projective tensor of the strong dual and the
 target maps continuously to operators with the bounded convergence topology. -/
