@@ -881,12 +881,6 @@ the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_precompact : IsCompact (closure E∞) := by
   sorry
 
-/-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain also has compact closure
-in the full archimedean idele group. -/
-theorem infiniteIdeleFundamentalDomain_precompact_ambient :
-    IsCompact (closure ((N∞).subtype '' E∞)) := by
-  sorry
-
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain has nonempty interior
 relative to the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_interior : (interior E∞).Nonempty := by
@@ -1060,6 +1054,15 @@ private theorem infiniteIdeleFundamentalDomain_subset_compact :
     exact h.symm
   · simp only [extend, hw, dite_false]
     rfl
+
+/-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain also has compact closure
+in the full archimedean idele group. -/
+theorem infiniteIdeleFundamentalDomain_precompact_ambient :
+    IsCompact (closure ((N∞).subtype '' E∞)) := by
+  have : T2Space (InfiniteAdeleRing F) :=
+    inferInstanceAs (T2Space (∀ w : InfinitePlace F, w.Completion))
+  obtain ⟨A, hA, hDomain⟩ := infiniteIdeleFundamentalDomain_subset_compact F b v₀ σ
+  exact hA.of_isClosed_subset isClosed_closure (closure_minimal hDomain hA.isClosed)
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has compact closure
