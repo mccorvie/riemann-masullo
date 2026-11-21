@@ -399,7 +399,8 @@ def intervalSobolevDensity (a b s x : ℝ) : ℝ :=
 density is one for every base interval and degree.
 Deviation: Sanity check at logarithmic coordinate zero. -/
 theorem intervalSobolevDensity_at_unit (a b s : ℝ) :
-    intervalSobolevDensity a b s 0 = 1 := by sorry
+    intervalSobolevDensity a b s 0 = 1 := by
+  simp [intervalSobolevDensity]
 
 /-- Paper: Proposition 9.2.1.8, p. 410. The compact-interval space has the positive
 endpoint density, and its dual model uses the reciprocal density.

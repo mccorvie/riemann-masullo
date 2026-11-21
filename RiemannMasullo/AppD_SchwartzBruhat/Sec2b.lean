@@ -149,13 +149,14 @@ private theorem exists_schwartzBruhatPettisIsotypicAverage (hcompact : CompactSp
   exact (existsUnique_compactActionIsotypicAverage (E := S) μ₁ τ hτ
     schwartzBruhat_bornological (hseq (fun k f ↦ τ k f) hτ) ω).exists
 
-/-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
-as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
-theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
-    ∃! P : S →L[ℂ] S, ∀ (f : S) (x : G),
-      P f x = (μ₁.real univ)⁻¹ •
-        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
-  have hcompact : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+/-- Paper: (D.2.1.1), pp. 792–793. The normalized Pettis average on the
+Schwartz–Bruhat space satisfies the scalar integral formula at each point. -/
+private theorem exists_schwartzBruhatIsotypicProjector_average (ω : PontryaginDual K) :
+    ∃ P : S →L[ℂ] S,
+      (∀ (f : S) (x : G), P f x = (μ₁.real univ)⁻¹ •
+        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁) ∧
+      IsPettisIsotypicAverageOn μ₁ univ ρS ω (μ₁.real univ • P) := by
+  letI hcompact : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
   have hex : ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ ρS ω A :=
     exists_schwartzBruhatPettisIsotypicAverage (G := G) m μ₁ hcompact ω
   obtain ⟨A, hA⟩ := hex
@@ -183,8 +184,18 @@ theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
       _ = ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ :=
         integral_congr_ae (ae_of_all _ fun k ↦ congrArg (star (ω k : ℂ) * ·) (hpointwise k))
     exact congrArg ((μ₁.real univ)⁻¹ • ·) hscalar
-  refine ⟨P, hP, fun Q hQ ↦ ContinuousLinearMap.ext fun f ↦ ?_⟩
-  exact Subtype.ext (funext fun x ↦ (hQ f x).trans (hP f x).symm)
+  have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
+  exact ⟨P, hP, by simpa only [P, smul_inv_smul₀ hmass] using hA⟩
+
+/-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
+as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
+theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
+    ∃! P : S →L[ℂ] S, ∀ (f : S) (x : G),
+      P f x = (μ₁.real univ)⁻¹ •
+        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
+  refine (exists_schwartzBruhatIsotypicProjector_average m hm μ₁ (hμ₁ := hμ₁) ω).elim
+    fun P hP ↦ ⟨P, hP.1, fun Q hQ ↦ ContinuousLinearMap.ext fun f ↦ ?_⟩
+  exact Subtype.ext (funext fun x ↦ (hQ f x).trans (hP.1 f x).symm)
 
 /-- Paper: (D.2.1.2), p. 792. The Schwartz–Bruhat projector is the
 continuous linear operator given by the normalized fiber integral. -/
@@ -605,6 +616,55 @@ theorem schwartzBruhat_dense_extension (hd : DenseRange i) (T : S →L[ℂ] S)
     obtain ⟨f, rfl⟩ := e.surjective x
     exact (hU f).trans (hF f).symm
 
+omit hE hρ heq hi hcomm hQ in
+/-- A continuous linear functional evaluates a Pettis integral over the whole
+space as a scalar integral. -/
+private theorem pettisIntegral_univ_eval {X V : Type*} [MeasurableSpace X]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    {μ : Measure X} {F : X → V} {a : V}
+    (h : HasPettisIntegral (.positive (μ.restrict univ)) F a) (φ : StrongDual ℂ V) :
+    φ a = ∫ x, φ (F x) ∂μ := by
+  obtain ⟨_, he⟩ := h
+  have h := LinearMap.congr_fun he φ
+  change φ a = ∫ x, φ (F x) ∂(μ.restrict univ) at h
+  rwa [Measure.restrict_univ] at h
+
+omit hE hρ heq hi hcomm hQ in
+/-- Paper: Lemma D.2.2.1(4), p. 795. Operators that intertwine the projectors
+descend uniquely to their kernel quotients. The descended maps agree on the
+image of the map relating the two operators. -/
+private theorem existsUnique_isotype_quotient_maps {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (P₀ P₁ T : X →L[ℂ] X) (Q₀ Q₁ U : Y →L[ℂ] Y) (j : X →L[ℂ] Y)
+    (hTP : ∀ f : X, T (P₀ f) = P₁ (T f)) (hUQ : ∀ u : Y, U (Q₀ u) = Q₁ (U u))
+    (hU : ∀ f : X, U (j f) = j (T f)) :
+    ∃! w : ((X ⧸ P₀.ker) →L[ℂ] (X ⧸ P₁.ker)) × ((Y ⧸ Q₀.ker) →L[ℂ] (Y ⧸ Q₁.ker)),
+      (∀ f : X, w.1 (P₀.ker.mkQ f) = P₁.ker.mkQ (T f) ∧ T (P₀ f) = P₁ (T f)) ∧
+      (∀ u : Y, w.2 (Q₀.ker.mkQ u) = Q₁.ker.mkQ (U u) ∧ U (Q₀ u) = Q₁ (U u)) ∧
+      ∀ f : X, w.2 (Q₀.ker.mkQ (j f)) = Q₁.ker.mkQ (j (T f)) := by
+  let Tq := P₀.ker.liftQL (P₁.ker.mkQL.comp T) (by
+    intro f hf
+    change P₀ f = 0 at hf
+    apply (Submodule.Quotient.mk_eq_zero P₁.ker).2
+    change P₁ (T f) = 0
+    exact (hTP f).symm.trans ((congrArg T hf).trans (map_zero T)))
+  let Uq := Q₀.ker.liftQL (Q₁.ker.mkQL.comp U) (by
+    intro u hu
+    change Q₀ u = 0 at hu
+    apply (Submodule.Quotient.mk_eq_zero Q₁.ker).2
+    change Q₁ (U u) = 0
+    exact (hUQ u).symm.trans ((congrArg U hu).trans (map_zero U)))
+  refine ⟨⟨Tq, Uq⟩, ⟨fun f ↦ ⟨rfl, hTP f⟩, fun u ↦ ⟨rfl, hUQ u⟩,
+    fun f ↦ congrArg Q₁.ker.mkQ (hU f)⟩, ?_⟩
+  intro w hw
+  apply Prod.ext <;> apply ContinuousLinearMap.ext
+  · exact (P₀.ker.mkQ_surjective.forall).2 fun f ↦ (hw.1 f).1
+  · exact (Q₀.ker.mkQ_surjective.forall).2 fun u ↦ (hw.2.1 u).1
+
+-- Retain the existing section hypotheses in the theorem signature.
+set_option maxHeartbeats 400000 in
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(4), p. 795. The extension inherits the
 intertwining relation on the norm-one subgroup. The intertwiner and
 its extension induce unique maps on the isotypic quotients, with
@@ -624,7 +684,92 @@ theorem schwartzBruhatIsotype_extension_intertwines (hd : DenseRange i)
     ∃! w : ((S ⧸ (P).ker) →L[ℂ] (S ⧸ P'.ker)) × ((E ⧸ Q.ker) →L[ℂ] (E ⧸ Q'.ker)),
       (∀ f : S, w.1 ((P).ker.mkQ f) = P'.ker.mkQ (T f) ∧ T (P f) = P' (T f)) ∧
       (∀ u : E, w.2 (Q.ker.mkQ u) = Q'.ker.mkQ (U u) ∧ U (Q u) = Q' (U u)) ∧
-      ∀ f : S, w.2 (Q.ker.mkQ (i f)) = Q'.ker.mkQ (i (T f)) := by sorry
+      ∀ f : S, w.2 (Q.ker.mkQ (i f)) = Q'.ker.mkQ (i (T f)) := by
+  have hUE (k : K) (u : E) : U (ρE k u) = ρ (α (k : G)) (U u) := by
+    refine hd.induction_on u
+      (isClosed_eq (U.continuous.comp (ρE k).continuous)
+        ((ρ (α (k : G))).continuous.comp U.continuous)) fun f ↦ ?_
+    calc
+      U (ρE k (i f)) = U (i (ρS k f)) := congrArg U (hcomm (k : G) f).symm
+      _ = i (T (ρS k f)) := hU _
+      _ = i (schwartzBruhatTranslationAction (G := G) (α (k : G)) (T f)) :=
+        congrArg i (hT k f)
+      _ = ρ (α (k : G)) (i (T f)) := hcomm (α (k : G)) (T f)
+      _ = ρ (α (k : G)) (U (i f)) := congrArg (ρ (α (k : G))) (hU f).symm
+  refine ⟨hUE, ?_⟩
+  let P' := schwartzBruhatIsotypicProjector m hm μ₁ χ
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
+  have hi_average (ξ : PontryaginDual K) (B : E →L[ℂ] E)
+      (hB : IsPettisIsotypicAverageOn μ₁ univ ρE ξ (μ₁.real univ • B)) (f : S) :
+      i (schwartzBruhatIsotypicProjector m hm μ₁ ξ f) = B (i f) := by
+    refine (exists_schwartzBruhatIsotypicProjector_average m hm μ₁ (hμ₁ := hμ₁) ξ).elim ?_
+    intro A hA
+    have hUnique := existsUnique_schwartzBruhatIsotypicProjector m hm μ₁ (hμ₁ := hμ₁) ξ
+    have hproj : A = schwartzBruhatIsotypicProjector m hm μ₁ ξ :=
+      hUnique.unique hA.1 (Classical.choose_spec hUnique.exists)
+    have havg : i ((μ₁.real univ • A) f) = (μ₁.real univ • B) (i f) := by
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+      intro φ
+      let F (k : K) : ℂ := φ (star (ξ k : ℂ) • ρE k (i f))
+      calc
+        φ (i ((μ₁.real univ • A) f)) =
+            ∫ k, φ (i (star (ξ k : ℂ) • ρS k f)) ∂μ₁ :=
+          pettisIntegral_univ_eval (hA.2 f) (φ.comp i)
+        _ = ∫ k, F k ∂μ₁ := integral_congr_ae (ae_of_all _ fun k ↦ by
+          refine congrArg φ ((i.map_smul (star (ξ k : ℂ)) (ρS k f)).trans ?_)
+          exact congrArg (fun v : E ↦ star (ξ k : ℂ) • v) (hcomm (k : G) f))
+        _ = φ ((μ₁.real univ • B) (i f)) := (pettisIntegral_univ_eval (hB (i f)) φ).symm
+    refine (congrArg (fun L : S →L[ℂ] S ↦ i (L f)) hproj.symm).trans ?_
+    exact smul_right_injective E hmass
+      ((i.map_smul_of_tower (μ₁.real univ) (A f)).symm.trans havg)
+  -- The restricted automorphism preserves Haar measure on the compact kernel.
+  have hαker (k : K) : α (k : G) ∈ K :=
+    (hα (k : G)).trans k.property
+  have hαsymmker (k : K) : α.symm (k : G) ∈ K := by
+    change m (α.symm (k : G)) = 1
+    rw [← hα (α.symm (k : G)), α.apply_symm_apply]
+    exact k.property
+  let β : K ≃ₜ* K :=
+    { toFun := fun k ↦ ⟨α (k : G), hαker k⟩
+      invFun := fun k ↦ ⟨α.symm (k : G), hαsymmker k⟩
+      left_inv := fun k ↦ Subtype.ext (α.symm_apply_apply k)
+      right_inv := fun k ↦ Subtype.ext (α.apply_symm_apply k)
+      map_mul' := fun k l ↦ Subtype.ext (map_mul α (k : G) (l : G))
+      continuous_toFun := (α.continuous.comp continuous_subtype_val).subtype_mk hαker
+      continuous_invFun := (α.symm.continuous.comp continuous_subtype_val).subtype_mk hαsymmker }
+  have hβ : MeasurePreserving β μ₁ μ₁ :=
+    β.toMonoidHom.measurePreserving β.continuous β.surjective rfl
+  have hUQ (u : E) : U (Q u) = Q' (U u) := by
+    apply smul_right_injective E hmass
+    change μ₁.real univ • U (Q u) = μ₁.real univ • Q' (U u)
+    rw [← U.map_smul_of_tower]
+    change U ((μ₁.real univ • Q) u) = (μ₁.real univ • Q') (U u)
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+    intro φ
+    let F (k : K) : ℂ := φ (star (χ k : ℂ) • ρE k (U u))
+    calc
+      φ (U ((μ₁.real univ • Q) u)) =
+          ∫ k, φ (U (star (ω k : ℂ) • ρE k u)) ∂μ₁ :=
+        pettisIntegral_univ_eval (hQ u) (φ.comp U)
+      _ = ∫ k, F (β k) ∂μ₁ := integral_congr_ae (ae_of_all _ fun k ↦ by
+        have hk : χ (β k) = ω k := hχ k (β k) rfl
+        change φ (U (star (ω k : ℂ) • ρE k u)) =
+          φ (star (χ (β k) : ℂ) • ρ (α (k : G)) (U u))
+        rw [hk, map_smul, hUE])
+      _ = ∫ k, F k ∂μ₁ :=
+        hβ.integral_comp β.toHomeomorph.toMeasurableEquiv.measurableEmbedding F
+      _ = φ ((μ₁.real univ • Q') (U u)) := (pettisIntegral_univ_eval (hQ' (U u)) φ).symm
+  have hTP (f : S) : T (P f) = P' (T f) := by
+    apply hi
+    calc
+      i (T (P f)) = U (i (P f)) := (hU (P f)).symm
+      _ = U (Q (i f)) := congrArg U (hi_average ω Q hQ f)
+      _ = Q' (U (i f)) := hUQ (i f)
+      _ = Q' (i (T f)) := congrArg Q' (hU f)
+      _ = i (P' (T f)) := (hi_average χ Q' hQ' (T f)).symm
+  exact existsUnique_isotype_quotient_maps P P' T Q Q' U i hTP hUQ hU
 
 end CoarserTopology
 

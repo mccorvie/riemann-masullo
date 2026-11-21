@@ -9,6 +9,8 @@ public import Mathlib.MeasureTheory.Group.Integral
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
+import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SmoothFamily
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
@@ -2850,7 +2852,130 @@ theorem elementarySchwartzSubmodule_real_iff
     (f : EuclideanSpace ℝ (Fin m) → ℂ) :
     (fun g : ElementaryLieGroup m 0 0 PUnit ↦ f g.1) ∈
         elementarySchwartzSubmodule m 0 0 PUnit ↔
-      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by sorry
+      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by
+  classical
+  let E := EuclideanSpace ℝ (Fin m)
+  let X := E × EuclideanSpace ℝ (Fin 0)
+  let g : ElementaryLieGroup m 0 0 PUnit → ℂ := fun p ↦ f p.1
+  let P : X →L[ℝ] E := ContinuousLinearMap.fst ℝ E _
+  let J : E →L[ℝ] X := ContinuousLinearMap.inl ℝ E _
+  let coord (j : Fin m) : E := EuclideanSpace.single j 1
+  let liftedCoord (j : Fin m) : X := (coord j, 0)
+  let directions (β : Fin m → ℕ) := (List.ofFn fun j ↦ List.replicate (β j) (liftedCoord j)).flatten
+  let mixedPartial (β : Fin m → ℕ) (x : E) : ℂ :=
+    iteratedFDeriv ℝ (directions β).length f x (fun j ↦ ((directions β).get j).1)
+  let weight (α : Fin m → ℕ) (x : E) : ℝ := ∏ j, ‖x j‖ ^ α j
+  -- The torus and lattice indices are empty, so only the real coordinates contribute.
+  have hBound (hf : ContDiff ℝ ∞ f) (i : ElementarySchwartzIndex m 0 0) :
+      elementarySchwartzBound g i =
+        ⨆ x : E, ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖) := by
+    have hPartial (xt : X) (a : Fin 0 → ℤ) (b : PUnit) :
+        elementaryPartial g i.2.1 i.2.2.1 xt a b = mixedPartial i.2.1 xt.1 := by
+      let l : List X := directions i.2.1 ++
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten
+      have hl : l = directions i.2.1 := by simp [l]
+      change (fun v : List X ↦ iteratedFDeriv ℝ v.length (f ∘ P) xt v.get) l = _
+      rw [hl]
+      change iteratedFDeriv ℝ (directions i.2.1).length (f ∘ P) xt (directions i.2.1).get = _
+      rw [P.iteratedFDeriv_comp_right hf xt (by simp),
+        ContinuousMultilinearMap.compContinuousLinearMap_apply]
+      rfl
+    simp only [elementarySchwartzBound, hPartial, Finset.univ_eq_empty (α := Fin 0),
+      Finset.prod_empty, mul_one, ENNReal.coe_nnreal_eq, coe_nnNorm, norm_mul, norm_prod,
+      norm_pow, Complex.norm_real, iSup_const]
+    exact (show Function.Surjective (Prod.fst : X → E) from fun x ↦ ⟨(x, 0), rfl⟩).iSup_comp
+      (fun x ↦ ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖))
+  -- Group any tuple of coordinate directions by its multiplicities.
+  have hCoord (hf : ContDiff ℝ ∞ f) {n : ℕ} (t : Fin n → Fin m) (x : E) :
+      iteratedFDeriv ℝ n f x (fun j ↦ coord (t j)) = mixedPartial (fun j ↦ (List.ofFn t).count j) x := by
+    let β (j : Fin m) := (List.ofFn t).count j
+    let l := (List.finRange m).flatMap fun j ↦ List.replicate (β j) j
+    have hPerm : (List.ofFn t).Perm l := by
+      apply List.perm_iff_count.mpr
+      intro j
+      rw [List.count_flatMap, ← Fin.sum_univ_def]
+      simp [List.count_replicate, β]
+    have hDirs : l.map liftedCoord = directions β := by
+      simp [l, directions, List.ofFn_eq_map, List.flatMap, Function.comp_def]
+    have h := iteratedFDeriv_apply_list_perm hf (Prod.fst : X → E) (hPerm.map liftedCoord) x
+    rw [hDirs, List.map_ofFn] at h
+    let eval (s : Σ k, Fin k → X) := iteratedFDeriv ℝ s.1 f x (fun j ↦ (s.2 j).1)
+    exact (congrArg eval (List.equivSigmaTuple.apply_symm_apply ⟨n, liftedCoord ∘ t⟩)).symm.trans h
+  change ((∀ (a : Fin 0 → ℤ) (b : PUnit), ContDiff ℝ ∞ (f ∘ P)) ∧
+    ∀ i, elementarySchwartzBound g i < (⊤ : ℝ≥0∞)) ↔ _
+  constructor
+  · rintro ⟨hs, hb⟩
+    have hf : ContDiff ℝ ∞ f := (hs 0 PUnit.unit).comp J.contDiff
+    refine ⟨⟨f, hf, ?_⟩, rfl⟩
+    intro k n
+    let α (i : Option (Fin m)) : Fin m → ℕ := i.elim 0 (fun j ↦ Pi.single j k)
+    let β (t : Fin n → Fin m) (j : Fin m) := (List.ofFn t).count j
+    let idx (i : Option (Fin m)) (t : Fin n → Fin m) :
+        ElementarySchwartzIndex m 0 0 := (α i, β t, 0, 0)
+    obtain ⟨C, hC⟩ := Finite.bddAbove_range (fun p : Option (Fin m) × (Fin n → Fin m) ↦
+      (elementarySchwartzBound g (idx p.1 p.2)).toReal)
+    refine ⟨((m : ℝ) + 1) ^ k * (Fintype.card (Fin n → Fin m) * C), fun x ↦ ?_⟩
+    -- Include the constant weight so the maximum exists even when m = 0.
+    let c (i : Option (Fin m)) : ℝ := i.elim 1 (fun j ↦ ‖x j‖)
+    obtain ⟨i, -, hi⟩ := Finset.exists_max_image Finset.univ c Finset.univ_nonempty
+    have hsum : ‖x‖ ≤ ∑ j, ‖x j‖ := by
+      conv_lhs => rw [← (EuclideanSpace.basisFun (Fin m) ℝ).sum_repr x]
+      refine (norm_sum_le _ _).trans_eq ?_
+      simp only [norm_smul, OrthonormalBasis.norm_eq_one, EuclideanSpace.basisFun_repr, mul_one]
+    have hsize : ‖x‖ ≤ ((m : ℝ) + 1) * c i := calc
+      _ ≤ ∑ _j : Fin m, c i :=
+        hsum.trans (Finset.sum_le_sum fun j _ ↦ hi (some j) (Finset.mem_univ _))
+      _ ≤ _ := by
+        have hnonneg : 0 ≤ c i := zero_le_one.trans (hi none (Finset.mem_univ _))
+        simp [add_mul, hnonneg]
+    have hw : weight (α i) x = c i ^ k := by
+      cases i <;> simp [weight, α, c, Pi.single, Function.update, apply_ite]
+    have hpow : ‖x‖ ^ k ≤ ((m : ℝ) + 1) ^ k * weight (α i) x := by
+      rw [hw, ← mul_pow]
+      exact pow_le_pow_left₀ (norm_nonneg _) hsize k
+    let T := iteratedFDeriv ℝ n f x
+    have hpoint (t : Fin n → Fin m) : weight (α i) x * ‖T (fun j ↦ coord (t j))‖ ≤ C := by
+      rw [show T (fun j ↦ coord (t j)) = mixedPartial (β t) x from hCoord hf t x]
+      have hle : ENNReal.ofReal (weight (α i) x * ‖mixedPartial (β t) x‖) ≤
+          elementarySchwartzBound g (idx i t) := by
+        rw [hBound hf]
+        exact le_iSup (fun y ↦ ENNReal.ofReal (weight (α i) y * ‖mixedPartial (β t) y‖)) x
+      have h := ENNReal.toReal_mono (hb (idx i t)).ne hle
+      rw [ENNReal.toReal_ofReal (by dsimp [weight]; positivity)] at h
+      exact h.trans (hC (mem_range_self (i, t)))
+    calc
+      ‖x‖ ^ k * ‖T‖ ≤ (((m : ℝ) + 1) ^ k * weight (α i) x) *
+          ∑ t : Fin n → Fin m, ‖T (fun j ↦ coord (t j))‖ :=
+        mul_le_mul hpow (norm_multilinear_le_sum_euclidean_basis T) (norm_nonneg _) (by positivity)
+      _ = ((m : ℝ) + 1) ^ k * ∑ t : Fin n → Fin m, weight (α i) x * ‖T (fun j ↦ coord (t j))‖ := by
+        rw [mul_assoc, Finset.mul_sum]
+      _ ≤ ((m : ℝ) + 1) ^ k * ∑ _t : Fin n → Fin m, C :=
+        mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun t _ ↦ hpoint t) (by positivity)
+      _ = _ := by simp
+  · rintro ⟨s, rfl⟩
+    refine ⟨fun _ _ ↦ s.smooth'.comp P.contDiff, fun i ↦ ?_⟩
+    rw [hBound s.smooth']
+    obtain ⟨C, -, hC⟩ := s.decay (∑ j, i.1 j) (directions i.2.1).length
+    refine lt_of_le_of_lt (b := ENNReal.ofReal C)
+      (iSup_le fun x ↦ ENNReal.ofReal_le_ofReal ?_) ENNReal.ofReal_lt_top
+    have hw : weight i.1 x ≤ ‖x‖ ^ (∑ j, i.1 j) := calc
+      _ ≤ ∏ j, ‖x‖ ^ i.1 j :=
+        Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun j _ ↦
+          pow_le_pow_left₀ (norm_nonneg _) (PiLp.norm_apply_le x j) _
+      _ = _ := Finset.prod_pow_eq_pow_sum _ _ _
+    have he (j : Fin (directions i.2.1).length) : ‖((directions i.2.1).get j).1‖ = 1 := by
+      have hmem := List.get_mem (directions i.2.1) j
+      simp only [directions, List.mem_flatten, List.mem_ofFn] at hmem
+      obtain ⟨_, ⟨q, rfl⟩, hq⟩ := hmem
+      rw [List.eq_of_mem_replicate hq]
+      change ‖EuclideanSpace.single q (1 : ℝ)‖ = 1
+      simpa only [EuclideanSpace.basisFun_apply] using
+        (EuclideanSpace.basisFun (Fin m) ℝ).norm_eq_one q
+    have hD : ‖mixedPartial i.2.1 x‖ ≤ ‖iteratedFDeriv ℝ (directions i.2.1).length s x‖ := by
+      simpa only [mixedPartial, he, Finset.prod_const_one, mul_one] using
+        (iteratedFDeriv ℝ (directions i.2.1).length s x).le_opNorm
+          (fun j ↦ ((directions i.2.1).get j).1)
+    exact (mul_le_mul hw hD (norm_nonneg _) (by positivity)).trans (hC x)
 
 section
 

@@ -22,6 +22,7 @@ import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Grid
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.CompactInterpolation
 import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.SpecialFunctions.ExpDeriv
+import Mathlib.Topology.Algebra.IsUniformGroup.DiscreteSubgroup
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 import RiemannMasullo.AppC_LCTVS.Sec2a
@@ -3237,11 +3238,155 @@ abbrev ModulatedExponentialDecayStage (k : GoodCompact) :=
     (fun i : I × {p : Seminorm ℂ (SchwartzBruhat (G ⧸ k.val)) // Continuous p} ↦
       i.2.val.comp (modulatedExponentialDecayTwist n I i.1))
 
+/-- The inverse image of a good subgroup of a compact quotient is good. -/
+private theorem isBruhatGoodSubgroup_comap_compactQuotient (k : Subgroup G)
+    (hk : IsCompact (k : Set G)) (J : Subgroup (G ⧸ k)) (hJ : IsBruhatGoodSubgroup J) :
+    IsBruhatGoodSubgroup (J.comap (QuotientGroup.mk' k)) := by
+  let q := QuotientGroup.mk' k
+  let L := J.comap q
+  let : IsClosed (k : Set G) := hk.isClosed
+  obtain ⟨e, he⟩ := lcaQuotientDual_equiv_annihilator k hk.isClosed
+  have hkL : k ≤ L := fun x hx ↦ by
+    change (x : G ⧸ k) ∈ J
+    rw [(QuotientGroup.eq_one_iff x).2 hx]
+    exact J.one_mem
+  have hAnn : lcaAnnihilator L ≤ lcaAnnihilator k := fun χ hχ ↦
+    (mem_lcaAnnihilator_iff k χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff L χ).mp hχ ⟨x, hkL x.property⟩
+  let A := (lcaAnnihilator L).subgroupOf (lcaAnnihilator k)
+  have hA : A.comap e.toMulEquiv.toMonoidHom = lcaAnnihilator J := by
+    ext χ
+    change (e χ).val ∈ lcaAnnihilator L ↔ χ ∈ lcaAnnihilator J
+    rw [mem_lcaAnnihilator_iff, mem_lcaAnnihilator_iff]
+    simp_rw [he]
+    constructor
+    · intro h x
+      obtain ⟨y, hy⟩ := QuotientGroup.mk_surjective x.val
+      simpa only [hy] using h ⟨y, show (y : G ⧸ k) ∈ J from hy.symm ▸ x.property⟩
+    · exact fun h x ↦ h ⟨q x, x.property⟩
+  have hOpenA : IsOpen (A : Set (lcaAnnihilator k)) := by
+    apply e.toHomeomorph.isOpen_preimage.mp
+    change IsOpen ((A.comap e.toMulEquiv.toMonoidHom : Subgroup _) : Set (PontryaginDual (G ⧸ k)))
+    rw [hA]
+    exact hJ.2.1
+  refine ⟨hJ.1.preimage QuotientGroup.continuous_mk, ?_, ?_⟩
+  · have hImage : Subtype.val '' (A : Set (lcaAnnihilator k)) = (lcaAnnihilator L : Set _) := by
+      ext χ
+      exact ⟨fun ⟨x, hx, hEq⟩ ↦ hEq ▸ hx, fun h ↦ ⟨⟨χ, hAnn h⟩, h, rfl⟩⟩
+    rw [← hImage]
+    exact (isOpen_lcaAnnihilator k hk).isOpenEmbedding_subtypeVal.isOpenMap _ hOpenA
+  · let B := A.comap e.toMulEquiv.toMonoidHom
+    let d : B →* A := (e.toMulEquiv.toMonoidHom.comp B.subtype).codRestrict A (·.property)
+    have hd : IsOpenQuotientMap d :=
+      e.toHomeomorph.isOpenQuotientMap.restrictPreimage (A : Set (lcaAnnihilator k))
+    let D := (MulEquiv.ofBijective d
+      ⟨fun x y h ↦ Subtype.ext (e.injective (congrArg Subtype.val h)), hd.surjective⟩
+      ).toContinuousMulEquiv (fun _ ↦ hd.isQuotientMap.isOpen_preimage)
+    have hGenB : IsCompactlyGeneratedGroup B := by
+      change IsCompactlyGeneratedGroup (A.comap e.toMulEquiv.toMonoidHom)
+      rw [hA]
+      exact hJ.2.2
+    exact isCompactlyGeneratedGroup_of_continuousMulEquiv
+      (D.trans (Subgroup.subgroupOfContinuousMulEquivOfLe hAnn)) hGenB
+
+/-- Pulling back a structural pair across a compact quotient preserves its elementary quotient. -/
+private theorem bruhatStructuralPair_lift_compactQuotient (k : Subgroup G)
+    (hk : IsCompact (k : Set G)) (a : BruhatStructuralPair (G ⧸ k)) :
+    ∃ (b : BruhatStructuralPair G) (v : b.quotient ≃ₜ* a.quotient)
+      (hb : ∀ g : G, g ∈ b.val.1 ↔ (g : G ⧸ k) ∈ a.val.1),
+      ∀ (g : G) (hg : g ∈ b.val.1),
+        v (QuotientGroup.mk ⟨g, hg⟩) = QuotientGroup.mk ⟨(g : G ⧸ k), (hb g).mp hg⟩ := by
+  let q := QuotientGroup.mk' k
+  let H := a.val.1.comap q
+  let J := OrderDual.ofDual a.val.2
+  let L := J.comap q
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  have hqProper : IsProperMap q := by
+    refine isProperMap_iff_isClosedMap_and_compact_fibers.mpr
+      ⟨hq.continuous, QuotientGroup.isClosedMap_coe hk, ?_⟩
+    intro y
+    obtain ⟨x, rfl⟩ := hq.surjective y
+    change IsCompact (QuotientGroup.mk ⁻¹' {QuotientGroup.mk x} : Set G)
+    rw [← Set.image_singleton, QuotientGroup.preimage_image_mk_eq_mul, Set.singleton_mul]
+    exact hk.image (continuous_const.mul continuous_id)
+  let p : H →* a.val.1 := (q.comp H.subtype).codRestrict a.val.1 (·.property)
+  have hp : IsOpenQuotientMap p := hq.restrictPreimage (a.val.1 : Set (G ⧸ k))
+  have hpProper : IsProperMap p := hqProper.restrictPreimage (a.val.1 : Set (G ⧸ k))
+  have hGen : IsCompactlyGeneratedGroup H := by
+    obtain ⟨U, hU, hUc, hUgen⟩ := a.property.2.1
+    refine ⟨p ⁻¹' U, hp.continuous.continuousAt.preimage_mem_nhds (by simpa only [map_one]),
+      hpProper.isCompact_preimage hUc, eq_top_iff.mpr ?_⟩
+    let C := Subgroup.closure (p ⁻¹' U)
+    have hImage : C.map p = ⊤ := by
+      rw [MonoidHom.map_closure, Set.image_preimage_eq _ hp.surjective, hUgen]
+    intro x _
+    obtain ⟨y, hy, hxy⟩ := Subgroup.mem_map.mp (hImage ▸ Subgroup.mem_top (p x))
+    have hker : y⁻¹ * x ∈ C := by
+      apply Subgroup.subset_closure
+      change p (y⁻¹ * x) ∈ U
+      rw [map_mul, map_inv, hxy, inv_mul_cancel]
+      exact mem_of_mem_nhds hU
+    simpa only [mul_inv_cancel_left] using C.mul_mem hy hker
+  let b : BruhatStructuralPair G := ⟨(H, OrderDual.toDual L),
+    a.property.1.preimage hq.continuous, hGen,
+    isBruhatGoodSubgroup_comap_compactQuotient k hk J a.property.2.2.1,
+    Subgroup.comap_mono a.property.2.2.2⟩
+  let r : H →* a.quotient := (QuotientGroup.mk' _).comp p
+  have hr : IsOpenQuotientMap r := QuotientGroup.isOpenQuotientMap_mk.comp hp
+  have hKer : L.comap H.subtype = r.ker := by
+    ext x
+    exact (a.quotient_mk_eq_one (p x)).symm
+  let w : b.quotient ≃* a.quotient :=
+    (QuotientGroup.quotientMulEquivOfEq hKer).trans
+      (QuotientGroup.quotientKerEquivOfSurjective r hr.surjective)
+  have hw (x : H) : w (QuotientGroup.mk x) = r x := rfl
+  let v := w.toContinuousMulEquiv fun s ↦ by
+    change IsOpen (w ⁻¹' s : Set (H ⧸ L.comap H.subtype)) ↔ IsOpen s
+    rw [← (QuotientGroup.isQuotientMap_mk (L.comap H.subtype)).isOpen_preimage]
+    exact hr.isQuotientMap.isOpen_preimage
+  exact ⟨b, v, fun _ ↦ Iff.rfl, fun g hg ↦ hw ⟨g, hg⟩⟩
+
+/-- Pullback by the quotient map of a compact subgroup preserves Schwartz–Bruhat membership. -/
+private theorem schwartzBruhatSubmodule_compactQuotient_pullback_mem (k : Subgroup G)
+    (hk : IsCompact (k : Set G)) {f : (G ⧸ k) → ℂ} (hf : f ∈ schwartzBruhatSubmodule (G ⧸ k)) :
+    (fun g : G ↦ f (g : G ⧸ k)) ∈ schwartzBruhatSubmodule G := by
+  let P : ((G ⧸ k) → ℂ) →ₗ[ℂ] (G → ℂ) :=
+    LinearMap.pi fun g : G ↦ LinearMap.proj (g : G ⧸ k)
+  change P f ∈ schwartzBruhatSubmodule G
+  suffices hP : (schwartzBruhatSubmodule (G ⧸ k)).map P ≤ schwartzBruhatSubmodule G by
+    exact hP (Submodule.mem_map_of_mem hf)
+  unfold schwartzBruhatSubmodule
+  simp only [Submodule.map_iSup]
+  refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+  rintro _ ⟨_, ⟨s, rfl⟩, rfl⟩
+  obtain ⟨b, v, hb, hv⟩ := bruhatStructuralPair_lift_compactQuotient k hk a
+  let e' : ElementaryLCAPresentation b.quotient := { e with equiv := v.trans e.equiv }
+  refine Submodule.mem_iSup_of_mem b (Submodule.mem_iSup_of_mem e' ⟨s, ?_⟩)
+  funext g
+  change schwartzBruhatStageRealization b e' s g =
+    schwartzBruhatStageRealization a e s (g : G ⧸ k)
+  by_cases hg : g ∈ b.val.1
+  · have hqg := (hb g).mp hg
+    calc
+      _ = s (e'.equiv (QuotientGroup.mk ⟨g, hg⟩)).toAdd :=
+        (schwartzBruhatStageRealization_apply b e' s g).trans (dite_eq_left hg)
+      _ = s (e.equiv (QuotientGroup.mk ⟨(g : G ⧸ k), hqg⟩)).toAdd :=
+        congrArg (fun x : a.quotient ↦ s (e.equiv x).toAdd) (hv g hg)
+      _ = _ := ((schwartzBruhatStageRealization_apply a e s (g : G ⧸ k)).trans
+        (dite_eq_left hqg)).symm
+  · have hqg := mt (hb g).mpr hg
+    exact ((schwartzBruhatStageRealization_apply b e' s g).trans (dite_eq_right hg)).trans
+      (((schwartzBruhatStageRealization_apply a e s (g : G ⧸ k)).trans
+        (dite_eq_right hqg)).symm)
+
 /-- Paper: Definition D.3.3.3, p. 805. Pulling a stage profile back along
 the quotient map lands in the ambient decay submodule. -/
 theorem modulatedExponentialDecayStage_pullback_mem (k : GoodCompact)
     (f : ModulatedExponentialDecayStage m I k) :
-    (fun g : G ↦ f.val (g : G ⧸ k.val)) ∈ modulatedExponentialDecaySubmodule m I := by sorry
+    (fun g : G ↦ f.val (g : G ⧸ k.val)) ∈ modulatedExponentialDecaySubmodule m I := by
+  refine (Submodule.mem_iInf _).mpr fun a ↦ Submodule.mem_comap.mpr ?_
+  exact schwartzBruhatSubmodule_compactQuotient_pullback_mem k.val k.property.1
+    (modulationWeight_mem_schwartzBruhat (quotientModulation m k.val k.property.1) I a f)
 
 /-- Paper: (D.3.3.1), p. 805. The canonical stage map is pullback from G/k. -/
 def modulatedExponentialDecayStageInclusion (k : GoodCompact) :
@@ -3257,7 +3402,42 @@ theorem modulatedExponentialDecayStageInclusion_range (k : GoodCompact) :
     Injective (modulatedExponentialDecayStageInclusion m I k) ∧
       ∀ f : modulatedExponentialDecaySubmodule m I,
         f ∈ (modulatedExponentialDecayStageInclusion m I k).range ↔
-          ∀ (g : G) (u : k.val), f.val (g * u.val) = f.val g := by sorry
+          ∀ (g : G) (u : k.val), f.val (g * u.val) = f.val g := by
+  constructor
+  · intro f f' h
+    apply Subtype.ext
+    funext q
+    exact QuotientGroup.induction_on q fun g ↦
+      congrArg (fun F : modulatedExponentialDecaySubmodule m I ↦ F.val g) h
+  intro f
+  constructor
+  · rintro ⟨F, rfl⟩ g u
+    exact congrArg F.val (QuotientGroup.mk_mul_of_mem g u.property)
+  · intro hf
+    let fbar : (G ⧸ k.val) → ℂ := fun q ↦ f.val q.out
+    have hbar (g : G) : fbar (g : G ⧸ k.val) = f.val g := by
+      obtain ⟨u, hu⟩ := QuotientGroup.mk_out_eq_mul k.val g
+      exact (congrArg f.val hu).trans (hf g u)
+    refine ⟨⟨fbar, ?_⟩, Subtype.ext (funext hbar)⟩
+    let : MeasurableSpace G := borel G
+    let : BorelSpace G := ⟨rfl⟩
+    let : CompactSpace k.val := isCompact_iff_compactSpace.mp k.property.1
+    let μ : Measure k.val := Measure.haarMeasure ⊤
+    let : IsProbabilityMeasure μ := ⟨Measure.haarMeasure_self⟩
+    refine (Submodule.mem_iInf _).2 fun a ↦ Submodule.mem_comap.2 ?_
+    let F := modulatedExponentialDecayTwist m I a f
+    let W := modulationWeight (quotientModulation m k.val k.property.1) a fbar
+    change W ∈ schwartzBruhatSubmodule (G ⧸ k.val)
+    have hW (g : G) : W (g : G ⧸ k.val) = F g := by
+      exact congrArg (fun z : ℂ ↦ ((((m g).val : ℝ) ^ (a : ℝ) : ℝ) : ℂ) * z) (hbar g)
+    have haverage : W = lcaCosetIntegral k.val μ F := by
+      funext q
+      have hconst (u : k.val) : F (q.out * u.val) = W q :=
+        (hW (q.out * u.val)).symm.trans
+          (congrArg W ((QuotientGroup.mk_mul_of_mem q.out u.property).trans (Quotient.out_eq' q)))
+      rw [lcaCosetIntegral, funext hconst, integral_const, probReal_univ, one_smul]
+    rw [haverage]
+    exact (lcaCosetIntegral_mem_schwartzBruhat k.val μ k.property.1.isClosed F).2
 
 /-- Paper: Definition D.3.3.3, p. 805. The topology of S_I(G) is the final
 locally convex topology for the inclusions of the compact-subgroup stages. -/

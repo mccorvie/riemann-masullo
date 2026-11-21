@@ -43,6 +43,18 @@ paper's objects and that Mathlib ought to have goes in `RiemannMasullo/ForMathli
 Mathlib would use. Do not edit the statement of any existing declaration, and do not touch files
 outside `RiemannMasullo/`.
 
+## Keep the build fast
+
+A proof that Lean accepts slowly costs everyone: every later build, CI check and agent recompiles
+your file and all that imports it. Time the file before and after your change
+(`time lake build RiemannMasullo.<Chapter>.<File>` after touching it). If your proof adds more
+than about a minute, find the slow step (`set_option profiler true in` on the theorem) and
+restructure: usually a unification that has to unfold a large definition or match instances on a
+quotient or subtype, which goes away when the argument is stated as a private lemma about
+abstract spaces and then applied, or when `exact`/`refine` get explicit arguments and types.
+Do not hand in a proof that takes minutes to elaborate, and do not raise `maxHeartbeats` to get
+one through.
+
 ## Before you finish
 
 Run `lake build` and `scripts/lint.sh`; both must pass. Then write `.agent/PR.md`: a one-line

@@ -2590,7 +2590,34 @@ theorem hilbertTrace_linear :
 /-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by
 the trace norm, which gives continuity for the trace norm. -/
 theorem norm_hilbertTrace_le (T : nuclearEndomorphisms H) :
-    ‖hilbertTrace T‖ ≤ traceNorm T := by sorry
+    ‖hilbertTrace T‖ ≤ traceNorm T := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  let z := hilbertTrace T
+  -- Rotate the trace onto the nonnegative real axis.
+  let c : ℂ := star z / (‖z‖ : ℂ)
+  have hc : ‖c‖ ≤ 1 := by
+    dsimp only [c]
+    rw [norm_div, Complex.star_def, Complex.norm_conj, Complex.norm_real,
+      Real.norm_of_nonneg (norm_nonneg z)]
+    exact div_self_le_one _
+  have hcz : (c * z).re = ‖z‖ := by
+    dsimp only [c]
+    rw [div_mul_eq_mul_div, Complex.star_def, ← Complex.normSq_eq_conj_mul_self,
+      Complex.normSq_eq_norm_sq, Complex.ofReal_pow, pow_two, mul_self_div_self, Complex.ofReal_re]
+  let U : H →L[ℂ] H := c • ContinuousLinearMap.id ℂ H
+  have hU : ‖U‖ ≤ 1 := by
+    dsimp only [U]
+    rw [norm_smul]
+    exact (mul_le_of_le_one_right (norm_nonneg _) ContinuousLinearMap.norm_id_le).trans hc
+  obtain ⟨r, hr, hr_le⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b T U hU
+  have htrace : HasSum (fun i ↦ ⟪b i, T.val (b i)⟫_ℂ) z :=
+    (summable_norm_hilbertDiagonal b T.val T.property).of_norm.hasSum
+  have hreal : HasSum (fun i ↦ (⟪b i, (U * T.val) (b i)⟫_ℂ).re) (c * z).re := by
+    simpa only [U, mul_apply_eq_comp, ContinuousLinearMap.comp_apply, smul_apply,
+      ContinuousLinearMap.id_apply, inner_smul_right, Complex.reCLM_apply] using
+      Complex.reCLM.hasSum (htrace.mul_left c)
+  rw [← hcz, hreal.unique hr]
+  exact hr_le
 
 /-- Paper: Lemma C.3.4.4(4), p. 698. The canonical image of the algebraic tensor
 of the dual and the Hilbert space consists of nuclear operators. -/

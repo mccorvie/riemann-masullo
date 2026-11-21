@@ -600,24 +600,21 @@ theorem weightedSobolev_toZeroAtInfty (hν : IsLCAPlancherelMeasure μ ν)
     change g = F f ↔ _
     exact ⟨fun h ↦ h ▸ hF f, unique f g⟩
 
--- TODO(paper-gap): The bound (9.1.1.15) places an extra square root on each L² norm.
-
-/-- Paper: Lemma 9.1.1.5, p. 397. The unweighted integral of the pointwise product
-pairs opposite degrees. It represents every continuous linear functional uniquely and
-isometrically by an element in the opposite degree. -/
-theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
-    (_hw : IsSobolevWeight w) (_hs : 0 ≤ s) :
+/-- The unweighted product pairing identifies the strong dual of a weighted L² space with the
+weighted L² space of opposite degree, for any continuous weight on a Borel space. -/
+private theorem weightedSobolev_dual_of_continuous {X : Type*} [MeasurableSpace X]
+    [TopologicalSpace X] [BorelSpace X] (ν : Measure X) {w : X → ℝ≥0} (hw : Continuous w)
+    (s : ℝ) :
     ∃! T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s),
       ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
-  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
-  let ρ (t : ℝ) (χ : PontryaginDual G) := (1 + (w χ : ℝ) ^ 2) ^ (t / 2)
-  have hρpos (t : ℝ) (χ : PontryaginDual G) : 0 < ρ t χ :=
+  let ρ (t : ℝ) (χ : X) := (1 + (w χ : ℝ) ^ 2) ^ (t / 2)
+  have hρpos (t : ℝ) (χ : X) : 0 < ρ t χ :=
     Real.rpow_pos_of_pos (by positivity) _
   have hρ (t : ℝ) : Continuous (ρ t) := by
     have hcont : Continuous (fun χ ↦ 1 + (w χ : ℝ) ^ 2) :=
-      continuous_const.add ((NNReal.continuous_coe.comp _hw.1).pow 2)
+      continuous_const.add ((NNReal.continuous_coe.comp hw).pow 2)
     exact hcont.rpow_const fun χ ↦ Or.inl (by positivity)
-  have hrecip (t : ℝ) (χ : PontryaginDual G) : ρ t χ * ρ (-t) χ = 1 := by
+  have hrecip (t : ℝ) (χ : X) : ρ t χ * ρ (-t) χ = 1 := by
     dsimp only [ρ]
     rw [← Real.rpow_add (by positivity), neg_div, add_neg_cancel, Real.rpow_zero]
   have hdens (t : ℝ) : Measurable (fun χ ↦ ENNReal.ofReal (ρ t χ)) :=
@@ -629,9 +626,9 @@ theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
       (ae_of_all _ fun χ ↦ (ENNReal.ofReal_pos.mpr (hρpos t χ)).ne')
   have hweighted (t : ℝ) : sobolevMeasure ν w t ≪ ν := withDensity_absolutelyContinuous _ _
   -- Conjugation times the density interchanges the two weighted L² spaces.
-  let u (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) : ℂ :=
+  let u (t : ℝ) (f : WeightedSobolev ν w t) (χ : X) : ℂ :=
     (ρ t χ : ℂ) * star (f χ)
-  have hsq (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) :
+  have hsq (t : ℝ) (f : WeightedSobolev ν w t) (χ : X) :
       ‖u t f χ‖ ^ 2 * ρ (-t) χ = ‖f χ‖ ^ 2 * ρ t χ := by
     calc
       _ = ‖f χ‖ ^ 2 * (ρ t χ * (ρ t χ * ρ (-t) χ)) := by
@@ -647,16 +644,16 @@ theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
     apply (memLp_two_iff_integrable_sq_norm hmeas).2
     change Integrable (fun χ ↦ ‖u t f χ‖ ^ 2) (ν.withDensity fun χ ↦ ENNReal.ofReal (ρ (-t) χ))
     apply (integrable_withDensity_iff (hdens (-t)) (hfinite (-t))).2
-    refine (weightedSobolev_norm ν _hw.1 t f).1.congr (ae_of_all _ fun χ ↦ ?_)
+    refine (weightedSobolev_norm ν hw t f).1.congr (ae_of_all _ fun χ ↦ ?_)
     change ‖f χ‖ ^ 2 * ρ t χ = ‖u t f χ‖ ^ 2 * (ENNReal.ofReal (ρ (-t) χ)).toReal
     rw [ENNReal.toReal_ofReal (hρpos (-t) χ).le, hsq]
   let S (t : ℝ) (f : WeightedSobolev ν w t) : WeightedSobolev ν w (-t) :=
     (hmem t f).toLp (u t f)
   have hS (t : ℝ) (f : WeightedSobolev ν w t) :
-      (S t f : PontryaginDual G → ℂ) =ᵐ[ν] u t f :=
+      (S t f : X → ℂ) =ᵐ[ν] u t f :=
     (hbase (-t)).ae_eq (hmem t f).coeFn_toLp
   have hSnorm (t : ℝ) (f : WeightedSobolev ν w t) : ‖S t f‖ = ‖f‖ := by
-    rw [(weightedSobolev_norm ν _hw.1 (-t) (S t f)).2, (weightedSobolev_norm ν _hw.1 t f).2]
+    rw [(weightedSobolev_norm ν hw (-t) (S t f)).2, (weightedSobolev_norm ν hw t f).2]
     congr 1
     apply integral_congr_ae
     filter_upwards [hS t f] with χ hχ
@@ -685,14 +682,14 @@ theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
     intro g
     have hs' : - -s = s := neg_neg s
     let f : WeightedSobolev ν w s := hs' ▸ S (-s) g
-    have hf : (f : PontryaginDual G → ℂ) =ᵐ[ν] u (-s) g := by
+    have hf : (f : X → ℂ) =ᵐ[ν] u (-s) g := by
       have hcast (t : ℝ) (ht : - -s = t) :
-          ((ht ▸ S (-s) g : WeightedSobolev ν w t) : PontryaginDual G → ℂ) = S (-s) g := by
+          ((ht ▸ S (-s) g : WeightedSobolev ν w t) : X → ℂ) = S (-s) g := by
         subst t
         rfl
       exact (hcast s hs').eventuallyEq.trans (hS (-s) g)
     refine ⟨f, Lp.ext ((hweighted (-s)).ae_eq ?_)⟩
-    change (S s f : PontryaginDual G → ℂ) =ᵐ[ν] g
+    change (S s f : X → ℂ) =ᵐ[ν] g
     filter_upwards [hS s f, hf] with χ hSf hfχ
     have hstar : star (ρ (-s) χ : ℂ) = (ρ (-s) χ : ℂ) := Complex.conj_ofReal _
     rw [hSf]
@@ -726,6 +723,18 @@ theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
   apply ContinuousLinearMap.ext
   intro f
   rw [(hPair (T.symm (T' Λ)) f).2, T.apply_symm_apply, (hT' Λ f).2]
+
+-- TODO(paper-gap): The bound (9.1.1.15) places an extra square root on each L² norm.
+
+/-- Paper: Lemma 9.1.1.5, p. 397. The unweighted integral of the pointwise product
+pairs opposite degrees. It represents every continuous linear functional uniquely and
+isometrically by an element in the opposite degree. -/
+theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
+    (_hw : IsSobolevWeight w) (_hs : 0 ≤ s) :
+    ∃! T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s),
+      ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  exact weightedSobolev_dual_of_continuous ν _hw.1 s
 
 end LCA
 
@@ -1228,7 +1237,8 @@ identifies the strong dual isometrically with the space of opposite degree. -/
 theorem modulatedSobolev_dual (_hm : IsModulation m) (_hsurj : Function.Surjective m)
     {s : ℝ} (_hs : 0 ≤ s) :
     ∃! T : StrongDual ℂ (ModulatedSobolev m μ s) ≃ₗᵢ[ℂ] ModulatedSobolev m μ (-s),
-      ∀ Λ f, Integrable (fun x ↦ f x * T Λ x) μ ∧ Λ f = ∫ x, f x * T Λ x ∂μ := by sorry
+      ∀ Λ f, Integrable (fun x ↦ f x * T Λ x) μ ∧ Λ f = ∫ x, f x * T Λ x ∂μ :=
+  weightedSobolev_dual_of_continuous μ (modulatedSobolevWeight_subadditive m).1 s
 
 -- TODO(paper-gap): The simultaneous invariance described in the proof uses opposite
 -- parameters for left and right translations under the transpose convention.

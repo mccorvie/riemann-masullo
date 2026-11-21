@@ -13,6 +13,7 @@ import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
+import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import Mathlib.Algebra.Group.Fin.Basic
 import Mathlib.Topology.Connected.TotallyDisconnected
@@ -83,12 +84,38 @@ structure ElementaryLCAPresentation (G : Type*) [CommGroup G] [TopologicalSpace 
 attribute [instance] ElementaryLCAPresentation.finiteGroup ElementaryLCAPresentation.finiteFintype
   ElementaryLCAPresentation.finiteTopology ElementaryLCAPresentation.finiteDiscrete
 
+/-- The product of two groups of order two is not cyclic, since its exponent is two. -/
+private theorem zmodTwoProd_not_isAddCyclic : ¬ IsAddCyclic (ZMod 2 × ZMod 2) := by
+  intro h
+  have h1 : AddMonoid.exponent (ZMod 2 × ZMod 2) = Nat.card (ZMod 2 × ZMod 2) :=
+    IsAddCyclic.exponent_eq_card
+  have h2 : AddMonoid.exponent (ZMod 2 × ZMod 2) ∣ 2 :=
+    AddMonoid.exponent_dvd_of_forall_nsmul_eq_zero (by decide)
+  rw [h1, Nat.card_eq_fintype_card] at h2
+  revert h2
+  decide
+
 /-- Paper: (D.1.4.2), p. 757. The Klein four group admits an elementary presentation
 whose finite factor has order four and is noncyclic.
 Deviation: Sanity check for the finite abelian factor. -/
 theorem ElementaryLCAPresentation.exists_kleinFour :
     ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
-      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
+      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by
+  let a : (ZMod 2 × ZMod 2) ≃+ ElementaryLieGroup 0 0 0 (ZMod 2 × ZMod 2) :=
+    { toFun := fun x ↦ (0, 0, 0, x)
+      invFun := fun p ↦ p.2.2.2
+      left_inv := fun _ ↦ rfl
+      right_inv := fun p ↦ Prod.ext (by ext i; exact i.elim0)
+        (Prod.ext (by ext i; exact i.elim0) (Prod.ext (by ext i; exact i.elim0) rfl))
+      map_add' := fun x y ↦ Prod.ext (by ext i; exact i.elim0)
+        (Prod.ext (by ext i; exact i.elim0) (Prod.ext (by ext i; exact i.elim0) rfl)) }
+  refine ⟨{ realDim := 0, torusDim := 0, latticeRank := 0, finiteFactor := ZMod 2 × ZMod 2
+            equiv := { AddEquiv.toMultiplicative a with
+              continuous_toFun := continuous_of_discreteTopology
+              continuous_invFun := continuous_of_discreteTopology } }, ?_, ?_⟩
+  · change Fintype.card (ZMod 2 × ZMod 2) = 4
+    decide
+  · exact zmodTwoProd_not_isAddCyclic
 
 /-- A continuous homomorphism from a torus to a real vector group vanishes,
 since the multiples of a nonzero vector cannot all lie in a compact range. -/
@@ -1284,7 +1311,49 @@ theorem lca_openSubgroup_quotient_elementary (J : OpenCompactlyGeneratedSubgroup
     (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G))
     (_h : lcaDualAnnihilator H.val ≤ J.val) :
     Nonempty (ElementaryLCAPresentation (J.val ⧸ (lcaDualAnnihilator H.val).comap J.val.subtype)) := by
-  sorry
+  let N := (lcaDualAnnihilator H.val).comap J.val.subtype
+  let : LocallyCompactSpace J.val :=
+    J.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : LocallyCompactSpace H.val :=
+    H.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let ι : H.val →ₜ* PontryaginDual G :=
+    ⟨H.val.subtype, continuous_subtype_val⟩
+  let f : J.val →ₜ* PontryaginDual H.val :=
+    (PontryaginDual.map ι).comp
+      (pontryaginDual_eval.comp
+        ⟨J.val.subtype, continuous_subtype_val⟩)
+  have hker : f.toMonoidHom.ker = N := by
+    ext x
+    rw [MonoidHom.mem_ker, Subgroup.mem_comap, Subgroup.coe_subtype,
+      mem_lcaDualAnnihilator_iff]
+    exact
+      ⟨fun hx χ ↦ congrArg (fun ψ : PontryaginDual H.val ↦ ψ χ) hx,
+        fun hx ↦ PontryaginDual.ext hx⟩
+  have hN : IsClosed (N : Set J.val) := by
+    rw [← hker]
+    exact isClosed_eq f.continuous continuous_const
+  let : T1Space (J.val ⧸ N) :=
+    QuotientGroup.t1Space_iff.mpr hN
+  refine lca_elementary_iff.mp
+    ⟨isCompactlyGeneratedGroup_quotient J.property.2 N hN, ?_⟩
+  let e : (J.val ⧸ N) →ₜ* PontryaginDual H.val :=
+    ⟨QuotientGroup.lift N f.toMonoidHom hker.ge,
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        f.continuous⟩
+  have he : Function.Injective e :=
+    (QuotientGroup.injective_lift_iff N f.toMonoidHom hker.ge).mpr
+      hker.symm
+  obtain ⟨W, hW, hPow⟩ := exists_nhds_one_of_isLocallyEuclidean
+    (isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp
+      H.property.2)
+  have hW' : W ∈ 𝓝 (e 1) := by
+    rwa [map_one]
+  refine isLocallyEuclidean_of_noSmallCyclicSubgroups
+    (e.continuous.continuousAt.preimage_mem_nhds hW') ?_
+  intro x hx
+  apply he
+  rw [map_one]
+  exact hPow (e x) fun n ↦ map_pow e x n ▸ hx n
 
 /-- Paper: Lemma D.1.4.7, p. 760. Each open compactly generated subgroup is the
 inverse limit of its quotients by the annihilators it contains.
@@ -2624,16 +2693,199 @@ theorem isBruhatContDiff_zero (p : ℕ) : IsBruhatContDiff p (0 : G → ℂ) := 
   intro e z b
   exact contDiff_const
 
+/-- The target of an open continuous map from a real vector group has an elementary
+presentation if it is compactly generated. -/
+private theorem elementaryPresentation_of_open_vector_map {E B : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    [CommGroup B] [TopologicalSpace B] [IsTopologicalGroup B] [T2Space B]
+    (f : E →+ Additive B) (hf : Continuous f) (hopen : IsOpenMap f)
+    (hB : IsCompactlyGeneratedGroup B) : Nonempty (ElementaryLCAPresentation B) := by
+  let : T2Space (Additive B) := ‹T2Space B›
+  obtain ⟨m, n, ⟨e⟩⟩ := exists_real_torus_equiv_of_open_vector_range f hf hopen
+  have hRange : IsOpen (f.range : Set (Additive B)) := by
+    rw [AddMonoidHom.coe_range, ← Set.image_univ]
+    exact hopen _ isOpen_univ
+  let : DivisibleBy f.range ℤ := divisibleByOfSMulRightSurj f.range ℤ (fun {z} hz y ↦ by
+    obtain ⟨x, rfl⟩ := f.rangeRestrict_surjective y
+    have hzR : (z : ℝ) ≠ 0 := Int.cast_ne_zero.mpr hz
+    refine ⟨f.rangeRestrict ((z : ℝ)⁻¹ • x), ?_⟩
+    change z • f.rangeRestrict ((z : ℝ)⁻¹ • x) = f.rangeRestrict x
+    rw [← map_zsmul, ← Int.cast_smul_eq_zsmul ℝ, smul_smul, mul_inv_cancel₀ hzR, one_smul])
+  obtain ⟨split⟩ := exists_continuousAddEquiv_prod_quotient_of_open f.range hRange
+  let D := Additive B ⧸ f.range
+  let : DiscreteTopology D := QuotientAddGroup.discreteTopology hRange
+  let product := split.toAddEquiv.trans (AddEquiv.prodCongr e.toAddEquiv (AddEquiv.refl D))
+  let assoc := Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ)) D
+  exact elementaryPresentation_of_compactlyGenerated hB {
+    AddEquiv.toMultiplicativeRight (product.trans AddEquiv.prodAssoc) with
+    continuous_toFun := assoc.continuous.comp
+      ((e.continuous_toFun.prodMap continuous_id).comp split.continuous_toFun)
+    continuous_invFun := split.continuous_invFun.comp
+      ((e.continuous_invFun.prodMap continuous_id).comp assoc.symm.continuous) }
+
+
+/-- The cover of the identity component of an elementary group as a homomorphism. -/
+private def elementaryCoverZeroHom {m n r : ℕ} {F : Type*} [AddCommGroup F] :
+    EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) →+ ElementaryLieGroup m n r F where
+  toFun := fun xt ↦ elementaryCover xt 0 0
+  map_zero' := Prod.ext rfl (Prod.ext (funext fun _ ↦ AddCircle.coe_zero (1 : ℝ)) rfl)
+  map_add' x y := Prod.ext rfl
+    (Prod.ext (funext fun i ↦ AddCircle.coe_add (1 : ℝ) (x.2 i) (y.2 i)) (zero_add _).symm)
+
+/-- The cover of the identity component is continuous and open in the elementary group. -/
+private theorem elementaryCoverZeroHom_continuous_isOpenMap {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] :
+    let c := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+    Continuous c ∧ IsOpenMap c := by
+  refine ⟨continuous_fst.prodMk
+    ((continuous_pi fun i ↦ (AddCircle.continuous_mk' (1 : ℝ)).comp
+      ((PiLp.continuous_apply 2 _ i).comp continuous_snd)).prodMk continuous_const), ?_⟩
+  let q : (Fin n → ℝ) → (Fin n → AddCircle (1 : ℝ)) := fun u i ↦ (u i : AddCircle (1 : ℝ))
+  have hq : IsOpenMap q := IsOpenMap.piMap
+    (fun _ ↦ (QuotientAddGroup.isOpenQuotientMap_mk
+      (N := AddSubgroup.zmultiples (1 : ℝ))).isOpenMap)
+    (Eventually.of_forall fun _ ↦ QuotientAddGroup.mk_surjective)
+  have hzero : IsOpenMap (fun _ : Unit ↦ (0 : (Fin r → ℤ) × F)) := fun _ _ ↦ isOpen_discrete _
+  have he : IsOpenMap (fun u : EuclideanSpace ℝ (Fin n) ↦
+      ((u, ()) : EuclideanSpace ℝ (Fin n) × Unit)) :=
+    (Homeomorph.prodUnique _ _).symm.isOpenMap
+  exact IsOpenMap.id.prodMap
+    (((hq.comp (EuclideanSpace.equiv (Fin n) ℝ).toHomeomorph.isOpenMap).prodMap hzero).comp he)
+
+/-- On a covered discrete fiber, a continuous homomorphism of elementary groups
+is represented in the target cover by a continuous affine map. -/
+private theorem contDiff_comp_elementaryHom {m n r m' n' r' : ℕ} {F F' : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
+    [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
+    {p : ℕ∞} (a : ElementaryLieGroup m n r F →+ ElementaryLieGroup m' n' r' F')
+    (ha : Continuous a) {f : ElementaryLieGroup m' n' r' F' → ℂ}
+    (hf : ∀ z b, ContDiff ℝ p (fun u ↦ f (elementaryCover u z b)))
+    (z : Fin r → ℤ) (b : F) :
+    ContDiff ℝ p (fun u ↦ f (a (elementaryCover u z b))) := by
+  let cover := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+  let A := a.comp cover
+  have hA : Continuous A := ha.comp elementaryCoverZeroHom_continuous_isOpenMap.1
+  let R := (AddMonoidHom.fst _ _).comp A
+  let T := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp A)
+  choose l hl using fun i : Fin n' ↦ exists_addCircle_coe_linearMap_eq
+    ((Pi.evalAddMonoidHom _ i).comp T) ((continuous_apply i).comp hA.snd.fst)
+  let L := (R.toRealLinearMap hA.fst).prod
+    ((EuclideanSpace.equiv (Fin n') ℝ).symm.toContinuousLinearMap.comp
+      (ContinuousLinearMap.pi l))
+  let c := a (elementaryCover 0 z b)
+  obtain ⟨t, ht⟩ := elementaryCover_surjective c.2.2.1 c.2.2.2 c.1 c.2.1
+  have hLift (u : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
+      elementaryCover (L u + (c.1, t)) c.2.2.1 c.2.2.2 = a (elementaryCover u z b) := by
+    have hshift : cover u + elementaryCover 0 z b = elementaryCover u z b := by
+      simp [cover, elementaryCoverZeroHom, elementaryCover, Pi.zero_def]
+    rw [← hshift, map_add]
+    refine Prod.ext rfl (Prod.ext ?_ ?_)
+    · funext i
+      have hti := congrArg (fun y : ElementaryLieGroup m' n' r' F' ↦ y.2.1 i) ht
+      change ((l i u + t i : ℝ) : AddCircle (1 : ℝ)) = (A u).2.1 i + c.2.1 i
+      rw [AddCircle.coe_add, hl i u]
+      exact congrArg ((A u).2.1 i + ·) hti
+    · have h := hA.snd.snd.isConst_of_preconnectedSpace u 0
+      rw [map_zero A] at h
+      change c.2.2 = (A u).2.2 + c.2.2
+      rw [h]
+      exact (zero_add _).symm
+  simp_rw [← hLift]
+  exact (hf c.2.2.1 c.2.2.2).comp (L.contDiff.add (contDiff_const (c := (c.1, t))))
+
+/-- Smooth descents for a good subgroup pull back to structural quotients by
+smaller good subgroups. -/
+private theorem bruhatContDiff_descend_of_le {p : ℕ} {f : G → ℂ}
+    {k : Subgroup G} (hk : IsBruhatGoodSubgroup k)
+    (hdesc : ∀ b : BruhatStructuralPair G, OrderDual.ofDual b.val.2 = k →
+      ∃ f₀ : b.quotient → ℂ, (∀ x : b.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
+        ∀ (e : ElementaryLCAPresentation b.quotient)
+          (z : Fin e.latticeRank → ℤ) (d : e.finiteFactor),
+          ContDiff ℝ (p : ℕ∞) (fun u ↦ f₀ (e.equiv.symm
+            (Multiplicative.ofAdd (elementaryCover u z d)))))
+    (a : BruhatStructuralPair G) (hak : OrderDual.ofDual a.val.2 ≤ k) :
+    ∃ f₀ : a.quotient → ℂ, (∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
+      ∀ (e : ElementaryLCAPresentation a.quotient)
+        (z : Fin e.latticeRank → ℤ) (d : e.finiteFactor),
+        ContDiff ℝ (p : ℕ∞) (fun u ↦ f₀ (e.equiv.symm
+          (Multiplicative.ofAdd (elementaryCover u z d)))) := by
+  have hkc := isCompact_lcaDualAnnihilator (lcaAnnihilator k) hk.2.1
+  rw [lcaDualAnnihilator_annihilator k hk.1] at hkc
+  obtain ⟨J, hkJ⟩ := exists_openCompactlyGeneratedSubgroup_contains hkc
+  obtain ⟨H, haH, hJH⟩ := (openCompactlyGeneratedSubgroups_colimit (G := G)).1.directed
+    ⟨a.val.1, a.property.1, a.property.2.1⟩ J
+  let b : BruhatStructuralPair G :=
+    ⟨(H.val, OrderDual.toDual k), H.property.1, H.property.2, hk, hkJ.trans hJH⟩
+  let i := Subgroup.inclusion (show a.val.1 ≤ H.val from haH)
+  let j : a.quotient →* b.quotient := QuotientGroup.map _ _ i (fun _ hx ↦ hak hx)
+  have hi : Continuous i := (continuous_subtype_val : Continuous ((↑) : a.val.1 → G)).subtype_mk _
+  have hj : Continuous j := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr
+    (QuotientGroup.continuous_mk.comp hi)
+  have hio : IsOpenMap i := a.property.1.isOpenMap_inclusion haH
+  have hjo : IsOpenMap j := by
+    intro U hU
+    let qa : a.val.1 → a.quotient := QuotientGroup.mk
+    let qb : b.val.1 → b.quotient := QuotientGroup.mk
+    have hEq : j '' U = (qb ∘ i) '' (qa ⁻¹' U) := by
+      rw [show qb ∘ i = j ∘ qa from rfl, Set.image_comp,
+        Set.image_preimage_eq _ QuotientGroup.mk_surjective]
+    rw [hEq]
+    exact (QuotientGroup.isOpenQuotientMap_mk.isOpenMap.comp hio) _
+      (hU.preimage QuotientGroup.continuous_mk)
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hdesc b rfl
+  refine ⟨f₀ ∘ j, fun x ↦ hf₀ (i x), ?_⟩
+  intro e z d
+  -- The image of the identity-component cover is open in the larger quotient.
+  let c := elementaryCoverZeroHom (m := e.realDim) (n := e.torusDim) (r := e.latticeRank)
+    (F := e.finiteFactor)
+  let j' := MonoidHom.toAdditiveRight (j.comp e.equiv.symm.toMulEquiv.toMonoidHom)
+  have hContinuous : Continuous (j'.comp c) :=
+    hj.comp (e.equiv.symm.continuous.comp elementaryCoverZeroHom_continuous_isOpenMap.1)
+  have hOpen : IsOpenMap (j'.comp c) :=
+    hjo.comp (e.equiv.symm.toHomeomorph.isOpenMap.comp
+      elementaryCoverZeroHom_continuous_isOpenMap.2)
+  have hkClosed : IsClosed ((k.comap b.val.1.subtype : Subgroup b.val.1) : Set b.val.1) :=
+    hk.1.preimage continuous_subtype_val
+  let : LocallyCompactSpace H.val := H.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : T1Space b.quotient := QuotientGroup.t1Space_iff.mpr hkClosed
+  obtain ⟨e'⟩ := elementaryPresentation_of_open_vector_map (j'.comp c) hContinuous hOpen
+    (isCompactlyGeneratedGroup_quotient H.property.2 _ hkClosed)
+  let L := AddMonoidHom.toMultiplicative.symm
+    (e'.equiv.toMulEquiv.toMonoidHom.comp (j.comp e.equiv.symm.toMulEquiv.toMonoidHom))
+  have hL : Continuous L := e'.equiv.continuous.comp (hj.comp e.equiv.symm.continuous)
+  let φ := fun y ↦ f₀ (e'.equiv.symm (Multiplicative.ofAdd y))
+  have hs := contDiff_comp_elementaryHom L hL (f := φ) (hSmooth e') z d
+  convert hs using 1
+  funext u
+  change f₀ (j (e.equiv.symm _)) = f₀ (e'.equiv.symm (e'.equiv (j (e.equiv.symm _))))
+  rw [e'.equiv.symm_apply_apply]
+
 /-- Paper: Definition D.1.5.3(1), p. 762. The sum of two functions of class Cᵖ
 is of class Cᵖ. -/
 theorem IsBruhatContDiff.add {p : ℕ} {f g : G → ℂ}
     (hf : IsBruhatContDiff p f) (hg : IsBruhatContDiff p g) :
-    IsBruhatContDiff p (f + g) := by sorry
+    IsBruhatContDiff p (f + g) := by
+  obtain ⟨k, hk, hfk, hfd⟩ := hf
+  obtain ⟨l, hl, hgl, hgd⟩ := hg
+  refine ⟨k ⊓ l, isBruhatGoodSubgroup_inf hk hl, ?_, ?_⟩
+  · intro h x
+    exact congrArg₂ (· + ·) (hfk ⟨h, h.property.1⟩ x) (hgl ⟨h, h.property.2⟩ x)
+  · intro a ha
+    obtain ⟨f₀, hf₀, hfSmooth⟩ := bruhatContDiff_descend_of_le hk hfd a (ha ▸ inf_le_left)
+    obtain ⟨g₀, hg₀, hgSmooth⟩ := bruhatContDiff_descend_of_le hl hgd a (ha ▸ inf_le_right)
+    exact ⟨f₀ + g₀, fun x ↦ congrArg₂ (· + ·) (hf₀ x) (hg₀ x),
+      fun e z d ↦ (hfSmooth e z d).add (hgSmooth e z d)⟩
 
 /-- Paper: Definition D.1.5.3(1), p. 762. A complex scalar multiple of a function
 of class Cᵖ is of class Cᵖ. -/
 theorem IsBruhatContDiff.smul {p : ℕ} {f : G → ℂ}
-    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by sorry
+    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by
+  obtain ⟨k, hk, hInv, hDescend⟩ := hf
+  refine ⟨k, hk, fun h x ↦ congrArg (z • ·) (hInv h x), ?_⟩
+  intro a ha
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend a ha
+  exact ⟨z • f₀, fun x ↦ congrArg (z • ·) (hf₀ x),
+    fun e l b ↦ (hSmooth e l b).const_smul z⟩
 
 /-- Paper: Definition D.1.5.3(1), p. 762. The Cᵖ functions form a complex vector
 subspace of the functions on G. -/

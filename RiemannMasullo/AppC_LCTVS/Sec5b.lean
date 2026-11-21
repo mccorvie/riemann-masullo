@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
+import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 public import Mathlib.Analysis.Complex.HasPrimitives
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
@@ -1751,7 +1752,8 @@ theorem tendstoUniformlyOn_taylor_derivatives (hf : ∀ k : ℕ,
 /-- Paper: Theorem C.5.2.6, p. 738. In the quasi-complete case weak holomorphy
 implies holomorphy in the target topology. -/
 theorem WeaklyHolomorphicOn.vectorHolomorphicOn (hf : WeaklyHolomorphicOn f Ω) :
-    VectorHolomorphicOn f Ω := by sorry
+    VectorHolomorphicOn f Ω := by
+  exact (weaklyHolomorphicOn_iff_all_derivatives hΩ hconn f).mp hf 0
 
 omit [QuasiCompleteSpace ℂ E] in
 /-- Paper: (C.5.2.6), p. 739. The weak derivative evaluates each continuous
@@ -1759,7 +1761,31 @@ linear functional to the corresponding scalar complex derivative. -/
 theorem WeaklyHolomorphicOn.existsUnique_weakDerivative (hf : WeaklyHolomorphicOn f Ω)
     {z : ℂ} (hz : z ∈ Ω) (k : ℕ) :
     ∃! v : PettisWeakCompletion E, ∀ φ : StrongDual ℂ E,
-      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ = iteratedDeriv k (φ ∘ f) z := by sorry
+      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ = iteratedDeriv k (φ ∘ f) z := by
+  clear hconn
+  -- (C.5.2.6) defines the weak derivative in (E')* by scalar differentiation.
+  let v : Module.Dual ℂ (StrongDual ℂ E) :=
+    { toFun := fun φ ↦ iteratedDeriv k (φ ∘ f) z
+      map_add' := fun φ ψ ↦ by
+        have hφ : ContDiffAt ℂ k (φ ∘ f) z :=
+          ((hf φ).contDiffOn hΩ).contDiffAt (hΩ.mem_nhds hz)
+        have hψ : ContDiffAt ℂ k (ψ ∘ f) z :=
+          ((hf ψ).contDiffOn hΩ).contDiffAt (hΩ.mem_nhds hz)
+        have hsum : (φ + ψ) ∘ f = (φ ∘ f) + (ψ ∘ f) := by
+          ext w
+          simp
+        rw [hsum]
+        exact iteratedDeriv_add hφ hψ
+      map_smul' := fun c φ ↦ by
+        have hsmul : (c • φ) ∘ f = c • (φ ∘ f) := by
+          ext w
+          simp
+        rw [hsmul]
+        exact iteratedDeriv_const_smul_field c (φ ∘ f) }
+  refine ⟨v, fun _ ↦ rfl, fun w hw ↦ ?_⟩
+  apply LinearMap.ext
+  intro φ
+  exact hw φ
 
 end Criteria
 

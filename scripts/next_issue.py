@@ -9,7 +9,8 @@ Proof issues are handed out bottom-up: from the library file that sits lowest in
 graph and still has a free issue, so that a section's statements are proved before work moves
 to what is built on them. At most PER_FILE proofs are in flight in one file at a time, so that
 agents running side by side rarely collide; when the lowest file is full the next one is used.
-Issues labelled `claimed`, `blocked` or `stuck` are not free.
+Issues labelled `claimed`, `blocked` or `stuck` are not free. While the file `.agent/PAUSE` exists
+no issue is handed out.
 """
 import collections, functools, json, pathlib, re, subprocess, sys
 
@@ -63,6 +64,10 @@ def depths():
 
 
 def main(argv):
+    # A switch for the owner of the checkout: `touch .agent/PAUSE` stops agents started with
+    # `next` from taking new issues (running ones finish); `rm .agent/PAUSE` resumes.
+    if (ROOT / ".agent" / "PAUSE").exists() and "--list" not in argv:
+        sys.exit("paused: .agent/PAUSE exists, no new issue handed out")
     label = argv[0] if argv else "proof"
     free, busy = [], collections.Counter()
     taken_already = in_review()
