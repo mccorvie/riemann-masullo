@@ -12,8 +12,10 @@ import Mathlib.Analysis.Calculus.Deriv.Mul
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.Analysis.Calculus.MeanValue
+import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -685,12 +687,174 @@ theorem vectorPeriodicSmoothSubmodule_eq_weak :
     QuasiCompleteSpace ℂ E →
       vectorPeriodicSmoothSubmodule d E = weakPeriodicSmoothSubmodule d E := by sorry
 
+omit hAdd hSMul hSemi hT2 in
+/-- A vector-valued weak coordinate derivative turns into the ordinary line derivative
+after applying a continuous linear functional. -/
+private theorem HasWeakPartialOn.hasLineDerivAt_eval
+    {f g : V → E} {i : Fin d}
+    (h : HasWeakPartialOn (k := ℝ) (Ω := univ) i f
+      (fun x ↦ toPettisWeakCompletion E (g x))) (φ : StrongDual ℂ E) (x : V) :
+    HasLineDerivAt ℝ (φ ∘ f) (φ (g x)) x (EuclideanSpace.single i 1) := by
+  simpa [HasLineDerivAt, Function.comp_def, toPettisWeakCompletion_apply] using
+    h φ ⟨x, mem_univ x⟩
+
+omit hAdd hSMul hSemi hT2 in
+/-- Testing by a continuous functional preserves each finite vector differentiability order. -/
+private theorem vectorContDiffOrderOn_eval (φ : StrongDual ℂ E) {f : V → E}
+    {m : ℕ} (h : VectorContDiffOrderOn f univ m) :
+    VectorContDiffOrderOn (φ ∘ f) univ m := by
+  induction m generalizing f with
+  | zero =>
+    apply (h.image φ).subset
+    rintro _ ⟨x, hx, y, hy, hxy, hd, rfl⟩
+    exact ⟨_, ⟨x, hx, y, hy, hxy, hd, rfl⟩, by simp⟩
+  | succ m ih =>
+    intro i
+    obtain ⟨g, hg, hc, hm⟩ := h i
+    exact ⟨φ ∘ g, (hasWeakPartialOn_complex_iff i _ _).mpr (hg.hasLineDerivAt_eval φ),
+      φ.continuous.comp_continuousOn hc, ih hm⟩
+
+omit hAdd hSMul hSemi hT2 in
+/-- Testing by a continuous functional preserves every chain of coordinate derivatives. -/
+private theorem hasPartials_eval (φ : StrongDual ℂ E) (l : List (Fin d))
+    {f g : V → E} (h : HasVectorMultiPartial.hasPartials g f l) :
+    HasVectorMultiPartial.hasPartials (φ ∘ g) (φ ∘ f) l := by
+  induction l generalizing f with
+  | nil => exact congrArg (φ ∘ ·) (show f = g from h)
+  | cons i l ih =>
+    obtain ⟨f', hf', hrest⟩ := h
+    exact ⟨φ ∘ f', (hasWeakPartialOn_complex_iff i _ _).mpr (hf'.hasLineDerivAt_eval φ),
+      ih hrest⟩
+
+omit hAdd hSMul hT2 in
+/-- Weak Schwartz maps satisfy the order-zero bounded difference condition. -/
+private theorem vectorContDiffOrderOn_zero_of_weakSchwartz {f : V → E}
+    (hf : f ∈ weakSchwartzSubmodule d E) : VectorContDiffOrderOn f univ 0 := by
+  apply isVonNBounded_of_dual_bounded
+  intro φ
+  rw [weakSchwartzSubmodule, Submodule.mem_iInf] at hf
+  obtain ⟨C, hC⟩ := (NormedSpace.isVonNBounded_iff' ℂ).mp
+    ((Submodule.mem_iInf _).mp ((Submodule.mem_inf.mp (hf φ)).1) 0)
+  refine ⟨C, ?_⟩
+  rintro _ ⟨x, hx, y, hy, hxy, hd, rfl⟩
+  simpa [map_smul, map_sub] using hC _ ⟨x, hx, y, hy, hxy, hd, rfl⟩
+
+omit hSemi hT2 in
+/-- The bounded normalized differences in the order-zero condition imply continuity. -/
+private theorem continuous_of_vectorContDiffOrderOn_zero {f : V → E}
+    (hf : VectorContDiffOrderOn f univ 0) : Continuous f := by
+  apply continuous_iff_continuousAt.mpr
+  intro x
+  apply tendsto_sub_nhds_zero_iff.mp
+  have ht : Tendsto (fun y : V ↦ (‖y - x‖ : ℂ)) (𝓝 x) (𝓝 0) := by
+    have h : Continuous fun y : V ↦ (‖y - x‖ : ℂ) :=
+      Complex.continuous_ofReal.comp (continuous_id.sub continuous_const).norm
+    simpa using h.tendsto x
+  have hnear : ∀ᶠ y in 𝓝 x, ‖y - x‖ ≤ 1 := by
+    filter_upwards [Metric.ball_mem_nhds x zero_lt_one] with y hy
+    exact ((dist_eq_norm y x) ▸ (Metric.mem_ball.mp hy)).le
+  have hq : ∀ᶠ y in 𝓝 x,
+      ((‖y - x‖⁻¹ : ℝ) : ℂ) • (f y - f x) ∈
+        insert 0 {z : E | ∃ a ∈ (univ : Set V), ∃ b ∈ (univ : Set V),
+          a ≠ b ∧ ‖b - a‖ ≤ 1 ∧ z = ((‖b - a‖⁻¹ : ℝ) : ℂ) • (f b - f a)} := by
+    filter_upwards [hnear] with y hy
+    rcases eq_or_ne x y with rfl | hne
+    · simp
+    · exact mem_insert_of_mem _ ⟨x, mem_univ x, y, mem_univ y, hne, hy, rfl⟩
+  have hb := (isVonNBounded_insert (0 : E)).mpr (show IsVonNBounded ℂ _ from hf)
+  apply (hb.smul_tendsto_zero hq ht).congr
+  intro y
+  change (‖y - x‖ : ℂ) • (((‖y - x‖⁻¹ : ℝ) : ℂ) • (f y - f x)) = f y - f x
+  rcases eq_or_ne y x with rfl | hne
+  · simp
+  · rw [Complex.ofReal_inv, smul_inv_smul₀ (by simpa using sub_ne_zero.mpr hne)]
+
+/-- Each weak Schwartz coordinate derivative has a vector-valued lift which is again
+weak Schwartz, since its scalar evaluations are Schwartz directional derivatives. -/
+private theorem exists_weakSchwartz_partial {f : V → E}
+    (hf : f ∈ weakSchwartzSubmodule d E) (i : Fin d) :
+    letI := IsTopologicalAddGroup.rightUniformSpace E
+    QuasiCompleteSpace ℂ E → ∃ g : V → E, g ∈ weakSchwartzSubmodule d E ∧
+      HasWeakPartialOn (k := ℝ) (Ω := univ) i f (fun x ↦ toPettisWeakCompletion E (g x)) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  intro hqc
+  let v : V := EuclideanSpace.single i 1
+  have hscalar (φ : StrongDual ℂ E) : ∃ F : SchwartzMap V ℂ, (F : V → ℂ) = φ ∘ f :=
+    (mem_vectorSchwartzSubmodule_complex_iff _).mp ((Submodule.mem_iInf _).mp hf φ)
+  have hex (x : V) : ∃ z : E, ∀ φ : StrongDual ℂ E,
+      HasLineDerivAt ℝ (φ ∘ f) (φ z) x v := by
+    apply exists_hasDerivAt_eval_zero_of_contDiff (F := fun t : ℝ ↦ f (x + t • v)) _ hqc
+    intro φ
+    obtain ⟨F, h⟩ := hscalar φ
+    change ContDiff ℝ 2 ((φ ∘ f) ∘ fun t : ℝ ↦ x + t • v)
+    rw [← h]
+    exact (F.smooth 2).comp (by fun_prop)
+  choose g hg using hex
+  refine ⟨g, ?_, fun φ x ↦ (hg x φ).hasDerivWithinAt⟩
+  apply (Submodule.mem_iInf _).mpr
+  intro φ
+  obtain ⟨F, hF⟩ := hscalar φ
+  let G : SchwartzMap V ℂ := LineDeriv.lineDerivOp v F
+  apply (mem_vectorSchwartzSubmodule_complex_iff _).mpr
+  refine ⟨G, funext fun x ↦ ?_⟩
+  change G x = φ (g x)
+  have hG : HasLineDerivAt ℝ (F : V → ℂ) (G x) x v :=
+    (F.differentiable x).hasFDerivAt.hasLineDerivAt v
+  rw [hF] at hG
+  exact hG.unique (hg x φ)
+
 /-- Paper: Remark C.5.1.27, p. 735. In a quasi-complete target the two
 definitions of the Schwartz space agree. -/
 theorem vectorSchwartzSubmodule_eq_weak :
     letI := IsTopologicalAddGroup.rightUniformSpace E
     QuasiCompleteSpace ℂ E →
-      vectorSchwartzSubmodule d E = weakSchwartzSubmodule d E := by sorry
+      vectorSchwartzSubmodule d E = weakSchwartzSubmodule d E := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  intro hqc
+  ext f
+  rw [vectorSchwartzSubmodule, Submodule.mem_inf, Submodule.mem_iInf]
+  change ((∀ m, VectorContDiffOrderOn f univ m) ∧ HasVectorSchwartzDecay f) ↔ _
+  constructor
+  · rintro ⟨ho, hd⟩
+    apply (Submodule.mem_iInf _).mpr
+    intro φ
+    rw [Submodule.mem_comap, vectorSchwartzSubmodule, Submodule.mem_inf, Submodule.mem_iInf]
+    change (∀ m, VectorContDiffOrderOn (φ ∘ f) univ m) ∧ HasVectorSchwartzDecay (φ ∘ f)
+    refine ⟨fun m ↦ vectorContDiffOrderOn_eval φ (ho m), fun α p ↦ ?_⟩
+    obtain ⟨g, hg, hb⟩ := hd α p
+    refine ⟨φ ∘ g, hasPartials_eval φ _ hg, (hb.image φ).subset ?_⟩
+    rintro _ ⟨x, rfl⟩
+    exact ⟨_, mem_range_self x, map_smul φ _ _⟩
+  · intro hf
+    have horder (m : ℕ) {f : V → E} (hf : f ∈ weakSchwartzSubmodule d E) :
+        VectorContDiffOrderOn f univ m := by
+      induction m generalizing f with
+      | zero => exact vectorContDiffOrderOn_zero_of_weakSchwartz hf
+      | succ m ih =>
+        intro i
+        obtain ⟨g, hg, hpartial⟩ := exists_weakSchwartz_partial hf i hqc
+        exact ⟨g, hpartial, (continuous_of_vectorContDiffOrderOn_zero
+          (vectorContDiffOrderOn_zero_of_weakSchwartz hg)).continuousOn, ih hg⟩
+    have hchain (l : List (Fin d)) {f : V → E} (hf : f ∈ weakSchwartzSubmodule d E) :
+        ∃ g ∈ weakSchwartzSubmodule d E, HasVectorMultiPartial.hasPartials g f l := by
+      induction l generalizing f with
+      | nil => exact ⟨f, hf, rfl⟩
+      | cons i l ih =>
+        obtain ⟨g, hg, hpartial⟩ := exists_weakSchwartz_partial hf i hqc
+        obtain ⟨h, hh, hrest⟩ := ih hg
+        exact ⟨h, hh, g, hpartial, hrest⟩
+    refine ⟨fun m ↦ horder m hf, fun α p ↦ ?_⟩
+    obtain ⟨g, hg, hpartial⟩ := hchain
+      ((List.finRange d).flatMap fun i ↦ List.replicate (α i) i) hf
+    refine ⟨g, hpartial, isVonNBounded_of_dual_bounded fun φ ↦ ?_⟩
+    obtain ⟨F, hF⟩ := (mem_vectorSchwartzSubmodule_complex_iff (φ ∘ g)).mp
+      ((Submodule.mem_iInf _).mp hg φ)
+    let G := SchwartzMap.smulLeftCLM ℂ (fun x : V ↦ p.eval (fun i ↦ (x i : ℂ))) F
+    have hG : (G : V → ℂ) = _ :=
+      SchwartzMap.smulLeftCLM_apply (polynomial_hasTemperateGrowth p) F
+    refine ⟨SchwartzMap.seminorm ℂ 0 0 G, ?_⟩
+    rintro _ ⟨x, rfl⟩
+    simpa only [hG, hF, Function.comp_apply, map_smul] using G.norm_le_seminorm ℂ x
 
 -- TODO(paper-gap): The families in (C.5.1.45) and (C.5.1.46) do not generate
 -- the printed topology. Already for scalar functions, uniform convergence of values
