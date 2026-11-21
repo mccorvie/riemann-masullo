@@ -2605,11 +2605,170 @@ theorem ratAdeleStandardCharacter_real (a : 𝔸[ℚ]) (ha : a.2 = 0) :
   rw [ratAdeleStandardCharacter, ha]
   simp [h0', h0]
 
+/-- The local factor of the rational standard character at a finite place. -/
+private def ratLocalStandardFactor (v : Primes(ℚ)) (x : v.adicCompletion ℚ) : Circle :=
+  letI : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+    ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+  padicStandardCharacter (Rat.HeightOneSpectrum.primesEquiv v).val
+    (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v x)
+
+/-- The local factor is trivial on local integers. -/
+private theorem ratLocalStandardFactor_eq_one (v : Primes(ℚ)) {x : v.adicCompletion ℚ}
+    (hx : x ∈ v.adicCompletionIntegers ℚ) : ratLocalStandardFactor v x = 1 := by
+  let : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+    ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+  exact padicStandardCharacter_eq_one_of_norm_le_one _
+    ((Rat.HeightOneSpectrum.adicCompletion.padicEquiv_bijOn v).mapsTo hx)
+
+/-- On a diagonal rational, the local factor is the p-adic character of that rational. -/
+private theorem ratLocalStandardFactor_algebraMap (v : Primes(ℚ)) (q : ℚ) :
+    ratLocalStandardFactor v ((algebraMap ℚ 𝔸[ℚ] q).2 v) =
+      letI : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+        ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+      padicStandardCharacter (Rat.HeightOneSpectrum.primesEquiv v).val (q : ℚ_[_]) := by
+  have h : (algebraMap ℚ 𝔸[ℚ] q).2 v = (q : v.adicCompletion ℚ) :=
+    eq_ratCast (algebraMap ℚ (v.adicCompletion ℚ)) q
+  simp only [ratLocalStandardFactor, h, map_ratCast]
+
+/-- The rational standard character is the real exponential times the local factors. -/
+private theorem ratAdeleStandardCharacter_eq_factors (a : 𝔸[ℚ]) :
+    ratAdeleStandardCharacter a =
+      Circle.exp (2 * Real.pi * extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+        (a.1 Rat.infinitePlace)) * ∏ᶠ v : Primes(ℚ), ratLocalStandardFactor v (a.2 v) := rfl
+
+/-- The rational standard character is additive. -/
+private theorem ratAdeleStandardCharacter_add' (a b : 𝔸[ℚ]) :
+    ratAdeleStandardCharacter (a + b) =
+      ratAdeleStandardCharacter a * ratAdeleStandardCharacter b := by
+  let f (x : 𝔸[ℚ]) (v : Primes(ℚ)) := ratLocalStandardFactor v (x.2 v)
+  have hfinite (x : 𝔸[ℚ]) : (f x).HasFiniteMulSupport := by
+    apply Filter.eventually_cofinite.mp
+    filter_upwards [x.2.2] with v hv
+    exact ratLocalStandardFactor_eq_one v hv
+  have hsum : f (a + b) = f a * f b := by
+    funext v
+    let : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+      ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+    change padicStandardCharacter _ (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v
+        (a.2 v + b.2 v)) =
+      padicStandardCharacter _ (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v (a.2 v)) *
+        padicStandardCharacter _ (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v (b.2 v))
+    rw [map_add, padicStandardCharacter_add]
+  have hreal : extensionEmbeddingOfIsReal Rat.isReal_infinitePlace ((a + b).1 Rat.infinitePlace) =
+      extensionEmbeddingOfIsReal Rat.isReal_infinitePlace (a.1 Rat.infinitePlace) +
+        extensionEmbeddingOfIsReal Rat.isReal_infinitePlace (b.1 Rat.infinitePlace) :=
+    map_add (extensionEmbeddingOfIsReal Rat.isReal_infinitePlace) _ _
+  rw [ratAdeleStandardCharacter_eq_factors, ratAdeleStandardCharacter_eq_factors,
+    ratAdeleStandardCharacter_eq_factors, hreal, mul_add, Circle.exp_add]
+  change _ * (∏ᶠ v, f (a + b) v) = (_ * ∏ᶠ v, f a v) * (_ * ∏ᶠ v, f b v)
+  rw [hsum]
+  simp only [Pi.mul_apply, finprod_mul_distrib (hfinite a) (hfinite b)]
+  ac_rfl
+
+/-- The p-adic character of a reciprocal prime power is trivial away from that prime. -/
+private theorem padicStandardCharacter_inv_prime_pow (l : ℕ) [Fact l.Prime] {p : ℕ}
+    (hp : p.Prime) (k : ℕ) :
+    padicStandardCharacter l (((1 / (p : ℚ) ^ k : ℚ)) : ℚ_[l]) =
+      if l = p then Circle.exp (-(2 * Real.pi * (1 / (p : ℝ) ^ k))) else 1 := by
+  split_ifs with hl
+  · subst hl
+    have := padicStandardCharacter_div_pow l 1 k
+    simpa using this
+  · apply padicStandardCharacter_eq_one_of_norm_le_one
+    have hcop : ¬ (l : ℤ) ∣ (p : ℤ) := by
+      rw [Int.natCast_dvd_natCast]
+      exact fun h ↦ hl ((Nat.prime_dvd_prime_iff_eq (Fact.out) hp).mp h)
+    have hnorm : ‖((p : ℚ) : ℚ_[l])‖ = 1 := by
+      have h := le_antisymm (Padic.norm_int_le_one (p : ℤ))
+        (not_lt.mp fun h ↦ hcop (Padic.norm_intCast_lt_one_iff.mp h))
+      exact_mod_cast h
+    rw [Rat.cast_div, Rat.cast_one, Rat.cast_pow, norm_div, norm_one, norm_pow, hnorm, one_pow,
+      div_one]
+
 /-- Paper: Example A.3.1.8, p. 558. The global rational character is trivial on the
 diagonally embedded rational numbers. The paper uses this without stating it; it is what
 Poisson summation over the rationals needs, and it fails for the signs as printed. -/
 theorem ratAdeleStandardCharacter_algebraMap (q : ℚ) :
-    ratAdeleStandardCharacter (algebraMap ℚ 𝔸[ℚ] q) = 1 := by sorry
+    ratAdeleStandardCharacter (algebraMap ℚ 𝔸[ℚ] q) = 1 := by
+  classical
+  -- The character restricted to the diagonal is a homomorphism from the rationals.
+  let Ψ : Multiplicative ℚ →* Circle :=
+    { toFun := fun x ↦ ratAdeleStandardCharacter (algebraMap ℚ 𝔸[ℚ] x.toAdd)
+      map_one' := by
+        have h := ratAdeleStandardCharacter_add' 0 0
+        rw [add_zero] at h
+        simpa using h
+      map_mul' := fun x y ↦ by
+        simp only [toAdd_mul, map_add]
+        exact ratAdeleStandardCharacter_add' _ _ }
+  have hΨ (x : ℚ) : Ψ (Multiplicative.ofAdd x) =
+      ratAdeleStandardCharacter (algebraMap ℚ 𝔸[ℚ] x) := rfl
+  have hreal (x : ℚ) : extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+      ((algebraMap ℚ 𝔸[ℚ] x).1 Rat.infinitePlace) = x := by
+    have h : (algebraMap ℚ 𝔸[ℚ] x).1 Rat.infinitePlace = (x : Rat.infinitePlace.Completion) :=
+      eq_ratCast (algebraMap ℚ Rat.infinitePlace.Completion) x
+    rw [h, map_ratCast]
+  -- Integers.
+  have hint (n : ℤ) : Ψ (Multiplicative.ofAdd (n : ℚ)) = 1 := by
+    rw [hΨ, ratAdeleStandardCharacter_eq_factors, hreal]
+    rw [finprod_eq_one_of_forall_eq_one fun v ↦ ?_, mul_one]
+    · rw [Rat.cast_intCast, mul_comm]
+      exact Circle.exp_int_mul_two_pi n
+    · let : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+        ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+      rw [ratLocalStandardFactor_algebraMap]
+      apply padicStandardCharacter_eq_one_of_norm_le_one
+      rw [Rat.cast_intCast]
+      exact Padic.norm_int_le_one n
+  -- Reciprocal prime powers.
+  have hprime (p : ℕ) (hp : p.Prime) (k : ℕ) :
+      Ψ (Multiplicative.ofAdd (1 / (p : ℚ) ^ k)) = 1 := by
+    let v₀ : Primes(ℚ) := Rat.HeightOneSpectrum.primesEquiv.symm ⟨p, hp⟩
+    have hv₀ : (Rat.HeightOneSpectrum.primesEquiv v₀).val = p := by
+      exact congrArg Subtype.val
+        (Rat.HeightOneSpectrum.primesEquiv.apply_symm_apply (⟨p, hp⟩ : Nat.Primes))
+    rw [hΨ, ratAdeleStandardCharacter_eq_factors, hreal]
+    rw [finprod_eq_single _ v₀ fun v hv ↦ ?_]
+    · let : Fact (Rat.HeightOneSpectrum.primesEquiv v₀).val.Prime :=
+        ⟨(Rat.HeightOneSpectrum.primesEquiv v₀).property⟩
+      rw [ratLocalStandardFactor_algebraMap, padicStandardCharacter_inv_prime_pow _ hp]
+      simp only [hv₀, ↓reduceIte]
+      rw [← Circle.exp_add]
+      push_cast
+      rw [add_neg_cancel, Circle.exp_zero]
+    · let : Fact (Rat.HeightOneSpectrum.primesEquiv v).val.Prime :=
+        ⟨(Rat.HeightOneSpectrum.primesEquiv v).property⟩
+      have hne : (Rat.HeightOneSpectrum.primesEquiv v).val ≠ p := fun h ↦
+        hv (Rat.HeightOneSpectrum.primesEquiv.injective (Subtype.ext (h.trans hv₀.symm)))
+      rw [ratLocalStandardFactor_algebraMap, padicStandardCharacter_inv_prime_pow _ hp]
+      simp only [hne, ↓reduceIte]
+  -- Every rational with a given denominator, by induction on the denominator.
+  have hden (b : ℕ) : ∀ a : ℤ, Ψ (Multiplicative.ofAdd ((a : ℚ) / b)) = 1 := by
+    induction b using Nat.recOnPosPrimePosCoprime with
+    | prime_pow p k hp hk =>
+      intro a
+      have h := congrArg (· ^ a) (hprime p hp k)
+      simp only [one_zpow, ← map_zpow, ← ofAdd_zsmul, zsmul_eq_mul] at h
+      rw [Nat.cast_pow, div_eq_mul_one_div]
+      exact h
+    | zero => intro a; simp
+    | one => intro a; simpa using hint a
+    | coprime m n hm hn hmn ihm ihn =>
+      intro a
+      obtain ⟨s, t, hst⟩ : ∃ s t : ℤ, s * m + t * n = 1 := by
+        refine ⟨Nat.gcdA m n, Nat.gcdB m n, ?_⟩
+        rw [mul_comm _ (m : ℤ), mul_comm _ (n : ℤ), ← Nat.gcd_eq_gcd_ab, hmn, Nat.cast_one]
+      have hm0 : (m : ℚ) ≠ 0 := by exact_mod_cast (by omega : m ≠ 0)
+      have hn0 : (n : ℚ) ≠ 0 := by exact_mod_cast (by omega : n ≠ 0)
+      have hsplit : (a : ℚ) / ((m * n : ℕ) : ℚ) = ((a * t : ℤ) : ℚ) / m + ((a * s : ℤ) : ℚ) / n := by
+        have hst' : (s : ℚ) * m + t * n = 1 := by exact_mod_cast hst
+        rw [eq_comm, div_add_div _ _ hm0 hn0, div_eq_div_iff (mul_ne_zero hm0 hn0)
+          (by push_cast; exact mul_ne_zero hm0 hn0)]
+        push_cast
+        linear_combination ((a : ℚ) * m * n) * hst'
+      rw [hsplit, ofAdd_add, map_mul, ihm, ihn, one_mul]
+  have hq := hden q.den q.num
+  rwa [Rat.num_div_den] at hq
 
 section RatAdeleSelfDuality
 
@@ -2992,7 +3151,40 @@ def adeleStandardCharacter (a : 𝔸[F]) : Circle :=
 /-- Paper: Example A.3.1.9, p. 558. The standard adelic character is trivial on the
 diagonally embedded field, which is what Theorem 2.2.3.2 and Theorem 3.2.2.1 need. -/
 theorem adeleStandardCharacter_algebraMap (x : F) :
-    adeleStandardCharacter F (algebraMap F 𝔸[F] x) = 1 := by sorry
+    adeleStandardCharacter F (algebraMap F 𝔸[F] x) = 1 := by
+  classical
+  -- The adelic trace of a diagonal element is the diagonal field trace.
+  let ι := Fin (Module.finrank ℚ F)
+  let dQ := algebraMap ℚ 𝔸[ℚ]
+  let dF := algebraMap F 𝔸[F]
+  let : Algebra 𝔸[ℚ] 𝔸[F] := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b₀, hb₀⟩ := exists_adelicIntegralBasis F
+  let reindex : Module.Free.ChooseBasisIndex ℤ (𝓞 F) ≃ ι :=
+    (Fintype.equivFin _).trans (finCongr (Module.finrank_eq_card_basis (integralBasis F)).symm)
+  let c := (integralBasis F).reindex reindex
+  let b := b₀.reindex reindex
+  have hb (i : ι) : b i = dF (c i) := by
+    simpa only [b, c, Module.Basis.reindex_apply] using hb₀ (reindex.symm i)
+  have hdiag (q : ι → ℚ) : b.equivFun.symm (dQ ∘ q) = dF (c.equivFun.symm q) := by
+    rw [Module.Basis.equivFun_symm_apply, Module.Basis.equivFun_symm_apply, map_sum]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    simp only [hb, Function.comp_apply, Algebra.smul_def, map_mul]
+    exact congrArg (· * dF (c i)) ((rationalAdeleEmbedding_spec F).2.1 (q i))
+  have hrepr (y : F) (i : ι) : b.repr (dF y) i = dQ (c.repr y i) := by
+    have h := hdiag (c.equivFun y)
+    rw [LinearEquiv.symm_apply_apply] at h
+    rw [← h, ← Module.Basis.equivFun_apply, LinearEquiv.apply_symm_apply]
+    rfl
+  have htrace : Algebra.trace 𝔸[ℚ] 𝔸[F] (dF x) = dQ (Algebra.trace ℚ F x) := by
+    rw [Algebra.trace_eq_matrix_trace b, Algebra.trace_eq_matrix_trace c, AddMonoidHom.map_trace]
+    congr 1
+    ext i j
+    change (Algebra.leftMulMatrix b (dF x)) i j = dQ ((Algebra.leftMulMatrix c x) i j)
+    rw [Algebra.leftMulMatrix_eq_repr_mul, Algebra.leftMulMatrix_eq_repr_mul, hb, ← map_mul,
+      hrepr]
+  change ratAdeleStandardCharacter (Algebra.trace 𝔸[ℚ] 𝔸[F] (dF x)) = 1
+  rw [htrace]
+  exact ratAdeleStandardCharacter_algebraMap _
 
 /-- Paper: Example A.3.1.9, p. 558. The standard adelic character reduces to the
 rational adelic character for the rational field. -/
