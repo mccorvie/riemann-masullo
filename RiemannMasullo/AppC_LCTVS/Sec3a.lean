@@ -2121,7 +2121,22 @@ theorem hilbertTrace_smulRight (φ : H →L[ℂ] ℂ) (y : H) :
 /-- Paper: Definition C.3.4.2(1), p. 697. The Hilbert-space trace is the
 nuclear trace from Proposition C.3.2.1 on the same endomorphism. -/
 theorem hilbertTrace_eq_nuclearTrace (T : nuclearEndomorphisms H) :
-    hilbertTrace T = nuclearTrace hilbert_approximationProperty T.val T.property := by sorry
+    hilbertTrace T = nuclearTrace hilbert_approximationProperty T.val T.property := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation T.val).mp T.property
+  obtain ⟨C, hC₀, hC⟩ :=
+    ((NormedSpace.equicontinuous_tfae r.functional).out 1 7).mp r.equicontinuous
+  obtain ⟨D, hD⟩ :=
+    ((NormedSpace.isVonNBounded_iff ℂ).mp r.isBanachDisc.bounded).exists_norm_le
+  have hcost : Summable (fun n ↦ ‖r.coeff n‖ * (‖r.functional n‖ * ‖(r.vector n : H)‖)) := by
+    refine (r.summable_coeff.mul_right (C * D)).of_nonneg_of_le (fun n ↦ by positivity) ?_
+    intro n
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hC n) (hD _ (r.vector_mem n)) (norm_nonneg _) hC₀) (norm_nonneg _)
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have htrace := ((exists_nuclearTrace_hasSum hilbert_approximationProperty
+    T.val T.property).exists.choose_spec r).2
+  exact (tsum_hilbertDiagonal_eq_series b T.val r.coeff r.functional
+    (fun n ↦ (r.vector n : H)) hcost r.hasSum).trans htrace.tsum_eq
 
 /-- Paper: Definition C.3.4.2(2), p. 697. The trace norm of a nuclear operator
 sums the real diagonal entries of the positive square root of its adjoint
