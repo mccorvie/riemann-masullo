@@ -1478,7 +1478,41 @@ compact subgroup of the dual. -/
 theorem bruhatDiffSymbol_compact_invariant (D : bruhatDiffAlgebra G)
     (K : Subgroup (PontryaginDual G)) (hK : IsCompact (K : Set (PontryaginDual G)))
     (χ : PontryaginDual G) (k : K) :
-    bruhatDiffSymbol D (χ * k.val) = bruhatDiffSymbol D χ := by sorry
+    bruhatDiffSymbol D (χ * k.val) = bruhatDiffSymbol D χ := by
+  let U := lcaDualAnnihilator K
+  have hU : IsOpen (U : Set G) := by
+    convert (isOpen_lcaAnnihilator K hK).preimage
+      (pontryaginDual_eval (G := G)).continuous using 1
+    ext x
+    exact (mem_lcaDualAnnihilator_iff K x).trans
+      (mem_lcaAnnihilator_iff K (pontryaginDual_eval x)).symm
+  -- Every operator in the generated algebra preserves agreement on the open annihilator.
+  have hD : ∀ (f g : bruhatSmoothSubmodule (G := G)), EqOn f.val g.val U →
+      EqOn (D.val f).val (D.val g).val U := by
+    refine Algebra.adjoin_induction (s := range (bruhatFirstOrder (G := G)))
+      (p := fun A _ ↦ ∀ (f g : bruhatSmoothSubmodule (G := G)), EqOn f.val g.val U →
+        EqOn (A f).val (A g).val U) ?_ ?_ ?_ ?_ D.property
+    · rintro _ ⟨a, rfl⟩ f g hfg x hx
+      rw [bruhatFirstOrder_apply, bruhatFirstOrder_apply, bruhatDirectionalDeriv]
+      have hOrbit : Continuous (fun t : ℝ ↦ x * a (Multiplicative.ofAdd t)) :=
+        continuous_const.mul a.continuous
+      have hAt : x * a (Multiplicative.ofAdd (0 : ℝ)) = x := by
+        change x * a 1 = x
+        rw [map_one, mul_one]
+      have hNear := hOrbit.tendsto' 0 x hAt (hU.mem_nhds hx)
+      exact EventuallyEq.deriv_eq (mem_of_superset hNear fun _ ht ↦ hfg ht)
+    · intro c f g hfg x hx
+      change (c • f).val x = (c • g).val x
+      simp only [Submodule.coe_smul, Pi.smul_apply, hfg hx]
+    · intro A B _ _ hA hB f g hfg x hx
+      simp only [LinearMap.add_apply, Submodule.coe_add, Pi.add_apply, hA f g hfg hx, hB f g hfg hx]
+    · intro A B _ _ hA hB f g hfg
+      exact hA (B f) (B g) (hB f g hfg)
+  refine hD ⟨_, pontryaginDual_mem_bruhatSmooth (χ * k.val)⟩
+    ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩ (fun x hx ↦ ?_) U.one_mem
+  have hkx : k.val x = 1 := (mem_lcaDualAnnihilator_iff K x).mp hx k
+  change (↑(χ x * k.val x) : ℂ) = ↑(χ x)
+  rw [hkx, mul_one]
 
 /-- Paper: Lemma D.1.6.14, p. 769. Real first-order operators correspond
 bijectively and real-linearly to continuous real-valued homomorphisms on the dual.
