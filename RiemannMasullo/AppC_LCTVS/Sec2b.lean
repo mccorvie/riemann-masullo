@@ -3882,7 +3882,14 @@ theorem precompactConvergenceCLM_eq_bounded_of_isNuclearTVS (hE : IsNuclearTVS.{
     (F : Type*) [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
     [PolynormableSpace ℂ F] [T2Space F] :
     (inferInstance : TopologicalSpace (PrecompactConvergenceCLM E F)) =
-      (inferInstance : TopologicalSpace (E →L[ℂ] F)) := by sorry
+      (inferInstance : TopologicalSpace (E →L[ℂ] F)) := by
+  have hsets : {S : Set E | IsPrecompactInCompletion S} = {S | IsVonNBounded ℂ S} := by
+    ext S
+    exact ⟨fun hS ↦ ((isPrecompactInCompletion_iff_totallyBounded S).mp hS).isVonNBounded ℂ,
+      isPrecompactInCompletion_of_isNuclearTVS E hE⟩
+  let convergenceTopology (S : Set (Set E)) : TopologicalSpace (E →L[ℂ] F) :=
+    UniformConvergenceCLM.instTopologicalSpace (RingHom.id ℂ) F S
+  exact congrArg convergenceTopology hsets
 
 /-- Paper: Lemma C.2.4.16(2), p. 690. Finite-rank endomorphisms of a nuclear
 space are dense for uniform convergence on precompact sets. -/
