@@ -472,7 +472,18 @@ theorem regulator_closed : IsClosed (Set.range (Units.logEmbedding F)) := by
 /-- Paper: Lemma A.2.3.4(1), p. 548. The quotient of the hyperplane by the regulator
 image is compact. -/
 theorem regulator_cocompact : CompactSpace (logSpace F ⧸ (Units.logEmbedding F).range) := by
-  sorry
+  let q := QuotientAddGroup.mk' (Units.logEmbedding F).range
+  have hq : IsCompact (Set.range q) := by
+    refine IsZLattice.isCompact_range_of_periodic (Units.unitLattice F) q
+      QuotientAddGroup.continuous_mk ?_
+    intro z w hw
+    have hw' : w ∈ (Units.logEmbedding F).range := by
+      simpa only [Units.unitLattice, Submodule.map_top, LinearMap.mem_range,
+        AddMonoidHom.mem_range, AddMonoidHom.coe_toIntLinearMap] using hw
+    have hqw : q w = 0 := (QuotientAddGroup.eq_zero_iff w).mpr hw'
+    rw [map_add, hqw, add_zero]
+  rw [(QuotientAddGroup.mk'_surjective _).range_eq] at hq
+  exact ⟨hq⟩
 
 /-- Paper: Lemma A.2.3.4(2), p. 548. The regulator kernel is exactly the torsion subgroup. -/
 theorem regulator_kernel : (Units.logEmbedding F).ker = (Units.torsion F).toAddSubgroup :=
