@@ -1220,6 +1220,111 @@ local notation "halfPlane" => Complex.re ⁻¹' Ioi (1 : ℝ)
 -- TODO(paper-gap): In Lemma B.1.1.2 the exponent must be allowed to depend on
 -- the strip. For ζ on each line σ < 0 the growth order is 1/2 - σ.
 
+/-- The finite Dirichlet series is bounded on every closed half-plane strictly to the right of
+one. The absolute series at the real endpoint majorizes the series throughout the half-plane. -/
+private theorem finiteHeckeL_continuation_boundedOn_right (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) {r : ℝ} (hr : 1 < r) :
+    ∃ C : ℝ, ∀ s : ℂ, r ≤ s.re → ‖L s‖ ≤ C := by
+  let c := (ideleClassNormTwist χ 0).LFunction
+  have hsum : Summable (fun n ↦ ‖LSeries.term c (r : ℂ) n‖) :=
+    (finiteHeckeL_seriesSummable χ ⟨(r : ℂ), by simpa using hr⟩).norm
+  refine ⟨∑' n, ‖LSeries.term c (r : ℂ) n‖, fun s hs ↦ ?_⟩
+  have hs' : 1 < s.re := hr.trans_le hs
+  rw [show L s = finiteHeckeL χ ⟨s, hs'⟩ from hSeries ⟨s, hs'⟩]
+  change ‖∑' n, LSeries.term c s n‖ ≤ _
+  have hsSum : Summable (fun n ↦ ‖LSeries.term c s n‖) :=
+    (finiteHeckeL_seriesSummable χ ⟨s, hs'⟩).norm
+  exact (norm_tsum_le_tsum_norm hsSum).trans
+    (hsSum.tsum_le_tsum (LSeries.norm_term_le_of_re_le_re c (by simpa using hs)) hsum)
+
+/-- On any right half-plane the finite continuation has only finitely many poles, all simple.
+The completed continuation has this property, and its reciprocal gamma factor is entire. -/
+private theorem exists_analyticOnNhd_isTheta_finiteHeckeL_continuation
+    (χ : U[F]) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) (a : ℝ) :
+    ∃ G : ℂ → ℂ, AnalyticOnNhd ℂ G (Complex.re ⁻¹' Ioi a) ∧
+      G =Θ[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioi a)] L := by
+  obtain ⟨Λ, hΛ, hΛSeries⟩ := completedHeckeL_exists_continuation χ
+  let R (s : ℂ) := (heckeGammaFactor χ s)⁻¹
+  let H := Λ * R
+  have hR := differentiable_inv_heckeGammaFactor χ
+  have hH : MeromorphicOn H univ := fun s hs ↦
+    (hΛ hs).meromorphicAt.mul (hR.analyticAt s).meromorphicAt
+  have hAgree : ∀ s : halfPlane, (L - H) s = 0 := by
+    intro s
+    have hne := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans s.property)
+    change L s - Λ s * (heckeGammaFactor χ s)⁻¹ = 0
+    rw [hSeries s, hΛSeries s, completedHeckeL, finiteHeckeL]
+    rw [mul_comm (heckeGammaFactor χ s), mul_assoc, mul_inv_cancel₀ hne, mul_one, sub_self]
+  have hAtTwo : meromorphicOrderAt (L - H) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ s : ℂ in 𝓝 (2 : ℂ), 1 < s.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun s hs ↦ hAgree ⟨s, hs⟩
+  have hOrd (s : ℂ) :
+      meromorphicOrderAt L s = meromorphicOrderAt Λ s + meromorphicOrderAt R s := by
+    have ho := (hL.meromorphicOn.sub hH).meromorphicOrderAt_eq_top_of_isPreconnected
+      isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) hAtTwo
+    have he : L =ᶠ[𝓝[≠] s] H := (meromorphicOrderAt_eq_top_iff.mp ho).mono fun z hz ↦
+      sub_eq_zero.mp hz
+    rw [meromorphicOrderAt_congr he]
+    exact meromorphicOrderAt_mul (hΛ (mem_univ s)).meromorphicAt (hR.analyticAt s).meromorphicAt
+  have hCompare (s : ℂ) : meromorphicOrderAt Λ s ≤ meromorphicOrderAt L s := by
+    rw [hOrd]
+    exact le_add_of_nonneg_right (hR.analyticAt s).meromorphicOrderAt_nonneg
+  have hPoles : ∃ S : Set ℂ, S.Finite ∧
+      (∀ s ∉ S, AnalyticAt ℂ Λ s) ∧ ∀ s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt Λ s := by
+    have hNeg : (-1 : WithTop ℤ) ≤ 0 := by decide
+    by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · obtain ⟨t, ⟨_, hp, hq, ha⟩, _⟩ :=
+        completedHeckeL_continuation_simplePoles χ Λ hΛ hΛSeries hχ
+      refine ⟨_, (finite_singleton (1 + Complex.I * (t : ℂ))).insert _, ha, fun s ↦ ?_⟩
+      by_cases h : s = Complex.I * (t : ℂ)
+      · rw [h, hp]
+      by_cases h' : s = 1 + Complex.I * (t : ℂ)
+      · rw [h', hq]
+      exact hNeg.trans (ha s (by simp [h, h'])).meromorphicOrderAt_nonneg
+    · have h := completedHeckeL_continuation_entire χ Λ hΛ hΛSeries hχ
+      exact ⟨∅, finite_empty, fun s _ ↦ h.analyticAt s, fun s ↦
+        hNeg.trans (h.analyticAt s).meromorphicOrderAt_nonneg⟩
+  obtain ⟨S, hS, hAway, hLower⟩ := hPoles
+  apply exists_analyticOnNhd_isTheta_atHeight (fun {_} _ ↦ hL (mem_univ _))
+  · refine hS.subset fun s hs ↦ ?_
+    by_contra h
+    exact (not_lt_of_ge ((hAway s h).meromorphicOrderAt_nonneg.trans (hCompare s))) hs.2
+  · intro s _ hs
+    have hBound := (hLower s).trans (hCompare s)
+    generalize meromorphicOrderAt L s = m at hs hBound ⊢
+    cases m with
+    | top => simp at hs
+    | coe m =>
+      have hm₁ : (-1 : ℤ) ≤ m := WithTop.coe_le_coe.mp hBound
+      have hm₂ : m < (0 : ℤ) := WithTop.coe_lt_coe.mp hs
+      have hm : m = -1 := by omega
+      simp [hm]
+
+/-- A preliminary exponential bound for the finite continuation on a fixed strip.
+Tate's split zeta integral gives boundedness of the completed function at large height, and
+reciprocal gamma factors cost at most an exponential in the absolute height. -/
+theorem finiteHeckeL_continuation_isBigO_exp (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (a b : ℝ) (hab : a < b) :
+    ∃ B : ℝ, 0 < B ∧ L =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)]
+      fun s ↦ Real.exp (B * |s.im|) := by
+  sorry
+
+/-- Paper: Equations (B.1.1.9)–(B.1.1.11), p. 590. On each negative half-integer line,
+the explicit functional equation bounds the finite continuation by a power of the height.
+The conductor factor has constant norm on that line, and the reflected series is absolutely
+convergent. After conjugation the two gamma arguments differ by `k + 1` at real places and
+`2 * (k + 1)` at complex places, so their quotients reduce in norm to finite products. -/
+theorem finiteHeckeL_continuation_isBigO_pow_on_neg_halfInteger_line
+    (χ : U[F]) (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) (k : ℕ) :
+    ∃ n : ℕ, 0 < n ∧ L =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {-(k : ℝ) - 1 / 2})]
+      fun s ↦ |s.im| ^ n := by
+  sorry
+
 /-- Paper: Lemma B.1.1.2, p. 590. The finite L-function of a unitary Hecke
 character grows at most polynomially on each fixed closed vertical strip.
 Deviation: `M` is chosen after the strip endpoints, as required even for ζ. -/
@@ -1227,7 +1332,46 @@ theorem finiteHeckeL_continuation_isBigO_rpow (χ : U[F]) (L : ℂ → ℂ)
     (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
     (a b : ℝ) (hab : a < b) :
     ∃ M : ℝ, 0 < M ∧ L =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun s ↦ |s.im| ^ M := by
-  sorry
+  obtain ⟨k, hk⟩ := exists_nat_gt (-a)
+  let l : ℝ := -(k : ℝ) - 1 / 2
+  let u : ℝ := max b 2
+  have hl : l ≤ a := by dsimp [l]; linarith
+  have hu : b ≤ u := le_max_left _ _
+  have hlu := hl.trans_lt (hab.trans_le hu)
+  let strip (S : Set ℝ) := atHeight ⊓ 𝓟 (Complex.re ⁻¹' S)
+  have hFilter {S₁ S₂ : Set ℝ} (h : S₁ ⊆ S₂) : strip S₁ ≤ strip S₂ :=
+    inf_le_inf_left _ (principal_mono.mpr (preimage_mono h))
+  have hHeight {S : Set ℝ} : Tendsto (fun s : ℂ ↦ |s.im|) (strip S) atTop :=
+    tendsto_inf_left tendsto_comap
+  obtain ⟨G, hG, hGL⟩ := exists_analyticOnNhd_isTheta_finiteHeckeL_continuation χ L hL hSeries (l - 1)
+  have hSub : Icc l u ⊆ Ioi (l - 1) := fun _ hs ↦
+    (sub_lt_self l zero_lt_one).trans_le hs.1
+  have hStrip := hFilter hSub
+  have hLeftFilter : strip {l} ≤ strip (Ioi (l - 1)) :=
+    hFilter (singleton_subset_iff.mpr (sub_lt_self l zero_lt_one))
+  have hRightFilter : strip {u} ≤ strip (Ioi (l - 1)) :=
+    hFilter (singleton_subset_iff.mpr ((sub_lt_self l zero_lt_one).trans hlu))
+  obtain ⟨n, hn, hLeft⟩ := finiteHeckeL_continuation_isBigO_pow_on_neg_halfInteger_line χ L hL hSeries k
+  have hLeftG : G =O[strip {l}] fun s ↦ |s.im| ^ n :=
+    (hGL.isBigO.mono hLeftFilter).trans hLeft
+  obtain ⟨C, hC⟩ := finiteHeckeL_continuation_boundedOn_right χ L hSeries
+    (r := u) (one_lt_two.trans_le (le_max_right _ _))
+  have hRightG : G =O[strip {u}] fun s ↦ |s.im| ^ n := by
+    apply (hGL.isBigO.mono hRightFilter).trans
+    refine Asymptotics.IsBigO.of_bound (max C 0) ?_
+    have hLine : ∀ᶠ s in strip {u}, s.re = u :=
+      eventually_inf_principal.mpr (Eventually.of_forall fun _ hs ↦ hs)
+    filter_upwards [hLine, hHeight.eventually_ge_atTop (1 : ℝ)] with s hs ht
+    rw [Real.norm_of_nonneg (pow_nonneg (abs_nonneg _) _)]
+    exact ((hC s hs.ge).trans (le_max_left _ _)).trans
+      (le_mul_of_one_le_right (le_max_right _ _) (one_le_pow₀ ht))
+  obtain ⟨B, _, hExp⟩ := finiteHeckeL_continuation_isBigO_exp χ L hL hSeries l u hlu
+  have hGPoly := isBigO_pow_verticalStrip_of_exp hlu
+    (hG.differentiableOn.mono (preimage_mono hSub))
+    ((hGL.isBigO.mono hStrip).trans hExp) hLeftG hRightG
+  refine ⟨(n : ℝ), by exact_mod_cast hn, ?_⟩
+  simpa only [Real.rpow_natCast] using ((hGL.symm.isBigO.mono hStrip).trans hGPoly).mono
+    (hFilter (Icc_subset_Icc hl hu))
 
 /-- Paper: Equation (B.1.1.10), p. 590. The reflection factor in the functional
 equation satisfies the stated power bound on every fixed closed vertical strip. -/

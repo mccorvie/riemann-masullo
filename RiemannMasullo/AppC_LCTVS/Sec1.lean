@@ -26,6 +26,7 @@ import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.Quotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Pointwise
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
+import RiemannMasullo.ForMathlib.Topology.Maps.Strict.Module
 import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-!
@@ -2471,20 +2472,6 @@ private theorem isInjectiveLCLimit_quotientStages [ContinuousSMul ℂ E]
     rw [hseminorms]
     exact (PolynormableSpace.withSeminorms ℂ (E ⧸ F)).withSeminorms_eq
 
-/-- In a strict Fréchet system, the limit topology on a stepwise closed subspace agrees
-with its inherited topology exactly when the quotient system is acyclic.
-This is the exact-sequence criterion for limit subspaces used in Wengenroth's Corollary 3.4.
-Apply the direct-sum difference maps to the short exact sequence of the stage subspaces,
-original stages, and quotient stages. The first two systems are strict, hence acyclic. -/
-private theorem isAcyclicSystem_quotientStages_iff
-    [ContinuousSMul ℂ E] [T2Space E] (hX : ∀ k, IsFrechetTVS (X k))
-    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
-    (hj : ∀ k, IsEmbedding (j k)) (F : Submodule ℂ E)
-    (hF : ∀ k, IsClosed (i k ⁻¹' (F : Set E))) :
-    IsAcyclicSystem (limitQuotientTransition h F) ↔
-      (inferInstance : TopologicalSpace F) = limitSubspaceTopology i F := by
-  sorry
-
 end QuotientStages
 
 /-- A quotient retains the Schwartz property. Pull back each continuous seminorm and
@@ -4115,6 +4102,332 @@ private theorem IsInjectiveLCLimit.isEmbedding_directSumDifference_of_compact_st
   exact IsEmbedding.subtypeVal.comp homeo.isEmbedding
 
 end MontelLimits
+
+section QuotientStageAcyclicity
+
+variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+  {X Y : ℕ → Type*} [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)]
+  [∀ k, TopologicalSpace (X k)] [∀ k, AddCommGroup (Y k)] [∀ k, Module ℂ (Y k)]
+  [∀ k, TopologicalSpace (Y k)]
+
+/-- The final locally convex topology on a direct sum makes a linear map into a
+polynormable space continuous whenever its restrictions to the summands are continuous. -/
+private theorem continuous_directSum [PolynormableSpace ℂ E]
+    (f : (⨁ k, X k) →ₗ[ℂ] E)
+    (hf : ∀ k, Continuous (f ∘ DirectSum.lof ℂ ℕ X k)) :
+    @Continuous (⨁ k, X k) E
+      (locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)) _ f := by
+  let lof := DirectSum.lof ℂ ℕ X
+  let : TopologicalSpace (⨁ k, X k) := locallyConvexFinalTopology lof
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ (⨁ k, X k) // ∀ k, Continuous (p ∘ lof k)} → _) :=
+    ⟨rfl⟩
+  apply (PolynormableSpace.withSeminorms ℂ E).continuous_of_continuous_comp
+  exact fun p ↦ hP.continuous_seminorm ⟨p.val.comp f, fun k ↦ p.property.comp (hf k)⟩
+
+/-- A direct sum of linear quotient maps is a quotient map for the locally convex
+direct-sum topologies. -/
+private theorem isQuotientMap_directSum_lmap
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, IsTopologicalAddGroup (Y k)]
+    (f : ∀ k, X k →ₗ[ℂ] Y k) (hf : ∀ k, IsQuotientMap (f k)) :
+    let := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    let := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Y)
+    IsQuotientMap (DirectSum.lmap f) := by
+  let D := ⨁ k, X k
+  let T := ⨁ k, Y k
+  let lofD := DirectSum.lof ℂ ℕ X
+  let lofT := DirectSum.lof ℂ ℕ Y
+  let : TopologicalSpace D := locallyConvexFinalTopology lofD
+  let : TopologicalSpace T := locallyConvexFinalTopology lofT
+  let q : D →ₗ[ℂ] T := DirectSum.lmap f
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lofD k)} → _) := ⟨rfl⟩
+  have hT : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ T // ∀ k, Continuous (p ∘ lofT k)} → _) := ⟨rfl⟩
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  let : PolynormableSpace ℂ T := hT.toPolynormableSpace
+  let : PolynormableSpace ℂ (D ⧸ q.ker) := polynormableSpace_quotient q.ker
+  have hsurj : Function.Surjective q := (DirectSum.lmap_surjective f).mpr fun k ↦ (hf k).surjective
+  let e := q.quotKerEquivOfSurjective hsurj
+  have hc : Continuous q := continuous_directSum q fun k ↦ by
+    change Continuous (fun x ↦ DirectSum.lmap f (DirectSum.lof ℂ ℕ X k x))
+    simp only [DirectSum.lmap_lof]
+    exact (hT.continuous_of_continuous_comp (lofT k) fun p ↦ p.property k).comp (hf k).continuous
+  have he : Continuous e := q.ker.isQuotientMap_mkQL.continuous_iff.mpr hc
+  have he' : Continuous e.symm := by
+    apply continuous_directSum e.symm.toLinearMap
+    intro k
+    apply (hf k).continuous_iff.mpr
+    have heq (x : X k) : e.symm (lofT k (f k x)) = q.ker.mkQ (lofD k x) := by
+      rw [← show q (lofD k x) = lofT k (f k x) from DirectSum.lmap_lof f k x]
+      exact q.quotKerEquivOfSurjective_symm_apply hsurj _
+    change Continuous (fun x ↦ e.symm (lofT k (f k x)))
+    simp only [heq]
+    exact q.ker.mkQL.continuous.comp (hD.continuous_of_continuous_comp (lofD k) fun p ↦ p.property k)
+  exact (Homeomorph.mk e.toEquiv he he').isQuotientMap.comp q.ker.isQuotientMap_mkQL
+
+/-- The locally convex direct sum of stage embeddings is an embedding. Each seminorm
+on the source is bounded by the sum of extensions of its restrictions to the stages. -/
+private theorem isEmbedding_directSum_lmap
+    [∀ k, IsTopologicalAddGroup (Y k)] [∀ k, PolynormableSpace ℂ (Y k)]
+    (f : ∀ k, X k →ₗ[ℂ] Y k) (hf : ∀ k, IsEmbedding (f k)) :
+    let := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    let := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Y)
+    IsEmbedding (DirectSum.lmap f) := by
+  classical
+  let D := ⨁ k, X k
+  let T := ⨁ k, Y k
+  let lofD := DirectSum.lof ℂ ℕ X
+  let lofT := DirectSum.lof ℂ ℕ Y
+  let tD : TopologicalSpace D := locallyConvexFinalTopology lofD
+  let : TopologicalSpace T := locallyConvexFinalTopology lofT
+  let a : D →ₗ[ℂ] T := DirectSum.lmap f
+  let p : SeminormFamily ℂ D {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lofD k)} := Subtype.val
+  let q : SeminormFamily ℂ T {q : Seminorm ℂ T // ∀ k, Continuous (q ∘ lofT k)} := Subtype.val
+  have hT : WithSeminorms q := ⟨rfl⟩
+  have hD : @WithSeminorms ℂ D _ _ _ _ p (TopologicalSpace.induced a inferInstance) := by
+    let : TopologicalSpace D := TopologicalSpace.induced a inferInstance
+    apply (a.withSeminorms_induced hT).congr
+    · intro s
+      choose r hr hrf using fun k ↦ exists_seminorm_extension (hf k).isInducing
+        (show Continuous (s.val.comp (lofD k)) from s.property k)
+      let R := directSumSeminorm r
+      have hR : ∀ k, Continuous (R ∘ lofT k) := fun k ↦ by
+        simpa only [Function.comp_def, R, lofT, directSumSeminorm_lof] using hr k
+      refine ⟨{⟨R, hR⟩}, 1, ?_⟩
+      rw [Finset.sup_singleton, one_smul]
+      intro x
+      change s.val x ≤ R (a x)
+      have hs := Finset.le_sum_of_subadditive s.val (map_zero s.val).le
+        (map_add_le_add s.val) x.support (fun k ↦ lofD k (x k))
+      rw [show (∑ k ∈ x.support, lofD k (x k)) = x from DirectSum.sum_support_of x] at hs
+      refine hs.trans_eq ?_
+      rw [show R (a x) = ∑ k ∈ x.support, r k (a x k) from
+        directSumSeminorm_apply r _ _ (DFinsupp.support_mapRange (hf := fun k ↦ map_zero (f k)))]
+      exact Finset.sum_congr rfl fun k _ ↦ (DFunLike.congr_fun (hrf k) (x k)).symm
+    · intro s
+      have hs (k : ℕ) : Continuous ((s.val.comp a) ∘ lofD k) := by
+        change Continuous (fun x ↦ s.val (DirectSum.lmap f (DirectSum.lof ℂ ℕ X k x)))
+        simp only [DirectSum.lmap_lof]
+        exact (s.property k).comp (hf k).continuous
+      refine ⟨{⟨s.val.comp a, hs⟩}, 1, ?_⟩
+      rw [Finset.sup_singleton, one_smul]
+      exact le_rfl
+  refine ⟨⟨?_⟩, (DirectSum.lmap_injective f).mpr fun k ↦ (hf k).injective⟩
+  let : TopologicalSpace D := TopologicalSpace.induced a inferInstance
+  exact hD.topology_eq_withSeminorms.symm
+
+/-- For a stepwise closed subspace the topology comparison is equivalent to the
+quotient-stage difference map being an embedding. Agreement of the topologies also
+makes the subspace closed, by completeness of its strict Fréchet limit. -/
+private theorem quotientStageDifference_embedding_and_closed_of_topologies
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E]
+    (hX : ∀ k, IsFrechetTVS (X k))
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (hj : ∀ k, IsEmbedding (j k)) (F : Submodule ℂ E)
+    (hF : ∀ k, IsClosed (i k ⁻¹' (F : Set E))) :
+    let Q (k : ℕ) := X k ⧸ limitStageKernel i F k
+    let tF : TopologicalSpace F := inferInstance
+    let := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Q)
+    (IsEmbedding (directSumDifference (limitQuotientTransition h F)) ↔
+      tF = limitSubspaceTopology i F) ∧
+      (tF = limitSubspaceTopology i F → IsClosed (F : Set E)) := by
+  let K := limitStageKernel i F
+  let S (k : ℕ) := F.comap (i k).toLinearMap
+  let Q (k : ℕ) := X k ⧸ K k
+  let tF : TopologicalSpace F := inferInstance
+  let tF' := limitSubspaceTopology i F
+  let : TopologicalSpace (⨁ k, X k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+  let : TopologicalSpace (⨁ k, S k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ (fun k ↦ S k))
+  let : TopologicalSpace (⨁ k, Q k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Q)
+  let σ := directSumDifference j
+  let τ := directSumDifference (limitQuotientTransition h F)
+  change (IsEmbedding τ ↔ tF = tF') ∧ (tF = tF' → IsClosed (F : Set E))
+  have hX' := hX
+  choose hadd hpoly hmetr hcomplete using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hadd
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetr
+  let : ∀ k, IsTopologicalAddGroup (S k) := fun _ ↦ inferInstance
+  let : ∀ k, PolynormableSpace ℂ (S k) := fun _ ↦ inferInstance
+  let : ∀ k, T2Space (X k) := fun _ ↦ inferInstance
+  let : ∀ k, T2Space (S k) := fun _ ↦ inferInstance
+  have hSK : S = K := by
+    funext k
+    ext x
+    exact (Submodule.Quotient.mk_eq_zero F).symm
+  have hFembed : @IsEmbedding F E tF' _ F.subtype ↔ tF = tF' := by
+    refine ⟨fun H ↦ H.eq_induced.symm, fun H ↦ ?_⟩
+    rw [← H]
+    exact IsEmbedding.subtypeVal
+  let l (k : ℕ) : S k →ₗ[ℂ] F := (i k).toLinearMap.restrict (fun _ hx ↦ hx)
+  let : TopologicalSpace F := tF'
+  have hPF : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ F // ∀ k, Continuous (p ∘ l k)} → _) := ⟨rfl⟩
+  let : IsTopologicalAddGroup F := hPF.isTopologicalAddGroup
+  let iF (k : ℕ) : S k →L[ℂ] F :=
+    ⟨l k, hPF.continuous_of_continuous_comp (l k) fun p ↦ p.property k⟩
+  have hcompat (k : ℕ) (x : X k) : i (k+1) (j k x) = i k x :=
+    DFunLike.congr_fun (h.compatible k) x
+  let jF (k : ℕ) : S k →L[ℂ] S (k+1) :=
+    ((j k).comp (S k).subtypeL).codRestrict (S (k+1)) (fun x ↦ by
+      change i (k+1) (j k x.val) ∈ F
+      rw [hcompat]
+      exact x.property)
+  have hjF (k : ℕ) : IsEmbedding (jF k) :=
+    IsEmbedding.subtypeVal.of_comp_iff.mp ((hj k).comp IsEmbedding.subtypeVal)
+  have hlimF : IsInjectiveLCLimit jF iF := by
+    refine ⟨fun k x y hxy ↦ Subtype.ext (h.injective k (congrArg Subtype.val hxy)), ?_, ?_, rfl⟩
+    · intro k
+      ext x : 1
+      exact Subtype.ext (hcompat k x.val)
+    · intro x
+      obtain ⟨k, y, hy⟩ := h.exhaustive x.val
+      have hy' : y ∈ S k := by
+        change i k y ∈ F
+        rw [hy]
+        exact x.property
+      exact ⟨k, ⟨y, hy'⟩, Subtype.ext hy⟩
+  constructor
+  · let a := DirectSum.lmap (fun k ↦ (S k).subtype)
+    let π := DirectSum.lmap (fun k ↦ (K k).mkQ)
+    let p := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+    let pF := DirectSum.toModule ℂ ℕ F (fun k ↦ (iF k).toLinearMap)
+    have ha := isEmbedding_directSum_lmap (fun k ↦ (S k).subtype) (fun _ ↦ IsEmbedding.subtypeVal)
+    have hp := h.isQuotientMap_directSum
+    have hπ := isQuotientMap_directSum_lmap (fun k ↦ (K k).mkQ)
+      (fun k ↦ (K k).isOpenQuotientMap_mkQ.isQuotientMap)
+    have hpF := hlimF.isQuotientMap_directSum
+    have hrσ : range σ = (p.ker : Set (⨁ k, X k)) := h.range_directSumDifference
+    have hra : range a = (π.ker : Set (⨁ k, X k)) := by
+      change (a.range : Set (⨁ k, X k)) = _
+      rw [show a.range = π.ker by
+        simp only [a, π, DirectSum.range_lmap, DirectSum.ker_lmap,
+          Submodule.range_subtype, Submodule.ker_mkQ, hSK]]
+    have hσ : IsEmbedding σ := (isAcyclicSystem_of_strict_frechet hX j hj).isEmbedding
+    have haddD : IsTopologicalAddGroup (⨁ k, X k) :=
+      (show WithSeminorms (Subtype.val : {p : Seminorm ℂ (⨁ k, X k) //
+        ∀ k, Continuous (p ∘ DirectSum.lof ℂ ℕ X k)} → _) from ⟨rfl⟩).isTopologicalAddGroup
+    let : IsTopologicalAddGroup (⨁ k, X k) := haddD
+    let : IsTopologicalAddGroup (⨁ k, Q k) :=
+      (show WithSeminorms (Subtype.val : {p : Seminorm ℂ (⨁ k, Q k) //
+        ∀ k, Continuous (p ∘ DirectSum.lof ℂ ℕ Q k)} → _) from ⟨rfl⟩).isTopologicalAddGroup
+    have commσ : π.comp σ = τ.comp π := by
+      apply LinearMap.ext
+      intro x
+      apply DFinsupp.ext
+      intro k
+      cases k with
+      | zero =>
+        exact (congrArg (K 0).mkQ (directSumDifference_apply j x).1).trans
+          ((directSumDifference_apply (limitQuotientTransition h F) (π x)).1.symm)
+      | succ k =>
+        change (K (k+1)).mkQ (σ x (k+1)) = τ (π x) (k+1)
+        rw [(directSumDifference_apply j x).2 k,
+          (directSumDifference_apply (limitQuotientTransition h F) (π x)).2 k, map_sub]
+        rfl
+    have comma : p.comp a = F.subtype.comp pF := by
+      apply DirectSum.linearMap_ext
+      intro k
+      ext x : 1
+      simp only [LinearMap.comp_apply, a, DirectSum.lmap_lof, p, pF, DirectSum.toModule_lof]
+      rfl
+    have hτinj : Function.Injective τ := by
+      intro x y hxy
+      apply DFinsupp.ext
+      intro k
+      have hcoord (k : ℕ) := congrArg (fun z : ⨁ k, Q k ↦ z k) hxy
+      induction k with
+      | zero =>
+        simpa only [τ, (directSumDifference_apply _ x).1, (directSumDifference_apply _ y).1]
+          using hcoord 0
+      | succ k ih =>
+        simpa only [τ, (directSumDifference_apply _ x).2, (directSumDifference_apply _ y).2,
+          ih, sub_left_inj] using hcoord (k+1)
+    have hstrict {A B : Type _} [TopologicalSpace A] [TopologicalSpace B]
+        {g : A → B} (hg : IsEmbedding g) (R : Set B) (hR : range g = R) :
+        ∃ u : A → R, IsQuotientMap u ∧ Subtype.val ∘ u = g := by
+      let u (x : A) : R := ⟨g x, hR ▸ mem_range_self x⟩
+      have hu : IsEmbedding u := IsEmbedding.subtypeVal.of_comp_iff.mp hg
+      exact ⟨u, (hu.isInducing.isOpenQuotientMap_of_surjective fun y ↦ by
+        have hy : y.val ∈ range g := (congrArg (fun U : Set B ↦ y.val ∈ U) hR).mpr y.property
+        obtain ⟨x, hx⟩ := hy
+        exact ⟨x, Subtype.ext hx⟩).isQuotientMap, rfl⟩
+    obtain ⟨s, hs, hs_eq⟩ := hstrict hσ _ hrσ
+    obtain ⟨b, hb, hb_eq⟩ := hstrict ha _ hra
+    have hleft : IsStrictMap (π.comp p.ker.subtype) ↔ IsStrictMap τ := by
+      have hcomp : (π.comp p.ker.subtype) ∘ s = τ ∘ π := by
+        calc
+          _ = π ∘ (Subtype.val ∘ s) := rfl
+          _ = π ∘ σ := by rw [hs_eq]
+          _ = _ := DFunLike.congr_fun commσ |> fun h ↦ funext h
+      exact hs.isStrictMap_iff.trans (hcomp ▸ hπ.isStrictMap_iff.symm)
+    have hright : IsStrictMap (p.comp π.ker.subtype) ↔ IsStrictMap F.subtype := by
+      have hcomp : (p.comp π.ker.subtype) ∘ b = F.subtype ∘ pF := by
+        calc
+          _ = p ∘ (Subtype.val ∘ b) := rfl
+          _ = p ∘ a := by rw [hb_eq]
+          _ = _ := DFunLike.congr_fun comma |> fun h ↦ funext h
+      exact hb.isStrictMap_iff.trans (hcomp ▸ hpF.isStrictMap_iff.symm)
+    have hmid := isStrictMap_comp_ker_subtype_iff π p
+      (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hπ)
+      (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hp)
+    have hinc : Function.Injective (F.subtype : F → E) := Subtype.val_injective
+    rw [isEmbedding_iff_isStrictMap_injective, and_iff_left hτinj, ← hFembed,
+      isEmbedding_iff_isStrictMap_injective, and_iff_left hinc]
+    exact hleft.symm.trans (hmid.trans hright)
+  · intro htop
+    let : ∀ k, UniformSpace (X k) := fun _ ↦ IsTopologicalAddGroup.rightUniformSpace _
+    let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+    let : ∀ k, CompleteSpace (X k) := hcomplete
+    have hc (k : ℕ) : @CompleteSpace (S k) (IsTopologicalAddGroup.rightUniformSpace (S k)) := by
+      let : IsUniformAddGroup (S k) := (S k).toAddSubgroup.isUniformAddGroup
+      rw [IsUniformAddGroup.rightUniformSpace_eq]
+      exact completeSpace_coe_iff_isComplete.mpr (hF k).isComplete
+    let : UniformSpace F := IsTopologicalAddGroup.rightUniformSpace F
+    let : IsUniformAddGroup F := isUniformAddGroup_of_addCommGroup
+    let : CompleteSpace F := (strictLCLimit_complete_nonmetrizable hc hlimF hjF).1
+    let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    have he : IsUniformInducing F.subtype :=
+      AddMonoidHom.isUniformInducing_of_isInducing (hFembed.mpr htop).isInducing
+    have hcF := he.isComplete_range.isClosed
+    change IsClosed (range (Subtype.val : F → E)) at hcF
+    rwa [Subtype.range_coe] at hcF
+
+/-- In a strict Fréchet system, the limit topology on a stepwise closed subspace agrees
+with its inherited topology exactly when the quotient system is acyclic.
+This is the exact-sequence criterion for limit subspaces used in Wengenroth's Corollary 3.4.
+Apply the direct-sum difference maps to the short exact sequence of the stage subspaces,
+original stages, and quotient stages. The first two systems are strict, hence acyclic. -/
+private theorem isAcyclicSystem_quotientStages_iff
+    [ContinuousSMul ℂ E] [T2Space E] (hX : ∀ k, IsFrechetTVS (X k))
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (hj : ∀ k, IsEmbedding (j k)) (F : Submodule ℂ E)
+    (hF : ∀ k, IsClosed (i k ⁻¹' (F : Set E))) :
+    IsAcyclicSystem (limitQuotientTransition h F) ↔
+      (inferInstance : TopologicalSpace F) = limitSubspaceTopology i F := by
+  have hPE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → _) := ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hPE.isTopologicalAddGroup
+  let K := limitStageKernel i F
+  let Q (k : ℕ) := X k ⧸ K k
+  let : TopologicalSpace (⨁ k, Q k) := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Q)
+  have hK (k : ℕ) : IsClosed (K k : Set (X k)) := by
+    convert hF k using 1
+    ext x
+    exact Submodule.Quotient.mk_eq_zero F
+  have hQ (k : ℕ) := isFrechetTVS_quotient (hX k) (K k) (hK k)
+  let : ∀ k, IsTopologicalAddGroup (Q k) := fun k ↦ (hQ k).choose
+  let : ∀ k, PolynormableSpace ℂ (Q k) := fun k ↦ (hQ k).choose_spec.1
+  have hlim := isInjectiveLCLimit_quotientStages h F
+  obtain ⟨hembed, hclosed⟩ := quotientStageDifference_embedding_and_closed_of_topologies hX h hj F hF
+  change IsClosedEmbedding (directSumDifference (limitQuotientTransition h F)) ↔ _
+  refine ⟨fun H ↦ hembed.mp H.isEmbedding, fun H ↦ ⟨hembed.mpr H, ?_⟩⟩
+  let : IsClosed (F : Set E) := hclosed H
+  exact hlim.closedRange_directSumDifference_iff.mpr inferInstance
+
+end QuotientStageAcyclicity
 
 /-- A countable injective system of Fréchet–Montel spaces is acyclic exactly when each
 bounded set of its limit is the image of a bounded set of one stage. This is the

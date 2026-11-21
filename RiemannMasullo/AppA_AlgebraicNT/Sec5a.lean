@@ -8,6 +8,8 @@ public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Measure.Haar.Extension
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
+import Mathlib.Topology.Algebra.ProperAction.CompactlyGenerated
+import Mathlib.Topology.Covering.Quotient
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
@@ -860,13 +862,49 @@ include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 571. The D′ condition is equivalent for the
 quotient sequence and for the lifts through the fundamental domain. -/
 theorem isDPrimeSequence_quotient_iff :
-    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by sorry
+    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by
+  unfold IsDPrimeSequence
+  rw [isDSequence_quotient_iff H hH hν hcount hE hEc hE₁ hbij hU hmono]
+  have hopen : IsOpenMap q := QuotientGroup.isOpenMap_coe
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  refine and_congr_right fun _ ↦ ⟨?_, ?_⟩
+  · intro h W hW
+    have himage : q '' (W ∩ E) ∈ 𝓝 (1 : G ⧸ H) := by
+      simpa only [map_one] using
+        hopen.image_mem_nhds (inter_mem hW (mem_interior_iff_mem_nhds.mp hE₁))
+    obtain ⟨k, hk⟩ := h _ himage
+    refine ⟨k, fun x hx ↦ ?_⟩
+    obtain ⟨y, hy, heq⟩ := hk hx.1
+    have hxy : y = x := (injOn_iff_injective.mpr hbij.1) hy.2 hx.2 heq
+    exact hxy ▸ hy.1
+  · intro h W hW
+    have hpreimage : q ⁻¹' W ∈ 𝓝 (1 : G) :=
+      hq.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hW)
+    obtain ⟨k, hk⟩ := h _ hpreimage
+    refine ⟨k, fun y hy ↦ ?_⟩
+    obtain ⟨x, rfl⟩ := hbij.2 y
+    exact hk ⟨hy, x.property⟩
 
 include hbij in
 /-- Paper: Proposition A.5.2.6, p. 571. For a symmetric fundamental domain,
 the quotient family is symmetric exactly when the lifted family is symmetric. -/
 theorem inv_eq_sequence_quotient_iff (hEsymm : E⁻¹ = E) :
-    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by sorry
+    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by
+  constructor
+  · intro h k
+    have hpre : (q ⁻¹' U k)⁻¹ = q ⁻¹' (U k)⁻¹ := by
+      ext x
+      simp only [Set.mem_inv, Set.mem_preimage, map_inv]
+    change (q ⁻¹' U k ∩ E)⁻¹ = q ⁻¹' U k ∩ E
+    rw [Set.inter_inv, hpre, h k, hEsymm]
+  · intro h k
+    have hsurj : q '' E = univ := by
+      rw [← Set.range_domRestrict, Set.range_eq_univ]
+      exact hbij.2
+    have himage : q '' lifted k = U k := by
+      change q '' (q ⁻¹' U k ∩ E) = U k
+      rw [Set.image_preimage_inter, hsurj, inter_univ]
+    simpa only [Set.image_inv, himage] using congrArg (fun s : Set G ↦ q '' s) (h k)
 
 -- TODO(paper-gap): The D″ equivalence claimed in the proof of A.5.2.6 fails.
 -- For ℤ → ℤ/3ℤ take the symmetric domain {-1, 0, 1} and U₀ = V₀ = ℤ/3ℤ.
@@ -881,7 +919,8 @@ theorem measurableSet_image_of_continuous_injOn_polish {X Y : Type*}
     [TopologicalSpace Y] [PolishSpace Y] [MeasurableSpace Y] [BorelSpace Y]
     {f : X → Y} (hf : Continuous f) {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn f E) :
-    MeasurableSet (f '' E) := by sorry
+    MeasurableSet (f '' E) := by
+  exact hE.image_of_continuousOn_injOn hf.continuousOn hinj
 
 /-- Paper: Lemma A.5.2.10, p. 572. A Borel partial transversal to a free proper action
 of a countable discrete abelian group extends to a Borel transversal.
@@ -893,7 +932,61 @@ theorem exists_borel_orbit_transversal {X H : Type*}
     {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn (Quotient.mk (MulAction.orbitRel H X)) E) :
     ∃ F : Set X, MeasurableSet F ∧ E ⊆ F ∧
-      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by sorry
+      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by
+  classical
+  let q := Quotient.mk (MulAction.orbitRel H X)
+  let : ProperlyDiscontinuousSMul H X :=
+    properlyDiscontinuousSMul_iff_properSMul.mpr inferInstance
+  have hlocal : IsLocallyInjective q :=
+    isLocalHomeomorph_quotientMk_of_properlyDiscontinuousSMul.isLocallyInjective
+  let OpenInj := {s : Set X // IsOpen s ∧ InjOn q s}
+  let : Nonempty OpenInj := ⟨⟨∅, isOpen_empty, injOn_empty q⟩⟩
+  obtain ⟨V, hV⟩ := isLindelof_univ.indexed_countable_subcover
+    (Subtype.val : OpenInj → Set X) (fun s ↦ s.property.1) (by
+      intro x _
+      obtain ⟨s, ho, hx, hi⟩ := hlocal x
+      exact mem_iUnion.mpr ⟨⟨s, ho, hi⟩, hx⟩)
+  let U : ℕ → Set X := fun
+    | 0 => E
+    | n + 1 => (V n).val
+  have hU (n : ℕ) : MeasurableSet (U n) ∧ InjOn q (U n) := by
+    cases n with
+    | zero => exact ⟨hE, hinj⟩
+    | succ n => exact ⟨(V n).property.1.measurableSet, (V n).property.2⟩
+  let Q (n : ℕ) := q '' U n
+  have hsat (n : ℕ) : MeasurableSet (q ⁻¹' Q n) := by
+    rw [show q ⁻¹' Q n = ⋃ g : H, (g • ·) '' U n from
+      MulAction.quotient_preimage_image_eq_union_mul (U n)]
+    exact MeasurableSet.iUnion fun g ↦
+      (Homeomorph.smul g).measurableEmbedding.measurableSet_image.mpr (hU n).1
+  -- Use the first set meeting each orbit, with `E` in position zero.
+  let F := ⋃ n, U n ∩ q ⁻¹' disjointed Q n
+  have hF : MeasurableSet F := MeasurableSet.iUnion fun n ↦ (hU n).1.inter (by
+    simp only [disjointed_eq_inter_compl, preimage_inter, preimage_iInter, preimage_compl]
+    exact (hsat n).inter (MeasurableSet.iInter fun j ↦
+      MeasurableSet.iInter fun _ ↦ (hsat j).compl))
+  refine ⟨F, hF, fun x hx ↦ mem_iUnion.mpr ⟨0, hx, ?_⟩, ⟨?_, ?_⟩⟩
+  · change q x ∈ disjointed Q 0
+    rw [show disjointed Q 0 = Q 0 from disjointed_bot Q]
+    exact mem_image_of_mem q hx
+  · rintro ⟨x, hx⟩ ⟨y, hy⟩ (hxy : q x = q y)
+    obtain ⟨m, hxm, hqx⟩ := mem_iUnion.mp hx
+    obtain ⟨n, hyn, hqy⟩ := mem_iUnion.mp hy
+    have hmn : m = n := by
+      by_contra hne
+      exact (Set.disjoint_left.mp (disjoint_disjointed Q hne)) hqx (hxy.symm ▸ hqy)
+    subst n
+    exact Subtype.ext ((hU m).2 hxm hyn hxy)
+  · intro z
+    obtain ⟨x, rfl⟩ := Quotient.mk_surjective z
+    obtain ⟨n, hn⟩ := mem_iUnion.mp (hV (mem_univ x))
+    have hx : q x ∈ ⋃ n, disjointed Q n := by
+      rw [iUnion_disjointed]
+      exact mem_iUnion.mpr ⟨n + 1, mem_image_of_mem q hn⟩
+    obtain ⟨m, hm⟩ := mem_iUnion.mp hx
+    obtain ⟨y, hy, hyx⟩ := disjointed_subset Q m hm
+    have hqy : q y ∈ disjointed Q m := hyx.symm ▸ hm
+    exact ⟨⟨y, mem_iUnion.mpr ⟨m, hy, hqy⟩⟩, hyx⟩
 
 section Ideles
 

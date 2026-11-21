@@ -5,6 +5,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
+public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
@@ -59,24 +60,34 @@ theorem isLocallyEuclidean_of_discrete (X : Type*) [TopologicalSpace X]
   ⟨0, ⟨ChartedSpace.ofDiscreteTopology⟩⟩
 
 /-- Paper: (D.1.4.2), p. 757. A presentation identifies a group topologically
-with a product of real, torus, free discrete and finite factors.
-Deviation: The finite factor is enumerated by `Fin finiteOrder`. -/
+with a product of real, torus, free discrete and finite discrete abelian factors. -/
 structure ElementaryLCAPresentation (G : Type*) [CommGroup G] [TopologicalSpace G] where
   realDim : ℕ
   torusDim : ℕ
   latticeRank : ℕ
-  finiteOrder : ℕ
-  finiteGroup : AddCommGroup (Fin finiteOrder)
-  equiv : letI := finiteGroup
-    G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank (Fin finiteOrder))
+  finiteFactor : Type
+  [finiteGroup : AddCommGroup finiteFactor]
+  [finiteFintype : Fintype finiteFactor]
+  [finiteTopology : TopologicalSpace finiteFactor]
+  [finiteDiscrete : DiscreteTopology finiteFactor]
+  equiv : G ≃ₜ* Multiplicative (ElementaryLieGroup realDim torusDim latticeRank finiteFactor)
+
+attribute [instance] ElementaryLCAPresentation.finiteGroup ElementaryLCAPresentation.finiteFintype
+  ElementaryLCAPresentation.finiteTopology ElementaryLCAPresentation.finiteDiscrete
+
+/-- Paper: (D.1.4.2), p. 757. The Klein four group admits an elementary presentation
+whose finite factor has order four and is noncyclic.
+Deviation: Sanity check for the finite abelian factor. -/
+theorem ElementaryLCAPresentation.exists_kleinFour :
+    ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
+      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
 
 /-- Paper: (D.1.4.2), p. 757. Two elementary presentations have the same real
 dimension, torus dimension and free lattice rank, and isomorphic finite factors.
 Deviation: The finite factors are compared up to group isomorphism. -/
 theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G) :
     e.realDim = e'.realDim ∧ e.torusDim = e'.torusDim ∧ e.latticeRank = e'.latticeRank ∧
-      Nonempty (@AddEquiv (Fin e.finiteOrder) (Fin e'.finiteOrder)
-        e.finiteGroup.toAdd e'.finiteGroup.toAdd) := by sorry
+      Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by sorry
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
@@ -1062,7 +1073,103 @@ theorem lca_openSubgroup_inverseLimit (J : OpenCompactlyGeneratedSubgroups G) :
     let δ : J.val → ((H : I) → J.val ⧸ K H) := fun x _ ↦ QuotientGroup.mk x
     Nonempty I ∧ IsDirectedOrder I ∧
       IsEmbedding δ ∧ range δ = {a | ∀ (H H' : I), H ≤ H' →
-      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by sorry
+      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by
+  let I := {H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) //
+    lcaDualAnnihilator H.val ≤ J.val}
+  let K (H : I) : Subgroup J.val := (lcaDualAnnihilator H.val.val).comap J.val.subtype
+  let δ : J.val →ₜ* ((H : I) → J.val ⧸ K H) :=
+    { toFun := fun x H ↦ QuotientGroup.mk x
+      map_one' := funext fun H ↦ QuotientGroup.mk_one (N := K H)
+      map_mul' := fun x y ↦ funext fun H ↦ QuotientGroup.mk_mul (K H) x y
+      continuous_toFun := continuous_pi fun H ↦ QuotientGroup.continuous_mk }
+  change Nonempty I ∧ IsDirectedOrder I ∧ IsEmbedding δ ∧
+    range δ = {a | ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'}
+  have hSmall {V : Set J.val} (hV : V ∈ 𝓝 (1 : J.val)) :
+      ∃ H : I, (K H : Set J.val) ⊆ V := by
+    obtain ⟨H, hH⟩ := exists_lcaDualAnnihilator_subset_nhds
+      (J.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hV)
+    refine ⟨⟨H, fun x hx ↦ ?_⟩, ?_⟩
+    · obtain ⟨y, _, rfl⟩ := hH hx
+      exact y.property
+    · intro x hx
+      obtain ⟨y, hy, hyx⟩ := hH (Subgroup.mem_comap.mp hx)
+      exact (Subtype.ext hyx : y = x) ▸ hy
+  let : Nonempty I := ⟨(hSmall Filter.univ_mem).choose⟩
+  let : IsDirectedOrder (OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :=
+    (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).1
+  have hAnti : Antitone (fun H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) ↦
+      lcaDualAnnihilator H.val) := by
+    intro H H' h x hx
+    exact (mem_lcaDualAnnihilator_iff H.val x).mpr fun χ ↦
+      (mem_lcaDualAnnihilator_iff H'.val x).mp hx (Subgroup.inclusion h χ)
+  let : IsDirectedOrder I := ⟨fun H H' ↦ by
+    obtain ⟨L, hHL, hH'L⟩ := exists_ge_ge H.val H'.val
+    exact ⟨⟨L, (hAnti hHL).trans H.property⟩, hHL, hH'L⟩⟩
+  -- A neighborhood can be tested in a quotient whose kernel lies in a smaller neighborhood.
+  have hInducing : IsInducing δ := by
+    rw [IsTopologicalGroup.isInducing_iff_nhds_one]
+    refine le_antisymm ?_ ?_
+    · have h : Tendsto δ (𝓝 1) (𝓝 (δ 1)) := δ.continuous.tendsto 1
+      rw [map_one] at h
+      exact h.le_comap
+    · intro U hU
+      obtain ⟨V, hV, h1V, hVV⟩ := exists_open_nhds_one_mul_subset hU
+      obtain ⟨H, hH⟩ := hSmall (hV.mem_nhds h1V)
+      let q : J.val → J.val ⧸ K H := QuotientGroup.mk
+      have hqV : q '' V ∈ 𝓝 (1 : J.val ⧸ K H) :=
+        (QuotientGroup.isOpenMap_coe (N := K H)).image_mem_nhds (hV.mem_nhds h1V)
+      refine Filter.mem_comap.mpr ⟨(fun a ↦ a H) ⁻¹' (q '' V),
+        (continuous_apply H).continuousAt.preimage_mem_nhds hqV, ?_⟩
+      intro x hx
+      obtain ⟨y, hy, hyx⟩ : q x ∈ q '' V := hx
+      have hDiff : y⁻¹ * x ∈ K H := QuotientGroup.eq.mp hyx
+      exact hVV ⟨y, hy, y⁻¹ * x, hH hDiff, mul_inv_cancel_left y x⟩
+  refine ⟨inferInstance, inferInstance, ⟨hInducing, hInducing.injective⟩, ?_⟩
+  ext a
+  constructor
+  · rintro ⟨x, rfl⟩ H H' _
+    exact ⟨x, rfl, rfl⟩
+  · intro ha
+    change ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H' at ha
+    let F (H : I) : Set J.val := {x | δ x H = a H}
+    have hNonempty (H : I) : (F H).Nonempty := by
+      obtain ⟨x, hx⟩ := QuotientGroup.mk_surjective (a H)
+      exact ⟨x, hx⟩
+    have hCompact (H : I) : IsCompact (K H : Set J.val) := by
+      have hEval := (isClosedEmbedding_pontryaginDual_eval (G := G)).comp
+        (J.val.isClosed_of_isOpen J.property.1).isClosedEmbedding_subtypeVal
+      have hPreimage : (K H : Set J.val) =
+          (pontryaginDual_eval ∘ (Subtype.val : J.val → G)) ⁻¹'
+            (lcaAnnihilator H.val.val : Set (PontryaginDual (PontryaginDual G))) := by
+        ext x
+        exact (mem_lcaDualAnnihilator_iff H.val.val x.val).trans
+          (mem_lcaAnnihilator_iff H.val.val (pontryaginDual_eval x.val)).symm
+      rw [hPreimage]
+      exact hEval.isCompact_preimage (isCompact_lcaAnnihilator H.val.val H.val.property.1)
+    -- The fibers are translates of compact kernels and decrease along the index order.
+    have hFiberCompact (H : I) : IsCompact (F H) := by
+      obtain ⟨y, hy⟩ := hNonempty H
+      have hFiber : F H = (fun z : J.val ↦ y * z) '' (K H : Set J.val) := by
+        ext x
+        constructor
+        · intro hx
+          exact ⟨y⁻¹ * x, QuotientGroup.eq.mp (hy.trans hx.symm), mul_inv_cancel_left y x⟩
+        · rintro ⟨z, hz, rfl⟩
+          change (QuotientGroup.mk (y * z) : J.val ⧸ K H) = a H
+          rw [QuotientGroup.mk_mul, (QuotientGroup.eq_one_iff z).mpr hz, mul_one]
+          exact hy
+      rw [hFiber]
+      exact (hCompact H).image (continuous_const.mul continuous_id)
+    have hFiberAnti : Antitone F := by
+      intro H H' h x hx
+      obtain ⟨y, hy, hy'⟩ := ha H H' h
+      have hDiff : x⁻¹ * y ∈ K H' := QuotientGroup.eq.mp (hx.trans hy'.symm)
+      have hK : K H' ≤ K H := Subgroup.comap_mono (hAnti (show H.val ≤ H'.val from h))
+      exact (QuotientGroup.eq.mpr (hK hDiff)).trans hy
+    obtain ⟨x, hx⟩ := IsCompact.nonempty_iInter_of_directed_nonempty_isCompact_isClosed
+      F (directed_of_isDirected_le hFiberAnti) hNonempty hFiberCompact
+      (fun H ↦ (hFiberCompact H).isClosed)
+    exact ⟨x, funext (mem_iInter.mp hx)⟩
 
 end Structure
 
@@ -1168,8 +1275,7 @@ def IsBruhatContDiff (p : ℕ) (f : G → ℂ) : Prop :=
     ∀ a : BruhatStructuralPair G, OrderDual.ofDual a.val.2 = k →
       ∃ f₀ : a.quotient → ℂ, (∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val) ∧
         ∀ (e : ElementaryLCAPresentation a.quotient)
-          (z : Fin e.latticeRank → ℤ) (b : Fin e.finiteOrder),
-          letI := e.finiteGroup
+          (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor),
           ContDiff ℝ (p : ℕ∞) (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd
             (elementaryCover xt z b))))
 
@@ -1237,7 +1343,7 @@ omit hTop hT2 hLC
 is the existing elementary Schwartz space with its seminorm topology. -/
 abbrev SchwartzBruhatStage {A : Type*} [CommGroup A] [TopologicalSpace A]
     (e : ElementaryLCAPresentation A) :=
-  ElementarySchwartz e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder)
+  ElementarySchwartz e.realDim e.torusDim e.latticeRank e.finiteFactor
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. A stage function is pulled back along
@@ -1245,19 +1351,17 @@ the quotient and extended by zero outside the open subgroup.
 Deviation: The printed composition is reversed and omits restriction to the open subgroup. -/
 def schwartzBruhatStageRealization (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) : SchwartzBruhatStage e →ₗ[ℂ] (G → ℂ) :=
-  letI := e.finiteGroup
   (LinearMap.pi fun x : G ↦
     if hx : x ∈ a.val.1 then
       LinearMap.proj (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
     else 0).comp (elementarySchwartzSubmodule e.realDim e.torusDim e.latticeRank
-      (Fin e.finiteOrder)).subtype
+      e.finiteFactor).subtype
 
 open Classical in
 /-- Paper: Definition D.1.5.3(2), p. 762. The realization evaluates a stage
 function at the quotient coordinate on the open subgroup and vanishes outside it. -/
 theorem schwartzBruhatStageRealization_apply (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) (x : G) :
-    letI := e.finiteGroup
     schwartzBruhatStageRealization a e f x =
       if hx : x ∈ a.val.1 then
         f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))

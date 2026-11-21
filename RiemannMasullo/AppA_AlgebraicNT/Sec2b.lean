@@ -1056,7 +1056,60 @@ theorem infiniteIdeleFundamentalDomain_cover :
 domain disjointly from itself. -/
 theorem infiniteIdeleFundamentalDomain_disjoint (u : (𝓞 F)ˣ) (hu : u ≠ 1) :
     Disjoint (unitAtInfinity u • archDomain) archDomain := by
-  sorry
+  rw [Set.disjoint_left]
+  intro x hx hy
+  obtain ⟨_, ⟨g, hg, rfl⟩, hx⟩ := Set.mem_smul_set.mp hx
+  obtain ⟨h, hh, hhx⟩ := hy
+  have hmul : unitAtInfinity u * g.val = h.val := hx.trans hhx.symm
+  -- An intersection forces the unit's logarithm to vanish.
+  let L (a : 𝕀∞) : logSpace F := fun w ↦ infiniteIdeleLog F a w.val
+  let k : (Units.logEmbedding F).range :=
+    ⟨Units.logEmbedding F (Additive.ofMul u), ⟨Additive.ofMul u, rfl⟩⟩
+  have hshift : k.val + L g.val = L h.val := by
+    funext w
+    change Units.logEmbedding F (Additive.ofMul u) w + infiniteIdeleLog F g.val w.val =
+      infiniteIdeleLog F h.val w.val
+    rw [regulator_eq_infiniteIdeleLog, ← Pi.add_apply, ← infiniteIdeleLog_mul, hmul]
+  have hk : k = 0 := by
+    by_contra hk
+    exact (Set.disjoint_left.mp (regulatorParallelotope_disjoint F b k hk))
+      (Set.mem_vadd_set.mpr ⟨L g.val, hg.1, hshift⟩) hh.1
+  have ht : u ∈ Units.torsion F := logEmbedding_eq_zero_iff.mp (congrArg Subtype.val hk)
+  -- Scaled arguments of points in the sector belong to one full turn.
+  let coord : 𝕀∞ →* ℂˣ :=
+    (Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom).comp atPlace
+  let z : ℂ := (coord (unitAtInfinity u)).val
+  let a : ℂ := (coord g.val).val
+  let c : ℂ := (coord h.val).val
+  let n := Units.torsionOrder F
+  have hcoord : z * a = c :=
+    (congrArg Units.val (map_mul coord _ _).symm).trans (congrArg (fun y ↦ (coord y).val) hmul)
+  have hz : z ^ n = 1 := by
+    have hup := congrArg (coord.comp unitAtInfinity) (Units.pow_torsionOrder_eq_one F ht)
+    rw [map_pow, map_one] at hup
+    exact congrArg Units.val hup
+  have hp : a ^ n = c ^ n := by rw [← hcoord, mul_pow, hz, one_mul]
+  have hang : (((n : ℝ) * a.arg : ℝ) : Real.Angle) = (((n : ℝ) * c.arg : ℝ) : Real.Angle) := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, Real.Angle.natCast_mul_eq_nsmul,
+      ← Complex.arg_pow_coe_angle, ← Complex.arg_pow_coe_angle, hp]
+  have hn : 0 < (n : ℝ) := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have hmem (t : ℝ) (ht : t ∈ Set.Ico 0 (2 * Real.pi / n)) :
+      (n : ℝ) * t ∈ Set.Ico 0 (2 * Real.pi) :=
+    ⟨mul_nonneg hn.le ht.1, by simpa only [mul_comm (n : ℝ) t] using (lt_div_iff₀ hn).mp ht.2⟩
+  have hinj := AddCircle.injOn_coe_Ico (2 * Real.pi) (0 : ℝ)
+  rw [zero_add] at hinj
+  have hargs : a.arg = c.arg :=
+    mul_left_cancel₀ hn.ne' (hinj (hmem a.arg hg.2) (hmem c.arg hh.2) hang)
+  have hzArg : (z.arg : Real.Angle) = 0 := by
+    have hadd := Complex.arg_mul_coe_angle (coord (unitAtInfinity u)).ne_zero (coord g.val).ne_zero
+    change ((z * a).arg : Real.Angle) = (z.arg : Real.Angle) + (a.arg : Real.Angle) at hadd
+    rw [hcoord, ← hargs] at hadd
+    exact add_right_cancel (hadd.symm.trans (zero_add _).symm)
+  have hzArgReal : z.arg = 0 := by
+    simpa using congrArg Real.Angle.toReal hzArg
+  apply hu (torsionUnit_eq_one_of_inTorsionSector F v₀ σ u ht ?_)
+  change z.arg ∈ Set.Ico 0 (2 * Real.pi / n)
+  exact ⟨hzArgReal.ge, hzArgReal ▸ by positivity⟩
 
 /-- Paper: Lemma A.2.3.8(2), p. 550. The torsion translates recover the whole
 preimage of the logarithmic parallelotope in the norm-one group. -/
