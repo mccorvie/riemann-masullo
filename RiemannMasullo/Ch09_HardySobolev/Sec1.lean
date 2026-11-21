@@ -7,6 +7,8 @@ import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
@@ -215,7 +217,16 @@ omit [μ.Regular] in
 space is separable. -/
 theorem weightedSobolev_separable [SecondCountableTopology G]
     (_hν : IsLCAPlancherelMeasure μ ν) (_hw : IsSobolevWeight w) :
-    SeparableSpace (WeightedSobolev ν w s) := by sorry
+    SeparableSpace (WeightedSobolev ν w s) := by
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual G) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap G Circle).secondCountableTopology
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := _hν.1
+  let : SigmaFinite (sobolevMeasure ν w s) := SigmaFinite.withDensity_ofReal _
+  let : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by simp⟩
+  infer_instance
 
 /-- Paper: Proposition 9.1.1.3(1), p. 396. In nonnegative degree the Sobolev space
 includes continuously and contractively into Haar L² via inverse Plancherel. -/
