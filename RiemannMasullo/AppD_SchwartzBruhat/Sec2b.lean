@@ -21,6 +21,9 @@ section SchwartzBruhatAction
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [hTop : IsTopologicalGroup G]
   [hT2 : T2Space G] [hLC : LocallyCompactSpace G] [hSC : SecondCountableTopology G]
 
+-- The unused-section-variable check repeatedly traverses the instance terms in
+-- SchwartzBruhat. Scope the option to the expensive declarations.
+set_option linter.unusedSectionVars false in
 include hSC in
 /-- Paper: Proposition D.1.9.2, p. 781. The existing left translations
 assemble into an action by continuous linear operators. -/
@@ -50,6 +53,7 @@ given by the left translations on the Schwartz–Bruhat space. -/
 def schwartzBruhatTranslationAction : G →* (SchwartzBruhat G →L[ℂ] SchwartzBruhat G) :=
   Classical.choose (existsUnique_schwartzBruhatTranslationAction (G := G)).exists
 
+set_option linter.unusedSectionVars false in
 /-- Paper: (D.2.1.2), p. 792. The bundled left translation is given
 by evaluation at the inverse translate. -/
 theorem schwartzBruhatTranslationAction_apply (g x : G) (f : SchwartzBruhat G) :
@@ -113,6 +117,7 @@ private theorem continuous_schwartzBruhat_eval (x : G) : Continuous (fun f : S �
   exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
     (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
 
+set_option linter.unusedSectionVars false in
 omit hm in
 /-- On a compact kernel the character-twisted orbits admit a continuous
 Schwartz–Bruhat Pettis average. -/
@@ -149,6 +154,7 @@ private theorem exists_schwartzBruhatPettisIsotypicAverage (hcompact : CompactSp
   exact (existsUnique_compactActionIsotypicAverage (E := S) μ₁ τ hτ
     schwartzBruhat_bornological (hseq (fun k f ↦ τ k f) hτ) ω).exists
 
+set_option linter.unusedSectionVars false in
 /-- Paper: (D.2.1.1), pp. 792–793. The normalized Pettis average on the
 Schwartz–Bruhat space satisfies the scalar integral formula at each point. -/
 private theorem exists_schwartzBruhatIsotypicProjector_average (ω : PontryaginDual K) :
@@ -187,6 +193,7 @@ private theorem exists_schwartzBruhatIsotypicProjector_average (ω : PontryaginD
   have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
   exact ⟨P, hP, by simpa only [P, smul_inv_smul₀ hmass] using hA⟩
 
+set_option linter.unusedSectionVars false in
 /-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
 as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
 theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
@@ -262,6 +269,7 @@ theorem schwartzBruhatIsotypicProjector_apply (ω : PontryaginDual K) (f : S) (x
   exact (hχ.mul ((continuous_schwartzBruhat f).comp hshift)).integrable_of_hasCompactSupport
     (HasCompactSupport.of_compactSpace _)
 
+set_option linter.unusedSectionVars false in
 /-- Paper: (D.2.1.2), p. 792. On an isotypic vector, the normalized average
 recovers the vector. -/
 theorem schwartzBruhatIsotypicProjector_apply_isotype (ω : PontryaginDual K) (f : S)
@@ -417,6 +425,7 @@ include hE hρ heq hi hcomm hQ
 pulls back to the kernel of averaging on the source. -/
 theorem schwartzBruhatIsotype_comap_ker : Q.ker.comap i.toLinearMap = (P).ker := by sorry
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(1), p. 795. The injection gives a continuous
 linear injection on the quotients by the averaging kernels. -/
 theorem schwartzBruhatIsotype_quotient_map :
@@ -476,6 +485,7 @@ theorem schwartzBruhatIsotype_comap : (actionIsotype ρE ω).comap i.toLinearMap
   intro k f
   exact hcomm (k : G) f
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic quotients. -/
 theorem schwartzBruhatIsotype_quotient_map_dense (hd : DenseRange i)
@@ -560,6 +570,7 @@ private theorem denseRange_isotype_of_pettisAverage
         (integrable_const_iff.mp hconst).resolve_right hfinite
     exact (show Surjective j from fun u ↦ ⟨0, (j.map_zero).trans (hzero u).symm⟩).denseRange
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic subspaces. -/
 theorem schwartzBruhatIsotype_subspace_map_dense (hd : DenseRange i)
@@ -577,9 +588,11 @@ theorem schwartzBruhatIsotype_subspace_map_dense (hd : DenseRange i)
   have havg : CompactSpace K → ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ ρS ω A :=
     fun hc ↦ exists_schwartzBruhatPettisIsotypicAverage (G := G) m μ₁ hc ω
   have hintertwines (k : K) (f : S) : i (ρS k f) = ρE k (i f) := hcomm (k : G) f
-  exact denseRange_isotype_of_pettisAverage (H := K) (X := S) (Y := E) μ₁ ω ρS ρE hρK
-    (μ₁.real univ • Q) hQ hcompact havg i hi hintertwines hd j hj
+  with_reducible
+    exact denseRange_isotype_of_pettisAverage (H := K) (X := S) (Y := E) μ₁ ω ρS ρE hρK
+      (μ₁.real univ • Q) hQ hcompact havg i hi hintertwines hd j hj
 
+set_option linter.unusedSectionVars false in
 omit hQ hρ heq hcomm in
 /-- Paper: Lemma D.2.2.1(4), p. 795. An endomorphism continuous
 for the topology induced by a dense injection extends uniquely to the
@@ -697,7 +710,7 @@ theorem schwartzBruhatIsotype_extension_intertwines (hd : DenseRange i)
       _ = ρ (α (k : G)) (i (T f)) := hcomm (α (k : G)) (T f)
       _ = ρ (α (k : G)) (U (i f)) := congrArg (ρ (α (k : G))) (hU f).symm
   refine ⟨hUE, ?_⟩
-  let P' := schwartzBruhatIsotypicProjector m hm μ₁ χ
+  intro P'
   have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
   have : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
   have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
@@ -769,7 +782,7 @@ theorem schwartzBruhatIsotype_extension_intertwines (hd : DenseRange i)
       _ = Q' (U (i f)) := hUQ (i f)
       _ = Q' (i (T f)) := congrArg Q' (hU f)
       _ = i (P' (T f)) := (hi_average χ Q' hQ' (T f)).symm
-  exact existsUnique_isotype_quotient_maps P P' T Q Q' U i hTP hUQ hU
+  exact existsUnique_isotype_quotient_maps (X := S) (Y := E) P P' T Q Q' U i hTP hUQ hU
 
 end CoarserTopology
 
