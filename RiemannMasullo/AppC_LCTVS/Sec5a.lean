@@ -1333,7 +1333,13 @@ theorem vectorContDiffOn_iff_weakDirectional {Ω : Set V} (hΩ : IsOpen Ω)
     VectorContDiffOn (k := k) Ω f ↔
       ∃ D : Ω × V → E,
         HasWeakDirectionalDerivativesOn (k := k) f (toPettisWeakCompletion E ∘ D) ∧
-          Continuous D := by sorry
+          Continuous D := by
+  constructor
+  · rintro ⟨D, hc, hD⟩
+    exact ⟨D, hD.hasWeakDirectionalDerivativesOn hΩ, hc⟩
+  · rintro ⟨D, hD, hc⟩
+    exact ⟨D, hasStrongDifferentialOn_of_basepoint_continuous_directional hΩ hd hD
+      (fun _ ↦ hc.comp (continuous_id.prodMk continuous_const))⟩
 
 /-- Paper: Lemma C.5.1.22, p. 732. If all scalar evaluations extend with one
 continuous derivative, the vector-valued function extends uniquely as a continuous map
