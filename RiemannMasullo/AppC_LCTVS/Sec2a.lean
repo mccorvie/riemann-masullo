@@ -353,11 +353,53 @@ theorem uniformConvergenceCLM_bounded_of_pointwise [QuasiCompleteSpace ℂ E]
   have hf' : f ∈ range (fun f : H ↦ f.val) := ⟨⟨f, hf⟩, rfl⟩
   exact (mem_smul_set_iff_inv_smul_mem₀ hc₀ V (f x)).mp (hc (mem_image2_of_mem hf' hx))
 
+-- Retain the existing hypotheses. The argument works for any cover of a barrelled source.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Lemma C.2.1.7, p. 672. For a barrelled source and quasi-complete target, uniform
 convergence on a directed cover by bounded subsets gives a quasi-complete mapping space. -/
 theorem uniformConvergenceCLM_quasiComplete [BarrelledSpace ℂ E] [QuasiCompleteSpace ℂ F]
     (S : Set (Set E)) (hdir : DirectedOn (· ⊆ ·) S) (hcover : ⋃₀ S = univ)
-    (hb : ∀ T ∈ S, IsVonNBounded ℂ T) : QuasiCompleteSpace ℂ (E →Lᵤ[ℂ, S] F) := by sorry
+    (hb : ∀ T ∈ S, IsVonNBounded ℂ T) : QuasiCompleteSpace ℂ (E →Lᵤ[ℂ, S] F) := by
+  refine ⟨fun {A} hA hAc ↦ completeSpace_coe_iff_isComplete.mp ⟨fun {l} hl ↦ ?_⟩⟩
+  have := hl.1
+  let g : A → E →L[ℂ] F := fun a ↦ (UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S).symm a.val
+  have hind := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id ℂ) F S
+  have heval (x : E) : UniformContinuous (fun f : E →Lᵤ[ℂ, S] F ↦ f x) :=
+    (UniformOnFun.uniformContinuous_eval hcover x).comp hind.uniformContinuous
+  have hbounded (x : E) : IsVonNBounded ℂ (range fun a : A ↦ g a x) := by
+    let ev : (E →Lᵤ[ℂ, S] F) →L[ℂ] F :=
+      ⟨{ toFun := fun f ↦ f x
+         map_add' := fun _ _ ↦ rfl
+         map_smul' := fun _ _ ↦ rfl }, (heval x).continuous⟩
+    change IsVonNBounded ℂ (range (ev ∘ (Subtype.val : A → _)))
+    rw [range_comp, Subtype.range_coe]
+    exact hA.image ev
+  -- Quasi-completeness of the target gives a limit at each point.
+  have hlimit (x : E) : ∃ y, Tendsto (fun a : A ↦ g a x) l (𝓝 y) := by
+    let gx : A → F := fun a ↦ g a x
+    have hc : Cauchy (l.map gx) := hl.map ((heval x).comp uniformContinuous_subtype_val)
+    have hmem : l.map gx ≤ 𝓟 (closure (range gx)) := by
+      rw [le_principal_iff, mem_map]
+      exact Eventually.of_forall fun a ↦ subset_closure (mem_range_self a)
+    obtain ⟨y, _, hy⟩ := QuasiCompleteSpace.quasiComplete (hbounded x).closure isClosed_closure
+      _ hc hmem
+    exact ⟨y, hy⟩
+  choose f hf using hlimit
+  have hpoint : Tendsto (fun a x ↦ g a x) l (𝓝 f) := tendsto_pi_nhds.mpr hf
+  -- Banach–Steinhaus makes the pointwise limit continuous.
+  let G : E →L[ℂ] F := ⟨linearMapOfTendsto f (fun a ↦ (g a).toLinearMap) hpoint,
+    hpoint.continuous_of_equicontinuous (PolynormableSpace.banach_steinhaus hbounded).equicontinuous⟩
+  let G' := UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S G
+  have hG : Tendsto (Subtype.val : A → E →Lᵤ[ℂ, S] F) l (𝓝 G') := by
+    apply (UniformConvergenceCLM.tendsto_iff_tendstoUniformlyOn _ _ S).mpr
+    intro T hT
+    have hc := hl.map (hind.uniformContinuous.comp uniformContinuous_subtype_val)
+    have hu : UniformCauchySeqOn (fun a x ↦ g a x) l T := fun U hU ↦
+      cauchy_map_iff'.mp hc (UniformOnFun.gen_mem_uniformity F S hT hU)
+    exact hu.tendstoUniformlyOn_of_tendsto fun x _ ↦ hf x
+  have hGA := hAc.mem_of_tendsto hG (Eventually.of_forall Subtype.property)
+  exact ⟨⟨G', hGA⟩, tendsto_subtype_rng.mpr hG⟩
 
 variable (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 
