@@ -11,6 +11,8 @@ import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.LocalSubgroup
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
@@ -27,6 +29,7 @@ import Mathlib.Topology.Homotopy.Lifting
 import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Baire.LocallyCompactRegular
+import Mathlib.Analysis.RCLike.Lemmas
 
 /-!
 # Structure of locally compact abelian groups and their Schwartz–Bruhat spaces
@@ -3268,10 +3271,57 @@ theorem schwartzBruhat_strongDual_reflexive [SecondCountableTopology G] :
     letI : TopologicalSpace (StrongDual ℂ DD) := ContinuousLinearMap.topologicalSpace
     ∃ e : D ≃L[ℂ] StrongDual ℂ DD, ∀ L M, e L M = M L := by sorry
 
+open scoped ComplexOrder in
 /-- Paper: Theorem D.1.5.7, p. 764. The strong dual of the Schwartz–Bruhat space
 is barrelled. -/
 theorem schwartzBruhat_strongDual_barrelled [SecondCountableTopology G] :
-    BarrelledSpace ℂ (StrongDual ℂ (SchwartzBruhat G)) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ (SchwartzBruhat G)) := by
+  suffices h : ∀ (E : Type _) [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+      [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+      [MontelSpace ℂ E], BarrelledSpace ℂ (StrongDual ℂ E) by
+    let : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+    let : MontelSpace ℂ (SchwartzBruhat G) := schwartzBruhat_montel
+    exact h (SchwartzBruhat G)
+  intro E _ _ _ _ _ _ _ _
+  let D := StrongDual ℂ E
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  have hS : ⋃₀ S = (univ : Set E) := sUnion_isVonNBounded_eq_univ (𝕜 := ℂ) (E := E)
+  have hdense : Dense (Submodule.span ℂ (⋃₀ S) : Set E) := by
+    rw [hS, Submodule.span_univ, Submodule.top_coe]
+    exact dense_univ
+  let : PolynormableSpace ℂ D :=
+    uniformConvergenceCLM_polynormable (E := E) (F := ℂ) S (fun _ hs ↦ hs) hdense
+  refine ⟨fun p hp ↦ Seminorm.continuous' (r := 1) ?_⟩
+  let U := p.closedBall 0 1
+  let A := (topDualPairing ℂ E).polar U
+  -- The polar of the absorbing unit ball is bounded under every functional on E.
+  have hA : IsVonNBounded ℂ A := by
+    apply (isVonNBounded_iff_dual_image (E := E) A).mpr
+    intro φ
+    obtain ⟨c, hc⟩ := (p.absorbent_closedBall_zero one_pos φ).exists
+    refine isBounded_iff_forall_norm_le.mpr ⟨‖c‖, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    obtain ⟨ψ, hψ, hφ⟩ := hc (mem_singleton φ)
+    rw [← hφ]
+    change ‖(c • ψ) x‖ ≤ ‖c‖
+    rw [smul_apply, norm_smul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (hx ψ hψ)
+  have hU : IsClosed U := by
+    rw [show U = {φ | p φ ≤ 1} from p.closedBall_zero_eq]
+    exact hp.isClosed_preimage 1
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  have haU : AbsConvex ℂ U := ⟨p.balanced_closedBall_zero 1,
+    convex_RCLike_iff_convex_real.mpr (p.convex_closedBall 0 1)⟩
+  have hzU : 0 ∈ U := p.mem_closedBall_zero.mpr (by simp)
+  -- A separating functional is evaluation at a point of A.
+  filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hA
+    (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with φ hφ
+  by_contra hnot
+  obtain ⟨l, hl, hlt⟩ := exists_dual_norm_le_one_lt_of_notMem hU haU hzU hnot
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval (E := E) l
+  have hx : x ∈ A := fun ψ hψ ↦ hl ψ hψ
+  exact (not_lt_of_ge (mem_ball_zero_iff.mp (hφ hx)).le) hlt
 
 /-- Paper: Remark D.1.5.8, p. 764. The Schwartz–Bruhat space of a group that
 fails second countability fails nuclearity. -/
