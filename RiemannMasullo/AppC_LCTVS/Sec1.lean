@@ -1241,12 +1241,324 @@ theorem lfSpace_quotient_properties :
       rw [hseminorms]
       exact (PolynormableSpace.withSeminorms ℂ (E ⧸ M)).withSeminorms_eq
 
+/-- The final locally convex topology of an increasing Fréchet exhaustion is strict
+when the stages carry their subspace topologies from a Hausdorff polynormable space. -/
+private theorem strictLF_of_frechet_exhaustion [T2Space E] [PolynormableSpace ℂ E]
+    (S : ℕ → Submodule ℂ E) (hmono : Monotone S) (hF : ∀ n, IsFrechetTVS (S n))
+    (hcover : ∀ x : E, ∃ n, x ∈ S n) :
+    @IsStrictLFSpace E _ _ (locallyConvexFinalTopology fun n ↦ (S n).subtype) := by
+  let P : SeminormFamily ℂ E
+      {p : Seminorm ℂ E // ∀ n, Continuous (p ∘ (S n).subtype)} := Subtype.val
+  have hOld := PolynormableSpace.withSeminorms ℂ E
+  have hpre (p : Seminorm ℂ E) (hp : Continuous p) (n : ℕ) :
+      Continuous (p ∘ (S n).subtype) := hp.comp continuous_subtype_val
+  have hadd (n : ℕ) : IsTopologicalAddGroup (S n) := (hF n).choose
+  let t := locallyConvexFinalTopology fun n ↦ (S n).subtype
+  have hP : WithSeminorms P := ⟨rfl⟩
+  have hold : @Continuous E E t tE id := by
+    exact @WithSeminorms.continuous_of_continuous_comp ℂ ℂ E E _ _ _ _ _ _ _ _ _ _
+      t hP.isTopologicalAddGroup tE hOld LinearMap.id
+      (fun p ↦ hP.continuous_seminorm ⟨p.val, hpre p.val p.property⟩)
+  have heq (n : ℕ) : TopologicalSpace.induced (fun x : S n ↦ (x : E)) t =
+      TopologicalSpace.induced (fun x : S n ↦ (x : E)) tE := by
+    have hnew : @Continuous (S n) E (TopologicalSpace.induced (fun x : S n ↦ (x : E)) tE)
+        t ((S n).subtype) :=
+      @WithSeminorms.continuous_of_continuous_comp ℂ ℂ (S n) E _ _ _ _ _ _ _ _ _ _
+        (TopologicalSpace.induced (fun x : S n ↦ (x : E)) tE) (hadd n) t hP
+        (S n).subtype (fun p ↦ p.property n)
+    apply le_antisymm
+    · apply induced_mono
+      simpa only [induced_id] using continuous_iff_le_induced.mp hold
+    · exact continuous_iff_le_induced.mp hnew
+  refine ⟨@T2Space.of_injective_continuous E E t tE _ id Function.injective_id hold,
+    S, hmono, ?_, hcover, ?_⟩
+  · intro n
+    change @IsFrechetTVS (S n) _ _ (TopologicalSpace.induced (fun x : S n ↦ (x : E)) t)
+    rw [heq]
+    exact hF n
+  · have hpred :
+        (fun p : Seminorm ℂ E ↦ ∀ n, @Continuous (S n) ℝ
+          (TopologicalSpace.induced (fun x : S n ↦ (x : E)) t) _ (p ∘ (S n).subtype)) =
+        (fun p : Seminorm ℂ E ↦ ∀ n, @Continuous (S n) ℝ
+          (TopologicalSpace.induced (fun x : S n ↦ (x : E)) tE) _ (p ∘ (S n).subtype)) := by
+      funext p
+      exact propext (forall_congr' fun n ↦ by rw [heq n])
+    change t = (SeminormFamily.moduleFilterBasis (Subtype.val :
+      {p : Seminorm ℂ E // ∀ n, @Continuous (S n) ℝ
+        (TopologicalSpace.induced (fun x : S n ↦ (x : E)) t) _ (p ∘ (S n).subtype)} →
+      Seminorm ℂ E)).topology
+    rw [hpred]
+    rfl
+
+/-- A strict LF-space is complete in its additive uniformity. -/
+private theorem IsStrictLFSpace.completeSpace [IsTopologicalAddGroup E]
+    (h : IsStrictLFSpace E) : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace E) := by
+  obtain ⟨_, S, hmono, hF, hcover, htop⟩ := h
+  choose hadd hpoly hmetr hcomplete using hF
+  let := hadd
+  let := hpoly
+  let := hmetr
+  let : ∀ n, T2Space (S n) := fun _ ↦ inferInstance
+  let j (n : ℕ) : S n →L[ℂ] S (n+1) :=
+    (S n).subtypeL.codRestrict (S (n+1)) fun x ↦ hmono n.le_succ x.property
+  have hlim : IsInjectiveLCLimit j (fun n ↦ (S n).subtypeL) := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ ?_, htop⟩
+    obtain ⟨n, hn⟩ := hcover x
+    exact ⟨n, ⟨⟨x, hn⟩, rfl⟩⟩
+  exact (strictLCLimit_complete_nonmetrizable hcomplete hlim fun n ↦
+    IsEmbedding.of_comp (j n).continuous continuous_subtype_val IsEmbedding.subtypeVal).1
+
+section StrictLFQuotient
+
+open scoped ZeroAtInfty
+
+local notation "Matrix" => (ℕ → ℕ → ℂ)
+local notation "NullRows" => (ℕ → C₀(ℕ, ℂ))
+local notation "MatrixPair" => (NullRows × Matrix)
+
+/-- Allow arbitrary entries in the first `n` correction rows and require the rest to vanish. -/
+private def finiteRowStage (n : ℕ) : Submodule ℂ MatrixPair :=
+  ⨅ i : {i : ℕ // n ≤ i},
+    ((ContinuousLinearMap.proj i.val).comp (ContinuousLinearMap.snd ℂ NullRows Matrix)).ker
+
+/-- The cutoff condition on a pair amounts to vanishing of all later correction rows. -/
+private theorem mem_finiteRowStage {n : ℕ} {x : MatrixPair} :
+    x ∈ finiteRowStage n ↔ ∀ i, n ≤ i → x.2 i = 0 := by
+  rw [finiteRowStage, Submodule.mem_iInf]
+  exact ⟨fun h i hi ↦ h ⟨i, hi⟩, fun h i ↦ h i.val i.property⟩
+
+/-- Increasing the cutoff preserves every previously allowed correction. -/
+private theorem finiteRowStage_mono : Monotone finiteRowStage := fun _ _ h _ hx ↦
+  mem_finiteRowStage.mpr fun i hi ↦ mem_finiteRowStage.mp hx i (h.trans hi)
+
+/-- A cutoff stage is closed in the product of the two row spaces. -/
+private theorem isClosed_finiteRowStage (n : ℕ) : IsClosed (finiteRowStage n : Set MatrixPair) := by
+  simp only [finiteRowStage, Submodule.coe_iInf]
+  exact isClosed_iInter fun i ↦ ((ContinuousLinearMap.proj i.val).comp
+    (ContinuousLinearMap.snd ℂ NullRows Matrix)).isClosed_ker
+
+/-- The source consists of a family of null rows and a correction supported on finitely many rows. -/
+private def finiteRowSource : Submodule ℂ MatrixPair := ⨆ n, finiteRowStage n
+
+/-- The cutoff stages regarded as subspaces of the source. -/
+private def finiteRowSourceStage (n : ℕ) : Submodule ℂ finiteRowSource :=
+  (finiteRowStage n).comap finiteRowSource.subtype
+
+/-- Give the source the final locally convex topology from the cutoff stages. -/
+@[instance_reducible]
+private def finiteRowTopology : TopologicalSpace finiteRowSource :=
+  locallyConvexFinalTopology fun n ↦ (finiteRowSourceStage n).subtype
+
+/-- The final topology is generated by seminorms continuous on the original cutoff stages. -/
+private theorem finiteRow_withSeminorms :
+    @WithSeminorms ℂ finiteRowSource _ _ _ _
+      (Subtype.val : {p : Seminorm ℂ finiteRowSource //
+        ∀ k, Continuous (p ∘ (finiteRowSourceStage k).subtype)} → Seminorm ℂ finiteRowSource)
+      finiteRowTopology := by
+  let : TopologicalSpace finiteRowSource := finiteRowTopology
+  exact ⟨rfl⟩
+
+/-- The additive group operations are continuous in the final topology. -/
+private theorem finiteRow_isTopologicalAddGroup :
+    @IsTopologicalAddGroup finiteRowSource finiteRowTopology _ := by
+  let : TopologicalSpace finiteRowSource := finiteRowTopology
+  exact finiteRow_withSeminorms.isTopologicalAddGroup
+
+/-- In the final topology every cutoff stage retains its Fréchet topology from the product. -/
+private theorem strictLF_finiteRowSource : @IsStrictLFSpace finiteRowSource _ _ finiteRowTopology := by
+  apply strictLF_of_frechet_exhaustion finiteRowSourceStage
+  · intro m n h x hx
+    exact finiteRowStage_mono h hx
+  · intro n
+    let S := finiteRowSourceStage n
+    let e : S → MatrixPair := fun x ↦ x.val.val
+    have he : IsUniformInducing e :=
+      (show IsUniformInducing (Subtype.val : finiteRowSource → MatrixPair) from ⟨rfl⟩).comp
+        (show IsUniformInducing (Subtype.val : S → finiteRowSource) from ⟨rfl⟩)
+    have hr : range e = (finiteRowStage n : Set MatrixPair) := by
+      ext x
+      constructor
+      · rintro ⟨y, rfl⟩
+        exact y.property
+      · intro hx
+        exact ⟨⟨⟨x, le_iSup finiteRowStage n hx⟩, hx⟩, rfl⟩
+    let : IsUniformAddGroup finiteRowSource := finiteRowSource.toAddSubgroup.isUniformAddGroup
+    let : IsUniformAddGroup S := S.toAddSubgroup.isUniformAddGroup
+    let : MetrizableSpace (ℕ → ℂ) := UniformSpace.metrizableSpace
+    let : MetrizableSpace NullRows := UniformSpace.metrizableSpace
+    let : MetrizableSpace Matrix := UniformSpace.metrizableSpace
+    let : MetrizableSpace MatrixPair := metrizableSpace_prod
+    let : MetrizableSpace finiteRowSource := MetrizableSpace.subtype (finiteRowSource : Set MatrixPair)
+    change IsFrechetTVS S
+    refine ⟨inferInstance, inferInstance, MetrizableSpace.subtype (S : Set finiteRowSource), ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq (G := S), completeSpace_iff_isComplete_range he, hr]
+    exact (isClosed_finiteRowStage n).isComplete
+  · intro x
+    exact (Submodule.mem_iSup_of_directed _ finiteRowStage_mono.directed_le).mp x.property
+
+/-- The inclusions from the cutoff stages with their original topologies are continuous. -/
+private theorem finiteRow_inclusion_continuous (n : ℕ) :
+    @Continuous (finiteRowSourceStage n) finiteRowSource _ finiteRowTopology
+      (finiteRowSourceStage n).subtype := by
+  exact @WithSeminorms.continuous_of_continuous_comp ℂ ℂ (finiteRowSourceStage n) finiteRowSource
+    _ _ _ _ _ _ _ _ _ _ _ inferInstance finiteRowTopology finiteRow_withSeminorms
+    (finiteRowSourceStage n).subtype (fun p ↦ p.property n)
+
+/-- Add the null rows to the finitely supported correction, reading the result entrywise. -/
+private def finiteRowRecover :
+    @ContinuousLinearMap ℂ ℂ _ _ (RingHom.id ℂ) finiteRowSource finiteRowTopology _ Matrix _ _ _ _ := by
+  let recover : MatrixPair →ₗ[ℂ] Matrix :=
+    { toFun := fun x i j ↦ x.1 i j + x.2 i j
+      map_add' := fun x y ↦ by
+        funext i j
+        change (x.1 i j + y.1 i j) + (x.2 i j + y.2 i j) = _
+        exact add_add_add_comm _ _ _ _
+      map_smul' := fun a x ↦ by
+        funext i j
+        change a * x.1 i j + a * x.2 i j = a * (x.1 i j + x.2 i j)
+        exact (mul_add _ _ _).symm }
+  have hrecover : Continuous recover := by
+    refine continuous_pi fun i ↦ continuous_pi fun j ↦ ?_
+    apply Continuous.add _ ((continuous_apply j).comp ((continuous_apply i).comp continuous_snd))
+    exact (BoundedContinuousFunction.lipschitz_eval_const j).continuous.comp
+      (ZeroAtInftyContinuousMap.isometry_toBCF.continuous.comp
+        ((continuous_apply i).comp continuous_fst))
+  have hstage (n : ℕ) : Continuous (fun x : finiteRowSourceStage n ↦ recover x.val.val) :=
+    hrecover.comp (continuous_subtype_val.comp continuous_subtype_val)
+  have hpre (p : Seminorm ℂ Matrix) (hp : Continuous p) (n : ℕ) :
+      Continuous (p.comp (recover.comp finiteRowSource.subtype) ∘ (finiteRowSourceStage n).subtype) :=
+    hp.comp (hstage n)
+  let : TopologicalSpace finiteRowSource := finiteRowTopology
+  let : IsTopologicalAddGroup finiteRowSource := finiteRow_isTopologicalAddGroup
+  refine ⟨recover.comp finiteRowSource.subtype, ?_⟩
+  apply (PolynormableSpace.withSeminorms ℂ Matrix).continuous_of_continuous_comp
+  intro p
+  exact finiteRow_withSeminorms.continuous_seminorm
+    ⟨p.val.comp (recover.comp finiteRowSource.subtype), hpre p.val p.property⟩
+
+/-- The null-row family enters the source with no correction. -/
+private def nullRowsInclusion (a : NullRows) : finiteRowSource :=
+  ⟨(a, 0), le_iSup finiteRowStage 0 (mem_finiteRowStage.mpr fun _ _ ↦ rfl)⟩
+
+/-- The same row can be used as the correction in all rows below a fixed cutoff. -/
+private def firstCorrectionRows (n : ℕ) (r : ℕ → ℂ) : finiteRowSource :=
+  ⟨(0, fun i ↦ if i < n then r else 0),
+    le_iSup finiteRowStage n (mem_finiteRowStage.mpr fun _ hi ↦ ite_eq_right hi.not_gt)⟩
+
+/-- The quotient by the kernel of row recovery has a Cauchy sequence of partial
+constant-one matrices. Its putative limit has no representative with finitely many corrections. -/
+private theorem incomplete_finiteRowQuotient :
+    letI := finiteRowTopology
+    letI := finiteRow_isTopologicalAddGroup
+    ¬ @CompleteSpace (finiteRowSource ⧸ finiteRowRecover.ker)
+      (IsTopologicalAddGroup.rightUniformSpace (finiteRowSource ⧸ finiteRowRecover.ker)) := by
+  -- Establish the continuity of the two ways of supplying the same finite row truncations.
+  let stageTopology (n : ℕ) : TopologicalSpace (finiteRowSourceStage n) := inferInstance
+  let liftNull (a : NullRows) : finiteRowSourceStage 0 :=
+    ⟨nullRowsInclusion a, mem_finiteRowStage.mpr fun _ _ ↦ rfl⟩
+  let liftParts (n : ℕ) (r : ℕ → ℂ) : finiteRowSourceStage n :=
+    ⟨firstCorrectionRows n r, mem_finiteRowStage.mpr fun _ hi ↦ ite_eq_right hi.not_gt⟩
+  have hLiftNull : Continuous liftNull :=
+    ((continuous_id.prodMk continuous_const).subtype_mk _).subtype_mk _
+  have hLiftParts (n : ℕ) : Continuous (liftParts n) := by
+    refine ((continuous_const.prodMk (continuous_pi fun i ↦ ?_)).subtype_mk _).subtype_mk _
+    by_cases hi : i < n
+    · simpa only [ite_eq_left hi] using (show Continuous (fun r : ℕ → ℂ ↦ r) from continuous_id)
+    · simpa only [ite_eq_right hi] using (continuous_const : Continuous (fun _ : ℕ → ℂ ↦ (0 : ℕ → ℂ)))
+  let : TopologicalSpace finiteRowSource := finiteRowTopology
+  have hnull : Continuous nullRowsInclusion :=
+    @Continuous.comp _ _ _ _ (stageTopology 0) finiteRowTopology _ _
+      (finiteRow_inclusion_continuous 0) hLiftNull
+  have hparts (n : ℕ) : Continuous (firstCorrectionRows n) :=
+    @Continuous.comp _ _ _ _ (stageTopology n) finiteRowTopology _ _
+      (finiteRow_inclusion_continuous n) (hLiftParts n)
+  let : IsTopologicalAddGroup finiteRowSource := finiteRow_isTopologicalAddGroup
+  let M : Submodule ℂ finiteRowSource := finiteRowRecover.ker
+  let Q := finiteRowSource ⧸ M
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  let : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+  let q : finiteRowSource →L[ℂ] Q := M.mkQL
+  let recover : Q →L[ℂ] Matrix := M.liftQL finiteRowRecover le_rfl
+  let y (n : ℕ) : Q := q (firstCorrectionRows n 1)
+  have htruncate : Tendsto (fun k ↦ (truncatedOneRow k : ℕ → ℂ)) atTop (𝓝 1) := by
+    apply tendsto_pi_nhds.mpr
+    intro j
+    apply tendsto_atTop_of_eventually_const (i₀ := j + 1)
+    intro k hk
+    exact ite_eq_left (show j < k from hk)
+  have hexchange (m k : ℕ) :
+      q (firstCorrectionRows m (truncatedOneRow k)) =
+        q (nullRowsInclusion fun i ↦ if i < m then truncatedOneRow k else 0) := by
+    change M.mkQ _ = M.mkQ _
+    simp only [Submodule.mkQ_apply, Submodule.Quotient.eq]
+    change finiteRowRecover (_ - _) = 0
+    rw [map_sub, sub_eq_zero]
+    funext i j
+    change 0 + (if i < m then (truncatedOneRow k : ℕ → ℂ) else 0) j =
+      (if i < m then truncatedOneRow k else 0) j + 0
+    simp only [zero_add, add_zero]
+    split <;> rfl
+  have hy : CauchySeq y := by
+    rw [cauchySeq_iff_sub_mem]
+    intro U hU
+    obtain ⟨V, hV, hclosed, hVU⟩ := exists_mem_nhds_isClosed_subset hU
+    have hpre : (fun a : NullRows ↦ q (nullRowsInclusion a)) ⁻¹' V ∈ 𝓝 0 :=
+      (q.continuous.comp hnull).continuousAt.preimage_mem_nhds
+        (show V ∈ 𝓝 (q (nullRowsInclusion 0)) from
+          (show q (nullRowsInclusion 0) = 0 from map_zero q) ▸ hV)
+    rw [nhds_pi, Filter.mem_pi'] at hpre
+    obtain ⟨s, W, hW, hsub⟩ := hpre
+    refine ⟨s.sup id + 1, fun m hm n hn ↦ hVU ?_⟩
+    have hlim (l : ℕ) : Tendsto (fun k ↦ q (firstCorrectionRows l (truncatedOneRow k)))
+        atTop (𝓝 (y l)) := ((q.continuous.comp (hparts l)).tendsto 1).comp htruncate
+    apply hclosed.mem_of_tendsto ((hlim m).sub (hlim n))
+    filter_upwards with k
+    rw [hexchange, hexchange, ← map_sub]
+    have hsubtraction (a b : NullRows) :
+        nullRowsInclusion a - nullRowsInclusion b = nullRowsInclusion (a - b) :=
+      Subtype.ext (Prod.ext rfl (sub_self (0 : Matrix)))
+    rw [hsubtraction]
+    apply hsub
+    intro i hi
+    have hi' : i ≤ s.sup id := Finset.le_sup (f := id) hi
+    change (if i < m then truncatedOneRow k else 0) -
+      (if i < n then truncatedOneRow k else 0) ∈ W i
+    rw [ite_eq_left (show i < m by omega), ite_eq_left (show i < n by omega), sub_self]
+    exact mem_of_mem_nhds (hW i)
+  intro hcomplete
+  have : CompleteSpace Q := hcomplete
+  obtain ⟨z, hz⟩ := cauchySeq_tendsto_of_complete hy
+  obtain ⟨x, rfl⟩ := M.mkQ_surjective z
+  obtain ⟨i, hi⟩ := (Submodule.mem_iSup_of_directed _ finiteRowStage_mono.directed_le).mp x.property
+  have hzero := mem_finiteRowStage.mp hi i le_rfl
+  have hconst (j : ℕ) : x.val.1 i j = 1 := by
+    have hentry : Tendsto (fun n ↦ recover (y n) i j) atTop (𝓝 (finiteRowRecover x i j)) :=
+      (((continuous_apply j).comp ((continuous_apply i).comp recover.continuous)).tendsto
+        (M.mkQ x)).comp hz
+    have heq := tendsto_nhds_unique hentry (tendsto_atTop_of_eventually_const (i₀ := i + 1) (by
+      intro n hn
+      change 0 + (if i < n then (1 : ℕ → ℂ) else 0) j = 1
+      rw [ite_eq_left (show i < n from hn), zero_add]
+      rfl))
+    change x.val.1 i j + x.val.2 i j = 1 at heq
+    simpa only [hzero, Pi.zero_apply, add_zero] using heq
+  have hlim := zero_at_infty (x.val.1 i)
+  rw [show (⇑(x.val.1 i)) = (fun _ ↦ 1) from funext hconst] at hlim
+  exact one_ne_zero (tendsto_nhds_unique tendsto_const_nhds hlim)
+
 /-- Paper: Example C.1.4.6(4), p. 663. A Hausdorff quotient of a strict LF-space can
 fail to be strict. -/
 theorem exists_quotient_not_strictLF :
     ∃ (E : Type) (_ : AddCommGroup E) (_ : Module ℂ E) (_ : TopologicalSpace E),
       IsStrictLFSpace E ∧ ∃ M : Submodule ℂ E, IsClosed (M : Set E) ∧
-        ¬ IsStrictLFSpace (E ⧸ M) := by sorry
+        ¬ IsStrictLFSpace (E ⧸ M) := by
+  let : TopologicalSpace finiteRowSource := finiteRowTopology
+  let : IsTopologicalAddGroup finiteRowSource := finiteRow_isTopologicalAddGroup
+  refine ⟨finiteRowSource, inferInstance, inferInstance, finiteRowTopology, strictLF_finiteRowSource,
+    finiteRowRecover.ker, finiteRowRecover.isClosed_ker, ?_⟩
+  exact fun h ↦ incomplete_finiteRowQuotient h.completeSpace
+
+end StrictLFQuotient
 
 /-- A point outside a stage of a system of closed embeddings is detected by a continuous
 seminorm on the limit that vanishes on that stage. -/
