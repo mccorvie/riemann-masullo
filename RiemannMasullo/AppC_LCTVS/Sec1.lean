@@ -8,6 +8,7 @@ public import Mathlib.Analysis.LocallyConvex.WeakSpace
 public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import Mathlib.Algebra.Module.ULift
+import Mathlib.Analysis.LocallyConvex.Barrelled
 import Mathlib.Analysis.LocallyConvex.Separation
 import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Lp.lpSpace
@@ -1456,13 +1457,168 @@ theorem isLimitSubspace_top [T2Space E] (hX : ∀ k, IsFrechetTVS (X k))
       exact le_rfl
   exact hq.topology_eq_withSeminorms
 
+/-- Lower semicontinuous seminorms on an LF-space are continuous, since their restrictions
+to its Fréchet stages are continuous by the Baire category theorem. -/
+private theorem IsLFSpace.barrelled {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (hE : IsLFSpace E) : BarrelledSpace ℂ E := by
+  obtain ⟨_, X, _, _, _, hX, j, i, h⟩ := hE
+  refine ⟨fun p hp ↦ ?_⟩
+  have hP : WithSeminorms
+      (Subtype.val : {q : Seminorm ℂ E // ∀ k, Continuous (q ∘ (i k).toLinearMap)} →
+        Seminorm ℂ E) := ⟨h.topology_eq⟩
+  apply hP.continuous_seminorm (i := ⟨p, ?_⟩)
+  intro k
+  obtain ⟨hadd, hpoly, hmetric, hcomplete⟩ := hX k
+  let : UniformSpace (X k) := IsTopologicalAddGroup.rightUniformSpace (X k)
+  let : IsUniformAddGroup (X k) := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace (X k) := hcomplete
+  let : ContinuousSMul ℂ (X k) := PolynormableSpace.continuousSMul ℂ (X k)
+  have : (uniformity (X k)).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero (X k)]
+    infer_instance
+  have : BaireSpace (X k) := by
+    let := UniformSpace.metricSpace (X k)
+    infer_instance
+  exact (p.comp (i k).toLinearMap).continuous_of_lowerSemicontinuous (hp.comp (i k).continuous)
+
 /-- Paper: Example C.1.5.7, p. 666. Some countable locally convex direct sum of Banach
 spaces has a closed linear subspace which, in its subspace topology, is not an LF-space. -/
 theorem exists_closed_subspace_not_LF :
     ∃ (Y : ℕ → Type) (_ : ∀ k, NormedAddCommGroup (Y k)) (_ : ∀ k, NormedSpace ℂ (Y k))
       (_ : ∀ k, CompleteSpace (Y k)),
       letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Y)
-      ∃ F : Submodule ℂ (⨁ k, Y k), IsClosed (F : Set (⨁ k, Y k)) ∧ ¬ IsLFSpace F := by sorry
+      ∃ F : Submodule ℂ (⨁ k, Y k), IsClosed (F : Set (⨁ k, Y k)) ∧ ¬ IsLFSpace F := by
+  classical
+  let B : Type := lp (fun _ : ℕ × ℕ ↦ ℂ) ⊤
+  let Y : ℕ → Type := fun _ ↦ B
+  refine ⟨Y, fun _ ↦ inferInstanceAs (NormedAddCommGroup B),
+    fun _ ↦ inferInstanceAs (NormedSpace ℂ B), fun _ ↦ inferInstanceAs (CompleteSpace B), ?_⟩
+  let D := ⨁ k, Y k
+  let lof := DirectSum.lof ℂ ℕ Y
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  let P : SeminormFamily ℂ D {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lof k)} := Subtype.val
+  have hP : WithSeminorms P := ⟨rfl⟩
+  let : PolynormableSpace ℂ D := hP.toPolynormableSpace
+  have hlof (k : ℕ) : Continuous (lof k) :=
+    hP.continuous_of_continuous_comp _ fun p ↦ p.property k
+  let coord (k : ℕ) : D →L[ℂ] B := ⟨DirectSum.component ℂ ℕ Y k, by
+    apply (norm_withSeminorms ℂ B).continuous_of_continuous_comp
+    intro i
+    apply hP.continuous_seminorm (i := ⟨_, ?_⟩)
+    intro l
+    change Continuous (fun x : Y l ↦ ‖DirectSum.component ℂ ℕ Y k (lof l x)‖)
+    by_cases h : l = k
+    · subst l
+      simpa only [lof, DirectSum.component.of, dite_true]
+        using (continuous_norm : Continuous fun x : B ↦ ‖x‖)
+    · simpa only [lof, DirectSum.component.of, h, dite_false, norm_zero] using (continuous_const : Continuous fun _ : B ↦ (0 : ℝ))⟩
+  let ev (k : ℕ) (j : ℕ × ℕ) : D →L[ℂ] ℂ :=
+    (lp.evalCLM ℂ (fun _ : ℕ × ℕ ↦ ℂ) ⊤ j).comp (coord k)
+  have hev (k : ℕ) (j : ℕ × ℕ) (x : D) : ev k j x = x k j := rfl
+  -- The (n,m) entry of the zeroth summand is (m+1) times that of the (n+1)st summand.
+  let eqn (j : ℕ × ℕ) : D →L[ℂ] ℂ := ev 0 j - ((j.2 + 1 : ℕ) : ℂ) • ev (j.1 + 1) j
+  let F : Submodule ℂ D := ⨅ j, (eqn j).ker
+  have hF (x : D) : x ∈ F ↔ ∀ j : ℕ × ℕ, x 0 j = ((j.2 + 1 : ℕ) : ℂ) * x (j.1 + 1) j := by
+    simp [F, eqn, Submodule.mem_iInf, LinearMap.mem_ker, hev, sub_eq_zero]
+  refine ⟨F, ?_, ?_⟩
+  · change IsClosed (↑(⨅ j, (eqn j).ker) : Set D)
+    rw [Submodule.coe_iInf]
+    exact isClosed_iInter fun j ↦ (eqn j).isClosed_ker
+  intro hLF
+  let : BarrelledSpace ℂ F := hLF.barrelled
+  let p (j : ℕ × ℕ) : Seminorm ℂ F := (normSeminorm ℂ ℂ).comp
+    (((j.1 + 1 : ℕ) : ℂ) • (ev 0 j).toLinearMap.comp F.subtype)
+  have hp (j : ℕ × ℕ) (x : F) : p j x = (j.1 + 1 : ℕ) * ‖x.val 0 j‖ := by
+    change ‖((j.1 + 1 : ℕ) : ℂ) * ev 0 j x.val‖ = _
+    rw [norm_mul, Complex.norm_natCast, hev]
+  have hpcont (j : ℕ × ℕ) : Continuous (p j) := by
+    exact (((ev 0 j).continuous.comp continuous_subtype_val).const_mul _).norm
+  -- Every vector has only finitely many nonzero rows in the zeroth summand.
+  have hbdd : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr fun x ↦ by
+    refine ⟨((x.val.support.sup (id : ℕ → ℕ) : ℕ) : ℝ) * ‖x.val 0‖, ?_⟩
+    rintro _ ⟨j, rfl⟩
+    change p j x ≤ _
+    rw [hp]
+    by_cases hj : j.1 + 1 ∈ x.val.support
+    · exact mul_le_mul (Nat.cast_le.mpr (Finset.le_sup (f := id) hj))
+        (lp.norm_apply_le_norm ENNReal.top_ne_zero (x.val 0) j) (norm_nonneg _) (by positivity)
+    · have hzero := DFinsupp.notMem_support_iff.mp hj
+      rw [(hF x.val).mp x.property j, hzero]
+      simp
+      positivity
+  let q : Seminorm ℂ F := ⨆ j, p j
+  have hq : Continuous q := by
+    simpa only [q, Seminorm.coe_iSup_eq hbdd] using Seminorm.continuous_iSup p hpcont hbdd
+  have hball := q.ball_mem_nhds hq (r := 1) zero_lt_one
+  rw [show 𝓝 (0 : F) = comap Subtype.val (𝓝 (0 : D)) from nhds_subtype_eq_comap] at hball
+  obtain ⟨U, hU, hUsub⟩ := Filter.mem_comap.mp hball
+  obtain ⟨s, hs, hsU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ D).mem_iff.mp hU
+  choose C hC hsC using fun k ↦
+    (s.comp (lof k)).bound_of_continuous_normedSpace (hs.comp (hlof k))
+  -- In any ambient zero-neighborhood, put a small entry in a sufficiently high row and
+  -- use a sufficiently large column to make its required auxiliary coordinate small too.
+  obtain ⟨n, hn⟩ := exists_nat_gt (2 * C 0)
+  obtain ⟨m, hm⟩ := exists_nat_gt (2 * C (n + 1))
+  let j : ℕ × ℕ := (n, m)
+  let a : ℂ := ((n + 1 : ℕ) : ℂ)⁻¹
+  let b : ℂ := a / ((m + 1 : ℕ) : ℂ)
+  let v : B := lp.single ⊤ j a
+  let w : B := lp.single ⊤ j b
+  let x : D := lof 0 v + lof (n + 1) w
+  have hx0 : x 0 = v := by
+    simp [x, lof, DirectSum.lof_eq_of, DirectSum.add_apply, DirectSum.of_eq_of_ne]
+  have hxk (k : ℕ) : x (k + 1) = if k = n then w else 0 := by
+    by_cases hk : k = n
+    · subst k
+      simp [x, lof, DirectSum.lof_eq_of, DirectSum.add_apply, DirectSum.of_eq_of_ne]
+    · simp [x, lof, DirectSum.lof_eq_of, DirectSum.add_apply, DirectSum.of_eq_of_ne, hk]
+  have hxF : x ∈ F := by
+    rw [hF]
+    intro l
+    rw [hx0, hxk]
+    by_cases hlj : l = j
+    · subst l
+      have hm0 : ((m + 1 : ℕ) : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (Nat.succ_ne_zero _)
+      simpa [j, v, w, b] using (mul_div_cancel₀ a hm0).symm
+    · rw [show v l = 0 from lp.single_apply_ne _ _ _ hlj]
+      split_ifs
+      · rw [show w l = 0 from lp.single_apply_ne _ _ _ hlj, mul_zero]
+      · simp
+  have ha : ‖a‖ = ((n + 1 : ℕ) : ℝ)⁻¹ := by
+    change ‖((n + 1 : ℕ) : ℂ)⁻¹‖ = _
+    rw [norm_inv, Complex.norm_natCast]
+  have ha_le : ‖a‖ ≤ 1 := by
+    rw [ha, inv_le_one₀ (by positivity)]
+    exact_mod_cast Nat.succ_le_succ (Nat.zero_le n)
+  have hxU : x ∈ U := by
+    apply hsU
+    rw [Seminorm.mem_ball_zero]
+    calc
+      s x ≤ s (lof 0 v) + s (lof (n + 1) w) := map_add_le_add _ _ _
+      _ ≤ C 0 * ‖v‖ + C (n + 1) * ‖w‖ := add_le_add (hsC 0 v) (hsC (n + 1) w)
+      _ < 1 := by
+        rw [lp.norm_single (by simp : (0 : ENNReal) < ⊤),
+          lp.norm_single (by simp : (0 : ENNReal) < ⊤)]
+        have hfirst : C 0 * ‖a‖ < 1 / 2 := by
+          rw [ha, ← div_eq_mul_inv, div_lt_iff₀ (by positivity), Nat.cast_succ]
+          linarith
+        have hsecond : C (n + 1) * ‖b‖ < 1 / 2 := by
+          change C (n + 1) * ‖a / ((m + 1 : ℕ) : ℂ)‖ < 1 / 2
+          rw [norm_div, Complex.norm_natCast, ← mul_div_assoc,
+            div_lt_iff₀ (by positivity), Nat.cast_succ]
+          have hbound := mul_le_of_le_one_right (hC (n + 1)).le ha_le
+          linarith
+        linarith
+  have hsmall : q ⟨x, hxF⟩ < 1 := by
+    simpa only [Seminorm.mem_ball_zero] using hUsub (a := ⟨x, hxF⟩) hxU
+  have hlarge : p j ⟨x, hxF⟩ = 1 := by
+    rw [hp]
+    change ((n + 1 : ℕ) : ℝ) * ‖x 0 j‖ = 1
+    rw [hx0]
+    change ((n + 1 : ℕ) : ℝ) * ‖lp.single (E := fun _ : ℕ × ℕ ↦ ℂ) ⊤ j a j‖ = 1
+    rw [lp.single_apply_self, ha]
+    exact mul_inv_cancel₀ (by positivity)
+  exact (not_lt_of_ge ((le_ciSup hbdd j) ⟨x, hxF⟩)) (hlarge ▸ hsmall)
 
 -- TODO(paper-gap): Footnotes 2–4 on p. 667 leave the explicit Köthe space, the two
 -- strong topologies, and the justification for the subspace example unspecified.
