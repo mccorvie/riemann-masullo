@@ -15,6 +15,11 @@ import Mathlib.Analysis.LocallyConvex.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
+import Mathlib.Analysis.Normed.Group.Ultra
+import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
+import Mathlib.Topology.Connected.LocallyConnected
 
 /-!
 # Schwartz–Bruhat functions
@@ -686,11 +691,263 @@ section FinitePlaces
 
 variable (F : Type u) [Field F] [NumberField F]
 
+section
+
+variable (w : Places(F))
+local notation "G" => Multiplicative (w.adicCompletion F)
+
+/-- The compact sets of the additive completion are contained in compact open subgroups. -/
+private theorem finitePlace_exists_compactOpenSubgroup {s : Set G} (hs : IsCompact s) :
+    ∃ H : OpenSubgroup G, IsCompact (H : Set G) ∧ s ⊆ H := by
+  let := properSpace_adicCompletion w (K := F)
+  have hs' : IsCompact (Multiplicative.toAdd '' s) := hs.image continuous_toAdd
+  obtain ⟨r, hr⟩ := (Metric.isBounded_iff_subset_closedBall 0).1 hs'.isBounded
+  let B := IsUltrametricDist.closedBall_openAddSubgroup (w.adicCompletion F)
+    (lt_max_of_lt_right (zero_lt_one' ℝ) : 0 < max r 1)
+  let H : OpenSubgroup G := ⟨B.toAddSubgroup.toSubgroup, B.isOpen⟩
+  refine ⟨H, isCompact_closedBall (0 : w.adicCompletion F) _, fun x hx ↦ ?_⟩
+  exact Metric.closedBall_subset_closedBall (le_max_left r _) (hr (mem_image_of_mem _ hx))
+
+/-- The open subgroup of a structural pair for the additive completion is compact. -/
+private theorem finitePlace_bruhatSubgroup_compact (a : BruhatStructuralPair G) :
+    IsCompact (a.val.1 : Set G) := by
+  obtain ⟨U, -, hU, hgen⟩ := a.property.2.1
+  obtain ⟨H, hH, hUH⟩ :=
+    finitePlace_exists_compactOpenSubgroup F w (hU.image continuous_subtype_val)
+  refine hH.of_isClosed_subset (a.val.1.isClosed_of_isOpen a.property.1) ?_
+  have h := ((H.toSubgroup.comap a.val.1.subtype).closure_le).2
+    (fun x hx ↦ hUH (mem_image_of_mem _ hx))
+  rw [hgen] at h
+  exact fun x hx ↦ h (Subgroup.mem_top (x := (⟨x, hx⟩ : a.val.1)))
+
+/-- Every elementary quotient in a structural pair for the additive completion is discrete. -/
+private theorem finitePlace_bruhatQuotient_discrete (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) : DiscreteTopology a.quotient := by
+  let := e.finiteGroup
+  -- Pull back the neighborhood, then send an open subgroup inside it to the quotient.
+  let : NonarchimedeanGroup a.quotient := {
+    is_nonarchimedean := fun U hU ↦ by
+      let q := QuotientGroup.mk' ((OrderDual.ofDual a.val.2).comap a.val.1.subtype)
+      have hq : Continuous q := QuotientGroup.continuous_mk
+      have hpre : q ⁻¹' U ∈ 𝓝 (1 : a.val.1) :=
+        hq.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+      change q ⁻¹' U ∈ 𝓝 (⟨1, a.val.1.one_mem⟩ : a.val.1) at hpre
+      rw [nhds_subtype_eq_comap] at hpre
+      obtain ⟨V, hV, hsub⟩ := mem_comap.mp hpre
+      have hV' : Multiplicative.ofAdd ⁻¹' V ∈ 𝓝 (0 : w.adicCompletion F) :=
+        continuous_ofAdd.continuousAt.preimage_mem_nhds hV
+      obtain ⟨B, hB⟩ := NonarchimedeanAddGroup.is_nonarchimedean _ hV'
+      let H := OpenSubgroup.comap a.val.1.subtype continuous_subtype_val
+        (⟨B.toAddSubgroup.toSubgroup, B.isOpen⟩ : OpenSubgroup G)
+      refine ⟨⟨H.toSubgroup.map q, QuotientGroup.isOpenMap_coe _ H.isOpen⟩, ?_⟩
+      rintro _ ⟨x, hx, rfl⟩
+      exact hsub (hB hx) }
+  let : T1Space a.quotient := QuotientGroup.t1Space_iff.2
+    (a.property.2.2.1.1.preimage continuous_subtype_val)
+  let : T2Space a.quotient := inferInstance
+  let : LocallyConnectedSpace (AddCircle (1 : ℝ)) :=
+    (QuotientAddGroup.isQuotientMap_mk _).isCoinducing.locallyConnectedSpace
+  let : LocallyConnectedSpace (Multiplicative
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder))) := by
+    change LocallyConnectedSpace
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder))
+    infer_instance
+  let : LocallyConnectedSpace a.quotient :=
+    e.equiv.symm.toHomeomorph.isQuotientMap.isCoinducing.locallyConnectedSpace
+  refine discreteTopology_iff_isOpen_singleton_one.2 ?_
+  rw [← totallyDisconnectedSpace_iff_connectedComponent_singleton.1 inferInstance (1 : a.quotient)]
+  exact isOpen_connectedComponent
+
+/-- Each realized stage on the additive completion is locally constant and compactly supported. -/
+private theorem finitePlace_bruhatStage_locallyConstant_compactSupport
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) :
+    IsLocallyConstant (schwartzBruhatStageRealization a e s) ∧
+      HasCompactSupport (schwartzBruhatStageRealization a e s) := by
+  classical
+  let := e.finiteGroup
+  let := finitePlace_bruhatQuotient_discrete F w a e
+  refine ⟨(IsLocallyConstant.iff_exists_open _).2 fun x ↦ ?_, ?_⟩
+  · by_cases hx : x ∈ a.val.1
+    · let q : a.val.1 → a.quotient := QuotientGroup.mk
+      let V := q ⁻¹' {q ⟨x, hx⟩}
+      have hV : IsOpen V := (isOpen_discrete _).preimage QuotientGroup.continuous_mk
+      refine ⟨Subtype.val '' V, a.property.1.isOpenEmbedding_subtypeVal.isOpenMap _ hV,
+        ⟨⟨x, hx⟩, rfl, rfl⟩, ?_⟩
+      rintro _ ⟨y, hy, rfl⟩
+      have heq : q y = q ⟨x, hx⟩ := hy
+      simp only [schwartzBruhatStageRealization_apply, dite_eq_left y.property, dite_eq_left hx]
+      exact congrArg (fun z ↦ s (Multiplicative.toAdd (e.equiv z))) heq
+    · refine ⟨(a.val.1 : Set G)ᶜ, (a.val.1.isClosed_of_isOpen a.property.1).isOpen_compl, hx, ?_⟩
+      intro y hy
+      change y ∉ a.val.1 at hy
+      simp only [schwartzBruhatStageRealization_apply, dite_eq_right hy, dite_eq_right hx]
+  · apply HasCompactSupport.of_support_subset_isCompact (finitePlace_bruhatSubgroup_compact F w a)
+    intro x hx
+    by_contra h
+    change x ∉ a.val.1 at h
+    exact hx (by simp only [schwartzBruhatStageRealization_apply, dite_eq_right h])
+
+open Classical in
+set_option maxRecDepth 2048 in
+/-- Every function on a finite cyclic structural quotient realizes a Schwartz–Bruhat function. -/
+private theorem finitePlace_mem_cyclicStage (a : BruhatStructuralPair G)
+    [Finite a.quotient] [DiscreteTopology a.quotient] (ha : IsCyclic a.quotient)
+    (f : a.quotient → ℂ) :
+    (fun x : G ↦ if hx : x ∈ a.val.1 then f (QuotientGroup.mk ⟨x, hx⟩) else 0) ∈
+      schwartzBruhatSubmodule G := by
+  classical
+  let n := Nat.card a.quotient
+  let : NeZero n := ⟨Nat.card_ne_zero.mpr ⟨inferInstance, inferInstance⟩⟩
+  let j : a.quotient ≃* Multiplicative (Fin n) :=
+    (zmodCyclicMulEquiv ha).symm.trans (ZMod.finEquiv n).symm.toAddEquiv.toMultiplicative
+  let k : Multiplicative (ElementaryLieGroup 0 0 0 (Fin n)) ≃* Multiplicative (Fin n) :=
+    { toEquiv := (Equiv.uniqueProd _ _).trans ((Equiv.uniqueProd _ _).trans (Equiv.uniqueProd _ _))
+      map_mul' := fun _ _ ↦ rfl }
+  let e : ElementaryLCAPresentation a.quotient :=
+    ⟨0, 0, 0, n, Fin.addCommGroup n, (j.trans k.symm).toContinuousMulEquiv
+      (fun S ↦ iff_of_true (isOpen_discrete _) (isOpen_discrete _))⟩
+  let g : ElementaryLieGroup 0 0 0 (Fin n) → ℂ := fun z ↦ f (e.equiv.symm (Multiplicative.ofAdd z))
+  have hg : g ∈ elementarySchwartzSubmodule 0 0 0 (Fin n) := by
+    refine ⟨fun z b ↦ ?_, fun i ↦ ?_⟩
+    · have heq : (fun x ↦ g (elementaryCover x z b)) = fun _ ↦ g (elementaryCover 0 z b) :=
+        funext fun x ↦ congrArg (fun y ↦ g (elementaryCover y z b)) (Subsingleton.elim x 0)
+      rw [heq]
+      exact contDiff_const
+    · rw [Subsingleton.elim i (0, 0, 0, 0), elementarySchwartzBound_zero]
+      let M := Finset.univ.sup fun z ↦ ‖g z‖₊
+      exact (iSup_le fun z ↦ ENNReal.coe_le_coe.2 (Finset.le_sup (Finset.mem_univ z))).trans_lt
+        (ENNReal.coe_lt_top (r := M))
+  let s : SchwartzBruhatStage e := ⟨g, hg⟩
+  apply Submodule.mem_iSup_of_mem a
+  apply Submodule.mem_iSup_of_mem e
+  refine ⟨s, funext fun x ↦ ?_⟩
+  by_cases hx : x ∈ a.val.1
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_left hx]
+    exact congrArg f (e.equiv.symm_apply_apply (QuotientGroup.mk ⟨x, hx⟩))
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx]
+
+open Classical in
+/-- A character on a finite quotient of a compact open subgroup, extended by zero, is
+Schwartz–Bruhat because its image is cyclic. -/
+private theorem finitePlace_mem_characterStage (H : OpenSubgroup G) (hH : IsCompact (H : Set G))
+    (L : Subgroup H.toSubgroup) (hL : IsOpen (L : Set H.toSubgroup))
+    (ψ : AddChar (Additive (H.toSubgroup ⧸ L)) ℂ) :
+    (fun x : G ↦ if hx : x ∈ H.toSubgroup then ψ (QuotientGroup.mk ⟨x, hx⟩) else 0) ∈
+      schwartzBruhatSubmodule G := by
+  classical
+  let : LocallyCompactSpace G := locallyCompactSpace_adicCompletion w (K := F)
+  let Q := H.toSubgroup ⧸ L
+  let : DiscreteTopology Q := QuotientGroup.discreteTopology hL
+  let φ : H.toSubgroup →* ℂ := ψ.toMonoidHom.comp (QuotientGroup.mk' L)
+  let K := φ.ker.map H.toSubgroup.subtype
+  have hKopen : IsOpen (K : Set G) := by
+    apply H.isOpen.isOpenEmbedding_subtypeVal.isOpenMap
+    change IsOpen ((QuotientGroup.mk : H.toSubgroup → Q) ⁻¹' (ψ ⁻¹' {1}))
+    exact (isOpen_discrete _).preimage QuotientGroup.continuous_mk
+  have hKH : K ≤ H.toSubgroup := fun _ ⟨x, _, hx⟩ ↦ hx ▸ x.property
+  have hKclosed := K.isClosed_of_isOpen hKopen
+  let : CompactSpace H.toSubgroup := isCompact_iff_compactSpace.1 hH
+  let : CompactSpace (lcaAnnihilator K) :=
+    isCompact_iff_compactSpace.1 (isCompact_lcaAnnihilator K hKopen)
+  let a : BruhatStructuralPair G :=
+    ⟨⟨H.toSubgroup, OrderDual.toDual K⟩, H.isOpen, isCompactlyGeneratedGroup_of_compact,
+      ⟨hKclosed, isOpen_lcaAnnihilator K (hH.of_isClosed_subset hKclosed hKH),
+        (show IsCompactlyGeneratedGroup (lcaAnnihilator K) from
+          isCompactlyGeneratedGroup_of_compact)⟩, hKH⟩
+  let : DiscreteTopology a.quotient :=
+    QuotientGroup.discreteTopology (hKopen.preimage continuous_subtype_val)
+  let : Finite a.quotient := finite_of_compact_of_discrete
+  have hker : K.comap H.toSubgroup.subtype = φ.ker :=
+    Subgroup.comap_map_eq_self_of_injective Subtype.val_injective _
+  let i : a.quotient →* ℂ := QuotientGroup.lift _ φ hker.le
+  have hi : Injective i := (QuotientGroup.injective_lift_iff _ φ hker.le).2 hker
+  exact finitePlace_mem_cyclicStage F w a (isCyclic_of_injective_ringHom i hi) i
+
+/-- A compactly supported, locally constant function descends to a finite quotient on a compact
+open subgroup. Extending the Fourier expansion on that quotient by zero gives Bruhat membership. -/
+private theorem finitePlace_mem_of_locallyConstant_compactSupport
+    (f : G → ℂ) (hf : IsLocallyConstant f) (hc : HasCompactSupport f) :
+    f ∈ schwartzBruhatSubmodule G := by
+  classical
+  obtain ⟨H, hH, hs⟩ := finitePlace_exists_compactOpenSubgroup F w hc
+  have hO : IsOpen {p : G × G | f (p.1 * p.2) = f p.1} := by
+    convert ((hf.comp_continuous continuous_mul).comp₂ (hf.comp_continuous continuous_fst) Eq) {True}
+      using 1
+    ext p
+    change (f (p.1 * p.2) = f p.1) ↔ (f (p.1 * p.2) = f p.1) = True
+    simp
+  obtain ⟨_, V, _, hV, hHV, h1V, hprod⟩ := generalized_tube_lemma hH isCompact_singleton hO
+    (show (H : Set G) ×ˢ ({1} : Set G) ⊆ _ by
+      rintro ⟨x, y⟩ ⟨_, hy⟩
+      obtain rfl := mem_singleton_iff.mp hy
+      simp)
+  have hnhds : Multiplicative.ofAdd ⁻¹' V ∈ 𝓝 (0 : w.adicCompletion F) :=
+    continuous_ofAdd.continuousAt.preimage_mem_nhds (hV.mem_nhds (h1V (mem_singleton 1)))
+  obtain ⟨B, hB⟩ := NonarchimedeanAddGroup.is_nonarchimedean _ hnhds
+  let L := B.toAddSubgroup.toSubgroup.comap H.toSubgroup.subtype
+  let Q := H.toSubgroup ⧸ L
+  have hL : IsOpen (L : Set H.toSubgroup) := B.isOpen.preimage continuous_subtype_val
+  let : CompactSpace H.toSubgroup := isCompact_iff_compactSpace.1 hH
+  let : DiscreteTopology Q := QuotientGroup.discreteTopology hL
+  let : Finite Q := finite_of_compact_of_discrete
+  let f₀ : Additive Q → ℂ :=
+    Quotient.lift (fun x : H.toSubgroup ↦ f x.val) (by
+      intro x y hxy
+      have heq : (QuotientGroup.mk x : Q) = QuotientGroup.mk y := Quotient.sound hxy
+      have hmem : x⁻¹ * y ∈ L := (QuotientGroup.eq (s := L)).mp heq
+      have hmemV : (x : G)⁻¹ * (y : G) ∈ V := hB hmem
+      have hh := hprod (mk_mem_prod (hHV x.property) hmemV)
+      simpa only [mem_ofPred_eq, mul_inv_cancel_left] using hh.symm)
+  let extend : (Additive Q → ℂ) →ₗ[ℂ] (G → ℂ) :=
+    LinearMap.pi fun x ↦ if hx : x ∈ H.toSubgroup then
+      LinearMap.proj (Additive.ofMul (QuotientGroup.mk ⟨x, hx⟩ : Q)) else 0
+  have hextend (g : Additive Q → ℂ) (x : G) :
+      extend g x = if hx : x ∈ H.toSubgroup then g (QuotientGroup.mk ⟨x, hx⟩) else 0 := by
+    dsimp only [extend]
+    rw [LinearMap.pi_apply]
+    split_ifs <;> rfl
+  -- The finite quotient need not be cyclic, but each character factors through a cyclic quotient.
+  have hle : ⊤ ≤ (schwartzBruhatSubmodule G).comap extend := by
+    rw [← (AddChar.complexBasis (Additive Q)).span_eq]
+    refine Submodule.span_le.mpr ?_
+    rintro _ ⟨ψ, rfl⟩
+    rw [AddChar.complexBasis_apply]
+    change extend (ψ : Additive Q → ℂ) ∈ schwartzBruhatSubmodule G
+    rw [funext (hextend _)]
+    exact finitePlace_mem_characterStage F w H hH L hL ψ
+  have hmem : extend f₀ ∈ schwartzBruhatSubmodule G := hle Submodule.mem_top
+  have hEq : extend f₀ = f := funext fun x ↦ by
+    rw [hextend]
+    split_ifs with hx
+    · rfl
+    · exact (notMem_support.mp (fun h ↦ hx (hs (subset_tsupport f h)))).symm
+  rwa [hEq] at hmem
+
+end
+
 /-- Paper: §2.1.2.2, p. 63. The additive Schwartz–Bruhat space of a finite completion
 consists exactly of the locally constant, compactly supported functions. -/
 theorem mem_finitePlaceSchwartz_iff (w : Places(F)) (f : w.adicCompletion F → ℂ) :
     (∃ g : ℬ(w.adicCompletion F), ∀ x, g (Multiplicative.ofAdd x) = f x) ↔
-      IsLocallyConstant f ∧ HasCompactSupport f := by sorry
+      IsLocallyConstant f ∧ HasCompactSupport f := by
+  let G := Multiplicative (w.adicCompletion F)
+  change (∃ g : SchwartzBruhat G, ∀ x : G, g x = f x) ↔ _
+  constructor
+  · rintro ⟨g, hg⟩
+    let S : Submodule ℂ (G → ℂ) :=
+      { carrier := {h | IsLocallyConstant h ∧ HasCompactSupport h}
+        zero_mem' := ⟨IsLocallyConstant.const 0, HasCompactSupport.zero⟩
+        add_mem' := fun hf hh ↦ ⟨hf.1.comp₂ hh.1 (· + ·), hf.2.add hh.2⟩
+        smul_mem' := fun c _ hf ↦ ⟨hf.1.comp (c • ·), hf.2.smul_left⟩ }
+    have hle : schwartzBruhatSubmodule G ≤ S := by
+      refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+      rintro _ ⟨s, rfl⟩
+      exact finitePlace_bruhatStage_locallyConstant_compactSupport F w a e s
+    have hmem := hle (show (g : G → ℂ) ∈ schwartzBruhatSubmodule G from g.property)
+    rwa [funext hg] at hmem
+  · rintro ⟨hf, hc⟩
+    exact ⟨⟨f, finitePlace_mem_of_locallyConstant_compactSupport F w f hf hc⟩, fun _ ↦ rfl⟩
 
 -- TODO(paper-gap): In Remark 2.1.2.3, continuity of all linear functionals alone
 -- does not characterize the finest locally convex topology. The weak topology
