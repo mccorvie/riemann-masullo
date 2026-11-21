@@ -515,7 +515,18 @@ theorem modulatedCutoffOperator_apply (ν : Measure G) {Λ ε : ℝ} {ρ : G →
 positive self-adjoint operator on weighted L². -/
 theorem modulatedCutoffOperator_isPositive (ν : Measure G) {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    (modulatedCutoffOperator m ν hρ).IsPositive := by sorry
+    (modulatedCutoffOperator m ν hρ).IsPositive := by
+  apply (ContinuousLinearMap.isPositive_iff_complex _).2
+  intro u
+  have hinner : inner ℂ (modulatedCutoffOperator m ν hρ u) u =
+      ((∫ x, ρ x * ‖u x‖ ^ 2 ∂ν : ℝ) : ℂ) := by
+    rw [L2.inner_def, ← integral_complex_ofReal]
+    apply integral_congr_ae
+    filter_upwards [modulatedCutoffOperator_apply m ν hρ u] with x hx
+    rw [hx, ← smul_eq_mul, inner_smul_left, inner_self_eq_norm_sq_to_K]
+    simp
+  rw [hinner]
+  exact ⟨rfl, integral_nonneg fun x ↦ mul_nonneg (hρ.nonneg x) (sq_nonneg _)⟩
 
 /-- Paper: Remark 9.3.3.2, p. 428. The multiplier norm is the essential
 supremum of its symbol for a sigma-finite measure.
