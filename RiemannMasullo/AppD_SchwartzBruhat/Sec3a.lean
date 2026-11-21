@@ -2216,13 +2216,44 @@ theorem modulatedExponentialDecayTwist_apply (a : I) (f : modulatedExponentialDe
     modulatedExponentialDecayTwist m I a f g = ((((m g).val : ℝ) ^ (a : ℝ) : ℝ) : ℂ) * f.val g :=
   rfl
 
+/-- A left translate of a function realized in one Schwartz–Bruhat stage is
+Schwartz–Bruhat. Enlarge the open subgroup of the structural pair to contain
+the translating element, then translate on the resulting elementary quotient. -/
+theorem schwartzBruhatStageRealization_translate_mem [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] (g : G) (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e) :
+    (fun x ↦ schwartzBruhatStageRealization a e s (g⁻¹ * x)) ∈ schwartzBruhatSubmodule G := by
+  sorry
+
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
 /-- Paper: Definition D.3.3.1, p. 804. Inverse left translation preserves
 the decay submodule. -/
 theorem modulatedExponentialDecaySubmodule_translate (hm : IsModulation m) (hms : Surjective m)
     (g : G) (f : modulatedExponentialDecaySubmodule m I) :
-    (fun x : G ↦ f.val (g⁻¹ * x)) ∈ modulatedExponentialDecaySubmodule m I := by sorry
+    (fun x : G ↦ f.val (g⁻¹ * x)) ∈ modulatedExponentialDecaySubmodule m I := by
+  let translate : (G → ℂ) →ₗ[ℂ] (G → ℂ) :=
+    LinearMap.pi fun x ↦ LinearMap.proj (g⁻¹ * x)
+  have htranslate : schwartzBruhatSubmodule G ≤ (schwartzBruhatSubmodule G).comap translate := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+    rintro _ ⟨s, rfl⟩
+    exact schwartzBruhatStageRealization_translate_mem g a e s
+  refine (Submodule.mem_iInf _).2 fun a ↦ Submodule.mem_comap.2 ?_
+  let weight (x : G) : ℂ := (((m x).val : ℝ) ^ (a : ℝ) : ℝ)
+  have hweight (x : G) : weight x = weight g * weight (g⁻¹ * x) := by
+    have hx : (m x).val = (m g).val * (m (g⁻¹ * x)).val := by
+      rw [← Units.val_mul, ← map_mul, mul_inv_cancel_left]
+    unfold weight
+    rw [hx, NNReal.coe_mul, Real.mul_rpow (NNReal.coe_nonneg _) (NNReal.coe_nonneg _),
+      Complex.ofReal_mul]
+  have htwist : modulationWeight m a (fun x ↦ f.val (g⁻¹ * x)) =
+      weight g • translate (modulationWeight m a f.val) := by
+    funext x
+    change weight x * f.val (g⁻¹ * x) = weight g * (weight (g⁻¹ * x) * f.val (g⁻¹ * x))
+    rw [hweight, mul_assoc]
+  rw [htwist]
+  exact (schwartzBruhatSubmodule G).smul_mem _ (htranslate (modulationWeight_mem_schwartzBruhat m I a f))
 
 /-- Paper: Lemma D.3.3.2, p. 804. If two exponent twists are Schwartz–Bruhat,
 every intermediate exponent twist is Schwartz–Bruhat as well. -/
