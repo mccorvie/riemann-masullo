@@ -721,9 +721,15 @@ theorem lcaDualQuotient_equiv_subgroupDual (H : Subgroup G) (hH : IsClosed (H : 
     ∃ e : (PontryaginDual G ⧸ lcaAnnihilator H) ≃ₜ* PontryaginDual H,
       ∀ (χ : PontryaginDual G) (x : H), e (QuotientGroup.mk χ) x = χ x.val := by sorry
 
+-- Retain the LCA assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.1.4.6(3), p. 758. The annihilator of a compact subgroup is open. -/
 theorem isOpen_lcaAnnihilator (H : Subgroup G) (hH : IsCompact (H : Set G)) :
-    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hH
+  let restrict := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  change IsOpen (restrict ⁻¹' ({1} : Set (PontryaginDual H)))
+  exact (isOpen_discrete _).preimage restrict.continuous
 
 /-- Paper: Lemma D.1.4.6(4), p. 758. The annihilator of an open subgroup is compact. -/
 theorem isCompact_lcaAnnihilator (H : Subgroup G) (hH : IsOpen (H : Set G)) :
