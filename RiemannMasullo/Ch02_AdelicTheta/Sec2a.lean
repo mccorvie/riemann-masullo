@@ -29,7 +29,8 @@ def euclideanSupNormShell (N : ℕ) (r : ℝ) : Set (Fin N → ℝ) :=
 /-- Paper: Equation (2.2.1.1), p. 75. In dimension one the shell uses the
 absolute value of the single coordinate, with the outer endpoint excluded. -/
 theorem mem_euclideanSupNormShell_one (x r : ℝ) :
-    (fun _ : Fin 1 ↦ x) ∈ euclideanSupNormShell 1 r ↔ r ≤ |x| ∧ |x| < r + 1 := by sorry
+    (fun _ : Fin 1 ↦ x) ∈ euclideanSupNormShell 1 r ↔ r ≤ |x| ∧ |x| < r + 1 := by
+  simp [euclideanSupNormShell, Real.norm_eq_abs]
 
 /-- Paper: Lemma 2.2.1.1, p. 75. Each shell is bounded in the supremum norm. -/
 theorem euclideanSupNormShell_bounded {N : ℕ} (_hN : 1 ≤ N) {r : ℝ} (_hr : 1 ≤ r) :
