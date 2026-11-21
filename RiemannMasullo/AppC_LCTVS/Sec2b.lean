@@ -708,7 +708,47 @@ and is bounded in that subspace's Euclidean topology. -/
 theorem finestLocallyConvex_isVonNBounded_iff (B : Set (FinestLocallyConvex E)) :
     IsVonNBounded ℂ B ↔
       ∃ S : Submodule ℂ (FinestLocallyConvex E),
-        FiniteDimensional ℂ S ∧ B ⊆ S ∧ IsVonNBounded ℂ ((Subtype.val : S → _) ⁻¹' B) := by sorry
+        FiniteDimensional ℂ S ∧ B ⊆ S ∧ IsVonNBounded ℂ ((Subtype.val : S → _) ⁻¹' B) := by
+  classical
+  constructor
+  · intro hB
+    have hP := finestLocallyConvex_withSeminorms E
+    rw [hP.isVonNBounded_iff_seminorm_bounded] at hB
+    obtain ⟨A, hAB, hspan, hA⟩ := exists_linearIndependent ℂ B
+    have hfinite : A.Finite := by
+      by_contra hinf
+      -- Assign the values 0, 1, 2, … to independent vectors of B.
+      let e := (show A.Infinite from hinf).natEmbedding A
+      let x : ℕ → FinestLocallyConvex E := Subtype.val ∘ e
+      have hx : LinearIndependent ℂ x := hA.comp e e.injective
+      let b := Module.Basis.span hx
+      let f := b.constr ℂ (fun n : ℕ ↦ (n : ℂ))
+      obtain ⟨g, hg⟩ := f.exists_extend
+      let p : Seminorm ℂ E := (normSeminorm ℂ ℂ).comp g
+      obtain ⟨r, -, hr⟩ := hB p
+      obtain ⟨n, hn⟩ := exists_nat_gt r
+      have hgn : g (x n) = (n : ℂ) := by
+        have h := LinearMap.congr_fun hg (b n)
+        simpa only [f, b, LinearMap.comp_apply, Submodule.subtype_apply,
+          Module.Basis.coe_span_apply, Module.Basis.constr_basis] using h
+      have hnr := hr (x n) (hAB (e n).property)
+      change ‖g (x n)‖ < r at hnr
+      rw [hgn, Complex.norm_natCast] at hnr
+      exact lt_asymm hn hnr
+    let S := Submodule.span ℂ A
+    refine ⟨S, FiniteDimensional.span_of_finite ℂ hfinite, ?_, ?_⟩
+    · change B ⊆ (Submodule.span ℂ A : Set _)
+      rw [hspan]
+      exact Submodule.subset_span
+    · have hSP := S.isEmbedding_subtype.isInducing.withSeminorms hP
+      rw [hSP.isVonNBounded_iff_seminorm_bounded]
+      intro p
+      obtain ⟨r, hr, h⟩ := hB p
+      exact ⟨r, hr, fun y hy ↦ h y hy⟩
+  · rintro ⟨S, -, hBS, hB⟩
+    have hsub : B ⊆ S.subtypeL '' ((Subtype.val : S → _) ⁻¹' B) :=
+      fun x hx ↦ ⟨⟨x, hBS hx⟩, hx, rfl⟩
+    exact (hB.image S.subtypeL).subset hsub
 
 /-- Paper: Proposition C.2.5.1(5), p. 692. A set is sequentially closed for the
 finest locally convex topology precisely when each finite-dimensional section is closed. -/
