@@ -43,7 +43,49 @@ def IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) : Prop :=
 two satisfies the jump and decay hypotheses in logarithmic coordinates.
 Deviation: Sanity check, using the test function from Remark B.4.1.4. -/
 theorem isPiecewiseSmoothMellinTest_indicator :
-    IsPiecewiseSmoothMellinTest ((Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))) := by sorry
+    IsPiecewiseSmoothMellinTest ((Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))) := by
+  let f := (Icc 0 (Real.log 2)).indicator (fun _ ↦ (1 : ℂ))
+  change IsPiecewiseSmoothMellinTest f
+  have hlog : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  have hzero : EqOn f (fun _ ↦ 0) (Icc 0 (Real.log 2))ᶜ :=
+    fun _ hx ↦ indicator_of_notMem hx _
+  have hone : EqOn f (fun _ ↦ 1) (Ioo 0 (Real.log 2)) :=
+    fun _ hx ↦ indicator_of_mem (mem_Icc_of_Ioo hx) _
+  have hlimit (j : ℕ) {s : Set ℝ} {L : Filter ℝ} {c : ℂ} (hs : IsOpen s)
+      (heq : EqOn f (fun _ ↦ c) s) (hmem : s ∈ L) :
+      ∃ l, Tendsto (iteratedDeriv j f) L (𝓝 l) := by
+    refine ⟨if j = 0 then c else 0, EventuallyEq.tendsto ?_⟩
+    filter_upwards [hmem] with x hx
+    rw [(eventuallyEq_of_mem (hs.mem_nhds hx) heq).iteratedDeriv_eq j, iteratedDeriv_const]
+  constructor
+  · refine ⟨{0, Real.log 2}, ?_, ?_⟩
+    · intro x hx
+      have hends : x ≠ 0 ∧ x ≠ Real.log 2 := by simpa using hx
+      apply ContDiffAt.contDiffWithinAt
+      by_cases hxI : x ∈ Icc 0 (Real.log 2)
+      · have hx' : x ∈ Ioo 0 (Real.log 2) :=
+          ⟨lt_of_le_of_ne hxI.1 hends.1.symm, lt_of_le_of_ne hxI.2 hends.2⟩
+        exact contDiffAt_const.congr_of_eventuallyEq
+          (eventuallyEq_of_mem (isOpen_Ioo.mem_nhds hx') hone)
+      · exact contDiffAt_const.congr_of_eventuallyEq
+          (eventuallyEq_of_mem (isClosed_Icc.isOpen_compl.mem_nhds hxI) hzero)
+    · intro j x hx
+      simp only [Finset.mem_insert, Finset.mem_singleton] at hx
+      rcases hx with rfl | rfl
+      · exact ⟨hlimit j isOpen_Iio (hzero.mono fun _ hy ↦ fun h ↦ hy.not_ge h.1)
+          self_mem_nhdsWithin, hlimit j isOpen_Ioo hone (Ioo_mem_nhdsGT hlog)⟩
+      · exact ⟨hlimit j isOpen_Ioo hone (Ioo_mem_nhdsLT hlog),
+          hlimit j isOpen_Ioi (hzero.mono fun _ hy ↦ fun h ↦ hy.not_ge h.2)
+            self_mem_nhdsWithin⟩
+  · intro N
+    refine ⟨1, one_pos, Real.log 2, hlog, ?_⟩
+    intro x hx
+    have hxI : x ∈ (Icc 0 (Real.log 2))ᶜ :=
+      fun h ↦ hx.not_ge (by simpa only [abs_of_nonneg h.1] using h.2)
+    have heq := eventuallyEq_of_mem (isClosed_Icc.isOpen_compl.mem_nhds hxI) hzero
+    rw [heq.self_of_nhds, heq.deriv_eq]
+    simpa only [deriv_const, norm_zero, one_mul] using
+      And.intro (Real.exp_pos (-(N : ℝ) * |x|)) (Real.exp_pos (-(N : ℝ) * |x|))
 
 open MeasureTheory in
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin integral (B.4.1.2) of a test
@@ -116,11 +158,55 @@ theorem mellinConvergent_of_piecewiseSmoothMellinTest
     have hpos : 0 < x := hT.trans hx
     simpa [abs_of_pos hpos] using hbound x (by simpa [abs_of_pos hpos] using hx)
 
+open MeasureTheory in
+open scoped Asymptotics in
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin transform of a test function
 with finitely many jumps is entire. -/
 theorem differentiable_mellin_of_piecewiseSmoothMellinTest
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) :
-    Differentiable ℂ (logMellin f) := by sorry
+    Differentiable ℂ (logMellin f) := by
+  obtain ⟨⟨S, hsmooth, hlimits⟩, hdecay⟩ := hf
+  have hcont := hsmooth.continuousOn
+  have hmeas : Measurable f :=
+    hcont.measurable_of_countable_compl (by simpa using S.finite_toSet.countable)
+  have hbounded (x : ℝ) : (𝓝 x).IsBoundedUnder (· ≤ ·) (fun y ↦ ‖f y‖) := by
+    by_cases hx : x ∈ S
+    · obtain ⟨⟨l, hl⟩, ⟨r, hr⟩⟩ := hlimits 0 x hx
+      simp only [iteratedDeriv_zero] at hl hr
+      rw [← nhdsNE_sup_pure x, ← nhdsLT_sup_nhdsGT x, IsBoundedUnder, Filter.map_sup, Filter.map_sup]
+      exact isBounded_sup (isBounded_sup hl.norm.isBoundedUnder_le hr.norm.isBoundedUnder_le)
+        ⟨‖f x‖, by simp⟩
+    · have hfx := (hcont x hx).continuousAt (S.finite_toSet.isClosed.isOpen_compl.mem_nhds hx)
+      exact hfx.tendsto.norm.isBoundedUnder_le
+  have hloc : LocallyIntegrableOn (fun t ↦ f (Real.log t)) (Ioi 0) := by
+    intro t ht
+    have ht' : 0 < t := ht
+    have hlog := (Real.continuousAt_log ht'.ne').tendsto
+    exact ((volume.finiteAt_nhds t).integrableAtFilter
+      (hmeas.comp Real.measurable_log).aestronglyMeasurable.stronglyMeasurableAtFilter
+      (hlog.isBoundedUnder_comp (hbounded (Real.log t)))).filter_mono nhdsWithin_le_nhds
+  intro s
+  obtain ⟨N, hN⟩ := exists_nat_gt |s.re|
+  obtain ⟨C, _, T, hT, hbound⟩ := hdecay N
+  have htop : f =O[atTop] (fun x ↦ Real.exp (-(N : ℝ) * x)) := by
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_gt_atTop T] with x hx
+    have hx' := hT.trans hx
+    simpa only [abs_of_pos hx', Real.norm_of_nonneg (Real.exp_pos _).le]
+      using (hbound x (by simpa only [abs_of_pos hx'] using hx)).1.le
+  have hbot : f =O[atBot] (fun x ↦ Real.exp ((N : ℝ) * x)) := by
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_lt_atBot (-T)] with x hx
+    have hx' : x < 0 := hx.trans (neg_lt_zero.mpr hT)
+    have hTx : T < |x| := by rw [abs_of_neg hx']; linarith
+    simpa only [abs_of_neg hx', neg_mul_neg, Real.norm_of_nonneg (Real.exp_pos _).le]
+      using (hbound x hTx).1.le
+  exact mellin_differentiableAt_of_isBigO_rpow hloc
+    (isBigO_comp_log_rpow_of_isBigO_exp htop Real.tendsto_log_atTop (eventually_gt_atTop 0))
+    ((le_abs_self _).trans_lt hN)
+    (isBigO_comp_log_rpow_of_isBigO_exp (by simpa only [neg_neg] using hbot)
+      Real.tendsto_log_nhdsGT_zero self_mem_nhdsWithin)
+    (neg_lt.mp ((neg_le_abs _).trans_lt hN))
 
 -- TODO(paper-gap): (B.4.1.4)–(B.4.1.5) have the wrong sign for the jump
 -- defined as the right limit minus the left limit at one.

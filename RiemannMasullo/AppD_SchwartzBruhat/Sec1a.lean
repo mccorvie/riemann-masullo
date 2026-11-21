@@ -873,7 +873,47 @@ def IsLCAPlancherelMeasure (μ : Measure G) (ν : Measure (PontryaginDual G)) : 
 total masses must be reciprocals. -/
 theorem isLCAPlancherelMeasure_subsingleton [Subsingleton G]
     (ν : Measure (PontryaginDual G)) [ν.IsHaarMeasure] [ν.Regular] :
-    IsLCAPlancherelMeasure μ ν ↔ ν univ = (μ univ)⁻¹ := by sorry
+    IsLCAPlancherelMeasure μ ν ↔ ν univ = (μ univ)⁻¹ := by
+  let : Subsingleton (PontryaginDual G) :=
+    ⟨fun χ ψ ↦ PontryaginDual.ext fun x ↦ by
+      rw [Subsingleton.elim x 1, map_one, map_one]⟩
+  have hμPos : 0 < μ univ := isOpen_univ.measure_pos μ univ_nonempty
+  have hμTop : μ univ ≠ ⊤ := measure_ne_top μ univ
+  have hμNorm : ‖μ.real univ‖ₑ = μ univ := by
+    rw [← ofReal_norm, Measure.real, Real.norm_of_nonneg ENNReal.toReal_nonneg]
+    exact ENNReal.ofReal_toReal hμTop
+  have hFourier (c : ℂ) :
+      lcaFourier μ (fun _ ↦ c) = fun _ ↦ μ.real univ • c := by
+    funext χ
+    rw [Subsingleton.elim χ 1, lcaFourier_one μ _ (integrable_const c), integral_const]
+  have hScale :
+      μ univ * ν univ ^ (1 / 2 : ℝ) =
+        μ univ ^ (1 / 2 : ℝ) * (μ univ * ν univ) ^ (1 / 2 : ℝ) := by
+    rw [ENNReal.mul_rpow_of_nonneg _ _ (by norm_num), ← mul_assoc,
+      ← ENNReal.rpow_add _ _ hμPos.ne' hμTop]
+    norm_num
+  constructor
+  · intro h
+    have hNorm := (h.2.2 (fun _ ↦ (1 : ℂ)) (integrable_const _) (memLp_const _)).2
+    simp only [hFourier, eLpNorm_const' _ two_ne_zero ENNReal.ofNat_ne_top,
+      ENNReal.toReal_ofNat, eNorm_smul, hμNorm, eNorm_one, mul_one, one_mul, hScale] at hNorm
+    have hCancel := (ENNReal.mul_right_inj
+      (ENNReal.rpow_pos hμPos hμTop).ne'
+      (ENNReal.rpow_lt_top_of_nonneg (by norm_num : (0 : ℝ) ≤ 1 / 2) hμTop).ne).mp
+      (hNorm.trans (mul_one _).symm)
+    have hMass : μ univ * ν univ = 1 :=
+      (ENNReal.strictMono_rpow_of_pos (by norm_num : (0 : ℝ) < 1 / 2)).injective
+        (hCancel.trans (ENNReal.one_rpow _).symm)
+    exact ENNReal.eq_inv_of_mul_eq_one_left ((mul_comm _ _).trans hMass)
+  · intro h
+    refine ⟨inferInstance, inferInstance, fun f _ _ ↦ ?_⟩
+    have hf : f = fun _ ↦ f 1 := funext fun x ↦ congrArg f (Subsingleton.elim x 1)
+    rw [hf, hFourier]
+    refine ⟨memLp_const _, ?_⟩
+    simp only [eLpNorm_const' _ two_ne_zero ENNReal.ofNat_ne_top, ENNReal.toReal_ofNat,
+      eNorm_smul, hμNorm]
+    rw [mul_comm (μ univ) ‖f 1‖ₑ, mul_assoc, hScale, h,
+      ENNReal.mul_inv_cancel hμPos.ne' hμTop, ENNReal.one_rpow, mul_one]
 
 /-- Paper: Lemma D.1.1.2(4), p. 747. There is exactly one Plancherel measure. -/
 theorem lcaPlancherelMeasure_existsUnique :
