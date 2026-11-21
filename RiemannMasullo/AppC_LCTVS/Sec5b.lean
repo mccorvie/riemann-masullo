@@ -574,10 +574,91 @@ theorem weaklyHolomorphicOn_iff_scalar_contDiffOn :
   · intro hf φ
     exact (hf φ 1).differentiableOn_one
 
+omit hconn in
+/-- Scalar holomorphy makes the vector difference quotients Cauchy in the target
+topology. Quasi-completeness gives their limit in the original space. -/
+private theorem differentiableOn_of_weaklyHolomorphicOn (hf : WeaklyHolomorphicOn f Ω) :
+    DifferentiableOn ℂ f Ω := by
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  apply (vectorHolomorphicOn_iff_tendsto hΩ f).mpr
+  intro z hz
+  obtain ⟨r, hr, hball⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz)
+  let K := Metric.closedBall z r
+  let S := K ∩ {z}ᶜ
+  let q := slope f z
+  -- The slopes of q control the difference between two quotients near z.
+  let D := (fun p : ℂ × ℂ ↦ slope q p.1 p.2) '' (S ×ˢ S)
+  have hscalar (φ : StrongDual ℂ E) : AnalyticOnNhd ℂ (dslope (φ ∘ f) z) Ω :=
+    ((hf φ).analyticOnNhd hΩ).dslope z
+  have heval (φ : StrongDual ℂ E) {w : ℂ} (hw : w ∈ S) :
+      φ (q w) = dslope (φ ∘ f) z w := by
+    rw [dslope_of_ne _ (show w ≠ z from hw.2)]
+    exact (φ.toLinearMap.slope_comp f z w).symm
+  have hK : IsCompact K := isCompact_closedBall z r
+  have hq : IsVonNBounded ℂ (q '' S) := by
+    apply (isVonNBounded_iff_dual_image _).mpr
+    intro φ
+    refine (hK.image_of_continuousOn ((hscalar φ).continuousOn.mono hball)).isBounded.subset ?_
+    rintro _ ⟨_, ⟨w, hw, rfl⟩, rfl⟩
+    exact ⟨w, hw.1, (heval φ hw).symm⟩
+  have hD : IsVonNBounded ℂ D := by
+    apply (isVonNBounded_iff_dual_image _).mpr
+    intro φ
+    let g := dslope (φ ∘ f) z
+    have hderiv : IsBounded (deriv g '' K) :=
+      (hK.image_of_continuousOn ((hscalar φ).deriv.continuousOn.mono hball)).isBounded
+    obtain ⟨C, hC⟩ := hderiv.exists_norm_le
+    refine isBounded_iff_forall_norm_le.mpr ⟨max C 0, ?_⟩
+    rintro _ ⟨_, ⟨⟨u, v⟩, ⟨hu, hv⟩, rfl⟩, rfl⟩
+    change ‖φ (slope q u v)‖ ≤ max C 0
+    rcases eq_or_ne v u with rfl | hne
+    · simp
+    have hmean := (convex_closedBall z r).norm_image_sub_le_of_norm_deriv_le
+      (f := g) (C := max C 0) (fun w hw ↦ (hscalar φ w (hball hw)).differentiableAt)
+      (fun w hw ↦ (hC _ ⟨w, hw, rfl⟩).trans (le_max_left _ _)) hu.1 hv.1
+    rw [slope_def_module, map_smul, map_sub, heval φ hu, heval φ hv, norm_smul, norm_inv]
+    exact (inv_mul_le_iff₀ (norm_pos_iff.mpr (sub_ne_zero.mpr hne))).mpr
+      (by simpa [g, mul_comm] using hmean)
+  let l := 𝓝[≠] z
+  have hS : ∀ᶠ w in l, w ∈ S :=
+    inter_mem (mem_nhdsWithin_of_mem_nhds (Metric.closedBall_mem_nhds z hr)) self_mem_nhdsWithin
+  have hc : Cauchy (map q l) := by
+    rw [IsUniformAddGroup.cauchy_map_iff_tendsto_swapped]
+    refine ⟨inferInstance, ?_⟩
+    have hfst : Tendsto (Prod.fst : ℂ × ℂ → ℂ) (l ×ˢ l) (𝓝 z) :=
+      tendsto_fst.mono_right nhdsWithin_le_nhds
+    have hsnd : Tendsto (Prod.snd : ℂ × ℂ → ℂ) (l ×ˢ l) (𝓝 z) :=
+      tendsto_snd.mono_right nhdsWithin_le_nhds
+    have hmem : ∀ᶠ p : ℂ × ℂ in l ×ˢ l, slope q p.1 p.2 ∈ D :=
+      (hS.prod_mk hS).mono fun p hp ↦ ⟨p, hp, rfl⟩
+    have hsub : Tendsto (fun p : ℂ × ℂ ↦ p.2 - p.1) (l ×ˢ l) (𝓝 0) := by
+      simpa only [sub_self] using hsnd.sub hfst
+    simpa only [Pi.smul_def', sub_smul_slope, vsub_eq_sub] using
+      hD.smul_tendsto_zero hmem hsub
+  obtain ⟨v, _, hv⟩ := (QuasiCompleteSpace.quasiComplete hq.closure isClosed_closure)
+    (map q l) hc (le_principal_iff.mpr (mem_map.mpr
+      (mem_of_superset hS fun w hw ↦ subset_closure (mem_image_of_mem q hw))))
+  exact ⟨v, by simpa only [Tendsto, l, q, slope_fun_def, vsub_eq_sub] using hv⟩
+
 /-- Paper: Theorem C.5.2.6(1,3), p. 738. Weak holomorphy is equivalent to the
 existence of complex derivatives in the original target of every order. -/
 theorem weaklyHolomorphicOn_iff_all_derivatives :
-    WeaklyHolomorphicOn f Ω ↔ ∀ k : ℕ, DifferentiableOn ℂ (deriv^[k] f) Ω := by sorry
+    WeaklyHolomorphicOn f Ω ↔ ∀ k : ℕ, DifferentiableOn ℂ (deriv^[k] f) Ω := by
+  clear hconn
+  constructor
+  · intro hf k
+    apply differentiableOn_of_weaklyHolomorphicOn hΩ
+    induction k with
+    | zero => exact hf
+    | succ k ih =>
+        rw [Function.iterate_succ_apply']
+        intro φ
+        refine ((ih φ).deriv hΩ).congr fun z hz ↦ ?_
+        exact (VectorHolomorphicOn.hasDerivAt_comp
+          (differentiableOn_of_weaklyHolomorphicOn hΩ _ ih) hΩ φ ⟨z, hz⟩).deriv.symm
+  · intro hf φ z hz
+    exact (VectorHolomorphicOn.hasDerivAt_comp (f := f) (hf 0) hΩ φ
+      ⟨z, hz⟩).differentiableAt.differentiableWithinAt
 
 /-- Paper: (C.5.2.4), p. 738. The higher derivatives are given by Pettis
 contour integrals with the Cauchy kernel and the factorial factor. -/
