@@ -21,8 +21,10 @@ import Mathlib.NumberTheory.NumberField.Discriminant.Basic
 import Mathlib.NumberTheory.NumberField.Discriminant.Different
 import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Maps.Proper.CompactlyGenerated
+import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 
 /-! # Haar measures
 
@@ -1079,10 +1081,45 @@ def IsTamagawaSelfDual (μ : Measure R) (ψ : R → Circle) : Prop :=
 
 end SelfDuality
 
+open scoped FourierTransform in
 /-- Paper: Example A.3.1.5, p. 557. Lebesgue measure is self-dual for the real
 character with phase `2πx`. -/
 theorem realTamagawaMeasure_selfDual :
-    IsTamagawaSelfDual (volume : Measure ℝ) (fun x ↦ Circle.exp (2 * Real.pi * x)) := by sorry
+    IsTamagawaSelfDual (volume : Measure ℝ) (fun x ↦ Circle.exp (2 * Real.pi * x)) := by
+  obtain ⟨e, he⟩ := exists_realPontryaginDualEquiv
+  refine ⟨e, he, ?_⟩
+  let μ : Measure (Multiplicative ℝ) := volume (α := ℝ)
+  let : MeasurableSpace (PontryaginDual (Multiplicative ℝ)) := borel _
+  let : BorelSpace (PontryaginDual (Multiplicative ℝ)) := ⟨rfl⟩
+  let hvol : (volume : Measure ℝ).IsAddHaarMeasure := inferInstance
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hvol.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hvol.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hvol.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := inferInstanceAs (volume : Measure ℝ).Regular
+  refine ⟨e.isHaarMeasure_map μ, Measure.Regular.map e.toHomeomorph, ?_⟩
+  intro f hf₁ hf₂
+  let g : ℝ → ℂ := fun x ↦ f (Multiplicative.ofAdd x)
+  have hFourier : lcaFourier μ f ∘ e = 𝓕 g := by
+    funext y
+    change lcaFourier μ f (e y) = 𝓕 g y.toAdd
+    rw [lcaFourier, Real.fourier_eq]
+    change (∫ x : ℝ, g x * star (e y (Multiplicative.ofAdd x) : ℂ)) =
+      ∫ x : ℝ, Real.fourierChar (-inner ℝ x y.toAdd) • g x
+    congr 1
+    funext x
+    have hPair : e y (Multiplicative.ofAdd x) = Real.fourierChar (x * y.toAdd) := by
+      change e (Multiplicative.ofAdd y.toAdd) (Multiplicative.ofAdd x) = _
+      rw [he, Real.fourierChar_apply', mul_comm x y.toAdd]
+    rw [hPair, Circle.star_addChar, Real.inner_apply, Circle.smul_def, smul_eq_mul, mul_comm]
+  have h := memLp_two_fourier_and_eLpNorm_eq (f := g) hf₁ hf₂
+  have hEmb := e.toHomeomorph.measurableEmbedding
+  refine ⟨hEmb.memLp_map_measure_iff.mpr (hFourier ▸ h.1), ?_⟩
+  calc
+    _ = eLpNorm (lcaFourier μ f ∘ e) 2 μ := hEmb.eLpNorm_map_measure
+    _ = eLpNorm (𝓕 g) 2 volume :=
+      congrArg (fun k : Multiplicative ℝ → ℂ ↦ eLpNorm k 2 μ) hFourier
+    _ = _ := h.2
 
 /-- Paper: Example A.3.1.5, p. 557. Twice plane Lebesgue measure is self-dual
 for the complex character with phase `4π Re(z)`. -/
