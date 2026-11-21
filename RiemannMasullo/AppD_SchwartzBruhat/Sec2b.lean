@@ -84,12 +84,66 @@ continuous linear operator given by the normalized fiber integral. -/
 def schwartzBruhatIsotypicProjector (ω : PontryaginDual K) : S →L[ℂ] S :=
   Classical.choose (existsUnique_schwartzBruhatIsotypicProjector m hm μ₁ ω).exists
 
+omit hm hμ₁ [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+  [MeasurableSpace G] [BorelSpace G] in
+/-- Schwartz–Bruhat functions are continuous because every elementary stage realization is
+continuous. -/
+private theorem continuous_schwartzBruhat (f : S) : Continuous (fun x ↦ f x) := by
+  classical
+  let C := (ContinuousMap.coeFnLinearMap ℂ (α := G) (M := ℂ)).range
+  suffices hle : schwartzBruhatSubmodule G ≤ C by
+    obtain ⟨g, hg⟩ := hle (show (fun x ↦ f x) ∈ schwartzBruhatSubmodule G from
+      (show schwartzBruhatSubmodule G from f).property)
+    exact hg ▸ g.continuous
+  unfold schwartzBruhatSubmodule
+  refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+  rintro _ ⟨s, rfl⟩
+  refine ⟨⟨_, ?_⟩, rfl⟩
+  let _ := e.finiteGroup
+  have htorus : IsOpenQuotientMap
+      (fun t : EuclideanSpace ℝ (Fin e.torusDim) ↦ fun i ↦ (t i : AddCircle (1 : ℝ))) :=
+    (IsOpenQuotientMap.piMap (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
+      (PiLp.homeomorph 2 (fun _ : Fin e.torusDim ↦ ℝ)).isOpenQuotientMap
+  have hcover := (IsOpenQuotientMap.id (X := EuclideanSpace ℝ (Fin e.realDim))).prodMap htorus
+  have hfiber (z : Fin e.latticeRank → ℤ) (b : Fin e.finiteOrder) :
+      Continuous (fun xt : EuclideanSpace ℝ (Fin e.realDim) × (Fin e.torusDim → AddCircle (1 : ℝ)) ↦
+        s (xt.1, xt.2, z, b)) :=
+    hcover.continuous_comp_iff.mp (s.property.1 z b).continuous
+  have hs : Continuous (fun g ↦ s g) := by
+    rw [← (Homeomorph.prodAssoc _ _ _).isOpenQuotientMap.continuous_comp_iff,
+      continuous_iff_continuousAt]
+    rintro ⟨xt, z, b⟩
+    exact continuousAt_prod_of_discrete_right.mpr (hfiber z b).continuousAt
+  have hopen := a.property.1
+  have hclosed := a.val.1.isClosed_of_isOpen hopen
+  rw [← continuousOn_univ, ← union_compl_self (a.val.1 : Set G),
+    continuousOn_union_iff_of_isOpen hopen hclosed.isOpen_compl]
+  constructor
+  · rw [continuousOn_iff_continuous_domRestrict]
+    refine (hs.comp (e.equiv.continuous.comp QuotientGroup.continuous_mk)).congr fun y ↦ ?_
+    change s (Multiplicative.toAdd (e.equiv (QuotientGroup.mk y))) =
+      schwartzBruhatStageRealization a e s (y : G)
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left y.property]
+  · apply continuousOn_const.congr
+    intro y hy
+    change schwartzBruhatStageRealization a e s y = 0
+    rw [schwartzBruhatStageRealization_apply]
+    exact dite_eq_right (show y ∉ a.val.1 from hy)
+
 /-- Paper: (D.2.1.2), p. 792. The kernel orbit is integrable at
 each evaluation point, where the projector agrees with the stated integral. -/
 theorem schwartzBruhatIsotypicProjector_apply (ω : PontryaginDual K) (f : S) (x : G) :
     Integrable (fun k : K ↦ star (ω k : ℂ) * f ((k : G)⁻¹ * x)) μ₁ ∧
     schwartzBruhatIsotypicProjector m hm μ₁ ω f x = (μ₁.real univ)⁻¹ •
-      ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by sorry
+      ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
+  refine ⟨?_, (Classical.choose_spec
+    (existsUnique_schwartzBruhatIsotypicProjector m hm μ₁ ω).exists) f x⟩
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have hχ : Continuous (fun k : K ↦ star (ω k : ℂ)) := by fun_prop
+  have hshift : Continuous (fun k : K ↦ (k : G)⁻¹ * x) :=
+    continuous_subtype_val.inv.mul continuous_const
+  exact (hχ.mul ((continuous_schwartzBruhat f).comp hshift)).integrable_of_hasCompactSupport
+    (HasCompactSupport.of_compactSpace _)
 
 /-- Paper: (D.2.1.2), p. 792. On an isotypic vector, the normalized average
 recovers the vector. -/
