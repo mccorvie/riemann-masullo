@@ -369,7 +369,9 @@ class Paths(unittest.TestCase):
         for path in ("lakefile.toml", "lean-toolchain", "lake-manifest.json", "scripts/ci/verdict.py",
                      ".github/workflows/pr_check.yml", "Main.lean", "Statements.lean", "RiemannMasullo/External/A.lean"):
             self.assertTrue(auto_merge.matters_to_everyone(path), path)
-        for path in ("RiemannMasullo/AppA/Sec1.lean", "ERRATA.md", "paper/paper.pdf", "prompts/prover.md"):
+        for path in ("RiemannMasullo/AppA/Sec1.lean", "ERRATA.md", "paper/paper.pdf", "prompts/prover.md",
+                     "RiemannMasullo/External/ATTRIBUTION.md", ".github/workflows/claims.yml",
+                     "scripts/ci/stale_claims.py", "scripts/ci/test_stale_claims.py"):
             self.assertFalse(auto_merge.matters_to_everyone(path), path)
 
 

@@ -69,6 +69,13 @@ MAX_MERGES = 60           # per run of this script
 BUILD_FILES = ("lakefile.toml", "lakefile.lean", "lean-toolchain", "lake-manifest.json",
                "scripts/lint.sh", "scripts/proof_review.sh", "scripts/signatures.sh", "scripts/Signatures.lean")
 BUILD_DIRS = ("scripts/ci/", ".github/workflows/", "RiemannMasullo/External/")
+# Source credits and issue claim maintenance are independent of proof checking.
+NON_BUILD_FILES = (
+    "RiemannMasullo/External/ATTRIBUTION.md",
+    ".github/workflows/claims.yml",
+    "scripts/ci/stale_claims.py",
+    "scripts/ci/test_stale_claims.py",
+)
 
 
 class ApiError(Exception):
@@ -119,8 +126,8 @@ def query(**params):
 
 def matters_to_everyone(path):
     """Whether a change to this file on main can change the result of any pull request's check."""
-    if path == "RiemannMasullo/External/ATTRIBUTION.md":
-        return False  # The source credits are not a build or checker input.
+    if path in NON_BUILD_FILES:
+        return False
     if path in BUILD_FILES or path.startswith(BUILD_DIRS):
         return True
     return path.endswith(".lean") and not plain_proof.library_file(path)
