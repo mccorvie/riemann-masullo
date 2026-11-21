@@ -552,7 +552,8 @@ theorem regulatorParallelotope_basis_line (i : Fin (Units.rank F)) (t : ℝ) :
 logarithmic hyperplane is compact.
 Deviation: We take F to be the number field of (A.2.3.5). -/
 theorem regulatorParallelotope_precompact : IsCompact (closure (regulatorParallelotope F b)) := by
-  sorry
+  rw [regulatorParallelotope]
+  exact (ZSpan.fundamentalDomain_isBounded _).isCompact_closure
 
 /-- Paper: Lemma A.2.3.5(1), p. 549. The parallelotope has nonempty relative interior. -/
 theorem regulatorParallelotope_interior : (interior (regulatorParallelotope F b)).Nonempty := by
