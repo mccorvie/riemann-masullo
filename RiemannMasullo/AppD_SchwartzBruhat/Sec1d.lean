@@ -65,7 +65,19 @@ theorem mem_range_integralIdeleInsertion (g : 𝕀[F]) :
 /-- Paper: Lemma D.1.10.1(1), p. 784. Insertion from the full S-stage is a continuous
 injective open map. -/
 theorem integralIdeleInsertion_isOpenEmbedding :
-    IsOpenEmbedding (integralIdeleInsertion F S) := by sorry
+    IsOpenEmbedding (integralIdeleInsertion F S) := by
+  have hopen : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+    exact (RestrictedProduct.isOpen_forall_imp_mem
+      (R := fun v : HeightOneSpectrum (𝓞 F) ↦ v.adicCompletion F)
+      (A := fun v ↦ v.adicCompletionIntegers F)
+      (fun v ↦ Valued.isOpen_valuationSubring (v.adicCompletion F))
+      (p := fun v ↦ v ∉ S)).preimage continuous_snd
+  have h := hopen.isOpenEmbedding_subtypeVal
+  have he : IsEmbedding (integralIdeleInsertion F S) := h.isEmbedding.units_map
+  have ho : IsOpenMap (integralIdeleInsertion F S) :=
+    Units.isOpenMap_map h.injective h.isOpenMap
+  exact ⟨he, ho.isOpen_range⟩
 
 /-- Paper: Lemma D.1.10.1(1), p. 784. The diagonal S-unit actions on the stage and
 on the global ideles are continuous, and insertion intertwines left translation.
