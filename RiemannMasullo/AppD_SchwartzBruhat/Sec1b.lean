@@ -1245,7 +1245,17 @@ theorem lca_dualSubgroup_eval_denseRange
     DenseRange ((PontryaginDual.map
       (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)).comp
         (pontryaginDual_eval (G := G))) := by
-  sorry
+  refine Function.Surjective.denseRange ?_
+  obtain ⟨restrict, hRestrict⟩ :=
+    lcaDualQuotient_equiv_subgroupDual H.val (H.val.isClosed_of_isOpen H.property.1)
+  obtain ⟨eval, hEval⟩ := pontryaginDual_bidual (G := G)
+  intro ψ
+  obtain ⟨q, rfl⟩ := restrict.surjective ψ
+  obtain ⟨η, rfl⟩ := QuotientGroup.mk_surjective q
+  obtain ⟨x, rfl⟩ := eval.surjective η
+  refine ⟨x, PontryaginDual.ext fun χ ↦ ?_⟩
+  change χ.val x = restrict (QuotientGroup.mk (eval x)) χ
+  rw [hRestrict, hEval]
 
 /-- Paper: (D.1.4.9)–(D.1.4.10), p. 759. The evaluation map onto the dual of
 an open compactly generated subgroup of the dual is an open quotient. Its
