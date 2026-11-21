@@ -65,7 +65,55 @@ theorem adeleOneParameter_norm_cases :
       (∃ e : ℝ≥0ˣ ≃ₜ* ℝ≥0ˣ, (∀ t, e t = ideleNorm F (γ t)) ∧
         ContDiff ℝ (∞ : ℕ∞ω) (fun s : ℝ ↦ Real.log (valueℝ (e (expUnit s)))) ∧
         ContDiff ℝ (∞ : ℕ∞ω) (fun s : ℝ ↦ Real.log (valueℝ (e.symm (expUnit s)))))
-      (∀ t : ℝ≥0ˣ, ideleNorm F (γ t) = 1) := by sorry
+      (∀ t : ℝ≥0ˣ, ideleNorm F (γ t) = 1) := by
+  let E : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let n : ℝ≥0ˣ →* ℝ≥0ˣ := (ideleNorm F).comp γ.toMonoidHom
+  have hE (s : ℝ) : valueℝ (E s) = Real.exp s := rfl
+  have hLog (t : ℝ≥0ˣ) : Real.log (valueℝ t) = E.symm t := by
+    obtain ⟨s, rfl⟩ := E.surjective t
+    rw [hE, Real.log_exp, E.symm_apply_apply]
+  have hZero : E 0 = 1 := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hAdd (s t : ℝ) : E (s + t) = E s * E t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_add s t))
+  -- In logarithmic coordinates, the norm is a continuous additive map on ℝ.
+  let f : ℝ →+ ℝ := AddMonoidHom.mk' (fun s ↦ E.symm (n (E s))) (by
+    intro s t
+    apply E.injective
+    simp only [E.apply_symm_apply, hAdd, map_mul])
+  have hf : Continuous f := E.symm.continuous.comp
+    ((ideleGroup_topology F).2.2.2.2.1.comp (γ.continuous.comp E.continuous))
+  let α := f 1
+  have hNorm (s : ℝ) : n (E s) = E (α * s) := by
+    apply E.symm.injective
+    rw [E.symm_apply_apply]
+    change f s = f 1 * s
+    simpa only [smul_eq_mul, mul_one, mul_comm s (f 1)] using map_real_smul f hf s (1 : ℝ)
+  by_cases hα : α = 0
+  · have hn (t : ℝ≥0ˣ) : n t = 1 := by
+      obtain ⟨s, rfl⟩ := E.surjective t
+      rw [hNorm, hα, zero_mul, hZero]
+    refine Or.inr ⟨hn, ?_⟩
+    rintro ⟨e, he, -, -⟩
+    have heOne (t : ℝ≥0ˣ) : e t = 1 := (he t).trans (hn t)
+    exact one_ne_zero (E.injective (e.injective ((heOne (E 1)).trans (heOne (E 0)).symm)))
+  · let H := (E.symm.trans (Homeomorph.mulLeft₀ α hα)).trans E
+    have hH (t : ℝ≥0ˣ) : H t = n t := by
+      change E (α * E.symm t) = n t
+      rw [← hNorm, E.apply_symm_apply]
+    let e := ContinuousMulEquiv.mk' H (by
+      intro t u
+      simp only [hH, map_mul])
+    refine Or.inl ⟨⟨e, hH, ?_, ?_⟩, ?_⟩
+    · change ContDiff ℝ (∞ : ℕ∞ω) (fun s ↦ Real.log (valueℝ (E (α * E.symm (E s)))))
+      simp only [hLog, E.symm_apply_apply]
+      exact contDiff_const.mul contDiff_id
+    · change ContDiff ℝ (∞ : ℕ∞ω) (fun s ↦ Real.log (valueℝ (E (α⁻¹ * E.symm (E s)))))
+      simp only [hLog, E.symm_apply_apply]
+      exact contDiff_const.mul contDiff_id
+    · intro hn
+      have hOne : E α = 1 := by
+        simpa only [mul_one] using (hNorm 1).symm.trans (hn (E 1))
+      exact hα (E.injective (hOne.trans hZero.symm))
 
 local notation "orbitDeriv" => fun (γ : ℝ≥0ˣ →ₜ* 𝕀[F]) (f : ℬ[F]) (x : Multiplicative 𝔸[F]) ↦
   deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd (Units.val (γ (expUnit s)) * Multiplicative.toAdd x))) 0
