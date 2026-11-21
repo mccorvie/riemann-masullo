@@ -4528,7 +4528,231 @@ theorem finiteLocalMultiplicativeTamagawaMeasure_eq_withDensity (v : Primes(F)) 
     finiteLocalMultiplicativeTamagawaMeasure F v =
       (↑v.asIdeal.absNorm / (↑v.asIdeal.absNorm - 1) : ℝ≥0∞) •
         ((finiteLocalAdditiveTamagawaMeasure F v).withDensity
-          (fun x ↦ (↑‖x‖₊ : ℝ≥0∞)⁻¹)).comap Units.val := by sorry
+          (fun x ↦ (↑‖x‖₊ : ℝ≥0∞)⁻¹)).comap Units.val := by
+  let K := v.adicCompletion F
+  let : ProperSpace K := properSpace_adicCompletion v
+  let O := v.adicCompletionIntegers F
+  let U : Set Kˣ := O.units
+  let μ := finiteLocalAdditiveTamagawaMeasure F v
+  let : μ.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : μ.Regular := finiteLocalAdditiveTamagawaMeasure_regular F v
+  let q : ℝ≥0∞ := v.asIdeal.absNorm
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast (show 1 < v.asIdeal.absNorm from HeightOneSpectrum.one_lt_absNorm v)
+  have hq₀ : q ≠ 0 := (zero_lt_one.trans hq).ne'
+  have hqf : q ≠ ⊤ := ENNReal.natCast_ne_top _
+  have hO : IsOpen (O : Set K) := Valued.isOpen_valuationSubring K
+  have hOmem (x : K) : x ∈ (O : Set K) ↔ ‖x‖ ≤ 1 :=
+    (HeightOneSpectrum.mem_adicCompletionIntegers (𝓞 F) F v).trans
+      Valued.toNormedField.norm_le_one_iff.symm
+  have hOc : IsCompact (O : Set K) :=
+    isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)
+  have hO₀ : μ (O : Set K) ≠ 0 := (hO.measure_pos μ ⟨0, O.zero_mem⟩).ne'
+  have hOf : μ (O : Set K) ≠ ⊤ := hOc.measure_ne_top
+
+  -- The uniformizer sends the integer ring to the kernel of reduction.
+  let val : Valuation K (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ : ∃ π : O, val.IsUniformizer (π : K) :=
+    val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let p : Kˣ := Units.mk0 π.val hπ.ne_zero
+  have hp : ‖p.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹ := norm_uniformizer_adicCompletion v _ hπ
+  obtain ⟨hπball, hπmass⟩ :
+      p • (O : Set K) = {x : K | ‖x‖ < 1} ∧
+        μ (p • (O : Set K)) = μ (O : Set K) / q := by
+    let : MeasurableSpace O := borel _
+    let : BorelSpace O := ⟨rfl⟩
+    let i := O.toSubring.subtype
+    have hi : Topology.IsOpenEmbedding i := hO.isOpenEmbedding_subtypeVal
+    let μO := μ.comap i
+    let : μO.IsAddHaarMeasure :=
+      Measure.IsAddHaarMeasure.comap (mH := inferInstance) μ (f := i.toAddMonoidHom) hi
+    let r := (IsLocalRing.residue O).toAddMonoidHom
+    have hindex : r.ker.index = v.asIdeal.absNorm := by
+      rw [AddSubgroup.index_ker, AddMonoidHom.range_eq_top.mpr (IsLocalRing.residue_surjective (R := O)),
+        AddSubgroup.card_top, card_residueField_adicCompletion]
+    let : r.ker.FiniteIndex := ⟨by rw [hindex]; exact (HeightOneSpectrum.one_lt_absNorm v).pos.ne'⟩
+    have hker (a : O) : a ∈ r.ker ↔ ‖(a : K)‖ < 1 :=
+      (IsLocalRing.residue_eq_zero_iff a).trans
+        ((Valuation.mem_maximalIdeal_iff K val).trans Valued.toNormedField.norm_lt_one_iff.symm)
+    have hkerMeas : MeasurableSet (r.ker : Set O) := by
+      change MeasurableSet {a : O | a ∈ r.ker}
+      simp_rw [hker]
+      exact (isOpen_lt (continuous_norm.comp
+        (continuous_subtype_val : Continuous (Subtype.val : O → K))) continuous_const).measurableSet
+    have hπO : i '' (r.ker : Set O) = p • (O : Set K) := by
+      have hdiv (a : O) : a ∈ r.ker ↔ π ∣ a := by
+        change IsLocalRing.residue O a = 0 ↔ _
+        have hgen : IsLocalRing.maximalIdeal O = Ideal.span {π} := hπ.is_generator
+        rw [IsLocalRing.residue_eq_zero_iff, hgen, Ideal.mem_span_singleton]
+      ext x
+      change (∃ a : O, a ∈ r.ker ∧ i a = x) ↔ ∃ b ∈ (O : Set K), p.val * b = x
+      simp only [hdiv]
+      constructor
+      · rintro ⟨a, ⟨b, rfl⟩, rfl⟩
+        exact ⟨b, b.property, rfl⟩
+      · rintro ⟨b, hb, rfl⟩
+        let bO : O := ⟨b, hb⟩
+        exact ⟨π * bO, dvd_mul_right π bO, rfl⟩
+    refine ⟨?_, ?_⟩
+    · rw [← hπO]
+      ext x
+      change x ∈ i '' (r.ker : Set O) ↔ ‖x‖ < 1
+      refine ⟨?_, ?_⟩
+      · rintro ⟨a, ha, rfl⟩
+        exact (hker a).mp ha
+      · intro hx
+        let a : O := ⟨x, (hOmem x).mpr hx.le⟩
+        exact ⟨a, (hker a).mpr hx, rfl⟩
+    · have h := r.ker.index_mul_measure hkerMeas μO
+      change (r.ker.index : ℝ≥0∞) * μ.comap i r.ker = μ.comap i univ at h
+      rw [hindex, hi.measurableEmbedding.comap_apply, hi.measurableEmbedding.comap_apply,
+        hπO, Set.image_univ, show range i = (O : Set K) from Subtype.range_coe] at h
+      rw [← h, mul_comm, ENNReal.mul_div_cancel_right hq₀ hqf]
+  -- The Haar scaling character agrees with the norm on a uniformizer and on integer units.
+  have hχp : distribHaarChar K p = ‖p.val‖₊ := by
+    apply ENNReal.coe_injective
+    rw [distribHaarChar_eq_div hO₀ hOf, hπmass]
+    simp only [div_eq_mul_inv]
+    rw [mul_right_comm, ENNReal.mul_inv_cancel hO₀ hOf, one_mul]
+    have hp' : ‖p.val‖₊ = (v.asIdeal.absNorm : ℝ≥0)⁻¹ := NNReal.eq (by simpa using hp)
+    rw [hp', ENNReal.coe_inv (by exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v).pos.ne'),
+      ENNReal.coe_natCast]
+
+  have hUnorm (u : Kˣ) : u ∈ U ↔ ‖u.val‖ = 1 :=
+    HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.trans
+      Valued.toNormedField.norm_eq_one_iff.symm
+  have hUnnNorm (u : Kˣ) (hu : u ∈ U) : ‖u.val‖₊ = 1 := by
+    apply NNReal.eq
+    simpa only [NNReal.coe_one, coe_nnNorm] using (hUnorm u).mp hu
+  have hχU (u : Kˣ) (hu : u ∈ U) : distribHaarChar K u = ‖u.val‖₊ := by
+    have hset : u • (O : Set K) = O := by
+      rw [← preimage_smul_inv]
+      ext x
+      change u⁻¹ • x ∈ (O : Set K) ↔ x ∈ (O : Set K)
+      simp only [hOmem, Units.smul_def, Units.val_inv_eq_inv_val, smul_eq_mul, norm_mul, norm_inv,
+        (hUnorm u).mp hu, inv_one, one_mul]
+    rw [hUnnNorm u hu]
+    apply distribHaarChar_eq_of_measure_smul_eq_mul hO₀ hOf
+    simp [hset]
+  have hχ (u : Kˣ) : distribHaarChar K u = ‖u.val‖₊ := by
+    obtain ⟨e, hep, heι⟩ := finitePlace_unitDecomposition v p hp
+    let ι := Units.map O.subtype.toMonoidHom
+    have hdecomp : u = p ^ (e u).1.toAdd * ι (e u).2 := by
+      apply e.injective
+      rw [map_mul, map_zpow, hep, heι]
+      refine Prod.ext ?_ (by simp)
+      change (e u).1.toAdd = (e u).1.toAdd * 1 + 0
+      simp
+    have hz : ι (e u).2 ∈ U := ⟨(e u).2.val.property, (e u).2.inv.property⟩
+    conv_lhs => rw [hdecomp]
+    rw [map_mul, map_zpow, hχp, hχU _ hz]
+    conv_rhs => rw [hdecomp]
+    rw [Units.val_mul, Units.val_zpow_eq_zpow_val, nnNorm_mul, nnNorm_zpow]
+
+  -- The additive Haar scaling cancels the change in the inverse-norm density.
+  let D (x : K) := (↑‖x‖₊ : ℝ≥0∞)⁻¹
+  have hD : Measurable D := by dsimp [D]; fun_prop
+  let ν := (μ.withDensity D).comap (Units.val : Kˣ → K)
+  have he : MeasurableEmbedding (Units.val : Kˣ → K) :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).measurableEmbedding
+  let : ν.IsMulLeftInvariant := ⟨fun u ↦ by
+    have hm : Measurable (u • · : K → K) := (measurableEmbedding_const_smul u).measurable
+    have hmap : μ.map (u • · : K → K) = (↑‖u.val‖₊ : ℝ≥0∞)⁻¹ • μ := by
+      ext s hs
+      rw [Measure.map_apply hm hs, preimage_smul, ← distribHaarChar_mul μ, hχ,
+        Units.val_inv_eq_inv_val, nnNorm_inv, ENNReal.coe_inv (by simp [u.ne_zero])]
+      rfl
+    ext s hs
+    have hs' := he.measurableSet_image.mpr hs
+    have hpre : (Units.val : Kˣ → K) '' ((u * ·) ⁻¹' s) =
+        (u • · : K → K) ⁻¹' ((Units.val : Kˣ → K) '' s) := by
+      change Units.val '' ((u • ·) ⁻¹' s) = _
+      rw [preimage_smul, preimage_smul, ← image_smul, ← image_smul, image_image, image_image]
+      rfl
+    rw [Measure.map_apply (by fun_prop) hs, he.comap_apply, he.comap_apply, hpre,
+      withDensity_apply _ (hs'.preimage hm), withDensity_apply _ hs']
+    have hDmul (x : K) : D x = D (u • x) * ↑‖u.val‖₊ := by
+      have hu : (↑‖u.val‖₊ : ℝ≥0∞) ≠ 0 := by simp [u.ne_zero]
+      simp only [D, Units.smul_def, smul_eq_mul, nnNorm_mul, ENNReal.coe_mul]
+      rw [ENNReal.mul_inv (Or.inl hu) (Or.inl ENNReal.coe_ne_top), mul_right_comm,
+        ENNReal.inv_mul_cancel hu ENNReal.coe_ne_top, one_mul]
+    calc
+      (∫⁻ x in (u • ·) ⁻¹' (Units.val '' s), D x ∂μ) =
+          ∫⁻ x in (u • ·) ⁻¹' (Units.val '' s), D (u • x) * ↑‖u.val‖₊ ∂μ :=
+        lintegral_congr hDmul
+      _ = _ := by
+        rw [lintegral_mul_const' _ _ ENNReal.coe_ne_top, ← setLIntegral_map hs' hD hm, hmap,
+          Measure.restrict_smul, lintegral_smul_measure, smul_eq_mul, mul_right_comm,
+          ENNReal.inv_mul_cancel (by simp [u.ne_zero]) ENNReal.coe_ne_top, one_mul]⟩
+
+  -- The density equals one on integer units, the complement of the open unit ball in O.
+  have hUo : IsOpen U := Submonoid.isOpen_units hO
+  have hUunit : (Units.val : Kˣ → K) '' U = {x : K | ‖x‖ = 1} := by
+    ext x
+    refine ⟨?_, ?_⟩
+    · rintro ⟨u, hu, rfl⟩
+      exact (hUnorm u).mp hu
+    · intro hx
+      have hx₀ := norm_ne_zero_iff.mp (hx.trans_ne one_ne_zero)
+      exact ⟨Units.mk0 x hx₀, (hUnorm _).mpr hx, rfl⟩
+  have hUimage : (Units.val : Kˣ → K) '' U = (O : Set K) \ (p • (O : Set K)) := by
+    rw [hUunit, hπball]
+    ext x
+    change ‖x‖ = 1 ↔ x ∈ (O : Set K) ∧ ¬ ‖x‖ < 1
+    rw [hOmem, not_lt, le_antisymm_iff]
+  have hνU : ν U = (1 - q⁻¹) * μ (O : Set K) := by
+    rw [he.comap_apply, withDensity_apply _ (he.measurableSet_image.mpr hUo.measurableSet)]
+    calc
+      (∫⁻ x in Units.val '' U, D x ∂μ) = ∫⁻ _ in Units.val '' U, (1 : ℝ≥0∞) ∂μ := by
+        apply setLIntegral_congr_fun (he.measurableSet_image.mpr hUo.measurableSet)
+        rintro _ ⟨u, hu, rfl⟩
+        simp [D, hUnnNorm u hu]
+      _ = (1 - q⁻¹) * μ (O : Set K) := by
+        have hsub : p • (O : Set K) ⊆ (O : Set K) := by
+          rw [hπball]
+          exact fun x hx ↦ (hOmem x).mpr hx.le
+        have hπm : MeasurableSet (p • (O : Set K)) := by
+          rw [hπball]
+          exact (isOpen_lt continuous_norm continuous_const).measurableSet
+        have hπf : μ (p • (O : Set K)) ≠ ⊤ :=
+          ((measure_mono hsub).trans_lt hOf.lt_top).ne
+        rw [lintegral_const, Measure.restrict_apply MeasurableSet.univ, univ_inter, one_mul,
+          hUimage, measure_sdiff hsub hπm.nullMeasurableSet hπf,
+          hπmass, ENNReal.sub_mul (fun _ _ ↦ hOf), one_mul, div_eq_mul_inv, mul_comm q⁻¹]
+  have hνf : ν U ≠ ⊤ := by
+    rw [hνU]
+    exact ENNReal.mul_ne_top ((tsub_le_self : 1 - q⁻¹ ≤ 1).trans_lt ENNReal.one_lt_top).ne hOf
+  let : IsLocallyFiniteMeasure ν :=
+    isLocallyFiniteMeasure_of_smulInvariant (G := Kˣ) hUo ⟨1, O.units.one_mem⟩ hνf
+  let : SecondCountableTopology Kˣ := (Units.isEmbedding_val₀ (G₀ := K)).secondCountableTopology
+  let η := Measure.haar (G := Kˣ)
+  have hscale := Measure.isMulLeftInvariant_eq_smul ν η
+
+  -- Haar uniqueness reduces the equality to the common normalization on U.
+  let c := q / (q - 1)
+  have hc : c * ν U = μ (O : Set K) := by
+    have hqsub : q - 1 ≠ 0 := (tsub_pos_of_lt hq).ne'
+    have hqsubf : q - 1 ≠ ⊤ := tsub_le_self.trans_lt hqf.lt_top |>.ne
+    have hdiv : 1 - q⁻¹ = (q - 1) / q := by
+      rw [div_eq_mul_inv, ENNReal.sub_mul (fun _ _ ↦ ENNReal.inv_ne_top.mpr hq₀),
+        ENNReal.mul_inv_cancel hq₀ hqf, one_mul]
+    rw [hνU, hdiv, ← mul_assoc, ENNReal.div_mul_div_cancel hqsub hqsubf,
+      ENNReal.div_self hq₀ hqf, one_mul]
+  have hη₀ : η U ≠ 0 := (hUo.measure_pos η ⟨1, O.units.one_mem⟩).ne'
+  have hηf : η U ≠ ⊤ := by
+    apply IsCompact.measure_ne_top
+    apply (Units.isEmbedding_val₀ (G₀ := K)).isCompact_iff.mpr
+    rw [hUunit]
+    exact hOc.of_isClosed_subset (isClosed_eq continuous_norm continuous_const)
+      (fun x hx ↦ (hOmem x).mpr hx.le)
+  have ha : c * (↑(ν.haarScalarFactor η) : ℝ≥0∞) = μ (O : Set K) / η U := by
+    apply (ENNReal.mul_left_inj hη₀ hηf).mp
+    rw [mul_assoc, ENNReal.div_mul_cancel hη₀ hηf, ← hc]
+    congr 1
+    exact (congrArg (fun m : Measure Kˣ ↦ m U) hscale).symm
+  change (differentMass(F, v) / η U) • η = c • ν
+  rw [← finiteLocalAdditiveTamagawaMeasure_integers F v, hscale, ENNReal.smul_def, smul_smul, ha]
 
 local notation "∞unitAt" => fun w : InfinitePlace F ↦
   Units.map (RingHom.toMonoidHom (RingHom.comp (Pi.evalRingHom InfinitePlace.Completion w)
