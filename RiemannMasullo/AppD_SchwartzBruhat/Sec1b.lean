@@ -502,6 +502,23 @@ theorem openCompactlyGeneratedSubgroups_colimit :
       (∀ U : Set G, IsOpen U ↔
         ∀ H : OpenCompactlyGeneratedSubgroups G, IsOpen (Subtype.val ⁻¹' U : Set H.val)) := by sorry
 
+omit [T2Space G] in
+/-- Every compact set is contained in an open compactly generated subgroup. -/
+private theorem exists_openCompactlyGeneratedSubgroup_contains {K : Set G} (hK : IsCompact K) :
+    ∃ H : OpenCompactlyGeneratedSubgroups G, K ⊆ (H.val : Set G) := by
+  obtain ⟨U, hU, hU₁⟩ := exists_compact_mem_nhds (1 : G)
+  let H := Subgroup.closure (U ∪ K)
+  have hSubset : U ∪ K ⊆ (H : Set G) := Subgroup.subset_closure
+  have hOpen : IsOpen (H : Set G) :=
+    H.isOpen_of_mem_nhds (mem_of_superset hU₁ (subset_union_left.trans hSubset))
+  refine ⟨⟨H, hOpen, ⟨Subtype.val ⁻¹' (U ∪ K), ?_, ?_, ?_⟩⟩,
+    subset_union_right.trans hSubset⟩
+  · exact continuous_subtype_val.continuousAt.preimage_mem_nhds
+      (mem_of_superset hU₁ subset_union_left)
+  · exact IsEmbedding.subtypeVal.isInducing.isCompact_preimage' (hU.union hK)
+      (Subtype.range_coe.symm ▸ hSubset)
+  · exact Subgroup.closure_preimage_eq_top _
+
 /-- Paper: Lemma D.1.4.4, p. 758. Evaluation on the open compactly generated
 subgroups of the dual identifies the group with their duals' inverse limit.
 Deviation: The limit is expressed as the range in the product, with the subspace topology. -/
@@ -510,7 +527,97 @@ theorem lca_dualSubgroups_inverseLimit :
     ∃ γ : G →ₜ* ((H : I) → PontryaginDual H.val),
       (∀ x H (χ : H.val), γ x H χ = χ.val x) ∧ IsEmbedding γ ∧
         range γ = {a | ∀ (H J : I) (h : H ≤ J) (χ : H.val),
-          a H χ = a J (Subgroup.inclusion h χ)} := by sorry
+          a H χ = a J (Subgroup.inclusion h χ)} := by
+  classical
+  let I := OpenCompactlyGeneratedSubgroups (PontryaginDual G)
+  change ∃ γ : G →ₜ* ((H : I) → PontryaginDual H.val), _
+  have hCover (χ : PontryaginDual G) : ∃ H : I, χ ∈ H.val := by
+    obtain ⟨H, hH⟩ := exists_openCompactlyGeneratedSubgroup_contains (isCompact_singleton (x := χ))
+    exact ⟨H, hH (mem_singleton χ)⟩
+  have hDirected (H J : I) : ∃ L : I, H ≤ L ∧ J ≤ L := by
+    obtain ⟨U, _, hU, hUgen⟩ := H.property.2
+    obtain ⟨V, _, hV, hVgen⟩ := J.property.2
+    obtain ⟨L, hL⟩ := exists_openCompactlyGeneratedSubgroup_contains
+      ((hU.image continuous_subtype_val).union (hV.image continuous_subtype_val))
+    have hLe (M : I) {S : Set M.val} (hGen : Subgroup.closure S = ⊤)
+        (hSub : Subtype.val '' S ⊆ (L.val : Set (PontryaginDual G))) : M ≤ L := by
+      have hTop : (⊤ : Subgroup M.val) ≤ L.val.comap M.val.subtype :=
+        hGen ▸ (Subgroup.closure_le _).mpr (fun x hx ↦ hSub (mem_image_of_mem Subtype.val hx))
+      exact fun x hx ↦ hTop (Subgroup.mem_top (⟨x, hx⟩ : M.val))
+    exact ⟨L, hLe H hUgen (subset_union_left.trans hL), hLe J hVgen (subset_union_right.trans hL)⟩
+  let restrict (H : I) : PontryaginDual (PontryaginDual G) →ₜ* PontryaginDual H.val :=
+    PontryaginDual.map ⟨H.val.subtype, continuous_subtype_val⟩
+  let γ : G →ₜ* ((H : I) → PontryaginDual H.val) :=
+    { toFun := fun x H ↦ restrict H (pontryaginDual_eval x)
+      map_one' := funext fun H ↦ (restrict H).comp pontryaginDual_eval |>.map_one
+      map_mul' := fun x y ↦ funext fun H ↦ (restrict H).comp pontryaginDual_eval |>.map_mul x y
+      continuous_toFun := continuous_pi fun H ↦ (restrict H).continuous.comp
+        (pontryaginDual_eval (G := G)).continuous }
+  have hEval (x : G) (H : I) (χ : H.val) : γ x H χ = χ.val x := rfl
+  refine ⟨γ, hEval, ⟨?_, ?_⟩, ?_⟩
+  · rw [IsTopologicalGroup.isInducing_iff_nhds_one]
+    refine le_antisymm ?_ ?_
+    · have h : Tendsto γ (𝓝 1) (𝓝 (γ 1)) := γ.continuous.tendsto 1
+      rw [map_one] at h
+      exact h.le_comap
+    · intro U hU
+      -- A single coordinate contains all the characters needed to test this neighborhood.
+      obtain ⟨K, hK, hTest⟩ := exists_pontryaginDual_compact_test hU
+      obtain ⟨H, hH⟩ := exists_openCompactlyGeneratedSubgroup_contains hK
+      have hKH : IsCompact (Subtype.val ⁻¹' K : Set H.val) :=
+        IsEmbedding.subtypeVal.isInducing.isCompact_preimage' hK (Subtype.range_coe.symm ▸ hH)
+      let V : Set (PontryaginDual H.val) :=
+        {ψ | MapsTo ψ (Subtype.val ⁻¹' K) (Metric.ball 1 (1 / 4))}
+      have hV : IsOpen V :=
+        (ContinuousMap.isOpen_setOfPred_mapsTo hKH Metric.isOpen_ball).preimage
+          (ContinuousMonoidHom.isInducing_toContinuousMap H.val Circle).continuous
+      refine Filter.mem_comap.mpr ⟨(fun a ↦ a H) ⁻¹' V,
+        (hV.preimage (continuous_apply H)).mem_nhds ?_, ?_⟩
+      · intro χ _
+        simp [Metric.mem_ball]
+      · intro x hx
+        apply hTest x
+        intro χ hχ
+        exact hx (show (⟨χ, hH hχ⟩ : H.val) ∈ Subtype.val ⁻¹' K from hχ)
+  · intro x y hxy
+    apply (pontryaginDual_pairing_separates (G := G)).1
+    funext χ
+    obtain ⟨H, hH⟩ := hCover χ
+    exact congrArg (fun a ↦ a H ⟨χ, hH⟩) hxy
+  · ext a
+    constructor
+    · rintro ⟨x, rfl⟩ H J h χ
+      rfl
+    · intro ha
+      change ∀ (H J : I) (h : H ≤ J) (χ : H.val),
+        a H χ = a J (Subgroup.inclusion h χ) at ha
+      choose H hH using hCover
+      let f (χ : PontryaginDual G) := a (H χ) ⟨χ, hH χ⟩
+      -- Compatibility makes the chosen subgroup irrelevant.
+      have hf (J : I) (χ : J.val) : f χ.val = a J χ := by
+        obtain ⟨L, h₁, h₂⟩ := hDirected (H χ.val) J
+        exact (ha _ _ h₁ _).trans (ha _ _ h₂ χ).symm
+      let J := H 1
+      let ψ : PontryaginDual (PontryaginDual G) :=
+        { toFun := f
+          map_one' := (hf J 1).trans (map_one (a J))
+          map_mul' := fun χ ξ ↦ by
+            obtain ⟨L, hχ, hξ⟩ := hDirected (H χ) (H ξ)
+            let χL : L.val := ⟨χ, hχ (hH χ)⟩
+            let ξL : L.val := ⟨ξ, hξ (hH ξ)⟩
+            exact (hf L (χL * ξL)).trans
+              ((map_mul (a L) χL ξL).trans (congrArg₂ (· * ·) (hf L χL).symm (hf L ξL).symm))
+          continuous_toFun := by
+            rw [continuous_iff_continuousAt]
+            intro χ
+            let J := H χ
+            have hComp : f ∘ (Subtype.val : J.val → PontryaginDual G) = a J := funext (hf J)
+            exact J.property.1.isOpenEmbedding_subtypeVal.continuousAt_iff.mp
+              (hComp.symm ▸ (a J).continuous.continuousAt (x := (⟨χ, hH χ⟩ : J.val))) }
+      obtain ⟨e, he⟩ := pontryaginDual_bidual (G := G)
+      refine ⟨e.symm ψ, funext fun J ↦ PontryaginDual.ext fun χ ↦ ?_⟩
+      rw [hEval, ← he, e.apply_symm_apply]
+      exact hf J χ
 
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
 /-- Paper: Definition D.1.4.5, p. 758. The annihilator consists of characters
