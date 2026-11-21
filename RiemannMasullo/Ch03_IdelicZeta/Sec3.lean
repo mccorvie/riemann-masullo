@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch02_AdelicTheta.Sec4
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-!
 # S-local idelic zeta functions
 
@@ -160,7 +162,96 @@ theorem sLocalIdelicZetaIntegral_tendstoUniformlyOn (f : ℬ(Aₛ))
     (K : Set Xₛ) (hK : IsCompact K) (hKpos : K ⊆ positive) :
     TendstoUniformlyOn (fun (n : ℕ) c ↦
       ∫ g in band[sIdeleNorm F S, n], f (Multiplicative.ofAdd g.val) * c (classOf g) ∂μₛ)
-      (sLocalIdelicZetaIntegral f) atTop K := by sorry
+      (sLocalIdelicZetaIntegral f) atTop K := by
+  rcases K.eq_empty_or_nonempty with rfl | hKne
+  · exact tendstoUniformlyOn_empty
+  have hne : ∃ x, mₛ x ≠ 1 := by
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+    exact ⟨σ t, (hσ t).trans_ne ht⟩
+  let abscissa := quasiCharacterAbscissa mₛ (isProperMap_sIdeleQuotientNorm F S) hne
+  have habs : Continuous abscissa :=
+    continuous_quasiCharacterAbscissa mₛ (isProperMap_sIdeleQuotientNorm F S) hne
+  obtain ⟨a, ha, hmin⟩ := hK.exists_isMinOn hKne habs.continuousOn
+  obtain ⟨b, hb, hmax⟩ := hK.exists_isMaxOn hKne habs.continuousOn
+  let r (g : Iₛ) : ℝ := (sIdeleNorm F S g : ℝ≥0)
+  have hr (g : Iₛ) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hnorm {c : Xₛ} (hc : c ∈ K) (g : Iₛ) : ‖c (classOf g)‖ = r g ^ abscissa c := by
+    obtain ⟨χ, s, -, rfl⟩ := hKpos hc
+    have hs : abscissa (chartₛ(χ) s) = s.re :=
+      quasiCharacterAbscissa_of_unitary_twist mₛ (isProperMap_sIdeleQuotientNorm F S) hne
+        _ χ s (fun _ ↦ rfl)
+    change ‖(χ (classOf g) : ℂ) * (modℂ[mₛ, classOf g]) ^ s‖ = _
+    rw [hs, norm_mul, Circle.norm_coe, one_mul, sIdeleQuotientNorm_mk]
+    exact Complex.norm_cpow_eq_rpow_re_of_pos (hr g) s
+  let integrand (c : Xₛ) (g : Iₛ) := f (Multiplicative.ofAdd g.val) * c (classOf g)
+  have hint {c : Xₛ} (hc : c ∈ K) : Integrable (integrand c) μₛ :=
+    sLocalIdelicZetaIntegral_integrable f c (hKpos hc)
+  -- The two endpoint characters bound the integrands below and above norm one.
+  let bound (g : Iₛ) := ‖integrand a g‖ + ‖integrand b g‖
+  have hbound : Integrable bound μₛ := (hint ha).norm.add (hint hb).norm
+  have hle {c : Xₛ} (hc : c ∈ K) (g : Iₛ) : ‖integrand c g‖ ≤ bound g := by
+    have hweighted {d : Xₛ} (h : ‖c (classOf g)‖ ≤ ‖d (classOf g)‖) :
+        ‖integrand c g‖ ≤ ‖integrand d g‖ := by
+      dsimp only [integrand]
+      rw [norm_mul, norm_mul]
+      exact mul_le_mul_of_nonneg_left h (norm_nonneg _)
+    by_cases hg : r g ≤ 1
+    · refine (hweighted (d := a) ?_).trans (le_add_of_nonneg_right (norm_nonneg (integrand b g)))
+      rw [hnorm hc, hnorm ha]
+      exact Real.rpow_le_rpow_of_exponent_ge (hr g) hg (hmin hc)
+    · refine (hweighted (d := b) ?_).trans (le_add_of_nonneg_left (norm_nonneg (integrand a g)))
+      rw [hnorm hc, hnorm hb]
+      exact Real.rpow_le_rpow_of_exponent_le (le_of_not_ge hg) (hmax hc)
+  let B (n : ℕ) : Set Iₛ := band[sIdeleNorm F S, n]
+  have hB (n : ℕ) : MeasurableSet (B n) := by
+    let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+    let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+    let : BorelSpace Aₛ := inferInstanceAs (BorelSpace
+      (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+    let : BorelSpace Iₛ := ⟨by
+      change MeasurableSpace.comap Units.val (inferInstance : MeasurableSpace Aₛ) = _
+      rw [(sIdeleGroup_description F S).1.eq_induced, borel_comap,
+        BorelSpace.measurable_eq (α := Aₛ)]⟩
+    have hnorm_cont : Continuous (fun g : Iₛ ↦ mₛ (classOf g)) :=
+      Continuous.comp hmₛ QuotientGroup.continuous_mk
+    have hrcont : Continuous r :=
+      NNReal.continuous_coe.comp (Units.continuous_val.comp hnorm_cont)
+    exact hrcont.measurable measurableSet_Icc
+  have hBmono : Monotone B := by
+    intro i j hij g hg
+    have hij' : (i : ℝ) + 1 ≤ j + 1 := by exact_mod_cast Nat.succ_le_succ hij
+    exact ⟨((inv_le_inv₀ (by positivity) (by positivity)).mpr hij').trans hg.1,
+      hg.2.trans hij'⟩
+  have htail : (⋂ n, (B n)ᶜ) = ∅ := by
+    apply Set.eq_empty_iff_forall_notMem.mpr
+    intro g hg
+    obtain ⟨n, hn⟩ := exists_nat_gt (max (r g) (r g)⁻¹)
+    have hn' : max (r g) (r g)⁻¹ ≤ (n : ℝ) + 1 :=
+      hn.le.trans (le_add_of_nonneg_right zero_le_one)
+    have hmem : g ∈ B n :=
+      ⟨(inv_le_comm₀ (by positivity) (hr g)).2 ((le_max_right _ _).trans hn'),
+        (le_max_left _ _).trans hn'⟩
+    exact (mem_iInter.mp hg n) hmem
+  have hlim : Tendsto (fun n ↦ ∫ g in (B n)ᶜ, bound g ∂μₛ) atTop (𝓝 0) := by
+    simpa only [htail, setIntegral_empty] using
+      (tendsto_setIntegral_of_antitone (μ := μₛ) (f := bound) (fun n ↦ (hB n).compl)
+        (fun _ _ hij ↦ compl_subset_compl.mpr (hBmono hij)) ⟨0, hbound.integrableOn⟩)
+  apply Metric.tendstoUniformlyOn_iff.mpr
+  intro ε hε
+  filter_upwards [(tendsto_order.mp hlim).2 ε hε] with n hn c hc
+  change dist (∫ g, integrand c g ∂μₛ) (∫ g in B n, integrand c g ∂μₛ) < ε
+  rw [dist_eq_norm, ← integral_add_compl (hB n) (hint hc), add_sub_cancel_left]
+  calc
+    ‖∫ g in (B n)ᶜ, integrand c g ∂μₛ‖ ≤ ∫ g in (B n)ᶜ, ‖integrand c g‖ ∂μₛ :=
+      norm_integral_le_integral_norm _
+    _ ≤ ∫ g in (B n)ᶜ, bound g ∂μₛ :=
+      setIntegral_mono_on (hint hc).norm.integrableOn hbound.integrableOn (hB n).compl
+        (fun g _ ↦ hle hc g)
+    _ < ε := hn
 
 /-- Paper: Theorem 3.3.1.1(1), p. 129. The zeta integral is holomorphic in
 every norm-twist coordinate on the right half-plane. -/
