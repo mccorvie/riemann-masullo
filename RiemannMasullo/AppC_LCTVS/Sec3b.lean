@@ -37,7 +37,17 @@ Deviation: The integral is required to be defined and to give the operator value
 almost everywhere in the target variable. -/
 theorem integralKernelOperator_apply (k : Lp ℂ 2 (μ.prod μ)) (f : Lp ℂ 2 μ) :
     ∀ᵐ x ∂μ, Integrable (fun y ↦ k (x, y) * f y) μ ∧
-      (integralKernelOperator μ k).val f x = ∫ y, k (x, y) * f y ∂μ := by sorry
+      (integralKernelOperator μ k).val f x = ∫ y, k (x, y) * f y ∂μ := by
+  let hswap := Measure.measurePreserving_swap (μ := μ) (ν := μ)
+  let swapped := Lp.compMeasurePreserving Prod.swap hswap k
+  have hkernel : ∀ᵐ p ∂(μ.prod μ), swapped p.swap = k p :=
+    hswap.quasiMeasurePreserving.ae (Lp.coeFn_compMeasurePreserving k hswap)
+  filter_upwards [Measure.ae_ae_of_ae_prod hkernel,
+    (hilbertSchmidtOperators_equiv_Lp_prod μ μ).choose_spec.2 swapped f] with x hx happly
+  have hmul : (fun y ↦ swapped (y, x) * f y) =ᵐ[μ] fun y ↦ k (x, y) * f y := by
+    filter_upwards [hx] with y hy
+    exact congrArg (· * f y) hy
+  exact ⟨happly.1.congr hmul, happly.2.trans (integral_congr_ae hmul)⟩
 
 /-- Paper: Theorem C.3.7.1(1), p. 708. The Hilbert-Schmidt norm of the integral
 operator is the L² norm of the kernel. -/
