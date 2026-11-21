@@ -61,7 +61,19 @@ theorem IsPettisIsotypicAverageOn.apply_fixed [T2Space E] [IsTopologicalAddGroup
     [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E] (μ : Measure G) [IsFiniteMeasure μ]
     (ρ : G →* (E →L[ℂ] E)) (P : E →L[ℂ] E)
     (hP : IsPettisIsotypicAverageOn μ univ ρ 1 P) (u : E) (hu : ∀ g, ρ g u = u) :
-    P u = μ.real univ • u := by sorry
+    P u = μ.real univ • u := by
+  have : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro φ
+  obtain ⟨_, he⟩ := hP u
+  have h := LinearMap.congr_fun he φ
+  change φ (P u) = ∫ g, φ (star ((1 : PontryaginDual G) g : ℂ) • ρ g u)
+    ∂(μ.restrict univ) at h
+  calc
+    φ (P u) = μ.real univ • φ u := by
+      simpa only [Measure.restrict_univ, PontryaginDual.one_apply, Circle.coe_one, star_one,
+        one_smul, hu, integral_const] using h
+    _ = φ (μ.real univ • u) := ((φ.restrictScalars ℝ).map_smul _ _).symm
 
 end Isotypes
 
