@@ -5,6 +5,8 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Fourier
 public import Mathlib.MeasureTheory.Integral.IntervalIntegral.Periodic
 
+import RiemannMasullo.ForMathlib.RingTheory.PicardGroup
+
 /-!
 # Schwartz–Bruhat topologies on elementary groups and idele class groups
 
@@ -273,12 +275,112 @@ theorem sIdeleClassInsertion_isOpenEmbedding : IsOpenEmbedding (sIdeleClassInser
       Subtype.ext u.val_inv, Subtype.ext u.inv_val⟩
   exact ⟨x, hinsertion.injective (Units.ext hval)⟩
 
+/-- The ideal classes of ideles that are units outside S are precisely the classes
+that become trivial over the S-integers. -/
+private theorem map_range_integralIdeleInsertion (p : 𝕀[F] →* CommRing.Pic (𝓞 F))
+    (hp : ∀ g, p g = ideleIdealClass F g) :
+    (integralIdeleInsertion F S).range.map p =
+      (CommRing.Pic.mapAlgebra (𝓞 F) (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)).ker := by
+  classical
+  let A := Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F
+  let m := CommRing.Pic.mapAlgebra (𝓞 F) A
+  ext c
+  change c ∈ (integralIdeleInsertion F S).range.map p ↔ m c = 1
+  constructor
+  · rintro ⟨_, ⟨u, rfl⟩, rfl⟩
+    rw [hp]
+    exact sIdele_ideal_class_trivial F S u
+  · intro hc
+    have h := picard_localization_exact F ∅ S (Finset.empty_subset S)
+    dsimp only at h
+    rw [Finset.sdiff_empty] at h
+    obtain ⟨j, _, hexact, _, hj⟩ := h
+    let A₀ := Set.integer
+      ((∅ : Finset (HeightOneSpectrum (𝓞 F))) : Set (HeightOneSpectrum (𝓞 F))) F
+    let m₀ := CommRing.Pic.mapAlgebra (𝓞 F) A₀
+    have hc₀ := hc
+    unfold m at hc₀
+    rw [← CommRing.Pic.mapRingHom_algebraMap] at hc₀
+    obtain ⟨z, hz⟩ := (hexact (m₀ c)).mp (by
+      rw [show m₀ c = CommRing.Pic.mapRingHom (algebraMap (𝓞 F) A₀) c by
+        rw [CommRing.Pic.mapRingHom_algebraMap],
+        CommRing.Pic.mapRingHom_mapRingHom]
+      exact hc₀)
+    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective z
+    choose x hx using fun v : S ↦ QuotientGroup.mk_surjective (y v)
+    have hy : (fun v : S ↦ QuotientGroup.mk (x v)) = y := funext hx
+    rw [← hy, hj] at hz
+    let a (v : S) := IdeleGroup.ofAdicCompletion (𝓞 F) F v.val (x v)
+    have ha (v : S) : a v ∈ (integralIdeleInsertion F S).range := by
+      apply (mem_range_integralIdeleInsertion F S _).mpr
+      intro w hw
+      have hne : w ≠ v.val := fun e ↦ hw (e.symm ▸ v.property)
+      constructor
+      · change Pi.mulSingle v.val (x v).val w ∈ w.adicCompletionIntegers F
+        rw [Pi.mulSingle_eq_of_ne hne]
+        exact one_mem _
+      · change ((a v)⁻¹).val.2 w ∈ w.adicCompletionIntegers F
+        dsimp only [a]
+        rw [← map_inv]
+        change Pi.mulSingle v.val ((x v)⁻¹).val w ∈ w.adicCompletionIntegers F
+        rw [Pi.mulSingle_eq_of_ne hne]
+        exact one_mem _
+    refine ⟨∏ v, a v, (integralIdeleInsertion F S).range.prod_mem (fun v _ ↦ ha v), ?_⟩
+    rw [map_prod]
+    calc
+      (∏ v, p (a v)) = ∏ v, localIdealClass F v.val (x v) :=
+        Finset.prod_congr rfl fun v _ ↦ (hp _).trans (ideleIdealClass_ofAdicCompletion F _ _)
+      _ = c := by
+        -- The base change to the empty stage is injective: its integer ring is the base ring.
+        have hA : A₀ = ⊥ := by simp [A₀]
+        let e := (Subalgebra.equivOfEq _ _ hA).trans
+          (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 F) F))
+        have he : e.toRingHom.comp (algebraMap (𝓞 F) _) = RingHom.id (𝓞 F) :=
+          RingHom.ext fun r ↦ (e.commutes r).trans (Algebra.algebraMap_self_apply r)
+        have hleft : LeftInverse (CommRing.Pic.mapRingHom e.toRingHom) m₀ := by
+          intro d
+          dsimp only [m₀]
+          rw [← CommRing.Pic.mapRingHom_algebraMap, CommRing.Pic.mapRingHom_mapRingHom,
+            he, CommRing.Pic.mapRingHom_id_apply]
+        exact hleft.injective hz
+
 /-- Paper: Lemma D.1.10.1(3), p. 784. The quotient by the image of the S-idele
 classes is isomorphic to the finite Picard group of the S-integer ring. -/
 theorem sIdeleClassInsertion_cokernel :
     Nonempty ((C[F] ⧸ (sIdeleClassInsertion F S).range) ≃*
       CommRing.Pic (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)) ∧
-    Finite (C[F] ⧸ (sIdeleClassInsertion F S).range) := by sorry
+    Finite (C[F] ⧸ (sIdeleClassInsertion F S).range) := by
+  let P := IdeleGroup.principalSubgroup (𝓞 F) F
+  let U := (integralIdeleInsertion F S).range
+  let A := Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F
+  let m := CommRing.Pic.mapAlgebra (𝓞 F) A
+  let : TopologicalSpace (CommRing.Pic (𝓞 F)) := ⊥
+  obtain ⟨p, hp, _, hexact, hquot⟩ := idele_ideal_class_exact F
+  have hpker : p.ker = P ⊔ (integralIdeleInsertion F ∅).range := by
+    rw [hexact.monoidHom_ker_eq, Subgroup.range_subtype]
+    rfl
+  have hU : (integralIdeleInsertion F ∅).range ≤ U :=
+    (integralIdeleInsertion_exhaustive F).1 (Finset.empty_subset S)
+  have hk : (m.comp p).ker = P ⊔ U := by
+    rw [← MonoidHom.comap_ker, ← map_range_integralIdeleInsertion F S p hp,
+      Subgroup.comap_map_eq, hpker, ← sup_left_comm, sup_eq_left.mpr hU, sup_comm]
+  have hP : P ≤ (m.comp p).ker := hk.symm ▸ le_sup_left
+  let q := QuotientGroup.lift P (m.comp p) hP
+  have hq : Surjective q := QuotientGroup.lift_surjective_of_surjective P _
+    ((picMapAlgebra_surjective_of_isLocalization
+      (Localization.submonoid (S : Set (HeightOneSpectrum (𝓞 F)))) A).comp hquot.surjective) hP
+  have hker : (sIdeleClassInsertion F S).range = q.ker := by
+    change (sIdeleClassInsertion F S).range = (QuotientGroup.lift P (m.comp p) hP).ker
+    rw [QuotientGroup.ker_lift, hk, Subgroup.map_sup, QuotientGroup.map_mk'_self, bot_sup_eq]
+    change (sIdeleClassInsertion F S).range = (integralIdeleInsertion F S).range.map _
+    rw [← MonoidHom.range_comp]
+    change (sIdeleClassInsertion F S).range =
+      ((sIdeleClassInsertion F S).comp (QuotientGroup.mk' _)).range
+    rw [MonoidHom.range_comp, MonoidHom.range_eq_top.mpr (QuotientGroup.mk'_surjective _),
+      Subgroup.map_top]
+  let e := QuotientGroup.liftEquiv _ hq hker
+  have : Finite (CommRing.Pic A) := (sIdeleClassGroup_finiteness F S).2.2.2.2.2
+  exact ⟨⟨e⟩, Finite.of_injective e e.injective⟩
 
 /-- Paper: Lemma D.1.10.1(3), p. 784. Insertion restricts to a topological
 group isomorphism between the identity components. -/
