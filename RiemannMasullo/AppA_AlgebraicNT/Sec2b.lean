@@ -119,7 +119,12 @@ theorem infiniteIdeleLog_mul (g h : 𝕀∞) :
 
 /-- Paper: Lemma A.2.3.2(1), p. 548. The full logarithm is continuous. -/
 theorem infiniteIdeleLog_continuous : Continuous (infiniteIdeleLog F) := by
-  sorry
+  apply continuous_pi
+  intro v
+  have hne (g : 𝕀∞) : g.val v ≠ 0 :=
+    (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
+  exact continuous_const.mul (((continuous_apply v).comp Units.continuous_val).norm.log
+    (fun g ↦ norm_ne_zero_iff.mpr (hne g)))
 
 /-- Paper: Lemma A.2.3.2(1), p. 548. The coordinates of the logarithm of a norm-one
 idele sum to zero, the defining equation of the logarithmic hyperplane. -/
