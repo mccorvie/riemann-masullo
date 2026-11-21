@@ -217,10 +217,9 @@ private theorem averageOrbit_commutes (f : Lp ℂ 1 μ) (T : H →L[ℂ] H)
     congrArg (fun S : H →L[ℂ] H ↦ f g • S v) (hT g).symm
 
 omit [IsTopologicalGroup G] in
-private theorem averageOrbit_dense (v : H) :
-    v ∈ closure (range fun f ↦ averageOrbit μ U hU hc f v) := by
-  rw [Metric.mem_closure_iff]
-  intro ε hε
+/-- Averages of norm at most one approximate each vector. -/
+private theorem exists_averageOrbit_close (v : H) {ε : ℝ} (hε : 0 < ε) :
+    ∃ f : Lp ℂ 1 μ, ‖f‖ ≤ 1 ∧ dist (averageOrbit μ U hU hc f v) v < ε := by
   let s : Set G := {g | ‖U g v - v‖ < ε / 2}
   have hs : s ∈ 𝓝 (1 : G) := by
     have ht : ContinuousAt (fun g ↦ ‖U g v - v‖) (1 : G) :=
@@ -240,7 +239,18 @@ private theorem averageOrbit_dense (v : H) :
     rw [hg]
     by_cases hgK : g ∈ K <;> simp [f, hgK]
   let a : ℂ := (μ.real K : ℂ)⁻¹
-  refine ⟨_, ⟨a • hf.toL1 f, rfl⟩, ?_⟩
+  have hfNorm : ‖hf.toL1 f‖ = μ.real K := by
+    rw [L1.norm_eq_integral_norm]
+    have h : (fun g ↦ ‖hf.toL1 f g‖) =ᵐ[μ] K.indicator (fun _ ↦ (1 : ℝ)) := by
+      filter_upwards [hf.coeFn_toL1] with g hg
+      change hf.toL1 f g = f g at hg
+      rw [hg]
+      by_cases hgK : g ∈ K <;> simp [f, hgK]
+    rw [integral_congr_ae h]
+    exact integral_indicator_one hK.measurableSet
+  refine ⟨a • hf.toL1 f, ?_, ?_⟩
+  · rw [norm_smul, hfNorm]
+    simp [a, abs_of_pos hKpos, hKpos.ne']
   have hint : IntegrableOn (fun g ↦ U g v) K μ := by
     apply (integrableOn_const (C := ‖v‖) hK.measure_lt_top.ne).mono'
       ((hc v).continuousOn.aestronglyMeasurable_of_isCompact hK hK.measurableSet)
@@ -254,9 +264,25 @@ private theorem averageOrbit_dense (v : H) :
       (integrableOn_const hK.measure_lt_top.ne), setIntegral_const, smul_sub,
       ← Complex.coe_smul, smul_smul]
     simp [a, hKpos.ne']
-  rw [dist_comm, dist_eq_norm, havg, norm_smul]
+  rw [dist_eq_norm, havg, norm_smul]
   refine (mul_le_mul_of_nonneg_left hnorm (norm_nonneg a)).trans_lt ?_
   simp [a, abs_of_pos hKpos, hKpos.ne', half_lt_self hε]
+
+omit [IsTopologicalGroup G] in
+private theorem averageOrbit_dense (v : H) :
+    v ∈ closure (range fun f ↦ averageOrbit μ U hU hc f v) := by
+  rw [Metric.mem_closure_iff]
+  intro ε hε
+  obtain ⟨f, -, hf⟩ := exists_averageOrbit_close μ U hU hc v hε
+  exact ⟨_, mem_range_self f, by rwa [dist_comm]⟩
+
+omit [IsTopologicalGroup G] [LocallyCompactSpace G] [μ.IsHaarMeasure] in
+/-- Haar averaging is contractive as a map from integrable weights to operators. -/
+private theorem norm_averageOrbit_le (f : Lp ℂ 1 μ) : ‖averageOrbit μ U hU hc f‖ ≤ ‖f‖ := by
+  have h : ‖averageOrbit μ U hU hc‖ ≤ 1 := by
+    unfold averageOrbit
+    exact LinearMap.mkContinuous₂_norm_le _ zero_le_one _
+  simpa using (averageOrbit μ U hU hc).le_of_opNorm_le h f
 
 end Averaging
 
@@ -268,12 +294,83 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteS
   (U : G →* (H →L[ℂ] H)) (hU : ∀ g v, ‖U g v‖ = ‖v‖)
   (hc : ∀ v, Continuous fun g ↦ U g v)
 
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G] in
+/-- Spectral characters on a compact level set of the average control its translates. -/
+private theorem exists_compact_test_of_gelfand {A : Type*} [CommCStarAlgebra A]
+    (V : G →* A) (hVstar : ∀ g, star (V g) = V g⁻¹) (a : A)
+    (hTranslate : Continuous fun g ↦ V g * a) {r ε : ℝ}
+    (hr : 0 < r) (ha : ‖a‖ ≤ r) (hε : 0 < ε) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ x : G, (∀ χ ∈ K, dist (χ x) 1 ≤ ε) → ‖V x * a - a‖ ≤ ε * r := by
+  let Φ := gelfandTransform ℂ A
+  have hΦ := gelfandTransform_isometry A
+  have hNorm (b : A) : ‖Φ b‖ = ‖b‖ := hΦ.norm_map_of_map_zero (map_zero Φ) b
+  -- On this spectral level set we can divide by the value of the average.
+  let Sε : Set (characterSpace ℂ A) := {ω | ε * r / 2 ≤ ‖ω a‖}
+  have hSε : IsCompact Sε := (isClosed_le continuous_const (Φ a).continuous.norm).isCompact
+  have hNonzero (ω : Sε) : (ω.1 : characterSpace ℂ A) a ≠ 0 :=
+    norm_pos_iff.mp ((by positivity : 0 < ε * r / 2).trans_le ω.2)
+  have hχ (ω : characterSpace ℂ A) (g : G) : ‖ω (V g)‖ = 1 := by
+    have heq : star (ω (V g)) * ω (V g) = 1 := by
+      rw [← map_star, ← map_mul, hVstar, ← map_mul, inv_mul_cancel, map_one, map_one]
+    have habs := congrArg norm heq
+    rw [norm_mul, norm_star, norm_one, ← sq] at habs
+    nlinarith [norm_nonneg (ω (V g))]
+  let test (ω : Sε) (g : G) : ℂ := (ω.1 : characterSpace ℂ A) (V g)
+  have hTest : Continuous (Function.uncurry test) := by
+    have hEval : Continuous fun p : Sε × G ↦ Φ (V p.2 * a) p.1.1 :=
+      continuous_eval.comp ((hΦ.continuous.comp (hTranslate.comp continuous_snd)).prodMk
+        (continuous_subtype_val.comp continuous_fst))
+    refine (hEval.div ((Φ a).continuous.comp
+      (continuous_subtype_val.comp continuous_fst)) (fun p ↦ hNonzero p.1)).congr ?_
+    intro p
+    change (p.1.1 : characterSpace ℂ A) (V p.2 * a) / (p.1.1 : characterSpace ℂ A) a =
+      (p.1.1 : characterSpace ℂ A) (V p.2)
+    rw [map_mul, mul_div_cancel_right₀ _ (hNonzero p.1)]
+  let χ (ω : Sε) : PontryaginDual G :=
+    { toFun g := ⟨test ω g, mem_sphere_zero_iff_norm.mpr (hχ ω.1 g)⟩
+      map_one' := Subtype.ext (by
+        change (ω.1 : characterSpace ℂ A) (V 1) = 1
+        rw [map_one, map_one])
+      map_mul' g k := Circle.ext (by
+        change (ω.1 : characterSpace ℂ A) (V (g * k)) =
+          (ω.1 : characterSpace ℂ A) (V g) * (ω.1 : characterSpace ℂ A) (V k)
+        rw [map_mul, map_mul])
+      continuous_toFun := (hTest.comp (continuous_const.prodMk continuous_id)).subtype_mk _ }
+  have hContinuous : Continuous χ :=
+    ContinuousMonoidHom.continuous_of_continuous_uncurry χ (hTest.subtype_mk _)
+  let : CompactSpace Sε := isCompact_iff_compactSpace.mp hSε
+  refine ⟨range χ, isCompact_range hContinuous, fun x hx ↦ ?_⟩
+  rw [← hNorm]
+  apply (ContinuousMap.norm_le _ (by positivity)).mpr
+  intro ω
+  change ‖ω (V x * a - a)‖ ≤ ε * r
+  rw [map_sub, map_mul, ← sub_one_mul, norm_mul]
+  by_cases hω : ω ∈ Sε
+  · have hDist : ‖ω (V x) - 1‖ ≤ ε := by
+      have h := hx (χ ⟨ω, hω⟩) (mem_range_self (⟨ω, hω⟩ : Sε))
+      change dist (ω (V x)) (1 : ℂ) ≤ ε at h
+      simpa only [dist_eq_norm] using h
+    have haNorm : ‖ω a‖ ≤ r :=
+      (ContinuousMap.norm_coe_le_norm (Φ a) ω).trans
+        ((hNorm a).trans_le ha)
+    exact mul_le_mul hDist haNorm (norm_nonneg _) hε.le
+  · calc
+      _ ≤ 2 * ‖ω a‖ := by
+        gcongr
+        simpa [hχ, one_add_one_eq_two] using norm_sub_le (ω (V x)) 1
+      _ ≤ ε * r := by
+        exact (le_div_iff₀' (by norm_num : (0 : ℝ) < 2)).mp (le_of_not_ge hω)
+
 include μ hU hc in
 open scoped IsMulCommutative Pointwise in
-/-- A strongly continuous unitary representation of an abelian group yields a continuous
-character detecting any element that acts nontrivially. -/
-private theorem exists_character_of_rep_ne_one {x : G} (hx : U x ≠ 1) :
-    ∃ χ : PontryaginDual G, χ x ≠ 1 := by
+/-- A compact family of characters controls the norm of a translated Haar average. -/
+private theorem exists_compact_test_of_averageOrbit (f : Lp ℂ 1 μ) {ε : ℝ} (hε : 0 < ε) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ x : G, (∀ χ ∈ K, dist (χ x) 1 ≤ ε) →
+        ‖U x * averageOrbit μ U hU hc f - averageOrbit μ U hU hc f‖ ≤ ε * ‖f‖ := by
+  by_cases hf : f = 0
+  · exact ⟨∅, isCompact_empty, by simp [hf]⟩
   let B := H →L[ℂ] H
   have hstar (g : G) : star (U g) = U g⁻¹ := by
     have hh := (U g).norm_map_iff_adjoint_comp_self.mp (hU g)
@@ -308,7 +405,26 @@ private theorem exists_character_of_rep_ne_one {x : G} (hx : U x ≠ 1) :
     rw [hA]
     exact Set.subset_centralizer_centralizer (mem_range_self _)
   have hVstar (g : G) : star (V g) = V g⁻¹ := Subtype.ext (hstar g)
-  -- Some averaged vector is still moved by x, since the averages approximate each vector.
+  let a : A := ⟨averageOrbit μ U hU hc f, by
+    change averageOrbit μ U hU hc f ∈ (A : Set B)
+    rw [hA]
+    intro T hT
+    exact averageOrbit_commutes μ U hU hc f T (fun g ↦ hT (U g) (mem_range_self g))⟩
+  have hTranslate : Continuous fun g ↦ V g * a := by
+    have h : Continuous fun g ↦ U g * averageOrbit μ U hU hc f := by
+      simp_rw [averageOrbit_translate]
+      exact (averageOrbit μ U hU hc).continuous.comp
+        (haarTranslation_continuous μ 1 ENNReal.one_ne_top f)
+    exact h.subtype_mk _
+  exact exists_compact_test_of_gelfand V hVstar a hTranslate
+    (norm_pos_iff.mpr hf) (norm_averageOrbit_le μ U hU hc f) hε
+
+include μ hU hc in
+/-- A strongly continuous unitary representation of an abelian group yields a continuous
+character detecting any element that acts nontrivially. -/
+private theorem exists_character_of_rep_ne_one {x : G} (hx : U x ≠ 1) :
+    ∃ χ : PontryaginDual G, χ x ≠ 1 := by
+  by_contra! hall
   obtain ⟨f, hf⟩ : ∃ f : Lp ℂ 1 μ,
       U x * averageOrbit μ U hU hc f ≠ averageOrbit μ U hU hc f := by
     by_contra! hall
@@ -318,46 +434,16 @@ private theorem exists_character_of_rep_ne_one {x : G} (hx : U x ≠ 1) :
     have heq : IsClosed {w : H | U x w = w} := isClosed_eq (U x).continuous continuous_id
     apply closure_minimal _ heq (averageOrbit_dense μ U hU hc v)
     rintro _ ⟨f, rfl⟩
-    exact congrArg (fun T : B ↦ T v) (hall f)
-  let a : A := ⟨averageOrbit μ U hU hc f, by
-    change averageOrbit μ U hU hc f ∈ (A : Set B)
-    rw [hA]
-    intro T hT
-    exact averageOrbit_commutes μ U hU hc f T (fun g ↦ hT (U g) (mem_range_self g))⟩
-  have hne : V x * a ≠ a := fun h ↦ hf (congrArg Subtype.val h)
-  obtain ⟨ω, hω⟩ : ∃ ω : characterSpace ℂ A, ω (V x * a) ≠ ω a := by
-    by_contra! hall
-    exact hne ((gelfandTransform_isometry A).injective (ContinuousMap.ext hall))
-  have ha : ω a ≠ 0 := by
-    intro h
-    apply hω
-    rw [map_mul, h, mul_zero]
-  have hχ (g : G) : ‖ω (V g)‖ = 1 := by
-    have heq : star (ω (V g)) * ω (V g) = 1 := by
-      rw [← map_star, ← map_mul, hVstar, ← map_mul, inv_mul_cancel, map_one, map_one]
-    have habs := congrArg norm heq
-    rw [norm_mul, norm_star, norm_one, ← sq] at habs
-    nlinarith [norm_nonneg (ω (V g))]
-  have hcont : Continuous fun g ↦ ω (V g) := by
-    have ht : Continuous fun g ↦ V g * a := by
-      have ht : Continuous fun g ↦ U g * averageOrbit μ U hU hc f := by
-        simp_rw [averageOrbit_translate]
-        exact (averageOrbit μ U hU hc).continuous.comp
-          (haarTranslation_continuous μ 1 ENNReal.one_ne_top f)
-      exact ht.subtype_mk _
-    refine (((CharacterSpace.toCLM ω).continuous.comp ht).div_const (ω a)).congr fun g ↦ ?_
-    change ω (V g * a) / ω a = ω (V g)
-    rw [map_mul, mul_div_cancel_right₀ _ ha]
-  let χ : PontryaginDual G :=
-    { toFun g := ⟨ω (V g), mem_sphere_zero_iff_norm.mpr (hχ g)⟩
-      map_one' := Subtype.ext (by simp)
-      map_mul' g k := Circle.ext (by
-        change ω (V (g * k)) = ω (V g) * ω (V k)
-        rw [map_mul, map_mul])
-      continuous_toFun := hcont.subtype_mk _ }
-  refine ⟨χ, fun h ↦ hω ?_⟩
-  have hh : ω (V x) = 1 := congrArg (fun z : Circle ↦ (z : ℂ)) h
-  rw [map_mul, hh, one_mul]
+    exact congrArg (fun T : H →L[ℂ] H ↦ T v) (hall f)
+  let d := ‖U x * averageOrbit μ U hU hc f - averageOrbit μ U hU hc f‖
+  have hd : 0 < d := norm_pos_iff.mpr (sub_ne_zero.mpr hf)
+  let ε := d / (‖f‖ + 1)
+  obtain ⟨K, -, hK⟩ := exists_compact_test_of_averageOrbit μ U hU hc f (ε := ε) (by positivity)
+  have h := hK x fun χ _ ↦ by simp [hall, show 0 ≤ ε by positivity]
+  change d ≤ ε * ‖f‖ at h
+  rw [show ε * ‖f‖ = d * ‖f‖ / (‖f‖ + 1) by dsimp [ε]; ring] at h
+  have := (le_div_iff₀ (by positivity : 0 < ‖f‖ + 1)).mp h
+  nlinarith
 
 end Spectrum
 
@@ -370,5 +456,71 @@ public theorem exists_pontryaginDual_apply_ne_one {x : G} (hx : x ≠ 1) :
   let μ : Measure G := Measure.haar
   exact exists_character_of_rep_ne_one μ (haarTranslation μ 2) (haarTranslation_norm μ 2)
     (haarTranslation_continuous μ 2 (by simp)) (haarTranslation_ne_one μ hx)
+
+open scoped Pointwise in
+/-- A compact family of continuous characters detects membership in an identity neighborhood. -/
+public theorem exists_compact_pontryaginDual_test {U : Set G} (hU : U ∈ 𝓝 (1 : G)) :
+    ∃ K : Set (PontryaginDual G), IsCompact K ∧
+      ∀ x : G, (∀ χ ∈ K, dist (χ x) 1 < 1 / 4) → x ∈ U := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let μ : Measure G := Measure.haar
+  obtain ⟨V, hV, -, hInv, hVV⟩ := exists_closed_nhds_one_inv_eq_mul_subset hU
+  obtain ⟨D, ⟨hD, hDc⟩, hDV⟩ := (compact_basis_nhds (1 : G)).mem_iff.mp hV
+  let v := indicatorConstLp (μ := μ) 2 hDc.isClosed.measurableSet hDc.measure_lt_top.ne (1 : ℂ)
+  have hμD : 0 < μ.real D :=
+    ENNReal.toReal_pos (μ.measure_pos_of_mem_nhds hD).ne' hDc.measure_lt_top.ne
+  have hv : 0 < ‖v‖ := by
+    dsimp [v]
+    rw [norm_indicatorConstLp (by norm_num) (by simp), norm_one, one_mul]
+    exact Real.rpow_pos_of_pos hμD _
+  let T := haarTranslation μ 2
+  have hT := haarTranslation_norm μ 2
+  have hc := haarTranslation_continuous μ 2 (by simp)
+  obtain ⟨f, hf, hfv⟩ := exists_averageOrbit_close μ T hT hc v (ε := ‖v‖ / 4) (by positivity)
+  let a := averageOrbit μ T hT hc f
+  have hav : ‖a v - v‖ < ‖v‖ / 4 := by
+    simpa only [dist_eq_norm] using hfv
+  obtain ⟨K, hK, hTest⟩ := exists_compact_test_of_averageOrbit μ T hT hc f
+    (ε := 1 / 4) (by norm_num)
+  refine ⟨K, hK, fun x hx ↦ ?_⟩
+  by_contra hxU
+  -- Away from the neighborhood, the translate of the indicator vanishes on D.
+  have hLower : ‖v‖ ≤ ‖T x v - v‖ := by
+    let m : MeasurePreserving (x⁻¹ * ·) μ μ := measurePreserving_mul_left μ x⁻¹
+    let ind : G → ℂ := D.indicator (fun _ ↦ 1)
+    have hvD : ⇑v =ᵐ[μ] ind := indicatorConstLp_coeFn
+    have hTx : ⇑(T x v) =ᵐ[μ] ind ∘ (x⁻¹ * ·) := by
+      change ⇑(Lp.compMeasurePreserving (x⁻¹ * ·) m v) =ᵐ[μ] _
+      exact (Lp.coeFn_compMeasurePreserving v m).trans
+        (m.quasiMeasurePreserving.ae_eq_comp hvD)
+    apply Lp.norm_le_norm_of_ae_le
+    filter_upwards [Lp.coeFn_sub (T x v) v, hTx, hvD] with y hsub hTy hvy
+    simp only [Pi.sub_apply] at hsub
+    rw [hsub, hTy, hvy]
+    by_cases hy : y ∈ D
+    · have hnot : x⁻¹ * y ∉ D := by
+        intro h
+        apply hxU
+        apply hVV
+        refine ⟨y, hDV hy, (x⁻¹ * y)⁻¹, ?_, by simp⟩
+        rw [← hInv]
+        exact Set.inv_mem_inv.mpr (hDV h)
+      simp [ind, hy, hnot]
+    · simp [ind, hy]
+  have hUpper : ‖T x * a - a‖ ≤ 1 / 4 :=
+    (hTest x fun χ hχ ↦ (hx χ hχ).le).trans (by linarith)
+  have hOp : ‖(T x * a - a) v‖ ≤ ‖v‖ / 4 := by
+    simpa [div_eq_mul_inv, mul_comm] using
+      (T x * a - a).le_of_opNorm_le hUpper v
+  have hErr : ‖T x (v - a v)‖ < ‖v‖ / 4 := by
+    rwa [hT, norm_sub_rev]
+  have hdecomp : T x v - v = T x (v - a v) + (T x * a - a) v + (a v - v) := by
+    rw [map_sub, sub_apply, mul_apply_eq_comp]
+    abel
+  rw [hdecomp] at hLower
+  have hTriangle := (norm_add_le (T x (v - a v) + (T x * a - a) v) (a v - v)).trans
+    (add_le_add (norm_add_le (T x (v - a v)) ((T x * a - a) v)) le_rfl)
+  linarith
 
 end RiemannMasullo
