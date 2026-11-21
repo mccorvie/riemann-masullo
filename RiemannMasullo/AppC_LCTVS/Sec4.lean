@@ -921,7 +921,39 @@ theorem existsUnique_pettisWeakIntegral_weil
       (∀ g : G, F (QuotientGroup.mk g) =
         pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g)) ∧
       ∃ hF : PettisWeaklyIntegrable (.positive ν) F,
-        pettisWeakIntegral (.positive μG) f hf = pettisWeakIntegral (.positive ν) F hF := by sorry
+        pettisWeakIntegral (.positive μG) f hf = pettisWeakIntegral (.positive ν) F hF := by
+  let F (q : G ⧸ H) :=
+    pettisIntegral (.positive μH) (fun h : H ↦ f (q.out * h)) (hsec q.out)
+  have hscalar (g : G) (φ : StrongDual ℂ E) :
+      φ (pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g)) =
+        ∫ h : H, φ (f (g * h)) ∂μH := by
+    obtain ⟨_, heq⟩ := hasPettisIntegral_pettisIntegral (.positive μH) _ (hsec g)
+    exact LinearMap.congr_fun heq φ
+  have hF_scalar (φ : StrongDual ℂ E) :
+      (fun q ↦ φ (F q)) = lcaCosetIntegral H μH (fun g ↦ φ (f g)) :=
+    funext fun q ↦ hscalar q.out φ
+  have hF_mk (g : G) : F (QuotientGroup.mk g) =
+      pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g) := by
+    let := polynormableSpace_separatingDual ℂ E
+    refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2 fun φ ↦ ?_
+    have hg : Integrable (fun h : H ↦ φ (f (g * h))) μH :=
+      (hasPettisIntegral_pettisIntegral (.positive μH) _ (hsec g)).choose φ
+    rw [congrFun (hF_scalar φ) (QuotientGroup.mk g), hscalar]
+    exact lcaCosetIntegral_mk H μH (fun x ↦ φ (f x)) g hg
+  have hweil (φ : StrongDual ℂ E) := weilQuotientIntegral_L1 H hH μG μH ν hν (hf φ)
+  have hF : PettisWeaklyIntegrable (.positive ν) F := by
+    intro φ
+    change Integrable (fun q ↦ φ (F q)) ν
+    rw [hF_scalar]
+    exact (hweil φ).2.1
+  refine ⟨F, ⟨hF_mk, hF, LinearMap.ext fun φ ↦ ?_⟩, ?_⟩
+  · change (∫ g, φ (f g) ∂μG) = ∫ q, φ (F q) ∂ν
+    rw [hF_scalar]
+    exact (hweil φ).2.2
+  · rintro F' ⟨hF'_mk, _⟩
+    funext q
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    exact (hF'_mk g).trans (hF_mk g).symm
 
 end Weil
 
