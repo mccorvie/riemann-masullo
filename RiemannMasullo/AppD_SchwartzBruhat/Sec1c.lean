@@ -629,7 +629,14 @@ theorem bruhatFirstOrder_scale (a : LCATopologicalLie G) (c : ℝ) :
     let scale : LCATopologicalLie (Multiplicative ℝ) :=
       ⟨(c • LinearMap.id (R := ℝ) (M := ℝ)).toAddMonoidHom.toMultiplicative,
         continuous_const_mul c⟩
-    bruhatFirstOrder (a.comp scale) = c • bruhatFirstOrder a := by sorry
+    bruhatFirstOrder (a.comp scale) = c • bruhatFirstOrder a := by
+  apply LinearMap.ext
+  intro f
+  apply Subtype.ext
+  funext x
+  let orbit : ℝ → ℂ := fun t ↦ f.val (x * a (Multiplicative.ofAdd t))
+  change deriv (fun t ↦ orbit (c * t)) 0 = c • deriv orbit 0
+  simpa only [mul_zero] using deriv_comp_mul_left c orbit 0
 
 /-- Paper: Lemma D.1.6.7(1), p. 767. The directional derivative restricts
 to a continuous complex linear endomorphism of the Schwartz–Bruhat space. -/
