@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Fourier.AddCircle
 public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
+import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
@@ -877,9 +878,89 @@ variable (hComplete : @CompleteSpace E (IsTopologicalAddGroup.rightUniformSpace 
 
 include hLC hHausdorff hBarrelled hComplete hReflexive hb ha
 
+-- Retain the section hypotheses in the theorem's signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
 barrelled reflexive space is shrinking. -/
-theorem isShrinking_of_isAbsolute : IsShrinking x f := by sorry
+theorem isShrinking_of_isAbsolute : IsShrinking x f := by
+  have horth (m n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+  refine ⟨fun m n ↦ ?_, fun g ↦ ?_⟩
+  · change f n (x m) = _
+    by_cases h : m = n
+    · simp [horth, h]
+    · simp [horth, h, Ne.symm h]
+  -- A continuous functional vanishing on the coefficient span is evaluation at zero.
+  let S := Submodule.span ℂ (range f)
+  have hdense : Dense (S : Set (StrongDual ℂ E)) := by
+    intro g
+    by_contra hg
+    obtain ⟨φ, hφ, hvanish⟩ := exists_dual_eq_zero_on_submodule_of_notMem
+      S.topologicalClosure S.isClosed_topologicalClosure hg
+    obtain ⟨u, rfl⟩ := hReflexive.surjective φ
+    have hzero (m : ℕ) : f m u = 0 :=
+      hvanish (f m) (S.le_topologicalClosure (Submodule.subset_span (mem_range_self m)))
+    have hsum : HasSum (fun _ : ℕ ↦ (0 : E)) u (SummationFilter.conditional ℕ) := by
+      simpa only [ContinuousLinearMap.coe_coe, hzero, zero_smul] using hb.2 u
+    have hu : u = 0 := hsum.unique (by simp)
+    apply hφ
+    change g u = 0
+    rw [hu, map_zero]
+  let P (s : Finset ℕ) (u : E) := ∑ m ∈ s, f m u • x m
+  let Q (s : Finset ℕ) : StrongDual ℂ E := ∑ m ∈ s, g (x m) • f m
+  have heval (s : Finset ℕ) (u : E) : (Q s - g) u = g (P s u - u) := by
+    simp only [P, Q, sub_apply, sum_apply, smul_apply, map_sub, map_sum, map_smul, smul_eq_mul,
+      mul_comm]
+  have hvanish (ψ : StrongDual ℂ E) (hψ : ψ ∈ S) :
+      ∀ᶠ s : Finset ℕ in atTop, ∀ u, ψ (P s u - u) = 0 := by
+    induction hψ using Submodule.span_induction with
+    | mem ψ hψ =>
+      obtain ⟨m, rfl⟩ := hψ
+      filter_upwards [eventually_ge_atTop ({m} : Finset ℕ)] with s hs u
+      have hm := Finset.singleton_subset_iff.mp hs
+      simp only [P, map_sub, map_sum, map_smul, horth, smul_eq_mul, mul_ite, mul_one,
+        mul_zero, Finset.sum_ite_eq, hm, ite_true, sub_self]
+    | zero => simp
+    | add ψ χ _ _ hψ hχ =>
+      filter_upwards [hψ, hχ] with s hs ht u
+      simp [hs u, ht u]
+    | smul c ψ _ hψ =>
+      filter_upwards [hψ] with s hs u
+      simp [hs u]
+  change Tendsto Q (SummationFilter.conditional ℕ).filter (𝓝 g)
+  refine (tendsto_sub_nhds_zero_iff.mp ?_).mono_left
+    (SummationFilter.conditional ℕ).le_atTop
+  apply (ContinuousLinearMap.hasBasis_nhds_zero_of_basis Metric.nhds_basis_ball).tendsto_right_iff.mpr
+  rintro ⟨B, ε⟩ ⟨hB, hε⟩
+  -- Absoluteness bounds all truncation errors on a bounded set by continuous seminorms.
+  let T := {v : E | ∃ (s : Finset ℕ) (u : E), u ∈ B ∧ P s u - u = v}
+  have hT : IsVonNBounded ℂ T := by
+    let hp := PolynormableSpace.withSeminorms ℂ E
+    apply hp.isVonNBounded_iff_seminorm_bounded.mpr
+    rintro ⟨q, hq⟩
+    obtain ⟨q', hq', habs⟩ := ha q hq
+    obtain ⟨C, hC, hqB⟩ := hp.isVonNBounded_iff_seminorm_bounded.mp hB ⟨q, hq⟩
+    obtain ⟨C', hC', hq'B⟩ := hp.isVonNBounded_iff_seminorm_bounded.mp hB ⟨q', hq'⟩
+    refine ⟨C' + C, add_pos hC' hC, ?_⟩
+    rintro _ ⟨s, u, hu, rfl⟩
+    have hP : q (P s u) ≤ q' u := calc
+      q (P s u) ≤ ∑ m ∈ s, q (f m u • x m) :=
+        Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q) _ _
+      _ ≤ ∑' m, q (f m u • x m) :=
+        (habs u).1.sum_le_tsum s (fun _ _ ↦ apply_nonneg _ _)
+      _ ≤ q' u := (habs u).2
+    exact (map_sub_le_add q _ _).trans_lt (add_lt_add (hP.trans_lt (hq'B u hu)) (hqB u hu))
+  -- Approximate g on the entire error set by a finite linear combination of coefficients.
+  have hnear : ∀ᶠ ψ : StrongDual ℂ E in 𝓝 g, MapsTo (ψ - g) T (Metric.ball 0 ε) := by
+    have ht : Tendsto (fun ψ ↦ ψ - g) (𝓝 g) (𝓝 0) :=
+      tendsto_sub_nhds_zero_iff.mpr tendsto_id
+    exact ht.eventually (ContinuousLinearMap.eventually_nhds_zero_mapsTo hT
+      (Metric.ball_mem_nhds _ hε))
+  obtain ⟨ψ, hψ, hclose⟩ := ((mem_closure_iff_frequently.mp (hdense g)).and_eventually hnear).exists
+  filter_upwards [hvanish ψ hψ] with s hs u hu
+  have h := hclose (show P s u - u ∈ T from ⟨s, u, hu, rfl⟩)
+  change (Q s - g) u ∈ Metric.ball 0 ε
+  rw [heval]
+  simpa only [Metric.mem_ball, dist_zero_right, sub_apply, hs u, zero_sub, norm_neg] using h
 
 /-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
 barrelled reflexive space is boundedly complete. -/

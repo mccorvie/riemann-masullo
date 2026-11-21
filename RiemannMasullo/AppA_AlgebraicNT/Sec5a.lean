@@ -860,13 +860,49 @@ include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 571. The D′ condition is equivalent for the
 quotient sequence and for the lifts through the fundamental domain. -/
 theorem isDPrimeSequence_quotient_iff :
-    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by sorry
+    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by
+  unfold IsDPrimeSequence
+  rw [isDSequence_quotient_iff H hH hν hcount hE hEc hE₁ hbij hU hmono]
+  have hopen : IsOpenMap q := QuotientGroup.isOpenMap_coe
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  refine and_congr_right fun _ ↦ ⟨?_, ?_⟩
+  · intro h W hW
+    have himage : q '' (W ∩ E) ∈ 𝓝 (1 : G ⧸ H) := by
+      simpa only [map_one] using
+        hopen.image_mem_nhds (inter_mem hW (mem_interior_iff_mem_nhds.mp hE₁))
+    obtain ⟨k, hk⟩ := h _ himage
+    refine ⟨k, fun x hx ↦ ?_⟩
+    obtain ⟨y, hy, heq⟩ := hk hx.1
+    have hxy : y = x := (injOn_iff_injective.mpr hbij.1) hy.2 hx.2 heq
+    exact hxy ▸ hy.1
+  · intro h W hW
+    have hpreimage : q ⁻¹' W ∈ 𝓝 (1 : G) :=
+      hq.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hW)
+    obtain ⟨k, hk⟩ := h _ hpreimage
+    refine ⟨k, fun y hy ↦ ?_⟩
+    obtain ⟨x, rfl⟩ := hbij.2 y
+    exact hk ⟨hy, x.property⟩
 
 include hbij in
 /-- Paper: Proposition A.5.2.6, p. 571. For a symmetric fundamental domain,
 the quotient family is symmetric exactly when the lifted family is symmetric. -/
 theorem inv_eq_sequence_quotient_iff (hEsymm : E⁻¹ = E) :
-    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by sorry
+    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by
+  constructor
+  · intro h k
+    have hpre : (q ⁻¹' U k)⁻¹ = q ⁻¹' (U k)⁻¹ := by
+      ext x
+      simp only [Set.mem_inv, Set.mem_preimage, map_inv]
+    change (q ⁻¹' U k ∩ E)⁻¹ = q ⁻¹' U k ∩ E
+    rw [Set.inter_inv, hpre, h k, hEsymm]
+  · intro h k
+    have hsurj : q '' E = univ := by
+      rw [← Set.range_domRestrict, Set.range_eq_univ]
+      exact hbij.2
+    have himage : q '' lifted k = U k := by
+      change q '' (q ⁻¹' U k ∩ E) = U k
+      rw [Set.image_preimage_inter, hsurj, inter_univ]
+    simpa only [Set.image_inv, himage] using congrArg (fun s : Set G ↦ q '' s) (h k)
 
 -- TODO(paper-gap): The D″ equivalence claimed in the proof of A.5.2.6 fails.
 -- For ℤ → ℤ/3ℤ take the symmetric domain {-1, 0, 1} and U₀ = V₀ = ℤ/3ℤ.
