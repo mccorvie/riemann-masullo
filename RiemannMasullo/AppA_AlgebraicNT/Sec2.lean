@@ -1697,7 +1697,20 @@ theorem canonicalIdeleNormSection_continuous : Continuous (canonicalIdeleNormSec
 /-- Paper: Lemma A.2.2.4, p. 547. The canonical homomorphism splits the idelic norm. -/
 theorem canonicalIdeleNormSection_rightInverse :
     RightInverse (canonicalIdeleNormSection F) (ideleNorm F) := by
-  sorry
+  intro t
+  let := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  let root := Units.map (NNReal.rpowMonoidHom (Module.finrank ℚ F : ℝ)⁻¹) t
+  let g := ratIdeleNormSection root
+  have hrelative : relativeIdeleNormRat F (canonicalIdeleNormSection F t) =
+      g ^ Module.finrank ℚ F := by
+    apply Units.ext
+    change Algebra.norm 𝔸[ℚ] (algebraMap 𝔸[ℚ] 𝔸[F] g.val) = g.val ^ Module.finrank ℚ F
+    simpa only [Fintype.card_fin] using Algebra.norm_algebraMap_of_basis b g.val
+  rw [← ideleNorm_comp_relativeIdeleNormRat, MonoidHom.comp_apply, hrelative, map_pow,
+    show ideleNorm ℚ g = root from ratIdeleNormSection_rightInverse root]
+  apply Units.ext
+  exact NNReal.rpow_inv_natCast_pow t.val (Module.finrank_pos (R := ℚ) (M := F)).ne'
 
 /-- Paper: Lemma A.2.2.4, p. 547. Every infinite component of the canonical section
 is the positive real root of order the field degree, viewed in the local field. -/
