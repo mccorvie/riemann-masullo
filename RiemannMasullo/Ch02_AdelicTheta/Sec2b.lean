@@ -55,7 +55,36 @@ theorem adeleOneParameter_finite_eq_one (t : ℝ≥0ˣ) : (γ t).val.2 = 1 := by
 subgroup is a power of its positive real parameter, with unique real exponent.
 The norm-one case has exponent zero. -/
 theorem adeleOneParameter_norm_rpow :
-    ∃! α : ℝ, ∀ t : ℝ≥0ˣ, valueℝ (ideleNorm F (γ t)) = (valueℝ t) ^ α := by sorry
+    ∃! α : ℝ, ∀ t : ℝ≥0ˣ, valueℝ (ideleNorm F (γ t)) = (valueℝ t) ^ α := by
+  let E : ℝ ≃ₜ ℝ≥0ˣ :=
+    Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have hE (x : ℝ) : valueℝ (E x) = Real.exp x := rfl
+  have hEadd (x y : ℝ) : E (x + y) = E x * E y :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_add x y))
+  have hpos (t : ℝ≥0ˣ) : 0 < valueℝ t := NNReal.coe_pos.mpr (Units.zero_lt t)
+  let f : ℝ →+ ℝ := AddMonoidHom.mk'
+    (fun x ↦ Real.log (valueℝ (ideleNorm F (γ (E x))))) (by
+      intro x y
+      dsimp only
+      rw [hEadd, map_mul, map_mul, Units.val_mul, NNReal.coe_mul,
+        Real.log_mul (hpos _).ne' (hpos _).ne'])
+  have hf : Continuous f := by
+    change Continuous (fun x ↦ Real.log (valueℝ (ideleNorm F (γ (E x)))))
+    have hNorm : Continuous (ideleNorm F) := (ideleGroup_topology F).2.2.2.2.1
+    exact (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (hNorm.comp (γ.continuous.comp E.continuous)))).log
+      fun x ↦ (hpos _).ne'
+  have hlinear (x : ℝ) : f x = x * f 1 := by
+    simpa only [smul_eq_mul, mul_one] using map_real_smul f hf x (1 : ℝ)
+  have hpower (x a : ℝ) : (valueℝ (E x)) ^ a = Real.exp (x * a) := by
+    rw [hE, Real.rpow_def_of_pos (Real.exp_pos x), Real.log_exp]
+  have h (t : ℝ≥0ˣ) : valueℝ (ideleNorm F (γ t)) = (valueℝ t) ^ f 1 := by
+    obtain ⟨x, rfl⟩ := E.surjective t
+    rw [hpower, ← hlinear]
+    exact (Real.exp_log (hpos _)).symm
+  refine ⟨f 1, h, fun a ha ↦ ?_⟩
+  have ha' := (ha (E 1)).symm.trans (h (E 1))
+  simpa only [hpower, one_mul, Real.exp_eq_exp] using ha'
 
 /-- Paper: Lemma 2.2.4.1(1)–(2), p. 87. The norm of the subgroup is either
 an automorphism smooth in both directions or identically one. Smoothness is
