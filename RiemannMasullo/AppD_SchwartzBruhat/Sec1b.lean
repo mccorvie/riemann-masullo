@@ -540,10 +540,29 @@ theorem mem_lcaDualAnnihilator_iff (J : Subgroup (PontryaginDual G)) (x : G) :
     x ∈ lcaDualAnnihilator J ↔ ∀ χ : J, χ.val x = 1 :=
   Subgroup.mem_iInf
 
+-- Retain `T2Space G` in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.1.4.6(1), p. 758. Taking the annihilator twice recovers a
 closed subgroup under the evaluation pairing. -/
 theorem lcaDualAnnihilator_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
-    lcaDualAnnihilator (lcaAnnihilator H) = H := by sorry
+    lcaDualAnnihilator (lcaAnnihilator H) = H := by
+  ext x
+  rw [mem_lcaDualAnnihilator_iff]
+  constructor
+  · intro hx
+    let : T1Space (G ⧸ H) := QuotientGroup.t1Space_iff.mpr hH
+    let q : G →ₜ* (G ⧸ H) := ⟨QuotientGroup.mk' H, QuotientGroup.continuous_mk⟩
+    apply (QuotientGroup.eq_one_iff x).mp
+    apply (pontryaginDual_pairing_separates (G := G ⧸ H)).1
+    funext ψ
+    have hψ : PontryaginDual.map q ψ ∈ lcaAnnihilator H := by
+      apply (mem_lcaAnnihilator_iff H _).mpr
+      intro y
+      have hy : q y.val = 1 := (QuotientGroup.eq_one_iff y.val).mpr y.property
+      rw [PontryaginDual.map_apply, hy, map_one]
+    exact (hx ⟨PontryaginDual.map q ψ, hψ⟩).trans (map_one ψ).symm
+  · intro hx χ
+    exact (mem_lcaAnnihilator_iff H χ.val).mp χ.property ⟨x, hx⟩
 
 /-- Paper: Lemma D.1.4.6(2), p. 758. Pullback by the quotient map identifies
 the dual of a quotient with the annihilator. -/
