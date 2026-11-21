@@ -8,6 +8,7 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
 
 /-!
 # Nuclear operators and the trace on Hilbert spaces
@@ -945,6 +946,91 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
 local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
   StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
 
+/-- Inserting an endomorphism on the vector side of a nuclear presentation gives an
+absolutely convergent scalar series, continuous in that endomorphism for precompact convergence. -/
+private theorem NuclearPresentation.exists_tracePairing {A : E →L[ℂ] E}
+    (r : NuclearPresentation A) :
+    ∃ L : PrecompactConvergenceCLM E E →L[ℂ] ℂ,
+      ∀ T : PrecompactConvergenceCLM E E,
+        Summable (fun n ↦ ‖r.coeff n * r.functional n (T (r.vector n))‖) ∧
+        HasSum (fun n ↦ r.coeff n * r.functional n (T (r.vector n))) (L T) := by
+  obtain ⟨d, hd, hd₀, hdiv⟩ := exists_pos_tendsto_zero_summable_div
+    r.summable_coeff (fun n ↦ norm_nonneg _)
+  let c (n : ℕ) : ℂ := r.coeff n / (d n : ℂ)
+  let y (n : ℕ) : E := (d n : ℂ) • (r.vector n : E)
+  have hc : Summable (fun n ↦ ‖c n‖) := by
+    simpa only [c, norm_div, Complex.norm_real, Real.norm_of_nonneg (hd _).le] using hdiv
+  have hy : Tendsto y atTop (𝓝 0) := r.isBanachDisc.bounded.smul_tendsto_zero
+    (Eventually.of_forall r.vector_mem) (by
+      simpa only [Function.comp_def, Complex.ofReal_zero] using
+        (Complex.continuous_ofReal.tendsto 0).comp hd₀)
+  let K := insert (0 : E) (range y)
+  have hK : IsCompact K := hy.isCompact_insert_range
+  have hyK (n : ℕ) : y n ∈ K := mem_insert_of_mem _ (mem_range_self n)
+  have hseminorm := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae
+    (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨p, hp, hφ⟩ := (hseminorm.mp r.equicontinuous) ()
+  let term (T : PrecompactConvergenceCLM E E) (n : ℕ) := c n * r.functional n (T (y n))
+  have hterm (T : PrecompactConvergenceCLM E E) (n : ℕ) :
+      ‖term T n‖ ≤ ‖c n‖ * p (T (y n)) := by
+    change ‖c n * r.functional n (T (y n))‖ ≤ _
+    rw [norm_mul]
+    exact mul_le_mul_of_nonneg_left (hφ n _) (norm_nonneg _)
+  have hs (T : PrecompactConvergenceCLM E E) : Summable (fun n ↦ ‖term T n‖) := by
+    obtain ⟨C, _, hC⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mp
+      (hK.isVonNBounded ℂ) ⟨p.comp T.toLinearMap, hp.comp T.continuous⟩
+    refine (hc.mul_right C).of_nonneg_of_le (fun n ↦ norm_nonneg _) fun n ↦ ?_
+    exact (hterm T n).trans (mul_le_mul_of_nonneg_left (hC _ (hyK n)).le (norm_nonneg _))
+  let L : PrecompactConvergenceCLM E E →ₗ[ℂ] ℂ :=
+    { toFun := fun T ↦ ∑' n, term T n
+      map_add' := fun T S ↦ by
+        change (∑' n, term (T + S) n) = (∑' n, term T n) + ∑' n, term S n
+        rw [← (hs T).of_norm.tsum_add (hs S).of_norm]
+        exact tsum_congr fun n ↦ by simp [term, mul_add]
+      map_smul' := fun a T ↦ by
+        change (∑' n, term (a • T) n) = a * ∑' n, term T n
+        rw [← tsum_mul_left]
+        exact tsum_congr fun n ↦ by simp [term, smul_eq_mul, mul_left_comm] }
+  have hL : Continuous L := by
+    refine continuous_of_continuousAt_zero L ?_
+    rw [ContinuousAt, map_zero, Metric.tendsto_nhds]
+    intro ε hε
+    let M := (∑' n, ‖c n‖) + 1
+    have hM : 0 < M := by dsimp [M]; positivity
+    have hδ : 0 < ε / M := div_pos hε hM
+    have hnear := UniformConvergenceCLM.eventually_nhds_zero_mapsTo (RingHom.id ℂ)
+      (𝔖 := {s | IsPrecompactInCompletion s})
+      ((isPrecompactInCompletion_iff_totallyBounded K).mpr hK.totallyBounded)
+      ((Seminorm.continuous_iff hδ).mp hp)
+    filter_upwards [hnear] with T hT
+    rw [dist_zero_right]
+    calc
+      ‖L T‖ ≤ ∑' n, ‖c n‖ * (ε / M) := by
+        refine tsum_of_norm_bounded (hc.mul_right (ε / M)).hasSum fun n ↦ ?_
+        exact (hterm T n).trans (mul_le_mul_of_nonneg_left
+          (p.mem_ball_zero.mp (hT (hyK n))).le (norm_nonneg _))
+      _ < ε := by
+        rw [tsum_mul_right, mul_div_left_comm]
+        simpa only [mul_one] using
+          mul_lt_mul_of_pos_left ((div_lt_one hM).mpr (lt_add_one _)) hε
+  refine ⟨⟨L, hL⟩, fun T ↦ ?_⟩
+  have heq (n : ℕ) : term T n = r.coeff n * r.functional n (T (r.vector n)) := by
+    simp only [term, c, y, map_smul, smul_eq_mul, ← mul_assoc]
+    rw [div_mul_cancel₀ _ (Complex.ofReal_ne_zero.mpr (hd n).ne')]
+  exact ⟨(hs T).congr (fun n ↦ congrArg norm (heq n)),
+    (hs T).of_norm.hasSum.congr_fun (fun n ↦ (heq n).symm)⟩
+
+omit [T2Space E] in
+/-- On a rank-one test map, the scalar series obtained by inserting it in a nuclear presentation
+depends only on the presented operator. -/
+private theorem NuclearPresentation.hasSum_tracePairing_tmul {A : E →L[ℂ] E}
+    (r : NuclearPresentation A) (φ : StrongDual ℂ E) (x : E) :
+    HasSum (fun n ↦ r.coeff n * r.functional n (tensorToFiniteRank (φ ⊗ₜ[ℂ] x) (r.vector n)))
+      (φ (A x)) := by
+  refine (φ.hasSum (r.hasSum x)).congr_fun fun n ↦ ?_
+  rw [tensorToFiniteRank_tmul, map_smul, map_smul, smul_eq_mul, smul_eq_mul]
+  ring
+
 /-- Paper: Proposition C.3.2.1, p. 694. On a space with the approximation property,
 every presentation of the same nuclear endomorphism gives an absolutely convergent
 scalar series with the same sum. -/
@@ -952,7 +1038,31 @@ theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
     (hA : IsNuclearOperator A) :
     ∃! z : ℂ, ∀ r : NuclearPresentation A,
       Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
-      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by sorry
+      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) z := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  obtain ⟨L, hL⟩ := r.exists_tracePairing
+  let I : PrecompactConvergenceCLM E E := ContinuousLinearMap.id ℂ E
+  refine ⟨L I, fun s ↦ ?_, fun z hz ↦ (hz r).2.unique (hL I).2⟩
+  obtain ⟨M, hM⟩ := s.exists_tracePairing
+  -- The coercion in `ApproxProp` makes `DenseRange` use bounded convergence.
+  let S : Set (Set E) := {U | IsPrecompactInCompletion U}
+  let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E S
+  have hj : Continuous j :=
+    ContinuousLinearMap.toUniformConvergenceCLM_continuous (RingHom.id ℂ) E S fun U hU ↦
+      ((isPrecompactInCompletion_iff_totallyBounded U).mp hU).isVonNBounded ℂ
+  have hclosed : IsClosed {T : E →L[ℂ] E | L (j T) = M (j T)} :=
+    isClosed_eq (L.continuous.comp hj) (M.continuous.comp hj)
+  have hLM : L I = M I := by
+    refine hclosed.closure_subset_iff.mpr ?_ (hE I)
+    rintro _ ⟨t, rfl⟩
+    change L (j (tensorToFiniteRank t)) = M (j (tensorToFiniteRank t))
+    induction t using TensorProduct.inductionOn with
+    | tmul φ x =>
+      exact ((hL _).2.unique (r.hasSum_tracePairing_tmul φ x)).trans
+        ((hM _).2.unique (s.hasSum_tracePairing_tmul φ x)).symm
+    | add t u ht hu => simp only [map_add, ht, hu]
+  rw [hLM]
+  exact hM I
 
 /-- Paper: (C.3.2.2), p. 694. The nuclear trace is the sum of the scalar series
 from any nuclear presentation on a space with the approximation property. -/
