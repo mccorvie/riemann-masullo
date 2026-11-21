@@ -30,7 +30,11 @@ line is scalar multiplication by its value at time one.
 Deviation: Sanity check on the additive real line. -/
 theorem lcaTopologicalLie_real (a : LCATopologicalLie (Multiplicative ℝ)) (t : ℝ) :
     (a (Multiplicative.ofAdd t)).toAdd =
-      t * (a (Multiplicative.ofAdd 1)).toAdd := by sorry
+      t * (a (Multiplicative.ofAdd 1)).toAdd := by
+  let f : ℝ →+ ℝ := AddMonoidHom.toMultiplicative.symm a.toMonoidHom
+  have hf : Continuous f := a.continuous
+  change f t = t * f 1
+  simpa only [smul_eq_mul, mul_one] using map_real_smul f hf t (1 : ℝ)
 
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [hTop : IsTopologicalGroup G]
   [hT2 : T2Space G] [hLC : LocallyCompactSpace G]
