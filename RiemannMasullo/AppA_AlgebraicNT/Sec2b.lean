@@ -10,6 +10,7 @@ import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
+import all RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -1268,7 +1269,65 @@ theorem idele_principal_integral_exact :
         j (i u).2 = (d (i u).1)⁻¹) ∧
       (∀ x, (p x).val = d x.1 * j x.2) ∧ IsClosedEmbedding i ∧
         MulExact i p ∧ IsOpenQuotientMap p := by
-  sorry
+  intro d j
+  let : TopologicalSpace Fˣ := ⊥
+  let : TopologicalSpace (𝓞 F)ˣ := ⊥
+  let : DiscreteTopology Fˣ := ⟨rfl⟩
+  let : DiscreteTopology (𝓞 F)ˣ := ⟨rfl⟩
+  let A := integralAdelesOutside F ∅
+  let e := Units.map (algebraMap (𝓞 F) F).toMonoidHom
+  let diagonal : (𝓞 F) →+* A :=
+    ((algebraMap F (AdeleRing (𝓞 F) F)).comp (algebraMap (𝓞 F) F)).codRestrict A fun u ↦ by
+      change algebraMap F (AdeleRing (𝓞 F) F) (algebraMap (𝓞 F) F u) ∈ A
+      rw [diagonal_mem_integralAdelesOutside, Finset.coe_empty, integer_empty, Algebra.mem_bot]
+      exact ⟨u, rfl⟩
+  let i : (𝓞 F)ˣ →* Fˣ × Aˣ := e.prod ((Units.map diagonal.toMonoidHom).comp invMonoidHom)
+  have hi (u : (𝓞 F)ˣ) : j (i u).2 = (d (e u))⁻¹ := by
+    change j (Units.map diagonal.toMonoidHom u⁻¹) = (d (e u))⁻¹
+    rw [map_inv, map_inv]
+    rfl
+  let m : Fˣ × Aˣ →* 𝕀[F] := d.comp (MonoidHom.fst _ _) * j.comp (MonoidHom.snd _ _)
+  have hm (x : Fˣ × Aˣ) : m x ∈ H :=
+    Subgroup.mul_mem_sup ⟨x.1, rfl⟩ ⟨x.2, rfl⟩
+  let p := m.codRestrict H hm
+  have hj : IsOpenEmbedding j := isOpenEmbedding_integralAdeleUnits F ∅
+  have hpcont : Continuous p :=
+    (((continuous_of_discreteTopology (f := d)).comp continuous_fst).mul
+      (hj.continuous.comp continuous_snd)).subtype_mk hm
+  have hexact : MulExact i p := by
+    intro x
+    constructor
+    · intro hx
+      have hmul : d x.1 * j x.2 = 1 := congrArg Subtype.val hx
+      have hinv : j x.2 = (d x.1)⁻¹ := eq_inv_of_mul_eq_one_right hmul
+      have hxInt : d x.1 ∈ j.range := by
+        rw [← inv_inv (d x.1), ← hinv]
+        exact j.range.inv_mem ⟨x.2, rfl⟩
+      obtain ⟨u, hu⟩ := exists_globalUnit_of_principal_mem_integralUnits F x.1 hxInt
+      change e u = x.1 at hu
+      refine ⟨u, Prod.ext hu (hj.injective ?_)⟩
+      rw [hi, hu, hinv]
+    · rintro ⟨u, rfl⟩
+      apply Subtype.ext
+      change d (e u) * j (i u).2 = 1
+      rw [hi, mul_inv_cancel]
+  refine ⟨i, p, fun u ↦ ⟨rfl, hi u⟩, fun _ ↦ rfl, ?_, hexact, ?_⟩
+  · have he : IsEmbedding e :=
+      (isOpenEmbedding_iff_continuous_injective_isOpenMap.mpr
+        ⟨continuous_of_discreteTopology, Units.map_injective (IsFractionRing.injective (𝓞 F) F),
+          fun _ _ ↦ isOpen_discrete _⟩).isEmbedding
+    have : T2Space (AdeleRing (𝓞 F) F) := (adeleHausdorff_ideleLocallyCompact F).1
+    refine ⟨IsEmbedding.of_comp continuous_of_discreteTopology continuous_fst he, ?_⟩
+    change IsClosed (i.range : Set (Fˣ × Aˣ))
+    rw [← hexact.monoidHom_ker_eq, MonoidHom.coe_ker]
+    exact isClosed_singleton.preimage hpcont
+  · refine ⟨?_, hpcont, ?_⟩
+    · intro g
+      obtain ⟨_, ⟨a, rfl⟩, _, ⟨b, rfl⟩, hab⟩ := Subgroup.mem_sup.mp g.property
+      exact ⟨(a, b), Subtype.ext hab⟩
+    · have hOpen : IsOpenMap m := isOpenMap_prod_of_discrete_left.mpr fun a ↦
+        (Homeomorph.mulLeft (d a)).isOpenMap.comp hj.isOpenMap
+      exact hOpen.codRestrict hm
 
 /-- Paper: Proposition A.2.3.9, p. 552. The ideal class map is a strict quotient of
 the ideles onto the discrete Picard group, with the principal times integral subgroup
