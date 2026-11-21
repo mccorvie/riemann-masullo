@@ -917,7 +917,8 @@ theorem measurableSet_image_of_continuous_injOn_polish {X Y : Type*}
     [TopologicalSpace Y] [PolishSpace Y] [MeasurableSpace Y] [BorelSpace Y]
     {f : X → Y} (hf : Continuous f) {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn f E) :
-    MeasurableSet (f '' E) := by sorry
+    MeasurableSet (f '' E) := by
+  exact hE.image_of_continuousOn_injOn hf.continuousOn hinj
 
 /-- Paper: Lemma A.5.2.10, p. 572. A Borel partial transversal to a free proper action
 of a countable discrete abelian group extends to a Borel transversal.
