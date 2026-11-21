@@ -636,7 +636,17 @@ section PolarHyperplanes
 /-- Paper: Definition 2.2.4.4, p. 91. The evaluations of a test function and
 its Fourier transform at zero are complex linear. -/
 theorem adelePolarValues_isLinear :
-    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by sorry
+    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by
+  constructor
+  · intro f g
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_add (adeleSchwartzFourier_apply_zero f).1
+      (adeleSchwartzFourier_apply_zero g).1
+  · intro c f
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_smul c (fun x ↦ f (Multiplicative.ofAdd x))
 
 /-- Paper: Definition 2.2.4.4, p. 91. The two polar functionals are the
 coordinates of the map that evaluates a test function and its transform at zero. -/
