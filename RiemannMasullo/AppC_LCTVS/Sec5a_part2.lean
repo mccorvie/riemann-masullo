@@ -14,6 +14,7 @@ import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.Analysis.Calculus.MeanValue
 import Mathlib.Analysis.Calculus.Taylor
 import RiemannMasullo.AppC_LCTVS.Sec1
+import RiemannMasullo.AppC_LCTVS.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
@@ -1084,7 +1085,32 @@ submodule is locally convex. -/
 theorem vectorSchwartzSubmodule_uniformValue_polynormable :
     letI : TopologicalSpace (vectorSchwartzSubmodule d E) :=
       uniformValueTopology (vectorSchwartzSubmodule d E)
-    PolynormableSpace ℂ (vectorSchwartzSubmodule d E) := by sorry
+    PolynormableSpace ℂ (vectorSchwartzSubmodule d E) := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let S : Set (Set V) := {univ}
+  have hS : (univ : Set V) ∈ S := mem_singleton _
+  let L : Submodule ℂ (V →ᵤ[S] E) := vectorSchwartzSubmodule d E
+  have hL : PolynormableSpace ℂ L := by
+    refine uniformOnFun_submodule_polynormable S ⟨_, hS⟩ (by simp [S, DirectedOn]) L
+      (by simp [S]) ?_ ?_
+    · intro f hf
+      have hf' : UniformOnFun.toFun S f ∈ vectorSchwartzSubmodule d E := hf
+      rw [vectorSchwartzSubmodule, Submodule.mem_inf, Submodule.mem_iInf] at hf'
+      exact continuous_of_vectorContDiffOrderOn_zero (hf'.1 0)
+    · intro f hf T _
+      have hf' : UniformOnFun.toFun S f ∈ vectorSchwartzSubmodule d E := hf
+      rw [vectorSchwartzSubmodule, Submodule.mem_inf] at hf'
+      have hdecay : HasVectorSchwartzDecay (UniformOnFun.toFun S f) := hf'.2
+      obtain ⟨g, hg, hb⟩ := hdecay 0 1
+      rw [← (hasVectorMultiPartial_zero_iff _ _).mp hg] at hb
+      have hbounded : IsVonNBounded ℂ (range (UniformOnFun.toFun S f)) := by simpa using hb
+      exact hbounded.subset (image_subset_range _ _)
+  let e := UniformOnFun.uniformEquivUniformFun E S hS
+  have htop : (inferInstance : TopologicalSpace L) =
+      uniformValueTopology (vectorSchwartzSubmodule d E) :=
+    (e.toHomeomorph.isInducing.comp IsInducing.subtypeVal).eq_induced
+  exact htop ▸ hL
 
 /-- Paper: (C.5.1.45), p. 735. The supremum of a continuous seminorm on a mixed
 derivative of a periodic smooth function is finite and defines a seminorm.
