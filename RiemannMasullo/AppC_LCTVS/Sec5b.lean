@@ -6,6 +6,7 @@ import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 public import Mathlib.Analysis.Complex.HasPrimitives
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
+import Mathlib.Analysis.Analytic.Order
 import Mathlib.Analysis.Calculus.FDeriv.Measurable
 import Mathlib.Analysis.Calculus.FDeriv.Mul
 import Mathlib.Analysis.Calculus.ParametricIntervalIntegral
@@ -1990,6 +1991,154 @@ theorem vectorLaurentCoeff_eq {a : ℤ → E} (ha : HasVectorLaurentSeriesAt f z
     (hRmin.trans_le (min_le_left r s)) hazero haconv φ k
   exact mul_left_cancel₀ hfactor (hbcoeff.symm.trans hacoeff)
 
+/-- The denominator in the Taylor kernel accounts for the power used to clear the pole. -/
+private theorem laurentKernel_mul_pow {x : ℂ} (hx : x ≠ 0) (n j : ℕ) :
+    (x ^ (j + 1))⁻¹ * x ^ n = x ^ (-((j : ℤ) - n) - 1) := by
+  rw [← zpow_natCast, ← zpow_natCast, ← zpow_neg, ← zpow_add₀ hx]
+  congr 1
+  omega
+
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- Clearing a pole shifts the Laurent exponent `j - n` to the Taylor exponent `j`. -/
+private theorem HasVectorLaurentSeriesAt.coeff_eq_derivative_of_cleared {a : ℤ → E}
+    (ha : HasVectorLaurentSeriesAt f z a) (φ : StrongDual ℂ E) (n j : ℕ)
+    {q : ℂ → ℂ} {s : ℝ} (hs : 0 < s) (hq : DifferentiableOn ℂ q (Metric.ball z s))
+    (heq : EqOn q (fun w ↦ (w - z) ^ n * φ (f w)) (Metric.ball z s \ {z})) :
+    φ (a ((j : ℤ) - n)) = iteratedDeriv j q z / (j.factorial : ℂ) := by
+  obtain ⟨N, r, hr, hzero, hconv⟩ := ha
+  let R := min r s / 2
+  have hR : 0 < R := half_pos (lt_min hr hs)
+  have hRr : R < r := (half_lt_self (lt_min hr hs)).trans_le (min_le_left _ _)
+  have hRs : R < s := (half_lt_self (lt_min hr hs)).trans_le (min_le_right _ _)
+  have hcauchy := DifferentiableOn.circleIntegral_one_div_sub_center_pow_smul hR j
+    (hq.mono (Metric.closedBall_subset_ball hRs))
+  have hlocal := HasVectorLaurentSeriesAt.circleIntegral_coeff hR hRr hzero hconv φ ((j : ℤ) - n)
+  have hkernel := circleIntegral.integral_congr (c := z) hR.le
+    (f := fun w ↦ (w - z) ^ (-((j : ℤ) - n) - 1) * φ (f w))
+    (g := fun w ↦ (1 / (w - z) ^ (j + 1)) • q w) (by
+      intro w hw
+      have hwz := Metric.ne_of_mem_sphere hw hR.ne'
+      dsimp only
+      rw [smul_eq_mul, one_div, heq ⟨Metric.mem_ball.mpr ((Metric.mem_sphere.mp hw).trans_lt hRs), hwz⟩]
+      dsimp only
+      rw [← mul_assoc, laurentKernel_mul_pow (sub_ne_zero.mpr hwz)])
+  rw [← hkernel, hlocal, smul_eq_mul, div_mul_eq_mul_div, mul_div_assoc] at hcauchy
+  exact mul_left_cancel₀
+    (mul_ne_zero (mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+      Complex.I_ne_zero) hcauchy
+
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- If the Laurent series has a nonzero negative term, its first nonzero term gives a pole. -/
+private theorem HasVectorLaurentSeriesAt.eq_zero_of_not_pole {a : ℤ → E}
+    (ha : HasVectorLaurentSeriesAt f z a) (hz : ¬ IsVectorPoleAt f z) {k : ℤ} (hk : k < 0) :
+    a k = 0 := by
+  classical
+  by_contra hne
+  obtain ⟨N, _, _, hzero, _⟩ := (show HasVectorLaurentSeriesAt f z a from ha)
+  obtain ⟨m, hm, hmin⟩ := Int.exists_least_of_bdd (P := fun j ↦ a j ≠ 0)
+    ⟨N, fun j hj ↦ le_of_not_gt fun h ↦ hj (hzero j h)⟩ ⟨k, hne⟩
+  exact hz ⟨m, (hmin k hne).trans_lt hk, ⟨a, ha, hm, fun j hj ↦ by
+    by_contra hj'
+    exact hj.not_ge (hmin j hj')⟩⟩
+
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- At a removable point, each scalar evaluation extends across the center with
+value equal to the scalar evaluation of the Laurent coefficient at zero. -/
+private theorem HasVectorLaurentSeriesAt.exists_analyticAt_of_not_pole {a : ℤ → E}
+    (ha : HasVectorLaurentSeriesAt f z a) (hz : ¬ IsVectorPoleAt f z)
+    {h : ℂ → E} {s : ℝ} (hs : 0 < s) (hh : VectorHolomorphicOn h (Metric.ball z s))
+    {n : ℕ} (heq : EqOn h (fun w ↦ (w - z) ^ n • f w) (Metric.ball z s \ {z}))
+    (φ : StrongDual ℂ E) :
+    ∃ q : ℂ → ℂ, AnalyticAt ℂ q z ∧ q z = φ (a 0) ∧ q =ᶠ[𝓝[≠] z] φ ∘ f := by
+  let b := φ ∘ h
+  have hb : DifferentiableOn ℂ b (Metric.ball z s) := fun w hw ↦
+    (VectorHolomorphicOn.hasDerivAt_comp hh Metric.isOpen_ball φ ⟨w, hw⟩).differentiableAt.differentiableWithinAt
+  have hbe : EqOn b (fun w ↦ (w - z) ^ n * φ (f w)) (Metric.ball z s \ {z}) := by
+    intro w hw
+    simp [b, heq hw, smul_eq_mul]
+  have hbz := hb.analyticAt (Metric.ball_mem_nhds z hs)
+  have hord : (n : ENat) ≤ analyticOrderAt b z := by
+    apply (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero hbz).mpr
+    intro j hj
+    have hj' : (j : ℤ) - n < 0 := by omega
+    have hcoeff := ha.coeff_eq_derivative_of_cleared φ n j hs hb hbe
+    rw [ha.eq_zero_of_not_pole hz hj', map_zero] at hcoeff
+    exact (div_eq_zero_iff.mp hcoeff.symm).resolve_right (by exact_mod_cast Nat.factorial_ne_zero j)
+  obtain ⟨q, hq, hqeq⟩ := (natCast_le_analyticOrderAt hbz).mp hord
+  obtain ⟨t, ht, hball⟩ := Metric.mem_nhds_iff.mp
+    (hq.eventually_analyticAt.and (hqeq.and (Metric.ball_mem_nhds z hs)))
+  have hdiff : DifferentiableOn ℂ q (Metric.ball z t) :=
+    fun w hw ↦ (hball hw).1.differentiableAt.differentiableWithinAt
+  have hqf : EqOn q (φ ∘ f) (Metric.ball z t \ {z}) := by
+    intro w hw
+    apply mul_left_cancel₀ (pow_ne_zero n (sub_ne_zero.mpr (show w ≠ z from hw.2)))
+    exact ((hball hw.1).2.1.symm).trans (hbe ⟨(hball hw.1).2.2, hw.2⟩)
+  refine ⟨q, hq, ?_, ?_⟩
+  · symm
+    simpa using ha.coeff_eq_derivative_of_cleared φ 0 0 ht hdiff (by
+      intro w hw
+      simpa using hqf hw)
+  · filter_upwards [mem_nhdsWithin_of_mem_nhds (Metric.ball_mem_nhds z ht),
+      self_mem_nhdsWithin] with w hw hwz
+    exact hqf ⟨hw, hwz⟩
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E]
+  [QuasiCompleteSpace ℂ E] in
+/-- Every point in the domain has a pole-clearing power on a disc whose puncture
+lies in the original domain of holomorphy. -/
+private theorem IsVectorMeromorphicOn.exists_cleared (hf : IsVectorMeromorphicOn f Ω D)
+    (hz : z ∈ Ω) :
+    ∃ (n : ℕ) (r : ℝ) (h : ℂ → E),
+      0 < r ∧ Metric.ball z r \ {z} ⊆ Ω \ D ∧ VectorHolomorphicOn h (Metric.ball z r) ∧
+      EqOn h (fun w ↦ (w - z) ^ n • f w) (Metric.ball z r \ {z}) := by
+  obtain ⟨_, _, hopen, hhol, hclear⟩ := hf
+  by_cases hzD : z ∈ D
+  · exact hclear z hzD
+  · obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp (hopen.mem_nhds ⟨hz, hzD⟩)
+    exact ⟨0, r, f, hr, sdiff_subset.trans hball, hhol.mono hball, fun w _ ↦ by simp⟩
+
+/-- Filling each removable exceptional point with the constant Laurent coefficient
+gives a holomorphic representative on the open complement of the exceptional poles. -/
+private theorem IsVectorMeromorphicOn.exists_holomorphic_representative (hΩ : IsOpen Ω)
+    (hf : IsVectorMeromorphicOn f Ω D) :
+    let U := Ω \ (D ∩ {w | IsVectorPoleAt f w})
+    IsOpen U ∧ ∃ g : ℂ → E, EqOn g f (Ω \ D) ∧ VectorHolomorphicOn g U := by
+  classical
+  intro U
+  obtain ⟨hDΩ, _, hopen, hhol, hclear⟩ := (show IsVectorMeromorphicOn f Ω D from hf)
+  have hsub : Ω \ D ⊆ U := fun _ hw ↦ ⟨hw.1, fun hp ↦ hw.2 hp.1⟩
+  have hU : IsOpen U := isOpen_iff_mem_nhds.mpr fun w hw ↦ by
+    by_cases hwD : w ∈ D
+    · obtain ⟨_, r, _, hr, hball, _, _⟩ := hclear w hwD
+      apply mem_of_superset (Metric.ball_mem_nhds w hr)
+      intro u hu
+      rcases eq_or_ne u w with rfl | huw
+      · exact hw
+      · exact hsub (hball ⟨hu, huw⟩)
+    · exact mem_of_superset (hopen.mem_nhds ⟨hw.1, hwD⟩) hsub
+  let a (w : ℂ) (hw : w ∈ D) : ℤ → E := (hf.existsUnique_laurentSeries hΩ (hDΩ hw)).exists.choose
+  let g (w : ℂ) := if hw : w ∈ D then a w hw 0 else f w
+  have hgf : EqOn g f (Ω \ D) := fun w hw ↦ dite_eq_right hw.2
+  refine ⟨hU, g, hgf, differentiableOn_of_weaklyHolomorphicOn hU g ?_⟩
+  intro φ w hw
+  apply DifferentiableAt.differentiableWithinAt
+  by_cases hwD : w ∈ D
+  · obtain ⟨n, r, h, hr, hball, hh, heq⟩ := hclear w hwD
+    have ha : HasVectorLaurentSeriesAt f w (a w hwD) := Classical.choose_spec (ExistsUnique.exists
+      (hf.existsUnique_laurentSeries hΩ (hDΩ hwD)))
+    obtain ⟨q, hq, hqval, hqf⟩ := ha.exists_analyticAt_of_not_pole
+      (fun hp ↦ hw.2 ⟨hwD, hp⟩) hr hh heq φ
+    apply hq.differentiableAt.congr_of_eventuallyEq
+    filter_upwards [eventually_nhdsWithin_iff.mp hqf, Metric.ball_mem_nhds w hr] with u hu hub
+    rcases eq_or_ne u w with rfl | huw
+    · simpa [g, hwD] using hqval.symm
+    · rw [Function.comp_apply, hgf (hball ⟨hub, huw⟩)]
+      exact (hu huw).symm
+  · have hw' : w ∈ Ω \ D := ⟨hw.1, hwD⟩
+    apply (VectorHolomorphicOn.hasDerivAt_comp hhol hopen φ ⟨w, hw'⟩).differentiableAt.congr_of_eventuallyEq
+    filter_upwards [hopen.mem_nhds hw'] with u hu
+    exact congrArg φ (hgf hu)
+
 -- TODO(paper-gap): C.5.3.2 omits the interior-containment hypothesis of C.5.2.4.
 -- On 1 < |w| < 4, take f(w) = 1/w, z = 2, the circle |w| = 3, and k = -1.
 
@@ -2006,7 +2155,87 @@ theorem hasPettisIntegral_laurentCoeff (hΩ : IsOpen Ω) (hconn : IsConnected Ω
       VectorHolomorphicOn g (Ω \ {w | IsVectorPoleAt f w}) ∧
       HasPettisIntegral (.complex γ.val.measure) (fun w ↦ ((w - z) ^ (k + 1))⁻¹ • g w)
         ((2 * (Real.pi : ℂ) * Complex.I) •
-          vectorLaurentCoeff (hf.existsUnique_laurentSeries hΩ (hinterior hz)).exists k) := by sorry
+          vectorLaurentCoeff (hf.existsUnique_laurentSeries hΩ (hinterior hz)).exists k) := by
+  classical
+  clear hconn
+  let U := Ω \ (D ∩ {w | IsVectorPoleAt f w})
+  obtain ⟨hU, g, hgf, hg⟩ : IsOpen U ∧ ∃ g, EqOn g f (Ω \ D) ∧ VectorHolomorphicOn g U :=
+    hf.exists_holomorphic_representative hΩ
+  refine ⟨g, hgf, hg.mono (fun w hw ↦ ⟨hw.1, fun hp ↦ hw.2 hp.2⟩), ?_⟩
+  have htraceU : γ.val.trace ⊆ U := fun w hw ↦ ⟨htrace hw, fun hp ↦ havoid w hw hp.2⟩
+  obtain ⟨n, r, h, hr, hpunct, hh, hclear⟩ := hf.exists_cleared (hinterior hz)
+  let V := U ∪ Metric.ball z r
+  have hV : IsOpen V := hU.union Metric.isOpen_ball
+  have htr : γ.val.trace ⊆ V := htraceU.trans subset_union_left
+  have hint : γ.interior ⊆ V := by
+    intro w hw
+    rcases eq_or_ne w z with rfl | hwz
+    · exact Or.inr (Metric.mem_ball_self hr)
+    · exact Or.inl ⟨hinterior hw, fun hp ↦ hwz (honly w hw hp.2)⟩
+  let a := (hf.existsUnique_laurentSeries hΩ (hinterior hz)).exists.choose
+  have ha : HasVectorLaurentSeriesAt f z a := Classical.choose_spec
+    (hf.existsUnique_laurentSeries hΩ (hinterior hz)).exists
+  let m := n + k.natAbs
+  let j := (k + (m : ℤ)).toNat
+  have hj : (j : ℤ) - (m : ℤ) = k := by dsimp [j, m]; omega
+  let μ := PettisMeasure.complex γ.val.measure
+  let c : ℂ := 2 * (Real.pi : ℂ) * Complex.I
+  have hscalar (φ : StrongDual ℂ E) :
+      Integrable (fun w ↦ ((w - z) ^ (k + 1))⁻¹ * φ (g w)) μ.variation ∧
+      μ.scalarIntegral (fun w ↦ ((w - z) ^ (k + 1))⁻¹ * φ (g w)) = c * φ (a k) := by
+    -- The extra power ensures the shifted exponent is a natural number for every `k`.
+    let q (w : ℂ) := (w - z) ^ k.natAbs * φ (h w)
+    let p (w : ℂ) := (w - z) ^ m * φ (g w)
+    let Q := update p z (q z)
+    have hQq : EqOn Q q (Metric.ball z r) := by
+      intro w hw
+      rcases eq_or_ne w z with rfl | hwz
+      · exact update_self _ _ _
+      · have hw' : w ∈ Metric.ball z r \ {z} := ⟨hw, hwz⟩
+        rw [show Q w = p w from update_of_ne hwz _ _]
+        simp [p, q, m, pow_add, hclear hw', hgf (hpunct hw'), smul_eq_mul, mul_assoc, mul_left_comm]
+    have hdiff (f₀ : ℂ → E) {S : Set ℂ} (hS : IsOpen S) (hf₀ : VectorHolomorphicOn f₀ S)
+        (l : ℕ) : DifferentiableOn ℂ (fun w ↦ (w - z) ^ l * φ (f₀ w)) S := by
+      apply ((differentiableOn_id.sub_const z).pow l).mul
+      intro w hw
+      exact (VectorHolomorphicOn.hasDerivAt_comp hf₀ hS φ ⟨w, hw⟩).differentiableAt.differentiableWithinAt
+    have hQball : DifferentiableOn ℂ Q (Metric.ball z r) :=
+      (hdiff h Metric.isOpen_ball hh _).congr hQq
+    have hQV : DifferentiableOn ℂ Q V := by
+      intro w hw
+      by_cases hwball : w ∈ Metric.ball z r
+      · exact (hQball.differentiableAt (Metric.isOpen_ball.mem_nhds hwball)).differentiableWithinAt
+      · have hwU : w ∈ U := hw.resolve_right hwball
+        have hwz : w ≠ z := fun he ↦ hwball (he ▸ Metric.mem_ball_self hr)
+        apply DifferentiableAt.differentiableWithinAt
+        apply ((hdiff g hU hg m).differentiableAt (hU.mem_nhds hwU)).congr_of_eventuallyEq
+        filter_upwards [isOpen_ne.mem_nhds hwz] with u hu
+        exact update_of_ne hu _ _
+    have hcoeff := ha.coeff_eq_derivative_of_cleared φ m j hr hQball (by
+      intro w hw
+      simp only [Q, update_of_ne (show w ≠ z from hw.2), p, hgf (hpunct hw)])
+    rw [hj] at hcoeff
+    have hker : (fun w ↦ ((w - z) ^ (j + 1))⁻¹ * Q w) =ᵐ[γ.val.measure.variation]
+        fun w ↦ ((w - z) ^ (k + 1))⁻¹ * φ (g w) := by
+      filter_upwards [γ.val.ae_mem_trace] with w hw
+      have hwz := ne_of_mem_of_not_mem hw hz.1
+      rw [show Q w = p w from update_of_ne hwz _ _]
+      dsimp only [p]
+      rw [← mul_assoc, laurentKernel_mul_pow (sub_ne_zero.mpr hwz), hj, ← zpow_neg]
+      congr 2
+      omega
+    obtain ⟨hi, heq⟩ := γ.scalarIntegral_cauchy_derivative hV htr hint hQV hz j
+    refine ⟨hi.congr hker, ?_⟩
+    have hcongr : μ.scalarIntegral (fun w ↦ ((w - z) ^ (j + 1))⁻¹ * Q w) =
+        μ.scalarIntegral (fun w ↦ ((w - z) ^ (k + 1))⁻¹ * φ (g w)) :=
+      VectorMeasure.integral_congr_ae hker
+    rw [← hcongr, heq, hcoeff]
+    simp only [c, div_eq_mul_inv]
+    ring
+  refine ⟨fun φ ↦ ?_, LinearMap.ext fun φ ↦ ?_⟩
+  · simpa only [map_smul, smul_eq_mul, Function.comp_apply] using (hscalar φ).1
+  · change φ (c • a k) = μ.scalarIntegral (fun w ↦ φ (((w - z) ^ (k + 1))⁻¹ • g w))
+    simpa only [map_smul, smul_eq_mul] using (hscalar φ).2.symm
 
 /-- Paper: (C.5.3.5), p. 740. The residue is the coefficient of exponent minus one. -/
 def vectorResidue (h : ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a) : E :=

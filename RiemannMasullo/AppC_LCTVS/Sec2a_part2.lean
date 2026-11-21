@@ -3891,7 +3891,30 @@ exactly when its associated bilinear map is continuous in each argument. -/
 theorem continuous_inductiveTensor_iff {G : Type*} [AddCommGroup G] [Module ℂ G]
     [TopologicalSpace G] [PolynormableSpace ℂ G] [T2Space G] (T : InductiveTensor E F →ₗ[ℂ] G) :
     Continuous T ↔ (∀ x : E, Continuous (fun y : F ↦ T (x ⊗ₜ[ℂ] y))) ∧
-      (∀ y : F, Continuous (fun x : E ↦ T (x ⊗ₜ[ℂ] y))) := by sorry
+      (∀ y : F, Continuous (fun x : E ↦ T (x ⊗ₜ[ℂ] y))) := by
+  have hsp := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+      (∀ x : E, Continuous (fun y : F ↦ p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : F, Continuous (fun x : E ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  constructor
+  · intro hT
+    constructor
+    · intro x
+      have : @Continuous F (InductiveTensor E F) _ _ (fun y : F ↦ x ⊗ₜ[ℂ] y) :=
+        hsp.continuous_of_continuous_comp (TensorProduct.mk ℂ E F x) fun p ↦ p.2.1 x
+      exact hT.comp this
+    · intro y
+      have : @Continuous E (InductiveTensor E F) _ _ (fun x : E ↦ x ⊗ₜ[ℂ] y) :=
+        hsp.continuous_of_continuous_comp ((TensorProduct.mk ℂ E F).flip y) fun p ↦ p.2.2 y
+      exact hT.comp this
+  · rintro ⟨h1, h2⟩
+    refine (PolynormableSpace.withSeminorms ℂ G).continuous_of_continuous_comp T fun q ↦ ?_
+    have hq : Continuous (fun x : InductiveTensor E F ↦ (q.1.comp T) x) :=
+      hsp.continuous_seminorm ⟨q.1.comp T, fun x ↦ (q.2.comp (h1 x)), fun y ↦ (q.2.comp (h2 y))⟩
+    exact hq
+
 
 omit [T2Space E] [T2Space F] in
 /-- A seminorm on the tensor product whose values on pure tensors are jointly continuous
@@ -3936,7 +3959,9 @@ theorem continuous_inductiveTensor_to_projectiveTensor :
 
 /-- Paper: (C.2.3.23), p. 682. The inductive tensor topology of Hausdorff factors is Hausdorff. -/
 @[instance]
-theorem inductiveTensor_t2 : T2Space (InductiveTensor E F) := by sorry
+theorem inductiveTensor_t2 : T2Space (InductiveTensor E F) :=
+  T2Space.of_injective_continuous (X := InductiveTensor E F) (Y := ProjectiveTensor E F)
+    (f := id) Function.injective_id continuous_inductiveTensor_to_projectiveTensor
 
 /-- Paper: Corollary C.2.3.12, p. 682. For Fréchet factors the identity from the inductive
 to the projective tensor product is a linear topological isomorphism. -/

@@ -9,6 +9,11 @@ import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
+import Mathlib.Algebra.Polynomial.Degree.Lemmas
+import Mathlib.Algebra.Polynomial.Degree.SmallDegree
+import Mathlib.Algebra.Polynomial.Roots
+import Mathlib.RingTheory.Adjoin.Polynomial.Basic
+import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
@@ -1120,6 +1125,485 @@ theorem modulatedSobolev_bidual (_hm : IsModulation m) (_hsurj : Function.Surjec
           (Real.rpow_pos_of_pos (hpos (a.symm χ)) _)).ne')
     exact hAC.ae_eq (Lp.coeFn_compMeasurePreserving f (hw.symm a))
 
+/-- Pointwise comparison with the Sobolev density bounds each power multiplier
+and recovers the weighted norm from the zeroth and highest powers. -/
+private theorem sobolev_power_graph {X : Type*} [MeasurableSpace X] [TopologicalSpace X]
+    [BorelSpace X] (μ : Measure X) {w : X → ℝ≥0} (hw : Continuous w) (N : ℕ)
+    (z : X → ℂ) (hz : Continuous z) (C : ℝ) (hC : 0 ≤ C)
+    (hupper : ∀ (k : Fin (N + 1)) x, ‖z x‖ ^ (2 * (k : ℕ)) ≤
+      C * (1 + (w x : ℝ) ^ 2) ^ N)
+    (hlower : ∀ x, (1 + (w x : ℝ) ^ 2) ^ N ≤ C * (1 + ‖z x‖ ^ (2 * N))) :
+    let E := WeightedSobolev μ w (2 * (N : ℝ))
+    ∃ B : Fin (N + 1) → (E →L[ℂ] Lp ℂ 2 μ),
+      (∀ k u, (B k u : X → ℂ) =ᵐ[μ] fun x ↦ z x ^ (k : ℕ) * u x) ∧
+      IsEmbedding (fun u : E ↦ fun k ↦ B k u) := by
+  dsimp only
+  let E := WeightedSobolev μ w (2 * (N : ℝ))
+  let ρ (x : X) : ℝ := (1 + (w x : ℝ) ^ 2) ^ N
+  let μw := sobolevMeasure μ w (2 * (N : ℝ))
+  have hρ : Continuous ρ := (continuous_const.add ((NNReal.continuous_coe.comp hw).pow 2)).pow N
+  have hρpos (x : X) : 0 < ρ x := by
+    dsimp [ρ]
+    positivity
+  have hμw : μw = μ.withDensity (fun x ↦ ENNReal.ofReal (ρ x)) := by
+    unfold μw sobolevMeasure
+    congr 1
+    funext x
+    rw [mul_div_cancel_left₀ _ (by norm_num : (2 : ℝ) ≠ 0), Real.rpow_natCast]
+  have hAC : μ ≪ μw := by
+    rw [hμw]
+    exact withDensity_absolutelyContinuous' hρ.measurable.aemeasurable.ennreal_ofReal
+      (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (hρpos x)).ne')
+  have hW (u : E) :
+      Integrable (fun x ↦ ‖u x‖ ^ 2 * ρ x) μ ∧
+      ‖u‖ ^ 2 = ∫ x, ‖u x‖ ^ 2 * ρ x ∂μ := by
+    have h := weightedSobolev_norm μ hw (2 * (N : ℝ)) u
+    simp only [mul_div_cancel_left₀ _ (by norm_num : (2 : ℝ) ≠ 0), Real.rpow_natCast] at h
+    refine ⟨h.1, ?_⟩
+    rw [h.2, Real.sq_sqrt]
+    exact integral_nonneg fun x ↦ mul_nonneg (sq_nonneg _) (hρpos x).le
+  let b (k : Fin (N + 1)) (u : E) (x : X) := z x ^ (k : ℕ) * u x
+  have hsquare (k : Fin (N + 1)) (u : E) (x : X) :
+      ‖b k u x‖ ^ 2 = ‖u x‖ ^ 2 * ‖z x‖ ^ (2 * (k : ℕ)) := by
+    simp only [b, norm_mul, norm_pow, mul_pow, ← pow_mul, Nat.mul_comm 2]
+    exact mul_comm _ _
+  have hbound (k : Fin (N + 1)) (u : E) (x : X) :
+      ‖b k u x‖ ^ 2 ≤ C * (‖u x‖ ^ 2 * ρ x) := by
+    rw [hsquare, mul_left_comm C]
+    exact mul_le_mul_of_nonneg_left (hupper k x) (sq_nonneg _)
+  have hmem (k : Fin (N + 1)) (u : E) : MemLp (b k u) 2 μ := by
+    have hm : AEStronglyMeasurable (b k u) μ :=
+      (hz.pow (k : ℕ)).aestronglyMeasurable.mul ((Lp.aestronglyMeasurable u).mono_ac hAC)
+    apply (memLp_two_iff_integrable_sq_norm hm).mpr
+    exact ((hW u).1.const_mul C).mono' (hm.norm.pow _) (.of_forall fun x ↦ by
+      rw [Real.norm_of_nonneg (sq_nonneg _)]
+      exact hbound k u x)
+  let T (k : Fin (N + 1)) : E →ₗ[ℂ] Lp ℂ 2 μ :=
+    { toFun := fun u ↦ (hmem k u).toLp (b k u)
+      map_add' u v := by
+        rw [← MemLp.toLp_add]
+        apply MemLp.toLp_congr
+        filter_upwards [hAC.ae_eq (Lp.coeFn_add u v)] with x hx
+        change z x ^ (k : ℕ) * (u + v) x = z x ^ (k : ℕ) * u x + z x ^ (k : ℕ) * v x
+        rw [show (u + v) x = u x + v x from hx, mul_add]
+      map_smul' c u := by
+        rw [← MemLp.toLp_const_smul]
+        apply MemLp.toLp_congr
+        filter_upwards [hAC.ae_eq (Lp.coeFn_smul c u)] with x hx
+        change z x ^ (k : ℕ) * (c • u) x = c * (z x ^ (k : ℕ) * u x)
+        rw [show (c • u) x = c * u x from hx, mul_left_comm] }
+  have hT (k : Fin (N + 1)) (u : E) :
+      ‖T k u‖ ^ 2 = ∫ x, ‖b k u x‖ ^ 2 ∂μ := by
+    rw [norm_eq_sqrt_re_inner (𝕜 := ℂ), Real.sq_sqrt (inner_self_nonneg (𝕜 := ℂ)),
+      L2.inner_def, ← integral_re (L2.integrable_inner (T k u) (T k u))]
+    simp_rw [inner_self_eq_norm_sq]
+    apply integral_congr_ae
+    exact (hmem k u).coeFn_toLp.mono fun x hx ↦ by
+      change ‖(T k u) x‖ ^ 2 = _
+      rw [show (T k u) x = b k u x from hx]
+  let B (k : Fin (N + 1)) : E →L[ℂ] Lp ℂ 2 μ := (T k).mkContinuous (Real.sqrt C) (by
+    intro u
+    apply (sq_le_sq₀ (norm_nonneg _) (by positivity)).mp
+    rw [hT, mul_pow, Real.sq_sqrt hC, (hW u).2, ← integral_const_mul]
+    exact integral_mono ((memLp_two_iff_integrable_sq_norm (hmem k u).aestronglyMeasurable).mp
+      (hmem k u)) ((hW u).1.const_mul C) (hbound k u))
+  refine ⟨B, fun k u ↦ (hmem k u).coeFn_toLp, ?_⟩
+  let L := ContinuousLinearMap.pi B
+  have hL (u : E) : ‖u‖ ^ 2 ≤ (2 * C) * ‖L u‖ ^ 2 := by
+    let i : Fin (N + 1) := ⟨0, Nat.zero_lt_succ N⟩
+    let j : Fin (N + 1) := Fin.last N
+    have hint (k : Fin (N + 1)) : Integrable (fun x ↦ ‖b k u x‖ ^ 2) μ :=
+      (memLp_two_iff_integrable_sq_norm (hmem k u).aestronglyMeasurable).mp (hmem k u)
+    have hpoint (x : X) : ‖u x‖ ^ 2 * ρ x ≤
+        C * (‖b i u x‖ ^ 2 + ‖b j u x‖ ^ 2) := by
+      rw [hsquare, hsquare]
+      change _ ≤ C * (‖u x‖ ^ 2 * ‖z x‖ ^ (2 * 0) + ‖u x‖ ^ 2 * ‖z x‖ ^ (2 * N))
+      rw [Nat.mul_zero, pow_zero, ← mul_add, mul_left_comm C]
+      exact mul_le_mul_of_nonneg_left (hlower x) (sq_nonneg _)
+    have hle (k : Fin (N + 1)) : ‖T k u‖ ^ 2 ≤ ‖L u‖ ^ 2 :=
+      (sq_le_sq₀ (norm_nonneg _) (norm_nonneg _)).mpr (norm_le_pi_norm (f := L u) k)
+    calc
+      ‖u‖ ^ 2 ≤ C * (‖T i u‖ ^ 2 + ‖T j u‖ ^ 2) := by
+        rw [(hW u).2, hT, hT, ← integral_add (hint i) (hint j), ← integral_const_mul]
+        exact integral_mono (hW u).1 (((hint i).add (hint j)).const_mul C) hpoint
+      _ ≤ (2 * C) * ‖L u‖ ^ 2 := by
+        rw [show (2 * C) * ‖L u‖ ^ 2 = C * (‖L u‖ ^ 2 + ‖L u‖ ^ 2) by ring]
+        exact mul_le_mul_of_nonneg_left (add_le_add (hle i) (hle j)) hC
+  let K : ℝ≥0 := ⟨Real.sqrt (2 * C), Real.sqrt_nonneg _⟩
+  have hAnti : AntilipschitzWith K L := AntilipschitzWith.of_le_mul_dist fun u v ↦ by
+    rw [dist_eq_norm, dist_eq_norm, ← map_sub]
+    apply (sq_le_sq₀ (norm_nonneg _) (by positivity)).mp
+    change ‖u - v‖ ^ 2 ≤ (Real.sqrt (2 * C) * ‖L (u - v)‖) ^ 2
+    rw [mul_pow, Real.sq_sqrt (by positivity)]
+    exact hL (u - v)
+  exact hAnti.isEmbedding L.continuous
+
+omit [MeasurableSpace G] [BorelSpace G] [IsTopologicalGroup G] [T2Space G]
+  [LocallyCompactSpace G] [SecondCountableTopology G] in
+/-- The logarithm of the positive modulation is continuous. -/
+private theorem continuous_log_modulation :
+    Continuous (fun x : G ↦ Real.log ((m x).val : ℝ)) :=
+  (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+    fun x ↦ NNReal.coe_ne_zero.mpr (m x).ne_zero
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+  [μ.IsHaarMeasure] in
+/-- The powers of any nonconstant affine function of the log modulation give
+a topological embedding of the degree-`2N` Sobolev space into a finite product of L² spaces. -/
+private theorem modulatedSobolev_affineLogPower_graph (N : ℕ) (a b : ℂ) (ha : a ≠ 0) :
+    let E := ModulatedSobolev m μ (2 * (N : ℝ))
+    ∃ B : Fin (N + 1) → (E →L[ℂ] Lp ℂ 2 μ),
+      (∀ k u, (B k u : G → ℂ) =ᵐ[μ]
+        fun x ↦ (a * (Real.log ((m x).val : ℝ) : ℂ) + b) ^ (k : ℕ) * u x) ∧
+      IsEmbedding (fun u : E ↦ fun k ↦ B k u) := by
+  let z (x : G) := a * (Real.log ((m x).val : ℝ) : ℂ) + b
+  have hz : Continuous z :=
+    (continuous_const.mul (Complex.continuous_ofReal.comp (continuous_log_modulation m))).add
+      continuous_const
+  let Q (v : ℂ) : ℝ := 1 + ‖v‖ ^ 2
+  let K (c d : ℂ) : ℝ := 1 + 2 * ‖c‖ ^ 2 + 2 * ‖d‖ ^ 2
+  have hK (c d : ℂ) : 0 ≤ K c d := by dsimp [K]; positivity
+  have hQ (c d v : ℂ) : Q (c * v + d) ≤ K c d * Q v := by
+    have h := (sq_le_sq₀ (norm_nonneg _) (add_nonneg (norm_nonneg _) (norm_nonneg _))).mpr
+      (norm_add_le (c * v) d)
+    rw [norm_mul] at h
+    dsimp [Q, K]
+    nlinarith [sq_nonneg (‖c‖ * ‖v‖ - ‖d‖), sq_nonneg ‖c‖, sq_nonneg ‖d‖,
+      sq_nonneg ‖v‖, mul_nonneg (sq_nonneg ‖d‖) (sq_nonneg ‖v‖)]
+  let C₁ := K a b ^ N
+  let C₂ := (K a⁻¹ (-(a⁻¹ * b)) * 2) ^ N
+  let C := max C₁ C₂
+  refine sobolev_power_graph μ (modulatedSobolevWeight_subadditive m).1 N z hz C
+    ((pow_nonneg (hK a b) _).trans (le_max_left _ _)) ?_ ?_
+  · intro k x
+    let v : ℂ := (Real.log ((m x).val : ℝ) : ℂ)
+    have hv : ‖v‖ = (modulatedSobolevWeight m x : ℝ) := Complex.norm_real _
+    rw [← hv]
+    change ‖z x‖ ^ (2 * (k : ℕ)) ≤ C * Q v ^ N
+    calc
+      ‖z x‖ ^ (2 * (k : ℕ)) = (‖z x‖ ^ 2) ^ (k : ℕ) := pow_mul ..
+      _ ≤ Q (z x) ^ (k : ℕ) := pow_le_pow_left₀ (sq_nonneg _) (by simp [Q]) _
+      _ ≤ Q (z x) ^ N := pow_le_pow_right₀ (by simp [Q]) (Nat.le_of_lt_succ k.isLt)
+      _ ≤ C₁ * Q v ^ N := by
+        rw [← mul_pow]
+        exact pow_le_pow_left₀ (by dsimp [Q]; positivity) (hQ a b v) _
+      _ ≤ C * Q v ^ N := mul_le_mul_of_nonneg_right (le_max_left _ _) (by dsimp [Q]; positivity)
+  · intro x
+    let v : ℂ := (Real.log ((m x).val : ℝ) : ℂ)
+    have hv : ‖v‖ = (modulatedSobolevWeight m x : ℝ) := Complex.norm_real _
+    have hv' : a⁻¹ * z x + -(a⁻¹ * b) = v := by
+      change a⁻¹ * (a * v + b) + -(a⁻¹ * b) = v
+      rw [mul_add, ← mul_assoc, inv_mul_cancel₀ ha, one_mul, add_neg_cancel_right]
+    have hreverse : Q v ≤ K a⁻¹ (-(a⁻¹ * b)) * Q (z x) := hv' ▸ hQ a⁻¹ (-(a⁻¹ * b)) (z x)
+    rw [← hv]
+    change Q v ^ N ≤ C * (1 + ‖z x‖ ^ (2 * N))
+    let t := ‖z x‖ ^ 2
+    have ht : 0 ≤ t := sq_nonneg _
+    have hmax : (1 + t) ^ N ≤ 2 ^ N * (1 + t ^ N) := by
+      by_cases h : t ≤ 1
+      · exact (pow_le_pow_left₀ (by positivity : 0 ≤ 1 + t) (by linarith : 1 + t ≤ 2) N).trans
+          (le_mul_of_one_le_right (by positivity) (le_add_of_nonneg_right (pow_nonneg ht _)))
+      · have h' : 1 ≤ t := le_of_not_ge h
+        calc
+          (1 + t) ^ N ≤ (2 * t) ^ N :=
+            pow_le_pow_left₀ (by positivity) (by linarith) _
+          _ = 2 ^ N * t ^ N := mul_pow ..
+          _ ≤ 2 ^ N * (1 + t ^ N) := mul_le_mul_of_nonneg_left (le_add_of_nonneg_left zero_le_one)
+            (by positivity)
+    rw [pow_mul]
+    calc
+      Q v ^ N ≤ (K a⁻¹ (-(a⁻¹ * b)) * Q (z x)) ^ N :=
+        pow_le_pow_left₀ (by dsimp [Q]; positivity) hreverse _
+      _ ≤ C₂ * (1 + t ^ N) := by
+        rw [mul_pow, show C₂ = K a⁻¹ (-(a⁻¹ * b)) ^ N * (2 : ℝ) ^ N from mul_pow .., mul_assoc]
+        exact mul_le_mul_of_nonneg_left hmax (pow_nonneg (hK _ _) _)
+      _ ≤ C * (1 + t ^ N) := mul_le_mul_of_nonneg_right (le_max_right _ _) (by positivity)
+
+omit [MeasurableSpace G] [SecondCountableTopology G] [BorelSpace G] in
+/-- Evaluation of differential operators on a character's eigenline is an algebra homomorphism. -/
+private theorem bruhatDiff_exists_symbol_algHom (χ : PontryaginDual G) :
+    ∃ S : bruhatDiffAlgebra G →ₐ[ℂ] ℂ, ∀ D, S D = bruhatDiffSymbol D χ := by
+  let v : bruhatSmoothSubmodule (G := G) := ⟨_, pontryaginDual_mem_bruhatSmooth χ⟩
+  let ev : bruhatSmoothSubmodule (G := G) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (1 : G)).comp (bruhatSmoothSubmodule (G := G)).subtype
+  have hev : ev v = 1 := by change (χ 1 : ℂ) = 1; simp
+  have heigen (D : bruhatDiffAlgebra G) : D.val v = bruhatDiffSymbol D χ • v := by
+    obtain ⟨c, hc⟩ := bruhatDiff_exists_presentation D
+    let applyV : bruhatDiffAlgebra G →ₗ[ℂ] bruhatSmoothSubmodule (G := G) :=
+      (LinearMap.applyₗ v).comp (bruhatDiffAlgebra G).val.toLinearMap
+    let e (w : List (LCATopologicalLie G)) :=
+      (w.map fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ).prod
+    have hword (w : List (LCATopologicalLie G)) : applyV (bruhatDiffWord w) = e w • v := by
+      apply Subtype.ext
+      funext x
+      exact bruhatDiffWord_character w χ x
+    have hsum : D.val v = (c.sum fun w z ↦ z * e w) • v := by
+      change applyV D = _
+      rw [← hc]
+      simp only [Finsupp.sum, map_sum, map_smul, hword, mul_smul, Finset.sum_smul]
+    have hscalar := congrArg ev hsum
+    change bruhatDiffSymbol D χ = ev ((c.sum fun w z ↦ z * e w) • v) at hscalar
+    rw [map_smul, hev, smul_eq_mul, mul_one] at hscalar
+    rwa [hscalar]
+  let S : bruhatDiffAlgebra G →ₐ[ℂ] ℂ :=
+    { toFun := fun D ↦ ev (D.val v)
+      map_one' := hev
+      map_mul' D E := by
+        change ev (D.val (E.val v)) = ev (D.val v) * ev (E.val v)
+        simp only [heigen E, map_smul, hev, smul_eq_mul, one_mul, mul_comm]
+      map_zero' := ev.map_zero
+      map_add' D E := ev.map_add (D.val v) (E.val v)
+      commutes' c := by
+        change ev (c • v) = c
+        rw [map_smul, hev, smul_eq_mul, mul_one] }
+  exact ⟨S, fun _ ↦ rfl⟩
+
+omit [MeasurableSpace G] [BorelSpace G] in
+/-- A single algebra generator on the dual has a symbol affine in the logarithm
+of the modulation, with nonzero slope. Its powers act by the corresponding symbol powers. -/
+private theorem modulatedSobolev_generator_symbol
+    (hm : IsModulation m) (hs : Function.Surjective m)
+    (b : G ≃ₜ* PontryaginDual (PontryaginDual G))
+    (D : bruhatDiffAlgebra (PontryaginDual G)) (hD : Algebra.adjoin ℂ {D} = ⊤) :
+    ∃ a c : ℂ, a ≠ 0 ∧ ∀ k : ℕ, ∀ x : G,
+      bruhatDiffSymbol (D ^ k) (b x) = (a * (Real.log ((m x).val : ℝ) : ℂ) + c) ^ k := by
+  let expHomeo := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let e : Multiplicative ℝ ≃ₜ* ℝ≥0ˣ :=
+    { expHomeo with
+      map_mul' := fun x y ↦ by
+        apply Units.ext
+        apply NNReal.eq
+        change Real.exp (x.toAdd + y.toAdd) = Real.exp x.toAdd * Real.exp y.toAdd
+        exact Real.exp_add _ _ }
+  have hlog (x : ℝ≥0ˣ) : (e.symm x).toAdd = Real.log (x.val : ℝ) := by
+    have h := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) (e.apply_symm_apply x)
+    change Real.exp (e.symm x).toAdd = (x.val : ℝ) at h
+    rw [← h, Real.log_exp]
+  let ℓ : G →ₜ* Multiplicative ℝ := (e.symm : ℝ≥0ˣ →ₜ* Multiplicative ℝ).comp m
+  obtain ⟨τ, hτ⟩ := hm.exists_section
+  let i : ℝ≥0ˣ →ₜ* m.toMonoidHom.range :=
+    ⟨(MonoidHom.id _).codRestrict _ (fun t ↦ hs t), continuous_id.subtype_mk _⟩
+  let s := (τ.comp i).comp (e : Multiplicative ℝ →ₜ* ℝ≥0ˣ)
+  have hms (t : Multiplicative ℝ) : m (s t) = e t := hτ _
+  have hfactor (f : G →ₜ* Multiplicative ℝ) :
+      ∃ c : ℝ, ∀ x : G, (f x).toAdd = c * (ℓ x).toAdd := by
+    let K := m.toMonoidHom.ker
+    have habs : Continuous (fun x : G ↦ |(f x).toAdd|) :=
+      (show Continuous (Multiplicative.toAdd ∘ f) from f.continuous).abs
+    obtain ⟨y, hy, hmax⟩ := hm.isCompact_ker.exists_isMaxOn ⟨1, K.one_mem⟩ habs.continuousOn
+    have hyy := hmax (K.mul_mem hy hy)
+    change |(f (y * y)).toAdd| ≤ |(f y).toAdd| at hyy
+    rw [map_mul] at hyy
+    change |(f y).toAdd + (f y).toAdd| ≤ _ at hyy
+    rw [← two_mul, abs_mul, abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 2)] at hyy
+    have hyzero : |(f y).toAdd| = 0 := by linarith [abs_nonneg (f y).toAdd]
+    have hk (x : G) (hx : x ∈ K) : f x = 1 := by
+      have h := hmax hx
+      change |(f x).toAdd| ≤ |(f y).toAdd| at h
+      rw [hyzero, abs_nonpos_iff] at h
+      exact h
+    refine ⟨(f (s (Multiplicative.ofAdd 1))).toAdd, fun x ↦ ?_⟩
+    have hsx : m (s (ℓ x)) = m x := (hms _).trans (e.apply_symm_apply _)
+    have hker : x / s (ℓ x) ∈ K := by
+      change m (x / s (ℓ x)) = 1
+      rw [map_div, hsx, div_self']
+    have heq := hk _ hker
+    rw [map_div, div_eq_one] at heq
+    rw [heq, mul_comm]
+    exact lcaTopologicalLie_real (f.comp s) (ℓ x).toAdd
+  let H := PontryaginDual G
+  let A := bruhatDiffAlgebra H
+  obtain ⟨σ, _, hσsmul, hχ⟩ := bruhatDiffDegreeOne_frequency (G := H)
+  let d := σ.symm (ℓ.comp (b.symm : PontryaginDual H →ₜ* G))
+  obtain ⟨a₀, ha₀⟩ := (mem_bruhatDiffDegreeOneReal_iff d.val).mp d.property
+  let P : A := bruhatDiffGenerator a₀
+  have hd (x : G) : σ d (b x) = ℓ x := by
+    rw [show σ d = ℓ.comp (b.symm : PontryaginDual H →ₜ* G) from σ.apply_symm_apply _]
+    change ℓ (b.symm (b x)) = ℓ x
+    rw [b.symm_apply_apply]
+  have hP (x : G) : bruhatDiffSymbol P (b x) =
+      2 * ↑Real.pi * Complex.I * (Real.log ((m x).val : ℝ) : ℂ) := by
+    apply bruhatDiffSymbol_generator
+    have h := hχ a₀ d ha₀ (b x)
+    rw [hd, show (ℓ x).toAdd = Real.log ((m x).val : ℝ) from hlog _] at h
+    exact h
+  have hgen : Algebra.adjoin ℂ {P} = ⊤ := by
+    let S := Algebra.adjoin ℂ {P}
+    have hPmem : P ∈ S := Algebra.subset_adjoin (by simp)
+    have hle : bruhatDiffAlgebra H ≤ S.map (bruhatDiffAlgebra H).val := by
+      apply Algebra.adjoin_le
+      rintro _ ⟨a, rfl⟩
+      let da : bruhatDiffDegreeOneReal (G := H) :=
+        ⟨bruhatFirstOrder a, Submodule.subset_span ⟨a, rfl⟩⟩
+      obtain ⟨c, hc⟩ := hfactor ((σ da).comp (b : G →ₜ* PontryaginDual H))
+      have heq : da = c • d := by
+        apply σ.injective
+        apply ContinuousMonoidHom.ext
+        intro χ
+        obtain ⟨x, rfl⟩ := b.surjective χ
+        apply Multiplicative.toAdd.injective
+        rw [hσsmul, hd]
+        exact hc x
+      refine ⟨(c : ℂ) • P, S.smul_mem hPmem _, ?_⟩
+      change (c : ℂ) • bruhatFirstOrder a₀ = bruhatFirstOrder a
+      rw [← ha₀]
+      exact (congrArg Subtype.val heq).symm
+    apply top_unique
+    intro T _
+    obtain ⟨T', hT', heq⟩ := hle T.property
+    exact (Subtype.ext heq : T' = T) ▸ hT'
+  obtain ⟨p, hp⟩ := Algebra.adjoin_mem_exists_aeval ℂ P
+    (show D ∈ Algebra.adjoin ℂ {P} by rw [hgen]; trivial)
+  obtain ⟨q, hq⟩ := Algebra.adjoin_mem_exists_aeval ℂ D
+    (show P ∈ Algebra.adjoin ℂ {D} by rw [hD]; trivial)
+  let c : ℂ := 2 * ↑Real.pi * Complex.I
+  have hc : c ≠ 0 :=
+    mul_ne_zero (mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+      Complex.I_ne_zero
+  -- The polynomial presentations are inverse on every real frequency.
+  have hpoly : q.comp p = Polynomial.X := by
+    apply Polynomial.eq_of_infinite_eval_eq
+    have hinj : Function.Injective (fun t : ℝ ↦ c * (t : ℂ)) :=
+      fun _ _ h ↦ Complex.ofReal_injective (mul_left_cancel₀ hc h)
+    refine (Set.infinite_range_of_injective hinj).mono ?_
+    rintro _ ⟨t, rfl⟩
+    obtain ⟨x, hx⟩ := hs (e (Multiplicative.ofAdd t))
+    obtain ⟨S, hS⟩ := bruhatDiff_exists_symbol_algHom (b x)
+    have ht : S P = c * (t : ℂ) := by
+      rw [hS, hP, hx, ← hlog, e.symm_apply_apply]
+      rfl
+    change Polynomial.eval (c * (t : ℂ)) (q.comp p) = Polynomial.eval _ Polynomial.X
+    rw [← ht, Polynomial.eval_comp, Polynomial.eval_X]
+    have hp' := congrArg S hp
+    have hq' := congrArg S hq
+    rw [← Polynomial.aeval_algHom_apply, Polynomial.aeval_def, Algebra.algebraMap_self,
+      Polynomial.eval₂_id] at hp' hq'
+    rw [hp', hq']
+    exact ht
+  have hdeg : p.natDegree = 1 := by
+    have h := congrArg Polynomial.natDegree hpoly
+    rw [Polynomial.natDegree_comp, Polynomial.natDegree_X] at h
+    exact Nat.eq_one_of_dvd_one ⟨q.natDegree, by simpa [Nat.mul_comm] using h.symm⟩
+  have hpaff := Polynomial.eq_X_add_C_of_natDegree_le_one hdeg.le
+  refine ⟨p.coeff 1 * c, p.coeff 0, mul_ne_zero ?_ hc, fun k x ↦ ?_⟩
+  · rw [← hdeg]
+    exact Polynomial.leadingCoeff_ne_zero.mpr fun hpz ↦ by simp [hpz] at hdeg
+  obtain ⟨S, hS⟩ := bruhatDiff_exists_symbol_algHom (b x)
+  rw [← hS, map_pow]
+  congr 1
+  rw [← hp, ← Polynomial.aeval_algHom_apply, Polynomial.aeval_def, Algebra.algebraMap_self,
+    Polynomial.eval₂_id]
+  conv_lhs => rw [hpaff]
+  rw [Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_C,
+    Polynomial.eval_X, hS, hP]
+  simp only [c, mul_assoc]
+
+omit [SecondCountableTopology G] [BorelSpace G] in
+/-- An integrable Schwartz–Bruhat function is square-integrable, since its stage
+bounds include the unweighted supremum norm. -/
+private theorem schwartzBruhat_memLp_two_of_integrable {μ : Measure G}
+    (f : SchwartzBruhat G) (hf : Integrable (f : G → ℂ) μ) : MemLp (f : G → ℂ) 2 μ := by
+  obtain ⟨p, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff _).mp
+    (show (f : G → ℂ) ∈ schwartzBruhatSubmodule G from
+      (show schwartzBruhatSubmodule G from f).property)
+  let i : ElementarySchwartzIndex e.realDim e.torusDim e.latticeRank := (0, 0, 0, 0)
+  let M := elementarySchwartzBound (s : _ → ℂ) i
+  have hM : M < ∞ := s.property.2 i
+  have hMbound (z) : ‖s z‖ ≤ M.toReal := by
+    have hz : (‖s z‖₊ : ℝ≥0∞) ≤ M := by
+      change _ ≤ elementarySchwartzBound _ (0, 0, 0, 0)
+      rw [elementarySchwartzBound_zero]
+      exact le_iSup (fun y ↦ (‖s y‖₊ : ℝ≥0∞)) z
+    exact ENNReal.toReal_mono hM.ne hz
+  have hbound (x : G) : ‖f x‖ ≤ M.toReal := by
+    rw [← congrFun hs x, schwartzBruhatStageRealization_apply]
+    split_ifs
+    · exact hMbound _
+    · simp
+  apply (memLp_two_iff_integrable_sq_norm hf.aestronglyMeasurable).mpr
+  apply (hf.norm.const_mul M.toReal).mono' (hf.aestronglyMeasurable.norm.pow 2)
+  exact .of_forall fun x ↦ by
+    change ‖‖f x‖ ^ 2‖ ≤ M.toReal * ‖f x‖
+    rw [Real.norm_of_nonneg (sq_nonneg _), sq]
+    exact mul_le_mul_of_nonneg_right (hbound x) (norm_nonneg _)
+
+/-- On compactly supported smooth data, differentiation on the Fourier side amounts
+to multiplication by the differential symbol evaluated at the inverse bidual character. -/
+private theorem modulatedSobolev_fourier_test_symbol
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hs : Function.Surjective m)
+    (hν : IsLCAPlancherelMeasure μ ν)
+    (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x)
+    (hbν : IsLCAPlancherelMeasure ν (μ.map b))
+    (f : G →C_c ℂ) (hf : IsBruhatSmooth (f : G → ℂ)) :
+    ∃ F : bruhatSmoothSubmodule (G := PontryaginDual G), F.val = lcaFourier μ f ∧
+      ∀ (Q : bruhatDiffAlgebra (PontryaginDual G)) (g : G → ℂ),
+        Integrable g μ → (∀ x, g x = bruhatDiffSymbol Q (b x⁻¹) * f x) →
+        lcaFourier μ g =ᵐ[ν] (Q.val F).val := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : BorelSpace (PontryaginDual (PontryaginDual G)) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  let : μ.Regular := inferInstance
+  have hfC : (f : G → ℂ) ∈ bruhatCompactSupportSubmodule G :=
+    ⟨(mem_bruhatSmoothSubmodule_iff _).mpr hf, f.hasCompactSupport⟩
+  have hfS : (f : G → ℂ) ∈ schwartzBruhatSubmodule G := by
+    rw [← modulatedExponentialDecaySubmodule_singleton_zero m]
+    exact bruhatCompactSupport_le_modulatedExponentialDecay m {0} hm hs hfC
+  let fS : SchwartzBruhat G := (⟨f, hfS⟩ : schwartzBruhatSubmodule G)
+  obtain ⟨T, hT⟩ := schwartzBruhat_fourier_equiv μ
+  obtain ⟨_, hT'⟩ := schwartzBruhat_fourier_equiv ν
+  let F := T fS
+  have hF : (F : PontryaginDual G → ℂ) = lcaFourier μ f := funext (hT fS).2
+  let F₀ : bruhatSmoothSubmodule (G := PontryaginDual G) :=
+    ⟨F, (mem_bruhatSmoothSubmodule_iff _).mpr (schwartzBruhat_isBruhatSmooth F)⟩
+  refine ⟨F₀, hF, fun Q g hg hg_eq ↦ ?_⟩
+  let a := b.toHomeomorph.toMeasurableEquiv
+  -- The Fourier transform on the dual uses the conjugate character.
+  let j := (MeasurableEquiv.inv G).trans a
+  have hj : MeasurePreserving j μ (μ.map b) :=
+    (show MeasurePreserving a μ (μ.map b) from ⟨a.measurable, rfl⟩).comp
+      (Measure.measurePreserving_inv μ)
+  have hfj : Integrable (F : PontryaginDual G → ℂ) ν := (hT' F).1
+  have hf₂ : MemLp (f : G → ℂ) 2 μ := f.continuous.memLp_of_hasCompactSupport f.hasCompactSupport
+  have hUF :
+      ((lcaFourier_unitary μ ν hν).exists.choose (hf₂.toLp f) : PontryaginDual G → ℂ)
+        =ᵐ[ν] (F : PontryaginDual G → ℂ) := by
+    rw [hF]
+    exact (lcaFourier_unitary μ ν hν).exists.choose_spec _ (hT fS).1 hf₂
+  obtain ⟨K, hK, hFormula⟩ :=
+    lcaInverseFourier_zeroAtInfty μ ν hν (hf₂.toLp f) F hfj hUF
+  have hBack : (fun x : G ↦ lcaFourier ν F (j x)) =ᵐ[μ] (f : G → ℂ) := by
+    have hEq (x : G) : lcaFourier ν F (j x) = K x := by
+      rw [hFormula, lcaFourier]
+      apply integral_congr_ae
+      exact .of_forall fun χ ↦ by
+        change F χ * star (b x⁻¹ χ : ℂ) = _
+        rw [hb, map_inv, Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+    exact (show (fun x : G ↦ lcaFourier ν F (j x)) =ᵐ[μ] (K : G → ℂ)
+      from Eventually.of_forall hEq).trans (hK.trans hf₂.coeFn_toLp)
+  obtain ⟨_, R, hR, _, hRint, hQR⟩ := lcaFourier_bruhatDiff ν Q F
+  have hREq : (R : PontryaginDual G → ℂ) = (Q.val F₀).val := hR
+  have hR₂ := schwartzBruhat_memLp_two_of_integrable R hRint
+  have hBackR : lcaFourier ν R =ᵐ[μ.map b] (g ∘ j.symm) := by
+    rw [← hj.map_eq, Filter.EventuallyEq, j.measurableEmbedding.ae_map_iff]
+    filter_upwards [hBack] with x hx
+    rw [Function.comp_apply, j.symm_apply_apply, hg_eq, hQR, Pi.mul_apply]
+    exact congrArg (bruhatDiffSymbol Q (b x⁻¹) * ·) hx
+  have hUR : ((lcaFourier_unitary ν (μ.map b) hbν).exists.choose (hR₂.toLp R) :
+      PontryaginDual (PontryaginDual G) → ℂ) =ᵐ[μ.map b] (g ∘ j.symm) :=
+    ((lcaFourier_unitary ν (μ.map b) hbν).exists.choose_spec _ hRint hR₂).trans hBackR
+  obtain ⟨L, hL, hLformula⟩ := lcaInverseFourier_zeroAtInfty ν (μ.map b) hbν (hR₂.toLp R)
+    (g ∘ j.symm) ((hj.symm j).integrable_comp_of_integrable hg) hUR
+  have hFourier : lcaFourier μ g = (L : PontryaginDual G → ℂ) := by
+    funext χ
+    rw [hLformula, ← hj.integral_comp', lcaFourier]
+    apply integral_congr_ae
+    exact .of_forall fun x ↦ by
+      change g x * star (χ x : ℂ) = g (j.symm (j x)) * (b x⁻¹ χ : ℂ)
+      rw [j.symm_apply_apply, hb, map_inv, Circle.coe_inv_eq_conj, Complex.star_def]
+  rw [hFourier, ← hREq]
+  exact hL.trans hR₂.coeFn_toLp
+
 -- TODO(paper-gap): (9.1.2.9) compares a squared norm on the left with homogeneous
 -- expressions of degree one on the right. In (9.1.2.11) the sign of the exponent
 -- for the character and the sign for its conjugate are printed the same way.
@@ -1137,7 +1621,58 @@ theorem modulatedSobolev_fourierDeriv_topology (_hm : IsModulation m)
         ∃ (u : E) (F : bruhatSmoothSubmodule (G := PontryaginDual G)),
           (u : G → ℂ) =ᵐ[μ] (f : G → ℂ) ∧ F.val = lcaFourier μ f ∧
           ∀ k, (A k u : PontryaginDual G → ℂ) =ᵐ[ν] ((D ^ (k : ℕ)).val F).val) ∧
-      IsEmbedding (fun f : E ↦ fun k ↦ A k f) := by sorry
+      IsEmbedding (fun f : E ↦ fun k ↦ A k f) := by
+  dsimp only
+  let E := ModulatedSobolev m μ (2 * (N : ℝ))
+  obtain ⟨b, hb, hbν, _⟩ := modulatedSobolev_bidual m μ ν _hm _hsurj _hν (2 * (N : ℝ))
+  obtain ⟨a, c, ha, hDpow⟩ := modulatedSobolev_generator_symbol m _hm _hsurj b D _hD
+  obtain ⟨B, hB, hEmb⟩ :=
+    modulatedSobolev_affineLogPower_graph m μ N (-a) c (neg_ne_zero.mpr ha)
+  let U := (lcaFourier_unitary μ ν _hν).exists.choose
+  let A (k : Fin (N + 1)) : E →L[ℂ] Lp ℂ 2 ν :=
+    U.toContinuousLinearEquiv.toContinuousLinearMap.comp (B k)
+  refine ⟨A, ?_, ?_⟩
+  · intro f hf
+    let w := modulatedSobolevWeight m
+    let μw := sobolevMeasure μ w (2 * (N : ℝ))
+    let ρ (x : G) : ℝ := (1 + (w x : ℝ) ^ 2) ^ ((2 * (N : ℝ)) / 2)
+    have hbase (x : G) : 0 < 1 + (w x : ℝ) ^ 2 := by positivity
+    have hρ : Continuous ρ :=
+      (continuous_const.add ((NNReal.continuous_coe.comp
+        (modulatedSobolevWeight_subadditive m).1).pow 2)).rpow_const
+        fun x ↦ Or.inl (hbase x).ne'
+    have hρpos (x : G) : 0 < ρ x := Real.rpow_pos_of_pos (hbase x) _
+    let : IsLocallyFiniteMeasure μw := IsLocallyFiniteMeasure.withDensity_ofReal hρ
+    have hAC : μ ≪ μw :=
+      withDensity_absolutelyContinuous' hρ.measurable.aemeasurable.ennreal_ofReal
+        (.of_forall fun x ↦ (ENNReal.ofReal_pos.mpr (hρpos x)).ne')
+    have hf₂ : MemLp (f : G → ℂ) 2 μw := f.continuous.memLp_of_hasCompactSupport f.hasCompactSupport
+    let u : E := hf₂.toLp f
+    have hu : (u : G → ℂ) =ᵐ[μ] (f : G → ℂ) := hAC.ae_eq hf₂.coeFn_toLp
+    obtain ⟨F, hF, htest⟩ := modulatedSobolev_fourier_test_symbol μ ν m _hm _hsurj _hν b hb hbν f hf
+    refine ⟨u, F, hu, hF, fun k ↦ ?_⟩
+    let z (x : G) := -a * (Real.log ((m x).val : ℝ) : ℂ) + c
+    let g (x : G) := z x ^ (k : ℕ) * f x
+    have hz : Continuous z :=
+      (continuous_const.mul (Complex.continuous_ofReal.comp (continuous_log_modulation m))).add
+        continuous_const
+    have hg : Integrable g μ :=
+      ((hz.pow (k : ℕ)).mul f.continuous).integrable_of_hasCompactSupport
+        f.hasCompactSupport.mul_left
+    have hgu : (B k u : G → ℂ) =ᵐ[μ] g :=
+      (hB k u).trans (hu.mono fun x hx ↦ congrArg (z x ^ (k : ℕ) * ·) hx)
+    have hg₂ : MemLp g 2 μ := (Lp.memLp (B k u)).ae_eq hgu
+    have hBg : B k u = hg₂.toLp g := Lp.ext (hgu.trans hg₂.coeFn_toLp.symm)
+    have hspec := (lcaFourier_unitary μ ν _hν).exists.choose_spec g hg hg₂
+    change (U (B k u) : PontryaginDual G → ℂ) =ᵐ[ν] _
+    rw [hBg]
+    refine hspec.trans (htest (D ^ (k : ℕ)) g hg fun x ↦ ?_)
+    have hInv : Real.log ((m x⁻¹).val : ℝ) = -Real.log ((m x).val : ℝ) := by
+      rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv]
+    simp only [g, z, hDpow, hInv, Complex.ofReal_neg, mul_neg, neg_mul]
+  · have hU : IsEmbedding (Pi.map (fun _ : Fin (N + 1) ↦ U)) :=
+      IsEmbedding.piMap fun _ ↦ U.isometry.isEmbedding
+    exact hU.comp hEmb
 
 -- TODO(paper-gap): In Remark 9.1.2.3 the ordinary derivatives are on the Fourier side.
 -- The stated generalization to all locally compact abelian groups also needs a weight.

@@ -4022,13 +4022,42 @@ theorem finestLocallyConvex_submodule_closedComplemented
 finest locally convex topology. -/
 theorem finestLocallyConvex_submodule_topology (S : Submodule ℂ (FinestLocallyConvex E)) :
     (inferInstance : TopologicalSpace S) =
-      (inferInstance : TopologicalSpace (FinestLocallyConvex S)) := by sorry
+      (inferInstance : TopologicalSpace (FinestLocallyConvex S)) := by
+  have := finestLocallyConvex_t2 E
+  have := finestLocallyConvex_t2 S
+  have : PolynormableSpace ℂ (FinestLocallyConvex S) := inferInstance
+  obtain ⟨P, hP⟩ := finestLocallyConvex_submodule_closedComplemented S
+  have h1 : @Continuous (FinestLocallyConvex S) S _ _ id :=
+    continuous_induced_rng.2
+      (continuous_of_finestLocallyConvex (E := S) (M := FinestLocallyConvex E) S.subtype)
+  have h2 : @Continuous S (FinestLocallyConvex S) _ _ id := by
+    have h3 := @continuous_of_finestLocallyConvex E _ _ (FinestLocallyConvex S) _ _ _ ‹_› ‹_›
+      (P.toLinearMap : FinestLocallyConvex E →ₗ[ℂ] FinestLocallyConvex S)
+    have : (id : S → FinestLocallyConvex S) = P ∘ Subtype.val := funext fun x ↦ (hP x).symm
+    rw [this]
+    exact h3.comp continuous_subtype_val
+  exact le_antisymm (continuous_id_iff_le.1 (by exact h2)) (continuous_id_iff_le.1 (by exact h1))
 
 /-- Paper: Proposition C.2.5.1(3), p. 691. The quotient topology is the finest
 locally convex topology on the quotient vector space. -/
 theorem finestLocallyConvex_quotient_topology (S : Submodule ℂ (FinestLocallyConvex E)) :
     (inferInstance : TopologicalSpace (FinestLocallyConvex E ⧸ S)) =
-      (inferInstance : TopologicalSpace (FinestLocallyConvex (FinestLocallyConvex E ⧸ S))) := by sorry
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (FinestLocallyConvex E ⧸ S))) := by
+  have := finestLocallyConvex_t2 E
+  have := finestLocallyConvex_submodule_isClosed S
+  have hT2 : T2Space (FinestLocallyConvex E ⧸ S) := inferInstance
+  let _ : PolynormableSpace ℂ (FinestLocallyConvex E ⧸ S) := polynormableSpace_quotient S
+  have : PolynormableSpace ℂ (FinestLocallyConvex (FinestLocallyConvex E ⧸ S)) := inferInstance
+  have : T2Space (FinestLocallyConvex (FinestLocallyConvex E ⧸ S)) := finestLocallyConvex_t2 _
+  have h1 : @Continuous (FinestLocallyConvex E ⧸ S) (FinestLocallyConvex (FinestLocallyConvex E ⧸ S)) _ _ id := by
+    have h3 := @continuous_of_finestLocallyConvex E _ _ (FinestLocallyConvex (FinestLocallyConvex E ⧸ S)) _ _ _ ‹_› ‹_›
+      ((S.mkQ : FinestLocallyConvex E →ₗ[ℂ] FinestLocallyConvex E ⧸ S) : FinestLocallyConvex E →ₗ[ℂ] FinestLocallyConvex (FinestLocallyConvex E ⧸ S))
+    exact (Topology.IsQuotientMap.continuous_iff (S.isOpenQuotientMap_mkQ.isQuotientMap)).2 h3
+  have h2 : @Continuous (FinestLocallyConvex (FinestLocallyConvex E ⧸ S)) (FinestLocallyConvex E ⧸ S) _ _ id :=
+    @continuous_of_finestLocallyConvex (FinestLocallyConvex E ⧸ S) _ _ (FinestLocallyConvex E ⧸ S) _ _ _ ‹_› hT2 LinearMap.id
+  have e1 := continuous_id_iff_le.1 h1
+  have e2 := continuous_id_iff_le.1 h2
+  exact le_antisymm e1 e2
 
 /-- Paper: Proposition C.2.5.1(3), p. 691. The finest locally convex topology
 is complete. -/
