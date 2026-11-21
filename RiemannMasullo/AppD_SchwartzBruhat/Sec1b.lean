@@ -468,10 +468,19 @@ theorem isCompactlyGeneratedGroup_closedSubgroup (hG : IsCompactlyGeneratedGroup
   obtain ⟨y, hy, hyx⟩ := Subgroup.mem_map.mp hxJ
   exact (Subtype.ext hyx : y = x) ▸ hy
 
+-- Retain the LCA and closedness assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Theorem D.1.4.3(1), p. 757. The quotient of a compactly generated LCA
 group by a closed subgroup is compactly generated. -/
 theorem isCompactlyGeneratedGroup_quotient (hG : IsCompactlyGeneratedGroup G)
-    (H : Subgroup G) (hH : IsClosed (H : Set G)) : IsCompactlyGeneratedGroup (G ⧸ H) := by sorry
+    (H : Subgroup G) (hH : IsClosed (H : Set G)) : IsCompactlyGeneratedGroup (G ⧸ H) := by
+  obtain ⟨U, hU, hCompact, hGen⟩ := hG
+  let q := QuotientGroup.mk' H
+  have hq : IsOpenQuotientMap q := QuotientGroup.isOpenQuotientMap_mk
+  refine ⟨q '' U, ?_, hCompact.image hq.continuous, ?_⟩
+  · simpa only [map_one] using hq.isOpenMap.image_mem_nhds hU
+  · rw [← MonoidHom.map_closure, hGen, Subgroup.map_top_of_surjective q hq.surjective]
 
 /-- Paper: Theorem D.1.4.3(2), p. 757. An LCA group has an elementary presentation
 exactly when it is compactly generated and locally Euclidean. -/
