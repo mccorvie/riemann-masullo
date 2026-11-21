@@ -430,11 +430,99 @@ theorem bruhatDirectionalDeriv_continuous (a : LCATopologicalLie G) {f : G → �
   exact hH.isOpenEmbedding_subtypeVal.continuousAt_iff.mp
     (hCont.continuousAt (x := (⟨x, hx⟩ : H)))
 
+omit hTop hT2 hLC in
+/-- Translation by an elementary one-parameter subgroup lifts on each discrete fiber
+to translation by a real multiple of a fixed vector. -/
+private theorem exists_elementaryCover_translation {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
+    (c : ℝ →+ ElementaryLieGroup m n r F) (hc : Continuous c) :
+    ∃ v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n),
+      ∀ u (z : Fin r → ℤ) (b : F) (t : ℝ),
+        elementaryCover (u + t • v) z b = elementaryCover u z b + c t := by
+  let cR := (AddMonoidHom.fst _ _).comp c
+  let cT := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp c)
+  have hR (t : ℝ) : (c t).1 = t • (c 1).1 := by
+    change cR t = t • cR 1
+    simpa only [smul_eq_mul, mul_one] using map_real_smul cR hc.fst t (1 : ℝ)
+  choose w hw using fun i : Fin n ↦ exists_addCircle_coe_mul_eq
+    ((Pi.evalAddMonoidHom _ i).comp cT) ((continuous_apply i).comp hc.snd.fst)
+  have hD (t : ℝ) : (c t).2.2 = 0 := by
+    have h := hc.snd.snd.isConst_of_preconnectedSpace t 0
+    rw [map_zero c] at h
+    exact h
+  refine ⟨((c 1).1, WithLp.toLp 2 w), fun u z b t ↦ ?_⟩
+  refine Prod.ext (congrArg (u.1 + ·) (hR t).symm) (Prod.ext ?_ ?_)
+  · funext i
+    change ((u.2 i + t * w i : ℝ) : AddCircle (1 : ℝ)) =
+      (u.2 i : AddCircle (1 : ℝ)) + (c t).2.1 i
+    rw [AddCircle.coe_add, hw i t]
+    rfl
+  · change (z, b) = (z, b) + (c t).2.2
+    rw [hD, add_zero]
+
+omit hT2 hLC in
+/-- On each structural quotient, differentiation along a one-parameter subgroup
+lowers the order of Bruhat differentiability by one and preserves the good subgroup. -/
+private theorem IsBruhatContDiff.directionalDeriv {p : ℕ} {f : G → ℂ}
+    (hf : IsBruhatContDiff (p + 1) f) (a : LCATopologicalLie G) :
+    IsBruhatContDiff p (bruhatDirectionalDeriv a f) := by
+  obtain ⟨k, hk, hInv, hDescent⟩ := hf
+  refine ⟨k, hk, ?_, ?_⟩
+  · intro h x
+    simp only [bruhatDirectionalDeriv, mul_assoc, hInv]
+  · intro q hq
+    obtain ⟨f₀, hf₀, hSmooth⟩ := hDescent q hq
+    have ha (t : Multiplicative ℝ) : a t ∈ q.val.1 := by
+      let : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+      exact (isPreconnected_range a.continuous).subset_isClopen
+        ⟨q.val.1.isClosed_of_isOpen q.property.1, q.property.1⟩
+        ⟨1, ⟨1, map_one a⟩, q.val.1.one_mem⟩ (mem_range_self t)
+    let aH := a.toMonoidHom.codRestrict q.val.1 ha
+    let π : q.val.1 →* q.quotient := QuotientGroup.mk' _
+    let aQ := π.comp aH
+    let df₀ (y : q.quotient) := deriv (fun t : ℝ ↦ f₀ (y * aQ (Multiplicative.ofAdd t))) 0
+    refine ⟨df₀, ?_, ?_⟩
+    · intro x
+      unfold df₀ bruhatDirectionalDeriv
+      congr 1
+      funext t
+      change f₀ (π x * π (aH (Multiplicative.ofAdd t))) = _
+      rw [← map_mul π]
+      exact hf₀ (x * aH (Multiplicative.ofAdd t))
+    · intro e z b
+      let c := AddMonoidHom.toMultiplicative.symm (e.equiv.toMulEquiv.toMonoidHom.comp aQ)
+      have hc : Continuous c :=
+        e.equiv.continuous.comp (QuotientGroup.continuous_mk.comp (a.continuous.subtype_mk ha))
+      obtain ⟨v, hv⟩ := exists_elementaryCover_translation c hc
+      let g := fun u ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover u z b)))
+      have hg : ContDiff ℝ ((p : ℕ∞) + 1) g := by
+        simpa only [Nat.cast_add, Nat.cast_one, WithTop.coe_add, WithTop.coe_one]
+          using hSmooth e z b
+      have hd : ContDiff ℝ (p : ℕ∞) (fun u ↦ fderiv ℝ g u v) :=
+        (hg.contDiff_fderiv_apply le_rfl).comp (contDiff_id.prodMk contDiff_const)
+      convert hd using 1
+      funext u
+      have hLine : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+        simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+      have hOrbit (t : ℝ) : g (u + t • v) =
+          f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover u z b)) *
+            aQ (Multiplicative.ofAdd t)) := by
+        dsimp only [g]
+        rw [hv]
+        change f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover u z b) *
+          e.equiv (aQ (Multiplicative.ofAdd t)))) = _
+        rw [map_mul, e.equiv.symm_apply_apply]
+      have h := (hg.differentiable (by simp) u).hasFDerivAt.comp_hasDerivAt_of_eq 0 hLine
+        (by simp)
+      simpa only [df₀, Function.comp_def, hOrbit] using h.deriv
+
 /-- Paper: Lemma D.1.6.6, p. 767. The first derivative of a Bruhat smooth
 function is Bruhat smooth. -/
 theorem bruhatDirectionalDeriv_mem_smooth (a : LCATopologicalLie G)
     (f : bruhatSmoothSubmodule (G := G)) :
-    bruhatDirectionalDeriv a f ∈ bruhatSmoothSubmodule := by sorry
+    bruhatDirectionalDeriv a f ∈ bruhatSmoothSubmodule := by
+  have hf := (mem_bruhatSmoothSubmodule_iff f.val).mp f.property
+  exact (mem_bruhatSmoothSubmodule_iff _).mpr fun p ↦ (hf (p + 1)).directionalDeriv a
 
 /-- Paper: Lemma D.1.6.6, p. 767. The first derivative satisfies the product
 rule on pairs of Bruhat C¹ functions. -/
@@ -618,36 +706,6 @@ theorem bruhatFirstOrder_translate (a : LCATopologicalLie G)
   change deriv (fun t : ℝ ↦ f.val (g⁻¹ * (x * a (Multiplicative.ofAdd t)))) 0 =
     deriv (fun t : ℝ ↦ f.val ((g⁻¹ * x) * a (Multiplicative.ofAdd t))) 0
   simp only [mul_assoc]
-
-omit hTop hT2 hLC in
-/-- Translation by an elementary one-parameter subgroup lifts on each discrete fiber
-to translation by a real multiple of a fixed vector. -/
-private theorem exists_elementaryCover_translation {m n r : ℕ} {F : Type*}
-    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
-    (c : ℝ →+ ElementaryLieGroup m n r F) (hc : Continuous c) :
-    ∃ v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n),
-      ∀ u (z : Fin r → ℤ) (b : F) (t : ℝ),
-        elementaryCover (u + t • v) z b = elementaryCover u z b + c t := by
-  let cR := (AddMonoidHom.fst _ _).comp c
-  let cT := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp c)
-  have hR (t : ℝ) : (c t).1 = t • (c 1).1 := by
-    change cR t = t • cR 1
-    simpa only [smul_eq_mul, mul_one] using map_real_smul cR hc.fst t (1 : ℝ)
-  choose w hw using fun i : Fin n ↦ exists_addCircle_coe_mul_eq
-    ((Pi.evalAddMonoidHom _ i).comp cT) ((continuous_apply i).comp hc.snd.fst)
-  have hD (t : ℝ) : (c t).2.2 = 0 := by
-    have h := hc.snd.snd.isConst_of_preconnectedSpace t 0
-    rw [map_zero c] at h
-    exact h
-  refine ⟨((c 1).1, WithLp.toLp 2 w), fun u z b t ↦ ?_⟩
-  refine Prod.ext (congrArg (u.1 + ·) (hR t).symm) (Prod.ext ?_ ?_)
-  · funext i
-    change ((u.2 i + t * w i : ℝ) : AddCircle (1 : ℝ)) =
-      (u.2 i : AddCircle (1 : ℝ)) + (c t).2.1 i
-    rw [AddCircle.coe_add, hw i t]
-    rfl
-  · change (z, b) = (z, b) + (c t).2.2
-    rw [hD, add_zero]
 
 /-- Paper: Lemma D.1.6.7(1), p. 767. First-order operators add under
 pointwise multiplication of one-parameter subgroups. -/
