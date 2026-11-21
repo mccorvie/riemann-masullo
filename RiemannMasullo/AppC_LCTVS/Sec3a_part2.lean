@@ -161,7 +161,44 @@ ascription outside, Lean coerces each summand first and forms the union, for whi
 is false (two coordinate axes in the plane). -/
 theorem tendsto_sum_orthogonalProjections_iff_dense_iSup (hV : PairwiseOrthogonal) :
     (∀ x, Tendsto (fun s : Finset ι ↦ (∑ i ∈ s, P(i)) x) atTop (𝓝 x)) ↔
-      Dense (((⨆ i, V i : Submodule ℂ H) : Submodule ℂ H) : Set H) := by sorry
+      Dense (((⨆ i, V i : Submodule ℂ H) : Submodule ℂ H) : Set H) := by
+  classical
+  let Q (s : Finset ι) : H →L[ℂ] H := ∑ i ∈ s, P(i)
+  constructor
+  · intro h x
+    refine mem_closure_of_tendsto (h x) (Eventually.of_forall fun s ↦ ?_)
+    change (∑ i ∈ s, P(i)) x ∈ ⨆ i, (V i : Submodule ℂ H)
+    rw [sum_apply]
+    exact Submodule.sum_mem _ fun i _ ↦ Submodule.mem_iSup_of_mem i
+      (Submodule.starProjection_apply_mem _ x)
+  · intro hd x
+    refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+    -- Approximate x by a vector in the sum of finitely many summands.
+    obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hd x) ε hε
+    change y ∈ ⨆ i, (V i : Submodule ℂ H) at hy
+    rw [iSup_eq_iSup_finset] at hy
+    have hmono : Monotone (fun s : Finset ι ↦ ⨆ i ∈ s, (V i : Submodule ℂ H)) :=
+      fun _ _ h ↦ iSup_le fun i ↦ iSup_le fun hi ↦ le_iSup_of_le i (le_iSup_of_le (h hi) le_rfl)
+    obtain ⟨t, ht⟩ := (Submodule.mem_iSup_of_directed _ hmono.directed_le).mp hy
+    filter_upwards [eventually_ge_atTop t] with s hs
+    have hrange : (⨆ i ∈ s, (V i : Submodule ℂ H)) ≤ (Q s).range := by
+      refine iSup_le fun i ↦ iSup_le fun hi z hz ↦ ⟨z, ?_⟩
+      change (∑ i ∈ s, P(i)) z = z
+      rw [sum_apply, Finset.sum_eq_single_of_mem i hi]
+      · exact Submodule.starProjection_eq_self_iff.mpr hz
+      · intro j _ hji
+        exact (Submodule.starProjection_apply_eq_zero_iff _).mpr ((hV hji.symm) hz)
+    have hP (i : ι) : IsStarProjection (P(i)) := isStarProjection_starProjection
+    have hQs : IsStarProjection (Q s) := by
+      refine IsStarProjection.sum (fun i _ ↦ hP i) ?_
+      intro i _ j _ hij
+      exact ((hP i).isSelfAdjoint.isStarOrtho_iff_mul_eq_zero (hP j).isSelfAdjoint).mpr
+        (hV hij).starProjection_comp_starProjection
+    obtain ⟨hproj, hQ⟩ := isStarProjection_iff_eq_starProjection_range.mp hQs
+    -- The projection onto the range of Q s is at least as close to x as y is.
+    change dist (Q s x) x < ε
+    rw [dist_comm, hQ, Submodule.dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem (hrange (hmono hs ht))).trans_lt hxy
 
 end OrthogonalSummands
 
