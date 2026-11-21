@@ -38,7 +38,12 @@ def HasVectorMultiPartial (α : Fin d → ℕ) (f g : V → E) : Prop :=
 /-- Paper: Definition C.5.1.26(2), p. 735. The derivative for the zero multi-index
 is the original function. -/
 theorem hasVectorMultiPartial_zero_iff (f g : V → E) :
-    HasVectorMultiPartial 0 f g ↔ f = g := by sorry
+    HasVectorMultiPartial 0 f g ↔ f = g := by
+  have h : (List.finRange d).flatMap (fun i ↦ List.replicate ((0 : Fin d → ℕ) i) i) = [] := by
+    simp [List.flatMap_eq_nil_iff]
+  unfold HasVectorMultiPartial
+  rw [h]
+  rfl
 
 /-- Paper: Definition C.5.1.26(2), p. 735. Differentiating a coordinate function
 once gives the corresponding entry of the identity matrix. -/
