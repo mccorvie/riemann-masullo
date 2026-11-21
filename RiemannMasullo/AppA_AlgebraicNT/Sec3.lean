@@ -15,6 +15,7 @@ public import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
 import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.MeasureTheory.Measure.Haar.Extension
+import Mathlib.MeasureTheory.Measure.Haar.Quotient
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.IsOpenUnits
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -190,10 +191,195 @@ theorem additiveTamagawaMeasure_quotientVolume :
         additiveTamagawaMeasure F) Measure.count ν ∧ ν univ = 1 :=
   (Classical.choose_spec (additiveTamagawaMeasure_existsUnique F).exists).2.2
 
+section
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+
+local instance instMeasurableSpaceWeilQuotientForFundamentalDomain (H : Subgroup G) :
+    MeasurableSpace (G ⧸ H) := borel _
+
+/-- For a closed discrete subgroup with counting measure, the mass of a precompact
+fundamental domain meeting every coset is the mass of the Weil quotient measure. -/
+private theorem weilQuotientMeasure_univ_eq_measure_fundamentalDomain
+    [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    {H : Subgroup G} [Countable H] [DiscreteTopology H] (hH : IsClosed (H : Set G))
+    {μ : Measure G} [μ.IsHaarMeasure] {ν : Measure (G ⧸ H)}
+    (hν : IsWeilQuotientMeasure H μ Measure.count ν)
+    (hνfinite : ν univ ≠ ⊤)
+    {D : Set G} (hD : IsFundamentalDomain H.op D μ) (hcompact : IsCompact (closure D))
+    (hcover : ∀ a : G, ∃ h : H.op, h • a ∈ D) :
+    ν univ = μ D := by
+  let π := QuotientGroup.mk' H
+  let νD := (μ.restrict D).map π
+  let : IsClosed (H : Set G) := hH
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  have hπ : Continuous π := QuotientGroup.continuous_mk
+  let count : Measure H := Measure.count
+  let : count.IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hsum (f : CompactlySupportedContinuousMap G ℝ) :
+      QuotientGroup.automorphize (Γ := H) f = ses.pushforward count f := by
+    funext q
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H q
+    rw [ses.pushforward_apply_apply, integral_countable (ses.pullback f x).integrable]
+    simp only [count, count_real_singleton, one_smul]
+    change (∑' h : H.op, f (x * (h.val.unop : G))) = ∑' h : H, f (x * (h : G))
+    exact (H.equivOp.tsum_eq (fun h : H.op ↦ f (x * h.val.unop))).symm
+  -- A compactly supported function equal to one on the domain has positive periodization.
+  obtain ⟨f, hf, -, hfc, hf₀⟩ :=
+    exists_continuous_one_zero_of_isCompact hcompact isClosed_empty (disjoint_empty _)
+  let f₀ : CompactlySupportedContinuousMap G ℝ := ⟨f, hfc⟩
+  let c := ses.pushforward count f₀
+  have hc (q : G ⧸ H) : 0 < c q := by
+    obtain ⟨a, rfl⟩ := QuotientGroup.mk'_surjective H q
+    obtain ⟨h, hd⟩ := hcover a
+    let d : G := h • a
+    have hdq : π d = π a := QuotientGroup.mk_mul_of_mem a (H.equivOp.symm h).property
+    change 0 < ses.pushforward count f₀ (π a)
+    rw [← hdq, ses.pushforward_apply_apply]
+    apply (integral_pos_iff_support_of_nonneg (fun _ ↦ (hf₀ _).1)
+      (ses.pullback f₀ d).integrable).mpr
+    apply pos_iff_ne_zero.mpr ∘ Measure.count_ne_zero
+    exact ⟨1, by simpa only [Function.mem_support, ses.pullback_def, Subgroup.coe_subtype,
+      Subgroup.coe_one, mul_one] using
+        (show f d ≠ 0 from (hf (subset_closure hd)).trans_ne one_ne_zero)⟩
+  -- Divide by the periodization so both quotient integrals test the constant one.
+  let g : CompactlySupportedContinuousMap G ℝ :=
+    ⟨⟨fun x ↦ (c (π x))⁻¹ • f₀ x,
+      ((c.continuous.comp hπ).inv₀ fun x ↦ (hc (π x)).ne').smul f₀.continuous⟩,
+      by
+        change HasCompactSupport ((fun x : G ↦ (c (π x))⁻¹) • ⇑f₀)
+        exact f₀.hasCompactSupport.smul_left⟩
+  have hg : QuotientGroup.automorphize (Γ := H) g = fun _ ↦ 1 := by
+    calc
+      _ = (fun q ↦ (c q)⁻¹) • QuotientGroup.automorphize (Γ := H) f₀ :=
+        QuotientGroup.automorphize_smul_left (⇑f₀) (fun q ↦ (c q)⁻¹)
+      _ = _ := by
+        rw [hsum f₀]
+        funext q
+        exact inv_mul_cancel₀ (hc q).ne'
+  let fc : CompactlySupportedContinuousMap G ℂ :=
+    ⟨⟨fun x ↦ (g x : ℂ), Complex.continuous_ofReal.comp g.continuous⟩,
+      g.hasCompactSupport.comp_left Complex.ofReal_zero⟩
+  have hcoset (q : G ⧸ H) :
+      lcaCosetIntegral H count fc q = (ses.pushforward count g q : ℂ) := by
+    have hp := ses.pushforward_apply_apply count g q.out
+    have hq : π q.out = q := QuotientGroup.out_eq' q
+    change ses.pushforward count g (π q.out) = _ at hp
+    rw [hq] at hp
+    rw [hp, lcaCosetIntegral]
+    exact integral_complex_ofReal
+  have hweil : (∫ x, g x ∂μ) = ∫ _q : G ⧸ H, (1 : ℝ) ∂ν := by
+    have h := hν.2.2 fc.toContinuousMap fc.hasCompactSupport
+    change (∫ x, (g x : ℂ) ∂μ) = ∫ q, lcaCosetIntegral H count fc q ∂ν at h
+    simp_rw [hcoset, ← hsum g, hg, integral_complex_ofReal] at h
+    exact Complex.ofReal_injective h
+  have hmeas : AEStronglyMeasurable (QuotientGroup.automorphize (Γ := H) g) νD :=
+    hg ▸ aestronglyMeasurable_const
+  have hunfold := QuotientGroup.integral_eq_integral_automorphize hD g.integrable hmeas
+  rw [hg] at hunfold
+  have hmass : νD univ = μ D := by
+    rw [Measure.map_apply hπ.measurable MeasurableSet.univ, Set.preimage_univ,
+      Measure.restrict_apply_univ]
+  have heq := hweil.symm.trans hunfold
+  simp only [integral_const, smul_eq_mul, mul_one, measureReal_def] at heq
+  change (ν univ).toReal = (νD univ).toReal at heq
+  rw [hmass] at heq
+  exact (ENNReal.toReal_eq_toReal_iff' hνfinite
+    ((measure_mono subset_closure).trans_lt hcompact.measure_lt_top).ne).mp heq
+
+end
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Definition A.3.1.1, p. 555. The additive Tamagawa measure of the
 chosen adelic fundamental domain equals the mass of the additive quotient, namely one. -/
 theorem additiveTamagawaMeasure_fundamentalDomain :
-    additiveTamagawaMeasure F (adeleFundamentalDomain F (RingOfIntegers.basis F)) = 1 := by sorry
+    additiveTamagawaMeasure F (adeleFundamentalDomain F (RingOfIntegers.basis F)) = 1 := by
+  classical
+  let G := Multiplicative 𝔸[F]
+  let H := A[F]
+  let μ : Measure G := additiveTamagawaMeasure F
+  let b := RingOfIntegers.basis F
+  let D : Set G := adeleFundamentalDomain F b
+  obtain ⟨-, hclosed, hdiscrete, -⟩ := adele_additive_quotient.{_, 0} F
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable H := (Set.countable_range (algebraMap F 𝔸[F])).to_subtype
+  let (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : Primes(F), IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : BorelSpace G := ⟨rfl⟩
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  have hμ := (Classical.choose_spec (additiveTamagawaMeasure_existsUnique F).exists)
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.1.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
+  have hmeas : MeasurableSet D := by
+    have hinf : Continuous (InfiniteAdeleRing.ringEquiv_mixedSpace F) := by
+      change Continuous (fun x : InfiniteAdeleRing F ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+      simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+      exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+        (continuous_apply v.1)).prodMk
+        (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+          (continuous_apply v.1))
+    have hIntegral : IsOpen (integralAdelesOutside F ∅ : Set 𝔸[F]) := by
+      simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred, Finset.notMem_empty,
+        not_false_eq_true, true_implies]
+      exact (RestrictedProduct.isOpen_forall_mem (fun v : Primes(F) ↦
+        Valued.isOpen_integer (v.adicCompletion F))).preimage continuous_snd
+    let : BorelSpace 𝔸[F] := ⟨rfl⟩
+    have hfst : Continuous (Prod.fst : 𝔸[F] → InfiniteAdeleRing F) := continuous_fst
+    have hm : Measurable (fun a : 𝔸[F] ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F a.1) :=
+      Continuous.measurable (α := 𝔸[F]) (hinf.comp hfst)
+    have hInt : MeasurableSet (integralAdelesOutside F ∅ : Set 𝔸[F]) := hIntegral.measurableSet
+    exact ((ZSpan.fundamentalDomain_measurableSet _).preimage hm).inter hInt
+  have hcover (a : G) : ∃ h : H.op, h • a ∈ D := by
+    have ha : a.toAdd ∈ ⋃ x : F, algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b :=
+      (adeleFundamentalDomain_cover F b).symm ▸ mem_univ _
+    obtain ⟨x, hx⟩ := Set.mem_iUnion.mp ha
+    obtain ⟨d, hd, hda⟩ := Set.mem_vadd_set.mp hx
+    let h : H := ⟨Multiplicative.ofAdd (algebraMap F 𝔸[F] x), ⟨x, rfl⟩⟩
+    refine ⟨H.equivOp h⁻¹, ?_⟩
+    change a * (h : G)⁻¹ ∈ D
+    have ha : Multiplicative.ofAdd d * (h : G) = a := (add_comm _ _).trans hda
+    rwa [← ha, mul_inv_cancel_right]
+  have hD : IsFundamentalDomain H.op D μ := by
+    refine IsFundamentalDomain.mk'' hmeas.nullMeasurableSet (Filter.Eventually.of_forall hcover) ?_
+      (fun h ↦ (measurePreserving_smul h μ).quasiMeasurePreserving)
+    · intro h hh
+      obtain ⟨x, hx⟩ := (H.equivOp.symm h).property
+      have hx0 : x ≠ 0 := by
+        rintro rfl
+        apply hh
+        apply H.equivOp.symm.injective
+        exact Subtype.ext (by simpa using hx.symm)
+      have htranslate : (h • D : Set G) =
+          (algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b : Set 𝔸[F]) := by
+        ext d
+        simp only [Set.mem_smul_set]
+        change (∃ a ∈ D, a.toAdd + (H.equivOp.symm h).val.toAdd = d.toAdd) ↔
+          (∃ a ∈ D, algebraMap F 𝔸[F] x + a.toAdd = d.toAdd)
+        change algebraMap F 𝔸[F] x = (H.equivOp.symm h).val.toAdd at hx
+        simp only [hx, add_comm]
+      rw [htranslate]
+      exact (adeleFundamentalDomain_disjoint F b x hx0).aedisjoint
+  have hcompact : IsCompact (closure D) := adeleFundamentalDomain_precompact F b
+  obtain ⟨ν, hν, hmass⟩ := additiveTamagawaMeasure_quotientVolume F
+  have hνfinite : ν univ ≠ ⊤ := hmass.trans_ne ENNReal.one_ne_top
+  exact (weilQuotientMeasure_univ_eq_measure_fundamentalDomain hclosed hν hνfinite hD
+    hcompact hcover).symm.trans hmass
 
 /-- Paper: Definition A.3.1.1, p. 555. Exactly one regular additive Haar measure on
 the S-adeles gives the quotient by the diagonal S-integers mass one. -/
