@@ -419,7 +419,19 @@ measurable function on the group.
 Deviation: This is the measurability needed to act on weighted L². -/
 theorem IsModulatedCutoff.measurable {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    Measurable ρ := by sorry
+    Measurable ρ := by
+  obtain ⟨q, jumps, hfactor, _, hq, _⟩ := hρ.profile
+  have hmeas : Measurable (fun t : Ioi (0 : ℝ) ↦ q t.val) := by
+    apply ContinuousOn.measurable_of_countable_compl (s := (Subtype.val ⁻¹' (jumps : Set ℝ))ᶜ)
+    · exact hq.continuousOn.comp continuous_subtype_val.continuousOn
+        fun t ht ↦ ⟨t.property, ht⟩
+    · rw [compl_compl]
+      exact jumps.finite_toSet.countable.preimage Subtype.val_injective
+  let modulePos (x : G) : Ioi (0 : ℝ) := ⟨(m x).val, NNReal.coe_pos.mpr (Units.zero_lt _)⟩
+  have hmodule : Continuous modulePos :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).subtype_mk _
+  rw [funext hfactor]
+  exact hmeas.comp hmodule.measurable
 
 /-- Paper: Definition 9.3.3.1, p. 427. A smooth cutoff is a cutoff whose
 complex-valued realization on the group is Bruhat smooth. -/
