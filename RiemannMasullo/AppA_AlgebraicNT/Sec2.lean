@@ -1180,11 +1180,78 @@ theorem ideleNorm_comp_relativeIdeleNormRat :
     (ideleNorm ℚ).comp (relativeIdeleNormRat F) = ideleNorm F := by
   sorry
 
+/-- Paper: Example A.2.1.3, p. 546. Rational translates of the compact closure
+of the fundamental domain give a countable compact cover of the rational adeles. -/
+private theorem rationalAdele_sigmaCompactSpace : SigmaCompactSpace 𝔸[ℚ] := by
+  let b := RingOfIntegers.basis ℚ
+  let D := adeleFundamentalDomain ℚ b
+  let K (q : ℚ) := algebraMap ℚ 𝔸[ℚ] q +ᵥ closure D
+  refine SigmaCompactSpace.of_countable (Set.range K) (Set.countable_range K) ?_ ?_
+  · rintro _ ⟨q, rfl⟩
+    exact IsCompact.vadd _ (adeleFundamentalDomain_precompact ℚ b)
+  · rw [Set.sUnion_range]
+    exact eq_top_mono (Set.iUnion_mono fun _ ↦ Set.vadd_set_mono (subset_closure (s := D)))
+      (adeleFundamentalDomain_cover ℚ b)
+
+open scoped RestrictedProduct in
+/-- The normalized adelic trace gives a continuous retraction of scalar extension
+on the adele rings. -/
+private theorem rationalAdeleEmbedding_isClosedEmbedding :
+    IsClosedEmbedding (rationalAdeleEmbedding F) := by
+  let : Algebra 𝔸[ℚ] 𝔸[F] := (rationalAdeleEmbedding F).toAlgebra
+  have hF : Continuous (algebraMap 𝔸[ℚ] 𝔸[F]) := (rationalAdeleEmbedding_spec F).1
+  have : T2Space 𝔸[F] := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : HeightOneSpectrum (𝓞 F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  have (v : HeightOneSpectrum (𝓞 F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  have : Fact (∀ v : HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  have : LocallyCompactSpace 𝔸[F] := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : HeightOneSpectrum (𝓞 F), [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : SigmaCompactSpace 𝔸[ℚ] := rationalAdele_sigmaCompactSpace
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  let e := b.equivFun.symm
+  have he : Continuous e := by
+    change Continuous (fun a ↦ e a)
+    simp only [e, Module.Basis.equivFun_symm_apply, Algebra.smul_def]
+    exact continuous_finsetSum _ fun i _ ↦
+      (hF.comp (continuous_apply i)).mul continuous_const
+  -- The open mapping theorem gives continuity of the inverse coordinate map.
+  have hcoords : Continuous e.symm :=
+    e.toEquiv.continuous_symm_iff.mpr (e.toAddMonoidHom.isOpenMap_of_sigmaCompact e.surjective he)
+  let tr := Algebra.trace 𝔸[ℚ] 𝔸[F]
+  have htr' : Continuous (fun a ↦ tr (e a)) := by
+    simp only [e, Module.Basis.equivFun_symm_apply, map_sum, map_smul, smul_eq_mul]
+    exact continuous_finsetSum _ fun i _ ↦ (continuous_apply i).mul continuous_const
+  have htr : Continuous tr :=
+    (htr'.comp hcoords).congr (fun x ↦ congrArg tr (e.apply_symm_apply x))
+  let d := Module.finrank ℚ F
+  let c := algebraMap ℚ 𝔸[ℚ] (d : ℚ)⁻¹
+  have hleft : LeftInverse (fun x ↦ c * tr x) (algebraMap 𝔸[ℚ] 𝔸[F]) := by
+    intro a
+    change c * tr (algebraMap 𝔸[ℚ] 𝔸[F] a) = a
+    rw [Algebra.trace_algebraMap_of_basis b, Fintype.card_fin, nsmul_eq_mul]
+    change c * ((d : 𝔸[ℚ]) * a) = a
+    rw [← mul_assoc, ← map_natCast (algebraMap ℚ 𝔸[ℚ]) d, ← map_mul,
+      inv_mul_cancel₀ (Nat.cast_ne_zero.mpr (Module.finrank_pos (R := ℚ) (M := F)).ne'),
+      map_one, one_mul]
+  exact hleft.isClosedEmbedding (continuous_const.mul htr) hF
+
+open scoped RestrictedProduct in
 /-- Paper: Lemma A.2.2.2, p. 546. Scalar extension embeds the rational ideles as a
 closed subgroup of the ideles of the field. -/
 theorem rationalIdeleEmbedding_isClosedEmbedding :
     IsClosedEmbedding (Units.map (rationalAdeleEmbedding F).toMonoidHom) := by
-  sorry
+  have : T2Space 𝔸[ℚ] := by
+    change T2Space (((v : InfinitePlace ℚ) → v.Completion) ×
+      (Πʳ v : HeightOneSpectrum (𝓞 ℚ), [v.adicCompletion ℚ, v.adicCompletionIntegers ℚ]))
+    infer_instance
+  exact (rationalAdeleEmbedding_isClosedEmbedding F).units_map
 
 /-- Paper: Lemma A.2.2.2, p. 546. The relative norm of an extended rational
 idele is the original idele raised to the field degree. -/
