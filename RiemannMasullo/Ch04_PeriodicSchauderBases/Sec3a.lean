@@ -236,6 +236,20 @@ coordinates is in the range of the transform. -/
 theorem regularIsotypicTransform_surjective :
     Surjective (regularIsotypicTransform m hm ν ν₁ τ hτ) := by sorry
 
+/-- Paper: Lemma 4.3.2.2, p. 179. The Hilbert sum of the isotypic coordinates
+determines the original L² class.
+Deviation: Injectivity holds for arbitrary Haar normalizations. -/
+theorem regularIsotypicTransform_injective :
+    Injective (regularIsotypicTransform m hm ν ν₁ τ hτ) := by sorry
+
+/-- Paper: Lemma 4.3.2.2, p. 179. The squared norm of the isotypic transform
+scales by the mass of the norm-one subgroup times the product Haar measure ratio.
+Deviation: The scaling factor accounts for the arbitrary Haar normalizations (ERRATA I73). -/
+theorem regularIsotypicTransform_norm_sq (c : ℝ≥0∞)
+    (hc : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = c • ν)
+    (f : RegularL2 ν) :
+    ‖regularIsotypicTransform m hm ν ν₁ τ hτ f‖ ^ 2 = ν₁.real univ * c.toReal * ‖f‖ ^ 2 := by sorry
+
 -- TODO(paper-gap): Lemma 4.3.2.2's isometry and the isometry asserted on
 -- p. 180 fail for the same measure rescaling as (4.3.2.5).
 

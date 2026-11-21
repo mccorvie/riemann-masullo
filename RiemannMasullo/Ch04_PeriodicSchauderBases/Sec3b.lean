@@ -241,6 +241,21 @@ theorem existsUnique_relativelyCompactActionAverage
 -- TODO(paper-gap): Lemma 4.3.3.7(2) and (3) fail for a relatively compact
 -- locally closed subset. On the circle take X to be a proper open arc
 -- around 1 and take the standard one-dimensional character action.
+
+/-- Paper: Corollary 4.3.3.8(1), p. 188. The character-weighted Pettis integrals
+over the relatively compact subset determine a unique continuous linear operator.
+Deviation: The subset is assumed locally closed so that it is measurable. -/
+theorem existsUnique_relativelyCompactActionIsotypicAverage
+    (X : Set G) (hX : IsCompact (closure X)) (hlc : IsLocallyClosed X)
+    (hint : (interior X).Nonempty)
+    (hborn : ∀ p : Seminorm ℂ E, (∀ B : Set E, IsVonNBounded ℂ B → BddAbove (p '' B)) →
+      Continuous p)
+    (hseq : ∀ (u : ℕ → E) (v : E), Tendsto u atTop (𝓝 v) →
+      ∀ K : Set G, IsCompact K →
+        TendstoUniformlyOn (fun n g ↦ ρ g (u n)) (fun g ↦ ρ g v) atTop K)
+    (ω : PontryaginDual G) :
+    ∃! P : E →L[ℂ] E, IsPettisIsotypicAverageOn μ X ρ ω P := by sorry
+
 -- TODO(paper-gap): Corollary 4.3.3.8(1) allows nonmeasurable X.
 -- Parts (2) and (3) fail even for an open arc and the trivial weight.
 

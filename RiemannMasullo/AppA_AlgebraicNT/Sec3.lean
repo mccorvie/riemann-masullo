@@ -514,9 +514,26 @@ theorem sAdeleStandardCharacter_single_finite (v : S) (x : v.val.adicCompletion 
 -- under (A.3.1.10) with the real and p-adic signs as printed. For F = ℚ and
 -- S = {∞, 3}, the pairing of 1/3 with 1 is exp(4πi/3).
 -- The proof also reverses the ambient group of the annihilator for (A.3.1.11).
--- TODO(later): needs §D.1.4 for the annihilator/quotient-dual identification
--- cited in the attempted proof of Example A.3.1.11.
 
+/-- Paper: Example A.3.1.11, p. 559. The standard S-local character takes the
+value one on every diagonally embedded S-integer.
+Deviation: This consequence of the lattice pairing holds for every finite S with the
+finite-place sign correction of ERRATA F13. -/
+theorem sAdeleStandardCharacter_sInteger (x : (S : Set (Primes(F))).integer F) :
+    sAdeleStandardCharacter F S (adeleProjection F S (integralAdeleDiagonal F S x).val) = 1 :=
+  by sorry
+
+/-- Paper: Example A.3.1.11, p. 559. The diagonal S-integers are their own annihilator
+for the standard character pairing when S contains every finite prime dividing the different.
+Deviation: The pairing uses the finite-place sign correction of ERRATA F13. -/
+theorem sInteger_annihilator_iff
+    (hS : ∀ v : Primes(F), v.asIdeal ∣ differentIdeal ℤ (𝓞 F) → v ∈ S)
+    (y : SAdeleRing F S) :
+    (∀ x : (S : Set (Primes(F))).integer F,
+        sAdeleStandardCharacter F S
+          (adeleProjection F S (integralAdeleDiagonal F S x).val * y) = 1) ↔
+      ∃ x : (S : Set (Primes(F))).integer F,
+        y = adeleProjection F S (integralAdeleDiagonal F S x).val := by sorry
 
 /-- Paper: Definition A.3.2.1, p. 559. The measure `dt/t` on the positive
 reals is the pushforward of real Lebesgue measure along the exponential. -/
