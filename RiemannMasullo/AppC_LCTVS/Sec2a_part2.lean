@@ -1365,7 +1365,25 @@ theorem tensorDualOperator_isEmbedding {Y : Type*} [AddCommGroup Y] [Module ℂ 
 theorem tensorDualOperator_continuous_mu {X : Type*} [AddCommGroup X] [Module ℂ X]
     [UniformSpace X] [IsUniformAddGroup X] [PolynormableSpace ℂ X] [T2Space X]
     [IsTopologicalAddGroup F] [ContinuousSMul ℂ F] (z : X ⊗[ℂ] F) :
-    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by sorry
+    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by
+  let : TopologicalSpace (StrongDual ℂ X) := completionCompactDualTopology X
+  induction z using TensorProduct.inductionOn with
+  | tmul x y =>
+    let K : Set (Set (Completion X)) := {A | IsCompact A}
+    have hext : Continuous (fun φ : StrongDual ℂ X ↦
+        UniformOnFun.ofFun K (φ.fromCompletion : Completion X → ℂ)) := continuous_induced_dom
+    have hsingleton : ({(x : Completion X)} : Set (Completion X)) ∈ K := isCompact_singleton
+    have heval : Continuous (fun φ : StrongDual ℂ X ↦ φ x) := by
+      have h := UniformOnFun.uniformContinuous_eval_of_mem (β := ℂ) K
+        (mem_singleton (x : Completion X)) hsingleton
+      simpa only [Function.comp_def, Function.eval, UniformOnFun.toFun_ofFun,
+        ContinuousLinearMap.fromCompletion_apply_coe] using h.continuous.comp hext
+    change Continuous (fun φ : StrongDual ℂ X ↦ tensorDualOperator (x ⊗ₜ[ℂ] y) φ)
+    simp_rw [tensorDualOperator_tmul]
+    exact continuous_smul.comp (heval.prodMk continuous_const)
+  | add z w hz hw =>
+    rw [map_add, LinearMap.coe_add]
+    exact hz.add hw
 
 -- TODO(paper-gap): For incomplete E, evaluation at a point of its completion can be a
 -- μ-continuous rank-one operator outside the image of (C.2.3.5).
