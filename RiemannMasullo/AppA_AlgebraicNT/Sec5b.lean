@@ -256,7 +256,39 @@ compact first member gives an almost everywhere finite measure maximal function.
 theorem ae_dSequenceMeasureMaximal_lt_top [μ.IsHaarMeasure] {ν : Measure G} [ν.Regular]
     (hU : IsDSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
     (hcompact : IsCompact (closure (U 0))) :
-    ∀ᵐ x ∂μ, dSequenceMeasureMaximal μ ν U x < ∞ := by sorry
+    ∀ᵐ x ∂μ, dSequenceMeasureMaximal μ ν U x < ∞ := by
+  rw [ae_iff]
+  simp only [not_lt, top_le_iff]
+  let A : Set G := {x | dSequenceMeasureMaximal μ ν U x = ∞}
+  change μ A = 0
+  obtain ⟨C, hC, hbound⟩ := hU.2.2
+  have hnull {K : Set G} (hK : IsCompact K) : μ (K ∩ A) = 0 := by
+    have hprod := hK.mul hcompact
+    have hμ : μ (K * U 0) < ∞ :=
+      (measure_mono (Set.mul_subset_mul Subset.rfl subset_closure)).trans_lt hprod.measure_lt_top
+    have hν : ν (K * closure (U 0)) < ∞ := hprod.measure_lt_top
+    have hlim : Tendsto (fun n : ℕ ↦ ENNReal.ofReal (C / n) * ν (K * closure (U 0)))
+        atTop (𝓝 0) := by
+      simpa only [ENNReal.ofReal_zero, zero_mul] using
+        ENNReal.Tendsto.mul_const (ENNReal.tendsto_ofReal (tendsto_const_div_atTop_nhds_zero_nat C))
+          (Or.inr hν.ne)
+    refine le_antisymm (ge_of_tendsto hlim ?_) bot_le
+    filter_upwards [eventually_gt_atTop (0 : ℕ)] with n hn
+    let E := K ∩ {x | ENNReal.ofReal (n : ℝ) < dSequenceMeasureMaximal μ ν U x}
+    calc
+      μ (K ∩ A) ≤ μ E := measure_mono fun x hx ↦
+        ⟨hx.1, by
+          rw [mem_ofPred_eq, show dSequenceMeasureMaximal μ ν U x = ∞ from hx.2]
+          exact ENNReal.ofReal_lt_top⟩
+      _ ≤ ENNReal.ofReal (C / n) * ν (E * U 0) :=
+        dSequenceMeasureMaximal_weak hU hBorel hC (fun k ↦ (hbound k).2)
+          hK.isClosed.measurableSet.nullMeasurableSet hμ (Nat.cast_pos.mpr hn)
+      _ ≤ ENNReal.ofReal (C / n) * ν (K * closure (U 0)) :=
+        mul_le_mul' le_rfl (measure_mono (Set.mul_subset_mul inter_subset_left subset_closure))
+  rw [← inter_univ A, ← iUnion_compactCovering G, inter_iUnion, measure_iUnion_null_iff]
+  intro n
+  rw [inter_comm]
+  exact hnull (isCompact_compactCovering G n)
 
 /-- Paper: Theorem A.5.3.5, p. 580. For a D′-sequence the weak bound on a
 compact set can use the `ν`-mass of that compact set itself.
