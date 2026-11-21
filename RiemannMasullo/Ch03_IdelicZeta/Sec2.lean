@@ -7,6 +7,8 @@ public import Mathlib.Analysis.Meromorphic.NormalForm
 public import Mathlib.Analysis.SpecialFunctions.Gamma.Deligne
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.DedekindZeta
 
+import Mathlib.Analysis.SpecialFunctions.Complex.LogBounds
+import Mathlib.Analysis.SpecialFunctions.Log.Summable
 import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
@@ -272,13 +274,6 @@ theorem completedHeckeL_continuation_functionalEquation (χ : U[F]) (L Ldual : �
     (hdual : ∀ s : halfPlane, Ldual s = completedHeckeL χ⁻¹ s) :
     ∃ ε : ℂ → ℂ, Differentiable ℂ ε ∧ (∀ s, ε s ≠ 0) ∧
       ∀ s, Ldual (1 - s) = ε s * L s := by sorry
-
-/-- Paper: Proposition 3.2.1.3(4), p. 123. A zero of the continuation in
-the positive half-plane lies strictly to the left of `Re(s) = 1`. -/
-theorem completedHeckeL_continuation_zeros (χ : U[F]) (L : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
-    {s : ℂ} (hs : 0 < s.re) (hzero : 0 < meromorphicOrderAt L s) :
-    s.re < 1 := by sorry
 
 /-- Paper: Definition 3.2.1.4, pp. 123–124. The finite Hecke L-function
 uses Mathlib's Hecke L-series on the half-plane of absolute convergence. -/
@@ -1124,6 +1119,316 @@ theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
     exact (((hL (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
       (hZNF (mem_univ s))).mp hlocal).eq_of_nhds
   rwa [hident]
+
+section HeckeZeros
+
+local notation "χ₀(" χ ")" => ideleClassNormTwist χ 0
+
+/-- The Euler product gives a nonzero value in its half-plane of absolute convergence. -/
+private theorem finiteHeckeL_ne_zero_of_one_lt_re (χ : U[F]) (s : halfPlane) :
+    finiteHeckeL χ s ≠ 0 := by
+  have hs : 1 < (s : ℂ).re := s.property
+  rw [← (finiteHeckeL_hasProd χ s).tprod_eq]
+  have hsum : Summable (fun v ↦ ‖finiteHeckeEulerFactor χ v s - 1‖) := by
+    have hq : Summable (fun v : HeightOneSpectrum (𝓞 F) ↦
+        (v.asIdeal.absNorm : ℝ) ^ (-(s : ℂ).re)) :=
+      (summable_absNorm_rpow F hs).comp_injective (fun _ _ he ↦ HeightOneSpectrum.ext he)
+    exact (hq.mul_left 2).of_nonneg_of_le (fun _ ↦ norm_nonneg _)
+      (fun v ↦ norm_finiteHeckeEulerFactor_sub_one_le χ v hs le_rfl)
+  have hn (v : HeightOneSpectrum (𝓞 F)) : finiteHeckeEulerFactor χ v s ≠ 0 := by
+    classical
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · apply inv_ne_zero
+      have hq : (1 : ℝ) < v.asIdeal.absNorm := by
+        exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+      have hlt : ‖χ₀(χ).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-(s : ℂ))‖ < 1 := by
+        rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul, ← Complex.ofReal_natCast,
+          Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hq), Complex.neg_re]
+        exact Real.rpow_lt_one_of_one_lt_of_neg hq (by linarith)
+      exact fun he ↦ hlt.ne (by rw [← sub_eq_zero.mp he, norm_one])
+    · exact one_ne_zero
+  simpa only [add_sub_cancel] using
+    (tprod_one_add_ne_zero_of_summable
+      (f := fun v ↦ finiteHeckeEulerFactor χ v s - 1)
+      (fun v ↦ by simpa only [add_sub_cancel] using hn v) hsum)
+
+open Complex in
+/-- The inequality for the three Euler factors with a common radius and a unit phase. -/
+private theorem one_le_norm_eulerFactor_product {r : ℝ} (hr : 0 ≤ r) (hr₁ : r < 1) {z : ℂ} (hz : ‖z‖ = 1) :
+    1 ≤ ‖(1 - (r : ℂ))⁻¹ ^ 3 * (1 - (r : ℂ) * z)⁻¹ ^ 4 *
+      (1 - (r : ℂ) * z ^ 2)⁻¹‖ := by
+  have h₀ : ‖(r : ℂ)‖ < 1 := by rw [Complex.norm_of_nonneg hr]; exact hr₁
+  have h₁ : ‖(r : ℂ) * z‖ < 1 := by simpa [norm_mul, hz] using h₀
+  have h₂ : ‖(r : ℂ) * z ^ 2‖ < 1 := by simpa [norm_mul, norm_pow, hz] using h₀
+  have hinv {w : ℂ} (hw : ‖w‖ < 1) : (1 - w)⁻¹ = exp (-log (1 - w)) := by
+    rw [exp_neg, exp_log (fun h ↦ hw.ne (by rw [← sub_eq_zero.mp h, norm_one]))]
+  rw [hinv h₀, hinv h₁, hinv h₂, ← exp_nat_mul, ← exp_nat_mul, ← exp_add, ← exp_add,
+    norm_exp, Real.one_le_exp_iff]
+  simp only [add_re, mul_re, re_ofNat, im_ofNat, Nat.cast_ofNat, zero_mul, sub_zero]
+  rw [← ((hasSum_re (hasSum_taylorSeries_neg_log h₀)).mul_left 3 |>.add
+    ((hasSum_re (hasSum_taylorSeries_neg_log h₁)).mul_left 4) |>.add
+    (hasSum_re (hasSum_taylorSeries_neg_log h₂))).tsum_eq]
+  apply tsum_nonneg
+  intro n
+  simp only [mul_pow, ← ofReal_pow, div_natCast_re, ofReal_re, mul_re, ofReal_im, zero_mul,
+    sub_zero, ← mul_div_assoc, ← add_div]
+  apply div_nonneg _ (Nat.cast_nonneg _)
+  have hnorm : ‖z ^ n‖ = 1 := by rw [norm_pow, hz, one_pow]
+  have him := sq_norm_sub_sq_re (z ^ n)
+  rw [hnorm, one_pow] at him
+  rw [← pow_mul, Nat.mul_comm 2 n, pow_mul, pow_two (z ^ n), mul_re]
+  have hident :
+      3 * r ^ n + 4 * (r ^ n * (z ^ n).re) + r ^ n *
+        ((z ^ n).re * (z ^ n).re - (z ^ n).im * (z ^ n).im) =
+      2 * r ^ n * ((z ^ n).re + 1) ^ 2 := by
+    rw [← sq ((z ^ n).im), ← him]
+    ring
+  rw [hident]
+  positivity
+
+/-- The de la Vallée Poussin Euler-product inequality for the trivial character, a unitary
+character, and its square at ordinates in the ratio zero, one, and two. -/
+private theorem norm_finiteHeckeL_product_ge_one (χ : U[F]) {x : ℝ} (hx : 1 < x)
+    (a : ℂ) (ha : a.re = 0) :
+    1 ≤ ‖χ₀((1 : U[F])).LSeries (x : ℂ) ^ 3 * χ₀(χ).LSeries ((x : ℂ) + a) ^ 4 *
+      χ₀(χ ^ 2).LSeries ((x : ℂ) + 2 * a)‖ := by
+  classical
+  have h₂a : (2 * a).re = 0 := by simp [Complex.mul_re, ha]
+  let s₀ : halfPlane := ⟨(x : ℂ), hx⟩
+  let s₁ : halfPlane := ⟨(x : ℂ) + a, by simpa [mem_preimage, Complex.add_re, ha]⟩
+  let s₂ : halfPlane := ⟨(x : ℂ) + 2 * a, by simpa [mem_preimage, Complex.add_re, h₂a]⟩
+  have hp := (((finiteHeckeL_hasProd (1 : U[F]) s₀).pow 3).mul
+    ((finiteHeckeL_hasProd χ s₁).pow 4)).mul (finiteHeckeL_hasProd (χ ^ 2) s₂)
+  apply ge_of_tendsto' hp.norm
+  intro T
+  rw [norm_prod]
+  refine Finset.one_le_prod₀ fun v _ ↦ ?_
+  change 1 ≤ ‖finiteHeckeEulerFactor (1 : U[F]) v x ^ 3 *
+    finiteHeckeEulerFactor χ v ((x : ℂ) + a) ^ 4 *
+    finiteHeckeEulerFactor (χ ^ 2) v ((x : ℂ) + 2 * a)‖
+  have hres (ψ : U[F]) (u : (v.adicCompletion F)ˣ) :
+      χ₀(ψ).restrict v (u : v.adicCompletion F) =
+        (ψ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) : ℂ) := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (ψ _ : ℂ) * _ ^ (0 : ℂ) = _
+    rw [Complex.cpow_zero, mul_one]
+  have hres_one (u : (v.adicCompletion F)ˣ) :
+      χ₀((1 : U[F])).restrict v (u : v.adicCompletion F) = 1 := by
+    rw [hres, PontryaginDual.one_apply, Circle.coe_one]
+  have hres_sq (u : (v.adicCompletion F)ˣ) :
+      χ₀(χ ^ 2).restrict v (u : v.adicCompletion F) =
+        (χ₀(χ).restrict v (u : v.adicCompletion F)) ^ 2 := by
+    rw [hres, hres]
+    rfl
+  have hu₀ : χ₀((1 : U[F])).IsUnramifiedAt v := HeckeCharacter.isUnramifiedAt_iff.mpr
+    fun u ↦ hres_one (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u)
+  have hu₂ (hu : χ₀(χ).IsUnramifiedAt v) : χ₀(χ ^ 2).IsUnramifiedAt v :=
+    HeckeCharacter.isUnramifiedAt_iff.mpr fun u ↦ by
+      rw [show χ₀(χ ^ 2).restrict v u = (χ₀(χ).restrict v u) ^ 2 from
+        hres_sq (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u),
+        hu.restrict_apply_unit_eq_one, one_pow]
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  let u := Units.mk0 (val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose : v.adicCompletion F)
+    val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero
+  have hv₀ : χ₀((1 : U[F])).localValue v = 1 := hres_one u
+  have hv₂ : χ₀(χ ^ 2).localValue v = (χ₀(χ).localValue v) ^ 2 := hres_sq u
+  let q : ℝ := v.asIdeal.absNorm
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ := zero_lt_one.trans hq
+  have hqC : (q : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hq₀.ne'
+  let r := q ^ (-x)
+  have hr : 0 ≤ r := Real.rpow_nonneg hq₀.le _
+  have hr₁ : r < 1 := Real.rpow_lt_one_of_one_lt_of_neg hq (by linarith)
+  let z (ψ : U[F]) (b : ℂ) := χ₀(ψ).localValue v * (q : ℂ) ^ (-b)
+  have hz (ψ : U[F]) (b : ℂ) (hb : b.re = 0) : ‖z ψ b‖ = 1 := by
+    simp [z, norm_ideleClassNormTwist_zero_localValue,
+      Complex.norm_cpow_eq_rpow_re_of_pos hq₀, Complex.neg_re, hb]
+  have hphase (ψ : U[F]) (b : ℂ) :
+      χ₀(ψ).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-((x : ℂ) + b)) =
+        (r : ℂ) * z ψ b := by
+    change χ₀(ψ).localValue v * (q : ℂ) ^ (-((x : ℂ) + b)) = _
+    rw [neg_add, Complex.cpow_add _ _ hqC, ← Complex.ofReal_neg,
+      ← Complex.ofReal_cpow hq₀.le]
+    exact mul_left_comm ..
+  have hsq : z (χ ^ 2) (2 * a) = z χ a ^ 2 := by
+    simp only [z, hv₂, mul_pow, neg_mul_eq_mul_neg]
+    rw [show (2 : ℂ) = (↑(2 : ℕ) : ℂ) by norm_num, Complex.cpow_nat_mul]
+  rw [finiteHeckeEulerFactor, ite_eq_left hu₀, hv₀, one_mul]
+  change 1 ≤ ‖(1 - (q : ℂ) ^ (-(x : ℂ)))⁻¹ ^ 3 * _ * _‖
+  rw [← Complex.ofReal_neg, ← Complex.ofReal_cpow hq₀.le]
+  by_cases hu : χ₀(χ).IsUnramifiedAt v
+  · rw [finiteHeckeEulerFactor, ite_eq_left hu, finiteHeckeEulerFactor, ite_eq_left (hu₂ hu),
+      hphase χ a, hphase (χ ^ 2) (2 * a), hsq]
+    exact one_le_norm_eulerFactor_product hr hr₁ (hz χ a ha)
+  · rw [finiteHeckeEulerFactor, ite_eq_right hu, one_pow, mul_one, finiteHeckeEulerFactor]
+    have hrnorm : ‖(1 : ℂ) - (r : ℂ)‖ = 1 - r := by
+      rw [← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_of_nonneg (sub_nonneg.mpr hr₁.le)]
+    split_ifs
+    · rw [hphase (χ ^ 2) (2 * a)]
+      let w := (r : ℂ) * z (χ ^ 2) (2 * a)
+      change 1 ≤ ‖(1 - (r : ℂ))⁻¹ ^ 3 * (1 - w)⁻¹‖
+      have hw : ‖w‖ = r := by
+        rw [show ‖w‖ = ‖(r : ℂ)‖ * ‖z (χ ^ 2) (2 * a)‖ from norm_mul _ _,
+          hz _ _ h₂a, Complex.norm_of_nonneg hr, mul_one]
+      have hpos : 0 < ‖(1 : ℂ) - w‖ := norm_pos_iff.mpr fun h ↦
+        hr₁.ne (by rw [← hw, ← sub_eq_zero.mp h, norm_one])
+      rw [norm_mul, norm_pow, norm_inv, norm_inv, hrnorm, inv_pow, ← mul_inv,
+        one_le_inv₀ (mul_pos (pow_pos (sub_pos.mpr hr₁) 3) hpos)]
+      have hle : ‖(1 : ℂ) - w‖ ≤ 1 + r := by
+        simpa only [hw, norm_one] using norm_sub_le (1 : ℂ) w
+      calc
+        (1 - r) ^ 3 * ‖(1 : ℂ) - w‖ ≤ (1 - r) ^ 3 * (1 + r) :=
+          mul_le_mul_of_nonneg_left hle (pow_nonneg (sub_nonneg.mpr hr₁.le) _)
+        _ = (1 - r) ^ 2 * (1 - r ^ 2) := by ring
+        _ ≤ (1 - r) ^ 2 * 1 :=
+          mul_le_mul_of_nonneg_left (by nlinarith [sq_nonneg r]) (sq_nonneg _)
+        _ ≤ 1 := by
+          rw [mul_one]
+          exact pow_le_one₀ (sub_nonneg.mpr hr₁.le) (by linarith)
+    · rw [mul_one, norm_pow, norm_inv, hrnorm, inv_pow,
+        one_le_inv₀ (pow_pos (sub_pos.mpr hr₁) 3)]
+      exact pow_le_one₀ (sub_nonneg.mpr hr₁.le) (by linarith)
+
+/-- The exceptional case of boundary nonvanishing. The square of the character is the
+norm twist whose continuation has a pole at the doubled ordinate. Translating the ordinate
+to zero replaces the character by its twist by the norm to the power `s - 1`, which has
+order dividing two. -/
+private theorem completedHeckeL_order_nonpos_of_square_normTwist (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    {s : ℂ} (hs : s.re = 1)
+    (hχ : χ₀(χ ^ 2) = ideleClassNormTwist (1 : U[F]) (-(2 * (s - 1)))) :
+    meromorphicOrderAt L s ≤ 0 := by
+  sorry
+
+/-- Removing the gamma factor preserves meromorphic order in the positive half-plane. -/
+private theorem meromorphicOrderAt_inv_gamma_mul (χ : U[F]) {L : ℂ → ℂ} {s : ℂ}
+    (hs : 0 < s.re) :
+    meromorphicOrderAt (fun w ↦ (heckeGammaFactor χ w)⁻¹ * L w) s =
+      meromorphicOrderAt L s := by
+  exact meromorphicOrderAt_mul_of_ne_zero
+    ((differentiable_inv_heckeGammaFactor χ).analyticAt s)
+    (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hs))
+
+/-- On the line of real part one, a zero would make the product in the Euler-product
+inequality tend to zero unless the squared character has a pole at the doubled ordinate. -/
+private theorem completedHeckeL_order_nonpos_on_one_line (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    {s : ℂ} (hs : s.re = 1) :
+    meromorphicOrderAt L s ≤ 0 := by
+  let a := s - 1
+  have ha : a.re = 0 := by simp [a, hs]
+  have h₂a : (2 * a).re = 0 := by simp [Complex.mul_re, ha]
+  have h₁ : 1 + a = s := by simp [a]
+  by_cases hχ : χ₀(χ ^ 2) = ideleClassNormTwist (1 : U[F]) (-(2 * a))
+  · exact completedHeckeL_order_nonpos_of_square_normTwist χ L hL h hs hχ
+  by_contra! hzero
+  obtain ⟨L₀, hL₀, h₀⟩ := completedHeckeL_exists_continuation (1 : U[F])
+  obtain ⟨L₂, hL₂, h₂⟩ := completedHeckeL_exists_continuation (χ ^ 2)
+  have han₂ : AnalyticAt ℂ L₂ (1 + 2 * a) := by
+    by_cases hk : (χ ^ 2).toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · obtain ⟨t, ⟨ht, _, _, han⟩, _⟩ := completedHeckeL_continuation_simplePoles _ L₂ hL₂ h₂ hk
+      apply han
+      simp only [mem_compl_iff, mem_insert_iff, mem_singleton_iff, not_or]
+      constructor
+      · intro he
+        have hre := congrArg Complex.re he
+        simp [Complex.add_re, h₂a, Complex.mul_re] at hre
+      · intro he
+        apply hχ
+        rw [add_right_inj] at he
+        simpa only [he, neg_mul] using ht
+    · exact (completedHeckeL_continuation_entire _ L₂ hL₂ h₂ hk).analyticAt _
+  let G (ψ : U[F]) (M : ℂ → ℂ) (w : ℂ) := (heckeGammaFactor ψ w)⁻¹ * M w
+  let G₀ := G (1 : U[F]) L₀
+  let G₁ (w : ℂ) := G χ L (w + a)
+  let G₂ (w : ℂ) := G (χ ^ 2) L₂ (w + 2 * a)
+  have hG (ψ : U[F]) (M : ℂ → ℂ) (hM : MeromorphicNFOn M univ) (w : ℂ) :
+      MeromorphicAt (G ψ M) w :=
+    ((differentiable_inv_heckeGammaFactor ψ).analyticAt w).meromorphicAt.mul
+      (hM (mem_univ w)).meromorphicAt
+  have hG₀ := hG (1 : U[F]) L₀ hL₀ 1
+  have hG₁ : MeromorphicAt G₁ 1 :=
+    (hG χ L hL (1 + a)).comp_analyticAt (g := fun w ↦ w + a) (by fun_prop)
+  have hG₂ : MeromorphicAt G₂ 1 :=
+    (hG (χ ^ 2) L₂ hL₂ (1 + 2 * a)).comp_analyticAt (g := fun w ↦ w + 2 * a)
+      (by fun_prop)
+  have ho₀ : meromorphicOrderAt G₀ 1 = -1 := by
+    exact (meromorphicOrderAt_inv_gamma_mul (1 : U[F])
+      (s := 1) (by simp)).trans (completedHeckeL_one_order_one L₀ hL₀ h₀)
+  have ho₁ : 1 ≤ meromorphicOrderAt G₁ 1 := by
+    have hp : 0 < meromorphicOrderAt G₁ 1 := by
+      change 0 < meromorphicOrderAt (fun w ↦ G χ L (w + a)) 1
+      rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt, h₁,
+        meromorphicOrderAt_inv_gamma_mul χ (by rw [hs]; exact zero_lt_one)]
+      exact hzero
+    cases horder : meromorphicOrderAt G₁ 1 with
+    | top => exact le_top
+    | coe n =>
+      rw [horder] at hp
+      exact_mod_cast (show (1 : ℤ) ≤ n by exact Int.add_one_le_of_lt (by exact_mod_cast hp))
+  have ho₂ : 0 ≤ meromorphicOrderAt G₂ 1 := by
+    change 0 ≤ meromorphicOrderAt (fun w ↦ G (χ ^ 2) L₂ (w + 2 * a)) 1
+    rw [meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt,
+      meromorphicOrderAt_inv_gamma_mul (χ ^ 2) (by simp [Complex.add_re, h₂a])]
+    exact han₂.meromorphicOrderAt_nonneg
+  let P : ℂ → ℂ := G₀ ^ 3 * G₁ ^ 4 * G₂
+  have hp : 0 < meromorphicOrderAt P 1 := by
+    dsimp only [P]
+    rw [meromorphicOrderAt_mul ((hG₀.pow 3).mul (hG₁.pow 4)) hG₂,
+      meromorphicOrderAt_mul (hG₀.pow 3) (hG₁.pow 4),
+      meromorphicOrderAt_pow hG₀, meromorphicOrderAt_pow hG₁, ho₀]
+    simp only [Nat.cast_ofNat]
+    have hlo : (0 : WithTop ℤ) < 3 * -1 + 4 * 1 + 0 := by
+      change ((0 : ℤ) : WithTop ℤ) < ((3 * -1 + 4 * 1 + 0 : ℤ) : WithTop ℤ)
+      exact WithTop.coe_lt_coe.mpr (by norm_num)
+    apply hlo.trans_le
+    gcongr
+    apply (WithTop.mul_right_strictMono (a := (4 : WithTop ℤ)) _ (by decide)).monotone ho₁
+    exact WithTop.coe_lt_coe.mpr (by norm_num : (0 : ℤ) < 4)
+  have hpath : Tendsto (fun x : ℝ ↦ (x : ℂ)) (𝓝[>] 1) (𝓝[≠] (1 : ℂ)) := by
+    simpa only [Complex.ofReal_one] using
+      (Complex.continuous_ofReal.continuousWithinAt (s := Ioi 1) (x := (1 : ℝ))).tendsto_nhdsWithin
+        (fun x hx ↦ by simpa using hx.ne')
+  have hlim := (tendsto_zero_of_meromorphicOrderAt_pos hp).comp hpath
+  have hval (ψ : U[F]) (M : ℂ → ℂ)
+      (hM : ∀ w : halfPlane, M w = completedHeckeL ψ w) (w : halfPlane) :
+      G ψ M w = χ₀(ψ).LSeries w := by
+    dsimp only [G]
+    rw [hM w, completedHeckeL, ← mul_assoc, inv_mul_cancel₀, one_mul]
+    exact heckeGammaFactor_ne_zero_of_re_pos ψ (zero_lt_one.trans w.property)
+  have hbound : ∀ᶠ x : ℝ in 𝓝[>] 1, 1 ≤ ‖P (x : ℂ)‖ := by
+    filter_upwards [self_mem_nhdsWithin] with x hx
+    have hx : 1 < x := hx
+    have hx₀ : (x : ℂ) ∈ halfPlane := hx
+    have hx₁ : (x : ℂ) + a ∈ halfPlane := by simpa [mem_preimage, Complex.add_re, ha]
+    have hx₂ : (x : ℂ) + 2 * a ∈ halfPlane := by simpa [mem_preimage, Complex.add_re, h₂a]
+    change 1 ≤ ‖G (1 : U[F]) L₀ x ^ 3 * G χ L ((x : ℂ) + a) ^ 4 *
+      G (χ ^ 2) L₂ ((x : ℂ) + 2 * a)‖
+    rw [hval _ L₀ h₀ ⟨_, hx₀⟩, hval _ L h ⟨_, hx₁⟩, hval _ L₂ h₂ ⟨_, hx₂⟩]
+    exact norm_finiteHeckeL_product_ge_one χ hx a ha
+  have hbad : (1 : ℝ) ≤ ‖(0 : ℂ)‖ := ge_of_tendsto hlim.norm hbound
+  exact (by norm_num : ¬ (1 : ℝ) ≤ ‖(0 : ℂ)‖) hbad
+
+/-- Paper: Proposition 3.2.1.3(4), p. 123. A zero of the continuation in
+the positive half-plane lies strictly to the left of `Re(s) = 1`. -/
+theorem completedHeckeL_continuation_zeros (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    {s : ℂ} (hs : 0 < s.re) (hzero : 0 < meromorphicOrderAt L s) :
+    s.re < 1 := by
+  by_contra! hge
+  rcases hge.eq_or_lt with he | hgt
+  · exact (not_lt_of_ge (completedHeckeL_order_nonpos_on_one_line χ L hL h he.symm)) hzero
+  · have hn : L s ≠ 0 := by
+      rw [show L s = completedHeckeL χ ⟨s, hgt⟩ from h ⟨s, hgt⟩, completedHeckeL]
+      exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hs)
+        (finiteHeckeL_ne_zero_of_one_lt_re χ ⟨s, hgt⟩)
+    have ho := (hL (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mpr hn
+    exact (not_lt_of_ge ho.le) hzero
+
+end HeckeZeros
 
 section HomogeneousMellin
 
