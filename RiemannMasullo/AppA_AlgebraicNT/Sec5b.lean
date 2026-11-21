@@ -6,6 +6,7 @@ import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Group.Prod
 import Mathlib.MeasureTheory.Integral.Layercake
 import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 
 /-!
 # Maximal theorems and Lebesgue differentiation on locally compact abelian groups
@@ -1237,6 +1238,67 @@ theorem dSequenceMaximal_memLp [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
     {f : G → ℂ} {p : ℝ} (hp : 1 < p) (hf : MemLp f (ENNReal.ofReal p) μ) :
     MemLp (dSequenceMaximal μ U f) (ENNReal.ofReal p) μ := by sorry
 
+/-- Paper: (A.5.3.15), p. 582. Above level `t + a`, the global maximal
+function is controlled by the weighted mass of the part of the input above `t`.
+Deviation: The estimate is global, obtained by applying the compact weak bound for the
+truncated density on a compact exhaustion. -/
+private theorem dSequenceMaximal_weak_truncation [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
+    (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
+    {f : G → ℂ} (hf : LocallyIntegrable f μ) {t a : ℝ} (ht : 0 ≤ t) (ha : 0 < a) :
+    μ {x | ENNReal.ofReal (t + a) < dSequenceMaximal μ U f x} ≤
+      ENNReal.ofReal (C / a) *
+        (μ.withDensity (fun x ↦ ‖f x‖ₑ)) {x | ENNReal.ofReal t < ‖f x‖ₑ} := by
+  let A : Set G := {x | ENNReal.ofReal t < ‖f x‖ₑ}
+  let w := A.indicator (fun x ↦ ‖f x‖ₑ)
+  let ν := μ.withDensity w
+  have hA : NullMeasurableSet A μ :=
+    nullMeasurableSet_lt aemeasurable_const hf.aestronglyMeasurable.eNorm
+  have : IsFiniteMeasureOnCompacts ν := ⟨fun K hK ↦ by
+    rw [withDensity_apply w hK.isClosed.measurableSet]
+    exact (lintegral_mono (indicator_le_self' (fun _ _ ↦ zero_le) (s := A))).trans_lt
+      (hf.integrableOn_isCompact hK).hasFiniteIntegral⟩
+  have hpoint (y : G) : ‖f y‖ₑ ≤ ENNReal.ofReal t + w y := by
+    by_cases hy : y ∈ A
+    · rw [show w y = ‖f y‖ₑ from indicator_of_mem hy _]
+      exact le_add_self
+    · exact (le_of_not_gt hy).trans le_self_add
+  have hcompare (x : G) :
+      dSequenceMaximal μ U f x ≤ ENNReal.ofReal t + dSequenceMeasureMaximal μ ν U x := by
+    have havg (k : ℕ) : (⨍⁻ y in x • U k, ‖f y‖ₑ ∂μ) ≤
+        ENNReal.ofReal t + ν (x • U k) / μ (U k) := by
+      rw [setLAverage_eq, measure_smul]
+      calc
+        _ ≤ (∫⁻ y in x • U k, ENNReal.ofReal t + w y ∂μ) / μ (U k) :=
+          ENNReal.div_le_div_right (lintegral_mono hpoint) _
+        _ = _ := by
+          rw [lintegral_add_left measurable_const, setLIntegral_const,
+            ← withDensity_apply₀ w ((hU.1.1 k).2.1.smul x), measure_smul, ENNReal.add_div,
+            ENNReal.mul_div_cancel_right (hU.1.1 k).2.2.1.ne' (hU.1.1 k).2.2.2.ne]
+    rw [add_comm, ← tsub_le_iff_right, dSequenceMaximal, ← ENNReal.limsup_sub_const,
+      dSequenceMeasureMaximal]
+    exact limsup_le_limsup (Eventually.of_forall fun k ↦ tsub_le_iff_right.mpr (by
+      simpa only [add_comm] using havg k))
+  let E : Set G := {x | ENNReal.ofReal a < dSequenceMeasureMaximal μ ν U x}
+  have hsub : {x | ENNReal.ofReal (t + a) < dSequenceMaximal μ U f x} ⊆ E := by
+    intro x hx
+    have hlt := hx.trans_le (hcompare x)
+    rw [ENNReal.ofReal_add ht ha.le] at hlt
+    exact (ENNReal.add_lt_add_iff_left ENNReal.ofReal_ne_top).mp hlt
+  refine (measure_mono hsub).trans ?_
+  have hmass : ν univ = (μ.withDensity (fun x ↦ ‖f x‖ₑ)) A := by
+    rw [withDensity_apply w MeasurableSet.univ, setLIntegral_univ, withDensity_apply₀ _ hA]
+    exact lintegral_indicator₀ hA _
+  rw [← hmass]
+  have hmono : Monotone (fun n ↦ compactCovering G n ∩ E) :=
+    fun _ _ hnm ↦ inter_subset_inter (compactCovering_subset G hnm) Subset.rfl
+  have hcover : (⋃ n, compactCovering G n ∩ E) = E := by
+    rw [← iUnion_inter, iUnion_compactCovering, univ_inter]
+  rw [← hcover, hmono.measure_iUnion]
+  exact iSup_le fun n ↦
+    (dSequenceMeasureMaximal_weak_compact (ν := ν) hU hC hbound
+      (isCompact_compactCovering G n) ha).trans
+      (mul_le_mul' le_rfl (measure_mono (subset_univ _)))
+
 /-- Paper: Theorem A.5.3.7(2), p. 582. On the entire group the `p`-th moment
 of the maximal function is bounded by the `p`-th power of the `Lᵖ` norm times the printed factor. -/
 theorem dSequenceMaximal_strong_global [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
@@ -1245,7 +1307,90 @@ theorem dSequenceMaximal_strong_global [μ.IsHaarMeasure] (hU : IsDPrimeSequence
     {f : G → ℂ} {p : ℝ} (hp : 1 < p) (hf : MemLp f (ENNReal.ofReal p) μ) :
     (∫⁻ x, dSequenceMaximal μ U f x ^ p ∂μ) ≤
       ENNReal.ofReal (C * p ^ (p + 1) / (p - 1) ^ p) *
-        eLpNorm f (ENNReal.ofReal p) μ ^ p := by sorry
+        eLpNorm f (ENNReal.ofReal p) μ ^ p := by
+  have hp₀ : 0 < p := zero_lt_one.trans hp
+  let q := p - 1
+  have hq : 0 < q := sub_pos.mpr hp
+  -- A cutoff at `t` for the scaled maximal function leaves a gap of `t / q`.
+  let d := p / q
+  have hd : 0 < d := div_pos hp₀ hq
+  have hloc := hf.locallyIntegrable (by simpa using ENNReal.ofReal_le_ofReal hp.le)
+  let M (x : G) := dSequenceMaximal μ U f x / ENNReal.ofReal d
+  have hM : AEMeasurable M μ := (dSequenceMaximal_aemeasurable hU.1 hcompact hloc).div_const _
+  let ν := μ.withDensity (fun x ↦ ‖f x‖ₑ)
+  have htail (t : ℝ) (ht : 0 < t) :
+      μ {x | ENNReal.ofReal t < M x} ≤
+        ENNReal.ofReal (C / (t / q)) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ} := by
+    have hlevel : {x | ENNReal.ofReal t < M x} =
+        {x | ENNReal.ofReal (t + t / q) < dSequenceMaximal μ U f x} := by
+      have hscale : t * d = t + t / q := by
+        dsimp [d, q]
+        field_simp [sub_ne_zero.mpr hp.ne']
+        ring
+      ext x
+      simp only [mem_ofPred_eq, M, ENNReal.lt_div_iff_mul_lt
+        (Or.inl (ENNReal.ofReal_pos.mpr hd).ne') (Or.inl ENNReal.ofReal_ne_top),
+        ← ENNReal.ofReal_mul ht.le, hscale]
+    rw [hlevel]
+    exact dSequenceMaximal_weak_truncation hU hC hbound hloc ht.le (div_pos ht hq)
+  have hfNorm := hf.aestronglyMeasurable.eNorm
+  -- The density contributes one power of the norm to the `q`-th moment.
+  have hweighted :
+      ENNReal.ofReal q * (∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖f x‖ₑ} *
+        ENNReal.ofReal (t ^ (q - 1))) = ∫⁻ x, ‖f x‖ₑ ^ p ∂μ := by
+    rw [← lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul ν
+      (hfNorm.mono_ac (withDensity_absolutelyContinuous _ _)) hq,
+      lintegral_withDensity_eq_lintegral_mul₀ hfNorm (hfNorm.pow_const _)]
+    refine lintegral_congr fun x ↦ ?_
+    rw [Pi.mul_apply]
+    calc
+      ‖f x‖ₑ * ‖f x‖ₑ ^ q = ‖f x‖ₑ ^ (1 : ℝ) * ‖f x‖ₑ ^ q := by rw [ENNReal.rpow_one]
+      _ = ‖f x‖ₑ ^ p := by
+        rw [← ENNReal.rpow_add_of_nonneg 1 q zero_le_one hq.le, show 1 + q = p by dsimp [q]; ring]
+  have hrescale (x : G) : dSequenceMaximal μ U f x ^ p =
+      ENNReal.ofReal (d ^ p) * M x ^ p := by
+    have heq : M x * ENNReal.ofReal d = dSequenceMaximal μ U f x :=
+      ENNReal.div_mul_cancel (ENNReal.ofReal_pos.mpr hd).ne' ENNReal.ofReal_ne_top
+    rw [← heq, ENNReal.mul_rpow_of_nonneg _ _ hp₀.le,
+      ← ENNReal.ofReal_rpow_of_nonneg hd.le hp₀.le, mul_comm]
+  simp_rw [hrescale]
+  rw [lintegral_const_mul' _ _ ENNReal.ofReal_ne_top,
+    lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul μ hM hp₀]
+  calc
+    _ ≤ ENNReal.ofReal (d ^ p) * (ENNReal.ofReal p *
+          (ENNReal.ofReal C * (ENNReal.ofReal q * ∫⁻ t in Ioi (0 : ℝ),
+            ν {x | ENNReal.ofReal t < ‖f x‖ₑ} * ENNReal.ofReal (t ^ (q - 1))))) := by
+      refine mul_le_mul' le_rfl (mul_le_mul' le_rfl ?_)
+      rw [← mul_assoc, ← lintegral_const_mul' _ _ (ENNReal.mul_ne_top ENNReal.ofReal_ne_top
+        ENNReal.ofReal_ne_top)]
+      apply setLIntegral_mono' measurableSet_Ioi
+      intro t ht
+      have ht₀ : 0 < t := ht
+      have hweight : ENNReal.ofReal (C / (t / q)) * ENNReal.ofReal (t ^ (p - 1)) =
+          ENNReal.ofReal C * ENNReal.ofReal q * ENNReal.ofReal (t ^ (q - 1)) := by
+        rw [← ENNReal.ofReal_mul hC.le, ← ENNReal.ofReal_mul (mul_nonneg hC.le hq.le),
+          ← ENNReal.ofReal_mul (div_nonneg hC.le (div_nonneg ht₀.le hq.le))]
+        congr 1
+        change C / (t / q) * t ^ q = C * q * t ^ (q - 1)
+        calc
+          _ = C * q * (t ^ q / t) := by rw [div_div_eq_mul_div]; ring
+          _ = _ := by rw [Real.rpow_sub ht₀ q 1, Real.rpow_one]
+      calc
+        _ ≤ (ENNReal.ofReal (C / (t / q)) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ}) *
+            ENNReal.ofReal (t ^ (p - 1)) := mul_le_mul' (htail t ht₀) le_rfl
+        _ = _ := by rw [mul_right_comm, hweight]; ac_rfl
+    _ = _ := by
+      rw [hweighted, lintegral_rpow_eNorm_eq_rpow_eLpNorm' hp₀,
+        eLpNorm_eq_eLpNorm' (ENNReal.ofReal_pos.mpr hp₀).ne' ENNReal.ofReal_ne_top
+          hf.aestronglyMeasurable, ENNReal.toReal_ofReal hp₀.le]
+      have hconstant : d ^ p * (p * C) = C * p ^ (p + 1) / (p - 1) ^ p := by
+        rw [show d = p / q from rfl, Real.div_rpow hp₀.le hq.le, Real.rpow_add hp₀,
+          Real.rpow_one]
+        change p ^ p / q ^ p * (p * C) = C * (p ^ p * p) / q ^ p
+        ring
+      rw [← hconstant, ENNReal.ofReal_mul (Real.rpow_nonneg hd.le _),
+        ENNReal.ofReal_mul hp₀.le]
+      ac_rfl
 
 /-- Paper: (A.5.4.1), p. 582. Average a complex-valued function over the
 left translate of a sequence member. Haar invariance equates the mass of the
