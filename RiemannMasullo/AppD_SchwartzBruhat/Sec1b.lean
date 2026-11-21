@@ -7,6 +7,7 @@ public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 public import Mathlib.Topology.Instances.ZMod
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
+import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
@@ -82,12 +83,115 @@ theorem ElementaryLCAPresentation.exists_kleinFour :
     ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
       Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
 
+/-- A continuous homomorphism from a torus to a real vector group vanishes,
+since the multiples of a nonzero vector cannot all lie in a compact range. -/
+private theorem elementary_torus_to_euclidean_eq_zero {m n : ℕ}
+    (f : (Fin n → AddCircle (1 : ℝ)) →+ EuclideanSpace ℝ (Fin m))
+    (hf : Continuous f) (x : Fin n → AddCircle (1 : ℝ)) : f x = 0 := by
+  obtain ⟨C, hC⟩ := isBounded_iff_forall_norm_le.mp (isCompact_range hf).isBounded
+  by_contra hx
+  have hpos : 0 < ‖f x‖ := norm_pos_iff.mpr hx
+  obtain ⟨k, hk⟩ := exists_nat_gt (C / ‖f x‖)
+  have hbound := hC (f (k • x)) ⟨k • x, rfl⟩
+  rw [map_nsmul, ← Nat.cast_smul_eq_nsmul ℝ, norm_smul,
+    Real.norm_of_nonneg (Nat.cast_nonneg k)] at hbound
+  exact (not_lt_of_ge hbound) ((div_lt_iff₀ hpos).mp hk)
+
+/-- The subgroup of a finite torus killed by doubling has cardinality two to
+the power of the number of circle coordinates. -/
+private theorem elementary_torus_two_torsion_card (n : ℕ) :
+    Nat.card {x : Fin n → AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} = 2 ^ n := by
+  let half : AddCircle (1 : ℝ) := ((1 / 2 : ℝ) : AddCircle (1 : ℝ))
+  have horder : addOrderOf half = 2 := by
+    simpa [half] using
+      (AddCircle.addOrderOf_period_div (p := (1 : ℝ)) (n := 2) (by decide))
+  have hhalf : half ≠ 0 := by
+    intro h
+    simp [h] at horder
+  let f (i : Fin 2) : {x : AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} :=
+    ⟨if i = 0 then 0 else half, by
+      split
+      · exact nsmul_zero _
+      · exact horder ▸ addOrderOf_nsmul_eq_zero half⟩
+  have hf : Function.Bijective f := by
+    constructor
+    · intro i j h
+      have hval := congrArg Subtype.val h
+      fin_cases i <;> fin_cases j <;> simp_all [f, Ne.symm hhalf]
+    · intro x
+      obtain ⟨k, hk, he⟩ := (AddCircle.nsmul_eq_zero_iff (by decide : 0 < 2)).mp x.property
+      refine ⟨⟨k, hk⟩, Subtype.ext ?_⟩
+      interval_cases k <;> simpa [f, half] using he
+  let coords : {x : Fin n → AddCircle (1 : ℝ) // (2 : ℕ) • x = 0} ≃
+      (Fin n → Fin 2) :=
+    (Equiv.subtypeEquiv (Equiv.refl _) (fun _ ↦ funext_iff)).trans
+      (Equiv.subtypePiEquivPi.trans (Equiv.piCongrRight fun _ ↦ (Equiv.ofBijective f hf).symm))
+  rw [Nat.card_congr coords, Nat.card_fun, Nat.card_fin, Nat.card_fin]
+
 /-- Paper: (D.1.4.2), p. 757. Two elementary presentations have the same real
 dimension, torus dimension and free lattice rank, and isomorphic finite factors.
 Deviation: The finite factors are compared up to group isomorphism. -/
 theorem ElementaryLCAPresentation.invariants (e e' : ElementaryLCAPresentation G) :
     e.realDim = e'.realDim ∧ e.torusDim = e'.torusDim ∧ e.latticeRank = e'.latticeRank ∧
-      Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by sorry
+      Nonempty (e.finiteFactor ≃+ e'.finiteFactor) := by
+  let model (p : ElementaryLCAPresentation G) :=
+    ElementaryLieGroup p.realDim p.torusDim p.latticeRank p.finiteFactor
+  let compare := e.equiv.symm.trans e'.equiv
+  let φ : model e ≃ₜ+ model e' :=
+    { MulEquiv.toAdditive compare.toMulEquiv with
+      continuous_toFun := compare.continuous_toFun
+      continuous_invFun := compare.continuous_invFun }
+  let assoc (p : ElementaryLCAPresentation G) :
+      (EuclideanSpace ℝ (Fin p.realDim) × (Fin p.torusDim → AddCircle (1 : ℝ))) ×
+        ((Fin p.latticeRank → ℤ) × p.finiteFactor) ≃ₜ+ model p :=
+    ContinuousAddEquiv.mk' (Homeomorph.prodAssoc _ _ _) (fun _ _ ↦ rfl)
+  let ψ := (assoc e).trans (φ.trans (assoc e').symm)
+  have connected_to_discrete {A B A' B' : Type} [AddZeroClass A] [AddZeroClass B]
+      [AddZeroClass A'] [AddZeroClass B'] [TopologicalSpace A] [TopologicalSpace B]
+      [TopologicalSpace A'] [TopologicalSpace B'] [PreconnectedSpace A] [DiscreteTopology B']
+      (g : A × B ≃ₜ+ A' × B') (a : A) : (g (a, 0)).2 = 0 := by
+    let f : A → B' := fun x ↦ (g (x, 0)).2
+    have hf : Continuous f := (g.continuous_toFun.comp (continuous_id.prodMk continuous_const)).snd
+    calc
+      (g (a, 0)).2 = (g (0, 0)).2 := TotallyDisconnectedSpace.eq_of_continuous f hf a 0
+      _ = 0 := congrArg Prod.snd (map_zero g)
+  obtain ⟨⟨connected⟩, ⟨discrete⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero ψ
+    (connected_to_discrete ψ) (connected_to_discrete ψ.symm)
+  let swap {A B : Type} [AddZeroClass A] [AddZeroClass B]
+      [TopologicalSpace A] [TopologicalSpace B] : B × A ≃ₜ+ A × B :=
+    ContinuousAddEquiv.mk' (Homeomorph.prodComm _ _) (fun _ _ ↦ rfl)
+  let γ := swap.trans (connected.trans swap.symm)
+  have torus_to_real {m n m' n' : ℕ}
+      (g : (Fin n → AddCircle (1 : ℝ)) × EuclideanSpace ℝ (Fin m) ≃ₜ+
+        (Fin n' → AddCircle (1 : ℝ)) × EuclideanSpace ℝ (Fin m')) (x : Fin n → AddCircle (1 : ℝ)) :
+      (g (x, 0)).2 = 0 :=
+    elementary_torus_to_euclidean_eq_zero
+      ((AddMonoidHom.snd _ _).comp (g.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl _ _)))
+      (g.continuous_toFun.comp (continuous_id.prodMk continuous_const)).snd x
+  obtain ⟨⟨torus⟩, ⟨real⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero γ
+    (torus_to_real γ) (torus_to_real γ.symm)
+  let δ := swap.trans (discrete.trans swap.symm)
+  have finite_to_lattice {F F' : Type} [AddCommGroup F] [AddCommGroup F']
+      [TopologicalSpace F] [TopologicalSpace F'] [Finite F] {r r' : ℕ}
+      (g : F × (Fin r → ℤ) ≃ₜ+ F' × (Fin r' → ℤ)) (x : F) : (g (x, 0)).2 = 0 := by
+    let f : F →+ (Fin r' → ℤ) :=
+      (AddMonoidHom.snd _ _).comp (g.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl _ _))
+    have h := congrArg f (addOrderOf_nsmul_eq_zero x)
+    rw [map_nsmul, map_zero] at h
+    exact (nsmul_eq_zero_iff_right (addOrderOf_pos x).ne').mp h
+  obtain ⟨⟨finite⟩, ⟨lattice⟩⟩ := continuousAddEquiv_factors_of_snd_eq_zero δ
+    (finite_to_lattice δ) (finite_to_lattice δ.symm)
+  refine ⟨?_, ?_, ?_, ⟨finite.toAddEquiv⟩⟩
+  · let linear := real.toAddEquiv.toRealLinearEquiv real.continuous_toFun real.continuous_invFun
+    simpa only [finrank_euclideanSpace, Fintype.card_fin] using linear.toLinearEquiv.finrank_eq
+  · have h := Nat.card_congr (torus.toEquiv.subtypeEquiv (p := fun x ↦ (2 : ℕ) • x = 0)
+      (q := fun y ↦ (2 : ℕ) • y = 0) fun x ↦ by
+        change (2 : ℕ) • x = 0 ↔ (2 : ℕ) • torus x = 0
+        rw [← map_nsmul, ← map_zero torus, torus.injective.eq_iff])
+    rw [elementary_torus_two_torsion_card, elementary_torus_two_torsion_card] at h
+    exact Nat.pow_right_injective (by decide : 2 ≤ 2) h
+  · simpa only [Module.finrank_pi, Fintype.card_fin] using
+      lattice.toAddEquiv.toIntLinearEquiv.finrank_eq
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
@@ -1210,9 +1314,100 @@ Deviation: Sanity check using the fact that its annihilator is the entire dual. 
 theorem isBruhatGoodSubgroup_bot_iff :
     IsBruhatGoodSubgroup (⊥ : Subgroup G) ↔ IsLocallyEuclidean G := by sorry
 
+/-- Paper: Lemma D.1.4.6(4), p. 758. An open subgroup of the dual has a
+compact annihilator in the original group. -/
+private theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    IsCompact (lcaDualAnnihilator H : Set G) := by
+  have hCompact := isCompact_lcaAnnihilator H hH
+  convert (isClosedEmbedding_pontryaginDual_eval (G := G)).isCompact_preimage hCompact using 1
+  ext x
+  exact (mem_lcaDualAnnihilator_iff H x).trans
+    (mem_lcaAnnihilator_iff H (pontryaginDual_eval x)).symm
+
+/-- Paper: Definition D.1.5.1, p. 760. The intersection of two good
+subgroups is good. Its annihilator is the join of their annihilators. -/
+private theorem isBruhatGoodSubgroup_inf {K L : Subgroup G}
+    (hK : IsBruhatGoodSubgroup K) (hL : IsBruhatGoodSubgroup L) :
+    IsBruhatGoodSubgroup (K ⊓ L) := by
+  have hLc := isCompact_lcaDualAnnihilator (lcaAnnihilator L) hL.2.1
+  rw [lcaDualAnnihilator_annihilator L hL.1] at hLc
+  have hAnti : Antitone (lcaAnnihilator (G := G)) := fun _ _ h χ hχ ↦
+    (mem_lcaAnnihilator_iff _ χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, h x.property⟩
+  have hAnn : lcaAnnihilator (K ⊓ L) = lcaAnnihilator K ⊔ lcaAnnihilator L := by
+    apply le_antisymm _ (sup_le (hAnti inf_le_left) (hAnti inf_le_right))
+    intro χ hχ
+    let restrict : PontryaginDual K :=
+      PontryaginDual.map ⟨K.subtype, continuous_subtype_val⟩ χ
+    obtain ⟨ψ, hψ, hψL⟩ := exists_pontryaginDual_extension_trivial_on_compact K L hK.1 hLc
+      restrict (fun x hx ↦ (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, x.property, hx⟩)
+    refine Subgroup.mem_sup.mpr ⟨χ * ψ⁻¹, ?_, ψ, (mem_lcaAnnihilator_iff L ψ).mpr hψL, ?_⟩
+    · refine (mem_lcaAnnihilator_iff K _).mpr fun x ↦ ?_
+      change χ x * (ψ x)⁻¹ = 1
+      rw [hψ x]
+      exact mul_inv_cancel _
+    · exact inv_mul_cancel_right χ ψ
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator K, hK.2⟩
+  let B : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator L, hL.2⟩
+  obtain ⟨C, hAC, hBC⟩ := (openCompactlyGeneratedSubgroups_colimit
+    (G := PontryaginDual G)).1.directed A B
+  have hOpen : IsOpen (lcaAnnihilator (K ⊓ L) : Set (PontryaginDual G)) :=
+    Subgroup.isOpen_mono (hAnti inf_le_left) hK.2.1
+  refine ⟨hK.1.inter hL.1, hOpen, ?_⟩
+  let J := lcaAnnihilator (K ⊓ L)
+  have hJC : J ≤ C.val := by
+    change lcaAnnihilator (K ⊓ L) ≤ C.val
+    rw [hAnn]
+    exact sup_le (show A.val ≤ C.val from hAC) (show B.val ≤ C.val from hBC)
+  have hClosed : IsClosed (J.subgroupOf C.val : Set C.val) :=
+    (J.isClosed_of_isOpen hOpen).preimage continuous_subtype_val
+  let : LocallyCompactSpace C.val := C.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨U, hU, hUc, hGen⟩ := isCompactlyGeneratedGroup_closedSubgroup C.property.2
+    (J.subgroupOf C.val) hClosed
+  let e := Subgroup.subgroupOfEquivOfLe hJC
+  have he : Continuous e := (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _
+  have he' : Continuous e.symm := (continuous_subtype_val.subtype_mk _).subtype_mk _
+  refine ⟨e '' U, ?_, hUc.image he, ?_⟩
+  · have hEq : e '' U = e.symm ⁻¹' U := e.toEquiv.image_eq_preimage_symm U
+    rw [hEq]
+    exact he'.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+  · change Subgroup.closure (e.toMonoidHom '' U) = ⊤
+    rw [← MonoidHom.map_closure e.toMonoidHom, hGen,
+      Subgroup.map_top_of_surjective e.toMonoidHom e.surjective]
+
+/-- Paper: Lemma D.1.4.6(1), p. 758. An open subgroup of the dual is recovered
+from its annihilator in the original group.
+Deviation: We isolate the open-subgroup case on the dual side. Once evaluation
+is surjective onto the bidual, this follows by separating points in the discrete quotient. -/
+theorem lcaAnnihilator_dualAnnihilator_of_open (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    lcaAnnihilator (lcaDualAnnihilator H) = H := by
+  sorry
+
 /-- Paper: Lemma D.1.5.2, p. 760. Structural pairs form a nonempty directed order. -/
 theorem bruhatStructuralPair_filtered :
-    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by sorry
+    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by
+  constructor
+  · obtain ⟨A, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+    let K := lcaDualAnnihilator A.val
+    have hKc : IsCompact (K : Set G) := isCompact_lcaDualAnnihilator A.val A.property.1
+    have hAnn : lcaAnnihilator K = A.val :=
+      lcaAnnihilator_dualAnnihilator_of_open A.val A.property.1
+    have hK : IsBruhatGoodSubgroup K :=
+      ⟨hKc.isClosed, hAnn.symm ▸ A.property⟩
+    obtain ⟨H, hKH⟩ := exists_openCompactlyGeneratedSubgroup_contains hKc
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩⟩
+  · constructor
+    intro p q
+    obtain ⟨H, hp, hq⟩ := (openCompactlyGeneratedSubgroups_colimit (G := G)).1.directed
+      ⟨p.val.1, p.property.1, p.property.2.1⟩ ⟨q.val.1, q.property.1, q.property.2.1⟩
+    let K := OrderDual.ofDual p.val.2 ⊓ OrderDual.ofDual q.val.2
+    have hK := isBruhatGoodSubgroup_inf p.property.2.2.1 q.property.2.2.1
+    have hKH : K ≤ H.val := inf_le_left.trans (p.property.2.2.2.trans hp)
+    have hKp : K ≤ OrderDual.ofDual p.val.2 := inf_le_left
+    have hKq : K ≤ OrderDual.ofDual q.val.2 := inf_le_right
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩, ⟨hp, hKp⟩, ⟨hq, hKq⟩⟩
 
 /-- Paper: Lemma D.1.5.2(1), p. 761. The quotient attached to a structural pair
 has an elementary presentation. -/

@@ -2753,10 +2753,440 @@ theorem isNuclearTVS_projectiveTensor {F : Type w}
     hback⟩ : ProjectiveTensor (ProjectiveTensor E F) G ≃ₜ
       InjectiveTensor (ProjectiveTensor E F) G).isHomeomorph
 
+/-- The local absolute summability criterion can be checked on finite families whose
+linear combinations with coefficients in the unit disk stay in one zero-neighborhood. -/
+private theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
+    (h : ∀ (q : Seminorm ℂ E), Continuous q →
+      ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
+        (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ U) →
+          ∑ i, q (x i) ≤ C) :
+    IsNuclearTVS.{v, u} E := by
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have comparisons (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U) :
+      ∃ (V : Set E) (hV : V ∈ 𝓝 0) (bV : Balanced ℂ V) (cV : Convex ℝ V) (hVU : V ⊆ U),
+        IsAbsolutelySummingLocalBanachMap E
+          (show gaugeSeminorm bU cU (absorbent_nhds_zero hU) ≤
+              gaugeSeminorm bV cV (absorbent_nhds_zero hV) from
+            gauge_mono (absorbent_nhds_zero hV) hVU) := by
+    let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+    obtain ⟨W, hW, C, hC, hbound⟩ := h q (continuous_gauge cU hU)
+    obtain ⟨s, hs, hsUW⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp (inter_mem hU hW)
+    let V := s.ball 0 (1 / 2)
+    have hV : V ∈ 𝓝 (0 : E) := s.ball_mem_nhds hs (by norm_num)
+    have bV : Balanced ℂ V := s.balanced_ball_zero _
+    have cV : Convex ℝ V := s.convex_ball _ _
+    have hclosed : closure V ⊆ U ∩ W := by
+      have hball : IsClosed (s.closedBall 0 (1 / 2)) := by
+        rw [s.closedBall_zero_eq]
+        exact isClosed_le hs continuous_const
+      refine (closure_minimal (s.ball_subset_closedBall _ _) hball).trans ?_
+      intro x hx
+      exact hsUW (s.mem_ball_zero.mpr ((s.mem_closedBall_zero.mp hx).trans_lt (by norm_num)))
+    have hVU : V ⊆ U := subset_closure.trans (hclosed.trans inter_subset_left)
+    let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+    let T := localBanachMap p q (gauge_mono (absorbent_nhds_zero hV) hVU)
+    refine ⟨V, hV, bV, cV, hVU, C, hC, fun n x M hM hx ↦ ?_⟩
+    change ∑ i, ‖T (x i)‖ ≤ C * M
+    let j : WithLocalSeminorm p →L[ℂ] LocalBanach p := Completion.toComplL
+    have hDense : DenseRange (fun y : Fin n → WithLocalSeminorm p ↦ fun i ↦ j (y i)) :=
+      DenseRange.piMap fun _ ↦ Completion.denseRange_coe
+    -- Keep the approximation errors on the right to pass the bound to the completion.
+    have bound (y : Fin n → LocalBanach p) :
+        ∑ i, ‖T (y i)‖ ≤ C * (M + ∑ i, ‖y i - x i‖) := by
+      refine hDense.induction_on y (isClosed_le (by fun_prop) (by fun_prop)) fun zs ↦ ?_
+      let z : Fin n → E := zs
+      let N := M + ∑ i, ‖j (zs i) - x i‖
+      have hN : 0 ≤ N := add_nonneg hM (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)
+      have hsum (a : Fin n → ℂ) (ha : ∀ i, ‖a i‖ ≤ 1) :
+          p (∑ i, a i • z i) ≤ N := by
+        change p ((∑ i, a i • zs i : WithLocalSeminorm p) : E) ≤ N
+        rw [← localBanach_norm_coe p, ← show j _ = Completion.coe' _ from rfl, map_sum]
+        obtain ⟨f, hf, hfx⟩ := exists_dual_vector'' ℂ (∑ i, j (a i • zs i))
+        have heq : ‖f (∑ i, j (a i • zs i))‖ = ‖∑ i, j (a i • zs i)‖ := by
+          rw [hfx]
+          exact Complex.norm_of_nonneg (norm_nonneg (∑ i, j (a i • zs i)))
+        rw [← heq, map_sum]
+        refine (norm_sum_le _ _).trans ?_
+        simp only [map_smul, norm_smul]
+        refine (Finset.sum_le_sum fun i _ ↦ mul_le_of_le_one_left (norm_nonneg _) (ha i)).trans ?_
+        have hdiff (i : Fin n) : ‖f (j (zs i))‖ ≤ ‖f (x i)‖ + ‖j (zs i) - x i‖ := by
+          calc
+            _ = ‖f (x i) + f (j (zs i) - x i)‖ := by rw [← map_add, add_sub_cancel]
+            _ ≤ ‖f (x i)‖ + ‖f (j (zs i) - x i)‖ := norm_add_le _ _
+            _ ≤ _ := by
+              gcongr
+              exact (f.le_opNorm _).trans (mul_le_of_le_one_left (norm_nonneg _) hf)
+        exact (Finset.sum_le_sum fun i _ ↦ hdiff i).trans
+          (by rw [Finset.sum_add_distrib]; exact add_le_add (hx f hf) le_rfl)
+      have hscaled : ∑ i, q (z i) ≤ C * N := by
+        refine le_of_forall_pos_le_add fun ε hε ↦ ?_
+        let r := N + ε / (C + 1)
+        have hr : 0 < r := by dsimp [r]; positivity
+        let a : ℂ := (r : ℂ)
+        have ha : ‖a‖ = r := Complex.norm_of_nonneg hr.le
+        have hz := hbound n (fun i ↦ a⁻¹ • z i) (fun b hb ↦ ?_)
+        · simp only [map_smul_eq_mul, norm_inv, ha, ← Finset.mul_sum] at hz
+          have h := (inv_mul_le_iff₀ hr).mp hz
+          calc
+            _ ≤ C * r := by simpa [mul_comm] using h
+            _ ≤ C * N + ε := by
+              dsimp [r]
+              have hε' : ε / (C + 1) * (C + 1) = ε := div_mul_cancel₀ _ (by positivity)
+              nlinarith [show 0 ≤ ε / (C + 1) by positivity]
+        · have heq : (∑ i, b i • a⁻¹ • z i) = a⁻¹ • ∑ i, b i • z i := by
+            rw [Finset.smul_sum]
+            exact Finset.sum_congr rfl fun i _ ↦ smul_comm _ _ _
+          apply (hclosed.trans inter_subset_right)
+          apply (gauge_le_one_iff_mem_closure cV hV).mp
+          change p (∑ i, b i • a⁻¹ • z i) ≤ 1
+          rw [heq, map_smul_eq_mul, norm_inv, ha]
+          apply (inv_mul_le_iff₀ hr).mpr
+          exact (hsum b hb).trans (by dsimp [r]; linarith [show 0 ≤ ε / (C + 1) by positivity])
+      have hnorm (i : Fin n) : ‖T (j (zs i))‖ = q (z i) := by
+        exact (congrArg norm (localBanachMap_coe p q _ (zs i))).trans (localBanach_norm_coe q _)
+      simpa only [hnorm] using hscaled
+    simpa using bound x
+  refine (isNuclearTVS_iff_localBanach_series E).mpr fun U hU bU cU ↦ ?_
+  obtain ⟨V₁, hV₁, bV₁, cV₁, h₁, s₁⟩ := comparisons U hU bU cU
+  obtain ⟨V₂, hV₂, bV₂, cV₂, h₂, s₂⟩ := comparisons V₁ hV₁ bV₁ cV₁
+  obtain ⟨V₃, hV₃, bV₃, cV₃, h₃, s₃⟩ := comparisons V₂ hV₂ bV₂ cV₂
+  exact ⟨V₃, hV₃, bV₃, cV₃, h₃.trans (h₂.trans h₁),
+    localBanachMap_hasSeries_of_three_absolutelySumming E _ _ _ s₁ s₂ s₃⟩
+
+/-- Paper: Lemma C.2.4.11, p. 689. In a nuclear Fréchet space, each bounded set is
+contained in the set of sums of an absolutely weighted bounded sequence, with
+coefficients in the complex unit disk. This is the bounded-set step of dual nuclearity.
+Total boundedness gives finite-valued approximations to the inclusion of the bounded
+set. Regard them as tensors of vectors with bounded scalar functions, using the
+indicators of the fibers as scalar factors. They converge in the completed injective
+tensor. Transport the limit to the completed projective tensor, expand it in a
+series, and evaluate the scalar factors at each point of the bounded set. -/
+theorem exists_bounded_series_cover_of_nuclear_frechet
+    (hE : IsFrechetTVS E) (hN : IsNuclearTVS.{v, u} E) (B : Set E) (hB : IsVonNBounded ℂ B) :
+    ∃ (c : ℕ → ℂ) (x : ℕ → E), Summable (fun k ↦ ‖c k‖) ∧ IsVonNBounded ℂ (range x) ∧
+      ∀ y ∈ B, ∃ a : ℕ → ℂ, (∀ k, ‖a k‖ ≤ 1) ∧
+        HasSum (fun k ↦ (c k * a k) • x k) y := by
+  sorry
+
+/-- Paper: Lemma C.2.4.11, p. 689. If the strong dual is nuclear, a bounded set
+containing all unit-disk linear combinations of a finite family controls the sum
+of the family's values under any fixed continuous seminorm. The bound is uniform
+over the size of the family. To obtain the estimate, pair norming functionals
+for the seminorm with the evaluations at the family members in the dual of the
+local Banach space for uniform convergence on the bounded set. Nuclearity bounds
+the trace pairing by an injective tensor seminorm. -/
+private theorem exists_sum_bound_on_bounded_sets_of_isNuclearTVS_strongDual
+    [PolynormableSpace ℂ E] [T2Space E] (hN : IsNuclearTVS.{v, u} (StrongDual ℂ E))
+    (q : Seminorm ℂ E) (hq : Continuous q) (B : Set E) (hB : IsVonNBounded ℂ B) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
+      (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ B) →
+        ∑ i, q (x i) ≤ C := by
+  classical
+  let D := StrongDual ℂ E
+  let : PolynormableSpace ℂ D := hN.2.1
+  let : T2Space D := hN.1
+  have : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let p := mappingSeminorm (E := E) (F := ℂ) ⟨B, hB⟩ ⟨normSeminorm ℂ ℂ, continuous_norm⟩
+  have hp_eval (f : D) : p f = ⨆ x : B, ‖f x.val‖ := mappingSeminorm_apply _ _ f
+  have hp : Continuous p := by
+    apply Seminorm.continuous' (r := 1)
+    filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hB
+      (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with f hf
+    rw [p.mem_closedBall_zero, hp_eval]
+    exact Real.iSup_le (fun x ↦ (mem_ball_zero_iff.mp (hf x.property)).le) zero_le_one
+  have hbound (f : D) (x : E) (hx : x ∈ B) : ‖f x‖ ≤ p f := by
+    obtain ⟨R, hR⟩ := isBounded_iff_forall_norm_le.mp
+      ((NormedSpace.isVonNBounded_iff ℂ).mp (hB.image f))
+    rw [hp_eval]
+    exact le_ciSup (f := fun y : B ↦ ‖f y.val‖)
+      ⟨R, forall_mem_range.mpr fun y ↦ hR _ (mem_image_of_mem f y.property)⟩ ⟨x, hx⟩
+  -- The continuous trace pairing tests the strong-dual factor on the bounded set B.
+  let H := LocalBanach p
+  let F := ULift.{v} (H →L[ℂ] ℂ)
+  let : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion p hp
+  let b : D →ₗ[ℂ] F →ₗ[ℂ] ℂ := LinearMap.mk₂ ℂ (fun f g ↦ g.down (j f))
+    (by intros; simp) (by intros; simp) (by intros; rfl) (by intros; rfl)
+  let r : InjectiveTensor D F →ₗ[ℂ] ℂ := TensorProduct.lift b
+  have hrProj : Continuous (show ProjectiveTensor D F → ℂ from r) := by
+    let hP := withGeneratingSeminorms_spec (D ⊗[ℂ] F)
+      (fun p : {p : Seminorm ℂ (D ⊗[ℂ] F) //
+        ContinuousAt (fun z : D × F ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+    let p' := (normSeminorm ℂ ℂ).comp r
+    have heval : Continuous (fun z : D × F ↦ z.2.down (j z.1)) :=
+      (ContinuousLinearMap.apply ℂ (E' := H) ℂ).continuous₂.comp
+        ((j.continuous.comp continuous_fst).prodMk (continuous_uliftDown.comp continuous_snd))
+    have hp' : ContinuousAt (fun z : D × F ↦ p' (z.1 ⊗ₜ[ℂ] z.2)) 0 :=
+      heval.norm.continuousAt
+    exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp
+      (show ProjectiveTensor D F →ₗ[ℂ] ℂ from r) fun _ ↦ hP.continuous_seminorm ⟨p', hp'⟩
+  let eqv := (hN.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+  have hback : Continuous (show InjectiveTensor D F → ProjectiveTensor D F from id) :=
+    eqv.continuous_symm.congr fun z ↦ eqv.apply_symm_apply z
+  let l : StrongDual ℂ (InjectiveTensor D F) := ⟨r, hrProj.comp hback⟩
+  obtain ⟨U, V, hUV⟩ := exists_injectiveTensorSeminorm_bound l
+  let A : Set D := {f | ∀ x, ‖f x‖ ≤ q x}
+  have hA : IsVonNBounded ℂ A := by
+    apply ContinuousLinearMap.isVonNBounded_iff.mpr
+    intro S hS
+    obtain ⟨C, _, hC⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mp
+      hS ⟨q, hq⟩
+    apply (NormedSpace.isVonNBounded_iff ℂ).mpr
+    refine isBounded_iff_forall_norm_le.mpr ⟨C, ?_⟩
+    rintro _ ⟨f, hf, x, hx, rfl⟩
+    exact (hf x).trans (hC x hx).le
+  obtain ⟨R, hR, hRU⟩ := (hA U.property).exists_pos
+  have hR' (φ : StrongDual.polar ℂ U.val) (f : D) (hf : f ∈ A) : ‖φ.val f‖ ≤ R := by
+    obtain ⟨g, hg, rfl⟩ := hRU (R : ℂ) (by rw [Complex.norm_of_nonneg hR.le]) hf
+    rw [map_smul, norm_smul, Complex.norm_of_nonneg hR.le]
+    exact mul_le_of_le_one_right hR.le (φ.property g hg)
+  obtain ⟨δ, hδ, hδV⟩ := Metric.mem_nhds_iff.mp V.property
+  have hδ' (ψ : StrongDual.polar ℂ V.val) : ‖ψ.val‖ ≤ δ⁻¹ := by
+    have hψ : ψ.val ∈ StrongDual.polar ℂ (Metric.ball (0 : F) δ) :=
+      fun y hy ↦ ψ.property y (hδV hy)
+    rw [NormedSpace.polar_ball hδ] at hψ
+    exact mem_closedBall_zero_iff.mp hψ
+  refine ⟨R * δ⁻¹, by positivity, fun n x hx ↦ ?_⟩
+  have hxB (i : Fin n) : x i ∈ B := by
+    simpa [Pi.single_apply, Finset.sum_ite_eq'] using hx (Pi.single i 1) fun k ↦ by
+      by_cases hk : k = i <;> simp [hk]
+  -- The evaluations extend to the completion. Their unit-disk combinations have norm at most one.
+  let e₀ (i : Fin n) : WithLocalSeminorm p →L[ℂ] ℂ :=
+    (show WithLocalSeminorm p →ₗ[ℂ] ℂ from
+      ((ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x i)) : D →L[ℂ] ℂ).toLinearMap).mkContinuous
+        1 (fun f ↦ (hbound f (x i) (hxB i)).trans_eq (one_mul _).symm)
+  let e (i : Fin n) : H →L[ℂ] ℂ := (e₀ i).fromCompletion
+  have he (i : Fin n) (f : D) : e i (j f) = f (x i) := by
+    rw [hj]
+    exact (e₀ i).fromCompletion_apply_coe _
+  have hesum (a : Fin n → ℂ) (ha : ∀ i, ‖a i‖ ≤ 1) :
+      ‖∑ i, a i • (ULift.up (e i) : F)‖ ≤ 1 := by
+    let e' : H →L[ℂ] ℂ := ∑ i, a i • e i
+    have he' : ‖e'‖ ≤ 1 := by
+      apply e'.opNorm_le_bound zero_le_one
+      intro y
+      refine Completion.induction_on y (isClosed_le e'.continuous.norm (by fun_prop)) fun f ↦ ?_
+      let f' : D := f
+      have hjf : j f' = (f : H) := hj f'
+      rw [← hjf, one_mul]
+      simp only [e', sum_apply, smul_apply, smul_eq_mul, he]
+      rw [hjf, localBanach_norm_coe]
+      simpa only [map_sum, map_smul, smul_eq_mul] using hbound f' _ (hx a ha)
+    let lift : (H →L[ℂ] ℂ) →ₗ[ℂ] F := (ULift.moduleEquiv : F ≃ₗ[ℂ] (H →L[ℂ] ℂ)).symm
+    change ‖∑ i, lift (a i • e i)‖ ≤ 1
+    rw [← map_sum]
+    exact he'
+  obtain ⟨j', hj'⟩ := exists_localBanach_inclusion q hq
+  choose g hg hgx using fun i : Fin n ↦ exists_dual_vector'' ℂ (j' (x i))
+  let f (i : Fin n) : D := (g i).comp j'
+  have hf (i : Fin n) : f i ∈ A := fun y ↦ by
+    have hnorm : ‖j' y‖ = q y := (congrArg norm (hj' y)).trans (localBanach_norm_coe q _)
+    change ‖g i (j' y)‖ ≤ q y
+    rw [← hnorm]
+    exact ((g i).le_opNorm _).trans (mul_le_of_le_one_left (norm_nonneg _) (hg i))
+  let z : D ⊗[ℂ] F := ∑ i, f i ⊗ₜ[ℂ] (ULift.up (e i) : F)
+  have hl : l z = (∑ i, q (x i) : ℝ) := by
+    change (TensorProduct.lift b) (∑ i, f i ⊗ₜ[ℂ] (ULift.up (e i) : F)) = _
+    rw [Complex.ofReal_sum, map_sum]
+    apply Finset.sum_congr rfl
+    intro i _
+    change e i (j (f i)) = _
+    rw [he]
+    change g i (j' (x i)) = _
+    rw [hgx i, hj', localBanach_norm_coe]
+    rfl
+  have hnorm : ‖l z‖ = ∑ i, q (x i) := by
+    rw [hl]
+    exact Complex.norm_of_nonneg (Finset.sum_nonneg fun _ _ ↦ apply_nonneg q _)
+  rw [← hnorm]
+  refine (hUV z).trans ?_
+  rw [(injectiveSeminorm_eq_ciSup U V z).2]
+  have : Nonempty (StrongDual.polar ℂ U.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  have : Nonempty (StrongDual.polar ℂ V.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  apply ciSup_le
+  rintro ⟨φ, ψ⟩
+  have hψ : (∑ i, ‖ψ.val (ULift.up (e i) : F)‖) ≤ δ⁻¹ := by
+    choose a ha hphase using fun i : Fin n ↦ Complex.exists_norm_mul_eq_self (ψ.val (ULift.up (e i) : F))
+    have ha' (i : Fin n) : a i ≠ 0 := norm_ne_zero_iff.mp (by rw [ha i]; exact one_ne_zero)
+    have hphase' (i : Fin n) :
+        (a i)⁻¹ * ψ.val (ULift.up (e i) : F) = (‖ψ.val (ULift.up (e i) : F)‖ : ℂ) := by
+      calc
+        _ = (a i)⁻¹ * (a i * (‖ψ.val (ULift.up (e i) : F)‖ : ℂ)) :=
+          congrArg ((a i)⁻¹ * ·) (hphase i).symm
+        _ = _ := by rw [← mul_assoc, inv_mul_cancel₀ (ha' i), one_mul]
+    let s : F := ∑ i, (a i)⁻¹ • (ULift.up (e i) : F)
+    have hs : ‖s‖ ≤ 1 := hesum _ fun i ↦ by rw [norm_inv, ha, inv_one]
+    have hψs : ψ.val s = (∑ i, ‖ψ.val (ULift.up (e i) : F)‖ : ℝ) := by
+      rw [Complex.ofReal_sum]
+      simp only [s, map_sum, map_smul, smul_eq_mul, hphase']
+    calc
+      _ = ‖ψ.val s‖ := by
+        rw [hψs]
+        exact (Complex.norm_of_nonneg (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)).symm
+      _ ≤ ‖ψ.val‖ * ‖s‖ := ψ.val.le_opNorm s
+      _ ≤ δ⁻¹ := (mul_le_of_le_one_right (norm_nonneg _) hs).trans (hδ' ψ)
+  change ‖tensorDualForm φ.val ψ.val z‖ ≤ R * δ⁻¹
+  simp only [z, map_sum, tensorDualForm_tmul]
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i, R * ‖ψ.val (ULift.up (e i) : F)‖ := by
+      apply Finset.sum_le_sum
+      intro i _
+      rw [norm_mul]
+      exact mul_le_mul_of_nonneg_right (hR' φ _ (hf i)) (norm_nonneg _)
+    _ ≤ _ := by rw [← Finset.mul_sum]; exact mul_le_mul_of_nonneg_left hψ hR.le
+
+/-- For a metrizable polynormable space, a bound for sums of seminorm values on
+every bounded set of unit-disk combinations gives a bound on a zero-neighborhood. -/
+private theorem exists_sum_bound_on_nhds_of_bounded [PolynormableSpace ℂ E] [TopologicalSpace.MetrizableSpace E]
+    (q : Seminorm ℂ E) (h : ∀ B : Set E, IsVonNBounded ℂ B →
+      ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
+        (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ B) →
+          ∑ i, q (x i) ≤ C) :
+    ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
+      (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ U) →
+        ∑ i, q (x i) ≤ C := by
+  classical
+  by_contra! hfail
+  obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+  choose n x hx hlower using fun k : ℕ ↦ hfail (U k) (hU.mem k) (k : ℝ) (Nat.cast_nonneg k)
+  -- The tail is small in any fixed seminorm. Only finitely many families precede it.
+  let B : Set E := {y | ∃ k : ℕ, ∃ a : Fin (n k) → ℂ,
+    (∀ i, ‖a i‖ ≤ 1) ∧ (∑ i, a i • x k i) = y}
+  have hB : IsVonNBounded ℂ B := by
+    apply (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mpr
+    rintro ⟨p, hp⟩
+    obtain ⟨j, _, hj⟩ := hU.1.mem_iff.mp (p.ball_mem_nhds hp one_pos)
+    let M := ∑ k ∈ Finset.range j, ∑ i, p (x k i)
+    have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ Finset.sum_nonneg fun _ _ ↦ apply_nonneg p _
+    refine ⟨M + 1, by linarith, ?_⟩
+    rintro _ ⟨k, a, ha, rfl⟩
+    change p (∑ i, a i • x k i) < M + 1
+    by_cases hk : j ≤ k
+    · have hmem := hj (hU.antitone hk (hx k a ha))
+      exact ((p.mem_ball_zero.mp hmem).trans_le (by linarith))
+    · refine lt_of_le_of_lt ?_ (lt_add_of_pos_right M one_pos)
+      calc
+        p (∑ i, a i • x k i) ≤ ∑ i, p (a i • x k i) :=
+          Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _
+        _ ≤ ∑ i, p (x k i) := by
+          apply Finset.sum_le_sum
+          intro i _
+          rw [map_smul_eq_mul]
+          exact mul_le_of_le_one_left (apply_nonneg p _) (ha i)
+        _ ≤ M := Finset.single_le_sum (f := fun k ↦ ∑ i, p (x k i))
+          (fun _ _ ↦ Finset.sum_nonneg fun _ _ ↦ apply_nonneg p _)
+          (Finset.mem_range.mpr (lt_of_not_ge hk))
+  obtain ⟨C, _, hC⟩ := h B hB
+  obtain ⟨k, hk⟩ := exists_nat_gt C
+  exact (not_lt_of_ge (hC (n k) (x k) fun a ha ↦ ⟨k, a, ha, rfl⟩)) (hk.trans (hlower k))
+
+/-- A series cover of each bounded set of the primal space gives absolute
+summability bounds for the seminorms of its strong dual. -/
+private theorem isNuclearTVS_strongDual_of_bounded_series_cover [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [T2Space E]
+    (h : ∀ B : Set E, IsVonNBounded ℂ B →
+      ∃ (c : ℕ → ℂ) (x : ℕ → E), Summable (fun k ↦ ‖c k‖) ∧ IsVonNBounded ℂ (range x) ∧
+        ∀ y ∈ B, ∃ a : ℕ → ℂ, (∀ k, ‖a k‖ ≤ 1) ∧ HasSum (fun k ↦ (c k * a k) • x k) y) :
+    IsNuclearTVS.{v, u} (StrongDual ℂ E) := by
+  classical
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let D := StrongDual ℂ E
+  let S : Set (Set E) := {B | IsVonNBounded ℂ B}
+  let p : S × Unit → Seminorm ℂ D := fun b ↦
+    mappingSeminorm (E := E) (F := ℂ)
+      ⟨b.1.val, by simpa only [S, mem_ofPred_eq] using b.1.property⟩
+      ⟨normSeminorm ℂ ℂ, continuous_norm⟩
+  have hp : WithSeminorms p :=
+    uniformConvergenceCLM_withSeminorms (E := E) S
+      (fun _ hB ↦ by simpa only [S, mem_ofPred_eq] using hB)
+      (by rw [show ⋃₀ S = univ from sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+      (fun _ : Unit ↦ normSeminorm ℂ ℂ) (norm_withSeminorms ℂ ℂ)
+  let : PolynormableSpace ℂ D := hp.toPolynormableSpace
+  apply isNuclearTVS_of_signedSum_bound
+  intro q hq
+  obtain ⟨s, K, _, hK⟩ := Seminorm.bound_of_continuous hp q hq
+  let B := ⋃ b ∈ s, (b.1.val : Set E)
+  have hB : IsVonNBounded ℂ B := by
+    exact (isVonNBounded_biUnion s.finite_toSet).mpr fun b _ ↦ by simpa only [S, mem_ofPred_eq] using b.1.property
+  obtain ⟨c, x, hc, hx, hcover⟩ := h B hB
+  let W : Set D := {f | MapsTo f (range x) (Metric.ball (0 : ℂ) 1)}
+  have hW : W ∈ 𝓝 (0 : D) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo hx (Metric.ball_mem_nhds _ one_pos)
+  refine ⟨W, hW, (K : ℝ) * (∑' k, ‖c k‖), by positivity, fun n f hf ↦ ?_⟩
+  have hsum (k : ℕ) : ∑ i, ‖f i (x k)‖ ≤ 1 := by
+    choose a ha heq using fun i : Fin n ↦ Complex.exists_norm_mul_eq_self (f i (x k))
+    have ha' (i : Fin n) : a i ≠ 0 := norm_ne_zero_iff.mp (by rw [ha i]; exact one_ne_zero)
+    have hphase (i : Fin n) : (a i)⁻¹ * f i (x k) = (‖f i (x k)‖ : ℂ) := by
+      calc
+        _ = (a i)⁻¹ * (a i * (‖f i (x k)‖ : ℂ)) := congrArg ((a i)⁻¹ * ·) (heq i).symm
+        _ = _ := by rw [← mul_assoc, inv_mul_cancel₀ (ha' i), one_mul]
+    have hz := hf (fun i ↦ (a i)⁻¹) (fun i ↦ by rw [norm_inv, ha, inv_one]) (mem_range_self k)
+    change (∑ i, (a i)⁻¹ • f i) (x k) ∈ Metric.ball 0 1 at hz
+    rw [Metric.mem_ball, dist_zero_right] at hz
+    have heval : (∑ i, (a i)⁻¹ • f i) (x k) = ((∑ i, ‖f i (x k)‖ : ℝ) : ℂ) := by
+      rw [Complex.ofReal_sum]
+      simp only [sum_apply, smul_apply, smul_eq_mul, hphase]
+    rw [heval, Complex.norm_of_nonneg (Finset.sum_nonneg fun i _ ↦ norm_nonneg (f i (x k)))] at hz
+    exact hz.le
+  have hmajorant (i : Fin n) : Summable (fun k ↦ ‖c k‖ * ‖f i (x k)‖) :=
+    Summable.of_nonneg_of_le (fun _ ↦ by positivity) (fun k ↦
+      mul_le_of_le_one_right (norm_nonneg _) ((Finset.single_le_sum
+        (fun j _ ↦ norm_nonneg (f j (x k))) (Finset.mem_univ i)).trans (hsum k))) hc
+  have heval (i : Fin n) (y : E) (hy : y ∈ B) :
+      ‖f i y‖ ≤ ∑' k, ‖c k‖ * ‖f i (x k)‖ := by
+    obtain ⟨a, ha, hseries⟩ := hcover y hy
+    have hseries' : HasSum (fun k ↦ c k * a k * f i (x k)) (f i y) := by
+      convert hseries.map (f i) (f i).continuous using 1
+      funext k
+      exact ((f i).map_smul (c k * a k) (x k)).symm
+    have hterm (k : ℕ) : ‖c k * a k * f i (x k)‖ ≤ ‖c k‖ * ‖f i (x k)‖ := by
+      rw [norm_mul, norm_mul]
+      exact mul_le_mul_of_nonneg_right (mul_le_of_le_one_right (norm_nonneg _) (ha k)) (norm_nonneg _)
+    have hs' := Summable.of_nonneg_of_le (fun k ↦ norm_nonneg _) hterm (hmajorant i)
+    rw [← hseries'.tsum_eq]
+    exact (norm_tsum_le_tsum_norm hs').trans (hs'.tsum_le_tsum hterm (hmajorant i))
+  have hdom (i : Fin n) : q (f i) ≤ (K : ℝ) * ∑' k, ‖c k‖ * ‖f i (x k)‖ := by
+    have hr : 0 ≤ ∑' k, ‖c k‖ * ‖f i (x k)‖ := tsum_nonneg fun _ ↦ by positivity
+    have hp' : ∀ b ∈ s, p b (f i) ≤ ∑' k, ‖c k‖ * ‖f i (x k)‖ := by
+      intro b hb
+      change mappingSeminorm (E := E) (F := ℂ) _ _ (f i) ≤ _
+      rw [mappingSeminorm_apply]
+      exact Real.iSup_le (fun y ↦ heval i y.val (mem_iUnion₂.mpr ⟨b, hb, y.property⟩)) hr
+    have hs' := Seminorm.finset_sup_apply_le hr hp'
+    exact (hK (f i)).trans (mul_le_mul_of_nonneg_left hs' K.coe_nonneg)
+  calc
+    ∑ i, q (f i) ≤ ∑ i, (K : ℝ) * ∑' k, ‖c k‖ * ‖f i (x k)‖ :=
+      Finset.sum_le_sum fun i _ ↦ hdom i
+    _ = (K : ℝ) * ∑' k, ∑ i, ‖c k‖ * ‖f i (x k)‖ := by
+      rw [← Finset.mul_sum, Summable.tsum_finsetSum fun i _ ↦ hmajorant i]
+    _ ≤ _ := by
+      have hle (k : ℕ) : ∑ i, ‖c k‖ * ‖f i (x k)‖ ≤ ‖c k‖ := by
+        rw [← Finset.mul_sum]
+        exact mul_le_of_le_one_right (norm_nonneg _) (hsum k)
+      have hs' := Summable.of_nonneg_of_le (fun k ↦ Finset.sum_nonneg fun _ _ ↦ by positivity) hle hc
+      exact mul_le_mul_of_nonneg_left (hs'.tsum_le_tsum hle hc) K.coe_nonneg
+
 /-- Paper: Lemma C.2.4.11, p. 689. A Fréchet space is nuclear exactly when its
 strong dual is nuclear. -/
 theorem isNuclearTVS_strongDual_iff (hE : IsFrechetTVS E) :
-    IsNuclearTVS.{v, u} (StrongDual ℂ E) ↔ IsNuclearTVS.{v, u} E := by sorry
+    IsNuclearTVS.{v, u} (StrongDual ℂ E) ↔ IsNuclearTVS.{v, u} E := by
+  obtain ⟨hadd, hpoly, hmet, hcomplete⟩ := hE
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  constructor
+  · intro h
+    exact isNuclearTVS_of_signedSum_bound fun q hq ↦
+      exists_sum_bound_on_nhds_of_bounded q
+        (exists_sum_bound_on_bounded_sets_of_isNuclearTVS_strongDual h q hq)
+  · intro h
+    exact isNuclearTVS_strongDual_of_bounded_series_cover
+      (exists_bounded_series_cover_of_nuclear_frechet ⟨hadd, hpoly, hmet, hcomplete⟩ h)
 
 /-- A linear map from a final locally convex topology to a polynormable space is
 continuous if its composites with the defining maps are continuous. -/

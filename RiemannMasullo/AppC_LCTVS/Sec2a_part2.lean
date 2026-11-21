@@ -11,6 +11,7 @@ import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
 import Mathlib.Topology.Algebra.Module.Spaces.CompactConvergenceCLM
 import Mathlib.Topology.UniformSpace.Ascoli
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
@@ -2070,19 +2071,69 @@ section Isometries
 variable {E F G H : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
   [NormedAddCommGroup F] [NormedSpace ℂ F] [NormedAddCommGroup G] [NormedSpace ℂ G]
   [NormedAddCommGroup H] [NormedSpace ℂ H]
+/-- Paper: Example C.2.3.4, p. 677. The injective norm is bounded by a real number exactly
+when every evaluation on a pair of dual unit-ball functionals is bounded by that number. -/
+private theorem injectiveTensorNorm_le_iff (z : E ⊗[ℂ] F) (r : ℝ) :
+    injectiveTensorNorm E F z ≤ r ↔
+      ∀ (φ : StrongDual ℂ E), ‖φ‖ ≤ 1 → ∀ (ψ : StrongDual ℂ F), ‖ψ‖ ≤ 1 →
+        ‖tensorDualForm φ ψ z‖ ≤ r := by
+  simpa only [injectiveTensorNorm, NormedSpace.polar_closedBall one_pos, inv_one,
+    mem_closedBall_zero_iff] using injectiveTensorSeminorm_le_iff
+      ⟨Metric.closedBall (0 : E) 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+      ⟨Metric.closedBall (0 : F) 1, Metric.closedBall_mem_nhds 0 one_pos⟩ z r
+
 variable (f : E →ₗᵢ[ℂ] G) (g : F →ₗᵢ[ℂ] H)
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. Tensoring isometric embeddings preserves the injective norm. -/
 theorem injectiveTensorMap_isometry (z : E ⊗[ℂ] F) :
     injectiveTensorNorm G H (TensorProduct.map f.toLinearMap g.toLinearMap z) =
-      injectiveTensorNorm E F z := by sorry
+      injectiveTensorNorm E F z := by
+  let T := TensorProduct.map f.toLinearMap g.toLinearMap
+  have eval_map (Φ : StrongDual ℂ G) (Ψ : StrongDual ℂ H) :
+      tensorDualForm Φ Ψ (T z) =
+        tensorDualForm (Φ.comp f.toContinuousLinearMap) (Ψ.comp g.toContinuousLinearMap) z := by
+    have h : (tensorDualForm Φ Ψ).comp T =
+        tensorDualForm (Φ.comp f.toContinuousLinearMap) (Ψ.comp g.toContinuousLinearMap) := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [T, tensorDualForm_tmul]
+    exact DFunLike.congr_fun h z
+  refine le_antisymm ((injectiveTensorNorm_le_iff (T z) _).mpr ?_)
+    ((injectiveTensorNorm_le_iff z _).mpr ?_)
+  · intro Φ hΦ Ψ hΨ
+    rw [eval_map]
+    have hΦ' : ‖Φ.comp f.toContinuousLinearMap‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun x ↦ by
+        simpa using Φ.le_of_opNorm_le hΦ (f x)
+    have hΨ' : ‖Ψ.comp g.toContinuousLinearMap‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun y ↦ by
+        simpa using Ψ.le_of_opNorm_le hΨ (g y)
+    exact (injectiveTensorNorm_le_iff z _).mp le_rfl _ hΦ' _ hΨ'
+  · intro φ hφ ψ hψ
+    obtain ⟨Φ, hΦ, hΦbound⟩ := exists_dual_extension_of_le_comp f.toContinuousLinearMap
+      f.isometry.isEmbedding (q := normSeminorm ℂ G) continuous_norm (φ := φ)
+      (fun x ↦ by simpa using φ.le_of_opNorm_le hφ x)
+    obtain ⟨Ψ, hΨ, hΨbound⟩ := exists_dual_extension_of_le_comp g.toContinuousLinearMap
+      g.isometry.isEmbedding (q := normSeminorm ℂ H) continuous_norm (φ := ψ)
+      (fun y ↦ by simpa using ψ.le_of_opNorm_le hψ y)
+    have hΦcomp : Φ.comp f.toContinuousLinearMap = φ := ContinuousLinearMap.ext hΦ
+    have hΨcomp : Ψ.comp g.toContinuousLinearMap = ψ := ContinuousLinearMap.ext hΨ
+    have h := (injectiveTensorNorm_le_iff (T z) _).mp le_rfl
+      Φ (Φ.opNorm_le_bound zero_le_one (fun x ↦ by simpa using hΦbound x))
+      Ψ (Ψ.opNorm_le_bound zero_le_one (fun y ↦ by simpa using hΨbound y))
+    rwa [eval_map, hΦcomp, hΨcomp] at h
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. The induced map of the completions in the
 injective norms is an isometry. -/
 theorem completedInjectiveTensorMap_isometry :
     letI := (injectiveTensorNorm E F).toSeminormedAddCommGroup
     letI := (injectiveTensorNorm G H).toSeminormedAddCommGroup
-    Isometry (Completion.map (TensorProduct.map f.toLinearMap g.toLinearMap)) := by sorry
+    Isometry (Completion.map (TensorProduct.map f.toLinearMap g.toLinearMap)) := by
+  let T := TensorProduct.map f.toLinearMap g.toLinearMap
+  let := (injectiveTensorNorm E F).toSeminormedAddCommGroup
+  let := (injectiveTensorNorm G H).toSeminormedAddCommGroup
+  apply Isometry.completion_map
+  exact AddMonoidHomClass.isometry_of_norm T (injectiveTensorMap_isometry f g)
 
 end Isometries
 
@@ -2099,7 +2150,32 @@ on completed injective tensor products. -/
 theorem completedInjectiveTensor_completionFactors :
     IsHomeomorph (Completion.map (injectiveTensorMap
       (Completion.toComplL : E →L[ℂ] Completion E).toLinearMap
-      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by sorry
+      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by
+  have : PolynormableSpace ℂ (Completion E) := polynormableSpace_completion
+  have : PolynormableSpace ℂ (Completion F) := polynormableSpace_completion
+  let f : E →L[ℂ] Completion E := Completion.toComplL
+  let g : F →L[ℂ] Completion F := Completion.toComplL
+  let T := injectiveTensorMap f.toLinearMap g.toLinearMap
+  have hf : IsEmbedding f := (Completion.isUniformEmbedding_coe E).isEmbedding
+  have hg : IsEmbedding g := (Completion.isUniformEmbedding_coe F).isEmbedding
+  have hT : IsUniformEmbedding T :=
+    AddMonoidHom.isUniformEmbedding_of_isEmbedding (injectiveTensorMap_isEmbedding f g hf hg)
+  have hmap : IsUniformEmbedding (Completion.map T) :=
+    (Completion.isUniformInducing_extension
+      ((Completion.isUniformInducing_coe (α := InjectiveTensor (Completion E) (Completion F))).comp
+        hT.isUniformInducing)).isUniformEmbedding
+  have hd : DenseRange T := injectiveTensorMap_denseRange f g hf hg
+    Completion.denseRange_coe Completion.denseRange_coe
+  have hdmap : DenseRange (Completion.map T) := by
+    apply DenseRange.of_comp
+      (g := ((↑) : InjectiveTensor E F → Completion (InjectiveTensor E F)))
+    simpa only [Function.comp_def, Completion.map_coe hT.uniformContinuous] using
+      Completion.denseRange_coe.comp hd (Completion.continuous_coe _)
+  have hclosed := hmap.isUniformInducing.isComplete_range.isClosed
+  refine isHomeomorph_iff_isEmbedding_surjective.mpr ⟨hmap.isEmbedding, fun y ↦ ?_⟩
+  change y ∈ range (Completion.map T)
+  rw [← hclosed.closure_eq]
+  exact hdmap y
 
 end CompletionFactors
 

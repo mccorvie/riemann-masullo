@@ -638,7 +638,63 @@ theorem approximationNumber_max_min (A : H →L[ℂ] H) (hA : IsCompactOperator 
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
     ∃ minima : {V : Submodule ℂ H // Module.rank ℂ V = ((n + 1 : ℕ) : Cardinal)} → ℝ,
       (∀ V, IsLeast {r | ∃ x ∈ Subtype.val V, ‖x‖ = 1 ∧ r = ‖A x‖} (minima V)) ∧
-        IsGreatest (Set.range minima) (approximationNumber A n) := by sorry
+        IsGreatest (Set.range minima) (approximationNumber A n) := by
+  classical
+  have hmin (U : {V : Submodule ℂ H // Module.rank ℂ V = ((n + 1 : ℕ) : Cardinal)}) :
+      ∃ m : ℝ, IsLeast {r | ∃ x ∈ U.val, ‖x‖ = 1 ∧ r = ‖A x‖} m := by
+    have : FiniteDimensional ℂ U.val :=
+      Module.rank_lt_aleph0_iff.mp (U.property.trans_lt Cardinal.natCast_lt_aleph0)
+    have : Nontrivial U.val := Submodule.nontrivial_iff_ne_bot.mpr fun h ↦
+      (Nat.cast_ne_zero.mpr (Nat.succ_ne_zero n)) (U.property.symm.trans (Submodule.rank_eq_zero.mpr h))
+    let : ProperSpace U.val := FiniteDimensional.proper ℂ U.val
+    obtain ⟨x, hx, hxmin⟩ := (isCompact_sphere (0 : U.val) 1).exists_isMinOn
+      (Set.nonempty_coe_sort.mp (NormedSpace.sphere_nonempty_rclike ℂ zero_le_one))
+      (A.comp U.val.subtypeL).continuous.norm.continuousOn
+    refine ⟨‖A x‖, ⟨x, x.property, mem_sphere_zero_iff_norm.mp hx, rfl⟩, ?_⟩
+    rintro _ ⟨y, hy, hy1, rfl⟩
+    exact isMinOn_iff.mp hxmin ⟨y, hy⟩ (mem_sphere_zero_iff_norm.mpr hy1)
+  choose minima hminima using hmin
+  obtain ⟨maxima, hmaxima, hleast⟩ := approximationNumber_min_max A hA n hn
+  obtain ⟨W, hW⟩ := hleast.1
+  -- Every (n + 1)-dimensional subspace contains a unit vector orthogonal to W.
+  have hle (U : {V : Submodule ℂ H // Module.rank ℂ V = ((n + 1 : ℕ) : Cardinal)}) :
+      minima U ≤ approximationNumber A n := by
+    have : FiniteDimensional ℂ W.val :=
+      Module.rank_lt_aleph0_iff.mp (W.property.trans_lt Cardinal.natCast_lt_aleph0)
+    let : CompleteSpace W.val := FiniteDimensional.completeSpace ℂ W.val
+    let R := W.val.orthogonalProjectionOnto.toLinearMap.comp U.val.subtype
+    have hker : R.ker ≠ ⊥ := by
+      intro h
+      have hrank := R.rank_le_of_injective (LinearMap.ker_eq_bot.mp h)
+      rw [U.property, W.property] at hrank
+      exact (not_le_of_gt (Nat.cast_lt.mpr (Nat.lt_succ_self n))) hrank
+    obtain ⟨x, hx, hx0⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hker
+    let y : U.val := (↑‖x‖ : ℂ)⁻¹ • x
+    have hy1 : ‖y‖ = 1 := norm_smul_inv_norm hx0
+    have hyker : y ∈ R.ker := R.ker.smul_mem _ hx
+    have hyW : (y : H) ∈ W.valᗮ := by
+      rw [← W.val.ker_orthogonalProjectionOnto]
+      exact hyker
+    rw [← hW]
+    exact (hminima U).2 ⟨y, y.property, hy1, rfl⟩ |>.trans
+      ((hmaxima W).2 ⟨y, hyW, hy1, rfl⟩)
+  -- Enlarging V by a maximizing line bounds the new minimum from below.
+  obtain ⟨V, hV, horth, hlower⟩ := exists_rank_subspace_of_compact A hA n hn.le
+  obtain ⟨U, _, hU, _, hUlower⟩ := exists_succ_rank_subspace_of_compact A hA hn hV horth hlower
+  let V₀ : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)} := ⟨V, hV⟩
+  let U₀ : {V : Submodule ℂ H // Module.rank ℂ V = ((n + 1 : ℕ) : Cardinal)} := ⟨U, hU⟩
+  have hge : approximationNumber A n ≤ minima U₀ := by
+    obtain ⟨v, hv, hv1, hvA⟩ := (hmaxima V₀).1
+    obtain ⟨u, hu, hu1, huA⟩ := (hminima U₀).1
+    calc
+      approximationNumber A n ≤ maxima V₀ := hleast.2 ⟨V₀, rfl⟩
+      _ ≤ ‖A.comp Vᗮ.subtypeL‖ := by
+        rw [hvA]
+        simpa [hv1] using (A.comp Vᗮ.subtypeL).le_opNorm ⟨v, hv⟩
+      _ ≤ minima U₀ := by simpa [hu1, huA] using hUlower u hu
+  refine ⟨minima, hminima, ⟨⟨U₀, le_antisymm (hle U₀) hge⟩, ?_⟩⟩
+  rintro _ ⟨U, rfl⟩
+  exact hle U
 
 -- Lemma C.3.5.4(1) is Mathlib's IsCompactOperator.comp_clm and IsCompactOperator.clm_comp.
 

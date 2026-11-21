@@ -8,6 +8,7 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Topology.Algebra.InfiniteSum.Module
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
 
 /-!
@@ -1306,6 +1307,56 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
 local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
   StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
 
+omit [T2Space E] in
+/-- Inserting an operator into the scalar series of a presentation gives a continuous
+additive functional for the topology of uniform convergence on bounded sets. -/
+private theorem nuclearPresentation_traceFunctional {A : E →L[ℂ] E} (r : NuclearPresentation A) :
+    ∃ L : (E →L[ℂ] E) →+ ℂ, Continuous L ∧
+      (∀ (φ : StrongDual ℂ E) (y : E), L (tensorToFiniteRank (φ ⊗ₜ[ℂ] y)) = φ (A y)) ∧
+      Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
+      HasSum (fun n ↦ r.coeff n * r.functional n (r.vector n)) (L (ContinuousLinearMap.id ℂ E)) := by
+  have hseminorm := ((norm_withSeminorms ℂ ℂ).equicontinuous_tfae
+    (fun n ↦ (r.functional n).toLinearMap)).out 1 4
+  obtain ⟨p, hp, hφ⟩ := (hseminorm.mp r.equicontinuous) ()
+  let term (B : E →L[ℂ] E) (n : ℕ) := r.coeff n * r.functional n (B (r.vector n))
+  have hs (B : E →L[ℂ] E) : Summable (fun n ↦ ‖term B n‖) := by
+    obtain ⟨C, _, hC⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mp
+      (r.isBanachDisc.bounded.image B) ⟨p, hp⟩
+    refine (r.summable_coeff.mul_right C).of_nonneg_of_le (fun _ ↦ norm_nonneg _) fun n ↦ ?_
+    simp only [term, norm_mul]
+    exact mul_le_mul_of_nonneg_left
+      ((hφ n _).trans (hC _ (mem_image_of_mem B (r.vector_mem n))).le) (norm_nonneg _)
+  let L : (E →L[ℂ] E) →+ ℂ := {
+    toFun := fun B ↦ ∑' n, term B n
+    map_zero' := by simp [term]
+    map_add' := fun B D ↦ by
+      simpa [term, mul_add] using ((hs B).of_norm.tsum_add (hs D).of_norm) }
+  let I := ContinuousLinearMap.id ℂ E
+  refine ⟨L, ?_, ?_, hs I, (hs I).of_norm.hasSum⟩
+  · apply continuous_of_continuousAt_zero L
+    rw [ContinuousAt, L.map_zero, Metric.tendsto_nhds]
+    intro ε hε
+    let C := (∑' n, ‖r.coeff n‖) + 1
+    have hC : 0 < C := by dsimp [C]; positivity
+    have hU := (Seminorm.continuous_iff (p := p) (div_pos hε hC)).mp hp
+    filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ)
+      r.isBanachDisc.bounded hU] with B hB
+    rw [dist_zero_right]
+    calc
+      ‖L B‖ ≤ ∑' n, ‖term B n‖ := norm_tsum_le_tsum_norm (hs B)
+      _ ≤ ∑' n, ‖r.coeff n‖ * (ε / C) := (hs B).tsum_le_tsum (fun n ↦ by
+        simp only [term, norm_mul]
+        apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+        exact (hφ n _).trans (p.mem_ball_zero.mp (hB (r.vector_mem n))).le)
+          (r.summable_coeff.mul_right _)
+      _ = (∑' n, ‖r.coeff n‖) * (ε / C) := r.summable_coeff.tsum_mul_right _
+      _ < C * (ε / C) := mul_lt_mul_of_pos_right (lt_add_one _) (div_pos hε hC)
+      _ = ε := by field_simp
+  · intro φ y
+    apply (hs (tensorToFiniteRank (φ ⊗ₜ[ℂ] y))).of_norm.hasSum.unique
+    refine (φ.hasSum (r.hasSum y)).congr_fun fun n ↦ ?_
+    simp only [term, tensorToFiniteRank_tmul, map_smul, smul_eq_mul]
+    ring
 /-- Inserting an endomorphism on the vector side of a nuclear presentation gives an
 absolutely convergent scalar series, continuous in that endomorphism for precompact convergence. -/
 private theorem NuclearPresentation.exists_tracePairing {A : E →L[ℂ] E}
@@ -1548,6 +1599,135 @@ private theorem isNuclearOperator_comp_comp {W X Y Z : Type*}
   obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
   exact (isNuclearOperator_iff_nonempty_presentation _).mpr ⟨r.comp_comp S R hR⟩
 
+/-- The Minkowski gauge is unchanged by a linear equivalence. -/
+private theorem gauge_eq_of_linearEquiv_image {S S' : Type*} [AddCommGroup S] [Module ℂ S]
+    [AddCommGroup S'] [Module ℂ S'] (e : S ≃ₗ[ℂ] S') (s : Set S) (x : S) :
+    gauge (e '' s) (e x) = gauge s x := by
+  open scoped Pointwise in
+  have hmem (r : ℝ) : e x ∈ r • (e '' s) ↔ x ∈ r • s := by
+    constructor
+    · intro h
+      rcases h with ⟨z, hz, hxz⟩
+      rcases hz with ⟨y, hy, rfl⟩
+      have : e x = e (r • y) := by
+        rw [← hxz]
+        exact (LinearMap.map_smul_of_tower e.toLinearMap r y).symm
+      exact ⟨y, hy, (e.injective this).symm⟩
+    · rintro ⟨y, hy, rfl⟩
+      exact ⟨e y, ⟨y, hy, rfl⟩, (LinearMap.map_smul_of_tower e.toLinearMap r y).symm⟩
+  have hset : {r : ℝ | 0 < r ∧ e x ∈ r • (e '' s)} = {r : ℝ | 0 < r ∧ x ∈ r • s} := by
+    ext r
+    simp only [Set.mem_ofPred_eq, hmem]
+  rw [gauge, gauge, hset]
+
+/-- The image of a Banach disc under a continuous linear automorphism is a Banach disc,
+because the automorphism identifies the two gauge spaces isometrically. -/
+private theorem isBanachDisc_image {B : Set E} (hB : IsBanachDisc B) (T : E ≃L[ℂ] E) :
+    IsBanachDisc (T '' B) := by
+  let S := Submodule.span ℂ B
+  let S' := Submodule.span ℂ (T '' B)
+  let e : E ≃ₗ[ℂ] E := T.toLinearEquiv
+  have hmap : S.map e.toLinearMap = S' := by
+    rw [Submodule.map_span]
+    rfl
+  let φ : S ≃ₗ[ℂ] S' := e.ofSubmodules S S' hmap
+  let preB : Set S := (↑) ⁻¹' B
+  let preB' : Set S' := (↑) ⁻¹' (T '' B)
+  have hset : preB' = φ '' preB := by
+    ext z
+    constructor
+    · intro hz
+      rcases hz with ⟨b, hb, hbz⟩
+      exact ⟨⟨b, Submodule.subset_span hb⟩, hb, Subtype.ext hbz⟩
+    · rintro ⟨x, hx, rfl⟩
+      change (φ x : E) ∈ T '' B
+      exact ⟨(x : E), hx, rfl⟩
+  have b' : Balanced ℂ preB' := by
+    rw [hset]
+    exact hB.balanced.image φ.toLinearMap
+  have c' : Convex ℝ preB' := by
+    rw [hset]
+    exact hB.convex.linear_image (φ.toLinearMap.restrictScalars ℝ)
+  have a' : Absorbent ℝ preB' := by
+    rw [hset]
+    exact Absorbent.image_of_surjective (f := φ.toLinearMap.restrictScalars ℝ) φ.surjective
+      hB.absorbent
+  let p := gaugeSeminorm hB.balanced hB.convex hB.absorbent
+  let q := gaugeSeminorm b' c' a'
+  have hgauge (x : S) : gauge preB' (φ x) = gauge preB x := by
+    rw [hset]
+    exact gauge_eq_of_linearEquiv_image φ preB x
+  let f : WithLocalSeminorm p → WithLocalSeminorm q := fun x => φ x
+  let g : WithLocalSeminorm q → WithLocalSeminorm p := fun y => φ.symm y
+  have hnorm (x : WithLocalSeminorm p) : ‖f x‖ = ‖x‖ := by
+    have hqx : ‖f x‖ = q (f x) := rfl
+    have hpx : ‖x‖ = p x := rfl
+    rw [hqx, hpx]
+    change gauge preB' (φ x) = gauge preB x
+    exact hgauge x
+  let iso : WithLocalSeminorm p ≃ᵢ WithLocalSeminorm q :=
+    { toFun := f
+      invFun := g
+      left_inv := fun x => φ.symm_apply_apply x
+      right_inv := fun y => φ.apply_symm_apply y
+      isometry_toFun := Isometry.of_dist_eq fun x y => by
+        rw [dist_eq_norm, dist_eq_norm]
+        have hsub : f x - f y = f (x - y) := (map_sub φ x y).symm
+        rw [hsub]
+        exact hnorm (x - y) }
+  exact {
+    bounded := hB.bounded.image (T : E →L[ℂ] E)
+    balanced := b'
+    convex := c'
+    absorbent := a'
+    separated := by
+      letI : T2Space (WithLocalSeminorm p) := hB.separated
+      exact iso.toHomeomorph.t2Space
+    complete := iso.completeSpace_iff.mp hB.complete }
+
+/-- Conjugating a nuclear presentation by a continuous linear automorphism gives a
+presentation of the conjugate operator with the same scalar trace series. -/
+private theorem nuclearPresentation_conj (A : E →L[ℂ] E) (r : NuclearPresentation A)
+    (T : E ≃L[ℂ] E) :
+    ∃ r' : NuclearPresentation
+        (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)),
+      ∀ n, r'.coeff n * r'.functional n (r'.vector n) =
+        r.coeff n * r.functional n (r.vector n) := by
+  let disc' := T.symm '' r.disc
+  have hdisc : IsBanachDisc disc' := isBanachDisc_image r.isBanachDisc T.symm
+  let S := Submodule.span ℂ r.disc
+  let S' := Submodule.span ℂ disc'
+  let e : E ≃ₗ[ℂ] E := T.symm.toLinearEquiv
+  have hmap : S.map e.toLinearMap = S' := by
+    rw [Submodule.map_span]
+    rfl
+  let φ : S ≃ₗ[ℂ] S' := e.ofSubmodules S S' hmap
+  refine ⟨{
+    coeff := r.coeff
+    functional := fun n => (r.functional n).comp T.toContinuousLinearMap
+    disc := disc'
+    isBanachDisc := hdisc
+    vector := fun n => φ (r.vector n)
+    vector_mem := fun n => ⟨(r.vector n : E), r.vector_mem n, rfl⟩
+    summable_coeff := r.summable_coeff
+    equicontinuous := ?_
+    hasSum := ?_ }, ?_⟩
+  · intro U hU
+    have hT : Tendsto T (𝓝 (0 : E)) (𝓝 (0 : E)) := by
+      simpa [map_zero T] using T.continuous.tendsto (0 : E)
+    simpa [map_zero T] using hT.eventually (r.equicontinuous U hU)
+  · intro x
+    refine (T.symm.toContinuousLinearMap.hasSum (r.hasSum (T x))).congr_fun fun n => ?_
+    rw [map_smul]
+    congr 1
+  · intro n
+    have hv : (φ (r.vector n) : E) = T.symm (r.vector n : E) := by
+      rw [LinearEquiv.ofSubmodules_apply]
+      exact congrFun (ContinuousLinearEquiv.coe_toLinearEquiv T.symm) _
+    rw [hv, ContinuousLinearMap.comp_apply]
+    exact congrArg (fun z => r.coeff n * (r.functional n) z)
+      (T.apply_symm_apply (r.vector n : E))
+
 /-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
 conjugation by a continuous linear automorphism. -/
 theorem isNuclearOperator_conj (A : E →L[ℂ] E) (hA : IsNuclearOperator A) (T : E ≃L[ℂ] E) :
@@ -1560,7 +1740,13 @@ under conjugation by a continuous linear automorphism. -/
 theorem nuclearTrace_conj (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A)
     (T : E ≃L[ℂ] E) :
     nuclearTrace hE A hA =
-      nuclearTrace hE _ (isNuclearOperator_conj A hA T) := by sorry
+      nuclearTrace hE _ (isNuclearOperator_conj A hA T) := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  obtain ⟨r', hr'⟩ := nuclearPresentation_conj A r T
+  have hAtr := ((exists_nuclearTrace_hasSum hE A hA).exists.choose_spec r).2
+  have hBtr := ((exists_nuclearTrace_hasSum hE _
+    (isNuclearOperator_conj A hA T)).exists.choose_spec r').2
+  exact HasSum.unique hAtr (hBtr.congr_fun fun n => (hr' n).symm)
 
 /-- Paper: Lemma C.3.2.2, p. 695. Both compositions of a nuclear map and
 a continuous linear injection in the opposite direction are nuclear.
@@ -1814,12 +2000,131 @@ theorem hasSum_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : nuclearEndomorphisms H) :
     HasSum (fun i ↦ (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re) (traceNorm T) := by sorry
 
+/-- A bounded endomorphism and the positive square root of its Gram operator
+each factor through the other by bounded postcomposition. -/
+private theorem exists_factors_sqrt_adjoint_mul (T : H →L[ℂ] H) :
+    ∃ U V : H →L[ℂ] H,
+      U * CFC.sqrt (T.adjoint * T) = T ∧ V * T = CFC.sqrt (T.adjoint * T) := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : S * S = T.adjoint * T :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.isPositive_adjoint_comp_self)
+  have hadj : S.adjoint = S :=
+    IsSelfAdjoint.star_eq (IsSelfAdjoint.of_nonneg (show 0 ≤ S from CFC.sqrt_nonneg _))
+  have hnorm (x : H) : ‖T x‖ = ‖S x‖ := by
+    rw [T.apply_norm_eq_sqrt_inner_adjoint_right, S.apply_norm_eq_sqrt_inner_adjoint_right]
+    change Real.sqrt (RCLike.re ⟪x, (T.adjoint * T) x⟫_ℂ) =
+      Real.sqrt (RCLike.re ⟪x, (S.adjoint * S) x⟫_ℂ)
+    rw [hadj, hS]
+  -- Extend the factor from the range of A to its closure, then project onto it.
+  have factor (A D : H →L[ℂ] H) (h : ∀ x, ‖D x‖ = ‖A x‖) :
+      ∃ U : H →L[ℂ] H, U * A = D := by
+    let W := A.toLinearMap.range.topologicalClosure
+    let i : H →ₗ[ℂ] W := A.toLinearMap.codRestrict W
+      (fun x ↦ A.toLinearMap.range.le_topologicalClosure ⟨x, rfl⟩)
+    have hi : DenseRange i := by
+      have hincl : DenseRange (Set.inclusion A.toLinearMap.range.le_topologicalClosure) :=
+        (denseRange_inclusion_iff _).2 subset_rfl
+      exact hincl.comp (show Function.Surjective A.toLinearMap.rangeRestrict from
+        fun ⟨x, y, hy⟩ ↦ ⟨y, Subtype.ext hy⟩).denseRange (continuous_inclusion _)
+    let j := D.toLinearMap.extendOfNorm i
+    have hj (x : H) : j (i x) = D x :=
+      LinearMap.extendOfNorm_eq hi ⟨1, fun x ↦ by simpa [i] using (h x).le⟩ x
+    refine ⟨j.comp W.orthogonalProjectionOnto, ?_⟩
+    ext x
+    change j (W.orthogonalProjectionOnto (A x)) = D x
+    exact (congrArg j (W.orthogonalProjectionOnto_mem_subspace_eq_self (i x))).trans (hj x)
+  obtain ⟨U, hU⟩ := factor S T hnorm
+  obtain ⟨V, hV⟩ := factor T S (fun x ↦ (hnorm x).symm)
+  exact ⟨U, V, hU, hV⟩
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. Postcomposition by a bounded endomorphism
+preserves nuclearity by applying the endomorphism to the vector sequence. -/
+private theorem isNuclearOperator_postcomp_hilbert {T : H →L[ℂ] H}
+    (hT : IsNuclearOperator T) (U : H →L[ℂ] H) : IsNuclearOperator (U * T) := by
+  obtain ⟨c, φ, y, hc, hφ, hy, hsum⟩ := (isNuclearOperator_iff_isBanachNuclear T).mp hT
+  refine (isNuclearOperator_iff_isBanachNuclear _).mpr
+    ⟨c, φ, U ∘ y, hc, hφ, (U.continuous.tendsto' 0 0 (map_zero U)).comp hy, fun x ↦ ?_⟩
+  change HasSum (fun n ↦ (c n * φ n x) • U (y n)) (U (T x))
+  simpa only [map_smul] using U.hasSum (hsum x)
+
+/-- If the images of a Hilbert basis under a self-adjoint operator have
+square-summable norms, its square has a nuclear rank-one expansion. -/
+private theorem isNuclearOperator_square_of_summable_basis {ι : Type*}
+    (b : HilbertBasis ι ℂ H) (B : H →L[ℂ] H) (hB : B.adjoint = B)
+    (hs : Summable (fun i ↦ ‖B (b i)‖ ^ 2)) : IsNuclearOperator (B * B) := by
+  classical
+  -- Only the support of the square-summable family contributes to the expansion.
+  let cost (i : ι) := ‖B (b i)‖ ^ 2
+  let I := Function.support cost
+  have : Countable I := hs.countable_support
+  obtain ⟨e, he⟩ := Countable.exists_injective_nat I
+  let r : ℕ → H := extend e (fun i ↦ B (b i.val)) 0
+  let y (n : ℕ) := normalizedFactor (r n)
+  let c (n : ℕ) : ℂ := (‖r n‖ : ℂ) ^ 2
+  apply (isNuclearOperator_iff_isBanachNuclear _).mpr
+  refine isBanachNuclear_of_bounded_series (B * B) c (fun n ↦ innerSL ℂ (y n)) y ?_
+    ⟨1, fun n ↦ (innerSL_apply_norm ℂ _).trans_le (norm_normalizedFactor_le_one _)⟩
+    (fun n ↦ norm_normalizedFactor_le_one _) fun x ↦ ?_
+  · have h := (summable_extend_zero he).mpr (hs.subtype (fun i ↦ i ∈ I))
+    refine h.congr fun n ↦ ?_
+    rcases em (∃ i, e i = n) with ⟨i, rfl⟩ | hn
+    · simp [r, c, he.extend_apply]
+    · simp [r, c, extend_apply' _ _ _ hn]
+  · let term (i : ι) := ⟪B (b i), x⟫_ℂ • B (b i)
+    have hterm : HasSum term ((B * B) x) := by
+      refine (B.hasSum (b.hasSum_repr (B x))).congr_fun fun i ↦ ?_
+      simp only [term, map_smul, b.repr_apply_apply, ← B.adjoint_inner_left, hB]
+    have hsupport : Function.support term ⊆ I := by
+      intro i hi
+      by_contra h
+      have hz : B (b i) = 0 := by simpa [I, cost, Function.mem_support] using h
+      exact hi (by simp [term, hz])
+    have hsub := (hasSum_subtype_iff_of_support_subset hsupport).mpr hterm
+    refine ((hasSum_extend_zero he).mpr hsub).congr_fun fun n ↦ ?_
+    have heq : extend e (term ∘ Subtype.val) 0 n = ⟪r n, x⟫_ℂ • r n := by
+      rcases em (∃ i, e i = n) with ⟨i, rfl⟩ | hn
+      · simp only [r, he.extend_apply, term, Function.comp_apply]
+      · simp [r, extend_apply' _ _ _ hn]
+    rw [heq]
+    symm
+    calc
+      _ = ⟪(‖r n‖ : ℂ) • y n, x⟫_ℂ • ((‖r n‖ : ℂ) • y n) := by
+        rw [show (‖r n‖ : ℂ) • y n = r n from norm_smul_normalizedFactor _]
+      _ = _ := by
+        simp only [inner_smul_left, Complex.conj_ofReal, smul_smul, innerSL_apply_apply, c]
+        congr 1
+        ring
+
 /-- Paper: Definition C.3.4.2(2), p. 697. Nuclearity is equivalent to finiteness
 of the positive-square-root diagonal sum in any given Hilbert basis. -/
 theorem isNuclearOperator_iff_summable_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : H →L[ℂ] H) :
     IsNuclearOperator T ↔
-      Summable (fun i ↦ (⟪b i, CFC.sqrt (T.adjoint * T) (b i)⟫_ℂ).re) := by sorry
+      Summable (fun i ↦ (⟪b i, CFC.sqrt (T.adjoint * T) (b i)⟫_ℂ).re) := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : 0 ≤ S := CFC.sqrt_nonneg _
+  obtain ⟨U, V, hU, hV⟩ := exists_factors_sqrt_adjoint_mul T
+  change U * S = T at hU
+  change V * T = S at hV
+  change IsNuclearOperator T ↔ Summable (fun i ↦ (⟪b i, S (b i)⟫_ℂ).re)
+  constructor
+  · intro hT
+    have hSn : IsNuclearOperator S := hV ▸ isNuclearOperator_postcomp_hilbert hT V
+    exact (summable_norm_hilbertDiagonal b S hSn).of_nonneg_of_le
+      (fun i ↦ (ContinuousLinearMap.nonneg_iff_isPositive.mp hS).re_inner_nonneg_right (b i))
+      (fun i ↦ Complex.re_le_norm _)
+  · intro hs
+    let B := CFC.sqrt S
+    have hsq : B * B = S := CFC.sqrt_mul_sqrt_self _ hS
+    have hB : B.adjoint = B :=
+      IsSelfAdjoint.star_eq (IsSelfAdjoint.of_nonneg (show 0 ≤ B from CFC.sqrt_nonneg _))
+    have hb : Summable (fun i ↦ ‖B (b i)‖ ^ 2) := hs.congr fun i ↦ by
+      rw [B.apply_norm_sq_eq_inner_adjoint_right]
+      change _ = (⟪b i, (B.adjoint * B) (b i)⟫_ℂ).re
+      rw [hB, hsq]
+    have hSn : IsNuclearOperator S := hsq ▸ isNuclearOperator_square_of_summable_basis b B hB hb
+    exact hU ▸ isNuclearOperator_postcomp_hilbert hSn U
 
 /-- Paper: Definition C.3.4.2(2), p. 697. A rank-one map has trace norm equal
 to the product of the functional and vector norms.

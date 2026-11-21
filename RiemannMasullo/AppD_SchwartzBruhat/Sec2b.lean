@@ -398,7 +398,16 @@ theorem schwartzBruhatIsotype_comap_ker : Q.ker.comap i.toLinearMap = (P).ker :=
 linear injection on the quotients by the averaging kernels. -/
 theorem schwartzBruhatIsotype_quotient_map :
     ∃ j : (S ⧸ (P).ker) →L[ℂ] (E ⧸ Q.ker), Injective j ∧
-      ∀ f : S, j ((P).ker.mkQ f) = Q.ker.mkQ (i f) := by sorry
+      ∀ f : S, j ((P).ker.mkQ f) = Q.ker.mkQ (i f) := by
+  let F := Q.ker.mkQL.comp i
+  have hker : (P).ker = F.ker := calc
+    (P).ker = Q.ker.comap i.toLinearMap :=
+      (schwartzBruhatIsotype_comap_ker m hm μ₁ ρ hρ heq i hi hcomm ω Q hQ).symm
+    _ = (Q.ker.mkQ.ker).comap i.toLinearMap :=
+      congrArg (Submodule.comap i.toLinearMap) (Submodule.ker_mkQ Q.ker).symm
+    _ = F.ker := (LinearMap.ker_comp i.toLinearMap Q.ker.mkQ).symm
+  refine ⟨(P).ker.liftQL F hker.le, ?_, fun _ ↦ rfl⟩
+  exact LinearMap.ker_eq_bot.mp (Submodule.ker_liftQ_eq_bot' (P).ker F.toLinearMap hker)
 
 /-- Paper: Lemma D.2.2.1(1), p. 795. The injection restricts to a
 continuous linear injection on the homogeneous subspaces. -/

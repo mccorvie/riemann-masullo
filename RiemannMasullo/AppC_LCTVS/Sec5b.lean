@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
+public import Mathlib.Analysis.Complex.HasPrimitives
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
 import Mathlib.Analysis.Calculus.FDeriv.Mul
@@ -397,6 +398,123 @@ theorem exists_positiveSimpleContour_circle (z : ℂ) {r : ℝ} (hr : 0 < r) :
   · refine (pettisIntegral_complex_iff _ _ _).2.2.mpr ⟨(hkernel z hzs).1, ?_⟩
     rw [(hkernel z hzs).2, circleIntegral.integral_sub_inv_of_mem_ball hz]
 
+/-- The velocity is integrable on the parameter interval of a piecewise `C¹` contour. -/
+private theorem ComplexContour.integrableOn_deriv (γ : ComplexContour) :
+    IntegrableOn (deriv (fun t ↦ γ.toContinuousMap t)) (Icc (0 : ℝ) 1) := by
+  obtain ⟨n, t, ht, hstart, hend, hdiff⟩ := γ.piecewiseContDiff
+  rw [integrableOn_congr_set_ae Ioo_ae_eq_Icc.symm]
+  apply IntegrableOn.mono_set (t := ⋃ i : Fin n, Icc (t i.castSucc) (t i.succ))
+  · apply integrableOn_finite_iUnion.mpr
+    intro i
+    have hi := ht i.castSucc_lt_succ
+    have hc := (hdiff i).continuousOn_derivWithin (uniqueDiffOn_Icc hi) le_rfl
+    rw [integrableOn_congr_set_ae Ioo_ae_eq_Icc.symm]
+    exact ((hc.integrableOn_compact isCompact_Icc).mono_set Ioo_subset_Icc_self).congr_fun
+      (fun _ hx ↦ derivWithin_of_mem_nhds (Icc_mem_nhds hx.1 hx.2)) measurableSet_Ioo
+  · intro x hx
+    classical
+    let s := Finset.univ.filter (fun j : Fin (n + 1) ↦ x ≤ t j)
+    have hlast : Fin.last n ∈ s := by simp [s, hend, hx.2.le]
+    let j := s.min' ⟨_, hlast⟩
+    have hj : j ∈ s := Finset.min'_mem _ _
+    have hjx : x ≤ t j := (Finset.mem_filter.mp hj).2
+    have hne : j ≠ 0 := by
+      intro h
+      rw [h, hstart] at hjx
+      exact hx.1.not_ge hjx
+    obtain ⟨i, hi⟩ := Fin.eq_succ_of_ne_zero hne
+    refine mem_iUnion.mpr ⟨i, le_of_lt (lt_of_not_ge ?_), hi ▸ hjx⟩
+    intro hxi
+    have himem : i.castSucc ∈ s := by simp [s, hxi]
+    exact i.castSucc_lt_succ.not_ge (hi ▸ Finset.min'_le s _ himem)
+
+/-- A function continuous on the trace is integrable against the contour measure, and
+its scalar integral is the parameter integral weighted by the contour velocity. -/
+private theorem ComplexContour.scalarIntegral_eq_integral (γ : ComplexContour) {g : ℂ → ℂ}
+    (hg : ContinuousOn g γ.trace) :
+    Integrable g (PettisMeasure.complex γ.measure).variation ∧
+      (PettisMeasure.complex γ.measure).scalarIntegral g =
+        ∫ t in Icc (0 : ℝ) 1, g (γ.toContinuousMap t) * deriv (fun s ↦ γ.toContinuousMap s) t := by
+  classical
+  let p : ℝ → ℂ := γ.toContinuousMap
+  let μ := volume.restrict (Icc (0 : ℝ) 1)
+  let ν : ComplexMeasure ℝ := μ.withDensityᵥ (deriv p)
+  have hp : Measurable p := γ.toContinuousMap.continuous.measurable
+  have hv : Integrable (deriv p) μ := γ.integrableOn_deriv
+  have hvm : Measurable (deriv p) := measurable_deriv _
+  have htrace : IsCompact γ.trace :=
+    isCompact_Icc.image γ.toContinuousMap.continuous
+  have hpre : ∀ᵐ t ∂μ, p t ∈ γ.trace :=
+    (ae_restrict_mem measurableSet_Icc).mono fun t ht ↦ mem_image_of_mem p ht
+  have hν := Measure.variation_withDensityᵥ hv
+  have hνμ : ν.variation ≪ μ := hν ▸ withDensity_absolutelyContinuous _ _
+  have htraceAE : ∀ᵐ z ∂ν.variation.map p, z ∈ γ.trace :=
+    (ae_map_iff hp.aemeasurable htrace.isClosed.measurableSet).2 (hνμ.ae_le hpre)
+  let g₀ := γ.trace.piecewise g 0
+  have hg₀ : Measurable g₀ :=
+    hg.measurable_piecewise continuousOn_const htrace.isClosed.measurableSet
+  have heq : g₀ =ᵐ[ν.variation.map p] g :=
+    htraceAE.mono fun z hz ↦ piecewise_eq_of_mem _ _ _ hz
+  have hgmap : AEStronglyMeasurable g (ν.variation.map p) :=
+    hg₀.aestronglyMeasurable.congr heq
+  obtain ⟨C, hC⟩ := (htrace.image_of_continuousOn hg).isBounded.exists_norm_le
+  have : IsFiniteMeasure ν.variation := by
+    change IsFiniteMeasure (μ.withDensityᵥ (deriv p)).variation
+    rw [hν]
+    exact isFiniteMeasure_withDensity hv.hasFiniteIntegral.ne
+  have hgi : ν.Integrable (g ∘ p) := by
+    have hpre' : ∀ᵐ t ∂ν.variation, p t ∈ γ.trace := hνμ.ae_le hpre
+    exact Integrable.of_bound (hgmap.comp_measurable hp) C
+      (hpre'.mono fun t ht ↦ hC _ (mem_image_of_mem _ ht))
+  refine ⟨hgi.map hgmap, ?_⟩
+  change (ν.map p).integral g (ContinuousLinearMap.mul ℝ ℂ) = _
+  rw [VectorMeasure.integral_map hp hgmap hgi]
+  exact VectorMeasure.integral_withDensityᵥ_mul hv hvm hgi
+
+/-- Paper: Theorem C.5.2.4(1–2), p. 738. Scalar Cauchy–Goursat for a simple contour
+of index zero outside the open set of holomorphy.
+Deviation: The conclusion uses the parameter integral and the hypothesis uses the
+index outside the domain. -/
+theorem PositiveSimpleContour.integral_eq_zero_of_index_eq_zero (γ : PositiveSimpleContour)
+    {U : Set ℂ} (hU : IsOpen U) (htrace : γ.val.trace ⊆ U)
+    (hindex : ∀ z ∉ U, γ.val.index z = 0) {g : ℂ → ℂ} (hg : DifferentiableOn ℂ g U) :
+    (∫ t in Icc (0 : ℝ) 1, g (γ.val.toContinuousMap t) *
+      deriv (fun s ↦ γ.val.toContinuousMap s) t) = 0 := by
+  sorry
+
+/-- A nondegenerate rectangle admits a positively oriented simple boundary contour.
+Its scalar integral agrees, up to orientation, with the sum of the two wedge
+integrals around the rectangle. -/
+theorem exists_positiveSimpleContour_rectangle (z w : ℂ) (hre : z.re ≠ w.re) (him : z.im ≠ w.im) :
+    ∃ γ : PositiveSimpleContour, γ.val.trace ⊆ Complex.Rectangle z w ∧
+      γ.interior ⊆ Complex.Rectangle z w ∧
+      ∃ ε : ℂ, (ε = 1 ∨ ε = -1) ∧
+        ∀ g : ℂ → ℂ, ContinuousOn g (Complex.Rectangle z w) →
+          (PettisMeasure.complex γ.val.measure).scalarIntegral g =
+            ε * (Complex.wedgeIntegral z w g + Complex.wedgeIntegral w z g) := by
+  sorry
+
+/-- Vanishing scalar integrals on simple contours imply complex differentiability
+by the rectangular form of Morera's theorem. -/
+private theorem differentiableOn_of_scalarIntegral_eq_zero {U : Set ℂ} (hU : IsOpen U)
+    {g : ℂ → ℂ} (hg : ContinuousOn g U)
+    (hzero : ∀ γ : PositiveSimpleContour, γ.val.trace ⊆ U → γ.interior ⊆ U →
+      (PettisMeasure.complex γ.val.measure).scalarIntegral g = 0) : DifferentiableOn ℂ g U := by
+  refine (Complex.isConservativeOn_and_continuousOn_iff_isDifferentiableOn hU).1 ⟨?_, hg⟩
+  intro z w hrect
+  rw [← add_eq_zero_iff_eq_neg]
+  by_cases hre : z.re = w.re
+  · rw [Complex.wedgeIntegral_add_wedgeIntegral_eq]
+    simp [hre]
+  by_cases him : z.im = w.im
+  · rw [Complex.wedgeIntegral_add_wedgeIntegral_eq]
+    simp [him]
+  obtain ⟨γ, htrace, hinterior, ε, hε, heq⟩ := exists_positiveSimpleContour_rectangle z w hre him
+  have h := hzero γ (htrace.trans hrect) (hinterior.trans hrect)
+  rw [heq g (hg.mono hrect)] at h
+  have hε₀ : ε ≠ 0 := by rcases hε with rfl | rfl <;> simp
+  exact (mul_eq_zero.mp h).resolve_left hε₀
+
 section Criteria
 
 variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
@@ -410,7 +528,25 @@ theorem weaklyHolomorphicOn_iff_contourIntegral_eq_zero :
     WeaklyHolomorphicOn f Ω ↔ WeaklyContinuousOn f Ω ∧
       ∀ γ : PositiveSimpleContour, γ.val.trace ⊆ Ω → γ.interior ⊆ Ω →
         ∃ hi : PettisWeaklyIntegrable (.complex γ.val.measure) f,
-          pettisWeakIntegral (.complex γ.val.measure) f hi = 0 := by sorry
+          pettisWeakIntegral (.complex γ.val.measure) f hi = 0 := by
+  constructor
+  · intro hf
+    have hc : WeaklyContinuousOn f Ω := fun φ ↦ (hf φ).continuousOn
+    refine ⟨hc, fun γ htrace hinterior ↦ ?_⟩
+    have hscalar (φ : StrongDual ℂ E) := γ.val.scalarIntegral_eq_integral ((hc φ).mono htrace)
+    refine ⟨fun φ ↦ (hscalar φ).1, LinearMap.ext fun φ ↦ ?_⟩
+    change (PettisMeasure.complex γ.val.measure).scalarIntegral (φ ∘ f) = 0
+    rw [(hscalar φ).2]
+    apply γ.integral_eq_zero_of_index_eq_zero hΩ htrace _ (hf φ)
+    intro z hz
+    have hzt : z ∉ γ.val.trace := fun h ↦ hz (htrace h)
+    exact (γ.property.2 z hzt).resolve_right fun h ↦ hz (hinterior ⟨hzt, h⟩)
+  · rintro ⟨hc, hzero⟩ φ
+    apply differentiableOn_of_scalarIntegral_eq_zero hΩ (hc φ)
+    intro γ htrace hinterior
+    obtain ⟨hi, h⟩ := hzero γ htrace hinterior
+    exact congrArg (fun v : PettisWeakCompletion E ↦
+      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ) h
 
 /-- Paper: Theorem C.5.2.4(1,3), p. 738. Weak holomorphy is equivalent to weak
 continuity and the Cauchy formula in the algebraic dual of the continuous dual. -/
