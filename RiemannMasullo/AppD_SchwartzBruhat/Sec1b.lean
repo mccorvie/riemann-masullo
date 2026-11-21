@@ -33,7 +33,8 @@ def IsCompactlyGeneratedGroup (G : Type*) [Group G] [TopologicalSpace G] : Prop 
 /-- Paper: Definition D.1.4.1, p. 757. A compact group is compactly generated.
 Deviation: Sanity check using the whole group as the generating neighborhood. -/
 theorem isCompactlyGeneratedGroup_of_compact [CompactSpace G] :
-    IsCompactlyGeneratedGroup G := by sorry
+    IsCompactlyGeneratedGroup G :=
+  ⟨Set.univ, Filter.univ_mem, isCompact_univ, Subgroup.closure_univ⟩
 
 /-- Paper: Theorem D.1.4.2, p. 757. A locally Euclidean space admits charts in
 some fixed finite real dimension. -/
