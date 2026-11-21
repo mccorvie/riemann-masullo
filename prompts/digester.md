@@ -12,7 +12,7 @@ one, because provers will build on it.
 
 1. Read the whole section (`scripts/paper.sh <first> <last>`) and the issue's comments, which may
    hold a scout's list of what already exists. Look at the page image for every formula you
-   formalize; the text extraction loses subscripts and accents.
+   formalize: the transcription that `paper.sh` prints is good but not exact, and the PDF decides.
 2. Write `RiemannMasullo/<Chapter>/Sec<N>.lean` (the issue gives the path). Follow the paper's
    order. Each numbered Definition, Lemma, Proposition, Theorem and Corollary becomes one
    declaration. Definitions are written out in full; every proof is `by sorry`. A definition

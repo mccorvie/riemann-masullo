@@ -209,7 +209,15 @@ theorem modulatedMellin_profile_translate (p p' : P)
     (hp : ∀ x : ℝ, p'.val x = (χ (τ (m γ) * γ⁻¹) : ℂ) * p.val (L + x))
     (s : ℂ) (hs : s.re ∈ I) :
     (M p').val s =
-      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) * (M p).val s := by sorry
+      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) * (M p).val s := by
+  have ha : 0 < ((m γ).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m γ))
+  rw [positiveRealFourierMellin_apply I hOpen hInt hne p' s hs,
+    positiveRealFourierMellin_apply I hOpen hInt hne p s hs, mul_assoc,
+    ← smul_eq_mul (a := (((m γ).val : ℝ) : ℂ) ^ (-s)),
+    ← mellin_comp_mul_left (fun u ↦ p.val (Real.log u)) s ha, ← smul_eq_mul,
+    ← mellin_const_smul]
+  refine setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_
+  simp only [hp, Real.log_mul ha.ne' (mem_Ioi.mp ht).ne', smul_eq_mul]
 
 /-- Paper: Discussion 4.4.1.1(5), p. 191. Translating the group multiplier in the
 spectral variable gives the compact character times the scalar multiplier. -/

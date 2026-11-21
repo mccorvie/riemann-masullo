@@ -3581,7 +3581,19 @@ theorem completedProjectiveTensorMap_isQuotientMap_range :
 /-- Paper: Proposition C.2.3.7, p. 679. If both domains are metrizable, the
 completed projective tensor map is surjective. -/
 theorem completedProjectiveTensorMap_surjective [MetrizableSpace E] [MetrizableSpace F] :
-    Function.Surjective (Completion.map (projectiveTensorMap f.toLinearMap g.toLinearMap)) := by sorry
+    Function.Surjective (Completion.map (projectiveTensorMap f.toLinearMap g.toLinearMap)) := by
+  obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+  obtain ⟨V, hV⟩ := (𝓝 (0 : F)).exists_antitone_basis
+  let X := ProjectiveTensor E F
+  have : (𝓝 (0 : X)).IsCountablyGenerated :=
+    (projectiveTensor_zero_basis hU.toHasBasis hV.toHasBasis).isCountablyGenerated
+  let : FirstCountableTopology X := ⟨fun x ↦ by
+    rw [← map_add_left_nhds_zero x]
+    infer_instance⟩
+  let T : X →+ ProjectiveTensor G H := (projectiveTensorMap f.toLinearMap g.toLinearMap).toAddMonoidHom
+  have hT : IsOpenQuotientMap T :=
+    AddMonoidHom.isOpenQuotientMap_of_isQuotientMap (projectiveTensorMap_isQuotientMap f g hf hg)
+  exact completion_map_surjective_of_isOpenQuotientMap T hT
 
 end ProjectiveQuotients
 

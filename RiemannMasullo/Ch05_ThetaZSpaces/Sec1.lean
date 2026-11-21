@@ -416,9 +416,77 @@ theorem globalThetaMellin_injective : Injective (globalThetaMellin (F := F)) := 
 The Mellin transform is injective on the S-local theta quotient. -/
 theorem sLocalThetaMellin_injective : Injective (sLocalThetaMellin (F := F) (S := S)) := by sorry
 
+open scoped ENNReal in
+/-- Point evaluation is continuous in the Schwartz–Bruhat topology since its
+norm is bounded on each stage by the zeroth Schwartz seminorm. -/
+private theorem schwartzBruhat_eval_continuous {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (x : G) : Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+  classical
+  let L : SchwartzBruhat G →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  have hstage (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+    let _ := e.finiteGroup
+    let q : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hq : Continuous q := elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0)
+    change Continuous (p.comp (schwartzBruhatStageInclusion a e))
+    refine Seminorm.continuous_of_le hq ?_
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ q f
+    rw [schwartzBruhatStageRealization_apply]
+    split_ifs with hx
+    · let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f y‖₊ : ℝ≥0∞).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+      refine ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne ?_
+      rw [elementarySchwartzBound_zero]
+      exact le_iSup (fun z ↦ (‖f z‖₊ : ℝ≥0∞)) y
+    · simpa only [norm_zero] using apply_nonneg q f
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨p, hstage⟩
+
+/-- At a fixed idele class, global theta is continuous in the test function. It is the
+pointwise limit of the finite partial sums of point evaluations, and the global
+Schwartz–Bruhat space is barrelled, so the Banach–Steinhaus theorem applies. -/
+private theorem adelicTheta_eval_continuous (c : C𝔽) :
+    Continuous (fun f : ℬ𝔽 ↦ adelicTheta f c) := by
+  induction c using QuotientGroup.induction_on with | H g => ?_
+  let : BarrelledSpace ℂ ℬ𝔽 := (adeleSchwartz_montel (F := F)).2.1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable Fˣ := Units.val_injective.countable
+  let pt (ξ : Fˣ) : Multiplicative 𝔸[F] :=
+    Multiplicative.ofAdd (algebraMap F 𝔸[F] (ξ : F) * g.val)
+  let ev (ξ : Fˣ) : ℬ𝔽 →L[ℂ] ℂ :=
+    ⟨(LinearMap.proj (pt ξ)).comp (schwartzBruhatSubmodule _).subtype,
+      schwartzBruhat_eval_continuous (pt ξ)⟩
+  let L (s : Finset Fˣ) : ℬ𝔽 →L[ℂ] ℂ := ∑ ξ ∈ s, ev ξ
+  have hL (s : Finset Fˣ) (f : ℬ𝔽) : L s f = ∑ ξ ∈ s, f (pt ξ) := by
+    simp only [L, ContinuousLinearMap.coe_sum', Finset.sum_apply]
+    rfl
+  have hsum (f : ℬ𝔽) : HasSum (fun ξ ↦ f (pt ξ)) (adelicTheta f (QuotientGroup.mk g)) := by
+    rw [adelicTheta_mk]
+    refine Summable.hasSum ?_
+    have hs := ((adelicAverage_summableUniformlyOn f {(g, 0)} isCompact_singleton).summable
+      rfl).of_norm
+    simpa only [add_zero, mul_comm g.val] using hs
+  have hT : Filter.Tendsto (fun s f ↦ L s f) Filter.atTop
+      (𝓝 fun f ↦ adelicTheta f (QuotientGroup.mk g)) :=
+    tendsto_pi_nhds.mpr fun f ↦ by
+      simp only [hL]
+      exact hsum f
+  exact (continuousLinearMapOfTendsto L hT).continuous
+
 /-- Paper: Theorem 5.1.1.3(1), p. 224.
 The global theta kernel is a closed subspace of the global Schwartz–Bruhat space. -/
-theorem adelicTheta_ker_isClosed : IsClosed (LinearMap.ker theta𝔽 : Set ℬ𝔽) := by sorry
+theorem adelicTheta_ker_isClosed : IsClosed (LinearMap.ker theta𝔽 : Set ℬ𝔽) := by
+  have hker : (⋂ c : C𝔽, (fun f : ℬ𝔽 ↦ adelicTheta f c) ⁻¹' {0}) =
+      (LinearMap.ker theta𝔽 : Set ℬ𝔽) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun c ↦ Set.mem_singleton_iff).trans ?_)
+    rw [SetLike.mem_coe, LinearMap.mem_ker, adelicThetaLinearMap_apply]
+    exact ⟨fun h ↦ ContinuousMap.ext h, fun h c ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) h⟩
+  exact (congrArg (IsClosed (X := ℬ𝔽)) hker).mp
+    (isClosed_iInter fun c ↦ isClosed_singleton.preimage (adelicTheta_eval_continuous c))
 
 /-- Paper: Theorem 5.1.1.3(1), p. 224.
 The S-local theta kernel is a closed subspace of the S-local Schwartz–Bruhat space. -/

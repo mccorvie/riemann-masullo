@@ -1130,7 +1130,42 @@ times a positive norm power holds below S-idelic norm one. -/
 theorem sLocalAdelicTheta_norm_pow_bounded_threshold_one
     (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) :
     ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : Iₛ, normℝ g < 1 →
-      ‖(normℝ g ^ ε) • sLocalAdelicTheta F S f g‖ ≤ C := by sorry
+      ‖(normℝ g ^ ε) • sLocalAdelicTheta F S f g‖ ≤ C := by
+  refine (sLocalAdelicTheta_log_growth_bounded F S B hB).elim fun C₁ h₁ ↦ ?_
+  refine h₁.elim fun C₂ h₂ ↦ ?_
+  have hC₁ := h₂.1
+  have hC₂ := h₂.2.1
+  have htheta := h₂.2.2
+  let n := Fintype.card (InfinitePlace F) + S.card - 1
+  let D : ℝ := (n.factorial : ℝ) / ε ^ n
+  have hD : 0 < D := by dsimp [D]; positivity
+  have hweighted (t : ℝ) (ht : 0 < t) (ht₁ : t ≤ 1) : t ^ ε * |Real.log t| ^ n ≤ D := by
+    have hexp : Real.exp (|Real.log t| * ε) = (t ^ ε)⁻¹ := by
+      rw [abs_of_nonpos (Real.log_nonpos ht.le ht₁), neg_mul, Real.exp_neg,
+        ← Real.rpow_def_of_pos ht]
+    -- Use the nth term of the exponential series to bound the weighted log power.
+    have hlog := Real.pow_div_factorial_le_exp (|Real.log t| * ε)
+      (mul_nonneg (abs_nonneg (Real.log t)) hε.le) n
+    rw [hexp, mul_pow] at hlog
+    have hfact : 0 < (n.factorial : ℝ) := by positivity
+    have hmul := (le_inv_mul_iff₀ (Real.rpow_pos_of_pos ht ε)).mp ((div_le_iff₀ hfact).mp hlog)
+    exact (le_div_iff₀ (pow_pos hε n)).mpr
+      ((mul_assoc (t ^ ε) (|Real.log t| ^ n) (ε ^ n)).le.trans hmul)
+  have hbound (t : ℝ) (ht : 0 < t) (ht₁ : t ≤ 1) (z : ℂ)
+      (hz : ‖z‖ ≤ C₁ * |Real.log t| ^ n + C₂) : ‖(t ^ ε) • z‖ ≤ C₁ * D + C₂ := by
+    have htε := (Real.rpow_pos_of_pos ht ε).le
+    rw [norm_smul, Real.norm_of_nonneg htε]
+    calc
+      _ ≤ t ^ ε * (C₁ * |Real.log t| ^ n + C₂) := mul_le_mul_of_nonneg_left hz htε
+      _ = C₁ * (t ^ ε * |Real.log t| ^ n) + C₂ * t ^ ε := by
+        rw [mul_add, mul_left_comm (t ^ ε) C₁, mul_comm (t ^ ε) C₂]
+      _ ≤ C₁ * D + C₂ :=
+        add_le_add (mul_le_mul_of_nonneg_left (hweighted t ht ht₁) hC₁.le)
+          (mul_le_of_le_one_right hC₂.le (Real.rpow_le_one ht.le ht₁ hε.le))
+  refine ⟨C₁ * D + C₂, add_pos (mul_pos hC₁ hD) hC₂, ?_⟩
+  intro f hf g hg
+  have hgpos : 0 < normℝ g := NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S g))
+  exact hbound (normℝ g) hgpos hg.le (sLocalAdelicTheta F S f g) (htheta f hf g hg)
 
 /-- Paper: Proposition 2.4.3.1(3), p. 113. The corresponding uniform
 homogeneous bound holds below S-idelic norm one.
@@ -1139,12 +1174,44 @@ theorem sLocalHomogeneousAdelicTheta_norm_pow_bounded_threshold_one
     (μ : Measure ↥J₁) [Measure.IsHaarMeasure μ] (ω : PontryaginDual J₁)
     (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) :
     ∃ C : ℝ, 0 < C ∧ ∀ f ∈ B, ∀ g : Iₛ, normℝ g < 1 →
-      ‖(normℝ g ^ ε) • sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C := by sorry
+      ‖(normℝ g ^ ε) • sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)‖ ≤ C := by
+  let : IsFiniteMeasure μ := normOneSIdeleQuotient_isFiniteMeasure F S μ
+  refine (sLocalAdelicTheta_norm_pow_bounded_threshold_one F S ε hε B hB).elim fun C hC ↦ ?_
+  refine ⟨C * μ.real Set.univ, mul_pos hC.1 measureReal_univ_pos, fun f hf g hg ↦ ?_⟩
+  let φ (h : J₁) := sLocalAdelicThetaOnClasses F S f (classOf g * h.val) * (ω h : ℂ)
+  change ‖(normℝ g ^ ε) • (∫ h, φ h ∂μ)‖ ≤ _
+  rw [← integral_smul]
+  apply norm_integral_le_of_norm_le_const
+  refine Eventually.of_forall fun h ↦ ?_
+  obtain ⟨k, hk, hclass⟩ := sIdele_exists_representative_mul_norm_one F S g h
+  have hnorm : ‖φ h‖ = ‖sLocalAdelicTheta F S f k‖ :=
+    sLocalTheta_char_norm_eq_of_representative F S ω f g k h hclass
+  calc
+    _ = ‖normℝ g ^ ε‖ * ‖φ h‖ := norm_smul _ _
+    _ = ‖normℝ k ^ ε‖ * ‖sLocalAdelicTheta F S f k‖ :=
+      congrArg₂ (fun t a : ℝ ↦ ‖t ^ ε‖ * a) hk.symm hnorm
+    _ = ‖(normℝ k ^ ε) • sLocalAdelicTheta F S f k‖ := (norm_smul _ _).symm
+    _ ≤ C := hC.2 f hf k (hk.trans_lt hg)
+
+/-- A bound at half the exponent leaves a positive power tending to zero. -/
+private theorem tendsto_norm_pow_of_isBigO_half {G : Type*} (r : G → ℝ) (θ : G → ℂ)
+    (hθ : (fun g ↦ (r g ^ (ε / 2)) • θ g) =O[comap r (𝓝[>] (0 : ℝ))]
+      (fun _ ↦ (1 : ℝ))) :
+    Tendsto (fun g ↦ (r g ^ ε) • θ g) (comap r (𝓝[>] (0 : ℝ))) (𝓝 0) := by
+  have hr : Tendsto r (comap r (𝓝[>] (0 : ℝ))) (𝓝[>] 0) := tendsto_comap
+  have hhalf := (hr.mono_right nhdsWithin_le_nhds).rpow_const_nhds_zero (half_pos hε)
+  refine (NormedField.tendsto_zero_smul_of_tendsto_zero_of_bounded hhalf
+    hθ.isBoundedUnder_le).congr' ?_
+  filter_upwards [hr.eventually self_mem_nhdsWithin] with g hg
+  change (r g ^ (ε / 2)) • ((r g ^ (ε / 2)) • θ g) = (r g ^ ε) • θ g
+  rw [smul_smul, ← Real.rpow_add hg, add_halves]
 
 /-- Paper: Corollary 2.4.3.2, p. 115. Theta multiplied by any positive
 real power of the S-idelic norm tends to zero as that norm tends to zero. -/
 theorem sLocalAdelicTheta_norm_pow_tendsto_zero (f : ℬₛ) :
-    Tendsto (fun g ↦ (normℝ g ^ ε) • sLocalAdelicTheta F S f g) smallNorm (𝓝 0) := by sorry
+    Tendsto (fun g ↦ (normℝ g ^ ε) • sLocalAdelicTheta F S f g) smallNorm (𝓝 0) := by
+  exact tendsto_norm_pow_of_isBigO_half ε hε normℝ (fun g ↦ sLocalAdelicTheta F S f g)
+    (sLocalAdelicTheta_norm_pow_isBigO F S (ε / 2) (half_pos hε) f)
 
 /-- Paper: Corollary 2.4.3.2, p. 115. The same vanishing holds for
 homogeneous theta for every continuous character of the norm-one classes.
@@ -1152,6 +1219,9 @@ Deviation: As in §2.3, the norm-one class Haar measure is explicit. -/
 theorem sLocalHomogeneousAdelicTheta_norm_pow_tendsto_zero
     (μ : Measure ↥J₁) [Measure.IsHaarMeasure μ] (ω : PontryaginDual J₁) (f : ℬₛ) :
     Tendsto (fun g ↦ (normℝ g ^ ε) • sLocalHomogeneousAdelicTheta F S μ ω f (classOf g))
-      smallNorm (𝓝 0) := by sorry
+      smallNorm (𝓝 0) := by
+  exact tendsto_norm_pow_of_isBigO_half ε hε normℝ
+    (fun g ↦ sLocalHomogeneousAdelicTheta F S μ ω f (classOf g))
+    (sLocalHomogeneousAdelicTheta_norm_pow_isBigO F S (ε / 2) (half_pos hε) μ ω f)
 
 end RiemannMasullo
