@@ -3108,6 +3108,8 @@ theorem schwartzBruhat_reflexive :
     ∃ e : SchwartzBruhat G ≃L[ℂ] StrongDual ℂ (StrongDual ℂ (SchwartzBruhat G)),
       ∀ f L, e f L = L f := by sorry
 
+-- Checking section-variable usage is expensive for the nested strong duals here.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem D.1.5.7, p. 764. Evaluation identifies the strong dual
 linearly and topologically with its own strong bidual. -/
 theorem schwartzBruhat_strongDual_reflexive [SecondCountableTopology G] :
@@ -3116,7 +3118,13 @@ theorem schwartzBruhat_strongDual_reflexive [SecondCountableTopology G] :
     let DD := StrongDual ℂ D
     letI : TopologicalSpace DD := ContinuousLinearMap.topologicalSpace
     letI : TopologicalSpace (StrongDual ℂ DD) := ContinuousLinearMap.topologicalSpace
-    ∃ e : D ≃L[ℂ] StrongDual ℂ DD, ∀ L M, e L M = M L := by sorry
+    ∃ e : D ≃L[ℂ] StrongDual ℂ DD, ∀ L M, e L M = M L := by
+  refine (schwartzBruhat_reflexive (G := G)).elim ?_
+  intro e he
+  refine ⟨e.arrowCongr (ContinuousLinearEquiv.refl ℂ ℂ), ?_⟩
+  intro L M
+  change L (e.symm M) = M L
+  simpa only [e.apply_symm_apply] using (he (e.symm M) L).symm
 
 /-- Paper: Theorem D.1.5.7, p. 764. The strong dual of the Schwartz–Bruhat space
 is barrelled. -/
