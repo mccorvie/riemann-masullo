@@ -1198,7 +1198,37 @@ theorem dSequenceMaximal_weak_global [μ.IsHaarMeasure] (hU : IsDPrimeSequence �
     (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
     {f : G → ℂ} (hf : Integrable f μ) {α : ℝ} (hα : 0 < α) :
     μ {x | ENNReal.ofReal α < dSequenceMaximal μ U f x} ≤
-      ENNReal.ofReal (2 * C / α) * eLpNorm f 1 μ := by sorry
+      ENNReal.ofReal (2 * C / α) * eLpNorm f 1 μ := by
+  let ν := μ.withDensity (fun y ↦ ‖f y‖ₑ)
+  have : IsFiniteMeasure ν := isFiniteMeasure_withDensity hf.hasFiniteIntegral.ne
+  have hν : ν univ = eLpNorm f 1 μ := by
+    rw [withDensity_apply _ MeasurableSet.univ, setLIntegral_univ,
+      eLpNorm_one_eq_lintegral_eNorm hf.aestronglyMeasurable]
+  have hmax (x : G) : dSequenceMaximal μ U f x = dSequenceMeasureMaximal μ ν U x := by
+    unfold dSequenceMaximal dSequenceMeasureMaximal
+    congr 1
+    funext k
+    rw [setLAverage_eq, measure_smul, withDensity_apply₀ _ ((hU.1.1 k).2.1.smul x)]
+  simp only [hmax]
+  let E := {x | ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x}
+  change μ E ≤ _
+  have hweak : μ E ≤ ENNReal.ofReal (C / α) * ν univ := by
+    have hmono : Monotone (fun n ↦ compactCovering G n ∩ E) :=
+      fun _ _ hnm ↦ inter_subset_inter (compactCovering_subset G hnm) Subset.rfl
+    have hcover : (⋃ n, compactCovering G n ∩ E) = E := by
+      rw [← iUnion_inter, iUnion_compactCovering, univ_inter]
+    rw [← hcover, hmono.measure_iUnion]
+    refine iSup_le fun n ↦ ?_
+    have hK := isCompact_compactCovering G n
+    have hfin : μ (compactCovering G n * U 0) < ∞ :=
+      (measure_mono (Set.mul_subset_mul Subset.rfl subset_closure)).trans_lt
+        (hK.mul hcompact).measure_lt_top
+    exact (dSequenceMeasureMaximal_weak_null (ν := ν) hU.1 hC hbound
+      hK.isClosed.measurableSet.nullMeasurableSet hfin hα).trans
+        (mul_le_mul' le_rfl (measure_mono (subset_univ _)))
+  rw [hν] at hweak
+  refine hweak.trans (mul_le_mul' (ENNReal.ofReal_le_ofReal ?_) le_rfl)
+  exact div_le_div_of_nonneg_right (by linarith) hα.le
 
 /-- Paper: Theorem A.5.3.7(2), p. 582. An `Lᵖ` input with `p > 1`
 has an `Lᵖ` maximal function. -/
