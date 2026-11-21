@@ -1173,7 +1173,22 @@ def IsWeilQuotientMeasure (μ : Measure G) (μH : Measure H) (ν : Measure (G �
 subgroup, normalized to mass one, recovers the pushforward of the group measure. -/
 theorem isWeilQuotientMeasure_bot (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular] :
     IsWeilQuotientMeasure (⊥ : Subgroup G) μ Measure.count
-      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by sorry
+      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by
+  let : BorelSpace (G ⧸ (⊥ : Subgroup G)) := ⟨rfl⟩
+  let e := (QuotientGroup.quotientBot (G := G)).symm
+  let h := e.toEquiv.toHomeomorphOfContinuousOpen
+    QuotientGroup.continuous_mk QuotientGroup.isOpenMap_coe
+  refine ⟨e.isHaarMeasure_map μ h.continuous h.symm.continuous, Measure.Regular.map h, ?_⟩
+  intro f _
+  have hcoset (q : G ⧸ (⊥ : Subgroup G)) :
+      lcaCosetIntegral (⊥ : Subgroup G) Measure.count f q = f (h.symm q) := by
+    have hout : q.out = h.symm q :=
+      h.injective ((Quotient.out_eq' q).trans (h.apply_symm_apply q).symm)
+    simp [lcaCosetIntegral, Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G)), hout]
+  simp_rw [hcoset]
+  change (∫ x, f x ∂μ) = ∫ q, f (h.symm q) ∂(μ.map h)
+  simpa only [Homeomorph.toMeasurableEquiv_coe, h.symm_apply_apply] using
+    (integral_map_equiv (μ := μ) h.toMeasurableEquiv (fun q ↦ f (h.symm q))).symm
 
 variable (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
 variable (μH : Measure H) [μH.IsHaarMeasure] [μH.Regular]
