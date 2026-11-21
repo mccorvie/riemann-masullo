@@ -6,6 +6,8 @@ public import Mathlib.LinearAlgebra.DirectSum.TensorProduct
 public import Mathlib.LinearAlgebra.TensorProduct.DirectLimit
 public import Mathlib.Topology.Algebra.LinearMapCompletion
 import Mathlib.Analysis.LocallyConvex.WeakDual
+import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
@@ -294,6 +296,182 @@ theorem mackeyDual_eq_precompact {X : Type*} [AddCommGroup X] [Module ℂ X]
 -- TODO(later): needs §C.2.4 for the nuclear Montel assertion of Remark C.2.3.1.
 -- TODO(later): needs §D.1 for its adelic Schwartz–Bruhat space examples.
 
+omit sF in
+/-- A continuous seminorm is attained in absolute value by evaluations on an absolutely
+convex, weak-star compact set of continuous linear functionals. -/
+private theorem exists_mackey_test_set
+    (p : Seminorm ℂ F) (hp : Continuous p) :
+    ∃ D : Set (WeakDual ℂ F), AbsConvex ℂ D ∧ IsCompact D ∧
+      ∀ y : F, ∃ ψ ∈ D, ‖ψ y‖ = p y := by
+  -- Use the seminorm on a copy of F while keeping the original topology on F.
+  let e : ULift.{0} F ≃ₗ[ℂ] F := ULift.moduleEquiv
+  let q := p.comp e.toLinearMap
+  let : SeminormedAddCommGroup (ULift.{0} F) := q.toSeminormedAddCommGroup
+  let : TopologicalSpace (ULift.{0} F) :=
+    q.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+  let : NormedSpace ℂ (ULift.{0} F) := ⟨fun c x ↦ (map_smul_eq_mul q c x).le⟩
+  let : IsTopologicalAddGroup F := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have he : Continuous e.symm := by
+    refine (Metric.continuous_iff' (f := fun y : F ↦ e.symm y)).mpr fun y ε hε ↦ ?_
+    have hc : Continuous (fun x : F ↦ p (x - y)) :=
+      hp.comp (continuous_id.sub continuous_const)
+    have hsmall := hc.continuousAt (x := y).eventually_lt continuousAt_const
+      (show p (y - y) < ε by simpa)
+    filter_upwards [hsmall] with x hx
+    rw [dist_eq_norm, ← map_sub]
+    change p (e (e.symm (x - y))) < ε
+    rwa [e.apply_symm_apply]
+  let pull : WeakDual ℂ (ULift.{0} F) →ₗ[ℂ] WeakDual ℂ F :=
+    (ContinuousLinearMap.precomp ℂ (⟨e.symm.toLinearMap, he⟩ : F →L[ℂ] ULift.{0} F)).toLinearMap
+  have hpull : Continuous pull :=
+    WeakDual.continuous_of_continuous_eval fun y ↦ WeakDual.eval_continuous (e.symm y)
+  let D₀ : Set (WeakDual ℂ (ULift.{0} F)) :=
+    WeakDual.toStrongDual ⁻¹' Metric.closedBall 0 1
+  have hD₀ : AbsConvex ℂ D₀ := by
+    change AbsConvex ℂ (Metric.closedBall (0 : StrongDual ℂ (ULift.{0} F)) 1)
+    exact ⟨balanced_closedBall_zero,
+      convex_RCLike_iff_convex_real.mpr (convex_closedBall _ _)⟩
+  have hcompact : IsCompact D₀ := WeakDual.isCompact_closedBall (0 : StrongDual ℂ (ULift.{0} F)) 1
+  refine ⟨pull '' D₀, ⟨hD₀.1.image pull, hD₀.2.linear_image pull⟩, hcompact.image hpull, fun y ↦ ?_⟩
+  obtain ⟨g, hg, hgy⟩ := exists_dual_vector'' ℂ (e.symm y)
+  refine ⟨pull g.toWeakDual, ⟨g.toWeakDual, ?_, rfl⟩, ?_⟩
+  · change g ∈ Metric.closedBall 0 1
+    simpa only [mem_closedBall_zero_iff] using hg
+  · change ‖g (e.symm y)‖ = p y
+    rw [hgy]
+    change ‖((‖e.symm y‖ : ℝ) : ℂ)‖ = p y
+    rw [Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)]
+    change p (e (e.symm y)) = p y
+    rw [e.apply_symm_apply]
+
+omit hE sE sF in
+/-- A linear map with a weakly continuous transpose is continuous from the Mackey dual. -/
+private theorem continuous_mackeyDual_of_transpose
+    (T : StrongDual ℂ E →ₗ[ℂ] F) (S : WeakDual ℂ F →ₗ[ℂ] E)
+    (hS : @Continuous (WeakDual ℂ F) (WeakSpace ℂ E) _ _ S)
+    (hST : ∀ (φ : StrongDual ℂ E) (ψ : WeakDual ℂ F), φ (S ψ) = ψ (T φ)) :
+    @Continuous _ _ (mackeyTopology (topDualPairing ℂ E)) _ T := by
+  let K : Set (Set E) := {A | AbsConvex ℂ A ∧ IsCompact (X := WeakSpace ℂ E) A}
+  let ev (φ : StrongDual ℂ E) := UniformOnFun.ofFun K φ
+  let : TopologicalSpace (StrongDual ℂ E) := mackeyTopology (topDualPairing ℂ E)
+  let : IsTopologicalAddGroup F := PolynormableSpace.isTopologicalAddGroup ℂ F
+  refine continuous_iff_continuousAt.mpr fun φ₀ ↦ ?_
+  suffices h : Tendsto (fun φ ↦ T φ - T φ₀) (𝓝 φ₀) (𝓝 0) by
+    simpa [ContinuousAt] using h.add_const (T φ₀)
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ F).tendsto_right_iff.mpr fun p hp ↦ ?_
+  obtain ⟨D, hD, hcompact, hnorm⟩ := exists_mackey_test_set p hp
+  have hKD : S '' D ∈ K := ⟨⟨hD.1.image S, hD.2.linear_image S⟩, hcompact.image hS⟩
+  have hev : Continuous ev := continuous_induced_dom
+  have hnear := UniformOnFun.gen_mem_nhds ℂ K (ev φ₀) hKD
+    (Metric.uniformity_basis_dist.mem_iff.mpr ⟨1, one_pos, Subset.rfl⟩)
+  filter_upwards [hev.continuousAt.preimage_mem_nhds hnear] with φ hφ
+  obtain ⟨ψ, hψ, hEq⟩ := hnorm (T φ - T φ₀)
+  have hlt : dist (φ₀ (S ψ)) (φ (S ψ)) < 1 := hφ (S ψ) (mem_image_of_mem S hψ)
+  rw [dist_comm, dist_eq_norm] at hlt
+  change ‖(φ - φ₀) (S ψ)‖ < 1 at hlt
+  rw [hST (φ - φ₀) ψ, map_sub T, hEq] at hlt
+  rwa [Seminorm.mem_ball_zero]
+
+omit hE sE in
+open scoped Pointwise in
+/-- A Mackey-continuous scalar functional on the dual is evaluation at a primal vector. -/
+private theorem exists_mackeyDual_eval (l : StrongDual ℂ E →ₗ[ℂ] ℂ)
+    (hl : @Continuous _ _ (mackeyTopology (topDualPairing ℂ E)) _ l) :
+    ∃ x : E, ∀ φ : StrongDual ℂ E, l φ = φ x := by
+  let K : Set (Set E) := {A | AbsConvex ℂ A ∧ IsCompact (X := WeakSpace ℂ E) A}
+  have hzero : ({0} : Set E) ∈ K :=
+    ⟨⟨balanced_zero, convex_singleton _⟩, isCompact_singleton⟩
+  have hdir : DirectedOn (· ⊆ ·) K := by
+    intro A hA D hD
+    rcases A.eq_empty_or_nonempty with rfl | hAn
+    · exact ⟨D, hD, empty_subset _, Subset.rfl⟩
+    rcases D.eq_empty_or_nonempty with rfl | hDn
+    · exact ⟨A, hA, Subset.rfl, empty_subset _⟩
+    refine ⟨A + D, ⟨⟨hA.1.1.add hD.1.1, hA.1.2.add hD.1.2⟩, hA.2.add hD.2⟩, ?_, ?_⟩
+    · intro x hx
+      simpa only [add_zero] using add_mem_add hx (hD.1.1.zero_mem hDn)
+    · intro x hx
+      simpa only [zero_add] using add_mem_add (hA.1.1.zero_mem hAn) hx
+  let : TopologicalSpace (StrongDual ℂ E) := mackeyTopology (topDualPairing ℂ E)
+  let ev (φ : StrongDual ℂ E) := UniformOnFun.ofFun K φ
+  have hn : {φ : StrongDual ℂ E | ‖l φ‖ < 1} ∈ 𝓝 0 := by
+    simpa only [map_zero, Metric.ball, dist_zero_right, Set.preimage_ofPred_eq] using
+      hl.continuousAt (x := 0).preimage_mem_nhds (Metric.ball_mem_nhds (l 0) one_pos)
+  change _ ∈ @nhds _ (TopologicalSpace.induced ev inferInstance) 0 at hn
+  rw [nhds_induced] at hn
+  obtain ⟨⟨A, ε⟩, ⟨hA, hε⟩, hbound⟩ :=
+    ((UniformOnFun.hasBasis_nhds_of_basis E ℂ K (ev 0) ⟨{0}, hzero⟩ hdir
+      Metric.uniformity_basis_dist).comap ev).mem_iff.mp hn
+  obtain ⟨D, hD, hAD, h0D⟩ := hdir A hA {0} hzero
+  have hb (φ : StrongDual ℂ E) (hφ : ∀ x ∈ D, ‖φ x‖ < ε) : ‖l φ‖ < 1 := by
+    apply hbound
+    intro x hx
+    change dist (φ x) (0 : ℂ) < ε
+    simpa only [dist_zero_right] using hφ x (hAD hx)
+  -- Separate the scaled functional from the image of the compact disk in the algebraic dual.
+  let P := (Module.Dual.eval ℂ (StrongDual ℂ E)).flip
+  let j := (topDualPairing ℂ E).flip
+  have hj : @Continuous (WeakSpace ℂ E) (WeakBilin P) _ _ j :=
+    WeakBilin.continuous_of_continuous_eval P fun φ ↦
+      WeakBilin.eval_continuous (topDualPairing ℂ E).flip φ
+  let : T2Space (WeakBilin P) := (WeakBilin.isEmbedding (B := P)
+    (fun _ _ h ↦ LinearMap.ext fun φ ↦ DFunLike.congr_fun h φ)).t2Space
+  let : Module ℝ (WeakBilin P) := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ (WeakBilin P) := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ (WeakBilin P) := P.weakBilin_withSeminorms.toLocallyConvexSpace
+  let scaled : WeakBilin P := (ε : ℂ) • l
+  have hmem : scaled ∈ j '' D := by
+    by_contra hnmem
+    obtain ⟨g, r, hgr, hrl⟩ := RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ) (E := WeakBilin P)
+      (convex_RCLike_iff_convex_real.mp (hD.1.2.linear_image j))
+      (hD.2.image hj).isClosed hnmem
+    obtain ⟨φ, rfl⟩ := P.dualEmbedding_surjective g
+    have hnorm (x : E) (hx : x ∈ D) : ‖φ x‖ < r := by
+      obtain ⟨c, hc, hcφ⟩ := RCLike.exists_norm_eq_mul_self (φ x)
+      have hcx := hgr (j (c • x))
+        (mem_image_of_mem j (hD.1.1 c hc.le (smul_mem_smul_set hx)))
+      change (φ (c • x)).re < r at hcx
+      rw [map_smul, smul_eq_mul, ← hcφ] at hcx
+      change (((‖φ x‖ : ℝ) : ℂ)).re < r at hcx
+      rwa [Complex.ofReal_re] at hcx
+    have hr : 0 < r := by simpa using hnorm 0 (h0D (mem_singleton 0))
+    change r < ((ε : ℂ) * l φ).re at hrl
+    rw [Complex.re_ofReal_mul] at hrl
+    have hlt : r < ε * ‖l φ‖ :=
+      hrl.trans_le (mul_le_mul_of_nonneg_left (Complex.re_le_norm _) hε.le)
+    have hφ : l φ ≠ 0 := by
+      intro he
+      simp [he, hr.not_gt] at hlt
+    have hbad := hb ((l φ)⁻¹ • φ) fun x hx ↦ by
+      change ‖(l φ)⁻¹ * φ x‖ < ε
+      rw [norm_mul, norm_inv, ← div_eq_inv_mul, div_lt_iff₀ (norm_pos_iff.mpr hφ)]
+      exact (hnorm x hx).trans hlt
+    simp [map_smul, smul_eq_mul, hφ] at hbad
+  obtain ⟨x, _, hx⟩ := hmem
+  refine ⟨(ε : ℂ)⁻¹ • x, fun φ ↦ ?_⟩
+  have hxφ : φ x = (ε : ℂ) * l φ := DFunLike.congr_fun hx φ
+  have hε₀ : (ε : ℂ) ≠ 0 := by exact_mod_cast hε.ne'
+  rw [map_smul, smul_eq_mul, hxφ, inv_mul_cancel_left₀ hε₀]
+
+omit hE sE hF sF in
+/-- A family of continuous weak-dual slices of a bilinear form gives a linear map
+into the primal space by weak dual representation. -/
+private theorem exists_weakDual_slice_operator [SeparatingDual ℂ F]
+    (B : WeakDual ℂ E →ₗ[ℂ] WeakDual ℂ F →ₗ[ℂ] ℂ) (hB : ∀ φ, Continuous (B φ)) :
+    ∃ T : StrongDual ℂ E →ₗ[ℂ] F, ∀ φ ψ, B φ ψ = ψ (T φ) := by
+  have hsep : (topDualPairing ℂ F).SeparatingRight :=
+    fun x h ↦ (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+      fun ψ ↦ (h ψ).trans (map_zero ψ).symm
+  let repr := (topDualPairing ℂ F).rightDualEquiv hsep
+  let slices : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ (WeakDual ℂ F) :=
+    { toFun := fun φ ↦ ⟨B φ, hB φ⟩
+      map_add' := fun φ φ' ↦ ContinuousLinearMap.ext fun ψ ↦
+        DFunLike.congr_fun (map_add B φ.toWeakDual φ'.toWeakDual) ψ
+      map_smul' := fun c φ ↦ ContinuousLinearMap.ext fun ψ ↦
+        DFunLike.congr_fun (map_smul B c φ.toWeakDual) ψ }
+  refine ⟨repr.symm.toLinearMap.comp slices, fun φ ψ ↦ ?_⟩
+  exact (DFunLike.congr_fun (repr.apply_symm_apply (slices φ)) ψ).symm
+
 include hE sE hF sF in
 /-- Paper: (C.2.3.3), p. 676. A separately continuous bilinear form on the weak duals
 corresponds to a unique continuous operator from the Mackey dual to F, by evaluation. -/
@@ -302,7 +480,37 @@ theorem mackeyDual_represents_separatelyContinuous
     (∀ φ, Continuous (B φ)) ∧ (∀ ψ, Continuous (B.flip ψ)) ↔
       ∃! T : StrongDual ℂ E →ₗ[ℂ] F,
         @Continuous _ _ (mackeyTopology (topDualPairing ℂ E)) _ T ∧
-        ∀ φ ψ, B φ ψ = ψ (T φ) := by sorry
+        ∀ φ ψ, B φ ψ = ψ (T φ) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let : SeparatingDual ℂ F := polynormableSpace_separatingDual ℂ F
+  constructor
+  · rintro ⟨hB, hflip⟩
+    obtain ⟨T, hT⟩ := exists_weakDual_slice_operator B hB
+    obtain ⟨S, hS⟩ := exists_weakDual_slice_operator B.flip hflip
+    have hST (φ : StrongDual ℂ E) (ψ : WeakDual ℂ F) : φ (S ψ) = ψ (T φ) :=
+      (hS ψ φ).symm.trans (hT φ ψ)
+    have hSw : @Continuous (WeakDual ℂ F) (WeakSpace ℂ E) _ _ S := by
+      refine WeakBilin.continuous_of_continuous_eval (topDualPairing ℂ E).flip fun φ ↦ ?_
+      change Continuous (fun ψ : WeakDual ℂ F ↦ φ (S ψ))
+      simpa only [hST] using WeakDual.eval_continuous (𝕜 := ℂ) (E := F) (T φ)
+    refine ⟨T, ⟨continuous_mackeyDual_of_transpose T S hSw hST, hT⟩, ?_⟩
+    rintro T' ⟨_, hT'⟩
+    exact LinearMap.ext fun φ ↦ (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+      fun ψ ↦ (hT' φ ψ).symm.trans (hT φ ψ)
+  · rintro ⟨T, ⟨hT, hB⟩, _⟩
+    refine ⟨fun φ ↦ ?_, fun ψ ↦ ?_⟩
+    · change Continuous (fun ψ : WeakDual ℂ F ↦ B φ ψ)
+      simpa only [hB] using WeakDual.eval_continuous (𝕜 := ℂ) (E := F) (T φ)
+    · let l := ψ.toStrongDual.toLinearMap.comp T
+      have hslice : @Continuous _ _ (mackeyTopology (topDualPairing ℂ E)) _ l := by
+        let : TopologicalSpace (StrongDual ℂ E) := mackeyTopology (topDualPairing ℂ E)
+        exact ψ.toStrongDual.continuous.comp hT
+      obtain ⟨x, hx⟩ := exists_mackeyDual_eval l hslice
+      have heq : (fun φ : WeakDual ℂ E ↦ B.flip ψ φ) = fun φ ↦ φ x :=
+        funext fun φ ↦ (hB φ ψ).trans (hx φ.toStrongDual)
+      change Continuous (fun φ : WeakDual ℂ E ↦ B.flip ψ φ)
+      rw [heq]
+      exact WeakDual.eval_continuous (𝕜 := ℂ) (E := E) x
 
 end DualForms
 
