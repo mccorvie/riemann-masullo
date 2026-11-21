@@ -1112,7 +1112,30 @@ contains each generator and excludes the identity operator.
 Deviation: Sanity check distinguishing the span from the unital algebra. -/
 theorem bruhatDiffDegreeOne_sanity (a : LCATopologicalLie G) :
     bruhatDiffGenerator a ∈ bruhatDiffDegreeOne ∧
-      (1 : bruhatDiffAlgebra G) ∉ bruhatDiffDegreeOne := by sorry
+      (1 : bruhatDiffAlgebra G) ∉ bruhatDiffDegreeOne := by
+  refine ⟨Submodule.subset_span ⟨a, rfl⟩, ?_⟩
+  -- The good subgroup witnessing smoothness of zero works for any constant.
+  obtain ⟨k, hk, _, _⟩ := isBruhatContDiff_zero (G := G) 0
+  have hone : (fun _ : G ↦ (1 : ℂ)) ∈ bruhatSmoothSubmodule := by
+    apply (mem_bruhatSmoothSubmodule_iff _).2
+    intro p
+    refine ⟨k, hk, fun _ _ ↦ rfl, fun q _ ↦ ⟨fun _ ↦ 1, fun _ ↦ rfl, ?_⟩⟩
+    intro e z b
+    exact contDiff_const
+  let f : bruhatSmoothSubmodule (G := G) := ⟨fun _ ↦ 1, hone⟩
+  let ev : bruhatDiffAlgebra G →ₗ[ℂ] bruhatSmoothSubmodule (G := G) :=
+    (LinearMap.applyₗ f).comp (bruhatDiffAlgebra G).val.toLinearMap
+  have hspan : bruhatDiffDegreeOne ≤ LinearMap.ker ev := by
+    apply Submodule.span_le.mpr
+    rintro _ ⟨b, rfl⟩
+    apply LinearMap.mem_ker.mpr
+    apply Subtype.ext
+    funext x
+    change bruhatDirectionalDeriv b (fun _ ↦ 1) x = 0
+    exact deriv_const (0 : ℝ) (1 : ℂ)
+  intro h
+  have hz : ev 1 = 0 := LinearMap.mem_ker.mp (hspan h)
+  exact one_ne_zero (congrArg (fun g : bruhatSmoothSubmodule (G := G) ↦ g.val 1) hz)
 
 /-- Paper: Definition D.1.6.8(1), p. 768. The real degree-one space consists
 of individual first-order operators, by real linearity in the direction. -/
