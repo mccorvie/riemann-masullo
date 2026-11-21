@@ -447,7 +447,11 @@ Bruhat C¹ functions. -/
 theorem bruhatDirectionalDeriv_add (a : LCATopologicalLie G)
     (f g : bruhatContDiffSubmodule (G := G) 1) :
     bruhatDirectionalDeriv a (f + g : bruhatContDiffSubmodule 1) =
-      bruhatDirectionalDeriv a f + bruhatDirectionalDeriv a g := by sorry
+      bruhatDirectionalDeriv a f + bruhatDirectionalDeriv a g := by
+  funext x
+  have hf := hasDerivAt_bruhatDirectionalDeriv a f.property x
+  have hg := hasDerivAt_bruhatDirectionalDeriv a g.property x
+  exact (hf.add hg).deriv
 
 /-- Paper: Definition D.1.6.5, p. 766. The orbit derivative commutes with
 complex scalar multiplication on Bruhat C¹ functions. -/
