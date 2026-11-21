@@ -1,5 +1,6 @@
 module
 
+import Mathlib.Analysis.Calculus.Deriv.Polynomial
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
@@ -121,7 +122,78 @@ Deviation: Sanity check for the three definitions. -/
 theorem exists_gaussian_logProfile_exponentialDecay :
     ∃ f : 𝓢(ℝ, ℂ), (∀ x : ℝ, f x = Real.exp (-(x ^ 2))) ∧
       ForwardSemiExponentialDecay f ∧ BackwardSemiExponentialDecay f ∧
-      ExponentialDecay f := by sorry
+      ExponentialDecay f := by
+  let G : ℝ → ℂ := fun x ↦ (Real.exp (-(x ^ 2)) : ℂ)
+  -- Differentiating p(x) exp(-x²) replaces p by p' - 2Xp.
+  have hderiv (j : ℕ) : ∃ p : Polynomial ℝ,
+      iteratedDeriv j G = fun x ↦ (↑(p.eval x * Real.exp (-(x ^ 2))) : ℂ) := by
+    induction j with
+    | zero => exact ⟨1, by simp [G]⟩
+    | succ j ih =>
+      obtain ⟨p, hp⟩ := ih
+      refine ⟨p.derivative - Polynomial.C 2 * Polynomial.X * p, ?_⟩
+      rw [iteratedDeriv_succ, hp]
+      funext x
+      have hexp : HasDerivAt (fun y : ℝ ↦ Real.exp (-(y ^ 2)))
+          (Real.exp (-(x ^ 2)) * -(2 * x)) x := by
+        simpa using! (((hasDerivAt_id x).pow 2).neg).exp
+      apply (((p.hasDerivAt x).mul hexp).ofReal_comp.deriv).trans
+      congr 1
+      simp only [Polynomial.eval_sub, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_X]
+      ring
+  -- A Gaussian absorbs polynomial weights and any fixed exponential weight.
+  have hbound (k j : ℕ) (A : ℝ) : ∃ C : ℝ, ∀ x : ℝ,
+      ‖x‖ ^ k * ‖iteratedDeriv j G x‖ ≤ C * Real.exp (-A * |x|) := by
+    obtain ⟨p, hp⟩ := hderiv j
+    let M : ℝ := ∑ i ∈ p.support, ‖p.coeff i‖ * ((k + i).factorial : ℝ)
+    have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ by positivity
+    refine ⟨M * Real.exp ((A + 1) ^ 2 / 4), fun x ↦ ?_⟩
+    have hpoly : ‖x‖ ^ k * ‖p.eval x‖ ≤ M * Real.exp |x| := by
+      rw [Polynomial.eval_eq_sum, Polynomial.sum, Finset.sum_mul]
+      refine (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (by positivity)).trans ?_
+      rw [Finset.mul_sum]
+      apply Finset.sum_le_sum
+      intro i _
+      rw [norm_mul, norm_pow, ← mul_left_comm, ← pow_add, Real.norm_eq_abs x, mul_assoc]
+      have hfact : (0 : ℝ) < (k + i).factorial := by positivity
+      have hpow := (div_le_iff₀ hfact).mp
+        (Real.pow_div_factorial_le_exp |x| (abs_nonneg x) (k + i))
+      exact mul_le_mul_of_nonneg_left (by simpa only [mul_comm] using hpow) (norm_nonneg _)
+    have hsquare : |x| + -(x ^ 2) ≤ (A + 1) ^ 2 / 4 + -A * |x| := by
+      rw [← sq_abs x]
+      nlinarith [sq_nonneg (|x| - (A + 1) / 2)]
+    rw [hp, Complex.norm_real, norm_mul, Real.norm_of_nonneg (Real.exp_pos _).le, ← mul_assoc]
+    calc
+      _ ≤ (M * Real.exp |x|) * Real.exp (-(x ^ 2)) :=
+        mul_le_mul_of_nonneg_right hpoly (Real.exp_pos _).le
+      _ = M * Real.exp (|x| + -(x ^ 2)) := by rw [mul_assoc, ← Real.exp_add]
+      _ ≤ M * Real.exp ((A + 1) ^ 2 / 4 + -A * |x|) :=
+        mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr hsquare) hM
+      _ = _ := by rw [Real.exp_add, mul_assoc]
+  have hsmooth : ContDiff ℝ ∞ G :=
+    Complex.ofRealCLM.contDiff.comp (by fun_prop : ContDiff ℝ ∞ fun x : ℝ ↦ Real.exp (-(x ^ 2)))
+  let f : 𝓢(ℝ, ℂ) := ⟨G, hsmooth, fun k j ↦ by
+    obtain ⟨C, hC⟩ := hbound k j 0
+    exact ⟨C, fun x ↦ by
+      simpa only [norm_iteratedFDeriv_eq_norm_iteratedDeriv, neg_zero, zero_mul,
+        Real.exp_zero, mul_one] using hC x⟩⟩
+  have hforward : ForwardSemiExponentialDecay f := by
+    intro j A _
+    change iteratedDeriv j G =O[atTop] _
+    obtain ⟨C, hC⟩ := hbound 0 j A
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_ge_atTop (0 : ℝ)] with x hx
+    simpa only [pow_zero, one_mul, abs_of_nonneg hx, Real.norm_eq_abs,
+      abs_of_pos (Real.exp_pos _)] using hC x
+  have hbackward : BackwardSemiExponentialDecay f := by
+    intro j A _
+    change iteratedDeriv j G =O[atBot] _
+    obtain ⟨C, hC⟩ := hbound 0 j A
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_le_atBot (0 : ℝ)] with x hx
+    simpa only [pow_zero, one_mul, abs_of_nonpos hx, neg_mul_neg, Real.norm_eq_abs,
+      abs_of_pos (Real.exp_pos _)] using hC x
+  exact ⟨f, fun _ ↦ rfl, hforward, hbackward, ⟨hforward, hbackward⟩⟩
 
 /-- An extra exponential factor absorbs any prescribed polynomial weight at positive infinity. -/
 private theorem forward_weighted_deriv_bound {f : 𝓢(ℝ, ℂ)} (hf : ForwardSemiExponentialDecay f)
