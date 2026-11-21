@@ -30,7 +30,8 @@ local notation "atAbsTop" => comap (abs : ℝ → ℝ) atTop
 zero-free region for each finite Hecke L-function, with a scale depending on
 the field and character. Meromorphic order distinguishes poles from zeros.
 Deviation: The scale is chosen greater than `1/3` so the logarithm in the
-denominator is positive at every height. The separate real-zero clause is false. -/
+denominator is positive at every height. It is an existential scale and may be
+enlarged to exclude an exceptional zero. The separate real-zero clause is false. -/
 theorem finiteHeckeL_zeroFreeRegion :
     ∃ A : ℝ, 0 < A ∧
       ∀ (F : Type*) [Field F] [NumberField F] (χ : U[F]),
@@ -41,6 +42,9 @@ theorem finiteHeckeL_zeroFreeRegion :
               Real.log (B * (|s.im| + 3))) ≤ s.re → meromorphicOrderAt L s ≤ 0 := by
   sorry
 
+-- TODO(paper-gap): The paragraph after (B.6.1.1) identifies two different conductors.
+-- A pure imaginary norm twist preserves the finite conductor but changes the
+-- archimedean parameter. No conductor-uniform exceptional-zero assertion is made here.
 -- TODO(paper-gap): The real-zero clause of Proposition B.6.1.1 is false on [1/2, 1].
 -- If ζ(1/2 + iγ) = 0 with γ ≠ 0, the nonquadratic norm character |·|^(iγ)
 -- over ℚ has finite L-function ζ(s + iγ), which vanishes at the real point 1/2.
@@ -134,23 +138,25 @@ theorem heckeIdealSummatory_tendsto_zero_of_nontrivial_on_normOne (χ : U[F])
 /-- Paper: Theorem B.6.1.3, p. 637. The logarithmic derivative is bounded by
 a squared logarithm for large absolute heights, uniformly over the narrower
 region defined by `α * η`. The Dedekind zeta continuation is the one for the
-trivial character.
+trivial character. For fixed field, character and `α`, the implied constant
+works for every admissible width. Its height threshold may depend on the width.
 Deviation: The width is represented by a real function restricted to `t ≥ 0`.
 Decreasing is expressed as nonincreasing, and the logarithm uses absolute height.
 Eventual analyticity and nonvanishing make the logarithmic derivative well-defined. -/
 theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree (χ : U[F]) (L Z : ℂ → ℂ)
     (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
     (hZ : MeromorphicNFOn Z univ) (hZSeries : ∀ s : halfPlane, Z s = dedekindZeta F s)
-    (η : ℝ → ℝ) (hη : MapsTo η (Ici 0) (Ioc 0 (1 / 2)))
-    (hηDiff : DifferentiableOn ℝ η (Ici 0)) (hηAnti : AntitoneOn η (Ici 0))
-    (hηDeriv : Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0))
-    (hηInv : (fun t ↦ (η t)⁻¹) =O[atTop] Real.log)
     (α : ℝ) (hα₀ : 0 < α) (hα₁ : α < 1)
-    (hα : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0)
-    (hZeroFree : ∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0) :
-    let l := atHeight ⊓ 𝓟 {s : ℂ | 1 - α * η |s.im| ≤ s.re}
-    (∀ᶠ s in l, AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
-      logDeriv L =O[l] (fun s ↦ (Real.log |s.im|) ^ 2) := by
+    (hα : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0) :
+    ∃ C : ℝ, 0 < C ∧ ∀ η : ℝ → ℝ,
+      MapsTo η (Ici 0) (Ioc 0 (1 / 2)) →
+      DifferentiableOn ℝ η (Ici 0) → AntitoneOn η (Ici 0) →
+      Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0) →
+      ((fun t ↦ (η t)⁻¹) =O[atTop] Real.log) →
+      (∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0) →
+      let l := atHeight ⊓ 𝓟 {s : ℂ | 1 - α * η |s.im| ≤ s.re}
+      (∀ᶠ s in l, AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
+        Asymptotics.IsBigOWith C l (logDeriv L) (fun s ↦ (Real.log |s.im|) ^ 2) := by
   sorry
 
 /-- Paper: Equation (B.6.1.13), p. 638. The ideal von Mangoldt function is
@@ -214,6 +220,9 @@ theorem heckeLogDerivCoefficient_bound (d : ℕ) :
           ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) m‖ ≤ C * Real.log (m : ℝ) := by
   sorry
 
+-- TODO(paper-gap): In (B.6.1.16) a pure norm twist can have a pole in Ω.
+-- Restrict the logarithm to heights above the pole. After (B.6.1.19) the
+-- summand must retain the power m in N(p)^(m * (1 + αη(T))).
 -- TODO(paper-gap): Substituting the radii from (B.6.1.18) into the first
 -- coefficient in (B.6.1.20) gives 4(1 + 3α) / ((1 - α)^2 η(T)).
 
@@ -236,6 +245,8 @@ theorem finiteHeckeL_inv_isBigO_oneLine (χ : U[F]) (L : ℂ → ℂ)
       ∃ N : ℕ, 0 < N ∧ (fun t : ℝ ↦ (L ⟨1, t⟩)⁻¹) =O[atAbsTop] (fun t ↦ |t| ^ N) := by
   sorry
 
+-- TODO(paper-gap): Equation (B.6.1.23) uses the finite L-factors. Its χ²
+-- argument has height 2t, which (B.6.1.28) must retain.
 -- TODO(paper-gap): The upper bound in (B.6.1.28) uses the critical-strip exponent
 -- for σ > 1, where that exponent can be negative and the Euler factors need not decay.
 
@@ -245,7 +256,9 @@ variable (χ : U[F]) (L : ℂ → ℂ) (S : Finset (HeightOneSpectrum (𝓞 F)))
 variable (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
 
 -- TODO(later): needs §6.3 to compare with the S-local quotient in (6.3.1.6).
--- The finite-factor expression is recalled on p. 641 and already occurs in §3.4.
+-- Compare as meromorphic germs, or after normalizing the quotient at removable
+-- singularities. The factors agree via sLocalHeckeL_eq_partialEulerProduct on
+-- descended characters. The finite-factor expression already occurs in §3.4.
 local notation "Loutside" => (fun s : ℂ ↦ (∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹) * L s)
 
 include hL hSeries
@@ -278,6 +291,8 @@ theorem finiteHeckeL_outside_horizontal_lower_bound_off_small_set :
 
 -- TODO(paper-gap): Footnote 29 asks for details in the proof of Corollary B.6.1.8
 -- that pass from horizontal lower bounds to bounds for reciprocal derivatives.
+-- At the selected heights use Cauchy's estimates on a wider fixed strip for
+-- derivatives of Loutside, then differentiate Loutside * (1 / Loutside) = 1.
 
 /-- Paper: Corollary B.6.1.8, p. 643. For each derivative order there is a
 nondecreasing sequence of heights tending to infinity in absolute value and
@@ -285,11 +300,14 @@ growing at most linearly in the index. The derivative of the reciprocal Euler
 product is bounded by a fixed power of the height on every selected segment.
 Deviation: The finite set records only finite places. All archimedean factors
 have already been removed from `L`. The supremum is expressed pointwise, and
-analyticity ensures the iterated derivatives are defined on the segments. -/
+analyticity ensures the iterated derivatives are defined on the segments. The
+unit intervals of Theorem B.6.1.7, reflected for the conjugate character on the
+negative tail, give heights within one of the index for the application of §B.3. -/
 theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound (m : ℕ) :
     let l := comap (abs : ℤ → ℤ) atTop
     ∃ (A β : ℝ) (T : ℤ → ℝ), 0 < A ∧ 0 < β ∧ Monotone T ∧
       Tendsto (abs ∘ T) l atTop ∧ (T =O[l] fun k ↦ |(k : ℝ)|) ∧
+      (∀ᶠ k : ℤ in l, |T k - (k : ℝ)| ≤ 1) ∧
       ∀ k : ℤ, ∀ σ ∈ Icc (-1 : ℝ) 2,
         AnalyticAt ℂ (fun s ↦ (Loutside s)⁻¹) ⟨σ, T k⟩ ∧
           ‖iteratedDeriv m (fun s ↦ (Loutside s)⁻¹) ⟨σ, T k⟩‖ ≤ A * |T k| ^ β := by
