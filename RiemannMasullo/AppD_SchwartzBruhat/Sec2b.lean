@@ -415,10 +415,30 @@ theorem schwartzBruhatIsotype_subspace_map :
     ∃ j : actionIsotype ρS ω →L[ℂ] actionIsotype ρE ω,
       Injective j ∧ ∀ f, (j f : E) = i (f : S) := by sorry
 
+omit hE hρ heq hi hcomm hQ in
+/-- An injective equivariant map pulls back each target isotype to the source isotype. -/
+private theorem actionIsotype_comap_of_injective {H X Y : Type*} [Monoid H] [TopologicalSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (σ : H →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y)) (χ : PontryaginDual H)
+    (j : X →L[ℂ] Y) (hj : Injective j) (h : ∀ k x, j (σ k x) = τ k (j x)) :
+    (actionIsotype τ χ).comap j.toLinearMap = actionIsotype σ χ := by
+  refine Submodule.ext fun x ↦ ?_
+  change j x ∈ actionIsotype τ χ ↔ x ∈ actionIsotype σ χ
+  simp only [mem_actionIsotype]
+  refine forall_congr' fun k ↦ ?_
+  rw [← h k x, ← j.map_smul]
+  exact hj.eq_iff
+
+-- Retain the existing hypotheses from the averaging setup in the signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(2), p. 795. The inverse image of the target
 isotype is the source isotype. -/
 theorem schwartzBruhatIsotype_comap : (actionIsotype ρE ω).comap i.toLinearMap =
-    actionIsotype ρS ω := by sorry
+    actionIsotype ρS ω := by
+  refine actionIsotype_comap_of_injective (H := K) (X := S) (Y := E) ρS ρE ω i hi ?_
+  intro k f
+  exact hcomm (k : G) f
 
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic quotients. -/
