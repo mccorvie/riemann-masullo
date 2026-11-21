@@ -10,6 +10,7 @@ import Mathlib.Analysis.Normed.Operator.Completeness
 import Mathlib.Topology.Algebra.Module.UniformConvergence
 import Mathlib.Topology.Baire.CompleteMetrizable
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.BanachSteinhaus
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
 /-!
 # Mapping spaces and topologies of a duality
@@ -670,13 +671,167 @@ convex circled subsets of F which are compact for the opposite weak topology. -/
 def mackeyTopology : TopologicalSpace E :=
   polarTopology B {A | AbsConvex ℂ A ∧ IsCompact (X := WeakBilin B.flip) A}
 
+/-- For a consistent topology, the elements of the paired space dominated by a continuous
+seminorm form a weakly compact set. -/
+private theorem isCompact_dualSeminormBall [t : TopologicalSpace E] [PolynormableSpace ℂ E]
+    (h : IsConsistentWithDuality B t) (p : Seminorm ℂ E) (hp : Continuous p) :
+    IsCompact (X := WeakBilin B.flip) {y | ∀ x, ‖B x y‖ ≤ p x} := by
+  let D : Set (E → ℂ) := univ.pi fun x ↦ Metric.closedBall 0 (p x)
+  let ev : WeakBilin B.flip → (E → ℂ) := fun y x ↦ B x y
+  have hD : IsCompact D := isCompact_univ_pi fun _ ↦ isCompact_closedBall _ _
+  have hev : IsInducing ev := ⟨rfl⟩
+  apply hev.isCompact_iff.mpr
+  have himage : ev '' {y | ∀ x, ‖B x y‖ ≤ p x} =
+      D ∩ range ((↑) : Module.Dual ℂ E → E → ℂ) := by
+    ext f
+    constructor
+    · rintro ⟨y, hy, rfl⟩
+      exact ⟨fun x _ ↦ mem_closedBall_zero_iff.mpr (hy x), ⟨B.flip y, rfl⟩⟩
+    · rintro ⟨hf, l, rfl⟩
+      have hb (x : E) : ‖l x‖ ≤ p x := mem_closedBall_zero_iff.mp (hf x (mem_univ x))
+      have hl : Continuous l := by
+        let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+        apply WithSeminorms.continuous_of_continuous_comp (norm_withSeminorms ℂ ℂ) l
+        exact fun _ ↦ Seminorm.continuous_of_le hp hb
+      obtain ⟨y, rfl⟩ := (h l).mp hl
+      exact ⟨y, hb, rfl⟩
+  rw [himage]
+  exact hD.inter_right (LinearMap.isClosed_range_coe E ℂ (RingHom.id ℂ))
+
+/-- Under a consistent topology, each continuous seminorm is attained by evaluating against
+an absolutely convex weakly compact set of the paired space. -/
+private theorem exists_mackeyDisk [t : TopologicalSpace E] [PolynormableSpace ℂ E]
+    (h : IsConsistentWithDuality B t) (p : Seminorm ℂ E) (hp : Continuous p) :
+    ∃ A : Set F, AbsConvex ℂ A ∧ IsCompact (X := WeakBilin B.flip) A ∧
+      ∀ x : E, ∃ y ∈ A, ‖B x y‖ = p x := by
+  let A : Set F := {y | ∀ x, ‖B x y‖ ≤ p x}
+  refine ⟨A, ?_, isCompact_dualSeminormBall B h p hp, ?_⟩
+  · let q (x : E) : Seminorm ℂ F := (normSeminorm ℂ ℂ).comp (B x)
+    have hA : A = ⋂ x, (q x).closedBall 0 (p x) := by
+      ext y
+      simp [A, q]
+    rw [hA]
+    exact ⟨balanced_iInter fun x ↦ (q x).balanced_closedBall_zero (p x),
+      convex_iInter fun x ↦ convex_RCLike_iff_convex_real.mpr ((q x).convex_closedBall 0 (p x))⟩
+  · intro x
+    obtain ⟨φ, hφ, hφx⟩ := exists_dual_norm_eq_seminorm p hp x
+    obtain ⟨y, hy⟩ := (h φ.toLinearMap).mp φ.continuous
+    refine ⟨y, fun z ↦ ?_, ?_⟩
+    · rw [← LinearMap.flip_apply B, hy]
+      exact hφ z
+    · rw [← LinearMap.flip_apply B, hy]
+      exact hφx
+
+/-- Every Mackey-continuous linear functional is an evaluation against the paired space. -/
+private theorem mem_range_flip_of_mackeyContinuous (l : Module.Dual ℂ E)
+    (hl : @Continuous _ _ (mackeyTopology B) _ l) : l ∈ range B.flip := by
+  let K : Set (Set F) := {A | AbsConvex ℂ A ∧ IsCompact (X := WeakBilin B.flip) A}
+  have hzero : ({0} : Set F) ∈ K :=
+    ⟨⟨balanced_zero, convex_singleton _⟩, isCompact_singleton⟩
+  have hdir : DirectedOn (· ⊆ ·) K := by
+    intro A hA D hD
+    rcases A.eq_empty_or_nonempty with rfl | hAn
+    · exact ⟨D, hD, empty_subset _, Subset.rfl⟩
+    rcases D.eq_empty_or_nonempty with rfl | hDn
+    · exact ⟨A, hA, Subset.rfl, empty_subset _⟩
+    refine ⟨A + D, ⟨⟨hA.1.1.add hD.1.1, hA.1.2.add hD.1.2⟩, hA.2.add hD.2⟩, ?_, ?_⟩
+    · intro y hy
+      simpa only [add_zero] using add_mem_add hy (hD.1.1.zero_mem hDn)
+    · intro y hy
+      simpa only [zero_add] using add_mem_add (hA.1.1.zero_mem hAn) hy
+  let : TopologicalSpace E := mackeyTopology B
+  let ev (x : E) := UniformOnFun.ofFun K (B x)
+  have hn : {x : E | ‖l x‖ < 1} ∈ 𝓝 0 := by
+    simpa only [map_zero, Metric.ball, dist_zero_right, Set.preimage_ofPred_eq] using
+      hl.continuousAt (x := 0).preimage_mem_nhds (Metric.ball_mem_nhds (l 0) one_pos)
+  change _ ∈ @nhds _ (TopologicalSpace.induced ev inferInstance) 0 at hn
+  rw [nhds_induced] at hn
+  obtain ⟨⟨A, ε⟩, ⟨hA, hε⟩, hbound⟩ :=
+    ((UniformOnFun.hasBasis_nhds_of_basis F ℂ K (ev 0) ⟨{0}, hzero⟩ hdir
+      Metric.uniformity_basis_dist).comap ev).mem_iff.mp hn
+  obtain ⟨D, hD, hAD, h0D⟩ := hdir A hA {0} hzero
+  let P := (Module.Dual.eval ℂ E).flip
+  let j := B.flip
+  let : TopologicalSpace F := WeakBilin.instTopologicalSpace B.flip
+  have hj : @Continuous F (Module.Dual ℂ E) (WeakBilin.instTopologicalSpace B.flip)
+      (WeakBilin.instTopologicalSpace P) j :=
+    WeakBilin.continuous_of_continuous_eval P fun x ↦ WeakBilin.eval_continuous B.flip x
+  have hP : P.Nondegenerate := ⟨LinearMap.SeparatingLeft.id, LinearMap.SeparatingLeft.eval⟩
+  let : TopologicalSpace (Module.Dual ℂ E) := WeakBilin.instTopologicalSpace P
+  let : PolynormableSpace ℂ (Module.Dual ℂ E) := P.weakBilin_withSeminorms.toPolynormableSpace
+  let : T2Space (WeakBilin P) := (WeakBilin.isEmbedding (B := P) fun _ _ h ↦ h).t2Space
+  let : T2Space (Module.Dual ℂ E) := inferInstanceAs (T2Space (WeakBilin P))
+  -- The bipolar of the image of the disk is the disk itself in the algebraic dual.
+  have heq : P.flip.polar (P.polar (j '' D)) = j '' D := by
+    let C : Set (WeakBilin P) := j '' D
+    have hzero' : 0 ∈ C := ⟨0, h0D (mem_singleton 0), map_zero j⟩
+    have hconv : AbsConvex ℂ C := ⟨hD.1.1.image j, hD.1.2.linear_image j⟩
+    have hclosed : IsClosed C := (hD.2.image hj).isClosed
+    let : TopologicalSpace E := WeakBilin.instTopologicalSpace P.flip
+    let : PolynormableSpace ℂ E := P.flip.weakBilin_withSeminorms.toPolynormableSpace
+    let : T2Space E := (WeakBilin.isEmbedding
+      (LinearMap.ker_eq_bot.mp (LinearMap.separatingRight_iff_flip_ker_eq_bot.mp hP.2))).t2Space
+    calc
+      _ = closure (X := WeakBilin P) (absConvexHull ℂ (insert 0 C)) :=
+        bipolar_eq_weakClosure_absConvexHull P hP _
+      _ = C := by rw [insert_eq_of_mem hzero', hconv.absConvexHull_eq, hclosed.closure_eq]
+  let c : ℂ := (ε / 2 : ℝ)
+  have hc : ‖c‖ = ε / 2 := by
+    rw [Complex.norm_real, Real.norm_of_nonneg (half_pos hε).le]
+  have hcl : c • l ∈ j '' D := by
+    rw [← heq]
+    intro x hx
+    have hxD (y : F) (hy : y ∈ D) : ‖B x y‖ ≤ 1 := hx (j y) (mem_image_of_mem j hy)
+    have hl' : ‖l (c • x)‖ < 1 := hbound fun y hy ↦ by
+      change dist (B (c • x) y) (B 0 y) < ε
+      rw [map_zero B, LinearMap.zero_apply, dist_zero_right, map_smul, LinearMap.smul_apply,
+        smul_eq_mul, norm_mul, hc]
+      exact (mul_le_of_le_one_right (half_pos hε).le (hxD y (hAD hy))).trans_lt (half_lt_self hε)
+    change ‖(c • l) x‖ ≤ 1
+    rw [LinearMap.smul_apply, ← map_smul]
+    exact hl'.le
+  obtain ⟨y, _, hy⟩ := hcl
+  have hc₀ : c ≠ 0 := norm_pos_iff.mp (hc ▸ half_pos hε)
+  refine ⟨c⁻¹ • y, ?_⟩
+  change B.flip y = c • l at hy
+  rw [map_smul, hy, inv_smul_smul₀ hc₀]
+
 /-- Paper: Mackey–Arens Theorem (§C.2.2.2), p. 674. A Hausdorff locally convex topology on E
 is consistent exactly when it is finer than the weak topology and coarser than the Mackey
 topology. In Lean's order on topologies the finer topology is the smaller element. -/
 theorem isConsistentWithDuality_iff_mackey_le_le_weak (hB : B.Nondegenerate)
     [t : TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E] :
     IsConsistentWithDuality B t ↔
-      mackeyTopology B ≤ t ∧ t ≤ WeakBilin.instTopologicalSpace B := by sorry
+      mackeyTopology B ≤ t ∧ t ≤ WeakBilin.instTopologicalSpace B := by
+  constructor
+  · intro h
+    refine ⟨?_, continuous_id_iff_le.mp (WeakBilin.continuous_of_continuous_eval B fun y ↦
+      (h (B.flip y)).mpr (mem_range_self y))⟩
+    let K : Set (Set F) := {A | AbsConvex ℂ A ∧ IsCompact (X := WeakBilin B.flip) A}
+    let ev (x : E) := UniformOnFun.ofFun K (B x)
+    let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+    apply continuous_id_iff_le.mp
+    apply (@continuous_iff_continuousAt E E (mackeyTopology B) t id).mpr
+    intro x
+    suffices hx : Tendsto (fun z : E ↦ z - x) (@nhds E (mackeyTopology B) x) (𝓝 0) by
+      change Tendsto (fun z : E ↦ z) (@nhds E (mackeyTopology B) x) (@nhds E t x)
+      simpa only [sub_add_cancel, zero_add] using hx.add_const x
+    change Tendsto _ (@nhds E (TopologicalSpace.induced ev inferInstance) x) _
+    rw [nhds_induced]
+    refine (PolynormableSpace.hasBasis_zero_ball ℂ E).tendsto_right_iff.mpr fun p hp ↦ ?_
+    obtain ⟨A, hA, hcompact, hattain⟩ := exists_mackeyDisk B h p hp
+    have hnear := UniformOnFun.gen_mem_nhds ℂ K (ev x) (s := A) ⟨hA, hcompact⟩
+      (Metric.uniformity_basis_dist.mem_iff.mpr ⟨1, one_pos, Subset.rfl⟩)
+    filter_upwards [preimage_mem_comap hnear] with z hz
+    obtain ⟨y, hy, hEq⟩ := hattain (z - x)
+    have hlt : dist (B x y) (B z y) < 1 := hz y hy
+    rw [dist_comm, dist_eq_norm, ← LinearMap.sub_apply, ← map_sub, hEq] at hlt
+    exact p.mem_ball_zero.mpr hlt
+  · rintro ⟨hM, hw⟩ l
+    exact ⟨fun hl ↦ mem_range_flip_of_mackeyContinuous B l
+        (@Continuous.comp E E ℂ (mackeyTopology B) t _ id l hl (continuous_id_iff_le.mpr hM)),
+      fun hl ↦ @Continuous.comp E E ℂ t (WeakBilin.instTopologicalSpace B) _ id l
+        ((weakTopology_isConsistentWithDuality B hB l).mpr hl) (continuous_id_iff_le.mpr hw)⟩
 
 /-- Paper: §C.2.2.2, p. 674. The strong topology of the duality is uniform convergence
 on all subsets of the opposite member that are bounded for its weak topology. -/
