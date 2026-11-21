@@ -721,7 +721,37 @@ include sep complete in
 /-- Paper: Remark C.2.3.2, p. 677. For a complete space, μ equals precompact convergence. -/
 theorem completionCompactDualTopology_eq_precompact :
     completionCompactDualTopology X =
-      polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by sorry
+      polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by
+  let K : Set (Set X) := {A | IsCompact A}
+  let Kc : Set (Set (Completion X)) := {A | IsCompact A}
+  let e : X ≃ᵤ Completion X := Completion.UniformCompletion.completeEquivSelf.symm
+  have he (x : X) : e x = (x : Completion X) :=
+    AbstractCompletion.compare_coe AbstractCompletion.ofComplete Completion.cPkg x
+  let u : (X →ᵤ[K] ℂ) ≃ᵤ (Completion X →ᵤ[Kc] ℂ) :=
+    UniformOnFun.congrLeft e.toEquiv
+      (fun _ hA ↦ hA.image e.continuous)
+      (fun _ hA ↦ e.toHomeomorph.isCompact_preimage.mpr hA)
+  calc
+    completionCompactDualTopology X = polarTopology (topDualPairing ℂ X) K := by
+      let ev (φ : StrongDual ℂ X) : X →ᵤ[K] ℂ := UniformOnFun.ofFun K φ
+      have hEval (φ : StrongDual ℂ X) :
+          u (ev φ) = UniformOnFun.ofFun Kc (φ.fromCompletion : Completion X → ℂ) := by
+        funext y
+        obtain ⟨x, rfl⟩ := e.surjective y
+        change φ (e.symm (e x)) = φ.fromCompletion (e x)
+        rw [e.symm_apply_apply, he, ContinuousLinearMap.fromCompletion_apply_coe]
+      change TopologicalSpace.induced
+        (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun Kc (φ.fromCompletion : Completion X → ℂ))
+        inferInstance = TopologicalSpace.induced ev inferInstance
+      simp_rw [← hEval]
+      exact (induced_compose (f := ev) (g := u)).symm.trans
+        (congrArg (TopologicalSpace.induced ev) u.isUniformInducing.isInducing.eq_induced.symm)
+    _ = polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by
+      refine le_antisymm (polarTopology_le_of_cofinal ?_) (polarTopology_le_of_cofinal ?_)
+      · intro A hA
+        exact ⟨closure A, hA.closure.isCompact_of_isClosed isClosed_closure, subset_closure⟩
+      · intro A hA
+        exact ⟨A, hA.totallyBounded, Subset.rfl⟩
 
 include sep complete in
 /-- Paper: Remark C.2.3.2, p. 677. For a complete metrizable space, μ is the finest
