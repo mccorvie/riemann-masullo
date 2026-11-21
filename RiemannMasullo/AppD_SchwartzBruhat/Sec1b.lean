@@ -2379,7 +2379,13 @@ theorem IsBruhatContDiff.add {p : ℕ} {f g : G → ℂ}
 /-- Paper: Definition D.1.5.3(1), p. 762. A complex scalar multiple of a function
 of class Cᵖ is of class Cᵖ. -/
 theorem IsBruhatContDiff.smul {p : ℕ} {f : G → ℂ}
-    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by sorry
+    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by
+  obtain ⟨k, hk, hInv, hDescend⟩ := hf
+  refine ⟨k, hk, fun h x ↦ congrArg (z • ·) (hInv h x), ?_⟩
+  intro a ha
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend a ha
+  exact ⟨z • f₀, fun x ↦ congrArg (z • ·) (hf₀ x),
+    fun e l b ↦ (hSmooth e l b).const_smul z⟩
 
 /-- Paper: Definition D.1.5.3(1), p. 762. The Cᵖ functions form a complex vector
 subspace of the functions on G. -/
