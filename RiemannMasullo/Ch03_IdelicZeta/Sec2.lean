@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2a
+public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 public import Mathlib.Analysis.Meromorphic.NormalForm
 public import Mathlib.Analysis.SpecialFunctions.Gamma.Deligne
@@ -455,10 +456,109 @@ theorem globalIdelicZFunction_entire_of_nontrivial (f : ℬ[F]) (χ : U[F])
     (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
     Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
 
--- TODO(later): needs §2.2.5 (Definition 2.2.5.1) for the homogeneous theta operator
--- Φ_{F,ω} in Theorem 3.2.2.1(3), including (3.2.2.4) and (3.2.2.5).
--- TODO(paper-gap): The signed fiber integral for (3.2.2.5) in the proof on p. 127
--- requires the factor ω(h) in the norm-one integration.
+section HomogeneousMellin
+
+local notation "χ₁[" F "]" => PontryaginDual (MonoidHom.ker (ideleClassNorm F))
+local notation "componentStrip" =>
+  componentVerticalStrip (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+    (ideleClassNorm_ne_one (F := F))
+local notation "mellinIntegrand" =>
+  fun (τ : ℝ≥0ˣ →ₜ* 𝕀[F]) (ω : χ₁[F]) (f : ℬ[F]) (c : 𝒳[F]) (t : ℝ≥0ˣ) ↦
+    homogeneousAdelicTheta ω f (classOf (τ t)) * c (classOf (τ t))
+
+/-- Paper: Equation (3.2.2.4), p. 125. The homogeneous theta Mellin integral
+uses a continuous homomorphic section of the idelic norm and the measure `dt/t`. -/
+def homogeneousThetaMellinIntegral (τ : ℝ≥0ˣ →ₜ* 𝕀[F]) (ω : χ₁[F])
+    (f : ℬ[F]) (c : 𝒳[F]) : ℂ :=
+  ∫ t, mellinIntegrand τ ω f c t ∂positiveRealHaar
+
+variable (τ : ℝ≥0ˣ →ₜ* 𝕀[F])
+variable (ω : χ₁[F]) (f : ℬ[F])
+
+/-- Paper: Equation (3.2.2.4), p. 125. For the squared norm character, the
+Mellin weight on the section is the square of the positive real parameter. -/
+theorem homogeneousThetaMellinIntegral_normSquared (hτ : RightInverse τ (ideleNorm F)) :
+    homogeneousThetaMellinIntegral τ (1 : χ₁[F]) f (ideleClassNormTwist (1 : U[F]) 2) =
+      ∫ t : ℝ≥0ˣ, homogeneousAdelicTheta (1 : χ₁[F]) f (classOf (τ t)) *
+        (t.val : ℂ) ^ (2 : ℕ) ∂positiveRealHaar := by
+  sorry
+
+/-- Paper: Theorem 3.2.2.1(3), p. 125. The homogeneous theta Mellin integral
+converges absolutely on the right half-plane of the component indexed by ω. -/
+theorem homogeneousThetaMellinIntegral_integrable (hτ : RightInverse τ (ideleNorm F)) (c : 𝒳[F])
+    (hc : c ∈ componentStrip ω (Ioi 1)) :
+    Integrable (mellinIntegrand τ ω f c) positiveRealHaar := by sorry
+
+/-- Paper: Theorem 3.2.2.1(3), p. 125. Norm-band truncations of the homogeneous
+theta Mellin integral converge uniformly on compact subsets of that right half-plane. -/
+theorem homogeneousThetaMellinIntegral_tendstoUniformlyOn
+    (hτ : RightInverse τ (ideleNorm F))
+    (K : Set 𝒳[F]) (hK : IsCompact K) (h : K ⊆ componentStrip ω (Ioi 1))
+    (a : ℕ → ℝ) (ha : ∀ n, 1 ≤ a n) (haTop : Tendsto a atTop atTop) :
+    TendstoUniformlyOn (fun n c ↦
+      ∫ t in {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc (a n)⁻¹ (a n)},
+        mellinIntegrand τ ω f c t ∂positiveRealHaar)
+      (homogeneousThetaMellinIntegral τ ω f) atTop K := by sorry
+
+/-- Paper: Theorem 3.2.2.1(3)(a) and (b), p. 125. The homogeneous theta Mellin
+integral converges absolutely throughout the component when both zero terms
+vanish or when the norm-one character is nontrivial. -/
+theorem homogeneousThetaMellinIntegral_integrable_on_component
+    (hτ : RightInverse τ (ideleNorm F))
+    (h : f ∈ adelePolarSubspace F ∨ ω ≠ 1) (c : 𝒳[F]) (hc : c ∈ componentStrip ω univ) :
+    Integrable (mellinIntegrand τ ω f c) positiveRealHaar := by sorry
+
+/-- Paper: Theorem 3.2.2.1(3)(a) and (b), p. 125. When both zero terms vanish
+or the norm-one character is nontrivial, norm-band truncations converge
+uniformly on every compact subset of the component. -/
+theorem homogeneousThetaMellinIntegral_tendstoUniformlyOn_component
+    (hτ : RightInverse τ (ideleNorm F))
+    (h : f ∈ adelePolarSubspace F ∨ ω ≠ 1)
+    (K : Set 𝒳[F]) (hK : IsCompact K) (hcomponent : K ⊆ componentStrip ω univ)
+    (a : ℕ → ℝ) (ha : ∀ n, 1 ≤ a n) (haTop : Tendsto a atTop atTop) :
+    TendstoUniformlyOn (fun n c ↦
+      ∫ t in {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Icc (a n)⁻¹ (a n)},
+        mellinIntegrand τ ω f c t ∂positiveRealHaar)
+      (homogeneousThetaMellinIntegral τ ω f) atTop K := by sorry
+
+/-- Paper: Theorem 3.2.2.1(3)(a) and (b), p. 125. In either case of
+convergence throughout the component, the integral is entire in its
+complex norm-twist coordinate. -/
+theorem homogeneousThetaMellinIntegral_entire_on_component
+    (hτ : RightInverse τ (ideleNorm F))
+    (h : f ∈ adelePolarSubspace F ∨ ω ≠ 1) (χ : U[F])
+    (hχ : ∀ g : (ideleClassNorm F).ker, χ g.val = ω g) :
+    Differentiable ℂ (fun s ↦
+      homogeneousThetaMellinIntegral τ ω f (ideleClassNormTwist χ s)) := by sorry
+
+-- The fiber integral in the proof on p. 127 needs the character weight ω(h).
+-- Definition 2.2.5.1 includes this weight in homogeneousAdelicTheta.
+
+/-- Paper: Equation (3.2.2.5), p. 125. On the right half-plane of a component,
+Weil integration identifies the theta Mellin integral with the homogeneous integral. -/
+theorem globalThetaMellinIntegral_eq_homogeneous (hτ : RightInverse τ (ideleNorm F)) :
+    EqOn (globalThetaMellinIntegral f) (homogeneousThetaMellinIntegral τ ω f)
+      (componentStrip ω (Ioi 1)) := by sorry
+
+/-- Paper: Equation (3.2.2.5), p. 125. The global Z-function in the component's
+norm-twist coordinate is the unique meromorphic continuation of the homogeneous
+theta Mellin integral. The theta Mellin integral has the same continuation by
+its equality with the homogeneous integral on the right half-plane.
+Deviation: Meromorphic continuation is expressed in Mathlib's normal form. -/
+theorem homogeneousThetaMellinIntegral_meromorphicContinuation
+    (hτ : RightInverse τ (ideleNorm F)) (χ : U[F])
+    (hχ : ∀ g : (ideleClassNorm F).ker, χ g.val = ω g) (M : ℂ → ℂ) :
+    (MeromorphicNFOn M univ ∧ EqOn M (fun s ↦
+      homogeneousThetaMellinIntegral τ ω f (ideleClassNormTwist χ s)) halfPlane) ↔
+    M = fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s) := by sorry
+
+/-- Paper: Theorem 3.2.2.1(3), p. 125. If both zero terms vanish, the global
+Z-function is entire in the norm-twist coordinate of every component. -/
+theorem globalIdelicZFunction_entire_of_vanishing
+    (h : f ∈ adelePolarSubspace F) (χ : U[F]) :
+    Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
+
+end HomogeneousMellin
 
 /-- Paper: Lemma 3.2.2.3, p. 125. For fixed quasi-character of abscissa
 greater than one, the zeta integral is continuous in the Schwartz–Bruhat topology. -/

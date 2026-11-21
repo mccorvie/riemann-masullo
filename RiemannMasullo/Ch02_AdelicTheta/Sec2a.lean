@@ -230,11 +230,36 @@ Deviation: Invariance is expressed as constancy on the fibers of the quotient ma
 theorem adelicAverage_at_zero_factorsThrough (f : ℬ[F]) :
     FactorsThrough (fun g : 𝕀[F] ↦ adelicAverage f g 0) classOf := by sorry
 
--- TODO(paper-gap): Lemma 2.2.2.1(3), pp. 77–78, bounds the whole idele sum
--- using an Archimedean restriction alone. Over ℚ, keep g∞ = 1 and take the
--- p-component p^m and all other finite components 1. For finite test function 1_Ẑ,
--- the contributing rationals lie in p^(-m) ℤ, so no fixed fractional ideal can
--- give the printed bound for a positive Archimedean bump near 0.
+-- ERRATA I65: With the Archimedean component fixed at one over ℚ, the
+-- p-component p^m and test function 1_Ẑ give contributing rationals in
+-- p^(-m) ℤ. The full domain below gives a uniform bound on the denominators.
+
+open scoped Pointwise nonZeroDivisors in
+/-- Paper: Lemma 2.2.2.1(3), p. 78. For a product of an Archimedean Schwartz
+function and local indicators as in (2.2.2.2), a single fractional ideal gives
+the summable Archimedean upper bound (2.2.2.3).
+Deviation: The whole idele varies over the canonical norm section times the
+norm-one fundamental domain used in the proof. -/
+theorem adelicAverage_at_zero_le_fractionalIdeal
+    (b : Module.Basis (Fin (Units.rank F)) ℤ (Additive ((𝓞 F)ˣ ⧸ Units.torsion F)))
+    (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
+    (r : CommRing.Pic (𝓞 F) → (ideleNorm F).ker) (hr₁ : r 1 = 1)
+    (hr : ∀ c, ideleIdealClass F (r c).val = c)
+    (f : ℬ[F]) (arch : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (K : (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) → Set (v.adicCompletion F))
+    (hK : ∀ v, IsCompact (K v) ∧ IsOpen (K v) ∧
+      K v ⊆ (v.adicCompletionIntegers F : Set (v.adicCompletion F)))
+    (hKcofinite : ∀ᶠ v in cofinite, K v = (v.adicCompletionIntegers F : Set (v.adicCompletion F)))
+    (hf : ∀ x : 𝔸[F], f (Multiplicative.ofAdd x) = arch (Multiplicative.ofAdd x.1) *
+      Set.indicator {y : 𝔸ᶠ[F] | ∀ v, y v ∈ K v} (fun _ ↦ (1 : ℂ)) x.2) :
+    ∃ I : FractionalIdeal (𝓞 F)⁰ F,
+      ∀ g ∈ Set.range (canonicalIdeleNormSection F) *
+          ((ideleNorm F).ker.subtype '' ideleFundamentalDomain F b v₀ σ r),
+        let term := fun ξ : {ξ : Fˣ // (ξ : F) ∈ I} ↦
+          ‖arch (Multiplicative.ofAdd (g.val.1 * algebraMap F (InfiniteAdeleRing F) (ξ.val : F)))‖
+        Summable term ∧
+          (∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (g.val * algebraMap F 𝔸[F] (ξ : F)))‖) ≤
+            ∑' ξ, term ξ := by sorry
 
 /-- Paper: Definition 2.2.3.1, p. 81. The global adelic theta function descends
 the average at `x = 0` to a continuous function on the idele class group. -/

@@ -407,9 +407,24 @@ Archimedean and finite adelic Schwartz–Bruhat spaces is complete. -/
 theorem adeleSchwartz_inductiveTensor_complete :
     CompleteSpace (InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) := by sorry
 
--- TODO(paper-gap): Lemma 2.1.3.2(3) uses indicators of subgroups as generators.
--- These are even in each finite coordinate, whereas coset indicators can distinguish
--- a point from its negative. The statement needs a revised class of generators.
+-- ERRATA F11: Subgroup indicators are even in each finite coordinate.
+-- The compact open subsets used below allow the coset indicators needed in the proof.
+
+/-- Paper: Lemma 2.1.3.2(3), p. 68. Every adelic Schwartz–Bruhat function is a
+finite linear combination of Archimedean Schwartz functions times finite adelic
+rectangle indicators. The rectangle is integral at all but finitely many places.
+Deviation: The local sets are compact open subsets, as in the proof on p. 70. -/
+theorem adeleSchwartz_eq_sum_compactOpen_rectangles (f : ℬ(𝔸[F])) :
+    ∃ (r : ℕ) (c : Fin r → ℂ) (arch : Fin r → ℬ(InfiniteAdeleRing F))
+        (K : Fin r → (v : Places(F)) → Set (v.adicCompletion F)) (φ : Fin r → ℬ(𝔸[F])),
+      1 ≤ r ∧
+      (∀ i, (∀ v, IsCompact (K i v) ∧ IsOpen (K i v)) ∧
+        (∀ᶠ v in cofinite, K i v = (v.adicCompletionIntegers F : Set (v.adicCompletion F))) ∧
+        ∀ x : 𝔸[F], φ i (Multiplicative.ofAdd x) =
+          arch i (Multiplicative.ofAdd x.1) *
+            Set.indicator {y : 𝔸ᶠ[F] | ∀ v, y v ∈ K i v} (fun _ ↦ (1 : ℂ)) x.2) ∧
+      f = ∑ i, c i • φ i := by sorry
+
 -- TODO(paper-gap): The proof on p. 69 cites “Lemma ??” for second countability
 -- and Proposition 2.1.2.8(6), which has only three parts.
 

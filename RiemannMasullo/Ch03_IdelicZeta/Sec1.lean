@@ -4,6 +4,7 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Analysis.SpecialFunctions.Pow.Complex
 public import Mathlib.Geometry.Manifold.LocalDiffeomorph
 public import Mathlib.NumberTheory.NumberField.HeckeLFunction
+public import Mathlib.Topology.Algebra.Group.Units
 public import Mathlib.Topology.Algebra.PontryaginDual
 
 import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
@@ -656,6 +657,13 @@ theorem dualQuasiCharacter_analyticEquiv [IsTopologicalGroup G] (hm : Continuous
       (∀ c, e c = dualQuasiCharacter m hm c) ∧ ∀ c, e.symm c = dualQuasiCharacter m hm c := by
   sorry
 
+/-- Paper: Following Equation (3.1.1.4), p. 119. Duality exchanges the components
+indexed by a norm-one character and its complex conjugate. -/
+theorem dualQuasiCharacter_image_component [IsTopologicalGroup G] (hm : IsProperMap m)
+    (hne : ∃ g, m g ≠ 1) (χ : PontryaginDual m.ker) :
+    dualQuasiCharacter m hm.continuous '' componentVerticalStrip m hm hne χ Set.univ =
+      componentVerticalStrip m hm hne χ⁻¹ Set.univ := by sorry
+
 end Generalities
 
 section Ideles
@@ -781,6 +789,22 @@ theorem heckeCharacter_eq_prod_restrictions (c : HeckeCharacter (𝓞 F) F)
         (RingHom.snd _ _)).toMonoidHom g)
     b.HasFiniteMulSupport ∧ c (QuotientGroup.mk g) = (∏ w, a w) * ∏ᶠ v, b v := by
   sorry
+
+open Classical in
+/-- Paper: §3.1.2, p. 120. A quasi-character of J_{F,S} is the product of its local
+restrictions at the infinite places and the finite places in S. Each restriction
+evaluates the character on the S-idele with the given coordinate and ones elsewhere. -/
+theorem sIdeleQuotientCharacter_eq_prod_restrictions (c : QuasiCharacter (SIdeleQuotient F S)) :
+    let e := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+      ((v : S) → v.val.adicCompletion F)
+    let eArch := ContinuousMulEquiv.piUnits (M := fun w : InfinitePlace F ↦ w.Completion)
+    let eS := ContinuousMulEquiv.piUnits (M := fun v : S ↦ v.val.adicCompletion F)
+    ∃ (a : (w : InfinitePlace F) → QuasiCharacter w.Completionˣ)
+        (b : (v : S) → QuasiCharacter (v.val.adicCompletion F)ˣ),
+      (∀ w u, a w u = c (QuotientGroup.mk (e.symm (eArch.symm (Pi.mulSingle w u), 1)))) ∧
+      (∀ v u, b v u = c (QuotientGroup.mk (e.symm (1, eS.symm (Pi.mulSingle v u))))) ∧
+      ∀ g : (SAdeleRing F S)ˣ, c (QuotientGroup.mk g) =
+        (∏ w, a w (eArch (e g).1 w)) * ∏ v, b v (eS (e g).2 v) := by sorry
 
 local notation "finiteNorm" => Units.map nnNormHom.toMonoidHom
 local notation "infiniteNorm(" w ")" => (Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w
