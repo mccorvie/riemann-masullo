@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
+import Mathlib.GroupTheory.ArchimedeanDensely
 import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Baire.LocallyCompactRegular
@@ -770,13 +771,404 @@ def relativeIdeleNormRat : 𝕀[F] →* 𝕀[ℚ] :=
   letI := (rationalAdeleEmbedding F).toAlgebra
   Units.map (Algebra.norm 𝔸[ℚ])
 
+section AdeleBasis
+
+open Filter
+open scoped RestrictedProduct
+
+local notation "dF(" F ")" => algebraMap F (𝔸ᶠ[F])
+
+/-- The finite adeles whose component at every finite place lies in the local integer ring. -/
+private def finiteIntegralAdeles : Subring (𝔸ᶠ[F]) :=
+  ⨅ v : HeightOneSpectrum (𝓞 F),
+    ((v.adicCompletionIntegers F).toSubring).comap (RestrictedProduct.evalRingHom _ v)
+
+local notation "IF(" F ")" => finiteIntegralAdeles F
+
+/-- Membership in the integral finite adeles is tested at each finite place. -/
+private theorem mem_finiteIntegralAdeles_iff (a : 𝔸ᶠ[F]) :
+    a ∈ IF(F) ↔ ∀ v : HeightOneSpectrum (𝓞 F), a v ∈ v.adicCompletionIntegers F := by
+  simp only [finiteIntegralAdeles, Subring.mem_iInf]
+  rfl
+
+/-- With no exceptional places, integrality is determined by the finite component. -/
+private theorem mem_integralAdelesOutside_iff_snd (a : 𝔸[F]) :
+    a ∈ integralAdelesOutside F ∅ ↔ a.2 ∈ IF(F) := by
+  rw [mem_finiteIntegralAdeles_iff]
+  simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty,
+    not_false_eq_true, true_implies]
+  rfl
+
+/-- A diagonal finite adele is everywhere integral exactly when it comes from a field integer. -/
+private theorem finiteDiagonal_mem_integral (x : F) :
+    dF(F) x ∈ IF(F) ↔ ∃ r : 𝓞 F, (r : F) = x := by
+  rw [← show (algebraMap F 𝔸[F] x).2 = dF(F) x from rfl,
+    ← mem_integralAdelesOutside_iff_snd, diagonal_mem_integralAdelesOutside]
+  simp only [Finset.coe_empty, integer_empty, Algebra.mem_bot]
+  rfl
+
+/-- Every finite adele differs from a diagonal field element by an integral finite adele. -/
+private theorem finiteAdele_sub_diagonal (a : 𝔸ᶠ[F]) :
+    ∃ x : F, a - dF(F) x ∈ IF(F) := by
+  obtain ⟨-, -, -, -, -, -, -, -, ⟨e, he⟩, -⟩ := adele_additive_quotient.{_, 0} F
+  let q := QuotientAddGroup.mk' (AdeleRing.principalSubgroup (𝓞 F) F)
+  let A : 𝔸[F] := (0, a)
+  obtain ⟨a₀, ha₀⟩ := QuotientAddGroup.mk'_surjective _ (e.symm (q A))
+  have hq : q A = q a₀.val := by rw [← he, ha₀, e.apply_symm_apply]
+  obtain ⟨x, hx⟩ := QuotientAddGroup.eq_iff_sub_mem.mp hq
+  have hx' : dF(F) x = a - a₀.val.2 := congrArg Prod.snd hx
+  exact ⟨x, by simpa only [hx', sub_sub_cancel] using
+    (mem_integralAdelesOutside_iff_snd F a₀.val).mp a₀.property⟩
+
+/-- The product of the local integer rings is compact in the finite adele ring. -/
+private theorem isCompact_finiteIntegralAdeles : IsCompact (IF(F) : Set (𝔸ᶠ[F])) := by
+  let integral (x : ∀ v : HeightOneSpectrum (𝓞 F), v.adicCompletionIntegers F) : 𝔸ᶠ[F] :=
+    ⟨fun v ↦ x v, Eventually.of_forall fun v ↦ (x v).property⟩
+  have hIntegral : Continuous integral :=
+    continuous_restrictedProduct_of_uniform
+      (fun v ↦ continuous_subtype_val.comp (continuous_apply v))
+      (Eventually.of_forall fun v x ↦ (x v).property)
+  have (v : HeightOneSpectrum (𝓞 F)) : CompactSpace (v.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v
+  convert isCompact_range hIntegral using 1
+  ext a
+  rw [SetLike.mem_coe, mem_finiteIntegralAdeles_iff]
+  exact ⟨fun ha ↦ ⟨fun v ↦ ⟨a v, ha v⟩, by apply RestrictedProduct.ext; intro v; rfl⟩,
+    fun ⟨x, hx⟩ v ↦ hx ▸ (x v).property⟩
+
+/-- Every integral finite adele is congruent to a diagonal field integer modulo any
+positive integer times the integral finite adeles. -/
+private theorem finiteIntegralAdeles_mod_nat (a : 𝔸ᶠ[F]) (ha : a ∈ IF(F))
+    (n : ℕ) (hn : n ≠ 0) :
+    ∃ (z : 𝓞 F) (u : 𝔸ᶠ[F]), u ∈ IF(F) ∧ a = dF(F) (z : F) + (n : 𝔸ᶠ[F]) * u := by
+  obtain ⟨x, hx⟩ := finiteAdele_sub_diagonal F (dF(F) (n : F)⁻¹ * a)
+  let u := dF(F) (n : F)⁻¹ * a - dF(F) x
+  have hnF : (n : F) ≠ 0 := Nat.cast_ne_zero.mpr hn
+  have h : (n : 𝔸ᶠ[F]) * u = a - dF(F) ((n : F) * x) := by
+    dsimp [u]
+    rw [mul_sub, ← map_natCast (dF(F)) n, ← mul_assoc, ← map_mul, ← map_mul,
+      mul_inv_cancel₀ hnF, map_one, one_mul]
+  have hz : dF(F) ((n : F) * x) ∈ IF(F) := by
+    rw [← sub_sub_cancel a (dF(F) ((n : F) * x)), ← h]
+    exact (IF(F)).sub_mem ha ((IF(F)).mul_mem (natCast_mem (IF(F)) n) hx)
+  obtain ⟨z, hz⟩ := (finiteDiagonal_mem_integral F _).mp hz
+  exact ⟨z, u, hx, by rw [hz, h, add_sub_cancel]⟩
+
+/-- A finite adele divisible by every positive integer within the integral finite adeles is zero. -/
+private theorem finiteAdele_eq_zero_of_forall_nat_mul (a : 𝔸ᶠ[F])
+    (h : ∀ n : ℕ, n ≠ 0 → ∃ u : 𝔸ᶠ[F], u ∈ IF(F) ∧ a = (n : 𝔸ᶠ[F]) * u) :
+    a = 0 := by
+  apply FiniteAdeleRing.ext
+  intro w
+  by_contra hw
+  let P := w.asIdeal.under ℤ
+  have hP : P ≠ ⊥ := Ideal.under_ne_bot ℤ w.ne_bot
+  obtain ⟨z, hzP, hz⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hP
+  let n := z.natAbs
+  have hn : n ≠ 0 := Int.natAbs_ne_zero.mpr hz
+  have hnP : (n : ℤ) ∈ P := by
+    rcases Int.natAbs_eq z with he | he
+    · rw [show (n : ℤ) = z from he.symm]
+      exact hzP
+    · have hneg : (n : ℤ) = -z := by
+        simpa only [neg_neg] using congrArg Neg.neg he.symm
+      rw [hneg]
+      exact P.neg_mem hzP
+  have hnval : Valued.v (n : w.adicCompletion F) < 1 := by
+    rw [← map_natCast (algebraMap F (w.adicCompletion F)),
+      show Valued.v (algebraMap F (w.adicCompletion F) (n : F)) = _ from
+        HeightOneSpectrum.valuedAdicCompletion_eq_valuation' (v := w) _]
+    change w.valuation F (n : F) < 1
+    have hp : (n : 𝓞 F) ∈ w.asIdeal := by simpa [P, Ideal.under] using hnP
+    simpa only [map_natCast] using (w.valuation_lt_one_iff_mem (K := F) (n : 𝓞 F)).2 hp
+  let γ : (WithZero (Multiplicative ℤ))ˣ :=
+    Units.mk0 (Valued.v (a w)) ((Valuation.ne_zero_iff _).mpr hw)
+  obtain ⟨k, hk⟩ := exists_pow_lt₀ hnval γ
+  obtain ⟨u, hu, he⟩ := h (n ^ k) (pow_ne_zero _ hn)
+  have huval : Valued.v (u w) ≤ 1 :=
+    (mem_finiteIntegralAdeles_iff F u).mp hu w
+  have hwa : a w = (n : w.adicCompletion F) ^ k * u w := by
+    let ev : 𝔸ᶠ[F] →+* w.adicCompletion F :=
+      RestrictedProduct.evalRingHom (fun v : HeightOneSpectrum (𝓞 F) ↦ v.adicCompletion F) w
+    have he' := congrArg ev he
+    rw [map_mul, map_natCast ev (n ^ k), Nat.cast_pow] at he'
+    exact he'
+  have hc : Valued.v (a w) ≤ Valued.v (n : w.adicCompletion F) ^ k := by
+    rw [hwa, map_mul, map_pow]
+    exact mul_le_of_le_one_right zero_le huval
+  exact (not_lt_of_ge hc) hk
+
+/-- The diagonal integral basis gives unique finite adelic coordinates over the rational finite
+adeles for a continuous scalar map preserving diagonals and integrality. -/
+private theorem finiteAdele_integralBasis_bijective
+    (g : 𝔸ᶠ[ℚ] →+* 𝔸ᶠ[F]) (hg : Continuous g)
+    (hdiag : ∀ x : ℚ, g (dF(ℚ) x) = dF(F) (algebraMap ℚ F x))
+    (hint : Set.MapsTo g (IF(ℚ) : Set (𝔸ᶠ[ℚ])) (IF(F) : Set (𝔸ᶠ[F]))) :
+    Bijective (fun c : Module.Free.ChooseBasisIndex ℤ (𝓞 F) → 𝔸ᶠ[ℚ] ↦
+      ∑ i, g (c i) * dF(F) (integralBasis F i)) := by
+  let ι := Module.Free.ChooseBasisIndex ℤ (𝓞 F)
+  let b := integralBasis F
+  let φ : (ι → 𝔸ᶠ[ℚ]) →+ 𝔸ᶠ[F] :=
+    { toFun := fun c ↦ ∑ i, g (c i) * dF(F) (b i)
+      map_zero' := by simp
+      map_add' := fun c e ↦ by simp [add_mul, Finset.sum_add_distrib] }
+  change Bijective φ
+  let S : Set (ι → 𝔸ᶠ[ℚ]) := Set.pi Set.univ fun _ ↦ (IF(ℚ) : Set (𝔸ᶠ[ℚ]))
+  have hS (c : ι → 𝔸ᶠ[ℚ]) : c ∈ S ↔ ∀ i, c i ∈ IF(ℚ) := by simp [S]
+  have hi (c : ι → 𝔸ᶠ[ℚ]) (hc : c ∈ S) : φ c ∈ IF(F) :=
+    sum_mem fun i _ ↦ (IF(F)).mul_mem (hint ((hS c).mp hc i))
+      ((finiteDiagonal_mem_integral F _).mpr ⟨RingOfIntegers.basis F i, (integralBasis_apply F i).symm⟩)
+  have hd (q : ι → ℚ) : φ (fun i ↦ dF(ℚ) (q i)) = dF(F) (b.equivFun.symm q) := by
+    change (∑ i, g (dF(ℚ) (q i)) * dF(F) (b i)) = _
+    simp only [hdiag, Module.Basis.equivFun_symm_apply, map_sum, Algebra.smul_def, map_mul]
+    rfl
+  have hcoords (z : 𝓞 F) (i : ι) : dF(ℚ) (b.equivFun (z : F) i) ∈ IF(ℚ) := by
+    apply (finiteDiagonal_mem_integral ℚ _).mpr
+    refine ⟨((RingOfIntegers.basis F).repr z i : ℤ), ?_⟩
+    simp only [Module.Basis.equivFun_apply, b, integralBasis_repr_apply, map_intCast]
+    rfl
+  have hc : Continuous φ := by
+    change Continuous fun c : ι → 𝔸ᶠ[ℚ] ↦ ∑ i, g (c i) * dF(F) (b i)
+    exact continuous_finsetSum _ fun i _ ↦ (hg.comp (continuous_apply i)).mul continuous_const
+  -- Approximate each coefficient by a rational. A relation forces the resulting
+  -- rational combination to be a field integer, so its coefficients are integral.
+  have hkernel (c : ι → 𝔸ᶠ[ℚ]) (hzero : φ c = 0) : c ∈ S := by
+    choose q hq using fun i ↦ finiteAdele_sub_diagonal ℚ (c i)
+    let u : ι → 𝔸ᶠ[ℚ] := fun i ↦ c i - dF(ℚ) (q i)
+    have hu : u ∈ S := (hS u).mpr hq
+    have he : c = (fun i ↦ dF(ℚ) (q i)) + u := by
+      funext i
+      exact (add_sub_cancel _ _).symm
+    rw [he, map_add, hd, add_eq_zero_iff_eq_neg] at hzero
+    obtain ⟨z, hz⟩ := (finiteDiagonal_mem_integral F _).mp
+      (hzero ▸ (IF(F)).neg_mem (hi u hu))
+    have hqz : b.equivFun (z : F) = q := by rw [hz, LinearEquiv.apply_symm_apply]
+    rw [he]
+    exact (hS _).mpr fun i ↦ (IF(ℚ)).add_mem (hqz ▸ hcoords z i) (hq i)
+  constructor
+  · apply (injective_iff_map_eq_zero φ).mpr
+    intro c hzero
+    funext i
+    apply finiteAdele_eq_zero_of_forall_nat_mul ℚ
+    intro n hn
+    -- Apply the same argument after dividing all coefficients by the given integer.
+    let t := dF(ℚ) (n : ℚ)⁻¹
+    let u : ι → 𝔸ᶠ[ℚ] := fun j ↦ t * c j
+    have he : φ u = g t * φ c := by
+      change (∑ j, g (t * c j) * dF(F) (b j)) = g t * ∑ j, g (c j) * dF(F) (b j)
+      simp only [map_mul, mul_assoc, Finset.mul_sum]
+    have hu : φ u = 0 := by rw [he, hzero, mul_zero]
+    refine ⟨u i, (hS u).mp (hkernel u hu) i, ?_⟩
+    change c i = (n : 𝔸ᶠ[ℚ]) * (dF(ℚ) (n : ℚ)⁻¹ * c i)
+    rw [← mul_assoc, ← map_natCast (dF(ℚ)) n, ← map_mul,
+      mul_inv_cancel₀ (Nat.cast_ne_zero.mpr hn), map_one, one_mul]
+  · have : T2Space (𝔸ᶠ[F]) := by
+      change T2Space (Πʳ v : HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F])
+      infer_instance
+    have hcompact : IsCompact (φ '' S) := by
+      apply IsCompact.image _ hc
+      exact isCompact_univ_pi fun _ ↦ isCompact_finiteIntegralAdeles ℚ
+    have hIntSurj (a : 𝔸ᶠ[F]) (ha : a ∈ IF(F)) : a ∈ φ '' S := by
+      -- Each congruence class meets the compact image of the integral coefficients.
+      -- Intersect these conditions and use separation by positive integer multiples.
+      let T (n : {n : ℕ // n ≠ 0}) : Set (𝔸ᶠ[F]) :=
+        (φ '' S) ∩ (fun x ↦ a - x) ⁻¹' ((fun u ↦ (n.val : 𝔸ᶠ[F]) * u) '' IF(F))
+      have hclosed (n : {n : ℕ // n ≠ 0}) :
+          IsClosed ((fun x : 𝔸ᶠ[F] ↦ a - x) ⁻¹' ((fun u ↦ (n.val : 𝔸ᶠ[F]) * u) '' IF(F))) :=
+        ((isCompact_finiteIntegralAdeles F).image (continuous_const.mul continuous_id)).isClosed.preimage
+          (continuous_const.sub continuous_id)
+      have hdirected : Directed (· ⊇ ·) T := by
+        intro n m
+        have hsub (k l : {n : ℕ // n ≠ 0}) :
+            T ⟨k.val * l.val, mul_ne_zero k.property l.property⟩ ⊆ T k := by
+          rintro x ⟨hx, u, hu, he⟩
+          exact ⟨hx, (l.val : 𝔸ᶠ[F]) * u,
+            (IF(F)).mul_mem (natCast_mem _ _) hu, by simpa only [Nat.cast_mul, mul_assoc] using he⟩
+        refine ⟨⟨n.val * m.val, mul_ne_zero n.property m.property⟩, hsub n m, ?_⟩
+        simpa only [mul_comm n.val m.val] using hsub m n
+      have hnonempty (n : {n : ℕ // n ≠ 0}) : (T n).Nonempty := by
+        obtain ⟨z, u, hu, he⟩ := finiteIntegralAdeles_mod_nat F a ha n n.property
+        let q := b.equivFun (z : F)
+        have hp : φ (fun i ↦ dF(ℚ) (q i)) = dF(F) (z : F) := by
+          rw [hd, LinearEquiv.symm_apply_apply]
+        exact ⟨dF(F) (z : F), ⟨_, (hS _).mpr (hcoords z), hp⟩, u, hu,
+          (eq_sub_iff_add_eq.mpr ((add_comm _ _).trans he.symm))⟩
+      have : Nonempty {n : ℕ // n ≠ 0} := ⟨⟨1, one_ne_zero⟩⟩
+      obtain ⟨x, hx⟩ := IsCompact.nonempty_iInter_of_directed_nonempty_isCompact_isClosed T
+        hdirected hnonempty (fun n ↦ hcompact.inter_right (hclosed n))
+        (fun n ↦ hcompact.isClosed.inter (hclosed n))
+      have hxa : a - x = 0 := finiteAdele_eq_zero_of_forall_nat_mul F _ fun n hn ↦ by
+        obtain ⟨_, u, hu, he⟩ := Set.mem_iInter.mp hx ⟨n, hn⟩
+        exact ⟨u, hu, he.symm⟩
+      exact (sub_eq_zero.mp hxa).symm ▸ (Set.mem_iInter.mp hx ⟨1, one_ne_zero⟩).1
+    intro a
+    obtain ⟨x, hx⟩ := finiteAdele_sub_diagonal F a
+    obtain ⟨u, -, hu⟩ := hIntSurj _ hx
+    let q := b.equivFun x
+    refine ⟨u + (fun i ↦ dF(ℚ) (q i)), ?_⟩
+    rw [map_add, hu, hd, LinearEquiv.symm_apply_apply, sub_add_cancel]
+
+/-- The infinite component of scalar extension depends only on the input infinite component. -/
+private theorem rationalAdeleEmbedding_fst_eq (a b : 𝔸[ℚ]) (h : a.1 = b.1) :
+    (rationalAdeleEmbedding F a).1 = (rationalAdeleEmbedding F b).1 := by
+  let f := rationalAdeleEmbedding F
+  have hzero : (f (a - b)).1 = 0 := by
+    funext w
+    apply (rationalAdeleEmbedding_spec F).2.2.1 w (a - b)
+    change (a.1 - b.1) _ = 0
+    rw [h, sub_self]
+    rfl
+  rw [map_sub] at hzero
+  exact sub_eq_zero.mp hzero
+
+/-- The diagonal integral basis gives unique infinite adelic coordinates over the rational
+infinite adeles. -/
+private theorem infiniteAdele_integralBasis_bijective :
+    Bijective (fun c : Module.Free.ChooseBasisIndex ℤ (𝓞 F) → InfiniteAdeleRing ℚ ↦
+      ∑ i, (rationalAdeleEmbedding F (c i, 0)).1 *
+        algebraMap F (InfiniteAdeleRing F) (integralBasis F i)) := by
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
+  let e : InfiniteAdeleRing ℚ ≃ₜ ℝ :=
+    (Homeomorph.piUnique InfinitePlace.Completion).trans
+      (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).toHomeomorph
+  have hm : Continuous m := by
+    simp only [m]
+    exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+      (continuous_apply v.1)).prodMk
+      (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+        (continuous_apply v.1))
+  let f := rationalAdeleEmbedding F
+  have hs := rationalAdeleEmbedding_spec F
+  let j (r : ℝ) : mixedEmbedding.mixedSpace F := m (f (e.symm r, 0)).1
+  have hj : Continuous j :=
+    hm.comp (continuous_fst.comp (hs.1.comp (e.symm.continuous.prodMk continuous_const)))
+  -- Both continuous real scalar maps agree on the dense rational diagonal.
+  have hreal : j = algebraMap ℝ (mixedEmbedding.mixedSpace F) := by
+    apply (Rat.denseRange_cast (𝕜 := ℝ)).equalizer hj
+      (continuous_algebraMap ℝ (mixedEmbedding.mixedSpace F))
+    funext q
+    change j (q : ℝ) = algebraMap ℝ (mixedEmbedding.mixedSpace F) (q : ℝ)
+    have hq : e ((algebraMap ℚ 𝔸[ℚ] q).1) = (q : ℝ) := by
+      change extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+        (algebraMap ℚ Rat.infinitePlace.Completion q) = (q : ℝ)
+      simp
+    have harg : e.symm (q : ℝ) = (algebraMap ℚ 𝔸[ℚ] q).1 := e.symm_apply_eq.mpr hq.symm
+    have h := rationalAdeleEmbedding_fst_eq F (e.symm (q : ℝ), 0) (algebraMap ℚ 𝔸[ℚ] q) harg
+    change m (f (e.symm (q : ℝ), 0)).1 = _
+    rw [h, hs.2.1, AdeleRing.algebraMap_fst_def]
+    exact DFunLike.congr_fun (Subsingleton.elim
+      (m.toRingHom.comp ((algebraMap F (InfiniteAdeleRing F)).comp (algebraMap ℚ F)))
+      ((algebraMap ℝ (mixedEmbedding.mixedSpace F)).comp (algebraMap ℚ ℝ))) q
+  let b := mixedEmbedding.latticeBasis F
+  let p := Equiv.piCongrRight (fun _ : Module.Free.ChooseBasisIndex ℤ (𝓞 F) ↦ e.toEquiv)
+  have he (c : Module.Free.ChooseBasisIndex ℤ (𝓞 F) → InfiniteAdeleRing ℚ) :
+      m (∑ i, (f (c i, 0)).1 * algebraMap F (InfiniteAdeleRing F) (integralBasis F i)) =
+        b.equivFun.symm (p c) := by
+    rw [Module.Basis.equivFun_symm_apply, map_sum]
+    apply Finset.sum_congr rfl
+    intro i _
+    have h : m (f (c i, 0)).1 = algebraMap ℝ (mixedEmbedding.mixedSpace F) (e (c i)) := by
+      simpa only [j, e.symm_apply_apply] using congrFun hreal (e (c i))
+    rw [map_mul, h, Algebra.smul_def, ← InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp,
+      ← mixedEmbedding.latticeBasis_apply]
+    rfl
+  have hcomp : Bijective (fun (c : Module.Free.ChooseBasisIndex ℤ (𝓞 F) → InfiniteAdeleRing ℚ) ↦
+      m (∑ i, (f (c i, 0)).1 * algebraMap F (InfiniteAdeleRing F) (integralBasis F i))) :=
+    (show (fun (c : Module.Free.ChooseBasisIndex ℤ (𝓞 F) → InfiniteAdeleRing ℚ) ↦
+        m (∑ i, (f (c i, 0)).1 *
+        algebraMap F (InfiniteAdeleRing F) (integralBasis F i))) = b.equivFun.symm ∘ p from
+      funext he) ▸ b.equivFun.symm.bijective.comp p.bijective
+  exact ⟨fun _ _ h ↦ hcomp.injective (congrArg m h),
+    fun y ↦ let ⟨c, hc⟩ := hcomp.surjective (m y); ⟨c, m.injective hc⟩⟩
+
 /-- Paper: Lemma A.2.2.2, p. 546. The adele algebra on which the relative norm
 takes a determinant is finite free of the field degree.
 Deviation: This sanity check rules out the default determinant on modules without a finite basis. -/
 theorem rationalAdeleEmbedding_hasBasis :
     letI := (rationalAdeleEmbedding F).toAlgebra
     Nonempty (Module.Basis (Fin (Module.finrank ℚ F)) 𝔸[ℚ] 𝔸[F]) := by
-  sorry
+  let := (rationalAdeleEmbedding F).toAlgebra
+  let f := rationalAdeleEmbedding F
+  have hs := rationalAdeleEmbedding_spec F
+  have hfin (a : 𝔸[ℚ]) : (f a).2 = (f (0, a.2)).2 := by
+    let a' : 𝔸[ℚ] := (0, a.2)
+    have h : (f (a - a')).2 = 0 := by
+      apply FiniteAdeleRing.ext
+      intro w
+      exact hs.2.2.2 (w.under (𝓞 ℚ)) w rfl (a - a') (by change a.2 _ - a.2 _ = 0; simp)
+    rw [map_sub] at h
+    exact sub_eq_zero.mp h
+  let g : 𝔸ᶠ[ℚ] →+* 𝔸ᶠ[F] :=
+    { toFun := fun a ↦ (f (0, a)).2
+      map_zero' := congrArg Prod.snd (map_zero f)
+      map_one' := (hfin 1).symm.trans (congrArg Prod.snd (map_one f))
+      map_add' := fun a b ↦ by
+        have h : ((0, a) : 𝔸[ℚ]) + (0, b) = (0, a + b) := Prod.ext (zero_add _) rfl
+        rw [← h, map_add]
+        rfl
+      map_mul' := fun a b ↦ by
+        have h : ((0, a) : 𝔸[ℚ]) * (0, b) = (0, a * b) := Prod.ext (zero_mul _) rfl
+        rw [← h, map_mul]
+        rfl }
+  have hg : Continuous g := continuous_snd.comp (hs.1.comp (continuous_const.prodMk continuous_id))
+  have hgfin (a : 𝔸[ℚ]) : (f a).2 = g a.2 := hfin a
+  have hgdiag (x : ℚ) : g (dF(ℚ) x) = dF(F) (algebraMap ℚ F x) := by
+    rw [← AdeleRing.algebraMap_snd_def, ← hgfin, hs.2.1, AdeleRing.algebraMap_snd_def]
+  have hgint : Set.MapsTo g (IF(ℚ) : Set (𝔸ᶠ[ℚ])) (IF(F) : Set (𝔸ᶠ[F])) := by
+    obtain ⟨-, -, -, -, -, -, -, -, -, extensions⟩ := adele_additive_quotient ℚ
+    obtain ⟨r, -, -, -, -, -, hr, -, -⟩ := (extensions F (algebraMap ℚ F)).2 f hs
+    intro a ha
+    let x : integralAdelesOutside ℚ ∅ :=
+      ⟨(1, a), (mem_integralAdelesOutside_iff_snd ℚ _).mpr ha⟩
+    change g ((x : 𝔸[ℚ]).2) ∈ IF(F)
+    rw [← hgfin (x : 𝔸[ℚ])]
+    apply (mem_integralAdelesOutside_iff_snd F _).mp
+    rw [← hr]
+    exact (r x).property
+  have hinf (a : 𝔸[ℚ]) : (f a).1 = (f (a.1, 0)).1 :=
+    rationalAdeleEmbedding_fst_eq F a (a.1, 0) rfl
+  let ι := Module.Free.ChooseBasisIndex ℤ (𝓞 F)
+  let v (i : ι) := algebraMap F 𝔸[F] (integralBasis F i)
+  let φ : (ι → 𝔸[ℚ]) →ₗ[𝔸[ℚ]] 𝔸[F] :=
+    ∑ i, (LinearMap.proj i).smulRight (v i)
+  have hφ (a : ι → 𝔸[ℚ]) : φ a = ∑ i, f (a i) * v i := by
+    simp only [φ, LinearMap.sum_apply, LinearMap.smulRight_apply, LinearMap.proj_apply,
+      Algebra.smul_def]
+    rfl
+  let φinf (a : ι → InfiniteAdeleRing ℚ) :=
+    ∑ i, (f (a i, 0)).1 * algebraMap F (InfiniteAdeleRing F) (integralBasis F i)
+  let φf (a : ι → 𝔸ᶠ[ℚ]) := ∑ i, g (a i) * dF(F) (integralBasis F i)
+  have hinf' (a : ι → 𝔸[ℚ]) : (φ a).1 = φinf (fun i ↦ (a i).1) := by
+    rw [hφ]
+    change (RingHom.fst _ _) (∑ i, f (a i) * v i) = _
+    simp only [map_sum, map_mul]
+    exact Finset.sum_congr rfl fun i _ ↦ congrArg (· * (v i).1) (hinf (a i))
+  have hfin' (a : ι → 𝔸[ℚ]) : (φ a).2 = φf (fun i ↦ (a i).2) := by
+    rw [hφ]
+    change (RingHom.snd _ _) (∑ i, f (a i) * v i) = _
+    simp only [map_sum, map_mul]
+    exact Finset.sum_congr rfl fun i _ ↦ congrArg (· * (v i).2) (hgfin (a i))
+  have hinfbij : Bijective φinf := infiniteAdele_integralBasis_bijective F
+  have hfinbij : Bijective φf := finiteAdele_integralBasis_bijective F g hg hgdiag hgint
+  have hbij : Bijective φ := by
+    constructor
+    · intro a b h
+      have h1 := hinfbij.injective ((hinf' a).symm.trans ((congrArg Prod.fst h).trans (hinf' b)))
+      have h2 := hfinbij.injective ((hfin' a).symm.trans ((congrArg Prod.snd h).trans (hfin' b)))
+      exact funext fun i ↦ Prod.ext (congrFun h1 i) (congrFun h2 i)
+    · intro a
+      obtain ⟨x, hx⟩ := hinfbij.surjective a.1
+      obtain ⟨y, hy⟩ := hfinbij.surjective a.2
+      refine ⟨fun i ↦ (x i, y i), Prod.ext ?_ ?_⟩
+      · exact (hinf' _).trans hx
+      · exact (hfin' _).trans hy
+  let e : ι ≃ Fin (Module.finrank ℚ F) :=
+    (Fintype.equivFin ι).trans (finCongr (Module.finrank_eq_card_basis (integralBasis F)).symm)
+  exact ⟨((Pi.basisFun 𝔸[ℚ] ι).map (LinearEquiv.ofBijective φ hbij)).reindex e⟩
+
+end AdeleBasis
 
 /-- Paper: Lemma A.2.2.2, p. 546. The relative norm to the rational ideles is continuous. -/
 theorem relativeIdeleNormRat_continuous : Continuous (relativeIdeleNormRat F) := by
