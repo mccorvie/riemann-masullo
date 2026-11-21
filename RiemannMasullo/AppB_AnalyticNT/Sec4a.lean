@@ -6,6 +6,7 @@ public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.IntegralEqImproper
 
@@ -475,6 +476,8 @@ theorem finite_mellinJumpMidpoint_ne_lattice
 -- TODO(paper-gap): Footnote 12 asks for a non-absolutely convergent example.
 -- The example at θ = 2 has only one nonzero frequency sample.
 
+open MeasureTheory in
+open scoped Asymptotics FourierTransform in
 /-- Paper: Remark B.4.1.4, p. 608. If the test function is globally smooth,
 the Mellin samples in the Poisson identity are absolutely summable. -/
 theorem summable_mellinPoissonSamples_of_smooth
@@ -482,7 +485,89 @@ theorem summable_mellinPoissonSamples_of_smooth
     {θ : ℝ} (hθ : 0 < θ) (hθ₁ : θ ≠ 1) (c : Circle) (ℓ : ℂ)
     (hℓ : Complex.exp ℓ = (c : ℂ)) :
     Summable (fun m : ℤ ↦
-      ‖logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log θ : ℂ))‖) := by sorry
+      ‖logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log θ : ℂ))‖) := by
+  let a := Real.log θ
+  have ha : a ≠ 0 := Real.log_ne_zero_of_pos_of_ne_one hθ hθ₁
+  have haC : (a : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ha
+  let w (x : ℝ) := Complex.exp (ℓ * (x : ℂ))
+  let g (x : ℝ) := w x * f (a * x)
+  have hw : ContDiff ℝ 1 w := (contDiff_const.mul (Complex.ofRealCLM.contDiff (n := 1))).cexp
+  have hg : ContDiff ℝ 1 g :=
+    hw.mul ((hsmooth.of_le (by simp : (1 : ℕ∞ω) ≤ ∞)).comp (contDiff_const.mul contDiff_id))
+  have hw_norm (x : ℝ) : ‖w x‖ = 1 := by
+    have hre : ℓ.re = 0 :=
+      (Real.exp_eq_one_iff ℓ.re).mp (by rw [← Complex.norm_exp, hℓ, Circle.norm_coe])
+    simp [w, Complex.norm_exp, Complex.mul_re, hre]
+  have hderiv (x : ℝ) : deriv g x = w x *
+      (ℓ * f (a * x) + (a : ℂ) * deriv f (a * x)) := by
+    have hw' := ((Complex.ofRealCLM.hasDerivAt (x := x)).const_mul ℓ).cexp
+    have hf' := (hsmooth.differentiable (by simp) (a * x)).hasDerivAt.scomp x
+      ((hasDerivAt_id x).const_mul a)
+    convert (hw'.mul hf').deriv using 1
+    · rfl
+    · simp [w, Complex.real_smul]
+      ring
+  -- The twist is unitary, so the profile and its derivative retain exponential decay.
+  obtain ⟨C, _, T, _, htail⟩ := hf.2 1
+  have ht : Tendsto (fun x : ℝ ↦ |a * x|) (cocompact ℝ) atTop := by
+    simpa only [abs_mul, Function.comp_def, Real.norm_eq_abs] using
+      (tendsto_const_mul_atTop_of_pos (abs_pos.mpr ha)).mpr
+        (tendsto_norm_cocompact_atTop (E := ℝ))
+  have hexp : (fun x : ℝ ↦ Real.exp (-|a * x|)) =O[cocompact ℝ]
+      (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    simpa only [Function.comp_def, abs_mul, neg_mul, Real.norm_eq_abs] using
+      (isLittleO_exp_neg_mul_rpow_atTop (abs_pos.mpr ha) (-2)).isBigO.comp_tendsto
+        (tendsto_norm_cocompact_atTop (E := ℝ))
+  have hg_decay : g =O[cocompact ℝ] (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    refine (Asymptotics.IsBigO.of_bound (g := fun x : ℝ ↦ Real.exp (-|a * x|)) C ?_).trans hexp
+    filter_upwards [ht.eventually_gt_atTop T] with x hx
+    simpa only [g, norm_mul, hw_norm, one_mul, Real.norm_eq_abs, Real.abs_exp, Nat.cast_one,
+      neg_one_mul] using (htail (a * x) hx).1.le
+  have hg'_decay : deriv g =O[cocompact ℝ] (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    refine (Asymptotics.IsBigO.of_bound (g := fun x : ℝ ↦ Real.exp (-|a * x|))
+      ((‖ℓ‖ + |a|) * C) ?_).trans hexp
+    filter_upwards [ht.eventually_gt_atTop T] with x hx
+    obtain ⟨hfx, hdfx⟩ := htail (a * x) hx
+    simp only [Nat.cast_one, neg_one_mul] at hfx hdfx
+    rw [hderiv, norm_mul, hw_norm, one_mul, Real.norm_eq_abs, Real.abs_exp]
+    calc
+      _ ≤ ‖ℓ‖ * ‖f (a * x)‖ + |a| * ‖deriv f (a * x)‖ := by
+        simpa only [norm_mul, Complex.norm_real, Real.norm_eq_abs] using
+          norm_add_le (ℓ * f (a * x)) ((a : ℂ) * deriv f (a * x))
+      _ ≤ ‖ℓ‖ * (C * Real.exp (-|a * x|)) + |a| * (C * Real.exp (-|a * x|)) :=
+        add_le_add (mul_le_mul_of_nonneg_left hfx.le (norm_nonneg _))
+          (mul_le_mul_of_nonneg_left hdfx.le (abs_nonneg _))
+      _ = _ := by ring
+  have hsum := (summable_norm_fourier_int_of_isBigO hg hg_decay hg'_decay).comp_injective
+    (neg_injective : Function.Injective (fun m : ℤ ↦ -m))
+  refine (hsum.mul_left |a|).congr fun m ↦ ?_
+  -- Substitute t = exp(a * x) to identify the rescaled Mellin sample.
+  let s := (ℓ + twoPiI * (m : ℂ)) / (a : ℂ)
+  let F (y : ℝ) := Complex.exp (s * y) * f y
+  have hmellin : logMellin f s = ∫ y, F y := by
+    change mellin (fun t ↦ f (Real.log t)) s = _
+    rw [mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with y
+    simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos y).ne'),
+      ← Complex.ofReal_log (Real.exp_pos y).le, Real.log_exp]
+    simp only [F, Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+    congr 2
+    ring
+  have hFourier : 𝓕 g ((-m : ℤ) : ℝ) = |a⁻¹| • logMellin f s := by
+    rw [hmellin, ← Measure.integral_comp_mul_left F, Real.fourier_real_eq_integral_exp_smul]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [g, w, F, smul_eq_mul, ← mul_assoc, ← Complex.exp_add, Int.cast_neg,
+      Complex.ofReal_neg, Complex.ofReal_intCast, Complex.ofReal_mul]
+    congr 2
+    dsimp [s]
+    field_simp
+    ring
+  change |a| * ‖𝓕 g ((-m : ℤ) : ℝ)‖ = ‖logMellin f s‖
+  rw [hFourier, norm_smul, Real.norm_eq_abs, abs_abs, abs_inv, ← mul_assoc,
+    mul_inv_cancel₀ (abs_ne_zero.mpr ha), one_mul]
 
 /-- Paper: Remark B.4.1.4, p. 608. The Mellin transform of the indicator of
 the interval from one to two is (B.4.1.9), with its removable value at zero. -/
