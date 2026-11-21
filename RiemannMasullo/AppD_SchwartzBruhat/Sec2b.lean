@@ -194,13 +194,12 @@ private theorem continuous_schwartzBruhat (f : S) : Continuous (fun x ↦ f x) :
   refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
   rintro _ ⟨s, rfl⟩
   refine ⟨⟨_, ?_⟩, rfl⟩
-  let _ := e.finiteGroup
   have htorus : IsOpenQuotientMap
       (fun t : EuclideanSpace ℝ (Fin e.torusDim) ↦ fun i ↦ (t i : AddCircle (1 : ℝ))) :=
     (IsOpenQuotientMap.piMap (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
       (PiLp.homeomorph 2 (fun _ : Fin e.torusDim ↦ ℝ)).isOpenQuotientMap
   have hcover := (IsOpenQuotientMap.id (X := EuclideanSpace ℝ (Fin e.realDim))).prodMap htorus
-  have hfiber (z : Fin e.latticeRank → ℤ) (b : Fin e.finiteOrder) :
+  have hfiber (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor) :
       Continuous (fun xt : EuclideanSpace ℝ (Fin e.realDim) × (Fin e.torusDim → AddCircle (1 : ℝ)) ↦
         s (xt.1, xt.2, z, b)) :=
     hcover.continuous_comp_iff.mp (s.property.1 z b).continuous

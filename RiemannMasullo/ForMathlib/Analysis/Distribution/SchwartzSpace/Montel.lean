@@ -3,7 +3,7 @@ module
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 public import Mathlib.Analysis.LocallyConvex.Montel
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
-import Mathlib.Topology.Compactification.OnePoint.Basic
+public import Mathlib.Topology.Compactification.OnePoint.Basic
 import Mathlib.Topology.ContinuousMap.Bounded.ArzelaAscoli
 
 /-! # Compactness of bounded closed sets in the real-line Schwartz space -/
@@ -147,5 +147,74 @@ theorem schwartzMap_real_montel : MontelSpace ℂ 𝓢(ℝ, ℂ) := by
   apply (isCompact_univ_pi hK).totallyBounded.subset
   rintro _ ⟨f, hf, rfl⟩ i _
   exact subset_closure (mem_image_of_mem _ (mem_image_of_mem _ hf))
+
+/-- Extension by zero at infinity sends a bounded Schwartz family into a relatively compact
+family for the supremum norm. -/
+theorem schwartz_compactified_bounded (D : Type*) [NormedAddCommGroup D] [NormedSpace ℝ D]
+    [ProperSpace D] : ∃ J : 𝓢(D, ℂ) →L[ℂ] (OnePoint D →ᵇ ℂ),
+      (∀ f (x : D), J f x = f x) ∧
+      ∀ S : Set 𝓢(D, ℂ), IsVonNBounded ℂ S → IsCompact (closure (J '' S)) := by
+  let j (f : 𝓢(D, ℂ)) : OnePoint D →ᵇ ℂ := .mkOfCompact
+    (OnePoint.continuousMapMk ⟨f, f.continuous⟩ 0 (by
+      change Tendsto (⇑f) (coclosedCompact D) (𝓝 (0 : ℂ))
+      rw [coclosedCompact_eq_cocompact]
+      exact f.tendsto_cocompact))
+  let J : 𝓢(D, ℂ) →L[ℂ] (OnePoint D →ᵇ ℂ) := SchwartzMap.mkCLMtoNormedSpace j
+    (fun f g ↦ by ext x; induction x using OnePoint.rec <;> simp [j, OnePoint.continuousMapMk])
+    (fun a f ↦ by ext x; induction x using OnePoint.rec <;> simp [j, OnePoint.continuousMapMk]) (by
+      refine ⟨{(0, 0)}, 1, zero_le_one, fun f ↦ ?_⟩
+      rw [one_mul, Finset.sup_singleton]
+      apply (BoundedContinuousFunction.norm_le (apply_nonneg _ _)).mpr
+      intro x
+      induction x using OnePoint.rec with
+      | infty => exact (norm_zero : ‖(0 : ℂ)‖ = 0).le.trans (apply_nonneg _ _)
+      | coe x => exact f.norm_le_seminorm ℂ x)
+  refine ⟨J, fun _ _ ↦ rfl, ?_⟩
+  intro S hS
+  have hb := (schwartz_withSeminorms ℂ D ℂ).isVonNBounded_iff_seminorm_bounded.mp hS
+  obtain ⟨C, hC, hbound⟩ := hb (0, 0)
+  obtain ⟨A, hA, hdecay⟩ := hb (1, 0)
+  obtain ⟨B, hB, hderiv⟩ := hb (0, 1)
+  apply BoundedContinuousFunction.arzela_ascoli (closedBall 0 C) (isCompact_closedBall _ _)
+  · rintro _ x ⟨f, hf, rfl⟩
+    induction x using OnePoint.rec with
+    | infty => exact mem_closedBall_self hC.le
+    | coe x =>
+      change dist (f x) 0 ≤ C
+      rw [dist_zero_right]
+      exact (f.norm_le_seminorm ℂ x).trans (hbound f hf).le
+  · intro z
+    induction z using OnePoint.rec with
+    | infty =>
+      rw [Metric.equicontinuousAt_iff_right]
+      intro ε hε
+      apply OnePoint.hasBasis_nhds_infty.eventually_iff.mpr
+      refine ⟨closedBall 0 (A / ε), ⟨isClosed_closedBall, isCompact_closedBall _ _⟩, ?_⟩
+      rintro _ (⟨x, hx, rfl⟩ | hz) ⟨_, f, hf, rfl⟩
+      · change dist 0 (f x) < ε
+        rw [dist_zero_left]
+        have hx' : A / ε < ‖x‖ := by simpa [mem_closedBall, dist_zero_right] using hx
+        have hh : ‖x‖ * ‖f x‖ < A := by
+          simpa using (f.norm_pow_mul_le_seminorm ℂ 1 x).trans_lt (hdecay _ hf)
+        exact lt_of_mul_lt_mul_left (hh.trans (by linarith [(div_lt_iff₀ hε).mp hx']))
+          (norm_nonneg x)
+      · subst hz
+        simpa using hε
+    | coe x =>
+      rw [Metric.equicontinuousAt_iff_right]
+      intro ε hε
+      rw [OnePoint.nhds_coe_eq, Filter.eventually_map]
+      filter_upwards [Metric.ball_mem_nhds x (div_pos hε hB)] with y hy
+      rintro ⟨_, f, hf, rfl⟩
+      change dist (f x) (f y) < ε
+      have hLip : LipschitzWith ⟨B, hB.le⟩ (⇑f) := by
+        apply lipschitzWith_of_nnNorm_fderiv_le f.differentiable
+        intro t
+        change ‖fderiv ℝ f t‖ ≤ B
+        simpa only [← norm_iteratedFDeriv_one] using
+          (f.norm_iteratedFDeriv_le_seminorm ℂ 1 t).trans (hderiv _ hf).le
+      apply (hLip.dist_le_mul x y).trans_lt
+      rw [dist_comm]
+      exact (lt_div_iff₀' hB).mp hy
 
 end RiemannMasullo

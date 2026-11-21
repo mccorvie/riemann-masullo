@@ -6,7 +6,12 @@ public import Mathlib.MeasureTheory.Constructions.Polish.Basic
 public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
+import Mathlib.MeasureTheory.Measure.Haar.Extension
+import Mathlib.Topology.Algebra.IsUniformGroup.Basic
+import Mathlib.Topology.Algebra.ProperAction.CompactlyGenerated
+import Mathlib.Topology.Covering.Quotient
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
+import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
 /-!
 # Maximal averages on the real line and D-sequences
@@ -388,7 +393,35 @@ theorem exists_isDDoublePrimeSequence_of_totallyDisconnected [FirstCountableTopo
     ∃ K : ℕ → OpenSubgroup G,
       let U : ℕ → Set G := fun k ↦ (K k : Set G)
       let V : ℕ → Set G := fun k ↦ U k * U k
-      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by sorry
+      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by
+  have hbasis : (𝓝 (1 : G)).HasBasis (fun H : OpenSubgroup G ↦ IsCompact (H : Set G))
+      (fun H ↦ (H : Set G)) := by
+    refine ⟨fun W ↦ ⟨exists_compact_openSubgroup_sub_mem_nhds, ?_⟩⟩
+    rintro ⟨H, _, hHW⟩
+    exact mem_of_superset H.mem_nhds_one hHW
+  obtain ⟨K, hcompact, hK⟩ := hbasis.exists_antitone_subbasis
+  let U : ℕ → Set G := fun k ↦ (K k : Set G)
+  have hmul (k : ℕ) : U k * U k = U k := (K k).toSubgroup.toSubmonoid.coe_mul_self_eq
+  have hdiff (k : ℕ) : U k * (U k)⁻¹ = U k := by
+    rw [show (U k)⁻¹ = U k from inv_coe_set, hmul]
+  have hmeas (k : ℕ) : NullMeasurableSet (U k) μ :=
+    (K k).isOpen.measurableSet.nullMeasurableSet
+  have hpos (k : ℕ) : 0 < μ (U k) := (K k).isOpen.measure_pos μ ⟨1, (K k).one_mem⟩
+  have hfin (k : ℕ) : μ (U k) < ∞ := (hcompact k).measure_lt_top
+  have hD : IsDSequence μ U := by
+    refine ⟨fun k ↦ ⟨(K k).one_mem, hmeas k, hpos k, hfin k⟩,
+      hK.antitone, 2, two_pos, fun k ↦ ?_⟩
+    rw [hdiff, ENNReal.ofReal_ofNat, two_mul]
+    exact ⟨hpos k, ENNReal.lt_add_right (hfin k).ne (hpos k).ne'⟩
+  refine ⟨K, ⟨⟨hD, fun _ hW ↦ hK.mem_iff.mp hW⟩, 1, one_pos, fun k ↦ ?_⟩, fun k ↦ ?_⟩
+  · change NullMeasurableSet (U k * U k) μ ∧
+      (U k * U k) * (U k * U k)⁻¹ ⊆ U k ∧
+      μ (U k) ≤ ENNReal.ofReal 1 * μ (U k * U k)
+    simp only [hmul, hdiff, ENNReal.ofReal_one, one_mul]
+    exact ⟨hmeas k, Subset.rfl, le_rfl⟩
+  · change IsCompact (U k) ∧ μ (U k) ≤ μ (U k * U k)
+    rw [hmul]
+    exact ⟨hcompact k, le_rfl⟩
 
 variable (H : OpenSubgroup G) (U : ℕ → Set H)
 
@@ -618,23 +651,260 @@ variable [DiscreteTopology H] (hH : IsClosed (H : Set G))
 
 local notation "lifted" => (fun k ↦ Set.inter (q ⁻¹' U k) E)
 
+include hH hν hcount hE hEc hbij in
+/-- A precompact Borel transversal computes Weil quotient mass, also for outer measures. -/
+private theorem weilQuotientMeasure_apply_of_transversal (S : Set (G ⧸ H)) :
+    ν S = μ (q ⁻¹' S ∩ E) := by
+  classical
+  let : IsClosed (H : Set G) := hH
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let : Countable H.op := H.equivOp.symm.injective.countable
+  let : ν.Regular := hν.2.1
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  let νE := (μ.restrict E).map q
+  let : IsFiniteMeasure νE := ⟨by
+    rw [Measure.map_apply hq.measurable MeasurableSet.univ, preimage_univ,
+      Measure.restrict_apply_univ]
+    exact (measure_mono subset_closure).trans_lt hEc.measure_lt_top⟩
+  have hdomain : IsFundamentalDomain H.op E μ := by
+    apply IsFundamentalDomain.mk' hE.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hbij.2 (q x)
+    let h : H := ⟨x⁻¹ * y, QuotientGroup.eq.mp hy.symm⟩
+    refine ⟨H.equivOp h, ?_, ?_⟩
+    · change x * (x⁻¹ * (y : G)) ∈ E
+      simp [y.property]
+    · intro a ha
+      apply H.equivOp.symm.injective
+      apply Subtype.ext
+      apply mul_left_cancel (a := x)
+      change a • x = x * (x⁻¹ * (y : G))
+      rw [mul_inv_cancel_left]
+      have he : (⟨a • x, ha⟩ : E) = y := hbij.1
+        ((QuotientGroup.mk_mul_of_mem x (H.equivOp.symm a).property).trans hy.symm)
+      exact congrArg Subtype.val he
+  have hsingle (h : H) : μH {h} = 1 := by
+    calc
+      μH {h} = μH ((fun x : H ↦ h * x) ⁻¹' {h}) := (measure_preimage_mul μH h _).symm
+      _ = μH {1} := by congr 1; ext x; simp
+      _ = 1 := hcount
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hperiod (f : CompactlySupportedContinuousMap G ℝ) :
+      QuotientGroup.automorphize (Γ := H) f = ses.pushforward μH f := by
+    funext z
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H z
+    rw [ses.pushforward_apply_apply, integral_countable (ses.pullback f x).integrable]
+    simp only [measureReal_def, hsingle, ENNReal.toReal_one, one_smul]
+    exact H.equivOp.symm.tsum_eq (fun h : H ↦ f (x * (h : G)))
+  have htest (f : CompactlySupportedContinuousMap G ℝ) :
+      (∫ z, ses.pushforward μH f z ∂ν) = ∫ z, ses.pushforward μH f z ∂νE := by
+    let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+    have hcoset (z : G ⧸ H) :
+        lcaCosetIntegral H μH fc z = (ses.pushforward μH f z : ℂ) := by
+      have hz : q z.out = z := Quotient.out_eq' z
+      rw [← hz, ses.pushforward_apply_apply]
+      rw [hz, lcaCosetIntegral]
+      exact integral_complex_ofReal
+    have hw := hν.2.2 fc (f.hasCompactSupport.comp_left Complex.ofReal_zero)
+    change (∫ x, (f x : ℂ) ∂μ) = ∫ z, lcaCosetIntegral H μH fc z ∂ν at hw
+    simp_rw [hcoset, integral_complex_ofReal] at hw
+    have hm : AEStronglyMeasurable (QuotientGroup.automorphize (Γ := H) f) νE :=
+      hperiod f ▸ (ses.pushforward μH f).continuous.aestronglyMeasurable
+    exact (Complex.ofReal_injective hw).symm.trans
+      (hperiod f ▸ QuotientGroup.integral_eq_integral_automorphize hdomain f.integrable hm)
+  obtain ⟨b, hb, -, hbc, hb₀⟩ :=
+    exists_continuous_one_zero_of_isCompact hEc isClosed_empty (disjoint_empty _)
+  let b₀ : CompactlySupportedContinuousMap G ℝ := ⟨b, hbc⟩
+  let c := ses.pushforward μH b₀
+  have hc (z : G ⧸ H) : 0 < c z := by
+    obtain ⟨x, rfl⟩ := hbij.2 z
+    change 0 < ses.pushforward μH b₀ (q (x : G))
+    rw [ses.pushforward_apply_apply]
+    apply (integral_pos_iff_support_of_nonneg (fun _ ↦ (hb₀ _).1)
+      (ses.pullback b₀ (x : G)).integrable).mpr
+    have hmem : (1 : H) ∈ Function.support (ses.pullback b₀ (x : G)) := by
+      rw [Function.mem_support, ses.pullback_def, Subgroup.coe_subtype,
+        Subgroup.coe_one, mul_one]
+      change b (x : G) ≠ 0
+      exact (hb (subset_closure x.property)).trans_ne one_ne_zero
+    have hle := measure_mono (μ := μH) (singleton_subset_iff.mpr hmem)
+    rw [hcount] at hle
+    exact zero_lt_one.trans_le hle
+  have hνE : ν = νE := by
+    apply Measure.ext_of_integral_eq_on_compactlySupported
+    intro g
+    let a : G → ℝ := fun x ↦ g (q x) / c (q x)
+    have ha : Continuous a :=
+      (g.continuous.comp hq).div (c.continuous.comp hq) fun x ↦ (hc (q x)).ne'
+    let f : CompactlySupportedContinuousMap G ℝ :=
+      ⟨⟨a * b₀, ha.mul b₀.continuous⟩, b₀.hasCompactSupport.mul_left⟩
+    have hf : ⇑(ses.pushforward μH f) = g := by
+      funext z
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H z
+      have hp (h : H) : ses.pullback f x h = a x * ses.pullback b₀ x h := by
+        have hh : q (x * (h : G)) = q x := QuotientGroup.mk_mul_of_mem x h.property
+        simp only [ses.pullback_def, Subgroup.coe_subtype]
+        change a (x * h) * b₀ (x * h) = a x * b₀ (x * h)
+        simp only [a, hh]
+      rw [ses.pushforward_apply_apply]
+      simp_rw [hp]
+      rw [integral_const_mul, ← ses.pushforward_apply_apply]
+      exact div_mul_cancel₀ _ (hc (q x)).ne'
+    simpa only [hf] using htest f
+  -- The measurable embedding extends the measure identity to arbitrary sets.
+  let : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+  let : IsUniformGroup G := isUniformGroup_of_commGroup
+  let : CompleteSpace G := IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace G
+  let : (uniformity G).IsCountablyGenerated := IsUniformGroup.uniformity_countably_generated
+  let : PolishSpace G := ⟨⟩
+  have hemb := ContinuousOn.measurableEmbedding hE hq.continuousOn
+    (injOn_iff_injective.mpr hbij.1)
+  have hcoe := MeasurableEmbedding.subtype_coe hE
+  rw [hνE]
+  change (μ.restrict E).map q S = _
+  rw [← Subtype.range_coe (s := E), ← hcoe.map_comap μ,
+    Measure.map_map hq.measurable hcoe.measurable]
+  change ((μ.comap (Subtype.val : E → G)).map (E.domRestrict q)) S = _
+  rw [hemb.map_apply, hcoe.comap_apply]
+  congr 1
+  ext x
+  simp [Set.mem_inter_iff, and_comm]
+
 include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 570. A decreasing Borel family on the
 quotient is a D-sequence exactly when its lifts to the fundamental domain form one. -/
 theorem isDSequence_quotient_iff :
-    IsDSequence ν U ↔ IsDSequence μ lifted := by sorry
+    IsDSequence ν U ↔ IsDSequence μ lifted := by
+  classical
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  have hmass := weilQuotientMeasure_apply_of_transversal H hH hν hcount hE hEc hbij
+  have hmassU (k : ℕ) : ν (U k) = μ (lifted k) := hmass (U k)
+  have hone : (1 : G) ∈ E := interior_subset hE₁
+  have himage (S : Set (G ⧸ H)) : q '' (q ⁻¹' S ∩ E) = S := by
+    refine subset_antisymm (image_subset_iff.mpr inter_subset_left) fun x hx ↦ ?_
+    obtain ⟨y, hy⟩ := hbij.2 x
+    change q (y : G) = x at hy
+    exact ⟨y, ⟨show q (y : G) ∈ S from hy.symm ▸ hx, y.property⟩, hy⟩
+  have himageU (k : ℕ) : q '' (lifted k) = U k := himage (U k)
+  let K : Set G := closure E * (closure E)⁻¹
+  have hK : IsCompact K := hEc.mul hEc.inv
+  have hEK : E ⊆ K :=
+    subset_closure.trans (Set.subset_mul_left _ (by simpa using subset_closure hone))
+  -- Sets inside K with the same quotient image cover one another by finitely many translates.
+  have hfin : (Subtype.val ⁻¹' (K * K⁻¹) : Set H).Finite :=
+    (hH.isClosedEmbedding_subtypeVal.isCompact_preimage (hK.mul hK.inv)).finite_of_discrete
+  let J := hfin.toFinset
+  let N : ℝ := J.card + 1
+  have hN : 0 < N := by dsimp [N]; positivity
+  have hJ : (J.card : ℝ≥0∞) ≤ ENNReal.ofReal N := by
+    rw [← ENNReal.ofReal_natCast]
+    exact ENNReal.ofReal_le_ofReal (by dsimp [N]; linarith)
+  have hcompare {A B : Set G} (hA : A ⊆ K) (hB : B ⊆ K)
+      (hAB : q '' A ⊆ q '' B) : μ A ≤ ENNReal.ofReal N * μ B := by
+    have hcover : A ⊆ ⋃ h ∈ J, (fun x : G ↦ (h : G) * x) ⁻¹' B := by
+      intro a ha
+      obtain ⟨b, hb, heq⟩ := hAB (mem_image_of_mem q ha)
+      let h : H := ⟨a⁻¹ * b, QuotientGroup.eq.mp heq.symm⟩
+      have hh : h ∈ J := hfin.mem_toFinset.mpr <| Set.mem_mul.mpr
+        ⟨b, hB hb, a⁻¹, Set.inv_mem_inv.mpr (hA ha), mul_comm _ _⟩
+      exact mem_iUnion₂.mpr ⟨h, hh, by simpa [h, mul_comm] using hb⟩
+    calc
+      μ A ≤ μ (⋃ h ∈ J, (fun x : G ↦ (h : G) * x) ⁻¹' B) := measure_mono hcover
+      _ ≤ ∑ h ∈ J, μ ((fun x : G ↦ (h : G) * x) ⁻¹' B) := measure_biUnion_finset_le _ _
+      _ = (J.card : ℝ≥0∞) * μ B := by simp [measure_preimage_mul, nsmul_eq_mul]
+      _ ≤ ENNReal.ofReal N * μ B := by gcongr
+  have hdiff (k : ℕ) :
+      μ (lifted k * (lifted k)⁻¹) ≤ ENNReal.ofReal N * ν (U k * (U k)⁻¹) ∧
+      ν (U k * (U k)⁻¹) ≤ ENNReal.ofReal N * μ (lifted k * (lifted k)⁻¹) := by
+    let S := U k * (U k)⁻¹
+    have hsub : lifted k * (lifted k)⁻¹ ⊆ K :=
+      Set.mul_subset_mul (inter_subset_right.trans subset_closure)
+        (Set.inv_subset_inv.mpr (inter_subset_right.trans subset_closure))
+    have hsub' : q ⁻¹' S ∩ E ⊆ K := inter_subset_right.trans hEK
+    have hqdiff : q '' (lifted k * (lifted k)⁻¹) = S := by
+      rw [Set.image_mul, Set.image_inv, himageU]
+    rw [hmass S]
+    exact ⟨hcompare hsub hsub' (by rw [hqdiff, himage]),
+      hcompare hsub' hsub (by rw [hqdiff, himage])⟩
+  have hscale {a b m : ℝ≥0∞} {C : ℝ}
+      (hle : a ≤ ENNReal.ofReal N * b) (hlt : b < ENNReal.ofReal C * m) :
+      a < ENNReal.ofReal (N * C) * m := by
+    rw [ENNReal.ofReal_mul hN.le, mul_assoc]
+    exact hle.trans_lt (ENNReal.mul_lt_mul_right (by simp [hN]) ENNReal.ofReal_ne_top hlt)
+  constructor
+  · rintro ⟨hbase, -, C, hC, hdouble⟩
+    have hbase' (k : ℕ) : 1 ∈ lifted k ∧ 0 < μ (lifted k) ∧ μ (lifted k) < ∞ := by
+      refine ⟨⟨by simpa using (hbase k).1, hone⟩, ?_⟩
+      rw [← hmassU k]
+      exact (hbase k).2.2
+    refine ⟨fun k ↦ ⟨(hbase' k).1, ((hq.measurable (hU k)).inter hE).nullMeasurableSet,
+        (hbase' k).2⟩, fun _ _ hij ↦ inter_subset_inter_left _ (preimage_mono (hmono hij)),
+      N * C, mul_pos hN hC, fun k ↦ ⟨?_, ?_⟩⟩
+    · exact (hbase' k).2.1.trans_le
+        (measure_mono (Set.subset_mul_left _ (by simpa using (hbase' k).1)))
+    · rw [← hmassU k]
+      exact hscale (hdiff k).1 (hdouble k).2
+  · rintro ⟨hbase, -, C, hC, hdouble⟩
+    have hbase' (k : ℕ) : 1 ∈ U k ∧ 0 < ν (U k) ∧ ν (U k) < ∞ := by
+      refine ⟨by simpa using (hbase k).1.1, ?_⟩
+      rw [hmass]
+      exact (hbase k).2.2
+    refine ⟨fun k ↦ ⟨(hbase' k).1, (hU k).nullMeasurableSet, (hbase' k).2⟩, hmono,
+      N * C, mul_pos hN hC, fun k ↦ ⟨?_, ?_⟩⟩
+    · exact (hbase' k).2.1.trans_le
+        (measure_mono (Set.subset_mul_left _ (by simpa using (hbase' k).1)))
+    · rw [hmass (U k)]
+      exact hscale (hdiff k).2 (hdouble k).2
 
 include hH hν hcount hE hEc hE₁ hbij hU hmono in
 /-- Paper: Proposition A.5.2.6, p. 571. The D′ condition is equivalent for the
 quotient sequence and for the lifts through the fundamental domain. -/
 theorem isDPrimeSequence_quotient_iff :
-    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by sorry
+    IsDPrimeSequence ν U ↔ IsDPrimeSequence μ lifted := by
+  unfold IsDPrimeSequence
+  rw [isDSequence_quotient_iff H hH hν hcount hE hEc hE₁ hbij hU hmono]
+  have hopen : IsOpenMap q := QuotientGroup.isOpenMap_coe
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  refine and_congr_right fun _ ↦ ⟨?_, ?_⟩
+  · intro h W hW
+    have himage : q '' (W ∩ E) ∈ 𝓝 (1 : G ⧸ H) := by
+      simpa only [map_one] using
+        hopen.image_mem_nhds (inter_mem hW (mem_interior_iff_mem_nhds.mp hE₁))
+    obtain ⟨k, hk⟩ := h _ himage
+    refine ⟨k, fun x hx ↦ ?_⟩
+    obtain ⟨y, hy, heq⟩ := hk hx.1
+    have hxy : y = x := (injOn_iff_injective.mpr hbij.1) hy.2 hx.2 heq
+    exact hxy ▸ hy.1
+  · intro h W hW
+    have hpreimage : q ⁻¹' W ∈ 𝓝 (1 : G) :=
+      hq.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hW)
+    obtain ⟨k, hk⟩ := h _ hpreimage
+    refine ⟨k, fun y hy ↦ ?_⟩
+    obtain ⟨x, rfl⟩ := hbij.2 y
+    exact hk ⟨hy, x.property⟩
 
 include hbij in
 /-- Paper: Proposition A.5.2.6, p. 571. For a symmetric fundamental domain,
 the quotient family is symmetric exactly when the lifted family is symmetric. -/
 theorem inv_eq_sequence_quotient_iff (hEsymm : E⁻¹ = E) :
-    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by sorry
+    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by
+  constructor
+  · intro h k
+    have hpre : (q ⁻¹' U k)⁻¹ = q ⁻¹' (U k)⁻¹ := by
+      ext x
+      simp only [Set.mem_inv, Set.mem_preimage, map_inv]
+    change (q ⁻¹' U k ∩ E)⁻¹ = q ⁻¹' U k ∩ E
+    rw [Set.inter_inv, hpre, h k, hEsymm]
+  · intro h k
+    have hsurj : q '' E = univ := by
+      rw [← Set.range_domRestrict, Set.range_eq_univ]
+      exact hbij.2
+    have himage : q '' lifted k = U k := by
+      change q '' (q ⁻¹' U k ∩ E) = U k
+      rw [Set.image_preimage_inter, hsurj, inter_univ]
+    simpa only [Set.image_inv, himage] using congrArg (fun s : Set G ↦ q '' s) (h k)
 
 -- TODO(paper-gap): The D″ equivalence claimed in the proof of A.5.2.6 fails.
 -- For ℤ → ℤ/3ℤ take the symmetric domain {-1, 0, 1} and U₀ = V₀ = ℤ/3ℤ.
@@ -649,7 +919,8 @@ theorem measurableSet_image_of_continuous_injOn_polish {X Y : Type*}
     [TopologicalSpace Y] [PolishSpace Y] [MeasurableSpace Y] [BorelSpace Y]
     {f : X → Y} (hf : Continuous f) {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn f E) :
-    MeasurableSet (f '' E) := by sorry
+    MeasurableSet (f '' E) := by
+  exact hE.image_of_continuousOn_injOn hf.continuousOn hinj
 
 /-- Paper: Lemma A.5.2.10, p. 572. A Borel partial transversal to a free proper action
 of a countable discrete abelian group extends to a Borel transversal.
@@ -661,7 +932,61 @@ theorem exists_borel_orbit_transversal {X H : Type*}
     {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn (Quotient.mk (MulAction.orbitRel H X)) E) :
     ∃ F : Set X, MeasurableSet F ∧ E ⊆ F ∧
-      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by sorry
+      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by
+  classical
+  let q := Quotient.mk (MulAction.orbitRel H X)
+  let : ProperlyDiscontinuousSMul H X :=
+    properlyDiscontinuousSMul_iff_properSMul.mpr inferInstance
+  have hlocal : IsLocallyInjective q :=
+    isLocalHomeomorph_quotientMk_of_properlyDiscontinuousSMul.isLocallyInjective
+  let OpenInj := {s : Set X // IsOpen s ∧ InjOn q s}
+  let : Nonempty OpenInj := ⟨⟨∅, isOpen_empty, injOn_empty q⟩⟩
+  obtain ⟨V, hV⟩ := isLindelof_univ.indexed_countable_subcover
+    (Subtype.val : OpenInj → Set X) (fun s ↦ s.property.1) (by
+      intro x _
+      obtain ⟨s, ho, hx, hi⟩ := hlocal x
+      exact mem_iUnion.mpr ⟨⟨s, ho, hi⟩, hx⟩)
+  let U : ℕ → Set X := fun
+    | 0 => E
+    | n + 1 => (V n).val
+  have hU (n : ℕ) : MeasurableSet (U n) ∧ InjOn q (U n) := by
+    cases n with
+    | zero => exact ⟨hE, hinj⟩
+    | succ n => exact ⟨(V n).property.1.measurableSet, (V n).property.2⟩
+  let Q (n : ℕ) := q '' U n
+  have hsat (n : ℕ) : MeasurableSet (q ⁻¹' Q n) := by
+    rw [show q ⁻¹' Q n = ⋃ g : H, (g • ·) '' U n from
+      MulAction.quotient_preimage_image_eq_union_mul (U n)]
+    exact MeasurableSet.iUnion fun g ↦
+      (Homeomorph.smul g).measurableEmbedding.measurableSet_image.mpr (hU n).1
+  -- Use the first set meeting each orbit, with `E` in position zero.
+  let F := ⋃ n, U n ∩ q ⁻¹' disjointed Q n
+  have hF : MeasurableSet F := MeasurableSet.iUnion fun n ↦ (hU n).1.inter (by
+    simp only [disjointed_eq_inter_compl, preimage_inter, preimage_iInter, preimage_compl]
+    exact (hsat n).inter (MeasurableSet.iInter fun j ↦
+      MeasurableSet.iInter fun _ ↦ (hsat j).compl))
+  refine ⟨F, hF, fun x hx ↦ mem_iUnion.mpr ⟨0, hx, ?_⟩, ⟨?_, ?_⟩⟩
+  · change q x ∈ disjointed Q 0
+    rw [show disjointed Q 0 = Q 0 from disjointed_bot Q]
+    exact mem_image_of_mem q hx
+  · rintro ⟨x, hx⟩ ⟨y, hy⟩ (hxy : q x = q y)
+    obtain ⟨m, hxm, hqx⟩ := mem_iUnion.mp hx
+    obtain ⟨n, hyn, hqy⟩ := mem_iUnion.mp hy
+    have hmn : m = n := by
+      by_contra hne
+      exact (Set.disjoint_left.mp (disjoint_disjointed Q hne)) hqx (hxy.symm ▸ hqy)
+    subst n
+    exact Subtype.ext ((hU m).2 hxm hyn hxy)
+  · intro z
+    obtain ⟨x, rfl⟩ := Quotient.mk_surjective z
+    obtain ⟨n, hn⟩ := mem_iUnion.mp (hV (mem_univ x))
+    have hx : q x ∈ ⋃ n, disjointed Q n := by
+      rw [iUnion_disjointed]
+      exact mem_iUnion.mpr ⟨n + 1, mem_image_of_mem q hn⟩
+    obtain ⟨m, hm⟩ := mem_iUnion.mp hx
+    obtain ⟨y, hy, hyx⟩ := disjointed_subset Q m hm
+    have hqy : q y ∈ disjointed Q m := hyx.symm ▸ hm
+    exact ⟨⟨y, mem_iUnion.mpr ⟨m, hy, hqy⟩⟩, hyx⟩
 
 section Ideles
 

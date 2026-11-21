@@ -10,6 +10,10 @@ import Mathlib.Data.List.FinRange
 import Mathlib.Data.List.OfFn
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
+import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
+import Mathlib.Analysis.LocallyConvex.WeakDual
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 
 /-!
@@ -508,11 +512,144 @@ theorem euclideanSchwartz_frechet (m : ℕ) :
   rw [IsUniformAddGroup.rightUniformSpace_eq]
   exact completeSpace_schwartzMap
 
+section Reflexivity
+
+open Metric LineDeriv
+open scoped SchwartzMap BoundedContinuousFunction OnePoint
+
+/-- Each mixed partial with its coordinate weight is dominated pointwise by an
+ordinary Schwartz function, depending continuously and linearly on the input. -/
+private theorem exists_schwartz_weighted_partial_clm {m : ℕ} (α β : Fin m → ℕ) :
+    let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+    ∃ T : E →L[ℂ] E, ∀ (f : E) x, euclideanSchwartzWeightedDeriv α β f x ≤ ‖T f x‖ := by
+  let D := EuclideanSpace ℝ (Fin m)
+  let w (x : D) := ∏ i, x i ^ α i
+  have hw (s : Finset (Fin m)) : (fun x : D ↦ ∏ i ∈ s, x i ^ α i).HasTemperateGrowth := by
+    classical
+    induction s using Finset.induction_on with
+    | empty => simp
+    | insert i s hi ih =>
+      simp only [Finset.prod_insert hi]
+      exact (((EuclideanSpace.proj (𝕜 := ℝ) i).hasTemperateGrowth.pow (α i)).mul ih)
+  -- Replace the nonsmooth absolute weight by a polynomial majorant.
+  have hW : (fun x : D ↦ ((2 + w x ^ 2 : ℝ) : ℂ)).HasTemperateGrowth := by
+    have : w.HasTemperateGrowth := hw Finset.univ
+    fun_prop
+  let dirs := (List.finRange m).flatMap fun i ↦ List.replicate (β i) i
+  let v (j : Fin dirs.length) := EuclideanSpace.single (dirs.get j) (1 : ℝ)
+  let T := (SchwartzMap.smulLeftCLM ℂ (fun x : D ↦ ((2 + w x ^ 2 : ℝ) : ℂ))).comp
+    (iteratedLineDerivOpCLM ℂ (SchwartzMap D ℂ) v)
+  refine ⟨T, fun f x ↦ ?_⟩
+  change (1 + |w x|) * _ ≤ ‖SchwartzMap.smulLeftCLM ℂ _ _ x‖
+  rw [SchwartzMap.smulLeftCLM_apply_apply hW, norm_smul, Complex.norm_real, Real.norm_eq_abs,
+    abs_of_nonneg (by positivity : 0 ≤ 2 + w x ^ 2)]
+  change (1 + |w x|) * ‖iteratedFDeriv ℝ _ f x v‖ ≤ (2 + w x ^ 2) * ‖∂^{v} f x‖
+  rw [SchwartzMap.iteratedLineDerivOp_eq_iteratedFDeriv]
+  apply mul_le_mul_of_nonneg_right _ (norm_nonneg _)
+  nlinarith [sq_nonneg (|w x| - 1), sq_abs (w x)]
+
+/-- Bounded closed sets in the Euclidean Schwartz space are compact: all weighted
+mixed partials are relatively compact in the uniform norm by Arzelà–Ascoli. -/
+private theorem montel_euclideanSchwartz (m : ℕ) :
+    MontelSpace ℂ (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ) := by
+  let D := EuclideanSpace ℝ (Fin m)
+  let E := SchwartzMap D ℂ
+  obtain ⟨J, hJ, hcomp⟩ := schwartz_compactified_bounded D
+  choose T hT using @exists_schwartz_weighted_partial_clm m
+  let I := (Fin m → ℕ) × (Fin m → ℕ)
+  -- The uniform norms of these coordinates recover every defining seminorm.
+  let c : E →L[ℂ] (I → OnePoint D →ᵇ ℂ) := ContinuousLinearMap.pi fun i ↦ J.comp (T i.1 i.2)
+  have hi : IsUniformInducing c := by
+    apply AddMonoidHom.isUniformInducing_of_isInducing (f := c.toLinearMap.toAddMonoidHom)
+    apply Topology.isInducing_iff_nhds.mpr
+    intro f
+    refine le_antisymm (c.continuous.tendsto f).le_comap ?_
+    apply tendsto_id'.mp
+    apply (schwartzMap_euclidean_tendsto_iff _ _ _).mpr
+    intro α β ε hε
+    have hc := (tendsto_pi_nhds.mp (tendsto_comap (f := c) (x := 𝓝 (c f)))) (α, β)
+    filter_upwards [(Metric.tendsto_nhds.mp hc ε hε)] with g hg x
+    have hx := hT α β (g - f) x
+    rw [← hJ] at hx
+    apply hx.trans_lt
+    refine ((J (T α β (g - f))).norm_coe_le_norm x).trans_lt ?_
+    change dist (J (T α β g)) (J (T α β f)) < ε at hg
+    simpa only [map_sub, dist_eq_norm] using hg
+  have : CompleteSpace E := completeSpace_schwartzMap
+  constructor
+  intro S hclosed hS
+  apply TotallyBounded.isCompact_of_isClosed _ hclosed
+  apply (totallyBounded_image_iff hi).mp
+  let K (i : I) := closure (J '' ((T i.1 i.2) '' S))
+  have hK (i : I) : IsCompact (K i) := hcomp _ (hS.image (T i.1 i.2))
+  apply (isCompact_univ_pi hK).totallyBounded.subset
+  rintro _ ⟨f, hf, rfl⟩ i _
+  exact subset_closure (mem_image_of_mem _ (mem_image_of_mem _ hf))
+
+open scoped ComplexOrder in
+/-- A strong-bidual functional belongs to the bipolar of evaluations on a compact
+disk of Schwartz functions. This disk already has weakly closed evaluation image. -/
+private theorem euclideanSchwartz_eval_surjective (m : ℕ) :
+    let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+    Surjective (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)) := by
+  let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+  let D := StrongDual ℂ E
+  have : PolynormableSpace ℂ E := (schwartz_withSeminorms ℂ _ _).toPolynormableSpace
+  have : MontelSpace ℂ E := montel_euclideanSchwartz m
+  change Surjective (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ))
+  intro b
+  have hU : b ⁻¹' closedBall 0 1 ∈ 𝓝 (0 : D) :=
+    b.continuous.continuousAt.preimage_mem_nhds (by rw [map_zero]; exact closedBall_mem_nhds _ zero_lt_one)
+  obtain ⟨⟨S, r⟩, ⟨hS, hr⟩, htest⟩ :=
+    (ContinuousLinearMap.hasBasis_nhds_zero_of_basis Metric.nhds_basis_closedBall).mem_iff.mp hU
+  let scale : E →L[ℂ] E := (r : ℂ)⁻¹ • ContinuousLinearMap.id ℂ E
+  obtain ⟨K, hK, habs, hsub⟩ := exists_compact_absConvex_superset (hS.image scale)
+  let B : Module.Dual ℂ D →ₗ[ℂ] D →ₗ[ℂ] ℂ := .id
+  let j : E →ₗ[ℂ] WeakBilin B := (topDualPairing ℂ E).flip
+  let A : Set (WeakBilin B) := j '' K
+  have hB : B.Nondegenerate := LinearMap.Nondegenerate.id
+  have hT : T2Space (WeakBilin B) := (WeakBilin.isEmbedding (B := B) injective_id).t2Space
+  have hclosed : IsClosed A := (hK.image
+    (WeakBilin.continuous_of_continuous_eval B fun φ ↦ φ.continuous : Continuous j)).isClosed
+  have hpolar : b.toLinearMap ∈ B.flip.polar (B.polar A) := by
+    intro φ hφ
+    apply mem_closedBall_zero_iff.mp (htest (a := φ) ?_)
+    intro x hx
+    have h := hφ _ (mem_image_of_mem j (hsub (mem_insert_of_mem _ (mem_image_of_mem scale hx))))
+    change ‖φ ((r : ℂ)⁻¹ • x)‖ ≤ 1 at h
+    rw [map_smul, norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hr,
+      inv_mul_le_iff₀ hr, mul_one] at h
+    exact mem_closedBall_zero_iff.mpr h
+  -- Apply the bipolar theorem in the algebraic dual paired with D.
+  have hbip : B.flip.polar (B.polar A) ⊆ A := by
+    let : TopologicalSpace (Module.Dual ℂ D) := inferInstanceAs (TopologicalSpace (WeakBilin B))
+    let : TopologicalSpace D := inferInstanceAs (TopologicalSpace (WeakBilin B.flip))
+    have : PolynormableSpace ℂ (Module.Dual ℂ D) := B.weakBilin_withSeminorms.toPolynormableSpace
+    have : PolynormableSpace ℂ D := B.flip.weakBilin_withSeminorms.toPolynormableSpace
+    have : T2Space (Module.Dual ℂ D) := hT
+    have : T2Space D := (WeakBilin.isEmbedding (LinearMap.ker_eq_bot.mp
+      (LinearMap.separatingLeft_iff_ker_eq_bot.mp (LinearMap.flip_separatingLeft.mpr hB.2)))).t2Space
+    rw [bipolar_eq_weakClosure_absConvexHull B hB A]
+    apply closure_minimal _ hclosed
+    apply absConvexHull_min _ ⟨habs.1.image j, habs.2.linear_image j⟩
+    exact insert_subset (⟨0, hsub (mem_insert _ _), map_zero j⟩ : (0 : WeakBilin B) ∈ A) Subset.rfl
+  obtain ⟨x, _, hx⟩ := hbip hpolar
+  exact ⟨x, ContinuousLinearMap.ext (LinearMap.congr_fun hx)⟩
+
+end Reflexivity
+
 /-- Paper: Proposition 2.1.1.6, p. 61. Evaluation identifies the Euclidean Schwartz space
 with its strong bidual. -/
 theorem euclideanSchwartz_reflexive (m : ℕ) :
     let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
-    ∃ e : E ≃L[ℂ] StrongDual ℂ (StrongDual ℂ E), ∀ f L, e f L = L f := by sorry
+    ∃ e : E ≃L[ℂ] StrongDual ℂ (StrongDual ℂ E), ∀ f L, e f L = L f := by
+  let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+  have : PolynormableSpace ℂ E := (schwartz_withSeminorms ℂ _ _).toPolynormableSpace
+  have : BarrelledSpace ℂ E := isFrechetTVS_barrelled (euclideanSchwartz_frechet m)
+  let j := ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)
+  have he : IsEmbedding j := isEmbedding_strongBidual_eval
+  have hh := isHomeomorph_iff_isEmbedding_surjective.mpr ⟨he, euclideanSchwartz_eval_surjective m⟩
+  exact ⟨.ofIsHomeomorph (.ofBijective j hh.bijective) hh, fun _ _ ↦ rfl⟩
 
 /-- Paper: Proposition 2.1.1.6, p. 61. The strong dual of the Euclidean Schwartz space
 is complete. -/

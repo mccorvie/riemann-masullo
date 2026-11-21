@@ -1336,7 +1336,8 @@ leaving the pure exponential weight. -/
 theorem exponentialDecayL2Integrand_zero_log (a : ℝ) (m : ℕ)
     (f : PositiveRealExponentialDecay univ) (x : ℝ) :
     exponentialDecayL2Integrand a 0 m f x =
-      (Real.exp (a * |x|) : ℂ) * iteratedDeriv m f.val x := by sorry
+      (Real.exp (a * |x|) : ℂ) * iteratedDeriv m f.val x := by
+  simp [exponentialDecayL2Integrand]
 
 private def decayTwistCLM (c : ℝ) : PositiveRealExponentialDecay univ →L[ℂ] 𝓢(ℝ, ℂ) :=
   ⟨logExponentialDecayTwist univ ⟨c, mem_univ c⟩,

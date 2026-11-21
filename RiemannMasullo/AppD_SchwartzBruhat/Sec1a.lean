@@ -14,6 +14,8 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
 import Mathlib.MeasureTheory.Function.LpSpace.ContinuousCompMeasurePreserving
 import Mathlib.MeasureTheory.Function.AEEqOfIntegral
+import Mathlib.Probability.Kernel.Composition.IntegralCompProd
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Measure
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import Mathlib.Topology.ContinuousMap.StoneWeierstrass
@@ -1122,10 +1124,72 @@ theorem lcaFourier_unitary (ν : Measure (PontryaginDual G))
 -- arbitrary measurable representative. A nonzero function supported at one point of
 -- the real line has zero transform, and its double transform is everywhere zero.
 
+/-- The integral of an L¹ convolution is the product of the integrals of its factors. -/
+private theorem integral_lcaConvolution {f g : G → ℂ} (hf : Integrable f μ)
+    (hg : Integrable g μ) :
+    (∫ x, lcaConvolution μ f g x ∂μ) = (∫ y, f y ∂μ) * (∫ z, g z ∂μ) := by
+  obtain ⟨S, k, hσ, hk, hs, hrow, hcol⟩ := lcaConvolution_kernel μ hf hg
+  have hzeroRow (x : G) (hx : x ∉ S) (y : G) : k (x, y) = 0 :=
+    Function.notMem_support.mp fun h ↦ hx (hs h).1
+  have hzeroCol (y : G) (hy : y ∉ S) (x : G) : k (x, y) = 0 :=
+    Function.notMem_support.mp fun h ↦ hy (hs h).2
+  -- Fubini applies to the kernel on its σ-finite supporting rectangle.
+  have hInt : Integrable k ((μ.restrict S).prod (μ.restrict S)) := by
+    refine (integrable_prod_iff' hk.aestronglyMeasurable).2 ⟨?_, ?_⟩
+    · apply ae_mono Measure.restrict_le_self
+      filter_upwards [hcol] with y hy
+      exact (((hg.comp_mul_left y⁻¹).const_mul (f y)).congr
+        (hy.mono fun _ hx ↦ hx.symm)).restrict
+    · refine (hf.norm.mul_const (∫ z, ‖g z‖ ∂μ)).restrict.congr ?_
+      apply ae_mono Measure.restrict_le_self
+      filter_upwards [hcol] with y hy
+      symm
+      calc
+        _ = ∫ x, ‖k (x, y)‖ ∂μ := setIntegral_eq_integral_of_forall_compl_eq_zero
+          (fun x hx ↦ by simp [hzeroRow x hx])
+        _ = ∫ x, ‖f y * g (y⁻¹ * x)‖ ∂μ :=
+          integral_congr_ae (hy.mono fun _ hx ↦ congrArg norm hx)
+        _ = _ := by
+          simp only [norm_mul, integral_const_mul, integral_mul_left_eq_self (fun z ↦ ‖g z‖)]
+  have hrowIntegral (x : G) : (∫ y in S, k (x, y) ∂μ) = lcaConvolution μ f g x :=
+    (setIntegral_eq_integral_of_forall_compl_eq_zero (hzeroCol · · x)).trans
+      (integral_congr_ae (hrow x))
+  calc
+    _ = ∫ x in S, ∫ y in S, k (x, y) ∂μ ∂μ := by
+      simp_rw [← hrowIntegral]
+      exact (setIntegral_eq_integral_of_forall_compl_eq_zero
+        (fun x hx ↦ by simp [hzeroRow x hx])).symm
+    _ = ∫ y in S, ∫ x in S, k (x, y) ∂μ ∂μ := integral_integral_swap hInt
+    _ = ∫ y, ∫ x, k (x, y) ∂μ ∂μ := by
+      have hcolIntegral (y : G) : (∫ x in S, k (x, y) ∂μ) = ∫ x, k (x, y) ∂μ :=
+        setIntegral_eq_integral_of_forall_compl_eq_zero (hzeroRow · · y)
+      simp_rw [hcolIntegral]
+      exact setIntegral_eq_integral_of_forall_compl_eq_zero
+        (fun y hy ↦ by simp [hzeroCol y hy])
+    _ = _ := by
+      rw [← integral_mul_const]
+      apply integral_congr_ae
+      filter_upwards [hcol] with y hy
+      rw [integral_congr_ae hy, integral_const_mul, integral_mul_left_eq_self g]
+
 /-- Paper: Lemma D.1.1.2(6), p. 747. The Fourier transform takes L¹ convolution
 to pointwise multiplication on the dual. -/
 theorem lcaFourier_convolution {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
-    lcaFourier μ (lcaConvolution μ f g) = lcaFourier μ f * lcaFourier μ g := by sorry
+    lcaFourier μ (lcaConvolution μ f g) = lcaFourier μ f * lcaFourier μ g := by
+  funext χ
+  change (∫ x, lcaConvolution μ f g x * star (χ x : ℂ) ∂μ) =
+    (∫ x, f x * star (χ x : ℂ) ∂μ) * (∫ x, g x * star (χ x : ℂ) ∂μ)
+  rw [← integral_lcaConvolution μ (integrable_fourierIntegrand μ hf χ)
+    (integrable_fourierIntegrand μ hg χ)]
+  apply integral_congr_ae
+  exact .of_forall fun x ↦ by
+    simp only [lcaConvolution, ← integral_mul_const]
+    apply integral_congr_ae
+    exact .of_forall fun y ↦ by
+      have hχ : (χ x : ℂ) = (χ y : ℂ) * (χ (y⁻¹ * x) : ℂ) := by
+        rw [← Circle.coe_mul, ← map_mul, mul_inv_cancel_left]
+      rw [hχ, star_mul]
+      ring
 
 end Fourier
 
@@ -1173,7 +1237,22 @@ def IsWeilQuotientMeasure (μ : Measure G) (μH : Measure H) (ν : Measure (G �
 subgroup, normalized to mass one, recovers the pushforward of the group measure. -/
 theorem isWeilQuotientMeasure_bot (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular] :
     IsWeilQuotientMeasure (⊥ : Subgroup G) μ Measure.count
-      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by sorry
+      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by
+  let : BorelSpace (G ⧸ (⊥ : Subgroup G)) := ⟨rfl⟩
+  let e := (QuotientGroup.quotientBot (G := G)).symm
+  let h := e.toEquiv.toHomeomorphOfContinuousOpen
+    QuotientGroup.continuous_mk QuotientGroup.isOpenMap_coe
+  refine ⟨e.isHaarMeasure_map μ h.continuous h.symm.continuous, Measure.Regular.map h, ?_⟩
+  intro f _
+  have hcoset (q : G ⧸ (⊥ : Subgroup G)) :
+      lcaCosetIntegral (⊥ : Subgroup G) Measure.count f q = f (h.symm q) := by
+    have hout : q.out = h.symm q :=
+      h.injective ((Quotient.out_eq' q).trans (h.apply_symm_apply q).symm)
+    simp [lcaCosetIntegral, Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G)), hout]
+  simp_rw [hcoset]
+  change (∫ x, f x ∂μ) = ∫ q, f (h.symm q) ∂(μ.map h)
+  simpa only [Homeomorph.toMeasurableEquiv_coe, h.symm_apply_apply] using
+    (integral_map_equiv (μ := μ) h.toMeasurableEquiv (fun q ↦ f (h.symm q))).symm
 
 variable (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
 variable (μH : Measure H) [μH.IsHaarMeasure] [μH.Regular]
@@ -1241,12 +1320,240 @@ theorem weilQuotientIntegral_L1 (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMe
       (∫ x, f x ∂μ) = ∫ q, lcaCosetIntegral H μH f q ∂ν := by sorry
 
 include hH in
+/-- Integrating the translated subgroup measures against the normalized quotient measure
+recovers the group measure. -/
+private theorem weilMeasure_eq_bind [SigmaFinite μ] (ν : Measure (G ⧸ H))
+    (hν : IsWeilQuotientMeasure H μ μH ν) :
+    let κ : G ⧸ H → Measure G := fun q ↦ μH.map (fun h : H ↦ q.out * (h : G))
+    Measurable κ ∧ ν.bind κ = μ := by
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : SigmaCompactSpace G := sigmaCompactSpace_of_sigmaFinite_haar μ
+  let K := CompactExhaustion.choice G
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  let tr (x : G) (h : H) : G := x * (h : G)
+  have htr (x : G) : Continuous (tr x) := continuous_const.mul continuous_subtype_val
+  let κ : G ⧸ H → Measure G := fun q ↦ μH.map (tr q.out)
+  change Measurable κ ∧ ν.bind κ = μ
+
+  have hgmeas (g : CompactlySupportedContinuousMap G ℝ) :
+      Measurable (fun x ↦ ENNReal.ofReal (g x)) :=
+    (ENNReal.continuous_ofReal.comp g.continuous).measurable
+  have htest (g : CompactlySupportedContinuousMap G ℝ) (hg : ∀ x, 0 ≤ g x) (q : G ⧸ H) :
+      (∫⁻ x, ENNReal.ofReal (g x) ∂κ q) = ENNReal.ofReal (ses.pushforward μH g q) := by
+    have hq : (QuotientGroup.mk' H) q.out = q := Quotient.out_eq' q
+    have hpush := ses.pushforward_apply_apply μH g q.out
+    rw [hq] at hpush
+    rw [show κ q = μH.map (tr q.out) from rfl,
+      lintegral_map (hgmeas g) (htr q.out).measurable, hpush]
+    exact (ofReal_integral_eq_lintegral_ofReal (μ := μH) (ses.pullback g q.out).integrable
+      (.of_forall fun h ↦ hg (tr q.out h))).symm
+
+  -- Compactly supported functions approximate the measure of each open fibre from below.
+  have hopen {U : Set G} (hU : IsOpen U) : Measurable (fun q ↦ κ q U) := by
+    suffices LowerSemicontinuous (fun q ↦ κ q U) from this.measurable
+    let F := {g : CompactlySupportedContinuousMap G ℝ //
+      tsupport g ⊆ U ∧ ∀ x, g x ∈ Icc 0 1}
+    have hsup (q : G ⧸ H) :
+        κ q U = ⨆ g : F, ENNReal.ofReal (ses.pushforward μH g.1 q) := by
+      rw [show κ q U = μH (tr q.out ⁻¹' U) from
+        Measure.map_apply (htr q.out).measurable hU.measurableSet]
+      apply le_antisymm
+      · refine le_of_forall_lt fun r hr ↦ ?_
+        obtain ⟨L, hLU, hL, hrL⟩ := (hU.preimage (htr q.out)).exists_lt_isCompact (μ := μH) hr
+        obtain ⟨g, hgL, hgcompact, hgU, hg⟩ := exists_continuousMap_one_of_isCompact_subset_isOpen
+          (hL.image (htr q.out)) hU (image_subset_iff.mpr hLU)
+        let g' : CompactlySupportedContinuousMap G ℝ := ⟨g, hgcompact⟩
+        refine hrL.trans_le (le_iSup_of_le (⟨g', hgU, hg⟩ : F) ?_)
+        rw [← htest g' (fun x ↦ (hg x).1), show κ q = μH.map (tr q.out) from rfl,
+          lintegral_map (hgmeas g') (htr q.out).measurable, ← lintegral_indicator_one hL.measurableSet]
+        apply lintegral_mono
+        intro h
+        by_cases hh : h ∈ L
+        · change L.indicator 1 h ≤ ENNReal.ofReal (g (tr q.out h))
+          simp [hh, hgL (mem_image_of_mem _ hh)]
+        · simp [hh]
+      · refine iSup_le fun g ↦ ?_
+        rw [← htest g.1 (fun x ↦ (g.2.2 x).1), show κ q = μH.map (tr q.out) from rfl,
+          lintegral_map (hgmeas g.1) (htr q.out).measurable,
+          ← lintegral_indicator_one (hU.preimage (htr q.out)).measurableSet]
+        apply lintegral_mono
+        intro h
+        by_cases hh : tr q.out h ∈ U
+        · simpa [hh] using ENNReal.ofReal_le_ofReal (g.2.2 (tr q.out h)).2
+        · have hz : g.1 (tr q.out h) = 0 :=
+            image_eq_zero_of_notMem_tsupport (fun hm ↦ hh (g.2.1 hm))
+          simp [hz, hh]
+    simp_rw [hsup]
+    exact lowerSemicontinuous_iSup fun g ↦
+      (ENNReal.continuous_ofReal.comp (ses.pushforward μH g.1).continuous).lowerSemicontinuous
+
+  have hκcompact (q : G ⧸ H) {L : Set G} (hL : IsCompact L) : κ q L < ⊤ := by
+    rw [show κ q L = μH (tr q.out ⁻¹' L) from
+      Measure.map_apply (htr q.out).measurable hL.measurableSet]
+    exact ((Homeomorph.mulLeft q.out).isClosedEmbedding.comp
+      ses.isClosedEmbedding).isCompact_preimage hL |>.measure_lt_top
+
+  -- The restrictions to relatively compact open sets are finite on each fibre.
+  have hκ : Measurable κ := by
+    let U (n : ℕ) := interior (K n)
+    have hU : ⋃ n, U n = univ := by
+      refine iUnion_eq_univ_iff.mpr fun x ↦ ?_
+      obtain ⟨n, hn⟩ := K.exists_mem x
+      exact ⟨n + 1, K.subset_interior_succ n hn⟩
+    have hrestrict (n : ℕ) : Measurable (fun q ↦ (κ q).restrict (U n)) := by
+      let (q : G ⧸ H) : IsFiniteMeasure ((κ q).restrict (U n)) :=
+        ⟨by
+          rw [Measure.restrict_apply_univ]
+          exact (measure_mono interior_subset).trans_lt (hκcompact q (K.isCompact n))⟩
+      refine Measurable.measure_of_isPiSystem BorelSpace.measurable_eq isPiSystem_isOpen ?_ ?_
+      · intro S hS
+        change IsOpen S at hS
+        simpa only [Measure.restrict_apply hS.measurableSet] using
+          hopen (hS.inter (isOpen_interior : IsOpen (U n)))
+      · simpa only [Measure.restrict_apply_univ] using hopen (isOpen_interior : IsOpen (U n))
+    refine Measure.measurable_of_measurable_coe _ fun S hS ↦ ?_
+    have heq (q : G ⧸ H) : κ q S = ⨆ n, (κ q).restrict (U n) S := by
+      have hmono : Monotone (fun n ↦ S ∩ U n) :=
+        monotone_const.inter (fun _ _ h ↦ interior_mono (K.subset h))
+      simpa only [← inter_iUnion, hU, inter_univ, Measure.restrict_apply hS] using
+        hmono.measure_iUnion (μ := κ q)
+    simp_rw [heq]
+    exact Measurable.iSup fun n ↦ (Measure.measurable_coe hS).comp (hrestrict n)
+
+  let ρ := ν.bind κ
+  have htests (g : CompactlySupportedContinuousMap G ℝ) (hg : ∀ x, 0 ≤ g x) :
+      (∫⁻ x, ENNReal.ofReal (g x) ∂ρ) = ∫⁻ x, ENNReal.ofReal (g x) ∂μ := by
+    let gℂ : C(G, ℂ) := ⟨fun x ↦ (g x : ℂ), Complex.continuous_ofReal.comp g.continuous⟩
+    have hgℂ : HasCompactSupport gℂ := g.hasCompactSupport.comp_left Complex.ofReal_zero
+    have hcoset (q : G ⧸ H) : lcaCosetIntegral H μH gℂ q = (ses.pushforward μH g q : ℂ) := by
+      have hq : (QuotientGroup.mk' H) q.out = q := Quotient.out_eq' q
+      rw [← hq, ses.pushforward_apply_apply]
+      rw [hq]
+      exact integral_complex_ofReal
+    have hgPush : ∀ q, 0 ≤ ses.pushforward μH g q := by
+      intro q
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+      change 0 ≤ ses.pushforward μH g ((QuotientGroup.mk' H) x)
+      rw [ses.pushforward_apply_apply]
+      exact integral_nonneg fun h ↦ hg (tr x h)
+    have heq : (∫ x, g x ∂μ) = ∫ q, ses.pushforward μH g q ∂ν := by
+      have heq := hν.2.2 gℂ hgℂ
+      simp_rw [hcoset] at heq
+      change (∫ x, (g x : ℂ) ∂μ) = _ at heq
+      rw [integral_complex_ofReal, integral_complex_ofReal] at heq
+      exact Complex.ofReal_injective heq
+    rw [Measure.lintegral_bind hκ.aemeasurable (hgmeas g).aemeasurable]
+    simp_rw [htest g hg]
+    rw [← ofReal_integral_eq_lintegral_ofReal (ses.pushforward μH g).integrable
+      (.of_forall hgPush), ← ofReal_integral_eq_lintegral_ofReal g.integrable (.of_forall hg), heq]
+
+  let : IsFiniteMeasureOnCompacts ρ := ⟨by
+    intro L hL
+    obtain ⟨g, hgL, hgcompact, -, hg⟩ :=
+      exists_continuousMap_one_of_isCompact_subset_isOpen hL isOpen_univ (subset_univ L)
+    let g' : CompactlySupportedContinuousMap G ℝ := ⟨g, hgcompact⟩
+    calc
+      ρ L = ∫⁻ x, L.indicator 1 x ∂ρ := (lintegral_indicator_one hL.measurableSet).symm
+      _ ≤ ∫⁻ x, ENNReal.ofReal (g' x) ∂ρ := by
+        apply lintegral_mono
+        intro x
+        change L.indicator 1 x ≤ ENNReal.ofReal (g x)
+        by_cases hx : x ∈ L
+        · simp [hx, hgL hx]
+        · simp [hx]
+      _ = ∫⁻ x, ENNReal.ofReal (g' x) ∂μ := htests g' (fun x ↦ (hg x).1)
+      _ < ⊤ := by
+        rw [← ofReal_integral_eq_lintegral_ofReal g'.integrable (.of_forall fun x ↦ (hg x).1)]
+        exact ENNReal.ofReal_lt_top⟩
+
+  have hrepresentative (x : G) : κ (QuotientGroup.mk x) = μH.map (tr x) := by
+    let y : G := (QuotientGroup.mk x : G ⧸ H).out
+    have hy : (QuotientGroup.mk y : G ⧸ H) = QuotientGroup.mk x := Quotient.out_eq' _
+    let k : H := ⟨y⁻¹ * x, QuotientGroup.eq.mp hy⟩
+    have htr_eq : tr x = tr y ∘ (k * ·) := by
+      funext h
+      simp [tr, k, ← mul_assoc]
+    change μH.map (tr y) = _
+    rw [htr_eq, ← Measure.map_map (htr y).measurable
+      (measurePreserving_mul_left μH k).measurable, (measurePreserving_mul_left μH k).map_eq]
+
+  let : ρ.IsMulLeftInvariant := ⟨by
+    intro x
+    have hx : Measurable (x * · : G → G) := (continuous_const.mul continuous_id).measurable
+    have hcov (q : G ⧸ H) : (κ q).map (x * ·) = κ (QuotientGroup.mk x * q) := by
+      obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective q
+      change (κ (QuotientGroup.mk y)).map (x * ·) =
+        κ ((QuotientGroup.mk' H) x * (QuotientGroup.mk' H) y)
+      rw [← (QuotientGroup.mk' H).map_mul x y]
+      change (κ (QuotientGroup.mk y)).map (x * ·) = κ (QuotientGroup.mk (x * y))
+      rw [hrepresentative, hrepresentative, Measure.map_map hx (htr y).measurable]
+      simp only [tr, Function.comp_def, mul_assoc]
+    change (ν.bind κ).map (x * ·) = ν.bind κ
+    rw [Measure.map_bind hκ.aemeasurable hx.aemeasurable]
+    simp_rw [hcov]
+    have hshift := measurePreserving_mul_left ν (QuotientGroup.mk x)
+    rw [← Measure.bind_map hshift.measurable.aemeasurable hκ.aemeasurable, hshift.map_eq]⟩
+
+  -- Uniqueness on relatively compact sets extends along the exhaustion.
+  let c := Measure.haarScalarFactor ρ μ
+  have hscalar : ρ = c • μ := by
+    ext S hS
+    have hmono : Monotone (fun n ↦ S ∩ K n) :=
+      monotone_const.inter (fun _ _ h ↦ K.subset h)
+    have hcover : ⋃ n, S ∩ K n = S := by rw [← inter_iUnion, K.iUnion_eq, inter_univ]
+    rw [← hcover, hmono.measure_iUnion, hmono.measure_iUnion]
+    congr with n
+    exact Measure.measure_isMulInvariant_eq_smul_of_isCompact_closure ρ μ
+      ((K.isCompact n).closure_of_subset inter_subset_right)
+  obtain ⟨g, hgcompact, hg, hgpos⟩ := exists_continuous_nonneg_pos (1 : G)
+  let g' : CompactlySupportedContinuousMap G ℝ := ⟨g, hgcompact⟩
+  have hpos : 0 < ∫ x, g' x ∂μ :=
+    g.continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero hgcompact hg hgpos
+  have heq := htests g' hg
+  rw [← ofReal_integral_eq_lintegral_ofReal g'.integrable (.of_forall hg),
+    ← ofReal_integral_eq_lintegral_ofReal g'.integrable (.of_forall hg), hscalar,
+    integral_smul_nnreal_measure] at heq
+  have heq' : (c : ℝ) * (∫ x, g' x ∂μ) = ∫ x, g' x ∂μ :=
+    (ENNReal.ofReal_eq_ofReal_iff (by positivity) hpos.le).mp heq
+  have hc : c = 1 := by
+    exact_mod_cast (mul_right_cancel₀ hpos.ne' (heq'.trans (one_mul _).symm))
+  exact ⟨hκ, by simpa [hc] using hscalar⟩
+
+include hH in
 /-- Paper: Lemma D.1.2.3, p. 747. For a σ-finite group, finiteness of
 the iterated integral of the norm implies integrability and Weil's formula. -/
 theorem integrable_of_weilNormIntegral [SigmaFinite μ] (ν : Measure (G ⧸ H))
     (hν : IsWeilQuotientMeasure H μ μH ν) {f : G → ℂ} (hf : Measurable f)
     (hfin : (∫⁻ q, ∫⁻ h : H, ‖f (q.out * (h : G))‖₊ ∂μH ∂ν) < (⊤ : ℝ≥0∞)) :
-    Integrable f μ ∧ (∫ x, f x ∂μ) = ∫ q, lcaCosetIntegral H μH f q ∂ν := by sorry
+    Integrable f μ ∧ (∫ x, f x ∂μ) = ∫ q, lcaCosetIntegral H μH f q ∂ν := by
+  let tr (q : G ⧸ H) (h : H) : G := q.out * (h : G)
+  have htr (q : G ⧸ H) : Measurable (tr q) :=
+    (continuous_const.mul continuous_subtype_val).measurable
+  let κ : G ⧸ H → Measure G := fun q ↦ μH.map (tr q)
+  have hκ : Measurable κ ∧ ν.bind κ = μ := weilMeasure_eq_bind H hH μ μH ν hν
+  have hfint : Integrable f μ := by
+    refine ⟨hf.aestronglyMeasurable, ?_⟩
+    rw [hasFiniteIntegral_iff_eNorm, ← hκ.2, Measure.lintegral_bind hκ.1.aemeasurable
+      hf.eNorm.aemeasurable]
+    have hnorm (q : G ⧸ H) : (∫⁻ x, ‖f x‖ₑ ∂κ q) = ∫⁻ h : H, ‖f (tr q h)‖ₑ ∂μH :=
+      lintegral_map hf.eNorm (htr q)
+    simp_rw [hnorm, eNorm_eq_nnNorm]
+    exact hfin
+  refine ⟨hfint, ?_⟩
+  let kernel : ProbabilityTheory.Kernel (G ⧸ H) G := ⟨κ, hκ.1⟩
+  have hcomp := Measure.comp_eq_comp_const_apply (κ := kernel) (μ := ν)
+  have hInt : Integrable f ((kernel.comp (ProbabilityTheory.Kernel.const Unit ν)) ()) := by
+    rwa [← hcomp, show ν.bind (⇑kernel) = μ from hκ.2]
+  calc
+    (∫ x, f x ∂μ) = ∫ q, ∫ x, f x ∂κ q ∂ν := by
+      rw [← hκ.2, show ν.bind κ = _ from hcomp]
+      have heq := ProbabilityTheory.Kernel.integral_comp hInt
+      rw [ProbabilityTheory.Kernel.const_apply] at heq
+      exact heq
+    _ = ∫ q, lcaCosetIntegral H μH f q ∂ν := by
+      congr with q
+      exact integral_map (htr q).aemeasurable hf.aestronglyMeasurable
 
 section FundamentalDomain
 
@@ -1254,12 +1561,39 @@ variable [DiscreteTopology H] [SecondCountableTopology G]
 variable {Δ Δ' : Set G} (hΔ : MeasurableSet Δ)
 variable (hbij : Function.Bijective (fun x : Δ ↦ (QuotientGroup.mk x.val : G ⧸ H)))
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Proposition D.1.2.4, p. 748. The integrals over the translates
 of a Borel fundamental domain sum absolutely to the group integral. -/
 theorem weilFundamentalDomain_hasSum {f : G → ℂ} (hf : Integrable f μ) :
     HasSum (fun h : H ↦ ∫ x in (fun y : G ↦ y * (h : G)) '' Δ, f x ∂μ)
-      (∫ x, f x ∂μ) := by sorry
+      (∫ x, f x ∂μ) := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let translate (h : H) : Set G := (fun y : G ↦ y * (h : G)) '' Δ
+  have hmeas (h : H) : MeasurableSet (translate h) :=
+    (measurableEmbedding_mulRight (h : G)).measurableSet_image' hΔ
+  have hdisj : Pairwise (fun h k ↦ Disjoint (translate h) (translate k)) := by
+    intro h k hne
+    rw [Set.disjoint_left]
+    rintro x ⟨a, ha, hax⟩ ⟨b, hb, hbx⟩
+    have hab : (⟨a, ha⟩ : Δ) = ⟨b, hb⟩ := hbij.1 <| calc
+      QuotientGroup.mk a = QuotientGroup.mk (a * (h : G)) :=
+        (QuotientGroup.mk_mul_of_mem a h.property).symm
+      _ = QuotientGroup.mk (b * (k : G)) := congrArg QuotientGroup.mk (hax.trans hbx.symm)
+      _ = QuotientGroup.mk b := QuotientGroup.mk_mul_of_mem b k.property
+    have hab' : a = b := congrArg Subtype.val hab
+    apply hne
+    apply Subtype.ext
+    exact mul_left_cancel (by simpa only [hab'] using hax.trans hbx.symm)
+  have hcover : ⋃ h, translate h = univ := by
+    apply Set.eq_univ_of_forall
+    intro x
+    obtain ⟨a, ha⟩ := hbij.2 (QuotientGroup.mk x)
+    let h : H := ⟨(a : G)⁻¹ * x, QuotientGroup.eq.mp ha⟩
+    exact mem_iUnion.mpr ⟨h, a, a.property, mul_inv_cancel_left _ _⟩
+  simpa only [hcover, Measure.restrict_univ, translate] using
+    hasSum_integral_iUnion hmeas hdisj hf.integrableOn
 
 variable (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMeasure H μ Measure.count ν)
 

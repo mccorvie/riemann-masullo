@@ -228,7 +228,8 @@ given, the midpoint sample is their average.
 Deviation: Sanity check for the normalization of the midpoint. -/
 theorem mellinJumpMidpoint_eq_average {f : ℝ → ℂ} {x : ℝ} {l r : ℂ}
     (hl : Tendsto f (𝓝[<] x) (𝓝 l)) (hr : Tendsto f (𝓝[>] x) (𝓝 r)) :
-    mellinJumpMidpoint f x = (l + r) / 2 := by sorry
+    mellinJumpMidpoint f x = (l + r) / 2 := by
+  rw [mellinJumpMidpoint, hl.limUnder_eq, hr.limUnder_eq]
 
 /-- Paper: Proposition B.4.1.2, p. 608. The unitary character's weighted
 midpoint samples on the multiplicative lattice are absolutely summable.
@@ -266,8 +267,19 @@ sample at all but finitely many integer powers of the lattice generator. -/
 theorem finite_mellinJumpMidpoint_ne_lattice
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) {θ : ℝ}
     (hθ : 0 < θ) (hθ₁ : θ ≠ 1) :
-    {m : ℤ | mellinJumpMidpoint f ((m : ℝ) * Real.log θ) ≠ f ((m : ℝ) * Real.log θ)}.Finite :=
-  by sorry
+    {m : ℤ | mellinJumpMidpoint f ((m : ℝ) * Real.log θ) ≠ f ((m : ℝ) * Real.log θ)}.Finite := by
+  obtain ⟨⟨S, hS, -⟩, -⟩ := hf
+  have hlog : Real.log θ ≠ 0 := Real.log_ne_zero_of_pos_of_ne_one hθ hθ₁
+  have hinj : Function.Injective (fun m : ℤ ↦ (m : ℝ) * Real.log θ) := fun m n h ↦ by
+    simpa [hlog] using h
+  refine ((S.finite_toSet.preimage hinj.injOn)).subset fun m hm ↦ ?_
+  by_contra hmS
+  apply hm
+  have hopen : IsOpen ((S : Set ℝ)ᶜ) := S.finite_toSet.isClosed.isOpen_compl
+  have hcont : ContinuousAt f ((m : ℝ) * Real.log θ) :=
+    (hS.continuousOn.continuousAt (hopen.mem_nhds hmS))
+  rw [mellinJumpMidpoint_eq_average (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+    (hcont.tendsto.mono_left nhdsWithin_le_nhds), add_self_div_two]
 
 -- TODO(paper-gap): Footnote 12 asks for a non-absolutely convergent example.
 -- The example at θ = 2 has only one nonzero frequency sample.
@@ -285,7 +297,29 @@ theorem summable_mellinPoissonSamples_of_smooth
 the interval from one to two is (B.4.1.9), with its removable value at zero. -/
 theorem mellin_indicator_one_two (s : ℂ) :
     mellin ((Icc (1 : ℝ) 2).indicator (fun _ ↦ (1 : ℂ))) s =
-      if s = 0 then (Real.log 2 : ℂ) else ((2 : ℂ) ^ s - 1) / s := by sorry
+      if s = 0 then (Real.log 2 : ℂ) else ((2 : ℂ) ^ s - 1) / s := by
+  have hint : mellin ((Icc (1 : ℝ) 2).indicator (fun _ ↦ (1 : ℂ))) s =
+      ∫ t in (1 : ℝ)..2, (t : ℂ) ^ (s - 1) := by
+    have heq : (fun t : ℝ ↦ (t : ℂ) ^ (s - 1) • (Icc (1 : ℝ) 2).indicator (fun _ ↦ (1 : ℂ)) t) =
+        (Icc (1 : ℝ) 2).indicator (fun t : ℝ ↦ (t : ℂ) ^ (s - 1)) := by
+      ext t
+      by_cases ht : t ∈ Icc (1 : ℝ) 2 <;> simp [ht]
+    rw [mellin, heq, MeasureTheory.setIntegral_indicator measurableSet_Icc,
+      inter_eq_right.mpr (fun t (ht : t ∈ Icc (1 : ℝ) 2) ↦
+        show (0 : ℝ) < t from zero_lt_one.trans_le ht.1),
+      MeasureTheory.integral_Icc_eq_integral_Ioc,
+      ← intervalIntegral.integral_of_le (by norm_num : (1 : ℝ) ≤ 2)]
+  have h0 : (0 : ℝ) ∉ uIcc (1 : ℝ) 2 := by
+    rw [uIcc_of_le (by norm_num : (1 : ℝ) ≤ 2)]; norm_num
+  rw [hint]
+  split_ifs with hs
+  · subst hs
+    have : (fun t : ℝ ↦ (t : ℂ) ^ ((0 : ℂ) - 1)) = fun t : ℝ ↦ ((t⁻¹ : ℝ) : ℂ) := by
+      ext t; simp [Complex.cpow_neg_one]
+    rw [this, intervalIntegral.integral_ofReal, integral_inv_of_pos (by norm_num) (by norm_num)]
+    norm_num
+  · rw [integral_cpow (Or.inr ⟨fun (h : s - 1 = -1) ↦ hs (by linear_combination h), h0⟩)]
+    simp
 
 section LocalFactor
 

@@ -8,6 +8,7 @@ public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.MeasureTheory.Measure.Prod
 public import Mathlib.MeasureTheory.Measure.Regular
 import Mathlib.LinearAlgebra.Dimension.LinearMap
+import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.NormAttainment
 
 /-!
 # Nuclear convergence and Schatten classes
@@ -154,10 +155,50 @@ theorem tendsto_sum_hilbertTrace_orthogonalProjections_mul [SeparableSpace H]
 
 /-- Paper: Remark C.3.5.2, p. 699. The finite sums of pairwise orthogonal
 projections converge strongly to the identity exactly when the algebraic
-sum of the subspaces is dense. -/
+sum of the subspaces is dense.
+The supremum is taken among submodules and only then viewed as a set: written with the set
+ascription outside, Lean coerces each summand first and forms the union, for which the statement
+is false (two coordinate axes in the plane). -/
 theorem tendsto_sum_orthogonalProjections_iff_dense_iSup (hV : PairwiseOrthogonal) :
     (∀ x, Tendsto (fun s : Finset ι ↦ (∑ i ∈ s, P(i)) x) atTop (𝓝 x)) ↔
-      Dense ((⨆ i, (V i : Submodule ℂ H)) : Set H) := by sorry
+      Dense (((⨆ i, V i : Submodule ℂ H) : Submodule ℂ H) : Set H) := by
+  classical
+  let Q (s : Finset ι) : H →L[ℂ] H := ∑ i ∈ s, P(i)
+  constructor
+  · intro h x
+    refine mem_closure_of_tendsto (h x) (Eventually.of_forall fun s ↦ ?_)
+    change (∑ i ∈ s, P(i)) x ∈ ⨆ i, (V i : Submodule ℂ H)
+    rw [sum_apply]
+    exact Submodule.sum_mem _ fun i _ ↦ Submodule.mem_iSup_of_mem i
+      (Submodule.starProjection_apply_mem _ x)
+  · intro hd x
+    refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+    -- Approximate x by a vector in the sum of finitely many summands.
+    obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hd x) ε hε
+    change y ∈ ⨆ i, (V i : Submodule ℂ H) at hy
+    rw [iSup_eq_iSup_finset] at hy
+    have hmono : Monotone (fun s : Finset ι ↦ ⨆ i ∈ s, (V i : Submodule ℂ H)) :=
+      fun _ _ h ↦ iSup_le fun i ↦ iSup_le fun hi ↦ le_iSup_of_le i (le_iSup_of_le (h hi) le_rfl)
+    obtain ⟨t, ht⟩ := (Submodule.mem_iSup_of_directed _ hmono.directed_le).mp hy
+    filter_upwards [eventually_ge_atTop t] with s hs
+    have hrange : (⨆ i ∈ s, (V i : Submodule ℂ H)) ≤ (Q s).range := by
+      refine iSup_le fun i ↦ iSup_le fun hi z hz ↦ ⟨z, ?_⟩
+      change (∑ i ∈ s, P(i)) z = z
+      rw [sum_apply, Finset.sum_eq_single_of_mem i hi]
+      · exact Submodule.starProjection_eq_self_iff.mpr hz
+      · intro j _ hji
+        exact (Submodule.starProjection_apply_eq_zero_iff _).mpr ((hV hji.symm) hz)
+    have hP (i : ι) : IsStarProjection (P(i)) := isStarProjection_starProjection
+    have hQs : IsStarProjection (Q s) := by
+      refine IsStarProjection.sum (fun i _ ↦ hP i) ?_
+      intro i _ j _ hij
+      exact ((hP i).isSelfAdjoint.isStarOrtho_iff_mul_eq_zero (hP j).isSelfAdjoint).mpr
+        (hV hij).starProjection_comp_starProjection
+    obtain ⟨hproj, hQ⟩ := isStarProjection_iff_eq_starProjection_range.mp hQs
+    -- The projection onto the range of Q s is at least as close to x as y is.
+    change dist (Q s x) x < ε
+    rw [dist_comm, hQ, Submodule.dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem (hrange (hmono hs ht))).trans_lt hxy
 
 end OrthogonalSummands
 
@@ -285,16 +326,117 @@ section SingularValues
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 
+/-- Within any positive operator-norm distance of `A.adjoint` there is a compact operator.
+The approximant is `A.adjoint` postcomposed with the orthogonal projection onto a
+finite-dimensional subspace, so it factors through a locally compact space. -/
+private theorem exists_isCompactOperator_norm_sub_adjoint_le (A : H →L[ℂ] H)
+    (hA : IsCompactOperator A) {ε : ℝ} (hε : 0 < ε) :
+    ∃ C : H →L[ℂ] H, IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ ε := by
+  obtain ⟨t, -, ht_fin, ht_cover⟩ :=
+    (hA.isCompact_closure_image_closedBall 1).finite_cover_balls hε
+  let U : Submodule ℂ H := Submodule.span ℂ t
+  have : FiniteDimensional ℂ U := FiniteDimensional.span_of_finite ℂ ht_fin
+  have : CompleteSpace U := FiniteDimensional.completeSpace ℂ U
+  have : U.HasOrthogonalProjection := inferInstance
+  have hnorm : ‖A - U.starProjection ∘L A‖ ≤ ε := by
+    refine ContinuousLinearMap.opNorm_le_bound _ hε.le fun x ↦ ?_
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp
+    · have hx0 : 0 < ‖x‖ := norm_pos_iff.mpr hx
+      let u : H := (‖x‖⁻¹ : ℂ) • x
+      have hu : ‖u‖ = 1 := by
+        rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hx0,
+          inv_mul_cancel₀ hx0.ne']
+      have hBu : ‖(A - U.starProjection ∘L A) u‖ < ε := by
+        have hu_ball : u ∈ Metric.closedBall (0 : H) 1 := by
+          rw [Metric.mem_closedBall, dist_zero_right, hu]
+        have hAu : A u ∈ closure (A '' Metric.closedBall (0 : H) 1) :=
+          subset_closure ⟨u, hu_ball, rfl⟩
+        obtain ⟨y, hy, hxy⟩ := Set.mem_iUnion₂.mp (ht_cover hAu)
+        have hdist : Metric.infDist (A u) (U : Set H) < ε :=
+          (Metric.infDist_lt_iff ⟨0, Submodule.zero_mem U⟩).2
+            ⟨y, Submodule.subset_span hy, Metric.mem_ball.mp hxy⟩
+        rw [sub_apply, ContinuousLinearMap.comp_apply, ← dist_eq_norm,
+          U.dist_starProjection_eq_infDist]
+        exact hdist
+      have hxeq : (‖x‖ : ℂ) • u = x := by
+        simp only [u, smul_smul, mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hx0.ne'), one_smul]
+      have hBx : ‖(A - U.starProjection ∘L A) x‖ =
+          ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ := by
+        conv_lhs => rw [← hxeq]
+        rw [(A - U.starProjection ∘L A).map_smul, norm_smul, Complex.norm_real,
+          Real.norm_eq_abs, abs_of_nonneg hx0.le]
+      rw [hBx]
+      calc
+        ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ ≤ ‖x‖ * ε :=
+          mul_le_mul_of_nonneg_left hBu.le hx0.le
+        _ = ε * ‖x‖ := mul_comm _ _
+  refine ⟨A.adjoint ∘L U.starProjection, ?_, ?_⟩
+  · have : LocallyCompactSpace U :=
+      LocallyCompactSpace.of_finiteDimensional_of_complete ℂ U
+    have hfac : A.adjoint ∘L U.starProjection =
+        (A.adjoint ∘L U.subtypeL) ∘L U.orthogonalProjectionOnto := rfl
+    rw [hfac]
+    exact (isCompactOperator_of_locallyCompactSpace_rng
+      (A.adjoint ∘L U.subtypeL)).comp_clm U.orthogonalProjectionOnto
+  · rw [← (isSelfAdjoint_starProjection U).adjoint_eq, ← ContinuousLinearMap.adjoint_comp,
+      ← (ContinuousLinearMap.adjoint (E := H) (F := H)).map_sub,
+      (ContinuousLinearMap.adjoint (E := H) (F := H)).norm_map]
+    exact hnorm
+
 /-- Paper: Lemma C.3.5.3(1), p. 700. The adjoint of a compact endomorphism is compact. -/
 theorem isCompactOperator_adjoint_of_compact (A : H →L[ℂ] H)
-    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by sorry
+    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by
+  have happrox : ∀ n : ℕ, ∃ C : H →L[ℂ] H,
+      IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ 1 / (n + 1 : ℝ) := by
+    intro n
+    exact exists_isCompactOperator_norm_sub_adjoint_le A hA (by positivity)
+  choose C hC hle using happrox
+  refine isCompactOperator_of_tendsto (l := atTop) (F := C) ?_ (Eventually.of_forall hC)
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  obtain ⟨N, hN⟩ := exists_nat_gt (1 / ε)
+  refine ⟨N, fun n hn ↦ ?_⟩
+  rw [dist_eq_norm, norm_sub_rev]
+  refine (hle n).trans_lt ?_
+  have hbig : 1 / ε < (n : ℝ) + 1 :=
+    lt_trans (lt_of_lt_of_le hN (Nat.cast_le.mpr hn)) (lt_add_one _)
+  have hmul : 1 < ((n : ℝ) + 1) * ε := (div_lt_iff₀ hε).mp hbig
+  rw [show (1 : ℝ) / (n + 1 : ℝ) = 1 / ((n : ℝ) + 1) by simp,
+    div_lt_iff₀' (by positivity)]
+  exact hmul
 
 /-- Paper: Lemma C.3.5.3(1), p. 700. A compact endomorphism and its adjoint
 have the same singular values at every index up to the Hilbert space dimension.
 Deviation: The singular values use the approximation-number definition with zero-based indices. -/
 theorem approximationNumber_adjoint (A : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber A n = approximationNumber A.adjoint n := by sorry
+    approximationNumber A n = approximationNumber A.adjoint n := by
+  clear hA hn
+  have rank_adjoint_le (S : H →L[ℂ] H)
+      (hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal)) :
+      Module.rank ℂ S.adjoint.toLinearMap.range ≤ (n : Cardinal) := by
+    let V := S.toLinearMap.range
+    have : FiniteDimensional ℂ V :=
+      Module.rank_lt_aleph0_iff.mp (hS.trans_lt Cardinal.natCast_lt_aleph0)
+    have : CompleteSpace V := FiniteDimensional.completeSpace ℂ V
+    -- Factoring S through its range gives a factorization of its adjoint through V.
+    have hfac : V.subtypeL.comp S.rangeRestrict = S := rfl
+    have hadj : S.adjoint = S.rangeRestrict.adjoint.comp V.subtypeL.adjoint := by
+      rw [← ContinuousLinearMap.adjoint_comp, hfac]
+    rw [hadj]
+    exact (LinearMap.rank_comp_le_left _ _).trans
+      (S.rangeRestrict.adjoint.toLinearMap.rank_le_domain.trans hS)
+  let errors (T : H →L[ℂ] H) : Set ℝ :=
+    {r | ∃ S : H →L[ℂ] H, Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}
+  have errors_subset (T : H →L[ℂ] H) : errors T ⊆ errors T.adjoint := by
+    rintro _ ⟨S, hS, rfl⟩
+    refine ⟨S.adjoint, rank_adjoint_le S hS, ?_⟩
+    rw [← ContinuousLinearMap.adjoint.map_sub, LinearIsometryEquiv.norm_map]
+  change sInf (errors A) = sInf (errors A.adjoint)
+  apply congrArg sInf
+  exact Set.Subset.antisymm (errors_subset A)
+    (by simpa only [ContinuousLinearMap.adjoint_adjoint] using errors_subset A.adjoint)
 
 /-- Paper: Lemma C.3.5.3(2), p. 700. The first singular value of a compact
 endomorphism equals its operator norm.
@@ -325,6 +467,107 @@ theorem approximationNumber_zero_eq_opNorm (A : H →L[ℂ] H) (hA : IsCompactOp
 -- argument can fail for repeated eigenvalues. The min-max identities still hold.
 -- The polar isometry used in part (1) has initial space (ker A)ᗮ.
 
+/-- The restriction of `A` to the orthogonal complement of a proper finite-dimensional
+subspace has a maximizing unit vector. Its image is orthogonal to the images of all vectors
+in the complement that are orthogonal to it. -/
+private theorem exists_unit_maximizer_on_orthogonal (A : H →L[ℂ] H) (hA : IsCompactOperator A)
+    {n : ℕ} (hn : (n : Cardinal) < Module.rank ℂ H)
+    {V : Submodule ℂ H} (hV : Module.rank ℂ V = (n : Cardinal)) :
+    ∃ e ∈ Vᗮ, ‖e‖ = 1 ∧ ‖A e‖ = ‖A.comp Vᗮ.subtypeL‖ ∧
+      ∀ y ∈ Vᗮ, ⟪e, y⟫_ℂ = 0 → ⟪A e, A y⟫_ℂ = 0 := by
+  have : FiniteDimensional ℂ V :=
+    Module.rank_lt_aleph0_iff.mp (hV.trans_lt Cardinal.natCast_lt_aleph0)
+  let : CompleteSpace V := FiniteDimensional.completeSpace ℂ V
+  have hproper : V ≠ ⊤ := by
+    intro h
+    exact hn.ne (by rw [← hV, h, rank_top])
+  have : Nontrivial Vᗮ := Submodule.nontrivial_iff_ne_bot.mpr
+    (fun h ↦ hproper (V.orthogonal_eq_bot_iff.mp h))
+  let T := A.comp Vᗮ.subtypeL
+  obtain ⟨e, he, heA, heig⟩ :=
+    exists_unit_norm_eq_opNorm_of_isCompactOperator T (hA.comp_clm Vᗮ.subtypeL)
+  refine ⟨e, e.property, he, heA, fun y hy hinner ↦ ?_⟩
+  let z : Vᗮ := ⟨y, hy⟩
+  change ⟪T e, T z⟫_ℂ = 0
+  rw [← T.adjoint_inner_left, heig, inner_smul_left]
+  change (starRingEnd ℂ _) * ⟪(e : H), y⟫_ℂ = 0
+  rw [hinner, mul_zero]
+
+/-- Adjoin a maximizing line to a subspace whose image is orthogonal to the image of its
+orthogonal complement. The enlarged subspace retains this property and has a lower
+norm bound given by the old restriction norm. -/
+private theorem exists_succ_rank_subspace_of_compact (A : H →L[ℂ] H)
+    (hA : IsCompactOperator A) {n : ℕ} (hn : (n : Cardinal) < Module.rank ℂ H)
+    {V : Submodule ℂ H} (hV : Module.rank ℂ V = (n : Cardinal))
+    (horth : ∀ x ∈ V, ∀ y ∈ Vᗮ, ⟪A x, A y⟫_ℂ = 0)
+    (hlower : ∀ x ∈ V, ‖A.comp Vᗮ.subtypeL‖ * ‖x‖ ≤ ‖A x‖) :
+    ∃ U : Submodule ℂ H, V ≤ U ∧ Module.rank ℂ U = ((n + 1 : ℕ) : Cardinal) ∧
+      (∀ x ∈ U, ∀ y ∈ Uᗮ, ⟪A x, A y⟫_ℂ = 0) ∧
+      ∀ x ∈ U, ‖A.comp Vᗮ.subtypeL‖ * ‖x‖ ≤ ‖A x‖ := by
+  obtain ⟨e, heV, he, heA, heorth⟩ := exists_unit_maximizer_on_orthogonal A hA hn hV
+  let L : Submodule ℂ H := ℂ ∙ e
+  have hL : L ≤ Vᗮ := Submodule.span_le.mpr (Set.singleton_subset_iff.mpr heV)
+  have he0 : e ≠ 0 := by
+    intro h
+    simp [h] at he
+  have hrankL : Module.rank ℂ L = 1 := by
+    rw [← Module.finrank_eq_rank, finrank_span_singleton he0, Nat.cast_one]
+  have hrank : Module.rank ℂ (V ⊔ L : Submodule ℂ H) = ((n + 1 : ℕ) : Cardinal) := by
+    have hinf : V ⊓ L = ⊥ := (V.orthogonal_disjoint.mono_right hL).eq_bot
+    have h := V.rank_sup_add_rank_inf_eq L
+    rw [hinf, rank_bot, add_zero, hV, hrankL] at h
+    simpa only [Nat.cast_add, Nat.cast_one] using h
+  refine ⟨V ⊔ L, le_sup_left, hrank, ?_, ?_⟩
+  · intro x hx y hy
+    obtain ⟨v, hv, z, hz, rfl⟩ := Submodule.mem_sup.mp hx
+    obtain ⟨a, rfl⟩ := Submodule.mem_span_singleton.mp hz
+    have hyV : y ∈ Vᗮ := Submodule.orthogonal_le le_sup_left hy
+    have hyL : y ∈ Lᗮ := Submodule.orthogonal_le le_sup_right hy
+    rw [map_add, map_smul, inner_add_left, inner_smul_left, horth v hv y hyV,
+      heorth y hyV (Submodule.mem_orthogonal_singleton_iff_inner_right.mp hyL), mul_zero,
+      add_zero]
+  · intro x hx
+    obtain ⟨v, hv, z, hz, rfl⟩ := Submodule.mem_sup.mp hx
+    have hzV : z ∈ Vᗮ := hL hz
+    let c := ‖A.comp Vᗮ.subtypeL‖
+    have hz_eq : ‖A z‖ = c * ‖z‖ := by
+      obtain ⟨a, rfl⟩ := Submodule.mem_span_singleton.mp hz
+      rw [map_smul, norm_smul, norm_smul, heA, he, mul_one, mul_comm]
+    apply le_of_sq_le_sq _ (norm_nonneg _)
+    change (c * ‖v + z‖) ^ 2 ≤ ‖A (v + z)‖ ^ 2
+    calc
+      (c * ‖v + z‖) ^ 2 = (c * ‖v‖) ^ 2 + (c * ‖z‖) ^ 2 := by
+        rw [mul_pow, norm_add_sq (𝕜 := ℂ) v z, (V.mem_orthogonal z).mp hzV v hv]
+        simp only [RCLike.zero_re, mul_zero, add_zero, mul_add, mul_pow]
+      _ ≤ ‖A v‖ ^ 2 + ‖A z‖ ^ 2 := by
+        rw [← hz_eq]
+        exact add_le_add ((sq_le_sq₀ (by positivity) (norm_nonneg _)).mpr (hlower v hv)) le_rfl
+      _ = ‖A (v + z)‖ ^ 2 := by
+        rw [map_add, norm_add_sq (𝕜 := ℂ) (A v) (A z), horth v hv z hzV]
+        simp
+
+/-- There are `n` dimensions whose image is orthogonal to the image of the complement, with
+norm bounded below by the norm of the operator on the complement. -/
+private theorem exists_rank_subspace_of_compact (A : H →L[ℂ] H) (hA : IsCompactOperator A)
+    (n : ℕ) (hn : (n : Cardinal) ≤ Module.rank ℂ H) :
+    ∃ V : Submodule ℂ H, Module.rank ℂ V = (n : Cardinal) ∧
+      (∀ x ∈ V, ∀ y ∈ Vᗮ, ⟪A x, A y⟫_ℂ = 0) ∧
+      ∀ x ∈ V, ‖A.comp Vᗮ.subtypeL‖ * ‖x‖ ≤ ‖A x‖ := by
+  induction n with
+  | zero =>
+    refine ⟨⊥, by simp, ?_, ?_⟩ <;> simp
+  | succ n ih =>
+    have hlt : (n : Cardinal) < Module.rank ℂ H :=
+      (Nat.cast_lt.mpr (Nat.lt_succ_self n)).trans_le hn
+    obtain ⟨V, hV, horth, hlower⟩ := ih hlt.le
+    obtain ⟨U, hVU, hU, hUorth, hUlower⟩ :=
+      exists_succ_rank_subspace_of_compact A hA hlt hV horth hlower
+    refine ⟨U, hU, hUorth, fun x hx ↦ ?_⟩
+    have hmono : ‖A.comp Uᗮ.subtypeL‖ ≤ ‖A.comp Vᗮ.subtypeL‖ := by
+      refine ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg _) fun y ↦ ?_
+      exact (A.comp Vᗮ.subtypeL).le_opNorm ⟨y, Submodule.orthogonal_le hVU y.property⟩
+    exact (mul_le_mul_of_nonneg_right hmono (norm_nonneg _)).trans (hUlower x hx)
+
 /-- Paper: Lemma C.3.5.3(3), p. 700. The singular value is the smallest of
 the attained maxima of the norm of A on the unit sphere of each orthogonal
 complement of an n-dimensional subspace.
@@ -333,7 +576,59 @@ theorem approximationNumber_min_max (A : H →L[ℂ] H) (hA : IsCompactOperator 
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
     ∃ maxima : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)} → ℝ,
       (∀ V, IsGreatest {r | ∃ x ∈ Submodule.orthogonal (Subtype.val V), ‖x‖ = 1 ∧ r = ‖A x‖} (maxima V)) ∧
-        IsLeast (Set.range maxima) (approximationNumber A n) := by sorry
+        IsLeast (Set.range maxima) (approximationNumber A n) := by
+  let maxima (V : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)}) :=
+    ‖A.comp (Subtype.val V)ᗮ.subtypeL‖
+  have hmax (V : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)}) :
+      IsGreatest {r | ∃ x ∈ (Subtype.val V)ᗮ, ‖x‖ = 1 ∧ r = ‖A x‖} (maxima V) := by
+    obtain ⟨e, he, he1, heA, _⟩ := exists_unit_maximizer_on_orthogonal A hA hn V.property
+    refine ⟨⟨e, he, he1, heA.symm⟩, ?_⟩
+    rintro _ ⟨x, hx, hx1, rfl⟩
+    simpa [maxima, hx1] using (A.comp V.valᗮ.subtypeL).le_opNorm ⟨x, hx⟩
+  have hle (V : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)}) :
+      approximationNumber A n ≤ maxima V := by
+    have : FiniteDimensional ℂ V.val :=
+      Module.rank_lt_aleph0_iff.mp (V.property.trans_lt Cardinal.natCast_lt_aleph0)
+    let : CompleteSpace V.val := FiniteDimensional.completeSpace ℂ V.val
+    -- Projecting onto V gives an admissible rank-n approximation.
+    let S := A.comp V.val.starProjection
+    have hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) := by
+      refine (LinearMap.rank_comp_le_right V.val.starProjection.toLinearMap A.toLinearMap).trans ?_
+      change Module.rank ℂ V.val.starProjection.toLinearMap.range ≤ (n : Cardinal)
+      rw [Submodule.range_starProjection, V.property]
+    have hdiff : A - S = (A.comp V.valᗮ.subtypeL).comp V.valᗮ.orthogonalProjectionOnto := by
+      change A - S = A.comp V.valᗮ.starProjection
+      ext x
+      simp [S, map_sub]
+    have happ : approximationNumber A n ≤ ‖S - A‖ :=
+      csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩ ⟨S, hS, rfl⟩
+    refine happ.trans ?_
+    rw [norm_sub_rev, hdiff]
+    refine ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg _) fun x ↦ ?_
+    exact ((A.comp V.valᗮ.subtypeL).le_opNorm (V.valᗮ.orthogonalProjectionOnto x)).trans
+      (mul_le_mul_of_nonneg_left (V.valᗮ.norm_orthogonalProjectionOnto_apply_le x) (norm_nonneg _))
+  obtain ⟨V, hV, horth, hlower⟩ := exists_rank_subspace_of_compact A hA n hn.le
+  obtain ⟨U, _, hU, _, hUlower⟩ := exists_succ_rank_subspace_of_compact A hA hn hV horth hlower
+  let V₀ : {V : Submodule ℂ H // Module.rank ℂ V = (n : Cardinal)} := ⟨V, hV⟩
+  have hge : maxima V₀ ≤ approximationNumber A n := by
+    refine le_csInf ⟨_, 0, by simp, rfl⟩ ?_
+    rintro _ ⟨S, hS, rfl⟩
+    -- Every admissible approximant kills a nonzero vector in U.
+    let R := S.toLinearMap.rangeRestrict.comp U.subtype
+    have hker : R.ker ≠ ⊥ := by
+      intro h
+      have hr := (R.rank_le_of_injective (LinearMap.ker_eq_bot.mp h)).trans hS
+      rw [hU] at hr
+      exact (not_le_of_gt (Nat.cast_lt.mpr (Nat.lt_succ_self n))) hr
+    obtain ⟨x, hx, hx0⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hker
+    have hSx : S (x : H) = 0 := congrArg Subtype.val (LinearMap.mem_ker.mp hx)
+    have hnorm : 0 < ‖(x : H)‖ := norm_pos_iff.mpr fun h ↦ hx0 (Subtype.ext h)
+    have hbound := (S - A).le_opNorm (x : H)
+    rw [sub_apply, hSx, zero_sub, norm_neg] at hbound
+    exact le_of_mul_le_mul_right ((hUlower x x.property).trans hbound) hnorm
+  refine ⟨maxima, hmax, ⟨⟨V₀, le_antisymm hge (hle V₀)⟩, ?_⟩⟩
+  rintro _ ⟨W, rfl⟩
+  exact hle W
 
 /-- Paper: Lemma C.3.5.3(3), p. 700. The singular value is the largest of
 the attained minima of the norm of A on the unit sphere of each
@@ -347,13 +642,42 @@ theorem approximationNumber_max_min (A : H →L[ℂ] H) (hA : IsCompactOperator 
 
 -- Lemma C.3.5.4(1) is Mathlib's IsCompactOperator.comp_clm and IsCompactOperator.clm_comp.
 
+omit [CompleteSpace H] in
+/-- An approximation number is bounded by the error of any admissible approximant. -/
+private theorem approximationNumber_le_norm_sub (T S : H →L[ℂ] H) {n : ℕ}
+    (hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal)) :
+    approximationNumber T n ≤ ‖S - T‖ :=
+  csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩ ⟨S, hS, rfl⟩
+
+omit [CompleteSpace H] in
+/-- If an operation `S ↦ S'` on approximants does not raise the rank and multiplies the
+error by at most `‖B‖`, then it bounds the approximation numbers of the new operator `A'`. -/
+private theorem approximationNumber_mul_le_of_rank_le (A B : H →L[ℂ] H) {n : ℕ}
+    {A' : H →L[ℂ] H} {op : (H →L[ℂ] H) → H →L[ℂ] H}
+    (hrank : ∀ S, Module.rank ℂ (op S).toLinearMap.range ≤ Module.rank ℂ S.toLinearMap.range)
+    (hnorm : ∀ S, ‖op S - A'‖ ≤ ‖S - A‖ * ‖B‖) :
+    approximationNumber A' n ≤ approximationNumber A n * ‖B‖ := by
+  rcases (norm_nonneg B).eq_or_lt with hB | hB
+  · rw [← hB, mul_zero]
+    have h := approximationNumber_le_norm_sub A' (op 0) (n := n)
+      ((hrank 0).trans (by simp))
+    simpa [← hB] using h.trans (hnorm 0)
+  · rw [← div_le_iff₀ hB]
+    refine le_csInf ⟨_, 0, by simp, rfl⟩ ?_
+    rintro _ ⟨S, hS, rfl⟩
+    rw [div_le_iff₀ hB]
+    exact (approximationNumber_le_norm_sub A' (op S) ((hrank S).trans hS)).trans (hnorm S)
+
 /-- Paper: Lemma C.3.5.4(2), p. 701. The singular value of a compact
 endomorphism composed on the right by a bounded operator is bounded by the
 same singular value times the norm of the right factor.
 Deviation: The approximation-number index starts at zero. -/
 theorem approximationNumber_mul_le_right (A B : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber (A * B) n ≤ approximationNumber A n * ‖B‖ := by sorry
+    approximationNumber (A * B) n ≤ approximationNumber A n * ‖B‖ :=
+  approximationNumber_mul_le_of_rank_le A B (op := fun S ↦ S * B)
+    (fun S ↦ Submodule.rank_mono (LinearMap.range_comp_le_range B.toLinearMap S.toLinearMap))
+    (fun S ↦ by rw [← sub_mul]; exact norm_mul_le _ _)
 
 /-- Paper: Lemma C.3.5.4(2), p. 701. The singular value of a compact
 endomorphism composed on the left by a bounded operator is bounded by the
@@ -361,7 +685,13 @@ same singular value times the norm of the left factor.
 Deviation: The approximation-number index starts at zero. -/
 theorem approximationNumber_mul_le_left (A B : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber (B * A) n ≤ approximationNumber A n * ‖B‖ := by sorry
+    approximationNumber (B * A) n ≤ approximationNumber A n * ‖B‖ :=
+  approximationNumber_mul_le_of_rank_le A B (op := fun S ↦ B * S)
+    (fun S ↦ by
+      change Module.rank ℂ (B.toLinearMap ∘ₗ S.toLinearMap).range ≤ _
+      rw [LinearMap.range_comp]
+      exact rank_map_le _ _)
+    (fun S ↦ by rw [← mul_sub, mul_comm ‖S - A‖]; exact norm_mul_le _ _)
 
 end SingularValues
 

@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
+import all RiemannMasullo.AppC_LCTVS.Sec1
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 
 /-!
 # Structure and Fourier–Mellin transform of Schwartz–Bruhat decay spaces
@@ -119,6 +121,70 @@ theorem modulatedExponentialDecayStage_transition (k k' : GoodCompact) (h : k'.v
 
 variable [hSC : SecondCountableTopology G]
 
+/-- Paper: Example D.3.3.5, p. 805. The compact components of a cofinal sequence of
+Bruhat structural pairs are cofinal among compact subgroups with compactly generated annihilator. -/
+private theorem exists_antitone_goodCompact :
+    ∃ k : ℕ → GoodCompact, Antitone (fun n ↦ (k n).val) ∧
+      ∀ k' : GoodCompact, ∃ n, (k n).val ≤ k'.val := by
+  obtain ⟨a, _, _, ha, hcof, _⟩ := schwartzBruhat_exists_topologicallyExact (G := G)
+  let subgroup (n : ℕ) := OrderDual.ofDual (a n).val.2
+  have hgood (n : ℕ) : IsBruhatGoodSubgroup (subgroup n) := (a n).property.2.2.1
+  have hcomp (n : ℕ) : IsCompact (subgroup n : Set G) := by
+    obtain ⟨_, _, _, hker, hc⟩ := lca_dualSubgroup_quotient
+      (⟨lcaAnnihilator (subgroup n), (hgood n).2⟩ : OpenCompactlyGeneratedSubgroups (PontryaginDual G))
+    rwa [hker, lcaDualAnnihilator_annihilator (subgroup n) (hgood n).1] at hc
+  refine ⟨fun n ↦ ⟨subgroup n, hcomp n, (hgood n).2.2⟩, fun _ _ h ↦ (ha h).2, ?_⟩
+  intro k'
+  obtain ⟨H, hH⟩ := exists_openCompactlyGeneratedSubgroup_contains k'.property.1
+  let b : BruhatStructuralPair G := ⟨(H.val, OrderDual.toDual k'.val), H.property.1,
+    H.property.2, ⟨k'.property.1.isClosed, isOpen_lcaAnnihilator _ k'.property.1,
+      k'.property.2⟩, hH⟩
+  obtain ⟨n, hn⟩ := hcof b
+  exact ⟨n, hn.2⟩
+
+/-- A decreasing cofinal sequence of indices for a family of embedded stages has the
+same union and final locally convex topology, and its maps into the union are embeddings. -/
+private theorem stageLimit_of_cofinal {ι : Type*} [Preorder ι]
+    {F : Type*} [AddCommGroup F] [Module ℂ F] [t : TopologicalSpace F] [IsTopologicalAddGroup F]
+    {X : ι → Type*} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] [∀ a, IsTopologicalAddGroup (X a)]
+    [∀ a, PolynormableSpace ℂ (X a)]
+    (i : ∀ a, X a →ₗ[ℂ] F) (hinj : ∀ a, Injective (i a))
+    (hex : ∀ x : F, ∃ a, x ∈ (i a).range) (ht : t = locallyConvexFinalTopology i)
+    (htrans : ∀ a b, b ≤ a → ∃ j : X a →L[ℂ] X b,
+      IsEmbedding j ∧ ∀ x, i b (j x) = i a x)
+    (k : ℕ → ι) (hk : Antitone k) (hcof : ∀ a, ∃ n, k n ≤ a) :
+    (∀ n, IsEmbedding (i (k n))) ∧ (∀ x : F, ∃ n, x ∈ (i (k n)).range) ∧
+      t = locallyConvexFinalTopology (fun n ↦ i (k n)) := by
+  have hfactor (a : ι) : ∃ n, ∃ j : X a →L[ℂ] X (k n), ∀ x, i (k n) (j x) = i a x := by
+    obtain ⟨n, hn⟩ := hcof a
+    obtain ⟨j, _, hj⟩ := htrans a (k n) hn
+    exact ⟨n, j, hj⟩
+  have hcover (x : F) : ∃ n, x ∈ (i (k n)).range := by
+    obtain ⟨a, y, rfl⟩ := hex x
+    obtain ⟨n, j, hj⟩ := hfactor a
+    exact ⟨n, j y, hj y⟩
+  have htests : (fun p : Seminorm ℂ F ↦ ∀ a, Continuous (p ∘ i a)) =
+      (fun p : Seminorm ℂ F ↦ ∀ n, Continuous (p ∘ i (k n))) := by
+    funext p
+    apply propext
+    refine ⟨fun h n ↦ h (k n), fun h a ↦ ?_⟩
+    obtain ⟨n, j, hj⟩ := hfactor a
+    exact ((h n).comp j.continuous).congr fun x ↦ congrArg p (hj x)
+  have ht' : t = locallyConvexFinalTopology (fun n ↦ i (k n)) :=
+    ht.trans (congrArg (fun pred : Seminorm ℂ F → Prop ↦
+      (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype pred → Seminorm ℂ F)).topology) htests)
+  have hseminorms : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ F // ∀ a, Continuous (p ∘ i a)} → Seminorm ℂ F) := ⟨ht⟩
+  let incl (n : ℕ) : X (k n) →L[ℂ] F :=
+    ⟨i (k n), hseminorms.continuous_of_continuous_comp _ fun p ↦ p.property (k n)⟩
+  choose j hj hcomm using fun n ↦ htrans (k n) (k (n + 1)) (hk (Nat.le_succ n))
+  have hlim : IsInjectiveLCLimit (X := fun n ↦ X (k n)) j incl :=
+    ⟨fun n ↦ hinj (k n), fun n ↦ ContinuousLinearMap.ext (hcomm n), hcover, ht'⟩
+  exact ⟨hlim.isEmbedding_stage hj, hcover, ht'⟩
+
+-- Checking unused section variables traverses the expanded seminorm families.
+set_option linter.unusedSectionVars false in
 include hSC hm hms hInt hne in
 /-- Paper: Example D.3.3.5, p. 805. A decreasing cofinal sequence of stages
 presents the decay space as a strict locally convex inductive limit. -/
@@ -128,7 +194,17 @@ theorem modulatedExponentialDecay_stageLimit :
         modulatedExponentialDecayStageInclusion m I (k n)
       Antitone (fun n ↦ (k n).val) ∧ (∀ k' : GoodCompact, ∃ n, (k n).val ≤ k'.val) ∧
       (∀ n, IsEmbedding (i n)) ∧ (∀ f : E, ∃ n, f ∈ (i n).range) ∧
-      (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology i := by sorry
+      (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology i := by
+  have hc := exists_antitone_goodCompact (G := G)
+  let k := hc.choose
+  exact ⟨k, hc.choose_spec.1, hc.choose_spec.2,
+    stageLimit_of_cofinal (F := E) (X := ModulatedExponentialDecayStage m I)
+      (fun a ↦ modulatedExponentialDecayStageInclusion m I a)
+      (fun a ↦ (modulatedExponentialDecayStageInclusion_range m I a).1)
+      (modulatedExponentialDecay_exists_stage m I hm hms hInt hne) rfl
+      (fun a b h ↦ (modulatedExponentialDecayStage_transition m I hm hms hInt hne a b h).imp
+        fun _ hj ↦ ⟨hj.1, fun f ↦ Subtype.ext (funext (hj.2 f))⟩)
+      k hc.choose_spec.1 hc.choose_spec.2⟩
 
 /-- Point evaluation on the Schwartz–Bruhat space is continuous since on each
 structural stage it is bounded by the zeroth Schwartz seminorm. -/
