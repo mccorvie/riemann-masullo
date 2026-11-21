@@ -573,7 +573,27 @@ Deviation: We use a homomorphic section, as in the introduction to §A.2.2. -/
 theorem ideleNormSection_product (s : ℝ≥0ˣ →* 𝕀[F]) (hs : Continuous s)
     (hn : RightInverse s (ideleNorm F)) :
     ∃ e : (ℝ≥0ˣ × (ideleNorm F).ker) ≃ₜ* 𝕀[F], ∀ t g, e (t, g) = s t * g.val := by
-  sorry
+  have hNorm : Continuous (ideleNorm F) := (ideleGroup_topology F).2.2.2.2.1
+  have hKer (g : 𝕀[F]) : (s (ideleNorm F g))⁻¹ * g ∈ (ideleNorm F).ker := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv, hn _, inv_mul_cancel]
+  let e : (ℝ≥0ˣ × (ideleNorm F).ker) ≃ₜ* 𝕀[F] :=
+    { toFun := fun p ↦ s p.1 * p.2.val
+      invFun := fun g ↦ (ideleNorm F g, ⟨(s (ideleNorm F g))⁻¹ * g, hKer g⟩)
+      left_inv := by
+        rintro ⟨t, g⟩
+        have ht : ideleNorm F (s t * g.val) = t := by
+          rw [map_mul, hn t, MonoidHom.mem_ker.mp g.property, mul_one]
+        refine Prod.ext ht (Subtype.ext ?_)
+        change (s (ideleNorm F (s t * g.val)))⁻¹ * (s t * g.val) = g.val
+        rw [ht, inv_mul_cancel_left]
+      right_inv := fun g ↦ mul_inv_cancel_left (s (ideleNorm F g)) g
+      map_mul' := by
+        rintro ⟨t, g⟩ ⟨u, h⟩
+        change s (t * u) * (g.val * h.val) = (s t * g.val) * (s u * h.val)
+        rw [map_mul, mul_mul_mul_comm]
+      continuous_toFun := (hs.comp continuous_fst).mul (continuous_subtype_val.comp continuous_snd)
+      continuous_invFun := hNorm.prodMk (((hs.comp hNorm).inv.mul continuous_id).subtype_mk hKer) }
+  exact ⟨e, fun _ _ ↦ rfl⟩
 
 end NormSections
 
