@@ -33,6 +33,7 @@ import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.RingTheory.Trace.Defs
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 
 /-! # Haar measures
@@ -3012,6 +3013,80 @@ def finiteLocalStandardCharacter (v : Primes(F)) (x : v.adicCompletion F) : Circ
   adeleStandardCharacter F (0, RestrictedProduct.single (fun w : Primes(F) ↦
     w.adicCompletionIntegers F) v x)
 
+section FiniteLocalTrace
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct
+
+local notation "O(" F ")" => (fun w : Primes(F) ↦ HeightOneSpectrum.adicCompletionIntegers F w)
+local notation "K(" F ")" => (fun w : Primes(F) ↦ HeightOneSpectrum.adicCompletion F w)
+
+/-- Projection to a finite coordinate of the adele ring. -/
+private def finiteAdeleEval (v : Primes(F)) : 𝔸[F] →+* v.adicCompletion F :=
+  (RestrictedProduct.evalRingHom (K(F)) v).comp (RingHom.snd _ _)
+
+/-- Inclusion of a finite completion as the adeles supported at its place. -/
+private def finiteAdeleSingle (v : Primes(F)) : v.adicCompletion F →+ 𝔸[F] where
+  toFun x := (0, RestrictedProduct.single (O(F)) v x)
+  map_zero' := Prod.ext rfl (RestrictedProduct.single_zero (O(F)) v)
+  map_add' x y := Prod.ext (zero_add _).symm (RestrictedProduct.single_add (O(F)) v x y)
+
+/-- Inserting an element at one finite place is continuous for the restricted product topology. -/
+private theorem continuous_finiteAdeleSingle (v : Primes(F)) :
+    Continuous (finiteAdeleSingle F v) := by
+  let S : Set Primes(F) := {v}ᶜ
+  let hS : Filter.cofinite ≤ Filter.principal S := by simp [S, Filter.le_principal_iff]
+  let s (x : v.adicCompletion F) : Πʳ w, [K(F) w, O(F) w]_[Filter.principal S] :=
+    ⟨Pi.single v x, by
+      rw [Filter.eventually_principal]
+      intro w hw
+      exact (Pi.single_eq_of_ne hw x).symm ▸ (O(F) w).zero_mem⟩
+  have hs : Continuous s := RestrictedProduct.continuous_rng_of_principal.mpr (continuous_single v)
+  exact continuous_const.prodMk ((RestrictedProduct.continuous_inclusion hS).comp hs)
+
+/-- Multiplying an adele supported at one finite place uses only that coordinate of the multiplier. -/
+private theorem finiteAdeleSingle_mul (v : Primes(F)) (a : 𝔸[F]) (x : v.adicCompletion F) :
+    finiteAdeleSingle F v (finiteAdeleEval F v a * x) = a * finiteAdeleSingle F v x :=
+  Prod.ext (mul_zero _).symm (RestrictedProduct.mul_single (O(F)) v x a.2)
+
+/-- The rational adelic embedding induces the local embedding on a finite coordinate. -/
+private theorem exists_finiteAdeleEmbedding (v : Primes(F)) (u : Primes(ℚ))
+    (hu : u.asIdeal = v.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))) :
+    ∃ j : u.adicCompletion ℚ →+* v.adicCompletion F,
+      Continuous j ∧ (∀ r : ℚ, j (algebraMap ℚ (u.adicCompletion ℚ) r) =
+        algebraMap F (v.adicCompletion F) (algebraMap ℚ F r)) ∧
+      ∀ a : 𝔸[ℚ], finiteAdeleEval F v (rationalAdeleEmbedding F a) =
+        j (finiteAdeleEval ℚ u a) := by
+  let p := finiteAdeleEval ℚ u
+  let s := finiteAdeleSingle ℚ u
+  let f := (finiteAdeleEval F v).comp (rationalAdeleEmbedding F)
+  have hps (x) : p (s x) = x := RestrictedProduct.single_eq_same (O(ℚ)) u x
+  have hfactor (a) : f a = f (s (p a)) := by
+    apply sub_eq_zero.mp
+    rw [← map_sub]
+    apply (rationalAdeleEmbedding_spec F).2.2.2 u v hu
+    change p (a - s (p a)) = 0
+    rw [map_sub, hps, sub_self]
+  let j : u.adicCompletion ℚ →+* v.adicCompletion F :=
+    { toFun := fun x ↦ f (s x)
+      map_zero' := by rw [map_zero, map_zero]
+      map_one' := by rw [← (map_one p), ← hfactor, map_one]
+      map_add' := fun x y ↦ by rw [map_add, map_add]
+      map_mul' := fun x y ↦ by
+        have hm := finiteAdeleSingle_mul ℚ u (s x) y
+        change s (p (s x) * y) = s x * s y at hm
+        rw [hps] at hm
+        rw [hm, map_mul] }
+  have hj : Continuous j := ((RestrictedProduct.continuous_eval v).comp
+    (continuous_snd.comp (rationalAdeleEmbedding_spec F).1)).comp
+      (continuous_finiteAdeleSingle ℚ u)
+  refine ⟨j, hj, ?_, hfactor⟩
+  intro r
+  have ha := hfactor (algebraMap ℚ 𝔸[ℚ] r)
+  rw [show f (algebraMap ℚ 𝔸[ℚ] r) =
+      algebraMap F (v.adicCompletion F) (algebraMap ℚ F r) from
+    congrArg (finiteAdeleEval F v) ((rationalAdeleEmbedding_spec F).2.1 r)] at ha
+  exact ha.symm
+
 /-- Paper: Example A.3.1.10, p. 558. At a finite place the trace character
 agrees with the standard p-adic character composed with the local field trace. -/
 theorem finiteLocalStandardCharacter_trace (v : Primes(F)) (u : Primes(ℚ))
@@ -3025,7 +3100,49 @@ theorem finiteLocalStandardCharacter_trace (v : Primes(F)) (u : Primes(ℚ))
       Module.Finite (u.adicCompletion ℚ) (v.adicCompletion F) ∧
         ∀ x : v.adicCompletion F, finiteLocalStandardCharacter F v x =
           padicStandardCharacter p.val (Rat.HeightOneSpectrum.adicCompletion.padicEquiv u
-            (Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) x)) := by sorry
+            (Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) x)) := by
+  dsimp only
+  obtain ⟨j, hj, hdiag, hlocal⟩ := exists_finiteAdeleEmbedding F v u hu
+  let := (rationalAdeleEmbedding F).toAlgebra
+  let := j.toAlgebra
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  let p := finiteAdeleEval ℚ u
+  let s := finiteAdeleSingle F v
+  have hp : Surjective p := fun z ↦
+    ⟨finiteAdeleSingle ℚ u z, RestrictedProduct.single_eq_same (O(ℚ)) u z⟩
+  obtain ⟨hfinite, htrace⟩ := trace_of_algebra_projection b p hp (finiteAdeleEval F v) s
+    (fun z ↦ RestrictedProduct.single_eq_same (O(F)) v z) hlocal (finiteAdeleSingle_mul F v)
+  refine ⟨j, hj, hdiag, hfinite, fun x ↦ ?_⟩
+  let e := finiteAdeleSingle ℚ u 1
+  let t := Algebra.trace 𝔸[ℚ] 𝔸[F] (s x)
+  -- The scalar adele supported at u acts as the identity on the summand at v.
+  have he : e • s x = s x := by
+    change rationalAdeleEmbedding F e * s x = s x
+    rw [← finiteAdeleSingle_mul, hlocal]
+    have hp₁ : p e = 1 := RestrictedProduct.single_eq_same (O(ℚ)) u 1
+    change s (j (p e) * x) = s x
+    rw [hp₁, map_one, one_mul]
+  have ht : e * t = t := by
+    change e • Algebra.trace 𝔸[ℚ] 𝔸[F] (s x) = t
+    rw [← map_smul, he]
+  have ht_single : finiteAdeleSingle ℚ u (p t) = t := by
+    have h := finiteAdeleSingle_mul ℚ u t 1
+    change finiteAdeleSingle ℚ u (p t * 1) = t * e at h
+    rwa [mul_one, mul_comm t e, ht] at h
+  change ratAdeleStandardCharacter t = ratLocalCharacter u
+    (Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) x)
+  rw [← htrace x]
+  conv_lhs => rw [← ht_single]
+  change Circle.exp (2 * Real.pi * extensionEmbeddingOfIsReal Rat.isReal_infinitePlace 0) *
+    (∏ᶠ w : Primes(ℚ), ratLocalCharacter w (RestrictedProduct.single (O(ℚ)) u (p t) w)) =
+      ratLocalCharacter u (p t)
+  rw [map_zero, mul_zero, Circle.exp_zero, one_mul, finprod_eq_single _ u]
+  · rw [RestrictedProduct.single_eq_same]
+  · intro w hw
+    rw [RestrictedProduct.single_eq_of_ne (O(ℚ)) _ hw]
+    exact (ratLocalCharacter_eq_one w 0).2 ((O(ℚ) w).zero_mem)
+
+end FiniteLocalTrace
 
 /-- Paper: Example A.3.1.10, p. 558. The local measure is self-dual under
 the local trace character. -/
