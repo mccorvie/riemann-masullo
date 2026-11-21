@@ -137,7 +137,45 @@ theorem smooth_fourier_series_unique {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ 
       (fun N : ℕ ↦ iteratedDeriv k (fun t : ℝ ↦
         ∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ), a m * fourier m (t : AddCircle (1 : ℝ))))
       (iteratedDeriv k φ) atTop (Ico 0 1)) :
-    a = fourierCoeffOn (zero_lt_one : (0 : ℝ) < 1) φ := by sorry
+    a = fourierCoeffOn (zero_lt_one : (0 : ℝ) < 1) φ := by
+  have : Fact (0 < (1 : ℝ)) := ⟨zero_lt_one⟩
+  let F : C(AddCircle (1 : ℝ), ℂ) := ⟨hper.lift, continuous_coinduced_dom.mpr hφ.continuous⟩
+  let S (N : ℕ) : C(AddCircle (1 : ℝ), ℂ) :=
+    ∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ), a m • fourier m
+  -- Every point of the circle has a representative in the interval of uniform convergence.
+  have hS : Tendsto S atTop (𝓝 F) := by
+    rw [ContinuousMap.tendsto_iff_tendstoUniformly, Metric.tendstoUniformly_iff]
+    have h := ha 0
+    simp only [iteratedDeriv_zero, Metric.tendstoUniformlyOn_iff] at h
+    intro ε hε
+    filter_upwards [h ε hε] with N hN t
+    obtain ⟨x, hx, rfl⟩ := AddCircle.eq_coe_Ico t
+    simpa only [F, S, ContinuousMap.coe_mk, Periodic.lift_coe, ContinuousMap.sum_apply,
+      ContinuousMap.smul_apply, smul_eq_mul] using hN x hx
+  funext m
+  -- Taking a coefficient is continuous via the embedding into L² and its Fourier basis.
+  let coeff : C(AddCircle (1 : ℝ), ℂ) →L[ℂ] ℂ :=
+    (innerSL ℂ (fourierBasis m)).comp (ContinuousMap.toLp 2 AddCircle.haarAddCircle ℂ)
+  have hcoeff (f : C(AddCircle (1 : ℝ), ℂ)) : coeff f = fourierCoeff f m := by
+    dsimp only [coeff]
+    rw [ContinuousLinearMap.comp_apply, innerSL_apply_apply, ← fourierBasis.repr_apply_apply,
+      fourierBasis_repr, fourierCoeff_toLp]
+  have hF : coeff F = fourierCoeffOn zero_lt_one φ m := by
+    rw [hcoeff, fourierCoeff_eq_intervalIntegral _ _ 0, fourierCoeffOn_eq_integral]
+    simp [F, Periodic.lift_coe]
+  rw [← hF]
+  refine tendsto_nhds_unique_of_eventuallyEq tendsto_const_nhds
+    (coeff.continuous.continuousAt.tendsto.comp hS) ?_
+  filter_upwards [eventually_ge_atTop m.natAbs] with N hN
+  have hm : m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ) := by
+    rw [Finset.mem_Icc]
+    omega
+  simp only [Function.comp_apply, S, map_sum, map_smul]
+  simp only [hcoeff, fourierCoeff_fourier]
+  rw [Finset.sum_eq_single_of_mem m hm]
+  · simp
+  · intro j _ hj
+    simp [hj]
 
 end Fourier
 
