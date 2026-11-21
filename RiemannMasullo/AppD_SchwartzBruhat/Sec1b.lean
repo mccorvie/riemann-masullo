@@ -485,13 +485,51 @@ generated subgroups ordered by inclusion. -/
 abbrev OpenCompactlyGeneratedSubgroups (G : Type*) [CommGroup G] [TopologicalSpace G] :=
   {H : Subgroup G // IsOpen (H : Set G) ∧ IsCompactlyGeneratedGroup H}
 
+-- Retain `T2Space G` in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (D.1.4.3), p. 758. The open compactly generated subgroups are filtered
 and cover the group. The topology is final for their open inclusions. -/
 theorem openCompactlyGeneratedSubgroups_colimit :
     IsDirectedOrder (OpenCompactlyGeneratedSubgroups G) ∧
       (∀ x : G, ∃ H : OpenCompactlyGeneratedSubgroups G, x ∈ H.val) ∧
       (∀ U : Set G, IsOpen U ↔
-        ∀ H : OpenCompactlyGeneratedSubgroups G, IsOpen (Subtype.val ⁻¹' U : Set H.val)) := by sorry
+        ∀ H : OpenCompactlyGeneratedSubgroups G, IsOpen (Subtype.val ⁻¹' U : Set H.val)) := by
+  let ofCompactNeighborhood (K : Set G) (hK : IsCompact K) (hKnhds : K ∈ 𝓝 (1 : G)) :
+      OpenCompactlyGeneratedSubgroups G := by
+    let H := Subgroup.closure K
+    have hH : IsOpen (H : Set G) := H.isOpen_of_mem_nhds
+      (mem_of_superset hKnhds Subgroup.subset_closure)
+    exact ⟨H, hH, Subtype.val ⁻¹' K,
+      continuous_subtype_val.continuousAt.preimage_mem_nhds hKnhds,
+      (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal.isCompact_preimage hK,
+      Subgroup.closure_preimage_eq_top K⟩
+  have hCover (x : G) : ∃ H : OpenCompactlyGeneratedSubgroups G, x ∈ H.val := by
+    obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (1 : G)
+    exact ⟨ofCompactNeighborhood (insert x K) (hK.insert x)
+      (mem_of_superset hKnhds (subset_insert x K)), Subgroup.subset_closure (mem_insert x K)⟩
+  refine ⟨⟨?_⟩, hCover, ?_⟩
+  · intro H J
+    obtain ⟨A, hAnhds, hA, hAgen⟩ := H.property.2
+    obtain ⟨B, _, hB, hBgen⟩ := J.property.2
+    have hAnhds' : H.val.subtype '' A ∈ 𝓝 (1 : G) :=
+      H.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hAnhds
+    let L := ofCompactNeighborhood (H.val.subtype '' A ∪ J.val.subtype '' B)
+      ((hA.image continuous_subtype_val).union (hB.image continuous_subtype_val))
+      (mem_of_superset hAnhds' subset_union_left)
+    have hL : L.val = H.val ⊔ J.val := by
+      change Subgroup.closure (H.val.subtype '' A ∪ J.val.subtype '' B) = _
+      rw [Subgroup.closure_union, ← MonoidHom.map_closure, ← MonoidHom.map_closure,
+        hAgen, hBgen, Subgroup.map_top, Subgroup.map_top, Subgroup.range_subtype,
+        Subgroup.range_subtype]
+    exact ⟨L, le_sup_left.trans hL.ge, le_sup_right.trans hL.ge⟩
+  · intro U
+    refine ⟨fun hU H ↦ hU.preimage continuous_subtype_val, ?_⟩
+    intro hU
+    refine isOpen_iff_mem_nhds.mpr fun x hx ↦ ?_
+    obtain ⟨H, hxH⟩ := hCover x
+    have hImage := H.property.1.isOpenEmbedding_subtypeVal.isOpenMap _ (hU H)
+    exact mem_of_superset (hImage.mem_nhds ⟨⟨x, hxH⟩, hx, rfl⟩)
+      (fun _ ⟨_, hy, hEq⟩ ↦ hEq ▸ hy)
 
 /-- Paper: Lemma D.1.4.4, p. 758. Evaluation on the open compactly generated
 subgroups of the dual identifies the group with their duals' inverse limit.
