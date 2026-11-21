@@ -370,7 +370,32 @@ have the same singular values at every index up to the Hilbert space dimension.
 Deviation: The singular values use the approximation-number definition with zero-based indices. -/
 theorem approximationNumber_adjoint (A : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber A n = approximationNumber A.adjoint n := by sorry
+    approximationNumber A n = approximationNumber A.adjoint n := by
+  clear hA hn
+  have rank_adjoint_le (S : H →L[ℂ] H)
+      (hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal)) :
+      Module.rank ℂ S.adjoint.toLinearMap.range ≤ (n : Cardinal) := by
+    let V := S.toLinearMap.range
+    have : FiniteDimensional ℂ V :=
+      Module.rank_lt_aleph0_iff.mp (hS.trans_lt Cardinal.natCast_lt_aleph0)
+    have : CompleteSpace V := FiniteDimensional.completeSpace ℂ V
+    -- Factoring S through its range gives a factorization of its adjoint through V.
+    have hfac : V.subtypeL.comp S.rangeRestrict = S := rfl
+    have hadj : S.adjoint = S.rangeRestrict.adjoint.comp V.subtypeL.adjoint := by
+      rw [← ContinuousLinearMap.adjoint_comp, hfac]
+    rw [hadj]
+    exact (LinearMap.rank_comp_le_left _ _).trans
+      (S.rangeRestrict.adjoint.toLinearMap.rank_le_domain.trans hS)
+  let errors (T : H →L[ℂ] H) : Set ℝ :=
+    {r | ∃ S : H →L[ℂ] H, Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}
+  have errors_subset (T : H →L[ℂ] H) : errors T ⊆ errors T.adjoint := by
+    rintro _ ⟨S, hS, rfl⟩
+    refine ⟨S.adjoint, rank_adjoint_le S hS, ?_⟩
+    rw [← ContinuousLinearMap.adjoint.map_sub, LinearIsometryEquiv.norm_map]
+  change sInf (errors A) = sInf (errors A.adjoint)
+  apply congrArg sInf
+  exact Set.Subset.antisymm (errors_subset A)
+    (by simpa only [ContinuousLinearMap.adjoint_adjoint] using errors_subset A.adjoint)
 
 /-- Paper: Lemma C.3.5.3(2), p. 700. The first singular value of a compact
 endomorphism equals its operator norm.
