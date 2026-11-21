@@ -7,6 +7,7 @@ public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
 import Mathlib.Analysis.Normed.Module.Dual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
@@ -2757,6 +2758,195 @@ strong dual is nuclear. -/
 theorem isNuclearTVS_strongDual_iff (hE : IsFrechetTVS E) :
     IsNuclearTVS.{v, u} (StrongDual ℂ E) ↔ IsNuclearTVS.{v, u} E := by sorry
 
+/-- A linear map from a final locally convex topology to a polynormable space is
+continuous if its composites with the defining maps are continuous. -/
+private theorem continuous_of_locallyConvexFinalTopology
+    {I : Type*} {X : I → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
+    [∀ i, TopologicalSpace (X i)] {D G : Type*} [AddCommGroup D] [Module ℂ D]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [PolynormableSpace ℂ G]
+    (j : ∀ i, X i →ₗ[ℂ] D) (g : D →ₗ[ℂ] G) (hg : ∀ i, Continuous (g ∘ j i)) :
+    letI := locallyConvexFinalTopology j
+    Continuous g := by
+  let := locallyConvexFinalTopology j
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ j i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let := hD.isTopologicalAddGroup
+  exact (PolynormableSpace.withSeminorms ℂ G).continuous_of_continuous_comp g fun p ↦
+    hD.continuous_seminorm ⟨p.val.comp g, fun i ↦ p.property.comp (hg i)⟩
+
+/-- Each coordinate projection is continuous for the final locally convex
+topology on the direct sum. -/
+private theorem continuous_natDirectSum_component {X : ℕ → Type*}
+    [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)] [∀ i, TopologicalSpace (X i)]
+    [∀ i, PolynormableSpace ℂ (X i)] (i : ℕ) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    Continuous (DirectSum.component ℂ ℕ X i) := by
+  apply continuous_of_locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+  intro k
+  change Continuous ((DirectSum.component ℂ ℕ X i).comp (DirectSum.lof ℂ ℕ X k))
+  by_cases h : k = i
+  · subst k
+    simpa only [DirectSum.component_comp_lof_same, LinearMap.id_coe] using
+      (continuous_id : Continuous (id : X i → X i))
+  · rw [DirectSum.component_comp_lof, dite_eq_right h]
+    exact continuous_const
+
+open scoped NNReal Pointwise in
+/-- The tensor comparison for a countable locally convex direct sum with a normed
+second factor is a homeomorphism if the comparisons on the summands are homeomorphisms.
+Geometric weights combine the seminorm bounds on the summands. -/
+private theorem natDirectSum_tensorComparison {X : ℕ → Type u} {F : Type*}
+    [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)] [∀ i, TopologicalSpace (X i)]
+    [∀ i, PolynormableSpace ℂ (X i)] [∀ i, T2Space (X i)]
+    [NormedAddCommGroup F] [NormedSpace ℂ F]
+    (hX : ∀ i, @IsHomeomorph (ProjectiveTensor (X i) F) (InjectiveTensor (X i) F) _ _ id) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+    T2Space (⨁ i, X i) →
+    @IsHomeomorph (ProjectiveTensor (⨁ i, X i) F) (InjectiveTensor (⨁ i, X i) F) _ _ id := by
+  classical
+  let D := ⨁ i, X i
+  let j := DirectSum.lof ℂ ℕ X
+  let : TopologicalSpace D := locallyConvexFinalTopology j
+  intro hT2
+  let : T2Space D := hT2
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ j i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  let : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+  let pr := DirectSum.component ℂ ℕ X
+  have hpr (i : ℕ) : Continuous (pr i) := continuous_natDirectSum_component i
+  let prL (i : ℕ) : D →L[ℂ] X i := ⟨pr i, hpr i⟩
+  have hj (i : ℕ) : Continuous (j i) := by
+    let := PolynormableSpace.isTopologicalAddGroup ℂ (X i)
+    exact hD.continuous_of_continuous_comp (j i) fun p ↦ p.property i
+  let jL (i : ℕ) : X i →L[ℂ] D := ⟨j i, hj i⟩
+  let hP := withGeneratingSeminorms_spec (D ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (D ⊗[ℂ] F) // ContinuousAt
+      (fun z : D × F ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+  have hback : Continuous (show InjectiveTensor D F → ProjectiveTensor D F from id) := by
+    refine hP.continuous_of_continuous_comp
+      (LinearMap.id : InjectiveTensor D F →ₗ[ℂ] ProjectiveTensor D F) fun ⟨r, hr⟩ ↦ ?_
+    let rStage (i : ℕ) : Seminorm ℂ (InjectiveTensor (X i) F) := r.comp ((j i).rTensor F)
+    have hrStage (i : ℕ) : Continuous (rStage i) :=
+      (hX i).isQuotientMap.continuous_iff.mpr
+        ((hP.continuous_seminorm ⟨r, hr⟩).comp
+          (projectiveTensorMap_continuous (jL i) (ContinuousLinearMap.id ℂ F)))
+    choose U V C _ hbound using fun i ↦ exists_injectiveSeminorm_bound (X := X i) univ
+      univ_mem (rStage i) (hrStage i)
+    choose d hd hball using fun i ↦ Metric.mem_nhds_iff.mp (V i).property
+    -- Shrink each first-factor neighborhood to absorb its constant and ball radius.
+    let weight (i : ℕ) : ℝ := (1 / 2) ^ i
+    let scale (i : ℕ) := weight i * d i / ((C i : ℝ) + 1)
+    have hscale (i : ℕ) : 0 < scale i :=
+      div_pos (mul_pos (by dsimp [weight]; positivity) (hd i)) (by positivity)
+    have hscaled (i : ℕ) : ((scale i : ℝ) : ℂ) • (U i).val ∈ 𝓝 (0 : X i) := by
+      let := PolynormableSpace.continuousSMul ℂ (X i)
+      simpa only [smul_zero] using smul_mem_nhds_smul₀ (c := (scale i : ℂ))
+        (by exact_mod_cast (hscale i).ne') (U i).property
+    choose q hq hqsub using fun i ↦
+      (PolynormableSpace.hasBasis_zero_ball ℂ (X i)).mem_iff.mp (hscaled i)
+    let Q := directSumSeminorm q
+    have hQ : Continuous Q := hD.continuous_seminorm ⟨Q, fun i ↦ by
+      exact (hq i).congr fun x ↦ (directSumSeminorm_lof q i x).symm⟩
+    let A : {A : Set D // A ∈ 𝓝 0} := ⟨Q.ball 0 1, Q.ball_mem_nhds hQ one_pos⟩
+    let B : {B : Set F // B ∈ 𝓝 0} := ⟨Metric.closedBall 0 1,
+      Metric.closedBall_mem_nhds _ one_pos⟩
+    have hproj (i : ℕ) (x : D) (hx : x ∈ A.val) :
+        pr i x ∈ ((scale i : ℝ) : ℂ) • (U i).val := by
+      apply hqsub i
+      rw [Seminorm.mem_ball_zero]
+      refine lt_of_le_of_lt ?_ ((Q.mem_ball_zero).mp hx)
+      change q i (x i) ≤ directSumSeminorm q x
+      simpa only [Finset.sum_singleton] using sum_le_directSumSeminorm q x {i}
+    have hstage (i : ℕ) (z : D ⊗[ℂ] F) :
+        rStage i ((pr i).rTensor F z) ≤ weight i * injectiveTensorSeminorm A B z := by
+      refine (hbound i _).trans ?_
+      have hε : injectiveTensorSeminorm (U i) (V i) ((pr i).rTensor F z) ≤
+          (scale i * (d i)⁻¹) * injectiveTensorSeminorm A B z := by
+        rw [(injectiveSeminorm_eq_ciSup (U i) (V i) _).2]
+        have : Nonempty (StrongDual.polar ℂ (U i).val) :=
+          (StrongDual.polar_nonempty ℂ _).to_subtype
+        have : Nonempty (StrongDual.polar ℂ (V i).val) :=
+          (StrongDual.polar_nonempty ℂ _).to_subtype
+        apply ciSup_le
+        rintro ⟨φ, ψ⟩
+        have heq : (tensorDualForm φ.val ψ.val).comp ((pr i).rTensor F) =
+            tensorDualForm (φ.val.comp (prL i)) ψ.val := by
+          apply TensorProduct.ext'
+          intro x y
+          simp [tensorDualForm_tmul, prL]
+        rw [show tensorDualForm φ.val ψ.val ((pr i).rTensor F z) =
+          tensorDualForm (φ.val.comp (prL i)) ψ.val z from DFunLike.congr_fun heq z]
+        refine norm_tensorDualForm_le_mul_injectiveSeminorm A B _ _ _
+          (hscale i) (inv_pos.mpr (hd i)) ?_ ?_
+        · intro x hx
+          obtain ⟨y, hy, hxy⟩ := hproj i x hx
+          change ‖φ.val (pr i x)‖ ≤ scale i
+          rw [← hxy, map_smul, norm_smul, Complex.norm_real, Real.norm_of_nonneg (hscale i).le]
+          exact mul_le_of_le_one_right (hscale i).le
+            ((StrongDual.mem_polar_iff ℂ _).mp φ.property _ hy)
+        · have hψ : ψ.val ∈ StrongDual.polar ℂ (Metric.ball 0 (d i)) :=
+            (topDualPairing ℂ F).flip.polar_antitone (hball i) ψ.property
+          rw [NormedSpace.polar_ball (hd i), Metric.mem_closedBall, dist_zero_right] at hψ
+          intro y hy
+          have hy' : ‖y‖ ≤ 1 := by
+            simpa only [B, Metric.mem_closedBall, dist_zero_right] using hy
+          exact (ψ.val.le_opNorm y).trans
+            ((mul_le_of_le_one_right (norm_nonneg _) hy').trans hψ)
+      calc
+        _ ≤ (C i : ℝ) * ((scale i * (d i)⁻¹) * injectiveTensorSeminorm A B z) :=
+          mul_le_mul_of_nonneg_left hε (C i).coe_nonneg
+        _ ≤ weight i * injectiveTensorSeminorm A B z := by
+          rw [← mul_assoc]
+          refine mul_le_mul_of_nonneg_right ?_ (apply_nonneg _ _)
+          have heq : (C i : ℝ) * (scale i * (d i)⁻¹) =
+              ((C i : ℝ) / ((C i : ℝ) + 1)) * weight i := by
+            have hC : 0 < (C i : ℝ) + 1 := by positivity
+            dsimp [scale]
+            field_simp [(hd i).ne', hC.ne']
+          rw [heq]
+          exact mul_le_of_le_one_left (by dsimp [weight]; positivity)
+            ((div_le_one (by positivity)).mpr (by linarith))
+    let e := TensorProduct.directSumLeft ℂ ℂ X F
+    have he (i : ℕ) :
+        (DirectSum.component ℂ ℕ (fun i ↦ X i ⊗[ℂ] F) i).comp e.toLinearMap =
+          (pr i).rTensor F := by
+      apply TensorProduct.ext'
+      intro x y
+      change e (x ⊗ₜ[ℂ] y) i = (pr i).rTensor F (x ⊗ₜ[ℂ] y)
+      rw [LinearMap.rTensor_tmul]
+      exact TensorProduct.directSumLeft_tmul ℂ ℂ x y i
+    have hrbound (z : D ⊗[ℂ] F) : r z ≤ 2 * injectiveTensorSeminorm A B z := by
+      let s := (e z).support
+      have hs (i : ℕ) : e.symm (DirectSum.of (fun i ↦ X i ⊗[ℂ] F) i (e z i)) =
+          (j i).rTensor F ((pr i).rTensor F z) :=
+        (TensorProduct.directSumLeft_symm_of ℂ ℂ (e z i)).trans
+          (congrArg ((j i).rTensor F) (DFunLike.congr_fun (he i) z))
+      have hsum : (∑ i ∈ s, (j i).rTensor F ((pr i).rTensor F z)) = z := by
+        simpa only [map_sum, LinearEquiv.symm_apply_apply, hs] using
+          congrArg e.symm (DirectSum.sum_support_of (e z))
+      calc
+        r z = r (∑ i ∈ s, (j i).rTensor F ((pr i).rTensor F z)) := congrArg r hsum.symm
+        _ ≤ ∑ i ∈ s, rStage i ((pr i).rTensor F z) :=
+          Finset.le_sum_of_subadditive r (map_zero r).le (map_add_le_add r) _ _
+        _ ≤ ∑ i ∈ s, weight i * injectiveTensorSeminorm A B z :=
+          Finset.sum_le_sum fun i _ ↦ hstage i z
+        _ ≤ 2 * injectiveTensorSeminorm A B z := by
+          rw [← Finset.sum_mul]
+          refine mul_le_mul_of_nonneg_right ?_ (apply_nonneg _ _)
+          exact tsum_geometric_two ▸ summable_geometric_two.sum_le_tsum s
+            (fun i _ ↦ by dsimp [weight]; positivity)
+    let hI := withGeneratingSeminorms_spec (D ⊗[ℂ] F)
+      (fun UV : {U : Set D // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+        injectiveTensorSeminorm UV.1 UV.2)
+    change @Continuous (InjectiveTensor D F) ℝ _ _ r
+    exact Seminorm.continuous_of_le (q := (2 : ℝ≥0) • injectiveTensorSeminorm A B)
+      ((hI.continuous_seminorm (A, B)).const_smul (2 : ℝ≥0)) hrbound
+  exact (⟨Equiv.refl (D ⊗[ℂ] F), (uniformContinuous_tensorComparison D F).continuous, hback⟩ :
+    ProjectiveTensor D F ≃ₜ InjectiveTensor D F).isHomeomorph
+
+-- The final topology makes the canonical stage maps continuous by construction.
+set_option linter.unusedVariables false in
 /-- Paper: Lemma C.2.4.12(1), p. 689. A Hausdorff locally convex inductive limit
 of a sequence of nuclear spaces is nuclear. The transition maps may have kernels. -/
 theorem isNuclearTVS_directLimit {X : ℕ → Type*}
@@ -2765,7 +2955,86 @@ theorem isNuclearTVS_directLimit {X : ℕ → Type*}
     (hf : ∀ i j h, Continuous (f i j h)) (hX : ∀ i, IsNuclearTVS.{v} (X i))
     (h : @T2Space _ (lcDirectLimitTopology f)) :
     letI := lcDirectLimitTopology f
-    IsNuclearTVS.{v} (Module.DirectLimit X f) := by sorry
+    IsNuclearTVS.{v} (Module.DirectLimit X f) := by
+  let D := ⨁ i, X i
+  let L := Module.DirectLimit X f
+  let j := DirectSum.lof ℂ ℕ X
+  let stage := Module.DirectLimit.of ℂ ℕ X f
+  let : TopologicalSpace D := locallyConvexFinalTopology j
+  let : TopologicalSpace L := lcDirectLimitTopology f
+  let : T2Space L := h
+  let : ∀ i, PolynormableSpace ℂ (X i) := fun i ↦ (hX i).2.1
+  let : ∀ i, T2Space (X i) := fun i ↦ (hX i).1
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ j i)} → Seminorm ℂ D) := ⟨rfl⟩
+  have hL : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ L // ∀ i, Continuous (p ∘ stage i)} → Seminorm ℂ L) := ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  let : PolynormableSpace ℂ L := hL.toPolynormableSpace
+  let : T2Space D := by
+    refine ⟨fun x y hxy ↦ ?_⟩
+    obtain ⟨i, hi⟩ : ∃ i, x i ≠ y i := by
+      by_contra! he
+      exact hxy (DFinsupp.ext he)
+    exact separated_by_continuous (continuous_natDirectSum_component i) hi
+  have hN : IsNuclearTVS.{v} D := by
+    apply (isNuclearTVS_iff_completedTensor_banach D).mpr
+    intro F _ _ _
+    let : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+    exact (isHomeomorph_completedTensorComparison_iff D F).mpr
+      (natDirectSum_tensorComparison (fun i ↦
+        (hX i).2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance)
+        inferInstance)
+  -- Present the limit as the quotient of the direct sum by the kernel of the canonical map.
+  let q : D →ₗ[ℂ] L := DirectSum.toModule ℂ ℕ L stage
+  have hqj (i : ℕ) (x : X i) : q (j i x) = stage i x := DirectSum.toModule_lof ℂ i x
+  have hq : Function.Surjective q := by
+    intro z
+    obtain ⟨i, x, rfl⟩ := Module.DirectLimit.exists_of z
+    exact ⟨j i x, hqj i x⟩
+  let K := q.ker
+  let Q := D ⧸ K
+  let : PolynormableSpace ℂ Q := polynormableSpace_quotient K
+  let e := q.quotKerEquivOfSurjective hq
+  have hj (i : ℕ) : Continuous (j i) := by
+    let := PolynormableSpace.isTopologicalAddGroup ℂ (X i)
+    exact hD.continuous_of_continuous_comp (j i) fun p ↦ p.property i
+  have hstage (i : ℕ) : Continuous (stage i) := by
+    let := PolynormableSpace.isTopologicalAddGroup ℂ (X i)
+    exact hL.continuous_of_continuous_comp (stage i) fun p ↦ p.property i
+  have he : Continuous e := by
+    apply K.isOpenQuotientMap_mkQ.isQuotientMap.continuous_iff.mpr
+    change Continuous q
+    exact continuous_of_locallyConvexFinalTopology j q fun i ↦
+      (hstage i).congr fun x ↦ (hqj i x).symm
+  have hes : Continuous e.symm := by
+    apply continuous_of_locallyConvexFinalTopology stage e.symm.toLinearMap
+    intro i
+    refine (K.mkQL.continuous.comp (hj i)).congr fun x ↦ ?_
+    change K.mkQ (j i x) = e.symm (stage i x)
+    rw [← hqj]
+    exact (q.quotKerEquivOfSurjective_symm_apply hq (j i x)).symm
+  let eL : Q ≃L[ℂ] L := ⟨e, he, hes⟩
+  let : T2Space Q := eL.symm.toHomeomorph.t2Space
+  have hQ : IsNuclearTVS.{v} Q := isNuclearTVS_quotient hN K
+  refine ⟨h, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  have hbackQ : Continuous (show InjectiveTensor Q F → ProjectiveTensor Q F from id) := by
+    let eQ := (hQ.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+    exact eQ.continuous_symm.congr fun z ↦ eQ.apply_symm_apply z
+  let forward := eL.toContinuousLinearMap
+  let backward := eL.symm.toContinuousLinearMap
+  let idF := ContinuousLinearMap.id ℂ F
+  have hback : Continuous (show InjectiveTensor L F → ProjectiveTensor L F from id) := by
+    refine ((projectiveTensorMap_continuous forward idF).comp hbackQ |>.comp
+      (injectiveTensorMap_continuous backward idF)).congr fun z ↦ ?_
+    change L ⊗[ℂ] F at z
+    change forward.toLinearMap.rTensor F (backward.toLinearMap.rTensor F z) = z
+    rw [← LinearMap.rTensor_comp_apply, show forward.toLinearMap.comp backward.toLinearMap =
+      LinearMap.id from LinearMap.ext e.apply_symm_apply, LinearMap.rTensor_id_apply]
+  exact (⟨Equiv.refl (L ⊗[ℂ] F), (uniformContinuous_tensorComparison L F).continuous, hback⟩ :
+    ProjectiveTensor L F ≃ₜ InjectiveTensor L F).isHomeomorph
 
 /-- Paper: Lemma C.2.4.12(2), p. 689. The projective limit of nuclear spaces
 is nuclear, with the topology on compatible families induced from the product. -/
