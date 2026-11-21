@@ -2787,10 +2787,27 @@ theorem finiteProduct_tailSchwartz_finestTopology (S T : Finset (Places(F))) :
     (inferInstance : TopologicalSpace ℬ(FiniteAdeleTail F T)) =
       (inferInstance : TopologicalSpace (FinestLocallyConvex ℬ(FiniteAdeleTail F T))) := by sorry
 
+/-- A countable-dimensional space with the finest locally convex topology is strict LF,
+using finite spans of a basis. -/
+private theorem strictLF_of_countableRank_of_finestTopology
+    (E : Type*) [AddCommGroup E] [Module ℂ E] [t : TopologicalSpace E]
+    (hRank : Module.rank ℂ E ≤ ℵ₀)
+    (hTop : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E))) :
+    IsStrictLFSpace E := by
+  let b := Module.Free.chooseBasis ℂ E
+  let : Countable (Module.Free.ChooseBasisIndex ℂ E) :=
+    Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hRank)
+  exact Eq.mpr (congrArg (fun t' ↦ @IsStrictLFSpace E _ _ t') hTop)
+    (finestLocallyConvex_strictLF_of_countable_span E (countable_range b) b.span_eq)
+
 /-- Paper: Proposition 2.1.2.8(1), p. 65. Both Schwartz–Bruhat spaces are strict LF-spaces.
 Their bornological property is stated in `schwartzBruhat_bornological`. -/
 theorem finiteProduct_tailSchwartz_strictLF (S T : Finset (Places(F))) :
-    IsStrictLFSpace ℬ((FinitePlaceProduct F S)) ∧ IsStrictLFSpace ℬ(FiniteAdeleTail F T) := by sorry
+    IsStrictLFSpace ℬ((FinitePlaceProduct F S)) ∧ IsStrictLFSpace ℬ(FiniteAdeleTail F T) := by
+  have hRank := finiteProduct_tailSchwartz_countableRank F S T
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨strictLF_of_countableRank_of_finestTopology ℬ((FinitePlaceProduct F S)) hRank.1 hTop.1,
+    strictLF_of_countableRank_of_finestTopology ℬ(FiniteAdeleTail F T) hRank.2 hTop.2⟩
 
 /-- Paper: Proposition 2.1.2.8(2), p. 65. The finite-product and tail Schwartz–Bruhat
 spaces are complete. -/
