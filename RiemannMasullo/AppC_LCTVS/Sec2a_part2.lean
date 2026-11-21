@@ -2208,11 +2208,188 @@ theorem injectiveTensor_finiteProducts [Finite I] [Finite J] :
     IsHomeomorph (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
       injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by sorry
 
+/-- Every functional in the polar of a product zero-neighborhood is determined by the
+same finite set of coordinates. -/
+private theorem product_polar_eq_sum_single {K : Type*} (X : K → Type*)
+    [DecidableEq K] [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)]
+    [∀ k, TopologicalSpace (X k)] (U : {U : Set (∀ k, X k) // U ∈ 𝓝 0}) :
+    ∃ s : Finset K, ∀ φ ∈ StrongDual.polar ℂ U.val, ∀ x : ∀ k, X k,
+      (∑ k ∈ s, φ (Pi.single k (x k))) = φ x := by
+  have hU : U.val ∈ Filter.pi (fun k ↦ 𝓝 ((0 : ∀ k, X k) k)) := by
+    simpa only [nhds_pi] using U.property
+  obtain ⟨s, W, hW, hWU⟩ := Filter.mem_pi'.mp hU
+  refine ⟨s, fun φ hφ x ↦ ?_⟩
+  let y : ∀ k, X k := ∑ k ∈ s, Pi.single k (x k)
+  have hy : ∀ k ∈ s, (x - y) k = 0 := by
+    intro k hk
+    dsimp only [Pi.sub_apply, y]
+    rw [Finset.sum_apply, Finset.sum_eq_single_of_mem k hk, Pi.single_eq_same, sub_self]
+    exact fun i _ hi ↦ Pi.single_eq_of_ne hi.symm _
+  have hzero : φ (x - y) = 0 := by
+    by_contra hne
+    let c : ℂ := 2 / φ (x - y)
+    have hmem : c • (x - y) ∈ U.val := hWU fun k hk ↦ by
+      change c • (x - y) k ∈ W k
+      rw [hy k hk, smul_zero]
+      exact mem_of_mem_nhds (hW k)
+    have hle := (StrongDual.mem_polar_iff ℂ _).mp hφ _ hmem
+    rw [map_smul, smul_eq_mul, div_mul_cancel₀ _ hne] at hle
+    norm_num [Complex.norm_two] at hle
+  rw [map_sub, sub_eq_zero] at hzero
+  rw [← map_sum]
+  exact hzero.symm
+
+/-- The injective topology on the algebraic tensor product of products is induced by
+the pairwise coordinate projections. -/
+private theorem injectiveTensor_products_isUniformInducing :
+    IsUniformInducing (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
+      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by
+  classical
+  let A := InjectiveTensor (∀ i, E i) (∀ j, F j)
+  let B (ij : I × J) := InjectiveTensor (E ij.1) (F ij.2)
+  let P : A →ₗ[ℂ] (∀ ij, B ij) := LinearMap.pi fun ij ↦
+    injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2)
+  change IsUniformInducing P
+  apply AddMonoidHom.isUniformInducing_of_isInducing
+  rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+  have hP : Continuous P := by
+    apply continuous_pi
+    intro ij
+    exact injectiveTensorMap_continuous
+      (ContinuousLinearMap.proj ij.1 : (∀ i, E i) →L[ℂ] E ij.1)
+      (ContinuousLinearMap.proj ij.2 : (∀ j, F j) →L[ℂ] F ij.2)
+  refine le_antisymm ((hP.tendsto' 0 0 (map_zero P)).le_comap) ?_
+  let Neighborhoods := {U : Set (∀ i, E i) // U ∈ 𝓝 0} × {V : Set (∀ j, F j) // V ∈ 𝓝 0}
+  let p : SeminormFamily ℂ A Neighborhoods := fun UV ↦ injectiveTensorSeminorm UV.1 UV.2
+  have hp : WithSeminorms p := withGeneratingSeminorms_spec _ _
+  rw [hp.hasBasis_zero_ball.ge_iff]
+  rintro ⟨S, r⟩ hr
+  have htest (UV : Neighborhoods) : {z : A | p UV z < r} ∈ comap P (𝓝 0) := by
+    obtain ⟨s, hs⟩ := product_polar_eq_sum_single E UV.1
+    obtain ⟨t, ht⟩ := product_polar_eq_sum_single F UV.2
+    let L (ij : I × J) : B ij →ₗ[ℂ] A :=
+      injectiveTensorMap (LinearMap.single ℂ E ij.1) (LinearMap.single ℂ F ij.2)
+    let lift (w : ∀ ij, B ij) : A := ∑ ij ∈ s ×ˢ t, L ij (w ij)
+    have hL (ij : I × J) : Continuous (L ij) :=
+      injectiveTensorMap_continuous (ContinuousLinearMap.single ℂ E ij.1)
+        (ContinuousLinearMap.single ℂ F ij.2)
+    have hlift : Continuous lift :=
+      continuous_finsetSum _ fun ij _ ↦ (hL ij).comp (continuous_apply ij)
+    have hzero : lift 0 = 0 := by simp [lift]
+    have hbound (z : A) : p UV z ≤ p UV (lift (P z)) := by
+      refine (injectiveTensorSeminorm_le_iff UV.1 UV.2 z _).mpr fun φ hφ ψ hψ ↦ ?_
+      let f := tensorDualForm φ ψ
+      let A₀ := (∀ i, E i) ⊗[ℂ] (∀ j, F j)
+      let project (ij : I × J) : A₀ →ₗ[ℂ] E ij.1 ⊗[ℂ] F ij.2 :=
+        TensorProduct.map (LinearMap.proj ij.1) (LinearMap.proj ij.2)
+      let insert (ij : I × J) : (E ij.1 ⊗[ℂ] F ij.2) →ₗ[ℂ] A₀ :=
+        TensorProduct.map (LinearMap.single ℂ E ij.1) (LinearMap.single ℂ F ij.2)
+      have hf : (∑ ij ∈ s ×ˢ t, f.comp ((insert ij).comp (project ij))) = f := by
+        apply TensorProduct.ext'
+        intro x y
+        rw [LinearMap.sum_apply]
+        change (∑ ij ∈ s ×ˢ t, φ (Pi.single ij.1 (x ij.1)) * ψ (Pi.single ij.2 (y ij.2))) =
+          φ x * ψ y
+        rw [Finset.sum_product]
+        simp_rw [← Finset.mul_sum]
+        rw [← Finset.sum_mul, hs φ hφ x, ht ψ hψ y]
+      have heval : f (lift (P z)) = f z := by
+        let z₀ : A₀ := z
+        change f (∑ ij ∈ s ×ˢ t, insert ij (project ij z₀)) = f z₀
+        rw [map_sum]
+        have hfz := DFunLike.congr_fun hf z₀
+        rw [LinearMap.sum_apply] at hfz
+        exact hfz
+      change ‖f z‖ ≤ _
+      rw [← heval]
+      exact norm_tensorDualForm_le_injectiveTensorSeminorm UV.1 UV.2 ⟨φ, hφ⟩ ⟨ψ, hψ⟩ _
+    refine mem_comap.mpr ⟨lift ⁻¹' (p UV).ball 0 r,
+      (hlift.tendsto' 0 0 hzero).eventually
+        ((p UV).ball_mem_nhds (hp.continuous_seminorm UV) hr), ?_⟩
+    exact fun z hz ↦ (hbound z).trans_lt ((p UV).mem_ball_zero.mp hz)
+  refine mem_of_superset ((Filter.biInter_finset_mem S).mpr fun UV _ ↦ htest UV) ?_
+  exact fun z hz ↦ (S.sup p).mem_ball_zero.mpr
+    (Seminorm.finset_sup_apply_lt hr fun UV hUV ↦ (mem_iInter₂.mp hz UV hUV : p UV z < r))
+
+omit [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
+  [∀ j, PolynormableSpace ℂ (F j)] [∀ j, T2Space (F j)] in
+/-- A tensor can realize any prescribed finite set of pairwise tensor coordinates, so
+the coordinate map has dense range in the product. -/
+private theorem injectiveTensor_products_denseRange :
+    DenseRange (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
+      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by
+  classical
+  intro w
+  refine mem_closure_iff_nhds.mpr fun U hU ↦ ?_
+  rw [nhds_pi] at hU
+  obtain ⟨s, W, hW, hWU⟩ := Filter.mem_pi'.mp hU
+  let A := (∀ i, E i) ⊗[ℂ] (∀ j, F j)
+  let project (ij : I × J) : A →ₗ[ℂ] E ij.1 ⊗[ℂ] F ij.2 :=
+    TensorProduct.map (LinearMap.proj ij.1) (LinearMap.proj ij.2)
+  let insert (ij : I × J) : (E ij.1 ⊗[ℂ] F ij.2) →ₗ[ℂ] A :=
+    TensorProduct.map (LinearMap.single ℂ E ij.1) (LinearMap.single ℂ F ij.2)
+  let w₀ (ij : I × J) : E ij.1 ⊗[ℂ] F ij.2 := w ij
+  let z : A := ∑ ij ∈ s, insert ij (w₀ ij)
+  have hcompose (ij kl : I × J) : project ij (insert kl (w₀ kl)) =
+      TensorProduct.map (LinearMap.proj ij.1 ∘ₗ LinearMap.single ℂ E kl.1)
+        (LinearMap.proj ij.2 ∘ₗ LinearMap.single ℂ F kl.2) (w₀ kl) :=
+    TensorProduct.map_map (LinearMap.proj ij.1 : (∀ i, E i) →ₗ[ℂ] E ij.1)
+      (LinearMap.proj ij.2 : (∀ j, F j) →ₗ[ℂ] F ij.2)
+      (LinearMap.single ℂ E kl.1) (LinearMap.single ℂ F kl.2) (w₀ kl)
+  have hmatch (ij : I × J) (hij : ij ∈ s) : project ij z = w₀ ij := by
+    simp only [z, map_sum]
+    rw [Finset.sum_eq_single_of_mem ij hij]
+    · rw [hcompose, LinearMap.proj_comp_single_same, LinearMap.proj_comp_single_same,
+        TensorProduct.map_id, LinearMap.id_apply]
+    · intro kl _ hne
+      rw [hcompose]
+      rcases ne_or_eq ij.1 kl.1 with h | h
+      · rw [LinearMap.proj_comp_single_ne _ _ _ _ h, TensorProduct.map_zero_left,
+          LinearMap.zero_apply]
+      · have h' : ij.2 ≠ kl.2 := fun he ↦ hne (Prod.ext h.symm he.symm)
+        rw [LinearMap.proj_comp_single_ne _ _ _ _ h', TensorProduct.map_zero_right,
+          LinearMap.zero_apply]
+  refine ⟨fun ij ↦ project ij z, hWU (fun ij hij ↦ ?_), ⟨z, rfl⟩⟩
+  change project ij z ∈ W ij
+  have hw := mem_of_mem_nhds (hW ij)
+  rw [hmatch ij hij]
+  exact hw
+
 /-- Paper: Lemma C.2.3.6(2), p. 678. On completed injective tensor products the
 coordinate map is a linear topological isomorphism for arbitrary products. -/
 theorem completedInjectiveTensor_products :
     IsHomeomorph (fun (z : Completion (InjectiveTensor (∀ i, E i) (∀ j, F j))) (ij : I × J) ↦
-      Completion.map (injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2)) z) := by sorry
+      Completion.map (injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2)) z) := by
+  let P (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) :=
+    injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z
+  let C (w : ∀ ij : I × J, InjectiveTensor (E ij.1) (F ij.2)) (ij : I × J) :=
+    (w ij : Completion (InjectiveTensor (E ij.1) (F ij.2)))
+  have hP : IsUniformInducing P := injectiveTensor_products_isUniformInducing E F
+  have hC : IsUniformInducing C := by
+    have h (ij : I × J) := (Completion.isUniformInducing_coe
+      (α := InjectiveTensor (E ij.1) (F ij.2))).comap_uniformity
+    rw [isUniformInducing_iff, Pi.uniformity, Filter.comap_iInf, Pi.uniformity]
+    simp_rw [Filter.comap_comap, ← h, Filter.comap_comap]
+    rfl
+  have hext := Completion.isUniformInducing_extension (hC.comp hP)
+  have hmap : Completion.extension (C ∘ P) =
+      fun z ij ↦ Completion.map (injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2)) z := by
+    refine Completion.extension_unique (hC.comp hP).uniformContinuous
+      (uniformContinuous_pi.mpr fun _ ↦ Completion.uniformContinuous_map) fun z ↦ ?_
+    funext ij
+    rw [Completion.map_coe ((uniformContinuous_pi.mp hP.uniformContinuous) ij)]
+    rfl
+  rw [← hmap]
+  have hd : DenseRange (C ∘ P) := (DenseRange.piMap fun _ ↦ Completion.denseRange_coe).comp
+    (injectiveTensor_products_denseRange E F) hC.uniformContinuous.continuous
+  have hclosed := hext.isComplete_range.isClosed
+  refine isHomeomorph_iff_isEmbedding_surjective.mpr ⟨hext.isUniformEmbedding.isEmbedding, ?_⟩
+  intro y
+  change y ∈ range (Completion.extension (C ∘ P))
+  rw [← hclosed.closure_eq]
+  refine Dense.mono ?_ hd y
+  rintro w ⟨z, hz⟩
+  exact ⟨(z : Completion _), (Completion.extension_coe (hC.comp hP).uniformContinuous z).trans hz⟩
 
 end Products
 
