@@ -18,6 +18,7 @@ import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
 import Mathlib.Topology.Algebra.Module.Star
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
@@ -775,7 +776,46 @@ theorem tendsto_pettisIntegral_of_tendstoUniformly
     letI := IsTopologicalAddGroup.rightUniformSpace E
     TendstoUniformly f g atTop →
       Tendsto (fun i ↦ pettisIntegral (.complex μ) (f i) (hfi i)) atTop
-        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by sorry
+        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  intro hfg
+  let a (i : ι) := pettisIntegral (.complex μ) (f i) (hfi i)
+  let b := pettisIntegral (.complex μ) g hgi
+  change Tendsto a atTop (𝓝 b)
+  have eval_integral {u : X → E} {z : E} {hu : PettisWeaklyIntegrable (.complex μ) u}
+      (h : toPettisWeakCompletion E z = pettisWeakIntegral (.complex μ) u hu)
+      (φ : StrongDual ℂ E) :
+      φ z = μ.integral (fun x ↦ φ (u x)) (ContinuousLinearMap.mul ℝ ℂ) :=
+    congrArg (fun w : PettisWeakCompletion E ↦
+      (show Module.Dual ℂ (StrongDual ℂ E) from w) φ) h
+  obtain ⟨hweakg, hrepg⟩ := hasPettisIntegral_pettisIntegral (.complex μ) g hgi
+  rw [← tendsto_sub_nhds_zero_iff]
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).tendsto_right_iff.mpr ?_
+  intro p hp
+  -- Use the total variation mass to choose a uniform bound on the integrands.
+  let mass := μ.variation.real univ
+  have hmass : 0 < mass + 1 := add_pos_of_nonneg_of_pos measureReal_nonneg one_pos
+  let δ := (mass + 1)⁻¹
+  have hδ : 0 < δ := inv_pos.mpr hmass
+  have huniform := (IsTopologicalAddGroup.tendstoUniformly_iff f g atTop rfl).mp hfg
+    (p.ball 0 δ) (Seminorm.ball_mem_nhds hp hδ)
+  filter_upwards [huniform] with i hi
+  obtain ⟨hweakf, hrepf⟩ := hasPettisIntegral_pettisIntegral (.complex μ) (f i) (hfi i)
+  -- Test the difference of the integrals with a functional that attains the seminorm.
+  obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm p hp (a i - b)
+  have hbound := VectorMeasure.norm_integral_le_of_norm_le_const
+    (B := ContinuousLinearMap.mul ℝ ℂ) (f := fun x ↦ φ (f i x) - φ (g x))
+    (ae_of_all μ.variation fun x ↦ by
+      rw [← map_sub]
+      exact (hφ _).trans (p.mem_ball_zero.mp (hi x)).le)
+  rw [VectorMeasure.integral_fun_sub (hweakf φ) (hweakg φ),
+    ← eval_integral hrepf φ, ← eval_integral hrepg φ, ← map_sub] at hbound
+  apply p.mem_ball_zero.mpr
+  calc
+    p (a i - b) = ‖φ (a i - b)‖ := heq.symm
+    _ ≤ δ * mass := by simpa only [ContinuousLinearMap.opNorm_mul, mul_one] using hbound
+    _ < δ * (mass + 1) := mul_lt_mul_of_pos_left (lt_add_one mass) hδ
+    _ = 1 := inv_mul_cancel₀ hmass.ne'
 
 end Criteria
 
@@ -808,7 +848,35 @@ theorem pettisWeakIntegral_prod
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
           pettisWeakIntegral (.positive μ) fx hfx ∧
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
-          pettisWeakIntegral (.positive ν) fy hfy := by sorry
+          pettisWeakIntegral (.positive ν) fy hfy := by
+  intro fx fy
+  have hφx (φ : StrongDual ℂ E) :
+      (fun x ↦ φ (fx x)) = fun x ↦ ∫ y, φ (f (x, y)) ∂ν := by
+    funext x
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive ν) _ (hx x)
+    exact LinearMap.congr_fun h φ
+  have hφy (φ : StrongDual ℂ E) :
+      (fun y ↦ φ (fy y)) = fun y ↦ ∫ x, φ (f (x, y)) ∂μ := by
+    funext y
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive μ) _ (hy y)
+    exact LinearMap.congr_fun h φ
+  have hfx : PettisWeaklyIntegrable (.positive μ) fx := by
+    intro φ
+    change Integrable (fun x ↦ φ (fx x)) μ
+    rw [hφx]
+    exact (hf φ).integral_prod_left
+  have hfy : PettisWeaklyIntegrable (.positive ν) fy := by
+    intro φ
+    change Integrable (fun y ↦ φ (fy y)) ν
+    rw [hφy]
+    exact (hf φ).integral_prod_right
+  refine ⟨hfx, hfy, LinearMap.ext fun φ ↦ ?_, LinearMap.ext fun φ ↦ ?_⟩
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ x, φ (fx x) ∂μ
+    rw [hφx]
+    exact integral_prod _ (hf φ)
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ y, φ (fy y) ∂ν
+    rw [hφy]
+    exact integral_prod_symm _ (hf φ)
 
 -- TODO(paper-gap): The image asserted in Remark C.4.4.2 can also contain zero
 -- from outside the support. Its compactness still follows by adjoining zero.
@@ -853,7 +921,39 @@ theorem existsUnique_pettisWeakIntegral_weil
       (∀ g : G, F (QuotientGroup.mk g) =
         pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g)) ∧
       ∃ hF : PettisWeaklyIntegrable (.positive ν) F,
-        pettisWeakIntegral (.positive μG) f hf = pettisWeakIntegral (.positive ν) F hF := by sorry
+        pettisWeakIntegral (.positive μG) f hf = pettisWeakIntegral (.positive ν) F hF := by
+  let F (q : G ⧸ H) :=
+    pettisIntegral (.positive μH) (fun h : H ↦ f (q.out * h)) (hsec q.out)
+  have hscalar (g : G) (φ : StrongDual ℂ E) :
+      φ (pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g)) =
+        ∫ h : H, φ (f (g * h)) ∂μH := by
+    obtain ⟨_, heq⟩ := hasPettisIntegral_pettisIntegral (.positive μH) _ (hsec g)
+    exact LinearMap.congr_fun heq φ
+  have hF_scalar (φ : StrongDual ℂ E) :
+      (fun q ↦ φ (F q)) = lcaCosetIntegral H μH (fun g ↦ φ (f g)) :=
+    funext fun q ↦ hscalar q.out φ
+  have hF_mk (g : G) : F (QuotientGroup.mk g) =
+      pettisIntegral (.positive μH) (fun h : H ↦ f (g * h)) (hsec g) := by
+    let := polynormableSpace_separatingDual ℂ E
+    refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2 fun φ ↦ ?_
+    have hg : Integrable (fun h : H ↦ φ (f (g * h))) μH :=
+      (hasPettisIntegral_pettisIntegral (.positive μH) _ (hsec g)).choose φ
+    rw [congrFun (hF_scalar φ) (QuotientGroup.mk g), hscalar]
+    exact lcaCosetIntegral_mk H μH (fun x ↦ φ (f x)) g hg
+  have hweil (φ : StrongDual ℂ E) := weilQuotientIntegral_L1 H hH μG μH ν hν (hf φ)
+  have hF : PettisWeaklyIntegrable (.positive ν) F := by
+    intro φ
+    change Integrable (fun q ↦ φ (F q)) ν
+    rw [hF_scalar]
+    exact (hweil φ).2.1
+  refine ⟨F, ⟨hF_mk, hF, LinearMap.ext fun φ ↦ ?_⟩, ?_⟩
+  · change (∫ g, φ (f g) ∂μG) = ∫ q, φ (F q) ∂ν
+    rw [hF_scalar]
+    exact (hweil φ).2.2
+  · rintro F' ⟨hF'_mk, _⟩
+    funext q
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    exact (hF'_mk g).trans (hF_mk g).symm
 
 end Weil
 

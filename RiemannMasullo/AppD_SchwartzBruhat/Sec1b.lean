@@ -1210,9 +1210,100 @@ Deviation: Sanity check using the fact that its annihilator is the entire dual. 
 theorem isBruhatGoodSubgroup_bot_iff :
     IsBruhatGoodSubgroup (⊥ : Subgroup G) ↔ IsLocallyEuclidean G := by sorry
 
+/-- Paper: Lemma D.1.4.6(4), p. 758. An open subgroup of the dual has a
+compact annihilator in the original group. -/
+private theorem isCompact_lcaDualAnnihilator (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    IsCompact (lcaDualAnnihilator H : Set G) := by
+  have hCompact := isCompact_lcaAnnihilator H hH
+  convert (isClosedEmbedding_pontryaginDual_eval (G := G)).isCompact_preimage hCompact using 1
+  ext x
+  exact (mem_lcaDualAnnihilator_iff H x).trans
+    (mem_lcaAnnihilator_iff H (pontryaginDual_eval x)).symm
+
+/-- Paper: Definition D.1.5.1, p. 760. The intersection of two good
+subgroups is good. Its annihilator is the join of their annihilators. -/
+private theorem isBruhatGoodSubgroup_inf {K L : Subgroup G}
+    (hK : IsBruhatGoodSubgroup K) (hL : IsBruhatGoodSubgroup L) :
+    IsBruhatGoodSubgroup (K ⊓ L) := by
+  have hLc := isCompact_lcaDualAnnihilator (lcaAnnihilator L) hL.2.1
+  rw [lcaDualAnnihilator_annihilator L hL.1] at hLc
+  have hAnti : Antitone (lcaAnnihilator (G := G)) := fun _ _ h χ hχ ↦
+    (mem_lcaAnnihilator_iff _ χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, h x.property⟩
+  have hAnn : lcaAnnihilator (K ⊓ L) = lcaAnnihilator K ⊔ lcaAnnihilator L := by
+    apply le_antisymm _ (sup_le (hAnti inf_le_left) (hAnti inf_le_right))
+    intro χ hχ
+    let restrict : PontryaginDual K :=
+      PontryaginDual.map ⟨K.subtype, continuous_subtype_val⟩ χ
+    obtain ⟨ψ, hψ, hψL⟩ := exists_pontryaginDual_extension_trivial_on_compact K L hK.1 hLc
+      restrict (fun x hx ↦ (mem_lcaAnnihilator_iff _ χ).mp hχ ⟨x, x.property, hx⟩)
+    refine Subgroup.mem_sup.mpr ⟨χ * ψ⁻¹, ?_, ψ, (mem_lcaAnnihilator_iff L ψ).mpr hψL, ?_⟩
+    · refine (mem_lcaAnnihilator_iff K _).mpr fun x ↦ ?_
+      change χ x * (ψ x)⁻¹ = 1
+      rw [hψ x]
+      exact mul_inv_cancel _
+    · exact inv_mul_cancel_right χ ψ
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator K, hK.2⟩
+  let B : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator L, hL.2⟩
+  obtain ⟨C, hAC, hBC⟩ := (openCompactlyGeneratedSubgroups_colimit
+    (G := PontryaginDual G)).1.directed A B
+  have hOpen : IsOpen (lcaAnnihilator (K ⊓ L) : Set (PontryaginDual G)) :=
+    Subgroup.isOpen_mono (hAnti inf_le_left) hK.2.1
+  refine ⟨hK.1.inter hL.1, hOpen, ?_⟩
+  let J := lcaAnnihilator (K ⊓ L)
+  have hJC : J ≤ C.val := by
+    change lcaAnnihilator (K ⊓ L) ≤ C.val
+    rw [hAnn]
+    exact sup_le (show A.val ≤ C.val from hAC) (show B.val ≤ C.val from hBC)
+  have hClosed : IsClosed (J.subgroupOf C.val : Set C.val) :=
+    (J.isClosed_of_isOpen hOpen).preimage continuous_subtype_val
+  let : LocallyCompactSpace C.val := C.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨U, hU, hUc, hGen⟩ := isCompactlyGeneratedGroup_closedSubgroup C.property.2
+    (J.subgroupOf C.val) hClosed
+  let e := Subgroup.subgroupOfEquivOfLe hJC
+  have he : Continuous e := (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _
+  have he' : Continuous e.symm := (continuous_subtype_val.subtype_mk _).subtype_mk _
+  refine ⟨e '' U, ?_, hUc.image he, ?_⟩
+  · have hEq : e '' U = e.symm ⁻¹' U := e.toEquiv.image_eq_preimage_symm U
+    rw [hEq]
+    exact he'.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+  · change Subgroup.closure (e.toMonoidHom '' U) = ⊤
+    rw [← MonoidHom.map_closure e.toMonoidHom, hGen,
+      Subgroup.map_top_of_surjective e.toMonoidHom e.surjective]
+
+/-- Paper: Lemma D.1.4.6(1), p. 758. An open subgroup of the dual is recovered
+from its annihilator in the original group.
+Deviation: We isolate the open-subgroup case on the dual side. Once evaluation
+is surjective onto the bidual, this follows by separating points in the discrete quotient. -/
+theorem lcaAnnihilator_dualAnnihilator_of_open (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    lcaAnnihilator (lcaDualAnnihilator H) = H := by
+  sorry
+
 /-- Paper: Lemma D.1.5.2, p. 760. Structural pairs form a nonempty directed order. -/
 theorem bruhatStructuralPair_filtered :
-    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by sorry
+    Nonempty (BruhatStructuralPair G) ∧ IsDirectedOrder (BruhatStructuralPair G) := by
+  constructor
+  · obtain ⟨A, _⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 1
+    let K := lcaDualAnnihilator A.val
+    have hKc : IsCompact (K : Set G) := isCompact_lcaDualAnnihilator A.val A.property.1
+    have hAnn : lcaAnnihilator K = A.val :=
+      lcaAnnihilator_dualAnnihilator_of_open A.val A.property.1
+    have hK : IsBruhatGoodSubgroup K :=
+      ⟨hKc.isClosed, hAnn.symm ▸ A.property⟩
+    obtain ⟨H, hKH⟩ := exists_openCompactlyGeneratedSubgroup_contains hKc
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩⟩
+  · constructor
+    intro p q
+    obtain ⟨H, hp, hq⟩ := (openCompactlyGeneratedSubgroups_colimit (G := G)).1.directed
+      ⟨p.val.1, p.property.1, p.property.2.1⟩ ⟨q.val.1, q.property.1, q.property.2.1⟩
+    let K := OrderDual.ofDual p.val.2 ⊓ OrderDual.ofDual q.val.2
+    have hK := isBruhatGoodSubgroup_inf p.property.2.2.1 q.property.2.2.1
+    have hKH : K ≤ H.val := inf_le_left.trans (p.property.2.2.2.trans hp)
+    have hKp : K ≤ OrderDual.ofDual p.val.2 := inf_le_left
+    have hKq : K ≤ OrderDual.ofDual q.val.2 := inf_le_right
+    exact ⟨⟨(H.val, OrderDual.toDual K), H.property.1, H.property.2, hK, hKH⟩, ⟨hp, hKp⟩, ⟨hq, hKq⟩⟩
 
 /-- Paper: Lemma D.1.5.2(1), p. 761. The quotient attached to a structural pair
 has an elementary presentation. -/
@@ -1224,7 +1315,38 @@ in the dual, with the annihilator of the good subgroup as the open subgroup. -/
 theorem BruhatStructuralPair.dual (p : BruhatStructuralPair G) :
     ∃ q : BruhatStructuralPair (PontryaginDual G),
       q.val.1 = lcaAnnihilator (OrderDual.ofDual p.val.2) ∧
-      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by sorry
+      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by
+  let H := p.val.1
+  let k := OrderDual.ofDual p.val.2
+  obtain ⟨hH, hGen, ⟨_, hkOpen, hkGen⟩, hkH⟩ := p.property
+  have hCompact := isCompact_lcaAnnihilator H hH
+  refine ⟨⟨(lcaAnnihilator k, OrderDual.toDual (lcaAnnihilator H)), hkOpen, hkGen,
+    ⟨hCompact.isClosed, isOpen_lcaAnnihilator _ hCompact, ?_⟩, ?_⟩, rfl, rfl⟩
+  · obtain ⟨e, he⟩ := pontryaginDual_bidual (G := G)
+    let A := lcaAnnihilator (lcaAnnihilator H)
+    change IsCompactlyGeneratedGroup A
+    have hMem (x : G) : e x ∈ A ↔ x ∈ H := by
+      change e x ∈ lcaAnnihilator (lcaAnnihilator H) ↔ x ∈ H
+      rw [mem_lcaAnnihilator_iff]
+      simp_rw [he]
+      rw [← mem_lcaDualAnnihilator_iff, lcaDualAnnihilator_annihilator H
+        (H.isClosed_of_isOpen hH)]
+    let f : H →* A := (e.toMonoidHom.comp H.subtype).codRestrict A
+      fun x ↦ (hMem x).mpr x.property
+    have hSurj : Function.Surjective f := by
+      intro y
+      obtain ⟨x, hx⟩ := e.surjective (y : PontryaginDual (PontryaginDual G))
+      exact ⟨⟨x, (hMem x).mp (hx.symm ▸ y.property)⟩, Subtype.ext hx⟩
+    have hInducing : IsInducing f := IsInducing.subtypeVal.of_comp_iff.mp
+      (e.toHomeomorph.isInducing.comp IsInducing.subtypeVal)
+    have hOpen : IsOpenMap f := hInducing.isOpenMap (hSurj.range_eq ▸ isOpen_univ)
+    obtain ⟨U, hU, hUc, hUgen⟩ := hGen
+    refine ⟨f '' U, ?_, hUc.image hInducing.continuous, ?_⟩
+    · simpa only [map_one] using hOpen.image_mem_nhds hU
+    · rw [← MonoidHom.map_closure, hUgen, Subgroup.map_top_of_surjective f hSurj]
+  · intro χ hχ
+    exact (mem_lcaAnnihilator_iff k χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff H χ).mp hχ ⟨x, hkH x.property⟩
 
 section Fourier
 

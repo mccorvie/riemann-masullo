@@ -119,6 +119,8 @@ def query(**params):
 
 def matters_to_everyone(path):
     """Whether a change to this file on main can change the result of any pull request's check."""
+    if path == "RiemannMasullo/External/ATTRIBUTION.md":
+        return False  # The source credits are not a build or checker input.
     if path in BUILD_FILES or path.startswith(BUILD_DIRS):
         return True
     return path.endswith(".lean") and not plain_proof.library_file(path)

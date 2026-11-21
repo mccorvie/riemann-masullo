@@ -181,7 +181,8 @@ class AutoMerge(unittest.TestCase):
 
     def test_forged_verdict_for_other_files(self):
         for path in ("lakefile.toml", "lean-toolchain", "lake-manifest.json", "scripts/lint.sh", "Main.lean",
-                     "RiemannMasullo/External/X.lean", "RiemannMasullo/a b.lean", "RiemannMasullo/X.txt"):
+                     "RiemannMasullo/External/X.lean", "RiemannMasullo/External/ATTRIBUTION.md",
+                     "RiemannMasullo/a b.lean", "RiemannMasullo/X.txt"):
             api = self.api = FakeApi()
             api.pull_request(7, {path: ("a", "b")})
             self.assertIn("refused", self.drain()[7], path)
@@ -244,7 +245,8 @@ class AutoMerge(unittest.TestCase):
 
     def test_main_changed_something_else(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
-        self.api.main_files = ["RiemannMasullo/AppB/Sec2.lean", "ERRATA.md", "README.md"]
+        self.api.main_files = ["RiemannMasullo/AppB/Sec2.lean", "ERRATA.md", "README.md",
+                               "RiemannMasullo/External/ATTRIBUTION.md"]
         self.assertEqual(self.drain(), {7: "merged"})
 
     def test_main_changed_the_progress_map_and_statement_reviewer(self):
