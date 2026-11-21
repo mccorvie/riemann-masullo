@@ -7,6 +7,9 @@ public import Mathlib.Algebra.Module.ZLattice.Basic
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 import Mathlib.Algebra.Module.ZLattice.Summable
 import Mathlib.Algebra.Order.Chebyshev
+import Mathlib.Analysis.PSeries
+import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
+import Mathlib.MeasureTheory.Integral.Pi
 import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 import Mathlib.MeasureTheory.Measure.Real
 import Mathlib.Tactic.Linarith
@@ -1133,12 +1136,222 @@ def adeleSchwartzFourier (f : ℬ[F]) : ℬ[F] :=
   ⟨fun y ↦ tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F)
     (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd, adeleSchwartzFourier_mem f⟩
 
+set_option maxSynthPendingDepth 8 in
+/-- The product measurable structure on an elementary group agrees with its Borel
+structure. -/
+private theorem elementaryLieGroup_borelSpace {m n r : ℕ} {Fk : Type*}
+    [TopologicalSpace Fk] [MeasurableSpace Fk] [BorelSpace Fk] :
+    BorelSpace (ElementaryLieGroup m n r Fk) := by
+  let : BorelSpace ((Fin r → ℤ) × Fk) := inferInstance
+  let : BorelSpace ((Fin n → AddCircle (1 : ℝ)) × (Fin r → ℤ) × Fk) := inferInstance
+  exact inferInstanceAs (BorelSpace (EuclideanSpace ℝ (Fin m) ×
+    (Fin n → AddCircle (1 : ℝ)) × (Fin r → ℤ) × Fk))
+
+set_option maxSynthPendingDepth 8 in
+/-- Rapid decay in the real and lattice directions makes an elementary Schwartz function
+integrable for any Haar measure on its elementary group. -/
+private theorem elementarySchwartz_integrable {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+    [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk] [MeasurableSpace Fk] [BorelSpace Fk]
+    (f : ElementarySchwartz m n r Fk) (μ : Measure (ElementaryLieGroup m n r Fk))
+    [μ.IsAddHaarMeasure] : Integrable f μ := by
+  let : (Measure.count : Measure ℤ).IsAddHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let : (Measure.count : Measure Fk).IsAddHaarMeasure :=
+    { lt_top_of_isCompact := fun _ hs ↦ Measure.count_apply_lt_top.mpr hs.finite_of_discrete
+      open_pos := fun _ _ hs ↦ Measure.count_ne_zero hs }
+  let : MeasurableAdd ((Fin r → ℤ) × Fk) := inferInstance
+  let : BorelSpace ((Fin r → ℤ) × Fk) := inferInstance
+  let : BorelSpace ((Fin n → AddCircle (1 : ℝ)) × (Fin r → ℤ) × Fk) := inferInstance
+  let : MeasurableAdd ((Fin n → AddCircle (1 : ℝ)) × (Fin r → ℤ) × Fk) :=
+    ContinuousAdd.measurableAdd
+  let νL : Measure ((Fin r → ℤ) × Fk) :=
+    (Measure.pi fun _ : Fin r ↦ (Measure.count : Measure ℤ)).prod Measure.count
+  let : νL.IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  let : SFinite νL := by dsimp [νL]; infer_instance
+  let νT : Measure ((Fin n → AddCircle (1 : ℝ)) × (Fin r → ℤ) × Fk) := volume.prod νL
+  let : νT.IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  let : SFinite νT := by dsimp [νT, νL]; infer_instance
+  let ν : Measure (ElementaryLieGroup m n r Fk) := volume.prod νT
+  let : BorelSpace (ElementaryLieGroup m n r Fk) := elementaryLieGroup_borelSpace
+  let : ν.IsAddHaarMeasure := Measure.prod.instIsAddHaarMeasure _ _
+  rw [Measure.isAddLeftInvariant_eq_smul μ ν]
+  apply Integrable.smul_measure_nnreal
+  let A (x : EuclideanSpace ℝ (Fin m)) := (1 + ‖x‖) ^ (m + 1)
+  let B (k : ℤ) := (1 + |(k : ℝ)|) ^ 2
+  have hA : Integrable (fun x ↦ (A x)⁻¹) volume := by
+    have hdim : (Module.finrank ℝ (EuclideanSpace ℝ (Fin m)) : ℝ) < ((m + 1 : ℕ) : ℝ) := by
+      simp
+    convert integrable_one_add_norm (μ := volume) hdim using 1
+    funext x
+    rw [Real.rpow_neg (by positivity), Real.rpow_natCast]
+  have hB : Integrable (fun k ↦ (B k)⁻¹) Measure.count := by
+    have hb (k : ℤ) : 0 ≤ (B k)⁻¹ := by dsimp [B]; positivity
+    simp only [integrable_count_iff, Real.norm_eq_abs, abs_of_nonneg (hb _),
+      summable_int_iff_summable_nat_and_neg, B, Int.cast_neg, Int.cast_natCast, abs_neg]
+    have hn (j : ℕ) : |(j : ℝ)| = j := abs_of_nonneg (Nat.cast_nonneg j)
+    simp only [hn]
+    have hs : Summable (fun j : ℕ ↦ ((1 + (j : ℝ)) ^ 2)⁻¹) := by
+      convert (Real.summable_one_div_nat_add_rpow 1 2).2 (by norm_num) using 1
+      funext j
+      rw [abs_of_nonneg (by positivity), add_comm (j : ℝ), one_div, ← Real.rpow_natCast]
+      norm_num
+    exact ⟨hs, hs⟩
+  let D (w : ElementaryLieGroup m n r Fk) := A w.1 * ∏ k, B (w.2.2.1 k)
+  obtain ⟨C, hC⟩ := elementarySchwartz_decay
+    (show (f : ElementaryLieGroup m n r Fk → ℂ) ∈ elementarySchwartzSubmodule m n r Fk from
+      (show elementarySchwartzSubmodule m n r Fk from f).property) (m + 1 + 2 * r)
+  have hdom : Integrable (fun w ↦ C * (D w)⁻¹) ν := by
+    have hπ := Integrable.fintype_prod (ι := Fin r) (fun _ ↦ hB)
+    have hf : Integrable (fun _ : Fk ↦ (1 : ℝ)) (Measure.count : Measure Fk) := integrable_const _
+    have ht : Integrable (fun _ : Fin n → AddCircle (1 : ℝ) ↦ (1 : ℝ)) volume :=
+      integrable_const _
+    convert (hA.mul_prod (ht.mul_prod (hπ.mul_prod hf))).const_mul C using 1
+    funext w
+    simp only [D, mul_inv_rev, one_mul, mul_one, Finset.prod_inv_distrib]
+    ring
+  refine hdom.mono' (continuous_elementarySchwartz f).aestronglyMeasurable
+    (Eventually.of_forall fun w ↦ ?_)
+  have hD : 0 < D w := by dsimp [D, A, B]; positivity
+  let t := 1 + (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|)
+  have hreal : 1 + ‖w.1‖ ≤ t := by
+    have := euclideanSpace_norm_le_sum_abs w.1
+    dsimp [t]
+    linarith [Finset.sum_nonneg (s := Finset.univ) fun k _ ↦ abs_nonneg (w.2.2.1 k : ℝ)]
+  have hint (k : Fin r) : 1 + |(w.2.2.1 k : ℝ)| ≤ t := by
+    have hk := Finset.single_le_sum
+      (f := fun k ↦ |(w.2.2.1 k : ℝ)|) (fun _ _ ↦ abs_nonneg _) (Finset.mem_univ k)
+    dsimp [t]
+    linarith [Finset.sum_nonneg (s := Finset.univ) fun j _ ↦ abs_nonneg (w.1 j)]
+  have hDt : D w ≤ t ^ (m + 1 + 2 * r) := by
+    calc
+      D w ≤ t ^ (m + 1) * ∏ _ : Fin r, t ^ 2 := by
+        unfold D A B
+        exact mul_le_mul
+          (pow_le_pow_left₀ (by positivity) hreal _)
+          (Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun k _ ↦
+            pow_le_pow_left₀ (by positivity) (hint k) _)
+          (by positivity)
+          (pow_nonneg (le_trans (by positivity) hreal) _)
+      _ = _ := by rw [Finset.prod_const, Finset.card_univ, Fintype.card_fin, ← pow_mul, ← pow_add]
+  rw [← div_eq_mul_inv]
+  exact (le_div_iff₀ hD).2 ((mul_le_mul_of_nonneg_left hDt (norm_nonneg (f w))).trans (hC w))
+
+set_option maxSynthPendingDepth 8 in
+open scoped Pointwise in
+/-- A Schwartz–Bruhat stage is integrable after pullback along the quotient by its compact
+kernel and extension by zero from its open subgroup. -/
+private theorem schwartzBruhatStage_integrable {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) :
+    Integrable (schwartzBruhatStageRealization a e f) μ := by
+  let H := a.val.1
+  let K := OrderDual.ofDual a.val.2
+  let L := K.comap H.subtype
+  have hH : IsOpen (H : Set G) := a.property.1
+  have hK : IsCompact (L : Set H) := by
+    let J := lcaAnnihilator K
+    have hEval := (isClosedEmbedding_pontryaginDual_eval (G := G)).comp
+      (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal
+    have hpre : (L : Set H) = (pontryaginDual_eval ∘ (Subtype.val : H → G)) ⁻¹'
+        (lcaAnnihilator J : Set (PontryaginDual (PontryaginDual G))) := by
+      ext x
+      change x.val ∈ K ↔ pontryaginDual_eval x.val ∈ lcaAnnihilator J
+      rw [← lcaDualAnnihilator_annihilator K a.property.2.2.1.1]
+      exact (mem_lcaDualAnnihilator_iff J x.val).trans
+        (mem_lcaAnnihilator_iff J (pontryaginDual_eval x.val)).symm
+    rw [hpre]
+    exact hEval.isCompact_preimage (isCompact_lcaAnnihilator J a.property.2.2.1.2.1)
+  let q := QuotientGroup.mk' L
+  have hq : IsProperMap q := by
+    refine isProperMap_iff_isClosedMap_and_compact_fibers.mpr
+      ⟨QuotientGroup.continuous_mk, QuotientGroup.isClosedMap_coe hK, ?_⟩
+    intro y
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective L y
+    change IsCompact (QuotientGroup.mk ⁻¹' {QuotientGroup.mk x})
+    rw [← image_singleton, QuotientGroup.preimage_image_mk_eq_mul]
+    exact isCompact_singleton.mul hK
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let : MeasurableSpace e.finiteFactor := borel _
+  let : BorelSpace e.finiteFactor := ⟨rfl⟩
+  let : BorelSpace E := elementaryLieGroup_borelSpace
+  let : T2Space (Multiplicative E) := inferInstanceAs (T2Space (EuclideanSpace ℝ (Fin e.realDim) ×
+    (Fin e.torusDim → AddCircle (1 : ℝ)) × (Fin e.latticeRank → ℤ) × e.finiteFactor))
+  let p : H →* Multiplicative E := e.equiv.toMonoidHom.comp q
+  have hp : IsProperMap p := e.equiv.toHomeomorph.isProperMap.comp hq
+  let ν := μ.comap H.subtype
+  let : ν.IsHaarMeasure :=
+    Measure.IsHaarMeasure.comap (mH := ContinuousMul.measurableMul) μ (f := H.subtype)
+      hH.isOpenEmbedding_subtypeVal
+  let ρ := ν.map p
+  have hρ : ρ.IsHaarMeasure := Measure.isHaarMeasure_map ν p hp.continuous
+    (e.equiv.surjective.comp (QuotientGroup.mk'_surjective L))
+    (isProperMap_iff_tendsto_cocompact.mp hp).2
+  let ρ' : Measure E := ρ
+  let : ρ'.IsAddHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hρ.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hρ.toIsOpenPosMeasure
+      map_add_left_eq_self := fun x ↦ hρ.map_mul_left_eq_self (Multiplicative.ofAdd x) }
+  have hf : Integrable f ρ' := elementarySchwartz_integrable f ρ'
+  have hcomp : Integrable (fun x : H ↦ f (Multiplicative.toAdd (p x))) ν :=
+    hf.comp_measurable hp.continuous.measurable
+  apply IntegrableOn.integrable_of_forall_notMem_eq_zero (s := (H : Set G))
+  · rw [integrableOn_iff_comap_subtypeVal hH.measurableSet]
+    refine hcomp.congr (Eventually.of_forall fun x ↦ ?_)
+    exact ((schwartzBruhatStageRealization_apply a e f x.val).trans
+      (dite_eq_left x.property)).symm
+  · intro x hx
+    exact (schwartzBruhatStageRealization_apply a e f x).trans (dite_eq_right hx)
+
+/-- Integrability is stable under the finite sums which generate the Schwartz–Bruhat submodule. -/
+private theorem schwartzBruhat_integrable {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (f : SchwartzBruhat G) : Integrable f μ := by
+  let fs : schwartzBruhatSubmodule G := f
+  change Integrable fs.val μ
+  refine Submodule.iSup_induction (motive := fun g : G → ℂ ↦ Integrable g μ) _
+    fs.property (fun a g hg ↦ ?_) (integrable_zero _ _ _) (fun _ _ hg hh ↦ hg.add hh)
+  exact Submodule.iSup_induction (motive := fun g : G → ℂ ↦ Integrable g μ) _ hg
+    (fun e g ⟨s, hs⟩ ↦ hs ▸ schwartzBruhatStage_integrable μ a e s)
+    (integrable_zero _ _ _) (fun _ _ hg hh ↦ hg.add hh)
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Theorem 2.2.3.2, p. 82. The value of the Fourier transform at zero
 is the integral of the Schwartz–Bruhat function, which is integrable. -/
 theorem adeleSchwartzFourier_apply_zero (f : ℬ[F]) :
     Integrable (fun x ↦ f (Multiplicative.ofAdd x)) (additiveTamagawaMeasure F) ∧
     adeleSchwartzFourier f zeroAdele =
-      ∫ x, f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F := by sorry
+      ∫ x, f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F := by
+  refine ⟨?_, ?_⟩
+  · let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+        CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+    let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+        LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+    let : Fact (∀ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+      ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+    let : LocallyCompactSpace (Multiplicative 𝔸[F]) := by
+      change LocallyCompactSpace (InfiniteAdeleRing F ×
+        (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+          [v.adicCompletion F, v.adicCompletionIntegers F]))
+      infer_instance
+    let : T2Space (Multiplicative 𝔸[F]) := by
+      change T2Space (((v : InfinitePlace F) → v.Completion) ×
+        (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+          [v.adicCompletion F, v.adicCompletionIntegers F]))
+      infer_instance
+    let : BorelSpace (Multiplicative 𝔸[F]) := ⟨rfl⟩
+    let μ : Measure (Multiplicative 𝔸[F]) := additiveTamagawaMeasure F
+    have hμ := (Classical.choose_spec (additiveTamagawaMeasure_existsUnique F).exists).1
+    let : μ.IsHaarMeasure :=
+      { toIsFiniteMeasureOnCompacts := hμ.toIsFiniteMeasureOnCompacts
+        toIsOpenPosMeasure := hμ.toIsOpenPosMeasure
+        map_mul_left_eq_self := fun x ↦ hμ.map_add_left_eq_self x.toAdd }
+    exact schwartzBruhat_integrable μ f
+  · change tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F)
+      (fun x ↦ f (Multiplicative.ofAdd x)) 0 = _
+    simp [tamagawaFourier, adeleStandardCharacter_zero]
 
 /-- Paper: Theorem 2.2.3.2, p. 82. Adelic Riemann–Roch relates theta at an idele
 class to the Fourier-transformed theta at its inverse, including the two zero terms. -/
