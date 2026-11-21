@@ -9,6 +9,9 @@ public import Mathlib.MeasureTheory.Function.LpSeminorm.LpNorm
 public import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 public import Mathlib.Analysis.InnerProductSpace.Calculus
 
+import Mathlib.Algebra.BigOperators.Group.Finset.Powerset
+import Mathlib.MeasureTheory.Integral.Marginal
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.RingTheory.PicardGroup
 
 /-!
@@ -1803,12 +1806,338 @@ theorem torusSchwartz_sup_generates (n : ℕ) (hn : 1 ≤ n) :
       fun f : ElementarySchwartz 0 n 0 PUnit ↦
         ⨆ z, (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞)) := by sorry
 
+section TorusLp
+
+open scoped ContDiff
+
+local notation "Torus" n => (Fin n → AddCircle (1 : ℝ))
+local notation "TorusSchwartz" n => (ElementarySchwartz 0 n 0 PUnit)
+local notation "torusHaar" n =>
+  (Measure.pi (fun _ : Fin n ↦ AddCircle.haarAddCircle (T := (1 : ℝ))))
+local notation "circleHaar" => (AddCircle.haarAddCircle (T := (1 : ℝ)))
+
+/-- Evaluating a torus partial on a real lift agrees with evaluating it on the quotient. -/
+private theorem torusSchwartzPartial_coe {n : ℕ} (β : Fin n → ℕ)
+    (f : TorusSchwartz n) (t : EuclideanSpace ℝ (Fin n)) :
+    torusSchwartzPartial β f (fun i ↦ (t i : AddCircle (1 : ℝ))) =
+      elementaryPartial f 0 β (0, t) 0 PUnit.unit := by
+  let z : Torus n := fun i ↦ (t i : AddCircle (1 : ℝ))
+  change torusSchwartzPartial β f z = _
+  unfold torusSchwartzPartial
+  apply (elementaryPartial_descends f 0 β 0 PUnit.unit (f.property.1 0 PUnit.unit)).2
+  have hz : (fun i ↦ (((AddCircle.equivIco (1 : ℝ) 0 (z i)).val : ℝ) :
+      AddCircle (1 : ℝ))) = z :=
+    funext fun i ↦ (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z i)
+  simp only [elementaryCover]
+  rw [hz]
+
+/-- Mixed partials descend continuously along the open quotient map from the real cover. -/
+private theorem continuous_torusSchwartzPartial {n : ℕ} (β : Fin n → ℕ)
+    (f : TorusSchwartz n) : Continuous (torusSchwartzPartial β f) := by
+  have hq : IsOpenQuotientMap (fun t : EuclideanSpace ℝ (Fin n) ↦
+      fun i ↦ (t i : AddCircle (1 : ℝ))) :=
+    (IsOpenQuotientMap.piMap fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk).comp
+      (PiLp.homeomorph 2 (fun _ : Fin n ↦ ℝ)).isOpenQuotientMap
+  apply hq.continuous_comp_iff.mp
+  simp only [Function.comp_def, torusSchwartzPartial_coe]
+  have hs := (elementaryPartial_descends f 0 β 0 PUnit.unit (f.property.1 0 PUnit.unit)).1
+  exact hs.continuous.comp (continuous_const.prodMk continuous_id)
+
+/-- Varying a single circle coordinate in the real cover adds one derivative
+in that coordinate to the mixed partial. -/
+private theorem torusSchwartzPartial_hasDerivAt_update {n : ℕ} (β : Fin n → ℕ)
+    (f : TorusSchwartz n) (z : Torus n) (j : Fin n) (t : ℝ) :
+    HasDerivAt (fun s : ℝ ↦ torusSchwartzPartial β f (update z j (s : AddCircle (1 : ℝ))))
+      (torusSchwartzPartial (β + Pi.single j 1) f (update z j (t : AddCircle (1 : ℝ)))) t := by
+  let E := EuclideanSpace ℝ (Fin n)
+  let X := EuclideanSpace ℝ (Fin 0) × E
+  let v (i : Fin n) : X := (0, EuclideanSpace.single i 1)
+  let dirs (γ : Fin n → ℕ) := (List.ofFn fun i ↦ List.replicate (γ i) (v i)).flatten
+  let g (x : X) : ℂ := f (elementaryCover x 0 PUnit.unit)
+  let D (γ : Fin n → ℕ) (x : X) :=
+    iteratedFDeriv ℝ (dirs γ).length g x (dirs γ).get
+  have hg : ContDiff ℝ (∞) g := f.property.1 0 PUnit.unit
+  have hpartial (γ : Fin n → ℕ) (x : X) :
+      elementaryPartial f 0 γ x 0 PUnit.unit = D γ x := rfl
+  have hinsert : (v j :: dirs β).Perm (dirs (β + Pi.single j 1)) := by
+    let indices (γ : Fin n → ℕ) := (List.finRange n).flatMap fun i ↦ List.replicate (γ i) i
+    have hmap (γ : Fin n → ℕ) : (indices γ).map v = dirs γ := by
+      simp only [indices, dirs, List.ofFn_eq_map, List.map_flatMap, List.map_replicate,
+        List.flatten_eq_flatMap, List.flatMap_map, id_eq]
+    have hcount (γ : Fin n → ℕ) (i : Fin n) : (indices γ).count i = γ i := by
+      dsimp only [indices]
+      rw [List.count_flatMap, ← Fin.sum_univ_def]
+      simp [List.count_replicate]
+    have hperm : (j :: indices β).Perm (indices (β + Pi.single j 1)) := by
+      rw [List.perm_iff_count]
+      intro i
+      simp only [List.count_cons, hcount, beq_iff_eq, Pi.add_apply, Pi.single_apply,
+        eq_comm (a := j)]
+    simpa only [List.map_cons, hmap] using hperm.map v
+  have hder (x : X) : fderiv ℝ (D β) x (v j) = D (β + Pi.single j 1) x := by
+    have hdiff := hg.differentiable_iteratedFDeriv (mod_cast ENat.natCast_lt_top (dirs β).length) x
+    have hcons := hdiff.iteratedFDeriv_succ_apply_left' (m := (v j :: dirs β).get)
+    exact hcons.symm.trans (iteratedFDeriv_apply_list_perm hg id hinsert x)
+  let r (i : Fin n) : ℝ := (AddCircle.equivIco (1 : ℝ) 0 (z i)).val
+  let b : X := (0, WithLp.toLp 2 (update r j 0))
+  let path (s : ℝ) : X := b + s • v j
+  have hpath : HasDerivAt path (v j) t := by
+    simpa [path] using ((hasDerivAt_id t).smul_const (v j)).const_add b
+  have hco (s : ℝ) : (fun i ↦ ((path s).2 i : AddCircle (1 : ℝ))) =
+      update z j (s : AddCircle (1 : ℝ)) := by
+    have hr (i : Fin n) : (r i : AddCircle (1 : ℝ)) = z i :=
+      (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z i)
+    funext i
+    change ((update r j 0 i + s * (EuclideanSpace.single j (1 : ℝ)) i : ℝ) : AddCircle (1 : ℝ)) = _
+    by_cases hi : i = j
+    · subst i
+      simp
+    · simp [hi, EuclideanSpace.single, hr]
+  have heq (γ : Fin n → ℕ) (s : ℝ) :
+      D γ (path s) = torusSchwartzPartial γ f (update z j (s : AddCircle (1 : ℝ))) := by
+    rw [← hco, torusSchwartzPartial_coe, hpartial]
+    congr 1
+    exact Prod.ext (Subsingleton.elim _ _) rfl
+  have hD : ContDiff ℝ (∞) (D β) :=
+    (ContinuousMultilinearMap.apply ℝ _ ℂ (dirs β).get).contDiff.comp
+      (hg.iteratedFDeriv_right (by simp))
+  have h := ((hD.differentiable (by simp) (path t)).hasFDerivAt).comp_hasDerivAt t hpath
+  simpa only [Function.comp_def, hder, heq] using h
+
+/-- The fundamental theorem of calculus bounds the norm at one point of a circle
+slice by the integrals of the slice and its first derivative. -/
+private theorem torusSchwartzPartial_slice_bound {n : ℕ} (β : Fin n → ℕ)
+    (f : TorusSchwartz n) (z : Torus n) (j : Fin n) :
+    ‖torusSchwartzPartial β f z‖ₑ ≤
+      (∫⁻ u, ‖torusSchwartzPartial β f (update z j u)‖ₑ ∂circleHaar) +
+      (∫⁻ u, ‖torusSchwartzPartial (β + Pi.single j 1) f (update z j u)‖ₑ ∂circleHaar) := by
+  let U (u : AddCircle (1 : ℝ)) := torusSchwartzPartial β f (update z j u)
+  let V (u : AddCircle (1 : ℝ)) := torusSchwartzPartial (β + Pi.single j 1) f (update z j u)
+  have hupdate : Continuous (update z j) := continuous_const.update j continuous_id
+  have hU : Continuous U := (continuous_torusSchwartzPartial β f).comp hupdate
+  have hV : Continuous V := (continuous_torusSchwartzPartial _ f).comp hupdate
+  have hUl : Integrable U circleHaar :=
+    hU.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  have hVl : Integrable V circleHaar :=
+    hV.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  let a : ℝ := (AddCircle.equivIco (1 : ℝ) 0 (z j)).val
+  have ha : (a : AddCircle (1 : ℝ)) = z j :=
+    (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z j)
+  let D (s : ℝ) := V (s : AddCircle (1 : ℝ))
+  have hD : Continuous D := hV.comp (AddCircle.continuous_mk' 1)
+  have hfull :
+      (∫ s in a..a + 1, ‖D s‖) = ∫ u, ‖V u‖ ∂circleHaar := by
+    rw [AddCircle.integral_haarAddCircle]
+    simpa [D] using AddCircle.intervalIntegral_preimage 1 a (fun u ↦ ‖V u‖)
+  have hpoint (u : AddCircle (1 : ℝ)) :
+      ‖U (z j)‖ ≤ ‖U u‖ + ∫ w, ‖V w‖ ∂circleHaar := by
+    let b := AddCircle.equivIoc (1 : ℝ) a u
+    have hb : ((b.val : ℝ) : AddCircle (1 : ℝ)) = u :=
+      (AddCircle.equivIoc (1 : ℝ) a).symm_apply_apply u
+    have hab : a ≤ b.val := b.property.1.le
+    have hcalc : (∫ s in a..b.val, D s) = U u - U (z j) := by
+      rw [← ha, ← hb]
+      exact intervalIntegral.integral_eq_sub_of_hasDerivAt
+        (fun s _ ↦ torusSchwartzPartial_hasDerivAt_update β f z j s)
+        (hD.intervalIntegrable _ _)
+    have hdiff : ‖U u - U (z j)‖ ≤ ∫ w, ‖V w‖ ∂circleHaar := calc
+      _ ≤ ∫ s in a..b.val, ‖D s‖ := by
+        rw [← hcalc]
+        exact intervalIntegral.norm_integral_le_integral_norm hab
+      _ ≤ ∫ s in a..a + 1, ‖D s‖ := by
+        rw [intervalIntegral.integral_of_le hab,
+          intervalIntegral.integral_of_le (by linarith : a ≤ a + 1)]
+        exact setIntegral_mono_set
+          (hD.norm.intervalIntegrable a (a + 1)).1
+          (ae_of_all _ fun s ↦ norm_nonneg (D s))
+          (Filter.Eventually.of_forall (Ioc_subset_Ioc_right b.property.2))
+      _ = _ := hfull
+    exact (norm_le_insert' (U (z j)) (U u)).trans (by
+      rw [norm_sub_rev]
+      linarith)
+  have hreal : ‖U (z j)‖ ≤ (∫ u, ‖U u‖ ∂circleHaar) + ∫ u, ‖V u‖ ∂circleHaar := by
+    have h := integral_mono (integrable_const ‖U (z j)‖)
+      (hUl.norm.add (integrable_const (∫ u, ‖V u‖ ∂circleHaar))) hpoint
+    simpa [integral_add hUl.norm (integrable_const (∫ u, ‖V u‖ ∂circleHaar))] using h
+  have hposU : 0 ≤ ∫ u, ‖U u‖ ∂circleHaar := integral_nonneg fun _ ↦ norm_nonneg _
+  have hposV : 0 ≤ ∫ u, ‖V u‖ ∂circleHaar := integral_nonneg fun _ ↦ norm_nonneg _
+  rw [← ofReal_integral_norm_eq_lintegral_eNorm hUl, ← ofReal_integral_norm_eq_lintegral_eNorm hVl,
+    ← ENNReal.ofReal_add hposU hposV, ← ofReal_norm]
+  simpa [U] using ENNReal.ofReal_le_ofReal hreal
+
+/-- Averaging the one-coordinate estimate over each coordinate bounds the value
+of a torus partial by the L¹ norms of its square-free further partials. -/
+private theorem torusSchwartzPartial_norm_le_integrals {n : ℕ} (β : Fin n → ℕ)
+    (f : TorusSchwartz n) (z : Torus n) :
+    ‖torusSchwartzPartial β f z‖ ≤ ∑ s : Finset (Fin n),
+      ∫ y, ‖torusSchwartzPartial (β + squarefreeMultiIndex s) f y‖ ∂(torusHaar n) := by
+  classical
+  have hc (γ : Fin n → ℕ) := continuous_torusSchwartzPartial γ f
+  let u (γ : Fin n → ℕ) (w : Torus n) := ‖torusSchwartzPartial γ f w‖ₑ
+  let μ (_ : Fin n) := circleHaar
+  have hu (γ : Fin n → ℕ) : Measurable (u γ) := (hc γ).eNorm.measurable
+  have h (s : Finset (Fin n)) (γ : Fin n → ℕ) (w : Torus n) :
+      u γ w ≤ ∑ t ∈ s.powerset, lmarginal μ s (u (γ + squarefreeMultiIndex t)) w := by
+    induction s using Finset.induction_on generalizing γ w with
+    | empty =>
+      have hzero : squarefreeMultiIndex (∅ : Finset (Fin n)) = 0 := by
+        funext i
+        simp [squarefreeMultiIndex]
+      simp [hzero]
+    | @insert i s hi ih =>
+      calc
+        u γ w ≤ (∫⁻ v, u γ (update w i v) ∂(μ i)) +
+            (∫⁻ v, u (γ + Pi.single i 1) (update w i v) ∂(μ i)) :=
+          torusSchwartzPartial_slice_bound γ f w i
+        _ ≤ (∫⁻ v, ∑ t ∈ s.powerset,
+              lmarginal μ s (u (γ + squarefreeMultiIndex t)) (update w i v) ∂(μ i)) +
+            (∫⁻ v, ∑ t ∈ s.powerset,
+              lmarginal μ s (u ((γ + Pi.single i 1) + squarefreeMultiIndex t))
+                (update w i v) ∂(μ i)) :=
+          add_le_add (lintegral_mono fun v ↦ ih _ _) (lintegral_mono fun v ↦ ih _ _)
+        _ = _ := by
+          have hsum (δ : Fin n → ℕ) :
+              (∫⁻ v, ∑ t ∈ s.powerset,
+                lmarginal μ s (u (δ + squarefreeMultiIndex t)) (update w i v) ∂(μ i)) =
+                ∑ t ∈ s.powerset, lmarginal μ (insert i s) (u (δ + squarefreeMultiIndex t)) w := by
+            rw [lintegral_finsetSum]
+            · exact Finset.sum_congr rfl fun t _ ↦ (lmarginal_insert _ (hu _) hi w).symm
+            · exact fun t _ ↦ ((hu _).lmarginal μ).comp
+                (continuous_const.update i continuous_id).measurable
+          rw [hsum, hsum, Finset.sum_powerset_insert hi]
+          congr 1
+          refine Finset.sum_congr rfl fun t ht ↦ ?_
+          have hit : i ∉ t := fun hmem ↦ hi (Finset.mem_powerset.mp ht hmem)
+          have hindex : Pi.single i 1 + squarefreeMultiIndex t =
+              squarefreeMultiIndex (insert i t) := by
+            funext j
+            by_cases hji : j = i
+            · subst j
+              simp [squarefreeMultiIndex, hit]
+            · simp [squarefreeMultiIndex, hji, Pi.single_eq_of_ne]
+          rw [add_assoc, hindex]
+  have hlin := h Finset.univ β z
+  simp only [Finset.powerset_univ, lmarginal_univ] at hlin
+  have hInt (s : Finset (Fin n)) :
+      Integrable (torusSchwartzPartial (β + squarefreeMultiIndex s) f) (torusHaar n) :=
+    (hc _).integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  have hfin (s : Finset (Fin n)) :
+      (∫⁻ y, u (β + squarefreeMultiIndex s) y ∂(torusHaar n)) ≠ ⊤ :=
+    (hInt s).hasFiniteIntegral.ne
+  have ht := ENNReal.toReal_mono (ENNReal.sum_ne_top.mpr fun s _ ↦ hfin s) hlin
+  rw [ENNReal.toReal_sum (fun s _ ↦ hfin s)] at ht
+  simpa only [u, toReal_eNorm, ← integral_norm_eq_lintegral_eNorm
+    (Measurable.aestronglyMeasurable (hc _).measurable)] using ht
+
+/-- On the pure torus stage, the canonical Schwartz seminorm is the supremum of
+the corresponding mixed partial on the quotient. -/
+private theorem torusSchwartzSeminorm_eq {n : ℕ}
+    (i : ElementarySchwartzIndex 0 n 0) (f : TorusSchwartz n) :
+    ENNReal.ofReal (elementarySchwartzSeminorm i f) =
+      ⨆ z, (‖torusSchwartzPartial i.2.2.1 f z‖₊ : ℝ≥0∞) := by
+  change ENNReal.ofReal (elementarySchwartzBound f.val i).toReal = _
+  rw [ENNReal.ofReal_toReal (f.property.2 i).ne]
+  obtain ⟨α, δ, β, γ⟩ := i
+  obtain rfl : δ = 0 := Subsingleton.elim _ _
+  simp only [elementarySchwartzBound, Finset.univ_eq_empty (α := Fin 0),
+    Finset.prod_empty, one_mul]
+  have h (xt : EuclideanSpace ℝ (Fin 0) × EuclideanSpace ℝ (Fin n))
+      (a : Fin 0 → ℤ) (b : PUnit) :
+      elementaryPartial f 0 β xt a b =
+        torusSchwartzPartial β f (fun j ↦ (xt.2 j : AddCircle (1 : ℝ))) := by
+    obtain ⟨x, t⟩ := xt
+    obtain rfl : x = 0 := Subsingleton.elim _ _
+    obtain rfl : a = 0 := Subsingleton.elim _ _
+    cases b
+    exact (torusSchwartzPartial_coe β f t).symm
+  simp only [h, iSup_const]
+  refine (show Surjective (fun xt : EuclideanSpace ℝ (Fin 0) × EuclideanSpace ℝ (Fin n) ↦
+    fun j ↦ (xt.2 j : AddCircle (1 : ℝ))) from ?_).iSup_comp
+      (fun z ↦ (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞))
+  intro z
+  let t : EuclideanSpace ℝ (Fin n) :=
+    WithLp.toLp 2 (fun j ↦ (AddCircle.equivIco (1 : ℝ) 0 (z j)).val)
+  exact ⟨(0, t), funext fun j ↦ (AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z j)⟩
+
 /-- Paper: Example D.1.10.4, p. 785. With product probability Haar measure, the Lᵖ
 norms of torus partials generate the smooth topology for each finite real p ≥ 1.
 Deviation: The stage with only torus coordinates represents the smooth space. -/
 theorem torusSchwartz_lp_generates (n : ℕ) (hn : 1 ≤ n) (p : ℝ) (hp : 1 ≤ p) :
     GeneratesLpSeminorms (Measure.pi (fun _ : Fin n ↦ AddCircle.haarAddCircle (T := (1 : ℝ))))
-      (ENNReal.ofReal p) (torusSchwartzPartial (n := n)) := by sorry
+      (ENNReal.ofReal p) (torusSchwartzPartial (n := n)) := by
+  -- The bounds also hold for the empty product.
+  clear hn
+  classical
+  let μ := torusHaar n
+  let q := ENNReal.ofReal p
+  have hq : 1 ≤ q := by simpa [q] using ENNReal.ofReal_le_ofReal hp
+  let : Fact (1 ≤ q) := ⟨hq⟩
+  have hmem (i : Fin n → ℕ) (f : TorusSchwartz n) : MemLp (torusSchwartzPartial i f) q μ :=
+    (continuous_torusSchwartzPartial i f).memLp_of_hasCompactSupport
+      (HasCompactSupport.of_compactSpace _)
+  let U (i : Fin n → ℕ) : (TorusSchwartz n) →ₗ[ℂ] Lp ℂ q μ :=
+    { toFun := fun f ↦ (hmem i f).toLp (torusSchwartzPartial i f)
+      map_add' := fun f g ↦ by
+        rw [← MemLp.toLp_add]
+        congr 1
+        funext z
+        exact elementaryPartial_add f.property.1 g.property.1 0 i _ 0 PUnit.unit
+      map_smul' := fun c f ↦ by
+        rw [RingHom.id_apply, ← MemLp.toLp_const_smul]
+        congr 1
+        funext z
+        exact elementaryPartial_smul c f.property.1 0 i _ 0 PUnit.unit }
+  let P (i : Fin n → ℕ) := (normSeminorm ℂ (Lp ℂ q μ)).comp (U i)
+  have hP (i : Fin n → ℕ) (f : TorusSchwartz n) :
+      ENNReal.ofReal (P i f) = eLpNorm (torusSchwartzPartial i f) q μ := by
+    change ENNReal.ofReal ‖(hmem i f).toLp _‖ = _
+    rw [Lp.norm_toLp, ENNReal.ofReal_toReal (hmem i f).eLpNorm_lt_top.ne]
+  refine ⟨hmem, ⟨P, ?_, hP⟩⟩
+  let Q : SeminormFamily ℂ (TorusSchwartz n) (ElementarySchwartzIndex 0 n 0) :=
+    elementarySchwartzSeminorm
+  have hQ : WithSeminorms Q := elementarySchwartz_withSeminorms
+  have hQval (i : ElementarySchwartzIndex 0 n 0) (f : TorusSchwartz n) :
+      ENNReal.ofReal (Q i f) = ⨆ z, (‖torusSchwartzPartial i.2.2.1 f z‖₊ : ℝ≥0∞) :=
+    torusSchwartzSeminorm_eq i f
+  refine hQ.congr (Seminorm.IsBounded.of_real fun i ↦ ?_)
+    (Seminorm.IsBounded.of_real fun i ↦ ?_)
+  · let j : ElementarySchwartzIndex 0 n 0 := (0, 0, i, 0)
+    refine ⟨{j}, 1, fun f ↦ ?_⟩
+    simp only [LinearMap.id_apply, Finset.sup_singleton, one_mul]
+    apply (ENNReal.ofReal_le_ofReal_iff (apply_nonneg (Q j) f)).mp
+    rw [hP]
+    have hle := eLpNorm_le_of_ae_bound (μ := μ) (p := q) (hmem i f).aestronglyMeasurable
+      (C := Q j f) (ae_of_all μ fun z ↦ ?_)
+    · simpa only [measure_univ, ENNReal.one_rpow, one_mul] using hle
+    · apply (ENNReal.ofReal_le_ofReal_iff (apply_nonneg (Q j) f)).mp
+      rw [hQval]
+      simpa only [ENNReal.coe_nnreal_eq, coe_nnNorm] using
+        le_iSup (fun z ↦ (‖torusSchwartzPartial i f z‖₊ : ℝ≥0∞)) z
+  · let index (s : Finset (Fin n)) := i.2.2.1 + squarefreeMultiIndex s
+    let support := Finset.univ.image index
+    refine ⟨support, Fintype.card (Finset (Fin n)), fun f ↦ ?_⟩
+    have hterm (s : Finset (Fin n)) : P (index s) f ≤ support.sup P f :=
+      Seminorm.le_finset_sup_apply (Finset.mem_image.mpr ⟨s, Finset.mem_univ _, rfl⟩)
+    have hL1 (j : Fin n → ℕ) : (∫ y, ‖torusSchwartzPartial j f y‖ ∂μ) ≤ P j f := by
+      rw [← lpNorm_one_eq_integral_norm (hmem j f).aestronglyMeasurable, lpNorm]
+      have hle := eLpNorm_le_eLpNorm_mul_rpow_measure_univ hq (hmem j f).aestronglyMeasurable
+      rw [measure_univ, ENNReal.one_rpow, mul_one, ← hP] at hle
+      exact (ENNReal.toReal_mono (by finiteness) hle).trans_eq
+        (ENNReal.toReal_ofReal (apply_nonneg _ _))
+    apply (ENNReal.ofReal_le_ofReal_iff (mul_nonneg (Nat.cast_nonneg _) (apply_nonneg _ _))).mp
+    rw [LinearMap.id_apply, hQval]
+    apply iSup_le
+    intro z
+    rw [← ENNReal.ofReal_coe_nnreal]
+    apply ENNReal.ofReal_le_ofReal
+    calc
+      _ ≤ ∑ s : Finset (Fin n), ∫ y, ‖torusSchwartzPartial (index s) f y‖ ∂μ :=
+        torusSchwartzPartial_norm_le_integrals i.2.2.1 f z
+      _ ≤ ∑ _s : Finset (Fin n), support.sup P f :=
+        Finset.sum_le_sum fun s _ ↦ (hL1 (index s)).trans (hterm s)
+      _ = _ := by simp
+
+end TorusLp
 
 /-- Paper: (D.1.10.12), p. 786. Multiply a rapidly decreasing sequence
 by the integer coordinate monomial. -/
