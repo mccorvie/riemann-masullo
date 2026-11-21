@@ -130,10 +130,102 @@ theorem modulatedExponentialDecay_stageLimit :
       (∀ n, IsEmbedding (i n)) ∧ (∀ f : E, ∃ n, f ∈ (i n).range) ∧
       (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology i := by sorry
 
+/-- Point evaluation on the Schwartz–Bruhat space is continuous since on each
+structural stage it is bounded by the zeroth Schwartz seminorm. -/
+private theorem continuous_schwartzBruhat_eval {A : Type*} [CommGroup A] [TopologicalSpace A]
+    (x : A) : Continuous (fun f : SchwartzBruhat A ↦ f x) := by
+  let ev : SchwartzBruhat A →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule A).subtype
+  let p : Seminorm ℂ (SchwartzBruhat A) := (normSeminorm ℂ ℂ).comp ev
+  have hp : Continuous p := by
+    apply (withGeneratingSeminorms_spec _ _).continuous_seminorm
+      (⟨p, ?_⟩ : {p : Seminorm ℂ (schwartzBruhatSubmodule A) //
+        ∀ (a : BruhatStructuralPair A) (e : ElementaryLCAPresentation a.quotient),
+          Continuous (p ∘ schwartzBruhatStageInclusion a e)})
+    intro a e
+    let _ := e.finiteGroup
+    let i : ElementarySchwartzIndex e.realDim e.torusDim e.latticeRank := (0, 0, 0, 0)
+    change Continuous (p.comp (schwartzBruhatStageInclusion a e) :
+      Seminorm ℂ (SchwartzBruhatStage e))
+    refine Seminorm.continuous_of_le («E» := SchwartzBruhatStage e)
+      (q := elementarySchwartzSeminorm i) (elementarySchwartz_withSeminorms.continuous_seminorm i) ?_
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ elementarySchwartzSeminorm i f
+    classical
+    erw [schwartzBruhatStageRealization_apply]
+    split_ifs with hx
+    · let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f.val y‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val i).toReal
+      apply ENNReal.toReal_mono (f.property.2 i).ne
+      rw [show i = (0, 0, 0, 0) from rfl, elementarySchwartzBound_zero]
+      exact le_iSup (fun z ↦ (‖f.val z‖₊ : ENNReal)) y
+    · exact (norm_zero («E» := ℂ)).le.trans (apply_nonneg (elementarySchwartzSeminorm i) f)
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp («E» := SchwartzBruhat A) ev
+    (fun _ ↦ hp)
+
+/-- The joint twist map has closed range because its coordinates obey pointwise
+compatibility equations with any one fixed twist. -/
+private theorem modulatedExponentialDecayTwists_closedRange {A : Type*} [CommGroup A]
+    [TopologicalSpace A] (n : A →ₜ* ℝ≥0ˣ) (J : Set ℝ) (hJ : J.Nonempty) :
+    IsClosed (range (fun (f : modulatedExponentialDecaySubmodule n J) (b : J) ↦
+      modulatedExponentialDecayTwist n J b f)) := by
+  let twists (f : modulatedExponentialDecaySubmodule n J) (b : J) :=
+    modulatedExponentialDecayTwist n J b f
+  change IsClosed (range twists)
+  obtain ⟨a, ha⟩ := hJ
+  let a₀ : J := ⟨a, ha⟩
+  let w (b : J) (x : A) : ℂ := ((((n x).val : ℝ) ^ (b : ℝ) : ℝ) : ℂ)
+  have hw (b : J) (x : A) : w b x ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n x))) _).ne'
+  have heval (b : J) (x : A) :
+      Continuous (fun g : J → SchwartzBruhat A ↦ g b x) := by
+    have hb : Continuous (fun g : J → SchwartzBruhat A ↦ g b) := continuous_apply b
+    exact (continuous_schwartzBruhat_eval (A := A) x).comp hb
+  let compatible (b : J) (x : A) : Set (J → SchwartzBruhat A) :=
+    {g | w a₀ x * g b x = w b x * g a₀ x}
+  have hrange : range twists = ⋂ (b : J) (x : A), compatible b x := by
+    refine Set.ext fun g ↦ ?_
+    simp only [mem_range, mem_iInter, compatible, mem_ofPred_eq]
+    constructor
+    · rintro ⟨f, rfl⟩ b x
+      change w a₀ x * (w b x * f.val x) = w b x * (w a₀ x * f.val x)
+      exact mul_left_comm _ _ _
+    · intro hg
+      let f (x : A) := g a₀ x / w a₀ x
+      have hmatch (b : J) (x : A) : w b x * f x = g b x := by
+        change w b x * (g a₀ x / w a₀ x) = g b x
+        rw [← mul_div_assoc]
+        exact (div_eq_iff (hw a₀ x)).mpr ((hg b x).symm.trans (mul_comm _ _))
+      have hf : f ∈ modulatedExponentialDecaySubmodule n J := by
+        refine (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr ?_
+        let gb : schwartzBruhatSubmodule A := g b
+        have hb : modulationWeight n b f = gb.val := funext (hmatch b)
+        exact hb ▸ gb.property
+      refine ⟨⟨f, hf⟩, ?_⟩
+      funext b
+      exact Subtype.ext (funext (hmatch b))
+  have hCompatible (b : J) (x : A) : IsClosed (compatible b x) :=
+    isClosed_eq (continuous_const.mul (heval b x)) (continuous_const.mul (heval a₀ x))
+  have hIntersection : IsClosed (⋂ (b : J) (x : A), compatible b x) :=
+    isClosed_iInter fun b ↦ isClosed_iInter (hCompatible b)
+  exact (congrArg (fun s : Set (J → SchwartzBruhat A) ↦ IsClosed s) hrange).mpr hIntersection
+
+set_option linter.unusedSectionVars false in
 include hSC hm hms hInt hne in
 /-- Paper: Example D.3.3.5, p. 806. Each compact-subgroup decay stage is complete. -/
 theorem modulatedExponentialDecayStage_complete (k : GoodCompact) :
-    CompleteSpace (ModulatedExponentialDecayStage m I k) := by sorry
+    CompleteSpace (ModulatedExponentialDecayStage m I k) := by
+  let n := quotientModulation m k.val k.property.1
+  let T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (I → SchwartzBruhat (G ⧸ k.val)) :=
+    LinearMap.pi (modulatedExponentialDecayTwist n I)
+  have hInd : IsInducing T := modulatedExponentialDecayStage_twists_isInducing m I k
+  have hT : IsUniformInducing T := AddMonoidHom.isUniformInducing_of_isInducing
+    (f := T) hInd
+  have hClosed : IsClosed (range T) :=
+    modulatedExponentialDecayTwists_closedRange n I hne
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let _ := schwartzBruhat_complete (G := G ⧸ k.val)
+  exact hT.completeSpace hClosed.isComplete
 
 include hm hms hInt hne in
 /-- Paper: Remark D.3.3.6, p. 806. Multiplying by the module to the power a
