@@ -44,13 +44,61 @@ include hTop hT2 hLC
 -- TODO(paper-gap): D.1.6.4 claims local compactness of the compact-open hom groups.
 -- For the countable product of circles the one-parameter subgroup space is ℝ^ℕ.
 
+omit hT2 in
+/-- If evaluation identifies `G` with its Pontryagin bidual, transposing character
+evaluation gives the inverse to dualizing one-parameter subgroups. -/
+theorem lcaTopologicalLie_dual_of_bidual
+    (eG : G ≃ₜ* PontryaginDual (PontryaginDual G))
+    (heG : ∀ x χ, eG x χ = χ x) :
+    ∃ e : LCATopologicalLie G ≃ₜ*
+        (PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ)),
+      ∀ a, e a = PontryaginDual.map a := by
+  let evalReal := pontryaginDual_eval (G := Multiplicative ℝ)
+  let eGinv : PontryaginDual (PontryaginDual G) →ₜ* G := eG.symm
+  let dual := PontryaginDual.mapHom (Multiplicative ℝ) G
+  let inverse (b : PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ)) :
+      LCATopologicalLie G :=
+    eGinv.comp ((PontryaginDual.map b).comp evalReal)
+  have hEval (b : PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ))
+      (t : Multiplicative ℝ) (χ : PontryaginDual G) : χ (inverse b t) = b χ t := by
+    calc
+      χ (inverse b t) = eG (inverse b t) χ := (heG _ _).symm
+      _ = evalReal t (b χ) := by
+        change eG (eG.symm (PontryaginDual.map b (evalReal t))) χ = _
+        rw [eG.apply_symm_apply, PontryaginDual.map_apply]
+      _ = b χ t := rfl
+  have hLeft : Function.LeftInverse inverse dual := by
+    intro a
+    apply ContinuousMonoidHom.ext
+    intro t
+    apply eG.injective
+    apply PontryaginDual.ext
+    intro χ
+    rw [heG, heG, hEval (dual a)]
+    rfl
+  have hRight : Function.RightInverse inverse dual :=
+    fun b ↦ ContinuousMonoidHom.ext fun χ ↦ PontryaginDual.ext fun t ↦ hEval b t χ
+  have hCont : Continuous inverse :=
+    eGinv.continuous_comp_right.comp
+      (evalReal.continuous_comp_left.comp
+        (PontryaginDual.mapHom (PontryaginDual G) (PontryaginDual (Multiplicative ℝ))).continuous)
+  exact ⟨{ toFun := dual
+           invFun := inverse
+           left_inv := hLeft
+           right_inv := hRight
+           map_mul' := map_mul dual
+           continuous_toFun := dual.continuous
+           continuous_invFun := hCont }, fun _ ↦ rfl⟩
+
 /-- Paper: Lemma D.1.6.4, p. 766. Precomposition of characters with a
 one-parameter subgroup gives the canonical compact-open topological group isomorphism.
 Deviation: The local compactness assertion fails for an infinite product of circles. -/
 theorem lcaTopologicalLie_dual :
     ∃ e : LCATopologicalLie G ≃ₜ*
         (PontryaginDual G →ₜ* PontryaginDual (Multiplicative ℝ)),
-      ∀ a, e a = PontryaginDual.map a := by sorry
+      ∀ a, e a = PontryaginDual.map a := by
+  obtain ⟨eG, heG⟩ := pontryaginDual_bidual (G := G)
+  exact lcaTopologicalLie_dual_of_bidual eG heG
 
 /-- Paper: Definition D.1.6.5, p. 766. Differentiate the orbit curve of a
 function along a one-parameter subgroup at time zero. -/
