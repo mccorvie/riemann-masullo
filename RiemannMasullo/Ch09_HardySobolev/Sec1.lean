@@ -164,7 +164,18 @@ weight condition with subadditivity constant one. -/
 theorem modulatedSobolevWeight_subadditive :
     Continuous (modulatedSobolevWeight m) ∧
       ∀ x y, modulatedSobolevWeight m (x * y) ≤
-        modulatedSobolevWeight m x + modulatedSobolevWeight m y := by sorry
+        modulatedSobolevWeight m x + modulatedSobolevWeight m y := by
+  have hne (x : G) : ((m x).val : ℝ) ≠ 0 :=
+    NNReal.coe_ne_zero.mpr (m x).ne_zero
+  constructor
+  · have hm : Continuous (fun x ↦ ((m x).val : ℝ)) :=
+      NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+    exact ((hm.log hne).abs).subtype_mk _
+  · intro x y
+    change |Real.log ((m (x * y)).val : ℝ)| ≤
+      |Real.log ((m x).val : ℝ)| + |Real.log ((m y).val : ℝ)|
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul (hne x) (hne y)]
+    exact abs_add_le _ _
 
 variable [MeasurableSpace G] (μ : Measure G)
 
