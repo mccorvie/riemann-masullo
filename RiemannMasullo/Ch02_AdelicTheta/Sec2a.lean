@@ -2042,7 +2042,28 @@ terms, theta decays faster than any power of the norm as it tends to zero. -/
 theorem adelicTheta_decay_small (f : ℬ[F]) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], normℝ g < T →
       ‖adelicTheta f g - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤
-        C * (normℝ g) ^ N := by sorry
+        C * (normℝ g) ^ N := by
+  obtain ⟨C, T, hC, hT, hlarge⟩ := adelicTheta_decay_large (adeleSchwartzFourier f) (N + 1)
+  refine ⟨C, T⁻¹, hC, inv_pos.mpr hT, ?_⟩
+  intro g hg
+  have hnorm : 0 < normℝ g :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero (ideleClassNorm F g)))
+  have hinv : normℝ (g⁻¹) = (normℝ g)⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  have hg' : T < normℝ (g⁻¹) := by
+    rw [hinv]
+    exact (lt_inv_comm₀ hnorm hT).mp hg
+  have hbound : ‖adelicTheta (adeleSchwartzFourier f) g⁻¹‖ ≤ C * (normℝ g) ^ (N + 1) := by
+    simpa only [hinv, inv_pow, inv_inv] using hlarge g⁻¹ hg'
+  rw [adelicTheta_riemannRoch f g, sub_right_comm, sub_add_cancel, add_sub_cancel_right,
+    norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr hnorm.le)]
+  calc
+    _ ≤ (normℝ g)⁻¹ * (C * (normℝ g) ^ (N + 1)) :=
+      mul_le_mul_of_nonneg_left hbound (inv_nonneg.mpr hnorm.le)
+    _ = C * ((normℝ g)⁻¹ * (normℝ g * (normℝ g) ^ N)) := by
+      rw [pow_succ']
+      ac_rfl
+    _ = _ := by rw [inv_mul_cancel_left₀ hnorm.ne']
 
 /-- Paper: Theorem 2.2.3.4(3), p. 83. If both zero terms vanish, theta
 decays at both ends at every exponential rate in the absolute logarithmic norm. -/
