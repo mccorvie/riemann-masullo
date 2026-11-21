@@ -302,6 +302,454 @@ section Characterizations
 variable (E : Type u) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
   [PolynormableSpace ℂ E] [T2Space E]
 
+/-- Paper: §C.2.4.2, p. 686. The canonical map into the local Banach space of a
+continuous seminorm is continuous for the original topology. -/
+private theorem exists_localBanach_inclusion {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [PolynormableSpace ℂ X] (p : Seminorm ℂ X) (hp : Continuous p) :
+    ∃ f : X →L[ℂ] LocalBanach p, ∀ x : X, f x = (show WithLocalSeminorm p from x) := by
+  let f : X →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+  refine ⟨⟨f, ?_⟩, fun _ ↦ rfl⟩
+  exact (PolynormableSpace.withSeminorms ℂ X).continuous_normedSpace_rng _ f
+    ⟨{⟨p, hp⟩}, 1, by
+      simpa using (show (normSeminorm ℂ _).comp f ≤ p from
+        fun x ↦ (localBanach_norm_coe p x).le)⟩
+
+omit [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. Contracting an algebraic tensor against a
+functional on a local Banach space is bounded by the injective seminorm of the tensor. -/
+private theorem norm_localBanach_contraction_le {F : Type*} [AddCommGroup F] [Module ℂ F]
+    [TopologicalSpace F] [PolynormableSpace ℂ F] {p : Seminorm ℂ E} {s : Seminorm ℂ F}
+    (V : {V : Set E // V ∈ 𝓝 0}) (W : {W : Set F // W ∈ 𝓝 0})
+    (i : E →L[ℂ] LocalBanach p) (j : F →L[ℂ] LocalBanach s)
+    (hi : ∀ x ∈ V.val, ‖i x‖ ≤ 1) (hj : ∀ y ∈ W.val, ‖j y‖ ≤ 1)
+    (φ : LocalBanach p →L[ℂ] ℂ) (z : E ⊗[ℂ] F) :
+    ‖((TensorProduct.lid ℂ (LocalBanach s)).toLinearMap.comp
+      (TensorProduct.map (φ.comp i).toLinearMap j.toLinearMap)) z‖ ≤
+        ‖φ‖ * injectiveTensorSeminorm V W z := by
+  let contract (ψ : LocalBanach p →L[ℂ] ℂ) :=
+    (TensorProduct.lid ℂ (LocalBanach s)).toLinearMap.comp
+      (TensorProduct.map (ψ.comp i).toLinearMap j.toLinearMap)
+  change ‖contract φ z‖ ≤ _
+  have unit (ψ : LocalBanach p →L[ℂ] ℂ) (hψ : ‖ψ‖ ≤ 1) :
+      ‖contract ψ z‖ ≤ injectiveTensorSeminorm V W z := by
+    obtain ⟨g, hg, hgz⟩ := exists_dual_vector'' ℂ (contract ψ z)
+    have hψV : ψ.comp i ∈ StrongDual.polar ℂ V.val :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun x hx ↦
+        (ψ.le_opNorm (i x)).trans (by simpa using mul_le_mul hψ (hi x hx) (norm_nonneg _) zero_le_one)
+    have hgW : g.comp j ∈ StrongDual.polar ℂ W.val :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦
+        (g.le_opNorm (j y)).trans (by simpa using mul_le_mul hg (hj y hy) (norm_nonneg _) zero_le_one)
+    have heq : g.toLinearMap.comp (contract ψ) = tensorDualForm (ψ.comp i) (g.comp j) := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [contract, tensorDualForm_tmul, smul_eq_mul]
+    have heqz := DFunLike.congr_fun heq z
+    change g (contract ψ z) = _ at heqz
+    rw [hgz] at heqz
+    obtain ⟨hBdd, hSup⟩ := injectiveSeminorm_eq_ciSup V W z
+    rw [hSup]
+    have h := le_ciSup hBdd (⟨ψ.comp i, hψV⟩, ⟨g.comp j, hgW⟩)
+    change ‖tensorDualForm (ψ.comp i) (g.comp j) z‖ ≤ _ at h
+    rw [← heqz] at h
+    change ‖(‖contract ψ z‖ : ℂ)‖ ≤ _ at h
+    simpa only [Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)] using h
+  by_cases hφ : φ = 0
+  · subst φ
+    have hz : contract 0 = 0 := by ext x y; simp [contract]
+    simp [hz]
+  let a : ℂ := ‖φ‖
+  have ha : a ≠ 0 := by simpa [a] using hφ
+  have hnorm : ‖a‖ = ‖φ‖ := by simp [a]
+  let ψ := a⁻¹ • φ
+  have hψ : ‖ψ‖ ≤ 1 := by
+    rw [norm_smul, norm_inv, hnorm, inv_mul_cancel₀ (norm_ne_zero_iff.mpr hφ)]
+  have heq : contract φ = a • contract ψ := by
+    apply TensorProduct.ext'
+    intro x y
+    simp [contract, ψ, smul_smul, ha]
+  rw [heq, LinearMap.smul_apply, norm_smul, hnorm]
+  exact mul_le_mul_of_nonneg_left (unit ψ hψ) (norm_nonneg _)
+
+omit [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. A local nuclear series bounds each projective
+seminorm with the injective seminorm from the source neighborhood and the second factor. -/
+private theorem projectiveSeminorm_le_of_localBanach_series {F : Type*}
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F]
+    {p q : Seminorm ℂ E} {s : Seminorm ℂ F} (hq : q ≤ p)
+    (V : {V : Set E // V ∈ 𝓝 0}) (W : {W : Set F // W ∈ 𝓝 0})
+    (i : E →L[ℂ] LocalBanach p) (j : F →L[ℂ] LocalBanach s)
+    (hi : ∀ x : E, i x = (show WithLocalSeminorm p from x))
+    (hj : ∀ y : F, j y = (show WithLocalSeminorm s from y))
+    (hiV : ∀ x ∈ V.val, p x ≤ 1) (hjW : ∀ y ∈ W.val, s y ≤ 1)
+    (r : Seminorm ℂ (E ⊗[ℂ] F)) (hr : ∀ x y, r (x ⊗ₜ[ℂ] y) ≤ q x * s y)
+    (c : ℕ → ℂ) (φ : ℕ → LocalBanach p →L[ℂ] ℂ) (b : ℕ → LocalBanach q)
+    (hc : Summable (fun n ↦ ‖c n‖)) (hφ : Tendsto φ atTop (𝓝 0))
+    (hb : Tendsto b atTop (𝓝 0))
+    (hseries : ∀ x, HasSum (fun n ↦ (c n * φ n x) • b n) (localBanachMap p q hq x)) :
+    ∃ C : ℝ, ∀ z, r z ≤ C * injectiveTensorSeminorm V W z := by
+  let κ : E ⊗[ℂ] F →ₗ[ℂ] LocalBanach r := Completion.toComplL.toLinearMap.comp LinearMap.id
+  have hκ (z : E ⊗[ℂ] F) : ‖κ z‖ = r z := localBanach_norm_coe r z
+  -- Extend the pure-tensor map to both local completions, with values in the completion for r.
+  let B₀ : WithLocalSeminorm q →L[ℂ] WithLocalSeminorm s →L[ℂ] LocalBanach r :=
+    ((LinearMap.compr₂ (TensorProduct.mk ℂ E F) κ :
+        WithLocalSeminorm q →ₗ[ℂ] WithLocalSeminorm s →ₗ[ℂ] LocalBanach r)).mkContinuous₂ 1
+      (fun x y ↦ by
+        change ‖κ (x ⊗ₜ[ℂ] y)‖ ≤ 1 * q x * s y
+        rw [hκ, one_mul]
+        exact hr x y)
+  let B₁ := B₀.fromCompletion
+  let B : LocalBanach q →L[ℂ] LocalBanach s →L[ℂ] LocalBanach r :=
+    ((B₁.flip.fromCompletion).flip)
+  have hB₀ : ‖B₀‖ ≤ 1 := LinearMap.mkContinuous₂_norm_le _ zero_le_one _
+  have hB (x : LocalBanach q) (y : LocalBanach s) : ‖B x y‖ ≤ ‖x‖ * ‖y‖ := by
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+    | ih x =>
+      induction y using Completion.induction_on with
+      | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+      | ih y =>
+        change ‖(B₁.flip.fromCompletion (y : LocalBanach s)) (x : LocalBanach q)‖ ≤ _
+        rw [ContinuousLinearMap.fromCompletion_apply_coe, ContinuousLinearMap.flip_apply,
+          ContinuousLinearMap.fromCompletion_apply_coe, Completion.norm_coe, Completion.norm_coe]
+        exact (B₀.le_opNorm₂ x y).trans
+          (by calc
+            ‖B₀‖ * ‖x‖ * ‖y‖ ≤ 1 * ‖x‖ * ‖y‖ := by gcongr
+            _ = _ := by rw [one_mul])
+  let D (n : ℕ) : E ⊗[ℂ] F →ₗ[ℂ] LocalBanach s :=
+    (TensorProduct.lid ℂ (LocalBanach s)).toLinearMap.comp
+      (TensorProduct.map ((φ n).comp i).toLinearMap j.toLinearMap)
+  have hD (n) (z : E ⊗[ℂ] F) :
+      ‖D n z‖ ≤ ‖φ n‖ * injectiveTensorSeminorm V W z :=
+    norm_localBanach_contraction_le E V W i j
+      (fun x hx ↦ by rw [hi, localBanach_norm_coe]; exact hiV x hx)
+      (fun y hy ↦ by rw [hj, localBanach_norm_coe]; exact hjW y hy) (φ n) z
+  -- Transport the local series across the extended bilinear map on each pure tensor.
+  have hs (z : E ⊗[ℂ] F) : HasSum (fun n ↦ c n • B (b n) (D n z)) (κ z) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      have hs := (hseries (i x)).map (B.flip (j y)) (B.flip (j y)).continuous
+      have heq : B (localBanachMap p q hq (i x)) (j y) = κ (x ⊗ₜ[ℂ] y) := by
+        rw [hi, hj, localBanachMap_coe]
+        let x' : WithLocalSeminorm q := x
+        let y' : WithLocalSeminorm s := y
+        change B₁.flip.fromCompletion (y' : LocalBanach s) (x' : LocalBanach q) = _
+        rw [ContinuousLinearMap.fromCompletion_apply_coe, ContinuousLinearMap.flip_apply,
+          ContinuousLinearMap.fromCompletion_apply_coe]
+        rfl
+      rw [← heq]
+      refine hs.congr_fun fun n ↦ ?_
+      simp [D, smul_smul, ContinuousLinearMap.flip_apply]
+    | add z z' hz hz' => simpa only [map_add, smul_add] using hz.add hz'
+  obtain ⟨A, hA⟩ := (show Tendsto (fun n ↦ ‖φ n‖) atTop (𝓝 0) by simpa using hφ.norm).bddAbove_range
+  obtain ⟨M, hM⟩ := (show Tendsto (fun n ↦ ‖b n‖) atTop (𝓝 0) by simpa using hb.norm).bddAbove_range
+  refine ⟨(∑' n, ‖c n‖) * (M * A), fun z ↦ ?_⟩
+  have hAz : 0 ≤ A := (norm_nonneg (φ 0)).trans (hA (mem_range_self 0))
+  have hMz : 0 ≤ M := (norm_nonneg (b 0)).trans (hM (mem_range_self 0))
+  rw [← hκ, mul_assoc]
+  apply (hs z).norm_le_of_bounded (hc.hasSum.mul_right _)
+  intro n
+  rw [norm_smul]
+  calc
+    _ ≤ ‖c n‖ * (‖b n‖ * ‖D n z‖) := by gcongr; exact hB _ _
+    _ ≤ ‖c n‖ * (M * (A * injectiveTensorSeminorm V W z)) := by
+      gcongr
+      · exact hM (mem_range_self n)
+      · exact (hD n z).trans (mul_le_mul_of_nonneg_right (hA (mem_range_self n)) (apply_nonneg _ _))
+    _ = _ := by ring
+
+omit [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. A generating projective seminorm is bounded
+on pure tensors by the product of two continuous seminorms on the factors. -/
+private theorem exists_projectiveSeminorm_pure_bound {F : Type*} [AddCommGroup F] [Module ℂ F]
+    [TopologicalSpace F] [PolynormableSpace ℂ F] (r : Seminorm ℂ (E ⊗[ℂ] F))
+    (hr : ContinuousAt (fun v : E × F ↦ r (v.1 ⊗ₜ[ℂ] v.2)) 0) :
+    ∃ (q : Seminorm ℂ E) (s : Seminorm ℂ F), Continuous q ∧ Continuous s ∧
+      ∀ x y, r (x ⊗ₜ[ℂ] y) ≤ q x * s y := by
+  have h : {v : E × F | r (v.1 ⊗ₜ[ℂ] v.2) < 1} ∈ 𝓝 0 :=
+    hr.preimage_mem_nhds (show Iio (1 : ℝ) ∈ 𝓝 (r ((0 : E × F).1 ⊗ₜ[ℂ] (0 : E × F).2)) by
+      simpa using Iio_mem_nhds one_pos)
+  rw [show (0 : E × F) = ((0 : E), (0 : F)) from rfl, nhds_prod_eq] at h
+  obtain ⟨U, hU, W, hW, hUW⟩ := Filter.mem_prod_iff.mp h
+  obtain ⟨q, hq, hqU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  obtain ⟨s, hs, hsW⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ F).mem_iff.mp hW
+  refine ⟨q, s, hq, hs, fun x y ↦ ?_⟩
+  have bound (a b : ℝ) (ha : q x < a) (hb : s y < b) :
+      r (x ⊗ₜ[ℂ] y) ≤ a * b := by
+    have ha₀ := (apply_nonneg q x).trans_lt ha
+    have hb₀ := (apply_nonneg s y).trans_lt hb
+    have hx : (a : ℂ)⁻¹ • x ∈ q.ball 0 1 := by
+      rwa [Seminorm.mem_ball_zero, map_smul_eq_mul, norm_inv, Complex.norm_real,
+        Real.norm_of_nonneg ha₀.le, inv_mul_lt_iff₀ ha₀, mul_one]
+    have hy : (b : ℂ)⁻¹ • y ∈ s.ball 0 1 := by
+      rwa [Seminorm.mem_ball_zero, map_smul_eq_mul, norm_inv, Complex.norm_real,
+        Real.norm_of_nonneg hb₀.le, inv_mul_lt_iff₀ hb₀, mul_one]
+    have hlt : r (((a : ℂ)⁻¹ • x) ⊗ₜ[ℂ] ((b : ℂ)⁻¹ • y)) < 1 :=
+      hUW (a := ((a : ℂ)⁻¹ • x, (b : ℂ)⁻¹ • y)) ⟨hqU hx, hsW hy⟩
+    have hscaled := hlt.le
+    rw [TensorProduct.smul_tmul_smul, map_smul_eq_mul, norm_mul, norm_inv, norm_inv,
+      Complex.norm_real, Complex.norm_real, Real.norm_of_nonneg ha₀.le,
+      Real.norm_of_nonneg hb₀.le,
+      show a⁻¹ * b⁻¹ = (a * b)⁻¹ by simp [mul_inv_rev, mul_comm]] at hscaled
+    rw [inv_mul_le_iff₀ (mul_pos ha₀ hb₀), mul_one] at hscaled
+    exact hscaled
+  have bound' (a : ℝ) (ha : q x < a) : r (x ⊗ₜ[ℂ] y) ≤ a * s y := by
+    have ht : Tendsto (fun b : ℝ ↦ a * b) (𝓝[>] (s y)) (𝓝 (a * s y)) :=
+      (continuous_const.mul continuous_id).continuousAt.mono_left inf_le_left
+    apply ge_of_tendsto ht
+    filter_upwards [self_mem_nhdsWithin (a := s y) (s := Ioi (s y))] with b hb
+    exact bound a b ha hb
+  have ht : Tendsto (fun a : ℝ ↦ a * s y) (𝓝[>] (q x)) (𝓝 (q x * s y)) :=
+    (continuous_id.mul continuous_const).continuousAt.mono_left inf_le_left
+  apply ge_of_tendsto ht
+  filter_upwards [self_mem_nhdsWithin (a := q x) (s := Ioi (q x))] with a ha
+  exact bound' a ha
+
+omit [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. Local nuclear series imply continuity of
+the identity from the injective topology to the projective topology. -/
+private theorem continuous_injectiveTensor_to_projectiveTensor_of_localSeries
+    (h : ∀ (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U),
+      ∃ (V : Set E) (hV : V ∈ 𝓝 0) (bV : Balanced ℂ V) (cV : Convex ℝ V) (hVU : V ⊆ U),
+        let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+        let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+        let T := localBanachMap p q (gauge_mono (absorbent_nhds_zero hV) hVU)
+        ∃ (c : ℕ → ℂ) (φ : ℕ → LocalBanach p →L[ℂ] ℂ) (y : ℕ → LocalBanach q),
+          Summable (fun n ↦ ‖c n‖) ∧ Tendsto φ atTop (𝓝 0) ∧ Tendsto y atTop (𝓝 0) ∧
+            ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (T x))
+    (F : Type*) [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F] :
+    Continuous (show InjectiveTensor E F → ProjectiveTensor E F from id) := by
+  let hI := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) // ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦
+      p.val)
+  refine hP.continuous_of_continuous_comp (LinearMap.id : InjectiveTensor E F →ₗ[ℂ] ProjectiveTensor E F)
+    fun ⟨r, hr⟩ ↦ ?_
+  obtain ⟨q, s, hq, hs, hrs⟩ := exists_projectiveSeminorm_pure_bound E r hr
+  let U := q.ball 0 1
+  let W : {W : Set F // W ∈ 𝓝 0} := ⟨s.ball 0 1, s.ball_mem_nhds hs one_pos⟩
+  have hU : U ∈ 𝓝 0 := q.ball_mem_nhds hq one_pos
+  obtain ⟨V, hV, bV, cV, hVU, c, φ, b, hc, hφ, hb, hseries⟩ :=
+    h U hU (q.balanced_ball_zero 1) (q.convex_ball 0 1)
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  have := PolynormableSpace.isTopologicalAddGroup (𝕜 := ℂ) (E := E)
+  obtain ⟨i, hi⟩ := exists_localBanach_inclusion p (continuous_gauge cV hV)
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion s hs
+  have hqeq : gaugeSeminorm (q.balanced_ball_zero 1) (q.convex_ball 0 1)
+      (absorbent_nhds_zero hU) = q :=
+    DFunLike.coe_injective (q.restrictScalars ℝ).gauge_ball
+  have hle := gauge_mono (absorbent_nhds_zero hV) hVU
+  have hrs' : ∀ x y, r (x ⊗ₜ[ℂ] y) ≤
+      gaugeSeminorm (q.balanced_ball_zero 1) (q.convex_ball 0 1) (absorbent_nhds_zero hU) x * s y := by
+    rw [hqeq]
+    exact hrs
+  let V' : {V : Set E // V ∈ 𝓝 0} := ⟨V, hV⟩
+  obtain ⟨C, hC⟩ := projectiveSeminorm_le_of_localBanach_series E hle V' W i j hi hj
+    (fun x hx ↦ gauge_le_one_of_mem hx) (fun y hy ↦ (s.mem_ball_zero.mp hy).le)
+    r hrs' c φ b hc hφ hb hseries
+  let s' : Seminorm ℂ (InjectiveTensor E F) := injectiveTensorSeminorm V' W
+  refine Seminorm.continuous_of_le (q := C.toNNReal • s') ?_ fun z ↦ (hC z).trans ?_
+  · exact (hI.continuous_seminorm (V', W)).const_smul C.toNNReal
+  · exact mul_le_mul_of_nonneg_right (Real.le_coe_toNNReal C) (apply_nonneg _ _)
+
+/-- Paper: Theorem C.2.4.2(2), p. 686. An absolutely summing local Banach
+comparison bounds sums of norms by the weak sums tested against the dual unit ball.
+Deviation: This intermediate condition is used to derive the nuclear series. -/
+def IsAbsolutelySummingLocalBanachMap {p q : Seminorm ℂ E} (h : q ≤ p) : Prop :=
+  ∃ C : ℝ, 0 ≤ C ∧
+    ∀ (n : ℕ) (x : Fin n → LocalBanach p) (M : ℝ), 0 ≤ M →
+      (∀ φ : LocalBanach p →L[ℂ] ℂ, ‖φ‖ ≤ 1 → ∑ i, ‖φ (x i)‖ ≤ M) →
+      ∑ i, ‖localBanachMap p q h (x i)‖ ≤ C * M
+
+omit [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. In a nuclear space, each local Banach
+space admits a comparison from a smaller neighborhood with an absolute
+summability bound. -/
+theorem exists_localBanachMap_absolutelySumming (h : IsNuclearTVS.{v, u} E)
+    (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U) :
+    ∃ (V : Set E) (hV : V ∈ 𝓝 0) (bV : Balanced ℂ V) (cV : Convex ℝ V) (hVU : V ⊆ U),
+      let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+      let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+      IsAbsolutelySummingLocalBanachMap E
+        (show q ≤ p from gauge_mono (absorbent_nhds_zero hV) hVU) := by
+  classical
+  have := PolynormableSpace.isTopologicalAddGroup (𝕜 := ℂ) (E := E)
+  let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  let F := ULift.{v} (LocalBanach q →L[ℂ] ℂ)
+  have : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion q (continuous_gauge cU hU)
+  let B : E →ₗ[ℂ] F →ₗ[ℂ] ℂ := LinearMap.mk₂ ℂ (fun x f ↦ f.down (j x))
+    (by intros; simp) (by intros; simp) (by intros; rfl) (by intros; rfl)
+  let r := (normSeminorm ℂ ℂ).comp (TensorProduct.lift B)
+  have hr : ContinuousAt (fun z : E × F ↦ r (z.1 ⊗ₜ[ℂ] z.2)) 0 := by
+    have hEval := (ContinuousLinearMap.apply ℂ (E' := LocalBanach q) ℂ).continuous₂
+    exact (hEval.comp ((j.continuous.comp continuous_fst).prodMk
+      (continuous_uliftDown.comp continuous_snd))).norm.continuousAt
+  let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun r : {r : Seminorm ℂ (E ⊗[ℂ] F) //
+      ContinuousAt (fun z : E × F ↦ r (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ r.val)
+  let hI := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  have hback : Continuous (show InjectiveTensor E F → ProjectiveTensor E F from id) := by
+    let e := (h.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+    refine e.continuous_symm.congr fun z ↦ ?_
+    exact e.apply_symm_apply z
+  obtain ⟨S, C, _, hC⟩ := Seminorm.bound_of_continuous hI r
+    ((hP.continuous_seminorm ⟨r, hr⟩).comp hback)
+  -- One pair of neighborhoods suffices by intersecting the finitely many pairs.
+  let A := U ∩ ⋂ UV ∈ S, (UV.1.val : Set E)
+  have hA : A ∈ 𝓝 0 := inter_mem hU (S.iInter_mem_sets.mpr fun UV _ ↦ UV.1.property)
+  obtain ⟨p₀, hp₀, hV⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hA
+  let V := p₀.ball 0 1
+  have hV₀ : V ∈ 𝓝 0 := p₀.ball_mem_nhds hp₀ one_pos
+  have bV : Balanced ℂ V := p₀.balanced_ball_zero 1
+  have cV : Convex ℝ V := p₀.convex_ball 0 1
+  have hVU : V ⊆ U := hV.trans inter_subset_left
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV₀)
+  let T := localBanachMap p q (gauge_mono (absorbent_nhds_zero hV₀) hVU)
+  let W : Set F := ⋂ UV ∈ S, (UV.2.val : Set F)
+  have hW : W ∈ 𝓝 0 := S.iInter_mem_sets.mpr fun UV _ ↦ UV.2.property
+  obtain ⟨δ, hδ, hδW⟩ := Metric.mem_nhds_iff.mp hW
+  let V' : {V : Set E // V ∈ 𝓝 0} := ⟨V, hV₀⟩
+  let W' : {W : Set F // W ∈ 𝓝 0} := ⟨W, hW⟩
+  have hVW (UV) (hUV : UV ∈ S) :
+      injectiveTensorSeminorm UV.1 UV.2 ≤ injectiveTensorSeminorm V' W' := by
+    intro z
+    obtain ⟨hBdd, hSup⟩ := injectiveSeminorm_eq_ciSup V' W' z
+    rw [(injectiveSeminorm_eq_ciSup UV.1 UV.2 z).2, hSup]
+    have : Nonempty (StrongDual.polar ℂ UV.1.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    have : Nonempty (StrongDual.polar ℂ UV.2.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    apply ciSup_le
+    rintro ⟨φ, ψ⟩
+    have hφ : φ.val ∈ StrongDual.polar ℂ V :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun x hx ↦
+        (StrongDual.mem_polar_iff ℂ _).mp φ.property x
+          (mem_iInter₂.mp (hV hx).2 UV hUV)
+    have hψ : ψ.val ∈ StrongDual.polar ℂ W :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦
+        (StrongDual.mem_polar_iff ℂ _).mp ψ.property y (mem_iInter₂.mp hy UV hUV)
+    exact le_ciSup hBdd (⟨φ.val, hφ⟩, ⟨ψ.val, hψ⟩)
+  have hrVW (z : E ⊗[ℂ] F) : r z ≤ C * injectiveTensorSeminorm V' W' z :=
+    (hC z).trans (mul_le_mul_of_nonneg_left ((Finset.sup_le hVW) z) C.coe_nonneg)
+  have extend (φ : StrongDual.polar ℂ V) :
+      ∃ g : LocalBanach p →L[ℂ] ℂ, ‖g‖ ≤ 1 ∧
+        ∀ x : WithLocalSeminorm p, g (x : LocalBanach p) = φ.val x := by
+    have bound (x : WithLocalSeminorm p) : ‖φ.val x‖ ≤ ‖x‖ := by
+      change ‖φ.val x‖ ≤ gauge V x
+      apply le_csInf (absorbent_nhds_zero hV₀).gauge_set_nonempty
+      rintro a ⟨ha, y, hy, hxy⟩
+      let x' : E := x
+      change (a • y : E) = x' at hxy
+      change ‖φ.val x'‖ ≤ a
+      have hmap : φ.val (a • y) = a • φ.val y := φ.val.toLinearMap.map_smul_of_tower a y
+      rw [← hxy, hmap, norm_smul, Real.norm_of_nonneg ha.le]
+      exact mul_le_of_le_one_right ha.le ((StrongDual.mem_polar_iff ℂ _).mp φ.property y hy)
+    let f := (show WithLocalSeminorm p →ₗ[ℂ] ℂ from φ.val.toLinearMap).mkContinuous 1
+      (fun x ↦ (bound x).trans_eq (one_mul _).symm)
+    refine ⟨f.fromCompletion, f.fromCompletion.opNorm_le_bound zero_le_one fun x ↦ ?_,
+      fun x ↦ f.fromCompletion_apply_coe x⟩
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+    | ih x =>
+      rw [ContinuousLinearMap.fromCompletion_apply_coe, Completion.norm_coe, one_mul]
+      exact bound x
+  have bound (n : ℕ) (x : Fin n → WithLocalSeminorm p) (M : ℝ)
+      (hMx : ∀ g : LocalBanach p →L[ℂ] ℂ, ‖g‖ ≤ 1 →
+        ∑ i, ‖g (x i : LocalBanach p)‖ ≤ M) :
+      ∑ i, ‖T (x i : LocalBanach p)‖ ≤ (C * (2 / δ)) * M := by
+    -- Evaluate the tensor against norming functionals for the images of the given family.
+    choose g hg hgx using fun i : Fin n ↦ exists_dual_vector'' ℂ (T (x i : LocalBanach p))
+    let x' (i : Fin n) : E := x i
+    let z : E ⊗[ℂ] F := ∑ i : Fin n, x' i ⊗ₜ[ℂ] (ULift.up (g i) : F)
+    have hrz : r z = ∑ i, ‖T (x i : LocalBanach p)‖ := by
+      change ‖TensorProduct.lift B z‖ = _
+      have hterm (i : Fin n) :
+          TensorProduct.lift B (x' i ⊗ₜ[ℂ] (ULift.up (g i) : F)) =
+            (‖T (x i : LocalBanach p)‖ : ℂ) := by
+        change g i (j (x' i)) = _
+        have hji : j (x' i) = T (x i : LocalBanach p) :=
+          (hj (x' i)).trans (localBanachMap_coe p q _ (x i)).symm
+        exact (congrArg (g i) hji).trans (hgx i)
+      rw [show TensorProduct.lift B z = ∑ i, (‖T (x i : LocalBanach p)‖ : ℂ) by
+        exact (map_sum _ _ _).trans (Finset.sum_congr rfl fun i _ ↦ hterm i)]
+      rw [← Complex.ofReal_sum, Complex.norm_real, Real.norm_of_nonneg (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)]
+    have heps : injectiveTensorSeminorm V' W' z ≤ M * (2 / δ) := by
+      rw [(injectiveSeminorm_eq_ciSup V' W' z).2]
+      have : Nonempty (StrongDual.polar ℂ V'.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+      have : Nonempty (StrongDual.polar ℂ W'.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+      apply ciSup_le
+      rintro ⟨φ, ψ⟩
+      obtain ⟨f, hf, hfx⟩ := extend ⟨φ.val, φ.property⟩
+      have hψ (i : Fin n) : ‖ψ.val (ULift.up (g i))‖ ≤ 2 / δ := by
+        let a : ℂ := (δ / 2 : ℝ)
+        have ha : ‖a‖ = δ / 2 := by
+          rw [Complex.norm_real, Real.norm_of_nonneg (by positivity)]
+        have hmem : a • (ULift.up (g i) : F) ∈ W :=
+          hδW (by
+            rw [Metric.mem_ball, dist_zero_right, norm_smul, ha, ULift.norm_up]
+            nlinarith [hg i, mul_le_mul_of_nonneg_left (hg i) (show 0 ≤ δ / 2 by positivity)])
+        have hnorm := (StrongDual.mem_polar_iff ℂ _).mp ψ.property _ hmem
+        rw [map_smul, norm_smul, ha] at hnorm
+        exact (le_div_iff₀ hδ).mpr (by nlinarith)
+      change ‖tensorDualForm φ.val ψ.val z‖ ≤ _
+      simp only [z, map_sum, tensorDualForm_tmul]
+      refine (norm_sum_le _ _).trans ?_
+      calc
+        _ ≤ ∑ i, ‖f (x i : LocalBanach p)‖ * (2 / δ) := by
+          apply Finset.sum_le_sum
+          intro i _
+          change ‖φ.val (x' i) * ψ.val (ULift.up (g i))‖ ≤ _
+          rw [norm_mul, ← hfx (x i)]
+          exact mul_le_mul_of_nonneg_left (hψ i) (norm_nonneg _)
+        _ ≤ _ := by rw [← Finset.sum_mul]; exact mul_le_mul_of_nonneg_right (hMx f hf) (by positivity)
+    rw [← hrz]
+    exact (hrVW z).trans (by
+      calc
+        _ ≤ (C : ℝ) * (M * (2 / δ)) := mul_le_mul_of_nonneg_left heps C.coe_nonneg
+        _ = _ := by ring)
+  refine ⟨V, hV₀, bV, cV, hVU, (C : ℝ) * (2 / δ), by positivity, fun n x M _ hMx ↦ ?_⟩
+  -- Pass the estimate to the completion using the sum of the approximation errors.
+  have hd : DenseRange (fun ys : Fin n → WithLocalSeminorm p ↦ fun i ↦ (ys i : LocalBanach p)) :=
+    DenseRange.piMap fun _ ↦ Completion.denseRange_coe
+  have hclose : ∀ y : Fin n → LocalBanach p, ∑ i, ‖T (y i)‖ ≤
+      ((C : ℝ) * (2 / δ)) * (M + ∑ i, ‖y i - x i‖) := by
+    intro y
+    refine hd.induction_on y ?_ (fun ys ↦ ?_)
+    · exact isClosed_le (by fun_prop) (by fun_prop)
+    · refine bound n ys _ fun g hg ↦ ?_
+      have hdiff (i : Fin n) :
+          ‖g (ys i : LocalBanach p)‖ ≤ ‖g (x i)‖ + ‖(ys i : LocalBanach p) - x i‖ := by
+        calc
+          _ ≤ ‖g (x i)‖ + ‖g ((ys i : LocalBanach p) - x i)‖ := by
+            rw [map_sub]
+            calc
+              _ = ‖g (x i) + (g (ys i : LocalBanach p) - g (x i))‖ := by
+                rw [add_comm, sub_add_cancel]
+              _ ≤ _ := norm_add_le _ _
+          _ ≤ _ := add_le_add le_rfl ((g.le_opNorm _).trans
+            (mul_le_of_le_one_left (norm_nonneg _) hg))
+      exact (Finset.sum_le_sum fun i _ ↦ hdiff i).trans
+        (by rw [Finset.sum_add_distrib]; exact add_le_add (hMx g hg) le_rfl)
+  simpa using hclose x
+
+omit [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E] in
+/-- Paper: Theorem C.2.4.2(2), p. 686. Three successive absolutely summing local
+Banach comparisons give the null-sequence series for their composite.
+Pietsch factorization gives a 2-summing map into a Hilbert space followed by a
+bounded map for each comparison. Composing adjacent factors gives two
+Hilbert–Schmidt maps between Hilbert spaces. Their composite gives an absolutely
+summable rank-one expansion, which can be rescaled to have norm-null factors. -/
+theorem localBanachMap_hasSeries_of_three_absolutelySumming
+    {p₀ p₁ p₂ p₃ : Seminorm ℂ E} (h₁ : p₀ ≤ p₁) (h₂ : p₁ ≤ p₂) (h₃ : p₂ ≤ p₃)
+    (s₁ : IsAbsolutelySummingLocalBanachMap E h₁) (s₂ : IsAbsolutelySummingLocalBanachMap E h₂)
+    (s₃ : IsAbsolutelySummingLocalBanachMap E h₃) :
+    ∃ (c : ℕ → ℂ) (φ : ℕ → LocalBanach p₃ →L[ℂ] ℂ) (y : ℕ → LocalBanach p₀),
+      Summable (fun n ↦ ‖c n‖) ∧ Tendsto φ atTop (𝓝 0) ∧ Tendsto y atTop (𝓝 0) ∧
+        ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (localBanachMap p₃ p₀ (h₁.trans (h₂.trans h₃)) x) := by
+  sorry
+
 /-- Paper: Theorem C.2.4.2(2), p. 686. Nuclearity is equivalent to the existence,
 inside each balanced convex zero-neighborhood, of another such neighborhood for
 which the canonical local Banach space map is nuclear.
@@ -316,7 +764,29 @@ theorem isNuclearTVS_iff_localBanach_series :
           let T := localBanachMap p q (gauge_mono (absorbent_nhds_zero hV) hVU)
           ∃ (c : ℕ → ℂ) (φ : ℕ → LocalBanach p →L[ℂ] ℂ) (y : ℕ → LocalBanach q),
             Summable (fun n ↦ ‖c n‖) ∧ Tendsto φ atTop (𝓝 0) ∧ Tendsto y atTop (𝓝 0) ∧
-              ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (T x) := by sorry
+              ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (T x) := by
+  constructor
+  · intro h U hU bU cU
+    obtain ⟨V₁, hV₁, bV₁, cV₁, h₁, s₁⟩ := exists_localBanachMap_absolutelySumming E h U hU bU cU
+    obtain ⟨V₂, hV₂, bV₂, cV₂, h₂, s₂⟩ := exists_localBanachMap_absolutelySumming E h V₁ hV₁ bV₁ cV₁
+    obtain ⟨V₃, hV₃, bV₃, cV₃, h₃, s₃⟩ := exists_localBanachMap_absolutelySumming E h V₂ hV₂ bV₂ cV₂
+    exact ⟨V₃, hV₃, bV₃, cV₃, h₃.trans (h₂.trans h₁),
+      localBanachMap_hasSeries_of_three_absolutelySumming E _ _ _ s₁ s₂ s₃⟩
+  · intro h
+    refine ⟨inferInstance, inferInstance, ?_⟩
+    intro F _ _ _ _ _
+    let hI := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+      (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+        injectiveTensorSeminorm UV.1 UV.2)
+    let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+      (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+        ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+    have hfwd : Continuous (show ProjectiveTensor E F → InjectiveTensor E F from id) :=
+      hI.continuous_of_continuous_comp (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F)
+        fun ⟨U, V⟩ ↦ hP.continuous_seminorm ⟨_, injectiveSeminorm_continuousAt_tmul U V⟩
+    let e : ProjectiveTensor E F ≃ₜ InjectiveTensor E F :=
+      ⟨Equiv.refl (E ⊗[ℂ] F), hfwd, continuous_injectiveTensor_to_projectiveTensor_of_localSeries E h F⟩
+    exact e.isHomeomorph
 
 /-- Paper: Theorem C.2.4.2(3), p. 686. Nuclearity can be tested on the completed
 projective to injective comparison against Banach spaces. -/
