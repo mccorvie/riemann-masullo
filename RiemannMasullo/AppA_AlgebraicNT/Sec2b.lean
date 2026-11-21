@@ -2279,7 +2279,49 @@ theorem ideleFundamentalDomain_bijective :
     let j : 𝕀∞ →* 𝕀[F] := fromInfinity
     Bijective (fun z : Fˣ × ℝ≥0ˣ × E₁ ↦
       IdeleGroup.unitEmbedding (𝓞 F) F z.1 * j (s z.2.1) * z.2.2.val.val) := by
-  sorry
+  let j : 𝕀∞ →* 𝕀[F] := fromInfinity
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  change Bijective (fun z : Fˣ × ℝ≥0ˣ × E₁ ↦ d z.1 * j (s z.2.1) * z.2.2.val.val)
+  have hsection (t : ℝ≥0ˣ) : ideleNorm F (j (s t)) = t :=
+    (infiniteIdeleNorm_eq_global F (s t)).symm.trans (hn t)
+  have hnorm (x : Fˣ) (t : ℝ≥0ˣ) (e : E₁) :
+      ideleNorm F (d x * j (s t) * e.val.val) = t := by
+    have hd : ideleNorm F (d x) = 1 := (principal₁ x).prop
+    simp only [map_mul, hsection, hd, MonoidHom.mem_ker.mp e.val.prop, one_mul, mul_one]
+  constructor
+  · rintro ⟨x, t, e⟩ ⟨y, u, f⟩ h
+    change d x * j (s t) * e.val.val = d y * j (s u) * f.val.val at h
+    have htu : t = u := by
+      simpa only [hnorm] using congrArg (ideleNorm F) h
+    subst u
+    have hmul : principal₁ x * e.val = principal₁ y * f.val := by
+      apply Subtype.ext
+      change d x * e.val.val = d y * f.val.val
+      rw [mul_right_comm (d x) (j (s t)), mul_right_comm (d y) (j (s t))] at h
+      exact mul_right_cancel h
+    have htranslate : principal₁ (x / y) * e.val = f.val := by
+      rw [map_div, div_mul_eq_mul_div, hmul, mul_div_cancel_left]
+    have hxy : x = y := by
+      apply div_eq_one.mp
+      by_contra hne
+      exact Set.disjoint_left.mp (ideleFundamentalDomain_disjoint F b v₀ σ r hr₁ hr (x / y) hne)
+        (Set.mem_smul_set.mpr ⟨e.val, e.prop, htranslate⟩) f.prop
+    subst y
+    have hef : e = f := Subtype.ext (mul_left_cancel hmul)
+    subst f
+    rfl
+  · intro g
+    let t := ideleNorm F g
+    let g₁ : N₁ := ⟨g / j (s t), (MonoidHom.div_mem_ker_iff (ideleNorm F)).mpr (hsection t).symm⟩
+    have hcover : g₁ ∈ ⋃ x : Fˣ, principal₁ x • E₁ := by
+      rw [ideleFundamentalDomain_cover F b v₀ σ r hr₁ hr]
+      exact Set.mem_univ _
+    obtain ⟨x, hx⟩ := Set.mem_iUnion.mp hcover
+    obtain ⟨e, he, heq⟩ := Set.mem_smul_set.mp hx
+    have hval : d x * e.val = g / j (s t) := congrArg Subtype.val heq
+    refine ⟨(x, t, ⟨e, he⟩), ?_⟩
+    change d x * j (s t) * e.val = g
+    rw [mul_right_comm, hval, div_mul_cancel]
 
 end Representatives
 
