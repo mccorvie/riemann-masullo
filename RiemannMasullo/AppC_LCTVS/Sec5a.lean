@@ -75,7 +75,13 @@ theorem compactSupportStageTopology_univ [CompactSpace X] :
     let K : Compacts X := ⟨univ, isCompact_univ⟩
     compactSupportStageTopology (E := E) K =
       TopologicalSpace.induced
-        (fun f : compactSupportStage (E := E) K ↦ f.val.toContinuousMap) inferInstance := by sorry
+        (fun f : compactSupportStage (E := E) K ↦ f.val.toContinuousMap) inferInstance := by
+  intro K
+  let restrictUniv : C(X, E) ≃ₜ C(↥(univ : Set X), E) :=
+    (Homeomorph.Set.univ X).symm.arrowCongr (Homeomorph.refl E)
+  change TopologicalSpace.induced
+    (restrictUniv ∘ fun f : compactSupportStage (E := E) K ↦ f.val.toContinuousMap) _ = _
+  rw [← induced_compose, ← restrictUniv.isInducing.eq_induced]
 
 /-- Paper: Definition C.5.1.1, p. 721. For compact X, the inductive limit topology
 agrees with the topology induced by the inclusion into continuous maps. -/
