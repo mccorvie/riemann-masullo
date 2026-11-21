@@ -35,7 +35,16 @@ continuous and multiplicative. -/
 theorem normPower_properties (m : G →* ℝ≥0ˣ) (hm : Continuous m) (s : ℂ) :
     (modℂ[m, (1 : G)]) ^ s = 1 ∧
     (∀ g h : G, (modℂ[m, g * h]) ^ s = (modℂ[m, g]) ^ s * (modℂ[m, h]) ^ s) ∧
-    Continuous (fun g : G ↦ (modℂ[m, g]) ^ s) := by sorry
+    Continuous (fun g : G ↦ (modℂ[m, g]) ^ s) := by
+  refine ⟨by simp, ?_, ?_⟩
+  · intro g h
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul]
+    exact Complex.mul_cpow_ofReal_nonneg (by positivity) (by positivity) s
+  · have hr : Continuous (fun g : G ↦ ((m g : ℝ≥0) : ℝ)) :=
+      NNReal.continuous_coe.comp (Units.continuous_val.comp hm)
+    apply (Complex.continuous_ofReal.comp hr).cpow continuous_const
+    intro g
+    exact Complex.ofReal_mem_slitPlane.mpr (NNReal.coe_pos.mpr (Units.zero_lt _))
 
 /-- Paper: §3.1.1, p. 119. A norm twist multiplies the quasi-character
 by the given complex power of the module. -/
