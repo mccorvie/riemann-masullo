@@ -1393,6 +1393,95 @@ theorem frechet_factorization [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [
 
 -- TODO(paper-gap): On p. 665 the second Baire argument only establishes a dense union.
 
+/-- A linear map out of a countable locally convex limit is continuous if it is
+continuous on every stage, even when the target only has a topological additive group
+structure. -/
+private theorem IsInjectiveLCLimit.continuous_of_stages
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    {G : Type*} [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [IsTopologicalAddGroup G]
+    (f : E →ₗ[ℂ] G) (hf : ∀ k, Continuous (f ∘ i k)) : Continuous f := by
+  classical
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  apply continuous_of_continuousAt_zero f
+  rw [ContinuousAt, map_zero]
+  intro U hU
+  change f ⁻¹' U ∈ 𝓝 (0 : E)
+  -- Use one smaller target neighborhood for each successive stage.
+  have shrink (V : {V : Set G // V ∈ 𝓝 (0 : G)}) :
+      ∃ W : {W : Set G // W ∈ 𝓝 (0 : G)}, W.val + W.val ⊆ V.val := by
+    obtain ⟨W, hW, hW₀, hWV⟩ := exists_open_nhds_zero_add_subset V.property
+    exact ⟨⟨W, hW.mem_nhds hW₀⟩, hWV⟩
+  let R : ℕ → {V : Set G // V ∈ 𝓝 (0 : G)} :=
+    Nat.rec ⟨U, hU⟩ fun _ R ↦ (shrink R).choose
+  have hR (n : ℕ) : (R (n+1)).val + (R (n+1)).val ⊆ (R n).val :=
+    (shrink (R n)).choose_spec
+  have hball (k : ℕ) := (PolynormableSpace.hasBasis_zero_ball ℂ (X k)).mem_iff.mp
+    (((hf k).tendsto' 0 0 (by simp)) (R (k+1)).property)
+  choose p hp hsub using hball
+  let A (k : ℕ) : Set E := i k '' (p k).ball 0 1
+  have hA₀ (k : ℕ) : 0 ∈ A k := ⟨0, (p k).mem_ball_self zero_lt_one, map_zero _⟩
+  have hA (k : ℕ) : MapsTo f (A k) (R (k+1)).val := by
+    rintro _ ⟨x, hx, rfl⟩
+    exact hsub k hx
+  -- The union of the finite sums is balanced and convex and stays inside the preimage of U.
+  let S : ℕ → Set E := Nat.rec 0 fun n S ↦ S + A n
+  have hstep (n : ℕ) : S (n+1) = S n + A n := rfl
+  have hSmono : Monotone S := monotone_nat_of_le_succ fun n x hx ↦ by
+    rw [hstep]
+    simpa only [add_zero] using add_mem_add hx (hA₀ n)
+  have hS₀ (n : ℕ) : 0 ∈ S n := hSmono (Nat.zero_le n) (by simp [S])
+  have hAS (n : ℕ) : A n ⊆ S (n+1) := fun x hx ↦ by
+    rw [hstep]
+    simpa only [zero_add] using add_mem_add (hS₀ n) hx
+  have hSsub (n : ℕ) : (f '' S n) + (R n).val ⊆ U := by
+    induction n with
+    | zero => simp [S, R]
+    | succ n ih =>
+      rw [hstep, image_add, add_assoc]
+      exact (add_subset_add Subset.rfl
+        ((add_subset_add (image_subset_iff.mpr (hA n)) Subset.rfl).trans (hR n))).trans ih
+  let W : Set E := ⋃ n, S n
+  have hWsub : W ⊆ f ⁻¹' U := by
+    intro x hx
+    obtain ⟨n, hn⟩ := mem_iUnion.mp hx
+    have hz := mem_of_mem_nhds (R n).property
+    change f x ∈ U
+    simpa only [add_zero] using hSsub n (add_mem_add (mem_image_of_mem f hn) hz)
+  have hWbal : Balanced ℂ W := balanced_iUnion fun n ↦ by
+    induction n with
+    | zero => exact balanced_zero
+    | succ n ih => exact ih.add (((p n).balanced_ball_zero 1).image (i n).toLinearMap)
+  have hWconv : Convex ℝ W := hSmono.directed_le.convex_iUnion fun n ↦ by
+    induction n with
+    | zero => exact convex_singleton 0
+    | succ n ih =>
+      exact ih.add (((p n).convex_ball 0 1).linear_image ((i n).toLinearMap.restrictScalars ℝ))
+  have hpre (k : ℕ) : (i k) ⁻¹' W ∈ 𝓝 (0 : X k) :=
+    mem_of_superset (Seminorm.ball_mem_nhds (hp k) zero_lt_one) fun x hx ↦
+      mem_iUnion.mpr ⟨k+1, hAS k (mem_image_of_mem _ hx)⟩
+  have hWabs : Absorbent ℝ W := by
+    apply absorbent_iff_eventually_nhdsNE_zero.mpr
+    intro x
+    obtain ⟨k, z, rfl⟩ := h.exhaustive x
+    let : ContinuousSMul ℝ (X k) := IsScalarTower.continuousSMul ℂ
+    filter_upwards [(absorbent_nhds_zero (𝕜 := ℝ) (hpre k)).eventually_nhdsNE_zero z] with a ha
+    change i k (a • z) ∈ W at ha
+    have hsmul : i k (a • z) = a • i k z := (i k).toLinearMap.map_smul_of_tower a z
+    exact hsmul ▸ ha
+  let g := gaugeSeminorm hWbal hWconv hWabs
+  have hg (k : ℕ) : Continuous (g ∘ i k) := by
+    apply Seminorm.continuous' (p := g.comp (i k).toLinearMap) (r := 1)
+    refine mem_of_superset (hpre k) fun x hx ↦ ?_
+    exact ((g.comp (i k).toLinearMap).mem_closedBall_zero).mpr (gauge_le_one_of_mem hx)
+  have hgn := g.ball_mem_nhds (hP.continuous_seminorm ⟨g, hg⟩) zero_lt_one
+  exact mem_of_superset hgn fun x hx ↦
+    hWsub (setOfPred_gauge_lt_one_subset_self hWconv (mem_iUnion.mpr ⟨0, hS₀ 0⟩)
+      hWabs (g.mem_ball_zero.mp hx))
+
 /-- Paper: Theorem C.1.5.5, p. 665. A continuous linear surjection onto an LF-space
 is open if its Hausdorff source is exhausted by rising continuous linear images of
 Fréchet spaces. -/
@@ -1400,7 +1489,50 @@ theorem isOpenMap_of_surjective_toLF (hE : IsLFSpace E)
     {F : Type*} [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
     [ContinuousSMul ℂ F] [T2Space F] (hX : ∀ k, IsFrechetTVS (X k)) (u : ∀ k, X k →L[ℂ] F)
     (hr : ∀ k, range (u k) ⊆ range (u (k+1))) (hcov : ∀ x : F, ∃ k, x ∈ range (u k))
-    (q : F →L[ℂ] E) (hq : Function.Surjective q) : IsOpenMap q := by sorry
+    (q : F →L[ℂ] E) (hq : Function.Surjective q) : IsOpenMap q := by
+  obtain ⟨hT2, Y, _, _, _, hY, j, i, h⟩ := hE
+  let : ∀ k, IsTopologicalAddGroup (Y k) := fun k ↦ (hY k).choose
+  let : ∀ k, PolynormableSpace ℂ (Y k) := fun k ↦ (hY k).choose_spec.1
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  let : ContinuousSMul ℂ E := hP.continuousSMul
+  let e := q.toLinearMap.quotKerEquivOfSurjective hq
+  let f (k : ℕ) := q.comp (u k)
+  let K (k : ℕ) := (f k).ker
+  let v (k : ℕ) : X k ⧸ K k →L[ℂ] E := (K k).liftQL (f k) le_rfl
+  have hv (k : ℕ) (x : X k) : v k ((K k).mkQ x) = q (u k x) := rfl
+  have hvrange (k : ℕ) : range (v k) = q '' range (u k) :=
+    ((K k).mkQ_surjective.range_comp (v k)).symm.trans (range_comp q (u k))
+  have hc : Continuous e.symm := by
+    apply h.continuous_of_stages e.symm.toLinearMap
+    intro n
+    obtain ⟨k, w, hw⟩ := frechet_factorization
+      (fun k ↦ isFrechetTVS_quotient (hX k) (K k) (f k).isClosed_ker) v
+      (fun k ↦ LinearMap.ker_eq_bot.mp ((K k).ker_liftQ_eq_bot' (f k).toLinearMap rfl))
+      (fun k ↦ by
+        rw [hvrange, hvrange]
+        exact image_mono (hr k))
+      (fun y ↦ by
+        obtain ⟨x, rfl⟩ := hq y
+        obtain ⟨k, z, rfl⟩ := hcov x
+        exact ⟨k, (K k).mkQ z, hv k z⟩)
+      (hY n) (i n)
+    -- The factor through the quotient stage induces a continuous map into F / ker(q).
+    let g : X k ⧸ K k →L[ℂ] F ⧸ q.ker :=
+      (K k).liftQL (q.ker.mkQL.comp (u k)) (by
+        intro x hx
+        change (Submodule.Quotient.mk (u k x) : F ⧸ q.ker) = 0
+        rw [Submodule.Quotient.mk_eq_zero]
+        exact hx)
+    have hg (z : X k ⧸ K k) : e.symm (v k z) = g z := by
+      obtain ⟨x, rfl⟩ := (K k).mkQ_surjective z
+      exact q.toLinearMap.quotKerEquivOfSurjective_symm_apply hq (u k x)
+    have heq (x : Y n) : e.symm (i n x) = g (w x) :=
+      (congrArg e.symm (DFunLike.congr_fun hw x).symm).trans (hg (w x))
+    simpa only [Function.comp_def, LinearEquiv.coe_coe, heq] using g.continuous.comp w.continuous
+  exact (e.toEquiv.continuous_symm_iff.mp hc).comp q.ker.isOpenQuotientMap_mkQ.isOpenMap
 
 /-- Paper: Definition C.1.5.6, p. 666. Take the final locally convex topology on the
 subspace from its intersections with the stages. Each intersection has the topology
