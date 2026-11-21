@@ -5,6 +5,8 @@ public import Mathlib.Analysis.Fourier.AddCircle
 public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
+import all RiemannMasullo.AppC_LCTVS.Sec2b  -- for the Hilbert domination lemma
+import Mathlib.Analysis.InnerProductSpace.GramSchmidtOrtho
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.PSeries
 import Mathlib.Analysis.InnerProductSpace.Dual
@@ -1310,11 +1312,277 @@ theorem isAbsolute_iff_summable_of_strictLF_stages [T2Space E]
       (hp.comp continuous_subtype_val)
   exact isAbsolute_iff_summable_of_barrelled
 
+/-- Equicontinuity of the partial projections bounds all individual coordinate
+projections by a common continuous seminorm. -/
+private theorem exists_coordinate_seminorm_bound [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    [PolynormableSpace ℂ E] (heq : IsEquicontinuous x f)
+    (q : Seminorm ℂ E) (hq : Continuous q) :
+    ∃ p : Seminorm ℂ E, Continuous p ∧ ∀ n z, q (f n z • x n) ≤ p z := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let G (k : ℕ) : E →ₗ[ℂ] E := (partialProjection x f k).toLinearMap
+  have hG : UniformEquicontinuous ((↑) ∘ G) :=
+    uniformEquicontinuous_of_equicontinuousAt_zero G heq
+  obtain ⟨p, hp, hbound⟩ :=
+    ((PolynormableSpace.withSeminorms ℂ E).uniformEquicontinuous_iff_exists_continuous_seminorm
+      G).mp hG ⟨q, hq⟩
+  have hproj (k : ℕ) (z : E) :
+      partialProjection x f k z = ∑ m ∈ Finset.range (k + 1), f m z • x m := by
+    rw [partialProjection, ← Nat.range_succ_eq_Iic]
+    simp [sum_apply, ContinuousLinearMap.smulRight_apply]
+  have hle (k : ℕ) (z : E) : q (partialProjection x f k z) ≤ p z := hbound k z
+  refine ⟨(2 : NNReal) • p, hp.const_smul _, fun n z ↦ ?_⟩
+  change q (f n z • x n) ≤ 2 * p z
+  cases n with
+  | zero =>
+    have h := hle 0 z
+    rw [hproj] at h
+    exact (by simpa using h : q (f 0 z • x 0) ≤ p z).trans (by linarith [apply_nonneg p z])
+  | succ n =>
+    have hstep : f (n + 1) z • x (n + 1) =
+        partialProjection x f (n + 1) z - partialProjection x f n z := by
+      rw [hproj, hproj, Finset.sum_range_succ, add_sub_cancel_left]
+    rw [hstep]
+    exact (map_sub_le_add q _ _).trans (by linarith [hle (n + 1) z, hle n z])
+
+open InnerProductSpace in
+/-- Gram–Schmidt on the images of the basis admits lifts that retain their own
+basis coefficient. The residual images have norm at most that of the original images. -/
+private theorem exists_orthogonal_coordinate_lifts
+    {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (a : E →ₗ[ℂ] H) (hb : IsSchauderBasis x f) :
+    ∃ y : ℕ → E, (∀ i, f i (y i) = 1) ∧ (∀ i, ‖a (y i)‖ ≤ ‖a (x i)‖) ∧
+      Pairwise (fun i j ↦ inner ℂ (a (y i)) (a (y j)) = 0) := by
+  let b := gramSchmidt ℂ (a ∘ x)
+  have hspan (i : ℕ) : b i ∈ (Submodule.span ℂ (x '' Iic i)).map a := by
+    rw [Submodule.map_span, image_image]
+    exact gramSchmidt_mem_span ℂ _ le_rfl
+  choose v hv hmap using fun i ↦ Submodule.mem_map.mp (hspan i)
+  let c (i j : ℕ) : ℂ := inner ℂ (b j) (a (x i)) / (‖b j‖ : ℂ)^2
+  let y (i : ℕ) : E := x i - ∑ j ∈ Finset.Iio i, c i j • v j
+  have heq (i : ℕ) : a (y i) = b i := by
+    simp only [y, map_sub, map_sum, map_smul, hmap]
+    conv_lhs => rw [show a (x i) = (a ∘ x) i from rfl, gramSchmidt_def'' ℂ (a ∘ x) i]
+    change b i + (∑ j ∈ Finset.Iio i, c i j • b j) -
+      (∑ j ∈ Finset.Iio i, c i j • b j) = b i
+    exact add_sub_cancel_right _ _
+  refine ⟨y, ?_, ?_, fun i j hij ↦ by
+    simpa only [heq] using gramSchmidt_pairwise_orthogonal ℂ (a ∘ x) hij⟩
+  · intro i
+    have hzero (j : ℕ) (hj : j < i) : f i (v j) = 0 := by
+      have hle : Submodule.span ℂ (x '' Iic j) ≤ (f i).toLinearMap.ker := by
+        refine Submodule.span_le.mpr ?_
+        rintro _ ⟨k, hk, rfl⟩
+        exact LinearMap.mem_ker.mpr (by
+          rw [show (f i).toLinearMap (x k) = if i = k then 1 else 0 from hb.1 i k]
+          exact ite_eq_right (ne_of_gt ((mem_Iic.mp hk).trans_lt hj)))
+      exact hle (hv j)
+    have hdiag : f i (x i) = 1 := by simpa using hb.1 i i
+    simp only [y, map_sub, map_sum, map_smul, hdiag]
+    rw [Finset.sum_eq_zero, sub_zero]
+    exact fun j hj ↦ by rw [hzero j (Finset.mem_Iio.mp hj), smul_zero]
+  · intro i
+    rw [heq]
+    have hinner : inner ℂ (b i) (a (x i)) = inner ℂ (b i) (b i) := by
+      conv_lhs => rw [show a (x i) = (a ∘ x) i from rfl, gramSchmidt_def'' ℂ (a ∘ x) i]
+      change inner ℂ (b i) (b i + ∑ j ∈ Finset.Iio i, c i j • b j) = _
+      rw [inner_add_right, inner_sum, Finset.sum_eq_zero, add_zero]
+      exact fun j hj ↦ by
+        rw [inner_smul_right,
+          gramSchmidt_pairwise_orthogonal ℂ (a ∘ x) (ne_of_gt (Finset.mem_Iio.mp hj)),
+          mul_zero]
+    have h := norm_inner_le_norm (𝕜 := ℂ) (b i) (a (x i))
+    rw [hinner, inner_self_eq_norm_sq_to_K, ← RCLike.ofReal_pow] at h
+    change ‖((‖b i‖ ^ 2 : ℝ) : ℂ)‖ ≤ _ at h
+    rw [Complex.norm_of_nonneg (sq_nonneg _), pow_two] at h
+    by_cases hi : ‖b i‖ = 0
+    · simp [hi]
+    · exact le_of_mul_le_mul_left h (lt_of_le_of_ne (norm_nonneg _) (Ne.symm hi))
+
+open InnerProductSpace UniformSpace in
+/-- Nuclearity gives a continuous denominator seminorm for which the ratios of
+basis-vector seminorms have uniformly bounded finite sums of squares. -/
+private theorem exists_square_summable_coordinate_ratios [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] (hE : IsNuclearTVS.{v, u} E)
+    (hb : IsSchauderBasis x f) (heq : IsEquicontinuous x f)
+    (q : Seminorm ℂ E) (hq : Continuous q) :
+    ∃ (r : Seminorm ℂ E) (C : ℝ), Continuous r ∧ 0 ≤ C ∧
+      (∀ i, r (x i) = 0 → q (x i) = 0) ∧
+      ∀ n, (∑ i ∈ Finset.range n, (q (x i) / r (x i)) ^ 2) ≤ C ^ 2 := by
+  let := hE.2.1
+  have : ContinuousSMul ℝ E :=
+    MulAction.continuousSMul_compHom (f := (algebraMap ℝ ℂ).toMonoidHom) Complex.continuous_ofReal
+  obtain ⟨s, hs, hscoord⟩ := exists_coordinate_seminorm_bound heq q hq
+  let U := s.ball 0 1
+  have hU := s.ball_mem_nhds hs one_pos
+  let bU := s.balanced_ball_zero 1
+  let cU := s.convex_ball 0 1
+  obtain ⟨V, hV, bV, cV, hVU, hsum⟩ :=
+    exists_localBanachMap_absolutelySumming E hE U hU bU cU
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  let s' := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  have hs' : s' = s := DFunLike.coe_injective (s.restrictScalars ℝ).gauge_ball
+  have hsp : s' ≤ p := gauge_mono (absorbent_nhds_zero hV) hVU
+  let T := localBanachMap p s' hsp
+  obtain ⟨A, hA, hsum⟩ := hsum
+  obtain ⟨H, _, _, _, a, D, hD, hp⟩ :=
+    exists_hilbert_domination hE p (continuous_gauge cV hV)
+  let r := (normSeminorm ℂ H).comp a.toLinearMap
+  let J : E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+  obtain ⟨y, hycoef, hynorm, hyorth⟩ := exists_orthogonal_coordinate_lifts a.toLinearMap hb
+  have hzero (i : ℕ) (hi : r (x i) = 0) : q (x i) = 0 := by
+    have hdiag : f i (x i) = 1 := by simpa using hb.1 i i
+    have h₁ : q (x i) ≤ s (x i) := by simpa only [hdiag, one_smul] using hscoord i (x i)
+    have h₂ : s (x i) ≤ p (x i) := hs' ▸ hsp (x i)
+    have h₃ : p (x i) ≤ 0 := by
+      have h := hp (x i)
+      change p (x i) ≤ D * r (x i) at h
+      simpa only [hi, mul_zero] using h
+    exact le_antisymm (h₁.trans (h₂.trans h₃)) (apply_nonneg _ _)
+  refine ⟨r, A * D, a.continuous.norm, mul_nonneg hA hD, hzero, fun n ↦ ?_⟩
+  let b (i : Fin n) := q (x i) / r (x i)
+  -- Normalize the orthogonal lifts by the seminorms of the original basis vectors.
+  let w (i : Fin n) : E := ((r (x i))⁻¹ : ℝ) • y i
+  have hw (i : Fin n) : ‖a (w i)‖ ≤ 1 := by
+    have hn : 0 ≤ r (x i) := apply_nonneg _ _
+    change ‖a (((r (x i))⁻¹ : ℝ) • y i)‖ ≤ 1
+    rw [a.map_smul_of_tower, norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr hn)]
+    refine (mul_le_mul_of_nonneg_left (hynorm i) (inv_nonneg.mpr hn)).trans ?_
+    change (r (x i))⁻¹ * r (x i) ≤ 1
+    by_cases hi : r (x i) = 0 <;> simp [hi]
+  have hbw (i : Fin n) : b i ≤ s (w i) := by
+    have hy : q (x i) ≤ s (y i) := by
+      simpa only [hycoef, one_smul] using hscoord i (y i)
+    calc
+      b i = (r (x i))⁻¹ * q (x i) := by
+        change (_ / _) = _
+        rw [div_eq_mul_inv, mul_comm]
+      _ ≤ (r (x i))⁻¹ * s (y i) := mul_le_mul_of_nonneg_left hy (by positivity)
+      _ = s (w i) := by
+        change _ = (s.restrictScalars ℝ) (((r (x i))⁻¹ : ℝ) • y i)
+        rw [map_smul_eq_mul, Real.norm_of_nonneg (by positivity)]
+        rfl
+  have horth (i j : Fin n) (hij : i ≠ j) : inner ℂ (a (w i)) (a (w j)) = 0 := by
+    simp only [w, ← Complex.coe_smul, map_smul, inner_smul_left, inner_smul_right]
+    change _ * (_ * inner ℂ (a (y i)) (a (y j))) = _
+    have hz : inner ℂ (a (y i)) (a (y j)) = 0 := hyorth (Fin.val_injective.ne hij)
+    rw [hz, mul_zero, mul_zero]
+  have hnorm (c : Fin n → ℂ) : ‖a (∑ i, c i • w i)‖ ^ 2 ≤ ∑ i, ‖c i‖ ^ 2 := by
+    rw [map_sum, norm_sq_eq_re_inner (𝕜 := ℂ), sum_inner, map_sum]
+    refine Finset.sum_le_sum fun i _ ↦ ?_
+    rw [inner_sum, map_sum, Finset.sum_eq_single i]
+    · rw [← norm_sq_eq_re_inner (𝕜 := ℂ), map_smul, norm_smul, mul_pow]
+      exact mul_le_of_le_one_right (sq_nonneg _) (by nlinarith [hw i, norm_nonneg (a (w i))])
+    · intro j _ hij
+      simp [inner_smul_left, inner_smul_right, horth i j (Ne.symm hij)]
+    · simp
+  -- Each dual unit functional has a uniform square-sum bound on the lifts.
+  have hdual (φ : LocalBanach p →L[ℂ] ℂ) (hφ : ‖φ‖ ≤ 1) :
+      (∑ i, ‖φ (J (w i))‖ ^ 2) ≤ D ^ 2 := by
+    let c (i : Fin n) := (starRingEnd ℂ) (φ (J (w i)))
+    let M : ℝ := ∑ i, ‖φ (J (w i))‖ ^ 2
+    let z : E := ∑ i, c i • w i
+    have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ sq_nonneg _
+    have hval : φ (J z) = (M : ℂ) := by
+      simp only [z, map_sum, map_smul, smul_eq_mul, c, M, Complex.ofReal_sum]
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      rw [mul_comm, Complex.mul_conj, Complex.normSq_eq_norm_sq]
+    have hle : M ≤ D * ‖a z‖ := by
+      have hh := (φ.le_opNorm (J z)).trans
+        (mul_le_of_le_one_left (norm_nonneg _) hφ)
+      rw [hval, Complex.norm_of_nonneg hM, show ‖J z‖ = p z from localBanach_norm_coe p z] at hh
+      exact hh.trans (hp z)
+    have ha : ‖a z‖ ^ 2 ≤ M := by simpa only [z, c, starRingEnd_apply, norm_star] using hnorm c
+    have hsq : M ^ 2 ≤ D ^ 2 * M := calc
+      M ^ 2 ≤ (D * ‖a z‖) ^ 2 := by gcongr
+      _ = D ^ 2 * ‖a z‖ ^ 2 := mul_pow _ _ _
+      _ ≤ D ^ 2 * M := by gcongr
+    change M ≤ D ^ 2
+    by_cases hm : M = 0
+    · rw [hm]
+      exact sq_nonneg _
+    · exact le_of_mul_le_mul_right (by simpa only [pow_two] using hsq)
+        (lt_of_le_of_ne hM (Ne.symm hm))
+  let M : ℝ := ∑ i, b i ^ 2
+  have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ sq_nonneg _
+  let z (i : Fin n) : LocalBanach p := J ((b i : ℂ) • w i)
+  have hbnn (i : Fin n) : 0 ≤ b i := div_nonneg (apply_nonneg _ _) (apply_nonneg _ _)
+  -- Test the absolutely summing map on the lifts weighted by the ratios.
+  have hbound : ∑ i, ‖T (z i)‖ ≤ A * (Real.sqrt M * D) := by
+    refine hsum n z (Real.sqrt M * D) (mul_nonneg (Real.sqrt_nonneg _) hD) fun φ hφ ↦ ?_
+    simp only [z, map_smul, norm_smul, Complex.norm_of_nonneg (hbnn _)]
+    exact (Real.sum_mul_le_sqrt_mul_sqrt Finset.univ b (fun i ↦ ‖φ (J (w i))‖)).trans
+      (mul_le_mul_of_nonneg_left ((Real.sqrt_le_iff.mpr ⟨hD, hdual φ hφ⟩)) (Real.sqrt_nonneg _))
+  have hle : M ≤ (A * D) * Real.sqrt M := by
+    calc
+      M ≤ ∑ i, ‖T (z i)‖ := by
+        refine Finset.sum_le_sum fun i _ ↦ ?_
+        have hnorm' : ‖T (z i)‖ = s ((b i : ℂ) • w i) :=
+          calc
+            _ = s' ((b i : ℂ) • w i) :=
+              (congrArg norm (localBanachMap_coe p s' hsp _)).trans (localBanach_norm_coe s' _)
+            _ = _ := congrArg (fun t : Seminorm ℂ E ↦ t ((b i : ℂ) • w i)) hs'
+        rw [hnorm', map_smul_eq_mul, Complex.norm_of_nonneg (hbnn i), pow_two]
+        exact mul_le_mul_of_nonneg_left (hbw i) (hbnn i)
+      _ ≤ A * (Real.sqrt M * D) := hbound
+      _ = (A * D) * Real.sqrt M := by ring
+  rw [← Fin.sum_univ_eq_sum_range]
+  change M ≤ (A * D) ^ 2
+  have hsqrt : Real.sqrt M ^ 2 = M := Real.sq_sqrt hM
+  have hnonneg := Real.sqrt_nonneg M
+  by_cases hz : Real.sqrt M = 0
+  · rw [← hsqrt, hz, zero_pow (by decide : (2 : ℕ) ≠ 0)]
+    exact sq_nonneg _
+  · have hdiv : Real.sqrt M ≤ A * D := by
+      have hh : Real.sqrt M * Real.sqrt M ≤ (A * D) * Real.sqrt M :=
+        (pow_two _).symm.trans hsqrt |>.le.trans hle
+      exact le_of_mul_le_mul_right hh (lt_of_le_of_ne hnonneg (Ne.symm hz))
+    rw [← hsqrt]
+    gcongr
+
 /-- Paper: Theorem 4.1.2.6(1), p. 161. Every equicontinuous Schauder basis of a
 nuclear space is absolute. -/
 theorem isAbsolute_of_isNuclearTVS [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     (hE : IsNuclearTVS.{v, u} E) (hb : IsSchauderBasis x f) (heq : IsEquicontinuous x f) :
-    IsAbsolute x f := by sorry
+    IsAbsolute x f := by
+  let := hE.2.1
+  intro q hq
+  obtain ⟨r, A, hr, hA, hqr, hsq₁⟩ :=
+    exists_square_summable_coordinate_ratios hE hb heq q hq
+  obtain ⟨s, B, hs, hB, hrs, hsq₂⟩ :=
+    exists_square_summable_coordinate_ratios hE hb heq r hr
+  obtain ⟨p, hp, hcoord⟩ := exists_coordinate_seminorm_bound heq s hs
+  let a (i : ℕ) := q (x i) / r (x i)
+  let b (i : ℕ) := r (x i) / s (x i)
+  -- Two square-summable ratios give a summable ratio by Cauchy–Schwarz.
+  have hsum (n : ℕ) : ∑ i ∈ Finset.range n, a i * b i ≤ A * B :=
+    (Real.sum_mul_le_sqrt_mul_sqrt _ a b).trans
+      (mul_le_mul (Real.sqrt_le_iff.mpr ⟨hA, hsq₁ n⟩) (Real.sqrt_le_iff.mpr ⟨hB, hsq₂ n⟩)
+        (Real.sqrt_nonneg _) hA)
+  have hfactor (i : ℕ) : a i * b i * s (x i) = q (x i) := by
+    by_cases hs₀ : s (x i) = 0
+    · rw [hs₀, mul_zero, hqr i (hrs i hs₀)]
+    by_cases hr₀ : r (x i) = 0
+    · simp [a, hqr i hr₀]
+    dsimp only [a, b]
+    rw [mul_assoc, div_mul_cancel₀ _ hs₀, div_mul_cancel₀ _ hr₀]
+  let C : NNReal := ⟨A * B, mul_nonneg hA hB⟩
+  refine ⟨C • p, hp.const_smul C, fun z ↦ ?_⟩
+  have hbound (n : ℕ) : (∑ i ∈ Finset.range n, q (f i z • x i)) ≤ (C : ℝ) * p z := by
+    calc
+      _ = ∑ i ∈ Finset.range n, (a i * b i) * s (f i z • x i) := by
+        refine Finset.sum_congr rfl fun i _ ↦ ?_
+        simp only [map_smul_eq_mul]
+        rw [← hfactor i, mul_left_comm ‖f i z‖, mul_assoc]
+      _ ≤ ∑ i ∈ Finset.range n, (a i * b i) * p z := by
+        refine Finset.sum_le_sum fun i _ ↦ mul_le_mul_of_nonneg_left (hcoord i z) ?_
+        dsimp only [a, b]
+        positivity
+      _ ≤ (C : ℝ) * p z := by
+        rw [← Finset.sum_mul]
+        exact mul_le_mul_of_nonneg_right (hsum n) (apply_nonneg _ _)
+  exact ⟨summable_of_sum_range_le (fun _ ↦ apply_nonneg _ _) hbound,
+    Real.tsum_le_of_sum_range_le (fun _ ↦ apply_nonneg _ _) hbound⟩
 
 /-- Paper: Theorem 4.1.2.6(2), p. 161. Every Schauder basis of a nuclear Fréchet
 space is absolute. -/
