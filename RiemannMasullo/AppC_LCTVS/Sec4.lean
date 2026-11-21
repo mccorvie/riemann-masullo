@@ -175,7 +175,12 @@ theorem completion_weakSpace_eq_pettisWeakCompletion :
 given topology is compact, its image is the closure in the weak completion. -/
 theorem image_closure_eq_closure_weakCompletion {s : Set E} (hs : Convex ℝ s)
     (hc : IsCompact (closure s)) :
-    toPettisWeakCompletion E '' closure s = closure (toPettisWeakCompletion E '' s) := by sorry
+    toPettisWeakCompletion E '' closure s = closure (toPettisWeakCompletion E '' s) := by
+  haveI : T2Space (PettisWeakCompletion E) :=
+    (WeakBilin.isEmbedding (B := (LinearMap.id : Module.Dual ℂ (StrongDual ℂ E) →ₗ[ℂ] _))
+      Function.injective_id).t2Space
+  exact image_closure_of_isCompact hc
+    (continuous_toPettisWeakCompletion (E := E)).continuousOn
 
 /-- Paper: Lemma C.4.1.2(2), p. 710. Evaluation into the weak completion of a
 normed space factors through Mathlib's isometric inclusion into the normed bidual. -/

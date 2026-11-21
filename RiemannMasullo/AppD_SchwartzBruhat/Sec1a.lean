@@ -1122,10 +1122,72 @@ theorem lcaFourier_unitary (ν : Measure (PontryaginDual G))
 -- arbitrary measurable representative. A nonzero function supported at one point of
 -- the real line has zero transform, and its double transform is everywhere zero.
 
+/-- The integral of an L¹ convolution is the product of the integrals of its factors. -/
+private theorem integral_lcaConvolution {f g : G → ℂ} (hf : Integrable f μ)
+    (hg : Integrable g μ) :
+    (∫ x, lcaConvolution μ f g x ∂μ) = (∫ y, f y ∂μ) * (∫ z, g z ∂μ) := by
+  obtain ⟨S, k, hσ, hk, hs, hrow, hcol⟩ := lcaConvolution_kernel μ hf hg
+  have hzeroRow (x : G) (hx : x ∉ S) (y : G) : k (x, y) = 0 :=
+    Function.notMem_support.mp fun h ↦ hx (hs h).1
+  have hzeroCol (y : G) (hy : y ∉ S) (x : G) : k (x, y) = 0 :=
+    Function.notMem_support.mp fun h ↦ hy (hs h).2
+  -- Fubini applies to the kernel on its σ-finite supporting rectangle.
+  have hInt : Integrable k ((μ.restrict S).prod (μ.restrict S)) := by
+    refine (integrable_prod_iff' hk.aestronglyMeasurable).2 ⟨?_, ?_⟩
+    · apply ae_mono Measure.restrict_le_self
+      filter_upwards [hcol] with y hy
+      exact (((hg.comp_mul_left y⁻¹).const_mul (f y)).congr
+        (hy.mono fun _ hx ↦ hx.symm)).restrict
+    · refine (hf.norm.mul_const (∫ z, ‖g z‖ ∂μ)).restrict.congr ?_
+      apply ae_mono Measure.restrict_le_self
+      filter_upwards [hcol] with y hy
+      symm
+      calc
+        _ = ∫ x, ‖k (x, y)‖ ∂μ := setIntegral_eq_integral_of_forall_compl_eq_zero
+          (fun x hx ↦ by simp [hzeroRow x hx])
+        _ = ∫ x, ‖f y * g (y⁻¹ * x)‖ ∂μ :=
+          integral_congr_ae (hy.mono fun _ hx ↦ congrArg norm hx)
+        _ = _ := by
+          simp only [norm_mul, integral_const_mul, integral_mul_left_eq_self (fun z ↦ ‖g z‖)]
+  have hrowIntegral (x : G) : (∫ y in S, k (x, y) ∂μ) = lcaConvolution μ f g x :=
+    (setIntegral_eq_integral_of_forall_compl_eq_zero (hzeroCol · · x)).trans
+      (integral_congr_ae (hrow x))
+  calc
+    _ = ∫ x in S, ∫ y in S, k (x, y) ∂μ ∂μ := by
+      simp_rw [← hrowIntegral]
+      exact (setIntegral_eq_integral_of_forall_compl_eq_zero
+        (fun x hx ↦ by simp [hzeroRow x hx])).symm
+    _ = ∫ y in S, ∫ x in S, k (x, y) ∂μ ∂μ := integral_integral_swap hInt
+    _ = ∫ y, ∫ x, k (x, y) ∂μ ∂μ := by
+      have hcolIntegral (y : G) : (∫ x in S, k (x, y) ∂μ) = ∫ x, k (x, y) ∂μ :=
+        setIntegral_eq_integral_of_forall_compl_eq_zero (hzeroRow · · y)
+      simp_rw [hcolIntegral]
+      exact setIntegral_eq_integral_of_forall_compl_eq_zero
+        (fun y hy ↦ by simp [hzeroCol y hy])
+    _ = _ := by
+      rw [← integral_mul_const]
+      apply integral_congr_ae
+      filter_upwards [hcol] with y hy
+      rw [integral_congr_ae hy, integral_const_mul, integral_mul_left_eq_self g]
+
 /-- Paper: Lemma D.1.1.2(6), p. 747. The Fourier transform takes L¹ convolution
 to pointwise multiplication on the dual. -/
 theorem lcaFourier_convolution {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
-    lcaFourier μ (lcaConvolution μ f g) = lcaFourier μ f * lcaFourier μ g := by sorry
+    lcaFourier μ (lcaConvolution μ f g) = lcaFourier μ f * lcaFourier μ g := by
+  funext χ
+  change (∫ x, lcaConvolution μ f g x * star (χ x : ℂ) ∂μ) =
+    (∫ x, f x * star (χ x : ℂ) ∂μ) * (∫ x, g x * star (χ x : ℂ) ∂μ)
+  rw [← integral_lcaConvolution μ (integrable_fourierIntegrand μ hf χ)
+    (integrable_fourierIntegrand μ hg χ)]
+  apply integral_congr_ae
+  exact .of_forall fun x ↦ by
+    simp only [lcaConvolution, ← integral_mul_const]
+    apply integral_congr_ae
+    exact .of_forall fun y ↦ by
+      have hχ : (χ x : ℂ) = (χ y : ℂ) * (χ (y⁻¹ * x) : ℂ) := by
+        rw [← Circle.coe_mul, ← map_mul, mul_inv_cancel_left]
+      rw [hχ, star_mul]
+      ring
 
 end Fourier
 
@@ -1173,7 +1235,22 @@ def IsWeilQuotientMeasure (μ : Measure G) (μH : Measure H) (ν : Measure (G �
 subgroup, normalized to mass one, recovers the pushforward of the group measure. -/
 theorem isWeilQuotientMeasure_bot (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular] :
     IsWeilQuotientMeasure (⊥ : Subgroup G) μ Measure.count
-      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by sorry
+      (μ.map (QuotientGroup.mk : G → G ⧸ (⊥ : Subgroup G))) := by
+  let : BorelSpace (G ⧸ (⊥ : Subgroup G)) := ⟨rfl⟩
+  let e := (QuotientGroup.quotientBot (G := G)).symm
+  let h := e.toEquiv.toHomeomorphOfContinuousOpen
+    QuotientGroup.continuous_mk QuotientGroup.isOpenMap_coe
+  refine ⟨e.isHaarMeasure_map μ h.continuous h.symm.continuous, Measure.Regular.map h, ?_⟩
+  intro f _
+  have hcoset (q : G ⧸ (⊥ : Subgroup G)) :
+      lcaCosetIntegral (⊥ : Subgroup G) Measure.count f q = f (h.symm q) := by
+    have hout : q.out = h.symm q :=
+      h.injective ((Quotient.out_eq' q).trans (h.apply_symm_apply q).symm)
+    simp [lcaCosetIntegral, Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G)), hout]
+  simp_rw [hcoset]
+  change (∫ x, f x ∂μ) = ∫ q, f (h.symm q) ∂(μ.map h)
+  simpa only [Homeomorph.toMeasurableEquiv_coe, h.symm_apply_apply] using
+    (integral_map_equiv (μ := μ) h.toMeasurableEquiv (fun q ↦ f (h.symm q))).symm
 
 variable (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
 variable (μH : Measure H) [μH.IsHaarMeasure] [μH.Regular]

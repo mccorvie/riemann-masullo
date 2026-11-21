@@ -1433,12 +1433,113 @@ def nuclearTrace (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator
 of its functional at its spanning vector.
 Deviation: This is a check of the trace formula on one term. -/
 theorem nuclearTrace_smulRight (hE : ApproxProp E) (φ : E →L[ℂ] ℂ) (y : E) :
-    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by sorry
+    nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by
+  obtain ⟨r, hc, hφ, hy, htail⟩ := nuclearPresentation_smulRight φ y 1 one_ne_zero
+  have htrace := ((exists_nuclearTrace_hasSum hE (φ.smulRight y)
+    (isNuclearOperator_smulRight φ y)).exists.choose_spec r).2
+  refine htrace.unique ((hasSum_ite_eq (0 : ℕ) (φ y)).congr_fun ?_)
+  intro n
+  cases n with
+  | zero => simp [hc, hφ, hy]
+  | succ n => simp [htail]
+
+/-- The gauge of the image of a set under a complex-linear equivalence, at an image point,
+is the gauge of the set at the original point. -/
+private theorem gauge_image_linearEquiv {M N : Type*} [AddCommGroup M] [Module ℂ M]
+    [AddCommGroup N] [Module ℂ N] (φ : M ≃ₗ[ℂ] N) (s : Set M) (x : M) :
+    gauge (φ '' s) (φ x) = gauge s x := by
+  unfold gauge
+  congr 1
+  ext r
+  simp only [Set.mem_setOf_eq]
+  refine and_congr_right fun _ ↦ ?_
+  simp only [Set.mem_smul_set, Set.exists_mem_image]
+  refine exists_congr fun y ↦ and_congr_right fun _ ↦ ?_
+  rw [show r • φ y = φ (r • y) from (LinearMap.map_smul_of_tower φ.toLinearMap r y).symm]
+  exact φ.injective.eq_iff
+
+/-- The image of a Banach disc under an injective continuous linear map is a Banach disc:
+the map restricts to a linear equivalence of the spans that preserves the gauges. -/
+private theorem IsBanachDisc.image_of_injective {Y Z : Type*}
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {B : Set Y} (hB : IsBanachDisc B) (T : Y →L[ℂ] Z) (hT : Injective T) :
+    IsBanachDisc (T '' B) := by
+  let S := Submodule.span ℂ B
+  let S' := Submodule.span ℂ (T '' B)
+  have hSS : S.map T.toLinearMap = S' := (Submodule.span_image T.toLinearMap).symm
+  let φ : S ≃ₗ[ℂ] S' :=
+    (Submodule.equivMapOfInjective T.toLinearMap hT S).trans (LinearEquiv.ofEq _ _ hSS)
+  have himage : ((↑) ⁻¹' (T '' B) : Set S') = φ '' ((↑) ⁻¹' B : Set S) := by
+    ext z
+    constructor
+    · rintro ⟨b, hb, hbz⟩
+      exact ⟨⟨b, Submodule.subset_span hb⟩, hb, Subtype.ext hbz⟩
+    · rintro ⟨w, hw, rfl⟩
+      exact ⟨w, hw, rfl⟩
+  have bB : Balanced ℂ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ hB.balanced.image φ.toLinearMap
+  have cB : Convex ℝ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ hB.convex.linear_image (φ.toLinearMap.restrictScalars ℝ)
+  have aB : Absorbent ℝ ((↑) ⁻¹' (T '' B) : Set S') :=
+    himage ▸ Absorbent.image_of_surjective (f := φ.toLinearMap.restrictScalars ℝ)
+      φ.surjective hB.absorbent
+  let p := gaugeSeminorm hB.balanced hB.convex hB.absorbent
+  let p' := gaugeSeminorm bB cB aB
+  have hnorm (z : S') : p' z = p (φ.symm z) := by
+    change gauge _ z = gauge _ (φ.symm z)
+    rw [himage, ← gauge_image_linearEquiv φ, φ.apply_symm_apply]
+  let ψ : WithLocalSeminorm p' → WithLocalSeminorm p := fun z ↦ (φ.symm (show S' from z) : S)
+  have hψ : Isometry ψ := Isometry.of_dist_eq fun x y ↦ by
+    rw [dist_eq_norm, dist_eq_norm]
+    change p (φ.symm (show S' from x) - φ.symm (show S' from y)) =
+      p' ((show S' from x) - (show S' from y))
+    rw [← map_sub]
+    exact (hnorm _).symm
+  have hinj : Injective ψ := fun a b h ↦ φ.symm.injective h
+  have hsurj : Surjective ψ := fun z ↦ ⟨(φ (show S from z) : S'), φ.symm_apply_apply _⟩
+  have := hB.separated
+  exact ⟨hB.bounded.image T, bB, cB, aB,
+    T2Space.of_injective_continuous hinj hψ.continuous,
+    (hψ.isUniformInducing.completeSpace_congr hsurj).mpr hB.complete⟩
+
+/-- Precomposing a nuclear operator with a continuous linear map and postcomposing it with
+an injective continuous linear map gives a nuclear operator. -/
+private theorem isNuclearOperator_comp_comp {W X Y Z : Type*}
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W]
+    [PolynormableSpace ℂ W] [T2Space W]
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {A : X →L[ℂ] Y} (hA : IsNuclearOperator A) (S : W →L[ℂ] X) (R : Y →L[ℂ] Z)
+    (hR : Injective R) :
+    IsNuclearOperator (R.comp (A.comp S)) := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
+  refine (isNuclearOperator_iff_nonempty_presentation _).mpr
+    ⟨{ coeff := r.coeff
+       functional := fun n ↦ (r.functional n).comp S
+       disc := R '' r.disc
+       isBanachDisc := r.isBanachDisc.image_of_injective R hR
+       vector := fun n ↦ ⟨R (r.vector n), Submodule.subset_span ⟨_, r.vector_mem n, rfl⟩⟩
+       vector_mem := fun n ↦ ⟨_, r.vector_mem n, rfl⟩
+       summable_coeff := r.summable_coeff
+       equicontinuous := fun U hU ↦ by
+         have h := (S.continuous.tendsto' 0 0 (map_zero S)).eventually (r.equicontinuous U hU)
+         simpa only [ContinuousLinearMap.comp_apply, map_zero] using h
+       hasSum := fun x ↦ by
+         simpa only [ContinuousLinearMap.comp_apply, map_smul] using R.hasSum (r.hasSum (S x)) }⟩
 
 /-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
 conjugation by a continuous linear automorphism. -/
 theorem isNuclearOperator_conj (A : E →L[ℂ] E) (hA : IsNuclearOperator A) (T : E ≃L[ℂ] E) :
-    IsNuclearOperator (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)) := by sorry
+    IsNuclearOperator (T.symm.toContinuousLinearMap.comp (A.comp T.toContinuousLinearMap)) :=
+  isNuclearOperator_comp_comp hA T.toContinuousLinearMap T.symm.toContinuousLinearMap
+    T.symm.injective
 
 /-- Paper: Proposition C.3.2.1, p. 694. The nuclear trace is invariant
 under conjugation by a continuous linear automorphism. -/
@@ -1453,7 +1554,12 @@ Deviation: The right-hand composition's nuclearity is made explicit to type its 
 The two approximation-property hypotheses are needed for the trace assertion. -/
 theorem isNuclearOperator_factor_comps (T : E →L[ℂ] F) (hT : Injective T)
     (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
-    IsNuclearOperator (A₀.comp T) ∧ IsNuclearOperator (T.comp A₀) := by sorry
+    IsNuclearOperator (A₀.comp T) ∧ IsNuclearOperator (T.comp A₀) := by
+  have h₁ := isNuclearOperator_comp_comp hA₀ T (ContinuousLinearMap.id ℂ E) injective_id
+  have h₂ := isNuclearOperator_comp_comp hA₀ (ContinuousLinearMap.id ℂ F) T hT
+  rw [ContinuousLinearMap.id_comp] at h₁
+  rw [ContinuousLinearMap.comp_id] at h₂
+  exact ⟨h₁, h₂⟩
 
 /-- Paper: Lemma C.3.2.2, p. 695. A nuclear map followed by an injection has
 the same trace as the reverse composition when both spaces have the approximation property.

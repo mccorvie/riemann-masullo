@@ -2,8 +2,11 @@ module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 public import RiemannMasullo.Ch02_AdelicTheta.Sec1
+public import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum
 public import Mathlib.Algebra.Module.ZLattice.Basic
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
+import Mathlib.Algebra.Module.ZLattice.Summable
+import Mathlib.Algebra.Order.Chebyshev
 import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 import Mathlib.MeasureTheory.Measure.Real
 import Mathlib.Tactic.Linarith
@@ -196,12 +199,691 @@ at the adeles `g * (ξ + x)` as `ξ` ranges over the nonzero field elements. -/
 def adelicAverage (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F]) : ℂ :=
   ∑' ξ : Fˣ, f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + x)))
 
+section AdelicAverageSummable
+
+open IsDedekindDomain
+
+open Classical in
+/-- A stage realization evaluates the stage function at the quotient coordinate on the open
+subgroup and vanishes outside it. -/
+private theorem schwartzBruhatStageRealization_apply_dite {G : Type*} [CommGroup G] [TopologicalSpace G] (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (f : SchwartzBruhatStage e) (x : G) :
+    schwartzBruhatStageRealization a e f x =
+      if hx : x ∈ a.val.1 then
+        f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
+      else 0 := by
+  change (if hx : x ∈ a.val.1 then (LinearMap.proj (R := ℂ)
+    (φ := fun _ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder) => ℂ)
+    (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))) else 0)
+    ((show elementarySchwartzSubmodule _ _ _ _ from f).val) = _
+  split_ifs with hx
+  · rfl
+  · rfl
+
+/-- A weighted bound of an elementary Schwartz function controls its pointwise size times the
+real and lattice monomials. -/
+private theorem elementarySchwartz_monomial_bound {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+    [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk]
+    {f : ElementaryLieGroup m n r Fk → ℂ} (hf : f ∈ elementarySchwartzSubmodule m n r Fk)
+    (β : Fin m → ℕ) (δ : Fin r → ℕ) (w : ElementaryLieGroup m n r Fk) :
+    (∏ k, |w.1 k| ^ β k) * (∏ k, |(w.2.2.1 k : ℝ)| ^ δ k) * ‖f w‖ ≤
+      (elementarySchwartzBound f (β, 0, 0, δ)).toReal := by
+  obtain ⟨t, ht⟩ := elementaryCover_surjective (F := Fk) w.2.2.1 w.2.2.2 w.1 w.2.1
+  have hfin := hf.2 (β, 0, 0, δ)
+  have hle : ((‖((∏ k, (w.1 k : ℂ) ^ β k) * (∏ k, (w.2.2.1 k : ℂ) ^ δ k)) *
+      elementaryPartial f 0 0 (w.1, t) w.2.2.1 w.2.2.2‖₊ : ENNReal)) ≤
+      elementarySchwartzBound f (β, 0, 0, δ) :=
+    le_iSup_of_le (w.1, t) (le_iSup_of_le w.2.2.1 (le_iSup_of_le w.2.2.2 le_rfl))
+  rw [elementaryPartial_zero, ht] at hle
+  have := (ENNReal.toReal_le_toReal ENNReal.coe_ne_top hfin.ne).mpr hle
+  simp only [ENNReal.coe_toReal, coe_nnNorm, norm_mul, norm_prod, norm_pow, Complex.norm_real,
+    Real.norm_eq_abs, Complex.norm_intCast] at this
+  convert this using 3
+
+/-- An elementary Schwartz function decays faster than any power of the real and lattice
+coordinates. -/
+private theorem elementarySchwartz_decay {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+    [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk]
+    {f : ElementaryLieGroup m n r Fk → ℂ} (hf : f ∈ elementarySchwartzSubmodule m n r Fk)
+    (N : ℕ) : ∃ C : ℝ, ∀ w : ElementaryLieGroup m n r Fk,
+      ‖f w‖ * (1 + (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|)) ^ N ≤ C := by
+  classical
+  let B : ElementarySchwartzIndex m n r → ℝ := fun i => (elementarySchwartzBound f i).toReal
+  let c : ℝ := Fintype.card (Option (Fin m ⊕ Fin r))
+  refine ⟨c ^ N * (B (0, 0, 0, 0) + ∑ j, B (Pi.single j (N + 1), 0, 0, 0) +
+    ∑ k, B (0, 0, 0, Pi.single k (N + 1))), fun w => ?_⟩
+  let g : Option (Fin m ⊕ Fin r) → ℝ := fun i => match i with
+    | none => 1
+    | some (Sum.inl j) => |w.1 j|
+    | some (Sum.inr k) => |(w.2.2.1 k : ℝ)|
+  have hg0 : ∀ i ∈ Finset.univ, 0 ≤ g i := by
+    rintro (_ | _ | _) _ <;> simp [g]
+  have hsum : ∑ i, g i = 1 + (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) := by
+    simp [g, Fintype.sum_option, Fintype.sum_sum_type]
+  have hS1 : 1 ≤ ∑ i, g i := by
+    rw [hsum]; have := Finset.sum_nonneg (fun j (_ : j ∈ Finset.univ) => abs_nonneg (w.1 j))
+    have := Finset.sum_nonneg (fun k (_ : k ∈ Finset.univ) => abs_nonneg ((w.2.2.1 k : ℝ)))
+    linarith
+  have hc : 0 < c := by positivity
+  have hpow := pow_sum_div_card_le_sum_pow hg0 N
+  rw [Finset.card_univ] at hpow
+  have hpow' : (∑ i, g i) ^ (N + 1) ≤ c ^ N * ∑ i, g i ^ (N + 1) := by
+    rwa [div_le_iff₀' (by positivity)] at hpow
+  have hmono : (∑ i, g i) ^ N ≤ (∑ i, g i) ^ (N + 1) :=
+    pow_le_pow_right₀ hS1 (Nat.le_succ N)
+  have hterm : ∀ i, g i ^ (N + 1) * ‖f w‖ ≤ (match i with
+      | none => B (0, 0, 0, 0)
+      | some (Sum.inl j) => B (Pi.single j (N + 1), 0, 0, 0)
+      | some (Sum.inr k) => B (0, 0, 0, Pi.single k (N + 1))) := by
+    rintro (_ | j | k)
+    · show (1 : ℝ) ^ (N + 1) * ‖f w‖ ≤ B (0, 0, 0, 0)
+      simpa using elementarySchwartz_monomial_bound hf 0 0 w
+    · have := elementarySchwartz_monomial_bound hf (Pi.single j (N + 1)) 0 w
+      rw [Finset.prod_eq_single j (fun k _ hk => by simp [hk]) (by simp)] at this
+      simp only [Pi.single_eq_same, Pi.zero_apply, pow_zero, Finset.prod_const_one,
+        mul_one] at this
+      exact this
+    · have := elementarySchwartz_monomial_bound hf 0 (Pi.single k (N + 1)) w
+      rw [Finset.prod_eq_single k (fun k' _ hk => by simp [hk]) (by simp)] at this
+      simp only [Pi.single_eq_same, Pi.zero_apply, pow_zero, Finset.prod_const_one,
+        one_mul] at this
+      exact this
+  have hfw : 0 ≤ ‖f w‖ := norm_nonneg _
+  rw [← hsum]
+  calc ‖f w‖ * (∑ i, g i) ^ N ≤ ‖f w‖ * (c ^ N * ∑ i, g i ^ (N + 1)) :=
+        mul_le_mul_of_nonneg_left (hmono.trans hpow') hfw
+    _ = c ^ N * ∑ i, g i ^ (N + 1) * ‖f w‖ := by rw [← Finset.sum_mul]; ring
+    _ ≤ c ^ N * ∑ i : Option (Fin m ⊕ Fin r), (match i with
+      | none => B (0, 0, 0, 0)
+      | some (Sum.inl j) => B (Pi.single j (N + 1), 0, 0, 0)
+      | some (Sum.inr k) => B (0, 0, 0, Pi.single k (N + 1))) := by
+        gcongr with i; exact hterm i
+    _ = _ := by simp [Fintype.sum_option, Fintype.sum_sum_type, add_assoc]
+
+
+/-- A compact set of finite adeles has bounded denominators: one nonzero integer multiplies it
+into the integral adeles. -/
+private theorem exists_mul_mem_adicCompletionIntegers_of_isCompact
+    {Ω : Set (FiniteAdeleRing (𝓞 F) F)} (hΩ : IsCompact Ω) :
+    ∃ b : 𝓞 F, b ≠ 0 ∧ ∀ x ∈ Ω, ∀ v : HeightOneSpectrum (𝓞 F),
+      (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b * x) v ∈ v.adicCompletionIntegers F := by
+  classical
+  let V : {b : 𝓞 F // b ≠ 0} → Set (FiniteAdeleRing (𝓞 F) F) := fun b =>
+    {x | ∀ v, (algebraMap (𝓞 F) _ b.1 * x) v ∈ v.adicCompletionIntegers F}
+  have hO : IsOpen {y : FiniteAdeleRing (𝓞 F) F | ∀ v, y v ∈ v.adicCompletionIntegers F} :=
+    RestrictedProduct.isOpen_forall_mem (fun v : HeightOneSpectrum (𝓞 F) =>
+      Valued.isOpen_integer (v.adicCompletion F))
+  have hVo : ∀ b, IsOpen (V b) := fun b => hO.preimage (continuous_const.mul continuous_id)
+  have hint (v : HeightOneSpectrum (𝓞 F)) (b : 𝓞 F) :
+      algebraMap (𝓞 F) (v.adicCompletion F) b ∈ v.adicCompletionIntegers F :=
+    HeightOneSpectrum.coe_mem_adicCompletionIntegers v b
+  have hcov : Ω ⊆ ⋃ b, V b := by
+    intro x _
+    have hS : {v | x v ∉ v.adicCompletionIntegers F}.Finite := by
+      exact Filter.eventually_cofinite.mp x.2
+    choose c hc hcx using fun v : HeightOneSpectrum (𝓞 F) =>
+      HeightOneSpectrum.adicCompletion.mul_nonZeroDivisor_mem_adicCompletionIntegers v (x v)
+    have hb : (∏ v ∈ hS.toFinset, c v) ≠ 0 :=
+      Finset.prod_ne_zero_iff.mpr fun v _ => nonZeroDivisors.ne_zero (hc v)
+    refine Set.mem_iUnion.mpr ⟨⟨∏ v ∈ hS.toFinset, c v, hb⟩, fun v => ?_⟩
+    change algebraMap (𝓞 F) (v.adicCompletion F) (∏ v ∈ hS.toFinset, c v) * x v ∈
+      v.adicCompletionIntegers F
+    by_cases hv : v ∈ hS.toFinset
+    · rw [← Finset.mul_prod_erase _ _ hv, map_mul, mul_comm, ← mul_assoc]
+      exact mul_mem (hcx v) (hint v _)
+    · have : x v ∈ v.adicCompletionIntegers F := by simpa using hv
+      exact mul_mem (hint v _) this
+  have hdir : Directed (· ⊆ ·) V := by
+    intro b c
+    refine ⟨⟨b.1 * c.1, mul_ne_zero b.2 c.2⟩, fun x hx v => ?_, fun x hx v => ?_⟩
+    · change algebraMap (𝓞 F) (v.adicCompletion F) (b.1 * c.1) * x v ∈ v.adicCompletionIntegers F
+      have := hx v
+      change algebraMap (𝓞 F) (v.adicCompletion F) b.1 * x v ∈ v.adicCompletionIntegers F at this
+      rw [map_mul, mul_comm (algebraMap _ _ b.1), mul_assoc]
+      exact mul_mem (hint v _) this
+    · change algebraMap (𝓞 F) (v.adicCompletion F) (b.1 * c.1) * x v ∈ v.adicCompletionIntegers F
+      have := hx v
+      change algebraMap (𝓞 F) (v.adicCompletion F) c.1 * x v ∈ v.adicCompletionIntegers F at this
+      rw [map_mul, mul_assoc]
+      exact mul_mem (hint v _) this
+  have : Nonempty {b : 𝓞 F // b ≠ 0} := ⟨⟨1, one_ne_zero⟩⟩
+  obtain ⟨b, hb⟩ := hΩ.elim_directed_cover V hVo hcov hdir
+  exact ⟨b.1, b.2, fun x hx => hb hx⟩
+
+
+/-- A field element that is integral at every finite place is an algebraic integer. -/
+private theorem mem_integers_of_forall_mem_adicCompletionIntegers {ξ : F}
+    (h : ∀ v : HeightOneSpectrum (𝓞 F),
+      algebraMap F (FiniteAdeleRing (𝓞 F) F) ξ v ∈ v.adicCompletionIntegers F) :
+    ξ ∈ (algebraMap (𝓞 F) F).range := by
+  refine HeightOneSpectrum.mem_integers_of_valuation_le_one F ξ fun v => ?_
+  have := h v
+  rw [HeightOneSpectrum.mem_adicCompletionIntegers] at this
+  rw [← HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+  exact this
+
+
+omit [NumberField F] in
+/-- The identification of the infinite adeles with the mixed space is continuous. -/
+private theorem continuous_ringEquiv_mixedSpace :
+    Continuous (InfiniteAdeleRing.ringEquiv_mixedSpace F) := by
+  have h : ⇑(InfiniteAdeleRing.ringEquiv_mixedSpace F) = fun x =>
+      ((fun (v : {w : InfinitePlace F // InfinitePlace.IsReal w}) =>
+        InfinitePlace.Completion.extensionEmbeddingOfIsReal v.2 (x v)),
+       (fun (v : {w : InfinitePlace F // InfinitePlace.IsComplex w}) =>
+        InfinitePlace.Completion.extensionEmbedding v.1 (x v))) := by
+    funext x; exact InfiniteAdeleRing.ringEquiv_mixedSpace_apply F x
+  rw [h]
+  refine Continuous.prodMk (continuous_pi fun v => ?_) (continuous_pi fun v => ?_)
+  · exact (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal v.2).continuous.comp
+      (continuous_apply (v.1))
+  · exact (InfinitePlace.Completion.isometry_extensionEmbedding v.1).continuous.comp
+      (continuous_apply (v.1))
+
+/-- A subgroup of the adeles with open annihilator has trivial archimedean coordinates, since the
+characters `y ↦ exp(i t φ(y_∞))` tend to the trivial character as `t → 0`. -/
+private theorem mixedSpace_eq_zero_of_isOpen_lcaAnnihilator
+    {k : Subgroup (Multiplicative 𝔸[F])}
+    (hk : IsOpen (lcaAnnihilator k : Set (PontryaginDual (Multiplicative 𝔸[F]))))
+    {y : Multiplicative 𝔸[F]} (hy : y ∈ k) :
+    InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1 = 0 := by
+  set m : 𝔸[F] → mixedEmbedding.mixedSpace F :=
+    fun z => InfiniteAdeleRing.ringEquiv_mixedSpace F z.1 with hm_def
+  have hm : Continuous m := continuous_ringEquiv_mixedSpace.comp continuous_fst
+  have hmadd : ∀ a b, m (a + b) = m a + m b := fun a b =>
+    map_add (InfiniteAdeleRing.ringEquiv_mixedSpace F) a.1 b.1
+  have hm0 : m 0 = 0 := map_zero (InfiniteAdeleRing.ringEquiv_mixedSpace F)
+  change m (Multiplicative.toAdd y) = 0
+  by_contra hne
+  obtain ⟨φ, hφ⟩ := SeparatingDual.exists_ne_zero (R := ℝ) hne
+  set c := φ (m (Multiplicative.toAdd y)) with hc
+  let χ : ℝ → PontryaginDual (Multiplicative 𝔸[F]) := fun t =>
+    { toFun := fun z => Circle.exp (t * φ (m (Multiplicative.toAdd z)))
+      map_one' := by simp [hm0]
+      map_mul' := fun a b => by
+        simp only [toAdd_mul, hmadd, map_add, mul_add, Circle.exp_add]
+      continuous_toFun := by
+        exact Circle.exp.continuous.comp (continuous_const.mul
+          (φ.continuous.comp (hm.comp continuous_toAdd))) }
+  have hχ : Continuous χ := by
+    apply ContinuousMonoidHom.continuous_of_continuous_uncurry
+    exact Circle.exp.continuous.comp (continuous_fst.mul
+          (φ.continuous.comp (hm.comp (continuous_toAdd.comp continuous_snd))))
+  have h0 : χ 0 ∈ lcaAnnihilator k := by
+    have : χ 0 = 1 := by
+      refine ContinuousMonoidHom.ext fun z => ?_
+      change Circle.exp (0 * _) = 1
+      rw [zero_mul, Circle.exp_zero]
+    rw [this]; exact Subgroup.one_mem _
+  obtain ⟨δ, hδ, hball⟩ := Metric.isOpen_iff.mp (hk.preimage hχ) 0 h0
+  have hcpos : 0 < |c| := abs_pos.mpr hφ
+  set t := min (δ / 2) (Real.pi / |c|) with ht
+  have htpos : 0 < t := lt_min (by linarith) (div_pos Real.pi_pos hcpos)
+  have htδ : t < δ := lt_of_le_of_lt (min_le_left _ _) (by linarith)
+  have htc : |t * c| ≤ Real.pi := by
+    rw [abs_mul, abs_of_pos htpos]
+    calc t * |c| ≤ (Real.pi / |c|) * |c| := by gcongr; exact min_le_right _ _
+      _ = Real.pi := div_mul_cancel₀ _ hcpos.ne'
+  have hmem : χ t ∈ lcaAnnihilator k := hball (by simpa [abs_of_pos htpos] using htδ)
+  have h1 := DFunLike.congr_fun (MonoidHom.mem_ker.mp hmem) ⟨y, hy⟩
+  change Circle.exp (t * c) = 1 at h1
+  obtain ⟨n, hn⟩ := Circle.exp_eq_one.mp h1
+  have htc0 : t * c ≠ 0 := mul_ne_zero htpos.ne' hφ
+  have hn0 : n ≠ 0 := by rintro rfl; exact htc0 (by simpa using hn)
+  have hn1 : (1 : ℝ) ≤ |(n : ℝ)| := by
+    rw [← Int.cast_abs]; exact_mod_cast Int.one_le_abs hn0
+  have : |t * c| = |(n : ℝ)| * (2 * Real.pi) := by
+    rw [hn, abs_mul, abs_of_pos (by positivity : (0:ℝ) < 2 * Real.pi)]
+  nlinarith [Real.pi_pos]
+
+
+/-- The Euclidean norm is at most the sum of the absolute values of the coordinates. -/
+private theorem euclideanSpace_norm_le_sum_abs {m : ℕ} (x : EuclideanSpace ℝ (Fin m)) :
+    ‖x‖ ≤ ∑ j, |x j| := by
+  rw [EuclideanSpace.norm_eq, Real.sqrt_le_iff]
+  refine ⟨Finset.sum_nonneg fun _ _ => abs_nonneg _, ?_⟩
+  simp only [Real.norm_eq_abs]
+  exact Finset.sum_sq_le_sq_sum_of_nonneg fun _ _ => abs_nonneg _
+
+/-- A continuous additive map from an elementary group to a real normed space grows at most
+linearly in the real and lattice coordinates. -/
+private theorem elementary_additive_norm_le {m n r : ℕ} {Fk : Type*} [AddCommGroup Fk]
+    [TopologicalSpace Fk] [CompactSpace Fk]
+    {V : Type*} [NormedAddCommGroup V] [NormedSpace ℝ V]
+    (P₀ : ElementaryLieGroup m n r Fk → V) (hP₀ : Continuous P₀)
+    (hadd : ∀ w₁ w₂, P₀ (w₁ + w₂) = P₀ w₁ + P₀ w₂) :
+    ∃ A B : ℝ, 0 ≤ A ∧ ∀ w : ElementaryLieGroup m n r Fk,
+      ‖P₀ w‖ ≤ A * (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) + B := by
+  classical
+  let P : ElementaryLieGroup m n r Fk →+ V := AddMonoidHom.mk' P₀ hadd
+  have hP : Continuous P := hP₀
+  show ∃ A B : ℝ, 0 ≤ A ∧ ∀ w : ElementaryLieGroup m n r Fk,
+      ‖P w‖ ≤ A * (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) + B
+  -- the real coordinate
+  let Pr : EuclideanSpace ℝ (Fin m) →+ V := P.comp (AddMonoidHom.inl _ _)
+  have hPr : Continuous Pr := hP.comp (continuous_id.prodMk continuous_const)
+  let L := Pr.toRealLinearMap hPr
+  -- the compact coordinates
+  let q : (Fin n → AddCircle (1 : ℝ)) × Fk → V := fun θb => P (0, θb.1, 0, θb.2)
+  have hq : Continuous q := hP.comp (continuous_const.prodMk
+    (continuous_fst.prodMk (continuous_const.prodMk continuous_snd)))
+  obtain ⟨C, hC⟩ := isCompact_univ.exists_bound_of_continuousOn hq.continuousOn
+  -- the lattice coordinate
+  let Pz : (Fin r → ℤ) →+ V :=
+    P.comp ((AddMonoidHom.inr _ _).comp ((AddMonoidHom.inr _ _).comp (AddMonoidHom.inl _ _)))
+  let A₂ : ℝ := ∑ k, ‖Pz (Pi.single k 1)‖
+  have hA₂ : 0 ≤ A₂ := Finset.sum_nonneg fun _ _ => norm_nonneg _
+  refine ⟨‖L‖ + A₂, C, add_nonneg (norm_nonneg _) hA₂, fun w => ?_⟩
+  have hw : w = (w.1, 0, 0, 0) + ((0, w.2.1, 0, w.2.2.2) + (0, 0, w.2.2.1, 0)) := by
+    ext <;> simp
+  have h1 : ‖P (w.1, 0, 0, 0)‖ ≤ ‖L‖ * ∑ j, |w.1 j| := by
+    have : P (w.1, 0, 0, 0) = L w.1 := rfl
+    rw [this]
+    exact (L.le_opNorm _).trans (mul_le_mul_of_nonneg_left
+      (euclideanSpace_norm_le_sum_abs _) (norm_nonneg _))
+  have h2 : ‖P (0, w.2.1, 0, w.2.2.2)‖ ≤ C := hC (w.2.1, w.2.2.2) (Set.mem_univ _)
+  have h3 : ‖P (0, 0, w.2.2.1, 0)‖ ≤ A₂ * ∑ k, |(w.2.2.1 k : ℝ)| := by
+    have : P (0, 0, w.2.2.1, 0) = Pz w.2.2.1 := rfl
+    rw [this]
+    have hdecomp : w.2.2.1 = ∑ k, (w.2.2.1 k) • (Pi.single k 1 : Fin r → ℤ) := by
+      ext i; simp [Pi.single_apply]
+    have hPz : Pz w.2.2.1 = ∑ k, (w.2.2.1 k) • Pz (Pi.single k 1) := by
+      conv_lhs => rw [hdecomp]
+      rw [map_sum]
+      simp only [map_zsmul]
+    rw [hPz]
+    refine (norm_sum_le _ _).trans ?_
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum fun k _ => ?_
+    rw [norm_zsmul ℝ, Real.norm_eq_abs, mul_comm]
+    have : ‖Pz (Pi.single k 1)‖ ≤ A₂ :=
+      Finset.single_le_sum (f := fun k => ‖Pz (Pi.single k 1)‖) (fun _ _ => norm_nonneg _)
+        (Finset.mem_univ k)
+    exact mul_le_mul_of_nonneg_right this (abs_nonneg _)
+  have hsplit : P w = P (w.1, 0, 0, 0) + (P (0, w.2.1, 0, w.2.2.2) + P (0, 0, w.2.2.1, 0)) := by
+    conv_lhs => rw [hw]
+    rw [map_add, map_add]
+  rw [hsplit]
+  have hX : 0 ≤ ∑ j, |w.1 j| := Finset.sum_nonneg fun _ _ => abs_nonneg _
+  have hY : 0 ≤ ∑ k, |(w.2.2.1 k : ℝ)| := Finset.sum_nonneg fun _ _ => abs_nonneg _
+  calc ‖P (w.1, 0, 0, 0) + (P (0, w.2.1, 0, w.2.2.2) + P (0, 0, w.2.2.1, 0))‖
+      ≤ ‖P (w.1, 0, 0, 0)‖ + (‖P (0, w.2.1, 0, w.2.2.2)‖ + ‖P (0, 0, w.2.2.1, 0)‖) :=
+        (norm_add_le _ _).trans (add_le_add le_rfl (norm_add_le _ _))
+    _ ≤ ‖L‖ * ∑ j, |w.1 j| + (C + A₂ * ∑ k, |(w.2.2.1 k : ℝ)|) := by gcongr
+    _ ≤ _ := by nlinarith [norm_nonneg L]
+
+open scoped Classical in
+/-- On the open subgroup of a structural pair of the adeles, the archimedean coordinate is
+controlled linearly by the real and lattice coordinates of any elementary presentation. -/
+private theorem presentation_mixedSpace_bound
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F]))
+    (e : ElementaryLCAPresentation a.quotient) :
+    ∃ A B : ℝ, 0 ≤ A ∧ ∀ (y : Multiplicative 𝔸[F]) (hy : y ∈ a.val.1),
+      ‖InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1‖ ≤
+        A * (∑ j, |(Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).1 j| +
+          ∑ k, |((Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).2.2.1 k : ℝ)|) +
+          B := by
+  by_cases hk : e.finiteOrder = 0
+  · refine ⟨0, 0, le_rfl, fun y hy => ?_⟩
+    have b := (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))).2.2.2
+    exact absurd b.2 (by omega)
+  have : NeZero e.finiteOrder := ⟨hk⟩
+  have hgood := a.property.2.2.1
+  let m : 𝔸[F] → mixedEmbedding.mixedSpace F :=
+    fun z => InfiniteAdeleRing.ringEquiv_mixedSpace F z.1
+  have hm : Continuous m := continuous_ringEquiv_mixedSpace.comp continuous_fst
+  let h0 : a.val.1 →* Multiplicative (mixedEmbedding.mixedSpace F) :=
+    { toFun := fun u => Multiplicative.ofAdd (m (Multiplicative.toAdd u.val))
+      map_one' := by
+        show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F 0) = 1
+        rw [map_zero]; rfl
+      map_mul' := fun u v => by
+        show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F
+          ((Multiplicative.toAdd u.val).1 + (Multiplicative.toAdd v.val).1)) = _
+        rw [map_add]; rfl }
+  have hker : ∀ u ∈ (OrderDual.ofDual a.val.2).comap a.val.1.subtype, h0 u = 1 := fun u hu => by
+    have := mixedSpace_eq_zero_of_isOpen_lcaAnnihilator hgood.2.1 (Subgroup.mem_comap.mp hu)
+    show Multiplicative.ofAdd (InfiniteAdeleRing.ringEquiv_mixedSpace F
+      (Multiplicative.toAdd u.val).1) = 1
+    rw [Subgroup.coe_subtype] at this
+    rw [this]; rfl
+  let lift : a.quotient →* Multiplicative (mixedEmbedding.mixedSpace F) :=
+    QuotientGroup.lift _ h0 hker
+  have hh0 : Continuous h0 := continuous_ofAdd.comp (hm.comp (continuous_toAdd.comp
+    continuous_subtype_val))
+  have hlift : Continuous lift := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr hh0
+  have key : ∀ w₁ w₂ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank
+      (Fin e.finiteOrder), e.equiv.symm (Multiplicative.ofAdd (w₁ + w₂)) =
+        e.equiv.symm (Multiplicative.ofAdd w₁) * e.equiv.symm (Multiplicative.ofAdd w₂) :=
+    fun w₁ w₂ => e.equiv.symm.map_mul (Multiplicative.ofAdd w₁) (Multiplicative.ofAdd w₂)
+  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder) →
+      mixedEmbedding.mixedSpace F :=
+    fun w => Multiplicative.toAdd (lift (e.equiv.symm (Multiplicative.ofAdd w)))
+  have hPadd : ∀ w₁ w₂, P (w₁ + w₂) = P w₁ + P w₂ := (fun w₁ w₂ => by
+        have h1 := key w₁ w₂
+        have h2 := congrArg (fun z => Multiplicative.toAdd (lift z)) h1
+        have h3 := map_mul lift (e.equiv.symm (Multiplicative.ofAdd w₁))
+          (e.equiv.symm (Multiplicative.ofAdd w₂))
+        have h4 := congrArg Multiplicative.toAdd h3
+        exact (h2.trans h4).trans (toAdd_mul _ _))
+
+  have hP : Continuous P := continuous_toAdd.comp (hlift.comp (e.equiv.symm.continuous.comp
+    continuous_ofAdd))
+  have H := elementary_additive_norm_le (m := e.realDim) (n := e.torusDim)
+    (r := e.latticeRank) (Fk := Fin e.finiteOrder) (V := mixedEmbedding.mixedSpace F) P hP hPadd
+  obtain ⟨A, B, hA, hAB⟩ := H
+  refine ⟨A, B, hA, ?_⟩
+  intro y hy
+  have h1 := congrArg (fun z => Multiplicative.toAdd (lift z))
+      (e.equiv.symm_apply_apply (QuotientGroup.mk ⟨y, hy⟩))
+  have h2 : lift (QuotientGroup.mk ⟨y, hy⟩) = h0 ⟨y, hy⟩ := QuotientGroup.lift_mk _ _ _
+  have h3 : Multiplicative.toAdd (h0 ⟨y, hy⟩) =
+      InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1 := rfl
+  have hPy : P (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))) =
+      InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1 := by
+    exact (h1.trans (congrArg Multiplicative.toAdd h2)).trans h3
+  exact (le_of_eq (congrArg norm hPy.symm)).trans
+    (hAB (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩))))
+
+/-- A compactly generated subgroup of the adeles has bounded denominators at the finite places. -/
+private theorem exists_mul_mem_adicCompletionIntegers_of_compactlyGenerated
+    {U : Subgroup (Multiplicative 𝔸[F])} (hU : IsCompactlyGeneratedGroup U) :
+    ∃ b : 𝓞 F, b ≠ 0 ∧ ∀ y ∈ U, ∀ v : HeightOneSpectrum (𝓞 F),
+      (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b * (Multiplicative.toAdd y).2) v ∈
+        v.adicCompletionIntegers F := by
+  obtain ⟨V, -, hVc, hVgen⟩ := hU
+  have hc : Continuous fun u : U => (Multiplicative.toAdd u.val).2 :=
+    continuous_snd.comp (continuous_toAdd.comp continuous_subtype_val)
+  obtain ⟨b, hb, hbV⟩ := exists_mul_mem_adicCompletionIntegers_of_isCompact (hVc.image hc)
+  suffices H : ∀ u ∈ Subgroup.closure V, ∀ v : HeightOneSpectrum (𝓞 F),
+      (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b * (Multiplicative.toAdd u.val).2) v ∈
+        v.adicCompletionIntegers F from
+    ⟨b, hb, fun y hy => H ⟨y, hy⟩ (hVgen ▸ Subgroup.mem_top _)⟩
+  intro u hmem
+  induction hmem using Subgroup.closure_induction with
+  | mem u hu => exact hbV _ ⟨u, hu, rfl⟩
+  | one =>
+    intro v
+    change algebraMap (𝓞 F) (v.adicCompletion F) b * 0 ∈ v.adicCompletionIntegers F
+    rw [mul_zero]; exact zero_mem _
+  | mul u w _ _ hu hw =>
+    intro v
+    change algebraMap (𝓞 F) (v.adicCompletion F) b *
+      ((Multiplicative.toAdd u.val).2 v + (Multiplicative.toAdd w.val).2 v) ∈
+        v.adicCompletionIntegers F
+    rw [mul_add]
+    exact add_mem (hu v) (hw v)
+  | inv u _ hu =>
+    intro v
+    change algebraMap (𝓞 F) (v.adicCompletion F) b * (-(Multiplicative.toAdd u.val).2 v) ∈
+        v.adicCompletionIntegers F
+    rw [mul_neg]
+    exact neg_mem (hu v)
+
+open scoped Classical in
+/-- Inverse powers of the archimedean size are summable over the field elements whose multiples
+by a fixed nonzero integer are integral, once the power exceeds the rank of the integer lattice. -/
+private theorem summable_indicator_inv_one_add_norm_pow (b : 𝓞 F) (hb : b ≠ 0) (N : ℕ)
+    (hN : Module.finrank ℤ (mixedEmbedding.integerLattice F) < N) :
+    Summable ({ξ : Fˣ | algebraMap (𝓞 F) F b * (ξ : F) ∈ (algebraMap (𝓞 F) F).range}.indicator
+      (fun ξ : Fˣ => ((1 + ‖mixedEmbedding F (ξ : F)‖) ^ N)⁻¹)) := by
+  set S := {ξ : Fˣ | algebraMap (𝓞 F) F b * (ξ : F) ∈ (algebraMap (𝓞 F) F).range}
+  rw [← summable_subtype_iff_indicator]
+  let L := mixedEmbedding.integerLattice F
+  have hmemL : ∀ ξ : S, mixedEmbedding F (algebraMap (𝓞 F) F b * (ξ.val : F)) ∈ L := by
+    rintro ⟨ξ, c, hc⟩
+    exact ⟨c, by simp [hc]⟩
+  let ι : S → L := fun ξ => ⟨_, hmemL ξ⟩
+  have hι : Function.Injective ι := by
+    intro ξ₁ ξ₂ h
+    have h1 := congrArg Subtype.val h
+    have h2 := (mixedEmbedding_injective F) h1
+    have hb' : algebraMap (𝓞 F) F b ≠ 0 := by
+      simpa using hb
+    exact Subtype.ext (Units.ext (mul_left_cancel₀ hb' h2))
+  have hsum := (ZLattice.summable_norm_pow_inv L N hN).comp_injective hι
+  have hbn : 0 < ‖mixedEmbedding F (algebraMap (𝓞 F) F b)‖ := by
+    rw [norm_pos_iff, map_ne_zero_iff _ (mixedEmbedding_injective F)]
+    simpa using hb
+  refine (hsum.mul_left (‖mixedEmbedding F (algebraMap (𝓞 F) F b)‖ ^ N)).of_nonneg_of_le
+    (fun _ => by simp only [Function.comp_apply]; positivity) (fun ξ => ?_)
+  simp only [Function.comp_apply]
+  have hξ0 : (ξ.val : F) ≠ 0 := ξ.val.ne_zero
+  have hιpos : 0 < ‖ι ξ‖ := by
+    change 0 < ‖mixedEmbedding F (algebraMap (𝓞 F) F b * (ξ.val : F))‖
+    rw [norm_pos_iff, map_ne_zero_iff _ (mixedEmbedding_injective F)]
+    exact mul_ne_zero (by simpa using hb) hξ0
+  have hιle : ‖ι ξ‖ ≤ ‖mixedEmbedding F (algebraMap (𝓞 F) F b)‖ *
+      (1 + ‖mixedEmbedding F (ξ.val : F)‖) := by
+    change ‖mixedEmbedding F (algebraMap (𝓞 F) F b * (ξ.val : F))‖ ≤ _
+    rw [map_mul]
+    refine (norm_mul_le _ _).trans ?_
+    gcongr
+    linarith
+  rw [inv_pow, ← div_eq_mul_inv, le_div_iff₀ (by positivity), mul_comm, ← div_eq_mul_inv,
+    div_le_iff₀ (by positivity), ← mul_pow]
+  exact pow_le_pow_left₀ (norm_nonneg _) hιle N
+
+
+/-- A norm estimate for `a * b - c` in a normed ring. -/
+private theorem norm_le_mul_add_of_eq {R : Type*} [NormedRing R] (a b c d : R) (h : d = a * b - c) :
+    ‖d‖ ≤ ‖a‖ * ‖b‖ + ‖c‖ := by
+  rw [h]
+  exact (norm_sub_le _ _).trans (add_le_add (norm_mul_le _ _) le_rfl)
+
+open scoped Classical in
+/-- The archimedean size of `ξ` is controlled by that of `g * (ξ + x)` and the sizes of
+`g⁻¹` and `x`. -/
+private theorem norm_mixedEmbedding_le_of_adele (g : IdeleGroup (𝓞 F) F) (x : 𝔸[F]) (ξ : F) :
+    ‖mixedEmbedding F ξ‖ ≤
+      ‖InfiniteAdeleRing.ringEquiv_mixedSpace F ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1‖ *
+        ‖InfiniteAdeleRing.ringEquiv_mixedSpace F (g.val * (algebraMap F 𝔸[F] ξ + x)).1‖ +
+      ‖InfiniteAdeleRing.ringEquiv_mixedSpace F x.1‖ := by
+  set E := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have hgi : ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1 * (g : 𝔸[F]).1 = 1 := by
+    have := congrArg Prod.fst (Units.inv_mul g)
+    exact this
+  have hξ : mixedEmbedding F ξ = E ((algebraMap F 𝔸[F] ξ).1) :=
+    InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp F
+  have h3 : ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1 * (g.val * (algebraMap F 𝔸[F] ξ + x)).1 =
+      (algebraMap F 𝔸[F] ξ).1 + x.1 := by
+    change ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1 * ((g : 𝔸[F]).1 *
+      ((algebraMap F 𝔸[F] ξ).1 + x.1)) = _
+    rw [← mul_assoc, hgi, one_mul]
+  have hkey : mixedEmbedding F ξ =
+      E ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1 * E (g.val * (algebraMap F 𝔸[F] ξ + x)).1 -
+        E x.1 := by
+    rw [← map_mul E, h3, map_add E, hξ, add_sub_cancel_right]
+  exact norm_le_mul_add_of_eq _ _ _ _ hkey
+
+/-- Bounded denominators of `g * (ξ + x)`, `g⁻¹` and `x` give bounded denominators of `ξ`. -/
+private theorem mul_mem_integers_of_adele {b₀ b₁ b₂ : 𝓞 F} (g : IdeleGroup (𝓞 F) F) (x : 𝔸[F]) (ξ : F)
+    (h0 : ∀ v : HeightOneSpectrum (𝓞 F), (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b₀ *
+      (g.val * (algebraMap F 𝔸[F] ξ + x)).2) v ∈ v.adicCompletionIntegers F)
+    (h1 : ∀ v : HeightOneSpectrum (𝓞 F), (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b₁ *
+      ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).2) v ∈ v.adicCompletionIntegers F)
+    (h2 : ∀ v : HeightOneSpectrum (𝓞 F), (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b₂ *
+      x.2) v ∈ v.adicCompletionIntegers F) :
+    algebraMap (𝓞 F) F (b₀ * b₁ * b₂) * ξ ∈ (algebraMap (𝓞 F) F).range := by
+  refine HeightOneSpectrum.mem_integers_of_valuation_le_one F _ fun v => ?_
+  rw [← HeightOneSpectrum.valuedAdicCompletion_eq_valuation', ← HeightOneSpectrum.mem_adicCompletionIntegers]
+  have hgi : ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).2 v * (g : 𝔸[F]).2 v = 1 := by
+    have := congrArg (fun z : 𝔸[F] => z.2 v) (Units.inv_mul g)
+    exact this
+  have e0 := h0 v
+  have e1 := h1 v
+  have e2 := h2 v
+  change ((algebraMap (𝓞 F) F b₀ : F) : v.adicCompletion F) *
+    ((g : 𝔸[F]).2 v * ((ξ : v.adicCompletion F) + x.2 v)) ∈ v.adicCompletionIntegers F at e0
+  change ((algebraMap (𝓞 F) F b₁ : F) : v.adicCompletion F) *
+    ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).2 v ∈ v.adicCompletionIntegers F at e1
+  change ((algebraMap (𝓞 F) F b₂ : F) : v.adicCompletion F) * x.2 v ∈
+    v.adicCompletionIntegers F at e2
+  have hint (c : 𝓞 F) : ((algebraMap (𝓞 F) F c : F) : v.adicCompletion F) ∈
+      v.adicCompletionIntegers F :=
+    HeightOneSpectrum.coe_mem_adicCompletionIntegers v c
+  have hcoe : ((algebraMap (𝓞 F) F (b₀ * b₁ * b₂) * ξ : F) : v.adicCompletion F) =
+      ((algebraMap (𝓞 F) F b₂ : F) : v.adicCompletion F) *
+        ((((algebraMap (𝓞 F) F b₁ : F) : v.adicCompletion F) *
+          ((g⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).2 v) *
+          (((algebraMap (𝓞 F) F b₀ : F) : v.adicCompletion F) *
+            ((g : 𝔸[F]).2 v * ((ξ : v.adicCompletion F) + x.2 v)))) -
+      ((algebraMap (𝓞 F) F (b₀ * b₁) : F) : v.adicCompletion F) *
+        (((algebraMap (𝓞 F) F b₂ : F) : v.adicCompletion F) * x.2 v) := by
+    simp only [map_mul, HeightOneSpectrum.adicCompletion.coe_mul]
+    linear_combination (-(((algebraMap (𝓞 F) F b₀ : F) : v.adicCompletion F) *
+      ((algebraMap (𝓞 F) F b₁ : F) : v.adicCompletion F) *
+      ((algebraMap (𝓞 F) F b₂ : F) : v.adicCompletion F) *
+      ((ξ : v.adicCompletion F) + x.2 v))) * hgi
+  rw [hcoe]
+  exact sub_mem (mul_mem (hint _) (mul_mem e1 e0)) (mul_mem (hint _) e2)
+
+/-- Real inequality transferring decay from the elementary coordinates to the archimedean one. -/
+private theorem real_decay_aux {S M X A B C : ℝ} {N : ℕ} (hS : 0 ≤ S) (hX : 0 ≤ X) (hA : 0 ≤ A)
+    (hM0 : 0 ≤ M) (hM : M ≤ A * X + B) (hC : S * (1 + X) ^ N ≤ C) :
+    S * (1 + M) ^ N ≤ (1 + A + max B 0) ^ N * max C 0 := by
+  have hB : B ≤ max B 0 := le_max_left _ _
+  have hB0 : 0 ≤ max B 0 := le_max_right _ _
+  have h2 : 1 + M ≤ (1 + A + max B 0) * (1 + X) := by nlinarith
+  calc S * (1 + M) ^ N ≤ S * ((1 + A + max B 0) * (1 + X)) ^ N := by gcongr
+    _ = (1 + A + max B 0) ^ N * (S * (1 + X) ^ N) := by rw [mul_pow]; ring
+    _ ≤ (1 + A + max B 0) ^ N * max C 0 := by gcongr; exact hC.trans (le_max_left _ _)
+
+/-- Real inequality transferring decay from `g * (ξ + x)` to `ξ`. -/
+private theorem real_decay_aux₂ {φ t μ A₁ A₂ C₀ : ℝ} {N : ℕ} (hφ : 0 ≤ φ) (ht : 0 ≤ t) (hμ : 0 ≤ μ)
+    (hA₁ : 0 ≤ A₁) (hA₂ : 0 ≤ A₂) (hpt : φ * (1 + t) ^ N ≤ C₀) (hmξ : μ ≤ A₁ * t + A₂) :
+    φ ≤ (1 + A₁ + A₂) ^ N * C₀ * ((1 + μ) ^ N)⁻¹ := by
+  have h1 : 1 + μ ≤ (1 + A₁ + A₂) * (1 + t) := by nlinarith
+  rw [← div_eq_mul_inv, le_div_iff₀ (by positivity)]
+  calc φ * (1 + μ) ^ N ≤ φ * ((1 + A₁ + A₂) * (1 + t)) ^ N := by gcongr
+    _ = (1 + A₁ + A₂) ^ N * (φ * (1 + t) ^ N) := by rw [mul_pow]; ring
+    _ ≤ (1 + A₁ + A₂) ^ N * C₀ := by gcongr
+
+open scoped Classical in
+/-- A stage realization on the adeles decays faster than any power of the archimedean size. -/
+private theorem realization_decay (a : BruhatStructuralPair (Multiplicative 𝔸[F]))
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e) (N : ℕ) :
+    ∃ C₀ : ℝ, ∀ y : Multiplicative 𝔸[F], y ∈ a.val.1 →
+      ‖schwartzBruhatStageRealization a e s y‖ *
+        (1 + ‖InfiniteAdeleRing.ringEquiv_mixedSpace F (Multiplicative.toAdd y).1‖) ^ N ≤ C₀ := by
+  have HAB := presentation_mixedSpace_bound a e
+  obtain ⟨A, B, hA, hAB⟩ := HAB
+  let _ : AddCommGroup (Fin e.finiteOrder) := e.finiteGroup
+  have HC := elementarySchwartz_decay (m := e.realDim) (n := e.torusDim)
+    (r := e.latticeRank) (Fk := Fin e.finiteOrder)
+    (f := (show elementarySchwartzSubmodule _ _ _ _ from s).val)
+    (show elementarySchwartzSubmodule _ _ _ _ from s).2 N
+  obtain ⟨C, hC⟩ := HC
+  refine ⟨(1 + A + max B 0) ^ N * max C 0, fun y hy => ?_⟩
+  rw [schwartzBruhatStageRealization_apply_dite, dite_eq_left hy]
+  have hC' := hC (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨y, hy⟩)))
+  exact real_decay_aux (norm_nonneg _)
+    (add_nonneg (Finset.sum_nonneg fun _ _ => abs_nonneg _)
+      (Finset.sum_nonneg fun _ _ => abs_nonneg _)) hA (norm_nonneg _) (hAB y hy) hC'
+
+open scoped Classical in
+/-- The summands of the adelic average of a stage realization admit a summable majorant on a
+compact set of ideles and adeles. -/
+private theorem realization_exists_summable_bound (a : BruhatStructuralPair (Multiplicative 𝔸[F]))
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e)
+    (K : Set (IdeleGroup (𝓞 F) F × 𝔸[F])) (hK : IsCompact K) :
+    ∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+      ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ := by
+  have hNlt : Module.finrank ℤ (mixedEmbedding.integerLattice F) <
+      Module.finrank ℤ (mixedEmbedding.integerLattice F) + 1 := Nat.lt_succ_self _
+  have HC := realization_decay a e s (Module.finrank ℤ (mixedEmbedding.integerLattice F) + 1)
+  obtain ⟨C₀, hpt⟩ := HC
+  -- finite-place constraints
+  have HU := exists_mul_mem_adicCompletionIntegers_of_compactlyGenerated a.property.2.1
+  obtain ⟨b₀, hb₀, hU⟩ := HU
+  have hc1 : Continuous fun p : IdeleGroup (𝓞 F) F × 𝔸[F] =>
+      ((p.1⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]) :=
+    Units.continuous_coe_inv.comp continuous_fst
+  have H1 := exists_mul_mem_adicCompletionIntegers_of_isCompact
+    (hK.image (continuous_snd.comp hc1))
+  obtain ⟨b₁, hb₁, hK1⟩ := H1
+  have H2 := exists_mul_mem_adicCompletionIntegers_of_isCompact
+    (hK.image (continuous_snd.comp continuous_snd))
+  obtain ⟨b₂, hb₂, hK2⟩ := H2
+  -- archimedean constraints
+  have HA1 := hK.exists_bound_of_continuousOn
+    ((continuous_ringEquiv_mixedSpace.comp (continuous_fst.comp hc1)).continuousOn)
+  obtain ⟨A₁, hA₁⟩ := HA1
+  have HA2 := hK.exists_bound_of_continuousOn
+    ((continuous_ringEquiv_mixedSpace.comp (continuous_fst.comp continuous_snd)).continuousOn)
+  obtain ⟨A₂, hA₂⟩ := HA2
+  have hb : b₀ * b₁ * b₂ ≠ 0 := mul_ne_zero (mul_ne_zero hb₀ hb₁) hb₂
+  have hsum := summable_indicator_inv_one_add_norm_pow (b₀ * b₁ * b₂) hb _ hNlt
+  refine ⟨_, hsum.mul_left ((1 + max A₁ 0 + max A₂ 0) ^
+    (Module.finrank ℤ (mixedEmbedding.integerLattice F) + 1) * max C₀ 0), ?_⟩
+  intro ξ p hp
+  by_cases hy : Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)) ∈ a.val.1
+  · have hξS := mul_mem_integers_of_adele p.1 p.2 (ξ : F) (hU _ hy)
+      (hK1 _ ⟨p, hp, rfl⟩) (hK2 _ ⟨p, hp, rfl⟩)
+    have hmξ := norm_mixedEmbedding_le_of_adele p.1 p.2 (ξ : F)
+    have e1 : ‖InfiniteAdeleRing.ringEquiv_mixedSpace F
+        ((p.1⁻¹ : IdeleGroup (𝓞 F) F) : 𝔸[F]).1‖ ≤ max A₁ 0 :=
+      (hA₁ p hp).trans (le_max_left _ _)
+    have e2 : ‖InfiniteAdeleRing.ringEquiv_mixedSpace F p.2.1‖ ≤ max A₂ 0 :=
+      (hA₂ p hp).trans (le_max_left _ _)
+    have hmξ' := hmξ.trans (add_le_add (mul_le_mul_of_nonneg_right e1 (norm_nonneg _)) e2)
+    have hpt' := (hpt _ hy).trans (le_max_left C₀ 0)
+    have hfin := real_decay_aux₂ (norm_nonneg _) (norm_nonneg _) (norm_nonneg _)
+      (le_max_right A₁ 0) (le_max_right A₂ 0) hpt' hmξ'
+    have hξS' : ξ ∈ {ξ : Fˣ | algebraMap (𝓞 F) F (b₀ * b₁ * b₂) * (ξ : F) ∈
+        (algebraMap (𝓞 F) F).range} := hξS
+    exact hfin.trans_eq (by simp only [Set.indicator_of_mem hξS'])
+  · have h0 : schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2))) = 0 := by
+      rw [schwartzBruhatStageRealization_apply_dite, dite_eq_right hy]
+    have h1 : ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ = 0 := by
+      rw [h0, norm_zero]
+    exact h1.le.trans (mul_nonneg (by positivity)
+      (Set.indicator_nonneg (fun _ _ => by positivity) _))
+
+end AdelicAverageSummable
+
 /-- Paper: Lemma 2.2.2.1, p. 77. The series of absolute values of the summands
 in the adelic average converges uniformly on every compact set. -/
 theorem adelicAverage_summableUniformlyOn (f : ℬ[F])
     (K : Set (𝕀[F] × 𝔸[F])) (hK : IsCompact K) :
     SummableUniformlyOn (fun (ξ : Fˣ) (p : 𝕀[F] × 𝔸[F]) ↦
-      ‖f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K := by sorry
+      ‖f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K := by
+  have key : ∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+      ‖(show schwartzBruhatSubmodule (Multiplicative 𝔸[F]) from f).val
+        (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ := by
+    have hf := (show schwartzBruhatSubmodule (Multiplicative 𝔸[F]) from f).2
+    have hzero : ∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+        ‖(0 : Multiplicative 𝔸[F] → ℂ)
+          (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ :=
+      ⟨0, summable_zero, fun _ _ _ => by simp⟩
+    have hadd : ∀ φ ψ : Multiplicative 𝔸[F] → ℂ,
+        (∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+          ‖φ (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ) →
+        (∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+          ‖ψ (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ) →
+        (∃ u : Fˣ → ℝ, Summable u ∧ ∀ ξ : Fˣ, ∀ p ∈ K,
+          ‖(φ + ψ) (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤
+            u ξ) := by
+      rintro φ ψ ⟨u₁, hu₁, h₁⟩ ⟨u₂, hu₂, h₂⟩
+      exact ⟨u₁ + u₂, hu₁.add hu₂, fun ξ p hp =>
+        (norm_add_le _ _).trans (add_le_add (h₁ ξ p hp) (h₂ ξ p hp))⟩
+    refine Submodule.iSup_induction _ (motive := fun φ => ∃ u : Fˣ → ℝ, Summable u ∧
+      ∀ ξ : Fˣ, ∀ p ∈ K,
+        ‖φ (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ)
+      hf ?_ hzero hadd
+    intro a φ hφ
+    refine Submodule.iSup_induction _ (motive := fun φ => ∃ u : Fˣ → ℝ, Summable u ∧
+      ∀ ξ : Fˣ, ∀ p ∈ K,
+        ‖φ (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖ ≤ u ξ)
+      hφ ?_ hzero hadd
+    intro e φ hφ
+    obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hφ
+    exact realization_exists_summable_bound a e s K hK
+  obtain ⟨u, hu, hle⟩ := key
+  exact summableUniformlyOn_of_ge hu fun ξ p hp => by rw [norm_norm]; exact hle ξ p hp
 
 /-- Paper: Lemma 2.2.2.1, pp. 77–78. At a fixed idele and adele, the
 realization of a single elementary Schwartz stage has an absolutely summable

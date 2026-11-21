@@ -285,16 +285,117 @@ section SingularValues
 
 variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
 
+/-- Within any positive operator-norm distance of `A.adjoint` there is a compact operator.
+The approximant is `A.adjoint` postcomposed with the orthogonal projection onto a
+finite-dimensional subspace, so it factors through a locally compact space. -/
+private theorem exists_isCompactOperator_norm_sub_adjoint_le (A : H →L[ℂ] H)
+    (hA : IsCompactOperator A) {ε : ℝ} (hε : 0 < ε) :
+    ∃ C : H →L[ℂ] H, IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ ε := by
+  obtain ⟨t, -, ht_fin, ht_cover⟩ :=
+    (hA.isCompact_closure_image_closedBall 1).finite_cover_balls hε
+  let U : Submodule ℂ H := Submodule.span ℂ t
+  have : FiniteDimensional ℂ U := FiniteDimensional.span_of_finite ℂ ht_fin
+  have : CompleteSpace U := FiniteDimensional.completeSpace ℂ U
+  have : U.HasOrthogonalProjection := inferInstance
+  have hnorm : ‖A - U.starProjection ∘L A‖ ≤ ε := by
+    refine ContinuousLinearMap.opNorm_le_bound _ hε.le fun x ↦ ?_
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp
+    · have hx0 : 0 < ‖x‖ := norm_pos_iff.mpr hx
+      let u : H := (‖x‖⁻¹ : ℂ) • x
+      have hu : ‖u‖ = 1 := by
+        rw [norm_smul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hx0,
+          inv_mul_cancel₀ hx0.ne']
+      have hBu : ‖(A - U.starProjection ∘L A) u‖ < ε := by
+        have hu_ball : u ∈ Metric.closedBall (0 : H) 1 := by
+          rw [Metric.mem_closedBall, dist_zero_right, hu]
+        have hAu : A u ∈ closure (A '' Metric.closedBall (0 : H) 1) :=
+          subset_closure ⟨u, hu_ball, rfl⟩
+        obtain ⟨y, hy, hxy⟩ := Set.mem_iUnion₂.mp (ht_cover hAu)
+        have hdist : Metric.infDist (A u) (U : Set H) < ε :=
+          (Metric.infDist_lt_iff ⟨0, Submodule.zero_mem U⟩).2
+            ⟨y, Submodule.subset_span hy, Metric.mem_ball.mp hxy⟩
+        rw [sub_apply, ContinuousLinearMap.comp_apply, ← dist_eq_norm,
+          U.dist_starProjection_eq_infDist]
+        exact hdist
+      have hxeq : (‖x‖ : ℂ) • u = x := by
+        simp only [u, smul_smul, mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hx0.ne'), one_smul]
+      have hBx : ‖(A - U.starProjection ∘L A) x‖ =
+          ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ := by
+        conv_lhs => rw [← hxeq]
+        rw [(A - U.starProjection ∘L A).map_smul, norm_smul, Complex.norm_real,
+          Real.norm_eq_abs, abs_of_nonneg hx0.le]
+      rw [hBx]
+      calc
+        ‖x‖ * ‖(A - U.starProjection ∘L A) u‖ ≤ ‖x‖ * ε :=
+          mul_le_mul_of_nonneg_left hBu.le hx0.le
+        _ = ε * ‖x‖ := mul_comm _ _
+  refine ⟨A.adjoint ∘L U.starProjection, ?_, ?_⟩
+  · have : LocallyCompactSpace U :=
+      LocallyCompactSpace.of_finiteDimensional_of_complete ℂ U
+    have hfac : A.adjoint ∘L U.starProjection =
+        (A.adjoint ∘L U.subtypeL) ∘L U.orthogonalProjectionOnto := rfl
+    rw [hfac]
+    exact (isCompactOperator_of_locallyCompactSpace_rng
+      (A.adjoint ∘L U.subtypeL)).comp_clm U.orthogonalProjectionOnto
+  · rw [← (isSelfAdjoint_starProjection U).adjoint_eq, ← ContinuousLinearMap.adjoint_comp,
+      ← (ContinuousLinearMap.adjoint (E := H) (F := H)).map_sub,
+      (ContinuousLinearMap.adjoint (E := H) (F := H)).norm_map]
+    exact hnorm
+
 /-- Paper: Lemma C.3.5.3(1), p. 700. The adjoint of a compact endomorphism is compact. -/
 theorem isCompactOperator_adjoint_of_compact (A : H →L[ℂ] H)
-    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by sorry
+    (hA : IsCompactOperator A) : IsCompactOperator A.adjoint := by
+  have happrox : ∀ n : ℕ, ∃ C : H →L[ℂ] H,
+      IsCompactOperator C ∧ ‖A.adjoint - C‖ ≤ 1 / (n + 1 : ℝ) := by
+    intro n
+    exact exists_isCompactOperator_norm_sub_adjoint_le A hA (by positivity)
+  choose C hC hle using happrox
+  refine isCompactOperator_of_tendsto (l := atTop) (F := C) ?_ (Eventually.of_forall hC)
+  rw [Metric.tendsto_atTop]
+  intro ε hε
+  obtain ⟨N, hN⟩ := exists_nat_gt (1 / ε)
+  refine ⟨N, fun n hn ↦ ?_⟩
+  rw [dist_eq_norm, norm_sub_rev]
+  refine (hle n).trans_lt ?_
+  have hbig : 1 / ε < (n : ℝ) + 1 :=
+    lt_trans (lt_of_lt_of_le hN (Nat.cast_le.mpr hn)) (lt_add_one _)
+  have hmul : 1 < ((n : ℝ) + 1) * ε := (div_lt_iff₀ hε).mp hbig
+  rw [show (1 : ℝ) / (n + 1 : ℝ) = 1 / ((n : ℝ) + 1) by simp,
+    div_lt_iff₀' (by positivity)]
+  exact hmul
 
 /-- Paper: Lemma C.3.5.3(1), p. 700. A compact endomorphism and its adjoint
 have the same singular values at every index up to the Hilbert space dimension.
 Deviation: The singular values use the approximation-number definition with zero-based indices. -/
 theorem approximationNumber_adjoint (A : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber A n = approximationNumber A.adjoint n := by sorry
+    approximationNumber A n = approximationNumber A.adjoint n := by
+  clear hA hn
+  have rank_adjoint_le (S : H →L[ℂ] H)
+      (hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal)) :
+      Module.rank ℂ S.adjoint.toLinearMap.range ≤ (n : Cardinal) := by
+    let V := S.toLinearMap.range
+    have : FiniteDimensional ℂ V :=
+      Module.rank_lt_aleph0_iff.mp (hS.trans_lt Cardinal.natCast_lt_aleph0)
+    have : CompleteSpace V := FiniteDimensional.completeSpace ℂ V
+    -- Factoring S through its range gives a factorization of its adjoint through V.
+    have hfac : V.subtypeL.comp S.rangeRestrict = S := rfl
+    have hadj : S.adjoint = S.rangeRestrict.adjoint.comp V.subtypeL.adjoint := by
+      rw [← ContinuousLinearMap.adjoint_comp, hfac]
+    rw [hadj]
+    exact (LinearMap.rank_comp_le_left _ _).trans
+      (S.rangeRestrict.adjoint.toLinearMap.rank_le_domain.trans hS)
+  let errors (T : H →L[ℂ] H) : Set ℝ :=
+    {r | ∃ S : H →L[ℂ] H, Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}
+  have errors_subset (T : H →L[ℂ] H) : errors T ⊆ errors T.adjoint := by
+    rintro _ ⟨S, hS, rfl⟩
+    refine ⟨S.adjoint, rank_adjoint_le S hS, ?_⟩
+    rw [← ContinuousLinearMap.adjoint.map_sub, LinearIsometryEquiv.norm_map]
+  change sInf (errors A) = sInf (errors A.adjoint)
+  apply congrArg sInf
+  exact Set.Subset.antisymm (errors_subset A)
+    (by simpa only [ContinuousLinearMap.adjoint_adjoint] using errors_subset A.adjoint)
 
 /-- Paper: Lemma C.3.5.3(2), p. 700. The first singular value of a compact
 endomorphism equals its operator norm.
@@ -347,13 +448,42 @@ theorem approximationNumber_max_min (A : H →L[ℂ] H) (hA : IsCompactOperator 
 
 -- Lemma C.3.5.4(1) is Mathlib's IsCompactOperator.comp_clm and IsCompactOperator.clm_comp.
 
+omit [CompleteSpace H] in
+/-- An approximation number is bounded by the error of any admissible approximant. -/
+private theorem approximationNumber_le_norm_sub (T S : H →L[ℂ] H) {n : ℕ}
+    (hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal)) :
+    approximationNumber T n ≤ ‖S - T‖ :=
+  csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩ ⟨S, hS, rfl⟩
+
+omit [CompleteSpace H] in
+/-- If an operation `S ↦ S'` on approximants does not raise the rank and multiplies the
+error by at most `‖B‖`, then it bounds the approximation numbers of the new operator `A'`. -/
+private theorem approximationNumber_mul_le_of_rank_le (A B : H →L[ℂ] H) {n : ℕ}
+    {A' : H →L[ℂ] H} {op : (H →L[ℂ] H) → H →L[ℂ] H}
+    (hrank : ∀ S, Module.rank ℂ (op S).toLinearMap.range ≤ Module.rank ℂ S.toLinearMap.range)
+    (hnorm : ∀ S, ‖op S - A'‖ ≤ ‖S - A‖ * ‖B‖) :
+    approximationNumber A' n ≤ approximationNumber A n * ‖B‖ := by
+  rcases (norm_nonneg B).eq_or_lt with hB | hB
+  · rw [← hB, mul_zero]
+    have h := approximationNumber_le_norm_sub A' (op 0) (n := n)
+      ((hrank 0).trans (by simp))
+    simpa [← hB] using h.trans (hnorm 0)
+  · rw [← div_le_iff₀ hB]
+    refine le_csInf ⟨_, 0, by simp, rfl⟩ ?_
+    rintro _ ⟨S, hS, rfl⟩
+    rw [div_le_iff₀ hB]
+    exact (approximationNumber_le_norm_sub A' (op S) ((hrank S).trans hS)).trans (hnorm S)
+
 /-- Paper: Lemma C.3.5.4(2), p. 701. The singular value of a compact
 endomorphism composed on the right by a bounded operator is bounded by the
 same singular value times the norm of the right factor.
 Deviation: The approximation-number index starts at zero. -/
 theorem approximationNumber_mul_le_right (A B : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber (A * B) n ≤ approximationNumber A n * ‖B‖ := by sorry
+    approximationNumber (A * B) n ≤ approximationNumber A n * ‖B‖ :=
+  approximationNumber_mul_le_of_rank_le A B (op := fun S ↦ S * B)
+    (fun S ↦ Submodule.rank_mono (LinearMap.range_comp_le_range B.toLinearMap S.toLinearMap))
+    (fun S ↦ by rw [← sub_mul]; exact norm_mul_le _ _)
 
 /-- Paper: Lemma C.3.5.4(2), p. 701. The singular value of a compact
 endomorphism composed on the left by a bounded operator is bounded by the
@@ -361,7 +491,13 @@ same singular value times the norm of the left factor.
 Deviation: The approximation-number index starts at zero. -/
 theorem approximationNumber_mul_le_left (A B : H →L[ℂ] H) (hA : IsCompactOperator A)
     (n : ℕ) (hn : (n : Cardinal) < Module.rank ℂ H) :
-    approximationNumber (B * A) n ≤ approximationNumber A n * ‖B‖ := by sorry
+    approximationNumber (B * A) n ≤ approximationNumber A n * ‖B‖ :=
+  approximationNumber_mul_le_of_rank_le A B (op := fun S ↦ B * S)
+    (fun S ↦ by
+      change Module.rank ℂ (B.toLinearMap ∘ₗ S.toLinearMap).range ≤ _
+      rw [LinearMap.range_comp]
+      exact rank_map_le _ _)
+    (fun S ↦ by rw [← mul_sub, mul_comm ‖S - A‖]; exact norm_mul_le _ _)
 
 end SingularValues
 

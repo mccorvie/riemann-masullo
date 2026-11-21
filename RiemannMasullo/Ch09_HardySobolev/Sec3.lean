@@ -57,7 +57,8 @@ on representatives almost everywhere. -/
 theorem hardySobolevTranslation_apply (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s)
     (g : G) (u : W a b s) :
     (hardySobolevTranslation μ m a b s hab hs g u : G → ℂ) =ᵐ[μ]
-      fun x ↦ u (g⁻¹ * x) := by sorry
+      fun x ↦ u (g⁻¹ * x) :=
+  (exists_hardySobolevTranslation μ m a b s hab hs).choose_spec.1 g u
 
 section Pettis
 
@@ -92,7 +93,8 @@ the Pettis integral of the test function times its orbit. -/
 theorem bruhatRegularizedAction_apply [CompleteSpace E]
     (hρ : Continuous (fun p : G × E ↦ ρ p.1 p.2)) (φ : BruhatCompactSupport G) (u : E) :
     HasPettisIntegral (.positive μ) (fun g ↦ φ.val g • ρ g u)
-      (bruhatRegularizedAction μ ρ hρ φ u) := by sorry
+      (bruhatRegularizedAction μ ρ hρ φ u) :=
+  (exists_bruhatRegularizedAction μ ρ hρ).choose_spec φ u
 
 /-- Paper: Definition 9.3.1.1, p. 419. Convolution of test kernels acts as
 composition of their integrated endomorphisms.
@@ -454,7 +456,8 @@ def lpCutoffMultiplier (ν : Measure G) (ρ : G → ℝ) (hm : Measurable ρ)
 almost everywhere with the product by the symbol. -/
 theorem lpCutoffMultiplier_apply (ν : Measure G) (ρ : G → ℝ) (hm : Measurable ρ)
     (hb : ∀ x, |ρ x| ≤ 1) (u : Lp ℂ 2 ν) :
-    (lpCutoffMultiplier ν ρ hm hb u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x := by sorry
+    (lpCutoffMultiplier ν ρ hm hb u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x :=
+  (exists_lpCutoffMultiplier ν ρ hm hb).choose_spec.2 u
 
 /-- Paper: Definition 9.3.3.1, p. 427. A cutoff gives a truncation operator
 on square-integrable classes for the chosen measure. -/
@@ -467,7 +470,8 @@ every representative value. -/
 theorem modulatedCutoffOperator_apply (ν : Measure G) {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) (u : Lp ℂ 2 ν) :
     (modulatedCutoffOperator m ν hρ u : G → ℂ) =ᵐ[ν]
-      fun x ↦ (ρ x : ℂ) * u x := by sorry
+      fun x ↦ (ρ x : ℂ) * u x :=
+  lpCutoffMultiplier_apply ν ρ hρ.measurable hρ.abs_le_one u
 
 /-- Paper: Remark 9.3.3.2, pp. 427–428. A nonnegative cutoff acts by a
 positive self-adjoint operator on weighted L². -/
@@ -503,19 +507,30 @@ def modulatedAbsoluteCutoff (J : Set ℝ) : G → ℝ :=
 product of the two one-sided cutoffs. -/
 theorem modulatedAbsoluteCutoff_Icc (Λ : ℝ) :
     modulatedAbsoluteCutoff m (Icc Λ⁻¹ Λ) =
-      modulatedAbsoluteCutoff m (Ici Λ⁻¹) * modulatedAbsoluteCutoff m (Iic Λ) := by sorry
+      modulatedAbsoluteCutoff m (Ici Λ⁻¹) * modulatedAbsoluteCutoff m (Iic Λ) := by
+  ext x
+  simp only [modulatedAbsoluteCutoff, Pi.mul_apply, indicator, mem_preimage, mem_Icc, mem_Ici,
+    mem_Iic, Pi.one_apply]
+  split_ifs <;> simp_all
 
 /-- Paper: Definition 9.3.3.3, p. 428. The two-sided cutoff of radius two
 takes value one at the identity.
 Deviation: Sanity check at a point inside the band. -/
 theorem modulatedAbsoluteCutoff_radius_two_apply_one :
-    modulatedAbsoluteCutoff m (Icc (1 / 2) 2) 1 = 1 := by sorry
+    modulatedAbsoluteCutoff m (Icc (1 / 2) 2) 1 = 1 := by
+  simp only [modulatedAbsoluteCutoff, map_one, Units.val_one]
+  exact indicator_of_mem (by norm_num) _
 
 /-- Paper: Definition 9.3.3.3, p. 428. Each measurable module band has a
 measurable indicator with values bounded in absolute value by one.
 Deviation: These are the side conditions for applying the common multiplier. -/
 theorem modulatedAbsoluteCutoff_measurable_bounded (J : Set ℝ) (_hJ : MeasurableSet J) :
-    Measurable (modulatedAbsoluteCutoff m J) ∧ ∀ x, |modulatedAbsoluteCutoff m J x| ≤ 1 := by sorry
+    Measurable (modulatedAbsoluteCutoff m J) ∧ ∀ x, |modulatedAbsoluteCutoff m J x| ≤ 1 := by
+  refine ⟨measurable_const.indicator
+    (_hJ.preimage (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable),
+    fun x ↦ ?_⟩
+  simp only [modulatedAbsoluteCutoff, indicator]
+  split_ifs <;> simp
 
 /-- Paper: Definition 9.3.3.3, p. 428. The absolute cutoff operator is
 multiplication by the indicator of the chosen set of module values. -/
@@ -539,7 +554,13 @@ on the chosen band and vanishes outside it, as an identity of L² representative
 theorem modulatedAbsoluteCutoffOperator_apply (ν : Measure G) (J : Set ℝ)
     (hJ : MeasurableSet J) (u : Lp ℂ 2 ν) :
     (modulatedAbsoluteCutoffOperator m ν J hJ u : G → ℂ) =ᵐ[ν]
-      fun x ↦ (modulatedAbsoluteCutoff m J x : ℂ) * u x := by sorry
+      fun x ↦ (modulatedAbsoluteCutoff m J x : ℂ) * u x := by
+  have h := (((hardySobolevCutoff_spec (μ := ν) (U := moduleValue ⁻¹' J)
+    (hJ.preimage (NNReal.continuous_coe.comp
+      (Units.continuous_val.comp m.continuous)).measurable)).choose_spec.2) u).2.2
+  refine h.trans (Eventually.of_forall fun x ↦ ?_)
+  simp only [modulatedAbsoluteCutoff, indicator]
+  split_ifs <;> simp
 
 -- TODO(paper-gap): Remark 9.3.3.4 calls the projectors injective and their symbols
 -- bounded below away from zero almost everywhere. Each one-sided cutoff kills

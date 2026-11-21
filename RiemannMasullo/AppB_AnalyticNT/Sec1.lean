@@ -2,6 +2,16 @@ module
 
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
+public import Mathlib.Analysis.Complex.AbsMax
+public import Mathlib.Analysis.Complex.PhragmenLindelof
+public import Mathlib.Analysis.Complex.RemovableSingularity
+public import Mathlib.Analysis.Convex.Continuous
+public import Mathlib.Analysis.Normed.Group.Bounded
+public import Mathlib.Analysis.SpecialFunctions.Complex.Log
+public import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
+public import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
+public import Mathlib.Topology.Order.Lattice
 
 import Mathlib.Analysis.Complex.AbsMax
 import Mathlib.Analysis.Convex.Continuous
@@ -70,6 +80,565 @@ theorem verticalGrowthOrder_id (σ : ℝ) : verticalGrowthOrder (id : ℂ → �
     rw [id_eq, Real.norm_of_nonneg (Real.rpow_nonneg hz.le _)] at hbound
     exact (not_lt_of_ge ((Complex.abs_im_le_norm z).trans hbound))
       ((lt_div_iff₀ (Real.rpow_pos_of_pos hz _)).mp hlarge)
+
+variable {f : ℂ → ℂ}
+
+/-- Raising the height to a larger real power only enlarges the vertical majorant. -/
+lemma isBigO_im_rpow_of_le {p q : ℝ} (hpq : p ≤ q) :
+    (fun s : ℂ ↦ |s.im| ^ p) =O[atHeight] fun s : ℂ ↦ |s.im| ^ q := by
+  refine Asymptotics.IsBigO.of_bound 1 ?_
+  filter_upwards [tendsto_comap.eventually_ge_atTop (1 : ℝ)] with s hs
+  have hp : 0 ≤ |s.im| ^ p := Real.rpow_nonneg (abs_nonneg _) _
+  have hq : 0 ≤ |s.im| ^ q := Real.rpow_nonneg (abs_nonneg _) _
+  simpa [Real.norm_of_nonneg hp, Real.norm_of_nonneg hq] using
+    Real.rpow_le_rpow_of_exponent_le hs hpq
+
+/-- A vertical big-O bound places the growth order at most at that exponent. -/
+lemma verticalGrowthOrder_toReal_le_of_isBigO {f : ℂ → ℂ} {σ r : ℝ} (hr : 0 ≤ r)
+    (hO : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ r) :
+    (verticalGrowthOrder f σ).toReal ≤ r := by
+  let k : ℝ≥0 := ⟨r, hr⟩
+  have hk : k ∈ {k : ℝ≥0 | f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ (k : ℝ)} :=
+    hO
+  have hle : verticalGrowthOrder f σ ≤ k := by
+    unfold verticalGrowthOrder
+    exact sInf_le (mem_image_of_mem _ hk)
+  exact ENNReal.toReal_le_coe_of_le_coe hle
+
+/-- A vertical big-O bound keeps the growth order finite. -/
+lemma verticalGrowthOrder_ne_top_of_isBigO {f : ℂ → ℂ} {σ r : ℝ} (hr : 0 ≤ r)
+    (hO : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ r) :
+    verticalGrowthOrder f σ ≠ ⊤ := by
+  let k : ℝ≥0 := ⟨r, hr⟩
+  have hk : k ∈ {k : ℝ≥0 | f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ (k : ℝ)} :=
+    hO
+  refine ne_top_of_le_ne_top (b := (k : ℝ≥0∞)) (by simp) ?_
+  unfold verticalGrowthOrder
+  exact sInf_le (mem_image_of_mem _ hk)
+
+/-- An exponent strictly above the growth order is admissible. -/
+lemma isBigO_of_verticalGrowthOrder_toReal_lt {f : ℂ → ℂ} {σ r : ℝ}
+    (hne : verticalGrowthOrder f σ ≠ ⊤) (hr : (verticalGrowthOrder f σ).toReal < r) :
+    f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ r := by
+  have hr0 : 0 < r := lt_of_le_of_lt ENNReal.toReal_nonneg hr
+  have hlt : verticalGrowthOrder f σ < ENNReal.ofReal r := by
+    rw [← ENNReal.ofReal_toReal hne]
+    exact (ENNReal.ofReal_lt_ofReal_iff hr0).2 hr
+  rw [verticalGrowthOrder] at hlt
+  obtain ⟨x, hx, hxlt⟩ := (sInf_lt_iff).1 hlt
+  obtain ⟨k, hk, rfl⟩ := hx
+  have hklt : (k : ℝ) < r := by
+    have hxlt' : (k : ℝ≥0∞) < ENNReal.ofReal r := hxlt
+    rw [ENNReal.coe_nnreal_eq] at hxlt'
+    exact (ENNReal.ofReal_lt_ofReal_iff hr0).1 hxlt'
+  exact hk.trans ((isBigO_im_rpow_of_le hklt.le).mono inf_le_left)
+
+open Complex in
+/-- Modulus of the affine-logarithmic weight used to interpolate vertical exponents. -/
+lemma norm_affineLogWeight {p q eps : ℝ} {z0 s : ℂ} (hs : 0 < (s - z0).re) :
+    ‖exp (((↑p + ↑q * s) * log (s - z0)) + ((↑(-eps * q * Real.pi / 2) * I) * s))‖ =
+      ‖s - z0‖ ^ (p + q * s.re) *
+        Real.exp (q * s.im * (eps * Real.pi / 2 - (s - z0).arg)) := by
+  have hpos : 0 < ‖s - z0‖ := lt_of_lt_of_le hs ((le_abs_self _).trans (abs_re_le_norm _))
+  rw [norm_exp]
+  set μ : ℂ := ↑(-eps * q * Real.pi / 2) * I
+  have hμre : μ.re = 0 := by simp [μ]
+  have hμim : μ.im = -eps * q * Real.pi / 2 := by simp [μ]
+  have hαre : (↑p + ↑q * s).re = p + q * s.re := by simp
+  have hαim : (↑p + ↑q * s).im = q * s.im := by simp
+  have hre :
+      (((↑p + ↑q * s) * log (s - z0)) + μ * s).re =
+        (p + q * s.re) * Real.log ‖s - z0‖ +
+          q * s.im * (eps * Real.pi / 2 - (s - z0).arg) := by
+    rw [add_re, mul_re, mul_re, log_re, log_im, hμre, hμim, hαre, hαim]
+    ring
+  rw [hre, Real.exp_add, mul_comm (p + q * s.re), ← Real.rpow_def_of_pos hpos]
+
+/-- On the closed right half of a vertical line, `t · (ε π/2 - arg)` stays between `0` and the
+real part. `\u03b5 = 1` is the upper half-plane and `\u03b5 = -1` the lower one. -/
+lemma im_mul_halfArg_bounds {z : ℂ} {ε : ℝ} (hε : ε = 1 ∨ ε = -1) (hx : 0 < z.re)
+    (hy : 0 ≤ ε * z.im) :
+    0 ≤ z.im * (ε * Real.pi / 2 - z.arg) ∧
+      z.im * (ε * Real.pi / 2 - z.arg) ≤ z.re := by
+  rcases hε with rfl | rfl
+  · simp only [one_mul] at hy ⊢
+    have him : 0 ≤ z.im := hy
+    have harg_lt : z.arg < Real.pi / 2 := Complex.arg_lt_pi_div_two_iff.2 (Or.inl hx)
+    refine ⟨mul_nonneg him (sub_nonneg.2 harg_lt.le), ?_⟩
+    rcases him.eq_or_lt with him0 | him0
+    · have him0' : z.im = 0 := him0.symm
+      simp [him0', Complex.arg_eq_zero_iff.2 ⟨hx.le, him0'⟩, hx.le]
+    · have harg_pos : 0 < z.arg := by
+        refine lt_of_le_of_ne (Complex.arg_nonneg_iff.2 him) ?_
+        intro hzero
+        exact him0.ne' ((Complex.arg_eq_zero_iff.1 hzero.symm).2)
+      have hpos : 0 < Real.pi / 2 - z.arg := sub_pos.2 harg_lt
+      have hlt : Real.pi / 2 - z.arg < Real.pi / 2 := sub_lt_self _ harg_pos
+      have htan : Real.tan (Real.pi / 2 - z.arg) = z.re / z.im := by
+        rw [Real.tan_pi_div_two_sub, Complex.tan_arg, inv_div]
+      have hle : Real.pi / 2 - z.arg ≤ z.re / z.im := by
+        rw [← htan]
+        exact Real.le_tan hpos.le hlt
+      have : (Real.pi / 2 - z.arg) * z.im ≤ z.re := (le_div_iff₀ him0).1 hle
+      simpa [mul_comm] using this
+  · simp only [neg_one_mul] at hy ⊢
+    have him : z.im ≤ 0 := by linarith
+    rcases him.eq_or_lt with him0 | him0
+    · have harg : z.arg = 0 := Complex.arg_eq_zero_iff.2 ⟨hx.le, him0⟩
+      simp [him0, harg, hx.le]
+    · have harg_gt : -(Real.pi / 2) < z.arg :=
+        Complex.neg_pi_div_two_lt_arg_iff.2 (Or.inl hx)
+      have harg_neg : z.arg < 0 := Complex.arg_neg_iff.2 him0
+      have hφpos : 0 < Real.pi / 2 + z.arg := by linarith
+      have hφlt : Real.pi / 2 + z.arg < Real.pi / 2 := by linarith
+      have htan : Real.tan (Real.pi / 2 + z.arg) = z.re / -z.im := by
+        rw [show Real.pi / 2 + z.arg = Real.pi / 2 - (-z.arg) by ring,
+          Real.tan_pi_div_two_sub, Real.tan_neg, Complex.tan_arg]
+        field_simp [hx.ne', him0.ne]
+      have hle : Real.pi / 2 + z.arg ≤ z.re / -z.im := by
+        rw [← htan]
+        exact Real.le_tan hφpos.le hφlt
+      have himabs : 0 < -z.im := neg_pos.2 him0
+      have hmul : (Real.pi / 2 + z.arg) * -z.im ≤ z.re := (le_div_iff₀ himabs).1 hle
+      constructor
+      · rw [show z.im * (-Real.pi / 2 - z.arg) = -z.im * (Real.pi / 2 + z.arg) by ring]
+        exact mul_nonneg himabs.le hφpos.le
+      · rw [show z.im * (-Real.pi / 2 - z.arg) = (Real.pi / 2 + z.arg) * -z.im by ring]
+        exact hmul
+
+open Complex in
+/-- Over a compact set of real parts, a vertical power bound for large heights and continuity
+give a global bound by the same power of the distance to a real point on the left. -/
+lemma exists_norm_le_mul_norm_sub_rpow {F : ℂ → ℂ} {K : Set ℝ} (hK : IsCompact K)
+    (hc : ContinuousOn F (re ⁻¹' K)) {A : ℝ} (hA : 0 ≤ A)
+    (hO : F =O[atHeight ⊓ 𝓟 (re ⁻¹' K)] fun s ↦ |s.im| ^ A) {x0 : ℝ}
+    (hx0 : ∀ σ ∈ K, x0 + 1 ≤ σ) :
+    ∃ C, 0 ≤ C ∧ ∀ s : ℂ, s.re ∈ K → ‖F s‖ ≤ C * ‖s - x0‖ ^ A := by
+  obtain ⟨c, hc'⟩ := Asymptotics.isBigO_iff.mp hO
+  rw [eventually_inf_principal, eventually_comap, eventually_atTop] at hc'
+  obtain ⟨T, hT⟩ := hc'
+  obtain ⟨M, hM⟩ := (hK.reProdIm (isCompact_Icc (a := -T) (b := T))).exists_bound_of_continuousOn
+    (hc.mono fun s hs ↦ hs.1)
+  refine ⟨max c 0 + max M 0, by positivity, fun s hs ↦ ?_⟩
+  have h1 : 1 ≤ ‖s - x0‖ := by
+    have := hx0 _ hs
+    calc (1:ℝ) ≤ (s - x0).re := by simp; linarith
+      _ ≤ |(s - x0).re| := le_abs_self _
+      _ ≤ ‖s - x0‖ := abs_re_le_norm _
+  have hpow : 1 ≤ ‖s - x0‖ ^ A := Real.one_le_rpow h1 hA
+  by_cases hs' : T ≤ |s.im|
+  · have hb := hT _ hs' s rfl hs
+    have him : |s.im| ≤ ‖s - x0‖ := by
+      have := abs_im_le_norm (s - x0); simpa using this
+    calc ‖F s‖ ≤ c * ‖|s.im| ^ A‖ := hb
+      _ ≤ max c 0 * |s.im| ^ A := by
+        rw [Real.norm_of_nonneg (by positivity)]
+        exact mul_le_mul_of_nonneg_right (le_max_left _ _) (by positivity)
+      _ ≤ max c 0 * ‖s - x0‖ ^ A := by
+        gcongr
+      _ ≤ (max c 0 + max M 0) * ‖s - x0‖ ^ A := by
+        gcongr; exact le_add_of_nonneg_right (le_max_right _ _)
+  · replace hs' := not_le.mp hs'
+    have hmem : s ∈ K ×ℂ Icc (-T) T := ⟨hs, abs_le.mp hs'.le⟩
+    calc ‖F s‖ ≤ M := hM s hmem
+      _ ≤ max c 0 + max M 0 := by linarith [le_max_left M 0, le_max_right c 0]
+      _ ≤ (max c 0 + max M 0) * ‖s - x0‖ ^ A := le_mul_of_one_le_right (by positivity) hpow
+
+/-- On the right half-plane, `t · (ε π / 2 - arg)` never exceeds the real part. -/
+lemma im_mul_halfArg_le_re {z : ℂ} {ε : ℝ} (hε : ε = 1 ∨ ε = -1) (hx : 0 < z.re) :
+    z.im * (ε * Real.pi / 2 - z.arg) ≤ z.re := by
+  by_cases hy : 0 ≤ ε * z.im
+  · exact (im_mul_halfArg_bounds hε hx hy).2
+  · replace hy := not_le.mp hy
+    refine le_trans ?_ hx.le
+    rcases hε with rfl | rfl
+    · have him : z.im < 0 := by linarith
+      have harg : z.arg < 0 := Complex.arg_neg_iff.2 him
+      have := mul_nonneg (neg_nonneg.2 him.le) (by linarith [Real.pi_pos] :
+        (0:ℝ) ≤ 1 * Real.pi / 2 - z.arg)
+      linarith
+    · have him : 0 < z.im := by linarith
+      have harg : 0 ≤ z.arg := Complex.arg_nonneg_iff.2 him.le
+      have := mul_nonneg him.le (by linarith [Real.pi_pos] :
+        (0:ℝ) ≤ -(-1 * Real.pi / 2 - z.arg))
+      linarith
+
+/-- A positive power is dominated by the exponential of the same multiple. -/
+lemma rpow_le_exp_mul {y r : ℝ} (hy : 0 < y) (hr : 0 ≤ r) : y ^ r ≤ Real.exp (r * y) := by
+  rw [Real.rpow_def_of_pos hy, mul_comm r y]
+  exact Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_right (Real.log_le_self hy.le) hr)
+
+open Complex in
+/-- Phragmén–Lindelöf interpolation of polynomial vertical bounds when the exponent on the right
+edge is at most the one on the left edge. -/
+lemma isBigO_rpow_of_verticalStrip_of_le {σ₁ σ₂ : ℝ} (h₁₂ : σ₁ < σ₂) {F : ℂ → ℂ}
+    (hF : DifferentiableOn ℂ F (re ⁻¹' Icc σ₁ σ₂)) {ξ : ℝ}
+    (hpoly : F =O[atHeight ⊓ 𝓟 (re ⁻¹' Icc σ₁ σ₂)] fun s ↦ |s.im| ^ ξ)
+    {A B : ℝ} (hB0 : 0 ≤ B) (hBA : B ≤ A)
+    (hA : F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ₁})] fun s ↦ |s.im| ^ A)
+    (hB : F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ₂})] fun s ↦ |s.im| ^ B)
+    {σ : ℝ} (hσ : σ ∈ Icc σ₁ σ₂) :
+    F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ})]
+      fun s ↦ |s.im| ^ (((σ₂ - σ) * A + (σ - σ₁) * B) / (σ₂ - σ₁)) := by
+  have hA0 : 0 ≤ A := hB0.trans hBA
+  have hw : 0 < σ₂ - σ₁ := sub_pos.mpr h₁₂
+  obtain ⟨q, hq⟩ : ∃ q : ℝ, q = (B - A) / (σ₂ - σ₁) := ⟨_, rfl⟩
+  obtain ⟨p, hp⟩ : ∃ p : ℝ, p = A - q * σ₁ := ⟨_, rfl⟩
+  have hq0 : q ≤ 0 := hq ▸ div_nonpos_of_nonpos_of_nonneg (by linarith) hw.le
+  have hℓ : ∀ x : ℝ, p + q * x = ((σ₂ - x) * A + (x - σ₁) * B) / (σ₂ - σ₁) := by
+    intro x
+    rw [hp, hq]
+    field_simp
+    ring
+  have hℓ₁ : p + q * σ₁ = A := by rw [hℓ]; field_simp; ring
+  have hℓ₂ : p + q * σ₂ = B := by rw [hℓ]; field_simp; ring
+  have hℓ0 : ∀ x ∈ Icc σ₁ σ₂, 0 ≤ p + q * x := by
+    intro x hx
+    rw [hℓ]
+    apply div_nonneg _ hw.le
+    have := mul_nonneg (sub_nonneg.2 hx.2) hA0
+    have := mul_nonneg (sub_nonneg.2 hx.1) hB0
+    linarith
+  obtain ⟨x0, hx0⟩ : ∃ x0 : ℝ, x0 = σ₁ - 1 := ⟨_, rfl⟩
+  have hFc : ContinuousOn F (re ⁻¹' Icc σ₁ σ₂) := hF.continuousOn
+  obtain ⟨C₁, hC₁0, hC₁⟩ := exists_norm_le_mul_norm_sub_rpow (K := {σ₁}) isCompact_singleton
+    (hFc.mono (preimage_mono (by simp [h₁₂.le]))) hA0 hA (x0 := x0)
+    (by intro y hy; rw [mem_singleton_iff.mp hy]; linarith)
+  obtain ⟨C₂, hC₂0, hC₂⟩ := exists_norm_le_mul_norm_sub_rpow (K := {σ₂}) isCompact_singleton
+    (hFc.mono (preimage_mono (by simp [h₁₂.le]))) hB0 hB (x0 := x0)
+    (by intro y hy; rw [mem_singleton_iff.mp hy]; linarith)
+  have hpoly' : F =O[atHeight ⊓ 𝓟 (re ⁻¹' Icc σ₁ σ₂)] fun s ↦ |s.im| ^ (max ξ 0) :=
+    hpoly.trans ((isBigO_im_rpow_of_le (le_max_left ξ 0)).mono inf_le_left)
+  obtain ⟨Cξ, hCξ0, hCξ⟩ := exists_norm_le_mul_norm_sub_rpow isCompact_Icc hFc
+    (le_max_right ξ 0) hpoly' (x0 := x0) (by intro y hy; linarith [hy.1])
+  obtain ⟨R, hR⟩ : ∃ R : ℝ, R = σ₂ - x0 := ⟨_, rfl⟩
+  have hR1 : 1 ≤ R := by rw [hR, hx0]; linarith
+  obtain ⟨E, hE⟩ : ∃ E : ℝ, E = Real.exp (-q * R) := ⟨_, rfl⟩
+  obtain ⟨D, hD⟩ : ∃ D : ℝ, D = E * max C₁ C₂ := ⟨_, rfl⟩
+  have hE0 : 0 < E := hE ▸ Real.exp_pos _
+  set z0 : ℂ := (x0 : ℂ) with hz0
+  -- basic facts about `s - z0` on the strip
+  have hre : ∀ s : ℂ, (s - z0).re = s.re - x0 := by intro s; simp [z0]
+  have him : ∀ s : ℂ, (s - z0).im = s.im := by intro s; simp [z0]
+  have hnorm1 : ∀ s : ℂ, σ₁ ≤ s.re → 1 ≤ ‖s - z0‖ := by
+    intro s hs
+    calc (1:ℝ) ≤ (s - z0).re := by rw [hre, hx0]; linarith
+      _ ≤ |(s - z0).re| := le_abs_self _
+      _ ≤ ‖s - z0‖ := abs_re_le_norm _
+  have hnormle : ∀ s : ℂ, σ₁ ≤ s.re → ‖s - z0‖ ≤ (s.re - x0) + |s.im| := by
+    intro s hs
+    have := norm_le_abs_re_add_abs_im (s - z0)
+    rwa [hre, him, abs_of_nonneg (by rw [hx0]; linarith)] at this
+  have hD0 : 0 ≤ D := by rw [hD]; exact mul_nonneg hE0.le (hC₁0.trans (le_max_left _ _))
+  obtain ⟨c, hc_def⟩ : ∃ c : ℝ, c = Real.pi / (σ₂ - σ₁) / 2 := ⟨_, rfl⟩
+  have hc : 0 < c := by rw [hc_def]; positivity
+  have hc_lt : c < Real.pi / (σ₂ - σ₁) := hc_def ▸ half_lt_self (by positivity)
+  have key : ∀ ε : ℝ, (ε = 1 ∨ ε = -1) → ∀ s : ℂ, s.re ∈ Icc σ₁ σ₂ → 0 ≤ ε * s.im →
+      ‖F s‖ ≤ D * ‖s - z0‖ ^ (p + q * s.re) := by
+    intro ε hε
+    set W : ℂ → ℂ := fun s ↦ exp (((↑(-p) + ↑(-q) * s) * log (s - z0)) +
+      ((↑(-ε * -q * Real.pi / 2) * I) * s)) with hW
+    have hWnorm : ∀ s : ℂ, σ₁ ≤ s.re → ‖W s‖ = (‖s - z0‖ ^ (p + q * s.re))⁻¹ *
+        Real.exp (-q * (s - z0).im * (ε * Real.pi / 2 - (s - z0).arg)) := by
+      intro s hs
+      have hpos : 0 < (s - z0).re := by rw [hre, hx0]; linarith
+      rw [hW, norm_affineLogWeight hpos, him, ← Real.rpow_neg (norm_nonneg _)]
+      congr 2; ring
+    have hWup : ∀ s : ℂ, s.re ∈ Icc σ₁ σ₂ → ‖W s‖ ≤ (‖s - z0‖ ^ (p + q * s.re))⁻¹ * E := by
+      intro s hs
+      have hpos : 0 < (s - z0).re := by rw [hre, hx0]; linarith [hs.1]
+      rw [hWnorm s hs.1]
+      have hX := im_mul_halfArg_le_re hε hpos
+      have hle : -q * (s - z0).im * (ε * Real.pi / 2 - (s - z0).arg) ≤ -q * R := by
+        rw [mul_assoc]
+        apply mul_le_mul_of_nonneg_left _ (by linarith)
+        rw [hre] at hX
+        linarith [hs.2]
+      rw [hE]
+      exact mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr hle) (by positivity)
+    have hWd : DifferentiableOn ℂ W (re ⁻¹' Icc σ₁ σ₂) := by
+      intro s hs
+      have hslit : s - z0 ∈ slitPlane :=
+        mem_slitPlane_iff.2 (Or.inl (by rw [hre, hx0]; linarith [(show σ₁ ≤ s.re from hs.1)]))
+      refine DifferentiableAt.differentiableWithinAt ?_
+      exact ((((differentiableAt_const _).add ((differentiableAt_const _).mul
+        differentiableAt_id)).mul ((differentiableAt_id.sub_const _).clog hslit)).add
+        ((differentiableAt_const _).mul differentiableAt_id)).cexp
+    have hGd : DiffContOnCl ℂ (fun s ↦ W s * F s) (re ⁻¹' Ioo σ₁ σ₂) := by
+      apply DifferentiableOn.diffContOnCl
+      rw [closure_preimage_re, closure_Ioo h₁₂.ne]
+      exact hWd.mul hF
+    have hGgrowth : (fun s ↦ W s * F s) =O[atHeight ⊓ 𝓟 (re ⁻¹' Ioo σ₁ σ₂)]
+        fun s ↦ Real.exp (max ξ 0 / c * Real.exp (c * |s.im|)) := by
+      refine Asymptotics.IsBigO.of_bound (E * Cξ * Real.exp (max ξ 0 * R)) ?_
+      rw [eventually_inf_principal]
+      refine Eventually.of_forall fun s hs ↦ ?_
+      have hs' : s.re ∈ Icc σ₁ σ₂ := ⟨hs.1.le, hs.2.le⟩
+      have hξ' : 0 ≤ max ξ 0 := le_max_right _ _
+      have hn1 := hnorm1 s hs'.1
+      have hu : 1 ≤ ‖s - z0‖ ^ (p + q * s.re) := Real.one_le_rpow hn1 (hℓ0 _ hs')
+      have hW1 : ‖W s‖ ≤ E := (hWup s hs').trans
+        (mul_le_of_le_one_left hE0.le (inv_le_one_of_one_le₀ hu))
+      have hF1 := hCξ s hs'
+      have hpow : ‖s - z0‖ ^ max ξ 0 ≤
+          Real.exp (max ξ 0 * R) * Real.exp (max ξ 0 / c * Real.exp (c * |s.im|)) := by
+        rw [← Real.exp_add]
+        refine (rpow_le_exp_mul (by linarith) hξ').trans (Real.exp_le_exp.mpr ?_)
+        have h1 : ‖s - z0‖ ≤ R + |s.im| :=
+          (hnormle s hs'.1).trans (by rw [hR]; linarith [hs'.2])
+        have h2 : c * |s.im| ≤ Real.exp (c * |s.im|) := by
+          linarith [Real.add_one_le_exp (c * |s.im|)]
+        have h3 : max ξ 0 * |s.im| ≤ max ξ 0 / c * Real.exp (c * |s.im|) := by
+          calc max ξ 0 * |s.im| = max ξ 0 / c * (c * |s.im|) := by field_simp
+            _ ≤ _ := mul_le_mul_of_nonneg_left h2 (by positivity)
+        nlinarith [mul_le_mul_of_nonneg_left h1 hξ']
+      rw [norm_mul, Real.norm_of_nonneg (Real.exp_pos _).le]
+      calc ‖W s‖ * ‖F s‖ ≤ E * (Cξ * ‖s - z0‖ ^ max ξ 0) :=
+            mul_le_mul hW1 hF1 (norm_nonneg _) (by positivity)
+        _ ≤ E * (Cξ * (Real.exp (max ξ 0 * R) *
+              Real.exp (max ξ 0 / c * Real.exp (c * |s.im|)))) := by gcongr
+        _ = _ := by ring
+    have hbound : ∀ s : ℂ, s.re ∈ Icc σ₁ σ₂ → ‖W s * F s‖ ≤ D := by
+      intro s hs
+      refine PhragmenLindelof.vertical_strip (a := σ₁) (b := σ₂) (f := fun s ↦ W s * F s)
+        (C := D) (z := s) hGd ⟨c, hc_lt, max ξ 0 / c, hGgrowth⟩ ?_ ?_ hs.1 hs.2
+      · intro z hz
+        have hz' : z.re ∈ Icc σ₁ σ₂ := by rw [hz]; exact ⟨le_rfl, h₁₂.le⟩
+        have hu : 0 < ‖z - z0‖ ^ A := Real.rpow_pos_of_pos (by linarith [hnorm1 z hz'.1]) _
+        have hWz := hWup z hz'
+        rw [hz, hℓ₁] at hWz
+        rw [norm_mul]
+        calc ‖W z‖ * ‖F z‖ ≤ ((‖z - z0‖ ^ A)⁻¹ * E) * (C₁ * ‖z - z0‖ ^ A) :=
+              mul_le_mul hWz (hC₁ z hz) (norm_nonneg _) (by positivity)
+          _ = E * C₁ := by field_simp
+          _ ≤ D := by rw [hD]; gcongr; exact le_max_left _ _
+      · intro z hz
+        have hz' : z.re ∈ Icc σ₁ σ₂ := by rw [hz]; exact ⟨h₁₂.le, le_rfl⟩
+        have hu : 0 < ‖z - z0‖ ^ B := Real.rpow_pos_of_pos (by linarith [hnorm1 z hz'.1]) _
+        have hWz := hWup z hz'
+        rw [hz, hℓ₂] at hWz
+        rw [norm_mul]
+        calc ‖W z‖ * ‖F z‖ ≤ ((‖z - z0‖ ^ B)⁻¹ * E) * (C₂ * ‖z - z0‖ ^ B) :=
+              mul_le_mul hWz (hC₂ z hz) (norm_nonneg _) (by positivity)
+          _ = E * C₂ := by field_simp
+          _ ≤ D := by rw [hD]; gcongr; exact le_max_right _ _
+    intro s hs hεs
+    have hpos : 0 < (s - z0).re := by rw [hre, hx0]; linarith [hs.1]
+    have hu : 0 < ‖s - z0‖ ^ (p + q * s.re) :=
+      Real.rpow_pos_of_pos (by linarith [hnorm1 s hs.1]) _
+    have hlow : (‖s - z0‖ ^ (p + q * s.re))⁻¹ ≤ ‖W s‖ := by
+      rw [hWnorm s hs.1]
+      refine le_mul_of_one_le_right (by positivity) (Real.one_le_exp ?_)
+      rw [mul_assoc]
+      exact mul_nonneg (by linarith) (im_mul_halfArg_bounds hε hpos (by rwa [him])).1
+    have hb := hbound s hs
+    rw [norm_mul] at hb
+    have h' : (‖s - z0‖ ^ (p + q * s.re))⁻¹ * ‖F s‖ ≤ D :=
+      (mul_le_mul_of_nonneg_right hlow (norm_nonneg _)).trans hb
+    rw [inv_mul_le_iff₀ hu] at h'
+    linarith
+  have hσ0 : 0 ≤ p + q * σ := hℓ0 σ hσ
+  rw [← hℓ σ]
+  refine Asymptotics.IsBigO.of_bound (D * 2 ^ (p + q * σ)) ?_
+  filter_upwards [(tendsto_comap.eventually_ge_atTop R).filter_mono inf_le_left,
+    mem_inf_of_right (mem_principal_self _)] with s hsR hs
+  have hs' : s.re = σ := hs
+  have hsR' : R ≤ |s.im| := hsR
+  have hsI : s.re ∈ Icc σ₁ σ₂ := by rw [hs']; exact hσ
+  have hFs : ‖F s‖ ≤ D * ‖s - z0‖ ^ (p + q * s.re) := by
+    rcases le_total 0 s.im with h | h
+    · exact key 1 (Or.inl rfl) s hsI (by linarith)
+    · exact key (-1) (Or.inr rfl) s hsI (by linarith)
+  rw [hs'] at hFs
+  have h2 : ‖s - z0‖ ≤ 2 * |s.im| := by
+    have := hnormle s hsI.1
+    rw [hs'] at this
+    have : σ - x0 ≤ R := by rw [hR]; linarith [hσ.2]
+    linarith
+  rw [Real.norm_of_nonneg (by positivity)]
+  calc ‖F s‖ ≤ D * ‖s - z0‖ ^ (p + q * σ) := hFs
+    _ ≤ D * (2 * |s.im|) ^ (p + q * σ) := by gcongr
+    _ = D * 2 ^ (p + q * σ) * |s.im| ^ (p + q * σ) := by
+      rw [Real.mul_rpow (by norm_num) (abs_nonneg _)]; ring
+
+open Complex in
+/-- Under the reflection `s ↦ c - s`, vertical power bounds over one set of real parts become
+bounds over the reflected set. -/
+lemma isBigO_comp_const_sub {F : ℂ → ℂ} {c : ℝ} {S T : Set ℝ} (hST : ∀ x ∈ T, c - x ∈ S)
+    {r : ℝ} (h : F =O[atHeight ⊓ 𝓟 (re ⁻¹' S)] fun s ↦ |s.im| ^ r) :
+    (fun s ↦ F (↑c - s)) =O[atHeight ⊓ 𝓟 (re ⁻¹' T)] fun s ↦ |s.im| ^ r := by
+  have ht : Tendsto (fun s : ℂ ↦ (c : ℂ) - s) (atHeight ⊓ 𝓟 (re ⁻¹' T))
+      (atHeight ⊓ 𝓟 (re ⁻¹' S)) := by
+    refine tendsto_inf.mpr ⟨tendsto_comap_iff.mpr ?_, tendsto_principal.mpr ?_⟩
+    · have : (abs ∘ im) ∘ (fun s : ℂ ↦ (c : ℂ) - s) = abs ∘ im := by
+        funext s; simp
+      rw [this]
+      exact tendsto_comap.mono_left inf_le_left
+    · exact mem_inf_of_right (mem_principal.mpr fun s hs ↦ by simpa using hST _ hs)
+  have := h.comp_tendsto ht
+  simpa [Function.comp_def] using this
+
+open Complex in
+/-- Phragmén–Lindelöf interpolation of polynomial vertical bounds on a closed vertical strip:
+a function holomorphic near the strip, polynomially bounded on it, and `O(|t|^A)`, `O(|t|^B)` on
+the two edges is `O(|t|^e)` on each intermediate line, with `e` the affine interpolation. -/
+lemma isBigO_rpow_of_verticalStrip {σ₁ σ₂ : ℝ} (h₁₂ : σ₁ < σ₂) {F : ℂ → ℂ}
+    (hF : DifferentiableOn ℂ F (re ⁻¹' Icc σ₁ σ₂)) {ξ : ℝ}
+    (hpoly : F =O[atHeight ⊓ 𝓟 (re ⁻¹' Icc σ₁ σ₂)] fun s ↦ |s.im| ^ ξ)
+    {A B : ℝ} (hA0 : 0 ≤ A) (hB0 : 0 ≤ B)
+    (hA : F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ₁})] fun s ↦ |s.im| ^ A)
+    (hB : F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ₂})] fun s ↦ |s.im| ^ B)
+    {σ : ℝ} (hσ : σ ∈ Icc σ₁ σ₂) :
+    F =O[atHeight ⊓ 𝓟 (re ⁻¹' {σ})]
+      fun s ↦ |s.im| ^ (((σ₂ - σ) * A + (σ - σ₁) * B) / (σ₂ - σ₁)) := by
+  rcases le_total B A with hBA | hAB
+  · exact isBigO_rpow_of_verticalStrip_of_le h₁₂ hF hpoly hB0 hBA hA hB hσ
+  · obtain ⟨c, hc⟩ : ∃ c : ℝ, c = σ₁ + σ₂ := ⟨_, rfl⟩
+    have hmaps : ∀ x ∈ Icc σ₁ σ₂, c - x ∈ Icc σ₁ σ₂ := fun x hx ↦
+      ⟨by rw [hc]; linarith [hx.2], by rw [hc]; linarith [hx.1]⟩
+    have hG : DifferentiableOn ℂ (fun s ↦ F (↑c - s)) (re ⁻¹' Icc σ₁ σ₂) := by
+      refine hF.comp ((differentiableOn_const _).sub differentiableOn_id) ?_
+      intro s hs
+      have := hmaps _ hs
+      simpa using this
+    have h := isBigO_rpow_of_verticalStrip_of_le h₁₂ hG
+      (isBigO_comp_const_sub hmaps hpoly) hA0 hAB
+      (isBigO_comp_const_sub (S := {σ₂}) (T := {σ₁})
+        (by intro x hx; rw [mem_singleton_iff.mp hx, hc]; simp) hB)
+      (isBigO_comp_const_sub (S := {σ₁}) (T := {σ₂})
+        (by intro x hx; rw [mem_singleton_iff.mp hx, hc]; simp) hA)
+      (hmaps σ hσ)
+    have h' := isBigO_comp_const_sub (c := c) (S := {c - σ}) (T := {σ})
+      (by intro x hx; rw [mem_singleton_iff.mp hx]; simp) h
+    have e : ((σ₂ - (c - σ)) * B + (c - σ - σ₁) * A) / (σ₂ - σ₁) =
+        ((σ₂ - σ) * A + (σ - σ₁) * B) / (σ₂ - σ₁) := by
+      rw [hc]; ring
+    rw [e] at h'
+    simpa using h'
+
+open Complex in
+/-- Clearing finitely many simple poles over a closed strip of real parts inside the half-plane:
+multiplying by the polynomial with the poles as roots and passing to normal form gives a function
+holomorphic on the strip which, for large heights, equals that product, while the polynomial has
+size `|t| ^ N` from above and below. -/
+lemma exists_clearPoles_verticalStrip {f : ℂ → ℂ} {a : ℝ}
+    (hf : MeromorphicNFOn f (re ⁻¹' Ioi a))
+    (hFinite : {s : ℂ | a < s.re ∧ meromorphicOrderAt f s < 0}.Finite)
+    (hSimple : ∀ s : ℂ, a < s.re → meromorphicOrderAt f s < 0 → meromorphicOrderAt f s = -1)
+    {l u : ℝ} (hl : a < l) :
+    ∃ g P : ℂ → ℂ, ∃ N : ℕ, DifferentiableOn ℂ g (re ⁻¹' Icc l u) ∧
+      (∀ᶠ s in atHeight ⊓ 𝓟 (re ⁻¹' Icc l u), g s = P s * f s ∧ P s ≠ 0) ∧
+      P =O[atHeight ⊓ 𝓟 (re ⁻¹' Icc l u)] (fun s ↦ |s.im| ^ (N : ℝ)) ∧
+      (fun s ↦ (P s)⁻¹) =O[atHeight ⊓ 𝓟 (re ⁻¹' Icc l u)]
+        (fun s ↦ |s.im| ^ (-(N : ℝ))) := by
+  obtain ⟨Z, hZ⟩ : ∃ Z : Finset ℂ, Z = hFinite.toFinset := ⟨_, rfl⟩
+  have hmemZ : ∀ x, x ∈ Z ↔ a < x.re ∧ meromorphicOrderAt f x < 0 := by
+    intro x; rw [hZ, Set.Finite.mem_toFinset]; rfl
+  obtain ⟨P, hP⟩ : ∃ P : ℂ → ℂ, P = fun s ↦ ∏ ρ ∈ Z, (s - ρ) := ⟨_, rfl⟩
+  have hPd : Differentiable ℂ P := by
+    rw [hP]; fun_prop
+  have hPa : ∀ x, AnalyticAt ℂ P x := fun x ↦ hPd.analyticAt x
+  have hggm : MeromorphicOn (P * f) (re ⁻¹' Ioi a) :=
+    MeromorphicOn.mul (fun x _ ↦ (hPa x).meromorphicAt) hf.meromorphicOn
+  obtain ⟨g, hg⟩ : ∃ g : ℂ → ℂ, g = toMeromorphicNFOn (P * f) (re ⁻¹' Ioi a) := ⟨_, rfl⟩
+  have hfa : ∀ x : ℂ, a < x.re → x ∉ Z → AnalyticAt ℂ f x := by
+    intro x hx hxZ
+    refine (hf hx).meromorphicOrderAt_nonneg_iff_analyticAt.mp ?_
+    by_contra h
+    exact hxZ ((hmemZ x).mpr ⟨hx, not_le.mp h⟩)
+  have hga : ∀ x : ℂ, a < x.re → AnalyticAt ℂ g x := by
+    intro x hx
+    rw [hg]
+    refine (meromorphicNFOn_toMeromorphicNFOn (P * f) _
+      (show x ∈ re ⁻¹' Ioi a from hx)).meromorphicOrderAt_nonneg_iff_analyticAt.mp ?_
+    rw [meromorphicOrderAt_toMeromorphicNFOn hggm hx,
+      meromorphicOrderAt_mul (hPa x).meromorphicAt (hf hx).meromorphicAt]
+    by_cases hxZ : x ∈ Z
+    · have hxp := (hmemZ x).mp hxZ
+      have hfo : meromorphicOrderAt f x = -1 := hSimple x hxp.1 hxp.2
+      have hPx : P x = 0 := by rw [hP]; exact Finset.prod_eq_zero hxZ (sub_self x)
+      have hne : analyticOrderAt P x ≠ 0 := (hPa x).analyticOrderAt_ne_zero.mpr hPx
+      rw [(hPa x).meromorphicOrderAt_eq, hfo]
+      cases h : analyticOrderAt P x with
+      | top => simp
+      | coe n =>
+        rw [h] at hne
+        have hn : 1 ≤ n := Nat.one_le_iff_ne_zero.mpr (by exact_mod_cast hne)
+        simp only [ENat.map_natCast]
+        have : ((n : ℤ) : WithTop ℤ) + -1 = ((n - 1 : ℤ) : WithTop ℤ) := by
+          rw [sub_eq_add_neg]; norm_cast
+        rw [this]
+        exact_mod_cast (by omega : (0 : ℤ) ≤ n - 1)
+    · exact add_nonneg (hPa x).meromorphicOrderAt_nonneg (hfa x hx hxZ).meromorphicOrderAt_nonneg
+  have hgeq : ∀ x : ℂ, a < x.re → x ∉ Z → g x = P x * f x := by
+    intro x hx hxZ
+    rw [hg, toMeromorphicNFOn_eq_toMeromorphicNFAt hggm hx,
+      toMeromorphicNFAt_eq_self.2 (((hPa x).mul (hfa x hx hxZ)).meromorphicNFAt)]
+    rfl
+  obtain ⟨S, hS⟩ : ∃ S : ℝ, S = ∑ ρ ∈ Z, ‖ρ‖ := ⟨_, rfl⟩
+  have hρS : ∀ ρ ∈ Z, ‖ρ‖ ≤ S := fun ρ hρ ↦
+    hS ▸ Finset.single_le_sum (f := fun i ↦ ‖i‖) (fun i _ ↦ norm_nonneg i) hρ
+  have hS0 : 0 ≤ S := hS ▸ Finset.sum_nonneg fun i _ ↦ norm_nonneg i
+  obtain ⟨T, hT⟩ : ∃ T : ℝ, T = 2 * S + |l| + |u| + 1 := ⟨_, rfl⟩
+  have hfactor : ∀ s : ℂ, s.re ∈ Icc l u → T ≤ |s.im| → ∀ ρ ∈ Z,
+      |s.im| / 2 ≤ ‖s - ρ‖ ∧ ‖s - ρ‖ ≤ 2 * |s.im| := by
+    intro s hs hT' ρ hρ
+    have h1 := hρS ρ hρ
+    have hre : |s.re| ≤ |l| + |u| := abs_le.mpr
+      ⟨by linarith [neg_abs_le l, abs_nonneg u, hs.1],
+        by linarith [le_abs_self u, abs_nonneg l, hs.2]⟩
+    constructor
+    · have h4 := abs_im_le_norm (s - ρ)
+      have h2 : |ρ.im| ≤ ‖ρ‖ := abs_im_le_norm ρ
+      rw [sub_im] at h4
+      have h3 : |s.im| - |ρ.im| ≤ |s.im - ρ.im| := abs_sub_abs_le_abs_sub _ _
+      linarith [abs_nonneg l, abs_nonneg u]
+    · have h4 := norm_sub_le s ρ
+      have h2 := norm_le_abs_re_add_abs_im s
+      linarith [abs_nonneg l, abs_nonneg u]
+  have hev : ∀ᶠ s in atHeight ⊓ 𝓟 (re ⁻¹' Icc l u), T ≤ |s.im| ∧ s.re ∈ Icc l u :=
+    ((tendsto_comap.eventually_ge_atTop T).filter_mono inf_le_left).and
+      (mem_inf_of_right (mem_principal_self _))
+  have hPnorm : ∀ s : ℂ, s.re ∈ Icc l u → T ≤ |s.im| →
+      (|s.im| / 2) ^ Z.card ≤ ‖P s‖ ∧ ‖P s‖ ≤ (2 * |s.im|) ^ Z.card := by
+    intro s hs hT'
+    rw [hP, norm_prod]
+    constructor
+    · rw [← Finset.prod_const]
+      exact Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun ρ hρ ↦ (hfactor s hs hT' ρ hρ).1
+    · rw [← Finset.prod_const]
+      exact Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) fun ρ hρ ↦ (hfactor s hs hT' ρ hρ).2
+  refine ⟨g, P, Z.card, ?_, ?_, ?_, ?_⟩
+  · intro s hs
+    exact (hga s (lt_of_lt_of_le hl hs.1)).differentiableAt.differentiableWithinAt
+  · filter_upwards [hev] with s hs'
+    obtain ⟨hT', hs⟩ := hs'
+    have him0 : 0 < |s.im| := by linarith [abs_nonneg l, abs_nonneg u]
+    have hsZ : s ∉ Z := by
+      intro hsZ
+      have h1 := hρS s hsZ
+      have h2 := abs_im_le_norm s
+      linarith [abs_nonneg l, abs_nonneg u]
+    refine ⟨hgeq s (lt_of_lt_of_le hl hs.1) hsZ, ?_⟩
+    have h1 := (hPnorm s hs hT').1
+    have hpos : 0 < (|s.im| / 2) ^ Z.card := pow_pos (half_pos him0) _
+    intro h0
+    rw [h0, norm_zero] at h1
+    linarith
+  · refine Asymptotics.IsBigO.of_bound (2 ^ Z.card) ?_
+    filter_upwards [hev] with s hs'
+    obtain ⟨hT', hs⟩ := hs'
+    rw [Real.norm_of_nonneg (by positivity), Real.rpow_natCast, ← mul_pow]
+    exact (hPnorm s hs hT').2
+  · refine Asymptotics.IsBigO.of_bound (2 ^ Z.card) ?_
+    filter_upwards [hev] with s hs'
+    obtain ⟨hT', hs⟩ := hs'
+    have him0 : 0 < |s.im| := by linarith [abs_nonneg l, abs_nonneg u]
+    rw [Real.norm_of_nonneg (by positivity), Real.rpow_neg him0.le, Real.rpow_natCast, norm_inv]
+    have h1 := (hPnorm s hs hT').1
+    have hpos : 0 < (|s.im| / 2) ^ Z.card := pow_pos (half_pos him0) _
+    calc ‖P s‖⁻¹ ≤ ((|s.im| / 2) ^ Z.card)⁻¹ := inv_anti₀ hpos h1
+      _ = 2 ^ Z.card * (|s.im| ^ Z.card)⁻¹ := by rw [div_pow]; field_simp
 
 section GrowthOrder
 
@@ -261,10 +830,85 @@ theorem convexOn_verticalGrowthOrder :
       nlinarith [mul_le_mul_of_nonneg_left hk₀.le hp.le, mul_le_mul_of_nonneg_left hk₁.le hq.le,
         congrArg (fun t : ℝ ↦ t * ε) hpq]
 
+/-- The convexity inequality behind Lemma B.1.1.1: for `a < σ₁ < σ < σ₂`, the growth order at
+`σ` is at most the affine interpolation of the orders at `σ₁` and `σ₂`. -/
+theorem verticalGrowthOrder_toReal_le_interp {σ₁ σ σ₂ : ℝ} (h₁ : a < σ₁) (h₁σ : σ₁ < σ)
+    (hσ₂ : σ < σ₂) :
+    (verticalGrowthOrder f σ).toReal ≤
+      ((σ₂ - σ) * (verticalGrowthOrder f σ₁).toReal +
+        (σ - σ₁) * (verticalGrowthOrder f σ₂).toReal) / (σ₂ - σ₁) := by
+  obtain ⟨ξ, hξ, hO⟩ := hGrowth
+  have h₁₂ : σ₁ < σ₂ := h₁σ.trans hσ₂
+  have hw : 0 < σ₂ - σ₁ := sub_pos.2 h₁₂
+  have hsub : ∀ K : Set ℝ, K ⊆ Icc σ₁ σ₂ →
+      atHeight ⊓ 𝓟 (Complex.re ⁻¹' K) ≤ atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc σ₁ σ₂) :=
+    fun K hK ↦ inf_le_inf_left _ (principal_mono.2 (preimage_mono hK))
+  have hIcc : atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc σ₁ σ₂) ≤
+      atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioi a) :=
+    inf_le_inf_left _ (principal_mono.2 (preimage_mono fun x hx ↦ lt_of_lt_of_le h₁ hx.1))
+  have hne : ∀ x ∈ Icc σ₁ σ₂, verticalGrowthOrder f x ≠ ⊤ := fun x hx ↦
+    verticalGrowthOrder_ne_top_of_isBigO hξ.le
+      ((hO.mono hIcc).mono (hsub {x} (singleton_subset_iff.2 hx)))
+  obtain ⟨g, P, N, hgd, hgeq, hPO, hPinv⟩ :=
+    exists_clearPoles_verticalStrip hf hFinite hSimple (u := σ₂) h₁
+  have htrans : ∀ K : Set ℝ, K ⊆ Icc σ₁ σ₂ → ∀ r : ℝ, 0 ≤ r →
+      f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' K)] (fun s ↦ |s.im| ^ r) →
+      g =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' K)] (fun s ↦ |s.im| ^ ((N : ℝ) + r)) := by
+    intro K hK r hr hfK
+    have e : (fun s : ℂ ↦ |s.im| ^ ((N : ℝ) + r)) = fun s ↦ |s.im| ^ (N : ℝ) * |s.im| ^ r :=
+      funext fun s ↦ Real.rpow_add_of_nonneg (abs_nonneg _) (Nat.cast_nonneg _) hr
+    rw [e]
+    refine Asymptotics.IsBigO.congr' ((hPO.mono (hsub K hK)).mul hfK) ?_ EventuallyEq.rfl
+    filter_upwards [hgeq.filter_mono (hsub K hK)] with s hs
+    exact hs.1.symm
+  have hφ₁ : 0 ≤ (verticalGrowthOrder f σ₁).toReal := ENNReal.toReal_nonneg
+  have hφ₂ : 0 ≤ (verticalGrowthOrder f σ₂).toReal := ENNReal.toReal_nonneg
+  refine le_of_forall_pos_le_add fun δ hδ ↦ ?_
+  have hA := isBigO_of_verticalGrowthOrder_toReal_lt (hne σ₁ ⟨le_rfl, h₁₂.le⟩)
+    (lt_add_of_pos_right (verticalGrowthOrder f σ₁).toReal hδ)
+  have hB := isBigO_of_verticalGrowthOrder_toReal_lt (hne σ₂ ⟨h₁₂.le, le_rfl⟩)
+    (lt_add_of_pos_right (verticalGrowthOrder f σ₂).toReal hδ)
+  have hgA := htrans {σ₁} (singleton_subset_iff.2 ⟨le_rfl, h₁₂.le⟩) _ (by positivity) hA
+  have hgB := htrans {σ₂} (singleton_subset_iff.2 ⟨h₁₂.le, le_rfl⟩) _ (by positivity) hB
+  have hgpoly := htrans (Icc σ₁ σ₂) subset_rfl ξ hξ.le (hO.mono hIcc)
+  have hgσ := isBigO_rpow_of_verticalStrip h₁₂ hgd hgpoly (by positivity) (by positivity) hgA hgB
+    (σ := σ) ⟨h₁σ.le, hσ₂.le⟩
+  obtain ⟨e, he⟩ : ∃ e : ℝ, e = ((σ₂ - σ) * (verticalGrowthOrder f σ₁).toReal +
+      (σ - σ₁) * (verticalGrowthOrder f σ₂).toReal) / (σ₂ - σ₁) + δ := ⟨_, rfl⟩
+  have he0 : 0 ≤ e := by
+    rw [he]
+    have := mul_nonneg (sub_pos.2 hσ₂).le hφ₁
+    have := mul_nonneg (sub_pos.2 h₁σ).le hφ₂
+    positivity
+  have hexp : ((σ₂ - σ) * ((N : ℝ) + ((verticalGrowthOrder f σ₁).toReal + δ)) +
+      (σ - σ₁) * ((N : ℝ) + ((verticalGrowthOrder f σ₂).toReal + δ))) / (σ₂ - σ₁) =
+      (N : ℝ) + e := by
+    rw [he]; field_simp; ring
+  rw [hexp] at hgσ
+  have hlσ := hsub {σ} (singleton_subset_iff.2 ⟨h₁σ.le, hσ₂.le⟩)
+  have hfσ : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {σ})] fun s ↦ |s.im| ^ e := by
+    refine Asymptotics.IsBigO.congr' (hgσ.mul (hPinv.mono hlσ)) ?_ ?_
+    · filter_upwards [hgeq.filter_mono hlσ] with s hs
+      rw [hs.1]
+      field_simp [hs.2]
+    · filter_upwards [(tendsto_comap.eventually_gt_atTop (0:ℝ)).filter_mono inf_le_left] with s hs
+      have hs' : 0 < |s.im| := hs
+      rw [← Real.rpow_add hs']
+      congr 1
+      ring
+  rw [← he]
+  exact verticalGrowthOrder_toReal_le_of_isBigO he0 hfσ
+
 /-- Paper: Lemma B.1.1.1, p. 589. The finite growth order is continuous in the
 open half-plane. -/
 theorem continuousOn_verticalGrowthOrder :
-    ContinuousOn (fun σ ↦ (verticalGrowthOrder f σ).toReal) (Ioi a) := by sorry
+    ContinuousOn (fun σ ↦ (verticalGrowthOrder f σ).toReal) (Ioi a) := by
+  refine ConvexOn.continuousOn isOpen_Ioi (convexOn_of_slope_mono_adjacent (convex_Ioi a) ?_)
+  intro x y z hx hz hxy hyz
+  have h := verticalGrowthOrder_toReal_le_interp hf hFinite hSimple hGrowth hx hxy hyz
+  rw [div_le_div_iff₀ (sub_pos.2 hxy) (sub_pos.2 hyz)]
+  rw [le_div_iff₀ (by linarith)] at h
+  linarith
 
 omit hf hFinite hSimple hGrowth
 

@@ -395,7 +395,22 @@ theorem pi_isAbsolute :
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/
-theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by sorry
+theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by
+  intro a _
+  -- In the product topology every coordinate series is eventually constant, so the
+  -- ordered partial sums converge to the scalar sequence itself.
+  refine ⟨a, ?_⟩
+  rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff]
+  simp only [Function.comp_def]
+  rw [tendsto_pi_nhds]
+  intro n
+  refine tendsto_atTop_of_eventually_const (i₀ := n + 1) fun N hN ↦ ?_
+  rw [Finset.sum_apply]
+  have hn : n ∈ Finset.range N := Finset.mem_range.mpr (Nat.lt_of_succ_le hN)
+  rw [Finset.sum_eq_single_of_mem n hn]
+  · rw [Pi.smul_apply, Pi.single_eq_same, smul_eq_mul, mul_one]
+  · intro m _ hmn
+    rw [Pi.smul_apply, Pi.single_eq_of_ne hmn.symm, smul_zero]
 
 /-- Paper: Definition 4.1.2.1(5), p. 158. A countable orthonormal Hilbert basis is
 shrinking, with its coefficients given by the inner products against its vectors. -/
@@ -405,12 +420,28 @@ theorem hilbertBasis_isShrinking {H : Type*} [NormedAddCommGroup H] [InnerProduc
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. Every zero neighborhood in the complex
 sequence space with the product topology contains a coordinate basis vector. -/
-theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by sorry
+theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by
+  rintro ⟨U, hU, havoid⟩
+  have hzero : Tendsto coordinateVector atTop (𝓝 (0 : ℕ → ℂ)) := by
+    refine tendsto_pi_nhds.mpr fun j ↦ ?_
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ne_atTop j] with n hn
+    simp only [Pi.single_eq_of_ne' hn, Pi.zero_apply]
+  obtain ⟨n, hn⟩ := (hzero.eventually hU).exists
+  exact havoid n hn
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. A countable orthonormal Hilbert basis is
 normalized in the paper's sense. -/
 theorem hilbertBasis_isNormalized {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
-    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by sorry
+    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by
+  have hnorm (n : ℕ) : ‖b n‖ = 1 := b.orthonormal.norm_eq_one n
+  constructor
+  · refine ⟨Metric.ball 0 1, Metric.ball_mem_nhds 0 zero_lt_one, fun n ↦ ?_⟩
+    rw [mem_ball_zero_iff, hnorm]
+    exact lt_irrefl 1
+  · refine (NormedSpace.isVonNBounded_iff' ℂ).mpr ⟨1, ?_⟩
+    rintro _ ⟨n, rfl⟩
+    exact (hnorm n).le
 
 end Examples
 

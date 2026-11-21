@@ -7,10 +7,14 @@ public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import Mathlib.Geometry.Manifold.HasGroupoid
 import Mathlib.Analysis.Normed.Module.Connected
 import Mathlib.Order.WellQuasiOrder
 import Mathlib.Topology.Homotopy.Lifting
+import Mathlib.Topology.Algebra.Group.OpenMapping
+import Mathlib.Topology.Baire.LocallyCompactRegular
 
 /-!
 # Structure of locally compact abelian groups and their Schwartz–Bruhat spaces
@@ -685,26 +689,278 @@ theorem mem_lcaDualAnnihilator_iff (J : Subgroup (PontryaginDual G)) (x : G) :
     x ∈ lcaDualAnnihilator J ↔ ∀ χ : J, χ.val x = 1 :=
   Subgroup.mem_iInf
 
+-- Retain `T2Space G` in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.1.4.6(1), p. 758. Taking the annihilator twice recovers a
 closed subgroup under the evaluation pairing. -/
 theorem lcaDualAnnihilator_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
-    lcaDualAnnihilator (lcaAnnihilator H) = H := by sorry
+    lcaDualAnnihilator (lcaAnnihilator H) = H := by
+  ext x
+  rw [mem_lcaDualAnnihilator_iff]
+  constructor
+  · intro hx
+    let : T1Space (G ⧸ H) := QuotientGroup.t1Space_iff.mpr hH
+    let q : G →ₜ* (G ⧸ H) := ⟨QuotientGroup.mk' H, QuotientGroup.continuous_mk⟩
+    apply (QuotientGroup.eq_one_iff x).mp
+    apply (pontryaginDual_pairing_separates (G := G ⧸ H)).1
+    funext ψ
+    have hψ : PontryaginDual.map q ψ ∈ lcaAnnihilator H := by
+      apply (mem_lcaAnnihilator_iff H _).mpr
+      intro y
+      have hy : q y.val = 1 := (QuotientGroup.eq_one_iff y.val).mpr y.property
+      rw [PontryaginDual.map_apply, hy, map_one]
+    exact (hx ⟨PontryaginDual.map q ψ, hψ⟩).trans (map_one ψ).symm
+  · intro hx χ
+    exact (mem_lcaAnnihilator_iff H χ.val).mp χ.property ⟨x, hx⟩
+
+omit [T2Space G] in
+/-- A compact subset of a quotient of a locally compact group lies in the image of a compact set. -/
+private theorem exists_isCompact_quotient_preimage (H : Subgroup G) {K : Set (G ⧸ H)}
+    (hK : IsCompact K) : ∃ C : Set G, IsCompact C ∧ K ⊆ QuotientGroup.mk '' C := by
+  obtain ⟨L, hLcomp, hL⟩ := exists_compact_mem_nhds (1 : G)
+  have hU : QuotientGroup.mk '' L ∈ 𝓝 (1 : G ⧸ H) :=
+    (QuotientGroup.isOpenMap_coe (N := H)).image_mem_nhds hL
+  obtain ⟨t, ht⟩ := compact_covered_by_mul_left_translates hK
+    ⟨(1 : G ⧸ H), mem_interior_iff_mem_nhds.mpr hU⟩
+  refine ⟨⋃ g ∈ t, Homeomorph.mulLeft (g.out)⁻¹ '' L,
+    t.isCompact_biUnion fun g _ =>
+      hLcomp.image (Homeomorph.mulLeft (g.out)⁻¹).continuous, ?_⟩
+  intro k hk
+  obtain ⟨g, hg, hkU⟩ := mem_iUnion₂.mp (ht hk)
+  rw [mem_preimage, mem_image] at hkU
+  obtain ⟨y, hy, hgy⟩ := hkU
+  refine ⟨(g.out)⁻¹ * y, mem_iUnion₂.mpr ⟨g, hg, mem_image_of_mem _ hy⟩, ?_⟩
+  rw [QuotientGroup.mk_mul, QuotientGroup.mk_inv, QuotientGroup.out_eq', hgy,
+    inv_mul_cancel_left]
 
 /-- Paper: Lemma D.1.4.6(2), p. 758. Pullback by the quotient map identifies
 the dual of a quotient with the annihilator. -/
 theorem lcaQuotientDual_equiv_annihilator (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     ∃ e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H,
-      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by sorry
+      ∀ (χ : PontryaginDual (G ⧸ H)) x, (e χ).val x = χ (QuotientGroup.mk x) := by
+  -- Closedness of `H` makes the quotient Hausdorff.
+  have hpre : QuotientGroup.mk ⁻¹' ({1} : Set (G ⧸ H)) = (H : Set G) := by
+    simpa [QuotientGroup.mk_one] using QuotientGroup.preimage_mk_one H
+  have : T2Space (G ⧸ H) := IsTopologicalGroup.t2Space_iff_one_closed.mpr <| by
+    rw [← (QuotientGroup.isQuotientMap_mk H).isCoinducing.isClosed_preimage, hpre]
+    exact hH
+  let q : G →ₜ* G ⧸ H :=
+    { toMonoidHom := QuotientGroup.mk' H
+      continuous_toFun := QuotientGroup.continuous_mk }
+  have hq (x : G) : q x = QuotientGroup.mk x := by
+    change QuotientGroup.mk' H x = QuotientGroup.mk x
+    exact QuotientGroup.mk'_apply H x
+  have hker (ψ : lcaAnnihilator H) : H ≤ ψ.val.toMonoidHom.ker := by
+    intro x hx
+    exact (mem_lcaAnnihilator_iff H ψ.val).1 ψ.property ⟨x, hx⟩
+  let toAnn : PontryaginDual (G ⧸ H) →* lcaAnnihilator H :=
+    { toFun := fun χ => ⟨PontryaginDual.map q χ, by
+        rw [mem_lcaAnnihilator_iff]
+        intro x
+        rw [PontryaginDual.map_apply]
+        have : q x.val = 1 := by
+          change QuotientGroup.mk x.val = 1
+          exact (QuotientGroup.eq_one_iff _).2 x.property
+        rw [this, map_one]⟩
+      map_one' := Subtype.ext (map_one (PontryaginDual.map q))
+      map_mul' := fun χ φ => Subtype.ext (map_mul (PontryaginDual.map q) χ φ) }
+  let fromAnnFun (ψ : lcaAnnihilator H) : PontryaginDual (G ⧸ H) :=
+    { toMonoidHom := QuotientGroup.lift H ψ.val.toMonoidHom (hker ψ)
+      continuous_toFun :=
+        (QuotientGroup.isQuotientMap_mk H).continuous_iff.2 ψ.val.continuous_toFun }
+  have happly (ψ : lcaAnnihilator H) (x : G) :
+      fromAnnFun ψ (QuotientGroup.mk x) = ψ.val x := by
+    dsimp [fromAnnFun]
+    exact QuotientGroup.lift_mk' H (hker ψ) x
+  let fromAnn : lcaAnnihilator H →* PontryaginDual (G ⧸ H) :=
+    { toFun := fromAnnFun
+      map_one' := by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly 1 x]
+        rfl
+      map_mul' := fun ψ φ => by
+        apply PontryaginDual.ext
+        intro y
+        obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+        rw [happly (ψ * φ) x]
+        have hr :
+            (fromAnnFun ψ * fromAnnFun φ) (QuotientGroup.mk x) =
+              fromAnnFun ψ (QuotientGroup.mk x) * fromAnnFun φ (QuotientGroup.mk x) :=
+          ContinuousMonoidHom.mul_apply _ _ _
+        rw [hr, happly ψ x, happly φ x, Subgroup.coe_mul]
+        rfl }
+  have hinv_left (χ : PontryaginDual (G ⧸ H)) : fromAnn (toAnn χ) = χ := by
+    apply PontryaginDual.ext
+    intro y
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    dsimp [fromAnn]
+    rw [happly (toAnn χ) x]
+    dsimp [toAnn]
+    rw [hq]
+  have hinv_right (ψ : lcaAnnihilator H) : toAnn (fromAnn ψ) = ψ := by
+    apply Subtype.ext
+    apply PontryaginDual.ext
+    intro x
+    dsimp [toAnn, fromAnn]
+    rw [hq, happly ψ x]
+  have hbij : Function.Bijective toAnn :=
+    ⟨fun χ φ h => (hinv_left χ).symm.trans ((congrArg fromAnn h).trans (hinv_left φ)),
+      fun ψ => ⟨fromAnn ψ, hinv_right ψ⟩⟩
+  have hto_cont : Continuous toAnn := by
+    rw [IsInducing.subtypeVal.continuous_iff (f := toAnn)]
+    exact (PontryaginDual.map q).continuous
+  have hfrom_cont : Continuous fromAnn := by
+    refine continuous_of_continuousAt_one fromAnn ?_
+    rw [ContinuousAt, map_one fromAnn]
+    refine (pontryaginDual_nhds_one_hasBasis (G := G ⧸ H)).tendsto_right_iff.mpr ?_
+    rintro ⟨K, V⟩ ⟨hK, hV⟩
+    obtain ⟨C, hC, hKC⟩ := exists_isCompact_quotient_preimage H hK
+    rw [IsInducing.subtypeVal.nhds_eq_comap (1 : lcaAnnihilator H)]
+    refine mem_comap.mpr ⟨{ψ : PontryaginDual G | MapsTo ψ C V},
+      pontryaginDual_nhds_one_hasBasis.mem_of_mem (i := (C, V)) ⟨hC, hV⟩, ?_⟩
+    intro ψ hψ
+    replace hψ : MapsTo (ψ.val : G → Circle) C V := by
+      simpa [Set.mem_ofPred] using hψ
+    show MapsTo (fromAnn ψ) K V
+    intro k hk
+    obtain ⟨x, hxC, rfl⟩ := hKC hk
+    dsimp [fromAnn]
+    rw [happly ψ x]
+    exact hψ hxC
+  let e : PontryaginDual (G ⧸ H) ≃ₜ* lcaAnnihilator H :=
+    { toFun := toAnn
+      invFun := fromAnn
+      left_inv := hinv_left
+      right_inv := hinv_right
+      map_mul' := toAnn.map_mul
+      continuous_toFun := hto_cont
+      continuous_invFun := hfrom_cont }
+  refine ⟨e, fun χ x => ?_⟩
+  dsimp [e, toAnn]
+  rw [hq]
+
+open scoped Pointwise in
+/-- Some compact subgroup has a σ-compact annihilator. The subgroup is the
+intersection of a decreasing sequence of compact identity neighborhoods. -/
+private theorem exists_compact_subgroup_sigmaCompact_annihilator :
+    ∃ K : Subgroup G, IsCompact (K : Set G) ∧ SigmaCompactSpace (lcaAnnihilator K) := by
+  let N := {U : Set G // U ∈ 𝓝 (1 : G) ∧ IsCompact U}
+  have hNext (U : N) : ∃ V : N, (V : Set G)⁻¹ = V.val ∧ V.val * V.val ⊆ U.val := by
+    obtain ⟨V, hV, hVc, hVi, hVV⟩ := exists_closed_nhds_one_inv_eq_mul_subset U.property.1
+    have hVU : V ⊆ U.val := fun x hx ↦ hVV (mul_one x ▸ Set.mul_mem_mul hx (mem_of_mem_nhds hV))
+    exact ⟨⟨V, hV, U.property.2.of_isClosed_subset hVc hVU⟩, hVi, hVV⟩
+  choose next hInv hMul using hNext
+  obtain ⟨U₀, hU₀, hU₀nhds⟩ := exists_compact_mem_nhds (1 : G)
+  let seq : ℕ → N := Nat.rec ⟨U₀, hU₀nhds, hU₀⟩ fun _ U ↦ next U
+  let U (n : ℕ) : Set G := (seq n).val
+  have hOne (n : ℕ) : (1 : G) ∈ U n := mem_of_mem_nhds (seq n).property.1
+  have hMulU (n : ℕ) : U (n + 1) * U (n + 1) ⊆ U n := hMul (seq n)
+  have hAnti : Antitone U := antitone_nat_of_succ_le fun n x hx ↦
+    hMulU n (mul_one x ▸ Set.mul_mem_mul hx (hOne (n + 1)))
+  let K : Subgroup G :=
+    { carrier := ⋂ n, U n
+      one_mem' := mem_iInter.mpr hOne
+      mul_mem' := fun hx hy ↦ mem_iInter.mpr fun n ↦ hMulU n
+        (Set.mul_mem_mul (mem_iInter.mp hx (n + 1)) (mem_iInter.mp hy (n + 1)))
+      inv_mem' := fun hx ↦ mem_iInter.mpr fun n ↦ hAnti (Nat.le_succ n) (by
+          change _ ∈ (next (seq n)).val
+          rw [← hInv (seq n)]
+          simpa only [Set.mem_inv, inv_inv] using mem_iInter.mp hx (n + 1)) }
+  have hUc (n) : IsCompact (U n) := (seq n).property.2
+  have hUK : IsClosed (K : Set G) := isClosed_iInter fun n ↦ (hUc n).isClosed
+  have hK : IsCompact (K : Set G) := (hUc 0).of_isClosed_subset hUK (iInter_subset U 0)
+  refine ⟨K, hK, ?_⟩
+  obtain ⟨r, hr, hPolar⟩ := exists_isCompact_pontryaginDual_polar (G := G)
+  let A := lcaAnnihilator K
+  have hA : IsClosed (A : Set (PontryaginDual G)) :=
+    isClosed_singleton.preimage
+      (PontryaginDual.map (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)).continuous
+  let P (n : ℕ) : Set A := Subtype.val ⁻¹' {χ | MapsTo χ (U n) (Metric.closedBall 1 r)}
+  refine ⟨⟨P, fun n ↦ (?_ : IsCompact (P n)), eq_univ_of_forall fun χ ↦ ?_⟩⟩
+  · exact hA.isClosedEmbedding_subtypeVal.isCompact_preimage (hPolar _ (seq n).property.1)
+  · let W := (χ.val : PontryaginDual G) ⁻¹' Metric.ball 1 r
+    have hW : IsOpen W := Metric.isOpen_ball.preimage χ.val.continuous
+    have hKW : (K : Set G) ⊆ W := fun x hx ↦
+      show χ.val x ∈ Metric.ball 1 r by
+        rw [(mem_lcaAnnihilator_iff K χ.val).mp χ.property ⟨x, hx⟩]
+        exact Metric.mem_ball_self hr
+    have hDisj : Disjoint (U 0 \ W) (⋂ n, U n) :=
+      Set.disjoint_left.mpr fun x hx hxn ↦ hx.2 (hKW hxn)
+    obtain ⟨n, hn⟩ := ((hUc 0).diff hW).elim_directed_family_closed U
+      (fun n ↦ (hUc n).isClosed) hDisj hAnti.directed_ge
+    refine mem_iUnion.mpr ⟨n, fun x hx ↦ Metric.ball_subset_closedBall ?_⟩
+    by_contra hxW
+    exact Set.disjoint_left.mp hn ⟨hAnti (Nat.zero_le n) hx, hxW⟩ hx
+
+/-- Restriction to a closed subgroup is an open map on the dual groups. -/
+private theorem isOpenMap_restrict_dual (H : Subgroup G) (hH : IsClosed (H : Set G)) :
+    IsOpenMap (PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)) := by
+  let f := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  let : LocallyCompactSpace H := hH.locallyCompactSpace
+  obtain ⟨K, hK, hSigma⟩ := exists_compact_subgroup_sigmaCompact_annihilator (G := G)
+  -- The restriction between the two open annihilators is surjective.
+  let L := K.comap H.subtype
+  have hL : IsCompact (L : Set H) := hH.isClosedEmbedding_subtypeVal.isCompact_preimage hK
+  let A := lcaAnnihilator K
+  let B := lcaAnnihilator L
+  let : SigmaCompactSpace A := hSigma
+  let : CompactSpace L := isCompact_iff_compactSpace.mp hL
+  have hB : IsOpen (B : Set (PontryaginDual H)) :=
+    (isOpen_discrete ({1} : Set (PontryaginDual L))).preimage
+      (PontryaginDual.map (⟨L.subtype, continuous_subtype_val⟩ : L →ₜ* H)).continuous
+  let : LocallyCompactSpace B := hB.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let g : A →* B := (f.toMonoidHom.comp A.subtype).codRestrict B fun χ ↦
+    (mem_lcaAnnihilator_iff L _).mpr fun x ↦
+      (mem_lcaAnnihilator_iff K χ.val).mp χ.property ⟨(x.val : G), x.property⟩
+  have hg : Continuous g := (f.continuous.comp continuous_subtype_val).subtype_mk _
+  have hgSurj : Function.Surjective g := by
+    intro χ
+    obtain ⟨ψ, hψ, hψK⟩ := exists_pontryaginDual_extension_trivial_on_compact H K hH hK χ.val
+      (fun x hx ↦ (mem_lcaAnnihilator_iff L χ.val).mp χ.property ⟨x, hx⟩)
+    exact ⟨⟨ψ, (mem_lcaAnnihilator_iff K ψ).mpr hψK⟩, Subtype.ext (PontryaginDual.ext hψ)⟩
+  have hOpen := g.isOpenMap_of_sigmaCompact hgSurj hg
+  have hImg (U : Set (PontryaginDual G)) (hU : U ∈ 𝓝 1) : f '' U ∈ 𝓝 1 := by
+    have hU' : (Subtype.val : A → PontryaginDual G) ⁻¹' U ∈ 𝓝 (1 : A) :=
+      continuous_subtype_val.continuousAt.preimage_mem_nhds hU
+    have hV := hOpen.image_mem_nhds hU'
+    rw [map_one g] at hV
+    apply mem_of_superset (hB.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hV)
+    rintro _ ⟨_, ⟨χ, hχ, rfl⟩, rfl⟩
+    exact ⟨χ.val, hχ, rfl⟩
+  exact IsTopologicalGroup.isOpenMap_iff_nhds_one.mpr fun U hU ↦
+    mem_of_superset (hImg (f ⁻¹' U) hU) (image_preimage_subset f U)
 
 /-- Paper: Lemma D.1.4.6(2), p. 758. Restriction of characters identifies the
 dual modulo the annihilator with the dual of the subgroup. -/
 theorem lcaDualQuotient_equiv_subgroupDual (H : Subgroup G) (hH : IsClosed (H : Set G)) :
     ∃ e : (PontryaginDual G ⧸ lcaAnnihilator H) ≃ₜ* PontryaginDual H,
-      ∀ (χ : PontryaginDual G) (x : H), e (QuotientGroup.mk χ) x = χ x.val := by sorry
+      ∀ (χ : PontryaginDual G) (x : H), e (QuotientGroup.mk χ) x = χ x.val := by
+  let f := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  have hSurj : Function.Surjective f := by
+    intro χ
+    obtain ⟨ψ, hψ, _⟩ := exists_pontryaginDual_extension_trivial_on_compact H ⊥ hH
+      (by simp) χ (fun x hx ↦ by
+        have hx1 : x = 1 := Subtype.ext (Subgroup.mem_bot.mp hx)
+        rw [hx1, map_one])
+    exact ⟨ψ, PontryaginDual.ext hψ⟩
+  have hOpen := isOpenMap_restrict_dual H hH
+  let e := QuotientGroup.quotientKerEquivOfSurjective f.toMonoidHom hSurj
+  have hq := QuotientGroup.isQuotientMap_mk (lcaAnnihilator H)
+  have hf := hOpen.isQuotientMap f.continuous hSurj
+  refine ⟨e.toContinuousMulEquiv fun _ ↦ ?_, fun _ _ ↦ rfl⟩
+  exact (hq.isCoinducing.isOpen_preimage.symm.trans hf.isCoinducing.isOpen_preimage)
 
+-- Retain the LCA assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.1.4.6(3), p. 758. The annihilator of a compact subgroup is open. -/
 theorem isOpen_lcaAnnihilator (H : Subgroup G) (hH : IsCompact (H : Set G)) :
-    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    IsOpen (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hH
+  let restrict := PontryaginDual.map (⟨H.subtype, continuous_subtype_val⟩ : H →ₜ* G)
+  change IsOpen (restrict ⁻¹' ({1} : Set (PontryaginDual H)))
+  exact (isOpen_discrete _).preimage restrict.continuous
 
 /-- Paper: Lemma D.1.4.6(4), p. 758. The annihilator of an open subgroup is compact. -/
 theorem isCompact_lcaAnnihilator (H : Subgroup G) (hH : IsOpen (H : Set G)) :

@@ -1297,7 +1297,19 @@ local notation "addAtS" =>
 
 /-- Paper: Definition A.2.4.1, p. 554. The only diagonal S-integer in the domain is zero. -/
 theorem diagonal_mem_sAdeleFundamentalDomain (x : Oₛ(F, S)) : addAtS x ∈ Dₛ ↔ x = 0 := by
-  sorry
+  constructor
+  · rintro ⟨hinf, hS⟩
+    refine Subtype.ext ((diagonal_mem_adeleFundamentalDomain F a x.val).mp ⟨hinf, ?_⟩)
+    rw [diagonal_mem_integralAdelesOutside]
+    intro v _
+    by_cases hv : v ∈ S
+    · have h := hS ⟨v, hv⟩
+      change Valued.v (x.val : v.adicCompletion F) ≤ 1 at h
+      rwa [HeightOneSpectrum.valuedAdicCompletion_eq_valuation'] at h
+    · exact x.prop v hv
+  · rintro rfl
+    rw [map_zero]
+    exact ⟨((diagonal_mem_adeleFundamentalDomain F a 0).mpr rfl).1, fun v ↦ zero_mem _⟩
 
 /-- Paper: Lemma A.2.4.2(1), p. 554. S-integer translates of the additive domain
 cover the S-adeles. -/
@@ -1344,7 +1356,35 @@ the full torsion subgroup of the S-units, so its order is independent of S. -/
 theorem sUnit_torsion_eq_image :
     (Units.torsion F).map (Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom) =
       CommGroup.torsion Oₛ(F, S)ˣ := by
-  sorry
+  ext u
+  constructor
+  · rintro ⟨w, hw, rfl⟩
+    exact (CommGroup.mem_torsion _).mpr (MonoidHom.isOfFinOrder _ hw)
+  · intro hu
+    obtain ⟨n, hn, hun⟩ := isOfFinOrder_iff_pow_eq_one.mp hu
+    -- A root of unity in F is integral over ℤ, hence lies in the ring of integers.
+    have hint (y : Oₛ(F, S)ˣ) (hy : y ^ n = 1) : IsIntegral ℤ (y.val.val : F) := by
+      refine IsIntegral.of_pow hn ?_
+      have : (y.val.val : F) ^ n = 1 := by
+        simpa using congrArg (fun z : Oₛ(F, S)ˣ ↦ (z.val.val : F)) hy
+      rw [this]
+      exact isIntegral_one
+    have hinv : u⁻¹ ^ n = 1 := by rw [inv_pow, hun, inv_one]
+    let w : (𝓞 F)ˣ :=
+      { val := ⟨u.val.val, hint u hun⟩
+        inv := ⟨u⁻¹.val.val, hint u⁻¹ hinv⟩
+        val_inv := RingOfIntegers.ext (congrArg (fun z : Oₛ(F, S) ↦ (z.val : F)) u.val_inv)
+        inv_val := RingOfIntegers.ext (congrArg (fun z : Oₛ(F, S) ↦ (z.val : F)) u.inv_val) }
+    have hmap : Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom w = u := by
+      ext
+      rfl
+    refine ⟨w, isOfFinOrder_iff_pow_eq_one.mpr ⟨n, hn, ?_⟩, hmap⟩
+    have hF : (u.val.val : F) ^ n = 1 := by
+      simpa using congrArg (fun z : Oₛ(F, S)ˣ ↦ (z.val.val : F)) hun
+    apply Units.ext
+    apply RingOfIntegers.ext
+    simp only [Units.val_pow_eq_pow_val, map_pow, Units.val_one, map_one]
+    exact hF
 
 local notation "sRank(" F ", " S ")" => (Fintype.card (InfinitePlace F) + Finset.card S - 1)
 variable (bₛ : Module.Basis (Fin sRank(F, S)) ℤ (Additive (Oₛ(F, S)ˣ ⧸ CommGroup.torsion Oₛ(F, S)ˣ)))

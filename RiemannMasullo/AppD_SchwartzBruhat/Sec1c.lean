@@ -659,7 +659,9 @@ def schwartzBruhatTranslate (g : G) (f : SchwartzBruhat G) : SchwartzBruhat G :=
 evaluating at gx recovers its original value at x.
 Deviation: Sanity check on the direction of left translation. -/
 theorem schwartzBruhatTranslate_apply_mul (g x : G) (f : SchwartzBruhat G) :
-    schwartzBruhatTranslate g f (g * x) = f x := by sorry
+    schwartzBruhatTranslate g f (g * x) = f x := by
+  change f.val (g⁻¹ * (g * x)) = f.val x
+  rw [inv_mul_cancel_left]
 
 /-- Paper: Proposition D.1.9.2, p. 781. For a second-countable group, left
 translation is jointly continuous in the group element and Schwartz–Bruhat function. -/
