@@ -1447,12 +1447,125 @@ theorem euclideanSchwartzMonomialPartial_zero {m : ℕ}
     simp [elementaryCover]
   exact hiter directions.length hlen directions.get
 
+/-- The derivative on the elementary cover reduces to the Euclidean coordinate derivative. -/
+private theorem euclideanSchwartzMonomialPartial_eq {m : ℕ} (α β : Fin m → ℕ)
+    (f : 𝓢(EuclideanSpace ℝ (Fin m), ℂ)) (x : EuclideanSpace ℝ (Fin m)) :
+    let directions := (List.finRange m).flatMap fun i ↦ List.replicate (β i) i
+    euclideanSchwartzMonomialPartial α β f x =
+      (∏ i, (x i : ℂ) ^ α i) *
+        iteratedFDeriv ℝ directions.length f x
+          (fun j ↦ EuclideanSpace.single (directions.get j) 1) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let X := E × EuclideanSpace ℝ (Fin 0)
+  let P : X →L[ℝ] E := ContinuousLinearMap.fst ℝ E _
+  let lift (i : Fin m) : X := (EuclideanSpace.single i 1, 0)
+  let directions := (List.finRange m).flatMap fun i ↦ List.replicate (β i) i
+  have hdirs : (List.ofFn (fun i ↦ List.replicate (β i) (lift i))).flatten ++
+      (List.ofFn (fun i : Fin 0 ↦ List.replicate ((0 : Fin 0 → ℕ) i)
+        ((0 : E), EuclideanSpace.single i 1))).flatten = directions.map lift := by
+    simp [directions, List.ofFn_eq_map, List.flatMap, Function.comp_def]
+  unfold euclideanSchwartzMonomialPartial elementaryPartial
+  change (∏ i, (x i : ℂ) ^ α i) *
+    (fun l : List X ↦ iteratedFDeriv ℝ l.length ((f : E → ℂ) ∘ P) (x, 0) l.get) _ = _
+  rw [hdirs]
+  have hderiv (l : List (Fin m)) :
+      iteratedFDeriv ℝ (l.map lift).length ((f : E → ℂ) ∘ P) (x, 0) (l.map lift).get =
+        iteratedFDeriv ℝ l.length f x (fun j ↦ EuclideanSpace.single (l.get j) 1) := by
+    rw [P.iteratedFDeriv_comp_right (f := (f : E → ℂ)) f.smooth' (x, 0) (by simp),
+      ContinuousMultilinearMap.compContinuousLinearMap_apply]
+    let eval (s : Σ n, Fin n → X) :=
+      iteratedFDeriv ℝ s.1 f x (fun j ↦ P (s.2 j))
+    have hl : l.map lift = List.ofFn (lift ∘ l.get) := by
+      rw [← List.map_ofFn, List.ofFn_get]
+    change eval (List.equivSigmaTuple (l.map lift)) = _
+    rw [hl]
+    exact congrArg eval (List.equivSigmaTuple.apply_symm_apply ⟨l.length, lift ∘ l.get⟩)
+  exact congrArg (_ * ·) (hderiv directions)
+
+/-- The weight in the Euclidean convergence criterion adds the unweighted derivative norm. -/
+private theorem euclideanSchwartzWeightedDeriv_eq_norms {m : ℕ} (α β : Fin m → ℕ)
+    (f : 𝓢(EuclideanSpace ℝ (Fin m), ℂ)) (x : EuclideanSpace ℝ (Fin m)) :
+    euclideanSchwartzWeightedDeriv α β f x =
+      ‖euclideanSchwartzMonomialPartial 0 β f x‖ +
+        ‖euclideanSchwartzMonomialPartial α β f x‖ := by
+  rw [euclideanSchwartzMonomialPartial_eq, euclideanSchwartzMonomialPartial_eq]
+  simp [euclideanSchwartzWeightedDeriv, one_add_mul, ← Real.norm_eq_abs, norm_prod]
+
+open Filter in
 /-- Paper: Example D.1.10.3, p. 785. Supremum norms of the monomial-weighted
 Euclidean partials generate the usual Schwartz topology. -/
 theorem euclideanSchwartz_monomialSup_generates (m : ℕ) (hm : 1 ≤ m) :
     GeneratesSeminormTopology (fun i : (Fin m → ℕ) × (Fin m → ℕ) ↦
       fun f : 𝓢(EuclideanSpace ℝ (Fin m), ℂ) ↦
-        ⨆ x, (‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖₊ : ℝ≥0∞)) := by sorry
+        ⨆ x, (‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖₊ : ℝ≥0∞)) := by
+  let E := EuclideanSpace ℝ (Fin m)
+  let S := 𝓢(E, ℂ)
+  let I := (Fin m → ℕ) × (Fin m → ℕ)
+  -- Pull back the seminorms of the elementary space with only Euclidean coordinates.
+  let A : S →ₗ[ℂ] elementarySchwartzSubmodule m 0 0 PUnit.{1} :=
+    { toFun := fun f ↦ ⟨fun g ↦ f g.1, (elementarySchwartzSubmodule_real_iff _).mpr ⟨f, rfl⟩⟩
+      map_add' := fun _ _ ↦ Subtype.ext rfl
+      map_smul' := fun _ _ ↦ Subtype.ext rfl }
+  let index (i : I) : ElementarySchwartzIndex m 0 0 := (i.1, i.2, 0, 0)
+  let P : SeminormFamily ℂ S I := fun i ↦ (elementarySchwartzSeminorm (index i)).comp A
+  have hvalues (i : I) (f : S) :
+      ENNReal.ofReal (P i f) = ⨆ x, (‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖₊ : ℝ≥0∞) := by
+    change ENNReal.ofReal (elementarySchwartzBound (A f).val (index i)).toReal = _
+    rw [ENNReal.ofReal_toReal ((A f).property.2 (index i)).ne]
+    have hfiber (xt : E × EuclideanSpace ℝ (Fin 0)) (a : Fin 0 → ℤ) (b : PUnit) :
+        ((∏ k, (xt.1 k : ℂ) ^ (index i).1 k) * (∏ k, (a k : ℂ) ^ (index i).2.2.2 k)) *
+          elementaryPartial (A f).val (index i).2.1 (index i).2.2.1 xt a b =
+            euclideanSchwartzMonomialPartial i.1 i.2 f xt.1 := by
+      obtain ⟨x, t⟩ := xt
+      obtain rfl : t = 0 := Subsingleton.elim _ _
+      obtain rfl : a = 0 := Subsingleton.elim _ _
+      cases b
+      simp only [Finset.univ_eq_empty (α := Fin 0), Finset.prod_empty, mul_one]
+      rfl
+    let b (x : E) : ℝ≥0∞ := ‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖₊
+    calc
+      _ = ⨆ (xt : E × EuclideanSpace ℝ (Fin 0)) (_ : Fin 0 → ℤ) (_ : PUnit), b xt.1 :=
+        iSup_congr fun xt ↦ iSup_congr fun a ↦ iSup_congr fun p ↦
+          congrArg (fun z : ℂ ↦ (‖z‖₊ : ℝ≥0∞)) (hfiber xt a p)
+      _ = _ := by
+        simp only [iSup_const]
+        exact (show Surjective (Prod.fst : E × EuclideanSpace ℝ (Fin 0) → E) from
+          fun x ↦ ⟨(x, 0), rfl⟩).iSup_comp b
+  have hbound (i : I) (f : S) {c : ℝ} (hc : 0 ≤ c) :
+      P i f ≤ c ↔ ∀ x, ‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖ ≤ c := by
+    rw [← ENNReal.ofReal_le_ofReal_iff hc, hvalues, iSup_le_iff]
+    simp only [ENNReal.coe_nnreal_eq, coe_nnNorm, ENNReal.ofReal_le_ofReal_iff hc]
+  have hle (i : I) (f : S) (x : E) :
+      ‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖ ≤ P i f :=
+    (hbound i f (apply_nonneg (P i) f)).mp le_rfl x
+  refine ⟨P, ?_, hvalues⟩
+  rw [SeminormFamily.withSeminorms_iff_nhds_eq_iInf]
+  let lP : Filter S := ⨅ i, (𝓝 (0 : ℝ)).comap (P i)
+  have hP (l : Filter S) :
+      l ≤ lP ↔ ∀ (i : I) ε, 0 < ε → ∀ᶠ f in l, P i f < ε := by
+    simp only [lP, le_iInf_iff, ← Filter.map_le_iff_le_comap]
+    change (∀ i, Tendsto (P i) l (𝓝 0)) ↔ _
+    simp only [Metric.tendsto_nhds, Real.dist_eq, sub_zero, abs_of_nonneg (apply_nonneg (P _) _)]
+  -- The two convergence criteria give the same neighborhood filter at zero.
+  have ht (l : Filter S) : l ≤ 𝓝 (0 : S) ↔ l ≤ lP := by
+    refine Filter.tendsto_id'.symm.trans
+      ((schwartzMap_euclidean_tendsto_iff (m := m) l (id : S → S) 0).trans ?_)
+    refine Iff.trans ?_ (hP l).symm
+    simp only [id_eq, FunLike.coe_zero, sub_zero]
+    constructor
+    · intro h i ε hε
+      filter_upwards [h i.1 i.2 (ε / 2) (half_pos hε)] with f hf
+      apply ((hbound i f (half_pos hε).le).mpr fun x ↦ ?_).trans_lt (half_lt_self hε)
+      have hfx := hf x
+      rw [euclideanSchwartzWeightedDeriv_eq_norms] at hfx
+      exact ((le_add_of_nonneg_left (norm_nonneg _)).trans_lt hfx).le
+    · intro h α β ε hε
+      filter_upwards [h (0, β) (ε / 2) (half_pos hε), h (α, β) (ε / 2) (half_pos hε)]
+        with f hf₀ hf x
+      rw [euclideanSchwartzWeightedDeriv_eq_norms]
+      exact (add_lt_add ((hle (0, β) f x).trans_lt hf₀)
+        ((hle (α, β) f x).trans_lt hf)).trans_eq (add_halves ε)
+  exact le_antisymm ((ht _).mp le_rfl) ((ht _).mpr le_rfl)
 
 /-- Paper: Example D.1.10.3(1)–(2), p. 785. For every real p at least one,
 the Lᵖ norms of the monomial-weighted Euclidean partials generate the topology.
