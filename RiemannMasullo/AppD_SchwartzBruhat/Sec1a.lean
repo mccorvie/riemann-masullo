@@ -915,9 +915,146 @@ theorem isLCAPlancherelMeasure_subsingleton [Subsingleton G]
     rw [mul_comm (μ univ) ‖f 1‖ₑ, mul_assoc, hScale, h,
       ENNReal.mul_inv_cancel hμPos.ne' hμTop, ENNReal.one_rpow, mul_one]
 
+omit [μ.Regular] in
+/-- The Fourier norm of a single nonzero compactly supported test function fixes the
+scalar between two regular Haar measures satisfying Plancherel. -/
+private theorem isLCAPlancherelMeasure_unique
+    {ν₁ ν₂ : Measure (PontryaginDual G)}
+    (h₁ : IsLCAPlancherelMeasure μ ν₁) (h₂ : IsLCAPlancherelMeasure μ ν₂) : ν₁ = ν₂ := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let := h₁.1
+  let := h₁.2.1
+  let := h₂.1
+  let := h₂.2.1
+  let c := ν₁.haarScalarFactor ν₂
+  have hc : ν₁ = c • ν₂ := Measure.isMulLeftInvariant_eq_smul_of_regular _ _
+  obtain ⟨g, hgK, -, hg₁⟩ := exists_continuous_nonneg_pos (1 : G)
+  let f : G → ℂ := fun x ↦ g x
+  have hfC : Continuous f := Complex.continuous_ofReal.comp g.continuous
+  have hfK : HasCompactSupport f := hgK.comp_left Complex.ofReal_zero
+  have hf₁ := hfC.integrable_of_hasCompactSupport (μ := μ) hfK
+  have hf₂ := hfC.memLp_of_hasCompactSupport (μ := μ) (p := 2) hfK
+  have hnorm : eLpNorm f 2 μ ≠ 0 := by
+    intro hzero
+    have hae := (eLpNorm_eq_zero_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)).mp hzero
+    have hEq : f = 0 := Measure.eq_of_ae_eq hae hfC continuous_const
+    exact hg₁ (Complex.ofReal_eq_zero.mp (congrFun hEq 1))
+  have hScale := (h₁.2.2 f hf₁ hf₂).2
+  rw [hc, eLpNorm_smul_measure_of_ne_top' (by simp : (2 : ℝ≥0∞) ≠ ⊤) _
+    _ (h₂.2.2 f hf₁ hf₂).1.aestronglyMeasurable, (h₂.2.2 f hf₁ hf₂).2] at hScale
+  change (↑(c ^ ((2 : ℝ≥0∞).toReal)⁻¹) : ℝ≥0∞) * eLpNorm f 2 μ = eLpNorm f 2 μ at hScale
+  rw [ENNReal.coe_rpow_of_nonneg _ (by positivity)] at hScale
+  have hRoot : (c : ℝ≥0∞) ^ ((2 : ℝ≥0∞).toReal)⁻¹ = 1 :=
+    (ENNReal.mul_left_inj hnorm hf₂.eLpNorm_ne_top).mp (hScale.trans (one_mul _).symm)
+  have hc₁ : c = 1 := by
+    apply ENNReal.coe_injective
+    apply (ENNReal.strictMono_rpow_of_pos (by norm_num : 0 < ((2 : ℝ≥0∞).toReal)⁻¹)).injective
+    simpa only [ENNReal.coe_one, ENNReal.one_rpow] using hRoot
+  rw [hc, hc₁, one_smul]
+
+/-- A Fourier norm identity for compactly supported continuous functions extends to
+integrable square-integrable functions by approximation in both norms. -/
+private theorem isLCAPlancherelMeasure_of_compactSupport
+    (ν : Measure (PontryaginDual G)) [ν.IsHaarMeasure] [ν.Regular]
+    (h : ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
+      eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ) :
+    IsLCAPlancherelMeasure μ ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hp : 1 ≤ (2 : ℝ≥0∞) := by norm_num
+  have hsub {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
+      lcaFourier μ (f - g) = lcaFourier μ f - lcaFourier μ g := by
+    funext χ
+    simp only [lcaFourier, Pi.sub_apply, sub_mul]
+    exact integral_sub (integrable_fourierIntegrand μ hf χ) (integrable_fourierIntegrand μ hg χ)
+  have hApprox (f : G → ℂ) (hf₁ : Integrable f μ) (hf₂ : MemLp f 2 μ) :
+      ∃ (g : ℕ → G → ℂ), (∀ n, Continuous (g n) ∧ HasCompactSupport (g n)) ∧
+        Tendsto (fun n ↦ eLpNorm (g n - f) 2 μ) atTop (𝓝 0) ∧
+        ∀ χ, Tendsto (fun n ↦ lcaFourier μ (g n) χ) atTop (𝓝 (lcaFourier μ f χ)) := by
+    let ε (n : ℕ) : ℝ≥0∞ := ((n : ℝ≥0∞) + 1)⁻¹
+    have hε : Tendsto ε atTop (𝓝 0) := by
+      simpa only [ε, Function.comp_def, Nat.cast_add, Nat.cast_one] using
+        ENNReal.tendsto_inv_nat_nhds_zero.comp (tendsto_add_atTop_nat 1)
+    choose g hgC hgK hg₁ hg₂ using fun n : ℕ ↦
+      exists_hasCompactSupport_eLpNorm_sub_le_two le_rfl hp ENNReal.one_ne_top
+        (by simp) (memLp_one_iff_integrable.mpr hf₁) hf₂ (ε := ε n) (by simp [ε])
+    have hlim (p : ℝ≥0∞) (hg : ∀ n, eLpNorm (f - g n) p μ ≤ ε n) :
+        Tendsto (fun n ↦ eLpNorm (g n - f) p μ) atTop (𝓝 0) :=
+      tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hε (fun _ ↦ bot_le)
+        (fun n ↦ (eLpNorm_sub_comm _ _ _ _).le.trans (hg n))
+    refine ⟨g, fun n ↦ ⟨hgC n, hgK n⟩, hlim 2 hg₂, fun χ ↦ ?_⟩
+    have hmem (n : ℕ) := ((hgC n).integrable_of_hasCompactSupport (μ := μ) (hgK n)).sub hf₁
+    refine tendsto_iff_norm_sub_tendsto_zero.mpr ?_
+    have hlim' := (ENNReal.tendsto_toReal ENNReal.zero_ne_top).comp (hlim 1 hg₁)
+    simp only [ENNReal.toReal_zero, Function.comp_def] at hlim'
+    refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hlim'
+      (fun _ ↦ norm_nonneg _) (fun n ↦ ?_)
+    have hEq : (eLpNorm (g n - f) 1 μ).toReal = ∫ x, ‖(g n - f) x‖ ∂μ := by
+      rw [eLpNorm_one_eq_lintegral_eNorm (hmem n).aestronglyMeasurable,
+        ← ofReal_integral_norm_eq_lintegral_eNorm (hmem n),
+        ENNReal.toReal_ofReal (integral_nonneg fun _ ↦ norm_nonneg _)]
+    rw [hEq, ← Pi.sub_apply, ← hsub
+      ((hgC n).integrable_of_hasCompactSupport (hgK n)) hf₁]
+    exact norm_lcaFourier_le_integral_norm μ _ χ
+  -- Pointwise convergence of the transforms and Fatou give the bound for arbitrary inputs.
+  have hupper (f : G → ℂ) (hf₁ : Integrable f μ) (hf₂ : MemLp f 2 μ) :
+      eLpNorm (lcaFourier μ f) 2 ν ≤ eLpNorm f 2 μ := by
+    obtain ⟨g, hg, hlim₂, hlimF⟩ := hApprox f hf₁ hf₂
+    have hg₁ (n : ℕ) : Integrable (g n) μ :=
+      (hg n).1.integrable_of_hasCompactSupport (hg n).2
+    have hg₂ (n : ℕ) : MemLp (g n) 2 μ := (hg n).1.memLp_of_hasCompactSupport (hg n).2
+    have hnorm : Tendsto (fun n ↦ eLpNorm (g n) 2 μ) atTop (𝓝 (eLpNorm f 2 μ)) := by
+      have ht := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' g hg₂ f hf₂).mpr hlim₂
+      simpa only [Lp.eNorm_toLp] using ht.eNorm
+    calc
+      eLpNorm (lcaFourier μ f) 2 ν ≤ liminf (fun n ↦ eLpNorm (lcaFourier μ (g n)) 2 ν) atTop :=
+        Lp.eLpNorm_lim_le_liminf_eLpNorm
+          (fun n ↦ (continuous_lcaFourier μ (hg₁ n)).aestronglyMeasurable)
+          _ (continuous_lcaFourier μ hf₁).aestronglyMeasurable (.of_forall hlimF)
+      _ = eLpNorm f 2 μ := by
+        simp_rw [h _ (hg _).1 (hg _).2]
+        exact hnorm.liminf_eq
+  refine ⟨inferInstance, inferInstance, fun f hf₁ hf₂ ↦ ?_⟩
+  have hfF : MemLp (lcaFourier μ f) 2 ν :=
+    (hupper f hf₁ hf₂).trans_lt hf₂.eLpNorm_lt_top
+  obtain ⟨g, hg, hlim₂, -⟩ := hApprox f hf₁ hf₂
+  have hg₁ (n : ℕ) : Integrable (g n) μ :=
+    (hg n).1.integrable_of_hasCompactSupport (hg n).2
+  have hg₂ (n : ℕ) : MemLp (g n) 2 μ := (hg n).1.memLp_of_hasCompactSupport (hg n).2
+  have hgF (n : ℕ) : MemLp (lcaFourier μ (g n)) 2 ν :=
+    (h (g n) (hg n).1 (hg n).2).trans_lt (hg₂ n).eLpNorm_lt_top
+  -- The bound applied to differences gives convergence of the transformed sequence in L².
+  have hlimF : Tendsto (fun n ↦ eLpNorm (lcaFourier μ (g n) - lcaFourier μ f) 2 ν)
+      atTop (𝓝 0) := by
+    refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hlim₂
+      (fun _ ↦ bot_le) (fun n ↦ ?_)
+    rw [← hsub (hg₁ n) hf₁]
+    exact hupper _ ((hg₁ n).sub hf₁) ((hg₂ n).sub hf₂)
+  have ht := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' g hg₂ f hf₂).mpr hlim₂
+  have htF := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' _ hgF _ hfF).mpr hlimF
+  refine ⟨hfF, tendsto_nhds_unique (l := atTop)
+    (f := fun n ↦ eLpNorm (lcaFourier μ (g n)) 2 ν) ?_ ?_⟩
+  · simpa only [Lp.eNorm_toLp] using htF.eNorm
+  · simp_rw [h _ (hg _).1 (hg _).2]
+    simpa only [Lp.eNorm_toLp] using ht.eNorm
+
+/-- There is a regular Haar measure on the dual for which the Fourier transform
+preserves the L² norm of every continuous compactly supported function. It suffices
+to construct this measure by Fourier inversion at the identity for autocorrelations
+of such functions. -/
+theorem exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport :
+    ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
+      ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
+        eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ := by
+  sorry
+
 /-- Paper: Lemma D.1.1.2(4), p. 747. There is exactly one Plancherel measure. -/
 theorem lcaPlancherelMeasure_existsUnique :
-    ∃! ν : Measure (PontryaginDual G), IsLCAPlancherelMeasure μ ν := by sorry
+    ∃! ν : Measure (PontryaginDual G), IsLCAPlancherelMeasure μ ν := by
+  obtain ⟨ν, hHaar, hReg, hNorm⟩ := exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport μ
+  let := hHaar
+  let := hReg
+  have hν := isLCAPlancherelMeasure_of_compactSupport μ ν hNorm
+  exact ⟨ν, hν, fun ν' hν' ↦ isLCAPlancherelMeasure_unique μ hν' hν⟩
 
 /-- Paper: Lemma D.1.1.2(4), p. 747. The Fourier transform on L¹ ∩ L²
 extends uniquely to a unitary isomorphism on L². -/
