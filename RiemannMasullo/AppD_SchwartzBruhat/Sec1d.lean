@@ -1454,12 +1454,214 @@ theorem euclideanSchwartz_monomialSup_generates (m : ℕ) (hm : 1 ≤ m) :
       fun f : 𝓢(EuclideanSpace ℝ (Fin m), ℂ) ↦
         ⨆ x, (‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖₊ : ℝ≥0∞)) := by sorry
 
+section EuclideanSchwartzLp
+
+open LineDeriv SchwartzMap
+
+local notation "Euc[" m "]" => EuclideanSpace ℝ (Fin m)
+local notation "Sch[" m "]" => 𝓢(Euc[m], ℂ)
+
+private def coordDirections {m : ℕ} (β : Fin m → ℕ) : List (Euc[m]) :=
+  (List.ofFn fun i ↦ List.replicate (β i) (EuclideanSpace.single i 1)).flatten
+
+private def monomialPartialCLM {m : ℕ} (α β : Fin m → ℕ) : Sch[m] →L[ℂ] Sch[m] :=
+  SchwartzMap.smulLeftCLM ℂ (fun x : Euc[m] ↦ ∏ i, (x i : ℂ) ^ α i) ∘L
+    iteratedLineDerivOpCLM ℂ (Sch[m]) (coordDirections β).get
+
+private theorem monomial_hasTemperateGrowth {m : ℕ} (α : Fin m → ℕ) :
+    (fun x : Euc[m] ↦ ∏ i, (x i : ℂ) ^ α i).HasTemperateGrowth := by
+  generalize Finset.univ (α := Fin m) = s
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp only [Finset.prod_empty]; exact HasTemperateGrowth.const _
+  | @insert i s hi ih =>
+    simp only [Finset.prod_insert hi]
+    have h := (Complex.ofRealCLM.comp (EuclideanSpace.proj i)).hasTemperateGrowth
+    exact HasTemperateGrowth.fun_mul (HasTemperateGrowth.fun_pow h (α i)) ih
+
+private theorem monomialPartialCLM_apply {m : ℕ} (α β : Fin m → ℕ) (f : Sch[m]) :
+    (monomialPartialCLM α β f : Euc[m] → ℂ) = euclideanSchwartzMonomialPartial α β f := by
+  funext x
+  simp only [monomialPartialCLM, ContinuousLinearMap.comp_apply, iteratedLineDerivOpCLM_apply,
+    smulLeftCLM_apply_apply (monomial_hasTemperateGrowth α), smul_eq_mul,
+    iteratedLineDerivOp_eq_iteratedFDeriv, euclideanSchwartzMonomialPartial]
+  congr 1
+  let L : Euc[m] × Euc[0] →L[ℝ] Euc[m] := ContinuousLinearMap.fst ℝ (Euc[m]) (Euc[0])
+  let d : List (Euc[m] × Euc[0]) :=
+    (List.ofFn fun i : Fin m ↦ List.replicate (β i) (EuclideanSpace.single i 1, 0)).flatten
+  have hzero : (List.ofFn fun i : Fin 0 ↦ List.replicate ((0 : Fin 0 → ℕ) i)
+      ((0 : Euc[m]), EuclideanSpace.single i (1 : ℝ))).flatten = [] := rfl
+  unfold elementaryPartial
+  dsimp only
+  have hdirs : d ++ (List.ofFn fun i : Fin 0 ↦ List.replicate ((0 : Fin 0 → ℕ) i)
+      ((0 : Euc[m]), EuclideanSpace.single i (1 : ℝ))).flatten = d := by
+    rw [hzero, List.append_nil]
+  refine Eq.trans ?_ (congrArg (fun w : List (Euc[m] × Euc[0]) ↦
+    iteratedFDeriv ℝ w.length ((f : Euc[m] → ℂ) ∘ L) (x, 0) w.get) hdirs).symm
+  change iteratedFDeriv ℝ (coordDirections β).length f x (coordDirections β).get =
+    iteratedFDeriv ℝ d.length ((f : Euc[m] → ℂ) ∘ L) (x, 0) d.get
+  rw [L.iteratedFDeriv_comp_right (f.smooth ⊤) _ (by simp)]
+  change _ = iteratedFDeriv ℝ d.length f x (fun i ↦ L (d.get i))
+  have hd : d.map L = coordDirections β := by
+    simp only [d, coordDirections, List.map_flatten, List.map_ofFn]
+    congr 2
+    funext i
+    simp [List.map_replicate, L]
+  rw [← hd]
+  have hg : (d.map L).get = fun i ↦ L (d.get (i.cast (List.length_map L))) := by
+    funext i
+    simp [List.get_eq_getElem]
+  rw [hg]
+  have hcast {n k : ℕ} (h : n = k) (v : Fin k → Euc[m]) :
+      iteratedFDeriv ℝ n f x (fun i ↦ v (i.cast h)) = iteratedFDeriv ℝ k f x v := by
+    subst n
+    rfl
+  exact hcast (List.length_map L) (fun i ↦ L (d.get i))
+
+/-- The closed unit cube with lower corner `x`, in Euclidean coordinates. -/
+private def unitCube {m : ℕ} (x : Euc[m]) : Set Euc[m] :=
+  WithLp.ofLp ⁻¹' Icc (WithLp.ofLp x) (fun j ↦ x j + 1)
+
+/-- Integrating the norm of a Schwartz function over a unit cube is bounded by
+its global Lᵖ norm, by Hölder on a set of measure one. -/
+private theorem unitCube_integral_norm_le_toLp {m : ℕ} (x : Euc[m]) (g : Sch[m])
+    (q : ℝ≥0∞) (hq : 1 ≤ q) :
+    (∫ y in unitCube x, ‖g y‖) ≤ ‖g.toLp q volume‖ := by
+  let ν := (volume : Measure Euc[m]).restrict (unitCube x)
+  have hvol : ν univ = 1 := by
+    rw [show ν univ = volume (unitCube x) from Measure.restrict_apply_univ _, unitCube,
+      (PiLp.volume_preserving_ofLp (Fin m)).measure_preimage measurableSet_Icc.nullMeasurableSet,
+      Real.volume_Icc_pi]
+    simp
+  have hg : AEStronglyMeasurable (g : Euc[m] → ℂ) ν :=
+    g.continuous.aestronglyMeasurable
+  have hle : eLpNorm (g : Euc[m] → ℂ) 1 ν ≤ eLpNorm (g : Euc[m] → ℂ) q volume := by
+    refine (eLpNorm_le_eLpNorm_mul_rpow_measure_univ hq hg).trans ?_
+    rw [hvol, ENNReal.one_rpow, mul_one]
+    exact eLpNorm_mono_measure _ Measure.restrict_le_self
+  rw [SchwartzMap.norm_toLp, integral_norm_eq_lintegral_eNorm hg,
+    ← eLpNorm_one_eq_lintegral_eNorm hg]
+  exact ENNReal.toReal_mono (g.eLpNorm_lt_top q volume).ne hle
+
+/-- The multi-index with a derivative in each coordinate of `s` and order zero elsewhere. -/
+private def squarefreeMultiIndex {m : ℕ} (s : Finset (Fin m)) : Fin m → ℕ :=
+  fun j ↦ if j ∈ s then 1 else 0
+
+/-- Evaluation at the lower corner of a unit cube is bounded by the integrals
+of the square-free partials over that cube. In one variable this is the
+fundamental theorem of calculus averaged over the unit interval. In multiple
+variables the one-variable bounds are iterated using Fubini. -/
+private theorem euclideanSchwartz_norm_le_unitCube_integrals {m : ℕ} (g : Sch[m]) (x : Euc[m]) :
+    ‖g x‖ ≤ ∑ s : Finset (Fin m),
+      ∫ y in unitCube x, ‖euclideanSchwartzMonomialPartial 0 (squarefreeMultiIndex s) g y‖ := by
+  sorry
+
+/-- The square-free partial in coordinates `s` of a monomial-weighted partial,
+expanded by the product rule. Each subset `t` lists the coordinates in which
+the derivative acts on the monomial. -/
+private theorem euclideanSchwartz_monomialPartial_leibniz {m : ℕ}
+    (α β : Fin m → ℕ) (s : Finset (Fin m)) (f : Sch[m]) (y : Euc[m]) :
+    euclideanSchwartzMonomialPartial 0 (squarefreeMultiIndex s) (monomialPartialCLM α β f) y =
+      ∑ t ∈ s.powerset, (∏ j ∈ t, (α j : ℂ)) *
+        euclideanSchwartzMonomialPartial (α - squarefreeMultiIndex t)
+          (β + squarefreeMultiIndex (s \ t)) f y := by
+  sorry
+
+/-- The unit-cube evaluation bound for a monomial-weighted partial, with each
+term expressed as the integral of another monomial-weighted partial. -/
+private theorem euclideanSchwartz_monomialPartial_le_unitCube_integrals {m : ℕ}
+    (α β : Fin m → ℕ) (f : Sch[m]) (x : Euc[m]) :
+    ‖euclideanSchwartzMonomialPartial α β f x‖ ≤
+      ∑ s : Finset (Fin m), ∑ t ∈ s.powerset, (∏ j ∈ t, (α j : ℝ)) *
+        ∫ y in unitCube x,
+          ‖euclideanSchwartzMonomialPartial (α - squarefreeMultiIndex t)
+            (β + squarefreeMultiIndex (s \ t)) f y‖ := by
+  rw [← monomialPartialCLM_apply]
+  apply (euclideanSchwartz_norm_le_unitCube_integrals _ x).trans
+  refine Finset.sum_le_sum fun s _ ↦ ?_
+  let a (t : Finset (Fin m)) : ℝ := ∏ j ∈ t, (α j : ℝ)
+  let g (t : Finset (Fin m)) :=
+    monomialPartialCLM (α - squarefreeMultiIndex t) (β + squarefreeMultiIndex (s \ t)) f
+  have hint (t : Finset (Fin m)) :
+      IntegrableOn (fun y ↦ a t * ‖g t y‖) (unitCube x) volume :=
+    ((g t).integrable.norm.const_mul (a t)).integrableOn
+  simp_rw [← monomialPartialCLM_apply]
+  change _ ≤ ∑ t ∈ s.powerset, a t * ∫ y in unitCube x, ‖g t y‖
+  simp_rw [← integral_const_mul]
+  rw [← integral_finsetSum _ (fun t _ ↦ hint t)]
+  refine integral_mono (monomialPartialCLM 0 (squarefreeMultiIndex s)
+    (monomialPartialCLM α β f)).integrable.norm.integrableOn
+    (integrable_finsetSum _ fun t _ ↦ hint t) (fun y ↦ ?_)
+  rw [show (monomialPartialCLM 0 (squarefreeMultiIndex s) (monomialPartialCLM α β f)) y =
+      _ from congrFun (monomialPartialCLM_apply ..) y, euclideanSchwartz_monomialPartial_leibniz]
+  apply (norm_sum_le _ _).trans
+  exact Finset.sum_le_sum fun t _ ↦ by
+    simp [a, g, monomialPartialCLM_apply, norm_prod]
+
 /-- Paper: Example D.1.10.3(1)–(2), p. 785. For every real p at least one,
 the Lᵖ norms of the monomial-weighted Euclidean partials generate the topology.
 Deviation: The same statement includes p = 1 and p > 1. -/
 theorem euclideanSchwartz_monomialLp_generates (m : ℕ) (hm : 1 ≤ m) (p : ℝ) (hp : 1 ≤ p) :
     GeneratesLpSeminorms (volume : Measure (EuclideanSpace ℝ (Fin m))) (ENNReal.ofReal p)
-      (fun i : (Fin m → ℕ) × (Fin m → ℕ) ↦ euclideanSchwartzMonomialPartial i.1 i.2) := by sorry
+      (fun i : (Fin m → ℕ) × (Fin m → ℕ) ↦ euclideanSchwartzMonomialPartial i.1 i.2) := by
+  classical
+  let q := ENNReal.ofReal p
+  have hq : 1 ≤ q := by simpa [q] using ENNReal.ofReal_le_ofReal hp
+  let : Fact (1 ≤ q) := ⟨hq⟩
+  let U (i : (Fin m → ℕ) × (Fin m → ℕ)) :=
+    SchwartzMap.toLpCLM ℂ ℂ q (volume : Measure Euc[m]) ∘L monomialPartialCLM i.1 i.2
+  let P (i : (Fin m → ℕ) × (Fin m → ℕ)) :=
+    (normSeminorm ℂ (Lp ℂ q (volume : Measure Euc[m]))).comp (U i).toLinearMap
+  have hP (i : (Fin m → ℕ) × (Fin m → ℕ)) (f : Sch[m]) :
+      P i f = ‖(monomialPartialCLM i.1 i.2 f).toLp q volume‖ := by
+    change ‖(U i) f‖ = _
+    rw [ContinuousLinearMap.comp_apply, SchwartzMap.toLpCLM_apply]
+  refine ⟨?_, ⟨P, ?_, ?_⟩⟩
+  · intro i f
+    change MemLp (euclideanSchwartzMonomialPartial i.1 i.2 f) q volume
+    rw [← monomialPartialCLM_apply]
+    exact (monomialPartialCLM i.1 i.2 f).memLp q volume
+  · obtain ⟨Q, hQ, hvalues⟩ := euclideanSchwartz_monomialSup_generates m hm
+    refine hQ.congr (fun i ↦ ?_) (Seminorm.IsBounded.of_real fun i ↦ ?_)
+    · obtain ⟨s, C, _, h⟩ := Seminorm.bound_of_continuous hQ (P i)
+        ((U i).continuous.norm : Continuous fun f ↦ ‖U i f‖)
+      exact ⟨s, C, h⟩
+    · let index (s t : Finset (Fin m)) :=
+        (i.1 - squarefreeMultiIndex t, i.2 + squarefreeMultiIndex (s \ t))
+      let support := (Finset.univ : Finset (Finset (Fin m) × Finset (Fin m))).image
+        (fun j ↦ index j.1 j.2)
+      let C : ℝ := ∑ s : Finset (Fin m), ∑ t ∈ s.powerset, ∏ j ∈ t, (i.1 j : ℝ)
+      have hC : 0 ≤ C := by
+        dsimp [C]
+        positivity
+      refine ⟨support, C, fun f ↦ ?_⟩
+      have hterm (s t : Finset (Fin m)) :
+          P (index s t) f ≤ support.sup P f :=
+        Seminorm.le_finset_sup_apply (Finset.mem_image.mpr ⟨(s, t), Finset.mem_univ _, rfl⟩)
+      have hle (x : Euc[m]) : ‖euclideanSchwartzMonomialPartial i.1 i.2 f x‖ ≤
+          C * support.sup P f := calc
+        _ ≤ _ := euclideanSchwartz_monomialPartial_le_unitCube_integrals i.1 i.2 f x
+        _ ≤ ∑ s : Finset (Fin m), ∑ t ∈ s.powerset, (∏ j ∈ t, (i.1 j : ℝ)) *
+            support.sup P f := by
+          refine Finset.sum_le_sum fun s _ ↦ Finset.sum_le_sum fun t _ ↦ ?_
+          apply mul_le_mul_of_nonneg_left _ (by positivity)
+          change (∫ y in unitCube x, ‖euclideanSchwartzMonomialPartial
+            (index s t).1 (index s t).2 f y‖) ≤ support.sup P f
+          rw [← monomialPartialCLM_apply]
+          exact (unitCube_integral_norm_le_toLp x _ q hq).trans
+            ((hP (index s t) f).symm ▸ hterm s t)
+        _ = _ := by simp only [C, Finset.sum_mul]
+      apply (ENNReal.ofReal_le_ofReal_iff (mul_nonneg hC (apply_nonneg _ _))).mp
+      rw [LinearMap.id_apply, hvalues]
+      exact iSup_le fun x ↦ by
+        rw [← ENNReal.ofReal_coe_nnreal]
+        exact ENNReal.ofReal_le_ofReal (hle x)
+  · intro i f
+    rw [hP, SchwartzMap.norm_toLp,
+      ENNReal.ofReal_toReal ((monomialPartialCLM i.1 i.2 f).eLpNorm_lt_top q volume).ne,
+      monomialPartialCLM_apply]
+
+end EuclideanSchwartzLp
 
 /-- Paper: (D.1.10.9)–(D.1.10.10), p. 785. On the torus take the mixed partial
 by differentiating the periodic lift.
