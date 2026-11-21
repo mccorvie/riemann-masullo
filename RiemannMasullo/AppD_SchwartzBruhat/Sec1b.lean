@@ -11,9 +11,11 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import Mathlib.Geometry.Manifold.HasGroupoid
+import Mathlib.GroupTheory.FiniteAbelian.Basic
 import Mathlib.Analysis.Normed.Module.Connected
 import Mathlib.Order.WellQuasiOrder
 import Mathlib.Topology.Homotopy.Lifting
+import Mathlib.Topology.Covering.AddCircle
 import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Baire.LocallyCompactRegular
 
@@ -497,11 +499,125 @@ theorem isCompactlyGeneratedGroup_quotient (hG : IsCompactlyGeneratedGroup G)
   · simpa only [map_one] using hq.isOpenMap.image_mem_nhds hU
   · rw [← MonoidHom.map_closure, hGen, Subgroup.map_top_of_surjective q hq.surjective]
 
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- The real, torus and discrete factors of an elementary presentation give product charts. -/
+private theorem locallyEuclidean_of_elementaryPresentation
+    (e : ElementaryLCAPresentation G) : IsLocallyEuclidean G := by
+  let R := Fin e.realDim → ℝ
+  let T := ModelPi (fun _ : Fin e.torusDim ↦ ℝ)
+  let D := (Fin e.latticeRank → ℤ) × e.finiteFactor
+  let : ChartedSpace R (EuclideanSpace ℝ (Fin e.realDim)) :=
+    (PiLp.homeomorph 2 (fun _ : Fin e.realDim ↦ ℝ)).symm.chartedSpace
+  let : ChartedSpace ℝ (AddCircle (1 : ℝ)) :=
+    (AddCircle.isLocalHomeomorph_coe (1 : ℝ)).chartedSpace QuotientAddGroup.mk_surjective
+  let : ChartedSpace PUnit.{1} D := ChartedSpace.ofDiscreteTopology
+  let M := ModelProd R (ModelProd T PUnit.{1})
+  let charts : ChartedSpace M
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) :=
+    prodChartedSpace _ _ _ _
+  let : ChartedSpace M
+      (Multiplicative (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)) := charts
+  let : ChartedSpace M G := e.equiv.toHomeomorph.symm.chartedSpace
+  let h : M ≃ₜ EuclideanSpace ℝ (Fin (e.realDim + e.torusDim)) :=
+    (Homeomorph.prodCongr (Homeomorph.refl R) (Homeomorph.prodUnique T PUnit)).trans
+      ((Fin.appendHomeomorph e.realDim e.torusDim).trans (PiLp.homeomorph 2 _).symm)
+  let : ChartedSpace (EuclideanSpace ℝ (Fin (e.realDim + e.torusDim))) M := h.symm.chartedSpace
+  exact ⟨e.realDim + e.torusDim, ⟨ChartedSpace.comp _ M G⟩⟩
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- An elementary presentation gives a compact generating neighborhood. -/
+private theorem compactlyGenerated_of_elementaryPresentation
+    (e : ElementaryLCAPresentation G) : IsCompactlyGeneratedGroup G := by
+  let R := EuclideanSpace ℝ (Fin e.realDim)
+  let T := Fin e.torusDim → AddCircle (1 : ℝ)
+  let D := (Fin e.latticeRank → ℤ) × e.finiteFactor
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (0 : R)
+  have hKgen : AddSubgroup.closure K = ⊤ := by
+    let H := AddSubgroup.closure K
+    have hH := H.isOpen_of_mem_nhds (mem_of_superset hKnhds AddSubgroup.subset_closure)
+    exact SetLike.coe_injective ((OpenAddSubgroup.mk H hH).isClopen.eq_univ ⟨0, H.zero_mem⟩)
+  obtain ⟨S, hSgen, hS⟩ := AddGroup.fg_iff.mp (inferInstance : AddGroup.FG D)
+  let U : Set (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) :=
+    K ×ˢ ((univ : Set T) ×ˢ insert 0 S)
+  have hD : insert 0 S ∈ 𝓝 (0 : D) := (isOpen_discrete _).mem_nhds (mem_insert _ _)
+  have hU : U ∈ 𝓝 0 := prod_mem_nhds hKnhds (prod_mem_nhds univ_mem hD)
+  have hUc : IsCompact U := hK.prod (isCompact_univ.prod (hS.insert 0).isCompact)
+  have hUgen : AddSubgroup.closure U = ⊤ := by
+    change AddSubgroup.closure (K ×ˢ ((univ : Set T) ×ˢ insert 0 S)) = ⊤
+    rw [AddSubgroup.closure_prod (mem_of_mem_nhds hKnhds) (by simp),
+      AddSubgroup.closure_prod (mem_univ (0 : T)) (mem_insert 0 S), hKgen,
+      AddSubgroup.closure_univ, AddSubgroup.closure_insert_zero, hSgen,
+      AddSubgroup.top_prod_top, AddSubgroup.top_prod_top]
+  let f := e.equiv.symm.toMulEquiv.toMonoidHom
+  let V : Set (Multiplicative (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)) :=
+    Multiplicative.toAdd ⁻¹' U
+  have hV : V ∈ 𝓝 1 := hU
+  refine ⟨f '' V, ?_, hUc.image e.equiv.symm.continuous, ?_⟩
+  · have h := e.equiv.symm.toHomeomorph.isOpenMap.image_mem_nhds hV
+    change f '' V ∈ 𝓝 (f 1) at h
+    rwa [map_one] at h
+  · have hVgen : Subgroup.closure V = ⊤ := by
+      rw [← AddSubgroup.toSubgroup_closure, hUgen]
+      rfl
+    rw [← MonoidHom.map_closure, hVgen,
+      Subgroup.map_top_of_surjective f e.equiv.symm.surjective]
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
+/-- In a real–torus–discrete decomposition of a compactly generated group, the discrete
+factor is finitely generated and splits as a free abelian group times a finite group. -/
+private theorem elementaryPresentation_of_compactlyGenerated
+    {m n : ℕ} {D : Type*} [AddCommGroup D] [TopologicalSpace D] [DiscreteTopology D]
+    (hG : IsCompactlyGeneratedGroup G)
+    (e : G ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin m) × (Fin n → AddCircle (1 : ℝ)) × D)) :
+    Nonempty (ElementaryLCAPresentation G) := by
+  classical
+  obtain ⟨U, _, hUc, hUgen⟩ := hG
+  let R := EuclideanSpace ℝ (Fin m)
+  let T := Fin n → AddCircle (1 : ℝ)
+  let eA := MulEquiv.toAdditiveLeft e.toMulEquiv
+  let p := ((AddMonoidHom.snd T D).comp (AddMonoidHom.snd R (T × D))).comp eA.toAddMonoidHom
+  have hp : Function.Surjective p := fun d ↦
+    ⟨eA.symm (0, 0, d), congrArg (fun a : R × T × D ↦ a.2.2) (eA.apply_symm_apply _)⟩
+  have hpc : Continuous p := (continuous_snd.comp continuous_snd).comp e.continuous
+  let V : Set (Additive G) := Additive.toMul ⁻¹' U
+  have hVgen : AddSubgroup.closure V = ⊤ := by
+    rw [← Subgroup.toAddSubgroup_closure, hUgen]
+    rfl
+  have : AddGroup.FG D := AddGroup.fg_iff.mpr
+    ⟨p '' V, by
+      rw [← AddMonoidHom.map_closure, hVgen,
+        AddSubgroup.map_top_of_surjective p hp],
+      (hUc.image hpc).finite DiscreteTopology.isDiscrete⟩
+  obtain ⟨r, ι, _, q, hq, k, ⟨d⟩⟩ := AddCommGroup.equiv_free_prod_directSum_zmod D
+  let F := (i : ι) → ZMod (q i ^ k i)
+  let (i : ι) : NeZero (q i ^ k i) := ⟨pow_ne_zero _ (hq i).ne_zero⟩
+  let : Fintype F := inferInstanceAs (Fintype ((i : ι) → ZMod (q i ^ k i)))
+  let : TopologicalSpace F := ⊥
+  let : DiscreteTopology F := ⟨rfl⟩
+  let d' : D ≃+ (Fin r → ℤ) × F :=
+    d.trans (AddEquiv.prodCongr Finsupp.addEquivFunOnFinite (DirectSum.addEquivProd _))
+  let e' := AddEquiv.toMultiplicativeRight
+    (eA.trans (AddEquiv.prodCongr (AddEquiv.refl R) (AddEquiv.prodCongr (AddEquiv.refl T) d')))
+  refine ⟨{ realDim := m, torusDim := n, latticeRank := r, finiteFactor := F
+            equiv := ?_ }⟩
+  exact { e' with
+    continuous_toFun := (continuous_id.prodMap
+      (continuous_id.prodMap (continuous_of_discreteTopology (f := d')))).comp e.continuous
+    continuous_invFun := e.symm.continuous.comp (continuous_id.prodMap
+      (continuous_id.prodMap (continuous_of_discreteTopology (f := d'.symm)))) }
+
 /-- Paper: Theorem D.1.4.3(2), p. 757. An LCA group has an elementary presentation
 exactly when it is compactly generated and locally Euclidean. -/
 theorem lca_elementary_iff :
     (IsCompactlyGeneratedGroup G ∧ IsLocallyEuclidean G) ↔
-      Nonempty (ElementaryLCAPresentation G) := by sorry
+      Nonempty (ElementaryLCAPresentation G) := by
+  constructor
+  · rintro ⟨hCompact, hEuclidean⟩
+    obtain ⟨m, n, D, _, _, _, ⟨e⟩⟩ := lca_equiv_real_torus_discrete hEuclidean
+    exact elementaryPresentation_of_compactlyGenerated hCompact e
+  · rintro ⟨e⟩
+    exact ⟨compactlyGenerated_of_elementaryPresentation e,
+      locallyEuclidean_of_elementaryPresentation e⟩
 
 omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] in
 /-- Paper: (D.1.4.3), p. 758. The indexing set consists of open compactly
