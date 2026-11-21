@@ -3257,7 +3257,42 @@ theorem modulatedExponentialDecayStageInclusion_range (k : GoodCompact) :
     Injective (modulatedExponentialDecayStageInclusion m I k) ∧
       ∀ f : modulatedExponentialDecaySubmodule m I,
         f ∈ (modulatedExponentialDecayStageInclusion m I k).range ↔
-          ∀ (g : G) (u : k.val), f.val (g * u.val) = f.val g := by sorry
+          ∀ (g : G) (u : k.val), f.val (g * u.val) = f.val g := by
+  constructor
+  · intro f f' h
+    apply Subtype.ext
+    funext q
+    exact QuotientGroup.induction_on q fun g ↦
+      congrArg (fun F : modulatedExponentialDecaySubmodule m I ↦ F.val g) h
+  intro f
+  constructor
+  · rintro ⟨F, rfl⟩ g u
+    exact congrArg F.val (QuotientGroup.mk_mul_of_mem g u.property)
+  · intro hf
+    let fbar : (G ⧸ k.val) → ℂ := fun q ↦ f.val q.out
+    have hbar (g : G) : fbar (g : G ⧸ k.val) = f.val g := by
+      obtain ⟨u, hu⟩ := QuotientGroup.mk_out_eq_mul k.val g
+      exact (congrArg f.val hu).trans (hf g u)
+    refine ⟨⟨fbar, ?_⟩, Subtype.ext (funext hbar)⟩
+    let : MeasurableSpace G := borel G
+    let : BorelSpace G := ⟨rfl⟩
+    let : CompactSpace k.val := isCompact_iff_compactSpace.mp k.property.1
+    let μ : Measure k.val := Measure.haarMeasure ⊤
+    let : IsProbabilityMeasure μ := ⟨Measure.haarMeasure_self⟩
+    refine (Submodule.mem_iInf _).2 fun a ↦ Submodule.mem_comap.2 ?_
+    let F := modulatedExponentialDecayTwist m I a f
+    let W := modulationWeight (quotientModulation m k.val k.property.1) a fbar
+    change W ∈ schwartzBruhatSubmodule (G ⧸ k.val)
+    have hW (g : G) : W (g : G ⧸ k.val) = F g := by
+      exact congrArg (fun z : ℂ ↦ ((((m g).val : ℝ) ^ (a : ℝ) : ℝ) : ℂ) * z) (hbar g)
+    have haverage : W = lcaCosetIntegral k.val μ F := by
+      funext q
+      have hconst (u : k.val) : F (q.out * u.val) = W q :=
+        (hW (q.out * u.val)).symm.trans
+          (congrArg W ((QuotientGroup.mk_mul_of_mem q.out u.property).trans (Quotient.out_eq' q)))
+      rw [lcaCosetIntegral, funext hconst, integral_const, probReal_univ, one_smul]
+    rw [haverage]
+    exact (lcaCosetIntegral_mem_schwartzBruhat k.val μ k.property.1.isClosed F).2
 
 /-- Paper: Definition D.3.3.3, p. 805. The topology of S_I(G) is the final
 locally convex topology for the inclusions of the compact-subgroup stages. -/
