@@ -866,7 +866,22 @@ include hbij in
 /-- Paper: Proposition A.5.2.6, p. 571. For a symmetric fundamental domain,
 the quotient family is symmetric exactly when the lifted family is symmetric. -/
 theorem inv_eq_sequence_quotient_iff (hEsymm : E⁻¹ = E) :
-    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by sorry
+    (∀ k, (U k)⁻¹ = U k) ↔ ∀ k, (lifted k)⁻¹ = lifted k := by
+  constructor
+  · intro h k
+    have hpre : (q ⁻¹' U k)⁻¹ = q ⁻¹' (U k)⁻¹ := by
+      ext x
+      simp only [Set.mem_inv, Set.mem_preimage, map_inv]
+    change (q ⁻¹' U k ∩ E)⁻¹ = q ⁻¹' U k ∩ E
+    rw [Set.inter_inv, hpre, h k, hEsymm]
+  · intro h k
+    have hsurj : q '' E = univ := by
+      rw [← Set.range_domRestrict, Set.range_eq_univ]
+      exact hbij.2
+    have himage : q '' lifted k = U k := by
+      change q '' (q ⁻¹' U k ∩ E) = U k
+      rw [Set.image_preimage_inter, hsurj, inter_univ]
+    simpa only [Set.image_inv, himage] using congrArg (fun s : Set G ↦ q '' s) (h k)
 
 -- TODO(paper-gap): The D″ equivalence claimed in the proof of A.5.2.6 fails.
 -- For ℤ → ℤ/3ℤ take the symmetric domain {-1, 0, 1} and U₀ = V₀ = ℤ/3ℤ.
