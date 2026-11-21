@@ -3334,7 +3334,15 @@ theorem finiteProduct_tailSchwartz_nuclear (S T : Finset (Places(F))) :
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both Schwartz–Bruhat spaces are Montel. -/
 theorem finiteProduct_tailSchwartz_montel (S T : Finset (Places(F))) :
     (BarrelledSpace ℂ ℬ((FinitePlaceProduct F S)) ∧ MontelSpace ℂ ℬ((FinitePlaceProduct F S))) ∧
-      (BarrelledSpace ℂ ℬ(FiniteAdeleTail F T) ∧ MontelSpace ℂ ℬ(FiniteAdeleTail F T)) := by sorry
+      (BarrelledSpace ℂ ℬ(FiniteAdeleTail F T) ∧ MontelSpace ℂ ℬ(FiniteAdeleTail F T)) := by
+  have of_finest (E : Type u) [AddCommGroup E] [Module ℂ E] (t : TopologicalSpace E)
+      (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E))) :
+      @BarrelledSpace ℂ E _ _ _ t ∧ @MontelSpace ℂ E _ _ _ t :=
+    Eq.mpr (congrArg (fun t' ↦ @BarrelledSpace ℂ E _ _ _ t' ∧ @MontelSpace ℂ E _ _ _ t') ht)
+      ⟨finestLocallyConvex_barrelled E, finestLocallyConvex_montel E⟩
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨of_finest ℬ((FinitePlaceProduct F S)) _ hTop.1,
+    of_finest ℬ(FiniteAdeleTail F T) _ hTop.2⟩
 
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both strong duals are Fréchet. -/
 theorem finiteProduct_tailSchwartz_strongDual_frechet (S T : Finset (Places(F))) :
