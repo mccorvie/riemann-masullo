@@ -10,7 +10,10 @@ import Mathlib.Data.List.FinRange
 import Mathlib.Data.List.OfFn
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
+import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
+import Mathlib.Topology.Instances.RealVectorSpace
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import Mathlib.Analysis.LocallyConvex.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
@@ -674,11 +677,404 @@ theorem euclideanSchwartz_strongDual_montel (m : ℕ) :
 -- second countability. A separable non-second-countable compact abelian group
 -- can have a nonnuclear Schwartz–Bruhat space.
 
+section RealSchwartzBruhat
+
+open scoped ENNReal NNReal
+
+/-- A compact identity neighborhood generates a connected locally compact group. -/
+private theorem realBruhat_compactlyGenerated (G : Type*) [Group G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [LocallyCompactSpace G] [PreconnectedSpace G] :
+    IsCompactlyGeneratedGroup G := by
+  obtain ⟨K, hc, hK⟩ := exists_compact_mem_nhds (1 : G)
+  have hOpen : IsOpen (Subgroup.closure K : Set G) :=
+    Subgroup.isOpen_of_mem_nhds _ (mem_of_superset hK Subgroup.subset_closure)
+  exact ⟨K, hK, hc, SetLike.coe_injective
+    ((OpenSubgroup.isClopen ⟨Subgroup.closure K, hOpen⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)⟩
+
+/-- A real structural pair has full open subgroup and trivial kernel, so its quotient
+map identifies it with the real group. -/
+private theorem realBruhat_pair_quotient (a : BruhatStructuralPair (Multiplicative ℝ)) :
+    ∃ (h : ∀ x : Multiplicative ℝ, x ∈ a.val.1)
+      (q : Multiplicative ℝ ≃ₜ* a.quotient),
+        ∀ x, q x = QuotientGroup.mk ⟨x, h x⟩ := by
+  obtain ⟨d, -⟩ := exists_realPontryaginDualEquiv
+  let : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  let : ConnectedSpace (PontryaginDual (Multiplicative ℝ)) :=
+    d.surjective.connectedSpace d.continuous
+  have ha : a.val.1 = ⊤ := SetLike.coe_injective
+    ((OpenSubgroup.isClopen ⟨a.val.1, a.property.1⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)
+  let k := OrderDual.ofDual a.val.2
+  have hk : k = ⊥ := by
+    let U : OpenSubgroup (PontryaginDual (Multiplicative ℝ)) :=
+      ⟨lcaAnnihilator k, a.property.2.2.1.2.1⟩
+    have hann : lcaAnnihilator k = ⊤ :=
+      SetLike.coe_injective (U.isClopen.eq_univ ⟨1, U.one_mem⟩)
+    refine le_antisymm (fun x hx ↦ Subgroup.mem_bot.mpr ?_) bot_le
+    apply (pontryaginDual_pairing_separates (G := Multiplicative ℝ)).1
+    funext χ
+    exact ((mem_lcaAnnihilator_iff k χ).mp (hann ▸ Subgroup.mem_top χ) ⟨x, hx⟩).trans
+      (map_one χ).symm
+  have h (x : Multiplicative ℝ) : x ∈ a.val.1 := ha ▸ Subgroup.mem_top x
+  let i : Multiplicative ℝ ≃ₜ* a.val.1 :=
+    { toMulEquiv :=
+        { toFun := fun x ↦ ⟨x, h x⟩
+          invFun := Subtype.val
+          left_inv := fun _ ↦ rfl
+          right_inv := fun _ ↦ rfl
+          map_mul' := fun _ _ ↦ rfl }
+      continuous_toFun := continuous_id.subtype_mk _
+      continuous_invFun := continuous_subtype_val }
+  let p := (QuotientGroup.mk' (k.comap a.val.1.subtype)).comp i.toMulEquiv.toMonoidHom
+  have hp : IsOpenQuotientMap p :=
+    QuotientGroup.isOpenQuotientMap_mk.comp i.toHomeomorph.isOpenQuotientMap
+  have hpInj : Injective p := (MonoidHom.ker_eq_bot_iff p).mp (le_antisymm (fun x hx ↦ by
+    change (QuotientGroup.mk (i x) : a.quotient) = 1 at hx
+    exact hk ▸ (a.quotient_mk_eq_one (i x)).mp hx) bot_le)
+  let q := MulEquiv.ofBijective p ⟨hpInj, hp.surjective⟩
+  exact ⟨h, q.toContinuousMulEquiv (fun _ ↦ hp.isQuotientMap.isOpen_preimage), fun _ ↦ rfl⟩
+
+/-- The full real group with trivial kernel has a one-dimensional elementary presentation. -/
+private theorem realBruhat_stage_exists :
+    ∃ a : BruhatStructuralPair (Multiplicative ℝ), Nonempty (ElementaryLCAPresentation a.quotient) := by
+  obtain ⟨d, -⟩ := exists_realPontryaginDualEquiv
+  let : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  let : ConnectedSpace (PontryaginDual (Multiplicative ℝ)) :=
+    d.surjective.connectedSpace d.continuous
+  have hAnn : lcaAnnihilator (⊥ : Subgroup (Multiplicative ℝ)) = ⊤ := by
+    refine eq_top_iff.mpr fun χ _ ↦ (mem_lcaAnnihilator_iff _ _).mpr fun x ↦ ?_
+    rw [Subgroup.mem_bot.mp x.property, map_one]
+  have hGood : IsBruhatGoodSubgroup (⊥ : Subgroup (Multiplicative ℝ)) := by
+    refine ⟨?_, ?_, ?_⟩
+    · simpa only [Subgroup.coe_bot] using isClosed_singleton
+    · rw [hAnn, Subgroup.coe_top]
+      exact isOpen_univ
+    · rw [hAnn]
+      let : ConnectedSpace (⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :=
+        (Subgroup.topEquiv.symm.surjective.connectedSpace
+          (continuous_id.subtype_mk _))
+      have hOpen : IsOpen ((⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :
+          Set (PontryaginDual (Multiplicative ℝ))) := by simp
+      let : LocallyCompactSpace (⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :=
+        hOpen.isOpenEmbedding_subtypeVal.locallyCompactSpace
+      exact realBruhat_compactlyGenerated _
+  have hTop : IsOpen ((⊤ : Subgroup (Multiplicative ℝ)) : Set (Multiplicative ℝ)) := by simp
+  let : ConnectedSpace (⊤ : Subgroup (Multiplicative ℝ)) :=
+    Subgroup.topEquiv.symm.surjective.connectedSpace (continuous_id.subtype_mk _)
+  let : LocallyCompactSpace (⊤ : Subgroup (Multiplicative ℝ)) :=
+    hTop.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let a : BruhatStructuralPair (Multiplicative ℝ) := ⟨(⊤, OrderDual.toDual ⊥),
+    hTop, realBruhat_compactlyGenerated _, hGood, bot_le⟩
+  obtain ⟨_, q, _⟩ := realBruhat_pair_quotient a
+  let E := EuclideanSpace ℝ (Fin 1)
+  let L : ℝ ≃L[ℝ] E := ContinuousLinearEquiv.ofFinrankEq (by simp [E, finrank_euclideanSpace])
+  let B := (Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × Fin 1
+  let : Unique B := uniqueOfSubsingleton 0
+  let M : ℝ ≃+ ElementaryLieGroup 1 0 0 (Fin 1) :=
+    L.toLinearEquiv.toAddEquiv.trans (AddEquiv.prodUnique (M := E) (N := B)).symm
+  let M' : Multiplicative ℝ ≃ₜ* Multiplicative (ElementaryLieGroup 1 0 0 (Fin 1)) :=
+    ⟨AddEquiv.toMultiplicative M,
+      show Continuous (fun x : ℝ ↦ (L x, (default : B))) from
+        L.continuous.prodMk continuous_const,
+      show Continuous (fun x : E × B ↦ L.symm x.1) from
+        L.symm.continuous.comp continuous_fst⟩
+  exact ⟨a, ⟨⟨1, 0, 0, 1, inferInstance, q.symm.trans M'⟩⟩⟩
+
+/-- In any elementary presentation of a real structural quotient, the torus and
+discrete factors are trivial, and the real coordinate is a continuous real-linear equivalence. -/
+private theorem realBruhat_stage_coordinates (a : BruhatStructuralPair (Multiplicative ℝ))
+    (e : ElementaryLCAPresentation a.quotient) :
+    letI := e.finiteGroup
+    e.torusDim = 0 ∧ e.latticeRank = 0 ∧ Subsingleton (Fin e.finiteOrder) ∧
+    ∃ (h : ∀ x : Multiplicative ℝ, x ∈ a.val.1)
+      (L : ℝ ≃L[ℝ] EuclideanSpace ℝ (Fin e.realDim)),
+      ∀ x : ℝ, (e.equiv (QuotientGroup.mk ⟨Multiplicative.ofAdd x, h _⟩)).toAdd =
+        (L x, 0, 0, 0) := by
+  let := e.finiteGroup
+  obtain ⟨h, q, hq⟩ := realBruhat_pair_quotient a
+  let E := EuclideanSpace ℝ (Fin e.realDim)
+  let T := Fin e.torusDim → AddCircle (1 : ℝ)
+  let Z := Fin e.latticeRank → ℤ
+  let F := Fin e.finiteOrder
+  let P := ElementaryLieGroup e.realDim e.torusDim e.latticeRank F
+  let w := q.trans e.equiv
+  let W : ℝ ≃+ P := MulEquiv.toAdditive w.toMulEquiv
+  have hW : Continuous W := w.continuous
+  have hWi : Continuous W.symm := w.symm.continuous
+  let : ConnectedSpace P := W.surjective.connectedSpace hW
+  let : ConnectedSpace Z :=
+    (show Surjective (fun p : P ↦ p.2.2.1) from fun z ↦ ⟨(0, 0, z, 0), rfl⟩).connectedSpace
+      (continuous_fst.comp (continuous_snd.comp continuous_snd))
+  let : ConnectedSpace F :=
+    (show Surjective (fun p : P ↦ p.2.2.2) from fun b ↦ ⟨(0, 0, 0, b), rfl⟩).connectedSpace
+      (continuous_snd.comp (continuous_snd.comp continuous_snd))
+  have hZ : Subsingleton Z := subsingleton_of_preconnected_totallyDisconnected
+  have hF : Subsingleton F := subsingleton_of_preconnected_totallyDisconnected
+  have hz : e.latticeRank = 0 := by
+    by_contra hn
+    let i : Fin e.latticeRank := ⟨0, Nat.pos_of_ne_zero hn⟩
+    have hi := congrFun (hZ.elim (0 : Z) 1) i
+    exact zero_ne_one hi
+  let tor : T →+ ℝ :=
+    { toFun := fun t ↦ W.symm (0, t, 0, 0)
+      map_zero' := by
+        let p : P := (0, 0, 0, 0)
+        have he : p + p = p :=
+          Prod.ext (zero_add _) (Prod.ext (zero_add _) (Prod.ext (zero_add _) (hF.elim _ _)))
+        have hzero := W.symm.map_add p p
+        rw [he] at hzero
+        change W.symm p = 0
+        linarith
+      map_add' := fun t u ↦ by
+        rw [← W.symm.map_add]
+        apply congrArg W.symm
+        exact Prod.ext (zero_add _).symm
+          (Prod.ext rfl (Prod.ext (zero_add _).symm (hF.elim _ _))) }
+  have htor : Continuous tor :=
+    hWi.comp (continuous_const.prodMk (continuous_id.prodMk continuous_const))
+  obtain ⟨C, hC⟩ := (isCompact_univ.image htor).isBounded.exists_norm_le
+  have htor0 (t : T) : tor t = 0 := by
+    by_contra ht
+    obtain ⟨n, hn⟩ := exists_nat_gt (C / ‖tor t‖)
+    have hb := hC (tor (n • t)) (mem_image_of_mem tor (mem_univ (n • t)))
+    rw [map_nsmul, nsmul_eq_mul, norm_mul, Real.norm_natCast] at hb
+    exact (not_lt_of_ge hb) ((div_lt_iff₀ (norm_pos_iff.mpr ht)).mp hn)
+  have hT : Subsingleton T := ⟨fun t u ↦ by
+    have hu : tor t = tor u := (htor0 t).trans (htor0 u).symm
+    exact congrArg (fun p : P ↦ p.2.1) (W.symm.injective hu)⟩
+  have ht : e.torusDim = 0 := by
+    by_contra hn
+    let i : Fin e.torusDim := ⟨0, Nat.pos_of_ne_zero hn⟩
+    have hi := congrFun (hT.elim (fun _ ↦ ((1 / 2 : ℝ) : AddCircle (1 : ℝ))) 0) i
+    exact (show (1 / 2 : ℝ) ≠ 0 by norm_num)
+      ((AddCircle.coe_eq_zero_iff_of_mem_Ico (by norm_num : (1 / 2 : ℝ) ∈ Ico 0 1)).mp hi)
+  let I : P ≃+ E :=
+    { toFun := Prod.fst
+      invFun := fun x ↦ (x, 0, 0, 0)
+      left_inv := fun p ↦ Prod.ext rfl (Subsingleton.elim _ _)
+      right_inv := fun _ ↦ rfl
+      map_add' := fun _ _ ↦ rfl }
+  let L := (W.trans I).toRealLinearEquiv (continuous_fst.comp hW)
+    (hWi.comp (continuous_id.prodMk continuous_const))
+  refine ⟨ht, hz, hF, h, L, fun x ↦ ?_⟩
+  rw [← hq]
+  exact Prod.ext rfl (Subsingleton.elim _ _)
+
+/-- The sole coordinate of the one-dimensional Euclidean space. -/
+private abbrev realBruhatCoordinate : EuclideanSpace ℝ (Fin 1) ≃L[ℝ] ℝ :=
+  PiLp.equivOfUnique 2 ℝ (fun _ : Fin 1 ↦ ℝ)
+
+/-- In dimension one, the elementary weighted bound is the supremum of the
+corresponding classical weighted derivative norms. -/
+private theorem elementarySchwartz_real_bound {F : Type*} [Nonempty F]
+    (f : ℝ → ℂ) (hf : ContDiff ℝ (∞) f) (i : ElementarySchwartzIndex 1 0 0) :
+    elementarySchwartzBound (fun p : ElementaryLieGroup 1 0 0 F ↦ f (realBruhatCoordinate p.1)) i =
+      ⨆ x : ℝ, ENNReal.ofReal (‖x‖ ^ i.1 0 * ‖iteratedFDeriv ℝ (i.2.1 0) f x‖) := by
+  let E := EuclideanSpace ℝ (Fin 1)
+  let E₀ := EuclideanSpace ℝ (Fin 0)
+  let P : E × E₀ →L[ℝ] ℝ :=
+    realBruhatCoordinate.toContinuousLinearMap.comp (ContinuousLinearMap.fst ℝ E E₀)
+  let u : E × E₀ := (EuclideanSpace.single 0 1, 0)
+  have hu : P u = 1 := by simp [P, u, realBruhatCoordinate]
+  let g : ElementaryLieGroup 1 0 0 F → ℂ := fun p ↦ f (realBruhatCoordinate p.1)
+  change elementarySchwartzBound g i = _
+  have hpartial (xt : E × E₀) (a : Fin 0 → ℤ) (b : F) :
+      elementaryPartial g i.2.1 i.2.2.1 xt a b = iteratedDeriv (i.2.1 0) f (P xt) := by
+    have hd : ((List.ofFn (fun j : Fin 1 ↦
+        List.replicate (i.2.1 j) ((EuclideanSpace.single j 1 : E), (0 : E₀)))).flatten ++
+        (List.ofFn (fun j : Fin 0 ↦ List.replicate (i.2.2.1 j)
+          ((0 : E), (EuclideanSpace.single j 1 : E₀)))).flatten) =
+        List.replicate (i.2.1 0) u := by
+      simp [List.ofFn_succ, u]
+    have hrep (l : List (E × E₀)) (hl : l = List.replicate (i.2.1 0) u) :
+        iteratedFDeriv ℝ l.length (f ∘ P) xt l.get = iteratedDeriv (i.2.1 0) f (P xt) := by
+      subst l
+      rw [P.iteratedFDeriv_comp_right hf xt (by simp),
+        ContinuousMultilinearMap.compContinuousLinearMap_apply,
+        iteratedFDeriv_apply_eq_iteratedDeriv_mul_prod]
+      simp [hu]
+    exact hrep _ hd
+  simp only [elementarySchwartzBound, hpartial, Finset.univ_eq_empty (α := Fin 0),
+    Finset.prod_empty, mul_one, Fin.prod_univ_one, ENNReal.coe_nnreal_eq, coe_nnNorm,
+    norm_mul, norm_pow, Complex.norm_real, ← norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+  have hp : Surjective P := fun x ↦ ⟨(realBruhatCoordinate.symm x, 0),
+    realBruhatCoordinate.apply_symm_apply x⟩
+  simp only [iSup_const]
+  exact hp.iSup_comp (fun x : ℝ ↦ ENNReal.ofReal
+    (‖x‖ ^ i.1 0 * ‖iteratedFDeriv ℝ (i.2.1 0) f x‖))
+
+/-- The one-dimensional elementary stage with trivial other factors is the classical
+Schwartz space, with the same seminorms. -/
+private theorem elementarySchwartz_real_equiv (F : Type*) [AddCommGroup F] [Subsingleton F] :
+    ∃ e : SchwartzMap ℝ ℂ ≃L[ℂ] ElementarySchwartz 1 0 0 F,
+      ∀ (f : SchwartzMap ℝ ℂ) (p : ElementaryLieGroup 1 0 0 F),
+        e f p = f (realBruhatCoordinate p.1) := by
+  classical
+  let P := ElementaryLieGroup 1 0 0 F
+  let A : SchwartzMap ℝ ℂ →ₗ[ℂ] ElementarySchwartz 1 0 0 F :=
+    { toFun := fun f ↦ ⟨fun p ↦ f (realBruhatCoordinate p.1), by
+        refine ⟨fun _ _ ↦ f.smooth'.comp
+          (realBruhatCoordinate.toContinuousLinearMap.contDiff.comp contDiff_fst), fun i ↦ ?_⟩
+        rw [elementarySchwartz_real_bound (f : ℝ → ℂ) f.smooth']
+        refine lt_of_le_of_lt (iSup_le fun x ↦ ENNReal.ofReal_le_ofReal (f.le_seminorm ℂ _ _ x))
+          ENNReal.ofReal_lt_top⟩
+      map_add' := fun _ _ ↦ Subtype.ext rfl
+      map_smul' := fun _ _ ↦ Subtype.ext rfl }
+  have hA (f : SchwartzMap ℝ ℂ) (p : P) : A f p = f (realBruhatCoordinate p.1) := rfl
+  have hp (p : P) : p = (p.1, 0, 0, 0) :=
+    Prod.ext rfl (Subsingleton.elim _ _)
+  have hsurj : Surjective A := by
+    intro s
+    let f : ℝ → ℂ := fun x ↦ s (realBruhatCoordinate.symm x, 0, 0, 0)
+    have hs (p : P) : s p = f (realBruhatCoordinate p.1) := by
+      dsimp only [f]
+      erw [realBruhatCoordinate.symm_apply_apply]
+      exact congrArg s (hp p)
+    have hf : ContDiff ℝ (∞) f := by
+      have hh := s.property.1 (0 : Fin 0 → ℤ) 0
+      have hcomp := hh.comp (realBruhatCoordinate.symm.toContinuousLinearMap.contDiff.prodMk
+        (contDiff_const (c := (0 : EuclideanSpace ℝ (Fin 0)))))
+      convert hcomp using 1
+      funext x
+      exact congrArg s (Prod.ext rfl (Subsingleton.elim _ _))
+    have hb (k n : ℕ) :
+        (⨆ x : ℝ, ENNReal.ofReal (‖x‖ ^ k * ‖iteratedFDeriv ℝ n f x‖)) < (⊤ : ℝ≥0∞) := by
+      let i : ElementarySchwartzIndex 1 0 0 := (fun _ ↦ k, fun _ ↦ n, 0, 0)
+      have heq : s.val = (fun p : P ↦ f (realBruhatCoordinate p.1)) := funext hs
+      calc
+        _ = elementarySchwartzBound (fun p : P ↦ f (realBruhatCoordinate p.1)) i :=
+          (elementarySchwartz_real_bound f hf i).symm
+        _ = elementarySchwartzBound s.val i := congrArg (fun g ↦ elementarySchwartzBound g i) heq.symm
+        _ < (⊤ : ℝ≥0∞) := s.property.2 i
+    let t : SchwartzMap ℝ ℂ := ⟨f, hf, fun k n ↦ by
+      let C := (⨆ x : ℝ, ENNReal.ofReal (‖x‖ ^ k * ‖iteratedFDeriv ℝ n f x‖))
+      refine ⟨C.toReal, fun x ↦ ?_⟩
+      apply (ENNReal.ofReal_le_ofReal_iff ENNReal.toReal_nonneg).mp
+      rw [ENNReal.ofReal_toReal (hb k n).ne]
+      exact le_iSup (fun x : ℝ ↦ ENNReal.ofReal (‖x‖ ^ k * ‖iteratedFDeriv ℝ n f x‖)) x⟩
+    exact ⟨t, Subtype.ext (funext fun p ↦ (hs p).symm)⟩
+  let e := LinearEquiv.ofBijective A ⟨fun f g h ↦ SchwartzMap.ext fun x ↦ by
+    have hh := congrArg (fun s : ElementarySchwartz 1 0 0 F ↦
+      s (realBruhatCoordinate.symm x, 0, 0, 0)) h
+    simpa only [hA, realBruhatCoordinate.apply_symm_apply] using hh, hsurj⟩
+  have hseminorm (f : SchwartzMap ℝ ℂ) (i : ElementarySchwartzIndex 1 0 0) :
+      elementarySchwartzSeminorm i (e f) = SchwartzMap.seminorm ℂ (i.1 0) (i.2.1 0) f := by
+    have heq : (e f).val = (fun p : P ↦ f (realBruhatCoordinate p.1)) := rfl
+    change (elementarySchwartzBound (e f).val i).toReal = _
+    rw [heq, elementarySchwartz_real_bound (f : ℝ → ℂ) f.smooth', ENNReal.toReal_iSup
+      (fun _ ↦ ENNReal.ofReal_ne_top)]
+    simp only [ENNReal.toReal_ofReal (mul_nonneg (pow_nonneg (norm_nonneg _) _) (norm_nonneg _))]
+    let b (x : ℝ) := ‖x‖ ^ i.1 0 * ‖iteratedFDeriv ℝ (i.2.1 0) f x‖
+    have hb : BddAbove (range b) := ⟨_, forall_mem_range.mpr (f.le_seminorm ℂ _ _)⟩
+    exact le_antisymm (ciSup_le (f.le_seminorm ℂ _ _))
+      (SchwartzMap.seminorm_le_bound ℂ _ _ f
+        ((by positivity : 0 ≤ b 0).trans (le_ciSup hb 0)) (le_ciSup hb))
+  refine ⟨⟨e, ?_, ?_⟩, hA⟩
+  · apply (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp e.toLinearMap
+    intro i
+    refine ((schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm (i.1 0, i.2.1 0)).congr ?_
+    intro f
+    exact (hseminorm f i).symm
+  · apply (schwartz_withSeminorms ℂ ℝ ℂ).continuous_of_continuous_comp e.symm.toLinearMap
+    rintro ⟨k, n⟩
+    let i : ElementarySchwartzIndex 1 0 0 := (fun _ ↦ k, fun _ ↦ n, 0, 0)
+    exact ((withGeneratingSeminorms_spec _ _).continuous_seminorm i).congr fun s ↦ by
+      change elementarySchwartzSeminorm i s = SchwartzMap.seminorm ℂ k n (e.symm s)
+      rw [← hseminorm (e.symm s) i, e.apply_symm_apply]
+
+set_option maxHeartbeats 800000 in
+/-- Every elementary stage of the real group is continuously linearly equivalent
+to the classical Schwartz space by pointwise realization. -/
+private theorem realBruhat_stage_equiv (a : BruhatStructuralPair (Multiplicative ℝ))
+    (e : ElementaryLCAPresentation a.quotient) :
+    ∃ J : SchwartzMap ℝ ℂ ≃L[ℂ] SchwartzBruhatStage e,
+      ∀ (f : SchwartzMap ℝ ℂ) (x : Multiplicative ℝ),
+        schwartzBruhatStageRealization a e (J f) x = f x.toAdd := by
+  classical
+  obtain ⟨ht, hz, hF, h, L, hL⟩ := realBruhat_stage_coordinates a e
+  have hm : e.realDim = 1 := by
+    simpa [finrank_euclideanSpace] using L.toLinearEquiv.finrank_eq.symm
+  rcases e with ⟨m, n, r, k, group, equiv⟩
+  dsimp only at hm ht hz
+  subst m n r
+  let := group
+  obtain ⟨E, hE⟩ := elementarySchwartz_real_equiv (Fin k)
+  let l : ℝ ≃L[ℝ] ℝ := L.trans realBruhatCoordinate
+  let P := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ l.symm (F := ℂ)
+  let Q := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ l (F := ℂ)
+  let J := ContinuousLinearEquiv.equivOfInverse P Q
+    (fun f ↦ SchwartzMap.ext fun x ↦ congrArg f (l.symm_apply_apply x))
+    (fun f ↦ SchwartzMap.ext fun x ↦ congrArg f (l.apply_symm_apply x))
+  refine ⟨J.trans E, fun f x ↦ ?_⟩
+  have hreal := schwartzBruhatStageRealization_apply a
+    ⟨1, 0, 0, k, group, equiv⟩ ((J.trans E) f) x
+  rw [dite_eq_left (h x)] at hreal
+  refine hreal.trans ((congrArg (fun p : ElementaryLieGroup 1 0 0 (Fin k) ↦ E (P f) p)
+    (hL x.toAdd)).trans ?_)
+  exact (hE (P f) _).trans (congrArg f (l.symm_apply_apply x.toAdd))
+
 /-- Paper: §2.1.1.3, p. 63. The classical Schwartz space on the real line agrees
 with the Schwartz–Bruhat space of the additive real group, including its topology. -/
 theorem realSchwartzBruhat_equiv :
     ∃ e : SchwartzMap ℝ ℂ ≃L[ℂ] ℬ(ℝ),
-      ∀ (f : SchwartzMap ℝ ℂ) (x : ℝ), e f (Multiplicative.ofAdd x) = f x := by sorry
+      ∀ (f : SchwartzMap ℝ ℂ) (x : ℝ), e f (Multiplicative.ofAdd x) = f x := by
+  classical
+  let R : SchwartzMap ℝ ℂ →ₗ[ℂ] (Multiplicative ℝ → ℂ) :=
+    { toFun := fun f x ↦ f x.toAdd
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let J (a : BruhatStructuralPair (Multiplicative ℝ)) (e : ElementaryLCAPresentation a.quotient) :=
+    Classical.choose (realBruhat_stage_equiv a e)
+  have hJ (a : BruhatStructuralPair (Multiplicative ℝ)) (e : ElementaryLCAPresentation a.quotient) :=
+    Classical.choose_spec (realBruhat_stage_equiv a e)
+  let a₀ := Classical.choose realBruhat_stage_exists
+  let e₀ := Classical.choice (Classical.choose_spec realBruhat_stage_exists)
+  have hRange (a : BruhatStructuralPair (Multiplicative ℝ))
+      (e : ElementaryLCAPresentation a.quotient) :
+      (schwartzBruhatStageRealization a e).range = R.range := by
+    have hcomp : (schwartzBruhatStageRealization a e).comp (J a e).toLinearEquiv.toLinearMap = R :=
+      LinearMap.ext fun f ↦ funext (hJ a e f)
+    rw [← hcomp, LinearMap.range_comp, LinearMap.range_eq_top.mpr (J a e).surjective,
+      Submodule.map_top]
+  have hrange : schwartzBruhatSubmodule (Multiplicative ℝ) = R.range := by
+    unfold schwartzBruhatSubmodule
+    exact le_antisymm (iSup_le fun a ↦ iSup_le fun e ↦ (hRange a e).le)
+      (le_iSup_of_le a₀ (le_iSup_of_le e₀ (hRange a₀ e₀).ge))
+  let A : SchwartzMap ℝ ℂ →ₗ[ℂ] ℬ(ℝ) :=
+    R.codRestrict (schwartzBruhatSubmodule (Multiplicative ℝ)) fun f ↦
+      hrange ▸ LinearMap.mem_range_self R f
+  let E := LinearEquiv.ofBijective A
+    ⟨fun f g h ↦ SchwartzMap.ext fun x ↦ congrArg (fun s : ℬ(ℝ) ↦ s (Multiplicative.ofAdd x)) h,
+      fun s ↦ by
+        have hs : s.val ∈ R.range := hrange ▸ s.property
+        obtain ⟨f, hf⟩ := hs
+        exact ⟨f, Subtype.ext hf⟩⟩
+  have hA (a : BruhatStructuralPair (Multiplicative ℝ))
+      (e : ElementaryLCAPresentation a.quotient) (f : SchwartzMap ℝ ℂ) :
+      (schwartzBruhatStageInclusion a e (J a e f) : ℬ(ℝ)) = E f :=
+    Subtype.ext (funext (hJ a e f))
+  refine ⟨⟨E, ?_, ?_⟩, fun _ _ ↦ rfl⟩
+  · apply (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp A
+    rintro ⟨p, hp⟩
+    exact ((hp a₀ e₀).comp (J a₀ e₀).continuous).congr (fun f ↦ congrArg p (hA a₀ e₀ f))
+  · apply (schwartz_withSeminorms ℂ ℝ ℂ).continuous_of_continuous_comp E.symm.toLinearMap
+    intro i
+    let p := (schwartzSeminormFamily ℂ ℝ ℂ i).comp E.symm.toLinearMap
+    have hp (a : BruhatStructuralPair (Multiplicative ℝ))
+        (e : ElementaryLCAPresentation a.quotient) :
+        Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+      refine (((schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm i).comp
+        (J a e).symm.continuous).congr fun s ↦ ?_
+      change schwartzSeminormFamily ℂ ℝ ℂ i ((J a e).symm s) =
+        schwartzSeminormFamily ℂ ℝ ℂ i (E.symm (schwartzBruhatStageInclusion a e s))
+      apply congrArg (schwartzSeminormFamily ℂ ℝ ℂ i)
+      apply E.injective
+      exact (hA a e ((J a e).symm s)).symm.trans
+        ((congrArg (fun t : SchwartzBruhatStage e ↦ (schwartzBruhatStageInclusion a e t : ℬ(ℝ)))
+          ((J a e).apply_symm_apply s)).trans
+            (E.apply_symm_apply (schwartzBruhatStageInclusion a e s)).symm)
+    exact (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨p, hp⟩
+
+end RealSchwartzBruhat
 
 end Euclidean
 
