@@ -97,7 +97,8 @@ theorem toPettisWeakCompletion_natural (T : E →L[ℂ] F) (x : E) :
     toPettisWeakCompletion F (T x) =
       (show PettisWeakCompletion F from
         (toPettisWeakCompletion E x).comp
-          (ContinuousLinearMap.precomp ℂ T : StrongDual ℂ F →L[ℂ] StrongDual ℂ E).toLinearMap) := by sorry
+          (ContinuousLinearMap.precomp ℂ T : StrongDual ℂ F →L[ℂ] StrongDual ℂ E).toLinearMap) := by
+  rfl
 
 omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E] in
 /-- Paper: Lemma C.4.1.2, p. 710. Evaluations at vectors are dense in the pointwise topology
@@ -176,7 +177,8 @@ theorem toPettisWeakCompletion_eq_inclusionInDoubleDual {B : Type*}
     [NormedAddCommGroup B] [NormedSpace ℂ B] (x : B) :
     toPettisWeakCompletion B x =
       (show PettisWeakCompletion B from
-        (NormedSpace.inclusionInDoubleDualLi (E := B) ℂ x).toLinearMap) := by sorry
+        (NormedSpace.inclusionInDoubleDualLi (E := B) ℂ x).toLinearMap) := by
+  rfl
 
 end WeakCompletion
 

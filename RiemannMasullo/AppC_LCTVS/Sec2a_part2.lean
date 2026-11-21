@@ -743,7 +743,8 @@ def tensorDualOperator : E ⊗[ℂ] F →ₗ[ℂ] StrongDual ℂ E →ₗ[ℂ] F
 /-- Paper: (C.2.3.6), p. 677. A pure tensor sends a functional to its value at the
 first factor times the second factor. -/
 theorem tensorDualOperator_tmul (x : E) (y : F) (φ : StrongDual ℂ E) :
-    tensorDualOperator (x ⊗ₜ[ℂ] y) φ = φ x • y := by sorry
+    tensorDualOperator (x ⊗ₜ[ℂ] y) φ = φ x • y := by
+  rfl
 
 include hE sE hF sF in
 /-- Paper: Remark C.2.3.2, p. 677. The canonical operator representation is injective. -/
@@ -1671,7 +1672,8 @@ variable {E F G H : Type*}
 /-- Paper: (C.2.3.25)–(C.2.3.27), p. 683. The inductive tensor map sends a pure
 tensor to the tensor of its images. -/
 theorem inductiveTensorMap_tmul (x : E) (y : F) :
-    inductiveTensorMap f.toLinearMap g.toLinearMap (x ⊗ₜ[ℂ] y) = f x ⊗ₜ[ℂ] g y := by sorry
+    inductiveTensorMap f.toLinearMap g.toLinearMap (x ⊗ₜ[ℂ] y) = f x ⊗ₜ[ℂ] g y := by
+  rfl
 
 /-- Paper: (C.2.3.25)–(C.2.3.27), p. 683. The inductive tensor map is continuous
 whenever its two factors are, so it induces the indicated maps of completions. -/
