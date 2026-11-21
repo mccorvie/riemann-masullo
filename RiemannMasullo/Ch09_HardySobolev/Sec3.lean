@@ -534,7 +534,46 @@ Deviation: A pointwise supremum of one can be attained only on a null set
 when the inner band is empty. -/
 theorem modulatedCutoffOperator_norm (ν : Measure G) [SigmaFinite ν] {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    ‖modulatedCutoffOperator m ν hρ‖ = (eLpNorm ρ ∞ ν).toReal := by sorry
+    ‖modulatedCutoffOperator m ν hρ‖ = (eLpNorm ρ ∞ ν).toReal := by
+  let T := modulatedCutoffOperator m ν hρ
+  change ‖T‖ = _
+  have hmul (u : Lp ℂ 2 ν) : ∀ᵐ x ∂ν, ‖(T u) x‖ = ‖ρ x‖ * ‖u x‖ := by
+    filter_upwards [modulatedCutoffOperator_apply m ν hρ u] with x hx
+    rw [hx, norm_mul, Complex.norm_real]
+  have htop : MemLp ρ ∞ ν :=
+    memLp_top_of_bound hρ.measurable.aestronglyMeasurable 1 (.of_forall hρ.abs_le_one)
+  apply le_antisymm
+  · apply T.opNorm_le_bound ENNReal.toReal_nonneg
+    intro u
+    apply Lp.norm_le_mul_norm_of_ae_le_mul
+    filter_upwards [hmul u, ae_le_lpNorm_exponent_top htop] with x hTu hx
+    exact hTu.trans_le (mul_le_mul_of_nonneg_right hx (norm_nonneg _))
+  · refine le_of_forall_gt_imp_ge_of_dense fun c hc ↦ ?_
+    have hc₀ : 0 ≤ c := (norm_nonneg T).trans hc.le
+    apply ENNReal.toReal_le_of_le_ofReal hc₀
+    rw [eLpNorm_exponent_top htop.aestronglyMeasurable]
+    apply eLpNormEssSup_le_of_ae_bound
+    rw [ae_iff]
+    simp only [not_le]
+    by_contra hnonzero
+    -- Test the operator on a finite-measure subset where the cutoff exceeds c.
+    obtain ⟨s, hs, hsub, hpos, hfin⟩ := Measure.exists_subset_measure_lt_top
+      (measurableSet_lt measurable_const hρ.measurable.norm) (pos_iff_ne_zero.mpr hnonzero)
+    let u : Lp ℂ 2 ν := indicatorConstLp 2 hs hfin.ne 1
+    have hu : 0 < ‖u‖ := by
+      dsimp only [u]
+      rw [norm_indicatorConstLp (by norm_num) (by norm_num), norm_one, one_mul]
+      exact Real.rpow_pos_of_pos (ENNReal.toReal_pos hpos.ne' hfin.ne) _
+    have hlow : c * ‖u‖ ≤ ‖T u‖ := by
+      rw [← Real.norm_of_nonneg hc₀, ← norm_smul]
+      apply Lp.norm_le_norm_of_ae_le
+      have hout : ∀ᵐ x ∂ν, x ∉ s → u x = 0 := indicatorConstLp_coeFn_notMem
+      filter_upwards [Lp.coeFn_smul c u, hmul u, hout] with x hcu hTu hxout
+      rw [hcu, Pi.smul_apply, norm_smul, Real.norm_of_nonneg hc₀, hTu]
+      by_cases hx : x ∈ s
+      · exact mul_le_mul_of_nonneg_right (hsub hx).le (norm_nonneg _)
+      · simp [hxout hx]
+    exact (mul_lt_mul_of_pos_right hc hu).not_ge (hlow.trans (T.le_opNorm u))
 
 /-- Paper: (9.3.3.3), p. 427. Inversion interchanges the two reflected
 interval spaces and intertwines their cutoff multipliers. -/
