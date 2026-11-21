@@ -316,7 +316,19 @@ section Examples
 coordinate functionals give a topological basis of the complex sequence space
 with the product topology. -/
 theorem pi_isTopologicalBasis :
-    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by sorry
+    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by
+  refine ⟨fun m n ↦ ?_, fun u ↦ ?_⟩
+  · simp [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.single_apply]
+  · rw [Pi.hasSum]
+    intro j
+    simp only [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero]
+    have : HasSum (fun b : ℕ ↦ if j = b then u b else 0) (u j)
+        (SummationFilter.conditional ℕ) := by
+      simpa using hasSum_sum_of_ne_finset_zero (L := SummationFilter.conditional ℕ) (s := {j})
+        (fun b hb ↦
+          ite_eq_right (Ne.symm (Finset.notMem_singleton.mp hb)))
+    exact this
 
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of the coordinate
 basis of the complex sequence space are equicontinuous in the product topology. -/

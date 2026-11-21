@@ -951,13 +951,136 @@ variable [IsTopologicalAddGroup E] [PolynormableSpace ℂ E] [T2Space E]
 /-- Paper: Lemma C.2.2.2, p. 675. The polar of every zero-neighborhood belongs to the
 equicontinuous compactology. -/
 theorem polar_mem_equicontinuousCompactology (U : Set E) (hU : U ∈ 𝓝 0) :
-    StrongDual.toWeakDual '' (StrongDual.polar ℂ U) ∈ equicontinuousCompactology E := by sorry
+    StrongDual.toWeakDual '' (StrongDual.polar ℂ U) ∈ equicontinuousCompactology E := by
+  let B : E →ₗ[ℂ] WeakDual ℂ E →ₗ[ℂ] ℂ :=
+    (topDualPairing ℂ E).flip.compl₂ WeakDual.toStrongDual.toLinearMap
+  have hpolar : StrongDual.toWeakDual '' StrongDual.polar ℂ U = B.polar U :=
+    StrongDual.toWeakDual.image_eq_preimage_symm _
+  rw [hpolar]
+  refine ⟨?_, LinearMap.polar_AbsConvex (B := B) U, ?_⟩
+  · rw [Metric.equicontinuousAt_iff_right]
+    intro ε hε
+    obtain ⟨a, ha, haε⟩ := NormedField.exists_norm_lt ℂ hε
+    have hnear : a • U ∈ 𝓝 (0 : E) := by
+      simpa using smul_mem_nhds_smul₀ (norm_pos_iff.mp ha) hU
+    filter_upwards [hnear] with x hx φ
+    obtain ⟨y, hy, rfl⟩ := hx
+    change dist (φ.val 0) (φ.val (a • y)) < ε
+    rw [map_zero, dist_zero_left, map_smul, norm_smul]
+    exact (mul_le_of_le_one_right ha.le (φ.property y hy)).trans_lt haε
+  · rw [B.polar_eq_biInter_preimage]
+    exact isClosed_biInter fun x _ ↦
+      Metric.isClosed_closedBall.preimage (WeakDual.eval_continuous x)
+
+omit [T2Space E] in
+/-- The bipolar of a closed absolutely convex zero-neighborhood is contained in it. -/
+lemma topDual_bipolar_subset (U : Set E) (hU : U ∈ 𝓝 0) (hc : IsClosed U)
+    (ha : AbsConvex ℂ U) :
+    (topDualPairing ℂ E).polar (StrongDual.polar ℂ U) ⊆ U := by
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  intro x hx
+  by_contra hxU
+  obtain ⟨f, r, hfr, hrx⟩ := RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ)
+    (ha.2.lift ℝ) hc hxU
+  have hnorm (z : E) (hz : z ∈ U) : ‖f z‖ < r := by
+    obtain ⟨c, hc, hcz⟩ := RCLike.exists_norm_eq_mul_self (f z)
+    have h := hfr (c • z) (balanced_iff_smul_mem.mp ha.1 hc.le hz)
+    rw [map_smul, smul_eq_mul] at h
+    change RCLike.re (c * f z) < r at h
+    simpa only [← hcz, RCLike.ofReal_re] using h
+  have hr : 0 < r := (norm_nonneg _).trans_lt (hnorm 0 (mem_of_mem_nhds hU))
+  have hf : (r : ℂ)⁻¹ • f ∈ StrongDual.polar ℂ U := by
+    intro z hz
+    change ‖(r : ℂ)⁻¹ * f z‖ ≤ 1
+    rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hr,
+      ← div_eq_inv_mul, div_le_iff₀ hr, one_mul]
+    exact (hnorm z hz).le
+  have hbound := hx _ hf
+  change ‖(r : ℂ)⁻¹ * f x‖ ≤ 1 at hbound
+  rw [norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hr,
+      ← div_eq_inv_mul, div_le_iff₀ hr, one_mul] at hbound
+  change r < (f x).re at hrx
+  exact (hrx.trans_le (Complex.re_le_norm _)).not_ge hbound
+
+/-- The polar of a zero-neighborhood is weakly closed, absolutely convex and equicontinuous. -/
+lemma topDual_polar_equicontinuousCompactology (U : Set E) (hU : U ∈ 𝓝 0) :
+    StrongDual.toWeakDual '' (StrongDual.polar ℂ U) ∈ equicontinuousCompactology E := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let A : Set (WeakDual ℂ E) := StrongDual.toWeakDual '' (StrongDual.polar ℂ U)
+  have hA : A = (topDualPairing ℂ E).flip.polar U := by
+    ext l
+    constructor
+    · rintro ⟨f, hf, rfl⟩
+      exact hf
+    · intro hl
+      exact ⟨WeakDual.toStrongDual l, hl, WeakDual.toWeakDual_toStrongDual l⟩
+  change EquicontinuousAt (fun l : A ↦ (l.val : E → ℂ)) 0 ∧ AbsConvex ℂ A ∧ IsClosed A
+  refine ⟨?_, hA ▸ LinearMap.polar_AbsConvex _, hA ▸ LinearMap.polar_isClosed _ _⟩
+  apply (equicontinuousAt_zero_iff_mapsTo (E := E) (F := ℂ) A).2
+  intro V hV
+  obtain ⟨ε, hε, hεV⟩ := Metric.mem_nhds_iff.mp hV
+  let c : ℂ := (ε / 2 : ℝ)
+  have hc : c ≠ 0 := by simp [c, ne_of_gt hε]
+  refine ⟨c • U, (set_smul_mem_nhds_zero_iff hc).2 hU, ?_⟩
+  intro f hf x hx
+  obtain ⟨y, hy, rfl⟩ := hx
+  apply hεV
+  have hfy : ‖f y‖ ≤ 1 := by
+    have hf' : f ∈ (topDualPairing ℂ E).flip.polar U := hA ▸ hf
+    exact hf' y hy
+  rw [Metric.mem_ball, dist_zero_right, map_smul, smul_eq_mul, norm_mul]
+  have hc' : ‖c‖ = ε / 2 := by simp [c, hε.le]
+  rw [hc']
+  nlinarith [norm_nonneg (f y)]
 
 /-- Paper: Lemma C.2.2.2, p. 675. The polars in E of the members of the equicontinuous
 compactology form a zero-neighborhood basis for the original topology on E. -/
 theorem nhds_zero_hasBasis_equicontinuousCompactology :
     (𝓝 (0 : E)).HasBasis (· ∈ equicontinuousCompactology E)
-      (fun A ↦ (topDualPairing ℂ E).polar (WeakDual.toStrongDual '' A)) := by sorry
+      (fun A ↦ (topDualPairing ℂ E).polar (WeakDual.toStrongDual '' A)) := by
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  have : LocallyConvexSpace ℂ E := by
+    apply LocallyConvexSpace.ofBasisZero ℂ E _ _ (LocallyConvexSpace.convex_basis_zero ℝ E)
+    intro s hs
+    apply convex_of_nonneg_surjective_algebraMap ℂ
+      (fun z hz ↦ RCLike.nonneg_iff_exists_ofReal.mp (show 0 ≤ z from hz))
+    exact hs.2
+  refine ⟨fun V ↦ ⟨?_, ?_⟩⟩
+  · intro hV
+    obtain ⟨U, ⟨hU, hclosed, habs⟩, hUV⟩ := (nhds_hasBasis_absConvex_closed ℂ E).mem_iff.mp hV
+    refine ⟨StrongDual.toWeakDual '' (StrongDual.polar ℂ U),
+      topDual_polar_equicontinuousCompactology E U hU, ?_⟩
+    have heq : WeakDual.toStrongDual '' (StrongDual.toWeakDual '' (StrongDual.polar ℂ U)) =
+        StrongDual.polar ℂ U := by
+      ext f
+      constructor
+      · rintro ⟨l, ⟨g, hg, rfl⟩, rfl⟩
+        simpa only [StrongDual.toStrongDual_toWeakDual] using hg
+      · intro hf
+        exact ⟨StrongDual.toWeakDual f, ⟨f, hf, rfl⟩, StrongDual.toStrongDual_toWeakDual f⟩
+    rw [heq]
+    exact (topDual_bipolar_subset E U hU hclosed habs).trans hUV
+  · rintro ⟨A, hA, hAV⟩
+    apply mem_of_superset _ hAV
+    have hb : (uniformity ℂ).HasBasis (fun V : Set ℂ ↦ V ∈ 𝓝 (0 : ℂ))
+        (fun V ↦ (fun x : ℂ × ℂ ↦ x.2 - x.1) ⁻¹' V) := by
+      rw [uniformity_eq_comap_nhds_zero]
+      exact (𝓝 (0 : ℂ)).basis_sets.comap _
+    have heq := hb.equicontinuousAt_iff_right.mp hA.1
+    obtain ⟨U, hU, hmaps⟩ := eventually_iff_exists_mem.mp
+      (heq (Metric.closedBall 0 1) (Metric.closedBall_mem_nhds 0 one_pos))
+    apply mem_of_superset hU
+    intro x hx f hf
+    obtain ⟨l, hl, rfl⟩ := hf
+    have h := hmaps x hx ⟨l, hl⟩
+    change ‖WeakDual.toStrongDual l x‖ ≤ 1
+    simpa only [mem_preimage, map_zero, sub_zero, Metric.mem_closedBall, dist_zero_right,
+      WeakDual.toStrongDual_apply] using h
 
 end Compactology
 

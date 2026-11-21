@@ -581,13 +581,36 @@ theorem ideleIdealClass_finite_support (g : 𝕀[F]) :
     (fun v : Primes(F) ↦ localIdealClass F v (Units.map
       ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
         (RingHom.snd _ _)).toMonoidHom g)).HasFiniteMulSupport := by
-  sorry
+  refine Set.Finite.subset (FiniteAdeleRing.hasFiniteMulSupport_valued
+    (Units.map (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).toMonoidHom g))
+    fun v hv ↦ ?_
+  simp only [Function.mem_mulSupport] at hv ⊢
+  intro h
+  apply hv
+  simp only [localIdealClass]
+  convert zpow_zero _
+  convert neg_zero
+  convert WithZero.log_one
+  exact h
 
 /-- Paper: Equation (A.2.3.12), p. 549. An idele supported at one finite place
 has exactly the local ideal class from §A.1. -/
 theorem ideleIdealClass_ofAdicCompletion (v : Primes(F)) (x : (v.adicCompletion F)ˣ) :
     ideleIdealClass F (IdeleGroup.ofAdicCompletion (𝓞 F) F v x) = localIdealClass F v x := by
-  sorry
+  classical
+  unfold ideleIdealClass
+  rw [finprod_eq_single _ v]
+  · congr 1
+    refine Units.ext ?_
+    exact Pi.mulSingle_eq_same (M := fun w : Primes(F) ↦ w.adicCompletion F) v x.val
+  · intro w hw
+    refine (localIdealClass_normalization F w _).1 ?_
+    have h1 : (Units.map ((RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F)
+        w).comp (RingHom.snd _ _)).toMonoidHom (IdeleGroup.ofAdicCompletion (𝓞 F) F v x)) = 1 := by
+      refine Units.ext ?_
+      exact Pi.mulSingle_eq_of_ne (M := fun w : Primes(F) ↦ w.adicCompletion F) hw x.val
+    rw [h1]
+    exact one_mem _
 
 /-- Paper: Equation (A.2.3.12), p. 549. Every ideal class has a norm-one representative,
 and the representative of the trivial class can be chosen to be one. -/

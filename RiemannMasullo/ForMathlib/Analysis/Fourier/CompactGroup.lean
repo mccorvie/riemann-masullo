@@ -65,6 +65,38 @@ theorem integral_character_pair [DecidableEq (PontryaginDual K)] (χ ψ : Pontry
     simp [← Circle.coe_inv_eq_conj, Complex.real_smul]
   · simpa [h] using integral_character_pair_zero μ h
 
+omit [μ.IsMulLeftInvariant] [NeZero μ] in
+/-- A square-integrable function on a compact Hausdorff abelian group vanishes
+almost everywhere if all its character coefficients vanish. -/
+theorem ae_eq_zero_of_character_integral_eq_zero [T2Space K] [μ.WeaklyRegular]
+    {u : K → ℂ} (hu : MemLp u 2 μ)
+    (h : ∀ χ : PontryaginDual K, ∫ a, star (χ a : ℂ) * u a ∂μ = 0) :
+    u =ᵐ[μ] 0 := by
+  let v (χ : PontryaginDual K) : C(K, ℂ) :=
+    ⟨fun a ↦ χ a, continuous_subtype_val.comp χ.continuous⟩
+  let T := ContinuousMap.toLp (E := ℂ) 2 μ ℂ
+  let L := (innerSL ℂ (hu.toLp u)).comp T
+  have hspan : Submodule.span ℂ (range v) ≤ L.ker := by
+    apply Submodule.span_le.mpr
+    rintro _ ⟨χ, rfl⟩
+    change ⟪hu.toLp u, T (v χ)⟫_ℂ = 0
+    rw [inner_eq_zero_symm, L2.inner_def, ← h χ]
+    apply integral_congr_ae
+    filter_upwards [(v χ).coeFn_toLp (p := 2) (𝕜 := ℂ) μ, hu.coeFn_toLp] with a ha hb
+    rw [ha, hb]
+    simp [v, mul_comm]
+  have htop := (Submodule.span ℂ (range v)).topologicalClosure_minimal hspan L.isClosed_ker
+  let r : PontryaginDual K →* C(K, ℂ) :=
+    { toFun := v, map_one' := rfl, map_mul' := fun _ _ ↦ rfl }
+  rw [show (Submodule.span ℂ (range v)).topologicalClosure = ⊤ from
+    dense_span_pontryaginDual r (fun _ _ ↦ rfl)] at htop
+  have hzero : hu.toLp u = 0 := by
+    have hd : DenseRange T := ContinuousMap.toLp_denseRange ℂ μ ℂ (p := 2) (by simp)
+    exact hd.eq_of_inner_left ℂ fun f ↦ by
+      rw [inner_zero_left]
+      exact htop (Submodule.mem_top (x := f))
+  exact hu.coeFn_toLp.symm.trans (hzero ▸ Lp.coeFn_zero ℂ 2 μ)
+
 /-- Bessel's inequality for continuous characters on a compact abelian group with
 finite nonzero invariant measure, including its total-mass factor. -/
 theorem sum_sq_character_integral_le {u : K → ℂ} (hu : MemLp u 2 μ)

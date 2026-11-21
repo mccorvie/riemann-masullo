@@ -898,11 +898,51 @@ def sAdeleStandardCharacter (a : SAdeleRing F S) : Circle :=
   (∏ w : InfinitePlace F, adeleStandardCharacter F (Pi.single w (a.1 w), 0)) *
     ∏ v : S, finiteLocalStandardCharacter F v.val (a.2 v)
 
+/-- The standard p-adic character is trivial at zero. -/
+theorem padicStandardCharacter_zero (p : ℕ) [Fact p.Prime] : padicStandardCharacter p 0 = 1 := by
+  have h (n : ℕ) (hx : ‖(p : ℚ_[p]) ^ n * 0‖ ≤ 1) :
+      PadicInt.toZModPow n (⟨(p : ℚ_[p]) ^ n * 0, hx⟩ : ℤ_[p]) = 0 := by
+    rw [show (⟨(p : ℚ_[p]) ^ n * 0, hx⟩ : ℤ_[p]) = (0 : ℤ_[p]) from Subtype.ext (mul_zero _)]
+    exact map_zero _
+  simp only [padicStandardCharacter]
+  rw [h]
+  simp
+
+/-- The rational adelic character is trivial at zero. -/
+theorem ratAdeleStandardCharacter_zero : ratAdeleStandardCharacter 0 = 1 := by
+  have h₁ : (0 : InfiniteAdeleRing ℚ) Rat.infinitePlace = 0 := rfl
+  have h₂ (v : Primes(ℚ)) : (0 : FiniteAdeleRing (𝓞 ℚ) ℚ) v = 0 := rfl
+  simp [ratAdeleStandardCharacter, h₁, h₂, padicStandardCharacter_zero]
+
+/-- The standard adelic character is trivial at zero. -/
+theorem adeleStandardCharacter_zero : adeleStandardCharacter F 0 = 1 := by
+  simp [adeleStandardCharacter, ratAdeleStandardCharacter_zero]
+
+/-- The local character at a finite place is trivial at zero. -/
+theorem finiteLocalStandardCharacter_zero (v : Primes(F)) :
+    finiteLocalStandardCharacter F v 0 = 1 := by
+  have h : (RestrictedProduct.single (fun w : Primes(F) ↦ w.adicCompletionIntegers F) v
+      (0 : v.adicCompletion F) : FiniteAdeleRing (𝓞 F) F) = 0 :=
+    RestrictedProduct.single_zero _ _
+  simp only [finiteLocalStandardCharacter, h]
+  exact adeleStandardCharacter_zero F
+
 /-- Paper: Example A.3.1.11, p. 559. On an S-adele supported at a single finite
 place, the product character restricts to the trace character at that place. -/
 theorem sAdeleStandardCharacter_single_finite (v : S) (x : v.val.adicCompletion F) :
-    sAdeleStandardCharacter F S (0, Pi.single v x) = finiteLocalStandardCharacter F v.val x :=
-  by sorry
+    sAdeleStandardCharacter F S (0, Pi.single v x) = finiteLocalStandardCharacter F v.val x := by
+  have h₀ (w : InfinitePlace F) : (0 : InfiniteAdeleRing F) w = 0 := rfl
+  have h₁ (w : InfinitePlace F) :
+      adeleStandardCharacter F (Pi.single w ((0 : InfiniteAdeleRing F) w), 0) = 1 := by
+    rw [h₀, Pi.single_zero]
+    exact adeleStandardCharacter_zero F
+  unfold sAdeleStandardCharacter
+  dsimp only
+  rw [Finset.prod_eq_one fun w _ ↦ h₁ w, one_mul, Finset.prod_eq_single v]
+  · rw [Pi.single_eq_same]
+  · intro w _ hw
+    rw [Pi.single_eq_of_ne hw, finiteLocalStandardCharacter_zero]
+  · simp
 
 -- TODO(paper-gap): In Example A.3.1.11, the lattice fails to annihilate itself
 -- under (A.3.1.10) with the real and p-adic signs as printed. For F = ℚ and

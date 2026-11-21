@@ -327,19 +327,89 @@ variable (hμ : ∀ (s : Set G₁) (t : Set G₂), MeasurableSet s → Measurabl
   μ (s ×ˢ t) = μ₁ s * μ₂ t)
 
 include hμ in
+/-- A measure specified by its values on Borel rectangles is bounded on any rectangle by the
+product of the outer measures of the sides. -/
+theorem measure_prod_le_of_rectangles (s : Set G₁) (t : Set G₂) :
+    μ (s ×ˢ t) ≤ μ₁ s * μ₂ t := by
+  calc μ (s ×ˢ t) ≤ μ (toMeasurable μ₁ s ×ˢ toMeasurable μ₂ t) :=
+        measure_mono (Set.prod_mono (subset_toMeasurable _ _) (subset_toMeasurable _ _))
+    _ = μ₁ s * μ₂ t := by
+        rw [hμ _ _ (measurableSet_toMeasurable _ _) (measurableSet_toMeasurable _ _),
+          measure_toMeasurable, measure_toMeasurable]
+
+include hμ in
+/-- A measure specified by its values on Borel rectangles takes the product value on a
+rectangle with null-measurable sides, and such a rectangle is null-measurable. -/
+theorem measure_prod_of_rectangles {s : Set G₁} {t : Set G₂} (hs : NullMeasurableSet s μ₁)
+    (ht : NullMeasurableSet t μ₂) :
+    μ (s ×ˢ t) = μ₁ s * μ₂ t ∧ NullMeasurableSet (s ×ˢ t) μ := by
+  obtain ⟨s', hs's, hs'm, hs'e⟩ := hs.exists_measurable_subset_ae_eq
+  obtain ⟨t', ht't, ht'm, ht'e⟩ := ht.exists_measurable_subset_ae_eq
+  have hrect : μ (s' ×ˢ t') = μ₁ s * μ₂ t := by
+    rw [hμ _ _ hs'm ht'm, measure_congr hs'e, measure_congr ht'e]
+  have hsub : s' ×ˢ t' ⊆ s ×ˢ t := Set.prod_mono hs's ht't
+  refine ⟨le_antisymm (measure_prod_le_of_rectangles hμ s t) (hrect ▸ measure_mono hsub), ?_⟩
+  have hs0 : μ₁ (s \ s') = 0 := (ae_eq_set.mp hs'e).2
+  have ht0 : μ₂ (t \ t') = 0 := (ae_eq_set.mp ht'e).2
+  have hdiff : s ×ˢ t \ s' ×ˢ t' ⊆ (s \ s') ×ˢ Set.univ ∪ Set.univ ×ˢ (t \ t') := by
+    rintro ⟨x, y⟩ ⟨⟨hx, hy⟩, hxy⟩
+    by_cases hx' : x ∈ s'
+    · exact Or.inr ⟨trivial, hy, fun hy' ↦ hxy ⟨hx', hy'⟩⟩
+    · exact Or.inl ⟨⟨hx, hx'⟩, trivial⟩
+  have hnull : μ (s ×ˢ t \ s' ×ˢ t') = 0 := by
+    refine measure_mono_null hdiff (measure_union_null ?_ ?_)
+    · exact le_zero_iff.mp ((measure_prod_le_of_rectangles hμ _ _).trans_eq
+        (by rw [hs0, zero_mul]))
+    · exact le_zero_iff.mp ((measure_prod_le_of_rectangles hμ _ _).trans_eq
+        (by rw [ht0, mul_zero]))
+  have hmeas : MeasurableSet (s' ×ˢ t') := by
+    have : BorelSpace (G₁ × G₂) := ⟨rfl⟩
+    exact (continuous_fst.measurable hs'm).inter (continuous_snd.measurable ht'm)
+  exact hmeas.nullMeasurableSet.congr
+    (ae_eq_set.mpr ⟨by rw [Set.sdiff_eq_empty.mpr hsub, measure_empty], hnull⟩)
+
+include hμ in
 /-- Paper: Lemma A.5.2.5, p. 570. The termwise Cartesian product of D-sequences is a
 D-sequence for product Haar measure.
 Deviation: The product Haar measure is specified by its values on Borel rectangles.
 This formulation also covers groups whose Haar measure is outside the scope of
 Mathlib's `Measure.prod` construction. -/
 theorem IsDSequence.prod (hU : IsDSequence μ₁ U) (hV : IsDSequence μ₂ V) :
-    IsDSequence μ (fun k ↦ U k ×ˢ V k) := by sorry
+    IsDSequence μ (fun k ↦ U k ×ˢ V k) := by
+  obtain ⟨hU₁, hUa, C₁, hC₁, hU₂⟩ := hU
+  obtain ⟨hV₁, hVa, C₂, hC₂, hV₂⟩ := hV
+  have hval (k : ℕ) := measure_prod_of_rectangles hμ (hU₁ k).2.1 (hV₁ k).2.1
+  have hpos (k : ℕ) : 0 < μ (U k ×ˢ V k) := by
+    rw [(hval k).1]
+    exact ENNReal.mul_pos (hU₁ k).2.2.1.ne' (hV₁ k).2.2.1.ne'
+  refine ⟨fun k ↦ ⟨⟨(hU₁ k).1, (hV₁ k).1⟩, (hval k).2, hpos k, ?_⟩,
+    fun i j hij ↦ Set.prod_mono (hUa hij) (hVa hij), C₁ * C₂, mul_pos hC₁ hC₂, fun k ↦ ?_⟩
+  · rw [(hval k).1]
+    exact ENNReal.mul_lt_top (hU₁ k).2.2.2 (hV₁ k).2.2.2
+  rw [Set.inv_prod, Set.prod_mul_prod_comm]
+  have hone₁ : (1 : G₁) ∈ (U k)⁻¹ := by simpa using (hU₁ k).1
+  have hone₂ : (1 : G₂) ∈ (V k)⁻¹ := by simpa using (hV₁ k).1
+  refine ⟨(hpos k).trans_le (measure_mono (Set.prod_mono (Set.subset_mul_left _ hone₁)
+    (Set.subset_mul_left _ hone₂))), ?_⟩
+  calc μ ((U k * (U k)⁻¹) ×ˢ (V k * (V k)⁻¹))
+      ≤ μ₁ (U k * (U k)⁻¹) * μ₂ (V k * (V k)⁻¹) := measure_prod_le_of_rectangles hμ _ _
+    _ < (ENNReal.ofReal C₁ * μ₁ (U k)) * (ENNReal.ofReal C₂ * μ₂ (V k)) :=
+        ENNReal.mul_lt_mul (hU₂ k).2 (hV₂ k).2
+    _ = ENNReal.ofReal (C₁ * C₂) * μ (U k ×ˢ V k) := by
+        rw [(hval k).1, ENNReal.ofReal_mul hC₁.le, mul_mul_mul_comm]
 
 include hμ in
 /-- Paper: Lemma A.5.2.5, p. 570. The termwise Cartesian product of D′-sequences is a
 D′-sequence for product Haar measure, specified by its values on Borel rectangles. -/
 theorem IsDPrimeSequence.prod (hU : IsDPrimeSequence μ₁ U) (hV : IsDPrimeSequence μ₂ V) :
-    IsDPrimeSequence μ (fun k ↦ U k ×ˢ V k) := by sorry
+    IsDPrimeSequence μ (fun k ↦ U k ×ˢ V k) := by
+  refine ⟨hU.1.prod hμ hV.1, fun W hW ↦ ?_⟩
+  obtain ⟨A, hA, B, hB, hAB⟩ := mem_nhds_prod_iff.mp hW
+  obtain ⟨k₁, hk₁⟩ := hU.2 A hA
+  obtain ⟨k₂, hk₂⟩ := hV.2 B hB
+  refine ⟨max k₁ k₂, (Set.prod_mono ?_ ?_).trans hAB⟩
+  · exact (hU.1.2.1 (le_max_left k₁ k₂)).trans hk₁
+  · exact (hV.1.2.1 (le_max_right k₁ k₂)).trans hk₂
 
 /-- Paper: Lemma A.5.2.5, p. 570. The product of two open members is open. -/
 theorem isOpen_prod_sequence (k : ℕ) (hU : IsOpen (U k)) (hV : IsOpen (V k)) :
