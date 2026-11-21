@@ -7,6 +7,8 @@ public import Mathlib.Analysis.InnerProductSpace.TensorProduct
 public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.MeasureTheory.Measure.Prod
 public import Mathlib.MeasureTheory.Measure.Regular
+import Mathlib.Analysis.Normed.Group.Tannery
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import Mathlib.LinearAlgebra.Dimension.LinearMap
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.NormAttainment
 
@@ -773,11 +775,75 @@ codomains and the proof specify. The sequence is indexed from zero. -/
 theorem tendsto_filtration_orthogonalProjections :
     ∀ x, Tendsto (fun i ↦ (P(i)) x) atTop (𝓝 x) := by sorry
 
+-- Keep the separability hypothesis in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Corollary C.3.5.5(2), p. 702. Left multiplication by the
 projections of a dense filtration converges in trace norm to the original operator. -/
 theorem tendsto_traceNorm_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ traceNorm
-      (⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T)) atTop (𝓝 0) := by sorry
+      (⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T)) atTop (𝓝 0) := by
+  let Q (i : ℕ) : H →L[ℂ] H := 1 - P(i)
+  have hQ_tendsto (x : H) : Tendsto (fun i ↦ Q i x) atTop (𝓝 0) := by
+    refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+    obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hdense x) ε hε
+    obtain ⟨j, hj⟩ := Set.mem_iUnion.mp hy
+    filter_upwards [eventually_ge_atTop j] with i hi
+    have hyi : y ∈ (V i : Submodule ℂ H) := hV hi hj
+    change dist (x - P(i) x) 0 < ε
+    rw [dist_zero_right, ← dist_eq_norm, (V i : Submodule ℂ H).dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem hyi).trans_lt hxy
+  let A (i : ℕ) : nuclearEndomorphisms H :=
+    ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T
+  have hA (i : ℕ) : (A i).val = -(Q i * T.val) := by
+    change P(i) * T.val - T.val = -((1 - P(i)) * T.val)
+    rw [sub_mul, one_mul, neg_sub]
+  let B (S : H →L[ℂ] H) := CFC.sqrt (star S * S)
+  have hB_pos (S : H →L[ℂ] H) : (B S).IsPositive :=
+    ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)
+  have hB_norm (S : H →L[ℂ] H) (x : H) : ‖B S x‖ = ‖S x‖ := by
+    have hsq : B S * B S = star S * S := CFC.sqrt_mul_sqrt_self _ (star_mul_self_nonneg S)
+    rw [(B S).apply_norm_eq_sqrt_inner_adjoint_right, S.apply_norm_eq_sqrt_inner_adjoint_right]
+    change Real.sqrt (⟪x, ((B S).adjoint * B S) x⟫_ℂ).re =
+      Real.sqrt (⟪x, (star S * S) x⟫_ℂ).re
+    rw [(hB_pos S).isSelfAdjoint.adjoint_eq, hsq]
+  -- The complementary projections bound the Gram operators, and square root preserves order.
+  have hB_le (i : ℕ) : B (A i).val ≤ B T.val := by
+    have hP : IsStarProjection (P(i)) := isStarProjection_starProjection
+    have hQ : IsStarProjection (Q i) := hP.one_sub
+    have hQ_le : Q i ≤ 1 := sub_le_self _ hP.nonneg
+    apply CFC.monotone_sqrt
+    calc
+      star (A i).val * (A i).val = star T.val * Q i * T.val := by
+        simp only [hA, star_neg, neg_mul_neg, star_mul, hQ.isSelfAdjoint.star_eq, mul_assoc]
+        rw [← mul_assoc (Q i), hQ.isIdempotentElem.eq]
+      _ ≤ star T.val * T.val := by
+        simpa only [mul_one] using star_left_conjugate_le_conjugate hQ_le T.val
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  let d (S : H →L[ℂ] H) i : ℝ := (⟪b i, B S (b i)⟫_ℂ).re
+  have htrace (S : nuclearEndomorphisms H) : HasSum (d S.val) (traceNorm S) :=
+    hasSum_traceNorm_diagonal b S
+  have hd_nonneg (S : H →L[ℂ] H) i : 0 ≤ d S i :=
+    (hB_pos S).re_inner_nonneg_right (b i)
+  have hd_bound (i : ℕ) j : ‖d (A i).val j‖ ≤ d T.val j := by
+    rw [Real.norm_of_nonneg (hd_nonneg _ _)]
+    have h := (ContinuousLinearMap.le_def.mp (hB_le i)).re_inner_nonneg_right (b j)
+    change 0 ≤ (⟪b j, (B T.val - B (A i).val) (b j)⟫_ℂ).re at h
+    simpa only [sub_apply, inner_sub_right, Complex.sub_re, sub_nonneg] using h
+  have hd_tendsto (j) : Tendsto (fun i ↦ d (A i).val j) atTop (𝓝 0) := by
+    refine squeeze_zero (g := fun i ↦ ‖b j‖ * ‖Q i (T.val (b j))‖)
+      (fun i ↦ hd_nonneg _ _) (fun i ↦ ?_) ?_
+    · calc
+        d (A i).val j ≤ ‖b j‖ * ‖B (A i).val (b j)‖ :=
+          (Complex.re_le_norm _).trans (norm_inner_le_norm _ _)
+        _ = ‖b j‖ * ‖Q i (T.val (b j))‖ := by
+          rw [hB_norm, hA, neg_apply, norm_neg]
+          rfl
+    · simpa only [norm_zero, mul_zero] using
+        tendsto_const_nhds.mul (hQ_tendsto (T.val (b j))).norm
+  have hsum (i : ℕ) : (∑' j, d (A i).val j) = traceNorm (A i) := (htrace (A i)).tsum_eq
+  simpa only [tsum_zero, hsum] using
+    tendsto_tsum_of_dominated_convergence (g := fun _ ↦ 0)
+      (htrace T).summable hd_tendsto (Eventually.of_forall hd_bound)
 
 /-- Paper: Corollary C.3.5.5(2), p. 702. Right multiplication by the
 projections of a dense filtration converges in trace norm to the original operator. -/
