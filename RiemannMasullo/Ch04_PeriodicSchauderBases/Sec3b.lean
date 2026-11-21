@@ -268,7 +268,17 @@ theorem existsUnique_relativelyCompactActionIsotypicAverage
       ∀ K : Set G, IsCompact K →
         TendstoUniformlyOn (fun n g ↦ ρ g (u n)) (fun g ↦ ρ g v) atTop K)
     (ω : PontryaginDual G) :
-    ∃! P : E →L[ℂ] E, IsPettisIsotypicAverageOn μ X ρ ω P := by sorry
+    ∃! P : E →L[ℂ] E, IsPettisIsotypicAverageOn μ X ρ ω P := by
+  have : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  have : IsFiniteMeasure (μ.restrict X) := isFiniteMeasure_restrict.2
+    ((measure_mono subset_closure).trans_lt (hX.measure_lt_top (μ := μ))).ne
+  have hμX : ∀ᵐ x ∂μ.restrict X, x ∈ closure X :=
+    (ae_restrict_iff isClosed_closure.measurableSet).2 (ae_of_all _ fun _ hx ↦ subset_closure hx)
+  let A (g : G) := star (ω g : ℂ) • ρ g
+  have hA : Continuous (fun p : G × E ↦ A p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul hρ
+  simpa [IsPettisIsotypicAverageOn, A] using
+    existsUnique_pettisIntegral_continuousFamily (μ.restrict X) hX hμX A hA
 
 -- TODO(paper-gap): Corollary 4.3.3.8(1) allows nonmeasurable X.
 -- Parts (2) and (3) fail even for an open arc and the trivial weight.
