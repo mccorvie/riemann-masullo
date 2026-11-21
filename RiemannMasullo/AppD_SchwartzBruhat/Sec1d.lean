@@ -126,7 +126,11 @@ kills the diagonal S-units. -/
 theorem integralIdeleInsertion_descends :
     (Units.map (integralAdeleDiagonal F S).toMonoidHom).range ≤
       ((QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)).comp
-        (integralIdeleInsertion F S)).ker := by sorry
+        (integralIdeleInsertion F S)).ker := by
+  rw [← MonoidHom.comap_ker, QuotientGroup.ker_mk']
+  rintro _ ⟨u, rfl⟩
+  exact ⟨Units.map (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F).val.toRingHom.toMonoidHom u,
+    Units.ext rfl⟩
 
 /-- Paper: (D.1.10.2), p. 784. Insert an S-idele representative and take its global
 idele class. The source is Appendix A's S-idele class group. -/
