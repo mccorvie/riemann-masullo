@@ -303,12 +303,77 @@ theorem modulatedExponentialDecayStage_complete (k : GoodCompact) :
   let _ := schwartzBruhat_complete (G := G ⧸ k.val)
   exact hT.completeSpace hClosed.isComplete
 
+set_option linter.unusedSectionVars false in
 include hm hms hInt hne in
 /-- Paper: Remark D.3.3.6, p. 806. Multiplying by the module to the power a
 moves the decay interval to its translate by -a and gives a topological isomorphism. -/
 theorem modulatedExponentialDecay_shift_equiv (a : ℝ) :
     ∃ e : E ≃L[ℂ] ModulatedExponentialDecay m ((fun b : ℝ ↦ b - a) '' I),
-      ∀ f, (e f).val = modulationWeight m a f.val := by sorry
+      ∀ f, (e f).val = modulationWeight m a f.val := by
+  have weight_add {A : Type _} [CommGroup A] [TopologicalSpace A]
+      (n : A →ₜ* ℝ≥0ˣ) (b c : ℝ) (f : A → ℂ) :
+      modulationWeight n b (modulationWeight n c f) = modulationWeight n (b + c) f := by
+    funext x
+    have hx : 0 < ((n x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (n x))
+    simp only [modulationWeight, LinearMap.mulLeft_apply, Pi.mul_apply,
+      Real.rpow_add hx, Complex.ofReal_mul, mul_assoc]
+  let shift {A : Type _} [CommGroup A] [TopologicalSpace A]
+      (n : A →ₜ* ℝ≥0ˣ) (S T : Set ℝ) (c : ℝ) (h : ∀ b ∈ T, b + c ∈ S) :
+      modulatedExponentialDecaySubmodule n S →ₗ[ℂ] modulatedExponentialDecaySubmodule n T :=
+    ((modulationWeight n c).comp (modulatedExponentialDecaySubmodule n S).subtype).codRestrict
+      (modulatedExponentialDecaySubmodule n T) (by
+        intro f
+        refine (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr ?_
+        change modulationWeight n b (modulationWeight n c f.val) ∈ schwartzBruhatSubmodule A
+        rw [weight_add]
+        exact modulationWeight_mem_schwartzBruhat n S ⟨b + c, h b b.property⟩ f)
+  let continuousShift (S T : Set ℝ) (c : ℝ) (h : ∀ b ∈ T, b + c ∈ S) :
+      ModulatedExponentialDecay m S →L[ℂ] ModulatedExponentialDecay m T := by
+    let F : ModulatedExponentialDecay m S →ₗ[ℂ] ModulatedExponentialDecay m T := shift m S T c h
+    refine ⟨F, ?_⟩
+    change Continuous F
+    let FinalSeminorms (U : Set ℝ) := {q : Seminorm ℂ (modulatedExponentialDecaySubmodule m U) //
+      ∀ k : GoodCompact, Continuous (q ∘ modulatedExponentialDecayStageInclusion m U k)}
+    have generating (U : Set ℝ) :=
+      withGeneratingSeminorms_spec _ (Subtype.val : FinalSeminorms U → _)
+    refine (generating T).continuous_of_continuous_comp F fun p ↦ ?_
+    let q : Seminorm ℂ (ModulatedExponentialDecay m S) := p.val.comp F
+    change Continuous q
+    have hq (k : GoodCompact) : Continuous (q ∘ modulatedExponentialDecayStageInclusion m S k) := by
+      let n := quotientModulation m k.val k.property.1
+      let stageShift : ModulatedExponentialDecayStage m S k →ₗ[ℂ]
+          ModulatedExponentialDecayStage m T k := shift n S T c h
+      have hstage : Continuous stageShift := by
+        apply (modulatedExponentialDecayStage_twists_isInducing m T k).continuous_iff.mpr
+        apply continuous_pi
+        intro b
+        let d : S := ⟨b + c, h b b.property⟩
+        have htwist : Continuous (fun f : ModulatedExponentialDecayStage m S k ↦
+            modulatedExponentialDecayTwist n S d f) :=
+          (continuous_apply d).comp (modulatedExponentialDecayStage_twists_isInducing m S k).continuous
+        exact htwist.congr fun f ↦ Subtype.ext (weight_add n b c f.val).symm
+      exact ((p.property k).comp hstage).congr fun f ↦ congrArg p.val (Subtype.ext rfl)
+    exact (generating S).continuous_seminorm (⟨q, hq⟩ : FinalSeminorms S)
+  let J := (fun b : ℝ ↦ b - a) '' I
+  have hforward : ∀ b ∈ J, b + a ∈ I := by
+    rintro b ⟨d, hd, rfl⟩
+    simpa only [sub_add_cancel] using hd
+  have hbackward : ∀ b ∈ I, b + -a ∈ J := by
+    intro b hb
+    exact ⟨b, hb, sub_eq_add_neg b a⟩
+  let forward : E →L[ℂ] ModulatedExponentialDecay m J := continuousShift I J a hforward
+  let backward : ModulatedExponentialDecay m J →L[ℂ] E := continuousShift J I (-a) hbackward
+  have hleft : LeftInverse backward forward := by
+    intro f
+    apply Subtype.ext
+    change modulationWeight m (-a) (modulationWeight m a f.val) = f.val
+    rw [weight_add, neg_add_cancel, modulationWeight_zero]
+  have hright : RightInverse backward forward := by
+    intro f
+    apply Subtype.ext
+    change modulationWeight m a (modulationWeight m (-a) f.val) = f.val
+    rw [weight_add, add_neg_cancel, modulationWeight_zero]
+  exact ⟨ContinuousLinearEquiv.equivOfInverse forward backward hleft hright, fun _ ↦ rfl⟩
 
 include hm hms in
 /-- Paper: Remark D.3.3.6, p. 806. Multiplication by a continuous quasi-character
