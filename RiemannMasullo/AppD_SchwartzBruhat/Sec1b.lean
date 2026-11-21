@@ -6,6 +6,7 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Geometry.Manifold.ChartedSpace
 public import Mathlib.Topology.MetricSpace.Ultra.Basic
 public import Mathlib.Topology.Instances.ZMod
+import all RiemannMasullo.AppC_LCTVS.Sec1
 import RiemannMasullo.ForMathlib.Algebra.Module.ZLattice.Quotient
 import RiemannMasullo.ForMathlib.Topology.Algebra.ContinuousMonoidHom
 import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Divisible
@@ -3029,12 +3030,161 @@ theorem pontryaginDual_restriction_isBruhatSmooth (χ : PontryaginDual G)
 when the group is second countable. -/
 theorem schwartzBruhat_t2 [SecondCountableTopology G] : T2Space (SchwartzBruhat G) := by sorry
 
+/-- Paper: Lemma D.1.5.6, p. 763. A compact exhaustion controls the open subgroups,
+and shrinking identity neighborhoods control the kernels, since the elementary quotients
+have no small subgroups. Together they give an increasing cofinal sequence. -/
+private theorem exists_cofinal_bruhatStructuralPairs [SecondCountableTopology G] :
+    ∃ b : ℕ → BruhatStructuralPair G, Monotone b ∧ ∀ a, ∃ n, a ≤ b n := by
+  classical
+  let C := CompactExhaustion.choice G
+  obtain ⟨U, hU⟩ := (𝓝 (1 : G)).exists_antitone_basis
+  choose H hH using fun n ↦ exists_openCompactlyGeneratedSubgroup_contains (C.isCompact n)
+  choose A hA using fun n ↦ exists_lcaDualAnnihilator_subset_nhds
+    (inter_mem (hU.mem n) ((H n).property.1.mem_nhds (H n).val.one_mem))
+  let K (n : ℕ) := lcaDualAnnihilator (A n).val
+  have hGood (n : ℕ) : IsBruhatGoodSubgroup (K n) := by
+    refine ⟨(isCompact_lcaDualAnnihilator _ (A n).property.1).isClosed, ?_⟩
+    rw [show lcaAnnihilator (K n) = (A n).val from
+      lcaAnnihilator_dualAnnihilator_of_open _ (A n).property.1]
+    exact (A n).property
+  let b (n : ℕ) : BruhatStructuralPair G :=
+    ⟨((H n).val, OrderDual.toDual (K n)), (H n).property.1, (H n).property.2,
+      hGood n, fun _ hx ↦ (hA n hx).2⟩
+  have hCofinal (a : BruhatStructuralPair G) : ∃ n, a ≤ b n := by
+    obtain ⟨D, _, hDc, hDgen⟩ := a.property.2.1
+    obtain ⟨m, hm⟩ := C.exists_superset_of_isCompact (hDc.image continuous_subtype_val)
+    let : LocallyCompactSpace a.val.1 := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+    let : T1Space a.quotient :=
+      QuotientGroup.t1Space_iff.mpr (a.property.2.2.1.1.preimage continuous_subtype_val)
+    obtain ⟨e⟩ := a.elementary
+    obtain ⟨W, hW, hPow⟩ :=
+      exists_nhds_one_of_isLocallyEuclidean (locallyEuclidean_of_elementaryPresentation e)
+    let π : a.val.1 →* a.quotient := QuotientGroup.mk' _
+    have hPre : π ⁻¹' W ∈ 𝓝 (1 : a.val.1) :=
+      (QuotientGroup.continuous_mk (N := _) : Continuous π).continuousAt.preimage_mem_nhds
+        (by change W ∈ 𝓝 (π 1); rwa [map_one])
+    have hImage : Subtype.val '' (π ⁻¹' W) ∈ 𝓝 (1 : G) :=
+      a.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hPre
+    obtain ⟨l, _, hl⟩ := hU.1.mem_iff.mp hImage
+    let n := max m l
+    refine ⟨n, ?_, ?_⟩
+    · have hD : D ⊆ ((H n).val.comap a.val.1.subtype : Set a.val.1) :=
+        fun x hx ↦ hH n (C.subset (le_max_left m l) (hm ⟨x, hx, rfl⟩))
+      have htop : ⊤ ≤ (H n).val.comap a.val.1.subtype :=
+        hDgen ▸ (Subgroup.closure_le _).mpr hD
+      exact fun x hx ↦ htop (Subgroup.mem_top ⟨x, hx⟩)
+    · have hSmall : (K n : Set G) ⊆ Subtype.val '' (π ⁻¹' W) :=
+        fun _ hx ↦ hl (hU.2 (le_max_right m l) (hA n hx).1)
+      intro x hx
+      obtain ⟨y, _, rfl⟩ := hSmall hx
+      apply (a.quotient_mk_eq_one y).mp
+      change π y = 1
+      apply hPow
+      intro k
+      rw [← map_pow]
+      obtain ⟨z, hz, hzy⟩ := hSmall ((K n).pow_mem hx k)
+      exact (Subtype.ext hzy : z = y ^ k) ▸ hz
+  let := (bruhatStructuralPair_filtered (G := G)).2
+  choose upper hleft hright using (exists_ge_ge (α := BruhatStructuralPair G))
+  let chain : ℕ → BruhatStructuralPair G :=
+    Nat.rec (b 0) fun n prev ↦ upper prev (b (n + 1))
+  have hdom (n : ℕ) : b n ≤ chain n := by
+    cases n with
+    | zero => exact le_rfl
+    | succ n => exact hright (chain n) (b (n + 1))
+  exact ⟨chain, monotone_nat_of_le_succ fun n ↦ hleft (chain n) (b (n + 1)), fun a ↦ by
+    obtain ⟨n, hn⟩ := hCofinal a
+    exact ⟨n, hn.trans (hdom n)⟩⟩
+
+omit hTop hT2 hLC in
+/-- A stage function is determined by its realization because every elementary coordinate
+is represented by a point in the open subgroup. -/
+private theorem schwartzBruhatStageInclusion_injective (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) :
+    Function.Injective (schwartzBruhatStageInclusion a e) := by
+  classical
+  intro f g hfg
+  apply Subtype.ext
+  funext z
+  obtain ⟨q, hq⟩ := e.equiv.surjective (Multiplicative.ofAdd z)
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+  have h := congrArg (fun f : schwartzBruhatSubmodule G ↦ f.val x.val) hfg
+  change schwartzBruhatStageRealization a e f x.val = schwartzBruhatStageRealization a e g x.val at h
+  simpa only [schwartzBruhatStageRealization_apply, dite_eq_left x.property, hq,
+    toAdd_ofAdd] using h
+
+omit hTop hT2 hLC in
+/-- A cofinal sequence with embedding transitions induces the same final locally convex
+topology as the full system. Each stage embeds by factoring through a stage of that sequence. -/
+private theorem isEmbedding_of_cofinal_lcStages {ι E : Type*}
+    [AddCommGroup E] [Module ℂ E] [t : TopologicalSpace E] [IsTopologicalAddGroup E]
+    {X : ι → Type*} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] [∀ a, IsTopologicalAddGroup (X a)]
+    [∀ a, PolynormableSpace ℂ (X a)]
+    (inc : ∀ a, X a →ₗ[ℂ] E) (s : ℕ → ι)
+    (hinj : ∀ n, Function.Injective (inc (s n)))
+    (hex : ∀ x : E, ∃ a, x ∈ (inc a).range)
+    (ht : t = locallyConvexFinalTopology inc)
+    (hstep : ∀ n, ∃ j : X (s n) →L[ℂ] X (s (n + 1)),
+      (∀ x, inc (s (n + 1)) (j x) = inc (s n) x) ∧ IsEmbedding j)
+    (hfactor : ∀ a, ∃ n, ∃ j : X a →L[ℂ] X (s n),
+      (∀ x, inc (s n) (j x) = inc a x) ∧ IsEmbedding j)
+    (a : ι) : IsEmbedding (inc a) := by
+  classical
+  let stage (n : ℕ) := inc (s n)
+  have htests : (fun q : Seminorm ℂ E ↦ ∀ a, Continuous (q ∘ inc a)) =
+      (fun q : Seminorm ℂ E ↦ ∀ n, Continuous (q ∘ stage n)) := by
+    funext q
+    exact propext ⟨fun h n ↦ h (s n), fun h a ↦ by
+      obtain ⟨n, j, hj, _⟩ := hfactor a
+      exact ((h n).comp j.continuous).congr fun x ↦ congrArg q (hj x)⟩
+  have ht' : t = locallyConvexFinalTopology stage :=
+    ht.trans (congrArg (fun P : Seminorm ℂ E → Prop ↦
+      (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype P → Seminorm ℂ E)).topology) htests)
+  have hseminorms : WithSeminorms
+      (Subtype.val : {q : Seminorm ℂ E // ∀ n, Continuous (q ∘ stage n)} → Seminorm ℂ E) := ⟨ht'⟩
+  let i (n : ℕ) : X (s n) →L[ℂ] E :=
+    ⟨stage n, hseminorms.continuous_of_continuous_comp _ fun q ↦ q.property n⟩
+  choose j hj hEmb using hstep
+  have hlim : IsInjectiveLCLimit (X := fun n ↦ X (s n)) j i := by
+    refine ⟨hinj, fun n ↦ ContinuousLinearMap.ext (hj n), ?_, ht'⟩
+    intro x
+    obtain ⟨c, y, rfl⟩ := hex x
+    obtain ⟨n, k, hk, _⟩ := hfactor c
+    exact ⟨n, k y, hk y⟩
+  obtain ⟨n, k, hk, hkEmb⟩ := hfactor a
+  have hcomp : (i n : X (s n) → E) ∘ k = inc a := funext hk
+  exact hcomp ▸ (hlim.isEmbedding_stage hEmb n).comp hkEmb
+
 /-- Paper: Lemma D.1.5.6(1), p. 763. Each structural stage inherits its intrinsic
 topology from the final locally convex topology. -/
 theorem schwartzBruhatStage_isEmbedding [SecondCountableTopology G]
     (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
     IsEmbedding (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from
-      schwartzBruhatStageInclusion a e) := by sorry
+      schwartzBruhatStageInclusion a e) := by
+  classical
+  let ι := (c : BruhatStructuralPair G) × ElementaryLCAPresentation c.quotient
+  let X (c : ι) := SchwartzBruhatStage c.2
+  let inc (c : ι) : X c →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion c.1 c.2
+  have hseq := exists_cofinal_bruhatStructuralPairs (G := G)
+  let b := hseq.choose
+  let s (n : ℕ) : ι := ⟨b n, Classical.choice (b n).elementary⟩
+  have htransition (c c' : ι) (hc : c.1 ≤ c'.1) :
+      ∃ j : X c →L[ℂ] X c', (∀ x, inc c' (j x) = inc c x) ∧ IsEmbedding j := by
+    have h := schwartzBruhatStage_transition hc c.2 c'.2
+    exact ⟨h.choose, fun x ↦ Subtype.ext (h.choose_spec.1 x), h.choose_spec.2.isEmbedding⟩
+  refine isEmbedding_of_cofinal_lcStages (X := X) inc s
+    (fun n ↦ schwartzBruhatStageInclusion_injective (s n).1 (s n).2)
+    ?_ schwartzBruhat_topology_eq_final
+    (fun n ↦ htransition (s n) (s (n + 1)) (hseq.choose_spec.1 (Nat.le_succ n))) ?_ ⟨a, e⟩
+  · intro f
+    have hf := (mem_schwartzBruhatSubmodule_iff _).mp
+      (show schwartzBruhatSubmodule G from f).property
+    exact hf.elim fun c hc ↦ hc.elim fun p hp ↦ hp.elim fun x hx ↦
+      ⟨⟨c, p⟩, x, Subtype.ext hx⟩
+  · intro c
+    have hc := hseq.choose_spec.2 c.1
+    exact ⟨hc.choose, htransition c (s hc.choose) hc.choose_spec⟩
 
 /-- Paper: Lemma D.1.5.6(2), p. 763. Every bounded subset of the limit is
 the image of a bounded subset of a single stage. -/
