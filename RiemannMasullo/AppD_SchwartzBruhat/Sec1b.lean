@@ -45,7 +45,8 @@ def IsLocallyEuclidean (X : Type*) [TopologicalSpace X] : Prop :=
 dimension zero.
 Deviation: Sanity check for the locally Euclidean condition. -/
 theorem isLocallyEuclidean_of_discrete (X : Type*) [TopologicalSpace X]
-    [DiscreteTopology X] : IsLocallyEuclidean X := by sorry
+    [DiscreteTopology X] : IsLocallyEuclidean X :=
+  ⟨0, ⟨ChartedSpace.ofDiscreteTopology⟩⟩
 
 /-- Paper: (D.1.4.2), p. 757. A presentation identifies a group topologically
 with a product of real, torus, free discrete and finite factors.
