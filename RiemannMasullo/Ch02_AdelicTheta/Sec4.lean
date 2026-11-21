@@ -1024,12 +1024,55 @@ theorem sLocalHomogeneousAdelicTheta_norm_pow_isBigO
   exact norm_pow_isBigO_integral_of_representatives μ r ε (𝓝[>] (0 : ℝ))
     θ₀ φ (sLocalAdelicTheta_norm_pow_isBigO F S ε hε f) hrep
 
+-- Scanning the inferred adelic instances for unused section variables is expensive.
+set_option linter.unusedSectionVars false in
 /-- Paper: Proposition 2.4.3.1(2), p. 113. Below a positive norm cutoff
 the bound for theta times a positive norm power is uniform on a bounded
 set of test functions. -/
 theorem sLocalAdelicTheta_norm_pow_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : Iₛ, normℝ g < T →
-      ‖(normℝ g ^ ε) • sLocalAdelicTheta F S f g‖ ≤ C := by sorry
+      ‖(normℝ g ^ ε) • sLocalAdelicTheta F S f g‖ ≤ C := by
+  refine (sLocalAdelicTheta_log_growth_bounded F S B hB).elim fun C₁ h₁ ↦ ?_
+  refine h₁.elim fun C₂ h₂ ↦ ?_
+  have hC₁ := h₂.1
+  have hC₂ := h₂.2.1
+  have hbound := h₂.2.2
+  -- The degree-n term in the exponential series bounds the logarithmic weight.
+  have hlog (n : ℕ) (t : ℝ) (ht : 0 < t) (ht₁ : t ≤ 1) :
+      t ^ ε * |Real.log t| ^ n ≤ n.factorial / ε ^ n := by
+    have htε := Real.rpow_pos_of_pos ht ε
+    have hexp : Real.exp (ε * |Real.log t|) = (t ^ ε)⁻¹ := by
+      rw [abs_of_nonpos (Real.log_nonpos ht.le ht₁), Real.rpow_def_of_pos ht,
+        ← Real.exp_neg, mul_neg, mul_comm ε (Real.log t)]
+    have hp := (div_le_iff₀ (by positivity : (0 : ℝ) < n.factorial)).mp
+      (Real.pow_div_factorial_le_exp (ε * |Real.log t|) (mul_nonneg hε.le (abs_nonneg _)) n)
+    rw [mul_pow, hexp] at hp
+    apply (le_div_iff₀ (pow_pos hε n)).mpr
+    calc
+      t ^ ε * |Real.log t| ^ n * ε ^ n = t ^ ε * (ε ^ n * |Real.log t| ^ n) := by
+        rw [mul_assoc, mul_comm (|Real.log t| ^ n)]
+      _ ≤ t ^ ε * ((t ^ ε)⁻¹ * n.factorial) := mul_le_mul_of_nonneg_left hp htε.le
+      _ = _ := by rw [← mul_assoc, mul_inv_cancel₀ htε.ne', one_mul]
+  let n := Fintype.card (InfinitePlace F) + S.card - 1
+  refine ⟨C₁ * (n.factorial / ε ^ n) + C₂, 1, by positivity, zero_lt_one, ?_⟩
+  intro f hf g hg
+  let t : ℝ := normℝ g
+  have ht : 0 < t := NNReal.coe_pos.mpr (Units.zero_lt (sIdeleNorm F S g))
+  have htε := Real.rpow_pos_of_pos ht ε
+  have htε_le : t ^ ε ≤ 1 := Real.rpow_le_one ht.le hg.le hε.le
+  have hweighted : C₁ * (t ^ ε * |Real.log t| ^ n) + t ^ ε * C₂ ≤
+      C₁ * (n.factorial / ε ^ n) + C₂ :=
+    add_le_add (mul_le_mul_of_nonneg_left (hlog n t ht hg.le) hC₁.le)
+      (mul_le_of_le_one_left hC₂.le htε_le)
+  change ‖(t ^ ε) • sLocalAdelicTheta F S f g‖ ≤ _
+  calc
+    _ = t ^ ε * ‖sLocalAdelicTheta F S f g‖ :=
+      norm_smul_of_nonneg htε.le (sLocalAdelicTheta F S f g)
+    _ ≤ t ^ ε * (C₁ * |Real.log t| ^ n + C₂) :=
+      mul_le_mul_of_nonneg_left (hbound f hf g hg) htε.le
+    _ = C₁ * (t ^ ε * |Real.log t| ^ n) + t ^ ε * C₂ := by
+      rw [mul_add, mul_left_comm (t ^ ε) C₁]
+    _ ≤ _ := hweighted
 
 /-- Paper: Proposition 2.4.3.1(2), p. 113. Below a positive norm cutoff
 the corresponding homogeneous bound is uniform on a bounded set of test functions.
