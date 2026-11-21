@@ -88,7 +88,84 @@ theorem tendsto_horizontalIntegral_of_slowGrowthNearPoles
     (ε : ℝ) (hε : 0 < ε) (hΦ : UniformlySchwartzOnStrip Φ (a - ε) (b + ε)) :
     let F (k : ℤ) (σ : ℝ) := ‖Φ (verticalPoint σ (T k)) * f (verticalPoint σ (T k))‖
     (∀ k : ℤ, 2 ≤ |k| → IntervalIntegrable (F k) volume a b) ∧
-      Tendsto (fun k : ℤ ↦ ∫ σ in a..b, F k σ) atAbsInfty (𝓝 0) := by sorry
+      Tendsto (fun k : ℤ ↦ ∫ σ in a..b, F k σ) atAbsInfty (𝓝 0) := by
+  intro F
+  obtain ⟨hab, _, _, _, hHeight, _, ⟨c, γ, hc, hγ, hLower⟩, hDiff,
+    ⟨β, A, _, hA, hGrowth⟩, _⟩ := hT
+  obtain ⟨_, hΦDiff, hDecay⟩ := hΦ
+  have hNonneg (k : ℤ) (σ : ℝ) : 0 ≤ F k σ := norm_nonneg _
+  have hProduct (k : ℤ) (hk : k ≠ 0) (σ : ℝ) (hσ : σ ∈ Ioo a b) {D : ℝ}
+      (hD : ‖Φ (verticalPoint σ (T k))‖ ≤ D) : F k σ ≤ D * (A * |(k : ℝ)| ^ β) := by
+    change ‖Φ (verticalPoint σ (T k)) * f (verticalPoint σ (T k))‖ ≤ _
+    rw [norm_mul]
+    exact mul_le_mul hD (hGrowth k hk σ hσ) (norm_nonneg _) ((norm_nonneg _).trans hD)
+  have hInt (k : ℤ) (hk : k ≠ 0) : IntervalIntegrable (F k) volume a b := by
+    have hPoint : Continuous (fun σ : ℝ ↦ verticalPoint σ (T k)) := by fun_prop
+    have hΦCont : ContinuousOn (fun σ ↦ Φ (verticalPoint σ (T k))) (Icc a b) := by
+      apply hΦDiff.continuousOn.comp hPoint.continuousOn
+      intro σ hσ
+      simpa using (show a - ε < σ ∧ σ < b + ε by
+        exact ⟨by linarith [hσ.1], by linarith [hσ.2]⟩)
+    obtain ⟨δ, hδ, hfDiff⟩ := hDiff k
+    have hfCont : ContinuousOn (fun σ ↦ f (verticalPoint σ (T k))) (Ioo a b) := by
+      apply hfDiff.continuousOn.comp hPoint.continuousOn
+      intro σ hσ
+      simpa using (show σ ∈ Ioo a b ∧ T k - δ < T k ∧ T k < T k + δ from
+        ⟨hσ, by linarith, by linarith⟩)
+    have hFCont : ContinuousOn (F k) (Ioo a b) :=
+      ((hΦCont.mono Ioo_subset_Icc_self).mul hfCont).norm
+    obtain ⟨M, hM⟩ := isCompact_Icc.bddAbove_image hΦCont.norm
+    rw [intervalIntegrable_iff_integrableOn_Ioc_of_le hab.le, IntegrableOn,
+      ← restrict_Ioo_eq_restrict_Ioc]
+    have hConst : IntegrableOn (fun _ : ℝ ↦ M * (A * |(k : ℝ)| ^ β)) (Ioo a b) volume :=
+      integrableOn_const measure_Ioo_lt_top.ne
+    apply hConst.mono_nonneg (hFCont.aestronglyMeasurable measurableSet_Ioo)
+      (Eventually.of_forall (hNonneg k))
+    filter_upwards [ae_restrict_mem (μ := volume) (measurableSet_Ioo (a := a) (b := b))] with σ hσ
+    exact hProduct k hk σ hσ (hM (mem_image_of_mem _ (Ioo_subset_Icc_self hσ)))
+  refine ⟨fun k hk ↦ hInt k (abs_pos.mp (lt_of_lt_of_le (by norm_num) hk)), ?_⟩
+  obtain ⟨N, hN⟩ := exists_nat_gt (max 1 (β / γ))
+  have hN₁ : 1 ≤ N := by
+    exact_mod_cast ((le_max_left 1 (β / γ)).trans hN.le)
+  have hExponent : β < γ * N := by
+    rw [mul_comm]
+    exact (div_lt_iff₀ hγ).mp ((le_max_right 1 (β / γ)).trans_lt hN)
+  obtain ⟨C, hC, hBound⟩ := hDecay ε hε (by linarith) N hN₁
+  have hAbs : Tendsto (fun k : ℤ ↦ |k|) atAbsInfty atTop := tendsto_comap
+  have hAbsReal : Tendsto (fun k : ℤ ↦ |(k : ℝ)|) atAbsInfty atTop := by
+    simpa only [Function.comp_def, Int.cast_abs] using
+      (tendsto_intCast_atTop_atTop (R := ℝ)).comp hAbs
+  let B (k : ℤ) := (C * A / c ^ N) * |(k : ℝ)| ^ (β - γ * N)
+  have hLimit : Tendsto (fun k : ℤ ↦ (b - a) * B k) atAbsInfty (𝓝 0) := by
+    have hPow := (tendsto_rpow_neg_atTop (sub_pos.mpr hExponent)).comp hAbsReal
+    simpa only [Function.comp_def, B, neg_sub, mul_zero] using
+      (hPow.const_mul (C * A / c ^ N)).const_mul (b - a)
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le' tendsto_const_nhds hLimit
+  · exact Eventually.of_forall fun k ↦ intervalIntegral.integral_nonneg_of_forall hab.le
+      (hNonneg k)
+  · have hDecayT : Tendsto T atAbsInfty (comap abs atTop) := tendsto_comap_iff.mpr hHeight
+    filter_upwards [hAbs.eventually_gt_atTop 0, hLower, hDecayT.eventually hBound] with k hk hl hd
+    have hk₀ := abs_pos.mp hk
+    have hkPos : 0 < |(k : ℝ)| := by exact_mod_cast hk
+    have hDenom : 0 < (c * |(k : ℝ)| ^ γ) ^ N := by positivity
+    have hPowLe : (c * |(k : ℝ)| ^ γ) ^ N ≤ |T k| ^ N := by gcongr
+    have hMajor : ∀ σ ∈ Ioo a b, F k σ ≤ B k := by
+      intro σ hσ
+      have hΦLe : ‖Φ (verticalPoint σ (T k))‖ ≤ C / |T k| ^ N := by
+        apply hd σ
+        simpa using Ioo_subset_Icc_self hσ
+      calc
+        F k σ ≤ (C / |T k| ^ N) * (A * |(k : ℝ)| ^ β) := hProduct k hk₀ σ hσ hΦLe
+        _ ≤ (C / (c * |(k : ℝ)| ^ γ) ^ N) * (A * |(k : ℝ)| ^ β) :=
+          mul_le_mul_of_nonneg_right (div_le_div_of_nonneg_left hC.le hDenom hPowLe) (by positivity)
+        _ = B k := by
+          dsimp only [B]
+          rw [mul_pow, ← Real.rpow_mul_natCast (abs_nonneg _) γ N, Real.rpow_sub hkPos]
+          ring
+    calc
+      (∫ σ in a..b, F k σ) ≤ ∫ _ in a..b, B k :=
+        intervalIntegral.integral_mono_on_of_le_Ioo hab.le (hInt k hk₀) intervalIntegrable_const hMajor
+      _ = (b - a) * B k := by rw [intervalIntegral.integral_const, smul_eq_mul]
 
 -- TODO(paper-gap): Theorem B.3.2.1(1) uses rectangles defined for T > 0,
 -- but the nonnegative-indexed witness heights need not be positive.
