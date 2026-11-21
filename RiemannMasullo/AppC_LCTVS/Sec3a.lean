@@ -2593,13 +2593,65 @@ theorem tensorToFiniteRank_mem_nuclearEndomorphisms (z : StrongDual ℂ H ⊗[�
     exact tensorToFiniteRank_tmul φ y x
   | add z w hz hw => rw [map_add]; exact add_mem hz hw
 
+/-- The trace norm of a nuclear series is bounded by the sum of its rank-one costs. -/
+private theorem traceNorm_le_tsum_rankOne_cost (T : nuclearEndomorphisms H)
+    (a : ℕ → ℂ) (φ : ℕ → H →L[ℂ] ℂ) (y : ℕ → H)
+    (hcost : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖y n‖)))
+    (hseries : ∀ x, HasSum (fun n ↦ (a n * φ n x) • y n) (T.val x)) :
+    traceNorm T ≤ ∑' n, ‖a n‖ * (‖φ n‖ * ‖y n‖) := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  obtain ⟨U, hU, hUS⟩ := exists_contraction_comp_eq_of_norm_le T.val S
+    (fun x ↦ (norm_sqrt_adjoint_mul_apply T.val x).le)
+  have hnorm (n : ℕ) : ‖U (y n)‖ ≤ ‖y n‖ :=
+    (U.le_opNorm (y n)).trans (mul_le_of_le_one_left (norm_nonneg _) hU)
+  have hle (n : ℕ) : ‖a n‖ * (‖φ n‖ * ‖U (y n)‖) ≤ ‖a n‖ * (‖φ n‖ * ‖y n‖) :=
+    mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left (hnorm n) (norm_nonneg _))
+      (norm_nonneg _)
+  have hcostU : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖U (y n)‖)) :=
+    hcost.of_nonneg_of_le (fun _ ↦ by positivity) hle
+  have hseriesS (x : H) : HasSum (fun n ↦ (a n * φ n x) • U (y n)) (S x) := by
+    rw [← hUS]
+    simpa only [ContinuousLinearMap.comp_apply, map_smul] using U.hasSum (hseries x)
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hS := isNuclearOperator_sqrt_adjoint_mul T.val T.property
+  have hre := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b S hS).of_norm.hasSum
+  simp only [Complex.reCLM_apply] at hre
+  rw [(hasSum_traceNorm_diagonal b T).unique hre,
+    tsum_hilbertDiagonal_eq_series b S a φ (fun n ↦ U (y n)) hcostU hseriesS]
+  have hentry (n : ℕ) : ‖a n * φ n (U (y n))‖ ≤ ‖a n‖ * (‖φ n‖ * ‖y n‖) := by
+    rw [norm_mul]
+    exact (mul_le_mul_of_nonneg_left ((φ n).le_opNorm (U (y n))) (norm_nonneg _)).trans (hle n)
+  exact (Complex.re_le_norm _).trans
+    ((hcost.of_norm_bounded hentry).hasSum.norm_le_of_bounded hcost.hasSum hentry)
+
 /-- Paper: Lemma C.3.4.4(4), p. 698. Finite-rank operators from the canonical
 tensor map approximate every nuclear endomorphism in trace norm. -/
 theorem exists_tensorToFiniteRank_traceNorm_sub_lt (T : nuclearEndomorphisms H)
     {ε : ℝ} (hε : 0 < ε) :
     ∃ z : StrongDual ℂ H ⊗[ℂ] H,
-      traceNorm (T - ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩) < ε :=
-  by sorry
+      traceNorm (T - ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩) < ε := by
+  obtain ⟨a, φ, y, ha, hφ, hy, hseries⟩ := (isNuclearOperator_iff_isBanachNuclear T.val).mp T.property
+  obtain ⟨C, hC, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  obtain ⟨R, _, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+  let cost (n : ℕ) := ‖a n‖ * (‖φ n‖ * ‖y n‖)
+  have hcost : Summable cost := by
+    have hnonneg (n : ℕ) : 0 ≤ cost n := by
+      dsimp [cost]
+      positivity
+    refine (ha.mul_right (C * R)).of_nonneg_of_le hnonneg fun n ↦ ?_
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hφC _ (mem_range_self n)) (hyR _ (mem_range_self n))
+        (norm_nonneg _) hC.le) (norm_nonneg _)
+  obtain ⟨N, hN⟩ := ((tendsto_sum_nat_add cost).eventually_lt_const hε).exists
+  let z : StrongDual ℂ H ⊗[ℂ] H := ∑ n ∈ Finset.range N, a n • (φ n ⊗ₜ[ℂ] y n)
+  refine ⟨z, lt_of_le_of_lt (traceNorm_le_tsum_rankOne_cost _
+    (fun n ↦ a (n + N)) (fun n ↦ φ (n + N)) (fun n ↦ y (n + N))
+    ((summable_nat_add_iff N).mpr hcost) ?_) hN⟩
+  intro x
+  change HasSum (fun n ↦ (a (n + N) * φ (n + N) x) • y (n + N))
+    (T.val x - tensorToFiniteRank z x)
+  simpa only [z, map_sum, sum_apply, map_smul, smul_apply, tensorToFiniteRank_tmul, mul_smul] using
+    (hasSum_nat_add_iff' N).mpr (hseries x)
 
 /-- Paper: Lemma C.3.4.4(4), p. 698. On a separable Hilbert space there is a
 countable trace-norm dense set of nuclear endomorphisms.
