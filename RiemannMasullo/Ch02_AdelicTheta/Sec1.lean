@@ -37,6 +37,7 @@ import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import Mathlib.Topology.Connected.LocallyConnected
 import Mathlib.Topology.Compactness.Bases
 import Mathlib.Topology.LocallyConstant.Algebra
+import RiemannMasullo.ForMathlib.Topology.LocallyConstant.CompactSupport
 
 /-!
 # Schwartz–Bruhat functions
@@ -2456,11 +2457,240 @@ local instance (S : Finset (Places(F))) :
 -- TODO(paper-gap): The cofinal family in the proof of Proposition 2.1.2.8 only
 -- shrinks inside the integral product. It cannot exhaust the ambient group.
 
+/-- For a totally disconnected group whose compact sets fit in compact subgroups, each
+elementary stage is realized by locally constant functions with compact support. -/
+private theorem bruhatStage_locallyConstant_compactSupport {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [TotallyDisconnectedSpace G]
+    (hcompact : ∀ K : Set G, IsCompact K → ∃ H : Subgroup G, IsCompact (H : Set G) ∧ K ⊆ H)
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) :
+    IsLocallyConstant (schwartzBruhatStageRealization a e s) ∧
+      HasCompactSupport (schwartzBruhatStageRealization a e s) := by
+  classical
+  obtain ⟨U, -, hU, hgen⟩ := a.property.2.1
+  obtain ⟨H, hH, hUH⟩ := hcompact _ (hU.image continuous_subtype_val)
+  have h := ((H.comap a.val.1.subtype).closure_le).2
+    (fun x hx ↦ hUH (mem_image_of_mem _ hx))
+  rw [hgen] at h
+  have hc : IsCompact (a.val.1 : Set G) :=
+    hH.of_isClosed_subset (a.val.1.isClosed_of_isOpen a.property.1)
+      fun x hx ↦ h (Subgroup.mem_top (x := (⟨x, hx⟩ : a.val.1)))
+  let : CompactSpace a.val.1 := isCompact_iff_compactSpace.mp hc
+  let : NonarchimedeanGroup a.quotient := {
+    is_nonarchimedean := fun V hV ↦ by
+      let q := QuotientGroup.mk' ((OrderDual.ofDual a.val.2).comap a.val.1.subtype)
+      have hq : Continuous q := QuotientGroup.continuous_mk
+      have hp : q ⁻¹' V ∈ 𝓝 (1 : a.val.1) :=
+        hq.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hV)
+      obtain ⟨W, ⟨hW, h1W⟩, hWV⟩ := (nhds_basis_isClopen (1 : a.val.1)).mem_iff.mp hp
+      obtain ⟨B, hB⟩ := IsTopologicalGroup.exist_openSubgroup_sub_clopen_nhds_of_one hW h1W
+      refine ⟨⟨B.toSubgroup.map q, QuotientGroup.isOpenMap_coe _ B.isOpen⟩, ?_⟩
+      rintro _ ⟨x, hx, rfl⟩
+      exact hWV (hB hx) }
+  let : T1Space a.quotient := QuotientGroup.t1Space_iff.2
+    (a.property.2.2.1.1.preimage continuous_subtype_val)
+  let : LocallyConnectedSpace (AddCircle (1 : ℝ)) :=
+    (QuotientAddGroup.isQuotientMap_mk _).isCoinducing.locallyConnectedSpace
+  let : LocallyConnectedSpace (Multiplicative
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)) :=
+    inferInstanceAs (LocallyConnectedSpace
+      (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor))
+  let : LocallyConnectedSpace a.quotient :=
+    e.equiv.symm.toHomeomorph.isQuotientMap.isCoinducing.locallyConnectedSpace
+  let : DiscreteTopology a.quotient := discreteTopology_iff_isOpen_singleton_one.2 (by
+    rw [← totallyDisconnectedSpace_iff_connectedComponent_singleton.1 inferInstance (1 : a.quotient)]
+    exact isOpen_connectedComponent)
+  refine ⟨(IsLocallyConstant.iff_exists_open _).2 fun x ↦ ?_, ?_⟩
+  · by_cases hx : x ∈ a.val.1
+    · let q : a.val.1 → a.quotient := QuotientGroup.mk
+      let V := q ⁻¹' {q ⟨x, hx⟩}
+      have hV : IsOpen V := (isOpen_discrete _).preimage QuotientGroup.continuous_mk
+      refine ⟨Subtype.val '' V, a.property.1.isOpenEmbedding_subtypeVal.isOpenMap _ hV,
+        ⟨⟨x, hx⟩, rfl, rfl⟩, ?_⟩
+      rintro _ ⟨y, hy, rfl⟩
+      have heq : q y = q ⟨x, hx⟩ := hy
+      simp only [schwartzBruhatStageRealization_apply, dite_eq_left y.property, dite_eq_left hx]
+      exact congrArg (fun z ↦ s (Multiplicative.toAdd (e.equiv z))) heq
+    · refine ⟨(a.val.1 : Set G)ᶜ, (a.val.1.isClosed_of_isOpen a.property.1).isOpen_compl, hx, ?_⟩
+      intro y hy
+      change y ∉ a.val.1 at hy
+      simp only [schwartzBruhatStageRealization_apply, dite_eq_right hy, dite_eq_right hx]
+  · apply HasCompactSupport.of_support_subset_isCompact hc
+    intro x hx
+    by_contra h
+    change x ∉ a.val.1 at h
+    exact hx (by simp only [schwartzBruhatStageRealization_apply, dite_eq_right h])
+
+/-- Second-countable totally disconnected groups whose compact sets fit in compact subgroups
+have countable-dimensional Schwartz–Bruhat spaces. -/
+private theorem schwartzBruhat_countableRank_of_compactSubgroups (G : Type*)
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [TotallyDisconnectedSpace G]
+    [SecondCountableTopology G]
+    (hcompact : ∀ K : Set G, IsCompact K → ∃ H : Subgroup G, IsCompact (H : Set G) ∧ K ⊆ H) :
+    Module.rank ℂ (SchwartzBruhat G) ≤ ℵ₀ := by
+  change Module.rank ℂ ↥(schwartzBruhatSubmodule G) ≤ ℵ₀
+  obtain ⟨s, hs, hspan⟩ := exists_countable_span_of_locallyConstant_compactSupport G ℂ
+  have hle : schwartzBruhatSubmodule G ≤ Submodule.span ℂ s := by
+    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+    rintro _ ⟨f, rfl⟩
+    obtain ⟨hf, hc⟩ := bruhatStage_locallyConstant_compactSupport hcompact a e f
+    exact hspan _ hf hc
+  exact (Submodule.rank_mono hle).trans
+    ((rank_span_le s).trans (Cardinal.mk_le_aleph0_iff.mpr hs.to_subtype))
+
+/-- Finite places form a countable set because their ideals are finitely generated
+over the countable ring of integers. -/
+private theorem finitePlaces_countable : Countable (Places(F)) := by
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable (𝓞 F) := (RingOfIntegers.coe_injective (K := F)).countable
+  have h : Surjective (fun s : Finset (𝓞 F) ↦ Ideal.span (s : Set (𝓞 F))) :=
+    fun I ↦ IsNoetherian.noetherian I
+  let : Countable (Ideal (𝓞 F)) := h.countable
+  exact (show Injective (HeightOneSpectrum.asIdeal (R := 𝓞 F)) from fun _ _ h ↦
+    HeightOneSpectrum.ext h).countable
+
+/-- Additive form of compact-subgroup containment in a finite completion. -/
+private theorem adicCompletion_compact_subset_addSubgroup (w : Places(F))
+    (K : Set (w.adicCompletion F)) (hK : IsCompact K) :
+    ∃ H : AddSubgroup (w.adicCompletion F), IsCompact (H : Set (w.adicCompletion F)) ∧ K ⊆ H := by
+  obtain ⟨H, hH, hKH⟩ :=
+    finitePlace_exists_compactOpenSubgroup F w (hK.image continuous_ofAdd)
+  exact ⟨H.toSubgroup.toAddSubgroup, hH, fun x hx ↦ hKH (mem_image_of_mem _ hx)⟩
+
+/-- Compact sets in a finite product fit in products of compact additive subgroups. -/
+private theorem finitePlaceProduct_compact_subset_subgroup (S : Finset (Places(F)))
+    (K : Set (Multiplicative (FinitePlaceProduct F S))) (hK : IsCompact K) :
+    ∃ H : Subgroup (Multiplicative (FinitePlaceProduct F S)),
+      IsCompact (H : Set (Multiplicative (FinitePlaceProduct F S))) ∧ K ⊆ H := by
+  choose B hB hKB using fun w : S ↦ adicCompletion_compact_subset_addSubgroup F w.val _
+    (hK.image ((continuous_apply w).comp continuous_toAdd))
+  exact ⟨(AddSubgroup.pi univ B).toSubgroup, isCompact_univ_pi hB,
+    fun x hx w _ ↦ hKB w (mem_image_of_mem _ hx)⟩
+
+open TopologicalSpace in
+/-- The tail is covered by the open stages with integral coordinates outside a finite set.
+Each of these stages embeds into the ordinary countable product. -/
+private theorem finiteAdeleTail_secondCountable (T : Finset (Places(F))) :
+    SecondCountableTopology (FiniteAdeleTail F T) := by
+  classical
+  let I := {w : Places(F) // w ∉ T}
+  let K (w : I) := w.val.adicCompletion F
+  let O (w : I) : Set (K w) := w.val.adicCompletionIntegers F
+  have hopen (w : I) : IsOpen (O w) := Valued.isOpen_valuationSubring (K w)
+  let : Countable (Places(F)) := finitePlaces_countable F
+  let (w : I) : ProperSpace (K w) := properSpace_adicCompletion w.val
+  let U (s : Finset I) := {a : FiniteAdeleTail F T | ∀ w ∉ s, a w ∈ O w}
+  let (s : Finset I) : SecondCountableTopology (U s) := by
+    have hs : Filter.cofinite ≤ Filter.principal (s : Set I)ᶜ :=
+      le_principal_iff.mpr s.finite_toSet.compl_mem_cofinite
+    have he := RestrictedProduct.isEmbedding_inclusion_principal (R := K) (A := O) hs
+    let : SecondCountableTopology (Πʳ w : I, [K w, O w]_[Filter.principal (s : Set I)ᶜ]) :=
+      (RestrictedProduct.isEmbedding_coe_of_principal (R := K) (A := O)).secondCountableTopology
+    have hrange : range (RestrictedProduct.inclusion K O hs) = U s := by
+      rw [RestrictedProduct.range_inclusion]
+      ext a
+      exact Filter.eventually_principal
+    exact hrange ▸ he.toHomeomorph.symm.isEmbedding.secondCountableTopology
+  refine secondCountableTopology_of_countable_cover (U := U)
+    (fun _ ↦ RestrictedProduct.isOpen_forall_imp_mem hopen) (eq_univ_of_forall fun a ↦ ?_)
+  have he := Filter.eventually_cofinite.mp a.2
+  exact mem_iUnion.mpr ⟨he.toFinset, fun w hw ↦ by
+    by_contra h
+    exact hw (he.mem_toFinset.mpr h)⟩
+
+/-- Compact sets in the tail have a common finite set of possibly nonintegral
+coordinates. Bound those coordinates by compact additive subgroups. -/
+private theorem finiteAdeleTail_compact_subset_subgroup (T : Finset (Places(F)))
+    (C : Set (Multiplicative (FiniteAdeleTail F T))) (hC : IsCompact C) :
+    ∃ H : Subgroup (Multiplicative (FiniteAdeleTail F T)),
+      IsCompact (H : Set (Multiplicative (FiniteAdeleTail F T))) ∧ C ⊆ H := by
+  classical
+  let I := {w : Places(F) // w ∉ T}
+  let K (w : I) := w.val.adicCompletion F
+  let O (w : I) := w.val.adicCompletionIntegers F
+  let C' := Multiplicative.toAdd '' C
+  let U (s : Finset I) := {a : FiniteAdeleTail F T | ∀ w ∉ s, a w ∈ O w}
+  have hcover : C' ⊆ ⋃ s, U s := by
+    intro a _
+    have ha := Filter.eventually_cofinite.mp a.2
+    exact mem_iUnion.mpr ⟨ha.toFinset, fun w hw ↦ not_not.mp (hw ∘ ha.mem_toFinset.mpr)⟩
+  obtain ⟨s, hs⟩ := (hC.image continuous_toAdd).elim_directed_cover U
+    (fun _ ↦ RestrictedProduct.isOpen_forall_imp_mem (fun w ↦ Valued.isOpen_valuationSubring (K w)))
+    hcover (fun s₁ s₂ ↦ ⟨s₁ ∪ s₂, fun _ hx w hw ↦ hx w (fun h ↦ hw (Finset.mem_union_left _ h)),
+      fun _ hx w hw ↦ hx w (fun h ↦ hw (Finset.mem_union_right _ h))⟩)
+  choose B hB hCB using fun w : I ↦ adicCompletion_compact_subset_addSubgroup F w.val _
+    ((hC.image continuous_toAdd).image (RestrictedProduct.continuous_eval w))
+  let D (w : I) : AddSubgroup (K w) := if w ∈ s then B w else (O w).toAddSubgroup
+  have hD_in (w : I) (hw : w ∈ s) : D w = B w := ite_eq_left hw
+  have hD_out (w : I) (hw : w ∉ s) : D w = (O w).toAddSubgroup := ite_eq_right hw
+  let (w : I) : CompactSpace (D w) := by
+    by_cases hw : w ∈ s
+    · rw [hD_in w hw]
+      exact isCompact_iff_compactSpace.mp (hB w)
+    · rw [hD_out w hw]
+      exact compactSpace_adicCompletionIntegers w.val
+  let eval : FiniteAdeleTail F T →+ (∀ w : I, K w) :=
+    ⟨⟨fun a w ↦ a w, rfl⟩, fun _ _ ↦ rfl⟩
+  let H := (AddSubgroup.pi univ D).comap eval
+  have hfilter : Filter.cofinite ≤ Filter.principal (s : Set I)ᶜ :=
+    le_principal_iff.mpr s.finite_toSet.compl_mem_cofinite
+  have hD (a : ∀ w, K w) (ha : ∀ w, a w ∈ D w) :
+      ∀ᶠ w in Filter.principal (s : Set I)ᶜ, a w ∈ O w :=
+    Filter.eventually_principal.mpr fun w hw ↦ by
+      have hn : w ∉ s := hw
+      have hm := ha w
+      rw [hD_out w hn] at hm
+      exact hm
+  let j (a : ∀ w, D w) : Πʳ w : I, [K w, O w]_[Filter.principal (s : Set I)ᶜ] :=
+    RestrictedProduct.mk (fun w ↦ a w) (hD _ fun w ↦ (a w).property)
+  let i := RestrictedProduct.inclusion K (fun w ↦ (O w : Set (K w))) hfilter
+  have hj : Continuous j := RestrictedProduct.continuous_rng_of_principal_iff_forall.mpr
+    (fun w ↦ continuous_subtype_val.comp (continuous_apply w))
+  have hH : range (i ∘ j) = (H : Set (FiniteAdeleTail F T)) := by
+    ext a
+    constructor
+    · rintro ⟨x, rfl⟩
+      exact fun w _ ↦ (x w).property
+    · intro ha
+      exact ⟨fun w ↦ ⟨a w, ha w (mem_univ _)⟩, DFunLike.ext _ _ fun _ ↦ rfl⟩
+  refine ⟨H.toSubgroup, ?_, fun x hx w _ ↦ ?_⟩
+  · change IsCompact (H : Set (FiniteAdeleTail F T))
+    rw [← hH]
+    exact isCompact_range ((RestrictedProduct.continuous_inclusion hfilter).comp hj)
+  · change (Multiplicative.toAdd x) w ∈ D w
+    by_cases hw : w ∈ s
+    · rw [hD_in w hw]
+      exact hCB w (mem_image_of_mem _ (mem_image_of_mem _ hx))
+    · rw [hD_out w hw]
+      exact hs (mem_image_of_mem _ hx) w hw
+
 /-- Paper: Proposition 2.1.2.8(1), p. 65. The finite-product and tail Schwartz–Bruhat
 spaces have countable complex dimension. -/
 theorem finiteProduct_tailSchwartz_countableRank (S T : Finset (Places(F))) :
     Module.rank ℂ ℬ((FinitePlaceProduct F S)) ≤ ℵ₀ ∧
-      Module.rank ℂ ℬ(FiniteAdeleTail F T) ≤ ℵ₀ := by sorry
+      Module.rank ℂ ℬ(FiniteAdeleTail F T) ≤ ℵ₀ := by
+  constructor
+  · let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+    let : TotallyDisconnectedSpace (Multiplicative (FinitePlaceProduct F S)) :=
+      inferInstanceAs (TotallyDisconnectedSpace (∀ w : S, w.val.adicCompletion F))
+    exact schwartzBruhat_countableRank_of_compactSubgroups _
+      (finitePlaceProduct_compact_subset_subgroup F S)
+  · let : SecondCountableTopology (FiniteAdeleTail F T) := finiteAdeleTail_secondCountable F T
+    let : IsTopologicalAddGroup (FiniteAdeleTail F T) := by
+      unfold FiniteAdeleTail
+      infer_instance
+    let : T2Space (Multiplicative (FiniteAdeleTail F T)) :=
+      inferInstanceAs (T2Space (Πʳ w : {w : Places(F) // w ∉ T},
+        [w.val.adicCompletion F, w.val.adicCompletionIntegers F]))
+    let : TotallyDisconnectedSpace (Multiplicative (FiniteAdeleTail F T)) :=
+      ⟨isTotallyDisconnected_of_image
+        (RestrictedProduct.continuous_coe.comp continuous_toAdd).continuousOn
+        (DFunLike.coe_injective.comp Multiplicative.toAdd.injective)
+        (isTotallyDisconnected_of_totallyDisconnectedSpace _)⟩
+    exact schwartzBruhat_countableRank_of_compactSubgroups _
+      (finiteAdeleTail_compact_subset_subgroup F T)
 
 /-- Paper: Proposition 2.1.2.8(1), p. 65. Both Schwartz–Bruhat spaces carry
 the finest locally convex topology. -/
