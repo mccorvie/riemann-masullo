@@ -2231,9 +2231,89 @@ theorem finitePlaceSchwartz_montel (w : Places(F)) :
     exact Eq.mpr (congrArg (fun t ↦ @MontelSpace ℂ E _ _ _ t) htop)
       (finestLocallyConvex_montel E)
 
+/-- Paper: Proposition C.2.5.1(6), p. 692. With the finest locally convex topology,
+a countable-dimensional space has Fréchet strong dual, via evaluation on a basis. -/
+private theorem finestLocallyConvex_dual_frechet_of_countableRank
+    (E : Type*) [AddCommGroup E] [Module ℂ E] (hE : Module.rank ℂ E ≤ ℵ₀) :
+    IsFrechetTVS (StrongDual ℂ (FinestLocallyConvex E)) := by
+  classical
+  let W := FinestLocallyConvex E
+  let D := StrongDual ℂ W
+  let ι := Module.Free.ChooseBasisIndex ℂ W
+  let b : Module.Basis ι ℂ W := Module.Free.chooseBasis ℂ W
+  let : Countable ι := Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hE)
+  let : T2Space W := finestLocallyConvex_t2 E
+  let : ContinuousSMul ℂ W := (finestLocallyConvex_withSeminorms E).continuousSMul
+  let e : D ≃ₗ[ℂ] (ι → ℂ) :=
+    { toFun := fun f i ↦ f (b i)
+      invFun := fun z ↦ ⟨b.constr ℂ z, continuous_of_finestLocallyConvex E _⟩
+      left_inv := fun f ↦ ContinuousLinearMap.ext fun x ↦ LinearMap.congr_fun
+        (b.constr_eq ℂ (f := f.toLinearMap) fun _ ↦ rfl) x
+      right_inv := fun z ↦ funext (b.constr_basis ℂ z)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hEval : Continuous e := continuous_pi fun i ↦ continuous_eval_const (b i)
+  have hContValue (x : W) : Continuous (fun z : ι → ℂ ↦ e.symm z x) := by
+    change Continuous (fun z : ι → ℂ ↦ (b.constr ℂ z) x)
+    simp only [b.constr_apply, Finsupp.sum]
+    exact continuous_finsetSum _ fun i _ ↦
+      (continuous_apply i : Continuous (fun z : ι → ℂ ↦ z i)).const_smul (b.repr x i)
+  -- On a bounded set, uniform convergence is controlled by finitely many evaluations.
+  have hInv : Continuous e.symm := by
+    apply continuous_of_tendsto_nhds_zero e.symm
+    rw [(ContinuousLinearMap.hasBasis_nhds_zero_of_basis
+      (Metric.nhds_basis_ball (x := (0 : ℂ)))).tendsto_right_iff]
+    rintro ⟨B, ε⟩ ⟨hB, hε⟩
+    obtain ⟨S, hS, hBS, hBounded⟩ :=
+      (finestLocallyConvex_isVonNBounded_iff (E := E) B).mp hB
+    let : FiniteDimensional ℂ S := hS
+    let c := Module.finBasis ℂ S
+    have hCoord i : ∃ C : ℝ, ∀ x ∈ (Subtype.val : S → W) ⁻¹' B, ‖c.repr x i‖ ≤ C := by
+      let l : S →L[ℂ] ℂ := ⟨c.coord i, (c.coord i).continuous_of_finiteDimensional⟩
+      exact (NormedSpace.image_isVonNBounded_iff ℂ).mp (hBounded.image l)
+    choose C hC using hCoord
+    let p (z : ι → ℂ) : ℝ := ∑ i, C i * ‖e.symm z (c i : W)‖
+    have hp : Continuous p := continuous_finsetSum _ fun i _ ↦
+      continuous_const.mul (hContValue (c i)).norm
+    have hp₀ : p 0 = 0 := by simp [p]
+    have hSmall : ∀ᶠ z in 𝓝 (0 : ι → ℂ), p z < ε :=
+      hp.continuousAt.eventually_lt continuousAt_const (hp₀ ▸ hε)
+    filter_upwards [hSmall] with z hz
+    intro x hx
+    rw [Metric.mem_ball, dist_zero_right]
+    let y : S := ⟨x, hBS hx⟩
+    let f : S →ₗ[ℂ] ℂ := (e.symm z).toLinearMap.comp S.subtype
+    change ‖f y‖ < ε
+    calc
+      ‖f y‖ = ‖∑ i, c.repr y i • f (c i)‖ := by
+        simpa only [map_sum, map_smul] using congrArg (fun x ↦ ‖f x‖) (c.sum_repr y).symm
+      _ ≤ ∑ i, ‖c.repr y i • f (c i)‖ := norm_sum_le _ _
+      _ ≤ p z := by
+        apply Finset.sum_le_sum
+        intro i _
+        rw [norm_smul]
+        exact mul_le_mul_of_nonneg_right (hC i y hx) (norm_nonneg _)
+      _ < ε := hz
+  let dualEquiv : D ≃L[ℂ] (ι → ℂ) := ⟨e, hEval, hInv⟩
+  have hInd := dualEquiv.toHomeomorph.isInducing
+  refine ⟨inferInstance, dualEquiv.PolynormableSpace,
+    dualEquiv.toHomeomorph.isEmbedding.metrizableSpace, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := D)]
+  exact (AddMonoidHom.isUniformInducing_of_isInducing (f := dualEquiv.toLinearEquiv.toAddMonoidHom)
+    hInd).completeSpace_congr dualEquiv.surjective |>.mpr inferInstance
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is Fréchet. -/
 theorem finitePlaceSchwartz_strongDual_frechet (w : Places(F)) :
-    IsFrechetTVS (StrongDual ℂ ℬ(w.adicCompletion F)) := by sorry
+    IsFrechetTVS (StrongDual ℂ ℬ(w.adicCompletion F)) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  change (letI : TopologicalSpace E := tS; IsFrechetTVS (StrongDual ℂ E))
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  exact Eq.mpr (congrArg (fun t : TopologicalSpace E ↦
+    letI := t
+    IsFrechetTVS (StrongDual ℂ E)) htop)
+    (finestLocallyConvex_dual_frechet_of_countableRank E (finitePlaceSchwartz_countableRank F w))
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is nuclear. -/
 theorem finitePlaceSchwartz_strongDual_nuclear (w : Places(F)) :
