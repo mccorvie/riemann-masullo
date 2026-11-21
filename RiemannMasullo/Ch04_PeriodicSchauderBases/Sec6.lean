@@ -252,7 +252,10 @@ def modulatedPeriodicMultiplicity (m : G →ₜ* ℝ≥0ˣ) (ω : PontryaginDual
 /-- Paper: Equations (4.6.1.12)–(4.6.1.13), p. 212. The spectrum consists
 exactly of the characters of positive multiplicity. -/
 theorem mem_modulatedPeriodicSpectrum_iff (ξ : PontryaginDual G) :
-    ξ ∈ modulatedPeriodicSpectrum m ω γs ↔ 0 < modulatedPeriodicMultiplicity m ω γs ξ := by sorry
+    ξ ∈ modulatedPeriodicSpectrum m ω γs ↔ 0 < modulatedPeriodicMultiplicity m ω γs ξ := by
+  classical
+  simp only [modulatedPeriodicSpectrum, modulatedPeriodicMultiplicity, Set.mem_iUnion,
+    Finset.card_pos, Finset.Nonempty, Finset.mem_filter, Finset.mem_univ, true_and]
 
 /-- Paper: Equation (4.6.1.13) and Example 4.6.1.6, pp. 212, 217.
 Every character in the fiber for a twice-repeated generator has multiplicity two. -/

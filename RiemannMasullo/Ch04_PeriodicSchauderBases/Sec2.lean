@@ -9,6 +9,7 @@ import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Baire.CompleteMetrizable
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
+import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-!
 # Periodization and Schauder bases on the positive real axis
@@ -689,7 +690,53 @@ theorem quotientDual_strongRange (M : Submodule ℂ X) (hM : IsClosed (M : Set X
 adjoint also embeds the strong dual, with image the same annihilator. -/
 theorem quotientDual_strongEmbedding_of_nuclear (M : Submodule ℂ X) (hM : IsClosed (M : Set X))
     (hN : IsNuclearTVS X) (hF : IsFrechetTVS X) :
-    IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by sorry
+    IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL) := by
+  -- Lift the compact closure of each bounded set in the nuclear Fréchet quotient.
+  have hlift : LiftsBoundedSets M.mkQL := by
+    let : T0Space X := inferInstance
+    let : IsClosed (M : Set X) := hM
+    let : PolynormableSpace ℂ (X ⧸ M) := polynormableSpace_quotient M
+    have hNQ := isNuclearTVS_quotient hN M
+    obtain ⟨_, _, _, hcompleteQ⟩ := isFrechetTVS_quotient hF M hM
+    obtain ⟨_, _, hmetr, hcomplete⟩ := hF
+    let : MetrizableSpace X := hmetr
+    let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+    let : CompleteSpace X := hcomplete
+    let : (uniformity X).IsCountablyGenerated := Filter.comap.isCountablyGenerated _ _
+    let := UniformSpace.metricSpace X
+    let : UniformSpace (X ⧸ M) := IsTopologicalAddGroup.rightUniformSpace (X ⧸ M)
+    let : IsUniformAddGroup (X ⧸ M) := isUniformAddGroup_of_addCommGroup
+    let : CompleteSpace (X ⧸ M) := hcompleteQ
+    intro B hB
+    have htotal := (isPrecompactInCompletion_iff_totallyBounded B).mp
+      (isPrecompactInCompletion_of_isNuclearTVS (X ⧸ M) hNQ hB)
+    obtain ⟨A, hA, himage⟩ := exists_isCompact_image_eq_of_isOpenQuotientMap
+      M.isOpenQuotientMap_mkQL (htotal.closure.isCompact_of_isClosed isClosed_closure)
+    exact ⟨A, hA.isVonNBounded ℂ, himage.symm ▸ subset_closure⟩
+  let pull : StrongDual ℂ (X ⧸ M) →L[ℂ] StrongDual ℂ X :=
+    ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ M.mkQL
+  have hind : IsUniformInducing pull := by
+    constructor
+    refine le_antisymm ?_ pull.uniformContinuous.le_comap
+    have hX := (ContinuousLinearMap.hasBasis_nhds_zero
+      (σ := RingHom.id ℂ) («E» := X) (F := ℂ)).uniformity_of_nhds_zero
+    have hQ := (ContinuousLinearMap.hasBasis_nhds_zero
+      (σ := RingHom.id ℂ) («E» := X ⧸ M) (F := ℂ)).uniformity_of_nhds_zero
+    refine ((hX.comap (Prod.map pull pull)).le_basis_iff hQ).mpr ?_
+    rintro ⟨B, U⟩ ⟨hB, hU⟩
+    obtain ⟨A, hA, hcover⟩ := hlift B hB
+    refine ⟨(A, U), ⟨hA, hU⟩, ?_⟩
+    intro p hp
+    change ∀ x ∈ A, (pull p.2 - pull p.1) x ∈ U at hp
+    change ∀ y ∈ B, (p.2 - p.1) y ∈ U
+    intro y hy
+    obtain ⟨x, hx, rfl⟩ := hcover hy
+    exact hp x hx
+  refine ⟨hind.isInducing, ?_⟩
+  intro f g hfg
+  ext y
+  obtain ⟨x, rfl⟩ := M.mkQ_surjective y
+  exact congrArg (fun l : StrongDual ℂ X ↦ l x) hfg
 
 /-- Paper: Lemma 4.2.1.3(2), p. 164. For a Hilbert space the quotient adjoint
 embeds the strong dual, with image the annihilator of the closed subspace. -/

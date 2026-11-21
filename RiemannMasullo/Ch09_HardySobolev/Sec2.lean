@@ -1315,7 +1315,13 @@ theorem modulatedIntervalSobolev_dual (_hm : IsModulation m)
     ∃! T : StrongDual ℂ (CompactIntervalSobolev μ (logModule m) a b s) ≃ₗᵢ[ℂ]
         CompactIntervalSobolev μ (logModule m) a b s true,
       ∀ Λ f, Integrable (fun g ↦ f g * T Λ g) μ ∧
-        Λ f = ∫ g, f g * T Λ g ∂μ := by sorry
+        Λ f = ∫ g, f g * T Λ g ∂μ := by
+  have hlog : Measurable (fun g ↦ Real.log ((m g).val : ℝ)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable.log
+  have hρ := (continuous_intervalSobolevDensity' a b s).measurable.comp hlog
+  exact weightedL2_dual μ hρ hρ.inv (fun g ↦ intervalSobolevDensity_pos a b s _)
+    (fun g ↦ inv_pos.mpr (intervalSobolevDensity_pos a b s _))
+    (fun g ↦ mul_inv_cancel₀ (intervalSobolevDensity_pos a b s _).ne')
 
 -- TODO(paper-gap): Corollary 9.2.2.12(1) omits the kernel character in the integral
 -- for a general isotype and uses m rather than k for the power of the logarithm.

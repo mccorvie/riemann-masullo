@@ -795,11 +795,6 @@ theorem sLocalNormalizedZFunction_eq_div (f : ℬ(SAdeleRing F S)) (χ : Pontrya
     sLocalNormalizedZFunction f (chartₛ(χ) s) =
       sLocalIdelicZetaIntegral f (chartₛ(χ) s) / sLocalHeckeL (chartₛ(χ) s) := by sorry
 
-/-- Paper: Lemma 3.3.1.7(2), p. 135. Dividing by the Euler product removes
-all poles of the S-local zeta function. -/
-theorem sLocalNormalizedZFunction_entire (f : ℬ(SAdeleRing F S)) (χ : PontryaginDual Jₛ) :
-    AnalyticOnNhd ℂ (fun s ↦ sLocalNormalizedZFunction f (chartₛ(χ) s)) univ := by sorry
-
 /-- Paper: Equation (3.3.1.27), p. 135. The normalized zeta function has the
 given Stirling growth bound uniformly on each closed positive strip.
 Deviation: The real exponential uses absolute height in both directions. -/
@@ -1005,6 +1000,138 @@ theorem sLocalRhoFactor_eq_epsilon_mul (χ : PontryaginDual Jₛ) :
       let c := chartₛ(χ) s
       sLocalRhoFactor c = sLocalEpsilonFactor c *
         (sLocalHeckeL c / sLocalHeckeL (dualQuasiCharacter (G := Jₛ) mₛ hmₛ c)) := by sorry
+
+/-- Twisting a point of the norm-twist chart moves along the chart. -/
+private theorem sLocal_chart_twist (χ : PontryaginDual Jₛ) (s t : ℂ) :
+    quasiCharacterNormTwist (G := Jₛ) mₛ hmₛ (chartₛ(χ) s) t = chartₛ(χ) (s + t) := by
+  ext1 g
+  let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+  have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+  change (χ g : ℂ) * N ^ s * N ^ t = (χ g : ℂ) * N ^ (s + t)
+  rw [Complex.cpow_add _ _ hN, mul_assoc]
+
+/-- Duality in the norm-twist chart takes the inverse unitary character and
+reflects the exponent. -/
+private theorem sLocal_dual_chart (χ : PontryaginDual Jₛ) (s : ℂ) :
+    dualQuasiCharacter (G := Jₛ) mₛ hmₛ (chartₛ(χ) s) = chartₛ(χ⁻¹) (1 - s) := by
+  ext1 g
+  let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+  have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+  change N * chartₛ(χ) s g⁻¹ = (χ⁻¹ g : ℂ) * N ^ (1 - s)
+  rw [map_inv]
+  change N * ((χ g : ℂ) * N ^ s)⁻¹ = (χ⁻¹ g : ℂ) * N ^ (1 - s)
+  rw [mul_inv_rev, Complex.cpow_sub 1 s hN, Complex.cpow_one, div_eq_mul_inv,
+    show ((χ⁻¹ g : Circle) : ℂ) = (χ g : ℂ)⁻¹ from rfl]
+  ac_rfl
+
+/-- The reciprocal of the S-local Euler product is entire in the norm-twist chart. -/
+private theorem differentiable_inv_sLocalHeckeL (χ : PontryaginDual Jₛ) :
+    Differentiable ℂ (fun s ↦ (sLocalHeckeL (chartₛ(χ) s))⁻¹) := by
+  classical
+  obtain ⟨χ', h, hχ, -⟩ := sLocal_character_extension χ
+  simp_rw [sLocalHeckeL_eq_partialEulerProduct χ χ' h hχ, mul_inv, ← Finset.prod_inv_distrib]
+  refine (differentiable_inv_heckeGammaFactor χ').mul
+    (Differentiable.fun_finsetProd fun v _ ↦ ?_)
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · simp_rw [inv_inv]
+    have hq : (q(v.val) : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+      ((Ideal.absNorm_eq_zero_iff).not.mpr v.val.ne_bot)
+    exact (differentiable_const _).sub ((differentiable_const _).mul
+      ((differentiable_neg).const_cpow (Or.inl hq)))
+  · simp_rw [inv_one]
+    exact differentiable_const _
+
+/-- If a function on the plane is meromorphic with no poles, then normalizing each
+of its translates and evaluating at the origin gives an entire function. -/
+private theorem analyticOnNhd_toMeromorphicNFOn_translate {H : ℂ → ℂ}
+    (hH : MeromorphicOn H univ) (hord : ∀ s, 0 ≤ meromorphicOrderAt H s) :
+    AnalyticOnNhd ℂ (fun s ↦ toMeromorphicNFOn (fun t ↦ H (s + t)) univ 0) univ := by
+  let G := toMeromorphicNFOn H univ
+  have hG (s : ℂ) : AnalyticAt ℂ G s :=
+    (meromorphicNFOn_toMeromorphicNFOn H univ (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      (by rw [meromorphicOrderAt_toMeromorphicNFOn hH (mem_univ s)]; exact hord s)
+  have heq (s : ℂ) : toMeromorphicNFOn (fun t ↦ H (s + t)) univ 0 = G s := by
+    have hm : MeromorphicOn (fun t ↦ H (s + t)) univ := fun t _ ↦ by
+      have := (hH (s + t) (mem_univ _)).comp_analyticAt (g := fun t ↦ s + t) (by fun_prop)
+      exact this
+    have hGs : AnalyticAt ℂ (fun t ↦ G (s + t)) 0 :=
+      (by simpa using hG s : AnalyticAt ℂ G (s + 0)).comp (by fun_prop)
+    have hnear : (fun t ↦ H (s + t)) =ᶠ[𝓝[≠] 0] fun t ↦ G (s + t) := by
+      have ht : Tendsto (fun t : ℂ ↦ s + t) (𝓝[≠] 0) (𝓝[≠] s) := by
+        refine tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within _ ?_ ?_
+        · exact (by simpa using (continuous_const_add s).tendsto (0 : ℂ) :
+            Tendsto (fun t : ℂ ↦ s + t) (𝓝 0) (𝓝 s)).mono_left nhdsWithin_le_nhds
+        · filter_upwards [self_mem_nhdsWithin] with t ht
+          simpa using ht
+      exact ht.eventually (hH.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ s)).symm
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ 0),
+      (toMeromorphicNFAt_eventuallyEq_nhds_congr hnear).eq_of_nhds,
+      toMeromorphicNFAt_eq_self.mpr hGs.meromorphicNFAt]
+    simp only [add_zero]
+  intro s _
+  rw [show (fun s ↦ toMeromorphicNFOn (fun t ↦ H (s + t)) univ 0) = G from funext heq]
+  exact hG s
+
+/-- Paper: Lemma 3.3.1.7(2), p. 135. Dividing by the Euler product removes
+all poles of the S-local zeta function. -/
+theorem sLocalNormalizedZFunction_entire (f : ℬ(SAdeleRing F S)) (χ : PontryaginDual Jₛ) :
+    AnalyticOnNhd ℂ (fun s ↦ sLocalNormalizedZFunction f (chartₛ(χ) s)) univ := by
+  -- Z / L = Z · L⁻¹ with L⁻¹ entire; a pole of Z is a pole of ρ = ε · L / L̂,
+  -- whose order is at most the order of the zero of L⁻¹.
+  let Z : ℂ → ℂ := fun u ↦ sLocalIdelicZFunction f (chartₛ(χ) u)
+  let Λ : ℂ → ℂ := fun u ↦ (sLocalHeckeL (chartₛ(χ) u))⁻¹
+  let Λ' : ℂ → ℂ := fun u ↦ (sLocalHeckeL (chartₛ(χ⁻¹) (1 - u)))⁻¹
+  let ε : ℂ → ℂ := fun u ↦ sLocalEpsilonFactor (chartₛ(χ) u)
+  have hΛ : Differentiable ℂ Λ := differentiable_inv_sLocalHeckeL χ
+  have hΛ' : Differentiable ℂ Λ' :=
+    (differentiable_inv_sLocalHeckeL χ⁻¹).comp (by fun_prop)
+  have hZ : MeromorphicOn Z univ := (sLocalIdelicZFunction_meromorphic f χ).meromorphicOn
+  have hH : MeromorphicOn (Z * Λ) univ := fun s _ ↦
+    (hZ s (mem_univ s)).mul (hΛ.analyticAt s).meromorphicAt
+  have hord (s : ℂ) : 0 ≤ meromorphicOrderAt (Z * Λ) s := by
+    have hΛo := (hΛ.analyticAt s).meromorphicOrderAt_nonneg
+    rw [meromorphicOrderAt_mul (hZ s (mem_univ s)) (hΛ.analyticAt s).meromorphicAt]
+    rcases le_or_gt 0 (meromorphicOrderAt Z s) with hz | hz
+    · exact add_nonneg hz hΛo
+    have hρ := (min_le_iff.mp (sLocalIdelicZFunction_poles f χ s)).resolve_left (not_le.mpr hz)
+    have hρeq : (fun z ↦ sLocalRhoFactor (chartₛ(χ) z)) =ᶠ[𝓝[≠] s] ε * (Λ⁻¹ * Λ') := by
+      filter_upwards [nhdsNE_le_codiscrete s (sLocalRhoFactor_eq_epsilon_mul χ)] with u hu
+      simp only at hu
+      simp only [Pi.mul_apply, Pi.inv_apply, ε, Λ, Λ', inv_inv, hu, div_eq_mul_inv,
+        sLocal_dual_chart]
+    have hε := ((sLocalEpsilonFactor_entire χ) s (mem_univ s))
+    rw [meromorphicOrderAt_congr hρeq, meromorphicOrderAt_mul hε.meromorphicAt
+      ((hΛ.analyticAt s).meromorphicAt.inv.mul (hΛ'.analyticAt s).meromorphicAt),
+      meromorphicOrderAt_mul (hΛ.analyticAt s).meromorphicAt.inv (hΛ'.analyticAt s).meromorphicAt,
+      meromorphicOrderAt_inv] at hρ
+    have hεo := hε.meromorphicOrderAt_nonneg
+    have hΛ'o := (hΛ'.analyticAt s).meromorphicOrderAt_nonneg
+    generalize meromorphicOrderAt Z s = a at *
+    generalize meromorphicOrderAt Λ s = l at *
+    generalize meromorphicOrderAt ε s = e at *
+    generalize meromorphicOrderAt Λ' s = l' at *
+    induction l using WithTop.recTopCoe with
+    | top => simp
+    | coe n =>
+      induction a using WithTop.recTopCoe with
+      | top => exact absurd hz (not_lt.mpr le_top)
+      | coe a =>
+        induction e using WithTop.recTopCoe with
+        | top => simp at hρ
+        | coe e =>
+          induction l' using WithTop.recTopCoe with
+          | top => simp at hρ
+          | coe l' =>
+            rw [← WithTop.LinearOrderedAddCommGroup.coe_neg] at hρ
+            norm_cast at *
+            omega
+  have hfun : (fun s ↦ sLocalNormalizedZFunction f (chartₛ(χ) s)) =
+      fun s ↦ toMeromorphicNFOn (fun t ↦ (Z * Λ) (s + t)) univ 0 := by
+    funext s
+    simp only [sLocalNormalizedZFunction, sLocal_chart_twist, Pi.mul_apply, Z, Λ, div_eq_mul_inv]
+  rw [hfun]
+  exact analyticOnNhd_toMeromorphicNFOn_translate hH hord
 
 /-- Paper: Remark 3.3.1.8, p. 136. At each infinite place the additive
 Tamagawa measure is self-dual for the restricted standard character. The finite

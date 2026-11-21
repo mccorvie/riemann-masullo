@@ -1087,7 +1087,11 @@ theorem exists_lcaAutocorrelation_measure (f : C_c(G, ℂ)) :
     ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
       ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
         lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x := by
-  sorry
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  obtain ⟨ρ, hFinite, hRegular, hρ⟩ := exists_haar_autocorrelation_measure μ (f := (f : G → ℂ))
+    (f.continuous.memLp_of_hasCompactSupport (p := 2) f.hasCompactSupport)
+  exact ⟨ρ, hFinite, hRegular, fun x ↦ by
+    simpa only [lcaConvolution, mul_inv_rev, inv_inv] using hρ x⟩
 
 open scoped CompactlySupported Pointwise in
 /-- The autocorrelation has compact support, and its Fourier integral is the
