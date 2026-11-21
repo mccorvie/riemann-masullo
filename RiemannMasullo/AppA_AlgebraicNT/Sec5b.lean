@@ -1180,19 +1180,6 @@ theorem dSequenceMaximal_weak_local [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ
   refine (measure_mono ((Set.mul_subset_mul inter_subset_left Subset.rfl).trans hprod)).trans_eq ?_
   rw [withDensity_apply₀ w hBU, lintegral_indicator hAm, Measure.restrict_restrict hAm, inter_comm]
 
-/-- Paper: Theorem A.5.3.6(2), p. 581. The `p`-th moment on `B` of the maximal
-function is bounded by the `p`-th moment of `|f|` on `B * U 0`, with the factor in (A.5.3.10).
-Deviation: The conditions on `B` from part (1) are read as applying to part (2) as well. -/
-theorem dSequenceMaximal_strong_local [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
-    (hcompact : IsCompact (closure (U 0)))
-    (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
-    {f : G → ℂ} (hf : LocallyIntegrable f μ) {B : Set G} (hB : NullMeasurableSet B μ)
-    (hBU : NullMeasurableSet (B * U 0) μ) (hfin : μ (B * U 0) < ∞)
-    {p : ℝ} (hp : 1 < p) :
-    (∫⁻ x in B, dSequenceMaximal μ U f x ^ p ∂μ) ≤
-      ENNReal.ofReal (C * p ^ (p + 1) / (p - 1) ^ p) *
-        ∫⁻ x in B * U 0, ‖f x‖ₑ ^ p ∂μ := by sorry
-
 /-- Paper: Theorem A.5.3.7(1), p. 582. The mass of the global strict level
 set is bounded by the `L¹` norm times `2 * C / α`. -/
 theorem dSequenceMaximal_weak_global [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
@@ -1493,6 +1480,60 @@ theorem dSequenceMaximal_strong_global [μ.IsHaarMeasure] (hU : IsDPrimeSequence
       rw [← hconstant, ENNReal.ofReal_mul (Real.rpow_nonneg hd.le _),
         ENNReal.ofReal_mul hp₀.le]
       ac_rfl
+
+-- Keep the stated finiteness hypothesis on B * U 0. The localization only needs a finite moment.
+set_option linter.unusedVariables false in
+/-- Paper: Theorem A.5.3.6(2), p. 581. The `p`-th moment on `B` of the maximal
+function is bounded by the `p`-th moment of `|f|` on `B * U 0`, with the factor in (A.5.3.10).
+Deviation: The conditions on `B` from part (1) are read as applying to part (2) as well. -/
+theorem dSequenceMaximal_strong_local [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
+    (hcompact : IsCompact (closure (U 0)))
+    (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
+    {f : G → ℂ} (hf : LocallyIntegrable f μ) {B : Set G} (hB : NullMeasurableSet B μ)
+    (hBU : NullMeasurableSet (B * U 0) μ) (hfin : μ (B * U 0) < ∞)
+    {p : ℝ} (hp : 1 < p) :
+    (∫⁻ x in B, dSequenceMaximal μ U f x ^ p ∂μ) ≤
+      ENNReal.ofReal (C * p ^ (p + 1) / (p - 1) ^ p) *
+        ∫⁻ x in B * U 0, ‖f x‖ₑ ^ p ∂μ := by
+  have hp₀ : 0 < p := zero_lt_one.trans hp
+  let S := B * U 0
+  by_cases htop : (∫⁻ x in S, ‖f x‖ₑ ^ p ∂μ) = ∞
+  · have hconst : 0 < C * p ^ (p + 1) / (p - 1) ^ p :=
+      div_pos (mul_pos hC (Real.rpow_pos_of_pos hp₀ _)) (Real.rpow_pos_of_pos (sub_pos.mpr hp) _)
+    change _ ≤ ENNReal.ofReal _ * ∫⁻ x in S, ‖f x‖ₑ ^ p ∂μ
+    rw [htop, ENNReal.mul_top (ENNReal.ofReal_pos.mpr hconst).ne']
+    exact le_top
+  -- Localize the input before applying the global bound.
+  let g := S.indicator f
+  have hfm : AEStronglyMeasurable f (μ.restrict S) :=
+    hf.aestronglyMeasurable.mono_measure Measure.restrict_le_self
+  have hpne : ENNReal.ofReal p ≠ 0 := (ENNReal.ofReal_pos.mpr hp₀).ne'
+  have hg : MemLp g (ENNReal.ofReal p) μ := by
+    rw [memLp_indicator_iff_restrict hBU, memLp_iff,
+      eLpNorm_lt_top_iff_lintegral_rpow_eNorm_lt_top hpne ENNReal.ofReal_ne_top hfm,
+      ENNReal.toReal_ofReal hp₀.le]
+    exact lt_top_iff_ne_top.mpr htop
+  have hlocal (x : G) (hx : x ∈ B) :
+      dSequenceMaximal μ U f x = dSequenceMaximal μ U g x := by
+    unfold dSequenceMaximal
+    congr 1
+    funext k
+    rw [setLAverage_eq, setLAverage_eq]
+    congr 1
+    refine setLIntegral_congr_fun₀ ((hU.1.1 k).2.1.smul x) fun y hy ↦ ?_
+    obtain ⟨z, hz, rfl⟩ := Set.mem_smul_set.mp hy
+    have hS : x * z ∈ S := Set.mul_mem_mul hx (hU.1.2.1 (Nat.zero_le k) hz)
+    change ‖f (x * z)‖ₑ = ‖g (x * z)‖ₑ
+    rw [show g (x * z) = f (x * z) from indicator_of_mem hS f]
+  have hglobal := dSequenceMaximal_strong_global hU hcompact hC hbound hp hg
+  rw [eLpNorm_indicator_eq_eLpNorm_restrict hBU, eLpNorm_eq_eLpNorm' hpne ENNReal.ofReal_ne_top hfm,
+    ENNReal.toReal_ofReal hp₀.le, ← lintegral_rpow_eNorm_eq_rpow_eLpNorm' hp₀] at hglobal
+  calc
+    _ = ∫⁻ x in B, dSequenceMaximal μ U g x ^ p ∂μ :=
+      setLIntegral_congr_fun₀ hB fun x hx ↦ by rw [hlocal x hx]
+    _ ≤ ∫⁻ x, dSequenceMaximal μ U g x ^ p ∂μ :=
+      setLIntegral_le_lintegral B _
+    _ ≤ _ := hglobal
 
 /-- Paper: (A.5.4.1), p. 582. Average a complex-valued function over the
 left translate of a sequence member. Haar invariance equates the mass of the
