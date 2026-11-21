@@ -72,7 +72,100 @@ the strip with real parts between −1 and 1, and has a simple pole at zero.
 Deviation: Sanity check for the repaired definition, with heights `T k = k + 1/2`. -/
 theorem hasSlowGrowthNearPoles_one_div :
     HasSlowGrowthNearPoles (fun z : ℂ ↦ 1 / z) (-1) 1 ∧
-      meromorphicOrderAt (fun z : ℂ ↦ 1 / z) 0 = -1 := by sorry
+      meromorphicOrderAt (fun z : ℂ ↦ 1 / z) 0 = -1 := by
+  have hOrder : meromorphicOrderAt (fun z : ℂ ↦ 1 / z) 0 = -1 := by
+    have h : meromorphicOrderAt (fun z : ℂ ↦ (z - 0) ^ (-1 : ℤ)) 0 =
+        ((-1 : ℤ) : WithTop ℤ) := meromorphicOrderAt_zpow_id_sub_const
+    simpa only [sub_zero, zpow_neg_one, one_div, WithTop.LinearOrderedAddCommGroup.coe_neg,
+      WithTop.coe_one] using h
+  refine ⟨?_, hOrder⟩
+  let T (k : ℤ) : ℝ := (k : ℝ) + 1 / 2
+  have hHeight (k : ℤ) : (1 / 2 : ℝ) ≤ |T k| := by
+    change (1 / 2 : ℝ) ≤ |(k : ℝ) + 1 / 2|
+    rcases le_or_gt 0 k with hk | hk
+    · have hk' : 0 ≤ (k : ℝ) := by exact_mod_cast hk
+      linarith [le_abs_self ((k : ℝ) + 1 / 2)]
+    · have hk' : (k : ℝ) ≤ -1 := Int.cast_le_neg_one_of_neg hk
+      linarith [neg_le_abs ((k : ℝ) + 1 / 2)]
+  have hIndex : Tendsto (fun k : ℤ ↦ |(k : ℝ)|) atAbsInfty atTop := by
+    simpa only [Function.comp_def, Int.cast_abs] using
+      (tendsto_intCast_atTop_atTop (R := ℝ)).comp
+        (tendsto_comap : Tendsto (abs : ℤ → ℤ) atAbsInfty atTop)
+  have hLower : ∀ᶠ k : ℤ in atAbsInfty, (1 / 2 : ℝ) * |(k : ℝ)| ≤ |T k| := by
+    filter_upwards [hIndex.eventually_ge_atTop 1] with k hk
+    have h := abs_sub_abs_le_abs_sub (k : ℝ) (-(1 / 2 : ℝ))
+    rw [abs_neg, abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 1 / 2), sub_neg_eq_add] at h
+    change (1 / 2 : ℝ) * |(k : ℝ)| ≤ |(k : ℝ) + 1 / 2|
+    linarith
+  have hReciprocal (σ y : ℝ) {c : ℝ} (hc : 0 < c) (hy : c ≤ |y|) :
+      ‖(1 : ℂ) / verticalPoint σ y‖ ≤ c⁻¹ := by
+    have hNorm : |y| ≤ ‖verticalPoint σ y‖ := by
+      simpa [Complex.add_im, Complex.mul_I_im] using
+        Complex.abs_im_le_norm (verticalPoint σ y)
+    rw [one_div, norm_inv]
+    exact (inv_le_inv₀ (hc.trans_le (hy.trans hNorm)) hc).2 (hy.trans hNorm)
+  refine ⟨T, by norm_num, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · exact ((Meromorphic.const (1 : ℂ)).div Meromorphic.id).meromorphicOn
+  · intro m n hmn
+    have hmn' : (m : ℝ) ≤ (n : ℝ) := by exact_mod_cast hmn
+    simp only [T, Int.cast_natCast, abs_of_nonneg (by positivity : 0 ≤ (m : ℝ) + 1 / 2)]
+    exact (add_le_add_left hmn' _).trans (le_abs_self _)
+  · intro m n hmn
+    have hmn' : (m : ℝ) ≤ (n : ℝ) := by exact_mod_cast hmn
+    simp only [T, Int.cast_neg, Int.cast_natCast]
+    apply abs_le'.2
+    refine ⟨?_, ?_⟩
+    · have hm : 0 ≤ (m : ℝ) := Nat.cast_nonneg m
+      have hn : (1 / 2 : ℝ) ≤ |-(n : ℝ) + 1 / 2| := by
+        simpa only [T, Int.cast_neg, Int.cast_natCast] using hHeight (-(n : ℤ))
+      exact (by linarith : -(m : ℝ) + 1 / 2 ≤ 1 / 2).trans hn
+    · exact (by linarith : -(-(m : ℝ) + 1 / 2) ≤ -(-(n : ℝ) + 1 / 2)).trans (neg_le_abs _)
+  · refine tendsto_atTop.2 fun r ↦ ?_
+    filter_upwards [hIndex.eventually_ge_atTop (2 * r), hLower] with k hk hbound
+    linarith
+  · refine ⟨1, zero_lt_one, Asymptotics.isBigO_iff.2 ⟨2, ?_⟩⟩
+    filter_upwards [hIndex.eventually_ge_atTop 1] with k hk
+    simp only [T, Real.rpow_one, Real.norm_eq_abs, abs_abs]
+    have h := abs_add_le (k : ℝ) (1 / 2)
+    rw [abs_of_nonneg (by norm_num : (0 : ℝ) ≤ 1 / 2)] at h
+    linarith
+  · exact ⟨1 / 2, 1, by norm_num, zero_lt_one, by simpa only [Real.rpow_one] using hLower⟩
+  · intro k
+    refine ⟨1 / 2, by norm_num, fun z hz ↦ ?_⟩
+    have hz₀ : z ≠ 0 := by
+      rintro rfl
+      have him := hz.2
+      change T k - 1 / 2 < (0 : ℂ).im ∧ (0 : ℂ).im < T k + 1 / 2 at him
+      rw [Complex.zero_im] at him
+      exact (not_lt_of_ge (hHeight k))
+        (abs_lt.2 ⟨by linarith [him.2], by linarith [him.1]⟩)
+    exact ((differentiableAt_const (1 : ℂ)).div differentiableAt_id hz₀).differentiableWithinAt
+  · refine ⟨1, 2, zero_lt_one, by norm_num, ?_⟩
+    intro k hk σ _
+    have hk' : (1 : ℝ) ≤ |(k : ℝ)| := by exact_mod_cast Int.one_le_abs hk
+    rw [Real.rpow_one]
+    calc
+      ‖(1 : ℂ) / verticalPoint σ (T k)‖ ≤ 2 := by
+        simpa only [one_div, inv_inv] using hReciprocal σ (T k) (by norm_num) (hHeight k)
+      _ ≤ 2 * |(k : ℝ)| := by linarith
+  · refine ⟨1 / 4, 1 / 2, by norm_num, by norm_num, by norm_num, ?_⟩
+    intro σ hσ
+    have hσ₀ : σ ≠ 0 := by
+      simp only [mem_insert_iff, mem_singleton_iff] at hσ
+      rcases hσ with rfl | rfl <;> norm_num
+    refine ⟨?_, 1, zero_lt_one, Asymptotics.isBigO_iff.2 ⟨1, ?_⟩⟩
+    · refine continuous_const.div
+        (continuous_const.add (Complex.continuous_ofReal.mul continuous_const)) fun y hz ↦ ?_
+      apply hσ₀
+      simpa [Complex.add_re, Complex.mul_I_re] using congrArg Complex.re hz
+    · have hY : ∀ᶠ y : ℝ in atAbsInfty, 1 ≤ |y| :=
+        tendsto_comap.eventually (eventually_ge_atTop 1)
+      filter_upwards [hY] with y hy
+      simp only [Real.rpow_one, Real.norm_eq_abs, abs_abs, one_mul]
+      calc
+        ‖(1 : ℂ) / verticalPoint σ y‖ ≤ 1 := by
+          simpa only [inv_one] using hReciprocal σ y zero_lt_one hy
+        _ ≤ |y| := hy
 
 -- TODO(paper-gap): The proof of (B.3.1.2) needs a polynomial lower bound on
 -- |T k|, whereas Definition B.3.1.1 gives an upper bound. The bounds at T k
