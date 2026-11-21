@@ -418,7 +418,14 @@ Deviation: Sanity check tying the density to §9.1. -/
 theorem intervalSobolev_zero_eq_sobolevMeasure {G : Type*} [CommGroup G] [TopologicalSpace G]
     [MeasurableSpace G] (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (s : ℝ) :
     (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logModule m x))) =
-      sobolevMeasure μ (modulatedSobolevWeight m) s := by sorry
+      sobolevMeasure μ (modulatedSobolevWeight m) s := by
+  unfold sobolevMeasure
+  congr 1
+  funext x
+  have hw : ((modulatedSobolevWeight m x : ℝ≥0) : ℝ) ^ 2 = Real.log ((m x).val : ℝ) ^ 2 :=
+    sq_abs _
+  rw [hw]
+  simp [intervalSobolevDensity]
 
 /-- Paper: Proposition 9.2.2.11, p. 417, with Corollary 10.2.2.3, p. 447. For the base interval
 {0} the reciprocal-density measure is the Sobolev measure of degree −s of Proposition 9.1.2.5.

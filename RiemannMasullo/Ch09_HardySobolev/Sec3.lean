@@ -368,7 +368,8 @@ theorem hardySobolevConvolution_apply (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ 
     (φ : G → ℂ) (hφ : AEMeasurable φ μ) (hc : HasCompactSupport φ)
     (hb : ∃ C : ℝ, ∀ x, ‖φ x‖ ≤ C) (u : W a b s) :
     ∀ᵐ x ∂μ, Integrable (fun g ↦ φ g * u (g⁻¹ * x)) μ ∧
-      hardySobolevConvolution μ m a b s hab hs φ hφ hc hb u x = lcaConvolution μ φ u x := by sorry
+      hardySobolevConvolution μ m a b s hab hs φ hφ hc hb u x = lcaConvolution μ φ u x :=
+  (exists_hardySobolevConvolution μ m a b s hab hs φ hφ hc hb).choose_spec u
 
 /-- Paper: §9.3.3.1, p. 426. On a test function the operator used for the
 trace is the regularized action of Definition 9.3.1.1. -/

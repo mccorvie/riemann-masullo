@@ -1146,7 +1146,12 @@ def bruhatDiffAlgebra (G : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologi
 
 /-- Paper: Definition D.1.6.8(1), p. 768. The invariant differential operator
 algebra is commutative. -/
-theorem bruhatDiffAlgebra_commute (D E : bruhatDiffAlgebra G) : Commute D E := by sorry
+theorem bruhatDiffAlgebra_commute (D E : bruhatDiffAlgebra G) : Commute D E := by
+  have hcomm : (range (bruhatFirstOrder (G := G))).Pairwise Commute := by
+    rintro _ ⟨a, rfl⟩ _ ⟨b, rfl⟩ _
+    exact bruhatFirstOrder_commute a b
+  let : IsMulCommutative (bruhatDiffAlgebra G) := Algebra.isMulCommutative_adjoin ℂ hcomm
+  exact mul_comm' D E
 
 /-- Paper: Definition D.1.6.8(1), p. 768. The first-order generator belongs to
 the differential operator algebra. -/

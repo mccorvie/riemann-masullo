@@ -2630,19 +2630,6 @@ theorem adelicTheta_decay_both (f : ℬ[F]) (hf : f zeroAdele = 0)
       _ ≤ C₂ := hbound
       _ ≤ max C₁ C₂ := le_max_right _ _
 
-/-- Paper: Theorem 2.2.3.4(4), p. 83. The three decay estimates admit a common
-constant and threshold uniform over a bounded set of Schwartz–Bruhat functions.
-The two-sided estimate applies to members whose two zero terms vanish. -/
-theorem adelicTheta_decay_bounded (B : Set ℬ[F]) (hB : IsVonNBounded ℂ B) (N : ℕ) :
-    ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : C[F],
-      (T < normℝ g → ‖adelicTheta f g‖ ≤ C * ((normℝ g) ^ N)⁻¹) ∧
-      (normℝ g < T →
-        ‖adelicTheta f g - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤
-          C * (normℝ g) ^ N) ∧
-      (f zeroAdele = 0 → adeleSchwartzFourier f zeroAdele = 0 →
-        Real.exp (-|Real.log (normℝ g)|) < T →
-        ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|)) := by sorry
-
 /-- Paper: Theorem 2.2.3.4(5), p. 83. The uniform estimates on a bounded set
 hold with threshold one and a common constant. -/
 theorem adelicTheta_decay_bounded_threshold_one (B : Set ℬ[F])
@@ -2655,6 +2642,22 @@ theorem adelicTheta_decay_bounded_threshold_one (B : Set ℬ[F])
       (f zeroAdele = 0 → adeleSchwartzFourier f zeroAdele = 0 →
         Real.exp (-|Real.log (normℝ g)|) < 1 →
         ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|)) := by sorry
+
+/-- Paper: Theorem 2.2.3.4(4), p. 83. The three decay estimates admit a common
+constant and threshold uniform over a bounded set of Schwartz–Bruhat functions.
+The two-sided estimate applies to members whose two zero terms vanish. -/
+theorem adelicTheta_decay_bounded (B : Set ℬ[F]) (hB : IsVonNBounded ℂ B) (N : ℕ) :
+    ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : C[F],
+      (T < normℝ g → ‖adelicTheta f g‖ ≤ C * ((normℝ g) ^ N)⁻¹) ∧
+      (normℝ g < T →
+        ‖adelicTheta f g - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤
+          C * (normℝ g) ^ N) ∧
+      (f zeroAdele = 0 → adeleSchwartzFourier f zeroAdele = 0 →
+        Real.exp (-|Real.log (normℝ g)|) < T →
+        ‖adelicTheta f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|)) := by
+  have hthreshold := adelicTheta_decay_bounded_threshold_one (F := F) B
+  obtain ⟨C, hC, hbound⟩ := hthreshold hB N
+  exact ⟨C, 1, hC, zero_lt_one, hbound⟩
 
 end Adelic
 

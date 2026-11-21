@@ -964,7 +964,17 @@ means that the logarithmic profile is a continuous map vanishing at infinity.
 Deviation: Sanity check using Mathlib's bundled space. -/
 theorem memLogContDiffZero_zero_iff (f : ℝ → ℂ) :
     MemLogContDiffZero 0 f ↔
-      ∃ g : ZeroAtInftyContinuousMap ℝ ℂ, (g : ℝ → ℂ) = f := by sorry
+      ∃ g : ZeroAtInftyContinuousMap ℝ ℂ, (g : ℝ → ℂ) = f := by
+  constructor
+  · rintro ⟨hc, ht⟩
+    have hc' : Continuous f := by simpa using hc
+    refine ⟨⟨⟨f, hc'⟩, ?_⟩, rfl⟩
+    simpa using ht 0 le_rfl
+  · rintro ⟨g, rfl⟩
+    refine ⟨by simpa using g.continuous, ?_⟩
+    intro j hj
+    obtain rfl := Nat.le_zero.mp hj
+    simpa using g.zero_at_infty'
 
 /-- Paper: Equation (B.2.1.19), p. 597. The norm is the sum of the
 supremum norms of the logarithmic derivatives through order m. -/
@@ -1318,7 +1328,12 @@ the inverse Mellin integral evaluated at one.
 Deviation: Sanity check for orientation and normalization. -/
 theorem verticalLineIntegral_div_eq_mellinInv_one (Φ : ℂ → ℂ) (σ : ℝ)
     (hΦ : Complex.VerticalIntegrable Φ σ) :
-    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by sorry
+    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by
+  unfold verticalLineIntegral mellinInv
+  simp only [Complex.ofReal_one, Complex.one_cpow, one_smul]
+  rw [Complex.real_smul]
+  push_cast
+  field_simp
 
 local notation "cauchyKernel" =>
   (fun (Φ : ℂ → ℂ) (N : ℕ) (z s : ℂ) ↦ Φ s / (s - z) ^ (N + 1))

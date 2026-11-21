@@ -752,7 +752,9 @@ def modulatedSobolevWeight (x : G) : ℝ≥0 :=
 Deviation: Sanity check in logarithmic coordinates. -/
 theorem modulatedSobolevWeight_of_exp {x : G} (t : ℝ)
     (hx : ((m x).val : ℝ) = Real.exp t) :
-    (modulatedSobolevWeight m x : ℝ) = |t| := by sorry
+    (modulatedSobolevWeight m x : ℝ) = |t| := by
+  change |Real.log ((m x).val : ℝ)| = |t|
+  rw [hx, Real.log_exp]
 
 /-- Paper: (9.1.2.1), p. 399. The logarithmic weight satisfies the Sobolev
 weight condition with subadditivity constant one. -/
