@@ -8,6 +8,7 @@ public import Mathlib.Topology.Compactness.Paracompact
 public import Mathlib.Topology.ContinuousMap.CompactlySupported
 public import Mathlib.Topology.Sets.Compacts
 public import Mathlib.Topology.UniformSpace.CompactConvergence
+import Mathlib.Topology.ContinuousMap.LocallyConvex
 
 /-!
 # Vector-valued continuous and differentiable functions
@@ -83,12 +84,79 @@ theorem compactSupportStageTopology_univ [CompactSpace X] :
     (restrictUniv ∘ fun f : compactSupportStage (E := E) K ↦ f.val.toContinuousMap) _ = _
   rw [← induced_compose, ← restrictUniv.isInducing.eq_induced]
 
+open scoped ComplexOrder in
 /-- Paper: Definition C.5.1.1, p. 721. For compact X, the inductive limit topology
 agrees with the topology induced by the inclusion into continuous maps. -/
 theorem compactSupportLCTopology_of_compact [CompactSpace X] :
     compactSupportLCTopology X E =
       TopologicalSpace.induced (CompactlySupportedContinuousMap.toContinuousMap :
-        C_c(X, E) → C(X, E)) inferInstance := by sorry
+        C_c(X, E) → C(X, E)) inferInstance := by
+  let inclusion : C_c(X, E) →ₗ[ℂ] C(X, E) :=
+    { toFun := CompactlySupportedContinuousMap.toContinuousMap
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let : TopologicalSpace C_c(X, E) := induced inclusion inferInstance
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : ContinuousSMul ℝ E := IsScalarTower.continuousSMul ℂ
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  let : LocallyConvexSpace ℂ E := LocallyConvexSpace.ofBasisZero ℂ E id _
+    (LocallyConvexSpace.convex_basis_zero ℝ E)
+    (fun _ h ↦ convex_RCLike_iff_convex_real.mpr h.2)
+  let : PolynormableSpace ℂ C_c(X, E) := PolynormableSpace.induced inclusion
+  let (K : Compacts X) := compactSupportStageTopology (E := E) K
+  have hStage (K : Compacts X) : Continuous (compactSupportStage (E := E) K).subtype := by
+    apply continuous_induced_rng.mpr
+    apply ContinuousMap.continuous_compactOpen.mpr
+    intro L hL U hU
+    let val : ↥(K : Set X) → X := Subtype.val
+    let restrict : compactSupportStage (E := E) K → C(↥(K : Set X), E) :=
+      fun f ↦ f.val.toContinuousMap.comp ⟨val, continuous_subtype_val⟩
+    have hRestrict : Continuous restrict := continuous_induced_dom
+    have hPreimage : IsCompact (val ⁻¹' L) :=
+      K.isCompact.isClosed.isClosedEmbedding_subtypeVal.isCompact_preimage hL
+    have hZero (f : compactSupportStage (E := E) K) {x : X} (hx : x ∉ (K : Set X)) :
+        f.val x = 0 :=
+      image_eq_zero_of_notMem_tsupport fun hs ↦
+        hx ((mem_compactSupportStage_iff K f.val).mp f.property hs)
+    -- Off the supporting set, the compact-open condition only tests the value zero.
+    have hMapsTo (f : compactSupportStage (E := E) K) :
+        MapsTo ((inclusion ∘ (compactSupportStage (E := E) K).subtype) f) L U ↔
+          MapsTo (restrict f) (val ⁻¹' L) U ∧
+            ∀ x ∈ L, x ∉ (K : Set X) → (0 : E) ∈ U := by
+      constructor
+      · intro hf
+        refine ⟨fun x hx ↦ hf hx, fun x hx hxK ↦ ?_⟩
+        rw [← hZero f hxK]
+        exact hf hx
+      · rintro ⟨hf, hOutside⟩ x hx
+        change f.val x ∈ U
+        by_cases hxK : x ∈ (K : Set X)
+        · exact hf (show ⟨x, hxK⟩ ∈ val ⁻¹' L from hx)
+        · rw [hZero f hxK]
+          exact hOutside x hx hxK
+    simp_rw [hMapsTo]
+    exact ((ContinuousMap.isOpen_setOfPred_mapsTo hPreimage hU).preimage hRestrict).inter
+      isOpen_const
+  -- Every map belongs to the whole-space stage.
+  let K : Compacts X := ⟨univ, isCompact_univ⟩
+  let lift : C_c(X, E) → compactSupportStage (E := E) K :=
+    fun f ↦ ⟨f, (mem_compactSupportStage_iff K f).mpr (subset_univ _)⟩
+  have hLift : Continuous lift := by
+    change Continuous[_, compactSupportStageTopology (E := E) K] lift
+    rw [compactSupportStageTopology_univ]
+    exact continuous_induced_rng.mpr continuous_induced_dom
+  have hContinuous : (fun p : Seminorm ℂ C_c(X, E) ↦
+      ∀ K, Continuous (p ∘ (compactSupportStage (E := E) K).subtype)) =
+      (fun p : Seminorm ℂ C_c(X, E) ↦ Continuous p) := by
+    funext p
+    exact propext ⟨fun hp ↦ (hp K).comp hLift, fun hp K ↦ hp.comp (hStage K)⟩
+  change (SeminormFamily.moduleFilterBasis
+    (Subtype.val : {p : Seminorm ℂ C_c(X, E) //
+      ∀ K, Continuous (p ∘ (compactSupportStage (E := E) K).subtype)} → _)).topology =
+    induced inclusion inferInstance
+  rw [hContinuous]
+  exact (PolynormableSpace.withSeminorms ℂ C_c(X, E)).withSeminorms_eq.symm
 
 /-- Paper: Lemma C.5.1.3(1), p. 721. The inductive limit topology on compactly supported
 continuous maps is Hausdorff. -/
