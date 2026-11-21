@@ -1134,7 +1134,37 @@ theorem not_exists_continuousLinear_extension_evalInverse
     let δ : K → WeakDual ℂ C(K, ℂ) := fun y ↦
       StrongDual.toWeakDual (ContinuousMap.evalCLM ℂ y)
     let V := Submodule.span ℂ (range δ)
-    ¬ ∃ T : V →L[ℂ] E, ∀ y : K, T ⟨δ y, Submodule.subset_span (mem_range_self y)⟩ = y.val := by sorry
+    ¬ ∃ T : V →L[ℂ] E, ∀ y : K, T ⟨δ y, Submodule.subset_span (mem_range_self y)⟩ = y.val := by
+  classical
+  intro δ V h
+  obtain ⟨T, hT⟩ := h
+  -- Continuity bounds the output norm by finitely many weak-dual evaluations.
+  let pairing := topDualPairing ℂ C(K, ℂ)
+  have hsub : IsInducing V.subtype := .subtypeVal
+  obtain ⟨s, c, -, hbound⟩ := Seminorm.bound_comp_of_isInducing
+    (p := (normSeminorm ℂ E).comp T.toLinearMap) T.continuous.norm
+    pairing.weakBilin_withSeminorms hsub
+  let a : V →ₗ[ℂ] (s → ℂ) :=
+    LinearMap.pi fun f : s ↦ (pairing.flip (f : C(K, ℂ))).comp V.subtype
+  have hker : a.ker ≤ T.toLinearMap.ker := by
+    intro φ hφ
+    have hsup : (s.sup pairing.toSeminormFamily) φ.val ≤ 0 := by
+      refine Seminorm.finset_sup_apply_le le_rfl fun f hf ↦ ?_
+      have hz : φ.val f = 0 := congrFun (LinearMap.mem_ker.mp hφ) ⟨f, hf⟩
+      change ‖φ.val f‖ ≤ 0
+      simp [hz]
+    have hnorm : ‖T φ‖ ≤ (c : ℝ) * (s.sup pairing.toSeminormFamily) φ.val := hbound φ
+    exact LinearMap.mem_ker.mpr (norm_le_zero_iff.mp
+      (hnorm.trans (mul_nonpos_of_nonneg_of_nonpos c.coe_nonneg hsup)))
+  have : FiniteDimensional ℂ (V ⧸ a.ker) :=
+    FiniteDimensional.of_injective a.quotKerEquivRange.toLinearMap a.quotKerEquivRange.injective
+  have : FiniteDimensional ℂ T.toLinearMap.range := by
+    rw [← Submodule.range_liftQ a.ker T.toLinearMap hker]
+    infer_instance
+  apply hKspan
+  refine Submodule.finiteDimensional_of_le (S₂ := T.toLinearMap.range) (Submodule.span_le.mpr ?_)
+  intro y hy
+  exact ⟨⟨δ ⟨y, hy⟩, Submodule.subset_span (mem_range_self _)⟩, hT ⟨y, hy⟩⟩
 
 section IntegralForms
 
