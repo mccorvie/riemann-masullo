@@ -1205,7 +1205,8 @@ theorem tendstoUniformlyOn_taylor_derivatives (hf : ∀ k : ℕ,
 /-- Paper: Theorem C.5.2.6, p. 738. In the quasi-complete case weak holomorphy
 implies holomorphy in the target topology. -/
 theorem WeaklyHolomorphicOn.vectorHolomorphicOn (hf : WeaklyHolomorphicOn f Ω) :
-    VectorHolomorphicOn f Ω := by sorry
+    VectorHolomorphicOn f Ω := by
+  exact (weaklyHolomorphicOn_iff_all_derivatives hΩ hconn f).mp hf 0
 
 omit [QuasiCompleteSpace ℂ E] in
 /-- Paper: (C.5.2.6), p. 739. The weak derivative evaluates each continuous
