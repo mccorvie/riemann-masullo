@@ -1636,11 +1636,77 @@ theorem homogeneousAdelicTheta_homogeneous (ω₁ : χ[F]) (f : ℬ[F]) (h : C�
   simp only [Subgroup.coe_mul, key, map_mul, Circle.coe_mul]
   ring
 
+/-- Norm-one classes do not change the idele class norm. -/
+private theorem normℝ_normOne_mul (h : C₁[F]) (g : C[F]) : normℝ (h.val * g) = normℝ g := by
+  simp only [map_mul, MonoidHom.mem_ker.mp h.property, one_mul]
+
+/-- The idele class norm is positive. -/
+private theorem normℝ_pos (g : C[F]) : 0 < normℝ g :=
+  NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero (ideleClassNorm F g)))
+
+/-- For norm at least one, an inverse power is an exponential in the absolute logarithm. -/
+private theorem inv_pow_eq_exp_neg_abs_log {n : ℝ} (hn : 0 < n) (hl : 0 ≤ Real.log n) (N : ℕ) :
+    (n ^ N)⁻¹ = Real.exp (-(N : ℝ) * |Real.log n|) := by
+  rw [abs_of_nonneg hl, neg_mul, Real.exp_neg, Real.exp_nat_mul, Real.exp_log hn]
+
+/-- For norm at most one, a power is an exponential in the absolute logarithm. -/
+private theorem pow_eq_exp_neg_abs_log {n : ℝ} (hn : 0 < n) (hl : Real.log n ≤ 0) (N : ℕ) :
+    n ^ N = Real.exp (-(N : ℝ) * |Real.log n|) := by
+  rw [abs_of_nonpos hl, neg_mul_neg, Real.exp_nat_mul, Real.exp_log hn]
+
+/-- Homogeneous theta is bounded by the norm-one class volume times a bound for theta
+on the norm-one orbit. -/
+private theorem norm_homogeneousAdelicTheta_le (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F]) {B : ℝ}
+    (hB : ∀ h : C₁[F], ‖adelicTheta f (h.val * g)‖ ≤ B) :
+    ‖homogeneousAdelicTheta ω₁ f g‖ ≤ (μ̄₁ univ).toReal * B := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : CompactSpace C₁[F] := (ideleClassGroup_finiteness F).2.1
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  simp only [homogeneousAdelicTheta, ContinuousMap.coe_mk]
+  refine (norm_integral_le_of_norm_le_const (.of_forall fun h ↦ ?_)).trans_eq
+    (by rw [measureReal_def, mul_comm])
+  rw [norm_mul, Circle.norm_coe, mul_one]
+  exact hB h
+
+open scoped Classical in
+/-- A character of the norm-one classes integrates to the volume if it is trivial,
+and to zero otherwise. -/
+private theorem integral_normOneCharacter (ω₁ : χ[F]) :
+    ∫ h, (ω₁ h : ℂ) ∂μ̄₁ = if ω₁ = 1 then (((μ̄₁ univ).toReal : ℝ) : ℂ) else 0 := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : CompactSpace C₁[F] := (ideleClassGroup_finiteness F).2.1
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have : μ̄₁.IsMulRightInvariant := ⟨fun k ↦ by
+    rw [show (· * k) = (k * ·) from funext fun x ↦ mul_comm x k]
+    exact map_mul_left_eq_self μ̄₁ k⟩
+  split_ifs with hω
+  · subst hω
+    simp [PontryaginDual.one_apply, measureReal_def]
+  · obtain ⟨h₀, hh₀⟩ : ∃ h₀, ω₁ h₀ ≠ 1 := by
+      by_contra hc
+      simp only [not_exists, ne_eq, not_not] at hc
+      exact hω (ContinuousMonoidHom.ext fun h ↦ (hc h).trans (PontryaginDual.one_apply h).symm)
+    have hne : (ω₁ h₀ : ℂ) ≠ 1 := fun h ↦ hh₀ (Circle.ext (h.trans Circle.coe_one.symm))
+    have hinv := integral_mul_right_eq_self (μ := μ̄₁) (fun h ↦ (ω₁ h : ℂ)) h₀
+    simp only [map_mul, Circle.coe_mul, integral_mul_const] at hinv
+    have hzero : (∫ h, (ω₁ h : ℂ) ∂μ̄₁) * ((ω₁ h₀ : ℂ) - 1) = 0 := by
+      rw [mul_sub, hinv, mul_one, sub_self]
+    exact (mul_eq_zero.mp hzero).resolve_right (sub_ne_zero.mpr hne)
+
 /-- Paper: Theorem 2.2.5.4(2), p. 97. At large norm, homogeneous theta decays
 faster than every inverse power of the norm. -/
 theorem homogeneousAdelicTheta_decay_large (ω₁ : χ[F]) (f : ℬ[F]) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], T < normℝ g →
-      ‖homogeneousAdelicTheta ω₁ f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖homogeneousAdelicTheta ω₁ f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  obtain ⟨C, T, hC, hT, hlarge⟩ := adelicTheta_decay_large f N
+  have hV : 0 ≤ (μ̄₁ univ).toReal := ENNReal.toReal_nonneg
+  refine ⟨((μ̄₁ univ).toReal + 1) * C, T, by positivity, hT, fun g hg ↦ ?_⟩
+  have hx : 0 ≤ ((normℝ g) ^ N)⁻¹ := by have := normℝ_pos g; positivity
+  have hB (h : C₁[F]) : ‖adelicTheta f (h.val * g)‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+    simpa only [normℝ_normOne_mul] using
+      hlarge (h.val * g) (by simpa only [normℝ_normOne_mul] using hg)
+  refine (norm_homogeneousAdelicTheta_le ω₁ f g hB).trans ?_
+  nlinarith [mul_nonneg hC.le hx]
 
 open scoped Classical in
 /-- Paper: Equation (2.2.5.10), p. 97. The polar term is the norm-one class
@@ -1657,12 +1723,61 @@ theorem homogeneousAdelicTheta_polarTerm_trivial_at_one (f : ℬ[F]) :
       (μ̄₁ univ).toReal • (adeleSchwartzFourier f zeroAdele - f zeroAdele) := by
   simp [homogeneousAdelicTheta_polarTerm]
 
+/-- After subtracting the polar term, homogeneous theta is bounded by the norm-one class
+volume times a bound for theta minus its polar terms on the norm-one orbit. -/
+private theorem norm_homogeneousAdelicTheta_sub_polarTerm_le (ω₁ : χ[F]) (f : ℬ[F]) (g : C[F])
+    {B : ℝ} (hB : ∀ h : C₁[F], ‖adelicTheta f (h.val * g) -
+      (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤ B) :
+    ‖homogeneousAdelicTheta ω₁ f g - homogeneousAdelicTheta_polarTerm ω₁ f g‖ ≤
+      (μ̄₁ univ).toReal * B := by
+  let : BorelSpace C[F] := ⟨rfl⟩
+  let : CompactSpace C₁[F] := (ideleClassGroup_finiteness F).2.1
+  let : μ̄₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let P : ℂ := (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele - f zeroAdele
+  have hωint : Integrable (fun h : C₁[F] ↦ (ω₁ h : ℂ)) μ̄₁ :=
+    (continuous_subtype_val.comp ω₁.continuous).integrable_of_hasCompactSupport
+      (HasCompactSupport.of_compactSpace _)
+  have hpol : homogeneousAdelicTheta_polarTerm ω₁ f g = ∫ h, P * (ω₁ h : ℂ) ∂μ̄₁ := by
+    rw [integral_const_mul, integral_normOneCharacter, homogeneousAdelicTheta_polarTerm]
+    split_ifs
+    · rw [Complex.real_smul, mul_comm]
+    · rw [mul_zero]
+  have hΦ : homogeneousAdelicTheta ω₁ f g =
+      ∫ h, adelicTheta f (h.val * g) * (ω₁ h : ℂ) ∂μ̄₁ := rfl
+  have hint : Integrable (fun h : C₁[F] ↦ adelicTheta f (h.val * g) * (ω₁ h : ℂ)) μ̄₁ :=
+    homogeneousAdelicTheta_integrable ω₁ f g
+  have hsub : homogeneousAdelicTheta ω₁ f g - homogeneousAdelicTheta_polarTerm ω₁ f g =
+      ∫ h, (adelicTheta f (h.val * g) - P) * (ω₁ h : ℂ) ∂μ̄₁ := by
+    rw [hΦ, hpol, ← integral_sub hint (hωint.const_mul P)]
+    exact integral_congr_ae (.of_forall fun h ↦ (sub_mul _ _ _).symm)
+  rw [hsub]
+  refine (norm_integral_le_of_norm_le_const (.of_forall fun h ↦ ?_)).trans_eq
+    (by rw [measureReal_def, mul_comm])
+  rw [norm_mul, Circle.norm_coe, mul_one]
+  have hP : adelicTheta f (h.val * g) - P =
+      adelicTheta f (h.val * g) - (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele +
+        f zeroAdele := by
+    simp only [P]
+    ring
+  rw [hP]
+  exact hB h
+
 /-- Paper: Theorem 2.2.5.4(2), p. 97. After subtracting the polar term,
 homogeneous theta decays faster than every power of the norm at small norm. -/
 theorem homogeneousAdelicTheta_decay_small (ω₁ : χ[F]) (f : ℬ[F]) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], normℝ g < T →
       ‖homogeneousAdelicTheta ω₁ f g - homogeneousAdelicTheta_polarTerm ω₁ f g‖ ≤
-        C * (normℝ g) ^ N := by sorry
+        C * (normℝ g) ^ N := by
+  obtain ⟨C, T, hC, hT, hsmall⟩ := adelicTheta_decay_small f N
+  have hV : 0 ≤ (μ̄₁ univ).toReal := ENNReal.toReal_nonneg
+  refine ⟨((μ̄₁ univ).toReal + 1) * C, T, by positivity, hT, fun g hg ↦ ?_⟩
+  have hx : 0 ≤ (normℝ g) ^ N := by have := normℝ_pos g; positivity
+  have hB (h : C₁[F]) : ‖adelicTheta f (h.val * g) -
+      (normℝ g)⁻¹ • adeleSchwartzFourier f zeroAdele + f zeroAdele‖ ≤ C * (normℝ g) ^ N := by
+    simpa only [normℝ_normOne_mul] using
+      hsmall (h.val * g) (by simpa only [normℝ_normOne_mul] using hg)
+  refine (norm_homogeneousAdelicTheta_sub_polarTerm_le ω₁ f g hB).trans ?_
+  nlinarith [mul_nonneg hC.le hx]
 
 /-- Paper: Theorem 2.2.5.4(3), p. 97. Homogeneous theta commutes with
 directional differentiation. The difference quotient tends to homogeneous theta
@@ -1697,7 +1812,46 @@ at every exponential rate in the absolute logarithmic norm. -/
 theorem homogeneousAdelicTheta_decay_both (ω₁ : χ[F]) (f : ℬ[F])
     (h : f ∈ adelePolarSubspace F ∨ ω₁ ≠ 1) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : C[F], T < |Real.log (normℝ g)| →
-      ‖homogeneousAdelicTheta ω₁ f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by sorry
+      ‖homogeneousAdelicTheta ω₁ f g‖ ≤ C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by
+  have hV : 0 ≤ (μ̄₁ univ).toReal := ENNReal.toReal_nonneg
+  rcases h with hf | hω
+  · obtain ⟨hf0, hF0⟩ := (mem_adelePolarSubspace f).mp hf
+    obtain ⟨C, T, hC, hT, hboth⟩ := adelicTheta_decay_both f hf0 hF0 N
+    refine ⟨((μ̄₁ univ).toReal + 1) * C, T, by positivity, hT, fun g hg ↦ ?_⟩
+    have hx : 0 ≤ Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := (Real.exp_pos _).le
+    have hB (h : C₁[F]) : ‖adelicTheta f (h.val * g)‖ ≤
+        C * Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := by
+      simpa only [normℝ_normOne_mul] using
+        hboth (h.val * g) (by simpa only [normℝ_normOne_mul] using hg)
+    refine (norm_homogeneousAdelicTheta_le ω₁ f g hB).trans ?_
+    nlinarith [mul_nonneg hC.le hx]
+  · obtain ⟨C₁, T₁, hC₁, hT₁, hlarge⟩ := homogeneousAdelicTheta_decay_large ω₁ f N
+    obtain ⟨C₂, T₂, hC₂, hT₂, hsmall⟩ := homogeneousAdelicTheta_decay_small ω₁ f N
+    refine ⟨C₁ + C₂, max (max |Real.log T₁| |Real.log T₂|) 1, by positivity, by positivity,
+      fun g hg ↦ ?_⟩
+    have hn := normℝ_pos g
+    have hx : 0 ≤ Real.exp (-(N : ℝ) * |Real.log (normℝ g)|) := (Real.exp_pos _).le
+    have h1 := le_abs_self (Real.log T₁)
+    have h2 := neg_abs_le (Real.log T₂)
+    have hm1 := le_max_left (max |Real.log T₁| |Real.log T₂|) 1
+    have hm11 := le_max_left |Real.log T₁| |Real.log T₂|
+    have hm12 := le_max_right |Real.log T₁| |Real.log T₂|
+    rcases le_or_gt 0 (Real.log (normℝ g)) with hl | hl
+    · rw [abs_of_nonneg hl] at hg
+      have hT : T₁ < normℝ g := by
+        rw [← Real.log_lt_log_iff hT₁ hn]
+        linarith
+      have := hlarge g hT
+      rw [inv_pow_eq_exp_neg_abs_log hn hl] at this
+      nlinarith [mul_nonneg hC₂.le hx]
+    · rw [abs_of_neg hl] at hg
+      have hT : normℝ g < T₂ := by
+        rw [← Real.log_lt_log_iff hn hT₂]
+        linarith
+      have := hsmall g hT
+      simp only [homogeneousAdelicTheta_polarTerm, hω, ite_false, sub_zero] at this
+      rw [pow_eq_exp_neg_abs_log hn hl.le] at this
+      nlinarith [mul_nonneg hC₁.le hx]
 
 -- TODO(paper-gap): The last sentence of Theorem 2.2.5.4(4) uses the
 -- conjugate of ω to descend to the logarithmic norm. Even after choosing a
