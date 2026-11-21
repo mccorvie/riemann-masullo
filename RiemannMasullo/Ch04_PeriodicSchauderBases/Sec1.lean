@@ -425,7 +425,15 @@ theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by sorry
 /-- Paper: Definition 4.1.2.1(6), p. 158. A countable orthonormal Hilbert basis is
 normalized in the paper's sense. -/
 theorem hilbertBasis_isNormalized {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H]
-    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by sorry
+    (b : HilbertBasis ℕ ℂ H) : IsNormalized (fun n ↦ b n) := by
+  have hnorm (n : ℕ) : ‖b n‖ = 1 := b.orthonormal.norm_eq_one n
+  constructor
+  · refine ⟨Metric.ball 0 1, Metric.ball_mem_nhds 0 zero_lt_one, fun n ↦ ?_⟩
+    rw [mem_ball_zero_iff, hnorm]
+    exact lt_irrefl 1
+  · refine (NormedSpace.isVonNBounded_iff' ℂ).mpr ⟨1, ?_⟩
+    rintro _ ⟨n, rfl⟩
+    exact (hnorm n).le
 
 end Examples
 
