@@ -153,7 +153,16 @@ Deviation: Sanity check on the topology formulation, stated with finite bounds. 
 theorem GeneratesSeminormTopology.isVonNBounded_iff
     {E ι : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     {v : ι → E → ℝ≥0∞} (hv : GeneratesSeminormTopology v) (B : Set E) :
-    IsVonNBounded ℂ B ↔ ∀ i, ∃ C : ℝ≥0, ∀ f ∈ B, v i f ≤ (C : ℝ≥0∞) := by sorry
+    IsVonNBounded ℂ B ↔ ∀ i, ∃ C : ℝ≥0, ∀ f ∈ B, v i f ≤ (C : ℝ≥0∞) := by
+  obtain ⟨P, hP, hvalues⟩ := hv
+  simp_rw [hP.isVonNBounded_iff_seminorm_bounded, ← hvalues, ENNReal.ofReal_le_coe]
+  constructor
+  · intro h i
+    obtain ⟨r, hr, hbound⟩ := h i
+    exact ⟨⟨r, hr.le⟩, fun f hf ↦ (hbound f hf).le⟩
+  · intro h i
+    obtain ⟨C, hbound⟩ := h i
+    exact ⟨(C : ℝ) + 1, by positivity, fun f hf ↦ lt_of_le_of_lt (hbound f hf) (lt_add_one _)⟩
 
 /-- Paper: Proposition D.1.10.2, p. 784. A family of function transforms gives a
 generating Lᵖ family if the transforms belong to Lᵖ and their norms generate the topology.
