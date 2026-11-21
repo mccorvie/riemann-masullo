@@ -1412,7 +1412,41 @@ theorem bruhatStructuralPair_filtered :
 /-- Paper: Lemma D.1.5.2(1), p. 761. The quotient attached to a structural pair
 has an elementary presentation. -/
 theorem BruhatStructuralPair.elementary (p : BruhatStructuralPair G) :
-    Nonempty (ElementaryLCAPresentation p.quotient) := by sorry
+    Nonempty (ElementaryLCAPresentation p.quotient) := by
+  let H := p.val.1
+  let k := OrderDual.ofDual p.val.2
+  let N := k.comap H.subtype
+  obtain ⟨hH, hGen, ⟨hk, hkOpen, hkGen⟩, _⟩ := p.property
+  let : LocallyCompactSpace H := hH.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let hN : IsClosed (N : Set H) := hk.preimage continuous_subtype_val
+  refine lca_elementary_iff.mp ⟨isCompactlyGeneratedGroup_quotient hGen N hN, ?_⟩
+  let A := lcaAnnihilator k
+  let : LocallyCompactSpace A := hkOpen.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  -- Evaluation on the annihilator has kernel exactly the good subgroup.
+  let ι : A →ₜ* PontryaginDual G := ⟨A.subtype, continuous_subtype_val⟩
+  let f : H →ₜ* PontryaginDual A :=
+    (PontryaginDual.map ι).comp (pontryaginDual_eval.comp ⟨H.subtype, continuous_subtype_val⟩)
+  have hker : f.toMonoidHom.ker = N := by
+    ext x
+    rw [MonoidHom.mem_ker, Subgroup.mem_comap, Subgroup.coe_subtype,
+      ← lcaDualAnnihilator_annihilator k hk, mem_lcaDualAnnihilator_iff]
+    exact ⟨fun hx χ ↦ congrArg (fun ψ : PontryaginDual A ↦ ψ χ) hx,
+      fun hx ↦ PontryaginDual.ext hx⟩
+  let e : p.quotient →ₜ* PontryaginDual A :=
+    ⟨QuotientGroup.lift N f.toMonoidHom hker.ge,
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr f.continuous⟩
+  have he : Function.Injective e :=
+    (QuotientGroup.injective_lift_iff N f.toMonoidHom hker.ge).mpr hker.symm
+  -- A neighborhood with no nontrivial cyclic subgroups pulls back along this injection.
+  obtain ⟨W, hW, hPow⟩ := exists_nhds_one_of_isLocallyEuclidean
+    (isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp hkGen)
+  have hW' : W ∈ 𝓝 (e 1) := by rwa [map_one]
+  refine isLocallyEuclidean_of_noSmallCyclicSubgroups
+    (e.continuous.continuousAt.preimage_mem_nhds hW') ?_
+  intro x hx
+  apply he
+  rw [map_one]
+  exact hPow (e x) fun n ↦ map_pow e x n ▸ hx n
 
 /-- Paper: Lemma D.1.5.2(2), p. 761. The two annihilators form a structural pair
 in the dual, with the annihilator of the good subgroup as the open subgroup. -/
