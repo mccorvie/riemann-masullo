@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import Mathlib.Topology.MetricSpace.ProperSpace.Real
+import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Extend
 
 /-! # Schwartz–Bruhat isotypes and coarser topologies -/
 
@@ -465,7 +466,34 @@ complete target space. -/
 theorem schwartzBruhat_dense_extension (hd : DenseRange i) (T : S →L[ℂ] S)
     (hT : @Continuous S E (TopologicalSpace.induced i inferInstance) _
       (fun f ↦ i (T f))) :
-    ∃! U : E →L[ℂ] E, ∀ f : S, U (i f) = i (T f) := by sorry
+    ∃! U : E →L[ℂ] E, ∀ f : S, U (i f) = i (T f) := by
+  let R := i.toLinearMap.range
+  let e : S ≃ₗ[ℂ] R := LinearEquiv.ofInjective i.toLinearMap hi
+  have he (f : S) : (e f : E) = i f := rfl
+  have he_cont : @Continuous R S _ (TopologicalSpace.induced i inferInstance) e.symm := by
+    apply continuous_induced_rng.mpr
+    refine continuous_subtype_val.congr fun x ↦ ?_
+    exact (congrArg Subtype.val (e.apply_symm_apply x)).symm.trans (he (e.symm x))
+  let F : R →L[ℂ] E := ⟨(i.toLinearMap.comp T.toLinearMap).comp e.symm.toLinearMap,
+    @Continuous.comp R S E _ (TopologicalSpace.induced i inferInstance) _
+      e.symm (fun f ↦ i (T f)) hT he_cont⟩
+  have hdR : DenseRange R.subtypeL := by
+    change Dense (Set.range R.subtype)
+    rw [← LinearMap.coe_range, Submodule.range_subtype]
+    exact hd
+  have huR : IsUniformInducing R.subtypeL := ⟨rfl⟩
+  have : IsUniformAddGroup R := huR.isUniformAddGroup R.subtypeL
+  have hF (f : S) : F (e f) = i (T f) := by
+    change i (T (e.symm (e f))) = i (T f)
+    exact congrArg (fun g ↦ i (T g)) (e.symm_apply_apply f)
+  refine ⟨F.extend R.subtypeL, ?_, ?_⟩
+  · intro f
+    exact (F.extend_eq hdR huR (e f)).trans (hF f)
+  · intro U hU
+    refine (F.extend_unique hdR huR U (ContinuousLinearMap.ext ?_)).symm
+    intro x
+    obtain ⟨f, rfl⟩ := e.surjective x
+    exact (hU f).trans (hF f).symm
 
 /-- Paper: Lemma D.2.2.1(4), p. 795. The extension inherits the
 intertwining relation on the norm-one subgroup. The intertwiner and
