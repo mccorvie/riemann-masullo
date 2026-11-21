@@ -1086,6 +1086,72 @@ theorem vectorSchwartzSubmodule_uniformValue_polynormable :
       uniformValueTopology (vectorSchwartzSubmodule d E)
     PolynormableSpace ℂ (vectorSchwartzSubmodule d E) := by sorry
 
+omit hAdd hSMul hSemi hT2 in
+/-- The continuous dual separates points, so a chain of weak coordinate derivatives
+has a unique vector-valued endpoint. -/
+private theorem hasPartials_unique [SeparatingDual ℂ E] (l : List (Fin d)) {f g₁ g₂ : V → E}
+    (h₁ : HasVectorMultiPartial.hasPartials g₁ f l)
+    (h₂ : HasVectorMultiPartial.hasPartials g₂ f l) : g₁ = g₂ := by
+  induction l generalizing f with
+  | nil => exact (show f = g₁ from h₁).symm.trans (show f = g₂ from h₂)
+  | cons i l ih =>
+    obtain ⟨f₁, hd₁, hr₁⟩ := h₁
+    obtain ⟨f₂, hd₂, hr₂⟩ := h₂
+    have heq : f₁ = f₂ := funext fun x ↦ SeparatingDual.eq_iff_forall_dual_eq.mpr fun φ ↦
+      (hd₁.hasLineDerivAt_eval φ x).unique (hd₂.hasLineDerivAt_eval φ x)
+    rw [← heq] at hr₂
+    exact ih hr₁ hr₂
+
+omit hAdd hSMul hSemi hT2 in
+/-- A continuous integer-periodic map takes all its values on the compact unit cube,
+so each continuous seminorm on its range is bounded above. -/
+private theorem bddAbove_seminorm_of_continuous_integer_periodic (q : Seminorm ℂ E)
+    (hq : Continuous q) {g : V → E} (hg : Continuous g)
+    (hp : ∀ n : Fin d → ℤ, Periodic g (eucInt n)) : BddAbove (range (q ∘ g)) := by
+  let Q : Set (Fin d → ℝ) := univ.pi fun _ ↦ Icc 0 1
+  have hQ : IsCompact Q := isCompact_univ_pi fun _ ↦ isCompact_Icc
+  have hCube := hQ.image (PiLp.continuous_toLp 2 (fun _ : Fin d ↦ ℝ))
+  apply (hCube.bddAbove_image (hq.comp hg).continuousOn).mono
+  rintro _ ⟨x, rfl⟩
+  let n : Fin d → ℤ := fun i ↦ ⌊x i⌋
+  have hx : (x - eucInt n) ∈ WithLp.toLp 2 '' Q := by
+    refine ⟨WithLp.ofLp (x - eucInt n), ?_, rfl⟩
+    intro i _
+    change x i - (⌊x i⌋ : ℝ) ∈ Icc 0 1
+    exact ⟨Int.fract_nonneg _, (Int.fract_lt_one _).le⟩
+  refine ⟨x - eucInt n, hx, congrArg q ?_⟩
+  have heq := hp n (x - eucInt n)
+  rw [sub_add_cancel] at heq
+  exact heq.symm
+
+omit hAdd hSMul hSemi hT2 in
+/-- A differentiability order matching the chain length supplies continuous lifts
+throughout the chain. A separating dual transfers all periods to those lifts. -/
+private theorem exists_continuous_integer_periodic_hasPartials [SeparatingDual ℂ E]
+    (l : List (Fin d)) {f : V → E} (hf : VectorContDiffOrderOn f univ l.length)
+    (hc : Continuous f)
+    (hp : ∀ n : Fin d → ℤ, Periodic f (eucInt n)) :
+    ∃ g : V → E, HasVectorMultiPartial.hasPartials g f l ∧ Continuous g ∧
+      ∀ n : Fin d → ℤ, Periodic g (eucInt n) := by
+  induction l generalizing f with
+  | nil => exact ⟨f, rfl, hc, hp⟩
+  | cons i l ih =>
+    obtain ⟨f', hd, hc', ho⟩ := hf i
+    have hp' (n : Fin d → ℤ) : Periodic f' (eucInt n) := by
+      intro x
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+      intro φ
+      have hline (t : ℝ) : φ (f ((x + eucInt n) + t • EuclideanSpace.single i 1)) =
+          φ (f (x + t • EuclideanSpace.single i 1)) := by
+        rw [add_right_comm x, hp n]
+      have h' : HasDerivAt (fun t : ℝ ↦ φ (f ((x + eucInt n) +
+          t • EuclideanSpace.single i 1))) (φ (f' (x + eucInt n))) 0 :=
+        hd.hasLineDerivAt_eval φ (x + eucInt n)
+      rw [funext hline] at h'
+      exact h'.unique (hd.hasLineDerivAt_eval φ x)
+    obtain ⟨g, hg, hgc, hgp⟩ := ih ho (continuousOn_univ.mp hc') hp'
+    exact ⟨g, ⟨f', hd, hg⟩, hgc, hgp⟩
+
 /-- Paper: (C.5.1.45), p. 735. The supremum of a continuous seminorm on a mixed
 derivative of a periodic smooth function is finite and defines a seminorm.
 Deviation: The supremum is over the Euclidean cover of the torus. -/
@@ -1094,7 +1160,28 @@ theorem exists_vectorPeriodicSmoothDerivativeSeminorm (q : Seminorm ℂ E) (hq :
     ∃ s : Seminorm ℂ (vectorPeriodicSmoothSubmodule d E),
       ∀ f : vectorPeriodicSmoothSubmodule d E, ∃ g : V → E,
         HasVectorMultiPartial α f.val g ∧ BddAbove (range (q ∘ g)) ∧
-          s f = ⨆ x : V, q (g x) := by sorry
+          s f = ⨆ x : V, q (g x) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let l := (List.finRange d).flatMap fun i ↦ List.replicate (α i) i
+  have hderiv (f : vectorPeriodicSmoothSubmodule d E) :
+      ∃ g : V → E, HasVectorMultiPartial.hasPartials g f.val l ∧
+        BddAbove (range (q ∘ g)) := by
+    have hf := f.property
+    simp only [vectorPeriodicSmoothSubmodule, Submodule.mem_inf, Submodule.mem_iInf,
+      LinearMap.mem_ker, LinearMap.sub_apply, LinearMap.proj_apply, sub_eq_zero] at hf
+    obtain ⟨g, hg, hc, hp⟩ := exists_continuous_integer_periodic_hasPartials l
+      (hf.1 l.length) (continuous_of_vectorContDiffOrderOn_zero (hf.1 0)) hf.2
+    exact ⟨g, hg, bddAbove_seminorm_of_continuous_integer_periodic q hq hc hp⟩
+  choose g hg hb using hderiv
+  let D : vectorPeriodicSmoothSubmodule d E →ₗ[ℂ] (V → E) :=
+    { toFun := g
+      map_add' := fun f₁ f₂ ↦ hasPartials_unique l (hg (f₁ + f₂))
+        (hasPartials_add (g f₁) (g f₂) l f₁.val f₂.val (hg f₁) (hg f₂))
+      map_smul' := fun c f ↦ hasPartials_unique l (hg (c • f))
+        (hasPartials_smul c (g f) l f.val (hg f)) }
+  let p (x : V) := q.comp ((LinearMap.proj x).comp D)
+  have hp : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr hb
+  exact ⟨⨆ x, p x, fun f ↦ ⟨g f, hg f, hb f, Seminorm.iSup_apply hp⟩⟩
 
 /-- Paper: (C.5.1.46), p. 735. The supremum of a continuous seminorm on
 a polynomially weighted mixed derivative is finite and defines a seminorm. -/
