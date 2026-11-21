@@ -11,6 +11,7 @@ import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
 import Mathlib.Topology.Algebra.Module.Spaces.CompactConvergenceCLM
 import Mathlib.Topology.UniformSpace.Ascoli
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
@@ -2099,7 +2100,32 @@ on completed injective tensor products. -/
 theorem completedInjectiveTensor_completionFactors :
     IsHomeomorph (Completion.map (injectiveTensorMap
       (Completion.toComplL : E →L[ℂ] Completion E).toLinearMap
-      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by sorry
+      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by
+  have : PolynormableSpace ℂ (Completion E) := polynormableSpace_completion
+  have : PolynormableSpace ℂ (Completion F) := polynormableSpace_completion
+  let f : E →L[ℂ] Completion E := Completion.toComplL
+  let g : F →L[ℂ] Completion F := Completion.toComplL
+  let T := injectiveTensorMap f.toLinearMap g.toLinearMap
+  have hf : IsEmbedding f := (Completion.isUniformEmbedding_coe E).isEmbedding
+  have hg : IsEmbedding g := (Completion.isUniformEmbedding_coe F).isEmbedding
+  have hT : IsUniformEmbedding T :=
+    AddMonoidHom.isUniformEmbedding_of_isEmbedding (injectiveTensorMap_isEmbedding f g hf hg)
+  have hmap : IsUniformEmbedding (Completion.map T) :=
+    (Completion.isUniformInducing_extension
+      ((Completion.isUniformInducing_coe (α := InjectiveTensor (Completion E) (Completion F))).comp
+        hT.isUniformInducing)).isUniformEmbedding
+  have hd : DenseRange T := injectiveTensorMap_denseRange f g hf hg
+    Completion.denseRange_coe Completion.denseRange_coe
+  have hdmap : DenseRange (Completion.map T) := by
+    apply DenseRange.of_comp
+      (g := ((↑) : InjectiveTensor E F → Completion (InjectiveTensor E F)))
+    simpa only [Function.comp_def, Completion.map_coe hT.uniformContinuous] using
+      Completion.denseRange_coe.comp hd (Completion.continuous_coe _)
+  have hclosed := hmap.isUniformInducing.isComplete_range.isClosed
+  refine isHomeomorph_iff_isEmbedding_surjective.mpr ⟨hmap.isEmbedding, fun y ↦ ?_⟩
+  change y ∈ range (Completion.map T)
+  rw [← hclosed.closure_eq]
+  exact hdmap y
 
 end CompletionFactors
 
