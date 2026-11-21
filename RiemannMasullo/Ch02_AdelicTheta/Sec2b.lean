@@ -6,6 +6,7 @@ import Mathlib.Analysis.Calculus.UniformLimitsDeriv
 import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 import Mathlib.LinearAlgebra.TensorProduct.Finiteness
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
+import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1211,10 +1212,123 @@ the Schwartz–Bruhat topology. -/
 theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by
   exact isClosed_singleton.preimage (adelePolarValues_continuous (F := F))
 
+local instance adelicThetaAdeleMeasurableSpace : MeasurableSpace 𝔸[F] := borel _
+
+open scoped ENNReal in
+/-- Integrating a function after adelic dilation scales its integral by the reciprocal norm. -/
+private theorem adeleIntegral_dilation {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (f : 𝔸[F] → E) (hf : Integrable f (additiveTamagawaMeasure F)) (g : 𝕀[F]) :
+    Integrable (fun x ↦ f (g.val * x)) (additiveTamagawaMeasure F) ∧
+      (∫ x, f (g.val * x) ∂additiveTamagawaMeasure F) =
+        (valueℝ (ideleNorm F g))⁻¹ • (∫ x, f x ∂additiveTamagawaMeasure F) := by
+  let μ := additiveTamagawaMeasure F
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let d := (Homeomorph.smul (α := 𝔸[F]) g).toMeasurableEquiv
+  have hmap : μ.map d = (↑(ideleNorm F g⁻¹).val : ℝ≥0∞) • μ := by
+    ext s hs
+    rw [Measure.map_apply d.measurable hs]
+    change μ ((fun x : 𝔸[F] ↦ g • x) ⁻¹' s) = (↑(ideleNorm F g⁻¹).val : ℝ≥0∞) * μ s
+    rw [← inv_inv g, Set.preimage_smul_inv]
+    exact adeleHaar_mul_image F μ g⁻¹ s hs
+  change Integrable (f ∘ d) μ ∧ (∫ x, f (d x) ∂μ) = _
+  refine ⟨(integrable_map_equiv d f).mp (hmap.symm ▸ hf.smul_measure ENNReal.coe_ne_top), ?_⟩
+  rw [← integral_map_equiv d f, hmap, integral_smul_measure]
+  simp only [ENNReal.coe_toReal, map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv]
+  rfl
+
+open scoped Pointwise in
+/-- The integral of a directional derivative vanishes when the original integral vanishes.
+The fundamental theorem of calculus along the dilation orbits and Fubini's theorem reduce
+this to the scaling law for the adelic Haar measure. -/
+private theorem adeleDirectionalDeriv_integral_eq_zero (f : ℬ[F])
+    (hf : (∫ x, f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F) = 0) :
+    (∫ x, adeleDirectionalDeriv γ f (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F) = 0 := by
+  let μ := additiveTamagawaMeasure F
+  let : BorelSpace 𝔸[F] := ⟨rfl⟩
+  let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let : SigmaCompactSpace 𝔸[F] := by
+    let : Countable F := Countable.of_moduleFinite (R := ℚ)
+    let b := RingOfIntegers.basis F
+    let D := adeleFundamentalDomain F b
+    let K (q : F) := algebraMap F 𝔸[F] q +ᵥ closure D
+    refine SigmaCompactSpace.of_countable (range K) (countable_range K) ?_ ?_
+    · rintro _ ⟨q, rfl⟩
+      exact IsCompact.vadd _ (adeleFundamentalDomain_precompact F b)
+    · rw [sUnion_range]
+      exact eq_top_mono (iUnion_mono fun _ ↦ vadd_set_mono (subset_closure (s := D)))
+        (adeleFundamentalDomain_cover F b)
+  let d := adeleDirectionalDeriv γ f
+  let g (s : ℝ) := γ (expUnit s)
+  let c (s : ℝ) := (valueℝ (ideleNorm F (g s)))⁻¹
+  have hg : Continuous g := γ.continuous.comp
+    ((Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous)
+  have hgAdd (s t : ℝ) : g (s + t) = g s * g t := by
+    have he : expUnit (s + t) = expUnit s * expUnit t :=
+      Units.ext (NNReal.coe_inj.mp (Real.exp_add s t))
+    exact (congrArg γ he).trans (map_mul γ _ _)
+  have hNormPos (s : ℝ) : 0 < valueℝ (ideleNorm F (g s)) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (ideleNorm F (g s)))
+  have hcPos (s : ℝ) : 0 < c s := inv_pos.mpr (hNormPos s)
+  have hc : Continuous c := by
+    apply Continuous.inv₀ _ (fun s ↦ (hNormPos s).ne')
+    exact NNReal.continuous_coe.comp (Units.continuous_val.comp
+      ((ideleGroup_topology F).2.2.2.2.1.comp hg))
+  let orbit (s : ℝ) (x : 𝔸[F]) := Multiplicative.ofAdd ((g s).val * x)
+  have hOrbit : Continuous (uncurry orbit) := continuous_ofAdd.comp
+    (((Units.continuous_val.comp hg).comp continuous_fst).mul continuous_snd)
+  have hDeriv (s : ℝ) (x : 𝔸[F]) :
+      HasDerivAt (fun t ↦ f (orbit t x)) (d (orbit s x)) s := by
+    have h : HasDerivAt (fun t : ℝ ↦ f (orbit t ((g s).val * x))) (d (orbit s x)) (s - s) := by
+      rw [sub_self]
+      exact (adeleOrbit_differentiableAt γ f (orbit s x)).hasDerivAt
+    refine (h.comp_sub_const s s).congr_of_eventuallyEq (Eventually.of_forall fun t ↦ ?_)
+    have hMul : g (t - s) * g s = g t := by rw [← hgAdd, sub_add_cancel]
+    simp only [orbit, ← mul_assoc, ← Units.val_mul, hMul]
+  have hFTC (x : 𝔸[F]) : (∫ s in (0 : ℝ)..1, d (orbit s x)) =
+      f (orbit 1 x) - f (orbit 0 x) :=
+    intervalIntegral.integral_eq_sub_of_hasDerivAt (fun s _ ↦ hDeriv s x)
+      (((schwartzBruhat_continuous d).comp (hOrbit.comp
+        (continuous_id.prodMk continuous_const))).intervalIntegrable 0 1)
+  have hd := (adeleSchwartzFourier_apply_zero d).1
+  have hfInt := (adeleSchwartzFourier_apply_zero f).1
+  have hProd : Integrable (uncurry (fun s x ↦ d (orbit s x)))
+      ((volume.restrict (uIoc (0 : ℝ) 1)).prod μ) := by
+    apply (integrable_prod_iff ((schwartzBruhat_continuous d).comp hOrbit).aestronglyMeasurable).mpr
+    refine ⟨Eventually.of_forall fun s ↦ (adeleIntegral_dilation _ hd (g s)).1, ?_⟩
+    have hBound : IntegrableOn (fun s ↦ c s • (∫ x, ‖d (Multiplicative.ofAdd x)‖ ∂μ))
+        (uIoc (0 : ℝ) 1) volume :=
+      (hc.smul continuous_const).integrableOn_Icc.mono_set uIoc_subset_uIcc
+    exact hBound.congr (Eventually.of_forall fun s ↦
+      (adeleIntegral_dilation _ hd.norm (g s)).2.symm)
+  have hInt : (∫ s in (0 : ℝ)..1, c s • (∫ x, d (Multiplicative.ofAdd x) ∂μ)) = 0 := by
+    calc
+      _ = ∫ s in (0 : ℝ)..1, ∫ x, d (orbit s x) ∂μ :=
+        intervalIntegral.integral_congr fun s _ ↦ (adeleIntegral_dilation _ hd (g s)).2.symm
+      _ = ∫ x, (∫ s in (0 : ℝ)..1, d (orbit s x)) ∂μ := intervalIntegral_integral_swap hProd
+      _ = 0 := by
+        simp_rw [hFTC]
+        rw [integral_sub (adeleIntegral_dilation _ hfInt (g 1)).1
+          (adeleIntegral_dilation _ hfInt (g 0)).1]
+        rw [(adeleIntegral_dilation _ hfInt (g 1)).2, (adeleIntegral_dilation _ hfInt (g 0)).2,
+          hf, smul_zero, smul_zero, sub_zero]
+  rw [intervalIntegral.integral_smul_const] at hInt
+  exact (smul_eq_zero.mp hInt).resolve_left (intervalIntegral.integral_pos zero_lt_one
+    hc.continuousOn (fun s _ ↦ (hcPos s).le) ⟨0, by simp, hcPos 0⟩).ne'
+
 /-- Paper: Lemma 2.2.4.5(1), p. 91. Directional differentiation preserves the
 common polar kernel, so it induces a linear map on the polar quotient. -/
 theorem adeleDirectionalDeriv_preserves_polarSubspace :
-    adelePolarSubspace F ≤ (adelePolarSubspace F).comap (adeleDirectionalDeriv γ) := by sorry
+    adelePolarSubspace F ≤ (adelePolarSubspace F).comap (adeleDirectionalDeriv γ) := by
+  intro f hf
+  change adeleDirectionalDeriv γ f ∈ adelePolarSubspace F
+  refine (mem_adelePolarSubspace _).mpr ⟨?_, ?_⟩
+  · change deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val * 0))) 0 = 0
+    simp only [mul_zero, deriv_const]
+  · rw [(adeleSchwartzFourier_apply_zero _).2]
+    apply adeleDirectionalDeriv_integral_eq_zero γ f
+    rw [← (adeleSchwartzFourier_apply_zero _).2]
+    exact ((mem_adelePolarSubspace f).mp hf).2
 
 /-- Paper: Equation (2.2.4.25), p. 91. The two polar evaluations are jointly
 surjective, so they identify the quotient by their common kernel with `ℂ × ℂ`. -/
@@ -1231,8 +1345,6 @@ theorem adeleDirectionalDeriv_polarQuotient_diagonal (α : ℝ)
       (adelePolarSubspace F).mapQ (τ₁₂ := RingHom.id ℂ) (adelePolarSubspace F)
         (adeleDirectionalDeriv (F := F) γ) (adeleDirectionalDeriv_preserves_polarSubspace (F := F) γ)
     T.toFun (D.toFun (T.symm.toFun z)) = (0, (-α) • z.2) := by sorry
-
-local instance adelicThetaAdeleMeasurableSpace : MeasurableSpace 𝔸[F] := borel _
 
 /-- Paper: Lemma 2.2.4.5(3), p. 92. The difference quotient of the Fourier
 transform under inverse dilation, weighted by the reciprocal norm, converges
