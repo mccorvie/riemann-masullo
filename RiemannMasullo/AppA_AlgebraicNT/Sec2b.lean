@@ -452,7 +452,9 @@ theorem regulator_eq_infiniteIdeleLog (u : (𝓞 F)ˣ) (v : {w : InfinitePlace F
 
 /-- Paper: Lemma A.2.3.4(1), p. 548. The regulator image is discrete in the hyperplane. -/
 theorem regulator_discrete : IsDiscrete (Set.range (Units.logEmbedding F)) := by
-  sorry
+  change IsDiscrete ((Units.logEmbedding F).toIntLinearMap.range : Set (logSpace F))
+  rw [LinearMap.range_eq_map, ← Units.unitLattice]
+  exact SetLike.isDiscrete_iff_discreteTopology.mpr (Units.instDiscrete_unitLattice F)
 
 /-- Paper: Lemma A.2.3.4(1), p. 548. The regulator image is closed in the hyperplane. -/
 theorem regulator_closed : IsClosed (Set.range (Units.logEmbedding F)) := by
