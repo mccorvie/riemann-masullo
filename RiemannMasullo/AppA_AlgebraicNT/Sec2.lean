@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec1
 public import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.GroupTheory.ArchimedeanDensely
+import Mathlib.RingTheory.Ideal.Norm.RelNorm
 import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Baire.LocallyCompactRegular
@@ -1083,12 +1084,11 @@ private theorem infiniteAdele_integralBasis_bijective :
   exact ⟨fun _ _ h ↦ hcomp.injective (congrArg m h),
     fun y ↦ let ⟨c, hc⟩ := hcomp.surjective (m y); ⟨c, m.injective hc⟩⟩
 
-/-- Paper: Lemma A.2.2.2, p. 546. The adele algebra on which the relative norm
-takes a determinant is finite free of the field degree.
-Deviation: This sanity check rules out the default determinant on modules without a finite basis. -/
-theorem rationalAdeleEmbedding_hasBasis :
+/-- The diagonal images of the integral basis form a basis over the rational adeles. -/
+private theorem exists_adelicIntegralBasis :
     letI := (rationalAdeleEmbedding F).toAlgebra
-    Nonempty (Module.Basis (Fin (Module.finrank ℚ F)) 𝔸[ℚ] 𝔸[F]) := by
+    ∃ b : Module.Basis (Module.Free.ChooseBasisIndex ℤ (𝓞 F)) 𝔸[ℚ] 𝔸[F],
+      ∀ i, b i = algebraMap F 𝔸[F] (integralBasis F i) := by
   let := (rationalAdeleEmbedding F).toAlgebra
   let f := rationalAdeleEmbedding F
   have hs := rationalAdeleEmbedding_spec F
@@ -1164,9 +1164,25 @@ theorem rationalAdeleEmbedding_hasBasis :
       refine ⟨fun i ↦ (x i, y i), Prod.ext ?_ ?_⟩
       · exact (hinf' _).trans hx
       · exact (hfin' _).trans hy
-  let e : ι ≃ Fin (Module.finrank ℚ F) :=
-    (Fintype.equivFin ι).trans (finCongr (Module.finrank_eq_card_basis (integralBasis F)).symm)
-  exact ⟨((Pi.basisFun 𝔸[ℚ] ι).map (LinearEquiv.ofBijective φ hbij)).reindex e⟩
+  refine ⟨(Pi.basisFun 𝔸[ℚ] ι).map (LinearEquiv.ofBijective φ hbij), fun i ↦ ?_⟩
+  change φ (Pi.basisFun 𝔸[ℚ] ι i) = v i
+  rw [Pi.basisFun_apply, hφ, Finset.sum_eq_single i]
+  · simp only [Pi.single_eq_same, map_one, one_mul]
+  · intro j _ hji
+    simp only [Pi.single_eq_of_ne hji, map_zero, zero_mul]
+  · exact fun h ↦ (h (Finset.mem_univ i)).elim
+
+/-- Paper: Lemma A.2.2.2, p. 546. The adele algebra on which the relative norm
+takes a determinant is finite free of the field degree.
+Deviation: This sanity check rules out the default determinant on modules without a finite basis. -/
+theorem rationalAdeleEmbedding_hasBasis :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    Nonempty (Module.Basis (Fin (Module.finrank ℚ F)) 𝔸[ℚ] 𝔸[F]) := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b, -⟩ := exists_adelicIntegralBasis F
+  let e : Module.Free.ChooseBasisIndex ℤ (𝓞 F) ≃ Fin (Module.finrank ℚ F) :=
+    (Fintype.equivFin _).trans (finCongr (Module.finrank_eq_card_basis (integralBasis F)).symm)
+  exact ⟨b.reindex e⟩
 
 end AdeleBasis
 
@@ -1174,11 +1190,375 @@ end AdeleBasis
 theorem relativeIdeleNormRat_continuous : Continuous (relativeIdeleNormRat F) := by
   sorry
 
+section RelativeNorm
+
+local notation "ιF" => Module.Free.ChooseBasisIndex ℤ (𝓞 F)
+local notation "dQ" => algebraMap ℚ 𝔸[ℚ]
+local notation "dL" => algebraMap F 𝔸[F]
+
+/-- Diagonal rational coordinates lift to adelic coordinates in the diagonal integral basis. -/
+private theorem adelicIntegralBasis_sum
+    (b : letI := (rationalAdeleEmbedding F).toAlgebra; Module.Basis ιF 𝔸[ℚ] 𝔸[F])
+    (hb : ∀ i, b i = dL (integralBasis F i)) (q : ιF → ℚ) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    (∑ i, dQ (q i) • b i) = dL ((integralBasis F).equivFun.symm q) := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  rw [Module.Basis.equivFun_symm_apply, map_sum]
+  refine Finset.sum_congr rfl fun i _ ↦ ?_
+  simp only [hb, Algebra.smul_def, map_mul]
+  exact congrArg (· * dL (integralBasis F i)) ((rationalAdeleEmbedding_spec F).2.1 (q i))
+
+/-- The determinant norm on a diagonal adele is the diagonal of the field norm. -/
+private theorem rationalAdeleNorm_diagonal
+    (b : letI := (rationalAdeleEmbedding F).toAlgebra; Module.Basis ιF 𝔸[ℚ] 𝔸[F])
+    (hb : ∀ i, b i = dL (integralBasis F i)) (x : F) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    Algebra.norm 𝔸[ℚ] (dL x) = dQ (Algebra.norm ℚ x) := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  rw [Algebra.norm_eq_matrix_det b, Algebra.norm_eq_matrix_det (integralBasis F), RingHom.map_det]
+  congr 1
+  ext i j
+  change (Algebra.leftMulMatrix b (dL x)) i j =
+    dQ ((Algebra.leftMulMatrix (integralBasis F) x) i j)
+  rw [Algebra.leftMulMatrix_eq_repr_mul, Algebra.leftMulMatrix_eq_repr_mul, hb, ← map_mul]
+  let y := x * integralBasis F j
+  change b.repr (dL y) i = dQ ((integralBasis F).repr y i)
+  have h := adelicIntegralBasis_sum F b hb ((integralBasis F).equivFun y)
+  rw [LinearEquiv.symm_apply_apply] at h
+  rw [← h, ← b.equivFun_symm_apply]
+  change b.equivFun (b.equivFun.symm _) i = _
+  rw [LinearEquiv.apply_symm_apply]
+  rfl
+
+/-- Projecting the determinant is polynomial in the projected coordinates of the input. -/
+private theorem rationalAdeleNorm_eval_sum {K : Type*} [CommRing K]
+    (b : letI := (rationalAdeleEmbedding F).toAlgebra; Module.Basis ιF 𝔸[ℚ] 𝔸[F])
+    (p : 𝔸[ℚ] →+* K) (c : ιF → 𝔸[ℚ]) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    p (Algebra.norm 𝔸[ℚ] (∑ i, c i • b i)) =
+      (∑ i, p (c i) • (Algebra.leftMulMatrix b (b i)).map p).det := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  rw [Algebra.norm_eq_matrix_det b, p.map_det, map_sum]
+  congr 1
+  ext i j
+  simp only [Matrix.map_apply, RingHom.mapMatrix_apply, Matrix.sum_apply, map_sum,
+    map_smul, Matrix.smul_apply, smul_eq_mul, map_mul]
+
+/-- A projected determinant identity extends from diagonal elements by density in the
+scalar coordinates. The scalar `r` retains the projected coordinates on both sides. -/
+private theorem rationalAdeleNorm_compare {K : Type*} [CommRing K] [TopologicalSpace K]
+    [IsTopologicalRing K] (p : 𝔸[ℚ] →+* K) (s : K → 𝔸[ℚ]) (hs : Continuous s)
+    (hdense : DenseRange (p ∘ dQ))
+    (r : 𝔸[ℚ]) (hr : ∀ c, r * s (p c) = r * c)
+    (n : K → ℝ) (hn : Continuous n) (g : 𝔸[F] → ℝ) (hg : Continuous g)
+    (hgr : ∀ a, g (rationalAdeleEmbedding F r * a) = g a)
+    (hdiag : ∀ x : F, n (p (dQ (Algebra.norm ℚ x))) = g (dL x)) (a : 𝔸[F]) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    n (p (Algebra.norm 𝔸[ℚ] a)) = g a := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b, hb⟩ := exists_adelicIntegralBasis F
+  let z (c : ιF → 𝔸[ℚ]) : 𝔸[F] := ∑ i, c i • b i
+  let P (t : ιF → K) : Matrix ιF ιF K := ∑ i, t i • (Algebra.leftMulMatrix b (b i)).map p
+  have hproject (c : ιF → 𝔸[ℚ]) : p (Algebra.norm 𝔸[ℚ] (z c)) = (P (p ∘ c)).det :=
+    rationalAdeleNorm_eval_sum F b p c
+  have hreplace (c : ιF → 𝔸[ℚ]) : g (z (s ∘ p ∘ c)) = g (z c) := by
+    rw [← hgr (z (s ∘ p ∘ c)), ← hgr (z c)]
+    change g (r • z (s ∘ p ∘ c)) = g (r • z c)
+    simp only [z, Finset.smul_sum, smul_smul, Function.comp_apply, hr]
+  have hleft : Continuous (fun t ↦ n (P t).det) := by
+    apply hn.comp
+    simp only [Matrix.det_apply, Units.smul_def, zsmul_eq_mul]
+    refine continuous_finsetSum _ fun σ _ ↦ continuous_const.mul
+      (continuous_finsetProd _ fun j _ ↦ ?_)
+    simp only [P, Matrix.sum_apply, Matrix.smul_apply, smul_eq_mul]
+    exact continuous_finsetSum _ fun i _ ↦ (continuous_apply i).mul continuous_const
+  have hright : Continuous (fun t ↦ g (z (s ∘ t))) := by
+    apply hg.comp
+    simp only [z, Function.comp_apply, Algebra.smul_def]
+    exact continuous_finsetSum _ fun i _ ↦
+      ((rationalAdeleEmbedding_spec F).1.comp (hs.comp (continuous_apply i))).mul
+        continuous_const
+  have hd : DenseRange (fun q : ιF → ℚ ↦ p ∘ dQ ∘ q) :=
+    DenseRange.piMap fun _ ↦ hdense
+  have he := hd.equalizer hleft hright (by
+    funext q
+    change n (P (p ∘ dQ ∘ q)).det = g (z (s ∘ p ∘ dQ ∘ q))
+    have hz : z (dQ ∘ q) = dL ((integralBasis F).equivFun.symm q) :=
+      adelicIntegralBasis_sum F b hb q
+    rw [← hproject (dQ ∘ q), hreplace (dQ ∘ q), hz, rationalAdeleNorm_diagonal F b hb]
+    exact hdiag _)
+  let c := b.equivFun a
+  have hc : z c = a := (b.equivFun_symm_apply c).symm.trans (b.equivFun.symm_apply_apply a)
+  calc
+    n (p (Algebra.norm 𝔸[ℚ] a)) = n (P (p ∘ c)).det := by rw [← hc, hproject]
+    _ = g (z (s ∘ p ∘ c)) := congrFun he (p ∘ c)
+    _ = g a := (hreplace c).trans (congrArg g hc)
+
+/-- The archimedean factor of the adelic determinant norm agrees with the normalized
+archimedean product on the original adele. -/
+private theorem rationalAdeleNorm_infinite (a : 𝔸[F]) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    ‖(Algebra.norm 𝔸[ℚ] a).1‖ = ‖a.1‖ := by
+  have hQ : Continuous (fun x : InfiniteAdeleRing ℚ ↦ ‖x‖) := by
+    simp only [InfiniteAdeleRing.norm_def]
+    exact continuous_finsetProd _ fun w _ ↦ (continuous_apply w).norm.pow _
+  have hF : Continuous (fun x : InfiniteAdeleRing F ↦ ‖x‖) := by
+    simp only [InfiniteAdeleRing.norm_def]
+    exact continuous_finsetProd _ fun w _ ↦ (continuous_apply w).norm.pow _
+  let r : 𝔸[ℚ] := (1, 0)
+  refine rationalAdeleNorm_compare F (RingHom.fst _ _) (fun t ↦ (t, 0))
+    (continuous_id.prodMk continuous_const)
+    (InfiniteAdeleRing.denseRange_algebraMap ℚ) r ?_ norm hQ
+    (fun a ↦ ‖a.1‖) (hF.comp continuous_fst) ?_ ?_ a
+  · intro c
+    exact Prod.ext rfl (by change (0 : 𝔸ᶠ[ℚ]) * 0 = 0 * c.2; simp)
+  · intro x
+    change ‖(rationalAdeleEmbedding F r).1 * x.1‖ = ‖x.1‖
+    rw [rationalAdeleEmbedding_fst_eq F r 1 rfl, map_one]
+    change ‖1 * x.1‖ = ‖x.1‖
+    rw [one_mul]
+  · intro x
+    change ‖algebraMap ℚ (InfiniteAdeleRing ℚ) (Algebra.norm ℚ x)‖ =
+      ‖algebraMap F (InfiniteAdeleRing F) x‖
+    rw [InfiniteAdeleRing.coe_norm_eq_abs_norm, InfiniteAdeleRing.coe_norm_eq_abs_norm,
+      Algebra.norm_self, MonoidHom.id_apply]
+
+attribute [local instance] FractionRing.liftAlgebra in
+/-- The multiplicity of a rational prime in a relative ideal norm is the sum of the
+multiplicities above it, weighted by the inertia degrees. -/
+private theorem multiplicity_relNorm_rat (v : HeightOneSpectrum (𝓞 ℚ))
+    (I : Ideal (𝓞 F)) (hI : I ≠ ⊥) :
+    let s := (Ideal.hasFiniteMulSupport hI).toFinset
+    multiplicity v.asIdeal (Ideal.relNorm (𝓞 ℚ) I) =
+      ∑ w ∈ s with w.under (𝓞 ℚ) = v, multiplicity w.asIdeal I * w.asIdeal.inertiaDeg (𝓞 ℚ) := by
+  let s := (Ideal.hasFiniteMulSupport hI).toFinset
+  let N : Ideal (𝓞 F) →*₀ Ideal (𝓞 ℚ) := Ideal.relNorm (𝓞 ℚ)
+  let m (w : HeightOneSpectrum (𝓞 F)) := multiplicity w.asIdeal I
+  have hpow (w : HeightOneSpectrum (𝓞 F)) :
+      N (w.maxPowDividing I) = (w.under (𝓞 ℚ)).asIdeal ^ (m w * w.asIdeal.inertiaDeg (𝓞 ℚ)) := by
+    let u := w.under (𝓞 ℚ)
+    have : w.asIdeal.LiesOver u.asIdeal := ⟨rfl⟩
+    have := w.isMaximal
+    have := u.isMaximal
+    rw [HeightOneSpectrum.maxPowDividing_eq_pow_multiplicity hI, map_pow,
+      Ideal.relNorm_eq_pow_of_isMaximal w.asIdeal u.asIdeal, ← pow_mul, Nat.mul_comm]
+  have hfac : ∏ w ∈ s, N (w.maxPowDividing I) = N I := by
+    rw [← map_prod, ← finprod_eq_prod _ (Ideal.hasFiniteMulSupport hI),
+      Ideal.finprod_heightOneSpectrum_factorization hI]
+  have hmult (w : HeightOneSpectrum (𝓞 F)) :
+      emultiplicity v.asIdeal (N (w.maxPowDividing I)) =
+        if w.under (𝓞 ℚ) = v then ((m w * w.asIdeal.inertiaDeg (𝓞 ℚ) : ℕ) : ℕ∞) else 0 := by
+    rw [hpow]
+    split_ifs with hw
+    · rw [hw, emultiplicity_pow_self_of_prime v.prime]
+    · have hnd : ¬ v.asIdeal ∣ (w.under (𝓞 ℚ)).asIdeal := by
+        intro h
+        exact hw (HeightOneSpectrum.ext ((w.under (𝓞 ℚ)).isMaximal.eq_of_le
+          v.isPrime.ne_top (Ideal.dvd_iff_le.mp h)))
+      rw [emultiplicity_pow v.prime, emultiplicity_eq_zero.mpr hnd, mul_zero]
+  have h := (Finset.emultiplicity_prod v.prime s (fun w ↦ N (w.maxPowDividing I))).symm
+  rw [hfac, (Ideal.finiteMultiplicity v.isPrime.ne_top
+    (mt (Ideal.relNorm_eq_bot_iff (R := 𝓞 ℚ)).mp hI)).emultiplicity_eq_multiplicity] at h
+  simp only [hmult, ← Finset.sum_filter] at h
+  exact_mod_cast h.symm
+
+/-- The normalized norm of an integer at a finite place is the inverse residue
+cardinality raised to its multiplicity. -/
+private theorem norm_int_finitePlace {K : Type*} [Field K] [NumberField K]
+    (w : HeightOneSpectrum (𝓞 K)) {z : 𝓞 K} (hz : z ≠ 0) :
+    ‖algebraMap K (w.adicCompletion K) (z : K)‖ =
+      (w.asIdeal.absNorm : ℝ)⁻¹ ^ multiplicity w.asIdeal (Ideal.span {z}) := by
+  have h := (FinitePlace.mk w).apply_mul_absNorm_pow_eq_one hz
+  rw [FinitePlace.maximalIdeal_mk, FinitePlace.mk_apply] at h
+  rw [inv_pow]
+  exact eq_inv_of_mul_eq_one_left h
+
+/-- The finite-place norm identity for nonzero field integers. -/
+private theorem norm_fieldNorm_ratFinitePlace_int (v : HeightOneSpectrum (𝓞 ℚ))
+    {z : 𝓞 F} (hz : z ≠ 0) :
+    ‖algebraMap ℚ (v.adicCompletion ℚ) (Algebra.norm ℚ (z : F))‖ =
+      ∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v),
+        ‖algebraMap F (w.adicCompletion F) (z : F)‖ := by
+  let I : Ideal (𝓞 F) := Ideal.span {z}
+  have hI : I ≠ ⊥ := mt Submodule.span_singleton_eq_bot.mp hz
+  let y := Algebra.intNorm (𝓞 ℚ) (𝓞 F) z
+  have hy : (y : ℚ) = Algebra.norm ℚ (z : F) := Algebra.algebraMap_intNorm z
+  have hy0 : y ≠ 0 := by
+    intro h
+    apply (Algebra.norm_ne_zero_iff.mpr (by exact_mod_cast hz) : Algebra.norm ℚ (z : F) ≠ 0)
+    rw [← hy, h]
+    rfl
+  rw [← hy, norm_int_finitePlace v hy0, ← Ideal.relNorm_singleton]
+  change (v.asIdeal.absNorm : ℝ)⁻¹ ^ multiplicity v.asIdeal (Ideal.relNorm (𝓞 ℚ) I) = _
+  rw [multiplicity_relNorm_rat F v I hI]
+  let s := (Ideal.hasFiniteMulSupport hI).toFinset
+  let p := (v.asIdeal.absNorm : ℝ)⁻¹
+  rw [← Finset.prod_pow_eq_pow_sum]
+  symm
+  have hprod : (∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v),
+      ‖algebraMap F (w.adicCompletion F) (z : F)‖) =
+      ∏ w ∈ s with w.under (𝓞 ℚ) = v, ‖algebraMap F (w.adicCompletion F) (z : F)‖ := by
+    apply finprod_cond_eq_prod_of_cond_iff
+    intro w hw
+    rw [Finset.mem_filter]
+    refine ⟨fun h ↦ ⟨(Ideal.hasFiniteMulSupport hI).mem_toFinset.mpr ?_, h⟩, And.right⟩
+    intro hOne
+    apply hw
+    change w.maxPowDividing (Ideal.span {z}) = 1 at hOne
+    change ‖FinitePlace.embedding w (algebraMap (𝓞 F) F z)‖ = 1
+    simpa only [hOne, map_one, Nat.cast_one, mul_one] using
+      HeightOneSpectrum.embedding_mul_absNorm F w hz
+  rw [hprod]
+  apply Finset.prod_congr rfl
+  intro w hw
+  have huv := (Finset.mem_filter.mp hw).2
+  have : w.asIdeal.LiesOver v.asIdeal := ⟨congrArg HeightOneSpectrum.asIdeal huv.symm⟩
+  have hcard := Ideal.absNorm_pow_inertiaDeg v.asIdeal w.asIdeal
+  rw [norm_int_finitePlace w hz]
+  change (w.asIdeal.absNorm : ℝ)⁻¹ ^ multiplicity w.asIdeal I =
+    p ^ (multiplicity w.asIdeal I * w.asIdeal.inertiaDeg (𝓞 ℚ))
+  rw [← hcard, Nat.cast_pow, ← inv_pow, ← pow_mul, Nat.mul_comm]
+
+/-- The places of a number field above a fixed rational finite place form a finite set. -/
+private theorem finite_finitePlacesOver_rat (v : HeightOneSpectrum (𝓞 ℚ)) :
+    {w : HeightOneSpectrum (𝓞 F) | w.under (𝓞 ℚ) = v}.Finite := by
+  refine ((IsDedekindDomain.primesOver_finite v.asIdeal (𝓞 F)).subset ?_).of_finite_image
+    (HeightOneSpectrum.asIdeal_injective.injOn)
+  rintro _ ⟨w, hw, rfl⟩
+  exact ⟨w.isPrime, ⟨congrArg HeightOneSpectrum.asIdeal hw.symm⟩⟩
+
+/-- The absolute value of a field norm at a rational finite prime is the product of
+the normalized absolute values of the element at the primes above it. -/
+private theorem norm_fieldNorm_ratFinitePlace (v : HeightOneSpectrum (𝓞 ℚ)) (x : F) :
+    ‖algebraMap ℚ (v.adicCompletion ℚ) (Algebra.norm ℚ x)‖ =
+      ∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v),
+        ‖algebraMap F (w.adicCompletion F) x‖ := by
+  let s := (finite_finitePlacesOver_rat F v).toFinset
+  have hprod (a : F) : (∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v),
+      ‖algebraMap F (w.adicCompletion F) a‖) =
+      ∏ w ∈ s, ‖algebraMap F (w.adicCompletion F) a‖ :=
+    finprod_mem_eq_finite_toFinset_prod _ (finite_finitePlacesOver_rat F v)
+  by_cases hx : x = 0
+  · subst x
+    have := v.isMaximal
+    obtain ⟨P, hP, hPv⟩ := Ideal.exists_maximal_ideal_liesOver_of_isIntegral (S := 𝓞 F) v.asIdeal
+    let w : HeightOneSpectrum (𝓞 F) := ⟨P, hP.isPrime, Ideal.ne_bot_of_liesOver_of_ne_bot v.ne_bot P⟩
+    have hw : w.under (𝓞 ℚ) = v := HeightOneSpectrum.ext hPv.over.symm
+    rw [Algebra.norm_zero, map_zero, norm_zero, hprod]
+    symm
+    exact Finset.prod_eq_zero ((finite_finitePlacesOver_rat F v).mem_toFinset.mpr hw)
+      (by rw [map_zero, norm_zero])
+  · obtain ⟨z, t, ht, hzt⟩ := IsFractionRing.div_surjective (𝓞 F) x
+    have ht0 : t ≠ 0 := nonZeroDivisors.ne_zero ht
+    have hz : z ≠ 0 := by
+      intro h
+      exact hx (by rw [← hzt, h, map_zero, zero_div])
+    have hnorm (a b : F) : Algebra.norm ℚ (a / b) = Algebra.norm ℚ a / Algebra.norm ℚ b := by
+      simp only [div_eq_mul_inv, map_mul, Algebra.norm_inv]
+    rw [← hzt, hnorm, map_div₀, norm_div, norm_fieldNorm_ratFinitePlace_int F v hz,
+      norm_fieldNorm_ratFinitePlace_int F v ht0, hprod, hprod, hprod]
+    simp only [map_div₀, norm_div, Finset.prod_div_distrib]
+
+
+open scoped RestrictedProduct in
+/-- At each rational finite place, the adelic determinant has absolute value equal to
+the product of the normalized local factors above that place. -/
+private theorem rationalAdeleNorm_finitePlace (v : HeightOneSpectrum (𝓞 ℚ)) (a : 𝔸[F]) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    ‖(Algebra.norm 𝔸[ℚ] a).2 v‖ =
+      ∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v), ‖a.2 w‖ := by
+  let p : 𝔸[ℚ] →+* v.adicCompletion ℚ :=
+    (RestrictedProduct.evalRingHom (fun w : HeightOneSpectrum (𝓞 ℚ) ↦ w.adicCompletion ℚ) v).comp
+      (RingHom.snd _ _)
+  let e : v.adicCompletion ℚ → 𝔸ᶠ[ℚ] := fun t ↦ ⟨Pi.single v t, by
+    filter_upwards [Filter.eventually_cofinite_ne v] with w hw
+    rw [Pi.single_eq_of_ne hw]
+    exact (w.adicCompletionIntegers ℚ).zero_mem⟩
+  have he : Continuous e := by
+    apply continuous_restrictedProduct_of_uniform
+    · intro w
+      change Continuous (fun t : v.adicCompletion ℚ ↦ Pi.single v t w)
+      by_cases hw : w = v
+      · subst w
+        simp only [Pi.single_eq_same]
+        exact continuous_id
+      · simp only [Pi.single_eq_of_ne hw]
+        exact continuous_const
+    · filter_upwards [Filter.eventually_cofinite_ne v] with w hw t
+      change Pi.single v t w ∈ w.adicCompletionIntegers ℚ
+      rw [Pi.single_eq_of_ne hw]
+      exact (w.adicCompletionIntegers ℚ).zero_mem
+  let r : 𝔸[ℚ] := (0, e 1)
+  let g (x : 𝔸[F]) := ∏ᶠ (w : HeightOneSpectrum (𝓞 F)) (_ : w.under (𝓞 ℚ) = v), ‖x.2 w‖
+  have hprod (x : 𝔸[F]) :
+      g x = ∏ w ∈ (finite_finitePlacesOver_rat F v).toFinset, ‖x.2 w‖ :=
+    finprod_mem_eq_finite_toFinset_prod _ (finite_finitePlacesOver_rat F v)
+  have hg : Continuous g := by
+    change Continuous (fun x ↦ g x)
+    simp only [hprod]
+    exact continuous_finsetProd _ fun w _ ↦ ((RestrictedProduct.continuous_eval w).comp
+      continuous_snd).norm
+  refine rationalAdeleNorm_compare F p (fun t ↦ (0, e t)) (continuous_const.prodMk he)
+    (v.denseRange_algebraMap ℚ) r ?_ norm continuous_norm g hg ?_
+    (norm_fieldNorm_ratFinitePlace F v) a
+  · intro c
+    refine Prod.ext ?_ ?_
+    · change (0 : InfiniteAdeleRing ℚ) * 0 = 0 * c.1
+      simp
+    · apply FiniteAdeleRing.ext
+      intro w
+      change Pi.single v 1 w * Pi.single v (c.2 v) w = Pi.single v 1 w * c.2 w
+      by_cases hw : w = v
+      · subst w
+        simp
+      · simp [Pi.single_eq_of_ne hw]
+  · intro x
+    simp only [hprod]
+    apply Finset.prod_congr rfl
+    intro w hw
+    have h := (finite_finitePlacesOver_rat F v).mem_toFinset.mp hw
+    have hwv : v.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)) := by
+      rw [← h]
+      rfl
+    have hr : (r.2 v : v.adicCompletion ℚ) = 1 := Pi.single_eq_same v 1
+    have hf := (rationalAdeleEmbedding_spec F).2.2.2 v w hwv (r - 1)
+      (by change r.2 v - 1 = 0; rw [hr, sub_self])
+    rw [map_sub, map_one] at hf
+    change (rationalAdeleEmbedding F r).2 w - 1 = 0 at hf
+    change ‖(rationalAdeleEmbedding F r).2 w * x.2 w‖ = ‖x.2 w‖
+    rw [sub_eq_zero.mp hf, one_mul]
+
+/-- The finite product of projected determinant norms is the finite factor
+of the idelic norm on the original idele. -/
+private theorem relativeIdeleNormRat_finite (a : 𝕀[F]) :
+    (∏ᶠ v : HeightOneSpectrum (𝓞 ℚ), ‖(relativeIdeleNormRat F a).val.2 v‖) =
+      ∏ᶠ w : HeightOneSpectrum (𝓞 F), ‖a.val.2 w‖ := by
+  let f (w : HeightOneSpectrum (𝓞 F)) := ‖a.val.2 w‖
+  have hf : f.HasFiniteMulSupport := ((ideleNorm_spec F).1 a).1
+  rw [finprod_eq_prod f hf, ← finprod_prod_filter (HeightOneSpectrum.under (𝓞 ℚ)) hf.toFinset f]
+  apply finprod_congr
+  intro v
+  refine (rationalAdeleNorm_finitePlace F v a.val).trans ?_
+  apply finprod_cond_eq_prod_of_cond_iff f
+  intro w hw
+  rw [Finset.mem_filter]
+  exact ⟨fun h ↦ ⟨hf.mem_toFinset.mpr hw, h⟩, And.right⟩
+
 /-- Paper: Lemma A.2.2.2, p. 546. Taking the rational idelic norm after the relative
 norm gives the idelic norm of the original idele. -/
 theorem ideleNorm_comp_relativeIdeleNormRat :
     (ideleNorm ℚ).comp (relativeIdeleNormRat F) = ideleNorm F := by
-  sorry
+  apply MonoidHom.ext
+  intro a
+  apply Units.ext
+  apply NNReal.coe_injective
+  change ((ideleNorm ℚ (relativeIdeleNormRat F a)).val : ℝ) = ((ideleNorm F a).val : ℝ)
+  rw [((ideleNorm_spec ℚ).1 _).2, ((ideleNorm_spec F).1 a).2, relativeIdeleNormRat_finite F a]
+  rw [← InfiniteAdeleRing.norm_def, ← InfiniteAdeleRing.norm_def]
+  rw [show ‖(relativeIdeleNormRat F a).val.1‖ = ‖a.val.1‖ from
+    rationalAdeleNorm_infinite F a.val]
+
+end RelativeNorm
 
 /-- Paper: Lemma A.2.2.2, p. 546. Scalar extension embeds the rational ideles as a
 closed subgroup of the ideles of the field. -/
