@@ -9,6 +9,7 @@ public import Mathlib.MeasureTheory.Group.Integral
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
+public import Mathlib.Topology.ContinuousMap.CompactlySupported
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SmoothFamily
@@ -40,6 +41,7 @@ import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Constructions.Polish.StronglyMeasurable
 import Mathlib.Analysis.Normed.Operator.Extend
 import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
+import Mathlib.MeasureTheory.Measure.WithDensity
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -1116,6 +1118,143 @@ private theorem isLCAPlancherelMeasure_of_compactSupport
   · simp_rw [h _ (hg _).1 (hg _).2]
     simpa only [Lp.eNorm_toLp] using ht.eNorm
 
+open scoped CompactlySupported in
+/-- The autocorrelation of a continuous compactly supported function is the
+Fourier–Stieltjes transform of a finite regular positive measure on the dual.
+This is the autocorrelation case of Bochner's theorem. -/
+theorem exists_lcaAutocorrelation_measure (f : C_c(G, ℂ)) :
+    ∃ ρ : Measure (PontryaginDual G), IsFiniteMeasure ρ ∧ ρ.Regular ∧
+      ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+        lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x := by
+  sorry
+
+open scoped CompactlySupported in
+/-- Averaging the weighted spectral measures of two autocorrelations over dual
+translations gives this identity on each measurable set. For a dual character `a`,
+the spectral measure of `f` modulated by `a` is the translate of its spectral
+measure by `a`. Weight that translate by the squared Fourier magnitude of `g`,
+or weight the spectral measure of `g` by the shifted squared Fourier magnitude
+of `f`. The two measures have the same Fourier–Stieltjes transform by
+commutativity of convolution. Integrate the resulting identity over `a`
+against the fixed Haar measure `η`. -/
+theorem lcaAutocorrelation_measure_mul_lintegral
+    (η : Measure (PontryaginDual G)) [η.IsHaarMeasure] [η.Regular]
+    (f g : C_c(G, ℂ)) (ρ σ : Measure (PontryaginDual G))
+    [IsFiniteMeasure ρ] [ρ.Regular] [IsFiniteMeasure σ] [σ.Regular]
+    (hρ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+      lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x)
+    (hσ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂σ) =
+      lcaConvolution μ g (fun y ↦ star (g y⁻¹)) x)
+    {s : Set (PontryaginDual G)} (hs : MeasurableSet s) :
+    (∫⁻ χ, ‖lcaFourier μ f χ‖ₑ ^ 2 ∂η) * σ s =
+      ρ univ * (∫⁻ χ in s, ‖lcaFourier μ g χ‖ₑ ^ 2 ∂η) := by
+  sorry
+
+omit [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [μ.Regular] in
+open scoped CompactlySupported in
+/-- Evaluating the Fourier–Stieltjes representation at the identity identifies
+the total mass with the integral of the squared source norm. -/
+private theorem lcaAutocorrelation_measure_univ (f : C_c(G, ℂ))
+    (ρ : Measure (PontryaginDual G)) [IsFiniteMeasure ρ]
+    (hρ : ∀ x : G, (∫ χ, (χ x : ℂ) ∂ρ) =
+      lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x) :
+    ρ univ = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ := by
+  have hSqC : Continuous (fun x ↦ ‖f x‖ ^ 2) := f.continuous.norm.pow 2
+  have hSqK : HasCompactSupport (fun x ↦ ‖f x‖ ^ 2) :=
+    f.hasCompactSupport.norm.comp_left (g := fun t : ℝ ↦ t ^ 2) (by simp)
+  have hAuto : lcaConvolution μ f (fun y ↦ star (f y⁻¹)) 1 =
+      ((∫ x, ‖f x‖ ^ 2 ∂μ : ℝ) : ℂ) := by
+    rw [lcaConvolution, ← integral_complex_ofReal]
+    apply integral_congr_ae
+    exact .of_forall fun x ↦ by
+      simp [Complex.mul_conj, Complex.normSq_eq_norm_sq]
+  have h := congrArg Complex.re (hρ 1)
+  simp only [map_one, Circle.coe_one, integral_const, Complex.real_smul, mul_one,
+    Complex.ofReal_re, hAuto] at h
+  rw [← ENNReal.ofReal_toReal (measure_ne_top ρ univ)]
+  change ENNReal.ofReal (ρ.real univ) = _
+  rw [h, ofReal_integral_eq_lintegral_ofReal (hSqC.integrable_of_hasCompactSupport hSqK)
+    (.of_forall fun x ↦ sq_nonneg _)]
+  exact lintegral_congr fun x ↦ by rw [ENNReal.ofReal_pow (norm_nonneg _), ofReal_norm]
+
+open scoped CompactlySupported in
+/-- A nonnegative compactly supported bump fixes the normalization of Haar measure
+on the dual. Its spectral measure gives positive mass to a compact set, so the
+averaging identity on that set ensures its squared Fourier integral is finite. -/
+private theorem exists_lcaFourier_weighted_haar
+    (ρ : C_c(G, ℂ) → Measure (PontryaginDual G))
+    (hρ : ∀ f, IsFiniteMeasure (ρ f) ∧ (ρ f).Regular ∧
+      ∀ x : G, (∫ χ, (χ x : ℂ) ∂(ρ f)) =
+        lcaConvolution μ f (fun y ↦ star (f y⁻¹)) x) :
+    ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
+      ∀ f : C_c(G, ℂ), ν.withDensity (fun χ ↦ ‖lcaFourier μ f χ‖ₑ ^ 2) = ρ f := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let η : Measure (PontryaginDual G) := MeasureTheory.Measure.haar
+  let (g : C_c(G, ℂ)) : IsFiniteMeasure (ρ g) := (hρ g).1
+  let (g : C_c(G, ℂ)) : (ρ g).Regular := (hρ g).2.1
+  obtain ⟨b, hbK, hb₀, hb₁⟩ := exists_continuous_nonneg_pos (1 : G)
+  let f : C_c(G, ℂ) := ⟨⟨fun x ↦ (b x : ℂ), Complex.continuous_ofReal.comp b.continuous⟩,
+    hbK.comp_left Complex.ofReal_zero⟩
+  let w (g : C_c(G, ℂ)) (χ : PontryaginDual G) := ‖lcaFourier μ g χ‖ₑ ^ 2
+  have hf₁ : f 1 ≠ 0 := Complex.ofReal_ne_zero.mpr hb₁
+  have hw (g : C_c(G, ℂ)) : Continuous (w g) :=
+    ENNReal.continuous_coe.comp ((continuous_lcaFourier μ g.integrable).nnNorm.pow 2)
+  have hfSq : Continuous (fun x ↦ ‖f x‖ₑ ^ 2) :=
+    ENNReal.continuous_coe.comp (f.continuous.nnNorm.pow 2)
+  have hM : ρ f univ ≠ 0 := by
+    rw [lcaAutocorrelation_measure_univ μ f (ρ f) (hρ f).2.2]
+    apply ne_of_gt
+    apply (lintegral_pos_iff_support hfSq.measurable).2
+    exact (isOpen_ne_fun hfSq continuous_const).measure_pos μ
+      ⟨1, show ‖f 1‖ₑ ^ 2 ≠ 0 by simpa using hf₁⟩
+  have hF₁ : lcaFourier μ f 1 ≠ 0 := by
+    rw [lcaFourier_one μ f f.integrable]
+    change (∫ x, (b x : ℂ) ∂μ) ≠ 0
+    rw [integral_complex_ofReal]
+    exact Complex.ofReal_ne_zero.mpr
+      (b.continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero hbK hb₀ hb₁).ne'
+  let I : ℝ≥0∞ := ∫⁻ χ, w f χ ∂η
+  have hI₀ : I ≠ 0 := by
+    apply ne_of_gt
+    apply (lintegral_pos_iff_support (hw f).measurable).2
+    exact (isOpen_ne_fun (hw f) continuous_const).measure_pos η
+      ⟨1, show w f 1 ≠ 0 by simpa [w] using hF₁⟩
+  obtain ⟨K, -, hK, hKpos⟩ := MeasurableSet.univ.exists_lt_isCompact (pos_iff_ne_zero.mpr hM)
+  have hI_top : I ≠ ⊤ := by
+    intro h
+    have hAvg := lcaAutocorrelation_measure_mul_lintegral μ η f f (ρ f) (ρ f)
+      (hρ f).2.2 (hρ f).2.2 hK.isClosed.measurableSet
+    change I * ρ f K = ρ f univ * (∫⁻ χ in K, w f χ ∂η) at hAvg
+    rw [h, ENNReal.top_mul hKpos.ne'] at hAvg
+    have hBound (χ : PontryaginDual G) : w f χ ≤ ENNReal.ofReal (∫ x, ‖f x‖ ∂μ) ^ 2 := by
+      change ‖lcaFourier μ f χ‖ₑ ^ 2 ≤ _
+      rw [← ofReal_norm]
+      exact pow_le_pow_left' (ENNReal.ofReal_le_ofReal
+        (norm_lcaFourier_le_integral_norm μ f χ)) _
+    have hFinite : (∫⁻ χ in K, w f χ ∂η) < ⊤ := by
+      refine (lintegral_mono hBound).trans_lt ?_
+      rw [setLIntegral_const]
+      exact ENNReal.mul_lt_top (ENNReal.pow_lt_top ENNReal.ofReal_lt_top) hK.measure_lt_top
+    exact (ENNReal.mul_lt_top (measure_lt_top (ρ f) univ) hFinite).ne hAvg.symm
+  let c := ρ f univ * I⁻¹
+  have hc₀ : c ≠ 0 := mul_ne_zero hM (ENNReal.inv_ne_zero.mpr hI_top)
+  have hc_top : c ≠ ⊤ :=
+    ENNReal.mul_ne_top (measure_ne_top (ρ f) univ) (ENNReal.inv_ne_top.mpr hI₀)
+  refine ⟨c • η, Measure.IsHaarMeasure.smul η hc₀ hc_top, Measure.Regular.smul hc_top, ?_⟩
+  intro g
+  ext1 s hs
+  have hAvg := lcaAutocorrelation_measure_mul_lintegral μ η f g (ρ f) (ρ g)
+    (hρ f).2.2 (hρ g).2.2 hs
+  change I * ρ g s = ρ f univ * (∫⁻ χ in s, w g χ ∂η) at hAvg
+  change (c • η).withDensity (w g) s = _
+  rw [withDensity_apply _ hs, setLIntegral_smul_measure, smul_eq_mul]
+  calc
+    c * (∫⁻ χ in s, w g χ ∂η) = I⁻¹ * (ρ f univ * (∫⁻ χ in s, w g χ ∂η)) := by
+      dsimp [c]
+      ac_rfl
+    _ = ρ g s := by rw [← hAvg, ← mul_assoc, ENNReal.inv_mul_cancel hI₀ hI_top, one_mul]
+
+open scoped CompactlySupported in
 /-- There is a regular Haar measure on the dual for which the Fourier transform
 preserves the L² norm of every continuous compactly supported function. It suffices
 to construct this measure by Fourier inversion at the identity for autocorrelations
@@ -1124,7 +1263,25 @@ theorem exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport :
     ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
       ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
         eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ := by
-  sorry
+  choose ρ hρ using exists_lcaAutocorrelation_measure μ
+  obtain ⟨ν, hHaar, hRegular, hDensity⟩ := exists_lcaFourier_weighted_haar μ ρ hρ
+  refine ⟨ν, hHaar, hRegular, fun f hf hs ↦ ?_⟩
+  let g : C_c(G, ℂ) := ⟨⟨f, hf⟩, hs⟩
+  let : IsFiniteMeasure (ρ g) := (hρ g).1
+  have hMass : ρ g univ = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ :=
+    lcaAutocorrelation_measure_univ μ g (ρ g) (hρ g).2.2
+  have hSqEq : (∫⁻ χ, ‖lcaFourier μ f χ‖ₑ ^ 2 ∂ν) = ∫⁻ x, ‖f x‖ₑ ^ 2 ∂μ := by
+    have h := congrArg (fun m : Measure (PontryaginDual G) ↦ m univ) (hDensity g)
+    change (ν.withDensity (fun χ ↦ ‖lcaFourier μ f χ‖ₑ ^ 2)) univ = ρ g univ at h
+    rwa [withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ, hMass] at h
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hFourier := continuous_lcaFourier μ (hf.integrable_of_hasCompactSupport (μ := μ) hs)
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+    hFourier.aestronglyMeasurable,
+    eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+      hf.aestronglyMeasurable]
+  simp only [ENNReal.toReal_ofNat, ENNReal.rpow_ofNat]
+  rw [hSqEq]
 
 /-- Paper: Lemma D.1.1.2(4), p. 747. There is exactly one Plancherel measure. -/
 theorem lcaPlancherelMeasure_existsUnique :
