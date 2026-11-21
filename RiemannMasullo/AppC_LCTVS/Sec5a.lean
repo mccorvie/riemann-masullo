@@ -504,7 +504,25 @@ theorem VectorContDiffOrderOn.add {Ω : Set V} {m : ℕ} {f g : V → E}
 /-- Paper: Definition C.5.1.23, p. 734. The order condition is preserved by complex
 scalar multiplication. -/
 theorem VectorContDiffOrderOn.smul {Ω : Set V} {m : ℕ} {f : V → E}
-    (c : ℂ) (hf : VectorContDiffOrderOn f Ω m) : VectorContDiffOrderOn (c • f) Ω m := by sorry
+    (c : ℂ) (hf : VectorContDiffOrderOn f Ω m) : VectorContDiffOrderOn (c • f) Ω m := by
+  induction m generalizing f with
+  | zero =>
+    unfold VectorContDiffOrderOn at hf ⊢
+    refine (hf.image (c • ContinuousLinearMap.id ℂ E)).subset ?_
+    rintro z ⟨x, hx, y, hy, hxy, hd, rfl⟩
+    refine ⟨_, ⟨x, hx, y, hy, hxy, hd, rfl⟩, ?_⟩
+    simp only [ContinuousLinearMap.smul_apply, ContinuousLinearMap.id_apply, Pi.smul_apply,
+      ← smul_sub]
+    exact smul_comm _ _ _
+  | succ m ih =>
+    intro i
+    obtain ⟨gf, hgf, cf, of⟩ := hf i
+    refine ⟨c • gf, ?_, cf.const_smul c, ih of⟩
+    intro φ x
+    simp only [Pi.smul_apply, map_smul]
+    convert ((hgf φ x).hasFDerivWithinAt.const_smul c).hasDerivWithinAt using 1
+    simp
+    rfl
 
 /-- Paper: Definition C.5.1.23, p. 734. The order condition defines a submodule of
 ambient functions. Restriction of this submodule gives the space on the open set. -/
