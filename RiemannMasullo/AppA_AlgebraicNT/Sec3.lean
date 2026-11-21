@@ -33,6 +33,7 @@ import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.Maps.Proper.CompactlyGenerated
 import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -3775,6 +3776,72 @@ local notation "classVolume(" F ")" =>
     Units.regulator F / (Real.sqrt (Nat.cast (Int.natAbs (NumberField.discr F))) *
       Nat.cast (Units.torsionOrder F)))
 
+/-- The exponential pushforward of Lebesgue measure is Haar measure on the positive reals. -/
+private theorem positiveRealHaar_isHaarMeasure : positiveRealHaar.IsHaarMeasure := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let : μ.IsHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts μ :=
+      inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+    have : Measure.IsOpenPosMeasure μ :=
+      inferInstanceAs (Measure.IsOpenPosMeasure (volume : Measure ℝ))
+    have : μ.IsMulLeftInvariant :=
+      ⟨fun t ↦ (measurePreserving_add_left (volume : Measure ℝ) t.toAdd).map_eq⟩
+    constructor
+  let h := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let e : Multiplicative ℝ ≃ₜ* ℝ≥0ˣ :=
+    { h with
+      map_mul' := fun x y ↦ by
+        apply Units.ext
+        apply NNReal.eq
+        exact Real.exp_add x.toAdd y.toAdd }
+  have he (x : ℝ) :
+      e (Multiplicative.ofAdd x) = Units.mk0 (Real.exp x).toNNReal (by positivity) := by
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  convert e.isHaarMeasure_map μ using 1
+  unfold positiveRealHaar
+  congr 1
+  funext x
+  exact (he x).symm
+
+/-- Given Haar measures on a closed subgroup and its quotient, Weil's formula
+determines a unique regular Haar measure on the ambient group. -/
+private theorem existsUnique_isWeilQuotientMeasure_left
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (H : Subgroup G) (hH : IsClosed (H : Set G)) (μH : Measure H) [μH.IsHaarMeasure] :
+    letI : MeasurableSpace (G ⧸ H) := borel _
+    ∀ (ν : Measure (G ⧸ H)), ν.IsHaarMeasure → ν.Regular →
+      ∃! μ : Measure G, μ.IsHaarMeasure ∧ μ.Regular ∧ IsWeilQuotientMeasure H μ μH ν := by
+  let : MeasurableSpace (G ⧸ H) := borel _
+  intro ν hνH hνR
+  let : ν.IsHaarMeasure := hνH
+  let : ν.Regular := hνR
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  let ses := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  let μ := ses.inducedMeasure μH ν
+  have hweil : IsWeilQuotientMeasure H μ μH ν := by
+    refine ⟨inferInstance, inferInstance, fun f hf ↦ ?_⟩
+    let fc : CompactlySupportedContinuousMap G ℂ := ⟨f, hf⟩
+    change (∫ x, fc x ∂μ) = _
+    rw [integral_inducedMeasure_complex ses μH ν fc, ses.integrate_apply]
+    refine integral_congr_ae (Filter.Eventually.of_forall fun q ↦ ?_)
+    conv_lhs => rw [← QuotientGroup.out_eq' q]
+    exact ses.pushforward_apply_apply μH fc q.out
+  refine ⟨μ, ⟨ses.isHaarMeasure_inducedMeasure μH ν, ses.inducedMeasure_regular μH ν, hweil⟩, ?_⟩
+  rintro μ' ⟨-, hregular, hweil'⟩
+  let : μ'.Regular := hregular
+  let : μ.Regular := ses.inducedMeasure_regular μH ν
+  apply Measure.ext_of_integral_eq_on_compactlySupported
+  intro f
+  let fc : C(G, ℂ) := ⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩
+  have hc : HasCompactSupport fc := f.hasCompactSupport.comp_left Complex.ofReal_zero
+  apply Complex.ofReal_injective
+  simpa only [fc, ContinuousMap.coe_mk, integral_complex_ofReal] using
+    (hweil'.2.2 fc hc).trans (hweil.2.2 fc hc).symm
+
 /-- Paper: Definition A.3.2.1, pp. 559–560. There is a unique compatible triple
 of regular Haar measures on the ideles, the idele classes and the norm-one
 classes. The quotient normalizations use counting measure and `dt/t`, respectively. -/
@@ -3784,8 +3851,78 @@ theorem multiplicativeTamagawaMeasures_existsUnique :
         IsWeilQuotientMeasure P[F] m.1 Measure.count m.2.1 ∧
         m.2.2.IsHaarMeasure ∧ m.2.2.Regular ∧ m.2.2 univ = classVolume(F) ∧
         IsWeilQuotientMeasure C₁[F] m.2.1 m.2.2
-          (positiveRealHaar.comap (QuotientGroup.kerLift (ideleClassNorm F))) :=
-  by sorry
+          (positiveRealHaar.comap (QuotientGroup.kerLift (ideleClassNorm F))) := by
+  let G := 𝕀[F]
+  let P := P[F]
+  let C := C[F]
+  let K := C₁[F]
+  let Q := C ⧸ K
+  obtain ⟨hG₂, hGlc, -⟩ := ideleGroup_topology F
+  obtain ⟨-, hP, hPd, -, -, hC₂, hClc, -, hn, -, ⟨s, hs, hsn⟩, -⟩ :=
+    ideleGroup_quotient.{_, 0} F
+  obtain ⟨hK, hKc, hK₂, -⟩ := ideleClassGroup_finiteness F
+  let : T2Space G := hG₂
+  let : LocallyCompactSpace G := hGlc
+  let : T2Space C := hC₂
+  let : LocallyCompactSpace C := hClc
+  let : T2Space K := hK₂
+  let : CompactSpace K := hKc
+  let : DiscreteTopology P := isDiscrete_iff_discreteTopology.mp hPd
+  let : BorelSpace G := ⟨rfl⟩
+  let : BorelSpace C := ⟨rfl⟩
+  let : BorelSpace Q := ⟨rfl⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let count : Measure P := Measure.count
+  let : count.IsHaarMeasure :=
+    { lt_top_of_isCompact := fun _ h ↦ Measure.count_apply_lt_top.mpr h.finite_of_discrete
+      open_pos := fun _ _ h ↦ Measure.count_ne_zero h }
+  let e₀ := QuotientGroup.quotientKerEquivOfRightInverse (ideleClassNorm F) s hsn
+  let e : Q ≃ₜ* ℝ≥0ˣ :=
+    { e₀ with
+      continuous_toFun := (QuotientGroup.isQuotientMap_mk K).continuous_iff.mpr hn
+      continuous_invFun := QuotientGroup.continuous_mk.comp hs }
+  let dt : Measure Q := positiveRealHaar.comap (QuotientGroup.kerLift (ideleClassNorm F))
+  let : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hdt : positiveRealHaar.map e.symm = dt :=
+    e.toHomeomorph.toMeasurableEquiv.map_symm
+  have hdtH : dt.IsHaarMeasure := hdt ▸ e.symm.isHaarMeasure_map positiveRealHaar
+  have hdtR : dt.Regular := hdt ▸ Measure.Regular.map e.symm.toHomeomorph
+  have hvol : 0 < classVolume(F) := by
+    have := NumberField.classNumber_pos F
+    have := NumberField.Units.regulator_pos F
+    have := NumberField.Units.torsionOrder_pos F
+    have := Int.natAbs_pos.mpr (NumberField.discr_ne_zero F)
+    exact ENNReal.ofReal_pos.mpr (by positivity)
+  let U : TopologicalSpace.PositiveCompacts K := ⟨⟨univ, isCompact_univ⟩, by simp⟩
+  let ν₀ := Measure.haarMeasure U
+  have hν₀ : ν₀ univ = 1 := Measure.haarMeasure_self (K₀ := U)
+  let c := (classVolume(F)).toNNReal
+  have hc : (c : ℝ≥0∞) = classVolume(F) := ENNReal.coe_toNNReal ENNReal.ofReal_ne_top
+  let ν := c • ν₀
+  have hνH : ν.IsHaarMeasure :=
+    Measure.IsHaarMeasure.nnreal_smul ν₀ (by exact_mod_cast hc ▸ hvol.ne')
+  have hνR : ν.Regular := inferInstanceAs ((c • ν₀).Regular)
+  have hν : ν univ = classVolume(F) := by
+    rw [show ν univ = (c : ℝ≥0∞) * ν₀ univ from rfl, hν₀, mul_one, hc]
+  obtain ⟨η, ⟨hηH, hηR, hη⟩, hηunique⟩ :=
+    existsUnique_isWeilQuotientMeasure_left K hK ν dt hdtH hdtR
+  obtain ⟨μ, ⟨hμH, hμR, hμ⟩, hμunique⟩ :=
+    existsUnique_isWeilQuotientMeasure_left P hP count η hηH hηR
+  refine ⟨(μ, η, ν), ⟨hμH, hμR, hμ, hνH, hνR, hν, hη⟩, ?_⟩
+  rintro ⟨μ', η', ν'⟩ ⟨hμH', hμR', hμ', hνH', hνR', hν', hη'⟩
+  let : ν'.IsHaarMeasure := hνH'
+  let : ν'.Regular := hνR'
+  have hνeq : ν' = ν := by
+    have hscale := Measure.isMulLeftInvariant_eq_smul_of_regular ν' ν₀
+    have hmass := congrArg (fun m : Measure K ↦ m univ) hscale
+    change ν' univ = (ν'.haarScalarFactor ν₀ : ℝ≥0∞) * ν₀ univ at hmass
+    rw [hν', hν₀, mul_one, ← hc] at hmass
+    rw [hscale, ← ENNReal.coe_inj.mp hmass]
+  subst ν'
+  have hηeq : η' = η := hηunique η' ⟨hμ'.1, hμ'.2.1, hη'⟩
+  subst η'
+  rw [hμunique μ' ⟨hμH', hμR', hμ'⟩]
 
 /-- Paper: Definition A.3.2.1, pp. 559–560. The global multiplicative Tamagawa
 measure uses the prescribed mass on the norm-one idele classes. -/
