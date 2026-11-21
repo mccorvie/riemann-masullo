@@ -9,6 +9,7 @@ import Mathlib.Analysis.LocallyConvex.WeakDual
 import Mathlib.Analysis.Normed.Module.HahnBanach
 import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
+import Mathlib.LinearAlgebra.TensorProduct.Pi
 import Mathlib.Topology.Algebra.Module.Spaces.CompactConvergenceCLM
 import Mathlib.Topology.UniformSpace.Ascoli
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
@@ -2311,12 +2312,6 @@ variable {I J : Type*} (E : I → Type*) (F : J → Type*)
   [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
   [∀ j, PolynormableSpace ℂ (F j)] [∀ j, T2Space (F j)]
 
-/-- Paper: Lemma C.2.3.6(1), p. 678. The tensor products of coordinate projections identify
-the injective tensor product of finite products with the product of the pairwise tensors. -/
-theorem injectiveTensor_finiteProducts [Finite I] [Finite J] :
-    IsHomeomorph (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
-      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by sorry
-
 /-- Every functional in the polar of a product zero-neighborhood is determined by the
 same finite set of coordinates. -/
 private theorem product_polar_eq_sum_single {K : Type*} (X : K → Type*)
@@ -2419,6 +2414,31 @@ private theorem injectiveTensor_products_isUniformInducing :
   refine mem_of_superset ((Filter.biInter_finset_mem S).mpr fun UV _ ↦ htest UV) ?_
   exact fun z hz ↦ (S.sup p).mem_ball_zero.mpr
     (Seminorm.finset_sup_apply_lt hr fun UV hUV ↦ (mem_iInter₂.mp hz UV hUV : p UV z < r))
+
+/-- Paper: Lemma C.2.3.6(1), p. 678. The tensor products of coordinate projections identify
+the injective tensor product of finite products with the product of the pairwise tensors. -/
+theorem injectiveTensor_finiteProducts [Finite I] [Finite J] :
+    IsHomeomorph (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
+      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by
+  classical
+  let : Fintype I := Fintype.ofFinite I
+  let : Fintype J := Fintype.ofFinite J
+  refine isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨(injectiveTensor_products_isUniformInducing E F).isInducing.isEmbedding, ?_⟩
+  let e := (TensorProduct.piLeft ℂ (∀ j, F j) E).trans
+    (LinearEquiv.piCongrRight fun i ↦ TensorProduct.piRight ℂ ℂ (E i) F)
+  have he : e.toLinearMap = LinearMap.pi (fun i ↦ LinearMap.pi fun j ↦
+      TensorProduct.map (LinearMap.proj i) (LinearMap.proj j)) := by
+    apply TensorProduct.ext'
+    intro x y
+    funext i j
+    simp [e]
+  intro w
+  let w' (i : I) (j : J) : E i ⊗[ℂ] F j := w (i, j)
+  refine ⟨e.symm w', funext fun ij ↦ ?_⟩
+  have h := DFunLike.congr_fun he (e.symm w')
+  rw [LinearEquiv.coe_toLinearMap, e.apply_symm_apply] at h
+  exact (congrFun (congrFun h ij.1) ij.2).symm
 
 omit [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
   [∀ j, PolynormableSpace ℂ (F j)] [∀ j, T2Space (F j)] in
