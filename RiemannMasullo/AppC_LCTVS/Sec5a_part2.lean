@@ -643,7 +643,11 @@ def weakSchwartzSubmodule : Submodule ℂ (V → E) :=
 function is represented by a Mathlib Schwartz map. -/
 theorem mem_weakSchwartzSubmodule_iff (f : V → E) :
     f ∈ weakSchwartzSubmodule d E ↔
-      ∀ φ : StrongDual ℂ E, ∃ g : SchwartzMap V ℂ, (g : V → ℂ) = φ ∘ f := by sorry
+      ∀ φ : StrongDual ℂ E, ∃ g : SchwartzMap V ℂ, (g : V → ℂ) = φ ∘ f := by
+  rw [weakSchwartzSubmodule, Submodule.mem_iInf]
+  simp only [Submodule.mem_comap]
+  change (∀ φ : StrongDual ℂ E, φ ∘ f ∈ vectorSchwartzSubmodule d ℂ) ↔ _
+  exact forall_congr' fun φ ↦ mem_vectorSchwartzSubmodule_complex_iff (φ ∘ f)
 
 /-- Paper: Remark C.5.1.27, p. 735. In a quasi-complete target the two
 definitions of the periodic smooth space agree. -/
