@@ -2,7 +2,10 @@ module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2a
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
+import Mathlib.LinearAlgebra.TensorProduct.Finiteness
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
 # Directional derivatives and homogeneous adelic theta functions
@@ -147,10 +150,146 @@ theorem adeleOneParameter_norm_cases :
 local notation "orbitDeriv" => fun (γ : ℝ≥0ˣ →ₜ* 𝕀[F]) (f : ℬ[F]) (x : Multiplicative 𝔸[F]) ↦
   deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd (Units.val (γ (expUnit s)) * Multiplicative.toAdd x))) 0
 
+section Archimedean
+
+open scoped Classical
+
+local notation "mixed" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+
+/-- In mixed real and complex coordinates, the archimedean Schwartz–Bruhat functions
+are precisely the classical Schwartz functions on the underlying real vector space. -/
+theorem mem_archimedeanSchwartzBruhat_iff (g : InfiniteAdeleRing F → ℂ) :
+    g ∘ Multiplicative.toAdd ∈ schwartzBruhatSubmodule (Multiplicative (InfiniteAdeleRing F)) ↔
+      ∃ G : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ, ∀ x, G (mixed x) = g x := by
+  sorry
+
+/-- The logarithmically parametrized archimedean component of the subgroup is
+differentiable at the identity in mixed coordinates. -/
+private theorem adeleOneParameter_archimedean_differentiable :
+    DifferentiableAt ℝ (fun s : ℝ ↦ mixed (γ (expUnit s)).val.1) 0 := by
+  have hCharacter (c : ℝ≥0ˣ →ₜ* ℂ) : DifferentiableAt ℝ (fun s ↦ c (expUnit s)) 0 := by
+    obtain ⟨z, hz, _⟩ := existsUnique_complexPower c
+    have hExp (s : ℝ) : c (expUnit s) = Complex.exp ((s : ℂ) * z) := by
+      have h := hz (expUnit s)
+      change c (expUnit s) = (↑(Real.exp s) : ℂ) ^ z at h
+      refine h.trans ?_
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos s).ne'),
+        ← Complex.ofReal_log (Real.exp_pos s).le, Real.log_exp]
+    simp_rw [hExp]
+    exact Complex.differentiableAt_exp.comp 0
+      (Complex.ofRealCLM.differentiableAt.mul_const z)
+  have hc (v : InfinitePlace F) :
+      DifferentiableAt ℝ (fun s : ℝ ↦
+        InfinitePlace.Completion.extensionEmbedding v ((γ (expUnit s)).val.1 v)) 0 := by
+    let c : ℝ≥0ˣ →ₜ* ℂ :=
+      { toFun := fun t ↦ InfinitePlace.Completion.extensionEmbedding v ((γ t).val.1 v)
+        map_one' := by rw [map_one]; exact map_one _
+        map_mul' := fun t u ↦ by rw [map_mul]; exact map_mul _ _ _
+        continuous_toFun := (InfinitePlace.Completion.isometry_extensionEmbedding v).continuous.comp
+          ((continuous_apply v).comp (continuous_fst.comp (Units.continuous_val.comp γ.continuous))) }
+    exact hCharacter c
+  simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+  apply DifferentiableAt.prodMk
+  · refine differentiableAt_pi.mpr fun v ↦ ?_
+    have h := Complex.reCLM.differentiableAt.comp 0 (hc v.1)
+    have hReal (s : ℝ) : (InfinitePlace.Completion.extensionEmbedding v.1
+        ((γ (expUnit s)).val.1 v.1)).re =
+          InfinitePlace.Completion.extensionEmbeddingOfIsReal v.2 ((γ (expUnit s)).val.1 v.1) := by
+      rw [← InfinitePlace.Completion.extensionEmbeddingOfIsReal_apply v.2, Complex.ofReal_re]
+    change DifferentiableAt ℝ (fun s ↦ (InfinitePlace.Completion.extensionEmbedding v.1
+      ((γ (expUnit s)).val.1 v.1)).re) 0 at h
+    simpa only [hReal] using h
+  · exact differentiableAt_pi.mpr fun v ↦ hc v.1
+
+/-- Differentiating a pure archimedean test function along the logarithmic
+dilation gives an archimedean test function, with an actual pointwise derivative. -/
+private theorem adeleDirectionalDeriv_archimedean
+    (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :
+    ∃ d : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)), ∀ x : InfiniteAdeleRing F,
+      HasDerivAt (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x)))
+        (d (Multiplicative.ofAdd x)) 0 := by
+  let V := mixedEmbedding.mixedSpace F
+  obtain ⟨G, hG⟩ := (mem_archimedeanSchwartzBruhat_iff
+    (fun x ↦ f (Multiplicative.ofAdd x))).mp f.property
+  let curve : ℝ → V := fun s ↦ mixed (γ (expUnit s)).val.1
+  let velocity : V := deriv curve 0
+  have hCurve : HasDerivAt curve velocity 0 :=
+    (adeleOneParameter_archimedean_differentiable γ).hasDerivAt
+  have hOne : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hZero : curve 0 = 1 := by
+    have hγ : γ (expUnit (0 : ℝ)) = 1 := (congrArg γ hOne).trans (map_one γ)
+    exact (congrArg (fun u : 𝕀[F] ↦ mixed u.val.1) hγ).trans (map_one mixed)
+  let L : V →L[ℝ] V := ContinuousLinearMap.mul ℝ V velocity
+  let D : SchwartzMap V ℂ :=
+    SchwartzMap.bilinLeftCLM (ContinuousLinearMap.apply ℝ ℂ).flip L.hasTemperateGrowth
+      (SchwartzMap.fderivCLM ℝ V ℂ G)
+  have hmem := (mem_archimedeanSchwartzBruhat_iff (fun x ↦ D (mixed x))).mpr ⟨D, fun _ ↦ rfl⟩
+  refine ⟨⟨fun x ↦ D (mixed x.toAdd), hmem⟩, fun x ↦ ?_⟩
+  have hOrbit : HasDerivAt (fun s ↦ curve s * mixed x) (L (mixed x)) 0 :=
+    hCurve.mul_const (mixed x)
+  have hG' : HasFDerivAt G (fderiv ℝ G (mixed x)) (curve 0 * mixed x) := by
+    rw [hZero, one_mul]
+    exact G.hasFDerivAt _
+  have hEval : (fun s : ℝ ↦ G (curve s * mixed x)) =
+      fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x)) := by
+    funext s
+    rw [← hG, map_mul mixed]
+  rw [← hEval]
+  exact hG'.comp_hasDerivAt 0 hOrbit
+
+end Archimedean
+
+open scoped TensorProduct in
 /-- Paper: Lemma 2.2.4.2, p. 87. Differentiating the orbit curve pointwise in
 the logarithmic parameter gives a Schwartz–Bruhat function. -/
 theorem adeleDirectionalDeriv_mem (f : ℬ[F]) :
-    orbitDeriv γ f ∈ schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by sorry
+    orbitDeriv γ f ∈ schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+  obtain ⟨e, he⟩ := adeleSchwartz_inductiveTensor_equiv F
+  let A := SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))
+  let B := SchwartzBruhat (Multiplicative (IsDedekindDomain.FiniteAdeleRing (𝓞 F) F))
+  let E : (A ⊗[ℂ] B) ≃ₗ[ℂ] ℬ[F] := e.toLinearEquiv
+  obtain ⟨n, a, b, hab⟩ := TensorProduct.exists_sum_tmul_eq (E.symm f)
+  have hf : f = ∑ i, E (a i ⊗ₜ[ℂ] b i) := by
+    calc
+      f = E (E.symm f) := (E.apply_symm_apply f).symm
+      _ = E (∑ i, a i ⊗ₜ[ℂ] b i) := congrArg E hab
+      _ = _ := map_sum E _ _
+  choose d hd using fun i ↦ adeleDirectionalDeriv_archimedean γ (a i)
+  let eval (x : 𝔸[F]) : ℬ[F] →ₗ[ℂ] ℂ :=
+    { toFun := fun g ↦ g (Multiplicative.ofAdd x)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let g (i : Fin n) : ℬ[F] := E (a i ⊗ₜ[ℂ] b i)
+  let dg (i : Fin n) : ℬ[F] := E (d i ⊗ₜ[ℂ] b i)
+  have hDeriv (i : Fin n) (x : 𝔸[F]) :
+      HasDerivAt (fun s : ℝ ↦ eval ((γ (expUnit s)).val * x) (g i)) (eval x (dg i)) 0 := by
+    let aOrbit (s : ℝ) := a i (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1))
+    let bValue := b i (Multiplicative.ofAdd x.2)
+    have hEval : (fun s : ℝ ↦ eval ((γ (expUnit s)).val * x) (g i)) =
+        fun s : ℝ ↦ aOrbit s * bValue := by
+      funext s
+      refine (he (a i) (b i) ((γ (expUnit s)).val * x)).trans ?_
+      have hFinite : ((γ (expUnit s)).val.2 * x.2) = x.2 :=
+        (congrArg (· * x.2) (adeleOneParameter_finite_eq_one γ (expUnit s))).trans (one_mul _)
+      exact congrArg (fun y ↦ aOrbit s * b i (Multiplicative.ofAdd y)) hFinite
+    have hValue : eval x (dg i) = d i (Multiplicative.ofAdd x.1) * bValue := he (d i) (b i) x
+    exact (congrArg₂ (fun c v ↦ HasDerivAt c v (0 : ℝ)) hEval hValue).mpr
+      ((hd i x.1).mul_const bValue)
+  let result : ℬ[F] := ∑ i, dg i
+  have hEq : orbitDeriv γ f = (result : Multiplicative 𝔸[F] → ℂ) := by
+    funext x
+    have hOrbit : (fun s : ℝ ↦ eval ((γ (expUnit s)).val * x.toAdd) f) =
+        fun s : ℝ ↦ ∑ i, eval ((γ (expUnit s)).val * x.toAdd) (g i) := by
+      funext s
+      let ev := eval ((γ (expUnit s)).val * x.toAdd)
+      exact (congrArg ev hf).trans (map_sum ev g Finset.univ)
+    have hValue : eval x.toAdd result = ∑ i, eval x.toAdd (dg i) :=
+      map_sum (eval x.toAdd) dg Finset.univ
+    change deriv (fun s : ℝ ↦ eval ((γ (expUnit s)).val * x.toAdd) f) 0 = eval x.toAdd result
+    exact (congrArg (fun c ↦ deriv c 0) hOrbit).trans
+      ((HasDerivAt.fun_sum (u := Finset.univ) fun i _ ↦ hDeriv i x.toAdd).deriv.trans hValue.symm)
+  rw [hEq]
+  exact result.property
 
 /-- Paper: Lemma 2.2.4.2, p. 87. Formation of the directional derivative is
 complex linear on the adelic Schwartz–Bruhat space. -/
