@@ -1061,11 +1061,69 @@ Deviation: The expansion uses orthonormal vectors only for nonzero coefficients.
 theorem isCompactOperator_iff_nonempty_singularExpansion (T : E →L[ℂ] F) :
     IsCompactOperator T ↔ Nonempty (SingularExpansion T) := by sorry
 
+-- Keep the completeness hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem C.3.6.1, p. 703. The series of rank-one maps in a
 singular expansion converges in operator norm. -/
 theorem SingularExpansion.hasSum_opNorm {T : E →L[ℂ] F} (d : SingularExpansion T) :
     HasSum (fun n : {n // d.coeff n ≠ 0} ↦
-      ((d.coeff n : ℝ) : ℂ) • (innerSL ℂ (d.source n)).smulRight (d.target n)) T := by sorry
+      ((d.coeff n : ℝ) : ℂ) • (innerSL ℂ (d.source n)).smulRight (d.target n)) T := by
+  classical
+  let ι := {n // d.coeff n ≠ 0}
+  let A (i : ι) : E →L[ℂ] F :=
+    ((d.coeff i : ℝ) : ℂ) • (innerSL ℂ (d.source i)).smulRight (d.target i)
+  let S (s : Finset ι) := ∑ i ∈ s, A i
+  have happly (s : Finset ι) (x : E) :
+      S s x = ∑ i ∈ s, (((d.coeff i : ℝ) : ℂ) * ⟪d.source i, x⟫_ℂ) • d.target i := by
+    simp only [S, A, sum_apply, smul_apply,
+      ContinuousLinearMap.smulRight_apply, innerSL_apply_apply, smul_smul]
+  have hpointwise (x : E) : Tendsto (fun s ↦ S s x) atTop (𝓝 (T x)) := by
+    simpa only [HasSum, SummationFilter.unconditional_filter, happly] using d.hasSum_apply x
+  change Tendsto S atTop (𝓝 T)
+  refine Metric.tendsto_atTop.mpr fun ε hε ↦ ?_
+  obtain ⟨N, hN⟩ := Metric.tendsto_atTop.mp d.tendsto_coeff ε hε
+  let c : ℝ := d.coeff N
+  have hc : 0 ≤ c := NNReal.coe_nonneg _
+  have hcε : c < ε := by
+    simpa only [NNReal.dist_eq, NNReal.coe_zero, sub_zero, abs_of_nonneg (NNReal.coe_nonneg _)]
+      using hN N le_rfl
+  let initial : Finset ι := (Finset.range N).subtype (fun n ↦ d.coeff n ≠ 0)
+  -- Use Pythagoras in the target and Bessel's inequality in the source.
+  have htail (u : Finset ι) (hu : ∀ i ∈ u, N ≤ (i : ℕ)) (x : E) :
+      ‖S u x‖ ≤ c * ‖x‖ := by
+    apply le_of_sq_le_sq _ (mul_nonneg hc (norm_nonneg _))
+    rw [happly, mul_pow]
+    calc
+      _ = ∑ i ∈ u, ‖((d.coeff i : ℝ) : ℂ) * ⟪d.source i, x⟫_ℂ‖ ^ 2 := by
+        simpa only [LinearIsometry.toSpanSingleton_apply] using
+          d.orthonormal_target.orthogonalFamily.norm_sum
+            (fun i ↦ ((d.coeff i : ℝ) : ℂ) * ⟪d.source i, x⟫_ℂ) u
+      _ ≤ ∑ i ∈ u, c ^ 2 * ‖⟪d.source i, x⟫_ℂ‖ ^ 2 := by
+        refine Finset.sum_le_sum fun i hi ↦ ?_
+        rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _), mul_pow]
+        exact mul_le_mul_of_nonneg_right
+          ((sq_le_sq₀ (NNReal.coe_nonneg _) hc).mpr (NNReal.coe_le_coe.mpr
+            (d.antitone_coeff (hu i hi)))) (sq_nonneg _)
+      _ ≤ c ^ 2 * ‖x‖ ^ 2 := by
+        rw [← Finset.mul_sum]
+        exact mul_le_mul_of_nonneg_left (d.orthonormal_source.sum_inner_products_le x)
+          (sq_nonneg c)
+  refine ⟨initial, fun s hs ↦ ?_⟩
+  rw [dist_eq_norm, norm_sub_rev]
+  refine (ContinuousLinearMap.opNorm_le_bound _ hc fun x ↦ ?_).trans_lt hcε
+  -- Pass the finite tail bound to the pointwise limit.
+  have hlim : Tendsto (fun t ↦ ‖S t x - S s x‖) atTop (𝓝 ‖(T - S s) x‖) := by
+    simpa only [sub_apply] using
+      ((hpointwise x).sub tendsto_const_nhds).norm
+  apply le_of_tendsto hlim
+  filter_upwards [eventually_ge_atTop s] with t ht
+  have hdiff : S t - S s = S (t \ s) := by
+    have hsum : S (t \ s) + S s = S t := Finset.sum_sdiff ht
+    exact (eq_sub_of_add_eq hsum).symm
+  rw [← sub_apply, hdiff]
+  refine htail _ (fun i hi ↦ ?_) x
+  exact Nat.le_of_not_gt fun hiN ↦
+    (Finset.mem_sdiff.mp hi).2 (hs (Finset.mem_subtype.mpr (Finset.mem_range.mpr hiN)))
 
 -- TODO(paper-gap): The proof on p. 704 bounds the squared norm using any
 -- coefficient. For a leading singular vector, the squared norm is the square
