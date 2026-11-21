@@ -6,6 +6,7 @@ public import Mathlib.Analysis.SpecialFunctions.Complex.Arg
 public import Mathlib.Geometry.Manifold.Instances.UnitsOfNormedAlgebra
 public import Mathlib.Geometry.Manifold.Submersion
 import Mathlib.Topology.Algebra.Group.Units
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Logarithmic coordinates and idelic fundamental domains
@@ -26,7 +27,7 @@ namespace RiemannMasullo
 
 open Function NumberField IsDedekindDomain Topology
 open NumberField.Units.dirichletUnitTheorem InfinitePlace.Completion
-open scoped Classical NNReal Pointwise ContDiff Manifold
+open scoped Classical NNReal Pointwise ContDiff Manifold RestrictedProduct
 
 variable (F : Type*) [Field F] [NumberField F]
 
@@ -422,11 +423,143 @@ end ExactSequences
 
 section Representatives
 
+omit [NumberField F] in
+/-- Paper: Lemma A.2.3.2(3), p. 548. Compact sets of logarithms bound both the
+archimedean coordinates and their inverses, so their preimages are compact. -/
+private theorem infiniteIdeleLog_isCompact_preimage {K : Set (InfinitePlace F → ℝ)}
+    (hK : IsCompact K) : IsCompact (infiniteIdeleLog F ⁻¹' K) := by
+  have : T1Space (InfiniteAdeleRing F) := inferInstanceAs (T1Space (∀ w : InfinitePlace F, w.Completion))
+  have hne (g : 𝕀∞) (w : InfinitePlace F) : g.val w ≠ 0 :=
+    (Units.map (Pi.evalRingHom InfinitePlace.Completion w).toMonoidHom g).ne_zero
+  have hcont : Continuous (infiniteIdeleLog F) := by
+    apply continuous_pi
+    intro w
+    exact continuous_const.mul (((continuous_apply w).comp Units.continuous_val).norm.log
+      (fun g ↦ norm_ne_zero_iff.mpr (hne g w)))
+  have hbound (w : InfinitePlace F) :
+      ∃ R, ∀ x ∈ K, Real.exp (|x w| / w.mult) ≤ R := by
+    obtain ⟨R, hR⟩ := hK.exists_bound_of_continuousOn
+      ((((continuous_apply w).abs.div_const (w.mult : ℝ)).rexp).continuousOn)
+    exact ⟨R, fun x hx ↦ (Real.le_norm_self _).trans (hR x hx)⟩
+  choose R hR using hbound
+  let B : Set (InfiniteAdeleRing F) := Set.univ.pi fun w ↦ Metric.closedBall 0 (R w)
+  have hB : IsCompact B := by
+    apply isCompact_univ_pi
+    intro w
+    let e := extensionEmbedding w
+    have he : Isometry e := isometry_extensionEmbedding w
+    convert he.isClosedEmbedding.isCompact_preimage (isCompact_closedBall (e 0) (R w)) using 1
+    ext z
+    simp only [Set.mem_preimage, Metric.mem_closedBall, he.dist_eq]
+  refine (Units.isClosedEmbedding_embedProduct.isCompact_preimage
+    (hB.prod (MulOpposite.opHomeomorph.symm.isCompact_preimage.mpr hB))).of_isClosed_subset
+      (hK.isClosed.preimage hcont) ?_
+  intro g hg
+  have hlog (w : InfinitePlace F) :
+      infiniteIdeleLog F g w / (w.mult : ℝ) = Real.log ‖g.val w‖ :=
+    mul_div_cancel_left₀ _ InfinitePlace.mult_coe_ne_zero
+  have hnorm (w : InfinitePlace F) :
+      Real.exp |Real.log ‖g.val w‖| ≤ R w := by
+    have hm : 0 ≤ (w.mult : ℝ) := Nat.cast_nonneg _
+    rw [← hlog, abs_div, abs_of_nonneg hm]
+    exact hR w (infiniteIdeleLog F g) hg
+  change g.val ∈ B ∧ g.inv ∈ B
+  constructor
+  · intro w _
+    change g.val w ∈ Metric.closedBall 0 (R w)
+    rw [Metric.mem_closedBall, dist_zero_right, ← Real.exp_log (norm_pos_iff.mpr (hne g w))]
+    exact (Real.exp_le_exp.mpr (le_abs_self _)).trans (hnorm w)
+  · intro w _
+    have hinv : g.inv w = (g.val w)⁻¹ := by
+      exact (Units.val_inv_eq_inv_val (Units.map (Pi.evalRingHom
+        InfinitePlace.Completion w).toMonoidHom g))
+    change g.inv w ∈ Metric.closedBall 0 (R w)
+    rw [Metric.mem_closedBall, dist_zero_right, hinv, norm_inv,
+      ← Real.exp_log (norm_pos_iff.mpr (hne g w)), ← Real.exp_neg]
+    exact (Real.exp_le_exp.mpr (neg_le_abs _)).trans (hnorm w)
+
+/-- Paper: Lemma A.2.3.8(1), p. 550. The compact logarithmic parallelepiped
+encloses the archimedean domain after the omitted coordinate is restored. -/
+private theorem infiniteIdeleFundamentalDomain_subset_compact :
+    ∃ A : Set 𝕀∞, IsCompact A ∧ (N∞).subtype '' E∞ ⊆ A := by
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let extend (x : logSpace F) (w : InfinitePlace F) :=
+    if hw : w = w₀ then -∑ v, x v else x ⟨w, hw⟩
+  have hExtend : Continuous extend := by
+    apply continuous_pi
+    intro w
+    by_cases hw : w = w₀
+    · simp only [extend, hw, dite_true]
+      exact (continuous_finsetSum Finset.univ fun v _ ↦ continuous_apply v :
+        Continuous (fun x : logSpace F ↦ ∑ v, x v)).neg
+    · simp only [extend, hw, dite_false]
+      exact continuous_apply (⟨w, hw⟩ : {v : InfinitePlace F // v ≠ w₀})
+  refine ⟨infiniteIdeleLog F ⁻¹' (extend '' B.parallelepiped),
+    infiniteIdeleLog_isCompact_preimage F (B.parallelepiped.isCompact.image hExtend), ?_⟩
+  rintro _ ⟨g, hg, rfl⟩
+  refine ⟨fun v ↦ infiniteIdeleLog F g.val v.val,
+    ZSpan.fundamentalDomain_subset_parallelepiped B hg.1, ?_⟩
+  funext w
+  by_cases hw : w = w₀
+  · subst w
+    have h := infiniteIdeleLog_sum_zero F g
+    rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀, add_eq_zero_iff_eq_neg] at h
+    simp only [extend, dite_true]
+    exact h.symm
+  · simp only [extend, hw, dite_false]
+    rfl
+
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has compact closure
 in the norm-one ideles. -/
 theorem ideleFundamentalDomain_precompact : IsCompact (closure E₁) := by
-  sorry
+  obtain ⟨hT2, _, _, _, _, hClosed⟩ := ideleGroup_topology F
+  obtain ⟨_, _, _, _, _, hFinite, ⟨ePic⟩⟩ := ideleClassGroup_finiteness F
+  have : Finite (CommRing.Pic (𝓞 F)) := @Finite.of_equiv _ _ hFinite ePic.toEquiv
+  have : T1Space (FiniteAdeleRing (𝓞 F) F) := by
+    change T1Space (Πʳ v : Primes(F), [v.adicCompletion F, v.adicCompletionIntegers F])
+    infer_instance
+  obtain ⟨A, hA, hDomain⟩ := infiniteIdeleFundamentalDomain_subset_compact F b v₀ σ
+  let S : Subring (FiniteAdeleRing (𝓞 F) F) :=
+    ⨅ v : Primes(F), (v.adicCompletionIntegers F).toSubring.comap
+      (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v)
+  have hS_iff (a : FiniteAdeleRing (𝓞 F) F) :
+      a ∈ S ↔ ∀ v : Primes(F), a v ∈ v.adicCompletionIntegers F := by
+    simp only [S, Subring.mem_iInf]
+    rfl
+  have hS : IsCompact (S : Set (FiniteAdeleRing (𝓞 F) F)) := by
+    have (v : Primes(F)) : CompactSpace (v.adicCompletionIntegers F) :=
+      compactSpace_adicCompletionIntegers v
+    let insert : (∀ v : Primes(F), v.adicCompletionIntegers F) → FiniteAdeleRing (𝓞 F) F :=
+      RestrictedProduct.structureMap _ _ Filter.cofinite
+    have hInsert : Continuous insert := RestrictedProduct.isEmbedding_structureMap.continuous
+    have hRange : Set.range insert = S := by
+      change Set.range (RestrictedProduct.structureMap _
+        (fun v : Primes(F) ↦ (v.adicCompletionIntegers F : Set (v.adicCompletion F)))
+        Filter.cofinite) = _
+      rw [RestrictedProduct.range_structureMap]
+      ext a
+      exact (hS_iff a).symm
+    rw [← hRange]
+    exact isCompact_range hInsert
+  let e := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)
+  let C : Set N₁ := Subtype.val ⁻¹' (e.symm '' (A ×ˢ (S.toSubmonoid.units : Set _)))
+  have hC : IsCompact C := hClosed.isClosedEmbedding_subtypeVal.isCompact_preimage
+    ((hA.prod (Submonoid.units_isCompact hS)).image e.symm.continuous)
+  apply (isCompact_iUnion fun c ↦ hC.smul (r c)).closure_of_subset
+  apply Set.iUnion_mono
+  intro c
+  apply Set.smul_set_mono
+  rintro g ⟨⟨u, hu⟩, hg⟩
+  refine ⟨e g.val, ⟨hDomain hg, ?_⟩, e.symm_apply_apply _⟩
+  have hmem (a : integralAdelesOutside F ∅) : a.val.2 ∈ S := by
+    have h := a.property
+    simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies] at h
+    exact (hS_iff _).mpr h
+  change g.val.val.2 ∈ S ∧ g.val.inv.2 ∈ S
+  rw [← hu]
+  exact ⟨hmem u.val, hmem u.inv⟩
 
 include hr₁ hr in
 /-- Paper: Proposition A.2.3.10(1), p. 552. The global domain has nonempty interior
