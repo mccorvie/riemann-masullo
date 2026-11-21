@@ -1612,7 +1612,82 @@ theorem isAbsolute_of_nuclear_strictLF_stages [T2Space E]
     (hFrechet : ∀ n, IsFrechetTVS (S n)) (hNuclear : ∀ n, IsNuclearTVS.{v, u} (S n))
     (hexhaustive : ∀ u : E, ∃ n, u ∈ S n)
     (ht : (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology (fun n ↦ (S n).subtype))
-    (hb : IsSchauderBasis x f) : IsAbsolute x f := by sorry
+    (hb : IsSchauderBasis x f) : IsAbsolute x f := by
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ n, Continuous (p ∘ (S n).subtype)} →
+        Seminorm ℂ E) := ⟨ht⟩
+  let : PolynormableSpace ℂ E := hE.toPolynormableSpace
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  let : ContinuousSMul ℂ E := hE.continuousSMul
+  have hN : IsNuclearTVS.{v, u} E := by
+    -- Identify the two presentations using the maps from their common stages.
+    let j (i k : ℕ) (hik : i ≤ k) := Submodule.inclusion (hS hik)
+    let : DirectedSystem (fun n ↦ S n) (j · · ·) :=
+      ⟨fun {_} _ ↦ rfl, fun {_ _ _} _ _ _ ↦ rfl⟩
+    let L := Module.DirectLimit (fun n ↦ S n) j
+    let stage := Module.DirectLimit.of ℂ ℕ (fun n ↦ S n) j
+    let : TopologicalSpace L := lcDirectLimitTopology j
+    have hL : WithSeminorms
+        (Subtype.val : {p : Seminorm ℂ L // ∀ n, Continuous (p ∘ stage n)} →
+          Seminorm ℂ L) := ⟨rfl⟩
+    let : IsTopologicalAddGroup L := hL.isTopologicalAddGroup
+    let g : L →ₗ[ℂ] E := Module.DirectLimit.lift ℂ ℕ (fun n ↦ S n) j
+      (fun n ↦ (S n).subtype) (fun _ _ _ _ ↦ rfl)
+    have hg_stage (n : ℕ) (z : S n) : g (stage n z) = z :=
+      Module.DirectLimit.lift_of (G := fun n ↦ S n) (f := j) _ _ z
+    have hginj : Function.Injective g :=
+      Module.DirectLimit.lift_injective _ _ fun _ ↦ Subtype.val_injective
+    have hg : Continuous g := hE.continuous_of_continuous_comp g fun p ↦
+      hL.continuous_seminorm ⟨p.val.comp g, fun n ↦
+        (p.property n).congr fun z ↦ (congrArg p.val (hg_stage n z)).symm⟩
+    let : T2Space L := T2Space.of_injective_continuous hginj hg
+    let e : L ≃ₗ[ℂ] E := LinearEquiv.ofBijective g ⟨hginj, fun z ↦ by
+      obtain ⟨n, hz⟩ := hexhaustive z
+      exact ⟨stage n ⟨z, hz⟩, hg_stage n ⟨z, hz⟩⟩⟩
+    have hes : Continuous e.symm :=
+      hL.continuous_of_continuous_comp e.symm.toLinearMap fun p ↦
+        hE.continuous_seminorm ⟨p.val.comp e.symm.toLinearMap, fun n ↦ by
+          refine (p.property n).congr fun z ↦ congrArg p.val (e.injective ?_)
+          change g (stage n z) = e (e.symm (z : E))
+          rw [hg_stage, e.apply_symm_apply]⟩
+    let eL : L ≃L[ℂ] E := ⟨e, hg, hes⟩
+    have hNL : IsNuclearTVS.{v, u} L := isNuclearTVS_directLimit j
+      (fun _ _ _ ↦ continuous_subtype_val.subtype_mk _) hNuclear inferInstance
+    let : PolynormableSpace ℂ L := hNL.2.1
+    -- Transfer the inverse tensor comparison along the continuous linear equivalence.
+    refine ⟨inferInstance, inferInstance, ?_⟩
+    intro F _ _ _ _ _
+    let idF := ContinuousLinearMap.id ℂ F
+    let forward := eL.toContinuousLinearMap
+    let backward := eL.symm.toContinuousLinearMap
+    have hbackL : Continuous (show InjectiveTensor L F → ProjectiveTensor L F from id) := by
+      let c := (hNL.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+      exact c.continuous_symm.congr fun z ↦ c.apply_symm_apply z
+    have hback : Continuous (show InjectiveTensor E F → ProjectiveTensor E F from id) := by
+      refine ((projectiveTensorMap_continuous forward idF).comp hbackL |>.comp
+        (injectiveTensorMap_continuous backward idF)).congr fun z ↦ ?_
+      change TensorProduct ℂ E F at z
+      change forward.toLinearMap.rTensor F (backward.toLinearMap.rTensor F z) = z
+      rw [← LinearMap.rTensor_comp_apply, show forward.toLinearMap.comp backward.toLinearMap =
+        LinearMap.id from LinearMap.ext e.apply_symm_apply, LinearMap.rTensor_id_apply]
+    exact (⟨Equiv.refl (TensorProduct ℂ E F),
+      (uniformContinuous_tensorComparison E F).continuous, hback⟩ :
+      ProjectiveTensor E F ≃ₜ InjectiveTensor E F).isHomeomorph
+  let : BarrelledSpace ℂ E := ⟨fun p hp ↦ hE.continuous_seminorm ⟨p, fun n ↦ by
+    let : BarrelledSpace ℂ (S n) := isFrechetTVS_barrelled (hFrechet n)
+    exact (p.comp (S n).subtype).continuous_of_lowerSemicontinuous
+      (hp.comp continuous_subtype_val)⟩⟩
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have htend (z : E) : Tendsto (fun k ↦ partialProjection x f k z) atTop (𝓝 z) := by
+    have hsum := hb.2 z
+    rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff] at hsum
+    simpa only [Function.comp_def, ContinuousLinearMap.coe_coe, partialProjection,
+      ← Nat.range_succ_eq_Iic, sum_apply, ContinuousLinearMap.smulRight_apply]
+      using hsum.comp (tendsto_add_atTop_nat 1)
+  have heq := PolynormableSpace.banach_steinhaus (𝓕 := partialProjection x f)
+    (fun z ↦ (htend z).isVonNBounded_range ℂ)
+  exact isAbsolute_of_isNuclearTVS hN hb (heq.equicontinuous 0)
 
 end Results
 
