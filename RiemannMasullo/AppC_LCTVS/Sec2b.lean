@@ -802,7 +802,52 @@ theorem isNuclearTVS_iff_completedTensor :
     IsNuclearTVS.{v, u} E ↔
       ∀ (F : Type (max v u)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : TopologicalSpace F)
         (_ : PolynormableSpace ℂ F) (_ : T2Space F),
-        IsHomeomorph (@Completion.map (ProjectiveTensor E F) _ (InjectiveTensor E F) _ id) := by sorry
+        IsHomeomorph (@Completion.map (ProjectiveTensor E F) _ (InjectiveTensor E F) _ id) := by
+  constructor
+  · rintro ⟨_, _, h⟩ F aF mF tF lcF hF
+    let e : ProjectiveTensor E F ≃ InjectiveTensor E F :=
+      ⟨id, id, fun _ ↦ rfl, fun _ ↦ rfl⟩
+    have he := e.isHomeomorph_iff.mp (h F aF mF tF lcF hF)
+    have hu : @UniformContinuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id :=
+      uniformContinuous_addMonoidHom_of_continuous
+        (α := ProjectiveTensor E F) (β := InjectiveTensor E F)
+        (f := (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F)) he.1
+    have hu' : @UniformContinuous (InjectiveTensor E F) (ProjectiveTensor E F) _ _ id :=
+      uniformContinuous_addMonoidHom_of_continuous
+        (α := InjectiveTensor E F) (β := ProjectiveTensor E F)
+        (f := (LinearMap.id : InjectiveTensor E F →ₗ[ℂ] ProjectiveTensor E F)) he.2
+    let eu : ProjectiveTensor E F ≃ᵤ InjectiveTensor E F := ⟨e, hu, hu'⟩
+    exact (Completion.mapEquiv eu).toHomeomorph.isHomeomorph
+  · intro h
+    refine ⟨inferInstance, inferInstance, ?_⟩
+    intro F aF mF tF lcF hF
+    have hc : @Continuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id := by
+      let hI := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+        (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+          injectiveTensorSeminorm UV.1 UV.2)
+      let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+        (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+          ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
+      exact hI.continuous_of_continuous_comp
+        (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F)
+        fun ⟨U, V⟩ ↦ hP.continuous_seminorm ⟨_, injectiveSeminorm_continuousAt_tmul U V⟩
+    have hu : @UniformContinuous (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id :=
+      uniformContinuous_addMonoidHom_of_continuous
+        (α := ProjectiveTensor E F) (β := InjectiveTensor E F)
+        (f := (LinearMap.id : ProjectiveTensor E F →ₗ[ℂ] InjectiveTensor E F)) hc
+    let coeP := Completion.coe' (α := ProjectiveTensor E F)
+    let coeI := Completion.coe' (α := InjectiveTensor E F)
+    let completedComparison := @Completion.map (ProjectiveTensor E F) _ (InjectiveTensor E F) _ id
+    have hcoe : completedComparison ∘ coeP = coeI ∘ (id : ProjectiveTensor E F → InjectiveTensor E F) :=
+      funext (Completion.map_coe (α := ProjectiveTensor E F) (β := InjectiveTensor E F) hu)
+    have hi : IsInducing (completedComparison ∘ coeP) :=
+      (h F aF mF tF lcF hF).isInducing.comp
+        (Completion.isUniformInducing_coe (ProjectiveTensor E F)).isInducing
+    rw [hcoe] at hi
+    have hid : @IsInducing (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id :=
+      (Completion.isUniformInducing_coe (InjectiveTensor E F)).isInducing.of_comp_iff.mp hi
+    exact isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨⟨hid, Function.injective_id⟩, Function.surjective_id⟩
 
 end Characterizations
 
