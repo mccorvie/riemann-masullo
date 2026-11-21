@@ -824,7 +824,69 @@ theorem exists_rescale_directSum_nhds (Y : ℕ → Type*) [∀ k, NormedAddCommG
     [∀ k, NormedSpace ℂ (Y k)] :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ Y)
     ∀ V : ℕ → Set (⨁ k, Y k), (∀ k, V k ∈ 𝓝 0) →
-      ∃ ρ : ℕ → ℝ, (∀ k, 0 < ρ k) ∧ (⋂ k, (ρ k : ℂ) • V k) ∈ 𝓝 0 := by sorry
+      ∃ ρ : ℕ → ℝ, (∀ k, 0 < ρ k) ∧ (⋂ k, (ρ k : ℂ) • V k) ∈ 𝓝 0 := by
+  classical
+  let D := ⨁ k, Y k
+  let lof := DirectSum.lof ℂ ℕ Y
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  intro V hV
+  let P : SeminormFamily ℂ D {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lof k)} := Subtype.val
+  have hP : WithSeminorms P := ⟨rfl⟩
+  let : PolynormableSpace ℂ D := hP.toPolynormableSpace
+  have hlof (k : ℕ) : Continuous (lof k) :=
+    hP.continuous_of_continuous_comp _ fun s ↦ s.property k
+  let basis := PolynormableSpace.hasBasis_zero_ball ℂ D
+  choose p hp hball using fun i ↦ basis.mem_iff.mp (hV i)
+  choose a ha hbound using fun i k ↦
+    ((p i).comp (lof k)).bound_of_continuous_normedSpace ((hp i).comp (hlof k))
+  -- Each scale bounds its row through the diagonal. Each weight bounds its column above it.
+  let ρ (i : ℕ) : ℝ := 1 + ∑ k ∈ Finset.range (i + 1), a i k
+  let w (k : ℕ) : ℝ := 1 + ∑ i ∈ Finset.range k, a i k
+  have hρ (i : ℕ) : 1 ≤ ρ i := le_add_of_nonneg_right (Finset.sum_nonneg fun k _ ↦ (ha i k).le)
+  have hw (k : ℕ) : 1 ≤ w k := le_add_of_nonneg_right (Finset.sum_nonneg fun i _ ↦ (ha i k).le)
+  have hρpos (i : ℕ) : 0 < ρ i := zero_lt_one.trans_le (hρ i)
+  have hdom (i k : ℕ) : a i k ≤ ρ i * w k := by
+    by_cases h : k ≤ i
+    · have hsum : a i k ≤ ∑ j ∈ Finset.range (i + 1), a i j :=
+        Finset.single_le_sum (fun j _ ↦ (ha i j).le) (Finset.mem_range.mpr (Nat.lt_succ_of_le h))
+      calc
+        a i k ≤ ρ i := hsum.trans (le_add_of_nonneg_left zero_le_one)
+        _ ≤ ρ i * w k := le_mul_of_one_le_right (hρpos i).le (hw k)
+    · have hsum : a i k ≤ ∑ j ∈ Finset.range k, a j k :=
+        Finset.single_le_sum (fun j _ ↦ (ha j k).le) (Finset.mem_range.mpr (Nat.lt_of_not_ge h))
+      calc
+        a i k ≤ w k := hsum.trans (le_add_of_nonneg_left zero_le_one)
+        _ ≤ ρ i * w k := le_mul_of_one_le_left (zero_le_one.trans (hw k)) (hρ i)
+  let s (k : ℕ) : Seminorm ℂ (Y k) :=
+    (w k).toNNReal • normSeminorm ℂ (Y k)
+  have hs (k : ℕ) (z : Y k) : s k z = w k * ‖z‖ := by
+    change ((w k).toNNReal : ℝ) * ‖z‖ = w k * ‖z‖
+    rw [Real.coe_toNNReal _ (zero_le_one.trans (hw k))]
+  let q := directSumSeminorm s
+  have hq : Continuous q := by
+    refine hP.continuous_seminorm ⟨q, fun k ↦ ?_⟩
+    change Continuous (fun z : Y k ↦ directSumSeminorm s (lof k z))
+    simp only [lof, directSumSeminorm_lof, hs]
+    exact continuous_norm.const_mul _
+  have hpq (i : ℕ) (x : D) : p i x ≤ ρ i * q x := by
+    have hsum := Finset.le_sum_of_subadditive (p i) (map_zero (p i)).le
+      (map_add_le_add (p i)) x.support (fun k ↦ lof k (x k))
+    rw [show (∑ k ∈ x.support, lof k (x k)) = x from DirectSum.sum_support_of x] at hsum
+    refine hsum.trans ?_
+    rw [show q x = ∑ k ∈ x.support, s k (x k) from directSumSeminorm_apply s x _ Subset.rfl,
+      Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro k _
+    rw [hs, ← mul_assoc]
+    exact (hbound i k (x k)).trans (mul_le_mul_of_nonneg_right (hdom i k) (norm_nonneg _))
+  refine ⟨ρ, hρpos, mem_of_superset (basis.mem_iff.mpr ⟨q, hq, Subset.rfl⟩) ?_⟩
+  intro x hx
+  rw [Seminorm.mem_ball_zero] at hx
+  refine mem_iInter.mpr fun i ↦ smul_set_mono (hball i) ?_
+  have hne : (ρ i : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hρpos i).ne'
+  rw [Seminorm.smul_ball_zero hne, Complex.norm_of_nonneg (hρpos i).le, mul_one,
+    Seminorm.mem_ball_zero]
+  exact (hpq i x).trans_lt (by simpa only [mul_one] using mul_lt_mul_of_pos_left hx (hρpos i))
 
 end InductiveLimits
 
