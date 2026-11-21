@@ -3,7 +3,10 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import Mathlib.Topology.MetricSpace.ProperSpace.Real
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
+import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Extend
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Compact
 
@@ -874,6 +877,239 @@ theorem schwartzBruhat_modulation_isotype_completion
         TopologicalSpace.induced (fun f ↦ i (j f)) inferInstance =
           TopologicalSpace.induced q inferInstance ∧ @CompleteSpace (E ⧸ Q.ker) (IsTopologicalAddGroup.rightUniformSpace _) := by sorry
 
+omit hm hE hμ₁ hρ hi hd hcomm in
+/-- Transport a structural pair and its presentation by a topological group
+isomorphism, preserving the elementary Schwartz functions in the stage. -/
+private theorem exists_schwartzBruhat_stage_pullback {A B : Type*} [CommGroup A] [CommGroup B]
+    [TopologicalSpace A] [TopologicalSpace B] [IsTopologicalGroup A] [IsTopologicalGroup B]
+    [T2Space A] [T2Space B] [LocallyCompactSpace A] [LocallyCompactSpace B] (e : A ≃ₜ* B)
+    (a : BruhatStructuralPair B) (p : ElementaryLCAPresentation a.quotient) :
+    ∃ (a' : BruhatStructuralPair A) (p' : ElementaryLCAPresentation a'.quotient)
+      (j : SchwartzBruhatStage p →L[ℂ] SchwartzBruhatStage p'),
+      ∀ f, schwartzBruhatStageRealization a p f ∘ e =
+        schwartzBruhatStageRealization a' p' (j f) := by
+  classical
+  let dual : PontryaginDual B ≃ₜ* PontryaginDual A :=
+    { toFun := PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e)
+      invFun := PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e.symm)
+      left_inv := fun χ ↦ PontryaginDual.ext fun y ↦ congrArg χ (e.apply_symm_apply y)
+      right_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (e.symm_apply_apply x)
+      map_mul' := map_mul (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e))
+      continuous_toFun := (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e)).continuous
+      continuous_invFun := (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e.symm)).continuous }
+  let J := a.val.1
+  let D := OrderDual.ofDual a.val.2
+  let J' := J.comap e.toMulEquiv.toMonoidHom
+  let D' := D.comap e.toMulEquiv.toMonoidHom
+  let eJ : J' ≃ₜ* J := ContinuousMulEquiv.mk'
+    (e.toHomeomorph.subtype fun _ ↦ Iff.rfl)
+    (fun x y ↦ Subtype.ext (map_mul e (x : A) (y : A)))
+  have hAnn (χ : PontryaginDual B) : χ ∈ lcaAnnihilator D ↔ dual χ ∈ lcaAnnihilator D' := by
+    simp only [mem_lcaAnnihilator_iff]
+    refine ⟨fun h x ↦ h ⟨e x, x.property⟩, fun h y ↦ ?_⟩
+    have hy : e.symm y ∈ D' := by
+      change e (e.symm y) ∈ D
+      simpa only [e.apply_symm_apply] using y.property
+    have heval : χ (e (e.symm y)) = 1 := h ⟨e.symm y, hy⟩
+    simpa only [e.apply_symm_apply] using heval
+  let eAnn : lcaAnnihilator D ≃ₜ* lcaAnnihilator D' := ContinuousMulEquiv.mk'
+    (dual.toHomeomorph.subtype hAnn)
+    (fun x y ↦ Subtype.ext (map_mul dual (x : PontryaginDual B) y))
+  have hopen : IsOpen (lcaAnnihilator D' : Set (PontryaginDual A)) := by
+    have heq : (lcaAnnihilator D' : Set (PontryaginDual A)) =
+        dual.symm ⁻¹' (lcaAnnihilator D : Set (PontryaginDual B)) := by
+      ext χ
+      change χ ∈ lcaAnnihilator D' ↔ dual.symm χ ∈ lcaAnnihilator D
+      rw [hAnn (dual.symm χ), dual.apply_symm_apply]
+    rw [heq]
+    exact a.property.2.2.1.2.1.preimage dual.symm.continuous
+  let a' : BruhatStructuralPair A :=
+    ⟨(J', OrderDual.toDual D'), a.property.1.preimage e.continuous,
+      isCompactlyGeneratedGroup_of_continuousMulEquiv eJ.symm a.property.2.1,
+      ⟨a.property.2.2.1.1.preimage e.continuous, hopen,
+        isCompactlyGeneratedGroup_of_continuousMulEquiv eAnn a.property.2.2.1.2.2⟩,
+      Subgroup.comap_mono a.property.2.2.2⟩
+  let N := D.comap J.subtype
+  let N' := D'.comap J'.subtype
+  have hN : N'.map eJ.toMulEquiv.toMonoidHom = N := by
+    change N'.map (eJ.toMulEquiv : J' →* J) = N
+    rw [Subgroup.map_equiv_eq_comap_symm eJ.toMulEquiv]
+    ext y
+    change e (e.symm y) ∈ D ↔ (y : B) ∈ D
+    rw [e.apply_symm_apply]
+  let q := QuotientGroup.congr N' N eJ.toMulEquiv hN
+  let eQ : a'.quotient ≃ₜ* a.quotient :=
+    ⟨q, (QuotientGroup.isQuotientMap_mk N').continuous_iff.mpr
+      (QuotientGroup.continuous_mk.comp eJ.continuous),
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        (QuotientGroup.continuous_mk.comp eJ.symm.continuous)⟩
+  let p' : ElementaryLCAPresentation a'.quotient := { p with equiv := eQ.trans p.equiv }
+  refine ⟨a', p', ContinuousLinearMap.id ℂ _, fun f ↦ funext fun x ↦ ?_⟩
+  change schwartzBruhatStageRealization a p f (e x) = schwartzBruhatStageRealization a' p' f x
+  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : e x ∈ J
+  · rw [dite_eq_left hx, dite_eq_left (show x ∈ a'.val.1 from hx)]
+    rfl
+  · rw [dite_eq_right hx, dite_eq_right (show x ∉ a'.val.1 from hx)]
+
+omit hm hE hμ₁ hρ hi hd hcomm in
+/-- Pullback by a topological group isomorphism is continuous on Schwartz–Bruhat
+spaces. Each structural quotient uses the same elementary coordinates after pullback. -/
+private theorem exists_schwartzBruhat_pullback {A B : Type*} [CommGroup A] [CommGroup B]
+    [TopologicalSpace A] [TopologicalSpace B] [IsTopologicalGroup A] [IsTopologicalGroup B]
+    [T2Space A] [T2Space B] [LocallyCompactSpace A] [LocallyCompactSpace B] (e : A ≃ₜ* B) :
+    ∃ L : SchwartzBruhat B →L[ℂ] SchwartzBruhat A, ∀ f x, L f x = f (e x) := by
+  classical
+  let L : (B → ℂ) →ₗ[ℂ] (A → ℂ) := LinearMap.funLeft ℂ ℂ e
+  have hle : schwartzBruhatSubmodule B ≤ (schwartzBruhatSubmodule A).comap L := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun p ↦ ?_
+    rintro _ ⟨f, rfl⟩
+    obtain ⟨a', p', j, hj⟩ := exists_schwartzBruhat_stage_pullback e a p
+    change schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule A
+    rw [hj]
+    exact (schwartzBruhatStageInclusion a' p' (j f)).property
+  let M : SchwartzBruhat B →ₗ[ℂ] SchwartzBruhat A :=
+    (L.comp (schwartzBruhatSubmodule B).subtype).codRestrict _ (fun f ↦ hle f.property)
+  have hc : Continuous M := by
+    refine (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp M ?_
+    rintro ⟨q, hq⟩
+    let qM : Seminorm ℂ (schwartzBruhatSubmodule B) := q.comp M
+    have hcomp (a : BruhatStructuralPair B) (p : ElementaryLCAPresentation a.quotient) :
+        Continuous (qM ∘ schwartzBruhatStageInclusion a p) := by
+      refine (exists_schwartzBruhat_stage_pullback e a p).elim fun a' hp ↦ ?_
+      refine hp.elim fun p' hj' ↦ ?_
+      refine hj'.elim fun j hj ↦ ?_
+      have heq (f : SchwartzBruhatStage p) :
+          schwartzBruhatStageInclusion a' p' (j f) = M (schwartzBruhatStageInclusion a p f) := by
+        exact Subtype.ext (hj f).symm
+      exact ((hq a' p').comp j.continuous).congr (fun f ↦ congrArg q (heq f))
+    exact (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨qM, hcomp⟩
+  exact ⟨⟨M, hc⟩, fun _ _ ↦ rfl⟩
+
+omit hm hE hμ₁ hρ hi hd hcomm in
+/-- On the Schwartz–Bruhat space, multiplication by a unitary character is
+conjugate to translation on the dual via the Fourier transform. -/
+private theorem exists_schwartzBruhat_characterEquiv (η : PontryaginDual G) :
+    ∃ M : S ≃L[ℂ] S, ∀ (f : S) (x : G), M f x = (η x : ℂ) * f x := by
+  let μ : Measure G := Measure.haar
+  have : μ.IsHaarMeasure := inferInstanceAs ((Measure.haar (G := G)).IsHaarMeasure)
+  have : μ.Regular := inferInstanceAs ((Measure.haar (G := G)).Regular)
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual G) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap G Circle).secondCountableTopology
+  have hFourier := schwartzBruhat_fourier_equiv μ
+  let F := hFourier.choose
+  have hF := hFourier.choose_spec
+  let ρ := schwartzBruhatTranslationAction (G := PontryaginDual G)
+  let T := ContinuousLinearEquiv.ofUnit (Units.map ρ (toUnits η))
+  let M := (F.trans T).trans F.symm
+  refine ⟨M, fun f x ↦ ?_⟩
+  let g (y : G) : ℂ := (η y : ℂ) * f y
+  have hη : Continuous (fun y : G ↦ (η y : ℂ)) := continuous_subtype_val.comp η.continuous
+  have hg : Integrable g μ := by
+    simpa only [g, mul_comm] using
+      (hF f).1.mul_bdd (c := 1) hη.aestronglyMeasurable (.of_forall fun y ↦ by simp)
+  have htransform (χ : PontryaginDual G) : lcaFourier μ (M f) χ = lcaFourier μ g χ := calc
+    _ = F (M f) χ := ((hF (M f)).2 χ).symm
+    _ = ρ η (F f) χ :=
+      congrArg (fun v : SchwartzBruhat (PontryaginDual G) ↦ v χ)
+        (F.apply_symm_apply (T (F f)))
+    _ = F f (η⁻¹ * χ) := schwartzBruhatTranslationAction_apply η χ (F f)
+    _ = lcaFourier μ f (η⁻¹ * χ) := (hF f).2 _
+    _ = lcaFourier μ g χ := integral_congr_ae (ae_of_all _ fun y ↦ by
+      change f y * star (((η y)⁻¹ * χ y : Circle) : ℂ) = g y * star (χ y : ℂ)
+      rw [Circle.coe_mul, Circle.coe_inv_eq_conj, ← Complex.star_def, star_mul, star_star]
+      dsimp only [g]
+      ring)
+  let u : G → ℂ := M f
+  have hu : Integrable u μ := (hF (M f)).1
+  have hz (χ : PontryaginDual G) : lcaFourier μ (u - g) χ = 0 := by
+    change (∫ y, (u y - g y) * star (χ y : ℂ) ∂μ) = 0
+    simp_rw [sub_mul]
+    rw [integral_sub (integrable_fourierIntegrand μ hu χ) (integrable_fourierIntegrand μ hg χ)]
+    exact sub_eq_zero.mpr (htransform χ)
+  have hae : u =ᵐ[μ] g :=
+    (ae_eq_zero_of_lcaFourier_eq_zero μ (hu.sub hg) hz).mono fun _ hy ↦ sub_eq_zero.mp hy
+  exact congrFun (((continuous_schwartzBruhat (M f)).ae_eq_iff_eq μ
+    (hη.mul (continuous_schwartzBruhat f))).mp hae) x
+
+omit hE hρ hi hd hcomm in
+/-- The normalized twisted coset integral is a quotient map onto the
+Schwartz–Bruhat profiles, and evaluates the isotypic projector along the section. -/
+private theorem exists_schwartzBruhat_isotype_profile (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : RightInverse τ m) (ω : PontryaginDual K) :
+    ∃ R : S →L[ℂ] SchwartzBruhat ℝ≥0ˣ, IsQuotientMap R ∧
+      ∀ f t, R f t = schwartzBruhatIsotypicProjector m hm μ₁ ω f (τ t) := by
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  let B := SchwartzBruhat ℝ≥0ˣ
+  have hK : IsClosed (K : Set G) := hm.isCompact_ker.isClosed
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : LocallyCompactSpace K := inferInstance
+  let : μ₁.Regular := inferInstance
+  let : T1Space (G ⧸ K) := QuotientGroup.t1Space_iff.mpr hK
+  let d : (G ⧸ K) ≃ₜ* ℝ≥0ˣ :=
+    { QuotientGroup.quotientKerEquivOfRightInverse m.toMonoidHom τ hτ with
+      continuous_toFun := (QuotientGroup.isQuotientMap_mk K).continuous_iff.mpr m.continuous
+      continuous_invFun := QuotientGroup.continuous_mk.comp τ.continuous }
+  let r : G →ₜ* K :=
+    ⟨((MonoidHom.id G) / (τ.toMonoidHom.comp m.toMonoidHom)).codRestrict K (fun g ↦ by
+        change m (g / τ (m g)) = 1
+        rw [map_div, hτ (m g), div_self']),
+      (continuous_id.div' (τ.continuous.comp m.continuous)).subtype_mk _⟩
+  have hr (k : K) (t : ℝ≥0ˣ) : r ((k : G) * τ t) = k := by
+    apply Subtype.ext
+    change (k : G) * τ t / τ (m ((k : G) * τ t)) = k
+    rw [map_mul, show m k = 1 from k.property, hτ t, one_mul, mul_div_cancel_right]
+  let η := PontryaginDual.map r ω
+  refine (exists_schwartzBruhat_characterEquiv η).elim fun M hM ↦ ?_
+  refine (exists_schwartzBruhat_pullback d.symm).elim fun T hT ↦ ?_
+  refine (exists_schwartzBruhat_pullback d).elim fun U hU ↦ ?_
+  let D := ContinuousLinearEquiv.equivOfInverse T U
+    (fun f ↦ Subtype.ext (funext fun q ↦ by rw [hU, hT, d.symm_apply_apply]))
+    (fun f ↦ Subtype.ext (funext fun t ↦ by rw [hT, hU, d.apply_symm_apply]))
+  refine (schwartzBruhatCosetIntegral_continuousLinear K μ₁ hK).elim fun A hA ↦ ?_
+  have hAq : IsQuotientMap A := by
+    let Q := SchwartzBruhat (G ⧸ K)
+    have heq : (A : S → Q) = schwartzBruhatCosetIntegral K μ₁ hK :=
+      funext hA
+    exact Eq.mpr (congrArg (fun F : S → Q ↦ IsQuotientMap F) heq)
+      (schwartzBruhatCosetIntegral_isQuotientMap K μ₁ hK)
+  have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
+  let c : ℂˣ := Units.mk0 (((μ₁.real univ)⁻¹ : ℝ) : ℂ)
+    (Complex.ofReal_ne_zero.mpr (inv_ne_zero hmass))
+  let N : B ≃L[ℂ] B := ContinuousLinearEquiv.smulLeft c
+  let R : S →L[ℂ] B :=
+    N.toContinuousLinearMap.comp (D.toContinuousLinearMap.comp (A.comp M.toContinuousLinearMap))
+  have hRq : IsQuotientMap R :=
+    N.toHomeomorph.isQuotientMap.comp
+      (D.toHomeomorph.isQuotientMap.comp (hAq.comp M.toHomeomorph.isQuotientMap))
+  refine ⟨R, hRq, fun f t ↦ ?_⟩
+  let q : G ⧸ K := QuotientGroup.mk (τ t)
+  let I (k : K) : ℂ := star (ω k : ℂ) * f ((k : G)⁻¹ * τ t)
+  have hcoset : A (M f) q = ∫ k : K, M f (τ t * (k : G)) ∂μ₁ :=
+    (congrArg (fun v : SchwartzBruhat (G ⧸ K) ↦ v q) (hA (M f))).trans
+      (schwartzBruhatCosetIntegral_mk K μ₁ hK (M f) (τ t))
+  have hpoint (k : K) : M f (τ t * (k : G)) = I k⁻¹ := calc
+    _ = M f ((k : G) * τ t) := congrArg (fun x : G ↦ M f x) (mul_comm (τ t) (k : G))
+    _ = (ω k : ℂ) * f ((k : G) * τ t) := by
+      refine (hM f ((k : G) * τ t)).trans ?_
+      change (ω (r ((k : G) * τ t)) : ℂ) * f ((k : G) * τ t) = _
+      rw [hr k t]
+    _ = I k⁻¹ := by
+      dsimp only [I]
+      rw [map_inv, Circle.coe_inv_eq_conj, ← Complex.star_def, star_star, Subgroup.coe_inv, inv_inv]
+  calc
+    R f t = (↑c : ℂ) * T (A (M f)) t := rfl
+    _ = (↑c : ℂ) * A (M f) q := congrArg ((↑c : ℂ) * ·) (hT (A (M f)) t)
+    _ = (↑c : ℂ) * (∫ k : K, M f (τ t * (k : G)) ∂μ₁) := congrArg ((↑c : ℂ) * ·) hcoset
+    _ = (↑c : ℂ) * (∫ k : K, I k⁻¹ ∂μ₁) :=
+      congrArg ((↑c : ℂ) * ·) (integral_congr_ae (ae_of_all _ hpoint))
+    _ = (↑c : ℂ) * (∫ k : K, I k ∂μ₁) := congrArg ((↑c : ℂ) * ·) (integral_inv_eq_self I μ₁)
+    _ = (μ₁.real univ)⁻¹ • (∫ k : K, I k ∂μ₁) := Complex.real_smul.symm
+    _ = P f (τ t) := (schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f (τ t)).2.symm
+
 omit hE hρ hi hd hcomm in
 /-- Paper: Corollary D.2.2.3(1), p. 797. For a surjective module,
 the Schwartz–Bruhat space of the positive reals maps isomorphically
@@ -885,7 +1121,67 @@ theorem schwartzBruhat_positiveReal_isotype_equiv (τ : ℝ≥0ˣ →ₜ* G)
       (e : SchwartzBruhat ℝ≥0ˣ ≃L[ℂ] (S ⧸ P.ker)),
       (∀ (f : SchwartzBruhat ℝ≥0ˣ) (k : K) (t : ℝ≥0ˣ),
         w f ((k : G) * τ t) = star (ω k : ℂ) * f t) ∧
-      ∀ f, e f = P.ker.mkQ (w f) := by sorry
+      ∀ f, e f = P.ker.mkQ (w f) := by
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  let ρ := MonoidHom.comp (schwartzBruhatTranslationAction (G := G)) (Subgroup.subtype K)
+  let k₀ (g : G) : K := ⟨g / τ (m g), by
+    change m (g / τ (m g)) = 1
+    rw [map_div, hτ (m g), div_self']⟩
+  have hsplit (g : G) : (k₀ g : G) * τ (m g) = g := div_mul_cancel _ _
+  refine (exists_schwartzBruhat_isotype_profile m hm μ₁ τ hτ ω).elim fun R h ↦ ?_
+  have hRq := h.1
+  have hR := h.2
+  refine (schwartzBruhatIsotypicProjector_quotient_equiv m hm μ₁ ω).elim fun J hJ ↦ ?_
+  have hmem (f : S) : P f ∈ actionIsotype ρ ω :=
+    Eq.mp (congrArg (fun u : S ↦ u ∈ actionIsotype ρ ω) (hJ f)) (J (P.ker.mkQ f)).property
+  have hhom (f : S) (k : K) (t : ℝ≥0ˣ) :
+      P f ((k : G) * τ t) = star (ω k : ℂ) * R f t := by
+    have hstar : (ω k⁻¹ : ℂ) = star (ω k : ℂ) := by
+      rw [map_inv, Circle.coe_inv_eq_conj, ← Complex.star_def]
+    have hk : (((k⁻¹ : K) : G)⁻¹ * τ t) = (k : G) * τ t := by rw [Subgroup.coe_inv, inv_inv]
+    calc
+      _ = P f (((k⁻¹ : K) : G)⁻¹ * τ t) := congrArg (fun x : G ↦ P f x) hk.symm
+      _ = ρ k⁻¹ (P f) (τ t) :=
+        (schwartzBruhatTranslationAction_apply ((k⁻¹ : K) : G) (τ t) (P f)).symm
+      _ = (ω k⁻¹ : ℂ) * P f (τ t) :=
+        congrArg (fun u : S ↦ u (τ t)) ((mem_actionIsotype ρ ω (P f)).mp (hmem f) k⁻¹)
+      _ = star (ω k : ℂ) * R f t := congrArg₂ (· * ·) hstar (hR f t).symm
+  have hker : P.ker = R.ker := by
+    ext f
+    change P f = 0 ↔ R f = 0
+    constructor
+    · intro hf
+      refine Subtype.ext (funext fun t ↦ ?_)
+      exact (hR f t).trans (congrArg (fun u : S ↦ u (τ t)) hf)
+    · intro hf
+      refine Subtype.ext (funext fun g ↦ ?_)
+      change P f g = 0
+      calc
+        _ = P f ((k₀ g : G) * τ (m g)) := congrArg (fun x : G ↦ P f x) (hsplit g).symm
+        _ = star (ω (k₀ g) : ℂ) * R f (m g) := hhom f (k₀ g) (m g)
+        _ = 0 := (congrArg (fun b : SchwartzBruhat ℝ≥0ˣ ↦ star (ω (k₀ g) : ℂ) * b (m g))
+          hf).trans (mul_zero _)
+  let L := P.ker.liftQL R hker.le
+  have hLq : IsQuotientMap L :=
+    P.ker.isQuotientMap_mkQL.of_comp_isQuotientMap hRq
+  have hLi : Injective L := (LinearMap.ker_eq_bot.mp
+    (Submodule.ker_liftQ_eq_bot' P.ker R.toLinearMap hker) : Injective L)
+  let F := ContinuousLinearEquiv.ofIsHomeomorph
+    (LinearEquiv.ofBijective L.toLinearMap ⟨hLi, hLq.surjective⟩)
+    (isHomeomorph_iff_isQuotientMap_injective.mpr ⟨hLq, hLi⟩)
+  let e := F.symm
+  let w := (actionIsotype ρ ω).subtypeL.comp (J.toContinuousLinearMap.comp e.toContinuousLinearMap)
+  have hwe (f : S) : w (R f) = P f :=
+    (congrArg (fun q : S ⧸ P.ker ↦ (J q : S)) (F.symm_apply_apply (P.ker.mkQ f))).trans (hJ f)
+  refine ⟨w, e, ?_, ?_⟩
+  · refine hRq.surjective.forall.mpr fun g k t ↦ ?_
+    exact (congrArg (fun u : S ↦ u ((k : G) * τ t)) (hwe g)).trans (hhom g k t)
+  · intro f
+    apply J.injective
+    apply Subtype.ext
+    change w f = (J (P.ker.mkQ (w f)) : S)
+    exact ((hJ (w f)).trans
+      (schwartzBruhatIsotypicProjector_apply_isotype m hm μ₁ ω (w f) (J (e f)).property)).symm
 
 -- TODO(paper-gap): Corollary D.2.2.3(2) drops the density hypothesis.
 -- For the trivial character, the injection into S(G) × ℂ with zero
