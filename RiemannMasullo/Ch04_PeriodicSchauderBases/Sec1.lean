@@ -1006,7 +1006,42 @@ theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by
 
 /-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
 boundedly complete. -/
-theorem strongDual_isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete f := by sorry
+theorem strongDual_isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete f := by
+  intro a hs
+  let s (k : ℕ) : StrongDual ℂ E := ∑ m ∈ Finset.Iic k, a m • f m
+  let S (k : ℕ) : WeakDual ℂ E := StrongDual.toWeakDual (s k)
+  -- Banach–Steinhaus puts the partial sums in the polar of a zero neighborhood.
+  have hpoint (u : E) : IsVonNBounded ℂ (range fun k ↦ s k u) := by
+    let ev := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) u
+    change IsVonNBounded ℂ (range (ev ∘ s))
+    rw [range_comp]
+    exact hs.image ev
+  have hequi : EquicontinuousAt (fun k u ↦ s k u) (0 : E) := by
+    let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+    let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    exact (PolynormableSpace.banach_steinhaus hpoint).equicontinuous 0
+  let U : Set E := {u | ∀ k, dist (s k 0) (s k u) < 1}
+  have hU : U ∈ 𝓝 (0 : E) := Metric.equicontinuousAt_iff_right.mp hequi 1 zero_lt_one
+  have hS (k : ℕ) : S k ∈ WeakDual.polar ℂ U := by
+    intro u hu
+    have hk : dist (s k 0) (s k u) < 1 := hu k
+    simpa [S, dist_eq_norm] using hk.le
+  have hfilter : Filter.map S atTop ≤ 𝓟 (WeakDual.polar ℂ U) := by
+    rw [Filter.le_principal_iff, Filter.mem_map]
+    exact Eventually.of_forall hS
+  obtain ⟨φ, _, hφ⟩ := (isCompact_weakDual_polar hU).exists_mapClusterPt hfilter
+  -- The stabilized evaluations give the coefficients of the cluster point.
+  have hcoeff (m : ℕ) : φ (x m) = a m := by
+    have hcl := hφ.continuousAt_comp (WeakDual.eval_continuous (x m)).continuousAt
+    have heq : ∀ᶠ k : ℕ in atTop, S k (x m) = a m := by
+      filter_upwards [eventually_ge_atTop m] with k hk
+      change s k (x m) = a m
+      have horth (n : ℕ) : f n (x m) = if n = m then 1 else 0 := hb.1 n m
+      simp [s, sum_apply, smul_apply, horth, smul_eq_mul, mul_ite, Finset.mem_Iic, hk]
+    exact isClosed_singleton.mem_of_mapClusterPt hcl heq
+  have hsum := (isShrinking_of_isAbsolute hComplete hReflexive hb ha).2 φ.toStrongDual
+  change HasSum (fun m ↦ φ (x m) • f m) φ.toStrongDual (SummationFilter.conditional ℕ) at hsum
+  exact ⟨φ.toStrongDual, by simpa only [hcoeff] using hsum⟩
 
 /-- Paper: Lemma 4.1.2.4, p. 159. If the original space is also nuclear, the
 coefficient basis of the strong dual is shrinking. -/
