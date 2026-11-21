@@ -178,4 +178,100 @@ theorem isBigO_rpow_verticalStrip_interpolate {f : ℂ → ℂ} {l u K k₀ k₁
         hfactor (by positivity) (by positivity)
     _ = _ := by ring
 
+/-- An exponential bound inside a vertical strip and polynomial bounds on both edges
+give a uniform polynomial bound on the strip with the same boundary exponent. -/
+theorem isBigO_pow_verticalStrip_of_exp {f : ℂ → ℂ} {a b B : ℝ} {n : ℕ}
+    (hab : a < b) (hf : DifferentiableOn ℂ f (Complex.re ⁻¹' Icc a b))
+    (hGrowth : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)]
+      fun z ↦ Real.exp (B * |z.im|))
+    (hLeft : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {a})] fun z ↦ |z.im| ^ n)
+    (hRight : f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' {b})] fun z ↦ |z.im| ^ n) :
+    f =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun z ↦ |z.im| ^ n := by
+  obtain ⟨A, hA, hLeft⟩ := norm_le_rpow_on_closedStrip (Nat.cast_nonneg n)
+    (hf.continuousOn.mono (preimage_mono (Icc_subset_Icc_right hab.le)))
+    (by simpa [Real.rpow_natCast] using hLeft)
+  obtain ⟨D, hD, hRight⟩ := norm_le_rpow_on_closedStrip (Nat.cast_nonneg n)
+    (hf.continuousOn.mono (preimage_mono (Icc_subset_Icc_left hab.le)))
+    (by simpa [Real.rpow_natCast] using hRight)
+  let g (z : ℂ) := f z / (z - ((a - 1 : ℝ) : ℂ)) ^ n
+  have hBase (z : ℂ) (hz : a ≤ z.re) : 1 ≤ ‖z - ((a - 1 : ℝ) : ℂ)‖ := by
+    refine le_trans ?_ (Complex.re_le_norm _)
+    simp only [Complex.sub_re, Complex.ofReal_re]
+    linarith
+  have hg : DiffContOnCl ℂ g (Complex.re ⁻¹' Ioo a b) := by
+    refine DifferentiableOn.diffContOnCl
+      (DifferentiableOn.mono (t := Complex.re ⁻¹' Icc a b) ?_ ?_)
+    · change DifferentiableOn ℂ (f / fun z ↦ (z - ((a - 1 : ℝ) : ℂ)) ^ n)
+        (Complex.re ⁻¹' Icc a b)
+      apply hf.div (by fun_prop)
+      intro z hz
+      exact pow_ne_zero _ (norm_pos_iff.mp (zero_lt_one.trans_le (hBase z hz.1)))
+    · exact closure_minimal (preimage_mono Ioo_subset_Icc_self)
+        (isClosed_Icc.preimage Complex.continuous_re)
+  have hIm (z : ℂ) : |z.im| ≤ ‖z - ((a - 1 : ℝ) : ℂ)‖ := by
+    simpa using Complex.abs_im_le_norm (z - ((a - 1 : ℝ) : ℂ))
+  have hEdge (z : ℂ) {C : ℝ} (hC : 0 ≤ C) (hz : a ≤ z.re)
+      (h : ‖f z‖ ≤ C * (1 + |z.im|) ^ (n : ℝ)) : ‖g z‖ ≤ C * 2 ^ n := by
+    have hpos := zero_lt_one.trans_le (hBase z hz)
+    simp only [g, norm_div, norm_pow, div_le_iff₀ (pow_pos hpos _)]
+    rw [Real.rpow_natCast] at h
+    calc
+      ‖f z‖ ≤ C * (1 + |z.im|) ^ n := h
+      _ ≤ C * (2 * ‖z - ((a - 1 : ℝ) : ℂ)‖) ^ n := by
+        exact mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity)
+          (by linarith [hBase z hz, hIm z]) n) hC
+      _ = _ := by rw [mul_pow, mul_assoc]
+  let c := Real.pi / (b - a) / 2
+  have hc : 0 < c := by dsimp [c]; positivity
+  let M := max B 0 / c
+  have hExp : g =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioo a b)]
+      fun z ↦ Real.exp (M * Real.exp (c * |z.im|)) := by
+    have hFilter : atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioo a b) ≤
+        atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b) :=
+      inf_le_inf_left _ (principal_mono.mpr (preimage_mono Ioo_subset_Icc_self))
+    apply (Asymptotics.IsBigO.of_bound 1 ?_ :
+      g =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Ioo a b)] f).trans
+        ((hGrowth.mono hFilter).trans ?_)
+    · rw [eventually_inf_principal]
+      exact Eventually.of_forall fun z (hz : z.re ∈ Ioo a b) ↦ by
+        simp only [g, norm_div, norm_pow, one_mul]
+        exact div_le_self (norm_nonneg _) (one_le_pow₀ (hBase z hz.1.le))
+    · apply Asymptotics.IsBigO.of_bound 1 (Eventually.of_forall fun z ↦ ?_)
+      simp only [Real.norm_eq_abs, abs_of_pos (Real.exp_pos _), one_mul]
+      apply Real.exp_le_exp.mpr
+      calc
+        B * |z.im| ≤ max B 0 * |z.im| :=
+          mul_le_mul_of_nonneg_right (le_max_left _ _) (abs_nonneg _)
+        _ = M * (c * |z.im|) := by simp [M, ← mul_assoc, hc.ne']
+        _ ≤ M * Real.exp (c * |z.im|) := mul_le_mul_of_nonneg_left
+          (by linarith [Real.add_one_le_exp (c * |z.im|)]) (by positivity)
+  apply Asymptotics.IsBigO.of_bound ((max A D * 2 ^ n) * (|b - a + 1| + 1) ^ n)
+  have hHeight : Tendsto (fun z : ℂ ↦ |z.im|)
+      (atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)) atTop := tendsto_inf_left tendsto_comap
+  have hStrip : ∀ᶠ z in atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b), z.re ∈ Icc a b :=
+    eventually_inf_principal.mpr (Eventually.of_forall fun _ hz ↦ hz)
+  filter_upwards [hStrip, hHeight.eventually_ge_atTop (1 : ℝ)] with z hz ht
+  have hBound := PhragmenLindelof.vertical_strip hg
+    ⟨c, half_lt_self (div_pos Real.pi_pos (sub_pos.mpr hab)), M, hExp⟩
+    (fun w hw ↦ (hEdge w hA.le hw.ge (hLeft w (by simp [hw]))).trans
+      (mul_le_mul_of_nonneg_right (le_max_left A D) (by positivity)))
+    (fun w hw ↦ (hEdge w hD.le (hw ▸ hab.le) (hRight w (by simp [hw]))).trans
+      (mul_le_mul_of_nonneg_right (le_max_right A D) (by positivity))) hz.1 hz.2
+  have hPos := pow_pos (zero_lt_one.trans_le (hBase z hz.1)) n
+  simp only [g, norm_div, norm_pow, div_le_iff₀ hPos] at hBound
+  have hSize : ‖z - ((a - 1 : ℝ) : ℂ)‖ ≤ (|b - a + 1| + 1) * |z.im| := by
+    refine (Complex.norm_le_abs_re_add_abs_im _).trans ?_
+    simp only [Complex.sub_re, Complex.ofReal_re, Complex.sub_im, Complex.ofReal_im, sub_zero]
+    have hRe : |z.re - (a - 1)| ≤ |b - a + 1| := by
+      rw [abs_of_nonneg (by linarith [hz.1] : 0 ≤ z.re - (a - 1))]
+      linarith [hz.2, le_abs_self (b - a + 1)]
+    nlinarith [hRe, mul_nonneg (abs_nonneg (b - a + 1)) (sub_nonneg.mpr ht)]
+  rw [Real.norm_of_nonneg (pow_nonneg (abs_nonneg _) _)]
+  calc
+    ‖f z‖ ≤ (max A D * 2 ^ n) * ‖z - ((a - 1 : ℝ) : ℂ)‖ ^ n := hBound
+    _ ≤ (max A D * 2 ^ n) * ((|b - a + 1| + 1) * |z.im|) ^ n :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _) hSize n)
+        (mul_nonneg (hA.le.trans (le_max_left _ _)) (by positivity))
+    _ = _ := by rw [mul_pow, mul_assoc (max A D * 2 ^ n)]
+
 end RiemannMasullo
