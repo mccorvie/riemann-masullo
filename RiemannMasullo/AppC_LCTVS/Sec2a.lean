@@ -6,6 +6,7 @@ public import Mathlib.Analysis.LocallyConvex.Polar
 import Mathlib.Analysis.LocallyConvex.WeakDual
 import Mathlib.Analysis.Normed.Module.Dual
 import Mathlib.Topology.Algebra.Module.UniformConvergence
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.BanachSteinhaus
 
 /-!
 # Mapping spaces and topologies of a duality
@@ -306,7 +307,26 @@ theorem uniformConvergenceCLM_bounded_of_pointwise [QuasiCompleteSpace ℂ E]
     (S : Set (Set E)) (hdir : DirectedOn (· ⊆ ·) S) (hcover : ⋃₀ S = univ)
     (hb : ∀ T ∈ S, IsVonNBounded ℂ T) (H : Set (E →L[ℂ] F))
     (hH : IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F {T | T.Finite}) '' H)) :
-    IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S) '' H) := by sorry
+    IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S) '' H) := by
+  have hpoint (x : E) : IsVonNBounded ℂ (range fun f : H ↦ f.val x) := by
+    have hx := UniformConvergenceCLM.isVonNBounded_image2_apply hH
+      (show {x} ∈ {T : Set E | T.Finite} from finite_singleton x)
+    apply hx.subset
+    rintro _ ⟨f, rfl⟩
+    exact mem_image2_of_mem (mem_image_of_mem _ f.property) (mem_singleton x)
+  have hS : S.Nonempty := by
+    have hz : (0 : E) ∈ ⋃₀ S := hcover.symm ▸ mem_univ _
+    obtain ⟨T, hT, _⟩ := mem_sUnion.mp hz
+    exact ⟨T, hT⟩
+  apply (uniformConvergenceCLM_zero_basis S hS hdir).isVonNBounded_iff.mpr
+  rintro ⟨T, V⟩ ⟨hT, hV⟩
+  have h := isVonNBounded_image2_apply_of_pointwise (fun f : H ↦ f.val) hpoint (hb T hT)
+  filter_upwards [h hV, eventually_ne_cobounded (0 : ℂ)] with c hc hc₀
+  rintro _ ⟨f, hf, rfl⟩
+  rw [mem_smul_set_iff_inv_smul_mem₀ hc₀]
+  intro x hx
+  have hf' : f ∈ range (fun f : H ↦ f.val) := ⟨⟨f, hf⟩, rfl⟩
+  exact (mem_smul_set_iff_inv_smul_mem₀ hc₀ V (f x)).mp (hc (mem_image2_of_mem hf' hx))
 
 /-- Paper: Lemma C.2.1.7, p. 672. For a barrelled source and quasi-complete target, uniform
 convergence on a directed cover by bounded subsets gives a quasi-complete mapping space. -/
