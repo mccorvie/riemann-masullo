@@ -6,6 +6,7 @@ public import Mathlib.MeasureTheory.Constructions.Polish.Basic
 public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 
 /-!
 # Maximal averages on the real line and D-sequences
@@ -71,15 +72,10 @@ theorem realCenteredMaximal_const (c : ℂ) (x : ℝ) :
 -- TODO(paper-gap): In Theorem A.5.1.1(1), the all-radii maximal function need not be finite
 -- anywhere. For f(x) = |x| both local hypotheses hold and the averages grow without bound.
 
--- Local integrability suffices for measurability.
-set_option linter.unusedVariables false in
-/-- Paper: Theorem A.5.1.1(1), p. 566. Under the two local integrability hypotheses,
-the centered maximal function is measurable. Input measurability is for completed
-Lebesgue measure.
-Deviation: The separate almost-everywhere finiteness claim fails for the all-radii operator. -/
-theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f volume)
-    (hlocal : LocallyIntegrable f volume)
-    (hlog : LocallyIntegrable (fun x ↦ (max (Real.log ‖f x‖) 0 : ℝ) • f x) volume) :
+/-- Paper: Proof of Theorem A.5.1.1(1), p. 566. Local integrability makes each
+fixed-radius average continuous and hence the centered maximal function measurable. -/
+private theorem realCenteredMaximal_measurable_of_locallyIntegrable {f : ℝ → ℂ}
+    (hlocal : LocallyIntegrable f volume) :
     Measurable (realCenteredMaximal f) := by
   have hint (a b : ℝ) : IntervalIntegrable (fun y ↦ ‖f y‖) volume a b :=
     (IntegrableOn.intervalIntegrable
@@ -106,6 +102,17 @@ theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f vo
     simp only [ofReal_norm]
   simp only [hlintegral]
   exact (ENNReal.continuous_const_mul (by simp [hr])).comp (ENNReal.continuous_ofReal.comp havg)
+
+set_option linter.unusedVariables false in
+/-- Paper: Theorem A.5.1.1(1), p. 566. Under the two local integrability hypotheses,
+the centered maximal function is measurable. Input measurability is for completed
+Lebesgue measure.
+Deviation: The separate almost-everywhere finiteness claim fails for the all-radii operator. -/
+theorem realCenteredMaximal_measurable {f : ℝ → ℂ} (hf : AEMeasurable f volume)
+    (hlocal : LocallyIntegrable f volume)
+    (hlog : LocallyIntegrable (fun x ↦ (max (Real.log ‖f x‖) 0 : ℝ) • f x) volume) :
+    Measurable (realCenteredMaximal f) :=
+  realCenteredMaximal_measurable_of_locallyIntegrable hlocal
 
 /-- Paper: Theorem A.5.1.1(2), p. 566. The level set of the centered maximal function
 has measure at most three times the L¹ norm divided by the positive level. -/
@@ -180,12 +187,152 @@ theorem realCenteredMaximal_weak_one {f : ℝ → ℂ} (hf : AEMeasurable f volu
       rw [ENNReal.tsum_mul_left, ← hnorm]
       gcongr
 
+/-- Paper: (A.5.1.8), p. 567. Truncating the input below a positive level bounds the
+measure of the maximal function's level set at twice that level by a weighted tail integral. -/
+private theorem realCenteredMaximal_tail {f : ℝ → ℂ} (hf : AEMeasurable f volume)
+    {p : ℝ} (hp : 1 < p) (hLp : MemLp f (ENNReal.ofReal p) volume) {t : ℝ} (ht : 0 < t) :
+    volume {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} ≤
+      ENNReal.ofReal (3 / t) * ∫⁻ x in {x | ENNReal.ofReal t < ‖f x‖ₑ}, ‖f x‖ₑ := by
+  classical
+  let s : Set ℝ := {x | ENNReal.ofReal t < ‖f x‖ₑ}
+  let g := s.indicator f
+  have hs : NullMeasurableSet s volume :=
+    nullMeasurableSet_lt aemeasurable_const hf.eNorm
+  have ht₀ : ENNReal.ofReal t ≠ 0 := by simp [ht]
+  have hsFin : volume s ≠ ∞ := by
+    apply (measure_mono (fun x (hx : x ∈ s) ↦ (show ENNReal.ofReal t < ‖f x‖ₑ from hx).le)).trans_lt
+      (hLp.meas_ge_lt_top'_eNorm (by positivity) ENNReal.ofReal_ne_top ht₀ (by simp)) |>.ne
+  have hp₁ : 1 ≤ ENNReal.ofReal p := by
+    simpa using ENNReal.ofReal_le_ofReal hp.le
+  have hgLp : MemLp g (ENNReal.ofReal p) volume :=
+    (memLp_indicator_iff_restrict hs).2 (hLp.restrict s)
+  have hg : Integrable g volume := memLp_one_iff_integrable.mp
+    (hgLp.mono_exponent_of_measure_support_ne_top (fun x hx ↦ indicator_of_notMem hx f) hsFin hp₁)
+  have hnorm (y : ℝ) : ‖f y‖ₑ ≤ ‖g y‖ₑ + ENNReal.ofReal t := by
+    by_cases hy : y ∈ s
+    · simp [g, hy]
+    · simpa [g, hy] using le_of_not_gt (show ¬ ENNReal.ofReal t < ‖f y‖ₑ from hy)
+  have hmax (x : ℝ) : realCenteredMaximal f x ≤ realCenteredMaximal g x + ENNReal.ofReal t := by
+    unfold realCenteredMaximal
+    refine iSup_le fun r ↦ ?_
+    let I := Ioc (x - (r : ℝ)) (x + (r : ℝ))
+    let len := ENNReal.ofReal (2 * (r : ℝ))
+    have hr : 0 < (r : ℝ) := r.property
+    have hlen : volume I = len := by
+      dsimp only [I, len]
+      rw [Real.volume_Ioc, show x + (r : ℝ) - (x - (r : ℝ)) = 2 * r by ring]
+    change len⁻¹ * (∫⁻ y in I, ‖f y‖ₑ) ≤ _
+    calc
+      _ ≤ len⁻¹ * (∫⁻ y in I, ‖g y‖ₑ + ENNReal.ofReal t) := by
+        gcongr
+        exact hnorm _
+      _ = len⁻¹ * (∫⁻ y in I, ‖g y‖ₑ) + ENNReal.ofReal t := by
+        rw [lintegral_add_left' hg.aestronglyMeasurable.eNorm.restrict,
+          setLIntegral_const, hlen, mul_add, mul_left_comm len⁻¹,
+          ENNReal.inv_mul_cancel (by simp [hr]) ENNReal.ofReal_ne_top, mul_one]
+      _ ≤ _ := by
+        gcongr
+        exact le_iSup (fun r : Ioi (0 : ℝ) ↦ (ENNReal.ofReal (2 * (r : ℝ)))⁻¹ *
+          ∫⁻ y in Ioc (x - (r : ℝ)) (x + (r : ℝ)), ‖g y‖ₑ) r
+  have hsubset : {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} ⊆
+      {x | ENNReal.ofReal t < realCenteredMaximal g x} := by
+    intro x hx
+    change ENNReal.ofReal (2 * t) < realCenteredMaximal f x at hx
+    rw [two_mul, ENNReal.ofReal_add ht.le ht.le] at hx
+    exact lt_of_not_ge fun h ↦
+      (hx.trans_le ((hmax x).trans (add_le_add_left h (ENNReal.ofReal t)))).false
+  refine (measure_mono hsubset).trans ?_
+  have hweak := realCenteredMaximal_weak_one hg.aestronglyMeasurable.aemeasurable hg ht
+  rwa [eLpNorm_one_eq_lintegral_eNorm hg.aestronglyMeasurable, show g = s.indicator f from rfl,
+    (show (fun x ↦ ‖s.indicator f x‖ₑ) = s.indicator (fun x ↦ ‖f x‖ₑ) by
+      funext x
+      exact eNorm_indicator_eq_indicator_eNorm f x), lintegral_indicator₀ hs] at hweak
+
 /-- Paper: Theorem A.5.1.1(3), p. 566. For a finite exponent p greater than one,
 the p-th moment of the centered maximal function has the displayed strong-type bound. -/
 theorem realCenteredMaximal_strong {f : ℝ → ℂ} (hf : AEMeasurable f volume) {p : ℝ}
     (hp : 1 < p) (hLp : MemLp f (ENNReal.ofReal p) volume) :
     (∫⁻ x, realCenteredMaximal f x ^ p) ≤
-      ENNReal.ofReal ((2 : ℝ) ^ p * 3 * p / (p - 1)) * ∫⁻ x, ‖f x‖ₑ ^ p := by sorry
+      ENNReal.ofReal ((2 : ℝ) ^ p * 3 * p / (p - 1)) * ∫⁻ x, ‖f x‖ₑ ^ p := by
+  have hp₀ : 0 < p := by positivity
+  have hp₁ : 0 < p - 1 := sub_pos.mpr hp
+  have hloc := hLp.locallyIntegrable (by simpa using ENNReal.ofReal_le_ofReal hp.le)
+  let M (x : ℝ) := realCenteredMaximal f x / 2
+  have hM : Measurable M :=
+    (realCenteredMaximal_measurable_of_locallyIntegrable hloc).div_const 2
+  -- Layer cake for this weighted measure accounts for the factor ‖f x‖ₑ in the tail.
+  let ν := (volume : Measure ℝ).withDensity (fun x ↦ ‖f x‖ₑ)
+  have htail (t : ℝ) (ht : 0 < t) :
+      volume {x | ENNReal.ofReal t < M x} ≤
+        ENNReal.ofReal (3 / t) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ} := by
+    have hlevel : {x | ENNReal.ofReal t < M x} =
+        {x | ENNReal.ofReal (2 * t) < realCenteredMaximal f x} := by
+      ext x
+      simp only [mem_ofPred_eq, M, ENNReal.lt_div_iff_mul_lt (Or.inl two_ne_zero)
+        (Or.inl ENNReal.ofNat_ne_top), two_mul, ENNReal.ofReal_add ht.le ht.le, mul_two]
+    rw [hlevel, withDensity_apply']
+    exact realCenteredMaximal_tail hf hp hLp ht
+  have hweighted :
+      ENNReal.ofReal (p - 1) * (∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖f x‖ₑ} *
+        ENNReal.ofReal (t ^ (p - 2))) = ∫⁻ x, ‖f x‖ₑ ^ p := by
+    have hfNorm := hf.eNorm
+    have h := lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul ν
+      (hfNorm.mono_ac (withDensity_absolutelyContinuous _ _)) hp₁
+    rw [show p - 1 - 1 = p - 2 by ring] at h
+    rw [← h, lintegral_withDensity_eq_lintegral_mul₀ hfNorm (hfNorm.pow_const _)]
+    refine lintegral_congr fun x ↦ ?_
+    calc
+      _ = ‖f x‖ₑ ^ (1 : ℝ) * ‖f x‖ₑ ^ (p - 1) := by
+        rw [Pi.mul_apply, ENNReal.rpow_one]
+      _ = _ := by
+        rw [← ENNReal.rpow_add_of_nonneg 1 (p - 1) zero_le_one hp₁.le,
+          show 1 + (p - 1) = p by ring]
+  have hrescale (x : ℝ) : realCenteredMaximal f x ^ p =
+      ENNReal.ofReal ((2 : ℝ) ^ p) * M x ^ p := by
+    have h : 2 * M x = realCenteredMaximal f x := by
+      rw [mul_comm]
+      exact ENNReal.div_mul_cancel two_ne_zero ENNReal.ofNat_ne_top
+    calc
+      _ = (2 * M x) ^ p := by rw [h]
+      _ = _ := by
+        rw [ENNReal.mul_rpow_of_nonneg _ _ hp₀.le,
+          ← ENNReal.ofReal_rpow_of_nonneg (by norm_num : 0 ≤ (2 : ℝ)) hp₀.le,
+          ENNReal.ofReal_ofNat]
+  simp_rw [hrescale]
+  rw [lintegral_const_mul _ (hM.pow_const p),
+    lintegral_ennreal_rpow_eq_lintegral_meas_lt_mul volume hM.aemeasurable hp₀, ← mul_assoc]
+  calc
+    _ ≤ (ENNReal.ofReal ((2 : ℝ) ^ p) * ENNReal.ofReal p) *
+        (3 * ∫⁻ t in Ioi (0 : ℝ), ν {x | ENNReal.ofReal t < ‖f x‖ₑ} *
+          ENNReal.ofReal (t ^ (p - 2))) := by
+      gcongr
+      rw [← lintegral_const_mul' _ _ ENNReal.ofNat_ne_top]
+      apply lintegral_mono_ae
+      filter_upwards [self_mem_ae_restrict (measurableSet_Ioi (a := (0 : ℝ)))] with t ht
+      have ht' : 0 < t := ht
+      have hweight : ENNReal.ofReal (3 / t) * ENNReal.ofReal (t ^ (p - 1)) =
+          (3 : ℝ≥0∞) * ENNReal.ofReal (t ^ (p - 2)) := by
+        rw [← ENNReal.ofReal_mul (by positivity : 0 ≤ 3 / t), ← ENNReal.ofReal_ofNat,
+          ← ENNReal.ofReal_mul (by norm_num : 0 ≤ (3 : ℝ))]
+        congr 1
+        rw [show t ^ (p - 2) = t ^ (p - 1) / t by
+          rw [show p - 2 = p - 1 - 1 by ring, Real.rpow_sub ht', Real.rpow_one]]
+        ring
+      calc
+        _ ≤ (ENNReal.ofReal (3 / t) * ν {x | ENNReal.ofReal t < ‖f x‖ₑ}) *
+            ENNReal.ofReal (t ^ (p - 1)) := by gcongr; exact htail t ht'
+        _ = _ := by rw [mul_right_comm, hweight, mul_right_comm, mul_assoc]
+    _ = _ := by
+      have h := congrArg (fun a ↦ (ENNReal.ofReal (p - 1))⁻¹ * a) hweighted
+      rw [ENNReal.inv_mul_cancel_left (ENNReal.ofReal_ne_zero_iff.mpr hp₁)
+        ENNReal.ofReal_ne_top] at h
+      rw [h, show (2 : ℝ) ^ p * 3 * p / (p - 1) =
+        ((2 : ℝ) ^ p * p) * (3 * (p - 1)⁻¹) by ring,
+        ENNReal.ofReal_mul (by positivity : 0 ≤ (2 : ℝ) ^ p * p),
+        ENNReal.ofReal_mul (by positivity : 0 ≤ (2 : ℝ) ^ p),
+        ENNReal.ofReal_mul (by norm_num : 0 ≤ (3 : ℝ)), ENNReal.ofReal_ofNat,
+        ENNReal.ofReal_inv_of_pos hp₁]
+      simp only [mul_assoc]
 
 /-- Paper: Theorem A.5.1.3, p. 568. Centered averages of a locally integrable
 function converge to its value at almost every point of the real line. -/
