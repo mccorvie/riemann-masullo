@@ -411,6 +411,23 @@ theorem finite_rectanglePoles {f : ℂ → ℂ} {a b σ₁ σ₂ t₁ t₂ : ℝ
   rw [MeromorphicOn.divisor_apply hmer hzK, Ne, WithTop.untop₀_eq_zero]
   exact not_or.mpr ⟨ne_of_lt hz.2.2, ne_top_of_lt (hz.2.2.trans_le le_top)⟩
 
+/-- Paper: Equation (B.3.2.3), p. 606. The counterclockwise boundary integral
+of a meromorphic function on a closed rectangle is `2πi` times the sum of the
+residues at its poles.
+Deviation: The finite index set may also contain regular interior points,
+whose residues vanish. -/
+theorem rectangleIntegral_eq_sum_complexResidue {g : ℂ → ℂ} {σ₁ σ₂ t₁ t₂ : ℝ}
+    (hσ : σ₁ < σ₂) (ht : t₁ < t₂) (S : Finset ℂ)
+    (hg : MeromorphicOn g (Icc σ₁ σ₂ ×ℂ Icc t₁ t₂))
+    (hInside : ∀ ρ ∈ S, ρ ∈ Ioo σ₁ σ₂ ×ℂ Ioo t₁ t₂)
+    (hOutside : ∀ ρ ∈ Icc σ₁ σ₂ ×ℂ Icc t₁ t₂, ρ ∉ S → 0 ≤ meromorphicOrderAt g ρ) :
+    (∫ x in σ₁..σ₂, g (verticalPoint x t₁)) -
+      (∫ x in σ₁..σ₂, g (verticalPoint x t₂)) +
+      Complex.I * (∫ y in t₁..t₂, g (verticalPoint σ₂ y)) -
+      Complex.I * (∫ y in t₁..t₂, g (verticalPoint σ₁ y)) =
+      twoPiI * ∑ ρ ∈ S, complexResidue g ρ := by
+  sorry
+
 section AsymptoticResidue
 
 variable {f Φ : ℂ → ℂ} {a b a' b' σ₁ σ₂ : ℝ} {T : ℤ → ℝ}
@@ -436,7 +453,122 @@ theorem tendsto_rectangleResidueSum :
           hT.2.1 hσ₁ hσ₂).toFinset, complexResidue (fun z ↦ Φ z * f z) ρ)
       atTop
       (𝓝 ((verticalLineIntegral (fun z ↦ Φ z * f z) σ₂ -
-        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by sorry
+        verticalLineIntegral (fun z ↦ Φ z * f z) σ₁) / twoPiI)) := by
+  let g (z : ℂ) := Φ z * f z
+  let lower (k : ℕ) := T (-(k : ℤ))
+  let upper (k : ℕ) := T (k : ℤ)
+  let horizontal (j : ℤ) := ∫ x in σ₁..σ₂, g (verticalPoint x (T j))
+  let vertical (σ : ℝ) (k : ℕ) :=
+    Complex.I * (∫ y in lower k..upper k, g (verticalPoint σ y))
+  have hk : ∀ᶠ k : ℕ in atTop, 0 < k := eventually_gt_atTop 0
+  have hIndex : Tendsto (fun k : ℕ ↦ (k : ℤ)) atTop atAbsInfty := by
+    apply tendsto_comap_iff.mpr
+    simpa [Function.comp_def, abs_of_nonneg (Int.natCast_nonneg _)] using
+      (tendsto_natCast_atTop_atTop (R := ℤ))
+  have hNegIndex : Tendsto (fun k : ℕ ↦ -(k : ℤ)) atTop atAbsInfty := by
+    apply tendsto_comap_iff.mpr
+    simpa only [Function.comp_def, abs_neg] using (tendsto_comap_iff.mp hIndex)
+  have hUpper : Tendsto upper atTop atTop :=
+    (hT.2.2.2.2.1.comp hIndex).congr' (hk.mono fun k hk ↦
+      abs_of_pos (hHeights k hk).2)
+  have hLower : Tendsto lower atTop atBot :=
+    (tendsto_neg_atTop_atBot.comp (hT.2.2.2.2.1.comp hNegIndex)).congr'
+      (hk.mono fun k hk ↦ neg_eq_iff_eq_neg.mpr (abs_of_neg (hHeights k hk).1))
+  have hVertical (σ : ℝ) (hσab : σ ∈ Ioo a b) (hσside : σ ∈ ({σ₁, σ₂} : Set ℝ)) :
+      Tendsto (vertical σ) atTop (𝓝 (verticalLineIntegral g σ)) := by
+    obtain ⟨hcont, hgrowth⟩ := hSides σ hσside
+    have hi : Complex.VerticalIntegrable g σ :=
+      verticalIntegrable_mul_of_polynomialGrowth hΦ
+        ⟨ha.trans hσab.1, hσab.2.trans hb⟩ hcont hgrowth
+    exact (intervalIntegral_tendsto_integral hi hLower hUpper).const_mul Complex.I
+  have hHorizontal : Tendsto horizontal atAbsInfty (𝓝 0) := by
+    let ε := min (a - a') (b' - b) / 2
+    have hε : 0 < ε := half_pos (lt_min (sub_pos.mpr ha) (sub_pos.mpr hb))
+    have hLeft : a' < a - ε := by dsimp [ε]; linarith [min_le_left (a - a') (b' - b)]
+    have hRight : b + ε < b' := by dsimp [ε]; linarith [min_le_right (a - a') (b' - b)]
+    have hΦsmall : UniformlySchwartzOnStrip Φ (a - ε) (b + ε) := by
+      refine ⟨by linarith [hT.1], hΦ.2.1.mono ?_, ?_⟩
+      · exact preimage_mono (Ioo_subset_Ioo hLeft.le hRight.le)
+      · intro δ hδ hδ' N hN
+        obtain ⟨C, hC, hbound⟩ := hΦ.2.2 δ hδ
+          (by linarith : a' + δ < b' - δ) N hN
+        exact ⟨C, hC, hbound.mono fun y hy x hx ↦
+          hy x ⟨by linarith [hx.1], by linarith [hx.2]⟩⟩
+    obtain ⟨hIntegrable, hLimit⟩ :=
+      tendsto_horizontalIntegral_of_slowGrowthNearPoles hT ε hε hΦsmall
+    apply squeeze_zero_norm' _ hLimit
+    have hLarge : ∀ᶠ j : ℤ in atAbsInfty, 2 ≤ |j| :=
+      tendsto_comap.eventually (eventually_ge_atTop 2)
+    filter_upwards [hLarge] with j hj
+    exact (intervalIntegral.norm_integral_le_integral_norm hσ.le).trans
+      (intervalIntegral.integral_mono_interval hσ₁.le hσ.le hσ₂.le
+        (Eventually.of_forall (fun _ ↦ norm_nonneg _)) (hIntegrable j hj))
+  have hVerticalOrder (σ y : ℝ) (hcont : Continuous (verticalTrace f σ)) :
+      0 ≤ meromorphicOrderAt f (verticalPoint σ y) := by
+    by_contra! hpole
+    have hline : Tendsto (verticalPoint σ) (𝓝[≠] y) (𝓝[≠] verticalPoint σ y) := by
+      apply tendsto_nhdsWithin_iff.mpr
+      refine ⟨(show Continuous (verticalPoint σ) by fun_prop).continuousAt.tendsto.mono_left
+        nhdsWithin_le_nhds, ?_⟩
+      filter_upwards [self_mem_nhdsWithin (s := {y}ᶜ)] with v hv
+      exact fun heq ↦ hv (by simpa using congrArg Complex.im heq)
+    have hPoleLimit := (tendsto_cobounded_of_meromorphicOrderAt_neg hpole).comp hline
+    exact not_tendsto_atTop_of_tendsto_nhds (hcont.continuousAt.continuousWithinAt.tendsto.norm)
+      (tendsto_norm_atTop_iff_cobounded.mpr hPoleLimit)
+  have hIdentity : ∀ᶠ k : ℕ in atTop,
+      (horizontal (-(k : ℤ)) - horizontal (k : ℤ) + vertical σ₂ k - vertical σ₁ k) /
+          twoPiI =
+        ∑ ρ ∈ (finite_rectanglePoles (t₁ := lower k) (t₂ := upper k)
+          hT.2.1 hσ₁ hσ₂).toFinset, complexResidue g ρ := by
+    filter_upwards [hk] with k hpos
+    let hFinite := finite_rectanglePoles (t₁ := lower k) (t₂ := upper k) hT.2.1 hσ₁ hσ₂
+    let S := hFinite.toFinset
+    have hgΦ (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) : AnalyticAt ℂ Φ z :=
+      hΦ.2.1.analyticAt ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+        ⟨ha.trans (hσ₁.trans_le hz.1), (hz.2.trans_lt hσ₂).trans hb⟩)
+    have hf (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) : MeromorphicAt f z :=
+      hT.2.1 z ⟨hσ₁.trans_le hz.1, hz.2.trans_lt hσ₂⟩
+    have hHorizontalOrder (j : ℤ) (z : ℂ) (hz : z.re ∈ Icc σ₁ σ₂) (hy : z.im = T j) :
+        0 ≤ meromorphicOrderAt f z := by
+      obtain ⟨δ, hδ, hd⟩ := hT.2.2.2.2.2.2.2.1 j
+      apply AnalyticAt.meromorphicOrderAt_nonneg
+      apply hd.analyticAt
+      apply ((isOpen_Ioo.preimage Complex.continuous_re).inter
+        (isOpen_Ioo.preimage Complex.continuous_im)).mem_nhds
+      exact ⟨⟨hσ₁.trans_le hz.1, hz.2.trans_lt hσ₂⟩, by
+        change T j - δ < z.im ∧ z.im < T j + δ
+        rw [hy]
+        exact ⟨sub_lt_self _ hδ, lt_add_of_pos_right _ hδ⟩⟩
+    have ht : lower k < upper k := (hHeights k hpos).1.trans (hHeights k hpos).2
+    have hrect := rectangleIntegral_eq_sum_complexResidue (g := g) hσ ht S
+      (fun z hz ↦ (hgΦ z hz.1).meromorphicAt.mul (hf z hz.1))
+      (fun ρ hρ ↦ ⟨(hFinite.mem_toFinset.mp hρ).1, (hFinite.mem_toFinset.mp hρ).2.1⟩) ?_
+    · have htwoPiI : twoPiI ≠ 0 := by simp [Real.pi_ne_zero, Complex.I_ne_zero]
+      change _ / twoPiI = ∑ ρ ∈ S, complexResidue g ρ
+      exact (div_eq_iff htwoPiI).mpr (by simpa only [mul_comm _ twoPiI] using hrect)
+    · intro z hz hzS
+      rw [show meromorphicOrderAt g z = meromorphicOrderAt Φ z + meromorphicOrderAt f z
+        from meromorphicOrderAt_mul (hgΦ z hz.1).meromorphicAt (hf z hz.1)]
+      apply add_nonneg (hgΦ z hz.1).meromorphicOrderAt_nonneg
+      rcases hz with ⟨⟨h₁, h₂⟩, ⟨h₃, h₄⟩⟩
+      rcases h₁.eq_or_lt with h₁ | h₁
+      · have hz' : z = verticalPoint σ₁ z.im := by rw [h₁]; exact (Complex.re_add_im z).symm
+        rw [hz']
+        exact hVerticalOrder σ₁ z.im (hSides σ₁ (by simp)).1
+      rcases h₂.eq_or_lt with h₂ | h₂
+      · have hz' : z = verticalPoint σ₂ z.im := by rw [← h₂]; exact (Complex.re_add_im z).symm
+        rw [hz']
+        exact hVerticalOrder σ₂ z.im (hSides σ₂ (by simp)).1
+      rcases h₃.eq_or_lt with h₃ | h₃
+      · exact hHorizontalOrder (-(k : ℤ)) z ⟨h₁.le, h₂.le⟩ h₃.symm
+      rcases h₄.eq_or_lt with h₄ | h₄
+      · exact hHorizontalOrder (k : ℤ) z ⟨h₁.le, h₂.le⟩ h₄
+      exact le_of_not_gt fun hzOrder ↦ hzS (hFinite.mem_toFinset.mpr
+        ⟨⟨h₁, h₂⟩, ⟨h₃, h₄⟩, hzOrder⟩)
+  have hLim := (((hHorizontal.comp hNegIndex).sub (hHorizontal.comp hIndex)).add
+    (hVertical σ₂ ⟨hσ₁.trans hσ, hσ₂⟩ (by simp))).sub
+    (hVertical σ₁ ⟨hσ₁, hσ.trans hσ₂⟩ (by simp))
+  simpa only [zero_sub, neg_zero, zero_add] using (hLim.div_const twoPiI).congr' hIdentity
 
 /-- Paper: Theorem B.3.2.1(1)–(2), p. 606. If the poles between the chosen
 lines are simple, the finite sums with weights `Φ ρ * complexResidue f ρ`
