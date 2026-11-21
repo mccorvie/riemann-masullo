@@ -267,13 +267,6 @@ meromorphically to the complex plane. We use Mathlib's normal form at poles. -/
 theorem completedHeckeL_exists_continuation (χ : U[F]) :
     ∃ L : ℂ → ℂ, MeromorphicNFOn L univ ∧ ∀ s : halfPlane, L s = completedHeckeL χ s := by sorry
 
-/-- Paper: Proposition 3.2.1.3(1), p. 123. When the restriction to norm-one
-classes is nontrivial, the continuation is entire. -/
-theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
-    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
-    Differentiable ℂ L := by sorry
-
 /-- Paper: Proposition 3.2.1.3(2), p. 123. If the character is trivial on norm-one
 classes, there is a unique real norm-twist parameter and the two indicated poles
 are simple. The continuation is analytic elsewhere.
@@ -781,6 +774,54 @@ Deviation: Entireness concerns the continuation of the integral from its region 
 theorem globalIdelicZFunction_entire_of_nontrivial (f : ℬ[F]) (χ : U[F])
     (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
     Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
+
+/-- Paper: §3.4.3.1, p. 152. On the half-plane of absolute convergence, the idelic
+zeta integral of a normalized adelic Gaussian gives the completed Euler product.
+Deviation: The finite Tamagawa unit masses are absorbed by scaling the test function.
+The complex Gaussian uses the opposite angular weight to the character. -/
+theorem exists_globalIdelicZetaIntegral_eq_completedHeckeL (χ : U[F]) :
+    ∃ f : ℬ[F], ∀ s : halfPlane,
+      globalIdelicZetaIntegral f (ideleClassNormTwist χ s) = completedHeckeL χ s := by
+  sorry
+
+/-- Paper: Proposition 3.2.1.3(1), p. 123. When the restriction to norm-one
+classes is nontrivial, the continuation is entire. -/
+theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (h : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
+    Differentiable ℂ L := by
+  obtain ⟨f, hf⟩ := exists_globalIdelicZetaIntegral_eq_completedHeckeL χ
+  let Z (s : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ s)
+  have hZ : Differentiable ℂ Z := globalIdelicZFunction_entire_of_nontrivial f χ hχ
+  have hZNF : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hEq : EqOn L Z halfPlane := by
+    intro s hs
+    have habs : quasiCharacterAbscissa (ideleClassNorm F)
+        (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F))
+        (ideleClassNormTwist χ s) = s.re :=
+      quasiCharacterAbscissa_of_unitary_twist (ideleClassNorm F) _ _ _ χ s (fun _ ↦ rfl)
+    have hmem : ideleClassNormTwist χ s ∈ rightHalf := by
+      change 1 < quasiCharacterAbscissa _ _ _ _
+      rwa [habs]
+    exact (h ⟨s, hs⟩).trans
+      ((globalIdelicZFunction_eq_integral f hmem).trans (hf ⟨s, hs⟩)).symm
+  have h₂ : ∀ᶠ s in 𝓝 (2 : ℂ), s ∈ halfPlane :=
+    (isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num)
+  have hnear : L =ᶠ[𝓝[≠] (2 : ℂ)] Z :=
+    (h₂.mono hEq).filter_mono nhdsWithin_le_nhds
+  have htop : meromorphicOrderAt (L - Z) (2 : ℂ) = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp hnear)
+  have hsub := hL.meromorphicOn.sub hZNF.meromorphicOn
+  -- The difference vanishes as a meromorphic germ everywhere by connectedness.
+  have hident : L = Z := by
+    funext s
+    have horder := hsub.meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+      (mem_univ (2 : ℂ)) (mem_univ s) htop
+    have hlocal : L =ᶠ[𝓝[≠] s] Z :=
+      eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp horder)
+    exact (((hL (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+      (hZNF (mem_univ s))).mp hlocal).eq_of_nhds
+  rwa [hident]
 
 section HomogeneousMellin
 
