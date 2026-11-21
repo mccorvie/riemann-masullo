@@ -1141,7 +1141,31 @@ variable [Measure.IsHaarMeasure μ]
 defines a complex-linear map in the test function. -/
 theorem sLocalHomogeneousAdelicTheta_isLinear (ω : PontryaginDual J₁) :
     IsLinearMap ℂ (fun f : ℬₛ ↦ (⟨fun g ↦ ∫ h, classIntegrand ω f g h ∂μ,
-      sLocalHomogeneousAdelicTheta_continuous F S μ ω f⟩ : C(Jₛ, ℂ))) := by sorry
+      sLocalHomogeneousAdelicTheta_continuous F S μ ω f⟩ : C(Jₛ, ℂ))) := by
+  have linearIntegral {E X Y H : Type _} [AddCommMonoid E] [Module ℂ E]
+      [TopologicalSpace X] [TopologicalSpace Y] [MeasurableSpace H]
+      (ν : Measure H) (p : X → Y) (hp : Surjective p) (θ : E →ₗ[ℂ] C(X, ℂ))
+      (desc : E → C(Y, ℂ)) (hdesc : ∀ f x, desc f (p x) = θ f x)
+      (shift : Y → H → Y) (weight : H → ℂ)
+      (hint : ∀ f g, Integrable (fun h ↦ desc f (shift g h) * weight h) ν)
+      (hcont : ∀ f, Continuous (fun g ↦ ∫ h, desc f (shift g h) * weight h ∂ν)) :
+      IsLinearMap ℂ (fun f ↦ (⟨fun g ↦ ∫ h, desc f (shift g h) * weight h ∂ν,
+        hcont f⟩ : C(Y, ℂ))) := by
+    refine ⟨fun f₁ f₂ ↦ ContinuousMap.ext fun g ↦ ?_, fun c f ↦ ContinuousMap.ext fun g ↦ ?_⟩
+    · refine (integral_congr_ae (Eventually.of_forall fun (h : H) ↦ ?_)).trans
+        (integral_add (hint f₁ g) (hint f₂ g))
+      obtain ⟨x, hx⟩ := hp (shift g h)
+      simp only [← hx, hdesc, θ.map_add, ContinuousMap.add_apply, add_mul]
+    · refine (integral_congr_ae (Eventually.of_forall fun (h : H) ↦ ?_)).trans
+        (integral_smul c (fun h ↦ desc f (shift g h) * weight h))
+      obtain ⟨x, hx⟩ := hp (shift g h)
+      simp only [← hx, hdesc, θ.map_smul, ContinuousMap.smul_apply, smul_mul_assoc]
+  exact linearIntegral (E := ℬₛ) (X := Iₛ) (Y := Jₛ) (H := J₁)
+    μ classOf QuotientGroup.mk_surjective
+    (sLocalAdelicTheta F S) (sLocalAdelicThetaOnClasses F S) (sLocalAdelicThetaOnClasses_mk F S)
+    (fun g h ↦ g * h.val) (fun h ↦ (ω h : ℂ))
+    (sLocalHomogeneousAdelicTheta_integrable F S μ ω)
+    (sLocalHomogeneousAdelicTheta_continuous F S μ ω)
 
 /-- Paper: Definition 2.3.1.3, p. 104. Homogeneous S-local theta integrates
 theta at the class product `g * h` against the character on norm-one classes.
