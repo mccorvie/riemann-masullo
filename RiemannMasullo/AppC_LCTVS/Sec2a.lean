@@ -234,7 +234,10 @@ for uniform convergence on all bounded subsets of a normed space. -/
 theorem boundedConvergenceCLM_opNorm_basis :
     let S := {T : Set E | IsVonNBounded ℂ T}
     (𝓝 (0 : E →Lᵤ[ℂ, S] F)).HasBasis (fun r : ℝ ↦ 0 < r)
-      (fun r ↦ {f | ‖(UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S).symm f‖ < r}) := by sorry
+      (fun r ↦ {f | ‖(UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S).symm f‖ < r}) := by
+  -- Mathlib equips ordinary continuous linear maps with the bounded-convergence topology.
+  change (𝓝 (0 : E →L[ℂ] F)).HasBasis (fun r : ℝ ↦ 0 < r) (fun r ↦ {f | ‖f‖ < r})
+  exact NormedAddGroup.nhds_zero_basis_norm_lt
 
 end OperatorNorm
 
