@@ -464,13 +464,24 @@ theorem equicontinuousAt_zero_iff_mapsTo :
   · rintro ⟨U, hU, h⟩
     exact ⟨U, hU, fun x hx f ↦ h f f.2 hx⟩
 
+-- Retain the paper's dense-span hypothesis. Boundedness follows test set by test set.
+set_option linter.unusedVariables false in
 include heq in
 /-- Paper: Lemma C.2.1.9(1), p. 672. An equicontinuous set is bounded for uniform
 convergence on bounded test sets whose union spans a dense subspace. -/
 theorem equicontinuous_isVonNBounded_uniformConvergenceCLM
     (S : Set (Set E)) (hb : ∀ T ∈ S, IsVonNBounded ℂ T)
     (hdense : Dense (Submodule.span ℂ (⋃₀ S) : Set E)) :
-    IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S) '' A) := by sorry
+    IsVonNBounded ℂ ((UniformConvergenceCLM.ofFun (RingHom.id ℂ) F S) '' A) := by
+  apply UniformConvergenceCLM.isVonNBounded_iff.mpr
+  intro T hT V hV
+  obtain ⟨U, hU, hmaps⟩ := (equicontinuousAt_zero_iff_mapsTo A).mp heq V hV
+  apply (absorbs_iff_eventually_nhds_zero (mem_of_mem_nhds hV)).mpr
+  filter_upwards [(hb T hT hU).eventually_nhds_zero (mem_of_mem_nhds hU)] with c hc
+  rintro _ ⟨_, ⟨f, hf, rfl⟩, x, hx, rfl⟩
+  change c • f x ∈ V
+  rw [← map_smul]
+  exact hmaps f hf (hc hx)
 
 include heq in
 /-- Paper: Lemma C.2.1.9(2), p. 672. Pointwise and precompact convergence induce the
