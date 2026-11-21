@@ -1795,10 +1795,69 @@ theorem injectiveTensorMap_isEmbedding (hf : IsEmbedding f) (hg : IsEmbedding g)
 theorem completedInjectiveTensorMap_isEmbedding (hf : IsEmbedding f) (hg : IsEmbedding g) :
     IsEmbedding (Completion.map (injectiveTensorMap f.toLinearMap g.toLinearMap)) := by sorry
 
+omit lcE lcF sE sF sG sH in
+open scoped Pointwise in
+/-- The pure tensor map into the injective tensor product is continuous in each factor. -/
+private theorem injectiveTensor_tmul_separatelyContinuous :
+    (∀ x : G, Continuous (Y := InjectiveTensor G H) (fun y : H ↦ x ⊗ₜ[ℂ] y)) ∧
+    (∀ y : H, Continuous (Y := InjectiveTensor G H) (fun x : G ↦ x ⊗ₜ[ℂ] y)) := by
+  let : IsTopologicalAddGroup G := PolynormableSpace.isTopologicalAddGroup ℂ G
+  let : IsTopologicalAddGroup H := PolynormableSpace.isTopologicalAddGroup ℂ H
+  let : ContinuousSMul ℂ G := (PolynormableSpace.withSeminorms ℂ G).continuousSMul
+  let : ContinuousSMul ℂ H := (PolynormableSpace.withSeminorms ℂ H).continuousSMul
+  let t : G →ₗ[ℂ] H →ₗ[ℂ] InjectiveTensor G H := TensorProduct.mk ℂ G H
+  have hunit (U : {U : Set G // U ∈ 𝓝 0}) (V : {V : Set H // V ∈ 𝓝 0})
+      {x : G} (hx : x ∈ U.val) {y : H} (hy : y ∈ V.val) :
+      injectiveTensorSeminorm U V (x ⊗ₜ[ℂ] y) ≤ 1 := by
+    refine (injectiveTensorSeminorm_le_iff U V _ _).2 fun φ hφ ψ hψ ↦ ?_
+    rw [tensorDualForm_tmul, norm_mul]
+    exact (mul_le_of_le_one_right (norm_nonneg _) ((StrongDual.mem_polar_iff ℂ _).1 hψ y hy)).trans
+      ((StrongDual.mem_polar_iff ℂ _).1 hφ x hx)
+  constructor
+  · intro x
+    change Continuous (t x)
+    refine (withGeneratingSeminorms_spec (G ⊗[ℂ] H) _).continuous_of_continuous_comp (t x)
+      fun ⟨U, V⟩ ↦ ?_
+    obtain ⟨a, x', hx', rfl⟩ : ∃ a : ℂ, x ∈ a • U.val :=
+      by simpa using (absorbent_nhds_zero (𝕜 := ℂ) U.property x).exists
+    refine Seminorm.continuous' (r := ‖a‖) (Filter.mem_of_superset V.property fun y hy ↦ ?_)
+    rw [Seminorm.mem_closedBall_zero]
+    change injectiveTensorSeminorm U V ((a • x') ⊗ₜ[ℂ] y) ≤ ‖a‖
+    rw [← TensorProduct.smul_tmul', map_smul_eq_mul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (hunit U V hx' hy)
+  · intro y
+    change Continuous (t.flip y)
+    refine (withGeneratingSeminorms_spec (G ⊗[ℂ] H) _).continuous_of_continuous_comp (t.flip y)
+      fun ⟨U, V⟩ ↦ ?_
+    obtain ⟨b, y', hy', rfl⟩ : ∃ b : ℂ, y ∈ b • V.val :=
+      by simpa using (absorbent_nhds_zero (𝕜 := ℂ) V.property y).exists
+    refine Seminorm.continuous' (r := ‖b‖) (Filter.mem_of_superset U.property fun x hx ↦ ?_)
+    rw [Seminorm.mem_closedBall_zero]
+    change injectiveTensorSeminorm U V (x ⊗ₜ[ℂ] (b • y')) ≤ ‖b‖
+    rw [TensorProduct.tmul_smul, map_smul_eq_mul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (hunit U V hx hy')
+
+-- Retain the existing signature. Only density is needed for this conclusion.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Lemma C.2.3.5(2), p. 678. Tensoring dense embeddings gives a map with dense image. -/
 theorem injectiveTensorMap_denseRange (hf : IsEmbedding f) (hg : IsEmbedding g)
     (hfd : DenseRange f) (hgd : DenseRange g) :
-    DenseRange (injectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    DenseRange (injectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  let : ContinuousSMul ℂ (InjectiveTensor G H) :=
+    (withGeneratingSeminorms_spec (G ⊗[ℂ] H) _).continuousSMul
+  let M := injectiveTensorMap f.toLinearMap g.toLinearMap
+  let S := M.range.topologicalClosure
+  intro z
+  change z ∈ S
+  change G ⊗[ℂ] H at z
+  induction z using TensorProduct.inductionOn with
+  | tmul x y =>
+      obtain ⟨hsecond, hfirst⟩ := injectiveTensor_tmul_separatelyContinuous (G := G) (H := H)
+      refine hfd.induction_on x (M.range.isClosed_topologicalClosure.preimage (hfirst y)) fun a ↦ ?_
+      refine hgd.induction_on y (M.range.isClosed_topologicalClosure.preimage (hsecond (f a))) fun b ↦ ?_
+      exact M.range.le_topologicalClosure ⟨a ⊗ₜ[ℂ] b, TensorProduct.map_tmul _ _ _ _⟩
+  | add z w hz hw => exact S.add_mem hz hw
 
 end Maps
 
