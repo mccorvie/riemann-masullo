@@ -18,6 +18,7 @@
 #   fail    it does not merge into main, build, pass the lint, or keep existing statements
 # Draft pull requests, and those labelled `integrator`, are left alone.
 set -uo pipefail
+script_dir=$(cd "$(dirname "$0")" && pwd)
 main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$main"
 apply=0; [ "${1:-}" = --apply ] && apply=1
@@ -47,37 +48,15 @@ check_one() {
 export -f check_one
 awk '{print $1, $2}' <<<"$list" | xargs -P 6 -L 1 bash -c 'check_one "$0" "$1"'
 
-# Added lines that make a pull request worth reading before it is merged.
-# Importing Mathlib or this library, and silencing a linter, are routine and are not flagged.
-eyes='^\+[[:space:]]*(#|@\[|open Lean|attribute|macro|syntax|notation|elab|initialize|unsafe|instance|def |abbrev |structure|class |inductive|axiom|opaque|noncomputable)|run_|by_elab|simproc|Lean\.|Elab|Meta\.|IO\.|extern|implemented_by|native'
-routine='^\+[[:space:]]*((public )?import (Mathlib|RiemannMasullo)\.[A-Za-z0-9_.]+[[:space:]]*$|set_option linter\.[A-Za-z0-9_.]+ (true|false) in[[:space:]]*$)'
-# A proof may add helper lemmas, but a new declaration taken from the paper is a statement, and
-# statements are the integrator's. Two signs of one are flagged for reading: a docstring that
-# cites the paper, and a declaration outside ForMathlib/ that is not `private`.
-decl='[[:space:]]*(@\[[^]]*\][[:space:]]*)*((public|protected|noncomputable|nonrec|scoped|local)[[:space:]]+)*(theorem|lemma|def|abbrev|instance|structure|class|inductive)[[:space:]]+'
-declared() {  # names declared on those diff lines of stdin that start with the sign $1
-  grep -E "^[$1]$decl" | sed -E "s/^[$1]$decl//; s/[[:space:]:({[].*//" | sort -u
-}
 merged=0
 while read -r n sha who; do
   out=".agent/pr-checks/$n-$sha.txt"
   title=$(gh pr view "$n" --json title --jq .title 2>/dev/null)
-  diff=$(git diff "$base...$sha") || { echo "error  #$n  cannot read the diff; it will be retried"; continue; }
-  added=$(grep -E '^\+[^+]' <<<"$diff" || true)
-  newfiles=$(git diff --diff-filter=A --name-only "$base...$sha") || exit 1
   if grep -q '^exit=0' "$out" && grep -q 'lint and build: pass' "$out" &&
      grep -q 'statements: none of' "$out" && grep -q 'definitions: none contains sorry' "$out"; then
-    why=""
-    grep -qw sorry <<<"$added" && why="adds a sorry"
-    [ -z "$newfiles" ] || why="${why:+$why, }new file"
-    rest=$(grep -vE "$routine" <<<"$added" || true)
-    grep -qE "$eyes|^\+[[:space:]]*(import|set_option) " <<<"$rest" && why="${why:+$why, }not plain proof text"
-    grep -qE '^\+.*Paper:' <<<"$added" && why="${why:+$why, }cites the paper"
-    # A name that is also on a removed line is an existing declaration whose first line was
-    # rewritten to hold the proof, not a new one.
-    lib=$(git diff "$base...$sha" -- RiemannMasullo ':(exclude)RiemannMasullo/ForMathlib') || exit 1
-    newdecl=$(comm -23 <(declared + <<<"$lib") <(declared - <<<"$lib") | paste -sd' ')
-    [ -z "$newdecl" ] || why="${why:+$why, }new public declaration: $newdecl"
+    why=$(bash "$script_dir/proof_review.sh" "$base" "$sha") || {
+      echo "error  #$n  cannot read the diff; it will be retried"; continue
+    }
     if [ -z "$why" ]; then
       echo "merge  #$n  $who  $title"
       if [ $apply = 1 ]; then gh pr merge "$n" --squash --match-head-commit "$sha" >/dev/null 2>&1 && merged=$((merged+1)) || echo "       could not merge (head or base changed?)"; fi
