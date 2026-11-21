@@ -941,7 +941,26 @@ theorem homogeneousAdelicTheta_trivial_at_one (f : ℬ[F]) :
 /-- Paper: Definition 2.2.5.1, p. 95. Formation of homogeneous theta is
 complex linear in the test function. -/
 theorem homogeneousAdelicTheta_isLinear (ω₁ : χ[F]) :
-    IsLinearMap ℂ (homogeneousAdelicTheta ω₁) := by sorry
+    IsLinearMap ℂ (homogeneousAdelicTheta ω₁) := by
+  have hθ := adelicTheta_isLinear (F := F)
+  constructor
+  · intro f f'
+    refine ContinuousMap.ext fun g ↦ ?_
+    change ∫ h, classIntegrand ω₁ (f + f') g h ∂μ̄₁ =
+      (∫ h, classIntegrand ω₁ f g h ∂μ̄₁) + ∫ h, classIntegrand ω₁ f' g h ∂μ̄₁
+    refine (integral_congr_ae (.of_forall fun h ↦ ?_)).trans
+      (integral_add (homogeneousAdelicTheta_integrable ω₁ f g)
+        (homogeneousAdelicTheta_integrable ω₁ f' g))
+    change adelicTheta (f + f') (h.val * g) * (ω₁ h : ℂ) =
+      adelicTheta f (h.val * g) * (ω₁ h : ℂ) + adelicTheta f' (h.val * g) * (ω₁ h : ℂ)
+    rw [hθ.map_add, ContinuousMap.add_apply, add_mul]
+  · intro c f
+    refine ContinuousMap.ext fun g ↦ ?_
+    change ∫ h, classIntegrand ω₁ (c • f) g h ∂μ̄₁ = c • ∫ h, classIntegrand ω₁ f g h ∂μ̄₁
+    refine (integral_congr_ae (.of_forall fun h ↦ ?_)).trans (integral_smul c _)
+    change adelicTheta (c • f) (h.val * g) * (ω₁ h : ℂ) =
+      c • (adelicTheta f (h.val * g) * (ω₁ h : ℂ))
+    rw [hθ.map_smul, ContinuousMap.smul_apply, smul_eq_mul, smul_eq_mul, mul_assoc]
 
 local notation "classOfNormOne" => fun h : N₁[F] ↦
   (Subtype.mk (classOf (Subtype.val h)) (Subtype.property h) : C₁[F])
