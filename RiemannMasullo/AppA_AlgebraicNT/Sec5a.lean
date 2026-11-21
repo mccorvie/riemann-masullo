@@ -1163,13 +1163,339 @@ theorem one_mem_centeredSLocalIdeleDomain :
   rw [map_one, map_one, Complex.arg_one, Set.mem_Ico, neg_div]
   exact ⟨neg_nonpos.mpr (by positivity), by positivity⟩
 
+section CenteredIntegralDomain
+
+local notation "infiniteProjection" => Units.map (RingHom.toMonoidHom
+  (RingHom.fst (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)))
+local notation "fieldUnit" => Units.map (RingHom.toMonoidHom (algebraMap (𝓞 F) F))
+local notation "diagonal" => IdeleGroup.unitEmbedding (𝓞 F) F
+local notation "integralUnits" =>
+  MonoidHom.range (Units.map (RingHom.toMonoidHom (Subring.subtype (integralAdelesOutside F ∅))))
+
+/-- Multiplication by a unique root of unity puts the argument in the centered sector. -/
+private theorem existsUnique_torsion_translate_centered_arg (φ : F →+* ℂ) (z : ℂˣ) :
+    ∃! t : Units.torsion F,
+      ((Units.complexEmbedding φ t.val).val * z.val).arg ∈
+        Ico (-Real.pi / (Units.torsionOrder F : ℝ)) (Real.pi / (Units.torsionOrder F : ℝ)) := by
+  let n := Units.torsionOrder F
+  let p : ℝ := 2 * Real.pi / n
+  let a : ℝ := -Real.pi / n
+  have hn : (0 : ℝ) < n := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have hn₂ : (2 : ℝ) ≤ n := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have := Units.torsionOrder_pos F
+    exact_mod_cast (show 2 ≤ Units.torsionOrder F by omega)
+  have hp : 0 < p := div_pos Real.two_pi_pos hn
+  have hap : a + p = Real.pi / n := by
+    dsimp [a, p]
+    ring
+  let θ := toIcoMod hp a z.val.arg
+  have hθ : θ ∈ Ico a (Real.pi / n) := hap ▸ toIcoMod_mem_Ico hp a z.val.arg
+  have hθ' : θ ∈ Ioc (-Real.pi) Real.pi := by
+    have hbound : Real.pi / n < Real.pi := by
+      rw [div_lt_iff₀ hn]
+      nlinarith [Real.pi_pos]
+    rw [show a = -(Real.pi / n) by simp [a, neg_div]] at hθ
+    exact ⟨by linarith [hθ.1], hθ.2.le.trans hbound.le⟩
+  let ξ := Complex.exp (((θ - z.val.arg : ℝ) : ℂ) * Complex.I)
+  have hξpow : ξ ^ n = 1 := by
+    dsimp only [ξ]
+    rw [← Complex.exp_nat_mul, Complex.exp_eq_one_iff]
+    refine ⟨-toIcoDiv hp a z.val.arg, ?_⟩
+    have hscale : (n : ℝ) * (θ - z.val.arg) =
+        (-toIcoDiv hp a z.val.arg : ℤ) * (2 * Real.pi) := by
+      dsimp only [θ]
+      rw [toIcoMod_sub_self, zsmul_eq_mul]
+      dsimp only [p]
+      field_simp
+    rw [← mul_assoc, ← Complex.ofReal_natCast, ← Complex.ofReal_mul, hscale]
+    push_cast
+    ring
+  let ζ : ℂˣ := Units.mk0 ξ (Complex.exp_ne_zero _)
+  obtain ⟨t, ht, htζ⟩ : ζ ∈ (Units.torsion F).map (Units.complexEmbedding φ) := by
+    rw [Units.map_complexEmbedding_torsion, mem_rootsOfUnity]
+    exact Units.ext hξpow
+  have htsector : ((Units.complexEmbedding φ t).val * z.val).arg ∈ Ico a (Real.pi / n) := by
+    rw [htζ]
+    change (ξ * z.val).arg ∈ _
+    have hrot : ξ * z.val = (‖z.val‖ : ℂ) * Complex.exp ((θ : ℂ) * Complex.I) := by
+      conv_lhs => rw [← Complex.norm_mul_exp_arg_mul_I z.val]
+      rw [mul_left_comm, ← Complex.exp_add]
+      congr 2
+      simp only [Complex.ofReal_sub]
+      ring
+    rw [hrot, Complex.arg_real_mul _ (norm_pos_iff.mpr z.ne_zero), Complex.arg_exp_mul_I,
+      (toIocMod_eq_self Real.two_pi_pos).mpr (by
+        simpa only [show -Real.pi + 2 * Real.pi = Real.pi by ring] using hθ')]
+    exact hθ
+  refine ⟨⟨t, ht⟩, htsector, ?_⟩
+  intro s hs
+  let x := (Units.complexEmbedding φ s.val).val
+  let y := (Units.complexEmbedding φ t).val
+  have hpow (u : Units.torsion F) : (Units.complexEmbedding φ u.val).val ^ n = 1 := by
+    simpa only [map_pow, map_one, Units.val_pow_eq_pow_val, Units.val_one] using
+      congrArg (fun v ↦ (Units.complexEmbedding φ v).val) (Units.pow_torsionOrder_eq_one F u.prop)
+  have hx : x ^ n = 1 := hpow s
+  have hy : y ^ n = 1 := hpow ⟨t, ht⟩
+  have hxy : (x * z.val) ^ n = (y * z.val) ^ n := by simp only [mul_pow, hx, hy, one_mul]
+  have hang : (((n : ℝ) * (x * z.val).arg : ℝ) : Real.Angle) =
+      (((n : ℝ) * (y * z.val).arg : ℝ) : Real.Angle) := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, Real.Angle.natCast_mul_eq_nsmul,
+      ← Complex.arg_pow_coe_angle, ← Complex.arg_pow_coe_angle, hxy]
+  have hmem (r : ℝ) (hr : r ∈ Ico a (Real.pi / n)) :
+      (n : ℝ) * r ∈ Ico (-Real.pi) (-Real.pi + 2 * Real.pi) := by
+    have h₁ := (div_le_iff₀ hn).mp hr.1
+    have h₂ := (lt_div_iff₀ hn).mp hr.2
+    exact ⟨by linarith, by linarith⟩
+  have harg := mul_left_cancel₀ hn.ne' (AddCircle.injOn_coe_Ico _ _
+    (hmem _ hs) (hmem _ htsector) hang)
+  have hnorm {w : ℂ} (hw : w ^ n = 1) : ‖w‖ = 1 :=
+    Complex.norm_eq_one_of_pow_eq_one hw (Units.torsionOrder_ne_zero F)
+  have hnorm' : ‖x * z.val‖ = ‖y * z.val‖ := by
+    rw [norm_mul, norm_mul, hnorm hx, hnorm hy]
+  exact Subtype.ext (Units.complexEmbedding_injective φ (Units.ext
+    (mul_right_cancel₀ z.ne_zero (Complex.ext_norm_arg hnorm' harg))))
+
+/-- A unique diagonal global unit puts the infinite logarithm and argument in the centered
+parallelotope and sector, respectively. -/
+private theorem centeredInfiniteIdeleDomain_unit_translate (g : (InfiniteAdeleRing F)ˣ) :
+    ∃! u : (𝓞 F)ˣ,
+      (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+        infiniteIdeleLog F (infiniteProjection (diagonal (fieldUnit u)) * g) w.val) ∈
+        centeredRegulatorParallelotope F b ∧
+      inCenteredTorsionSector F v₀ σ (atPlace (infiniteProjection (diagonal (fieldUnit u)) * g)) := by
+  classical
+  let α := MonoidHom.comp infiniteProjection (MonoidHom.comp diagonal fieldUnit)
+  let L (x : (InfiniteAdeleRing F)ˣ) : logSpace F := fun w ↦ infiniteIdeleLog F x w.val
+  let ℓ (u : (𝓞 F)ˣ) := Units.logEmbedding F (Additive.ofMul u)
+  have hℓ_mul (u v : (𝓞 F)ˣ) : ℓ (u * v) = ℓ u + ℓ v :=
+    (Units.logEmbedding F).map_add (Additive.ofMul u) (Additive.ofMul v)
+  have hℓ_inv (u : (𝓞 F)ˣ) : ℓ u⁻¹ = -ℓ u :=
+    (Units.logEmbedding F).map_neg (Additive.ofMul u)
+  have hshift (u : (𝓞 F)ˣ) (x : (InfiniteAdeleRing F)ˣ) : L (α u * x) = ℓ u + L x := by
+    funext w
+    change infiniteIdeleLog F (α u * x) w.val = ℓ u w + infiniteIdeleLog F x w.val
+    dsimp only [ℓ]
+    rw [infiniteIdeleLog_mul, Pi.add_apply, regulator_eq_infiniteIdeleLog F u w]
+    rfl
+  let s := ∑ i, (1 / 2 : ℝ) • Units.logEmbeddingQuot F (b i)
+  have hbox (x : logSpace F) :
+      x ∈ centeredRegulatorParallelotope F b ↔ s + x ∈ regulatorParallelotope F b := by
+    simp only [centeredRegulatorParallelotope, Set.mem_vadd_set_iff_neg_vadd_mem, neg_neg,
+      vadd_eq_add, s]
+  -- First reduce the logarithm modulo the regulator lattice.
+  obtain ⟨k, hk⟩ : ∃ k : (Units.logEmbedding F).range,
+      s + L g ∈ k.val +ᵥ regulatorParallelotope F b := by
+    apply Set.mem_iUnion.mp
+    rw [regulatorParallelotope_cover]
+    exact Set.mem_univ _
+  obtain ⟨y, hy, heq⟩ := Set.mem_vadd_set.mp hk
+  obtain ⟨a, ha⟩ := k.prop
+  let u₀ := a.toMul⁻¹
+  have hu₀ : s + L (α u₀ * g) ∈ regulatorParallelotope F b := by
+    have heq' : ℓ a.toMul + y = s + L g := by
+      change k.val + y = s + L g at heq
+      rw [← ha] at heq
+      exact heq
+    rw [hshift, hℓ_inv, show s + (-ℓ a.toMul + L g) = y by
+      rw [show s + (-ℓ a.toMul + L g) = -ℓ a.toMul + (s + L g) by abel, ← heq']
+      abel]
+    exact hy
+  have htors (u : (𝓞 F)ˣ) (hu : L (α u * g) ∈ centeredRegulatorParallelotope F b) :
+      u * u₀⁻¹ ∈ Units.torsion F := by
+    let d : (Units.logEmbedding F).range := ⟨ℓ (u * u₀⁻¹), ⟨_, rfl⟩⟩
+    have hdiff : d.val + (s + L (α u₀ * g)) = s + L (α u * g) := by
+      change ℓ (u * u₀⁻¹) + (s + L (α u₀ * g)) = _
+      rw [hℓ_mul, hℓ_inv, hshift, hshift]
+      abel
+    have hd : d = 0 := by
+      by_contra hne
+      exact (Set.disjoint_left.mp (regulatorParallelotope_disjoint F b d hne))
+        (Set.mem_vadd_set.mpr ⟨_, hu₀, hdiff⟩) ((hbox _).mp hu)
+    exact logEmbedding_eq_zero_iff.mp (congrArg Subtype.val hd)
+  -- The remaining freedom is a torsion unit, which is fixed by the angular condition.
+  let e := σ.toRingHom.comp (extensionEmbedding v₀)
+  let φ := e.comp ((Pi.evalRingHom InfinitePlace.Completion v₀).comp
+    (algebraMap F (InfiniteAdeleRing F)))
+  let coord := (Units.map e.toMonoidHom).comp atPlace
+  have hsector (t : (𝓞 F)ˣ) (x : (InfiniteAdeleRing F)ˣ) :
+      inCenteredTorsionSector F v₀ σ (atPlace (α t * x)) ↔
+        ((Units.complexEmbedding φ t).val * (coord x).val).arg ∈
+          Ico (-Real.pi / (Units.torsionOrder F : ℝ)) (Real.pi / (Units.torsionOrder F : ℝ)) := by
+    change (coord (α t * x)).val.arg ∈ _ ↔ _
+    rw [map_mul, Units.val_mul]
+    rfl
+  obtain ⟨t, ht, ht_unique⟩ :=
+    existsUnique_torsion_translate_centered_arg F φ (coord (α u₀ * g))
+  refine ⟨t.val * u₀, ⟨?_, ?_⟩, ?_⟩
+  · change L (α (t.val * u₀) * g) ∈ _
+    apply (hbox _).mpr
+    rw [hshift, hℓ_mul, show ℓ t.val = 0 from logEmbedding_eq_zero_iff.mpr t.prop,
+      zero_add, ← hshift]
+    exact hu₀
+  · change inCenteredTorsionSector F v₀ σ (atPlace (α (t.val * u₀) * g))
+    rw [map_mul α, mul_assoc]
+    exact (hsector _ _).mpr ht
+  · intro u hu
+    have hu' : L (α u * g) ∈ centeredRegulatorParallelotope F b ∧
+        inCenteredTorsionSector F v₀ σ (atPlace (α u * g)) := hu
+    let t' : Units.torsion F := ⟨u * u₀⁻¹, htors u hu'.1⟩
+    have hmul : t'.val * u₀ = u := inv_mul_cancel_right _ _
+    have hangle : inCenteredTorsionSector F v₀ σ (atPlace (α t'.val * (α u₀ * g))) := by
+      rw [← mul_assoc, ← map_mul, hmul]
+      exact hu'.2
+    have ht' : t' = t := ht_unique t' ((hsector _ _).mp hangle)
+    rw [← hmul, ht']
+
+/-- A principal idele is integral and invertible at all finite places exactly when
+its defining field unit comes from a global unit. -/
+private theorem principal_mem_integralUnits_iff (x : Fˣ) :
+    diagonal x ∈ integralUnits ↔ x ∈ (MonoidHom.range fieldUnit) := by
+  have hInt (y : F) :
+      algebraMap F (AdeleRing (𝓞 F) F) y ∈ integralAdelesOutside F ∅ ↔
+        y ∈ (algebraMap (𝓞 F) F).range := by
+    rw [diagonal_mem_integralAdelesOutside, Finset.coe_empty, integer_empty, Algebra.mem_bot]
+    rfl
+  constructor
+  · rintro ⟨a, ha⟩
+    have hval : a.val.val = algebraMap F (AdeleRing (𝓞 F) F) x.val := congrArg Units.val ha
+    have hinv : a.inv.val = algebraMap F (AdeleRing (𝓞 F) F) x.inv := congrArg Units.inv ha
+    obtain ⟨y, hy⟩ := (hInt x.val).mp (hval ▸ a.val.property)
+    obtain ⟨z, hz⟩ := (hInt x.inv).mp (hinv ▸ a.inv.property)
+    let u : (𝓞 F)ˣ := ⟨y, z,
+      (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hy, hz, x.val_inv, map_one]),
+      (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hz, hy, x.inv_val, map_one])⟩
+    exact ⟨u, Units.ext hy⟩
+  · rintro ⟨u, rfl⟩
+    let f := ((algebraMap F (AdeleRing (𝓞 F) F)).comp (algebraMap (𝓞 F) F)).codRestrict
+      (integralAdelesOutside F ∅) (fun y ↦ (hInt _).mpr ⟨y, rfl⟩)
+    exact ⟨Units.map f.toMonoidHom u, Units.ext rfl⟩
+
+/-- The archimedean projection of a norm-one integral idele has norm one. -/
+private theorem atInfinity_mem_ker_of_integral (g : N₁) (hg : g.val ∈ integralUnits) :
+    infiniteProjection g.val ∈ N∞ := by
+  classical
+  have hfin (v : HeightOneSpectrum (𝓞 F)) : ‖g.val.val.2 v‖ = 1 := by
+    obtain ⟨u, hu⟩ := hg
+    let eval := (RestrictedProduct.evalRingHom
+      (fun w : HeightOneSpectrum (𝓞 F) ↦ w.adicCompletion F) v).comp
+        (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))
+    have hmem (a : integralAdelesOutside F ∅) : eval a.val ∈ v.adicCompletionIntegers F := by
+      have ha := a.property
+      simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+        true_implies] at ha
+      exact ha v
+    apply Valued.toNormedField.norm_eq_one_iff.mpr
+    apply (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+      (a := Units.map eval.toMonoidHom g.val)).mp
+    rw [← hu]
+    exact ⟨hmem u.val, hmem u.inv⟩
+  let x := Units.map (MonoidHom.inl (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))
+    (infiniteProjection g.val)
+  have hxfin (v : HeightOneSpectrum (𝓞 F)) : x.val.2 v = 1 := rfl
+  change infiniteIdeleNorm F (infiniteProjection g.val) = 1
+  rw [infiniteIdeleNorm_eq_global]
+  change ideleNorm F x = 1
+  apply Units.ext
+  apply NNReal.coe_injective
+  have hxinf : x.val.1 = g.val.val.1 := rfl
+  rw [((ideleNorm_spec F).1 x).2, hxinf]
+  simp only [hxfin, norm_one, finprod_one, mul_one, Units.val_one, NNReal.coe_one]
+  have h := ((ideleNorm_spec F).1 g.val).2
+  rw [show ideleNorm F g.val = 1 from g.prop] at h
+  simpa only [hfin, finprod_one, mul_one, Units.val_one, NNReal.coe_one] using h.symm
+
 /-- Paper: Lemma A.5.2.12(1), p. 575. The class-representative translates of
 the centered integral domain meet every principal orbit in exactly one point. -/
 theorem centeredIntegralIdeleDomain_fundamental
     (r : CommRing.Pic (𝓞 F) → N₁) (hr₁ : r 1 = 1)
     (hr : ∀ c, ideleIdealClass F (r c).val = c) (g : N₁) :
     ∃! a : Fˣ, (IdeleGroup.unitEmbedding (𝓞 F) F a)⁻¹ * g.val ∈
-      (N₁).subtype '' (⋃ c, r c • centeredIntegralIdeleDomain F b v₀ σ) := by sorry
+      (N₁).subtype '' (⋃ c, r c • centeredIntegralIdeleDomain F b v₀ σ) := by
+  classical
+  clear hr₁
+  let d := MonoidHom.codRestrict diagonal N₁
+    (fun a ↦ (ideleNorm_spec F).2 (Set.mem_range_self a))
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let H := (IdeleGroup.principalSubgroup (𝓞 F) F ⊔ integralUnits).comap (N₁).subtype
+  let q := QuotientGroup.mk' H
+  let c := e (q g)
+  have hq (a : Fˣ) : q (d a) = 1 :=
+    (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_left (Set.mem_range_self a))
+  have hq_int (x : N₁) (hx : x.val ∈ integralUnits) : q x = 1 :=
+    (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_right hx)
+  have hq_r : q (r c) = q g := e.injective ((he (r c)).trans (hr c))
+  have hker : (g / r c).val ∈ IdeleGroup.principalSubgroup (𝓞 F) F ⊔ integralUnits := by
+    change g / r c ∈ H
+    apply (QuotientGroup.eq_one_iff (N := H) (g / r c)).mp
+    change q (g / r c) = 1
+    rw [map_div, hq_r, div_self']
+  obtain ⟨_, ⟨a₀, rfl⟩, k, hk, hk_eq⟩ := Subgroup.mem_sup.mp hker
+  have hk_norm : k ∈ N₁ := by
+    rw [← div_eq_of_eq_mul' hk_eq.symm]
+    exact Subgroup.div_mem N₁ (g / r c).prop (d a₀).prop
+  let k₁ : N₁ := ⟨k, hk_norm⟩
+  have hg : g = r c * (d a₀ * k₁) := by
+    exact (eq_mul_of_div_eq (Subtype.ext hk_eq.symm)).trans (mul_comm _ _)
+  obtain ⟨u, hu, hu_unique⟩ :=
+    centeredInfiniteIdeleDomain_unit_translate F b v₀ σ (infiniteProjection k)
+  let a := a₀ / fieldUnit u
+  let x := d (fieldUnit u) * k₁
+  have hx_int : x.val ∈ integralUnits :=
+    Subgroup.mul_mem integralUnits ((principal_mem_integralUnits_iff F _).mpr (Set.mem_range_self u)) hk
+  have hx : x ∈ centeredIntegralIdeleDomain F b v₀ σ := by
+    refine ⟨hx_int, ⟨⟨infiniteProjection x.val, atInfinity_mem_ker_of_integral F x hx_int⟩, ?_, rfl⟩⟩
+    have heq : infiniteProjection x.val =
+        infiniteProjection (diagonal (fieldUnit u)) * infiniteProjection k :=
+      map_mul infiniteProjection _ _
+    change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F (infiniteProjection x.val) w.val) ∈ centeredRegulatorParallelotope F b ∧
+        inCenteredTorsionSector F v₀ σ (atPlace (infiniteProjection x.val))
+    rw [heq]
+    exact hu
+  have htrans : (d a)⁻¹ * g = r c * x := by
+    have hd : (d a)⁻¹ * d a₀ = d (fieldUnit u) := by
+      dsimp only [a]
+      rw [map_div, div_eq_mul_inv, mul_inv_rev, inv_inv, mul_assoc, inv_mul_cancel, mul_one]
+    rw [hg, mul_left_comm (d a)⁻¹ (r c), ← mul_assoc (d a)⁻¹, hd]
+  refine ⟨a, ⟨r c * x, Set.mem_iUnion.mpr ⟨c, Set.mem_smul_set.mpr ⟨x, hx, rfl⟩⟩,
+    congrArg Subtype.val htrans.symm⟩, ?_⟩
+  rintro a' ⟨y, hy, hy_eq⟩
+  obtain ⟨c', hc'⟩ := Set.mem_iUnion.mp hy
+  obtain ⟨x', hx', rfl⟩ := Set.mem_smul_set.mp hc'
+  have hy' : r c' * x' = (d a')⁻¹ * g := Subtype.ext hy_eq
+  have hc_eq : c' = c := by
+    have hqy := congrArg q hy'
+    rw [map_mul, hq_int x' hx'.1, mul_one, map_mul, map_inv, hq, inv_one, one_mul] at hqy
+    exact (hr c').symm.trans ((he (r c')).symm.trans (congrArg e hqy))
+  subst c'
+  have hx_eq : x' = d (a₀ / a') * k₁ := by
+    apply mul_left_cancel (a := r c)
+    rw [hy', hg, mul_left_comm (d a')⁻¹ (r c), ← mul_assoc (d a')⁻¹, map_div, div_eq_mul_inv,
+      mul_comm (d a₀) (d a')⁻¹]
+  have ha'_int : diagonal (a₀ / a') ∈ integralUnits := by
+    have h : diagonal (a₀ / a') = x'.val / k := by
+      rw [hx_eq]
+      change _ = diagonal (a₀ / a') * k / k
+      exact (mul_div_cancel_right _ _).symm
+    rw [h]
+    exact Subgroup.div_mem integralUnits hx'.1 hk
+  obtain ⟨u', hu'⟩ := (principal_mem_integralUnits_iff F _).mp ha'_int
+  have hu'_dom : d (fieldUnit u') * k₁ ∈ centeredIntegralIdeleDomain F b v₀ σ := by
+    rw [hu', ← hx_eq]
+    exact hx'
+  obtain ⟨z, hz, hz_eq⟩ := hu'_dom.2
+  have hu'_eq : u' = u := by
+    apply hu_unique
+    have hz_eq' : z.val = infiniteProjection (diagonal (fieldUnit u')) * infiniteProjection k :=
+      hz_eq.trans (map_mul infiniteProjection _ _)
+    simpa only [centeredInfiniteIdeleDomain, Set.mem_ofPred_eq, hz_eq'] using hz
+  rw [hu'_eq] at hu'
+  dsimp only [a]
+  rw [hu']
+  simp
+
+end CenteredIntegralDomain
 
 /-- Paper: Lemma A.5.2.12(2), p. 575. The centered S-local domain meets each
 orbit of the diagonal S-units in the norm-one S-ideles in exactly one point. -/
