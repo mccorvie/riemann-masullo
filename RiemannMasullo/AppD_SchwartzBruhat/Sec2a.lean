@@ -4,6 +4,7 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import Mathlib.Algebra.Order.Group.Cyclic
 import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
+import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
 /-! # Modulated groups and their canonical Haar measures -/
 
@@ -35,7 +36,13 @@ theorem IsModulation.normTwistHypotheses {m : G →ₜ* ℝ≥0ˣ} (hm : IsModul
 modulation of the global idele class group. -/
 theorem exists_ideleClassModulation (F : Type*) [Field F] [NumberField F] :
     ∃ m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ,
-      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by sorry
+      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by
+  have hproper := isProperMap_ideleClassNorm F
+  let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, hproper.continuous⟩
+  obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨g, hg⟩ := hsurj t
+  exact ⟨m, rfl, ⟨hproper, ⟨g, fun h ↦ ht (hg.symm.trans h)⟩⟩, hsurj⟩
 
 /-- Paper: Definition D.2.1.1(1), p. 793. The norm-one subgroup is compact. -/
 theorem IsModulation.isCompact_ker {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m) :
