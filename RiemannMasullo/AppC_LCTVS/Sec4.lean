@@ -808,7 +808,35 @@ theorem pettisWeakIntegral_prod
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
           pettisWeakIntegral (.positive μ) fx hfx ∧
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
-          pettisWeakIntegral (.positive ν) fy hfy := by sorry
+          pettisWeakIntegral (.positive ν) fy hfy := by
+  intro fx fy
+  have hφx (φ : StrongDual ℂ E) :
+      (fun x ↦ φ (fx x)) = fun x ↦ ∫ y, φ (f (x, y)) ∂ν := by
+    funext x
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive ν) _ (hx x)
+    exact LinearMap.congr_fun h φ
+  have hφy (φ : StrongDual ℂ E) :
+      (fun y ↦ φ (fy y)) = fun y ↦ ∫ x, φ (f (x, y)) ∂μ := by
+    funext y
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive μ) _ (hy y)
+    exact LinearMap.congr_fun h φ
+  have hfx : PettisWeaklyIntegrable (.positive μ) fx := by
+    intro φ
+    change Integrable (fun x ↦ φ (fx x)) μ
+    rw [hφx]
+    exact (hf φ).integral_prod_left
+  have hfy : PettisWeaklyIntegrable (.positive ν) fy := by
+    intro φ
+    change Integrable (fun y ↦ φ (fy y)) ν
+    rw [hφy]
+    exact (hf φ).integral_prod_right
+  refine ⟨hfx, hfy, LinearMap.ext fun φ ↦ ?_, LinearMap.ext fun φ ↦ ?_⟩
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ x, φ (fx x) ∂μ
+    rw [hφx]
+    exact integral_prod _ (hf φ)
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ y, φ (fy y) ∂ν
+    rw [hφy]
+    exact integral_prod_symm _ (hf φ)
 
 -- TODO(paper-gap): The image asserted in Remark C.4.4.2 can also contain zero
 -- from outside the support. Its compactness still follows by adjoining zero.
