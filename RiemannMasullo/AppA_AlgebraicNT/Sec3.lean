@@ -19,7 +19,9 @@ import Mathlib.MeasureTheory.Measure.Haar.Quotient
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.NumberTheory.NumberField.Discriminant.Basic
 import Mathlib.NumberTheory.NumberField.Discriminant.Different
+import Mathlib.Topology.Algebra.Group.OpenMapping
 import Mathlib.Topology.Algebra.IsOpenUnits
+import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.Maps.Proper.CompactlyGenerated
 import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
@@ -1121,11 +1123,183 @@ theorem realTamagawaMeasure_selfDual :
       congrArg (fun k : Multiplicative ℝ → ℂ ↦ eLpNorm k 2 μ) hFourier
     _ = _ := h.2
 
+/-- Paper: Example A.3.1.5, p. 557. The complex Tamagawa pairing identifies the
+additive complex plane with its Pontryagin dual. -/
+private theorem exists_complexTamagawaDualEquiv :
+    ∃ e : Multiplicative ℂ ≃ₜ* PontryaginDual (Multiplicative ℂ),
+      ∀ x y : ℂ, e (Multiplicative.ofAdd x) (Multiplicative.ofAdd y) =
+        Circle.exp (4 * Real.pi * (x * y).re) := by
+  let G := Multiplicative ℂ
+  let phase : ℂ → Circle := fun z ↦ Circle.exp (4 * Real.pi * z.re)
+  have hzero : phase 0 = 1 := by simp [phase]
+  have hadd (x y : ℂ) : phase (x + y) = phase x * phase y := by
+    simp only [phase, Complex.add_re, mul_add, Circle.exp_add]
+  have hcont : Continuous phase := Circle.exp.continuous.comp (by fun_prop)
+  let pairing : G →* PontryaginDual G :=
+    { toFun := fun x ↦
+        { toFun := fun y ↦ phase (x.toAdd * y.toAdd)
+          map_one' := by change phase (x.toAdd * 0) = 1; rw [mul_zero, hzero]
+          map_mul' := fun y z ↦ by
+            change phase (x.toAdd * (y.toAdd + z.toAdd)) = _
+            rw [mul_add, hadd]
+          continuous_toFun := hcont.comp (continuous_const.mul continuous_id) }
+      map_one' := PontryaginDual.ext fun y ↦ by
+        change phase (0 * y.toAdd) = 1
+        rw [zero_mul, hzero]
+      map_mul' := fun x y ↦ PontryaginDual.ext fun z ↦ by
+        change phase ((x.toAdd + y.toAdd) * z.toAdd) =
+          phase (x.toAdd * z.toAdd) * phase (y.toAdd * z.toAdd)
+        rw [add_mul, hadd] }
+  have hpcont : Continuous pairing :=
+    ContinuousMonoidHom.continuous_of_continuous_uncurry
+      (show G → (G →ₜ* Circle) from pairing)
+      (hcont.comp (continuous_fst.mul continuous_snd))
+  obtain ⟨eR, heR⟩ := exists_realPontryaginDualEquiv
+  let axis (u : ℂ) : Multiplicative ℝ →ₜ* G :=
+    let l := (1 : ℝ →L[ℝ] ℝ).smulRight u
+    ⟨l.toLinearMap.toAddMonoidHom.toMultiplicative, l.continuous⟩
+  -- Restrict a character to each coordinate axis to use real Pontryagin duality.
+  have haxis (u : ℂ) (x : G) :
+      PontryaginDual.map (axis u) (pairing x) =
+        eR (Multiplicative.ofAdd (2 * (x.toAdd * u).re)) := by
+    apply PontryaginDual.ext
+    intro t
+    change phase (x.toAdd * (t.toAdd • u)) =
+      eR (Multiplicative.ofAdd (2 * (x.toAdd * u).re)) (Multiplicative.ofAdd t.toAdd)
+    rw [heR _ t.toAdd]
+    apply congrArg Circle.exp
+    rw [mul_smul_comm, Complex.smul_re, smul_eq_mul]
+    ring
+  have hreal (x : G) :
+      PontryaginDual.map (axis 1) (pairing x) = eR (Multiplicative.ofAdd (2 * x.toAdd.re)) := by
+    simpa only [mul_one] using haxis 1 x
+  have himag (x : G) :
+      PontryaginDual.map (axis Complex.I) (pairing x) =
+        eR (Multiplicative.ofAdd (-(2 * x.toAdd.im))) := by
+    simpa only [Complex.mul_I_re, mul_neg] using haxis Complex.I x
+  have hinj : Injective pairing := by
+    intro x y hxy
+    have hre := eR.injective <| (hreal x).symm.trans <|
+      (congrArg (PontryaginDual.map (axis 1)) hxy).trans (hreal y)
+    have him := eR.injective <| (himag x).symm.trans <|
+      (congrArg (PontryaginDual.map (axis Complex.I)) hxy).trans (himag y)
+    change 2 * x.toAdd.re = 2 * y.toAdd.re at hre
+    change -(2 * x.toAdd.im) = -(2 * y.toAdd.im) at him
+    change x.toAdd = y.toAdd
+    exact Complex.ext (by linarith) (by linarith)
+  have hsurj : Surjective pairing := by
+    intro χ
+    let a := (eR.symm (PontryaginDual.map (axis 1) χ)).toAdd
+    let b := (eR.symm (PontryaginDual.map (axis Complex.I) χ)).toAdd
+    let x : G := Multiplicative.ofAdd (⟨a / 2, -(b / 2)⟩ : ℂ)
+    have hre : PontryaginDual.map (axis 1) (pairing x) = PontryaginDual.map (axis 1) χ := by
+      rw [hreal, show 2 * x.toAdd.re = a by change 2 * (a / 2) = a; ring]
+      exact eR.apply_symm_apply _
+    have him : PontryaginDual.map (axis Complex.I) (pairing x) =
+        PontryaginDual.map (axis Complex.I) χ := by
+      rw [himag, show -(2 * x.toAdd.im) = b by change -(2 * -(b / 2)) = b; ring]
+      exact eR.apply_symm_apply _
+    refine ⟨x, PontryaginDual.ext fun y ↦ ?_⟩
+    have hy : y = axis 1 (Multiplicative.ofAdd y.toAdd.re) *
+        axis Complex.I (Multiplicative.ofAdd y.toAdd.im) := by
+      change y.toAdd = y.toAdd.re • (1 : ℂ) + y.toAdd.im • Complex.I
+      apply Complex.ext <;> simp
+    rw [hy, map_mul, map_mul]
+    exact congrArg₂ (· * ·) (DFunLike.congr_fun hre _) (DFunLike.congr_fun him _)
+  let equiv := MulEquiv.ofBijective pairing ⟨hinj, hsurj⟩
+  exact ⟨{ equiv with
+    continuous_toFun := hpcont
+    continuous_invFun := (Equiv.continuous_symm_iff equiv.toEquiv).mpr
+      (pairing.isOpenMap_of_sigmaCompact hsurj hpcont) }, fun _ _ ↦ rfl⟩
+
+open scoped FourierTransform in
 /-- Paper: Example A.3.1.5, p. 557. Twice plane Lebesgue measure is self-dual
 for the complex character with phase `4π Re(z)`. -/
 theorem complexTamagawaMeasure_selfDual :
-    IsTamagawaSelfDual (2 • (volume : Measure ℂ)) (fun z ↦ Circle.exp (4 * Real.pi * z.re)) :=
-  by sorry
+    IsTamagawaSelfDual (2 • (volume : Measure ℂ)) (fun z ↦ Circle.exp (4 * Real.pi * z.re)) := by
+  rw [← Nat.cast_smul_eq_nsmul ℝ≥0∞]
+  norm_num only [Nat.cast_ofNat]
+  obtain ⟨e, he⟩ := exists_complexTamagawaDualEquiv
+  refine ⟨e, he, ?_⟩
+  let μ : Measure (Multiplicative ℂ) := (2 : ℝ≥0∞) • (volume : Measure ℂ)
+  let : MeasurableSpace (PontryaginDual (Multiplicative ℂ)) := borel _
+  let : BorelSpace (PontryaginDual (Multiplicative ℂ)) := ⟨rfl⟩
+  have hvol : ((2 : ℝ≥0∞) • (volume : Measure ℂ)).IsAddHaarMeasure :=
+    Measure.IsAddHaarMeasure.smul _ (by norm_num) (by norm_num)
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hvol.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hvol.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hvol.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := Measure.Regular.smul (μ := (volume : Measure ℂ)) (by norm_num)
+  change IsLCAPlancherelMeasure (G := Multiplicative ℂ) μ (Measure.map e μ)
+  refine ⟨e.isHaarMeasure_map μ, Measure.Regular.map e.toHomeomorph, ?_⟩
+  intro f hf₁ hf₂
+  let g : ℂ → ℂ := fun x ↦ f (Multiplicative.ofAdd x)
+  -- The trace pairing is the Euclidean pairing with the frequency doubled and conjugated.
+  let T : ℂ ≃ₜ ℂ :=
+    (Units.mk0 (2 : ℝ) two_ne_zero • Complex.conjCLE).toHomeomorph
+  have hT (y : ℂ) : T y = (2 : ℝ) • star y := rfl
+  have hmap : Measure.map T (volume : Measure ℂ) = (4 : ℝ≥0∞)⁻¹ • volume := by
+    change Measure.map ((fun z : ℂ ↦ (2 : ℝ) • z) ∘ Complex.conjLIE) volume = _
+    rw [← Measure.map_map (by fun_prop) Complex.conjLIE.measurePreserving.measurable,
+      Complex.conjLIE.measurePreserving.map_eq, Measure.map_addHaar_smul _ two_ne_zero,
+      Complex.finrank_real_complex]
+    rw [show |((2 : ℝ) ^ (2 : ℕ))⁻¹| = (4 : ℝ)⁻¹ by norm_num,
+      ENNReal.ofReal_inv_of_pos (by norm_num)]
+    norm_num
+  have hFourier : lcaFourier μ f ∘ e = (2 : ℝ) • ((𝓕 g) ∘ T) := by
+    funext y
+    change lcaFourier μ f (e y) = (2 : ℝ) • 𝓕 g (T y.toAdd)
+    rw [lcaFourier, Real.fourier_eq]
+    change (∫ x : ℂ, g x * star (e y (Multiplicative.ofAdd x) : ℂ)
+      ∂((2 : ℝ≥0∞) • (volume : Measure ℂ))) = _
+    rw [integral_smul_measure]
+    norm_num only [ENNReal.toReal_ofNat]
+    congr 1
+    apply integral_congr_ae
+    filter_upwards with x
+    have hPair : e y (Multiplicative.ofAdd x) = Real.fourierChar (inner ℝ x (T y.toAdd)) := by
+      change e (Multiplicative.ofAdd y.toAdd) (Multiplicative.ofAdd x) = _
+      rw [he, Real.fourierChar_apply', hT, real_inner_smul_right]
+      have hInner : inner ℝ x (star y.toAdd) = (y.toAdd * x).re := by
+        change (star y.toAdd * star x).re = _
+        rw [← star_mul, mul_comm x y.toAdd]
+        exact Complex.conj_re _
+      rw [hInner]
+      apply congrArg Circle.exp
+      ring
+    rw [hPair, Circle.star_addChar, Circle.smul_def, smul_eq_mul, mul_comm]
+  have hle : (volume : Measure ℂ) ≤ (2 : ℝ≥0∞) • volume := by
+    rw [two_smul]
+    exact Measure.le_add_right le_rfl
+  have h := memLp_two_fourier_and_eLpNorm_eq (f := g) (Integrable.mono_measure hf₁ hle)
+    (MemLp.mono_measure hle hf₂)
+  have hTEmb := T.measurableEmbedding
+  have hLp : MemLp ((2 : ℝ) • ((𝓕 g) ∘ T)) 2 (volume : Measure ℂ) := by
+    apply MemLp.const_smul
+    apply hTEmb.memLp_map_measure_iff.mp
+    rw [hmap]
+    exact h.1.smul_measure (by norm_num)
+  -- The Jacobian contributes a factor of one half to the L² norm.
+  have hNorm : eLpNorm ((2 : ℝ) • ((𝓕 g) ∘ T)) 2 (volume : Measure ℂ) =
+      eLpNorm g 2 volume := by
+    rw [eLpNorm_const_smul, ← hTEmb.eLpNorm_map_measure, hmap,
+      eLpNorm_smul_measure_of_ne_zero (by norm_num), h.2]
+    rw [show ‖(2 : ℝ)‖ₑ = (2 : ℝ≥0∞) by norm_num [← ofReal_norm]]
+    simp only [one_div, ENNReal.toReal_inv, ENNReal.toReal_ofNat, smul_eq_mul]
+    rw [ENNReal.inv_rpow, show (4 : ℝ≥0∞) = (2 : ℝ≥0∞) ^ (2 : ℝ) by
+      rw [ENNReal.rpow_ofNat]; norm_num]
+    rw [ENNReal.rpow_rpow_inv two_ne_zero, ← mul_assoc,
+      ENNReal.mul_inv_cancel (by norm_num) (by norm_num), one_mul]
+  have hEmb := e.toHomeomorph.measurableEmbedding
+  refine ⟨hEmb.memLp_map_measure_iff.mpr (hFourier ▸ hLp.smul_measure (by norm_num)), ?_⟩
+  calc
+    _ = eLpNorm (lcaFourier μ f ∘ e) 2 μ := hEmb.eLpNorm_map_measure
+    _ = eLpNorm g 2 ((2 : ℝ≥0∞) • (volume : Measure ℂ)) := ?_
+  rw [hFourier]
+  change eLpNorm ((2 : ℝ) • ((𝓕 g) ∘ T)) 2 ((2 : ℝ≥0∞) • (volume : Measure ℂ)) =
+    eLpNorm g 2 ((2 : ℝ≥0∞) • (volume : Measure ℂ))
+  simp only [eLpNorm_smul_measure_of_ne_zero (by norm_num : (2 : ℝ≥0∞) ≠ 0), hNorm]
 
 section Padic
 
