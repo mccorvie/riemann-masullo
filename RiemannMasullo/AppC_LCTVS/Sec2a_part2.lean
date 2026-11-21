@@ -537,10 +537,72 @@ abbrev InjectiveTensor :=
 variable [hE : PolynormableSpace ℂ E] [sE : T2Space E]
   [hF : PolynormableSpace ℂ F] [sF : T2Space F]
 
+open scoped Pointwise in
+include hE hF in
+omit sE sF in
+/-- Paper: (C.2.3.7), p. 677. The generating injective seminorm bounds each
+evaluation against a pair of functionals in the two polars. -/
+private theorem norm_tensorDualForm_le_injectiveTensorSeminorm
+    (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0})
+    (φ : StrongDual.polar ℂ U.val) (ψ : StrongDual.polar ℂ V.val) (z : E ⊗[ℂ] F) :
+    ‖tensorDualForm φ.val ψ.val z‖ ≤ injectiveTensorSeminorm U V z := by
+  let D := StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val
+  let p (f : D) := (normSeminorm ℂ ℂ).comp (tensorDualForm f.1.val f.2.val)
+  have hb : BddAbove (range p) := by
+    apply Seminorm.bddAbove_range_iff.mpr
+    intro w
+    induction w using TensorProduct.inductionOn with
+    | tmul x y =>
+        obtain ⟨a, x', hx', rfl⟩ : ∃ a : ℂ, x ∈ a • U.val :=
+          by simpa using (absorbent_nhds_zero (𝕜 := ℂ) U.property x).exists
+        obtain ⟨b, y', hy', rfl⟩ : ∃ b : ℂ, y ∈ b • V.val :=
+          by simpa using (absorbent_nhds_zero (𝕜 := ℂ) V.property y).exists
+        refine ⟨‖a‖ * ‖b‖, forall_mem_range.mpr fun f ↦ ?_⟩
+        have hφ := (StrongDual.mem_polar_iff ℂ _).mp f.1.property x' hx'
+        have hψ := (StrongDual.mem_polar_iff ℂ _).mp f.2.property y' hy'
+        change ‖tensorDualForm f.1.val f.2.val ((a • x') ⊗ₜ[ℂ] (b • y'))‖ ≤ _
+        rw [tensorDualForm_tmul, norm_mul, map_smul, map_smul, norm_smul, norm_smul]
+        exact mul_le_mul (mul_le_of_le_one_right (norm_nonneg _) hφ)
+          (mul_le_of_le_one_right (norm_nonneg _) hψ)
+          (mul_nonneg (norm_nonneg _) (norm_nonneg _)) (norm_nonneg _)
+    | add w₁ w₂ h₁ h₂ =>
+        obtain ⟨C₁, h₁⟩ := h₁
+        obtain ⟨C₂, h₂⟩ := h₂
+        exact ⟨C₁ + C₂, forall_mem_range.mpr fun f ↦
+          (map_add_le_add (p f) w₁ w₂).trans
+            (add_le_add (h₁ (mem_range_self f)) (h₂ (mem_range_self f)))⟩
+  unfold injectiveTensorSeminorm
+  rw [← ciSup_prod hb]
+  exact le_ciSup hb (φ, ψ) z
+
 include hE sE hF sF in
 /-- Paper: (C.2.3.4), p. 676. The injective tensor topology is Hausdorff. -/
 @[instance]
-theorem injectiveTensor_t2 : T2Space (InjectiveTensor E F) := by sorry
+theorem injectiveTensor_t2 : T2Space (InjectiveTensor E F) := by
+  classical
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let : SeparatingDual ℂ F := polynormableSpace_separatingDual ℂ F
+  have hT1 : T1Space (InjectiveTensor E F) :=
+    (withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).T1_of_separating fun z hz ↦ by
+      change E ⊗[ℂ] F at z
+      by_contra! h
+      apply hz
+      apply tensorDualForm_ext
+      intro φ ψ
+      let U : {U : Set E // U ∈ 𝓝 0} :=
+        ⟨φ ⁻¹' Metric.closedBall 0 1, φ.continuous.continuousAt.preimage_mem_nhds
+          (by simpa using Metric.closedBall_mem_nhds (φ 0) one_pos)⟩
+      let V : {V : Set F // V ∈ 𝓝 0} :=
+        ⟨ψ ⁻¹' Metric.closedBall 0 1, ψ.continuous.continuousAt.preimage_mem_nhds
+          (by simpa using Metric.closedBall_mem_nhds (ψ 0) one_pos)⟩
+      have hφ : φ ∈ StrongDual.polar ℂ U.val :=
+        (StrongDual.mem_polar_iff ℂ _).mpr fun _ hx ↦ mem_closedBall_zero_iff.mp hx
+      have hψ : ψ ∈ StrongDual.polar ℂ V.val :=
+        (StrongDual.mem_polar_iff ℂ _).mpr fun _ hy ↦ mem_closedBall_zero_iff.mp hy
+      have hle := norm_tensorDualForm_le_injectiveTensorSeminorm U V ⟨φ, hφ⟩ ⟨ψ, hψ⟩ z
+      exact (norm_le_zero_iff.mp (hle.trans_eq (h (U, V)))).trans
+        (map_zero (tensorDualForm φ ψ)).symm
+  infer_instance
 
 include hE sE hF sF in
 /-- Paper: (C.2.3.4), p. 676. Evaluation realizes the injective topology as uniform
