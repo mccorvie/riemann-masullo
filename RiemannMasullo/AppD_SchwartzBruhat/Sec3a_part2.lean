@@ -653,13 +653,71 @@ theorem modulatedExponentialDecay_strip_coordinates
 local notation "T" => InductiveTensor (SchwartzBruhat K) P
 
 include hSC hm hInt hne hτ in
+/-- Paper: Theorem D.3.3.7(1), p. 806. Multiplication in split coordinates
+extends to a continuous linear map from the completed inductive tensor product
+to the decay space. -/
+private theorem modulatedExponentialDecay_completedTensor_mul :
+    ∃ L : Completion T →L[ℂ] E,
+      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ)) := by
+  sorry
+
+include hSC hm hInt hne hτ in
+/-- Paper: (D.3.3.3), p. 806. Multiplication from the completed tensor product
+reaches every decay function. The quotient-stage isomorphisms give preimages
+for functions in the individual compact-subgroup stages. -/
+private theorem modulatedExponentialDecay_completedTensor_mul_surjective
+    (L : Completion T →L[ℂ] E)
+    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ))) :
+    Surjective L := by
+  sorry
+
+include hSC hm hInt hne hτ in
+/-- Paper: (D.3.3.3), p. 806. Pulling back the decay-space topology by
+multiplication gives the topology of the completed inductive tensor product. -/
+private theorem modulatedExponentialDecay_completedTensor_mul_isInducing
+    (L : Completion T →L[ℂ] E)
+    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ))) :
+    IsInducing L := by
+  sorry
+
+/-- A surjective inducing continuous linear map out of a separated space
+can be bundled as a continuous linear equivalence with the same evaluations. -/
+private theorem bundle_inducing_surjection
+    {A B : Type*} [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [T0Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B]
+    (p : (A → B) → Prop)
+    (hex : ∃ F : A →L[ℂ] B, p F)
+    (hs : ∀ F : A →L[ℂ] B, p F → Surjective F)
+    (hi : ∀ F : A →L[ℂ] B, p F → IsInducing F) :
+    ∃ e : A ≃L[ℂ] B, p e := by
+  rcases hex with ⟨F, hF⟩
+  have hh : IsHomeomorph F := isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨(hi F hF).isEmbedding, hs F hF⟩
+  exact ⟨ContinuousLinearEquiv.ofIsHomeomorph
+      (LinearEquiv.ofBijective F.toLinearMap hh.bijective) hh, hF⟩
+
+include hSC hm hInt hne hτ in
 /-- Paper: Theorem D.3.3.7(1), p. 806. The splitting of the modulation induces
 the completed inductive tensor isomorphism, given by multiplication in split coordinates. -/
 theorem modulatedExponentialDecay_tensor_equiv :
     ∃ e : Completion T ≃L[ℂ] E,
       ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
         (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-          h u * f.val (Real.log (t.val : ℝ)) := by sorry
+          h u * f.val (Real.log (t.val : ℝ)) := by
+  exact bundle_inducing_surjection (A := Completion T) (B := E)
+    (fun L ↦ ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+        h u * f.val (Real.log (t.val : ℝ)))
+    (modulatedExponentialDecay_completedTensor_mul m I hm hInt hne τ hτ)
+    (modulatedExponentialDecay_completedTensor_mul_surjective m I hm hInt hne τ hτ)
+    (modulatedExponentialDecay_completedTensor_mul_isInducing m I hm hInt hne τ hτ)
+
 
 include hm hInt hne hτ in
 /-- Paper: Theorem D.3.3.7(1), p. 806. The tensor isomorphism intertwines
