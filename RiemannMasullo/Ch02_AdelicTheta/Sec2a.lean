@@ -1120,12 +1120,163 @@ theorem adelicTheta_isLinear : IsLinearMap ℂ (adelicTheta (F := F)) := by
 
 local instance : MeasurableSpace 𝔸[F] := borel _
 
+/-- A topological group isomorphism carries a compact generating neighborhood to one. -/
+private theorem isCompactlyGeneratedGroup_of_equiv {G H : Type*}
+    [Group G] [Group H] [TopologicalSpace G] [TopologicalSpace H]
+    (e : G ≃ₜ* H) (h : IsCompactlyGeneratedGroup G) : IsCompactlyGeneratedGroup H := by
+  obtain ⟨U, hU, hK, hgen⟩ := h
+  refine ⟨e '' U, ?_, hK.image e.continuous, ?_⟩
+  · have hmap := e.toHomeomorph.map_nhds_eq 1
+    rw [show e.toHomeomorph 1 = 1 from map_one e] at hmap
+    rw [← hmap]
+    exact Filter.mem_map.mpr (mem_of_superset hU (subset_preimage_image e U))
+  · have hmap := MonoidHom.map_closure e.toMulEquiv.toMonoidHom U
+    rw [hgen, Subgroup.map_top, MonoidHom.range_eq_top.mpr e.surjective] at hmap
+    exact hmap.symm
+
+/-- Pulling back a structural pair along a topological group isomorphism preserves its
+elementary quotient and carries its realized Schwartz functions to the pulled-back stage. -/
+private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H]
+    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient)
+    (f : SchwartzBruhatStage p) :
+    schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule G := by
+  classical
+  let J := a.val.1
+  let K := OrderDual.ofDual a.val.2
+  let J' := J.comap e.toMulEquiv.toMonoidHom
+  let K' := K.comap e.toMulEquiv.toMonoidHom
+  let eJ : J' ≃ₜ* J := ContinuousMulEquiv.mk'
+    (e.toHomeomorph.subtype fun _ ↦ Iff.rfl)
+    (fun x y ↦ Subtype.ext (map_mul e (x : G) (y : G)))
+  -- Precomposition identifies the annihilators of the two kernels.
+  let hom : G →ₜ* H := ⟨e.toMulEquiv.toMonoidHom, e.continuous⟩
+  let inv : H →ₜ* G := ⟨e.symm.toMulEquiv.toMonoidHom, e.symm.continuous⟩
+  let dual : PontryaginDual H ≃ₜ* PontryaginDual G :=
+    { toFun := PontryaginDual.map hom
+      invFun := PontryaginDual.map inv
+      left_inv := fun χ ↦ PontryaginDual.ext fun y ↦ congrArg χ (e.apply_symm_apply y)
+      right_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (e.symm_apply_apply x)
+      map_mul' := map_mul (PontryaginDual.map hom)
+      continuous_toFun := (PontryaginDual.map hom).continuous
+      continuous_invFun := (PontryaginDual.map inv).continuous }
+  have hAnn (χ : PontryaginDual H) : χ ∈ lcaAnnihilator K ↔ dual χ ∈ lcaAnnihilator K' := by
+    simp only [mem_lcaAnnihilator_iff]
+    refine ⟨fun h x ↦ h ⟨e x, x.property⟩, fun h y ↦ ?_⟩
+    have hy : e.symm y ∈ K' := by
+      change e (e.symm y) ∈ K
+      rw [e.apply_symm_apply]
+      exact y.property
+    have heval : χ (e (e.symm y)) = 1 := h ⟨e.symm y, hy⟩
+    simpa using heval
+  let eAnn : lcaAnnihilator K ≃ₜ* lcaAnnihilator K' := ContinuousMulEquiv.mk'
+    (dual.toHomeomorph.subtype hAnn)
+    (fun x y ↦ Subtype.ext (map_mul dual (x : PontryaginDual H) y))
+  have hopen : IsOpen (lcaAnnihilator K' : Set (PontryaginDual G)) := by
+    have heq : (lcaAnnihilator K' : Set (PontryaginDual G)) =
+        dual.symm ⁻¹' (lcaAnnihilator K : Set (PontryaginDual H)) := by
+      ext χ
+      simpa using (hAnn (dual.symm χ)).symm
+    rw [heq]
+    exact a.property.2.2.1.2.1.preimage dual.symm.continuous
+  let a' : BruhatStructuralPair G :=
+    ⟨(J', OrderDual.toDual K'), a.property.1.preimage e.continuous,
+      isCompactlyGeneratedGroup_of_equiv eJ.symm a.property.2.1,
+      ⟨a.property.2.2.1.1.preimage e.continuous, hopen,
+        isCompactlyGeneratedGroup_of_equiv eAnn a.property.2.2.1.2.2⟩,
+      Subgroup.comap_mono a.property.2.2.2⟩
+  -- The restricted isomorphism descends to the quotients, keeping the same coordinates.
+  let N := K.comap J.subtype
+  let N' := K'.comap J'.subtype
+  have hN : N'.map eJ.toMulEquiv.toMonoidHom = N := by
+    change N'.map (eJ.toMulEquiv : J' →* J) = N
+    rw [Subgroup.map_equiv_eq_comap_symm eJ.toMulEquiv]
+    ext y
+    change e (e.symm y) ∈ K ↔ (y : H) ∈ K
+    rw [e.apply_symm_apply]
+  let q := QuotientGroup.congr N' N eJ.toMulEquiv hN
+  let eQ : a'.quotient ≃ₜ* a.quotient :=
+    ⟨q, (QuotientGroup.isQuotientMap_mk N').continuous_iff.mpr
+      (QuotientGroup.continuous_mk.comp eJ.continuous),
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        (QuotientGroup.continuous_mk.comp eJ.symm.continuous)⟩
+  let p' : ElementaryLCAPresentation a'.quotient :=
+    { p with equiv := eQ.trans p.equiv }
+  have hreal : schwartzBruhatStageRealization a' p' f =
+      schwartzBruhatStageRealization a p f ∘ e := by
+    funext x
+    rw [Function.comp_apply, schwartzBruhatStageRealization_apply,
+      schwartzBruhatStageRealization_apply]
+    by_cases hx : e x ∈ J
+    · rw [dite_eq_left (show x ∈ a'.val.1 from hx), dite_eq_left hx]
+      rfl
+    · rw [dite_eq_right (show x ∉ a'.val.1 from hx), dite_eq_right hx]
+  rw [← hreal]
+  exact (schwartzBruhatStageInclusion a' p' f).property
+
+/-- Pullback along a topological group isomorphism preserves Schwartz–Bruhat membership. -/
+private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H]
+    (e : G ≃ₜ* H) {g : H → ℂ} (hg : g ∈ schwartzBruhatSubmodule H) :
+    g ∘ e ∈ schwartzBruhatSubmodule G := by
+  let pullback : (H → ℂ) →ₗ[ℂ] (G → ℂ) := LinearMap.funLeft ℂ ℂ e
+  have hle : schwartzBruhatSubmodule H ≤ (schwartzBruhatSubmodule G).comap pullback := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun p ↦ ?_
+    rintro _ ⟨f, rfl⟩
+    exact schwartzBruhat_stage_comp_equiv e a p f
+  exact hle hg
+
+open scoped RestrictedProduct in
 /-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
 character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
 theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
     (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
       (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
-      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by sorry
+      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+  let G := Multiplicative 𝔸[F]
+  let μ : Measure G := additiveTamagawaMeasure F
+  let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+      LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+  let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+      CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : BorelSpace G := ⟨rfl⟩
+  have hμ := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.1.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := hμ.2.1
+  obtain ⟨e, he, -⟩ := additiveTamagawaMeasure_selfDual F
+  obtain ⟨Fourier, hFourier⟩ := schwartzBruhat_fourier_equiv μ
+  let g : schwartzBruhatSubmodule (PontryaginDual G) := Fourier f
+  have hg := schwartzBruhat_mem_comp_equiv e g.property
+  have hEq (y : G) : tamagawaFourier (additiveTamagawaMeasure F)
+      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd =
+        g.val (e y) := by
+    rw [tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
+      rw [mul_comm x y.toAdd]
+      exact he y.toAdd x)]
+    exact ((hFourier f).2 (e y)).symm
+  rw [funext hEq]
+  exact hg
 
 /-- Paper: Theorem 2.2.3.2, p. 82. The Fourier transform in the theta identity
 uses the trace character and the covolume-one measure of Appendix A. -/
