@@ -25,27 +25,97 @@ local instance {X : Type*} [AddCommGroup X] [Module ℂ X] {ι : Type*}
     (p : SeminormFamily ℂ X ι) : ContinuousSMul ℂ (WithGeneratingSeminorms X p) :=
   (withGeneratingSeminorms_spec X p).continuousSMul
 
-variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
-  [T2Space G] [LocallyCompactSpace G]
+variable {G : Type*} [CommGroup G] [TopologicalSpace G]
+local notation "GoodCompact" => {k : Subgroup G // IsCompact (k : Set G) ∧
+  IsCompactlyGeneratedGroup (lcaAnnihilator k)}
+
+/-- Paper: Example D.3.3.5, p. 805. Pullback along the quotient map for nested
+compact subgroups with compactly generated annihilators is a topological embedding
+on the ordinary Schwartz–Bruhat spaces. -/
+theorem schwartzBruhat_compactQuotient_pullback [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] (k k' : GoodCompact) (h : k'.val ≤ k.val) :
+    ∃ j : SchwartzBruhat (G ⧸ k.val) →L[ℂ] SchwartzBruhat (G ⧸ k'.val),
+      IsEmbedding j ∧ ∀ f (g : G), j f (g : G ⧸ k'.val) = f (g : G ⧸ k.val) := by
+  sorry
+
+variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 variable (m : G →ₜ* ℝ≥0ˣ) (I : Set ℝ)
 
 local notation "K" => m.toMonoidHom.ker
 local notation "E" => ModulatedExponentialDecay m I
 local notation "P" => PositiveRealExponentialDecay I
-local notation "GoodCompact" => {k : Subgroup G // IsCompact (k : Set G) ∧
-  IsCompactlyGeneratedGroup (lcaAnnihilator k)}
 
 section Stages
 
+/-- Paper: (D.3.3.2), p. 805. The topology of a decay stage is induced by the
+joint map to the product of its Schwartz–Bruhat twists. -/
+private theorem modulatedExponentialDecayStage_twists_isInducing (k : GoodCompact) :
+    IsInducing (fun (f : ModulatedExponentialDecayStage m I k) (a : I) ↦
+      modulatedExponentialDecayTwist (quotientModulation m k.val k.property.1) I a f) := by
+  let T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (I → SchwartzBruhat (G ⧸ k.val)) :=
+    LinearMap.pi (modulatedExponentialDecayTwist (quotientModulation m k.val k.property.1) I)
+  change IsInducing T
+  have hPi := withSeminorms_pi
+    (fun _ : I ↦ PolynormableSpace.withSeminorms ℂ (SchwartzBruhat (G ⧸ k.val)))
+  have hInduced := WithSeminorms.topologicalSpace_eq_iInf (t := induced T inferInstance)
+    (T.withSeminorms_induced hPi)
+  refine ⟨(withGeneratingSeminorms_spec _ _).topologicalSpace_eq_iInf.trans
+    (Eq.trans ?_ hInduced.symm)⟩
+  exact (Equiv.sigmaEquivProd I _).symm.iInf_congr (fun _ ↦ rfl)
+
 variable (hm : IsModulation m) (hms : Surjective m) (hInt : OrdConnected I) (hne : I.Nonempty)
 
+set_option linter.unusedSectionVars false in
 include hm hms hInt hne in
 /-- Paper: Example D.3.3.5, p. 805. When k' is contained in k, pullback
 from G/k to G/k' embeds the decay stage topologically in the larger stage. -/
 theorem modulatedExponentialDecayStage_transition (k k' : GoodCompact) (h : k'.val ≤ k.val) :
     ∃ j : ModulatedExponentialDecayStage m I k →L[ℂ] ModulatedExponentialDecayStage m I k',
-      IsEmbedding j ∧ ∀ f (g : G), (j f).val (g : G ⧸ k'.val) = f.val (g : G ⧸ k.val) :=
-  by sorry
+      IsEmbedding j ∧ ∀ f (g : G), (j f).val (g : G ⧸ k'.val) = f.val (g : G ⧸ k.val) := by
+  have hSchwartz := schwartzBruhat_compactQuotient_pullback (G := G) k k' h
+  let L := hSchwartz.choose
+  have hL : IsEmbedding L := hSchwartz.choose_spec.1
+  have hL_apply := hSchwartz.choose_spec.2
+  let n := quotientModulation m k.val k.property.1
+  let n' := quotientModulation m k'.val k'.property.1
+  let q : (G ⧸ k'.val) →* (G ⧸ k.val) :=
+    QuotientGroup.map k'.val k.val (MonoidHom.id G) (by simpa only [Subgroup.comap_id] using h)
+  let pullback : ModulatedExponentialDecayStage m I k →ₗ[ℂ] ((G ⧸ k'.val) → ℂ) :=
+    (LinearMap.pi fun x ↦ LinearMap.proj (q x)).comp
+      (modulatedExponentialDecaySubmodule n I).subtype
+  have hweight (f : ModulatedExponentialDecayStage m I k) (a : I) :
+      modulationWeight n' a (pullback f) =
+        (L (modulatedExponentialDecayTwist n I a f) : (G ⧸ k'.val) → ℂ) := by
+    funext x
+    exact QuotientGroup.induction_on x fun g ↦
+      (hL_apply (modulatedExponentialDecayTwist n I a f) g).symm
+  let j : ModulatedExponentialDecayStage m I k →ₗ[ℂ] ModulatedExponentialDecayStage m I k' :=
+    pullback.codRestrict (modulatedExponentialDecaySubmodule n' I) (by
+      intro f
+      refine (Submodule.mem_iInf _).mpr fun a ↦ Submodule.mem_comap.mpr ?_
+      rw [hweight]
+      exact (L (modulatedExponentialDecayTwist n I a f)).property)
+  let twists (f : ModulatedExponentialDecayStage m I k) (a : I) :=
+    modulatedExponentialDecayTwist n I a f
+  let twists' (f : ModulatedExponentialDecayStage m I k') (a : I) :=
+    modulatedExponentialDecayTwist n' I a f
+  let mapTwists := Pi.map fun _ : I ↦
+    (L : SchwartzBruhat (G ⧸ k.val) → SchwartzBruhat (G ⧸ k'.val))
+  have hcomm : twists' ∘ j = mapTwists ∘ twists :=
+    funext fun f ↦ funext fun a ↦ Subtype.ext (hweight f a)
+  have hmapTwists : IsInducing mapTwists := IsInducing.piMap fun _ ↦ hL.isInducing
+  have hcomposite : IsInducing (twists' ∘ j) :=
+    Eq.mpr (congrArg (fun φ : ModulatedExponentialDecayStage m I k →
+      I → SchwartzBruhat (G ⧸ k'.val) ↦ IsInducing φ) hcomm)
+      (hmapTwists.comp (modulatedExponentialDecayStage_twists_isInducing m I k))
+  have htwists' : IsInducing twists' := modulatedExponentialDecayStage_twists_isInducing m I k'
+  have hj : IsInducing j := htwists'.of_comp_iff.mp hcomposite
+  refine ⟨⟨j, hj.continuous⟩, ⟨hj, ?_⟩, fun _ _ ↦ rfl⟩
+  intro f g hfg
+  apply Subtype.ext
+  funext x
+  exact QuotientGroup.induction_on x fun y ↦
+    congrArg (fun z : ModulatedExponentialDecayStage m I k' ↦ z.val (y : G ⧸ k'.val)) hfg
 
 variable [hSC : SecondCountableTopology G]
 
