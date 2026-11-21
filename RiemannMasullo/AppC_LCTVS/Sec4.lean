@@ -10,12 +10,14 @@ public import Mathlib.MeasureTheory.Integral.Prod
 public import Mathlib.MeasureTheory.Measure.Complex
 public import Mathlib.MeasureTheory.VectorMeasure.Integral
 public import Mathlib.Topology.Algebra.Group.Quotient
+import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Operator.Banach
 import Mathlib.LinearAlgebra.Dual.Lemmas
 import Mathlib.MeasureTheory.Function.ConvergenceInMeasure
 import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
+import Mathlib.Topology.Algebra.Module.Star
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
@@ -175,7 +177,12 @@ theorem completion_weakSpace_eq_pettisWeakCompletion :
 given topology is compact, its image is the closure in the weak completion. -/
 theorem image_closure_eq_closure_weakCompletion {s : Set E} (hs : Convex ℝ s)
     (hc : IsCompact (closure s)) :
-    toPettisWeakCompletion E '' closure s = closure (toPettisWeakCompletion E '' s) := by sorry
+    toPettisWeakCompletion E '' closure s = closure (toPettisWeakCompletion E '' s) := by
+  haveI : T2Space (PettisWeakCompletion E) :=
+    (WeakBilin.isEmbedding (B := (LinearMap.id : Module.Dual ℂ (StrongDual ℂ E) →ₗ[ℂ] _))
+      Function.injective_id).t2Space
+  exact image_closure_of_isCompact hc
+    (continuous_toPettisWeakCompletion (E := E)).continuousOn
 
 /-- Paper: Lemma C.4.1.2(2), p. 710. Evaluation into the weak completion of a
 normed space factors through Mathlib's isometric inclusion into the normed bidual. -/
@@ -536,13 +543,32 @@ theorem closedAbsConvexHull_eq_pettisWeakIntegrals_unitBall [CompactSpace X]
       ∃ hi : PettisWeaklyIntegrable (.complex μ) f,
         pettisWeakIntegral (.complex μ) f hi = a} := by sorry
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem C.4.3.2(2), p. 712. The closed absolutely convex hull of the
 image in the weak completion is compact.
 Deviation: The hull includes zero for the empty domain, as in the bipolar convention. -/
 theorem isCompact_closedAbsConvexHull_weakCompletion_range [CompactSpace X]
     (f : X → E) (hf : Continuous f) :
     IsCompact (closure (convexHull ℝ
-      (balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f)))))) := by sorry
+      (balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f)))))) := by
+  let K := Metric.closedBall (0 : ℂ) 1 • insert 0 (range f)
+  have hK : IsCompact K := (isCompact_closedBall _ _).smul_set ((isCompact_range hf).insert 0)
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hK
+  let : MeasurableSpace K := borel K
+  let : BorelSpace K := ⟨rfl⟩
+  have hrange : range (toPettisWeakCompletion E ∘ (Subtype.val : K → E)) =
+      balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f))) := by
+    rw [range_comp, Subtype.range_coe]
+    change (toPettisWeakCompletion E) '' image2 (· • ·) _ _ = _
+    rw [image_image2_distrib_right (f' := (· • ·))
+      (fun c x ↦ (toPettisWeakCompletion E).map_smul c x),
+      image_insert_eq, (toPettisWeakCompletion E).map_zero, ← range_comp]
+    ext z
+    rw [mem_balancedHull_iff (𝕜 := ℂ) (E := PettisWeakCompletion E)]
+    simp only [image2_smul, Set.mem_smul, Metric.mem_closedBall, dist_zero_right, mem_smul_set]
+  let : ContinuousSMul ℝ (PettisWeakCompletion E) := IsScalarTower.continuousSMul ℂ
+  rw [← hrange, ← closedConvexHull_eq_closure_convexHull]
+  exact isCompact_closedConvexHull_weakCompletion_range Subtype.val continuous_subtype_val
 
 -- TODO(paper-gap): The level comparison in Remark C.4.3.4 is a preorder.
 -- Distinct vectors can lie at the same level.
@@ -669,7 +695,70 @@ theorem exists_hasPettisIntegral_apply
     (f : X → H →L[ℂ] H)
     (hf : ∀ u, PettisWeaklyMeasurable (.complex μ) (fun x ↦ f x u))
     (hnorm : Integrable (fun x ↦ ‖f x‖) μ.variation) :
-    ∃ A : H →L[ℂ] H, ∀ u, HasPettisIntegral (.complex μ) (fun x ↦ f x u) (A u) := by sorry
+    ∃ A : H →L[ℂ] H, ∀ u, HasPettisIntegral (.complex μ) (fun x ↦ f x u) (A u) := by
+  have hpoint (u : H) (φ : StrongDual ℂ H) (x : X) :
+      ‖φ (f x u)‖ ≤ (‖φ‖ * ‖u‖) * ‖f x‖ := calc
+    ‖φ (f x u)‖ ≤ ‖φ‖ * ‖f x u‖ := φ.le_opNorm _
+    _ ≤ ‖φ‖ * (‖f x‖ * ‖u‖) :=
+      mul_le_mul_of_nonneg_left ((f x).le_opNorm u) (norm_nonneg _)
+    _ = _ := by ring
+  have hi (u : H) : PettisWeaklyIntegrable (.complex μ) (fun x ↦ f x u) :=
+    fun φ ↦ (hnorm.const_mul (‖φ‖ * ‖u‖)).mono' (hf u φ).aestronglyMeasurable
+      (Eventually.of_forall (hpoint u φ))
+  -- Use Riesz representation on the conjugate of a bidual functional.
+  have hH : Surjective (NormedSpace.inclusionInDoubleDual ℂ H) := by
+    intro l
+    let d := InnerProductSpace.toDual ℂ H
+    let g : StrongDual ℂ H := (starL ℂ (A := ℂ)).toContinuousLinearMap.comp
+      (l.comp d.toLinearIsometry.toContinuousLinearMap)
+    obtain ⟨z, hz⟩ := d.surjective g
+    refine ⟨z, ContinuousLinearMap.ext fun φ ↦ ?_⟩
+    obtain ⟨y, rfl⟩ := d.surjective φ
+    change inner ℂ y z = l (d y)
+    rw [← inner_conj_symm]
+    change starRingEnd ℂ (d z y) = l (d y)
+    rw [hz]
+    change starRingEnd ℂ (starRingEnd ℂ (l (d y))) = l (d y)
+    simp
+  choose a ha using fun u ↦ pettisIntegrable_of_reflexive hH μ (fun x ↦ f x u) (hi u)
+  have heval (u : H) (φ : StrongDual ℂ H) :
+      φ (a u) = (PettisMeasure.complex μ).scalarIntegral (fun x ↦ φ (f x u)) := by
+    obtain ⟨_, h⟩ := ha u
+    exact congrArg (fun z : PettisWeakCompletion H ↦
+      (show Module.Dual ℂ (StrongDual ℂ H) from z) φ) h
+  let L : H →ₗ[ℂ] H :=
+    { toFun := a
+      map_add' := fun u v ↦ by
+        apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+        intro φ
+        simp only [map_add, heval]
+        exact VectorMeasure.integral_fun_add (hi u φ) (hi v φ)
+      map_smul' := fun c u ↦ by
+        apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+        intro φ
+        simp only [RingHom.id_apply, map_smul, heval]
+        exact pettisScalarIntegral_smul (.complex μ) (fun x ↦ f x u) (hi u) c φ }
+  -- Bound the representing vectors by integrating against the variation of μ.
+  let C := ∫ x, ‖f x‖ ∂μ.variation
+  have hC : 0 ≤ C := integral_nonneg fun x ↦ norm_nonneg _
+  have hL (u : H) : ‖L u‖ ≤ C * ‖u‖ := by
+    apply NormedSpace.norm_le_dual_bound (𝕜 := ℂ) _ (mul_nonneg hC (norm_nonneg _))
+    intro φ
+    change ‖φ (a u)‖ ≤ _
+    rw [heval]
+    change ‖μ.integral (fun x ↦ φ (f x u)) (ContinuousLinearMap.mul ℝ ℂ)‖ ≤ _
+    calc
+      _ ≤ ‖ContinuousLinearMap.mul ℝ ℂ‖ * ∫ x, ‖φ (f x u)‖ ∂μ.variation :=
+        VectorMeasure.norm_integral_le_integral_norm
+      _ ≤ ∫ x, ‖φ (f x u)‖ ∂μ.variation :=
+        mul_le_of_le_one_left (integral_nonneg fun x ↦ norm_nonneg _)
+          (ContinuousLinearMap.opNorm_mul_le ℝ ℂ)
+      _ ≤ ∫ x, (‖φ‖ * ‖u‖) * ‖f x‖ ∂μ.variation :=
+        integral_mono (hi u φ).norm (hnorm.const_mul _) (hpoint u φ)
+      _ = _ := by
+        rw [integral_const_mul]
+        ring
+  exact ⟨L.mkContinuous C hL, ha⟩
 
 -- TODO(paper-gap): The proof of C.4.3.12 uses |μ(X)| where a uniform estimate
 -- needs |μ|(X). The integrability of each function is already assumed.

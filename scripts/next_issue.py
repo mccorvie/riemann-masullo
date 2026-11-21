@@ -30,6 +30,23 @@ def issues(label):
     return [json.loads(line) for line in out.stdout.splitlines() if line.strip()]
 
 
+def in_review():
+    """Issue numbers that already have an open pull request from a launcher branch. Such an
+    issue can be without the `claimed` label (after a hand-in by hand, say); several agents
+    sent to it at once would fight over one worktree."""
+    out = subprocess.run(
+        ["gh", "api", "--paginate", "repos/{owner}/{repo}/pulls?state=open&per_page=100",
+         "--jq", ".[].head.ref"], capture_output=True, text=True, cwd=ROOT)
+    if out.returncode:
+        return set()
+    found = set()
+    for ref in out.stdout.split():
+        m = re.fullmatch(r"(?:prover|digester)/(\d+)", ref)
+        if m:
+            found.add(int(m.group(1)))
+    return found
+
+
 def depths():
     """For each library file, the length of the longest chain of project imports below it."""
     imports = {}
@@ -48,10 +65,11 @@ def depths():
 def main(argv):
     label = argv[0] if argv else "proof"
     free, busy = [], collections.Counter()
+    taken_already = in_review()
     for issue in issues(label):
         m = MARK.search(issue["body"] or "")
         file = m.group(1) if m else "-"
-        if "claimed" in issue["labels"]:
+        if "claimed" in issue["labels"] or issue["number"] in taken_already:
             busy[file] += 1
         elif not {"blocked", "stuck"} & set(issue["labels"]):
             free.append((file, issue["number"]))

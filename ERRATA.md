@@ -164,6 +164,21 @@ parts that are not stated in Lean yet, so nothing here has been tested by the fo
 | R2 | §1.4.3, p. 29, and §1.8.4.3, p. 54 | The bound on the archimedean terms, claimed to be uniform in the cutoff and used for a Montel extraction, is reported to fail for the printed family of test functions, already for ζ: with nonnegative approximants tending to t⁻² on t > 1, Fatou's lemma makes the archimedean contribution diverge as the cutoff neighbourhood of 1 shrinks. The report says this concerns the passage to the limit in the introduction's sketch and leaves the trace identity itself undecided. A sign discrepancy in the prime sum on p. 29 is also reported. | [`survey/endgame.md`](RiemannMasullo/External/survey/endgame.md) | scout, against the page images |
 | R3 | Chapter 11 and §12.4–12.5, pp. 475–520 (Theorem 12.5.1.1) | An outside audit of the argument, done with an AI model and not checked by a number theorist, reports that the step restricting the spectral side to zeros in a window (p. 520) is unsupported, and lists further objections with computations in small cases. A companion calculation at the prime 2 (p. 514, (12.4.1.23)) reports that removing the norm cutoff and the Fourier cutoff in the two orders gives different values. Neither has been checked here; these chapters are not yet formalized. | issue #2469, pull request #2734 | reported |
 
+## Errors of the formalization, not of the paper
+
+Statements or definitions on `main` that were wrong although the paper is right, found by review
+or by provers. They are listed because each cost effort and each shows a way Lean can silently
+say something other than what was meant.
+
+| Where | What was wrong | Found by |
+|---|---|---|
+| `tendsto_sum_orthogonalProjections_iff_dense_iSup` (Remark C.3.5.2) | A set ascription outside a supremum made Lean take the union of the subspaces, not their sum. | a prover, #750 |
+| `weaklyContDiffOn_iff_scalar` (Definition C.5.1.6) | Stated for any normed source; the paper has k^d, and it fails in infinite dimensions. | a prover, #958 |
+| `ElementaryLCAPresentation` ((D.1.4.2)) | The finite factor is `Fin n` with a supplied group structure, but Lean uses addition mod n, so only cyclic factors were covered. Repaired in #2914: the finite factor is a finite type with its own group structure. | provers, #683 and #688 |
+| The Z-space quotient maps of §5.1 | Written with the range subtype as codomain, they used the subspace topology, not the transported one. | review of #2258 |
+| The eigendistribution weight and complex Gaussian of §3.4 | Inverse weight relative to the action on `main`; a Gaussian whose zeta integral vanishes. | review of #2289 |
+| The standard additive character | Followed the paper's signs; see F13. | statement audit |
+
 ## How this file is kept
 
 Digesters and provers mark a problem where they meet it with a comment `-- TODO(paper-gap): …`

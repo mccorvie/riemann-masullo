@@ -146,11 +146,6 @@ theorem uniformConvergenceCLM_t2_of_dense_span : T2Space (E →Lᵤ[ℂ, S] F) :
   · exact UniformOnFun.uniformContinuous_restrict_toFun.continuous.comp
       (UniformConvergenceCLM.isEmbedding_coeFn (RingHom.id ℂ) F S).continuous
 
-include hb hdense in
-/-- Paper: Lemma C.2.1.2, p. 671. The same family gives a locally convex vector topology on
-continuous linear maps into a Hausdorff locally convex target. -/
-theorem uniformConvergenceCLM_polynormable : PolynormableSpace ℂ (E →Lᵤ[ℂ, S] F) := by sorry
-
 /-- Paper: (C.2.1.4), p. 671. Take the supremum of a continuous target seminorm after
 evaluation at each point of a bounded test set. -/
 def mappingSeminorm (T : {T : Set E // IsVonNBounded ℂ T})
@@ -219,6 +214,13 @@ theorem uniformConvergenceCLM_withSeminorms {ι : Type*} (p : SeminormFamily ℂ
       exact le_ciSup (f := fun y : T ↦ p i (f y))
         ⟨r, forall_mem_range.mpr fun y ↦ (hbound y y.2).le⟩ ⟨x, hx⟩
     exact hxle.trans_lt ((q (⟨T, hT⟩, i)).mem_ball_zero.mp (mem_iInter₂.mp hf i hi))
+
+include hb hdense in
+/-- Paper: Lemma C.2.1.2, p. 671. The same family gives a locally convex vector topology on
+continuous linear maps into a Hausdorff locally convex target. -/
+theorem uniformConvergenceCLM_polynormable : PolynormableSpace ℂ (E →Lᵤ[ℂ, S] F) := by
+  exact (uniformConvergenceCLM_withSeminorms S hb hdense _
+    (PolynormableSpace.withSeminorms ℂ F)).toPolynormableSpace
 
 -- Example C.2.1.3 (p. 671) comments on the prevalence of these topologies.
 
