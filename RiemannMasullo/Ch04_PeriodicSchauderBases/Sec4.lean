@@ -148,7 +148,18 @@ theorem modulatedMellin_translate (f : D) (s : ℂ) (hs : s.re ∈ I) :
       modulatedExponentialDecaySubmodule_translate m I hm hms γ⁻¹ f⟩
     modulatedFourierMellin m I hm μ f'.val (twist[s]) =
       (χ γ⁻¹ : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) *
-        modulatedFourierMellin m I hm μ f.val (twist[s]) := by sorry
+        modulatedFourierMellin m I hm μ f.val (twist[s]) := by
+  intro f'
+  have hmem : twist[s] ∈ relativeVerticalStrip m.toMonoidHom hm.1 hm.2 I := by
+    change quasiCharacterAbscissa m.toMonoidHom hm.1 hm.2 (twist[s]) ∈ I
+    rw [quasiCharacterAbscissa_of_unitary_twist m.toMonoidHom hm.1 hm.2 _ χ s (fun _ ↦ rfl)]
+    exact hs
+  have hval : (twist[s]) γ⁻¹ = (χ γ⁻¹ : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) := by
+    change (χ γ⁻¹ : ℂ) * (((m γ⁻¹).val : ℝ) : ℂ) ^ s = _
+    rw [map_inv m γ, Units.val_inv_eq_inv_val, NNReal.coe_inv, Complex.ofReal_inv,
+      Complex.inv_cpow_ofReal_nonneg (NNReal.coe_nonneg _), Complex.cpow_neg]
+  exact (modulatedFourierMellin_equivariant m I hm hInt hne μ hOpen hms γ⁻¹ f ⟨_, hmem⟩).trans
+    (congrArg (· * modulatedFourierMellin m I hm μ f.val (twist[s])) hval)
 
 include hτ in
 /-- Paper: Discussion 4.4.1.1(3), p. 191. Compact averaging sends translation by
