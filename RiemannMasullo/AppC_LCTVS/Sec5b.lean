@@ -2,14 +2,27 @@ module
 
 public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
+import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 public import Mathlib.Analysis.Complex.HasPrimitives
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
+import Mathlib.Analysis.Calculus.FDeriv.Measurable
 import Mathlib.Analysis.Calculus.FDeriv.Mul
+import Mathlib.Analysis.Calculus.ParametricIntervalIntegral
 import Mathlib.Analysis.Complex.CauchyIntegral
+import Mathlib.Analysis.Complex.Liouville
+import Mathlib.Analysis.Complex.LocallyUniformLimit
+import Mathlib.Analysis.Complex.RealDeriv
 import Mathlib.Analysis.Complex.RemovableSingularity
+import Mathlib.Analysis.Complex.Tietze
+import Mathlib.Analysis.Normed.Module.Ball.Pointwise
 import Mathlib.Analysis.Normed.Module.Completion
+import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
+import Mathlib.Topology.MetricSpace.Thickening
+import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.Integral
 
 /-!
@@ -399,6 +412,295 @@ theorem exists_positiveSimpleContour_circle (z : ℂ) {r : ℝ} (hr : 0 < r) :
   · refine (pettisIntegral_complex_iff _ _ _).2.2.mpr ⟨(hkernel z hzs).1, ?_⟩
     rw [(hkernel z hzs).2, circleIntegral.integral_sub_inv_of_mem_ball hz]
 
+section ContourIntegral
+
+open Complex intervalIntegral Metric
+
+private lemma ComplexContour.partition_nonempty
+    {n : ℕ} {t : Fin (n + 1) → ℝ} (ht0 : t 0 = 0) (ht1 : t (Fin.last n) = 1) :
+    0 < n := by
+  cases n with
+  | zero =>
+    have : (0 : ℝ) = 1 := by simpa [Fin.last_zero, ht0] using ht1
+    exact absurd this zero_ne_one
+  | succ n => exact Nat.succ_pos n
+
+private lemma ComplexContour.exists_piece
+    {n : ℕ} {t : Fin (n + 1) → ℝ} (ht : StrictMono t) (ht0 : t 0 = 0)
+    (ht1 : t (Fin.last n) = 1) {s : ℝ} (hs : s ∈ Icc (0 : ℝ) 1) :
+    ∃ i : Fin n, s ∈ Icc (t i.castSucc) (t i.succ) := by
+  have hn := ComplexContour.partition_nonempty ht0 ht1
+  classical
+  let S : Finset (Fin (n + 1)) := Finset.univ.filter (fun i => s ≤ t i)
+  have hne : S.Nonempty := by
+    refine ⟨Fin.last n, Finset.mem_filter.mpr ⟨Finset.mem_univ _, ?_⟩⟩
+    rw [ht1]
+    exact hs.2
+  have hmem := Finset.min'_mem S hne
+  have hle : s ≤ t (S.min' hne) := (Finset.mem_filter.mp hmem).2
+  have hpred (j : Fin (n + 1)) (hj : j < S.min' hne) : ¬ s ≤ t j := by
+    intro hjs
+    have hjS : j ∈ S := Finset.mem_filter.mpr ⟨Finset.mem_univ _, hjs⟩
+    exact (Finset.min'_le S j hjS).not_gt hj
+  cases hmin : S.min' hne using Fin.cases with
+  | zero =>
+    have hs0 : s = 0 := le_antisymm (by simpa [hmin, ht0] using hle) hs.1
+    refine ⟨⟨0, hn⟩, ?_, ?_⟩
+    · simp [hs0, ht0]
+    · have : t 0 ≤ t (Fin.succ (⟨0, hn⟩ : Fin n)) :=
+        ht.monotone (Fin.zero_le _)
+      simpa [hs0, ht0] using this
+  | succ k =>
+    refine ⟨k, ?_, ?_⟩
+    · have hlt : k.castSucc < S.min' hne := by simpa [hmin] using k.castSucc_lt_succ
+      exact (lt_of_not_ge (hpred k.castSucc hlt)).le
+    · simpa [hmin] using hle
+
+/-- The velocity of a piecewise `C¹` contour is integrable on the parameter interval. -/
+lemma ComplexContour.integrable_deriv (g : ComplexContour) :
+    Integrable (fun t : ℝ => deriv g.toContinuousMap t) (volume.restrict (Icc (0 : ℝ) 1)) := by
+  obtain ⟨n, t, ht, ht0, ht1, hcd⟩ := g.piecewiseContDiff
+  have hpiece (i : Fin n) :
+      IntegrableOn (fun s : ℝ => deriv g.toContinuousMap s)
+        (Icc (t i.castSucc) (t i.succ)) := by
+    have hab : t i.castSucc < t i.succ := ht i.castSucc_lt_succ
+    have hu : UniqueDiffOn ℝ (Icc (t i.castSucc) (t i.succ)) := uniqueDiffOn_Icc hab
+    have hcont : ContinuousOn (derivWithin g.toContinuousMap (Icc (t i.castSucc) (t i.succ)))
+        (Icc (t i.castSucc) (t i.succ)) :=
+      (hcd i).continuousOn_derivWithin hu le_rfl
+    have hint : IntegrableOn (derivWithin g.toContinuousMap (Icc (t i.castSucc) (t i.succ)))
+        (Icc (t i.castSucc) (t i.succ)) :=
+      hcont.integrableOn_compact isCompact_Icc
+    have heq : EqOn (deriv g.toContinuousMap)
+        (derivWithin g.toContinuousMap (Icc (t i.castSucc) (t i.succ)))
+        (Ioo (t i.castSucc) (t i.succ)) := by
+      intro s hs
+      exact (derivWithin_of_mem_nhds (Icc_mem_nhds hs.1 hs.2)).symm
+    have hioo : IntegrableOn (deriv g.toContinuousMap) (Ioo (t i.castSucc) (t i.succ)) :=
+      (hint.mono_set Ioo_subset_Icc_self).congr_fun heq.symm measurableSet_Ioo
+    exact (integrableOn_congr_set_ae (Ioo_ae_eq_Icc (a := t i.castSucc)
+      (b := t i.succ))).1 hioo
+  have hunion : IntegrableOn (fun s : ℝ => deriv g.toContinuousMap s)
+      (⋃ i : Fin n, Icc (t i.castSucc) (t i.succ)) :=
+    (integrableOn_finite_iUnion).2 hpiece
+  refine hunion.mono_set ?_
+  intro s hs
+  obtain ⟨i, hi⟩ := ComplexContour.exists_piece ht ht0 ht1 hs
+  exact mem_iUnion.2 ⟨i, hi⟩
+
+/-- The contour variation is supported on the trace. -/
+lemma ComplexContour.variation_compl_trace (g : ComplexContour) :
+    (PettisMeasure.complex g.measure).variation (g.trace)ᶜ = 0 := by
+  let p : ℝ → ℂ := g.toContinuousMap
+  let m : Measure ℝ := volume.restrict (Icc (0 : ℝ) 1)
+  let n : ComplexMeasure ℝ := m.withDensityᵥ (deriv p)
+  have hvel : Integrable (deriv p) m := g.integrable_deriv
+  have hvar : n.variation = m.withDensity (fun t => ‖deriv p t‖ₑ) :=
+    Measure.variation_withDensityᵥ hvel
+  have htrace : IsClosed g.trace :=
+    (isCompact_Icc.image g.toContinuousMap.continuous).isClosed
+  let pre : Set ℝ := Set.preimage p (g.traceᶜ)
+  have hpre : MeasurableSet pre :=
+    g.toContinuousMap.continuous.measurable (htrace.measurableSet.compl)
+  have hzero_m : m pre = 0 := by
+    rw [Measure.restrict_apply' measurableSet_Icc]
+    convert measure_empty (μ := volume)
+    ext t
+    simp only [pre, mem_inter_iff, mem_preimage, mem_compl_iff, mem_empty_iff_false, iff_false,
+      not_and]
+    intro ht htI
+    exact ht ⟨t, htI, rfl⟩
+  have hzero_n : n.variation pre = 0 := by
+    rw [hvar, withDensity_apply (fun t => ‖deriv p t‖ₑ) hpre]
+    exact setLIntegral_measure_zero _ _ hzero_m
+  have hmap : (n.variation.map p) (g.traceᶜ) = 0 := by
+    rw [Measure.map_apply g.toContinuousMap.continuous.measurable htrace.measurableSet.compl]
+    exact hzero_n
+  have hle : (n.map p).variation (g.traceᶜ) ≤ (n.variation.map p) (g.traceᶜ) :=
+    VectorMeasure.variation_map_le _
+  exact le_antisymm (hle.trans_eq hmap) bot_le
+
+/-- A function continuous on the trace is integrable against the contour variation, and its
+scalar integral is the parameter integral against the velocity. -/
+lemma ComplexContour.scalarIntegral_eq_intervalIntegral (g : ComplexContour) {f : ℂ → ℂ}
+    (hf : ContinuousOn f g.trace) :
+    Integrable f (PettisMeasure.complex g.measure).variation ∧
+      (PettisMeasure.complex g.measure).scalarIntegral f =
+        ∫ t in (0 : ℝ)..1, f (g.toContinuousMap t) * deriv g.toContinuousMap t := by
+  let p : C(ℝ, ℂ) := g.toContinuousMap
+  let m : Measure ℝ := volume.restrict (Icc (0 : ℝ) 1)
+  let n : ComplexMeasure ℝ := m.withDensityᵥ (deriv (p : ℝ → ℂ))
+  have hvel : Integrable (deriv (p : ℝ → ℂ)) m := g.integrable_deriv
+  have hclosed : IsClosed g.trace :=
+    (isCompact_Icc.image p.continuous).isClosed
+  let fRes : C(g.trace, ℂ) :=
+    ⟨fun z => f z.1, ContinuousOn.comp_continuous hf continuous_subtype_val (fun z => z.2)⟩
+  obtain ⟨F, hF⟩ := ContinuousMap.exists_restrict_eq hclosed fRes
+  have hagree (t : ℝ) (ht : t ∈ Icc (0 : ℝ) 1) : F (p t) = f (p t) := by
+    have hw : p t ∈ g.trace := ⟨t, ht, rfl⟩
+    have := congrFun (congrArg ContinuousMap.toFun hF) ⟨p t, hw⟩
+    simpa [fRes] using this
+  have hcomp : ContinuousOn (fun t : ℝ => F (p t)) (Icc (0 : ℝ) 1) :=
+    F.continuous.comp_continuousOn p.continuous.continuousOn
+  have hbdd : ∃ C : ℝ, 0 ≤ C ∧ ∀ t ∈ Icc (0 : ℝ) 1, ‖F (p t)‖ ≤ C := by
+    have hne : (Icc (0 : ℝ) 1).Nonempty := nonempty_Icc.2 zero_le_one
+    obtain ⟨t, ht, hmax⟩ := isCompact_Icc.exists_isMaxOn hne hcomp.norm
+    exact ⟨‖F (p t)‖, norm_nonneg _, fun s hs => hmax hs⟩
+  obtain ⟨C, hC0, hC⟩ := hbdd
+  have hsmul : Integrable (fun t => ‖deriv (p : ℝ → ℂ) t‖ • F (p t)) m := by
+    refine (hvel.norm.const_mul C).mono'
+      (((aestronglyMeasurable_deriv (p : ℝ → ℂ) m).norm.smul
+        (hcomp.aestronglyMeasurable measurableSet_Icc))) ?_
+    filter_upwards [ae_restrict_mem measurableSet_Icc] with t ht
+    rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg (norm_nonneg _)]
+    exact (mul_le_mul_of_nonneg_left (hC t ht) (norm_nonneg _)).trans_eq (mul_comm _ _)
+  have hfi : n.Integrable (F ∘ p) := by
+    change Integrable (F ∘ p) n.variation
+    rw [Measure.variation_withDensityᵥ hvel]
+    exact (integrable_withDensity_iff_integrable_smul (measurable_deriv (p : ℝ → ℂ)).nnnorm).2
+      hsmul
+  have hfm : AEStronglyMeasurable F ((n.variation).map p) :=
+    F.continuous.aestronglyMeasurable
+  have hmeasure : g.measure = n.map (p : ℝ → ℂ) := rfl
+  have hint : (n.map p).integral F (ContinuousLinearMap.mul ℝ ℂ) =
+      ∫ t in (0 : ℝ)..1, F (p t) * deriv (p : ℝ → ℂ) t := by
+    rw [VectorMeasure.integral_map p.continuous.measurable hfm hfi]
+    have hn : n = m.withDensityᵥ (deriv (p : ℝ → ℂ)) := rfl
+    have hmul := VectorMeasure.integral_withDensityᵥ_mul (μ := m) (f := F ∘ (p : ℝ → ℂ))
+      (g := deriv (p : ℝ → ℂ)) hvel (measurable_deriv _) hfi
+    rw [hn]
+    change (m.withDensityᵥ (deriv (p : ℝ → ℂ))).integral (F ∘ (p : ℝ → ℂ))
+      (ContinuousLinearMap.mul ℝ ℂ) = _
+    rw [hmul]
+    change (∫ x in Icc (0 : ℝ) 1, (F ∘ (p : ℝ → ℂ)) x * deriv (p : ℝ → ℂ) x) = _
+    rw [integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le zero_le_one]
+    rfl
+  have hae : f =ᵐ[(PettisMeasure.complex g.measure).variation] (F : ℂ → ℂ) := by
+    have hsupp : ∀ᵐ w ∂(PettisMeasure.complex g.measure).variation, w ∈ g.trace := by
+      rw [ae_iff]
+      exact g.variation_compl_trace
+    filter_upwards [hsupp] with w hw
+    have := congrFun (congrArg ContinuousMap.toFun hF) ⟨w, hw⟩
+    simpa [fRes] using this.symm
+  refine ⟨?_, ?_⟩
+  · exact (hfi.map hfm).congr hae.symm
+  · have hcongr := VectorMeasure.integral_congr_ae (μ := g.measure)
+      (B := ContinuousLinearMap.mul ℝ ℂ) hae
+    rw [PettisMeasure.scalarIntegral, hcongr, hmeasure, hint]
+    refine intervalIntegral.integral_congr_ae (Eventually.of_forall ?_)
+    intro t ht
+    have ht' : t ∈ Icc (0 : ℝ) 1 := by
+      rw [uIoc_of_le zero_le_one] at ht
+      exact Ioc_subset_Icc_self ht
+    rw [hagree t ht']
+
+private lemma sub_eq_mul_intervalIntegral_deriv {Ω : Set ℂ} (hΩ : IsOpen Ω) {g : ℂ → ℂ}
+    (hg : DifferentiableOn ℂ g Ω) {w z : ℂ}
+    (hseg : ∀ t ∈ Icc (0 : ℝ) 1, w + (t : ℂ) * (z - w) ∈ Ω) :
+    g z - g w = (z - w) * ∫ t in (0 : ℝ)..1, deriv g (w + (t : ℂ) * (z - w)) := by
+  let p (t : ℝ) : ℂ := w + (t : ℂ) * (z - w)
+  have hp (t : ℝ) : HasDerivAt p (z - w) t := by
+    have hid : HasDerivAt (fun s : ℝ => (s : ℂ)) (1 : ℂ) t := by
+      simpa using (hasDerivAt_id t).ofReal_comp
+    simpa [p, one_mul] using (hid.mul_const (z - w)).const_add w
+  have hcomp (t : ℝ) (ht : t ∈ Icc (0 : ℝ) 1) :
+      HasDerivAt (g ∘ p) (deriv g (p t) * (z - w)) t := by
+    have hgt : HasDerivAt g (deriv g (p t)) (p t) :=
+      (hg.differentiableAt (hΩ.mem_nhds (hseg t ht))).hasDerivAt
+    simpa using (hgt.complexToReal_fderiv.comp_hasDerivAt t (hp t))
+  have hderiv_cont : ContinuousOn (deriv g) Ω :=
+    (hg.contDiffOn hΩ).continuousOn_deriv_of_isOpen hΩ le_rfl
+  have hpath : ContinuousOn p (Icc (0 : ℝ) 1) := by fun_prop
+  have hI : uIcc (0 : ℝ) 1 = Icc 0 1 := uIcc_of_le zero_le_one
+  have hint : IntervalIntegrable (fun t => deriv g (p t) * (z - w)) volume 0 1 := by
+    refine ContinuousOn.intervalIntegrable ?_
+    rw [hI]
+    exact (hderiv_cont.comp hpath fun t ht => hseg t ht).mul continuousOn_const
+  have hFTC := intervalIntegral.integral_eq_sub_of_hasDerivAt
+    (f := g ∘ p) (f' := fun t => deriv g (p t) * (z - w))
+    (fun t ht => hcomp t (by simpa [hI] using ht)) hint
+  have hends : (g ∘ p) 1 - (g ∘ p) 0 = g z - g w := by simp [p]
+  rw [← hends, ← hFTC, intervalIntegral.integral_mul_const, mul_comm]
+
+private lemma norm_dslope_le_on {Ω : Set ℂ} (hΩ : IsOpen Ω) {g : ℂ → ℂ}
+    (hg : DifferentiableOn ℂ g Ω) {M : Set ℂ} (hM : IsCompact M) (hMΩ : M ⊆ Ω) :
+    ∃ C, ∀ w ∈ M, ∀ z ∈ M, ‖dslope g w z‖ ≤ C := by
+  obtain ⟨δ, hδ, hthick⟩ := hM.exists_cthickening_subset_open hΩ hMΩ
+  have hδ2 : 0 < δ / 2 := half_pos hδ
+  have hthick2 : cthickening (δ / 2) M ⊆ Ω :=
+    (cthickening_mono (half_le_self hδ.le) M).trans hthick
+  have hKc : IsCompact (cthickening (δ / 2) M) := hM.cthickening
+  have hderiv_cont : ContinuousOn (fun ξ => ‖deriv g ξ‖) (cthickening (δ / 2) M) :=
+    ((hg.contDiffOn hΩ).continuousOn_deriv_of_isOpen hΩ le_rfl).norm.mono hthick2
+  have hB : ∃ B, ∀ ξ ∈ cthickening (δ / 2) M, ‖deriv g ξ‖ ≤ B := by
+    by_cases hne : (cthickening (δ / 2) M).Nonempty
+    · obtain ⟨ξ, hξ, hmax⟩ := hKc.exists_isMaxOn hne hderiv_cont
+      exact ⟨‖deriv g ξ‖, fun η hη => hmax hη⟩
+    · exact ⟨0, fun ξ hξ => (hne ⟨ξ, hξ⟩).elim⟩
+  obtain ⟨B, hB⟩ := hB
+  have hg_cont : ContinuousOn (fun ξ => ‖g ξ‖) M := hg.continuousOn.norm.mono hMΩ
+  have hG : ∃ G, ∀ ξ ∈ M, ‖g ξ‖ ≤ G := by
+    by_cases hne : M.Nonempty
+    · obtain ⟨ξ, hξ, hmax⟩ := hM.exists_isMaxOn hne hg_cont
+      exact ⟨‖g ξ‖, fun η hη => hmax hη⟩
+    · exact ⟨0, fun ξ hξ => (hne ⟨ξ, hξ⟩).elim⟩
+  obtain ⟨G, hG⟩ := hG
+  refine ⟨max B (4 * G / δ), fun w hw z hz => ?_⟩
+  have hmem_seg {t : ℝ} (ht0 : 0 ≤ t) (ht1 : t ≤ 1) (hclose : ‖z - w‖ < δ / 2) :
+      w + (t : ℂ) * (z - w) ∈ cthickening (δ / 2) M := by
+    refine (thickening_subset_cthickening (δ / 2) M) ?_
+    rw [mem_thickening_iff]
+    refine ⟨w, hw, ?_⟩
+    rw [dist_eq_norm, add_sub_cancel_left, Complex.norm_mul, Complex.norm_real,
+      Real.norm_eq_abs]
+    have ht1' : |t| ≤ 1 := abs_le.mpr ⟨by linarith, ht1⟩
+    calc |t| * ‖z - w‖ ≤ 1 * ‖z - w‖ :=
+        mul_le_mul_of_nonneg_right ht1' (norm_nonneg _)
+      _ = ‖z - w‖ := by ring
+      _ < δ / 2 := hclose
+  by_cases hclose : ‖z - w‖ < δ / 2
+  · have hseg : ∀ t ∈ Icc (0 : ℝ) 1, w + (t : ℂ) * (z - w) ∈ Ω :=
+      fun t ht => hthick2 (hmem_seg ht.1 ht.2 hclose)
+    by_cases hzw : z = w
+    · rw [hzw, dslope_same]
+      exact (hB w (self_subset_cthickening M hw)).trans (le_max_left _ _)
+    · have hsub := sub_eq_mul_intervalIntegral_deriv hΩ hg hseg
+      have heq : dslope g w z =
+          ∫ t in (0 : ℝ)..1, deriv g (w + (t : ℂ) * (z - w)) := by
+        rw [dslope_of_ne _ hzw]
+        simp only [slope, vsub_eq_sub, smul_eq_mul]
+        rw [hsub]
+        field_simp [sub_ne_zero.mpr hzw]
+      rw [heq]
+      have hle_int := intervalIntegral.norm_integral_le_of_norm_le_const (a := (0 : ℝ)) (b := 1)
+        (C := B) (f := fun t : ℝ => deriv g (w + (t : ℂ) * (z - w))) (fun t ht => ?_)
+      · have hB1 : B * |1 - 0| = B := by simp
+        exact (hle_int.trans_eq hB1).trans (le_max_left _ _)
+      · rw [uIoc_of_le zero_le_one] at ht
+        exact hB _ (hmem_seg (le_of_lt ht.1) ht.2 hclose)
+  · have hfar : δ / 2 ≤ ‖z - w‖ := le_of_not_gt hclose
+    have hzw : z ≠ w := by
+      intro h
+      subst h
+      simp at hfar
+      linarith
+    rw [dslope_of_ne _ hzw]
+    simp only [slope, vsub_eq_sub, smul_eq_mul, norm_mul, norm_inv]
+    rw [← div_eq_inv_mul]
+    have hnum : ‖g z - g w‖ ≤ 2 * G := by
+      calc ‖g z - g w‖ ≤ ‖g z‖ + ‖g w‖ := norm_sub_le _ _
+        _ ≤ G + G := add_le_add (hG z hz) (hG w hw)
+        _ = 2 * G := by ring
+    have hpos : 0 < ‖z - w‖ := lt_of_lt_of_le hδ2 hfar
+    have hG0 : 0 ≤ 2 * G := le_trans (norm_nonneg _) hnum
+    calc ‖g z - g w‖ / ‖z - w‖ ≤ (2 * G) / ‖z - w‖ :=
+          div_le_div_of_nonneg_right hnum hpos.le
+      _ ≤ (2 * G) / (δ / 2) := div_le_div_of_nonneg_left hG0 hδ2 hfar
+      _ = 4 * G / δ := by ring
+      _ ≤ max B (4 * G / δ) := le_max_right _ _
+
+end ContourIntegral
+
 /-- The velocity is integrable on the parameter interval of a piecewise `C¹` contour. -/
 private theorem ComplexContour.integrableOn_deriv (γ : ComplexContour) :
     IntegrableOn (deriv (fun t ↦ γ.toContinuousMap t)) (Icc (0 : ℝ) 1) := by
@@ -549,6 +851,226 @@ theorem weaklyHolomorphicOn_iff_contourIntegral_eq_zero :
     exact congrArg (fun v : PettisWeakCompletion E ↦
       (show Module.Dual ℂ (StrongDual ℂ E) from v) φ) h
 
+section ScalarCauchy
+
+omit hΩ hconn
+open Metric Complex
+
+private lemma ComplexContour.compact_trace (γ : ComplexContour) : IsCompact γ.trace :=
+  isCompact_Icc.image γ.toContinuousMap.continuous
+
+private lemma ComplexContour.ae_mem_trace (γ : ComplexContour) :
+    ∀ᵐ w ∂γ.measure.variation, w ∈ γ.trace := by
+  rw [ae_iff]
+  exact γ.variation_compl_trace
+
+private lemma ComplexContour.scalarIntegral_const_mul (γ : ComplexContour) (c : ℂ) (g : ℂ → ℂ) :
+    (PettisMeasure.complex γ.measure).scalarIntegral (fun w ↦ c * g w) =
+      c * (PettisMeasure.complex γ.measure).scalarIntegral g := by
+  simp only [PettisMeasure.scalarIntegral, VectorMeasure.integral_eq_setToFun]
+  apply setToFun_smul _ _ c g
+  intro a s z
+  simp [VectorMeasure.transpose, mul_left_comm]
+
+private lemma ComplexContour.scalarIntegral_sub (γ : ComplexContour) {g h : ℂ → ℂ}
+    (hg : ContinuousOn g γ.trace) (hh : ContinuousOn h γ.trace) :
+    (PettisMeasure.complex γ.measure).scalarIntegral (fun w ↦ g w - h w) =
+      (PettisMeasure.complex γ.measure).scalarIntegral g -
+        (PettisMeasure.complex γ.measure).scalarIntegral h :=
+  VectorMeasure.integral_fun_sub (γ.scalarIntegral_eq_intervalIntegral hg).1
+    (γ.scalarIntegral_eq_intervalIntegral hh).1
+
+/-- Bounded convergence for kernels continuous on the contour trace. -/
+private lemma ComplexContour.tendsto_scalarIntegral (γ : ComplexContour) {l : Filter ℂ}
+    [l.IsCountablyGenerated] {K : ℂ → ℂ → ℂ} {k : ℂ → ℂ}
+    (hc : ∀ᶠ z in l, ContinuousOn (K z) γ.trace)
+    (hb : ∃ C : ℝ, ∀ᶠ z in l, ∀ w ∈ γ.trace, ‖K z w‖ ≤ C)
+    (ht : ∀ w ∈ γ.trace, Tendsto (fun z ↦ K z w) l (𝓝 (k w))) :
+    Tendsto (fun z ↦ (PettisMeasure.complex γ.measure).scalarIntegral (K z)) l
+      (𝓝 ((PettisMeasure.complex γ.measure).scalarIntegral k)) := by
+  have : IsFiniteMeasure γ.measure.variation :=
+    (integrable_const_iff_isFiniteMeasure (one_ne_zero : (1 : ℂ) ≠ 0)).mp
+      (γ.scalarIntegral_eq_intervalIntegral continuousOn_const).1
+  apply VectorMeasure.tendsto_integral_filter_of_norm_le_const
+  · exact hc.mono fun z hz ↦ (γ.scalarIntegral_eq_intervalIntegral hz).1.aestronglyMeasurable
+  · obtain ⟨C, hC⟩ := hb
+    exact ⟨C, hC.mono fun z hz ↦ γ.ae_mem_trace.mono (hz ·)⟩
+  · exact γ.ae_mem_trace.mono (ht ·)
+
+/-- A locally uniformly bounded family of holomorphic kernels may be differentiated
+under the contour integral. Cauchy's estimate bounds the difference quotients. -/
+private lemma ComplexContour.differentiableOn_scalarIntegral (γ : ComplexContour) {U : Set ℂ}
+    (hU : IsOpen U) {K : ℂ → ℂ → ℂ} (hc : ∀ z ∈ U, ContinuousOn (K z) γ.trace)
+    (hd : ∀ w ∈ γ.trace, DifferentiableOn ℂ (fun z ↦ K z w) U)
+    (hb : ∀ M : Set ℂ, IsCompact M → M ⊆ U → ∃ C : ℝ, ∀ z ∈ M, ∀ w ∈ γ.trace, ‖K z w‖ ≤ C) :
+    DifferentiableOn ℂ (fun z ↦ (PettisMeasure.complex γ.measure).scalarIntegral (K z)) U := by
+  intro x hx
+  obtain ⟨r, hr, hball⟩ := nhds_basis_closedBall.mem_iff.mp (hU.mem_nhds hx)
+  obtain ⟨C, hC⟩ := hb _ (isCompact_closedBall x r) hball
+  have hr' := half_pos hr
+  have hsmall : ball x (r / 2) ⊆ closedBall x r :=
+    ball_subset_closedBall.trans (closedBall_subset_closedBall (half_le_self hr.le))
+  have hderiv (w : ℂ) (hw : w ∈ γ.trace) (y : ℂ) (hy : y ∈ ball x (r / 2)) :
+      ‖deriv (fun z ↦ K z w) y‖ ≤ C / (r / 2) := by
+    have hs : closedBall y (r / 2) ⊆ closedBall x r :=
+      closedBall_subset_closedBall' (by have := mem_ball.mp hy; linarith)
+    apply norm_deriv_le_of_forall_mem_sphere_norm_le hr'
+      ((hd w hw).diffContOnCl_ball (hs.trans hball))
+    exact fun z hz ↦ hC z (hs (sphere_subset_closedBall hz)) w hw
+  let Q (y w : ℂ) := slope (fun z ↦ K z w) x y
+  have hnear : ∀ᶠ y in 𝓝[≠] x, y ∈ ball x (r / 2) :=
+    mem_nhdsWithin_of_mem_nhds (ball_mem_nhds x hr')
+  have hQ : Tendsto (fun y ↦ (PettisMeasure.complex γ.measure).scalarIntegral (Q y)) (𝓝[≠] x)
+      (𝓝 ((PettisMeasure.complex γ.measure).scalarIntegral (fun w ↦ deriv (fun z ↦ K z w) x))) := by
+    apply γ.tendsto_scalarIntegral
+    · filter_upwards [hnear] with y hy
+      exact continuousOn_const.mul ((hc y (hball (hsmall hy))).sub (hc x hx))
+    · refine ⟨C / (r / 2), ?_⟩
+      filter_upwards [hnear, self_mem_nhdsWithin] with y hy hyx
+      intro w hw
+      have hs := (convex_ball x (r / 2)).norm_image_sub_le_of_norm_deriv_le
+        (fun z hz ↦ (hd w hw).differentiableAt (hU.mem_nhds (hball (hsmall hz))))
+        (hderiv w hw) (mem_ball_self hr') hy
+      change ‖slope (fun z ↦ K z w) x y‖ ≤ _
+      rw [slope_def_field, norm_div]
+      exact (div_le_iff₀ (norm_pos_iff.mpr (sub_ne_zero.mpr hyx))).mpr hs
+    · exact fun w hw ↦ ((hd w hw).differentiableAt (hU.mem_nhds hx)).hasDerivAt.tendsto_slope
+  apply DifferentiableAt.differentiableWithinAt
+  apply HasDerivAt.differentiableAt
+  apply hasDerivAt_iff_tendsto_slope.mpr
+  apply hQ.congr'
+  filter_upwards [hnear] with y hy
+  simp only [Q, slope, vsub_eq_sub, smul_eq_mul]
+  rw [γ.scalarIntegral_const_mul, γ.scalarIntegral_sub (hc y (hball (hsmall hy))) (hc x hx)]
+
+private lemma ComplexContour.continuousOn_inv_sub (γ : ComplexContour) {z : ℂ} (hz : z ∉ γ.trace) :
+    ContinuousOn (fun w ↦ (w - z)⁻¹) γ.trace :=
+  (continuousOn_id.sub continuousOn_const).inv₀ fun _ hw ↦ sub_ne_zero.mpr (ne_of_mem_of_not_mem hw hz)
+
+private lemma ComplexContour.differentiableOn_cauchyTransform (γ : ComplexContour) {g : ℂ → ℂ}
+    (hg : ContinuousOn g γ.trace) : DifferentiableOn ℂ
+      (fun z ↦ (PettisMeasure.complex γ.measure).scalarIntegral (fun w ↦ (w - z)⁻¹ * g w)) γ.traceᶜ := by
+  apply γ.differentiableOn_scalarIntegral γ.compact_trace.isClosed.isOpen_compl
+  · exact fun z hz ↦ (γ.continuousOn_inv_sub hz).mul hg
+  · intro w hw
+    exact ((differentiableOn_const w).sub differentiableOn_id |>.inv fun z hz ↦
+      sub_ne_zero.mpr (ne_of_mem_of_not_mem hw hz)).mul (differentiableOn_const (g w))
+  · intro M hM hs
+    have hc : ContinuousOn (fun p : ℂ × ℂ ↦ (p.2 - p.1)⁻¹ * g p.2) (M ×ˢ γ.trace) :=
+      (((continuousOn_snd (s := M ×ˢ γ.trace)).sub continuousOn_fst).inv₀ fun p hp ↦
+        sub_ne_zero.mpr (ne_of_mem_of_not_mem hp.2 (hs hp.1))).mul
+        (hg.comp continuousOn_snd mapsTo_snd_prod)
+    obtain ⟨C, hC⟩ := (hM.prod γ.compact_trace).exists_bound_of_continuousOn hc
+    exact ⟨C, fun z hz w hw ↦ hC (z, w) ⟨hz, hw⟩⟩
+
+private lemma ComplexContour.tendsto_cauchyTransform (γ : ComplexContour) {g : ℂ → ℂ}
+    (hg : ContinuousOn g γ.trace) : Tendsto
+      (fun z ↦ (PettisMeasure.complex γ.measure).scalarIntegral (fun w ↦ (w - z)⁻¹ * g w))
+      (cocompact ℂ) (𝓝 0) := by
+  have hzero : (PettisMeasure.complex γ.measure).scalarIntegral (fun _ ↦ 0) = 0 :=
+    VectorMeasure.integral_zero
+  have : (cocompact ℂ).IsCountablyGenerated := by
+    rw [← cobounded_eq_cocompact]
+    infer_instance
+  rw [← hzero]
+  apply γ.tendsto_scalarIntegral
+  · filter_upwards [γ.compact_trace.compl_mem_cocompact] with z hz
+    exact (γ.continuousOn_inv_sub hz).mul hg
+  · obtain ⟨R, hR⟩ := γ.compact_trace.exists_bound_of_continuousOn (f := id) continuousOn_id
+    obtain ⟨C, hC⟩ := γ.compact_trace.exists_bound_of_continuousOn hg
+    refine ⟨C, ?_⟩
+    filter_upwards [tendsto_norm_cocompact_atTop.eventually_ge_atTop (R + 1)] with z hz
+    intro w hw
+    have hzw := norm_sub_norm_le z w
+    rw [norm_sub_rev] at hzw
+    have h1 : 1 ≤ ‖w - z‖ := by have := hR w hw; change ‖w‖ ≤ R at this; linarith
+    rw [norm_mul, norm_inv]
+    exact (mul_le_mul_of_nonneg_right (inv_le_one_of_one_le₀ h1) (norm_nonneg (g w))).trans
+      ((one_mul _).le.trans (hC w hw))
+  · intro w _
+    rw [← cobounded_eq_cocompact]
+    simpa using ((tendsto_inv₀_cobounded.comp (tendsto_const_sub_cobounded w)).mul_const (g w))
+
+private lemma ComplexContour.differentiableOn_dslopeIntegral (γ : ComplexContour) {U : Set ℂ}
+    (hU : IsOpen U) (htr : γ.trace ⊆ U) {g : ℂ → ℂ} (hg : DifferentiableOn ℂ g U) :
+    DifferentiableOn ℂ (fun z ↦ (PettisMeasure.complex γ.measure).scalarIntegral (dslope g z)) U := by
+  have hd := (hg.analyticOnNhd hU).dslope
+  apply γ.differentiableOn_scalarIntegral hU
+  · exact fun z _ ↦ (hd z).differentiableOn.continuousOn.mono htr
+  · intro w _
+    apply (hd w).differentiableOn.congr
+    intro z _
+    rcases eq_or_ne w z with rfl | hne
+    · rfl
+    · rw [dslope_of_ne _ hne, dslope_of_ne _ hne.symm, slope_comm]
+  · intro M hM hs
+    obtain ⟨C, hC⟩ := norm_dslope_le_on hU hg (hM.union γ.compact_trace) (union_subset hs htr)
+    exact ⟨C, fun z hz w hw ↦ hC z (.inl hz) w (.inr hw)⟩
+
+/-- Dixon's gluing argument: integrate the divided difference on the domain and
+use the Cauchy transform on the part of the complement with index zero. -/
+private lemma PositiveSimpleContour.scalar_cauchy {U : Set ℂ} (hU : IsOpen U)
+    (γ : PositiveSimpleContour) (htr : γ.val.trace ⊆ U) (hint : γ.interior ⊆ U)
+    {g : ℂ → ℂ} (hg : DifferentiableOn ℂ g U) {z : ℂ} (hz : z ∈ γ.interior) :
+    g z = (2 * (Real.pi : ℂ) * I)⁻¹ *
+      (PettisMeasure.complex γ.val.measure).scalarIntegral (fun w ↦ (w - z)⁻¹ * g w) := by
+  classical
+  let c : ℂ := 2 * (Real.pi : ℂ) * I
+  have hc : c ≠ 0 := mul_ne_zero (mul_ne_zero (by norm_num) (by exact_mod_cast Real.pi_ne_zero)) I_ne_zero
+  let L := (PettisMeasure.complex γ.val.measure).scalarIntegral
+  let A (x : ℂ) := L (fun w ↦ (w - x)⁻¹ * g w)
+  let B (x : ℂ) := L (dslope g x)
+  let J (x : ℂ) := L (fun w ↦ (w - x)⁻¹)
+  have hg' := hg.continuousOn.mono htr
+  have hdA : DifferentiableOn ℂ A γ.val.traceᶜ := γ.val.differentiableOn_cauchyTransform hg'
+  have hdB : DifferentiableOn ℂ B U := γ.val.differentiableOn_dslopeIntegral hU htr hg
+  have hdJ : DifferentiableOn ℂ J γ.val.traceᶜ := by
+    simpa only [mul_one] using γ.val.differentiableOn_cauchyTransform (continuousOn_const (c := (1 : ℂ)))
+  have htJ : Tendsto J (cocompact ℂ) (𝓝 0) := by
+    simpa only [mul_one] using γ.val.tendsto_cauchyTransform (continuousOn_const (c := (1 : ℂ)))
+  have hB (x : ℂ) (hx : x ∉ γ.val.trace) : B x = A x - g x * J x := by
+    have hk := γ.val.continuousOn_inv_sub hx
+    calc B x = L (fun w ↦ ((w - x)⁻¹ * g w) - g x * (w - x)⁻¹) := by
+          apply VectorMeasure.integral_congr_ae
+          filter_upwards [γ.val.ae_mem_trace] with w hw
+          rw [dslope_of_ne g (ne_of_mem_of_not_mem hw hx)]
+          simp only [slope, vsub_eq_sub, smul_eq_mul]
+          ring
+      _ = A x - g x * J x := by
+          dsimp only [A, J, L]
+          rw [γ.val.scalarIntegral_sub (g := fun w ↦ (w - x)⁻¹ * g w)
+            (h := fun w ↦ g x * (w - x)⁻¹) (hk.mul hg') (continuousOn_const.mul hk),
+            γ.val.scalarIntegral_const_mul]
+  have hJ (x : ℂ) (hx : x ∉ γ.val.trace) (hn : J x ≠ c) : J x = 0 := by
+    rcases γ.property.2 x hx with h | h
+    · exact (mul_eq_zero.mp (show c⁻¹ * J x = 0 from h)).resolve_left (inv_ne_zero hc)
+    · exact (hn ((inv_mul_eq_one₀ hc).mp h).symm).elim
+  let F (x : ℂ) := if x ∈ U then B x else A x
+  have hFA (x : ℂ) (hx : x ∉ γ.val.trace) (hn : J x ≠ c) : F x = A x := by
+    simp [F, hB x hx, hJ x hx hn]
+  have hdF : Differentiable ℂ F := by
+    intro x
+    by_cases hx : x ∈ U
+    · apply (hdB.differentiableAt (hU.mem_nhds hx)).congr_of_eventuallyEq
+      filter_upwards [hU.mem_nhds hx] with y hy using ite_eq_left hy
+    · have hxtr : x ∉ γ.val.trace := fun h ↦ hx (htr h)
+      have hnb := γ.val.compact_trace.isClosed.isOpen_compl.mem_nhds hxtr
+      have hn : J x ≠ c := fun h ↦ hx (hint ⟨hxtr, (inv_mul_eq_one₀ hc).mpr h.symm⟩)
+      apply (hdA.differentiableAt hnb).congr_of_eventuallyEq
+      filter_upwards [hnb, (hdJ.continuousOn.continuousAt hnb).eventually_ne hn] with y hy hn'
+      exact hFA y hy hn'
+  have htF : Tendsto F (cocompact ℂ) (𝓝 0) := by
+    apply (γ.val.tendsto_cauchyTransform hg').congr'
+    filter_upwards [γ.val.compact_trace.compl_mem_cocompact, htJ.eventually_ne hc.symm] with x hx hn
+    exact (hFA x hx hn).symm
+  have he := hdF.apply_eq_of_tendsto_cocompact z htF
+  have hJz : c = J z := (inv_mul_eq_one₀ hc).mp hz.2
+  change g z = c⁻¹ * A z
+  rw [show F z = B z from ite_eq_left (hint hz), hB z hz.1, ← hJz] at he
+  rw [sub_eq_zero.mp he, mul_comm (g z) c, inv_mul_cancel_left₀ hc]
+
+end ScalarCauchy
+
 /-- Paper: Theorem C.5.2.4(1,3), p. 738. Weak holomorphy is equivalent to weak
 continuity and the Cauchy formula in the algebraic dual of the continuous dual. -/
 theorem weaklyHolomorphicOn_iff_weak_cauchyIntegral :
@@ -559,7 +1081,38 @@ theorem weaklyHolomorphicOn_iff_weak_cauchyIntegral :
             toPettisWeakCompletion E (f z) =
               (2 * (Real.pi : ℂ) * Complex.I)⁻¹ •
                 pettisWeakIntegral (.complex γ.val.measure) (fun w ↦ (w - z)⁻¹ • f w) hi := by
-  sorry
+  constructor
+  · intro hf
+    refine ⟨fun φ ↦ (hf φ).continuousOn, ?_⟩
+    intro γ htr hint z hz
+    have hi : PettisWeaklyIntegrable (.complex γ.val.measure) (fun w ↦ (w - z)⁻¹ • f w) := by
+      intro φ
+      simp only [map_smul, smul_eq_mul]
+      exact (γ.val.scalarIntegral_eq_intervalIntegral
+        ((γ.val.continuousOn_inv_sub hz.1).mul ((hf φ).continuousOn.mono htr))).1
+    refine ⟨hi, LinearMap.ext fun φ ↦ ?_⟩
+    change φ (f z) = _ * (PettisMeasure.complex γ.val.measure).scalarIntegral
+      (fun w ↦ φ ((w - z)⁻¹ • f w))
+    simp only [map_smul, smul_eq_mul]
+    exact γ.scalar_cauchy hΩ htr hint (hf φ) hz
+  · rintro ⟨hc, hformula⟩ φ x hx
+    obtain ⟨r, hr, hball⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hx)
+    obtain ⟨γ, _, htrace, hinterior, _, _⟩ := exists_positiveSimpleContour_circle x hr
+    have htr : γ.val.trace ⊆ Ω := htrace ▸ Metric.sphere_subset_closedBall.trans hball
+    have hint : γ.interior ⊆ Ω := hinterior ▸ Metric.ball_subset_closedBall.trans hball
+    have hnb : γ.interior ∈ 𝓝 x := hinterior ▸ Metric.ball_mem_nhds x hr
+    have hxtr : x ∉ γ.val.trace := (mem_of_mem_nhds hnb).1
+    have hd := (γ.val.differentiableOn_cauchyTransform ((hc φ).mono htr)).differentiableAt
+      (γ.val.compact_trace.isClosed.isOpen_compl.mem_nhds hxtr)
+    apply DifferentiableAt.differentiableWithinAt
+    apply (hd.const_mul (2 * (Real.pi : ℂ) * Complex.I)⁻¹).congr_of_eventuallyEq
+    filter_upwards [hnb] with z hz
+    obtain ⟨hi, he⟩ := hformula γ htr hint z hz
+    have he' := congrArg (fun v : PettisWeakCompletion E ↦
+      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ) he
+    change φ (f z) = _ * (PettisMeasure.complex γ.val.measure).scalarIntegral
+      (fun w ↦ φ ((w - z)⁻¹ • f w)) at he'
+    simpa only [Function.comp_apply, map_smul, smul_eq_mul] using he'
 
 variable [QuasiCompleteSpace ℂ E]
 
@@ -847,6 +1400,210 @@ theorem hasPettisIntegral_cauchy_derivative (hf : ∀ k : ℕ, DifferentiableOn 
     rw [hderiv φ k (hinterior hz)] at h
     exact h.symm
 
+omit [ContinuousSMul ℂ E] [T2Space E] hΩ [QuasiCompleteSpace ℂ E] hconn in
+/-- Uniform convergence in a polynormable space is seminorm-smallness of the difference. -/
+private theorem tendstoUniformlyOn_of_forall_continuous_seminorm
+    {ι : Type*} {l : Filter ι} {F : ι → ℂ → E} {g : ℂ → E} {s : Set ℂ}
+    (h : ∀ q : Seminorm ℂ E, Continuous q → ∀ ε : ℝ, 0 < ε →
+      ∀ᶠ i in l, ∀ x ∈ s, q (F i x - g x) < ε) :
+    TendstoUniformlyOn F g l s := by
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have hbasis := (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero
+  rw [hbasis.tendstoUniformlyOn_iff_of_uniformity]
+  intro p hp
+  filter_upwards [h p hp 1 zero_lt_one] with i hi x hx
+  simpa [Seminorm.mem_ball_zero] using hi x hx
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] hconn in
+/-- Weak holomorphy implies continuity: scalar Cauchy estimates are uniform on seminorm balls. -/
+private theorem WeaklyHolomorphicOn.continuousOn_of_open (hf : WeaklyHolomorphicOn f Ω) :
+    ContinuousOn f Ω := by
+  intro z hz
+  rw [continuousWithinAt_iff_continuousAt (hΩ.mem_nhds hz)]
+  unfold ContinuousAt
+  rw [(PolynormableSpace.withSeminorms ℂ E).tendsto_nhds f (f z)]
+  intro q ε hε
+  obtain ⟨R, hR, hsub⟩ := (Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz))
+  have hsphere : Metric.sphere z R ⊆ Ω := Metric.sphere_subset_closedBall.trans hsub
+  have hbdd : IsVonNBounded ℂ (f '' Metric.sphere z R) := by
+    refine isVonNBounded_of_dual_bounded fun φ ↦ ?_
+    obtain ⟨C, hC⟩ :=
+      ((isCompact_sphere z R).image_of_continuousOn
+        ((hf φ).continuousOn.mono hsphere)).isBounded.exists_norm_le
+    refine ⟨C, fun y hy ↦ ?_⟩
+    obtain ⟨ξ, hξ, rfl⟩ := hy
+    exact hC ((φ ∘ f) ξ) ⟨ξ, hξ, rfl⟩
+  obtain ⟨M, hM⟩ :=
+    ((PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mp hbdd q)
+  let C := max M 1
+  have hC (w) (hw : w ∈ Metric.sphere z R) : q.1 (f w) ≤ C :=
+    le_max_of_le_left (hM (mem_image_of_mem q.1 (mem_image_of_mem f hw)))
+  have hCpos : 0 < C := lt_max_of_lt_right zero_lt_one
+  let δ := min (R / 2) (ε * R / (2 * C))
+  have hδ : 0 < δ := by
+    refine lt_min (half_pos hR) (div_pos (mul_pos hε hR) (mul_pos two_pos hCpos))
+  filter_upwards [Metric.ball_mem_nhds z hδ] with w hw
+  rcases eq_or_ne w z with rfl | hwz
+  · simpa using hε
+  · have hwR : dist w z < R / 2 := lt_of_lt_of_le (Metric.mem_ball.mp hw) (min_le_left _ _)
+    have hwball : w ∈ Metric.ball z R := Metric.mem_ball.mpr (hwR.trans (half_lt_self hR))
+    obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm q.1 q.2 (f w - f z)
+    have hd : DifferentiableOn ℂ (φ ∘ f) (Metric.closedBall z R) := (hf φ).mono hsub
+    have hIw := hd.circleIntegral_sub_inv_smul hwball
+    have hIz := hd.circleIntegral_sub_inv_smul (Metric.mem_ball_self hR)
+    simp only [smul_eq_mul] at hIw hIz
+    have hcont (c : ℂ) (hc : c ∈ Metric.ball z R) :
+        ContinuousOn (fun ξ : ℂ ↦ (ξ - c)⁻¹ * (φ ∘ f) ξ) (Metric.sphere z R) := by
+      refine ContinuousOn.mul ?_ (((hf φ).continuousOn).mono hsphere)
+      refine (continuousOn_id.sub continuousOn_const).inv₀ fun ξ hξ hzero ↦ ?_
+      have hξeq : ξ = c := sub_eq_zero.mp hzero
+      rw [hξeq] at hξ
+      exact Metric.sphere_disjoint_ball.notMem_of_mem_left hξ hc
+    have hint (c : ℂ) (hc : c ∈ Metric.ball z R) :
+        CircleIntegrable (fun ξ : ℂ ↦ (ξ - c)⁻¹ * (φ ∘ f) ξ) z R :=
+      (hcont c hc).circleIntegrable hR.le
+    have hdiffint := circleIntegral.integral_sub (hint w hwball) (hint z (Metric.mem_ball_self hR))
+    have h2pi : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 := by simp [Real.pi_ne_zero, Complex.I_ne_zero]
+    have hval : φ (f w) - φ (f z) =
+        (2 * (Real.pi : ℂ) * Complex.I)⁻¹ *
+          ∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ := by
+      have hker :
+          (∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ) =
+            (∮ ξ in C(z, R), (ξ - w)⁻¹ * (φ ∘ f) ξ) -
+              ∮ ξ in C(z, R), (ξ - z)⁻¹ * (φ ∘ f) ξ := by
+        have hfun :
+            (fun ξ ↦ ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ) =
+              fun ξ ↦ (ξ - w)⁻¹ * (φ ∘ f) ξ - (ξ - z)⁻¹ * (φ ∘ f) ξ := by
+          funext ξ
+          exact sub_mul _ _ _
+        rw [circleIntegral.integral_congr hR.le (fun ξ _ ↦ congrFun hfun ξ)]
+        exact hdiffint
+      rw [hker, hIw, hIz, mul_sub]
+      field_simp [h2pi]
+      rfl
+    set d := dist w z
+    have hdpos : 0 < R - d := by linarith [hwR]
+    have hbound : ∀ ξ ∈ Metric.sphere z R,
+        ‖((ξ - w)⁻¹ - (ξ - z)⁻¹) * φ (f ξ)‖ ≤ d * C / ((R - d) * R) := by
+      intro ξ hξ
+      have hξz : ‖ξ - z‖ = R := by simpa [Metric.mem_sphere, dist_eq_norm] using hξ
+      have hξw : R - d ≤ ‖ξ - w‖ := by
+        have : ‖ξ - z‖ - ‖w - z‖ ≤ ‖(ξ - z) - (w - z)‖ := norm_sub_norm_le _ _
+        simpa [sub_sub_sub_cancel_left, dist_eq_norm, d, hξz] using this
+      have hpos : 0 < ‖ξ - w‖ := hdpos.trans_le hξw
+      have hne : ξ - w ≠ 0 := norm_ne_zero_iff.mp hpos.ne'
+      have hnez : ξ - z ≠ 0 := norm_ne_zero_iff.mp (hξz.trans_ne hR.ne')
+      have halg : (ξ - w)⁻¹ - (ξ - z)⁻¹ = (w - z) / ((ξ - w) * (ξ - z)) := by
+        field_simp [hne, hnez]
+        ring
+      have hwd : ‖w - z‖ = d := by simp [d, dist_eq_norm]
+      rw [norm_mul, halg, norm_div, norm_mul, hξz, hwd]
+      have hle : ‖φ (f ξ)‖ ≤ C := (hφ _).trans (hC _ hξ)
+      calc
+        d / (‖ξ - w‖ * R) * ‖φ (f ξ)‖ ≤ d / (‖ξ - w‖ * R) * C := by gcongr
+        _ ≤ d / ((R - d) * R) * C := by gcongr
+        _ = d * C / ((R - d) * R) := by ring
+    have hintle := circleIntegral.norm_integral_le_of_norm_le_const hR.le hbound
+    rw [← heq, map_sub, hval, norm_mul]
+    have hinv : ‖(2 * (Real.pi : ℂ) * Complex.I)⁻¹‖ = (2 * Real.pi)⁻¹ := by simp
+    rw [hinv]
+    calc
+      (2 * Real.pi)⁻¹ * ‖∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ‖
+          ≤ (2 * Real.pi)⁻¹ * (2 * Real.pi * R * (d * C / ((R - d) * R))) := by
+            gcongr
+            exact hintle
+      _ = d * C / (R - d) := by
+        field_simp [Real.pi_ne_zero, hR.ne', hdpos.ne']
+      _ < ε := by
+        rw [div_lt_iff₀ hdpos]
+        have hdist : d * (2 * C) < ε * R :=
+          (lt_div_iff₀ (mul_pos two_pos hCpos)).mp
+            (lt_of_lt_of_le (Metric.mem_ball.mp hw) (min_le_right _ _))
+        nlinarith [hdist, hwR, hε]
+
+omit hconn in
+/-- Lift a first scalar derivative by restricting to a smooth real curve inside the domain. -/
+private theorem WeaklyHolomorphicOn.exists_eval_deriv (hf : WeaklyHolomorphicOn f Ω)
+    {z : ℂ} (hz : z ∈ Ω) : ∃ b : E, ∀ φ : StrongDual ℂ E, φ b = deriv (φ ∘ f) z := by
+  obtain ⟨R, hR, hsub⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz)
+  let c (t : ℝ) : ℂ := z + ((R * Real.sin t : ℝ) : ℂ)
+  have hc (t) : c t ∈ Ω := by
+    apply hsub
+    simp only [c, Metric.mem_closedBall, dist_eq_norm, add_sub_cancel_left, Complex.norm_real,
+      Real.norm_eq_abs, abs_mul, abs_of_pos hR]
+    exact mul_le_of_le_one_right hR.le (Real.abs_sin_le_one t)
+  have hdiff : ContDiff ℝ 2 c := by
+    apply contDiff_const.add
+    exact Complex.ofRealCLM.contDiff.comp (contDiff_const.mul Real.contDiff_sin)
+  obtain ⟨v, hv⟩ := exists_hasDerivAt_eval_zero_of_contDiff (F := f ∘ c)
+    (fun φ ↦ (((hf φ).contDiffOn hΩ).restrict_scalars ℝ).comp_contDiff hdiff hc) inferInstance
+  refine ⟨(R : ℂ)⁻¹ • v, fun φ ↦ ?_⟩
+  have hc' : HasDerivAt c (R : ℂ) 0 := by
+    simpa [c] using (((Real.hasDerivAt_sin 0).const_mul R).ofReal_comp.const_add z)
+  have hd : HasDerivAt (φ ∘ f) (deriv (φ ∘ f) z) (c 0) := by
+    simpa [c] using ((hf φ).differentiableAt (hΩ.mem_nhds hz)).hasDerivAt
+  have he := (hv φ).unique (hd.scomp 0 hc')
+  rw [map_smul, he, inv_smul_smul₀ (Complex.ofReal_ne_zero.mpr hR.ne')]
+
+omit hconn in
+/-- Iteration gives vector representatives for all scalar derivatives on the open set. -/
+private theorem WeaklyHolomorphicOn.exists_eval_iteratedDeriv (hf : WeaklyHolomorphicOn f Ω)
+    (k : ℕ) : ∃ g : ℂ → E, WeaklyHolomorphicOn g Ω ∧
+      ∀ φ : StrongDual ℂ E, EqOn (φ ∘ g) (iteratedDeriv k (φ ∘ f)) Ω := by
+  classical
+  induction k with
+  | zero => exact ⟨f, hf, fun φ ↦ by simp [Set.EqOn]⟩
+  | succ k ih =>
+    obtain ⟨g, hg, he⟩ := ih
+    let b (z : ℂ) : E := if hz : z ∈ Ω then (hg.exists_eval_deriv hΩ g hz).choose else 0
+    have hb (φ : StrongDual ℂ E) : EqOn (φ ∘ b) (deriv (φ ∘ g)) Ω := by
+      intro z hz
+      simpa only [comp_apply, b, dite_eq_left hz] using (hg.exists_eval_deriv hΩ g hz).choose_spec φ
+    exact ⟨b, fun φ ↦ ((hg φ).deriv hΩ).congr (hb φ), fun φ ↦ by
+      rw [iteratedDeriv_succ]
+      exact (hb φ).trans ((he φ).deriv hΩ)⟩
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] hconn in
+/-- The Taylor errors on a closed subdisc remain bounded even after multiplication
+by the truncation index: this can be tested on each functional separately. -/
+private theorem WeaklyHolomorphicOn.bounded_taylorErrors (hf : WeaklyHolomorphicOn f Ω)
+    {z : ℂ} {a : ℕ → E}
+    (ha : ∀ (φ : StrongDual ℂ E) k, φ (a k) = iteratedDeriv k (φ ∘ f) z / k.factorial)
+    {r : ℝ} (hr : 0 < r) (hs : Metric.closedBall z r ⊆ Ω) :
+    IsVonNBounded ℂ (range fun x : ℕ × Metric.closedBall z r ↦ (x.1 : ℂ) •
+      ((∑ k ∈ Finset.range x.1, ((x.2 : ℂ) - z) ^ k • a k) - f x.2)) := by
+  obtain ⟨δ, hδ, hlarge⟩ := (isCompact_closedBall z r).exists_cthickening_subset_open hΩ hs
+  rw [cthickening_closedBall hδ.le hr.le] at hlarge
+  let R : NNReal := ⟨δ + r, by positivity⟩
+  let ρ : NNReal := ⟨δ / 2 + r, by positivity⟩
+  have hρ : ρ < R := by change δ / 2 + r < δ + r; linarith
+  apply isVonNBounded_of_dual_bounded
+  intro φ
+  have hd : DifferentiableOn ℂ (φ ∘ f) (Metric.closedBall z R) := (hf φ).mono hlarge
+  have hps := hd.hasFPowerSeriesOnBall (show 0 < R by change 0 < δ + r; positivity)
+  rw [hps.hasFPowerSeriesAt.eq_formalMultilinearSeries hps.analyticAt.hasFPowerSeriesAt] at hps
+  obtain ⟨t, ht, C, hC, hest⟩ := hps.uniform_geometric_approx (ENNReal.coe_lt_coe.mpr hρ)
+  obtain ⟨M, hM⟩ := (tendsto_self_mul_const_pow_of_lt_one ht.1.le ht.2).bddAbove_range
+  refine ⟨C * M, ?_⟩
+  rintro _ ⟨⟨n, w⟩, rfl⟩
+  have hw : (w : ℂ) - z ∈ Metric.ball 0 ρ := by
+    rw [Metric.mem_ball, dist_zero_right]
+    have hle := Metric.mem_closedBall.mp w.property
+    rw [dist_eq_norm] at hle
+    change _ < δ / 2 + r
+    linarith
+  have he := hest _ hw n
+  simp only [add_sub_cancel, FormalMultilinearSeries.partialSum,
+    FormalMultilinearSeries.ofScalars_apply_eq, comp_apply, smul_eq_mul] at he
+  simp only [map_smul, map_sub, map_sum, ha, smul_eq_mul, norm_mul, Complex.norm_natCast]
+  rw [norm_sub_rev]
+  calc
+    _ ≤ (n : ℝ) * (C * t ^ n) := by
+      apply mul_le_mul_of_nonneg_left _ (Nat.cast_nonneg n)
+      simpa only [mul_comm] using he
+    _ = C * ((n : ℝ) * t ^ n) := by ring
+    _ ≤ C * M := mul_le_mul_of_nonneg_left (hM (mem_range_self n)) hC.le
+
 /-- Paper: Theorem C.5.2.6(1,4), p. 738. Weak holomorphy is equivalent to a
 power series at every center that converges uniformly to the function on each closed
 disc about that center contained in the domain. -/
@@ -854,7 +1611,41 @@ theorem weaklyHolomorphicOn_iff_taylor :
     WeaklyHolomorphicOn f Ω ↔ ∀ z ∈ Ω, ∃ a : ℕ → E,
       ∀ r : ℝ, 0 < r → Metric.closedBall z r ⊆ Ω →
         TendstoUniformlyOn (fun n w ↦ ∑ k ∈ Finset.range n, (w - z) ^ k • a k)
-          f atTop (Metric.closedBall z r) := by sorry
+          f atTop (Metric.closedBall z r) := by
+  classical
+  clear hconn
+  constructor
+  · intro hf z hz
+    choose g _ he using hf.exists_eval_iteratedDeriv hΩ f
+    let a (k : ℕ) : E := (k.factorial : ℂ)⁻¹ • g k z
+    have ha (φ : StrongDual ℂ E) (k : ℕ) : φ (a k) = iteratedDeriv k (φ ∘ f) z / k.factorial := by
+      simp only [a, map_smul, smul_eq_mul, div_eq_inv_mul]
+      rw [show φ (g k z) = _ from he k φ hz]
+    refine ⟨a, fun r hr hs ↦ ?_⟩
+    have hb := hf.bounded_taylorErrors hΩ f ha hr hs
+    apply tendstoUniformlyOn_of_forall_continuous_seminorm
+    intro q hq ε hε
+    obtain ⟨M, hM⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mp
+      hb ⟨q, hq⟩
+    filter_upwards [tendsto_natCast_atTop_atTop.eventually_gt_atTop (M / ε),
+      eventually_gt_atTop 0] with n hn hn₀ w hw
+    have h := hM (mem_image_of_mem _ (mem_range_self (n, ⟨w, hw⟩)))
+    change q ((n : ℂ) • _) ≤ M at h
+    rw [map_smul_eq_mul, Complex.norm_natCast] at h
+    exact lt_of_mul_lt_mul_left (h.trans_lt ((div_lt_iff₀ hε).mp hn)) (by positivity)
+  · intro h φ z hz
+    obtain ⟨a, ha⟩ := h z hz
+    obtain ⟨r, hr, hs⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz)
+    have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    have hlim : TendstoUniformlyOn
+        (fun n w ↦ ∑ k ∈ Finset.range n, (w - z) ^ k * φ (a k)) (φ ∘ f) atTop
+        (Metric.closedBall z r) := by
+      simpa only [comp_def, map_sum, map_smul, smul_eq_mul] using
+        φ.uniformContinuous.comp_tendstoUniformlyOn (ha r hr hs)
+    have hd := (hlim.mono Metric.ball_subset_closedBall).tendstoLocallyUniformlyOn.differentiableOn
+      (Eventually.of_forall fun n ↦ (Differentiable.fun_sum fun i _ ↦
+        ((differentiable_id.sub_const z).pow i).mul_const (φ (a i))).differentiableOn) Metric.isOpen_ball
+    exact (hd.differentiableAt (Metric.ball_mem_nhds z hr)).differentiableWithinAt
 
 omit hΩ hconn in
 /-- The Taylor series of a Banach-valued holomorphic function converges uniformly
@@ -962,7 +1753,8 @@ theorem tendstoUniformlyOn_taylor_derivatives (hf : ∀ k : ℕ,
 /-- Paper: Theorem C.5.2.6, p. 738. In the quasi-complete case weak holomorphy
 implies holomorphy in the target topology. -/
 theorem WeaklyHolomorphicOn.vectorHolomorphicOn (hf : WeaklyHolomorphicOn f Ω) :
-    VectorHolomorphicOn f Ω := by sorry
+    VectorHolomorphicOn f Ω := by
+  exact (weaklyHolomorphicOn_iff_all_derivatives hΩ hconn f).mp hf 0
 
 omit [QuasiCompleteSpace ℂ E] in
 /-- Paper: (C.5.2.6), p. 739. The weak derivative evaluates each continuous
@@ -970,7 +1762,31 @@ linear functional to the corresponding scalar complex derivative. -/
 theorem WeaklyHolomorphicOn.existsUnique_weakDerivative (hf : WeaklyHolomorphicOn f Ω)
     {z : ℂ} (hz : z ∈ Ω) (k : ℕ) :
     ∃! v : PettisWeakCompletion E, ∀ φ : StrongDual ℂ E,
-      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ = iteratedDeriv k (φ ∘ f) z := by sorry
+      (show Module.Dual ℂ (StrongDual ℂ E) from v) φ = iteratedDeriv k (φ ∘ f) z := by
+  clear hconn
+  -- (C.5.2.6) defines the weak derivative in (E')* by scalar differentiation.
+  let v : Module.Dual ℂ (StrongDual ℂ E) :=
+    { toFun := fun φ ↦ iteratedDeriv k (φ ∘ f) z
+      map_add' := fun φ ψ ↦ by
+        have hφ : ContDiffAt ℂ k (φ ∘ f) z :=
+          ((hf φ).contDiffOn hΩ).contDiffAt (hΩ.mem_nhds hz)
+        have hψ : ContDiffAt ℂ k (ψ ∘ f) z :=
+          ((hf ψ).contDiffOn hΩ).contDiffAt (hΩ.mem_nhds hz)
+        have hsum : (φ + ψ) ∘ f = (φ ∘ f) + (ψ ∘ f) := by
+          ext w
+          simp
+        rw [hsum]
+        exact iteratedDeriv_add hφ hψ
+      map_smul' := fun c φ ↦ by
+        have hsmul : (c • φ) ∘ f = c • (φ ∘ f) := by
+          ext w
+          simp
+        rw [hsmul]
+        exact iteratedDeriv_const_smul_field c (φ ∘ f) }
+  refine ⟨v, fun _ ↦ rfl, fun w hw ↦ ?_⟩
+  apply LinearMap.ext
+  intro φ
+  exact hw φ
 
 end Criteria
 
@@ -1074,12 +1890,105 @@ from the local Laurent expansion, with existence supplied as evidence. -/
 def vectorLaurentCoeff (h : ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a) (k : ℤ) : E :=
   Classical.choose h k
 
+omit [ContinuousSMul ℂ E] [T2Space E] [PolynormableSpace ℂ E] [QuasiCompleteSpace ℂ E] in
+/-- On a circle in the punctured disc, integrating a scalar evaluation of the
+Laurent expansion against the local coordinate to the power `-k - 1` gives
+`2πi` times the scalar evaluation of the coefficient at `k`. -/
+private theorem HasVectorLaurentSeriesAt.circleIntegral_coeff {a : ℤ → E}
+    {N : ℤ} {r R : ℝ} (hR : 0 < R) (hRr : R < r) (hzero : ∀ k < N, a k = 0)
+    (hconv : ∀ K : Set ℂ, K ⊆ Metric.ball z r \ {z} → IsCompact K →
+      TendstoUniformlyOn
+        (fun n w ↦ ∑ j ∈ Finset.range n, (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ)))
+        f atTop K)
+    (φ : StrongDual ℂ E) (k : ℤ) :
+    circleIntegral (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) z R =
+      (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+  have hne (w : ℂ) (hw : w ∈ Metric.sphere z R) : w - z ≠ 0 :=
+    sub_ne_zero.mpr (Metric.ne_of_mem_sphere hw hR.ne')
+  have hsub : Metric.sphere z R ⊆ Metric.ball z r \ {z} := by
+    intro w hw
+    exact ⟨Metric.mem_ball.mpr ((Metric.mem_sphere.mp hw).trans_lt hRr),
+      sub_ne_zero.mp (hne w hw)⟩
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : UniformSpace ℂ := PseudoMetricSpace.toUniformSpace
+  have hscalar := φ.uniformContinuous.comp_tendstoUniformlyOn
+    (hconv _ hsub (isCompact_sphere z R))
+  let term (j : ℕ) (w : ℂ) := (w - z) ^ (N + (j : ℤ) - k - 1) • φ (a (N + (j : ℤ)))
+  have hterm (j : ℕ) : ContinuousOn (term j) (Metric.sphere z R) :=
+    ((continuousOn_id.sub continuousOn_const).zpow₀ _ fun w hw ↦ Or.inl (hne w hw)).smul
+      continuousOn_const
+  have hweighted : TendstoUniformlyOn (fun n w ↦ ∑ j ∈ Finset.range n, term j w)
+      (fun w ↦ (w - z) ^ (-k - 1) * φ (f w)) atTop (Metric.sphere z R) := by
+    rw [Metric.tendstoUniformlyOn_iff] at hscalar ⊢
+    intro ε hε
+    have hbound : 0 < R ^ (-k - 1) := zpow_pos hR _
+    filter_upwards [hscalar (ε / R ^ (-k - 1)) (div_pos hε hbound)] with n hn w hw
+    have hsum :
+        ∑ j ∈ Finset.range n, term j w =
+          (w - z) ^ (-k - 1) * φ (∑ j ∈ Finset.range n,
+            (w - z) ^ (N + (j : ℤ)) • a (N + (j : ℤ))) := by
+      rw [map_sum, Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j _
+      have hexp : N + (j : ℤ) - k - 1 = (-k - 1) + (N + (j : ℤ)) := by omega
+      simp [term, hexp, zpow_add₀ (hne w hw), smul_eq_mul, mul_assoc]
+    have hnorm : ‖w - z‖ = R := by simpa only [dist_eq_norm] using Metric.mem_sphere.mp hw
+    rw [hsum, dist_eq_norm, ← mul_sub, norm_mul, norm_zpow, hnorm, ← dist_eq_norm,
+      ← lt_div_iff₀' hbound]
+    exact hn w hw
+  have hlim := hweighted.tendsto_circleIntegral_of_continuousOn hR.le
+    (Eventually.of_forall fun n ↦ continuousOn_finsetSum _ fun j _ ↦ hterm j)
+  have hintegral (j : ℕ) : circleIntegral (term j) z R =
+      if N + (j : ℤ) = k then (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) else 0 := by
+    dsimp only [term]
+    rw [circleIntegral.integral_smul_const]
+    split_ifs with hj
+    · rw [hj, show k - k - 1 = (-1 : ℤ) by omega]
+      simp only [zpow_neg_one, circleIntegral.integral_sub_center_inv z hR.ne', smul_eq_mul]
+    · have hpow : N + (j : ℤ) - k - 1 ≠ -1 := by omega
+      rw [circleIntegral.integral_sub_zpow_of_ne hpow, zero_smul]
+  -- Only the summand whose exponent is shifted to minus one contributes.
+  have heventual : ∀ᶠ n : ℕ in atTop, circleIntegral (fun w ↦ ∑ j ∈ Finset.range n, term j w)
+      z R = (2 * (Real.pi : ℂ) * Complex.I) * φ (a k) := by
+    filter_upwards [eventually_gt_atTop (k - N).toNat] with n hn
+    rw [circleIntegral.integral_fun_sum fun j _ ↦ ContinuousOn.circleIntegrable hR.le (hterm j)]
+    simp only [hintegral]
+    by_cases hk : N ≤ k
+    · have hj : N + ((k - N).toNat : ℤ) = k := by omega
+      rw [Finset.sum_eq_single (k - N).toNat]
+      · rw [ite_eq_left hj]
+      · intro j _ hj'
+        have : N + (j : ℤ) ≠ k := by omega
+        simp [this]
+      · exact fun h ↦ (h (Finset.mem_range.mpr hn)).elim
+    · have hak : a k = 0 := hzero k (lt_of_not_ge hk)
+      have hj (j : ℕ) : N + (j : ℤ) ≠ k := by omega
+      simp [hj, hak]
+  exact tendsto_nhds_unique hlim (tendsto_const_nhds.congr' (heventual.mono fun _ hn ↦ hn.symm))
+
+-- Retain the target space hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Coefficient notation in Lemma C.5.3.2, p. 740. Reading a coefficient
 from a specified expansion reproduces the coefficient at the requested exponent.
 Deviation: This is a sanity check for the coefficient operation. -/
 theorem vectorLaurentCoeff_eq {a : ℤ → E} (ha : HasVectorLaurentSeriesAt f z a)
     (h : ∃ a : ℤ → E, HasVectorLaurentSeriesAt f z a) (k : ℤ) :
-    vectorLaurentCoeff h k = a k := by sorry
+    vectorLaurentCoeff h k = a k := by
+  change Classical.choose h k = a k
+  obtain ⟨M, s, hs, hbzero, hbconv⟩ := Classical.choose_spec h
+  obtain ⟨N, r, hr, hazero, haconv⟩ := ha
+  let R := min r s / 2
+  have hR : 0 < R := half_pos (lt_min hr hs)
+  have hRmin : R < min r s := half_lt_self (lt_min hr hs)
+  have hfactor : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 :=
+    mul_ne_zero (mul_ne_zero (by norm_num) (by exact_mod_cast Real.pi_ne_zero)) Complex.I_ne_zero
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr fun φ ↦ ?_
+  have hbcoeff := HasVectorLaurentSeriesAt.circleIntegral_coeff hR
+    (hRmin.trans_le (min_le_right r s)) hbzero hbconv φ k
+  have hacoeff := HasVectorLaurentSeriesAt.circleIntegral_coeff hR
+    (hRmin.trans_le (min_le_left r s)) hazero haconv φ k
+  exact mul_left_cancel₀ hfactor (hbcoeff.symm.trans hacoeff)
 
 -- TODO(paper-gap): C.5.3.2 omits the interior-containment hypothesis of C.5.2.4.
 -- On 1 < |w| < 4, take f(w) = 1/w, z = 2, the circle |w| = 3, and k = -1.

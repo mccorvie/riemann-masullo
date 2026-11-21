@@ -1,7 +1,13 @@
 module
 
+import Mathlib.Analysis.Calculus.Deriv.Polynomial
 import Mathlib.Analysis.Calculus.ParametricIntegral
 import Mathlib.Analysis.SpecialFunctions.Pow.Deriv
+import Mathlib.Analysis.Calculus.Deriv.ZPow
+import Mathlib.Analysis.Calculus.FDeriv.Extend
+import Mathlib.Analysis.SpecialFunctions.Log.Deriv
+import Mathlib.Analysis.Complex.RealDeriv
+import Mathlib.Combinatorics.Enumerative.Stirling
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Deriv
 public import Mathlib.Analysis.MellinTransform
@@ -121,7 +127,78 @@ Deviation: Sanity check for the three definitions. -/
 theorem exists_gaussian_logProfile_exponentialDecay :
     ∃ f : 𝓢(ℝ, ℂ), (∀ x : ℝ, f x = Real.exp (-(x ^ 2))) ∧
       ForwardSemiExponentialDecay f ∧ BackwardSemiExponentialDecay f ∧
-      ExponentialDecay f := by sorry
+      ExponentialDecay f := by
+  let G : ℝ → ℂ := fun x ↦ (Real.exp (-(x ^ 2)) : ℂ)
+  -- Differentiating p(x) exp(-x²) replaces p by p' - 2Xp.
+  have hderiv (j : ℕ) : ∃ p : Polynomial ℝ,
+      iteratedDeriv j G = fun x ↦ (↑(p.eval x * Real.exp (-(x ^ 2))) : ℂ) := by
+    induction j with
+    | zero => exact ⟨1, by simp [G]⟩
+    | succ j ih =>
+      obtain ⟨p, hp⟩ := ih
+      refine ⟨p.derivative - Polynomial.C 2 * Polynomial.X * p, ?_⟩
+      rw [iteratedDeriv_succ, hp]
+      funext x
+      have hexp : HasDerivAt (fun y : ℝ ↦ Real.exp (-(y ^ 2)))
+          (Real.exp (-(x ^ 2)) * -(2 * x)) x := by
+        simpa using! (((hasDerivAt_id x).pow 2).neg).exp
+      apply (((p.hasDerivAt x).mul hexp).ofReal_comp.deriv).trans
+      congr 1
+      simp only [Polynomial.eval_sub, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_X]
+      ring
+  -- A Gaussian absorbs polynomial weights and any fixed exponential weight.
+  have hbound (k j : ℕ) (A : ℝ) : ∃ C : ℝ, ∀ x : ℝ,
+      ‖x‖ ^ k * ‖iteratedDeriv j G x‖ ≤ C * Real.exp (-A * |x|) := by
+    obtain ⟨p, hp⟩ := hderiv j
+    let M : ℝ := ∑ i ∈ p.support, ‖p.coeff i‖ * ((k + i).factorial : ℝ)
+    have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ by positivity
+    refine ⟨M * Real.exp ((A + 1) ^ 2 / 4), fun x ↦ ?_⟩
+    have hpoly : ‖x‖ ^ k * ‖p.eval x‖ ≤ M * Real.exp |x| := by
+      rw [Polynomial.eval_eq_sum, Polynomial.sum, Finset.sum_mul]
+      refine (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (by positivity)).trans ?_
+      rw [Finset.mul_sum]
+      apply Finset.sum_le_sum
+      intro i _
+      rw [norm_mul, norm_pow, ← mul_left_comm, ← pow_add, Real.norm_eq_abs x, mul_assoc]
+      have hfact : (0 : ℝ) < (k + i).factorial := by positivity
+      have hpow := (div_le_iff₀ hfact).mp
+        (Real.pow_div_factorial_le_exp |x| (abs_nonneg x) (k + i))
+      exact mul_le_mul_of_nonneg_left (by simpa only [mul_comm] using hpow) (norm_nonneg _)
+    have hsquare : |x| + -(x ^ 2) ≤ (A + 1) ^ 2 / 4 + -A * |x| := by
+      rw [← sq_abs x]
+      nlinarith [sq_nonneg (|x| - (A + 1) / 2)]
+    rw [hp, Complex.norm_real, norm_mul, Real.norm_of_nonneg (Real.exp_pos _).le, ← mul_assoc]
+    calc
+      _ ≤ (M * Real.exp |x|) * Real.exp (-(x ^ 2)) :=
+        mul_le_mul_of_nonneg_right hpoly (Real.exp_pos _).le
+      _ = M * Real.exp (|x| + -(x ^ 2)) := by rw [mul_assoc, ← Real.exp_add]
+      _ ≤ M * Real.exp ((A + 1) ^ 2 / 4 + -A * |x|) :=
+        mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr hsquare) hM
+      _ = _ := by rw [Real.exp_add, mul_assoc]
+  have hsmooth : ContDiff ℝ ∞ G :=
+    Complex.ofRealCLM.contDiff.comp (by fun_prop : ContDiff ℝ ∞ fun x : ℝ ↦ Real.exp (-(x ^ 2)))
+  let f : 𝓢(ℝ, ℂ) := ⟨G, hsmooth, fun k j ↦ by
+    obtain ⟨C, hC⟩ := hbound k j 0
+    exact ⟨C, fun x ↦ by
+      simpa only [norm_iteratedFDeriv_eq_norm_iteratedDeriv, neg_zero, zero_mul,
+        Real.exp_zero, mul_one] using hC x⟩⟩
+  have hforward : ForwardSemiExponentialDecay f := by
+    intro j A _
+    change iteratedDeriv j G =O[atTop] _
+    obtain ⟨C, hC⟩ := hbound 0 j A
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_ge_atTop (0 : ℝ)] with x hx
+    simpa only [pow_zero, one_mul, abs_of_nonneg hx, Real.norm_eq_abs,
+      abs_of_pos (Real.exp_pos _)] using hC x
+  have hbackward : BackwardSemiExponentialDecay f := by
+    intro j A _
+    change iteratedDeriv j G =O[atBot] _
+    obtain ⟨C, hC⟩ := hbound 0 j A
+    apply Asymptotics.IsBigO.of_bound C
+    filter_upwards [eventually_le_atBot (0 : ℝ)] with x hx
+    simpa only [pow_zero, one_mul, abs_of_nonpos hx, neg_mul_neg, Real.norm_eq_abs,
+      abs_of_pos (Real.exp_pos _)] using hC x
+  exact ⟨f, fun _ ↦ rfl, hforward, hbackward, ⟨hforward, hbackward⟩⟩
 
 /-- An extra exponential factor absorbs any prescribed polynomial weight at positive infinity. -/
 private theorem forward_weighted_deriv_bound {f : 𝓢(ℝ, ℂ)} (hf : ForwardSemiExponentialDecay f)
@@ -215,7 +292,63 @@ zero extension smooth across the origin.
 Deviation: The ordinary Schwartz assertion is false without forward decay. -/
 theorem contDiff_zeroExtension_of_backwardSemiExponentialDecay (f : 𝓢(ℝ, ℂ))
     (hf : BackwardSemiExponentialDecay f) :
-    ContDiff ℝ ∞ ((Ioi (0 : ℝ)).indicator (fromLog f)) := by sorry
+    ContDiff ℝ ∞ ((Ioi (0 : ℝ)).indicator (fromLog f)) := by
+  let G (a : ℝ) (j : ℕ) : ℝ → ℂ :=
+    (Ioi (0 : ℝ)).indicator fun t ↦ t ^ a • iteratedDeriv j (f : ℝ → ℂ) (Real.log t)
+  have G_eq (a : ℝ) (j : ℕ) {t : ℝ} (ht : 0 < t) :
+      G a j t = t ^ a • iteratedDeriv j (f : ℝ → ℂ) (Real.log t) :=
+    indicator_of_mem ht _
+  have G_zero (a : ℝ) (j : ℕ) {t : ℝ} (ht : t ≤ 0) : G a j t = 0 :=
+    indicator_of_notMem (show t ∉ Ioi (0 : ℝ) from ht.not_gt) _
+  -- The extra two powers of t give a zero derivative at the origin.
+  have hdecay (a : ℝ) (j : ℕ) (ha : a ≤ 0) : G a j =O[𝓝 0] (fun t : ℝ ↦ t ^ 2) := by
+    rw [← nhdsLE_sup_nhdsGT, Asymptotics.isBigO_sup]
+    constructor
+    · apply (Asymptotics.isBigO_zero _ _).congr' _ EventuallyEq.rfl
+      filter_upwards [self_mem_nhdsWithin (s := Iic (0 : ℝ))] with t ht
+      exact (G_zero a j ht).symm
+    · have hlog := isBigO_comp_log_rpow_of_isBigO_exp (hf j (2 - a) (by linarith))
+        Real.tendsto_log_nhdsGT_zero self_mem_nhdsWithin
+      apply ((Asymptotics.isBigO_refl (fun t : ℝ ↦ t ^ a) _).smul hlog).congr'
+      · filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with t ht
+        exact (G_eq a j ht).symm
+      · filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with t ht
+        rw [smul_eq_mul, ← Real.rpow_add ht, show a + (2 - a) = 2 by ring, Real.rpow_two]
+  have hderiv (a : ℝ) (j : ℕ) (ha : a ≤ 0) (t : ℝ) :
+      HasDerivAt (G a j) (G (a - 1) (j + 1) t + a • G (a - 1) j t) t := by
+    rcases lt_trichotomy t 0 with ht | rfl | ht
+    · rw [G_zero _ _ ht.le, G_zero _ _ ht.le, smul_zero, add_zero]
+      exact (hasDerivAt_const t (0 : ℂ)).congr_of_eventuallyEq
+        ((eventually_lt_nhds ht).mono fun u hu ↦ G_zero a j hu.le)
+    · simp only [G_zero _ _ le_rfl, smul_zero, add_zero, hasDerivAt_iff_isLittleO,
+        sub_zero]
+      exact (hdecay a j ha).trans_isLittleO (by
+        simpa only [pow_one] using
+          (Asymptotics.isLittleO_pow_pow (𝕜 := ℝ) (m := 1) (n := 2) (by decide)))
+    · have hlog : HasDerivAt (fromLog (iteratedDeriv j (f : ℝ → ℂ)))
+          (t⁻¹ • iteratedDeriv (j + 1) (f : ℝ → ℂ) (Real.log t)) t := by
+        rw [iteratedDeriv_succ]
+        exact ((f.smooth ⊤).differentiable_iteratedDeriv j
+          (ENat.natCast_lt_of_coe_top_le_withTop le_rfl j)
+          (Real.log t)).hasDerivAt.scomp t (Real.hasDerivAt_log ht.ne')
+      have h := (Real.hasDerivAt_rpow_const (p := a) (Or.inl ht.ne')).smul hlog
+      rw [G_eq _ _ ht, G_eq _ _ ht, smul_smul]
+      rw [smul_smul, mul_comm (t ^ a) t⁻¹, ← div_eq_inv_mul, ← Real.rpow_sub_one ht.ne'] at h
+      exact h.congr_of_eventuallyEq ((eventually_gt_nhds ht).mono fun u hu ↦ G_eq a j hu)
+  have hsmooth (n : ℕ) (a : ℝ) (j : ℕ) (ha : a ≤ 0) : ContDiff ℝ n (G a j) := by
+    induction n generalizing a j with
+    | zero =>
+      exact contDiff_zero.mpr (Differentiable.continuous fun t ↦ (hderiv a j ha t).differentiableAt)
+    | succ n ih =>
+      rw [Nat.cast_succ, contDiff_succ_iff_deriv]
+      refine ⟨fun t ↦ (hderiv a j ha t).differentiableAt, by simp, ?_⟩
+      rw [show deriv (G a j) = G (a - 1) (j + 1) + a • G (a - 1) j from
+        funext fun t ↦ (hderiv a j ha t).deriv]
+      have ha' : a - 1 ≤ 0 := by linarith
+      exact (ih (a - 1) (j + 1) ha').add ((ih (a - 1) j ha').const_smul a)
+  rw [contDiff_infty]
+  intro n
+  simpa only [G, Real.rpow_zero, one_smul, iteratedDeriv_zero] using hsmooth n 0 0 le_rfl
 
 /-- Paper: Lemma B.2.1.4(2), p. 593. Inversion on the positive reals is
 the continuous linear involution given by reflection of the logarithmic profile. -/
@@ -257,11 +390,438 @@ theorem exponentialDecay_iff_reflected (f g : 𝓢(ℝ, ℂ)) (hg : ∀ x : ℝ,
   have h₂ := backwardSemiExponentialDecay_iff_forward_reflected g f hgf
   exact ⟨fun h ↦ ⟨h₁.mp h.2, h₂.mpr h.1⟩, fun h ↦ ⟨h₂.mp h.2, h₁.mpr h.1⟩⟩
 
+/-- Signed Stirling numbers of the first kind, so that
+`t^{-n} \sum_j s(n,j) f^{(j)}(\log t)` is the `n`-th derivative of `f \circ \log`. -/
+private def sStir (n k : ℕ) : ℤ := (-1) ^ (n - k) * (Nat.stirlingFirst n k : ℤ)
+
+private lemma sStir_succ_succ (n k : ℕ) :
+    sStir (n + 1) (k + 1) = sStir n k - (n : ℤ) * sStir n (k + 1) := by
+  dsimp only [sStir]
+  have hsub : (n + 1) - (k + 1) = n - k := Nat.succ_sub_succ n k
+  rw [hsub, Nat.stirlingFirst_succ_succ]
+  push_cast
+  by_cases hkn : n ≤ k
+  · have hS2 : Nat.stirlingFirst n (k + 1) = 0 :=
+      Nat.stirlingFirst_eq_zero_of_lt (by omega)
+    have hnk : n - k = 0 := Nat.sub_eq_zero_of_le hkn
+    simp [hS2, hnk]
+  · have hsub' : n - (k + 1) + 1 = n - k := by omega
+    have hsign : (-1 : ℤ) ^ (n - k) = - (-1 : ℤ) ^ (n - (k + 1)) := by
+      rw [← hsub', pow_succ]
+      ring
+    rw [hsign]
+    ring
+
+private lemma sStir_rec (n k : ℕ) :
+    sStir (n + 1) k =
+      (if k = 0 then 0 else sStir n (k - 1)) - (n : ℤ) * sStir n k := by
+  cases k with
+  | zero =>
+    have hL : sStir (n + 1) 0 = 0 := by
+      dsimp only [sStir]
+      rw [Nat.sub_zero, Nat.stirlingFirst_succ_zero, Nat.cast_zero, mul_zero]
+    have hR : (n : ℤ) * sStir n 0 = 0 := by
+      dsimp only [sStir, Nat.sub_zero]
+      cases n with
+      | zero => simp [Nat.stirlingFirst_zero]
+      | succ n => rw [Nat.stirlingFirst_succ_zero, Nat.cast_zero, mul_zero, mul_zero]
+    simp [hL, hR]
+  | succ k =>
+    simpa using sStir_succ_succ n k
+
+private lemma sStir_sum_identity (n : ℕ) (d : ℕ → ℂ) :
+    (∑ j ∈ Finset.range (n + 1),
+        (((sStir n j : ℂ) * (-(n : ℂ))) * d j + (sStir n j : ℂ) * d (j + 1))) =
+      ∑ k ∈ Finset.range (n + 2), (sStir (n + 1) k : ℂ) * d k := by
+  have hzero : sStir n (n + 1) = 0 := by
+    dsimp only [sStir]
+    rw [Nat.stirlingFirst_eq_zero_of_lt (Nat.lt_succ_self n), Nat.cast_zero, mul_zero]
+  have hfirst :
+      (∑ j ∈ Finset.range (n + 1), ((sStir n j : ℂ) * (-(n : ℂ))) * d j) =
+        ∑ k ∈ Finset.range (n + 2), ((sStir n k : ℂ) * (-(n : ℂ))) * d k := by
+    conv_rhs => rw [Finset.sum_range_succ]
+    simp [hzero]
+  have hsecond :
+      (∑ j ∈ Finset.range (n + 1), (sStir n j : ℂ) * d (j + 1)) =
+        ∑ k ∈ Finset.range (n + 2),
+          (if k = 0 then (0 : ℂ) else (sStir n (k - 1) : ℂ)) * d k := by
+    have hIcc :
+        (∑ j ∈ Finset.range (n + 1), (sStir n j : ℂ) * d (j + 1)) =
+          ∑ k ∈ Finset.Icc 1 (n + 1), (sStir n (k - 1) : ℂ) * d k := by
+      refine Finset.sum_nbij' (fun j => j + 1) (fun k => k - 1) ?_ ?_ ?_ ?_ ?_
+      · intro j hj
+        simp only [Finset.mem_range, Finset.mem_Icc] at hj ⊢
+        omega
+      · intro k hk
+        simp only [Finset.mem_range, Finset.mem_Icc] at hk ⊢
+        omega
+      · intro j _hj; simp
+      · intro k hk
+        simp only [Finset.mem_Icc] at hk
+        exact Nat.sub_add_cancel hk.1
+      · intro j _hj; simp
+    have hsub : Finset.Icc 1 (n + 1) ⊆ Finset.range (n + 2) := by
+      intro k hk
+      simp only [Finset.mem_Icc, Finset.mem_range] at hk ⊢
+      omega
+    rw [hIcc]
+    have hIf :
+        (∑ k ∈ Finset.Icc 1 (n + 1), (sStir n (k - 1) : ℂ) * d k) =
+          ∑ k ∈ Finset.Icc 1 (n + 1),
+            (if k = 0 then (0 : ℂ) else (sStir n (k - 1) : ℂ)) * d k := by
+      refine Finset.sum_congr rfl ?_
+      intro k hk
+      simp only [Finset.mem_Icc] at hk
+      have hk0 : k ≠ 0 := by omega
+      simp [hk0]
+    rw [hIf]
+    refine Finset.sum_subset hsub ?_
+    intro k hk hk'
+    simp only [Finset.mem_range, Finset.mem_Icc] at hk hk'
+    have hk0 : k = 0 := by omega
+    simp [hk0]
+  rw [Finset.sum_add_distrib, hfirst, hsecond, ← Finset.sum_add_distrib]
+  refine Finset.sum_congr rfl ?_
+  intro k _hk
+  have hrec : (sStir (n + 1) k : ℂ) =
+      (if k = 0 then (0 : ℂ) else (sStir n (k - 1) : ℂ)) - (n : ℂ) * (sStir n k : ℂ) := by
+    rw [sStir_rec]
+    push_cast
+    split_ifs <;> simp
+  rw [hrec]
+  ring
+
+/-- The `n`-th derivative, on `(0, \infty)`, of `t \mapsto f(\log t)`. -/
+private def prof (f : ℝ → ℂ) (n : ℕ) (s : ℝ) : ℂ :=
+  ∑ j ∈ Finset.range (n + 1),
+    (sStir n j : ℂ) * ((s ^ (-(n : ℤ)) : ℝ) : ℂ) * iteratedDeriv j f (Real.log s)
+
+private lemma norm_sStir (n k : ℕ) : ‖(sStir n k : ℂ)‖ = (Nat.stirlingFirst n k : ℝ) := by
+  have hnat : (sStir n k).natAbs = Nat.stirlingFirst n k := by
+    dsimp [sStir]
+    rw [Int.natAbs_mul, Int.natAbs_pow, Int.natAbs_neg, Int.natAbs_one, one_pow, one_mul,
+      Int.natAbs_natCast]
+  rw [Complex.norm_intCast, ← Int.cast_abs, Int.abs_eq_natAbs, hnat]
+  simp
+
+private lemma hasDerivAt_prof (f : ℝ → ℂ) (hf : ContDiff ℝ ∞ f) (n : ℕ) {t : ℝ} (ht : 0 < t) :
+    HasDerivAt (prof f n) (prof f (n + 1) t) t := by
+  have hiter (j : ℕ) (y : ℝ) :
+      HasDerivAt (iteratedDeriv j f) (iteratedDeriv (j + 1) f y) y := by
+    have hdj : ContDiff ℝ (j + 1) f := hf.of_le (by simp)
+    simpa [iteratedDeriv_succ] using (hdj.differentiable_iteratedDeriv' j y).hasDerivAt
+  let term (j : ℕ) (s : ℝ) : ℂ :=
+    (sStir n j : ℂ) * ((s ^ (-(n : ℤ)) : ℝ) : ℂ) * iteratedDeriv j f (Real.log s)
+  have hterm (j : ℕ) :
+      HasDerivAt (term j)
+        ((sStir n j : ℂ) * ((t ^ (-((n + 1) : ℤ)) : ℝ) : ℂ) *
+          ((-(n : ℂ)) * iteratedDeriv j f (Real.log t) +
+            iteratedDeriv (j + 1) f (Real.log t))) t := by
+    let c : ℂ := (sStir n j : ℂ)
+    let u : ℝ → ℂ := fun s => ((s ^ (-(n : ℤ)) : ℝ) : ℂ)
+    let v : ℝ → ℂ := fun s => iteratedDeriv j f (Real.log s)
+    have hu := (hasDerivAt_zpow (-(n : ℤ)) t (Or.inl ht.ne')).ofReal_comp
+    have hv : HasDerivAt v ((t⁻¹ : ℝ) • iteratedDeriv (j + 1) f (Real.log t)) t :=
+      (hiter j (Real.log t)).scomp t (Real.hasDerivAt_log ht.ne')
+    have hmul := ((hasDerivAt_const t c).mul hu).mul hv
+    refine hmul.congr_deriv ?_
+    have hpow : (↑((↑(-(n : ℤ)) : ℝ) * t ^ (-(n : ℤ) - 1)) : ℂ) =
+        (-(n : ℂ)) * ↑(t ^ (-((n : ℤ) + 1))) := by
+      rw [show (↑(-(n : ℤ)) : ℝ) = -(n : ℝ) by simp [Int.cast_neg, Int.cast_natCast]]
+      rw [show -(n : ℤ) - 1 = -((n : ℤ) + 1) by ring]
+      rw [Complex.ofReal_mul, Complex.ofReal_neg, Complex.ofReal_natCast]
+    have hinv : (t ^ (-(n : ℤ)) : ℝ) * t⁻¹ = t ^ (-((n + 1) : ℤ)) := by
+      rw [← zpow_neg_one, ← zpow_add₀ ht.ne']
+      congr 1
+      ring
+    have hsmul : (t⁻¹ : ℝ) • iteratedDeriv (j + 1) f (Real.log t) =
+        ((t⁻¹ : ℝ) : ℂ) * iteratedDeriv (j + 1) f (Real.log t) := by
+      simp [Complex.real_smul]
+    set dj := iteratedDeriv j f (Real.log t)
+    set djs := iteratedDeriv (j + 1) f (Real.log t)
+    set pn := ((t ^ (-(n : ℤ)) : ℝ) : ℂ)
+    set pn1 := ((t ^ (-((n + 1) : ℤ)) : ℝ) : ℂ)
+    have hpn : pn * ((t⁻¹ : ℝ) : ℂ) = pn1 := by
+      simpa [pn, pn1, Complex.ofReal_mul] using congrArg Complex.ofReal hinv
+    simp only [c, v, zero_mul, zero_add, Pi.mul_apply]
+    rw [hpow, hsmul]
+    conv_lhs =>
+      rhs
+      rw [mul_assoc]
+      arg 2
+      rw [← mul_assoc]
+    rw [hpn]
+    ring
+  have hsum := HasDerivAt.fun_sum (u := Finset.range (n + 1)) (fun j _hj => hterm j)
+  change HasDerivAt (fun s => prof f n s) _ t
+  simp only [prof] at hsum ⊢
+  refine hsum.congr_deriv ?_
+  have hfactor :
+      (∑ j ∈ Finset.range (n + 1),
+          (sStir n j : ℂ) * ((t ^ (-((n + 1) : ℤ)) : ℝ) : ℂ) *
+            ((-(n : ℂ)) * iteratedDeriv j f (Real.log t) +
+              iteratedDeriv (j + 1) f (Real.log t))) =
+        ((t ^ (-((n + 1) : ℤ)) : ℝ) : ℂ) *
+          ∑ j ∈ Finset.range (n + 1),
+            ((sStir n j : ℂ) * (-(n : ℂ)) * iteratedDeriv j f (Real.log t) +
+              (sStir n j : ℂ) * iteratedDeriv (j + 1) f (Real.log t)) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl ?_
+    intro j _hj
+    ring
+  rw [hfactor]
+  have hid := sStir_sum_identity n (fun j => iteratedDeriv j f (Real.log t))
+  rw [hid, Finset.mul_sum]
+  refine Finset.sum_congr rfl ?_
+  intro k _hk
+  rw [show -((n : ℤ) + 1) = -((n + 1 : ℕ) : ℤ) by push_cast; rfl]
+  ring
+
+private lemma prof_zero (f : ℝ → ℂ) (t : ℝ) : prof f 0 t = f (Real.log t) := by
+  simp [prof, sStir, Nat.stirlingFirst_zero, iteratedDeriv_zero]
+
+/-- Exponential decay in both directions bounds every derivative against every exponential weight. -/
+private theorem exp_mul_iteratedDeriv_bounded {f : 𝓢(ℝ, ℂ)} (hf : ExponentialDecay f)
+    (j : ℕ) (c : ℝ) :
+    ∃ B : ℝ, 0 ≤ B ∧ ∀ y : ℝ,
+      Real.exp (c * y) * ‖iteratedDeriv j (f : ℝ → ℂ) y‖ ≤ B := by
+  let A := |c| + 1
+  have hA : 0 < A := by positivity
+  obtain ⟨Cf, Cf_pos, hfwd⟩ := (hf.1 j A hA).exists_pos
+  obtain ⟨R, hR⟩ := eventually_atTop.mp hfwd.bound
+  obtain ⟨Cb, Cb_pos, hbwd⟩ := (hf.2 j A hA).exists_pos
+  obtain ⟨S, hS⟩ := eventually_atBot.mp hbwd.bound
+  let R' := max R (0 : ℝ)
+  let S' := min S (0 : ℝ)
+  have hS'R' : S' ≤ R' := (min_le_right S 0).trans (le_max_right R 0)
+  have : (Icc S' R').Nonempty := nonempty_Icc.mpr hS'R'
+  let G (y : ℝ) := Real.exp (c * y) * ‖iteratedDeriv j (f : ℝ → ℂ) y‖
+  have hGc : Continuous G := by
+    have hcont : Continuous (iteratedDeriv j (f : ℝ → ℂ)) :=
+      (f.smooth ⊤).continuous_iteratedDeriv j (by simp)
+    exact (Real.continuous_exp.comp (continuous_const.mul continuous_id')).mul hcont.norm
+  obtain ⟨M, hM⟩ := (isCompact_Icc (a := S') (b := R')).bddAbove_image hGc.continuousOn
+  refine ⟨max (max Cf Cb) (max M 0), by positivity, fun y => ?_⟩
+  by_cases hyR : R' ≤ y
+  · have hy0 : 0 ≤ y := (le_max_right R 0).trans hyR
+    have hyb := hR y ((le_max_left R 0).trans hyR)
+    rw [Real.norm_of_nonneg (Real.exp_nonneg _)] at hyb
+    have htail : G y ≤ Cf := by
+      calc
+        G y ≤ Real.exp (c * y) * (Cf * Real.exp (-A * y)) :=
+          mul_le_mul_of_nonneg_left hyb (Real.exp_nonneg _)
+        _ = Cf * Real.exp ((c - A) * y) := by
+          rw [mul_left_comm (Real.exp (c * y)) Cf, ← Real.exp_add]
+          congr 1
+          ring
+        _ ≤ Cf := by
+          rw [mul_le_iff_le_one_right Cf_pos, Real.exp_le_one_iff]
+          have hcA : c - A ≤ 0 := by
+            dsimp [A]
+            linarith [le_abs_self c]
+          exact mul_nonpos_of_nonpos_of_nonneg hcA hy0
+    exact htail.trans ((le_max_left Cf Cb).trans (le_max_left _ _))
+  · by_cases hyS : y ≤ S'
+    · have hy0 : y ≤ 0 := hyS.trans (min_le_right S 0)
+      have hyb := hS y (hyS.trans (min_le_left S 0))
+      rw [Real.norm_of_nonneg (Real.exp_nonneg _)] at hyb
+      have htail : G y ≤ Cb := by
+        calc
+          G y ≤ Real.exp (c * y) * (Cb * Real.exp (A * y)) :=
+            mul_le_mul_of_nonneg_left hyb (Real.exp_nonneg _)
+          _ = Cb * Real.exp ((c + A) * y) := by
+            rw [mul_left_comm (Real.exp (c * y)) Cb, ← Real.exp_add]
+            congr 1
+            ring
+          _ ≤ Cb := by
+            rw [mul_le_iff_le_one_right Cb_pos, Real.exp_le_one_iff]
+            have hcA : 0 ≤ c + A := by
+              dsimp [A]
+              linarith [neg_le_abs c]
+            exact mul_nonpos_of_nonneg_of_nonpos hcA hy0
+      exact htail.trans ((le_max_right Cf Cb).trans (le_max_left _ _))
+    · have hyI : y ∈ Icc S' R' := ⟨le_of_not_ge hyS, le_of_not_ge hyR⟩
+      exact (hM (mem_image_of_mem G hyI)).trans ((le_max_left M 0).trans (le_max_right _ _))
+
 /-- Paper: Lemma B.2.1.4(3), p. 593. The zero extension of a function with
 exponential decay is an ordinary Schwartz function on the real line. -/
 theorem exists_schwartz_zeroExtension_of_exponentialDecay (f : 𝓢(ℝ, ℂ))
     (hf : ExponentialDecay f) :
-    ∃ g : 𝓢(ℝ, ℂ), (g : ℝ → ℂ) = (Ioi (0 : ℝ)).indicator (fromLog f) := by sorry
+    ∃ g : 𝓢(ℝ, ℂ), (g : ℝ → ℂ) = (Ioi (0 : ℝ)).indicator (fromLog f) := by
+  let D (n : ℕ) (s : ℝ) : ℂ := if 0 < s then prof (⇑f) n s else 0
+  have hAway (n : ℕ) {s : ℝ} (hs : s ≠ 0) : HasDerivAt (D n) (D (n + 1) s) s := by
+    by_cases hs0 : 0 < s
+    · have hprof := hasDerivAt_prof (⇑f) f.smooth' n hs0
+      have heq : D n =ᶠ[𝓝 s] prof (⇑f) n := by
+        filter_upwards [Ioi_mem_nhds hs0] with y hy
+        have hy0 : 0 < y := hy
+        simp [D, hy0]
+      have hval : D (n + 1) s = prof (⇑f) (n + 1) s := by simp [D, hs0]
+      rw [hval]
+      exact hprof.congr_of_eventuallyEq heq
+    · have hsneg : s < 0 := lt_of_le_of_ne (le_of_not_gt hs0) hs
+      have heq : D n =ᶠ[𝓝 s] fun _ => (0 : ℂ) := by
+        filter_upwards [Iio_mem_nhds hsneg] with y hy
+        simp [D, not_lt.mpr hy.le]
+      have hval : D (n + 1) s = 0 := by simp [D, not_lt.mpr hsneg.le]
+      rw [hval]
+      exact (hasDerivAt_const s (0 : ℂ)).congr_of_eventuallyEq heq
+  have hNear (n : ℕ) : ∃ K : ℝ, 0 ≤ K ∧ ∀ t, 0 < t → ‖prof (⇑f) n t‖ ≤ K * t := by
+    have hB : ∀ j : ℕ, ∃ B : ℝ, 0 ≤ B ∧ ∀ y : ℝ,
+        Real.exp ((-((n + 1 : ℕ) : ℝ)) * y) * ‖iteratedDeriv j (f : ℝ → ℂ) y‖ ≤ B :=
+      fun j => exp_mul_iteratedDeriv_bounded hf j (-(n + 1 : ℕ))
+    choose B hB0 hBy using hB
+    refine ⟨∑ j ∈ Finset.range (n + 1), (Nat.stirlingFirst n j : ℝ) * B j,
+      Finset.sum_nonneg fun j _ => mul_nonneg (by positivity) (hB0 j), fun t ht => ?_⟩
+    have hzpos : 0 < t ^ (-(n : ℤ)) := zpow_pos ht _
+    have hsplit : (t ^ (-(n : ℤ)) : ℝ) =
+        t * Real.exp ((-((n + 1 : ℕ) : ℝ)) * Real.log t) := by
+      have hexp : (t ^ (-(n : ℤ)) : ℝ) =
+          Real.exp ((-(n : ℤ) : ℝ) * Real.log t) := by
+        rw [← Real.exp_log hzpos, Real.log_zpow]
+        simp [Int.cast_neg, Int.cast_natCast]
+      rw [hexp]
+      have hcoef : ((-(n : ℤ) : ℝ) * Real.log t) =
+          Real.log t + (-((n + 1 : ℕ) : ℝ)) * Real.log t := by
+        push_cast
+        ring
+      rw [hcoef, Real.exp_add, Real.exp_log ht]
+    calc
+      ‖prof (⇑f) n t‖
+        ≤ ∑ j ∈ Finset.range (n + 1),
+            ‖(sStir n j : ℂ)‖ * ‖((t ^ (-(n : ℤ)) : ℝ) : ℂ)‖ *
+              ‖iteratedDeriv j (f : ℝ → ℂ) (Real.log t)‖ := by
+            simpa [prof, norm_mul] using norm_sum_le (Finset.range (n + 1))
+              (fun j => (sStir n j : ℂ) * ((t ^ (-(n : ℤ)) : ℝ) : ℂ) *
+                iteratedDeriv j (f : ℝ → ℂ) (Real.log t))
+      _ = ∑ j ∈ Finset.range (n + 1),
+            (Nat.stirlingFirst n j : ℝ) * (t ^ (-(n : ℤ))) *
+              ‖iteratedDeriv j (f : ℝ → ℂ) (Real.log t)‖ := by
+            refine Finset.sum_congr rfl fun j _ => ?_
+            rw [norm_sStir, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hzpos]
+      _ = ∑ j ∈ Finset.range (n + 1),
+            (Nat.stirlingFirst n j : ℝ) * t *
+              (Real.exp ((-((n + 1 : ℕ) : ℝ)) * Real.log t) *
+                ‖iteratedDeriv j (f : ℝ → ℂ) (Real.log t)‖) := by
+            refine Finset.sum_congr rfl fun j _ => ?_
+            rw [hsplit]
+            ring
+      _ ≤ ∑ j ∈ Finset.range (n + 1), (Nat.stirlingFirst n j : ℝ) * t * B j := by
+            refine Finset.sum_le_sum fun j _ => ?_
+            have hnn : 0 ≤ (Nat.stirlingFirst n j : ℝ) * t := by positivity
+            exact mul_le_mul_of_nonneg_left (hBy j (Real.log t)) hnn
+      _ = (∑ j ∈ Finset.range (n + 1), (Nat.stirlingFirst n j : ℝ) * B j) * t := by
+            rw [Finset.sum_mul]
+            refine Finset.sum_congr rfl fun j _ => ?_
+            ring
+  have hCont (n : ℕ) : Continuous (D n) := by
+    rw [continuous_iff_continuousAt]
+    intro s
+    by_cases hs0 : 0 < s
+    · have hprof := (hasDerivAt_prof (⇑f) f.smooth' n hs0).continuousAt
+      have heq : prof (⇑f) n =ᶠ[𝓝 s] D n := by
+        filter_upwards [Ioi_mem_nhds hs0] with y hy
+        have hy0 : 0 < y := hy
+        simp [D, hy0]
+      exact hprof.congr heq
+    · by_cases hs : s = 0
+      · subst hs
+        obtain ⟨K, _hK0, hK⟩ := hNear n
+        refine (Metric.continuousAt_iff).2 fun ε hε => ?_
+        refine ⟨ε / (K + 1), by positivity, fun y hy => ?_⟩
+        have hyabs : |y| < ε / (K + 1) := by simpa [Real.dist_eq] using hy
+        have hzero : D n 0 = 0 := by simp [D]
+        rw [hzero, dist_zero_right]
+        by_cases hy0 : 0 < y
+        · have hle : ‖D n y‖ ≤ K * y := by simpa [D, hy0] using hK y hy0
+          calc
+            ‖D n y‖ ≤ K * |y| := by simpa [abs_of_pos hy0] using hle
+            _ ≤ (K + 1) * |y| :=
+              mul_le_mul_of_nonneg_right (by linarith) (abs_nonneg _)
+            _ < (K + 1) * (ε / (K + 1)) :=
+              mul_lt_mul_of_pos_left hyabs (by positivity)
+            _ = ε := by field_simp
+        · have : D n y = 0 := by simp [D, hy0]
+          simpa [this] using hε
+      · have hsneg : s < 0 := lt_of_le_of_ne (le_of_not_gt hs0) hs
+        have heq : D n =ᶠ[𝓝 s] fun _ => (0 : ℂ) := by
+          filter_upwards [Iio_mem_nhds hsneg] with y hy
+          simp [D, not_lt.mpr hy.le]
+        exact continuousAt_const.congr heq.symm
+  have hHas (n : ℕ) (s : ℝ) : HasDerivAt (D n) (D (n + 1) s) s := by
+    by_cases hs : s = 0
+    · subst hs
+      exact hasDerivAt_of_hasDerivAt_of_ne (fun y hy => hAway n hy)
+        (hCont n).continuousAt (hCont (n + 1)).continuousAt
+    · exact hAway n hs
+  have hIter : ∀ m, iteratedDeriv m (D 0) = D m := by
+    intro m
+    induction m with
+    | zero => simp [iteratedDeriv_zero]
+    | succ m ih =>
+      rw [iteratedDeriv_succ, ih]
+      ext s
+      exact (hHas m s).deriv
+  have hsmooth : ContDiff ℝ ∞ (D 0) := by
+    refine contDiff_of_differentiable_iteratedDeriv (n := ⊤) ?_
+    intro m _hm
+    simpa [hIter m] using (show Differentiable ℝ (D m) from fun s => (hHas m s).differentiableAt)
+  have hdecay : ∀ k n : ℕ, ∃ C : ℝ, ∀ x : ℝ,
+      ‖x‖ ^ k * ‖iteratedFDeriv ℝ n (D 0) x‖ ≤ C := by
+    intro k n
+    have hB : ∀ j : ℕ, ∃ B : ℝ, 0 ≤ B ∧ ∀ y : ℝ,
+        Real.exp ((((k : ℝ) - n) * y)) * ‖iteratedDeriv j (f : ℝ → ℂ) y‖ ≤ B :=
+      fun j => exp_mul_iteratedDeriv_bounded hf j ((k : ℝ) - n)
+    choose B hB0 hBy using hB
+    refine ⟨∑ j ∈ Finset.range (n + 1), (Nat.stirlingFirst n j : ℝ) * B j, fun x => ?_⟩
+    rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv, hIter n]
+    by_cases hx : 0 < x
+    · have hzpos : 0 < x ^ (-(n : ℤ)) := zpow_pos hx _
+      have hpow : (x ^ k : ℝ) * (x ^ (-(n : ℤ)) : ℝ) =
+          Real.exp ((((k : ℝ) - n) * Real.log x)) := by
+        have hxk : (x ^ k : ℝ) = Real.exp ((k : ℝ) * Real.log x) := by
+          rw [← Real.exp_log (pow_pos hx k), Real.log_pow]
+        have hxn : (x ^ (-(n : ℤ)) : ℝ) =
+            Real.exp ((-(n : ℤ) : ℝ) * Real.log x) := by
+          rw [← Real.exp_log hzpos, Real.log_zpow]
+          simp [Int.cast_neg, Int.cast_natCast]
+        rw [hxk, hxn, ← Real.exp_add]
+        congr 1
+        push_cast
+        ring
+      have hnormx : ‖x‖ = x := by simp [Real.norm_eq_abs, abs_of_pos hx]
+      rw [hnormx]
+      calc
+        x ^ k * ‖D n x‖
+          = x ^ k * ‖prof (⇑f) n x‖ := by simp [D, hx]
+        _ ≤ x ^ k * ∑ j ∈ Finset.range (n + 1),
+              ‖(sStir n j : ℂ)‖ * ‖((x ^ (-(n : ℤ)) : ℝ) : ℂ)‖ *
+                ‖iteratedDeriv j (f : ℝ → ℂ) (Real.log x)‖ := by
+              gcongr
+              simpa [prof, norm_mul] using norm_sum_le (Finset.range (n + 1))
+                (fun j => (sStir n j : ℂ) * ((x ^ (-(n : ℤ)) : ℝ) : ℂ) *
+                  iteratedDeriv j (f : ℝ → ℂ) (Real.log x))
+        _ = ∑ j ∈ Finset.range (n + 1),
+              (Nat.stirlingFirst n j : ℝ) *
+                (x ^ k * (x ^ (-(n : ℤ))) * ‖iteratedDeriv j (f : ℝ → ℂ) (Real.log x)‖) := by
+              rw [Finset.mul_sum]
+              refine Finset.sum_congr rfl fun j _ => ?_
+              rw [norm_sStir, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hzpos]
+              ring
+        _ ≤ ∑ j ∈ Finset.range (n + 1), (Nat.stirlingFirst n j : ℝ) * B j := by
+              refine Finset.sum_le_sum fun j _ => ?_
+              rw [hpow]
+              exact mul_le_mul_of_nonneg_left (hBy j (Real.log x)) (by positivity)
+    · have hzero : D n x = 0 := by simp [D, hx]
+      rw [hzero, norm_zero, mul_zero]
+      exact Finset.sum_nonneg fun j _ => mul_nonneg (by positivity) (hB0 j)
+  let g : 𝓢(ℝ, ℂ) := ⟨D 0, hsmooth, hdecay⟩
+  refine ⟨g, ?_⟩
+  ext t
+  change D 0 t = (Ioi (0 : ℝ)).indicator (fromLog (⇑f)) t
+  by_cases ht : 0 < t
+  · simp [D, ht, prof_zero, mem_Ioi]
+  · simp [D, ht, mem_Ioi]
 
 /-- Paper: Lemma B.2.1.4(4), p. 593. Logarithmic differentiation preserves
 forward semi-exponential decay. -/
@@ -404,7 +964,17 @@ means that the logarithmic profile is a continuous map vanishing at infinity.
 Deviation: Sanity check using Mathlib's bundled space. -/
 theorem memLogContDiffZero_zero_iff (f : ℝ → ℂ) :
     MemLogContDiffZero 0 f ↔
-      ∃ g : ZeroAtInftyContinuousMap ℝ ℂ, (g : ℝ → ℂ) = f := by sorry
+      ∃ g : ZeroAtInftyContinuousMap ℝ ℂ, (g : ℝ → ℂ) = f := by
+  constructor
+  · rintro ⟨hc, ht⟩
+    have hc' : Continuous f := by simpa using hc
+    refine ⟨⟨⟨f, hc'⟩, ?_⟩, rfl⟩
+    simpa using ht 0 le_rfl
+  · rintro ⟨g, rfl⟩
+    refine ⟨by simpa using g.continuous, ?_⟩
+    intro j hj
+    obtain rfl := Nat.le_zero.mp hj
+    simpa using g.zero_at_infty'
 
 /-- Paper: Equation (B.2.1.19), p. 597. The norm is the sum of the
 supremum norms of the logarithmic derivatives through order m. -/
@@ -415,7 +985,8 @@ def logContDiffZeroNorm (m : ℕ) (f : {f : ℝ → ℂ // MemLogContDiffZero m 
 supremum of the absolute value on the positive reals.
 Deviation: Sanity check for the logarithmic norm. -/
 theorem logContDiffZeroNorm_zero (f : {f : ℝ → ℂ // MemLogContDiffZero 0 f}) :
-    logContDiffZeroNorm 0 f = sSup (range fun x : ℝ ↦ ‖f.val x‖) := by sorry
+    logContDiffZeroNorm 0 f = sSup (range fun x : ℝ ↦ ‖f.val x‖) := by
+  simp [logContDiffZeroNorm]
 
 -- TODO(paper-gap): In the proof of Proposition B.2.1.8, the integrals in dτ
 -- need the factor 1/(2π). The boundary term of (B.2.1.22) uses f, since it
@@ -757,7 +1328,12 @@ the inverse Mellin integral evaluated at one.
 Deviation: Sanity check for orientation and normalization. -/
 theorem verticalLineIntegral_div_eq_mellinInv_one (Φ : ℂ → ℂ) (σ : ℝ)
     (hΦ : Complex.VerticalIntegrable Φ σ) :
-    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by sorry
+    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by
+  unfold verticalLineIntegral mellinInv
+  simp only [Complex.ofReal_one, Complex.one_cpow, one_smul]
+  rw [Complex.real_smul]
+  push_cast
+  field_simp
 
 local notation "cauchyKernel" =>
   (fun (Φ : ℂ → ℂ) (N : ℕ) (z s : ℂ) ↦ Φ s / (s - z) ^ (N + 1))

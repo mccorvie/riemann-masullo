@@ -368,7 +368,8 @@ theorem hardySobolevConvolution_apply (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ 
     (φ : G → ℂ) (hφ : AEMeasurable φ μ) (hc : HasCompactSupport φ)
     (hb : ∃ C : ℝ, ∀ x, ‖φ x‖ ≤ C) (u : W a b s) :
     ∀ᵐ x ∂μ, Integrable (fun g ↦ φ g * u (g⁻¹ * x)) μ ∧
-      hardySobolevConvolution μ m a b s hab hs φ hφ hc hb u x = lcaConvolution μ φ u x := by sorry
+      hardySobolevConvolution μ m a b s hab hs φ hφ hc hb u x = lcaConvolution μ φ u x :=
+  (exists_hardySobolevConvolution μ m a b s hab hs φ hφ hc hb).choose_spec u
 
 /-- Paper: §9.3.3.1, p. 426. On a test function the operator used for the
 trace is the regularized action of Definition 9.3.1.1. -/
@@ -412,14 +413,30 @@ whenever the inner module band contains one.
 Deviation: Sanity check on the plateau condition. -/
 theorem IsModulatedCutoff.apply_one {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) (_h₁ : Λ⁻¹ + ε ≤ 1) (_h₂ : 1 ≤ Λ - ε) :
-    ρ 1 = 1 := by sorry
+    ρ 1 = 1 :=
+  hρ.eq_one (by
+    change ((m 1).val : ℝ) ∈ Icc (Λ⁻¹ + ε) (Λ - ε)
+    rw [map_one, Units.val_one, NNReal.coe_one]
+    exact ⟨_h₁, _h₂⟩)
 
 /-- Paper: Definition 9.3.3.1, p. 427. The piecewise smooth profile gives a
 measurable function on the group.
 Deviation: This is the measurability needed to act on weighted L². -/
 theorem IsModulatedCutoff.measurable {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    Measurable ρ := by sorry
+    Measurable ρ := by
+  obtain ⟨q, jumps, hfactor, _, hq, _⟩ := hρ.profile
+  have hmeas : Measurable (fun t : Ioi (0 : ℝ) ↦ q t.val) := by
+    apply ContinuousOn.measurable_of_countable_compl (s := (Subtype.val ⁻¹' (jumps : Set ℝ))ᶜ)
+    · exact hq.continuousOn.comp continuous_subtype_val.continuousOn
+        fun t ht ↦ ⟨t.property, ht⟩
+    · rw [compl_compl]
+      exact jumps.finite_toSet.countable.preimage Subtype.val_injective
+  let modulePos (x : G) : Ioi (0 : ℝ) := ⟨(m x).val, NNReal.coe_pos.mpr (Units.zero_lt _)⟩
+  have hmodule : Continuous modulePos :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).subtype_mk _
+  rw [funext hfactor]
+  exact hmeas.comp hmodule.measurable
 
 /-- Paper: Definition 9.3.3.1, p. 427. A smooth cutoff is a cutoff whose
 complex-valued realization on the group is Bruhat smooth. -/
@@ -446,7 +463,24 @@ Hardy–Sobolev weight. -/
 theorem exists_lpCutoffMultiplier (ν : Measure G) (ρ : G → ℝ) (_hm : Measurable ρ)
     (_hb : ∀ x, |ρ x| ≤ 1) :
     ∃ T : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν, ‖T‖ ≤ 1 ∧
-      ∀ u, (T u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x := by sorry
+      ∀ u, (T u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x := by
+  let symbol (x : G) : ℂ := ρ x
+  have hbound (x : G) : ‖symbol x‖ ≤ 1 := by
+    simpa only [symbol, Complex.norm_real, Real.norm_eq_abs] using _hb x
+  have hsymbol : MemLp symbol ∞ ν :=
+    memLp_top_of_bound (Complex.measurable_ofReal.comp _hm).aestronglyMeasurable
+      1 (.of_forall hbound)
+  let multiply := ContinuousLinearMap.mul ℂ ℂ
+  let T := multiply.holderL ν ∞ 2 2 (hsymbol.toLp symbol)
+  have hT (u : Lp ℂ 2 ν) : (T u : G → ℂ) =ᵐ[ν] fun x ↦ symbol x * u x :=
+    (multiply.coeFn_holder (r := 2) (hsymbol.toLp symbol) u).trans <|
+      hsymbol.coeFn_toLp.mono fun x hx ↦ congrArg (· * u x) hx
+  refine ⟨T, T.opNorm_le_bound zero_le_one (fun u ↦ ?_), hT⟩
+  rw [one_mul]
+  apply Lp.norm_le_norm_of_ae_le
+  filter_upwards [hT u] with x hx
+  rw [hx, norm_mul]
+  exact mul_le_of_le_one_left (norm_nonneg _) (hbound x)
 
 /-- Paper: Definition 9.3.3.1, p. 427. The cutoff operator is pointwise multiplication
 on the space of square-integrable classes.
@@ -481,7 +515,18 @@ theorem modulatedCutoffOperator_apply (ν : Measure G) {Λ ε : ℝ} {ρ : G →
 positive self-adjoint operator on weighted L². -/
 theorem modulatedCutoffOperator_isPositive (ν : Measure G) {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsModulatedCutoff m Λ ε ρ) :
-    (modulatedCutoffOperator m ν hρ).IsPositive := by sorry
+    (modulatedCutoffOperator m ν hρ).IsPositive := by
+  apply (ContinuousLinearMap.isPositive_iff_complex _).2
+  intro u
+  have hinner : inner ℂ (modulatedCutoffOperator m ν hρ u) u =
+      ((∫ x, ρ x * ‖u x‖ ^ 2 ∂ν : ℝ) : ℂ) := by
+    rw [L2.inner_def, ← integral_complex_ofReal]
+    apply integral_congr_ae
+    filter_upwards [modulatedCutoffOperator_apply m ν hρ u] with x hx
+    rw [hx, ← smul_eq_mul, inner_smul_left, inner_self_eq_norm_sq_to_K]
+    simp
+  rw [hinner]
+  exact ⟨rfl, integral_nonneg fun x ↦ mul_nonneg (hρ.nonneg x) (sq_nonneg _)⟩
 
 /-- Paper: Remark 9.3.3.2, p. 428. The multiplier norm is the essential
 supremum of its symbol for a sigma-finite measure.

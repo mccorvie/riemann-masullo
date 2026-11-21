@@ -7,6 +7,10 @@ public import Mathlib.Analysis.InnerProductSpace.TensorProduct
 public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.MeasureTheory.Measure.Prod
 public import Mathlib.MeasureTheory.Measure.Regular
+import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
+import Mathlib.Analysis.Normed.Group.Tannery
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import Mathlib.LinearAlgebra.Dimension.LinearMap
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.NormAttainment
 
@@ -771,33 +775,222 @@ to the identity.
 Deviation: The projections are onto the individual subspaces, as their declared
 codomains and the proof specify. The sequence is indexed from zero. -/
 theorem tendsto_filtration_orthogonalProjections :
-    ∀ x, Tendsto (fun i ↦ (P(i)) x) atTop (𝓝 x) := by sorry
+    ∀ x, Tendsto (fun i ↦ (P(i)) x) atTop (𝓝 x) := by
+  intro x
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hdense x) ε hε
+  obtain ⟨j, hj⟩ := Set.mem_iUnion.mp hy
+  filter_upwards [eventually_ge_atTop j] with i hi
+  have hyi : y ∈ (V i : Submodule ℂ H) := hV hi hj
+  rw [dist_comm, (V i : Submodule ℂ H).dist_starProjection_eq_infDist]
+  exact (Metric.infDist_le_dist_of_mem hyi).trans_lt hxy
 
+-- Keep the separability hypothesis in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Corollary C.3.5.5(2), p. 702. Left multiplication by the
 projections of a dense filtration converges in trace norm to the original operator. -/
 theorem tendsto_traceNorm_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ traceNorm
-      (⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T)) atTop (𝓝 0) := by sorry
+      (⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T)) atTop (𝓝 0) := by
+  let Q (i : ℕ) : H →L[ℂ] H := 1 - P(i)
+  have hQ_tendsto (x : H) : Tendsto (fun i ↦ Q i x) atTop (𝓝 0) := by
+    refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+    obtain ⟨y, hy, hxy⟩ := Metric.mem_closure_iff.mp (hdense x) ε hε
+    obtain ⟨j, hj⟩ := Set.mem_iUnion.mp hy
+    filter_upwards [eventually_ge_atTop j] with i hi
+    have hyi : y ∈ (V i : Submodule ℂ H) := hV hi hj
+    change dist (x - P(i) x) 0 < ε
+    rw [dist_zero_right, ← dist_eq_norm, (V i : Submodule ℂ H).dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem hyi).trans_lt hxy
+  let A (i : ℕ) : nuclearEndomorphisms H :=
+    ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩ - T
+  have hA (i : ℕ) : (A i).val = -(Q i * T.val) := by
+    change P(i) * T.val - T.val = -((1 - P(i)) * T.val)
+    rw [sub_mul, one_mul, neg_sub]
+  let B (S : H →L[ℂ] H) := CFC.sqrt (star S * S)
+  have hB_pos (S : H →L[ℂ] H) : (B S).IsPositive :=
+    ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)
+  have hB_norm (S : H →L[ℂ] H) (x : H) : ‖B S x‖ = ‖S x‖ := by
+    have hsq : B S * B S = star S * S := CFC.sqrt_mul_sqrt_self _ (star_mul_self_nonneg S)
+    rw [(B S).apply_norm_eq_sqrt_inner_adjoint_right, S.apply_norm_eq_sqrt_inner_adjoint_right]
+    change Real.sqrt (⟪x, ((B S).adjoint * B S) x⟫_ℂ).re =
+      Real.sqrt (⟪x, (star S * S) x⟫_ℂ).re
+    rw [(hB_pos S).isSelfAdjoint.adjoint_eq, hsq]
+  -- The complementary projections bound the Gram operators, and square root preserves order.
+  have hB_le (i : ℕ) : B (A i).val ≤ B T.val := by
+    have hP : IsStarProjection (P(i)) := isStarProjection_starProjection
+    have hQ : IsStarProjection (Q i) := hP.one_sub
+    have hQ_le : Q i ≤ 1 := sub_le_self _ hP.nonneg
+    apply CFC.monotone_sqrt
+    calc
+      star (A i).val * (A i).val = star T.val * Q i * T.val := by
+        simp only [hA, star_neg, neg_mul_neg, star_mul, hQ.isSelfAdjoint.star_eq, mul_assoc]
+        rw [← mul_assoc (Q i), hQ.isIdempotentElem.eq]
+      _ ≤ star T.val * T.val := by
+        simpa only [mul_one] using star_left_conjugate_le_conjugate hQ_le T.val
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  let d (S : H →L[ℂ] H) i : ℝ := (⟪b i, B S (b i)⟫_ℂ).re
+  have htrace (S : nuclearEndomorphisms H) : HasSum (d S.val) (traceNorm S) :=
+    hasSum_traceNorm_diagonal b S
+  have hd_nonneg (S : H →L[ℂ] H) i : 0 ≤ d S i :=
+    (hB_pos S).re_inner_nonneg_right (b i)
+  have hd_bound (i : ℕ) j : ‖d (A i).val j‖ ≤ d T.val j := by
+    rw [Real.norm_of_nonneg (hd_nonneg _ _)]
+    have h := (ContinuousLinearMap.le_def.mp (hB_le i)).re_inner_nonneg_right (b j)
+    change 0 ≤ (⟪b j, (B T.val - B (A i).val) (b j)⟫_ℂ).re at h
+    simpa only [sub_apply, inner_sub_right, Complex.sub_re, sub_nonneg] using h
+  have hd_tendsto (j) : Tendsto (fun i ↦ d (A i).val j) atTop (𝓝 0) := by
+    refine squeeze_zero (g := fun i ↦ ‖b j‖ * ‖Q i (T.val (b j))‖)
+      (fun i ↦ hd_nonneg _ _) (fun i ↦ ?_) ?_
+    · calc
+        d (A i).val j ≤ ‖b j‖ * ‖B (A i).val (b j)‖ :=
+          (Complex.re_le_norm _).trans (norm_inner_le_norm _ _)
+        _ = ‖b j‖ * ‖Q i (T.val (b j))‖ := by
+          rw [hB_norm, hA, neg_apply, norm_neg]
+          rfl
+    · simpa only [norm_zero, mul_zero] using
+        tendsto_const_nhds.mul (hQ_tendsto (T.val (b j))).norm
+  have hsum (i : ℕ) : (∑' j, d (A i).val j) = traceNorm (A i) := (htrace (A i)).tsum_eq
+  simpa only [tsum_zero, hsum] using
+    tendsto_tsum_of_dominated_convergence (g := fun _ ↦ 0)
+      (htrace T).summable hd_tendsto (Eventually.of_forall hd_bound)
 
+omit hsep hV hdense in
+open scoped CStarAlgebra in
+/-- The trace norm of a nuclear rank-one series is bounded by the sum of its rank-one norms. -/
+private theorem traceNorm_le_of_rankOne_series (A : nuclearEndomorphisms H)
+    (φ : ℕ → StrongDual ℂ H) (y : ℕ → H)
+    (hs : Summable (fun n ↦ ‖φ n‖ * ‖y n‖))
+    (hA : ∀ x, HasSum (fun n ↦ φ n x • y n) (A.val x)) :
+    traceNorm A ≤ ∑' n, ‖φ n‖ * ‖y n‖ := by
+  let R (n : ℕ) : nuclearEndomorphisms H :=
+    ⟨(φ n).smulRight (y n), smulRight_mem_nuclearEndomorphisms (φ n) (y n)⟩
+  have hR : Summable (fun n ↦ ‖(R n).val‖) := by
+    simpa only [R, ContinuousLinearMap.norm_smulRight_apply] using hs
+  have hsum : HasSum (fun n ↦ (R n).val) A.val := by
+    obtain ⟨B, hB⟩ := hR.of_norm
+    have hBA : B = A.val := by
+      ext x
+      exact ((ContinuousLinearMap.apply ℂ H x).hasSum hB).unique (hA x)
+    rwa [hBA] at hB
+  have hfin : Tendsto (fun s : Finset ℕ ↦ CFC.abs (∑ n ∈ s, R n).val) atTop
+      (𝓝 (CFC.abs A.val)) := by
+    simpa only [Submodule.coe_sum, Function.comp_def, SummationFilter.unconditional_filter] using
+      (CFC.continuous_abs.tendsto A.val).comp hsum
+  -- Pass to the limit in each finite sum of the nonnegative trace diagonal.
+  obtain ⟨ι, b, -⟩ := exists_hilbertBasis (𝕜 := ℂ) (E := H)
+  let diag (B : H →L[ℂ] H) (i : ι) : ℝ := (⟪b i, B (b i)⟫_ℂ).re
+  have hdiag (X : nuclearEndomorphisms H) :
+      HasSum (diag (CFC.abs X.val)) (traceNorm X) := hasSum_traceNorm_diagonal b X
+  have hnonneg (B : H →L[ℂ] H) (i : ι) : 0 ≤ diag (CFC.abs B) i :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.abs_nonneg B)).re_inner_nonneg_right _
+  refine le_of_tendsto' (hdiag A) fun t ↦ ?_
+  have hcont : Continuous (fun B : H →L[ℂ] H ↦ ∑ i ∈ t, diag B i) := by
+    unfold diag
+    fun_prop
+  refine le_of_tendsto' ((hcont.tendsto (CFC.abs A.val)).comp hfin) fun s ↦ ?_
+  calc
+    ∑ i ∈ t, diag (CFC.abs (∑ n ∈ s, R n).val) i ≤ traceNorm (∑ n ∈ s, R n) :=
+      sum_le_hasSum t (fun i _ ↦ hnonneg _ i) (hdiag _)
+    _ ≤ ∑ n ∈ s, ‖φ n‖ * ‖y n‖ := by
+      let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+      have hcore := traceNorm_normedSpaceCore (H := H)
+      have hzero : traceNorm (0 : nuclearEndomorphisms H) = 0 :=
+        (hcore.norm_eq_zero_iff 0).mpr rfl
+      exact (s.le_sum_of_subadditive traceNorm hzero.le hcore.toCore.norm_triangle R).trans_eq
+        (Finset.sum_congr rfl fun n _ ↦ traceNorm_smulRight _ _)
+    _ ≤ ∑' n, ‖φ n‖ * ‖y n‖ :=
+      hs.sum_le_tsum s (fun _ _ ↦ mul_nonneg (norm_nonneg _) (norm_nonneg _))
+
+set_option linter.unusedSectionVars false in
+open InnerProductSpace in
 /-- Paper: Corollary C.3.5.5(2), p. 702. Right multiplication by the
 projections of a dense filtration converges in trace norm to the original operator. -/
 theorem tendsto_traceNorm_mul_filtration_orthogonalProjections (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ traceNorm
-      (⟨T.val * P(i), mul_mem_nuclearEndomorphisms_right (P(i)) T⟩ - T)) atTop (𝓝 0) := by sorry
+      (⟨T.val * P(i), mul_mem_nuclearEndomorphisms_right (P(i)) T⟩ - T)) atTop (𝓝 0) := by
+  let Q (i : ℕ) : H →L[ℂ] H := P(i) - 1
+  have hQ (x : H) : Tendsto (fun i ↦ Q i x) atTop (𝓝 0) := by
+    have hd : Dense ((⨆ i, (V i : Submodule ℂ H) : Submodule ℂ H) : Set H) :=
+      hdense.mono (iUnion_subset fun i ↦ le_iSup (fun j ↦ (V j : Submodule ℂ H)) i)
+    have h := Submodule.starProjection_tendsto_self (fun i ↦ (V i : Submodule ℂ H))
+      (fun _ _ hij ↦ ClosedSubmodule.toSubmodule_le_toSubmodule.mpr (hV hij)) x
+      (Submodule.dense_iff_topologicalClosure_eq_top.mp hd).ge
+    simpa [Q] using h.sub tendsto_const_nhds (b := x)
+  have hQa (i : ℕ) : (Q i).adjoint = Q i :=
+    ((isSelfAdjoint_starProjection (V i : Submodule ℂ H)).sub
+      (IsSelfAdjoint.one (H →L[ℂ] H))).adjoint_eq
+  have hQc (i : ℕ) (x : H) : ‖Q i x‖ ≤ ‖x‖ := by
+    have hP : IsStarProjection (P(i)) := isStarProjection_starProjection
+    have h := hP.one_sub.norm_le _
+    rw [norm_sub_rev] at h
+    simpa only [one_mul] using (ContinuousLinearMap.opNorm_le_iff zero_le_one).mp h x
+  obtain ⟨c, φ, y, hc, hφ, hy, hT⟩ := (isNuclearOperator_iff_isBanachNuclear T.val).mp T.property
+  -- Since Q i is self-adjoint, right composition applies Q i to each Riesz vector.
+  let u (n : ℕ) := (toDual ℂ H).symm (φ n)
+  have hu (n : ℕ) : ‖u n‖ = ‖φ n‖ := (toDual ℂ H).symm.norm_map _
+  let cost (i n : ℕ) := ‖c n‖ * (‖Q i (u n)‖ * ‖y n‖)
+  let bound (n : ℕ) := ‖c n‖ * (‖φ n‖ * ‖y n‖)
+  have hcost_nonneg (i n : ℕ) : 0 ≤ cost i n := by dsimp [cost]; positivity
+  have hbound (i n : ℕ) : ‖cost i n‖ ≤ bound n := by
+    rw [Real.norm_of_nonneg (hcost_nonneg i n)]
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul_of_nonneg_right ((hQc i (u n)).trans_eq (hu n)) (norm_nonneg _))
+      (norm_nonneg _)
+  have hs : Summable bound := by
+    obtain ⟨C, hC, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+    obtain ⟨D, _, hyD⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+    refine (hc.mul_right (C * D)).of_norm_bounded fun n ↦ ?_
+    rw [Real.norm_of_nonneg (by dsimp [bound]; positivity)]
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hφC _ (mem_range_self n)) (hyD _ (mem_range_self n))
+        (norm_nonneg _) hC.le) (norm_nonneg _)
+  have hlim : Tendsto (fun i ↦ ∑' n, cost i n) atTop (𝓝 0) := by
+    have hterm (n : ℕ) : Tendsto (fun i ↦ cost i n) atTop (𝓝 0) := by
+      simpa [cost] using ((hQ (u n)).norm.mul_const ‖y n‖).const_mul ‖c n‖
+    simpa only [tsum_zero] using
+      tendsto_tsum_of_dominated_convergence hs hterm (Eventually.of_forall hbound)
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  refine squeeze_zero (fun _ ↦ (traceNorm_normedSpaceCore (H := H)).toCore.norm_nonneg _)
+    ?_ hlim
+  intro i
+  let ψ (n : ℕ) : StrongDual ℂ H := c n • innerSL ℂ (Q i (u n))
+  have hψ (n : ℕ) : ‖ψ n‖ * ‖y n‖ = cost i n := by
+    simp only [ψ, cost, norm_smul, innerSL_apply_norm, mul_assoc]
+  simp_rw [← hψ]
+  refine traceNorm_le_of_rankOne_series _ ψ y
+    ((hs.of_norm_bounded (hbound i)).congr fun n ↦ (hψ n).symm) fun x ↦ ?_
+  have heval (n : ℕ) : ψ n x = c n * φ n (Q i x) := by
+    have hinner := (Q i).adjoint_inner_left x (u n)
+    rw [hQa] at hinner
+    simp only [ψ, smul_apply, smul_eq_mul, innerSL_apply_apply, hinner, u, toDual_symm_apply]
+  simpa [heval, Q, map_sub, mul_apply_eq_comp] using hT (Q i x)
 
 /-- Paper: Corollary C.3.5.5(3), p. 702. The traces of the left-projected
 operators converge to the trace of the original operator. -/
 theorem tendsto_hilbertTrace_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ hilbertTrace
       ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩)
-      atTop (𝓝 (hilbertTrace T)) := by sorry
+      atTop (𝓝 (hilbertTrace T)) := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply tendsto_iff_norm_sub_tendsto_zero.mpr
+  simp only [← htr, ← map_sub]
+  simp only [htr]
+  exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _)
+    (tendsto_traceNorm_filtration_orthogonalProjections_mul V hV hdense T)
 
 /-- Paper: Corollary C.3.5.5(3), p. 702. The traces of the right-projected
 operators converge to the trace of the original operator. -/
 theorem tendsto_hilbertTrace_mul_filtration_orthogonalProjections (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ hilbertTrace
       ⟨T.val * P(i), mul_mem_nuclearEndomorphisms_right (P(i)) T⟩)
-      atTop (𝓝 (hilbertTrace T)) := by sorry
+      atTop (𝓝 (hilbertTrace T)) := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply tendsto_iff_norm_sub_tendsto_zero.mpr
+  simp only [← htr, ← map_sub]
+  simp only [htr]
+  exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _)
+    (tendsto_traceNorm_mul_filtration_orthogonalProjections V hV hdense T)
 
 end FiltrationConvergence
 
@@ -831,7 +1024,36 @@ coefficients zero.
 Deviation: This checks the vectors and coefficient normalization for a rank-one map. -/
 theorem singularExpansion_smulRight (e : E) (f : F) (he : ‖e‖ = 1) (hf : ‖f‖ = 1) :
     ∃ d : SingularExpansion ((innerSL ℂ e).smulRight f),
-      d.coeff 0 = 1 ∧ ∀ n, d.coeff (n + 1) = 0 := by sorry
+      d.coeff 0 = 1 ∧ ∀ n, d.coeff (n + 1) = 0 := by
+  let c : ℕ → ℝ≥0 := fun n ↦ if n = 0 then 1 else 0
+  have hc (n : {n // c n ≠ 0}) : n.1 = 0 := by
+    by_contra h
+    exact n.2 (by simp [c, h])
+  have : Subsingleton {n // c n ≠ 0} :=
+    ⟨fun a b ↦ Subtype.ext ((hc a).trans (hc b).symm)⟩
+  refine ⟨{
+    coeff := c
+    antitone_coeff := ?_
+    tendsto_coeff := ?_
+    source := fun _ ↦ e
+    target := fun _ ↦ f
+    orthonormal_source := orthonormal_subsingleton_iff.mpr fun _ ↦ he
+    orthonormal_target := orthonormal_subsingleton_iff.mpr fun _ ↦ hf
+    hasSum_apply := ?_ }, ?_, fun n ↦ ?_⟩
+  · intro m n hmn
+    by_cases hn : n = 0
+    · subst hn
+      obtain rfl : m = 0 := Nat.le_zero.mp hmn
+      exact le_rfl
+    · simp [c, hn]
+  · exact tendsto_const_nhds.congr'
+      (eventually_atTop.mpr ⟨1, fun n hn ↦ by simp [c, Nat.pos_iff_ne_zero.mp hn]⟩)
+  · intro x
+    convert hasSum_single (⟨0, by simp [c]⟩ : {n // c n ≠ 0})
+      (fun b hb ↦ absurd (Subsingleton.elim _ _) hb) using 1
+    simp [c]
+  · simp [c]
+  · simp [c]
 
 /-- Paper: Theorem C.3.6.1(1)–(2), p. 703. A bounded operator is compact
 exactly when it admits a singular expansion.

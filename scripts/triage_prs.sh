@@ -5,8 +5,8 @@
 #   scripts/triage_prs.sh            check and report
 #   scripts/triage_prs.sh --apply    also merge the clean ones, and tell authors what failed
 #
-# Each pull request is checked once per head commit with scripts/check_pr.sh (under bwrap), and
-# the result is kept in .agent/pr-checks/. Verdicts:
+# Each head is checked with scripts/check_pr.sh (under bwrap). Reuse its report in .agent/pr-checks/
+# while the relevant files on main are unchanged. Verdicts:
 #   merge   it passes, adds no `sorry`, and its added lines are ordinary proof text
 #   read    it passes, but something deserves a look first: a split (a new `sorry`), a new
 #           definition or file, an attribute, a `#` command, an import, or anything that could
@@ -51,8 +51,7 @@ ready_prs() {
   local -a pending=()
   while read -r n sha who; do
     out=".agent/pr-checks/$n-$sha.txt"
-    # Older reports did not record which head was actually built.
-    if [ -s "$out" ] && grep -qF "checking $sha against " "$out"; then
+    if [ -s "$out" ] && python3 "$script_dir/triage_report.py" "$out" "$sha" "$base" >/dev/null; then
       printf '%s %s %s\n' "$n" "$sha" "$who"
     else
       pending+=("$n $sha $who")
@@ -76,6 +75,17 @@ while read -r -u "$results" n sha who; do
     | .headRefOid + " " + .title') || { echo "error  #$n  could not refresh the PR"; continue; }
   [[ "$current" == "$sha "* ]] || { echo "skip   #$n  head or review status changed"; continue; }
   title=${current#* }
+  # Another worker or the live queue may have landed a related change during this pass.
+  tip=$(gh api 'repos/{owner}/{repo}/git/ref/heads/main' --jq .object.sha) || {
+    echo "error  #$n  could not refresh main"; continue
+  }
+  if ! git cat-file -e "$tip^{commit}" 2>/dev/null && ! git fetch -q --no-write-fetch-head --refmap= origin "$tip"; then
+    echo "error  #$n  could not fetch the current main"; continue
+  fi
+  if ! why=$(python3 "$script_dir/triage_report.py" "$out" "$sha" "$tip"); then
+    echo "retry  #$n  ${why:-could not verify the report}; it will be rechecked on the next pass"
+    continue
+  fi
   if grep -q '^exit=0' "$out" && grep -q 'lint and build: pass' "$out" &&
      grep -q 'statements: none of' "$out" && grep -q 'definitions: none contains sorry' "$out"; then
     why=$(bash "$script_dir/proof_review.sh" "$base" "$sha") || {

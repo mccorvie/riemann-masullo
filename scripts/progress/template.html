@@ -102,6 +102,18 @@ button { font: inherit; color: inherit; }
 .stat .d { font-size: 12px; color: var(--ink-2); }
 .since { font-size: 12px; color: var(--ink-3); }
 
+/* Pace and contributors */
+.pulse { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 20px 36px; align-items: start; border-top: 1px solid var(--line); padding-top: 18px; }
+@media (max-width: 860px) { .pulse { grid-template-columns: minmax(0, 1fr); } }
+.pulse > div { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.podium { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.podium li { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+.podium .rank { font: 600 15px/1.2 var(--font-display); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.podium .who { font: 600 18px/1.2 var(--font-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium .n { font-size: 13px; font-variant-numeric: tabular-nums; }
+.hour { font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.hour .k { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+
 /* Chart */
 .chart-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .chart-legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); }
@@ -690,6 +702,7 @@ function overview() {
   const right = h('div', null);
   timeline(right);
   frag.push(h('section', { class: 'totals' }, left, right));
+  frag.push(pulse());
 
   /* map */
   const secs = D.groups.filter(g => g.id != null);
@@ -788,6 +801,62 @@ function overview() {
   frag.push(notes());
   frag.push(footer());
   return frag;
+}
+
+/* ---------- pace and contributors ---------- */
+// Rates are exponentially weighted counts of proof-issue events: an event `a` seconds before
+// the page was generated counts exp(-a / TAU), and the sum over TAU is a rate per second.
+const TAU = 2 * 3600;
+function pulse() {
+  const now = Date.parse(D.meta.generated) / 1000, t = D.totals;
+  const perHour = arr => arr.reduce((a, ts) => a + (ts <= now ? Math.exp((ts - now) / TAU) : 0), 0) / TAU * 3600;
+  const r1 = v => v >= 10 ? String(Math.round(v)) : (Math.round(v * 10) / 10).toString();
+  const closing = perHour(D.timeline.closed), filing = perHour(D.timeline.filed), net = closing - filing;
+  const open = t.issuesOpen;
+  const stat = (k, v, d) => h('div', { class: 'stat' }, h('span', { class: 'k' }, k),
+    h('span', { class: 'v' }, v), d ? h('span', { class: 'd' }, d) : null);
+  let finish;
+  if (!open) finish = stat('Open issues closed in', '—', 'no proof issue is open');
+  else if (closing < 0.05) finish = stat('Open issues closed in', '—', 'no proof issue closed lately');
+  else {
+    const hrs = open / closing;
+    const span = hrs < 1 ? Math.max(1, Math.round(hrs * 60)) + ' min' : hrs < 48 ? Math.round(hrs) + ' h' : (hrs / 24).toFixed(1) + ' days';
+    finish = stat('Open issues closed in', '≈ ' + span, 'around ' + new Date((now + hrs * 3600) * 1000).toLocaleString(undefined,
+      { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
+  }
+  const pace = h('div', null,
+    h('h3', null, 'Pace'),
+    h('div', { class: 'stats' },
+      stat('Closing', r1(closing) + ' / h', 'proof issues closed'),
+      stat('Filed', r1(filing) + ' / h', 'new proof issues (new sorries)'),
+      stat('Open issues', open, 'net ' + (net >= 0 ? '−' : '+') + r1(Math.abs(net)) + ' an hour'),
+      finish),
+    h('div', { class: 'since' }, 'Rates are averages of the proof issues closed and filed, weighted toward the last two hours ' +
+      '(an exponential average with a two-hour time constant). The estimate is deliberately optimistic: it is the time to close ' +
+      'the issues open now at the current closing rate, and counts none of the issues still to come, from proofs that split ' +
+      'into smaller lemmas or from the sections and waves not digested yet.'));
+
+  const M = D.merged;
+  if (!M) return h('section', { class: 'pulse' }, pace);
+  const tally = rows => {
+    const by = {};
+    rows.forEach(r => { const e = by[r[0]] || (by[r[0]] = { who: r[0], n: 0, last: 0 }); e.n++; e.last = Math.max(e.last, r[1]); });
+    return Object.values(by).sort((a, b) => b.n - a.n || b.last - a.last);
+  };
+  const RECENT = 3;   // hours
+  const all = tally(M), hour = tally(M.filter(r => r[1] > now - RECENT * 3600 && r[1] <= now));
+  const site = new URL(repo).origin;
+  const person = who => ext(site + '/' + encodeURIComponent(who), who);
+  const prs = (who, n, since) => ext(repo + '/pulls?q=' + encodeURIComponent('is:pr is:merged author:' + who +
+    (since ? ' merged:>=' + new Date(since * 1000).toISOString().slice(0, 19) + 'Z' : '')), plural(n, 'merged PR'));
+  const podium = rows => h('ol', { class: 'podium' }, rows.slice(0, 3).map((e, i) => h('li', null,
+    h('span', { class: 'rank' }, i + 1), h('span', { class: 'who' }, person(e.who)), h('span', { class: 'n' }, prs(e.who, e.n, now - RECENT * 3600)))));
+  const people = h('div', null,
+    h('h3', null, 'Top contributors, last ' + RECENT + ' hours'),
+    hour.length ? podium(hour) : h('div', { class: 'muted' }, 'No contributor\u2019s pull request was merged in the ' + RECENT + ' hours before this page was made.'),
+    all.length ? h('div', { class: 'hour' }, h('span', { class: 'k' }, 'Top overall'), person(all[0].who), ' · ', prs(all[0].who, all[0].n)) : null,
+    h('div', { class: 'since' }, 'Counted by pull requests merged in the ' + RECENT + ' hours before this page was made. The repository owner\u2019s account, which the project\u2019s own agents push from, is left out.'));
+  return h('section', { class: 'pulse' }, pace, people);
 }
 
 function notes() {

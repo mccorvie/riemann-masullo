@@ -7,6 +7,7 @@ public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
 import Mathlib.Analysis.Normed.Module.Dual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.Hilbert
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
@@ -3594,30 +3595,53 @@ section ApproximationProperty
 variable (E : Type u) [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
   [PolynormableSpace ℂ E] [T2Space E]
 
-/-- Paper: Lemma C.2.4.15(1)–(2), p. 689. The identity is approximable by finite-rank
-maps uniformly on precompact sets exactly when those maps are dense among endomorphisms. -/
-theorem id_mem_closure_finiteRank_iff_dense :
-    (ContinuousLinearMap.id ℂ E : PrecompactConvergenceCLM E E) ∈
-      closure (range (tensorToFiniteRank (E := E) (F := E) :
-        StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E)) ↔
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) := by
+/-- Paper: Lemma C.2.4.15(2), p. 689. A space has the approximation property if its
+finite-rank endomorphisms are dense for uniform convergence on precompact sets. -/
+def HasApproximationProperty : Prop :=
+  DenseRange (X := PrecompactConvergenceCLM E E) (fun z ↦ tensorToFiniteRank z)
+
+omit [T2Space E] in
+/-- Paper: Lemma C.2.4.15(2), p. 689. Unfolding the approximation property gives density
+for the uniform convergence topology indexed by sets with compact closure in the completion. -/
+theorem hasApproximationProperty_iff_denseRange :
+    HasApproximationProperty E ↔
+      DenseRange (X := E →Lᵤ[ℂ, {s | IsPrecompactInCompletion s}] E)
+        (fun z ↦ tensorToFiniteRank z) := Iff.rfl
+
+/-- Paper: Lemma C.2.4.15(2), p. 689. Density for uniform convergence on bounded sets
+implies the approximation property. For a normed space the hypothesis is operator-norm density.
+Deviation: This compares the two topologies on the same finite-rank maps. -/
+theorem hasApproximationProperty_of_denseRange_bounded
+    (h : DenseRange (X := E →L[ℂ] E) (fun z ↦ tensorToFiniteRank z)) :
+    HasApproximationProperty E := by
+  let S := {s : Set E | IsPrecompactInCompletion s}
+  let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E S
+  have hj : Continuous j :=
+    ContinuousLinearMap.toUniformConvergenceCLM_continuous (RingHom.id ℂ) E S fun s hs ↦
+      ((isPrecompactInCompletion_iff_totallyBounded s).mp hs).isVonNBounded ℂ
+  exact j.surjective.denseRange.comp h hj
+
+omit [T2Space E] in
+/-- Postcomposition by each endomorphism takes a finite-rank approximation of the identity
+to one of that endomorphism, for uniform convergence on any fixed family of sets. -/
+private theorem id_mem_closure_finiteRank_iff_dense_uniform (S : Set (Set E)) :
+    ContinuousLinearMap.id ℂ E ∈
+      closure (X := E →Lᵤ[ℂ, S] E) (range (fun z ↦ tensorToFiniteRank z)) ↔
+    DenseRange (X := E →Lᵤ[ℂ, S] E) (fun z ↦ tensorToFiniteRank z) := by
   refine ⟨fun h A ↦ ?_, fun h ↦ h _⟩
-  -- As elaborated, both sides use the bounded convergence topology of `E →L[ℂ] E`.
-  let post : (E →L[ℂ] E) →L[ℂ] (E →L[ℂ] E) := ContinuousLinearMap.postcomp E A
-  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E) A.toLinearMap
+  let post : (E →Lᵤ[ℂ, S] E) →L[ℂ] (E →Lᵤ[ℂ, S] E) :=
+    (A : E →L[ℂ] E).postcompUniformConvergenceCLM S
+  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E)
+    (A : E →L[ℂ] E).toLinearMap
   have hmap (z : StrongDual ℂ E ⊗[ℂ] E) :
       post (tensorToFiniteRank z) = tensorToFiniteRank (map z) := by
+    ext x
+    change (A : E →L[ℂ] E) (tensorToFiniteRank z x) = tensorToFiniteRank (map z) x
     induction z using TensorProduct.inductionOn with
-    | tmul φ y =>
-      ext x
-      change A (tensorToFiniteRank (φ ⊗ₜ[ℂ] y) x) = tensorToFiniteRank (map (φ ⊗ₜ[ℂ] y)) x
-      simp [map, tensorToFiniteRank_tmul]
-    | add z w hz hw => rw [map_add, map_add, map_add, hz, hw, map_add]
-  have hsub : post '' range (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) ⊆
-      range (tensorToFiniteRank (E := E) (F := E) :
-        StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) := by
+    | tmul φ y => simp [map, tensorToFiniteRank_tmul]; rfl
+    | add z w hz hw => simp only [map_add, add_apply, hz, hw]
+  have hsub : post '' range (fun z ↦ tensorToFiniteRank z) ⊆
+      range (fun z ↦ tensorToFiniteRank z) := by
     rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
     exact ⟨map z, (hmap z).symm⟩
   have hA : post (ContinuousLinearMap.id ℂ E) = A := by
@@ -3626,32 +3650,238 @@ theorem id_mem_closure_finiteRank_iff_dense :
   rw [← hA]
   exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ h))
 
+/-- Paper: Lemma C.2.4.15(1)–(2), p. 689. The identity is approximable by finite-rank
+maps uniformly on precompact sets exactly when those maps are dense among endomorphisms. -/
+theorem id_mem_closure_finiteRank_iff_dense :
+    ContinuousLinearMap.id ℂ E ∈
+      closure (X := PrecompactConvergenceCLM E E) (range (fun z ↦ tensorToFiniteRank z)) ↔
+    HasApproximationProperty E :=
+  id_mem_closure_finiteRank_iff_dense_uniform E {s | IsPrecompactInCompletion s}
+
 /-- Paper: Lemma C.2.4.15(2)–(3), p. 689. Density of finite-rank maps for the
 precompact convergence topology on endomorphisms is equivalent to the corresponding
 density for all targets. -/
 theorem dense_finiteRank_iff_forall_targets :
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) ↔
+    HasApproximationProperty E ↔
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : TopologicalSpace F)
         (_ : IsTopologicalAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
-        DenseRange (tensorToFiniteRank (E := E) (F := F) :
-          StrongDual ℂ E ⊗[ℂ] F → PrecompactConvergenceCLM E F) := by sorry
+        DenseRange (X := PrecompactConvergenceCLM E F) (fun z ↦ tensorToFiniteRank z) := by sorry
+
+/-- Applying the pulled-back tensor of finite-rank maps precomposes the operator: for a
+differential `b` of the source, `λ(Σ φᵢ ⊗ yᵢ) ∘ b = λ(Σ (φᵢ ∘ b) ⊗ yᵢ)`. -/
+private theorem tensorToFiniteRank_precomp_apply {S T U : Type*} [AddCommGroup S] [Module ℂ S]
+    [TopologicalSpace S]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T] [PolynormableSpace ℂ T]
+    [IsTopologicalAddGroup T] [AddCommGroup U] [Module ℂ U]
+    [TopologicalSpace U] (b : U →L[ℂ] S) (z : StrongDual ℂ S ⊗[ℂ] T) (x : U) :
+    tensorToFiniteRank (E := U) (F := T)
+        (TensorProduct.map
+          { toFun := fun ψ : StrongDual ℂ S => ψ.comp b
+            map_add' := fun ψ χ => by ext y; simp
+            map_smul' := fun c ψ => by ext y; simp }
+          (LinearMap.id : T →ₗ[ℂ] T) z) x
+      = tensorToFiniteRank (E := S) (F := T) z (b x) := by
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+      rw [TensorProduct.map_tmul, tensorToFiniteRank_tmul, tensorToFiniteRank_tmul]
+      rfl
+  | add z w hz hw =>
+      simp only [map_add, add_apply, hz, hw]
+
+omit [T2Space E] in
+/-- Precompact-convergence closure tests uniform approximation on each totally bounded set. -/
+private theorem mem_closure_finiteRank_iff {F : Type*} [AddCommGroup F] [Module ℂ F] [UniformSpace F]
+    [T2Space F] (T : F →L[ℂ] E) :
+    T ∈ closure (X := PrecompactConvergenceCLM F E) (range (fun z ↦ tensorToFiniteRank z)) ↔
+      ∀ B : Set F, TotallyBounded B → ∀ V ∈ 𝓝 (0 : E),
+        ∃ z : StrongDual ℂ F ⊗[ℂ] E,
+          ∀ x ∈ B, tensorToFiniteRank z x - T x ∈ V := by
+  let S := {s : Set F | IsPrecompactInCompletion s}
+  have hpre (s : Set F) : s ∈ S ↔ TotallyBounded s := isPrecompactInCompletion_iff_totallyBounded s
+  have hne : S.Nonempty := ⟨∅, (hpre ∅).2 totallyBounded_empty⟩
+  have hd : DirectedOn (· ⊆ ·) S := directedOn_of_sup_mem fun s t hs ht ↦
+    (hpre _).2 (((hpre s).1 hs).union ((hpre t).1 ht))
+  have hb := UniformConvergenceCLM.hasBasis_nhds_zero (RingHom.id ℂ) E S hne hd
+  have hT := hb.nhds_of_zero (T : PrecompactConvergenceCLM F E)
+  constructor
+  · intro h B hB V hV
+    obtain ⟨_, ⟨z, rfl⟩, hz⟩ := (mem_closure_iff_nhds_basis hT).mp h (B, V) ⟨(hpre B).2 hB, hV⟩
+    exact ⟨z, hz⟩
+  · intro h
+    apply (mem_closure_iff_nhds_basis hT).mpr
+    rintro ⟨B, V⟩ ⟨hB, hV⟩
+    obtain ⟨z, hz⟩ := h B ((hpre B).1 hB) V hV
+    exact ⟨tensorToFiniteRank z, ⟨z, rfl⟩, hz⟩
 
 /-- Paper: Lemma C.2.4.15(2), (4), pp. 689–690. Density of finite-rank maps for
 the precompact convergence topology on endomorphisms is equivalent to the corresponding
 density for all sources. -/
 theorem dense_finiteRank_iff_forall_sources :
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) ↔
+    HasApproximationProperty E ↔
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : UniformSpace F)
         (_ : IsUniformAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
-        DenseRange (tensorToFiniteRank (E := F) (F := E) :
-          StrongDual ℂ F ⊗[ℂ] E → PrecompactConvergenceCLM F E) := by sorry
+        DenseRange (X := PrecompactConvergenceCLM F E) (fun z ↦ tensorToFiniteRank z) := by
+  constructor
+  · -- (2) ⟹ (4): precompose the finite-rank approximants with the source operator.
+    intro hdense F _ _ _ _ _ _ T
+    change F →L[ℂ] E at T
+    refine (mem_closure_finiteRank_iff E T).mpr fun B hB V hV ↦ ?_
+    obtain ⟨z, hz⟩ :=
+      (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mp
+        (hdense (ContinuousLinearMap.id ℂ E)) (T '' B)
+        (hB.image (T : F →L[ℂ] E).uniformContinuous) V hV
+    exact ⟨TensorProduct.map
+      { toFun := fun ψ : StrongDual ℂ E => ψ.comp (T : F →L[ℂ] E)
+        map_add' := fun ψ χ => by ext y; rfl
+        map_smul' := fun c ψ => by ext y; rfl }
+      (LinearMap.id : E →ₗ[ℂ] E) z, fun x hx ↦ by
+      rw [tensorToFiniteRank_precomp_apply (T : F →L[ℂ] E) z x]
+      exact hz (T x) (mem_image_of_mem (T : F →L[ℂ] E) hx)⟩
+  · -- (4) ⟹ (2): apply the hypothesis to the universe-raised copy of `E`.
+    intro hforall
+    refine (id_mem_closure_finiteRank_iff_dense E).mp ?_
+    refine (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mpr fun B hB V hV ↦ ?_
+    classical
+    let G := ULift.{max u v, u} E
+    letI hGadd : AddCommGroup G := ULift.addCommGroup
+    letI hGmod : Module ℂ G := ULift.module'
+    letI hGunif : UniformSpace G := UniformSpace.comap (fun g : G ↦ ULift.down g) ‹UniformSpace E›
+    have hdownui : IsUniformInducing (fun g : G ↦ ULift.down g) :=
+      (isUniformEmbedding_comap (f := fun g : G ↦ ULift.down g)
+        (fun a b (h : ULift.down a = ULift.down b) => by
+          cases a with
+          | up a' =>
+          cases b with
+          | up b' =>
+          exact congrArg ULift.up h)).isUniformInducing
+    have hdowncont : Continuous (fun g : G ↦ ULift.down g) :=
+      hdownui.uniformContinuous.continuous
+    have hupcont : Continuous (fun x : E ↦ (⟨x⟩ : G)) :=
+      (uniformContinuous_comap' (f := fun g : G ↦ ULift.down g)
+        (g := fun x : E ↦ (⟨x⟩ : G))
+        (by rw [show ((fun g : G ↦ ULift.down g) ∘ fun x : E ↦ (⟨x⟩ : G)) = id from rfl]
+            exact uniformContinuous_id)).continuous
+    have hdownind : IsInducing (fun g : G ↦ ULift.down g) := hdownui.isInducing
+    letI hGuadd : IsUniformAddGroup G :=
+      IsUniformAddGroup.comap
+        (f := (⟨⟨fun g : G ↦ ULift.down g, rfl⟩, fun _ _ ↦ rfl⟩ : G →+ E))
+    have hGT2 : T2Space G := by
+      have hemb : IsEmbedding (fun g : G ↦ ULift.down g) :=
+        ⟨hdownind, fun a b (h : ULift.down a = ULift.down b) => by
+          cases a with
+          | up a' =>
+          cases b with
+          | up b' =>
+          exact congrArg ULift.up h⟩
+      exact hemb.t2Space
+    have hGpolyn : PolynormableSpace ℂ G :=
+      hdownind.polynormableSpace (f := (ULift.moduleEquiv (R := ℂ) (M := E)).toLinearMap)
+    let downCLM : G →L[ℂ] E :=
+      ⟨(ULift.moduleEquiv (R := ℂ) (M := E)).toLinearMap, hdowncont⟩
+    let hupCLM : E →L[ℂ] G := ⟨(ULift.moduleEquiv (R := ℂ) (M := E)).symm.toLinearMap, hupcont⟩
+    have hGdense := hforall G hGadd hGmod hGunif hGuadd hGpolyn hGT2
+    have hdmem : downCLM ∈ closure (X := PrecompactConvergenceCLM G E)
+        (range (fun z ↦ tensorToFiniteRank z)) := hGdense downCLM
+    obtain ⟨zG, hzG⟩ :=
+      (mem_closure_finiteRank_iff E downCLM).mp hdmem (hupCLM '' B) (hB.image hupCLM.uniformContinuous) V hV
+    exact ⟨TensorProduct.map
+      { toFun := fun ψ : StrongDual ℂ G => ψ.comp hupCLM
+        map_add' := fun ψ χ => by ext y; rfl
+        map_smul' := fun c ψ => by ext y; rfl }
+      (LinearMap.id : E →ₗ[ℂ] E) zG, fun x hx ↦ by
+      rw [tensorToFiniteRank_precomp_apply]
+      exact hzG (hupCLM x) (mem_image_of_mem hupCLM hx)⟩
 
 /-- Paper: Lemma C.2.4.16(1), p. 690. A bounded set in a nuclear space has
 compact closure in the completion. -/
 theorem isPrecompactInCompletion_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
-    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by sorry
+    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by
+  classical
+  apply (isPrecompactInCompletion_iff_totallyBounded S).mpr
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero.totallyBounded_iff.mpr ?_
+  intro q hq
+  let U := q.ball 0 1
+  have hU : U ∈ 𝓝 (0 : E) := q.ball_mem_nhds hq one_pos
+  have bU : Balanced ℂ U := q.balanced_ball_zero 1
+  have cU : Convex ℝ U := q.convex_ball 0 1
+  obtain ⟨V, hV, bV, cV, hVU, C, hC, hsum⟩ :=
+    exists_localBanachMap_absolutelySumming E hE U hU bU cU
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  let q' := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  let T := localBanachMap p q' (gauge_mono (absorbent_nhds_zero hV) hVU)
+  have hq' : q' = q := DFunLike.coe_injective (q.restrictScalars ℝ).gauge_ball
+  have hp : Continuous p := continuous_gauge cV hV
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion p hp
+  obtain ⟨H, _, _, _, a, D, hD, ha⟩ := exists_hilbert_domination hE p hp
+  -- Extend the map into the source local Banach space across the Hilbert closure.
+  let R := LinearMap.range a.toLinearMap
+  let a' : E →L[ℂ] R.topologicalClosure :=
+    a.codRestrict _ fun x ↦ R.le_topologicalClosure ⟨x, rfl⟩
+  let : CompleteSpace R.topologicalClosure := R.isClosed_topologicalClosure.completeSpace_coe
+  have hd : DenseRange a' := by
+    change DenseRange (Set.inclusion (s := (R : Set H))
+      (R.le_topologicalClosure : (R : Set H) ⊆ R.topologicalClosure) ∘ Set.rangeFactorization a)
+    exact ((denseRange_inclusion_iff _).mpr subset_rfl).comp
+      Set.rangeFactorization_surjective.denseRange (continuous_inclusion _)
+  have hj' (x : E) : ‖j x‖ ≤ D * ‖a' x‖ := by
+    rw [hj, localBanach_norm_coe]
+    exact ha x
+  let A := j.toLinearMap.extendOfNorm a'.toLinearMap
+  have hA (x : E) : A (a' x) = j x := LinearMap.extendOfNorm_eq hd ⟨D, hj'⟩ x
+  have hAnorm : ‖A‖ ≤ D := LinearMap.opNorm_extendOfNorm_le hd hD hj'
+  -- Absolute summability is preserved by precomposition with the extended map.
+  let K := T.comp A
+  have hK : IsCompactOperator K := by
+    apply isCompactOperator_of_hilbert_absolutelySumming K (C := C * (D + 1)) (by positivity)
+    intro n x M hM hx
+    have hpos : 0 < D + 1 := by positivity
+    have hweak (φ : LocalBanach p →L[ℂ] ℂ) (hφ : ‖φ‖ ≤ 1) :
+        ∑ i, ‖φ (A (x i))‖ ≤ (D + 1) * M := by
+      let r : ℂ := ((D + 1 : ℝ) : ℂ)
+      have hr : ‖r‖ = D + 1 := Complex.norm_of_nonneg hpos.le
+      let ψ := r⁻¹ • φ.comp A
+      have hψ : ‖ψ‖ ≤ 1 := by
+        rw [norm_smul, norm_inv, hr, inv_mul_le_iff₀ hpos, mul_one]
+        exact (φ.opNorm_comp_le A).trans
+          ((mul_le_of_le_one_left (norm_nonneg A) hφ).trans (by linarith))
+      have hψi (i : Fin n) : ‖ψ (x i)‖ = (D + 1)⁻¹ * ‖φ (A (x i))‖ := by
+        simp only [ψ, smul_apply, norm_smul, norm_inv, hr,
+          ContinuousLinearMap.comp_apply]
+      have h := hx ψ hψ
+      rw [Finset.sum_congr rfl (fun i _ ↦ hψi i), ← Finset.mul_sum] at h
+      exact (inv_mul_le_iff₀ hpos).mp h
+    simpa only [K, ContinuousLinearMap.comp_apply, mul_assoc] using
+      hsum n (fun i ↦ A (x i)) ((D + 1) * M) (mul_nonneg hpos.le hM) hweak
+  let J : E → LocalBanach q' := fun x ↦ (show WithLocalSeminorm q' from x)
+  have hJ : J = K ∘ a' := by
+    funext x
+    change J x = T (A (a' x))
+    rw [hA, hj]
+    exact (localBanachMap_coe p q' _ (show WithLocalSeminorm p from x)).symm
+  have htotal : TotallyBounded (J '' S) := by
+    rw [hJ, Set.image_comp]
+    obtain ⟨B, hB, hsub⟩ := hK.image_subset_compact_of_isVonNBounded
+      (f := K.toLinearMap) (hS.image a')
+    exact hB.totallyBounded.subset hsub
+  -- Lift the centers of a finite net back to the bounded set.
+  obtain ⟨s, hs, hsf, hcover⟩ := htotal.exists_subset (Metric.dist_mem_uniformity one_pos)
+  have hpre (y : s) : ∃ x : E, x ∈ S ∧ J x = y := hs y.property
+  choose g hg using hpre
+  let : Finite s := hsf.to_subtype
+  refine ⟨range g, finite_range g, fun x hx ↦ ?_⟩
+  obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover (mem_image_of_mem J hx))
+  refine mem_iUnion₂.mpr ⟨g ⟨y, hy⟩, mem_range_self _, ?_⟩
+  change dist (J x) y < 1 at hxy
+  have hy' : J (g ⟨y, hy⟩) = y := (hg ⟨y, hy⟩).2
+  rw [← hy', dist_comm, dist_eq_norm] at hxy
+  change g ⟨y, hy⟩ - x ∈ U
+  apply q.mem_ball_zero.mpr
+  rw [← hq']
+  let x' : WithLocalSeminorm q' := x
+  let y' : WithLocalSeminorm q' := g ⟨y, hy⟩
+  change q' (y' - x') < 1
+  rw [← localBanach_norm_coe q' (y' - x'), Completion.coe_sub]
+  exact hxy
 
 /-- Paper: Lemma C.2.4.16(1), p. 690. For a nuclear source, uniform convergence
 on bounded sets and on precompact sets give the same topology on the operator space. -/
@@ -3659,13 +3889,19 @@ theorem precompactConvergenceCLM_eq_bounded_of_isNuclearTVS (hE : IsNuclearTVS.{
     (F : Type*) [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
     [PolynormableSpace ℂ F] [T2Space F] :
     (inferInstance : TopologicalSpace (PrecompactConvergenceCLM E F)) =
-      (inferInstance : TopologicalSpace (E →L[ℂ] F)) := by sorry
+      (inferInstance : TopologicalSpace (E →L[ℂ] F)) := by
+  have hsets : {S : Set E | IsPrecompactInCompletion S} = {S | IsVonNBounded ℂ S} := by
+    ext S
+    exact ⟨fun hS ↦ ((isPrecompactInCompletion_iff_totallyBounded S).mp hS).isVonNBounded ℂ,
+      isPrecompactInCompletion_of_isNuclearTVS E hE⟩
+  let convergenceTopology (S : Set (Set E)) : TopologicalSpace (E →L[ℂ] F) :=
+    UniformConvergenceCLM.instTopologicalSpace (RingHom.id ℂ) F S
+  exact congrArg convergenceTopology hsets
 
 /-- Paper: Lemma C.2.4.16(2), p. 690. Finite-rank endomorphisms of a nuclear
 space are dense for uniform convergence on precompact sets. -/
 theorem dense_finiteRank_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E) :
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) := by sorry
+    HasApproximationProperty E := by sorry
 
 /-- Paper: Remark C.2.4.17, p. 690. For a nuclear source, finite-rank maps are
 dense in the strong operator space with uniform convergence on bounded sets. -/

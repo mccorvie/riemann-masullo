@@ -6,7 +6,9 @@ public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
+import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.IntegralEqImproper
 
 /-!
 # Complements on Poisson summation and Cauchy integrals
@@ -211,12 +213,178 @@ theorem differentiable_mellin_of_piecewiseSmoothMellinTest
 -- TODO(paper-gap): (B.4.1.4)–(B.4.1.5) have the wrong sign for the jump
 -- defined as the right limit minus the left limit at one.
 
+open MeasureTheory in
 /-- Paper: Lemma B.4.1.1, p. 607. The Mellin transform satisfies the bound
 (B.4.1.3) of order one over the modulus, uniformly on each bounded-width strip. -/
 theorem mellin_inverseNormBound_of_piecewiseSmoothMellinTest
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) (a b : ℝ) :
     ∃ C > (0 : ℝ), ∃ R > (0 : ℝ), ∀ s : ℂ, s.re ∈ Icc a b → R < ‖s‖ →
-      ‖logMellin f s‖ ≤ C / ‖s‖ := by sorry
+      ‖logMellin f s‖ ≤ C / ‖s‖ := by
+  classical
+  obtain ⟨⟨S, hsmooth, hlimits⟩, hdecay⟩ := hf
+  have hopen : IsOpen (S : Set ℝ)ᶜ := S.finite_toSet.isClosed.isOpen_compl
+  have hcont := hsmooth.continuousOn
+  have hcont' := hsmooth.continuousOn_deriv_of_isOpen hopen (by simp)
+  have hlim₀ x (hx : x ∈ S) :
+      (∃ l, Tendsto f (𝓝[<] x) (𝓝 l)) ∧ (∃ r, Tendsto f (𝓝[>] x) (𝓝 r)) := by
+    simpa only [iteratedDeriv_zero] using hlimits 0 x hx
+  have hlim₁ x (hx : x ∈ S) :
+      (∃ l, Tendsto (deriv f) (𝓝[<] x) (𝓝 l)) ∧
+        (∃ r, Tendsto (deriv f) (𝓝[>] x) (𝓝 r)) := by
+    simpa only [iteratedDeriv_one] using hlimits 1 x hx
+  let M := max |a| |b|
+  have hM : 0 ≤ M := (abs_nonneg a).trans (le_max_left _ _)
+  obtain ⟨N, hN⟩ := exists_nat_gt (M + 1)
+  obtain ⟨C, hC, T, _, htail⟩ := hdecay N
+  -- One-sided limits bound both profiles on the compact interval between the tails.
+  have hcompact {g : ℝ → ℂ} (hg : ContinuousOn g (S : Set ℝ)ᶜ)
+      (hlim : ∀ x ∈ S, (∃ l, Tendsto g (𝓝[<] x) (𝓝 l)) ∧
+        (∃ r, Tendsto g (𝓝[>] x) (𝓝 r))) :
+      ∃ B : ℝ, ∀ x ∈ Icc (-T) T, ‖g x‖ ≤ B := by
+    have hloc (x : ℝ) : (𝓝 x).IsBoundedUnder (· ≤ ·) (fun y ↦ ‖g y‖) := by
+      by_cases hx : x ∈ S
+      · obtain ⟨⟨l, hl⟩, ⟨r, hr⟩⟩ := hlim x hx
+        rw [← nhdsNE_sup_pure x, ← nhdsLT_sup_nhdsGT x, IsBoundedUnder, map_sup, map_sup]
+        exact isBounded_sup (isBounded_sup hl.norm.isBoundedUnder_le hr.norm.isBoundedUnder_le)
+          ⟨‖g x‖, by simp⟩
+      · exact ((hg x hx).continuousAt (hopen.mem_nhds hx)).tendsto.norm.isBoundedUnder_le
+    have hbounded : Bornology.IsBounded (g '' Icc (-T) T) := by
+      apply Bornology.isBounded_image_of_isLocallyBounded_of_isCompact isCompact_Icc
+      intro x
+      obtain ⟨B, hB⟩ := hloc x
+      exact ⟨{y | ‖g y‖ ≤ B}, eventually_map.mp hB,
+        isBounded_iff_forall_norm_le.mpr ⟨B, forall_mem_image.mpr fun _ hy ↦ hy⟩⟩
+    obtain ⟨B, hB⟩ := hbounded.exists_norm_le
+    exact ⟨B, fun x hx ↦ hB _ (mem_image_of_mem g hx)⟩
+  obtain ⟨U, hU⟩ := hcompact hcont hlim₀
+  obtain ⟨V, hV⟩ := hcompact hcont' hlim₁
+  let A := C + (|U| + |V|) * Real.exp ((M + 1) * T)
+  have hCA : C ≤ A :=
+    le_add_of_nonneg_right (mul_nonneg (add_nonneg (abs_nonneg _) (abs_nonneg _))
+      (Real.exp_pos _).le)
+  have hA := hC.trans_le hCA
+  have hdecay' (x y : ℝ) (hy₀ : x ∈ Icc (-T) T → y ≤ |U| + |V|)
+      (hy₁ : T < |x| → y ≤ C * Real.exp (-(N : ℝ) * |x|)) :
+      y ≤ A * Real.exp (-(M + 1) * |x|) := by
+    by_cases hx : T < |x|
+    · exact (hy₁ hx).trans (mul_le_mul hCA
+        (Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_right (neg_le_neg hN.le) (abs_nonneg x)))
+        (Real.exp_pos _).le hA.le)
+    · have hx' := le_of_not_gt hx
+      -- Multiply by the reciprocal of the desired exponential factor.
+      rw [neg_mul, Real.exp_neg, ← div_eq_mul_inv, le_div_iff₀ (Real.exp_pos _)]
+      calc
+        _ ≤ (|U| + |V|) * Real.exp ((M + 1) * T) :=
+          mul_le_mul (hy₀ (abs_le.mp hx'))
+            (Real.exp_le_exp.mpr (mul_le_mul_of_nonneg_left hx' (by positivity)))
+            (Real.exp_pos _).le (by positivity)
+        _ ≤ A := le_add_of_nonneg_left hC.le
+  -- This majorant absorbs every exponential weight in the strip.
+  let B (x : ℝ) := A * Real.exp (-|x|)
+  have hB : Integrable B := by
+    apply Integrable.const_mul (f := fun x : ℝ ↦ Real.exp (-|x|)) _ A
+    rw [← integrableOn_univ, ← Iic_union_Ioi (a := (0 : ℝ)), integrableOn_union]
+    exact ⟨(integrableOn_exp_Iic 0).congr_fun
+      (fun x hx ↦ by rw [abs_of_nonpos hx, neg_neg]) measurableSet_Iic,
+      (integrableOn_exp_neg_Ioi 0).congr_fun
+        (fun x hx ↦ by rw [abs_of_pos hx]) measurableSet_Ioi⟩
+  let K : ℝ := (∫ x, B x) + (S.card : ℝ) * (A + A)
+  have hK : 0 ≤ K := add_nonneg (integral_nonneg (fun _ ↦ by positivity)) (by positivity)
+  refine ⟨K + 1, by positivity, 1, one_pos, fun s hs hsnorm ↦ ?_⟩
+  apply (le_div_iff₀ (zero_lt_one.trans hsnorm)).mpr
+  let w (x : ℝ) := Complex.exp (s * x)
+  let F (x : ℝ) := w x * f x
+  let G (x : ℝ) := w x * deriv f x
+  have hw : Continuous w := by
+    dsimp [w]
+    fun_prop
+  have hweight (x : ℝ) : ‖w x‖ ≤ Real.exp (M * |x|) := by
+    have hsM : |s.re| ≤ M := abs_le.mpr
+      ⟨(neg_le_neg (le_max_left |a| |b|)).trans ((neg_abs_le a).trans hs.1),
+        hs.2.trans ((le_abs_self b).trans (le_max_right |a| |b|))⟩
+    simp only [w, Complex.norm_exp, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im,
+      mul_zero, sub_zero]
+    exact Real.exp_le_exp.mpr ((le_abs_self (s.re * x)).trans
+      (by rw [abs_mul]; exact mul_le_mul_of_nonneg_right hsM (abs_nonneg x)))
+  have hweighted (x : ℝ) {z : ℂ} (hz : ‖z‖ ≤ A * Real.exp (-(M + 1) * |x|)) :
+      ‖w x * z‖ ≤ B x := by
+    rw [norm_mul]
+    calc
+      _ ≤ Real.exp (M * |x|) * (A * Real.exp (-(M + 1) * |x|)) :=
+        mul_le_mul (hweight x) hz (norm_nonneg _) (Real.exp_pos _).le
+      _ = B x := by
+        rw [mul_left_comm, ← Real.exp_add]
+        congr 2
+        ring
+  have hFbound x : ‖F x‖ ≤ B x := hweighted x (hdecay' x _
+    (fun hx ↦ (hU x hx).trans ((le_abs_self _).trans (le_add_of_nonneg_right (abs_nonneg _))))
+    (fun hx ↦ (htail x hx).1.le))
+  have hGbound x : ‖G x‖ ≤ B x := hweighted x (hdecay' x _
+    (fun hx ↦ (hV x hx).trans ((le_abs_self _).trans (le_add_of_nonneg_left (abs_nonneg _))))
+    (fun hx ↦ (htail x hx).2.le))
+  have hint {g : ℝ → ℂ} (hg : ContinuousOn g (S : Set ℝ)ᶜ) (hbound : ∀ x, ‖g x‖ ≤ B x) :
+      Integrable g :=
+    hB.mono' (hg.measurable_of_countable_compl (by simpa using S.finite_toSet.countable)
+      |>.aestronglyMeasurable) (Eventually.of_forall hbound)
+  have hF : Integrable F := hint (hw.continuousOn.mul hcont) hFbound
+  have hG : Integrable G := hint (hw.continuousOn.mul hcont') hGbound
+  have hFtop : Tendsto F atTop (𝓝 0) := squeeze_zero_norm hFbound <| by
+    apply (by simpa using Real.tendsto_exp_neg_atTop_nhds_zero.const_mul A :
+      Tendsto (fun x : ℝ ↦ A * Real.exp (-x)) atTop (𝓝 0)).congr'
+    filter_upwards [eventually_ge_atTop (0 : ℝ)] with x hx
+    simp [B, abs_of_nonneg hx]
+  have hFbot : Tendsto F atBot (𝓝 0) := squeeze_zero_norm hFbound <| by
+    apply (by simpa using Real.tendsto_exp_atBot.const_mul A :
+      Tendsto (fun x : ℝ ↦ A * Real.exp x) atBot (𝓝 0)).congr'
+    filter_upwards [eventually_le_atBot (0 : ℝ)] with x hx
+    simp [B, abs_of_nonpos hx]
+  let l (x : ℝ) := limUnder (𝓝[<] x) f
+  let r (x : ℝ) := limUnder (𝓝[>] x) f
+  have hl x (hx : x ∈ S) : Tendsto F (𝓝[<] x) (𝓝 (w x * l x)) := by
+    obtain ⟨v, hv⟩ := (hlim₀ x hx).1
+    simpa only [l, hv.limUnder_eq] using (hw.continuousAt.continuousWithinAt.tendsto.mul hv)
+  have hr x (hx : x ∈ S) : Tendsto F (𝓝[>] x) (𝓝 (w x * r x)) := by
+    obtain ⟨v, hv⟩ := (hlim₀ x hx).2
+    simpa only [r, hv.limUnder_eq] using (hw.continuousAt.continuousWithinAt.tendsto.mul hv)
+  have hderiv x (hx : x ∉ S) : HasDerivAt F (s * F x + G x) x := by
+    have hw' : HasDerivAt w (w x * s) x := by
+      simpa [w, mul_comm] using
+        ((Complex.ofRealCLM.hasDerivAt (x := x)).const_mul s).cexp
+    have hf' := ((hsmooth x hx).contDiffAt (hopen.mem_nhds hx)).differentiableAt
+      (by simp : (∞ : ℕ∞ω) ≠ 0)
+    convert hw'.mul hf'.hasDerivAt using 1
+    dsimp [F, G]
+    ring
+  have heq := integral_deriv_eq_sub_add_sum_jumps S ((hF.const_mul s).add hG)
+    hderiv hl hr hFbot hFtop
+  change (∫ x, s * F x + G x) = (0 : ℂ) - 0 + _ at heq
+  rw [sub_self, zero_add, integral_add (hF.const_mul s) hG, integral_const_mul] at heq
+  have htransform : logMellin f s = ∫ x, F x := by
+    change mellin (fun t ↦ f (Real.log t)) s = _
+    rw [mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+    simp only [F, w, Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+    congr 2
+    ring
+  have hFle (x : ℝ) : ‖F x‖ ≤ A := (hFbound x).trans
+    (mul_le_of_le_one_right hA.le (Real.exp_le_one_iff.mpr (neg_nonpos.mpr (abs_nonneg x))))
+  have hjump : ‖∑ x ∈ S, (w x * l x - w x * r x)‖ ≤ (S.card : ℝ) * (A + A) := by
+    calc
+      _ ≤ ∑ x ∈ S, ‖w x * l x - w x * r x‖ := norm_sum_le _ _
+      _ ≤ ∑ _x ∈ S, (A + A) := Finset.sum_le_sum fun x hx ↦
+        (norm_sub_le _ _).trans (add_le_add
+          (le_of_tendsto (hl x hx).norm (Eventually.of_forall hFle))
+          (le_of_tendsto (hr x hx).norm (Eventually.of_forall hFle)))
+      _ = _ := by simp only [Finset.sum_const, nsmul_eq_mul]
+  rw [htransform, mul_comm, ← norm_mul, eq_sub_of_add_eq heq]
+  exact ((norm_sub_le _ _).trans (add_le_add hjump
+    (norm_integral_le_of_norm_le hB (Eventually.of_forall hGbound)))).trans (by
+      dsimp [K]
+      linarith)
 
 /-- Paper: Proposition B.4.1.2, p. 608. At a point with both one-sided limits,
 the sample used for Poisson summation is their arithmetic mean. -/
@@ -237,8 +405,32 @@ The value `c` on the generator determines the character. -/
 theorem summable_mellinJumpMidpoint_lattice
     {f : ℝ → ℂ} (hf : IsPiecewiseSmoothMellinTest f) {θ : ℝ}
     (hθ : 0 < θ) (hθ₁ : θ ≠ 1) (c : Circle) :
-    Summable (fun m : ℤ ↦ (c : ℂ) ^ m * mellinJumpMidpoint f ((m : ℝ) * Real.log θ)) :=
-  by sorry
+    Summable (fun m : ℤ ↦ (c : ℂ) ^ m * mellinJumpMidpoint f ((m : ℝ) * Real.log θ)) := by
+  obtain ⟨⟨S, hsmooth, _⟩, hdecay⟩ := hf
+  obtain ⟨C, _, T, _, htail⟩ := hdecay 1
+  have hlog := Real.log_ne_zero_of_pos_of_ne_one hθ hθ₁
+  have hgeom : Summable (fun n : ℕ ↦ Real.exp ((n : ℝ) * -|Real.log θ|)) :=
+    Real.summable_exp_nat_mul_iff.mpr (neg_lt_zero.mpr (abs_pos.mpr hlog))
+  have hsum : Summable (fun m : ℤ ↦ Real.exp (|(m : ℝ)| * -|Real.log θ|)) := by
+    apply summable_int_iff_summable_nat_and_neg.mpr
+    constructor <;> simpa [abs_of_nonneg (Nat.cast_nonneg (α := ℝ) _)] using hgeom
+  apply (hsum.mul_left C).of_norm_bounded_eventually
+  have hlattice : Tendsto (fun m : ℤ ↦ (m : ℝ) * Real.log θ) cofinite (cocompact ℝ) := by
+    have h : Tendsto (fun m : ℤ ↦ zmultiplesHom ℝ (Real.log θ) m) cofinite (cocompact ℝ) :=
+      Int.tendsto_zmultiplesHom_cofinite hlog
+    simpa only [zmultiplesHom_apply, zsmul_eq_mul] using h
+  have habs : Tendsto (fun m : ℤ ↦ |(m : ℝ) * Real.log θ|) cofinite atTop := by
+    simpa only [Function.comp_def, Real.norm_eq_abs] using
+      tendsto_norm_cocompact_atTop.comp hlattice
+  filter_upwards [hlattice.eventually S.finite_toSet.isCompact.compl_mem_cocompact,
+    habs.eventually_gt_atTop T] with m hmS hmT
+  have hcont := hsmooth.continuousOn.continuousAt
+    (S.finite_toSet.isClosed.isOpen_compl.mem_nhds hmS)
+  rw [mellinJumpMidpoint_eq_average (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+    (hcont.tendsto.mono_left nhdsWithin_le_nhds), add_self_div_two,
+    Complex.norm_mul, Complex.norm_zpow, Circle.norm_coe, one_zpow, one_mul]
+  simpa only [Nat.cast_one, neg_one_mul, abs_mul, mul_neg] using
+    (htail ((m : ℝ) * Real.log θ) hmT).1.le
 
 -- TODO(paper-gap): (B.4.1.7) has the wrong sign for 0 < θ < 1.
 -- With θ = 1/2, the trivial character and the indicator of [1, 2],
@@ -284,6 +476,8 @@ theorem finite_mellinJumpMidpoint_ne_lattice
 -- TODO(paper-gap): Footnote 12 asks for a non-absolutely convergent example.
 -- The example at θ = 2 has only one nonzero frequency sample.
 
+open MeasureTheory in
+open scoped Asymptotics FourierTransform in
 /-- Paper: Remark B.4.1.4, p. 608. If the test function is globally smooth,
 the Mellin samples in the Poisson identity are absolutely summable. -/
 theorem summable_mellinPoissonSamples_of_smooth
@@ -291,7 +485,89 @@ theorem summable_mellinPoissonSamples_of_smooth
     {θ : ℝ} (hθ : 0 < θ) (hθ₁ : θ ≠ 1) (c : Circle) (ℓ : ℂ)
     (hℓ : Complex.exp ℓ = (c : ℂ)) :
     Summable (fun m : ℤ ↦
-      ‖logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log θ : ℂ))‖) := by sorry
+      ‖logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log θ : ℂ))‖) := by
+  let a := Real.log θ
+  have ha : a ≠ 0 := Real.log_ne_zero_of_pos_of_ne_one hθ hθ₁
+  have haC : (a : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ha
+  let w (x : ℝ) := Complex.exp (ℓ * (x : ℂ))
+  let g (x : ℝ) := w x * f (a * x)
+  have hw : ContDiff ℝ 1 w := (contDiff_const.mul (Complex.ofRealCLM.contDiff (n := 1))).cexp
+  have hg : ContDiff ℝ 1 g :=
+    hw.mul ((hsmooth.of_le (by simp : (1 : ℕ∞ω) ≤ ∞)).comp (contDiff_const.mul contDiff_id))
+  have hw_norm (x : ℝ) : ‖w x‖ = 1 := by
+    have hre : ℓ.re = 0 :=
+      (Real.exp_eq_one_iff ℓ.re).mp (by rw [← Complex.norm_exp, hℓ, Circle.norm_coe])
+    simp [w, Complex.norm_exp, Complex.mul_re, hre]
+  have hderiv (x : ℝ) : deriv g x = w x *
+      (ℓ * f (a * x) + (a : ℂ) * deriv f (a * x)) := by
+    have hw' := ((Complex.ofRealCLM.hasDerivAt (x := x)).const_mul ℓ).cexp
+    have hf' := (hsmooth.differentiable (by simp) (a * x)).hasDerivAt.scomp x
+      ((hasDerivAt_id x).const_mul a)
+    convert (hw'.mul hf').deriv using 1
+    · rfl
+    · simp [w, Complex.real_smul]
+      ring
+  -- The twist is unitary, so the profile and its derivative retain exponential decay.
+  obtain ⟨C, _, T, _, htail⟩ := hf.2 1
+  have ht : Tendsto (fun x : ℝ ↦ |a * x|) (cocompact ℝ) atTop := by
+    simpa only [abs_mul, Function.comp_def, Real.norm_eq_abs] using
+      (tendsto_const_mul_atTop_of_pos (abs_pos.mpr ha)).mpr
+        (tendsto_norm_cocompact_atTop (E := ℝ))
+  have hexp : (fun x : ℝ ↦ Real.exp (-|a * x|)) =O[cocompact ℝ]
+      (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    simpa only [Function.comp_def, abs_mul, neg_mul, Real.norm_eq_abs] using
+      (isLittleO_exp_neg_mul_rpow_atTop (abs_pos.mpr ha) (-2)).isBigO.comp_tendsto
+        (tendsto_norm_cocompact_atTop (E := ℝ))
+  have hg_decay : g =O[cocompact ℝ] (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    refine (Asymptotics.IsBigO.of_bound (g := fun x : ℝ ↦ Real.exp (-|a * x|)) C ?_).trans hexp
+    filter_upwards [ht.eventually_gt_atTop T] with x hx
+    simpa only [g, norm_mul, hw_norm, one_mul, Real.norm_eq_abs, Real.abs_exp, Nat.cast_one,
+      neg_one_mul] using (htail (a * x) hx).1.le
+  have hg'_decay : deriv g =O[cocompact ℝ] (fun x : ℝ ↦ |x| ^ (-2 : ℝ)) := by
+    refine (Asymptotics.IsBigO.of_bound (g := fun x : ℝ ↦ Real.exp (-|a * x|))
+      ((‖ℓ‖ + |a|) * C) ?_).trans hexp
+    filter_upwards [ht.eventually_gt_atTop T] with x hx
+    obtain ⟨hfx, hdfx⟩ := htail (a * x) hx
+    simp only [Nat.cast_one, neg_one_mul] at hfx hdfx
+    rw [hderiv, norm_mul, hw_norm, one_mul, Real.norm_eq_abs, Real.abs_exp]
+    calc
+      _ ≤ ‖ℓ‖ * ‖f (a * x)‖ + |a| * ‖deriv f (a * x)‖ := by
+        simpa only [norm_mul, Complex.norm_real, Real.norm_eq_abs] using
+          norm_add_le (ℓ * f (a * x)) ((a : ℂ) * deriv f (a * x))
+      _ ≤ ‖ℓ‖ * (C * Real.exp (-|a * x|)) + |a| * (C * Real.exp (-|a * x|)) :=
+        add_le_add (mul_le_mul_of_nonneg_left hfx.le (norm_nonneg _))
+          (mul_le_mul_of_nonneg_left hdfx.le (abs_nonneg _))
+      _ = _ := by ring
+  have hsum := (summable_norm_fourier_int_of_isBigO hg hg_decay hg'_decay).comp_injective
+    (neg_injective : Function.Injective (fun m : ℤ ↦ -m))
+  refine (hsum.mul_left |a|).congr fun m ↦ ?_
+  -- Substitute t = exp(a * x) to identify the rescaled Mellin sample.
+  let s := (ℓ + twoPiI * (m : ℂ)) / (a : ℂ)
+  let F (y : ℝ) := Complex.exp (s * y) * f y
+  have hmellin : logMellin f s = ∫ y, F y := by
+    change mellin (fun t ↦ f (Real.log t)) s = _
+    rw [mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with y
+    simp only [Real.log_exp, Complex.real_smul, smul_eq_mul]
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos y).ne'),
+      ← Complex.ofReal_log (Real.exp_pos y).le, Real.log_exp]
+    simp only [F, Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+    congr 2
+    ring
+  have hFourier : 𝓕 g ((-m : ℤ) : ℝ) = |a⁻¹| • logMellin f s := by
+    rw [hmellin, ← Measure.integral_comp_mul_left F, Real.fourier_real_eq_integral_exp_smul]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [g, w, F, smul_eq_mul, ← mul_assoc, ← Complex.exp_add, Int.cast_neg,
+      Complex.ofReal_neg, Complex.ofReal_intCast, Complex.ofReal_mul]
+    congr 2
+    dsimp [s]
+    field_simp
+    ring
+  change |a| * ‖𝓕 g ((-m : ℤ) : ℝ)‖ = ‖logMellin f s‖
+  rw [hFourier, norm_smul, Real.norm_eq_abs, abs_abs, abs_inv, ← mul_assoc,
+    mul_inv_cancel₀ (abs_ne_zero.mpr ha), one_mul]
 
 /-- Paper: Remark B.4.1.4, p. 608. The Mellin transform of the indicator of
 the interval from one to two is (B.4.1.9), with its removable value at zero. -/
@@ -349,7 +625,54 @@ Deviation: Sanity check for the support, weights and normalization of the comb. 
 theorem hasSum_localDiracComb_apply (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
     (hχ : χ₀(χ).IsUnramifiedAt v) (σ : ℝ) (f : 𝓢(ℝ, ℂ)) :
     HasSum (fun m : ℕ ↦ combWeight (χ₀(χ).localValue v) q(v) σ m * f (q(v) ^ (m + 1)))
-      (localDiracComb χ v hχ σ f) := by sorry
+      (localDiracComb χ v hχ σ f) := by
+  let q : ℝ := q(v)
+  let term := combTerm (χ₀(χ).localValue v) q σ
+  obtain ⟨k, hk⟩ := exists_nat_gt σ
+  have hq : 1 < q := by
+    dsimp [q]
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ := zero_lt_one.trans hq
+  let r : ℝ := q ^ (σ - k)
+  have hr₀ : 0 ≤ r := Real.rpow_nonneg hq₀.le _
+  have hr₁ : r < 1 := Real.rpow_lt_one_of_one_lt_of_neg hq (sub_neg.mpr hk)
+  have hgeom : Summable (fun m : ℕ ↦ r ^ (m + 1)) :=
+    (summable_nat_add_iff 1).2 (summable_geometric_of_lt_one hr₀ hr₁)
+  have hfactor : r * q ^ k = q ^ σ := by
+    dsimp only [r]
+    rw [← Real.rpow_natCast q k, ← Real.rpow_add hq₀, sub_add_cancel]
+  have hbound (g : 𝓢(ℝ, ℂ)) (m : ℕ) :
+      ‖term m g‖ ≤ r ^ (m + 1) * SchwartzMap.seminorm ℂ k 0 g := by
+    have hg := SchwartzMap.norm_pow_mul_le_seminorm ℂ g k (q ^ (m + 1))
+    rw [Real.norm_of_nonneg (pow_nonneg hq₀.le _)] at hg
+    change ‖(χ₀(χ).localValue v ^ (m + 1) * (q ^ ((m + 1 : ℕ) * σ) : ℝ)) *
+      g (q ^ (m + 1))‖ ≤ _
+    rw [norm_mul, norm_mul, norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow,
+      one_mul, Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hq₀.le _),
+      mul_comm ((m + 1 : ℕ) : ℝ) σ, Real.rpow_mul_natCast hq₀.le, ← hfactor, mul_pow,
+      ← pow_mul, Nat.mul_comm k (m + 1), pow_mul, mul_assoc]
+    exact mul_le_mul_of_nonneg_left hg (pow_nonneg hr₀ _)
+  have hsum (g : 𝓢(ℝ, ℂ)) : Summable (fun m ↦ term m g) :=
+    (hgeom.mul_right _).of_norm_bounded (hbound g)
+  -- The same seminorm bounds the pointwise sum, so it defines a tempered distribution.
+  let L : 𝓢(ℝ, ℂ) →L[ℂ] ℂ := SchwartzMap.mkCLMtoNormedSpace
+    (fun g ↦ ∑' m, term m g)
+    (fun g h ↦ by simp only [map_add, (hsum g).tsum_add (hsum h)])
+    (fun a g ↦ by simp only [map_smul, RingHom.id_apply, (hsum g).tsum_const_smul a])
+    (by
+      refine ⟨{(k, 0)}, ∑' m : ℕ, r ^ (m + 1), tsum_nonneg (fun _ ↦ pow_nonneg hr₀ _), ?_⟩
+      intro g
+      rw [Finset.sup_singleton]
+      exact tsum_of_norm_bounded (hgeom.hasSum.mul_right _) (hbound g))
+  let T : 𝓢'(ℝ, ℂ) := ContinuousLinearMap.toPointwiseConvergenceCLM _ _ _ _ L
+  have hT : HasSum term T := by
+    apply PointwiseConvergenceCLM.tendsto_iff_forall_tendsto.mpr
+    intro g
+    rw [show T g = ∑' m, term m g from rfl]
+    simpa only [HasSum, sum_apply] using (hsum g).hasSum
+  have hcomb : localDiracComb χ v hχ σ = T := hT.tsum_eq
+  rw [hcomb]
+  exact (hsum f).hasSum
 
 /-- Paper: Equation (B.4.1.18), p. 611. The weighted Dirac series converges
 to the local comb in the weak topology. -/
