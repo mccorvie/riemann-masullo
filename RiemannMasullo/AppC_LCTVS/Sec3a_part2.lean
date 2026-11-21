@@ -38,7 +38,24 @@ local notation "PairwiseOrthogonal" =>
 /-- Paper: Proposition C.3.5.1, p. 699. A pairwise orthogonal family of nonzero
 closed subspaces of a separable Hilbert space has a countable index type. -/
 theorem countable_orthogonalSummands [SeparableSpace H]
-    (hV : PairwiseOrthogonal) (hne : ∀ i, V i ≠ ⊥) : Countable ι := by sorry
+    (hV : PairwiseOrthogonal) (hne : ∀ i, V i ≠ ⊥) : Countable ι := by
+  have exists_unit (i : ι) : ∃ x ∈ (V i : Submodule ℂ H), ‖x‖ = 1 := by
+    have hi : (V i : Submodule ℂ H) ≠ ⊥ :=
+      fun h ↦ hne i (ClosedSubmodule.toSubmodule_injective h)
+    obtain ⟨x, hx, hx0⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hi
+    exact ⟨(‖x‖⁻¹ : ℂ) • x, (V i : Submodule ℂ H).smul_mem _ hx, norm_smul_inv_norm hx0⟩
+  choose u hu hunit using exists_unit
+  refine Pairwise.countable_of_isOpen_disjoint (s := fun i ↦ Metric.ball (u i) (1 / 2))
+    ?_ (fun _ ↦ Metric.isOpen_ball) (fun _ ↦ Metric.nonempty_ball.mpr (by norm_num))
+  intro i j hij
+  apply Metric.ball_disjoint_ball
+  have hsq : dist (u i) (u j) ^ 2 = 2 := by
+    rw [dist_eq_norm, @norm_sub_sq ℂ, (hV hij).inner_eq (hu i) (hu j), hunit i, hunit j]
+    norm_num
+  rw [show (1 / 2 : ℝ) + 1 / 2 = 1 by norm_num]
+  apply (sq_le_sq₀ zero_le_one dist_nonneg).mp
+  rw [hsq]
+  norm_num
 
 -- TODO(paper-gap): The proof on p. 701 calls each PᵢT finite-rank. A single
 -- summand equal to ℓ²(ℕ) and T diagonal with entries 2^(-n-1) gives a counterexample.
