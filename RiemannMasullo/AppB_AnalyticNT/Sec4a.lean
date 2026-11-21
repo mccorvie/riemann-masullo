@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Distribution.TemperedDistribution
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
+import Mathlib.Analysis.Normed.Group.FunctionSeries
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
@@ -891,15 +892,14 @@ def localDiracComb (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
 -- TODO(paper-gap): The geometric majorant on p. 611 after (B.4.1.18)
 -- is missing the index m in the exponent -2m.
 
-/-- Paper: Equation (B.4.1.18), p. 611. Evaluation of the local Dirac comb on
-a Schwartz function is the sum of its weighted values at the positive powers.
-Deviation: Sanity check for the support, weights and normalization of the comb. -/
-theorem hasSum_localDiracComb_apply (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
-    (hχ : χ₀(χ).IsUnramifiedAt v) (σ : ℝ) (f : 𝓢(ℝ, ℂ)) :
-    HasSum (fun m : ℕ ↦ combWeight (χ₀(χ).localValue v) q(v) σ m * f (q(v) ^ (m + 1)))
-      (localDiracComb χ v hχ σ f) := by
+/-- Paper: Equation (B.4.1.18), p. 611. Each weighted Dirac evaluation is bounded
+by a summable geometric factor times a fixed Schwartz seminorm. -/
+private theorem exists_localDiracComb_majorant (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
+    (σ : ℝ) :
+    ∃ (k : ℕ) (u : ℕ → ℝ), Summable u ∧ (∀ m, 0 ≤ u m) ∧
+      ∀ (g : 𝓢(ℝ, ℂ)) (m : ℕ),
+        ‖combTerm (χ₀(χ).localValue v) q(v) σ m g‖ ≤ u m * SchwartzMap.seminorm ℂ k 0 g := by
   let q : ℝ := q(v)
-  let term := combTerm (χ₀(χ).localValue v) q σ
   obtain ⟨k, hk⟩ := exists_nat_gt σ
   have hq : 1 < q := by
     dsimp [q]
@@ -913,29 +913,38 @@ theorem hasSum_localDiracComb_apply (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
   have hfactor : r * q ^ k = q ^ σ := by
     dsimp only [r]
     rw [← Real.rpow_natCast q k, ← Real.rpow_add hq₀, sub_add_cancel]
-  have hbound (g : 𝓢(ℝ, ℂ)) (m : ℕ) :
-      ‖term m g‖ ≤ r ^ (m + 1) * SchwartzMap.seminorm ℂ k 0 g := by
-    have hg := SchwartzMap.norm_pow_mul_le_seminorm ℂ g k (q ^ (m + 1))
-    rw [Real.norm_of_nonneg (pow_nonneg hq₀.le _)] at hg
-    change ‖(χ₀(χ).localValue v ^ (m + 1) * (q ^ ((m + 1 : ℕ) * σ) : ℝ)) *
-      g (q ^ (m + 1))‖ ≤ _
-    rw [norm_mul, norm_mul, norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow,
-      one_mul, Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hq₀.le _),
-      mul_comm ((m + 1 : ℕ) : ℝ) σ, Real.rpow_mul_natCast hq₀.le, ← hfactor, mul_pow,
-      ← pow_mul, Nat.mul_comm k (m + 1), pow_mul, mul_assoc]
-    exact mul_le_mul_of_nonneg_left hg (pow_nonneg hr₀ _)
+  refine ⟨k, (fun m ↦ r ^ (m + 1)), hgeom, (fun _ ↦ pow_nonneg hr₀ _), fun g m ↦ ?_⟩
+  have hg := SchwartzMap.norm_pow_mul_le_seminorm ℂ g k (q ^ (m + 1))
+  rw [Real.norm_of_nonneg (pow_nonneg hq₀.le _)] at hg
+  change ‖(χ₀(χ).localValue v ^ (m + 1) * (q ^ ((m + 1 : ℕ) * σ) : ℝ)) *
+    g (q ^ (m + 1))‖ ≤ _
+  rw [norm_mul, norm_mul, norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow,
+    one_mul, Complex.norm_real, Real.norm_of_nonneg (Real.rpow_nonneg hq₀.le _),
+    mul_comm ((m + 1 : ℕ) : ℝ) σ, Real.rpow_mul_natCast hq₀.le, ← hfactor, mul_pow,
+    ← pow_mul, Nat.mul_comm k (m + 1), pow_mul, mul_assoc]
+  exact mul_le_mul_of_nonneg_left hg (pow_nonneg hr₀ _)
+
+/-- Paper: Equation (B.4.1.18), p. 611. Evaluation of the local Dirac comb on
+a Schwartz function is the sum of its weighted values at the positive powers.
+Deviation: Sanity check for the support, weights and normalization of the comb. -/
+theorem hasSum_localDiracComb_apply (χ : U[F]) (v : HeightOneSpectrum (𝓞 F))
+    (hχ : χ₀(χ).IsUnramifiedAt v) (σ : ℝ) (f : 𝓢(ℝ, ℂ)) :
+    HasSum (fun m : ℕ ↦ combWeight (χ₀(χ).localValue v) q(v) σ m * f (q(v) ^ (m + 1)))
+      (localDiracComb χ v hχ σ f) := by
+  let term := combTerm (χ₀(χ).localValue v) q(v) σ
+  obtain ⟨k, u, hu, hu₀, hbound⟩ := exists_localDiracComb_majorant χ v σ
   have hsum (g : 𝓢(ℝ, ℂ)) : Summable (fun m ↦ term m g) :=
-    (hgeom.mul_right _).of_norm_bounded (hbound g)
+    (hu.mul_right _).of_norm_bounded (hbound g)
   -- The same seminorm bounds the pointwise sum, so it defines a tempered distribution.
   let L : 𝓢(ℝ, ℂ) →L[ℂ] ℂ := SchwartzMap.mkCLMtoNormedSpace
     (fun g ↦ ∑' m, term m g)
     (fun g h ↦ by simp only [map_add, (hsum g).tsum_add (hsum h)])
     (fun a g ↦ by simp only [map_smul, RingHom.id_apply, (hsum g).tsum_const_smul a])
     (by
-      refine ⟨{(k, 0)}, ∑' m : ℕ, r ^ (m + 1), tsum_nonneg (fun _ ↦ pow_nonneg hr₀ _), ?_⟩
+      refine ⟨{(k, 0)}, ∑' m, u m, tsum_nonneg hu₀, ?_⟩
       intro g
       rw [Finset.sup_singleton]
-      exact tsum_of_norm_bounded (hgeom.hasSum.mul_right _) (hbound g))
+      exact tsum_of_norm_bounded (hu.hasSum.mul_right _) (hbound g))
   let T : 𝓢'(ℝ, ℂ) := ContinuousLinearMap.toPointwiseConvergenceCLM _ _ _ _ L
   have hT : HasSum term T := by
     apply PointwiseConvergenceCLM.tendsto_iff_forall_tendsto.mpr
@@ -961,7 +970,24 @@ theorem tendsto_localDiracComb_strongDual (χ : U[F]) (v : HeightOneSpectrum (�
     (hχ : χ₀(χ).IsUnramifiedAt v) (σ : ℝ) :
     Tendsto (fun n : ℕ ↦
       ∑ m ∈ Finset.range n, toStrongSchwartzDual (combTerm (χ₀(χ).localValue v) q(v) σ m))
-      atTop (𝓝 (toStrongSchwartzDual (localDiracComb χ v hχ σ))) := by sorry
+      atTop (𝓝 (toStrongSchwartzDual (localDiracComb χ v hχ σ))) := by
+  let term := combTerm (χ₀(χ).localValue v) q(v) σ
+  rw [(ContinuousLinearMap.isUniformEmbedding_toUniformOnFun (σ := RingHom.id ℂ)
+    (E := 𝓢(ℝ, ℂ)) (F := ℂ)).isEmbedding.tendsto_nhds_iff,
+    UniformOnFun.tendsto_iff_tendstoUniformlyOn]
+  intro s hs
+  obtain ⟨k, u, hu, hu₀, hbound⟩ := exists_localDiracComb_majorant χ v σ
+  obtain ⟨C, _, hC⟩ :=
+    ((schwartz_withSeminorms ℂ ℝ ℂ).isVonNBounded_iff_seminorm_bounded.mp hs) (k, 0)
+  have hmajor (m : ℕ) (g : 𝓢(ℝ, ℂ)) (hg : g ∈ s) : ‖term m g‖ ≤ u m * C :=
+    (hbound g m).trans (mul_le_mul_of_nonneg_left (hC g hg).le (hu₀ m))
+  have hlim := (tendstoUniformlyOn_tsum_nat (hu.mul_right C) hmajor).congr_right
+    (show EqOn (fun g ↦ ∑' m, term m g) (localDiracComb χ v hχ σ) s from
+      fun g _ ↦ (hasSum_localDiracComb_apply χ v hχ σ g).tsum_eq)
+  change TendstoUniformlyOn (fun n g ↦ (∑ m ∈ Finset.range n,
+    toStrongSchwartzDual (term m)) g) (localDiracComb χ v hχ σ) atTop s
+  simp only [sum_apply]
+  exact hlim
 
 variable (χ : U[F]) (v : HeightOneSpectrum (𝓞 F)) (hχ : χ₀(χ).IsUnramifiedAt v)
 variable (f : 𝓢(ℝ, ℂ)) (hf : ExponentialDecay f)
