@@ -4,6 +4,10 @@ public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import Mathlib.Algebra.Order.Group.Cyclic
 import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
+import Mathlib.Algebra.Category.Grp.Injective
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Pi
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 
 /-! # Modulated groups and their canonical Haar measures -/
 
@@ -78,10 +82,190 @@ theorem IsModulation.range_eq_zpowers {m : G →ₜ* ℝ≥0ˣ}
       (by simpa only [Subgroup.zpowers_inv] using he.symm)
     exact inv_injective (by simpa using hgen)
 
+omit [SecondCountableTopology G] in
+/-- A surjective proper modulation admits a continuous homomorphic right inverse.
+Extend the real frequency on characters pulled back along the modulation to all characters
+of the group, then use character separation to lift the resulting one-parameter subgroup. -/
+private theorem exists_section_of_surjective {m : G →ₜ* ℝ≥0ˣ}
+    (hm : IsProperMap m) (hs : Surjective m) :
+    ∃ τ : ℝ≥0ˣ →ₜ* G, RightInverse τ m := by
+  classical
+  let logVal (t : ℝ≥0ˣ) : ℝ := Real.log ((t : ℝ≥0) : ℝ)
+  have hpos (t : ℝ≥0ˣ) : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hlog : Continuous logVal :=
+    (NNReal.continuous_coe.comp Units.continuous_val).log fun t ↦ (hpos t).ne'
+  let freq : Multiplicative ℝ →* PontryaginDual ℝ≥0ˣ :=
+    { toFun := fun a ↦
+        { toFun := fun t ↦ Circle.exp (a.toAdd * logVal t)
+          map_one' := by simp [logVal]
+          map_mul' := fun t u ↦ by
+            change Circle.exp (a.toAdd * Real.log (((t : ℝ≥0) : ℝ) * ((u : ℝ≥0) : ℝ))) = _
+            rw [Real.log_mul (hpos t).ne' (hpos u).ne', mul_add, Circle.exp_add]
+          continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul hlog) }
+      map_one' := PontryaginDual.ext fun t ↦ by change Circle.exp (0 * logVal t) = 1; simp
+      map_mul' := fun a b ↦ PontryaginDual.ext fun t ↦ by
+        change Circle.exp ((a.toAdd + b.toAdd) * logVal t) = _
+        rw [add_mul, Circle.exp_add]
+        rfl }
+  let coe : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  have hfreq (a : Multiplicative ℝ) (t : ℝ≥0ˣ) :
+      (freq a t : ℂ) = (((t : ℝ≥0) : ℝ) : ℂ) ^ ((a.toAdd : ℂ) * Complex.I) := by
+    change (Circle.exp (a.toAdd * logVal t) : ℂ) = _
+    rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (hpos t).ne'),
+      ← Complex.ofReal_log (hpos t).le]
+    congr 1
+    simp only [logVal, Complex.ofReal_mul]
+    ring
+  have hfInj : Injective freq := by
+    intro a b hab
+    obtain ⟨z, hz, hu⟩ := existsUnique_complexPower (coe.comp (freq a))
+    have he : (a.toAdd : ℂ) * Complex.I = (b.toAdd : ℂ) * Complex.I :=
+      (hu _ (hfreq a)).trans (hu _ (hab ▸ hfreq b)).symm
+    exact Complex.ofReal_injective (mul_right_cancel₀ Complex.I_ne_zero he)
+  have hfSurj : Surjective freq := by
+    intro χ
+    obtain ⟨z, ⟨hz, hχ⟩, _⟩ :=
+      existsUnique_unitaryComplexPower (coe.comp χ) (fun t ↦ Circle.norm_coe (χ t))
+    have hz' : (z.im : ℂ) * Complex.I = z := by
+      apply Complex.ext <;> simp [hz]
+    refine ⟨Multiplicative.ofAdd z.im, PontryaginDual.ext fun t ↦ Circle.ext ?_⟩
+    rw [hfreq]
+    change (((t : ℝ≥0) : ℝ) : ℂ) ^ ((z.im : ℂ) * Complex.I) = _
+    rw [hz']
+    exact (hχ t).symm
+  let X := PontryaginDual G
+  let f := PontryaginDual.map m
+  have hf : Injective f := fun a b h ↦
+    PontryaginDual.ext fun t ↦ by
+      obtain ⟨g, rfl⟩ := hs t
+      exact congrArg (fun χ : X ↦ χ g) h
+  let pull := f.toMonoidHom.comp freq
+  let i : ℝ →+ Additive X := AddMonoidHom.toMultiplicativeLeft.symm pull
+  let R := ULift.{_} ℝ
+  let down : R ≃ₗ[ℤ] ℝ := ULift.moduleEquiv
+  let iLift := i.toIntLinearMap.comp down.toLinearMap
+  let : DivisibleBy (R) ℤ := divisibleByOfSMulRightSurj _ ℤ fun {n} hn y ↦ by
+    obtain ⟨x, hx⟩ := DivisibleBy.surjective_smul ℝ ℤ hn (down y)
+    refine ⟨down.symm x, down.injective ?_⟩
+    rw [map_smul, down.apply_symm_apply]
+    exact hx
+  have := (Module.Baer.of_divisible (R)).injective
+  have hiLift : Injective iLift := (hf.comp hfInj).comp down.injective
+  obtain ⟨L, hL⟩ := Module.Injective.out iLift hiLift (LinearMap.id : R →ₗ[ℤ] _)
+  let fretract : X →* Multiplicative ℝ :=
+    AddMonoidHom.toMultiplicativeRight (down.toLinearMap.comp L).toAddMonoidHom
+  let r := freq.comp fretract
+  have hr (χ : PontryaginDual ℝ≥0ˣ) : r (f χ) = χ := by
+    obtain ⟨a, rfl⟩ := hfSurj χ
+    exact congrArg freq (congrArg down (hL (down.symm a.toAdd)))
+      |>.trans (congrArg (fun x : ℝ ↦ freq (Multiplicative.ofAdd x)) (down.apply_symm_apply _))
+
+  -- Properness makes the character evaluation map with first coordinate m a closed embedding.
+  let P := X → Circle
+  let e : G →ₜ* (ℝ≥0ˣ × P) :=
+    m.prod { toFun := fun g χ ↦ χ g
+             map_one' := funext fun χ ↦ map_one χ
+             map_mul' := fun g h ↦ funext fun χ ↦ map_mul χ g h
+             continuous_toFun := continuous_pi fun χ ↦ χ.continuous }
+  have heInj : Injective e := fun _ _ h ↦
+    pontryaginDual_pairing_separates.1 (congrArg Prod.snd h)
+  have heProper : IsProperMap e :=
+    isProperMap_of_comp_of_t2 e.continuous continuous_fst hm
+  have he : Topology.IsClosedEmbedding e :=
+    Topology.IsClosedEmbedding.of_continuous_injective_isClosedMap
+      e.continuous heInj heProper.isClosedMap
+  let H := e.toMonoidHom.range
+  let : IsClosed (H : Set (ℝ≥0ˣ × P)) := he.isClosed_range
+  let q : (ℝ≥0ˣ × P) →ₜ* ((ℝ≥0ˣ × P) ⧸ H) :=
+    ⟨QuotientGroup.mk' H, QuotientGroup.continuous_mk⟩
+  let s : ℝ≥0ˣ →ₜ* (ℝ≥0ˣ × P) :=
+    (ContinuousMonoidHom.id _).prod
+      { toFun := fun t χ ↦ r χ t
+        map_one' := funext fun χ ↦ map_one (r χ)
+        map_mul' := fun t u ↦ funext fun χ ↦ map_mul (r χ) t u
+        continuous_toFun := continuous_pi fun χ ↦ (r χ).continuous }
+
+  -- A character trivial on the embedded group is also trivial on the proposed section.
+  have hmem (t : ℝ≥0ˣ) : s t ∈ H := by
+    apply (QuotientGroup.eq_one_iff (s t)).mp
+    by_contra hne
+    obtain ⟨ψ, hψ⟩ := exists_pontryaginDual_apply_ne_one (show q (s t) ≠ 1 from hne)
+    let ψ₁ := (ψ.comp q).comp (ContinuousMonoidHom.inl ℝ≥0ˣ P)
+    let ψ₂ := (ψ.comp q).comp (ContinuousMonoidHom.inr ℝ≥0ˣ P)
+    have hψProd (a : ℝ≥0ˣ) (p : P) : ψ (q (a, p)) = ψ₁ a * ψ₂ p := by
+      change (ψ.comp q) (a, p) = (ψ.comp q) (a, 1) * (ψ.comp q) (1, p)
+      rw [← map_mul]
+      simp
+    obtain ⟨I, n, hn⟩ := exists_finset_circleCharacter_eq_prod_zpow ψ₂
+    let χ : X := ∏ j ∈ I, j ^ n j
+    have hχ (g : G) : χ g = (ψ₁ (m g))⁻¹ := by
+      have hg : q (e g) = 1 := (QuotientGroup.eq_one_iff (e g)).mpr ⟨g, rfl⟩
+      have hh : ψ (q (e g)) = ψ₁ (m g) * χ g := by
+        change ψ (q (m g, fun j : X ↦ j g)) = _
+        rw [hψProd]
+        congr 1
+        refine (hn _).trans ?_
+        change _ = pontryaginDual_eval g χ
+        simp only [χ, map_prod, map_zpow]
+        rfl
+      rw [hg, map_one] at hh
+      exact eq_inv_of_mul_eq_one_right hh.symm
+    have hχPull : χ = f ψ₁⁻¹ := PontryaginDual.ext fun g ↦ hχ g
+    have hψS : ψ (q (s t)) = ψ₁ t * r χ t := by
+      change ψ (q (t, fun j : X ↦ r j t)) = _
+      rw [hψProd]
+      congr 1
+      refine (hn _).trans ?_
+      change _ = pontryaginDual_eval t (r χ)
+      simp only [χ, map_prod, map_zpow]
+      rfl
+    apply hψ
+    rw [hψS, hχPull, hr]
+    exact mul_inv_cancel _
+  let eRange : G ≃* H := MulEquiv.ofBijective e.toMonoidHom.rangeRestrict
+    ⟨fun _ _ h ↦ heInj (congrArg Subtype.val h), e.toMonoidHom.rangeRestrict_surjective⟩
+  have hInd : Topology.IsInducing eRange :=
+    Topology.IsEmbedding.subtypeVal.isInducing.of_comp_iff.mp he.isInducing
+  let sRange : ℝ≥0ˣ →* H := s.toMonoidHom.codRestrict H hmem
+  refine ⟨⟨eRange.symm.toMonoidHom.comp sRange, hInd.continuous_iff.mpr ?_⟩, fun t ↦ ?_⟩
+  · have hComp : eRange ∘ (eRange.symm.toMonoidHom.comp sRange) = sRange :=
+      funext fun t ↦ eRange.apply_symm_apply (sRange t)
+    change Continuous (eRange ∘ ⇑(eRange.symm.toMonoidHom.comp sRange))
+    rw [hComp]
+    exact s.continuous.subtype_mk _
+  · exact congrArg (fun x : H ↦ x.val.1) (eRange.apply_symm_apply (sRange t))
+
 /-- Paper: Remark D.2.1.2, p. 793. A module has a continuous homomorphic section
 on its image. -/
 theorem IsModulation.exists_section {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m) :
-    ∃ τ : m.toMonoidHom.range →ₜ* G, ∀ t, m (τ t) = (t : ℝ≥0ˣ) := by sorry
+    ∃ τ : m.toMonoidHom.range →ₜ* G, ∀ t, m (τ t) = (t : ℝ≥0ˣ) := by
+  by_cases hs : Surjective m
+  · obtain ⟨τ, hτ⟩ := exists_section_of_surjective hm.1 hs
+    exact ⟨τ.comp ⟨m.toMonoidHom.range.subtype, continuous_subtype_val⟩, fun t ↦ hτ t⟩
+  · obtain ⟨a, ⟨ha, hr⟩, _⟩ := hm.range_eq_zpowers hs
+    have : OrderTopology ℝ≥0ˣ := by
+      let e : ℝ≥0ˣ ≃ₜ Set.Ioi (0 : ℝ) := Nonneg.unitsHomeomorphPos ℝ
+      exact ⟨e.isInducing.eq_induced.trans
+        ((show StrictMono e from fun _ _ h ↦ h).induced_topology_eq_preorder
+          (e.surjective.range_eq ▸ Set.ordConnected_univ))⟩
+    let : DiscreteTopology m.toMonoidHom.range := hr ▸ inferInstanceAs
+      (DiscreteTopology (Subgroup.zpowers a))
+    let t : m.toMonoidHom.range := ⟨a, hr.symm ▸ Subgroup.mem_zpowers a⟩
+    obtain ⟨g, hg⟩ := t.property
+    let f := (zpowersHom ℝ≥0ˣ a).codRestrict m.toMonoidHom.range fun n ↦
+      hr.symm ▸ Subgroup.zpow_mem_zpowers a n.toAdd
+    let e : Multiplicative ℤ ≃* m.toMonoidHom.range := MulEquiv.ofBijective f
+      ⟨fun _ _ h ↦ IsMulTorsionFree.zpow_right_injective
+          (ne_of_gt (show (1 : ℝ≥0ˣ) < a from ha)) (congrArg Subtype.val h),
+        fun x ↦ by
+          have hx : (x : ℝ≥0ˣ) ∈ Subgroup.zpowers a := hr ▸ x.property
+          obtain ⟨n, hn⟩ := Subgroup.mem_zpowers_iff.mp hx
+          exact ⟨Multiplicative.ofAdd n, Subtype.ext hn⟩⟩
+    refine ⟨⟨(zpowersHom G g).comp e.symm.toMonoidHom, continuous_of_discreteTopology⟩,
+      fun x ↦ ?_⟩
+    change m (g ^ (e.symm x).toAdd) = (x : ℝ≥0ˣ)
+    rw [map_zpow, show m g = a from hg]
+    exact congrArg Subtype.val (e.apply_symm_apply x)
 
 /-- Paper: Remark D.2.1.2, p. 793. Each section identifies the product of the
 norm-one subgroup and the image of the module with the original group. -/
