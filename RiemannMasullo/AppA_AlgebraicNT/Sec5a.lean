@@ -23,7 +23,28 @@ namespace RiemannMasullo
 converge to its value as the radius decreases to zero. -/
 theorem tendsto_centeredAverage_of_continuous {f : ℝ → ℝ} (hf : Continuous f) (x : ℝ) :
     Tendsto (fun r : ℝ ↦ (2 * r)⁻¹ * ∫ y in x - r..x + r, f y)
-      (𝓝[>] 0) (𝓝 (f x)) := by sorry
+      (𝓝[>] 0) (𝓝 (f x)) := by
+  have hradius : Tendsto (fun r : ℝ ↦ r) (𝓝[>] 0) (𝓝 0) :=
+    tendsto_id'.2 nhdsWithin_le_nhds
+  have hleft : Tendsto (fun r : ℝ ↦ x - r) (𝓝[>] 0) (𝓝 x) := by
+    simpa using (tendsto_const_nhds (x := x)).sub hradius
+  have hright : Tendsto (fun r : ℝ ↦ x + r) (𝓝[>] 0) (𝓝 x) := by
+    simpa using (tendsto_const_nhds (x := x)).add hradius
+  have herror := intervalIntegral.integral_sub_linear_isLittleO_of_tendsto_ae
+    (l' := 𝓝 x) hf.aestronglyMeasurable.stronglyMeasurableAtFilter
+    (hf.continuousAt.tendsto.mono_left inf_le_left) hleft hright
+  have hlength (r : ℝ) : x + r - (x - r) = 2 * r := by ring
+  have hquot :
+      Tendsto (fun r : ℝ ↦ ((∫ y in x - r..x + r, f y) - (2 * r) * f x) / (2 * r))
+        (𝓝[>] 0) (𝓝 0) := by
+    simpa only [Pi.sub_apply, hlength, smul_eq_mul] using herror.tendsto_div_nhds_zero
+  have hlim := hquot.add (tendsto_const_nhds (x := f x))
+  rw [zero_add] at hlim
+  refine hlim.congr' ?_
+  filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with r hr
+  have hne : 2 * r ≠ 0 := mul_ne_zero two_ne_zero (ne_of_gt (mem_Ioi.mp hr))
+  rw [sub_div, mul_comm (2 * r) (f x), mul_div_cancel_right₀ _ hne, sub_add_cancel,
+    div_eq_mul_inv, mul_comm]
 
 /-- Paper: (A.5.1.2), p. 566. The centered maximal function takes the supremum of
 the averages of the absolute value over intervals of all positive radii.
