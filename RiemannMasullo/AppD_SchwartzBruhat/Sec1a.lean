@@ -87,7 +87,7 @@ carrying most of its Bochner measure. -/
 theorem exists_pontryaginDual_compact_test {U : Set G} (hU : U ∈ 𝓝 (1 : G)) :
     ∃ K : Set (PontryaginDual G), IsCompact K ∧
       ∀ x : G, (∀ χ ∈ K, dist (χ x) 1 < 1 / 4) → x ∈ U := by
-  sorry
+  exact exists_compact_pontryaginDual_test hU
 
 /-- Paper: Theorem D.1.1.1(2), p. 746. Evaluation embeds the group as a closed subgroup
 of its bidual. -/
@@ -331,7 +331,12 @@ theorem pontryaginDual_bidual :
 /-- Paper: Theorem D.1.1.1(3), p. 746. A locally compact abelian group is compact
 exactly when its dual is discrete. -/
 theorem compactSpace_iff_discretePontryaginDual :
-    CompactSpace G ↔ DiscreteTopology (PontryaginDual G) := by sorry
+    CompactSpace G ↔ DiscreteTopology (PontryaginDual G) := by
+  constructor
+  · intro h
+    infer_instance
+  · intro h
+    exact (isClosedEmbedding_pontryaginDual_eval (G := G)).compactSpace
 
 end Pontryagin
 
@@ -366,7 +371,16 @@ def lcaConvolution (μ : Measure G) (f g : G → ℂ) (x : G) : ℂ :=
 /-- Paper: (D.1.1.5), p. 746. Convolution on a one-point group is multiplication
 scaled by its total Haar mass. -/
 theorem lcaConvolution_subsingleton [Subsingleton G] (f g : G → ℂ) (x : G) :
-    lcaConvolution μ f g x = (μ univ).toReal * f x * g x := by sorry
+    lcaConvolution μ f g x = (μ univ).toReal * f x * g x := by
+  unfold lcaConvolution
+  calc
+    (∫ y, f y * g (y⁻¹ * x) ∂μ) = ∫ _ : G, f x * g x ∂μ := by
+      apply integral_congr_ae
+      exact Filter.Eventually.of_forall fun y ↦ by
+        change f y * g (y⁻¹ * x) = f x * g x
+        rw [Subsingleton.elim y x, Subsingleton.elim (x⁻¹ * x) x]
+    _ = (μ univ).toReal * f x * g x := by
+      simp only [integral_const, measureReal_def, Complex.real_smul, mul_assoc]
 
 /-- Paper: (D.1.1.5)–(D.1.1.6), p. 746. The fibre integrals of two L¹ functions
 exist almost everywhere and their convolution is L¹ with the product norm bound. -/

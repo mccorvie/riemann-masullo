@@ -891,7 +891,43 @@ every closed, convex, circled, absorbent set is a neighborhood of zero. -/
 theorem barrelledSpace_iff_barrels_mem_nhds [TopologicalSpace E] [PolynormableSpace ℂ E]
     [T2Space E] :
     BarrelledSpace ℂ E ↔
-      ∀ U : Set E, IsClosed U → AbsConvex ℂ U → Absorbent ℂ U → U ∈ 𝓝 0 := by sorry
+      ∀ U : Set E, IsClosed U → AbsConvex ℂ U → Absorbent ℂ U → U ∈ 𝓝 0 := by
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  constructor
+  · intro h U hClosed hConvex hAbsorbent
+    let : ContinuousSMul ℝ E := IsScalarTower.continuousSMul ℂ
+    have hConvexReal : Convex ℝ U := hConvex.2.lift ℝ
+    have hAbsorbentReal : Absorbent ℝ U := by
+      intro x
+      apply (hAbsorbent x).restrict_scalars
+      change Tendsto (fun r : ℝ ↦ (r : ℂ) * 1) (cobounded ℝ) (cobounded ℂ)
+      simpa only [mul_one] using Complex.isometry_ofReal.antilipschitzWith.tendsto_cobounded
+    let p := gaugeSeminorm hConvex.1 hConvexReal hAbsorbentReal
+    -- Each nonnegative sublevel of the gauge is an intersection of closed dilates.
+    have hp : LowerSemicontinuous p := by
+      rw [lowerSemicontinuous_iff_isClosed_preimage]
+      intro r
+      change IsClosed {x : E | gauge U x ≤ r}
+      by_cases hr : 0 ≤ r
+      · rw [setOfPred_gauge_le_eq hConvexReal hAbsorbentReal.zero_mem hAbsorbentReal hr]
+        exact isClosed_iInter fun t ↦ isClosed_iInter fun ht ↦
+          hClosed.smul_of_ne_zero (hr.trans_lt ht).ne'
+      · rw [show {x : E | gauge U x ≤ r} = ∅ from
+          eq_empty_iff_forall_notMem.mpr fun x hx ↦ hr ((gauge_nonneg x).trans hx)]
+        exact isClosed_empty
+    refine Filter.mem_of_superset
+      ((Seminorm.continuous_iff (p := p) one_pos).mp (p.continuous_of_lowerSemicontinuous hp)) ?_
+    rw [p.ball_zero_eq]
+    exact setOfPred_gauge_lt_one_subset_self hConvexReal hAbsorbentReal.zero_mem hAbsorbentReal
+  · intro h
+    refine ⟨fun p hp ↦ Seminorm.continuous' (r := 1) (h (p.closedBall 0 1) ?_ ?_ ?_)⟩
+    · rw [p.closedBall_zero_eq]
+      exact hp.isClosed_preimage 1
+    · exact ⟨p.balanced_closedBall_zero 1,
+        convex_RCLike_iff_convex_real.mpr (p.convex_closedBall 0 1)⟩
+    · exact p.absorbent_closedBall_zero one_pos
 
 end Duality
 

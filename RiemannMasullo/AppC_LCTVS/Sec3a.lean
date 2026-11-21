@@ -778,7 +778,71 @@ theorem exists_nuclearPresentation_tendsto_zero (A : E →L[ℂ] F) (hA : IsNucl
     ∃ (r : NuclearPresentation A) (U : Set E), U ∈ 𝓝 0 ∧
       TendstoUniformlyOn (fun n x ↦ r.functional n x) 0 atTop U ∧
       Tendsto (fun n ↦ gauge ((↑) ⁻¹' r.disc : Set (Submodule.span ℂ r.disc)) (r.vector n))
-        atTop (𝓝 0) := by sorry
+        atTop (𝓝 0) := by
+  obtain ⟨U, hU, bU, cU, B, hB, _, T, ⟨c, φ, y, hc, hφ, hy, hT⟩, hA⟩ := hA
+  let p := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  let G := WithLocalSeminorm (gaugeSeminorm hB.balanced hB.convex hB.absorbent)
+  let i : E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+  have hi : Continuous i :=
+    (PolynormableSpace.withSeminorms ℂ E).continuous_normedSpace_rng (LocalBanach p) i
+      ⟨{⟨p, continuous_gauge cU hU⟩}, 1, by
+        simpa using (show (normSeminorm ℂ _).comp i ≤ p from
+          fun x ↦ (localBanach_norm_coe p x).le)⟩
+  let j : G →L[ℂ] F := ⟨(Submodule.span ℂ B).subtype, continuous_banachDisc_subtype hB⟩
+  obtain ⟨R, hR, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_lt
+  obtain ⟨C, _, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  let r : ℂ := R
+  have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr hR.ne'
+  have hr_norm : ‖r‖ = R := by
+    dsimp [r]
+    rw [Complex.norm_real, Real.norm_of_nonneg hR.le]
+  let pres : NuclearPresentation A :=
+    { coeff := fun n ↦ c n * r
+      functional := fun n ↦ (φ n).comp ⟨i, hi⟩
+      disc := B
+      isBanachDisc := hB
+      vector := fun n ↦ (r⁻¹ • y n : G)
+      vector_mem := by
+        intro n
+        apply setOfPred_gauge_lt_one_subset_self hB.convex hB.absorbent.zero_mem hB.absorbent
+        change ‖(r⁻¹ • y n : G)‖ < 1
+        rw [norm_smul, norm_inv, hr_norm, inv_mul_lt_iff₀ hR, mul_one]
+        exact hyR _ (mem_range_self n)
+      summable_coeff := by simpa only [norm_mul] using hc.mul_right ‖r‖
+      equicontinuous := by
+        refine Metric.equicontinuousAt_of_continuity_modulus (fun x ↦ C * ‖i x‖) ?_ _
+          (Eventually.of_forall fun x n ↦ ?_)
+        · have hi0 : Tendsto i (𝓝 0) (𝓝 0) := by simpa only [map_zero] using hi.tendsto 0
+          simpa only [norm_zero, mul_zero] using hi0.norm.const_mul C
+        · change dist (φ n (i 0)) (φ n (i x)) ≤ C * ‖i x‖
+          rw [map_zero i, map_zero, dist_zero_left]
+          exact ((φ n).le_opNorm (i x)).trans
+            (mul_le_mul_of_nonneg_right (hφC _ (mem_range_self n)) (norm_nonneg _))
+      hasSum := by
+        intro x
+        have hs := j.hasSum (hT (i x))
+        rw [show j (T (i x)) = A x from hA x] at hs
+        refine hs.congr_fun fun n ↦ ?_
+        change (c n * r * φ n (i x)) • j (r⁻¹ • y n) =
+          j ((c n * φ n (i x)) • y n)
+        rw [map_smul, map_smul, smul_smul, mul_right_comm (c n) r, mul_inv_cancel_right₀ hr] }
+  refine ⟨pres, U, hU, ?_, ?_⟩
+  · rw [Metric.tendstoUniformlyOn_iff]
+    intro ε hε
+    have hnorm : Tendsto (fun n ↦ ‖φ n‖) atTop (𝓝 0) := by
+      simpa using hφ.norm
+    filter_upwards [(Metric.tendsto_nhds.mp hnorm) ε hε] with n hn x hx
+    have hiU : ‖i x‖ ≤ 1 := by
+      change ‖((show WithLocalSeminorm p from x) : LocalBanach p)‖ ≤ 1
+      exact (localBanach_norm_coe p (show WithLocalSeminorm p from x)).le.trans
+        (gauge_le_one_of_mem hx)
+    have hn' : ‖φ n‖ < ε := by simpa [Real.dist_eq] using hn
+    change dist 0 (φ n (i x)) < ε
+    rw [dist_zero_left]
+    exact ((φ n).le_opNorm (i x)).trans_lt
+      ((mul_le_of_le_one_right (norm_nonneg _) hiU).trans_lt hn')
+  · change Tendsto (fun n ↦ ‖(r⁻¹ • y n : G)‖) atTop (𝓝 0)
+    simpa using (hy.const_smul r⁻¹).norm
 
 end LocallyConvexOperators
 

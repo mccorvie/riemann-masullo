@@ -507,7 +507,19 @@ real coordinates in the logarithms of the chosen basis of units modulo torsion. 
 theorem regulator_coordinates_unique (g : N∞) :
     ∃! t : Fin (Units.rank F) → ℝ, ∀ w : {w : InfinitePlace F // w ≠ w₀},
       infiniteIdeleLog F g.val w.val = ∑ i, t i * Units.logEmbeddingQuot F (b i) w := by
-  sorry
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  have hB (j : Fin (Units.rank F)) : Units.logEmbeddingQuot F (b j) = B j := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  let v : logSpace F := fun w ↦ infiniteIdeleLog F g.val w.val
+  have hsum (t : Fin (Units.rank F) → ℝ) (w : {w : InfinitePlace F // w ≠ w₀}) :
+      (∑ i, t i • B i) w = ∑ i, t i * Units.logEmbeddingQuot F (b i) w := by
+    simp [Finset.sum_apply, hB]
+  refine ⟨fun i ↦ B.repr v i, fun w ↦ ?_, fun t ht ↦ ?_⟩
+  · rw [← hsum, B.sum_repr v]
+  · have hv : v = ∑ i, t i • B i := funext fun w ↦ (ht w).trans (hsum t w).symm
+    funext i
+    rw [hv, B.repr_sum_self]
 
 /-- Paper: Equation (A.2.3.9), p. 549. The regulator parallelotope is the half-open
 fundamental parallelepiped of the image of the chosen basis of units modulo torsion. -/
@@ -1222,7 +1234,19 @@ def sIdeleLog (g : 𝕀ₛ) : InfinitePlace F ⊕ S → ℝ :=
 the logarithm of the S-idelic norm. -/
 theorem sIdeleLog_sum (g : 𝕀ₛ) :
     ∑ v, sIdeleLog F S g v = Real.log ((sIdeleNorm F S g).val : ℝ) := by
-  sorry
+  have hne₁ (w : InfinitePlace F) : ‖g.val.1 w‖ ^ w.mult ≠ 0 := by
+    have hu : IsUnit (g.val.1 w) := (g.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ w)
+    exact pow_ne_zero _ (norm_ne_zero_iff.mpr hu.ne_zero)
+  have hne₂ (v : S) : ‖g.val.2 v‖ ≠ 0 := by
+    have hu : IsUnit (g.val.2 v) := (g.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)
+    exact norm_ne_zero_iff.mpr hu.ne_zero
+  have hnorm : ((sIdeleNorm F S g).val : ℝ) =
+      (∏ w : InfinitePlace F, ‖g.val.1 w‖ ^ w.mult) * ∏ v : S, ‖g.val.2 v‖ := by
+    simp [sIdeleNorm, Units.coe_prod]
+  rw [hnorm, Real.log_mul (Finset.prod_ne_zero_iff.mpr fun w _ ↦ hne₁ w)
+    (Finset.prod_ne_zero_iff.mpr fun v _ ↦ hne₂ v), Real.log_prod (fun w _ ↦ hne₁ w),
+    Real.log_prod (fun v _ ↦ hne₂ v), Fintype.sum_sum_type]
+  simp [sIdeleLog, Real.log_pow]
 
 /-- Paper: Definition A.2.4.3, p. 554. On diagonal S-units the S-logarithm vanishes
 exactly on torsion units. -/
@@ -1255,7 +1279,15 @@ def sRegulatorParallelotope : Set (InfinitePlace F ⊕ S → ℝ) :=
 hyperplane where the sum of the coordinates vanishes. -/
 theorem sRegulatorParallelotope_sum_zero (y : InfinitePlace F ⊕ S → ℝ)
     (hy : y ∈ sRegulatorParallelotope F S bₛ) : ∑ v, y v = 0 := by
-  sorry
+  obtain ⟨t, -, rfl⟩ := hy
+  have hu (u : Oₛ(F, S)ˣ) : ∑ v, sIdeleLog F S (unitAtS u) v = 0 := by
+    have h1 : sIdeleNorm F S (unitAtS u) = 1 :=
+      MonoidHom.mem_ker.mp ((sIdeleNorm_spec F S).2 ⟨u, rfl⟩)
+    rw [sIdeleLog_sum, h1]
+    simp
+  simp only [Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+  rw [Finset.sum_comm]
+  exact Finset.sum_eq_zero fun i _ ↦ by rw [← Finset.mul_sum, hu, mul_zero]
 
 /-- Paper: Definition A.2.4.3, p. 555. Along a basis logarithm the parallelotope
 includes the coefficient zero and excludes one. Any lift of the basis unit gives the same test.

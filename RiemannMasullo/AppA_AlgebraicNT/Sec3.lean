@@ -466,7 +466,131 @@ def sAdditiveCovolumeOneMeasure : Measure (SAdeleRing F S) :=
 for the additive measure normalized by the quotient. -/
 theorem sAdditiveCovolumeOneMeasure_fundamentalDomain :
     sAdditiveCovolumeOneMeasure F S
-      (sAdeleFundamentalDomain F S (RingOfIntegers.basis F)) = 1 := by sorry
+      (sAdeleFundamentalDomain F S (RingOfIntegers.basis F)) = 1 := by
+  classical
+  let G := Multiplicative (SAdeleRing F S)
+  let H := Aₛ
+  let μ : Measure G := sAdditiveCovolumeOneMeasure F S
+  let b := RingOfIntegers.basis F
+  let D : Set G := sAdeleFundamentalDomain F S b
+  let I := integralAdelesOutside F S
+  let p := adeleProjection F S
+  obtain ⟨-, hclosed, hdiscrete, -⟩ := sAdele_additive_quotient F S
+  let : DiscreteTopology H := isDiscrete_iff_discreteTopology.mp hdiscrete
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable ((S : Set (Primes(F))).integer F) := inferInstance
+  let : Countable H := (Set.countable_range dₛ).to_subtype
+  let (v : Primes(F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let (v : InfinitePlace F) : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (BorelSpace ((v : InfinitePlace F) → v.Completion))
+  let : BorelSpace G := by
+    change BorelSpace (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F))
+    infer_instance
+  obtain ⟨hμ, -, ν, hν, hmass⟩ :=
+    Classical.choose_spec (sAdditiveCovolumeOneMeasure_existsUnique F S).exists
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.map_add_left_eq_self x.toAdd }
+  obtain ⟨e, -, -, he⟩ := integralAdelesOutside_factors F S
+  have hlift (a : SAdeleRing F S) : ∃ c : I, p c.val = a :=
+    ⟨e.symm (a, 0), (he _).1.symm.trans (congrArg Prod.fst (e.apply_symm_apply _))⟩
+  have hIntegral (a : 𝔸[F]) (ha : a ∈ adeleFundamentalDomain F b) : a ∈ I := by
+    have h := ha.2
+    simp only [I, integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies] at h ⊢
+    exact fun v _ ↦ h v
+  -- On adeles integral outside S, membership in the two domains agrees under projection.
+  have hproject (a : I) : p a.val ∈ D ↔ a.val ∈ adeleFundamentalDomain F b := by
+    change (_ ∧ ∀ v : S, a.val.2 v.val ∈ v.val.adicCompletionIntegers F) ↔
+      (_ ∧ a.val ∈ integralAdelesOutside F ∅)
+    refine and_congr_right fun _ ↦ ?_
+    have houtside := a.property
+    simp only [I, integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies] at houtside ⊢
+    refine ⟨fun h v ↦ ?_, fun h v ↦ h v.val⟩
+    by_cases hv : v ∈ S
+    · exact h ⟨v, hv⟩
+    · exact houtside v hv
+  have hmeas : MeasurableSet D := by
+    have hinf : Continuous (InfiniteAdeleRing.ringEquiv_mixedSpace F) := by
+      change Continuous (fun x : InfiniteAdeleRing F ↦ InfiniteAdeleRing.ringEquiv_mixedSpace F x)
+      simp only [InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+      exact (continuous_pi fun v ↦ (isometryEquivRealOfIsReal v.2).continuous.comp
+        (continuous_apply v.1)).prodMk
+        (continuous_pi fun v ↦ (isometryEquivComplexOfIsComplex v.2).continuous.comp
+          (continuous_apply v.1))
+    have hinfMeas : MeasurableSet (infiniteAdeleFundamentalDomain F b) :=
+      (ZSpan.fundamentalDomain_measurableSet _).preimage hinf.measurable
+    have hfinMeas : MeasurableSet {x : ∀ v : S, v.val.adicCompletion F |
+        ∀ v : S, x v ∈ v.val.adicCompletionIntegers F} :=
+      MeasurableSet.univ_pi' fun _ ↦ (Valued.isClosed_integer _).measurableSet
+    exact hinfMeas.prod hfinMeas
+  have hcompact : IsCompact (closure D) := by
+    have hp : Continuous p :=
+      continuous_fst.prodMk (continuous_pi fun v ↦
+        (RestrictedProduct.continuous_eval v.val).comp continuous_snd)
+    refine ((adeleFundamentalDomain_precompact F b).image hp).closure_of_subset ?_
+    intro a ha
+    obtain ⟨c, hc⟩ := hlift a
+    exact ⟨c.val, subset_closure ((hproject c).mp (hc.symm ▸ ha)), hc⟩
+  have hcover (a : G) : ∃ h : H.op, h • a ∈ D := by
+    obtain ⟨c, hc⟩ := hlift a.toAdd
+    have hcu : c.val ∈ ⋃ x : F, algebraMap F 𝔸[F] x +ᵥ adeleFundamentalDomain F b :=
+      (adeleFundamentalDomain_cover F b).symm ▸ mem_univ _
+    obtain ⟨x, hx⟩ := Set.mem_iUnion.mp hcu
+    obtain ⟨y, hy, hxy⟩ := Set.mem_vadd_set.mp hx
+    change algebraMap F 𝔸[F] x + y = c.val at hxy
+    have hxI : algebraMap F 𝔸[F] x ∈ I := by
+      have h := I.sub_mem c.property (hIntegral y hy)
+      rwa [← hxy, add_sub_cancel_right] at h
+    let xS : (S : Set (Primes(F))).integer F :=
+      ⟨x, (diagonal_mem_integralAdelesOutside F S x).mp hxI⟩
+    let h : H := ⟨Multiplicative.ofAdd (dₛ xS), ⟨xS, rfl⟩⟩
+    have hd : Multiplicative.ofAdd (p y) * (h : G) = a := by
+      change p y + p (algebraMap F 𝔸[F] x) = a.toAdd
+      rw [add_comm, ← map_add, hxy, hc]
+    refine ⟨H.equivOp h⁻¹, ?_⟩
+    change a * (h : G)⁻¹ ∈ D
+    rw [← hd, mul_inv_cancel_right]
+    exact (hproject ⟨y, hIntegral y hy⟩).mpr hy
+  have hD : IsFundamentalDomain H.op D μ := by
+    refine IsFundamentalDomain.mk'' hmeas.nullMeasurableSet (Filter.Eventually.of_forall hcover) ?_
+      (fun h ↦ (measurePreserving_smul h μ).quasiMeasurePreserving)
+    intro h hh
+    apply Disjoint.aedisjoint
+    apply Set.disjoint_left.mpr
+    intro a ha haD
+    obtain ⟨y, hy, rfl⟩ := Set.mem_smul_set.mp ha
+    obtain ⟨x, hx⟩ := (H.equivOp.symm h).property
+    change dₛ x = (H.equivOp.symm h).val.toAdd at hx
+    have hx0 : (x : F) ≠ 0 := by
+      intro hzero
+      have : x = 0 := Subtype.ext hzero
+      subst x
+      apply hh
+      apply H.equivOp.symm.injective
+      exact Subtype.ext (by simpa using hx.symm)
+    obtain ⟨c, hc⟩ := hlift y.toAdd
+    let a₀ : I := integralAdeleDiagonal F S x + c
+    have ha₀ : p a₀.val ∈ D := by
+      change p (algebraMap F 𝔸[F] (x : F) + c.val) ∈ D
+      rw [map_add, hc, show p (algebraMap F 𝔸[F] (x : F)) = dₛ x from rfl, hx, add_comm]
+      exact haD
+    refine Set.disjoint_left.mp (adeleFundamentalDomain_disjoint F b (x : F) hx0)
+      (Set.mem_vadd_set.mpr ⟨c.val, (hproject c).mp (hc.symm ▸ hy), rfl⟩)
+      ((hproject a₀).mp ha₀)
+  exact (weilQuotientMeasure_univ_eq_measure_fundamentalDomain (μ := μ) hclosed hν
+    (hmass.trans_ne ENNReal.one_ne_top) hD hcompact hcover).symm.trans hmass
 
 /-- Paper: Definition A.3.1.2(1)–(2), p. 556. Transfer Lebesgue measure from the
 real line or twice plane Lebesgue measure from the complex line to the completion. -/

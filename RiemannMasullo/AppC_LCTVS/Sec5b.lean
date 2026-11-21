@@ -4,6 +4,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
 public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
+import Mathlib.Analysis.Calculus.FDeriv.Mul
 
 /-!
 # Holomorphic and meromorphic vector-valued functions
@@ -283,7 +284,35 @@ theorem vectorMeromorphic_inv :
     IsVectorMeromorphicOn (fun w : ℂ ↦ w⁻¹) univ {0} ∧
       HasVectorLaurentSeriesAt (fun w : ℂ ↦ w⁻¹) 0 (fun k ↦ if k = -1 then 1 else 0) ∧
       HasVectorMeromorphicOrderAt (fun w : ℂ ↦ w⁻¹) 0 (-1) ∧
-      IsVectorPoleAt (fun w : ℂ ↦ w⁻¹) 0 := by sorry
+      IsVectorPoleAt (fun w : ℂ ↦ w⁻¹) 0 := by
+  let a : ℤ → ℂ := fun k ↦ if k = -1 then 1 else 0
+  have hsum (n : ℕ) (hn : 1 ≤ n) (w : ℂ) :
+      ∑ j ∈ Finset.range n, (w - 0) ^ (-1 + (j : ℤ)) • a (-1 + (j : ℤ)) = w⁻¹ := by
+    rw [Finset.sum_eq_single 0]
+    · simp [a]
+    · intro j _ hj
+      have : (-1 + (j : ℤ)) ≠ -1 := by omega
+      simp [a, this]
+    · intro h
+      exact absurd (Finset.mem_range.mpr hn) h
+  have hL : HasVectorLaurentSeriesAt (fun w : ℂ ↦ w⁻¹) 0 a := by
+    refine ⟨-1, 1, one_pos, fun k hk ↦ ?_, fun K _ _ ↦ ?_⟩
+    · simp [a, hk.ne]
+    · intro u hu
+      filter_upwards [eventually_ge_atTop 1] with n hn x _
+      rw [hsum n hn x]
+      exact @refl_mem_uniformity ℂ (IsTopologicalAddGroup.rightUniformSpace ℂ) _ _ hu
+  have hO : HasVectorMeromorphicOrderAt (fun w : ℂ ↦ w⁻¹) 0 (-1) :=
+    ⟨a, hL, by simp [a], fun j hj ↦ by simp [a, hj.ne]⟩
+  refine ⟨⟨subset_univ _, Set.subsingleton_singleton.isDiscrete,
+    isOpen_univ.sdiff isClosed_singleton, fun w hw ↦ ?_, ?_⟩, hL, hO, ⟨-1, by norm_num, hO⟩⟩
+  · have hw0 : w ≠ 0 := hw.2
+    exact (differentiableAt_inv (𝕜 := ℂ) hw0).differentiableWithinAt
+  · rintro z rfl
+    refine ⟨1, 1, fun _ ↦ 1, one_pos, fun w hw ↦ ⟨mem_univ w, hw.2⟩,
+      differentiableOn_const 1, fun w hw ↦ ?_⟩
+    have hw0 : w ≠ 0 := hw.2
+    simp [hw0]
 
 -- TODO(paper-gap): The pairs (f, D) have no specified identification when D
 -- changes. Residue linearity below uses the common domain of the representatives.

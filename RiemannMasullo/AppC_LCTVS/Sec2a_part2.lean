@@ -1365,7 +1365,25 @@ theorem tensorDualOperator_isEmbedding {Y : Type*} [AddCommGroup Y] [Module ℂ 
 theorem tensorDualOperator_continuous_mu {X : Type*} [AddCommGroup X] [Module ℂ X]
     [UniformSpace X] [IsUniformAddGroup X] [PolynormableSpace ℂ X] [T2Space X]
     [IsTopologicalAddGroup F] [ContinuousSMul ℂ F] (z : X ⊗[ℂ] F) :
-    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by sorry
+    @Continuous _ F (completionCompactDualTopology X) _ (tensorDualOperator z) := by
+  let : TopologicalSpace (StrongDual ℂ X) := completionCompactDualTopology X
+  induction z using TensorProduct.inductionOn with
+  | tmul x y =>
+    let K : Set (Set (Completion X)) := {A | IsCompact A}
+    have hext : Continuous (fun φ : StrongDual ℂ X ↦
+        UniformOnFun.ofFun K (φ.fromCompletion : Completion X → ℂ)) := continuous_induced_dom
+    have hsingleton : ({(x : Completion X)} : Set (Completion X)) ∈ K := isCompact_singleton
+    have heval : Continuous (fun φ : StrongDual ℂ X ↦ φ x) := by
+      have h := UniformOnFun.uniformContinuous_eval_of_mem (β := ℂ) K
+        (mem_singleton (x : Completion X)) hsingleton
+      simpa only [Function.comp_def, Function.eval, UniformOnFun.toFun_ofFun,
+        ContinuousLinearMap.fromCompletion_apply_coe] using h.continuous.comp hext
+    change Continuous (fun φ : StrongDual ℂ X ↦ tensorDualOperator (x ⊗ₜ[ℂ] y) φ)
+    simp_rw [tensorDualOperator_tmul]
+    exact continuous_smul.comp (heval.prodMk continuous_const)
+  | add z w hz hw =>
+    rw [map_add, LinearMap.coe_add]
+    exact hz.add hw
 
 -- TODO(paper-gap): For incomplete E, evaluation at a point of its completion can be a
 -- μ-continuous rank-one operator outside the image of (C.2.3.5).
@@ -1399,7 +1417,29 @@ abbrev injectiveTensorNorm (E F : Type*) [NormedAddCommGroup E] [NormedSpace ℂ
 and its operator norm is the injective norm of the tensor. -/
 theorem injectiveTensorNorm_eq_opNorm (z : E ⊗[ℂ] F) :
     ∃ T : StrongDual ℂ E →L[ℂ] F, T.toLinearMap = tensorDualOperator z ∧
-      injectiveTensorNorm E F z = ‖T‖ := by sorry
+      injectiveTensorNorm E F z = ‖T‖ := by
+  let U : {U : Set E // U ∈ 𝓝 0} := ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+  let V : {V : Set F // V ∈ 𝓝 0} := ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+  have htest (r : ℝ) : injectiveTensorNorm E F z ≤ r ↔
+      ∀ (φ : StrongDual ℂ E), ‖φ‖ ≤ 1 → ∀ (ψ : StrongDual ℂ F), ‖ψ‖ ≤ 1 →
+        ‖ψ (tensorDualOperator z φ)‖ ≤ r := by
+    simpa only [U, V, NormedSpace.polar_closedBall one_pos, inv_one, mem_closedBall_zero_iff,
+      ← tensorDualOperator_eval] using injectiveTensorSeminorm_le_iff U V z r
+  have hunit (φ : StrongDual ℂ E) (hφ : ‖φ‖ ≤ 1) :
+      ‖tensorDualOperator z φ‖ ≤ injectiveTensorNorm E F z := by
+    obtain ⟨ψ, hψ, heval⟩ := exists_dual_vector'' ℂ (tensorDualOperator z φ)
+    simpa only [heval, RCLike.norm_coe_norm] using (htest _).mp le_rfl φ hφ ψ hψ
+  let T := (tensorDualOperator z).mkContinuousOfExistsBound
+    (LinearMap.bound_of_ball_bound one_pos _ _ fun φ hφ ↦ hunit φ (mem_ball_zero_iff.mp hφ).le)
+  refine ⟨T, rfl, le_antisymm ((htest _).mpr ?_) ?_⟩
+  · intro φ hφ ψ hψ
+    change ‖ψ (T φ)‖ ≤ ‖T‖
+    calc
+      ‖ψ (T φ)‖ ≤ ‖ψ‖ * ‖T φ‖ := ψ.le_opNorm _
+      _ ≤ ‖T φ‖ := mul_le_of_le_one_left (norm_nonneg _) hψ
+      _ ≤ ‖T‖ := T.unit_le_opNorm φ hφ
+  · exact ContinuousLinearMap.opNorm_le_of_unit_norm (apply_nonneg _ _)
+      fun φ hφ ↦ hunit φ hφ.le
 
 /-- Paper: Example C.2.3.4, p. 677. The unit-ball seminorm alone generates the ε-topology. -/
 theorem injectiveTensorNorm_withSeminorms :

@@ -1349,7 +1349,12 @@ the smooth submodule and of every finite-order submodule. -/
 theorem const_mem_vectorSmoothSpace (Ω : Set V) (z : E) :
     (fun _ : Ω ↦ z) ∈ vectorSmoothSpace Ω ∧
       ∀ m : ℕ, (fun _ : Ω ↦ z) ∈ vectorContDiffOrderSpace Ω m ∧
-        (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m := by sorry
+        (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m := by
+  have h3 (m : ℕ) : (fun _ : V ↦ z) ∈ vectorContDiffOrderSubmodule Ω m :=
+    vectorSmoothOn_const Ω z m
+  have h2 (m : ℕ) : (fun _ : Ω ↦ z) ∈ vectorContDiffOrderSpace Ω m :=
+    Submodule.mem_map.mpr ⟨_, h3 m, rfl⟩
+  exact ⟨Submodule.mem_iInf _ |>.mpr h2, fun m ↦ ⟨h2 m, h3 m⟩⟩
 
 -- TODO(paper-gap): C.5.1.24 is false with the global bound at order zero.
 -- On ℝ, x ↦ x² is weakly C¹ even under the recursive scalar reading, and fails order zero.
