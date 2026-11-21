@@ -1355,11 +1355,57 @@ complex dimension. -/
 theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
     Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by sorry
 
+/-- Paper: §2.1.2.2, p. 63. Each elementary Schwartz stage of the additive finite completion
+is finite-dimensional because its structural quotient is compact and discrete. -/
+private theorem finitePlace_bruhatStage_finiteDimensional (w : Places(F))
+    (a : BruhatStructuralPair (Multiplicative (w.adicCompletion F)))
+    (e : ElementaryLCAPresentation a.quotient) : FiniteDimensional ℂ (SchwartzBruhatStage e) := by
+  let : CompactSpace a.val.1 :=
+    isCompact_iff_compactSpace.mp (finitePlace_bruhatSubgroup_compact F w a)
+  let : CompactSpace a.quotient := Quotient.compactSpace
+  let : DiscreteTopology a.quotient := finitePlace_bruhatQuotient_discrete F w a e
+  let : Finite a.quotient := finite_of_compact_of_discrete
+  let : Finite (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) :=
+    Finite.of_equiv a.quotient e.equiv.toEquiv
+  change FiniteDimensional ℂ (elementarySchwartzSubmodule _ _ _ _)
+  infer_instance
+
 /-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat topology
 is the finest locally convex topology. -/
 theorem finitePlaceSchwartz_finestTopology (w : Places(F)) :
     (inferInstance : TopologicalSpace ℬ(w.adicCompletion F)) =
-      (inferInstance : TopologicalSpace (FinestLocallyConvex ℬ(w.adicCompletion F))) := by sorry
+      (inferInstance : TopologicalSpace (FinestLocallyConvex ℬ(w.adicCompletion F))) := by
+  let G := Multiplicative (w.adicCompletion F)
+  let E := SchwartzBruhat G
+  let P := {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+    ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion a e)}
+  let p : SeminormFamily ℂ (schwartzBruhatSubmodule G) P := Subtype.val
+  have hfinest := finestLocallyConvex_withSeminorms E
+  let : ContinuousSMul ℂ (FinestLocallyConvex E) := hfinest.continuousSMul
+  have hsurj : Surjective p := by
+    intro q
+    refine ⟨⟨q, ?_⟩, rfl⟩
+    intro a e
+    let : FiniteDimensional ℂ (SchwartzBruhatStage e) :=
+      finitePlace_bruhatStage_finiteDimensional F w a e
+    let : T2Space (SchwartzBruhatStage e) := elementarySchwartz_t2
+    let : ContinuousSMul ℂ (SchwartzBruhatStage e) :=
+      elementarySchwartz_withSeminorms.continuousSMul
+    let j : SchwartzBruhatStage e →ₗ[ℂ] FinestLocallyConvex E :=
+      schwartzBruhatStageInclusion a e
+    exact (hfinest.continuous_seminorm q).comp j.continuous_of_finiteDimensional
+  let t (q : Seminorm ℂ (schwartzBruhatSubmodule G)) :
+      TopologicalSpace (schwartzBruhatSubmodule G) :=
+    q.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+  let tS : TopologicalSpace (schwartzBruhatSubmodule G) :=
+    (inferInstance : TopologicalSpace E)
+  let tF : TopologicalSpace (schwartzBruhatSubmodule G) :=
+    (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  have hstage : tS = ⨅ i : P, t (p i) :=
+    (withGeneratingSeminorms_spec (schwartzBruhatSubmodule G) p).topologicalSpace_eq_iInf
+  have hall : tF = ⨅ q, t q := hfinest.topologicalSpace_eq_iInf
+  exact hstage.trans ((hsurj.iInf_comp t).trans hall.symm)
 
 /-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space is a strict
 LF-space. -/
