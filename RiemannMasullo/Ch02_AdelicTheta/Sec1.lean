@@ -2242,7 +2242,10 @@ theorem finitePlaceSchwartz_strongDual_nuclear (w : Places(F)) :
 /-- Paper: Proposition 2.1.2.4(3), p. 64. Every linear subspace of the local Schwartz–Bruhat
 space has a continuous linear retraction. -/
 theorem finitePlaceSchwartz_complemented (w : Places(F))
-    (W : Submodule ℂ ℬ(w.adicCompletion F)) : W.ClosedComplemented := by sorry
+    (W : Submodule ℂ ℬ(w.adicCompletion F)) : W.ClosedComplemented := by
+  exact (congrArg (fun t ↦ @Submodule.ClosedComplemented ℂ _ _ t _ _ W)
+    (finitePlaceSchwartz_finestTopology F w)).mpr
+    (finestLocallyConvex_submodule_closedComplemented W)
 
 -- TODO(paper-gap): Examples 2.1.2.5–6 assert that every open subset is a finite union
 -- of balls. The whole local field is open and noncompact. The assertion applies
