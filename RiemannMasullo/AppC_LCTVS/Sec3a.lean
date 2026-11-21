@@ -8,6 +8,8 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
+import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
 import Mathlib.Topology.Algebra.InfiniteSum.Module
 import Mathlib.Topology.UniformSpace.Ascoli
@@ -2256,11 +2258,173 @@ theorem mul_mem_nuclearEndomorphisms_right (A : H →L[ℂ] H) (T : nuclearEndom
   simpa only [ContinuousLinearMap.id_comp] using
     isNuclearOperator_comp_comp T.property A (ContinuousLinearMap.id ℂ H) injective_id
 
+/-- An operator and the positive square root of its Gram operator have equal pointwise norms. -/
+private theorem norm_sqrt_adjoint_mul_apply (T : H →L[ℂ] H) (x : H) :
+    ‖CFC.sqrt (T.adjoint * T) x‖ = ‖T x‖ := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : S.adjoint = S :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  have hsq : S * S = T.adjoint * T :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.isPositive_adjoint_comp_self)
+  change ‖S x‖ = ‖T x‖
+  rw [S.apply_norm_eq_sqrt_inner_adjoint_right, T.apply_norm_eq_sqrt_inner_adjoint_right, hS,
+    ← ContinuousLinearMap.mul_def, hsq, ContinuousLinearMap.mul_def]
+
+/-- Taking a second positive square root writes the trace norm as a sum of squared norms. -/
+private theorem hasSum_norm_sq_traceNorm {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) :
+    HasSum (fun i ↦ ‖CFC.sqrt (CFC.sqrt (T.val.adjoint * T.val)) (b i)‖ ^ 2) (traceNorm T) := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  let B := CFC.sqrt S
+  have hB : B.adjoint = B :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  refine (hasSum_traceNorm_diagonal b T).congr_fun fun i ↦ ?_
+  change ‖B (b i)‖ ^ 2 = (⟪b i, S (b i)⟫_ℂ).re
+  rw [B.apply_norm_sq_eq_inner_adjoint_right, hB, ← ContinuousLinearMap.mul_def,
+    CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)]
+  rfl
+
+set_option maxHeartbeats 800000 in
+/-- The real diagonal sum of a nuclear operator composed on the left by a contraction
+is bounded by its trace norm. -/
+private theorem exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) (U : H →L[ℂ] H) (hU : ‖U‖ ≤ 1) :
+    ∃ r, HasSum (fun i ↦ (⟪b i, (U * T.val) (b i)⟫_ℂ).re) r ∧ r ≤ traceNorm T := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  let B := CFC.sqrt S
+  have hB : B.adjoint = B :=
+    (ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg _)).isSelfAdjoint.adjoint_eq
+  have hsq : B * B = S := CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)
+  obtain ⟨W, hW, hWT⟩ := exists_contraction_comp_eq_of_norm_le S T.val
+    (fun x ↦ (norm_sqrt_adjoint_mul_apply T.val x).ge)
+  have hWT' : W * S = T.val := hWT
+  let A := U * W
+  have hA : ‖A‖ ≤ 1 :=
+    (norm_mul_le U W).trans ((mul_le_of_le_one_left (norm_nonneg W) hU).trans hW)
+  have hT : HasSum (fun i ↦ ‖B (b i)‖ ^ 2) (traceNorm T) := hasSum_norm_sq_traceNorm b T
+  have hfactor : A * (B * B) = U * T.val := by
+    calc
+      A * (B * B) = A * S := congrArg (A * ·) hsq
+      _ = U * (W * S) := mul_assoc U W S
+      _ = U * T.val := congrArg (U * ·) hWT'
+  clear_value A B
+  have hparseval (x : H) : HasSum (fun i ↦ ‖⟪b i, x⟫_ℂ‖ ^ 2) (‖x‖ ^ 2) := by
+    simpa [b.repr_apply_apply] using
+      (lp.hasSum_norm (p := 2) (by norm_num) (b.repr x))
+  -- Summing the squared entries of A * B by columns gives the bound for its adjoint.
+  let a (j i : ι) := ‖⟪b i, A (B (b j))⟫_ℂ‖ ^ 2
+  have hcol (j : ι) : HasSum (a j) (‖A (B (b j))‖ ^ 2) := hparseval (A (B (b j)))
+  have hbound (j : ι) : ‖A (B (b j))‖ ^ 2 ≤ ‖B (b j)‖ ^ 2 := by
+    have h := (ContinuousLinearMap.opNorm_le_iff (show (0 : ℝ) ≤ 1 by norm_num)).mp hA (B (b j))
+    exact (sq_le_sq₀ (norm_nonneg _) (norm_nonneg _)).mpr (by simpa only [one_mul] using h)
+  have ha : Summable (Function.uncurry a) := by
+    refine (summable_prod_of_nonneg (fun p ↦ sq_nonneg _)).mpr ⟨fun j ↦ (hcol j).summable, ?_⟩
+    refine hT.summable.of_nonneg_of_le (fun j ↦ tsum_nonneg fun i ↦ sq_nonneg _) (fun j ↦ ?_)
+    rw [(hcol j).tsum_eq]
+    exact hbound j
+  have hrow (i : ι) : HasSum (fun j ↦ a j i) (‖B (A.adjoint (b i))‖ ^ 2) := by
+    refine (hparseval (B (A.adjoint (b i)))).congr_fun fun j ↦ ?_
+    change ‖⟪b i, A (B (b j))⟫_ℂ‖ ^ 2 = ‖⟪b j, B (A.adjoint (b i))⟫_ℂ‖ ^ 2
+    have hentry := B.adjoint_inner_right (b j) (A.adjoint (b i))
+    rw [hB] at hentry
+    rw [hentry, A.adjoint_inner_right]
+    exact congrArg (fun r : ℝ ↦ r ^ 2) (norm_inner_symm (𝕜 := ℂ) (b i) (A (B (b j))))
+  have hrow_sum : Summable (fun i ↦ ‖B (A.adjoint (b i))‖ ^ 2) :=
+    ha.prod_symm.prod.congr fun i ↦ (hrow i).tsum_eq
+  have hrow_bound : (∑' i, ‖B (A.adjoint (b i))‖ ^ 2) ≤ traceNorm T := by
+    calc
+      _ = ∑' i, ∑' j, a j i := tsum_congr fun i ↦ (hrow i).tsum_eq.symm
+      _ = ∑' j, ∑' i, a j i := ha.tsum_comm
+      _ ≤ traceNorm T := by
+        rw [hT.tsum_eq.symm]
+        exact ha.prod.tsum_le_tsum (fun j ↦ (hcol j).tsum_eq ▸ hbound j) hT.summable
+  have hdiag := (summable_norm_hilbertDiagonal b _ (mul_mem_nuclearEndomorphisms_left U T)).of_norm
+  have hreal := Complex.reCLM.hasSum hdiag.hasSum
+  simp only [Complex.reCLM_apply] at hreal
+  refine ⟨_, hreal, (hasSum_le (fun i ↦ ?_) hreal ((hT.add hrow_sum.hasSum).div_const 2)).trans ?_⟩
+  · rw [← hfactor]
+    change (⟪b i, A (B (B (b i)))⟫_ℂ).re ≤ _
+    rw [← A.adjoint_inner_left, ← B.adjoint_inner_left, hB]
+    exact (Complex.re_le_norm _).trans ((norm_inner_le_norm _ _).trans (by
+      nlinarith [sq_nonneg (‖B (b i)‖ - ‖B (A.adjoint (b i))‖)]))
+  · linarith
+
+/-- The positive square root of the Gram operator scales by the absolute value of the scalar. -/
+private theorem sqrt_adjoint_mul_smul (c : ℂ) (T : H →L[ℂ] H) :
+    CFC.sqrt ((c • T).adjoint * (c • T)) = ‖c‖ • CFC.sqrt (T.adjoint * T) := by
+  apply CFC.sqrt_unique
+  · have hT : 0 ≤ T.adjoint * T :=
+      ContinuousLinearMap.nonneg_iff_isPositive.mpr T.isPositive_adjoint_comp_self
+    rw [smul_mul_smul_comm, ← pow_two, CFC.sqrt_mul_sqrt_self _ hT]
+    change ‖c‖ ^ 2 • (T.adjoint * T) = star (c • T) * (c • T)
+    rw [star_smul, smul_mul_smul_comm, ← Complex.coe_smul, ← Complex.normSq_eq_norm_sq,
+      mul_comm]
+    change (Complex.normSq c : ℂ) • (T.adjoint * T) =
+      (c * (starRingEnd ℂ) c) • (T.adjoint * T)
+    rw [Complex.mul_conj]
+  · exact smul_nonneg (norm_nonneg _) (CFC.sqrt_nonneg _)
+
 /-- Paper: Lemma C.3.4.4(1), p. 698. The trace norm satisfies the normed-space
 axioms on the complex vector space of nuclear endomorphisms. -/
 theorem traceNorm_normedSpaceCore :
     letI : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
-    NormedSpace.Core ℂ (nuclearEndomorphisms H) := by sorry
+    NormedSpace.Core ℂ (nuclearEndomorphisms H) := by
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  refine ⟨⟨?_, ?_, ?_⟩, ?_⟩
+  · intro T
+    change 0 ≤ traceNorm T
+    rw [← (hasSum_norm_sq_traceNorm b T).tsum_eq]
+    exact tsum_nonneg fun i ↦ sq_nonneg _
+  · intro c T
+    change traceNorm (c • T) = ‖c‖ * traceNorm T
+    refine (hasSum_traceNorm_diagonal b (c • T)).unique
+      (((hasSum_traceNorm_diagonal b T).mul_left ‖c‖).congr_fun fun i ↦ ?_)
+    change (⟪b i, CFC.sqrt ((c • T.val).adjoint * (c • T.val)) (b i)⟫_ℂ).re =
+      ‖c‖ * (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re
+    rw [sqrt_adjoint_mul_smul]
+    simp only [smul_apply, ← Complex.coe_smul, inner_smul_right,
+      Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero]
+  · intro T D
+    change traceNorm (T + D) ≤ traceNorm T + traceNorm D
+    let X := T + D
+    let S := CFC.sqrt (X.val.adjoint * X.val)
+    obtain ⟨U, hU, hUX⟩ := exists_contraction_comp_eq_of_norm_le X.val S
+      (fun x ↦ (norm_sqrt_adjoint_mul_apply X.val x).le)
+    have hUX' : U * (T.val + D.val) = S := hUX
+    obtain ⟨r, hr, hrle⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b T U hU
+    obtain ⟨s, hs, hsle⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b D U hU
+    have hsum : HasSum (fun i ↦ (⟪b i, S (b i)⟫_ℂ).re) (r + s) := by
+      refine (hr.add hs).congr_fun fun i ↦ ?_
+      rw [← hUX', mul_add, add_apply, inner_add_right, Complex.add_re]
+    rw [(hasSum_traceNorm_diagonal b X).unique hsum]
+    exact add_le_add hrle hsle
+  · intro T
+    change traceNorm T = 0 ↔ T = 0
+    constructor
+    · intro hz
+      let S := CFC.sqrt (T.val.adjoint * T.val)
+      let B := CFC.sqrt S
+      have hsum : HasSum (fun i ↦ ‖B (b i)‖ ^ 2) 0 := hz ▸ hasSum_norm_sq_traceNorm b T
+      have hb (i) : B (b i) = 0 := by
+        have hi := hsum.summable.le_tsum i (fun j _ ↦ sq_nonneg _)
+        rw [hsum.tsum_eq] at hi
+        exact norm_eq_zero.mp (by nlinarith [norm_nonneg (B (b i))])
+      have hzero (x : H) : B x = 0 := by
+        have h := B.hasSum (b.hasSum_repr x)
+        simpa only [map_smul, hb, smul_zero, tsum_zero] using h.tsum_eq.symm
+      apply Subtype.ext
+      ext x
+      change T.val x = 0
+      apply norm_eq_zero.mp
+      rw [← norm_sqrt_adjoint_mul_apply]
+      change ‖S x‖ = 0
+      rw [show S = B * B from (CFC.sqrt_mul_sqrt_self _ (CFC.sqrt_nonneg _)).symm]
+      exact norm_eq_zero.mpr (hzero _)
+    · rintro rfl
+      exact (hasSum_traceNorm_diagonal b (0 : nuclearEndomorphisms H)).unique (by
+        simp [CFC.sqrt_zero])
 
 -- TODO(paper-gap): The equality in (C.3.4.3) is false. For A = diag(1, 0) and
 -- T swapping the first coordinate into the second and killing the second, AT = 0
@@ -2270,17 +2434,121 @@ theorem traceNorm_normedSpaceCore :
 most the operator norm of the left factor times the trace norm of the right factor.
 Deviation: The invalid equality in (C.3.4.3) is recorded above. -/
 theorem traceNorm_mul_left_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    traceNorm ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ ≤ ‖A‖ * traceNorm T := by sorry
+    traceNorm ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ ≤ ‖A‖ * traceNorm T := by
+  let S : H →L[ℂ] H := (‖A‖ : ℂ) • T.val
+  have hGram : (A * T.val).adjoint * (A * T.val) ≤ S.adjoint * S := by
+    apply (ContinuousLinearMap.norm_map_le_norm_map_iff_le (A * T.val) S).mp
+    intro x
+    simpa [S, norm_smul, Complex.norm_real, abs_of_nonneg (norm_nonneg A)] using
+      A.le_opNorm (T.val x)
+  have hAbs : CFC.abs (A * T.val) ≤ ‖A‖ • CFC.abs T.val := by
+    have h := CFC.sqrt_le_sqrt _ _ hGram
+    change CFC.abs (A * T.val) ≤ CFC.abs S at h
+    simpa [S, CFC.abs_smul, Complex.norm_real, abs_of_nonneg (norm_nonneg A)] using h
+  obtain ⟨ι, b, -⟩ := exists_hilbertBasis (𝕜 := ℂ) (E := H)
+  refine hasSum_le (fun i ↦ ?_) (hasSum_traceNorm_diagonal b
+    ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩)
+    ((hasSum_traceNorm_diagonal b T).mul_left ‖A‖)
+  have h := (ContinuousLinearMap.le_def.mp hAbs).re_inner_nonneg_right (b i)
+  simpa [CFC.abs, ContinuousLinearMap.star_eq_adjoint, inner_sub_right,
+    inner_smul_right_eq_smul, sub_nonneg] using h
+
+/-- Moving a bounded factor across a nuclear factor preserves the real diagonal sum. -/
+private theorem tsum_re_hilbertDiagonal_mul_comm {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : nuclearEndomorphisms H) (A : H →L[ℂ] H) :
+    (∑' i, (⟪b i, (T.val * A) (b i)⟫_ℂ).re) =
+      ∑' i, (⟪b i, (A * T.val) (b i)⟫_ℂ).re := by
+  obtain ⟨a, φ, y, ha, hφ, hy, hseries⟩ :=
+    (isNuclearOperator_iff_isBanachNuclear T.val).mp T.property
+  have hcost (f : ℕ → H →L[ℂ] ℂ) (z : ℕ → H)
+      (hf : Tendsto f atTop (𝓝 0)) (hz : Tendsto z atTop (𝓝 0)) :
+      Summable (fun n ↦ ‖a n‖ * (‖f n‖ * ‖z n‖)) := by
+    obtain ⟨C, hC, hfC⟩ := (Metric.isBounded_range_of_tendsto f hf).exists_pos_norm_le
+    obtain ⟨R, _, hzR⟩ := (Metric.isBounded_range_of_tendsto z hz).exists_pos_norm_le
+    refine (ha.mul_right (C * R)).of_nonneg_of_le (fun n ↦ by positivity) fun n ↦ ?_
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hfC _ (mem_range_self n)) (hzR _ (mem_range_self n))
+        (norm_nonneg _) hC.le) (norm_nonneg _)
+  let precomp := (ContinuousLinearMap.compL ℂ H H ℂ).flip A
+  have hφA : Tendsto (fun n ↦ (φ n).comp A) atTop (𝓝 0) := by
+    change Tendsto (⇑precomp ∘ φ) atTop (𝓝 0)
+    simpa only [map_zero] using (precomp.continuous.tendsto 0).comp hφ
+  have hyA : Tendsto (A ∘ y) atTop (𝓝 0) := by
+    simpa only [map_zero] using (A.continuous.tendsto 0).comp hy
+  have hright := tsum_hilbertDiagonal_eq_series b (T.val * A) a
+    (fun n ↦ (φ n).comp A) y (hcost _ _ hφA hy) (fun x ↦ hseries (A x))
+  have hleft := tsum_hilbertDiagonal_eq_series b (A * T.val) a
+    φ (A ∘ y) (hcost _ _ hφ hyA) (fun x ↦ by
+      simpa only [map_smul, Function.comp_apply, mul_apply_eq_comp,
+        ContinuousLinearMap.comp_apply] using A.hasSum (hseries x))
+  have h₁ := (summable_norm_hilbertDiagonal b _ (mul_mem_nuclearEndomorphisms_right A T)).of_norm
+  have h₂ := (summable_norm_hilbertDiagonal b _ (mul_mem_nuclearEndomorphisms_left A T)).of_norm
+  change (∑' i, Complex.reCLM ⟪b i, (T.val * A) (b i)⟫_ℂ) =
+    ∑' i, Complex.reCLM ⟪b i, (A * T.val) (b i)⟫_ℂ
+  rw [← Complex.reCLM.map_tsum h₁, ← Complex.reCLM.map_tsum h₂, hright, hleft]
+  rfl
 
 /-- Paper: Lemma C.3.4.4(2), p. 698. The trace norm of a right product is at
 most the operator norm of the right factor times the trace norm of the left factor.
 Deviation: The invalid equality in (C.3.4.3) is recorded above. -/
 theorem traceNorm_mul_right_le (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
-    traceNorm ⟨T.val * A, mul_mem_nuclearEndomorphisms_right A T⟩ ≤ ‖A‖ * traceNorm T := by sorry
+    traceNorm ⟨T.val * A, mul_mem_nuclearEndomorphisms_right A T⟩ ≤ ‖A‖ * traceNorm T := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  let X : nuclearEndomorphisms H := ⟨T.val * A, mul_mem_nuclearEndomorphisms_right A T⟩
+  change traceNorm X ≤ ‖A‖ * traceNorm T
+  let S := CFC.sqrt (X.val.adjoint * X.val)
+  have hS := hasSum_traceNorm_diagonal b X
+  change HasSum (fun i ↦ (⟪b i, S (b i)⟫_ℂ).re) (traceNorm X) at hS
+  by_cases hA : A = 0
+  · have hX : X.val = 0 := by simp [X, hA]
+    have hS₀ : S = 0 := by simp [S, hX, CFC.sqrt_zero]
+    rw [hS₀] at hS
+    simp only [hA, norm_zero, zero_mul, zero_apply, inner_zero_right, Complex.zero_re] at hS ⊢
+    exact (hS.unique hasSum_zero).le
+  obtain ⟨U, hU, hUX⟩ := exists_contraction_comp_eq_of_norm_le X.val S
+    (fun x ↦ (norm_sqrt_adjoint_mul_apply X.val x).le)
+  let Y : nuclearEndomorphisms H := ⟨U * T.val, mul_mem_nuclearEndomorphisms_left U T⟩
+  have hSY : Y.val * A = S := by
+    change U * T.val * A = S
+    rw [mul_assoc]
+    exact hUX
+  let V : H →L[ℂ] H := ‖A‖⁻¹ • (A * U)
+  have hV : ‖V‖ ≤ 1 := by
+    rw [norm_smul, norm_inv, Real.norm_of_nonneg (norm_nonneg A),
+      inv_mul_le_one₀ (norm_pos_iff.mpr hA)]
+    exact (norm_mul_le A U).trans (mul_le_of_le_one_right (norm_nonneg A) hU)
+  have hY : A * Y.val = ‖A‖ • (V * T.val) := by
+    change A * (U * T.val) = ‖A‖ • ((‖A‖⁻¹ • (A * U)) * T.val)
+    rw [← mul_assoc, smul_mul_assoc, smul_smul,
+      mul_inv_cancel₀ (norm_ne_zero_iff.mpr hA), one_smul]
+  obtain ⟨r, hr, hrle⟩ := exists_hasSum_re_hilbertDiagonal_mul_le_traceNorm b T V hV
+  have hsum : HasSum (fun i ↦ (⟪b i, (A * Y.val) (b i)⟫_ℂ).re) (‖A‖ * r) := by
+    refine (hr.mul_left ‖A‖).congr_fun fun i ↦ ?_
+    simp only [hY, smul_apply, ← Complex.coe_smul, inner_smul_right, Complex.mul_re,
+      Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero]
+  rw [← hS.tsum_eq, ← hSY, tsum_re_hilbertDiagonal_mul_comm b Y A, hsum.tsum_eq]
+  exact mul_le_mul_of_nonneg_left hrle (norm_nonneg A)
 
 /-- Paper: Lemma C.3.4.4(3), p. 698. The trace is complex linear. -/
 theorem hilbertTrace_linear :
-    ∃ f : nuclearEndomorphisms H →ₗ[ℂ] ℂ, ∀ T, f T = hilbertTrace T := by sorry
+    ∃ f : nuclearEndomorphisms H →ₗ[ℂ] ℂ, ∀ T, f T = hilbertTrace T := by
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hs (T : nuclearEndomorphisms H) :
+      Summable (fun i ↦ ⟪b i, T.val (b i)⟫_ℂ) :=
+    (summable_norm_hilbertDiagonal b T.val T.property).of_norm
+  refine ⟨{ toFun := hilbertTrace
+            map_add' := ?_
+            map_smul' := ?_ }, fun _ ↦ rfl⟩
+  · intro T S
+    change (∑' i, ⟪b i, (T.val + S.val) (b i)⟫_ℂ) =
+      (∑' i, ⟪b i, T.val (b i)⟫_ℂ) + ∑' i, ⟪b i, S.val (b i)⟫_ℂ
+    simp only [add_apply, inner_add_right]
+    exact (hs T).tsum_add (hs S)
+  · intro c T
+    change (∑' i, ⟪b i, (c • T.val) (b i)⟫_ℂ) =
+      c • ∑' i, ⟪b i, T.val (b i)⟫_ℂ
+    simp only [smul_apply, inner_smul_right, smul_eq_mul]
+    exact (hs T).tsum_mul_left c
 
 /-- Paper: Lemma C.3.4.4(3), p. 698. The modulus of the trace is bounded by
 the trace norm, which gives continuity for the trace norm. -/

@@ -4,6 +4,8 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1d
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 public import Mathlib.Topology.MetricSpace.ProperSpace.Real
 import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Extend
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Compact
 
 /-! # Schwartz–Bruhat isotypes and coarser topologies -/
 
@@ -111,13 +113,13 @@ private theorem continuous_schwartzBruhat_eval (x : G) : Continuous (fun f : S �
   exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
     (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
 
-/-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
-as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
-theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
-    ∃! P : S →L[ℂ] S, ∀ (f : S) (x : G),
-      P f x = (μ₁.real univ)⁻¹ •
-        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
-  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+omit hm in
+/-- On a compact kernel the character-twisted orbits admit a continuous
+Schwartz–Bruhat Pettis average. -/
+private theorem exists_schwartzBruhatPettisIsotypicAverage (hcompact : CompactSpace K)
+    (ω : PontryaginDual K) :
+    ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ ρS ω A := by
+  have : CompactSpace K := hcompact
   have : ContinuousSMul ℂ S := (withGeneratingSeminorms_spec _ _).continuousSMul
   have : LocallyConvexSpace ℝ S := (withGeneratingSeminorms_spec _ _).toLocallyConvexSpace
   have : T2Space S := T2Space.of_injective_continuous
@@ -144,9 +146,18 @@ theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
     rw [nhdsWithin_univ] at hW
     filter_upwards [hu.eventually hW] with n hn k
     exact h (u n) hn k (mem_univ k)
-  have hex : ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ τ ω A :=
-    (existsUnique_compactActionIsotypicAverage (E := S) μ₁ τ hτ
-      schwartzBruhat_bornological (hseq (fun k f ↦ τ k f) hτ) ω).exists
+  exact (existsUnique_compactActionIsotypicAverage (E := S) μ₁ τ hτ
+    schwartzBruhat_bornological (hseq (fun k f ↦ τ k f) hτ) ω).exists
+
+/-- Paper: (D.2.1.1), pp. 792–793. The normalized character average exists
+as a continuous linear endomorphism of the Schwartz–Bruhat space. -/
+theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
+    ∃! P : S →L[ℂ] S, ∀ (f : S) (x : G),
+      P f x = (μ₁.real univ)⁻¹ •
+        ∫ k : K, star (ω k : ℂ) * f ((k : G)⁻¹ * x) ∂μ₁ := by
+  have hcompact : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have hex : ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ ρS ω A :=
+    exists_schwartzBruhatPettisIsotypicAverage (G := G) m μ₁ hcompact ω
   obtain ⟨A, hA⟩ := hex
   let P : S →L[ℂ] S := (μ₁.real univ)⁻¹ • A
   have hP (f : S) (x : G) :
@@ -156,15 +167,15 @@ theorem existsUnique_schwartzBruhatIsotypicProjector (ω : PontryaginDual K) :
       ⟨(LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype,
         continuous_schwartzBruhat_eval x⟩
     have hIntegral : HasPettisIntegral (.positive (μ₁.restrict univ))
-        (fun k : K ↦ star (ω k : ℂ) • τ k f) (A f) := hA f
+        (fun k : K ↦ star (ω k : ℂ) • ρS k f) (A f) := hA f
     unfold HasPettisIntegral at hIntegral
     obtain ⟨_, h⟩ := hIntegral
     have he := congrArg (fun z : PettisWeakCompletion S ↦
       (show Module.Dual ℂ (StrongDual ℂ S) from z) ev) h
-    let F : K → ℂ := fun k ↦ star (ω k : ℂ) * (τ k f) x
+    let F : K → ℂ := fun k ↦ star (ω k : ℂ) * (ρS k f) x
     change A f x = ∫ k, F k ∂(μ₁.restrict univ) at he
-    have hpointwise (k : K) : (τ k f) x = f ((k : G)⁻¹ * x) :=
-      congrArg (fun g : S ↦ g x) (hρ k f)
+    have hpointwise (k : K) : (ρS k f) x = f ((k : G)⁻¹ * x) :=
+      schwartzBruhatTranslationAction_apply (k : G) x f
     have hscalar := calc
       A f x = ∫ k, F k ∂(μ₁.restrict univ) := he
       _ = ∫ k, F k ∂μ₁ :=
@@ -465,12 +476,98 @@ theorem schwartzBruhatIsotype_quotient_map_dense (hd : DenseRange i)
   rw [h]
   exact Q.ker.mkQ_surjective.denseRange.comp hd Q.ker.continuous_mkQ
 
+omit hE hρ heq hi hcomm hQ in
+/-- Equivariant injections with dense range remain dense on the isotypes when the
+compact-group averages exist. For infinite Haar measure, weak integrability
+of the twisted target orbits forces the target isotype to vanish. -/
+private theorem denseRange_isotype_of_pettisAverage
+    {H X Y : Type*} [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H]
+    [T2Space H] [MeasurableSpace H] [BorelSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [T2Space Y] [ContinuousSMul ℂ Y] [LocallyConvexSpace ℝ Y]
+    (μ : Measure H) [μ.IsHaarMeasure] (ω : PontryaginDual H)
+    (σ : H →* (X →L[ℂ] X)) (τ : H →* (Y →L[ℂ] Y))
+    (hτ : Continuous (fun p : H × Y ↦ τ p.1 p.2))
+    (B : Y →L[ℂ] Y) (hB : IsPettisIsotypicAverageOn μ univ τ ω B)
+    (hcompact : IsFiniteMeasure μ → CompactSpace H)
+    (havg : CompactSpace H → ∃ A : X →L[ℂ] X, IsPettisIsotypicAverageOn μ univ σ ω A)
+    (i : X →L[ℂ] Y) (hi : Injective i) (hiστ : ∀ (k : H) (f : X), i (σ k f) = τ k (i f))
+    (hd : DenseRange i) (j : actionIsotype σ ω →L[ℂ] actionIsotype τ ω)
+    (hj : ∀ f, (j f : Y) = i (f : X)) : DenseRange j := by
+  have : SeparatingDual ℂ Y := locallyConvexSpace_separatingDual ℂ Y
+  by_cases hfinite : IsFiniteMeasure μ
+  · have : CompactSpace H := hcompact hfinite
+    have hrangeB := compactActionAverage_range μ τ hτ ω B hB
+    obtain ⟨A, hA⟩ := havg (inferInstance : CompactSpace H)
+    let B' := B.codRestrict (actionIsotype τ ω) (by
+      intro u
+      rw [← hrangeB]
+      exact ⟨u, rfl⟩)
+    have hsurj : Surjective B' := by
+      intro u
+      have hu : (u : Y) ∈ B.toLinearMap.range := hrangeB.symm ▸ u.property
+      obtain ⟨v, hv⟩ := hu
+      exact ⟨v, Subtype.ext hv⟩
+    have havgComm (f : X) : i (A f) = B (i f) := by
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+      intro φ
+      obtain ⟨_, hs⟩ := hA f
+      obtain ⟨_, ht⟩ := hB (i f)
+      have hs' := LinearMap.congr_fun hs (φ.comp i)
+      have ht' := LinearMap.congr_fun ht φ
+      change φ (i (A f)) = ∫ k : H, φ (i (star (ω k : ℂ) • σ k f))
+        ∂(μ.restrict univ) at hs'
+      change φ (B (i f)) = ∫ k : H, φ (star (ω k : ℂ) • τ k (i f))
+        ∂(μ.restrict univ) at ht'
+      have horbit (k : H) : i (σ k f) = τ k (i f) := hiστ k f
+      simpa only [map_smul i, horbit, ← ht'] using hs'
+    let A' := A.codRestrict (actionIsotype σ ω) (by
+      intro f
+      apply (mem_actionIsotype σ ω (A f)).2
+      intro k
+      apply hi
+      rw [hiστ, map_smul, havgComm]
+      exact ((mem_actionIsotype τ ω _).1 (B' (i f)).property) k)
+    have hcomp : (j : _ → _) ∘ A' = (B' : _ → _) ∘ i :=
+      funext fun f ↦ Subtype.ext ((hj (A' f)).trans (havgComm f))
+    apply DenseRange.of_comp (g := A')
+    rw [hcomp]
+    exact hsurj.denseRange.comp hd B'.continuous
+  · have hzero (u : actionIsotype τ ω) : u = 0 := by
+      apply Subtype.ext
+      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+      intro φ
+      have hint := (hB (u : Y)).choose φ
+      change Integrable (fun k : H ↦ φ (star (ω k : ℂ) • τ k (u : Y)))
+        (μ.restrict univ) at hint
+      rw [Measure.restrict_univ] at hint
+      have horbit := (mem_actionIsotype τ ω (u : Y)).mp u.property
+      have hconst : Integrable (fun _ : H ↦ φ (u : Y)) μ := by
+        simpa [horbit, smul_smul, ← Circle.coe_inv_eq_conj] using hint
+      simpa only [Submodule.coe_zero, map_zero] using
+        (integrable_const_iff.mp hconst).resolve_right hfinite
+    exact (show Surjective j from fun u ↦ ⟨0, (j.map_zero).trans (hzero u).symm⟩).denseRange
+
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic subspaces. -/
 theorem schwartzBruhatIsotype_subspace_map_dense (hd : DenseRange i)
     (j : actionIsotype ρS ω →L[ℂ] actionIsotype ρE ω)
     (hj : ∀ f, (j f : E) = i (f : S)) :
-    DenseRange j := by sorry
+    DenseRange j := by
+  have hρK : Continuous (fun p : K × E ↦ ρE p.1 p.2) :=
+    hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hcompact : IsFiniteMeasure μ₁ → CompactSpace K := by
+    intro hfinite
+    have hclosed : IsClosed (K : Set G) := isClosed_singleton.preimage m.continuous
+    have : LocallyCompactSpace K := hclosed.locallyCompactSpace
+    have : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+    exact compactSpace_of_isFiniteMeasure_haar μ₁
+  have havg : CompactSpace K → ∃ A : S →L[ℂ] S, IsPettisIsotypicAverageOn μ₁ univ ρS ω A :=
+    fun hc ↦ exists_schwartzBruhatPettisIsotypicAverage (G := G) m μ₁ hc ω
+  have hintertwines (k : K) (f : S) : i (ρS k f) = ρE k (i f) := hcomm (k : G) f
+  exact denseRange_isotype_of_pettisAverage (H := K) (X := S) (Y := E) μ₁ ω ρS ρE hρK
+    (μ₁.real univ • Q) hQ hcompact havg i hi hintertwines hd j hj
 
 omit hQ hρ heq hcomm in
 /-- Paper: Lemma D.2.2.1(4), p. 795. An endomorphism continuous

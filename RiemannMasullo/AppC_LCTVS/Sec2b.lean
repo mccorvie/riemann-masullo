@@ -7,6 +7,7 @@ public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
 import Mathlib.Analysis.Normed.Module.Dual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.Hilbert
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
@@ -3787,7 +3788,93 @@ theorem dense_finiteRank_iff_forall_sources :
 /-- Paper: Lemma C.2.4.16(1), p. 690. A bounded set in a nuclear space has
 compact closure in the completion. -/
 theorem isPrecompactInCompletion_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
-    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by sorry
+    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by
+  classical
+  apply (isPrecompactInCompletion_iff_totallyBounded S).mpr
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero.totallyBounded_iff.mpr ?_
+  intro q hq
+  let U := q.ball 0 1
+  have hU : U ∈ 𝓝 (0 : E) := q.ball_mem_nhds hq one_pos
+  have bU : Balanced ℂ U := q.balanced_ball_zero 1
+  have cU : Convex ℝ U := q.convex_ball 0 1
+  obtain ⟨V, hV, bV, cV, hVU, C, hC, hsum⟩ :=
+    exists_localBanachMap_absolutelySumming E hE U hU bU cU
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  let q' := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  let T := localBanachMap p q' (gauge_mono (absorbent_nhds_zero hV) hVU)
+  have hq' : q' = q := DFunLike.coe_injective (q.restrictScalars ℝ).gauge_ball
+  have hp : Continuous p := continuous_gauge cV hV
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion p hp
+  obtain ⟨H, _, _, _, a, D, hD, ha⟩ := exists_hilbert_domination hE p hp
+  -- Extend the map into the source local Banach space across the Hilbert closure.
+  let R := LinearMap.range a.toLinearMap
+  let a' : E →L[ℂ] R.topologicalClosure :=
+    a.codRestrict _ fun x ↦ R.le_topologicalClosure ⟨x, rfl⟩
+  let : CompleteSpace R.topologicalClosure := R.isClosed_topologicalClosure.completeSpace_coe
+  have hd : DenseRange a' := by
+    change DenseRange (Set.inclusion (s := (R : Set H))
+      (R.le_topologicalClosure : (R : Set H) ⊆ R.topologicalClosure) ∘ Set.rangeFactorization a)
+    exact ((denseRange_inclusion_iff _).mpr subset_rfl).comp
+      Set.rangeFactorization_surjective.denseRange (continuous_inclusion _)
+  have hj' (x : E) : ‖j x‖ ≤ D * ‖a' x‖ := by
+    rw [hj, localBanach_norm_coe]
+    exact ha x
+  let A := j.toLinearMap.extendOfNorm a'.toLinearMap
+  have hA (x : E) : A (a' x) = j x := LinearMap.extendOfNorm_eq hd ⟨D, hj'⟩ x
+  have hAnorm : ‖A‖ ≤ D := LinearMap.opNorm_extendOfNorm_le hd hD hj'
+  -- Absolute summability is preserved by precomposition with the extended map.
+  let K := T.comp A
+  have hK : IsCompactOperator K := by
+    apply isCompactOperator_of_hilbert_absolutelySumming K (C := C * (D + 1)) (by positivity)
+    intro n x M hM hx
+    have hpos : 0 < D + 1 := by positivity
+    have hweak (φ : LocalBanach p →L[ℂ] ℂ) (hφ : ‖φ‖ ≤ 1) :
+        ∑ i, ‖φ (A (x i))‖ ≤ (D + 1) * M := by
+      let r : ℂ := ((D + 1 : ℝ) : ℂ)
+      have hr : ‖r‖ = D + 1 := Complex.norm_of_nonneg hpos.le
+      let ψ := r⁻¹ • φ.comp A
+      have hψ : ‖ψ‖ ≤ 1 := by
+        rw [norm_smul, norm_inv, hr, inv_mul_le_iff₀ hpos, mul_one]
+        exact (φ.opNorm_comp_le A).trans
+          ((mul_le_of_le_one_left (norm_nonneg A) hφ).trans (by linarith))
+      have hψi (i : Fin n) : ‖ψ (x i)‖ = (D + 1)⁻¹ * ‖φ (A (x i))‖ := by
+        simp only [ψ, smul_apply, norm_smul, norm_inv, hr,
+          ContinuousLinearMap.comp_apply]
+      have h := hx ψ hψ
+      rw [Finset.sum_congr rfl (fun i _ ↦ hψi i), ← Finset.mul_sum] at h
+      exact (inv_mul_le_iff₀ hpos).mp h
+    simpa only [K, ContinuousLinearMap.comp_apply, mul_assoc] using
+      hsum n (fun i ↦ A (x i)) ((D + 1) * M) (mul_nonneg hpos.le hM) hweak
+  let J : E → LocalBanach q' := fun x ↦ (show WithLocalSeminorm q' from x)
+  have hJ : J = K ∘ a' := by
+    funext x
+    change J x = T (A (a' x))
+    rw [hA, hj]
+    exact (localBanachMap_coe p q' _ (show WithLocalSeminorm p from x)).symm
+  have htotal : TotallyBounded (J '' S) := by
+    rw [hJ, Set.image_comp]
+    obtain ⟨B, hB, hsub⟩ := hK.image_subset_compact_of_isVonNBounded
+      (f := K.toLinearMap) (hS.image a')
+    exact hB.totallyBounded.subset hsub
+  -- Lift the centers of a finite net back to the bounded set.
+  obtain ⟨s, hs, hsf, hcover⟩ := htotal.exists_subset (Metric.dist_mem_uniformity one_pos)
+  have hpre (y : s) : ∃ x : E, x ∈ S ∧ J x = y := hs y.property
+  choose g hg using hpre
+  let : Finite s := hsf.to_subtype
+  refine ⟨range g, finite_range g, fun x hx ↦ ?_⟩
+  obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover (mem_image_of_mem J hx))
+  refine mem_iUnion₂.mpr ⟨g ⟨y, hy⟩, mem_range_self _, ?_⟩
+  change dist (J x) y < 1 at hxy
+  have hy' : J (g ⟨y, hy⟩) = y := (hg ⟨y, hy⟩).2
+  rw [← hy', dist_comm, dist_eq_norm] at hxy
+  change g ⟨y, hy⟩ - x ∈ U
+  apply q.mem_ball_zero.mpr
+  rw [← hq']
+  let x' : WithLocalSeminorm q' := x
+  let y' : WithLocalSeminorm q' := g ⟨y, hy⟩
+  change q' (y' - x') < 1
+  rw [← localBanach_norm_coe q' (y' - x'), Completion.coe_sub]
+  exact hxy
 
 /-- Paper: Lemma C.2.4.16(1), p. 690. For a nuclear source, uniform convergence
 on bounded sets and on precompact sets give the same topology on the operator space. -/

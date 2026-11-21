@@ -1879,11 +1879,6 @@ theorem mem_finitePlaceSchwartz_iff (w : Places(F)) (f : w.adicCompletion F → 
 -- does not characterize the finest locally convex topology. The weak topology
 -- also makes all those functionals continuous.
 
-/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
-complex dimension. -/
-theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
-    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by sorry
-
 /-- Paper: §2.1.2.2, p. 63. Each elementary Schwartz stage of the additive finite completion
 is finite-dimensional because its structural quotient is compact and discrete. -/
 private theorem finitePlace_bruhatStage_finiteDimensional (w : Places(F))
@@ -2010,6 +2005,15 @@ private theorem finitePlaceSchwartz_countableSpanningSet (w : Places(F)) :
   exact Submodule.sum_mem _ fun a _ ↦ Submodule.smul_mem _ _
     (Submodule.subset_span (mem_range_self (U a)))
 
+/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
+complex dimension. -/
+theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
+    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by
+  change Module.rank ℂ ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F))) ≤ ℵ₀
+  obtain ⟨s, hs, hspan⟩ := finitePlaceSchwartz_countableSpanningSet F w
+  rw [← rank_top ℂ _, ← hspan]
+  exact (rank_span_le s).trans (Cardinal.mk_le_aleph0_iff.mpr hs.to_subtype)
+
 /-- Finite spans of a countable generating set give a strict LF presentation
 for the finest locally convex topology. -/
 private theorem finestLocallyConvex_strictLF_of_countable_span
@@ -2063,18 +2067,84 @@ theorem finitePlaceSchwartz_strictLF (w : Places(F)) :
   exact (finitePlaceSchwartz_countableSpanningSet F w).elim fun s hs ↦
     finestLocallyConvex_strictLF_of_countable_span E hs.1 hs.2
 
+/-- A strict LF presentation gives completeness for the compatible additive uniformity. -/
+private theorem completeSpace_of_strictLF {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] (h : IsStrictLFSpace E) : CompleteSpace E := by
+  obtain ⟨_, S, hmono, hFrechet, hcover, htop⟩ := h
+  choose hadd hpoly hmetr hcomplete using hFrechet
+  let := hadd
+  let := hpoly
+  let := hmetr
+  let : ∀ n, T2Space (S n) := fun _ ↦ inferInstance
+  let j (n : ℕ) : S n →L[ℂ] S (n + 1) :=
+    (S n).subtypeL.codRestrict (S (n + 1)) fun x ↦ hmono n.le_succ x.property
+  have hlim : IsInjectiveLCLimit j (fun n ↦ (S n).subtypeL) := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ ?_, htop⟩
+    obtain ⟨n, hn⟩ := hcover x
+    exact ⟨n, ⟨⟨x, hn⟩, rfl⟩⟩
+  rw [← IsUniformAddGroup.rightUniformSpace_eq (G := E)]
+  exact (strictLCLimit_complete_nonmetrizable hcomplete hlim fun n ↦
+    IsEmbedding.of_comp (j n).continuous continuous_subtype_val IsEmbedding.subtypeVal).1
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is complete. -/
 theorem finitePlaceSchwartz_complete (w : Places(F)) :
-    CompleteSpace ℬ(w.adicCompletion F) := by sorry
+    CompleteSpace ℬ(w.adicCompletion F) :=
+  completeSpace_of_strictLF (finitePlaceSchwartz_strictLF F w)
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Hausdorff
 locally convex and nuclear. -/
 theorem finitePlaceSchwartz_nuclear (w : Places(F)) :
     IsNuclearTVS.{v} ℬ(w.adicCompletion F) := by sorry
 
+section FinestMontel
+
+open scoped Pointwise
+
+/-- Every seminorm is continuous in the finest locally convex topology, so that topology is
+barrelled. -/
+private theorem finestLocallyConvex_barrelled (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    BarrelledSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun p _ ↦ ?_⟩
+  exact (finestLocallyConvex_withSeminorms E).continuous_seminorm p
+
+/-- Closed von Neumann bounded sets are compact in the finest locally convex topology: each is
+closed and absorbed by a compact neighborhood inside a finite-dimensional subspace. -/
+private theorem finestLocallyConvex_montel (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    MontelSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun s hs hbd ↦ ?_⟩
+  obtain ⟨S, hfin, hsub, hbdS⟩ := (finestLocallyConvex_isVonNBounded_iff (E := E) s).mp hbd
+  have : FiniteDimensional ℂ S := hfin
+  have : LocallyCompactSpace S := LocallyCompactSpace.of_finiteDimensional_of_complete ℂ S
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (0 : S)
+  let pre : Set S := Subtype.val ⁻¹' s
+  have habs : Absorbs ℂ K pre := hbdS hKnhds
+  obtain ⟨a, ha⟩ := habs.exists
+  have hpre : IsCompact pre :=
+    (hK.smul a).of_isClosed_subset (hs.preimage continuous_subtype_val) ha
+  have himage : Subtype.val '' pre = s := by
+    unfold pre
+    apply image_preimage_eq_of_subset
+    rw [Subtype.range_val]
+    exact hsub
+  rw [← himage]
+  exact hpre.image continuous_subtype_val
+
+end FinestMontel
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Montel. -/
 theorem finitePlaceSchwartz_montel (w : Places(F)) :
-    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by sorry
+    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  refine ⟨?_, ?_⟩
+  · change @BarrelledSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @BarrelledSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_barrelled E)
+  · change @MontelSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @MontelSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_montel E)
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is Fréchet. -/
 theorem finitePlaceSchwartz_strongDual_frechet (w : Places(F)) :

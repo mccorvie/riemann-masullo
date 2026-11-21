@@ -19,7 +19,7 @@ Masullo, §§2.2.4–2.2.5, pp. 86–98.
 @[expose] public noncomputable section
 
 open Bornology Filter Function MeasureTheory NumberField Set Topology
-open scoped ContDiff Manifold NNReal NumberField.AdeleRing
+open scoped ContDiff Manifold NNReal NumberField.AdeleRing TensorProduct
 
 namespace RiemannMasullo
 
@@ -522,17 +522,95 @@ as in (2.2.4.4). -/
 def adeleDirectionalDeriv : ℬ[F] →ₗ[ℂ] ℬ[F] :=
   IsLinearMap.mk' _ (adeleDirectionalDeriv_isLinear γ)
 
+/-- Paper: Lemma 2.2.4.2, pp. 87–88. Differentiation of the archimedean orbit
+in the logarithmic parameter is a continuous complex-linear operator on
+archimedean Schwartz–Bruhat functions. -/
+theorem exists_archimedeanDirectionalDeriv :
+    ∃ D : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →L[ℂ]
+        SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
+      ∀ (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) (x : InfiniteAdeleRing F),
+        D f (Multiplicative.ofAdd x) =
+          deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x))) 0 := by
+  sorry
+
+/-- Tensoring a continuous endomorphism with the identity is continuous for
+the inductive tensor topology. -/
+private theorem continuous_inductiveTensorMap_id {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] (L : A →L[ℂ] A) :
+    Continuous (inductiveTensorMap L.toLinearMap (LinearMap.id (M := B))) := by
+  let T := inductiveTensorMap L.toLinearMap (LinearMap.id (M := B))
+  let hS := withGeneratingSeminorms_spec (A ⊗[ℂ] B)
+    (fun p : {p : Seminorm ℂ (A ⊗[ℂ] B) //
+      (∀ f : A, Continuous (fun g : B ↦ p (f ⊗ₜ[ℂ] g))) ∧
+      (∀ g : B, Continuous (fun f : A ↦ p (f ⊗ₜ[ℂ] g)))} ↦ p.val)
+  refine hS.continuous_of_continuous_comp T fun p ↦ ?_
+  exact hS.continuous_seminorm
+    ⟨p.val.comp T, fun f ↦ p.property.1 (L f), fun g ↦ (p.property.2 g).comp L.continuous⟩
+
 /-- Paper: Lemma 2.2.4.2, p. 87. Formation of the directional derivative
 is continuous in the Schwartz–Bruhat topology. -/
-theorem adeleDirectionalDeriv_continuous : Continuous (adeleDirectionalDeriv γ) := by sorry
+theorem adeleDirectionalDeriv_continuous : Continuous (adeleDirectionalDeriv γ) := by
+  refine Exists.elim (adeleSchwartz_inductiveTensor_equiv F) fun e he ↦ ?_
+  refine Exists.elim (exists_archimedeanDirectionalDeriv γ) fun D hD ↦ ?_
+  let I := ContinuousLinearMap.id ℂ (SchwartzBruhat (Multiplicative 𝔸ᶠ[F]))
+  let T := inductiveTensorMap D.toLinearMap I.toLinearMap
+  have hleft : (adeleDirectionalDeriv γ).comp e.toLinearEquiv.toLinearMap =
+      e.toLinearEquiv.toLinearMap.comp T := by
+    apply TensorProduct.ext'
+    intro f g
+    apply Subtype.ext
+    funext y
+    let x := Multiplicative.toAdd y
+    have hOrbit (s : ℝ) :
+        e (f ⊗ₜ[ℂ] g)
+            (Multiplicative.ofAdd ((γ (expUnit s)).val * x)) =
+          f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1)) *
+            g (Multiplicative.ofAdd x.2) := by
+      have hfinite : ((γ (expUnit s)).val * x).2 = x.2 := by
+        change (γ (expUnit s)).val.2 * x.2 = x.2
+        rw [adeleOneParameter_finite_eq_one γ (expUnit s), one_mul]
+      exact (he f g _).trans (congrArg (fun z : 𝔸ᶠ[F] ↦
+        f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1)) *
+          g (Multiplicative.ofAdd z)) hfinite)
+    change deriv (fun s : ℝ ↦ e (f ⊗ₜ[ℂ] g)
+      (Multiplicative.ofAdd ((γ (expUnit s)).val * x))) 0 =
+        e (D f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x)
+    let u (s : ℝ) := f (Multiplicative.ofAdd ((γ (expUnit s)).val.1 * x.1))
+    let v := g (Multiplicative.ofAdd x.2)
+    exact (congrArg (fun k : ℝ → ℂ ↦ deriv k 0) (funext hOrbit)).trans
+      ((deriv_mul_const_field (u := u) v).trans
+        ((congrArg (· * v) (hD f x.1).symm).trans (he (D f) g x).symm))
+  have hcont : Continuous T :=
+    continuous_inductiveTensorMap_id (B := SchwartzBruhat (Multiplicative 𝔸ᶠ[F])) D
+  refine (e.continuous.comp (hcont.comp e.symm.continuous)).congr fun f ↦ ?_
+  change e (T (e.symm f)) = adeleDirectionalDeriv γ f
+  have h := DFunLike.congr_fun hleft (e.symm f)
+  change adeleDirectionalDeriv γ (e (e.symm f)) = e (T (e.symm f)) at h
+  simpa only [e.apply_symm_apply] using h.symm
 
 /-- Paper: Lemma 2.2.4.2, p. 87. The difference quotient in the positive real
 parameter converges to the directional derivative at every adele. -/
 theorem adeleDirectionalDeriv_tendsto (f : ℬ[F]) (x : 𝔸[F]) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (f (Multiplicative.ofAdd ((γ t).val * x)) - f (Multiplicative.ofAdd x)) /
-        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) :=
-  by sorry
+        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) := by
+  have hOrbit := (adeleOrbit_differentiableAt γ f (Multiplicative.ofAdd x)).hasDerivAt
+  have hLog := hOrbit.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · have hc := NNReal.continuous_coe.comp (Units.continuous_val (M := ℝ≥0))
+      exact (hc.continuousAt (x := (1 : ℝ≥0ˣ))).continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (Eventually.of_forall fun t ↦ ?_)
+  have hExpLog : expUnit (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  have hZero : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  simp only [Function.comp_apply, slope_def_module, Real.log_one, hExpLog, hZero,
+    map_one, Units.val_one, one_mul, toAdd_ofAdd, Complex.real_smul, Complex.ofReal_inv,
+    Complex.ofReal_sub, Complex.ofReal_one, div_eq_inv_mul]
 
 -- TODO(paper-gap): The last sentence of the proof of Lemma 2.2.4.2 uses
 -- injectivity of γ∞. Lemma 2.2.4.1 only gives factorization through the infinite ideles.
@@ -636,7 +714,17 @@ section PolarHyperplanes
 /-- Paper: Definition 2.2.4.4, p. 91. The evaluations of a test function and
 its Fourier transform at zero are complex linear. -/
 theorem adelePolarValues_isLinear :
-    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by sorry
+    IsLinearMap ℂ (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele)) := by
+  constructor
+  · intro f g
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_add (adeleSchwartzFourier_apply_zero f).1
+      (adeleSchwartzFourier_apply_zero g).1
+  · intro c f
+    refine Prod.ext rfl ?_
+    simp only [(adeleSchwartzFourier_apply_zero _).2]
+    exact integral_smul c (fun x ↦ f (Multiplicative.ofAdd x))
 
 /-- Paper: Definition 2.2.4.4, p. 91. The two polar functionals are the
 coordinates of the map that evaluates a test function and its transform at zero. -/

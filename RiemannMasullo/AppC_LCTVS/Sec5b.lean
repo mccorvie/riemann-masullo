@@ -7,9 +7,14 @@ public import Mathlib.Analysis.SpecialFunctions.Complex.CircleMap
 public import Mathlib.MeasureTheory.VectorMeasure.WithDensity
 import Mathlib.Analysis.Calculus.FDeriv.Mul
 import Mathlib.Analysis.Complex.CauchyIntegral
+import Mathlib.Analysis.Complex.LocallyUniformLimit
+import Mathlib.Analysis.Complex.RealDeriv
 import Mathlib.Analysis.Complex.RemovableSingularity
+import Mathlib.Analysis.Normed.Module.Ball.Pointwise
 import Mathlib.Analysis.Normed.Module.Completion
+import RiemannMasullo.ForMathlib.Analysis.Calculus.Deriv.Weak
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.MeasureTheory.VectorMeasure.Integral
 
 /-!
@@ -847,6 +852,210 @@ theorem hasPettisIntegral_cauchy_derivative (hf : ∀ k : ℕ, DifferentiableOn 
     rw [hderiv φ k (hinterior hz)] at h
     exact h.symm
 
+omit [ContinuousSMul ℂ E] [T2Space E] hΩ [QuasiCompleteSpace ℂ E] hconn in
+/-- Uniform convergence in a polynormable space is seminorm-smallness of the difference. -/
+private theorem tendstoUniformlyOn_of_forall_continuous_seminorm
+    {ι : Type*} {l : Filter ι} {F : ι → ℂ → E} {g : ℂ → E} {s : Set ℂ}
+    (h : ∀ q : Seminorm ℂ E, Continuous q → ∀ ε : ℝ, 0 < ε →
+      ∀ᶠ i in l, ∀ x ∈ s, q (F i x - g x) < ε) :
+    TendstoUniformlyOn F g l s := by
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have hbasis := (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero
+  rw [hbasis.tendstoUniformlyOn_iff_of_uniformity]
+  intro p hp
+  filter_upwards [h p hp 1 zero_lt_one] with i hi x hx
+  simpa [Seminorm.mem_ball_zero] using hi x hx
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] hconn in
+/-- Weak holomorphy implies continuity: scalar Cauchy estimates are uniform on seminorm balls. -/
+private theorem WeaklyHolomorphicOn.continuousOn_of_open (hf : WeaklyHolomorphicOn f Ω) :
+    ContinuousOn f Ω := by
+  intro z hz
+  rw [continuousWithinAt_iff_continuousAt (hΩ.mem_nhds hz)]
+  unfold ContinuousAt
+  rw [(PolynormableSpace.withSeminorms ℂ E).tendsto_nhds f (f z)]
+  intro q ε hε
+  obtain ⟨R, hR, hsub⟩ := (Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz))
+  have hsphere : Metric.sphere z R ⊆ Ω := Metric.sphere_subset_closedBall.trans hsub
+  have hbdd : IsVonNBounded ℂ (f '' Metric.sphere z R) := by
+    refine isVonNBounded_of_dual_bounded fun φ ↦ ?_
+    obtain ⟨C, hC⟩ :=
+      ((isCompact_sphere z R).image_of_continuousOn
+        ((hf φ).continuousOn.mono hsphere)).isBounded.exists_norm_le
+    refine ⟨C, fun y hy ↦ ?_⟩
+    obtain ⟨ξ, hξ, rfl⟩ := hy
+    exact hC ((φ ∘ f) ξ) ⟨ξ, hξ, rfl⟩
+  obtain ⟨M, hM⟩ :=
+    ((PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mp hbdd q)
+  let C := max M 1
+  have hC (w) (hw : w ∈ Metric.sphere z R) : q.1 (f w) ≤ C :=
+    le_max_of_le_left (hM (mem_image_of_mem q.1 (mem_image_of_mem f hw)))
+  have hCpos : 0 < C := lt_max_of_lt_right zero_lt_one
+  let δ := min (R / 2) (ε * R / (2 * C))
+  have hδ : 0 < δ := by
+    refine lt_min (half_pos hR) (div_pos (mul_pos hε hR) (mul_pos two_pos hCpos))
+  filter_upwards [Metric.ball_mem_nhds z hδ] with w hw
+  rcases eq_or_ne w z with rfl | hwz
+  · simpa using hε
+  · have hwR : dist w z < R / 2 := lt_of_lt_of_le (Metric.mem_ball.mp hw) (min_le_left _ _)
+    have hwball : w ∈ Metric.ball z R := Metric.mem_ball.mpr (hwR.trans (half_lt_self hR))
+    obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm q.1 q.2 (f w - f z)
+    have hd : DifferentiableOn ℂ (φ ∘ f) (Metric.closedBall z R) := (hf φ).mono hsub
+    have hIw := hd.circleIntegral_sub_inv_smul hwball
+    have hIz := hd.circleIntegral_sub_inv_smul (Metric.mem_ball_self hR)
+    simp only [smul_eq_mul] at hIw hIz
+    have hcont (c : ℂ) (hc : c ∈ Metric.ball z R) :
+        ContinuousOn (fun ξ : ℂ ↦ (ξ - c)⁻¹ * (φ ∘ f) ξ) (Metric.sphere z R) := by
+      refine ContinuousOn.mul ?_ (((hf φ).continuousOn).mono hsphere)
+      refine (continuousOn_id.sub continuousOn_const).inv₀ fun ξ hξ hzero ↦ ?_
+      have hξeq : ξ = c := sub_eq_zero.mp hzero
+      rw [hξeq] at hξ
+      exact Metric.sphere_disjoint_ball.notMem_of_mem_left hξ hc
+    have hint (c : ℂ) (hc : c ∈ Metric.ball z R) :
+        CircleIntegrable (fun ξ : ℂ ↦ (ξ - c)⁻¹ * (φ ∘ f) ξ) z R :=
+      (hcont c hc).circleIntegrable hR.le
+    have hdiffint := circleIntegral.integral_sub (hint w hwball) (hint z (Metric.mem_ball_self hR))
+    have h2pi : (2 * (Real.pi : ℂ) * Complex.I) ≠ 0 := by simp [Real.pi_ne_zero, Complex.I_ne_zero]
+    have hval : φ (f w) - φ (f z) =
+        (2 * (Real.pi : ℂ) * Complex.I)⁻¹ *
+          ∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ := by
+      have hker :
+          (∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ) =
+            (∮ ξ in C(z, R), (ξ - w)⁻¹ * (φ ∘ f) ξ) -
+              ∮ ξ in C(z, R), (ξ - z)⁻¹ * (φ ∘ f) ξ := by
+        have hfun :
+            (fun ξ ↦ ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ) =
+              fun ξ ↦ (ξ - w)⁻¹ * (φ ∘ f) ξ - (ξ - z)⁻¹ * (φ ∘ f) ξ := by
+          funext ξ
+          exact sub_mul _ _ _
+        rw [circleIntegral.integral_congr hR.le (fun ξ _ ↦ congrFun hfun ξ)]
+        exact hdiffint
+      rw [hker, hIw, hIz, mul_sub]
+      field_simp [h2pi]
+      rfl
+    set d := dist w z
+    have hdpos : 0 < R - d := by linarith [hwR]
+    have hbound : ∀ ξ ∈ Metric.sphere z R,
+        ‖((ξ - w)⁻¹ - (ξ - z)⁻¹) * φ (f ξ)‖ ≤ d * C / ((R - d) * R) := by
+      intro ξ hξ
+      have hξz : ‖ξ - z‖ = R := by simpa [Metric.mem_sphere, dist_eq_norm] using hξ
+      have hξw : R - d ≤ ‖ξ - w‖ := by
+        have : ‖ξ - z‖ - ‖w - z‖ ≤ ‖(ξ - z) - (w - z)‖ := norm_sub_norm_le _ _
+        simpa [sub_sub_sub_cancel_left, dist_eq_norm, d, hξz] using this
+      have hpos : 0 < ‖ξ - w‖ := hdpos.trans_le hξw
+      have hne : ξ - w ≠ 0 := norm_ne_zero_iff.mp hpos.ne'
+      have hnez : ξ - z ≠ 0 := norm_ne_zero_iff.mp (hξz.trans_ne hR.ne')
+      have halg : (ξ - w)⁻¹ - (ξ - z)⁻¹ = (w - z) / ((ξ - w) * (ξ - z)) := by
+        field_simp [hne, hnez]
+        ring
+      have hwd : ‖w - z‖ = d := by simp [d, dist_eq_norm]
+      rw [norm_mul, halg, norm_div, norm_mul, hξz, hwd]
+      have hle : ‖φ (f ξ)‖ ≤ C := (hφ _).trans (hC _ hξ)
+      calc
+        d / (‖ξ - w‖ * R) * ‖φ (f ξ)‖ ≤ d / (‖ξ - w‖ * R) * C := by gcongr
+        _ ≤ d / ((R - d) * R) * C := by gcongr
+        _ = d * C / ((R - d) * R) := by ring
+    have hintle := circleIntegral.norm_integral_le_of_norm_le_const hR.le hbound
+    rw [← heq, map_sub, hval, norm_mul]
+    have hinv : ‖(2 * (Real.pi : ℂ) * Complex.I)⁻¹‖ = (2 * Real.pi)⁻¹ := by simp
+    rw [hinv]
+    calc
+      (2 * Real.pi)⁻¹ * ‖∮ ξ in C(z, R), ((ξ - w)⁻¹ - (ξ - z)⁻¹) * (φ ∘ f) ξ‖
+          ≤ (2 * Real.pi)⁻¹ * (2 * Real.pi * R * (d * C / ((R - d) * R))) := by
+            gcongr
+            exact hintle
+      _ = d * C / (R - d) := by
+        field_simp [Real.pi_ne_zero, hR.ne', hdpos.ne']
+      _ < ε := by
+        rw [div_lt_iff₀ hdpos]
+        have hdist : d * (2 * C) < ε * R :=
+          (lt_div_iff₀ (mul_pos two_pos hCpos)).mp
+            (lt_of_lt_of_le (Metric.mem_ball.mp hw) (min_le_right _ _))
+        nlinarith [hdist, hwR, hε]
+
+omit hconn in
+/-- Lift a first scalar derivative by restricting to a smooth real curve inside the domain. -/
+private theorem WeaklyHolomorphicOn.exists_eval_deriv (hf : WeaklyHolomorphicOn f Ω)
+    {z : ℂ} (hz : z ∈ Ω) : ∃ b : E, ∀ φ : StrongDual ℂ E, φ b = deriv (φ ∘ f) z := by
+  obtain ⟨R, hR, hsub⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz)
+  let c (t : ℝ) : ℂ := z + ((R * Real.sin t : ℝ) : ℂ)
+  have hc (t) : c t ∈ Ω := by
+    apply hsub
+    simp only [c, Metric.mem_closedBall, dist_eq_norm, add_sub_cancel_left, Complex.norm_real,
+      Real.norm_eq_abs, abs_mul, abs_of_pos hR]
+    exact mul_le_of_le_one_right hR.le (Real.abs_sin_le_one t)
+  have hdiff : ContDiff ℝ 2 c := by
+    apply contDiff_const.add
+    exact Complex.ofRealCLM.contDiff.comp (contDiff_const.mul Real.contDiff_sin)
+  obtain ⟨v, hv⟩ := exists_hasDerivAt_eval_zero_of_contDiff (F := f ∘ c)
+    (fun φ ↦ (((hf φ).contDiffOn hΩ).restrict_scalars ℝ).comp_contDiff hdiff hc) inferInstance
+  refine ⟨(R : ℂ)⁻¹ • v, fun φ ↦ ?_⟩
+  have hc' : HasDerivAt c (R : ℂ) 0 := by
+    simpa [c] using (((Real.hasDerivAt_sin 0).const_mul R).ofReal_comp.const_add z)
+  have hd : HasDerivAt (φ ∘ f) (deriv (φ ∘ f) z) (c 0) := by
+    simpa [c] using ((hf φ).differentiableAt (hΩ.mem_nhds hz)).hasDerivAt
+  have he := (hv φ).unique (hd.scomp 0 hc')
+  rw [map_smul, he, inv_smul_smul₀ (Complex.ofReal_ne_zero.mpr hR.ne')]
+
+omit hconn in
+/-- Iteration gives vector representatives for all scalar derivatives on the open set. -/
+private theorem WeaklyHolomorphicOn.exists_eval_iteratedDeriv (hf : WeaklyHolomorphicOn f Ω)
+    (k : ℕ) : ∃ g : ℂ → E, WeaklyHolomorphicOn g Ω ∧
+      ∀ φ : StrongDual ℂ E, EqOn (φ ∘ g) (iteratedDeriv k (φ ∘ f)) Ω := by
+  classical
+  induction k with
+  | zero => exact ⟨f, hf, fun φ ↦ by simp [Set.EqOn]⟩
+  | succ k ih =>
+    obtain ⟨g, hg, he⟩ := ih
+    let b (z : ℂ) : E := if hz : z ∈ Ω then (hg.exists_eval_deriv hΩ g hz).choose else 0
+    have hb (φ : StrongDual ℂ E) : EqOn (φ ∘ b) (deriv (φ ∘ g)) Ω := by
+      intro z hz
+      simpa only [comp_apply, b, dite_eq_left hz] using (hg.exists_eval_deriv hΩ g hz).choose_spec φ
+    exact ⟨b, fun φ ↦ ((hg φ).deriv hΩ).congr (hb φ), fun φ ↦ by
+      rw [iteratedDeriv_succ]
+      exact (hb φ).trans ((he φ).deriv hΩ)⟩
+
+omit [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E] [QuasiCompleteSpace ℂ E] hconn in
+/-- The Taylor errors on a closed subdisc remain bounded even after multiplication
+by the truncation index: this can be tested on each functional separately. -/
+private theorem WeaklyHolomorphicOn.bounded_taylorErrors (hf : WeaklyHolomorphicOn f Ω)
+    {z : ℂ} {a : ℕ → E}
+    (ha : ∀ (φ : StrongDual ℂ E) k, φ (a k) = iteratedDeriv k (φ ∘ f) z / k.factorial)
+    {r : ℝ} (hr : 0 < r) (hs : Metric.closedBall z r ⊆ Ω) :
+    IsVonNBounded ℂ (range fun x : ℕ × Metric.closedBall z r ↦ (x.1 : ℂ) •
+      ((∑ k ∈ Finset.range x.1, ((x.2 : ℂ) - z) ^ k • a k) - f x.2)) := by
+  obtain ⟨δ, hδ, hlarge⟩ := (isCompact_closedBall z r).exists_cthickening_subset_open hΩ hs
+  rw [cthickening_closedBall hδ.le hr.le] at hlarge
+  let R : NNReal := ⟨δ + r, by positivity⟩
+  let ρ : NNReal := ⟨δ / 2 + r, by positivity⟩
+  have hρ : ρ < R := by change δ / 2 + r < δ + r; linarith
+  apply isVonNBounded_of_dual_bounded
+  intro φ
+  have hd : DifferentiableOn ℂ (φ ∘ f) (Metric.closedBall z R) := (hf φ).mono hlarge
+  have hps := hd.hasFPowerSeriesOnBall (show 0 < R by change 0 < δ + r; positivity)
+  rw [hps.hasFPowerSeriesAt.eq_formalMultilinearSeries hps.analyticAt.hasFPowerSeriesAt] at hps
+  obtain ⟨t, ht, C, hC, hest⟩ := hps.uniform_geometric_approx (ENNReal.coe_lt_coe.mpr hρ)
+  obtain ⟨M, hM⟩ := (tendsto_self_mul_const_pow_of_lt_one ht.1.le ht.2).bddAbove_range
+  refine ⟨C * M, ?_⟩
+  rintro _ ⟨⟨n, w⟩, rfl⟩
+  have hw : (w : ℂ) - z ∈ Metric.ball 0 ρ := by
+    rw [Metric.mem_ball, dist_zero_right]
+    have hle := Metric.mem_closedBall.mp w.property
+    rw [dist_eq_norm] at hle
+    change _ < δ / 2 + r
+    linarith
+  have he := hest _ hw n
+  simp only [add_sub_cancel, FormalMultilinearSeries.partialSum,
+    FormalMultilinearSeries.ofScalars_apply_eq, comp_apply, smul_eq_mul] at he
+  simp only [map_smul, map_sub, map_sum, ha, smul_eq_mul, norm_mul, Complex.norm_natCast]
+  rw [norm_sub_rev]
+  calc
+    _ ≤ (n : ℝ) * (C * t ^ n) := by
+      apply mul_le_mul_of_nonneg_left _ (Nat.cast_nonneg n)
+      simpa only [mul_comm] using he
+    _ = C * ((n : ℝ) * t ^ n) := by ring
+    _ ≤ C * M := mul_le_mul_of_nonneg_left (hM (mem_range_self n)) hC.le
+
 /-- Paper: Theorem C.5.2.6(1,4), p. 738. Weak holomorphy is equivalent to a
 power series at every center that converges uniformly to the function on each closed
 disc about that center contained in the domain. -/
@@ -854,7 +1063,41 @@ theorem weaklyHolomorphicOn_iff_taylor :
     WeaklyHolomorphicOn f Ω ↔ ∀ z ∈ Ω, ∃ a : ℕ → E,
       ∀ r : ℝ, 0 < r → Metric.closedBall z r ⊆ Ω →
         TendstoUniformlyOn (fun n w ↦ ∑ k ∈ Finset.range n, (w - z) ^ k • a k)
-          f atTop (Metric.closedBall z r) := by sorry
+          f atTop (Metric.closedBall z r) := by
+  classical
+  clear hconn
+  constructor
+  · intro hf z hz
+    choose g _ he using hf.exists_eval_iteratedDeriv hΩ f
+    let a (k : ℕ) : E := (k.factorial : ℂ)⁻¹ • g k z
+    have ha (φ : StrongDual ℂ E) (k : ℕ) : φ (a k) = iteratedDeriv k (φ ∘ f) z / k.factorial := by
+      simp only [a, map_smul, smul_eq_mul, div_eq_inv_mul]
+      rw [show φ (g k z) = _ from he k φ hz]
+    refine ⟨a, fun r hr hs ↦ ?_⟩
+    have hb := hf.bounded_taylorErrors hΩ f ha hr hs
+    apply tendstoUniformlyOn_of_forall_continuous_seminorm
+    intro q hq ε hε
+    obtain ⟨M, hM⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bddAbove.mp
+      hb ⟨q, hq⟩
+    filter_upwards [tendsto_natCast_atTop_atTop.eventually_gt_atTop (M / ε),
+      eventually_gt_atTop 0] with n hn hn₀ w hw
+    have h := hM (mem_image_of_mem _ (mem_range_self (n, ⟨w, hw⟩)))
+    change q ((n : ℂ) • _) ≤ M at h
+    rw [map_smul_eq_mul, Complex.norm_natCast] at h
+    exact lt_of_mul_lt_mul_left (h.trans_lt ((div_lt_iff₀ hε).mp hn)) (by positivity)
+  · intro h φ z hz
+    obtain ⟨a, ha⟩ := h z hz
+    obtain ⟨r, hr, hs⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hz)
+    have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+    have hlim : TendstoUniformlyOn
+        (fun n w ↦ ∑ k ∈ Finset.range n, (w - z) ^ k * φ (a k)) (φ ∘ f) atTop
+        (Metric.closedBall z r) := by
+      simpa only [comp_def, map_sum, map_smul, smul_eq_mul] using
+        φ.uniformContinuous.comp_tendstoUniformlyOn (ha r hr hs)
+    have hd := (hlim.mono Metric.ball_subset_closedBall).tendstoLocallyUniformlyOn.differentiableOn
+      (Eventually.of_forall fun n ↦ (Differentiable.fun_sum fun i _ ↦
+        ((differentiable_id.sub_const z).pow i).mul_const (φ (a i))).differentiableOn) Metric.isOpen_ball
+    exact (hd.differentiableAt (Metric.ball_mem_nhds z hr)).differentiableWithinAt
 
 omit hΩ hconn in
 /-- The Taylor series of a Banach-valued holomorphic function converges uniformly

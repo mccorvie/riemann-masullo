@@ -14,6 +14,9 @@ import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Complex.CircleLocalHo
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
+import Mathlib.Algebra.Group.Fin.Basic
+import Mathlib.Topology.Connected.TotallyDisconnected
 import Mathlib.Geometry.Manifold.HasGroupoid
 import Mathlib.GroupTheory.FiniteAbelian.Basic
 import Mathlib.Analysis.Normed.Module.Connected
@@ -2307,11 +2310,262 @@ theorem isBruhatContDiff_real_iff (p : ℕ) (f : Multiplicative ℝ → ℂ) :
       simp only [map_add]
       exact hlin.add contDiff_const)
 
+/-- The Pontryagin dual of the additive reals is connected. -/
+private theorem connectedSpace_pontryaginDual_multiplicative_real :
+    ConnectedSpace (PontryaginDual (Multiplicative ℝ)) := by
+  obtain ⟨d, _⟩ := exists_realPontryaginDualEquiv
+  have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  exact d.surjective.connectedSpace d.continuous
+
+/-- A compact identity neighborhood generates a connected locally compact group. -/
+private theorem realSmooth_compactlyGenerated (G : Type*) [Group G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [LocallyCompactSpace G] [PreconnectedSpace G] :
+    IsCompactlyGeneratedGroup G := by
+  obtain ⟨K, hc, hK⟩ := exists_compact_mem_nhds (1 : G)
+  have hOpen : IsOpen (Subgroup.closure K : Set G) :=
+    Subgroup.isOpen_of_mem_nhds _ (mem_of_superset hK Subgroup.subset_closure)
+  exact ⟨K, hK, hc, SetLike.coe_injective
+    ((OpenSubgroup.isClopen ⟨Subgroup.closure K, hOpen⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)⟩
+
+/-- The trivial subgroup is the only good subgroup of the additive reals. -/
+private theorem isBruhatGoodSubgroup_real_bot :
+    IsBruhatGoodSubgroup (⊥ : Subgroup (Multiplicative ℝ)) := by
+  have := connectedSpace_pontryaginDual_multiplicative_real
+  have hAnn : lcaAnnihilator (⊥ : Subgroup (Multiplicative ℝ)) = ⊤ := by
+    refine eq_top_iff.mpr fun χ _ ↦ (mem_lcaAnnihilator_iff _ _).mpr fun x ↦ ?_
+    rw [Subgroup.mem_bot.mp x.property, map_one]
+  refine ⟨?_, ?_, ?_⟩
+  · simpa only [Subgroup.coe_bot] using isClosed_singleton
+  · rw [hAnn, Subgroup.coe_top]
+    exact isOpen_univ
+  · rw [hAnn]
+    let : ConnectedSpace (⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :=
+      (Subgroup.topEquiv.symm.surjective.connectedSpace (continuous_id.subtype_mk _))
+    have hOpen : IsOpen ((⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :
+        Set (PontryaginDual (Multiplicative ℝ))) := by simp
+    let : LocallyCompactSpace (⊤ : Subgroup (PontryaginDual (Multiplicative ℝ))) :=
+      hOpen.isOpenEmbedding_subtypeVal.locallyCompactSpace
+    exact realSmooth_compactlyGenerated _
+
+private theorem isBruhatGoodSubgroup_real_iff (k : Subgroup (Multiplicative ℝ)) :
+    IsBruhatGoodSubgroup k ↔ k = ⊥ := by
+  constructor
+  · intro hk
+    have := connectedSpace_pontryaginDual_multiplicative_real
+    let U : OpenSubgroup (PontryaginDual (Multiplicative ℝ)) :=
+      ⟨lcaAnnihilator k, hk.2.1⟩
+    have hann : lcaAnnihilator k = ⊤ :=
+      SetLike.coe_injective (U.isClopen.eq_univ ⟨1, U.one_mem⟩)
+    refine le_antisymm (fun x hx ↦ Subgroup.mem_bot.mpr ?_) bot_le
+    apply (pontryaginDual_pairing_separates (G := Multiplicative ℝ)).1
+    funext χ
+    exact ((mem_lcaAnnihilator_iff k χ).mp (hann ▸ Subgroup.mem_top χ) ⟨x, hx⟩).trans
+      (map_one χ).symm
+  · rintro rfl
+    exact isBruhatGoodSubgroup_real_bot
+
+/-- A real structural pair has full open subgroup and trivial kernel, so its quotient
+map identifies it with the real group. -/
+private theorem realSmooth_pair_quotient (a : BruhatStructuralPair (Multiplicative ℝ)) :
+    ∃ (h : ∀ x : Multiplicative ℝ, x ∈ a.val.1) (q : Multiplicative ℝ ≃ₜ* a.quotient),
+      ∀ x, q x = QuotientGroup.mk ⟨x, h x⟩ := by
+  have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  have ha : a.val.1 = ⊤ := SetLike.coe_injective
+    ((OpenSubgroup.isClopen ⟨a.val.1, a.property.1⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)
+  have hk : OrderDual.ofDual a.val.2 = ⊥ :=
+    (isBruhatGoodSubgroup_real_iff _).mp a.property.2.2.1
+  have h (x : Multiplicative ℝ) : x ∈ a.val.1 := ha ▸ Subgroup.mem_top x
+  let i : Multiplicative ℝ ≃ₜ* a.val.1 :=
+    { toMulEquiv :=
+        { toFun := fun x ↦ ⟨x, h x⟩
+          invFun := Subtype.val
+          left_inv := fun _ ↦ rfl
+          right_inv := fun _ ↦ rfl
+          map_mul' := fun _ _ ↦ rfl }
+      continuous_toFun := continuous_id.subtype_mk _
+      continuous_invFun := continuous_subtype_val }
+  let k := OrderDual.ofDual a.val.2
+  let p := (QuotientGroup.mk' (k.comap a.val.1.subtype)).comp i.toMulEquiv.toMonoidHom
+  have hp : IsOpenQuotientMap p :=
+    QuotientGroup.isOpenQuotientMap_mk.comp i.toHomeomorph.isOpenQuotientMap
+  have hpInj : Function.Injective p := (MonoidHom.ker_eq_bot_iff p).mp (le_antisymm (fun x hx ↦ by
+    change (QuotientGroup.mk (i x) : a.quotient) = 1 at hx
+    exact hk ▸ (a.quotient_mk_eq_one (i x)).mp hx) bot_le)
+  let q := MulEquiv.ofBijective p ⟨hpInj, hp.surjective⟩
+  exact ⟨h, q.toContinuousMulEquiv (fun _ ↦ hp.isQuotientMap.isOpen_preimage), fun _ ↦ rfl⟩
+
+/-- In any elementary presentation of a real structural quotient, the torus and
+discrete factors are trivial and the real coordinate is a linear equivalence. -/
+private theorem realSmooth_coordinates (a : BruhatStructuralPair (Multiplicative ℝ))
+    (e : ElementaryLCAPresentation a.quotient) :
+    e.torusDim = 0 ∧ e.latticeRank = 0 ∧ Subsingleton e.finiteFactor ∧
+      ∃ (h : ∀ x : Multiplicative ℝ, x ∈ a.val.1)
+        (L : ℝ ≃L[ℝ] EuclideanSpace ℝ (Fin e.realDim)),
+        ∀ x : ℝ, (e.equiv (QuotientGroup.mk ⟨Multiplicative.ofAdd x, h _⟩)).toAdd =
+          (L x, 0, 0, 0) := by
+  obtain ⟨h, q, hq⟩ := realSmooth_pair_quotient a
+  let E := EuclideanSpace ℝ (Fin e.realDim)
+  let T := Fin e.torusDim → AddCircle (1 : ℝ)
+  let Z := Fin e.latticeRank → ℤ
+  let F := e.finiteFactor
+  let P := ElementaryLieGroup e.realDim e.torusDim e.latticeRank F
+  let w := q.trans e.equiv
+  let W : ℝ ≃+ P := MulEquiv.toAdditive w.toMulEquiv
+  have hW : Continuous W := w.continuous
+  have hWi : Continuous W.symm := w.symm.continuous
+  let : ConnectedSpace P := W.surjective.connectedSpace hW
+  let : ConnectedSpace Z :=
+    (show Function.Surjective (fun p : P ↦ p.2.2.1) from fun z ↦ ⟨(0, 0, z, 0), rfl⟩).connectedSpace
+      (continuous_fst.comp (continuous_snd.comp continuous_snd))
+  let : ConnectedSpace F :=
+    (show Function.Surjective (fun p : P ↦ p.2.2.2) from fun b ↦ ⟨(0, 0, 0, b), rfl⟩).connectedSpace
+      (continuous_snd.comp (continuous_snd.comp continuous_snd))
+  have hZ : Subsingleton Z := subsingleton_of_preconnected_totallyDisconnected
+  have hF : Subsingleton F := subsingleton_of_preconnected_totallyDisconnected
+  have hz : e.latticeRank = 0 := by
+    by_contra hn
+    let i : Fin e.latticeRank := ⟨0, Nat.pos_of_ne_zero hn⟩
+    have hi := congrFun (hZ.elim (0 : Z) 1) i
+    exact zero_ne_one hi
+  let tor : T →+ ℝ :=
+    { toFun := fun t ↦ W.symm (0, t, 0, 0)
+      map_zero' := by
+        let p : P := (0, 0, 0, 0)
+        have he : p + p = p :=
+          Prod.ext (zero_add _) (Prod.ext (zero_add _) (Prod.ext (zero_add _) (hF.elim _ _)))
+        have hzero := W.symm.map_add p p
+        rw [he] at hzero
+        change W.symm p = 0
+        linarith
+      map_add' := fun t u ↦ by
+        rw [← W.symm.map_add]
+        apply congrArg W.symm
+        exact Prod.ext (zero_add _).symm
+          (Prod.ext rfl (Prod.ext (zero_add _).symm (hF.elim _ _))) }
+  have htor : Continuous tor :=
+    hWi.comp (continuous_const.prodMk (continuous_id.prodMk continuous_const))
+  obtain ⟨C, hC⟩ := (isCompact_univ.image htor).isBounded.exists_norm_le
+  have htor0 (t : T) : tor t = 0 := by
+    by_contra ht
+    obtain ⟨n, hn⟩ := exists_nat_gt (C / ‖tor t‖)
+    have hb := hC (tor (n • t)) (mem_image_of_mem tor (mem_univ (n • t)))
+    rw [map_nsmul, nsmul_eq_mul, norm_mul, Real.norm_natCast] at hb
+    exact (not_lt_of_ge hb) ((div_lt_iff₀ (norm_pos_iff.mpr ht)).mp hn)
+  have hT : Subsingleton T := ⟨fun t u ↦ by
+    have hu : tor t = tor u := (htor0 t).trans (htor0 u).symm
+    exact congrArg (fun p : P ↦ p.2.1) (W.symm.injective hu)⟩
+  have ht : e.torusDim = 0 := by
+    by_contra hn
+    let i : Fin e.torusDim := ⟨0, Nat.pos_of_ne_zero hn⟩
+    have hi := congrFun (hT.elim (fun _ ↦ ((1 / 2 : ℝ) : AddCircle (1 : ℝ))) 0) i
+    exact (show (1 / 2 : ℝ) ≠ 0 by norm_num)
+      ((AddCircle.coe_eq_zero_iff_of_mem_Ico (by norm_num : (1 / 2 : ℝ) ∈ Ico 0 1)).mp hi)
+  let I : P ≃+ E :=
+    { toFun := Prod.fst
+      invFun := fun x ↦ (x, 0, 0, 0)
+      left_inv := fun p ↦ Prod.ext rfl (Subsingleton.elim _ _)
+      right_inv := fun _ ↦ rfl
+      map_add' := fun _ _ ↦ rfl }
+  let L := (W.trans I).toRealLinearEquiv (continuous_fst.comp hW)
+    (hWi.comp (continuous_id.prodMk continuous_const))
+  refine ⟨ht, hz, hF, h, L, fun x ↦ ?_⟩
+  rw [← hq]
+  exact Prod.ext rfl (Subsingleton.elim _ _)
+
+/-- The full real group with trivial kernel has a one-dimensional elementary presentation. -/
+private theorem realSmooth_stage :
+    ∃ a : BruhatStructuralPair (Multiplicative ℝ), Nonempty (ElementaryLCAPresentation a.quotient) := by
+  have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
+  have hTop : IsOpen ((⊤ : Subgroup (Multiplicative ℝ)) : Set (Multiplicative ℝ)) := by simp
+  let : ConnectedSpace (⊤ : Subgroup (Multiplicative ℝ)) :=
+    Subgroup.topEquiv.symm.surjective.connectedSpace (continuous_id.subtype_mk _)
+  let : LocallyCompactSpace (⊤ : Subgroup (Multiplicative ℝ)) :=
+    hTop.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let a : BruhatStructuralPair (Multiplicative ℝ) := ⟨(⊤, OrderDual.toDual ⊥),
+    hTop, realSmooth_compactlyGenerated _, isBruhatGoodSubgroup_real_bot, bot_le⟩
+  obtain ⟨_, q, _⟩ := realSmooth_pair_quotient a
+  let E := EuclideanSpace ℝ (Fin 1)
+  let L : ℝ ≃L[ℝ] E := ContinuousLinearEquiv.ofFinrankEq (by simp [E, finrank_euclideanSpace])
+  let B := (Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × Fin 1
+  let : Unique B := uniqueOfSubsingleton 0
+  let M : ℝ ≃+ ElementaryLieGroup 1 0 0 (Fin 1) :=
+    L.toLinearEquiv.toAddEquiv.trans (AddEquiv.prodUnique (M := E) (N := B)).symm
+  let M' : Multiplicative ℝ ≃ₜ* Multiplicative (ElementaryLieGroup 1 0 0 (Fin 1)) :=
+    ⟨AddEquiv.toMultiplicative M,
+      show Continuous (fun x : ℝ ↦ (L x, (default : B))) from
+        L.continuous.prodMk continuous_const,
+      show Continuous (fun x : E × B ↦ L.symm x.1) from
+        L.symm.continuous.comp continuous_fst⟩
+  exact ⟨a, ⟨({ realDim := 1, torusDim := 0, latticeRank := 0, finiteFactor := Fin 1, equiv := q.symm.trans M' } : ElementaryLCAPresentation a.quotient)⟩⟩
+
+/-- Along any elementary chart of a real structural quotient, the descended function
+is the original function precomposed with a linear projection. -/
+private theorem realSmooth_pullback_eq (f : Multiplicative ℝ → ℂ)
+    (a : BruhatStructuralPair (Multiplicative ℝ)) (e : ElementaryLCAPresentation a.quotient)
+    (f₀ : a.quotient → ℂ) (hf₀ : ∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val)
+    (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor) :
+    ∃ L : ℝ ≃L[ℝ] EuclideanSpace ℝ (Fin e.realDim),
+      (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover xt z b)))) =
+        fun xt ↦ (f ∘ Multiplicative.ofAdd) (L.symm xt.1) := by
+  obtain ⟨ht, hz, hF, hmem, L, hL⟩ := realSmooth_coordinates a e
+  have : IsEmpty (Fin e.torusDim) := by rw [ht]; exact Fin.isEmpty
+  have : IsEmpty (Fin e.latticeRank) := by rw [hz]; exact Fin.isEmpty
+  have : Subsingleton e.finiteFactor := hF
+  refine ⟨L, funext fun xt ↦ ?_⟩
+  have htail : elementaryCover xt z b = (xt.1, 0, 0, 0) := by
+    apply Prod.ext
+    · rfl
+    · exact Subsingleton.elim _ _
+  rw [htail]
+  have hpoint := hL (L.symm xt.1)
+  rw [L.apply_symm_apply] at hpoint
+  have hmul := congrArg Multiplicative.ofAdd hpoint
+  simp only [ofAdd_toAdd] at hmul
+  rw [← hmul, e.equiv.symm_apply_apply, hf₀]
+  rfl
+
 /-- Paper: Definition D.1.5.3(1), p. 762. On the real additive group, Bruhat
 smoothness agrees with ordinary smoothness.
 Deviation: Sanity check on the real group. -/
 theorem isBruhatSmooth_real_iff (f : Multiplicative ℝ → ℂ) :
-    IsBruhatSmooth f ↔ ContDiff ℝ ∞ (f ∘ Multiplicative.ofAdd) := by sorry
+    IsBruhatSmooth f ↔ ContDiff ℝ ∞ (f ∘ Multiplicative.ofAdd) := by
+  constructor
+  · intro hf
+    rw [contDiff_infty]
+    intro n
+    rcases hf n with ⟨k, hk, -, hpair⟩
+    have hk0 : k = ⊥ := (isBruhatGoodSubgroup_real_iff k).mp hk
+    obtain ⟨a, ⟨e⟩⟩ := realSmooth_stage
+    have ha : OrderDual.ofDual a.val.2 = k := by
+      rw [hk0]
+      exact (isBruhatGoodSubgroup_real_iff _).mp a.property.2.2.1
+    obtain ⟨f₀, hf₀, hcover⟩ := hpair a ha
+    obtain ⟨L, hEq⟩ := realSmooth_pullback_eq f a e f₀ hf₀ 0 0
+    have hfun : f ∘ Multiplicative.ofAdd =
+        (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover xt 0 0)))) ∘
+          fun x ↦ (L x, (0 : EuclideanSpace ℝ (Fin e.torusDim))) := by
+      funext x
+      rw [Function.comp_apply, hEq]
+      simp [L.symm_apply_apply]
+    rw [hfun]
+    exact (hcover e 0 0).comp (L.contDiff.prodMk contDiff_const)
+  · intro hf n
+    refine ⟨⊥, isBruhatGoodSubgroup_real_bot, ?_, ?_⟩
+    · intro h x
+      rw [Subgroup.mem_bot.mp h.property, one_mul]
+    · intro a _ha
+      obtain ⟨hmem, q, hquot⟩ := realSmooth_pair_quotient a
+      let f₀ : a.quotient → ℂ := fun y ↦ f (q.symm y)
+      have hf₀ : ∀ x : a.val.1, f₀ (QuotientGroup.mk x) = f x.val := by
+        intro x
+        change f (q.symm (QuotientGroup.mk x)) = f x.val
+        apply congrArg f
+        apply q.injective
+        rw [q.apply_symm_apply, hquot x.val]
+      refine ⟨f₀, hf₀, fun e z b ↦ ?_⟩
+      obtain ⟨L, hEq⟩ := realSmooth_pullback_eq f a e f₀ hf₀ z b
+      rw [hEq]
+      exact (hf.of_le (by simp)).comp (L.symm.contDiff.comp contDiff_fst)
 
 variable [hTop : IsTopologicalGroup G] [hT2 : T2Space G] [hLC : LocallyCompactSpace G]
 
