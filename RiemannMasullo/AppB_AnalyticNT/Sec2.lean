@@ -215,7 +215,63 @@ zero extension smooth across the origin.
 Deviation: The ordinary Schwartz assertion is false without forward decay. -/
 theorem contDiff_zeroExtension_of_backwardSemiExponentialDecay (f : 𝓢(ℝ, ℂ))
     (hf : BackwardSemiExponentialDecay f) :
-    ContDiff ℝ ∞ ((Ioi (0 : ℝ)).indicator (fromLog f)) := by sorry
+    ContDiff ℝ ∞ ((Ioi (0 : ℝ)).indicator (fromLog f)) := by
+  let G (a : ℝ) (j : ℕ) : ℝ → ℂ :=
+    (Ioi (0 : ℝ)).indicator fun t ↦ t ^ a • iteratedDeriv j (f : ℝ → ℂ) (Real.log t)
+  have G_eq (a : ℝ) (j : ℕ) {t : ℝ} (ht : 0 < t) :
+      G a j t = t ^ a • iteratedDeriv j (f : ℝ → ℂ) (Real.log t) :=
+    indicator_of_mem ht _
+  have G_zero (a : ℝ) (j : ℕ) {t : ℝ} (ht : t ≤ 0) : G a j t = 0 :=
+    indicator_of_notMem (show t ∉ Ioi (0 : ℝ) from ht.not_gt) _
+  -- The extra two powers of t give a zero derivative at the origin.
+  have hdecay (a : ℝ) (j : ℕ) (ha : a ≤ 0) : G a j =O[𝓝 0] (fun t : ℝ ↦ t ^ 2) := by
+    rw [← nhdsLE_sup_nhdsGT, Asymptotics.isBigO_sup]
+    constructor
+    · apply (Asymptotics.isBigO_zero _ _).congr' _ EventuallyEq.rfl
+      filter_upwards [self_mem_nhdsWithin (s := Iic (0 : ℝ))] with t ht
+      exact (G_zero a j ht).symm
+    · have hlog := isBigO_comp_log_rpow_of_isBigO_exp (hf j (2 - a) (by linarith))
+        Real.tendsto_log_nhdsGT_zero self_mem_nhdsWithin
+      apply ((Asymptotics.isBigO_refl (fun t : ℝ ↦ t ^ a) _).smul hlog).congr'
+      · filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with t ht
+        exact (G_eq a j ht).symm
+      · filter_upwards [self_mem_nhdsWithin (s := Ioi (0 : ℝ))] with t ht
+        rw [smul_eq_mul, ← Real.rpow_add ht, show a + (2 - a) = 2 by ring, Real.rpow_two]
+  have hderiv (a : ℝ) (j : ℕ) (ha : a ≤ 0) (t : ℝ) :
+      HasDerivAt (G a j) (G (a - 1) (j + 1) t + a • G (a - 1) j t) t := by
+    rcases lt_trichotomy t 0 with ht | rfl | ht
+    · rw [G_zero _ _ ht.le, G_zero _ _ ht.le, smul_zero, add_zero]
+      exact (hasDerivAt_const t (0 : ℂ)).congr_of_eventuallyEq
+        ((eventually_lt_nhds ht).mono fun u hu ↦ G_zero a j hu.le)
+    · simp only [G_zero _ _ le_rfl, smul_zero, add_zero, hasDerivAt_iff_isLittleO,
+        sub_zero]
+      exact (hdecay a j ha).trans_isLittleO (by
+        simpa only [pow_one] using
+          (Asymptotics.isLittleO_pow_pow (𝕜 := ℝ) (m := 1) (n := 2) (by decide)))
+    · have hlog : HasDerivAt (fromLog (iteratedDeriv j (f : ℝ → ℂ)))
+          (t⁻¹ • iteratedDeriv (j + 1) (f : ℝ → ℂ) (Real.log t)) t := by
+        rw [iteratedDeriv_succ]
+        exact ((f.smooth ⊤).differentiable_iteratedDeriv j
+          (ENat.natCast_lt_of_coe_top_le_withTop le_rfl j)
+          (Real.log t)).hasDerivAt.scomp t (Real.hasDerivAt_log ht.ne')
+      have h := (Real.hasDerivAt_rpow_const (p := a) (Or.inl ht.ne')).smul hlog
+      rw [G_eq _ _ ht, G_eq _ _ ht, smul_smul]
+      rw [smul_smul, mul_comm (t ^ a) t⁻¹, ← div_eq_inv_mul, ← Real.rpow_sub_one ht.ne'] at h
+      exact h.congr_of_eventuallyEq ((eventually_gt_nhds ht).mono fun u hu ↦ G_eq a j hu)
+  have hsmooth (n : ℕ) (a : ℝ) (j : ℕ) (ha : a ≤ 0) : ContDiff ℝ n (G a j) := by
+    induction n generalizing a j with
+    | zero =>
+      exact contDiff_zero.mpr (Differentiable.continuous fun t ↦ (hderiv a j ha t).differentiableAt)
+    | succ n ih =>
+      rw [Nat.cast_succ, contDiff_succ_iff_deriv]
+      refine ⟨fun t ↦ (hderiv a j ha t).differentiableAt, by simp, ?_⟩
+      rw [show deriv (G a j) = G (a - 1) (j + 1) + a • G (a - 1) j from
+        funext fun t ↦ (hderiv a j ha t).deriv]
+      have ha' : a - 1 ≤ 0 := by linarith
+      exact (ih (a - 1) (j + 1) ha').add ((ih (a - 1) j ha').const_smul a)
+  rw [contDiff_infty]
+  intro n
+  simpa only [G, Real.rpow_zero, one_smul, iteratedDeriv_zero] using hsmooth n 0 0 le_rfl
 
 /-- Paper: Lemma B.2.1.4(2), p. 593. Inversion on the positive reals is
 the continuous linear involution given by reflection of the logarithmic profile. -/
