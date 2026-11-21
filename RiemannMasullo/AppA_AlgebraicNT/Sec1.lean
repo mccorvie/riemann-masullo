@@ -2805,13 +2805,190 @@ private theorem sInteger_divisorPic_surjective (S : Finset (Primes(F))) :
   (picMapAlgebra_surjective_of_isLocalization (Localization.submonoid (S : Set (Primes(F))))
     (Oₛ(F, S))).comp (divisorPic_surjective F)
 
+open scoped nonZeroDivisors in
+/-- A prime of the ring of integers is disjoint from the S-integer denominators exactly
+when it lies outside S. -/
+private theorem sInteger_prime_disjoint_iff (S : Finset (Primes(F))) (v : Primes(F)) :
+    Disjoint (Localization.submonoid (S : Set (Primes(F))) : Set (𝓞 F)) (v.asIdeal : Set (𝓞 F)) ↔
+      v ∉ S := by
+  classical
+  constructor
+  · intro hd hv
+    obtain ⟨a, ha⟩ := exists_prime_power_generator F v
+    have hpos : 0 < (classNumber F : ℤ) := by
+      exact_mod_cast (classNumber_ne_zero F).bot_lt
+    have hlt : WithZero.exp (-(classNumber F : ℤ)) < 1 :=
+      WithZero.exp_lt_one_iff.mpr (neg_lt_zero.mpr hpos)
+    obtain ⟨b, hb⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (a : F) (by
+      intro w
+      rw [ha]
+      split_ifs
+      · exact hlt.le
+      · exact le_rfl)
+    have hval (w : Primes(F)) :
+        w.intValuation b = if w = v then WithZero.exp (-(classNumber F : ℤ)) else 1 := by
+      rw [← w.valuation_of_algebraMap (K := F) b]
+      change w.valuation F ((algebraMap (𝓞 F) F) b) = _
+      rw [hb, ha]
+    have hbV : b ∈ v.asIdeal := (v.intValuation_lt_one_iff_mem b).mp (by simpa [hval] using hlt)
+    have hbM : b ∈ Localization.submonoid (S : Set (Primes(F))) := by
+      rw [Localization.mem_submonoid_iff]
+      refine ⟨fun w hw ↦ w.intValuation_eq_one_iff.mp ?_, mem_nonZeroDivisors_iff_ne_zero.mpr ?_⟩
+      · exact (hval w).trans (ite_eq_right (show w ≠ v from fun h ↦ hw (h.symm ▸ hv)))
+      · exact fun h ↦ a.ne_zero (by rw [← hb, h, map_zero])
+    exact Set.disjoint_left.mp hd hbM hbV
+  · intro hv
+    apply Set.disjoint_left.mpr
+    intro b hb
+    change b ∈ Localization.submonoid (S : Set (Primes(F))) at hb
+    rw [Localization.mem_submonoid_iff] at hb
+    exact hb.1 v hv
+
+open scoped nonZeroDivisors in
 /-- Paper: Equation (A.1.5.9), p. 544. A divisor becomes principal over the S-integers
 precisely when its exponents away from S agree with the orders of a single nonzero field
 element. The exponents at the primes in S disappear under localization. -/
 private theorem sInteger_divisorPic_eq_one_iff (S : Finset (Primes(F))) (n : Primes(F) →₀ ℤ) :
     CommRing.Pic.mapAlgebra (𝓞 F) (Oₛ(F, S)) (divisorPic F (Multiplicative.ofAdd n)) = 1 ↔
       ∃ a : Fˣ, ∀ v ∉ S, n v = -WithZero.log (v.valuation F (a : F)) := by
-  sorry
+  classical
+  let R := 𝓞 F
+  let A := Oₛ(F, S)
+  let M := Localization.submonoid (S : Set (Primes(F)))
+  have hM : M ≤ R⁰ := Localization.submonoid_le_nonZeroDivisors _
+  let : IsFractionRing A F := IsFractionRing.isFractionRing_of_isLocalization M A F hM
+  let extend := Units.map (FractionalIdeal.extendedHom F A :
+    FractionalIdeal R⁰ F →+* FractionalIdeal A⁰ F).toMonoidHom
+  let prime (v : Primes(F)) : (Ideal R)⁰ :=
+    ⟨v.asIdeal, mem_nonZeroDivisors_iff_ne_zero.mpr v.ne_bot⟩
+  let divisor (m : Primes(F) →₀ ℤ) : (FractionalIdeal R⁰ F)ˣ :=
+    m.prod fun v k ↦ FractionalIdeal.mk0 F (prime v) ^ k
+  let extendPrime (v : Primes(F)) (hv : v ∉ S) : HeightOneSpectrum A :=
+    ⟨v.asIdeal.map (algebraMap R A), IsLocalization.isPrime_of_isPrime_disjoint M A _
+      v.isPrime ((sInteger_prime_disjoint_iff F S v).mpr hv),
+      (Ideal.map_eq_bot_iff_of_injective
+        (FaithfulSMul.algebraMap_injective R A)).not.mpr v.ne_bot⟩
+  have hunder (v : Primes(F)) (hv : v ∉ S) : (extendPrime v hv).asIdeal.under R = v.asIdeal :=
+    IsLocalization.under_map_of_isPrime_disjoint M A v.isPrime
+      ((sInteger_prime_disjoint_iff F S v).mpr hv)
+  have hprime (v : Primes(F)) :
+      extend (FractionalIdeal.mk0 F (prime v)) =
+        FractionalIdeal.mk0 F (ClassGroup.extendedIdeal R A (prime v)) := by
+    apply Units.ext
+    simp only [extend, Units.coe_map, RingHom.toMonoidHom_eq_coe, MonoidHom.coe_ofClass,
+      FractionalIdeal.coe_mk0, FractionalIdeal.extendedHom_coeIdeal_eq_map]
+  have hPic :
+      CommRing.Pic.mapAlgebra R A (divisorPic F (Multiplicative.ofAdd n)) =
+        ClassGroup.equivPic A (ClassGroup.mk F (extend (divisor n))) := by
+    change CommRing.Pic.mapAlgebra R A (n.prod _) = _
+    dsimp only [divisor, Finsupp.prod]
+    simp only [map_prod]
+    apply Finset.prod_congr rfl
+    intro v _
+    rw [map_zpow, map_zpow, map_zpow, hprime, ClassGroup.mk_mk0, map_zpow,
+      picMapAlgebra_equivPic_mk0_of_isLocalization M A (prime v)
+        (ClassGroup.extendedIdeal R A (prime v)) rfl]
+  have hcount (m : Primes(F) →₀ ℤ) (w : HeightOneSpectrum A) (v : Primes(F))
+      (hv : w.asIdeal.under R = v.asIdeal) :
+      FractionalIdeal.count F w (extend (divisor m) : FractionalIdeal A⁰ F) = m v := by
+    have hfactor (j : Primes(F)) :
+        FractionalIdeal.count F w
+          (extend (FractionalIdeal.mk0 F (prime j)) : FractionalIdeal A⁰ F) =
+          if j = v then 1 else 0 := by
+      rw [hprime, FractionalIdeal.coe_mk0]
+      change FractionalIdeal.count F w
+        ((j.asIdeal.map (algebraMap R A) : Ideal A) : FractionalIdeal A⁰ F) = _
+      by_cases hjv : j = v
+      · subst j
+        rw [← hv, IsLocalization.map_under M A, FractionalIdeal.count_self, ite_eq_left rfl]
+      rw [ite_eq_right hjv]
+      by_cases hj : j ∈ S
+      · have htop : j.asIdeal.map (algebraMap R A) = ⊤ := by
+          by_contra hne
+          exact (sInteger_prime_disjoint_iff F S j).mp
+            ((IsLocalization.map_algebraMap_ne_top_iff_disjoint M A _).mp hne) hj
+        rw [htop, FractionalIdeal.coeIdeal_top, FractionalIdeal.count_one]
+      · have hne : extendPrime j hj ≠ w := by
+          intro h
+          apply hjv
+          apply HeightOneSpectrum.ext
+          rw [← hv, ← hunder j hj]
+          exact congrArg (fun p : HeightOneSpectrum A ↦ p.asIdeal.under R) h
+        exact FractionalIdeal.count_maximal_coprime F w hne
+    change FractionalIdeal.count F w (Units.coeHom _ (extend (divisor m))) = _
+    dsimp only [divisor, Finsupp.prod]
+    simp only [map_prod]
+    rw [FractionalIdeal.count_prod]
+    · simp only [map_zpow, Units.coeHom_apply,
+        FractionalIdeal.count_zpow, hfactor, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq',
+        Finsupp.mem_support_iff, ne_eq, ite_not]
+      split_ifs with h
+      · exact h.symm
+      · rfl
+    · exact fun _ _ ↦ Units.ne_zero _
+  have hdivisor_eq (m : Primes(F) →₀ ℤ) :
+      extend (divisor n) = extend (divisor m) ↔ ∀ v ∉ S, n v = m v := by
+    constructor
+    · intro h v hv
+      rw [← hcount n (extendPrime v hv) v (hunder v hv),
+        ← hcount m (extendPrime v hv) v (hunder v hv), h]
+    · intro h
+      apply Units.ext
+      rw [← FractionalIdeal.finprod_heightOneSpectrum_factorization' F
+        (extend (divisor n)).ne_zero, ← FractionalIdeal.finprod_heightOneSpectrum_factorization' F
+          (extend (divisor m)).ne_zero]
+      apply finprod_congr
+      intro w
+      have := w.isPrime
+      obtain ⟨hp, hd⟩ := (IsLocalization.isPrime_iff_isPrime_disjoint M A _).mp w.isPrime
+      let v : Primes(F) := ⟨w.asIdeal.under R, hp,
+        (IsLocalization.bot_lt_under_prime M A hM _ w.ne_bot).ne'⟩
+      rw [hcount n w v rfl, hcount m w v rfl, h v ((sInteger_prime_disjoint_iff F S v).mp hd)]
+  have hprincipal (a : Fˣ) : ∃ m : Primes(F) →₀ ℤ,
+      (∀ v, m v = -WithZero.log (v.valuation F (a : F))) ∧
+        extend (divisor m) = toPrincipalIdeal A F a := by
+    let g := IdeleGroup.unitEmbedding R F a
+    let m := Finsupp.ofSupportFinite (ideleExponent F g)
+      (eventually_cofinite.mp (eventually_ideleExponent_eq_zero F g))
+    have hm (v : Primes(F)) : m v = -WithZero.log (v.valuation F (a : F)) := by
+      change -WithZero.log (Valued.v ((a : F) : v.adicCompletion F)) = _
+      rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+    have hmI : divisor m = ideleFractionalIdeal F g := by
+      change (∏ v ∈ m.support, FractionalIdeal.mk0 F (prime v) ^ m v) =
+        ∏ᶠ v, FractionalIdeal.mk0 F (prime v) ^ m v
+      rw [finprod_eq_finsetProd_of_mulSupport_subset]
+      intro v hv
+      exact Finsupp.mem_support_iff.mpr fun hz ↦ hv (by simp [hz])
+    refine ⟨m, hm, ?_⟩
+    rw [hmI, ideleFractionalIdeal_principal]
+    apply Units.ext
+    simp only [extend, Units.coe_map, RingHom.toMonoidHom_eq_coe, MonoidHom.coe_ofClass,
+      coe_toPrincipalIdeal]
+    rw [FractionalIdeal.extendedHom_spanSingleton (A := R)]
+    have hid : IsFractionRing.map (K := F) (L := F)
+        (FaithfulSMul.algebraMap_injective R A) = RingHom.id F := by
+      apply IsLocalization.ringHom_ext R⁰
+      ext r
+      change (IsFractionRing.map (FaithfulSMul.algebraMap_injective R A))
+        ((algebraMap R F) r) = (algebraMap R F) r
+      rw [IsFractionRing.map, IsLocalization.map_eq]
+      exact (IsScalarTower.algebraMap_apply R A F r).symm
+    rw [hid, RingHom.id_apply]
+  rw [hPic, ← (ClassGroup.equivPic A).map_one, (ClassGroup.equivPic A).injective.eq_iff,
+    ← (ClassGroup.equiv F).injective.eq_iff, ClassGroup.equiv_mk, map_one]
+  rw [FractionalIdeal.canonicalEquiv_self]
+  change (QuotientGroup.mk (extend (divisor n)) :
+    (FractionalIdeal A⁰ F)ˣ ⧸ (toPrincipalIdeal A F).range) = 1 ↔ _
+  rw [QuotientGroup.eq_one_iff, MonoidHom.mem_range]
+  constructor
+  · rintro ⟨a, ha⟩
+    obtain ⟨m, hm, hmI⟩ := hprincipal a
+    have h := (hdivisor_eq m).mp (ha.symm.trans hmI.symm)
+    exact ⟨a, fun v hv ↦ (h v hv).trans (hm v)⟩
+  · rintro ⟨a, ha⟩
+    obtain ⟨m, hm, hmI⟩ := hprincipal a
+    have h := (hdivisor_eq m).mpr (fun v hv ↦ (ha v hv).trans (hm v).symm)
+    exact ⟨a, (h.trans hmI).symm⟩
 
 /-- The additive order identifies the local multiplicative classes with the integers. -/
 private def localClassOrder (v : Primes(F)) : LocalClass(F, v) ≃* Multiplicative ℤ := by

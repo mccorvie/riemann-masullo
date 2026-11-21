@@ -43,11 +43,24 @@ variable (M : Submonoid R) (A : Type*) [CommRing A] [IsDedekindDomain A]
   [Algebra R A] [IsLocalization M A]
 
 include M in
+/-- The Picard class of a nonzero ideal maps to the class of its extension under localization. -/
+theorem picMapAlgebra_equivPic_mk0_of_isLocalization
+    (I : (Ideal R)⁰) (J : (Ideal A)⁰) (h : (I : Ideal R).map (algebraMap R A) = J) :
+    Pic.mapAlgebra R A (ClassGroup.equivPic R (ClassGroup.mk0 I)) =
+      ClassGroup.equivPic A (ClassGroup.mk0 J) := by
+  obtain ⟨_, hI⟩ := equivPic_mk0_eq_picMk I
+  obtain ⟨_, hJ⟩ := equivPic_mk0_eq_picMk J
+  rw [hI, hJ]
+  exact Pic.mk_eq_mk_iff.mpr
+    ⟨(TensorProduct.AlgebraTensorModule.congr (.refl ..) (Pic.mk.linearEquiv ..)) ≪≫ₗ
+      (IsLocalizedModule.isBaseChange M A (Algebra.idealMap A (I : Ideal R))).equiv ≪≫ₗ
+      LinearEquiv.ofEq _ _ h⟩
+
+include M in
 /-- Base change to a localization of a Dedekind domain is surjective on Picard groups. -/
 theorem picMapAlgebra_surjective_of_isLocalization : Function.Surjective (Pic.mapAlgebra R A) := by
   intro x
   obtain ⟨J, hJ⟩ := ClassGroup.mk0_surjective ((ClassGroup.equivPic A).symm x)
-  obtain ⟨_, hPicJ⟩ := equivPic_mk0_eq_picMk J
   let I := (J : Ideal A).under R
   have himage : I.map (algebraMap R A) = (J : Ideal A) := IsLocalization.map_under M A J
   have hI : I ≠ ⊥ := by
@@ -56,14 +69,8 @@ theorem picMapAlgebra_surjective_of_isLocalization : Function.Surjective (Pic.ma
     rw [← himage, he, Ideal.map_bot]
     rfl
   let I₀ : (Ideal R)⁰ := ⟨I, mem_nonZeroDivisors_iff_ne_zero.mpr hI⟩
-  obtain ⟨_, hPicI⟩ := equivPic_mk0_eq_picMk I₀
-  let e := (IsLocalizedModule.isBaseChange M A (Algebra.idealMap A I)).equiv.trans
-    (LinearEquiv.ofEq _ _ himage)
   refine ⟨ClassGroup.equivPic R (ClassGroup.mk0 I₀), ?_⟩
-  calc
-    _ = Pic.mapAlgebra R A (Pic.mk R (I₀ : Ideal R)) := congrArg _ hPicI
-    _ = Pic.mk A (J : Ideal A) := Pic.mk_eq_mk_iff.mpr
-      ⟨(TensorProduct.AlgebraTensorModule.congr (.refl ..) (Pic.mk.linearEquiv ..)) ≪≫ₗ e⟩
-    _ = x := hPicJ.symm.trans (by rw [hJ, MulEquiv.apply_symm_apply])
+  rw [picMapAlgebra_equivPic_mk0_of_isLocalization M A I₀ J himage, hJ,
+    MulEquiv.apply_symm_apply]
 
 end RiemannMasullo
