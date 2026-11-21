@@ -160,12 +160,114 @@ open scoped Classical
 
 local notation "mixed" => InfiniteAdeleRing.ringEquiv_mixedSpace F
 
+/-- Euclidean coordinates identify the full, trivial-kernel Bruhat stage with the
+classical Schwartz space. Every structural stage maps into this stage. -/
+private theorem mem_schwartzBruhatSubmodule_euclidean_iff
+    {A : Type*} [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A]
+    [LocallyCompactSpace A] {n : ℕ}
+    (v : A ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin n))) (g : A → ℂ) :
+    g ∈ schwartzBruhatSubmodule A ↔
+      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin n)) ℂ, ∀ x, s (v x).toAdd = g x := by
+  classical
+  let E := EuclideanSpace ℝ (Fin n)
+  let P := ElementaryLieGroup n 0 0 PUnit
+  let D := (Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × PUnit
+  let : Unique D := uniqueOfSubsingleton 0
+  let p : Multiplicative E ≃ₜ* Multiplicative P :=
+    { toMulEquiv := (AddEquiv.prodUnique (M := E) (N := D)).symm.toMultiplicative
+      continuous_toFun := (continuous_id.prodMk continuous_const :
+        Continuous (fun x : E ↦ (x, (default : D))))
+      continuous_invFun := (continuous_fst : Continuous (Prod.fst : E × D → E)) }
+  let e : ElementaryLCAPresentation A :=
+    { realDim := n, torusDim := 0, latticeRank := 0, finiteFactor := PUnit, equiv := v.trans p }
+  have hA := (lca_elementary_iff (G := A)).mpr ⟨e⟩
+  let i : (⊤ : Subgroup A) ≃ₜ* A :=
+    { Subgroup.topEquiv with
+      continuous_toFun := continuous_subtype_val
+      continuous_invFun := continuous_id.subtype_mk _ }
+  let a : BruhatStructuralPair A := ⟨(⊤, OrderDual.toDual ⊥), by simp,
+    isCompactlyGeneratedGroup_of_continuousMulEquiv i.symm hA.1,
+    isBruhatGoodSubgroup_bot_iff.mpr hA.2, bot_le⟩
+  let q₀ : A →* a.quotient := (QuotientGroup.mk' _).comp i.symm.toMulEquiv.toMonoidHom
+  have hq₀ : IsOpenQuotientMap q₀ :=
+    QuotientGroup.isOpenQuotientMap_mk.comp i.symm.toHomeomorph.isOpenQuotientMap
+  have hinj : Injective q₀ := (MonoidHom.ker_eq_bot_iff q₀).mp (eq_bot_iff.mpr fun x hx ↦ by
+    exact (a.quotient_mk_eq_one (i.symm x)).mp hx)
+  let q := (MulEquiv.ofBijective q₀ ⟨hinj, hq₀.surjective⟩).toContinuousMulEquiv
+    (fun _ ↦ hq₀.isQuotientMap.isOpen_preimage)
+  let e₀ : ElementaryLCAPresentation a.quotient := { e with equiv := q.symm.trans e.equiv }
+  have hreal (s : SchwartzBruhatStage e₀) (x : A) :
+      schwartzBruhatStageRealization a e₀ s x = s ((v x).toAdd, 0, 0, PUnit.unit) := by
+    have hx : x ∈ a.val.1 := Subgroup.mem_top x
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left hx]
+    change s ((e₀.equiv (q x)).toAdd) = _
+    change s ((e.equiv (q.symm (q x))).toAdd) = _
+    rw [q.symm_apply_apply]
+    rfl
+  have hrange : schwartzBruhatSubmodule A = (schwartzBruhatStageRealization a e₀).range := by
+    refine le_antisymm (iSup_le fun b ↦ iSup_le fun eb ↦ ?_) ?_
+    · rintro _ ⟨sb, rfl⟩
+      obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition (show b ≤ a from ⟨le_top, le_top⟩) eb e₀
+      exact ⟨j sb, hj sb⟩
+    · exact le_iSup_of_le a (le_iSup (fun e ↦ (schwartzBruhatStageRealization a e).range) e₀)
+  rw [hrange, LinearMap.mem_range]
+  constructor
+  · rintro ⟨s, hs⟩
+    let f : E → ℂ := fun x ↦ s (x, 0, 0, PUnit.unit)
+    have hs' (y : P) : f y.1 = s y :=
+      congrArg (fun z : P ↦ s z) (Prod.ext rfl (Subsingleton.elim _ _))
+    have hf : (fun y : P ↦ f y.1) ∈ elementarySchwartzSubmodule n 0 0 PUnit :=
+      (funext hs').symm ▸ s.property
+    obtain ⟨S, hS⟩ := (elementarySchwartzSubmodule_real_iff f).mp hf
+    refine ⟨S, fun x ↦ ?_⟩
+    exact (congrFun hS (v x).toAdd).trans
+      ((hreal s x).symm.trans (congrFun hs x))
+  · rintro ⟨s, hs⟩
+    let t : SchwartzBruhatStage e₀ :=
+      ⟨fun y : P ↦ s y.1, (elementarySchwartzSubmodule_real_iff _).mpr ⟨s, rfl⟩⟩
+    exact ⟨t, funext fun x ↦ (hreal t x).trans (hs x)⟩
+
+omit [NumberField F] in
+/-- The mixed coordinate map on infinite adeles is continuous in both directions. -/
+private theorem continuous_mixedCoordinates : Continuous mixed ∧ Continuous (mixed).symm := by
+  classical
+  open InfinitePlace in
+  let h : InfiniteAdeleRing F ≃ₜ mixedEmbedding.mixedSpace F :=
+    (Homeomorph.piEquivPiSubtypeProd IsReal (fun v : InfinitePlace F ↦ v.Completion)).trans
+      ((Homeomorph.piCongrRight fun v ↦
+          (Completion.isometryEquivRealOfIsReal v.2).toHomeomorph).prodCongr
+        ((Homeomorph.piCongrRight fun v ↦
+          (Completion.isometryEquivComplexOfIsComplex
+            (not_isReal_iff_isComplex.mp v.2)).toHomeomorph).trans
+          (Homeomorph.piCongrLeft (Y := fun _ ↦ ℂ)
+            (Equiv.subtypeEquivRight fun _ ↦ not_isReal_iff_isComplex))))
+  exact ⟨h.continuous, h.symm.continuous⟩
+
 /-- In mixed real and complex coordinates, the archimedean Schwartz–Bruhat functions
 are precisely the classical Schwartz functions on the underlying real vector space. -/
 theorem mem_archimedeanSchwartzBruhat_iff (g : InfiniteAdeleRing F → ℂ) :
     g ∘ Multiplicative.toAdd ∈ schwartzBruhatSubmodule (Multiplicative (InfiniteAdeleRing F)) ↔
       ∃ G : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ, ∀ x, G (mixed x) = g x := by
-  sorry
+  classical
+  let V := mixedEmbedding.mixedSpace F
+  let n := Module.finrank ℝ V
+  let L : V ≃L[ℝ] EuclideanSpace ℝ (Fin n) :=
+    ContinuousLinearEquiv.ofFinrankEq finrank_euclideanSpace_fin.symm
+  obtain ⟨hm, hm'⟩ := continuous_mixedCoordinates (F := F)
+  let v : Multiplicative (InfiniteAdeleRing F) ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin n)) :=
+    { toMulEquiv := ((mixed).toAddEquiv.trans L.toLinearEquiv.toAddEquiv).toMultiplicative
+      continuous_toFun := L.continuous.comp hm
+      continuous_invFun := hm'.comp L.symm.continuous }
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+    v.toHomeomorph.isEmbedding.t2Space
+  rw [mem_schwartzBruhatSubmodule_euclidean_iff v]
+  constructor
+  · rintro ⟨s, hs⟩
+    exact ⟨SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L s, fun x ↦ hs (Multiplicative.ofAdd x)⟩
+  · rintro ⟨s, hs⟩
+    refine ⟨SchwartzMap.compCLMOfContinuousLinearEquiv ℂ L.symm s, fun x ↦ ?_⟩
+    change s (L.symm (L (mixed x.toAdd))) = g x.toAdd
+    rw [L.symm_apply_apply, hs]
 
 /-- The logarithmically parametrized archimedean component of the subgroup is
 differentiable at the identity in mixed coordinates. -/
