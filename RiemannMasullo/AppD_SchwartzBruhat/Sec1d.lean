@@ -1801,7 +1801,50 @@ generate the smooth topology. -/
 theorem torusSchwartz_sup_generates (n : ℕ) (hn : 1 ≤ n) :
     GeneratesSeminormTopology (fun β : Fin n → ℕ ↦
       fun f : ElementarySchwartz 0 n 0 PUnit ↦
-        ⨆ z, (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞)) := by sorry
+        ⨆ z, (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞)) := by
+  let idx (β : Fin n → ℕ) : ElementarySchwartzIndex 0 n 0 := (0, 0, β, 0)
+  have hidx (i : ElementarySchwartzIndex 0 n 0) : idx i.2.2.1 = i := by
+    rcases i with ⟨a, b, c, d⟩
+    have ha : a = 0 := Subsingleton.elim _ _
+    have hb : b = 0 := Subsingleton.elim _ _
+    have hd : d = 0 := Subsingleton.elim _ _
+    subst a; subst b; subst d
+    rfl
+  have hbound (β : Fin n → ℕ) (f : ElementarySchwartz 0 n 0 PUnit) :
+      elementarySchwartzBound f.val (idx β) =
+        ⨆ z, (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞) := by
+    simp only [elementarySchwartzBound, idx, Finset.univ_eq_empty (α := Fin 0),
+      Finset.prod_empty, one_mul]
+    apply le_antisymm
+    · refine iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+      have ha : a = 0 := Subsingleton.elim _ _
+      have hb : b = PUnit.unit := Subsingleton.elim _ _
+      subst a; subst b
+      let z : Fin n → AddCircle (1 : ℝ) := fun i ↦ (xt.2 i : AddCircle (1 : ℝ))
+      have heq : elementaryPartial f.val 0 β xt 0 PUnit.unit = torusSchwartzPartial β f z := by
+        unfold torusSchwartzPartial
+        apply (elementaryPartial_descends f.val 0 β 0 PUnit.unit (f.property.1 0 PUnit.unit)).2
+        apply Prod.ext
+        · exact Subsingleton.elim _ _
+        · simp only [elementaryCover]
+          apply Prod.ext
+          · apply funext
+            intro i
+            exact ((AddCircle.equivIco (1 : ℝ) 0).symm_apply_apply (z i)).symm
+          · rfl
+      rw [heq]
+      exact le_iSup (fun z ↦ (‖torusSchwartzPartial β f z‖₊ : ℝ≥0∞)) z
+    · refine iSup_le fun z ↦ ?_
+      exact le_iSup_of_le (0, WithLp.toLp 2 (fun i ↦ (AddCircle.equivIco (1 : ℝ) 0 (z i)).val))
+        (le_iSup_of_le 0 (le_iSup_of_le PUnit.unit le_rfl))
+  refine ⟨fun β ↦ elementarySchwartzSeminorm (idx β), ?_, ?_⟩
+  · let e : (Fin n → ℕ) ≃ ElementarySchwartzIndex 0 n 0 :=
+      Equiv.ofBijective idx ⟨fun a b h ↦ congrArg (fun i : ElementarySchwartzIndex 0 n 0 ↦ i.2.2.1) h,
+        fun i ↦ ⟨i.2.2.1, hidx i⟩⟩
+    exact (elementarySchwartz_withSeminorms (m := 0) (n := n) (r := 0) (F := PUnit)).congr_equiv e
+  · intro β f
+    change ENNReal.ofReal (elementarySchwartzBound f.val (idx β)).toReal = _
+    rw [ENNReal.ofReal_toReal (f.property.2 (idx β)).ne, hbound]
 
 /-- Paper: Example D.1.10.4, p. 785. With product probability Haar measure, the Lᵖ
 norms of torus partials generate the smooth topology for each finite real p ≥ 1.

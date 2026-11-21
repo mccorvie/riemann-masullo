@@ -419,11 +419,57 @@ variable (ω : PontryaginDual m.toMonoidHom.ker) (Q : E →L[ℂ] E)
 
 local notation "P" => schwartzBruhatIsotypicProjector m hm μ₁ ω
 
+/-- A continuous linear functional evaluates a Pettis integral over the whole
+space as a scalar integral. -/
+private theorem pettisIntegral_univ_eval {X V : Type*} [MeasurableSpace X]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    {μ : Measure X} {F : X → V} {a : V}
+    (h : HasPettisIntegral (.positive (μ.restrict univ)) F a) (φ : StrongDual ℂ V) :
+    φ a = ∫ x, φ (F x) ∂μ := by
+  obtain ⟨_, he⟩ := h
+  have h := LinearMap.congr_fun he φ
+  change φ a = ∫ x, φ (F x) ∂(μ.restrict univ) at h
+  rwa [Measure.restrict_univ] at h
+
+set_option linter.unusedSectionVars false in
+include hcomm hQ in
+/-- Paper: Lemma D.2.2.1, p. 795. An equivariant continuous linear map
+from the Schwartz–Bruhat space intertwines the normalized Pettis averages. -/
+private theorem schwartzBruhatIsotypicProjector_intertwines (f : S) : i (P f) = Q (i f) := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : SeparatingDual ℂ E := locallyConvexSpace_separatingDual ℂ E
+  have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
+  refine (exists_schwartzBruhatIsotypicProjector_average m hm μ₁ (hμ₁ := hμ₁) ω).elim ?_
+  intro A hA
+  have hUnique := existsUnique_schwartzBruhatIsotypicProjector m hm μ₁ (hμ₁ := hμ₁) ω
+  have hproj : A = P := hUnique.unique hA.1 (Classical.choose_spec hUnique.exists)
+  have havg : i ((μ₁.real univ • A) f) = (μ₁.real univ • Q) (i f) := by
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+    intro φ
+    let F (k : K) : ℂ := φ (star (ω k : ℂ) • ρE k (i f))
+    calc
+      φ (i ((μ₁.real univ • A) f)) = ∫ k : K, φ (i (star (ω k : ℂ) • ρS k f)) ∂μ₁ :=
+        pettisIntegral_univ_eval (hA.2 f) (φ.comp i)
+      _ = ∫ k, F k ∂μ₁ := integral_congr_ae (ae_of_all _ fun k ↦ by
+        refine congrArg φ ((i.map_smul (star (ω k : ℂ)) (ρS k f)).trans ?_)
+        exact congrArg (fun v : E ↦ star (ω k : ℂ) • v) (hcomm (k : G) f))
+      _ = φ ((μ₁.real univ • Q) (i f)) := (pettisIntegral_univ_eval (hQ (i f)) φ).symm
+  refine (congrArg (fun L : S →L[ℂ] S ↦ i (L f)) hproj.symm).trans ?_
+  exact smul_right_injective E hmass ((i.map_smul_of_tower (μ₁.real univ) (A f)).symm.trans havg)
+
 include hE hρ heq hi hcomm hQ
 
+-- Retain the existing section hypotheses in the theorem signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(1), p. 795. The kernel of averaging on the target
 pulls back to the kernel of averaging on the source. -/
-theorem schwartzBruhatIsotype_comap_ker : Q.ker.comap i.toLinearMap = (P).ker := by sorry
+theorem schwartzBruhatIsotype_comap_ker : Q.ker.comap i.toLinearMap = (P).ker := by
+  refine Submodule.ext fun f ↦ ?_
+  change Q (i f) = 0 ↔ P f = 0
+  have hf : i (P f) = Q (i f) :=
+    schwartzBruhatIsotypicProjector_intertwines m hm μ₁ ρ i hcomm ω Q hQ f
+  exact ⟨fun h ↦ hi (hf.trans (h.trans i.map_zero.symm)),
+    fun h ↦ hf.symm.trans ((congrArg i h).trans i.map_zero)⟩
 
 set_option linter.unusedSectionVars false in
 /-- Paper: Lemma D.2.2.1(1), p. 795. The injection gives a continuous
@@ -630,19 +676,6 @@ theorem schwartzBruhat_dense_extension (hd : DenseRange i) (T : S →L[ℂ] S)
     exact (hU f).trans (hF f).symm
 
 omit hE hρ heq hi hcomm hQ in
-/-- A continuous linear functional evaluates a Pettis integral over the whole
-space as a scalar integral. -/
-private theorem pettisIntegral_univ_eval {X V : Type*} [MeasurableSpace X]
-    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
-    {μ : Measure X} {F : X → V} {a : V}
-    (h : HasPettisIntegral (.positive (μ.restrict univ)) F a) (φ : StrongDual ℂ V) :
-    φ a = ∫ x, φ (F x) ∂μ := by
-  obtain ⟨_, he⟩ := h
-  have h := LinearMap.congr_fun he φ
-  change φ a = ∫ x, φ (F x) ∂(μ.restrict univ) at h
-  rwa [Measure.restrict_univ] at h
-
-omit hE hρ heq hi hcomm hQ in
 /-- Paper: Lemma D.2.2.1(4), p. 795. Operators that intertwine the projectors
 descend uniquely to their kernel quotients. The descended maps agree on the
 image of the map relating the two operators. -/
@@ -716,27 +749,8 @@ theorem schwartzBruhatIsotype_extension_intertwines (hd : DenseRange i)
   have hmass : μ₁.real univ ≠ 0 := measureReal_univ_ne_zero
   have hi_average (ξ : PontryaginDual K) (B : E →L[ℂ] E)
       (hB : IsPettisIsotypicAverageOn μ₁ univ ρE ξ (μ₁.real univ • B)) (f : S) :
-      i (schwartzBruhatIsotypicProjector m hm μ₁ ξ f) = B (i f) := by
-    refine (exists_schwartzBruhatIsotypicProjector_average m hm μ₁ (hμ₁ := hμ₁) ξ).elim ?_
-    intro A hA
-    have hUnique := existsUnique_schwartzBruhatIsotypicProjector m hm μ₁ (hμ₁ := hμ₁) ξ
-    have hproj : A = schwartzBruhatIsotypicProjector m hm μ₁ ξ :=
-      hUnique.unique hA.1 (Classical.choose_spec hUnique.exists)
-    have havg : i ((μ₁.real univ • A) f) = (μ₁.real univ • B) (i f) := by
-      apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
-      intro φ
-      let F (k : K) : ℂ := φ (star (ξ k : ℂ) • ρE k (i f))
-      calc
-        φ (i ((μ₁.real univ • A) f)) =
-            ∫ k, φ (i (star (ξ k : ℂ) • ρS k f)) ∂μ₁ :=
-          pettisIntegral_univ_eval (hA.2 f) (φ.comp i)
-        _ = ∫ k, F k ∂μ₁ := integral_congr_ae (ae_of_all _ fun k ↦ by
-          refine congrArg φ ((i.map_smul (star (ξ k : ℂ)) (ρS k f)).trans ?_)
-          exact congrArg (fun v : E ↦ star (ξ k : ℂ) • v) (hcomm (k : G) f))
-        _ = φ ((μ₁.real univ • B) (i f)) := (pettisIntegral_univ_eval (hB (i f)) φ).symm
-    refine (congrArg (fun L : S →L[ℂ] S ↦ i (L f)) hproj.symm).trans ?_
-    exact smul_right_injective E hmass
-      ((i.map_smul_of_tower (μ₁.real univ) (A f)).symm.trans havg)
+      i (schwartzBruhatIsotypicProjector m hm μ₁ ξ f) = B (i f) :=
+    schwartzBruhatIsotypicProjector_intertwines m hm μ₁ ρ i hcomm ξ B hB f
   -- The restricted automorphism preserves Haar measure on the compact kernel.
   have hαker (k : K) : α (k : G) ∈ K :=
     (hα (k : G)).trans k.property

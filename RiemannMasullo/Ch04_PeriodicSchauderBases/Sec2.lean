@@ -588,7 +588,23 @@ Deviation: Frequencies are enumerated by the natural numbers. -/
 theorem cyclicFourierCoeff_unconditionalBasis :
     let ev := fun n : ℕ ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (cyclicExponential (freq n))
     IsSchauderBasis (cyclicFourierCoeff ∘ freq) ev ∧
-      SchauderBasis.IsUnconditional (cyclicFourierCoeff ∘ freq) ev := by sorry
+      SchauderBasis.IsUnconditional (cyclicFourierCoeff ∘ freq) ev := by
+  have hFrechet : IsFrechetTVS S := elementarySchwartz_isFrechet
+  let : BarrelledSpace ℂ S := isFrechetTVS_barrelled hFrechet
+  let : T2Space S := elementarySchwartz_t2
+  obtain ⟨_, _, _, hComplete⟩ := hFrechet
+  obtain ⟨e, he⟩ := elementarySchwartz_reflexive (m := 0) (n := 1) (r := 0) (F := PUnit)
+  let eval : S →ₗ[ℂ] StrongDual ℂ (StrongDual ℂ S) :=
+    ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ)
+  have hReflexive : IsHomeomorph eval := by
+    have heq : (eval : S → StrongDual ℂ (StrongDual ℂ S)) = e := by
+      funext f
+      exact DFunLike.ext _ _ fun L ↦ (he f L).symm
+    rw [heq]
+    exact e.isHomeomorph
+  obtain ⟨hb, ha⟩ := cyclicExponential_absoluteBasis
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hComplete hReflexive hb ha,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hComplete hReflexive hb ha⟩
 
 /-- Paper: Lemma 4.2.1.2(3), p. 162. The quotient Fourier coefficient is the
 normalized integral of the lift over the multiplicative fundamental interval. -/

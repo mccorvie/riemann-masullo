@@ -265,13 +265,196 @@ theorem sLocal_character_extension (χ : PontryaginDual Jₛ) :
   change ideleClassNormTwist e 0 y = (χ (QuotientGroup.mk g) : ℂ) * _ ^ (0 : ℂ)
   simp [he, hval]
 
+local notation "sProdUnits" => ContinuousMulEquiv.prodUnits
+  (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F)
+local notation "sInfiniteUnit(" w ", " x ")" => (sProdUnits).symm
+  (ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) w x), 1)
+local notation "sFiniteUnit(" v ", " x ")" => (sProdUnits).symm
+  (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x))
+
+/-- Inserting an infinite local unit through the S-ideles gives its full idele insertion. -/
+private theorem sIdeleInsertion_infiniteUnit (w : InfinitePlace F) (x : w.Completionˣ) :
+    sIdeleInsertion F S (sInfiniteUnit(w, x)) = IdeleGroup.ofCompletion (𝓞 F) F w x := by
+  classical
+  obtain ⟨ha, hf, ho⟩ := sIdeleInsertion_apply F S (sInfiniteUnit(w, x))
+  apply Units.ext
+  apply Prod.ext
+  · rw [ha]
+    funext u
+    change ((Pi.mulSingle (M := fun t ↦ t.Completionˣ) w x u : u.Completionˣ) : u.Completion) =
+      Pi.mulSingle (M := fun t ↦ t.Completion) w (x : w.Completion) u
+    by_cases hu : u = w
+    · subst u
+      simp
+    · simp [Pi.mulSingle_eq_of_ne hu]
+  · apply RestrictedProduct.ext
+    intro v
+    change (sIdeleInsertion F S (sInfiniteUnit(w, x))).val.2 v = 1
+    by_cases hv : v ∈ S
+    · exact hf ⟨v, hv⟩
+    · exact ho v hv
+
+/-- Inserting a finite local unit through the S-ideles gives its full idele insertion. -/
+private theorem sIdeleInsertion_finiteUnit (v : S) (x : (v.val.adicCompletion F)ˣ) :
+    sIdeleInsertion F S (sFiniteUnit(v, x)) = IdeleGroup.ofAdicCompletion (𝓞 F) F v.val x := by
+  classical
+  let : DecidableEq S := Classical.decEq _
+  obtain ⟨ha, hf, ho⟩ := sIdeleInsertion_apply F S (sFiniteUnit(v, x))
+  apply Units.ext
+  apply Prod.ext
+  · exact ha
+  · apply RestrictedProduct.ext
+    intro u
+    change (sIdeleInsertion F S (sFiniteUnit(v, x))).val.2 u =
+      RestrictedProduct.mulSingle (fun w : Primes ↦ w.adicCompletionIntegers F) v.val x.val u
+    by_cases hu : u = v.val
+    · subst u
+      rw [hf v, RestrictedProduct.mulSingle_eq_same]
+      change ((Pi.mulSingle (M := fun t : S ↦ (t.val.adicCompletion F)ˣ) v x v :
+        (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F) = _
+      rw [Pi.mulSingle_eq_same]
+    · rw [RestrictedProduct.mulSingle_eq_of_ne _ _ hu]
+      by_cases hm : u ∈ S
+      · rw [hf ⟨u, hm⟩]
+        change ((Pi.mulSingle (M := fun t : S ↦ (t.val.adicCompletion F)ˣ) v x ⟨u, hm⟩ :
+          (u.adicCompletion F)ˣ) : u.adicCompletion F) = 1
+        rw [Pi.mulSingle_eq_of_ne (fun e ↦ hu (congrArg Subtype.val e)), Units.val_one]
+      · exact ho u hm
+
+/-- The finite local Euler factor of a restricted global twist uses the same
+ramification condition and uniformizer value as the global finite Euler factor. -/
+private theorem finiteLocalEulerFactor_eq_finiteHeckeEulerFactor
+    (χ' : PontryaginDual C𝔽) (v : Primes) (s : ℂ) :
+    finiteLocalEulerFactor v (finitePlaceRestriction F v (ideleClassNormTwist χ' s)) =
+      finiteHeckeEulerFactor χ' v s := by
+  classical
+  let c := finitePlaceRestriction F v (ideleClassNormTwist χ' s)
+  let c₀ := finitePlaceRestriction F v (ideleClassNormTwist χ' 0)
+  have htwist (x : (v.adicCompletion F)ˣ) :
+      c x = c₀ x * (‖x.val‖ : ℂ) ^ s := by
+    let g := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x
+    change (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) * _
+    rw [Complex.cpow_zero, mul_one, ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hrestrict (x : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist χ' 0).restrict v x.val = c₀ x := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    rfl
+  have hunram : unramified[v, c] ↔ (ideleClassNormTwist χ' 0).IsUnramifiedAt v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff]
+    refine forall_congr' fun u ↦ ?_
+    let x := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u
+    change c x = 1 ↔ (ideleClassNormTwist χ' 0).restrict v x.val = 1
+    have hn : ‖x.val‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one (a := x)).mp
+          ⟨u.val.property, u.inv.property⟩)
+    rw [htwist, hn, Complex.ofReal_one, Complex.one_cpow, mul_one, hrestrict]
+  change finiteLocalEulerFactor v c = finiteHeckeEulerFactor χ' v s
+  by_cases hv : (ideleClassNormTwist χ' 0).IsUnramifiedAt v
+  · rw [finiteLocalEulerFactor, ite_eq_left (hunram.mpr hv), finiteHeckeEulerFactor, ite_eq_left hv]
+    let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    let hπ := val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+    let π := Units.mk0 _ hπ.ne_zero
+    change (1 - c π)⁻¹ = _
+    have hn := norm_uniformizer_adicCompletion v π.val hπ
+    rw [htwist, hv.localValue_eq π.val hπ, hrestrict, hn,
+      Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) s,
+      Complex.cpow_neg, Complex.ofReal_natCast]
+  · rw [finiteLocalEulerFactor, ite_eq_right (mt hunram.mp hv), finiteHeckeEulerFactor,
+      ite_eq_right hv]
+
+/-- The product of local factors of the infinite restrictions of a global
+norm twist is the global gamma factor. -/
+private theorem prod_infiniteLocalEulerFactor_eq_heckeGammaFactor
+    (χ' : PontryaginDual C𝔽) (s : ℂ) :
+    (∏ w : InfinitePlace F,
+      infiniteLocalEulerFactor w (infinitePlaceRestriction F w (ideleClassNormTwist χ' s))) =
+      heckeGammaFactor χ' s := by
+  classical
+  unfold heckeGammaFactor
+  refine Finset.prod_congr rfl fun w _ ↦ ?_
+  let c := infinitePlaceRestriction F w (ideleClassNormTwist χ' s)
+  let c₀ := infinitePlaceRestriction F w (ideleClassNormTwist χ' 0)
+  have htwist (x : w.Completionˣ) :
+      c x = c₀ x * ((‖x.val‖ ^ w.mult : ℝ) : ℂ) ^ s := by
+    let g := IdeleClassGroup.ofCompletion (𝓞 F) F w x
+    change (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ' g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) * _
+    rw [Complex.cpow_zero, mul_one, ideleClassNorm_ofCompletion]
+    rfl
+  change infiniteLocalEulerFactor w c = _
+  by_cases hw : w.IsReal
+  · let a := (realHeckeCharacter_parameters χ' w hw).exists.choose
+    have ha := (realHeckeCharacter_parameters χ' w hw).exists.choose_spec.2
+    have hshape : realShape[hw, c, s + a.1, a.2] := by
+      intro x
+      have hn : ‖((realModel(hw)).symm (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+        (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+          (map_zero (realModel(hw)).symm) (x : ℝ)
+      have hx : (‖(x : ℝ)‖ : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+      rw [htwist, ha, Complex.cpow_add _ _ hx]
+      change _ * ((‖((realModel(hw)).symm (x : ℝ) : w.Completion)‖ ^ w.mult : ℝ) : ℂ) ^ s = _
+      simp only [hn, InfinitePlace.mult, hw, ite_true, pow_one]
+      ac_rfl
+    have hp := (realLocalEulerParameters w hw c).unique
+      (realLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s + a.1, a.2)) hshape
+    simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hp, a]
+  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    let a := (complexHeckeCharacter_parameters χ' w hc).exists.choose
+    have ha := (complexHeckeCharacter_parameters χ' w hc).exists.choose_spec.2
+    have hshape : complexShape[hc, c, s + a.1, a.2] := by
+      intro x
+      have hn : ‖((complexModel(hc)).symm (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+        (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+          (map_zero (complexModel(hc)).symm) (x : ℂ)
+      have hx : ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr x.ne_zero))
+      rw [htwist, ha, Complex.cpow_add _ _ hx]
+      change _ * ((‖((complexModel(hc)).symm (x : ℂ) : w.Completion)‖ ^ w.mult : ℝ) : ℂ) ^ s = _
+      simp only [hn, InfinitePlace.mult, hw, ite_false]
+      ac_rfl
+    have hp := (complexLocalEulerParameters w hc c).unique
+      (complexLocalEulerParameters w hc c).exists.choose_spec (y₂ := (s + a.1, a.2)) hshape
+    simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hp, a]
+
 /-- Paper: Remark 3.3.1.6, p. 135. Along the component of any such lift,
 the S-local product matches the selected Euler factors of the global L-function. -/
 theorem sLocalHeckeL_eq_partialEulerProduct (χ : PontryaginDual Jₛ) (χ' : PontryaginDual C𝔽)
     (h : ideleClassNormTwist χ' 0 ∈ unramifiedOutside F S)
     (hχ : sIdeleRestriction F S ⟨ideleClassNormTwist χ' 0, h⟩ = chartₛ(χ) 0) (s : ℂ) :
     sLocalHeckeL (chartₛ(χ) s) =
-      heckeGammaFactor χ' s * ∏ v : S, finiteHeckeEulerFactor χ' v.val s := by sorry
+      heckeGammaFactor χ' s * ∏ v : S, finiteHeckeEulerFactor χ' v.val s := by
+  classical
+  have htwist (g : (SAdeleRing F S)ˣ) :
+      chartₛ(χ) s (QuotientGroup.mk g) =
+        ideleClassNormTwist χ' s (QuotientGroup.mk (sIdeleInsertion F S g)) := by
+    have hbase := DFunLike.congr_fun hχ (QuotientGroup.mk g)
+    rw [sIdeleRestriction_mk] at hbase
+    change (χ' (QuotientGroup.mk (sIdeleInsertion F S g)) : ℂ) * _ ^ (0 : ℂ) =
+      (χ (QuotientGroup.mk g) : ℂ) * _ ^ (0 : ℂ) at hbase
+    simp only [Complex.cpow_zero, mul_one] at hbase
+    change (χ (QuotientGroup.mk g) : ℂ) *
+        (((mₛ (QuotientGroup.mk g) : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ' (QuotientGroup.mk (sIdeleInsertion F S g)) : ℂ) * _ ^ s
+    rw [← hbase, sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
+    rfl
+  have hinfinite (w : InfinitePlace F) : sLocalInfiniteRestriction w (chartₛ(χ) s) =
+      infinitePlaceRestriction F w (ideleClassNormTwist χ' s) := by
+    ext1 x
+    change chartₛ(χ) s (QuotientGroup.mk (sInfiniteUnit(w, x))) =
+      ideleClassNormTwist χ' s (QuotientGroup.mk (IdeleGroup.ofCompletion (𝓞 F) F w x))
+    rw [htwist, sIdeleInsertion_infiniteUnit]
+  have hfinite (v : S) : sLocalFiniteRestriction v (chartₛ(χ) s) =
+      finitePlaceRestriction F v.val (ideleClassNormTwist χ' s) := by
+    ext1 x
+    change chartₛ(χ) s (QuotientGroup.mk (sFiniteUnit(v, x))) =
+      ideleClassNormTwist χ' s (QuotientGroup.mk (IdeleGroup.ofAdicCompletion (𝓞 F) F v.val x))
+    rw [htwist, sIdeleInsertion_finiteUnit]
+  simp_rw [sLocalHeckeL, hinfinite, hfinite, prod_infiniteLocalEulerFactor_eq_heckeGammaFactor,
+    finiteLocalEulerFactor_eq_finiteHeckeEulerFactor]
 
 /-- Paper: Lemma 3.3.1.7(1), p. 135. On every bounded strip in the positive
 half-plane the zeta function is uniformly Schwartz in height. -/
