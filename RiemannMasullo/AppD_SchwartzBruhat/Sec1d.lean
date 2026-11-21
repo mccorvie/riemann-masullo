@@ -65,7 +65,19 @@ theorem mem_range_integralIdeleInsertion (g : 𝕀[F]) :
 /-- Paper: Lemma D.1.10.1(1), p. 784. Insertion from the full S-stage is a continuous
 injective open map. -/
 theorem integralIdeleInsertion_isOpenEmbedding :
-    IsOpenEmbedding (integralIdeleInsertion F S) := by sorry
+    IsOpenEmbedding (integralIdeleInsertion F S) := by
+  have hopen : IsOpen (integralAdelesOutside F S : Set 𝔸[F]) := by
+    simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred]
+    exact (RestrictedProduct.isOpen_forall_imp_mem
+      (R := fun v : HeightOneSpectrum (𝓞 F) ↦ v.adicCompletion F)
+      (A := fun v ↦ v.adicCompletionIntegers F)
+      (fun v ↦ Valued.isOpen_valuationSubring (v.adicCompletion F))
+      (p := fun v ↦ v ∉ S)).preimage continuous_snd
+  have h := hopen.isOpenEmbedding_subtypeVal
+  have he : IsEmbedding (integralIdeleInsertion F S) := h.isEmbedding.units_map
+  have ho : IsOpenMap (integralIdeleInsertion F S) :=
+    Units.isOpenMap_map h.injective h.isOpenMap
+  exact ⟨he, ho.isOpen_range⟩
 
 /-- Paper: Lemma D.1.10.1(1), p. 784. The diagonal S-unit actions on the stage and
 on the global ideles are continuous, and insertion intertwines left translation.
@@ -78,7 +90,17 @@ theorem integralIdeleInsertion_equivariant :
     Continuous (fun x : SUnits × (integralAdelesOutside F S)ˣ ↦ d x.1 * x.2) ∧
     Continuous (fun x : SUnits × 𝕀[F] ↦ e x.1 * x.2) ∧
     ∀ u g, integralIdeleInsertion F S (d u * g) =
-      e u * integralIdeleInsertion F S g := by sorry
+      e u * integralIdeleInsertion F S g := by
+  let : TopologicalSpace SUnits := ⊥
+  let : DiscreteTopology SUnits := discreteTopology_bot _
+  intro d e
+  have hd : Continuous d := continuous_of_discreteTopology
+  have he : Continuous e := continuous_of_discreteTopology
+  refine ⟨(hd.comp continuous_fst).mul continuous_snd,
+    (he.comp continuous_fst).mul continuous_snd, ?_⟩
+  intro u g
+  rw [map_mul]
+  exact congrArg (· * integralIdeleInsertion F S g) (Units.ext rfl)
 
 -- TODO(paper-gap): D.1.10.1(2) names only GL₁(A_{F,S}). With the finite-product
 -- convention of (A.1.5.1), inserting 1 off S misses ideles with infinitely many
@@ -90,7 +112,19 @@ Deviation: The source is the full stage in (D.1.10.1), with the outside local un
 theorem integralIdeleInsertion_exhaustive :
     Monotone (fun T : Finset (HeightOneSpectrum (𝓞 F)) ↦
       range (integralIdeleInsertion F T)) ∧
-    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by sorry
+    ∀ g : 𝕀[F], ∃ T, g ∈ range (integralIdeleInsertion F T) := by
+  constructor
+  · intro U T hUT g hg
+    apply (mem_range_integralIdeleInsertion F T g).2
+    intro v hv
+    exact (mem_range_integralIdeleInsertion F U g).1 hg v (fun h ↦ hv (hUT h))
+  · intro g
+    have hfinite := Filter.eventually_cofinite.mp
+      (g.val.2.cofinite_mem_adicCompletionIntegers.and
+        g.inv.2.cofinite_mem_adicCompletionIntegers)
+    refine ⟨hfinite.toFinset, (mem_range_integralIdeleInsertion F _ g).2 ?_⟩
+    intro v hv
+    exact not_not.mp (fun h ↦ hv (hfinite.mem_toFinset.mpr h))
 
 /-- Paper: Lemma D.1.10.1(2), p. 784. The topology on the union of the full S-stages
 is final for their insertions. Their transition maps are the inclusions of the images.

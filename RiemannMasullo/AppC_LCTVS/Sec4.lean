@@ -10,12 +10,15 @@ public import Mathlib.MeasureTheory.Integral.Prod
 public import Mathlib.MeasureTheory.Measure.Complex
 public import Mathlib.MeasureTheory.VectorMeasure.Integral
 public import Mathlib.Topology.Algebra.Group.Quotient
+import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Operator.Banach
 import Mathlib.LinearAlgebra.Dual.Lemmas
 import Mathlib.MeasureTheory.Function.ConvergenceInMeasure
 import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
+import Mathlib.Topology.Algebra.Module.Star
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
 /-!
@@ -693,7 +696,70 @@ theorem exists_hasPettisIntegral_apply
     (f : X → H →L[ℂ] H)
     (hf : ∀ u, PettisWeaklyMeasurable (.complex μ) (fun x ↦ f x u))
     (hnorm : Integrable (fun x ↦ ‖f x‖) μ.variation) :
-    ∃ A : H →L[ℂ] H, ∀ u, HasPettisIntegral (.complex μ) (fun x ↦ f x u) (A u) := by sorry
+    ∃ A : H →L[ℂ] H, ∀ u, HasPettisIntegral (.complex μ) (fun x ↦ f x u) (A u) := by
+  have hpoint (u : H) (φ : StrongDual ℂ H) (x : X) :
+      ‖φ (f x u)‖ ≤ (‖φ‖ * ‖u‖) * ‖f x‖ := calc
+    ‖φ (f x u)‖ ≤ ‖φ‖ * ‖f x u‖ := φ.le_opNorm _
+    _ ≤ ‖φ‖ * (‖f x‖ * ‖u‖) :=
+      mul_le_mul_of_nonneg_left ((f x).le_opNorm u) (norm_nonneg _)
+    _ = _ := by ring
+  have hi (u : H) : PettisWeaklyIntegrable (.complex μ) (fun x ↦ f x u) :=
+    fun φ ↦ (hnorm.const_mul (‖φ‖ * ‖u‖)).mono' (hf u φ).aestronglyMeasurable
+      (Eventually.of_forall (hpoint u φ))
+  -- Use Riesz representation on the conjugate of a bidual functional.
+  have hH : Surjective (NormedSpace.inclusionInDoubleDual ℂ H) := by
+    intro l
+    let d := InnerProductSpace.toDual ℂ H
+    let g : StrongDual ℂ H := (starL ℂ (A := ℂ)).toContinuousLinearMap.comp
+      (l.comp d.toLinearIsometry.toContinuousLinearMap)
+    obtain ⟨z, hz⟩ := d.surjective g
+    refine ⟨z, ContinuousLinearMap.ext fun φ ↦ ?_⟩
+    obtain ⟨y, rfl⟩ := d.surjective φ
+    change inner ℂ y z = l (d y)
+    rw [← inner_conj_symm]
+    change starRingEnd ℂ (d z y) = l (d y)
+    rw [hz]
+    change starRingEnd ℂ (starRingEnd ℂ (l (d y))) = l (d y)
+    simp
+  choose a ha using fun u ↦ pettisIntegrable_of_reflexive hH μ (fun x ↦ f x u) (hi u)
+  have heval (u : H) (φ : StrongDual ℂ H) :
+      φ (a u) = (PettisMeasure.complex μ).scalarIntegral (fun x ↦ φ (f x u)) := by
+    obtain ⟨_, h⟩ := ha u
+    exact congrArg (fun z : PettisWeakCompletion H ↦
+      (show Module.Dual ℂ (StrongDual ℂ H) from z) φ) h
+  let L : H →ₗ[ℂ] H :=
+    { toFun := a
+      map_add' := fun u v ↦ by
+        apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+        intro φ
+        simp only [map_add, heval]
+        exact VectorMeasure.integral_fun_add (hi u φ) (hi v φ)
+      map_smul' := fun c u ↦ by
+        apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+        intro φ
+        simp only [RingHom.id_apply, map_smul, heval]
+        exact pettisScalarIntegral_smul (.complex μ) (fun x ↦ f x u) (hi u) c φ }
+  -- Bound the representing vectors by integrating against the variation of μ.
+  let C := ∫ x, ‖f x‖ ∂μ.variation
+  have hC : 0 ≤ C := integral_nonneg fun x ↦ norm_nonneg _
+  have hL (u : H) : ‖L u‖ ≤ C * ‖u‖ := by
+    apply NormedSpace.norm_le_dual_bound (𝕜 := ℂ) _ (mul_nonneg hC (norm_nonneg _))
+    intro φ
+    change ‖φ (a u)‖ ≤ _
+    rw [heval]
+    change ‖μ.integral (fun x ↦ φ (f x u)) (ContinuousLinearMap.mul ℝ ℂ)‖ ≤ _
+    calc
+      _ ≤ ‖ContinuousLinearMap.mul ℝ ℂ‖ * ∫ x, ‖φ (f x u)‖ ∂μ.variation :=
+        VectorMeasure.norm_integral_le_integral_norm
+      _ ≤ ∫ x, ‖φ (f x u)‖ ∂μ.variation :=
+        mul_le_of_le_one_left (integral_nonneg fun x ↦ norm_nonneg _)
+          (ContinuousLinearMap.opNorm_mul_le ℝ ℂ)
+      _ ≤ ∫ x, (‖φ‖ * ‖u‖) * ‖f x‖ ∂μ.variation :=
+        integral_mono (hi u φ).norm (hnorm.const_mul _) (hpoint u φ)
+      _ = _ := by
+        rw [integral_const_mul]
+        ring
+  exact ⟨L.mkContinuous C hL, ha⟩
 
 -- TODO(paper-gap): The proof of C.4.3.12 uses |μ(X)| where a uniform estimate
 -- needs |μ|(X). The integrability of each function is already assumed.
@@ -710,7 +776,46 @@ theorem tendsto_pettisIntegral_of_tendstoUniformly
     letI := IsTopologicalAddGroup.rightUniformSpace E
     TendstoUniformly f g atTop →
       Tendsto (fun i ↦ pettisIntegral (.complex μ) (f i) (hfi i)) atTop
-        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by sorry
+        (𝓝 (pettisIntegral (.complex μ) g hgi)) := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  intro hfg
+  let a (i : ι) := pettisIntegral (.complex μ) (f i) (hfi i)
+  let b := pettisIntegral (.complex μ) g hgi
+  change Tendsto a atTop (𝓝 b)
+  have eval_integral {u : X → E} {z : E} {hu : PettisWeaklyIntegrable (.complex μ) u}
+      (h : toPettisWeakCompletion E z = pettisWeakIntegral (.complex μ) u hu)
+      (φ : StrongDual ℂ E) :
+      φ z = μ.integral (fun x ↦ φ (u x)) (ContinuousLinearMap.mul ℝ ℂ) :=
+    congrArg (fun w : PettisWeakCompletion E ↦
+      (show Module.Dual ℂ (StrongDual ℂ E) from w) φ) h
+  obtain ⟨hweakg, hrepg⟩ := hasPettisIntegral_pettisIntegral (.complex μ) g hgi
+  rw [← tendsto_sub_nhds_zero_iff]
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).tendsto_right_iff.mpr ?_
+  intro p hp
+  -- Use the total variation mass to choose a uniform bound on the integrands.
+  let mass := μ.variation.real univ
+  have hmass : 0 < mass + 1 := add_pos_of_nonneg_of_pos measureReal_nonneg one_pos
+  let δ := (mass + 1)⁻¹
+  have hδ : 0 < δ := inv_pos.mpr hmass
+  have huniform := (IsTopologicalAddGroup.tendstoUniformly_iff f g atTop rfl).mp hfg
+    (p.ball 0 δ) (Seminorm.ball_mem_nhds hp hδ)
+  filter_upwards [huniform] with i hi
+  obtain ⟨hweakf, hrepf⟩ := hasPettisIntegral_pettisIntegral (.complex μ) (f i) (hfi i)
+  -- Test the difference of the integrals with a functional that attains the seminorm.
+  obtain ⟨φ, hφ, heq⟩ := exists_dual_norm_eq_seminorm p hp (a i - b)
+  have hbound := VectorMeasure.norm_integral_le_of_norm_le_const
+    (B := ContinuousLinearMap.mul ℝ ℂ) (f := fun x ↦ φ (f i x) - φ (g x))
+    (ae_of_all μ.variation fun x ↦ by
+      rw [← map_sub]
+      exact (hφ _).trans (p.mem_ball_zero.mp (hi x)).le)
+  rw [VectorMeasure.integral_fun_sub (hweakf φ) (hweakg φ),
+    ← eval_integral hrepf φ, ← eval_integral hrepg φ, ← map_sub] at hbound
+  apply p.mem_ball_zero.mpr
+  calc
+    p (a i - b) = ‖φ (a i - b)‖ := heq.symm
+    _ ≤ δ * mass := by simpa only [ContinuousLinearMap.opNorm_mul, mul_one] using hbound
+    _ < δ * (mass + 1) := mul_lt_mul_of_pos_left (lt_add_one mass) hδ
+    _ = 1 := inv_mul_cancel₀ hmass.ne'
 
 end Criteria
 
@@ -743,7 +848,35 @@ theorem pettisWeakIntegral_prod
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
           pettisWeakIntegral (.positive μ) fx hfx ∧
         pettisWeakIntegral (.positive (μ.prod ν)) f hf =
-          pettisWeakIntegral (.positive ν) fy hfy := by sorry
+          pettisWeakIntegral (.positive ν) fy hfy := by
+  intro fx fy
+  have hφx (φ : StrongDual ℂ E) :
+      (fun x ↦ φ (fx x)) = fun x ↦ ∫ y, φ (f (x, y)) ∂ν := by
+    funext x
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive ν) _ (hx x)
+    exact LinearMap.congr_fun h φ
+  have hφy (φ : StrongDual ℂ E) :
+      (fun y ↦ φ (fy y)) = fun y ↦ ∫ x, φ (f (x, y)) ∂μ := by
+    funext y
+    obtain ⟨_, h⟩ := hasPettisIntegral_pettisIntegral (.positive μ) _ (hy y)
+    exact LinearMap.congr_fun h φ
+  have hfx : PettisWeaklyIntegrable (.positive μ) fx := by
+    intro φ
+    change Integrable (fun x ↦ φ (fx x)) μ
+    rw [hφx]
+    exact (hf φ).integral_prod_left
+  have hfy : PettisWeaklyIntegrable (.positive ν) fy := by
+    intro φ
+    change Integrable (fun y ↦ φ (fy y)) ν
+    rw [hφy]
+    exact (hf φ).integral_prod_right
+  refine ⟨hfx, hfy, LinearMap.ext fun φ ↦ ?_, LinearMap.ext fun φ ↦ ?_⟩
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ x, φ (fx x) ∂μ
+    rw [hφx]
+    exact integral_prod _ (hf φ)
+  · change (∫ z, φ (f z) ∂μ.prod ν) = ∫ y, φ (fy y) ∂ν
+    rw [hφy]
+    exact integral_prod_symm _ (hf φ)
 
 -- TODO(paper-gap): The image asserted in Remark C.4.4.2 can also contain zero
 -- from outside the support. Its compactness still follows by adjoining zero.

@@ -777,24 +777,23 @@ private theorem realBruhat_stage_exists :
         L.continuous.prodMk continuous_const,
       show Continuous (fun x : E × B ↦ L.symm x.1) from
         L.symm.continuous.comp continuous_fst⟩
-  exact ⟨a, ⟨⟨1, 0, 0, 1, inferInstance, q.symm.trans M'⟩⟩⟩
+  refine ⟨a, ⟨?_⟩⟩
+  exact { realDim := 1, torusDim := 0, latticeRank := 0, finiteFactor := Fin 1, equiv := q.symm.trans M' }
 
 /-- In any elementary presentation of a real structural quotient, the torus and
 discrete factors are trivial, and the real coordinate is a continuous real-linear equivalence. -/
 private theorem realBruhat_stage_coordinates (a : BruhatStructuralPair (Multiplicative ℝ))
     (e : ElementaryLCAPresentation a.quotient) :
-    letI := e.finiteGroup
-    e.torusDim = 0 ∧ e.latticeRank = 0 ∧ Subsingleton (Fin e.finiteOrder) ∧
+    e.torusDim = 0 ∧ e.latticeRank = 0 ∧ Subsingleton e.finiteFactor ∧
     ∃ (h : ∀ x : Multiplicative ℝ, x ∈ a.val.1)
       (L : ℝ ≃L[ℝ] EuclideanSpace ℝ (Fin e.realDim)),
       ∀ x : ℝ, (e.equiv (QuotientGroup.mk ⟨Multiplicative.ofAdd x, h _⟩)).toAdd =
         (L x, 0, 0, 0) := by
-  let := e.finiteGroup
   obtain ⟨h, q, hq⟩ := realBruhat_pair_quotient a
   let E := EuclideanSpace ℝ (Fin e.realDim)
   let T := Fin e.torusDim → AddCircle (1 : ℝ)
   let Z := Fin e.latticeRank → ℤ
-  let F := Fin e.finiteOrder
+  let F := e.finiteFactor
   let P := ElementaryLieGroup e.realDim e.torusDim e.latticeRank F
   let w := q.trans e.equiv
   let W : ℝ ≃+ P := MulEquiv.toAdditive w.toMulEquiv
@@ -993,11 +992,14 @@ private theorem realBruhat_stage_equiv (a : BruhatStructuralPair (Multiplicative
   obtain ⟨ht, hz, hF, h, L, hL⟩ := realBruhat_stage_coordinates a e
   have hm : e.realDim = 1 := by
     simpa [finrank_euclideanSpace] using L.toLinearEquiv.finrank_eq.symm
-  rcases e with ⟨m, n, r, k, group, equiv⟩
+  rcases e with @⟨m, n, r, F, group, finite, topology, discrete, equiv⟩
   dsimp only at hm ht hz
   subst m n r
-  let := group
-  obtain ⟨E, hE⟩ := elementarySchwartz_real_equiv (Fin k)
+  letI := group
+  letI := finite
+  letI := topology
+  letI := discrete
+  obtain ⟨E, hE⟩ := elementarySchwartz_real_equiv F
   let l : ℝ ≃L[ℝ] ℝ := L.trans realBruhatCoordinate
   let P := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ l.symm (F := ℂ)
   let Q := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ l (F := ℂ)
@@ -1006,9 +1008,9 @@ private theorem realBruhat_stage_equiv (a : BruhatStructuralPair (Multiplicative
     (fun f ↦ SchwartzMap.ext fun x ↦ congrArg f (l.apply_symm_apply x))
   refine ⟨J.trans E, fun f x ↦ ?_⟩
   have hreal := schwartzBruhatStageRealization_apply a
-    ⟨1, 0, 0, k, group, equiv⟩ ((J.trans E) f) x
+    { realDim := 1, torusDim := 0, latticeRank := 0, finiteFactor := F, equiv := equiv } ((J.trans E) f) x
   rw [dite_eq_left (h x)] at hreal
-  refine hreal.trans ((congrArg (fun p : ElementaryLieGroup 1 0 0 (Fin k) ↦ E (P f) p)
+  refine hreal.trans ((congrArg (fun p : ElementaryLieGroup 1 0 0 F ↦ E (P f) p)
     (hL x.toAdd)).trans ?_)
   exact (hE (P f) _).trans (congrArg f (l.symm_apply_apply x.toAdd))
 
