@@ -9,6 +9,8 @@ public import Mathlib.MeasureTheory.Group.Integral
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
+import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SmoothFamily
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
@@ -2222,11 +2224,308 @@ theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
   rw [← hsurj.image_preimage (f ⁻¹' s)]
   exact hq.measurableSet_image' (hrestrict hs)
 
+include hbij in
+/-- Every point has a unique right `H`-translate in the Borel section `Δ`. -/
+private lemma weilSection_existsUnique (x : G) : ∃! γ : H.op, γ • x ∈ Δ := by
+  obtain ⟨d, hd⟩ := hbij.2 (QuotientGroup.mk x)
+  have hmem : x⁻¹ * (d : G) ∈ H := by
+    simpa [mul_inv_rev, inv_inv] using H.inv_mem ((QuotientGroup.eq).mp hd)
+  let g : H.op := H.equivOp ⟨x⁻¹ * (d : G), hmem⟩
+  have hgx : g • x = (d : G) := by
+    have hg : (g : Gᵐᵒᵖ) = MulOpposite.op (x⁻¹ * (d : G)) := rfl
+    rw [Submonoid.smul_def, hg, MulOpposite.smul_eq_mul_unop]
+    simp
+  refine ExistsUnique.intro g (hgx ▸ d.property) ?_
+  intro g' hg'
+  have hmk (γ : H.op) :
+      QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+    rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+    simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+  let a : Δ := ⟨g • x, hgx ▸ d.property⟩
+  let b : Δ := ⟨g' • x, hg'⟩
+  have hab : a = b := hbij.1 ((hmk g).trans (hmk g').symm)
+  have hgx' : g • x = g' • x := congrArg Subtype.val hab
+  rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+    MulOpposite.smul_eq_mul_unop] at hgx'
+  exact Subtype.ext <| MulOpposite.unop_injective <| mul_left_cancel hgx'.symm
+
+include hΔ hbij in
+/-- A Borel set meeting every coset exactly once is a strict fundamental domain for the
+right action of `H`. -/
+private lemma weilSection_isFundamentalDomain :
+    IsFundamentalDomain H.op Δ μ :=
+  IsFundamentalDomain.mk' hΔ.nullMeasurableSet (weilSection_existsUnique H hbij)
+
+/-- Right multiplication by `H` does not change the coset. -/
+private lemma weilSection_mk_smul (γ : H.op) (x : G) :
+    QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+  rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+  simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Integrability on the quotient
 can be tested on the pullback restricted to a Borel fundamental domain. -/
 theorem weilFundamentalDomain_integrable_iff (f : G ⧸ H → ℂ) :
-    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by sorry
+    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by
+  haveI : IsClosed (H : Set G) := hH
+  letI : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  haveI : Countable H :=
+    (TopologicalSpace.separableSpace_iff_countable (α := H)).1 inferInstance
+  haveI : Countable H.op := Countable.of_equiv H H.equivOp
+  haveI : MeasurableConstSMul H.op G :=
+    ⟨fun γ ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measurable_mul_const _⟩
+  haveI : SMulInvariantMeasure H.op G μ :=
+    ⟨fun γ s _hs ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measure_preimage_mul_right μ _ s⟩
+  let π : G → G ⧸ H := QuotientGroup.mk
+  have hπ : Measurable π := QuotientGroup.continuous_mk.measurable
+  have hfund : IsFundamentalDomain H.op Δ μ := weilSection_isFundamentalDomain H μ hΔ hbij
+  have hfundImage (g : G) : IsFundamentalDomain H.op ((fun y ↦ g * y) '' Δ) μ := by
+    refine IsFundamentalDomain.mk'
+      ((measurableEmbedding_mulLeft g).measurableSet_image.mpr hΔ).nullMeasurableSet fun x ↦ ?_
+    obtain ⟨γ, hγ, huniq⟩ := weilSection_existsUnique H hbij (g⁻¹ * x)
+    have hcomm : γ • x = g * (γ • (g⁻¹ * x)) := by
+      rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+        MulOpposite.smul_eq_mul_unop]
+      simp [mul_assoc]
+    refine ExistsUnique.intro γ ?_ ?_
+    · rw [hcomm]
+      exact ⟨γ • (g⁻¹ * x), hγ, rfl⟩
+    · intro γ' hγ'
+      apply huniq
+      have hcomm' : γ' • (g⁻¹ * x) = g⁻¹ * (γ' • x) := by
+        rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+          MulOpposite.smul_eq_mul_unop]
+        simp [mul_assoc]
+      rw [hcomm']
+      obtain ⟨y, hy, hyx⟩ := hγ'
+      have hyx' : g⁻¹ * (γ' • x) = y := by
+        rw [← hyx]
+        simp
+      simpa [hyx'] using hy
+  have hpush (g : G) :
+      (μ.restrict ((fun y ↦ g * y) '' Δ)).map π = (μ.restrict Δ).map π := by
+    ext U hU
+    have hpre : MeasurableSet (π ⁻¹' U) := hU.preimage hπ
+    rw [Measure.map_apply hπ hU, Measure.restrict_apply hpre, Measure.map_apply hπ hU,
+      Measure.restrict_apply hpre]
+    refine (hfund.measure_set_eq (hfundImage g) hpre ?_).symm
+    intro γ
+    ext y
+    simp only [Set.mem_preimage, π]
+    rw [weilSection_mk_smul H γ y]
+  let νΔ : Measure (G ⧸ H) := (μ.restrict Δ).map π
+  haveI : νΔ.IsMulLeftInvariant := by
+    refine ⟨fun q ↦ ?_⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    let L : G → G := fun x ↦ g * x
+    let LQ : G ⧸ H → G ⧸ H := fun r ↦ π g * r
+    have hpres : MeasurePreserving L (μ.restrict Δ) (μ.restrict (L '' Δ)) :=
+      (measurePreserving_mul_left μ g).restrict_image_emb (measurableEmbedding_mulLeft g) Δ
+    have hcomp : LQ ∘ π = π ∘ L := by
+      ext x
+      simp [LQ, L, π, QuotientGroup.mk_mul]
+    calc
+      Measure.map LQ νΔ = Measure.map LQ (Measure.map π (μ.restrict Δ)) := rfl
+      _ = Measure.map (LQ ∘ π) (μ.restrict Δ) :=
+        Measure.map_map (measurable_const_mul (π g)) hπ
+      _ = Measure.map (π ∘ L) (μ.restrict Δ) := by rw [hcomp]
+      _ = Measure.map π (Measure.map L (μ.restrict Δ)) :=
+        (Measure.map_map hπ (measurable_const_mul g)).symm
+      _ = Measure.map π (μ.restrict (L '' Δ)) := by rw [hpres.map_eq]
+      _ = νΔ := by rw [hpush g]
+  have hdisc : IsDiscrete (H : Set G) :=
+    (SetLike.isDiscrete_iff_discreteTopology).2 inferInstance
+  obtain ⟨U, hU, -, hsep⟩ := hdisc.exists_nhds_eq_one_of_image_mulRight_inter_nonempty
+  obtain ⟨K0, hK0, hK0n⟩ := exists_compact_mem_nhds (1 : G)
+  have hmem : K0 ∩ U ∈ 𝓝 (1 : G) := Filter.inter_mem hK0n hU
+  obtain ⟨W, hWsub, hWo, hW1⟩ := mem_nhds_iff.mp hmem
+  have hWcl : IsCompact (closure W) :=
+    IsCompact.of_isClosed_subset hK0 isClosed_closure
+      (closure_minimal (hWsub.trans inter_subset_left) hK0.isClosed)
+  have hWlt : μ W < (⊤ : ℝ≥0∞) :=
+    lt_of_le_of_lt (measure_mono subset_closure) hWcl.measure_lt_top
+  have hWpos : 0 < μ W := hWo.measure_pos μ ⟨1, hW1⟩
+  have hWU : W ⊆ U := hWsub.trans inter_subset_right
+  let leftPiece (h : H) : Set G := W ∩ (fun x ↦ x * (h : G)) '' Δ
+  let rightPiece (h : H) : Set G := (fun x ↦ x * (h : G)) '' W ∩ Δ
+  have hleftMeas (h : H) : MeasurableSet (leftPiece h) :=
+    hWo.measurableSet.inter ((measurableEmbedding_mulRight (h : G)).measurableSet_image.mpr hΔ)
+  have hrightMeas (h : H) : MeasurableSet (rightPiece h) :=
+    ((Homeomorph.mulRight (h : G)).isOpenMap W hWo).measurableSet.inter hΔ
+  have hdisjL : Pairwise fun h₁ h₂ ↦ Disjoint (leftPiece h₁) (leftPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨-, d₁, hd₁, rfl⟩
+    rcases hz₂ with ⟨-, d₂, hd₂, hd₂eq⟩
+    have hsame : QuotientGroup.mk (s := H) d₁ = QuotientGroup.mk (s := H) d₂ := by
+      rw [QuotientGroup.eq]
+      have heq : d₂ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          d₂ * (h₂ : G) = d₁ * (h₁ : G) := hd₂eq
+          _ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have heqd : d₁ = d₂ := by
+      have hsub : (⟨d₁, hd₁⟩ : Δ) = ⟨d₂, hd₂⟩ := hbij.1 (by simpa using hsame)
+      simpa using congrArg Subtype.val hsub
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := d₁)
+      calc d₁ * (h₁ : G) = d₂ * (h₂ : G) := hd₂eq.symm
+        _ = d₁ * (h₂ : G) := by rw [heqd]
+    exact hne (Subtype.ext hh)
+  have hdisjR : Pairwise fun h₁ h₂ ↦ Disjoint (rightPiece h₁) (rightPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨⟨w₁, hw₁, rfl⟩, -⟩
+    rcases hz₂ with ⟨⟨w₂, hw₂, hw₂eq⟩, -⟩
+    have hmk : QuotientGroup.mk (s := H) w₁ = QuotientGroup.mk (s := H) w₂ := by
+      rw [QuotientGroup.eq]
+      have heq : w₂ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          w₂ * (h₂ : G) = w₁ * (h₁ : G) := hw₂eq
+          _ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have hrel : w₁⁻¹ * w₂ ∈ H := (QuotientGroup.eq).mp hmk
+    have hone : w₁⁻¹ * w₂ = 1 := by
+      apply hsep _ hrel
+      exact ⟨w₂, ⟨w₁, hWU hw₁, by simp⟩, hWU hw₂⟩
+    have hw12 : w₁ = w₂ := by
+      have : w₁ * (w₁⁻¹ * w₂) = w₁ := by simp [hone]
+      exact (by simpa using this : w₂ = w₁).symm
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := w₁)
+      calc w₁ * (h₁ : G) = w₂ * (h₂ : G) := hw₂eq.symm
+        _ = w₁ * (h₂ : G) := by rw [hw12]
+    exact hne (Subtype.ext hh)
+  have hcoverL : ⋃ h : H, leftPiece h = W := by
+    ext w
+    constructor
+    · rintro ⟨-, ⟨h, rfl⟩, hw, -⟩
+      exact hw
+    · intro hw
+      obtain ⟨d, hd⟩ := hbij.2 (π w)
+      have hh : (d : G)⁻¹ * w ∈ H := (QuotientGroup.eq).mp hd
+      refine mem_iUnion.2 ⟨⟨(d : G)⁻¹ * w, hh⟩, hw, ⟨d, d.property, ?_⟩⟩
+      exact mul_inv_cancel_left (d : G) w
+  have hcoverR : ⋃ h : H, rightPiece h = π ⁻¹' (π '' W) ∩ Δ := by
+    ext z
+    constructor
+    · rintro ⟨_, ⟨h, rfl⟩, ⟨w, hw, rfl⟩, hz⟩
+      exact ⟨⟨w, hw, by simpa [π] using (QuotientGroup.mk_mul w (h : G)).symm⟩, hz⟩
+    · rintro ⟨⟨w, hw, hwz⟩, hz⟩
+      have hh : w⁻¹ * z ∈ H := (QuotientGroup.eq).mp (by simpa [π] using hwz)
+      refine mem_iUnion.2 ⟨⟨w⁻¹ * z, hh⟩, ⟨w, hw, ?_⟩, hz⟩
+      exact mul_inv_cancel_left w z
+  have hμ (h : H) : μ (leftPiece h) = μ (rightPiece h⁻¹) := by
+    have hpre : (fun y ↦ y * (h : G)⁻¹) ⁻¹' rightPiece h⁻¹ = leftPiece h := by
+      ext y
+      constructor
+      · intro hy
+        obtain ⟨⟨w, hw, hwz⟩, hyΔ⟩ := hy
+        have hwz' : w = y := by simpa using hwz
+        have hyw : y = w := hwz'.symm
+        subst hyw
+        exact ⟨hw, y * (h : G)⁻¹, hyΔ, by simp⟩
+      · rintro ⟨hyW, d, hd, hd'⟩
+        refine ⟨⟨y, hyW, rfl⟩, ?_⟩
+        have hd'' : d * (h : G) = y := by simpa using hd'
+        rw [← hd'']
+        simpa using hd
+    rw [← hpre]
+    exact measure_preimage_mul_right μ ((h : G)⁻¹) (rightPiece h⁻¹)
+  have hmass : νΔ (π '' W) = μ W := by
+    have hopen : IsOpen (π '' W) := QuotientGroup.isOpenMap_coe W hWo
+    rw [Measure.map_apply hπ hopen.measurableSet,
+      Measure.restrict_apply (hopen.measurableSet.preimage hπ), ← hcoverR,
+      measure_iUnion hdisjR hrightMeas]
+    have hre : (∑' h : H, μ (rightPiece h)) = ∑' h : H, μ (leftPiece h) := by
+      simp_rw [fun h : H ↦ (by simpa using (hμ h⁻¹).symm : μ (rightPiece h) = μ (leftPiece h⁻¹))]
+      exact (Equiv.inv H).tsum_eq (fun h ↦ μ (leftPiece h))
+    rw [hre, ← measure_iUnion hdisjL hleftMeas, hcoverL]
+  let S (g : G) : Set (G ⧸ H) := (fun r ↦ π g * r) '' (π '' W)
+  haveI : IsFiniteMeasureOnCompacts νΔ := by
+    refine ⟨fun K hK ↦ ?_⟩
+    have hsub : K ⊆ ⋃ g : G, S g := by
+      intro q _
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+      refine mem_iUnion.2 ⟨x, ⟨1, ?_, by simp [π]⟩⟩
+      exact ⟨1, hW1, by simp [π]⟩
+    have hSopen (g : G) : IsOpen (S g) :=
+      (Homeomorph.mulLeft (π g)).isOpenMap _ (QuotientGroup.isOpenMap_coe W hWo)
+    obtain ⟨t, ht⟩ := hK.elim_finite_subcover S hSopen hsub
+    have hpiece (g : G) : νΔ (S g) = νΔ (π '' W) := by
+      have him : S g = (fun r ↦ (π g)⁻¹ * r) ⁻¹' (π '' W) := by
+        ext r
+        constructor
+        · rintro ⟨r', hr', rfl⟩
+          have : (π g)⁻¹ * (π g * r') = r' := by
+            rw [← mul_assoc, inv_mul_cancel, one_mul]
+          simpa [this] using hr'
+        · intro hr
+          refine ⟨(π g)⁻¹ * r, hr, ?_⟩
+          change π g * ((π g)⁻¹ * r) = r
+          rw [← mul_assoc, mul_inv_cancel, one_mul]
+      rw [him, measure_preimage_mul]
+    have hle : νΔ K ≤ ∑ g ∈ t, νΔ (S g) :=
+      (measure_mono ht).trans (measure_biUnion_finset_le t S)
+    have hsum : ∑ g ∈ t, νΔ (S g) = (t.card : ℝ≥0∞) * νΔ (π '' W) := by
+      simp [hpiece, Finset.sum_const, nsmul_eq_mul]
+    rw [hsum, hmass] at hle
+    exact lt_of_le_of_lt hle (ENNReal.mul_lt_top (lt_top_iff_ne_top.mpr (ENNReal.natCast_ne_top _)) hWlt)
+  haveI : Measure.IsHaarMeasure ν := hν.1
+  have hscale : νΔ = Measure.haarScalarFactor νΔ ν • ν :=
+    Measure.isMulLeftInvariant_eq_smul νΔ ν
+  have hc0 : Measure.haarScalarFactor νΔ ν ≠ 0 := by
+    intro h0
+    have hzeroμ : νΔ = (0 : Measure (G ⧸ H)) := by simpa [h0] using hscale
+    have hzero : νΔ (π '' W) = 0 := by simp [hzeroμ]
+    exact hWpos.ne' (hmass.symm.trans hzero)
+  have hiffν : Integrable f ν ↔ Integrable f νΔ := by
+    rw [hscale]
+    exact (integrable_smul_measure (c := (Measure.haarScalarFactor νΔ ν : ℝ≥0∞))
+      (by exact_mod_cast hc0) ENNReal.coe_ne_top).symm
+  haveI : PolishSpace G := by
+    letI : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+    haveI : IsUniformGroup G := isUniformGroup_of_commGroup (G := G)
+    haveI : CompleteSpace G :=
+      IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace (G := G)
+    haveI := IsUniformGroup.uniformity_countably_generated (α := G)
+    infer_instance
+  have hinj : InjOn π Δ := by
+    intro a ha b hb hab
+    have hsub : (⟨a, ha⟩ : Δ) = ⟨b, hb⟩ := hbij.1 (by simpa using hab)
+    exact congrArg Subtype.val hsub
+  have hemb : MeasurableEmbedding (Δ.domRestrict π) :=
+    ContinuousOn.measurableEmbedding (f := π) hΔ QuotientGroup.continuous_mk.continuousOn hinj
+  have hmap : νΔ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := by
+    have hsub : (μ.comap ((↑) : Δ → G)).map ((↑) : Δ → G) = μ.restrict Δ := by
+      rw [(MeasurableEmbedding.subtype_coe hΔ).map_comap, Subtype.range_coe]
+    calc
+      νΔ = Measure.map π (μ.restrict Δ) := rfl
+      _ = Measure.map π (Measure.map ((↑) : Δ → G) (μ.comap ((↑) : Δ → G))) := by rw [← hsub]
+      _ = Measure.map (π ∘ ((↑) : Δ → G)) (μ.comap ((↑) : Δ → G)) :=
+        Measure.map_map hπ continuous_subtype_val.measurable
+      _ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := rfl
+  rw [hiffν, hmap, hemb.integrable_map_iff]
+  have hfun : (fun x : Δ ↦ f (π (x : G))) = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) := rfl
+  rw [show f ∘ Δ.domRestrict π = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) from hfun]
+  rw [← integrableOn_iff_comap_subtypeVal (f := fun x ↦ f (π x)) hΔ,
+    integrable_indicator_iff hΔ]
 
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. The integral on the quotient
@@ -2276,6 +2575,8 @@ theorem weilFundamentalDomain_integral {f : G ⧸ H → ℂ} (hf : Integrable f 
   rw [← hmap] at hf ⊢
   exact integral_map hπ.aemeasurable hf.aestronglyMeasurable
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Corollary D.1.2.5, p. 748. The integral of a subgroup-invariant function
 over one Borel fundamental domain agrees with its integral over any other such domain. -/
@@ -2283,7 +2584,34 @@ theorem weilFundamentalDomain_integral_eq (hΔ' : MeasurableSet Δ')
     (hbij' : Function.Bijective (fun x : Δ' ↦ (QuotientGroup.mk x.val : G ⧸ H)))
     {f : G → ℂ} (hf : Measurable f) (hinv : ∀ (x : G) (h : H), f (x * (h : G)) = f x)
     (hint : IntegrableOn f Δ μ) :
-    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by sorry
+    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hdomain {D : Set G} (hD : MeasurableSet D)
+      (hDq : Function.Bijective (fun x : D ↦ (QuotientGroup.mk x.val : G ⧸ H))) :
+      IsFundamentalDomain H D μ := by
+    apply IsFundamentalDomain.mk' hD.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hDq.surjective (QuotientGroup.mk x)
+    let h : H := ⟨x⁻¹ * (y : G), QuotientGroup.eq.mp hy.symm⟩
+    have hh : (h : G) * x = (y : G) := by
+      change (x⁻¹ * (y : G)) * x = (y : G)
+      rw [mul_comm, mul_inv_cancel_left]
+    refine ⟨h, ?_, ?_⟩
+    · change (h : G) * x ∈ D
+      rw [hh]
+      exact y.property
+    · intro k hk
+      have hkq : (QuotientGroup.mk ((k : G) * x) : G ⧸ H) = QuotientGroup.mk x := by
+        rw [mul_comm, QuotientGroup.mk_mul_of_mem x k.property]
+      have hky : (⟨(k : G) * x, hk⟩ : D) = y := hDq.injective (hkq.trans hy.symm)
+      exact Subtype.ext (mul_right_cancel ((congrArg Subtype.val hky).trans hh.symm))
+  have hs := hdomain hΔ hbij
+  have ht := hdomain hΔ' hbij'
+  have hsmul (h : H) (x : G) : f (h • x) = f x := by
+    change f ((h : G) * x) = f x
+    rw [mul_comm, hinv]
+  exact ⟨⟨hf.aestronglyMeasurable, (hs.hasFiniteIntegral_on_iff ht hsmul).mp hint.2⟩,
+    hs.setIntegral_eq ht hsmul⟩
 
 end FundamentalDomain
 
@@ -2524,7 +2852,130 @@ theorem elementarySchwartzSubmodule_real_iff
     (f : EuclideanSpace ℝ (Fin m) → ℂ) :
     (fun g : ElementaryLieGroup m 0 0 PUnit ↦ f g.1) ∈
         elementarySchwartzSubmodule m 0 0 PUnit ↔
-      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by sorry
+      ∃ s : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ, (s : _ → ℂ) = f := by
+  classical
+  let E := EuclideanSpace ℝ (Fin m)
+  let X := E × EuclideanSpace ℝ (Fin 0)
+  let g : ElementaryLieGroup m 0 0 PUnit → ℂ := fun p ↦ f p.1
+  let P : X →L[ℝ] E := ContinuousLinearMap.fst ℝ E _
+  let J : E →L[ℝ] X := ContinuousLinearMap.inl ℝ E _
+  let coord (j : Fin m) : E := EuclideanSpace.single j 1
+  let liftedCoord (j : Fin m) : X := (coord j, 0)
+  let directions (β : Fin m → ℕ) := (List.ofFn fun j ↦ List.replicate (β j) (liftedCoord j)).flatten
+  let mixedPartial (β : Fin m → ℕ) (x : E) : ℂ :=
+    iteratedFDeriv ℝ (directions β).length f x (fun j ↦ ((directions β).get j).1)
+  let weight (α : Fin m → ℕ) (x : E) : ℝ := ∏ j, ‖x j‖ ^ α j
+  -- The torus and lattice indices are empty, so only the real coordinates contribute.
+  have hBound (hf : ContDiff ℝ ∞ f) (i : ElementarySchwartzIndex m 0 0) :
+      elementarySchwartzBound g i =
+        ⨆ x : E, ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖) := by
+    have hPartial (xt : X) (a : Fin 0 → ℤ) (b : PUnit) :
+        elementaryPartial g i.2.1 i.2.2.1 xt a b = mixedPartial i.2.1 xt.1 := by
+      let l : List X := directions i.2.1 ++
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten
+      have hl : l = directions i.2.1 := by simp [l]
+      change (fun v : List X ↦ iteratedFDeriv ℝ v.length (f ∘ P) xt v.get) l = _
+      rw [hl]
+      change iteratedFDeriv ℝ (directions i.2.1).length (f ∘ P) xt (directions i.2.1).get = _
+      rw [P.iteratedFDeriv_comp_right hf xt (by simp),
+        ContinuousMultilinearMap.compContinuousLinearMap_apply]
+      rfl
+    simp only [elementarySchwartzBound, hPartial, Finset.univ_eq_empty (α := Fin 0),
+      Finset.prod_empty, mul_one, ENNReal.coe_nnreal_eq, coe_nnNorm, norm_mul, norm_prod,
+      norm_pow, Complex.norm_real, iSup_const]
+    exact (show Function.Surjective (Prod.fst : X → E) from fun x ↦ ⟨(x, 0), rfl⟩).iSup_comp
+      (fun x ↦ ENNReal.ofReal (weight i.1 x * ‖mixedPartial i.2.1 x‖))
+  -- Group any tuple of coordinate directions by its multiplicities.
+  have hCoord (hf : ContDiff ℝ ∞ f) {n : ℕ} (t : Fin n → Fin m) (x : E) :
+      iteratedFDeriv ℝ n f x (fun j ↦ coord (t j)) = mixedPartial (fun j ↦ (List.ofFn t).count j) x := by
+    let β (j : Fin m) := (List.ofFn t).count j
+    let l := (List.finRange m).flatMap fun j ↦ List.replicate (β j) j
+    have hPerm : (List.ofFn t).Perm l := by
+      apply List.perm_iff_count.mpr
+      intro j
+      rw [List.count_flatMap, ← Fin.sum_univ_def]
+      simp [List.count_replicate, β]
+    have hDirs : l.map liftedCoord = directions β := by
+      simp [l, directions, List.ofFn_eq_map, List.flatMap, Function.comp_def]
+    have h := iteratedFDeriv_apply_list_perm hf (Prod.fst : X → E) (hPerm.map liftedCoord) x
+    rw [hDirs, List.map_ofFn] at h
+    let eval (s : Σ k, Fin k → X) := iteratedFDeriv ℝ s.1 f x (fun j ↦ (s.2 j).1)
+    exact (congrArg eval (List.equivSigmaTuple.apply_symm_apply ⟨n, liftedCoord ∘ t⟩)).symm.trans h
+  change ((∀ (a : Fin 0 → ℤ) (b : PUnit), ContDiff ℝ ∞ (f ∘ P)) ∧
+    ∀ i, elementarySchwartzBound g i < (⊤ : ℝ≥0∞)) ↔ _
+  constructor
+  · rintro ⟨hs, hb⟩
+    have hf : ContDiff ℝ ∞ f := (hs 0 PUnit.unit).comp J.contDiff
+    refine ⟨⟨f, hf, ?_⟩, rfl⟩
+    intro k n
+    let α (i : Option (Fin m)) : Fin m → ℕ := i.elim 0 (fun j ↦ Pi.single j k)
+    let β (t : Fin n → Fin m) (j : Fin m) := (List.ofFn t).count j
+    let idx (i : Option (Fin m)) (t : Fin n → Fin m) :
+        ElementarySchwartzIndex m 0 0 := (α i, β t, 0, 0)
+    obtain ⟨C, hC⟩ := Finite.bddAbove_range (fun p : Option (Fin m) × (Fin n → Fin m) ↦
+      (elementarySchwartzBound g (idx p.1 p.2)).toReal)
+    refine ⟨((m : ℝ) + 1) ^ k * (Fintype.card (Fin n → Fin m) * C), fun x ↦ ?_⟩
+    -- Include the constant weight so the maximum exists even when m = 0.
+    let c (i : Option (Fin m)) : ℝ := i.elim 1 (fun j ↦ ‖x j‖)
+    obtain ⟨i, -, hi⟩ := Finset.exists_max_image Finset.univ c Finset.univ_nonempty
+    have hsum : ‖x‖ ≤ ∑ j, ‖x j‖ := by
+      conv_lhs => rw [← (EuclideanSpace.basisFun (Fin m) ℝ).sum_repr x]
+      refine (norm_sum_le _ _).trans_eq ?_
+      simp only [norm_smul, OrthonormalBasis.norm_eq_one, EuclideanSpace.basisFun_repr, mul_one]
+    have hsize : ‖x‖ ≤ ((m : ℝ) + 1) * c i := calc
+      _ ≤ ∑ _j : Fin m, c i :=
+        hsum.trans (Finset.sum_le_sum fun j _ ↦ hi (some j) (Finset.mem_univ _))
+      _ ≤ _ := by
+        have hnonneg : 0 ≤ c i := zero_le_one.trans (hi none (Finset.mem_univ _))
+        simp [add_mul, hnonneg]
+    have hw : weight (α i) x = c i ^ k := by
+      cases i <;> simp [weight, α, c, Pi.single, Function.update, apply_ite]
+    have hpow : ‖x‖ ^ k ≤ ((m : ℝ) + 1) ^ k * weight (α i) x := by
+      rw [hw, ← mul_pow]
+      exact pow_le_pow_left₀ (norm_nonneg _) hsize k
+    let T := iteratedFDeriv ℝ n f x
+    have hpoint (t : Fin n → Fin m) : weight (α i) x * ‖T (fun j ↦ coord (t j))‖ ≤ C := by
+      rw [show T (fun j ↦ coord (t j)) = mixedPartial (β t) x from hCoord hf t x]
+      have hle : ENNReal.ofReal (weight (α i) x * ‖mixedPartial (β t) x‖) ≤
+          elementarySchwartzBound g (idx i t) := by
+        rw [hBound hf]
+        exact le_iSup (fun y ↦ ENNReal.ofReal (weight (α i) y * ‖mixedPartial (β t) y‖)) x
+      have h := ENNReal.toReal_mono (hb (idx i t)).ne hle
+      rw [ENNReal.toReal_ofReal (by dsimp [weight]; positivity)] at h
+      exact h.trans (hC (mem_range_self (i, t)))
+    calc
+      ‖x‖ ^ k * ‖T‖ ≤ (((m : ℝ) + 1) ^ k * weight (α i) x) *
+          ∑ t : Fin n → Fin m, ‖T (fun j ↦ coord (t j))‖ :=
+        mul_le_mul hpow (norm_multilinear_le_sum_euclidean_basis T) (norm_nonneg _) (by positivity)
+      _ = ((m : ℝ) + 1) ^ k * ∑ t : Fin n → Fin m, weight (α i) x * ‖T (fun j ↦ coord (t j))‖ := by
+        rw [mul_assoc, Finset.mul_sum]
+      _ ≤ ((m : ℝ) + 1) ^ k * ∑ _t : Fin n → Fin m, C :=
+        mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun t _ ↦ hpoint t) (by positivity)
+      _ = _ := by simp
+  · rintro ⟨s, rfl⟩
+    refine ⟨fun _ _ ↦ s.smooth'.comp P.contDiff, fun i ↦ ?_⟩
+    rw [hBound s.smooth']
+    obtain ⟨C, -, hC⟩ := s.decay (∑ j, i.1 j) (directions i.2.1).length
+    refine lt_of_le_of_lt (b := ENNReal.ofReal C)
+      (iSup_le fun x ↦ ENNReal.ofReal_le_ofReal ?_) ENNReal.ofReal_lt_top
+    have hw : weight i.1 x ≤ ‖x‖ ^ (∑ j, i.1 j) := calc
+      _ ≤ ∏ j, ‖x‖ ^ i.1 j :=
+        Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) fun j _ ↦
+          pow_le_pow_left₀ (norm_nonneg _) (PiLp.norm_apply_le x j) _
+      _ = _ := Finset.prod_pow_eq_pow_sum _ _ _
+    have he (j : Fin (directions i.2.1).length) : ‖((directions i.2.1).get j).1‖ = 1 := by
+      have hmem := List.get_mem (directions i.2.1) j
+      simp only [directions, List.mem_flatten, List.mem_ofFn] at hmem
+      obtain ⟨_, ⟨q, rfl⟩, hq⟩ := hmem
+      rw [List.eq_of_mem_replicate hq]
+      change ‖EuclideanSpace.single q (1 : ℝ)‖ = 1
+      simpa only [EuclideanSpace.basisFun_apply] using
+        (EuclideanSpace.basisFun (Fin m) ℝ).norm_eq_one q
+    have hD : ‖mixedPartial i.2.1 x‖ ≤ ‖iteratedFDeriv ℝ (directions i.2.1).length s x‖ := by
+      simpa only [mixedPartial, he, Finset.prod_const_one, mul_one] using
+        (iteratedFDeriv ℝ (directions i.2.1).length s x).le_opNorm
+          (fun j ↦ ((directions i.2.1).get j).1)
+    exact (mul_le_mul hw hD (norm_nonneg _) (by positivity)).trans (hC x)
 
 section
 

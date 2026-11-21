@@ -71,7 +71,8 @@ local notation "point" z => ((0, fun _ : Fin 1 ↦ z, 0, PUnit.unit) :
 
 /-- Paper: Example D.3.3.4, p. 805. The positive reals with the identity module
 are a modulated group. -/
-theorem identityModulation_isModulation : IsModulation m := by sorry
+theorem identityModulation_isModulation : IsModulation m :=
+  ⟨isProperMap_id, exists_ne 1⟩
 
 variable (γ : ℝ≥0ˣ) (hγ : 1 < γ.val)
 
