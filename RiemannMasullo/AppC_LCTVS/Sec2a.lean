@@ -172,7 +172,48 @@ seminorms generate the topology of uniform convergence on S. -/
 theorem uniformConvergenceCLM_withSeminorms {ι : Type*} (p : SeminormFamily ℂ F ι)
     (hp : WithSeminorms p) :
     WithSeminorms (E := E →Lᵤ[ℂ, S] F) (fun a : S × ι ↦
-      mappingSeminorm ⟨a.1.val, hb _ a.1.property⟩ ⟨p a.2, hp.continuous_seminorm a.2⟩) := by sorry
+      mappingSeminorm ⟨a.1.val, hb _ a.1.property⟩ ⟨p a.2, hp.continuous_seminorm a.2⟩) := by
+  let q : SeminormFamily ℂ (E →Lᵤ[ℂ, S] F) (S × ι) := fun a ↦
+    mappingSeminorm ⟨a.1.val, hb _ a.1.property⟩ ⟨p a.2, hp.continuous_seminorm a.2⟩
+  have hq (a : S × ι) (f : E →Lᵤ[ℂ, S] F) :
+      q a f = ⨆ x : a.1.val, p a.2 (f x) :=
+    mappingSeminorm_apply _ _ f
+  change WithSeminorms q
+  rw [q.withSeminorms_iff_nhds_eq_iInf]
+  refine le_antisymm (le_iInf fun a ↦ ?_) ?_
+  · rw [((Metric.nhds_basis_ball (x := (0 : ℝ))).comap (q a)).ge_iff]
+    intro r hr
+    rw [← (q a).ball_zero_eq_preimage_ball]
+    -- A smaller ball leaves room for the supremum to attain its upper bound.
+    have hball : (p a.2).ball 0 (r / 2) ∈ 𝓝 0 :=
+      Seminorm.ball_mem_nhds (hp.continuous_seminorm a.2) (half_pos hr)
+    filter_upwards [UniformConvergenceCLM.eventually_nhds_zero_mapsTo
+      (RingHom.id ℂ) a.1.property hball] with f hf
+    apply (q a).mem_ball_zero.mpr
+    rw [hq]
+    exact (Real.iSup_le (fun x ↦ ((p a.2).mem_ball_zero.mp (hf x.2)).le)
+      (half_pos hr).le).trans_lt (half_lt_self hr)
+  · rw [UniformConvergenceCLM.nhds_zero_eq_of_basis (RingHom.id ℂ) F S hp.hasBasis_zero_ball]
+    simp only [le_iInf_iff, le_principal_iff]
+    intro T hT ir hr
+    have hball (i : ι) : (q (⟨T, hT⟩, i)).ball 0 ir.2 ∈ ⨅ a, comap (q a) (𝓝 0) := by
+      rw [(q (⟨T, hT⟩, i)).ball_zero_eq_preimage_ball]
+      apply mem_iInf_of_mem (f := fun a ↦ comap (q a) (𝓝 (0 : ℝ))) (⟨T, hT⟩, i)
+      exact preimage_mem_comap (Metric.ball_mem_nhds (0 : ℝ) hr)
+    have hFin : (⋂ i ∈ ir.1, (q (⟨T, hT⟩, i)).ball 0 ir.2) ∈
+        ⨅ a, comap (q a) (𝓝 0) := ir.1.iInter_mem_sets.mpr fun i _ ↦ hball i
+    refine mem_of_superset hFin ?_
+    intro f hf x hx
+    apply (ir.1.sup p).mem_ball_zero.mpr
+    apply Seminorm.finset_sup_apply_lt hr
+    intro i hi
+    obtain ⟨r, _, hbound⟩ :=
+      (hp.image_isVonNBounded_iff_seminorm_bounded f).mp ((hb T hT).image f) i
+    have hxle : p i (f x) ≤ q (⟨T, hT⟩, i) f := by
+      rw [hq]
+      exact le_ciSup (f := fun y : T ↦ p i (f y))
+        ⟨r, forall_mem_range.mpr fun y ↦ (hbound y y.2).le⟩ ⟨x, hx⟩
+    exact hxle.trans_lt ((q (⟨T, hT⟩, i)).mem_ball_zero.mp (mem_iInter₂.mp hf i hi))
 
 -- Example C.2.1.3 (p. 671) comments on the prevalence of these topologies.
 
