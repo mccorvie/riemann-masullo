@@ -7,6 +7,7 @@ public import Mathlib.Analysis.InnerProductSpace.l2Space
 public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
+import Mathlib.Analysis.Normed.Module.HahnBanach
 
 /-!
 # Nuclear operators and the trace on Hilbert spaces
@@ -117,6 +118,245 @@ and scales the target vector. -/
 theorem projectiveTensorToOperators_tmul (φ : StrongDual ℂ E) (y : F) (x : E) :
     projectiveTensorToOperators (φ ⊗ₜ[ℂ] y) x = φ x • y := rfl
 
+omit [PolynormableSpace ℂ E] [T2Space E] [IsUniformAddGroup F] [T2Space F] in
+/-- A linear map from a barrelled space is continuous if all its scalar compositions
+with continuous functionals are continuous. -/
+private theorem continuous_of_dual_compositions [BarrelledSpace ℂ E] (T : E →ₗ[ℂ] F)
+    (hT : ∀ ψ : StrongDual ℂ F, Continuous (fun x ↦ ψ (T x))) : Continuous T := by
+  refine (PolynormableSpace.withSeminorms ℂ F).continuous_of_continuous_comp T fun ⟨q, hq⟩ ↦ ?_
+  let A := {ψ : StrongDual ℂ F // ∀ y, ‖ψ y‖ ≤ q y}
+  have : Nonempty A := ⟨⟨0, fun y ↦ by simp⟩⟩
+  let p (ψ : A) := (normSeminorm ℂ ℂ).comp (ψ.val.toLinearMap.comp T)
+  have hle (ψ : A) : p ψ ≤ q.comp T := fun x ↦ ψ.property (T x)
+  have hb : BddAbove (range p) := ⟨q.comp T, forall_mem_range.mpr hle⟩
+  have heq : (⨆ ψ, p ψ) = q.comp T := by
+    apply le_antisymm
+    · exact ciSup_le hle
+    · intro x
+      let : SeminormedAddCommGroup (WithLocalSeminorm q) := inferInstance
+      obtain ⟨g, hg, hgx⟩ := exists_dual_vector'' ℂ (show WithLocalSeminorm q from T x)
+      have hgq (y : F) : ‖g (show WithLocalSeminorm q from y)‖ ≤ q y :=
+        (g.le_opNorm y).trans (mul_le_of_le_one_left (apply_nonneg q y) hg)
+      let g' : F →ₗ[ℂ] ℂ := g.toLinearMap
+      have hgc : Continuous g' :=
+        (PolynormableSpace.withSeminorms ℂ F).continuous_normedSpace_rng ℂ g'
+          ⟨{⟨q, hq⟩}, 1, by simpa using (show (normSeminorm ℂ ℂ).comp g' ≤ q from hgq)⟩
+      let ψ : A := ⟨⟨g', hgc⟩, hgq⟩
+      have hpx : p ψ x = q (T x) := by
+        change ‖g (show WithLocalSeminorm q from T x)‖ = q (T x)
+        rw [hgx]
+        exact Complex.norm_real _ |>.trans (Real.norm_of_nonneg (apply_nonneg q (T x)))
+      exact hpx ▸ le_ciSup hb ψ x
+  rw [← heq, Seminorm.coe_iSup_eq hb]
+  exact Seminorm.continuous_iSup p (fun ψ ↦ (hT ψ.val).norm) hb
+
+omit [T2Space E] in
+/-- With complete target and complete strong dual of a barrelled source, the space
+of continuous linear maps is complete for uniform convergence on bounded sets. -/
+private theorem completeSpace_boundedOperators [CompleteSpace F] [BarrelledSpace ℂ E]
+    [CompleteSpace (StrongDual ℂ E)] : CompleteSpace (E →Lᵦ F) := by
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  let j : (E →Lᵦ F) → (E →ᵤ[S] F) := UniformOnFun.ofFun S ∘ DFunLike.coe
+  let i : StrongDual ℂ E → (E →ᵤ[S] ℂ) := UniformOnFun.ofFun S ∘ DFunLike.coe
+  have hj := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id ℂ) F S
+  have hi := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id ℂ) ℂ S
+  change IsUniformInducing j at hj
+  change IsUniformInducing i at hi
+  have : T2Space (E →ᵤ[S] ℂ) := T2Space.of_injective_continuous
+    (UniformOnFun.toFun S).injective
+    (UniformOnFun.uniformContinuous_toFun sUnion_isVonNBounded_eq_univ).continuous
+  have hclosed : IsClosed (range i) := hi.isComplete_range.isClosed
+  rw [completeSpace_iff_isComplete_range hj]
+  apply IsClosed.isComplete
+  rw [← closure_subset_iff_isClosed]
+  intro f hf
+  have hpoint : IsClosed {f : E →ᵤ[S] F | UniformOnFun.toFun S f ∈
+      range (fun T : E →ₗ[ℂ] F ↦ (T : E → F))} :=
+    (LinearMap.isClosed_range_coe E F (RingHom.id ℂ)).preimage
+      (UniformOnFun.uniformContinuous_toFun (𝔖 := S) sUnion_isVonNBounded_eq_univ).continuous
+  obtain ⟨T, hTf⟩ := hpoint.closure_subset_iff.mpr (by
+    rintro _ ⟨A, rfl⟩
+    exact ⟨A.toLinearMap, rfl⟩) hf
+  have hT (ψ : StrongDual ℂ F) : Continuous (fun x ↦ ψ (T x)) := by
+    let k := fun f : E →ᵤ[S] F ↦ UniformOnFun.ofFun S (ψ ∘ UniformOnFun.toFun S f)
+    have hk : Continuous k := (UniformOnFun.postcomp_uniformContinuous ψ.uniformContinuous).continuous
+    have hki : IsClosed (k ⁻¹' range i) := hclosed.preimage hk
+    obtain ⟨φ, hφ⟩ := hki.closure_subset_iff.mpr (by
+      rintro _ ⟨A, rfl⟩
+      exact ⟨ψ.comp A, rfl⟩) hf
+    have heq : (fun x ↦ ψ (T x)) = φ := by
+      change (T : E → F) = UniformOnFun.toFun S f at hTf
+      rw [show (fun x ↦ ψ (T x)) = ψ ∘ (T : E → F) from rfl, hTf]
+      exact (UniformOnFun.ofFun S).injective hφ.symm
+    rw [heq]
+    exact φ.continuous
+  exact ⟨⟨T, continuous_of_dual_compositions T hT⟩, (UniformOnFun.ofFun S).congr_arg hTf⟩
+
+/-- An equicontinuous set of functionals sends a common zero-neighborhood into
+any prescribed scalar zero-neighborhood. -/
+private theorem dual_mem_nhds_of_equicontinuous {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] (B : Set (StrongDual ℂ X))
+    (hB : EquicontinuousAt (fun φ : B ↦ (φ.val : X → ℂ)) 0)
+    {W : Set ℂ} (hW : W ∈ 𝓝 0) : {x : X | ∀ φ ∈ B, φ x ∈ W} ∈ 𝓝 0 := by
+  obtain ⟨r, hr, hrW⟩ := Metric.mem_nhds_iff.mp hW
+  filter_upwards [(Metric.uniformity_basis_dist.equicontinuousAt_iff_right.mp hB) r hr]
+    with x hx
+  intro φ hφ
+  exact hrW (by simpa only [Metric.mem_ball, map_zero, dist_comm 0 (φ x)] using hx ⟨φ, hφ⟩)
+
+/-- Testing the tensor against two equicontinuous dual sets is controlled by
+uniform convergence of the associated operator on a bounded set of the source. -/
+private theorem projectiveTensorToOperators_isUniformInducing_of_homeomorph
+    [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (hI : IsHomeomorph (show ProjectiveTensor (StrongDual ℂ E) F →
+      InjectiveTensor (StrongDual ℂ E) F from id)) :
+    IsUniformInducing (projectiveTensorToOperators (E := E) (F := F)) := by
+  let D := StrongDual ℂ E
+  let P := ProjectiveTensor D F
+  let I := InjectiveTensor D F
+  let T : P →L[ℂ] (E →Lᵦ F) := projectiveTensorToOperators
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  have hform (φ : StrongDual ℂ D) (ψ : StrongDual ℂ F) (z : P) :
+      tensorDualForm φ ψ z = φ (ψ.comp (T z)) := by
+    let post : (E →Lᵦ F) →L[ℂ] D := ψ.postcompUniformConvergenceCLM S
+    have heq : tensorDualForm φ ψ = φ.toLinearMap.comp (post.toLinearMap.comp T.toLinearMap) := by
+      apply TensorProduct.ext'
+      intro f y
+      have hψ : ψ.comp (T (f ⊗ₜ[ℂ] y)) = ψ y • f := by
+        apply ContinuousLinearMap.ext
+        intro x
+        change ψ (projectiveTensorToOperators (f ⊗ₜ[ℂ] y) x) = ψ y * f x
+        rw [projectiveTensorToOperators_tmul, map_smul, smul_eq_mul, mul_comm]
+      change tensorDualForm φ ψ (f ⊗ₜ[ℂ] y) = φ (ψ.comp (T (f ⊗ₜ[ℂ] y)))
+      rw [tensorDualForm_tmul, hψ, map_smul, smul_eq_mul, mul_comm]
+    exact DFunLike.congr_fun heq z
+  apply AddMonoidHom.isUniformInducing_of_isInducing (f := T)
+  rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+  apply le_antisymm
+  · exact (by simpa only [map_zero] using T.continuous.tendsto 0 :
+      Tendsto T (𝓝 0) (𝓝 0)).le_comap
+  · let j : P → I := fun z ↦ z
+    have hj : IsInducing j := hI.isInducing
+    rw [hj.nhds_eq_comap (0 : P)]
+    change comap T (𝓝 0) ≤ comap j (𝓝 (0 : I))
+    rw [((injectiveTensor_zero_basis (E := D) (F := F)).comap j).ge_iff]
+    rintro ⟨A, C⟩ ⟨hA, hC⟩
+    have hS : DirectedOn (· ⊆ ·) S := directedOn_of_sup_mem fun _ _ ↦ IsVonNBounded.union
+    have hD := UniformConvergenceCLM.hasBasis_nhds_zero (RingHom.id ℂ) ℂ S
+      ⟨∅, isVonNBounded_empty ℂ E⟩ hS
+    obtain ⟨⟨B, W⟩, ⟨hB, hW⟩, hBW⟩ := hD.mem_iff.mp
+      (dual_mem_nhds_of_equicontinuous A hA (Metric.ball_mem_nhds 0 one_pos))
+    have hTsmall := ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hB
+      (dual_mem_nhds_of_equicontinuous C hC hW)
+    rw [Filter.mem_comap]
+    refine ⟨_, hTsmall, fun z hz φ hφ ψ hψ ↦ ?_⟩
+    rw [hform]
+    have hp := hBW (show ∀ x ∈ B, (ψ.comp (T z)) x ∈ W from fun _ hx ↦ hz hx ψ hψ) φ hφ
+    exact (mem_ball_zero_iff.mp hp).le
+
+section TensorOperatorUniverse
+
+universe u v
+
+variable {X : Type u} {Y : Type v} [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+  [PolynormableSpace ℂ X] [T2Space X]
+  [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+  [PolynormableSpace ℂ Y] [T2Space Y]
+
+/-- View the target in a universe allowed by the nuclearity test and transport the
+induced topology along the resulting tensor and operator maps. -/
+private theorem projectiveTensorToOperators_isUniformInducing (h : IsNuclearTVS (StrongDual ℂ X)) :
+    IsUniformInducing (projectiveTensorToOperators (E := X) (F := Y)) := by
+  let D := StrongDual ℂ X
+  have : T2Space D := h.1
+  have : PolynormableSpace ℂ D := h.2.1
+  let L := ULift.{u} Y
+  let e : Y ≃L[ℂ] L := ContinuousLinearEquiv.ulift.symm
+  have : PolynormableSpace ℂ L := PolynormableSpace.induced e.symm.toLinearEquiv.toLinearMap
+  have : IsTopologicalAddGroup L := PolynormableSpace.isTopologicalAddGroup ℂ L
+  let : UniformSpace L := IsTopologicalAddGroup.rightUniformSpace L
+  have : IsUniformAddGroup L := isUniformAddGroup_of_addCommGroup
+  have hI : IsHomeomorph (show ProjectiveTensor D L → InjectiveTensor D L from id) := by
+    have hn := (isNuclearTVS_iff_localBanach_series D).mp h
+    exact ((isNuclearTVS_iff_localBanach_series.{v, u} D).mpr hn).2.2 L
+      inferInstance inferInstance inferInstance inferInstance inferInstance
+  let one : D →L[ℂ] D := ContinuousLinearMap.id ℂ D
+  let lift := projectiveTensorMap one.toLinearMap e.toContinuousLinearMap.toLinearMap
+  let down := projectiveTensorMap one.toLinearMap e.symm.toContinuousLinearMap.toLinearMap
+  have hLift (φ : D) (y : Y) : lift (φ ⊗ₜ[ℂ] y) = φ ⊗ₜ[ℂ] e y :=
+    TensorProduct.map_tmul _ _ _ _
+  have hDown (φ : D) (y : L) : down (φ ⊗ₜ[ℂ] y) = φ ⊗ₜ[ℂ] e.symm y :=
+    TensorProduct.map_tmul _ _ _ _
+  have hleft : Function.LeftInverse down lift := by
+    have hm : down.comp lift = (LinearMap.id : ProjectiveTensor D Y →ₗ[ℂ] _) := by
+      apply TensorProduct.ext'
+      intro φ y
+      change down (lift (φ ⊗ₜ[ℂ] y)) = φ ⊗ₜ[ℂ] y
+      rw [hLift, hDown, e.symm_apply_apply]
+    exact DFunLike.congr_fun hm
+  have hlift : IsUniformInducing lift := AddMonoidHom.isUniformInducing_of_isInducing
+    (hleft.isEmbedding (projectiveTensorMap_continuous one e.symm.toContinuousLinearMap)
+      (projectiveTensorMap_continuous one e.toContinuousLinearMap)).isInducing
+  let S : Set (Set X) := {s | IsVonNBounded ℂ s}
+  let post := e.toContinuousLinearMap.postcompUniformConvergenceCLM (σ := RingHom.id ℂ) S
+  let T : ProjectiveTensor D Y →L[ℂ] (X →Lᵦ Y) := projectiveTensorToOperators
+  let T' : ProjectiveTensor D L →L[ℂ] (X →Lᵦ L) := projectiveTensorToOperators
+  have hcomp : post ∘ T = T' ∘ lift := by
+    apply congr_arg (fun f : ProjectiveTensor D Y →ₗ[ℂ] (X →Lᵦ L) ↦ (f : _ → _))
+      (show post.toLinearMap.comp T.toLinearMap = T'.toLinearMap.comp lift from ?_)
+    apply TensorProduct.ext'
+    intro φ y
+    apply ContinuousLinearMap.ext
+    intro x
+    change e (T (φ ⊗ₜ[ℂ] y) x) = T' (lift (φ ⊗ₜ[ℂ] y)) x
+    rw [hLift]
+    change e (φ x • y) = φ x • e y
+    exact map_smul e _ _
+  apply IsUniformInducing.of_comp T.uniformContinuous post.uniformContinuous
+  rw [hcomp]
+  exact (projectiveTensorToOperators_isUniformInducing_of_homeomorph hI).comp hlift
+
+end TensorOperatorUniverse
+
+/-- Paper: Remark C.3.1.1, p. 693. If the strong dual of a complete barrelled
+space is complete and nuclear, finite-rank endomorphisms approximate the identity
+uniformly on bounded subsets of the source. -/
+theorem id_mem_closure_boundedFiniteRank_of_nuclearStrongDual [CompleteSpace E]
+    [BarrelledSpace ℂ E] [CompleteSpace (StrongDual ℂ E)] (h : IsNuclearTVS (StrongDual ℂ E)) :
+    (ContinuousLinearMap.id ℂ E : E →Lᵦ E) ∈
+      closure (range (projectiveTensorToOperators (E := E) (F := E))) := by sorry
+
+/-- Postcomposition carries bounded convergence approximation of the identity by
+finite-rank operators to approximation of any continuous linear map. -/
+private theorem denseRange_projectiveTensorToOperators
+    (h : (ContinuousLinearMap.id ℂ E : E →Lᵦ E) ∈
+      closure (range (projectiveTensorToOperators (E := E) (F := E)))) :
+    DenseRange (projectiveTensorToOperators (E := E) (F := F)) := by
+  intro A
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  let post : (E →Lᵦ E) →L[ℂ] (E →Lᵦ F) := A.postcompUniformConvergenceCLM S
+  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E) A.toLinearMap
+  have hmap : ∀ z : ProjectiveTensor (StrongDual ℂ E) E,
+      post (projectiveTensorToOperators z) = projectiveTensorToOperators (map z) := by
+    apply DFunLike.congr_fun (f := post.toLinearMap.comp projectiveTensorToOperators.toLinearMap)
+      (g := projectiveTensorToOperators.toLinearMap.comp map)
+    apply TensorProduct.ext'
+    intro φ y
+    ext x
+    change A (projectiveTensorToOperators (φ ⊗ₜ[ℂ] y) x) =
+      projectiveTensorToOperators (map (φ ⊗ₜ[ℂ] y)) x
+    simp [map, projectiveTensorToOperators_tmul]
+    rfl
+  have hsub : post '' range (projectiveTensorToOperators (E := E) (F := E)) ⊆
+      range (projectiveTensorToOperators (E := E) (F := F)) := by
+    rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
+    exact ⟨map z, (hmap z).symm⟩
+  have hA : post (ContinuousLinearMap.id ℂ E) = A := by
+    ext x
+    rfl
+  rw [← hA]
+  exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ h))
+
 /-- Paper: Remark C.3.1.1, p. 693. For complete spaces, with barrelled source
 and complete nuclear strong dual, the completed projective tensor is linearly
 homeomorphic to the bounded convergence operator space by the canonical map. -/
@@ -124,7 +364,26 @@ theorem completedProjectiveTensorToOperators_equiv [CompleteSpace E] [CompleteSp
     [BarrelledSpace ℂ E] [CompleteSpace (StrongDual ℂ E)] (h : IsNuclearTVS (StrongDual ℂ E)) :
     CompleteSpace (E →Lᵦ F) ∧
       ∃ e : Completion (ProjectiveTensor (StrongDual ℂ E) F) ≃L[ℂ] (E →Lᵦ F),
-        ∀ z : ProjectiveTensor (StrongDual ℂ E) F, e z = projectiveTensorToOperators z := by sorry
+        ∀ z : ProjectiveTensor (StrongDual ℂ E) F, e z = projectiveTensorToOperators z := by
+  have := completeSpace_boundedOperators (E := E) (F := F)
+  refine ⟨inferInstance, ?_⟩
+  have : T2Space (E →Lᵦ F) :=
+    UniformConvergenceCLM.t2Space (RingHom.id ℂ) F _ sUnion_isVonNBounded_eq_univ
+  let T : ProjectiveTensor (StrongDual ℂ E) F →L[ℂ] (E →Lᵦ F) := projectiveTensorToOperators
+  have he : IsUniformInducing T.fromCompletion :=
+    Completion.isUniformInducing_extension (projectiveTensorToOperators_isUniformInducing h)
+  have hclosed : IsClosed (range T.fromCompletion) := he.isComplete_range.isClosed
+  have hdense : DenseRange T := denseRange_projectiveTensorToOperators
+      (id_mem_closure_boundedFiniteRank_of_nuclearStrongDual h)
+  have hsurj : Function.Surjective T.fromCompletion := fun A ↦
+    hclosed.closure_subset_iff.mpr (by
+      rintro _ ⟨z, rfl⟩
+      exact ⟨z, T.fromCompletion_apply_coe z⟩) (hdense A)
+  have hhome : IsHomeomorph T.fromCompletion :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr ⟨⟨he.isInducing, he.injective⟩, hsurj⟩
+  exact ⟨ContinuousLinearEquiv.ofIsHomeomorph
+    (LinearEquiv.ofBijective T.fromCompletion.toLinearMap hhome.bijective) hhome,
+    T.fromCompletion_apply_coe⟩
 
 /-- Paper: §C.3.1, p. 693. A Banach disc is a bounded balanced convex set whose
 linear span, equipped with the Minkowski seminorm of the disc, is separated and complete.
