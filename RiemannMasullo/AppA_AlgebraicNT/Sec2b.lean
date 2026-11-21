@@ -912,10 +912,120 @@ theorem infiniteIdeleFundamentalDomain_precompact_ambient :
     IsCompact (closure ((N∞).subtype '' E∞)) := by
   sorry
 
+/-- At every positive radius there is a point in an open subset of the local torsion sector. -/
+private theorem exists_open_torsionSector_at_radius {a : ℝ} (ha : 0 < a) :
+    ∃ U : Set v₀.Completion, IsOpen U ∧
+      (∀ x : v₀.Completionˣ, x.val ∈ U → inTorsionSector F v₀ σ x) ∧
+      ∃ z ∈ U, ‖z‖ = a := by
+  by_cases hv : v₀.IsReal
+  · let U := extensionEmbeddingOfIsReal hv ⁻¹' Set.Ioi (0 : ℝ)
+    obtain ⟨z, hz⟩ := surjective_extensionEmbeddingOfIsReal hv a
+    refine ⟨U, isOpen_Ioi.preimage (isometry_extensionEmbeddingOfIsReal hv).continuous,
+      fun x hx ↦ (inTorsionSector_real F v₀ σ hv x).mpr hx, z, ?_, ?_⟩
+    · change 0 < extensionEmbeddingOfIsReal hv z
+      rwa [hz]
+    · rw [← (isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero (map_zero _) z,
+        hz, Real.norm_of_nonneg ha.le]
+  · let f (z : v₀.Completion) := σ (extensionEmbedding v₀ z)
+    have hσ : Isometry σ := by
+      change Isometry (σ.toAlgHom : ℂ → ℂ)
+      rcases Complex.real_algHom_eq_id_or_conj σ.toAlgHom with h | h
+      · rw [h]
+        exact isometry_id
+      · rw [h]
+        exact Complex.isometry_conj
+    have hf : Isometry f := hσ.comp (isometry_extensionEmbedding v₀)
+    let bound := 2 * Real.pi / (Units.torsionOrder F : ℝ)
+    have hbound : 0 < bound := div_pos Real.two_pi_pos (by exact_mod_cast Units.torsionOrder_pos F)
+    let θ := min bound Real.pi / 2
+    have hθ : 0 < θ := half_pos (lt_min hbound Real.pi_pos)
+    have hθb : θ < bound := (half_lt_self (lt_min hbound Real.pi_pos)).trans_le (min_le_left _ _)
+    have hθπ : θ < Real.pi := (half_lt_self (lt_min hbound Real.pi_pos)).trans_le (min_le_right _ _)
+    let w : ℂ := (a : ℂ) * Complex.exp (θ * Complex.I)
+    have harg : w.arg = θ := by
+      change Complex.arg ((a : ℂ) * Complex.exp (θ * Complex.I)) = θ
+      rw [Complex.arg_real_mul _ ha, Complex.arg_exp_mul_I]
+      apply (toIocMod_eq_self Real.two_pi_pos).mpr
+      exact ⟨by linarith [Real.pi_pos], by linarith⟩
+    have hwnorm : ‖w‖ = a := by
+      change ‖(a : ℂ) * Complex.exp (θ * Complex.I)‖ = a
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg ha.le,
+        Complex.norm_exp_ofReal_mul_I, mul_one]
+    obtain ⟨z, hz⟩ := (σ.surjective.comp (surjective_extensionEmbedding_of_isComplex
+      (InfinitePlace.not_isReal_iff_isComplex.mp hv))) w
+    change f z = w at hz
+    let V : Set ℂ := Complex.slitPlane ∩ Complex.arg ⁻¹' Set.Ioo 0 bound
+    refine ⟨f ⁻¹' V, (Complex.continuousOn_arg.isOpen_inter_preimage Complex.isOpen_slitPlane
+      isOpen_Ioo).preimage hf.continuous, ?_, z, ?_, ?_⟩
+    · intro x hx
+      exact Set.Ioo_subset_Ico_self hx.2
+    · change f z ∈ V
+      rw [hz]
+      refine ⟨Complex.mem_slitPlane_iff_arg.mpr
+        ⟨harg.trans_ne hθπ.ne, norm_ne_zero_iff.mp (hwnorm.trans_ne ha.ne')⟩, ?_⟩
+      change w.arg ∈ Set.Ioo 0 bound
+      rw [harg]
+      exact ⟨hθ, hθb⟩
+    · rw [← hf.norm_map_of_map_zero (by simp [f]) z, hz, hwnorm]
+
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain has nonempty interior
 relative to the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_interior : (interior E∞).Nonempty := by
-  sorry
+  obtain ⟨x, hx⟩ := regulatorParallelotope_interior F b
+  -- Restore the omitted coordinate so that the full logarithm sums to zero.
+  let y (v : InfinitePlace F) := if hv : v = w₀ then -∑ w, x w else x ⟨v, hv⟩
+  have hy (v : {w : InfinitePlace F // w ≠ w₀}) : y v.val = x v := dif_neg v.property
+  obtain ⟨a, ha⟩ := infiniteIdeleLog_surjective F y
+  obtain ⟨U, hU, hsector, z, hz, hznorm⟩ :=
+    exists_open_torsionSector_at_radius F v₀ σ (Real.exp_pos (y v₀ / v₀.mult))
+  have hzne : z ≠ 0 := norm_ne_zero_iff.mp (hznorm.trans_ne (Real.exp_pos _).ne')
+  -- Replace the chosen component with a point of the same logarithmic radius.
+  let localUnits := Function.update (MulEquiv.piUnits a) v₀ (Units.mk0 z hzne)
+  let g : 𝕀∞ := MulEquiv.piUnits.symm localUnits
+  have hg₀ : g.val v₀ = z := by
+    change (localUnits v₀).val = z
+    simp [localUnits]
+  have hlog : infiniteIdeleLog F g = y := by
+    funext v
+    by_cases hv : v = v₀
+    · subst v
+      rw [infiniteIdeleLog, hg₀, hznorm, Real.log_exp, mul_div_cancel₀ _ v₀.mult_coe_ne_zero]
+    · change (v.mult : ℝ) * Real.log
+        ‖(Function.update (MulEquiv.piUnits a) v₀ (Units.mk0 z hzne) v).val‖ = y v
+      rw [Function.update_of_ne hv]
+      exact congrFun ha v
+  have hsum : ∑ v, infiniteIdeleLog F g v = 0 := by
+    rw [hlog, Fintype.sum_eq_add_sum_subtype_ne _ w₀]
+    simp only [hy]
+    simp [y]
+  have hnorm : infiniteIdeleNorm F g = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    simp [infiniteIdeleNorm, Units.coe_prod]
+    change ∏ v : InfinitePlace F, ‖g.val v‖ ^ v.mult = 1
+    have hne (v : InfinitePlace F) : g.val v ≠ 0 :=
+      (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
+    calc
+      ∏ v : InfinitePlace F, ‖g.val v‖ ^ v.mult = ∏ v, Real.exp (infiniteIdeleLog F g v) := by
+        apply Finset.prod_congr rfl
+        intro v _
+        rw [infiniteIdeleLog, Real.exp_nat_mul, Real.exp_log (norm_pos_iff.mpr (hne v))]
+      _ = 1 := by rw [← Real.exp_sum, hsum, Real.exp_zero]
+  let p (u : N∞) : logSpace F := fun v ↦ infiniteIdeleLog F u.val v.val
+  let q (u : N∞) : v₀.Completion := u.val.val v₀
+  have hp : Continuous p := continuous_pi fun v ↦
+    (continuous_apply v.val).comp ((infiniteIdeleLog_continuous F).comp continuous_subtype_val)
+  have hq : Continuous q := (continuous_apply v₀).comp
+    (Units.continuous_val.comp continuous_subtype_val)
+  have hSubset : (p ⁻¹' interior (regulatorParallelotope F b)) ∩ (q ⁻¹' U) ⊆ E∞ :=
+    fun u hu ↦ ⟨interior_subset hu.1, hsector (atPlace u.val) hu.2⟩
+  refine ⟨⟨g, hnorm⟩, interior_maximal hSubset
+    ((isOpen_interior.preimage hp).inter (hU.preimage hq)) ⟨?_, ?_⟩⟩
+  · change (fun v : {w : InfinitePlace F // w ≠ w₀} ↦ infiniteIdeleLog F g v.val) ∈
+      interior (regulatorParallelotope F b)
+    simpa only [hlog, hy] using hx
+  · change g.val v₀ ∈ U
+    rwa [hg₀]
 
 local notation "archDomain" => (Subgroup.subtype N∞ '' E∞)
 
