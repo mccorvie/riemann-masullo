@@ -444,7 +444,74 @@ def IsNuclearOperator (A : E →L[ℂ] F) : Prop :=
 /-- Paper: §C.3.1, p. 694. A continuous rank-one operator is nuclear.
 Deviation: This is a check of the local factorization definition. -/
 theorem isNuclearOperator_smulRight (φ : E →L[ℂ] ℂ) (y : F) :
-    IsNuclearOperator (φ.smulRight y) := by sorry
+    IsNuclearOperator (φ.smulRight y) := by
+  let D := Metric.closedBall (0 : ℂ) 1
+  let f := ContinuousLinearMap.toSpanSingleton ℂ y
+  let B := f '' D
+  let S := Submodule.span ℂ B
+  have hS : S = f.toLinearMap.range := by
+    have hD : Absorbent ℂ D := absorbent_nhds_zero (Metric.closedBall_mem_nhds 0 one_pos)
+    have hspan : Submodule.span ℂ D = ⊤ :=
+      (hD.mono Submodule.subset_span).submodule_eq_top
+    change Submodule.span ℂ (f.toLinearMap '' D) = _
+    rw [Submodule.span_image, hspan, Submodule.map_top]
+  let g := f.codRestrict S (fun z ↦ hS.symm ▸ LinearMap.mem_range_self f.toLinearMap z)
+  have hg : Function.Surjective g := by
+    intro z
+    have hz : (z : F) ∈ f.toLinearMap.range := hS ▸ z.property
+    obtain ⟨w, hw⟩ := hz
+    exact ⟨w, Subtype.ext hw⟩
+  have himage : ((↑) ⁻¹' B : Set S) = g '' D := by
+    ext z
+    constructor
+    · rintro ⟨w, hw, heq⟩
+      exact ⟨w, hw, Subtype.ext heq⟩
+    · rintro ⟨w, hw, rfl⟩
+      exact ⟨w, hw, rfl⟩
+  have bB : Balanced ℂ ((↑) ⁻¹' B : Set S) :=
+    himage ▸ balanced_closedBall_zero.image g.toLinearMap
+  have cB : Convex ℝ ((↑) ⁻¹' B : Set S) :=
+    himage ▸ (convex_closedBall (0 : ℂ) 1).linear_image (g.toLinearMap.restrictScalars ℝ)
+  have aB : Absorbent ℝ ((↑) ⁻¹' B : Set S) :=
+    himage ▸ Absorbent.image_of_surjective
+      (f := g.toLinearMap.restrictScalars ℝ) hg
+      (absorbent_nhds_zero (Metric.closedBall_mem_nhds 0 one_pos))
+  -- Boundedness makes the gauge a norm, and the span is finite-dimensional.
+  let pB := gaugeSeminorm bB cB aB
+  have hb : IsVonNBounded ℝ ((↑) ⁻¹' B : Set S) :=
+    himage ▸ ((isCompact_closedBall (0 : ℂ) 1).image g.continuous).isVonNBounded ℝ
+  let : NormedAddCommGroup (WithLocalSeminorm pB) :=
+    NormedAddCommGroup.ofSeparation fun z hz ↦ (gauge_eq_zero aB hb).mp hz
+  let : FiniteDimensional ℂ (WithLocalSeminorm pB) :=
+    Module.Finite.of_surjective (show ℂ →ₗ[ℂ] WithLocalSeminorm pB from g.toLinearMap) hg
+  have hB : IsBanachDisc B :=
+    ⟨(NormedSpace.isVonNBounded_closedBall ℂ ℂ 1).image f, bB, cB, aB,
+      inferInstance, FiniteDimensional.completeSpace ℂ (WithLocalSeminorm pB)⟩
+  -- The source gauge is the seminorm x ↦ ‖φ x‖, so φ extends to the completion.
+  let q := (normSeminorm ℂ ℂ).comp φ.toLinearMap
+  let U := q.ball 0 1
+  have hU : U ∈ 𝓝 (0 : E) := by
+    exact (Seminorm.continuous_iff (p := q) one_pos).mp φ.continuous.norm
+  let pU := gaugeSeminorm (q.balanced_ball_zero 1) (q.convex_ball 0 1) (absorbent_nhds_zero hU)
+  let ψ := (show WithLocalSeminorm pU →ₗ[ℂ] ℂ from φ.toLinearMap).mkContinuous 1 (by
+    intro x
+    change ‖φ x‖ ≤ 1 * gauge U x
+    rw [one_mul]
+    exact ge_of_eq (congrFun (q.restrictScalars ℝ).gauge_ball x))
+  let yB : WithLocalSeminorm pB := g 1
+  refine ⟨U, hU, q.balanced_ball_zero 1, q.convex_ball 0 1, B, hB, ?_,
+    ψ.fromCompletion.smulRight yB, isBanachNuclear_smulRight _ _, ?_⟩
+  · intro x hx
+    refine ⟨φ x, ?_, rfl⟩
+    change φ x ∈ Metric.closedBall (0 : ℂ) 1
+    rw [Metric.mem_closedBall, dist_zero_right]
+    exact (show ‖φ x‖ < 1 from q.mem_ball_zero.mp hx).le
+  · intro x
+    let xU : WithLocalSeminorm pU := x
+    change (↑(show S from ψ.fromCompletion xU • yB) : F) = φ x • y
+    rw [ψ.fromCompletion_apply_coe]
+    change φ x • (1 : ℂ) • y = φ x • y
+    rw [one_smul]
 
 /-- Paper: (C.3.1.3), p. 694. A nuclear presentation is a pointwise operator sum
 of rank-one maps with summable coefficients, equicontinuous functionals and
