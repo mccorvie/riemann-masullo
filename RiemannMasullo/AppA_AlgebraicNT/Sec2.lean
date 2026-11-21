@@ -1312,7 +1312,10 @@ def canonicalIdeleNormSection : ℝ≥0ˣ →* 𝕀[F] :=
 
 /-- Paper: Lemma A.2.2.4, p. 547. The canonical homomorphism is continuous. -/
 theorem canonicalIdeleNormSection_continuous : Continuous (canonicalIdeleNormSection F) := by
-  sorry
+  simp only [canonicalIdeleNormSection, MonoidHom.coe_comp]
+  exact ((rationalAdeleEmbedding_spec F).1.units_map _).comp
+    (ratIdeleNormSection_continuous.comp
+      ((NNReal.continuous_rpow_const (by positivity)).units_map _))
 
 /-- Paper: Lemma A.2.2.4, p. 547. The canonical homomorphism splits the idelic norm. -/
 theorem canonicalIdeleNormSection_rightInverse :
