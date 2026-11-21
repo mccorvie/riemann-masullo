@@ -1291,11 +1291,64 @@ of a continuous linear functional on the injective tensor product to pure tensor
 def IsIntegralBilinearForm (b : E → F → ℂ) : Prop :=
   ∃ l : StrongDual ℂ (InjectiveTensor E F), ∀ x y, l (x ⊗ₜ[ℂ] y) = b x y
 
+open scoped Pointwise in
 /-- Paper: Proposition C.2.4.8, p. 688. A product of two continuous linear
 functionals is an integral bilinear form.
 Deviation: This is a check on the definition using a rank-one form. -/
 theorem isIntegralBilinearForm_mul (φ : StrongDual ℂ E) (ψ : StrongDual ℂ F) :
-    IsIntegralBilinearForm (fun x y ↦ φ x * ψ y) := by sorry
+    IsIntegralBilinearForm (fun x y ↦ φ x * ψ y) := by
+  let p := (normSeminorm ℂ ℂ).comp φ.toLinearMap
+  let q := (normSeminorm ℂ ℂ).comp ψ.toLinearMap
+  let U : {U : Set E // U ∈ 𝓝 0} :=
+    ⟨p.closedBall 0 1, Filter.mem_of_superset (p.ball_mem_nhds φ.continuous.norm one_pos)
+      (p.ball_subset_closedBall _ _)⟩
+  let V : {V : Set F // V ∈ 𝓝 0} :=
+    ⟨q.closedBall 0 1, Filter.mem_of_superset (q.ball_mem_nhds ψ.continuous.norm one_pos)
+      (q.ball_subset_closedBall _ _)⟩
+  have hφ : φ ∈ StrongDual.polar ℂ U.val :=
+    (StrongDual.mem_polar_iff ℂ _).mpr fun _ hx ↦ p.mem_closedBall_zero.mp hx
+  have hψ : ψ ∈ StrongDual.polar ℂ V.val :=
+    (StrongDual.mem_polar_iff ℂ _).mpr fun _ hy ↦ q.mem_closedBall_zero.mp hy
+  let D := StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val
+  let evaluation (f : D) := (normSeminorm ℂ ℂ).comp (tensorDualForm f.1.val f.2.val)
+  -- Absorbency of the closed seminorm balls bounds all polar evaluations on each tensor.
+  have hbound (z : E ⊗[ℂ] F) : ∃ C : ℝ, ∀ f : D, evaluation f z ≤ C := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+        obtain ⟨a, x', hx', rfl⟩ : ∃ a : ℂ, x ∈ a • U.val := by
+          simpa using (p.absorbent_closedBall_zero one_pos x).exists
+        obtain ⟨b, y', hy', rfl⟩ : ∃ b : ℂ, y ∈ b • V.val := by
+          simpa using (q.absorbent_closedBall_zero one_pos y).exists
+        refine ⟨‖a‖ * ‖b‖, fun f ↦ ?_⟩
+        have hx := (StrongDual.mem_polar_iff ℂ _).mp f.1.property x' hx'
+        have hy := (StrongDual.mem_polar_iff ℂ _).mp f.2.property y' hy'
+        change ‖tensorDualForm f.1.val f.2.val ((a • x') ⊗ₜ[ℂ] (b • y'))‖ ≤ _
+        simp only [tensorDualForm_tmul, map_smul, norm_mul, norm_smul]
+        simpa only [mul_one] using
+          mul_le_mul (mul_le_of_le_one_right (norm_nonneg _) hx)
+            (mul_le_of_le_one_right (norm_nonneg _) hy)
+            (mul_nonneg (norm_nonneg _) (norm_nonneg _)) (norm_nonneg _)
+    | add z w hz hw =>
+        obtain ⟨C, hC⟩ := hz
+        obtain ⟨D', hD'⟩ := hw
+        exact ⟨C + D', fun f ↦ (map_add_le_add (evaluation f) z w).trans
+          (add_le_add (hC f) (hD' f))⟩
+  have hb : BddAbove (range evaluation) := by
+    apply Seminorm.bddAbove_range_iff.mpr
+    intro z
+    obtain ⟨C, hC⟩ := hbound z
+    exact ⟨C, forall_mem_range.mpr hC⟩
+  have hle : (normSeminorm ℂ ℂ).comp (tensorDualForm φ ψ) ≤ injectiveTensorSeminorm U V := by
+    unfold injectiveTensorSeminorm
+    rw [← ciSup_prod hb]
+    exact le_ciSup hb (⟨φ, hφ⟩, ⟨ψ, hψ⟩)
+  let T : InjectiveTensor E F →ₗ[ℂ] ℂ := tensorDualForm φ ψ
+  have hT : Continuous T := by
+    apply ((norm_withSeminorms ℂ ℂ).continuous_iff_continuous_comp T).mpr
+    intro _
+    exact Seminorm.continuous_of_le
+      ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U, V)) hle
+  exact ⟨⟨T, hT⟩, tensorDualForm_tmul φ ψ⟩
 
 /-- Paper: Proposition C.2.4.8, p. 688. A continuous bilinear form is integral
 exactly when a positive Radon measure of mass at most one on a product of weakly
