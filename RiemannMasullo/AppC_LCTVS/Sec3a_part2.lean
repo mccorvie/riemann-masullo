@@ -1059,6 +1059,31 @@ section
 
 open InnerProductSpace
 
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- Bessel's inequality bounds the action of a finite sum of singular terms by
+any nonnegative upper bound for its coefficients times the norm of the input. -/
+private theorem norm_sum_singularTerms_le (c : ℕ → ℝ≥0)
+    {e : {n // c n ≠ 0} → E} {f : {n // c n ≠ 0} → F}
+    (he : Orthonormal ℂ e) (hf : Orthonormal ℂ f)
+    (s : Finset {n // c n ≠ 0}) {r : ℝ} (hr : 0 ≤ r)
+    (hs : ∀ i ∈ s, (c i : ℝ) ≤ r) (x : E) :
+    ‖∑ i ∈ s, ((c i : ℝ) * ⟪e i, x⟫_ℂ) • f i‖ ≤ r * ‖x‖ := by
+  let a (i : {n // c n ≠ 0}) : ℂ := (c i : ℝ) * ⟪e i, x⟫_ℂ
+  change ‖∑ i ∈ s, a i • f i‖ ≤ _
+  apply le_of_sq_le_sq _ (mul_nonneg hr (norm_nonneg x))
+  rw [norm_sq_eq_re_inner (𝕜 := ℂ), hf.inner_sum a a, map_sum, mul_pow]
+  calc
+    ∑ i ∈ s, RCLike.re (starRingEnd ℂ (a i) * a i) ≤ ∑ i ∈ s, r ^ 2 * ‖⟪e i, x⟫_ℂ‖ ^ 2 := by
+      refine Finset.sum_le_sum fun i hi ↦ ?_
+      rw [RCLike.conj_mul, ← RCLike.ofReal_pow, RCLike.ofReal_re]
+      have hi0 : 0 ≤ (c i : ℝ) := (c i).2
+      simp only [a, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hi0, mul_pow]
+      exact mul_le_mul_of_nonneg_right
+        ((sq_le_sq₀ (c i).2 hr).mpr (hs i hi)) (sq_nonneg _)
+    _ ≤ r ^ 2 * ‖x‖ ^ 2 := by
+      rw [← Finset.mul_sum]
+      exact mul_le_mul_of_nonneg_left (he.sum_inner_products_le x) (sq_nonneg _)
+
 omit [CompleteSpace E] in
 /-- The rank-one terms from two orthonormal families and coefficients tending to zero
 are summable in operator norm. -/
@@ -1068,26 +1093,11 @@ private theorem summable_singularTerms (c : ℕ → ℝ≥0) (hc : Tendsto c atT
     Summable (fun i : {n // c n ≠ 0} ↦ ((c i : ℝ) : ℂ) • rankOne ℂ (f i) (e i)) := by
   classical
   let A (i : {n // c n ≠ 0}) : E →L[ℂ] F := ((c i : ℝ) : ℂ) • rankOne ℂ (f i) (e i)
-  -- Bessel's inequality bounds any finite sum by the largest coefficient in it.
   have hbound (s : Finset {n // c n ≠ 0}) {r : ℝ} (hr : 0 ≤ r)
       (hs : ∀ i ∈ s, (c i : ℝ) ≤ r) : ‖∑ i ∈ s, A i‖ ≤ r := by
     refine ContinuousLinearMap.opNorm_le_bound _ hr fun x ↦ ?_
-    let a (i : {n // c n ≠ 0}) : ℂ := (c i : ℝ) * ⟪e i, x⟫_ℂ
-    have happly : (∑ i ∈ s, A i) x = ∑ i ∈ s, a i • f i := by
-      simp only [A, a, sum_apply, smul_apply, rankOne_apply, smul_smul]
-    apply le_of_sq_le_sq _ (mul_nonneg hr (norm_nonneg x))
-    rw [happly, norm_sq_eq_re_inner (𝕜 := ℂ), hf.inner_sum a a, map_sum, mul_pow]
-    calc
-      ∑ i ∈ s, RCLike.re (starRingEnd ℂ (a i) * a i) ≤ ∑ i ∈ s, r ^ 2 * ‖⟪e i, x⟫_ℂ‖ ^ 2 := by
-        refine Finset.sum_le_sum fun i hi ↦ ?_
-        rw [RCLike.conj_mul, ← RCLike.ofReal_pow, RCLike.ofReal_re]
-        have hi0 : 0 ≤ (c i : ℝ) := (c i).2
-        simp only [a, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hi0, mul_pow]
-        exact mul_le_mul_of_nonneg_right
-          ((sq_le_sq₀ (c i).2 hr).mpr (hs i hi)) (sq_nonneg _)
-      _ ≤ r ^ 2 * ‖x‖ ^ 2 := by
-        rw [← Finset.mul_sum]
-        exact mul_le_mul_of_nonneg_left (he.sum_inner_products_le x) (sq_nonneg _)
+    simpa only [A, sum_apply, smul_apply, rankOne_apply, smul_smul] using
+      norm_sum_singularTerms_le c he hf s hr hs x
   change Summable A
   rw [summable_iff_cauchySeq_finset, NormedAddCommGroup.cauchySeq_iff]
   intro ε hε
@@ -1310,7 +1320,24 @@ theorem SingularExpansion.hasSum_opNorm {T : E →L[ℂ] F} (d : SingularExpansi
 /-- Paper: Theorem C.3.6.1, p. 703. The first coefficient of a singular
 expansion equals the operator norm, including for the zero operator. -/
 theorem SingularExpansion.coeff_zero_eq_opNorm {T : E →L[ℂ] F} (d : SingularExpansion T) :
-    (d.coeff 0 : ℝ) = ‖T‖ := by sorry
+    (d.coeff 0 : ℝ) = ‖T‖ := by
+  apply le_antisymm
+  · by_cases h : d.coeff 0 = 0
+    · simpa only [h, NNReal.coe_zero] using norm_nonneg T
+    let i : {n // d.coeff n ≠ 0} := ⟨0, h⟩
+    have hT : T (d.source i) = ((d.coeff i : ℝ) * ⟪d.source i, d.source i⟫_ℂ) • d.target i :=
+      (d.hasSum_apply (d.source i)).unique (hasSum_single i fun j hj ↦ by
+        rw [d.orthonormal_source.inner_eq_zero hj, mul_zero, zero_smul])
+    have hinner : ⟪d.source i, d.source i⟫_ℂ = 1 := by
+      simp [inner_self_eq_norm_sq_to_K, d.orthonormal_source.norm_eq_one i]
+    have hi0 : 0 ≤ (d.coeff i : ℝ) := (d.coeff i).2
+    simpa only [hT, hinner, mul_one, norm_smul, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_nonneg hi0, d.orthonormal_target.norm_eq_one i,
+      d.orthonormal_source.norm_eq_one i] using T.le_opNorm (d.source i)
+  · refine ContinuousLinearMap.opNorm_le_bound T (d.coeff 0).2 fun x ↦ ?_
+    refine le_of_tendsto' (d.hasSum_apply x).norm fun s ↦ ?_
+    exact norm_sum_singularTerms_le d.coeff d.orthonormal_source d.orthonormal_target
+      s (d.coeff 0).2 (fun i _ ↦ d.antitone_coeff (Nat.zero_le i.val)) x
 
 /-- Paper: §C.3.6, p. 704. The coefficients of a singular expansion are
 the approximation numbers and are independent of the orthonormal vectors.
