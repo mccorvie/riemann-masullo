@@ -4,8 +4,12 @@ public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Algebra.Ring.Periodic
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Basic
+import Mathlib.Analysis.Calculus.ContDiff.Operations
 import Mathlib.Analysis.Calculus.Deriv.Add
+import Mathlib.Analysis.Calculus.Deriv.Comp
 import Mathlib.Analysis.Calculus.Deriv.Mul
+import Mathlib.Analysis.Calculus.MeanValue
+import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -87,11 +91,101 @@ def vectorPeriodicSmoothSubmodule : Submodule ℂ (V → E) :=
     ⨅ (n : Fin d → ℤ) (x : V), LinearMap.ker
       ((LinearMap.proj (x + eucInt n) : (V → E) →ₗ[ℂ] E) - LinearMap.proj x)
 
+/-- At positive order, the scalar vector differentiability condition implies ordinary
+continuous differentiability of that order. -/
+private theorem contDiff_of_vectorContDiffOrderOn_succ (m : ℕ) {f : V → ℂ}
+    (hf : VectorContDiffOrderOn (k := ℝ) f univ (m + 1)) :
+    ContDiff ℝ (↑(m + 1 : ℕ)) f := by
+  have step {m : ℕ} {f : V → ℂ} {g : Fin d → V → ℂ}
+      (hg : ∀ i, HasWeakPartialOn (k := ℝ) (Ω := univ) i f
+        (fun x ↦ toPettisWeakCompletion ℂ (g i x)))
+      (hc : ∀ i, ContDiff ℝ (m : ℕ∞) (g i)) : ContDiff ℝ (↑(m + 1 : ℕ)) f := by
+    have hderiv (x : V) : HasFDerivAt f
+        (∑ i, (EuclideanSpace.proj (𝕜 := ℝ) i).smulRight (g i x)) x := by
+      refine hasFDerivAt_of_continuous_coordinate_derivatives g
+        (fun i ↦ Eventually.of_forall fun y ↦ ?_) (fun i ↦ (hc i).continuous.continuousAt)
+      have h := hg i (ContinuousLinearMap.id ℂ ℂ) ⟨y, mem_univ y⟩
+      simpa [HasLineDerivAt, toPettisWeakCompletion_apply] using h
+    rw [Nat.cast_add, Nat.cast_one, contDiff_succ_iff_fderiv]
+    refine ⟨fun x ↦ (hderiv x).differentiableAt, by simp, ?_⟩
+    have hformula : fderiv ℝ f = fun x ↦
+        ∑ i, (EuclideanSpace.proj (𝕜 := ℝ) i).smulRight (g i x) :=
+      funext fun x ↦ (hderiv x).fderiv
+    rw [hformula]
+    exact ContDiff.sum fun i _ ↦
+      (ContinuousLinearMap.smulRightL ℝ V ℂ (EuclideanSpace.proj i)).contDiff.comp (hc i)
+  induction m generalizing f with
+  | zero =>
+    choose g hg hc _ using hf
+    exact step hg fun i ↦ contDiff_zero.mpr (continuousOn_univ.mp (hc i))
+  | succ m ih =>
+    choose g hg _ horder using hf
+    exact step hg fun i ↦ ih (horder i)
+
+/-- The Fréchet derivative of an integer-periodic function has the same periods. -/
+private theorem fderiv_integer_periodic {f : V → ℂ}
+    (hp : ∀ n : Fin d → ℤ, Periodic f (eucInt n)) (n : Fin d → ℤ) :
+    Periodic (fderiv ℝ f) (eucInt n) := by
+  intro x
+  rw [← fderiv_comp_add_right, show (fun y ↦ f (y + eucInt n)) = f from funext (hp n)]
+
+/-- A smooth scalar periodic map satisfies the vector order condition at every finite order.
+At order zero, the derivative bound on the unit cube controls all normalized differences. -/
+private theorem vectorContDiffOrderOn_of_contDiff_periodic (m : ℕ) {f : V → ℂ}
+    (hf : ContDiff ℝ ∞ f) (hp : ∀ n : Fin d → ℤ, Periodic f (eucInt n)) :
+    VectorContDiffOrderOn (k := ℝ) f univ m := by
+  induction m generalizing f with
+  | zero =>
+    have h' := contDiff_infty_iff_fderiv.mp hf
+    let Q : Set (Fin d → ℝ) := univ.pi fun _ ↦ Icc 0 1
+    have hQ : IsCompact Q := isCompact_univ_pi fun _ ↦ isCompact_Icc
+    obtain ⟨C, hC⟩ := ((hQ.image (PiLp.continuous_toLp 2 (fun _ : Fin d ↦ ℝ))).image
+      h'.2.continuous).isBounded.exists_norm_le
+    have hbound (x : V) : ‖fderiv ℝ f x‖ ≤ C := by
+      let n : Fin d → ℤ := fun i ↦ ⌊x i⌋
+      have hx : (x - eucInt n) ∈ WithLp.toLp 2 '' Q := by
+        refine ⟨WithLp.ofLp (x - eucInt n), ?_, rfl⟩
+        intro i _
+        change x i - (⌊x i⌋ : ℝ) ∈ Icc 0 1
+        exact ⟨Int.fract_nonneg _, (Int.fract_lt_one _).le⟩
+      have heq := fderiv_integer_periodic hp n (x - eucInt n)
+      rw [sub_add_cancel] at heq
+      rw [heq]
+      exact hC _ (mem_image_of_mem _ hx)
+    apply (NormedSpace.isVonNBounded_iff ℂ).mpr
+    refine isBounded_iff_forall_norm_le.mpr ⟨C, ?_⟩
+    rintro _ ⟨x, _, y, _, hxy, _, rfl⟩
+    have hnorm : 0 < ‖y - x‖ := norm_pos_iff.mpr (sub_ne_zero.mpr hxy.symm)
+    rw [norm_smul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (inv_pos.mpr hnorm),
+      ← div_eq_inv_mul, div_le_iff₀ hnorm]
+    exact (convex_univ : Convex ℝ (univ : Set V)).norm_image_sub_le_of_norm_fderiv_le
+      (fun z _ ↦ h'.1 z) (fun z _ ↦ hbound z) (mem_univ x) (mem_univ y)
+  | succ m ih =>
+    have h' := contDiff_infty_iff_fderiv.mp hf
+    intro i
+    let v : V := EuclideanSpace.single i 1
+    let g (x : V) := fderiv ℝ f x v
+    have hg : ContDiff ℝ ∞ g := h'.2.clm_apply contDiff_const
+    refine ⟨g, ?_, hg.continuous.continuousOn,
+      ih hg (fun n x ↦ congrArg (fun L : V →L[ℝ] ℂ ↦ L v) (fderiv_integer_periodic hp n x))⟩
+    intro φ x
+    have h : HasLineDerivAt ℝ f (g x) x v := (h'.1 x).hasFDerivAt.hasLineDerivAt v
+    change HasDerivWithinAt (fun t : ℝ ↦ φ (f ((x : V) + t • v))) (φ (g x)) _ 0
+    exact ((φ.restrictScalars ℝ).hasFDerivAt.comp_hasDerivAt (0 : ℝ) h).hasDerivWithinAt
+
 /-- Paper: Definition C.5.1.26(1), p. 735. On the complex scalar line as target,
 membership means ordinary smoothness and invariance under the integer translations. -/
 theorem mem_vectorPeriodicSmoothSubmodule_complex_iff (f : V → ℂ) :
     f ∈ vectorPeriodicSmoothSubmodule d ℂ ↔
-      ContDiff ℝ ∞ f ∧ ∀ n : Fin d → ℤ, Periodic f (eucInt n) := by sorry
+      ContDiff ℝ ∞ f ∧ ∀ n : Fin d → ℤ, Periodic f (eucInt n) := by
+  simp only [vectorPeriodicSmoothSubmodule, Submodule.mem_inf, Submodule.mem_iInf,
+    LinearMap.mem_ker, LinearMap.sub_apply, LinearMap.proj_apply, sub_eq_zero, Periodic]
+  constructor
+  · rintro ⟨h, hp⟩
+    refine ⟨contDiff_infty.mpr fun m ↦ ?_, hp⟩
+    exact (contDiff_of_vectorContDiffOrderOn_succ m (h (m + 1))).of_le (by simp)
+  · rintro ⟨hf, hp⟩
+    exact ⟨fun m ↦ vectorContDiffOrderOn_of_contDiff_periodic m hf hp, hp⟩
 
 /-- Paper: Definition C.5.1.26(2), p. 735. Every mixed coordinate derivative,
 multiplied by any complex polynomial in the real coordinates, has bounded range. -/
