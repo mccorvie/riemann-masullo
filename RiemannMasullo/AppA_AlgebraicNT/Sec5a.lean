@@ -1664,7 +1664,60 @@ theorem centeredSLocalIdeleDomain_fundamental
 /-- Paper: Lemma A.5.2.13(1), p. 576. The interior of the centered archimedean
 domain contains the identity and is therefore a neighborhood of it. -/
 theorem interior_centeredInfiniteIdeleDomain_mem_nhds :
-    interior (centeredInfiniteIdeleDomain F b v₀ σ) ∈ 𝓝 (1 : N∞) := by sorry
+    interior (centeredInfiniteIdeleDomain F b v₀ σ) ∈ 𝓝 (1 : N∞) := by
+  classical
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  have hB (i : Fin (Units.rank F)) : Units.logEmbeddingQuot F (b i) = B i := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  let p (g : N∞) : logSpace F := fun w ↦ infiniteIdeleLog F g.val w.val
+  have hp : Continuous p := continuous_pi fun w ↦
+    (continuous_apply w.val).comp ((infiniteIdeleLog_continuous F).comp continuous_subtype_val)
+  have hp₁ : p 1 = 0 := by
+    funext w
+    change (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = 0
+    simp
+  let s : logSpace F := ∑ i, (1 / 2 : ℝ) • B i
+  let c (g : N∞) := B.equivFun (s + p g)
+  have hc : Continuous c :=
+    B.equivFun.toLinearMap.continuous_of_finiteDimensional.comp (continuous_const.add hp)
+  have hc₁ (i : Fin (Units.rank F)) : c 1 i = 1 / 2 := by
+    simp only [c, hp₁, add_zero, Module.Basis.equivFun_apply, s, B.repr_sum_self]
+  have hlog : ∀ᶠ g in 𝓝 (1 : N∞), p g ∈ centeredRegulatorParallelotope F b := by
+    let U : Set (Fin (Units.rank F) → ℝ) := Set.pi univ fun _ ↦ Ioo 0 1
+    have hU : IsOpen U := isOpen_set_pi finite_univ fun _ _ ↦ isOpen_Ioo
+    have hU₁ : c 1 ∈ U := by
+      intro i _
+      rw [hc₁]
+      norm_num
+    filter_upwards [hc.continuousAt.preimage_mem_nhds (hU.mem_nhds hU₁)] with g hg
+    simp only [centeredRegulatorParallelotope, hB]
+    rw [Set.mem_vadd_set_iff_neg_vadd_mem, neg_neg, vadd_eq_add]
+    change s + p g ∈ ZSpan.fundamentalDomain B
+    rw [ZSpan.mem_fundamentalDomain, ← Module.Basis.equivFun_apply]
+    exact fun i ↦ Ioo_subset_Ico_self (hg i (mem_univ i))
+  let z (g : N∞) := σ (extensionEmbedding v₀ (g.val.val v₀))
+  have hz : Continuous z :=
+    σ.toLinearMap.continuous_of_finiteDimensional.comp
+      ((isometry_extensionEmbedding v₀).continuous.comp
+        ((continuous_apply v₀).comp (Units.continuous_val.comp continuous_subtype_val)))
+  have hz₁ : z 1 = 1 := by
+    change σ (extensionEmbedding v₀ 1) = 1
+    simp
+  have harg : ContinuousAt (fun g : N∞ ↦ (z g).arg) 1 :=
+    (Complex.continuousAt_arg (by rw [hz₁]; exact Complex.one_mem_slitPlane)).comp
+      hz.continuousAt
+  let a := Real.pi / (Units.torsionOrder F : ℝ)
+  have ha : 0 < a := div_pos Real.pi_pos (by exact_mod_cast Units.torsionOrder_pos F)
+  have hangle : Ioo (-a) a ∈ 𝓝 ((z 1).arg) := by
+    rw [hz₁, Complex.arg_one]
+    exact isOpen_Ioo.mem_nhds ⟨neg_lt_zero.mpr ha, ha⟩
+  apply interior_mem_nhds.mpr
+  filter_upwards [hlog, harg.preimage_mem_nhds hangle] with g hg hangle'
+  refine ⟨hg, ?_⟩
+  change (z g).arg ∈ Ico (-Real.pi / _) _
+  rw [neg_div]
+  exact Ioo_subset_Ico_self hangle'
 
 /-- Paper: Lemma A.5.2.13(1), p. 576. The interior of the centered archimedean
 domain is invariant under inversion. -/
