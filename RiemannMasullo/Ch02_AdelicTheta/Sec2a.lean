@@ -33,7 +33,10 @@ theorem mem_euclideanSupNormShell_one (x r : ℝ) :
 
 /-- Paper: Lemma 2.2.1.1, p. 75. Each shell is bounded in the supremum norm. -/
 theorem euclideanSupNormShell_bounded {N : ℕ} (_hN : 1 ≤ N) {r : ℝ} (_hr : 1 ≤ r) :
-    IsBounded (euclideanSupNormShell N r) := by sorry
+    IsBounded (euclideanSupNormShell N r) := by
+  apply (Metric.isBounded_ball (x := (0 : Fin N → ℝ)) (r := r + 1)).subset
+  intro x hx
+  simpa only [Metric.mem_ball, dist_zero_right] using hx.2
 
 /-- Paper: Lemma 2.2.1.1, p. 75. Each shell is measurable for completed
 Lebesgue measure. -/
