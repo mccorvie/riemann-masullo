@@ -14,6 +14,7 @@ public import Mathlib.Topology.Algebra.Group.Units
 
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
 import Mathlib.Analysis.SpecialFunctions.Complex.CircleAddChar
+import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
 import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.LinearAlgebra.Countable
 import Mathlib.MeasureTheory.Measure.Haar.DistribChar
@@ -2236,10 +2237,376 @@ Poisson summation over the rationals needs, and it fails for the signs as printe
 theorem ratAdeleStandardCharacter_algebraMap (q : ℚ) :
     ratAdeleStandardCharacter (algebraMap ℚ 𝔸[ℚ] q) = 1 := by sorry
 
+section RatAdeleSelfDuality
+
+local instance : BorelSpace 𝔸[ℚ] := ⟨rfl⟩
+
+/-- The real coordinate of a rational adele in the unique real completion. -/
+private def ratRealPart (a : 𝔸[ℚ]) : ℝ :=
+  extensionEmbeddingOfIsReal Rat.isReal_infinitePlace (a.1 Rat.infinitePlace)
+
+local notation "ratIntegralAdeles" => (integralAdelesOutside ℚ ∅ : Set 𝔸[ℚ])
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
+/-- The adeles integral at every finite place form an open subring. -/
+private theorem isOpen_ratIntegralAdeles : IsOpen ratIntegralAdeles := by
+  simp only [integralAdelesOutside, Subring.coe_iInf, Set.iInter_ofPred, Finset.notMem_empty,
+    not_false_eq_true, true_implies]
+  exact (RestrictedProduct.isOpen_forall_mem (fun v : Primes(ℚ) ↦
+    Valued.isOpen_integer (v.adicCompletion ℚ))).preimage continuous_snd
+
+/-- Projecting the restriction to integral finite components onto the real coordinate
+gives Lebesgue measure. The finite integral factors have product mass one. -/
+private theorem ratTamagawaMeasurePreserving_realPart :
+    MeasurePreserving ratRealPart ((additiveTamagawaMeasure ℚ).restrict ratIntegralAdeles)
+      (volume : Measure ℝ) := by
+  let t : InfiniteAdeleRing ℚ → ℝ := fun a ↦
+    extensionEmbeddingOfIsReal Rat.isReal_infinitePlace (a Rat.infinitePlace)
+  have ht : Continuous t :=
+    (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).continuous.comp (continuous_apply _)
+  let μ := infiniteLocalAdditiveTamagawaMeasure ℚ
+  let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
+  let (v : InfinitePlace ℚ) : BorelSpace v.Completion := ⟨rfl⟩
+  let (v : InfinitePlace ℚ) : SecondCountableTopology v.Completion :=
+    (isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let : BorelSpace (InfiniteAdeleRing ℚ) :=
+    inferInstanceAs (BorelSpace ((v : InfinitePlace ℚ) → v.Completion))
+  let e := (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).toHomeomorph.toMeasurableEquiv
+  have he : MeasurePreserving e (μ Rat.infinitePlace) volume := by
+    refine ⟨e.measurable, ?_⟩
+    change (infiniteLocalAdditiveTamagawaMeasure ℚ Rat.infinitePlace).map e = _
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left Rat.isReal_infinitePlace]
+    change (Measure.map e.symm volume).map e = _
+    rw [Measure.map_map e.measurable e.symm.measurable, e.self_comp_symm, Measure.map_id]
+  have hπ : MeasurePreserving t (Measure.pi μ) volume :=
+    he.comp (measurePreserving_piUnique μ)
+  have hm : Measurable ratRealPart :=
+    Continuous.measurable (α := 𝔸[ℚ]) (ht.comp continuous_fst)
+  refine ⟨hm, Measure.ext fun B hB ↦ ?_⟩
+  rw [Measure.map_apply hm hB, Measure.restrict_apply (hm hB)]
+  have hset : ratRealPart ⁻¹' B ∩ ratIntegralAdeles =
+      {a : 𝔸[ℚ] | a.1 ∈ t ⁻¹' B ∧
+        (∀ v : (∅ : Finset (Primes(ℚ))), a.2 v.val ∈ (Set.univ : Set (v.val.adicCompletion ℚ))) ∧
+        a ∈ integralAdelesOutside ℚ ∅} := by
+    ext a
+    simp [t, ratRealPart]
+  rw [hset, additiveTamagawaMeasure_restrictedProduct ℚ ∅ _ (ht.measurable hB) _
+    (fun _ ↦ MeasurableSet.univ)]
+  have htail : (∏ᶠ v : {v : Primes(ℚ) // v ∉ (∅ : Finset (Primes(ℚ)))},
+      differentMass(ℚ, v.val)) = 1 := by
+    rw [finprod_subtype_eq_finprod_cond (f := fun v : Primes(ℚ) ↦ differentMass(ℚ, v))
+      (fun v ↦ v ∉ (∅ : Finset (Primes(ℚ))))]
+    simp only [Finset.notMem_empty, not_false_eq_true, finprod_true,
+      finiteLocalTamagawaMass_finprod]
+    simp
+  simp only [htail, Finset.univ_eq_empty, Finset.prod_empty, mul_one]
+  exact hπ.measure_preimage hB.nullMeasurableSet
+
+/-- Paper: Example A.3.1.8, p. 558. The adelic Gaussian is the real Gaussian times
+the indicator of the adeles integral at every finite place. -/
+private def ratAdeleGaussian : 𝔸[ℚ] → ℂ :=
+  Set.indicator ratIntegralAdeles (fun a ↦ (Real.exp (-Real.pi * (ratRealPart a) ^ 2) : ℂ))
+
+/-- The adelic Gaussian is integrable and square-integrable. -/
+private theorem ratAdeleGaussian_integrable_memLp :
+    Integrable ratAdeleGaussian (additiveTamagawaMeasure ℚ) ∧
+      MemLp ratAdeleGaussian 2 (additiveTamagawaMeasure ℚ) := by
+  let g : ℝ → ℂ := fun x ↦ (Real.exp (-Real.pi * x ^ 2) : ℂ)
+  have hg : Integrable g volume := (integrable_exp_neg_mul_sq Real.pi_pos).ofReal
+  have hg₂ : MemLp g 2 volume := by
+    apply (memLp_two_iff_integrable_sq_norm hg.aestronglyMeasurable).2
+    convert integrable_exp_neg_mul_sq (b := 2 * Real.pi) (by positivity) using 1
+    funext x
+    dsimp [g]
+    rw [Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le, ← Real.exp_nat_mul]
+    push_cast
+    congr 1
+    ring
+  have hI := isOpen_ratIntegralAdeles.measurableSet
+  exact ⟨(integrable_indicator_iff hI).2
+    (ratTamagawaMeasurePreserving_realPart.integrable_comp_of_integrable hg),
+    (memLp_indicator_iff_restrict hI.nullMeasurableSet).2
+      (hg₂.comp_measurePreserving ratTamagawaMeasurePreserving_realPart)⟩
+
+/-- The standard character on the completion at a finite rational place. -/
+private def ratLocalCharacter (v : Primes(ℚ)) (x : v.adicCompletion ℚ) : Circle :=
+  let p := Rat.HeightOneSpectrum.primesEquiv v
+  letI : Fact p.val.Prime := ⟨p.property⟩
+  padicStandardCharacter p.val (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v x)
+
+/-- At each finite rational place, the local character has kernel the local integers. -/
+private theorem ratLocalCharacter_eq_one (v : Primes(ℚ)) (x : v.adicCompletion ℚ) :
+    ratLocalCharacter v x = 1 ↔ x ∈ v.adicCompletionIntegers ℚ := by
+  let p := Rat.HeightOneSpectrum.primesEquiv v
+  let : Fact p.val.Prime := ⟨p.property⟩
+  let e := Rat.HeightOneSpectrum.adicCompletion.padicEquiv v
+  change padicStandardCharacter p.val (e x) = 1 ↔ _
+  rw [padicStandardCharacter_eq_one_iff]
+  have h := Rat.HeightOneSpectrum.adicCompletion.padicEquiv_bijOn v
+  refine ⟨fun hx ↦ ?_, fun hx ↦ h.mapsTo hx⟩
+  obtain ⟨z, hz, he⟩ := h.surjOn hx
+  exact e.injective he ▸ hz
+
+/-- Membership in the integral subring amounts to integrality in each finite coordinate. -/
+private theorem mem_ratIntegralAdeles (a : 𝔸[ℚ]) :
+    a ∈ ratIntegralAdeles ↔ ∀ v : Primes(ℚ), a.2 v ∈ v.adicCompletionIntegers ℚ := by
+  change a ∈ integralAdelesOutside ℚ ∅ ↔ _
+  simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+    true_implies]
+  rfl
+
+/-- On integral finite components the global character is its real factor. -/
+private theorem ratAdeleStandardCharacter_of_integral (a : 𝔸[ℚ]) (ha : a ∈ ratIntegralAdeles) :
+    ratAdeleStandardCharacter a = Circle.exp (2 * Real.pi * ratRealPart a) := by
+  change Circle.exp (2 * Real.pi * ratRealPart a) *
+    (∏ᶠ v : Primes(ℚ), ratLocalCharacter v (a.2 v)) = _
+  rw [finprod_eq_one_of_forall_eq_one (fun v ↦
+    (ratLocalCharacter_eq_one v (a.2 v)).2 ((mem_ratIntegralAdeles a).1 ha v)), mul_one]
+
+/-- The global character is multiplicative on sums of rational adeles. -/
+private theorem ratAdeleStandardCharacter_add (a b : 𝔸[ℚ]) :
+    ratAdeleStandardCharacter (a + b) =
+      ratAdeleStandardCharacter a * ratAdeleStandardCharacter b := by
+  let f (x : 𝔸[ℚ]) (v : Primes(ℚ)) := ratLocalCharacter v (x.2 v)
+  have hfinite (x : 𝔸[ℚ]) : (f x).HasFiniteMulSupport := by
+    apply Filter.eventually_cofinite.mp
+    filter_upwards [x.2.2] with v hv
+    exact (ratLocalCharacter_eq_one v _).2 hv
+  have hsum : f (a + b) = f a * f b := by
+    funext v
+    let p := Rat.HeightOneSpectrum.primesEquiv v
+    let : Fact p.val.Prime := ⟨p.property⟩
+    let e := Rat.HeightOneSpectrum.adicCompletion.padicEquiv v
+    change padicStandardCharacter p.val (e (a.2 v + b.2 v)) =
+      padicStandardCharacter p.val (e (a.2 v)) * padicStandardCharacter p.val (e (b.2 v))
+    rw [map_add, padicStandardCharacter_add]
+  have hreal : ratRealPart (a + b) = ratRealPart a + ratRealPart b :=
+    map_add (extensionEmbeddingOfIsReal Rat.isReal_infinitePlace) _ _
+  change Circle.exp (2 * Real.pi * ratRealPart (a + b)) * (∏ᶠ v, f (a + b) v) =
+    (Circle.exp (2 * Real.pi * ratRealPart a) * (∏ᶠ v, f a v)) *
+      (Circle.exp (2 * Real.pi * ratRealPart b) * (∏ᶠ v, f b v))
+  rw [hreal, mul_add, Circle.exp_add, hsum]
+  simp only [Pi.mul_apply, finprod_mul_distrib (hfinite a) (hfinite b)]
+  ac_rfl
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
+/-- A frequency with a nonintegral finite component gives a nontrivial character
+on some integral adele supported at one finite place. -/
+private theorem exists_ratIntegralAdeles_character_ne_one (y : 𝔸[ℚ]) (hy : y ∉ ratIntegralAdeles) :
+    ∃ b : 𝔸[ℚ], b ∈ ratIntegralAdeles ∧ b.1 = 0 ∧ ratAdeleStandardCharacter (b * y) ≠ 1 := by
+  classical
+  rw [mem_ratIntegralAdeles, not_forall] at hy
+  obtain ⟨v, hv⟩ := hy
+  let O := fun w : Primes(ℚ) ↦ w.adicCompletionIntegers ℚ
+  let b : 𝔸[ℚ] := (0, RestrictedProduct.single O v 1)
+  refine ⟨b, (mem_ratIntegralAdeles b).2 ?_, rfl, ?_⟩
+  · intro w
+    change RestrictedProduct.single O v 1 w ∈ O w
+    by_cases hw : w = v
+    · subst w
+      rw [RestrictedProduct.single_eq_same]
+      exact (O v).one_mem
+    · rw [RestrictedProduct.single_eq_of_ne O _ hw]
+      exact (O w).zero_mem
+  have hval : ratAdeleStandardCharacter (b * y) = ratLocalCharacter v (y.2 v) := by
+    change Circle.exp (2 * Real.pi * ratRealPart (b * y)) *
+      (∏ᶠ w : Primes(ℚ), ratLocalCharacter w (RestrictedProduct.single O v 1 w * y.2 w)) = _
+    have hz : ratRealPart (b * y) = 0 := by
+      change extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+        ((0 : Rat.infinitePlace.Completion) * y.1 Rat.infinitePlace) = 0
+      rw [zero_mul, map_zero]
+    rw [hz, mul_zero, Circle.exp_zero, one_mul, finprod_eq_single _ v]
+    · rw [RestrictedProduct.single_eq_same, one_mul]
+    · intro w hw
+      rw [RestrictedProduct.single_eq_of_ne O _ hw, zero_mul]
+      exact (ratLocalCharacter_eq_one w 0).2 (O w).zero_mem
+  rw [hval]
+  exact fun h ↦ hv ((ratLocalCharacter_eq_one v _).1 h)
+
+open scoped FourierTransform in
+/-- Paper: Example A.3.1.8, p. 558. The real Gaussian times the indicator of the
+integral finite adeles is fixed by the rational adelic Fourier transform. -/
+private theorem tamagawaFourier_ratAdeleGaussian :
+    tamagawaFourier (additiveTamagawaMeasure ℚ) ratAdeleStandardCharacter ratAdeleGaussian =
+      ratAdeleGaussian := by
+  funext y
+  let I := integralAdelesOutside ℚ ∅
+  let μ := additiveTamagawaMeasure ℚ
+  by_cases hy : y ∈ I
+  · let g : ℝ → ℂ := fun t ↦ (Real.exp (-Real.pi * t ^ 2) : ℂ)
+    let k : ℝ → ℂ := fun t ↦
+      g t * star (Circle.exp (2 * Real.pi * (t * ratRealPart y)) : ℂ)
+    have hK : AEStronglyMeasurable k (volume : Measure ℝ) := by
+      apply Continuous.aestronglyMeasurable
+      dsimp [k, g]
+      fun_prop
+    have hIntegrand (x : 𝔸[ℚ]) :
+        ratAdeleGaussian x * star (ratAdeleStandardCharacter (x * y) : ℂ) =
+          (I : Set 𝔸[ℚ]).indicator (k ∘ ratRealPart) x := by
+      by_cases hx : x ∈ I
+      · rw [ratAdeleGaussian, indicator_of_mem hx, indicator_of_mem hx,
+          ratAdeleStandardCharacter_of_integral _ (I.mul_mem hx hy)]
+        have hmul : ratRealPart (x * y) = ratRealPart x * ratRealPart y :=
+          map_mul (extensionEmbeddingOfIsReal Rat.isReal_infinitePlace) _ _
+        rw [hmul]
+        rfl
+      · rw [ratAdeleGaussian, indicator_of_notMem hx, indicator_of_notMem hx, zero_mul]
+    rw [tamagawaFourier]
+    simp_rw [hIntegrand]
+    rw [integral_indicator isOpen_ratIntegralAdeles.measurableSet]
+    have hMap := integral_map ratTamagawaMeasurePreserving_realPart.measurable.aemeasurable
+      (f := k) (ratTamagawaMeasurePreserving_realPart.map_eq.symm ▸ hK)
+    rw [ratTamagawaMeasurePreserving_realPart.map_eq] at hMap
+    change (∫ x, k (ratRealPart x) ∂μ.restrict I) = ratAdeleGaussian y
+    rw [← hMap]
+    have hFourier : (∫ t, k t) = 𝓕 g (ratRealPart y) := by
+      rw [Real.fourier_eq]
+      congr 1
+      funext t
+      dsimp only [k]
+      rw [← Real.fourierChar_apply', Circle.star_addChar, Real.inner_apply,
+        Circle.smul_def, smul_eq_mul, mul_comm t (ratRealPart y), mul_comm (g t)]
+    have hg : 𝓕 g = g := by
+      have hg' : (fun t : ℝ ↦ Complex.exp (-(Real.pi : ℂ) * 1 * (t : ℂ) ^ 2)) = g := by
+        funext t
+        dsimp only [g]
+        rw [Complex.ofReal_exp]
+        push_cast
+        rw [mul_one]
+      rw [← hg']
+      simpa using fourier_gaussian_pi (b := (1 : ℂ)) (by norm_num)
+    rw [hFourier, hg]
+    rw [ratAdeleGaussian, indicator_of_mem hy]
+  · obtain ⟨b, hb, hreal, hchar⟩ := exists_ratIntegralAdeles_character_ne_one y hy
+    let h : 𝔸[ℚ] → ℂ := fun x ↦ ratAdeleGaussian x *
+      star (ratAdeleStandardCharacter (x * y) : ℂ)
+    have hμ : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique ℚ).exists.choose_spec.1
+    have htranslate (x : 𝔸[ℚ]) :
+        h (b + x) = h x * star (ratAdeleStandardCharacter (b * y) : ℂ) := by
+      have hI : b + x ∈ I ↔ x ∈ I := ⟨fun hx ↦ by
+        simpa only [add_comm b x, add_sub_cancel_right] using I.sub_mem hx hb, I.add_mem hb⟩
+      have hg : ratAdeleGaussian (b + x) = ratAdeleGaussian x := by
+        have hx : ratRealPart (b + x) = ratRealPart x := by
+          change extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+            (b.1 Rat.infinitePlace + x.1 Rat.infinitePlace) = _
+          rw [hreal, Pi.zero_apply, zero_add]
+          rfl
+        unfold ratAdeleGaussian
+        by_cases hmem : x ∈ I
+        · rw [indicator_of_mem (hI.2 hmem), indicator_of_mem hmem, hx]
+        · rw [indicator_of_notMem (hI.not.2 hmem), indicator_of_notMem hmem]
+      simp only [h, hg, add_mul, ratAdeleStandardCharacter_add, Circle.coe_mul, star_mul']
+      ring
+    have hJ : (∫ x, h x ∂μ) =
+        (∫ x, h x ∂μ) * star (ratAdeleStandardCharacter (b * y) : ℂ) := by
+      rw [← integral_mul_const]
+      simp_rw [← htranslate]
+      exact (integral_add_left_eq_self h b).symm
+    have hne : star (ratAdeleStandardCharacter (b * y) : ℂ) ≠ 1 := by
+      intro hc
+      apply hchar
+      apply Circle.coe_injective
+      rw [Circle.coe_one]
+      exact star_injective (hc.trans (star_one ℂ).symm)
+    change (∫ x, h x ∂μ) = ratAdeleGaussian y
+    rw [ratAdeleGaussian, indicator_of_notMem hy]
+    by_contra hn
+    exact hne (mul_left_cancel₀ hn (hJ.symm.trans (mul_one _).symm))
+
+/-- Paper: Example A.3.1.8, p. 558. The product character pairing identifies
+the additive rational adeles with their Pontryagin dual as topological groups.
+The local integer rings are their own annihilators for the finite-place pairings. -/
+theorem exists_ratAdeleDualEquiv :
+    ∃ e : Multiplicative 𝔸[ℚ] ≃ₜ* PontryaginDual (Multiplicative 𝔸[ℚ]),
+      ∀ x y : 𝔸[ℚ], e (Multiplicative.ofAdd x) (Multiplicative.ofAdd y) =
+        ratAdeleStandardCharacter (x * y) := by
+  sorry
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Example A.3.1.8, p. 558. The additive Tamagawa measure on the rational
 adeles is self-dual under the product of the standard local characters. -/
 theorem ratAdditiveTamagawaMeasure_selfDual :
-    IsTamagawaSelfDual (additiveTamagawaMeasure ℚ) ratAdeleStandardCharacter := by sorry
+    IsTamagawaSelfDual (additiveTamagawaMeasure ℚ) ratAdeleStandardCharacter := by
+  obtain ⟨e, he⟩ := exists_ratAdeleDualEquiv
+  refine ⟨e, he, ?_⟩
+  let G := Multiplicative 𝔸[ℚ]
+  let μ : Measure G := additiveTamagawaMeasure ℚ
+  let (v : Primes(ℚ)) : CompactSpace (v.adicCompletionIntegers ℚ) :=
+    compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : Primes(ℚ), IsOpen (v.adicCompletionIntegers ℚ : Set (v.adicCompletion ℚ))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing ℚ ×
+      (Πʳ v : Primes(ℚ), [v.adicCompletion ℚ, v.adicCompletionIntegers ℚ]))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace ℚ) → v.Completion) ×
+      (Πʳ v : Primes(ℚ), [v.adicCompletion ℚ, v.adicCompletionIntegers ℚ]))
+    infer_instance
+  let : BorelSpace G := ⟨rfl⟩
+  let : MeasurableSpace (PontryaginDual G) := borel _
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hμ := (additiveTamagawaMeasure_existsUnique ℚ).exists.choose_spec
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.1.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := hμ.2.1
+  obtain ⟨ν, hν, _⟩ := lcaPlancherelMeasure_existsUnique μ
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  let η := μ.map e.toHomeomorph
+  let : η.IsHaarMeasure := e.isHaarMeasure_map μ
+  let : η.Regular := Measure.Regular.map e.toHomeomorph
+  let c := ν.haarScalarFactor η
+  have hc : ν = c • η := Measure.isMulLeftInvariant_eq_smul_of_regular ν η
+  let f : G → ℂ := fun x ↦ ratAdeleGaussian x.toAdd
+  obtain ⟨hf₁, hf₂⟩ := ratAdeleGaussian_integrable_memLp
+  have hFourier : lcaFourier μ f ∘ e.toHomeomorph = f := by
+    funext x
+    have hx := congrFun tamagawaFourier_ratAdeleGaussian x.toAdd
+    rw [tamagawaFourier_eq_lcaFourier _ _ _ _ _ (fun y ↦ by
+      rw [he x.toAdd y, mul_comm])] at hx
+    exact hx
+  have hnorm : eLpNorm f 2 μ ≠ 0 := by
+    intro hzero
+    have hae := (eLpNorm_eq_zero_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)).1 hzero
+    have hI : IsClopen ratIntegralAdeles :=
+      ⟨(integralAdelesOutside ℚ ∅).toAddSubgroup.isClosed_of_isOpen isOpen_ratIntegralAdeles,
+        isOpen_ratIntegralAdeles⟩
+    have hfun : Continuous ratAdeleGaussian := by
+      unfold ratAdeleGaussian
+      apply hI.continuous_indicator
+      exact Complex.continuous_ofReal.comp (Real.continuous_exp.comp
+        (continuous_const.mul (((isometryEquivRealOfIsReal Rat.isReal_infinitePlace).continuous.comp
+          ((continuous_apply Rat.infinitePlace).comp continuous_fst)).pow 2)))
+    have heq : f = 0 := Measure.eq_of_ae_eq hae hfun continuous_const
+    have h1 := congrFun heq (1 : G)
+    change ratAdeleGaussian 0 = 0 at h1
+    simp [ratAdeleGaussian, ratRealPart, (integralAdelesOutside ℚ ∅).zero_mem] at h1
+  have hLp : MemLp (lcaFourier μ f) 2 η := by
+    apply e.toHomeomorph.measurableEmbedding.memLp_map_measure_iff.mpr
+    rw [hFourier]
+    exact hf₂
+  have hScale := (hν.2.2 f hf₁ hf₂).2
+  have hMap : eLpNorm (lcaFourier μ f) 2 η =
+      eLpNorm (lcaFourier μ f ∘ e.toHomeomorph) 2 μ :=
+    e.toHomeomorph.measurableEmbedding.eLpNorm_map_measure
+  rw [hc, eLpNorm_smul_measure_of_ne_top' (by simp) _
+    _ hLp.aestronglyMeasurable, hMap, hFourier] at hScale
+  change (↑(c ^ ((2 : ℝ≥0∞).toReal)⁻¹) : ℝ≥0∞) * eLpNorm f 2 μ = eLpNorm f 2 μ at hScale
+  rw [ENNReal.coe_rpow_of_nonneg _ (by positivity)] at hScale
+  have hRoot : (c : ℝ≥0∞) ^ ((2 : ℝ≥0∞).toReal)⁻¹ = 1 :=
+    (ENNReal.mul_left_inj hnorm hf₂.eLpNorm_ne_top).mp (hScale.trans (one_mul _).symm)
+  have hc₁ : c = 1 := by
+    apply ENNReal.coe_injective
+    apply (ENNReal.strictMono_rpow_of_pos
+      (by norm_num : 0 < ((2 : ℝ≥0∞).toReal)⁻¹)).injective
+    simpa only [ENNReal.coe_one, ENNReal.one_rpow] using hRoot
+  change IsLCAPlancherelMeasure μ η
+  simpa only [hc, hc₁, one_smul] using hν
+
+end RatAdeleSelfDuality
 
 /-- Paper: Example A.3.1.9, p. 558. In (A.3.1.7) the standard adelic character is
 the rational adelic character composed with the adelic trace.
