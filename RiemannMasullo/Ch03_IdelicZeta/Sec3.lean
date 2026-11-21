@@ -3,6 +3,11 @@ module
 public import RiemannMasullo.Ch02_AdelicTheta.Sec4
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Unique
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-!
 # S-local idelic zeta functions
 
@@ -97,7 +102,49 @@ S-adelic character and additive Tamagawa measure preserves the test space. -/
 theorem sAdeleSchwartzFourier_mem (f : ℬ(Aₛ)) :
     (fun y : Multiplicative Aₛ ↦ tamagawaFourier (sAdditiveTamagawaMeasure F S)
       (sAdeleStandardCharacter F S) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
-        schwartzBruhatSubmodule (G := Multiplicative Aₛ) := by sorry
+        schwartzBruhatSubmodule (G := Multiplicative Aₛ) := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+  let G := Multiplicative Aₛ
+  let : LocallyCompactSpace G := inferInstanceAs (LocallyCompactSpace Aₛ)
+  let : T2Space Aₛ := inferInstanceAs (T2Space
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : T2Space G := ‹T2Space Aₛ›
+  let : SigmaCompactSpace Aₛ := inferInstanceAs (SigmaCompactSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : BorelSpace Aₛ := inferInstanceAs (BorelSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : BorelSpace G := ‹BorelSpace Aₛ›
+  let μ : Measure G := sAdditiveTamagawaMeasure F S
+  let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F w
+  let (v : S) : (finiteLocalAdditiveTamagawaMeasure F v.val).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v.val
+  let : (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)).IsAddHaarMeasure :=
+    Measure.pi.isAddHaarMeasure _
+  let : (Measure.pi (fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val)).IsAddHaarMeasure :=
+    Measure.pi.isAddHaarMeasure _
+  let hμ : (sAdditiveTamagawaMeasure F S).IsAddHaarMeasure :=
+    Measure.prod.instIsAddHaarMeasure _ _
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := addHaar_regular_of_sigmaCompactSpace (sAdditiveTamagawaMeasure F S)
+  obtain ⟨e, he, -⟩ := sAdditiveTamagawaMeasure_selfDual F S
+  obtain ⟨fourier, hfourier⟩ := schwartzBruhat_fourier_equiv μ
+  let g : schwartzBruhatSubmodule (PontryaginDual G) := fourier f
+  have hEq (y : G) : tamagawaFourier (sAdditiveTamagawaMeasure F S)
+      (sAdeleStandardCharacter F S) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd = g.val (e y) := by
+    rw [tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
+      rw [mul_comm x y.toAdd]
+      exact he y.toAdd x)]
+    exact ((hfourier f).2 (e y)).symm
+  rw [funext hEq]
+  exact schwartzBruhat_mem_comp_equiv e g.property
 
 /-- Paper: §3.3.1, p. 128. The S-adelic Fourier transform uses the product
 additive Tamagawa measure and the standard S-adelic character. -/
