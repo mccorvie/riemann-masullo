@@ -314,12 +314,135 @@ local notation "principal₁" =>
 
 variable (hr₁ : r 1 = 1) (hr : ∀ c, ideleIdealClass F (r c).val = c)
 
+/-- A unit whose logarithm belongs to the regulator parallelotope has zero logarithm. -/
+private theorem logEmbedding_eq_zero_of_mem_regulatorParallelotope (u : (𝓞 F)ˣ)
+    (hu : Units.logEmbedding F (Additive.ofMul u) ∈ regulatorParallelotope F b) :
+    Units.logEmbedding F (Additive.ofMul u) = 0 := by
+  let B := b.map (Units.logEmbeddingEquiv F)
+  let z := Units.logEmbeddingEquiv F (Additive.ofMul (QuotientGroup.mk u))
+  change (z : logSpace F) ∈ ZSpan.fundamentalDomain (B.ofZLatticeBasis ℝ _) at hu
+  change (z : logSpace F) = 0
+  apply (B.ofZLatticeBasis ℝ _).repr.injective
+  ext i
+  rw [ZSpan.mem_fundamentalDomain] at hu
+  have hi := hu i
+  rw [B.ofZLatticeBasis_repr_apply ℝ _ z i] at hi ⊢
+  simp only [map_zero, Finsupp.zero_apply]
+  have hi' : 0 ≤ B.repr z i ∧ B.repr z i < 1 := ⟨by exact_mod_cast hi.1, by exact_mod_cast hi.2⟩
+  exact_mod_cast (show B.repr z i = 0 by omega)
+
+/-- The chosen half-open sector contains no diagonal torsion unit other than one. -/
+private theorem torsionUnit_eq_one_of_inTorsionSector (u : (𝓞 F)ˣ) (hu : u ∈ Units.torsion F)
+    (hsector : inTorsionSector F v₀ σ (atPlace (unitAtInfinity u))) : u = 1 := by
+  let f : F →+* ℂ := σ.toRingHom.comp ((extensionEmbedding v₀).comp
+    ((Pi.evalRingHom InfinitePlace.Completion v₀).comp (algebraMap F (InfiniteAdeleRing F))))
+  let z := f (algebraMap (𝓞 F) F u.val)
+  let n := Units.torsionOrder F
+  have hn : 0 < (n : ℝ) := by exact_mod_cast Units.torsionOrder_pos F
+  have hz : z ^ n = 1 := by
+    simpa only [Units.val_pow_eq_pow_val, map_pow, Units.val_one, map_one] using
+      congrArg (fun a : (𝓞 F)ˣ ↦ f (algebraMap (𝓞 F) F a.val))
+        (Units.pow_torsionOrder_eq_one F hu)
+  change z.arg ∈ Set.Ico 0 (2 * Real.pi / n) at hsector
+  have hangle : (((n : ℝ) * z.arg : ℝ) : Real.Angle) = 0 := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, ← Complex.arg_pow_coe_angle, hz]
+    simp
+  have harg : (n : ℝ) * z.arg = 0 := by
+    have hinj := AddCircle.injOn_coe_Ico (2 * Real.pi) (0 : ℝ)
+    rw [zero_add] at hinj
+    exact hinj ⟨mul_nonneg hn.le hsector.1, mul_comm (n : ℝ) z.arg ▸
+      (lt_div_iff₀ hn).mp hsector.2⟩ ⟨le_rfl, Real.two_pi_pos⟩ hangle
+  have hnorm : ‖z‖ = 1 := by
+    apply (pow_eq_one_iff_of_nonneg (norm_nonneg z) (Units.torsionOrder_ne_zero F)).mp
+    rw [← norm_pow, hz, norm_one]
+  apply Units.coe_injective F
+  apply f.injective
+  have hz₁ : z = 1 := Complex.ext_norm_arg (by simpa using hnorm)
+    (by simpa using (mul_eq_zero.mp harg).resolve_left hn.ne')
+  simpa only [Units.val_one, map_one] using hz₁
+
+/-- A diagonal idele that is a unit in the integral adele ring comes from a global unit. -/
+private theorem exists_globalUnit_of_principal_mem_integralUnits (x : Fˣ)
+    (hx : IdeleGroup.unitEmbedding (𝓞 F) F x ∈ integralUnits) :
+    ∃ u : (𝓞 F)ˣ, Units.map (algebraMap (𝓞 F) F).toMonoidHom u = x := by
+  obtain ⟨a, ha⟩ := hx
+  have lift (y : F) (hy : algebraMap F (AdeleRing (𝓞 F) F) y ∈ integralAdelesOutside F ∅) :
+      y ∈ (algebraMap (𝓞 F) F).range := by
+    have h := (diagonal_mem_integralAdelesOutside F ∅ y).mp hy
+    rwa [Finset.coe_empty, integer_empty, Algebra.mem_bot] at h
+  have hval : a.val.val = algebraMap F (AdeleRing (𝓞 F) F) x.val := congrArg Units.val ha
+  have hinv : a.inv.val = algebraMap F (AdeleRing (𝓞 F) F) x.inv := congrArg Units.inv ha
+  obtain ⟨y, hy⟩ := lift x.val (hval ▸ a.val.property)
+  obtain ⟨z, hz⟩ := lift x.inv (hinv ▸ a.inv.property)
+  let u : (𝓞 F)ˣ := ⟨y, z,
+    (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hy, hz, x.val_inv, map_one]),
+    (IsFractionRing.injective (𝓞 F) F) (by rw [map_mul, hy, hz, x.inv_val, map_one])⟩
+  exact ⟨u, Units.ext hy⟩
+
 include hr₁ hr in
 /-- Paper: Definition A.2.3.6, p. 549. With the trivial class represented by one,
 the only principal idele in the global domain is the identity. -/
 theorem principal_mem_ideleFundamentalDomain (x : Fˣ) :
     principal₁ x ∈ E₁ ↔ x = 1 := by
-  sorry
+  constructor
+  · intro hx
+    obtain ⟨c, hc⟩ := Set.mem_iUnion.mp hx
+    obtain ⟨g, ⟨hgInt, hgArch⟩, hcg⟩ := Set.mem_smul_set.mp hc
+    obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+    let q := QuotientGroup.mk'
+      ((IdeleGroup.principalSubgroup (𝓞 F) F ⊔ integralUnits).comap (N₁).subtype)
+    have hclass (a : N₁) : e (q a) = ideleIdealClass F a.val := he a
+    have hqx : q (principal₁ x) = 1 :=
+      (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_left (Set.mem_range_self x))
+    have hqg : q g = 1 :=
+      (QuotientGroup.eq_one_iff _).mpr (Subgroup.mem_sup_right hgInt)
+    have hqc := congrArg q hcg
+    rw [smul_eq_mul, map_mul, hqg, mul_one, hqx] at hqc
+    have hc₁ : c = 1 := by rw [← hr c, ← hclass, hqc, map_one]
+    have hg : g = principal₁ x := by simpa only [hc₁, hr₁, one_smul] using hcg
+    subst g
+    obtain ⟨u, hu⟩ := exists_globalUnit_of_principal_mem_integralUnits F x hgInt
+    have hArch : atInfinity ((principal₁ x).val) = unitAtInfinity u := by
+      rw [← hu]
+      exact Units.ext rfl
+    obtain ⟨gInf, ⟨hlog, hsector⟩, hgInf⟩ := hgArch
+    have hgVal : gInf.val = unitAtInfinity u := hgInf.trans hArch
+    change inTorsionSector F v₀ σ (atPlace gInf.val) at hsector
+    rw [hgVal] at hsector
+    change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F gInf.val w.val) ∈ regulatorParallelotope F b at hlog
+    rw [hgVal] at hlog
+    have hlogEq : Units.logEmbedding F (Additive.ofMul u) =
+        fun w ↦ infiniteIdeleLog F (unitAtInfinity u) w.val := by
+      funext w
+      rw [logEmbedding_component, infiniteIdeleLog]
+      change _ = (w.val.mult : ℝ) * Real.log
+        ‖algebraMap F (InfiniteAdeleRing F) (algebraMap (𝓞 F) F u.val) w.val‖
+      rw [InfiniteAdeleRing.algebraMap_apply, AbsoluteValue.Completion.norm_coe]
+      rfl
+    rw [← hlogEq] at hlog
+    have htors := logEmbedding_eq_zero_iff.mp
+      (logEmbedding_eq_zero_of_mem_regulatorParallelotope F b u hlog)
+    rw [torsionUnit_eq_one_of_inTorsionSector F v₀ σ u htors hsector, map_one] at hu
+    exact hu.symm
+  · rintro rfl
+    apply Set.mem_iUnion.mpr
+    refine ⟨1, Set.mem_smul_set.mpr ⟨1, ⟨one_mem _, ?_⟩, by rw [hr₁, one_smul, map_one]⟩⟩
+    refine ⟨1, ⟨?_, ?_⟩, ?_⟩
+    · have hzero : (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+          infiniteIdeleLog F (1 : 𝕀∞) w.val) = 0 := by
+        funext w
+        change (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = 0
+        simp
+      change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+        infiniteIdeleLog F (1 : 𝕀∞) w.val) ∈ regulatorParallelotope F b
+      rw [hzero, regulatorParallelotope, ZSpan.mem_fundamentalDomain]
+      simp
+    · change inTorsionSector F v₀ σ (atPlace (1 : 𝕀∞))
+      simp [inTorsionSector, Set.mem_Ico, div_pos Real.two_pi_pos
+        (Nat.cast_pos.mpr (Units.torsionOrder_pos F))]
+    · change (1 : 𝕀∞) = atInfinity (1 : 𝕀[F])
+      rw [map_one]
 
 -- Remark A.2.3.7, p. 549, is a bibliographic identification of (A.2.3.14).
 
