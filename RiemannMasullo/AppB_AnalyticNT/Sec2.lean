@@ -1483,7 +1483,30 @@ theorem differentiable_mellin_of_exponentialDecay :
 /-- Paper: Proposition B.2.1.9(2), p. 598. The Mellin transform satisfies
 every inverse-power height bound uniformly on each bounded closed strip. -/
 theorem mellin_heightBound_of_exponentialDecay (a b : ℝ) (hab : a < b) (N : ℕ) (hN : 1 ≤ N) :
-    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Icc a b) N C := by sorry
+    ∃ C > (0 : ℝ), heightBound (mellin (fromLog f)) (Icc a b) N C := by
+  -- Weight the profile so that the translated strip lies in the right half-plane.
+  let c := a - 1
+  obtain ⟨g, hg⟩ := exponentialDecay_weighted_schwartz f hf c
+  have hgForward : ForwardSemiExponentialDecay g := by
+    apply (forwardSemiExponentialDecay_iff_weighted_schwartz g).mpr
+    intro A _
+    obtain ⟨k, hk⟩ := exponentialDecay_weighted_schwartz f hf (A + c)
+    refine ⟨k, fun x ↦ ?_⟩
+    simp only [hk, hg, ← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add, add_mul]
+  obtain ⟨C, hC, hbound⟩ := mellin_heightBound_of_forwardSemiExponentialDecay g hgForward
+    (a - c) (b - c) (by dsimp [c]; linarith) (sub_lt_sub_right hab c) N hN
+  refine ⟨C, hC, fun σ hσ y hy ↦ ?_⟩
+  have hshift : mellin (fromLog g) (verticalPoint (σ - c) y) =
+      mellin (fromLog f) (verticalPoint σ y) := by
+    rw [mellin_fromLog_eq_integral_cexp, mellin_fromLog_eq_integral_cexp]
+    refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+    simp only [hg, Complex.ofReal_exp, Complex.ofReal_mul]
+    rw [mul_comm _ (f x), mul_assoc, ← Complex.exp_add]
+    congr 2
+    push_cast
+    ring
+  rw [← hshift]
+  exact hbound (σ - c) ⟨sub_le_sub_right hσ.1 c, sub_le_sub_right hσ.2 c⟩ y hy
 
 /-- Paper: Proposition B.2.1.9(3), p. 599. On a closed strip, the vertical
 Lᵖ norms satisfy the bound with the exponentially weighted L¹ term.
