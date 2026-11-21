@@ -426,11 +426,17 @@ theorem weaklyHolomorphicOn_iff_weak_cauchyIntegral :
 
 variable [QuasiCompleteSpace ℂ E]
 
+-- Retain the domain and target space hypotheses in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem C.5.2.6(1–2), p. 738. Weak holomorphy is equivalent to
 continuous complex differentiability of every finite order of each scalar evaluation. -/
 theorem weaklyHolomorphicOn_iff_scalar_contDiffOn :
     WeaklyHolomorphicOn f Ω ↔ ∀ (φ : StrongDual ℂ E) (k : ℕ), ContDiffOn ℂ k (φ ∘ f) Ω := by
-  sorry
+  constructor
+  · intro hf φ k
+    exact (hf φ).contDiffOn hΩ
+  · intro hf φ
+    exact (hf φ 1).differentiableOn_one
 
 /-- Paper: Theorem C.5.2.6(1,3), p. 738. Weak holomorphy is equivalent to the
 existence of complex derivatives in the original target of every order. -/

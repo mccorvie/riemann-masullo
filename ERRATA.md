@@ -174,7 +174,7 @@ say something other than what was meant.
 |---|---|---|
 | `tendsto_sum_orthogonalProjections_iff_dense_iSup` (Remark C.3.5.2) | A set ascription outside a supremum made Lean take the union of the subspaces, not their sum. | a prover, #750 |
 | `weaklyContDiffOn_iff_scalar` (Definition C.5.1.6) | Stated for any normed source; the paper has k^d, and it fails in infinite dimensions. | a prover, #958 |
-| `ElementaryLCAPresentation` ((D.1.4.2)) | The finite factor is `Fin n` with a supplied group structure, but Lean uses addition mod n, so only cyclic factors are covered. Repair under #2896. | provers, #683 and #688 |
+| `ElementaryLCAPresentation` ((D.1.4.2)) | The finite factor is `Fin n` with a supplied group structure, but Lean uses addition mod n, so only cyclic factors were covered. Repaired in #2914: the finite factor is a finite type with its own group structure. | provers, #683 and #688 |
 | The Z-space quotient maps of §5.1 | Written with the range subtype as codomain, they used the subspace topology, not the transported one. | review of #2258 |
 | The eigendistribution weight and complex Gaussian of §3.4 | Inverse weight relative to the action on `main`; a Gaussian whose zeta integral vanishes. | review of #2289 |
 | The standard additive character | Followed the paper's signs; see F13. | statement audit |

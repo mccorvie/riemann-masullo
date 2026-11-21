@@ -8,6 +8,8 @@ public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Measure.Haar.Extension
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
+import Mathlib.Topology.Algebra.ProperAction.CompactlyGenerated
+import Mathlib.Topology.Covering.Quotient
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
@@ -917,7 +919,8 @@ theorem measurableSet_image_of_continuous_injOn_polish {X Y : Type*}
     [TopologicalSpace Y] [PolishSpace Y] [MeasurableSpace Y] [BorelSpace Y]
     {f : X → Y} (hf : Continuous f) {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn f E) :
-    MeasurableSet (f '' E) := by sorry
+    MeasurableSet (f '' E) := by
+  exact hE.image_of_continuousOn_injOn hf.continuousOn hinj
 
 /-- Paper: Lemma A.5.2.10, p. 572. A Borel partial transversal to a free proper action
 of a countable discrete abelian group extends to a Borel transversal.
@@ -929,7 +932,61 @@ theorem exists_borel_orbit_transversal {X H : Type*}
     {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn (Quotient.mk (MulAction.orbitRel H X)) E) :
     ∃ F : Set X, MeasurableSet F ∧ E ⊆ F ∧
-      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by sorry
+      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by
+  classical
+  let q := Quotient.mk (MulAction.orbitRel H X)
+  let : ProperlyDiscontinuousSMul H X :=
+    properlyDiscontinuousSMul_iff_properSMul.mpr inferInstance
+  have hlocal : IsLocallyInjective q :=
+    isLocalHomeomorph_quotientMk_of_properlyDiscontinuousSMul.isLocallyInjective
+  let OpenInj := {s : Set X // IsOpen s ∧ InjOn q s}
+  let : Nonempty OpenInj := ⟨⟨∅, isOpen_empty, injOn_empty q⟩⟩
+  obtain ⟨V, hV⟩ := isLindelof_univ.indexed_countable_subcover
+    (Subtype.val : OpenInj → Set X) (fun s ↦ s.property.1) (by
+      intro x _
+      obtain ⟨s, ho, hx, hi⟩ := hlocal x
+      exact mem_iUnion.mpr ⟨⟨s, ho, hi⟩, hx⟩)
+  let U : ℕ → Set X := fun
+    | 0 => E
+    | n + 1 => (V n).val
+  have hU (n : ℕ) : MeasurableSet (U n) ∧ InjOn q (U n) := by
+    cases n with
+    | zero => exact ⟨hE, hinj⟩
+    | succ n => exact ⟨(V n).property.1.measurableSet, (V n).property.2⟩
+  let Q (n : ℕ) := q '' U n
+  have hsat (n : ℕ) : MeasurableSet (q ⁻¹' Q n) := by
+    rw [show q ⁻¹' Q n = ⋃ g : H, (g • ·) '' U n from
+      MulAction.quotient_preimage_image_eq_union_mul (U n)]
+    exact MeasurableSet.iUnion fun g ↦
+      (Homeomorph.smul g).measurableEmbedding.measurableSet_image.mpr (hU n).1
+  -- Use the first set meeting each orbit, with `E` in position zero.
+  let F := ⋃ n, U n ∩ q ⁻¹' disjointed Q n
+  have hF : MeasurableSet F := MeasurableSet.iUnion fun n ↦ (hU n).1.inter (by
+    simp only [disjointed_eq_inter_compl, preimage_inter, preimage_iInter, preimage_compl]
+    exact (hsat n).inter (MeasurableSet.iInter fun j ↦
+      MeasurableSet.iInter fun _ ↦ (hsat j).compl))
+  refine ⟨F, hF, fun x hx ↦ mem_iUnion.mpr ⟨0, hx, ?_⟩, ⟨?_, ?_⟩⟩
+  · change q x ∈ disjointed Q 0
+    rw [show disjointed Q 0 = Q 0 from disjointed_bot Q]
+    exact mem_image_of_mem q hx
+  · rintro ⟨x, hx⟩ ⟨y, hy⟩ (hxy : q x = q y)
+    obtain ⟨m, hxm, hqx⟩ := mem_iUnion.mp hx
+    obtain ⟨n, hyn, hqy⟩ := mem_iUnion.mp hy
+    have hmn : m = n := by
+      by_contra hne
+      exact (Set.disjoint_left.mp (disjoint_disjointed Q hne)) hqx (hxy.symm ▸ hqy)
+    subst n
+    exact Subtype.ext ((hU m).2 hxm hyn hxy)
+  · intro z
+    obtain ⟨x, rfl⟩ := Quotient.mk_surjective z
+    obtain ⟨n, hn⟩ := mem_iUnion.mp (hV (mem_univ x))
+    have hx : q x ∈ ⋃ n, disjointed Q n := by
+      rw [iUnion_disjointed]
+      exact mem_iUnion.mpr ⟨n + 1, mem_image_of_mem q hn⟩
+    obtain ⟨m, hm⟩ := mem_iUnion.mp hx
+    obtain ⟨y, hy, hyx⟩ := disjointed_subset Q m hm
+    have hqy : q y ∈ disjointed Q m := hyx.symm ▸ hm
+    exact ⟨⟨y, mem_iUnion.mpr ⟨m, hy, hqy⟩⟩, hyx⟩
 
 section Ideles
 
@@ -1078,11 +1135,163 @@ def centeredSRegulatorParallelotope : Set (InfinitePlace F ⊕ S → ℝ) :=
   {y | ∃ t : Fin sRank(F, S) → ℝ, (∀ i, t i ∈ Ico (-1 / 2 : ℝ) (1 / 2)) ∧
     y = ∑ i, t i • sIdeleLog F S (unitAtS (bₛ i).toMul.out)}
 
+/-- The logarithm on diagonal S-units, viewed as a homomorphism to an additive space. -/
+private def sUnitLogHom : Oₛ(F, S)ˣ →* Multiplicative (InfinitePlace F ⊕ S → ℝ) where
+  toFun u := Multiplicative.ofAdd (sIdeleLog F S (unitAtS u))
+  map_one' := by
+    change sIdeleLog F S (unitAtS 1) = 0
+    rw [map_one]
+    funext v
+    rcases v with v | v
+    · change (v.mult : ℝ) * Real.log ‖(1 : v.Completion)‖ = 0
+      simp
+    · change Real.log ‖(1 : v.val.adicCompletion F)‖ = 0
+      simp
+  map_mul' u w := by
+    change sIdeleLog F S (unitAtS (u * w)) =
+      sIdeleLog F S (unitAtS u) + sIdeleLog F S (unitAtS w)
+    rw [map_mul]
+    let g := unitAtS u
+    let h := unitAtS w
+    change sIdeleLog F S (g * h) = sIdeleLog F S g + sIdeleLog F S h
+    funext v
+    rcases v with v | v
+    · have hne (a : (SAdeleRing F S)ˣ) : a.val.1 v ≠ 0 :=
+        ((a.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ v)).ne_zero
+      change (v.mult : ℝ) * Real.log ‖g.val.1 v * h.val.1 v‖ =
+        v.mult * Real.log ‖g.val.1 v‖ + v.mult * Real.log ‖h.val.1 v‖
+      rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h)),
+        mul_add]
+    · have hne (a : (SAdeleRing F S)ˣ) : a.val.2 v ≠ 0 :=
+        ((a.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)).ne_zero
+      change Real.log ‖g.val.2 v * h.val.2 v‖ =
+        Real.log ‖g.val.2 v‖ + Real.log ‖h.val.2 v‖
+      rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h))]
+
+/-- Diagonal S-units with logarithms in a sufficiently small ball are finite in number. -/
+private theorem sUnitLog_finite_near_zero :
+    {u : Oₛ(F, S)ˣ | ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2}.Finite := by
+  let value (u : Oₛ(F, S)ˣ) : F := u.val.val
+  have hinj : Injective value := fun _ _ h ↦ Units.ext (Subtype.ext h)
+  let r : ℝ := Real.log 2 / 2
+  refine Set.Finite.of_finite_image ?_ hinj.injOn
+  refine (Embeddings.finite_of_norm_le F ℂ (Real.exp r)).subset ?_
+  rintro _ ⟨u, hu, rfl⟩
+  have hne : value u ≠ 0 := (u.isUnit.map (Oₛ(F, S)).val).ne_zero
+  have hcoord (v : InfinitePlace F ⊕ S) : sIdeleLog F S (unitAtS u) v ≤ r :=
+    (le_abs_self _).trans ((norm_le_pi_norm (sIdeleLog F S (unitAtS u)) v).trans hu)
+  refine ⟨?_, (InfinitePlace.le_iff_le (value u) (Real.exp r)).mp ?_⟩
+  · -- At the selected finite places a norm less than two is at most one.
+    have hval (v : HeightOneSpectrum (𝓞 F)) : v.valuation F (value u) ≤ 1 := by
+      by_cases hv : v ∈ S
+      · let x : v.adicCompletion F := algebraMap F _ (value u)
+        have hxne : x ≠ 0 := (map_ne_zero_iff _ (RingHom.injective _)).mpr hne
+        have hxlog : Real.log ‖x‖ ≤ r := hcoord (Sum.inr ⟨v, hv⟩)
+        have hxlt : ‖x‖ < 2 := (Real.log_lt_log_iff (norm_pos_iff.mpr hxne) (by norm_num)).mp
+          (hxlog.trans_lt (by dsimp [r]; linarith [Real.log_pos (by norm_num : (1 : ℝ) < 2)]))
+        have hx : ‖x‖ ≤ 1 := le_of_not_gt fun h ↦
+          (not_le_of_gt hxlt) (FinitePlace.two_le_norm_of_one_lt_norm (K := F) (v := v) x h)
+        rw [← HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+        exact Valued.toNormedField.norm_le_one_iff.mp hx
+      · exact u.val.property v hv
+    obtain ⟨a, ha⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (value u) hval
+    exact ha ▸ a.isIntegral_coe
+  · intro v
+    have hlog : (v.mult : ℝ) * Real.log (v (value u)) ≤ r := by
+      have hv := hcoord (Sum.inl v)
+      change (v.mult : ℝ) * Real.log ‖algebraMap F v.Completion (value u)‖ ≤ r at hv
+      rw [InfinitePlace.coe_apply]
+      simpa only [AbsoluteValue.Completion.algebraMap_def, AbsoluteValue.Completion.norm_coe,
+        WithAbs.algebraMap_right_apply, Algebra.algebraMap_self_apply, WithAbs.ofAbs_toAbs] using hv
+    have hr : 0 ≤ r := div_nonneg (Real.log_nonneg (by norm_num)) (by norm_num)
+    have hm : (1 : ℝ) ≤ v.mult := by exact_mod_cast v.mult_pos
+    apply (Real.log_le_iff_le_exp (v.pos_iff.mpr hne)).mp
+    rw [mul_comm, ← le_div_iff₀ (lt_of_lt_of_le (by norm_num) hm)] at hlog
+    exact hlog.trans (div_le_self hr hm)
+
+/-- The logarithms of an integral basis of the S-units modulo torsion are real-linearly
+independent. -/
+private theorem sUnitLog_basis_linearIndependent :
+    LinearIndependent ℝ (fun i ↦ sIdeleLog F S (unitAtS (bₛ i).toMul.out)) := by
+  let L := sUnitLogHom F S
+  have hr : 0 < Real.log 2 / 2 := div_pos (Real.log_pos (by norm_num)) (by norm_num)
+  have hfinite := sUnitLog_finite_near_zero F S
+  -- The kernel is finite, and the target has no nontrivial torsion.
+  have hker : L.ker = CommGroup.torsion Oₛ(F, S)ˣ := by
+    have : Finite L.ker := Set.finite_coe_iff.mpr (hfinite.subset (fun u hu ↦ by
+      change sIdeleLog F S (unitAtS u) = 0 at hu
+      change ‖sIdeleLog F S (unitAtS u)‖ ≤ _
+      rw [hu, norm_zero]
+      exact hr.le))
+    ext u
+    constructor
+    · intro hu
+      exact (CommGroup.mem_torsion _).mpr
+        (L.ker.subtype.isOfFinOrder (isOfFinOrder_of_finite (⟨u, hu⟩ : L.ker)))
+    · intro hu
+      exact (isOfFinOrder_iff_eq_one (L u)).mp (L.isOfFinOrder hu)
+  let q := (QuotientGroup.kerLift L).comp (QuotientGroup.quotientMulEquivOfEq hker.symm).toMonoidHom
+  let f := q.toAdditiveLeft.toIntLinearMap
+  have hf : Injective f :=
+    (QuotientGroup.kerLift_injective L).comp (QuotientGroup.quotientMulEquivOfEq hker.symm).injective
+  have hmk (u : Oₛ(F, S)ˣ) :
+      f (Additive.ofMul (QuotientGroup.mk u)) = sIdeleLog F S (unitAtS u) := rfl
+  let v (i : Fin sRank(F, S)) := sIdeleLog F S (unitAtS (bₛ i).toMul.out)
+  change LinearIndependent ℝ v
+  have hv : f ∘ bₛ = v := by
+    funext i
+    have hi := hmk (bₛ i).toMul.out
+    rw [show QuotientGroup.mk (bₛ i).toMul.out = (bₛ i).toMul from Quotient.out_eq' _] at hi
+    exact hi
+  have hli : LinearIndependent ℤ v := by
+    rw [← hv]
+    exact bₛ.linearIndependent.map' f (LinearMap.ker_eq_bot.mpr hf)
+  have hspan : Submodule.span ℤ (Set.range v) = f.range := by
+    rw [← hv, Set.range_comp, ← Submodule.map_span, bₛ.span_eq, Submodule.map_top]
+  -- The finite intersection with a neighborhood of zero makes the range discrete.
+  have hdisc : DiscreteTopology (Submodule.span ℤ (Set.range v)) := by
+    rw [hspan]
+    refine discreteTopology_of_isOpen_singleton_zero
+      (isOpen_singleton_of_finite_mem_nhds 0 (s := Metric.closedBall 0 (Real.log 2 / 2))
+        (Metric.closedBall_mem_nhds _ hr) ?_)
+    refine Set.Finite.of_finite_image ?_ Subtype.val_injective.injOn
+    refine (hfinite.image (fun u ↦ sIdeleLog F S (unitAtS u))).subset ?_
+    rintro _ ⟨⟨_, ⟨a, rfl⟩⟩, ha, rfl⟩
+    obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective a.toMul
+    have heq : f a = sIdeleLog F S (unitAtS u) := by rw [← hmk, hu]; rfl
+    refine ⟨u, ?_, heq.symm⟩
+    rw [Metric.mem_closedBall, dist_zero_right] at ha
+    change ‖f a‖ ≤ Real.log 2 / 2 at ha
+    change ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2
+    rwa [heq] at ha
+  apply linearIndependent_iff_card_eq_finrank_span.mpr
+  rw [Real.finrank_eq_int_finrank_of_discrete hdisc]
+  exact linearIndependent_iff_card_eq_finrank_span.mp hli
+
 /-- Paper: (A.5.2.18), p. 575. Each basis logarithm contributes a half-open
 interval on its own line in the centered parallelotope. -/
 theorem centeredSRegulatorParallelotope_basis_line (i : Fin sRank(F, S)) (t : ℝ) :
     t • sIdeleLog F S (unitAtS (bₛ i).toMul.out) ∈ centeredSRegulatorParallelotope F S bₛ ↔
-      t ∈ Ico (-1 / 2 : ℝ) (1 / 2) := by sorry
+      t ∈ Ico (-1 / 2 : ℝ) (1 / 2) := by
+  let v (j : Fin sRank(F, S)) := sIdeleLog F S (unitAtS (bₛ j).toMul.out)
+  change (∃ c : Fin sRank(F, S) → ℝ, (∀ j, c j ∈ Ico (-1 / 2 : ℝ) (1 / 2)) ∧
+      t • v i = ∑ j, c j • v j) ↔ _
+  have hsingle : Fintype.linearCombination ℝ v (Pi.single i t) = t • v i :=
+    Fintype.linearCombination_apply_single (R := ℝ) (v := v) i t
+  constructor
+  · rintro ⟨c, hc, heq⟩
+    have hc_eq : Pi.single i t = c :=
+      (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective
+        (hsingle.trans heq)
+    simpa only [← hc_eq, Pi.single_eq_same] using hc i
+  · intro ht
+    refine ⟨Pi.single i t, ?_, hsingle.symm⟩
+    intro j
+    by_cases h : j = i
+    · simpa [h] using ht
+    · rw [Pi.single_eq_of_ne h]
+      norm_num
+
 
 /-- Paper: (A.5.2.15)–(A.5.2.18), p. 575. The centered S-local domain is cut
 out by the centered S-parallelotope and the centered angular sector at the chosen place. -/

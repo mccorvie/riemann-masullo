@@ -1111,12 +1111,90 @@ theorem infiniteIdeleFundamentalDomain_disjoint (u : (𝓞 F)ˣ) (hu : u ≠ 1) 
   change z.arg ∈ Set.Ico 0 (2 * Real.pi / n)
   exact ⟨hzArgReal.ge, hzArgReal ▸ by positivity⟩
 
+/-- A diagonal torsion unit moves an archimedean idele into the chosen angular sector. -/
+private theorem exists_torsionUnit_mul_mem_inTorsionSector (g : 𝕀∞) :
+    ∃ u : Units.torsion F, inTorsionSector F v₀ σ (atPlace (unitAtInfinity u.val * g)) := by
+  let f : 𝕀∞ →* ℂˣ :=
+    (Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom).comp atPlace
+  let φ : F →+* ℂ := σ.toRingHom.comp ((extensionEmbedding v₀).comp
+    ((Pi.evalRingHom InfinitePlace.Completion v₀).comp (algebraMap F (InfiniteAdeleRing F))))
+  let z : ℂ := (f g).val
+  let n := Units.torsionOrder F
+  let p := 2 * Real.pi / (n : ℝ)
+  have hn : 0 < (n : ℝ) := by exact_mod_cast Units.torsionOrder_pos F
+  have hp : 0 < p := div_pos Real.two_pi_pos hn
+  have hn₂ : (2 : ℝ) ≤ n := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have := Units.torsionOrder_pos F
+    exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+  have hpπ : p ≤ Real.pi := (div_le_iff₀ hn).mpr (by
+    simpa only [mul_comm Real.pi] using mul_le_mul_of_nonneg_right hn₂ Real.pi_pos.le)
+  obtain ⟨k, hk, -⟩ := existsUnique_add_zsmul_mem_Ico hp z.arg 0
+  rw [zero_add] at hk
+  let w := Complex.exp ((p : ℂ) * Complex.I)
+  have hw : w ^ n = 1 := by
+    simpa [w, p, div_mul_eq_mul_div] using
+      (Complex.isPrimitiveRoot_exp n (Units.torsionOrder_ne_zero F)).pow_eq_one
+  let ζ : ℂˣ := Units.mk0 w (Complex.exp_ne_zero _)
+  have hζ : ζ ∈ rootsOfUnity n ℂ := (mem_rootsOfUnity' n ζ).mpr hw
+  rw [← Units.map_complexEmbedding_torsion F φ] at hζ
+  obtain ⟨u, hu, hmap⟩ := hζ
+  let u₀ : Units.torsion F := ⟨u, hu⟩
+  have hunit : f (unitAtInfinity u) = ζ := hmap
+  have hrotate : w ^ k * z =
+      (‖z‖ : ℂ) * Complex.exp (((z.arg + k • p : ℝ) : ℂ) * Complex.I) := by
+    calc
+      _ = w ^ k * ((‖z‖ : ℂ) * Complex.exp ((z.arg : ℂ) * Complex.I)) :=
+        congrArg (w ^ k * ·) (Complex.norm_mul_exp_arg_mul_I z).symm
+      _ = _ := by
+        dsimp only [w]
+        rw [← Complex.exp_int_mul, zsmul_eq_mul]
+        push_cast
+        rw [add_mul, Complex.exp_add, mul_assoc (k : ℂ) (p : ℂ) Complex.I]
+        ring
+  refine ⟨u₀ ^ k, ?_⟩
+  change (f (unitAtInfinity (u ^ k) * g)).val.arg ∈ Set.Ico 0 p
+  rw [map_mul, map_zpow, map_zpow, hunit, Units.val_mul, Units.val_zpow_eq_zpow_val]
+  change (w ^ k * z).arg ∈ Set.Ico 0 p
+  rw [hrotate, Complex.arg_real_mul _ (norm_pos_iff.mpr (f g).ne_zero),
+    Complex.arg_exp_mul_I, (toIocMod_eq_self Real.two_pi_pos).mpr]
+  · exact hk
+  · refine ⟨(neg_lt_zero.mpr Real.pi_pos).trans_le hk.1, ?_⟩
+    rw [show -Real.pi + 2 * Real.pi = Real.pi by ring]
+    exact hk.2.le.trans hpπ
+
 /-- Paper: Lemma A.2.3.8(2), p. 550. The torsion translates recover the whole
 preimage of the logarithmic parallelotope in the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_torsion_cover :
     (⋃ u : Units.torsion F, unitAtInfinity u.val • archDomain) =
       (N∞).subtype '' {g : N∞ | inLogBox g} := by
-  sorry
+  let diag : Units.torsion F →* 𝕀∞ := (unitAtInfinity).comp (Units.torsion F).subtype
+  let logHom : 𝕀∞ →* Multiplicative (InfinitePlace F → ℝ) :=
+    MonoidHom.mk' (fun g ↦ Multiplicative.ofAdd (infiniteIdeleLog F g)) (infiniteIdeleLog_mul F)
+  -- The norm and logarithm kill torsion because their targets are torsion-free.
+  have hNorm (u : Units.torsion F) : unitAtInfinity u.val ∈ N∞ :=
+    (((infiniteIdeleNorm F).comp diag).isOfFinOrder (isOfFinOrder_of_finite u)).eq_one'
+  have hLog (u : Units.torsion F) (g : 𝕀∞) :
+      infiniteIdeleLog F (unitAtInfinity u.val * g) = infiniteIdeleLog F g := by
+    have hu : infiniteIdeleLog F (unitAtInfinity u.val) = 0 :=
+      ((logHom.comp diag).isOfFinOrder (isOfFinOrder_of_finite u)).eq_one'
+    rw [infiniteIdeleLog_mul, hu, zero_add]
+  let shift (u : Units.torsion F) (g : N∞) : N∞ :=
+    ⟨unitAtInfinity u.val * g.val, (N∞).mul_mem (hNorm u) g.property⟩
+  have hBox (u : Units.torsion F) (g : N∞) : inLogBox (shift u g) ↔ inLogBox g := by
+    simp only [shift, hLog]
+  ext x
+  constructor
+  · intro hx
+    obtain ⟨u, hu⟩ := Set.mem_iUnion.mp hx
+    obtain ⟨_, ⟨g, hg, rfl⟩, rfl⟩ := Set.mem_smul_set.mp hu
+    exact ⟨shift u g, (hBox u g).mpr hg.1, rfl⟩
+  · rintro ⟨g, hg, rfl⟩
+    obtain ⟨u, hu⟩ := exists_torsionUnit_mul_mem_inTorsionSector F v₀ σ g.val
+    refine Set.mem_iUnion.mpr ⟨u⁻¹, Set.mem_smul_set.mpr
+      ⟨(shift u g).val, ⟨shift u g, ⟨(hBox u g).mpr hg, hu⟩, rfl⟩, ?_⟩⟩
+    change unitAtInfinity (u.val⁻¹) * (unitAtInfinity u.val * g.val) = g.val
+    rw [map_inv, inv_mul_cancel_left]
 
 -- TODO(paper-gap): (A.2.3.18) repeats the closure where the preceding sentence specifies K.
 -- The proof on p. 551 reduces the general compact K to the case K equal to the closure.

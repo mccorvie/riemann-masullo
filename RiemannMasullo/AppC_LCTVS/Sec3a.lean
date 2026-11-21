@@ -1685,19 +1685,81 @@ theorem summable_norm_hilbertDiagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
 -- of absolute diagonal entries is 2 in the coordinate basis and 0 in the
 -- orthonormal basis formed by the normalized sum and difference of its vectors.
 
+/-- Summing the diagonal of a nuclear series gives the sum of the functional values
+on the corresponding vectors, weighted by the coefficients. -/
+private theorem tsum_hilbertDiagonal_eq_series {ι : Type*} (b : HilbertBasis ι ℂ H)
+    (T : H →L[ℂ] H) (a : ℕ → ℂ) (φ : ℕ → H →L[ℂ] ℂ) (y : ℕ → H)
+    (hcost : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖y n‖)))
+    (hT : ∀ x, HasSum (fun n ↦ (a n * φ n x) • y n) (T x)) :
+    (∑' i, ⟪b i, T (b i)⟫_ℂ) = ∑' n, a n * φ n (y n) := by
+  let f (n : ℕ) (i : ι) := a n * (φ n (b i) * ⟪b i, y n⟫_ℂ)
+  have hrow (n : ℕ) :
+      (Summable fun i ↦ ‖φ n (b i) * ⟪b i, y n⟫_ℂ‖) ∧
+        ∑' i, ‖φ n (b i) * ⟪b i, y n⟫_ℂ‖ ≤ ‖φ n‖ * ‖y n‖ := by
+    let z := (InnerProductSpace.toDual ℂ H).symm (φ n)
+    have hz (x : H) : ⟪z, x⟫_ℂ = φ n x := InnerProductSpace.toDual_symm_apply
+    have hzn : ‖z‖ = ‖φ n‖ := (InnerProductSpace.toDual ℂ H).symm.norm_map _
+    have h := lp.tsum_mul_le_mul_norm
+      (by simpa using Real.HolderConjugate.two_two) (b.repr z) (b.repr (y n))
+    simpa only [b.repr_apply_apply, b.repr.norm_map, norm_inner_symm (𝕜 := ℂ) (b _) z,
+      hz, hzn, norm_mul] using h
+  have hnorm (n : ℕ) (i : ι) : ‖f n i‖ = ‖a n‖ * ‖φ n (b i) * ⟪b i, y n⟫_ℂ‖ :=
+    norm_mul _ _
+  -- The nuclear costs dominate the sum of the absolute row sums.
+  have habs : Summable (fun p : ℕ × ι ↦ ‖f p.1 p.2‖) := by
+    refine (summable_prod_of_nonneg (fun p ↦ norm_nonneg (f p.1 p.2))).mpr ⟨?_, ?_⟩
+    · intro n
+      simpa only [hnorm] using (hrow n).1.mul_left ‖a n‖
+    · refine hcost.of_norm_bounded fun n ↦ ?_
+      simp only [hnorm, tsum_mul_left]
+      rw [Real.norm_of_nonneg (mul_nonneg (norm_nonneg _) (tsum_nonneg fun _ ↦ norm_nonneg _))]
+      exact mul_le_mul_of_nonneg_left (hrow n).2 (norm_nonneg _)
+  have hdiag (i : ι) : (∑' n, f n i) = ⟪b i, T (b i)⟫_ℂ := by
+    have h := (innerSL ℂ (b i)).hasSum (hT (b i))
+    exact (h.congr_fun fun n ↦ by
+      simp only [f, innerSL_apply_apply, inner_smul_right, mul_assoc]).tsum_eq
+  have htrace (n : ℕ) : (∑' i, f n i) = a n * φ n (y n) := by
+    have h := (φ n).hasSum (b.hasSum_repr (y n))
+    exact ((h.mul_left (a n)).congr_fun fun i ↦ by
+      simp only [f, map_smul, smul_eq_mul, b.repr_apply_apply,
+        mul_comm (⟪b i, y n⟫_ℂ)]).tsum_eq
+  calc
+    _ = ∑' i, ∑' n, f n i := tsum_congr fun i ↦ (hdiag i).symm
+    _ = ∑' n, ∑' i, f n i := habs.of_norm.tsum_comm
+    _ = _ := tsum_congr htrace
+
 /-- Paper: Lemma C.3.4.1(3), p. 697. The sum of the diagonal entries of a
 nuclear endomorphism is independent of the Hilbert basis.
 Deviation: Mathlib's inner product is linear in the second argument. -/
 theorem tsum_hilbertDiagonal_eq {ι κ : Type*} (b : HilbertBasis ι ℂ H) (c : HilbertBasis κ ℂ H)
     (T : H →L[ℂ] H) (hT : IsNuclearOperator T) :
-    (∑' i, ⟪b i, T (b i)⟫_ℂ) = ∑' j, ⟪c j, T (c j)⟫_ℂ := by sorry
+    (∑' i, ⟪b i, T (b i)⟫_ℂ) = ∑' j, ⟪c j, T (c j)⟫_ℂ := by
+  obtain ⟨a, φ, y, ha, hφ, hy, hseries⟩ := (isNuclearOperator_iff_isBanachNuclear T).mp hT
+  obtain ⟨C, hCpos, hC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  obtain ⟨R, _, hR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+  have hcost : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖y n‖)) := by
+    refine (ha.mul_right (C * R)).of_norm_bounded fun n ↦ ?_
+    rw [Real.norm_of_nonneg (by positivity)]
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hC _ (mem_range_self n)) (hR _ (mem_range_self n))
+        (norm_nonneg _) hCpos.le) (norm_nonneg _)
+  exact (tsum_hilbertDiagonal_eq_series b T a φ y hcost hseries).trans
+    (tsum_hilbertDiagonal_eq_series c T a φ y hcost hseries).symm
 
 /-- Paper: Lemma C.3.4.4(1), p. 698. The nuclear endomorphisms of a Hilbert space
 contain zero and are closed under addition and complex scalar multiplication. -/
 theorem nuclearEndomorphisms_submodule_axioms :
     IsNuclearOperator (0 : H →L[ℂ] H) ∧
       (∀ {A B : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator B → IsNuclearOperator (A + B)) ∧
-      (∀ (c : ℂ) {A : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator (c • A)) := by sorry
+      (∀ (c : ℂ) {A : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator (c • A)) := by
+  let S := (completedProjectiveTensorToOperators (E := H) (F := H)).toLinearMap.range
+  have hmem (A : H →L[ℂ] H) : IsNuclearOperator A ↔ A ∈ S :=
+    (isNuclearOperator_iff_isBanachNuclear A).trans (isBanachNuclear_iff_mem_range A)
+  refine ⟨(hmem 0).mpr S.zero_mem, ?_, ?_⟩
+  · intro A B hA hB
+    exact (hmem (A + B)).mpr (S.add_mem ((hmem A).mp hA) ((hmem B).mp hB))
+  · intro c A hA
+    exact (hmem (c • A)).mpr (S.smul_mem c ((hmem A).mp hA))
 
 variable (H) in
 /-- Paper: Definition C.3.4.2, p. 697. The space of nuclear endomorphisms is

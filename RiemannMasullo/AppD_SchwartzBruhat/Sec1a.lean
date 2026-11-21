@@ -1561,12 +1561,39 @@ variable [DiscreteTopology H] [SecondCountableTopology G]
 variable {Δ Δ' : Set G} (hΔ : MeasurableSet Δ)
 variable (hbij : Function.Bijective (fun x : Δ ↦ (QuotientGroup.mk x.val : G ⧸ H)))
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Proposition D.1.2.4, p. 748. The integrals over the translates
 of a Borel fundamental domain sum absolutely to the group integral. -/
 theorem weilFundamentalDomain_hasSum {f : G → ℂ} (hf : Integrable f μ) :
     HasSum (fun h : H ↦ ∫ x in (fun y : G ↦ y * (h : G)) '' Δ, f x ∂μ)
-      (∫ x, f x ∂μ) := by sorry
+      (∫ x, f x ∂μ) := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let translate (h : H) : Set G := (fun y : G ↦ y * (h : G)) '' Δ
+  have hmeas (h : H) : MeasurableSet (translate h) :=
+    (measurableEmbedding_mulRight (h : G)).measurableSet_image' hΔ
+  have hdisj : Pairwise (fun h k ↦ Disjoint (translate h) (translate k)) := by
+    intro h k hne
+    rw [Set.disjoint_left]
+    rintro x ⟨a, ha, hax⟩ ⟨b, hb, hbx⟩
+    have hab : (⟨a, ha⟩ : Δ) = ⟨b, hb⟩ := hbij.1 <| calc
+      QuotientGroup.mk a = QuotientGroup.mk (a * (h : G)) :=
+        (QuotientGroup.mk_mul_of_mem a h.property).symm
+      _ = QuotientGroup.mk (b * (k : G)) := congrArg QuotientGroup.mk (hax.trans hbx.symm)
+      _ = QuotientGroup.mk b := QuotientGroup.mk_mul_of_mem b k.property
+    have hab' : a = b := congrArg Subtype.val hab
+    apply hne
+    apply Subtype.ext
+    exact mul_left_cancel (by simpa only [hab'] using hax.trans hbx.symm)
+  have hcover : ⋃ h, translate h = univ := by
+    apply Set.eq_univ_of_forall
+    intro x
+    obtain ⟨a, ha⟩ := hbij.2 (QuotientGroup.mk x)
+    let h : H := ⟨(a : G)⁻¹ * x, QuotientGroup.eq.mp ha⟩
+    exact mem_iUnion.mpr ⟨h, a, a.property, mul_inv_cancel_left _ _⟩
+  simpa only [hcover, Measure.restrict_univ, translate] using
+    hasSum_integral_iUnion hmeas hdisj hf.integrableOn
 
 variable (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMeasure H μ Measure.count ν)
 
