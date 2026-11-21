@@ -32,6 +32,10 @@ local notation "J₁(" S ")" => MonoidHom.ker (sIdeleQuotientNorm F S)
 
 section Topology
 
+-- TODO(paper-gap): On p. 231 the Fréchet quotients of the test-function stages
+-- give an LF presentation. Strictness requires control of their induced topologies.
+-- See Example C.1.4.6(4) and Corollary C.1.5.13 for the bounded-lifting issue in (5.2.1.4).
+
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
 The global theta space is a strict LF-space.
 Deviation: The Fréchet stages inherit nuclearity from the separately stated
@@ -63,11 +67,19 @@ The S-local theta quotient is nuclear. -/
 theorem sLocalAdelicThetaSpace_nuclear : IsNuclearTVS (Θₛ(S)) := by sorry
 
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
-The global theta quotient is Montel. -/
+The global theta quotient is barrelled. -/
+theorem globalAdelicThetaSpace_barrelled : BarrelledSpace ℂ Θ𝔽 := by sorry
+
+/-- Paper: Theorem 5.2.1.1(1), p. 230.
+Closed bounded subsets are compact in the global theta quotient. -/
 theorem globalAdelicThetaSpace_montel : MontelSpace ℂ Θ𝔽 := by sorry
 
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
-The S-local theta quotient is Montel. -/
+The S-local theta quotient is barrelled. -/
+theorem sLocalAdelicThetaSpace_barrelled : BarrelledSpace ℂ (Θₛ(S)) := by sorry
+
+/-- Paper: Theorem 5.2.1.1(1), p. 230.
+Closed bounded subsets are compact in the S-local theta quotient. -/
 theorem sLocalAdelicThetaSpace_montel : MontelSpace ℂ (Θₛ(S)) := by sorry
 
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
@@ -91,12 +103,22 @@ theorem sLocalAdelicThetaSpace_strongDual_nuclear : IsNuclearTVS (StrongDual ℂ
   by sorry
 
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
-The strong dual of the global theta quotient is Montel. -/
+The strong dual of the global theta quotient is barrelled. -/
+theorem globalAdelicThetaSpace_strongDual_barrelled :
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽) := by sorry
+
+/-- Paper: Theorem 5.2.1.1(1), p. 230.
+Closed bounded subsets are compact in the strong dual of the global theta quotient. -/
 theorem globalAdelicThetaSpace_strongDual_montel : MontelSpace ℂ (StrongDual ℂ Θ𝔽) :=
   by sorry
 
 /-- Paper: Theorem 5.2.1.1(1), p. 230.
-The strong dual of the S-local theta quotient is Montel. -/
+The strong dual of the S-local theta quotient is barrelled. -/
+theorem sLocalAdelicThetaSpace_strongDual_barrelled :
+    BarrelledSpace ℂ (StrongDual ℂ (Θₛ(S))) := by sorry
+
+/-- Paper: Theorem 5.2.1.1(1), p. 230.
+Closed bounded subsets are compact in the strong dual of the S-local theta quotient. -/
 theorem sLocalAdelicThetaSpace_strongDual_montel : MontelSpace ℂ (StrongDual ℂ (Θₛ(S))) :=
   by sorry
 
@@ -111,8 +133,12 @@ end Topology
 -- I-exponentially decaying target without giving a statement.
 -- TODO(paper-gap): Footnote 2 on p. 231 asks to adjust Theorem 5.2.1.1
 -- and gives no replacement. Its proof needs a stage projection preserving
--- the theta kernel. Tail evaluation at the all-ones vector, allowed by
--- Lemma 2.1.4.3, can send an odd test function to a nonzero theta class.
+-- the theta kernel. For ℚ and S = {∞}, put e = 1_{ℤ̂}. Every tail functional
+-- fixing e sends f − ρ(2)f, for f = φ ⊗ e, to (φ − c φ(·/2)) ⊗ e for some c.
+-- For an even bump φ supported within 1/4 of ±1 with φ(±1) = 1, this has
+-- theta values 2(1−c) and −2c at real scales 1 and 2. Thus the tensor
+-- projections used on p. 73 cannot descend. The assertion on p. 232 about
+-- convergence on bounded sets requires a family of projections on the quotients.
 
 section Transitions
 
@@ -169,6 +195,19 @@ theorem sLocalThetaToGlobal_mk (f : ℬₛ(S)) :
 /-- Paper: Theorem 5.2.1.1(3), p. 230.
 The S-local theta space embeds topologically in the global theta space. -/
 theorem sLocalThetaToGlobal_isEmbedding : IsEmbedding (sLocalThetaToGlobal F S) := by sorry
+
+/-- Paper: Theorem 5.2.1.1(3), p. 231.
+The global stage insertion has closed range, as used in Lemma 5.3.1.5. -/
+theorem sLocalThetaToGlobal_isClosed_range :
+    IsClosed (Set.range (sLocalThetaToGlobal F S)) := by
+  let : UniformSpace (Θₛ(S)) := IsTopologicalAddGroup.rightUniformSpace _
+  let : UniformSpace Θ𝔽 := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (Θₛ(S)) := isUniformAddGroup_of_addCommGroup
+  let : IsUniformAddGroup Θ𝔽 := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace (Θₛ(S)) := sLocalAdelicThetaSpace_complete
+  let : T2Space Θ𝔽 := (globalAdelicThetaSpace_strictLF (F := F)).1
+  exact (AddMonoidHom.isUniformInducing_of_isInducing
+    (sLocalThetaToGlobal_isEmbedding (F := F) (S := S)).isInducing).isComplete_range.isClosed
 
 /-- Paper: Theorem 5.2.1.1(2), p. 230.
 The stage insertions and transitions form a compatible family in the global quotient. -/
@@ -312,10 +351,35 @@ theorem sLocalHomogeneousThetaSpace_mk_eq_iff (ω : PontryaginDual (J₁(S))) (f
       sLocalHomogeneousAdelicThetaLinearMap F S ω f =
         sLocalHomogeneousAdelicThetaLinearMap F S ω g := by sorry
 
+/-- Paper: Definition 5.2.2.1(1), p. 232.
+The homogeneous theta quotient identifies canonically with the quotient of ordinary
+theta space by the closed span of the character-twisted translation differences. -/
+theorem globalHomogeneousThetaSpace_equiv_coinvariants (ω : PontryaginDual C₁) :
+    let ρ := (existsUnique_globalThetaAction (F := F)).exists.choose
+    let D := (Submodule.span ℂ (Set.range (fun p : C₁ × Θ𝔽 ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure
+    ∃ e : GlobalHomogeneousThetaSpace F ω ≃L[ℂ] (Θ𝔽 ⧸ D),
+      ∀ f : ℬ𝔽, e (Submodule.Quotient.mk f) = D.mkQ ((K𝔽).mkQ f) := by sorry
+
+/-- Paper: Definition 5.2.2.1(2), p. 232.
+The S-local homogeneous quotient identifies canonically with the quotient of ordinary
+S-local theta space by the closed span of the twisted norm-one translation differences. -/
+theorem sLocalHomogeneousThetaSpace_equiv_coinvariants (ω : PontryaginDual (J₁(S))) :
+    let ρ := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
+    let D := (Submodule.span ℂ (Set.range (fun p : J₁(S) × Θₛ(S) ↦
+      p.2 - star (ω p.1 : ℂ) • ρ p.1.val p.2))).topologicalClosure
+    ∃ e : SLocalHomogeneousThetaSpace F S ω ≃L[ℂ] (Θₛ(S) ⧸ D),
+      ∀ f : ℬₛ(S), e (Submodule.Quotient.mk f) = D.mkQ ((Kₛ(S)).mkQ f) := by sorry
+
 end HomogeneousQuotients
 
 -- The first digest ends at Definition 5.2.2.1. The isotypic structure
 -- results and the Fourier descent statements remain for a subsequent digest.
+-- TODO(continuation): (5.2.2.2), Theorem 5.2.3.1, Proposition 5.2.3.2,
+-- Remarks 5.2.3.3–5.2.3.5 and the individual involutions in Theorem 5.2.4.1.
+-- TODO(paper-gap): The global L² argument on p. 237 fails for the rational
+-- Gaussian, whose theta is asymptotic to 1/t at the origin. Character
+-- uniqueness can be applied on each compact norm-one fiber instead.
 -- TODO(paper-gap): On p. 234 the proof of Theorem 5.2.3.1 refers to the
 -- descending idempotent as "(??)". The proof on p. 231 does not construct
 -- a kernel-preserving Schwartz–Bruhat projection.
