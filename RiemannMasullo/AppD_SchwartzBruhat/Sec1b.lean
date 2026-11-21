@@ -1062,7 +1062,103 @@ theorem lca_openSubgroup_inverseLimit (J : OpenCompactlyGeneratedSubgroups G) :
     let δ : J.val → ((H : I) → J.val ⧸ K H) := fun x _ ↦ QuotientGroup.mk x
     Nonempty I ∧ IsDirectedOrder I ∧
       IsEmbedding δ ∧ range δ = {a | ∀ (H H' : I), H ≤ H' →
-      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by sorry
+      ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'} := by
+  let I := {H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) //
+    lcaDualAnnihilator H.val ≤ J.val}
+  let K (H : I) : Subgroup J.val := (lcaDualAnnihilator H.val.val).comap J.val.subtype
+  let δ : J.val →ₜ* ((H : I) → J.val ⧸ K H) :=
+    { toFun := fun x H ↦ QuotientGroup.mk x
+      map_one' := funext fun H ↦ QuotientGroup.mk_one (N := K H)
+      map_mul' := fun x y ↦ funext fun H ↦ QuotientGroup.mk_mul (K H) x y
+      continuous_toFun := continuous_pi fun H ↦ QuotientGroup.continuous_mk }
+  change Nonempty I ∧ IsDirectedOrder I ∧ IsEmbedding δ ∧
+    range δ = {a | ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H'}
+  have hSmall {V : Set J.val} (hV : V ∈ 𝓝 (1 : J.val)) :
+      ∃ H : I, (K H : Set J.val) ⊆ V := by
+    obtain ⟨H, hH⟩ := exists_lcaDualAnnihilator_subset_nhds
+      (J.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hV)
+    refine ⟨⟨H, fun x hx ↦ ?_⟩, ?_⟩
+    · obtain ⟨y, _, rfl⟩ := hH hx
+      exact y.property
+    · intro x hx
+      obtain ⟨y, hy, hyx⟩ := hH (Subgroup.mem_comap.mp hx)
+      exact (Subtype.ext hyx : y = x) ▸ hy
+  let : Nonempty I := ⟨(hSmall Filter.univ_mem).choose⟩
+  let : IsDirectedOrder (OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :=
+    (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).1
+  have hAnti : Antitone (fun H : OpenCompactlyGeneratedSubgroups (PontryaginDual G) ↦
+      lcaDualAnnihilator H.val) := by
+    intro H H' h x hx
+    exact (mem_lcaDualAnnihilator_iff H.val x).mpr fun χ ↦
+      (mem_lcaDualAnnihilator_iff H'.val x).mp hx (Subgroup.inclusion h χ)
+  let : IsDirectedOrder I := ⟨fun H H' ↦ by
+    obtain ⟨L, hHL, hH'L⟩ := exists_ge_ge H.val H'.val
+    exact ⟨⟨L, (hAnti hHL).trans H.property⟩, hHL, hH'L⟩⟩
+  -- A neighborhood can be tested in a quotient whose kernel lies in a smaller neighborhood.
+  have hInducing : IsInducing δ := by
+    rw [IsTopologicalGroup.isInducing_iff_nhds_one]
+    refine le_antisymm ?_ ?_
+    · have h : Tendsto δ (𝓝 1) (𝓝 (δ 1)) := δ.continuous.tendsto 1
+      rw [map_one] at h
+      exact h.le_comap
+    · intro U hU
+      obtain ⟨V, hV, h1V, hVV⟩ := exists_open_nhds_one_mul_subset hU
+      obtain ⟨H, hH⟩ := hSmall (hV.mem_nhds h1V)
+      let q : J.val → J.val ⧸ K H := QuotientGroup.mk
+      have hqV : q '' V ∈ 𝓝 (1 : J.val ⧸ K H) :=
+        (QuotientGroup.isOpenMap_coe (N := K H)).image_mem_nhds (hV.mem_nhds h1V)
+      refine Filter.mem_comap.mpr ⟨(fun a ↦ a H) ⁻¹' (q '' V),
+        (continuous_apply H).continuousAt.preimage_mem_nhds hqV, ?_⟩
+      intro x hx
+      obtain ⟨y, hy, hyx⟩ : q x ∈ q '' V := hx
+      have hDiff : y⁻¹ * x ∈ K H := QuotientGroup.eq.mp hyx
+      exact hVV ⟨y, hy, y⁻¹ * x, hH hDiff, mul_inv_cancel_left y x⟩
+  refine ⟨inferInstance, inferInstance, ⟨hInducing, hInducing.injective⟩, ?_⟩
+  ext a
+  constructor
+  · rintro ⟨x, rfl⟩ H H' _
+    exact ⟨x, rfl, rfl⟩
+  · intro ha
+    change ∀ (H H' : I), H ≤ H' → ∃ x : J.val, δ x H = a H ∧ δ x H' = a H' at ha
+    let F (H : I) : Set J.val := {x | δ x H = a H}
+    have hNonempty (H : I) : (F H).Nonempty := by
+      obtain ⟨x, hx⟩ := QuotientGroup.mk_surjective (a H)
+      exact ⟨x, hx⟩
+    have hCompact (H : I) : IsCompact (K H : Set J.val) := by
+      have hEval := (isClosedEmbedding_pontryaginDual_eval (G := G)).comp
+        (J.val.isClosed_of_isOpen J.property.1).isClosedEmbedding_subtypeVal
+      have hPreimage : (K H : Set J.val) =
+          (pontryaginDual_eval ∘ (Subtype.val : J.val → G)) ⁻¹'
+            (lcaAnnihilator H.val.val : Set (PontryaginDual (PontryaginDual G))) := by
+        ext x
+        exact (mem_lcaDualAnnihilator_iff H.val.val x.val).trans
+          (mem_lcaAnnihilator_iff H.val.val (pontryaginDual_eval x.val)).symm
+      rw [hPreimage]
+      exact hEval.isCompact_preimage (isCompact_lcaAnnihilator H.val.val H.val.property.1)
+    -- The fibers are translates of compact kernels and decrease along the index order.
+    have hFiberCompact (H : I) : IsCompact (F H) := by
+      obtain ⟨y, hy⟩ := hNonempty H
+      have hFiber : F H = (fun z : J.val ↦ y * z) '' (K H : Set J.val) := by
+        ext x
+        constructor
+        · intro hx
+          exact ⟨y⁻¹ * x, QuotientGroup.eq.mp (hy.trans hx.symm), mul_inv_cancel_left y x⟩
+        · rintro ⟨z, hz, rfl⟩
+          change (QuotientGroup.mk (y * z) : J.val ⧸ K H) = a H
+          rw [QuotientGroup.mk_mul, (QuotientGroup.eq_one_iff z).mpr hz, mul_one]
+          exact hy
+      rw [hFiber]
+      exact (hCompact H).image (continuous_const.mul continuous_id)
+    have hFiberAnti : Antitone F := by
+      intro H H' h x hx
+      obtain ⟨y, hy, hy'⟩ := ha H H' h
+      have hDiff : x⁻¹ * y ∈ K H' := QuotientGroup.eq.mp (hx.trans hy'.symm)
+      have hK : K H' ≤ K H := Subgroup.comap_mono (hAnti (show H.val ≤ H'.val from h))
+      exact (QuotientGroup.eq.mpr (hK hDiff)).trans hy
+    obtain ⟨x, hx⟩ := IsCompact.nonempty_iInter_of_directed_nonempty_isCompact_isClosed
+      F (directed_of_isDirected_le hFiberAnti) hNonempty hFiberCompact
+      (fun H ↦ (hFiberCompact H).isClosed)
+    exact ⟨x, funext (mem_iInter.mp hx)⟩
 
 end Structure
 
