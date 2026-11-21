@@ -804,6 +804,10 @@ theorem schwartzBruhatIsotype_extension_intertwines (hd : DenseRange i)
 
 end CoarserTopology
 
+-- Direct Lean invocations do not inherit the Lake option. The section-variable check
+-- traverses the large instance terms in the transport and tensor proofs below.
+set_option linter.unusedSectionVars false
+
 section Transport
 
 variable {A B : Type*} [CommGroup A] [TopologicalSpace A]
@@ -990,6 +994,31 @@ local instance {X : Type*} [AddCommGroup X] [Module ℂ X] {ι : Type*}
     (p : SeminormFamily ℂ X ι) : ContinuousSMul ℂ (WithGeneratingSeminorms X p) :=
   (withGeneratingSeminorms_spec X p).continuousSMul
 
+/-- To intertwine an operator on a completed inductive tensor product with a continuous
+linear map, it suffices to check their actions on pure tensors. -/
+private theorem completion_inductiveTensor_intertwines
+    {U V Z : Type*} [AddCommGroup U] [Module ℂ U] [TopologicalSpace U]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    [PolynormableSpace ℂ U] [PolynormableSpace ℂ V] [T2Space U] [T2Space V]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [T2Space Z]
+    (A : U →L[ℂ] U) (B : V →L[ℂ] V) (C : Z →L[ℂ] Z)
+    (e : Completion (InductiveTensor U V) ≃L[ℂ] Z)
+    (h : ∀ f g, e (Completion.coe' (α := InductiveTensor U V) (A f ⊗ₜ[ℂ] B g)) =
+      C (e (Completion.coe' (α := InductiveTensor U V) (f ⊗ₜ[ℂ] g))))
+    (z : Completion (InductiveTensor U V)) :
+    e (Completion.map (inductiveTensorMap A.toLinearMap B.toLinearMap :
+      InductiveTensor U V → InductiveTensor U V) z) = C (e z) := by
+  let M := inductiveTensorMap A.toLinearMap B.toLinearMap
+  let j : InductiveTensor U V →L[ℂ] Completion (InductiveTensor U V) := Completion.toComplL
+  let F : U ⊗[ℂ] V →ₗ[ℂ] Z := e.toLinearEquiv.toLinearMap.comp j.toLinearMap
+  have hlin : F.comp (TensorProduct.map A.toLinearMap B.toLinearMap) = C.toLinearMap.comp F :=
+    TensorProduct.ext' h
+  have hM : UniformContinuous (M : InductiveTensor U V → InductiveTensor U V) :=
+    uniformContinuous_addMonoidHom_of_continuous (inductiveTensorMap_continuous A B)
+  exact Completion.ext' (e.continuous.comp Completion.continuous_map)
+    (C.continuous.comp e.continuous) (fun w ↦
+      (congrArg (fun y ↦ e y) (Completion.map_coe hM w)).trans (LinearMap.congr_fun hlin w)) z
+
 section TensorTranslation
 
 variable {X Y G : Type*}
@@ -1021,46 +1050,30 @@ private theorem schwartzBruhat_tensor_intertwines
       ((schwartzBruhatTranslationAction (G := X)) k).toLinearMap
       ((schwartzBruhatTranslationAction (G := Y)) t).toLinearMap : HS → HS) z) =
     schwartzBruhatTranslate (d (k, t)) (e z) := by
-  let A := schwartzBruhatTranslationAction (G := X) k
-  let B := schwartzBruhatTranslationAction (G := Y) t
-  let C := schwartzBruhatTranslationAction (G := G) (d (k, t))
-  let M : HS →ₗ[ℂ] HS := inductiveTensorMap A.toLinearMap B.toLinearMap
-  let j : HS →L[ℂ] Completion HS := Completion.toComplL
-  let F : HS →ₗ[ℂ] S := e.toLinearEquiv.toLinearMap.comp j.toLinearMap
-  have hlin : F.comp M = C.toLinearMap.comp F := by
-    refine TensorProduct.ext' fun f h ↦ ?_
+  have : T2Space (SchwartzBruhat X) := schwartzBruhat_eval_t2
+  have : T2Space (SchwartzBruhat Y) := schwartzBruhat_eval_t2
+  have : T2Space S := schwartzBruhat_eval_t2
+  refine (completion_inductiveTensor_intertwines (schwartzBruhatTranslationAction (G := X) k)
+    (schwartzBruhatTranslationAction (G := Y) t)
+    (schwartzBruhatTranslationAction (G := G) (d (k, t))) e ?_ z).trans ?_
+  · intro f h
     refine Subtype.ext (funext (d.surjective.forall.mpr ?_))
     rintro ⟨a, b⟩
     have hshift : (d (k, t))⁻¹ * d (a, b) = d (k⁻¹ * a, t⁻¹ * b) :=
       ((map_mul d (k, t)⁻¹ (a, b)).trans
         (congrArg (· * d (a, b)) (map_inv d (k, t)))).symm
-    have htensor : M (f ⊗ₜ[ℂ] h) = A f ⊗ₜ[ℂ] B h :=
-      TensorProduct.map_tmul A.toLinearMap B.toLinearMap f h
+    have lhs := he (schwartzBruhatTranslationAction (G := X) k f)
+      (schwartzBruhatTranslationAction (G := Y) t h) a b
+    have rhs := schwartzBruhatTranslationAction_apply (d (k, t)) (d (a, b))
+      (e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)))
     calc
-      e (j (M (f ⊗ₜ[ℂ] h))) (d (a, b)) =
-          e (j (A f ⊗ₜ[ℂ] B h)) (d (a, b)) :=
-        congrArg (fun w : HS ↦ e (j w) (d (a, b))) htensor
-      _ = A f a * B h b := he (A f) (B h) a b
-      _ = f (k⁻¹ * a) * h (t⁻¹ * b) :=
-        congrArg₂ (· * ·) (schwartzBruhatTranslationAction_apply k a f)
-          (schwartzBruhatTranslationAction_apply t b h)
-      _ = e (j (f ⊗ₜ[ℂ] h)) (d (k⁻¹ * a, t⁻¹ * b)) := (he f h _ _).symm
-      _ = e (j (f ⊗ₜ[ℂ] h)) ((d (k, t))⁻¹ * d (a, b)) :=
-        congrArg (fun x : G ↦ e (j (f ⊗ₜ[ℂ] h)) x) hshift.symm
-      _ = C (e (j (f ⊗ₜ[ℂ] h))) (d (a, b)) :=
-        (schwartzBruhatTranslationAction_apply _ _ _).symm
-  let : T2Space (SchwartzBruhat X) := schwartzBruhat_eval_t2
-  let : T2Space (SchwartzBruhat Y) := schwartzBruhat_eval_t2
-  let : T2Space S := schwartzBruhat_eval_t2
-  have hMcont : Continuous M := inductiveTensorMap_continuous A B
-  have hM : UniformContinuous M := uniformContinuous_addMonoidHom_of_continuous hMcont
-  have hcomp : ∀ w : Completion HS, e (Completion.map M w) = C (e w) :=
-    Completion.ext' (e.continuous.comp Completion.continuous_map)
-      (C.continuous.comp e.continuous) fun w ↦
-        (congrArg (fun y : Completion HS ↦ e y) (Completion.map_coe hM w)).trans
-          (LinearMap.congr_fun hlin w)
-  refine (hcomp z).trans (Subtype.ext (funext fun x ↦ ?_))
-  exact schwartzBruhatTranslationAction_apply (d (k, t)) x (e z)
+      _ = _ := lhs
+      _ = f (k⁻¹ * a) * h (t⁻¹ * b) := congrArg₂ (· * ·)
+        (schwartzBruhatTranslationAction_apply k a f) (schwartzBruhatTranslationAction_apply t b h)
+      _ = _ := (he f h (k⁻¹ * a) (t⁻¹ * b)).symm
+      _ = _ := congrArg (fun x : G ↦ e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) x) hshift.symm
+      _ = _ := rhs.symm
+  · exact Subtype.ext (funext fun x ↦ schwartzBruhatTranslationAction_apply (d (k, t)) x (e z))
 
 end TensorTranslation
 
@@ -1102,21 +1115,29 @@ theorem schwartzBruhat_modulation_tensor (τ : Γ →ₜ* G)
     (Units.isEmbedding_val₀ (G₀ := ℝ≥0)).secondCountableTopology
   let : SecondCountableTopology Γ := TopologicalSpace.Subtype.secondCountableTopology (Γ : Set ℝ≥0ˣ)
   let : LocallyCompactSpace Γ := hm.isClosed_range.locallyCompactSpace
-  let d := (hm.exists_prod_equiv τ hτ).choose
-  have hd := (hm.exists_prod_equiv τ hτ).choose_spec
-  let P := (schwartzBruhat_kernel_equiv (G := K) (H := Γ)).choose
-  have hP := (schwartzBruhat_kernel_equiv (G := K) (H := Γ)).choose_spec
-  let T := (schwartzBruhat_congr d).choose
-  have hT := (schwartzBruhat_congr d).choose_spec
+  refine (hm.exists_prod_equiv τ hτ).elim fun d hd ↦ ?_
+  have hKernel : ∃ P : Completion HS ≃L[ℂ] SchwartzBruhat (K × Γ),
+      ∀ (f : SK) (h : SΓ) (k : K) (t : Γ),
+        P (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) (k, t) = f k * h t := by
+    with_reducible exact schwartzBruhat_kernel_equiv (G := K) (H := Γ)
+  obtain ⟨P, hP⟩ := hKernel
+  refine (schwartzBruhat_congr d).elim fun T hT ↦ ?_
   let e := P.trans T
   have he (f : SchwartzBruhat K) (h : SΓ) (k : K) (t : Γ) :
-      e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) (d (k, t)) = f k * h t :=
-    (hT _ (k, t)).trans (hP f h k t)
-  refine ⟨e, fun f h k t ↦ ?_, fun k t z ↦ ?_⟩
-  · exact (congrArg (fun x : G ↦ e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) x)
-      (hd k t).symm).trans (he f h k t)
-  · exact (schwartzBruhat_tensor_intertwines d e he k t z).trans
-      (congrArg (fun g : G ↦ schwartzBruhatTranslate g (e z)) (hd k t))
+      e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) (d (k, t)) = f k * h t := by
+    change T (P (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h))) (d (k, t)) = _
+    with_reducible exact (hT _ (k, t)).trans (hP f h k t)
+  clear_value e
+  refine ⟨e, ?_, ?_⟩
+  · intro f h k t
+    exact Eq.subst (motive := fun x : G ↦
+      e (Completion.coe' (α := HS) (f ⊗ₜ[ℂ] h)) x = f k * h t) (hd k t) (he f h k t)
+  · intro k t z
+    calc
+      _ = schwartzBruhatTranslate (d (k, t)) (e z) := by
+        with_reducible_and_instances
+          exact schwartzBruhat_tensor_intertwines (X := K) (Y := Γ) d e he k t z
+      _ = _ := congrArg (fun g : G ↦ schwartzBruhatTranslate g (e z)) (hd k t)
 
 omit hm in
 /-- The constant function one is a Schwartz–Bruhat function on a compact group. -/
@@ -1136,7 +1157,9 @@ private theorem compact_schwartzBruhat_one {H : Type*} [CommGroup H] [Topologica
     change Subsingleton ((⊤ : Subgroup H) ⧸ (⊤ : Subgroup (⊤ : Subgroup H)))
     exact QuotientGroup.subsingleton_quotient_top
   let A := Multiplicative (ElementaryLieGroup 0 0 0 PUnit)
-  let : Subsingleton A := inferInstanceAs (Subsingleton (ElementaryLieGroup 0 0 0 PUnit))
+  have : Subsingleton A := by
+    change Subsingleton (ElementaryLieGroup 0 0 0 PUnit)
+    infer_instance
   let f : a.quotient →* A := 1
   let e₀ : a.quotient ≃* A := MulEquiv.ofBijective f
     ⟨fun _ _ _ ↦ Subsingleton.elim _ _, fun y ↦ ⟨1, Subsingleton.elim _ y⟩⟩
@@ -1364,17 +1387,14 @@ private theorem schwartzBruhat_modulation_source_projector
     IsPettisIsotypicAverageOn μ₁ univ ρS ω (μ₁.real univ • P) ∧
       (∀ f : S, P f ∈ actionIsotype ρS ω) ∧
       (∀ f : S, f ∈ actionIsotype ρS ω → P f = f) := by
-  let ρS := (schwartzBruhatTranslationAction (G := G)).comp (Subgroup.subtype K)
-  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
-  have hSourceQuotient := @schwartzBruhatIsotypicProjector_quotient_equiv G
-    ‹CommGroup G› ‹TopologicalSpace G› ‹IsTopologicalGroup G› ‹T2Space G›
-    ‹LocallyCompactSpace G› ‹SecondCountableTopology G› ‹MeasurableSpace G› ‹BorelSpace G›
-    m hm μ₁ hμ₁ ω
-  rcases hSourceQuotient with ⟨p, hp⟩
+  intro ρS P
+  have hQuotient : ∃ p : (S ⧸ P.ker) ≃L[ℂ] actionIsotype ρS ω,
+      ∀ f : S, (p (P.ker.mkQ f) : S) = P f := by
+    with_reducible exact schwartzBruhatIsotypicProjector_quotient_equiv m hm μ₁ ω
+  obtain ⟨p, hp⟩ := hQuotient
   have hPmem (f : S) : P f ∈ actionIsotype ρS ω := by
-    let z : actionIsotype ρS ω := p (P.ker.mkQ f)
-    have hz : (z : S) = P f := hp f
-    exact Eq.mp (congrArg (fun u : S ↦ u ∈ actionIsotype ρS ω) hz) z.property
+    exact Eq.mp (congrArg (fun u : S ↦ u ∈ actionIsotype ρS ω) (hp f))
+      (p (P.ker.mkQ f)).property
   have hSourceAverage := @exists_schwartzBruhatIsotypicProjector_average G
     ‹CommGroup G› ‹TopologicalSpace G› ‹IsTopologicalGroup G› ‹T2Space G›
     ‹LocallyCompactSpace G› ‹SecondCountableTopology G› ‹MeasurableSpace G› ‹BorelSpace G›
