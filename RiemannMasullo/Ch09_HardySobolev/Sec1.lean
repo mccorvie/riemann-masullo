@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3a
 public import Mathlib.MeasureTheory.Measure.WithDensity
+import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
@@ -605,7 +606,124 @@ isometrically by an element in the opposite degree. -/
 theorem weightedSobolev_dual (_hν : IsLCAPlancherelMeasure μ ν)
     (_hw : IsSobolevWeight w) (_hs : 0 ≤ s) :
     ∃! T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s),
-      ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by sorry
+      ∀ Λ f, Integrable (fun χ ↦ f χ * T Λ χ) ν ∧ Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let ρ (t : ℝ) (χ : PontryaginDual G) := (1 + (w χ : ℝ) ^ 2) ^ (t / 2)
+  have hρpos (t : ℝ) (χ : PontryaginDual G) : 0 < ρ t χ :=
+    Real.rpow_pos_of_pos (by positivity) _
+  have hρ (t : ℝ) : Continuous (ρ t) := by
+    have hcont : Continuous (fun χ ↦ 1 + (w χ : ℝ) ^ 2) :=
+      continuous_const.add ((NNReal.continuous_coe.comp _hw.1).pow 2)
+    exact hcont.rpow_const fun χ ↦ Or.inl (by positivity)
+  have hrecip (t : ℝ) (χ : PontryaginDual G) : ρ t χ * ρ (-t) χ = 1 := by
+    dsimp only [ρ]
+    rw [← Real.rpow_add (by positivity), neg_div, add_neg_cancel, Real.rpow_zero]
+  have hdens (t : ℝ) : Measurable (fun χ ↦ ENNReal.ofReal (ρ t χ)) :=
+    (hρ t).measurable.ennreal_ofReal
+  have hfinite (t : ℝ) : ∀ᵐ χ ∂ν, ENNReal.ofReal (ρ t χ) < ∞ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hbase (t : ℝ) : ν ≪ sobolevMeasure ν w t :=
+    withDensity_absolutelyContinuous' (hdens t).aemeasurable
+      (ae_of_all _ fun χ ↦ (ENNReal.ofReal_pos.mpr (hρpos t χ)).ne')
+  have hweighted (t : ℝ) : sobolevMeasure ν w t ≪ ν := withDensity_absolutelyContinuous _ _
+  -- Conjugation times the density interchanges the two weighted L² spaces.
+  let u (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) : ℂ :=
+    (ρ t χ : ℂ) * star (f χ)
+  have hsq (t : ℝ) (f : WeightedSobolev ν w t) (χ : PontryaginDual G) :
+      ‖u t f χ‖ ^ 2 * ρ (-t) χ = ‖f χ‖ ^ 2 * ρ t χ := by
+    calc
+      _ = ‖f χ‖ ^ 2 * (ρ t χ * (ρ t χ * ρ (-t) χ)) := by
+        dsimp only [u]
+        rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hρpos t χ), norm_star]
+        ring
+      _ = _ := by rw [hrecip, mul_one]
+  have hmem (t : ℝ) (f : WeightedSobolev ν w t) :
+      MemLp (u t f) 2 (sobolevMeasure ν w (-t)) := by
+    have hmeas : AEStronglyMeasurable (u t f) (sobolevMeasure ν w (-t)) :=
+      (Complex.continuous_ofReal.comp (hρ t)).aestronglyMeasurable.mul
+        (((Lp.aestronglyMeasurable f).mono_ac (hbase t)).mono_ac (hweighted (-t))).star
+    apply (memLp_two_iff_integrable_sq_norm hmeas).2
+    change Integrable (fun χ ↦ ‖u t f χ‖ ^ 2) (ν.withDensity fun χ ↦ ENNReal.ofReal (ρ (-t) χ))
+    apply (integrable_withDensity_iff (hdens (-t)) (hfinite (-t))).2
+    refine (weightedSobolev_norm ν _hw.1 t f).1.congr (ae_of_all _ fun χ ↦ ?_)
+    change ‖f χ‖ ^ 2 * ρ t χ = ‖u t f χ‖ ^ 2 * (ENNReal.ofReal (ρ (-t) χ)).toReal
+    rw [ENNReal.toReal_ofReal (hρpos (-t) χ).le, hsq]
+  let S (t : ℝ) (f : WeightedSobolev ν w t) : WeightedSobolev ν w (-t) :=
+    (hmem t f).toLp (u t f)
+  have hS (t : ℝ) (f : WeightedSobolev ν w t) :
+      (S t f : PontryaginDual G → ℂ) =ᵐ[ν] u t f :=
+    (hbase (-t)).ae_eq (hmem t f).coeFn_toLp
+  have hSnorm (t : ℝ) (f : WeightedSobolev ν w t) : ‖S t f‖ = ‖f‖ := by
+    rw [(weightedSobolev_norm ν _hw.1 (-t) (S t f)).2, (weightedSobolev_norm ν _hw.1 t f).2]
+    congr 1
+    apply integral_congr_ae
+    filter_upwards [hS t f] with χ hχ
+    change ‖S t f χ‖ ^ 2 * ρ (-t) χ = ‖f χ‖ ^ 2 * ρ t χ
+    rw [hχ, hsq]
+  let C : WeightedSobolev ν w s →ₗᵢ⋆[ℂ] WeightedSobolev ν w (-s) :=
+    { toFun := S s
+      map_add' := fun f g ↦ Lp.ext <| (hweighted (-s)).ae_eq <| by
+        filter_upwards [hS s (f + g), hS s f, hS s g,
+          (hbase s).ae_eq (Lp.coeFn_add f g),
+          (hbase (-s)).ae_eq (Lp.coeFn_add (S s f) (S s g))] with χ hfg hf hg hχ hsum
+        rw [hfg, hsum]
+        change u s (f + g) χ = S s f χ + S s g χ
+        rw [hf, hg]
+        simp only [u, hχ, Pi.add_apply, star_add, mul_add]
+      map_smul' := fun c f ↦ Lp.ext <| (hweighted (-s)).ae_eq <| by
+        filter_upwards [hS s (c • f), hS s f, (hbase s).ae_eq (Lp.coeFn_smul c f),
+          (hbase (-s)).ae_eq (Lp.coeFn_smul ((starRingEnd ℂ) c) (S s f))]
+          with χ hcf hf hχ hsmul
+        rw [hcf, hsmul]
+        change u s (c • f) χ = (starRingEnd ℂ) c • S s f χ
+        rw [hf]
+        simp only [u, hχ, Pi.smul_apply, starRingEnd_apply, smul_eq_mul, star_mul', mul_left_comm]
+      norm_map' := hSnorm s }
+  have hSurj : Function.Surjective C := by
+    intro g
+    have hs' : - -s = s := neg_neg s
+    let f : WeightedSobolev ν w s := hs' ▸ S (-s) g
+    have hf : (f : PontryaginDual G → ℂ) =ᵐ[ν] u (-s) g := by
+      have hcast (t : ℝ) (ht : - -s = t) :
+          ((ht ▸ S (-s) g : WeightedSobolev ν w t) : PontryaginDual G → ℂ) = S (-s) g := by
+        subst t
+        rfl
+      exact (hcast s hs').eventuallyEq.trans (hS (-s) g)
+    refine ⟨f, Lp.ext ((hweighted (-s)).ae_eq ?_)⟩
+    change (S s f : PontryaginDual G → ℂ) =ᵐ[ν] g
+    filter_upwards [hS s f, hf] with χ hSf hfχ
+    have hstar : star (ρ (-s) χ : ℂ) = (ρ (-s) χ : ℂ) := Complex.conj_ofReal _
+    rw [hSf]
+    simp only [u, hfχ, star_mul', hstar, star_star]
+    rw [← mul_assoc, ← Complex.ofReal_mul, hrecip, Complex.ofReal_one, one_mul]
+  let R := InnerProductSpace.toDual ℂ (WeightedSobolev ν w s)
+  let T : StrongDual ℂ (WeightedSobolev ν w s) ≃ₗᵢ[ℂ] WeightedSobolev ν w (-s) :=
+    R.symm.trans (LinearIsometryEquiv.ofSurjective C hSurj)
+  have hPair (Λ : StrongDual ℂ (WeightedSobolev ν w s)) (f : WeightedSobolev ν w s) :
+      Integrable (fun χ ↦ f χ * T Λ χ) ν ∧
+        Λ f = ∫ χ, f χ * T Λ χ ∂ν := by
+    let g := R.symm Λ
+    have hprod : (fun χ ↦ f χ * T Λ χ) =ᵐ[ν]
+        fun χ ↦ (ENNReal.ofReal (ρ s χ)).toReal • inner ℂ (g χ) (f χ) := by
+      filter_upwards [hS s g] with χ hχ
+      change f χ * S s g χ = _
+      rw [hχ, ENNReal.toReal_ofReal (hρpos s χ).le, RCLike.inner_apply, starRingEnd_apply]
+      simp only [u, Complex.real_smul, mul_left_comm]
+    refine ⟨?_, ?_⟩
+    · exact ((integrable_withDensity_iff_integrable_smul' (hdens s) (hfinite s)).1
+        (L2.integrable_inner g f)).congr hprod.symm
+    · calc
+        Λ f = inner ℂ g f := InnerProductSpace.toDual_symm_apply.symm
+        _ = ∫ χ, inner ℂ (g χ) (f χ) ∂sobolevMeasure ν w s := L2.inner_def g f
+        _ = ∫ χ, (ENNReal.ofReal (ρ s χ)).toReal • inner ℂ (g χ) (f χ) ∂ν :=
+          integral_withDensity_eq_integral_toReal_smul (hdens s) (hfinite s) _
+        _ = ∫ χ, f χ * T Λ χ ∂ν := integral_congr_ae hprod.symm
+  refine ⟨T, hPair, fun T' hT' ↦ LinearIsometryEquiv.ext fun Λ ↦ ?_⟩
+  apply T.symm.injective
+  rw [T.symm_apply_apply]
+  apply ContinuousLinearMap.ext
+  intro f
+  rw [(hPair (T.symm (T' Λ)) f).2, T.apply_symm_apply, (hT' Λ f).2]
 
 end LCA
 
