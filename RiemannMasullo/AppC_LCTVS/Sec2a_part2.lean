@@ -19,6 +19,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
+import RiemannMasullo.ForMathlib.Topology.Algebra.GroupCompletion
 
 /-!
 # Topological tensor products
@@ -3572,7 +3573,10 @@ theorem projectiveTensorMap_isQuotientMap :
 onto its range with the subspace topology. -/
 theorem completedProjectiveTensorMap_isQuotientMap_range :
     IsQuotientMap (rangeFactorization (Completion.map
-      (projectiveTensorMap f.toLinearMap g.toLinearMap))) := by sorry
+      (projectiveTensorMap f.toLinearMap g.toLinearMap))) := by
+  exact isQuotientMap_rangeFactorization_completion_map
+    (projectiveTensorMap f.toLinearMap g.toLinearMap).toAddMonoidHom
+    (projectiveTensorMap_isQuotientMap f g hf hg)
 
 /-- Paper: Proposition C.2.3.7, p. 679. If both domains are metrizable, the
 completed projective tensor map is surjective. -/
