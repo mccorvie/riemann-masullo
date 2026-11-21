@@ -293,7 +293,33 @@ unitary homomorphism on the quotient. -/
 theorem modulatedCyclicCharacter_properties (j : J) :
     let u : G → Circle := fun x ↦ expValue[j, x]
     u 1 = 1 ∧ (∀ x y, u (x * y) = u x * u y) ∧ Continuous u ∧
-      (∀ x : (Γ), u x.val = 1) := by sorry
+      (∀ x : (Γ), u x.val = 1) := by
+  intro u
+  have hpos (x : G) : ((m x).val : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr (m x).ne_zero
+  have hL : L ≠ 0 := (Real.log_pos (by exact_mod_cast hγ)).ne'
+  have hone : u 1 = 1 := by simp [u]
+  have hmul (x y : G) : u (x * y) = u x * u y := by
+    simp only [u, map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul (hpos x) (hpos y), mul_add,
+      Circle.exp_add, mul_inv]
+    exact mul_mul_mul_comm _ _ _ _
+  have hcont : Continuous u := by
+    have hlog : Continuous fun x : G ↦ logModule x :=
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log hpos
+    exact (map_continuous (χ j.1)).inv.mul
+      (Circle.exp.continuous.comp (continuous_const.mul hlog))
+  have hgen : u γ = 1 := by
+    have harg : (t₀ j.1 - 2 * Real.pi * (j.2 : ℝ) / L) * L =
+        t₀ j.1 * L - 2 * Real.pi * (j.2 : ℝ) := by
+      rw [sub_mul, div_mul_cancel₀ _ hL]
+    change (χ j.1 γ)⁻¹ * Circle.exp ((t₀ j.1 - 2 * Real.pi * (j.2 : ℝ) / L) * L) = 1
+    rw [harg, Circle.exp_sub, (ht₀ j.1).2, Circle.exp_two_pi_mul_int, div_one, inv_mul_cancel]
+  refine ⟨hone, hmul, hcont, ?_⟩
+  rintro ⟨x, hx⟩
+  obtain ⟨k, rfl⟩ := Subgroup.mem_zpowers_iff.mp hx
+  let U : G →* Circle := { toFun := u, map_one' := hone, map_mul' := hmul }
+  have hU (y : G) : U y = u y := rfl
+  change u (γ ^ k) = 1
+  rw [← hU, map_zpow, hU, hgen, one_zpow]
 
 /-- Paper: Equation (4.4.2.4), p. 193. The lattice character is the inverse of
 the chosen lift multiplied by the indicated phase and integer frequency. -/

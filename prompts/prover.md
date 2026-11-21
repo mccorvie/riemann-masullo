@@ -20,7 +20,9 @@ where to find your issue, and how to hand in.
 ## Three acceptable results
 
 **Proved.** The `sorry` is gone and `#print axioms` on the declaration shows only `propext`,
-`Classical.choice` and `Quot.sound`.
+`Classical.choice` and `Quot.sound`. If it also shows `sorryAx` only because the statement or
+your proof uses other declarations whose proofs are still `sorry`, that is fine and still counts
+as proved: say so in the pull request. It is not a reason to report the issue as blocked.
 
 **Split.** If the proof is too large to finish, reduce it to a few intermediate lemmas, each
 stated precisely, each with a docstring, each proved by `sorry`, and prove the original

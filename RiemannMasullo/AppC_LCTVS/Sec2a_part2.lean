@@ -10,6 +10,7 @@ import Mathlib.Analysis.Normed.Module.HahnBanach
 import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.Convex.Gauge
 import Mathlib.Analysis.RCLike.Lemmas
+import Mathlib.LinearAlgebra.TensorProduct.Pi
 import Mathlib.Topology.Algebra.InfiniteSum.Real
 import Mathlib.Topology.Algebra.Module.Spaces.CompactConvergenceCLM
 import Mathlib.Topology.UniformSpace.Ascoli
@@ -2313,12 +2314,6 @@ variable {I J : Type*} (E : I → Type*) (F : J → Type*)
   [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
   [∀ j, PolynormableSpace ℂ (F j)] [∀ j, T2Space (F j)]
 
-/-- Paper: Lemma C.2.3.6(1), p. 678. The tensor products of coordinate projections identify
-the injective tensor product of finite products with the product of the pairwise tensors. -/
-theorem injectiveTensor_finiteProducts [Finite I] [Finite J] :
-    IsHomeomorph (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
-      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by sorry
-
 /-- Every functional in the polar of a product zero-neighborhood is determined by the
 same finite set of coordinates. -/
 private theorem product_polar_eq_sum_single {K : Type*} (X : K → Type*)
@@ -2421,6 +2416,31 @@ private theorem injectiveTensor_products_isUniformInducing :
   refine mem_of_superset ((Filter.biInter_finset_mem S).mpr fun UV _ ↦ htest UV) ?_
   exact fun z hz ↦ (S.sup p).mem_ball_zero.mpr
     (Seminorm.finset_sup_apply_lt hr fun UV hUV ↦ (mem_iInter₂.mp hz UV hUV : p UV z < r))
+
+/-- Paper: Lemma C.2.3.6(1), p. 678. The tensor products of coordinate projections identify
+the injective tensor product of finite products with the product of the pairwise tensors. -/
+theorem injectiveTensor_finiteProducts [Finite I] [Finite J] :
+    IsHomeomorph (fun (z : InjectiveTensor (∀ i, E i) (∀ j, F j)) (ij : I × J) ↦
+      injectiveTensorMap (LinearMap.proj ij.1) (LinearMap.proj ij.2) z) := by
+  classical
+  let : Fintype I := Fintype.ofFinite I
+  let : Fintype J := Fintype.ofFinite J
+  refine isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨(injectiveTensor_products_isUniformInducing E F).isInducing.isEmbedding, ?_⟩
+  let e := (TensorProduct.piLeft ℂ (∀ j, F j) E).trans
+    (LinearEquiv.piCongrRight fun i ↦ TensorProduct.piRight ℂ ℂ (E i) F)
+  have he : e.toLinearMap = LinearMap.pi (fun i ↦ LinearMap.pi fun j ↦
+      TensorProduct.map (LinearMap.proj i) (LinearMap.proj j)) := by
+    apply TensorProduct.ext'
+    intro x y
+    funext i j
+    simp [e]
+  intro w
+  let w' (i : I) (j : J) : E i ⊗[ℂ] F j := w (i, j)
+  refine ⟨e.symm w', funext fun ij ↦ ?_⟩
+  have h := DFunLike.congr_fun he (e.symm w')
+  rw [LinearEquiv.coe_toLinearMap, e.apply_symm_apply] at h
+  exact (congrFun (congrFun h ij.1) ij.2).symm
 
 omit [∀ i, PolynormableSpace ℂ (E i)] [∀ i, T2Space (E i)]
   [∀ j, PolynormableSpace ℂ (F j)] [∀ j, T2Space (F j)] in
@@ -2973,7 +2993,17 @@ theorem projectiveTensor_assoc {G : Type*} [AddCommGroup G] [Module ℂ G] [Topo
 
 /-- Paper: §C.2.3.2, p. 679. The projective tensor product of Hausdorff factors is Hausdorff. -/
 @[instance]
-theorem projectiveTensor_t2 : T2Space (ProjectiveTensor E F) := by sorry
+theorem projectiveTensor_t2 : T2Space (ProjectiveTensor E F) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let : SeparatingDual ℂ F := polynormableSpace_separatingDual ℂ F
+  let eval : ProjectiveTensor E F → (StrongDual ℂ E × StrongDual ℂ F → ℂ) :=
+    fun z v ↦ tensorDualForm v.1 v.2 z
+  refine T2Space.of_injective_continuous (f := eval)
+    (fun _ _ h ↦ tensorDualForm_ext fun φ ψ ↦ congrFun h (φ, ψ)) ?_
+  refine continuous_pi fun v ↦ (continuous_projectiveTensor_iff
+    (tensorDualForm v.1 v.2 : ProjectiveTensor E F →ₗ[ℂ] ℂ)).2 ?_
+  exact ((v.1.continuous.comp continuous_fst).mul (v.2.continuous.comp continuous_snd)).congr
+    fun xy ↦ (tensorDualForm_tmul v.1 v.2 xy.1 xy.2).symm
 
 -- TODO(paper-gap): The claimed projective analogue of Lemma C.2.3.5 on p. 679 fails
 -- for embeddings. Even finite-dimensional isometric inclusions can lose isometry.
@@ -3248,12 +3278,72 @@ theorem completedProjectiveTensor_exists_series (hE : IsFrechetTVS E) (hF : IsFr
   · simp only [Function.comp_def, cn, xy, he.extend_apply]
     exact htotal
 
+-- Fréchet completeness of the factors is not used: the completion is already complete.
+set_option linter.unusedVariables false in
 /-- Paper: (C.2.3.16), p. 679. Conversely, every series of the displayed form converges.
 Deviation: The sequences are reindexed from zero. -/
 theorem completedProjectiveTensor_summable_series (hE : IsFrechetTVS E) (hF : IsFrechetTVS F)
     (c : ℕ → ℂ) (x : ℕ → E) (y : ℕ → F) (hc : Summable (fun n ↦ ‖c n‖))
     (hx : Tendsto x atTop (𝓝 0)) (hy : Tendsto y atTop (𝓝 0)) :
-    Summable (fun n ↦ (Completion.coe' (α := ProjectiveTensor E F) (c n • (x n ⊗ₜ[ℂ] y n)))) := by sorry
+    Summable (fun n ↦ (Completion.coe' (α := ProjectiveTensor E F) (c n • (x n ⊗ₜ[ℂ] y n)))) := by
+  let P := ProjectiveTensor E F
+  have : UniformContinuousConstSMul ℂ P :=
+    uniformContinuousConstSMul_of_continuousConstSMul ℂ P
+  have : PolynormableSpace ℂ (Completion P) := polynormableSpace_completion
+  let tmul : E × F → P := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  let z (n : ℕ) : Completion P := Completion.coe' (c n • tmul (x n, y n))
+  change Summable z
+  -- Joint continuity of pure tensors at zero makes `xₙ ⊗ yₙ` a null sequence.
+  have htmul : Tendsto (fun n ↦ tmul (x n, y n)) atTop (𝓝 (0 : P)) := by
+    have h :=
+      ((continuousAt_projectiveTensor_tmul_zero E F).tendsto.comp (hx.prodMk_nhds hy))
+    have h0 : ((0 : E × F).1 ⊗ₜ[ℂ] (0 : E × F).2 : P) = 0 := by
+      simp [Prod.fst_zero, Prod.snd_zero, TensorProduct.zero_tmul]
+    rw [h0] at h
+    exact h.congr fun _ ↦ rfl
+  rw [summable_iff_vanishing]
+  intro U hU
+  obtain ⟨q, hq, hqU⟩ :=
+    (PolynormableSpace.hasBasis_zero_ball ℂ (Completion P)).mem_iff.mp hU
+  have hcoe : Tendsto (fun n ↦ (tmul (x n, y n) : Completion P)) atTop (𝓝 0) := by
+    have h := ((Completion.continuous_coe (α := P)).tendsto (0 : P)).comp htmul
+    simp only [Completion.coe_zero] at h
+    exact h.congr fun _ ↦ rfl
+  have hb : Tendsto (fun n ↦ q (tmul (x n, y n) : Completion P)) atTop (𝓝 0) := by
+    have h := (hq.tendsto (0 : Completion P)).comp hcoe
+    simp only [map_zero q] at h
+    exact h.congr fun _ ↦ rfl
+  obtain ⟨M, hMpos, hM⟩ := (Metric.isBounded_range_of_tendsto _ hb).exists_pos_norm_le
+  have hbound (n : ℕ) : q (tmul (x n, y n) : Completion P) ≤ M := by
+    have hle := hM _ (mem_range_self n)
+    rwa [Real.norm_of_nonneg (apply_nonneg q _)] at hle
+  have hqz (n : ℕ) : q (z n) ≤ M * ‖c n‖ := by
+    have hsmul : (z n) = c n • (tmul (x n, y n) : Completion P) := by
+      simp [z]
+    rw [hsmul, map_smul_eq_mul, mul_comm M]
+    exact mul_le_mul_of_nonneg_left (hbound n) (norm_nonneg (c n))
+  have htri (t : Finset ℕ) : q (∑ n ∈ t, z n) ≤ ∑ n ∈ t, q (z n) := by
+    induction t using Finset.cons_induction with
+    | empty => simp [map_zero]
+    | cons a s ha ih =>
+      rw [Finset.sum_cons ha, Finset.sum_cons ha]
+      exact (map_add_le_add q _ _).trans (add_le_add le_rfl ih)
+  obtain ⟨s, hs⟩ := summable_iff_vanishing.mp hc (Metric.ball (0 : ℝ) (1 / M))
+    (Metric.ball_mem_nhds 0 (one_div_pos.mpr hMpos))
+  refine ⟨s, fun t ht ↦ ?_⟩
+  have htail : ∑ n ∈ t, ‖c n‖ < 1 / M := by
+    have hmem := hs t ht
+    rw [Metric.mem_ball, dist_zero_right,
+      Real.norm_of_nonneg (Finset.sum_nonneg fun n _ ↦ norm_nonneg _)] at hmem
+    exact hmem
+  have hlt : q (∑ n ∈ t, z n) < 1 :=
+    calc
+      q (∑ n ∈ t, z n) ≤ ∑ n ∈ t, q (z n) := htri t
+      _ ≤ ∑ n ∈ t, M * ‖c n‖ := Finset.sum_le_sum fun n _ ↦ hqz n
+      _ = M * ∑ n ∈ t, ‖c n‖ := by rw [← Finset.mul_sum]
+      _ < M * (1 / M) := mul_lt_mul_of_pos_left htail hMpos
+      _ = 1 := mul_one_div_cancel hMpos.ne'
+  exact hqU (q.mem_ball_zero.mpr hlt)
 
 end Projective
 

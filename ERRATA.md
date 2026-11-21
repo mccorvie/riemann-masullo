@@ -155,14 +155,21 @@ formula.
 
 ## Reported from reading, beyond what has been formalized
 
-The scouts who surveyed existing Lean also read ahead in the paper. These two reports concern
-parts that are not stated in Lean yet, so nothing here has been tested by the formalization.
+The scouts who surveyed existing Lean, and outside readers, also read ahead in the paper. These
+reports concern parts that are not stated in Lean yet, so nothing here has been tested by the
+formalization. "Reported" means that nobody in the project has checked it.
 
 | # | Where | Report | Source | Checked |
 |---|---|---|---|---|
 | R1 | Proposition 8.2.0.4(1),(2), p. 386 | Uniqueness modulo the embedded local unit group is reported to fail for the full idele group as printed: for the adele that is zero at a finite place v and one elsewhere, both the identity and the idele with a uniformizer at v fix it. The proof itself computes the stabilizer in the full group as the whole local multiplicative group. Restricting to norm one is a candidate correction; Theorem 8.3.0.1(1) cites the proposition. | [`survey/geometry.md`](RiemannMasullo/External/survey/geometry.md) | scout, against the page image |
 | R2 | §1.4.3, p. 29, and §1.8.4.3, p. 54 | The bound on the archimedean terms, claimed to be uniform in the cutoff and used for a Montel extraction, is reported to fail for the printed family of test functions, already for ζ: with nonnegative approximants tending to t⁻² on t > 1, Fatou's lemma makes the archimedean contribution diverge as the cutoff neighbourhood of 1 shrinks. The report says this concerns the passage to the limit in the introduction's sketch and leaves the trace identity itself undecided. A sign discrepancy in the prime sum on p. 29 is also reported. | [`survey/endgame.md`](RiemannMasullo/External/survey/endgame.md) | scout, against the page images |
 | R3 | Chapter 11 and §12.4–12.5, pp. 475–520 (Theorem 12.5.1.1) | An outside audit of the argument, done with an AI model and not checked by a number theorist, reports that the step restricting the spectral side to zeros in a window (p. 520) is unsupported, and lists further objections with computations in small cases. A companion calculation at the prime 2 (p. 514, (12.4.1.23)) reports that removing the norm cutoff and the Fourier cutoff in the two orders gives different values. Neither has been checked here; these chapters are not yet formalized. | issue #2469, pull request #2734 | reported |
+| R4 | Theorem 12.5.1.1, pp. 519–520, and Theorem B.4.4.7, pp. 623–625 | The two sides are reported to differ by the factor μ̄₁(C_F¹): the right side integrates against the Tamagawa measure while the left uses the canonical local measures, and the proof quotes Theorem 12.4.1.1 without its factor 1/μ̄_{S,1}(J¹_{F,S}). Numerically the ratio is π/4 for ℚ(i) and π/(3√3) for ℚ(√−3), and 1 for ℚ. With the factor divided out the identity is Weil's explicit formula. The interval I is also not quantified, and the identity is reported to fail for the degenerate strip α = 0. | issue #587 | reported |
+| R5 | Theorem 10.3.1.1, (10.3.1.18), p. 451 | The constant C, claimed independent of the zero, cannot exist: for ζ the functionals attached to two simple zeros 1/2 + it, 1/2 + iu are at distance tending to 0 with \|t − u\|, and zeros come arbitrarily close (a positive proportion are simple, and there are ≫ T log T of them), so the biorthogonal vectors are unbounded. The nuclearity argument of pp. 451–455 needs an estimate that allows close ordinates. | issue #1169 | reported |
+| R6 | Theorem 11.1.2.1(2), (11.1.2.6), p. 480 | The strict inclusion of cutoff spaces is reported to fail for one prime over ℚ: with S_i = ∅, S_i′ = {p} and the trivial character, a telescoping sum shows the two closed cutoff spaces are equal for every Λ > 1. The step on p. 482 uses strong convergence of the cutoffs on inputs that depend on the cutoff. | issue #1170 | reported |
+| R7 | Lemma 5.3.1.1, p. 240 | On the full local Schwartz–Bruhat space the operator f(x) − f(π⁻¹x) depends on the uniformizer and its range is smaller than ker δ₀: on ℚ₃ with f the indicator of 1 + 3ℤ₃, the uniformizers 3 and −3 give different values at 3, and f lies in ker δ₀ but outside the range. Both claims hold on the unit-invariant subspace, which is all that Definition 5.3.1.2 uses. To be taken into account when §5.3 is stated. | issue #1177 | reported |
+| R8 | Proposition 12.2.2.2(4), pp. 508–512 | Equivalence of regularity of the kernel upstairs and downstairs at each pair is reported to fail: a rank-one quotient kernel on ℤ × ℝ³, regular everywhere on its diagonal, has an indented lift whose neighbourhood averages diverge at a diagonal point. Related to I46. | issue #2047 | reported |
+| R9 | §12.4.1, Step II, pp. 516–517 | The norm cutoff m(\|x\| \|y\|_p) is used as a multiplier on the additive Schwartz–Bruhat space, but it does not preserve it: already for one real and one finite place, e^{−x²} 1_{ℤ_p}(y) times the cutoff has no common open period at p. | issue #2109 | reported |
 
 ## Errors of the formalization, not of the paper
 
@@ -178,6 +185,7 @@ say something other than what was meant.
 | The Z-space quotient maps of §5.1 | Written with the range subtype as codomain, they used the subspace topology, not the transported one. | review of #2258 |
 | The eigendistribution weight and complex Gaussian of §3.4 | Inverse weight relative to the action on `main`; a Gaussian whose zeta integral vanishes. | review of #2289 |
 | The standard additive character | Followed the paper's signs; see F13. | statement audit |
+| The approximation property (Lemma C.2.4.15, §C.3.4): `hilbert_approximationProperty`, the hypothesis of `nuclearTrace`, `dense_finiteRank_iff_forall_targets` | A type ascription to the precompact-convergence synonym did not change the codomain Lean inferred, so density was for bounded convergence (the operator norm): false for ℓ², and too strong as a hypothesis. Repair tracked in #3146. | provers, #561, #567 and #429 |
 
 ## How this file is kept
 

@@ -28,6 +28,7 @@ import Mathlib.Topology.Algebra.Module.Spaces.WeakDual
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Montel
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
@@ -1879,11 +1880,6 @@ theorem mem_finitePlaceSchwartz_iff (w : Places(F)) (f : w.adicCompletion F → 
 -- does not characterize the finest locally convex topology. The weak topology
 -- also makes all those functionals continuous.
 
-/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
-complex dimension. -/
-theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
-    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by sorry
-
 /-- Paper: §2.1.2.2, p. 63. Each elementary Schwartz stage of the additive finite completion
 is finite-dimensional because its structural quotient is compact and discrete. -/
 private theorem finitePlace_bruhatStage_finiteDimensional (w : Places(F))
@@ -2010,6 +2006,15 @@ private theorem finitePlaceSchwartz_countableSpanningSet (w : Places(F)) :
   exact Submodule.sum_mem _ fun a _ ↦ Submodule.smul_mem _ _
     (Submodule.subset_span (mem_range_self (U a)))
 
+/-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space has countable
+complex dimension. -/
+theorem finitePlaceSchwartz_countableRank (w : Places(F)) :
+    Module.rank ℂ ℬ(w.adicCompletion F) ≤ ℵ₀ := by
+  change Module.rank ℂ ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F))) ≤ ℵ₀
+  obtain ⟨s, hs, hspan⟩ := finitePlaceSchwartz_countableSpanningSet F w
+  rw [← rank_top ℂ _, ← hspan]
+  exact (rank_span_le s).trans (Cardinal.mk_le_aleph0_iff.mpr hs.to_subtype)
+
 /-- Finite spans of a countable generating set give a strict LF presentation
 for the finest locally convex topology. -/
 private theorem finestLocallyConvex_strictLF_of_countable_span
@@ -2087,14 +2092,144 @@ theorem finitePlaceSchwartz_complete (w : Places(F)) :
     CompleteSpace ℬ(w.adicCompletion F) :=
   completeSpace_of_strictLF (finitePlaceSchwartz_strictLF F w)
 
+open scoped NNReal in
+/-- A countable spanning set gives a rank-one expansion with geometrically
+bounded coefficients for the finest locally convex topology. -/
+private theorem finestLocallyConvex_nuclear_of_countable_span
+    (E : Type u) [AddCommGroup E] [Module ℂ E]
+    {s : Set E} (hs : s.Countable) (hspan : Submodule.span ℂ s = ⊤) :
+    IsNuclearTVS.{v} (FinestLocallyConvex E) := by
+  classical
+  let W := FinestLocallyConvex E
+  let : T2Space W := finestLocallyConvex_t2 E
+  obtain ⟨t, hts, htspan, htindep⟩ := exists_linearIndependent ℂ s
+  let b : Module.Basis t ℂ W := Module.Basis.mk htindep (by
+    change (⊤ : Submodule ℂ E) ≤ Submodule.span ℂ (range ((↑) : t → E))
+    rw [Subtype.range_coe, htspan, hspan])
+  let : Encodable t := (hs.mono hts).toEncodable
+  let e : t → ℕ := Encodable.encode
+  have he : Injective e := Encodable.encode_injective
+  apply nuclear_of_rankOne_series
+  intro q _
+  let d (n : ℕ) : ℝ := (1 / 2) ^ n
+  have hd (n : ℕ) : 0 < d n := by dsimp [d]; positivity
+  -- Rescale each basis vector to lie in the unit ball of q.
+  let a (i : t) : ℝ := 1 + q (b i)
+  have ha (i : t) : 0 < a i := by dsimp [a]; positivity
+  let c (i : t) : ℝ≥0 := ⟨a i / d (e i), div_nonneg (ha i).le (hd _).le⟩
+  let pᵢ (i : t) : Seminorm ℂ ℂ := c i • normSeminorm ℂ ℂ
+  let coords := (b.repr.trans (finsuppLEquivDirectSum ℂ ℂ t)).toLinearMap
+  let p : Seminorm ℂ W := (directSumSeminorm pᵢ).comp coords
+  let φ₀ (i : t) : W →ₗ[ℂ] ℂ := (a i : ℂ) • b.coord i
+  let z₀ (i : t) : W := (a i : ℂ)⁻¹ • b i
+  let φ := e.extend φ₀ (fun _ ↦ 0)
+  let z := e.extend z₀ (fun _ ↦ 0)
+  refine ⟨p, φ, z, d, 1, (finestLocallyConvex_withSeminorms E).continuous_seminorm p,
+    zero_le_one, summable_geometric_two, fun n ↦ (hd n).le, ?_, ?_, ?_⟩
+  · intro n x
+    by_cases hn : n ∈ range e
+    · obtain ⟨i, rfl⟩ := hn
+      have hcoord : (a i / d (e i)) * ‖b.repr x i‖ ≤ p x := by
+        have h := sum_le_directSumSeminorm pᵢ (coords x) {i}
+        rw [Finset.sum_singleton] at h
+        exact h
+      rw [show φ (e i) = φ₀ i from he.extend_apply _ _ _]
+      change ‖(a i : ℂ) * b.repr x i‖ ≤ d (e i) * p x
+      rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (ha i).le]
+      rw [div_mul_eq_mul_div₀] at hcoord
+      simpa only [mul_comm (d (e i)) (p x)] using (div_le_iff₀ (hd _)).mp hcoord
+    · rw [show φ n = 0 from extend_apply' _ _ _ hn, LinearMap.zero_apply, norm_zero]
+      exact mul_nonneg (hd n).le (apply_nonneg p x)
+  · intro n
+    by_cases hn : n ∈ range e
+    · obtain ⟨i, rfl⟩ := hn
+      rw [show z (e i) = z₀ i from he.extend_apply _ _ _]
+      dsimp only [z₀]
+      rw [map_smul_eq_mul, norm_inv, Complex.norm_real, Real.norm_of_nonneg (ha i).le,
+        ← div_eq_inv_mul, div_le_one (ha i)]
+      exact le_add_of_nonneg_left zero_le_one
+    · rw [show z n = 0 from extend_apply' _ _ _ hn, map_zero]
+      exact zero_le_one
+  · intro x
+    apply (he.hasSum_iff (f := fun n ↦ φ n x • z n) (fun n hn ↦ ?_)).mp
+    · have hterm (i : t) : φ (e i) x • z (e i) = b.repr x i • b i := by
+        rw [show φ (e i) = φ₀ i from he.extend_apply _ _ _,
+          show z (e i) = z₀ i from he.extend_apply _ _ _]
+        change ((a i : ℂ) * b.repr x i) • ((a i : ℂ)⁻¹ • b i) = _
+        rw [smul_smul, mul_comm (a i : ℂ), mul_assoc,
+          mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr (ha i).ne'), mul_one]
+      change HasSum (fun i : t ↦ φ (e i) x • z (e i)) x
+      simp_rw [hterm]
+      have hsum := hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional t)
+        (s := (b.repr x).support)
+        (f := fun i ↦ b.repr x i • b i)
+        (fun i hi ↦ by rw [Finsupp.notMem_support_iff.mp hi, zero_smul])
+      change HasSum _ ((b.repr x).sum fun i c ↦ c • b i) at hsum
+      simpa only [← Finsupp.linearCombination_apply, b.linearCombination_repr] using hsum
+    · rw [show φ n = 0 from extend_apply' _ _ _ hn, LinearMap.zero_apply, zero_smul]
+
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Hausdorff
 locally convex and nuclear. -/
 theorem finitePlaceSchwartz_nuclear (w : Places(F)) :
-    IsNuclearTVS.{v} ℬ(w.adicCompletion F) := by sorry
+    IsNuclearTVS.{v} ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  change @IsNuclearTVS.{v} E _ _ tS
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  rw [htop]
+  obtain ⟨s, hs, hspan⟩ := finitePlaceSchwartz_countableSpanningSet F w
+  exact finestLocallyConvex_nuclear_of_countable_span E hs hspan
+
+section FinestMontel
+
+open scoped Pointwise
+
+/-- Every seminorm is continuous in the finest locally convex topology, so that topology is
+barrelled. -/
+private theorem finestLocallyConvex_barrelled (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    BarrelledSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun p _ ↦ ?_⟩
+  exact (finestLocallyConvex_withSeminorms E).continuous_seminorm p
+
+/-- Closed von Neumann bounded sets are compact in the finest locally convex topology: each is
+closed and absorbed by a compact neighborhood inside a finite-dimensional subspace. -/
+private theorem finestLocallyConvex_montel (E : Type*) [AddCommGroup E] [Module ℂ E] :
+    MontelSpace ℂ (FinestLocallyConvex E) := by
+  refine ⟨fun s hs hbd ↦ ?_⟩
+  obtain ⟨S, hfin, hsub, hbdS⟩ := (finestLocallyConvex_isVonNBounded_iff (E := E) s).mp hbd
+  have : FiniteDimensional ℂ S := hfin
+  have : LocallyCompactSpace S := LocallyCompactSpace.of_finiteDimensional_of_complete ℂ S
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds (0 : S)
+  let pre : Set S := Subtype.val ⁻¹' s
+  have habs : Absorbs ℂ K pre := hbdS hKnhds
+  obtain ⟨a, ha⟩ := habs.exists
+  have hpre : IsCompact pre :=
+    (hK.smul a).of_isClosed_subset (hs.preimage continuous_subtype_val) ha
+  have himage : Subtype.val '' pre = s := by
+    unfold pre
+    apply image_preimage_eq_of_subset
+    rw [Subtype.range_val]
+    exact hsub
+  rw [← himage]
+  exact hpre.image continuous_subtype_val
+
+end FinestMontel
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is Montel. -/
 theorem finitePlaceSchwartz_montel (w : Places(F)) :
-    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by sorry
+    BarrelledSpace ℂ ℬ(w.adicCompletion F) ∧ MontelSpace ℂ ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  refine ⟨?_, ?_⟩
+  · change @BarrelledSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @BarrelledSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_barrelled E)
+  · change @MontelSpace ℂ E _ _ _ tS
+    exact Eq.mpr (congrArg (fun t ↦ @MontelSpace ℂ E _ _ _ t) htop)
+      (finestLocallyConvex_montel E)
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local strong dual is Fréchet. -/
 theorem finitePlaceSchwartz_strongDual_frechet (w : Places(F)) :

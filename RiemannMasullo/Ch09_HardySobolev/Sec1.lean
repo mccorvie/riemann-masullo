@@ -8,6 +8,7 @@ import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Lp
 import Mathlib.MeasureTheory.Integral.Prod
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.Bochner.Regular
 
 /-!
@@ -1119,12 +1120,108 @@ theorem modulatedSobolev_fourierDeriv_topology (_hm : IsModulation m)
 -- TODO(paper-gap): In Remark 9.1.2.3 the ordinary derivatives are on the Fourier side.
 -- The stated generalization to all locally compact abelian groups also needs a weight.
 
+/-- The Japanese bracket `(1 + |x|²)^(-s/2)` is Lebesgue integrable on the real line
+exactly when `s > 1`. -/
+private theorem integrable_one_add_sq_rpow_iff {s : ℝ} (hs : 0 ≤ s) :
+    Integrable (fun x : ℝ ↦ (1 + |x| ^ 2) ^ (-s / 2)) ↔ 1 < s := by
+  constructor
+  · intro h
+    have hI : IntegrableOn (fun x : ℝ ↦ x ^ (-s)) (Ioi 1) := by
+      refine (h.integrableOn.const_mul ((2 : ℝ) ^ (s / 2))).mono' ?_ ?_
+      · exact (continuousOn_id.rpow_const fun x hx ↦
+          Or.inl (zero_lt_one.trans hx).ne').aestronglyMeasurable measurableSet_Ioi
+      · refine (ae_restrict_mem measurableSet_Ioi).mono fun x (hx : 1 < x) ↦ ?_
+        have hx0 : 0 < x := zero_lt_one.trans hx
+        rw [Real.norm_eq_abs, abs_of_pos (Real.rpow_pos_of_pos hx0 _)]
+        have hle : 1 + |x| ^ 2 ≤ 2 * x ^ 2 := by
+          rw [abs_of_pos hx0]; nlinarith
+        have h1 : (2 * x ^ 2) ^ (-s / 2) ≤ (1 + |x| ^ 2) ^ (-s / 2) :=
+          Real.rpow_le_rpow_of_nonpos (by positivity) hle (by linarith)
+        have h2 : (2 * x ^ 2) ^ (-s / 2) = (2 : ℝ) ^ (-s / 2) * x ^ (-s) := by
+          rw [Real.mul_rpow (by norm_num) (by positivity), ← Real.rpow_natCast,
+            ← Real.rpow_mul hx0.le]
+          congr 2; ring
+        have h3 : (2 : ℝ) ^ (s / 2) * (2 : ℝ) ^ (-s / 2) = 1 := by
+          rw [← Real.rpow_add (by norm_num)]; ring_nf; exact Real.rpow_zero 2
+        calc x ^ (-s) = (2 : ℝ) ^ (s / 2) * ((2 : ℝ) ^ (-s / 2) * x ^ (-s)) := by
+              rw [← mul_assoc, h3, one_mul]
+          _ ≤ (2 : ℝ) ^ (s / 2) * (1 + |x| ^ 2) ^ (-s / 2) := by
+              rw [← h2]; gcongr
+    have := (integrableOn_Ioi_rpow_iff zero_lt_one).mp hI
+    linarith
+  · intro h
+    have := integrable_rpow_neg_one_add_norm_sq (E := ℝ) (μ := volume)
+      (r := s) (by simpa using h)
+    simpa [Real.norm_eq_abs] using this
+
+/-- In logarithmic coordinates, `(1 + |log t|²)^(-s/2)` is integrable for `dt/t` on the
+positive reals exactly when `s > 1`. -/
+private theorem integrable_positiveRealHaar_logBracket_iff {s : ℝ} (hs : 0 ≤ s) :
+    Integrable (fun t : ℝ≥0ˣ ↦ (1 + |Real.log ((t.val : ℝ≥0) : ℝ)| ^ 2) ^ (-s / 2))
+      positiveRealHaar ↔ 1 < s := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have hne (t : ℝ≥0ˣ) : ((t.val : ℝ≥0) : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr t.ne_zero
+  have hFc : Continuous fun t : ℝ≥0ˣ ↦ (1 + |Real.log ((t.val : ℝ≥0) : ℝ)| ^ 2) ^ (-s / 2) :=
+    ((((NNReal.continuous_coe.comp Units.continuous_val).log hne).abs.pow 2).const_add
+      1).rpow_const fun t ↦ Or.inl (add_pos_of_pos_of_nonneg one_pos (sq_nonneg _)).ne'
+  have hE : Continuous fun x : ℝ ↦ Units.mk0 (Real.exp x).toNNReal
+      (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x))) := by
+    rw [Units.continuous_iff]
+    refine ⟨continuous_real_toNNReal.comp Real.continuous_exp, ?_⟩
+    simp only [Units.val_inv_eq_inv_val, Units.val_mk0]
+    exact (continuous_real_toNNReal.comp Real.continuous_exp).inv₀ fun x ↦
+      Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x))
+  unfold positiveRealHaar
+  rw [integrable_map_measure hFc.aestronglyMeasurable hE.aemeasurable]
+  convert integrable_one_add_sq_rpow_iff hs using 3 with x
+  simp [Real.coe_toNNReal _ (Real.exp_pos x).le]
+
 /-- Paper: Lemma 9.1.2.4, p. 402. The reciprocal logarithmic Sobolev
 density is integrable exactly above degree one. -/
 theorem modulatedSobolev_reciprocal_integrable_iff (_hm : IsModulation m)
     (_hsurj : Function.Surjective m) {s : ℝ} (_hs : 0 ≤ s) :
-    Integrable (fun x ↦ (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2)) μ ↔ 1 < s :=
-  by sorry
+    Integrable (fun x ↦ (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2)) μ ↔ 1 < s := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  set f : G → ℝ := fun x ↦ (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2)
+  set F : ℝ≥0ˣ → ℝ := fun t ↦ (1 + |Real.log ((t.val : ℝ≥0) : ℝ)| ^ 2) ^ (-s / 2)
+  have hne (t : ℝ≥0ˣ) : ((t.val : ℝ≥0) : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr t.ne_zero
+  have hFc : Continuous F :=
+    ((((NNReal.continuous_coe.comp Units.continuous_val).log hne).abs.pow 2).const_add
+      1).rpow_const fun t ↦ Or.inl (add_pos_of_pos_of_nonneg one_pos (sq_nonneg _)).ne'
+  have hfc : Continuous f := hFc.comp m.continuous
+  obtain ⟨τ', hτ'⟩ := _hm.exists_section
+  let r : ℝ≥0ˣ →ₜ* m.toMonoidHom.range :=
+    ⟨(MonoidHom.id ℝ≥0ˣ).codRestrict _ fun t ↦ _hsurj t, continuous_id.subtype_mk _⟩
+  let τ : ℝ≥0ˣ →ₜ* G := τ'.comp r
+  have hτ : Function.RightInverse τ m := fun t ↦ hτ' (r t)
+  have : CompactSpace m.toMonoidHom.ker := isCompact_iff_compactSpace.mp _hm.isCompact_ker
+  let μ₁ : Measure m.toMonoidHom.ker := Measure.haarMeasure ⊤
+  have hμ₁ : μ₁ univ = 1 := Measure.haarMeasure_self
+  have hcan := canonicalModulatedHaar_eq_map_prod m _hm τ hτ μ₁ hμ₁
+  have hνH : (canonicalModulatedHaar m _hm).IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m _hm).exists).1
+  have h1 : Integrable f μ ↔ Integrable f (canonicalModulatedHaar m _hm) := by
+    constructor
+    · intro h; rw [Measure.isMulLeftInvariant_eq_smul (canonicalModulatedHaar m _hm) μ]
+      exact h.smul_measure_nnreal
+    · intro h; rw [Measure.isMulLeftInvariant_eq_smul μ (canonicalModulatedHaar m _hm)]
+      exact h.smul_measure_nnreal
+  have hφ : Continuous fun z : m.toMonoidHom.ker × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2 := by fun_prop
+  have h2 : Integrable f (canonicalModulatedHaar m _hm) ↔
+      Integrable (F ∘ Prod.snd) (μ₁.prod positiveRealHaar) := by
+    rw [hcan, integrable_map_measure hfc.aestronglyMeasurable hφ.aemeasurable]
+    congr! 1
+    funext z
+    have hk : m (z.1 : G) = 1 := z.1.property
+    simp only [Function.comp_apply, f, F, map_mul, hk, one_mul, hτ z.2]
+  have h3 : Integrable (F ∘ Prod.snd) (μ₁.prod positiveRealHaar) ↔
+      Integrable F positiveRealHaar := by
+    rw [← integrable_map_measure hFc.aestronglyMeasurable measurable_snd.aemeasurable,
+      Measure.map_snd_prod, hμ₁, one_smul]
+  rw [h1, h2, h3]
+  exact integrable_positiveRealHaar_logBracket_iff _hs
 
 /-- Paper: Proposition 9.1.2.5, p. 402. The unweighted product pairing on the group
 identifies the strong dual isometrically with the space of opposite degree. -/
@@ -1172,7 +1269,109 @@ theorem modulatedSobolev_toL1 (_hm : IsModulation m) (_hsurj : Function.Surjecti
     ∃ (J : ModulatedSobolev m μ s →L[ℂ] Lp ℂ 1 μ) (C : ℝ),
       Function.Injective J ∧ 0 < C ∧ ‖J‖ ≤ C ∧
       ∀ f : ModulatedSobolev m μ s,
-        Integrable (f : G → ℂ) μ ∧ (J f : G → ℂ) =ᵐ[μ] (f : G → ℂ) := by sorry
+        Integrable (f : G → ℂ) μ ∧ (J f : G → ℂ) =ᵐ[μ] (f : G → ℂ) := by
+  -- `P x = 1 + |log |x||²`; the Sobolev measure has density `P^(s/2)`.
+  have hne (x : G) : (((m x).val : ℝ≥0) : ℝ) ≠ 0 := NNReal.coe_ne_zero.mpr (m x).ne_zero
+  have hL : Continuous fun x ↦ Real.log ((m x).val : ℝ) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log hne
+  have hPpos (x : G) : 0 < 1 + |Real.log ((m x).val : ℝ)| ^ 2 :=
+    add_pos_of_pos_of_nonneg one_pos (sq_nonneg _)
+  have hP : Continuous fun x ↦ 1 + |Real.log ((m x).val : ℝ)| ^ 2 :=
+    continuous_const.add (hL.abs.pow 2)
+  have hρ : Continuous fun x ↦ (1 + (modulatedSobolevWeight m x : ℝ) ^ 2) ^ (s / 2) :=
+    hP.rpow_const fun x ↦ Or.inl (hPpos x).ne'
+  have hac₁ : sobolevMeasure μ (modulatedSobolevWeight m) s ≪ μ :=
+    withDensity_absolutelyContinuous _ _
+  have hac₂ : μ ≪ sobolevMeasure μ (modulatedSobolevWeight m) s :=
+    withDensity_absolutelyContinuous' (ENNReal.continuous_ofReal.comp hρ).aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (Real.rpow_pos_of_pos (hPpos x) _)).ne')
+  set I := ∫ x, (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2) ∂μ
+  have hI : Integrable (fun x ↦ (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2)) μ :=
+    (modulatedSobolev_reciprocal_integrable_iff m μ _hm _hsurj (by linarith)).mpr _hs
+  -- Cauchy–Schwarz against the weight, as in the paper.
+  have key (f : ModulatedSobolev m μ s) :
+      Integrable (f : G → ℂ) μ ∧
+        ∫ x, ‖(f : G → ℂ) x‖ ∂μ ≤ Real.sqrt I * ‖f‖ := by
+    obtain ⟨hfi, hfn⟩ := modulatedSobolev_norm m μ s f
+    have hfm : AEStronglyMeasurable (f : G → ℂ) μ := (Lp.aestronglyMeasurable f).mono_ac hac₂
+    set a : G → ℝ := fun x ↦
+      ‖(f : G → ℂ) x‖ * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 4)
+    set b : G → ℝ := fun x ↦ (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 4)
+    have hab (x : G) : a x * b x = ‖(f : G → ℂ) x‖ := by
+      simp only [a, b]
+      rw [mul_assoc, ← Real.rpow_add (hPpos x), show s / 4 + -s / 4 = 0 by ring,
+        Real.rpow_zero, mul_one]
+    have ha2 (x : G) : a x ^ 2 =
+        ‖(f : G → ℂ) x‖ ^ 2 * (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2) := by
+      simp only [a]
+      rw [mul_pow]
+      congr 1
+      rw [← Real.rpow_natCast _ 2, ← Real.rpow_mul (hPpos x).le]
+      norm_num; ring_nf
+    have hb2 (x : G) : b x ^ 2 = (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (-s / 2) := by
+      simp only [b]
+      rw [← Real.rpow_natCast _ 2, ← Real.rpow_mul (hPpos x).le]
+      norm_num; ring_nf
+    have hbc : Continuous b := hP.rpow_const fun x ↦ Or.inl (hPpos x).ne'
+    have ham : MemLp a 2 μ :=
+      (memLp_two_iff_integrable_sq (hfm.norm.mul
+        (hP.rpow_const fun x ↦ Or.inl (hPpos x).ne').aestronglyMeasurable)).mpr
+        (hfi.congr (ae_of_all _ fun x ↦ (ha2 x).symm))
+    have hbm : MemLp b 2 μ :=
+      (memLp_two_iff_integrable_sq hbc.aestronglyMeasurable).mpr
+        (hI.congr (ae_of_all _ fun x ↦ (hb2 x).symm))
+    have hint : Integrable (fun x ↦ ‖(f : G → ℂ) x‖) μ :=
+      (ham.integrable_mul hbm).congr (ae_of_all _ hab)
+    refine ⟨(integrable_norm_iff hfm).mp hint, ?_⟩
+    have hH := integral_mul_le_Lp_mul_Lq_of_nonneg Real.HolderConjugate.two_two
+      (ae_of_all _ fun x ↦ mul_nonneg (norm_nonneg _) (Real.rpow_nonneg (hPpos x).le _))
+      (ae_of_all _ fun x ↦ Real.rpow_nonneg (hPpos x).le _)
+      (by rw [ENNReal.ofReal_ofNat]; exact ham) (by rw [ENNReal.ofReal_ofNat]; exact hbm)
+    have e1 : ∫ x, a x * b x ∂μ = ∫ x, ‖(f : G → ℂ) x‖ ∂μ :=
+      integral_congr_ae (ae_of_all _ hab)
+    have e2 : ∫ x, a x ^ (2 : ℝ) ∂μ =
+        ∫ x, ‖(f : G → ℂ) x‖ ^ 2 *
+          (1 + |Real.log ((m x).val : ℝ)| ^ 2) ^ (s / 2) ∂μ :=
+      integral_congr_ae (ae_of_all _ fun x ↦ by beta_reduce; rw [Real.rpow_two, ha2])
+    have e3 : ∫ x, b x ^ (2 : ℝ) ∂μ = I :=
+      integral_congr_ae (ae_of_all _ fun x ↦ by beta_reduce; rw [Real.rpow_two, hb2])
+    calc ∫ x, ‖(f : G → ℂ) x‖ ∂μ = ∫ x, a x * b x ∂μ := e1.symm
+      _ ≤ (∫ x, a x ^ (2 : ℝ) ∂μ) ^ (1 / (2 : ℝ)) *
+            (∫ x, b x ^ (2 : ℝ) ∂μ) ^ (1 / (2 : ℝ)) := hH
+      _ = Real.sqrt I * ‖f‖ := by
+        rw [e2, e3, hfn, Real.sqrt_eq_rpow, Real.sqrt_eq_rpow, mul_comm]
+  -- The inclusion as a linear map into L¹.
+  let J₀ : ModulatedSobolev m μ s →ₗ[ℂ] Lp ℂ 1 μ :=
+    { toFun := fun f ↦ (key f).1.toL1 _
+      map_add' := fun f g ↦ by
+        apply Lp.ext
+        filter_upwards [(key (f + g)).1.coeFn_toL1, (key f).1.coeFn_toL1,
+          (key g).1.coeFn_toL1, Lp.coeFn_add ((key f).1.toL1 _) ((key g).1.toL1 _),
+          hac₂.ae_le (Lp.coeFn_add f g)] with x h1 h2 h3 h4 h5
+        rw [h1, h4, Pi.add_apply, h2, h3, h5, Pi.add_apply]
+      map_smul' := fun c f ↦ by
+        apply Lp.ext
+        filter_upwards [(key (c • f)).1.coeFn_toL1, (key f).1.coeFn_toL1,
+          Lp.coeFn_smul c ((key f).1.toL1 _), hac₂.ae_le (Lp.coeFn_smul c f)]
+          with x h1 h2 h3 h4
+        rw [h1, RingHom.id_apply, h3, Pi.smul_apply, h2, h4, Pi.smul_apply] }
+  have hJ₀ (f : ModulatedSobolev m μ s) : ‖J₀ f‖ ≤ Real.sqrt I * ‖f‖ := by
+    change ‖(key f).1.toL1 _‖ ≤ _
+    rw [L1.norm_of_fun_eq_integral_norm]
+    exact (key f).2
+  let J := J₀.mkContinuous (Real.sqrt I) hJ₀
+  refine ⟨J, Real.sqrt I + 1, ?_, by positivity,
+    (J₀.mkContinuous_norm_le (Real.sqrt_nonneg _) hJ₀).trans (by linarith),
+    fun f ↦ ⟨(key f).1, (key f).1.coeFn_toL1⟩⟩
+  rw [injective_iff_map_eq_zero]
+  intro f hf
+  have h0 : ((key f).1.toL1 (f : G → ℂ) : G → ℂ) =ᵐ[μ] 0 := by
+    have : (key f).1.toL1 (f : G → ℂ) = 0 := hf
+    rw [this]
+    exact Lp.coeFn_zero _ _ _
+  have h1 : (f : G → ℂ) =ᵐ[sobolevMeasure μ (modulatedSobolevWeight m) s] 0 :=
+    hac₁.ae_le ((key f).1.coeFn_toL1.symm.trans h0)
+  exact Lp.ext (h1.trans (Lp.coeFn_zero _ _ _).symm)
 
 end Modulated
 
