@@ -2790,6 +2790,576 @@ private theorem IsInjectiveLCLimit.lifts_nullSequence_of_acyclic (h : IsInjectiv
     ∃ k, ∃ v : ℕ → X k, IsVonNBounded ℂ (range v) ∧ ∀ n, i k (v n) = u n := by
   sorry
 
+/-- The composite of the transition maps from stage `a` to stage `b`. -/
+private def limitStageTransition (j : ∀ k, X k →L[ℂ] X (k+1))
+    {a b : ℕ} (hab : a ≤ b) : X a →L[ℂ] X b :=
+  Nat.leRec (ContinuousLinearMap.id ℂ (X a)) (fun {k} _ f ↦ (j k).comp f) hab
+
+/-- Advancing the destination stage by one composes with its transition map. -/
+private theorem limitStageTransition_succ {a b : ℕ} (hab : a ≤ b) :
+    limitStageTransition j (Nat.le_succ_of_le hab) =
+      (j b).comp (limitStageTransition j hab) := by
+  unfold limitStageTransition
+  rw [Nat.leRec_succ _ _ hab]
+
+/-- Composites of consecutive blocks of transition maps concatenate. -/
+private theorem limitStageTransition_trans {a b c : ℕ} (hab : a ≤ b) (hbc : b ≤ c) :
+    limitStageTransition j (hab.trans hbc) =
+      (limitStageTransition j hbc).comp (limitStageTransition j hab) := by
+  induction c, hbc using Nat.le_induction with
+  | base => simp [limitStageTransition, Nat.leRec_self]
+  | succ c hbc ih =>
+    rw [limitStageTransition_succ (hab.trans hbc), limitStageTransition_succ hbc, ih,
+      ContinuousLinearMap.comp_assoc]
+
+/-- Passing to a later stage preserves the image in the limit. -/
+private theorem IsInjectiveLCLimit.limitStageTransition_apply (h : IsInjectiveLCLimit j i)
+    {a b : ℕ} (hab : a ≤ b) (z : X a) :
+    i b (limitStageTransition j hab z) = i a z := by
+  induction b, hab using Nat.le_induction with
+  | base =>
+    simp [limitStageTransition, Nat.leRec_self]
+  | succ b hab ih =>
+    have heq : i (b+1) (j b (limitStageTransition j hab z)) =
+        i b (limitStageTransition j hab z) :=
+      DFunLike.congr_fun (h.compatible b) _
+    unfold limitStageTransition
+    rw [Nat.leRec_succ _ _ hab]
+    exact heq.trans ih
+
+/-- Compact lifting forces a uniform stage for null sequences drawn from a single
+zero-neighborhood of a fixed stage. The neighborhood and the later stage are chosen
+before the sequence. -/
+private theorem IsInjectiveLCLimit.exists_stage_tendsto_of_compact_lift
+    (h : IsInjectiveLCLimit j i) [T2Space E] [∀ k, FirstCountableTopology (X k)]
+    (hlift : ∀ K : Set E, IsCompact K → ∃ k, ∃ C : Set (X k), IsCompact C ∧ i k '' C = K)
+    (a : ℕ) :
+    ∃ (m : ℕ) (ham : a ≤ m) (U : Set (X a)), U ∈ 𝓝 0 ∧
+      ∀ v : ℕ → X a, (∀ n, v n ∈ U) → Tendsto (i a ∘ v) atTop (𝓝 0) →
+        Tendsto (limitStageTransition j ham ∘ v) atTop (𝓝 0) := by
+  classical
+  obtain ⟨U, hU⟩ := (𝓝 (0 : X a)).exists_antitone_basis
+  by_contra! hno
+  have hfail (n : ℕ) := hno (a + n) (Nat.le_add_right a n) (U n)
+    (hU.toHasBasis.mem_of_mem trivial)
+  choose v hv hlim hbad using hfail
+  let K : Set E := ⋃ n, insert 0 (range (i a ∘ v n))
+  -- Every open neighborhood of zero contains all but finitely many entire rows.
+  have hsmall (V : Set E) (hV : V ∈ 𝓝 0) :
+      ∃ N : ℕ, ∀ n ≥ N, range (i a ∘ v n) ⊆ V := by
+    have hpre : i a ⁻¹' V ∈ 𝓝 (0 : X a) := (i a).continuous.tendsto' 0 0 (map_zero _) hV
+    obtain ⟨N, -, hN⟩ := hU.toHasBasis.mem_iff.mp hpre
+    refine ⟨N, fun n hn ↦ ?_⟩
+    rintro _ ⟨b, rfl⟩
+    exact hN (hU.antitone hn (hv n b))
+  have hzero : (0 : E) ∈ K := mem_iUnion.mpr ⟨0, mem_insert _ _⟩
+  have hK : IsCompact K := by
+    apply isCompact_of_finite_subcover
+    intro ι W hW hcover
+    obtain ⟨c, hc⟩ := mem_iUnion.mp (hcover hzero)
+    obtain ⟨N, hN⟩ := hsmall (W c) ((hW c).mem_nhds hc)
+    let row (n : ℕ) := insert (0 : E) (range (i a ∘ v n))
+    obtain ⟨t, ht⟩ := ((Finset.range N).isCompact_biUnion
+      (f := row) fun n _ ↦ (hlim n).isCompact_insert_range).elim_finite_subcover W hW
+        (fun x hx ↦ hcover (by
+          obtain ⟨n, _, hn⟩ := mem_iUnion₂.mp hx
+          exact mem_iUnion.mpr ⟨n, hn⟩))
+    refine ⟨insert c t, ?_⟩
+    intro x hx
+    obtain ⟨n, hn⟩ := mem_iUnion.mp hx
+    by_cases hN' : n < N
+    · obtain ⟨b, hb, hxb⟩ :=
+        mem_iUnion₂.mp (ht (mem_iUnion₂.mpr ⟨n, Finset.mem_range.mpr hN', hn⟩))
+      exact mem_iUnion₂.mpr ⟨b, Finset.mem_insert_of_mem hb, hxb⟩
+    · refine mem_iUnion₂.mpr ⟨c, Finset.mem_insert_self _ _, ?_⟩
+      rcases mem_insert_iff.mp hn with rfl | hx'
+      · exact hc
+      · exact hN n (Nat.le_of_not_gt hN') hx'
+  obtain ⟨k, C, hC, himage⟩ := hlift K hK
+  let : CompactSpace C := isCompact_iff_compactSpace.mp hC
+  let f : C → E := fun z ↦ i k z
+  have hf : IsEmbedding f :=
+    (((i k).continuous.comp continuous_subtype_val).isClosedEmbedding
+      ((h.injective k).comp Subtype.val_injective)).isEmbedding
+  have hsurj (z : E) (hz : z ∈ K) : ∃ w : C, f w = z := by
+    obtain ⟨w, hw, he⟩ := himage.symm ▸ hz
+    exact ⟨⟨w, hw⟩, he⟩
+  obtain ⟨w₀, hw₀⟩ := hsurj 0 hzero
+  have hw₀' : (w₀ : X k) = 0 := h.injective k (hw₀.trans (map_zero _).symm)
+  have hrow (b : ℕ) : i a (v k b) ∈ K :=
+    mem_iUnion.mpr ⟨k, mem_insert_of_mem _ (mem_range_self b)⟩
+  choose w hw using fun b ↦ hsurj _ (hrow b)
+  have hwlim : Tendsto w atTop (𝓝 w₀) := hf.tendsto_nhds_iff.mpr (by
+    rw [hw₀, show f ∘ w = i a ∘ v k from funext hw]
+    exact hlim k)
+  let g := limitStageTransition j (Nat.le_add_left k a)
+  have hg : Tendsto (fun b ↦ g (w b)) atTop (𝓝 0) :=
+    (g.continuous.tendsto' w₀ 0 (by rw [hw₀', map_zero])).comp
+      (continuous_subtype_val.tendsto w₀ |>.comp hwlim)
+  apply hbad k
+  convert hg using 1
+  funext b
+  apply h.injective (a + k)
+  exact (h.limitStageTransition_apply _ _).trans ((hw b).symm.trans
+    (h.limitStageTransition_apply _ _).symm)
+
+/-- A uniform stage for null sequences yields a seminorm estimate. On the original
+stage one fixed continuous seminorm can be given an arbitrarily small coefficient,
+with the remainder controlled by a continuous seminorm on any further stage. -/
+private theorem IsInjectiveLCLimit.exists_stage_seminorm_interpolation
+    (h : IsInjectiveLCLimit j i) [T2Space E] [∀ k, FirstCountableTopology (X k)]
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    (hlift : ∀ K : Set E, IsCompact K → ∃ k, ∃ C : Set (X k), IsCompact C ∧ i k '' C = K)
+    (a : ℕ) :
+    ∃ (m : ℕ) (ham : a ≤ m) (p : Seminorm ℂ (X a)), Continuous p ∧
+      ∀ (l : ℕ) (hal : a ≤ l), m ≤ l →
+        ∀ (q : Seminorm ℂ (X m)), Continuous q → ∀ ε : ℝ, 0 < ε →
+          ∃ r : Seminorm ℂ (X l), Continuous r ∧
+            ∀ z, q (limitStageTransition j ham z) ≤ ε * p z + r (limitStageTransition j hal z) := by
+  obtain ⟨m, ham, U, hU, hseq⟩ := h.exists_stage_tendsto_of_compact_lift hlift a
+  obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ (X a)).mem_iff.mp hU
+  refine ⟨m, ham, p, hp, fun l hal _ q hq ε hε ↦ ?_⟩
+  obtain ⟨V, hV⟩ := (𝓝 (0 : X l)).exists_antitone_basis
+  have hballs (n : ℕ) := (PolynormableSpace.hasBasis_zero_ball ℂ (X l)).mem_iff.mp
+    (hV.toHasBasis.mem_of_mem (i := n) trivial)
+  choose r hr hrV using hballs
+  by_contra! hno
+  have hfail (n : ℕ) := hno (ε.toNNReal • r n)
+    (show Continuous (fun z ↦ (ε.toNNReal : ℝ) * r n z) from (hr n).const_mul _)
+  choose z hz using hfail
+  let A := limitStageTransition j ham
+  let B := limitStageTransition j hal
+  have hineq (n : ℕ) : ε * p (z n) + ε * r n (B (z n)) < q (A (z n)) := by
+    have hn := hz n
+    change ε * p (z n) + (ε.toNNReal : ℝ) * r n (B (z n)) < q (A (z n)) at hn
+    rwa [Real.coe_toNNReal _ hε.le] at hn
+  have hpos (n : ℕ) : 0 < q (A (z n)) :=
+    lt_of_le_of_lt (by positivity) (hineq n)
+  let v (n : ℕ) : X a := ((ε / q (A (z n)) : ℝ) : ℂ) • z n
+  have hvnorm (n : ℕ) : ‖((ε / q (A (z n)) : ℝ) : ℂ)‖ = ε / q (A (z n)) :=
+    Complex.norm_of_nonneg (div_nonneg hε.le (hpos n).le)
+  have hvU (n : ℕ) : v n ∈ U := by
+    apply hpU
+    rw [Seminorm.mem_ball_zero]
+    dsimp only [v]
+    rw [map_smul_eq_mul, hvnorm, div_mul_eq_mul_div,
+      div_lt_iff₀ (hpos n), one_mul]
+    exact (le_add_of_nonneg_right (by positivity)).trans_lt (hineq n)
+  have hvV (n : ℕ) : B (v n) ∈ V n := by
+    apply hrV n
+    rw [Seminorm.mem_ball_zero]
+    dsimp only [v]
+    rw [map_smul, map_smul_eq_mul, hvnorm, div_mul_eq_mul_div,
+      div_lt_iff₀ (hpos n), one_mul]
+    exact (le_add_of_nonneg_left (by positivity)).trans_lt (hineq n)
+  have hB : Tendsto (B ∘ v) atTop (𝓝 0) := hV.tendsto hvV
+  have hi : Tendsto (i a ∘ v) atTop (𝓝 0) := by
+    have heq : i l ∘ (B ∘ v) = i a ∘ v :=
+      funext fun n ↦ h.limitStageTransition_apply _ _
+    rw [← heq]
+    exact ((i l).continuous.tendsto' 0 0 (map_zero _)).comp hB
+  have hlim := (hq.tendsto' 0 0 (map_zero _)).comp (hseq v hvU hi)
+  have heq : q ∘ (A ∘ v) = fun _ ↦ ε := by
+    funext n
+    change q (A (((ε / q (A (z n)) : ℝ) : ℂ) • z n)) = ε
+    rw [map_smul, map_smul_eq_mul, hvnorm, div_mul_cancel₀ _ (hpos n).ne']
+  change Tendsto (q ∘ (A ∘ v)) atTop (𝓝 0) at hlim
+  rw [heq] at hlim
+  exact hε.ne' (tendsto_nhds_unique tendsto_const_nhds hlim)
+
+/-- A vector in a single summand contributes to that summand and its successor. -/
+private theorem directSumDifference_lof (j : ∀ k, X k →L[ℂ] X (k+1)) (k : ℕ) (z : X k) :
+    directSumDifference j (DirectSum.lof ℂ ℕ X k z) =
+      DirectSum.lof ℂ ℕ X k z - DirectSum.lof ℂ ℕ X (k+1) (j k z) := by
+  rw [directSumDifference, LinearMap.sub_apply, LinearMap.id_apply, DirectSum.toModule_lof]
+  rfl
+
+/-- A stage vector propagated along a finite interval of coordinates of the direct sum. -/
+private def propagateStageVector (j : ∀ k, X k →L[ℂ] X (k+1)) (a : ℕ) :
+    ℕ → X a →ₗ[ℂ] (⨁ k, X k)
+  | 0 => 0
+  | d+1 => DirectSum.lof ℂ ℕ X a + (propagateStageVector j (a+1) d).comp (j a).toLinearMap
+
+/-- A seminorm bound for the inverse on a cofinal subsequence gives one on the original
+spectrum. Propagate the recovered coordinates at the retained stages and add the
+increments between consecutive retained stages. -/
+private theorem directSumDifference_seminorm_bound_of_cofinal
+    [∀ k, IsTopologicalAddGroup (X k)]
+    [dec : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
+    {a : ℕ → ℕ} (ha : StrictMono a)
+    (hbound : letI : ∀ (k : ℕ) (z : X (a k)), Decidable (z ≠ 0) := fun k ↦ dec (a k)
+      ∀ s : ∀ k, Seminorm ℂ (X (a k)), (∀ k, Continuous (s k)) →
+        ∃ r : ∀ k, Seminorm ℂ (X (a k)), (∀ k, Continuous (r k)) ∧
+          ∀ x, directSumSeminorm s x ≤ directSumSeminorm r
+            (directSumDifference (fun k ↦ limitStageTransition j (ha (Nat.lt_succ_self k)).le) x))
+    (s : ∀ k, Seminorm ℂ (X k)) (hs : ∀ k, Continuous (s k)) :
+    ∃ r : ∀ k, Seminorm ℂ (X k), (∀ k, Continuous (r k)) ∧
+      ∀ x, directSumSeminorm s x ≤ directSumSeminorm r (directSumDifference j x) := by
+  classical
+  let Y (k : ℕ) := X (a k)
+  let : ∀ (k : ℕ) (z : Y k), Decidable (z ≠ 0) := fun k ↦ dec (a k)
+  let : ∀ k, IsTopologicalAddGroup (Y k) := fun _ ↦ inferInstance
+  let D := ⨁ k, X k
+  let D' := ⨁ k, Y k
+  let L := DirectSum.lof ℂ ℕ X
+  let L' := DirectSum.lof ℂ ℕ Y
+  let : TopologicalSpace D := locallyConvexFinalTopology L
+  let : TopologicalSpace D' := locallyConvexFinalTopology L'
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ L k)} → Seminorm ℂ D) := ⟨rfl⟩
+  have hD' : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D' // ∀ k, Continuous (p ∘ L' k)} → Seminorm ℂ D') := ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  have hL (k : ℕ) : Continuous (L k) :=
+    hD.continuous_of_continuous_comp _ fun p ↦ p.property k
+  have hprop (k d : ℕ) : Continuous (propagateStageVector j k d) := by
+    induction d generalizing k with
+    | zero => exact continuous_zero
+    | succ d ih => exact (hL k).add ((ih (k+1)).comp (j k).continuous)
+  have hex (k : ℕ) : ∃ n, k ≤ a n := ⟨k, ha.id_le k⟩
+  let next (k : ℕ) := Nat.find (hex k)
+  have hnext (k : ℕ) : k ≤ a (next k) := Nat.find_spec (hex k)
+  have hleast (k n : ℕ) (hkn : k ≤ a n) : next k ≤ n := Nat.find_min' (hex k) hkn
+  have hself (n : ℕ) : next (a n) = n :=
+    le_antisymm (hleast _ _ le_rfl) (ha.le_iff_le.mp (hnext _))
+  have hsucc (n : ℕ) : next (a n + 1) = n+1 := by
+    apply le_antisymm (hleast _ _ (ha (Nat.lt_succ_self _)))
+    exact Nat.succ_le_of_lt (ha.lt_iff_lt.mp (hnext _))
+  have hskip (k : ℕ) (hk : k ∉ range a) : next (k+1) = next k := by
+    have hlt : k < a (next k) := lt_of_le_of_ne (hnext k) fun he ↦ hk ⟨_, he.symm⟩
+    exact le_antisymm (hleast _ _ hlt) (hleast _ _ (Nat.le_of_succ_le (hnext (k+1))))
+  let Gk (k : ℕ) : X k →ₗ[ℂ] D' := (L' (next k)).comp (limitStageTransition j (hnext k)).toLinearMap
+  let Hk (k : ℕ) : X k →ₗ[ℂ] D := propagateStageVector j k (a (next k) - k)
+  let Fk (n : ℕ) : Y n →ₗ[ℂ] D := propagateStageVector j (a n) (a (n+1) - a n)
+  let G := DirectSum.toModule ℂ ℕ D' Gk
+  let H := DirectSum.toModule ℂ ℕ D Hk
+  let F := DirectSum.toModule ℂ ℕ D Fk
+  let P : D →ₗ[ℂ] D' :=
+    { toFun := DFinsupp.comapDomain a ha.injective
+      map_add' := DFinsupp.comapDomain_add a ha.injective
+      map_smul' := DFinsupp.comapDomain_smul a ha.injective }
+  let J (n : ℕ) : Y n →L[ℂ] Y (n+1) := limitStageTransition j (ha (Nat.lt_succ_self n)).le
+  let σ := directSumDifference j
+  let σ' := directSumDifference J
+  have hP (n : ℕ) (z : Y n) : P (L (a n) z) = L' n z :=
+    DFinsupp.comapDomain_single a ha.injective n z
+  have hPzero (k : ℕ) (hk : k ∉ range a) (z : X k) : P (L k z) = 0 := by
+    apply DFinsupp.ext
+    intro n
+    change L k z (a n) = 0
+    change DFinsupp.single k z (a n) = 0
+    exact DFinsupp.single_eq_of_ne (fun he ↦ hk ⟨n, he⟩)
+  have hσ (k : ℕ) (z : X k) : σ (L k z) = L k z - L (k+1) (j k z) :=
+    directSumDifference_lof j k z
+  have hσ' (n : ℕ) (z : Y n) : σ' (L' n z) = L' n z - L' (n+1) (J n z) :=
+    directSumDifference_lof J n z
+  have hGk (k : ℕ) (z : X k) : G (L k z) = Gk k z := DirectSum.toModule_lof _ _ _
+  have hHk (k : ℕ) (z : X k) : H (L k z) = Hk k z := DirectSum.toModule_lof _ _ _
+  have hFk (n : ℕ) (z : Y n) : F (L' n z) = Fk n z := DirectSum.toModule_lof _ _ _
+  have hGk_eq (k n : ℕ) (hn : next k = n) (z : X k) :
+      Gk k z = L' n (limitStageTransition j (hn ▸ hnext k) z) := by
+    subst n
+    rfl
+  have hstep (k n : ℕ) (hkn : k+1 ≤ n) (z : X k) :
+      limitStageTransition j (Nat.le_of_succ_le hkn) z =
+        limitStageTransition j hkn (j k z) := by
+    rw [limitStageTransition_trans (Nat.le_succ k) hkn]
+    rw [limitStageTransition_succ (le_refl k)]
+    simp [limitStageTransition, Nat.leRec_self]
+  have hGcomp : G.comp σ = σ'.comp P := by
+    apply DirectSum.linearMap_ext
+    intro k
+    ext z : 1
+    change G (σ (L k z)) = σ' (P (L k z))
+    rw [hσ, map_sub, hGk, hGk]
+    by_cases hk : k ∈ range a
+    · obtain ⟨n, rfl⟩ := hk
+      rw [hP, hσ']
+      have hfirst : Gk (a n) z = L' n z := by
+        rw [hGk_eq _ _ (hself n)]
+        simp [limitStageTransition, Nat.leRec_self]
+      have hsecond : Gk (a n + 1) (j (a n) z) = L' (n+1) (J n z) := by
+        rw [hGk_eq _ _ (hsucc n), ← hstep (a n) (a (n+1)) (ha (Nat.lt_succ_self n))]
+      rw [hfirst, hsecond]
+    · rw [hPzero k hk, map_zero, sub_eq_zero]
+      rw [hGk_eq (k+1) (next k) (hskip k hk), hGk_eq k (next k) rfl,
+        hstep k (a (next k)) (hskip k hk ▸ hnext (k+1))]
+  have hreconstruct : F.comp P + H.comp σ = LinearMap.id := by
+    apply DirectSum.linearMap_ext
+    intro k
+    ext z : 1
+    change F (P (L k z)) + H (σ (L k z)) = L k z
+    rw [hσ, map_sub, hHk, hHk]
+    by_cases hk : k ∈ range a
+    · obtain ⟨n, rfl⟩ := hk
+      rw [hP, hFk]
+      have hlen : a (n+1) - a n = a (n+1) - (a n + 1) + 1 := by
+        have hlt : a n < a (n+1) := ha (Nat.lt_succ_self n)
+        omega
+      have hpart : Fk n z = L (a n) z + Hk (a n + 1) (j (a n) z) := by
+        simp only [Fk, Hk, hsucc]
+        nth_rw 1 [hlen]
+        rfl
+      rw [show Hk (a n) z = 0 by simp [Hk, hself, propagateStageVector]]
+      rw [hpart, zero_sub, ← sub_eq_add_neg, add_sub_cancel_right]
+    · rw [hPzero k hk, map_zero, zero_add]
+      have hlen : a (next k) - k = a (next k) - (k+1) + 1 := by
+        have hlt : k < a (next k) := lt_of_le_of_ne (hnext k) fun he ↦ hk ⟨_, he.symm⟩
+        omega
+      have hpart : Hk k z = L k z + Hk (k+1) (j k z) := by
+        simp only [Hk, hskip k hk]
+        nth_rw 1 [hlen]
+        rfl
+      rw [hpart, add_sub_cancel_right]
+  let p := directSumSeminorm s
+  have hp : Continuous p := by
+    refine hD.continuous_seminorm (i := ⟨p, fun k ↦ ?_⟩)
+    change Continuous (fun z : X k ↦ directSumSeminorm s (DirectSum.lof ℂ ℕ X k z))
+    simpa only [directSumSeminorm_lof] using hs k
+  let s' (n : ℕ) := p.comp (Fk n)
+  obtain ⟨r', hr', hbound'⟩ := hbound s' fun n ↦ hp.comp (hprop _ _)
+  let p' : Seminorm ℂ D' := directSumSeminorm (X := Y) r'
+  have hp' : Continuous p' := by
+    refine hD'.continuous_seminorm (i := ⟨p', fun k ↦ ?_⟩)
+    have heq (z : Y k) : p' (L' k z) = r' k z :=
+      directSumSeminorm_lof (X := Y) r' k z
+    change Continuous (fun z : Y k ↦ p' (L' k z))
+    simpa only [heq] using hr' k
+  have hL' (k : ℕ) : Continuous (L' k) :=
+    hD'.continuous_of_continuous_comp _ fun p ↦ p.property k
+  let q := p'.comp G + p.comp H
+  let r (k : ℕ) := q.comp (L k)
+  have hr (k : ℕ) : Continuous (r k) := by
+    change Continuous (fun z : X k ↦ p' (G (L k z)) + p (H (L k z)))
+    simp_rw [hGk, hHk]
+    exact (hp'.comp ((hL' _).comp (limitStageTransition j (hnext k)).continuous)).add
+      (hp.comp (hprop _ _))
+  have hFp (z : D') : p (F z) ≤ directSumSeminorm s' z := by
+    have hsum := Finset.le_sum_of_subadditive (p.comp F) (map_zero (p.comp F)).le
+      (map_add_le_add (p.comp F)) z.support (fun k ↦ L' k (z k))
+    have hdecomp : (∑ k ∈ z.support, L' k (z k)) = z := DirectSum.sum_support_of z
+    rw [hdecomp] at hsum
+    rw [directSumSeminorm_apply s' z _ Subset.rfl]
+    simpa only [s', Seminorm.comp_apply, hFk] using hsum
+  refine ⟨r, hr, fun x ↦ ?_⟩
+  have hsplit : F (P x) + H (σ x) = x := LinearMap.congr_fun hreconstruct x
+  have hcomm : G (σ x) = σ' (P x) := LinearMap.congr_fun hGcomp x
+  have hq : q (σ x) ≤ directSumSeminorm r (σ x) := by
+    have hsum := Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q)
+      (σ x).support (fun k ↦ L k (σ x k))
+    have hdecomp : (∑ k ∈ (σ x).support, L k (σ x k)) = σ x := DirectSum.sum_support_of (σ x)
+    rw [hdecomp] at hsum
+    rw [directSumSeminorm_apply _ _ _ Subset.rfl]
+    exact hsum
+  have hcontrol : directSumSeminorm s' (P x) ≤ p' (G (σ x)) := by
+    rw [hcomm]
+    exact hbound' (P x)
+  change p x ≤ directSumSeminorm r (σ x)
+  conv => lhs; rw [← hsplit]
+  -- The retained coordinates and the skipped increments are controlled separately.
+  exact (map_add_le_add p (F (P x)) (H (σ x))).trans
+    ((add_le_add ((hFp (P x)).trans hcontrol) (le_refl (p (H (σ x))))).trans hq)
+
+open scoped NNReal in
+/-- For a spectrum with seminorm interpolation across consecutive triples of stages,
+a weighted estimate for the inverse follows from a forward bound on the partial
+sums and a backward bound starting beyond the support. This follows the sufficiency
+argument in Vogt, `On the splitting relation for Fréchet-Hilbert spaces`, §2. -/
+private theorem directSumDifference_seminorm_bound_adjacent
+    [∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
+    (p : ∀ k, Seminorm ℂ (X k)) (hp : ∀ k, Continuous (p k))
+    (hinterp : ∀ (k : ℕ) (q : Seminorm ℂ (X (k+1))), Continuous q →
+      ∃ r : Seminorm ℂ (X (k+2)), Continuous r ∧
+        ∀ z, q (j k z) ≤ p k z + r (j (k+1) (j k z)))
+    (s : ∀ k, Seminorm ℂ (X k)) (hs : ∀ k, Continuous (s k)) :
+    ∃ r : ∀ k, Seminorm ℂ (X k), (∀ k, Continuous (r k)) ∧
+      ∀ x, directSumSeminorm s x ≤ directSumSeminorm r (directSumDifference j x) := by
+  classical
+  -- Retain the error term from the previous stage when applying interpolation.
+  choose step hstep hstep_bound using fun k (t : {t : Seminorm ℂ (X (k+1)) // Continuous t}) ↦
+    hinterp k (p (k+1) + t.val) ((hp (k+1)).add t.property)
+  let t : ∀ k, {t : Seminorm ℂ (X (k+1)) // Continuous t} :=
+    Nat.rec ⟨0, continuous_zero⟩ fun k t ↦ ⟨step k t, hstep k t⟩
+  let b (k : ℕ) := p k + (t k).val.comp (j k).toLinearMap
+  have hb (k : ℕ) : Continuous (b k) := (hp k).add ((t k).property.comp (j k).continuous)
+  have ht (k : ℕ) (z : X k) :
+      p (k+1) (j k z) + (t k).val (j k z) ≤ p k z + (t (k+1)).val (j (k+1) (j k z)) :=
+    hstep_bound k (t k) z
+  let y := directSumDifference j
+  have hforward (x : ⨁ k, X k) (k : ℕ) :
+      p k (x k) ≤ (∑ l ∈ Finset.range (k+1), b l (y x l)) + (t k).val (j k (x k)) := by
+    induction k with
+    | zero => simp [y, b, t, (directSumDifference_apply j x).1]
+    | succ k ih =>
+      have hcoord : y x (k+1) = x (k+1) - j k (x k) :=
+        (directSumDifference_apply j x).2 k
+      have hsum : x (k+1) = j k (x k) + y x (k+1) := by rw [hcoord, add_sub_cancel]
+      have hp' := map_add_le_add (p (k+1)) (j k (x k)) (y x (k+1))
+      rw [← hsum] at hp'
+      have ht' := map_sub_le_add (t (k+1)).val (j (k+1) (x (k+1))) (j (k+1) (y x (k+1)))
+      conv at ht' => lhs; rw [← map_sub, hcoord, sub_sub_cancel]
+      rw [Finset.sum_range_succ]
+      change _ ≤ _ + (p (k+1) (y x (k+1)) + (t (k+1)).val (j (k+1) (y x (k+1)))) + _
+      linarith [ht k (x k)]
+  let weight (k : ℕ) : ℝ≥0 := 4 * 2 ^ k
+  choose next hnext hnext_bound using fun k (u : {q : Seminorm ℂ (X (k+1)) // Continuous q}) ↦
+    hinterp k (u.val + (t k).val) (u.property.add (t k).property)
+  -- Each successive control seminorm absorbs twice the preceding error.
+  let R : ∀ k, {r : Seminorm ℂ (X k) // Continuous r} :=
+    fun k ↦ match k with
+    | 0 => ⟨weight 0 • s 0, (hs 0).const_mul _⟩
+    | k+1 => Nat.rec (motive := fun k ↦ {r : Seminorm ℂ (X (k+1)) // Continuous r})
+        ⟨weight 1 • s 1, (hs 1).const_mul _⟩
+        (fun k r ↦ ⟨weight (k+2) • s (k+2) + (2 : ℝ≥0) • next k r,
+          ((hs (k+2)).const_mul _).add ((hnext k r).const_mul _)⟩) k
+  let err (k : ℕ) := next k (R (k+1))
+  have hErr (k : ℕ) (z : X (k+2)) : 2 * err k z ≤ (R (k+2)).val z := by
+    change 2 * err k z ≤ (weight (k+2) : ℝ) * s (k+2) z + 2 * err k z
+    exact le_add_of_nonneg_left (by positivity)
+  have hR (k : ℕ) (z : X k) : (weight k : ℝ) * s k z ≤ (R k).val z := by
+    rcases k with _ | _ | k
+    · exact le_rfl
+    · exact le_rfl
+    · change _ ≤ _ + 2 * err k z
+      exact le_add_of_nonneg_right (by positivity)
+  let r (k : ℕ) := b k + (R k).val + match k with
+    | 0 => 0
+    | 1 => (err 0).comp (j 1).toLinearMap
+    | k+2 => err k + (err (k+1)).comp (j (k+2)).toLinearMap
+  have hr (k : ℕ) : Continuous (r k) := by
+    apply ((hb k).add (R k).property).add
+    rcases k with _ | _ | k
+    · exact continuous_zero
+    · exact (hnext 0 (R 1)).comp (j 1).continuous
+    · exact (hnext k (R (k+1))).add ((hnext (k+1) (R (k+2))).comp (j (k+2)).continuous)
+  have hb_le (k : ℕ) (z : X k) : b k z ≤ r k z := by
+    calc
+      _ ≤ (b k + (R k).val) z := le_add_of_nonneg_right (apply_nonneg (R k).val z)
+      _ ≤ _ := le_add_of_nonneg_right (apply_nonneg _ z)
+  have hlocal (x : ⨁ k, X k) (k : ℕ) :
+      (R k).val (x k) ≤ directSumSeminorm r (y x) + (R (k+1)).val (x (k+1)) / 2 := by
+    cases k with
+    | zero =>
+      have h0 : (R 0).val (y x 0) ≤ r 0 (y x 0) := by
+        change _ ≤ b 0 (y x 0) + (R 0).val (y x 0) + 0
+        simp [apply_nonneg (b 0) (y x 0)]
+      rw [← (directSumDifference_apply j x).1]
+      exact (h0.trans (by simpa only [Finset.sum_singleton] using sum_le_directSumSeminorm r (y x) {0})).trans
+        (le_add_of_nonneg_right (by positivity))
+    | succ k =>
+      have hcoord (l : ℕ) : y x (l+1) = x (l+1) - j l (x l) :=
+        (directSumDifference_apply j x).2 l
+      have hsum : x (k+1) = j k (x k) + y x (k+1) := by rw [hcoord, add_sub_cancel]
+      have hnext_sum : j (k+1) (j k (x k)) =
+          (x (k+2) - y x (k+2)) - j (k+1) (y x (k+1)) := by
+        rw [hcoord (k+1), sub_sub_cancel, ← map_sub, hcoord k, sub_sub_cancel]
+      have h1 := hnext_bound k (R (k+1)) (x k)
+      change (R (k+1)).val (j k (x k)) + (t k).val (j k (x k)) ≤
+        p k (x k) + err k (j (k+1) (j k (x k))) at h1
+      have h2 := map_add_le_add (R (k+1)).val (j k (x k)) (y x (k+1))
+      rw [← hsum] at h2
+      have h3 := map_sub_le_add (err k) (x (k+2) - y x (k+2)) (j (k+1) (y x (k+1)))
+      rw [← hnext_sum] at h3
+      have h4 := map_sub_le_add (err k) (x (k+2)) (y x (k+2))
+      have h5 : (R (k+1)).val (y x (k+1)) + err k (j (k+1) (y x (k+1))) ≤ r (k+1) (y x (k+1)) := by
+        cases k with
+        | zero =>
+          change _ ≤ b 1 (y x 1) + (R 1).val (y x 1) + err 0 (j 1 (y x 1))
+          linarith [apply_nonneg (b 1) (y x 1)]
+        | succ k =>
+          change _ ≤ b (k+2) (y x (k+2)) + (R (k+2)).val (y x (k+2)) +
+            (err k (y x (k+2)) + err (k+1) (j (k+2) (y x (k+2))))
+          linarith [apply_nonneg (b (k+2)) (y x (k+2)), apply_nonneg (err k) (y x (k+2))]
+      have h6 : err k (y x (k+2)) ≤ r (k+2) (y x (k+2)) := by
+        change _ ≤ b (k+2) (y x (k+2)) + (R (k+2)).val (y x (k+2)) +
+          (err k (y x (k+2)) + err (k+1) (j (k+2) (y x (k+2))))
+        linarith [apply_nonneg (b (k+2)) (y x (k+2)),
+          apply_nonneg (R (k+2)).val (y x (k+2)),
+          apply_nonneg (err (k+1)) (j (k+2) (y x (k+2)))]
+      have h7 := sum_le_directSumSeminorm r (y x) (Finset.range (k+3))
+      rw [Finset.sum_range_succ, Finset.sum_range_succ] at h7
+      have h8 : (∑ l ∈ Finset.range (k+1), b l (y x l)) ≤
+          ∑ l ∈ Finset.range (k+1), r l (y x l) := Finset.sum_le_sum fun l _ ↦ hb_le l _
+      linarith [hforward x k, hErr k (x (k+2))]
+  refine ⟨r, hr, fun x ↦ ?_⟩
+  let Q := directSumSeminorm r (y x)
+  have hQ : 0 ≤ Q := apply_nonneg _ _
+  obtain ⟨N, hN⟩ := Finset.exists_nat_subset_range x.support
+  have hcontrol (k : ℕ) : (R k).val (x k) ≤ 2 * Q := by
+    by_cases hk : k ≤ N
+    · induction hk using Nat.decreasingInduction with
+      | self =>
+        have hzero : x N = 0 := DFinsupp.notMem_support_iff.mp fun hmem ↦
+          (Nat.lt_irrefl N) (Finset.mem_range.mp (hN hmem))
+        rw [hzero, map_zero]
+        positivity
+      | of_succ k hk ih => linarith [hlocal x k]
+    · have hzero : x k = 0 := DFinsupp.notMem_support_iff.mp fun hmem ↦
+        hk (Finset.mem_range.mp (hN hmem)).le
+      rw [hzero, map_zero]
+      positivity
+  rw [directSumSeminorm_apply _ _ _ hN]
+  calc
+    _ ≤ ∑ k ∈ Finset.range N, (1 / 2 : ℝ)^k * (Q / 2) := by
+      apply Finset.sum_le_sum
+      intro k _
+      have hpos : 0 < (2 : ℝ)^k := by positivity
+      rw [one_div, inv_pow, ← div_eq_inv_mul, le_div_iff₀ hpos]
+      have hweight : (weight k : ℝ) = 4 * 2^k := by simp [weight]
+      have hle := (hR k (x k)).trans (hcontrol k)
+      rw [hweight] at hle
+      nlinarith
+    _ = (∑ k ∈ Finset.range N, (1 / 2 : ℝ)^k) * (Q / 2) := (Finset.sum_mul ..).symm
+    _ ≤ Q := by
+      have hsum (n : ℕ) : (∑ k ∈ Finset.range n, (1 / 2 : ℝ)^k) =
+          2 - 2 * (1 / 2 : ℝ)^n := by
+        induction n with
+        | zero => simp
+        | succ n ih => rw [Finset.sum_range_succ, ih, pow_succ]; ring
+      have hgeom : (∑ k ∈ Finset.range N, (1 / 2 : ℝ)^k) ≤ 2 := by
+        rw [hsum]
+        exact sub_le_self _ (by positivity)
+      linarith [mul_le_mul_of_nonneg_right hgeom (show 0 ≤ Q / 2 by positivity)]
+
+/-- Choose a cofinal subsequence whose consecutive triples satisfy the interpolation
+estimate, then apply the estimate for consecutive stages. -/
+private theorem directSumDifference_seminorm_bound_of_interpolation
+    [∀ k, IsTopologicalAddGroup (X k)] [dec : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0)]
+    (hinterp : ∀ a : ℕ,
+      ∃ (m : ℕ) (ham : a ≤ m) (p : Seminorm ℂ (X a)), Continuous p ∧
+        ∀ (l : ℕ) (hal : a ≤ l), m ≤ l →
+          ∀ (q : Seminorm ℂ (X m)), Continuous q → ∀ ε : ℝ, 0 < ε →
+            ∃ r : Seminorm ℂ (X l), Continuous r ∧
+              ∀ z, q (limitStageTransition j ham z) ≤ ε * p z + r (limitStageTransition j hal z))
+    (s : ∀ k, Seminorm ℂ (X k)) (hs : ∀ k, Continuous (s k)) :
+    ∃ r : ∀ k, Seminorm ℂ (X k), (∀ k, Continuous (r k)) ∧
+      ∀ x, directSumSeminorm s x ≤ directSumSeminorm r (directSumDifference j x) := by
+  choose m hm p hp h using hinterp
+  let a : ℕ → ℕ := Nat.rec 0 fun _ t ↦ m t + 1
+  have hma (k : ℕ) : m (a k) ≤ a (k+1) := Nat.le_succ _
+  have ha : StrictMono a := strictMono_nat_of_lt_succ fun k ↦ Nat.lt_succ_of_le (hm (a k))
+  have hab (k : ℕ) : a k ≤ a (k+1) := (ha (Nat.lt_succ_self k)).le
+  let J (k : ℕ) := limitStageTransition j (hab k)
+  refine directSumDifference_seminorm_bound_of_cofinal ha ?_ s hs
+  let : ∀ (k : ℕ) (z : X (a k)), Decidable (z ≠ 0) := fun k ↦ dec (a k)
+  intro s' hs'
+  refine directSumDifference_seminorm_bound_adjacent (j := J) (fun k ↦ p (a k))
+    (fun k ↦ hp (a k)) ?_ s' hs'
+  intro k q hq
+  let T := limitStageTransition j (hma k)
+  let q₀ := q.comp T.toLinearMap
+  obtain ⟨r, hr, hbound⟩ := h (a k) (a (k+2)) ((hab k).trans (hab (k+1)))
+    ((hma k).trans (hab (k+1))) q₀ (hq.comp T.continuous) 1 zero_lt_one
+  refine ⟨r, hr, fun z ↦ ?_⟩
+  have h₁ : T (limitStageTransition j (hm (a k)) z) = J k z :=
+    (DFunLike.congr_fun (limitStageTransition_trans (j := j) (hm (a k)) (hma k)) z).symm
+  have h₂ : limitStageTransition j ((hab k).trans (hab (k+1))) z = J (k+1) (J k z) :=
+    DFunLike.congr_fun (limitStageTransition_trans (j := j) (hab k) (hab (k+1))) z
+  specialize hbound z
+  change q (T (limitStageTransition j (hm (a k)) z)) ≤
+    1 * p (a k) z + r (limitStageTransition j ((hab k).trans (hab (k+1))) z) at hbound
+  rwa [h₁, h₂, one_mul] at hbound
+
 /-- In a Fréchet–Montel system, compact lifting from the Hausdorff limit makes the
 difference map a topological embedding. This is the embedding step of Wengenroth's
 Theorem 3.3. Closedness of its range follows separately from Hausdorffness of the limit. -/
@@ -2799,7 +3369,72 @@ private theorem IsInjectiveLCLimit.isEmbedding_directSumDifference_of_compact_st
     (hlift : ∀ K : Set E, IsCompact K → ∃ k, ∃ C : Set (X k), IsCompact C ∧ i k '' C = K) :
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
     IsEmbedding (directSumDifference j) := by
-  sorry
+  classical
+  -- The compact lifting hypothesis already supplies the needed compactness.
+  clear hM
+  let _ : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0) := fun _ _ ↦ Classical.propDecidable _
+  choose hadd hpoly hmetric _ using hX
+  let : ∀ k, IsTopologicalAddGroup (X k) := hadd
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetric
+  have hinterp := h.exists_stage_seminorm_interpolation hlift
+  let D := ⨁ k, X k
+  let lof := DirectSum.lof ℂ ℕ X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lof k)} → Seminorm ℂ D) :=
+    ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  have hlof (k : ℕ) : Continuous (lof k) :=
+    hD.continuous_of_continuous_comp _ fun p ↦ p.property k
+  let σ : D →ₗ[ℂ] D := directSumDifference j
+  have hσ : Continuous σ := by
+    apply hD.continuous_of_continuous_comp
+    intro p
+    refine hD.continuous_seminorm (i := ⟨p.val.comp σ, fun k ↦ ?_⟩)
+    change Continuous (fun z : X k ↦ p.val (directSumDifference j (DirectSum.lof ℂ ℕ X k z)))
+    simp_rw [directSumDifference_lof]
+    exact (hD.continuous_seminorm (i := p)).comp
+      ((hlof k).sub ((hlof (k+1)).comp (j k).continuous))
+  have hinj : Function.Injective σ := by
+    intro x y hxy
+    apply DFinsupp.ext
+    intro k
+    induction k with
+    | zero =>
+      exact (directSumDifference_apply j x).1.symm.trans
+        ((congrArg (fun z : D ↦ z 0) hxy).trans (directSumDifference_apply j y).1)
+    | succ k ih =>
+      have heq : directSumDifference j x (k+1) = directSumDifference j y (k+1) :=
+        congrArg (fun z : D ↦ z (k+1)) hxy
+      rwa [(directSumDifference_apply j x).2 k, (directSumDifference_apply j y).2 k, ih,
+        sub_left_inj] at heq
+  let e := LinearEquiv.ofInjective σ hinj
+  have heInv : Continuous e.symm := by
+    apply hD.continuous_of_continuous_comp
+    intro p
+    let s (k : ℕ) := p.val.comp (lof k)
+    obtain ⟨r, hr, hbound⟩ := directSumDifference_seminorm_bound_of_interpolation
+      hinterp s p.property
+    let q := directSumSeminorm r
+    have hq : Continuous q := by
+      refine hD.continuous_seminorm (i := ⟨q, fun k ↦ ?_⟩)
+      change Continuous (fun z : X k ↦ directSumSeminorm r (DirectSum.lof ℂ ℕ X k z))
+      simpa only [directSumSeminorm_lof] using hr k
+    have hqsub : Continuous (q.comp σ.range.subtype) := hq.comp continuous_subtype_val
+    refine Seminorm.continuous_of_le hqsub fun y ↦ ?_
+    let x := e.symm y
+    have hx : σ x = (y : D) := congrArg Subtype.val (e.apply_symm_apply y)
+    change p.val x ≤ q (y : D)
+    rw [← hx]
+    apply le_trans _ (hbound x)
+    rw [directSumSeminorm_apply _ _ x.support Subset.rfl]
+    have hsum := Finset.le_sum_of_subadditive p.val (map_zero p.val).le
+      (map_add_le_add p.val) x.support (fun k ↦ lof k (x k))
+    have hdecomp : (∑ k ∈ x.support, lof k (x k)) = x := DirectSum.sum_support_of x
+    rwa [hdecomp] at hsum
+  let homeo : D ≃ₜ σ.range := ⟨e.toEquiv, hσ.subtype_mk _, heInv⟩
+  exact IsEmbedding.subtypeVal.comp homeo.isEmbedding
 
 end MontelLimits
 
