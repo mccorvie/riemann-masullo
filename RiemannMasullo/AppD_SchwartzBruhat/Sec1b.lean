@@ -849,7 +849,10 @@ theorem isOpen_lcaAnnihilator (H : Subgroup G) (hH : IsCompact (H : Set G)) :
 
 /-- Paper: Lemma D.1.4.6(4), p. 758. The annihilator of an open subgroup is compact. -/
 theorem isCompact_lcaAnnihilator (H : Subgroup G) (hH : IsOpen (H : Set G)) :
-    IsCompact (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    IsCompact (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  let : DiscreteTopology (G ⧸ H) := QuotientGroup.discreteTopology hH
+  obtain ⟨e, _⟩ := lcaQuotientDual_equiv_annihilator H (H.isClosed_of_isOpen hH)
+  exact isCompact_iff_compactSpace.mpr e.toHomeomorph.compactSpace
 
 /-- Paper: (D.1.4.9)–(D.1.4.10), p. 759. The evaluation map onto the dual of
 an open compactly generated subgroup of the dual is an open quotient. Its
