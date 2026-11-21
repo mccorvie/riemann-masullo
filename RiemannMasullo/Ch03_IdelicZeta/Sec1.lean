@@ -525,7 +525,55 @@ theorem norm_quasiCharacter_eq_rpow_abscissa [IsTopologicalGroup G] [T2Space G]
     [LocallyCompactSpace G] (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1)
     (c : QuasiCharacter G) (g : G) :
     ‖c g‖ = (modℝ g) ^ quasiCharacterAbscissa m hm hne c := by
-  sorry
+  let s := quasiCharacterAbscissa m hm hne c
+  have hmod (x : G) : 0 < modℝ x :=
+    NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (m x).ne_zero)
+  have hnorm (x : G) : 0 < ‖c x‖ := norm_pos_iff.mpr ((Group.isUnit x).map c).ne_zero
+  let q : G →ₜ* ℝ :=
+    { toFun := fun x => ‖c x‖ / (modℝ x) ^ s
+      map_one' := by simp
+      map_mul' := fun x y => by
+        simp only [map_mul, norm_mul, Units.val_mul, NNReal.coe_mul,
+          Real.mul_rpow (hmod x).le (hmod y).le, mul_div_mul_comm]
+      continuous_toFun := c.continuous.norm.div
+        ((NNReal.continuous_coe.comp (Units.continuous_val.comp hm.continuous)).rpow
+          continuous_const (fun x => Or.inl (hmod x).ne'))
+        (fun x => (Real.rpow_pos_of_pos (hmod x) s).ne') }
+  have hqpos (x : G) : 0 < q x := div_pos (hnorm x) (Real.rpow_pos_of_pos (hmod x) s)
+  have hqbase : q hne.choose = 1 := by
+    have hlog := Real.log_ne_zero_of_pos_of_ne_one (hmod hne.choose) fun h =>
+      hne.choose_spec (Units.val_inj.mp (NNReal.coe_inj.mp h))
+    change ‖c hne.choose‖ / (modℝ hne.choose) ^ s = 1
+    have hs := Real.rpow_pos_of_pos (hmod hne.choose) s
+    apply (div_eq_one_iff_eq hs.ne').mpr
+    apply Real.log_injOn_pos (hnorm hne.choose) hs
+    rw [Real.log_rpow (hmod hne.choose)]
+    exact (div_mul_cancel₀ _ hlog).symm
+  obtain ⟨a, ha, hqa⟩ : ∃ a, 1 < m a ∧ q a = 1 := by
+    rcases lt_or_gt_of_ne hne.choose_spec with h | h
+    · exact ⟨hne.choose⁻¹, by simpa only [map_inv, one_lt_inv'] using h,
+        by rw [map_inv, hqbase, inv_one]⟩
+    · exact ⟨hne.choose, h, hqbase⟩
+  have := nonnegRealUnits_orderTopology_and_compactIccSpace.2
+  let K := m ⁻¹' Set.Icc 1 (m a)
+  have hK : IsCompact K := hm.isCompact_preimage isCompact_Icc
+  have hKone : (1 : G) ∈ K := by simp [K, ha.le]
+  obtain ⟨x, -, hx⟩ := hK.exists_isMaxOn ⟨1, hKone⟩ q.continuous.continuousOn
+  -- Multiplying by powers of a moves every point into K and preserves its q-value.
+  have hmax (y : G) : q y ≤ q x := by
+    obtain ⟨n, hn, -⟩ := existsUnique_zpow_near_of_one_lt' ha (m y)
+    have hy : y / a ^ n ∈ K := by
+      simpa only [K, Set.mem_preimage, Set.mem_Icc, map_div, map_zpow] using ⟨hn.1, hn.2.le⟩
+    have h := hx hy
+    change q (y / a ^ n) ≤ q x at h
+    simpa only [map_div, map_zpow, hqa, one_zpow, div_one] using h
+  have hsq := hmax (x * x)
+  rw [map_mul] at hsq
+  have hle (y : G) : q y ≤ 1 := (hmax y).trans ((mul_le_iff_le_one_right (hqpos x)).mp hsq)
+  have hinv := hle g⁻¹
+  rw [map_inv] at hinv
+  have hqg : q g = 1 := (hle g).antisymm ((inv_le_one₀ (hqpos g)).mp hinv)
+  exact (div_eq_one_iff_eq (Real.rpow_pos_of_pos (hmod g) s).ne').mp hqg
 
 /-- Paper: Equation (3.1.1.2), p. 119. The abscissa is continuous in the compact-open topology. -/
 theorem continuous_quasiCharacterAbscissa (hm : IsProperMap m) (hne : ∃ g, m g ≠ 1) :
