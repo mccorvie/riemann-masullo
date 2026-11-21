@@ -4,6 +4,8 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.TestFunction
 public import Mathlib.LinearAlgebra.PiTensorProduct.Basic
 import Mathlib.Algebra.BigOperators.Fin
+import Mathlib.Analysis.InnerProductSpace.l2Space
+import Mathlib.Analysis.PSeries
 import Mathlib.Data.List.FinRange
 import Mathlib.Data.List.OfFn
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
@@ -225,9 +227,274 @@ theorem schwartzMap_euclidean_tendsto_iff {m : ℕ} {ι : Type*} (l : Filter ι)
     exact fun x ↦ schwartz_norm_bound_of_coordinates k n ((f i - g).smooth ⊤) x
       fun j t ↦ (hi j t x).le
 
+section Nuclearity
+
+open MeasureTheory UniformSpace
+open scoped NNReal
+
+/-- An absolutely summable rank-one expansion of a normed-space map induces an
+integral evaluation form. -/
+private theorem integral_evaluation_of_rankOne_series
+    {X Y : Type*} [NormedAddCommGroup X] [NormedSpace ℂ X]
+    [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+    (T : X →L[ℂ] Y) (φ : ℕ → X →L[ℂ] ℂ) (b : ℕ → Y)
+    (hs : Summable (fun n ↦ ‖φ n‖ * ‖b n‖))
+    (hT : ∀ x, HasSum (fun n ↦ φ n x • b n) (T x)) :
+    IsIntegralBilinearForm (fun x (ψ : StrongDual ℂ Y) ↦ ψ (T x)) := by
+  let F := StrongDual ℂ Y
+  let : PolynormableSpace ℂ X := (norm_withSeminorms ℂ X).toPolynormableSpace
+  let : PolynormableSpace ℂ F := (norm_withSeminorms ℂ F).toPolynormableSpace
+  let L : X ⊗[ℂ] F →ₗ[ℂ] ℂ := TensorProduct.lift
+    (LinearMap.mk₂ ℂ (fun x (ψ : F) ↦ ψ (T x))
+      (by intros; simp) (by intros; simp) (by intros; rfl) (by intros; rfl))
+  have hsum (z : X ⊗[ℂ] F) :
+      HasSum (fun n ↦ (tensorDualOperator z (φ n)) (b n)) (L z) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x ψ =>
+      simpa [L, tensorDualOperator_tmul] using (hT x).mapL ψ
+    | add z w hz hw => simpa using hz.add hw
+  let ε : Seminorm ℂ (InjectiveTensor X F) := injectiveTensorNorm X F
+  let C : ℝ≥0 := ⟨∑' n, ‖φ n‖ * ‖b n‖, tsum_nonneg fun _ ↦ by positivity⟩
+  have hbound (z : X ⊗[ℂ] F) : ‖L z‖ ≤ C * ε z := by
+    obtain ⟨A, hA, hε⟩ := injectiveTensorNorm_eq_opNorm z
+    have hterm (n : ℕ) :
+        ‖(tensorDualOperator z (φ n)) (b n)‖ ≤ (‖φ n‖ * ‖b n‖) * ε z := by
+      rw [← hA, show ε z = ‖A‖ from hε]
+      calc
+        ‖(A (φ n)) (b n)‖ ≤ ‖A (φ n)‖ * ‖b n‖ := (A (φ n)).le_opNorm _
+        _ ≤ (‖A‖ * ‖φ n‖) * ‖b n‖ :=
+          mul_le_mul_of_nonneg_right (A.le_opNorm _) (norm_nonneg _)
+        _ = _ := by ring
+    have hdom := hs.mul_right (ε z)
+    have hs' := hdom.of_nonneg_of_le (fun _ ↦ norm_nonneg _) hterm
+    change ‖L z‖ ≤ (∑' n, ‖φ n‖ * ‖b n‖) * ε z
+    rw [← (hsum z).tsum_eq, ← tsum_mul_right]
+    exact (norm_tsum_le_tsum_norm hs').trans (hs'.tsum_le_tsum hterm hdom)
+  let hI := withGeneratingSeminorms_spec (X ⊗[ℂ] F)
+    (fun UV : {U : Set X // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  have hε : Continuous ε := hI.continuous_seminorm
+    (⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩,
+     ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩)
+  let L' : InjectiveTensor X F →ₗ[ℂ] ℂ := L
+  have hL : Continuous L' :=
+    (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L' fun _ ↦
+      Seminorm.continuous_of_le (q := C • ε) (hε.const_smul C) hbound
+  exact ⟨⟨L', hL⟩, fun _ _ ↦ rfl⟩
+
+/-- A summable coefficient bound and a uniform vector bound in each continuous
+seminorm suffice for nuclearity. -/
+private theorem nuclear_of_rankOne_series
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [PolynormableSpace ℂ E] [T2Space E]
+    (h : ∀ q : Seminorm ℂ E, Continuous q →
+      ∃ (p : Seminorm ℂ E) (φ : ℕ → E →ₗ[ℂ] ℂ) (b : ℕ → E)
+        (d : ℕ → ℝ) (C : ℝ), Continuous p ∧ 0 ≤ C ∧ Summable d ∧
+        (∀ n, 0 ≤ d n) ∧ (∀ n x, ‖φ n x‖ ≤ d n * p x) ∧
+        (∀ n, q (b n) ≤ C) ∧ ∀ x, HasSum (fun n ↦ φ n x • b n) x) :
+    IsNuclearTVS.{v} E := by
+  apply (isNuclearTVS_iff_localBanach_integral E).mpr
+  intro U hU bU cU
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  have : ContinuousSMul ℝ E :=
+    MulAction.continuousSMul_compHom (f := (algebraMap ℝ ℂ).toMonoidHom) Complex.continuous_ofReal
+  let q := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+  obtain ⟨p₀, φ, b, d, C, hp₀, hC, hd, hd₀, hφ, hb, hsum⟩ :=
+    h q (continuous_gauge cU hU)
+  obtain ⟨r, hr, hrU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  let p := p₀ + r
+  have hp : Continuous p := hp₀.add hr
+  have hp₀p (x : E) : p₀ x ≤ p x := le_add_of_nonneg_right (apply_nonneg r x)
+  let V := p.ball 0 1
+  have hV : V ∈ 𝓝 0 := p.ball_mem_nhds hp one_pos
+  have bV := p.balanced_ball_zero 1
+  have cV := p.convex_ball 0 1
+  have hVU : V ⊆ U := fun x hx ↦ hrU <| r.mem_ball_zero.mpr
+    ((le_add_of_nonneg_left (apply_nonneg p₀ x)).trans_lt (p.mem_ball_zero.mp hx))
+  have hpg : gaugeSeminorm bV cV (absorbent_nhds_zero hV) = p :=
+    DFunLike.coe_injective (p.restrictScalars ℝ).gauge_ball
+  refine ⟨V, hV, bV, cV, hVU, ?_⟩
+  let p' := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  let T := localBanachMap p' q (gauge_mono (absorbent_nhds_zero hV) hVU)
+  have hbound (n : ℕ) (x : E) : ‖φ n x‖ ≤ d n * p' x := by
+    rw [show p' = p from hpg]
+    exact (hφ n x).trans (mul_le_mul_of_nonneg_left (hp₀p x) (hd₀ n))
+  let f (n : ℕ) : WithLocalSeminorm p' →L[ℂ] ℂ :=
+    (show WithLocalSeminorm p' →ₗ[ℂ] ℂ from φ n).mkContinuous (d n) (hbound n)
+  let φ' (n : ℕ) := (f n).fromCompletion
+  let b' (n : ℕ) : LocalBanach q := (show WithLocalSeminorm q from b n)
+  have hφ' (n : ℕ) : ‖φ' n‖ ≤ d n := by
+    apply ContinuousLinearMap.opNorm_le_bound _ (hd₀ n)
+    intro x
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+    | ih x =>
+      rw [show φ' n (x : LocalBanach p') = f n x from (f n).fromCompletion_apply_coe x,
+        Completion.norm_coe]
+      exact hbound n x
+  have hb' (n : ℕ) : ‖b' n‖ ≤ C := (localBanach_norm_coe q (b n)).trans_le (hb n)
+  have hs : Summable (fun n ↦ ‖φ' n‖ * ‖b' n‖) :=
+    (hd.mul_right C).of_nonneg_of_le (fun _ ↦ by positivity)
+      (fun n ↦ mul_le_mul (hφ' n) (hb' n) (norm_nonneg _) (hd₀ n))
+  apply integral_evaluation_of_rankOne_series T φ' b' hs
+  let R (n : ℕ) : LocalBanach p' →L[ℂ] LocalBanach q := (φ' n).smulRight (b' n)
+  have hR : Summable R :=
+    Summable.of_norm (hs.congr fun n ↦ ((φ' n).norm_smulRight_apply (b' n)).symm)
+  let j₀ : E →ₗ[ℂ] LocalBanach q := Completion.toComplL.toLinearMap.comp LinearMap.id
+  have hj₀ (x : E) : ‖j₀ x‖ = q x := localBanach_norm_coe q x
+  let j : E →L[ℂ] LocalBanach q := ⟨j₀, by
+    apply (PolynormableSpace.withSeminorms ℂ E).continuous_normedSpace_rng (LocalBanach q) j₀
+    refine ⟨{⟨q, continuous_gauge cU hU⟩}, 1, ?_⟩
+    simpa using (show (normSeminorm ℂ _).comp j₀ ≤ q from fun x ↦ (hj₀ x).le)⟩
+  -- On the dense image of E, the operator series is the original expansion.
+  have hRT : (∑' n, R n) = T := by
+    ext x
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_eq (by fun_prop) (by fun_prop)
+    | ih x =>
+      have hsum' := (hsum x).mapL j
+      have hsumR := hR.hasSum.mapL
+        (ContinuousLinearMap.apply ℂ (LocalBanach q) (x : LocalBanach p'))
+      apply hsumR.unique
+      convert hsum' using 1
+      · ext n
+        change φ' n (x : LocalBanach p') • b' n = j (φ n x • b n)
+        rw [(f n).fromCompletion_apply_coe, map_smul]
+        rfl
+      · exact localBanachMap_coe p' q _ x
+  intro x
+  simpa only [hRT, ContinuousLinearMap.apply_apply, R, ContinuousLinearMap.smulRight_apply] using
+    hR.hasSum.mapL (ContinuousLinearMap.apply ℂ (LocalBanach q) x)
+
+
+/-- A series of Euclidean Schwartz functions is summable if it is absolutely
+summable in every defining seminorm. -/
+private theorem euclideanSchwartz_summable_of_seminorm {m : ℕ}
+    {f : ℕ → SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ}
+    (h : ∀ k l, Summable (fun n ↦ SchwartzMap.seminorm ℂ k l (f n))) : Summable f := by
+  let E := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+  have : CompleteSpace E := completeSpace_schwartzMap
+  apply summable_iff_cauchySeq_finset.mpr
+  rw [CauchySeq, cauchy_map_iff', uniformity_eq_comap_nhds_zero, tendsto_comap_iff,
+    (schwartz_withSeminorms ℂ _ _).tendsto_nhds]
+  rintro ⟨k, l⟩ ε hε
+  let p : Seminorm ℂ E := SchwartzMap.seminorm ℂ k l
+  let j : E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+  have hj (x : E) : ‖j x‖ = p x := localBanach_norm_coe p x
+  have hs : Summable (fun n ↦ j (f n)) := Summable.of_norm (by simpa only [hj] using h k l)
+  have ht := cauchy_map_iff'.mp (summable_iff_cauchySeq_finset.mp hs)
+  rw [tendsto_uniformity_iff_dist_tendsto_zero, Metric.tendsto_nhds] at ht
+  filter_upwards [ht ε hε] with s hs'
+  rw [Real.dist_eq, sub_zero, abs_of_nonneg dist_nonneg] at hs'
+  rw [dist_eq_norm', ← map_sum, ← map_sum, ← map_sub, hj] at hs'
+  simpa only [sub_zero, Function.comp_apply, schwartzSeminormFamily, p] using hs'
+
+/-- In positive dimension, the Hermite functions form a Hilbert basis of complex
+L² consisting of Schwartz functions. Enumerating the multi-indices in order
+of total degree gives an indexing by ℕ with polynomial growth of the basis
+seminorms and rapid decay of the coefficients. For each decay order the bound
+is uniform on the unit ball of a suitable continuous Schwartz seminorm. -/
+private theorem euclideanSchwartz_hermite_estimates (m : ℕ) (hm : 0 < m) :
+    let D := EuclideanSpace ℝ (Fin m)
+    let E := SchwartzMap D ℂ
+    let J := SchwartzMap.toLpCLM ℂ ℂ 2 (volume : Measure D)
+    ∃ (b : ℕ → E) (B : HilbertBasis ℕ ℂ (Lp ℂ 2 (volume : Measure D))),
+      (∀ n, J (b n) = B n) ∧
+      (∀ q : Seminorm ℂ E, Continuous q → ∃ (C : ℝ) (k : ℕ), 0 ≤ C ∧
+        ∀ n : ℕ, q (b n) ≤ C * ((n : ℝ) + 1) ^ k) ∧
+      ∀ k : ℕ, ∃ p : Seminorm ℂ E, Continuous p ∧
+        ∀ (n : ℕ) (f : E), ‖B.repr (J f) n‖ * ((n : ℝ) + 1) ^ k ≤ p f := by
+  sorry
+
 /-- Paper: Proposition 2.1.1.6, p. 61. The Euclidean Schwartz space is nuclear. -/
 theorem euclideanSchwartz_nuclear (m : ℕ) :
-    IsNuclearTVS.{v} (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ) := by sorry
+    IsNuclearTVS.{v} (SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ) := by
+  let D := EuclideanSpace ℝ (Fin m)
+  let E := SchwartzMap D ℂ
+  let : PolynormableSpace ℂ E := (schwartz_withSeminorms ℂ _ _).toPolynormableSpace
+  by_cases hm : m = 0
+  · subst m
+    let eval : E →ₗ[ℂ] ℂ :=
+      { toFun := fun f ↦ f 0
+        map_add' := by intros; rfl
+        map_smul' := by intros; rfl }
+    have heval : Injective eval := by
+      intro f g h
+      ext x
+      exact (Subsingleton.elim (0 : D) x) ▸ h
+    let : FiniteDimensional ℂ E := FiniteDimensional.of_injective eval heval
+    exact isNuclearTVS_of_finiteDimensional E
+  let J := SchwartzMap.toLpCLM ℂ ℂ 2 (volume : Measure D)
+  obtain ⟨b, B, hb, hgrowth, hdecay⟩ := euclideanSchwartz_hermite_estimates m (Nat.pos_of_ne_zero hm)
+  change ∀ n, J (b n) = B n at hb
+  let φ (n : ℕ) : E →ₗ[ℂ] ℂ := ((innerSL ℂ (B n)).comp J).toLinearMap
+  have hcoeff (n : ℕ) (f : E) : φ n f = B.repr (J f) n := (B.repr_apply_apply _ _).symm
+  let d (n : ℕ) : ℝ := (((n : ℝ) + 1) ^ 2)⁻¹
+  have hd : Summable d := by
+    simpa only [d, Function.comp_def, Nat.cast_succ] using
+      (Real.summable_nat_pow_inv.mpr (by decide : 1 < 2)).comp_injective Nat.succ_injective
+  have hd₀ (n : ℕ) : 0 ≤ d n := by positivity
+  -- Rescale the two factors without changing their product to bound the vectors
+  -- uniformly in the chosen seminorm and the coefficients by a summable sequence.
+  have hscale (q : Seminorm ℂ E) (hq : Continuous q) :
+      ∃ (p : Seminorm ℂ E) (ψ : ℕ → E →ₗ[ℂ] ℂ) (c : ℕ → E) (C : ℝ),
+        Continuous p ∧ 0 ≤ C ∧ (∀ n f, ‖ψ n f‖ ≤ d n * p f) ∧
+          (∀ n, q (c n) ≤ C) ∧ ∀ n f, ψ n f • c n = φ n f • b n := by
+    obtain ⟨C, k, hC, hq'⟩ := hgrowth q hq
+    obtain ⟨p, hp, hp'⟩ := hdecay (k + 2)
+    let w (n : ℕ) : ℝ := ((n : ℝ) + 1) ^ k
+    have hw (n : ℕ) : 0 < w n := by positivity
+    refine ⟨p, fun n ↦ (w n : ℂ) • φ n, fun n ↦ (w n : ℂ)⁻¹ • b n, C, hp, hC, ?_, ?_, ?_⟩
+    · intro n f
+      rw [LinearMap.smul_apply, norm_smul, Complex.norm_of_nonneg (hw n).le, hcoeff]
+      have hh := hp' n f
+      rw [pow_add] at hh
+      change ‖B.repr (J f) n‖ * (w n * ((n : ℝ) + 1) ^ 2) ≤ p f at hh
+      rw [← mul_assoc, mul_comm ‖B.repr (J f) n‖] at hh
+      exact (le_inv_mul_iff₀ (by positivity : 0 < ((n : ℝ) + 1) ^ 2)).mpr (by
+        rw [mul_comm]
+        exact hh)
+    · intro n
+      rw [map_smul_eq_mul, norm_inv, Complex.norm_of_nonneg (hw n).le]
+      exact (inv_mul_le_iff₀ (hw n)).mpr (by rw [mul_comm]; exact hq' n)
+    · intro n f
+      have hw' : (w n : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hw n).ne'
+      rw [LinearMap.smul_apply, smul_eq_mul, smul_smul, mul_right_comm,
+        mul_inv_cancel₀ hw', one_mul]
+  have hsum (f : E) : HasSum (fun n ↦ φ n f • b n) f := by
+    have hs : Summable (fun n ↦ φ n f • b n) := by
+      apply euclideanSchwartz_summable_of_seminorm
+      intro k l
+      let q : Seminorm ℂ E := SchwartzMap.seminorm ℂ k l
+      obtain ⟨p, ψ, c, C, -, hC, hψ, hc, heq⟩ := hscale q
+        ((schwartz_withSeminorms ℂ _ _).continuous_seminorm (k, l))
+      apply ((hd.mul_right (p f)).mul_right C).of_nonneg_of_le (fun _ ↦ apply_nonneg _ _)
+      intro n
+      change q (φ n f • b n) ≤ (d n * p f) * C
+      rw [← heq, map_smul_eq_mul]
+      exact mul_le_mul (hψ n f) (hc n) (apply_nonneg _ _) (by positivity)
+    -- Identify the Schwartz limit using the same sum in L².
+    have hJ : Injective J := by
+      intro f₁ f₂ he
+      apply SchwartzMap.ext
+      have h₁ := f₁.coeFn_toLp 2 (volume : Measure D)
+      have h₂ := f₂.coeFn_toLp 2 (volume : Measure D)
+      change f₁.toLp 2 (volume : Measure D) = f₂.toLp 2 (volume : Measure D) at he
+      rw [he] at h₁
+      exact congrFun ((f₁.continuous.ae_eq_iff_eq _ f₂.continuous).mp (h₁.symm.trans h₂))
+    have hL2 := B.hasSum_repr (J f)
+    have hsumJ := hs.hasSum.mapL J
+    have h' : J (∑' n, φ n f • b n) = J f := by
+      apply hsumJ.unique
+      simpa only [map_smul, hcoeff, hb] using hL2
+    simpa only [hJ h'] using hs.hasSum
+  apply nuclear_of_rankOne_series
+  intro q hq
+  obtain ⟨p, ψ, c, C, hp, hC, hψ, hc, heq⟩ := hscale q hq
+  exact ⟨p, ψ, c, d, C, hp, hC, hd, hd₀, hψ, hc, fun f ↦ by simpa only [heq] using hsum f⟩
+
+end Nuclearity
 
 /-- Paper: Proposition 2.1.1.6, p. 61. The Euclidean Schwartz space is Fréchet. -/
 theorem euclideanSchwartz_frechet (m : ℕ) :
