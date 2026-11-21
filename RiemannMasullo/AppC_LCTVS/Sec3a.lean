@@ -10,6 +10,7 @@ import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
 import Mathlib.Topology.Algebra.InfiniteSum.Module
+import Mathlib.Topology.UniformSpace.Ascoli
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
 
 /-!
@@ -2178,7 +2179,27 @@ endomorphisms on the right by a fixed compact operator gives convergence
 in operator norm. -/
 theorem tendsto_compact_comp_of_pointwise {A Q : H →L[ℂ] H} {Qm : ℕ → H →L[ℂ] H}
     (hA : IsCompactOperator A) (hQ : ∀ x, Tendsto (fun m ↦ Qm m x) atTop (𝓝 (Q x))) :
-    Tendsto (fun m ↦ (Qm m).comp A) atTop (𝓝 (Q.comp A)) := by sorry
+    Tendsto (fun m ↦ (Qm m).comp A) atTop (𝓝 (Q.comp A)) := by
+  obtain ⟨K, hK, hAK⟩ := hA.image_closedBall_subset_compact 1
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hK
+  have heq : Equicontinuous (fun m x ↦ Qm m x) :=
+    (PolynormableSpace.banach_steinhaus (𝓕 := Qm)
+      (fun x ↦ (hQ x).isVonNBounded_range ℂ)).equicontinuous
+  have hrestrict : Equicontinuous (fun m (x : K) ↦ Qm m x) :=
+    (equicontinuous_restrict_iff _).mpr (heq.equicontinuousOn K)
+  have hunif : TendstoUniformly (fun m (x : K) ↦ Qm m x) (fun x ↦ Q x) atTop :=
+    UniformFun.tendsto_iff_tendstoUniformly.mp <|
+      (hrestrict.tendsto_uniformFun_iff_pi atTop (fun x ↦ Q x)).mpr
+        (tendsto_pi_nhds.mpr fun x ↦ hQ x)
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  filter_upwards [Metric.tendstoUniformly_iff.mp hunif (ε / 2) (half_pos hε)] with m hm
+  rw [dist_eq_norm]
+  refine (ContinuousLinearMap.opNorm_le_of_unit_norm (half_pos hε).le fun x hx ↦ ?_).trans_lt
+    (half_lt_self hε)
+  have hAx : A x ∈ K := hAK (mem_image_of_mem A (mem_closedBall_zero_iff.mpr hx.le))
+  change ‖Qm m (A x) - Q (A x)‖ ≤ ε / 2
+  rw [← dist_eq_norm, dist_comm]
+  exact (hm ⟨A x, hAx⟩).le
 
 /-- Paper: Lemma C.3.4.4(1), p. 698. Left multiplication by a bounded operator
 preserves nuclearity. -/
