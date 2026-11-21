@@ -339,12 +339,17 @@ periodic map is a scalar smooth periodic function. -/
 def weakPeriodicSmoothSubmodule : Submodule ℂ (V → E) :=
   ⨅ φ : StrongDual ℂ E, (vectorPeriodicSmoothSubmodule d ℂ).comap (φ.toLinearMap.compLeft V)
 
+-- Retain the section instances in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: Remark C.5.1.27, p. 735. The weak periodic condition tests ordinary
 smoothness and integer translation invariance of each scalar evaluation. -/
 theorem mem_weakPeriodicSmoothSubmodule_iff (f : V → E) :
     f ∈ weakPeriodicSmoothSubmodule d E ↔
       ∀ φ : StrongDual ℂ E, ContDiff ℝ ∞ (φ ∘ f) ∧
-        ∀ n : Fin d → ℤ, Periodic (φ ∘ f) (eucInt n) := by sorry
+        ∀ n : Fin d → ℤ, Periodic (φ ∘ f) (eucInt n) := by
+  rw [weakPeriodicSmoothSubmodule, Submodule.mem_iInf]
+  exact forall_congr' fun φ ↦
+    Submodule.mem_comap.trans (mem_vectorPeriodicSmoothSubmodule_complex_iff (φ ∘ f))
 
 variable (d E) in
 /-- Paper: Remark C.5.1.27, p. 735. Each scalar evaluation of a weak Schwartz
