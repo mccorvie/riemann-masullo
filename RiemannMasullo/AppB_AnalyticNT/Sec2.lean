@@ -60,7 +60,25 @@ Deviation: Sanity check for the extended-norm formulation. -/
 theorem memLeftHardy_one_iff (Φ : ℂ → ℂ) (b : ℝ) :
     MemLeftHardy Φ b 1 ↔ DifferentiableOn ℂ Φ (Complex.re ⁻¹' Iio b) ∧
       ∃ C : ℝ, ∀ σ < b, Complex.VerticalIntegrable Φ σ ∧
-        (∫ y : ℝ, ‖Φ (verticalPoint σ y)‖) ≤ C := by sorry
+        (∫ y : ℝ, ‖Φ (verticalPoint σ y)‖) ≤ C := by
+  simp only [MemLeftHardy, zero_lt_one, true_and, ENNReal.ofReal_one,
+    Complex.VerticalIntegrable]
+  constructor
+  · rintro ⟨hΦ, C, hC⟩
+    refine ⟨hΦ, C, fun σ hσ ↦ ?_⟩
+    have hLp := hC σ hσ
+    have hInt : Integrable (verticalTrace Φ σ) :=
+      memLp_one_iff_integrable.mp (memLp_iff.mpr (hLp.trans_lt ENNReal.coe_lt_top))
+    refine ⟨hInt, ?_⟩
+    rw [integral_norm_eq_lintegral_eNorm hInt.aestronglyMeasurable,
+      ← eLpNorm_one_eq_lintegral_eNorm hInt.aestronglyMeasurable]
+    exact ENNReal.toReal_mono ENNReal.coe_ne_top hLp
+  · rintro ⟨hΦ, C, hC⟩
+    refine ⟨hΦ, C.toNNReal, fun σ hσ ↦ ?_⟩
+    obtain ⟨hInt, hBound⟩ := hC σ hσ
+    rw [eLpNorm_one_eq_lintegral_eNorm hInt.aestronglyMeasurable,
+      ← ofReal_integral_norm_eq_lintegral_eNorm hInt, ENNReal.ofNNReal_toNNReal]
+    exact ENNReal.ofReal_le_ofReal hBound
 
 -- TODO(paper-gap): Footnotes 5 and 6 ask how the cited Hardy-space results
 -- apply on the left half-plane. Footnote 7 asks how far the decay is uniform.
