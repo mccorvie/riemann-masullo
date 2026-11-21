@@ -180,7 +180,104 @@ numbers agree with Mathlib's singular values, including the zero tail.
 Deviation: This checks the rank cutoff and the zero-based indexing. -/
 theorem approximationNumber_eq_singularValues [FiniteDimensional ℂ E] [FiniteDimensional ℂ F]
     (T : E →L[ℂ] F) (n : ℕ) :
-    approximationNumber T n = T.toLinearMap.singularValues n := by sorry
+    approximationNumber T n = T.toLinearMap.singularValues n := by
+  classical
+  let errors : Set ℝ := {r | ∃ S : E →L[ℂ] F,
+    Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}
+  change sInf errors = _
+  have hnonneg : (0 : ℝ) ∈ lowerBounds errors := by
+    rintro r ⟨S, _, rfl⟩
+    exact norm_nonneg _
+  have hzero : Module.rank ℂ (0 : E →L[ℂ] F).toLinearMap.range ≤ (n : Cardinal) := by simp
+  by_cases hlarge : Module.finrank ℂ T.toLinearMap.range ≤ n
+  · have hrank : Module.rank ℂ T.toLinearMap.range ≤ (n : Cardinal) := by
+      simpa only [← Module.finrank_eq_rank, Nat.cast_le] using hlarge
+    rw [T.toLinearMap.singularValues_eq_zero_iff_le_finrank_range.mpr hlarge]
+    apply le_antisymm
+    · exact (csInf_le ⟨0, hnonneg⟩ ⟨T, hrank, rfl⟩).trans_eq (by simp)
+    · exact le_csInf ⟨_, T, hrank, rfl⟩ hnonneg
+  have hn := (Nat.lt_of_not_ge hlarge).trans_le T.toLinearMap.finrank_range_le
+  let hSymm := T.toLinearMap.isSymmetric_adjoint_comp_self
+  let b := hSymm.eigenvectorBasis rfl
+  let σ := T.toLinearMap.singularValues
+  have hσ : ∀ i, 0 ≤ σ i := T.toLinearMap.singularValues_nonneg
+  have hanti : Antitone σ := T.toLinearMap.singularValues_antitone
+  -- In the eigenbasis of T†T, the squared norm of T x is a weighted sum of coordinates.
+  have henergy (x : E) : ‖T x‖ ^ 2 =
+      ∑ i : Fin (Module.finrank ℂ E), σ i ^ 2 * ‖⟪b i, x⟫_ℂ‖ ^ 2 := by
+    rw [show ‖T x‖ ^ 2 = RCLike.re ⟪x, (T.toLinearMap.adjoint ∘ₗ T.toLinearMap) x⟫_ℂ by
+      rw [LinearMap.comp_apply, LinearMap.adjoint_inner_right, ← norm_sq_eq_re_inner]
+      rfl]
+    rw [← b.sum_inner_mul_inner, map_sum]
+    apply Finset.sum_congr rfl
+    intro i _
+    rw [← b.repr_apply_apply, hSymm.eigenvectorBasis_apply_self_apply rfl,
+      ← T.toLinearMap.sq_singularValues_fin rfl i, b.repr_apply_apply]
+    rw [mul_left_comm, RCLike.re_ofReal_mul, inner_mul_symm_re_eq_norm, norm_mul,
+      ← inner_conj_symm x, RCLike.norm_conj, ← pow_two]
+  let V (k : ℕ) := Submodule.span ℂ (b '' {i | (i : ℕ) < k})
+  have hdim (k : ℕ) (hk : k ≤ Module.finrank ℂ E) : Module.finrank ℂ (V k) = k := by
+    have hind := b.orthonormal.linearIndependent.comp (Fin.castLE hk) (Fin.castLE_injective hk)
+    change Module.finrank ℂ (Submodule.span ℂ (b '' {i | (i : ℕ) < k})) = k
+    rw [← Fin.range_castLE hk, ← Set.range_comp]
+    simpa only [Fintype.card_fin] using finrank_span_eq_card hind
+  apply le_antisymm
+  · -- Truncate T to the first n eigenvectors.
+    let S := T.comp (V n).starProjection
+    have hS : Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) := by
+      rw [← Module.finrank_eq_rank, Nat.cast_le]
+      change Module.finrank ℂ (T.toLinearMap.comp (V n).starProjection.toLinearMap).range ≤ n
+      rw [LinearMap.range_comp, Submodule.range_starProjection]
+      exact (Submodule.finrank_map_le _ _).trans_eq (hdim n hn.le)
+    refine (csInf_le ⟨0, hnonneg⟩ ⟨S, hS, rfl⟩).trans ?_
+    rw [norm_sub_rev]
+    apply ContinuousLinearMap.opNorm_le_bound _ (hσ n)
+    intro x
+    let y := (V n)ᗮ.starProjection x
+    have hy : y ∈ (V n)ᗮ := ((V n)ᗮ.orthogonalProjectionOnto x).property
+    have heq : (T - S) x = T y := by
+      simp [S, y, map_sub]
+    rw [heq]
+    refine (show ‖T y‖ ≤ σ n * ‖y‖ from ?_).trans
+      (mul_le_mul_of_nonneg_left ((V n)ᗮ.norm_starProjection_apply_le x) (hσ n))
+    apply le_of_sq_le_sq _ (mul_nonneg (hσ n) (norm_nonneg _))
+    rw [henergy, mul_pow, ← b.sum_sq_norm_inner_right y, Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro i _
+    by_cases hi : (i : ℕ) < n
+    · have hz := ((V n).mem_orthogonal y).mp hy (b i)
+          (Submodule.subset_span (Set.mem_image_of_mem _ hi))
+      simp [hz]
+    · exact mul_le_mul_of_nonneg_right
+        ((sq_le_sq₀ (hσ i) (hσ n)).mpr (hanti (Nat.le_of_not_lt hi))) (sq_nonneg _)
+  · refine le_csInf ⟨_, 0, hzero, rfl⟩ ?_
+    rintro r ⟨S, hS, rfl⟩
+    have hSdim : Module.finrank ℂ S.toLinearMap.range ≤ n := by
+      simpa only [← Module.finrank_eq_rank, Nat.cast_le] using hS
+    -- Every admissible S kills a nonzero vector in the span of the first n + 1 eigenvectors.
+    let R := S.toLinearMap.rangeRestrict.comp (V (n + 1)).subtype
+    have hker : R.ker ≠ ⊥ := LinearMap.ker_ne_bot_of_finrank_lt (by
+      rw [hdim (n + 1) hn]
+      exact Nat.lt_succ_of_le hSdim)
+    obtain ⟨x, hx, hx0⟩ := Submodule.exists_mem_ne_zero_of_ne_bot hker
+    have hSx : S (x : E) = 0 := congrArg Subtype.val (LinearMap.mem_ker.mp hx)
+    have hxnorm : 0 < ‖(x : E)‖ := norm_pos_iff.mpr (fun h ↦ hx0 (Subtype.ext h))
+    have hlower : σ n * ‖(x : E)‖ ≤ ‖T (x : E)‖ := by
+      apply le_of_sq_le_sq _ (norm_nonneg _)
+      rw [henergy, mul_pow, ← b.sum_sq_norm_inner_right (x : E), Finset.mul_sum]
+      apply Finset.sum_le_sum
+      intro i _
+      by_cases hi : (i : ℕ) ≤ n
+      · exact mul_le_mul_of_nonneg_right
+          ((sq_le_sq₀ (hσ n) (hσ i)).mpr (hanti hi)) (sq_nonneg _)
+      · have hsupport := (b.toBasis.repr_support_subset_of_mem_span _ x.property)
+        have hz : ⟪b i, (x : E)⟫_ℂ = 0 := by
+          rw [← b.repr_apply_apply, ← b.coe_toBasis_repr_apply, ← Finsupp.notMem_support_iff]
+          exact fun hs ↦ hi (Nat.lt_succ_iff.mp (hsupport hs))
+        simp [hz]
+    have hbound := (S - T).le_opNorm (x : E)
+    rw [sub_apply, hSx, zero_sub, norm_neg] at hbound
+    exact le_of_mul_le_mul_right (hlower.trans hbound) hxnorm
 
 end ApproximationNumbers
 
