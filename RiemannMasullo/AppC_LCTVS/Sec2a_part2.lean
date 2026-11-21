@@ -2338,14 +2338,97 @@ abbrev ProjectiveTensor :=
     (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
       ContinuousAt (fun v : E × F ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val)
 
+/-- The seminorms with jointly continuous pullback at zero generate the projective topology. -/
+private theorem projectiveTensor_withSeminorms (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
+
+/-- Pure tensors depend jointly continuously on their factors at zero in the projective topology. -/
+private theorem continuousAt_projectiveTensor_tmul_zero (X Y : Type*)
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
+    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
+  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
+  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
+  rw [hzero,
+    (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp (projectiveTensor_withSeminorms X Y),
+    tendsto_iInf]
+  intro p
+  rw [tendsto_comap_iff]
+  have hp := p.property.tendsto
+  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
+  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
+
 variable {E F} [lcE : PolynormableSpace ℂ E] [sE : T2Space E]
   [lcF : PolynormableSpace ℂ F] [sF : T2Space F]
 
+omit sE sF in
+/-- The canonical bilinear map into the projective tensor product is jointly continuous. -/
+private theorem continuous_projectiveTensor_tmul :
+    @Continuous (E × F) (ProjectiveTensor E F) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) := by
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : IsTopologicalAddGroup F := PolynormableSpace.isTopologicalAddGroup ℂ F
+  let tmul : E × F → ProjectiveTensor E F := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
+  have hzero : ContinuousAt tmul 0 := continuousAt_projectiveTensor_tmul_zero E F
+  -- Scale the fixed factor into the rectangle where the generating seminorm is bounded.
+  have hleft (y : F) : Continuous (fun x : E ↦ tmul (x, y)) := by
+    let L : E →ₗ[ℂ] ProjectiveTensor E F := (TensorProduct.mk ℂ E F).flip y
+    refine (projectiveTensor_withSeminorms E F).continuous_of_continuous_comp L fun p ↦ ?_
+    let q := p.val.comp L
+    have hsmall : {v : E × F | p.val (tmul v) < 1} ∈ 𝓝 ((0 : E), (0 : F)) := by
+      exact p.property.preimage_mem_nhds (Iio_mem_nhds (by simp))
+    obtain ⟨U, hU, V, hV, hUV⟩ := mem_nhds_prod_iff.mp hsmall
+    obtain ⟨c, hc, hc_ne⟩ := ((absorbent_nhds_zero (𝕜 := ℂ) hV).eventually_nhdsNE_zero y
+      |>.and eventually_mem_nhdsWithin).exists
+    refine q.continuous (r := 1 / ‖c‖) (mem_of_superset hU fun x hx ↦ ?_)
+    rw [Seminorm.mem_ball_zero]
+    change p.val (x ⊗ₜ[ℂ] y) < 1 / ‖c‖
+    have hbound := hUV (show (x, c • y) ∈ U ×ˢ V from ⟨hx, hc⟩)
+    change p.val (x ⊗ₜ[ℂ] (c • y)) < 1 at hbound
+    rw [TensorProduct.tmul_smul, map_smul_eq_mul] at hbound
+    exact (lt_div_iff₀' (norm_pos_iff.mpr hc_ne)).mpr hbound
+  have hright (x : E) : Continuous (fun y : F ↦ tmul (x, y)) := by
+    let L : F →ₗ[ℂ] ProjectiveTensor E F := TensorProduct.mk ℂ E F x
+    refine (projectiveTensor_withSeminorms E F).continuous_of_continuous_comp L fun p ↦ ?_
+    let q := p.val.comp L
+    have hsmall : {v : E × F | p.val (tmul v) < 1} ∈ 𝓝 ((0 : E), (0 : F)) := by
+      exact p.property.preimage_mem_nhds (Iio_mem_nhds (by simp))
+    obtain ⟨U, hU, V, hV, hUV⟩ := mem_nhds_prod_iff.mp hsmall
+    obtain ⟨c, hc, hc_ne⟩ := ((absorbent_nhds_zero (𝕜 := ℂ) hU).eventually_nhdsNE_zero x
+      |>.and eventually_mem_nhdsWithin).exists
+    refine q.continuous (r := 1 / ‖c‖) (mem_of_superset hV fun y hy ↦ ?_)
+    rw [Seminorm.mem_ball_zero]
+    change p.val (x ⊗ₜ[ℂ] y) < 1 / ‖c‖
+    have hbound := hUV (show (c • x, y) ∈ U ×ˢ V from ⟨hc, hy⟩)
+    change p.val ((c • x) ⊗ₜ[ℂ] y) < 1 at hbound
+    rw [← TensorProduct.smul_tmul', map_smul_eq_mul] at hbound
+    exact (lt_div_iff₀' (norm_pos_iff.mpr hc_ne)).mpr hbound
+  refine continuous_iff_continuousAt.mpr fun a ↦ ?_
+  let d : E × F → E × F := fun v ↦ v - a
+  have hd : ContinuousAt d a := (continuous_id.sub continuous_const).continuousAt
+  have hda : d a = 0 := sub_self a
+  have hdiff := hzero.comp_of_eq hd hda
+  have h₁ := (hleft a.2).continuousAt.comp (continuous_fst.continuousAt.comp hd)
+  have h₂ := (hright a.1).continuousAt.comp (continuous_snd.continuousAt (x := a))
+  refine ((hdiff.add h₁).add h₂).congr_of_eventuallyEq (Filter.Eventually.of_forall fun v ↦ ?_)
+  change v.1 ⊗ₜ[ℂ] v.2 = ((v.1 - a.1) ⊗ₜ[ℂ] (v.2 - a.2) +
+    (v.1 - a.1) ⊗ₜ[ℂ] a.2) + a.1 ⊗ₜ[ℂ] v.2
+  rw [← tmul_add, sub_add_cancel, ← add_tmul, sub_add_cancel]
+
+-- Retain the Hausdorff assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.2.3.14), p. 679. A linear map out of the projective tensor product is
 continuous exactly when its associated bilinear map is jointly continuous. -/
 theorem continuous_projectiveTensor_iff {G : Type*} [AddCommGroup G] [Module ℂ G]
     [TopologicalSpace G] [PolynormableSpace ℂ G] (T : ProjectiveTensor E F →ₗ[ℂ] G) :
-    Continuous T ↔ Continuous (fun v : E × F ↦ T (v.1 ⊗ₜ[ℂ] v.2)) := by sorry
+    Continuous T ↔ Continuous (fun v : E × F ↦ T (v.1 ⊗ₜ[ℂ] v.2)) := by
+  refine ⟨fun h ↦ h.comp continuous_projectiveTensor_tmul, fun h ↦ ?_⟩
+  refine (PolynormableSpace.withSeminorms ℂ G).continuous_of_continuous_comp T fun q ↦ ?_
+  exact (projectiveTensor_withSeminorms E F).continuous_seminorm
+    ⟨q.val.comp T, (q.property.comp h).continuousAt⟩
 
 /-- Paper: (C.2.3.15), p. 679. The convex circled hulls of pure tensors from pairs
 of basic zero-neighborhoods form a zero-neighborhood basis. -/
@@ -2505,30 +2588,6 @@ theorem injectiveTensor_equicontinuous_iff (D : Set (StrongDual ℂ (InjectiveTe
 end Comparison
 
 section DirectSums
-
-/-- The seminorms with jointly continuous pullback at zero generate the projective topology. -/
-private theorem projectiveTensor_withSeminorms (X Y : Type*)
-    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
-    WithSeminorms (E := ProjectiveTensor X Y) (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
-      ContinuousAt (fun v : X × Y ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val) := ⟨rfl⟩
-
-/-- Pure tensors depend jointly continuously on their factors at zero in the projective topology. -/
-private theorem continuousAt_projectiveTensor_tmul_zero (X Y : Type*)
-    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] :
-    @ContinuousAt (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) 0 := by
-  let tmul : X × Y → ProjectiveTensor X Y := fun v ↦ v.1 ⊗ₜ[ℂ] v.2
-  have hzero : tmul 0 = 0 := TensorProduct.zero_tmul _ _
-  change Tendsto tmul (𝓝 0) (𝓝 (tmul 0))
-  rw [hzero,
-    (SeminormFamily.withSeminorms_iff_nhds_eq_iInf _).mp (projectiveTensor_withSeminorms X Y),
-    tendsto_iInf]
-  intro p
-  rw [tendsto_comap_iff]
-  have hp := p.property.tendsto
-  change Tendsto (p.val ∘ tmul) (𝓝 0) (𝓝 (p.val (tmul 0))) at hp
-  rwa [hzero, show p.val (0 : ProjectiveTensor X Y) = 0 from map_zero p.val] at hp
 
 /-- A generating projective seminorm, tested on the unit ball in the normed factor, is bounded
 by a single continuous seminorm on the other factor. -/
