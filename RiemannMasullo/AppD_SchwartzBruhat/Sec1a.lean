@@ -2276,6 +2276,8 @@ theorem weilFundamentalDomain_integral {f : G ⧸ H → ℂ} (hf : Integrable f 
   rw [← hmap] at hf ⊢
   exact integral_map hπ.aemeasurable hf.aestronglyMeasurable
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Corollary D.1.2.5, p. 748. The integral of a subgroup-invariant function
 over one Borel fundamental domain agrees with its integral over any other such domain. -/
@@ -2283,7 +2285,34 @@ theorem weilFundamentalDomain_integral_eq (hΔ' : MeasurableSet Δ')
     (hbij' : Function.Bijective (fun x : Δ' ↦ (QuotientGroup.mk x.val : G ⧸ H)))
     {f : G → ℂ} (hf : Measurable f) (hinv : ∀ (x : G) (h : H), f (x * (h : G)) = f x)
     (hint : IntegrableOn f Δ μ) :
-    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by sorry
+    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hdomain {D : Set G} (hD : MeasurableSet D)
+      (hDq : Function.Bijective (fun x : D ↦ (QuotientGroup.mk x.val : G ⧸ H))) :
+      IsFundamentalDomain H D μ := by
+    apply IsFundamentalDomain.mk' hD.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hDq.surjective (QuotientGroup.mk x)
+    let h : H := ⟨x⁻¹ * (y : G), QuotientGroup.eq.mp hy.symm⟩
+    have hh : (h : G) * x = (y : G) := by
+      change (x⁻¹ * (y : G)) * x = (y : G)
+      rw [mul_comm, mul_inv_cancel_left]
+    refine ⟨h, ?_, ?_⟩
+    · change (h : G) * x ∈ D
+      rw [hh]
+      exact y.property
+    · intro k hk
+      have hkq : (QuotientGroup.mk ((k : G) * x) : G ⧸ H) = QuotientGroup.mk x := by
+        rw [mul_comm, QuotientGroup.mk_mul_of_mem x k.property]
+      have hky : (⟨(k : G) * x, hk⟩ : D) = y := hDq.injective (hkq.trans hy.symm)
+      exact Subtype.ext (mul_right_cancel ((congrArg Subtype.val hky).trans hh.symm))
+  have hs := hdomain hΔ hbij
+  have ht := hdomain hΔ' hbij'
+  have hsmul (h : H) (x : G) : f (h • x) = f x := by
+    change f ((h : G) * x) = f x
+    rw [mul_comm, hinv]
+  exact ⟨⟨hf.aestronglyMeasurable, (hs.hasFiniteIntegral_on_iff ht hsmul).mp hint.2⟩,
+    hs.setIntegral_eq ht hsmul⟩
 
 end FundamentalDomain
 
