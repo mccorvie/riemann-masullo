@@ -6,6 +6,7 @@ public import Mathlib.Analysis.LocallyConvex.Polar
 import Mathlib.Analysis.LocallyConvex.WeakDual
 import Mathlib.Analysis.Normed.Module.Dual
 import Mathlib.Topology.Algebra.Module.UniformConvergence
+import Mathlib.Topology.Baire.CompleteMetrizable
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.BanachSteinhaus
 
 /-!
@@ -370,7 +371,16 @@ theorem hilbert_pointwiseOperators_quasiComplete : QuasiCompleteSpace ℂ (H →
 
 /-- Paper: Remark C.2.1.8, p. 672. Every complex Fréchet space is barrelled. -/
 theorem isFrechetTVS_barrelled {X : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    (hX : IsFrechetTVS X) : BarrelledSpace ℂ X := by sorry
+    (hX : IsFrechetTVS X) : BarrelledSpace ℂ X := by
+  obtain ⟨hadd, hpoly, hmetric, hcomplete⟩ := hX
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace X := hcomplete
+  have : (uniformity X).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero X]
+    infer_instance
+  have : BaireSpace X := BaireSpace.of_completelyPseudoMetrizable
+  exact BaireSpace.instBarrelledSpace
 
 variable (A : Set (E →L[ℂ] F))
   (heq : EquicontinuousAt (fun f : A ↦ (f.val : E → F)) 0)
