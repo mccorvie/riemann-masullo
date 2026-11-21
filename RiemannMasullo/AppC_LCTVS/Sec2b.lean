@@ -1010,7 +1010,48 @@ variable (E : Type u) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
 zero-neighborhood in the weak dual is finite-dimensional. -/
 theorem finiteDimensional_weakDual_localBanach (U : Set (WeakDual ℂ E)) (hU : U ∈ 𝓝 0)
     (hb : Balanced ℂ U) (hc : Convex ℝ U) :
-    FiniteDimensional ℂ (LocalBanach (gaugeSeminorm hb hc (absorbent_nhds_zero hU))) := by sorry
+    FiniteDimensional ℂ (LocalBanach (gaugeSeminorm hb hc (absorbent_nhds_zero hU))) := by
+  classical
+  let p := gaugeSeminorm hb hc (absorbent_nhds_zero hU)
+  let i : WeakDual ℂ E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+  let evaluations := (topDualPairing ℂ E).toSeminormFamily
+  change U ∈ 𝓝 (0 : WeakBilin (topDualPairing ℂ E)) at hU
+  obtain ⟨⟨s, r⟩, hr, hsU⟩ :=
+    (topDualPairing ℂ E).weakBilin_withSeminorms.hasBasis_zero_ball.mem_iff.mp hU
+  let a : WeakDual ℂ E →ₗ[ℂ] (s → ℂ) :=
+    LinearMap.pi fun x : s ↦ (topDualPairing ℂ E).flip (x : E)
+  have hkerU : (a.ker : Set (WeakDual ℂ E)) ⊆ U := by
+    intro φ hφ
+    apply hsU
+    change φ.toStrongDual ∈ (s.sup evaluations).ball 0 r
+    rw [Seminorm.mem_ball_zero]
+    refine Seminorm.finset_sup_apply_lt hr fun x hx ↦ ?_
+    have hzero : φ x = 0 := congrFun (LinearMap.mem_ker.mp hφ) ⟨x, hx⟩
+    change ‖φ x‖ < r
+    simpa only [hzero, norm_zero] using hr
+  -- Every positive dilate of U contains the kernel of the evaluation map.
+  have hker : a.ker ≤ i.ker := by
+    intro φ hφ
+    let φ' : WithLocalSeminorm p := φ
+    have hiφ : ‖i φ‖ = p φ := localBanach_norm_coe p φ'
+    rw [LinearMap.mem_ker, ← norm_eq_zero, hiφ]
+    refine le_antisymm (le_of_forall_pos_le_add fun ε hε ↦ ?_) (apply_nonneg p φ)
+    rw [zero_add]
+    exact gauge_le_of_mem hε.le
+      ⟨ε⁻¹ • φ, hkerU ((a.ker.restrictScalars ℝ).smul_mem ε⁻¹ hφ), smul_inv_smul₀ hε.ne' φ⟩
+  have : FiniteDimensional ℂ (WeakDual ℂ E ⧸ a.ker) :=
+    FiniteDimensional.of_injective a.quotKerEquivRange.toLinearMap a.quotKerEquivRange.injective
+  have hker' : a.ker ≤ i.rangeRestrict.ker := by rwa [LinearMap.ker_rangeRestrict]
+  have : FiniteDimensional ℂ i.range :=
+    FiniteDimensional.of_surjective (a.ker.liftQ i.rangeRestrict hker') (by
+      rw [← LinearMap.range_eq_top, Submodule.range_liftQ, LinearMap.range_rangeRestrict])
+  -- The image in the completion is both dense and closed.
+  have hdense : DenseRange i := Completion.denseRange_coe (α := WithLocalSeminorm p)
+  apply FiniteDimensional.of_surjective i.range.subtype
+  intro z
+  have hz := hdense z
+  rw [← LinearMap.coe_range, i.range.isClosed_of_finiteDimensional.closure_eq] at hz
+  exact ⟨⟨z, hz⟩, rfl⟩
 
 /-- Paper: Lemma C.2.4.4, p. 687. The weak dual of a Hausdorff locally convex space
 is nuclear. -/
