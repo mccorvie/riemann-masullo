@@ -633,7 +633,37 @@ S has trivial ideal class after extension to the S-integers.
 Deviation: This is the obstruction to the representatives prescribed for (A.2.4.4). -/
 theorem sIdele_ideal_class_trivial (g : (integralAdelesOutside F S)ˣ) :
     CommRing.Pic.mapAlgebra (𝓞 F) Oₛ(F, S) (ideleIdealClass F (outsideInclusion g)) = 1 := by
-  sorry
+  let ev (v : Primes(F)) := (RestrictedProduct.evalRingHom
+    (fun w : Primes(F) ↦ w.adicCompletion F) v).comp (RingHom.snd
+      (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))
+  let x (v : Primes(F)) := Units.map (ev v).toMonoidHom (outsideInclusion g)
+  have hle (a : integralAdelesOutside F S) (v : Primes(F)) (hv : v ∉ S) :
+      Valued.v (ev v a.val) ≤ 1 := by
+    have ha := a.property
+    simp only [integralAdelesOutside, Subring.mem_iInf, Subring.mem_comap] at ha
+    exact ha v hv
+  -- Both the idele and its inverse are integral outside S.
+  have hsupp : (Function.mulSupport fun v ↦ localIdealClass F v (x v)) ⊆ (S : Set _) := by
+    intro v hv
+    by_contra hvS
+    apply hv
+    apply (localIdealClass_normalization F v (x v)).1
+    rw [HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one]
+    have hmul : Valued.v (x v).val * Valued.v (x v).inv = 1 := by
+      rw [← map_mul, (x v).val_inv, map_one]
+    exact eq_one_of_one_le_mul_left (hle g.val v hvS) (hle g.inv v hvS) hmul.ge
+  change CommRing.Pic.mapAlgebra (𝓞 F) Oₛ(F, S)
+    (∏ᶠ v, localIdealClass F v (x v)) = 1
+  rw [finprod_eq_finsetProd_of_mulSupport_subset _ hsupp,
+    Finset.prod_subtype S (fun _ ↦ Iff.rfl)]
+  -- The product over S comes from the first map in the Picard localization sequence.
+  have h := picard_localization_exact F ∅ S (Finset.empty_subset S)
+  dsimp only at h
+  rw [Finset.sdiff_empty] at h
+  obtain ⟨j, _, hexact, _, hj⟩ := h
+  have hclass := hexact.apply_apply_eq_one (QuotientGroup.mk (fun v : S ↦ QuotientGroup.mk (x v)))
+  rw [hj, ← CommRing.Pic.mapRingHom_algebraMap, CommRing.Pic.mapRingHom_mapRingHom] at hclass
+  rwa [← CommRing.Pic.mapRingHom_algebraMap]
 
 /-- Paper: Definition A.2.4.3, p. 554. Equation (A.2.4.4) takes a union of translates
 of the local domain times the outside integral units, inside the norm-one group integral
