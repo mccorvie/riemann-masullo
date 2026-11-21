@@ -187,7 +187,8 @@ of mass one with counting measure on the diagonal. -/
 theorem additiveTamagawaMeasure_quotientVolume :
     ∃ ν : Measure (Multiplicative 𝔸[F] ⧸ A[F]),
       IsWeilQuotientMeasure A[F] (show Measure (Multiplicative 𝔸[F]) from
-        additiveTamagawaMeasure F) Measure.count ν ∧ ν univ = 1 := by sorry
+        additiveTamagawaMeasure F) Measure.count ν ∧ ν univ = 1 :=
+  (Classical.choose_spec (additiveTamagawaMeasure_existsUnique F).exists).2.2
 
 /-- Paper: Definition A.3.1.1, p. 555. The additive Tamagawa measure of the
 chosen adelic fundamental domain equals the mass of the additive quotient, namely one. -/
