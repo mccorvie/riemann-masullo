@@ -1498,6 +1498,8 @@ variable {ν : Measure (PontryaginDual G)}
 -- TODO(paper-gap): D.1.5.2(3) asserts pointwise converses for arbitrary integrable
 -- representatives. On ℝ a function nonzero only at 0 has zero Fourier transform.
 
+-- Retain the integrability hypothesis in the existing signature.
+set_option linter.unusedVariables false in
 /-- Paper: Lemma D.1.5.2(3), p. 761. Invariance under a subgroup forces the Fourier
 transform to vanish off the annihilator.
 Deviation: Stated in the forward direction because pointwise invariance can fail
@@ -1505,7 +1507,25 @@ for an integrable representative of an invariant class. -/
 theorem lcaFourier_support_subset_annihilator (_hν : IsLCAPlancherelMeasure μ ν)
     {f : G → ℂ} (hf : Integrable f μ) (_hfhat : Integrable (lcaFourier μ f) ν)
     (H : Subgroup G) (_hH : IsClosed (H : Set G)) (hinv : ∀ h : H, ∀ x, f (h.val * x) = f x) :
-    Function.support (lcaFourier μ f) ⊆ (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
+    Function.support (lcaFourier μ f) ⊆ (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  intro χ hχ
+  refine (mem_lcaAnnihilator_iff H χ).mpr fun h ↦ ?_
+  have htranslate : lcaFourier μ f χ = lcaFourier μ f χ * star (χ h.val : ℂ) := by
+    unfold lcaFourier
+    calc
+      (∫ x, f x * star (χ x : ℂ) ∂μ) =
+          ∫ x, f (h.val * x) * star (χ (h.val * x) : ℂ) ∂μ :=
+        (integral_mul_left_eq_self (μ := μ) (fun x ↦ f x * star (χ x : ℂ)) h.val).symm
+      _ = (∫ x, f x * star (χ x : ℂ) ∂μ) * star (χ h.val : ℂ) := by
+        rw [← integral_mul_const]
+        apply integral_congr_ae
+        exact .of_forall fun x ↦ by
+          change f (h.val * x) * star (χ (h.val * x) : ℂ) =
+            (f x * star (χ x : ℂ)) * star (χ h.val : ℂ)
+          rw [hinv h x, map_mul, Circle.coe_mul, star_mul, mul_assoc]
+  have hstar : star (χ h.val : ℂ) = 1 :=
+    mul_left_cancel₀ (Function.mem_support.mp hχ) (htranslate.symm.trans (mul_one _).symm)
+  exact Circle.coe_eq_one.mp (by simpa only [star_star, star_one] using congrArg star hstar)
 
 /-- Paper: Lemma D.1.5.2(3), p. 761. Support in the open subgroup and invariance
 under the good subgroup give the corresponding conditions for the dual pair.
