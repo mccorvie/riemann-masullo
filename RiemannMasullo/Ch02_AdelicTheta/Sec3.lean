@@ -451,11 +451,353 @@ theorem sLocalAdelicTheta_decay_large (f : ℬₛ) (N : ℕ) (hN : 1 ≤ N) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ g : Iₛ, T < normℝ g →
       ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
 
+section UniformDecay
+
+open scoped Classical
+
+local notation "A∞" => mixedEmbedding.mixedSpace F
+set_option quotPrecheck false in
+local notation "Aᶠₛ" => (∀ v : S, HeightOneSpectrum.adicCompletion F (Subtype.val v))
+local notation "arch" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+local notation "sDiagonal" =>
+  RingHom.comp (RingHom.comp (adeleProjection F S) (Subring.subtype (integralAdelesOutside F S)))
+    (integralAdeleDiagonal F S)
+local notation "Gₛ" => Multiplicative (SAdeleRing F S)
+
+set_option quotPrecheck false in
+local notation "radial" => fun t : ℝ≥0ˣ ↦
+  Units.map (adeleProjection F S).toMonoidHom (canonicalIdeleNormSection F t)
+
+/-- The norm-one S-idele classes have representatives in one compact set of S-ideles. -/
+private theorem sLocalTheta_exists_compact_representatives :
+    ∃ K : Set Iₛ, IsCompact K ∧ ∀ c : Jₛ, sIdeleQuotientNorm F S c = 1 →
+      ∃ k ∈ K, classOf k = c := by
+  let : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  have hCompact : IsCompact ((sIdeleQuotientNorm F S) ⁻¹' {1}) :=
+    (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton
+  choose U hUc hU using fun k : Iₛ ↦ exists_compact_mem_nhds k
+  let V (k : Iₛ) := classOf '' interior (U k)
+  have hVo (k : Iₛ) : IsOpen (V k) := QuotientGroup.isOpenMap_coe _ isOpen_interior
+  have hCover : (sIdeleQuotientNorm F S) ⁻¹' {1} ⊆ ⋃ k, V k := by
+    intro c _
+    obtain ⟨k, rfl⟩ := QuotientGroup.mk_surjective c
+    exact mem_iUnion.mpr ⟨k, mem_image_of_mem _ (mem_interior_iff_mem_nhds.mpr (hU k))⟩
+  obtain ⟨s, hs⟩ := hCompact.elim_finite_subcover V hVo hCover
+  refine ⟨⋃ k : s, U k, isCompact_iUnion (fun k ↦ hUc k), fun c hc ↦ ?_⟩
+  obtain ⟨i, hi⟩ := mem_iUnion.mp (hs (show c ∈ (sIdeleQuotientNorm F S) ⁻¹' {1} from hc))
+  obtain ⟨hi', k, hk, rfl⟩ := mem_iUnion.mp hi
+  exact ⟨k, mem_iUnion.mpr ⟨⟨i, hi'⟩, interior_subset hk⟩, rfl⟩
+
+/-- The projected canonical section has S-idelic norm equal to its parameter. -/
+private theorem sLocalTheta_radial_norm (t : ℝ≥0ˣ) : sIdeleNorm F S (radial t) = t := by
+  have hinsert : sIdeleInsertion F S (radial t) = canonicalIdeleNormSection F t := by
+    obtain ⟨harch, hin, hout⟩ := sIdeleInsertion_apply F S (radial t)
+    apply Units.ext
+    refine Prod.ext harch (Subtype.ext (funext fun v ↦ ?_))
+    by_cases hv : v ∈ S
+    · exact hin ⟨v, hv⟩
+    · exact (hout v hv).trans
+        (congrArg (fun b : FiniteAdeleRing (𝓞 F) F ↦ b v)
+          (canonicalIdeleNormSection_finite F t)).symm
+  rw [← ideleNorm_sIdeleInsertion, hinsert]
+  exact canonicalIdeleNormSection_rightInverse F t
+
+/-- For functions with a fixed compact finite support, the norm-weighted theta estimate
+is controlled by a single archimedean decay bound. -/
+private theorem sLocalTheta_weighted_bound (C : Set Aᶠₛ) (hC : IsCompact C) (N : ℕ) :
+    ∃ (M : ℕ) (D : ℝ), 0 ≤ D ∧
+      ∀ (f : ℬₛ) (A : ℝ), 0 ≤ A →
+        (∀ x : Aₛ, x.2 ∉ C → f (Multiplicative.ofAdd x) = 0) →
+        (∀ x : Aₛ, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ^ M ≤ A) →
+          ∀ g : Iₛ, 1 ≤ normℝ g → ‖sLocalAdelicTheta F S f g‖ * (normℝ g) ^ N ≤ D * A := by
+  refine (sLocalTheta_exists_compact_representatives F S).elim fun K h ↦ ?_
+  have hK := h.1
+  have hRep := h.2
+  let T : Aᶠₛ × Iₛ → Aᶠₛ := fun p ↦ p.1 * (p.2⁻¹).val.2
+  have hT : Continuous T := continuous_fst.mul
+    (continuous_snd.comp (Units.continuous_val.comp (continuous_inv.comp continuous_snd)))
+  refine (finiteSAdele_exists_compact_addSubgroup F S (T '' (C ×ˢ K))
+    ((hC.prod hK).image hT)).elim fun H hH ↦ ?_
+  refine (sInteger_arch_discrete_lattice F S H hH.1).elim fun L hL ↦ ?_
+  let : DiscreteTopology L := hL.1
+  let d := Module.finrank ℚ F
+  let M := d * N + Module.finrank ℤ L + 1
+  let diag (ξ : Uₛ) : Aₛ := sDiagonal ξ.val
+  let P : Set Uₛ := {ξ | (diag ξ).2 ∈ H}
+  let toL (ξ : P) : L := ⟨arch (diag ξ.val).1, hL.2 ξ.val.val ξ.property⟩
+  have hToL : Injective toL := by
+    intro ξ η h
+    have heq := (arch).injective (congrArg Subtype.val h)
+    obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    exact Subtype.ext (Units.ext (Subtype.ext ((algebraMap F w.Completion).injective
+      (congrFun heq w))))
+  let u := P.indicator (fun ξ ↦ (‖arch (diag ξ).1‖ ^ M)⁻¹)
+  have hu : Summable u := by
+    apply summable_subtype_iff_indicator.mp
+    change Summable ((fun z : L ↦ (‖z‖ ^ M)⁻¹) ∘ toL)
+    simpa only [inv_pow] using
+      (ZLattice.summable_norm_pow_inv L M (by dsimp [M]; omega)).comp_injective hToL
+  have hu₀ : ∀ ξ, 0 ≤ u ξ := indicator_nonneg (fun _ _ ↦ by positivity)
+  refine (hK.exists_bound_of_continuousOn
+    (((isEmbedding_thetaArch F).continuous.comp
+      (continuous_fst.comp (Units.continuous_val.comp continuous_inv))).continuousOn :
+      ContinuousOn (fun g : Iₛ ↦ arch (g⁻¹).val.1) K)).elim fun R₀ hR₀ ↦ ?_
+  let R := max R₀ 1
+  have hR : 0 ≤ R := zero_le_one.trans (le_max_right _ _)
+  refine ⟨M, R ^ M * ∑' ξ, u ξ, mul_nonneg (pow_nonneg hR _) (tsum_nonneg hu₀), ?_⟩
+  intro f A hA hsupp hdecay g hg
+  let t := sIdeleNorm F S g
+  let a := radial t
+  let q : Iₛ →* Jₛ := QuotientGroup.mk' _
+  have haNorm : sIdeleNorm F S a = t := sLocalTheta_radial_norm F S t
+  have hnorm : sIdeleQuotientNorm F S (classOf (a⁻¹ * g)) = 1 := by
+    rw [sIdeleQuotientNorm_mk, map_mul, map_inv, haNorm]
+    exact inv_mul_cancel t
+  refine (hRep _ hnorm).elim fun k hk ↦ ?_
+  have hq := hk.2
+  have hclass : classOf (a * k) = classOf g := by
+    change q (a * k) = q g
+    rw [map_mul, show q k = q (a⁻¹ * g) from hq, ← map_mul, mul_inv_cancel_left]
+  rw [← sLocalAdelicTheta_factorsThrough F S f hclass, sLocalAdelicTheta_apply]
+  have hf : Summable (fun ξ : Uₛ ↦ ‖thetaTerm f ξ (a * k)‖) :=
+    (sLocalAdelicTheta_summableUniformlyOn_norm F S f {a * k} isCompact_singleton).summable (by rfl)
+  refine mul_le_mul_of_nonneg_right (norm_tsum_le_tsum_norm hf) (by positivity) |>.trans ?_
+  rw [← tsum_mul_right]
+  let r := (t.val : ℝ) ^ (d : ℝ)⁻¹
+  have hr : 1 ≤ r := Real.one_le_rpow hg (by positivity)
+  have hpow : r ^ (d * N) = (t.val : ℝ) ^ N := by
+    have hd : (d : ℝ) ≠ 0 := by exact_mod_cast (Module.finrank_pos (R := ℚ) (M := F)).ne'
+    dsimp [r]
+    rw [← Real.rpow_mul_natCast t.val.coe_nonneg, ← Real.rpow_natCast,
+      Nat.cast_mul, ← mul_assoc, inv_mul_cancel₀ hd, one_mul]
+  have htPow : (t.val : ℝ) ^ N ≤ r ^ M :=
+    hpow ▸ pow_le_pow_right₀ hr (by dsimp [M]; omega)
+  have hterm (ξ : Uₛ) : ‖thetaTerm f ξ (a * k)‖ * (t.val : ℝ) ^ N ≤ (A * R ^ M) * u ξ := by
+    let x : Aₛ := (unitAtS ξ * k).val
+    let y : Aₛ := a.val * x
+    have hy : (unitAtS ξ * (a * k)).val = y := by
+      rw [mul_left_comm (unitAtS ξ) a k]
+      rfl
+    let fs : schwartzBruhatSubmodule Gₛ := f
+    change ‖fs.val (Multiplicative.ofAdd ((unitAtS ξ * (a * k)).val))‖ * (t.val : ℝ) ^ N ≤ _
+    rw [hy]
+    have hfinite : y.2 = x.2 := by
+      have ha : a.val.2 = 1 := by
+        funext v
+        change (canonicalIdeleNormSection F t).val.2 v.val = 1
+        exact congrArg (fun b : FiniteAdeleRing (𝓞 F) F ↦ b v.val)
+          (canonicalIdeleNormSection_finite F t)
+      change a.val.2 * x.2 = x.2
+      rw [ha, one_mul]
+    have hdiag : diag ξ = x * (k⁻¹).val := by
+      change (unitAtS ξ).val = x * (k⁻¹).val
+      rw [← Units.val_mul, mul_assoc, mul_inv_cancel, mul_one]
+    by_cases hyC : y.2 ∈ C
+    · have hξ : ξ ∈ P := by
+        change (diag ξ).2 ∈ H
+        rw [hdiag]
+        exact hH.2 ⟨(y.2, k), ⟨hyC, hk.1⟩, by simp only [T, hfinite, Prod.snd_mul]⟩
+      have hpos : 0 < ‖arch (diag ξ).1‖ := by
+        apply norm_pos_iff.mpr
+        exact (Units.map ((arch).toMonoidHom.comp (RingHom.fst _ _).toMonoidHom)
+          (unitAtS ξ)).ne_zero
+      have hnorm : ‖arch (diag ξ).1‖ ≤ ‖arch x.1‖ * R := by
+        rw [hdiag, Prod.fst_mul, map_mul]
+        exact (norm_mul_le _ _).trans
+          (mul_le_mul_of_nonneg_left ((hR₀ k hk.1).trans (le_max_left _ _)) (norm_nonneg _))
+      have hyNorm : ‖arch y.1‖ = r * ‖arch x.1‖ := by
+        change ‖arch ((canonicalIdeleNormSection F t).val.1 * x.1)‖ = _
+        rw [show arch ((canonicalIdeleNormSection F t).val.1 * x.1) = r • arch x.1
+          from canonicalIdeleNormSection_smul_mixedSpace (F := F) t
+            (x.1, (0 : FiniteAdeleRing (𝓞 F) F)), norm_smul,
+          Real.norm_of_nonneg (zero_le_one.trans hr)]
+      rw [show u ξ = _ from indicator_of_mem hξ _, ← div_eq_mul_inv, le_div_iff₀ (pow_pos hpos M)]
+      calc
+        _ ≤ ‖fs.val (Multiplicative.ofAdd y)‖ * r ^ M * ‖arch (diag ξ).1‖ ^ M :=
+          mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left htPow (norm_nonneg _)) (by positivity)
+        _ = ‖fs.val (Multiplicative.ofAdd y)‖ * (r * ‖arch (diag ξ).1‖) ^ M := by
+          rw [mul_pow, mul_assoc]
+        _ ≤ ‖fs.val (Multiplicative.ofAdd y)‖ * (‖arch y.1‖ * R) ^ M := by
+          apply mul_le_mul_of_nonneg_left _ (norm_nonneg _)
+          apply pow_le_pow_left₀ (by positivity)
+          rw [hyNorm, mul_assoc]
+          exact mul_le_mul_of_nonneg_left hnorm (zero_le_one.trans hr)
+        _ = (‖fs.val (Multiplicative.ofAdd y)‖ * ‖arch y.1‖ ^ M) * R ^ M := by
+          rw [mul_pow, mul_assoc]
+        _ ≤ A * R ^ M := mul_le_mul_of_nonneg_right (hdecay y) (pow_nonneg hR _)
+    · have hz : fs.val (Multiplicative.ofAdd y) = 0 := hsupp y hyC
+      rw [hz, norm_zero, zero_mul]
+      exact mul_nonneg (mul_nonneg hA (pow_nonneg hR _)) (hu₀ ξ)
+  calc
+    _ ≤ ∑' ξ, (A * R ^ M) * u ξ :=
+      Summable.tsum_le_tsum hterm (hf.mul_right _) (hu.mul_left _)
+    _ = R ^ M * (∑' ξ, u ξ) * A := by rw [tsum_mul_left]; ring
+
+/-- A continuous seminorm on an elementary Schwartz space controls the values weighted by the
+sum of the absolute real and lattice coordinates. -/
+private theorem elementarySchwartz_decay_seminorm {m n l : ℕ} {Fk : Type*}
+    [AddCommGroup Fk] [TopologicalSpace Fk] [DiscreteTopology Fk] [Finite Fk] (N : ℕ) :
+    ∃ q : Seminorm ℂ (ElementarySchwartz m n l Fk), Continuous q ∧
+      ∀ (s : ElementarySchwartz m n l Fk) (w : ElementaryLieGroup m n l Fk),
+        ‖s w‖ * (1 + (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|)) ^ N ≤ q s := by
+  let I := Option (Fin m ⊕ Fin l)
+  let idx : I → ElementarySchwartzIndex m n l
+    | none => (0, 0, 0, 0)
+    | some (Sum.inl j) => (Pi.single j N, 0, 0, 0)
+    | some (Sum.inr k) => (0, 0, 0, Pi.single k N)
+  let c : ℝ≥0 := Fintype.card I
+  let q : Seminorm ℂ (ElementarySchwartz m n l Fk) :=
+    c ^ N • ∑ i : I, elementarySchwartzSeminorm (idx i)
+  have hq (s : ElementarySchwartz m n l Fk) :
+      q s = (c : ℝ) ^ N * ∑ i : I, elementarySchwartzSeminorm (idx i) s := by
+    change (↑(c ^ N) : ℝ) *
+      FunLike.coeAddMonoidHom _ _ _ (∑ i : I, elementarySchwartzSeminorm (idx i)) s = _
+    rw [NNReal.coe_pow, map_sum, Finset.sum_apply]
+    rfl
+  refine ⟨q, ?_, fun s w ↦ ?_⟩
+  · simp_rw [show (q : ElementarySchwartz m n l Fk → ℝ) =
+        (fun s ↦ (c : ℝ) ^ N * ∑ i : I, elementarySchwartzSeminorm (idx i) s) from funext hq]
+    exact continuous_const.mul (continuous_finsetSum _ fun i _ ↦
+      elementarySchwartz_withSeminorms.continuous_seminorm (idx i))
+  let z : I → ℝ
+    | none => 1
+    | some (Sum.inl j) => |w.1 j|
+    | some (Sum.inr k) => |(w.2.2.1 k : ℝ)|
+  obtain ⟨i, hi, hmax⟩ := Finset.exists_max_image Finset.univ z ⟨none, Finset.mem_univ _⟩
+  have hsum : 1 + (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) ≤ (c : ℝ) * z i := by
+    calc
+      _ = ∑ j : I, z j := by simp [I, z, Fintype.sum_option, Fintype.sum_sum_type]
+      _ ≤ ∑ _ : I, z i := Finset.sum_le_sum hmax
+      _ = _ := by simp [c, nsmul_eq_mul]
+  have hmon (j : I) : ‖s w‖ * z j ^ N ≤ elementarySchwartzSeminorm (idx j) s := by
+    change ‖s w‖ * z j ^ N ≤ (elementarySchwartzBound s.val (idx j)).toReal
+    rcases j with _ | (_ | _)
+    · simpa [idx, z] using elementarySchwartz_monomial_bound s.property 0 0 w
+    · rename_i j
+      have h := elementarySchwartz_monomial_bound s.property (Pi.single j N) 0 w
+      rw [Finset.prod_eq_single j (fun k _ hk => by simp [hk]) (by simp)] at h
+      simpa [idx, z, mul_comm] using h
+    · rename_i k
+      have h := elementarySchwartz_monomial_bound s.property 0 (Pi.single k N) w
+      rw [Finset.prod_eq_single k (fun j _ hj => by simp [hj]) (by simp)] at h
+      simpa [idx, z, mul_comm] using h
+  rw [hq]
+  calc
+    _ ≤ ‖s w‖ * ((c : ℝ) * z i) ^ N :=
+      mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hsum _) (norm_nonneg _)
+    _ = (c : ℝ) ^ N * (‖s w‖ * z i ^ N) := by rw [mul_pow]; ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left
+      ((hmon i).trans (Finset.single_le_sum (f := fun j : I ↦ elementarySchwartzSeminorm (idx j) s)
+        (fun _ _ ↦ apply_nonneg _ _) hi)) (by positivity)
+
+/-- The archimedean polynomial weight on an S-adelic stage is controlled by a
+continuous seminorm on that stage. -/
+private theorem sAdeleStage_arch_decay_seminorm (a : BruhatStructuralPair Gₛ)
+    (e : ElementaryLCAPresentation a.quotient) (M : ℕ) :
+    ∃ q : Seminorm ℂ (SchwartzBruhatStage e), Continuous q ∧
+      ∀ (s : SchwartzBruhatStage e) (x : Aₛ),
+        ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd x)‖ *
+          ‖arch x.1‖ ^ M ≤ q s := by
+  let m : Gₛ →* Multiplicative A∞ :=
+    ((arch).toAddMonoidHom.comp (AddMonoidHom.fst _ _)).toMultiplicative
+  have hm : Continuous m := (isEmbedding_thetaArch F).continuous.comp continuous_fst
+  let l := m.comp a.val.1.subtype
+  have hker : (OrderDual.ofDual a.val.2).comap a.val.1.subtype ≤ l.ker :=
+    fun x hx ↦ sAdeleStage_arch_eq_zero F S a x hx
+  let p : a.quotient →* Multiplicative A∞ := QuotientGroup.lift _ l hker
+  have hp : Continuous p := (QuotientGroup.isQuotientMap_mk _).continuous_iff.mpr
+    (hm.comp continuous_subtype_val)
+  let P : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor →+ A∞ :=
+    (p.comp e.equiv.symm.toMonoidHom).toAdditive
+  have hP : Continuous P :=
+    continuous_toAdd.comp (hp.comp (e.equiv.symm.continuous.comp continuous_ofAdd))
+  refine (elementary_additive_norm_le P hP P.map_add).elim fun A hA ↦
+    hA.elim fun B hAB ↦ ?_
+  refine (elementarySchwartz_decay_seminorm
+    (m := e.realDim) (n := e.torusDim) (l := e.latticeRank) (Fk := e.finiteFactor) M).elim
+    fun q hq ↦ ?_
+  let c : ℝ≥0 := ⟨(1 + A + max B 0) ^ M,
+    pow_nonneg (add_nonneg (add_nonneg zero_le_one hAB.1) (le_max_right B 0)) _⟩
+  have hqc : Continuous (c • q : Seminorm ℂ (SchwartzBruhatStage e)) :=
+    continuous_const.mul hq.1
+  refine ⟨c • q, hqc, fun s x ↦ ?_⟩
+  by_cases hx : Multiplicative.ofAdd x ∈ a.val.1
+  · let y : a.quotient := QuotientGroup.mk ⟨Multiplicative.ofAdd x, hx⟩
+    let w := Multiplicative.toAdd (e.equiv y)
+    have hw : P w = arch x.1 := by
+      change (p (e.equiv.symm (e.equiv y))).toAdd = _
+      rw [e.equiv.symm_apply_apply]
+      rfl
+    have hval : schwartzBruhatStageRealization a e s (Multiplicative.ofAdd x) = s w :=
+      (schwartzBruhatStageRealization_apply a e s _).trans (dite_eq_left hx)
+    have hnorm : ‖arch x.1‖ ≤ A * (∑ j, |w.1 j| + ∑ k, |(w.2.2.1 k : ℝ)|) + B :=
+      (congrArg (fun z : A∞ ↦ ‖z‖) hw.symm).trans_le (hAB.2 w)
+    have hbound := real_decay_aux (norm_nonneg (s w))
+      (add_nonneg (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+        (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)) hAB.1 (norm_nonneg _) hnorm (hq.2 s w)
+    calc
+      _ = ‖s w‖ * ‖arch x.1‖ ^ M := congrArg (fun z : ℂ ↦ ‖z‖ * ‖arch x.1‖ ^ M) hval
+      _ ≤ ‖s w‖ * (1 + ‖arch x.1‖) ^ M :=
+        mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (norm_nonneg _)
+          (le_add_of_nonneg_left zero_le_one) _) (norm_nonneg _)
+      _ ≤ (c • q) s := hbound.trans_eq (congrArg ((c : ℝ) * ·) (max_eq_left (apply_nonneg q s)))
+  · have hval : schwartzBruhatStageRealization a e s (Multiplicative.ofAdd x) = 0 :=
+      (schwartzBruhatStageRealization_apply a e s _).trans (dite_eq_right hx)
+    calc
+      _ = ‖(0 : ℂ)‖ * ‖arch x.1‖ ^ M :=
+        congrArg (fun z : ℂ ↦ ‖z‖ * ‖arch x.1‖ ^ M) hval
+      _ ≤ (c • q) s := by simpa only [norm_zero, zero_mul] using apply_nonneg (c • q) s
+
 /-- Paper: Proposition 2.3.1.2(3), p. 100. The large-norm decay constant
 and threshold can be chosen uniformly for a bounded set of test functions. -/
 theorem sLocalAdelicTheta_decay_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : Iₛ, T < normℝ g →
-      ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖sLocalAdelicTheta F S f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  let p (g : {g : Iₛ // 1 ≤ normℝ g}) : Seminorm ℂ ℬₛ :=
+    let c : NNReal := ⟨(normℝ g.val) ^ N, pow_nonneg (NNReal.coe_nonneg _) _⟩
+    c • (normSeminorm ℂ ℂ).comp ((ContinuousMap.evalCLM ℂ g.val).toLinearMap.comp
+      (sLocalAdelicTheta F S))
+  have hp (g) (f : ℬₛ) : p g f = ‖sLocalAdelicTheta F S f g.val‖ * (normℝ g.val) ^ N := by
+    exact mul_comm _ _
+  have hbounded : BddAbove (Set.range p) := Seminorm.bddAbove_range_iff.mpr fun f ↦ by
+    refine (sAdeleSchwartz_exists_decay_bound F S f).elim fun C hC ↦ ?_
+    refine (sLocalTheta_weighted_bound F S C hC.1 N).elim fun M hM ↦
+      hM.elim fun D hD ↦ ?_
+    refine (hC.2.2 M).elim fun A hA ↦ ?_
+    exact ⟨D * A, Set.forall_mem_range.mpr fun g ↦ (hp g f).trans_le
+      (hD.2 f A hA.1 hC.2.1 hA.2 g.val g.property)⟩
+  let : Nonempty {g : Iₛ // 1 ≤ normℝ g} := ⟨⟨1, by simp⟩⟩
+  let q : Seminorm ℂ (schwartzBruhatSubmodule Gₛ) := ⨆ g, p g
+  have hq (g) : p g ≤ q := le_ciSup hbounded g
+  have hstage (a : BruhatStructuralPair Gₛ) (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (q ∘ schwartzBruhatStageInclusion a e) := by
+    refine (sAdeleStage_exists_compact_finite F S a).elim fun C hC ↦ ?_
+    refine (sLocalTheta_weighted_bound F S C hC.1 N).elim fun M hM ↦
+      hM.elim fun D hD ↦ ?_
+    refine (sAdeleStage_arch_decay_seminorm F S a e M).elim fun r hr ↦ ?_
+    let c : ℝ≥0 := ⟨D, hD.1⟩
+    have hcr : Continuous (c • r : Seminorm ℂ (SchwartzBruhatStage e)) :=
+      continuous_const.mul hr.1
+    apply Seminorm.continuous_of_le (p := q.comp (schwartzBruhatStageInclusion a e)) hcr
+    intro s
+    let f : ℬₛ := schwartzBruhatStageInclusion a e s
+    change q f ≤ D * r s
+    refine (Seminorm.iSup_apply (p := p) hbounded (x := f)).trans_le (ciSup_le fun g ↦ ?_)
+    refine (hp g f).trans_le (hD.2 f (r s) (apply_nonneg r s) ?_ (hr.2 s) g.val g.property)
+    intro x hx
+    exact (schwartzBruhatStageRealization_apply a e s (Multiplicative.ofAdd x)).trans
+      (dite_eq_right (fun h ↦ hx (hC.2 _ h)))
+  let i : {p : Seminorm ℂ (schwartzBruhatSubmodule Gₛ) //
+      ∀ (a : BruhatStructuralPair Gₛ) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion a e)} := ⟨q, hstage⟩
+  refine (((withGeneratingSeminorms_spec _ _).isVonNBounded_iff_seminorm_bounded.mp hB) i).elim
+    fun C hC ↦ ?_
+  refine ⟨C, 1, hC.1, zero_lt_one, fun f hf g hg ↦ ?_⟩
+  have hweight := ((hp ⟨g, hg.le⟩ f).ge.trans (hq ⟨g, hg.le⟩ f)).trans (hC.2 f hf).le
+  simpa only [div_eq_mul_inv] using
+    (le_div_iff₀ (pow_pos (zero_lt_one.trans hg) N)).mpr hweight
+
+end UniformDecay
 
 /-- Paper: Proposition 2.3.1.2(4), p. 100. The bounded-set decay estimate
 holds above S-idelic norm one with a uniform constant. -/
