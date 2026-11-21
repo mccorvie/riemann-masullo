@@ -142,9 +142,6 @@ private theorem isBruhatContDiff_of_modulationWeight
       exact (Complex.ofRealCLM.contDiff.comp ((hLog.mul (contDiff_const (c := -a))).exp)).mul
         (hSmooth e z b)
 
--- TODO(paper-gap): In the proof of Remark D.3.4.1 the product rule differentiates
--- the weight times the function. The weight's derivative has coefficient a * r.
-
 /-- Paper: Remark D.3.4.1, p. 815. A function of prescribed exponential decay
 is Bruhat smooth whenever the exponent interval is nonempty. -/
 theorem modulatedExponentialDecay_mem_bruhatSmooth (hne : I.Nonempty)
@@ -157,13 +154,86 @@ theorem modulatedExponentialDecay_mem_bruhatSmooth (hne : I.Nonempty)
   refine (Submodule.mem_iInf _).2 fun p ↦ ?_
   exact isBruhatContDiff_of_modulationWeight m (hs p)
 
+/-- Paper: Remark D.3.4.1, p. 815. First-order differentiation preserves each
+exponential decay condition by the product rule for the modulation weight.
+Deviation: If the modulation along the subgroup is exp(rt), the derivative
+of the weight at exponent a has coefficient a * r. -/
+private theorem bruhatFirstOrder_mem_modulatedExponentialDecay
+    (b : LCATopologicalLie G) (f : bruhatSmoothSubmodule (G := G))
+    (hf : f.val ∈ modulatedExponentialDecaySubmodule m I) :
+    (bruhatFirstOrder b f).val ∈ modulatedExponentialDecaySubmodule m I := by
+  refine (Submodule.mem_iInf _).2 fun a ↦ Submodule.mem_comap.2 ?_
+  let w (x : G) : ℝ := ((m x).val : ℝ) ^ (a : ℝ)
+  have hPos (x : G) : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  let logOrbit : ℝ →+ ℝ := AddMonoidHom.mk'
+    (fun t ↦ Real.log ((m (b (Multiplicative.ofAdd t))).val : ℝ)) (by
+      intro s t
+      simp only [ofAdd_add, map_mul, Units.val_mul, NNReal.coe_mul]
+      exact Real.log_mul (hPos _).ne' (hPos _).ne')
+  have hLogContinuous : Continuous logOrbit :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (m.continuous.comp (b.continuous.comp continuous_ofAdd)))).log
+      fun _ ↦ (hPos _).ne'
+  have hLog (t : ℝ) : logOrbit t = t * logOrbit 1 := by
+    simpa only [smul_eq_mul, mul_one] using map_real_smul logOrbit hLogContinuous t (1 : ℝ)
+  let c := logOrbit 1 * (a : ℝ)
+  have hOrbit (x : G) (t : ℝ) :
+      w (x * b (Multiplicative.ofAdd t)) = w x * Real.exp (t * c) := by
+    unfold w
+    rw [map_mul, Units.val_mul, NNReal.coe_mul,
+      Real.mul_rpow (hPos x).le (hPos _).le, Real.rpow_def_of_pos (hPos (b _))]
+    change _ * Real.exp (logOrbit t * (a : ℝ)) = _
+    rw [hLog, mul_assoc]
+  have hw (x : G) : HasDerivAt (fun t : ℝ ↦ (w (x * b (Multiplicative.ofAdd t)) : ℂ))
+      ((w x * c : ℝ) : ℂ) 0 := by
+    have h := (((hasDerivAt_id (0 : ℝ)).mul_const c).exp.const_mul (w x)).ofReal_comp
+    simpa only [id, zero_mul, Real.exp_zero, one_mul, hOrbit] using h
+  let F := modulationWeight m a f.val
+  have hF : F ∈ schwartzBruhatSubmodule G :=
+    modulationWeight_mem_schwartzBruhat m I a ⟨f.val, hf⟩
+  obtain ⟨A, hA⟩ := bruhatFirstOrder_schwartz b
+  have hDF : bruhatDirectionalDeriv b F ∈ schwartzBruhatSubmodule G := by
+    have hEq : (A ⟨F, hF⟩).val = bruhatDirectionalDeriv b F := funext (hA ⟨F, hF⟩)
+    exact hEq ▸ (A ⟨F, hF⟩).property
+  have hTwist : modulationWeight m a (bruhatFirstOrder b f).val =
+      bruhatDirectionalDeriv b F - (c : ℂ) • F := by
+    funext x
+    have h := ((hw x).fun_mul (hasDerivAt_bruhatDirectionalDeriv b
+      ((mem_bruhatSmoothSubmodule_iff f.val).1 f.property 1) x)).deriv
+    change bruhatDirectionalDeriv b F x =
+      ((w x * c : ℝ) : ℂ) * f.val (x * b (Multiplicative.ofAdd 0)) +
+        (w (x * b (Multiplicative.ofAdd 0)) : ℂ) * bruhatDirectionalDeriv b f.val x at h
+    simp only [ofAdd_zero, map_one, mul_one, Complex.ofReal_mul] at h
+    change (w x : ℂ) * bruhatDirectionalDeriv b f.val x =
+      bruhatDirectionalDeriv b F x - (c : ℂ) * ((w x : ℂ) * f.val x)
+    rw [h]
+    ring
+  rw [hTwist]
+  exact (schwartzBruhatSubmodule G).sub_mem hDF ((schwartzBruhatSubmodule G).smul_mem _ hF)
+
 include hm hms in
 /-- Paper: Remark D.3.4.1, p. 815. Invariant differential operators preserve
 the Schwartz–Bruhat space with decay exponents in the given interval. -/
 theorem modulatedExponentialDecay_invariantDiff (hInt : OrdConnected I) (hne : I.Nonempty)
     (D : bruhatDiffAlgebra G) (f : ModulatedExponentialDecay m I) :
     (D.val ⟨f.val, modulatedExponentialDecay_mem_bruhatSmooth m I hne f⟩).val ∈
-      modulatedExponentialDecaySubmodule m I := by sorry
+      modulatedExponentialDecaySubmodule m I := by
+  refine Algebra.adjoin_induction
+    (p := fun (A : Module.End ℂ (bruhatSmoothSubmodule (G := G))) _ ↦
+      ∀ (g : bruhatSmoothSubmodule (G := G)),
+        g.val ∈ modulatedExponentialDecaySubmodule m I →
+          (A g).val ∈ modulatedExponentialDecaySubmodule m I)
+    ?_ ?_ ?_ ?_ D.property _ f.property
+  · rintro _ ⟨b, rfl⟩ g hg
+    exact bruhatFirstOrder_mem_modulatedExponentialDecay m I b g hg
+  · intro z g hg
+    rw [Module.algebraMap_end_apply, Submodule.coe_smul]
+    exact (modulatedExponentialDecaySubmodule m I).smul_mem z hg
+  · intro A B _ _ hA hB g hg
+    rw [LinearMap.add_apply, Submodule.coe_add]
+    exact (modulatedExponentialDecaySubmodule m I).add_mem (hA g hg) (hB g hg)
+  · intro A B _ _ hA hB g hg
+    exact hA (B g) (hB g hg)
 
 /-- Paper: Theorem D.3.4.2, p. 816. A continuous quasi-character is Bruhat smooth,
 so the operator in the symbol formula can act on it. -/
