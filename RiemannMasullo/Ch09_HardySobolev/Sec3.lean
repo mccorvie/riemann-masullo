@@ -446,7 +446,24 @@ Hardy–Sobolev weight. -/
 theorem exists_lpCutoffMultiplier (ν : Measure G) (ρ : G → ℝ) (_hm : Measurable ρ)
     (_hb : ∀ x, |ρ x| ≤ 1) :
     ∃ T : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν, ‖T‖ ≤ 1 ∧
-      ∀ u, (T u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x := by sorry
+      ∀ u, (T u : G → ℂ) =ᵐ[ν] fun x ↦ (ρ x : ℂ) * u x := by
+  let symbol (x : G) : ℂ := ρ x
+  have hbound (x : G) : ‖symbol x‖ ≤ 1 := by
+    simpa only [symbol, Complex.norm_real, Real.norm_eq_abs] using _hb x
+  have hsymbol : MemLp symbol ∞ ν :=
+    memLp_top_of_bound (Complex.measurable_ofReal.comp _hm).aestronglyMeasurable
+      1 (.of_forall hbound)
+  let multiply := ContinuousLinearMap.mul ℂ ℂ
+  let T := multiply.holderL ν ∞ 2 2 (hsymbol.toLp symbol)
+  have hT (u : Lp ℂ 2 ν) : (T u : G → ℂ) =ᵐ[ν] fun x ↦ symbol x * u x :=
+    (multiply.coeFn_holder (r := 2) (hsymbol.toLp symbol) u).trans <|
+      hsymbol.coeFn_toLp.mono fun x hx ↦ congrArg (· * u x) hx
+  refine ⟨T, T.opNorm_le_bound zero_le_one (fun u ↦ ?_), hT⟩
+  rw [one_mul]
+  apply Lp.norm_le_norm_of_ae_le
+  filter_upwards [hT u] with x hx
+  rw [hx, norm_mul]
+  exact mul_le_of_le_one_left (norm_nonneg _) (hbound x)
 
 /-- Paper: Definition 9.3.3.1, p. 427. The cutoff operator is pointwise multiplication
 on the space of square-integrable classes.
