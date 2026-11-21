@@ -1531,12 +1531,167 @@ theorem exponentialDecayL2_continuous_seminorm (a b : ℝ) (ha : 0 < a) (hb : 0 
   · rw [hp, hT f, ENNReal.ofReal_toReal]
     exact (hT f ▸ hm f).eLpNorm_ne_top
 
+/-- Integrating on the ray away from zero bounds a weighted derivative by the weighted
+L² norm of the next derivative, with one unit of spare exponential decay. -/
+private theorem decay_exp_mul_norm_le (a b : ℝ) (hb : 0 ≤ b) (hab : b + 1 ≤ a)
+    (m : ℕ) (f : PositiveRealExponentialDecay univ)
+    (hW : MemLp (exponentialDecayL2Integrand a 0 (m + 1) f) 2 volume) (x : ℝ) :
+    Real.exp (b * |x|) * ‖iteratedDeriv m f.val x‖ ≤
+      lpNorm (fun y : ℝ ↦ Real.exp (-|y|)) 2 volume *
+        lpNorm (exponentialDecayL2Integrand a 0 (m + 1) f) 2 volume := by
+  let H (y : ℝ) := Real.exp (-|y|)
+  let W := exponentialDecayL2Integrand a 0 (m + 1) f
+  let g := decayWeightedDeriv 0 m f
+  let d := decayWeightedDeriv 0 (m + 1) f
+  have hprofile (n : ℕ) : ⇑(decayWeightedDeriv 0 n f) = iteratedDeriv n f.val := by
+    simpa using decayWeightedDeriv_apply 0 n f
+  have hd (y : ℝ) : HasDerivAt g (d y) y := by
+    simpa only [g, d, hprofile, iteratedDeriv_succ] using g.hasDerivAt y
+  have hH : MemLp H 2 volume := by
+    simpa [H] using memLp_decayEnvelope 1 0 one_pos le_rfl
+  let V : ℝ → ℝ := H • (fun y ↦ ‖W y‖)
+  have hV : Integrable V volume := memLp_one_iff_integrable.mp (hH.smul (r := 1) hW.norm)
+  have hVval (y : ℝ) : V y = H y * ‖W y‖ := rfl
+  have hVnonneg (y : ℝ) : 0 ≤ V y := by
+    rw [hVval]
+    exact mul_nonneg (Real.exp_pos _).le (norm_nonneg _)
+  have htail (s : Set ℝ) (hs : MeasurableSet s) (habs : ∀ y ∈ s, |x| ≤ |y|)
+      (hg : ‖g x‖ ≤ ∫ y in s, ‖d y‖) :
+      Real.exp (b * |x|) * ‖g x‖ ≤ ∫ y, V y := by
+    calc
+      _ ≤ Real.exp (b * |x|) * ∫ y in s, ‖d y‖ :=
+        mul_le_mul_of_nonneg_left hg (Real.exp_pos _).le
+      _ = ∫ y in s, Real.exp (b * |x|) * ‖d y‖ := (integral_const_mul ..).symm
+      _ ≤ ∫ y in s, V y := by
+        apply setIntegral_mono_on (d.integrable.norm.const_mul _).integrableOn
+          hV.integrableOn hs
+        intro y hy
+        rw [hVval, show W y = exponentialDecayL2Integrand a 0 (m + 1) f y from rfl,
+          exponentialDecayL2Integrand_zero_log, norm_mul, Complex.norm_real,
+          Real.norm_of_nonneg (Real.exp_pos _).le, ← hprofile (m + 1)]
+        rw [← mul_assoc]
+        change _ ≤ (Real.exp (-|y|) * Real.exp (a * |y|)) * ‖d y‖
+        rw [← Real.exp_add]
+        apply mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr ?_) (norm_nonneg _)
+        calc
+          b * |x| ≤ b * |y| := mul_le_mul_of_nonneg_left (habs y hy) hb
+          _ ≤ -|y| + a * |y| := by
+            linarith [mul_le_mul_of_nonneg_right hab (abs_nonneg y)]
+      _ ≤ ∫ y, V y := setIntegral_le_integral hV (Eventually.of_forall hVnonneg)
+  have hx : Real.exp (b * |x|) * ‖g x‖ ≤ ∫ y, V y := by
+    rcases le_total 0 x with hx | hx
+    · apply htail (Ioi x) measurableSet_Ioi
+      · intro y hy
+        have hxy := (mem_Ioi.mp hy).le
+        rwa [abs_of_nonneg hx, abs_of_nonneg (hx.trans hxy)]
+      · have h := integral_Ioi_of_hasDerivAt_of_tendsto' (a := x) (fun y _ ↦ hd y)
+          d.integrable.integrableOn (g.tendsto_cocompact.mono_left atTop_le_cocompact)
+        simpa [h] using norm_integral_le_integral_norm (μ := volume.restrict (Ioi x)) d
+    · apply htail (Iic x) measurableSet_Iic
+      · intro y hy
+        have hxy := mem_Iic.mp hy
+        rw [abs_of_nonpos hx, abs_of_nonpos (hxy.trans hx)]
+        exact neg_le_neg hxy
+      · have h := integral_Iic_of_hasDerivAt_of_tendsto' (a := x) (fun y _ ↦ hd y)
+          d.integrable.integrableOn (g.tendsto_cocompact.mono_left atBot_le_cocompact)
+        simpa [h] using norm_integral_le_integral_norm (μ := volume.restrict (Iic x)) d
+  rw [show g x = iteratedDeriv m f.val x from congrFun (hprofile m) x] at hx
+  apply hx.trans
+  have h : eLpNorm V 1 volume ≤ eLpNorm H 2 volume * eLpNorm (fun y ↦ ‖W y‖) 2 volume :=
+    eLpNorm_smul_le_mul_eLpNorm (r := 1) hH.aestronglyMeasurable
+    hW.norm.aestronglyMeasurable
+  have hbound := ENNReal.toReal_mono
+    (ENNReal.mul_ne_top hH.eLpNorm_ne_top hW.norm.eLpNorm_ne_top) h
+  have hnorm (y : ℝ) : ‖V y‖ = V y := Real.norm_of_nonneg (hVnonneg y)
+  simpa only [ENNReal.toReal_mul, eLpNorm_norm _ hW.aestronglyMeasurable, toReal_eLpNorm,
+    lpNorm_one_eq_integral_norm hV.aestronglyMeasurable, hnorm] using hbound
+
 /-- Paper: Lemma D.3.2.7(2), p. 803. Exponential weights on an unbounded sequence
 of positive exponents generate the topology. -/
 theorem exponentialDecayL2_generates (a : ℕ → ℝ) (ha : ∀ n, 0 < a n)
     (hunbounded : ¬ BddAbove (range a)) :
     GeneratesLpSeminorms volume 2
-      (fun (i : ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) 0 i.2) := by sorry
+      (fun (i : ℕ × ℕ) ↦ exponentialDecayL2Integrand (a i.1) 0 i.2) := by
+  classical
+  have h (i : ℕ × ℕ) :=
+    exponentialDecayL2_continuous_seminorm (a i.1) 0 (ha i.1) le_rfl i.2
+  choose P hPc hPval using fun i ↦ (h i).2
+  refine ⟨fun i ↦ (h i).1, P, ?_, hPval⟩
+  let t : TopologicalSpace (PositiveRealExponentialDecay univ) := inferInstance
+  let u := (SeminormFamily.moduleFilterBasis P).topology
+  have hP : WithSeminorms (topology := u) P := ⟨rfl⟩
+  refine WithSeminorms.mk (topology := t) ?_
+  change t = u
+  apply le_antisymm
+  · exact le_topology_withSeminorms (t := t) hP hPc
+  have hsource := withGeneratingSeminorms_spec (logExponentialDecaySubmodule univ)
+    (fun i : ↥(univ : Set ℝ) × ℕ × ℕ ↦
+      (SchwartzMap.seminorm ℂ i.2.1 i.2.2).comp (logExponentialDecayTwist univ i.1))
+  let : TopologicalSpace (PositiveRealExponentialDecay univ) := u
+  let : IsTopologicalAddGroup (PositiveRealExponentialDecay univ) := hP.isTopologicalAddGroup
+  apply le_topology_withSeminorms (t := u) hsource
+  rintro ⟨c, k, n⟩
+  obtain ⟨_, ⟨i, rfl⟩, hi⟩ := not_bddAbove_iff.mp hunbounded (|(c : ℝ)| + 1 + 1)
+  let C : ℝ≥0 := ⟨lpNorm (fun y : ℝ ↦ Real.exp (-|y|)) 2 volume, lpNorm_nonneg⟩
+  let coeff (j : ℕ) : ℝ≥0 := (n.choose j : ℝ≥0) * ‖(c : ℝ)‖₊ ^ j
+  let Q := ((k.factorial : ℝ≥0) * C) •
+    ∑ j ∈ Finset.range (n + 1), coeff j • P (i, n - j + 1)
+  have hQ : Continuous Q :=
+    (Seminorm.continuous_finsetSum fun j _ ↦
+      (hP.continuous_seminorm (i, n - j + 1)).const_smul (coeff j)).const_smul _
+  apply Seminorm.continuous_of_le hQ
+  intro f
+  change SchwartzMap.seminorm ℂ k n (logExponentialDecayTwist univ c f) ≤ Q f
+  apply SchwartzMap.seminorm_le_bound' ℂ k n _ (apply_nonneg Q f)
+  intro x
+  have htwist : ⇑(logExponentialDecayTwist univ c f) =
+      (fun y ↦ Real.exp ((c : ℝ) * y)) • f.val := by
+    funext y
+    exact (logExponentialDecayTwist_apply univ c f y).trans Complex.real_smul.symm
+  have hexp : ContDiff ℝ n (fun y ↦ Real.exp ((c : ℝ) * y)) := by fun_prop
+  have hderiv := iteratedDerivWithin_smul (mem_univ x) uniqueDiffOn_univ
+    hexp.contDiffAt.contDiffWithinAt
+    (((decayProfile_smooth f).of_le (by exact_mod_cast (le_top : (n : ℕ∞) ≤ ⊤))).contDiffAt.contDiffWithinAt)
+  simp only [iteratedDerivWithin_univ, iteratedDeriv_exp_const_mul] at hderiv
+  rw [htwist, hderiv]
+  refine (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (pow_nonneg (abs_nonneg x) k)).trans ?_
+  have hweight : |x| ^ k * Real.exp ((c : ℝ) * x) ≤
+      k.factorial * Real.exp ((|(c : ℝ)| + 1) * |x|) := by
+    have hpow := (div_le_iff₀ (show 0 < (k.factorial : ℝ) by positivity)).mp
+      (Real.pow_div_factorial_le_exp |x| (abs_nonneg x) k)
+    have hcx : (c : ℝ) * x ≤ |(c : ℝ)| * |x| := by
+      simpa only [abs_mul] using le_abs_self ((c : ℝ) * x)
+    calc
+      _ ≤ (Real.exp |x| * k.factorial) * Real.exp (|(c : ℝ)| * |x|) :=
+        mul_le_mul hpow (Real.exp_le_exp.mpr hcx) (Real.exp_pos _).le (by positivity)
+      _ = _ := by rw [add_mul, one_mul, Real.exp_add]; ring
+  simp only [Q, smul_apply, NNReal.smul_def, NNReal.coe_mul, NNReal.coe_natCast, smul_eq_mul,
+    FunLike.coe_sum, Finset.sum_apply, Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro j _
+  rw [RCLike.norm_nsmul (K := ℝ), nsmul_eq_mul, norm_smul, norm_mul,
+    Real.norm_of_nonneg (Real.exp_pos _).le, norm_pow]
+  have hj := decay_exp_mul_norm_le (a i) (|(c : ℝ)| + 1) (by positivity) hi.le
+    (n - j) f ((h (i, n - j + 1)).1 f) x
+  have hval : lpNorm (exponentialDecayL2Integrand (a i) 0 (n - j + 1) f) 2 volume =
+      P (i, n - j + 1) f := by
+    rw [← toReal_eLpNorm, ← hPval (i, n - j + 1) f, ENNReal.toReal_ofReal (apply_nonneg _ _)]
+  rw [hval] at hj
+  change _ ≤ (C : ℝ) * P (i, n - j + 1) f at hj
+  simp only [coeff, NNReal.coe_mul, NNReal.coe_natCast, NNReal.coe_pow, coe_nnNorm]
+  calc
+    _ = ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        ((|x| ^ k * Real.exp ((c : ℝ) * x)) * ‖iteratedDeriv (n - j) f.val x‖) := by ring
+    _ ≤ ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        (k.factorial * (Real.exp ((|(c : ℝ)| + 1) * |x|) *
+          ‖iteratedDeriv (n - j) f.val x‖)) := by
+      rw [← mul_assoc (k.factorial : ℝ)]
+      exact mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hweight (norm_nonneg _))
+        (by positivity)
+    _ ≤ ((n.choose j : ℝ) * ‖(c : ℝ)‖ ^ j) *
+        (k.factorial * ((C : ℝ) * P (i, n - j + 1) f)) :=
+      mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left hj (by positivity)) (by positivity)
+    _ = _ := by ring
 
 /-- Paper: Lemma D.3.2.7(3), p. 803. The same topology is generated by including
 all nonnegative integer logarithmic weights. -/
