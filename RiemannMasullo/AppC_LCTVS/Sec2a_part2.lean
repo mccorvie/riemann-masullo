@@ -2710,7 +2710,17 @@ theorem projectiveTensor_assoc {G : Type*} [AddCommGroup G] [Module ℂ G] [Topo
 
 /-- Paper: §C.2.3.2, p. 679. The projective tensor product of Hausdorff factors is Hausdorff. -/
 @[instance]
-theorem projectiveTensor_t2 : T2Space (ProjectiveTensor E F) := by sorry
+theorem projectiveTensor_t2 : T2Space (ProjectiveTensor E F) := by
+  let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+  let : SeparatingDual ℂ F := polynormableSpace_separatingDual ℂ F
+  let eval : ProjectiveTensor E F → (StrongDual ℂ E × StrongDual ℂ F → ℂ) :=
+    fun z v ↦ tensorDualForm v.1 v.2 z
+  refine T2Space.of_injective_continuous (f := eval)
+    (fun _ _ h ↦ tensorDualForm_ext fun φ ψ ↦ congrFun h (φ, ψ)) ?_
+  refine continuous_pi fun v ↦ (continuous_projectiveTensor_iff
+    (tensorDualForm v.1 v.2 : ProjectiveTensor E F →ₗ[ℂ] ℂ)).2 ?_
+  exact ((v.1.continuous.comp continuous_fst).mul (v.2.continuous.comp continuous_snd)).congr
+    fun xy ↦ (tensorDualForm_tmul v.1 v.2 xy.1 xy.2).symm
 
 -- TODO(paper-gap): The claimed projective analogue of Lemma C.2.3.5 on p. 679 fails
 -- for embeddings. Even finite-dimensional isometric inclusions can lose isometry.
