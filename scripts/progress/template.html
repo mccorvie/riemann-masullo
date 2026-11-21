@@ -175,8 +175,10 @@ button { font: inherit; color: inherit; }
 .sec.ready { border-color: var(--accent); }
 .sec.digesting { border-color: var(--wip); }
 .sec.extra { border-style: dotted; }
+.sec.complete { background: var(--ok-soft); border-color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
 .ico { flex: none; display: block; }
 .word { font-weight: 600; letter-spacing: .02em; }
+.word.complete { color: var(--ok); }
 .word.blocked { color: var(--ink-3); }
 .word.ready { color: var(--accent); }
 .word.digesting { color: var(--wip); }
@@ -313,9 +315,11 @@ D.groups.forEach(g => g.needs.forEach(n => { (neededBy[n] = neededBy[n] || []).p
 
 const KINDS = { t: 'theorem', d: 'definition', a: 'abbreviation', s: 'structure', c: 'class',
   i: 'inductive type', n: 'instance', o: 'opaque constant', x: 'axiom' };
-const STATE_WORD = { stated: 'stated', digesting: 'being digested', ready: 'ready to digest', blocked: 'blocked', extra: 'support' };
+const STATE_WORD = { complete: 'complete', stated: 'stated', digesting: 'being digested', ready: 'ready to digest', blocked: 'blocked', extra: 'support' };
+// Complete: statements are in and every theorem is proved without resting on a sorry.
+const secState = g => g.state === 'stated' && g.thms > 0 && g.solid === g.thms ? 'complete' : g.state;
 // An open, unclaimed section can already have part of its statements on main.
-const stateWord = g => g.state === 'ready' && g.defs + g.thms ? 'stated in part, rest ready to digest' : STATE_WORD[g.state];
+const stateWord = g => g.state === 'ready' && g.defs + g.thms ? 'stated in part, rest ready to digest' : STATE_WORD[secState(g)];
 const srcUrl = d => repo + '/blob/' + sha + '/' + D.files[d[FILE]] + '#L' + d[LINE];
 const issueUrl = n => repo + '/issues/' + n;
 function glyphClass(d) {
@@ -342,9 +346,13 @@ const glyph = (d, i) => h('i', { class: glyphClass(d), title: d[N] + ' — ' + s
 function stateIcon(state) {
   const svg = s('svg', { class: 'ico', width: 13, height: 13, viewBox: '0 0 13 13', 'aria-hidden': 'true' });
   const ring = col => s('circle', { cx: 6.5, cy: 6.5, r: 5.25, fill: 'none', stroke: col, 'stroke-width': 1.5 });
-  if (state === 'stated') {
+  if (state === 'complete') {
     svg.appendChild(s('circle', { cx: 6.5, cy: 6.5, r: 6, fill: 'var(--ok)' }));
     svg.appendChild(s('path', { d: 'M3.6 6.8l2 2 3.8-4.2', fill: 'none', stroke: 'var(--surface)', 'stroke-width': 1.6,
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+  } else if (state === 'stated') {
+    svg.appendChild(ring('var(--ok)'));
+    svg.appendChild(s('path', { d: 'M3.9 6.8l1.8 1.8 3.4-3.8', fill: 'none', stroke: 'var(--ok)', 'stroke-width': 1.4,
       'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
   } else if (state === 'digesting') {
     svg.appendChild(ring('var(--wip)'));
@@ -621,13 +629,15 @@ function overview() {
   secs.forEach(g => g.needsDrawn.forEach(n => edges.push([g.id, n, 1])));
   let dg;
   const cards = secs.map(g => {
-    const el = h('a', { class: 'card sec ' + g.state, href: '#' + g.key,
+    const st = secState(g);
+    const el = h('a', { class: 'card sec ' + st, href: '#' + g.key,
       title: g.num + ' ' + g.title + ' — ' + stateWord(g) +
         (g.thms ? ', ' + g.proved + ' of ' + g.thms + ' theorems proved' : '') });
-    el.appendChild(h('span', { class: 'r1' }, stateIcon(g.state), h('span', { class: 'n' }, g.num)));
+    el.appendChild(h('span', { class: 'r1' }, stateIcon(st), h('span', { class: 'n' }, g.num)));
     el.appendChild(h('span', { class: 't' }, g.title));
     el.appendChild(g.thms ?
-      h('span', { class: 'r3' }, progressBar(g), h('span', { class: 'num' }, g.proved + '/' + g.thms)) :
+      h('span', { class: 'r3' }, st === 'complete' ? h('span', { class: 'word complete' }, 'complete') : null,
+        progressBar(g), h('span', { class: 'num' }, g.proved + '/' + g.thms)) :
       g.defs ? h('span', { class: 'r3' }, plural(g.defs, 'definition')) :
       h('span', { class: 'r3' }, h('span', { class: 'word ' + g.state }, STATE_WORD[g.state]),
         g.state === 'digesting' ? null : h('span', { class: 'pp' }, fmtPages(g.pages))));
@@ -646,7 +656,8 @@ function overview() {
     }),
   });
   const legend = h('div', { class: 'legend' },
-    ['stated', 'digesting', 'ready', 'blocked'].map(st => h('span', null, stateIcon(st), STATE_WORD[st])),
+    ['complete', 'stated', 'digesting', 'ready', 'blocked'].map(st => h('span', null, stateIcon(st),
+      st === 'complete' ? 'complete (every theorem proved, none resting on a sorry)' : STATE_WORD[st])),
     h('i', { class: 'sep' }),
     h('span', null, h('span', { class: 'bar', style: 'width:38px;flex:none' }, h('i', { class: 'b-ok', style: 'width:40%' })), 'theorems proved / stated'),
     legendEdge(false, 'needs (arrow points at the section that waits)'));
@@ -692,7 +703,7 @@ function overview() {
   const tb = h('tbody');
   D.groups.forEach(g => {
     tb.appendChild(h('tr', null,
-      h('td', null, h('span', { class: 'sec-cell' }, stateIcon(g.state), h('span', null, h('a', { href: '#' + g.key }, g.num), ' ', g.title))),
+      h('td', null, h('span', { class: 'sec-cell' }, stateIcon(secState(g)), h('span', null, h('a', { href: '#' + g.key }, g.num), ' ', g.title))),
       h('td', { class: 'wide' }, stateWord(g)),
       h('td', { class: 'r wide' }, g.defs), h('td', { class: 'r' }, g.thms ? g.proved + ' / ' + g.thms : ''),
       h('td', { class: 'r wide' }, g.claimed || ''), h('td', { class: 'r wide' }, g.thms - g.proved || ''),
