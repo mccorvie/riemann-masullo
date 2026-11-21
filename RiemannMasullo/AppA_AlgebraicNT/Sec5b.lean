@@ -155,20 +155,18 @@ theorem dSequenceMeasureMaximal_haar [μ.IsHaarMeasure] (hU : IsDSequence μ U) 
     rw [measure_smul, ENNReal.div_self hpos.ne' hfin.ne]
   simp only [dSequenceMeasureMaximal, hratio, limsup_const]
 
-/-- Paper: Theorem A.5.3.4(1), p. 579. On `B` the measure maximal function satisfies
-the localized weak bound, with the mass on the right measured by `ν`.
+/-- Paper: Theorem A.5.3.4(1), p. 579. The localized weak bound is strict whenever
+the strict level set meets `B`.
 Deviation: Products of sets are measured by outer measure. -/
-theorem dSequenceMeasureMaximal_weak [μ.IsHaarMeasure] {ν : Measure G} [ν.Regular]
+private theorem dSequenceMeasureMaximal_weak_strict [μ.IsHaarMeasure] {ν : Measure G} [ν.Regular]
     (hU : IsDSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
     (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
     {B : Set G} (hB : NullMeasurableSet B μ) (hBU : μ (B * U 0) < ∞)
     {α : ℝ} (hα : 0 < α) :
     let E := B ∩ {x | ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x}
-    μ E ≤ ENNReal.ofReal (C / α) * ν (E * U 0) := by
+    E.Nonempty → μ E < ENNReal.ofReal (C / α) * ν (E * U 0) := by
   classical
-  intro E
-  obtain hE | hE := E.eq_empty_or_nonempty
-  · simp [hE]
+  intro E hE
   have htranslate (x : G) (k : ℕ) :
       x • U k = (fun y : G ↦ y * x⁻¹) ⁻¹' U k := by
     ext y
@@ -210,10 +208,10 @@ theorem dSequenceMeasureMaximal_weak [μ.IsHaarMeasure] {ν : Measure G} [ν.Reg
         exact (hBorel (k i)).preimage (measurable_mul_const _)
       _ ≤ ν (E * U 0) := measure_mono hunion
   calc
-    μ E ≤ ENNReal.ofReal C * ∑ i, μ (U (k i)) := by
-      rw [mul_comm, ← ENNReal.div_le_iff (ENNReal.ofReal_pos.mpr hC).ne'
-        ENNReal.ofReal_ne_top]
-      exact hmass.le
+    μ E < ENNReal.ofReal C * ∑ i, μ (U (k i)) := by
+      rw [mul_comm, ← ENNReal.div_lt_iff (Or.inl (ENNReal.ofReal_pos.mpr hC).ne')
+        (Or.inl ENNReal.ofReal_ne_top)]
+      exact hmass
     _ ≤ ENNReal.ofReal C * (ν (E * U 0) / ENNReal.ofReal α) := by
       refine mul_le_mul' le_rfl ?_
       apply (ENNReal.le_div_iff_mul_le (Or.inl (ENNReal.ofReal_pos.mpr hα).ne')
@@ -221,6 +219,21 @@ theorem dSequenceMeasureMaximal_weak [μ.IsHaarMeasure] {ν : Measure G} [ν.Reg
       simpa only [mul_comm _ (ENNReal.ofReal α), Finset.mul_sum] using hsum
     _ = ENNReal.ofReal (C / α) * ν (E * U 0) := by
       rw [ENNReal.ofReal_div_of_pos hα, ENNReal.div_eq_inv_mul, ← mul_assoc, div_eq_mul_inv]
+
+/-- Paper: Theorem A.5.3.4(1), p. 579. On `B` the measure maximal function satisfies
+the localized weak bound, with the mass on the right measured by `ν`.
+Deviation: Products of sets are measured by outer measure. -/
+theorem dSequenceMeasureMaximal_weak [μ.IsHaarMeasure] {ν : Measure G} [ν.Regular]
+    (hU : IsDSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
+    (hC : 0 < C) (hbound : ∀ k, μ (U k * (U k)⁻¹) < ENNReal.ofReal C * μ (U k))
+    {B : Set G} (hB : NullMeasurableSet B μ) (hBU : μ (B * U 0) < ∞)
+    {α : ℝ} (hα : 0 < α) :
+    let E := B ∩ {x | ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x}
+    μ E ≤ ENNReal.ofReal (C / α) * ν (E * U 0) := by
+  intro E
+  obtain hE | hE := E.eq_empty_or_nonempty
+  · simp [hE]
+  · exact (dSequenceMeasureMaximal_weak_strict hU hBorel hC hbound hB hBU hα hE).le
 
 /-- Paper: Theorem A.5.3.4(1), p. 579. Equality in the localized weak bound
 holds exactly when the part of the strict level set in `B` is empty.
@@ -231,7 +244,12 @@ theorem dSequenceMeasureMaximal_weak_eq_iff [μ.IsHaarMeasure] {ν : Measure G} 
     {B : Set G} (hB : NullMeasurableSet B μ) (hBU : μ (B * U 0) < ∞)
     {α : ℝ} (hα : 0 < α) :
     let E := B ∩ {x | ENNReal.ofReal α < dSequenceMeasureMaximal μ ν U x}
-    μ E = ENNReal.ofReal (C / α) * ν (E * U 0) ↔ E = ∅ := by sorry
+    μ E = ENNReal.ofReal (C / α) * ν (E * U 0) ↔ E = ∅ := by
+  intro E
+  obtain hE | hE := E.eq_empty_or_nonempty
+  · simp [hE]
+  · exact iff_of_false (dSequenceMeasureMaximal_weak_strict hU hBorel hC hbound hB hBU hα hE).ne
+      hE.ne_empty
 
 /-- Paper: Theorem A.5.3.4(2), p. 580. A Borel D-sequence with relatively
 compact first member gives an almost everywhere finite measure maximal function. -/
