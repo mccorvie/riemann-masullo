@@ -7,6 +7,7 @@ public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
+import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
 /-!
 # Maximal averages on the real line and D-sequences
@@ -388,7 +389,35 @@ theorem exists_isDDoublePrimeSequence_of_totallyDisconnected [FirstCountableTopo
     ∃ K : ℕ → OpenSubgroup G,
       let U : ℕ → Set G := fun k ↦ (K k : Set G)
       let V : ℕ → Set G := fun k ↦ U k * U k
-      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by sorry
+      IsDDoublePrimeSequence μ U V ∧ ∀ k, IsCompact (U k) ∧ μ (U k) ≤ μ (V k) := by
+  have hbasis : (𝓝 (1 : G)).HasBasis (fun H : OpenSubgroup G ↦ IsCompact (H : Set G))
+      (fun H ↦ (H : Set G)) := by
+    refine ⟨fun W ↦ ⟨exists_compact_openSubgroup_sub_mem_nhds, ?_⟩⟩
+    rintro ⟨H, _, hHW⟩
+    exact mem_of_superset H.mem_nhds_one hHW
+  obtain ⟨K, hcompact, hK⟩ := hbasis.exists_antitone_subbasis
+  let U : ℕ → Set G := fun k ↦ (K k : Set G)
+  have hmul (k : ℕ) : U k * U k = U k := (K k).toSubgroup.toSubmonoid.coe_mul_self_eq
+  have hdiff (k : ℕ) : U k * (U k)⁻¹ = U k := by
+    rw [show (U k)⁻¹ = U k from inv_coe_set, hmul]
+  have hmeas (k : ℕ) : NullMeasurableSet (U k) μ :=
+    (K k).isOpen.measurableSet.nullMeasurableSet
+  have hpos (k : ℕ) : 0 < μ (U k) := (K k).isOpen.measure_pos μ ⟨1, (K k).one_mem⟩
+  have hfin (k : ℕ) : μ (U k) < ∞ := (hcompact k).measure_lt_top
+  have hD : IsDSequence μ U := by
+    refine ⟨fun k ↦ ⟨(K k).one_mem, hmeas k, hpos k, hfin k⟩,
+      hK.antitone, 2, two_pos, fun k ↦ ?_⟩
+    rw [hdiff, ENNReal.ofReal_ofNat, two_mul]
+    exact ⟨hpos k, ENNReal.lt_add_right (hfin k).ne (hpos k).ne'⟩
+  refine ⟨K, ⟨⟨hD, fun _ hW ↦ hK.mem_iff.mp hW⟩, 1, one_pos, fun k ↦ ?_⟩, fun k ↦ ?_⟩
+  · change NullMeasurableSet (U k * U k) μ ∧
+      (U k * U k) * (U k * U k)⁻¹ ⊆ U k ∧
+      μ (U k) ≤ ENNReal.ofReal 1 * μ (U k * U k)
+    simp only [hmul, hdiff, ENNReal.ofReal_one, one_mul]
+    exact ⟨hmeas k, Subset.rfl, le_rfl⟩
+  · change IsCompact (U k) ∧ μ (U k) ≤ μ (U k * U k)
+    rw [hmul]
+    exact ⟨hcompact k, le_rfl⟩
 
 variable (H : OpenSubgroup G) (U : ℕ → Set H)
 
