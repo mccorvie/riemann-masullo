@@ -878,7 +878,56 @@ theorem isBanachNuclear_iff_mem_range (A : E →L[ℂ] F) :
 /-- Paper: §C.3.1, p. 694. The local and Banach-space definitions of a
 nuclear operator agree for Banach spaces. -/
 theorem isNuclearOperator_iff_isBanachNuclear (A : E →L[ℂ] F) :
-    IsNuclearOperator A ↔ IsBanachNuclear A := by sorry
+    IsNuclearOperator A ↔ IsBanachNuclear A := by
+  constructor
+  · rintro ⟨U, hU, bU, cU, B, hB, _, T, ⟨c, φ, y, hc, hφ, hy, hT⟩, hA⟩
+    let p := gaugeSeminorm bU cU (absorbent_nhds_zero hU)
+    let G := WithLocalSeminorm (gaugeSeminorm hB.balanced hB.convex hB.absorbent)
+    let i₀ : E →ₗ[ℂ] LocalBanach p := Completion.toComplL.toLinearMap.comp LinearMap.id
+    let i : E →L[ℂ] LocalBanach p :=
+      ⟨i₀, (PolynormableSpace.withSeminorms ℂ E).continuous_normedSpace_rng (LocalBanach p) i₀
+        ⟨{⟨p, continuous_gauge cU hU⟩}, 1, by
+          simpa using (show (normSeminorm ℂ _).comp i₀ ≤ p from
+            fun x ↦ (localBanach_norm_coe p x).le)⟩⟩
+    let j : G →L[ℂ] F := ⟨(Submodule.span ℂ B).subtype, continuous_banachDisc_subtype hB⟩
+    let precomp := (ContinuousLinearMap.compL ℂ E (LocalBanach p) ℂ).flip i
+    refine ⟨c, ⇑precomp ∘ φ, ⇑j ∘ y, hc, ?_, ?_, ?_⟩
+    · simpa only [map_zero] using (precomp.continuous.tendsto 0).comp hφ
+    · simpa only [map_zero] using (j.continuous.tendsto 0).comp hy
+    · intro x
+      have hs := j.hasSum (hT (i x))
+      rw [show j (T (i x)) = A x from hA x] at hs
+      change HasSum (fun n ↦ (c n * φ n (i x)) • j (y n)) (A x)
+      simpa only [map_smul] using hs
+  · rintro ⟨c, φ, y, hc, hφ, hy, hA⟩
+    apply (isNuclearOperator_iff_nonempty_presentation A).mpr
+    obtain ⟨C, _, hC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+    have hφ_bound : ∃ C : ℝ, ∀ n, ‖φ n‖ ≤ C := ⟨C, fun n ↦ hC _ (mem_range_self n)⟩
+    obtain ⟨R, hR, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+    let r : ℂ := R
+    have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr hR.ne'
+    have hr_norm : ‖r‖ = R := by
+      dsimp [r]
+      rw [Complex.norm_real, Real.norm_of_nonneg hR.le]
+    let B := Metric.closedBall (0 : F) 1
+    have hyB (n : ℕ) : r⁻¹ • y n ∈ B := by
+      change dist (r⁻¹ • y n) 0 ≤ 1
+      rw [dist_zero_right, norm_smul, norm_inv, hr_norm, inv_mul_le_iff₀ hR, mul_one]
+      exact hyR _ (mem_range_self n)
+    refine ⟨{
+      coeff := fun n ↦ c n * r
+      functional := φ
+      disc := B
+      isBanachDisc := isBanachDisc_closedUnitBall
+      vector := fun n ↦ ⟨r⁻¹ • y n, Submodule.subset_span (hyB n)⟩
+      vector_mem := hyB
+      summable_coeff := by simpa only [norm_mul] using hc.mul_right ‖r‖
+      equicontinuous := ((NormedSpace.equicontinuous_tfae φ).out 6 1).mp hφ_bound
+      hasSum := ?_ }⟩
+    intro x
+    refine (hA x).congr_fun fun n ↦ ?_
+    change (c n * r * φ n x) • (r⁻¹ • y n) = (c n * φ n x) • y n
+    rw [smul_smul, mul_right_comm (c n) r, mul_inv_cancel_right₀ hr]
 
 end BanachTensor
 
