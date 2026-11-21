@@ -595,8 +595,21 @@ theorem tensorDualOperator_tmul (x : E) (y : F) (φ : StrongDual ℂ E) :
 
 include hE sE hF sF in
 /-- Paper: Remark C.2.3.2, p. 677. The canonical operator representation is injective. -/
-theorem tensorDualOperator_injective : Function.Injective (tensorDualOperator (E := E) (F := F)) :=
-  by sorry
+theorem tensorDualOperator_injective : Function.Injective (tensorDualOperator (E := E) (F := F)) := by
+  let := polynormableSpace_separatingDual ℂ E
+  let := polynormableSpace_separatingDual ℂ F
+  intro z w h
+  apply tensorDualForm_ext
+  intro φ ψ
+  have hform : tensorDualForm φ ψ =
+      ψ.toLinearMap.comp ((LinearMap.applyₗ (R := ℂ) φ).comp tensorDualOperator) := by
+    apply TensorProduct.ext'
+    intro x y
+    change tensorDualForm φ ψ (x ⊗ₜ[ℂ] y) = ψ (tensorDualOperator (x ⊗ₜ[ℂ] y) φ)
+    simp [tensorDualForm_tmul, tensorDualOperator, dualTensorHom_apply, LinearMap.flip_apply]
+  rw [hform]
+  change ψ (tensorDualOperator z φ) = ψ (tensorDualOperator w φ)
+  rw [h]
 
 /-- Paper: Remark C.2.3.2, p. 677. The operator associated to each tensor has
 finite-dimensional image. -/
