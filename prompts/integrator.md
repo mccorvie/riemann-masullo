@@ -12,7 +12,7 @@ is his to decide (listed at the end).
 
 - `main`: it always builds and passes `scripts/lint.sh`.
 - The target statements (`Statements.lean`, `Challenge.lean`, `Main.lean`, `comparator.json`) and
-  the infrastructure. Nobody else edits these.
+  the infrastructure, except for the merge and triage scripts maintained by the merger.
 - The issue tracker: section issues, proof issues, labels, claims.
 - Statements already merged. Changing one is your decision, made deliberately, because provers
   are building on it.
@@ -68,9 +68,9 @@ issue is worth doing, re-file it in your own words.
 
 When a merger session is running (`prompts/merger.md`), the proof queue is its job: it runs
 `land.sh` and `triage_prs.sh`, reads splits and resolves conflicts, and labels what it leaves for
-you `integrator`. It also runs the issue sync and republishes the progress page after its
-merges, from its own worktree. You keep statement pull requests, seeding and everything else
-here, and still run the sync after you merge statements.
+you `integrator`. It also runs the issue sync after proof merges from its own worktree.
+You keep statement pull requests and seeding, and run the sync after you merge statements.
+The [progress tracker](progress-tracker.md) builds and publishes the progress map.
 
 `scripts/pool.sh <count>` keeps that many provers working and merges what `land.sh` accepts,
 without touching this checkout; you still pull, rebuild and run `scripts/issues.py --apply`. An

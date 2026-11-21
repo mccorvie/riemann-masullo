@@ -33,7 +33,8 @@ Role instructions are in [`prompts/`](prompts/README.md).
 | `RiemannMasullo/ForMathlib/` | general lemmas missing from Mathlib, at the path Mathlib would use | provers |
 | `RiemannMasullo/External/` | vendored third-party Lean, see its README | integrator |
 | `Statements.lean`, `Challenge.lean`, `Main.lean`, `comparator.json` | the target theorems | integrator |
-| `lakefile.toml`, `lean-toolchain`, `lake-manifest.json`, `.github/`, `scripts/`, `prompts/` | infrastructure | integrator |
+| `scripts/land.sh`, `scripts/triage_prs.sh`, `scripts/check_pr.sh` | proof PR merging and triage | merger |
+| `lakefile.toml`, `lean-toolchain`, `lake-manifest.json`, `.github/`, remaining `scripts/`, `prompts/` | infrastructure | integrator |
 | `paper/` | the PDF and a text extraction | nobody |
 
 Every module under `RiemannMasullo/` is built automatically, so a new file needs no entry in an

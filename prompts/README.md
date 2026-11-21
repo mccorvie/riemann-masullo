@@ -4,6 +4,7 @@
 |---|---|---|---|
 | Integrator | [`integrator.md`](integrator.md) | the whole repository; one long-running session | merges, issues |
 | Merger | [`merger.md`](merger.md) | the pull-request queue; one long-running session | merged proofs, reviews of splits |
+| Progress tracker | [`progress-tracker.md`](progress-tracker.md) | the public progress map | updated Claude artifact |
 | Scout | [`scout.md`](scout.md) | one issue | a comment listing existing Lean and literature |
 | Digester | [`digester.md`](digester.md) | one `section` issue | a pull request of statements with `sorry` |
 | Prover | [`prover.md`](prover.md) | one `proof` issue | a pull request that proves or splits it |
@@ -37,5 +38,9 @@ has no network; that is why the launcher does the git and GitHub steps.
 
 The integrator and the merger are started by hand in the main checkout ("You are the merger; read
 prompts/merger.md and start"). The merger never touches the working tree there.
+
+Start the progress tracker by hand in the main checkout, in a Claude session with the Artifact
+tool. Give it the instruction “You are the progress tracker. Read `prompts/progress-tracker.md`
+and start.”
 
 Every agent also reads [`AGENTS.md`](../AGENTS.md), which holds the rules common to all roles.
