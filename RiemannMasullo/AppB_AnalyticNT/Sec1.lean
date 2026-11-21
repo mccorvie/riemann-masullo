@@ -15,7 +15,9 @@ public import Mathlib.Topology.Order.Lattice
 
 import Mathlib.Analysis.Complex.AbsMax
 import Mathlib.Analysis.Convex.Continuous
+import Mathlib.NumberTheory.LSeries.Injectivity
 import RiemannMasullo.ForMathlib.Analysis.Complex.Hadamard
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
 
 /-!
 # Convexity bounds for finite Hecke L-functions
@@ -1373,6 +1375,59 @@ theorem finiteHeckeL_continuation_isBigO_rpow (χ : U[F]) (L : ℂ → ℂ)
   simpa only [Real.rpow_natCast] using ((hGL.symm.isBigO.mono hStrip).trans hGPoly).mono
     (hFilter (Icc_subset_Icc hl hu))
 
+/-- Paper: Equation (B.1.1.11), p. 590. The finite functional equation has a
+multiplier given by the archimedean gamma ratio and a nonzero constant times a
+real-scale exponential. Deviation: The conductor and phase are absorbed into
+the real exponent coefficient and the nonzero constant. -/
+private theorem finiteHeckeL_functionalEquation_conductorScale (χ : U[F]) (L Ldual : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (hLdual : MeromorphicNFOn Ldual univ)
+    (hDualSeries : ∀ s : halfPlane, Ldual s = finiteHeckeL χ⁻¹ s) :
+    ∃ (c : ℂ) (r : ℝ), c ≠ 0 ∧
+      L =ᶠ[codiscreteWithin univ] fun s ↦
+        (c * Complex.exp ((r : ℂ) * s) *
+          toMeromorphicNFOn (fun z ↦ heckeGammaFactor χ⁻¹ (1 - z) / heckeGammaFactor χ z)
+            univ s) * Ldual (1 - s) := by
+  sorry
+
+/-- Paper: Equations (B.1.1.7)–(B.1.1.11), p. 590. Uniform Stirling estimates
+at the real and complex places bound the normal form of the archimedean gamma
+ratio by the height to the power `[F : ℚ] * (1 / 2 - Re(s))`. -/
+private theorem heckeGammaRatio_isBigO_on_strip (χ : U[F]) (a b : ℝ) (hab : a < b) :
+    toMeromorphicNFOn (fun z ↦ heckeGammaFactor χ⁻¹ (1 - z) / heckeGammaFactor χ z) univ
+      =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)]
+        fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - s.re)) := by
+  sorry
+
+/-- A finite Hecke continuation is nonzero somewhere because its Dirichlet
+series tends to its first coefficient, one, along the positive real axis. -/
+private theorem finiteHeckeL_continuation_exists_ne_zero (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) : ∃ s, L s ≠ 0 := by
+  let ψ := ideleClassNormTwist χ 0
+  have hCoeff : ψ.LFunction 1 = 1 := by
+    have hLocal (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) : ψ.localEulerFactor v 1 = 1 := by
+      simp [NumberField.HeckeCharacter.localEulerFactor, NumberField.HeckeCharacter.localPowerSeries,
+        ArithmeticFunction.ofPowerSeries_apply_one, PowerSeries.constantCoeff_invOfUnit]
+    obtain ⟨S, hS⟩ := (heckeLocalEulerFactor_eventually_prod_eq ψ 1).exists
+    rw [← hS]
+    clear hS
+    classical
+    induction S using Finset.induction_on with
+    | empty => simp
+    | insert v S hv ih =>
+        rw [Finset.prod_insert hv, ArithmeticFunction.mul_apply_one, hLocal, ih, one_mul]
+  have hAbscissa : LSeries.abscissaOfAbsConv ψ.LFunction < ⊤ :=
+    (finiteHeckeL_seriesSummable χ ⟨2, by change 1 < (2 : ℂ).re; norm_num⟩).abscissaOfAbsConv_le.trans_lt
+      (EReal.coe_lt_top _)
+  have hLimit : Tendsto (fun t : ℝ ↦ L (t : ℂ)) atTop (𝓝 1) := by
+    rw [← hCoeff]
+    apply (LSeries.tendsto_atTop hAbscissa).congr'
+    filter_upwards [eventually_gt_atTop (1 : ℝ)] with t ht
+    exact (hSeries ⟨(t : ℂ), by change 1 < (t : ℂ).re; simpa using ht⟩).symm
+  by_contra! h
+  exact one_ne_zero (tendsto_nhds_unique_of_eventuallyEq hLimit tendsto_const_nhds
+    (Eventually.of_forall fun t ↦ h (t : ℂ)))
+
 /-- Paper: Equation (B.1.1.10), p. 590. The reflection factor in the functional
 equation satisfies the stated power bound on every fixed closed vertical strip. -/
 theorem finiteHeckeReflectionFactor_isBigO_on_strip (χ : U[F]) (L Ldual ε : ℂ → ℂ)
@@ -1384,7 +1439,56 @@ theorem finiteHeckeReflectionFactor_isBigO_on_strip (χ : U[F]) (L Ldual ε : �
       (fun s ↦ finiteHeckeReflectionFactor χ ε s * Ldual (1 - s)))
     (a b : ℝ) (hab : a < b) :
     finiteHeckeReflectionFactor χ ε =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)]
-      fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - s.re)) := by sorry
+      fun s ↦ |s.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - s.re)) := by
+  -- The functional equation determines the multiplier in meromorphic normal form.
+  clear hε hεNe
+  let G := toMeromorphicNFOn
+    (fun z ↦ heckeGammaFactor χ⁻¹ (1 - z) / heckeGammaFactor χ z) univ
+  obtain ⟨c, r, hc, hExplicit⟩ :=
+    finiteHeckeL_functionalEquation_conductorScale χ L Ldual hL hSeries hLdual hDualSeries
+  let E (s : ℂ) := c * Complex.exp ((r : ℂ) * s)
+  let D (s : ℂ) := Ldual (1 - s)
+  have hD : MeromorphicOn D univ := fun s _ ↦
+    (hLdual (mem_univ (1 - s))).meromorphicAt.comp_analyticAt
+      (analyticAt_const.sub analyticAt_id)
+  obtain ⟨s₀, hs₀⟩ := finiteHeckeL_continuation_exists_ne_zero χ⁻¹ Ldual hDualSeries
+  have hD₀ : meromorphicOrderAt D (1 - s₀) ≠ ⊤ := by
+    have hL₀ : AnalyticAt ℂ Ldual s₀ := by
+      rcases meromorphicNFAt_iff_analyticAt_or.mp (hLdual (mem_univ s₀)) with h | ⟨_, h⟩
+      · exact h
+      · exact (hs₀ h.2).elim
+    have h : AnalyticAt ℂ D (1 - s₀) :=
+      hL₀.comp_of_eq (analyticAt_const.sub analyticAt_id) (sub_sub_cancel 1 s₀)
+    rw [h.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr (by simpa [D] using hs₀)]
+    exact WithTop.zero_ne_top
+  have hDne := hD.eventually_codiscreteWithin_apply_ne_zero fun s hs ↦
+    hD.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ (mem_univ _) hs hD₀
+  have hAgree : finiteHeckeReflectionFactor χ ε =ᶠ[codiscreteWithin univ] E * G := by
+    filter_upwards [hEq, hExplicit, hDne] with s hs ht hsne
+    exact mul_right_cancel₀ hsne (hs.symm.trans ht)
+  have hE : Differentiable ℂ E := by
+    dsimp [E]
+    fun_prop
+  have hEG : MeromorphicNFOn (E * G) univ :=
+    (meromorphicNFOn_mul_iff_right_of_analyticOnNhd (fun s _ ↦ hE.analyticAt s)
+      (fun s _ ↦ mul_ne_zero hc (Complex.exp_ne_zero _))).mpr (meromorphicNFOn_toMeromorphicNFOn _ _)
+  have hW : MeromorphicNFOn (finiteHeckeReflectionFactor χ ε) univ :=
+    meromorphicNFOn_toMeromorphicNFOn _ _
+  have hEqW : finiteHeckeReflectionFactor χ ε = E * G := by
+    funext s
+    have hs := (eventuallyEq_codiscreteWithin_iff_forall_eventually_nhdsNE.mp hAgree) s (mem_univ s)
+    exact (((hW (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+      (hEG (mem_univ s))).mp (hs.mono fun z hz ↦ hz (mem_univ z))).eq_of_nhds
+  have hBound : E =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun _ ↦ (1 : ℝ) := by
+    obtain ⟨C, hC⟩ := (isCompact_Icc (a := a) (b := b)).exists_bound_of_continuousOn
+      (f := fun x ↦ ‖c‖ * Real.exp (r * x)) (by fun_prop)
+    refine Asymptotics.IsBigO.of_bound C (eventually_inf_principal.mpr (Eventually.of_forall ?_))
+    intro s hs
+    simpa [E, norm_mul, Complex.norm_exp, Complex.mul_re,
+      Real.norm_of_nonneg (by positivity : 0 ≤ ‖c‖ * Real.exp (r * s.re))] using hC s.re hs
+  rw [hEqW]
+  change (fun s ↦ E s * G s) =O[_] _
+  simpa only [one_mul] using hBound.mul (heckeGammaRatio_isBigO_on_strip χ a b hab)
 
 -- TODO(paper-gap): After (B.1.1.11), the displayed multiplier is called entire
 -- and zero-free. For F = ℚ and χ trivial, its gamma quotient has a pole at 1
