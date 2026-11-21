@@ -9,6 +9,9 @@ import Mathlib.Analysis.LocallyConvex.WeakDual
 import Mathlib.Analysis.Normed.Module.HahnBanach
 import Mathlib.Analysis.Normed.Module.WeakDual
 import Mathlib.Analysis.RCLike.Lemmas
+import Mathlib.Topology.Algebra.Module.Spaces.CompactConvergenceCLM
+import Mathlib.Topology.UniformSpace.Ascoli
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WeakSpace
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
@@ -724,6 +727,325 @@ theorem completionCompactDualTopology_eq_precompact :
       polarTopology (topDualPairing ℂ X) {A | TotallyBounded A} := by sorry
 
 include sep complete in
+open scoped CompactConvergenceCLM in
+/-- On a complete Hausdorff space, testing the extended functionals on compact sets
+gives the compact convergence topology on the original functionals. -/
+private theorem completionCompactDualTopology_eq_compact :
+    completionCompactDualTopology X = (inferInstance : TopologicalSpace (X →L_c[ℂ] ℂ)) := by
+  let e := (Completion.UniformCompletion.completeEquivSelf : Completion X ≃ᵤ X).symm.toHomeomorph
+  have he (x : X) : e x = (x : Completion X) := by
+    apply e.symm.injective
+    exact (e.symm_apply_apply x).trans (Completion.cPkg.compare_coe AbstractCompletion.ofComplete x).symm
+  let K : Set (Set X) := {A | IsCompact A}
+  let L : Set (Set (Completion X)) := {A | IsCompact A}
+  let E : (X →ᵤ[K] ℂ) ≃ᵤ (Completion X →ᵤ[L] ℂ) :=
+    UniformOnFun.congrLeft e.toEquiv (fun _ h ↦ h.image e.continuous)
+      (fun _ h ↦ e.isCompact_preimage.mpr h)
+  rw [UniformConvergenceCLM.topologicalSpace_eq (RingHom.id ℂ) ℂ K]
+  change induced (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun L φ.fromCompletion)
+    inferInstance = induced (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun K φ) inferInstance
+  have h : (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun L φ.fromCompletion) =
+      E ∘ (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun K φ) := by
+    funext φ
+    change φ.fromCompletion = (fun x ↦ φ (e.symm x))
+    funext x
+    obtain ⟨y, rfl⟩ := e.surjective x
+    rw [e.symm_apply_apply, he, ContinuousLinearMap.fromCompletion_apply_coe]
+  rw [h, ← induced_compose]
+  exact congrArg (induced (fun φ : StrongDual ℂ X ↦ UniformOnFun.ofFun K φ))
+    E.isUniformInducing.isInducing.eq_induced.symm
+
+omit lc sep complete in
+open scoped CompactConvergenceCLM in
+/-- Compact convergence induces pointwise convergence on an equicontinuous family. -/
+private theorem compactDualTopology_induced (A : Set (WeakDual ℂ X))
+    (hA : EquicontinuousAt (fun φ : A ↦ (φ.val : X → ℂ)) 0) :
+    (inferInstance : TopologicalSpace (X →L_c[ℂ] ℂ)).induced
+      (fun φ : A ↦ WeakDual.toStrongDual φ.val) = (inferInstance : TopologicalSpace A) := by
+  let f : A → X → ℂ := fun φ ↦ φ.val
+  have hEq : Equicontinuous f :=
+    equicontinuous_of_equicontinuousAt_zero
+      (fun φ : A ↦ φ.val.toStrongDual.toAddMonoidHom) hA
+  have hweak : IsInducing f :=
+    (show IsInducing (fun φ : WeakDual ℂ X ↦ (φ : X → ℂ)) from ⟨rfl⟩).comp
+      IsInducing.subtypeVal
+  let K : Set (Set X) := {A | IsCompact A}
+  have hcompact : IsInducing (UniformOnFun.ofFun K ∘ f) :=
+    (EquicontinuousOn.isInducing_uniformOnFun_iff_pi sUnion_isCompact_eq_univ
+      (fun _ h ↦ h) (fun k _ ↦ hEq.equicontinuousOn k)).mpr hweak
+  let j : A → (X →L_c[ℂ] ℂ) := fun φ ↦ φ.val.toStrongDual
+  change induced j inferInstance = _
+  rw [UniformConvergenceCLM.topologicalSpace_eq (RingHom.id ℂ) ℂ K, induced_compose]
+  exact hcompact.eq_induced.symm
+
+omit lc sep complete in
+/-- A seminorm continuous on a weak-dual polar admits finite simultaneous evaluation
+approximations there for all algebraic functionals dominated by the seminorm. -/
+private theorem finite_approx_on_polar (p : Seminorm ℂ (StrongDual ℂ X))
+    (q : Seminorm ℂ X) (hq : Continuous q)
+    (hp : Continuous (fun φ : WeakDual.polar ℂ (q.closedBall 0 1) ↦ p φ.val.toStrongDual))
+    {ε : ℝ} (hε : 0 < ε) :
+    ∃ D : Set X, D.Finite ∧ ∀ l : Module.Dual ℂ (StrongDual ℂ X),
+      (∀ φ, ‖l φ‖ ≤ p φ) → ∃ x ∈ D, ∀ φ ∈ WeakDual.polar ℂ (q.closedBall 0 1),
+        ‖l φ.toStrongDual - φ x‖ ≤ ε := by
+  classical
+  let e : ULift.{0} X ≃ₗ[ℂ] X := ULift.moduleEquiv
+  let q' := q.comp e.toLinearMap
+  let : SeminormedAddCommGroup (ULift.{0} X) := q'.toSeminormedAddCommGroup
+  let : TopologicalSpace (ULift.{0} X) :=
+    q'.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+  let : NormedSpace ℂ (ULift.{0} X) := ⟨fun c y ↦ (map_smul_eq_mul q' c y).le⟩
+  have he : Continuous e.symm := by
+    refine (Metric.continuous_iff' (f := fun y : X ↦ e.symm y)).mpr fun y r hr ↦ ?_
+    have hc : Continuous (fun x : X ↦ q (x - y)) := hq.comp (continuous_id.sub continuous_const)
+    filter_upwards [hc.continuousAt (x := y).eventually_lt continuousAt_const
+      (show q (y - y) < r by simpa)] with x hx
+    rw [dist_eq_norm, ← map_sub]
+    change q (e (e.symm (x - y))) < r
+    rwa [e.apply_symm_apply]
+  let Y := StrongDual ℂ (ULift.{0} X)
+  let : SeminormedAddCommGroup Y :=
+    inferInstanceAs (SeminormedAddCommGroup (StrongDual ℂ (ULift.{0} X)))
+  let : NormedAddCommGroup Y := NormedAddCommGroup.ofSeparation fun g hg ↦ by
+    apply ContinuousLinearMap.ext
+    intro y
+    exact norm_le_zero_iff.mp (by simpa [hg] using g.le_opNorm y)
+  let : NormedSpace ℂ Y := inferInstanceAs (NormedSpace ℂ (StrongDual ℂ (ULift.{0} X)))
+  let j : Y →ₗ[ℂ] StrongDual ℂ X :=
+    (ContinuousLinearMap.precomp ℂ (⟨e.symm.toLinearMap, he⟩ : X →L[ℂ] ULift.{0} X)).toLinearMap
+  let P := WeakDual.polar ℂ (q.closedBall 0 1)
+  have hunit (g : Y) (hg : ‖g‖ ≤ 1) : (j g).toWeakDual ∈ P := by
+    intro x hx
+    change ‖g (e.symm x)‖ ≤ 1
+    calc
+      ‖g (e.symm x)‖ ≤ ‖g‖ * ‖e.symm x‖ := g.le_opNorm _
+      _ ≤ 1 * 1 := mul_le_mul hg (q.mem_closedBall_zero.mp hx) (norm_nonneg _) zero_le_one
+      _ = 1 := one_mul _
+  have hcover (φ : WeakDual ℂ X) (hφ : φ ∈ P) :
+      ∃ g : Y, ‖g‖ ≤ 1 ∧ j g = φ.toStrongDual := by
+    have hbound (x : X) : ‖φ x‖ ≤ q x := by
+      refine le_of_forall_gt_imp_ge_of_dense fun r hr ↦ ?_
+      have hr' := (apply_nonneg q x).trans_lt hr
+      have hu : (r : ℂ)⁻¹ • x ∈ q.closedBall 0 1 := by
+        apply q.mem_closedBall_zero.mpr
+        rw [map_smul_eq_mul, norm_inv, Complex.norm_of_nonneg hr'.le, ← div_eq_inv_mul,
+          div_le_iff₀ hr', one_mul]
+        exact hr.le
+      have h : ‖φ ((r : ℂ)⁻¹ • x)‖ ≤ 1 := hφ _ hu
+      rw [map_smul, norm_smul, norm_inv, Complex.norm_of_nonneg hr'.le, ← div_eq_inv_mul,
+        div_le_iff₀ hr', one_mul] at h
+      exact h
+    let f := φ.toStrongDual.toLinearMap.comp e.toLinearMap
+    have hf (z : ULift.{0} X) : ‖f z‖ ≤ 1 * ‖z‖ := by
+      change ‖φ (e z)‖ ≤ 1 * q (e z)
+      simpa only [one_mul] using hbound (e z)
+    refine ⟨f.mkContinuous 1 hf, f.mkContinuous_norm_le zero_le_one hf, ?_⟩
+    ext x
+    exact congrArg φ (e.apply_symm_apply x)
+  -- Restriction of the seminorm to the normed dual is continuous on its unit ball.
+  let B := Metric.closedBall (0 : Y) 1
+  let pull (g : B) : P :=
+    ⟨(j g.val).toWeakDual, hunit g.val (mem_closedBall_zero_iff.mp g.property)⟩
+  have hpull : Continuous pull := by
+    apply Continuous.subtype_mk
+    apply WeakDual.continuous_of_continuous_eval
+    intro x
+    exact (ContinuousLinearMap.apply ℂ ℂ (e.symm x)).continuous.comp continuous_subtype_val
+  have hpc : Continuous (fun g : B ↦ p (j g.val)) := hp.comp hpull
+  let pp := p.comp j
+  have hpp : Continuous pp := by
+    refine Seminorm.continuous' (r := 1) ?_
+    let z : B := ⟨0, Metric.mem_closedBall_self zero_le_one⟩
+    have hnear : {g : B | pp g.val < 1} ∈ 𝓝 z :=
+      hpc.continuousAt.preimage_mem_nhds (show Iio 1 ∈ 𝓝 (pp z.val) by
+        simp only [z, map_zero]; exact Iio_mem_nhds one_pos)
+    rw [nhds_subtype] at hnear
+    obtain ⟨W, hW, hsub⟩ := Filter.mem_comap.mp hnear
+    filter_upwards [hW, Metric.closedBall_mem_nhds (0 : Y) one_pos] with g hg hB
+    exact pp.mem_closedBall_zero.mpr (hsub (a := ⟨g, hB⟩) hg).le
+  obtain ⟨C, hC, hbound⟩ := pp.bound_of_continuous_normedSpace hpp
+  -- Continuity at zero on the polar gives finitely many evaluations whose joint
+  -- kernel has small seminorm on the unit ball.
+  let z : P := ⟨0, by intro x hx; simp⟩
+  have hnear : {φ : P | p φ.val.toStrongDual < ε / 2} ∈ 𝓝 z :=
+    hp.continuousAt.preimage_mem_nhds (show Iio (ε / 2) ∈ 𝓝 (p z.val.toStrongDual) by
+      simp only [z, map_zero]; exact Iio_mem_nhds (half_pos hε))
+  rw [nhds_subtype] at hnear
+  obtain ⟨W, hW, hsub⟩ := Filter.mem_comap.mp hnear
+  change W ∈ 𝓝 (0 : WeakBilin (topDualPairing ℂ X)) at hW
+  obtain ⟨⟨s, r⟩, hr, hs⟩ :=
+    (topDualPairing ℂ X).weakBilin_withSeminorms.hasBasis_zero_ball.mem_iff.mp hW
+  let ev : X →ₗ[ℂ] StrongDual ℂ Y :=
+    (ContinuousLinearMap.apply ℂ ℂ (E' := ULift.{0} X)).toLinearMap.comp e.symm.toLinearMap
+  let V : Submodule ℂ (StrongDual ℂ Y) := Submodule.span ℂ (ev '' (s : Set X))
+  let T : Submodule ℂ Y := ⨅ x : s, (ev x).toLinearMap.ker
+  have hsmall (g : T) (hg : ‖g‖ ≤ 1) : p (j g.val) ≤ ε / 2 := by
+    have hPg := hunit g.val hg
+    have hball : j g.val ∈ (s.sup (topDualPairing ℂ X).toSeminormFamily).ball 0 r := by
+      refine (s.sup (topDualPairing ℂ X).toSeminormFamily).mem_ball_zero.mpr
+        (Seminorm.finset_sup_apply_lt hr fun x hx ↦ ?_)
+      have hzero : (ev x) g.val = 0 :=
+        LinearMap.mem_ker.mp ((Submodule.mem_iInf _).mp g.property ⟨x, hx⟩)
+      change ‖(ev x) g.val‖ < r
+      simpa only [hzero, norm_zero] using hr
+    exact (hsub (a := ⟨(j g.val).toWeakDual, hPg⟩) (hs hball)).le
+  let R := C + ε / 2
+  let : FiniteDimensional ℂ V := FiniteDimensional.span_of_finite ℂ (s.finite_toSet.image ev)
+  let : ProperSpace V := FiniteDimensional.proper ℂ V
+  have hcompact : IsCompact (Metric.closedBall (0 : V) R) := isCompact_closedBall _ _
+  have hballs : Metric.closedBall (0 : V) R ⊆ ⋃ v : V, Metric.ball v (ε / 2) := by
+    intro v _
+    exact mem_iUnion.mpr ⟨v, Metric.mem_ball_self (half_pos hε)⟩
+  obtain ⟨F, hF⟩ := hcompact.elim_finite_subcover _ (fun _ ↦ Metric.isOpen_ball) hballs
+  have hV : V ≤ ev.range :=
+    Submodule.span_le.mpr (fun _ ⟨x, _, hx⟩ ↦ ⟨x, hx⟩)
+  choose x hx using fun v : V ↦ show ∃ x, ev x = v.val from hV v.property
+  refine ⟨x '' (F : Set V), F.finite_toSet.image x, fun l hl ↦ ?_⟩
+  let lj := l.comp j
+  let f := lj.mkContinuous C (fun g ↦ (hl (j g)).trans (hbound g))
+  let ft := lj.comp T.subtype
+  -- Extend the small restriction on the joint kernel. The remaining functional is
+  -- in the span of the finite set of evaluations.
+  have hft (g : T) : ‖ft g‖ ≤ (ε / 2) * ‖g‖ := by
+    by_cases hg : g = 0
+    · simp [hg]
+    have hg' : 0 < ‖g‖ := norm_pos_iff.mpr hg
+    have hnorm : ‖((‖g‖ : ℝ) : ℂ)⁻¹ • g‖ ≤ 1 := by
+      rw [norm_smul, norm_inv, Complex.norm_of_nonneg hg'.le, inv_mul_cancel₀ hg'.ne']
+    have hscale := (hl (j ((((‖g‖ : ℝ) : ℂ)⁻¹ • g : T)).val)).trans (hsmall _ hnorm)
+    change ‖ft (((‖g‖ : ℂ)⁻¹) • g)‖ ≤ ε / 2 at hscale
+    rw [map_smul, norm_smul, norm_inv, Complex.norm_of_nonneg hg'.le, ← div_eq_inv_mul,
+      div_le_iff₀ hg'] at hscale
+    exact hscale
+  obtain ⟨b, hb, hbnd⟩ := Module.Dual.exists_continuous_extension_of_le_seminorm T ft
+    (p := (Real.toNNReal (ε / 2)) • normSeminorm ℂ Y)
+    (continuous_norm.const_smul _) (fun g ↦ by
+      simpa [smul_apply, NNReal.smul_def, Real.toNNReal_of_nonneg (half_pos hε).le] using hft g)
+  have hbn : ‖b‖ ≤ ε / 2 := b.opNorm_le_bound (half_pos hε).le fun g ↦ by
+    simpa [smul_apply, NNReal.smul_def, Real.toNNReal_of_nonneg (half_pos hε).le] using hbnd g
+  have hker : T ≤ (f - b).toLinearMap.ker := fun g hg ↦ by
+    apply LinearMap.mem_ker.mpr
+    exact sub_eq_zero.mpr (hb ⟨g, hg⟩).symm
+  have hspan := mem_span_of_iInf_ker_le_ker hker
+  have hfb : f - b ∈ V := by
+    obtain ⟨c, hc⟩ := (Submodule.mem_span_range_iff_exists_fun ℂ).mp hspan
+    have heq : f - b = ∑ i : s, c i • ev i := by
+      apply ContinuousLinearMap.coe_injective
+      simpa using hc.symm
+    rw [heq]
+    exact V.sum_mem fun i _ ↦ V.smul_mem _ (Submodule.subset_span ⟨i, i.property, rfl⟩)
+  let v : V := ⟨f - b, hfb⟩
+  have hv : v ∈ Metric.closedBall (0 : V) R := by
+    change dist (f - b) (0 : StrongDual ℂ Y) ≤ R
+    rw [dist_zero_right]
+    exact (norm_sub_le _ _).trans (add_le_add (lj.mkContinuous_norm_le hC.le _) hbn)
+  obtain ⟨w, hw, hd⟩ := mem_iUnion₂.mp (hF hv)
+  refine ⟨x w, mem_image_of_mem x hw, fun φ hφ ↦ ?_⟩
+  obtain ⟨g, hg, hj⟩ := hcover φ hφ
+  have hnorm : ‖f - ev (x w)‖ ≤ ε := by
+    rw [hx w, show f - w.val = (f - b - w.val) + b by abel]
+    have hvw : ‖(f - b) - w.val‖ < ε / 2 := by
+      change dist (f - b) w.val < ε / 2 at hd
+      simpa only [dist_eq_norm] using hd
+    exact (norm_add_le _ _).trans (by linarith)
+  calc
+    ‖l φ.toStrongDual - φ (x w)‖ = ‖(f - ev (x w)) g‖ := by
+      change ‖l φ.toStrongDual - φ.toStrongDual (x w)‖ = ‖l (j g) - (j g) (x w)‖
+      rw [hj]
+    _ ≤ ‖f - ev (x w)‖ * ‖g‖ := (f - ev (x w)).le_opNorm _
+    _ ≤ ε := (mul_le_of_le_one_right (norm_nonneg (f - ev (x w))) hg).trans hnorm
+
+include complete in
+omit sep in
+open scoped NNReal Uniformity in
+/-- Finite evaluation approximations on each seminorm polar give a common compact set
+of representing vectors for the functionals dominated by the dual seminorm. -/
+private theorem compact_eval_of_finite_approx [MetrizableSpace X]
+    (p : Seminorm ℂ (StrongDual ℂ X))
+    (h : ∀ (q : Seminorm ℂ X), Continuous q → ∀ ε : ℝ, 0 < ε →
+      ∃ D : Set X, D.Finite ∧ ∀ l : Module.Dual ℂ (StrongDual ℂ X),
+        (∀ φ, ‖l φ‖ ≤ p φ) → ∃ x ∈ D, ∀ φ ∈ WeakDual.polar ℂ (q.closedBall 0 1),
+          ‖l φ.toStrongDual - φ x‖ ≤ ε) :
+    ∃ K : Set X, IsCompact K ∧ ∀ l : Module.Dual ℂ (StrongDual ℂ X),
+      (∀ φ, ‖l φ‖ ≤ p φ) → ∃ x ∈ K, ∀ φ : StrongDual ℂ X, l φ = φ x := by
+  classical
+  have hbasis : (𝓝 (0 : X)).HasBasis (fun q : Seminorm ℂ X ↦ Continuous q)
+      (fun q ↦ q.closedBall 0 1) := by
+    apply (PolynormableSpace.hasBasis_zero_ball ℂ X).to_hasBasis
+    · intro q hq
+      refine ⟨(2 : ℝ≥0) • q, hq.const_smul _, fun x hx ↦ ?_⟩
+      rw [Seminorm.mem_closedBall_zero, smul_apply] at hx
+      change 2 * q x ≤ 1 at hx
+      exact q.mem_ball_zero.mpr (by linarith)
+    · intro q hq
+      exact ⟨q, hq, q.ball_subset_closedBall _ _⟩
+  obtain ⟨q, hq, hU⟩ := hbasis.exists_antitone_subbasis
+  let U (n : ℕ) := (q n).closedBall 0 1
+  let P (n : ℕ) := WeakDual.polar ℂ (U n)
+  have hP : Monotone P := fun _ _ hnm φ hφ x hx ↦ hφ x (hU.2 hnm hx)
+  let δ (n : ℕ) : ℝ := (1 / 2) ^ (n + 1)
+  have hδpos (n : ℕ) : 0 < δ n := by dsimp [δ]; positivity
+  have hδhalf (n : ℕ) : δ n ≤ 1 / 2 := by
+    simpa [δ] using pow_le_pow_of_le_one (by norm_num : 0 ≤ (1 / 2 : ℝ))
+      (by norm_num : (1 / 2 : ℝ) ≤ 1) (show 1 ≤ n + 1 by omega)
+  have hδzero : Tendsto δ atTop (𝓝 0) := by
+    simpa only [δ, pow_succ, zero_mul] using
+      (tendsto_pow_atTop_nhds_zero_of_lt_one (by norm_num : 0 ≤ (1 / 2 : ℝ))
+        (by norm_num)).mul_const (1 / 2)
+  choose D hD happrox using fun n ↦ h (q n) (hq n) (δ n) (hδpos n)
+  let S := {l : Module.Dual ℂ (StrongDual ℂ X) | ∀ φ, ‖l φ‖ ≤ p φ}
+  choose a ha herror using fun (l : S) n ↦ happrox n l.val l.property
+  have hdiff (l : S) (k m n : ℕ) (hm : k ≤ m) (hn : k ≤ n) :
+      a l m - a l n ∈ U k := by
+    obtain ⟨ψ, hψ, heq⟩ := exists_dual_norm_eq_seminorm (q k) (hq k) (a l m - a l n)
+    have hmem : ψ.toWeakDual ∈ P k := fun y hy ↦
+      (hψ y).trans ((q k).mem_closedBall_zero.mp hy)
+    apply (q k).mem_closedBall_zero.mpr
+    have hm' := herror l m ψ.toWeakDual (hP hm hmem)
+    have hn' := herror l n ψ.toWeakDual (hP hn hmem)
+    change ‖l.val ψ - ψ (a l m)‖ ≤ δ m at hm'
+    change ‖l.val ψ - ψ (a l n)‖ ≤ δ n at hn'
+    rw [← heq, map_sub]
+    calc
+      ‖ψ (a l m) - ψ (a l n)‖ ≤
+          ‖ψ (a l m) - l.val ψ‖ + ‖l.val ψ - ψ (a l n)‖ := norm_sub_le_norm_sub_add_norm_sub ..
+      _ ≤ δ m + δ n := add_le_add ((norm_sub_rev _ _).trans_le hm') hn'
+      _ ≤ 1 := by linarith [hδhalf m, hδhalf n]
+  have hUniform : (𝓤 X).HasBasis (fun _ : ℕ ↦ True)
+      (fun n ↦ {z : X × X | z.2 - z.1 ∈ U n}) := by
+    rw [uniformity_eq_comap_nhds_zero]
+    exact hU.1.comap _
+  have hcauchy (l : S) : CauchySeq (a l) :=
+    hUniform.cauchySeq_iff.mpr fun k _ ↦ ⟨k, fun _ hm _ hn ↦ hdiff l k _ _ hn hm⟩
+  choose x hx using fun l ↦ cauchySeq_tendsto_of_complete (hcauchy l)
+  have hclose (l : S) (n : ℕ) : a l n - x l ∈ U n := by
+    have hclosed : IsClosed (U n) := by
+      rw [show U n = {y | q n y ≤ 1} from (q n).closedBall_zero_eq]
+      exact isClosed_le (hq n) continuous_const
+    have hlim : Tendsto (fun m ↦ a l n - a l m) atTop (𝓝 (a l n - x l)) :=
+      tendsto_const_nhds.sub (hx l)
+    exact hclosed.mem_of_tendsto hlim
+      (eventually_atTop.mpr ⟨n, fun m hm ↦ hdiff l n n m le_rfl hm⟩)
+  have htot : TotallyBounded (range x) := by
+    refine hUniform.totallyBounded_iff.mpr fun n _ ↦ ⟨D n, hD n, ?_⟩
+    rintro _ ⟨l, rfl⟩
+    exact mem_iUnion₂.mpr ⟨a l n, ha l n, hclose l n⟩
+  refine ⟨closure (range x), htot.closure.isCompact_of_isClosed isClosed_closure, fun l hl ↦ ?_⟩
+  let s : S := ⟨l, hl⟩
+  refine ⟨x s, subset_closure (mem_range_self s), fun φ ↦ ?_⟩
+  have hφnear : φ ⁻¹' Metric.closedBall 0 1 ∈ 𝓝 (0 : X) :=
+    φ.continuous.continuousAt.preimage_mem_nhds (by simpa using Metric.closedBall_mem_nhds (0 : ℂ) one_pos)
+  obtain ⟨n, hn⟩ := hU.mem_iff.mp hφnear
+  have hφmem : φ.toWeakDual ∈ P n := fun y hy ↦ mem_closedBall_zero_iff.mp (hn hy)
+  have hlim : Tendsto (fun m ↦ ‖l φ - φ (a s m)‖) atTop (𝓝 ‖l φ - φ (x s)‖) :=
+    (tendsto_const_nhds.sub ((φ.continuous.tendsto (x s)).comp (hx s))).norm
+  have hz : ‖l φ - φ (x s)‖ ≤ 0 :=
+    le_of_tendsto_of_tendsto hlim hδzero
+      (eventually_atTop.mpr ⟨n, fun m hm ↦ herror s m φ.toWeakDual (hP hm hφmem)⟩)
+  exact sub_eq_zero.mp (norm_le_zero_iff.mp hz)
+
+include sep complete in
+open scoped CompactConvergenceCLM in
 /-- Paper: Remark C.2.3.2, p. 677. For a complete metrizable space, μ is the finest
 locally convex topology agreeing with the weak dual topology on all equicontinuous sets. -/
 theorem completionCompactDualTopology_isLeast [met : MetrizableSpace X] :
@@ -731,7 +1053,44 @@ theorem completionCompactDualTopology_isLeast [met : MetrizableSpace X] :
       @PolynormableSpace ℂ _ _ _ _ t ∧
       ∀ A : Set (WeakDual ℂ X), EquicontinuousAt (fun φ : A ↦ (φ.val : X → ℂ)) 0 →
         t.induced (fun φ : A ↦ WeakDual.toStrongDual φ.val) = (inferInstance : TopologicalSpace A)}
-      (completionCompactDualTopology X) := by sorry
+      (completionCompactDualTopology X) := by
+  rw [completionCompactDualTopology_eq_compact]
+  let K : Set (Set X) := {A | IsCompact A}
+  have hμ : PolynormableSpace ℂ (X →L_c[ℂ] ℂ) :=
+    (uniformConvergenceCLM_withSeminorms K (fun _ h ↦ h.isVonNBounded ℂ)
+      (by rw [show ⋃₀ K = univ from sUnion_isCompact_eq_univ, Submodule.span_univ]; simp)
+      (fun _ : Unit ↦ normSeminorm ℂ ℂ)
+      (norm_withSeminorms ℂ ℂ)).toPolynormableSpace
+  refine ⟨⟨hμ, compactDualTopology_induced⟩, ?_⟩
+  rintro t ⟨ht, hagree⟩
+  let : TopologicalSpace (StrongDual ℂ X) := t
+  let : PolynormableSpace ℂ (StrongDual ℂ X) := ht
+  change (inferInstance : TopologicalSpace (X →L_c[ℂ] ℂ)) ≤ t
+  rw [← induced_id (t := t)]
+  apply Continuous.le_induced
+  refine (PolynormableSpace.withSeminorms ℂ (StrongDual ℂ X)).continuous_of_continuous_comp
+    (show (X →L_c[ℂ] ℂ) →ₗ[ℂ] StrongDual ℂ X from LinearMap.id) ?_
+  rintro ⟨p, hp⟩
+  obtain ⟨C, hC, hrepr⟩ := compact_eval_of_finite_approx p fun q hq ε hε ↦ by
+    have hU : q.closedBall 0 1 ∈ 𝓝 (0 : X) :=
+      mem_of_superset (q.ball_mem_nhds hq one_pos) (q.ball_subset_closedBall _ _)
+    let P := WeakDual.polar ℂ (q.closedBall 0 1)
+    have hP : Continuous (fun φ : P ↦ φ.val.toStrongDual) :=
+      (show IsInducing (fun φ : P ↦ φ.val.toStrongDual) from
+        ⟨(hagree P (weakDual_polar_mem_compactology hU).1).symm⟩).continuous
+    exact finite_approx_on_polar p q hq (hp.comp hP) hε
+  change Continuous (fun φ : X →L_c[ℂ] ℂ ↦ p φ)
+  refine Seminorm.continuous' (p := (show Seminorm ℂ (X →L_c[ℂ] ℂ) from p)) (r := 1) ?_
+  have hnear := CompactConvergenceCLM.hasBasis_nhds_zero_of_basis
+    (Metric.nhds_basis_ball (x := (0 : ℂ))) (E := X) (σ := RingHom.id ℂ)
+  filter_upwards [hnear.mem_of_mem (i := (C, 1)) ⟨hC, one_pos⟩] with φ hφ
+  obtain ⟨l, hl, heq⟩ := exists_dual_norm_eq_seminorm p hp φ
+  obtain ⟨x, hx, hEval⟩ := hrepr l.toLinearMap hl
+  apply (show Seminorm ℂ (X →L_c[ℂ] ℂ) from p).mem_closedBall_zero.mpr
+  calc
+    p (show StrongDual ℂ X from φ) = ‖l φ‖ := heq.symm
+    _ = ‖φ x‖ := congrArg norm (hEval φ)
+    _ ≤ 1 := (mem_ball_zero_iff.mp (hφ x hx)).le
 end Mu
 
 /-- Paper: (C.2.3.5)–(C.2.3.6), p. 677. Contracting a tensor against the first
