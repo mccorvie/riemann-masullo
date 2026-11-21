@@ -1289,7 +1289,42 @@ theorem vectorContDiffOn_iff_weakPartials {Ω : Set V} (hΩ : IsOpen Ω)
     (hd : 1 ≤ d) (f : V → E) :
     VectorContDiffOn (k := k) Ω f ↔
       ∀ i : Fin d, ∃ D : Ω → E, HasWeakPartialOn i f (toPettisWeakCompletion E ∘ D) ∧
-        Continuous D := by sorry
+        Continuous D := by
+  rw [vectorContDiffOn_iff_weakDifferential hΩ hd f]
+  let e (i : Fin d) := EuclideanSpace.single i (1 : k)
+  constructor
+  · rintro ⟨D, hD, hc⟩ i
+    refine ⟨fun x ↦ D (x, e i), ?_, hc.comp (continuous_id.prodMk continuous_const)⟩
+    intro φ x
+    obtain ⟨L, hL, heval⟩ := hD φ x
+    change HasLineDerivWithinAt k (φ ∘ f) (φ (D (x, e i))) Ω (x : V) (e i)
+    rw [show φ (D (x, e i)) = L (e i) from heval (e i)]
+    exact hL.hasLineDerivWithinAt (e i)
+  · intro h
+    choose P hP hPc using h
+    obtain ⟨_, hWeak, _⟩ := (weaklyContDiffOn_iff_continuous_weakPartials hΩ hd f).2
+      (fun i ↦ ⟨_, hP i, continuous_toPettisWeakCompletion.comp (hPc i)⟩)
+    let D (p : Ω × V) : E := ∑ i, algebraMap k ℂ (p.2 i) • P i p.1
+    refine ⟨D, ?_, continuous_finsetSum _ fun i _ ↦ ?_⟩
+    · intro φ x
+      obtain ⟨L, hL, _⟩ := hWeak φ x
+      refine ⟨L, hL, fun v ↦ ?_⟩
+      have hpartial (i : Fin d) : φ (P i x) = L (e i) := by
+        have hp : HasLineDerivWithinAt k (φ ∘ f) (φ (P i x)) Ω (x : V) (e i) :=
+          hP i φ x
+        have hx := hΩ.mem_nhds x.property
+        exact (hp.hasLineDerivAt hx).unique ((hL.hasFDerivAt hx).hasLineDerivAt (e i))
+      have hcoord : (∑ i, v i • e i) = v := by
+        simpa only [EuclideanSpace.basisFun_repr, EuclideanSpace.basisFun_apply, e] using
+          (EuclideanSpace.basisFun (Fin d) k).sum_repr v
+      change φ (∑ i, algebraMap k ℂ (v i) • P i x) = L v
+      calc
+        _ = L (∑ i, v i • e i) := by
+          simp only [map_sum, map_smul, hpartial, Algebra.smul_def, Algebra.algebraMap_self_apply]
+        _ = L v := congrArg L hcoord
+    · exact ((continuous_algebraMap k ℂ).comp
+        ((EuclideanSpace.proj (𝕜 := k) i).continuous.comp continuous_snd)).smul
+        ((hPc i).comp continuous_fst)
 
 /-- Paper: Theorem C.5.1.21(1, 4), p. 732. Strong continuous differentiability
 is equivalent to jointly continuous vector-valued lifts of the weak directional limits. -/
