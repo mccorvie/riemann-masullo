@@ -966,13 +966,57 @@ theorem isOpen_lcaAnnihilator (H : Subgroup G) (hH : IsCompact (H : Set G)) :
 theorem isCompact_lcaAnnihilator (H : Subgroup G) (hH : IsOpen (H : Set G)) :
     IsCompact (lcaAnnihilator H : Set (PontryaginDual G)) := by sorry
 
+/-- Paper: (D.1.4.9), p. 759. Evaluation at points of the original group is dense
+in the dual of each open compactly generated subgroup of its Pontryagin dual.
+Deviation: This isolates the density consequence of biduality and character extension. -/
+theorem lca_dualSubgroup_eval_denseRange
+    (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :
+    DenseRange ((PontryaginDual.map
+      (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)).comp
+        (pontryaginDual_eval (G := G))) := by
+  sorry
+
 /-- Paper: (D.1.4.9)–(D.1.4.10), p. 759. The evaluation map onto the dual of
 an open compactly generated subgroup of the dual is an open quotient. Its
 kernel is the compact annihilator of the subgroup. -/
 theorem lca_dualSubgroup_quotient (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G)) :
     ∃ γ : G →ₜ* PontryaginDual H.val,
       (∀ x (χ : H.val), γ x χ = χ.val x) ∧ IsOpenQuotientMap γ ∧
-        γ.toMonoidHom.ker = lcaDualAnnihilator H.val ∧ IsCompact (γ.toMonoidHom.ker : Set G) := by sorry
+        γ.toMonoidHom.ker = lcaDualAnnihilator H.val ∧ IsCompact (γ.toMonoidHom.ker : Set G) := by
+  let r := PontryaginDual.map (⟨H.val.subtype, continuous_subtype_val⟩ : H.val →ₜ* PontryaginDual G)
+  let γ := r.comp (pontryaginDual_eval (G := G))
+  have hEval (x : G) (χ : H.val) : γ x χ = χ.val x := rfl
+  have hH := H.val.isClosed_of_isOpen H.property.1
+  -- The kernel of restriction is dual to the discrete quotient by the open subgroup.
+  let : DiscreteTopology (PontryaginDual G ⧸ H.val) := QuotientGroup.discreteTopology H.property.1
+  obtain ⟨a, _⟩ := lcaQuotientDual_equiv_annihilator H.val hH
+  have hCompact : IsCompact (lcaAnnihilator H.val : Set (PontryaginDual (PontryaginDual G))) :=
+    isCompact_iff_compactSpace.mpr a.toHomeomorph.compactSpace
+  obtain ⟨e, he⟩ := lcaDualQuotient_equiv_subgroupDual H.val hH
+  have hr : (r : PontryaginDual (PontryaginDual G) → PontryaginDual H.val) =
+      e ∘ QuotientGroup.mk := funext fun χ ↦ PontryaginDual.ext fun ψ ↦ (he χ ψ).symm
+  have hClosedR : IsClosedMap r := hr ▸
+    e.toHomeomorph.isClosedMap.comp (QuotientGroup.isClosedMap_coe hCompact)
+  have hEmb := isClosedEmbedding_pontryaginDual_eval (G := G)
+  have hClosed : IsClosedMap γ := hClosedR.comp hEmb.isClosedMap
+  have hRange : IsClosed (range γ) := by
+    rw [← image_univ]
+    exact hClosed _ isClosed_univ
+  have hSurj : Function.Surjective γ := by
+    intro ψ
+    change ψ ∈ range γ
+    rw [← hRange.closure_eq]
+    exact lca_dualSubgroup_eval_denseRange H ψ
+  have hQ := hClosed.isQuotientMap γ.continuous hSurj
+  let iso := (QuotientGroup.quotientKerEquivOfSurjective γ.toMonoidHom hSurj).toContinuousMulEquiv
+    fun _ ↦ (QuotientGroup.isQuotientMap_mk γ.toMonoidHom.ker).isCoinducing.isOpen_preimage.symm.trans
+      hQ.isCoinducing.isOpen_preimage
+  refine ⟨γ, hEval, iso.toHomeomorph.isOpenQuotientMap.comp QuotientGroup.isOpenQuotientMap_mk,
+    ?_, hEmb.isCompact_preimage hCompact⟩
+  ext x
+  rw [MonoidHom.mem_ker, mem_lcaDualAnnihilator_iff]
+  exact ⟨fun h χ ↦ congrArg (fun ψ : PontryaginDual H.val ↦ ψ χ) h,
+    fun h ↦ PontryaginDual.ext (fun χ ↦ h χ)⟩
 
 -- TODO(paper-gap): p. 759 calls the quotient codomains Uᵢ small subgroups of G.
 -- The kernels Kᵢ are the subgroups that become small, as on p. 760.
