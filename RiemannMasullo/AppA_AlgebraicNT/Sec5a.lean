@@ -5,6 +5,7 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 public import Mathlib.MeasureTheory.Constructions.Polish.Basic
 public import Mathlib.MeasureTheory.Function.LocallyIntegrable
 public import Mathlib.Topology.Algebra.ProperAction.Basic
+import Mathlib.MeasureTheory.Covering.Vitali
 
 /-!
 # Maximal averages on the real line and D-sequences
@@ -111,7 +112,73 @@ has measure at most three times the L¹ norm divided by the positive level. -/
 theorem realCenteredMaximal_weak_one {f : ℝ → ℂ} (hf : AEMeasurable f volume)
     (h₁ : Integrable f volume) {a : ℝ} (ha : 0 < a) :
     volume {x | ENNReal.ofReal a < realCenteredMaximal f x} ≤
-      ENNReal.ofReal (3 / a) * eLpNorm f 1 volume := by sorry
+      ENNReal.ofReal (3 / a) * eLpNorm f 1 volume := by
+  classical
+  let ν := (volume : Measure ℝ).withDensity (fun x ↦ ‖f x‖ₑ)
+  have hnorm : ν univ = eLpNorm f 1 volume := by
+    dsimp only [ν]
+    rw [withDensity_apply _ MeasurableSet.univ, setLIntegral_univ,
+      eLpNorm_one_eq_lintegral_eNorm hf.aestronglyMeasurable]
+  have htotal : ν univ ≠ ∞ :=
+    hnorm ▸ (memLp_one_iff_integrable.mpr h₁).eLpNorm_lt_top.ne
+  let interval (p : ℝ × ℝ) := Ioc (p.1 - p.2) (p.1 + p.2)
+  let enlarged (p : ℝ × ℝ) := Icc (p.1 - 3 * p.2) (p.1 + 3 * p.2)
+  let good : Set (ℝ × ℝ) := {p | 0 < p.2 ∧ ENNReal.ofReal (a * (2 * p.2)) < ν (interval p)}
+  have hbounded (p : ℝ × ℝ) (hp : p ∈ good) : p.2 ≤ (ν univ).toReal / a := by
+    have hpos := hp.1
+    have hle := ENNReal.toReal_mono htotal (hp.2.le.trans (measure_mono (subset_univ _)))
+    rw [ENNReal.toReal_ofReal (by positivity : 0 ≤ a * (2 * p.2))] at hle
+    rw [le_div_iff₀ ha]
+    nlinarith [mul_nonneg ha.le hpos.le]
+  obtain ⟨u, hug, hdisjoint, hintersects⟩ :=
+    Vitali.exists_disjoint_subfamily_covering_enlargement interval good Prod.snd 2
+      one_lt_two (fun p hp ↦ hp.1.le) ((ν univ).toReal / a) hbounded
+      (fun p hp ↦ ⟨p.1, by
+        change p.1 - p.2 < p.1 ∧ p.1 ≤ p.1 + p.2
+        have := hp.1
+        constructor <;> linarith⟩)
+  have : Countable u := hdisjoint.countable_of_nonempty_interior (fun p hp ↦ by
+    dsimp only [interval]
+    rw [interior_Ioc]
+    exact nonempty_Ioo.mpr (by linarith [(hug hp).1]))
+  -- Only the centers need to be covered by the triple dilations.
+  have hcover : {x | ENNReal.ofReal a < realCenteredMaximal f x} ⊆
+      ⋃ p : u, enlarged p.val := by
+    intro x hx
+    obtain ⟨r, hr⟩ := lt_iSup_iff.mp (show ENNReal.ofReal a < realCenteredMaximal f x from hx)
+    have hgood : (x, (r : ℝ)) ∈ good := by
+      refine ⟨r.property, ?_⟩
+      dsimp only [ν, interval, Prod.fst, Prod.snd]
+      rw [withDensity_apply _ measurableSet_Ioc, ENNReal.ofReal_mul ha.le]
+      exact ENNReal.mul_lt_of_lt_div (by rwa [ENNReal.div_eq_inv_mul])
+    obtain ⟨p, hp, ⟨y, hy₁, hy₂⟩, hrad⟩ := hintersects (x, (r : ℝ)) hgood
+    apply mem_iUnion.mpr
+    refine ⟨⟨p, hp⟩, ?_⟩
+    change x - (r : ℝ) < y ∧ y ≤ x + (r : ℝ) at hy₁
+    change p.1 - p.2 < y ∧ y ≤ p.1 + p.2 at hy₂
+    change (r : ℝ) ≤ 2 * p.2 at hrad
+    change p.1 - 3 * p.2 ≤ x ∧ x ≤ p.1 + 3 * p.2
+    constructor <;> linarith [hy₁.1, hy₁.2, hy₂.1, hy₂.2]
+  have henlarged (p : u) : volume (enlarged p.val) ≤ ENNReal.ofReal (3 / a) * ν (interval p.val) := by
+    have hlength : p.val.1 + 3 * p.val.2 - (p.val.1 - 3 * p.val.2) =
+        (3 / a) * (a * (2 * p.val.2)) := by
+      rw [← mul_assoc, div_mul_cancel₀ _ ha.ne']
+      ring
+    dsimp only [enlarged]
+    rw [Real.volume_Icc, hlength, ENNReal.ofReal_mul (by positivity)]
+    gcongr
+    exact (hug p.property).2.le
+  have hsum : (∑' p : u, ν (interval p.val)) ≤ ν univ := by
+    rw [← measure_iUnion (hdisjoint.on_injective Subtype.val_injective Subtype.property)
+      (fun _ ↦ measurableSet_Ioc)]
+    exact measure_mono (subset_univ _)
+  calc
+    _ ≤ volume (⋃ p : u, enlarged p.val) := measure_mono hcover
+    _ ≤ ∑' p : u, volume (enlarged p.val) := measure_iUnion_le _
+    _ ≤ ∑' p : u, ENNReal.ofReal (3 / a) * ν (interval p.val) := tsum_le_tsum henlarged
+    _ ≤ _ := by
+      rw [ENNReal.tsum_mul_left, ← hnorm]
+      gcongr
 
 /-- Paper: Theorem A.5.1.1(3), p. 566. For a finite exponent p greater than one,
 the p-th moment of the centered maximal function has the displayed strong-type bound. -/
