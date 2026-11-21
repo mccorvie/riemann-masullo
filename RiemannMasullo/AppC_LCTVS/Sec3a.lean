@@ -1814,12 +1814,131 @@ theorem hasSum_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : nuclearEndomorphisms H) :
     HasSum (fun i ↦ (⟪b i, CFC.sqrt (T.val.adjoint * T.val) (b i)⟫_ℂ).re) (traceNorm T) := by sorry
 
+/-- A bounded endomorphism and the positive square root of its Gram operator
+each factor through the other by bounded postcomposition. -/
+private theorem exists_factors_sqrt_adjoint_mul (T : H →L[ℂ] H) :
+    ∃ U V : H →L[ℂ] H,
+      U * CFC.sqrt (T.adjoint * T) = T ∧ V * T = CFC.sqrt (T.adjoint * T) := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : S * S = T.adjoint * T :=
+    CFC.sqrt_mul_sqrt_self _ (ContinuousLinearMap.nonneg_iff_isPositive.mpr
+      T.isPositive_adjoint_comp_self)
+  have hadj : S.adjoint = S :=
+    IsSelfAdjoint.star_eq (IsSelfAdjoint.of_nonneg (show 0 ≤ S from CFC.sqrt_nonneg _))
+  have hnorm (x : H) : ‖T x‖ = ‖S x‖ := by
+    rw [T.apply_norm_eq_sqrt_inner_adjoint_right, S.apply_norm_eq_sqrt_inner_adjoint_right]
+    change Real.sqrt (RCLike.re ⟪x, (T.adjoint * T) x⟫_ℂ) =
+      Real.sqrt (RCLike.re ⟪x, (S.adjoint * S) x⟫_ℂ)
+    rw [hadj, hS]
+  -- Extend the factor from the range of A to its closure, then project onto it.
+  have factor (A D : H →L[ℂ] H) (h : ∀ x, ‖D x‖ = ‖A x‖) :
+      ∃ U : H →L[ℂ] H, U * A = D := by
+    let W := A.toLinearMap.range.topologicalClosure
+    let i : H →ₗ[ℂ] W := A.toLinearMap.codRestrict W
+      (fun x ↦ A.toLinearMap.range.le_topologicalClosure ⟨x, rfl⟩)
+    have hi : DenseRange i := by
+      have hincl : DenseRange (Set.inclusion A.toLinearMap.range.le_topologicalClosure) :=
+        (denseRange_inclusion_iff _).2 subset_rfl
+      exact hincl.comp (show Function.Surjective A.toLinearMap.rangeRestrict from
+        fun ⟨x, y, hy⟩ ↦ ⟨y, Subtype.ext hy⟩).denseRange (continuous_inclusion _)
+    let j := D.toLinearMap.extendOfNorm i
+    have hj (x : H) : j (i x) = D x :=
+      LinearMap.extendOfNorm_eq hi ⟨1, fun x ↦ by simpa [i] using (h x).le⟩ x
+    refine ⟨j.comp W.orthogonalProjectionOnto, ?_⟩
+    ext x
+    change j (W.orthogonalProjectionOnto (A x)) = D x
+    exact (congrArg j (W.orthogonalProjectionOnto_mem_subspace_eq_self (i x))).trans (hj x)
+  obtain ⟨U, hU⟩ := factor S T hnorm
+  obtain ⟨V, hV⟩ := factor T S (fun x ↦ (hnorm x).symm)
+  exact ⟨U, V, hU, hV⟩
+
+/-- Paper: Lemma C.3.4.4(1), p. 698. Postcomposition by a bounded endomorphism
+preserves nuclearity by applying the endomorphism to the vector sequence. -/
+private theorem isNuclearOperator_postcomp_hilbert {T : H →L[ℂ] H}
+    (hT : IsNuclearOperator T) (U : H →L[ℂ] H) : IsNuclearOperator (U * T) := by
+  obtain ⟨c, φ, y, hc, hφ, hy, hsum⟩ := (isNuclearOperator_iff_isBanachNuclear T).mp hT
+  refine (isNuclearOperator_iff_isBanachNuclear _).mpr
+    ⟨c, φ, U ∘ y, hc, hφ, (U.continuous.tendsto' 0 0 (map_zero U)).comp hy, fun x ↦ ?_⟩
+  change HasSum (fun n ↦ (c n * φ n x) • U (y n)) (U (T x))
+  simpa only [map_smul] using U.hasSum (hsum x)
+
+/-- If the images of a Hilbert basis under a self-adjoint operator have
+square-summable norms, its square has a nuclear rank-one expansion. -/
+private theorem isNuclearOperator_square_of_summable_basis {ι : Type*}
+    (b : HilbertBasis ι ℂ H) (B : H →L[ℂ] H) (hB : B.adjoint = B)
+    (hs : Summable (fun i ↦ ‖B (b i)‖ ^ 2)) : IsNuclearOperator (B * B) := by
+  classical
+  -- Only the support of the square-summable family contributes to the expansion.
+  let cost (i : ι) := ‖B (b i)‖ ^ 2
+  let I := Function.support cost
+  have : Countable I := hs.countable_support
+  obtain ⟨e, he⟩ := Countable.exists_injective_nat I
+  let r : ℕ → H := extend e (fun i ↦ B (b i.val)) 0
+  let y (n : ℕ) := normalizedFactor (r n)
+  let c (n : ℕ) : ℂ := (‖r n‖ : ℂ) ^ 2
+  apply (isNuclearOperator_iff_isBanachNuclear _).mpr
+  refine isBanachNuclear_of_bounded_series (B * B) c (fun n ↦ innerSL ℂ (y n)) y ?_
+    ⟨1, fun n ↦ (innerSL_apply_norm ℂ _).trans_le (norm_normalizedFactor_le_one _)⟩
+    (fun n ↦ norm_normalizedFactor_le_one _) fun x ↦ ?_
+  · have h := (summable_extend_zero he).mpr (hs.subtype (fun i ↦ i ∈ I))
+    refine h.congr fun n ↦ ?_
+    rcases em (∃ i, e i = n) with ⟨i, rfl⟩ | hn
+    · simp [r, c, he.extend_apply]
+    · simp [r, c, extend_apply' _ _ _ hn]
+  · let term (i : ι) := ⟪B (b i), x⟫_ℂ • B (b i)
+    have hterm : HasSum term ((B * B) x) := by
+      refine (B.hasSum (b.hasSum_repr (B x))).congr_fun fun i ↦ ?_
+      simp only [term, map_smul, b.repr_apply_apply, ← B.adjoint_inner_left, hB]
+    have hsupport : Function.support term ⊆ I := by
+      intro i hi
+      by_contra h
+      have hz : B (b i) = 0 := by simpa [I, cost, Function.mem_support] using h
+      exact hi (by simp [term, hz])
+    have hsub := (hasSum_subtype_iff_of_support_subset hsupport).mpr hterm
+    refine ((hasSum_extend_zero he).mpr hsub).congr_fun fun n ↦ ?_
+    have heq : extend e (term ∘ Subtype.val) 0 n = ⟪r n, x⟫_ℂ • r n := by
+      rcases em (∃ i, e i = n) with ⟨i, rfl⟩ | hn
+      · simp only [r, he.extend_apply, term, Function.comp_apply]
+      · simp [r, extend_apply' _ _ _ hn]
+    rw [heq]
+    symm
+    calc
+      _ = ⟪(‖r n‖ : ℂ) • y n, x⟫_ℂ • ((‖r n‖ : ℂ) • y n) := by
+        rw [show (‖r n‖ : ℂ) • y n = r n from norm_smul_normalizedFactor _]
+      _ = _ := by
+        simp only [inner_smul_left, Complex.conj_ofReal, smul_smul, innerSL_apply_apply, c]
+        congr 1
+        ring
+
 /-- Paper: Definition C.3.4.2(2), p. 697. Nuclearity is equivalent to finiteness
 of the positive-square-root diagonal sum in any given Hilbert basis. -/
 theorem isNuclearOperator_iff_summable_traceNorm_diagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : H →L[ℂ] H) :
     IsNuclearOperator T ↔
-      Summable (fun i ↦ (⟪b i, CFC.sqrt (T.adjoint * T) (b i)⟫_ℂ).re) := by sorry
+      Summable (fun i ↦ (⟪b i, CFC.sqrt (T.adjoint * T) (b i)⟫_ℂ).re) := by
+  let S := CFC.sqrt (T.adjoint * T)
+  have hS : 0 ≤ S := CFC.sqrt_nonneg _
+  obtain ⟨U, V, hU, hV⟩ := exists_factors_sqrt_adjoint_mul T
+  change U * S = T at hU
+  change V * T = S at hV
+  change IsNuclearOperator T ↔ Summable (fun i ↦ (⟪b i, S (b i)⟫_ℂ).re)
+  constructor
+  · intro hT
+    have hSn : IsNuclearOperator S := hV ▸ isNuclearOperator_postcomp_hilbert hT V
+    exact (summable_norm_hilbertDiagonal b S hSn).of_nonneg_of_le
+      (fun i ↦ (ContinuousLinearMap.nonneg_iff_isPositive.mp hS).re_inner_nonneg_right (b i))
+      (fun i ↦ Complex.re_le_norm _)
+  · intro hs
+    let B := CFC.sqrt S
+    have hsq : B * B = S := CFC.sqrt_mul_sqrt_self _ hS
+    have hB : B.adjoint = B :=
+      IsSelfAdjoint.star_eq (IsSelfAdjoint.of_nonneg (show 0 ≤ B from CFC.sqrt_nonneg _))
+    have hb : Summable (fun i ↦ ‖B (b i)‖ ^ 2) := hs.congr fun i ↦ by
+      rw [B.apply_norm_sq_eq_inner_adjoint_right]
+      change _ = (⟪b i, (B.adjoint * B) (b i)⟫_ℂ).re
+      rw [hB, hsq]
+    have hSn : IsNuclearOperator S := hsq ▸ isNuclearOperator_square_of_summable_basis b B hB hb
+    exact hU ▸ isNuclearOperator_postcomp_hilbert hSn U
 
 /-- Paper: Definition C.3.4.2(2), p. 697. A rank-one map has trace norm equal
 to the product of the functional and vector norms.
