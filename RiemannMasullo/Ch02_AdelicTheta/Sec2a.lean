@@ -1044,7 +1044,15 @@ theorem adelicAverage_at_zero_continuous (f : ℬ[F]) :
 under multiplication by principal ideles.
 Deviation: Invariance is expressed as constancy on the fibers of the quotient map. -/
 theorem adelicAverage_at_zero_factorsThrough (f : ℬ[F]) :
-    FactorsThrough (fun g : 𝕀[F] ↦ adelicAverage f g 0) classOf := by sorry
+    FactorsThrough (fun g : 𝕀[F] ↦ adelicAverage f g 0) classOf := by
+  intro g h hgh
+  obtain ⟨u, rfl⟩ := ((ideleClassGroup_description F).2 g h).mp hgh
+  simp only [adelicAverage, add_zero]
+  refine (tsum_congr fun ξ ↦ ?_).trans ((Equiv.mulLeft u).tsum_eq _)
+  apply congrArg (fun y : 𝔸[F] ↦ f (Multiplicative.ofAdd y))
+  change (algebraMap F 𝔸[F] (u : F) * h.val) * algebraMap F 𝔸[F] (ξ : F) =
+    h.val * algebraMap F 𝔸[F] ((u : F) * (ξ : F))
+  rw [map_mul (algebraMap F 𝔸[F]), ← mul_assoc, mul_comm h.val]
 
 -- ERRATA I65: With the Archimedean component fixed at one over ℚ, the
 -- p-component p^m and test function 1_Ẑ give contributing rationals in
@@ -1093,7 +1101,22 @@ theorem adelicTheta_mk (f : ℬ[F]) (g : 𝕀[F]) :
 
 /-- Paper: Definition 2.2.3.1, p. 82. Formation of the global adelic theta
 function is complex linear. -/
-theorem adelicTheta_isLinear : IsLinearMap ℂ (adelicTheta (F := F)) := by sorry
+theorem adelicTheta_isLinear : IsLinearMap ℂ (adelicTheta (F := F)) := by
+  have htheta (f : ℬ[F]) (g : 𝕀[F]) : adelicTheta f (classOf g) = adelicAverage f g 0 :=
+    DFunLike.congr_fun (IsQuotientMap.lift_comp (f := ⟨classOf, QuotientGroup.continuous_mk⟩)
+      (QuotientGroup.isQuotientMap_mk _) ⟨_, adelicAverage_at_zero_continuous f⟩
+      (adelicAverage_at_zero_factorsThrough f)) g
+  have hs (f : ℬ[F]) (g : 𝕀[F]) :
+      Summable (fun ξ : Fˣ ↦ f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + 0)))) :=
+    ((adelicAverage_summableUniformlyOn f {(g, 0)} isCompact_singleton).summable rfl).of_norm
+  have hsurj : Surjective (classOf : 𝕀[F] → C[F]) := QuotientGroup.mk_surjective
+  constructor
+  · refine fun f h ↦ ContinuousMap.ext (hsurj.forall.mpr fun g ↦ ?_)
+    simp only [ContinuousMap.add_apply, htheta]
+    exact (hs f g).tsum_add (hs h g)
+  · refine fun c f ↦ ContinuousMap.ext (hsurj.forall.mpr fun g ↦ ?_)
+    simp only [ContinuousMap.smul_apply, htheta]
+    exact tsum_mul_left
 
 local instance : MeasurableSpace 𝔸[F] := borel _
 
