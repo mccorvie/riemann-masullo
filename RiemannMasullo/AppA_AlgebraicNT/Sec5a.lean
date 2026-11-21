@@ -1323,12 +1323,259 @@ theorem centeredIntegralIdeleDomain_fundamental
     ∃! a : Fˣ, (IdeleGroup.unitEmbedding (𝓞 F) F a)⁻¹ * g.val ∈
       (N₁).subtype '' (⋃ c, r c • centeredIntegralIdeleDomain F b v₀ σ) := by sorry
 
+/-- The S-idele logarithm sends multiplication to addition. -/
+private theorem sIdeleLog_mul (x y : (SAdeleRing F S)ˣ) :
+    sIdeleLog F S (x * y) = sIdeleLog F S x + sIdeleLog F S y := by
+  funext v
+  rcases v with v | v
+  · change infiniteIdeleLog F (atInfinity (x * y)) v =
+      infiniteIdeleLog F (atInfinity x) v + infiniteIdeleLog F (atInfinity y) v
+    rw [map_mul, infiniteIdeleLog_mul]
+    rfl
+  · have hne (a : (SAdeleRing F S)ˣ) : a.val.2 v ≠ 0 :=
+      ((a.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)).ne_zero
+    change Real.log ‖x.val.2 v * y.val.2 v‖ =
+      Real.log ‖x.val.2 v‖ + Real.log ‖y.val.2 v‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne x)) (norm_ne_zero_iff.mpr (hne y))]
+
+/-- Translating a norm-one S-idele into the centered log box determines the
+translating S-unit up to torsion. -/
+private theorem exists_centeredSLog_translate (g : Nₛ) :
+    ∃ a : Oₛ(F, S)ˣ,
+      sIdeleLog F S ((unitAtS a)⁻¹ * g.val) ∈ centeredSRegulatorParallelotope F S bₛ ∧
+      ∀ u : Oₛ(F, S)ˣ,
+        sIdeleLog F S ((unitAtS u)⁻¹ * g.val) ∈ centeredSRegulatorParallelotope F S bₛ →
+        a⁻¹ * u ∈ CommGroup.torsion Oₛ(F, S)ˣ := by
+  classical
+  let L := sUnitLogHom F S
+  let T := CommGroup.torsion Oₛ(F, S)ˣ
+  let q := QuotientGroup.lift T L (fun _ hu ↦ (L.isOfFinOrder hu).eq_one')
+  let f := q.toAdditiveLeft.toIntLinearMap
+  let v (i : Fin sRank(F, S)) := sIdeleLog F S (unitAtS (bₛ i).toMul.out)
+  let coord (u : Oₛ(F, S)ˣ) := bₛ.equivFun (Additive.ofMul (QuotientGroup.mk u))
+  let B := Fintype.linearCombination ℝ v
+  have hv (i : Fin sRank(F, S)) : f (bₛ i) = v i := by
+    have h : f (Additive.ofMul (QuotientGroup.mk (bₛ i).toMul.out)) = v i := rfl
+    rw [show QuotientGroup.mk (bₛ i).toMul.out = (bₛ i).toMul from Quotient.out_eq' _] at h
+    exact h
+  have hunit (u : Oₛ(F, S)ˣ) :
+      sIdeleLog F S (unitAtS u) = B (fun i ↦ (coord u i : ℝ)) := by
+    have h := congrArg f (bₛ.sum_equivFun (Additive.ofMul (QuotientGroup.mk u)))
+    change f (Additive.ofMul (QuotientGroup.mk u)) =
+      Fintype.linearCombination ℝ v (fun i ↦ (bₛ.equivFun (Additive.ofMul (QuotientGroup.mk u)) i : ℝ))
+    simpa only [map_sum, map_zsmul, hv, Fintype.linearCombination_apply, Int.cast_smul_eq_zsmul]
+      using h.symm
+  have hshift (u : Oₛ(F, S)ˣ) :
+      sIdeleLog F S ((unitAtS u)⁻¹ * g.val) = sIdeleLog F S g.val - sIdeleLog F S (unitAtS u) := by
+    rw [← map_inv, sIdeleLog_mul]
+    have h : sIdeleLog F S (unitAtS u⁻¹) = -sIdeleLog F S (unitAtS u) := map_inv L u
+    rw [h, sub_eq_add_neg, add_comm]
+  -- The independent basis logarithms span the hyperplane because their count is its dimension.
+  let sum : (InfinitePlace F ⊕ S → ℝ) →ₗ[ℝ] ℝ := ∑ j, LinearMap.proj j
+  have hsum (x : InfinitePlace F ⊕ S → ℝ) : sum x = ∑ j, x j := by
+    simp [sum, LinearMap.sum_apply]
+  have hzero (x : Nₛ) : sum (sIdeleLog F S x.val) = 0 := by
+    rw [hsum, sIdeleLog_sum, MonoidHom.mem_ker.mp x.property]
+    simp
+  have hspan : B.range = sum.ker := by
+    have hsurj : Surjective sum := by
+      intro x
+      obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      refine ⟨Pi.single (Sum.inl w : InfinitePlace F ⊕ S) x, ?_⟩
+      simp [hsum]
+    have hdim := sum.finrank_range_add_finrank_ker
+    rw [LinearMap.range_eq_top.mpr hsurj, finrank_top, Module.finrank_self, Module.finrank_pi,
+      Fintype.card_sum, Fintype.card_coe] at hdim
+    rw [Fintype.range_linearCombination]
+    apply Submodule.eq_of_le_of_finrank_le
+    · apply Submodule.span_le.mpr
+      rintro _ ⟨i, rfl⟩
+      exact LinearMap.mem_ker.mpr (hzero ⟨_, (sIdeleNorm_spec F S).2 ⟨_, rfl⟩⟩)
+    · have hdim' : Fintype.card (Fin sRank(F, S)) =
+          Module.finrank ℝ (Submodule.span ℝ (range v)) :=
+        linearIndependent_iff_card_eq_finrank_span.mp (sUnitLog_basis_linearIndependent F S bₛ)
+      rw [← hdim', Fintype.card_fin]
+      omega
+  obtain ⟨x, hx⟩ := hspan.symm ▸ (LinearMap.mem_ker.mpr (hzero g) :
+    sIdeleLog F S g.val ∈ sum.ker)
+  have hB : Injective B := (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective
+  have hbox (u : Oₛ(F, S)ˣ) :
+      sIdeleLog F S ((unitAtS u)⁻¹ * g.val) ∈ centeredSRegulatorParallelotope F S bₛ ↔
+      ∀ i, x i - (coord u i : ℝ) ∈ Ico (-1 / 2 : ℝ) (1 / 2) := by
+    rw [hshift, hunit, ← hx, ← map_sub]
+    change (∃ t, (∀ i, t i ∈ Ico (-1 / 2 : ℝ) (1 / 2)) ∧
+      B (x - fun i ↦ (coord u i : ℝ)) = B t) ↔ _
+    constructor
+    · rintro ⟨t, ht, heq⟩
+      rw [← hB heq] at ht
+      exact ht
+    · exact fun h ↦ ⟨_, h, rfl⟩
+  -- Round each coordinate into the half-open interval of length one.
+  let k (i : Fin sRank(F, S)) := toIcoDiv (p := (1 : ℝ)) zero_lt_one (-1 / 2) (x i)
+  have hround (u : Oₛ(F, S)ˣ) :
+      sIdeleLog F S ((unitAtS u)⁻¹ * g.val) ∈ centeredSRegulatorParallelotope F S bₛ ↔
+      coord u = k := by
+    rw [hbox, funext_iff]
+    apply forall_congr' fun i ↦ ?_
+    rw [eq_comm (a := coord u i)]
+    simpa only [k, zsmul_eq_mul, mul_one, show (-1 / 2 : ℝ) + 1 = 1 / 2 by norm_num] using
+        (toIcoDiv_eq_iff (p := (1 : ℝ)) (n := coord u i) (a := -1 / 2)
+          (b := x i) zero_lt_one).symm
+  obtain ⟨a, ha⟩ := QuotientGroup.mk_surjective (bₛ.equivFun.symm k).toMul
+  have hka : coord a = k := by
+    change bₛ.equivFun (Additive.ofMul (QuotientGroup.mk a)) = _
+    rw [ha]
+    exact bₛ.equivFun.apply_symm_apply k
+  refine ⟨a, (hround a).mpr hka, fun u hu ↦ QuotientGroup.eq.mp ?_⟩
+  exact congrArg Additive.toMul (bₛ.equivFun.injective (hka.trans ((hround u).mp hu).symm))
+
+/-- The centered angular sector chooses a unique torsion translation of each S-idele. -/
+private theorem existsUnique_centeredSTorsion_translate (g : (SAdeleRing F S)ˣ) :
+    ∃! u : CommGroup.torsion Oₛ(F, S)ˣ,
+      inCenteredTorsionSector F v₀ σ (atPlace (atInfinity ((unitAtS u.val)⁻¹ * g))) := by
+  let coord : (SAdeleRing F S)ˣ →* ℂˣ :=
+    (Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom).comp
+      ((atPlace).comp atInfinity)
+  let φ : F →+* ℂ :=
+    σ.toRingHom.comp ((extensionEmbedding v₀).comp (algebraMap F v₀.Completion))
+  let e := coord.comp unitAtS
+  let T := CommGroup.torsion Oₛ(F, S)ˣ
+  let n := Units.torsionOrder F
+  have hn : 0 < (n : ℝ) := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have he : Injective e := by
+    intro a b hab
+    exact Units.ext (Subtype.ext (φ.injective (congrArg Units.val hab)))
+  have himage : T.map e = rootsOfUnity n ℂ := by
+    change (CommGroup.torsion Oₛ(F, S)ˣ).map e = _
+    rw [← sUnit_torsion_eq_image F S, Subgroup.map_map,
+      show e.comp (Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom) =
+        Units.complexEmbedding φ from MonoidHom.ext fun _ ↦ Units.ext rfl,
+      Units.map_complexEmbedding_torsion]
+  let p : ℝ := 2 * Real.pi / n
+  let lower : ℝ := -Real.pi / n
+  have hp : 0 < p := div_pos Real.two_pi_pos hn
+  have hright : lower + p = Real.pi / n := by dsimp [lower, p]; ring
+  have hbound : Real.pi / n < Real.pi := by
+    have hn₂ : (2 : ℝ) ≤ n := by
+      obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+      have := Units.torsionOrder_pos F
+      exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+    exact (div_lt_iff₀ hn).mpr (by nlinarith [Real.pi_pos])
+  let z : ℂ := (coord g).val
+  obtain ⟨k, hk, -⟩ := existsUnique_add_zsmul_mem_Ico hp z.arg lower
+  let w := Complex.exp ((p : ℂ) * Complex.I)
+  have hw : w ^ n = 1 := by
+    simpa [w, p, div_mul_eq_mul_div] using
+      (Complex.isPrimitiveRoot_exp n (Units.torsionOrder_ne_zero F)).pow_eq_one
+  let ζ : ℂˣ := Units.mk0 w (Complex.exp_ne_zero _)
+  have hζ : ζ ∈ rootsOfUnity n ℂ := (mem_rootsOfUnity' n ζ).mpr hw
+  obtain ⟨u, hu, hmap⟩ := himage ▸ hζ
+  let a : T := (⟨u, hu⟩ : T) ^ (-k)
+  have hrotate : w ^ k * z =
+      (‖z‖ : ℂ) * Complex.exp (((z.arg + k • p : ℝ) : ℂ) * Complex.I) := by
+    calc
+      _ = w ^ k * ((‖z‖ : ℂ) * Complex.exp ((z.arg : ℂ) * Complex.I)) :=
+        congrArg (w ^ k * ·) (Complex.norm_mul_exp_arg_mul_I z).symm
+      _ = _ := by
+        dsimp only [w]
+        rw [← Complex.exp_int_mul, zsmul_eq_mul]
+        push_cast
+        rw [add_mul, Complex.exp_add, mul_assoc (k : ℂ) (p : ℂ) Complex.I]
+        ring
+  have ha : inCenteredTorsionSector F v₀ σ (atPlace (atInfinity ((unitAtS a.val)⁻¹ * g))) := by
+    change (coord ((unitAtS a.val)⁻¹ * g)).val.arg ∈ Ico lower (Real.pi / n)
+    rw [← hright, map_mul, map_inv]
+    change ((e (u ^ (-k)))⁻¹ * coord g).val.arg ∈ _
+    rw [map_zpow, hmap, zpow_neg, inv_inv, Units.val_mul,
+      Units.val_zpow_eq_zpow_val]
+    change (w ^ k * z).arg ∈ _
+    rw [hrotate, Complex.arg_real_mul _ (norm_pos_iff.mpr (coord g).ne_zero),
+      Complex.arg_exp_mul_I, (toIocMod_eq_self Real.two_pi_pos).mpr]
+    · exact hk
+    · rw [show -Real.pi + 2 * Real.pi = Real.pi by ring]
+      exact ⟨(neg_lt_neg hbound).trans_le (by simpa only [lower, neg_div] using hk.1),
+        hk.2.le.trans (hright.trans_le hbound.le)⟩
+  refine ⟨a, ha, fun b hb ↦ ?_⟩
+  let x : ℂˣ := (e a.val)⁻¹ * coord g
+  let y : ℂˣ := (e b.val)⁻¹ * coord g
+  have hsector (t : T) :
+      inCenteredTorsionSector F v₀ σ (atPlace (atInfinity ((unitAtS t.val)⁻¹ * g))) ↔
+        ((e t.val)⁻¹ * coord g).val.arg ∈ Ico lower (Real.pi / n) := by
+    change (coord ((unitAtS t.val)⁻¹ * g)).val.arg ∈ Ico lower (Real.pi / n) ↔ _
+    rw [map_mul, map_inv]
+    rfl
+  -- The n-th power is constant on each torsion orbit and injective on the sector.
+  have hpow (t : T) : (e t.val).val ^ n = 1 :=
+    (mem_rootsOfUnity' n _).mp (himage ▸ ⟨t.val, t.property, rfl⟩)
+  have hpow' (t : T) : (((e t.val)⁻¹ * coord g).val : ℂ) ^ n = z ^ n := by
+    rw [Units.val_mul, Units.val_inv_eq_inv_val, mul_pow, inv_pow, hpow, inv_one, one_mul]
+  have hxy : x.val ^ n = y.val ^ n := (hpow' a).trans (hpow' b).symm
+  have hnorm : ‖x.val‖ = ‖y.val‖ :=
+    (pow_left_inj₀ (norm_nonneg _) (norm_nonneg _) (Units.torsionOrder_ne_zero F)).mp
+      (by simpa only [norm_pow] using congrArg norm hxy)
+  have hangle : (((n : ℝ) * x.val.arg : ℝ) : Real.Angle) =
+      (((n : ℝ) * y.val.arg : ℝ) : Real.Angle) := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, Real.Angle.natCast_mul_eq_nsmul,
+      ← Complex.arg_pow_coe_angle, ← Complex.arg_pow_coe_angle, hxy]
+  have hmem (t : ℝ) (ht : t ∈ Ico lower (Real.pi / n)) :
+      (n : ℝ) * t ∈ Ico (-Real.pi) (-Real.pi + 2 * Real.pi) := by
+    rw [show -Real.pi + 2 * Real.pi = Real.pi by ring]
+    exact ⟨by simpa only [mul_comm (n : ℝ) t] using (div_le_iff₀ hn).mp ht.1,
+      by simpa only [mul_comm (n : ℝ) t] using (lt_div_iff₀ hn).mp ht.2⟩
+  have harg : x.val.arg = y.val.arg :=
+    mul_left_cancel₀ hn.ne' (AddCircle.injOn_coe_Ico (2 * Real.pi) (-Real.pi)
+      (hmem x.val.arg ((hsector a).mp ha)) (hmem y.val.arg ((hsector b).mp hb)) hangle)
+  have hxy' : x = y := Units.ext (Complex.ext_norm_arg hnorm harg)
+  exact Subtype.ext (he (inv_injective (mul_right_cancel hxy'.symm)))
+
 /-- Paper: Lemma A.5.2.12(2), p. 575. The centered S-local domain meets each
 orbit of the diagonal S-units in the norm-one S-ideles in exactly one point. -/
 theorem centeredSLocalIdeleDomain_fundamental
     (g : Nₛ) :
     ∃! a : Oₛ(F, S)ˣ, (unitAtS a)⁻¹ * g.val ∈
-      (Nₛ).subtype '' centeredSLocalIdeleDomain F v₀ σ S bₛ := by sorry
+      (Nₛ).subtype '' centeredSLocalIdeleDomain F v₀ σ S bₛ := by
+  let T := CommGroup.torsion Oₛ(F, S)ˣ
+  let L := sUnitLogHom F S
+  let move (a : Oₛ(F, S)ˣ) : (SAdeleRing F S)ˣ := (unitAtS a)⁻¹ * g.val
+  let inLogBox (x : (SAdeleRing F S)ˣ) : Prop :=
+    sIdeleLog F S x ∈ centeredSRegulatorParallelotope F S bₛ
+  let inSector (x : (SAdeleRing F S)ˣ) : Prop :=
+    inCenteredTorsionSector F v₀ σ (atPlace (atInfinity x))
+  have hmem (a : Oₛ(F, S)ˣ) :
+      move a ∈ (Nₛ).subtype '' centeredSLocalIdeleDomain F v₀ σ S bₛ ↔
+        inLogBox (move a) ∧ inSector (move a) := by
+    constructor
+    · rintro ⟨x, hx, heq⟩
+      change x.val = move a at heq
+      change inLogBox x.val ∧ inSector x.val at hx
+      exact heq ▸ hx
+    · intro h
+      have hn : move a ∈ Nₛ :=
+        (Nₛ).mul_mem ((Nₛ).inv_mem ((sIdeleNorm_spec F S).2 ⟨a, rfl⟩)) g.property
+      exact ⟨⟨move a, hn⟩, h, rfl⟩
+  change ∃! a : Oₛ(F, S)ˣ, move a ∈ _
+  apply (existsUnique_congr hmem).mpr
+  obtain ⟨a, ha, han⟩ := exists_centeredSLog_translate F S bₛ g
+  obtain ⟨t, ht, huniq⟩ := existsUnique_centeredSTorsion_translate F v₀ σ S (move a)
+  have hshift (u : T) : move (a * u.val) = (unitAtS u.val)⁻¹ * move a := by
+    change (unitAtS (a * u.val))⁻¹ * g.val = (unitAtS u.val)⁻¹ * ((unitAtS a)⁻¹ * g.val)
+    simp only [map_mul, mul_inv_rev, mul_assoc]
+  have hlog : inLogBox (move (a * t.val)) := by
+    have hzero : sIdeleLog F S ((unitAtS t.val)⁻¹) = 0 := by
+      rw [← map_inv]
+      exact (L.isOfFinOrder (T.inv_mem t.property)).eq_one'
+    change sIdeleLog F S (move (a * t.val)) ∈ _
+    rw [hshift, sIdeleLog_mul, hzero, zero_add]
+    exact ha
+  have hsector : inSector (move (a * t.val)) := (congrArg inSector (hshift t)).mpr ht
+  refine ⟨a * t.val, ⟨hlog, hsector⟩, fun b hb ↦ ?_⟩
+  let u : T := ⟨a⁻¹ * b, han b hb.1⟩
+  have hu : a * u.val = b := mul_inv_cancel_left a b
+  have hsector' : inSector ((unitAtS u.val)⁻¹ * move a) :=
+    (congrArg inSector ((hshift u).symm.trans (congrArg move hu))).mpr hb.2
+  calc
+    b = a * u.val := hu.symm
+    _ = a * t.val := congrArg (fun x : T ↦ a * x.val) (huniq u hsector')
 
 -- TODO(paper-gap): Lemma A.5.2.12(3) omits the outside-S unit factor from the domain.
 -- For ℚ with S = {∞}, a tuple with archimedean component 1 and nontrivial outside unit
