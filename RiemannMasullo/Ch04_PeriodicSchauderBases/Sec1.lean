@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Fourier.AddCircle
 public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
+import Mathlib.Analysis.PSeries
 
 /-!
 # Schauder bases
@@ -22,6 +23,36 @@ namespace RiemannMasullo
 
 section Fourier
 
+open scoped Interval
+
+/-- Differentiation of a smooth periodic lift multiplies its Fourier coefficient by the
+corresponding frequency. -/
+private theorem fourierCoeffOn_deriv_one_periodic {f : ℝ → ℂ} (hf : ContDiff ℝ ∞ f)
+    (hper : Periodic f 1) (m : ℤ) :
+    fourierCoeffOn zero_lt_one (deriv f) m =
+      (2 * Real.pi * Complex.I * m) * fourierCoeffOn zero_lt_one f m := by
+  obtain ⟨hd, hd'⟩ := contDiff_infty_iff_deriv.mp hf
+  have hcont := hd'.continuous
+  have hend : f 1 = f 0 := by simpa using hper 0
+  let e (x : ℝ) := fourier (-m) (x : AddCircle (1 : ℝ))
+  let a : ℂ := 2 * Real.pi * Complex.I * m
+  have he (x : ℝ) : HasDerivAt e (-a * e x) x := by
+    simpa [e, a, neg_mul] using hasDerivAt_fourier_neg 1 m x
+  have hecont : Continuous e := (fourier (-m)).continuous.comp (AddCircle.continuous_mk' 1)
+  have heend : e 1 = e 0 := by simp only [e, AddCircle.coe_period, AddCircle.coe_zero]
+  have h := intervalIntegral.integral_mul_deriv_eq_deriv_mul_of_hasDerivAt
+    (a := 0) (b := 1) hecont.continuousOn hf.continuous.continuousOn
+    (fun x _ ↦ he x) (fun x _ ↦ (hd x).hasDerivAt)
+    ((continuous_const.mul hecont).intervalIntegrable 0 1) (hcont.intervalIntegrable 0 1)
+  rw [hend, heend, sub_self, zero_sub] at h
+  simp_rw [mul_assoc, intervalIntegral.integral_const_mul, neg_mul, neg_neg] at h
+  have hcoeff (g : ℝ → ℂ) :
+      fourierCoeffOn zero_lt_one g m = ∫ x in 0..1, e x * g x := by
+    rw [fourierCoeffOn_eq_integral, sub_zero]
+    simp only [div_one, one_smul, smul_eq_mul, e]
+  rw [hcoeff, hcoeff]
+  exact h
+
 /-- Paper: (4.1.1.1), p. 156. The Fourier series of a smooth function on the
 unit circle converges uniformly in every derivative order.
 Deviation: Functions on the circle are represented by their periodic lifts, and
@@ -31,7 +62,71 @@ theorem smooth_fourier_series {φ : ℝ → ℂ} (hφ : ContDiff ℝ ∞ φ) (hp
       (fun s : Finset ℤ ↦ iteratedDeriv k (fun t : ℝ ↦
         ∑ m ∈ s, fourierCoeffOn (zero_lt_one : (0 : ℝ) < 1) φ m *
           fourier m (t : AddCircle (1 : ℝ))))
-      (iteratedDeriv k φ) atTop (Ico 0 1) := by sorry
+      (iteratedDeriv k φ) atTop (Ico 0 1) := by
+  have deriv_periodic {f : ℝ → ℂ} (hf : Periodic f 1) : Periodic (deriv f) 1 := by
+    intro x
+    rw [← deriv_comp_add_const, show (fun y ↦ f (y + 1)) = f from funext hf]
+  induction k generalizing φ with
+  | zero =>
+      simp only [iteratedDeriv_zero]
+      have : Fact (0 < (1 : ℝ)) := ⟨zero_lt_one⟩
+      let F : C(AddCircle (1 : ℝ), ℂ) := ⟨hper.lift, continuous_coinduced_dom.mpr hφ.continuous⟩
+      have hcoeff (m : ℤ) : fourierCoeff F m = fourierCoeffOn zero_lt_one φ m := by
+        rw [fourierCoeff_eq_intervalIntegral _ _ 0, fourierCoeffOn_eq_integral]
+        simp [F, Periodic.lift_coe]
+      have hs : Summable (fourierCoeff F) := by
+        have hd := (contDiff_infty_iff_deriv.mp hφ).2
+        have hdd := (contDiff_infty_iff_deriv.mp hd).2
+        obtain ⟨C, hC⟩ := isCompact_uIcc.exists_bound_of_continuousOn
+          (s := uIcc (0 : ℝ) 1) hdd.continuous.continuousOn
+        have hbound (m : ℤ) : ‖fourierCoeffOn zero_lt_one (deriv (deriv φ)) m‖ ≤ C := by
+          rw [fourierCoeffOn_eq_integral]
+          simp only [sub_zero, div_one, one_smul]
+          have hb : ∀ x ∈ uIoc (0 : ℝ) 1,
+              ‖fourier (-m) (x : AddCircle (1 : ℝ)) • deriv (deriv φ) x‖ ≤ C := by
+            intro x hx
+            rw [norm_smul, fourier_apply, Circle.norm_coe, one_mul]
+            exact hC x (uIoc_subset_uIcc hx)
+          simpa using intervalIntegral.norm_integral_le_of_norm_le_const hb
+        -- Two derivatives give an inverse-square bound away from frequency zero.
+        let a : ℂ := 2 * Real.pi * Complex.I
+        have ha : 0 < ‖a‖ := norm_pos_iff.mpr (by simp [a, Real.pi_ne_zero])
+        have hp := Real.summable_one_div_int_pow.mpr (by decide : 1 < (2 : ℕ))
+        refine (hp.mul_left (C / ‖a‖ ^ 2)).of_norm_bounded_eventually ?_
+        filter_upwards [eventually_cofinite_ne (0 : ℤ)] with m hm
+        rw [hcoeff]
+        specialize hbound m
+        rw [fourierCoeffOn_deriv_one_periodic hd (deriv_periodic hper),
+          fourierCoeffOn_deriv_one_periodic hφ hper, ← mul_assoc, ← pow_two, norm_mul,
+          norm_pow, norm_mul, mul_pow, Complex.norm_intCast, sq_abs] at hbound
+        have hpos : 0 < ‖a‖ ^ 2 * (m : ℝ)^2 := by
+          have hm' : (m : ℝ) ≠ 0 := by exact_mod_cast hm
+          positivity
+        rw [mul_one_div, div_div]
+        exact (le_div_iff₀ hpos).2 (by simpa only [a, mul_comm] using hbound)
+      have hu := ContinuousMap.tendsto_iff_tendstoUniformly.mp
+        (hasSum_fourier_series_of_summable hs)
+      have hlift := hu.comp (fun t : ℝ ↦ (t : AddCircle (1 : ℝ)))
+      simp only [Function.comp_def, ContinuousMap.sum_apply, ContinuousMap.smul_apply,
+        smul_eq_mul, hcoeff] at hlift
+      simpa only [F, ContinuousMap.coe_mk, Periodic.lift_coe, SummationFilter.unconditional_filter]
+        using hlift.tendstoUniformlyOn
+  | succ k ih =>
+      simp only [iteratedDeriv_succ']
+      have hsum (s : Finset ℤ) :
+          deriv (fun t : ℝ ↦ ∑ m ∈ s, fourierCoeffOn zero_lt_one φ m *
+            fourier m (t : AddCircle (1 : ℝ))) =
+          fun t : ℝ ↦ ∑ m ∈ s, fourierCoeffOn zero_lt_one (deriv φ) m *
+            fourier m (t : AddCircle (1 : ℝ)) := by
+        funext t
+        apply HasDerivAt.deriv
+        apply HasDerivAt.fun_sum
+        intro m _
+        rw [fourierCoeffOn_deriv_one_periodic hφ hper]
+        simpa only [Complex.ofReal_one, div_one, mul_left_comm, mul_assoc] using
+          (hasDerivAt_fourier 1 m t).const_mul (fourierCoeffOn zero_lt_one φ m)
+      simp only [hsum]
+      exact ih (contDiff_infty_iff_deriv.mp hφ).2 (deriv_periodic hper)
 
 /-- Paper: (4.1.1.1), p. 156. A series of exponentials converging in the smooth
 topology has the Fourier coefficients of its limit.
