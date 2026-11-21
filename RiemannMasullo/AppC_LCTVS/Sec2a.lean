@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.AppC_LCTVS.Sec1
 public import Mathlib.Analysis.LocallyConvex.Barrelled
 public import Mathlib.Analysis.LocallyConvex.Polar
+import Mathlib.Analysis.LocallyConvex.WeakDual
+import Mathlib.Analysis.Normed.Module.Dual
 import Mathlib.Topology.Algebra.Module.UniformConvergence
 
 /-!
@@ -382,7 +384,44 @@ theorem bipolar_eq_weakClosure_absConvexHull [TopologicalSpace E] [PolynormableS
     [T2Space E] [TopologicalSpace F] [PolynormableSpace ℂ F] [T2Space F]
     (hB : B.Nondegenerate) (A : Set E) :
     B.flip.polar (B.polar A) =
-      closure (X := WeakBilin B) (absConvexHull ℂ (insert 0 A)) := by sorry
+      closure (X := WeakBilin B) (absConvexHull ℂ (insert 0 A)) := by
+  let C : Set (WeakBilin B) := closure (X := WeakBilin B) (absConvexHull ℂ (insert 0 A))
+  have hsub : insert 0 A ⊆ C := subset_absConvexHull.trans (subset_closure (X := WeakBilin B))
+  apply Subset.antisymm
+  · intro x hx
+    by_contra hxC
+    let : Module ℝ (WeakBilin B) := Module.restrictScalars ℝ ℂ _
+    let : IsScalarTower ℝ ℂ (WeakBilin B) := IsScalarTower.restrictScalars ℝ ℂ _
+    let : LocallyConvexSpace ℝ (WeakBilin B) := B.weakBilin_withSeminorms.toLocallyConvexSpace
+    have hC : AbsConvex ℂ C := AbsConvex.closure (E := WeakBilin B) absConvex_absConvexHull
+    obtain ⟨f, r, hfr, hrx⟩ := RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ)
+      (E := WeakBilin B) (hC.2.lift ℝ) isClosed_closure hxC
+    obtain ⟨y, hy⟩ := (B.rightDualEquiv hB.2).surjective f
+    change WeakBilin.eval B y = f at hy
+    subst f
+    -- Rotate each pairing value on C to the nonnegative real axis.
+    have hnorm (z : WeakBilin B) (hz : z ∈ C) : ‖B z y‖ < r := by
+      obtain ⟨c, hc, hcz⟩ := RCLike.exists_norm_eq_mul_self (B z y)
+      have h := hfr (c • z) (balanced_iff_smul_mem.mp hC.1 hc.le hz)
+      rw [map_smul, smul_eq_mul] at h
+      change RCLike.re (c * B z y) < r at h
+      simpa only [← hcz, RCLike.ofReal_re] using h
+    have hr : 0 < r := (norm_nonneg _).trans_lt (hnorm 0 (hsub (mem_insert _ _)))
+    have hscale (z : E) : ‖B z ((r : ℂ)⁻¹ • y)‖ = ‖B z y‖ / r := by
+      rw [map_smul, smul_eq_mul, norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_pos hr, div_eq_inv_mul]
+    have hy' : (r : ℂ)⁻¹ • y ∈ B.polar A := by
+      intro z hz
+      rw [hscale, div_le_iff₀ hr, one_mul]
+      exact (hnorm z (hsub (mem_insert_of_mem _ hz))).le
+    have hbound := hx _ hy'
+    change ‖B x ((r : ℂ)⁻¹ • y)‖ ≤ 1 at hbound
+    rw [hscale, div_le_iff₀ hr, one_mul] at hbound
+    change r < (B x y).re at hrx
+    exact (hrx.trans_le (Complex.re_le_norm _)).not_ge hbound
+  · exact closure_minimal (X := WeakBilin B)
+      (absConvexHull_min (insert_subset (B.flip.zero_mem_polar _) (B.subset_bipolar A))
+        (LinearMap.polar_AbsConvex _)) (B.flip.polar_isClosed (B.polar A))
 
 /-- Paper: §C.2.2.1, p. 674. A weakly bounded test set defines a seminorm by taking the
 supremum of the absolute values of the pairing over that set. -/
