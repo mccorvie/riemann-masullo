@@ -338,7 +338,38 @@ theorem pi_isEquicontinuous :
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/
 theorem pi_isAbsolute :
-    IsAbsolute coordinateVector coordinateFunctional := by sorry
+    IsAbsolute coordinateVector coordinateFunctional := by
+  classical
+  intro q hq
+  let p (n : ℕ) : Seminorm ℂ (ℕ → ℂ) := (normSeminorm ℂ ℂ).comp (LinearMap.proj n)
+  let e := Equiv.sigmaEquivProd ℕ Unit
+  have hp : WithSeminorms p :=
+    (withSeminorms_pi fun _ : ℕ ↦ norm_withSeminorms ℂ ℂ).congr_equiv
+      (e.trans (Equiv.prodUnique ℕ Unit)).symm
+  obtain ⟨s, C, _, hC⟩ := Seminorm.bound_sum_of_continuous hp q hq
+  let term (m : ℕ) : (ℕ → ℂ) →L[ℂ] (ℕ → ℂ) :=
+    (coordinateFunctional m).smulRight ((coordinateVector : ℕ → ℕ → ℂ) m)
+  let r (m : ℕ) := q.comp (term m).toLinearMap
+  refine ⟨∑ m ∈ s, r m,
+    Seminorm.continuous_finsetSum (fun m _ ↦ hq.comp (term m).continuous), ?_⟩
+  intro u
+  -- Outside the controlling coordinates, the seminorm of each coordinate term is zero.
+  have hz (m : ℕ) (hm : m ∉ s) : q (term m u) = 0 := by
+    have h := hC (term m u)
+    rw [smul_apply] at h
+    change q _ ≤ C • (FunLike.coeAddMonoidHom _ _ _ (∑ i ∈ s, p i)) _ at h
+    rw [map_sum, Finset.sum_apply, Finset.sum_eq_zero (fun i hi ↦ ?_), smul_zero] at h
+    · exact le_antisymm h (apply_nonneg q _)
+    · have him : i ≠ m := fun him ↦ hm (him ▸ hi)
+      change ‖term m u i‖ = 0
+      simp [term, ContinuousLinearMap.smulRight_apply, Pi.smul_apply, Pi.single_eq_of_ne him]
+  change Summable (fun m ↦ q (term m u)) ∧ (∑' m, q (term m u)) ≤ (∑ m ∈ s, r m) u
+  have hs := hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℕ) hz
+  refine ⟨hs.summable, le_of_eq ?_⟩
+  rw [hs.tsum_eq]
+  change _ = (FunLike.coeAddMonoidHom _ _ _ (∑ m ∈ s, r m)) u
+  rw [map_sum, Finset.sum_apply]
+  rfl
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/
