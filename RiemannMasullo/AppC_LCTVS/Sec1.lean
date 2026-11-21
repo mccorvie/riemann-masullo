@@ -9,6 +9,7 @@ public import Mathlib.Analysis.Normed.Module.Completion
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 import Mathlib.Algebra.Module.ULift
 import Mathlib.Analysis.LocallyConvex.Barrelled
+import Mathlib.Analysis.LocallyConvex.Montel
 import Mathlib.Analysis.LocallyConvex.Separation
 import Mathlib.Analysis.InnerProductSpace.Dual
 import Mathlib.Analysis.Normed.Lp.lpSpace
@@ -24,6 +25,7 @@ import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.Quotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
+import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-!
 # Locally convex topological vector spaces
@@ -2091,6 +2093,191 @@ theorem isSchwartzTVS_iff_finiteDimensional (E : Type*) [NormedAddCommGroup E] [
 
 -- TODO(paper-gap): Example C.1.5.10 requires nuclear locally convex spaces from §C.2.4.
 
+section QuotientStages
+
+variable {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+  [IsTopologicalAddGroup E] {X : ℕ → Type*} [∀ k, AddCommGroup (X k)]
+  [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
+
+/-- The kernel of the map from a stage into the quotient of the limit. -/
+private abbrev limitStageKernel (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :=
+  (F.mkQL.comp (i k)).ker
+
+/-- The map from a quotient stage into the quotient of the limit. -/
+private def limitQuotientStageMap (i : ∀ k, X k →L[ℂ] E) (F : Submodule ℂ E) (k : ℕ) :
+    X k ⧸ limitStageKernel i F k →L[ℂ] E ⧸ F :=
+  (limitStageKernel i F k).liftQL (F.mkQL.comp (i k)) le_rfl
+
+/-- The transition map induced by the original transition between consecutive quotient stages. -/
+private def limitQuotientTransition
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (F : Submodule ℂ E) (k : ℕ) :
+    X k ⧸ limitStageKernel i F k →L[ℂ] X (k+1) ⧸ limitStageKernel i F (k+1) :=
+  (limitStageKernel i F k).liftQL ((limitStageKernel i F (k+1)).mkQL.comp (j k)) (by
+    intro x hx
+    change (limitStageKernel i F (k+1)).mkQ (j k x) = 0
+    rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+    change F.mkQ (i (k+1) (j k x)) = 0
+    rw [show i (k+1) (j k x) = i k x from DFunLike.congr_fun (h.compatible k) x]
+    exact hx)
+
+omit [IsTopologicalAddGroup E] in
+/-- Passing to a quotient of the limit gives the limit of the corresponding quotient stages.
+The final topology identity also holds for a non-Hausdorff quotient. -/
+private theorem isInjectiveLCLimit_quotientStages [ContinuousSMul ℂ E]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (F : Submodule ℂ E) :
+    IsInjectiveLCLimit (limitQuotientTransition h F) (limitQuotientStageMap i F) := by
+  let K := limitStageKernel i F
+  let q := limitQuotientStageMap i F
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro k
+    exact LinearMap.ker_eq_bot.mp ((K k).ker_liftQ_eq_bot' (F.mkQL.comp (i k)).toLinearMap rfl)
+  · intro k
+    ext z
+    obtain ⟨x, rfl⟩ := (K k).mkQ_surjective z
+    exact congrArg F.mkQ (DFunLike.congr_fun (h.compatible k) x)
+  · intro z
+    obtain ⟨x, rfl⟩ := F.mkQ_surjective z
+    obtain ⟨k, y, rfl⟩ := h.exhaustive x
+    exact ⟨k, (K k).mkQ y, rfl⟩
+  · have hP : WithSeminorms
+        (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+      ⟨h.topology_eq⟩
+    let : PolynormableSpace ℂ E := hP.toPolynormableSpace
+    let : PolynormableSpace ℂ (E ⧸ F) := polynormableSpace_quotient F
+    have hseminorms : (fun p : Seminorm ℂ (E ⧸ F) ↦ ∀ k, Continuous (p ∘ q k)) =
+        (fun p : Seminorm ℂ (E ⧸ F) ↦ Continuous p) := by
+      funext p
+      apply propext
+      refine ⟨fun hp ↦ F.isQuotientMap_mkQL.continuous_iff.mpr ?_,
+        fun hp k ↦ hp.comp (q k).continuous⟩
+      exact hP.continuous_seminorm ⟨p.comp F.mkQ, fun k ↦ (hp k).comp (K k).mkQL.continuous⟩
+    change (inferInstance : TopologicalSpace (E ⧸ F)) = (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ (E ⧸ F) // ∀ k, Continuous (p ∘ q k)} → _)).topology
+    rw [hseminorms]
+    exact (PolynormableSpace.withSeminorms ℂ (E ⧸ F)).withSeminorms_eq
+
+/-- In a strict Fréchet system, the limit topology on a stepwise closed subspace agrees
+with its inherited topology exactly when the quotient system is acyclic.
+This is the exact-sequence criterion for limit subspaces used in Wengenroth's Corollary 3.4.
+Apply the direct-sum difference maps to the short exact sequence of the stage subspaces,
+original stages, and quotient stages. The first two systems are strict, hence acyclic. -/
+private theorem isAcyclicSystem_quotientStages_iff
+    [ContinuousSMul ℂ E] [T2Space E] (hX : ∀ k, IsFrechetTVS (X k))
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
+    (hj : ∀ k, IsEmbedding (j k)) (F : Submodule ℂ E)
+    (hF : ∀ k, IsClosed (i k ⁻¹' (F : Set E))) :
+    IsAcyclicSystem (limitQuotientTransition h F) ↔
+      (inferInstance : TopologicalSpace F) = limitSubspaceTopology i F := by
+  sorry
+
+end QuotientStages
+
+/-- A quotient retains the Schwartz property. Pull back each continuous seminorm and
+send a neighborhood that is totally bounded for the pullback to the quotient. -/
+private theorem isSchwartzTVS_quotient
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] (hE : IsSchwartzTVS E) (F : Submodule ℂ E) :
+    IsSchwartzTVS (E ⧸ F) := by
+  let : PolynormableSpace ℂ E := hE.1
+  refine ⟨polynormableSpace_quotient F, fun p hp ↦ ?_⟩
+  let q := p.comp F.mkQ
+  obtain ⟨V, hV, htotal⟩ := hE.2 q (hp.comp F.mkQL.continuous)
+  refine ⟨F.mkQ '' V, ?_, ?_⟩
+  · rw [← map_zero F.mkQ, ← F.isOpenQuotientMap_mkQ.map_nhds_eq 0]
+    exact Filter.image_mem_map hV
+  · let := q.toSeminormedAddCommGroup
+    let := p.toSeminormedAddCommGroup
+    have hisom : Isometry F.mkQ := Isometry.of_dist_eq fun x y ↦ by
+      rw [dist_eq_norm_sub, dist_eq_norm_sub]
+      change p (F.mkQ x - F.mkQ y) = p (F.mkQ (x - y))
+      rw [map_sub F.mkQ]
+    exact htotal.image hisom.uniformContinuous
+
+/-- Bounded subsets of a complete Schwartz space have compact closure. Every continuous
+seminorm gives finite ball covers, since a bounded set is absorbed by a neighborhood that
+is totally bounded for that seminorm. -/
+private theorem isCompact_closure_of_schwartz
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    [CompleteSpace E] (hS : IsSchwartzTVS E) {B : Set E} (hB : IsVonNBounded ℂ B) :
+    IsCompact (closure B) := by
+  let : PolynormableSpace ℂ E := hS.1
+  suffices htotal : TotallyBounded B from htotal.closure.isCompact_of_isClosed isClosed_closure
+  apply (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero_swapped.totallyBounded_iff.mpr
+  intro p hp
+  obtain ⟨V, hV, htotal⟩ := hS.2 p hp
+  obtain ⟨r, hr, hsub⟩ := (hB hV).exists_pos
+  let c : ℂ := r
+  have hBV : B ⊆ c • V := hsub c (by simp [c, abs_of_pos hr])
+  let := p.toSeminormedAddCommGroup
+  let : UniformSpace E := p.toSeminormedAddCommGroup.toUniformSpace
+  have hsmul : LipschitzWith ‖c‖₊ (c • · : E → E) :=
+    LipschitzWith.of_dist_le_mul fun x y ↦ by
+      rw [dist_eq_norm_sub, dist_eq_norm_sub, ← smul_sub]
+      exact (map_smul_eq_mul p c (x - y)).le
+  have htotalB : TotallyBounded B :=
+    (htotal.image hsmul.uniformContinuous).subset hBV
+  obtain ⟨A, hA, hcover⟩ := Metric.totallyBounded_iff.mp htotalB 1 zero_lt_one
+  refine ⟨A, hA, fun x hx ↦ ?_⟩
+  obtain ⟨a, ha, hxa⟩ := mem_iUnion₂.mp (hcover hx)
+  refine mem_iUnion₂.mpr ⟨a, ha, ?_⟩
+  change x - a ∈ p.ball 0 1
+  rwa [p.sub_mem_ball, add_zero, p.ball_eq_metric]
+
+/-- A Schwartz Fréchet space has the Heine–Borel property used in the Montel regularity
+criterion. -/
+private theorem montelSpace_of_schwartz_frechet
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hE : IsFrechetTVS E) (hS : IsSchwartzTVS E) : MontelSpace ℂ E := by
+  obtain ⟨hadd, _, _, hcomplete⟩ := hE
+  let : IsTopologicalAddGroup E := hadd
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hcomplete
+  exact ⟨fun B hclosed hB ↦ hclosed.closure_eq ▸ isCompact_closure_of_schwartz hS hB⟩
+
+/-- A countable injective system of Fréchet–Montel spaces is acyclic exactly when each
+bounded set of its limit is the image of a bounded set of one stage. This is the
+regularity criterion in Wengenroth's Theorem 3.3. In the non-Hausdorff case the
+bounded-stage condition fails, since the closure of zero is a bounded subspace and a
+Hausdorff locally convex stage has no nonzero bounded subspace. -/
+private theorem isAcyclicSystem_iff_bounded_stage_of_montel
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] {X : ℕ → Type*}
+    [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
+    (hX : ∀ k, IsFrechetTVS (X k)) (hM : ∀ k, MontelSpace ℂ (X k))
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i) :
+    IsAcyclicSystem j ↔
+      ∀ B : Set E, IsVonNBounded ℂ B →
+        ∃ k, ∃ A : Set (X k), IsVonNBounded ℂ A ∧ i k '' A = B := by
+  sorry
+
+/-- Paper: §C.1.5.1 (after Definition C.1.5.9), p. 667. A closed quotient of a Schwartz
+Fréchet space lifts bounded sets. Grothendieck's result gives a compact lift, by lifting
+the compact closure of the bounded set in the quotient. -/
+private theorem liftsBoundedSets_mkQL_of_schwartz_frechet
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hE : IsFrechetTVS E) (hS : IsSchwartzTVS E) (F : Submodule ℂ E)
+    (hF : IsClosed (F : Set E)) : LiftsBoundedSets F.mkQL := by
+  let hQ := isFrechetTVS_quotient hE F hF
+  obtain ⟨hadd, _, hmetr, hcomplete⟩ := hE
+  let : IsTopologicalAddGroup E := hadd
+  let : MetrizableSpace E := hmetr
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hcomplete
+  let : (uniformity E).IsCountablyGenerated := Filter.comap.isCountablyGenerated _ _
+  let := UniformSpace.pseudoMetricSpace E
+  obtain ⟨haddQ, _, _, hcompleteQ⟩ := hQ
+  let : IsTopologicalAddGroup (E ⧸ F) := haddQ
+  let : UniformSpace (E ⧸ F) := IsTopologicalAddGroup.rightUniformSpace (E ⧸ F)
+  let : IsUniformAddGroup (E ⧸ F) := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace (E ⧸ F) := hcompleteQ
+  intro B hB
+  obtain ⟨A, hA, hqA⟩ := exists_isCompact_image_eq_of_isOpenQuotientMap
+    F.isOpenQuotientMap_mkQL (isCompact_closure_of_schwartz (isSchwartzTVS_quotient hS F) hB)
+  exact ⟨A, hA.isVonNBounded ℂ, hqA.symm ▸ subset_closure⟩
+
 /-- Paper: Theorem C.1.5.11, p. 668. In a strict countable limit of Schwartz Fréchet
 spaces, a stepwise closed subspace inherits the limit topology exactly when the quotient
 map lifts bounded sets.
@@ -2105,7 +2292,42 @@ theorem limitSubspaceTopology_eq_iff_liftsBoundedSets
     {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] E} (h : IsInjectiveLCLimit j i)
     (hj : ∀ k, IsEmbedding (j k)) (F : Submodule ℂ E) (hF : ∀ k, IsClosed (i k ⁻¹' (F : Set E))) :
     (inferInstance : TopologicalSpace F) = limitSubspaceTopology i F ↔
-      LiftsBoundedSets F.mkQL := by sorry
+      LiftsBoundedSets F.mkQL := by
+  let K := limitStageKernel i F
+  have hK (k : ℕ) : IsClosed (K k : Set (X k)) := by
+    convert hF k using 1
+    ext x
+    exact Submodule.Quotient.mk_eq_zero F
+  have hX' := hX
+  choose hadd hpoly hmetr hcomplete using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hadd
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, MetrizableSpace (X k) := hmetr
+  let : ∀ k, UniformSpace (X k) := fun _ ↦ IsTopologicalAddGroup.rightUniformSpace _
+  let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (X k) := hcomplete
+  have hjClosed (k : ℕ) : IsClosedEmbedding (j k) :=
+    (AddMonoidHom.isUniformEmbedding_of_isEmbedding (hj k)).isClosedEmbedding
+  have hFrechetQ (k : ℕ) := isFrechetTVS_quotient (hX k) (K k) (hK k)
+  have hregular := isAcyclicSystem_iff_bounded_stage_of_montel hFrechetQ
+    (fun k ↦ montelSpace_of_schwartz_frechet (hFrechetQ k) (isSchwartzTVS_quotient (hS k) (K k)))
+    (isInjectiveLCLimit_quotientStages h F)
+  rw [← isAcyclicSystem_quotientStages_iff hX h hj F hF, hregular]
+  constructor
+  · intro hB B hbounded
+    obtain ⟨k, C, hC, rfl⟩ := hB B hbounded
+    obtain ⟨A, hA, hcover⟩ := liftsBoundedSets_mkQL_of_schwartz_frechet
+      (hX k) (hS k) (K k) (hK k) C hC
+    refine ⟨i k '' A, hA.image (i k), ?_⟩
+    rintro _ ⟨z, hz, rfl⟩
+    obtain ⟨a, ha, rfl⟩ := hcover hz
+    exact ⟨i k a, mem_image_of_mem (i k) ha, rfl⟩
+  · intro hlift B hB
+    obtain ⟨A, hA, rfl⟩ := (hasBoundedLift_iff_image F.mkQL B).mp (hlift B hB)
+    obtain ⟨k, C, hC, rfl⟩ := (isVonNBounded_iff_bounded_stage h hjClosed A).mp hA
+    refine ⟨k, (K k).mkQL '' C, hC.image (K k).mkQL, ?_⟩
+    rw [image_image, image_image]
+    rfl
 
 -- TODO(paper-gap): The sentence after C.1.5.11 reverses the implication of Example C.1.5.10.
 -- TODO(paper-gap): Remark C.1.5.12 and Corollary C.1.5.13 require nuclearity from §C.2.4.
