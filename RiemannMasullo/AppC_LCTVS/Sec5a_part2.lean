@@ -4,6 +4,7 @@ public import RiemannMasullo.AppC_LCTVS.Sec5a
 public import Mathlib.Algebra.MvPolynomial.Eval
 public import Mathlib.Algebra.Ring.Periodic
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Basic
+import Mathlib.Analysis.Calculus.Deriv.Add
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -49,7 +50,29 @@ theorem hasVectorMultiPartial_zero_iff (f g : V → E) :
 once gives the corresponding entry of the identity matrix. -/
 theorem hasVectorMultiPartial_coordinate (i j : Fin d) :
     HasVectorMultiPartial (Pi.single i 1) (fun x : V ↦ (x j : ℂ))
-      (fun _ ↦ if i = j then (1 : ℂ) else 0) := by sorry
+      (fun _ ↦ if i = j then (1 : ℂ) else 0) := by
+  have hIndices :
+      (List.finRange d).flatMap (fun k ↦ List.replicate ((Pi.single i 1 : Fin d → ℕ) k) k) =
+        [i] := by
+    calc
+      _ = (List.finRange d).filter (fun k ↦ decide (k = i)) := by
+        rw [← List.filterMap_eq_filter, List.filterMap_eq_flatMap_toList]
+        congr 1
+        funext k
+        by_cases hk : k = i <;> simp [Option.guard, hk]
+      _ = [i] := by rw [List.filter_eq, List.count_finRange]; rfl
+  unfold HasVectorMultiPartial
+  rw [hIndices]
+  refine ⟨fun _ ↦ if i = j then (1 : ℂ) else 0, ?_, rfl⟩
+  intro φ x
+  change HasDerivWithinAt _ (φ (if i = j then 1 else 0)) _ _
+  apply HasDerivAt.hasDerivWithinAt
+  let L : ℝ →L[ℝ] ℂ :=
+    (if i = j then (1 : ℝ) else 0) • (φ.restrictScalars ℝ).comp Complex.ofRealCLM
+  have hDeriv := (L.hasFDerivAt.hasDerivAt (x := 0)).const_add (φ ((x : V) j))
+  by_cases hij : i = j <;>
+    simpa [L, PiLp.add_apply, PiLp.smul_apply, PiLp.single_apply, eq_comm (a := j), hij]
+      using hDeriv
 
 variable [hAdd : IsTopologicalAddGroup E] [hSMul : ContinuousSMul ℂ E]
   [hSemi : PolynormableSpace ℂ E] [hT2 : T2Space E]
