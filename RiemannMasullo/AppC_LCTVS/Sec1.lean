@@ -24,6 +24,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.Quotient
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
+import RiemannMasullo.ForMathlib.Topology.Algebra.Group.Pointwise
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
@@ -2781,6 +2782,266 @@ private theorem bounded_stage_of_nullSequence (h : IsInjectiveLCLimit j i)
       (norm_pos_iff.mpr (hε n))
   · rw [map_smul, he n, inv_smul_smul₀ (hε n)]
 
+/-- Retakh's neighborhood stabilization for an acyclic Fréchet system. The disks exhaust
+the limit and contain a zero neighborhood from each corresponding stage. A disk closes
+in a later stage, and each of its closed subsets there pulls back to a closed set in
+every stage. One obtains the nested disks by applying the continuity of the inverse
+difference map to seminorms witnessing failure of stabilization on finite boxes. -/
+private theorem IsInjectiveLCLimit.exists_stagewise_stable_disks
+    (h : IsInjectiveLCLimit j i) (hX : ∀ k, IsFrechetTVS (X k))
+    (hacyclic : IsAcyclicSystem j) :
+    ∃ S : ℕ → Set E, Monotone S ∧ (∀ x : E, ∃ n, x ∈ S n) ∧
+      (∀ n, S n + S n ⊆ S (n+1)) ∧ (∀ n, i n ⁻¹' S n ∈ 𝓝 (0 : X n)) ∧
+      ∀ n, ∃ m, n ≤ m ∧ S n ⊆ range (i m) ∧ IsClosed (i m ⁻¹' S n) ∧
+        ∀ A : Set E, A ⊆ S n → IsClosed (i m ⁻¹' A) → ∀ k, IsClosed (i k ⁻¹' A) := by
+  sorry
+
+/-- If each coordinate belongs to a prescribed stage neighborhood, the image of
+the resulting direct-sum box under the canonical quotient contains a zero neighborhood. -/
+private theorem IsInjectiveLCLimit.directSum_box_image_mem_nhds (h : IsInjectiveLCLimit j i)
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    (V : ∀ k, Set (X k)) (hV : ∀ k, V k ∈ 𝓝 (0 : X k)) :
+    DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap) ''
+      {z : ⨁ k, X k | ∀ k, z k ∈ V k} ∈ 𝓝 (0 : E) := by
+  classical
+  let D := ⨁ k, X k
+  let lof := DirectSum.lof ℂ ℕ X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  let q : D →ₗ[ℂ] E := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ lof k)} → Seminorm ℂ D) :=
+    ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  have hq : IsQuotientMap q := h.isQuotientMap_directSum
+  let e := q.quotKerEquivOfSurjective hq.surjective
+  have heq : (e : (D ⧸ q.ker) → E) ∘ q.ker.mkQ = q := by
+    funext z
+    exact q.quotKerEquivOfSurjective_apply_mk hq.surjective z
+  have hop : IsOpenMap q := by
+    have he : Continuous e := q.ker.isQuotientMap_mkQ.continuous_iff.mpr (heq.symm ▸ hq.continuous)
+    have he' : Continuous e.symm := hq.continuous_iff.mpr (by
+      have heq' : (e.symm : E → (D ⧸ q.ker)) ∘ q = q.ker.mkQ :=
+        funext (q.quotKerEquivOfSurjective_symm_apply hq.surjective)
+      rw [heq']
+      exact q.ker.continuous_mkQ)
+    let homeo : (D ⧸ q.ker) ≃ₜ E := ⟨e.toEquiv, he, he'⟩
+    rw [← heq]
+    exact homeo.isOpenMap.comp q.ker.isOpenMap_mkQ
+  choose p hp hsub using fun k ↦
+    (PolynormableSpace.hasBasis_zero_ball ℂ (X k)).mem_iff.mp (hV k)
+  let r := directSumSeminorm (fun k ↦ (p k : Seminorm ℂ (X k)))
+  have hr : Continuous r := hD.continuous_seminorm (i := ⟨r, fun k ↦ by
+    have he : (r : D → ℝ) ∘ lof k = p k := funext (directSumSeminorm_lof _ k)
+    rw [he]
+    exact hp k⟩)
+  have hb : {z : D | ∀ k, z k ∈ V k} ∈ 𝓝 (0 : D) := by
+    refine mem_of_superset (r.ball_mem_nhds hr zero_lt_one) fun z hz k ↦ hsub k ?_
+    rw [Seminorm.mem_ball_zero] at hz ⊢
+    have hcoord : p k (z k) ≤ r z := by
+      simpa only [Finset.sum_singleton] using
+        sum_le_directSumSeminorm (fun k ↦ (p k : Seminorm ℂ (X k))) z {k}
+    exact hcoord.trans_lt hz
+  simpa only [map_zero] using hop.image_mem_nhds hb
+
+/-- The canonical direct-sum map is a finite sum of stage images. -/
+private theorem exists_eq_sum_stage_coords (z : ⨁ k, X k) :
+    ∃ b : ℕ, DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap) z =
+      ∑ k ∈ Finset.range b, i k (z k) := by
+  let _ : ∀ (k : ℕ) (z : X k), Decidable (z ≠ 0) := fun _ _ ↦ Classical.propDecidable _
+  obtain ⟨b, hb⟩ := Finset.exists_nat_subset_range z.support
+  let lof := DirectSum.lof ℂ ℕ X
+  let q := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap)
+  have he : z.sum (fun k ↦ lof k) = z := DirectSum.sum_support_of z
+  have hzsum : (∑ k ∈ Finset.range b, lof k (z k)) = z := by
+    rwa [DFinsupp.sum_of_support_subset hb (fun k _ ↦ map_zero (lof k))] at he
+  refine ⟨b, ?_⟩
+  calc
+    q z = q (∑ k ∈ Finset.range b, lof k (z k)) := congrArg q hzsum.symm
+    _ = _ := by
+      rw [map_sum]
+      exact Finset.sum_congr rfl fun k _ ↦ DirectSum.toModule_lof _ _ _
+
+/-- A stagewise closed set inside one of a nested family of stable disks is closed in
+the locally convex limit. Starting with the set, successively add images of small
+stage neighborhoods and close each partial sum in a stage where the larger disk has
+stabilized. Each closure remains stagewise closed, so the neighborhoods can be
+chosen to keep any fixed exterior point outside every partial sum. -/
+private theorem IsInjectiveLCLimit.isClosed_of_stagewise_closed_in_stable_disks
+    (h : IsInjectiveLCLimit j i) (hX : ∀ k, IsFrechetTVS (X k))
+    (S : ℕ → Set E) (hmono : Monotone S) (hcover : ∀ x : E, ∃ n, x ∈ S n)
+    (hadd : ∀ n, S n + S n ⊆ S (n+1)) (hnhds : ∀ n, i n ⁻¹' S n ∈ 𝓝 (0 : X n))
+    (hstable : ∀ n, ∃ m, n ≤ m ∧ S n ⊆ range (i m) ∧ IsClosed (i m ⁻¹' S n) ∧
+      ∀ A : Set E, A ⊆ S n → IsClosed (i m ⁻¹' A) → ∀ k, IsClosed (i k ⁻¹' A))
+    (A : Set E) (n : ℕ) (hA : A ⊆ S n) (hclosed : ∀ k, IsClosed (i k ⁻¹' A)) :
+    IsClosed A := by
+  classical
+  have hX' := hX
+  choose hgroup hpoly _ _ using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hgroup
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  have htransition (a m : ℕ) (ham : a ≤ m) :
+      ∃ f : X a →L[ℂ] X m, (i m).comp f = i a := by
+    induction m, ham using Nat.le_induction with
+    | base => exact ⟨ContinuousLinearMap.id ℂ _, rfl⟩
+    | succ m _ ih =>
+      obtain ⟨f, hf⟩ := ih
+      exact ⟨(j m).comp f, by rw [← ContinuousLinearMap.comp_assoc, h.compatible, hf]⟩
+  rw [← isOpen_compl_iff]
+  apply isOpen_iff_mem_nhds.mpr
+  intro x hx
+  obtain ⟨a, ha⟩ := hcover x
+  let b := max n a
+  have hxS : x ∈ S b := hmono (le_max_right _ _) ha
+  let P (k : ℕ) := {K : Set E // K ⊆ S (b+k) ∧ (∀ l, IsClosed (i l ⁻¹' K)) ∧ x ∉ K}
+  have hstep (k : ℕ) (K : P k) :
+      ∃ V : Set (X k), V ∈ 𝓝 (0 : X k) ∧ ∃ L : P (k+1), K.val + i k '' V ⊆ L.val := by
+    have hs : b+k ≤ b+(k+1) := by omega
+    obtain ⟨m, hm, hSm, hSmclosed, htransfer⟩ := hstable (b+(k+1))
+    obtain ⟨y, hy⟩ := hSm (hmono (by omega : b ≤ b+(k+1)) hxS)
+    have hyK : y ∉ i m ⁻¹' K.val := fun hyK ↦ K.property.2.2 (hy ▸ hyK)
+    obtain ⟨W, hW, havoid⟩ := exists_nhds_zero_closure_add_avoids_finset
+      (i m ⁻¹' K.val) (K.property.2.1 m) {y} (by simpa using hyK)
+    obtain ⟨f, hf⟩ := htransition k m (by omega)
+    have hfi (z : X k) : i m (f z) = i k z := DFunLike.congr_fun hf z
+    let V := i k ⁻¹' S k ∩ f ⁻¹' W
+    have hV : V ∈ 𝓝 (0 : X k) :=
+      inter_mem (hnhds k) ((f.continuous.tendsto' 0 0 (map_zero f)) hW)
+    let T := closure (i m ⁻¹' K.val + f '' V)
+    let L := i m '' T
+    have hT : T ⊆ i m ⁻¹' S (b+(k+1)) := by
+      apply hSmclosed.closure_subset_iff.mpr
+      rintro _ ⟨s, hsK, _, ⟨t, ht, rfl⟩, rfl⟩
+      change i m (s + f t) ∈ S (b+(k+1))
+      rw [map_add, hfi]
+      exact hadd (b+k) (add_mem_add (K.property.1 hsK) (hmono (by omega : k ≤ b+k) ht.1))
+    have hL : L ⊆ S (b+(k+1)) := image_subset_iff.mpr hT
+    have hLy : x ∉ L := by
+      rintro ⟨y', hy', he⟩
+      have he' := h.injective m (he.trans hy.symm)
+      apply havoid y (Finset.mem_singleton_self y)
+      apply closure_mono (add_subset_add Subset.rfl ?_) (he' ▸ hy')
+      rintro _ ⟨z, hz, rfl⟩
+      exact hz.2
+    have hLclosed : ∀ l, IsClosed (i l ⁻¹' L) := by
+      apply htransfer L hL
+      rw [show i m ⁻¹' L = T from preimage_image_eq _ (h.injective m)]
+      exact isClosed_closure
+    refine ⟨V, hV, ⟨L, hL, hLclosed, hLy⟩, ?_⟩
+    rintro _ ⟨s, hsK, _, ⟨t, ht, rfl⟩, rfl⟩
+    obtain ⟨s', hs'⟩ := hSm (hmono hs (K.property.1 hsK))
+    have hs'' : s' ∈ i m ⁻¹' K.val := by rw [mem_preimage, hs']; exact hsK
+    refine ⟨s' + f t, subset_closure (add_mem_add hs'' (mem_image_of_mem f ht)), ?_⟩
+    rw [map_add, hs', hfi]
+  let K : ∀ k, P k := Nat.rec
+    ⟨A, hA.trans (hmono (show n ≤ b+0 by omega)), hclosed, hx⟩
+    fun k K ↦ (hstep k K).choose_spec.2.choose
+  let V (k : ℕ) := (hstep k (K k)).choose
+  have hV (k : ℕ) : V k ∈ 𝓝 (0 : X k) := (hstep k (K k)).choose_spec.1
+  have hKV (k : ℕ) : (K k).val + i k '' V k ⊆ (K (k+1)).val :=
+    (hstep k (K k)).choose_spec.2.choose_spec
+  let U := DirectSum.toModule ℂ ℕ E (fun k ↦ (i k).toLinearMap) ''
+    {z : ⨁ k, X k | ∀ k, z k ∈ V k}
+  have hU : U ∈ 𝓝 (0 : E) := h.directSum_box_image_mem_nhds V hV
+  have havoid : ∀ a ∈ A, ∀ y ∈ U, a + y ≠ x := by
+    rintro z hz _ ⟨w, hw, rfl⟩
+    have hsum (n : ℕ) : z + (∑ k ∈ Finset.range n, i k (w k)) ∈ (K n).val := by
+      induction n with
+      | zero => simpa [K] using hz
+      | succ n ih =>
+        rw [Finset.sum_range_succ]
+        simpa only [add_assoc] using hKV n (add_mem_add ih (mem_image_of_mem (i n) (hw n)))
+    obtain ⟨N, hN⟩ := exists_eq_sum_stage_coords (i := i) w
+    rw [hN]
+    exact fun he ↦ (K N).property.2.2 (he ▸ hsum N)
+  have hop : IsOpenMap (fun y : E ↦ x - y) := by
+    simpa only [Function.comp_def, sub_eq_add_neg] using
+      (isOpenMap_add_left x).comp (isOpenMap_neg E)
+  refine mem_of_superset (by simpa only [sub_zero] using hop.image_mem_nhds hU) ?_
+  rintro _ ⟨y, hy, rfl⟩ ha
+  exact havoid _ ha y hy (sub_add_cancel x y)
+
+/-- In a countable locally convex limit, a null sequence lies in one member of any
+nested closed exhaustion whose members contain stage neighborhoods and satisfy the
+doubling inclusion. If every member misses arbitrarily late terms, thicken successive
+partial sums inside the exhaustion while avoiding one more term at each step. -/
+private theorem IsInjectiveLCLimit.range_nullSequence_subset_closed_disk
+    (h : IsInjectiveLCLimit j i) [T2Space E] [IsTopologicalAddGroup E]
+    [∀ k, IsTopologicalAddGroup (X k)] [∀ k, PolynormableSpace ℂ (X k)]
+    (S : ℕ → Set E) (hmono : Monotone S) (hcover : ∀ x : E, ∃ n, x ∈ S n)
+    (hadd : ∀ n, S n + S n ⊆ S (n+1)) (hnhds : ∀ n, i n ⁻¹' S n ∈ 𝓝 (0 : X n))
+    (hclosed : ∀ n, IsClosed (S n)) (u : ℕ → E) (hu : Tendsto u atTop (𝓝 0)) :
+    ∃ n, range u ⊆ S n := by
+  classical
+  by_contra! hno
+  have hmiss (k N : ℕ) : ∃ n, N ≤ n ∧ u n ∉ S k := by
+    by_contra! htail
+    choose f hf using fun n ↦ hcover (u n)
+    let m := k ⊔ (Finset.range N).sup f
+    obtain ⟨x, ⟨n, rfl⟩, hx⟩ := Set.not_subset.mp (hno m)
+    apply hx
+    by_cases hn : n < N
+    · exact hmono (le_sup_of_le_right (Finset.le_sup (Finset.mem_range.mpr hn))) (hf n)
+    · exact hmono le_sup_left (htail n (Nat.le_of_not_gt hn))
+  let P (k : ℕ) := {K : Set E // IsClosed K ∧ K ⊆ S k}
+  have hzero : (0 : E) ∈ S 0 := by
+    simpa only [mem_preimage, map_zero] using mem_of_mem_nhds (hnhds 0)
+  let p (k : ℕ) := (hmiss (k+1) k).choose
+  have hp (k : ℕ) : k ≤ p k ∧ u (p k) ∉ S (k+1) := (hmiss (k+1) k).choose_spec
+  let F (k : ℕ) := (Finset.range k).image (u ∘ p)
+  let Q (k : ℕ) := {K : P k // ∀ x ∈ F k, x ∉ K.val}
+  have hstep (k : ℕ) (K : Q k) :
+      ∃ V : Set (X k), V ∈ 𝓝 (0 : X k) ∧
+        ∃ L : Q (k+1), K.val.val + i k '' V ⊆ L.val.val := by
+    obtain ⟨W, hW, havoid⟩ :=
+      exists_nhds_zero_closure_add_avoids_finset K.val.val K.val.property.1 (F k) K.property
+    let V := i k ⁻¹' (S k ∩ W)
+    have hV : V ∈ 𝓝 (0 : X k) :=
+      inter_mem (hnhds k) (((i k).continuous.tendsto' 0 0 (map_zero _)) hW)
+    let L := closure (K.val.val + i k '' V)
+    have hL : L ⊆ S (k+1) := (hclosed (k+1)).closure_subset_iff.mpr
+      ((add_subset_add K.val.property.2 (image_preimage_subset _ _)).trans
+        ((add_subset_add Subset.rfl inter_subset_left).trans (hadd k)))
+    have hLF (x : E) (hx : x ∈ F (k+1)) : x ∉ L := by
+      change x ∈ (Finset.range (k+1)).image (u ∘ p) at hx
+      rw [Finset.range_add_one, Finset.image_insert, Finset.mem_insert] at hx
+      rcases hx with rfl | hx
+      · exact fun hx ↦ (hp k).2 (hL hx)
+      · exact fun hz ↦ havoid x hx
+          (closure_mono (add_subset_add Subset.rfl
+            ((image_preimage_subset _ _).trans inter_subset_right)) hz)
+    exact ⟨V, hV, ⟨⟨L, isClosed_closure, hL⟩, hLF⟩, subset_closure⟩
+  let K : ∀ k, Q k := Nat.rec ⟨⟨{0}, isClosed_singleton, singleton_subset_iff.mpr hzero⟩,
+    by simp [F]⟩ fun k K ↦ (hstep k K).choose_spec.2.choose
+  let V (k : ℕ) := (hstep k (K k)).choose
+  have hV (k : ℕ) : V k ∈ 𝓝 (0 : X k) := (hstep k (K k)).choose_spec.1
+  have hKV (k : ℕ) : (K k).val.val + i k '' V k ⊆ (K (k+1)).val.val :=
+    (hstep k (K k)).choose_spec.2.choose_spec
+  have hKmono : Monotone (fun k ↦ (K k).val.val) := monotone_nat_of_le_succ fun k x hx ↦ by
+    have hz : (0 : E) ∈ i k '' V k := ⟨0, mem_of_mem_nhds (hV k), map_zero _⟩
+    exact hKV k (by simpa only [add_zero] using add_mem_add hx hz)
+  let U := ⋃ k, (K k).val.val
+  have hU : U ∈ 𝓝 (0 : E) := by
+    refine mem_of_superset (h.directSum_box_image_mem_nhds V hV) ?_
+    rintro _ ⟨z, hz, rfl⟩
+    have hsum (n : ℕ) : (∑ k ∈ Finset.range n, i k (z k)) ∈ (K n).val.val := by
+      induction n with
+      | zero => simp [K]
+      | succ n ih =>
+        rw [Finset.sum_range_succ]
+        exact hKV n (add_mem_add ih (mem_image_of_mem (i n) (hz n)))
+    obtain ⟨b, hb⟩ := exists_eq_sum_stage_coords (i := i) z
+    exact mem_iUnion.mpr ⟨b, hb.symm ▸ hsum b⟩
+  obtain ⟨N, hN⟩ := eventually_atTop.mp (hu hU)
+  obtain ⟨k, hk⟩ := mem_iUnion.mp (hN (p N) (hp N).1)
+  let b := max k (N+1)
+  exact (K b).property (u (p N)) (Finset.mem_image.mpr
+    ⟨N, Finset.mem_range.mpr (lt_of_lt_of_le (Nat.lt_succ_self N) (le_max_right _ _)), rfl⟩)
+    (hKmono (le_max_left _ _) hk)
+
 /-- Acyclicity of a Fréchet–Montel system gives bounded stage representatives for each
 null sequence in its Hausdorff limit. This is the null-sequence lifting part of
 Wengenroth's Theorem 3.3. -/
@@ -2788,7 +3049,55 @@ private theorem IsInjectiveLCLimit.lifts_nullSequence_of_acyclic (h : IsInjectiv
     [T2Space E] (hX : ∀ k, IsFrechetTVS (X k)) (hM : ∀ k, MontelSpace ℂ (X k))
     (hacyclic : IsAcyclicSystem j) (u : ℕ → E) (hu : Tendsto u atTop (𝓝 0)) :
     ∃ k, ∃ v : ℕ → X k, IsVonNBounded ℂ (range v) ∧ ∀ n, i k (v n) = u n := by
-  sorry
+  have hX' := hX
+  choose hgroup hpoly _ _ using hX'
+  let : ∀ k, IsTopologicalAddGroup (X k) := hgroup
+  let : ∀ k, PolynormableSpace ℂ (X k) := hpoly
+  let : ∀ k, ContinuousSMul ℂ (X k) := fun k ↦ PolynormableSpace.continuousSMul ℂ (X k)
+  have hE : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ E) :=
+    ⟨h.topology_eq⟩
+  let : IsTopologicalAddGroup E := hE.isTopologicalAddGroup
+  obtain ⟨S, hmono, hcover, hadd, hnhds, hstable⟩ := h.exists_stagewise_stable_disks hX hacyclic
+  have hclosed (n : ℕ) : IsClosed (S n) := by
+    obtain ⟨k, _, _, hk, htransfer⟩ := hstable n
+    exact h.isClosed_of_stagewise_closed_in_stable_disks hX S hmono hcover hadd hnhds hstable
+      (S n) n Subset.rfl (htransfer _ Subset.rfl hk)
+  obtain ⟨n, hn⟩ := h.range_nullSequence_subset_closed_disk S hmono hcover hadd hnhds hclosed u hu
+  obtain ⟨k, _, hsub, hk, htransfer⟩ := hstable n
+  let C := i k ⁻¹' S n
+  let f (x : C) := i k (x : X k)
+  have hf : range f = S n := by
+    change range ((i k) ∘ (Subtype.val : C → X k)) = S n
+    rw [range_comp, Subtype.range_coe_subtype]
+    exact image_preimage_eq_of_subset hsub
+  have hfemb : IsClosedEmbedding f := by
+    refine IsClosedEmbedding.of_continuous_injective_isClosedMap
+      ((i k).continuous.comp continuous_subtype_val)
+      (fun _ _ he ↦ Subtype.ext (h.injective k he)) ?_
+    intro A hA
+    have hpre : i k ⁻¹' (f '' A) = Subtype.val '' A := by
+      ext x
+      constructor
+      · rintro ⟨y, hy, he⟩
+        exact ⟨y, hy, h.injective k he⟩
+      · rintro ⟨y, hy, rfl⟩
+        exact mem_image_of_mem f hy
+    have hA' : f '' A ⊆ S n := hf ▸ image_subset_range _ _
+    apply h.isClosed_of_stagewise_closed_in_stable_disks hX S hmono hcover hadd hnhds hstable
+      (f '' A) n hA'
+    apply htransfer _ hA'
+    rw [hpre]
+    exact hk.isClosedMap_subtype_val _ hA
+  have hK := (hfemb.isCompact_preimage hu.isCompact_insert_range).image
+    (continuous_subtype_val : Continuous (Subtype.val : C → X k))
+  choose v hv using fun m ↦ hf.symm ▸ hn (mem_range_self m)
+  refine ⟨k, fun m ↦ (v m : X k), hK.isVonNBounded ℂ |>.subset ?_, hv⟩
+  rintro _ ⟨m, rfl⟩
+  refine ⟨v m, ?_, rfl⟩
+  change f (v m) ∈ insert 0 (range u)
+  rw [hv m]
+  exact mem_insert_of_mem _ (mem_range_self m)
 
 /-- In a Fréchet–Montel system, compact lifting from the Hausdorff limit makes the
 difference map a topological embedding. This is the embedding step of Wengenroth's

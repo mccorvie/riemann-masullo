@@ -7,6 +7,7 @@ import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Support
 import Mathlib.MeasureTheory.Function.LpSpace.InfiniteSum
 import Mathlib.MeasureTheory.Integral.DominatedConvergence
 import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
 
 /-!
 # Integral kernels
@@ -17,7 +18,7 @@ Masullo, Appendix C, §C.3.7, pp. 707–708.
 @[expose] public noncomputable section
 
 open Filter MeasureTheory TopologicalSpace
-open scoped ENNReal InnerProductSpace Topology
+open scoped ComplexConjugate ENNReal InnerProductSpace Topology
 
 namespace RiemannMasullo
 
@@ -466,6 +467,70 @@ private theorem exists_hilbertSchmidt_factorization
   change T = (U * B) * B
   rw [mul_assoc, hB, hUS]
 
+/-- The adjoint integral operator has the conjugate kernel with its arguments reversed. -/
+private theorem integralKernelOperator_adjoint (a : Lp ℂ 2 (μ.prod μ)) :
+    ∃ c : Lp ℂ 2 (μ.prod μ), (c : X × X → ℂ) =ᵐ[μ.prod μ] (fun p ↦ conj (a p.swap)) ∧
+      (integralKernelOperator μ c).val = (integralKernelOperator μ a).val.adjoint := by
+  let swap := Measure.measurePreserving_swap (μ := μ) (ν := μ)
+  have ha := (Lp.memLp a).comp_measurePreserving swap
+  have hc : MemLp (fun p : X × X ↦ conj (a p.swap)) 2 (μ.prod μ) :=
+    ha.congr_norm (Complex.continuous_conj.comp_aestronglyMeasurable
+      ha.aestronglyMeasurable)
+      (Eventually.of_forall fun p : X × X ↦ (Complex.norm_conj (a p.swap)).symm)
+  let c := hc.toLp (fun p : X × X ↦ conj (a p.swap))
+  refine ⟨c, hc.coeFn_toLp, ?_⟩
+  apply ContinuousLinearMap.ext
+  intro g
+  apply ext_inner_right ℂ
+  intro f
+  -- Pair the two operators with arbitrary vectors and exchange the two integrations.
+  rw [ContinuousLinearMap.adjoint_inner_left]
+  simp only [L2.inner_def, RCLike.inner_apply]
+  let F (p : X × X) := conj (g p.1) * (a p * f p.2)
+  obtain ⟨K, hK, -⟩ := L2.exists_outerProduct f g
+  have hF : Integrable F (μ.prod μ) := by
+    refine ((Lp.memLp a).integrable_mul ((Lp.memLp K).comp_measurePreserving swap)).congr ?_
+    filter_upwards [swap.quasiMeasurePreserving.ae hK] with p hp
+    change a p * K p.swap = F p
+    rw [hp, RCLike.inner_apply]
+    dsimp [F]
+    ring
+  calc
+    _ = ∫ y, ∫ x, F (x, y) ∂μ ∂μ := by
+      apply integral_congr_ae
+      filter_upwards [integralKernelOperator_apply μ c g,
+        Measure.ae_ae_of_ae_prod hc.coeFn_toLp] with y hy hcy
+      have hconj : conj (∫ x, c (y, x) * g x ∂μ) =
+          ∫ x, conj (c (y, x) * g x) ∂μ :=
+        (Complex.conjCLE.toContinuousLinearMap.integral_comp_comm hy.1).symm
+      rw [hy.2, hconj, ← integral_const_mul]
+      apply integral_congr_ae
+      filter_upwards [hcy] with x hx
+      rw [hx, map_mul, Complex.conj_conj]
+      dsimp [F]
+      ring
+    _ = ∫ x, ∫ y, F (x, y) ∂μ ∂μ :=
+      (integral_prod_symm F hF).symm.trans (integral_prod F hF)
+    _ = _ := by
+      apply integral_congr_ae
+      filter_upwards [integralKernelOperator_apply μ a f] with x hx
+      rw [hx.2, mul_comm, ← integral_const_mul]
+
+omit [T2Space X] [BorelSpace X] [Measure.InnerRegular μ] in
+/-- The conjugate of almost every row gives an L² vector whose inner product with
+an input vector computes the kernel integral. -/
+private theorem ae_exists_integralKernel_row (a : Lp ℂ 2 (μ.prod μ)) :
+    ∀ᵐ x ∂μ, ∃ u : Lp ℂ 2 μ, (u : X → ℂ) =ᵐ[μ] (fun y ↦ conj (a (x, y))) ∧
+      ∀ f : Lp ℂ 2 μ, ⟪u, f⟫_ℂ = ∫ y, a (x, y) * f y ∂μ := by
+  filter_upwards [ae_memLp_integralKernel_row μ a] with x hx
+  have hu := hx.congr_norm (Complex.continuous_conj.comp_aestronglyMeasurable
+    hx.aestronglyMeasurable) (Eventually.of_forall fun y ↦ (Complex.norm_conj (a (x, y))).symm)
+  refine ⟨hu.toLp _, hu.coeFn_toLp, fun f ↦ ?_⟩
+  rw [L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [hu.coeFn_toLp] with y hy
+  rw [RCLike.inner_apply, hy, Complex.conj_conj, mul_comm]
+
 /-- Paper: Theorem C.3.7.1(2)(b), p. 708. The trace of a nuclear composite of
 two integral operators with square-integrable kernels is the product-space integral
 of the first kernel times the second kernel with its variables reversed.
@@ -474,7 +539,72 @@ theorem hilbertTrace_integralKernelOperator_comp (a b : Lp ℂ 2 (μ.prod μ))
     (h : IsNuclearOperator
       ((integralKernelOperator μ a).val.comp (integralKernelOperator μ b).val)) :
     hilbertTrace ⟨(integralKernelOperator μ a).val.comp (integralKernelOperator μ b).val, h⟩ =
-      ∫ p : X × X, a p * b p.swap ∂(μ.prod μ) := by sorry
+      ∫ p : X × X, a p * b p.swap ∂(μ.prod μ) := by
+  obtain ⟨c, hc, hadj⟩ := integralKernelOperator_adjoint μ a
+  let B := (integralKernelOperator μ b).val
+  let C := (integralKernelOperator μ c).val
+  let e := (exists_hilbertBasis (𝕜 := ℂ) (E := Lp ℂ 2 μ)).choose_spec.choose
+  -- Countability lets us apply the section formula simultaneously to every basis vector.
+  let : Fact (1 ≤ (2 : ℝ≥0∞)) := ⟨by norm_num⟩
+  let : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by simp⟩
+  have : Countable (exists_hilbertBasis (𝕜 := ℂ) (E := Lp ℂ 2 μ)).choose := by
+    refine Pairwise.countable_of_isOpen_disjoint (s := fun i ↦ Metric.ball (e i) (1 / 2))
+      ?_ (fun _ ↦ Metric.isOpen_ball) (fun i ↦ ⟨e i, Metric.mem_ball_self (by norm_num)⟩)
+    intro i j hij
+    apply Metric.ball_disjoint_ball
+    have hd : dist (e i) (e j) ^ 2 = 2 := by
+      rw [dist_eq_norm, norm_sub_sq (𝕜 := ℂ), e.orthonormal.norm_eq_one i,
+        e.orthonormal.norm_eq_one j, e.orthonormal.inner_eq_zero hij]
+      norm_num
+    nlinarith [dist_nonneg (x := e i) (y := e j)]
+  have hB := (mem_hilbertSchmidtOperators_iff_summable_basis e B).mp
+    (integralKernelOperator μ b).property
+  have hC := (mem_hilbertSchmidtOperators_iff_summable_basis e C).mp
+    (integralKernelOperator μ c).property
+  let d i (x : X) := ⟪C (e i) x, B (e i) x⟫_ℂ
+  have hInt (i : _) : Integrable (d i) μ := L2.integrable_inner _ _
+  have hNorm : Summable fun i ↦ ∫ x, ‖d i x‖ ∂μ := by
+    refine ((hB.add hC).div_const 2).of_nonneg_of_le
+      (fun _ ↦ integral_nonneg fun _ ↦ norm_nonneg _) fun i ↦ ?_
+    have hbound := integral_mul_norm_le_Lp_mul_Lq Real.HolderConjugate.two_two
+      (by simpa using Lp.memLp (B (e i))) (by simpa using Lp.memLp (C (e i)))
+    simp only [← Real.sqrt_eq_rpow, Real.rpow_two, L2.integral_sq_norm (𝕜 := ℂ),
+      Real.sqrt_sq (norm_nonneg _)] at hbound
+    simp only [d, RCLike.inner_apply, norm_mul, Complex.norm_conj]
+    exact hbound.trans ((le_div_iff₀ (by norm_num)).2 (by
+      linarith only [two_mul_le_add_sq ‖B (e i)‖ ‖C (e i)‖]))
+  have hdiag : (fun x ↦ ∑' i, d i x) =ᵐ[μ] (fun x ↦ ∫ y, b (x, y) * a (y, x) ∂μ) := by
+    filter_upwards [ae_exists_integralKernel_row μ b, ae_exists_integralKernel_row μ c,
+      Measure.ae_ae_of_ae_prod hc,
+      ae_all_iff.2 fun i ↦ integralKernelOperator_apply μ b (e i),
+      ae_all_iff.2 fun i ↦ integralKernelOperator_apply μ c (e i)] with
+      x hbx hcx hswap hBe hCe
+    obtain ⟨u, hu, hu_inner⟩ := hbx
+    obtain ⟨v, hv, hv_inner⟩ := hcx
+    calc
+      _ = ⟪u, v⟫_ℂ := by
+        refine ((e.hasSum_inner_mul_inner u v).congr_fun fun i ↦ ?_).tsum_eq
+        have hBi : B (e i) x = ⟪u, e i⟫_ℂ := (hBe i).2.trans (hu_inner (e i)).symm
+        have hCi : C (e i) x = ⟪v, e i⟫_ℂ := (hCe i).2.trans (hv_inner (e i)).symm
+        rw [show d i x = ⟪C (e i) x, B (e i) x⟫_ℂ from rfl, RCLike.inner_apply,
+          hBi, hCi, inner_conj_symm]
+      _ = _ := by
+        rw [L2.inner_def]
+        apply integral_congr_ae
+        filter_upwards [hu, hv, hswap] with y hyu hyv hcy
+        rw [RCLike.inner_apply, hyu, hyv, hcy, Complex.conj_conj, Complex.conj_conj, mul_comm]
+        rfl
+  change (∑' i, ⟪e i, (integralKernelOperator μ a).val (B (e i))⟫_ℂ) = _
+  calc
+    _ = ∑' i, ⟪C (e i), B (e i)⟫_ℂ := tsum_congr fun i ↦ by
+      rw [← ContinuousLinearMap.adjoint_inner_left, ← hadj]
+    _ = ∫ x, ∑' i, d i x ∂μ := by
+      simpa only [d, L2.inner_def] using (hasSum_integral_of_summable_integral_norm hInt hNorm).tsum_eq
+    _ = ∫ p : X × X, b p * a p.swap ∂(μ.prod μ) :=
+      (integral_congr_ae hdiag).trans (integral_prod _ (integrable_integralKernel_mul_swap μ b a)).symm
+    _ = _ := by
+      simpa only [Prod.swap_swap, mul_comm] using
+        (integral_prod_swap (μ := μ) (ν := μ) (fun p : X × X ↦ a p * b p.swap))
 
 /-- Paper: Theorem C.3.7.1(2)(b), p. 708. A nuclear integral operator has
 Hilbert-Schmidt factors whose kernel convolution represents the original kernel.

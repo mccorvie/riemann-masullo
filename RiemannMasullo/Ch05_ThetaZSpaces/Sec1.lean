@@ -44,7 +44,27 @@ Deviation: These are the closure fields for the submodule of regular restriction
 theorem meromorphicContinuationWithPoleBound_closed :
     let admissible := HasMeromorphicContinuationWithPoleBound chart orderBound
     admissible 0 ∧ (∀ u v, admissible u → admissible v → admissible (u + v)) ∧
-      (∀ (a : ℂ) u, admissible u → admissible (a • u)) := by sorry
+      (∀ (a : ℂ) u, admissible u → admissible (a • u)) := by
+  refine ⟨⟨0, fun _ ↦ rfl, fun c ↦ ?_⟩, ?_, ?_⟩
+  · refine ⟨analyticAt_const.meromorphicAt, ?_, fun _ ↦ analyticAt_const⟩
+    exact le_top.trans_eq (meromorphicOrderAt_eq_top_iff.2
+      (Filter.Eventually.of_forall fun _ ↦ rfl)).symm
+  · rintro u v ⟨Zu, hu, hZu⟩ ⟨Zv, hv, hZv⟩
+    refine ⟨Zu + Zv, fun c ↦ by simp [hu, hv], fun c ↦ ?_⟩
+    obtain ⟨mu, ou, au⟩ := hZu c
+    obtain ⟨mv, ov, av⟩ := hZv c
+    refine ⟨mu.add mv, ?_, fun h ↦ (au h).add (av h)⟩
+    exact (le_min ou ov).trans (meromorphicOrderAt_add mu mv)
+  · rintro a u ⟨Z, hu, hZ⟩
+    refine ⟨a • Z, fun c ↦ by simp [hu], fun c ↦ ?_⟩
+    obtain ⟨m, o, an⟩ := hZ c
+    refine ⟨m.const_smul a, ?_, fun h ↦ (an h).const_smul⟩
+    show orderBound c ≤ meromorphicOrderAt (a • fun z ↦ Z (chart c z)) 0
+    by_cases ha : a = 0
+    · subst ha
+      exact le_top.trans_eq (meromorphicOrderAt_eq_top_iff.2
+        (Filter.Eventually.of_forall fun _ ↦ zero_smul ℂ _)).symm
+    · rwa [meromorphicOrderAt_const_smul_eq_meromorphicOrderAt ha]
 
 /-- Paper: Definition 5.1.1.1(1)–(2), p. 223.
 Meromorphic functions with bounded poles form a complex vector space with the
@@ -64,7 +84,15 @@ Deviation: This checks the target in the case where no poles are allowed. -/
 theorem mem_meromorphicWithPoleBound_zero_iff
     (u : C({c : X // 0 ≤ (0 : WithTop ℤ)}, ℂ)) :
     u ∈ meromorphicWithPoleBound chart (fun _ ↦ 0) ↔
-      ∀ c : X, AnalyticAt ℂ (fun z ↦ u ⟨chart c z, le_rfl⟩) 0 := by sorry
+      ∀ c : X, AnalyticAt ℂ (fun z ↦ u ⟨chart c z, le_rfl⟩) 0 := by
+  constructor
+  · rintro ⟨Z, hZ, h⟩ c
+    have hZ' : Z = fun x ↦ u ⟨x, le_rfl⟩ := funext fun x ↦ hZ ⟨x, le_rfl⟩
+    subst hZ'
+    exact (h c).2.2 le_rfl
+  · intro h
+    refine ⟨fun x ↦ u ⟨x, le_rfl⟩, fun _ ↦ rfl, fun c ↦ ?_⟩
+    exact ⟨(h c).meromorphicAt, (h c).meromorphicOrderAt_nonneg, fun _ ↦ h c⟩
 
 end MeromorphicTarget
 
@@ -95,7 +123,23 @@ def globalIdelicOrderBound (c : X𝔽) : WithTop ℤ :=
 The trivial character allows a simple pole and the squared norm character allows none. -/
 theorem globalIdelicOrderBound_one_and_normSquared :
     globalIdelicOrderBound (1 : X𝔽) = -1 ∧
-      globalIdelicOrderBound (ideleClassNormTwist (1 : PontryaginDual C𝔽) 2) = 0 := by sorry
+      globalIdelicOrderBound (ideleClassNormTwist (1 : PontryaginDual C𝔽) 2) = 0 := by
+  refine ⟨ite_eq_left (Or.inl rfl), ite_eq_right ?_⟩
+  obtain ⟨g, hg⟩ :=
+    (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1 (Units.mk0 (2 : ℝ≥0) two_ne_zero)
+  have hval : ∀ s : ℂ, ideleClassNormTwist (1 : PontryaginDual C𝔽) s g = (2 : ℂ) ^ s := by
+    intro s
+    change (((1 : PontryaginDual C𝔽) g : Circle) : ℂ) *
+      (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    rw [hg]
+    simp
+  rintro (h | h)
+  · have := DFunLike.congr_fun h g
+    rw [hval] at this
+    norm_num at this
+  · have := DFunLike.congr_fun h g
+    rw [hval, hval] at this
+    norm_num at this
 
 local notation "globalMeromorphic" =>
   meromorphicWithPoleBound (X := X𝔽) normChart𝔽 (globalIdelicOrderBound (F := F))
@@ -335,7 +379,8 @@ def sLocalThetaToZ : SLocalAdelicThetaSpace F S →ₗ[ℂ] SLocalIdelicZSpace F
 /-- Paper: Definition 5.1.1.1(4), p. 223.
 The map from the S-local theta space onto its Z-space is a quotient map. -/
 theorem sLocalThetaToZ_isQuotientMap :
-    IsQuotientMap (sLocalThetaToZ (F := F) (S := S)) := by sorry
+    IsQuotientMap (sLocalThetaToZ (F := F) (S := S)) :=
+  { eq_coinduced := rfl, surjective := LinearMap.surjective_rangeRestrict _ }
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is locally convex. -/
@@ -351,13 +396,17 @@ theorem sLocalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (SLocalAdeli
 The global theta quotient is Hausdorff if the global theta kernel is closed. -/
 theorem globalAdelicThetaSpace_t2_of_isClosed
     (h : IsClosed (LinearMap.ker theta𝔽 : Set ℬ𝔽)) :
-    T2Space (GlobalAdelicThetaSpace F) := by sorry
+    T2Space (GlobalAdelicThetaSpace F) := by
+  have : IsClosed (LinearMap.ker theta𝔽 : Set ℬ𝔽) := h
+  infer_instance
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The S-local theta quotient is Hausdorff if the S-local theta kernel is closed. -/
 theorem sLocalAdelicThetaSpace_t2_of_isClosed
     (h : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ)) :
-    T2Space (SLocalAdelicThetaSpace F S) := by sorry
+    T2Space (SLocalAdelicThetaSpace F S) := by
+  have : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ) := h
+  infer_instance
 
 /-- Paper: Theorem 5.1.1.3, p. 223.
 The Mellin transform is injective on the global theta quotient. -/

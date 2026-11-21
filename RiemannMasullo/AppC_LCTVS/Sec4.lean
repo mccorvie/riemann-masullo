@@ -541,13 +541,32 @@ theorem closedAbsConvexHull_eq_pettisWeakIntegrals_unitBall [CompactSpace X]
       ∃ hi : PettisWeaklyIntegrable (.complex μ) f,
         pettisWeakIntegral (.complex μ) f hi = a} := by sorry
 
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem C.4.3.2(2), p. 712. The closed absolutely convex hull of the
 image in the weak completion is compact.
 Deviation: The hull includes zero for the empty domain, as in the bipolar convention. -/
 theorem isCompact_closedAbsConvexHull_weakCompletion_range [CompactSpace X]
     (f : X → E) (hf : Continuous f) :
     IsCompact (closure (convexHull ℝ
-      (balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f)))))) := by sorry
+      (balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f)))))) := by
+  let K := Metric.closedBall (0 : ℂ) 1 • insert 0 (range f)
+  have hK : IsCompact K := (isCompact_closedBall _ _).smul_set ((isCompact_range hf).insert 0)
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hK
+  let : MeasurableSpace K := borel K
+  let : BorelSpace K := ⟨rfl⟩
+  have hrange : range (toPettisWeakCompletion E ∘ (Subtype.val : K → E)) =
+      balancedHull ℂ (insert 0 (range (toPettisWeakCompletion E ∘ f))) := by
+    rw [range_comp, Subtype.range_coe]
+    change (toPettisWeakCompletion E) '' image2 (· • ·) _ _ = _
+    rw [image_image2_distrib_right (f' := (· • ·))
+      (fun c x ↦ (toPettisWeakCompletion E).map_smul c x),
+      image_insert_eq, (toPettisWeakCompletion E).map_zero, ← range_comp]
+    ext z
+    rw [mem_balancedHull_iff (𝕜 := ℂ) (E := PettisWeakCompletion E)]
+    simp only [image2_smul, Set.mem_smul, Metric.mem_closedBall, dist_zero_right, mem_smul_set]
+  let : ContinuousSMul ℝ (PettisWeakCompletion E) := IsScalarTower.continuousSMul ℂ
+  rw [← hrange, ← closedConvexHull_eq_closure_convexHull]
+  exact isCompact_closedConvexHull_weakCompletion_range Subtype.val continuous_subtype_val
 
 -- TODO(paper-gap): The level comparison in Remark C.4.3.4 is a preorder.
 -- Distinct vectors can lie at the same level.

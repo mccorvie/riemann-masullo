@@ -2442,7 +2442,76 @@ theorem isNuclearTVS_quotient (hE : IsNuclearTVS.{v, u} E) (S : Submodule ℂ E)
 the product topology. -/
 theorem isNuclearTVS_pi {I : Type w} {X : I → Type u}
     [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)] [∀ i, TopologicalSpace (X i)]
-    (hX : ∀ i, IsNuclearTVS.{max v w, u} (X i)) : IsNuclearTVS.{v, max u w} (∀ i, X i) := by sorry
+    (hX : ∀ i, IsNuclearTVS.{max v w, u} (X i)) : IsNuclearTVS.{v, max u w} (∀ i, X i) := by
+  classical
+  let : ∀ i, T2Space (X i) := fun i ↦ (hX i).1
+  let : ∀ i, PolynormableSpace ℂ (X i) := fun i ↦ (hX i).2.1
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  let proj (i : I) : (∀ i, X i) →L[ℂ] X i := ContinuousLinearMap.proj i
+  let single (i : I) := ContinuousLinearMap.single ℂ X i
+  let M (i : I) : ((∀ i, X i) ⊗[ℂ] F) →ₗ[ℂ] ((∀ i, X i) ⊗[ℂ] F) :=
+    ((single i).toLinearMap.rTensor F).comp ((proj i).toLinearMap.rTensor F)
+  have hM (i : I) : Continuous
+      (show InjectiveTensor (∀ i, X i) F → ProjectiveTensor (∀ i, X i) F from M i) := by
+    let e := ((hX i).2.2 F inferInstance inferInstance inferInstance inferInstance
+      inferInstance).homeomorph
+    have hback : Continuous (show InjectiveTensor (X i) F → ProjectiveTensor (X i) F from id) :=
+      e.continuous_symm.congr fun z ↦ e.apply_symm_apply z
+    exact ((projectiveTensorMap_continuous (single i) (ContinuousLinearMap.id ℂ F)).comp
+      hback).comp (injectiveTensorMap_continuous (proj i) (ContinuousLinearMap.id ℂ F))
+  let hP := withGeneratingSeminorms_spec ((∀ i, X i) ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ ((∀ i, X i) ⊗[ℂ] F) // ContinuousAt
+        (fun z : (∀ i, X i) × F ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+  have hback : Continuous (show InjectiveTensor (∀ i, X i) F →
+      ProjectiveTensor (∀ i, X i) F from id) := by
+    refine hP.continuous_of_continuous_comp
+      (LinearMap.id : InjectiveTensor (∀ i, X i) F →ₗ[ℂ] ProjectiveTensor (∀ i, X i) F)
+      fun ⟨r, hr⟩ ↦ ?_
+    obtain ⟨q, p, hq, _, hbound⟩ := exists_projectiveSeminorm_pure_bound (∀ i, X i) r hr
+    -- The seminorm bounding the first factor depends on finitely many coordinates.
+    obtain ⟨s, C, _, hs⟩ := Seminorm.bound_of_continuous
+      (withSeminorms_pi (fun i ↦ PolynormableSpace.withSeminorms ℂ (X i))) q hq
+    let t := s.image Sigma.fst
+    have hqzero (x : ∀ i, X i) (hx : ∀ i ∈ t, x i = 0) : q x = 0 := by
+      apply le_antisymm ?_ (apply_nonneg q x)
+      refine (hs x).trans ?_
+      rw [smul_apply, ← smul_zero C]
+      refine smul_le_smul_of_nonneg_left (Seminorm.finset_sup_apply_le (le_refl 0) ?_) zero_le
+      intro j hj
+      change j.2.val (x j.1) ≤ 0
+      rw [hx _ (Finset.mem_image_of_mem _ hj), map_zero]
+    let T := ∑ i ∈ t, M i
+    have hT : Continuous
+        (show InjectiveTensor (∀ i, X i) F → ProjectiveTensor (∀ i, X i) F from T) :=
+      (continuous_finsetSum t (fun i _ ↦ hM i)).congr fun z ↦
+        (LinearMap.sum_apply t M z).symm
+    let D := LinearMap.id - T
+    have hD (z : (∀ i, X i) ⊗[ℂ] F) : r (D z) = 0 := by
+      induction z using TensorProduct.inductionOn with
+      | tmul x y =>
+        change r (x ⊗ₜ[ℂ] y - T (x ⊗ₜ[ℂ] y)) = 0
+        simp only [T, M, LinearMap.sum_apply, LinearMap.comp_apply, LinearMap.rTensor_tmul]
+        rw [← sum_tmul, ← sub_tmul]
+        apply le_antisymm ((hbound _ y).trans_eq ?_) (apply_nonneg _ _)
+        rw [hqzero, zero_mul]
+        intro i hi
+        rw [Pi.sub_apply, Finset.sum_apply, Finset.sum_eq_single_of_mem i hi]
+        · simp [single, proj]
+        · intro j _ hji
+          exact Pi.single_eq_of_ne hji.symm _
+      | add z z' hz hz' =>
+        rw [map_add]
+        exact le_antisymm ((map_add_le_add r _ _).trans_eq (by rw [hz, hz', add_zero]))
+          (apply_nonneg _ _)
+    let rT : Seminorm ℂ (InjectiveTensor (∀ i, X i) F) := r.comp T
+    refine Seminorm.continuous_of_le (q := rT)
+      ((hP.continuous_seminorm ⟨r, hr⟩).comp hT) fun z ↦ ?_
+    change r z ≤ r (T z)
+    have h := map_add_le_add r (D z) (T z)
+    rwa [hD z, zero_add, show D z + T z = z from sub_add_cancel z (T z)] at h
+  exact (⟨Equiv.refl ((∀ i, X i) ⊗[ℂ] F), (uniformContinuous_tensorComparison _ F).continuous,
+    hback⟩ : ProjectiveTensor (∀ i, X i) F ≃ₜ InjectiveTensor (∀ i, X i) F).isHomeomorph
 
 /-- Paper: Lemma C.2.4.10(2), p. 689. The locally convex direct sum of a countable
 family of nuclear spaces is nuclear. -/

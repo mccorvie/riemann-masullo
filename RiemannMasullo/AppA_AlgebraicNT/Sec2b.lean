@@ -721,12 +721,6 @@ ideles with logarithm in the parallelotope and chosen coordinate in the torsion 
 def infiniteIdeleFundamentalDomain : Set N∞ :=
   {g | inLogBox g ∧ inTorsionSector F v₀ σ (atPlace g.val)}
 
-/-- Paper: Definition A.2.3.6, p. 549. The only diagonal unit in the archimedean
-domain is the identity. -/
-theorem unit_mem_infiniteIdeleFundamentalDomain (u : (𝓞 F)ˣ) :
-    unitAtInfinity u ∈ (N∞).subtype '' infiniteIdeleFundamentalDomain F b v₀ σ ↔ u = 1 := by
-  sorry
-
 variable (r : CommRing.Pic (𝓞 F) → (ideleNorm F).ker)
 local notation "E∞" => infiniteIdeleFundamentalDomain F b v₀ σ
 local notation "integralUnits" =>
@@ -790,6 +784,37 @@ private theorem torsionUnit_eq_one_of_inTorsionSector (u : (𝓞 F)ˣ) (hu : u �
   have hz₁ : z = 1 := Complex.ext_norm_arg (by simpa using hnorm)
     (by simpa using (mul_eq_zero.mp harg).resolve_left hn.ne')
   simpa only [Units.val_one, map_one] using hz₁
+
+/-- Paper: Definition A.2.3.6, p. 549. The only diagonal unit in the archimedean
+domain is the identity. -/
+theorem unit_mem_infiniteIdeleFundamentalDomain (u : (𝓞 F)ˣ) :
+    unitAtInfinity u ∈ (N∞).subtype '' infiniteIdeleFundamentalDomain F b v₀ σ ↔ u = 1 := by
+  constructor
+  · rintro ⟨g, ⟨hlog, hsector⟩, hg⟩
+    change g.val = unitAtInfinity u at hg
+    change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F g.val w.val) ∈ regulatorParallelotope F b at hlog
+    change inTorsionSector F v₀ σ (atPlace g.val) at hsector
+    rw [hg] at hlog hsector
+    simp_rw [← regulator_eq_infiniteIdeleLog] at hlog
+    have htors := logEmbedding_eq_zero_iff.mp
+      (logEmbedding_eq_zero_of_mem_regulatorParallelotope F b u hlog)
+    exact torsionUnit_eq_one_of_inTorsionSector F v₀ σ u htors hsector
+  · rintro rfl
+    rw [map_one]
+    refine ⟨1, ⟨?_, ?_⟩, rfl⟩
+    · have hzero : (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+          infiniteIdeleLog F (1 : 𝕀∞) w.val) = 0 := by
+        funext w
+        change (w.val.mult : ℝ) * Real.log ‖(1 : w.val.Completion)‖ = 0
+        simp
+      change (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+        infiniteIdeleLog F (1 : 𝕀∞) w.val) ∈ regulatorParallelotope F b
+      rw [hzero, regulatorParallelotope, ZSpan.mem_fundamentalDomain]
+      simp
+    · change inTorsionSector F v₀ σ (atPlace (1 : 𝕀∞))
+      simp [inTorsionSector, Set.mem_Ico, div_pos Real.two_pi_pos
+        (Nat.cast_pos.mpr (Units.torsionOrder_pos F))]
 
 /-- A diagonal idele that is a unit in the integral adele ring comes from a global unit. -/
 private theorem exists_globalUnit_of_principal_mem_integralUnits (x : Fˣ)
