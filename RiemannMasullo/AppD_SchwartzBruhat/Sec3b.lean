@@ -24,6 +24,128 @@ section RiemannLebesgue
 
 variable (I : Set ℝ) (hm : IsModulation m) (hms : Surjective m)
 
+/-- A continuous real-valued additive character vanishes on a subgroup with open annihilator. -/
+private theorem le_ker_of_isOpen_lcaAnnihilator
+    (l : G →ₜ* Multiplicative ℝ) {k : Subgroup G}
+    (hk : IsOpen (lcaAnnihilator k : Set (PontryaginDual G))) :
+    k ≤ l.toMonoidHom.ker := by
+  let χ (t : ℝ) : PontryaginDual G :=
+    { toFun := fun x ↦ Circle.exp (t * Multiplicative.toAdd (l x))
+      map_one' := by simp
+      map_mul' := fun x y ↦ by
+        rw [map_mul l]
+        change Circle.exp (t * (Multiplicative.toAdd (l x) + Multiplicative.toAdd (l y))) = _
+        rw [mul_add, Circle.exp_add]
+      continuous_toFun := Circle.exp.continuous.comp
+        (continuous_const.mul (continuous_toAdd.comp l.continuous)) }
+  have hχ : Continuous χ :=
+    ContinuousMonoidHom.continuous_of_continuous_uncurry χ
+      (Circle.exp.continuous.comp
+        (continuous_fst.mul ((continuous_toAdd.comp l.continuous).comp continuous_snd)))
+  have hAll : χ ⁻¹' (lcaAnnihilator k : Set (PontryaginDual G)) = univ :=
+    IsClopen.eq_univ ⟨((lcaAnnihilator k).isClosed_of_isOpen hk).preimage hχ, hk.preimage hχ⟩
+      ⟨0, (mem_lcaAnnihilator_iff k (χ 0)).2 fun x ↦ by
+        change Circle.exp (0 * Multiplicative.toAdd (l x.val)) = 1
+        simp⟩
+  intro x hx
+  change Multiplicative.toAdd (l x) = 0
+  by_contra h
+  let t := Real.pi / Multiplicative.toAdd (l x)
+  have ht : t ∈ χ ⁻¹' (lcaAnnihilator k : Set (PontryaginDual G)) := hAll.symm ▸ mem_univ t
+  have hxχ := (mem_lcaAnnihilator_iff k (χ t)).1 ht ⟨x, hx⟩
+  change Circle.exp (t * Multiplicative.toAdd (l x)) = 1 at hxχ
+  exact Circle.exp_pi_ne_one (by simpa only [t, div_mul_cancel₀ _ h] using hxχ)
+
+/-- In each discrete fibre, the lift of a continuous real-valued additive character
+is an affine, smooth function of the real and torus cover coordinates. -/
+private theorem contDiff_logHom_elementaryCover {d t r : ℕ} {F A : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [CommGroup A] [TopologicalSpace A]
+    (e : Multiplicative (ElementaryLieGroup d t r F) ≃ₜ* A) (n : A →ₜ* Multiplicative ℝ)
+    (z : Fin r → ℤ) (b : F) (p : ℕ∞ω) :
+    ContDiff ℝ p (fun xt ↦ Multiplicative.toAdd
+      (n (e (Multiplicative.ofAdd (elementaryCover xt z b))))) := by
+  let l : ElementaryLieGroup d t r F →+ ℝ :=
+    AddMonoidHom.mk' (fun y ↦ Multiplicative.toAdd (n (e (Multiplicative.ofAdd y)))) <| by
+      intro x y
+      rw [← toAdd_mul, ← map_mul n]
+      exact congrArg (fun q ↦ Multiplicative.toAdd (n q))
+        (e.map_mul' (Multiplicative.ofAdd x) (Multiplicative.ofAdd y))
+  have hl : Continuous l :=
+    continuous_toAdd.comp (n.continuous.comp (e.continuous_toFun.comp continuous_ofAdd))
+  change ContDiff ℝ p (fun xt ↦ l (elementaryCover xt z b))
+  let cover : (EuclideanSpace ℝ (Fin d) × EuclideanSpace ℝ (Fin t)) →+
+      ElementaryLieGroup d t r F :=
+    { toFun := fun xt ↦ elementaryCover xt 0 0
+      map_zero' := by simp [elementaryCover, Pi.zero_def]
+      map_add' := by
+        intro x y
+        simp [elementaryCover, Pi.add_def, Pi.zero_def] }
+  have hCover : Continuous cover :=
+    continuous_fst.prodMk ((continuous_pi fun i ↦ ((AddCircle.continuous_mk' (1 : ℝ)).comp
+      ((PiLp.continuous_apply 2 _ i).comp continuous_snd))).prodMk
+        (continuous_const.prodMk continuous_const))
+  let l₀ := l.comp cover
+  have hLinear : ContDiff ℝ p l₀ := (l₀.toRealLinearMap (hl.comp hCover)).contDiff
+  have hAffine : (fun xt ↦ l₀ xt + l (elementaryCover 0 z b)) =
+      fun xt ↦ l (elementaryCover xt z b) := by
+    funext xt
+    change l (elementaryCover xt 0 0) + l (elementaryCover 0 z b) = _
+    rw [← map_add]
+    simp [elementaryCover, ← Pi.zero_def]
+  rw [← hAffine]
+  exact hLinear.add contDiff_const
+
+/-- Untwisting by a real power of the modulation preserves every finite order
+of Bruhat differentiability. The same good subgroup fixes both functions. -/
+private theorem isBruhatContDiff_of_modulationWeight
+    {p : ℕ} {a : ℝ} {f : G → ℂ} (hf : IsBruhatContDiff p (modulationWeight m a f)) :
+    IsBruhatContDiff p f := by
+  have hPos (x : G) : (0 : ℝ) < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  let l : G →ₜ* Multiplicative ℝ :=
+    { toFun := fun x ↦ Multiplicative.ofAdd (Real.log ((m x).val : ℝ))
+      map_one' := by simp
+      map_mul' := fun x y ↦ by
+        simp only [map_mul, Units.val_mul, NNReal.coe_mul, ← ofAdd_add]
+        rw [Real.log_mul (hPos x).ne' (hPos y).ne']
+      continuous_toFun := continuous_ofAdd.comp
+        ((NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+          fun x ↦ (hPos x).ne') }
+  obtain ⟨k, hk, hInvariant, hDescend⟩ := hf
+  have hKer := le_ker_of_isOpen_lcaAnnihilator l hk.2.1
+  have hWeight (x : G) :
+      modulationWeight m a f x = (Real.exp (Multiplicative.toAdd (l x) * a) : ℂ) * f x := by
+    rw [modulationWeight, LinearMap.mulLeft_apply, Pi.mul_apply, Real.rpow_def_of_pos (hPos x)]
+    rfl
+  have hUndo (x : G) :
+      (Real.exp (Multiplicative.toAdd (l x) * -a) : ℂ) * modulationWeight m a f x = f x := by
+    rw [hWeight, ← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add]
+    simp [mul_neg]
+  refine ⟨k, hk, ?_, ?_⟩
+  · intro h x
+    have hh : l h.val = 1 := hKer h.property
+    rw [← hUndo (h.val * x), ← hUndo x, hInvariant, map_mul, hh, one_mul]
+  · intro s hs
+    obtain ⟨g, hg, hSmooth⟩ := hDescend s hs
+    let l' : s.val.1 →* Multiplicative ℝ := l.toMonoidHom.comp s.val.1.subtype
+    have hKer' : (OrderDual.ofDual s.val.2).comap s.val.1.subtype ≤ l'.ker :=
+      fun x hx ↦ hKer (hs ▸ hx)
+    let lq : s.quotient →ₜ* Multiplicative ℝ :=
+      { toMonoidHom := QuotientGroup.lift _ l' hKer'
+        continuous_toFun := (QuotientGroup.isQuotientMap_mk _).continuous_iff.2
+          (l.continuous.comp continuous_subtype_val) }
+    refine ⟨fun q ↦ (Real.exp (Multiplicative.toAdd (lq q) * -a) : ℂ) * g q,
+      fun x ↦ ?_, fun e z b ↦ ?_⟩
+    · dsimp only
+      rw [hg]
+      exact hUndo x.val
+    · -- The presentation uses the standard addition on `Fin`.
+      let finiteGroup := @Fin.addCommGroup e.finiteOrder ⟨(Fin.pos b).ne'⟩
+      have hLog := @contDiff_logHom_elementaryCover e.realDim e.torusDim e.latticeRank
+        (Fin e.finiteOrder) s.quotient finiteGroup inferInstance inferInstance inferInstance
+        e.equiv.symm lq z b (p : ℕ∞)
+      exact (Complex.ofRealCLM.contDiff.comp ((hLog.mul (contDiff_const (c := -a))).exp)).mul
+        (hSmooth e z b)
+
 -- TODO(paper-gap): In the proof of Remark D.3.4.1 the product rule differentiates
 -- the weight times the function. The weight's derivative has coefficient a * r.
 
@@ -31,7 +153,13 @@ variable (I : Set ℝ) (hm : IsModulation m) (hms : Surjective m)
 is Bruhat smooth whenever the exponent interval is nonempty. -/
 theorem modulatedExponentialDecay_mem_bruhatSmooth (hne : I.Nonempty)
     (f : ModulatedExponentialDecay m I) :
-    f.val ∈ bruhatSmoothSubmodule := by sorry
+    f.val ∈ bruhatSmoothSubmodule := by
+  obtain ⟨a, ha⟩ := hne
+  have hw : modulationWeight m a f.val ∈ schwartzBruhatSubmodule G :=
+    (Submodule.mem_iInf _).mp f.property ⟨a, ha⟩
+  have hs := schwartzBruhat_isBruhatSmooth (⟨modulationWeight m a f.val, hw⟩ : SchwartzBruhat G)
+  refine (Submodule.mem_iInf _).2 fun p ↦ ?_
+  exact isBruhatContDiff_of_modulationWeight m (hs p)
 
 include hm hms in
 /-- Paper: Remark D.3.4.1, p. 815. Invariant differential operators preserve
