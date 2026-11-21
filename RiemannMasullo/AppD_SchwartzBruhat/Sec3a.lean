@@ -18,6 +18,10 @@ import Mathlib.Analysis.Calculus.IteratedDeriv.Lemmas
 import Mathlib.Analysis.SpecialFunctions.ExpDeriv
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
+import RiemannMasullo.AppC_LCTVS.Sec2a
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 
 /-!
 # Schwartz–Bergman spaces and Schwartz–Bruhat functions with exponential decay
@@ -948,10 +952,49 @@ theorem positiveRealExponentialDecay_strongDual_complete (hInt : OrdConnected I)
 theorem positiveRealExponentialDecay_strongDual_nuclear (hInt : OrdConnected I) (hne : I.Nonempty) :
     IsNuclearTVS D := by sorry
 
+open scoped ComplexOrder in
 /-- Paper: Lemma D.3.2.3(2), p. 801. The strong dual has the Montel
 property and is barrelled. -/
 theorem positiveRealExponentialDecay_strongDual_montel (hInt : OrdConnected I) (hne : I.Nonempty) :
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by
+  obtain ⟨hbarrel, hmontel⟩ := positiveRealExponentialDecay_montel I hInt hne
+  let : T2Space E := (positiveRealExponentialDecay_isEmbedding I hne).t2Space
+  refine ⟨⟨fun p hp ↦ ?_⟩, montelSpace_strongDual⟩
+  let U := p.closedBall 0 1
+  let A := (topDualPairing ℂ E).polar U
+  -- The polar of the absorbing unit ball is pointwise bounded.
+  have hA : IsVonNBounded ℂ A := by
+    apply (isVonNBounded_iff_dual_image A).mpr
+    intro φ
+    obtain ⟨c, hc⟩ := (p.absorbent_closedBall_zero one_pos φ).exists
+    refine isBounded_iff_forall_norm_le.mpr ⟨‖c‖, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    obtain ⟨ψ, hψ, hφ⟩ := hc (mem_singleton φ)
+    rw [← hφ]
+    change ‖(c • ψ) x‖ ≤ ‖c‖
+    rw [smul_apply, norm_smul]
+    exact mul_le_of_le_one_right (norm_nonneg _) (hx ψ hψ)
+  refine Seminorm.continuous' (r := 1) ?_
+  have hU : IsClosed U := by
+    rw [show U = {φ | p φ ≤ 1} from p.closedBall_zero_eq]
+    exact hp.isClosed_preimage 1
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let S : Set (Set E) := {s | IsVonNBounded ℂ s}
+  let : PolynormableSpace ℂ D :=
+    uniformConvergenceCLM_polynormable (F := ℂ) S (fun _ hs ↦ hs)
+      (by rw [show ⋃₀ S = univ from sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+  have haU : AbsConvex ℂ U := ⟨p.balanced_closedBall_zero 1,
+    convex_RCLike_iff_convex_real.mpr (p.convex_closedBall 0 1)⟩
+  have hzU : 0 ∈ U := p.mem_closedBall_zero.mpr (by simp)
+  -- Any separating functional would be evaluation at a point of the polar.
+  filter_upwards [ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hA
+    (Metric.ball_mem_nhds (0 : ℂ) one_pos)] with φ hφ
+  by_contra hnot
+  obtain ⟨l, hl, hlt⟩ := exists_dual_norm_le_one_lt_of_notMem hU haU hzU hnot
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval l
+  have hx : x ∈ A := fun ψ hψ ↦ hl ψ hψ
+  exact (not_lt_of_ge (mem_ball_zero_iff.mp (hφ hx)).le) hlt
 
 /-- Paper: Lemma D.3.2.3(3), p. 801. If zero lies in I, the zero-weight
 profile is a continuous linear inclusion into the ordinary Schwartz space. -/
