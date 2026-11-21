@@ -308,7 +308,112 @@ theorem infiniteIdeleLog_kernel :
         ({v : InfinitePlace F // v.IsComplex} → Circle)), ∀ g,
       let z := InfiniteAdeleRing.ringEquiv_mixedSpace F g.val.val
       (∀ v, ((e g).1 v).val.val = z.1 v) ∧ (∀ v, (((e g).2 v : Circle) : ℂ) = z.2 v) := by
-  sorry
+  intro L
+  let m := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let R := {v : InfinitePlace F // v.IsReal}
+  let C := {v : InfinitePlace F // v.IsComplex}
+  let T := (R → rootsOfUnity 2 ℝ) × (C → Circle)
+  let u := (mixedUnits)
+  have hlog (g : 𝕀∞) (v : InfinitePlace F) :
+      infiniteIdeleLog F g v = v.mult * Real.log (mixedEmbedding.normAtPlace v (m g.val)) := by
+    have h := infiniteIdeleLog_eq_mixed F (u g) v
+    change infiniteIdeleLog F (u.symm (u g)) v = _ at h
+    rw [u.symm_apply_apply] at h
+    exact h
+  have hker (g : 𝕀∞) : g ∈ L.ker ↔
+      (∀ v : R, ‖(m g.val).1 v‖ = 1) ∧ (∀ v : C, ‖(m g.val).2 v‖ = 1) := by
+    have hnorm (v : InfinitePlace F) :
+        infiniteIdeleLog F g v = 0 ↔ mixedEmbedding.normAtPlace v (m g.val) = 1 := by
+      have hne : mixedEmbedding.normAtPlace v (m g.val) ≠ 0 :=
+        (Units.map (mixedEmbedding.normAtPlace v).toMonoidHom (u g)).ne_zero
+      have hpos := lt_of_le_of_ne (mixedEmbedding.normAtPlace_nonneg v (m g.val)) hne.symm
+      rw [hlog, mul_eq_zero, or_iff_right v.mult_coe_ne_zero]
+      exact ⟨Real.eq_one_of_pos_of_log_eq_zero hpos, fun h ↦ h ▸ Real.log_one⟩
+    change infiniteIdeleLog F g = 0 ↔ _
+    rw [funext_iff]
+    constructor
+    · intro h
+      exact ⟨fun v ↦ (mixedEmbedding.normAtPlace_apply_of_isReal v.2 _).symm ▸
+          (hnorm v).mp (h v),
+        fun v ↦ (mixedEmbedding.normAtPlace_apply_of_isComplex v.2 _).symm ▸
+          (hnorm v).mp (h v)⟩
+    · rintro ⟨hr, hc⟩ v
+      apply (hnorm v).mpr
+      by_cases hv : v.IsReal
+      · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv]
+        exact hr ⟨v, hv⟩
+      · have hc' := InfinitePlace.not_isReal_iff_isComplex.mp hv
+        rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc']
+        exact hc ⟨v, hc'⟩
+  have hsquare (x : ℝ) : ‖x‖ = 1 ↔ x ^ 2 = 1 := by
+    rw [Real.norm_eq_abs, ← sq_eq_sq₀ (abs_nonneg x) zero_le_one, sq_abs, one_pow]
+  let coords (x : T) : mixedEmbedding.mixedSpace F :=
+    (fun v ↦ (x.1 v).val.val, fun v ↦ (x.2 v : ℂ))
+  -- Assemble units coordinatewise, then transport them back to the adele ring.
+  let pack : T →* (mixedEmbedding.mixedSpace F)ˣ :=
+    MulEquiv.prodUnits.symm.toMonoidHom.comp <|
+      (MulEquiv.piUnits.symm.toMonoidHom.comp
+        (MonoidHom.piMap fun _ ↦ (rootsOfUnity 2 ℝ).subtype)).prodMap
+      (MulEquiv.piUnits.symm.toMonoidHom.comp (MonoidHom.piMap fun _ ↦ Circle.toUnits))
+  let lift := u.symm.toMonoidHom.comp pack
+  have hlift (x : T) : m (lift x).val = coords x :=
+    congrArg Units.val (u.apply_symm_apply (pack x))
+  let j := lift.codRestrict L.ker fun x ↦ (hker _).mpr (by
+    rw [hlift]
+    exact ⟨fun v ↦ (hsquare _).mpr ((mem_rootsOfUnity' 2 _).mp (x.1 v).property),
+      fun v ↦ Circle.norm_coe (x.2 v)⟩)
+  have hj (x : T) : m (j x).val.val = coords x := hlift x
+  have hbij : Bijective j := by
+    constructor
+    · intro x y h
+      have heq := congrArg (fun g : L.ker ↦ m g.val.val) h
+      rw [hj, hj] at heq
+      refine Prod.ext (funext fun v ↦ Subtype.ext (Units.ext ?_))
+        (funext fun v ↦ Circle.ext ?_)
+      · exact congrFun (congrArg Prod.fst heq) v
+      · exact congrFun (congrArg Prod.snd heq) v
+    · intro g
+      obtain ⟨hr, hc⟩ := (hker g.val).mp g.property
+      let z := m g.val.val
+      let x : T :=
+        (fun v ↦ ⟨Units.mk0 (z.1 v) (norm_ne_zero_iff.mp ((hr v).trans_ne one_ne_zero)),
+          (mem_rootsOfUnity' 2 _).mpr ((hsquare _).mp (hr v))⟩,
+         fun v ↦ ⟨z.2 v, mem_sphere_zero_iff_norm.mpr (hc v)⟩)
+      refine ⟨x, Subtype.ext (Units.ext (m.injective ?_))⟩
+      exact hj x
+  let h : InfiniteAdeleRing F ≃ₜ mixedEmbedding.mixedSpace F :=
+    (Homeomorph.piEquivPiSubtypeProd InfinitePlace.IsReal
+      (fun v : InfinitePlace F ↦ v.Completion)).trans
+      (Homeomorph.prodCongr
+        (Homeomorph.piCongrRight fun v ↦ (isometryEquivRealOfIsReal v.2).toHomeomorph)
+        ((Homeomorph.piCongrRight fun v ↦
+          (isometryEquivComplexOfIsComplex
+            (InfinitePlace.not_isReal_iff_isComplex.mp v.2)).toHomeomorph).trans
+          (Homeomorph.piCongrLeft (Y := fun _ ↦ ℂ)
+            (Equiv.subtypeEquivRight fun _ ↦ InfinitePlace.not_isReal_iff_isComplex))))
+  have hval : IsEmbedding (Units.val : 𝕀∞ → InfiniteAdeleRing F) :=
+    (IsEmbedding.piMap fun _ ↦ Units.isEmbedding_val₀).comp
+      ContinuousMulEquiv.piUnits.toHomeomorph.isEmbedding
+  have hcoords : IsEmbedding (fun g : L.ker ↦ m g.val.val) :=
+    h.isEmbedding.comp (hval.comp IsEmbedding.subtypeVal)
+  have hc : Continuous j := by
+    apply hcoords.isInducing.continuous_iff.mpr
+    change Continuous (fun x ↦ m (j x).val.val)
+    simp only [hj]
+    exact (continuous_pi fun v ↦ Units.continuous_val.comp
+      (continuous_subtype_val.comp ((continuous_apply v).comp continuous_fst))).prodMk
+      (continuous_pi fun v ↦ continuous_subtype_val.comp
+        ((continuous_apply v).comp continuous_snd))
+  letI : T2Space L.ker := hcoords.t2Space
+  let e₀ := MulEquiv.ofBijective j hbij
+  let e : T ≃ₜ* L.ker :=
+    { e₀, (hc : Continuous e₀).homeoOfEquivCompactToT2 with }
+  refine ⟨e.symm, fun g ↦ ?_⟩
+  have hz := hj (e.symm g)
+  change m (e (e.symm g)).val.val = coords (e.symm g) at hz
+  rw [e.apply_symm_apply] at hz
+  exact ⟨fun v ↦ congrFun (congrArg Prod.fst hz.symm) v,
+    fun v ↦ congrFun (congrArg Prod.snd hz.symm) v⟩
 
 /-- Paper: Lemma A.2.3.2(3), p. 548. The full logarithm is proper. -/
 theorem infiniteIdeleLog_proper : IsProperMap (infiniteIdeleLog F) := by
