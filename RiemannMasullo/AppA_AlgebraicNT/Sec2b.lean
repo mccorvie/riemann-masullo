@@ -488,12 +488,82 @@ local notation "placeSection" =>
 variable (K : Set ℝ≥0ˣ) (hK : IsCompact K)
 local notation "productLocus" => (placeSection '' K) * (Subgroup.subtype N∞ '' closure E∞)
 
+omit [NumberField F] in
+/-- Ideles whose full logarithms lie in a compact set have compact closure.
+Each local coordinate is bounded above in norm and bounded away from zero. -/
+private theorem infiniteIdeleLog_closure_preimage_compact
+    (C : Set (InfinitePlace F → ℝ)) (hC : IsCompact C) :
+    IsCompact (closure (infiniteIdeleLog F ⁻¹' C)) := by
+  let logRadius (v : InfinitePlace F) (x : InfinitePlace F → ℝ) := x v / (v.mult : ℝ)
+  have hlogRadius (v : InfinitePlace F) : Continuous (logRadius v) :=
+    (continuous_apply v).div_const _
+  choose lower hlower using fun v ↦ hC.bddBelow_image (hlogRadius v).continuousOn
+  choose upper hupper using fun v ↦ hC.bddAbove_image (hlogRadius v).continuousOn
+  let annulus (v : InfinitePlace F) : Set v.Completion :=
+    Metric.closedBall 0 (Real.exp (upper v)) ∩ {z | Real.exp (lower v) ≤ ‖z‖}
+  have hannulus (v : InfinitePlace F) : IsCompact (annulus v) := by
+    have he := isometry_extensionEmbedding v
+    have hball : IsCompact (Metric.closedBall (0 : v.Completion) (Real.exp (upper v))) := by
+      simpa only [← he.preimage_closedBall] using he.isClosedEmbedding.isCompact_preimage
+        (isCompact_closedBall (extensionEmbedding v 0) (Real.exp (upper v)))
+    exact hball.inter_right (isClosed_le continuous_const continuous_norm)
+  let box := Set.univ.pi fun v ↦ Units.val ⁻¹' annulus v
+  have hbox : IsCompact box := isCompact_univ_pi fun v ↦ by
+    refine Units.isEmbedding_val₀.isInducing.isCompact_preimage' (hannulus v) ?_
+    intro z hz
+    have hzpos : 0 < ‖z‖ := (Real.exp_pos _).trans_le hz.2
+    exact ⟨Units.mk0 z (norm_pos_iff.mp hzpos), rfl⟩
+  refine (ContinuousMulEquiv.piUnits.toHomeomorph.isCompact_preimage.mpr hbox).closure_of_subset ?_
+  intro g hg v _
+  have hlog : logRadius v (infiniteIdeleLog F g) = Real.log ‖g.val v‖ :=
+    mul_div_cancel_left₀ _ v.mult_coe_ne_zero
+  have hne : g.val v ≠ 0 :=
+    (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom g).ne_zero
+  have hnorm : Real.exp (logRadius v (infiniteIdeleLog F g)) = ‖g.val v‖ := by
+    rw [hlog, Real.exp_log (norm_pos_iff.mpr hne)]
+  have hmem : logRadius v (infiniteIdeleLog F g) ∈ logRadius v '' C := ⟨_, hg, rfl⟩
+  change g.val v ∈ annulus v
+  simp only [annulus, Set.mem_inter_iff, mem_closedBall_zero_iff, Set.mem_ofPred_eq, ← hnorm]
+  exact ⟨Real.exp_le_exp.mpr (hupper v hmem), Real.exp_le_exp.mpr (hlower v hmem)⟩
+
 include hK in
 /-- Paper: Lemma A.2.3.13(1), p. 553. Multiplying the closed archimedean domain by
 a compact subset of the positive subgroup at the chosen place gives a compact set.
 The positive subgroup is parametrized by the single-place norm section. -/
 theorem infiniteIdele_product_compact : IsCompact productLocus := by
-  sorry
+  have hsection : Continuous placeSection := by
+    change Continuous (atInfinity ∘ singlePlaceIdeleNormSection F v₀)
+    exact (continuous_fst.units_map _).comp (singlePlaceIdeleNormSection_continuous F v₀)
+  let fullLog (x : logSpace F) (v : InfinitePlace F) :=
+    if hv : v ≠ w₀ then x ⟨v, hv⟩ else -∑ w, x w
+  have hfullLog : Continuous fullLog := by
+    apply continuous_pi
+    intro v
+    by_cases hv : v ≠ w₀
+    · simpa only [fullLog, dite_eq_left hv] using
+        (continuous_apply (⟨v, hv⟩ : {w : InfinitePlace F // w ≠ w₀}))
+    · simp only [fullLog, dite_eq_right hv]
+      exact continuous_neg.comp (continuous_finsetSum Finset.univ fun w _ ↦ continuous_apply w)
+  let basis := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  have hLogPreimage := infiniteIdeleLog_closure_preimage_compact F _
+    (basis.parallelepiped.isCompact.image hfullLog)
+  have hsub : IsClosedEmbedding (Subgroup.subtype N∞) :=
+    (infiniteIdeleNorm_ker_closed F).isClosedEmbedding_subtypeVal
+  have hDomain : IsCompact (closure E∞) := by
+    refine (hsub.isCompact_preimage hLogPreimage).closure_of_subset ?_
+    intro g hg
+    apply subset_closure
+    let x : logSpace F := fun w ↦ infiniteIdeleLog F g.val w
+    refine ⟨x, ZSpan.fundamentalDomain_subset_parallelepiped basis hg.1, ?_⟩
+    funext v
+    change fullLog x v = infiniteIdeleLog F g.val v
+    by_cases hv : v ≠ w₀
+    · simp only [fullLog, dite_eq_left hv, x]
+    · obtain rfl : v = w₀ := not_ne_iff.mp hv
+      have hsum := infiniteIdeleLog_sum_zero F g
+      rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀, add_eq_zero_iff_eq_neg] at hsum
+      simpa only [fullLog, dite_eq_right (not_ne_iff.mpr rfl), x] using hsum.symm
+  exact (hK.image hsection).mul (hDomain.image hsub.continuous)
 
 include hK in
 /-- Paper: Lemma A.2.3.13(1), p. 553. If the compact set has interior in the
