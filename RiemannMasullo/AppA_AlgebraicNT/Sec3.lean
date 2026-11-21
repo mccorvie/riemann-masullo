@@ -19,6 +19,7 @@ import Mathlib.MeasureTheory.Measure.Haar.Quotient
 import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.NumberTheory.NumberField.Discriminant.Basic
 import Mathlib.NumberTheory.NumberField.Discriminant.Different
+import Mathlib.NumberTheory.Padics.ProperSpace
 import Mathlib.Topology.Algebra.IsOpenUnits
 import Mathlib.Topology.Maps.Proper.CompactlyGenerated
 import RiemannMasullo.ForMathlib.Analysis.Fourier.LpSpace
@@ -1224,7 +1225,15 @@ local notation "ℤₚ" => Metric.closedBall (0 : ℚ_[p]) 1
 /-- Paper: Example A.3.1.7, p. 557. The standard additive measure on the
 p-adic field is Haar measure with the integer ring assigned volume one. -/
 theorem padicTamagawaMeasure_existsUnique :
-    ∃! μ : Measure ℚ_[p], μ.IsAddHaarMeasure ∧ μ.Regular ∧ μ (ℤₚ) = 1 := by sorry
+    ∃! μ : Measure ℚ_[p], μ.IsAddHaarMeasure ∧ μ.Regular ∧ μ (ℤₚ) = 1 := by
+  let K : TopologicalSpace.PositiveCompacts ℚ_[p] :=
+    ⟨⟨ℤₚ, isCompact_closedBall _ _⟩,
+      ⟨0, Metric.ball_subset_interior_closedBall (Metric.mem_ball_self zero_lt_one)⟩⟩
+  refine ⟨Measure.addHaarMeasure K,
+    ⟨inferInstance, inferInstance, Measure.addHaarMeasure_self⟩, ?_⟩
+  rintro μ ⟨hhaar, -, hμ⟩
+  let : μ.IsAddHaarMeasure := hhaar
+  exact ((Measure.addHaarMeasure_eq_iff K μ).2 hμ).symm
 
 /-- Paper: Example A.3.1.7, p. 557. Use the unique regular additive Haar
 measure on the p-adic field for which the integer ring has mass one. -/
