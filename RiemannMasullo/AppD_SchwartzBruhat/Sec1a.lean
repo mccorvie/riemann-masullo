@@ -1597,11 +1597,34 @@ theorem weilFundamentalDomain_hasSum {f : G → ℂ} (hf : Integrable f μ) :
 
 variable (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMeasure H μ Measure.count ν)
 
+-- Retain the existing hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Borel measurability on the quotient
 can be tested on the pullback restricted to a Borel fundamental domain. -/
 theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
-    Measurable f ↔ Measurable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) := by sorry
+    Measurable f ↔ Measurable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) := by
+  let : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  have hmk : Continuous (QuotientGroup.mk : G → G ⧸ H) := QuotientGroup.continuous_mk
+  refine ⟨fun hf ↦ (hf.comp hmk.measurable).indicator hΔ, fun hf ↦ ?_⟩
+  let : IsClosed (H : Set G) := hH
+  let : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+  let : IsUniformGroup G := isUniformGroup_of_commGroup
+  let : CompleteSpace G := IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace G
+  let := IsUniformGroup.uniformity_countably_generated (α := G)
+  let : PolishSpace G := by constructor
+  let q : Δ → G ⧸ H := fun x ↦ QuotientGroup.mk x.val
+  have hq : MeasurableEmbedding q :=
+    hmk.continuousOn.measurableEmbedding hΔ (injOn_iff_injective.mpr hbij.1)
+  have hrestrict : Measurable (f ∘ q) := by
+    have heq : (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) ∘ ((↑) : Δ → G) = f ∘ q :=
+      funext fun x ↦ indicator_of_mem x.property _
+    rw [← heq]
+    exact hf.comp measurable_subtype_coe
+  intro s hs
+  have hsurj : Function.Surjective q := hbij.2
+  rw [← hsurj.image_preimage (f ⁻¹' s)]
+  exact hq.measurableSet_image' (hrestrict hs)
 
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Integrability on the quotient
