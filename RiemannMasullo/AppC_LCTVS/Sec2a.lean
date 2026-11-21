@@ -259,7 +259,26 @@ abbrev PrecompactConvergenceCLM (E F : Type*) [AddCommGroup E] [Module ℂ E] [U
 convergence agrees with uniform convergence on compact sets. -/
 theorem precompactConvergenceCLM_eq_compact [CompleteSpace E] :
     (inferInstance : TopologicalSpace (PrecompactConvergenceCLM E F)) =
-      (inferInstance : TopologicalSpace (E →Lᵤ[ℂ, {T | IsCompact T}] F)) := by sorry
+      (inferInstance : TopologicalSpace (E →Lᵤ[ℂ, {T | IsCompact T}] F)) := by
+  let precompact : Set (Set E) := {T | IsPrecompactInCompletion T}
+  let compact : Set (Set E) := {T | IsCompact T}
+  have hpre (T : Set E) : T ∈ precompact ↔ TotallyBounded T :=
+    isPrecompactInCompletion_iff_totallyBounded T
+  have hne : precompact.Nonempty := ⟨∅, (hpre ∅).2 totallyBounded_empty⟩
+  have hdir : DirectedOn (· ⊆ ·) precompact :=
+    directedOn_of_sup_mem fun A B hA hB ↦
+      (hpre (A ∪ B)).2 (TotallyBounded.union ((hpre A).1 hA) ((hpre B).1 hB))
+  have hsub : compact ⊆ precompact := fun T hT ↦
+    (hpre T).2 (show IsCompact T from hT).totallyBounded
+  have hcof : ∀ T ∈ precompact, ∃ K ∈ compact, T ⊆ K := by
+    intro T hT
+    have hclosure : TotallyBounded (closure T) := totallyBounded_closure.2 ((hpre T).1 hT)
+    exact ⟨closure T, hclosure.isCompact_of_isClosed isClosed_closure, subset_closure⟩
+  have h := uniformOnFun_topology_eq_of_cofinal (F := F) precompact hne hdir compact hsub hcof
+  change UniformConvergenceCLM.instTopologicalSpace (RingHom.id ℂ) F precompact =
+    UniformConvergenceCLM.instTopologicalSpace (RingHom.id ℂ) F compact
+  rw [UniformConvergenceCLM.topologicalSpace_eq, UniformConvergenceCLM.topologicalSpace_eq]
+  exact congrArg (TopologicalSpace.induced (fun f : E →L[ℂ] F ↦ (f : E → F))) h.symm
 
 end MappingSpaces
 
