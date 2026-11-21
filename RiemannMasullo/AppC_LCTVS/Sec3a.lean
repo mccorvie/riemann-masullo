@@ -1505,6 +1505,32 @@ private theorem IsBanachDisc.image_of_injective {Y Z : Type*}
     T2Space.of_injective_continuous hinj hψ.continuous,
     (hψ.isUniformInducing.completeSpace_congr hsurj).mpr hB.complete⟩
 
+/-- Precomposition acts on the functionals of a nuclear presentation, while injective
+postcomposition acts on its vectors and Banach disc. -/
+private def NuclearPresentation.comp_comp {W X Y Z : Type*}
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W]
+    [PolynormableSpace ℂ W] [T2Space W]
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y]
+    [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z]
+    [PolynormableSpace ℂ Z] [T2Space Z]
+    {A : X →L[ℂ] Y} (r : NuclearPresentation A) (S : W →L[ℂ] X) (R : Y →L[ℂ] Z)
+    (hR : Injective R) : NuclearPresentation (R.comp (A.comp S)) where
+  coeff := r.coeff
+  functional n := (r.functional n).comp S
+  disc := R '' r.disc
+  isBanachDisc := r.isBanachDisc.image_of_injective R hR
+  vector n := ⟨R (r.vector n), Submodule.subset_span ⟨_, r.vector_mem n, rfl⟩⟩
+  vector_mem n := ⟨_, r.vector_mem n, rfl⟩
+  summable_coeff := r.summable_coeff
+  equicontinuous U hU := by
+    have h := (S.continuous.tendsto' 0 0 (map_zero S)).eventually (r.equicontinuous U hU)
+    simpa only [ContinuousLinearMap.comp_apply, map_zero] using h
+  hasSum x := by
+    simpa only [ContinuousLinearMap.comp_apply, map_smul] using R.hasSum (r.hasSum (S x))
+
 /-- Precomposing a nuclear operator with a continuous linear map and postcomposing it with
 an injective continuous linear map gives a nuclear operator. -/
 private theorem isNuclearOperator_comp_comp {W X Y Z : Type*}
@@ -1520,19 +1546,7 @@ private theorem isNuclearOperator_comp_comp {W X Y Z : Type*}
     (hR : Injective R) :
     IsNuclearOperator (R.comp (A.comp S)) := by
   obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A).mp hA
-  refine (isNuclearOperator_iff_nonempty_presentation _).mpr
-    ⟨{ coeff := r.coeff
-       functional := fun n ↦ (r.functional n).comp S
-       disc := R '' r.disc
-       isBanachDisc := r.isBanachDisc.image_of_injective R hR
-       vector := fun n ↦ ⟨R (r.vector n), Submodule.subset_span ⟨_, r.vector_mem n, rfl⟩⟩
-       vector_mem := fun n ↦ ⟨_, r.vector_mem n, rfl⟩
-       summable_coeff := r.summable_coeff
-       equicontinuous := fun U hU ↦ by
-         have h := (S.continuous.tendsto' 0 0 (map_zero S)).eventually (r.equicontinuous U hU)
-         simpa only [ContinuousLinearMap.comp_apply, map_zero] using h
-       hasSum := fun x ↦ by
-         simpa only [ContinuousLinearMap.comp_apply, map_smul] using R.hasSum (r.hasSum (S x)) }⟩
+  exact (isNuclearOperator_iff_nonempty_presentation _).mpr ⟨r.comp_comp S R hR⟩
 
 /-- Paper: Proposition C.3.2.1, p. 694. Nuclearity is preserved by
 conjugation by a continuous linear automorphism. -/
@@ -1567,7 +1581,15 @@ Deviation: The given endomorphism is written as its factorization. -/
 theorem nuclearTrace_factor_comps (hE : ApproxProp E) (hF : ApproxProp F)
     (T : E →L[ℂ] F) (hT : Injective T) (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
     nuclearTrace hE (A₀.comp T) (isNuclearOperator_factor_comps T hT A₀ hA₀).1 =
-      nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by sorry
+      nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by
+  obtain ⟨r⟩ := (isNuclearOperator_iff_nonempty_presentation A₀).mp hA₀
+  let rE : NuclearPresentation (A₀.comp T) := r.comp_comp T (ContinuousLinearMap.id ℂ E) injective_id
+  let rF : NuclearPresentation (T.comp A₀) := r.comp_comp (ContinuousLinearMap.id ℂ F) T hT
+  have h := isNuclearOperator_factor_comps T hT A₀ hA₀
+  have hsumE := ((exists_nuclearTrace_hasSum hE (A₀.comp T) h.1).exists.choose_spec rE).2
+  have hsumF := ((exists_nuclearTrace_hasSum hF (T.comp A₀) h.2).exists.choose_spec rF).2
+  -- Both series have terms `r.coeff n * r.functional n (T (r.vector n))`.
+  exact hsumE.unique hsumF
 
 end NuclearTrace
 
