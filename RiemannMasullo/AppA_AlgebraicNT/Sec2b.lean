@@ -879,7 +879,30 @@ theorem principal_mem_ideleFundamentalDomain (x : Fˣ) :
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain has compact closure in
 the norm-one group. -/
 theorem infiniteIdeleFundamentalDomain_precompact : IsCompact (closure E∞) := by
-  sorry
+  -- Restore the omitted logarithmic coordinate using the sum-zero equation.
+  let extend (x : logSpace F) (w : InfinitePlace F) :=
+    if hw : w = w₀ then -∑ v, x v else x ⟨w, hw⟩
+  have hExtend : Continuous extend := by
+    apply continuous_pi
+    intro w
+    by_cases hw : w = w₀
+    · simp only [extend, dite_eq_left hw]
+      exact (continuous_finsetSum Finset.univ fun v _ ↦ continuous_apply v).neg
+    · simp only [extend, dite_eq_right hw]
+      exact continuous_apply (⟨w, hw⟩ : {v : InfinitePlace F // v ≠ w₀})
+  have hCompact := (infiniteIdeleLog_proper F).isCompact_preimage
+    ((regulatorParallelotope_precompact F b).image hExtend)
+  refine ((infiniteIdeleNorm_ker_closed F).isClosedEmbedding_subtypeVal.isCompact_preimage
+    hCompact).closure_of_subset ?_
+  intro g hg
+  refine ⟨fun w ↦ infiniteIdeleLog F g.val w.val, subset_closure hg.1, ?_⟩
+  funext w
+  by_cases hw : w = w₀
+  · subst w
+    have hsum := infiniteIdeleLog_sum_zero F g
+    rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀, add_eq_zero_iff_eq_neg] at hsum
+    simpa only [extend, dite_true] using hsum.symm
+  · simp only [extend, dite_eq_right hw]
 
 /-- Paper: Lemma A.2.3.8(1), p. 550. The archimedean domain also has compact closure
 in the full archimedean idele group. -/
