@@ -511,7 +511,44 @@ theorem equicontinuous_coeff_of_isRegular [IsTopologicalAddGroup E] [ContinuousS
 /-- Paper: Remark 4.1.2.3, p. 159. A Fréchet space with a regular Schauder basis
 has a continuous norm, represented by a continuous seminorm separating zero. -/
 theorem exists_continuous_norm_of_isRegular (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f)
-    (hr : IsRegular x) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ u, q u = 0 → u = 0 := by sorry
+    (hr : IsRegular x) : ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ u, q u = 0 → u = 0 := by
+  let : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+  obtain ⟨hadd, hpoly, hmetric, _⟩ := hE
+  let : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  obtain ⟨U, hU, hx⟩ := hr
+  obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+  have hpos (n : ℕ) : 0 < p (x n) := by
+    have hn : x n ∉ p.ball 0 1 := fun hn ↦ hx n (hpU hn)
+    rw [Seminorm.ball_zero_eq] at hn
+    exact zero_lt_one.trans_le (le_of_not_gt hn)
+  have hsum (u : E) : Tendsto (fun N : ℕ ↦ ∑ n ∈ Finset.range N, f n u • x n) atTop (𝓝 u) := by
+    simpa only [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff,
+      Function.comp_def, ContinuousLinearMap.coe_coe] using hb.2 u
+  let T (n : ℕ) := (f n).smulRight (x n)
+  let r (n : ℕ) := p.comp (T n).toLinearMap
+  -- Each coordinate term is the difference of two successive partial sums.
+  have hbdd : BddAbove (range r) := by
+    rw [Seminorm.bddAbove_range_iff]
+    intro u
+    have hs := hsum u
+    have hd : Tendsto (fun n ↦ f n u • x n) atTop (𝓝 0) := by
+      simpa only [Function.comp_def, Finset.sum_range_succ_sub_sum, sub_self] using
+        (hs.comp (tendsto_add_atTop_nat 1)).sub hs
+    have ht : Tendsto (fun n ↦ r n u) atTop (𝓝 (p 0)) := hp.continuousAt.tendsto.comp hd
+    exact (Metric.isBounded_range_of_tendsto _ ht).bddAbove
+  refine ⟨⨆ n, r n, ?_, ?_⟩
+  · rw [Seminorm.coe_iSup_eq hbdd]
+    exact Seminorm.continuous_iSup r (fun n ↦ hp.comp (T n).continuous) hbdd
+  · intro u hu
+    have hz (n : ℕ) : f n u = 0 := by
+      have hle : r n ≤ ⨆ m, r m := le_ciSup hbdd n
+      have hzero : r n u = 0 := le_antisymm ((hle u).trans_eq hu) (apply_nonneg _ _)
+      change p (f n u • x n) = 0 at hzero
+      rw [map_smul_eq_mul, mul_eq_zero] at hzero
+      exact norm_eq_zero.mp (hzero.resolve_right (hpos n).ne')
+    have hs := hsum u
+    simp only [hz, zero_smul, Finset.sum_const_zero] at hs
+    exact tendsto_nhds_unique hs tendsto_const_nhds
 
 /-- Paper: Remark 4.1.2.3, p. 159. A Fréchet space with a regular Schauder basis
 has no complemented closed subspace isomorphic to the product of countably
