@@ -1478,7 +1478,19 @@ theorem mellinConvergent_of_exponentialDecay (s : ℂ) :
 /-- Paper: Proposition B.2.1.9(1), p. 598. The Mellin transform of an
 exponentially decaying function is entire. -/
 theorem differentiable_mellin_of_exponentialDecay :
-    Differentiable ℂ (mellin (fromLog f)) := by sorry
+    Differentiable ℂ (mellin (fromLog f)) := by
+  intro s
+  let A : ℝ := |s.re| + 1
+  have hA : 0 < A := by dsimp [A]; positivity
+  refine mellin_differentiableAt_of_isBigO_rpow (a := A) (b := -A)
+    (fromLog_locallyIntegrable f) (isBigO_fromLog_atTop f hf.1 hA) ?_ ?_ ?_
+  · dsimp [A]
+    linarith [le_abs_self s.re]
+  · apply isBigO_comp_log_rpow_of_isBigO_exp _ Real.tendsto_log_nhdsGT_zero
+      self_mem_nhdsWithin
+    simpa only [neg_neg, iteratedDeriv_zero] using hf.2 0 A hA
+  · dsimp [A]
+    linarith [neg_abs_le s.re]
 
 /-- Paper: Proposition B.2.1.9(2), p. 598. The Mellin transform satisfies
 every inverse-power height bound uniformly on each bounded closed strip. -/
