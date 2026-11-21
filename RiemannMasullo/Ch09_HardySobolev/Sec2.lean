@@ -203,7 +203,43 @@ theorem hardySobolevCutoff_spec {A : Type*} [MeasurableSpace A] {μ : Measure A}
     {U : Set A} (hU : MeasurableSet U) :
     ∃ P : Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 μ, IsClosed (range P) ∧
       ∀ f, P (P f) = P f ∧ P f = hardySobolevCutoff hU f ∧
-        (P f : A → ℂ) =ᵐ[μ] U.indicator f := by sorry
+        (P f : A → ℂ) =ᵐ[μ] U.indicator f := by
+  have hae (f : Lp ℂ 2 μ) : (hardySobolevCutoff hU f : A → ℂ) =ᵐ[μ] U.indicator f :=
+    MemLp.coeFn_toLp _
+  let L : Lp ℂ 2 μ →ₗ[ℂ] Lp ℂ 2 μ :=
+    { toFun := hardySobolevCutoff hU
+      map_add' := fun f g ↦ by
+        refine Lp.ext ?_
+        filter_upwards [hae (f + g), hae f, hae g, Lp.coeFn_add f g,
+          Lp.coeFn_add (hardySobolevCutoff hU f) (hardySobolevCutoff hU g)] with x h1 h2 h3 h4 h5
+        rw [h1, h5, Pi.add_apply, h2, h3]
+        by_cases hx : x ∈ U
+        · simp only [Set.indicator_of_mem hx]
+          exact h4
+        · simp only [Set.indicator_of_notMem hx, add_zero]
+      map_smul' := fun c f ↦ by
+        refine Lp.ext ?_
+        filter_upwards [hae (c • f), hae f, Lp.coeFn_smul c f,
+          Lp.coeFn_smul c (hardySobolevCutoff hU f)] with x h1 h2 h3 h4
+        rw [RingHom.id_apply, h1, h4, Pi.smul_apply, h2]
+        by_cases hx : x ∈ U <;> simp [hx, h3] }
+  have hbound (f : Lp ℂ 2 μ) : ‖L f‖ ≤ 1 * ‖f‖ := by
+    rw [one_mul]
+    refine Lp.norm_le_norm_of_ae_le ?_
+    filter_upwards [hae f] with x hx
+    exact hx ▸ norm_indicator_le_norm_self _ _
+  obtain ⟨P, hP⟩ : ∃ P : Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 μ, ∀ f, P f = hardySobolevCutoff hU f :=
+    ⟨L.mkContinuous 1 hbound, fun _ ↦ rfl⟩
+  have hidem (f : Lp ℂ 2 μ) : P (P f) = P f := by
+    rw [hP (P f), hP f]
+    refine Lp.ext ?_
+    filter_upwards [hae (hardySobolevCutoff hU f), hae f] with x h1 h2
+    rw [h1]
+    by_cases hx : x ∈ U <;> simp [hx, h2]
+  refine ⟨P, ?_, fun f ↦ ⟨hidem f, hP f, hP f ▸ hae f⟩⟩
+  convert isClosed_eq P.continuous continuous_id using 1
+  ext f
+  exact ⟨fun ⟨g, hg⟩ ↦ hg ▸ hidem g, fun h ↦ ⟨f, h⟩⟩
 
 /-- Paper: Theorem 9.2.1.2(1), p. 404. The closure of exponential-decay tests
 supported strictly above the cutoff is the range of the cutoff projection.
@@ -418,7 +454,14 @@ Deviation: Sanity check tying the density to §9.1. -/
 theorem intervalSobolev_zero_eq_sobolevMeasure {G : Type*} [CommGroup G] [TopologicalSpace G]
     [MeasurableSpace G] (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (s : ℝ) :
     (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logModule m x))) =
-      sobolevMeasure μ (modulatedSobolevWeight m) s := by sorry
+      sobolevMeasure μ (modulatedSobolevWeight m) s := by
+  unfold sobolevMeasure
+  congr 1
+  funext x
+  have hw : ((modulatedSobolevWeight m x : ℝ≥0) : ℝ) ^ 2 = Real.log ((m x).val : ℝ) ^ 2 :=
+    sq_abs _
+  rw [hw]
+  simp [intervalSobolevDensity]
 
 /-- Paper: Proposition 9.2.2.11, p. 417, with Corollary 10.2.2.3, p. 447. For the base interval
 {0} the reciprocal-density measure is the Sobolev measure of degree −s of Proposition 9.1.2.5.
@@ -426,7 +469,15 @@ Deviation: Sanity check tying the dual density to §9.1. -/
 theorem intervalSobolev_zero_dual_eq_sobolevMeasure {G : Type*} [CommGroup G]
     [TopologicalSpace G] [MeasurableSpace G] (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G) (s : ℝ) :
     (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logModule m x))⁻¹) =
-      sobolevMeasure μ (modulatedSobolevWeight m) (-s) := by sorry
+      sobolevMeasure μ (modulatedSobolevWeight m) (-s) := by
+  unfold sobolevMeasure
+  congr 1
+  funext x
+  have hw : ((modulatedSobolevWeight m x : ℝ≥0) : ℝ) ^ 2 = Real.log ((m x).val : ℝ) ^ 2 :=
+    sq_abs _
+  have h : (0 : ℝ) ≤ 1 + Real.log ((m x).val : ℝ) ^ 2 := by positivity
+  rw [hw, neg_div, Real.rpow_neg h]
+  simp [intervalSobolevDensity]
 
 /-- Paper: Definition 9.2.1.1, p. 404. The b-line density and the density of the base
 interval {b} in degree 2N bound each other, so the two spaces have the same elements and

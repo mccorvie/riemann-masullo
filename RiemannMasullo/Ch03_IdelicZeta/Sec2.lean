@@ -262,11 +262,6 @@ is the archimedean gamma factor times Mathlib's finite Hecke L-series. -/
 def completedHeckeL (χ : U[F]) (s : halfPlane) : ℂ :=
   heckeGammaFactor χ s * χ₀(χ).LSeries s
 
-/-- Paper: Proposition 3.2.1.3, p. 123. The completed Hecke L-function extends
-meromorphically to the complex plane. We use Mathlib's normal form at poles. -/
-theorem completedHeckeL_exists_continuation (χ : U[F]) :
-    ∃ L : ℂ → ℂ, MeromorphicNFOn L univ ∧ ∀ s : halfPlane, L s = completedHeckeL χ s := by sorry
-
 /-- Paper: Proposition 3.2.1.3(1), p. 123. When the restriction to norm-one
 classes is nontrivial, the continuation is entire. -/
 theorem completedHeckeL_continuation_entire (χ : U[F]) (L : ℂ → ℂ)
@@ -687,6 +682,53 @@ the global Z-function is in meromorphic normal form. -/
 theorem globalIdelicZFunction_meromorphic (f : ℬ[F]) (χ : U[F]) :
     MeromorphicNFOn (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) univ :=
   (globalIdelicZetaIntegral_exists_continuation f).choose_spec.1 χ
+
+local notation "archimedeanZeta" =>
+  fun (f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) (c : 𝒳[F]) ↦
+    ∫ g : (SAdeleRing F ∅)ˣ, f (Multiplicative.ofAdd (Units.val g)) *
+      c (classOf (sIdeleInsertion F ∅ g)) ∂sMultiplicativeTamagawaMeasure F ∅
+
+/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. The archimedean test function
+given by the product of the local Gaussians has zeta integral equal to the gamma
+factor of the unitary character in the half-plane of absolute convergence.
+Deviation: The complex monomial is chosen with angular weight opposite to the character. -/
+theorem exists_archimedeanHeckeTest (χ : U[F]) :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)), ∀ s : halfPlane,
+      archimedeanZeta f (ideleClassNormTwist χ s) = heckeGammaFactor χ s := by
+  sorry
+
+/-- Paper: Equations (3.4.3.7)–(3.4.3.9), p. 152. Tensoring an archimedean test
+with integer-ring indicators at unramified places and inverse character weights
+on integer units at ramified places contributes the finite Hecke Euler product.
+Deviation: The finite integer-unit Tamagawa masses give a nonzero scalar independent of `s`. -/
+theorem exists_globalHeckeTest (χ : U[F])
+    (fArch : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) :
+    ∃ (f : ℬ[F]) (a : ℂ), a ≠ 0 ∧ ∀ s : halfPlane,
+      globalIdelicZetaIntegral f (ideleClassNormTwist χ s) =
+        a * (archimedeanZeta fArch (ideleClassNormTwist χ s) * finiteHeckeL χ s) := by
+  sorry
+
+/-- Paper: Proposition 3.2.1.3, p. 123. The completed Hecke L-function extends
+meromorphically to the complex plane. We use Mathlib's normal form at poles. -/
+theorem completedHeckeL_exists_continuation (χ : U[F]) :
+    ∃ L : ℂ → ℂ, MeromorphicNFOn L univ ∧ ∀ s : halfPlane, L s = completedHeckeL χ s := by
+  obtain ⟨fArch, hArch⟩ := exists_archimedeanHeckeTest χ
+  obtain ⟨f, a, ha, hf⟩ := exists_globalHeckeTest χ fArch
+  refine ⟨fun s ↦ a⁻¹ * globalIdelicZFunction f (ideleClassNormTwist χ s), ?_, ?_⟩
+  · exact (meromorphicNFOn_fun_const_smul_iff_meromorphicNFOn (inv_ne_zero ha)).2
+      (globalIdelicZFunction_meromorphic f χ)
+  · intro s
+    have hσ := quasiCharacterAbscissa_of_unitary_twist (ideleClassNorm F)
+      (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F))
+      (ideleClassNormTwist χ s) χ s (fun _ ↦ rfl)
+    have hs : ideleClassNormTwist χ s ∈ rightHalf := by
+      change 1 < quasiCharacterAbscissa (ideleClassNorm F) _ _ _
+      rw [hσ]
+      exact s.property
+    change a⁻¹ * globalIdelicZFunction f (ideleClassNormTwist χ s) = completedHeckeL χ s
+    rw [globalIdelicZFunction_eq_integral f hs, hf s, hArch s, ← mul_assoc,
+      inv_mul_cancel₀ ha, one_mul]
+    rfl
 
 /-- Paper: Theorem 3.2.2.1(1)(a), p. 124. The global Z-function is analytic
 away from the trivial character and the norm, where it has at most simple poles. -/

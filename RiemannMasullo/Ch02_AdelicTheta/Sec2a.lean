@@ -920,7 +920,11 @@ theorem adelicAverage_stage_summable_norm
     (s : SchwartzBruhatStage e) (g : 𝕀[F]) (x : 𝔸[F]) :
     Summable (fun ξ : Fˣ ↦
       ‖schwartzBruhatStageRealization a e s
-        (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + x)))‖) := by sorry
+        (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + x)))‖) := by
+  let f : ℬ[F] := schwartzBruhatStageInclusion a e s
+  have hK : IsCompact ({(g, x)} : Set (𝕀[F] × 𝔸[F])) := isCompact_singleton
+  have h := adelicAverage_summableUniformlyOn (F := F) f _ hK
+  simpa only [f, schwartzBruhatStageInclusion_apply] using h.summable (Set.mem_singleton (g, x))
 
 /-- Paper: Lemma 2.2.2.1(1), p. 77. Adding the term at `ξ = 0` to the adelic
 average gives the sum over all field elements. -/

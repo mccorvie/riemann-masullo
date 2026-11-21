@@ -1344,6 +1344,62 @@ theorem vectorContDiffOn_iff_weakDirectional {Ω : Set V} (hΩ : IsOpen Ω)
     exact ⟨D, hasStrongDifferentialOn_of_basepoint_continuous_directional hΩ hd hD
       (fun _ ↦ hc.comp (continuous_id.prodMk continuous_const))⟩
 
+open scoped Uniformity in
+omit [ContinuousSMul ℂ E] [T2Space E] in
+/-- Scalar `C¹` extensions bound the vector difference quotients on any closed ball
+in the extension domain, giving uniform continuity on the part where they agree with
+the scalar evaluations. -/
+private theorem uniformContinuousOn_of_scalar_extensions
+    {Ω S : Set k} (hΩ : IsOpen Ω) {x : k} {r : ℝ} (hball : Metric.closedBall x r ⊆ Ω)
+    (hS : S ⊆ Metric.closedBall x r) {f : k → E}
+    (hf : ∀ φ : StrongDual ℂ E, ∃ g : k → ℂ, ContDiffOn k 1 g Ω ∧ EqOn g (φ ∘ f) S) :
+    letI := IsTopologicalAddGroup.rightUniformSpace E
+    UniformContinuousOn f S := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let c (p : k × k) : ℂ := algebraMap k ℂ (p.2 - p.1)
+  let q (p : k × k) : E := (c p)⁻¹ • (f p.2 - f p.1)
+  let D := q '' (S ×ˢ S)
+  have hD : IsVonNBounded ℂ D := by
+    apply isVonNBounded_of_dual_bounded
+    intro φ
+    obtain ⟨g, hg, heq⟩ := hf φ
+    obtain ⟨C, hC⟩ := ((isCompact_closedBall x r).image_of_continuousOn
+      ((hg.continuousOn_deriv_of_isOpen hΩ le_rfl).mono hball)).isBounded.exists_norm_le
+    refine ⟨max C 0, ?_⟩
+    rintro _ ⟨⟨u, v⟩, ⟨hu, hv⟩, rfl⟩
+    rcases eq_or_ne v u with rfl | hne
+    · simp [q]
+    have hmean := (convex_closedBall x r).norm_image_sub_le_of_norm_deriv_le
+      (f := g) (C := max C 0)
+      (fun w hw ↦ (hg.differentiableOn_one w (hball hw)).differentiableAt
+        (hΩ.mem_nhds (hball hw)))
+      (fun w hw ↦ (hC _ (mem_image_of_mem _ hw)).trans (le_max_left _ _)) (hS hu) (hS hv)
+    have hpos : 0 < ‖v - u‖ := norm_pos_iff.mpr (sub_ne_zero.mpr hne)
+    change ‖φ ((algebraMap k ℂ (v - u))⁻¹ • (f v - f u))‖ ≤ max C 0
+    rw [map_smul, map_sub φ, norm_smul, norm_inv, norm_algebraMap',
+      ← show g v = φ (f v) from heq hv, ← show g u = φ (f u) from heq hu]
+    exact (inv_mul_le_iff₀ hpos).mpr (by simpa only [mul_comm] using hmean)
+  let l := 𝓤 k ⊓ 𝓟 (S ×ˢ S)
+  have hc' : Tendsto (fun p : k × k ↦ p.2 - p.1) l (𝓝 0) := by
+    apply Tendsto.mono_left _ (inf_le_left : l ≤ 𝓤 k)
+    rw [uniformity_eq_comap_nhds_zero]
+    exact tendsto_comap
+  have hc : Tendsto c l (𝓝 0) := by
+    simpa only [c, Function.comp_def, map_zero] using
+      ((continuous_algebraMap k ℂ).tendsto 0).comp hc'
+  have hq : ∀ᶠ p in l, q p ∈ D :=
+    mem_of_superset (le_principal_iff.mp (inf_le_right : l ≤ 𝓟 (S ×ˢ S)))
+      fun p hp ↦ mem_image_of_mem q hp
+  rw [UniformContinuousOn, uniformity_eq_comap_nhds_zero E, tendsto_comap_iff]
+  apply (hD.smul_tendsto_zero hq hc).congr
+  rintro ⟨u, v⟩
+  rcases eq_or_ne v u with rfl | hne
+  · simp [q]
+  · have hne' : c (u, v) ≠ 0 := by
+      simpa only [c, map_zero] using (algebraMap k ℂ).injective.ne (sub_ne_zero.mpr hne)
+    exact smul_inv_smul₀ hne' _
+
 /-- Paper: Lemma C.5.1.22, p. 732. If all scalar evaluations extend with one
 continuous derivative, the vector-valued function extends uniquely as a continuous map
 on the open domain and that extension is weakly continuously differentiable.
@@ -1355,7 +1411,64 @@ theorem exists_weaklyContDiffOn_extension_puncture {Ω : Set k} (hΩ : IsOpen Ω
     letI := IsTopologicalAddGroup.rightUniformSpace E
     QuasiCompleteSpace ℂ E →
       ∃ F : k → E, ContinuousOn F Ω ∧ EqOn F f (Ω \ {x₀}) ∧ WeaklyContDiffOn k F Ω ∧
-        ∀ G : k → E, ContinuousOn G Ω → EqOn G f (Ω \ {x₀}) → EqOn G F Ω := by sorry
+        ∀ G : k → E, ContinuousOn G Ω → EqOn G f (Ω \ {x₀}) → EqOn G F Ω := by
+  classical
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  intro hcomplete
+  let S := Ω \ {x₀}
+  have hS : IsOpen S := hΩ.sdiff isClosed_singleton
+  have hlocal {x : k} {r : ℝ} {T : Set k} (hball : Metric.closedBall x r ⊆ Ω)
+      (hT : T ⊆ Metric.closedBall x r) (hTS : T ⊆ S) : UniformContinuousOn f T :=
+    uniformContinuousOn_of_scalar_extensions hΩ hball hT fun φ ↦
+      (hf φ).2.imp fun _ ⟨hg, heq⟩ ↦ ⟨hg, heq.mono hTS⟩
+  have hcont : ContinuousOn f S := by
+    intro x hx
+    obtain ⟨r, hr, hb⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hS.mem_nhds hx)
+    exact ((hlocal (hb.trans sdiff_subset) Subset.rfl hb).continuousOn x
+      (Metric.mem_closedBall_self hr.le)).mono_of_mem_nhdsWithin
+        (mem_nhdsWithin_of_mem_nhds (Metric.closedBall_mem_nhds x hr))
+  let l := 𝓝[S] x₀
+  have hl : l.NeBot := by
+    change (𝓝[Ω ∩ {x₀}ᶜ] x₀).NeBot
+    rw [nhdsWithin_inter_of_mem (mem_nhdsWithin_of_mem_nhds (hΩ.mem_nhds hx₀))]
+    infer_instance
+  obtain ⟨r, hr, hb⟩ := Metric.nhds_basis_closedBall.mem_iff.mp (hΩ.mem_nhds hx₀)
+  let T := Metric.closedBall x₀ r ∩ S
+  have hT : T ∈ l :=
+    inter_mem (mem_nhdsWithin_of_mem_nhds (Metric.closedBall_mem_nhds x₀ hr)) self_mem_nhdsWithin
+  have hu := hlocal hb (T := T) inter_subset_left inter_subset_right
+  have hc : Cauchy (map f l) := by
+    refine cauchy_map_iff.mpr ⟨hl, hu.mono_left (le_inf ?_ ?_)⟩
+    · exact (Filter.prod_mono nhdsWithin_le_nhds nhdsWithin_le_nhds).trans cauchy_nhds.2
+    · rw [← prod_principal_principal]
+      exact Filter.prod_mono (le_principal_iff.mpr hT) (le_principal_iff.mpr hT)
+  have htb : TotallyBounded (f '' T) := by
+    rw [← range_domRestrict, ← image_univ]
+    have hsub : TotallyBounded (univ : Set T) :=
+      (totallyBounded_preimage isUniformEmbedding_subtype_val.isUniformInducing
+        (isCompact_closedBall x₀ r).totallyBounded).subset (fun y _ ↦ y.property.1)
+    exact hsub.image hu.restrict
+  obtain ⟨v, _, hv⟩ := hcomplete.quasiComplete (htb.isVonNBounded ℂ).closure
+    isClosed_closure (map f l) hc (le_principal_iff.mpr (mem_map.mpr
+      (mem_of_superset hT fun x hx ↦ subset_closure (mem_image_of_mem f hx))))
+  let F := update f x₀ v
+  have hF : ContinuousOn F Ω := continuousOn_update_iff.mpr ⟨hcont, fun _ ↦ hv⟩
+  have heq : EqOn F f S := fun x hx ↦ update_of_ne hx.2 _ _
+  have hdense : Ω ⊆ closure S := by
+    intro x hx
+    rcases eq_or_ne x x₀ with rfl | hne
+    · exact mem_closure_iff_nhdsWithin_neBot.mpr hl
+    · exact subset_closure ⟨hx, hne⟩
+  refine ⟨F, hF, heq, (weaklyContDiffOn_iff_scalar hΩ F).mpr ?_, ?_⟩
+  · intro φ
+    obtain ⟨g, hg, hgEq⟩ := (hf φ).2
+    have hscalar : EqOn (φ ∘ F) g S := fun x hx ↦
+      (congrArg φ (heq hx)).trans (hgEq hx).symm
+    exact hg.congr (hscalar.of_subset_closure (φ.continuous.comp_continuousOn hF)
+      hg.continuousOn sdiff_subset hdense)
+  · intro G hG hg
+    exact (hg.trans heq.symm).of_subset_closure hG hF sdiff_subset hdense
 
 end PartialDifferentials
 

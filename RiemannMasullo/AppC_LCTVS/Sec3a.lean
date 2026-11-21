@@ -8,9 +8,12 @@ public import Mathlib.Analysis.Normed.Operator.Compact.Basic
 public import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic
 import Mathlib.Analysis.LocallyConvex.StrongTopology
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Analysis.Normed.Operator.Compact.FiniteDimension
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Projection.Basic
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongDual
 import Mathlib.Topology.Algebra.InfiniteSum.Module
 import Mathlib.Topology.UniformSpace.Ascoli
 import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.Real
@@ -324,13 +327,106 @@ private theorem projectiveTensorToOperators_isUniformInducing (h : IsNuclearTVS 
 
 end TensorOperatorUniverse
 
+/-- A complete barrelled space with complete nuclear strong dual has the Heine–Borel
+property. Evaluation embeds it as a closed subspace of the bidual, where bounded
+sets of evaluations are contained in compact polars. -/
+private theorem montelSpace_of_nuclearStrongDual [CompleteSpace E] [ContinuousSMul ℂ E]
+    [BarrelledSpace ℂ E] [CompleteSpace (StrongDual ℂ E)]
+    (h : IsNuclearTVS (StrongDual ℂ E)) : MontelSpace ℂ E := by
+  let D := StrongDual ℂ E
+  let : PolynormableSpace ℂ D := h.2.1
+  let : T2Space D := h.1
+  let : ContinuousSMul ℂ D := PolynormableSpace.continuousSMul ℂ D
+  let : MontelSpace ℂ D := ⟨fun S hS hbounded ↦
+    ((isPrecompactInCompletion_iff_totallyBounded S).mp
+      (isPrecompactInCompletion_of_isNuclearTVS D h hbounded)).isCompact_of_isClosed hS⟩
+  let j : E →ₗ[ℂ] StrongDual ℂ D := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ)
+  have hj : IsEmbedding j := isEmbedding_strongBidual_eval
+  have hjUniform : IsUniformInducing j :=
+    AddMonoidHom.isUniformInducing_of_isInducing (β := StrongDual ℂ D) (f := j) hj.isInducing
+  have hjClosed : IsClosedEmbedding j := ⟨hj, hjUniform.isComplete_range.isClosed⟩
+  refine ⟨fun B hB hbounded ↦ ?_⟩
+  let U : Set D := {φ | ∀ x ∈ B, φ x ∈ Metric.ball 0 1}
+  have hU : U ∈ 𝓝 (0 : D) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo hbounded (Metric.ball_mem_nhds 0 one_pos)
+  refine (hjClosed.isCompact_preimage (isCompact_strongDual_polar hU)).of_isClosed_subset hB ?_
+  intro x hx φ hφ
+  exact (mem_ball_zero_iff.mp (hφ x hx)).le
+
+omit [T2Space E] in
+/-- Transposing a finite-rank operator on the strong dual exchanges its tensor factors,
+using evaluation to identify the strong bidual with the original space. -/
+private theorem tensorToFiniteRank_transpose [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (e : E ≃ₗ[ℂ] StrongDual ℂ (StrongDual ℂ E))
+    (he : ∀ (x : E) (φ : StrongDual ℂ E), e x φ = φ x)
+    (z : StrongDual ℂ (StrongDual ℂ E) ⊗[ℂ] StrongDual ℂ E)
+    (x : E) (φ : StrongDual ℂ E) :
+    φ (tensorToFiniteRank ((TensorProduct.map LinearMap.id e.symm.toLinearMap)
+      (TensorProduct.comm ℂ _ _ z)) x) =
+      tensorToFiniteRank (E := StrongDual ℂ E) (F := StrongDual ℂ E) z φ x := by
+  induction z using TensorProduct.inductionOn with
+  | tmul l ψ =>
+    simp only [TensorProduct.comm_tmul, TensorProduct.map_tmul, tensorToFiniteRank_tmul]
+    change φ (ψ x • e.symm l) = (l φ • ψ) x
+    rw [map_smul, smul_apply, smul_eq_mul, smul_eq_mul, mul_comm]
+    rw [← he, e.apply_symm_apply]
+  | add z w hz hw =>
+    simp only [map_add, add_apply, hz, hw]
+
 /-- Paper: Remark C.3.1.1, p. 693. If the strong dual of a complete barrelled
 space is complete and nuclear, finite-rank endomorphisms approximate the identity
 uniformly on bounded subsets of the source. -/
 theorem id_mem_closure_boundedFiniteRank_of_nuclearStrongDual [CompleteSpace E]
     [BarrelledSpace ℂ E] [CompleteSpace (StrongDual ℂ E)] (h : IsNuclearTVS (StrongDual ℂ E)) :
     (ContinuousLinearMap.id ℂ E : E →Lᵦ E) ∈
-      closure (range (projectiveTensorToOperators (E := E) (F := E))) := by sorry
+      closure (range (projectiveTensorToOperators (E := E) (F := E))) := by
+  let D := StrongDual ℂ E
+  let : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  let : PolynormableSpace ℂ D := h.2.1
+  let : T2Space D := h.1
+  let : MontelSpace ℂ E := montelSpace_of_nuclearStrongDual h
+  let j := ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)
+  have hj : IsEmbedding j := isEmbedding_strongBidual_eval
+  let e := LinearEquiv.ofBijective j ⟨hj.injective, surjective_strongBidual_eval⟩
+  let I : E →Lᵦ E := ContinuousLinearMap.id ℂ E
+  have htr : 𝓝 I = comap (fun T : E →Lᵦ E ↦ T - I) (𝓝 0) := by
+    simpa only [sub_eq_add_neg] using (nhds_translation_add_neg I).symm
+  let S : Set (Set E) := {B | IsVonNBounded ℂ B}
+  have hS : DirectedOn (· ⊆ ·) S := directedOn_of_sup_mem fun _ _ ↦ IsVonNBounded.union
+  have hbasis := UniformConvergenceCLM.hasBasis_nhds_zero (RingHom.id ℂ) E S
+    ⟨∅, isVonNBounded_empty ℂ E⟩ hS
+  rw [show (ContinuousLinearMap.id ℂ E : E →Lᵦ E) = I from rfl]
+  refine (mem_closure_iff_nhds_basis (htr ▸ hbasis.comap _)).mpr ?_
+  rintro ⟨B, U⟩ ⟨hB, hU⟩
+  -- Test the error in the bidual on a bounded set of functionals.
+  have hj0 : 𝓝 (0 : E) = comap j (𝓝 (0 : StrongDual ℂ D)) := by
+    simpa only [map_zero] using hj.isInducing.nhds_eq_comap (0 : E)
+  rw [hj0] at hU
+  obtain ⟨⟨A, r⟩, ⟨hA, hr⟩, hsmall⟩ :=
+    ((ContinuousLinearMap.hasBasis_nhds_zero_of_basis
+      (σ := RingHom.id ℂ) (E := D) Metric.nhds_basis_ball).comap j).mem_iff.mp hU
+  let V : Set D := {φ | ∀ x ∈ B, φ x ∈ Metric.ball 0 r}
+  have hV : V ∈ 𝓝 (0 : D) :=
+    ContinuousLinearMap.eventually_nhds_zero_mapsTo hB (Metric.ball_mem_nhds 0 hr)
+  let J := ContinuousLinearMap.id ℂ D
+  have hnear : ∀ᶠ T : D →L[ℂ] D in 𝓝 J, ∀ φ ∈ A, (T - J) φ ∈ V := by
+    rw [← nhds_translation_add_neg J]
+    exact preimage_mem_comap
+      (ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) hA hV)
+  have hd := dense_finiteRank_boundedConvergence_of_isNuclearTVS D h D J
+  obtain ⟨_, ⟨z, rfl⟩, hz⟩ :=
+    ((mem_closure_iff_frequently.mp hd).and_eventually hnear).exists
+  -- The transposed approximant has the same scalar errors on these two bounded sets.
+  let w : ProjectiveTensor (StrongDual ℂ E) E :=
+    TensorProduct.map LinearMap.id e.symm.toLinearMap (TensorProduct.comm ℂ _ _ z)
+  refine ⟨projectiveTensorToOperators w, ⟨w, rfl⟩, ?_⟩
+  intro x hx
+  apply hsmall
+  intro φ hφ
+  have hzx := hz φ hφ x hx
+  change φ (tensorToFiniteRank w x - x) ∈ Metric.ball 0 r
+  rw [map_sub, tensorToFiniteRank_transpose e (fun _ _ ↦ rfl) z]
+  exact hzx
 
 /-- Postcomposition carries bounded convergence approximation of the identity by
 finite-rank operators to approximation of any continuous linear map. -/
@@ -1308,9 +1404,6 @@ variable {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
   [AddCommGroup F] [Module ℂ F] [UniformSpace F] [IsUniformAddGroup F]
   [PolynormableSpace ℂ F] [T2Space F]
 
-local notation "ApproxProp" X => DenseRange (tensorToFiniteRank (E := X) (F := X) :
-  StrongDual ℂ X ⊗[ℂ] X → PrecompactConvergenceCLM X X)
-
 omit [T2Space E] in
 /-- Inserting an operator into the scalar series of a presentation gives a continuous
 additive functional for the topology of uniform convergence on bounded sets. -/
@@ -1449,7 +1542,7 @@ private theorem NuclearPresentation.hasSum_tracePairing_tmul {A : E →L[ℂ] E}
 /-- Paper: Proposition C.3.2.1, p. 694. On a space with the approximation property,
 every presentation of the same nuclear endomorphism gives an absolutely convergent
 scalar series with the same sum. -/
-theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
+theorem exists_nuclearTrace_hasSum (hE : HasApproximationProperty E) (A : E →L[ℂ] E)
     (hA : IsNuclearOperator A) :
     ∃! z : ℂ, ∀ r : NuclearPresentation A,
       Summable (fun n ↦ ‖r.coeff n * r.functional n (r.vector n)‖) ∧
@@ -1459,17 +1552,13 @@ theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
   let I : PrecompactConvergenceCLM E E := ContinuousLinearMap.id ℂ E
   refine ⟨L I, fun s ↦ ?_, fun z hz ↦ (hz r).2.unique (hL I).2⟩
   obtain ⟨M, hM⟩ := s.exists_tracePairing
-  -- The coercion in `ApproxProp` makes `DenseRange` use bounded convergence.
-  let S : Set (Set E) := {U | IsPrecompactInCompletion U}
-  let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E S
-  have hj : Continuous j :=
-    ContinuousLinearMap.toUniformConvergenceCLM_continuous (RingHom.id ℂ) E S fun U hU ↦
-      ((isPrecompactInCompletion_iff_totallyBounded U).mp hU).isVonNBounded ℂ
-  have hclosed : IsClosed {T : E →L[ℂ] E | L (j T) = M (j T)} :=
-    isClosed_eq (L.continuous.comp hj) (M.continuous.comp hj)
+  have hclosed : IsClosed {T : PrecompactConvergenceCLM E E | L T = M T} :=
+    isClosed_eq L.continuous M.continuous
   have hLM : L I = M I := by
     refine hclosed.closure_subset_iff.mpr ?_ (hE I)
     rintro _ ⟨t, rfl⟩
+    let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E
+      {s : Set E | IsPrecompactInCompletion s}
     change L (j (tensorToFiniteRank t)) = M (j (tensorToFiniteRank t))
     induction t using TensorProduct.inductionOn with
     | tmul φ x =>
@@ -1481,13 +1570,13 @@ theorem exists_nuclearTrace_hasSum (hE : ApproxProp E) (A : E →L[ℂ] E)
 
 /-- Paper: (C.3.2.2), p. 694. The nuclear trace is the sum of the scalar series
 from any nuclear presentation on a space with the approximation property. -/
-def nuclearTrace (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A) : ℂ :=
+def nuclearTrace (hE : HasApproximationProperty E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A) : ℂ :=
   (exists_nuclearTrace_hasSum hE A hA).exists.choose
 
 /-- Paper: (C.3.2.2), p. 694. The trace of a rank-one operator is the value
 of its functional at its spanning vector.
 Deviation: This is a check of the trace formula on one term. -/
-theorem nuclearTrace_smulRight (hE : ApproxProp E) (φ : E →L[ℂ] ℂ) (y : E) :
+theorem nuclearTrace_smulRight (hE : HasApproximationProperty E) (φ : E →L[ℂ] ℂ) (y : E) :
     nuclearTrace hE (φ.smulRight y) (isNuclearOperator_smulRight φ y) = φ y := by
   obtain ⟨r, hc, hφ, hy, htail⟩ := nuclearPresentation_smulRight φ y 1 one_ne_zero
   have htrace := ((exists_nuclearTrace_hasSum hE (φ.smulRight y)
@@ -1741,7 +1830,7 @@ theorem isNuclearOperator_conj (A : E →L[ℂ] E) (hA : IsNuclearOperator A) (T
 
 /-- Paper: Proposition C.3.2.1, p. 694. The nuclear trace is invariant
 under conjugation by a continuous linear automorphism. -/
-theorem nuclearTrace_conj (hE : ApproxProp E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A)
+theorem nuclearTrace_conj (hE : HasApproximationProperty E) (A : E →L[ℂ] E) (hA : IsNuclearOperator A)
     (T : E ≃L[ℂ] E) :
     nuclearTrace hE A hA =
       nuclearTrace hE _ (isNuclearOperator_conj A hA T) := by
@@ -1768,7 +1857,7 @@ theorem isNuclearOperator_factor_comps (T : E →L[ℂ] F) (hT : Injective T)
 /-- Paper: Lemma C.3.2.2, p. 695. A nuclear map followed by an injection has
 the same trace as the reverse composition when both spaces have the approximation property.
 Deviation: The given endomorphism is written as its factorization. -/
-theorem nuclearTrace_factor_comps (hE : ApproxProp E) (hF : ApproxProp F)
+theorem nuclearTrace_factor_comps (hE : HasApproximationProperty E) (hF : HasApproximationProperty F)
     (T : E →L[ℂ] F) (hT : Injective T) (A₀ : F →L[ℂ] E) (hA₀ : IsNuclearOperator A₀) :
     nuclearTrace hE (A₀.comp T) (isNuclearOperator_factor_comps T hT A₀ hA₀).1 =
       nuclearTrace hF (T.comp A₀) (isNuclearOperator_factor_comps T hT A₀ hA₀).2 := by
@@ -1823,9 +1912,52 @@ theorem metrizableSpace_bounded_pointwiseOperators [SeparableSpace H]
 -- pointwiseConvergenceCLM_withSeminorms and hilbert_pointwiseOperators_quasiComplete.
 
 /-- Paper: §C.3.4, p. 697. Hilbert spaces have the approximation property. -/
-theorem hilbert_approximationProperty :
-    DenseRange (tensorToFiniteRank (E := H) (F := H) :
-      StrongDual ℂ H ⊗[ℂ] H → PrecompactConvergenceCLM H H) := by sorry
+theorem hilbert_approximationProperty : HasApproximationProperty H := by
+  classical
+  apply (id_mem_closure_finiteRank_iff_dense H).mp
+  let S := {s : Set H | IsPrecompactInCompletion s}
+  have hpre (s : Set H) : s ∈ S ↔ TotallyBounded s := isPrecompactInCompletion_iff_totallyBounded s
+  have hS : S.Nonempty := ⟨∅, (hpre ∅).2 totallyBounded_empty⟩
+  have hdir : DirectedOn (· ⊆ ·) S := directedOn_of_sup_mem fun s t hs ht ↦
+    (hpre _).2 (((hpre s).1 hs).union ((hpre t).1 ht))
+  have hb := UniformConvergenceCLM.hasBasis_nhds_zero_of_basis (RingHom.id ℂ) H S hS hdir
+    (Metric.nhds_basis_ball (x := (0 : H)))
+  apply (mem_closure_iff_nhds_basis (hb.nhds_of_zero (ContinuousLinearMap.id ℂ H))).mpr
+  rintro ⟨s, ε⟩ ⟨hs, hε⟩
+  -- Projection onto the span of a finite ε-net approximates the identity on s.
+  obtain ⟨t, ht, hcover⟩ := Metric.totallyBounded_iff.mp ((hpre s).mp hs) ε hε
+  let V := Submodule.span ℂ t
+  let : FiniteDimensional ℂ V := FiniteDimensional.span_of_finite ℂ ht
+  let b := stdOrthonormalBasis ℂ V
+  refine ⟨V.starProjection, ⟨∑ i, (innerSL ℂ (b i : H)) ⊗ₜ[ℂ] (b i : H), ?_⟩, ?_⟩
+  · change tensorToFiniteRank _ = V.starProjection
+    rw [map_sum, b.starProjection_eq_sum_rankOne]
+    rfl
+  · intro x hx
+    obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover hx)
+    change dist (V.starProjection x - x) 0 < ε
+    rw [dist_zero_right, ← dist_eq_norm, dist_comm, V.dist_starProjection_eq_infDist]
+    exact (Metric.infDist_le_dist_of_mem (Submodule.subset_span hy : y ∈ V)).trans_lt hxy
+
+/-- Paper: §C.3.4, p. 697. On an infinite-dimensional Hilbert space finite-rank operators
+are not dense in operator norm.
+Deviation: This checks that operator-norm density is strictly stronger than the approximation property. -/
+theorem hilbert_not_denseRange_finiteRank_opNorm (hinf : ¬ FiniteDimensional ℂ H) :
+    ¬ DenseRange (X := H →L[ℂ] H) (fun z ↦ tensorToFiniteRank z) := by
+  intro h
+  apply hinf
+  apply FiniteDimensional.of_isCompactOperator_id
+  apply isClosed_setOfPred_isCompactOperator.closure_subset_iff.mpr ?_
+    (h (ContinuousLinearMap.id ℂ H))
+  rintro _ ⟨z, rfl⟩
+  change IsCompactOperator (tensorToFiniteRank z)
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+    exact (isCompactOperator_of_locallyCompactSpace_rng
+      (ContinuousLinearMap.toSpanSingleton ℂ y)).comp_clm φ
+  | add z w hz hw =>
+    rw [map_add]
+    exact hz.add hw
 
 /-- Paper: Lemma C.3.4.1(1), p. 697. The diagonal of a nuclear endomorphism
 is absolutely summable in any Hilbert basis, including an uncountable basis.
@@ -2593,13 +2725,65 @@ theorem tensorToFiniteRank_mem_nuclearEndomorphisms (z : StrongDual ℂ H ⊗[�
     exact tensorToFiniteRank_tmul φ y x
   | add z w hz hw => rw [map_add]; exact add_mem hz hw
 
+/-- The trace norm of a nuclear series is bounded by the sum of its rank-one costs. -/
+private theorem traceNorm_le_tsum_rankOne_cost (T : nuclearEndomorphisms H)
+    (a : ℕ → ℂ) (φ : ℕ → H →L[ℂ] ℂ) (y : ℕ → H)
+    (hcost : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖y n‖)))
+    (hseries : ∀ x, HasSum (fun n ↦ (a n * φ n x) • y n) (T.val x)) :
+    traceNorm T ≤ ∑' n, ‖a n‖ * (‖φ n‖ * ‖y n‖) := by
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  obtain ⟨U, hU, hUS⟩ := exists_contraction_comp_eq_of_norm_le T.val S
+    (fun x ↦ (norm_sqrt_adjoint_mul_apply T.val x).le)
+  have hnorm (n : ℕ) : ‖U (y n)‖ ≤ ‖y n‖ :=
+    (U.le_opNorm (y n)).trans (mul_le_of_le_one_left (norm_nonneg _) hU)
+  have hle (n : ℕ) : ‖a n‖ * (‖φ n‖ * ‖U (y n)‖) ≤ ‖a n‖ * (‖φ n‖ * ‖y n‖) :=
+    mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left (hnorm n) (norm_nonneg _))
+      (norm_nonneg _)
+  have hcostU : Summable (fun n ↦ ‖a n‖ * (‖φ n‖ * ‖U (y n)‖)) :=
+    hcost.of_nonneg_of_le (fun _ ↦ by positivity) hle
+  have hseriesS (x : H) : HasSum (fun n ↦ (a n * φ n x) • U (y n)) (S x) := by
+    rw [← hUS]
+    simpa only [ContinuousLinearMap.comp_apply, map_smul] using U.hasSum (hseries x)
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  have hS := isNuclearOperator_sqrt_adjoint_mul T.val T.property
+  have hre := Complex.reCLM.hasSum (summable_norm_hilbertDiagonal b S hS).of_norm.hasSum
+  simp only [Complex.reCLM_apply] at hre
+  rw [(hasSum_traceNorm_diagonal b T).unique hre,
+    tsum_hilbertDiagonal_eq_series b S a φ (fun n ↦ U (y n)) hcostU hseriesS]
+  have hentry (n : ℕ) : ‖a n * φ n (U (y n))‖ ≤ ‖a n‖ * (‖φ n‖ * ‖y n‖) := by
+    rw [norm_mul]
+    exact (mul_le_mul_of_nonneg_left ((φ n).le_opNorm (U (y n))) (norm_nonneg _)).trans (hle n)
+  exact (Complex.re_le_norm _).trans
+    ((hcost.of_norm_bounded hentry).hasSum.norm_le_of_bounded hcost.hasSum hentry)
+
 /-- Paper: Lemma C.3.4.4(4), p. 698. Finite-rank operators from the canonical
 tensor map approximate every nuclear endomorphism in trace norm. -/
 theorem exists_tensorToFiniteRank_traceNorm_sub_lt (T : nuclearEndomorphisms H)
     {ε : ℝ} (hε : 0 < ε) :
     ∃ z : StrongDual ℂ H ⊗[ℂ] H,
-      traceNorm (T - ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩) < ε :=
-  by sorry
+      traceNorm (T - ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩) < ε := by
+  obtain ⟨a, φ, y, ha, hφ, hy, hseries⟩ := (isNuclearOperator_iff_isBanachNuclear T.val).mp T.property
+  obtain ⟨C, hC, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  obtain ⟨R, _, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+  let cost (n : ℕ) := ‖a n‖ * (‖φ n‖ * ‖y n‖)
+  have hcost : Summable cost := by
+    have hnonneg (n : ℕ) : 0 ≤ cost n := by
+      dsimp [cost]
+      positivity
+    refine (ha.mul_right (C * R)).of_nonneg_of_le hnonneg fun n ↦ ?_
+    exact mul_le_mul_of_nonneg_left
+      (mul_le_mul (hφC _ (mem_range_self n)) (hyR _ (mem_range_self n))
+        (norm_nonneg _) hC.le) (norm_nonneg _)
+  obtain ⟨N, hN⟩ := ((tendsto_sum_nat_add cost).eventually_lt_const hε).exists
+  let z : StrongDual ℂ H ⊗[ℂ] H := ∑ n ∈ Finset.range N, a n • (φ n ⊗ₜ[ℂ] y n)
+  refine ⟨z, lt_of_le_of_lt (traceNorm_le_tsum_rankOne_cost _
+    (fun n ↦ a (n + N)) (fun n ↦ φ (n + N)) (fun n ↦ y (n + N))
+    ((summable_nat_add_iff N).mpr hcost) ?_) hN⟩
+  intro x
+  change HasSum (fun n ↦ (a (n + N) * φ (n + N) x) • y (n + N))
+    (T.val x - tensorToFiniteRank z x)
+  simpa only [z, map_sum, sum_apply, map_smul, smul_apply, tensorToFiniteRank_tmul, mul_smul] using
+    (hasSum_nat_add_iff' N).mpr (hseries x)
 
 /-- Paper: Lemma C.3.4.4(4), p. 698. On a separable Hilbert space there is a
 countable trace-norm dense set of nuclear endomorphisms.

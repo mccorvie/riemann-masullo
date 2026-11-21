@@ -1328,7 +1328,12 @@ the inverse Mellin integral evaluated at one.
 Deviation: Sanity check for orientation and normalization. -/
 theorem verticalLineIntegral_div_eq_mellinInv_one (Φ : ℂ → ℂ) (σ : ℝ)
     (hΦ : Complex.VerticalIntegrable Φ σ) :
-    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by sorry
+    verticalLineIntegral Φ σ / (2 * (Real.pi : ℂ) * Complex.I) = mellinInv σ Φ 1 := by
+  unfold verticalLineIntegral mellinInv
+  simp only [Complex.ofReal_one, Complex.one_cpow, one_smul]
+  rw [Complex.real_smul]
+  push_cast
+  field_simp
 
 local notation "cauchyKernel" =>
   (fun (Φ : ℂ → ℂ) (N : ℕ) (z s : ℂ) ↦ Φ s / (s - z) ^ (N + 1))

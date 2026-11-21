@@ -3361,12 +3361,114 @@ variable (E F : Type*) [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUnifo
   [PolynormableSpace ℂ E] [T2Space E] [AddCommGroup F] [Module ℂ F] [UniformSpace F]
   [IsUniformAddGroup F] [PolynormableSpace ℂ F] [T2Space F]
 
+omit [T2Space E] [T2Space F] in
+/-- The canonical bilinear map to the completed projective tensor product extends
+jointly continuously to both completed factors. -/
+private theorem exists_completedProjectiveTensor_bilinear :
+    ∃ B : Completion E →ₗ[ℂ] Completion F →ₗ[ℂ] Completion (ProjectiveTensor E F),
+      Continuous (fun v : Completion E × Completion F ↦ B v.1 v.2) ∧
+      ∀ (x : E) (y : F), B x y =
+        Completion.coe' (α := ProjectiveTensor E F) (x ⊗ₜ[ℂ] y) := by
+  let G := Completion (ProjectiveTensor E F)
+  let L : E →ₗ[ℂ] F →ₗ[ℂ] G :=
+    (TensorProduct.mk ℂ E F).compr₂
+      (Completion.toComplL : ProjectiveTensor E F →L[ℂ] G).toLinearMap
+  let A : E →+ F →+ G := LinearMap.toAddMonoidHom'.comp L.toAddMonoidHom
+  have hA : Continuous (fun v : E × F ↦ A v.1 v.2) :=
+    (Completion.continuous_coe (ProjectiveTensor E F)).comp continuous_projectiveTensor_tmul
+  let de : IsDenseInducing ((↑) : E → Completion E) := Completion.isDenseInducing_coe
+  let df : IsDenseInducing ((↑) : F → Completion F) := Completion.isDenseInducing_coe
+  let b := (de.prodMap df).extend (fun v : E × F ↦ A v.1 v.2)
+  have hb : Continuous b :=
+    IsDenseInducing.extend_Z_bilin (e := Completion.toCompl) (f := Completion.toCompl) de df hA
+  have hcoe (x : E) (y : F) : b (x, y) = L x y :=
+    (de.prodMap df).extend_eq hA (x, y)
+  -- Each bilinearity identity extends from the dense image by continuity.
+  refine ⟨LinearMap.mk₂ ℂ (fun x y ↦ b (x, y)) ?_ ?_ ?_ ?_, hb, hcoe⟩
+  · intro x x' y
+    refine Completion.induction_on₃ x x' y (isClosed_eq ?_ ?_) fun a a' c ↦ ?_
+    · exact hb.comp ((continuous_fst.add continuous_snd.fst).prodMk continuous_snd.snd)
+    · exact (hb.comp (continuous_fst.prodMk continuous_snd.snd)).add
+        (hb.comp (continuous_snd.fst.prodMk continuous_snd.snd))
+    · rw [← Completion.coe_add a a']
+      simp only [hcoe, map_add, LinearMap.add_apply]
+  · intro c x y
+    refine Completion.induction_on₂ x y (isClosed_eq ?_ ?_) fun a d ↦ ?_
+    · exact hb.comp ((continuous_fst.const_smul c).prodMk continuous_snd)
+    · exact hb.fun_const_smul c
+    · rw [← Completion.coe_smul c a]
+      simp only [hcoe, map_smul, LinearMap.smul_apply]
+  · intro x y y'
+    refine Completion.induction_on₃ x y y' (isClosed_eq ?_ ?_) fun a d d' ↦ ?_
+    · exact hb.comp (continuous_fst.prodMk (continuous_snd.fst.add continuous_snd.snd))
+    · exact (hb.comp (continuous_fst.prodMk continuous_snd.fst)).add
+        (hb.comp (continuous_fst.prodMk continuous_snd.snd))
+    · rw [← Completion.coe_add d d']
+      simp only [hcoe, map_add]
+  · intro c x y
+    refine Completion.induction_on₂ x y (isClosed_eq ?_ ?_) fun a d ↦ ?_
+    · exact hb.comp (continuous_fst.prodMk (continuous_snd.const_smul c))
+    · exact hb.fun_const_smul c
+    · rw [← Completion.coe_smul c d]
+      simp only [hcoe, map_smul]
+
 /-- Paper: §C.2.3.2, p. 679. Completing the two factors induces an isomorphism on
 completed projective tensors. -/
 theorem completedProjectiveTensor_completionFactors :
     IsHomeomorph (Completion.map (projectiveTensorMap
       (Completion.toComplL : E →L[ℂ] Completion E).toLinearMap
-      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by sorry
+      (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap)) := by
+  let X := ProjectiveTensor E F
+  let Y := ProjectiveTensor (Completion E) (Completion F)
+  let : PolynormableSpace ℂ (Completion E) := polynormableSpace_completion
+  let : PolynormableSpace ℂ (Completion F) := polynormableSpace_completion
+  let : PolynormableSpace ℂ (Completion X) := polynormableSpace_completion
+  let T : X →ₗ[ℂ] Y := projectiveTensorMap
+    (Completion.toComplL : E →L[ℂ] Completion E).toLinearMap
+    (Completion.toComplL : F →L[ℂ] Completion F).toLinearMap
+  have ht (x : E) (y : F) : T (x ⊗ₜ[ℂ] y) = (x : Completion E) ⊗ₜ[ℂ] (y : Completion F) :=
+    TensorProduct.map_tmul _ _ _ _
+  let forward : X →L[ℂ] Y := ⟨T, (continuous_projectiveTensor_iff T).2 (by
+    simp only [ht]
+    exact continuous_projectiveTensor_tmul.comp
+      ((Completion.continuous_coe E).prodMap (Completion.continuous_coe F)))⟩
+  obtain ⟨B, hB, hcoe⟩ := exists_completedProjectiveTensor_bilinear E F
+  let backward : Y →L[ℂ] Completion X :=
+    ⟨TensorProduct.lift B,
+      (continuous_projectiveTensor_iff (TensorProduct.lift B : Y →ₗ[ℂ] Completion X)).2 hB⟩
+  have hb (x : Completion E) (y : Completion F) : backward (x ⊗ₜ[ℂ] y) = B x y :=
+    TensorProduct.lift.tmul (f' := B) x y
+  change IsHomeomorph forward.completion
+  refine isHomeomorph_iff_exists_inverse.mpr
+    ⟨forward.completion.continuous, backward.fromCompletion, ?_, ?_,
+      backward.fromCompletion.continuous⟩
+  · have hleft : backward.toLinearMap.comp T =
+        (Completion.toComplL : X →L[ℂ] Completion X).toLinearMap := by
+      apply TensorProduct.ext'
+      intro x y
+      change backward (T (x ⊗ₜ[ℂ] y)) = _
+      rw [ht, hb]
+      exact hcoe x y
+    refine Completion.ext' (backward.fromCompletion.continuous.comp forward.completion.continuous)
+      continuous_id fun z : X ↦ ?_
+    simp only [ContinuousLinearMap.completion_apply_coe, ContinuousLinearMap.fromCompletion_apply_coe]
+    exact DFunLike.congr_fun hleft z
+  · have hright : forward.completion.toLinearMap.comp backward.toLinearMap =
+        (Completion.toComplL : Y →L[ℂ] Completion Y).toLinearMap := by
+      apply TensorProduct.ext'
+      intro x y
+      change forward.completion (backward (x ⊗ₜ[ℂ] y)) = Completion.coe' (α := Y) (x ⊗ₜ[ℂ] y)
+      rw [hb]
+      refine Completion.induction_on₂ x y
+        (isClosed_eq (forward.completion.continuous.comp hB)
+          ((Completion.continuous_coe Y).comp continuous_projectiveTensor_tmul)) fun a b ↦ ?_
+      rw [hcoe]
+      exact (forward.completion_apply_coe (a ⊗ₜ[ℂ] b)).trans
+        (congrArg (Completion.coe' (α := Y)) (ht a b))
+    refine Completion.ext' (forward.completion.continuous.comp backward.fromCompletion.continuous)
+      continuous_id fun z : Y ↦ ?_
+    simp only [ContinuousLinearMap.fromCompletion_apply_coe]
+    exact DFunLike.congr_fun hright z
 
 end ProjectiveCompletion
 
@@ -3411,11 +3513,60 @@ theorem projectiveTensorMap_continuous :
   change ContinuousAt ((fun w : G × H ↦ q.val (w.1 ⊗ₜ[ℂ] w.2)) ∘ fun v : E × F ↦ (f v.1, g v.2)) 0
   exact ContinuousAt.comp_of_eq q.property hfg.continuousAt (by simp)
 
+/-- A linear image of an absolutely convex set is absolutely convex. -/
+private theorem absConvex_linear_image {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    {S : Set X} (hS : AbsConvex ℂ S) (L : X →ₗ[ℂ] Y) : AbsConvex ℂ (L '' S) :=
+  ⟨hS.1.image L, hS.2.linear_image L⟩
+
+/-- The absolutely convex hull of a linear image sits inside the image of the hull. -/
+private theorem absConvexHull_subset_linear_image {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y]
+    (L : X →ₗ[ℂ] Y) (S : Set X) :
+    absConvexHull ℂ (L '' S) ⊆ L '' absConvexHull ℂ S :=
+  absConvexHull_min (image_mono subset_absConvexHull)
+    (absConvex_linear_image absConvex_absConvexHull L)
+
 include hf hg
 
 /-- Paper: §C.2.3.2, p. 679. Tensoring quotient maps gives a projective quotient map. -/
 theorem projectiveTensorMap_isQuotientMap :
-    IsQuotientMap (projectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    IsQuotientMap (projectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  let T := projectiveTensorMap f.toLinearMap g.toLinearMap
+  have hsurj : Function.Surjective T := by
+    intro z
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      obtain ⟨a, ha⟩ := hf.surjective x
+      obtain ⟨b, hb⟩ := hg.surjective y
+      exact ⟨a ⊗ₜ[ℂ] b, by rw [projectiveTensorMap_tmul, ha, hb]⟩
+    | add x y hx hy =>
+      obtain ⟨x, rfl⟩ := hx
+      obtain ⟨y, rfl⟩ := hy
+      exact ⟨x + y, map_add T x y⟩
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : IsTopologicalAddGroup F := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have hfOpen : IsOpenMap f :=
+    (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hf).isOpenMap
+  have hgOpen : IsOpenMap g :=
+    (AddMonoidHom.isOpenQuotientMap_of_isQuotientMap hg).isOpenMap
+  -- (C.2.3.15): a basic projective neighborhood is the absolutely convex hull of a product of
+  -- factor neighborhoods, and a quotient map sends those to neighborhoods.
+  have hopen : IsOpenMap T := by
+    rw [IsTopologicalAddGroup.isOpenMap_iff_nhds_zero, le_map_iff]
+    intro W hW
+    obtain ⟨U, V, hU, hV, hUV⟩ := projectiveTensor_nhds_superset_absConvexHull hW
+    have hFU : f '' U ∈ 𝓝 (0 : G) := by
+      simpa [map_zero f] using hfOpen.image_mem_nhds hU
+    have hGV : g '' V ∈ 𝓝 (0 : H) := by
+      simpa [map_zero g] using hgOpen.image_mem_nhds hV
+    have heq : T '' image2 (TensorProduct.tmul ℂ) U V =
+        image2 (TensorProduct.tmul ℂ) (f '' U) (g '' V) :=
+      image_image2_distrib fun x y => projectiveTensorMap_tmul f g x y
+    refine mem_of_superset (projectiveTensor_absConvexHull_mem_nhds hFU hGV) ?_
+    rw [← heq]
+    exact (absConvexHull_subset_linear_image T _).trans (image_mono hUV)
+  exact IsOpenMap.isQuotientMap hopen (projectiveTensorMap_continuous f g) hsurj
 
 /-- Paper: Proposition C.2.3.7, p. 679. The extension to completions is a quotient map
 onto its range with the subspace topology. -/
