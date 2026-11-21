@@ -12,6 +12,8 @@ import Mathlib.Analysis.Normed.Group.Tannery
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Abs
 import Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order
 import Mathlib.LinearAlgebra.Dimension.LinearMap
+import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
 import Mathlib.Topology.MetricSpace.UniformConvergence
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.NormAttainment
 
@@ -1835,6 +1837,361 @@ section HilbertSchmidtKernels
 
 open MeasureTheory
 
+open scoped ComplexConjugate ENNReal
+
+private theorem kernelLp_norm_sq {Z : Type*} [MeasurableSpace Z] {ρ : Measure Z}
+    (g : Lp ℂ 2 ρ) : ‖g‖ ^ 2 = ∫ z, ‖g z‖ ^ 2 ∂ρ := by
+  rw [@InnerProductSpace.norm_sq_eq_re_inner ℂ, L2.inner_def]
+  simp_rw [inner_self_eq_norm_sq_to_K]
+  norm_cast
+
+private theorem kernelLp_norm_sq_toLp {Z : Type*} [MeasurableSpace Z] {ρ : Measure Z}
+    {g : Z → ℂ} (hg : MemLp g 2 ρ) :
+    ‖hg.toLp g‖ ^ 2 = ∫ z, ‖g z‖ ^ 2 ∂ρ := by
+  rw [kernelLp_norm_sq]
+  exact integral_congr_ae (hg.coeFn_toLp.fun_comp (fun c ↦ ‖c‖ ^ 2))
+
+private theorem kernelLp_slice_integrable {Z : Type*} [MeasurableSpace Z] {ρ : Measure Z}
+    {g h : Z → ℂ} (hg : MemLp g 2 ρ) (hh : MemLp h 2 ρ) :
+    Integrable (fun z ↦ g z * h z) ρ := by
+  have : ENNReal.HolderTriple 2 2 1 := by infer_instance
+  exact memLp_one_iff_integrable.mp (hg.fun_mul hh)
+
+private theorem kernelLp_conj {Z : Type*} [MeasurableSpace Z] {ρ : Measure Z}
+    {g : Z → ℂ} (hg : MemLp g 2 ρ) :
+    ∃ u : Lp ℂ 2 ρ, (u =ᵐ[ρ] fun z ↦ conj (g z)) ∧ ‖u‖ = ‖hg.toLp g‖ := by
+  let h : Z → ℂ := fun z ↦ conj (g z)
+  have hh : MemLp h 2 ρ := by
+    apply (memLp_two_iff_integrable_sq_norm _).mpr
+    · simpa [h] using (memLp_two_iff_integrable_sq_norm hg.aestronglyMeasurable).mp hg
+    · exact Complex.continuous_conj.comp_aestronglyMeasurable hg.aestronglyMeasurable
+  refine ⟨hh.toLp h, hh.coeFn_toLp, (sq_eq_sq₀ (norm_nonneg _) (norm_nonneg _)).mp ?_⟩
+  rw [kernelLp_norm_sq_toLp, kernelLp_norm_sq_toLp]
+  simp [h]
+
+private theorem kernelLp_integral_eq_inner {Z : Type*} [MeasurableSpace Z] {ρ : Measure Z}
+    {g : Z → ℂ} {u : Lp ℂ 2 ρ} (hu : u =ᵐ[ρ] fun z ↦ conj (g z)) (f : Lp ℂ 2 ρ) :
+    (∫ z, g z * f z ∂ρ) = ⟪u, f⟫_ℂ := by
+  rw [L2.inner_def]
+  apply integral_congr_ae
+  filter_upwards [hu] with z hz
+  simp [hz, RCLike.inner_apply, mul_comm]
+
+section
+variable {X Y : Type*} [MeasurableSpace X] [MeasurableSpace Y]
+  {μ : Measure X} {ν : Measure Y} [SigmaFinite μ] [SigmaFinite ν]
+
+/-- For almost every target point, an L² kernel has an L² source slice. -/
+private theorem kernelLp_slices (k : Lp ℂ 2 (μ.prod ν)) :
+    ∀ᵐ y ∂ν, MemLp (fun x ↦ k (x, y)) 2 μ := by
+  have h := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable k)).mp (Lp.memLp k)
+  filter_upwards [h.prod_left_ae] with y hy
+  exact (memLp_two_iff_integrable_sq_norm
+    ((Lp.stronglyMeasurable k).comp_measurable measurable_prodMk_right).aestronglyMeasurable).mpr hy
+
+private theorem kernelLp_slice_norm_sq (k : Lp ℂ 2 (μ.prod ν)) :
+    Integrable (fun y ↦ ∫ x, ‖k (x, y)‖ ^ 2 ∂μ) ν ∧
+      (∫ y, ∫ x, ‖k (x, y)‖ ^ 2 ∂μ ∂ν) = ‖k‖ ^ 2 := by
+  have h := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable k)).mp (Lp.memLp k)
+  exact ⟨h.swap.integral_prod_left, (integral_prod_symm _ h).symm.trans (kernelLp_norm_sq k).symm⟩
+
+omit [SigmaFinite μ] in
+private theorem kernelLp_apply_bound {g : X → ℂ} (hg : MemLp g 2 μ) (f : Lp ℂ 2 μ) :
+    ‖∫ x, g x * f x ∂μ‖ ≤ ‖hg.toLp g‖ * ‖f‖ := by
+  obtain ⟨u, hu, hnorm⟩ := kernelLp_conj hg
+  rw [← hnorm]
+  exact (le_of_eq (congrArg norm (kernelLp_integral_eq_inner hu f))).trans (norm_inner_le_norm _ _)
+
+private theorem kernelLp_memLp (k : Lp ℂ 2 (μ.prod ν)) (f : Lp ℂ 2 μ) :
+    MemLp (fun y ↦ ∫ x, k (x, y) * f x ∂μ) 2 ν := by
+  have hmeas : StronglyMeasurable (fun z : X × Y ↦ k z * f z.1) :=
+    (Lp.stronglyMeasurable k).mul ((Lp.stronglyMeasurable f).comp_measurable measurable_fst)
+  apply (memLp_two_iff_integrable_sq_norm hmeas.integral_prod_left'.aestronglyMeasurable).mpr
+  refine ((kernelLp_slice_norm_sq k).1.const_mul (‖f‖ ^ 2)).mono'
+    (hmeas.integral_prod_left'.norm.pow 2).aestronglyMeasurable ?_
+  filter_upwards [kernelLp_slices k] with y hy
+  rw [Real.norm_of_nonneg (sq_nonneg _), mul_comm, ← kernelLp_norm_sq_toLp hy, ← mul_pow]
+  exact pow_le_pow_left₀ (norm_nonneg _) (kernelLp_apply_bound hy f) 2
+
+private theorem kernelLpOperator_bound (k : Lp ℂ 2 (μ.prod ν)) (f : Lp ℂ 2 μ) :
+    ‖(kernelLp_memLp k f).toLp _‖ ≤ ‖k‖ * ‖f‖ := by
+  apply (sq_le_sq₀ (norm_nonneg _) (mul_nonneg (norm_nonneg _) (norm_nonneg _))).mp
+  rw [kernelLp_norm_sq_toLp, mul_pow, ← (kernelLp_slice_norm_sq k).2, ← integral_mul_const]
+  apply integral_mono_ae
+    ((memLp_two_iff_integrable_sq_norm (kernelLp_memLp k f).aestronglyMeasurable).mp
+      (kernelLp_memLp k f)) ((kernelLp_slice_norm_sq k).1.mul_const _)
+  filter_upwards [kernelLp_slices k] with y hy
+  rw [← kernelLp_norm_sq_toLp hy, ← mul_pow]
+  exact pow_le_pow_left₀ (norm_nonneg _) (kernelLp_apply_bound hy f) 2
+
+private def kernelLpOperator (k : Lp ℂ 2 (μ.prod ν)) : Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 ν :=
+  LinearMap.mkContinuous
+    { toFun := fun f ↦ (kernelLp_memLp k f).toLp _
+      map_add' := by
+        intro f g
+        apply Lp.ext
+        filter_upwards [(kernelLp_memLp k (f + g)).coeFn_toLp,
+          (kernelLp_memLp k f).coeFn_toLp, (kernelLp_memLp k g).coeFn_toLp,
+          Lp.coeFn_add ((kernelLp_memLp k f).toLp _) ((kernelLp_memLp k g).toLp _),
+          kernelLp_slices k] with y hfg hf hg hadd hy
+        rw [hfg, hadd, Pi.add_apply, hf, hg, ← integral_add
+          (kernelLp_slice_integrable hy (Lp.memLp f)) (kernelLp_slice_integrable hy (Lp.memLp g))]
+        apply integral_congr_ae
+        filter_upwards [Lp.coeFn_add f g] with x hx
+        rw [hx, Pi.add_apply, mul_add]
+      map_smul' := by
+        intro c f
+        apply Lp.ext
+        filter_upwards [(kernelLp_memLp k (c • f)).coeFn_toLp,
+          (kernelLp_memLp k f).coeFn_toLp,
+          Lp.coeFn_smul c ((kernelLp_memLp k f).toLp _)] with y hcf hf hsmul
+        simp only [RingHom.id_apply]
+        rw [hcf, hsmul, Pi.smul_apply, hf, ← integral_smul]
+        apply integral_congr_ae
+        filter_upwards [Lp.coeFn_smul c f] with x hx
+        rw [hx, Pi.smul_apply, smul_eq_mul, smul_eq_mul]
+        ring } ‖k‖ (kernelLpOperator_bound k)
+
+private theorem kernelLpOperator_apply (k : Lp ℂ 2 (μ.prod ν)) (f : Lp ℂ 2 μ) :
+    ∀ᵐ y ∂ν, Integrable (fun x ↦ k (x, y) * f x) μ ∧
+      kernelLpOperator k f y = ∫ x, k (x, y) * f x ∂μ := by
+  filter_upwards [kernelLp_slices k, (kernelLp_memLp k f).coeFn_toLp] with y hy h
+  exact ⟨kernelLp_slice_integrable hy (Lp.memLp f), h⟩
+
+/-- Integration against an L² kernel is linear in the kernel. -/
+private def kernelLpToOperator :
+    Lp ℂ 2 (μ.prod ν) →ₗ[ℂ] (Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 ν) where
+  toFun := kernelLpOperator
+  map_add' k l := by
+    ext1 f
+    apply Lp.ext
+    have h := Measure.ae_ae_of_ae_prod
+      ((Measure.measurePreserving_swap (μ := ν) (ν := μ)).quasiMeasurePreserving.ae (Lp.coeFn_add k l))
+    filter_upwards [kernelLpOperator_apply (k + l) f, kernelLpOperator_apply k f,
+      kernelLpOperator_apply l f, h, Lp.coeFn_add (kernelLpOperator k f) (kernelLpOperator l f)]
+      with y hkl hk hl hy hadd
+    change kernelLpOperator (k + l) f y = (kernelLpOperator k f + kernelLpOperator l f) y
+    rw [hkl.2, hadd, Pi.add_apply, hk.2, hl.2, ← integral_add hk.1 hl.1]
+    apply integral_congr_ae
+    filter_upwards [hy] with x hx
+    exact (congrArg (fun z : ℂ ↦ z * f x) hx).trans (add_mul _ _ _)
+  map_smul' c k := by
+    ext1 f
+    apply Lp.ext
+    have h := Measure.ae_ae_of_ae_prod
+      ((Measure.measurePreserving_swap (μ := ν) (ν := μ)).quasiMeasurePreserving.ae (Lp.coeFn_smul c k))
+    filter_upwards [kernelLpOperator_apply (c • k) f, kernelLpOperator_apply k f,
+      h, Lp.coeFn_smul c (kernelLpOperator k f)] with y hck hk hy hsmul
+    change kernelLpOperator (c • k) f y = (c • kernelLpOperator k f) y
+    rw [hck.2, hsmul, Pi.smul_apply, hk.2, ← integral_smul]
+    apply integral_congr_ae
+    filter_upwards [hy] with x hx
+    exact (congrArg (fun z : ℂ ↦ z * f x) hx).trans (mul_assoc _ _ _)
+
+
+/-- Parseval on the source slices gives the squared L² norm of the kernel. -/
+private theorem hasSum_norm_sq_kernelLpOperator {ι : Type*} [Countable ι]
+    (b : HilbertBasis ι ℂ (Lp ℂ 2 μ)) (k : Lp ℂ 2 (μ.prod ν)) :
+    HasSum (fun i ↦ ‖kernelLpOperator k (b i)‖ ^ 2) (‖k‖ ^ 2) := by
+  let F (i : ι) (y : Y) := ‖kernelLpOperator k (b i) y‖ ^ 2
+  have hF (i : ι) : Integrable (F i) ν :=
+    (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable _)).mp (Lp.memLp _)
+  have hpoint : ∀ᵐ y ∂ν, (∑' i, ENNReal.ofReal (F i y)) =
+      ENNReal.ofReal (∫ x, ‖k (x, y)‖ ^ 2 ∂μ) := by
+    filter_upwards [kernelLp_slices k, ae_all_iff.mpr (fun i ↦ kernelLpOperator_apply k (b i))]
+      with y hy heval
+    obtain ⟨u, hu, hnorm⟩ := kernelLp_conj hy
+    have hsum : HasSum (fun i ↦ F i y) (‖u‖ ^ 2) := by
+      have hnormsum := lp.hasSum_norm (p := 2) (by norm_num) (b.repr u)
+      convert hnormsum using 1
+      · funext i
+        change ‖kernelLpOperator k (b i) y‖ ^ 2 = ‖b.repr u i‖ ^ (2 : ℝ≥0∞).toReal
+        rw [b.repr_apply_apply, show (2 : ℝ≥0∞).toReal = (2 : ℕ) by norm_num,
+          Real.rpow_natCast, (heval i).2, kernelLp_integral_eq_inner hu, norm_inner_symm]
+      · rw [b.repr.norm_map, show (2 : ℝ≥0∞).toReal = (2 : ℕ) by norm_num, Real.rpow_natCast]
+    rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ sq_nonneg _) hsum.summable,
+      hsum.tsum_eq, hnorm, kernelLp_norm_sq_toLp]
+  have ht : (∑' i, ENNReal.ofReal (‖kernelLpOperator k (b i)‖ ^ 2)) =
+      ENNReal.ofReal (‖k‖ ^ 2) := by
+    have heq (i : ι) : ENNReal.ofReal (‖kernelLpOperator k (b i)‖ ^ 2) =
+        ∫⁻ y, ENNReal.ofReal (F i y) ∂ν := by
+      rw [kernelLp_norm_sq, ofReal_integral_eq_lintegral_ofReal (hF i)
+        (ae_of_all _ fun _ ↦ sq_nonneg _)]
+    simp_rw [heq]
+    rw [← lintegral_tsum (fun i ↦ (hF i).aemeasurable.ennreal_ofReal),
+      lintegral_congr_ae hpoint,
+      ← ofReal_integral_eq_lintegral_ofReal (kernelLp_slice_norm_sq k).1
+        (ae_of_all _ fun _ ↦ integral_nonneg fun _ ↦ sq_nonneg _),
+      (kernelLp_slice_norm_sq k).2]
+  have hsum : Summable (fun i ↦ ‖kernelLpOperator k (b i)‖ ^ 2) := by
+    have hfin := ht.trans_ne ENNReal.ofReal_ne_top
+    have hn := ENNReal.tsum_coe_ne_top_iff_summable_coe.mp hfin
+    simpa only [Real.coe_toNNReal _ (sq_nonneg _)] using hn
+  have heq : (∑' i, ‖kernelLpOperator k (b i)‖ ^ 2) = ‖k‖ ^ 2 := by
+    rw [← ENNReal.ofReal_eq_ofReal_iff (tsum_nonneg fun _ ↦ sq_nonneg _) (sq_nonneg _),
+      ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ sq_nonneg _) hsum]
+    exact ht
+  exact heq ▸ hsum.hasSum
+
+
+private theorem kernelLpToOperator_norm_le (k : Lp ℂ 2 (μ.prod ν)) :
+    ‖kernelLpToOperator k‖ ≤ ‖k‖ :=
+  LinearMap.mkContinuous_norm_le _ (norm_nonneg _) (kernelLpOperator_bound k)
+
+omit [SigmaFinite μ] [SigmaFinite ν] in
+private theorem rankOneKernel_memLp (e : Lp ℂ 2 μ) (f : Lp ℂ 2 ν) :
+    MemLp (fun z : X × Y ↦ conj (e z.1) * f z.2) 2 (μ.prod ν) := by
+  have he := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable e)).mp (Lp.memLp e)
+  have hf := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable f)).mp (Lp.memLp f)
+  apply (memLp_two_iff_integrable_sq_norm
+    (((Complex.continuous_conj.comp_stronglyMeasurable (Lp.stronglyMeasurable e)).comp_measurable
+      measurable_fst).mul ((Lp.stronglyMeasurable f).comp_measurable
+        measurable_snd)).aestronglyMeasurable).mpr
+  change Integrable (fun z : X × Y ↦ ‖conj (e z.1) * f z.2‖ ^ 2) (μ.prod ν)
+  simpa only [norm_mul, Complex.norm_conj, mul_pow] using he.mul_prod hf
+
+/-- The product kernel of the operator sending `g` to `⟪e, g⟫_ℂ • f`. -/
+private def rankOneKernel (e : Lp ℂ 2 μ) (f : Lp ℂ 2 ν) : Lp ℂ 2 (μ.prod ν) :=
+  (rankOneKernel_memLp e f).toLp _
+
+private theorem rankOneKernel_inner (e e' : Lp ℂ 2 μ) (f f' : Lp ℂ 2 ν) :
+    ⟪rankOneKernel e f, rankOneKernel e' f'⟫_ℂ = ⟪e', e⟫_ℂ * ⟪f, f'⟫_ℂ := by
+  simp only [L2.inner_def]
+  rw [← integral_prod_mul]
+  apply integral_congr_ae
+  filter_upwards [(rankOneKernel_memLp e f).coeFn_toLp,
+    (rankOneKernel_memLp e' f').coeFn_toLp] with z hz hz'
+  change (rankOneKernel e f) z = _ at hz
+  change (rankOneKernel e' f') z = _ at hz'
+  rw [hz, hz']
+  simp only [RCLike.inner_apply, map_mul, starRingEnd_apply, star_star]
+  ring
+
+private theorem kernelLpToOperator_rankOne (e : Lp ℂ 2 μ) (f : Lp ℂ 2 ν) :
+    kernelLpToOperator (rankOneKernel e f) = (innerSL ℂ e).smulRight f := by
+  ext1 g
+  apply Lp.ext
+  have h := Measure.ae_ae_of_ae_prod ((Measure.measurePreserving_swap
+    (μ := ν) (ν := μ)).quasiMeasurePreserving.ae (rankOneKernel_memLp e f).coeFn_toLp)
+  filter_upwards [kernelLpOperator_apply (rankOneKernel e f) g, h,
+    Lp.coeFn_smul ⟪e, g⟫_ℂ f] with y hy hker hsmul
+  change kernelLpOperator (rankOneKernel e f) g y = (⟪e, g⟫_ℂ • f) y
+  rw [hy.2, hsmul, Pi.smul_apply, smul_eq_mul, L2.inner_def, ← integral_mul_const]
+  apply integral_congr_ae
+  filter_upwards [hker] with x hx
+  change (rankOneKernel e f) (x, y) = conj (e x) * f y at hx
+  rw [hx]
+  simp only [RCLike.inner_apply, starRingEnd_apply]
+  ring
+
+/-- A singular expansion yields a convergent orthogonal series of rank-one kernels. -/
+private theorem kernelLpToOperator_surjective_of_mem_hilbertSchmidt
+    (T : hilbertSchmidtOperators (Lp ℂ 2 μ) (Lp ℂ 2 ν)) :
+    ∃ k, kernelLpToOperator k = T.val := by
+  classical
+  have hT : IsCompactOperator T.val ∧
+      Summable (fun n ↦ approximationNumber T.val n ^ (2 : ℝ)) := T.property
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T.val).mp hT.1
+  let I := {n // d.coeff n ≠ 0}
+  let w (i : I) := rankOneKernel (d.source i) (d.target i)
+  have hw : Orthonormal ℂ w := by
+    rw [orthonormal_iff_ite]
+    intro i j
+    change ⟪rankOneKernel (d.source i) (d.target i),
+      rankOneKernel (d.source j) (d.target j)⟫_ℂ = _
+    rw [rankOneKernel_inner, orthonormal_iff_ite.mp d.orthonormal_target]
+    split_ifs with h
+    · subst j
+      rw [orthonormal_iff_ite.mp d.orthonormal_source]
+      simp
+    · simp
+  have hcoeff : Summable (fun n ↦ (d.coeff n : ℝ) ^ 2) := by
+    simpa only [d.coeff_eq_approximationNumber, Real.rpow_two] using hT.2
+  have hs : Summable (fun i : I ↦ ((d.coeff i : ℝ) : ℂ) • w i) := by
+    have h := (hw.orthogonalFamily.summable_iff_norm_sq_summable
+      (fun i : I ↦ ((d.coeff i : ℝ) : ℂ))).mpr
+    apply h
+    change Summable (fun i : I ↦ ‖((d.coeff i : ℝ) : ℂ)‖ ^ 2)
+    simp only [Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _)]
+    exact hcoeff.subtype (fun n ↦ d.coeff n ≠ 0)
+  let A := (kernelLpToOperator (μ := μ) (ν := ν)).mkContinuous 1 (fun k ↦
+    (kernelLpToOperator_norm_le k).trans_eq (one_mul _).symm)
+  refine ⟨∑' i : I, ((d.coeff i : ℝ) : ℂ) • w i, ?_⟩
+  have hsum := A.hasSum hs.hasSum
+  change HasSum (fun i : I ↦ kernelLpToOperator (((d.coeff i : ℝ) : ℂ) • w i)) _ at hsum
+  simp only [map_smul, w, kernelLpToOperator_rankOne] at hsum
+  exact hsum.unique d.hasSum_opNorm
+
+omit [SigmaFinite μ] in
+private theorem countable_kernelLp_basis {ι : Type*} [SeparableSpace (Lp ℂ 2 μ)]
+    (b : HilbertBasis ι ℂ (Lp ℂ 2 μ)) : Countable ι := by
+  refine Pairwise.countable_of_isOpen_disjoint (s := fun i ↦ Metric.ball (b i) (1 / 2))
+    ?_ (fun _ ↦ Metric.isOpen_ball) (fun _ ↦ Metric.nonempty_ball.mpr (by norm_num))
+  intro i j hij
+  apply Metric.ball_disjoint_ball
+  have hsq : dist (b i) (b j) ^ 2 = 2 := by
+    rw [dist_eq_norm, @norm_sub_sq ℂ, b.orthonormal.inner_eq_zero hij,
+      b.orthonormal.norm_eq_one, b.orthonormal.norm_eq_one]
+    norm_num
+  rw [show (1 / 2 : ℝ) + 1 / 2 = 1 by norm_num]
+  apply (sq_le_sq₀ zero_le_one dist_nonneg).mp
+  rw [hsq]
+  norm_num
+
+private theorem kernelLpToOperator_mem_hilbertSchmidt [SeparableSpace (Lp ℂ 2 μ)]
+    (k : Lp ℂ 2 (μ.prod ν)) :
+    kernelLpToOperator k ∈ hilbertSchmidtOperators (Lp ℂ 2 μ) (Lp ℂ 2 ν) := by
+  obtain ⟨w, b, _⟩ := exists_hilbertBasis ℂ (Lp ℂ 2 μ)
+  have := countable_kernelLp_basis b
+  exact (mem_hilbertSchmidtOperators_iff_summable_basis b _).mpr
+    (hasSum_norm_sq_kernelLpOperator b k).summable
+
+/-- Extend the right singular vectors to a basis to compute the Schatten norm by Parseval. -/
+private theorem schattenNorm_kernelLpToOperator [SeparableSpace (Lp ℂ 2 μ)]
+    (k : Lp ℂ 2 (μ.prod ν)) :
+    schattenNorm ⟨kernelLpToOperator k, kernelLpToOperator_mem_hilbertSchmidt k⟩ = ‖k‖ := by
+  classical
+  let T := kernelLpToOperator k
+  have hT : IsCompactOperator T ∧ Summable (fun n ↦ approximationNumber T n ^ (2 : ℝ)) :=
+    kernelLpToOperator_mem_hilbertSchmidt k
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T).mp hT.1
+  obtain ⟨w, b, hw, hb⟩ := d.orthonormal_source.toSubtypeRange.exists_hilbertBasis_extension
+  have := countable_kernelLp_basis b
+  let I := {n // d.coeff n ≠ 0}
+  let j (i : I) : w := ⟨d.source i, hw (mem_range_self i)⟩
+  have hj : Injective j := fun i i' h ↦
+    d.orthonormal_source.linearIndependent.injective (congrArg Subtype.val h)
+  have hTj (i : I) : T (b (j i)) = ((d.coeff i : ℝ) : ℂ) • d.target i := by
+    rw [show b (j i) = d.source i from congrFun hb (j i)]
+    rw [(d.hasSum_apply (d.source i)).unique (hasSum_single i (fun i' hi ↦ by
+      simp [d.orthonormal_source.inner_eq_zero hi]))]
+    simp [d.orthonormal_source.norm_eq_one]
+  have hzero (a : w) (ha : a ∉ range j) : T (b a) = 0 := by
+    refine (d.hasSum_apply (b a)).unique ?_
+    convert (hasSum_zero (β := I) (α := Lp ℂ 2 ν)) using 1
+    funext i
+    rw [show d.source i = b (j i) from (congrFun hb (j i)).symm,
+      b.orthonormal.inner_eq_zero (fun h ↦ ha ⟨i, h⟩)]
+    simp
+  have hcoeff : Summable (fun n ↦ (d.coeff n : ℝ) ^ 2) := by
+    simpa only [d.coeff_eq_approximationNumber, Real.rpow_two] using hT.2
+  have hsub : HasSum (fun i : I ↦ ‖T (b (j i))‖ ^ 2) (∑' n, (d.coeff n : ℝ) ^ 2) := by
+    have hz : support (fun n ↦ (d.coeff n : ℝ) ^ 2) ⊆ {n | d.coeff n ≠ 0} := by
+      intro n hn
+      change d.coeff n ≠ 0
+      intro h
+      exact hn (by simp [h])
+    simp only [hTj, norm_smul, Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _),
+      d.orthonormal_target.norm_eq_one, mul_one]
+    exact (hasSum_subtype_iff_of_support_subset hz).mpr hcoeff.hasSum
+  have hsum := (hj.hasSum_iff (f := fun a ↦ ‖T (b a)‖ ^ 2)
+    (fun a ha ↦ by simp [hzero a ha])).mp hsub
+  have heq := hsum.unique (hasSum_norm_sq_kernelLpOperator b k)
+  change (∑' n, approximationNumber T n ^ (2 : ℝ)) ^ (1 / (2 : ℝ)) = ‖k‖
+  simp_rw [Real.rpow_two, ← d.coeff_eq_approximationNumber]
+  rw [heq, ← Real.sqrt_eq_rpow, Real.sqrt_sq (norm_nonneg _)]
+
+end
 variable {X Y : Type*}
   [TopologicalSpace X] [T2Space X] [LocallyCompactSpace X] [SecondCountableTopology X]
   [MeasurableSpace X] [BorelSpace X]
@@ -1854,7 +2211,31 @@ theorem hilbertSchmidtOperators_equiv_Lp_prod (μ : Measure X) (ν : Measure Y)
       (∀ k, schattenNorm (e k) = ‖k‖) ∧
       ∀ (k : Lp ℂ 2 (μ.prod ν)) (f : Lp ℂ 2 μ), ∀ᵐ y ∂ν,
         Integrable (fun x ↦ k (x, y) * f x) μ ∧
-          (e k).val f y = ∫ x, k (x, y) * f x ∂μ := by sorry
+          (e k).val f y = ∫ x, k (x, y) * f x ∂μ := by
+  have : SigmaFinite μ := inferInstance
+  have : SigmaFinite ν := inferInstance
+  have : Fact (1 ≤ (2 : ℝ≥0∞)) := ⟨by norm_num⟩
+  have : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by norm_num⟩
+  have : SecondCountableTopology (Lp ℂ 2 μ) := Lp.SecondCountableTopology
+  let S := hilbertSchmidtOperators (Lp ℂ 2 μ) (Lp ℂ 2 ν)
+  let L := kernelLpToOperator.codRestrict S kernelLpToOperator_mem_hilbertSchmidt
+  have hL : Bijective L := by
+    constructor
+    · apply (injective_iff_map_eq_zero L).mpr
+      intro k hk
+      have hk' : kernelLpToOperator k = 0 := congrArg Subtype.val hk
+      obtain ⟨w, b, _⟩ := exists_hilbertBasis ℂ (Lp ℂ 2 μ)
+      have := countable_kernelLp_basis b
+      have hs := hasSum_norm_sq_kernelLpOperator b k
+      change HasSum (fun i ↦ ‖kernelLpToOperator k (b i)‖ ^ 2) (‖k‖ ^ 2) at hs
+      rw [hk'] at hs
+      have heq : ‖k‖ ^ 2 = 0 := hs.unique (by simp)
+      exact norm_eq_zero.mp (sq_eq_zero_iff.mp heq)
+    · intro T
+      obtain ⟨k, hk⟩ := kernelLpToOperator_surjective_of_mem_hilbertSchmidt T
+      exact ⟨k, Subtype.ext hk⟩
+  exact ⟨LinearEquiv.ofBijective L hL, schattenNorm_kernelLpToOperator,
+    kernelLpOperator_apply⟩
 
 end HilbertSchmidtKernels
 
