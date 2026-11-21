@@ -1551,9 +1551,92 @@ theorem injectiveTensorMap_continuous :
     DFunLike.congr_fun hform z]
   exact le_ciSup (Seminorm.bddAbove_range_iff.mp hSource z) (φ', ψ')
 
+omit lcE lcF lcG lcH sE sF sG sH in
+/-- For a linear embedding, all functionals in a zero-neighborhood polar extend to
+functionals in a common zero-neighborhood polar in the target. -/
+private theorem exists_polar_extensions {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y]
+    (a : X →L[ℂ] Y) (ha : IsEmbedding a) (U : {U : Set X // U ∈ 𝓝 0}) :
+    ∃ V : {V : Set Y // V ∈ 𝓝 0}, ∀ φ : StrongDual.polar ℂ U.val,
+      ∃ ψ : StrongDual.polar ℂ V.val, ∀ x, ψ.val (a x) = φ.val x := by
+  have hnhds : 𝓝 (0 : X) = (𝓝 (0 : Y)).comap a := by
+    simpa only [map_zero] using ha.isInducing.nhds_eq_comap (0 : X)
+  have hU : U.val ∈ (𝓝 (0 : Y)).comap a := hnhds ▸ U.property
+  obtain ⟨p, hp, hsub⟩ :=
+    ((PolynormableSpace.hasBasis_zero_ball ℂ Y).comap a).mem_iff.mp hU
+  refine ⟨⟨p.ball 0 1, Seminorm.ball_mem_nhds hp one_pos⟩, fun φ ↦ ?_⟩
+  let e := LinearEquiv.ofInjective a.toLinearMap ha.injective
+  let l := φ.val.toLinearMap.comp e.symm.toLinearMap
+  have hbound (x : X) : ‖φ.val x‖ ≤ p (a x) := by
+    by_contra! h
+    obtain ⟨r, hr, hφ⟩ := exists_between h
+    have hr₀ : 0 < r := (apply_nonneg p (a x)).trans_lt hr
+    have hnorm : ‖(r : ℂ)⁻¹‖ = r⁻¹ := by
+      rw [norm_inv, Complex.norm_real, Real.norm_of_nonneg hr₀.le]
+    have hx : (r : ℂ)⁻¹ • x ∈ a ⁻¹' p.ball 0 1 := by
+      change a ((r : ℂ)⁻¹ • x) ∈ p.ball 0 1
+      rw [Seminorm.mem_ball_zero, map_smul, map_smul_eq_mul, hnorm,
+        inv_mul_lt_iff₀ hr₀, mul_one]
+      exact hr
+    have hle := (StrongDual.mem_polar_iff ℂ U.val).mp φ.property _ (hsub hx)
+    rw [map_smul, norm_smul, hnorm, inv_mul_le_iff₀ hr₀, mul_one] at hle
+    exact (not_lt_of_ge hle) hφ
+  obtain ⟨ψ, hψ, hle⟩ := Module.Dual.exists_continuous_extension_of_le_seminorm
+    a.toLinearMap.range l hp (fun y ↦ by
+      change ‖φ.val (e.symm y)‖ ≤ p y
+      have he := congrArg Subtype.val (e.apply_symm_apply y)
+      change a (e.symm y) = (y : Y) at he
+      rw [← he]
+      exact hbound (e.symm y))
+  refine ⟨⟨ψ, (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦
+    (hle y).trans (Seminorm.mem_ball_zero _ |>.mp hy).le⟩, fun x ↦ ?_⟩
+  have heq := hψ (e x)
+  change ψ (a x) = φ.val (e.symm (e x)) at heq
+  simpa only [e.symm_apply_apply] using heq
+
 /-- Paper: Lemma C.2.3.5(1), p. 678. Tensoring two embeddings gives an embedding. -/
 theorem injectiveTensorMap_isEmbedding (hf : IsEmbedding f) (hg : IsEmbedding g) :
-    IsEmbedding (injectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    IsEmbedding (injectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  let M := injectiveTensorMap f.toLinearMap g.toLinearMap
+  apply IsInducing.isEmbedding
+  apply IsTopologicalAddGroup.isInducing_iff_nhds_zero.mpr
+  refine le_antisymm (tendsto_iff_comap.mp
+    ((injectiveTensorMap_continuous f g).tendsto' 0 0 (map_zero M))) ?_
+  rw [SeminormFamily.withSeminorms_iff_nhds_eq_iInf _ |>.mp
+    (withGeneratingSeminorms_spec (E ⊗[ℂ] F) _)]
+  refine le_iInf fun ⟨U, V⟩ ↦ ?_
+  obtain ⟨U', hU'⟩ := exists_polar_extensions f hf U
+  obtain ⟨V', hV'⟩ := exists_polar_extensions g hg V
+  have hle (z : InjectiveTensor E F) :
+      injectiveTensorSeminorm U V z ≤ injectiveTensorSeminorm U' V' (M z) := by
+    change E ⊗[ℂ] F at z
+    have hb := injectiveTensorSeminorm_bddAbove U V
+    conv_lhs => unfold injectiveTensorSeminorm
+    rw [← ciSup_prod hb, Seminorm.iSup_apply hb]
+    have : Nonempty (StrongDual.polar ℂ U.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    have : Nonempty (StrongDual.polar ℂ V.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    apply ciSup_le
+    rintro ⟨φ, ψ⟩
+    obtain ⟨φ', hφ⟩ := hU' φ
+    obtain ⟨ψ', hψ⟩ := hV' ψ
+    have hform : (tensorDualForm φ'.val ψ'.val).comp (TensorProduct.map
+        f.toLinearMap g.toLinearMap) = tensorDualForm φ.val ψ.val := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [tensorDualForm_tmul, hφ, hψ]
+    change ‖tensorDualForm φ.val ψ.val z‖ ≤ _
+    rw [← DFunLike.congr_fun hform z]
+    exact norm_tensorDualForm_le_injectiveTensorSeminorm U' V' φ' ψ' (M z)
+  refine (NormedAddGroup.nhds_zero_basis_norm_lt.comap _).ge_iff.mpr fun r hr ↦ ?_
+  refine Filter.mem_comap.mpr ⟨(injectiveTensorSeminorm U' V').ball 0 r,
+    Seminorm.ball_mem_nhds
+      ((withGeneratingSeminorms_spec (G ⊗[ℂ] H) _).continuous_seminorm (U', V')) hr,
+    fun z hz ↦ ?_⟩
+  change E ⊗[ℂ] F at z
+  change ‖injectiveTensorSeminorm U V z‖ < r
+  rw [Real.norm_of_nonneg (apply_nonneg _ _)]
+  exact (hle z).trans_lt (Seminorm.mem_ball_zero _ |>.mp hz)
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. The extension to the completions is an embedding. -/
 theorem completedInjectiveTensorMap_isEmbedding (hf : IsEmbedding f) (hg : IsEmbedding g) :

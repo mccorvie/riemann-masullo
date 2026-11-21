@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
 import Mathlib.Analysis.PSeries
+import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.NatInt
 
 /-!
 # Schauder bases
@@ -249,7 +250,14 @@ summation is equivalent to convergence of each permuted coordinate series. -/
 theorem isUnconditional_iff_forall_permutation [IsTopologicalAddGroup E] [T2Space E]
     (h : IsSchauderBasis x f) :
     IsUnconditional x f ↔ ∀ (u : E) (σ : ℕ ≃ ℕ),
-      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by sorry
+      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by
+  constructor
+  · intro hu u σ
+    exact (σ.hasSum_iff.mpr (hu u)).summable.mono_filter
+      (SummationFilter.conditional ℕ).le_atTop
+  · intro hperm u
+    exact hasSum_of_summable_conditional_permutations
+      ((show IsTopologicalBasis x (fun m ↦ (f m).toLinearMap) from h).2 u) (hperm u)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. For each continuous seminorm, one
 continuous seminorm bounds the sums of the seminorms of the coordinate terms

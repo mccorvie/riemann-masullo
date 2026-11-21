@@ -634,7 +634,35 @@ def infiniteIdeleLogNeighborhood (k : ℕ) : Set N∞ :=
 /-- Paper: (A.5.2.19)–(A.5.2.20), p. 576. A norm-one archimedean idele belongs
 to every one of the log neighborhoods exactly when all its logarithmic coordinates vanish. -/
 theorem mem_all_infiniteIdeleLogNeighborhood_iff (g : N∞) :
-    (∀ k, g ∈ infiniteIdeleLogNeighborhood F b k) ↔ infiniteIdeleLog F g.val = 0 := by sorry
+    (∀ k, g ∈ infiniteIdeleLogNeighborhood F b k) ↔ infiniteIdeleLog F g.val = 0 := by
+  constructor
+  · intro h
+    have hw (w : {w : InfinitePlace F // w ≠ w₀}) : infiniteIdeleLog F g.val w.val = 0 := by
+      set C := ∑ i, |Units.logEmbeddingQuot F (b i) w|
+      have hbound (k : ℕ) : |infiniteIdeleLog F g.val w.val| ≤ C / ((k : ℝ) + 1) := by
+        obtain ⟨t, ht, hg⟩ := h k
+        rw [hg w, Finset.sum_div]
+        refine (Finset.abs_sum_le_sum_abs _ _).trans (Finset.sum_le_sum fun i _ ↦ ?_)
+        have hti : |t i| ≤ 1 / ((k : ℝ) + 1) := (abs_lt.mpr (ht i)).le
+        rw [abs_mul]
+        exact le_of_le_of_eq (mul_le_mul_of_nonneg_right hti (abs_nonneg _)) (by ring)
+      by_contra hne
+      have hpos : 0 < |infiniteIdeleLog F g.val w.val| := abs_pos.mpr hne
+      obtain ⟨k, hk⟩ := exists_nat_gt (C / |infiniteIdeleLog F g.val w.val|)
+      have h1 := hbound k
+      rw [div_lt_iff₀ hpos] at hk
+      rw [le_div_iff₀ (by positivity)] at h1
+      nlinarith
+    funext v
+    show infiniteIdeleLog F g.val v = 0
+    by_cases hv : v = w₀
+    · rw [hv]
+      have hs := infiniteIdeleLog_sum_zero F g
+      rwa [Finset.sum_eq_single w₀ (fun v _ hv ↦ hw ⟨v, hv⟩) (by simp)] at hs
+    · exact hw ⟨v, hv⟩
+  · intro h k
+    have hk : (0 : ℝ) < 1 / ((k : ℝ) + 1) := by positivity
+    exact ⟨0, fun _ ↦ ⟨by simpa using hk, hk⟩, fun w ↦ by rw [h]; simp⟩
 
 /-- Paper: Lemma A.5.2.13(2), p. 576. Each shrinking log cube pulls back
 to an inversion-invariant subset of the archimedean norm-one group. -/

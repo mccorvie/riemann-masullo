@@ -807,7 +807,17 @@ global rational character takes the value of the standard real character. -/
 theorem ratAdeleStandardCharacter_real (a : 𝔸[ℚ]) (ha : a.2 = 0) :
     ratAdeleStandardCharacter a =
       Circle.exp (2 * Real.pi * extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
-        (a.1 Rat.infinitePlace)) := by sorry
+        (a.1 Rat.infinitePlace)) := by
+  have h0 (q : ℕ) [Fact q.Prime] : padicStandardCharacter q 0 = 1 := by
+    have hval (n : ℕ) (hn : n = 0) (x : ZMod (q ^ n)) : x.val = 0 := by
+      subst hn
+      exact Nat.lt_one_iff.mp (by simpa using x.val_lt)
+    simp only [padicStandardCharacter]
+    rw [hval _ (by simp) _]
+    simp
+  have h0' (v : Primes(ℚ)) : (0 : FiniteAdeleRing (𝓞 ℚ) ℚ) v = 0 := rfl
+  rw [ratAdeleStandardCharacter, ha]
+  simp [h0', h0]
 
 /-- Paper: Example A.3.1.8, p. 558. The global rational character is trivial on the
 diagonally embedded rational numbers. The paper uses this without stating it; it is what

@@ -881,7 +881,11 @@ def strongDualityTopology : TopologicalSpace E :=
 
 /-- Paper: §C.2.2.2, p. 674. The strong topology is finer than the Mackey topology. -/
 theorem strongDualityTopology_le_mackeyTopology (hB : B.Nondegenerate) :
-    strongDualityTopology B ≤ mackeyTopology B := by sorry
+    strongDualityTopology B ≤ mackeyTopology B := by
+  have hsub : {A : Set F | AbsConvex ℂ A ∧ IsCompact (X := WeakBilin B.flip) A} ⊆
+      {A | IsVonNBounded (E := WeakBilin B.flip) ℂ A} :=
+    fun A hA ↦ IsCompact.isVonNBounded (E := WeakBilin B.flip) ℂ hA.2
+  exact induced_mono (UniformSpace.toTopologicalSpace_mono (UniformOnFun.mono le_rfl hsub))
 
 -- TODO(paper-gap): On p. 674 barrelledness of E does not imply β(E',E) = τ(E',E).
 -- For the Banach space c₀, the norm dual of its strong dual ℓ¹ is ℓ∞, strictly larger than c₀.

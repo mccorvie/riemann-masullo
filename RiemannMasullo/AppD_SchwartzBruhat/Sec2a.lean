@@ -3,7 +3,9 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import Mathlib.Algebra.Order.Group.Cyclic
+import Mathlib.MeasureTheory.Measure.Haar.Unique
 import Mathlib.Topology.Algebra.Order.ArchimedeanDiscrete
+import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
 /-! # Modulated groups and their canonical Haar measures -/
 
@@ -35,7 +37,13 @@ theorem IsModulation.normTwistHypotheses {m : G →ₜ* ℝ≥0ˣ} (hm : IsModul
 modulation of the global idele class group. -/
 theorem exists_ideleClassModulation (F : Type*) [Field F] [NumberField F] :
     ∃ m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ,
-      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by sorry
+      m.toMonoidHom = ideleClassNorm F ∧ IsModulation m ∧ Surjective m := by
+  have hproper := isProperMap_ideleClassNorm F
+  let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, hproper.continuous⟩
+  obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  obtain ⟨g, hg⟩ := hsurj t
+  exact ⟨m, rfl, ⟨hproper, ⟨g, fun h ↦ ht (hg.symm.trans h)⟩⟩, hsurj⟩
 
 /-- Paper: Definition D.2.1.1(1), p. 793. The norm-one subgroup is compact. -/
 theorem IsModulation.isCompact_ker {m : G →ₜ* ℝ≥0ˣ} (hm : IsModulation m) :
@@ -124,16 +132,181 @@ end Modulation
 
 section CanonicalHaar
 
+open scoped ENNReal
+
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
   [MeasurableSpace G] [BorelSpace G]
+
+omit [T2Space G] [SecondCountableTopology G] in
+/-- Paper: Definition D.2.1.1(2), p. 793. A Haar measure normalized on a half-open
+logarithmic band has the required growth on symmetric modulation intervals. -/
+private theorem exists_canonicalModulatedHaar (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) :
+    ∃ μ : Measure G, μ.IsHaarMeasure ∧
+      (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
+        =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+  let f (g : G) := Real.log ((m g).val : ℝ)
+  have hpos (g : G) : 0 < ((m g).val : ℝ) :=
+    NNReal.coe_pos.mpr (pos_of_ne_zero (m g).ne_zero)
+  have hmul (g h : G) : f (g * h) = f g + f h := by
+    simp only [f, map_mul, Units.val_mul, NNReal.coe_mul]
+    exact Real.log_mul (hpos g).ne' (hpos h).ne'
+  have hone : f 1 = 0 := by simp [f]
+  have hproper : IsProperMap f := by
+    let e : ℝ≥0ˣ ≃ₜ ℝ :=
+      (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+    have he : (e ∘ m) = f := funext fun g ↦ (Real.log_of_pos (hpos g)).symm
+    exact he ▸ e.isProperMap.comp hm.1
+  obtain ⟨u, hu⟩ : ∃ u : G, 0 < f u := by
+    obtain ⟨g, hg⟩ := hm.2
+    have hn : f g ≠ 0 := by
+      intro hz
+      apply hg
+      apply Units.ext
+      apply NNReal.eq
+      change ((m g).val : ℝ) = 1
+      calc
+        ((m g).val : ℝ) = Real.exp (f g) := (Real.exp_log (hpos g)).symm
+        _ = 1 := by rw [hz, Real.exp_zero]
+    rcases hn.lt_or_gt with h | h
+    · refine ⟨g⁻¹, ?_⟩
+      have hsum := hmul g⁻¹ g
+      rw [inv_mul_cancel, hone] at hsum
+      linarith
+    · exact ⟨g, h⟩
+  let a := f u
+  have ha : 0 < a := hu
+  have hpow (k : ℤ) : f (u ^ k) = (k : ℝ) * a := by
+    simp [f, a, map_zpow, Units.val_zpow_eq_zpow_val, NNReal.coe_zpow, Real.log_zpow]
+  let band (b c : ℝ) := f ⁻¹' Ico b c
+  have hfinite (μ : Measure G) [μ.IsHaarMeasure] (b c : ℝ) :
+      μ (f ⁻¹' Icc b c) ≠ ∞ :=
+    (hproper.isCompact_preimage isCompact_Icc).measure_lt_top.ne
+  have hbandFinite (μ : Measure G) [μ.IsHaarMeasure] (b c : ℝ) : μ (band b c) ≠ ∞ :=
+    ne_top_of_le_ne_top (hfinite μ b c) (measure_mono (preimage_mono Ico_subset_Icc_self))
+  have hadd (μ : Measure G) [μ.IsHaarMeasure] {b c d : ℝ} (hbc : b ≤ c) (hcd : c ≤ d) :
+      μ.real (band b d) = μ.real (band b c) + μ.real (band c d) := by
+    have hdisj : Disjoint (Ico b c) (Ico c d) :=
+      disjoint_left.mpr fun _ hx hy ↦ (hx.2.not_ge hy.1)
+    have hmeas : MeasurableSet (band c d) :=
+      measurableSet_Ico.preimage hproper.continuous.measurable
+    rw [← measureReal_union (hdisj.preimage f) hmeas (hbandFinite μ b c) (hbandFinite μ c d)]
+    simp only [band, ← preimage_union, Ico_union_Ico_eq_Ico hbc hcd]
+  -- Powers of u translate the first band to each successive band.
+  have htile (μ : Measure G) [μ.IsHaarMeasure] (k : ℤ) :
+      μ.real (band ((k : ℝ) * a) ((k : ℝ) * a + a)) = μ.real (band 0 a) := by
+    have hpre : (fun g : G ↦ u ^ k * g) ⁻¹' band ((k : ℝ) * a) ((k : ℝ) * a + a) =
+        band 0 a := by
+      ext g
+      change ((k : ℝ) * a ≤ f (u ^ k * g) ∧ f (u ^ k * g) < (k : ℝ) * a + a) ↔
+        (0 ≤ f g ∧ f g < a)
+      rw [hmul, hpow]
+      constructor <;> rintro ⟨h₁, h₂⟩ <;> exact ⟨by linarith, by linarith⟩
+    simpa only [hpre, measureReal_def] using
+      (congrArg ENNReal.toReal (measure_preimage_mul μ (u ^ k)
+        (band ((k : ℝ) * a) ((k : ℝ) * a + a)))).symm
+  have hcount (μ : Measure G) [μ.IsHaarMeasure] (k : ℤ) (n : ℕ) :
+      μ.real (band ((k : ℝ) * a) (((k : ℝ) + n) * a)) = n * μ.real (band 0 a) := by
+    induction n with
+    | zero => simp [band]
+    | succ n ih =>
+      have hleft : (k : ℝ) * a ≤ ((k : ℝ) + n) * a :=
+        mul_le_mul_of_nonneg_right (le_add_of_nonneg_right (Nat.cast_nonneg n)) ha.le
+      have hright : ((k : ℝ) + n) * a ≤ ((k : ℝ) + (n + 1)) * a := by
+        gcongr
+        exact le_add_of_nonneg_right zero_le_one
+      rw [Nat.cast_succ, hadd μ hleft hright, ih]
+      have hlast := htile μ (k + (n : ℤ))
+      push_cast at hlast
+      rw [← add_assoc (k : ℝ) n 1, add_mul ((k : ℝ) + n) 1 a, one_mul, hlast]
+      ring
+  have hcenter (μ : Measure G) [μ.IsHaarMeasure] (n : ℕ) :
+      μ.real (band (-(n * a)) (n * a)) = 2 * n * μ.real (band 0 a) := by
+    have h := hcount μ (-(n : ℤ)) (n + n)
+    push_cast at h
+    rw [neg_mul, neg_add_cancel_left] at h
+    rw [h]
+    ring
+  -- The open band around the identity gives the first band positive mass.
+  let ν : Measure G := Measure.haar
+  have hν : ν.IsHaarMeasure := by dsimp [ν]; infer_instance
+  have hνpos : 0 < ν.real (band 0 a) := by
+    have hOpen : IsOpen (f ⁻¹' Ioo (-a) a) := isOpen_Ioo.preimage hproper.continuous
+    have hne : (f ⁻¹' Ioo (-a) a).Nonempty := ⟨1, by
+      change -a < f 1 ∧ f 1 < a
+      rw [hone]
+      exact ⟨neg_lt_zero.mpr ha, ha⟩⟩
+    have hsub : f ⁻¹' Ioo (-a) a ⊆ band (-a) a := preimage_mono Ioo_subset_Ico_self
+    have hfin := hbandFinite ν (-a) a
+    have hmass : 0 < ν.real (band (-a) a) :=
+      ENNReal.toReal_pos (mt (measure_mono_null hsub) (hOpen.measure_pos ν hne).ne') hfin
+    have h₁ := hcenter ν 1
+    simp only [Nat.cast_one, one_mul, mul_one] at h₁
+    linarith
+  let c := ENNReal.ofReal (a / ν.real (band 0 a))
+  let μ := c • ν
+  have hc : 0 < a / ν.real (band 0 a) := div_pos ha hνpos
+  have hμ : μ.IsHaarMeasure :=
+    Measure.IsHaarMeasure.smul ν (ENNReal.ofReal_pos.mpr hc).ne' ENNReal.ofReal_ne_top
+  have hnorm : μ.real (band 0 a) = a := by
+    change (c • ν).real (band 0 a) = a
+    rw [measureReal_ennreal_smul_apply, ENNReal.toReal_ofReal hc.le,
+      div_mul_cancel₀ _ hνpos.ne']
+  refine ⟨μ, hμ, Asymptotics.isBigO_iff.mpr ⟨2 * a, ?_⟩⟩
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with Λ hΛ
+  have hΛpos : 0 < Λ := zero_lt_one.trans_le hΛ
+  have hwindow : {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ} = f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) := by
+    ext g
+    change (Λ⁻¹ ≤ ((m g).val : ℝ) ∧ ((m g).val : ℝ) ≤ Λ) ↔
+      (-Real.log Λ ≤ f g ∧ f g ≤ Real.log Λ)
+    dsimp [f]
+    rw [← Real.log_inv, Real.log_le_log_iff (inv_pos.mpr hΛpos) (hpos g),
+      Real.log_le_log_iff (hpos g) hΛpos]
+  -- Enclose the closed window between half-open bands at successive integer radii.
+  let n := ⌊Real.log Λ / a⌋₊
+  have hlo : (n : ℝ) * a ≤ Real.log Λ :=
+    (le_div_iff₀ ha).mp (Nat.floor_le (div_nonneg (Real.log_nonneg hΛ) ha.le))
+  have hhi : Real.log Λ < ((n : ℝ) + 1) * a :=
+    (div_lt_iff₀ ha).mp (Nat.lt_floor_add_one _)
+  have hlow : band (-(n * a)) (n * a) ⊆ f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) := by
+    apply preimage_mono
+    intro x hx
+    exact ⟨(neg_le_neg hlo).trans hx.1, hx.2.le.trans hlo⟩
+  have hupp : f ⁻¹' Icc (-Real.log Λ) (Real.log Λ) ⊆
+      band (-(((n : ℝ) + 1) * a)) (((n : ℝ) + 1) * a) := by
+    apply preimage_mono
+    intro x hx
+    exact ⟨(neg_le_neg hhi.le).trans hx.1, hx.2.trans_lt hhi⟩
+  have h₁ := measureReal_mono (μ := μ) hlow (hfinite μ _ _)
+  have h₂ := measureReal_mono (μ := μ) hupp (hbandFinite μ _ _)
+  rw [hcenter μ n, hnorm] at h₁
+  rw [← Nat.cast_succ, hcenter μ (n + 1), hnorm, Nat.cast_succ] at h₂
+  rw [hwindow, ← measureReal_def, Real.norm_eq_abs, norm_one, mul_one, abs_le]
+  constructor <;> linarith
 
 /-- Paper: Definition D.2.1.1(2), p. 793. Exactly one Haar measure has mass
 `2 log Λ + O(1)` on the inverse image of the closed interval from `Λ⁻¹` to `Λ`. -/
 theorem existsUnique_canonicalModulatedHaar (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) :
     ∃! μ : Measure G, μ.IsHaarMeasure ∧
       (fun Λ : ℝ ↦ (μ {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}).toReal - 2 * Real.log Λ)
-        =O[atTop] (fun _ ↦ (1 : ℝ)) := by sorry
+        =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+  obtain ⟨μ, hμ, hgrowth⟩ := exists_canonicalModulatedHaar m hm
+  refine ⟨μ, ⟨hμ, hgrowth⟩, ?_⟩
+  rintro ν ⟨hν, hgrowth'⟩
+  let c := ν.haarScalarFactor μ
+  have hscale : ν = c • μ := Measure.isMulLeftInvariant_eq_smul ν μ
+  suffices hc : c = 1 by simpa [hc] using hscale
+  by_contra hne
+  have hdiff : (fun Λ : ℝ ↦ (2 * ((c : ℝ) - 1)) * Real.log Λ)
+      =O[atTop] (fun _ ↦ (1 : ℝ)) := by
+    apply (hgrowth'.sub (hgrowth.const_mul_left (c : ℝ))).congr_left
+    intro Λ
+    simp only [← measureReal_def, hscale, measureReal_nnreal_smul_apply]
+    ring
+  have hcoef : 2 * ((c : ℝ) - 1) ≠ 0 :=
+    mul_ne_zero two_ne_zero (sub_ne_zero.mpr (by exact_mod_cast hne))
+  exact Real.isLittleO_const_log_atTop.not_isBigO (Frequently.of_forall fun _ ↦ one_ne_zero)
+    ((Asymptotics.isBigO_const_mul_left_iff hcoef).mp hdiff)
 
 /-- Paper: Definition D.2.1.1(2), p. 793. The canonical Haar measure is selected
 by the logarithmic growth condition on symmetric module intervals. -/

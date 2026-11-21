@@ -256,7 +256,39 @@ compact first member gives an almost everywhere finite measure maximal function.
 theorem ae_dSequenceMeasureMaximal_lt_top [μ.IsHaarMeasure] {ν : Measure G} [ν.Regular]
     (hU : IsDSequence μ U) (hBorel : ∀ k, MeasurableSet (U k))
     (hcompact : IsCompact (closure (U 0))) :
-    ∀ᵐ x ∂μ, dSequenceMeasureMaximal μ ν U x < ∞ := by sorry
+    ∀ᵐ x ∂μ, dSequenceMeasureMaximal μ ν U x < ∞ := by
+  rw [ae_iff]
+  simp only [not_lt, top_le_iff]
+  let A : Set G := {x | dSequenceMeasureMaximal μ ν U x = ∞}
+  change μ A = 0
+  obtain ⟨C, hC, hbound⟩ := hU.2.2
+  have hnull {K : Set G} (hK : IsCompact K) : μ (K ∩ A) = 0 := by
+    have hprod := hK.mul hcompact
+    have hμ : μ (K * U 0) < ∞ :=
+      (measure_mono (Set.mul_subset_mul Subset.rfl subset_closure)).trans_lt hprod.measure_lt_top
+    have hν : ν (K * closure (U 0)) < ∞ := hprod.measure_lt_top
+    have hlim : Tendsto (fun n : ℕ ↦ ENNReal.ofReal (C / n) * ν (K * closure (U 0)))
+        atTop (𝓝 0) := by
+      simpa only [ENNReal.ofReal_zero, zero_mul] using
+        ENNReal.Tendsto.mul_const (ENNReal.tendsto_ofReal (tendsto_const_div_atTop_nhds_zero_nat C))
+          (Or.inr hν.ne)
+    refine le_antisymm (ge_of_tendsto hlim ?_) bot_le
+    filter_upwards [eventually_gt_atTop (0 : ℕ)] with n hn
+    let E := K ∩ {x | ENNReal.ofReal (n : ℝ) < dSequenceMeasureMaximal μ ν U x}
+    calc
+      μ (K ∩ A) ≤ μ E := measure_mono fun x hx ↦
+        ⟨hx.1, by
+          rw [mem_ofPred_eq, show dSequenceMeasureMaximal μ ν U x = ∞ from hx.2]
+          exact ENNReal.ofReal_lt_top⟩
+      _ ≤ ENNReal.ofReal (C / n) * ν (E * U 0) :=
+        dSequenceMeasureMaximal_weak hU hBorel hC (fun k ↦ (hbound k).2)
+          hK.isClosed.measurableSet.nullMeasurableSet hμ (Nat.cast_pos.mpr hn)
+      _ ≤ ENNReal.ofReal (C / n) * ν (K * closure (U 0)) :=
+        mul_le_mul' le_rfl (measure_mono (Set.mul_subset_mul inter_subset_left subset_closure))
+  rw [← inter_univ A, ← iUnion_compactCovering G, inter_iUnion, measure_iUnion_null_iff]
+  intro n
+  rw [inter_comm]
+  exact hnull (isCompact_compactCovering G n)
 
 /-- Paper: Theorem A.5.3.5, p. 580. For a D′-sequence the weak bound on a
 compact set can use the `ν`-mass of that compact set itself.
@@ -278,7 +310,14 @@ def dSequenceMaximal (μ : Measure G) (U : ℕ → Set G) (f : G → ℂ) (x : G
 singleton of positive finite mass, the maximal function is the pointwise norm. -/
 theorem dSequenceMaximal_eventually_singleton [μ.IsHaarMeasure]
     (h₀ : 0 < μ {1}) (hfin : μ {1} < ∞) (hU : ∀ᶠ k in atTop, U k = {1})
-    (f : G → ℂ) (x : G) : dSequenceMaximal μ U f x = ‖f x‖ₑ := by sorry
+    (f : G → ℂ) (x : G) : dSequenceMaximal μ U f x = ‖f x‖ₑ := by
+  have hx : μ {x} = μ {1} := by
+    rw [← measure_smul μ x ({1} : Set G), Set.smul_set_singleton, smul_eq_mul, mul_one]
+  have hev : ∀ᶠ k in atTop, ⨍⁻ y in x • U k, ‖f y‖ₑ ∂μ = ‖f x‖ₑ := by
+    filter_upwards [hU] with k hk
+    rw [hk, Set.smul_set_singleton, smul_eq_mul, mul_one, setLAverage_eq, lintegral_singleton,
+      hx, ENNReal.mul_div_cancel_right h₀.ne' hfin.ne]
+  rw [dSequenceMaximal, limsup_congr hev, limsup_const]
 
 /-- Paper: Theorem A.5.3.6, p. 581. The local function maximal operator gives
 a function measurable for the completed Haar measure. -/
@@ -419,7 +458,9 @@ def dSequenceSmoothening (μ : Measure G) (U : ℕ → Set G) (f : G → ℂ)
 same constant on its regular set. -/
 theorem dSequenceSmoothening_const [μ.IsHaarMeasure] (hU : IsDSequence μ U) (c : ℂ)
     (x : dSequenceRegularSet μ U (fun _ ↦ c)) :
-    dSequenceSmoothening μ U (fun _ ↦ c) x = c := by sorry
+    dSequenceSmoothening μ U (fun _ ↦ c) x = c := by
+  simp only [dSequenceSmoothening, dSequenceAverage_const hU]
+  exact tendsto_const_nhds.limUnder_eq
 
 -- TODO(paper-gap): Remark A.5.4.2 refers to D_f without specifying it.
 
