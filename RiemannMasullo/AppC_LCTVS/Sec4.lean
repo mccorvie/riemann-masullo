@@ -13,6 +13,8 @@ public import Mathlib.Topology.Algebra.Group.Quotient
 import Mathlib.Analysis.Normed.Operator.Banach
 import Mathlib.LinearAlgebra.Dual.Lemmas
 import Mathlib.MeasureTheory.Function.ConvergenceInMeasure
+import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
+import Mathlib.MeasureTheory.Measure.Prokhorov
 import Mathlib.Topology.Algebra.LinearMapCompletion
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 
@@ -439,7 +441,70 @@ theorem closedConvexHull_eq_pettisWeakIntegrals_probability [CompactSpace X]
     let hull := closedConvexHull ℝ (range (toPettisWeakCompletion E ∘ f))
     hull = {a | ∃ μ : Measure X, μ.Regular ∧ μ univ = 1 ∧
       ∃ hi : PettisWeaklyIntegrable (.positive μ) f,
-        pettisWeakIntegral (.positive μ) f hi = a} := by sorry
+        pettisWeakIntegral (.positive μ) f hi = a} := by
+  let B : Module.Dual ℂ (StrongDual ℂ E) →ₗ[ℂ] Module.Dual ℂ (StrongDual ℂ E) := .id
+  have : T2Space (PettisWeakCompletion E) :=
+    (WeakBilin.isEmbedding (B := B) Function.injective_id).t2Space
+  let g (φ : StrongDual ℂ E) : BoundedContinuousFunction X ℂ :=
+    BoundedContinuousFunction.mkOfCompact ⟨fun x ↦ φ (f x), φ.continuous.comp hf⟩
+  have hi (μ : Measure X) [IsFiniteMeasure μ] : PettisWeaklyIntegrable (.positive μ) f :=
+    fun φ ↦ (g φ).integrable (μ := μ)
+  let barycenter (p : ProbabilityMeasure X) : PettisWeakCompletion E :=
+    pettisWeakIntegral (.positive (p : Measure X)) f (hi p)
+  have hcont : Continuous barycenter := by
+    apply WeakBilin.continuous_of_continuous_eval B
+    intro φ
+    rw [continuous_iff_continuousAt]
+    intro p
+    exact (ProbabilityMeasure.tendsto_iff_forall_integral_rclike_tendsto ℂ).mp
+      (tendsto_id (x := 𝓝 p)) (g φ)
+  have hconv : Convex ℝ (range barycenter) := by
+    rintro _ ⟨p, rfl⟩ _ ⟨q, rfl⟩ a b ha hb hab
+    let μ := ENNReal.ofReal a • (p : Measure X)
+    let ν := ENNReal.ofReal b • (q : Measure X)
+    let r : ProbabilityMeasure X := ⟨μ + ν, ⟨by simp [μ, ν, ← ENNReal.ofReal_add ha hb, hab]⟩⟩
+    refine ⟨r, LinearMap.ext fun φ ↦ ?_⟩
+    change ∫ x, g φ x ∂(μ + ν) =
+      a • (∫ x, g φ x ∂(p : Measure X)) + b • (∫ x, g φ x ∂(q : Measure X))
+    have hp : Integrable (g φ) (p : Measure X) := hi p φ
+    have hq : Integrable (g φ) (q : Measure X) := hi q φ
+    rw [integral_add_measure (hp.smul_measure ENNReal.ofReal_ne_top)
+      (hq.smul_measure ENNReal.ofReal_ne_top)]
+    simp [ENNReal.toReal_ofReal ha, ENNReal.toReal_ofReal hb]
+  have hsubset : range (toPettisWeakCompletion E ∘ f) ⊆ range barycenter := by
+    rintro _ ⟨x, rfl⟩
+    exact ⟨⟨Measure.dirac x, Measure.dirac.isProbabilityMeasure⟩,
+      LinearMap.ext fun φ ↦ integral_dirac (g φ) x⟩
+  apply le_antisymm
+  · intro a ha
+    obtain ⟨p, rfl⟩ := closedConvexHull_min hsubset hconv (isCompact_range hcont).isClosed ha
+    -- Use a regular representative of the probability measure with the same moments.
+    obtain ⟨ν, hνreg, hνfin, hν⟩ := (p : Measure X).exists_regular_eq_of_compactSpace
+    refine ⟨ν, hνreg, ?_, hi ν, LinearMap.ext fun φ ↦ ?_⟩
+    · apply (ENNReal.toReal_eq_one_iff _).mp
+      simpa [measureReal_def] using (hν (1 : BoundedContinuousFunction X ℝ)).symm
+    · change (∫ x, g φ x ∂ν) = ∫ x, g φ x ∂(p : Measure X)
+      apply Complex.ext
+      · let gre := BoundedContinuousFunction.mkOfCompact
+          ⟨fun x ↦ (g φ x).re, Complex.continuous_re.comp (g φ).continuous⟩
+        exact (integral_re (hi ν φ)).symm.trans ((hν gre).symm.trans (integral_re (hi p φ)))
+      · let gim := BoundedContinuousFunction.mkOfCompact
+          ⟨fun x ↦ (g φ x).im, Complex.continuous_im.comp (g φ).continuous⟩
+        exact (integral_im (hi ν φ)).symm.trans ((hν gim).symm.trans (integral_im (hi p φ)))
+  · rintro _ ⟨μ, _, hμ, h, rfl⟩
+    have : IsProbabilityMeasure μ := ⟨hμ⟩
+    -- A separating functional would give a scalar bound violated by its own integral.
+    by_contra hnot
+    obtain ⟨l, r, hl, hr⟩ := RCLike.geometric_hahn_banach_closed_point (𝕜 := ℂ)
+      convex_closedConvexHull isClosed_closedConvexHull hnot
+    obtain ⟨φ, rfl⟩ := B.dualEmbedding_surjective l
+    have hle : ∀ x, (φ (f x)).re ≤ r := fun x ↦
+      (hl _ (subset_closedConvexHull (mem_range_self x))).le
+    have hφi : Integrable (fun x ↦ φ (f x)) μ := h φ
+    have hb := integral_mono hφi.re (integrable_const r) hle
+    rw [integral_re hφi, integral_const, probReal_univ, one_smul] at hb
+    change r < RCLike.re (∫ x, φ (f x) ∂μ) at hr
+    exact hr.not_ge hb
 
 /-- Paper: Theorem C.4.3.2(1), p. 712. The closed convex hull of the
 image in the weak completion is compact. -/
