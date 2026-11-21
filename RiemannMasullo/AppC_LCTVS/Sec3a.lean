@@ -1642,7 +1642,44 @@ is absolutely summable in any Hilbert basis, including an uncountable basis.
 Deviation: Mathlib's inner product is linear in the second argument. -/
 theorem summable_norm_hilbertDiagonal {ι : Type*} (b : HilbertBasis ι ℂ H)
     (T : H →L[ℂ] H) (hT : IsNuclearOperator T) :
-    Summable (fun i ↦ ‖⟪b i, T (b i)⟫_ℂ‖) := by sorry
+    Summable (fun i ↦ ‖⟪b i, T (b i)⟫_ℂ‖) := by
+  obtain ⟨c, φ, y, hc, hφ, hy, hsum⟩ := (isNuclearOperator_iff_isBanachNuclear T).mp hT
+  obtain ⟨C, hC, hφC⟩ := (Metric.isBounded_range_of_tendsto φ hφ).exists_pos_norm_le
+  obtain ⟨R, _, hyR⟩ := (Metric.isBounded_range_of_tendsto y hy).exists_pos_norm_le
+  -- Bound the absolute diagonal of each rank-one term by Cauchy–Schwarz.
+  have hdiag (n : ℕ) :
+      (Summable fun i ↦ ‖φ n (b i)‖ * ‖⟪b i, y n⟫_ℂ‖) ∧
+        (∑' i, ‖φ n (b i)‖ * ‖⟪b i, y n⟫_ℂ‖) ≤ ‖φ n‖ * ‖y n‖ := by
+    let u := (InnerProductSpace.toDual ℂ H).symm (φ n)
+    have hu (i : ι) : ‖b.repr u i‖ = ‖φ n (b i)‖ := by
+      rw [b.repr_apply_apply, norm_inner_symm (𝕜 := ℂ)]
+      exact congrArg norm InnerProductSpace.toDual_symm_apply
+    have hp : (2 : ENNReal).toReal.HolderConjugate (2 : ENNReal).toReal := by
+      simpa using Real.HolderConjugate.two_two
+    have hCS := lp.tsum_mul_le_mul_norm hp (b.repr u) (b.repr (y n))
+    simp only [hu] at hCS
+    simpa only [b.repr_apply_apply, LinearIsometryEquiv.norm_map, u] using hCS
+  let a (n : ℕ) (i : ι) : ℝ := ‖c n‖ * (‖φ n (b i)‖ * ‖⟪b i, y n⟫_ℂ‖)
+  have ha_nonneg (n : ℕ) (i : ι) : 0 ≤ a n i :=
+    mul_nonneg (norm_nonneg _) (mul_nonneg (norm_nonneg _) (norm_nonneg _))
+  have ha_row (n : ℕ) : Summable (a n) := (hdiag n).1.mul_left _
+  have ha_bound (n : ℕ) : (∑' i, a n i) ≤ ‖c n‖ * (C * R) := by
+    rw [show (∑' i, a n i) = ‖c n‖ * ∑' i, ‖φ n (b i)‖ * ‖⟪b i, y n⟫_ℂ‖ from
+      (hdiag n).1.tsum_mul_left _]
+    refine mul_le_mul_of_nonneg_left ((hdiag n).2.trans ?_) (norm_nonneg _)
+    exact mul_le_mul (hφC _ (mem_range_self n)) (hyR _ (mem_range_self n))
+      (norm_nonneg _) hC.le
+  have ha : Summable (Function.uncurry a) :=
+    (summable_prod_of_nonneg (f := Function.uncurry a) (fun p ↦ ha_nonneg p.1 p.2)).mpr
+      ⟨ha_row, Summable.of_nonneg_of_le (fun n ↦ tsum_nonneg (ha_nonneg n))
+        ha_bound (hc.mul_right (C * R))⟩
+  -- Sum the majorant in the other order to control the diagonal of the full operator.
+  have ha_swap : Summable (fun p : ι × ℕ ↦ a p.2 p.1) := ha.prod_symm
+  refine Summable.of_nonneg_of_le (g := fun i ↦ ‖⟪b i, T (b i)⟫_ℂ‖)
+    (fun i ↦ norm_nonneg ⟪b i, T (b i)⟫_ℂ) (fun i ↦ ?_) ha_swap.prod
+  refine ((innerSL ℂ (b i)).hasSum (hsum (b i))).norm_le_of_bounded
+    (ha_swap.prod_factor i).hasSum (fun n ↦ ?_)
+  simp only [a, innerSL_apply_apply, inner_smul_right, norm_mul, mul_assoc, le_refl]
 
 -- TODO(paper-gap): Lemma C.3.4.1(2) is false. For diag(1, -1) on ℂ², the sum
 -- of absolute diagonal entries is 2 in the coordinate basis and 0 in the
