@@ -399,7 +399,33 @@ structure IsBanachDisc (B : Set F) : Prop where
 /-- Paper: §C.3.1, p. 693. The closed unit ball of a Banach space is a Banach disc.
 Deviation: This is a check of the disc definition. -/
 theorem isBanachDisc_closedUnitBall {X : Type*} [NormedAddCommGroup X] [NormedSpace ℂ X]
-    [CompleteSpace X] : IsBanachDisc (Metric.closedBall (0 : X) 1) := by sorry
+    [CompleteSpace X] : IsBanachDisc (Metric.closedBall (0 : X) 1) := by
+  let B := Metric.closedBall (0 : X) 1
+  let S := Submodule.span ℂ B
+  have hball : ((↑) ⁻¹' B : Set S) = Metric.closedBall (0 : S) 1 := rfl
+  have hb : Balanced ℂ ((↑) ⁻¹' B : Set S) := by
+    rw [hball]
+    exact balanced_closedBall_zero
+  have hc : Convex ℝ ((↑) ⁻¹' B : Set S) := by
+    rw [hball]
+    exact convex_closedBall 0 1
+  have ha : Absorbent ℝ ((↑) ⁻¹' B : Set S) := by
+    rw [hball]
+    exact absorbent_nhds_zero (Metric.closedBall_mem_nhds 0 one_pos)
+  let p := gaugeSeminorm hb hc ha
+  have hp (z : S) : p z = ‖z‖ := by
+    change gauge ((↑) ⁻¹' B : Set S) z = ‖z‖
+    rw [hball, gauge_closedBall zero_le_one, div_one]
+  let f : WithLocalSeminorm p → X := fun x ↦ (x : S).val
+  have hf : Isometry f := Isometry.of_dist_eq fun x y ↦ by
+    rw [dist_eq_norm, dist_eq_norm]
+    exact (hp ((x : S) - (y : S))).symm
+  have hB : Absorbent ℂ B := absorbent_nhds_zero (Metric.closedBall_mem_nhds 0 one_pos)
+  have hspan : S = ⊤ := (hB.mono Submodule.subset_span).submodule_eq_top
+  have hsurj : Function.Surjective f := fun x ↦ ⟨⟨x, by simp [hspan]⟩, rfl⟩
+  exact ⟨NormedSpace.isVonNBounded_closedBall ℂ X 1, hb, hc, ha,
+    T2Space.of_injective_continuous (fun _ _ h ↦ Subtype.ext h) hf.continuous,
+    (hf.isUniformInducing.completeSpace_congr hsurj).mpr inferInstance⟩
 
 /-- Paper: §C.3.1, p. 694. Nuclearity means that some balanced convex zero-neighborhood
 maps into a Banach disc and that the induced operator from the local Banach space
