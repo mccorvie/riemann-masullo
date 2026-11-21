@@ -6,6 +6,7 @@ import all RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-!
@@ -647,8 +648,39 @@ theorem modulatedExponentialDecay_strip_coordinates
     (c : relativeVerticalStrip m.toMonoidHom hm.1 hm.2 I) :
     ∃! p : PontryaginDual K × ℂ, p.2.re ∈ I ∧
       ∀ (u : K) (t : ℝ≥0ˣ),
-        (c : QuasiCharacter G) ((u : G) * τ t) = (p.1 u : ℂ) * ((t.val : ℝ) : ℂ) ^ p.2 :=
-  by sorry
+        (c : QuasiCharacter G) ((u : G) * τ t) = (p.1 u : ℂ) * ((t.val : ℝ) : ℂ) ^ p.2 := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp
+    (hm.1.isCompact_preimage (isCompact_singleton (x := 1)))
+  let d : QuasiCharacter G := c
+  obtain ⟨e, he⟩ :=
+    quasiCharacterParametrization_of_split m.toMonoidHom m.continuous τ hτ
+  obtain ⟨hs, hχ⟩ := he d
+  change ∀ t : ℝ≥0ˣ, d (τ t) = ((t.val : ℝ) : ℂ) ^ (e d).1 at hs
+  have hre : (e d).1.re = quasiCharacterAbscissa m.toMonoidHom hm.1 hm.2 d := by
+    let t : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+    have ht : (t.val : ℝ) = 2 := by norm_num [t]
+    have hnorm := norm_quasiCharacter_eq_rpow_abscissa m.toMonoidHom hm.1 hm.2 d (τ t)
+    change ‖d (τ t)‖ = ((m.toMonoidHom (τ t)).val : ℝ) ^ _ at hnorm
+    rw [hs t, show m.toMonoidHom (τ t) = t from hτ t, ht,
+      Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num : (0 : ℝ) < 2)] at hnorm
+    exact (Real.rpow_right_inj (by norm_num : (0 : ℝ) < 2) (by norm_num)).mp hnorm
+  refine ⟨((e d).2, (e d).1), ⟨?_, ?_⟩, ?_⟩
+  · change (e d).1.re ∈ I
+    rw [hre]
+    exact c.property
+  · intro u t
+    change d ((u : G) * τ t) = ((e d).2 u : ℂ) * ((t.val : ℝ) : ℂ) ^ (e d).1
+    rw [map_mul, hχ u, hs t]
+  · rintro ⟨χ, s⟩ ⟨_, h⟩
+    apply Prod.ext
+    · apply ContinuousMonoidHom.ext
+      intro u
+      apply Circle.ext
+      have hu : d (u : G) = (χ u : ℂ) := by simpa using h u 1
+      exact hu.symm.trans (hχ u).symm
+    · obtain ⟨_, _, hz⟩ := existsUnique_complexPower (d.comp τ)
+      refine (hz s fun t ↦ ?_).trans (hz (e d).1 hs).symm
+      simpa using h 1 t
 
 local notation "T" => InductiveTensor (SchwartzBruhat K) P
 
