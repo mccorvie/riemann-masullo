@@ -10,6 +10,7 @@ import Mathlib.Analysis.Calculus.Deriv.Comp
 import Mathlib.Analysis.Calculus.Deriv.Mul
 import Mathlib.Analysis.Calculus.MeanValue
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Partial
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.HahnBanach
 
 /-!
 # Spaces of smooth vector-valued functions
@@ -313,6 +314,8 @@ def uniformValueTopology {X : Type*} (S : Submodule ℂ (X → E)) : Topological
   letI := IsTopologicalAddGroup.rightUniformSpace E
   TopologicalSpace.induced (fun f : S ↦ (UniformFun.ofFun f.val : X →ᵤ E)) inferInstance
 
+-- Retain the continuous scalar multiplication and Hausdorff assumptions in the signature.
+set_option linter.unusedSectionVars false in
 include hSMul hSemi hT2 in
 /-- Paper: Definition C.5.1.26(1–2), p. 735. A family converges to zero in the
 uniform value topology exactly when scalar convergence is uniform in both the argument
@@ -322,7 +325,32 @@ theorem tendsto_uniformValueTopology_zero_iff {X I : Type*} (S : Submodule ℂ (
     letI := uniformValueTopology S
     Tendsto f l (𝓝 0) ↔
       ∀ A : Set (StrongDual ℂ E), EquicontinuousAt (fun φ : A ↦ (φ.val : E → ℂ)) 0 →
-        ∀ ε : ℝ, 0 < ε → ∀ᶠ j in l, ∀ x : X, ∀ φ ∈ A, ‖φ ((f j).val x)‖ < ε := by sorry
+        ∀ ε : ℝ, 0 < ε → ∀ᶠ j in l, ∀ x : X, ∀ φ ∈ A, ‖φ ((f j).val x)‖ < ε := by
+  let := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have hb := UniformFun.hasBasis_nhds_of_basis X E (UniformFun.ofFun (0 : X → E))
+    (𝓝 (0 : E)).basis_sets.uniformity_of_nhds_zero
+  simp only [nhds_induced, tendsto_comap_iff, hb.tendsto_right_iff,
+    Function.comp_def, Set.mem_ofPred_eq, UniformFun.gen, UniformFun.toFun_ofFun,
+    Submodule.coe_zero, Pi.zero_apply, sub_zero]
+  constructor
+  · intro h A hA ε hε
+    have hnear : (∀ᶠ y in 𝓝 (0 : E), ∀ φ : A, ‖φ.val y‖ < ε) := by
+      simpa only [map_zero, dist_zero_left] using Metric.equicontinuousAt_iff_right.mp hA ε hε
+    filter_upwards [h _ hnear] with j hj x φ hφ
+    exact hj x ⟨φ, hφ⟩
+  · intro h U hU
+    obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+    let A : Set (StrongDual ℂ E) := {φ | ∀ y, ‖φ y‖ ≤ p y}
+    have hA : EquicontinuousAt (fun φ : A ↦ (φ.val : E → ℂ)) 0 := by
+      rw [Metric.equicontinuousAt_iff_right]
+      intro ε hε
+      filter_upwards [p.ball_mem_nhds hp hε] with y hy φ
+      simpa only [map_zero, dist_zero_left] using
+        (φ.property y).trans_lt (p.mem_ball_zero.mp hy)
+    filter_upwards [h A hA 1 one_pos] with j hj x
+    obtain ⟨φ, hφ, hEq⟩ := exists_dual_norm_eq_seminorm p hp ((f j).val x)
+    exact hpU (p.mem_ball_zero.mpr (hEq ▸ hj x φ hφ))
 
 include hT2 in
 /-- Paper: Definition C.5.1.26(1–2), p. 735. The uniform value topology is Hausdorff. -/
