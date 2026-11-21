@@ -511,7 +511,23 @@ def vectorSmoothSpace (Ω : Set V) : Submodule ℂ (Ω → E) :=
 
 /-- Paper: Definition C.5.1.23, p. 734. Constant vector-valued functions are smooth. -/
 theorem vectorSmoothOn_const (Ω : Set V) (z : E) :
-    VectorSmoothOn (fun _ : V ↦ z) Ω := by sorry
+    VectorSmoothOn (fun _ : V ↦ z) Ω := by
+  have key : ∀ (m : ℕ) (z : E), VectorContDiffOrderOn (fun _ : V ↦ z) Ω m := by
+    intro m
+    induction m with
+    | zero =>
+      intro z
+      show IsVonNBounded ℂ _
+      refine (Bornology.isVonNBounded_singleton (0 : E)).subset ?_
+      rintro w ⟨x, -, y, -, -, -, rfl⟩
+      simp
+    | succ m ih =>
+      intro z i
+      refine ⟨fun _ ↦ 0, ?_, continuousOn_const, ih 0⟩
+      intro φ x
+      simp only [map_zero]
+      exact hasDerivWithinAt_const _ _ _
+  exact fun m ↦ key m z
 
 /-- Paper: Definition C.5.1.23, p. 734. Restricting a constant map gives a member of
 the smooth submodule and of every finite-order submodule. -/
