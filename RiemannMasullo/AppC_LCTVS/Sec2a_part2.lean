@@ -681,10 +681,84 @@ to the corresponding entries of a pure tensor. -/
 theorem injectiveTensorMap_tmul (x : E) (y : F) :
     injectiveTensorMap f.toLinearMap g.toLinearMap (x ⊗ₜ[ℂ] y) = f x ⊗ₜ[ℂ] g y := by sorry
 
+omit lcE lcF lcG lcH sE sF sG sH in
+open scoped Pointwise in
+/-- Paper: (C.2.3.7), p. 677. The evaluation seminorms from two zero-neighborhood
+polars form a bounded family in the pointwise order on seminorms. -/
+private theorem injectiveTensorSeminorm_bddAbove {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [ContinuousSMul ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [ContinuousSMul ℂ Y]
+    (U : {U : Set X // U ∈ 𝓝 0}) (V : {V : Set Y // V ∈ 𝓝 0}) :
+    BddAbove (range fun v : StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val ↦
+      (normSeminorm ℂ ℂ).comp (tensorDualForm v.1.val v.2.val)) := by
+  refine Seminorm.bddAbove_range_iff.mpr fun z ↦ ?_
+  suffices ∃ C : ℝ, ∀ (φ : StrongDual.polar ℂ U.val) (ψ : StrongDual.polar ℂ V.val),
+      ‖tensorDualForm φ.val ψ.val z‖ ≤ C by
+    obtain ⟨C, hC⟩ := this
+    exact ⟨C, forall_mem_range.mpr fun v ↦ hC v.1 v.2⟩
+  induction z using TensorProduct.inductionOn with
+  | tmul x y =>
+      obtain ⟨a, hx⟩ : ∃ a : ℂ, x ∈ a • U.val := by
+        simpa using (absorbent_nhds_zero (𝕜 := ℂ) U.property x).exists
+      obtain ⟨b, hy⟩ : ∃ b : ℂ, y ∈ b • V.val := by
+        simpa using (absorbent_nhds_zero (𝕜 := ℂ) V.property y).exists
+      obtain ⟨x', hx', rfl⟩ := hx
+      obtain ⟨y', hy', rfl⟩ := hy
+      refine ⟨‖a‖ * ‖b‖, fun φ ψ ↦ ?_⟩
+      have hφ := (StrongDual.mem_polar_iff ℂ _).mp φ.property _ hx'
+      have hψ := (StrongDual.mem_polar_iff ℂ _).mp ψ.property _ hy'
+      simp only [tensorDualForm_tmul, map_smul, norm_mul, norm_smul]
+      exact mul_le_mul (mul_le_of_le_one_right (norm_nonneg _) hφ)
+        (mul_le_of_le_one_right (norm_nonneg _) hψ) (mul_nonneg (norm_nonneg _) (norm_nonneg _))
+        (norm_nonneg _)
+  | add z w hz hw =>
+      obtain ⟨C, hC⟩ := hz
+      obtain ⟨D, hD⟩ := hw
+      exact ⟨C + D, fun φ ψ ↦ by
+        rw [map_add]
+        exact (norm_add_le _ _).trans (add_le_add (hC φ ψ) (hD φ ψ))⟩
+
+-- Retain the Hausdorff assumptions in the existing signature.
+set_option linter.unusedSectionVars false in
 /-- Paper: (C.2.3.9), p. 678. Tensoring two continuous linear maps is continuous
 for the injective topologies. -/
 theorem injectiveTensorMap_continuous :
-    Continuous (injectiveTensorMap f.toLinearMap g.toLinearMap) := by sorry
+    Continuous (injectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  let M := injectiveTensorMap f.toLinearMap g.toLinearMap
+  refine (withGeneratingSeminorms_spec (G ⊗[ℂ] H) _).continuous_of_continuous_comp M
+    fun ⟨U, V⟩ ↦ ?_
+  let U' : {U : Set E // U ∈ 𝓝 0} :=
+    ⟨f ⁻¹' U.val, f.continuous.continuousAt.preimage_mem_nhds (by simpa using U.property)⟩
+  let V' : {V : Set F // V ∈ 𝓝 0} :=
+    ⟨g ⁻¹' V.val, g.continuous.continuousAt.preimage_mem_nhds (by simpa using V.property)⟩
+  refine Seminorm.continuous_of_le
+    ((withGeneratingSeminorms_spec (E ⊗[ℂ] F) _).continuous_seminorm (U', V')) fun z ↦ ?_
+  change E ⊗[ℂ] F at z
+  let T := TensorProduct.map f.toLinearMap g.toLinearMap
+  change injectiveTensorSeminorm U V (T z) ≤ injectiveTensorSeminorm U' V' z
+  have hTarget := injectiveTensorSeminorm_bddAbove U V
+  have hSource := injectiveTensorSeminorm_bddAbove U' V'
+  unfold injectiveTensorSeminorm
+  rw [← ciSup_prod hTarget, ← ciSup_prod hSource,
+    Seminorm.iSup_apply hTarget, Seminorm.iSup_apply hSource]
+  have : Nonempty (StrongDual.polar ℂ U.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  have : Nonempty (StrongDual.polar ℂ V.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+  apply ciSup_le
+  rintro ⟨φ, ψ⟩
+  let φ' : StrongDual.polar ℂ U'.val :=
+    ⟨φ.val.comp f, (StrongDual.mem_polar_iff ℂ _).mpr fun x hx ↦
+      (StrongDual.mem_polar_iff ℂ _).mp φ.property (f x) hx⟩
+  let ψ' : StrongDual.polar ℂ V'.val :=
+    ⟨ψ.val.comp g, (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦
+      (StrongDual.mem_polar_iff ℂ _).mp ψ.property (g y) hy⟩
+  have hform : (tensorDualForm φ.val ψ.val).comp T = tensorDualForm φ'.val ψ'.val := by
+    apply TensorProduct.ext'
+    intro x y
+    simp [T, tensorDualForm_tmul, φ', ψ']
+  change ‖tensorDualForm φ.val ψ.val (T z)‖ ≤ _
+  rw [show tensorDualForm φ.val ψ.val (T z) = tensorDualForm φ'.val ψ'.val z from
+    DFunLike.congr_fun hform z]
+  exact le_ciSup (Seminorm.bddAbove_range_iff.mp hSource z) (φ', ψ')
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. Tensoring two embeddings gives an embedding. -/
 theorem injectiveTensorMap_isEmbedding (hf : IsEmbedding f) (hg : IsEmbedding g) :
