@@ -64,6 +64,17 @@ theorem torusFlow_one (τ : Fin N → ℝ) : torusFlow τ 1 = torusQuotient N τ
 -- TODO(paper-gap): The sentence before §B.5.2 claims injectivity also in dimension one.
 -- For N = 1 and τ₁ = 1, times zero and one have the same image.
 
+/-- Paper: §B.5.1, p. 627. Rationally independent frequencies give a dense
+one-parameter subgroup of the ambient torus. -/
+theorem torusFlow_denseRange_of_linearIndependent [NeZero N] {τ : Fin N → ℝ}
+    (hτ : LinearIndependent ℚ τ) : DenseRange (torusFlow τ) := by sorry
+
+/-- Paper: §B.5.1, p. 627. For at least two rationally independent frequencies,
+distinct times give distinct phases.
+Deviation: Adds the dimension hypothesis used in the proof on p. 628. -/
+theorem torusFlow_injective_of_linearIndependent (hN : 2 ≤ N) {τ : Fin N → ℝ}
+    (hτ : LinearIndependent ℚ τ) : Injective (torusFlow τ) := by sorry
+
 /-- Paper: Theorem B.5.2.1(1), p. 627.
 The orbit closure is the closed additive subgroup obtained by closing the range of the flow. -/
 def torusFlowClosure (τ : Fin N → ℝ) : AddSubgroup (UnitAddTorus (Fin N)) :=
@@ -121,6 +132,27 @@ theorem torusFlowClosure_equiv_torus [NeZero N] (τ : Fin N → ℝ) :
 -- A function supported on a Haar-null orbit arc can pull back to a nonmeasurable time function.
 -- TODO(paper-gap): The bound in (B.5.2.14) needs an absolute value around the frequency.
 
+/-- Paper: Theorem B.5.2.1(2), p. 627. Symmetric time averages of a
+Riemann-integrable observable converge to its Haar probability integral.
+Deviation: Requires Lebesgue measurability up to null sets along the orbit for the time integral. -/
+theorem kroneckerWeyl_riemannIntegrable_symmetric [NeZero N] (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
+    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
+    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t)) volume) :
+    Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ • ∫ t in -T..T, u (torusFlowInClosure τ t))
+      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
+
+/-- Paper: Theorem B.5.2.1(2), p. 627. Forward time averages of a
+Riemann-integrable observable converge to its Haar probability integral.
+Deviation: Requires Lebesgue measurability up to null sets on the forward orbit. -/
+theorem kroneckerWeyl_riemannIntegrable_forward [NeZero N] (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
+    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
+    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t))
+      (volume.restrict (Ici (0 : ℝ)))) :
+    Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (torusFlowInClosure τ t))
+      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
+
 /-- Paper: Theorem B.5.2.1(2), p. 627.
 Symmetric time averages of a continuous observable converge to its Haar probability integral.
 Deviation: This is the continuous case singled out in the paper. -/
@@ -150,8 +182,9 @@ theorem exists_continuous_sandwich_indicator {X : Type*} [TopologicalSpace X] [T
         U.indicator (fun _ ↦ (1 : ℝ)) x ≤ (upper x : ℝ)) ∧
       (∫ x, ((upper x : ℝ) - (lower x : ℝ)) ∂μ) < ε := by sorry
 
--- TODO(paper-gap): The proof of Remark B.5.2.3(1) identifies two sets that need only be
--- related by inclusion. For U = [0, 1), the image is the whole circle with empty frontier.
+-- TODO(paper-gap): Neither inclusion in the asserted frontier identity holds in general.
+-- Away from the coordinate seams the cube projection is a local homeomorphism, so the
+-- torus frontier lies in the image of the relative frontier together with the null seams.
 
 /-- Paper: Remark B.5.2.3(1), p. 628.
 A subset of the half-open cube with a null relative frontier has a torus image with null
@@ -246,11 +279,11 @@ open IsDedekindDomain NumberField
 variable {F : Type*} [Field F] [NumberField F]
 
 /-- Paper: Proposition B.5.3.3, p. 632.
-The reciprocal partial Euler product evaluates each local Euler polynomial at its prime
-norm raised to the negative complex exponent. This gives its holomorphic value at every point. -/
+The reciprocal partial Euler product multiplies the reciprocals of the finite Euler factors
+from §3.2. At a zero of the local Euler polynomial this gives its holomorphic value zero. -/
 def reciprocalPartialHeckeEulerProduct (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
     (S : Finset (HeightOneSpectrum (𝓞 F))) (s : ℂ) : ℂ :=
-  ∏ v ∈ S, ((ideleClassNormTwist χ 0).localPolynomial v).eval ((v.asIdeal.absNorm : ℂ) ^ (-s))
+  ∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹
 
 /-- For a singleton unramified place the product is the linear factor with coefficient
 given by the value of the character on a local uniformizer. -/
@@ -258,7 +291,21 @@ theorem reciprocalPartialHeckeEulerProduct_singleton
     (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (v : HeightOneSpectrum (𝓞 F))
     (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v) (s : ℂ) :
     reciprocalPartialHeckeEulerProduct χ {v} s =
-      1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s) := by sorry
+      1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s) := by
+  classical
+  simp [reciprocalPartialHeckeEulerProduct, finiteHeckeEulerFactor, hv]
+
+/-- Paper: Proposition B.5.3.2, p. 632. There is a nondecreasing sequence
+escaping to infinity on both tails on which the reciprocal product is bounded away from zero.
+Deviation: Uses the negative sign condition for strictly negative indices. The height at
+index zero may then be chosen away from all poles of the Euler factors. -/
+theorem exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (hχ : ∀ v ∈ S, (ideleClassNormTwist χ 0).IsUnramifiedAt v) :
+    ∃ (c : ℝ) (T : ℤ → ℝ), 0 < c ∧ Monotone T ∧
+      (∀ k, 0 ≤ k → 0 ≤ T k) ∧ (∀ k, k < 0 → T k ≤ 0) ∧
+      Tendsto (fun k ↦ |T k|) (comap (abs : ℤ → ℤ) atTop) atTop ∧
+      ∀ k, c ≤ ‖reciprocalPartialHeckeEulerProduct χ S ((T k : ℂ) * Complex.I)‖ := by sorry
 
 /-- Paper: Proposition B.5.3.3, p. 632.
 The nonnegative vertical shifts that uniformly approximate the reciprocal partial Euler
@@ -301,11 +348,9 @@ theorem stronglyRecurrentOn_of_subset {a b : ℝ} (hab : a < b) {f : ℂ → ℂ
 -- any disc contained in the strip, and disc-by-disc recurrence need not give simultaneous return
 -- times on that segment. The report gives a Runge approximation counterexample.
 
--- TODO(paper-gap): The first disk integrand in (B.5.3.9) is missing its square.
-
 /-- Paper: Lemma B.5.3.5, p. 633.
-A squared area error below π times the square of the distance from the compact set to the
-complement times the squared tolerance forces a uniform error below the tolerance.
+If the squared area error integrated over the closure of the open set is below
+`π * δ² * X²`, the uniform error on the compact set is below `X`.
 Deviation: The subscript `r` in (B.5.3.6) is read as `2`, as in (B.5.3.8). -/
 theorem areaApproximation_subset_verticalReturnTimes {a b : ℝ} (hab : a < b) {f : ℂ → ℂ}
     (hf : DifferentiableOn ℂ f (verticalStrip a b)) {K U : Set ℂ}
@@ -313,7 +358,7 @@ theorem areaApproximation_subset_verticalReturnTimes {a b : ℝ} (hab : a < b) {
     (hU : IsOpen U) (hUcompact : IsCompact (closure U)) (hUI : closure U ⊆ verticalStrip a b)
     (hKU : K ⊆ U) {δ : ℝ} (hδ : δ = ⨅ z : K, Metric.infDist (z : ℂ) Uᶜ)
     (hδpos : 0 < δ) {T X : ℝ} (hT : 0 < T) (hX : 0 < X) :
-    {t ∈ Icc (-T) T | (∫ z in U, ‖f (z + (t : ℂ) * Complex.I) - f z‖ ^ 2) <
+    {t ∈ Icc (-T) T | (∫ z in closure U, ‖f (z + (t : ℂ) * Complex.I) - f z‖ ^ 2) <
       Real.pi * δ ^ 2 * X ^ 2} ⊆ Icc (-T) T ∩ verticalReturnTimes f K X := by sorry
 
 end Recurrence
