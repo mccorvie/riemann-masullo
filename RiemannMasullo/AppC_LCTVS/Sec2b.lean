@@ -10,6 +10,10 @@ import Mathlib.Analysis.Normed.Module.Dual
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.Analysis.Normed.Module.HahnBanach
+import Mathlib.Analysis.InnerProductSpace.Projection.Basic
+import Mathlib.Analysis.Normed.Operator.Extend
+import Mathlib.MeasureTheory.Function.L2Space
+import Mathlib.MeasureTheory.Function.LpSpace.ContinuousFunctions
 import Mathlib.MeasureTheory.Integral.Bochner.ContinuousLinearMap
 import Mathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.MeasureTheory.Measure.Prokhorov
@@ -2036,10 +2040,185 @@ section Permanence
 
 variable {E : Type u} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
 
+/-- Evaluating an equicontinuous family of weak dual functionals is continuous into
+the uniform norm on continuous functions on a compact parameter space. -/
+private def weakDualEvaluationCLM {X K : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X] [TopologicalSpace K] [CompactSpace K]
+    (a : K → WeakDual ℂ X) (ha : Continuous a)
+    (he : EquicontinuousAt (fun k x ↦ a k x) 0) : X →L[ℂ] C(K, ℂ) := by
+  let f : X →ₗ[ℂ] C(K, ℂ) :=
+    { toFun x := ⟨fun k ↦ a k x, (WeakDual.eval_continuous x).comp ha⟩
+      map_add' x y := ContinuousMap.ext fun k ↦ map_add (a k) x y
+      map_smul' c x := ContinuousMap.ext fun k ↦ map_smul (a k) c x }
+  refine ⟨f, continuous_of_continuousAt_zero f ?_⟩
+  rw [ContinuousAt, map_zero, Metric.tendsto_nhds]
+  intro ε hε
+  filter_upwards [Metric.equicontinuousAt_iff_right.mp he ε hε] with x hx
+  rw [dist_zero_right, ContinuousMap.norm_lt_iff _ hε]
+  intro k
+  simpa only [f, LinearMap.coe_mk, AddHom.coe_mk, ContinuousMap.coe_mk,
+    map_zero, dist_zero_left] using hx k
+
+set_option maxHeartbeats 500000 in
+/-- Every continuous seminorm on a nuclear space is bounded by the norm of a
+continuous linear map into a Hilbert space, up to a constant. -/
+private theorem exists_hilbert_domination (hE : IsNuclearTVS.{v, u} E)
+    (q : Seminorm ℂ E) (hq : Continuous q) :
+    ∃ (H : Type (max v u)) (_ : NormedAddCommGroup H) (_ : InnerProductSpace ℂ H)
+      (_ : CompleteSpace H) (a : E →L[ℂ] H) (C : ℝ), 0 ≤ C ∧ ∀ x, q x ≤ C * ‖a x‖ := by
+  let := hE.1
+  let := hE.2.1
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let Y := ULift.{v} (StrongDual ℂ (LocalBanach q))
+  let : PolynormableSpace ℂ Y := (norm_withSeminorms ℂ Y).toPolynormableSpace
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion q hq
+  let b : E →ₗ[ℂ] Y →ₗ[ℂ] ℂ := LinearMap.mk₂ ℂ (fun x y ↦ y.down (j x))
+    (by intros; simp) (by intros; simp) (by intros; rfl) (by intros; rfl)
+  have hb : Continuous (fun z : E × Y ↦ b z.1 z.2) :=
+    (ContinuousLinearMap.apply ℂ (E' := LocalBanach q) ℂ).continuous₂.comp
+      ((j.continuous.comp continuous_fst).prodMk (continuous_uliftDown.comp continuous_snd))
+  let l : InjectiveTensor E Y →ₗ[ℂ] ℂ := TensorProduct.lift b
+  let r := (normSeminorm ℂ ℂ).comp l
+  let e := (hE.2.2 Y inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+  have hback : Continuous (show InjectiveTensor E Y → ProjectiveTensor E Y from id) :=
+    e.continuous_symm.congr fun z ↦ e.apply_symm_apply z
+  let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] Y)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] Y) //
+      ContinuousAt (fun z : E × Y ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+  have hr : Continuous r := (hP.continuous_seminorm ⟨r, hb.norm.continuousAt⟩).comp hback
+  have hl : Continuous l :=
+    (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp l fun _ ↦ hr
+  obtain ⟨A, B, _, _, hA, hB, heA, heB, μ, _, _, hμ, hrep⟩ :=
+    (isIntegralBilinearForm_iff_radon b hb).mp ⟨⟨l, hl⟩, fun _ _ ↦ rfl⟩
+  let : CompactSpace A := isCompact_iff_compactSpace.mp hA
+  let : CompactSpace B := isCompact_iff_compactSpace.mp hB
+  let : MeasurableSpace (A × B) := borel (A × B)
+  let : BorelSpace (A × B) := ⟨rfl⟩
+  let : IsFiniteMeasure μ := ⟨hμ.trans_lt ENNReal.one_lt_top⟩
+  let J := ContinuousMap.toLp 2 μ ℂ (E := ℂ)
+  let f : E →L[ℂ] C(A × B, ℂ) :=
+    weakDualEvaluationCLM (fun k ↦ k.1.val) (continuous_subtype_val.comp continuous_fst)
+      (heA.comp Prod.fst)
+  let g : Y →L[ℂ] C(A × B, ℂ) :=
+    weakDualEvaluationCLM (fun k ↦ k.2.val) (continuous_subtype_val.comp continuous_snd)
+      (heB.comp Prod.snd)
+  refine ⟨Lp ℂ 2 μ, inferInstance, inferInstance, inferInstance, J.comp f, ‖J‖ * ‖g‖,
+    by positivity, fun x ↦ ?_⟩
+  obtain ⟨y, hy, hyx⟩ := exists_dual_vector'' ℂ (j x)
+  let y' : Y := ULift.up y
+  have hinner : inner ℂ (J (star (g y'))) (J (f x)) = b x y' := by
+    rw [L2.inner_def]
+    refine (integral_congr_ae ?_).trans (hrep x y').2.symm
+    filter_upwards [ContinuousMap.coeFn_toLp (p := 2) (𝕜 := ℂ) μ (star (g y')),
+      ContinuousMap.coeFn_toLp (p := 2) (𝕜 := ℂ) μ (f x)] with k hk₁ hk₂
+    rw [hk₁, hk₂, RCLike.inner_apply, ContinuousMap.star_apply]
+    change k.1.val x * star (star (k.2.val y')) = _
+    rw [star_star]
+  have hnorm : ‖J (star (g y'))‖ ≤ ‖J‖ * ‖g‖ := by
+    have hy' : ‖y'‖ ≤ 1 := hy
+    have hg : ‖g y'‖ ≤ ‖g‖ :=
+      (g.le_opNorm y').trans (mul_le_of_le_one_right (norm_nonneg g) hy')
+    calc
+      _ ≤ ‖J‖ * ‖star (g y')‖ := J.le_opNorm _
+      _ = ‖J‖ * ‖g y'‖ := by rw [norm_star]
+      _ ≤ ‖J‖ * ‖g‖ := mul_le_mul_of_nonneg_left hg (norm_nonneg J)
+  have heq : b x y' = (‖j x‖ : ℂ) := hyx
+  calc
+    q x = ‖b x y'‖ := by rw [heq, Complex.norm_of_nonneg (norm_nonneg _), hj, localBanach_norm_coe]
+    _ ≤ _ := hinner ▸ (norm_inner_le_norm _ _).trans (mul_le_mul_of_nonneg_right hnorm (norm_nonneg _))
+
 /-- Paper: Lemma C.2.4.10(1), p. 689. A linear subspace of a nuclear space is
 nuclear for its subspace topology. -/
 theorem isNuclearTVS_submodule (hE : IsNuclearTVS.{v, u} E) (S : Submodule ℂ E) :
-    IsNuclearTVS.{v, u} S := by sorry
+    IsNuclearTVS.{v, u} S := by
+  let := hE.1
+  let := hE.2.1
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  let i : S →L[ℂ] E := ⟨S.subtype, continuous_subtype_val⟩
+  let M := injectiveTensorMap i.toLinearMap (ContinuousLinearMap.id ℂ F).toLinearMap
+  have hM : Continuous M := injectiveTensorMap_continuous i (ContinuousLinearMap.id ℂ F)
+  let e := (hE.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+  have hEback : Continuous (show InjectiveTensor E F → ProjectiveTensor E F from id) :=
+    e.continuous_symm.congr fun z ↦ e.apply_symm_apply z
+  have hback : Continuous (show InjectiveTensor S F → ProjectiveTensor S F from id) := by
+    let hP := withGeneratingSeminorms_spec (S ⊗[ℂ] F)
+      (fun p : {p : Seminorm ℂ (S ⊗[ℂ] F) //
+        ContinuousAt (fun z : S × F ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+    refine hP.continuous_of_continuous_comp
+      (LinearMap.id : InjectiveTensor S F →ₗ[ℂ] ProjectiveTensor S F) fun ⟨r, hr⟩ ↦ ?_
+    obtain ⟨q, s, hq, hs, hbound⟩ := exists_projectiveSeminorm_pure_bound S r hr
+    obtain ⟨p, hp, hqp⟩ := Seminorm.exists_le_comp_of_isInducing hq (f := S.subtype) .subtypeVal
+    obtain ⟨H, _, _, _, a, C, _, ha⟩ := exists_hilbert_domination hE p hp
+    let aS := a.toLinearMap.comp S.subtype
+    let K := aS.range.topologicalClosure
+    let aK := (Submodule.inclusion aS.range.le_topologicalClosure).comp aS.rangeRestrict
+    have hd : DenseRange aK :=
+      ((denseRange_inclusion_iff aS.range.le_topologicalClosure).mpr subset_rfl).comp
+        aS.surjective_rangeRestrict.denseRange (continuous_inclusion _)
+    let : CompleteSpace K := aS.range.isClosed_topologicalClosure.completeSpace_coe
+    -- Extend the bilinear map for r through the closure of the image of S in H.
+    let κ : S ⊗[ℂ] F →ₗ[ℂ] LocalBanach r := Completion.toComplL.toLinearMap.comp LinearMap.id
+    let B : WithLocalSeminorm q →ₗ[ℂ] WithLocalSeminorm s →ₗ[ℂ] LocalBanach r :=
+      (TensorProduct.mk ℂ S F).compr₂ κ
+    have hB (x : WithLocalSeminorm q) (y : WithLocalSeminorm s) :
+        ‖B x y‖ ≤ 1 * ‖x‖ * ‖y‖ := by
+      change ‖κ (x ⊗ₜ[ℂ] y)‖ ≤ 1 * q x * s y
+      rw [show ‖κ (x ⊗ₜ[ℂ] y)‖ = r (x ⊗ₜ[ℂ] y) from localBanach_norm_coe r _, one_mul]
+      exact hbound x y
+    let D := B.mkContinuous₂ 1 hB
+    let Dc := D.flip.fromCompletion
+    let d : S →ₗ[ℂ] LocalBanach s →L[ℂ] LocalBanach r := Dc.flip.toLinearMap
+    have hd_coe (x : S) (y : WithLocalSeminorm s) : d x y = D x y := by
+      change Dc y x = D x y
+      rw [show Dc y = D.flip y from D.flip.fromCompletion_apply_coe y]
+      rfl
+    have hD : ‖D‖ ≤ 1 := LinearMap.mkContinuous₂_norm_le _ zero_le_one _
+    have hd_norm (x : S) : ‖d x‖ ≤ q x := by
+      refine (d x).opNorm_le_bound (apply_nonneg q x) fun y ↦ ?_
+      induction y using Completion.induction_on with
+      | hp => exact isClosed_le (by fun_prop) (by fun_prop)
+      | ih y =>
+        rw [hd_coe, Completion.norm_coe]
+        exact (D.le_opNorm₂ x y).trans
+          (mul_le_mul_of_nonneg_right (mul_le_of_le_one_left (apply_nonneg q x) hD) (norm_nonneg y))
+    have hda (x : S) : ‖d x‖ ≤ C * ‖aK x‖ :=
+      (hd_norm x).trans ((hqp x).trans (ha x))
+    let dK := LinearMap.extendOfNorm (σ₁₂ := RingHom.id ℂ)
+      (F := LocalBanach s →L[ℂ] LocalBanach r) d aK
+    let D' := (dK.comp K.orthogonalProjectionOnto).comp a
+    have hD' (x : S) : D' x = d x := by
+      change dK (K.orthogonalProjectionOnto (a x)) = d x
+      rw [show K.orthogonalProjectionOnto (a x) = aK x from
+        K.orthogonalProjectionOnto_mem_subspace_eq_self (aK x)]
+      exact LinearMap.extendOfNorm_eq (σ₁₂ := RingHom.id ℂ) (f := d) hd ⟨C, hda⟩ x
+    obtain ⟨j, hj⟩ := exists_localBanach_inclusion s hs
+    let b : E →ₗ[ℂ] F →ₗ[ℂ] LocalBanach r :=
+      LinearMap.mk₂ ℂ (fun x y ↦ D' x (j y))
+        (by intros; simp) (by intros; simp) (by intros; simp) (by intros; simp)
+    let R := (normSeminorm ℂ (LocalBanach r)).comp (TensorProduct.lift b)
+    have hR : ContinuousAt (fun z : E × F ↦ R (z.1 ⊗ₜ[ℂ] z.2)) 0 := by
+      change ContinuousAt (fun z : E × F ↦ ‖D' z.1 (j z.2)‖) 0
+      exact ((D'.continuous.comp continuous_fst).clm_apply
+        (j.continuous.comp continuous_snd)).norm.continuousAt
+    have hκ : (TensorProduct.lift b).comp M = κ := by
+      apply TensorProduct.ext'
+      intro x y
+      change (TensorProduct.lift b) (TensorProduct.map S.subtype LinearMap.id (x ⊗ₜ[ℂ] y)) = _
+      rw [TensorProduct.map_tmul, TensorProduct.lift.tmul, LinearMap.id_apply]
+      change D' x (j y) = κ (x ⊗ₜ[ℂ] y)
+      rw [hD', hj, hd_coe]
+      rfl
+    let hP' := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+      (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+        ContinuousAt (fun z : E × F ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+    have hcont := ((hP'.continuous_seminorm ⟨R, hR⟩).comp hEback).comp hM
+    exact hcont.congr fun z ↦ by
+      change ‖((TensorProduct.lift b).comp M) z‖ = r z
+      rw [hκ]
+      exact localBanach_norm_coe r z
+  exact (⟨Equiv.refl (S ⊗[ℂ] F), (uniformContinuous_tensorComparison S F).continuous, hback⟩ :
+    ProjectiveTensor S F ≃ₜ InjectiveTensor S F).isHomeomorph
 
 /-- Paper: Lemma C.2.4.10(1), p. 689. A Hausdorff quotient of a nuclear space is nuclear. -/
 theorem isNuclearTVS_quotient (hE : IsNuclearTVS.{v, u} E) (S : Submodule ℂ E)
