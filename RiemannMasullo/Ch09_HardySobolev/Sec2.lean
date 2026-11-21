@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch09_HardySobolev.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
+public import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 public import Mathlib.Analysis.InnerProductSpace.TensorProduct
 public import Mathlib.Analysis.Fourier.LpSpace
 
@@ -22,7 +23,33 @@ namespace RiemannMasullo
 
 -- TODO(paper-gap): The coordinate integrals on pp. 403 and 416 omit the
 -- kernel character. Use the intrinsic transform from §D.3.3.
--- TODO(prerequisite): The operator comparison in Remark 9.2.0.1 needs §5.1.
+
+open NumberField in
+open scoped NumberField.AdeleRing in
+/-- Paper: Remark 9.2.0.1, p. 403. When a test and its Fourier transform vanish at zero,
+the global idelic Mellin transform is the canonical Mellin transform of its theta function
+times the Tamagawa mass of the norm-one classes.
+Deviation: The operator called L in the remark is Z in (5.1.1.1). The equality uses regular
+values of the bundled target. On the theta quotient use `globalThetaMellin_mk`. -/
+theorem globalIdelicMellin_eq_canonical_of_vanishing {F : Type*} [Field F] [NumberField F]
+    [SecondCountableTopology (IdeleClassGroup (𝓞 F) F)]
+    (f : SchwartzBruhat (Multiplicative 𝔸[F]))
+    (hf : f (Multiplicative.ofAdd 0) = 0)
+    (hFourier : adeleSchwartzFourier (F := F) f (Multiplicative.ofAdd 0) = 0)
+    (c : {c : QuasiCharacter (IdeleClassGroup (𝓞 F) F) // 0 ≤ globalIdelicOrderBound (F := F) c}) :
+    let hClass := ideleGroup_quotient.{_, 0} F
+    letI : T2Space (IdeleClassGroup (𝓞 F) F) := hClass.2.2.2.2.2.1
+    letI : LocallyCompactSpace (IdeleClassGroup (𝓞 F) F) := hClass.2.2.2.2.2.2.1
+    letI : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+    letI : BorelSpace (IdeleClassGroup (𝓞 F) F) := ⟨rfl⟩
+    let m : IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ :=
+      ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    let hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    let μ := canonicalModulatedHaar m hm
+    let V := (normOneIdeleClassTamagawaMeasure F).real univ
+    Integrable (fun g ↦ adelicTheta (F := F) f g * c.val g) μ ∧
+      (globalIdelicMellin (F := F) f).val c =
+        (V : ℂ) * modulatedFourierMellin m univ hm μ (adelicTheta (F := F) f) c.val := by sorry
 
 local notation "verticalPoint" => (fun (b y : ℝ) ↦ (b : ℂ) + (y : ℂ) * Complex.I)
 set_option quotPrecheck false in
@@ -237,6 +264,18 @@ theorem modulatedLineSobolev_mellin (hm : IsModulation m)
             fun y ↦ iteratedDeriv (k : ℕ) (mellin (fun t ↦ f.val (Real.log t)))
               (verticalPoint b y)) ∧ M u = ↑(g ⊗ₜ[ℂ] v) := by sorry
 
+/-- Paper: Theorem 9.2.1.5(2), p. 408, and Equation (9.2.1.25), p. 409.
+Taking the isotype coefficient of a line Mellin tensor multiplies the scalar trace
+by the kernel Fourier coefficient at the inverse character, as in (D.3.3.14). -/
+theorem modulatedLineSobolev_mellin_isotype
+    [MeasurableSpace m.toMonoidHom.ker] [BorelSpace m.toMonoidHom.ker]
+    (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure] (_hμ₁ : μ₁ univ = 1)
+    (b : ℝ) (N : ℕ) (ω : PontryaginDual m.toMonoidHom.ker) :
+    let H := ScalarLineHardySobolev b N
+    ∃ coefficient : UniformSpace.Completion (Lp ℂ 2 μ₁ ⊗[ℂ] H) →L[ℂ] H,
+      ∀ (g : Lp ℂ 2 μ₁) (v : H),
+        coefficient ↑(g ⊗ₜ[ℂ] v) = lcaFourier μ₁ g ω⁻¹ • v := by sorry
+
 -- TODO(paper-gap): Theorem 9.2.1.5(3) switches from the Hilbert tensor product
 -- to the projective tensor product in the middle of the bottom row.
 -- TODO(paper-gap): Corollary 9.2.1.6 also omits the one-sided support condition.
@@ -429,6 +468,19 @@ theorem scalarIntervalSobolev_boundary_values (a b s : ℝ) (_hab : a < b) (_hs 
       MemLp ((Lp.fourierTransformₗᵢ ℝ ℂ).symm u : ℝ → ℂ) 2
         (volume.withDensity fun x : ℝ ↦ ENNReal.ofReal ((1 + x ^ 2) ^ (s / 2))) := by sorry
 
+/-- Paper: Proposition 9.2.2.4(2), p. 414. At even degree the almost-everywhere endpoint
+limits of the moments from order zero through N are the traces of one element of the
+Hardy–Sobolev space on that line.
+Deviation: State the compact nondegenerate case in the weighted source model. -/
+theorem scalarIntervalSobolev_boundary_traces (a b : ℝ) (_hab : a < b) (N : ℕ)
+    (c : ℝ) (_hc : c ∈ ({a, b} : Set ℝ))
+    (f : CompactIntervalSobolev volume id a b (2 * (N : ℝ))) :
+    ∃ u : ScalarLineHardySobolev c N,
+      ∀ k : Fin (N + 1), ∀ᵐ y : ℝ ∂volume, Tendsto
+        (fun σ : ℝ ↦ ∫ x : ℝ, f x * (x : ℂ) ^ (k : ℕ) *
+          Complex.exp (verticalPoint σ y * (x : ℂ)))
+        (𝓝[Ioo a b] c) (𝓝 (u.val () k y)) := by sorry
+
 /-- Paper: Proposition 9.2.2.4(3), p. 414. For even degree and compact base,
 Mellin gives a topological linear equivalence with the closure of the two endpoint traces.
 Deviation: Use the endpoint topology of Lemma 9.2.2.2(2). The sampling rule of
@@ -453,7 +505,29 @@ theorem scalarIntervalSobolev_eval_interior (a b s : ℝ) (_hs : 0 ≤ s)
       ∀ f, Integrable (fun x : ℝ ↦ f x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) volume ∧
         Λ f = ∫ x : ℝ, f x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by sorry
 
+/-- Paper: Corollary 9.2.2.5(1), p. 414. The kth complex derivative of the
+Mellin integral on the open strip equals the absolutely convergent kth moment.
+Deviation: State the compact-base assertion in logarithmic coordinates. -/
+theorem scalarIntervalSobolev_iteratedDeriv_mellin (a b s : ℝ) (_hs : 0 ≤ s)
+    (f : CompactIntervalSobolev volume id a b s) (k : ℕ) (z : ℂ) (_hz : z.re ∈ Ioo a b) :
+    Integrable (fun x : ℝ ↦ f x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) ∧
+      iteratedDeriv k (fun w : ℂ ↦ ∫ x : ℝ, f x * Complex.exp (w * (x : ℂ))) z =
+        ∫ x : ℝ, f x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by sorry
+
 -- TODO(paper-gap): Corollary 9.2.2.5(2) includes the divergent critical case s = 2k + 1.
+
+/-- Paper: Corollary 9.2.2.5(2), p. 414. At either endpoint, a Mellin derivative
+evaluation on the unrestricted tests extends continuously exactly when the degree
+exceeds twice the derivative order plus one.
+Deviation: The compact weighted model includes a singleton base. The critical
+equality in the printed bound is excluded. -/
+theorem scalarIntervalSobolev_eval_boundary_iff (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 ≤ s)
+    (k : ℕ) (z : ℂ) (_hz : z.re ∈ ({a, b} : Set ℝ)) :
+    let E := CompactIntervalSobolev volume id a b s
+    (∃ Λ : E →L[ℂ] ℂ, ∀ (f : PositiveRealExponentialDecay univ) (u : E),
+      (u : ℝ → ℂ) =ᵐ[volume] f.val →
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔ 2 * (k : ℝ) + 1 < s :=
+  by sorry
 
 /-- Paper: Theorem 9.2.2.6(1), p. 415. On a compact base interval of even
 degree the supported test closure is the same as the indicator range.
@@ -482,6 +556,17 @@ theorem scalarIntervalSobolev_cutoff_eval (a b A : ℝ) (_hab : a ≤ b) (_hA : 
         Λ f = ∫ x : ℝ, (Ici (-Real.log A)).indicator (⇑f) x *
           (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by sorry
 
+/-- Paper: Corollary 9.2.2.8(1), p. 415. On the open half-plane below the upper
+endpoint, the kth derivative of the supported Mellin integral is its kth moment.
+Deviation: Use the cutoff in logarithmic coordinates on the compact-base source. -/
+theorem scalarIntervalSobolev_cutoff_iteratedDeriv_mellin
+    (a b A : ℝ) (_hab : a ≤ b) (_hA : 1 < A) (N k : ℕ)
+    (f : CompactIntervalSobolev volume id a b (2 * (N : ℝ))) (z : ℂ) (_hz : z.re < b) :
+    let g := (Ici (-Real.log A)).indicator (f : ℝ → ℂ)
+    Integrable (fun x : ℝ ↦ g x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) ∧
+      iteratedDeriv k (fun w : ℂ ↦ ∫ x : ℝ, g x * Complex.exp (w * (x : ℂ))) z =
+        ∫ x : ℝ, g x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by sorry
+
 /-- Paper: Corollary 9.2.2.8(2), p. 416. At the upper endpoint a derivative
 evaluation of an even-degree supported space is bounded exactly below order N.
 Deviation: State bounded extendibility of the evaluation on supported tests in the
@@ -492,6 +577,20 @@ theorem scalarIntervalSobolev_cutoff_eval_boundary_iff (a b A : ℝ)
       ∀ (f : PositiveRealExponentialDecay univ) (u : CompactIntervalSobolev volume id a b (2 * (N : ℝ))),
         tsupport f.val ⊆ Ioi (-Real.log A) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
         Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔ k < N := by sorry
+
+/-- Paper: Corollary 9.2.2.8(1)–(2), p. 415. On supported scalar tests every order
+extends at a distinct lower endpoint. At the upper endpoint the degree must exceed
+twice the derivative order plus one.
+Deviation: State the endpoint criterion in the compact weighted model for all nonnegative
+degrees. The corollary states the even-degree case, with part (2) on p. 416. -/
+theorem scalarIntervalSobolev_cutoff_eval_endpoints_iff (a b A s : ℝ)
+    (_hab : a ≤ b) (_hA : 1 < A) (_hs : 0 ≤ s) (k : ℕ) (z : ℂ)
+    (_hz : z.re ∈ ({a, b} : Set ℝ)) :
+    let E := CompactIntervalSobolev volume id a b s
+    (∃ Λ : E →L[ℂ] ℂ, ∀ (f : PositiveRealExponentialDecay univ) (u : E),
+      tsupport f.val ⊆ Ioi (-Real.log A) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔
+      z.re < b ∨ 2 * (k : ℝ) + 1 < s := by sorry
 
 end Interval
 
@@ -524,23 +623,29 @@ theorem modulatedIntervalSobolev_dense
       ∀ f, (j f : G → ℂ) =ᵐ[canonicalModulatedHaar m hm] f.val := by sorry
 
 /-- Paper: Lemma 9.2.2.10(1), p. 416. For a compact base interval and an even degree,
-pullback to split coordinates followed by the unitary kernel Fourier transform
+pullback to split coordinates followed by the unitary kernel Fourier transform and dual inversion
 identifies the space with the completed Hilbert tensor product.
 Deviation: The pullback in (9.2.2.32) lands in physical kernel coordinates
-before applying the compact Fourier transform. Use the weighted norm of (9.2.2.34). -/
+before applying the compact Fourier transform at the inverse character, as in (9.2.1.25).
+Use the weighted norm of (9.2.2.34). -/
 theorem modulatedIntervalSobolev_tensor (τ : ℝ≥0ˣ →ₜ* G) (_hτ : RightInverse τ m)
     [MeasurableSpace K] [BorelSpace K] (μ₁ : Measure K) [μ₁.IsHaarMeasure] (_hμ₁ : μ₁ univ = 1)
     (ν₁ : Measure (PontryaginDual K)) (hν₁ : IsLCAPlancherelMeasure μ₁ ν₁)
     (a b : ℝ) (_hab : a ≤ b) (N : ℕ) :
     letI : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+    letI : BorelSpace (PontryaginDual K) := ⟨rfl⟩
+    letI : ν₁.IsHaarMeasure := hν₁.1
+    letI : ν₁.Regular := hν₁.2.1
     let U := Classical.choose (lcaFourier_unitary μ₁ ν₁ hν₁).exists
+    let invert := Lp.compMeasurePreserving (E := ℂ) (p := 2) Inv.inv
+      (Measure.measurePreserving_inv ν₁)
     let E := ModulatedIntervalSobolev m hm a b (2 * (N : ℝ))
     let E₀ := CompactIntervalSobolev volume id a b (2 * (N : ℝ))
     ∃ P : E ≃ₗᵢ[ℂ] UniformSpace.Completion (E₀ ⊗[ℂ] Lp ℂ 2 ν₁),
       ∀ (f : E₀) (g : Lp ℂ 2 μ₁) (u : E),
         (fun p : K × ℝ≥0ˣ ↦ u ((p.1 : G) * τ p.2)) =ᵐ[μ₁.prod positiveRealHaar]
           (fun p ↦ f (Real.log (p.2.val : ℝ)) * g p.1) →
-        P u = ↑(f ⊗ₜ[ℂ] U g) := by sorry
+        P u = ↑(f ⊗ₜ[ℂ] invert (U g)) := by sorry
 
 /-- Paper: Lemma 9.2.2.10(1), p. 416. For compact bases and even degrees,
 the scalar Mellin transform on split elementary tensors acts by vertical derivative
@@ -631,8 +736,39 @@ theorem modulatedIntervalSobolev_cutoff_eval (a b A s : ℝ)
       ∀ f : E, Integrable (fun g ↦ U.indicator (⇑f) g * (logModule m g : ℂ) ^ k * c g) μ ∧
         Λ f = ∫ g, U.indicator (⇑f) g * (logModule m g : ℂ) ^ k * c g ∂μ := by sorry
 
+/-- Paper: Corollary 9.2.2.12(1), p. 418. In the norm-twist coordinate of a unitary
+quasi-character, the kth derivative of the cutoff Mellin integral equals its kth moment.
+Deviation: The intrinsic quasi-character includes the character missing in (9.2.2.43),
+and the cutoff gives convergence throughout the open half-plane below the upper endpoint. -/
+theorem modulatedIntervalSobolev_cutoff_iteratedDeriv_mellin (a b A s : ℝ)
+    (_hab : a ≤ b) (_hA : 1 < A) (_hs : 0 ≤ s) (k : ℕ)
+    (f : ModulatedIntervalSobolev m hm a b s) (z : ℂ) (_hz : z.re < b)
+    (χ : QuasiCharacter G) (_hχ : ∀ g, ‖χ g‖ = 1) :
+    let μ := canonicalModulatedHaar m hm
+    let u := ((logModule m) ⁻¹' Ici (-Real.log A)).indicator (f : G → ℂ)
+    let c := quasiCharacterNormTwist m.toMonoidHom m.continuous χ
+    Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ k * c z g) μ ∧
+      iteratedDeriv k (fun w : ℂ ↦ ∫ g, u g * c w g ∂μ) z =
+        ∫ g, u g * (logModule m g : ℂ) ^ k * c z g ∂μ := by sorry
+
 -- TODO(paper-gap): Corollary 9.2.2.12(2) includes the divergent critical case
 -- s = 2k + 1 at the upper endpoint, even for the trivial kernel character.
+
+/-- Paper: Corollary 9.2.2.12(2), p. 418. A Mellin derivative evaluation in any
+isotype extends from supported tests at the endpoints of the compact base.
+Deviation: At the upper endpoint the condition is strict. At a distinct lower
+endpoint the cutoff allows all orders. The modulation is onto as in §9.2. -/
+theorem modulatedIntervalSobolev_cutoff_eval_endpoints_iff (_hms : Surjective m)
+    (a b A s : ℝ) (_hab : a ≤ b) (_hA : 1 < A) (_hs : 0 ≤ s) (k : ℕ)
+    (z : ℂ) (_hz : z.re ∈ ({a, b} : Set ℝ))
+    (χ : QuasiCharacter G) (_hχ : ∀ g, ‖χ g‖ = 1) :
+    let μ := canonicalModulatedHaar m hm
+    let E := ModulatedIntervalSobolev m hm a b s
+    let c := quasiCharacterNormTwist m.toMonoidHom m.continuous χ
+    (∃ Λ : E →L[ℂ] ℂ, ∀ (f : ModulatedExponentialDecay m univ) (u : E),
+      tsupport f.val ⊆ (logModule m) ⁻¹' Ioi (-Real.log A) → (u : G → ℂ) =ᵐ[μ] f.val →
+        Λ u = iteratedDeriv k (fun w ↦ modulatedFourierMellin m univ hm μ f.val (c w)) z) ↔
+      z.re < b ∨ 2 * (k : ℝ) + 1 < s := by sorry
 
 /-- Paper: Theorem 9.2.2.13(1), p. 418. For compact bases and surjective module,
 the support-restricted tests are dense in the indicator range.
