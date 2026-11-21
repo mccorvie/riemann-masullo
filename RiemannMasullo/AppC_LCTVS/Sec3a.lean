@@ -1751,7 +1751,15 @@ contain zero and are closed under addition and complex scalar multiplication. -/
 theorem nuclearEndomorphisms_submodule_axioms :
     IsNuclearOperator (0 : H →L[ℂ] H) ∧
       (∀ {A B : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator B → IsNuclearOperator (A + B)) ∧
-      (∀ (c : ℂ) {A : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator (c • A)) := by sorry
+      (∀ (c : ℂ) {A : H →L[ℂ] H}, IsNuclearOperator A → IsNuclearOperator (c • A)) := by
+  let S := (completedProjectiveTensorToOperators (E := H) (F := H)).toLinearMap.range
+  have hmem (A : H →L[ℂ] H) : IsNuclearOperator A ↔ A ∈ S :=
+    (isNuclearOperator_iff_isBanachNuclear A).trans (isBanachNuclear_iff_mem_range A)
+  refine ⟨(hmem 0).mpr S.zero_mem, ?_, ?_⟩
+  · intro A B hA hB
+    exact (hmem (A + B)).mpr (S.add_mem ((hmem A).mp hA) ((hmem B).mp hB))
+  · intro c A hA
+    exact (hmem (c • A)).mpr (S.smul_mem c ((hmem A).mp hA))
 
 variable (H) in
 /-- Paper: Definition C.3.4.2, p. 697. The space of nuclear endomorphisms is

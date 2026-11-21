@@ -2070,34 +2070,57 @@ section Isometries
 variable {E F G H : Type*} [NormedAddCommGroup E] [NormedSpace ℂ E]
   [NormedAddCommGroup F] [NormedSpace ℂ F] [NormedAddCommGroup G] [NormedSpace ℂ G]
   [NormedAddCommGroup H] [NormedSpace ℂ H]
+/-- Paper: Example C.2.3.4, p. 677. The injective norm is bounded by a real number exactly
+when every evaluation on a pair of dual unit-ball functionals is bounded by that number. -/
+private theorem injectiveTensorNorm_le_iff (z : E ⊗[ℂ] F) (r : ℝ) :
+    injectiveTensorNorm E F z ≤ r ↔
+      ∀ (φ : StrongDual ℂ E), ‖φ‖ ≤ 1 → ∀ (ψ : StrongDual ℂ F), ‖ψ‖ ≤ 1 →
+        ‖tensorDualForm φ ψ z‖ ≤ r := by
+  simpa only [injectiveTensorNorm, NormedSpace.polar_closedBall one_pos, inv_one,
+    mem_closedBall_zero_iff] using injectiveTensorSeminorm_le_iff
+      ⟨Metric.closedBall (0 : E) 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+      ⟨Metric.closedBall (0 : F) 1, Metric.closedBall_mem_nhds 0 one_pos⟩ z r
+
 variable (f : E →ₗᵢ[ℂ] G) (g : F →ₗᵢ[ℂ] H)
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. Tensoring isometric embeddings preserves the injective norm. -/
 theorem injectiveTensorMap_isometry (z : E ⊗[ℂ] F) :
     injectiveTensorNorm G H (TensorProduct.map f.toLinearMap g.toLinearMap z) =
-      injectiveTensorNorm E F z := by sorry
-
-/-- Paper: (C.2.3.7), p. 677. The injective norm is bounded by `r` exactly when every
-pair of functionals with operator norms at most one gives an evaluation bounded by `r`. -/
-private theorem injectiveTensorNorm_le_iff (z : E ⊗[ℂ] F) (r : ℝ) :
-    injectiveTensorNorm E F z ≤ r ↔
-      ∀ (φ : StrongDual ℂ E), ‖φ‖ ≤ 1 → ∀ (ψ : StrongDual ℂ F), ‖ψ‖ ≤ 1 →
-        ‖tensorDualForm φ ψ z‖ ≤ r := by
-  simpa only [NormedSpace.polar_closedBall one_pos, inv_one, mem_closedBall_zero_iff] using
-    injectiveTensorSeminorm_le_iff
-      ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩
-      ⟨Metric.closedBall 0 1, Metric.closedBall_mem_nhds 0 one_pos⟩ z r
-
-/-- A functional of operator norm at most one extends along a linear isometry to a functional
-of operator norm at most one. -/
-private theorem exists_dual_unit_extension (φ : StrongDual ℂ E) (hφ : ‖φ‖ ≤ 1) :
-    ∃ Φ : StrongDual ℂ G, Φ.comp f.toContinuousLinearMap = φ ∧ ‖Φ‖ ≤ 1 := by
-  obtain ⟨Φ, hΦ, hle⟩ := exists_dual_extension_of_le_comp f.toContinuousLinearMap
-    f.isometry.isEmbedding (q := normSeminorm ℂ G) continuous_norm (φ := φ) fun x ↦ by
-      simpa only [coe_normSeminorm, LinearIsometry.coe_toContinuousLinearMap, f.norm_map] using
-        (φ.le_opNorm x).trans (mul_le_of_le_one_left (norm_nonneg _) hφ)
-  exact ⟨Φ, ContinuousLinearMap.ext hΦ, Φ.opNorm_le_bound zero_le_one fun y ↦ by
-    simpa only [coe_normSeminorm, one_mul] using hle y⟩
+      injectiveTensorNorm E F z := by
+  let T := TensorProduct.map f.toLinearMap g.toLinearMap
+  have eval_map (Φ : StrongDual ℂ G) (Ψ : StrongDual ℂ H) :
+      tensorDualForm Φ Ψ (T z) =
+        tensorDualForm (Φ.comp f.toContinuousLinearMap) (Ψ.comp g.toContinuousLinearMap) z := by
+    have h : (tensorDualForm Φ Ψ).comp T =
+        tensorDualForm (Φ.comp f.toContinuousLinearMap) (Ψ.comp g.toContinuousLinearMap) := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [T, tensorDualForm_tmul]
+    exact DFunLike.congr_fun h z
+  refine le_antisymm ((injectiveTensorNorm_le_iff (T z) _).mpr ?_)
+    ((injectiveTensorNorm_le_iff z _).mpr ?_)
+  · intro Φ hΦ Ψ hΨ
+    rw [eval_map]
+    have hΦ' : ‖Φ.comp f.toContinuousLinearMap‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun x ↦ by
+        simpa using Φ.le_of_opNorm_le hΦ (f x)
+    have hΨ' : ‖Ψ.comp g.toContinuousLinearMap‖ ≤ 1 :=
+      ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun y ↦ by
+        simpa using Ψ.le_of_opNorm_le hΨ (g y)
+    exact (injectiveTensorNorm_le_iff z _).mp le_rfl _ hΦ' _ hΨ'
+  · intro φ hφ ψ hψ
+    obtain ⟨Φ, hΦ, hΦbound⟩ := exists_dual_extension_of_le_comp f.toContinuousLinearMap
+      f.isometry.isEmbedding (q := normSeminorm ℂ G) continuous_norm (φ := φ)
+      (fun x ↦ by simpa using φ.le_of_opNorm_le hφ x)
+    obtain ⟨Ψ, hΨ, hΨbound⟩ := exists_dual_extension_of_le_comp g.toContinuousLinearMap
+      g.isometry.isEmbedding (q := normSeminorm ℂ H) continuous_norm (φ := ψ)
+      (fun y ↦ by simpa using ψ.le_of_opNorm_le hψ y)
+    have hΦcomp : Φ.comp f.toContinuousLinearMap = φ := ContinuousLinearMap.ext hΦ
+    have hΨcomp : Ψ.comp g.toContinuousLinearMap = ψ := ContinuousLinearMap.ext hΨ
+    have h := (injectiveTensorNorm_le_iff (T z) _).mp le_rfl
+      Φ (Φ.opNorm_le_bound zero_le_one (fun x ↦ by simpa using hΦbound x))
+      Ψ (Ψ.opNorm_le_bound zero_le_one (fun y ↦ by simpa using hΨbound y))
+    rwa [eval_map, hΦcomp, hΨcomp] at h
 
 /-- Paper: Lemma C.2.3.5(1), p. 678. The induced map of the completions in the
 injective norms is an isometry. -/
@@ -2109,30 +2132,7 @@ theorem completedInjectiveTensorMap_isometry :
   let := (injectiveTensorNorm E F).toSeminormedAddCommGroup
   let := (injectiveTensorNorm G H).toSeminormedAddCommGroup
   apply Isometry.completion_map
-  refine AddMonoidHomClass.isometry_of_norm T fun z ↦ ?_
-  change injectiveTensorNorm G H (T z) = injectiveTensorNorm E F z
-  have eval_map (Φ : StrongDual ℂ G) (Ψ : StrongDual ℂ H) :
-      tensorDualForm Φ Ψ (T z) = tensorDualForm (Φ.comp f.toContinuousLinearMap)
-        (Ψ.comp g.toContinuousLinearMap) z := by
-    have h : (tensorDualForm Φ Ψ).comp T = tensorDualForm (Φ.comp f.toContinuousLinearMap)
-        (Ψ.comp g.toContinuousLinearMap) := by
-      apply TensorProduct.ext'
-      intro x y
-      simp [T, tensorDualForm_tmul]
-    exact DFunLike.congr_fun h z
-  apply le_antisymm
-  · refine (injectiveTensorNorm_le_iff (T z) _).mpr fun Φ hΦ Ψ hΨ ↦ ?_
-    rw [eval_map]
-    have hΦ' := (Φ.opNorm_comp_le f.toContinuousLinearMap).trans
-      ((mul_le_of_le_one_right (norm_nonneg _) f.norm_toContinuousLinearMap_le).trans hΦ)
-    have hΨ' := (Ψ.opNorm_comp_le g.toContinuousLinearMap).trans
-      ((mul_le_of_le_one_right (norm_nonneg _) g.norm_toContinuousLinearMap_le).trans hΨ)
-    exact (injectiveTensorNorm_le_iff z _).mp le_rfl _ hΦ' _ hΨ'
-  · refine (injectiveTensorNorm_le_iff z _).mpr fun φ hφ ψ hψ ↦ ?_
-    obtain ⟨Φ, hΦ, hΦnorm⟩ := exists_dual_unit_extension f φ hφ
-    obtain ⟨Ψ, hΨ, hΨnorm⟩ := exists_dual_unit_extension g ψ hψ
-    rw [← hΦ, ← hΨ, ← eval_map]
-    exact (injectiveTensorNorm_le_iff (T z) _).mp le_rfl Φ hΦnorm Ψ hΨnorm
+  exact AddMonoidHomClass.isometry_of_norm T (injectiveTensorMap_isometry f g)
 
 end Isometries
 

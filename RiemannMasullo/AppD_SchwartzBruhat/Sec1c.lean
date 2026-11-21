@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
+import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-!
 # Differential operators, Poisson summation, supports and translations
@@ -119,12 +121,120 @@ theorem bruhatDirectionalDeriv_real
   change deriv (fun t : ℝ ↦ (f ∘ Multiplicative.ofAdd) (x + t)) 0 = _
   rw [deriv_comp_const_add, add_zero]
 
+/-- Every point belongs to the open subgroup of a structural pair with the given good subgroup. -/
+private theorem exists_bruhatStructuralPair_mem (k : Subgroup G) (hk : IsBruhatGoodSubgroup k)
+    (x : G) : ∃ p : BruhatStructuralPair G, OrderDual.ofDual p.val.2 = k ∧ x ∈ p.val.1 := by
+  obtain ⟨r, hr, hPolar⟩ := exists_isCompact_pontryaginDual_polar (G := PontryaginDual G)
+  have hCompact : IsCompact (k : Set G) := by
+    refine (isClosedEmbedding_pontryaginDual_eval.isCompact_preimage
+      (hPolar _ (hk.2.1.mem_nhds (lcaAnnihilator k).one_mem))).of_isClosed_subset hk.1 ?_
+    intro y hy χ hχ
+    change χ y ∈ Metric.closedBall 1 r
+    rw [(mem_lcaAnnihilator_iff k χ).mp hχ ⟨y, hy⟩]
+    exact Metric.mem_closedBall_self hr.le
+  obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : G)
+  let K := insert x (U ∪ (k : Set G))
+  let H := Subgroup.closure K
+  have hK : IsCompact K := (hUc.union hCompact).insert x
+  have hK₁ : K ∈ 𝓝 (1 : G) :=
+    mem_of_superset hU (subset_union_left.trans (subset_insert _ _))
+  have hH : IsOpen (H : Set G) :=
+    H.isOpen_of_mem_nhds (mem_of_superset hK₁ Subgroup.subset_closure)
+  have hGen : IsCompactlyGeneratedGroup H :=
+    ⟨Subtype.val ⁻¹' K, continuous_subtype_val.continuousAt.preimage_mem_nhds hK₁,
+      IsEmbedding.subtypeVal.isInducing.isCompact_preimage' hK
+        (Subtype.range_coe.symm ▸ Subgroup.subset_closure),
+      Subgroup.closure_preimage_eq_top K⟩
+  exact ⟨⟨(H, OrderDual.toDual k), hH, hGen, hk,
+    fun y hy ↦ Subgroup.subset_closure (mem_insert_of_mem _ (Or.inr hy))⟩,
+    rfl, Subgroup.subset_closure (mem_insert _ _)⟩
+
+omit hT2 hLC in
+/-- On an elementary presentation of a structural quotient, a translated one-parameter
+subgroup lifts to an affine line in the real and torus cover of a single discrete fiber. -/
+private theorem contDiff_bruhatOrbit_of_presentation (a : LCATopologicalLie G) {f : G → ℂ}
+    (p : BruhatStructuralPair G) {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (e : p.quotient ≃ₜ* Multiplicative (ElementaryLieGroup m n r F))
+    (f₀ : p.quotient → ℂ) (hf₀ : ∀ x : p.val.1, f₀ (QuotientGroup.mk x) = f x.val)
+    (hCover : ∀ (z : Fin r → ℤ) (b : F),
+      ContDiff ℝ 1 (fun xt ↦ f₀ (e.symm (Multiplicative.ofAdd (elementaryCover xt z b)))))
+    (x : p.val.1) :
+    ContDiff ℝ 1 (fun t : ℝ ↦ f (x.val * a (Multiplicative.ofAdd t))) := by
+  have haMem (t : ℝ) : a (Multiplicative.ofAdd t) ∈ p.val.1 := by
+    have haCont : Continuous (fun t : ℝ ↦ a (Multiplicative.ofAdd t)) := a.continuous
+    exact isPreconnected_range haCont |>.subset_isClopen
+      ⟨p.val.1.isClosed_of_isOpen p.property.1, p.property.1⟩
+      ⟨1, ⟨0, map_one a⟩, p.val.1.one_mem⟩ (mem_range_self t)
+  let aH : Multiplicative ℝ →* p.val.1 := a.toMonoidHom.codRestrict p.val.1 haMem
+  let q : p.val.1 →* p.quotient := QuotientGroup.mk' _
+  let c : ℝ →+ ElementaryLieGroup m n r F :=
+    AddMonoidHom.toMultiplicative.symm (e.toMulEquiv.toMonoidHom.comp (q.comp aH))
+  have hc : Continuous c :=
+    e.continuous.comp (QuotientGroup.continuous_mk.comp (a.continuous.subtype_mk haMem))
+  let cR := (AddMonoidHom.fst _ _).comp c
+  let cT := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp c)
+  have hR (t : ℝ) : (c t).1 = t • (c 1).1 := by
+    change cR t = t • cR 1
+    simpa only [smul_eq_mul, mul_one] using
+      map_real_smul cR (continuous_fst.comp hc) t (1 : ℝ)
+  choose v hv using fun i : Fin n ↦ exists_addCircle_coe_mul_eq
+    ((Pi.evalAddMonoidHom _ i).comp cT) ((continuous_apply i).comp hc.snd.fst)
+  have hD (t : ℝ) : (c t).2.2 = 0 := by
+    have h := hc.snd.snd.isConst_of_preconnectedSpace t 0
+    rw [map_zero c] at h
+    exact h
+  let y := (e (q x)).toAdd
+  obtain ⟨u, hu⟩ := elementaryCover_surjective y.2.2.1 y.2.2.2 y.1 y.2.1
+  let w := (y.1, u)
+  let d := ((c 1).1, WithLp.toLp 2 v)
+  have hLine (t : ℝ) : elementaryCover (w + t • d) y.2.2.1 y.2.2.2 = y + c t := by
+    refine Prod.ext (congrArg (y.1 + ·) (hR t).symm) (Prod.ext ?_ ?_)
+    · funext i
+      have hui := congrArg (fun z : ElementaryLieGroup m n r F ↦ z.2.1 i) hu
+      change ((u i + t * v i : ℝ) : AddCircle (1 : ℝ)) = y.2.1 i + (c t).2.1 i
+      rw [AddCircle.coe_add, show (u i : AddCircle (1 : ℝ)) = y.2.1 i from hui, hv i t]
+      rfl
+    · change y.2.2 = y.2.2 + (c t).2.2
+      rw [hD, add_zero]
+  have hOrbit (t : ℝ) :
+      f (x.val * a (Multiplicative.ofAdd t)) =
+        f₀ (e.symm (Multiplicative.ofAdd
+          (elementaryCover (w + t • d) y.2.2.1 y.2.2.2))) := by
+    rw [hLine]
+    change f ((x * aH (Multiplicative.ofAdd t)).val) =
+      f₀ (e.symm (e (q x) * e (q (aH (Multiplicative.ofAdd t)))))
+    rw [← map_mul, e.symm_apply_apply, ← map_mul]
+    exact (hf₀ _).symm
+  simp only [hOrbit]
+  exact (hCover y.2.2.1 y.2.2.2).comp
+    (contDiff_const.add (contDiff_id.smul contDiff_const))
+
+/-- A structural pair can be restricted around a point while keeping its good subgroup,
+so that the new quotient has an elementary presentation. The original pair itself
+has such a presentation by Lemma D.1.5.2(1). -/
+theorem BruhatStructuralPair.exists_elementary_subpair_mem
+    (p : BruhatStructuralPair G) (x : p.val.1) :
+    ∃ q : BruhatStructuralPair G, q.val.1 ≤ p.val.1 ∧
+      OrderDual.ofDual q.val.2 = OrderDual.ofDual p.val.2 ∧
+      x.val ∈ q.val.1 ∧ Nonempty (ElementaryLCAPresentation q.quotient) :=
+  ⟨p, le_rfl, rfl, x.property, p.elementary⟩
+
 /-- Paper: Definition D.1.6.5, p. 766. For a Bruhat C¹ function the orbit
 derivative exists at time zero for every starting point. -/
 theorem hasDerivAt_bruhatDirectionalDeriv (a : LCATopologicalLie G) {f : G → ℂ}
     (hf : IsBruhatContDiff 1 f) (x : G) :
     HasDerivAt (fun t : ℝ ↦ f (x * a (Multiplicative.ofAdd t)))
-      (bruhatDirectionalDeriv a f x) 0 := by sorry
+      (bruhatDirectionalDeriv a f x) 0 := by
+  obtain ⟨k, hk, _, hDescent⟩ := hf
+  obtain ⟨p, hp, hx⟩ := exists_bruhatStructuralPair_mem k hk x
+  obtain ⟨q, _, hq, hxq, ⟨e⟩⟩ := p.exists_elementary_subpair_mem ⟨x, hx⟩
+  obtain ⟨f₀, hf₀, hCover⟩ := hDescent q (hq.trans hp)
+  have h : ContDiff ℝ 1 (fun t : ℝ ↦ f (x * a (Multiplicative.ofAdd t))) :=
+    contDiff_bruhatOrbit_of_presentation a q
+      (m := e.realDim) (n := e.torusDim) (r := e.latticeRank) (F := e.finiteFactor)
+      e.equiv f₀ hf₀ (hCover e) ⟨x, hxq⟩
+  exact (h.differentiable one_ne_zero 0).hasDerivAt
 
 -- TODO(paper-gap): The proofs of D.1.6.6 and D.1.6.7 use support in an open
 -- compactly generated subgroup. A global smooth function need not have such support.

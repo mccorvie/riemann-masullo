@@ -3036,6 +3036,8 @@ theorem isNuclearTVS_directLimit {X : ℕ → Type*}
   exact (⟨Equiv.refl (L ⊗[ℂ] F), (uniformContinuous_tensorComparison L F).continuous, hback⟩ :
     ProjectiveTensor L F ≃ₜ InjectiveTensor L F).isHomeomorph
 
+-- Nuclearity holds for every submodule of the product, independently of the transition maps.
+set_option linter.unusedVariables false in
 /-- Paper: Lemma C.2.4.12(2), p. 689. The projective limit of nuclear spaces
 is nuclear, with the topology on compatible families induced from the product. -/
 theorem isNuclearTVS_projectiveLimit {I : Type w} [Preorder I] [IsDirectedOrder I] [Nonempty I]
@@ -3045,7 +3047,9 @@ theorem isNuclearTVS_projectiveLimit {I : Type w} [Preorder I] [IsDirectedOrder 
     (hf : ∀ i j h, Continuous (f i j h)) (hX : ∀ i, IsNuclearTVS.{max v w, u} (X i)) :
     let L : Submodule ℂ (∀ i, X i) := ⨅ i, ⨅ j, ⨅ h : i ≤ j,
       LinearMap.ker (LinearMap.proj i - (f i j h).comp (LinearMap.proj j))
-    IsNuclearTVS.{v, max u w} L := by sorry
+    IsNuclearTVS.{v, max u w} L := by
+  intro L
+  exact isNuclearTVS_submodule (isNuclearTVS_pi hX) L
 
 /-- Paper: Remark C.2.4.13, p. 689. Hausdorffness can fail in locally convex
 inductive limits, even for a sequence with nuclear stages.

@@ -881,15 +881,12 @@ include hLC hHausdorff hBarrelled hComplete hReflexive hb ha
 
 -- Retain the section hypotheses in the theorem's signature.
 set_option linter.unusedSectionVars false in
-/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
-barrelled reflexive space is shrinking. -/
-theorem isShrinking_of_isAbsolute : IsShrinking x f := by
+/-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
+unconditional, with coefficients given by evaluation at the original basis vectors. -/
+theorem strongDual_isUnconditional_of_isAbsolute :
+    IsUnconditional f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by
+  intro g
   have horth (m n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
-  refine ⟨fun m n ↦ ?_, fun g ↦ ?_⟩
-  · change f n (x m) = _
-    by_cases h : m = n
-    · simp [horth, h]
-    · simp [horth, h, Ne.symm h]
   -- A continuous functional vanishing on the coefficient span is evaluation at zero.
   let S := Submodule.span ℂ (range f)
   have hdense : Dense (S : Set (StrongDual ℂ E)) := by
@@ -927,9 +924,8 @@ theorem isShrinking_of_isAbsolute : IsShrinking x f := by
     | smul c ψ _ hψ =>
       filter_upwards [hψ] with s hs u
       simp [hs u]
-  change Tendsto Q (SummationFilter.conditional ℕ).filter (𝓝 g)
-  refine (tendsto_sub_nhds_zero_iff.mp ?_).mono_left
-    (SummationFilter.conditional ℕ).le_atTop
+  change Tendsto Q atTop (𝓝 g)
+  apply tendsto_sub_nhds_zero_iff.mp
   apply (ContinuousLinearMap.hasBasis_nhds_zero_of_basis Metric.nhds_basis_ball).tendsto_right_iff.mpr
   rintro ⟨B, ε⟩ ⟨hB, hε⟩
   -- Absoluteness bounds all truncation errors on a bounded set by continuous seminorms.
@@ -963,6 +959,18 @@ theorem isShrinking_of_isAbsolute : IsShrinking x f := by
   rw [heval]
   simpa only [Metric.mem_ball, dist_zero_right, sub_apply, hs u, zero_sub, norm_neg] using h
 
+/-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
+barrelled reflexive space is shrinking. -/
+theorem isShrinking_of_isAbsolute : IsShrinking x f := by
+  have horth (m n : ℕ) : f m (x n) = if m = n then 1 else 0 := hb.1 m n
+  refine ⟨fun m n ↦ ?_, fun g ↦ ?_⟩
+  · change f n (x m) = _
+    by_cases h : m = n
+    · simp [horth, h]
+    · simp [horth, h, Ne.symm h]
+  · exact Tendsto.mono_left (strongDual_isUnconditional_of_isAbsolute hComplete hReflexive hb ha g)
+      (SummationFilter.conditional ℕ).le_atTop
+
 -- Retain the section hypotheses in the theorem's signature.
 set_option linter.unusedSectionVars false in
 /-- Paper: Lemma 4.1.2.4, p. 159. An absolute Schauder basis of a complete
@@ -995,11 +1003,6 @@ theorem isBoundedlyComplete_of_isAbsolute : IsBoundedlyComplete x := by
       isClosed_singleton.mem_of_mapClusterPt hcl heq
     exact (congrArg (fun g : StrongDual ℂ (StrongDual ℂ E) ↦ g (f m)) hu).trans hval
   exact ⟨u, by simpa only [ContinuousLinearMap.coe_coe, hcoeff] using hb.2 u⟩
-
-/-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
-unconditional, with coefficients given by evaluation at the original basis vectors. -/
-theorem strongDual_isUnconditional_of_isAbsolute :
-    IsUnconditional f (fun m ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x m)) := by sorry
 
 /-- Paper: Lemma 4.1.2.4, p. 159. The coefficient basis of the strong dual is
 boundedly complete. -/

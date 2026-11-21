@@ -1224,7 +1224,38 @@ in the dual, with the annihilator of the good subgroup as the open subgroup. -/
 theorem BruhatStructuralPair.dual (p : BruhatStructuralPair G) :
     ∃ q : BruhatStructuralPair (PontryaginDual G),
       q.val.1 = lcaAnnihilator (OrderDual.ofDual p.val.2) ∧
-      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by sorry
+      OrderDual.ofDual q.val.2 = lcaAnnihilator p.val.1 := by
+  let H := p.val.1
+  let k := OrderDual.ofDual p.val.2
+  obtain ⟨hH, hGen, ⟨_, hkOpen, hkGen⟩, hkH⟩ := p.property
+  have hCompact := isCompact_lcaAnnihilator H hH
+  refine ⟨⟨(lcaAnnihilator k, OrderDual.toDual (lcaAnnihilator H)), hkOpen, hkGen,
+    ⟨hCompact.isClosed, isOpen_lcaAnnihilator _ hCompact, ?_⟩, ?_⟩, rfl, rfl⟩
+  · obtain ⟨e, he⟩ := pontryaginDual_bidual (G := G)
+    let A := lcaAnnihilator (lcaAnnihilator H)
+    change IsCompactlyGeneratedGroup A
+    have hMem (x : G) : e x ∈ A ↔ x ∈ H := by
+      change e x ∈ lcaAnnihilator (lcaAnnihilator H) ↔ x ∈ H
+      rw [mem_lcaAnnihilator_iff]
+      simp_rw [he]
+      rw [← mem_lcaDualAnnihilator_iff, lcaDualAnnihilator_annihilator H
+        (H.isClosed_of_isOpen hH)]
+    let f : H →* A := (e.toMonoidHom.comp H.subtype).codRestrict A
+      fun x ↦ (hMem x).mpr x.property
+    have hSurj : Function.Surjective f := by
+      intro y
+      obtain ⟨x, hx⟩ := e.surjective (y : PontryaginDual (PontryaginDual G))
+      exact ⟨⟨x, (hMem x).mp (hx.symm ▸ y.property)⟩, Subtype.ext hx⟩
+    have hInducing : IsInducing f := IsInducing.subtypeVal.of_comp_iff.mp
+      (e.toHomeomorph.isInducing.comp IsInducing.subtypeVal)
+    have hOpen : IsOpenMap f := hInducing.isOpenMap (hSurj.range_eq ▸ isOpen_univ)
+    obtain ⟨U, hU, hUc, hUgen⟩ := hGen
+    refine ⟨f '' U, ?_, hUc.image hInducing.continuous, ?_⟩
+    · simpa only [map_one] using hOpen.image_mem_nhds hU
+    · rw [← MonoidHom.map_closure, hUgen, Subgroup.map_top_of_surjective f hSurj]
+  · intro χ hχ
+    exact (mem_lcaAnnihilator_iff k χ).mpr fun x ↦
+      (mem_lcaAnnihilator_iff H χ).mp hχ ⟨x, hkH x.property⟩
 
 section Fourier
 
