@@ -948,11 +948,102 @@ local notation "classOfNormOne" => fun h : N₁[F] ↦
 local notation "ideleIntegrand" => fun (ω₁ : χ[F]) (f : ℬ[F]) (g : 𝕀[F]) (h : N₁[F]) ↦
   f (Multiplicative.ofAdd (Units.val (Subtype.val h * g))) * (ω₁ (classOfNormOne h) : ℂ)
 
+/-- The translates of the compact closure of the idelic fundamental domain
+by principal ideles cover the norm-one ideles. -/
+private theorem exists_compact_normOneIdele_cover :
+    ∃ principal : Fˣ → N₁[F],
+      (∀ ξ, (principal ξ).val = IdeleGroup.unitEmbedding (𝓞 F) F ξ) ∧
+      ∃ K : Set N₁[F], IsCompact K ∧
+        (⋃ ξ : Fˣ, (fun h : N₁[F] ↦ principal ξ * h) '' K) = univ := by
+  obtain ⟨b⟩ := regulator_units_mod_torsion_basis F
+  obtain ⟨r, hr₁, hr⟩ := exists_normOne_class_representatives F
+  let v₀ := Classical.choice (inferInstance : Nonempty (InfinitePlace F))
+  let E := ideleFundamentalDomain F b v₀ (AlgEquiv.refl : ℂ ≃ₐ[ℝ] ℂ) r
+  let principal := (IdeleGroup.unitEmbedding (𝓞 F) F).codRestrict (ideleNorm F).ker
+    (fun ξ ↦ (ideleNorm_spec F).2 (Set.mem_range_self ξ))
+  refine ⟨principal, fun _ ↦ rfl, closure E, ideleFundamentalDomain_precompact F b v₀ _ r hr₁ hr, ?_⟩
+  have hcover : (⋃ ξ : Fˣ, (fun h : N₁[F] ↦ principal ξ * h) '' E) = univ :=
+    (congrArg Set.iUnion (funext fun ξ : Fˣ ↦ Set.image_smul (a := principal ξ) (t := E))).trans
+      (ideleFundamentalDomain_cover F b v₀ _ r hr₁ hr)
+  exact Set.eq_univ_of_univ_subset (hcover ▸ iUnion_mono fun _ ↦ image_mono subset_closure)
+
+/-- The restriction of an adelic test function along a translated norm-one
+idele orbit is integrable for norm-one Tamagawa measure. -/
+private theorem normOneIdele_testFunction_integrable (f : ℬ[F]) (g : 𝕀[F]) :
+    Integrable (fun h : N₁[F] ↦ f (Multiplicative.ofAdd (h.val * g).val)) μ₁ := by
+  classical
+  let : BorelSpace 𝕀[F] := ⟨rfl⟩
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable Fˣ := Units.val_injective.countable
+  let : (normOneIdeleTamagawaMeasure F).IsHaarMeasure :=
+    (normOneIdeleTamagawaMeasure_existsUnique F).exists.choose_spec.1
+  let φ (h : N₁[F]) := f (Multiplicative.ofAdd (h.val * g).val)
+  have hφ : Continuous φ := (schwartzBruhat_continuous f).comp
+    (continuous_ofAdd.comp (Units.continuous_val.comp (continuous_subtype_val.mul_const g)))
+  refine ⟨hφ.aestronglyMeasurable, (hasFiniteIntegral_iff_norm φ).mpr ?_⟩
+  obtain ⟨principal, hprincipal, K, hK, hcover⟩ := exists_compact_normOneIdele_cover (F := F)
+  let p (h : N₁[F]) : 𝕀[F] × 𝔸[F] := (h.val * g, 0)
+  have hp : Continuous p := (continuous_subtype_val.mul_const g).prodMk continuous_const
+  let term (ξ : Fˣ) (z : 𝕀[F] × 𝔸[F]) : ℝ :=
+    ‖f (Multiplicative.ofAdd (z.1.val * (algebraMap F 𝔸[F] (ξ : F) + z.2)))‖
+  have ht (ξ : Fˣ) : Continuous (term ξ) := ((schwartzBruhat_continuous f).comp
+    (continuous_ofAdd.comp ((Units.continuous_val.comp continuous_fst).mul
+      (continuous_const.add continuous_snd)))).norm
+  have hs : SummableUniformlyOn term (p '' K) :=
+    adelicAverage_summableUniformlyOn f _ (hK.image hp)
+  have hcont : ContinuousOn (fun z ↦ ∑' ξ, term ξ z) (p '' K) :=
+    hs.hasSumUniformlyOn.tendstoUniformlyOn.continuousOn
+      (Eventually.of_forall fun s ↦ (continuous_finsetSum s fun ξ _ ↦ ht ξ).continuousOn).frequently
+  obtain ⟨C, hC⟩ := (hK.image hp).exists_bound_of_continuousOn hcont
+  have hterm (ξ : Fˣ) (h : N₁[F]) : ‖φ (principal ξ * h)‖ = term ξ (p h) := by
+    change ‖f (Multiplicative.ofAdd (((principal ξ).val * h.val * g).val))‖ =
+      ‖f (Multiplicative.ofAdd ((h.val * g).val * (algebraMap F 𝔸[F] (ξ : F) + 0)))‖
+    rw [hprincipal ξ, add_zero, mul_assoc,
+      mul_comm (IdeleGroup.unitEmbedding (𝓞 F) F ξ), Units.val_mul]
+    rfl
+  let H (h : N₁[F]) := ENNReal.ofReal ‖φ h‖
+  -- The compact translates may overlap, which gives an upper bound by the sum.
+  calc
+    (∫⁻ h, H h ∂μ₁) = ∫⁻ h in ⋃ ξ : Fˣ, (fun x : N₁[F] ↦ principal ξ * x) '' K, H h ∂μ₁ := by
+      rw [hcover, Measure.restrict_univ]
+    _ ≤ ∑' ξ : Fˣ, ∫⁻ h in (fun x : N₁[F] ↦ principal ξ * x) '' K, H h ∂μ₁ :=
+      lintegral_iUnion_le _ _
+    _ = ∑' ξ : Fˣ, ∫⁻ h in K, ENNReal.ofReal (term ξ (p h)) ∂μ₁ := by
+      apply tsum_congr
+      intro ξ
+      exact ((measurePreserving_mul_left μ₁ (principal ξ)).setLIntegral_comp_emb
+        (Homeomorph.mulLeft (principal ξ)).measurableEmbedding H K).symm.trans
+        (lintegral_congr fun h ↦ congrArg ENNReal.ofReal (hterm ξ h))
+    _ = ∫⁻ h in K, ∑' ξ : Fˣ, ENNReal.ofReal (term ξ (p h)) ∂μ₁ := by
+      exact (lintegral_tsum fun ξ ↦
+        (ENNReal.continuous_ofReal.comp ((ht ξ).comp hp)).aemeasurable).symm
+    _ ≤ ∫⁻ _ in K, ENNReal.ofReal C ∂μ₁ := by
+      apply setLIntegral_mono measurable_const
+      intro h hh
+      have hmem : p h ∈ p '' K := mem_image_of_mem p hh
+      rw [← ENNReal.ofReal_tsum_of_nonneg (fun ξ ↦ norm_nonneg _) (hs.summable hmem)]
+      exact ENNReal.ofReal_le_ofReal ((le_abs_self _).trans (hC _ hmem))
+    _ < ⊤ := by
+      rw [setLIntegral_const]
+      exact ENNReal.mul_lt_top ENNReal.ofReal_lt_top hK.measure_lt_top
+
 /-- Paper: Lemma 2.2.5.2(1), p. 95. The integral of the adelic test function
 against the character pulled back from the norm-one classes converges absolutely
 on norm-one ideles. -/
 theorem homogeneousAdelicTheta_idele_integrable (ω₁ : χ[F]) (f : ℬ[F]) (g : 𝕀[F]) :
-    Integrable (ideleIntegrand ω₁ f g) μ₁ := by sorry
+    Integrable (ideleIntegrand ω₁ f g) μ₁ := by
+  let : BorelSpace 𝕀[F] := ⟨rfl⟩
+  have hf : Continuous (fun h : N₁[F] ↦ f (Multiplicative.ofAdd (h.val * g).val)) :=
+    (schwartzBruhat_continuous f).comp
+      (continuous_ofAdd.comp (Units.continuous_val.comp (continuous_subtype_val.mul_const g)))
+  have hq : Continuous (fun h : N₁[F] ↦ classOfNormOne h) := by
+    apply Continuous.subtype_mk
+    exact QuotientGroup.continuous_mk.comp continuous_subtype_val
+  have hω : Continuous (fun h : N₁[F] ↦ (ω₁ (classOfNormOne h) : ℂ)) :=
+    continuous_subtype_val.comp (ω₁.continuous.comp hq)
+  exact (normOneIdele_testFunction_integrable f g).mono
+    (hf.mul hω).aestronglyMeasurable
+    (.of_forall fun h ↦ by rw [norm_mul, Circle.norm_coe, mul_one])
 
 /-- Paper: Lemma 2.2.5.2(1), p. 95. The norm-one idele integral against the
 pulled-back character is continuous in the ambient idele. -/
