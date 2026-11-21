@@ -313,7 +313,17 @@ support of its realization is contained in the designated compact set. -/
 theorem mem_bruhatCompactSupportStage_iff (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (C : Compacts G) (f : SchwartzBruhatStage e) :
     f ∈ bruhatCompactSupportStage a e C ↔
-      tsupport (schwartzBruhatStageRealization a e f) ⊆ (C : Set G) := by sorry
+      tsupport (schwartzBruhatStageRealization a e f) ⊆ (C : Set G) := by
+  simp only [bruhatCompactSupportStage, Submodule.mem_iInf, LinearMap.mem_ker,
+    LinearMap.coe_comp, Function.comp_apply, LinearMap.coe_proj, Function.eval, Subtype.forall]
+  constructor
+  · intro h
+    refine closure_minimal (fun x hx ↦ ?_) C.isCompact.isClosed
+    by_contra hxC
+    exact hx (h x hxC)
+  · intro h x hx
+    by_contra hne
+    exact hx (h (subset_tsupport _ hne))
 
 /-- Paper: Lemma D.3.6.1, p. 819. A function from a fixed-support
 elementary stage realizes to a smooth compactly supported function on the group. -/
@@ -336,7 +346,7 @@ theorem bruhatCompactSupportStageInclusion_apply (a : BruhatStructuralPair G)
     (e : ElementaryLCAPresentation a.quotient) (C : Compacts G)
     (f : bruhatCompactSupportStage a e C) (x : G) :
     (bruhatCompactSupportStageInclusion a e C f).val x =
-      schwartzBruhatStageRealization a e f.val x := by sorry
+      schwartzBruhatStageRealization a e f.val x := rfl
 
 /-- Paper: Lemma D.3.6.1, p. 819. The topology of the test function space
 is final locally convex for the fixed-support stage inclusions.

@@ -1,0 +1,20 @@
+name: Stop merged PR check
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  stop:
+    if: github.event.pull_request.merged
+    runs-on: ubuntu-latest
+    # Match the group in pr_check.yml. Queueing this job cancels the check
+    # for the merged head, even if a project launcher landed it during CI.
+    concurrency:
+      group: pr-check-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+      cancel-in-progress: true
+    steps:
+      - run: 'true'

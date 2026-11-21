@@ -73,7 +73,7 @@ args=(exec --sandbox workspace-write --skip-git-repo-check -C "$dir" -o "$dir/la
 [ -n "$effort" ] && args+=(-c "model_reasoning_effort=\"$effort\"")
 rm -f "$dir/REVIEW.md"
 set +e
-codex "${args[@]}" "$prompt" >"$dir/log.txt" 2>&1
+codex "${args[@]}" "$prompt" >"$dir/log.txt" 2>&1 </dev/null   # or it waits for more input on stdin
 echo "agent exited with status $?"
 set -e
 [ -s "$dir/REVIEW.md" ] || { echo "no REVIEW.md was written; see $dir/log.txt" >&2; exit 1; }

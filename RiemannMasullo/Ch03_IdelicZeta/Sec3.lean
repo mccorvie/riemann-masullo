@@ -109,7 +109,26 @@ def sAdeleSchwartzFourier (f : ℬ(Aₛ)) : ℬ(Aₛ) :=
 test function against the additive Tamagawa measure. -/
 theorem sAdeleSchwartzFourier_apply_zero (f : ℬ(Aₛ)) :
     sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) =
-      ∫ x : Aₛ, f (Multiplicative.ofAdd x) ∂sAdditiveTamagawaMeasure F S := by sorry
+      ∫ x : Aₛ, f (Multiplicative.ofAdd x) ∂sAdditiveTamagawaMeasure F S := by
+  have hp (p : ℕ) [Fact p.Prime] : padicStandardCharacter p 0 = 1 := by
+    have key (n : ℕ) (a : ℤ_[p]) (ha : a = 0) :
+        Circle.exp (-(2 * Real.pi * ((PadicInt.toZModPow n a).val : ℝ) / (p : ℝ) ^ n)) = 1 := by
+      subst ha
+      simp
+    unfold padicStandardCharacter
+    exact key _ _ (Subtype.ext (mul_zero _))
+  have hr : (0 : InfiniteAdeleRing ℚ) Rat.infinitePlace = 0 := rfl
+  have hf (v : HeightOneSpectrum (𝓞 ℚ)) : (0 : FiniteAdeleRing (𝓞 ℚ) ℚ) v = 0 := rfl
+  have h0 : adeleStandardCharacter F 0 = 1 := by
+    simp [adeleStandardCharacter, ratAdeleStandardCharacter, hp, hr, hf]
+  have hi (w : InfinitePlace F) : (0 : Aₛ).1 w = 0 := rfl
+  have hS : sAdeleStandardCharacter F S 0 = 1 := by
+    simp only [sAdeleStandardCharacter, finiteLocalStandardCharacter, hi, Pi.single_zero,
+      Prod.snd_zero, Pi.zero_apply, RestrictedProduct.single_zero]
+    exact (congrArg₂ (· * ·) (Finset.prod_eq_one fun _ _ ↦ h0)
+      (Finset.prod_eq_one fun _ _ ↦ h0)).trans (one_mul 1)
+  change tamagawaFourier _ _ _ (0 : Aₛ) = _
+  simp [tamagawaFourier, hS]
 
 /-- Paper: Equation (3.3.1.1), p. 129. The S-local zeta integral weights
 the restriction of the test function to the S-ideles by the quasi-character. -/
@@ -161,8 +180,18 @@ def localIdelicZetaIntegral (μ : Measure Kˣ) (f : K → ℂ) (c : QuasiCharact
 measure on which the character is trivial, the local zeta integral is its mass. -/
 theorem localIdelicZetaIntegral_indicator (μ : Measure Kˣ) (c : QuasiCharacter Kˣ)
     (U : Set Kˣ) (hU : MeasurableSet U) (hfin : μ U ≠ ⊤) (hc : ∀ g ∈ U, c g = 1) :
-    localIdelicZetaIntegral μ ((Units.val '' U).indicator (fun _ ↦ 1)) c = (μ U).toReal :=
-  by sorry
+    localIdelicZetaIntegral μ ((Units.val '' U).indicator (fun _ ↦ 1)) c = (μ U).toReal := by
+  have h (g : Kˣ) : (Units.val '' U).indicator (fun _ ↦ (1 : ℂ)) g.val * c g =
+      U.indicator (fun _ ↦ (1 : ℂ)) g := by
+    by_cases hg : g ∈ U
+    · rw [Set.indicator_of_mem (Set.mem_image_of_mem _ hg), Set.indicator_of_mem hg, hc g hg,
+        one_mul]
+    · rw [Set.indicator_of_notMem, Set.indicator_of_notMem hg, zero_mul]
+      rintro ⟨x, hx, hxg⟩
+      exact hg (Units.ext hxg ▸ hx)
+  unfold localIdelicZetaIntegral
+  simp_rw [h]
+  rw [integral_indicator_const _ hU, measureReal_def, Complex.real_smul, mul_one]
 
 variable [IsTopologicalGroup Kˣ]
 

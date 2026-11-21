@@ -618,7 +618,14 @@ zeta integral weights the test function by the square of the idelic norm. -/
 theorem globalIdelicZetaIntegral_normSquared (f : ℬ[F]) :
     globalIdelicZetaIntegral f (ideleClassNormTwist (1 : U[F]) 2) =
       ∫ g : 𝕀[F], f (Multiplicative.ofAdd g.val) * ((ideleNorm F g : ℝ≥0) : ℂ) ^ (2 : ℕ)
-        ∂multiplicativeTamagawaMeasure F := by sorry
+        ∂multiplicativeTamagawaMeasure F := by
+  unfold globalIdelicZetaIntegral
+  congr 1
+  funext g
+  congr 1
+  change (((1 : U[F]) (classOf g) : Circle) : ℂ) * (classNormℝ (classOf g) : ℂ) ^ (2 : ℂ) = _
+  rw [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_ofNat]
+  rfl
 
 /-- Paper: Theorem 3.2.2.1(1), p. 124. The global zeta integral converges
 absolutely for every quasi-character with abscissa greater than one. -/
@@ -800,7 +807,16 @@ theorem homogeneousThetaMellinIntegral_normSquared (hτ : RightInverse τ (idele
     homogeneousThetaMellinIntegral τ (1 : χ₁[F]) f (ideleClassNormTwist (1 : U[F]) 2) =
       ∫ t : ℝ≥0ˣ, homogeneousAdelicTheta (1 : χ₁[F]) f (classOf (τ t)) *
         (t.val : ℂ) ^ (2 : ℕ) ∂positiveRealHaar := by
-  sorry
+  unfold homogeneousThetaMellinIntegral
+  congr 1
+  funext t
+  beta_reduce
+  congr 1
+  change (((1 : U[F]) (classOf (τ t)) : Circle) : ℂ) *
+    (classNormℝ (classOf (τ t)) : ℂ) ^ (2 : ℂ) = _
+  rw [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_ofNat]
+  change (((ideleNorm F (τ t) : ℝ≥0) : ℝ) : ℂ) ^ 2 = _
+  rw [hτ t]
 
 /-- Paper: Theorem 3.2.2.1(3), p. 125. The homogeneous theta Mellin integral
 converges absolutely on the right half-plane of the component indexed by ω. -/

@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Partial Euler products and local zeta residues
@@ -137,7 +138,33 @@ def finiteLocalEulerFactor (v : Primes) (c : QuasiCharacter (v.adicCompletion F)
 field gives the geometric Euler factor in the right half-plane. -/
 theorem finiteLocalEulerFactor_norm (v : Primes) {s : ℂ} (hs : s ∈ rightHalf) :
     finiteLocalEulerFactor v (chart𝔭[v, (1 : PontryaginDual (v.adicCompletion F)ˣ)] s) =
-      (1 - (q(v) : ℂ) ^ (-s))⁻¹ := by sorry
+      (1 - (q(v) : ℂ) ^ (-s))⁻¹ := by
+  have hval (g : (v.adicCompletion F)ˣ) :
+      chart𝔭[v, (1 : PontryaginDual (v.adicCompletion F)ˣ)] s g = ((‖g.val‖ : ℝ) : ℂ) ^ s := by
+    change (((1 : PontryaginDual (v.adicCompletion F)ˣ) g : Circle) : ℂ) *
+      (((m𝔭(v) g : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    rw [PontryaginDual.one_apply, Circle.coe_one, one_mul]
+    rfl
+  have hunr : unramified[v, chart𝔭[v, (1 : PontryaginDual (v.adicCompletion F)ˣ)] s] := by
+    intro u
+    rw [hval]
+    have hu : ‖(Units.map (HeightOneSpectrum.adicCompletionIntegers F v).subtype.toMonoidHom u :
+        (v.adicCompletion F)ˣ).val‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+          (a := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u)).mp
+          ⟨u.val.property, u.inv.property⟩)
+    rw [hu, Complex.ofReal_one, Complex.one_cpow]
+  unfold finiteLocalEulerFactor
+  rw [if_pos hunr]
+  dsimp only
+  have harg : ((q(v) : ℝ) : ℂ).arg ≠ Real.pi := by
+    rw [Complex.arg_ofReal_of_nonneg (by positivity)]
+    exact Real.pi_ne_zero.symm
+  rw [hval, Units.val_mk0, norm_uniformizer_adicCompletion v _
+    (Valued.v : Valuation (v.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec,
+    Complex.ofReal_inv, Complex.inv_cpow _ _ harg, ← Complex.cpow_neg, Complex.ofReal_natCast]
 
 /-- Paper: Equation (3.3.1.25), p. 134. The S-local Hecke L-function is the
 product of the Euler factors of the restricted quasi-characters. -/
@@ -150,7 +177,43 @@ places, the partial Euler product consists of the unshifted gamma factors. -/
 theorem sLocalHeckeL_archimedean (s : ℂ) :
     sLocalHeckeL (emptyChart s) =
       Complex.Gammaℝ s ^ InfinitePlace.nrRealPlaces F *
-        (Complex.Gammaℂ s / 2) ^ InfinitePlace.nrComplexPlaces F := by sorry
+        (Complex.Gammaℂ s / 2) ^ InfinitePlace.nrComplexPlaces F := by
+  classical
+  rw [sLocalHeckeL, Finset.univ_eq_attach, Finset.attach_empty, Finset.prod_empty, mul_one]
+  have hfac (w : InfinitePlace F) :
+      infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (emptyChart s)) =
+        if w.IsReal then Complex.Gammaℝ s else Complex.Gammaℂ s / 2 := by
+    have hval (g : w.Completionˣ) : sLocalInfiniteRestriction w (emptyChart s) g =
+        (((m∞(w) g : ℝ≥0) : ℝ) : ℂ) ^ s :=
+      sLocalInfiniteRestriction_normTwist (S := ∅) w s g
+    by_cases hw : w.IsReal
+    · have hshape : realShape[hw, (sLocalInfiniteRestriction w (emptyChart s)), s, (0 : Fin 2)] := by
+        intro x
+        have hn : ‖((realModel(hw)).symm (x : ℝ) : w.Completion)‖ = ‖(x : ℝ)‖ :=
+          (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+            (map_zero (realModel(hw)).symm) (x : ℝ)
+        rw [hval]
+        simp [InfinitePlace.mult, hw, hn]
+      have h := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (emptyChart s))).unique
+        (realLocalEulerParameters w hw _).exists.choose_spec (y₂ := (s, 0)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, ↓reduceIte, h, Fin.val_zero,
+        Nat.cast_zero, add_zero]
+    · have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      have hshape : complexShape[hc, (sLocalInfiniteRestriction w (emptyChart s)), s, (0 : ℤ)] := by
+        intro x
+        have hn : ‖((complexModel(hc)).symm (x : ℂ) : w.Completion)‖ = ‖(x : ℂ)‖ :=
+          (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+            (map_zero (complexModel(hc)).symm) (x : ℂ)
+        rw [hval]
+        simp [InfinitePlace.mult, hw, hn]
+      have h := (complexLocalEulerParameters w hc (sLocalInfiniteRestriction w (emptyChart s))).unique
+        (complexLocalEulerParameters w hc _).exists.choose_spec (y₂ := (s, 0)) hshape
+      simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, ↓reduceIte, h, Int.natAbs_zero,
+        Nat.cast_zero, zero_div, add_zero]
+  simp_rw [hfac]
+  rw [Finset.prod_ite, Finset.prod_const, Finset.prod_const]
+  simp_rw [InfinitePlace.not_isReal_iff_isComplex]
+  rw [← Fintype.card_subtype, ← Fintype.card_subtype]
 
 -- TODO(paper-gap): The description after (3.3.1.25) calls local insertion
 -- injective. For ℚ with only its real place, insertion kills the diagonal unit −1.

@@ -10,6 +10,7 @@ import Mathlib.MeasureTheory.Function.AEEqOfIntegral
 import Mathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Function.LpSeminorm.Prod
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactGroup
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.Subspace
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
@@ -684,7 +685,52 @@ theorem regularIsotypicTransform_surjective :
 determines the original L² class.
 Deviation: Injectivity holds for arbitrary Haar normalizations. -/
 theorem regularIsotypicTransform_injective :
-    Injective (regularIsotypicTransform m hm ν ν₁ τ hτ) := by sorry
+    Injective (regularIsotypicTransform m hm ν ν₁ τ hτ) := by
+  obtain ⟨T, hT⟩ := regularIsotypicTransform_continuousLinear m hm ν ν₁ τ hτ
+  rw [← funext hT]
+  apply (LinearMap.ker_eq_bot.mp _ : Injective T.toLinearMap)
+  apply (Submodule.eq_bot_iff _).mpr
+  intro f hf
+  have hf0 : regularIsotypicTransform m hm ν ν₁ τ hτ f = 0 := (hT f).symm.trans hf
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : LocallyCompactSpace K := hm.isCompact_ker.isClosed.locallyCompactSpace
+  have : SecondCountableTopology K := Subtype.secondCountableTopology (K : Set G)
+  have : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  have : SecondCountableTopology (PontryaginDual K) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap K Circle).secondCountableTopology
+  have : Countable (PontryaginDual K) := countable_of_Lindelof_of_discrete
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let logHomeo := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have : LocallyCompactSpace ℝ≥0ˣ := logHomeo.isOpenEmbedding.locallyCompactSpace
+  obtain ⟨j, hj⟩ := exists_regularIsotypic_sectionEquiv m hm τ hτ
+  let η := ν₁.prod positiveRealHaar
+  have : (η.map j).IsHaarMeasure := j.isHaarMeasure_map η
+  have hmem : MemLp (f : G → ℂ) 2 (η.map j) := by
+    rw [Measure.isMulLeftInvariant_eq_smul (η.map j) ν]
+    exact (Lp.memLp f).smul_measure_nnreal
+  have hjm := j.continuous.measurable
+  have hcoeff (χ : PontryaginDual K) :
+      (fun t ↦ ∫ k : K, star (χ k : ℂ) * f (j (k, t)) ∂ν₁) =ᵐ[positiveRealHaar] 0 := by
+    have h := regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ χ f
+    rw [hf0, lp.coeFn_zero, Pi.zero_apply] at h
+    simpa only [hj] using h.symm.trans (Lp.coeFn_zero ℂ 2 positiveRealHaar)
+  -- A common full-measure set of fibers works for all characters.
+  have hfiber : ∀ᵐ t ∂positiveRealHaar, ∀ᵐ k ∂ν₁, f (j (k, t)) = 0 := by
+    filter_upwards [memLp_two_prod_left_ae (hmem.comp_of_map hjm.aemeasurable),
+      ae_all_iff.mpr hcoeff] with t ht hc
+    exact ae_eq_zero_of_character_integral_eq_zero ν₁ ht hc
+  have hmeas : MeasurableSet {x : G | f x = 0} :=
+    measurableSet_eq_fun (Lp.stronglyMeasurable f).measurable measurable_const
+  have hprod : ∀ᵐ p ∂η, f (j p) = 0 :=
+    (Measure.ae_prod_iff_ae_ae (hjm hmeas)).2
+      ((Measure.ae_ae_comm (hjm hmeas)).2 hfiber)
+  have hzero : ∀ᵐ x ∂η.map j, f x = 0 := (ae_map_iff hjm.aemeasurable hmeas).2 hprod
+  have hae : (f : G → ℂ) =ᵐ[ν] 0 :=
+    (Measure.absolutelyContinuous_isHaarMeasure ν (η.map j)).ae_le hzero
+  exact Lp.ext (hae.trans (Lp.coeFn_zero ℂ 2 ν).symm)
 
 /-- Paper: Lemma 4.3.2.2, p. 179. The squared norm of the isotypic transform
 scales by the mass of the norm-one subgroup times the product Haar measure ratio.
@@ -692,7 +738,47 @@ Deviation: The scaling factor accounts for the arbitrary Haar normalizations (ER
 theorem regularIsotypicTransform_norm_sq (c : ℝ≥0∞)
     (hc : (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) = c • ν)
     (f : RegularL2 ν) :
-    ‖regularIsotypicTransform m hm ν ν₁ τ hτ f‖ ^ 2 = ν₁.real univ * c.toReal * ‖f‖ ^ 2 := by sorry
+    ‖regularIsotypicTransform m hm ν ν₁ τ hτ f‖ ^ 2 = ν₁.real univ * c.toReal * ‖f‖ ^ 2 := by
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : SecondCountableTopology K := Subtype.secondCountableTopology (K : Set G)
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let logHomeo := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.toHomeomorph.symm
+  have : LocallyCompactSpace ℝ≥0ˣ := logHomeo.isOpenEmbedding.locallyCompactSpace
+  obtain ⟨j, hj⟩ := exists_regularIsotypic_sectionEquiv m hm τ hτ
+  let η := ν₁.prod positiveRealHaar
+  have : (η.map j).IsHaarMeasure := j.isHaarMeasure_map η
+  have hmem : MemLp (f : G → ℂ) 2 (η.map j) := by
+    rw [Measure.isMulLeftInvariant_eq_smul (η.map j) ν]
+    exact (Lp.memLp f).smul_measure_nnreal
+  have hcomp := hmem.comp_of_map j.continuous.measurable.aemeasurable
+  have hmap : η.map j = c • ν := by
+    let q (z : K × ℝ≥0ˣ) : G := (z.1 : G) * τ z.2
+    have hq : Measurable q :=
+      (continuous_subtype_val.comp continuous_fst).measurable.mul
+        (τ.continuous.measurable.comp measurable_snd)
+    have hinv : MeasurePreserving (Prod.map (Inv.inv : K → K) id) η η :=
+      (Measure.measurePreserving_inv ν₁).prod (MeasurePreserving.id positiveRealHaar)
+    rw [show (j : K × ℝ≥0ˣ → G) = q ∘ Prod.map Inv.inv id from funext hj,
+      ← Measure.map_map hq hinv.measurable, hinv.map_eq]
+    exact hc
+  let y := regularIsotypicTransform m hm ν ν₁ τ hτ f
+  have hy : HasSum (fun χ ↦ ‖y χ‖ ^ 2) (‖y‖ ^ 2) := by
+    simpa using lp.hasSum_norm (by norm_num) y
+  have hn : ‖f‖ ^ 2 = ∫ x, ‖f x‖ ^ 2 ∂ν := by
+    simpa only [Lp.toLp_coeFn] using norm_sq_toLp_two (Lp.memLp f)
+  calc
+    ‖y‖ ^ 2 = ∑' χ, ‖y χ‖ ^ 2 := hy.tsum_eq.symm
+    _ = ν₁.real univ * ∫ p, ‖f (j p)‖ ^ 2 ∂η := by
+      refine tsum_sq_character_integral_prod ν₁ hcomp y (fun χ ↦ ?_)
+      simpa only [Function.comp_apply, hj] using
+        regularIsotypicTransform_ae_eq m hm ν ν₁ τ hτ χ f
+    _ = _ := by
+      have heq : ∫ x, ‖f x‖ ^ 2 ∂η.map j = ∫ p, ‖f (j p)‖ ^ 2 ∂η :=
+        integral_map j.continuous.measurable.aemeasurable (hmem.aestronglyMeasurable.norm.pow 2)
+      rw [← heq, hmap, integral_smul_measure, hn, mul_assoc]
+      rfl
 
 -- TODO(paper-gap): Lemma 4.3.2.2's isometry and the isometry asserted on
 -- p. 180 fail for the same measure rescaling as (4.3.2.5).

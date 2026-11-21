@@ -1596,7 +1596,7 @@ def quotientModulation (k : Subgroup G) (hk : IsCompact (k : Set G)) : (G ⧸ k)
 /-- Paper: Definition D.3.3.3, p. 805. The descended modulation agrees with
 the original one on each coset representative. -/
 theorem quotientModulation_apply (k : Subgroup G) (hk : IsCompact (k : Set G)) (g : G) :
-    quotientModulation m k hk (g : G ⧸ k) = m g := by sorry
+    quotientModulation m k hk (g : G ⧸ k) = m g := rfl
 
 /-- Paper: Definition D.3.3.3, p. 805. The stage S_I(k,G) carries the topology
 induced by the Schwartz–Bruhat twists on G/k.

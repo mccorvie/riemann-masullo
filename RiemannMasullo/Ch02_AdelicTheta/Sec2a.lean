@@ -9,6 +9,7 @@ import Mathlib.MeasureTheory.Measure.Real
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.Positivity
 import Mathlib.Tactic.Ring
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Global adelic theta functions
@@ -202,28 +203,160 @@ theorem adelicAverage_summableUniformlyOn (f : ℬ[F])
     SummableUniformlyOn (fun (ξ : Fˣ) (p : 𝕀[F] × 𝔸[F]) ↦
       ‖f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K := by sorry
 
+/-- Paper: Lemma 2.2.2.1, pp. 77–78. At a fixed idele and adele, the
+realization of a single elementary Schwartz stage has an absolutely summable
+series over the nonzero diagonal field elements.
+Deviation: This isolates pointwise convergence on one stage of the defining submodule. -/
+theorem adelicAverage_stage_summable_norm
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F])) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) (g : 𝕀[F]) (x : 𝔸[F]) :
+    Summable (fun ξ : Fˣ ↦
+      ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] (ξ : F) + x)))‖) := by sorry
+
 /-- Paper: Lemma 2.2.2.1(1), p. 77. Adding the term at `ξ = 0` to the adelic
 average gives the sum over all field elements. -/
 theorem hasSum_adelicAverage_add_zeroTerm (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F]) :
     HasSum (fun ξ : F ↦ f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))))
-      (adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x))) := by sorry
+      (adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x))) := by
+  classical
+  let point (ξ : F) := Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))
+  let S : Submodule ℂ (Multiplicative 𝔸[F] → ℂ) :=
+    { carrier := {φ | Summable (fun ξ : Fˣ ↦ φ (point (ξ : F)))}
+      zero_mem' := summable_zero
+      add_mem' := fun hφ hψ ↦ hφ.add hψ
+      smul_mem' := fun c _ hφ ↦ hφ.const_smul c }
+  have hS : schwartzBruhatSubmodule (Multiplicative 𝔸[F]) ≤ S := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
+    rintro _ ⟨s, rfl⟩
+    exact (adelicAverage_stage_summable_norm a e s g x).of_norm
+  have hs : Summable (fun ξ : Fˣ ↦ f (point (ξ : F))) :=
+    hS (show (f : Multiplicative 𝔸[F] → ℂ) ∈ schwartzBruhatSubmodule _ from
+      (show schwartzBruhatSubmodule _ from f).property)
+  let e : Fˣ ≃ {ξ : F // ξ ∉ ({0} : Finset F)} :=
+    unitsEquivNeZero.trans (Equiv.subtypeEquivRight (fun _ ↦ by simp))
+  have hne : HasSum (fun ξ : {ξ : F // ξ ∉ ({0} : Finset F)} ↦ f (point ξ.val))
+      (adelicAverage f g x) := e.hasSum_iff.mp hs.hasSum
+  simpa only [Finset.sum_singleton, point, map_zero, zero_add] using
+    (Finset.hasSum_compl_iff (f := fun ξ : F ↦ f (point ξ)) {0}).mp hne
+
+/-- Smoothness on the covering space gives continuity on each discrete fiber. -/
+private theorem continuous_elementarySchwartz {m n r k : ℕ} [AddCommGroup (Fin k)]
+    (f : ElementarySchwartz m n r (Fin k)) : Continuous f := by
+  let q : EuclideanSpace ℝ (Fin n) → (Fin n → AddCircle (1 : ℝ)) :=
+    fun t i ↦ (t i : AddCircle (1 : ℝ))
+  have hq : IsOpenQuotientMap q :=
+    (IsOpenQuotientMap.piMap (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
+      (PiLp.continuousLinearEquiv 2 ℝ (fun _ : Fin n ↦ ℝ)).toHomeomorph.isOpenQuotientMap
+  rw [← (Homeomorph.prodAssoc (EuclideanSpace ℝ (Fin m)) (Fin n → AddCircle (1 : ℝ))
+    ((Fin r → ℤ) × Fin k)).isOpenQuotientMap.continuous_comp_iff]
+  refine continuous_prod_of_discrete_right.mpr fun ab ↦ ?_
+  have hcover := (IsOpenQuotientMap.id (X := EuclideanSpace ℝ (Fin m))).prodMap hq
+  rw [← hcover.continuous_comp_iff]
+  let fs : elementarySchwartzSubmodule m n r (Fin k) := f
+  exact (fs.property.1 ab.1 ab.2).continuous
+
+/-- The Schwartz–Bruhat submodule is spanned by continuous stage functions. -/
+private theorem continuous_schwartzBruhat_apply {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] (f : SchwartzBruhat G) : Continuous f := by
+  classical
+  let fs : schwartzBruhatSubmodule G := f
+  change Continuous fs.val
+  refine Submodule.iSup_induction (motive := fun g : G → ℂ ↦ Continuous g) _
+    fs.property (fun a g hg ↦ ?_) continuous_const (fun _ _ hg hh ↦ hg.add hh)
+  refine Submodule.iSup_induction (motive := fun g : G → ℂ ↦ Continuous g) _ hg
+    (fun e g ⟨s, hs⟩ ↦ ?_) continuous_const (fun _ _ hg hh ↦ hg.add hh)
+  subst g
+  let := e.finiteGroup
+  let U : OpenSubgroup G := ⟨a.val.1, a.property.1⟩
+  have hu : IsClopen (U : Set G) := U.isClopen
+  have hcomp : Continuous (fun x : a.val.1 ↦
+      s (Multiplicative.toAdd (e.equiv (QuotientGroup.mk x)))) :=
+    (continuous_elementarySchwartz s).comp
+      (continuous_toAdd.comp (e.equiv.continuous.comp QuotientGroup.continuous_mk))
+  refine continuous_iff_continuousAt.mpr fun x ↦ ?_
+  by_cases hx : x ∈ U
+  · apply (U.isOpen.isOpenEmbedding_subtypeVal.continuousAt_iff
+      (x := (⟨x, hx⟩ : U))).mp
+    convert hcomp.continuousAt (x := ⟨x, hx⟩) using 1
+    funext y
+    exact (schwartzBruhatStageRealization_apply a e s y.val).trans (dite_eq_left y.property)
+  · refine (continuousAt_const (y := (0 : ℂ))).congr ?_
+    filter_upwards [hu.1.isOpen_compl.mem_nhds hx] with y hy
+    exact ((schwartzBruhatStageRealization_apply a e s y).trans (dite_eq_right hy)).symm
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
+/-- Uniform absolute convergence on compact sets gives continuity of the adelic average. -/
+private theorem adelicAverage_continuous_of_summableUniformlyOn (f : ℬ[F])
+    (hsummable : ∀ K : Set (𝕀[F] × 𝔸[F]), IsCompact K →
+      SummableUniformlyOn (fun (ξ : Fˣ) (p : 𝕀[F] × 𝔸[F]) ↦
+        ‖f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))‖) K) :
+    Continuous (uncurry (adelicAverage f)) := by
+  let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+      CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace (𝔸[F]) := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F]))
+    let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+        LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+    infer_instance
+  let : LocallyCompactSpace (𝕀[F]) := (ideleGroup_topology F).2.1
+  let term (ξ : Fˣ) (p : 𝕀[F] × 𝔸[F]) :=
+    f (Multiplicative.ofAdd (p.1.val * (algebraMap F 𝔸[F] (ξ : F) + p.2)))
+  have hterm (ξ : Fˣ) : Continuous (term ξ) :=
+    (continuous_schwartzBruhat_apply f).comp (continuous_ofAdd.comp
+      ((Units.continuous_val.comp continuous_fst).mul (continuous_const.add continuous_snd)))
+  change Continuous (fun p ↦ ∑' ξ, term ξ p)
+  have hsum : HasSumLocallyUniformly term (fun p ↦ ∑' ξ, term ξ p) := by
+    apply hasSumLocallyUniformly_of_forall_compact
+    intro K hK
+    have habs : SummableUniformlyOn (fun ξ p ↦ ‖term ξ p‖) K :=
+      hsummable K hK
+    apply hasSumUniformlyOn_iff_tendstoUniformlyOn.mpr
+    refine Metric.tendstoUniformlyOn_iff.mpr fun ε hε ↦ ?_
+    filter_upwards [Metric.tendstoUniformlyOn_iff.mp
+      habs.hasSumUniformlyOn.tendstoUniformlyOn ε hε] with s hs p hp
+    -- The norm of the complex tail is bounded by the real tail.
+    have h := habs.summable hp
+    have htail := norm_tsum_le_tsum_norm (h.subtype fun ξ ↦ ξ ∉ s)
+    rw [dist_eq_norm, ← h.of_norm.sum_add_tsum_subtype_compl s, add_sub_cancel_left]
+    apply htail.trans_lt
+    have hn := hs p hp
+    rw [dist_eq_norm, ← h.sum_add_tsum_subtype_compl s, add_sub_cancel_left,
+      Real.norm_eq_abs, abs_of_nonneg (tsum_nonneg (fun _ ↦ norm_nonneg _))] at hn
+    exact hn
+  exact TendstoLocallyUniformly.continuous hsum
+    (Eventually.of_forall fun s ↦ continuous_finsetSum s fun ξ _ ↦ hterm ξ).frequently
 
 /-- Paper: Lemma 2.2.2.1(1), p. 77. The adelic average is jointly continuous in
 the idele and adele arguments. -/
 theorem adelicAverage_continuous (f : ℬ[F]) :
-    Continuous (uncurry (adelicAverage f)) := by sorry
+    Continuous (uncurry (adelicAverage f)) :=
+  adelicAverage_continuous_of_summableUniformlyOn f (adelicAverage_summableUniformlyOn f)
 
 /-- Paper: Lemma 2.2.2.1(1), p. 77. The sum with the zero term included is
 invariant under addition of a diagonal field element to the adele argument. -/
 theorem adelicAverage_add_zeroTerm_add_principal (f : ℬ[F]) (g : 𝕀[F]) (x : 𝔸[F]) (a : F) :
     let y := algebraMap F 𝔸[F] a + x
     adelicAverage f g y + f (Multiplicative.ofAdd (g.val * y)) =
-      adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x)) := by sorry
+      adelicAverage f g x + f (Multiplicative.ofAdd (g.val * x)) := by
+  dsimp only
+  rw [← (hasSum_adelicAverage_add_zeroTerm f g (algebraMap F 𝔸[F] a + x)).tsum_eq,
+    ← (hasSum_adelicAverage_add_zeroTerm f g x).tsum_eq]
+  simpa only [Equiv.coe_addRight, map_add, add_assoc] using
+    (Equiv.addRight a).tsum_eq
+      (fun ξ : F ↦ f (Multiplicative.ofAdd (g.val * (algebraMap F 𝔸[F] ξ + x))))
 
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is continuous
 as a function of the idele. -/
 theorem adelicAverage_at_zero_continuous (f : ℬ[F]) :
-    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) := by sorry
+    Continuous (fun g : 𝕀[F] ↦ adelicAverage f g 0) :=
+  (adelicAverage_continuous f).comp (continuous_id.prodMk continuous_const)
 
 /-- Paper: Lemma 2.2.2.1(2), p. 77. The adelic average at `x = 0` is invariant
 under multiplication by principal ideles.

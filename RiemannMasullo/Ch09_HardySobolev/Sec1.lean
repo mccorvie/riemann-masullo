@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3a
 public import Mathlib.MeasureTheory.Measure.WithDensity
+import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 
 /-!
 # Sobolev spaces on locally compact abelian groups
@@ -45,7 +46,8 @@ def sobolevMeasure [MeasurableSpace A] (ν : Measure A) (w : A → ℝ≥0) (s :
 measure.
 Deviation: Sanity check on the normalization in (9.1.1.3). -/
 theorem sobolevMeasure_zero [MeasurableSpace A] (ν : Measure A) (w : A → ℝ≥0) :
-    sobolevMeasure ν w 0 = ν := by sorry
+    sobolevMeasure ν w 0 = ν := by
+  simp [sobolevMeasure]
 
 -- TODO(paper-gap): The input to the completion is written C_c(Ĝ) but its norm takes a
 -- Fourier transform and still evaluates on Ĝ. Use the Fourier-side interpretation below.
@@ -64,7 +66,44 @@ theorem weightedSobolev_norm [MeasurableSpace A] [TopologicalSpace A] [BorelSpac
     (ν : Measure A) {w : A → ℝ≥0} (hw : Continuous w) (s : ℝ)
     (f : WeightedSobolev ν w s) :
     Integrable (fun x ↦ ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2)) ν ∧
-    ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν) := by sorry
+    ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν) := by
+  let μ : Measure A := sobolevMeasure ν w s
+  let ρ : A → ℝ := fun x ↦ (1 + (w x : ℝ) ^ 2) ^ (s / 2)
+  have hρ_cont : Continuous ρ := by
+    refine Continuous.rpow_const (continuous_const.add
+      ((NNReal.continuous_coe.comp hw).pow 2)) ?_
+    intro x
+    refine Or.inl (ne_of_gt ?_)
+    exact lt_of_lt_of_le one_pos (le_add_of_nonneg_right (sq_nonneg _))
+  have hρ_nonneg (x : A) : 0 ≤ ρ x := by
+    dsimp only [ρ]
+    exact Real.rpow_nonneg (add_nonneg zero_le_one (sq_nonneg _)) _
+  have hdens : Measurable (fun x ↦ ENNReal.ofReal (ρ x)) :=
+    (ENNReal.continuous_ofReal.comp hρ_cont).measurable
+  have hμ : μ = ν.withDensity (fun x ↦ ENNReal.ofReal (ρ x)) := rfl
+  have hflt : ∀ᵐ x ∂ν, ENNReal.ofReal (ρ x) < ∞ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hint_sq : Integrable (fun x ↦ ‖(f : A → ℂ) x‖ ^ 2) μ :=
+    (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable f)).1 (Lp.memLp f)
+  have hint : Integrable (fun x ↦ ‖f x‖ ^ 2 * ρ x) ν := by
+    rw [hμ] at hint_sq
+    refine ((integrable_withDensity_iff hdens hflt).1 hint_sq).congr ?_
+    filter_upwards with x
+    rw [ENNReal.toReal_ofReal (hρ_nonneg x)]
+  refine ⟨hint, ?_⟩
+  rw [norm_eq_sqrt_re_inner (𝕜 := ℂ) (x := f)]
+  refine congrArg Real.sqrt ?_
+  rw [L2.inner_def (f := f) (g := f), ← integral_re (L2.integrable_inner f f)]
+  simp_rw [inner_self_eq_norm_sq]
+  calc
+    ∫ x, ‖(f : A → ℂ) x‖ ^ 2 ∂sobolevMeasure ν w s
+        = ∫ x, ‖(f : A → ℂ) x‖ ^ 2 ∂ν.withDensity (fun x ↦ ENNReal.ofReal (ρ x)) := rfl
+    _ = ∫ x, (ENNReal.ofReal (ρ x)).toReal • ‖(f : A → ℂ) x‖ ^ 2 ∂ν :=
+      integral_withDensity_eq_integral_toReal_smul hdens hflt _
+    _ = ∫ x, ‖f x‖ ^ 2 * (1 + (w x : ℝ) ^ 2) ^ (s / 2) ∂ν := by
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      dsimp
+      rw [ENNReal.toReal_ofReal (hρ_nonneg x), mul_comm]
 
 end Weighted
 
@@ -83,12 +122,87 @@ theorem weightedSobolev_compactSupport_dense (_hν : IsLCAPlancherelMeasure μ �
     (_hw : IsSobolevWeight w) :
     ∃ J : (PontryaginDual G →C_c ℂ) →ₗ[ℂ] WeightedSobolev ν w s,
       DenseRange J ∧ Function.Injective J ∧
-        ∀ f, (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by sorry
+        ∀ f, (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := _hν.1
+  let : ν.Regular := _hν.2.1
+  let ρ (χ : PontryaginDual G) : ℝ := (1 + (w χ : ℝ) ^ 2) ^ (s / 2)
+  have hρpos (χ : PontryaginDual G) : 0 < ρ χ := Real.rpow_pos_of_pos (by positivity) _
+  have hbase : Continuous (fun χ ↦ 1 + (w χ : ℝ) ^ 2) :=
+    continuous_const.add ((NNReal.continuous_coe.comp _hw.1).pow 2)
+  have hρ : Continuous ρ := hbase.rpow_const fun χ ↦ Or.inl (by positivity)
+  let νw := sobolevMeasure ν w s
+  let : IsLocallyFiniteMeasure νw := IsLocallyFiniteMeasure.withDensity_ofReal hρ
+  have hννw : ν ≪ νw :=
+    withDensity_absolutelyContinuous' hρ.measurable.aemeasurable.ennreal_ofReal
+      (ae_of_all _ fun χ ↦ (ENNReal.ofReal_pos.mpr (hρpos χ)).ne')
+  have mem (f : PontryaginDual G →C_c ℂ) : MemLp (f : PontryaginDual G → ℂ) 2 νw :=
+    f.continuous.memLp_of_hasCompactSupport f.hasCompactSupport
+  let J : (PontryaginDual G →C_c ℂ) →ₗ[ℂ] WeightedSobolev ν w s :=
+    { toFun := fun f ↦ (mem f).toLp f
+      map_add' := fun f g ↦ MemLp.toLp_add (mem f) (mem g)
+      map_smul' := fun c f ↦ MemLp.toLp_const_smul c (mem f) }
+  have hJ (f : PontryaginDual G →C_c ℂ) :
+      (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) :=
+    hννw.ae_eq (mem f).coeFn_toLp
+  have hJinj : Function.Injective J := by
+    intro f g hfg
+    apply DFunLike.coe_injective
+    exact Measure.eq_of_ae_eq ((hJ f).symm.trans (hfg ▸ hJ g)) f.continuous g.continuous
+  refine ⟨J, ?_, hJinj, hJ⟩
+  -- Multiplying by the square root of the density transfers the weighted L² seminorm.
+  let m (χ : PontryaginDual G) : ℂ := Real.sqrt (ρ χ)
+  have hm : Continuous m := Complex.continuous_ofReal.comp hρ.sqrt
+  have hmne (χ : PontryaginDual G) : m χ ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (Real.sqrt_pos.mpr (hρpos χ)).ne'
+  have hnorm (u : PontryaginDual G → ℂ) (hu : AEStronglyMeasurable u νw) :
+      eLpNorm u 2 νw = eLpNorm (fun χ ↦ m χ * u χ) 2 ν := by
+    have huν := hu.mono_ac hννw
+    change eLpNorm u 2 νw = eLpNorm (m * u) 2 ν
+    rw [eLpNorm_eq_eLpNorm' (p := 2) (by simp) ENNReal.ofNat_ne_top hu,
+      eLpNorm_eq_eLpNorm' (p := 2) (by simp) ENNReal.ofNat_ne_top (hm.aestronglyMeasurable.mul huν)]
+    simp only [eLpNorm', ENNReal.toReal_ofNat, ENNReal.rpow_two]
+    congr 1
+    change (∫⁻ χ, ‖u χ‖ₑ ^ 2 ∂ν.withDensity (fun χ ↦ ENNReal.ofReal (ρ χ))) = _
+    rw [lintegral_withDensity_eq_lintegral_mul₀ hρ.measurable.aemeasurable.ennreal_ofReal
+      (huν.eNorm.pow_const 2)]
+    apply lintegral_congr
+    intro χ
+    have hmSq : ‖m χ‖ₑ ^ 2 = ENNReal.ofReal (ρ χ) := by
+      rw [← ofReal_norm, show ‖m χ‖ = Real.sqrt (ρ χ) by simp [m],
+        ← ENNReal.ofReal_pow (Real.sqrt_nonneg _), Real.sq_sqrt (hρpos χ).le]
+    simp only [Pi.mul_apply, eNorm_mul, mul_pow, hmSq]
+  intro f
+  refine EMetric.mem_closure_iff.mpr fun ε hε ↦ ?_
+  have hf := Lp.memLp f
+  have hmf : MemLp (fun χ ↦ m χ * f χ) 2 ν := by
+    change eLpNorm (fun χ ↦ m χ * f χ) 2 ν < ∞
+    rw [← hnorm _ hf.aestronglyMeasurable]
+    exact hf.eLpNorm_lt_top
+  obtain ⟨δ, hδ, hδε⟩ := exists_between hε
+  obtain ⟨g, hgDist, hgCont, hgSupp⟩ :=
+    exists_hasCompactSupport_eLpNorm_sub_le ENNReal.ofNat_ne_top hmf hδ.ne'
+  let a : PontryaginDual G →C_c ℂ :=
+    ⟨⟨fun χ ↦ (m χ)⁻¹ * g χ, (hm.inv₀ hmne).mul hgCont⟩, hgSupp.mul_left⟩
+  refine ⟨J a, ⟨a, rfl⟩, ?_⟩
+  have hfa : ((f : PontryaginDual G → ℂ) - (J a : PontryaginDual G → ℂ)) =ᵐ[νw]
+      (f : PontryaginDual G → ℂ) - (a : PontryaginDual G → ℂ) :=
+    Filter.EventuallyEq.rfl.sub (mem a).coeFn_toLp
+  change edist f (J a) < ε
+  rw [Lp.edist_def, eLpNorm_congr_ae hfa,
+    hnorm _ (hf.aestronglyMeasurable.sub (mem a).aestronglyMeasurable)]
+  have hdiff : (fun χ ↦ m χ * (f χ - a χ)) = (fun χ ↦ m χ * f χ) - g := by
+    funext χ
+    simp [a, mul_sub, hmne χ]
+  change eLpNorm (fun χ ↦ m χ * (f χ - a χ)) 2 ν < ε
+  rw [hdiff]
+  exact hgDist.trans_lt hδε
 
 /-- Paper: Lemma 9.1.1.2, p. 396. The weighted L² space is complete with its
 Mathlib L² inner product. -/
 theorem weightedSobolev_complete (_hν : IsLCAPlancherelMeasure μ ν) (_hw : IsSobolevWeight w) :
-    CompleteSpace (WeightedSobolev ν w s) := by sorry
+    CompleteSpace (WeightedSobolev ν w s) := by
+  infer_instance
 
 omit [μ.Regular] in
 /-- Paper: Lemma 9.1.1.2, p. 396. For a second-countable group, the Sobolev Hilbert

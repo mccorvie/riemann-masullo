@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Topology.Algebra.Equicontinuity
 public import Mathlib.Topology.Algebra.Module.Complement
 import Mathlib.Analysis.PSeries
+import RiemannMasullo.ForMathlib.Topology.Algebra.InfiniteSum.NatInt
 
 /-!
 # Schauder bases
@@ -198,7 +199,18 @@ def IsSchauderBasis (x : ℕ → E) (f : ℕ → StrongDual ℂ E) : Prop :=
 predicate agrees with Mathlib's bundled sequence and its coefficient maps. -/
 theorem isSchauderBasis_iff_exists_mathlib {F : Type*} [NormedAddCommGroup F]
     [NormedSpace ℂ F] (x : ℕ → F) (f : ℕ → StrongDual ℂ F) :
-    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by sorry
+    IsSchauderBasis x f ↔ ∃ b : _root_.SchauderBasis ℂ F, b.basis = x ∧ b.coord = f := by
+  constructor
+  · intro h
+    -- Pack the biorthogonality and the convergence of the coordinate series into
+    -- Mathlib's bundled structure. The only mismatch is the decidability instance
+    -- for `Pi.single`, which is bridged by case-splitting on the index equality.
+    refine ⟨⟨x, f, fun i j => ?_, fun u => h.2 u⟩, rfl, rfl⟩
+    by_cases hij : i = j <;> simpa [hij, Pi.single_apply] using h.1 i j
+  · -- Conversely, unpack the bundled structure and read off the two conditions.
+    rintro ⟨b, rfl, rfl⟩
+    refine ⟨fun m n => ?_, fun u => b.expansion u⟩
+    by_cases hmn : m = n <;> simpa [hmn, Pi.single_apply] using b.ortho m n
 
 -- TODO(paper-gap): The individual block sums can converge even when the ordered
 -- series has no limit. The equivalent permutation description needs cumulative sums.
@@ -249,7 +261,14 @@ summation is equivalent to convergence of each permuted coordinate series. -/
 theorem isUnconditional_iff_forall_permutation [IsTopologicalAddGroup E] [T2Space E]
     (h : IsSchauderBasis x f) :
     IsUnconditional x f ↔ ∀ (u : E) (σ : ℕ ≃ ℕ),
-      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by sorry
+      Summable (fun m ↦ f (σ m) u • x (σ m)) (SummationFilter.conditional ℕ) := by
+  constructor
+  · intro hu u σ
+    exact (σ.hasSum_iff.mpr (hu u)).summable.mono_filter
+      (SummationFilter.conditional ℕ).le_atTop
+  · intro hperm u
+    exact hasSum_of_summable_conditional_permutations
+      ((show IsTopologicalBasis x (fun m ↦ (f m).toLinearMap) from h).2 u) (hperm u)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. For each continuous seminorm, one
 continuous seminorm bounds the sums of the seminorms of the coordinate terms
@@ -297,12 +316,46 @@ section Examples
 coordinate functionals give a topological basis of the complex sequence space
 with the product topology. -/
 theorem pi_isTopologicalBasis :
-    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by sorry
+    IsTopologicalBasis coordinateVector (fun n ↦ (coordinateFunctional n).toLinearMap) := by
+  refine ⟨fun m n ↦ ?_, fun u ↦ ?_⟩
+  · simp [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.single_apply]
+  · rw [Pi.hasSum]
+    intro j
+    simp only [ContinuousLinearMap.coe_proj, LinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero]
+    have : HasSum (fun b : ℕ ↦ if j = b then u b else 0) (u j)
+        (SummationFilter.conditional ℕ) := by
+      simpa using hasSum_sum_of_ne_finset_zero (L := SummationFilter.conditional ℕ) (s := {j})
+        (fun b hb ↦
+          ite_eq_right (Ne.symm (Finset.notMem_singleton.mp hb)))
+    exact this
 
 /-- Paper: Definition 4.1.2.1(1), p. 158. The basic projections of the coordinate
 basis of the complex sequence space are equicontinuous in the product topology. -/
 theorem pi_isEquicontinuous :
-    IsEquicontinuous coordinateVector coordinateFunctional := by sorry
+    IsEquicontinuous coordinateVector coordinateFunctional := by
+  have hproj (k : ℕ) (u : ℕ → ℂ) (j : ℕ) :
+      partialProjection coordinateVector coordinateFunctional k u j =
+        if j ≤ k then u j else 0 := by
+    simp only [partialProjection, sum_apply, ContinuousLinearMap.smulRight_apply,
+      Finset.sum_apply, ContinuousLinearMap.proj_apply, Pi.smul_apply, smul_eq_mul,
+      Pi.single_apply, mul_ite, mul_one, mul_zero, Finset.sum_ite_eq, Finset.mem_Iic]
+  unfold IsEquicontinuous EquicontinuousAt
+  intro U hU
+  rw [uniformity_eq_comap_nhds_zero'] at hU
+  obtain ⟨V, hV, hVU⟩ := Filter.mem_comap.mp hU
+  -- Every basic product neighborhood of zero is preserved by coordinate truncation.
+  rw [nhds_pi] at hV
+  obtain ⟨I, hI, s, hs, hsV⟩ := Filter.mem_pi.mp hV
+  filter_upwards [set_pi_mem_nhds (x := (0 : ℕ → ℂ)) hI (fun j _ ↦ hs j)] with u hu k
+  apply hVU
+  simp only [mem_preimage, map_zero, neg_zero, add_zero]
+  apply hsV
+  intro j hj
+  rw [hproj]
+  split_ifs
+  · exact hu j hj
+  · exact mem_of_mem_nhds (hs j)
 
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/

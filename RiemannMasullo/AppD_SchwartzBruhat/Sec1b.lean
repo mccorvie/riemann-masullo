@@ -627,7 +627,8 @@ abbrev BruhatStructuralPair.quotient (p : BruhatStructuralPair G) :=
 /-- Paper: (D.1.5.2), p. 761. The quotient sends a point to the identity if and
 only if it belongs to the good subgroup. -/
 theorem BruhatStructuralPair.quotient_mk_eq_one (p : BruhatStructuralPair G) (x : p.val.1) :
-    (QuotientGroup.mk x : p.quotient) = 1 ↔ (x : G) ∈ OrderDual.ofDual p.val.2 := by sorry
+    (QuotientGroup.mk x : p.quotient) = 1 ↔ (x : G) ∈ OrderDual.ofDual p.val.2 := by
+  rw [QuotientGroup.eq_one_iff, Subgroup.mem_comap, Subgroup.coe_subtype]
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
 
@@ -756,7 +757,7 @@ def bruhatSmoothSubmodule : Submodule ℂ (G → ℂ) :=
 /-- Paper: Definition D.1.5.3(1), p. 762. Membership in the Cᵖ submodule is
 equivalent to the stated Bruhat differentiability condition. -/
 theorem mem_bruhatContDiffSubmodule_iff (p : ℕ) (f : G → ℂ) :
-    f ∈ bruhatContDiffSubmodule p ↔ IsBruhatContDiff p f := by sorry
+    f ∈ bruhatContDiffSubmodule p ↔ IsBruhatContDiff p f := Iff.rfl
 
 /-- Paper: Definition D.1.5.3(1), p. 762. Membership in the smooth submodule
 means Bruhat differentiability at every finite order. -/
@@ -795,7 +796,10 @@ theorem schwartzBruhatStageRealization_apply (a : BruhatStructuralPair G)
     schwartzBruhatStageRealization a e f x =
       if hx : x ∈ a.val.1 then
         f (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩)))
-      else 0 := by sorry
+      else 0 := by
+  unfold schwartzBruhatStageRealization
+  erw [LinearMap.comp_apply, LinearMap.pi_apply]
+  split_ifs <;> rfl
 
 include hTop hT2 hLC in
 /-- Paper: Lemma D.1.5.4, p. 762. Pullback to the smaller kernel and extension by

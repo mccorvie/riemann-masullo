@@ -403,17 +403,95 @@ of the sum of the p-th powers of the approximation numbers. -/
 def schattenNorm {p : ℝ} {hp : 1 ≤ p} (T : schattenClass E F p hp) : ℝ :=
   (∑' n, (approximationNumber T.val n) ^ p) ^ (1 / p)
 
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- An approximation number vanishes once its index bounds the rank of the operator,
+since the operator approximates itself. -/
+private theorem approximationNumber_eq_zero_of_rank_le (T : E →L[ℂ] F) {n : ℕ}
+    (hn : Module.rank ℂ T.toLinearMap.range ≤ (n : Cardinal)) :
+    approximationNumber T n = 0 := by
+  have hlow : ∀ r ∈ {r | ∃ S : E →L[ℂ] F,
+      Module.rank ℂ S.toLinearMap.range ≤ (n : Cardinal) ∧ r = ‖S - T‖}, 0 ≤ r :=
+    fun _ ⟨_, _, h⟩ ↦ h ▸ norm_nonneg _
+  apply le_antisymm
+  · exact (csInf_le ⟨0, hlow⟩ ⟨T, hn, rfl⟩).trans_eq (by simp)
+  · exact le_csInf ⟨_, T, hn, rfl⟩ hlow
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- The zeroth approximation number is the operator norm, since the only approximant of
+rank zero is the zero operator. -/
+private theorem approximationNumber_zero_eq_norm (T : E →L[ℂ] F) :
+    approximationNumber T 0 = ‖T‖ := by
+  have hset : {r | ∃ S : E →L[ℂ] F, Module.rank ℂ S.toLinearMap.range ≤ ((0 : ℕ) : Cardinal) ∧
+      r = ‖S - T‖} = {‖T‖} := by
+    ext r
+    constructor
+    · rintro ⟨S, hS, rfl⟩
+      have h0 : Module.rank ℂ S.toLinearMap.range = 0 := by
+        rw [Nat.cast_zero] at hS
+        exact le_zero_iff.mp hS
+      rw [Submodule.rank_eq_zero, LinearMap.range_eq_bot] at h0
+      have hS0 : S = 0 := ContinuousLinearMap.coe_injective h0
+      simp [hS0]
+    · rintro rfl
+      exact ⟨0, by simp, by simp⟩
+  unfold approximationNumber
+  rw [hset, csInf_singleton]
+
+/-- An operator with finite-dimensional range is compact and its approximation numbers
+vanish from the dimension of the range on, so it lies in every Schatten class. -/
+private theorem mem_schattenClass_of_finiteDimensional_range {p : ℝ} (hp : 1 ≤ p)
+    (T : E →L[ℂ] F) (hT : FiniteDimensional ℂ T.toLinearMap.range) :
+    T ∈ schattenClass E F p hp := by
+  have : ProperSpace T.toLinearMap.range := FiniteDimensional.proper_rclike ℂ _
+  refine ⟨?_, ?_⟩
+  · let T' : E →L[ℂ] T.toLinearMap.range :=
+      T.codRestrict _ (fun x ↦ LinearMap.mem_range_self T.toLinearMap x)
+    exact (isCompactOperator_of_locallyCompactSpace_dom T').continuous_comp
+      continuous_subtype_val
+  · apply summable_of_ne_finset_zero (s := Finset.range (Module.finrank ℂ T.toLinearMap.range))
+    intro n hn
+    have hn : Module.finrank ℂ T.toLinearMap.range ≤ n := by simpa using hn
+    rw [approximationNumber_eq_zero_of_rank_le T (by
+      rw [← Module.finrank_eq_rank]
+      exact_mod_cast hn), Real.zero_rpow (by linarith)]
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- The range of a rank-one map lies in the span of its vector. -/
+private theorem range_smulRight_le (φ : E →L[ℂ] ℂ) (f : F) :
+    (φ.smulRight f).toLinearMap.range ≤ ℂ ∙ f := by
+  rintro _ ⟨x, rfl⟩
+  exact Submodule.mem_span_singleton.mpr ⟨φ x, rfl⟩
+
 /-- Paper: Definition C.3.6.2(1), p. 704. A rank-one map belongs to every
 Schatten class.
 Deviation: This checks class membership on rank-one maps. -/
 theorem smulRight_mem_schattenClass {p : ℝ} (hp : 1 ≤ p) (φ : E →L[ℂ] ℂ) (f : F) :
-    φ.smulRight f ∈ schattenClass E F p hp := by sorry
+    φ.smulRight f ∈ schattenClass E F p hp := by
+  have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton f)
+  exact mem_schattenClass_of_finiteDimensional_range hp _
+    (Submodule.finiteDimensional_of_le (range_smulRight_le φ f))
 
 /-- Paper: Definition C.3.6.2(1), p. 704. A rank-one map has Schatten norm
 equal to the product of the norms of its functional and its vector.
 Deviation: This checks the normalization of the Schatten norm for all indices. -/
 theorem schattenNorm_smulRight {p : ℝ} (hp : 1 ≤ p) (φ : E →L[ℂ] ℂ) (f : F) :
-    schattenNorm ⟨φ.smulRight f, smulRight_mem_schattenClass hp φ f⟩ = ‖φ‖ * ‖f‖ := by sorry
+    schattenNorm ⟨φ.smulRight f, smulRight_mem_schattenClass hp φ f⟩ = ‖φ‖ * ‖f‖ := by
+  have hp0 : p ≠ 0 := by linarith
+  have hrank : Module.rank ℂ (φ.smulRight f).toLinearMap.range ≤ 1 :=
+    (Submodule.rank_mono (range_smulRight_le φ f)).trans
+      ((rank_span_le _).trans_eq (Cardinal.mk_singleton f))
+  have hterm (n : ℕ) : approximationNumber (φ.smulRight f) n ^ p =
+      if n = 0 then ‖φ.smulRight f‖ ^ p else 0 := by
+    rcases n with _ | n
+    · simp [approximationNumber_zero_eq_norm]
+    · have h1 : (1 : Cardinal) ≤ ((n + 1 : ℕ) : Cardinal) := by
+        exact_mod_cast Nat.succ_le_succ (Nat.zero_le n)
+      rw [approximationNumber_eq_zero_of_rank_le _ (hrank.trans h1), Real.zero_rpow hp0]
+      simp
+  unfold schattenNorm
+  simp only [hterm, tsum_ite_eq]
+  rw [one_div, Real.rpow_rpow_inv (norm_nonneg _) hp0,
+    ContinuousLinearMap.norm_smulRight_apply]
 
 variable (E F) in
 /-- Paper: Definition C.3.6.2(2), p. 704. The Hilbert-Schmidt operators
@@ -557,7 +635,17 @@ variable {E F : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [Complet
 tensor under the canonical map belongs to each Schatten class. -/
 theorem tensorToFiniteRank_mem_schattenClass {p : ℝ} (hp : 1 ≤ p)
     (z : StrongDual ℂ E ⊗[ℂ] F) :
-    tensorToFiniteRank z ∈ schattenClass E F p hp := by sorry
+    tensorToFiniteRank z ∈ schattenClass E F p hp := by
+  refine mem_schattenClass_of_finiteDimensional_range hp _ ?_
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+    have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton y)
+    apply Submodule.finiteDimensional_of_le (S₂ := ℂ ∙ y)
+    rintro _ ⟨x, rfl⟩
+    exact Submodule.mem_span_singleton.mpr ⟨φ x, (tensorToFiniteRank_tmul φ y x).symm⟩
+  | add z w hz hw =>
+    rw [map_add, ContinuousLinearMap.toLinearMap_add]
+    exact Submodule.finiteDimensional_of_le (LinearMap.range_add_le _ _)
 
 /-- Paper: (C.3.6.8), p. 705. The norm of the dual of a Hilbert space satisfies
 the parallelogram identity.
