@@ -360,11 +360,57 @@ theorem pi_isEquicontinuous :
 /-- Paper: Definition 4.1.2.1(3), p. 158. The coordinate basis of the complex
 sequence space with the product topology is absolute. -/
 theorem pi_isAbsolute :
-    IsAbsolute coordinateVector coordinateFunctional := by sorry
+    IsAbsolute coordinateVector coordinateFunctional := by
+  classical
+  intro q hq
+  let p (n : ℕ) : Seminorm ℂ (ℕ → ℂ) := (normSeminorm ℂ ℂ).comp (LinearMap.proj n)
+  let e := Equiv.sigmaEquivProd ℕ Unit
+  have hp : WithSeminorms p :=
+    (withSeminorms_pi fun _ : ℕ ↦ norm_withSeminorms ℂ ℂ).congr_equiv
+      (e.trans (Equiv.prodUnique ℕ Unit)).symm
+  obtain ⟨s, C, _, hC⟩ := Seminorm.bound_sum_of_continuous hp q hq
+  let term (m : ℕ) : (ℕ → ℂ) →L[ℂ] (ℕ → ℂ) :=
+    (coordinateFunctional m).smulRight ((coordinateVector : ℕ → ℕ → ℂ) m)
+  let r (m : ℕ) := q.comp (term m).toLinearMap
+  refine ⟨∑ m ∈ s, r m,
+    Seminorm.continuous_finsetSum (fun m _ ↦ hq.comp (term m).continuous), ?_⟩
+  intro u
+  -- Outside the controlling coordinates, the seminorm of each coordinate term is zero.
+  have hz (m : ℕ) (hm : m ∉ s) : q (term m u) = 0 := by
+    have h := hC (term m u)
+    rw [smul_apply] at h
+    change q _ ≤ C • (FunLike.coeAddMonoidHom _ _ _ (∑ i ∈ s, p i)) _ at h
+    rw [map_sum, Finset.sum_apply, Finset.sum_eq_zero (fun i hi ↦ ?_), smul_zero] at h
+    · exact le_antisymm h (apply_nonneg q _)
+    · have him : i ≠ m := fun him ↦ hm (him ▸ hi)
+      change ‖term m u i‖ = 0
+      simp [term, ContinuousLinearMap.smulRight_apply, Pi.smul_apply, Pi.single_eq_of_ne him]
+  change Summable (fun m ↦ q (term m u)) ∧ (∑' m, q (term m u)) ≤ (∑ m ∈ s, r m) u
+  have hs := hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℕ) hz
+  refine ⟨hs.summable, le_of_eq ?_⟩
+  rw [hs.tsum_eq]
+  change _ = (FunLike.coeAddMonoidHom _ _ _ (∑ m ∈ s, r m)) u
+  rw [map_sum, Finset.sum_apply]
+  rfl
 
 /-- Paper: Definition 4.1.2.1(4), p. 158. The coordinate basis of the complex
 sequence space with the product topology is boundedly complete. -/
-theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by sorry
+theorem pi_isBoundedlyComplete : IsBoundedlyComplete coordinateVector := by
+  intro a _
+  -- In the product topology every coordinate series is eventually constant, so the
+  -- ordered partial sums converge to the scalar sequence itself.
+  refine ⟨a, ?_⟩
+  rw [HasSum, SummationFilter.conditional_filter_eq_map_range, tendsto_map'_iff]
+  simp only [Function.comp_def]
+  rw [tendsto_pi_nhds]
+  intro n
+  refine tendsto_atTop_of_eventually_const (i₀ := n + 1) fun N hN ↦ ?_
+  rw [Finset.sum_apply]
+  have hn : n ∈ Finset.range N := Finset.mem_range.mpr (Nat.lt_of_succ_le hN)
+  rw [Finset.sum_eq_single_of_mem n hn]
+  · rw [Pi.smul_apply, Pi.single_eq_same, smul_eq_mul, mul_one]
+  · intro m _ hmn
+    rw [Pi.smul_apply, Pi.single_eq_of_ne hmn.symm, smul_zero]
 
 /-- Paper: Definition 4.1.2.1(5), p. 158. A countable orthonormal Hilbert basis is
 shrinking, with its coefficients given by the inner products against its vectors. -/
@@ -374,7 +420,15 @@ theorem hilbertBasis_isShrinking {H : Type*} [NormedAddCommGroup H] [InnerProduc
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. Every zero neighborhood in the complex
 sequence space with the product topology contains a coordinate basis vector. -/
-theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by sorry
+theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by
+  rintro ⟨U, hU, havoid⟩
+  have hzero : Tendsto coordinateVector atTop (𝓝 (0 : ℕ → ℂ)) := by
+    refine tendsto_pi_nhds.mpr fun j ↦ ?_
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ne_atTop j] with n hn
+    simp only [Pi.single_eq_of_ne' hn, Pi.zero_apply]
+  obtain ⟨n, hn⟩ := (hzero.eventually hU).exists
+  exact havoid n hn
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. A countable orthonormal Hilbert basis is
 normalized in the paper's sense. -/

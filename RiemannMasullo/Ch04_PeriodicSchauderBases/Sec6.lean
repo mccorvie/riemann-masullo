@@ -1,5 +1,6 @@
 module
 
+public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 
 /-!
@@ -149,19 +150,23 @@ theorem modulatedIsotypicDifferenceProduct_quotient :
 include hS₀ hγ in
 /-- Paper: Lemma 4.6.1.3(3), pp. 210–211. Applying the last cyclic difference
 identifies the shorter quotient with the last difference image modulo the
-full product image. The isomorphism intertwines left translations, expressed
-on representatives in the two quotients. -/
+full product image. The isomorphism intertwines the jointly continuous
+left translation actions on the two quotients. -/
 theorem modulatedIsotypicDifferenceProduct_cancel_equiv :
     let A := P[ω, [γ]]
     let R := A.range
     let N := (P[ω, S₀]).range
     let M := (P[ω, S₀ ++ [γ]]).range.comap R.subtype
-    ∃ F : (H₀[ω] ⧸ N) ≃L[ℂ] (R ⧸ M),
+    let X := H₀[ω] ⧸ N
+    let Y := R ⧸ M
+    ∃ F : X ≃L[ℂ] Y,
       (∀ f, F (N.mkQ f) = M.mkQ (A.rangeRestrict f)) ∧
-      (∀ (g : G) (f f' : H₀[ω]) (u u' : R),
-        (∀ x, f'.val.val x = f.val.val (g⁻¹ * x)) →
-        (∀ x, u'.val.val.val x = u.val.val.val (g⁻¹ * x)) →
-        F (N.mkQ f) = M.mkQ u → F (N.mkQ f') = M.mkQ u') ∧
+      (∃ (ρ : G × X → X) (τ : G × Y → Y), Continuous ρ ∧ Continuous τ ∧
+        (∀ g (f : H₀[ω]), ∃ f' : H₀[ω],
+          (∀ x, f'.val.val x = f.val.val (g⁻¹ * x)) ∧ ρ (g, N.mkQ f) = N.mkQ f') ∧
+        (∀ g (u : R), ∃ u' : R,
+          (∀ x, u'.val.val.val x = u.val.val.val (g⁻¹ * x)) ∧ τ (g, M.mkQ u) = M.mkQ u') ∧
+        ∀ g v, F (ρ (g, v)) = τ (g, F v)) ∧
       SeparableSpace (R ⧸ M) ∧ IsNuclearTVS (R ⧸ M) ∧ IsFrechetTVS (R ⧸ M) := by sorry
 
 end IsotypicQuotient
@@ -408,6 +413,36 @@ theorem repeatedCyclicDifference_mellin_division_eval (f : A) (n : ℤ) :
     let z : ℂ := ((2 * Real.pi * (n : ℝ) / Real.log (a.val : ℝ) : ℝ) : ℂ) * Complex.I
     f.val z = deriv (T f).val z / (Real.log (a.val : ℝ) : ℂ) := by sorry
 
+include ha hT in
+/-- Paper: Example 4.6.1.6, p. 218. The normalized Fourier coefficient of
+the periodized profile is a first derivative of the repeated-generator numerator.
+Deviation: The coefficient in (4.2.1.4) contributes another inverse log-period
+and uses the negative Mellin frequency. -/
+theorem repeatedCyclicDifference_mellin_division_fourierCoeff
+    (f : PositiveRealExponentialDecay univ) (n : ℤ) :
+    let L := Real.log (a.val : ℝ)
+    let z := (2 * (Real.pi : ℂ) * Complex.I * (n : ℂ)) / (L : ℂ)
+    cyclicFourierCoeff n (cyclicPeriodizationCLM (a.val : ℝ) (by exact_mod_cast ha) f) =
+      deriv (T (Mellin f)).val (-z) / (L : ℂ) ^ 2 := by
+  dsimp only
+  have hreal : 1 < (a.val : ℝ) := by exact_mod_cast ha
+  have hL : (Real.log (a.val : ℝ) : ℂ) ≠ 0 := by exact_mod_cast (Real.log_pos hreal).ne'
+  have hc := cyclicQuotientMellinCoeff_mk (a.val : ℝ) hreal n f
+  change (Real.log (a.val : ℝ) : ℂ) * cyclicFourierCoeff n
+    (cyclicPeriodizationCLM (a.val : ℝ) hreal f) = _ at hc
+  rw [← positiveRealFourierMellin_apply univ isOpen_univ ordConnected_univ univ_nonempty
+    f _ (mem_univ _)] at hc
+  have hd := repeatedCyclicDifference_mellin_division_eval a ha T hT (Mellin f) (-n)
+  dsimp only at hd
+  have hz : ((2 * Real.pi * ((-n : ℤ) : ℝ) / Real.log (a.val : ℝ) : ℝ) : ℂ) * Complex.I =
+      -(2 * (Real.pi : ℂ) * Complex.I * (n : ℂ) / (Real.log (a.val : ℝ) : ℂ)) := by
+    push_cast
+    ring
+  rw [hz] at hd
+  rw [hd] at hc
+  field_simp [hL] at hc ⊢
+  linear_combination hc
+
 end RepeatedGenerator
 
 /-! ## 4.6.2 Support conditions in the presence of multiplicity -/
@@ -461,7 +496,7 @@ local notation "ΔT" => schwartzBruhatDifferenceProduct S
 local notation "j₀" => modulatedExponentialDecayTwist m I ⟨0, h0⟩
 
 -- TODO(paper-gap): In (4.6.3.2), the middle denominator must be P_S S_I(G).
--- The cancellation argument gives membership in the shorter product range.
+-- The injection into P_γ E / P_S E has source E / P_{S₀} E.
 -- The closedness argument needs higher moments at repeated frequencies.
 
 include hS hγS hOpen in
@@ -483,5 +518,25 @@ theorem modulatedDifferenceProduct_quotient_equivs :
         let H₂ := actionIsotype ρK η
         F '' (R₀.mkQ '' (H₀[η] : Set E)) = R₁.mkQ '' (H₁ : Set V) ∧
           J '' (R₁.mkQ '' (H₁ : Set V)) = R₂.mkQ '' (H₂ : Set T) := by sorry
+
+include hm hms hS hγS in
+/-- Paper: Corollary 4.6.3.1, p. 220. The ordinary product range is closed.
+The two equivalences in (4.6.3.1) therefore identify Hausdorff quotients. -/
+theorem schwartzBruhatDifferenceProduct_isClosed_range :
+    IsClosed ((ΔT).range : Set (SchwartzBruhat G)) := by sorry
+
+include hS hγS hOpen in
+/-- Paper: Corollary 4.6.3.1, pp. 219–220. On each norm-one isotype the
+canonical inclusions identify the quotients by differences of isotypic functions. -/
+theorem modulatedIsotypicDifferenceProduct_quotient_equivs :
+    let H := H₀[ω]
+    let H₁ := modulatedDecayIsotype m I h0 ω
+    let H₂ := actionIsotype ρK ω
+    let R₀ := (H.map (ΔE).toLinearMap).comap H.subtype
+    let R₁ := (H₁.map (ΔI).toLinearMap).comap H₁.subtype
+    let R₂ := (H₂.map (ΔT).toLinearMap).comap H₂.subtype
+    ∃ (F : (H ⧸ R₀) ≃L[ℂ] (H₁ ⧸ R₁)) (J : (H₁ ⧸ R₁) ≃L[ℂ] (H₂ ⧸ R₂)),
+      (∀ f : H, ∃ g : H₁, (∀ x, g.val.val x = f.val.val x) ∧ F (R₀.mkQ f) = R₁.mkQ g) ∧
+      ∀ g : H₁, ∃ h : H₂, (∀ x, h.val x = g.val.val x) ∧ J (R₁.mkQ g) = R₂.mkQ h := by sorry
 
 end RiemannMasullo

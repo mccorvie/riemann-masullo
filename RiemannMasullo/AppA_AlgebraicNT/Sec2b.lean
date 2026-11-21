@@ -585,15 +585,40 @@ theorem regulatorParallelotope_interior : (interior (regulatorParallelotope F b)
   change (1 / 2 : ℝ) ∈ Set.Ioo 0 1
   norm_num
 
+/-- The integer span of the parallelotope's basis is the image of the logarithmic embedding. -/
+private theorem mem_span_regulatorBasis_iff (y : logSpace F) :
+    y ∈ Submodule.span ℤ (Set.range
+      ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F))) ↔
+      y ∈ (Units.logEmbedding F).range := by
+  rw [Module.Basis.ofZLatticeBasis_span, Units.unitLattice, Submodule.map_top]
+  rfl
+
 /-- Paper: Lemma A.2.3.5(2), p. 549. Regulator translates cover the hyperplane. -/
 theorem regulatorParallelotope_cover :
     (⋃ x : (Units.logEmbedding F).range, x.val +ᵥ regulatorParallelotope F b) = Set.univ := by
-  sorry
+  refine Set.eq_univ_of_forall fun y ↦ Set.mem_iUnion.mpr ?_
+  obtain ⟨v, hv, -⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain
+    ((b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)) y
+  refine ⟨⟨-v.val, (mem_span_regulatorBasis_iff F b _).mp (neg_mem v.prop)⟩,
+    Set.mem_vadd_set.mpr ⟨v +ᵥ y, hv, ?_⟩⟩
+  change -v.val + (v.val + y) = y
+  abel
 
 /-- Paper: Lemma A.2.3.5(2), p. 549. Every nonzero regulator translate misses the parallelotope. -/
 theorem regulatorParallelotope_disjoint (x : (Units.logEmbedding F).range) (hx : x ≠ 0) :
     Disjoint (x.val +ᵥ regulatorParallelotope F b) (regulatorParallelotope F b) := by
-  sorry
+  rw [Set.disjoint_left]
+  rintro _ ⟨z, hz, rfl⟩ hxz
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  let x' : Submodule.span ℤ (Set.range B) :=
+    ⟨x.val, (mem_span_regulatorBasis_iff F b _).mpr x.prop⟩
+  obtain ⟨v, -, hv⟩ := ZSpan.exist_unique_vadd_mem_fundamentalDomain B z
+  have h₁ : x' = v := hv x' hxz
+  have h₀ : (0 : Submodule.span ℤ (Set.range B)) = v := hv 0 (by
+    change ((0 : Submodule.span ℤ (Set.range B)) : logSpace F) + z ∈ _
+    rw [ZeroMemClass.coe_zero, zero_add]
+    exact hz)
+  exact hx (Subtype.ext (congrArg Subtype.val (h₁.trans h₀.symm) :))
 
 /-- Paper: Equation (A.2.3.12), p. 549. The natural ideal class of an idele is the
 product of its finite local contributions, with the valuation convention of §A.1. -/
@@ -643,7 +668,17 @@ theorem ideleIdealClass_ofAdicCompletion (v : Primes(F)) (x : (v.adicCompletion 
 and the representative of the trivial class can be chosen to be one. -/
 theorem exists_normOne_class_representatives :
     ∃ r : CommRing.Pic (𝓞 F) → N₁, r 1 = 1 ∧ ∀ c, ideleIdealClass F (r c).val = c := by
-  sorry
+  obtain ⟨e, he⟩ := (picard_uniformization F ∅).2.2.2
+  let p := e.toMonoidHom.comp (QuotientGroup.mk' _)
+  have hp : Surjective p := e.surjective.comp QuotientGroup.mk_surjective
+  obtain ⟨r, hr⟩ := hp.hasRightInverse
+  refine ⟨Function.update r 1 1, Function.update_self .., fun c ↦ ?_⟩
+  refine (he (Function.update r 1 1 c)).symm.trans ?_
+  change p (Function.update r 1 1 c) = c
+  by_cases hc : c = 1
+  · subst c
+    rw [Function.update_self, map_one]
+  · rw [Function.update_of_ne hc, hr c]
 
 variable (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
 

@@ -397,13 +397,42 @@ local notation "inclusion" => (fun x : H ↦ (x : G))
 /-- Paper: Proposition A.5.2.3(2), p. 570. A sequence in an open subgroup is a
 D-sequence for the restricted Haar measure exactly when its images form one in the group. -/
 theorem isDSequence_openSubgroup_iff [μ.IsHaarMeasure] :
-    IsDSequence (μ.comap inclusion) U ↔ IsDSequence μ (fun k ↦ inclusion '' U k) := by sorry
+    IsDSequence (μ.comap inclusion) U ↔ IsDSequence μ (fun k ↦ inclusion '' U k) := by
+  have hH : MeasurableSet (H : Set G) := H.isOpen.measurableSet
+  have hemb : MeasurableEmbedding inclusion := MeasurableEmbedding.subtype_coe hH
+  have hmeas (s : Set H) : μ.comap inclusion s = μ (inclusion '' s) := hemb.comap_apply μ s
+  have hnull (s : Set H) :
+      NullMeasurableSet s (μ.comap inclusion) ↔ NullMeasurableSet (inclusion '' s) μ := by
+    refine ⟨fun hs ↦ Measure.NullMeasurableSet.subtype_coe (s := (H : Set G)) hH.nullMeasurableSet hs,
+      fun hs ↦ ?_⟩
+    have hqmp : QuasiMeasurePreserving inclusion (μ.comap inclusion) μ :=
+      ⟨measurable_subtype_coe.aemeasurable, by
+        rw [hemb.map_comap]
+        exact Measure.absolutelyContinuous_of_le Measure.restrict_le_self⟩
+    simpa only [Set.preimage_image_eq _ Subtype.val_injective] using hs.preimage hqmp
+  have hone (s : Set H) : (1 : H) ∈ s ↔ (1 : G) ∈ inclusion '' s :=
+    (Subtype.val_injective.mem_set_image (a := (1 : H))).symm
+  have hdiff (s : Set H) :
+      inclusion '' (s * s⁻¹) = inclusion '' s * (inclusion '' s)⁻¹ := by
+    have h := Set.image_mul (m := (H : Subgroup G).subtype) (s := s) (t := s⁻¹)
+    rw [Set.image_inv] at h
+    exact h
+  have hanti : Antitone U ↔ Antitone (fun k ↦ inclusion '' U k) := by
+    simp only [Antitone, Set.image_subset_image_iff Subtype.val_injective]
+  unfold IsDSequence
+  simp only [hmeas, hnull, hone, hdiff, hanti]
 
 /-- Paper: Proposition A.5.2.3(2), p. 570. The D′ condition transfers in both
 directions under the inclusion of an open subgroup, with the restricted Haar measure. -/
 theorem isDPrimeSequence_openSubgroup_iff [μ.IsHaarMeasure] :
     IsDPrimeSequence (μ.comap inclusion) U ↔
-      IsDPrimeSequence μ (fun k ↦ inclusion '' U k) := by sorry
+      IsDPrimeSequence μ (fun k ↦ inclusion '' U k) := by
+  have hemb : IsOpenEmbedding inclusion := H.isOpen.isOpenEmbedding_subtypeVal
+  refine and_congr (isDSequence_openSubgroup_iff μ H U) ⟨fun h W hW ↦ ?_, fun h W hW ↦ ?_⟩
+  · obtain ⟨k, hk⟩ := h _ (continuous_subtype_val.continuousAt.preimage_mem_nhds hW)
+    exact ⟨k, Set.image_subset_iff.mpr hk⟩
+  · obtain ⟨k, hk⟩ := h _ (hemb.image_mem_nhds.mpr hW)
+    exact ⟨k, (Set.image_subset_image_iff Subtype.val_injective).mp hk⟩
 
 /-- Paper: Proposition A.5.2.3(2), p. 570. Openness agrees in the open subgroup
 and in the ambient group. -/

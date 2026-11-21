@@ -160,7 +160,10 @@ complex scalar multiplication on Bruhat C¹ functions. -/
 theorem bruhatDirectionalDeriv_smul (a : LCATopologicalLie G)
     (f : bruhatContDiffSubmodule (G := G) 1) (c : ℂ) :
     bruhatDirectionalDeriv a (c • f : bruhatContDiffSubmodule 1) =
-      c • bruhatDirectionalDeriv a f := by sorry
+      c • bruhatDirectionalDeriv a f := by
+  funext x
+  simp only [bruhatDirectionalDeriv, Submodule.coe_smul, Pi.smul_apply, smul_eq_mul]
+  rw [deriv_const_mul_field']
 
 /-- Paper: Definition D.1.6.5, p. 766. Orbit differentiation is a complex
 linear map from Bruhat C¹ functions to continuous functions. -/
@@ -275,7 +278,8 @@ def bruhatDiffWord (w : List (LCATopologicalLie G)) : bruhatDiffAlgebra G :=
 /-- Paper: Definition D.1.6.8(2), p. 768. A one-letter word evaluates to its
 first-order generator. -/
 theorem bruhatDiffWord_singleton (a : LCATopologicalLie G) :
-    bruhatDiffWord [a] = bruhatDiffGenerator a := by sorry
+    bruhatDiffWord [a] = bruhatDiffGenerator a := by
+  simp [bruhatDiffWord]
 
 /-- Paper: Definition D.1.6.8(2), p. 768. Each operator has a presentation
 as a finite linear combination of words in the first-order generators. -/
@@ -310,7 +314,8 @@ def bruhatDiffSymbol (D : bruhatDiffAlgebra G) (χ : PontryaginDual G) : ℂ :=
 symbol one.
 Deviation: Sanity check on the normalization of the symbol. -/
 theorem bruhatDiffSymbol_one (χ : PontryaginDual G) :
-    bruhatDiffSymbol (1 : bruhatDiffAlgebra G) χ = 1 := by sorry
+    bruhatDiffSymbol (1 : bruhatDiffAlgebra G) χ = 1 := by
+  simp [bruhatDiffSymbol]
 
 omit hTop hT2 hLC in
 /-- Paper: Example D.1.6.12, p. 768. On the real line, the symbol of the

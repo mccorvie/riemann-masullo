@@ -1441,9 +1441,156 @@ theorem injectiveTensorNorm_eq_opNorm (z : E ⊗[ℂ] F) :
   · exact ContinuousLinearMap.opNorm_le_of_unit_norm (apply_nonneg _ _)
       fun φ hφ ↦ hunit φ hφ.le
 
+/-- Scaling out both arguments of the evaluation functional attached to a pure tensor
+term of continuous functionals. -/
+private theorem tensorDualForm_smul (a b : ℂ) (φ : StrongDual ℂ E) (ψ : StrongDual ℂ F) :
+    tensorDualForm (a • φ) (b • ψ) = (a * b) • tensorDualForm φ ψ := by
+  apply TensorProduct.ext'
+  intro x y
+  simp only [tensorDualForm_tmul, smul_apply, LinearMap.smul_apply, smul_eq_mul]
+  ring
+
+/-- A functional in the polar of a zero-neighborhood of a normed space is a positive multiple
+of a functional in the polar of the closed unit ball. -/
+private theorem exists_scaled_polar_mem (U : {U : Set E // U ∈ 𝓝 0}) (ε : ℝ) (hε : 0 < ε)
+    (hball : Metric.ball (0 : E) ε ⊆ U.val) (φ : StrongDual.polar ℂ U.val) :
+    ∃ φ₀ : StrongDual.polar ℂ (Metric.closedBall (0 : E) 1),
+      φ.val = ((2 : ℂ) / ((ε : ℝ) : ℂ)) • φ₀.val := by
+  have hεc : ((ε : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (ne_of_gt hε)
+  refine ⟨⟨(((ε / 2) : ℝ) : ℂ) • φ.val,
+    (StrongDual.mem_polar_iff ℂ _).mpr (fun x hx ↦ ?_)⟩, ?_⟩
+  · have hx1 : ‖x‖ ≤ 1 := mem_closedBall_zero_iff.mp hx
+    have hmem : (((ε / 2) : ℝ) : ℂ) • x ∈ Metric.ball (0 : E) ε := by
+      rw [mem_ball_zero_iff, norm_smul, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_nonneg (by linarith : (0 : ℝ) ≤ ε / 2)]
+      exact lt_of_le_of_lt (mul_le_of_le_one_right (by linarith) hx1) (by linarith)
+    have hφ := (StrongDual.mem_polar_iff ℂ _).mp φ.property _ (hball hmem)
+    rw [map_smul] at hφ
+    have hφ' := hφ
+    rw [norm_smul, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_nonneg (by linarith : (0 : ℝ) ≤ ε / 2)] at hφ'
+    rw [smul_apply, norm_smul, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_nonneg (by linarith : (0 : ℝ) ≤ ε / 2)]
+    exact hφ'
+  · have hco : (((ε / 2) : ℝ) : ℂ) = ((ε : ℝ) : ℂ) / 2 := by
+      norm_num [Complex.ofReal_div]
+    have hscal : ((2 : ℂ) / ((ε : ℝ) : ℂ)) * (((ε / 2) : ℝ) : ℂ) = 1 := by
+      rw [hco, div_mul_div_comm]
+      field_simp
+    rw [smul_smul, hscal, one_smul]
+
+/-- Each evaluation against functionals in the two polars of zero-neighborhoods is bounded by
+a positive multiple of the injective norm. -/
+private theorem exists_le_injectiveTensorNorm
+    (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0}) :
+    ∃ C : ℝ, 0 < C ∧ ∀ (φ : StrongDual.polar ℂ U.val) (ψ : StrongDual.polar ℂ V.val)
+        (z : E ⊗[ℂ] F), ‖tensorDualForm φ.val ψ.val z‖ ≤ C * injectiveTensorNorm E F z := by
+  obtain ⟨ε, hε, hballU⟩ := Metric.mem_nhds_iff.mp U.property
+  obtain ⟨δ, hδ, hballV⟩ := Metric.mem_nhds_iff.mp V.property
+  have hC : 0 < 4 / (ε * δ) := div_pos (by norm_num) (mul_pos hε hδ)
+  refine ⟨4 / (ε * δ), hC, ?_⟩
+  intro φ ψ z
+  obtain ⟨φ₀, hφ⟩ := exists_scaled_polar_mem U ε hε hballU φ
+  obtain ⟨ψ₀, hψ⟩ := exists_scaled_polar_mem V δ hδ hballV ψ
+  have hbound := norm_tensorDualForm_le_injectiveTensorSeminorm
+    ⟨Metric.closedBall (0 : E) 1, Metric.closedBall_mem_nhds 0 one_pos⟩
+    ⟨Metric.closedBall (0 : F) 1, Metric.closedBall_mem_nhds 0 one_pos⟩ φ₀ ψ₀ z
+  have hscal : ‖((2 : ℂ) / ((ε : ℝ) : ℂ)) * ((2 : ℂ) / ((δ : ℝ) : ℂ))‖ = 4 / (ε * δ) := by
+    rw [norm_mul]
+    simp only [norm_div, Complex.norm_real, Real.norm_eq_abs, abs_of_pos hε, abs_of_pos hδ]
+    norm_num
+    field_simp
+    norm_num
+  calc ‖tensorDualForm φ.val ψ.val z‖
+      = ‖((2 : ℂ) / ((ε : ℝ) : ℂ)) * ((2 : ℂ) / ((δ : ℝ) : ℂ)) *
+          tensorDualForm φ₀.val ψ₀.val z‖ := by
+          rw [hφ, hψ, tensorDualForm_smul]
+          simp
+    _ = (4 / (ε * δ)) * ‖tensorDualForm φ₀.val ψ₀.val z‖ := by
+          rw [norm_mul, hscal]
+    _ ≤ (4 / (ε * δ)) * injectiveTensorNorm E F z :=
+          mul_le_mul_of_nonneg_left hbound hC.le
+
+/-- Each injective seminorm of a normed pair is bounded by a positive multiple of the
+injective norm. -/
+private theorem injectiveTensorSeminorm_le_const_mul
+    (U : {U : Set E // U ∈ 𝓝 0}) (V : {V : Set F // V ∈ 𝓝 0}) :
+    ∃ C : ℝ, 0 < C ∧ ∀ z : E ⊗[ℂ] F,
+      injectiveTensorSeminorm U V z ≤ C * injectiveTensorNorm E F z := by
+  obtain ⟨C, hC, hper⟩ := exists_le_injectiveTensorNorm U V
+  refine ⟨C, hC, fun z ↦ ?_⟩
+  have hb : BddAbove (range fun v : StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val ↦
+      (normSeminorm ℂ ℂ).comp (tensorDualForm v.1.val v.2.val)) := by
+    rw [Seminorm.bddAbove_range_iff]
+    intro w
+    exact ⟨C * injectiveTensorNorm E F w, forall_mem_range.mpr fun v ↦ hper v.1 v.2 w⟩
+  unfold injectiveTensorSeminorm
+  rw [← ciSup_prod hb, Seminorm.iSup_apply hb]
+  have hne : Nonempty (StrongDual.polar ℂ U.val × StrongDual.polar ℂ V.val) :=
+    ⟨(⟨0, StrongDual.zero_mem_polar ℂ U.val⟩, ⟨0, StrongDual.zero_mem_polar ℂ V.val⟩)⟩
+  refine ciSup_le fun v ↦ ?_
+  exact hper v.1 v.2 z
+
+/-- On a finite family of zero-neighborhood pairs the injective seminorms are uniformly
+bounded by a positive multiple of the injective norm. -/
+private theorem hfinbound :
+    ∀ s : Finset ({U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0}), ∃ C : ℝ, 0 < C ∧
+      ∀ UV ∈ s, ∀ z : InjectiveTensor E F,
+        injectiveTensorSeminorm UV.1 UV.2 z ≤ C * injectiveTensorNorm E F z := by
+  intro s
+  classical
+  refine ⟨∑ UV ∈ s, (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose + 1, ?_, ?_⟩
+  · refine add_pos_of_nonneg_of_pos
+      (Finset.sum_nonneg fun UV _ ↦
+        (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose_spec.1.le) one_pos
+  · intro UV hUV z
+    have hspec := (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose_spec
+    refine hspec.2 z |>.trans (mul_le_mul_of_nonneg_right ?_ (apply_nonneg _ z))
+    calc (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose
+        ≤ ∑ UV ∈ s, (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose :=
+          Finset.single_le_sum (f := fun UV : _ × _ ↦
+            (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose)
+            (fun UV _ ↦ (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose_spec.1.le) hUV
+      _ ≤ (∑ UV ∈ s, (injectiveTensorSeminorm_le_const_mul UV.1 UV.2).choose) + 1 :=
+          le_add_of_nonneg_right zero_le_one
+
 /-- Paper: Example C.2.3.4, p. 677. The unit-ball seminorm alone generates the ε-topology. -/
 theorem injectiveTensorNorm_withSeminorms :
-    WithSeminorms (E := InjectiveTensor E F) (fun _ : Unit ↦ injectiveTensorNorm E F) := by sorry
+    WithSeminorms (E := InjectiveTensor E F) (fun _ : Unit ↦ injectiveTensorNorm E F) := by
+  have htop := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0} ↦
+      injectiveTensorSeminorm UV.1 UV.2)
+  refine SeminormFamily.withSeminorms_of_nhds _ ?_
+  refine le_antisymm ?_ ?_
+  · -- The single-seminorm filter is finer: its basis balls are neighborhoods.
+    intro U hU
+    rcases (FilterBasis.mem_filter_iff _).1 hU with ⟨t, ht, hts⟩
+    obtain ⟨s, r, hr, rfl⟩ := (SeminormFamily.basisSets_iff _).mp ht
+    exact Filter.mem_of_superset
+      (SeminormFamily.basisSets_mem_nhds _ (fun _ ↦ htop.continuous_seminorm
+        (⟨Metric.closedBall (0 : E) 1, Metric.closedBall_mem_nhds 0 one_pos⟩,
+          ⟨Metric.closedBall (0 : F) 1, Metric.closedBall_mem_nhds 0 one_pos⟩)) _ ht) hts
+  · -- Every neighborhood contains a ball of the injective norm.
+    intro U hU
+    obtain ⟨⟨s, r⟩, hr, hBU⟩ := htop.hasBasis_zero_ball.mem_iff.mp hU
+    obtain ⟨C, hC, hfin⟩ := hfinbound (E := E) (F := F) s
+    rw [FilterBasis.mem_filter_iff]
+    refine ⟨(({()} : Finset Unit)).sup (fun _ : Unit ↦ injectiveTensorNorm E F) |>.ball 0
+      (r / (2 * C)),
+      SeminormFamily.basisSets_mem _ {()} (div_pos hr (by linarith : (0 : ℝ) < 2 * C)), ?_⟩
+    have hsup1 : (({()} : Finset Unit)).sup (fun _ : Unit ↦ injectiveTensorNorm E F) =
+        injectiveTensorNorm E F := Finset.sup_singleton
+    intro z hz
+    rw [hsup1] at hz
+    refine hBU ((s.sup (fun UV : _ × _ ↦ injectiveTensorSeminorm UV.1 UV.2)).mem_ball_zero.mpr
+      (Seminorm.finset_sup_apply_lt hr ?_))
+    intro UV hUV
+    have hz' : injectiveTensorNorm E F z < r / (2 * C) :=
+      (injectiveTensorNorm E F).mem_ball_zero.mp hz
+    calc injectiveTensorSeminorm UV.1 UV.2 z ≤ C * injectiveTensorNorm E F z := hfin UV hUV z
+      _ < C * (r / (2 * C)) := mul_lt_mul_of_pos_left hz' hC
+      _ = r / 2 := by field_simp
+      _ < r := by linarith
 
 end Normed
 

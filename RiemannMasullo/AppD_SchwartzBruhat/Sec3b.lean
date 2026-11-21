@@ -183,7 +183,7 @@ def bruhatDiffQuasiCharacterSymbol (D : bruhatDiffAlgebra G) (c : QuasiCharacter
 ordinary symbol on unitary characters. -/
 theorem bruhatDiffQuasiCharacterSymbol_unitary (D : bruhatDiffAlgebra G) (χ : PontryaginDual G) :
     let coeCircle : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
-    bruhatDiffQuasiCharacterSymbol D (coeCircle.comp χ) = bruhatDiffSymbol D χ := by sorry
+    bruhatDiffQuasiCharacterSymbol D (coeCircle.comp χ) = bruhatDiffSymbol D χ := rfl
 
 variable [hSC : SecondCountableTopology G] [MeasurableSpace G] [hBorel : BorelSpace G]
 

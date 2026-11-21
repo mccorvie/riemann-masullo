@@ -24,6 +24,8 @@ import Mathlib.MeasureTheory.Measure.Haar.Unique
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Haar.Extension
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Constructions.Polish.StronglyMeasurable
+import Mathlib.Analysis.Normed.Operator.Extend
+import Mathlib.Analysis.InnerProductSpace.Projection.Submodule
 
 /-!
 # Fourier analysis and Schwartz spaces of elementary abelian Lie groups
@@ -573,6 +575,28 @@ private theorem continuous_lcaFourier {f : G → ℂ} (hf : Integrable f μ) :
   exact (norm_add_le _ _).trans_lt (by linarith)
 
 omit [T2Space G] [LocallyCompactSpace G] [μ.Regular] in
+/-- Left translation multiplies the Fourier transform by the corresponding character value. -/
+private theorem lcaFourier_translate (f : G → ℂ) (a : G) (χ : PontryaginDual G) :
+    lcaFourier μ (fun x ↦ f (a * x)) χ = (χ a : ℂ) * lcaFourier μ f χ := by
+  have hUnit : (χ a : ℂ) * star (χ a : ℂ) = 1 := by
+    rw [Complex.star_def, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]
+    simp
+  unfold lcaFourier
+  rw [← integral_mul_left_eq_self (μ := μ) (fun x ↦ f x * star (χ x : ℂ)) a,
+    ← integral_const_mul]
+  apply integral_congr_ae
+  exact .of_forall fun x ↦ by
+    change f (a * x) * star (χ x : ℂ) =
+      (χ a : ℂ) * (f (a * x) * star (χ (a * x) : ℂ))
+    have hMul : (χ (a * x) : ℂ) = (χ a : ℂ) * (χ x : ℂ) := by
+      simp only [map_mul, Circle.coe_mul]
+    rw [hMul, star_mul]
+    symm
+    calc
+      _ = ((χ a : ℂ) * star (χ a : ℂ)) * (f (a * x) * star (χ x : ℂ)) := by ring
+      _ = _ := by rw [hUnit, one_mul]
+
+omit [T2Space G] [LocallyCompactSpace G] [μ.Regular] in
 /-- A small L¹ translation difference bounds the transform times the displacement
 of the character at the translating element. -/
 private theorem norm_mul_lcaFourier_le_translation {f : G → ℂ} (hf : Integrable f μ)
@@ -588,24 +612,6 @@ private theorem norm_mul_lcaFourier_le_translation {f : G → ℂ} (hf : Integra
       ((measurePreserving_mul_left μ a).quasiMeasurePreserving.ae_eq_comp hF)
   have hDiff : ((T - f₁ : Lp ℂ 1 μ) : G → ℂ) =ᵐ[μ] fun x ↦ f (a * x) - f x :=
     (Lp.coeFn_sub T f₁).trans (hT.sub hF)
-  have hUnit : (χ a : ℂ) * star (χ a : ℂ) = 1 := by
-    rw [Complex.star_def, Complex.mul_conj, Complex.normSq_eq_norm_sq, Circle.norm_coe]
-    simp
-  have hShift : (∫ x, f (a * x) * star (χ x : ℂ) ∂μ) = (χ a : ℂ) * lcaFourier μ f χ := by
-    unfold lcaFourier
-    rw [← integral_mul_left_eq_self (μ := μ) (fun x ↦ f x * star (χ x : ℂ)) a,
-      ← integral_const_mul]
-    apply integral_congr_ae
-    exact .of_forall fun x ↦ by
-      change f (a * x) * star (χ x : ℂ) =
-        (χ a : ℂ) * (f (a * x) * star (χ (a * x) : ℂ))
-      have hMul : (χ (a * x) : ℂ) = (χ a : ℂ) * (χ x : ℂ) := by
-        simp only [map_mul, Circle.coe_mul]
-      rw [hMul, star_mul]
-      symm
-      calc
-        _ = ((χ a : ℂ) * star (χ a : ℂ)) * (f (a * x) * star (χ x : ℂ)) := by ring
-        _ = _ := by rw [hUnit, one_mul]
   have hTransform : lcaFourier μ (T - f₁ : Lp ℂ 1 μ) χ =
       ((χ a : ℂ) - 1) * lcaFourier μ f χ := by
     unfold lcaFourier at *
@@ -618,7 +624,9 @@ private theorem norm_mul_lcaFourier_le_translation {f : G → ℂ} (hf : Integra
         exact integral_sub
           (integrable_fourierIntegrand μ
             ((measurePreserving_mul_left μ a).integrable_comp_of_integrable hf) χ) (integrable_fourierIntegrand μ hf χ)
-      _ = _ := by rw [hShift, sub_mul, one_mul]
+      _ = _ := by
+        rw [sub_mul, one_mul]
+        exact congrArg (· - _) (lcaFourier_translate μ f a χ)
   rw [← norm_mul, ← hTransform, L1.norm_eq_integral_norm (T - f₁)]
   exact norm_lcaFourier_le_integral_norm μ _ χ
 
@@ -662,152 +670,23 @@ theorem lcaFourier_zeroAtInfty {f : G → ℂ} (hf : Integrable f μ) :
   exact (mul_lt_mul_iff_of_pos_left hr).mp
     ((mul_le_mul_of_nonneg_right hDist (norm_nonneg _)).trans_lt (hle.trans_lt ha))
 
-open scoped Pointwise in
 omit [μ.IsHaarMeasure] in
-/-- An integrable function whose Fourier transform is zero vanishes almost everywhere.
-On the compact group of abstract characters of the dual, Stone–Weierstrass extends
-the vanishing from character coordinates to all continuous tests. Compact subsets
-of a measurable set and of its complement then allow continuous indicator approximations. -/
+/-- An integrable function whose Fourier transform is zero vanishes almost everywhere. -/
 private theorem ae_eq_zero_of_lcaFourier_eq_zero {f : G → ℂ} (hf : Integrable f μ)
     (h : ∀ χ, lcaFourier μ f χ = 0) : f =ᵐ[μ] 0 := by
-  classical
-  let B : Set (PontryaginDual G → Circle) := {b | b 1 = 1 ∧ ∀ χ ψ, b (χ * ψ) = b χ * b ψ}
-  have hB : IsClosed B := by
-    rw [show B = {b | b 1 = 1} ∩ ⋂ χ, ⋂ ψ, {b | b (χ * ψ) = b χ * b ψ} by ext; simp [B]]
-    exact (isClosed_eq (continuous_apply 1) continuous_const).inter
-      (isClosed_iInter fun χ ↦ isClosed_iInter fun ψ ↦
-        isClosed_eq (continuous_apply (χ * ψ)) ((continuous_apply χ).mul (continuous_apply ψ)))
-  let : CompactSpace B := isCompact_iff_compactSpace.mp hB.isCompact
-  let e (x : G) : B := ⟨fun χ ↦ χ x, rfl, fun _ _ ↦ rfl⟩
-  have he : Continuous e := (continuous_pi fun χ ↦ χ.continuous).subtype_mk _
-  have heInj : Function.Injective e := fun _ _ heq ↦
-    pontryaginDual_pairing_separates.1 (congrArg Subtype.val heq)
-  let coord : PontryaginDual G →* C(B, ℂ) :=
-    { toFun := fun χ ↦ ⟨fun b ↦ (b.1 χ : ℂ),
-        continuous_subtype_val.comp ((continuous_apply χ).comp continuous_subtype_val)⟩
-      map_one' := ContinuousMap.ext fun b ↦ by
-        change (b.1 1 : ℂ) = 1
-        rw [b.2.1, Circle.coe_one]
-      map_mul' χ ψ := ContinuousMap.ext fun b ↦ by
-        change (b.1 (χ * ψ) : ℂ) = (b.1 χ : ℂ) * (b.1 ψ : ℂ)
-        rw [b.2.2, Circle.coe_mul] }
-  have hStar (χ : PontryaginDual G) : star (coord χ) = coord χ⁻¹ := by
-    ext b
-    have hInv : b.1 χ⁻¹ = (b.1 χ)⁻¹ := by
-      apply eq_inv_of_mul_eq_one_left
-      rw [← b.2.2, inv_mul_cancel, b.2.1]
-    change star (b.1 χ : ℂ) = (b.1 χ⁻¹ : ℂ)
-    rw [hInv, Circle.coe_inv_eq_conj, Complex.star_def]
-  let A := StarAlgebra.adjoin ℂ (Set.range coord)
-  have hSep : A.SeparatesPoints := by
-    intro a b hab
-    obtain ⟨χ, hχ⟩ : ∃ χ, a.1 χ ≠ b.1 χ := by
-      by_contra! hEq
-      exact hab (Subtype.ext (funext hEq))
-    exact ⟨coord χ, ⟨coord χ, StarAlgebra.subset_adjoin _ _ (mem_range_self χ), rfl⟩,
-      fun heq ↦ hχ (Circle.ext heq)⟩
-  have hSpan : A.toSubalgebra.toSubmodule ≤ Submodule.span ℂ (Set.range coord) := by
-    rw [StarAlgebra.adjoin_eq_span]
-    apply Submodule.span_mono
-    suffices Submonoid.closure (Set.range coord ∪ star (Set.range coord)) ≤
-        MonoidHom.mrange coord from this
-    apply Submonoid.closure_le.mpr
-    rintro z (hMem | hMem)
-    · exact hMem
-    · obtain ⟨χ, hχ⟩ := Set.mem_star.mp hMem
-      exact ⟨χ⁻¹, (hStar χ).symm.trans (by rw [hχ, star_star])⟩
-  let test (u : C(B, ℂ)) (x : G) := f x * u (e x)
-  have hBound (u : C(B, ℂ)) (x : G) : ‖test u x‖ ≤ ‖u‖ * ‖f x‖ := by
-    change ‖f x * u (e x)‖ ≤ _
-    rw [norm_mul, mul_comm]
-    exact mul_le_mul_of_nonneg_right (ContinuousMap.norm_coe_le_norm u _) (norm_nonneg _)
-  have hInt (u : C(B, ℂ)) : Integrable (test u) μ :=
-    hf.mul_bdd (u.continuous.comp he).aestronglyMeasurable
-      (.of_forall fun x ↦ ContinuousMap.norm_coe_le_norm u (e x))
-  let L : C(B, ℂ) →L[ℂ] ℂ := LinearMap.mkContinuous
-    { toFun := fun u ↦ ∫ x, test u x ∂μ
-      map_add' := fun u v ↦ by
-        simp only [test, ContinuousMap.add_apply, mul_add]
-        exact integral_add (hInt u) (hInt v)
-      map_smul' := fun c u ↦ by
-        simp only [test, ContinuousMap.smul_apply, mul_smul_comm,
-          RingHom.id_apply, integral_smul] }
-    (∫ x, ‖f x‖ ∂μ) fun u ↦ by
-      change ‖∫ x, test u x ∂μ‖ ≤ (∫ x, ‖f x‖ ∂μ) * ‖u‖
-      rw [mul_comm, ← integral_const_mul]
-      exact norm_integral_le_of_norm_le (hf.norm.const_mul ‖u‖) (.of_forall (hBound u))
-  have hCoord (χ : PontryaginDual G) : L (coord χ) = 0 := by
-    have hinv (x : G) : star (χ⁻¹ x : ℂ) = (χ x : ℂ) := by
-      change star (((χ x)⁻¹ : Circle) : ℂ) = _
-      rw [Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
-    change (∫ x, f x * (χ x : ℂ) ∂μ) = 0
-    simpa only [lcaFourier, hinv] using h χ⁻¹
-  have hL (u : C(B, ℂ)) : L u = 0 := by
-    have hDense := ContinuousMap.starSubalgebra_topologicalClosure_eq_top_of_separatesPoints A hSep
-    have hClosed : IsClosed {v | L v = 0} := isClosed_eq L.continuous continuous_const
-    refine closure_minimal (s := (A : Set C(B, ℂ))) ?_ hClosed ?_
-    · intro v hv
-      have hKer : Submodule.span ℂ (Set.range coord) ≤ L.toLinearMap.ker :=
-        Submodule.span_le.mpr (fun _ ⟨χ, hχ⟩ ↦ hχ ▸ hCoord χ)
-      exact hKer (hSpan hv)
-    · have hu : u ∈ A.topologicalClosure := hDense ▸ StarSubalgebra.mem_top
-      exact hu
-  apply hf.ae_eq_zero_of_forall_setIntegral_eq_zero
-  intro s hs _
-  have hNorm : ‖∫ x in s, f x ∂μ‖ ≤ 0 := by
-    apply le_of_forall_pos_lt_add
-    intro ε hε
-    obtain ⟨K₁, hK₁s, hK₁, hTail₁⟩ := exists_isCompact_integral_norm_sdiff_lt hf hs (half_pos hε)
-    obtain ⟨K₀, hK₀s, hK₀, hTail₀⟩ :=
-      exists_isCompact_integral_norm_sdiff_lt hf hs.compl (half_pos hε)
-    have hDisj : Disjoint (e '' K₀) (e '' K₁) := Set.disjoint_left.mpr <| by
-      rintro _ ⟨x, hx, rfl⟩ ⟨y, hy, heq⟩
-      exact hK₀s hx (heInj heq ▸ hK₁s hy)
-    obtain ⟨u, hu₀, hu₁, hu01⟩ := exists_continuous_zero_one_of_isClosed
-      (hK₀.image he).isClosed (hK₁.image he).isClosed hDisj
-    let v : C(B, ℂ) := ⟨fun b ↦ (u b : ℂ), Complex.continuous_ofReal.comp u.continuous⟩
-    let q (x : G) := s.indicator f x - test v x
-    have hEq : (∫ x, q x ∂μ) = ∫ x in s, f x ∂μ := by
-      rw [show (∫ x, q x ∂μ) = (∫ x, s.indicator f x ∂μ) - L v from
-        integral_sub (hf.indicator hs) (hInt v), hL, sub_zero, integral_indicator hs]
-    rw [zero_add, ← hEq]
-    let tail₁ := (s \ K₁).indicator (fun x ↦ ‖f x‖)
-    let tail₀ := (sᶜ \ K₀).indicator (fun x ↦ ‖f x‖)
-    have ht₁ := hs.diff hK₁.isClosed.measurableSet
-    have ht₀ := hs.compl.diff hK₀.isClosed.measurableSet
-    have hDom (x : G) : ‖q x‖ ≤ tail₁ x + tail₀ x := by
-      have hBounds := hu01 (e x)
-      by_cases hx : x ∈ s
-      · by_cases hk : x ∈ K₁
-        · simp [q, test, v, hx, hu₁ (mem_image_of_mem e hk), tail₁, tail₀, hk]
-        have hDist : ‖1 - (u (e x) : ℂ)‖ ≤ 1 := by
-          rw [← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_real,
-            Real.norm_eq_abs, abs_of_nonneg (sub_nonneg.mpr hBounds.2)]
-          linarith [hBounds.1]
-        have hTail : tail₁ x + tail₀ x = ‖f x‖ := by simp [tail₁, tail₀, hx, hk]
-        rw [hTail]
-        change ‖s.indicator f x - f x * (u (e x) : ℂ)‖ ≤ ‖f x‖
-        calc
-          _ = ‖f x * (1 - (u (e x) : ℂ))‖ := by rw [indicator_of_mem hx, mul_sub, mul_one]
-          _ ≤ _ := by simpa only [norm_mul, mul_one] using
-            mul_le_mul_of_nonneg_left hDist (norm_nonneg (f x))
-      · by_cases hk : x ∈ K₀
-        · simp [q, test, v, hx, hu₀ (mem_image_of_mem e hk), tail₁, tail₀, hk]
-        have hNormU : ‖(u (e x) : ℂ)‖ ≤ 1 := by
-          simpa [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg hBounds.1] using hBounds.2
-        have hTail : tail₁ x + tail₀ x = ‖f x‖ := by simp [tail₁, tail₀, hx, hk]
-        rw [hTail]
-        change ‖s.indicator f x - f x * (u (e x) : ℂ)‖ ≤ ‖f x‖
-        rw [indicator_of_notMem hx, zero_sub, norm_neg, norm_mul]
-        simpa only [mul_one] using mul_le_mul_of_nonneg_left hNormU (norm_nonneg (f x))
-    have ht₁Int : Integrable tail₁ μ := hf.norm.indicator ht₁
-    have ht₀Int : Integrable tail₀ μ := hf.norm.indicator ht₀
-    refine (norm_integral_le_of_norm_le (ht₁Int.add ht₀Int) (.of_forall hDom)).trans_lt ?_
-    change (∫ x, tail₁ x + tail₀ x ∂μ) < ε
-    rw [integral_add ht₁Int ht₀Int, show (∫ x, tail₁ x ∂μ) = _ from integral_indicator ht₁,
-      show (∫ x, tail₀ x ∂μ) = _ from integral_indicator ht₀]
-    linarith
-  exact norm_eq_zero.mp (le_antisymm hNorm (norm_nonneg _))
+  let e (x : G) : PontryaginDual G →* Circle :=
+    { toFun := fun χ ↦ χ x
+      map_one' := rfl
+      map_mul' := fun _ _ ↦ rfl }
+  have hInj : Function.Injective e := fun _ _ hEq ↦
+    pontryaginDual_pairing_separates.1 (funext (DFunLike.congr_fun hEq))
+  refine ae_eq_zero_of_integral_mul_circle_eq_zero e (fun χ ↦ χ.continuous) hInj hf ?_
+  intro χ
+  have hinv (x : G) : star (χ⁻¹ x : ℂ) = (χ x : ℂ) := by
+    change star (((χ x)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+  change (∫ x, f x * (χ x : ℂ) ∂μ) = 0
+  simpa only [lcaFourier, hinv] using h χ⁻¹
 
 /-- Paper: Lemma D.1.1.2(2), p. 746. The integral formula gives an injective
 complex-linear map on L¹ equivalence classes with operator norm at most one. -/
@@ -915,9 +794,249 @@ theorem isLCAPlancherelMeasure_subsingleton [Subsingleton G]
     rw [mul_comm (μ univ) ‖f 1‖ₑ, mul_assoc, hScale, h,
       ENNReal.mul_inv_cancel hμPos.ne' hμTop, ENNReal.one_rpow, mul_one]
 
+omit [μ.Regular] in
+/-- The Fourier norm of a single nonzero compactly supported test function fixes the
+scalar between two regular Haar measures satisfying Plancherel. -/
+private theorem isLCAPlancherelMeasure_unique
+    {ν₁ ν₂ : Measure (PontryaginDual G)}
+    (h₁ : IsLCAPlancherelMeasure μ ν₁) (h₂ : IsLCAPlancherelMeasure μ ν₂) : ν₁ = ν₂ := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let := h₁.1
+  let := h₁.2.1
+  let := h₂.1
+  let := h₂.2.1
+  let c := ν₁.haarScalarFactor ν₂
+  have hc : ν₁ = c • ν₂ := Measure.isMulLeftInvariant_eq_smul_of_regular _ _
+  obtain ⟨g, hgK, -, hg₁⟩ := exists_continuous_nonneg_pos (1 : G)
+  let f : G → ℂ := fun x ↦ g x
+  have hfC : Continuous f := Complex.continuous_ofReal.comp g.continuous
+  have hfK : HasCompactSupport f := hgK.comp_left Complex.ofReal_zero
+  have hf₁ := hfC.integrable_of_hasCompactSupport (μ := μ) hfK
+  have hf₂ := hfC.memLp_of_hasCompactSupport (μ := μ) (p := 2) hfK
+  have hnorm : eLpNorm f 2 μ ≠ 0 := by
+    intro hzero
+    have hae := (eLpNorm_eq_zero_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)).mp hzero
+    have hEq : f = 0 := Measure.eq_of_ae_eq hae hfC continuous_const
+    exact hg₁ (Complex.ofReal_eq_zero.mp (congrFun hEq 1))
+  have hScale := (h₁.2.2 f hf₁ hf₂).2
+  rw [hc, eLpNorm_smul_measure_of_ne_top' (by simp : (2 : ℝ≥0∞) ≠ ⊤) _
+    _ (h₂.2.2 f hf₁ hf₂).1.aestronglyMeasurable, (h₂.2.2 f hf₁ hf₂).2] at hScale
+  change (↑(c ^ ((2 : ℝ≥0∞).toReal)⁻¹) : ℝ≥0∞) * eLpNorm f 2 μ = eLpNorm f 2 μ at hScale
+  rw [ENNReal.coe_rpow_of_nonneg _ (by positivity)] at hScale
+  have hRoot : (c : ℝ≥0∞) ^ ((2 : ℝ≥0∞).toReal)⁻¹ = 1 :=
+    (ENNReal.mul_left_inj hnorm hf₂.eLpNorm_ne_top).mp (hScale.trans (one_mul _).symm)
+  have hc₁ : c = 1 := by
+    apply ENNReal.coe_injective
+    apply (ENNReal.strictMono_rpow_of_pos (by norm_num : 0 < ((2 : ℝ≥0∞).toReal)⁻¹)).injective
+    simpa only [ENNReal.coe_one, ENNReal.one_rpow] using hRoot
+  rw [hc, hc₁, one_smul]
+
+/-- A Fourier norm identity for compactly supported continuous functions extends to
+integrable square-integrable functions by approximation in both norms. -/
+private theorem isLCAPlancherelMeasure_of_compactSupport
+    (ν : Measure (PontryaginDual G)) [ν.IsHaarMeasure] [ν.Regular]
+    (h : ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
+      eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ) :
+    IsLCAPlancherelMeasure μ ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hp : 1 ≤ (2 : ℝ≥0∞) := by norm_num
+  have hsub {f g : G → ℂ} (hf : Integrable f μ) (hg : Integrable g μ) :
+      lcaFourier μ (f - g) = lcaFourier μ f - lcaFourier μ g := by
+    funext χ
+    simp only [lcaFourier, Pi.sub_apply, sub_mul]
+    exact integral_sub (integrable_fourierIntegrand μ hf χ) (integrable_fourierIntegrand μ hg χ)
+  have hApprox (f : G → ℂ) (hf₁ : Integrable f μ) (hf₂ : MemLp f 2 μ) :
+      ∃ (g : ℕ → G → ℂ), (∀ n, Continuous (g n) ∧ HasCompactSupport (g n)) ∧
+        Tendsto (fun n ↦ eLpNorm (g n - f) 2 μ) atTop (𝓝 0) ∧
+        ∀ χ, Tendsto (fun n ↦ lcaFourier μ (g n) χ) atTop (𝓝 (lcaFourier μ f χ)) := by
+    let ε (n : ℕ) : ℝ≥0∞ := ((n : ℝ≥0∞) + 1)⁻¹
+    have hε : Tendsto ε atTop (𝓝 0) := by
+      simpa only [ε, Function.comp_def, Nat.cast_add, Nat.cast_one] using
+        ENNReal.tendsto_inv_nat_nhds_zero.comp (tendsto_add_atTop_nat 1)
+    choose g hgC hgK hg₁ hg₂ using fun n : ℕ ↦
+      exists_hasCompactSupport_eLpNorm_sub_le_two le_rfl hp ENNReal.one_ne_top
+        (by simp) (memLp_one_iff_integrable.mpr hf₁) hf₂ (ε := ε n) (by simp [ε])
+    have hlim (p : ℝ≥0∞) (hg : ∀ n, eLpNorm (f - g n) p μ ≤ ε n) :
+        Tendsto (fun n ↦ eLpNorm (g n - f) p μ) atTop (𝓝 0) :=
+      tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hε (fun _ ↦ bot_le)
+        (fun n ↦ (eLpNorm_sub_comm _ _ _ _).le.trans (hg n))
+    refine ⟨g, fun n ↦ ⟨hgC n, hgK n⟩, hlim 2 hg₂, fun χ ↦ ?_⟩
+    have hmem (n : ℕ) := ((hgC n).integrable_of_hasCompactSupport (μ := μ) (hgK n)).sub hf₁
+    refine tendsto_iff_norm_sub_tendsto_zero.mpr ?_
+    have hlim' := (ENNReal.tendsto_toReal ENNReal.zero_ne_top).comp (hlim 1 hg₁)
+    simp only [ENNReal.toReal_zero, Function.comp_def] at hlim'
+    refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hlim'
+      (fun _ ↦ norm_nonneg _) (fun n ↦ ?_)
+    have hEq : (eLpNorm (g n - f) 1 μ).toReal = ∫ x, ‖(g n - f) x‖ ∂μ := by
+      rw [eLpNorm_one_eq_lintegral_eNorm (hmem n).aestronglyMeasurable,
+        ← ofReal_integral_norm_eq_lintegral_eNorm (hmem n),
+        ENNReal.toReal_ofReal (integral_nonneg fun _ ↦ norm_nonneg _)]
+    rw [hEq, ← Pi.sub_apply, ← hsub
+      ((hgC n).integrable_of_hasCompactSupport (hgK n)) hf₁]
+    exact norm_lcaFourier_le_integral_norm μ _ χ
+  -- Pointwise convergence of the transforms and Fatou give the bound for arbitrary inputs.
+  have hupper (f : G → ℂ) (hf₁ : Integrable f μ) (hf₂ : MemLp f 2 μ) :
+      eLpNorm (lcaFourier μ f) 2 ν ≤ eLpNorm f 2 μ := by
+    obtain ⟨g, hg, hlim₂, hlimF⟩ := hApprox f hf₁ hf₂
+    have hg₁ (n : ℕ) : Integrable (g n) μ :=
+      (hg n).1.integrable_of_hasCompactSupport (hg n).2
+    have hg₂ (n : ℕ) : MemLp (g n) 2 μ := (hg n).1.memLp_of_hasCompactSupport (hg n).2
+    have hnorm : Tendsto (fun n ↦ eLpNorm (g n) 2 μ) atTop (𝓝 (eLpNorm f 2 μ)) := by
+      have ht := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' g hg₂ f hf₂).mpr hlim₂
+      simpa only [Lp.eNorm_toLp] using ht.eNorm
+    calc
+      eLpNorm (lcaFourier μ f) 2 ν ≤ liminf (fun n ↦ eLpNorm (lcaFourier μ (g n)) 2 ν) atTop :=
+        Lp.eLpNorm_lim_le_liminf_eLpNorm
+          (fun n ↦ (continuous_lcaFourier μ (hg₁ n)).aestronglyMeasurable)
+          _ (continuous_lcaFourier μ hf₁).aestronglyMeasurable (.of_forall hlimF)
+      _ = eLpNorm f 2 μ := by
+        simp_rw [h _ (hg _).1 (hg _).2]
+        exact hnorm.liminf_eq
+  refine ⟨inferInstance, inferInstance, fun f hf₁ hf₂ ↦ ?_⟩
+  have hfF : MemLp (lcaFourier μ f) 2 ν :=
+    (hupper f hf₁ hf₂).trans_lt hf₂.eLpNorm_lt_top
+  obtain ⟨g, hg, hlim₂, -⟩ := hApprox f hf₁ hf₂
+  have hg₁ (n : ℕ) : Integrable (g n) μ :=
+    (hg n).1.integrable_of_hasCompactSupport (hg n).2
+  have hg₂ (n : ℕ) : MemLp (g n) 2 μ := (hg n).1.memLp_of_hasCompactSupport (hg n).2
+  have hgF (n : ℕ) : MemLp (lcaFourier μ (g n)) 2 ν :=
+    (h (g n) (hg n).1 (hg n).2).trans_lt (hg₂ n).eLpNorm_lt_top
+  -- The bound applied to differences gives convergence of the transformed sequence in L².
+  have hlimF : Tendsto (fun n ↦ eLpNorm (lcaFourier μ (g n) - lcaFourier μ f) 2 ν)
+      atTop (𝓝 0) := by
+    refine tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds hlim₂
+      (fun _ ↦ bot_le) (fun n ↦ ?_)
+    rw [← hsub (hg₁ n) hf₁]
+    exact hupper _ ((hg₁ n).sub hf₁) ((hg₂ n).sub hf₂)
+  have ht := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' g hg₂ f hf₂).mpr hlim₂
+  have htF := (Lp.tendsto_Lp_iff_tendsto_eLpNorm'' _ hgF _ hfF).mpr hlimF
+  refine ⟨hfF, tendsto_nhds_unique (l := atTop)
+    (f := fun n ↦ eLpNorm (lcaFourier μ (g n)) 2 ν) ?_ ?_⟩
+  · simpa only [Lp.eNorm_toLp] using htF.eNorm
+  · simp_rw [h _ (hg _).1 (hg _).2]
+    simpa only [Lp.eNorm_toLp] using ht.eNorm
+
+/-- There is a regular Haar measure on the dual for which the Fourier transform
+preserves the L² norm of every continuous compactly supported function. It suffices
+to construct this measure by Fourier inversion at the identity for autocorrelations
+of such functions. -/
+theorem exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport :
+    ∃ ν : Measure (PontryaginDual G), ν.IsHaarMeasure ∧ ν.Regular ∧
+      ∀ (f : G → ℂ), Continuous f → HasCompactSupport f →
+        eLpNorm (lcaFourier μ f) 2 ν = eLpNorm f 2 μ := by
+  sorry
+
 /-- Paper: Lemma D.1.1.2(4), p. 747. There is exactly one Plancherel measure. -/
 theorem lcaPlancherelMeasure_existsUnique :
-    ∃! ν : Measure (PontryaginDual G), IsLCAPlancherelMeasure μ ν := by sorry
+    ∃! ν : Measure (PontryaginDual G), IsLCAPlancherelMeasure μ ν := by
+  obtain ⟨ν, hHaar, hReg, hNorm⟩ := exists_lcaFourier_eLpNorm_eq_of_hasCompactSupport μ
+  let := hHaar
+  let := hReg
+  have hν := isLCAPlancherelMeasure_of_compactSupport μ ν hNorm
+  exact ⟨ν, hν, fun ν' hν' ↦ isLCAPlancherelMeasure_unique μ hν' hν⟩
+
+/-- The range of an L² Fourier isometry has trivial orthogonal complement.
+Orthogonality to translates of each integrable test function forces the product of its
+conjugated transform with the orthogonal vector to vanish almost everywhere. -/
+private theorem lcaFourier_isometry_surjective
+    {ν : Measure (PontryaginDual G)} [ν.Regular]
+    (U : Lp ℂ 2 μ →ₗᵢ[ℂ] Lp ℂ 2 ν)
+    (hU : ∀ (f : G → ℂ), Integrable f μ → ∀ (h₂ : MemLp f 2 μ),
+      (U (h₂.toLp f) : PontryaginDual G → ℂ) =ᵐ[ν] lcaFourier μ f) :
+    Function.Surjective U := by
+  classical
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let R := U.toLinearMap.range
+  have hClosed : IsClosed (R : Set (Lp ℂ 2 ν)) := U.isometry.isClosedEmbedding.isClosed_range
+  let : CompleteSpace R := hClosed.isComplete.completeSpace_coe
+  suffices R = ⊤ from LinearMap.range_eq_top.mp this
+  refine Submodule.orthogonal_eq_bot_iff.mp ((Submodule.eq_bot_iff _).mpr ?_)
+  intro g hg
+  have hInner (f : G → ℂ) (hf : Integrable f μ) (h₂ : MemLp f 2 μ) :
+      ∫ χ, g χ * star (lcaFourier μ f χ) ∂ν = 0 := by
+    have hZero := (R.mem_orthogonal g).mp hg _ (U.toLinearMap.mem_range_self (h₂.toLp f))
+    change inner ℂ (U (h₂.toLp f)) g = 0 at hZero
+    rw [L2.inner_def] at hZero
+    refine (integral_congr_ae ((hU f hf h₂).mono fun χ hχ ↦ ?_)).trans hZero
+    rw [RCLike.inner_apply, starRingEnd_apply, hχ]
+  have hProduct (f : G → ℂ) (hf : Integrable f μ) (h₂ : MemLp f 2 μ) :
+      (fun χ ↦ g χ * star (lcaFourier μ f χ)) =ᵐ[ν] 0 := by
+    have hInt : Integrable (fun χ ↦ g χ * star (lcaFourier μ f χ)) ν :=
+      (L2.integrable_inner (𝕜 := ℂ) (U (h₂.toLp f)) g).congr
+        ((hU f hf h₂).mono fun χ hχ ↦ by
+          change inner ℂ (U (h₂.toLp f) χ) (g χ) = _
+          rw [RCLike.inner_apply, starRingEnd_apply, hχ])
+    refine ae_eq_zero_of_integral_mul_circle_eq_zero (X := PontryaginDual G) (D := G)
+      (fun χ : PontryaginDual G ↦ χ.toMonoidHom)
+      (fun a ↦ (continuous_eval_const (F := C(G, Circle)) a).comp
+        (ContinuousMonoidHom.isInducing_toContinuousMap G Circle).continuous)
+      (fun _ _ h ↦ PontryaginDual.ext (fun a ↦ congrArg (fun k : G →* Circle ↦ k a) h))
+      hInt ?_
+    intro a
+    let m := measurePreserving_mul_left μ a⁻¹
+    have hZero := hInner (fun x ↦ f (a⁻¹ * x)) (m.integrable_comp_of_integrable hf)
+      (h₂.comp_measurePreserving m)
+    refine (integral_congr_ae (.of_forall fun χ ↦ ?_)).trans hZero
+    change g χ * star (lcaFourier μ f χ) * (χ a : ℂ) = _
+    rw [lcaFourier_translate μ f a⁻¹ χ, star_mul, map_inv, Circle.coe_inv_eq_conj,
+      ← Complex.star_def, star_star]
+    ring
+  -- A modulated indicator of a compact neighborhood gives a transform nonzero at each point.
+  obtain ⟨K, hK, hK₁⟩ := exists_compact_mem_nhds (1 : G)
+  have hKm := hK.isClosed.measurableSet
+  have hKfin := (hK.measure_lt_top (μ := μ)).ne
+  have hKpos : 0 < μ K := (isOpen_interior.measure_pos μ
+    ⟨1, mem_interior_iff_mem_nhds.mpr hK₁⟩).trans_le (measure_mono interior_subset)
+  let : IsFiniteMeasure (μ.restrict K) := isFiniteMeasure_restrict.mpr hKfin
+  let f (ψ : PontryaginDual G) : G → ℂ := K.indicator fun x ↦ (ψ x : ℂ)
+  have hfLp (ψ : PontryaginDual G) (p : ℝ≥0∞) : MemLp (f ψ) p μ :=
+    (memLp_indicator_iff_restrict hKm.nullMeasurableSet).mpr <|
+      MemLp.of_bound (continuous_subtype_val.comp ψ.continuous).aestronglyMeasurable
+        1 (.of_forall fun x ↦ (Circle.norm_coe (ψ x)).le)
+  have hf (ψ : PontryaginDual G) : Integrable (f ψ) μ :=
+    memLp_one_iff_integrable.mp (hfLp ψ 1)
+  have hNonzero (ψ : PontryaginDual G) : lcaFourier μ (f ψ) ψ ≠ 0 := by
+    unfold lcaFourier
+    rw [show (fun x ↦ f ψ x * star (ψ x : ℂ)) = K.indicator (fun _ ↦ (1 : ℂ)) by
+      funext x
+      by_cases hx : x ∈ K
+      · simp only [f, indicator_of_mem hx, Complex.star_def, Complex.mul_conj,
+          Complex.normSq_eq_norm_sq, Circle.norm_coe, one_pow, Complex.ofReal_one]
+      · simp [f, hx]]
+    rw [integral_indicator hKm, integral_const, Measure.real, Measure.restrict_apply_univ,
+      Complex.real_smul, mul_one]
+    exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_pos hKpos.ne' hKfin).ne'
+  let O (ψ : PontryaginDual G) := {χ | lcaFourier μ (f ψ) χ ≠ 0}
+  have hOpen (ψ : PontryaginDual G) : IsOpen (O ψ) :=
+    isOpen_ne_fun (continuous_lcaFourier μ (hf ψ)) continuous_const
+  have hLocal (ψ : PontryaginDual G) : ∀ᵐ χ ∂ν.restrict (O ψ), g χ = 0 := by
+    filter_upwards [ae_restrict_of_ae (hProduct (f ψ) (hf ψ) (hfLp ψ 2)),
+      ae_restrict_mem (hOpen ψ).measurableSet] with χ hχ hmem
+    exact (mul_eq_zero.mp hχ).resolve_right (star_ne_zero.mpr hmem)
+  have hCompact (L : Set (PontryaginDual G)) (hL : IsCompact L) :
+      ∀ᵐ χ ∂ν.restrict L, g χ = 0 := by
+    obtain ⟨t, -, ht⟩ := hL.elim_nhds_subcover O (fun ψ _ ↦ (hOpen ψ).mem_nhds (hNonzero ψ))
+    exact ae_mono (Measure.restrict_mono ht le_rfl)
+      ((ae_restrict_biUnion_finset_iff O t _).mpr (fun ψ _ ↦ hLocal ψ))
+  -- Compact approximation of the integrable squared norm avoids a countability assumption.
+  apply (inner_self_eq_zero (𝕜 := ℂ)).mp
+  rw [L2.inner_def]
+  apply norm_eq_zero.mp
+  apply le_antisymm _ (norm_nonneg _)
+  apply le_of_forall_pos_lt_add
+  intro ε hε
+  let q (χ : PontryaginDual G) := inner ℂ (g χ) (g χ)
+  have hq : Integrable q ν := L2.integrable_inner g g
+  obtain ⟨L, -, hL, hTail⟩ := exists_isCompact_integral_norm_sdiff_lt hq MeasurableSet.univ hε
+  have hZero : ∫ χ in L, q χ ∂ν = 0 := by
+    have hqZero : q =ᵐ[ν.restrict L] (0 : PontryaginDual G → ℂ) :=
+      (hCompact L hL).mono fun χ hχ ↦ by simp [q, hχ]
+    rw [integral_congr_ae hqZero, Pi.zero_def, integral_zero]
+  have hEq : (∫ χ, q χ ∂ν) = ∫ χ in Lᶜ, q χ ∂ν := by
+    rw [← integral_add_compl hL.isClosed.measurableSet hq, hZero, zero_add]
+  change ‖∫ χ, q χ ∂ν‖ < 0 + ε
+  rw [hEq, zero_add]
+  exact (norm_integral_le_integral_norm q).trans_lt (by rwa [← compl_eq_univ_sdiff] at hTail)
 
 /-- Paper: Lemma D.1.1.2(4), p. 747. The Fourier transform on L¹ ∩ L²
 extends uniquely to a unitary isomorphism on L². -/
@@ -925,7 +1044,79 @@ theorem lcaFourier_unitary (ν : Measure (PontryaginDual G))
     (hν : IsLCAPlancherelMeasure μ ν) :
     ∃! U : Lp ℂ 2 μ ≃ₗᵢ[ℂ] Lp ℂ 2 ν,
       ∀ (f : G → ℂ) (hf : Integrable f μ) (h₂ : MemLp f 2 μ),
-        (U (h₂.toLp f) : PontryaginDual G → ℂ) =ᵐ[ν] lcaFourier μ f := by sorry
+        (U (h₂.toLp f) : PontryaginDual G → ℂ) =ᵐ[ν] lcaFourier μ f := by
+  let : ν.Regular := hν.2.1
+  let D : Submodule ℂ (Lp ℂ 2 μ) :=
+    { carrier := {f | Integrable (f : G → ℂ) μ}
+      zero_mem' := (integrable_zero G ℂ μ).congr (Lp.coeFn_zero ℂ 2 μ).symm
+      add_mem' := fun {_ _} hf hg ↦ (hf.add hg).congr (Lp.coeFn_add _ _).symm
+      smul_mem' := fun c _ hf ↦ (hf.smul c).congr (Lp.coeFn_smul c _).symm }
+  have hDense : DenseRange D.subtype := by
+    apply (Lp.simpleFunc.dense (E := ℂ) (p := 2) (μ := μ) ENNReal.ofNat_ne_top).mono
+    intro f hf
+    let g : Lp.simpleFunc ℂ 2 μ := ⟨f, hf⟩
+    have hInt : Integrable (Lp.simpleFunc.toSimpleFunc g) μ :=
+      (SimpleFunc.memLp_iff_integrable two_ne_zero ENNReal.ofNat_ne_top).mp (Lp.simpleFunc.memLp g)
+    exact ⟨⟨f, hInt.congr (Lp.simpleFunc.toSimpleFunc_eq_toFun g)⟩, rfl⟩
+  have hPlancherel (f : D) := hν.2.2 f f.2 (Lp.memLp (f : Lp ℂ 2 μ))
+  let transform (f : D) : Lp ℂ 2 ν := (hPlancherel f).1.toLp (lcaFourier μ f)
+  have hTransform (f : D) : (transform f : PontryaginDual G → ℂ) =ᵐ[ν] lcaFourier μ f :=
+    MemLp.coeFn_toLp _
+  let F : D →ₗ[ℂ] Lp ℂ 2 ν :=
+    { toFun := transform
+      map_add' f g := by
+        apply Lp.ext
+        filter_upwards [hTransform (f + g), hTransform f, hTransform g,
+          Lp.coeFn_add (transform f) (transform g)] with χ hfg hf hg hAdd
+        change transform (f + g) χ = (transform f + transform g) χ
+        rw [hfg, hAdd, Pi.add_apply, hf, hg]
+        unfold lcaFourier
+        calc
+          _ = ∫ x, ((f : Lp ℂ 2 μ) x + (g : Lp ℂ 2 μ) x) * star (χ x : ℂ) ∂μ :=
+            integral_congr_ae ((Lp.coeFn_add (f : Lp ℂ 2 μ) g).mono fun x hx ↦ by
+              change ((f : Lp ℂ 2 μ) + (g : Lp ℂ 2 μ)) x * _ = _
+              rw [hx]
+              rfl)
+          _ = _ := by
+            simp_rw [add_mul]
+            exact integral_add (integrable_fourierIntegrand μ f.2 χ)
+              (integrable_fourierIntegrand μ g.2 χ)
+      map_smul' c f := by
+        apply Lp.ext
+        filter_upwards [hTransform (c • f), hTransform f, Lp.coeFn_smul c (transform f)]
+          with χ hcf hf hSmul
+        change transform (c • f) χ = (c • transform f) χ
+        rw [hcf, hSmul, Pi.smul_apply, hf]
+        unfold lcaFourier
+        calc
+          _ = ∫ x, c • ((f : Lp ℂ 2 μ) x * star (χ x : ℂ)) ∂μ :=
+            integral_congr_ae ((Lp.coeFn_smul c (f : Lp ℂ 2 μ)).mono fun x hx ↦ by
+              change ((c • (f : Lp ℂ 2 μ)) : Lp ℂ 2 μ) x * _ = _
+              rw [hx, Pi.smul_apply]
+              exact smul_mul_assoc _ _ _)
+          _ = _ := integral_smul c _ }
+  have hNorm (f : D) : ‖F f‖ = ‖D.subtype f‖ := by
+    change ‖(hPlancherel f).1.toLp (lcaFourier μ f)‖ = ‖(f : Lp ℂ 2 μ)‖
+    rw [Lp.norm_toLp, Lp.norm_def, (hPlancherel f).2]
+  let U := F.extendOfIsometry hDense hNorm
+  have hU (f : G → ℂ) (hf : Integrable f μ) (h₂ : MemLp f 2 μ) :
+      (U (h₂.toLp f) : PontryaginDual G → ℂ) =ᵐ[ν] lcaFourier μ f := by
+    let x : D := ⟨h₂.toLp f, hf.congr h₂.coeFn_toLp.symm⟩
+    have hEq : U (D.subtype x) = F x := F.extendOfIsometry_eq hDense hNorm x
+    change (U (D.subtype x) : PontryaginDual G → ℂ) =ᵐ[ν] _
+    rw [hEq]
+    refine (hTransform x).trans (.of_forall fun χ ↦ integral_congr_ae ?_)
+    exact h₂.coeFn_toLp.mono fun y hy ↦ by change _ * _ = _ * _; rw [hy]
+  let e := LinearIsometryEquiv.ofSurjective U (lcaFourier_isometry_surjective μ U hU)
+  refine ⟨e, hU, fun V hV ↦ ?_⟩
+  apply LinearIsometryEquiv.ext
+  intro f
+  refine hDense.induction_on (p := fun w ↦ V w = e w) f
+    (isClosed_eq V.continuous e.continuous) fun x ↦ ?_
+  have hx := Lp.memLp (x : Lp ℂ 2 μ)
+  have hEq : hx.toLp (x : G → ℂ) = D.subtype x := Lp.toLp_coeFn _ hx
+  rw [← hEq]
+  exact Lp.ext ((hV x x.2 hx).trans (hU x x.2 hx).symm)
 
 -- TODO(paper-gap): Lemma D.1.1.2(5) asserts continuity and pointwise inversion for an
 -- arbitrary measurable representative. A nonzero function supported at one point of

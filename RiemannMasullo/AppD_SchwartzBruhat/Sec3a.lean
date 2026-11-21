@@ -1524,12 +1524,21 @@ def modulatedExponentialDecaySubmodule : Submodule ℂ (G → ℂ) :=
 /-- Paper: Definition D.3.3.1, p. 804. The exponent set containing only zero
 recovers the ordinary Schwartz–Bruhat functions. -/
 theorem modulatedExponentialDecaySubmodule_singleton_zero :
-    modulatedExponentialDecaySubmodule m {0} = schwartzBruhatSubmodule G := by sorry
+    modulatedExponentialDecaySubmodule m {0} = schwartzBruhatSubmodule G := by
+  ext f
+  simp only [modulatedExponentialDecaySubmodule, Submodule.mem_iInf, Submodule.mem_comap]
+  constructor
+  · intro h
+    simpa [modulationWeight_zero] using h ⟨0, rfl⟩
+  · rintro hf ⟨a, ha⟩
+    obtain rfl : a = 0 := ha
+    simpa [modulationWeight_zero] using hf
 
 /-- Paper: (D.3.3.2), p. 805. The given exponent supplies the corresponding
 Schwartz–Bruhat membership. -/
 theorem modulationWeight_mem_schwartzBruhat (a : I) (f : modulatedExponentialDecaySubmodule m I) :
-    modulationWeight m a f.val ∈ schwartzBruhatSubmodule G := by sorry
+    modulationWeight m a f.val ∈ schwartzBruhatSubmodule G :=
+  Submodule.mem_comap.1 (Submodule.mem_iInf _ |>.1 f.2 a)
 
 /-- Paper: (D.3.3.2), p. 805. The linear map Tₐ sends a function in the decay
 submodule to its weighted Schwartz–Bruhat function. -/
@@ -1585,7 +1594,7 @@ theorem compactSubgroup_le_modulation_ker (k : Subgroup G) (hk : IsCompact (k : 
 modulation on a compact-subgroup quotient is continuous. -/
 theorem continuous_quotientModulation (k : Subgroup G) (hk : IsCompact (k : Set G)) :
     Continuous (QuotientGroup.lift k m.toMonoidHom (compactSubgroup_le_modulation_ker m k hk)) :=
-  by sorry
+  continuous_coinduced_dom.2 m.continuous
 
 /-- Paper: Definition D.3.3.3, p. 805. Use the descended modulation to form
 the projective system on the quotient by a compact subgroup. -/
