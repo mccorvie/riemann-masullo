@@ -268,7 +268,41 @@ theorem weightedSobolev_ofHigherDegree (_hν : IsLCAPlancherelMeasure μ ν)
     (_hw : IsSobolevWeight w) (_hs : 0 ≤ s) {s' : ℝ} (_hss' : s < s') :
     ∃ J : WeightedSobolev ν w s' →L[ℂ] WeightedSobolev ν w s,
       Function.Injective J ∧ ‖J‖ ≤ 1 ∧
-        ∀ f, (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by sorry
+        ∀ f, (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) := by
+  have hmono {a b : ℝ} (hab : a ≤ b) : sobolevMeasure ν w a ≤ sobolevMeasure ν w b := by
+    apply withDensity_mono
+    refine ae_of_all _ fun χ ↦ ENNReal.ofReal_le_ofReal ?_
+    exact Real.rpow_le_rpow_of_exponent_le (le_add_of_nonneg_right (sq_nonneg _))
+      (div_le_div_of_nonneg_right hab (by norm_num))
+  have hle := hmono _hss'.le
+  have hνle : ν ≤ sobolevMeasure ν w s := calc
+    ν = sobolevMeasure ν w 0 := (sobolevMeasure_zero ν w).symm
+    _ ≤ sobolevMeasure ν w s := hmono _hs
+  have h_ac : sobolevMeasure ν w s' ≪ ν := withDensity_absolutelyContinuous _ _
+  have hle' : sobolevMeasure ν w s ≤ (1 : ℝ≥0∞) • sobolevMeasure ν w s' := by
+    simpa only [one_smul] using hle
+  have hone : (1 : ℝ≥0∞) ≠ ∞ := ENNReal.one_ne_top
+  let I : WeightedSobolev ν w s' →L[ℝ] WeightedSobolev ν w s :=
+    Lp.LpToLpOfMeasureLeSMul hone hle'
+  have hI (f : WeightedSobolev ν w s') :
+      (I f : PontryaginDual G → ℂ) =ᵐ[sobolevMeasure ν w s] (f : PontryaginDual G → ℂ) :=
+    Lp.coeFn_LpToLpOfMeasureLeSMul hone hle' f
+  let J : WeightedSobolev ν w s' →L[ℂ] WeightedSobolev ν w s :=
+    { toFun := I
+      map_add' := I.map_add
+      map_smul' := fun c f ↦ Lp.ext <|
+        (hI (c • f)).trans <| Filter.EventuallyEq.trans (ae_mono hle (Lp.coeFn_smul c f)) <|
+          ((hI f).symm.fun_comp (c • ·)).trans (Lp.coeFn_smul c (I f)).symm
+      cont := I.continuous }
+  have hJ (f : WeightedSobolev ν w s') :
+      (J f : PontryaginDual G → ℂ) =ᵐ[ν] (f : PontryaginDual G → ℂ) :=
+    ae_mono hνle (hI f)
+  refine ⟨J, ?_, ?_, hJ⟩
+  · intro f g hfg
+    exact Lp.ext (h_ac.ae_eq ((hJ f).symm.trans (hfg ▸ hJ g)))
+  · rw [← ContinuousLinearMap.norm_restrictScalars (𝕜' := ℝ) J]
+    change ‖I‖ ≤ 1
+    simpa [I] using Lp.norm_LpToLpOfMeasureLeSMul_le (E := ℂ) (p := 2) hone hle'
 
 /-- Paper: Proposition 9.1.1.3(3), p. 397. When the reciprocal density is integrable,
 the inverse Plancherel class of each Sobolev element has a unique representative
