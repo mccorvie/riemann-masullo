@@ -1283,7 +1283,89 @@ function via its circle-valued character map.
 Deviation: The global differentiability definition in §D.1.5 allows any
 good subgroup in the kernel, so the symbol can use the character itself. -/
 theorem pontryaginDual_mem_bruhatSmooth (χ : PontryaginDual G) :
-    (fun x : G ↦ (χ x : ℂ)) ∈ bruhatSmoothSubmodule := by sorry
+    (fun x : G ↦ (χ x : ℂ)) ∈ bruhatSmoothSubmodule := by
+  obtain ⟨H, hχ⟩ := (openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)).2.1 χ
+  let k := lcaDualAnnihilator H.val
+  have hkClosed : IsClosed (k : Set G) := by
+    have hSet : (k : Set G) = ⋂ ψ : H.val, (ψ.val : G → Circle) ⁻¹' {1} := by
+      ext x
+      simp only [k, SetLike.mem_coe, mem_lcaDualAnnihilator_iff, mem_iInter, mem_preimage,
+        mem_singleton_iff]
+    rw [hSet]
+    exact isClosed_iInter fun ψ ↦ isClosed_singleton.preimage ψ.val.continuous
+  have hk : IsBruhatGoodSubgroup k :=
+    ⟨hkClosed, (lcaAnnihilator_dualAnnihilator_of_open H.val H.property.1).symm ▸ H.property⟩
+  have hTrivial (x : k) : χ x.val = 1 :=
+    (mem_lcaDualAnnihilator_iff H.val x.val).mp x.property ⟨χ, hχ⟩
+  apply (mem_bruhatSmoothSubmodule_iff _).2
+  intro p
+  refine ⟨k, hk, fun x y ↦ ?_, fun a ha ↦ ?_⟩
+  · change (χ (x.val * y) : ℂ) = (χ y : ℂ)
+    rw [map_mul, hTrivial, one_mul]
+  · let N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype
+    let χH : a.val.1 →* Circle := χ.toMonoidHom.comp a.val.1.subtype
+    have hN : N ≤ χH.ker := by
+      intro x hx
+      have hxk : (x : G) ∈ k := ha ▸ hx
+      exact MonoidHom.mem_ker.mpr (hTrivial ⟨x, hxk⟩)
+    let χ₀ : a.quotient →* Circle := QuotientGroup.lift N χH hN
+    have hχ₀ : Continuous χ₀ := (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+      (χ.continuous.comp continuous_subtype_val)
+    refine ⟨fun x ↦ (χ₀ x : ℂ), fun x ↦ rfl, fun e z b ↦ ?_⟩
+    -- Lift the character on the vector cover of the identity fiber to a linear phase.
+    let E := EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)
+    let S := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+    let cover : E →+ S :=
+      { toFun := fun xt ↦ elementaryCover xt 0 0
+        map_zero' := Prod.ext rfl (Prod.ext (funext fun _ ↦ AddCircle.coe_zero (1 : ℝ)) rfl)
+        map_add' := fun x y ↦ Prod.ext rfl (Prod.ext
+          (funext fun i ↦ AddCircle.coe_add (1 : ℝ) (x.2 i) (y.2 i)) (zero_add _).symm) }
+    have hCover : Continuous cover := continuous_fst.prodMk
+      ((continuous_pi fun i ↦ (AddCircle.continuous_mk' (1 : ℝ)).comp
+        ((PiLp.continuous_apply 2 _ i).comp continuous_snd)).prodMk continuous_const)
+    let ψ := χ₀.comp e.equiv.symm.toMulEquiv.toMonoidHom
+    let circleEquiv : AddCircle (1 : ℝ) ≃ₜ Circle := AddCircle.homeomorphCircle one_ne_zero
+    let phase : E →+ AddCircle (1 : ℝ) :=
+      { toFun := fun x ↦ circleEquiv.symm (ψ (Multiplicative.ofAdd (cover x)))
+        map_zero' := by
+          apply circleEquiv.injective
+          simp [circleEquiv, AddCircle.homeomorphCircle_apply]
+        map_add' := by
+          intro x y
+          apply circleEquiv.injective
+          have hAdd (u v : AddCircle (1 : ℝ)) :
+              circleEquiv (u + v) = circleEquiv u * circleEquiv v := by
+            simp only [circleEquiv, AddCircle.homeomorphCircle_apply, AddCircle.toCircle_add]
+          change circleEquiv (circleEquiv.symm (ψ (Multiplicative.ofAdd (cover (x + y))))) = _
+          simp only [circleEquiv.apply_symm_apply, hAdd, map_add]
+          exact map_mul ψ (Multiplicative.ofAdd (cover x)) (Multiplicative.ofAdd (cover y)) }
+    have hPhase : Continuous phase :=
+      circleEquiv.symm.continuous.comp (hχ₀.comp (e.equiv.symm.continuous.comp hCover))
+    obtain ⟨L, hL⟩ := exists_addCircle_coe_linearMap_eq phase hPhase
+    have hExp (x : E) : ψ (Multiplicative.ofAdd (cover x)) = Circle.exp (2 * Real.pi * L x) := by
+      have h := congrArg circleEquiv (hL x)
+      have hApply : circleEquiv (phase x) = ψ (Multiplicative.ofAdd (cover x)) :=
+        circleEquiv.apply_symm_apply _
+      simpa only [hApply, circleEquiv, AddCircle.homeomorphCircle_apply,
+        AddCircle.toCircle_apply_mk, div_one] using h.symm
+    -- Moving to the fiber indexed by z and b multiplies the character by a constant.
+    have hShift (x : E) : cover x + elementaryCover 0 z b = elementaryCover x z b := by
+      refine Prod.ext (add_zero _) (Prod.ext ?_ (zero_add _))
+      funext j
+      change (x.2 j : AddCircle (1 : ℝ)) + ((0 : ℝ) : AddCircle (1 : ℝ)) =
+        (x.2 j : AddCircle (1 : ℝ))
+      rw [AddCircle.coe_zero, add_zero]
+    have hFormula (x : E) : (ψ (Multiplicative.ofAdd (elementaryCover x z b)) : ℂ) =
+        Complex.exp (↑(2 * Real.pi * L x) * Complex.I) *
+          (ψ (Multiplicative.ofAdd (elementaryCover 0 z b)) : ℂ) := by
+      rw [← hShift x]
+      change (ψ (Multiplicative.ofAdd (cover x) *
+        Multiplicative.ofAdd (elementaryCover 0 z b)) : ℂ) = _
+      rw [map_mul, hExp, Circle.coe_mul, Circle.coe_exp]
+    change ContDiff ℝ _ (fun x : E ↦ (ψ (Multiplicative.ofAdd (elementaryCover x z b)) : ℂ))
+    rw [funext hFormula]
+    exact (((Complex.ofRealCLM.contDiff.comp (contDiff_const.mul L.contDiff)).mul
+      contDiff_const).cexp).mul contDiff_const
 
 /-- A scalar directional derivative must vanish on constants and hence on all
 characters. Character separation then forces its one-parameter subgroup to be trivial. -/
