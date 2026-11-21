@@ -425,7 +425,11 @@ dense map of isotypic quotients. -/
 theorem schwartzBruhatIsotype_quotient_map_dense (hd : DenseRange i)
     (j : (S ⧸ (P).ker) →L[ℂ] (E ⧸ Q.ker))
     (hj : ∀ f : S, j ((P).ker.mkQ f) = Q.ker.mkQ (i f)) :
-    DenseRange j := by sorry
+    DenseRange j := by
+  refine DenseRange.of_comp (g := (P).ker.mkQ) ?_
+  have h : (j : _ → _) ∘ (P).ker.mkQ = (Q.ker.mkQ : E → _) ∘ i := funext hj
+  rw [h]
+  exact Q.ker.mkQ_surjective.denseRange.comp hd Q.ker.continuous_mkQ
 
 /-- Paper: Lemma D.2.2.1(3), p. 795. A dense injection induces a
 dense map of isotypic subspaces. -/
