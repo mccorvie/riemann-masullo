@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppA_AlgebraicNT.Sec5a
 public import Mathlib.MeasureTheory.Integral.Average
 import Mathlib.MeasureTheory.Covering.Vitali
+import Mathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Group.Prod
 import Mathlib.MeasureTheory.Integral.Layercake
 import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
@@ -1384,11 +1385,144 @@ theorem dSequenceRegularSet_const [μ.IsHaarMeasure] (hU : IsDSequence μ U) (c 
 -- TODO(paper-gap): In the proof of Theorem A.5.4.1(2), the boundary of a relatively compact
 -- open set can have positive Haar mass, and an indicator's averages can diverge at a point.
 
+omit [T2Space G] [LocallyCompactSpace G] [BorelSpace G] [SecondCountableTopology G] in
+/-- Translates of a D′-sequence eventually lie in every neighborhood of their center. -/
+private theorem eventually_dSequenceTranslate_subset (hU : IsDPrimeSequence μ U)
+    {x : G} {W : Set G} (hW : W ∈ 𝓝 x) : ∀ᶠ k in atTop, x • U k ⊆ W := by
+  have hpre : (fun y : G ↦ x * y) ⁻¹' W ∈ 𝓝 (1 : G) :=
+    (continuous_const.mul continuous_id).continuousAt.preimage_mem_nhds (by simpa using hW)
+  obtain ⟨N, hN⟩ := hU.2 _ hpre
+  filter_upwards [eventually_ge_atTop N] with k hk
+  exact Set.smul_set_subset_iff.mpr fun _ hz ↦ hN (hU.1.2.1 hk hz)
+
+omit [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G] in
+/-- The D′-sequence averages of an integrable continuous function tend to its value. -/
+private theorem tendsto_dSequenceAverage_of_continuous [μ.IsHaarMeasure]
+    (hU : IsDPrimeSequence μ U) {g : G → ℂ} (hg : Continuous g) (hgint : Integrable g μ)
+    (x : G) : Tendsto (fun k ↦ dSequenceAverage μ (U k) g x) atTop (𝓝 (g x)) := by
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  have hW : g ⁻¹' Metric.ball (g x) (ε / 2) ∈ 𝓝 x :=
+    hg.continuousAt.preimage_mem_nhds (Metric.ball_mem_nhds _ (half_pos hε))
+  filter_upwards [eventually_dSequenceTranslate_subset hU hW] with k hk
+  let S := x • U k
+  have h₀ : μ S ≠ 0 := by simpa only [S, measure_smul] using (hU.1.1 k).2.2.1.ne'
+  have hfin : μ S ≠ ∞ := by simpa only [S, measure_smul] using (hU.1.1 k).2.2.2.ne
+  have havg : (⨍ y in S, g y - g x ∂μ) = dSequenceAverage μ (U k) g x - g x := by
+    simpa only [Pi.sub_apply, setAverage_const h₀ hfin, dSequenceAverage] using
+      (setAverage_sub (s := S) hgint.integrableOn (integrableOn_const (C := g x) hfin))
+  rw [dist_eq_norm, ← ENNReal.ofReal_lt_ofReal_iff hε, ofReal_norm, ← havg]
+  calc
+    ‖⨍ y in S, g y - g x ∂μ‖ₑ ≤ ⨍⁻ y in S, ‖g y - g x‖ₑ ∂μ := by
+      rw [setAverage_eq', setLAverage_eq']
+      exact eNorm_integral_le_lintegral_eNorm _
+    _ ≤ ⨍⁻ _ in S, ENNReal.ofReal (ε / 2) ∂μ := by
+      rw [setLAverage_eq', setLAverage_eq']
+      apply lintegral_mono_ae
+      have hS := (ae_restrict_mem₀ ((hU.1.1 k).2.1.smul x)).filter_mono
+        (Measure.ae_smul_measure_le (μ S)⁻¹)
+      filter_upwards [hS] with y hy
+      have hy' : dist (g y) (g x) < ε / 2 := hk hy
+      rw [← ofReal_norm, ← dist_eq_norm]
+      exact ENNReal.ofReal_le_ofReal hy'.le
+    _ < ENNReal.ofReal ε := by
+      rw [setLAverage_const h₀ hfin, ENNReal.ofReal_lt_ofReal_iff hε]
+      exact half_lt_self hε
+
+/-- Continuous approximation and the weak maximal bound make the averages of an integrable
+function Cauchy almost everywhere when the first D′-sequence member has compact closure. -/
+private theorem ae_cauchySeq_dSequenceAverage_of_integrable [μ.IsHaarMeasure]
+    (hU : IsDPrimeSequence μ U) (hcompact : IsCompact (closure (U 0)))
+    {f : G → ℂ} (hf : Integrable f μ) :
+    ∀ᵐ x ∂μ, CauchySeq (fun k ↦ dSequenceAverage μ (U k) f x) := by
+  obtain ⟨C, hC, hbound⟩ := hU.1.2.2
+  have htail (t : ℝ) (ht : 0 < t) :
+      ∀ᵐ x ∂μ, ∃ N : ℕ, ∀ i ≥ N, ∀ j ≥ N,
+        dist (dSequenceAverage μ (U i) f x) (dSequenceAverage μ (U j) f x) < 6 * t := by
+    rw [ae_iff]
+    apply le_antisymm _ bot_le
+    apply ENNReal.le_of_forall_pos_le_add
+    intro ε hε _
+    let c := ENNReal.ofReal (2 * C / t)
+    have hc₀ : c ≠ 0 := (ENNReal.ofReal_pos.mpr (by positivity)).ne'
+    have hcfin : c ≠ ∞ := ENNReal.ofReal_ne_top
+    have hδ : (ε : ℝ≥0∞) / c ≠ 0 := (ENNReal.div_pos (by exact_mod_cast hε.ne') hcfin).ne'
+    obtain ⟨g, hfg, hg⟩ := hf.exists_boundedContinuous_lintegral_sub_le hδ
+    have herror := hf.sub hg
+    have hweak := dSequenceMaximal_weak_global hU hcompact hC (fun k ↦ (hbound k).2)
+      herror ht
+    rw [eLpNorm_one_eq_lintegral_eNorm herror.aestronglyMeasurable] at hweak
+    refine (measure_mono ?_).trans (hweak.trans ?_)
+    · intro x hx
+      by_contra hxmax
+      -- The maximal bound controls the error eventually, with room for the strict inequality.
+      have hmax : dSequenceMaximal μ U (f - g) x < ENNReal.ofReal (2 * t) :=
+        (le_of_not_gt hxmax).trans_lt ((ENNReal.ofReal_lt_ofReal_iff (by positivity)).mpr
+          (by linarith))
+      have herr := eventually_lt_of_limsup_lt hmax
+      have hgavg := Metric.tendsto_nhds.mp
+        (tendsto_dSequenceAverage_of_continuous hU g.continuous hg x) t ht
+      have havg : ∀ᶠ k in atTop, dist (dSequenceAverage μ (U k) f x) (g x) < 3 * t := by
+        filter_upwards [herr, hgavg] with k hk hgk
+        have hb : ‖dSequenceAverage μ (U k) f x - dSequenceAverage μ (U k) g x‖ₑ ≤
+            ⨍⁻ y in x • U k, ‖(f - g) y‖ₑ ∂μ := by
+          simp only [dSequenceAverage, ← setAverage_sub hf.integrableOn hg.integrableOn]
+          rw [setAverage_eq', setLAverage_eq']
+          exact eNorm_integral_le_lintegral_eNorm _
+        have hb' : dist (dSequenceAverage μ (U k) f x) (dSequenceAverage μ (U k) g x) <
+            2 * t := by
+          rw [dist_eq_norm, ← ENNReal.ofReal_lt_ofReal_iff (by positivity : 0 < 2 * t), ofReal_norm]
+          exact hb.trans_lt hk
+        exact (dist_triangle _ (dSequenceAverage μ (U k) g x) _).trans_lt (by linarith)
+      obtain ⟨N, hN⟩ := eventually_atTop.mp havg
+      apply hx
+      refine ⟨N, fun i hi j hj ↦ ?_⟩
+      have hj' := hN j hj
+      rw [dist_comm] at hj'
+      exact (dist_triangle _ (g x) _).trans_lt (by linarith [hN i hi])
+    · change c * (∫⁻ x, ‖(f - g) x‖ₑ ∂μ) ≤ 0 + ↑ε
+      rw [zero_add, ← ENNReal.mul_div_cancel hc₀ hcfin (b := (ε : ℝ≥0∞))]
+      exact mul_le_mul' le_rfl hfg
+  have hcount := ae_all_iff.mpr fun n : ℕ ↦ htail (1 / ((n : ℝ) + 1)) (by positivity)
+  filter_upwards [hcount] with x hx
+  refine Metric.cauchySeq_iff.mpr fun ε hε ↦ ?_
+  obtain ⟨n, hn⟩ := exists_nat_one_div_lt (show 0 < ε / 6 by positivity)
+  obtain ⟨N, hN⟩ := hx n
+  exact ⟨N, fun i hi j hj ↦ (hN i hi j hj).trans (by linarith)⟩
+
 /-- Paper: Theorem A.5.4.1(2)–(3), p. 582. The complement of the regular set
 is negligible, equivalently the averages converge almost everywhere. -/
 theorem measure_compl_dSequenceRegularSet [μ.IsHaarMeasure] (hU : IsDPrimeSequence μ U)
     {f : G → ℂ} (hf : LocallyIntegrable f μ) :
-    μ (dSequenceRegularSet μ U f)ᶜ = 0 := by sorry
+    μ (dSequenceRegularSet μ U f)ᶜ = 0 := by
+  -- Start the sequence at a member with compact closure.
+  obtain ⟨V, hV, hVnhds⟩ := exists_compact_mem_nhds (1 : G)
+  obtain ⟨N, hN⟩ := hU.2 V hVnhds
+  let U' := fun k ↦ U (k + N)
+  have hU' : IsDPrimeSequence μ U' := by
+    refine ⟨hU.1.tail N, fun W hW ↦ ?_⟩
+    obtain ⟨k, hk⟩ := hU.2 W hW
+    exact ⟨k, (hU.1.2.1 (Nat.le_add_right k N)).trans hk⟩
+  have hcompact : IsCompact (closure (U' 0)) := by
+    apply hV.of_isClosed_subset isClosed_closure
+    simpa only [U', Nat.zero_add] using closure_minimal hN hV.isClosed
+  refine (measure_zero_of_locally_negligible (A := (dSequenceRegularSet μ U f)ᶜ) ?_).1
+  intro x
+  obtain ⟨K, hK, hKnhds⟩ := exists_compact_mem_nhds x
+  have hfK := (hf.integrableOn_isCompact hK).integrable_indicator hK.measurableSet
+  have hconv := ae_cauchySeq_dSequenceAverage_of_integrable hU' hcompact hfK
+  refine ⟨interior K, isOpen_interior.mem_nhds (mem_interior_iff_mem_nhds.mpr hKnhds), ?_⟩
+  have hregular : ∀ᵐ y ∂μ.restrict (interior K), y ∈ dSequenceRegularSet μ U f := by
+    filter_upwards [hconv.filter_mono ae_restrict_le, ae_restrict_mem isOpen_interior.measurableSet]
+      with y hy hyK
+    obtain ⟨l, hl⟩ := cauchySeq_tendsto_of_complete hy
+    refine ⟨l, (tendsto_add_atTop_iff_nat N).mp (hl.congr' ?_)⟩
+    -- At an interior point, the translates eventually stay inside the cutoff.
+    filter_upwards [eventually_dSequenceTranslate_subset hU'
+      (mem_interior_iff_mem_nhds.mp hyK)] with k hk
+    simp only [dSequenceAverage, setAverage_eq]
+    rw [setIntegral_congr_fun₀ ((hU'.1.1 k).2.1.smul y)
+      (fun _ hz ↦ indicator_of_mem (hk hz) _)]
+  rwa [ae_iff, Measure.restrict_apply' isOpen_interior.measurableSet] at hregular
 
 -- TODO(paper-gap): In the proof of Theorem A.5.4.1(3), compact support does not imply Lᵖ
 -- integrability, and the Lᑫ norm of the normalized kernel is μ(U k)^(1/q - 1).
