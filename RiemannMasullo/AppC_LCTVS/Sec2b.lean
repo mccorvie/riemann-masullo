@@ -3621,6 +3621,31 @@ theorem hasApproximationProperty_of_denseRange_bounded
       ((isPrecompactInCompletion_iff_totallyBounded s).mp hs).isVonNBounded ℂ
   exact j.surjective.denseRange.comp h hj
 
+omit [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E] in
+/-- Postcomposition preserves the closure of the finite-rank maps for uniform convergence
+on any fixed family of sets. -/
+private theorem postcomp_mem_closure_finiteRank_uniform {F G : Type*}
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
+    [PolynormableSpace ℂ F]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [IsTopologicalAddGroup G]
+    [PolynormableSpace ℂ G] (S : Set (Set E)) (A : F →L[ℂ] G) {T : E →L[ℂ] F}
+    (hT : T ∈ closure (X := E →Lᵤ[ℂ, S] F) (range (fun z ↦ tensorToFiniteRank z))) :
+    A.comp T ∈ closure (X := E →Lᵤ[ℂ, S] G) (range (fun z ↦ tensorToFiniteRank z)) := by
+  let post : (E →Lᵤ[ℂ, S] F) →L[ℂ] (E →Lᵤ[ℂ, S] G) :=
+    A.postcompUniformConvergenceCLM S
+  change post T ∈ _
+  refine Set.MapsTo.closure (f := post) ?_ post.continuous hT
+  rintro _ ⟨z, rfl⟩
+  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E)
+    A.toLinearMap
+  refine ⟨map z, ContinuousLinearMap.ext fun x ↦ ?_⟩
+  change tensorToFiniteRank (map z) x = A (tensorToFiniteRank z x)
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+    simp only [map, TensorProduct.map_tmul, LinearMap.id_apply, tensorToFiniteRank_tmul, map_smul,
+      ContinuousLinearMap.coe_coe]
+  | add z w hz hw => simp only [map_add, add_apply, hz, hw]
+
 omit [T2Space E] in
 /-- Postcomposition by each endomorphism takes a finite-rank approximation of the identity
 to one of that endomorphism, for uniform convergence on any fixed family of sets. -/
@@ -3629,26 +3654,9 @@ private theorem id_mem_closure_finiteRank_iff_dense_uniform (S : Set (Set E)) :
       closure (X := E →Lᵤ[ℂ, S] E) (range (fun z ↦ tensorToFiniteRank z)) ↔
     DenseRange (X := E →Lᵤ[ℂ, S] E) (fun z ↦ tensorToFiniteRank z) := by
   refine ⟨fun h A ↦ ?_, fun h ↦ h _⟩
-  let post : (E →Lᵤ[ℂ, S] E) →L[ℂ] (E →Lᵤ[ℂ, S] E) :=
-    (A : E →L[ℂ] E).postcompUniformConvergenceCLM S
-  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E)
-    (A : E →L[ℂ] E).toLinearMap
-  have hmap (z : StrongDual ℂ E ⊗[ℂ] E) :
-      post (tensorToFiniteRank z) = tensorToFiniteRank (map z) := by
-    ext x
-    change (A : E →L[ℂ] E) (tensorToFiniteRank z x) = tensorToFiniteRank (map z) x
-    induction z using TensorProduct.inductionOn with
-    | tmul φ y => simp [map, tensorToFiniteRank_tmul]; rfl
-    | add z w hz hw => simp only [map_add, add_apply, hz, hw]
-  have hsub : post '' range (fun z ↦ tensorToFiniteRank z) ⊆
-      range (fun z ↦ tensorToFiniteRank z) := by
-    rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
-    exact ⟨map z, (hmap z).symm⟩
-  have hA : post (ContinuousLinearMap.id ℂ E) = A := by
-    ext x
-    rfl
-  rw [← hA]
-  exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ h))
+  change E →L[ℂ] E at A
+  have hA := postcomp_mem_closure_finiteRank_uniform E S A h
+  rwa [ContinuousLinearMap.comp_id] at hA
 
 /-- Paper: Lemma C.2.4.15(1)–(2), p. 689. The identity is approximable by finite-rank
 maps uniformly on precompact sets exactly when those maps are dense among endomorphisms. -/
@@ -3665,7 +3673,24 @@ theorem dense_finiteRank_iff_forall_targets :
     HasApproximationProperty E ↔
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : TopologicalSpace F)
         (_ : IsTopologicalAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
-        DenseRange (X := PrecompactConvergenceCLM E F) (fun z ↦ tensorToFiniteRank z) := by sorry
+        DenseRange (X := PrecompactConvergenceCLM E F) (fun z ↦ tensorToFiniteRank z) := by
+  let S := {s : Set E | IsPrecompactInCompletion s}
+  constructor
+  · intro h F _ _ _ _ _ _ A
+    change E →L[ℂ] F at A
+    have hA := postcomp_mem_closure_finiteRank_uniform E S A (h (ContinuousLinearMap.id ℂ E))
+    rwa [ContinuousLinearMap.comp_id] at hA
+  · intro h
+    let G := ULift.{v, u} E
+    let e : G ≃L[ℂ] E := ContinuousLinearEquiv.ulift
+    have : PolynormableSpace ℂ G :=
+      e.toHomeomorph.isInducing.polynormableSpace (f := e.toLinearEquiv.toLinearMap)
+    have : IsTopologicalAddGroup G := PolynormableSpace.isTopologicalAddGroup ℂ G
+    have hup := h G inferInstance inferInstance inferInstance inferInstance inferInstance
+      inferInstance (e.symm : E →L[ℂ] G)
+    apply (id_mem_closure_finiteRank_iff_dense E).mp
+    simpa only [ContinuousLinearEquiv.coe_comp_coe_symm] using
+      postcomp_mem_closure_finiteRank_uniform E S (e : G →L[ℂ] E) hup
 
 /-- Applying the pulled-back tensor of finite-rank maps precomposes the operator: for a
 differential `b` of the source, `λ(Σ φᵢ ⊗ yᵢ) ∘ b = λ(Σ (φᵢ ∘ b) ⊗ yᵢ)`. -/
