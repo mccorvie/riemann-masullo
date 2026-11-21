@@ -2389,7 +2389,10 @@ include hK in
 subgroup, the product also has interior in the archimedean adele ring. -/
 theorem infiniteIdele_product_adele_interior (hi : (interior K).Nonempty) :
     (interior (Units.val '' productLocus)).Nonempty := by
-  sorry
+  have hOpen : IsOpenMap (Units.val : 𝕀∞ → InfiniteAdeleRing F) :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := (w : InfinitePlace F) → w.Completion)).isOpenMap
+  exact ((infiniteIdele_product_interior F b v₀ σ K hK hi).image Units.val).mono
+    (hOpen.image_interior_subset productLocus)
 
 section SLocal
 
