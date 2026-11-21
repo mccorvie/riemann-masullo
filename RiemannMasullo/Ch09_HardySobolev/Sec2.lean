@@ -612,6 +612,139 @@ theorem lineSobolevDensity_le_interval (b : ℝ) (N : ℕ) (x : ℝ) :
 -- TODO(paper-gap): The proposed test pairing on all of S_J × S_J can
 -- diverge, and S_J need not be contained in the reciprocal-density space.
 
+/-- The compact-interval density is positive. -/
+private theorem intervalSobolevDensity_pos (a b s t : ℝ) : 0 < intervalSobolevDensity a b s t :=
+  mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+
+/-- The compact-interval density is continuous. -/
+private theorem continuous_intervalSobolevDensity' (a b s : ℝ) :
+    Continuous (intervalSobolevDensity a b s) := by
+  unfold intervalSobolevDensity
+  refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+  positivity
+
+/-- In weighted L², the squared norm is the integral of the squared modulus against
+the density. -/
+private theorem weightedL2_norm_eq {X : Type*} [MeasurableSpace X] (ν : Measure X)
+    {ρ : X → ℝ} (hρ : Measurable ρ) (hpos : ∀ x, 0 < ρ x)
+    (f : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x))) :
+    Integrable (fun x ↦ ‖f x‖ ^ 2 * ρ x) ν ∧ ‖f‖ = Real.sqrt (∫ x, ‖f x‖ ^ 2 * ρ x ∂ν) := by
+  have hdens : Measurable (fun x ↦ ENNReal.ofReal (ρ x)) := hρ.ennreal_ofReal
+  have hflt : ∀ᵐ x ∂ν, ENNReal.ofReal (ρ x) < ∞ := ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hint_sq : Integrable (fun x ↦ ‖(f : X → ℂ) x‖ ^ 2)
+      (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) :=
+    (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable f)).1 (Lp.memLp f)
+  refine ⟨((integrable_withDensity_iff hdens hflt).1 hint_sq).congr
+    (ae_of_all _ fun x ↦ by simp only [ENNReal.toReal_ofReal (hpos x).le]), ?_⟩
+  rw [norm_eq_sqrt_re_inner (𝕜 := ℂ) (x := f)]
+  refine congrArg Real.sqrt ?_
+  rw [L2.inner_def (f := f) (g := f), ← integral_re (L2.integrable_inner f f)]
+  simp_rw [inner_self_eq_norm_sq]
+  rw [integral_withDensity_eq_integral_toReal_smul hdens hflt]
+  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  simp only [smul_eq_mul, ENNReal.toReal_ofReal (hpos x).le, mul_comm]
+
+/-- The unweighted product pairing identifies the strong dual of a weighted L² space with
+the L² space for the reciprocal density. -/
+private theorem weightedL2_dual {X : Type*} [MeasurableSpace X] (ν : Measure X)
+    {ρ₁ ρ₂ : X → ℝ} (hρ₁ : Measurable ρ₁) (hρ₂ : Measurable ρ₂)
+    (hpos₁ : ∀ x, 0 < ρ₁ x) (hpos₂ : ∀ x, 0 < ρ₂ x) (hrecip : ∀ x, ρ₁ x * ρ₂ x = 1) :
+    ∃! T : StrongDual ℂ (Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ₁ x))) ≃ₗᵢ[ℂ]
+        Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ₂ x)),
+      ∀ Λ f, Integrable (fun x ↦ f x * T Λ x) ν ∧ Λ f = ∫ x, f x * T Λ x ∂ν := by
+  let E₁ := Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ₁ x))
+  let E₂ := Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ₂ x))
+  have hdens₁ : Measurable (fun x ↦ ENNReal.ofReal (ρ₁ x)) := hρ₁.ennreal_ofReal
+  have hflt₁ : ∀ᵐ x ∂ν, ENNReal.ofReal (ρ₁ x) < ∞ := ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hbase {ρ : X → ℝ} (hρ : Measurable ρ) (hpos : ∀ x, 0 < ρ x) :
+      ν ≪ ν.withDensity fun x ↦ ENNReal.ofReal (ρ x) :=
+    withDensity_absolutelyContinuous' hρ.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hpos x)).ne')
+  have hweighted (ρ : X → ℝ) : (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) ≪ ν :=
+    withDensity_absolutelyContinuous _ _
+  -- Conjugation times the density maps one weighted space isometrically onto the other.
+  have hmap {ρ ρ' : X → ℝ} (hρ : Measurable ρ) (hρ' : Measurable ρ') (hpos : ∀ x, 0 < ρ x)
+      (hpos' : ∀ x, 0 < ρ' x) (hr : ∀ x, ρ x * ρ' x = 1)
+      (f : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x))) :
+      ∃ g : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)),
+        (g : X → ℂ) =ᵐ[ν] (fun x ↦ (ρ x : ℂ) * star (f x)) ∧ ‖g‖ = ‖f‖ := by
+    let u : X → ℂ := fun x ↦ (ρ x : ℂ) * star (f x)
+    have hsq (x : X) : ‖u x‖ ^ 2 * ρ' x = ‖f x‖ ^ 2 * ρ x := by
+      calc
+        _ = ‖f x‖ ^ 2 * (ρ x * (ρ x * ρ' x)) := by
+          dsimp only [u]
+          rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos x), norm_star]
+          ring
+        _ = _ := by rw [hr, mul_one]
+    have hmeas : AEStronglyMeasurable u (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)) :=
+      (Complex.measurable_ofReal.comp hρ).aestronglyMeasurable.mul
+        (((Lp.aestronglyMeasurable f).mono_ac (hbase hρ hpos)).mono_ac (hweighted ρ')).star
+    have hmem : MemLp u 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x)) := by
+      apply (memLp_two_iff_integrable_sq_norm hmeas).2
+      apply (integrable_withDensity_iff hρ'.ennreal_ofReal
+        (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).2
+      refine (weightedL2_norm_eq ν hρ hpos f).1.congr (ae_of_all _ fun x ↦ ?_)
+      change ‖f x‖ ^ 2 * ρ x = ‖u x‖ ^ 2 * (ENNReal.ofReal (ρ' x)).toReal
+      rw [ENNReal.toReal_ofReal (hpos' x).le, hsq]
+    have hcoe : (hmem.toLp u : X → ℂ) =ᵐ[ν] u := (hbase hρ' hpos').ae_eq hmem.coeFn_toLp
+    refine ⟨hmem.toLp u, hcoe, ?_⟩
+    rw [(weightedL2_norm_eq ν hρ' hpos' _).2, (weightedL2_norm_eq ν hρ hpos f).2]
+    congr 1
+    apply integral_congr_ae
+    filter_upwards [hcoe] with x hx
+    rw [hx, hsq]
+  choose S hS hSnorm using hmap hρ₁ hρ₂ hpos₁ hpos₂ hrecip
+  choose S' hS' _ using hmap hρ₂ hρ₁ hpos₂ hpos₁ (fun x ↦ (mul_comm _ _).trans (hrecip x))
+  let C : E₁ →ₗᵢ⋆[ℂ] E₂ :=
+    { toFun := S
+      map_add' := fun f g ↦ Lp.ext <| (hweighted ρ₂).ae_eq <| by
+        filter_upwards [hS (f + g), hS f, hS g,
+          (hbase hρ₁ hpos₁).ae_eq (Lp.coeFn_add f g),
+          (hbase hρ₂ hpos₂).ae_eq (Lp.coeFn_add (S f) (S g))] with x hfg hf hg hx hsum
+        rw [hfg, hsum, Pi.add_apply, hf, hg, hx, Pi.add_apply, star_add, mul_add]
+      map_smul' := fun c f ↦ Lp.ext <| (hweighted ρ₂).ae_eq <| by
+        filter_upwards [hS (c • f), hS f, (hbase hρ₁ hpos₁).ae_eq (Lp.coeFn_smul c f),
+          (hbase hρ₂ hpos₂).ae_eq (Lp.coeFn_smul ((starRingEnd ℂ) c) (S f))]
+          with x hcf hf hx hsmul
+        rw [hcf, hsmul, Pi.smul_apply, hf, hx, Pi.smul_apply]
+        simp only [starRingEnd_apply, smul_eq_mul, star_mul', mul_left_comm]
+      norm_map' := hSnorm }
+  have hSurj : Function.Surjective C := by
+    intro g
+    refine ⟨S' g, Lp.ext ((hweighted ρ₂).ae_eq ?_)⟩
+    change (S (S' g) : X → ℂ) =ᵐ[ν] g
+    filter_upwards [hS (S' g), hS' g] with x hSx hS'x
+    have hstar : star (ρ₂ x : ℂ) = (ρ₂ x : ℂ) := Complex.conj_ofReal _
+    rw [hSx, hS'x, star_mul', hstar, star_star, ← mul_assoc, ← Complex.ofReal_mul, hrecip,
+      Complex.ofReal_one, one_mul]
+  let R := InnerProductSpace.toDual ℂ E₁
+  let T : StrongDual ℂ E₁ ≃ₗᵢ[ℂ] E₂ := R.symm.trans (LinearIsometryEquiv.ofSurjective C hSurj)
+  have hPair (Λ : StrongDual ℂ E₁) (f : E₁) :
+      Integrable (fun x ↦ f x * T Λ x) ν ∧ Λ f = ∫ x, f x * T Λ x ∂ν := by
+    let g := R.symm Λ
+    have hprod : (fun x ↦ f x * T Λ x) =ᵐ[ν]
+        fun x ↦ (ENNReal.ofReal (ρ₁ x)).toReal • inner ℂ (g x) (f x) := by
+      filter_upwards [hS g] with x hx
+      change f x * S g x = _
+      rw [hx, ENNReal.toReal_ofReal (hpos₁ x).le, RCLike.inner_apply, starRingEnd_apply]
+      simp only [Complex.real_smul, mul_left_comm]
+    refine ⟨?_, ?_⟩
+    · exact ((integrable_withDensity_iff_integrable_smul' hdens₁ hflt₁).1
+        (L2.integrable_inner g f)).congr hprod.symm
+    · calc
+        Λ f = inner ℂ g f := InnerProductSpace.toDual_symm_apply.symm
+        _ = ∫ x, inner ℂ (g x) (f x) ∂(ν.withDensity fun x ↦ ENNReal.ofReal (ρ₁ x)) :=
+          L2.inner_def g f
+        _ = ∫ x, (ENNReal.ofReal (ρ₁ x)).toReal • inner ℂ (g x) (f x) ∂ν :=
+          integral_withDensity_eq_integral_toReal_smul hdens₁ hflt₁ _
+        _ = ∫ x, f x * T Λ x ∂ν := integral_congr_ae hprod.symm
+  refine ⟨T, hPair, fun T' hT' ↦ LinearIsometryEquiv.ext fun Λ ↦ ?_⟩
+  apply T.symm.injective
+  rw [T.symm_apply_apply]
+  apply ContinuousLinearMap.ext
+  intro f
+  rw [(hPair (T.symm (T' Λ)) f).2, T.apply_symm_apply, (hT' Λ f).2]
+
 /-- Paper: Proposition 9.2.1.8, p. 409. The strong dual of the scalar compact-interval
 space is represented isometrically by integration against the reciprocal-density space.
 Deviation: The duality is stated on the weighted L² spaces. The pairing on all of
@@ -621,7 +754,11 @@ theorem scalarIntervalSobolev_dual (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 ≤ s
     ∃! T : StrongDual ℂ (CompactIntervalSobolev volume id a b s) ≃ₗᵢ[ℂ]
         CompactIntervalSobolev volume id a b s true,
       ∀ Λ f, Integrable (fun x ↦ f x * T Λ x) volume ∧
-        Λ f = ∫ x, f x * T Λ x := by sorry
+        Λ f = ∫ x, f x * T Λ x :=
+  weightedL2_dual volume (continuous_intervalSobolevDensity' a b s).measurable
+    (continuous_intervalSobolevDensity' a b s).measurable.inv
+    (intervalSobolevDensity_pos a b s) (fun x ↦ inv_pos.mpr (intervalSobolevDensity_pos a b s x))
+    (fun x ↦ mul_inv_cancel₀ (intervalSobolevDensity_pos a b s x).ne')
 
 -- TODO(paper-gap): The topology generated by individual interior line norms in
 -- (9.2.2.2) is strictly coarser than the uniform Hardy norm in (9.2.2.1).
