@@ -52,7 +52,10 @@ theorem integralKernelOperator_apply (k : Lp ℂ 2 (μ.prod μ)) (f : Lp ℂ 2 �
 /-- Paper: Theorem C.3.7.1(1), p. 708. The Hilbert-Schmidt norm of the integral
 operator is the L² norm of the kernel. -/
 theorem schattenNorm_integralKernelOperator (k : Lp ℂ 2 (μ.prod μ)) :
-    schattenNorm (integralKernelOperator μ k) = ‖k‖ := by sorry
+    schattenNorm (integralKernelOperator μ k) = ‖k‖ := by
+  unfold integralKernelOperator
+  rw [(hilbertSchmidtOperators_equiv_Lp_prod μ μ).choose_spec.1]
+  exact Lp.norm_compMeasurePreserving k (Measure.measurePreserving_swap (μ := μ) (ν := μ))
 
 /-- Paper: Theorem C.3.7.1(2)(a), p. 708. If a square-integrable kernel is jointly
 continuous at almost every diagonal point and its operator is nuclear, the diagonal
