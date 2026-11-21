@@ -3595,30 +3595,53 @@ section ApproximationProperty
 variable (E : Type u) [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
   [PolynormableSpace ℂ E] [T2Space E]
 
-/-- Paper: Lemma C.2.4.15(1)–(2), p. 689. The identity is approximable by finite-rank
-maps uniformly on precompact sets exactly when those maps are dense among endomorphisms. -/
-theorem id_mem_closure_finiteRank_iff_dense :
-    (ContinuousLinearMap.id ℂ E : PrecompactConvergenceCLM E E) ∈
-      closure (range (tensorToFiniteRank (E := E) (F := E) :
-        StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E)) ↔
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) := by
+/-- Paper: Lemma C.2.4.15(2), p. 689. A space has the approximation property if its
+finite-rank endomorphisms are dense for uniform convergence on precompact sets. -/
+def HasApproximationProperty : Prop :=
+  DenseRange (X := PrecompactConvergenceCLM E E) (fun z ↦ tensorToFiniteRank z)
+
+omit [T2Space E] in
+/-- Paper: Lemma C.2.4.15(2), p. 689. Unfolding the approximation property gives density
+for the uniform convergence topology indexed by sets with compact closure in the completion. -/
+theorem hasApproximationProperty_iff_denseRange :
+    HasApproximationProperty E ↔
+      DenseRange (X := E →Lᵤ[ℂ, {s | IsPrecompactInCompletion s}] E)
+        (fun z ↦ tensorToFiniteRank z) := Iff.rfl
+
+/-- Paper: Lemma C.2.4.15(2), p. 689. Density for uniform convergence on bounded sets
+implies the approximation property. For a normed space the hypothesis is operator-norm density.
+Deviation: This compares the two topologies on the same finite-rank maps. -/
+theorem hasApproximationProperty_of_denseRange_bounded
+    (h : DenseRange (X := E →L[ℂ] E) (fun z ↦ tensorToFiniteRank z)) :
+    HasApproximationProperty E := by
+  let S := {s : Set E | IsPrecompactInCompletion s}
+  let j := ContinuousLinearMap.toUniformConvergenceCLM (RingHom.id ℂ) E S
+  have hj : Continuous j :=
+    ContinuousLinearMap.toUniformConvergenceCLM_continuous (RingHom.id ℂ) E S fun s hs ↦
+      ((isPrecompactInCompletion_iff_totallyBounded s).mp hs).isVonNBounded ℂ
+  exact j.surjective.denseRange.comp h hj
+
+omit [T2Space E] in
+/-- Postcomposition by each endomorphism takes a finite-rank approximation of the identity
+to one of that endomorphism, for uniform convergence on any fixed family of sets. -/
+private theorem id_mem_closure_finiteRank_iff_dense_uniform (S : Set (Set E)) :
+    ContinuousLinearMap.id ℂ E ∈
+      closure (X := E →Lᵤ[ℂ, S] E) (range (fun z ↦ tensorToFiniteRank z)) ↔
+    DenseRange (X := E →Lᵤ[ℂ, S] E) (fun z ↦ tensorToFiniteRank z) := by
   refine ⟨fun h A ↦ ?_, fun h ↦ h _⟩
-  -- As elaborated, both sides use the bounded convergence topology of `E →L[ℂ] E`.
-  let post : (E →L[ℂ] E) →L[ℂ] (E →L[ℂ] E) := ContinuousLinearMap.postcomp E A
-  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E) A.toLinearMap
+  let post : (E →Lᵤ[ℂ, S] E) →L[ℂ] (E →Lᵤ[ℂ, S] E) :=
+    (A : E →L[ℂ] E).postcompUniformConvergenceCLM S
+  let map := TensorProduct.map (LinearMap.id : StrongDual ℂ E →ₗ[ℂ] StrongDual ℂ E)
+    (A : E →L[ℂ] E).toLinearMap
   have hmap (z : StrongDual ℂ E ⊗[ℂ] E) :
       post (tensorToFiniteRank z) = tensorToFiniteRank (map z) := by
+    ext x
+    change (A : E →L[ℂ] E) (tensorToFiniteRank z x) = tensorToFiniteRank (map z) x
     induction z using TensorProduct.inductionOn with
-    | tmul φ y =>
-      ext x
-      change A (tensorToFiniteRank (φ ⊗ₜ[ℂ] y) x) = tensorToFiniteRank (map (φ ⊗ₜ[ℂ] y)) x
-      simp [map, tensorToFiniteRank_tmul]
-    | add z w hz hw => rw [map_add, map_add, map_add, hz, hw, map_add]
-  have hsub : post '' range (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) ⊆
-      range (tensorToFiniteRank (E := E) (F := E) :
-        StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) := by
+    | tmul φ y => simp [map, tensorToFiniteRank_tmul]; rfl
+    | add z w hz hw => simp only [map_add, add_apply, hz, hw]
+  have hsub : post '' range (fun z ↦ tensorToFiniteRank z) ⊆
+      range (fun z ↦ tensorToFiniteRank z) := by
     rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
     exact ⟨map z, (hmap z).symm⟩
   have hA : post (ContinuousLinearMap.id ℂ E) = A := by
@@ -3627,16 +3650,22 @@ theorem id_mem_closure_finiteRank_iff_dense :
   rw [← hA]
   exact closure_mono hsub (image_closure_subset_closure_image post.continuous (mem_image_of_mem _ h))
 
+/-- Paper: Lemma C.2.4.15(1)–(2), p. 689. The identity is approximable by finite-rank
+maps uniformly on precompact sets exactly when those maps are dense among endomorphisms. -/
+theorem id_mem_closure_finiteRank_iff_dense :
+    ContinuousLinearMap.id ℂ E ∈
+      closure (X := PrecompactConvergenceCLM E E) (range (fun z ↦ tensorToFiniteRank z)) ↔
+    HasApproximationProperty E :=
+  id_mem_closure_finiteRank_iff_dense_uniform E {s | IsPrecompactInCompletion s}
+
 /-- Paper: Lemma C.2.4.15(2)–(3), p. 689. Density of finite-rank maps for the
 precompact convergence topology on endomorphisms is equivalent to the corresponding
 density for all targets. -/
 theorem dense_finiteRank_iff_forall_targets :
-    DenseRange (tensorToFiniteRank (E := E) (F := E) :
-      StrongDual ℂ E ⊗[ℂ] E → PrecompactConvergenceCLM E E) ↔
+    HasApproximationProperty E ↔
       ∀ (F : Type (max u v)) (_ : AddCommGroup F) (_ : Module ℂ F) (_ : TopologicalSpace F)
         (_ : IsTopologicalAddGroup F) (_ : PolynormableSpace ℂ F) (_ : T2Space F),
-        DenseRange (tensorToFiniteRank (E := E) (F := F) :
-          StrongDual ℂ E ⊗[ℂ] F → PrecompactConvergenceCLM E F) := by sorry
+        DenseRange (X := PrecompactConvergenceCLM E F) (fun z ↦ tensorToFiniteRank z) := by sorry
 
 /-- Applying the pulled-back tensor of finite-rank maps precomposes the operator: for a
 differential `b` of the source, `λ(Σ φᵢ ⊗ yᵢ) ∘ b = λ(Σ (φᵢ ∘ b) ⊗ yᵢ)`. -/
@@ -3718,7 +3747,7 @@ theorem dense_finiteRank_iff_forall_sources :
     refine (mem_closure_finiteRank_iff E T).mpr fun B hB V hV ↦ ?_
     obtain ⟨z, hz⟩ :=
       (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mp
-        ((id_mem_closure_finiteRank_iff_dense (E := E)).mpr hdense) (T '' B)
+        (hdense (ContinuousLinearMap.id ℂ E)) (T '' B)
         (hB.image (T : F →L[ℂ] E)) V hV
     exact ⟨TensorProduct.map
       { toFun := fun ψ : StrongDual ℂ E => ψ.comp (T : F →L[ℂ] E)
@@ -3729,7 +3758,7 @@ theorem dense_finiteRank_iff_forall_sources :
       exact hz (T x) (mem_image_of_mem (T : F →L[ℂ] E) hx)⟩
   · -- (4) ⟹ (2): apply the hypothesis to the universe-raised copy of `E`.
     intro hforall
-    refine (id_mem_closure_finiteRank_iff_dense (E := E)).mp ?_
+    refine (id_mem_closure_finiteRank_iff_dense_uniform E {s | IsVonNBounded ℂ s}).mp ?_
     refine (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mpr fun B hB V hV ↦ ?_
     classical
     let G := ULift.{max u v, u} E
