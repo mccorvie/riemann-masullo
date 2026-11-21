@@ -1176,7 +1176,26 @@ theorem bruhatDiffDegreeOne_sanity (a : LCATopologicalLie G) :
 of individual first-order operators, by real linearity in the direction. -/
 theorem mem_bruhatDiffDegreeOneReal_iff
     (D : Module.End ℂ (bruhatSmoothSubmodule (G := G))) :
-    D ∈ bruhatDiffDegreeOneReal ↔ ∃ a : LCATopologicalLie G, D = bruhatFirstOrder a := by sorry
+    D ∈ bruhatDiffDegreeOneReal ↔ ∃ a : LCATopologicalLie G, D = bruhatFirstOrder a := by
+  change D ∈ Submodule.span ℝ (Set.range (bruhatFirstOrder (G := G))) ↔ _
+  constructor
+  · intro hD
+    induction hD using Submodule.span_induction with
+    | mem E hE =>
+      obtain ⟨a, rfl⟩ := hE
+      exact ⟨a, rfl⟩
+    | zero =>
+      exact ⟨_, by simpa only [zero_smul] using
+        (bruhatFirstOrder_scale (1 : LCATopologicalLie G) 0).symm⟩
+    | add E F _ _ hE hF =>
+      obtain ⟨a, rfl⟩ := hE
+      obtain ⟨b, rfl⟩ := hF
+      exact ⟨a * b, (bruhatFirstOrder_mul a b).symm⟩
+    | smul c E _ hE =>
+      obtain ⟨a, rfl⟩ := hE
+      exact ⟨_, (bruhatFirstOrder_scale a c).symm⟩
+  · rintro ⟨a, rfl⟩
+    exact Submodule.subset_span ⟨a, rfl⟩
 
 /-- Paper: Definition D.1.6.8(2), p. 768. A word acts by applying its first
 letter first and its last letter last. -/
