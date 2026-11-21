@@ -1302,7 +1302,11 @@ idele is the original idele raised to the field degree. -/
 theorem relativeIdeleNormRat_on_rational (g : 𝕀[ℚ]) :
     relativeIdeleNormRat F (Units.map (rationalAdeleEmbedding F).toMonoidHom g) =
       g ^ Module.finrank ℚ F := by
-  sorry
+  let := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  apply Units.ext
+  change Algebra.norm 𝔸[ℚ] (algebraMap 𝔸[ℚ] 𝔸[F] g.val) = g.val ^ Module.finrank ℚ F
+  simpa only [Fintype.card_fin] using Algebra.norm_algebraMap_of_basis b g.val
 
 /-- Paper: Definition A.2.2.3, p. 547. The canonical section takes the positive
 root of order the field degree, applies the rational section and extends scalars. -/
