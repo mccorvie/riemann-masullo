@@ -405,7 +405,15 @@ theorem hilbertBasis_isShrinking {H : Type*} [NormedAddCommGroup H] [InnerProduc
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. Every zero neighborhood in the complex
 sequence space with the product topology contains a coordinate basis vector. -/
-theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by sorry
+theorem pi_not_isRegular : ¬ IsRegular coordinateVector := by
+  rintro ⟨U, hU, havoid⟩
+  have hzero : Tendsto coordinateVector atTop (𝓝 (0 : ℕ → ℂ)) := by
+    refine tendsto_pi_nhds.mpr fun j ↦ ?_
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [eventually_ne_atTop j] with n hn
+    simp only [Pi.single_eq_of_ne' hn, Pi.zero_apply]
+  obtain ⟨n, hn⟩ := (hzero.eventually hU).exists
+  exact havoid n hn
 
 /-- Paper: Definition 4.1.2.1(6), p. 158. A countable orthonormal Hilbert basis is
 normalized in the paper's sense. -/
