@@ -3,7 +3,10 @@ module
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 import all RiemannMasullo.AppC_LCTVS.Sec1
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-!
 # Structure and Fourier–Mellin transform of Schwartz–Bruhat decay spaces
@@ -375,12 +378,259 @@ theorem modulatedExponentialDecay_shift_equiv (a : ℝ) :
     rw [weight_add, add_neg_cancel, modulationWeight_zero]
   exact ⟨ContinuousLinearEquiv.equivOfInverse forward backward hleft hright, fun _ ↦ rfl⟩
 
+/-- Multiplication by a unitary character is continuous on Schwartz–Bruhat functions,
+since the Fourier transform turns it into translation on the dual group. -/
+private theorem schwartzBruhat_mul_unitaryCharacter {A : Type*} [CommGroup A]
+    [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A]
+    [SecondCountableTopology A] (η : PontryaginDual A) :
+    ∃ M : SchwartzBruhat A →L[ℂ] SchwartzBruhat A,
+      ∀ f x, M f x = (η x : ℂ) * f x := by
+  let : MeasurableSpace A := borel A
+  let : BorelSpace A := ⟨rfl⟩
+  let μ : Measure A := Measure.haar
+  have : μ.IsHaarMeasure := inferInstanceAs ((Measure.haar (G := A)).IsHaarMeasure)
+  have : μ.Regular := inferInstanceAs ((Measure.haar (G := A)).Regular)
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual A) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap A Circle).secondCountableTopology
+  have hFourier := schwartzBruhat_fourier_equiv (G := A) μ
+  let F := hFourier.choose
+  have hF := hFourier.choose_spec
+  let T : SchwartzBruhat (PontryaginDual A) →L[ℂ] SchwartzBruhat (PontryaginDual A) :=
+    { toFun := schwartzBruhatTranslate η
+      map_add' := fun f g ↦ Subtype.ext (funext fun χ ↦ rfl)
+      map_smul' := fun a f ↦ Subtype.ext (funext fun χ ↦ rfl)
+      cont := (schwartzBruhatTranslate_continuous (G := PontryaginDual A)).comp
+        (continuous_const.prodMk continuous_id) }
+  let M := F.symm.toContinuousLinearMap.comp (T.comp F.toContinuousLinearMap)
+  refine ⟨M, fun f x ↦ ?_⟩
+  let g (y : A) := (η y : ℂ) * f y
+  have hη : Continuous (fun y : A ↦ (η y : ℂ)) := continuous_subtype_val.comp η.continuous
+  have hg : Integrable g μ := by
+    simpa only [g, mul_comm] using
+      (hF f).1.mul_bdd (c := 1) hη.aestronglyMeasurable (.of_forall fun y ↦ by simp)
+  have htransform (χ : PontryaginDual A) : lcaFourier μ (M f) χ = lcaFourier μ g χ := by
+    rw [← (hF (M f)).2 χ]
+    have hM : F (M f) = T (F f) := F.apply_symm_apply _
+    rw [hM]
+    change F f (η⁻¹ * χ) = _
+    rw [(hF f).2]
+    apply integral_congr_ae
+    exact Filter.Eventually.of_forall fun y ↦ by
+      change f y * star (((η y)⁻¹ * χ y : Circle) : ℂ) = g y * star (χ y : ℂ)
+      rw [Circle.coe_mul, Circle.coe_inv_eq_conj, ← Complex.star_def, star_mul, star_star]
+      dsimp only [g]
+      ring
+  let u : A → ℂ := M f
+  have hu : Integrable u μ := (hF (M f)).1
+  have hz (χ : PontryaginDual A) : lcaFourier μ (u - g) χ = 0 := by
+    change (∫ y, (u y - g y) * star (χ y : ℂ) ∂μ) = 0
+    simp_rw [sub_mul]
+    rw [integral_sub (integrable_fourierIntegrand (G := A) μ hu χ)
+      (integrable_fourierIntegrand (G := A) μ hg χ)]
+    exact sub_eq_zero.mpr (htransform χ)
+  have hae : u =ᵐ[μ] g :=
+    (ae_eq_zero_of_lcaFourier_eq_zero (G := A) μ (hu.sub hg) hz).mono
+      fun _ hy ↦ sub_eq_zero.mp hy
+  have hcont : Continuous u := continuous_schwartzBruhat (G := A) (M f)
+  have heq := (hcont.ae_eq_iff_eq μ (hη.mul (continuous_schwartzBruhat (G := A) f))).mp hae
+  exact congrFun heq x
+
+omit hSC in
+/-- Every compact-subgroup stage admits a refinement on whose quotient a given
+unitary character descends. -/
+private theorem goodCompact_refine_unitaryCharacter (k : GoodCompact) (η : PontryaginDual G) :
+    ∃ (l : GoodCompact) (η' : PontryaginDual (G ⧸ l.val)),
+      l.val ≤ k.val ∧ ∀ g : G, η' (g : G ⧸ l.val) = η g := by
+  let K' : OpenCompactlyGeneratedSubgroups (PontryaginDual G) :=
+    ⟨lcaAnnihilator k.val, isOpen_lcaAnnihilator k.val k.property.1, k.property.2⟩
+  have hgroups := openCompactlyGeneratedSubgroups_colimit (G := PontryaginDual G)
+  obtain ⟨H, hηH⟩ := hgroups.2.1 η
+  obtain ⟨J, hKJ, hHJ⟩ := hgroups.1.directed K' H
+  let L := lcaDualAnnihilator J.val
+  have hLc : IsCompact (L : Set G) := isCompact_lcaDualAnnihilator J.val J.property.1
+  have hAnn : lcaAnnihilator L = J.val :=
+    lcaAnnihilator_dualAnnihilator_of_open J.val J.property.1
+  have hLgen : IsCompactlyGeneratedGroup (lcaAnnihilator L) := by
+    rw [hAnn]
+    exact J.property.2
+  let l : GoodCompact := ⟨L, hLc, hLgen⟩
+  have hlk : l.val ≤ k.val := by
+    intro g hg
+    rw [← lcaDualAnnihilator_annihilator k.val k.property.1.isClosed]
+    exact (mem_lcaDualAnnihilator_iff _ _).mpr fun χ ↦
+      (mem_lcaDualAnnihilator_iff _ _).mp hg ⟨χ.val, hKJ χ.property⟩
+  obtain ⟨e, he⟩ := lcaQuotientDual_equiv_annihilator L hLc.isClosed
+  let ηL : lcaAnnihilator L := ⟨η, by
+    rw [hAnn]
+    exact hHJ hηH⟩
+  refine ⟨l, e.symm ηL, hlk, fun g ↦ ?_⟩
+  rw [← he (e.symm ηL) g, e.apply_symm_apply]
+
+/-- The pointwise multiplier on the decay submodule is well-defined because it commutes
+with each real twist and preserves Schwartz–Bruhat functions. -/
+private def modulatedExponentialDecayUnitaryMultiplication {A : Type*} [CommGroup A]
+    [TopologicalSpace A] (n : A →ₜ* ℝ≥0ˣ) (χ : PontryaginDual A)
+    (U : SchwartzBruhat A →L[ℂ] SchwartzBruhat A)
+    (hU : ∀ (f : SchwartzBruhat A) (x : A), U f x = (χ x : ℂ) * f x) :
+    modulatedExponentialDecaySubmodule n I →ₗ[ℂ] modulatedExponentialDecaySubmodule n I :=
+  ((LinearMap.mulLeft ℂ (fun x ↦ (χ x : ℂ))).comp
+    (modulatedExponentialDecaySubmodule n I).subtype).codRestrict _ (by
+      intro f
+      refine (Submodule.mem_iInf _).mpr fun a ↦ Submodule.mem_comap.mpr ?_
+      let u := U (modulatedExponentialDecayTwist n I a f)
+      have h : modulationWeight n a (fun x ↦ (χ x : ℂ) * f.val x) = u.val := by
+        funext x
+        let w : ℂ := (((n x).val : ℝ) ^ (a : ℝ) : ℝ)
+        exact (mul_left_comm w (χ x : ℂ) (f.val x)).trans
+          (hU (modulatedExponentialDecayTwist n I a f) x).symm
+      exact h ▸ u.property)
+
+-- The unused-section-variable check expands the seminorm families of the decay spaces.
+set_option linter.unusedSectionVars false in
+include hm hms hInt hne in
+/-- Unitary character multiplication commutes with the real twists and is continuous
+on the inductive limit by refining each source stage to a quotient carrying the character. -/
+private theorem modulatedExponentialDecay_mul_unitaryCharacter (η : PontryaginDual G) :
+    ∃ M : E →L[ℂ] E, ∀ f g, (M f).val g = (η g : ℂ) * f.val g := by
+  have hMultiply := schwartzBruhat_mul_unitaryCharacter (A := G) η
+  let U := hMultiply.choose
+  have hU := hMultiply.choose_spec
+  let M : E →ₗ[ℂ] E := modulatedExponentialDecayUnitaryMultiplication I m η U hU
+  let FinalSeminorms := {p : Seminorm ℂ (modulatedExponentialDecaySubmodule m I) //
+    ∀ k : GoodCompact, Continuous (p ∘ modulatedExponentialDecayStageInclusion m I k)}
+  have generating := withGeneratingSeminorms_spec _ (Subtype.val : FinalSeminorms → _)
+  refine ⟨⟨M, ?_⟩, fun _ _ ↦ rfl⟩
+  change Continuous M
+  refine generating.continuous_of_continuous_comp M fun p ↦ ?_
+  let q : Seminorm ℂ E := p.val.comp M
+  change Continuous q
+  refine generating.continuous_seminorm (⟨q, fun k ↦ ?_⟩ : FinalSeminorms)
+  refine (goodCompact_refine_unitaryCharacter (G := G) k η).elim fun l h ↦ ?_
+  refine h.elim fun η' hη ↦ ?_
+  have hlk := hη.1
+  have hη' := hη.2
+  have hTransition := modulatedExponentialDecayStage_transition m I hm hms hInt hne k l hlk
+  let j := hTransition.choose
+  have hj := hTransition.choose_spec.2
+  let : IsClosed (l.val : Set G) := l.property.1.isClosed
+  have hMultiply' := schwartzBruhat_mul_unitaryCharacter (A := G ⧸ l.val) η'
+  let V := hMultiply'.choose
+  have hV := hMultiply'.choose_spec
+  let n := quotientModulation m l.val l.property.1
+  let B : ModulatedExponentialDecayStage m I l →ₗ[ℂ] ModulatedExponentialDecayStage m I l :=
+    modulatedExponentialDecayUnitaryMultiplication I n η' V hV
+  have hInd := modulatedExponentialDecayStage_twists_isInducing m I l
+  have hB : Continuous B := by
+    apply hInd.continuous_iff.mpr
+    apply continuous_pi
+    intro a
+    change Continuous (fun f : ModulatedExponentialDecayStage m I l ↦
+      modulatedExponentialDecayTwist n I a (B f))
+    have htwist : Continuous (fun f : ModulatedExponentialDecayStage m I l ↦
+        modulatedExponentialDecayTwist n I a f) := (continuous_apply a).comp hInd.continuous
+    have hVtwist : Continuous (fun f : ModulatedExponentialDecayStage m I l ↦
+        V (modulatedExponentialDecayTwist n I a f)) := V.continuous.comp htwist
+    have hcomm (f : ModulatedExponentialDecayStage m I l) :
+        V (modulatedExponentialDecayTwist n I a f) =
+          modulatedExponentialDecayTwist n I a (B f) := by
+      apply Subtype.ext
+      funext x
+      let w : ℂ := (((n x).val : ℝ) ^ (a : ℝ) : ℝ)
+      change V (modulatedExponentialDecayTwist n I a f) x =
+        w * ((η' x : ℂ) * f.val x)
+      exact (hV (modulatedExponentialDecayTwist n I a f) x).trans
+        (mul_left_comm (η' x : ℂ) w (f.val x))
+    exact hVtwist.congr hcomm
+  have hcomm (f : ModulatedExponentialDecayStage m I k) :
+      modulatedExponentialDecayStageInclusion m I l (B (j f)) =
+        M (modulatedExponentialDecayStageInclusion m I k f) := by
+    apply Subtype.ext
+    funext g
+    change (η' (g : G ⧸ l.val) : ℂ) * (j f).val (g : G ⧸ l.val) =
+      (η g : ℂ) * f.val (g : G ⧸ k.val)
+    exact congrArg₂ (fun z : Circle ↦ fun w : ℂ ↦ (z : ℂ) * w) (hη' g) (hj f g)
+  change Continuous (fun f : ModulatedExponentialDecayStage m I k ↦
+    p.val (M (modulatedExponentialDecayStageInclusion m I k f)))
+  have hstage : Continuous (fun f : ModulatedExponentialDecayStage m I k ↦
+      p.val (modulatedExponentialDecayStageInclusion m I l (B (j f)))) :=
+    (p.property l).comp (hB.comp j.continuous)
+  exact hstage.congr fun f ↦ congrArg p.val (hcomm f)
+
+set_option linter.unusedSectionVars false in
+include hm hms in
+/-- The quasi-character multiplier is the composition of its unitary multiplier and the
+real shift given by its abscissa. -/
+private theorem modulatedExponentialDecay_quasiCharacterMultiplier (d : QuasiCharacter G) :
+    ∃ M : ModulatedExponentialDecay m univ →L[ℂ] ModulatedExponentialDecay m univ,
+      ∀ f g, (M f).val g = d g * f.val g := by
+  let D := ModulatedExponentialDecay m univ
+  have hnonzero (g : G) : d g ≠ 0 := ((Group.isUnit g).map d).ne_zero
+  let a := quasiCharacterAbscissa m hm.1 hm.2 d
+  have habs (g : G) : ‖d g‖ = ((m g).val : ℝ) ^ a :=
+    norm_quasiCharacter_eq_rpow_abscissa m hm.1 hm.2 d g
+  let unit (g : G) := d g / (‖d g‖ : ℂ)
+  have hnorm (g : G) : ‖unit g‖ = 1 := by
+    change ‖d g / (‖d g‖ : ℂ)‖ = 1
+    rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _),
+      div_self (norm_ne_zero_iff.mpr (hnonzero g))]
+  let η : PontryaginDual G :=
+    { toFun := fun g ↦ ⟨unit g, mem_sphere_zero_iff_norm.mpr (hnorm g)⟩
+      map_one' := Circle.ext (by simp [unit])
+      map_mul' := fun g h ↦ Circle.ext (by
+        change unit (g * h) = unit g * unit h
+        simp only [unit, map_mul, norm_mul, Complex.ofReal_mul, mul_div_mul_comm])
+      continuous_toFun := (d.continuous.div (Complex.continuous_ofReal.comp d.continuous.norm)
+        (fun g ↦ Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (hnonzero g)))).subtype_mk _ }
+  have hMultiply := modulatedExponentialDecay_mul_unitaryCharacter m univ hm hms
+    ordConnected_univ univ_nonempty η
+  let U := hMultiply.choose
+  have hU := hMultiply.choose_spec
+  have hJ : (fun b : ℝ ↦ b - a) '' univ = univ :=
+    image_univ_of_surjective fun b ↦ ⟨b + a, add_sub_cancel_right b a⟩
+  have hshift : ∃ S : D ≃L[ℂ] D, ∀ f, (S f).val = modulationWeight m a f.val :=
+    (congrArg (fun J : Set ℝ ↦ ∃ S : D ≃L[ℂ] ModulatedExponentialDecay m J,
+      ∀ f, (S f).val = modulationWeight m a f.val) hJ).mp
+      (modulatedExponentialDecay_shift_equiv m univ hm hms ordConnected_univ univ_nonempty a)
+  let S := hshift.choose
+  have hS := hshift.choose_spec
+  refine ⟨U.comp S.toContinuousLinearMap, fun f g ↦ ?_⟩
+  change (U (S f)).val g = _
+  rw [hU (S f) g, hS f]
+  change (d g / (‖d g‖ : ℂ)) * (((((m g).val : ℝ) ^ a : ℝ) : ℂ) * f.val g) = _
+  rw [← habs g, ← mul_assoc, div_mul_cancel₀ _
+    (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (hnonzero g)))]
+
+set_option linter.unusedSectionVars false in
 include hm hms in
 /-- Paper: Remark D.3.3.6, p. 806. Multiplication by a continuous quasi-character
 is a topological automorphism of the space with two-sided exponential decay. -/
 theorem modulatedExponentialDecay_mul_quasiCharacter (c : QuasiCharacter G) :
     ∃ e : ModulatedExponentialDecay m univ ≃L[ℂ] ModulatedExponentialDecay m univ,
-      ∀ f g, (e f).val g = c g * f.val g := by sorry
+      ∀ f g, (e f).val g = c g * f.val g := by
+  let D := ModulatedExponentialDecay m univ
+  have cancel {X : Type _} (value : X → G → ℂ) (hinj : Injective value)
+      (A B : X → X) (a b : G → ℂ)
+      (hA : ∀ f g, value (A f) g = a g * value f g)
+      (hB : ∀ f g, value (B f) g = b g * value f g) (hab : ∀ g, b g * a g = 1) :
+      LeftInverse B A := by
+    intro f
+    apply hinj
+    funext g
+    rw [hB (A f) g, hA f g, ← mul_assoc, hab g, one_mul]
+  let cInv := c.comp (ContinuousMonoidHom.inv G)
+  refine (modulatedExponentialDecay_quasiCharacterMultiplier m hm hms c).elim fun M hM ↦ ?_
+  refine (modulatedExponentialDecay_quasiCharacterMultiplier m hm hms cInv).elim fun N hN ↦ ?_
+  have hInv (g : G) : cInv g = (c g)⁻¹ := map_inv c g
+  have hcancel (g : G) : cInv g * c g = 1 := by
+    rw [hInv, inv_mul_cancel₀ ((Group.isUnit g).map c).ne_zero]
+  have hleft : LeftInverse N M :=
+    cancel (fun f : D ↦ f.val) Subtype.val_injective M N c cInv hM hN hcancel
+  have hright : RightInverse N M :=
+    cancel (fun f : D ↦ f.val) Subtype.val_injective N M cInv c hN hM fun g ↦
+      (mul_comm _ _).trans (hcancel g)
+  exact ⟨ContinuousLinearEquiv.equivOfInverse M N hleft hright, hM⟩
 
 end Stages
 
