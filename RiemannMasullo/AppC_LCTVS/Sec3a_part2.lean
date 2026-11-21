@@ -971,7 +971,13 @@ operators converge to the trace of the original operator. -/
 theorem tendsto_hilbertTrace_filtration_orthogonalProjections_mul (T : nuclearEndomorphisms H) :
     Tendsto (fun i ↦ hilbertTrace
       ⟨P(i) * T.val, mul_mem_nuclearEndomorphisms_left (P(i)) T⟩)
-      atTop (𝓝 (hilbertTrace T)) := by sorry
+      atTop (𝓝 (hilbertTrace T)) := by
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+  apply tendsto_iff_norm_sub_tendsto_zero.mpr
+  simp only [← htr, ← map_sub]
+  simp only [htr]
+  exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _)
+    (tendsto_traceNorm_filtration_orthogonalProjections_mul V hV hdense T)
 
 /-- Paper: Corollary C.3.5.5(3), p. 702. The traces of the right-projected
 operators converge to the trace of the original operator. -/
