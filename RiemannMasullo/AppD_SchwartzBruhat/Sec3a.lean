@@ -4500,10 +4500,56 @@ theorem modulatedExponentialDecayStage_frechet (I : Set ℝ) (hInt : OrdConnecte
     (hne : I.Nonempty) (k : GoodCompact) :
     IsFrechetTVS (ModulatedExponentialDecayStage m I k) := by sorry
 
+omit hms in
+/-- The quotient underlying a decay stage is second countable. Properness gives
+σ-compactness, and compact generation of the dual gives Euclidean charts. -/
+private theorem modulatedDecayStage_quotient_secondCountable (k : GoodCompact) :
+    SecondCountableTopology (G ⧸ k.val) := by
+  let Q := G ⧸ k.val
+  let : IsClosed (k.val : Set G) := k.property.1.isClosed
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : SigmaCompactSpace G :=
+    ⟨⟨fun j ↦ m ⁻¹' compactCovering ℝ≥0ˣ j,
+      fun j ↦ hm.1.isCompact_preimage (isCompact_compactCovering _ j), by
+        rw [← preimage_iUnion, iUnion_compactCovering, preimage_univ]⟩⟩
+  let q : G → Q := QuotientGroup.mk
+  have hq : Surjective q := QuotientGroup.mk_surjective
+  have : SigmaCompactSpace Q :=
+    isSigmaCompact_univ_iff.mp (hq.range_eq ▸
+      isSigmaCompact_range (show Continuous q from QuotientGroup.continuous_mk))
+  obtain ⟨e, _⟩ := lcaQuotientDual_equiv_annihilator (G := G) k.val k.property.1.isClosed
+  have hDual : IsCompactlyGeneratedGroup (PontryaginDual Q) :=
+    isCompactlyGeneratedGroup_of_continuousMulEquiv e.symm k.property.2
+  obtain ⟨d, ⟨charts⟩⟩ := isLocallyEuclidean_of_isCompactlyGeneratedGroup_dual (G := Q) hDual
+  let : ChartedSpace (EuclideanSpace ℝ (Fin d)) Q := charts
+  exact ChartedSpace.secondCountable_of_sigmaCompact (EuclideanSpace ℝ (Fin d)) Q
+
+-- The proof uses properness of the modulation and nonemptiness of the exponent set.
+set_option linter.unusedSectionVars false in
+set_option linter.unusedVariables false in
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is nuclear. -/
 theorem modulatedExponentialDecayStage_nuclear (I : Set ℝ) (hInt : OrdConnected I)
     (hne : I.Nonempty) (k : GoodCompact) :
-    IsNuclearTVS (ModulatedExponentialDecayStage m I k) := by sorry
+    IsNuclearTVS (ModulatedExponentialDecayStage m I k) := by
+  let Q := G ⧸ k.val
+  let n := quotientModulation m k.val k.property.1
+  let : IsClosed (k.val : Set G) := k.property.1.isClosed
+  have : SecondCountableTopology Q := modulatedDecayStage_quotient_secondCountable m hm k
+  let T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (I → SchwartzBruhat Q) :=
+    LinearMap.pi (modulatedExponentialDecayTwist n I)
+  have hT : IsEmbedding T := by
+    refine ⟨modulatedDecayStage_twists_isInducing m I k, ?_⟩
+    let a : I := ⟨hne.choose, hne.choose_spec⟩
+    intro f g h
+    apply Subtype.ext
+    funext x
+    have hx := congrArg (fun p : I → SchwartzBruhat Q ↦ p a x) h
+    let w : ℂ := (((n x).val : ℝ) ^ (a : ℝ) : ℝ)
+    have hw : w ≠ 0 := Complex.ofReal_ne_zero.mpr
+      (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n x))) (a : ℝ)).ne'
+    exact mul_left_cancel₀ hw (show w * f.val x = w * g.val x from hx)
+  exact isNuclearTVS_of_linearEmbedding T hT
+    (isNuclearTVS_pi fun _ : I ↦ schwartzBruhat_nuclear (G := Q))
 
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is separable. -/
 theorem modulatedExponentialDecayStage_separable (I : Set ℝ) (hInt : OrdConnected I)
