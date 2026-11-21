@@ -2,6 +2,9 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.Convex.Contractible
+import Mathlib.Topology.Covering.AddCircle
+import Mathlib.Topology.Homotopy.Lifting
 
 /-!
 # Differential operators, Poisson summation, supports and translations
@@ -129,11 +132,195 @@ theorem hasDerivAt_bruhatDirectionalDeriv (a : LCATopologicalLie G) {f : G → �
 -- TODO(paper-gap): The proofs of D.1.6.6 and D.1.6.7 use support in an open
 -- compactly generated subgroup. A global smooth function need not have such support.
 
+omit hTop hT2 hLC in
+/-- Paper: Lemma D.1.6.6, p. 767. On an elementary group, differentiability of
+class C¹ on each lifted discrete fiber gives continuity of the orbit derivative. -/
+private theorem continuous_elementary_orbitDeriv {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F]
+    (a : ℝ →+ ElementaryLieGroup m n r F) (ha : Continuous a)
+    {f : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ z b, ContDiff ℝ 1 (fun u ↦ f (elementaryCover u z b))) :
+    Continuous (fun x ↦ deriv (fun t ↦ f (x + a t)) 0) := by
+  let V := EuclideanSpace ℝ (Fin m)
+  let W := EuclideanSpace ℝ (Fin n)
+  let D := (Fin r → ℤ) × F
+  let aV : ℝ →+ V := (AddMonoidHom.fst _ _).comp a
+  have haV : Continuous aV := continuous_fst.comp ha
+  have hD (t : ℝ) : (a t).2.2 = 0 := by
+    have hc : Continuous (fun t ↦ (a t).2.2) := continuous_snd.comp (continuous_snd.comp ha)
+    have hconst : (a t).2.2 = (a 0).2.2 :=
+      (isPreconnected_range hc).subsingleton (mem_range_self t) (mem_range_self 0)
+    exact hconst.trans (by rw [map_zero]; rfl)
+  -- The lift through each circle cover is additive by uniqueness of lifts.
+  have hLift (i : Fin n) : ∃ v : ℝ, ∀ t : ℝ, ((t * v : ℝ) : AddCircle (1 : ℝ)) = (a t).2.1 i := by
+    let q : ℝ → AddCircle (1 : ℝ) := (↑)
+    let g : C(ℝ, AddCircle (1 : ℝ)) :=
+      ⟨fun t ↦ (a t).2.1 i, (continuous_apply i).comp (continuous_fst.comp (continuous_snd.comp ha))⟩
+    have hg0 : q 0 = g 0 := by simp [q, g, a.map_zero]
+    have hq := AddCircle.isCoveringMap_coe (1 : ℝ)
+    obtain ⟨b, ⟨hb0, hb⟩, _⟩ := hq.existsUnique_continuousMap_lifts g 0 0 hg0
+    have hb' (t : ℝ) : q (b t) = (a t).2.1 i := congrFun hb t
+    have hadd (s t : ℝ) : b (s + t) = b s + b t := by
+      have heq : q ∘ (fun p : ℝ × ℝ ↦ b (p.1 + p.2)) =
+          q ∘ (fun p : ℝ × ℝ ↦ b p.1 + b p.2) := by
+        funext p
+        change q (b (p.1 + p.2)) = q (b p.1 + b p.2)
+        rw [show q (b p.1 + b p.2) = q (b p.1) + q (b p.2) from QuotientAddGroup.mk_add _ _ _,
+          hb', hb', hb', map_add]
+        rfl
+      exact congrFun (hq.eq_of_comp_eq (b.continuous.comp (continuous_fst.add continuous_snd))
+        ((b.continuous.comp continuous_fst).add (b.continuous.comp continuous_snd))
+        heq (0, 0) (by simp [hb0])) (s, t)
+    let bHom : ℝ →+ ℝ := ⟨⟨b, hb0⟩, hadd⟩
+    refine ⟨b 1, fun t ↦ ?_⟩
+    have ht : b t = t * b 1 := by
+      change bHom t = t * bHom 1
+      simpa only [smul_eq_mul, mul_one] using map_real_smul bHom b.continuous t (1 : ℝ)
+    rw [← ht]
+    exact hb' t
+  choose w hw using hLift
+  let v : V × W := (aV 1, WithLp.toLp 2 w)
+  have hOrbit (u : V × W) (d : D) (t : ℝ) :
+      elementaryCover u d.1 d.2 + a t = elementaryCover (u + t • v) d.1 d.2 := by
+    have ht : aV t = t • aV 1 := by
+      simpa only [smul_eq_mul, mul_one] using map_real_smul aV haV t (1 : ℝ)
+    change (u.1 + aV t, (fun i ↦ (u.2 i : AddCircle (1 : ℝ)) + (a t).2.1 i),
+      d + (a t).2.2) = (u.1 + t • v.1, (fun i ↦ ((u.2 i + t * w i : ℝ) : AddCircle (1 : ℝ))), d)
+    simp only [ht, v, hD, add_zero, QuotientAddGroup.mk_add, hw]
+  let q : (V × W) × D → ElementaryLieGroup m n r F :=
+    fun p ↦ elementaryCover p.1 p.2.1 p.2.2
+  have hqW : IsOpenQuotientMap (fun u : W ↦ fun i ↦ (u i : AddCircle (1 : ℝ))) :=
+    (IsOpenQuotientMap.piMap fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk).comp
+      (PiLp.homeomorph 2 (fun _ : Fin n ↦ ℝ)).isOpenQuotientMap
+  have hq : IsOpenQuotientMap q :=
+    (Homeomorph.prodAssoc V (Fin n → AddCircle (1 : ℝ)) D).isOpenQuotientMap.comp
+      ((IsOpenQuotientMap.id.prodMap hqW).prodMap IsOpenQuotientMap.id)
+  apply hq.continuous_comp_iff.mp
+  rw [continuous_iff_continuousAt]
+  intro p
+  let g (d : D) (u : V × W) := f (elementaryCover u d.1 d.2)
+  have hg (d : D) : ContDiff ℝ 1 (g d) := hf d.1 d.2
+  have hd : ∀ᶠ p' : (V × W) × D in 𝓝 p, p'.2 = p.2 :=
+    continuousAt_snd.preimage_mem_nhds ((isOpen_discrete {p.2}).mem_nhds (mem_singleton _))
+  have hEq (u : V × W) (d : D) :
+      deriv (fun t ↦ f (elementaryCover u d.1 d.2 + a t)) 0 = fderiv ℝ (g d) u v := by
+    have hPath : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+      simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+    have hBase : (fun t : ℝ ↦ u + t • v) 0 = u := by simp
+    have hFDeriv := ((hg d).differentiable one_ne_zero (u + (0 : ℝ) • v)).hasFDerivAt
+    have hDeriv := (hFDeriv.comp_hasDerivAt 0 hPath).deriv
+    simp only [hBase] at hDeriv
+    simpa only [Function.comp_def, g, hOrbit] using hDeriv
+  refine (((hg p.2).continuous_fderiv_apply one_ne_zero).comp
+    (continuous_fst.prodMk (continuous_const (y := v)))).continuousAt.congr ?_
+  filter_upwards [hd] with p' hp'
+  exact hp' ▸ (hEq p'.1 p'.2).symm
+
+/-- A good subgroup is contained, together with any prescribed point, in an
+open compactly generated subgroup. -/
+private theorem exists_structuralPair_at (k : Subgroup G) (hk : IsBruhatGoodSubgroup k) (x : G) :
+    ∃ p : BruhatStructuralPair G, x ∈ p.val.1 ∧ OrderDual.ofDual p.val.2 = k := by
+  let J := lcaAnnihilator k
+  let : DiscreteTopology (PontryaginDual G ⧸ J) := QuotientGroup.discreteTopology hk.2.1
+  let π : PontryaginDual G →ₜ* (PontryaginDual G ⧸ J) :=
+    ⟨QuotientGroup.mk' J, QuotientGroup.continuous_mk⟩
+  let eval := pontryaginDual_eval (G := G)
+  -- The dual of the discrete quotient is compact, and evaluation is a closed embedding.
+  have hkCompact : IsCompact (k : Set G) := by
+    have hRange : IsCompact (range (PontryaginDual.map π)) :=
+      isCompact_range (PontryaginDual.map π).continuous
+    have hkPreimage : (k : Set G) = eval ⁻¹' range (PontryaginDual.map π) := by
+      ext y
+      change y ∈ k ↔ eval y ∈ range (PontryaginDual.map π)
+      rw [← lcaDualAnnihilator_annihilator k hk.1, mem_lcaDualAnnihilator_iff]
+      constructor
+      · intro hy
+        let χ : PontryaginDual (PontryaginDual G ⧸ J) :=
+          { toMonoidHom := QuotientGroup.lift J (eval y).toMonoidHom (fun z hz ↦ hy ⟨z, hz⟩)
+            continuous_toFun := (QuotientGroup.isQuotientMap_mk J).continuous_iff.mpr
+              (eval y).continuous }
+        exact ⟨χ, PontryaginDual.ext fun _ ↦ rfl⟩
+      · rintro ⟨χ, hχ⟩ z
+        change eval y z.val = 1
+        rw [← hχ, PontryaginDual.map_apply]
+        have hz : π z.val = 1 := (QuotientGroup.eq_one_iff z.val).mpr z.property
+        rw [hz, map_one]
+    rw [hkPreimage]
+    exact isClosedEmbedding_pontryaginDual_eval.isCompact_preimage hRange
+  obtain ⟨U, hU, hUnhds⟩ := exists_compact_mem_nhds (1 : G)
+  let K := insert x (U ∪ (k : Set G))
+  let H := Subgroup.closure K
+  have hSub : K ⊆ (H : Set G) := Subgroup.subset_closure
+  have hK : K ∈ 𝓝 (1 : G) :=
+    mem_of_superset hUnhds (subset_union_left.trans (subset_insert _ _))
+  have hH : IsOpen (H : Set G) := H.isOpen_of_mem_nhds (mem_of_superset hK hSub)
+  have hGenerated : IsCompactlyGeneratedGroup H :=
+    ⟨Subtype.val ⁻¹' K, continuous_subtype_val.continuousAt.preimage_mem_nhds hK,
+      (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal.isCompact_preimage
+        ((hU.union hkCompact).insert x), Subgroup.closure_preimage_eq_top K⟩
+  exact ⟨⟨(H, OrderDual.toDual k), hH, hGenerated, hk,
+    subset_union_right.trans ((subset_insert _ _).trans hSub)⟩, hSub (mem_insert _ _), rfl⟩
+
+/-- Paper: Lemma D.1.6.6, p. 767. An open structural subgroup can be shrunk around
+a prescribed point, keeping the same good subgroup, so that the quotient has an
+elementary presentation.
+Deviation: Local form of the reduction to elementary groups. In real, torus, and
+discrete coordinates on the original quotient, restrict the discrete factor to the
+cyclic subgroup generated by the point's discrete coordinate. -/
+theorem BruhatStructuralPair.exists_elementary_refinement (p : BruhatStructuralPair G)
+    (x : p.val.1) :
+    ∃ q : BruhatStructuralPair G, q.val.1 ≤ p.val.1 ∧ x.val ∈ q.val.1 ∧
+      OrderDual.ofDual q.val.2 = OrderDual.ofDual p.val.2 ∧
+      Nonempty (ElementaryLCAPresentation q.quotient) := by
+  sorry
+
 /-- Paper: Lemma D.1.6.6, p. 767. A first derivative of a Bruhat C¹ function
 is continuous. -/
 theorem bruhatDirectionalDeriv_continuous (a : LCATopologicalLie G) {f : G → ℂ}
     (hf : IsBruhatContDiff 1 f) :
-    Continuous (bruhatDirectionalDeriv a f) := by sorry
+    Continuous (bruhatDirectionalDeriv a f) := by
+  obtain ⟨k, hk, _, hDescend⟩ := hf
+  rw [continuous_iff_continuousAt]
+  intro x
+  obtain ⟨p₀, hx₀, hp₀⟩ := exists_structuralPair_at k hk x
+  obtain ⟨p, _, hx, hp, ⟨e⟩⟩ := p₀.exists_elementary_refinement ⟨x, hx₀⟩
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend p (hp.trans hp₀)
+  -- The multiplication in the presentation uses the standard addition on `Fin`.
+  let : NeZero e.finiteOrder := ⟨(Fin.pos e.finiteGroup.toZero.zero).ne'⟩
+  let H := p.val.1
+  have hH : IsOpen (H : Set G) := p.property.1
+  have ha (t : Multiplicative ℝ) : a t ∈ H := by
+    let : PreconnectedSpace (Multiplicative ℝ) := inferInstanceAs (PreconnectedSpace ℝ)
+    have hRange : IsPreconnected (range a) := isPreconnected_range a.continuous
+    exact hRange.subset_isClopen ⟨H.isClosed_of_isOpen hH, hH⟩
+      ⟨1, ⟨1, map_one a⟩, H.one_mem⟩ (mem_range_self t)
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank (Fin e.finiteOrder)
+  let φ := e.equiv
+  let aH : Multiplicative ℝ →* H := a.toMonoidHom.codRestrict H ha
+  let q : H →* p.quotient := QuotientGroup.mk' _
+  let aq : Multiplicative ℝ →* Multiplicative E := φ.toMulEquiv.toMonoidHom.comp (q.comp aH)
+  let aE : ℝ →+ E := AddMonoidHom.toMultiplicative.symm aq
+  have hq : Continuous q := QuotientGroup.continuous_mk
+  have hφ : Continuous φ := φ.continuous
+  have haE : Continuous aE := hφ.comp (hq.comp (a.continuous.subtype_mk ha))
+  let g : E → ℂ := fun y ↦ f₀ (φ.symm (Multiplicative.ofAdd y))
+  have hDeriv := continuous_elementary_orbitDeriv aE haE (f := g) (hSmooth e)
+  have hCont : Continuous (fun y : H ↦ deriv (fun t : ℝ ↦ g ((φ (q y)).toAdd + aE t)) 0) :=
+    hDeriv.comp (hφ.comp hq)
+  have hEq (y : H) :
+      deriv (fun t : ℝ ↦ g ((φ (q y)).toAdd + aE t)) 0 = bruhatDirectionalDeriv a f y.val := by
+    unfold bruhatDirectionalDeriv
+    congr 1
+    funext t
+    let b := aH (Multiplicative.ofAdd t)
+    change f₀ (φ.symm (φ (q y) * φ (q b))) = f (y.val * a (Multiplicative.ofAdd t))
+    rw [← show φ (q y * q b) = φ (q y) * φ (q b) from φ.map_mul _ _,
+      φ.symm_apply_apply, ← map_mul q]
+    exact hf₀ (y * b)
+  rw [show (fun y : H ↦ deriv (fun t : ℝ ↦ g ((φ (q y)).toAdd + aE t)) 0) =
+      bruhatDirectionalDeriv a f ∘ (Subtype.val : H → G) from funext hEq] at hCont
+  exact hH.isOpenEmbedding_subtypeVal.continuousAt_iff.mp
+    (hCont.continuousAt (x := (⟨x, hx⟩ : H)))
 
 /-- Paper: Lemma D.1.6.6, p. 767. The first derivative of a Bruhat smooth
 function is Bruhat smooth. -/
