@@ -8,6 +8,7 @@ import Mathlib.Analysis.InnerProductSpace.l2Space
 import Mathlib.Analysis.PSeries
 import Mathlib.Data.List.FinRange
 import Mathlib.Data.List.OfFn
+import Mathlib.Data.Set.FiniteExhaustion
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import Mathlib.Analysis.Calculus.IteratedDeriv.Defs
@@ -23,6 +24,8 @@ import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
 import Mathlib.Analysis.Normed.Group.Ultra
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import Mathlib.Topology.Connected.LocallyConnected
+import Mathlib.Topology.Compactness.Bases
+import Mathlib.Topology.LocallyConstant.Algebra
 
 /-!
 # Schwartz–Bruhat functions
@@ -1407,10 +1410,132 @@ theorem finitePlaceSchwartz_finestTopology (w : Places(F)) :
   have hall : tF = ⨅ q, t q := hfinest.topologicalSpace_eq_iInf
   exact hstage.trans ((hsurj.iInf_comp t).trans hall.symm)
 
+open TopologicalSpace in
+/-- The local Schwartz–Bruhat space is spanned by the countable family of indicators
+of compact open subsets of the completion. -/
+private theorem finitePlaceSchwartz_countableSpanningSet (w : Places(F)) :
+    ∃ s : Set (schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F))),
+      s.Countable ∧ Submodule.span ℂ s = ⊤ := by
+  classical
+  let K := w.adicCompletion F
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative K))
+  let : ProperSpace K := properSpace_adicCompletion w (K := F)
+  let compactOpens : Set (Set K) := {U | IsCompact U ∧ IsOpen U}
+  let C := ↥compactOpens
+  let : Countable (countableBasis K) := countable_countableBasis K
+  -- Every compact open set is a finite union of basic open sets.
+  let unionBasis (t : Finset (countableBasis K)) : Set K := (t : Set (countableBasis K)).sUnion
+  let : Countable C := (countable_range unionBasis).mono fun U hU ↦ by
+    obtain ⟨t, ht⟩ := eq_sUnion_finset_of_isTopologicalBasis_of_isCompact_open _
+      (isBasis_countableBasis K) U hU.1 hU.2
+    exact ⟨t, ht.symm⟩
+  have hχ (U : C) : ∃ g : E, ∀ x : K,
+      g.val (Multiplicative.ofAdd x) = U.val.indicator (1 : K → ℂ) x := by
+    have hcl : IsClopen U.val := ⟨U.property.1.isClosed, U.property.2⟩
+    apply (mem_finitePlaceSchwartz_iff F w _).2
+    refine ⟨(LocallyConstant.charFn ℂ hcl).isLocallyConstant, ?_⟩
+    exact U.property.1.of_isClosed_subset isClosed_closure
+      (closure_minimal support_indicator_subset hcl.1)
+  let χ (U : C) : E := (hχ U).choose
+  have hχ_apply (U : C) (x : K) :
+      (χ U).val (Multiplicative.ofAdd x) = U.val.indicator (1 : K → ℂ) x :=
+    (hχ U).choose_spec x
+  have hcount : (range χ).Countable := countable_range χ
+  refine ⟨range χ, hcount, ?_⟩
+  apply top_unique
+  intro g _
+  let f : K → ℂ := fun x ↦ g.val (Multiplicative.ofAdd x)
+  obtain ⟨hf, hc⟩ := (mem_finitePlaceSchwartz_iff F w f).1 ⟨g, fun _ ↦ rfl⟩
+  have hfinite : (f '' tsupport f).Finite := by
+    let : CompactSpace (tsupport f) := isCompact_iff_compactSpace.mp hc
+    rw [← range_domRestrict]
+    exact (hf.comp_continuous continuous_subtype_val).range_finite
+  let A := hfinite.toFinset.erase 0
+  have h₀ (a : A) : a.val ≠ 0 := (Finset.mem_erase.mp a.property).1
+  let U (a : A) : C := ⟨{x | f x = a.val},
+    hc.of_isClosed_subset (hf.isClosed_fiber a.val)
+      (fun x hx ↦ subset_tsupport f (mem_support.mpr (fun h ↦ h₀ a (hx.symm.trans h)))),
+    hf.isOpen_fiber a.val⟩
+  have hsum : (∑ a : A, a.val • χ (U a)) = g := by
+    apply Subtype.ext
+    funext x
+    let y : K := Multiplicative.toAdd x
+    let ev : E →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule (Multiplicative K)).subtype
+    change ev (∑ a : A, a.val • χ (U a)) = f y
+    simp only [map_sum, map_smul]
+    have hterm (a : A) : ev (χ (U a)) = if f y = a.val then 1 else 0 := by
+      change (χ (U a)).val (Multiplicative.ofAdd y) = _
+      rw [hχ_apply]
+      rfl
+    simp only [hterm]
+    by_cases hy : f y = 0
+    · rw [hy]
+      apply Finset.sum_eq_zero
+      intro a _
+      rw [ite_eq_right (h₀ a).symm, smul_zero]
+    · have hmem : f y ∈ A := Finset.mem_erase.mpr
+        ⟨hy, hfinite.mem_toFinset.mpr ⟨y, subset_tsupport f (mem_support.mpr hy), rfl⟩⟩
+      let a : A := ⟨f y, hmem⟩
+      rw [Finset.sum_eq_single_of_mem a (Finset.mem_univ _) (fun b _ hb ↦ ?_)]
+      · simp [a]
+      · have hne : f y ≠ b.val := fun h ↦ hb (Subtype.ext h.symm)
+        simp [hne]
+  rw [← hsum]
+  exact Submodule.sum_mem _ fun a _ ↦ Submodule.smul_mem _ _
+    (Submodule.subset_span (mem_range_self (U a)))
+
+/-- Finite spans of a countable generating set give a strict LF presentation
+for the finest locally convex topology. -/
+private theorem finestLocallyConvex_strictLF_of_countable_span
+    (E : Type u) [AddCommGroup E] [Module ℂ E]
+    {s : Set E} (hs : s.Countable) (hspan : Submodule.span ℂ s = ⊤) :
+    IsStrictLFSpace (FinestLocallyConvex E) := by
+  let W := FinestLocallyConvex E
+  let : T2Space W := finestLocallyConvex_t2 E
+  have hfinest := finestLocallyConvex_withSeminorms E
+  let A := hs.finiteExhaustion
+  let S (n : ℕ) : Submodule ℂ W := Submodule.span ℂ (A n)
+  have hmono : Monotone S := fun _ _ h ↦ Submodule.span_mono (A.mono h)
+  have hFinite (n : ℕ) : FiniteDimensional ℂ (S n) :=
+    FiniteDimensional.span_of_finite ℂ (A.finite n)
+  refine ⟨inferInstance, S, hmono, ?_, ?_, ?_⟩
+  · intro n
+    let : FiniteDimensional ℂ (S n) := hFinite n
+    let e := (Module.finBasis ℂ (S n)).equivFun.toContinuousLinearEquiv
+    refine ⟨inferInstance, inferInstance, e.toHomeomorph.isEmbedding.metrizableSpace, ?_⟩
+    let : UniformSpace (S n) := IsTopologicalAddGroup.rightUniformSpace (S n)
+    let : IsUniformAddGroup (S n) := isUniformAddGroup_of_addCommGroup
+    exact FiniteDimensional.completeSpace ℂ (S n)
+  · intro g
+    apply (Submodule.mem_iSup_of_directed S hmono.directed_le).mp
+    have hSup : (⨆ n, S n) = ⊤ := by
+      change (⨆ n, Submodule.span ℂ (A n)) = ⊤
+      rw [Submodule.iSup_span, A.iUnion_eq, hspan]
+    exact hSup.symm ▸ Submodule.mem_top
+  · let P : SeminormFamily ℂ W {p : Seminorm ℂ W // ∀ n, Continuous (p ∘ (S n).subtype)} :=
+      Subtype.val
+    have hP : Surjective P := by
+      intro p
+      refine ⟨⟨p, fun n ↦ ?_⟩, rfl⟩
+      let : FiniteDimensional ℂ (S n) := hFinite n
+      exact (hfinest.continuous_seminorm p).comp (S n).subtype.continuous_of_finiteDimensional
+    let t (p : Seminorm ℂ W) : TopologicalSpace W :=
+      p.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+    have hfinal := (withGeneratingSeminorms_spec W P).topologicalSpace_eq_iInf
+    exact hfinest.topologicalSpace_eq_iInf.trans ((hP.iInf_comp t).symm.trans hfinal.symm)
+
 /-- Paper: Proposition 2.1.2.4(1), p. 64. The local Schwartz–Bruhat space is a strict
 LF-space. -/
 theorem finitePlaceSchwartz_strictLF (w : Places(F)) :
-    IsStrictLFSpace ℬ(w.adicCompletion F) := by sorry
+    IsStrictLFSpace ℬ(w.adicCompletion F) := by
+  let E := ↥(schwartzBruhatSubmodule (Multiplicative (w.adicCompletion F)))
+  let tS : TopologicalSpace E := (inferInstance : TopologicalSpace ℬ(w.adicCompletion F))
+  let tF : TopologicalSpace E := (inferInstance : TopologicalSpace (FinestLocallyConvex E))
+  change @IsStrictLFSpace E _ _ tS
+  have htop : tS = tF := finitePlaceSchwartz_finestTopology F w
+  refine Eq.mpr (congrArg (fun t ↦ @IsStrictLFSpace E _ _ t) htop) ?_
+  exact (finitePlaceSchwartz_countableSpanningSet F w).elim fun s hs ↦
+    finestLocallyConvex_strictLF_of_countable_span E hs.1 hs.2
 
 /-- Paper: Proposition 2.1.2.4(2), p. 64. The local Schwartz–Bruhat space is complete. -/
 theorem finitePlaceSchwartz_complete (w : Places(F)) :
