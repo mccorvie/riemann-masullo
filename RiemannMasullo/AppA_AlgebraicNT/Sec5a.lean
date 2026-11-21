@@ -8,6 +8,8 @@ public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Measure.Haar.Extension
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
+import Mathlib.Topology.Algebra.ProperAction.CompactlyGenerated
+import Mathlib.Topology.Covering.Quotient
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Integral
 import RiemannMasullo.ForMathlib.Topology.Algebra.OpenSubgroup
 
@@ -929,7 +931,61 @@ theorem exists_borel_orbit_transversal {X H : Type*}
     {E : Set X} (hE : MeasurableSet E)
     (hinj : InjOn (Quotient.mk (MulAction.orbitRel H X)) E) :
     ∃ F : Set X, MeasurableSet F ∧ E ⊆ F ∧
-      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by sorry
+      Bijective (fun x : F ↦ Quotient.mk (MulAction.orbitRel H X) (x : X)) := by
+  classical
+  let q := Quotient.mk (MulAction.orbitRel H X)
+  let : ProperlyDiscontinuousSMul H X :=
+    properlyDiscontinuousSMul_iff_properSMul.mpr inferInstance
+  have hlocal : IsLocallyInjective q :=
+    isLocalHomeomorph_quotientMk_of_properlyDiscontinuousSMul.isLocallyInjective
+  let OpenInj := {s : Set X // IsOpen s ∧ InjOn q s}
+  let : Nonempty OpenInj := ⟨⟨∅, isOpen_empty, injOn_empty q⟩⟩
+  obtain ⟨V, hV⟩ := isLindelof_univ.indexed_countable_subcover
+    (Subtype.val : OpenInj → Set X) (fun s ↦ s.property.1) (by
+      intro x _
+      obtain ⟨s, ho, hx, hi⟩ := hlocal x
+      exact mem_iUnion.mpr ⟨⟨s, ho, hi⟩, hx⟩)
+  let U : ℕ → Set X := fun
+    | 0 => E
+    | n + 1 => (V n).val
+  have hU (n : ℕ) : MeasurableSet (U n) ∧ InjOn q (U n) := by
+    cases n with
+    | zero => exact ⟨hE, hinj⟩
+    | succ n => exact ⟨(V n).property.1.measurableSet, (V n).property.2⟩
+  let Q (n : ℕ) := q '' U n
+  have hsat (n : ℕ) : MeasurableSet (q ⁻¹' Q n) := by
+    rw [show q ⁻¹' Q n = ⋃ g : H, (g • ·) '' U n from
+      MulAction.quotient_preimage_image_eq_union_mul (U n)]
+    exact MeasurableSet.iUnion fun g ↦
+      (Homeomorph.smul g).measurableEmbedding.measurableSet_image.mpr (hU n).1
+  -- Use the first set meeting each orbit, with `E` in position zero.
+  let F := ⋃ n, U n ∩ q ⁻¹' disjointed Q n
+  have hF : MeasurableSet F := MeasurableSet.iUnion fun n ↦ (hU n).1.inter (by
+    simp only [disjointed_eq_inter_compl, preimage_inter, preimage_iInter, preimage_compl]
+    exact (hsat n).inter (MeasurableSet.iInter fun j ↦
+      MeasurableSet.iInter fun _ ↦ (hsat j).compl))
+  refine ⟨F, hF, fun x hx ↦ mem_iUnion.mpr ⟨0, hx, ?_⟩, ⟨?_, ?_⟩⟩
+  · change q x ∈ disjointed Q 0
+    rw [show disjointed Q 0 = Q 0 from disjointed_bot Q]
+    exact mem_image_of_mem q hx
+  · rintro ⟨x, hx⟩ ⟨y, hy⟩ (hxy : q x = q y)
+    obtain ⟨m, hxm, hqx⟩ := mem_iUnion.mp hx
+    obtain ⟨n, hyn, hqy⟩ := mem_iUnion.mp hy
+    have hmn : m = n := by
+      by_contra hne
+      exact (Set.disjoint_left.mp (disjoint_disjointed Q hne)) hqx (hxy.symm ▸ hqy)
+    subst n
+    exact Subtype.ext ((hU m).2 hxm hyn hxy)
+  · intro z
+    obtain ⟨x, rfl⟩ := Quotient.mk_surjective z
+    obtain ⟨n, hn⟩ := mem_iUnion.mp (hV (mem_univ x))
+    have hx : q x ∈ ⋃ n, disjointed Q n := by
+      rw [iUnion_disjointed]
+      exact mem_iUnion.mpr ⟨n + 1, mem_image_of_mem q hn⟩
+    obtain ⟨m, hm⟩ := mem_iUnion.mp hx
+    obtain ⟨y, hy, hyx⟩ := disjointed_subset Q m hm
+    have hqy : q y ∈ disjointed Q m := hyx.symm ▸ hm
+    exact ⟨⟨y, mem_iUnion.mpr ⟨m, hy, hqy⟩⟩, hyx⟩
 
 section Ideles
 
