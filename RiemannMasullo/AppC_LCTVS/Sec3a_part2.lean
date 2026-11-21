@@ -1617,13 +1617,105 @@ are the Schatten class of index two. -/
 abbrev hilbertSchmidtOperators : Submodule ℂ (E →L[ℂ] F) :=
   schattenClass E F 2 one_le_two
 
+omit [CompleteSpace E] in
+/-- Square summability on a Hilbert basis gives an operator-norm limit of finite-rank maps. -/
+private theorem isCompactOperator_of_summable_basis {ι : Type*} (b : HilbertBasis ι ℂ E)
+    (T : E →L[ℂ] F) (h : Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ))) :
+    IsCompactOperator T := by
+  let A (i : ι) : E →L[ℂ] F := InnerProductSpace.rankOne ℂ (T (b i)) (b i)
+  have hbound (s : Finset ι) : ‖∑ i ∈ s, A i‖ ≤ √(∑ i ∈ s, ‖T (b i)‖ ^ 2) := by
+    refine ContinuousLinearMap.opNorm_le_bound _ (Real.sqrt_nonneg _) fun x ↦ ?_
+    rw [sum_apply]
+    calc
+      ‖∑ i ∈ s, A i x‖ ≤ ∑ i ∈ s, ‖T (b i)‖ * ‖⟪b i, x⟫_ℂ‖ := by
+        simpa only [A, InnerProductSpace.rankOne_apply, norm_smul, mul_comm] using
+          (norm_sum_le s (fun i ↦ A i x))
+      _ ≤ √(∑ i ∈ s, ‖T (b i)‖ ^ 2) * √(∑ i ∈ s, ‖⟪b i, x⟫_ℂ‖ ^ 2) :=
+        Real.sum_mul_le_sqrt_mul_sqrt s _ _
+      _ ≤ √(∑ i ∈ s, ‖T (b i)‖ ^ 2) * ‖x‖ := by
+        rw [← Real.sqrt_sq (norm_nonneg x)]
+        exact mul_le_mul_of_nonneg_left
+          (Real.sqrt_le_sqrt (b.orthonormal.sum_inner_products_le x)) (Real.sqrt_nonneg _)
+  have hA : Summable A := by
+    refine summable_iff_vanishing_norm.mpr fun ε hε ↦ ?_
+    obtain ⟨s, hs⟩ := summable_iff_vanishing_norm.mp h (ε ^ 2) (by positivity)
+    exact ⟨s, fun t ht ↦ (hbound t).trans_lt
+      ((Real.sqrt_lt' hε).mpr ((le_abs_self _).trans_lt (hs t ht)))⟩
+  have hsum : (∑' i, A i) = T := by
+    ext x
+    have hpoint : HasSum (fun i ↦ A i x) (T x) := by
+      simpa only [A, InnerProductSpace.rankOne_apply, b.repr_apply_apply, map_smul] using
+        T.hasSum (b.hasSum_repr x)
+    exact ((ContinuousLinearMap.apply ℂ F x).hasSum hA.hasSum).unique hpoint
+  rw [← hsum]
+  refine isCompactOperator_of_tendsto hA.hasSum (Eventually.of_forall fun s ↦ ?_)
+  refine (compactOperator (RingHom.id ℂ) E F).sum_mem fun i _ ↦ ?_
+  change IsCompactOperator (InnerProductSpace.rankOne ℂ (T (b i)) (b i))
+  rw [InnerProductSpace.rankOne_def']
+  exact (isCompactOperator_of_locallyCompactSpace_rng
+    (ContinuousLinearMap.toSpanSingleton ℂ (T (b i)))).comp_clm (innerSL ℂ (b i))
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- Parseval in the given basis and orthogonality in the singular expansion identify the
+two square-summability criteria by summing the same nonnegative family in either order. -/
+private theorem SingularExpansion.summable_sq_iff_summable_basis {ι : Type*}
+    (b : HilbertBasis ι ℂ E) {T : E →L[ℂ] F} (d : SingularExpansion T) :
+    Summable (fun n ↦ (d.coeff n : ℝ) ^ (2 : ℕ)) ↔
+      Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
+  let J := {n : ℕ // d.coeff n ≠ 0}
+  let a (j : J) (i : ι) : ℝ := (d.coeff j : ℝ) ^ 2 * ‖⟪d.source j, b i⟫_ℂ‖ ^ 2
+  have hrow (j : J) : HasSum (a j) ((d.coeff j : ℝ) ^ 2) := by
+    have hparseval : HasSum (fun i ↦ ‖⟪d.source j, b i⟫_ℂ‖ ^ (2 : ℕ)) 1 := by
+      simpa only [ENNReal.toReal_ofNat, Real.rpow_two, LinearIsometryEquiv.norm_map,
+        b.repr_apply_apply, norm_inner_symm (b _) (d.source j),
+        d.orthonormal_source.norm_eq_one j, one_pow] using
+        lp.hasSum_norm (p := 2) (by norm_num) (b.repr (d.source j))
+    simpa only [a, mul_one] using hparseval.mul_left ((d.coeff j : ℝ) ^ (2 : ℕ))
+  have hcol (i : ι) : HasSum (fun j ↦ a j i) (‖T (b i)‖ ^ 2) := by
+    let c (j : J) : ℂ := (d.coeff j : ℝ) * ⟪d.source j, b i⟫_ℂ
+    have hnorm (s : Finset J) : ‖∑ j ∈ s, c j • d.target j‖ ^ 2 = ∑ j ∈ s, a j i := by
+      simpa only [LinearIsometry.toSpanSingleton_apply, c, a, norm_mul, Complex.norm_real,
+        Real.norm_of_nonneg (NNReal.coe_nonneg _), mul_pow] using
+        d.orthonormal_target.orthogonalFamily.norm_sum c s
+    exact ((d.hasSum_apply (b i)).norm.pow 2).congr hnorm
+  have hrows : Summable (fun p : J × ι ↦ a p.1 p.2) ↔
+      Summable (fun j : J ↦ (d.coeff j : ℝ) ^ (2 : ℕ)) := by
+    have hnonneg (p : J × ι) : 0 ≤ a p.1 p.2 := mul_nonneg (sq_nonneg _) (sq_nonneg _)
+    have htsum (j : J) : (∑' i, a j i) = (d.coeff j : ℝ) ^ 2 := (hrow j).tsum_eq
+    rw [summable_prod_of_nonneg hnonneg, and_iff_right (fun j ↦ (hrow j).summable)]
+    simp only [htsum]
+  have hcols : Summable (fun p : ι × J ↦ a p.2 p.1) ↔
+      Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
+    have hnonneg (p : ι × J) : 0 ≤ a p.2 p.1 := mul_nonneg (sq_nonneg _) (sq_nonneg _)
+    have htsum (i : ι) : (∑' j, a j i) = ‖T (b i)‖ ^ 2 := (hcol i).tsum_eq
+    rw [summable_prod_of_nonneg hnonneg, and_iff_right (fun i ↦ (hcol i).summable)]
+    simp only [htsum]
+  have hsupp : Function.support (fun n ↦ (d.coeff n : ℝ) ^ (2 : ℕ)) ⊆
+      {n | d.coeff n ≠ 0} := by
+    intro n hn hz
+    exact hn (by simp [hz])
+  have hsub : Summable (fun j : J ↦ (d.coeff j : ℝ) ^ (2 : ℕ)) ↔
+      Summable (fun n ↦ (d.coeff n : ℝ) ^ (2 : ℕ)) :=
+    exists_congr fun _ ↦ hasSum_subtype_iff_of_support_subset hsupp
+  exact hsub.symm.trans (hrows.symm.trans ((Equiv.prodComm ι J).summable_iff.symm.trans hcols))
+
 /-- Paper: Definition C.3.6.2(2), p. 704. An operator is Hilbert-Schmidt
 exactly when the squared norms of the images of any given Hilbert basis
 form a summable family.
 Deviation: This checks the index-two class against the basis criterion. -/
 theorem mem_hilbertSchmidtOperators_iff_summable_basis {ι : Type*} (b : HilbertBasis ι ℂ E)
     (T : E →L[ℂ] F) :
-    T ∈ hilbertSchmidtOperators E F ↔ Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by sorry
+    T ∈ hilbertSchmidtOperators E F ↔ Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
+  change (IsCompactOperator T ∧ Summable (fun n ↦ approximationNumber T n ^ (2 : ℝ))) ↔ _
+  simp only [Real.rpow_two]
+  have hcompact (hT : IsCompactOperator T) :
+      Summable (fun n ↦ approximationNumber T n ^ (2 : ℕ)) ↔
+        Summable (fun i ↦ ‖T (b i)‖ ^ (2 : ℕ)) := by
+    obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T).mp hT
+    simpa only [d.coeff_eq_approximationNumber] using d.summable_sq_iff_summable_basis b
+  refine ⟨fun ⟨hT, hs⟩ ↦ (hcompact hT).mp hs, fun hs ↦ ?_⟩
+  have hT := isCompactOperator_of_summable_basis b T hs
+  exact ⟨hT, (hcompact hT).mpr hs⟩
 
 variable (E F) in
 /-- Paper: Definition C.3.6.2(3), p. 704. The trace-class operators are
