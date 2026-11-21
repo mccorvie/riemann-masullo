@@ -16,6 +16,7 @@ import all RiemannMasullo.AppA_AlgebraicNT.Sec2  -- for the diagonal adelic basi
 import Mathlib.Analysis.SpecialFunctions.Complex.Circle
 import Mathlib.Analysis.SpecialFunctions.Complex.CircleAddChar
 import Mathlib.Analysis.SpecialFunctions.Gaussian.FourierTransform
+import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 import Mathlib.Analysis.SpecialFunctions.Pow.NNReal
 import Mathlib.LinearAlgebra.Countable
 import Mathlib.LinearAlgebra.TensorProduct.Basis
@@ -4498,7 +4499,38 @@ between 1 and 2 the measure is the integral of `dt/t`, namely `log 2`. -/
 theorem infiniteLocalMultiplicativeTamagawaMeasure_real_interval (v : InfinitePlace F)
     (h : v.IsReal) :
     infiniteLocalMultiplicativeTamagawaMeasure F v
-      {x | ringEquivRealOfIsReal h x.val ∈ Icc 1 2} = ENNReal.ofReal (Real.log 2) := by sorry
+      {x | ringEquivRealOfIsReal h x.val ∈ Icc 1 2} = ENNReal.ofReal (Real.log 2) := by
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let e := (isometryEquivRealOfIsReal h).toHomeomorph.toMeasurableEquiv
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.Completion)).measurableEmbedding
+  have hpos {t : ℝ} (ht : t ∈ Icc (1 : ℝ) 2) : 0 < t := zero_lt_one.trans_le ht.1
+  have hsub : e ⁻¹' Icc 1 2 ⊆ range (Units.val : v.Completionˣ → v.Completion) := by
+    intro x hx
+    have hx0 : x ≠ 0 := (ringEquivRealOfIsReal h).map_ne_zero_iff.mp (hpos hx).ne'
+    exact ⟨Units.mk0 x hx0, rfl⟩
+  change infiniteLocalMultiplicativeTamagawaMeasure F v
+    (Units.val ⁻¹' (e ⁻¹' Icc 1 2)) = _
+  rw [infiniteLocalMultiplicativeTamagawaMeasure, hval.comap_preimage,
+    inter_eq_self_of_subset_left hsub, withDensity_apply _ (e.measurable measurableSet_Icc),
+    infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+  change (∫⁻ x in e ⁻¹' Icc 1 2, (↑(‖x‖₊ ^ v.mult) : ℝ≥0∞)⁻¹ ∂volume.map e.symm) = _
+  rw [e.symm.restrict_map, e.symm.measurableEmbedding.lintegral_map, e.symm_preimage_preimage]
+  have hnorm (t : ℝ) : ‖e.symm t‖ = ‖t‖ :=
+    (isometryEquivRealOfIsReal h).symm.isometry.norm_map_of_map_zero
+      (map_zero (ringEquivRealOfIsReal h).symm) t
+  rw [setLIntegral_congr_fun (g := fun t : ℝ ↦ ENNReal.ofReal t⁻¹) measurableSet_Icc
+    (fun t ht ↦ by
+      rw [h.mult_eq_one, pow_one, ← ENNReal.ofReal_coe_nnreal, coe_nnNorm, hnorm,
+        Real.norm_eq_abs, abs_of_pos (hpos ht)]
+      exact (ENNReal.ofReal_inv_of_pos (hpos ht)).symm)]
+  have hint : IntegrableOn (fun t : ℝ ↦ t⁻¹) (Icc 1 2) :=
+    (continuousOn_inv₀.mono fun _ ht ↦ (hpos ht).ne').integrableOn_Icc
+  rw [← ofReal_integral_eq_lintegral_ofReal hint
+      ((ae_restrict_iff' measurableSet_Icc).2 (Filter.Eventually.of_forall
+        fun _ ht ↦ inv_nonneg.mpr (hpos ht).le)),
+    integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le (by norm_num : (1 : ℝ) ≤ 2),
+    integral_inv_of_pos zero_lt_one zero_lt_two, div_one]
 
 /-- Paper: Definition A.3.2.2(2), p. 560. Scale local multiplicative Haar
 measure so that the integer units have the inverse square root different-norm mass. -/
