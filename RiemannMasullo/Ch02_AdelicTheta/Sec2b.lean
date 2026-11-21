@@ -8,6 +8,7 @@ import Mathlib.LinearAlgebra.TensorProduct.Finiteness
 import Mathlib.MeasureTheory.Integral.IntervalIntegral.FundThmCalculus
 import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
 
 /-!
@@ -594,8 +595,23 @@ parameter converges to the directional derivative at every adele. -/
 theorem adeleDirectionalDeriv_tendsto (f : ℬ[F]) (x : 𝔸[F]) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (f (Multiplicative.ofAdd ((γ t).val * x)) - f (Multiplicative.ofAdd x)) /
-        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) :=
-  by sorry
+        ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 (adeleDirectionalDeriv γ f (Multiplicative.ofAdd x))) := by
+  have hOrbit := (adeleOrbit_differentiableAt γ f (Multiplicative.ofAdd x)).hasDerivAt
+  have hLog := hOrbit.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · have hc := NNReal.continuous_coe.comp (Units.continuous_val (M := ℝ≥0))
+      exact (hc.continuousAt (x := (1 : ℝ≥0ˣ))).continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (Eventually.of_forall fun t ↦ ?_)
+  have hExpLog : expUnit (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  have hZero : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  simp only [Function.comp_apply, slope_def_module, Real.log_one, hExpLog, hZero,
+    map_one, Units.val_one, one_mul, toAdd_ofAdd, Complex.real_smul, Complex.ofReal_inv,
+    Complex.ofReal_sub, Complex.ofReal_one, div_eq_inv_mul]
 
 -- TODO(paper-gap): The last sentence of the proof of Lemma 2.2.4.2 uses
 -- injectivity of γ∞. Lemma 2.2.4.1 only gives factorization through the infinite ideles.
@@ -732,15 +748,88 @@ theorem mem_adelePolarSubspace (f : ℬ[F]) :
     f ∈ adelePolarSubspace F ↔ f zeroAdele = 0 ∧ adeleSchwartzFourier f zeroAdele = 0 :=
   LinearMap.mem_ker.trans Prod.mk_eq_zero
 
+open scoped ENNReal in
+/-- Point evaluation is continuous in the Schwartz–Bruhat topology since its
+norm is bounded on each stage by the zeroth Schwartz seminorm. -/
+private theorem schwartzBruhat_continuous_eval {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (x : G) : Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+  classical
+  let L : SchwartzBruhat G →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  have hstage (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+    let _ := e.finiteGroup
+    let q : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hq : Continuous q := elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0)
+    change Continuous (p.comp (schwartzBruhatStageInclusion a e))
+    refine Seminorm.continuous_of_le hq ?_
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ q f
+    rw [schwartzBruhatStageRealization_apply]
+    split_ifs with hx
+    · let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f y‖₊ : ℝ≥0∞).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+      refine ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne ?_
+      rw [elementarySchwartzBound_zero]
+      exact le_iSup (fun z ↦ (‖f z‖₊ : ℝ≥0∞)) y
+    · simpa only [norm_zero] using apply_nonneg q f
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨p, hstage⟩
+
+/-- Integration against regular Haar measure is continuous on the Schwartz–Bruhat
+space, since it evaluates the Fourier transform at the trivial character. -/
+private theorem schwartzBruhat_continuous_integral {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular] :
+    Continuous (fun f : SchwartzBruhat G ↦ ∫ x, f x ∂μ) := by
+  obtain ⟨Fourier, hFourier⟩ := schwartzBruhat_fourier_equiv μ
+  refine ((schwartzBruhat_continuous_eval (1 : PontryaginDual G)).comp Fourier.continuous).congr
+    fun f ↦ ?_
+  exact ((hFourier f).2 1).trans (lcaFourier_one μ f (hFourier f).1)
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Definition 2.2.4.4, p. 91. Both polar functionals are continuous,
 expressed as continuity of the pair of evaluations. -/
-theorem adelePolarValues_continuous : Continuous (adelePolarValues (F := F)) := by sorry
+theorem adelePolarValues_continuous : Continuous (adelePolarValues (F := F)) := by
+  change Continuous (fun f : ℬ[F] ↦ (f zeroAdele, adeleSchwartzFourier f zeroAdele))
+  refine (schwartzBruhat_continuous_eval zeroAdele).prodMk ?_
+  let G := Multiplicative 𝔸[F]
+  let : MeasurableSpace 𝔸[F] := borel _
+  let μ : Measure G := additiveTamagawaMeasure F
+  let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+      LocallyCompactSpace (v.adicCompletion F) := locallyCompactSpace_adicCompletion v
+  let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
+      CompactSpace (v.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+      IsOpen (v.adicCompletionIntegers F : Set (v.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing F ×
+      (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace F) → v.Completion) ×
+      (Πʳ v : IsDedekindDomain.HeightOneSpectrum (𝓞 F),
+        [v.adicCompletion F, v.adicCompletionIntegers F]))
+    infer_instance
+  let : BorelSpace G := ⟨rfl⟩
+  have hμ := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.1.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := hμ.2.1
+  exact (schwartzBruhat_continuous_integral (G := G) μ).congr
+    fun f ↦ (adeleSchwartzFourier_apply_zero f).2.symm
 
 variable (γ : ℝ≥0ˣ →ₜ* 𝕀[F])
 
 /-- Paper: Lemma 2.2.4.5(1), p. 91. The common polar kernel is closed in
 the Schwartz–Bruhat topology. -/
-theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by sorry
+theorem adelePolarSubspace_closed : IsClosed (adelePolarSubspace F : Set ℬ[F]) := by
+  exact isClosed_singleton.preimage (adelePolarValues_continuous (F := F))
 
 /-- Paper: Lemma 2.2.4.5(1), p. 91. Directional differentiation preserves the
 common polar kernel, so it induces a linear map on the polar quotient. -/

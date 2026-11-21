@@ -1170,7 +1170,30 @@ contains each generator and excludes the identity operator.
 Deviation: Sanity check distinguishing the span from the unital algebra. -/
 theorem bruhatDiffDegreeOne_sanity (a : LCATopologicalLie G) :
     bruhatDiffGenerator a ∈ bruhatDiffDegreeOne ∧
-      (1 : bruhatDiffAlgebra G) ∉ bruhatDiffDegreeOne := by sorry
+      (1 : bruhatDiffAlgebra G) ∉ bruhatDiffDegreeOne := by
+  refine ⟨Submodule.subset_span ⟨a, rfl⟩, ?_⟩
+  -- The good subgroup witnessing smoothness of zero works for any constant.
+  obtain ⟨k, hk, _, _⟩ := isBruhatContDiff_zero (G := G) 0
+  have hone : (fun _ : G ↦ (1 : ℂ)) ∈ bruhatSmoothSubmodule := by
+    apply (mem_bruhatSmoothSubmodule_iff _).2
+    intro p
+    refine ⟨k, hk, fun _ _ ↦ rfl, fun q _ ↦ ⟨fun _ ↦ 1, fun _ ↦ rfl, ?_⟩⟩
+    intro e z b
+    exact contDiff_const
+  let f : bruhatSmoothSubmodule (G := G) := ⟨fun _ ↦ 1, hone⟩
+  let ev : bruhatDiffAlgebra G →ₗ[ℂ] bruhatSmoothSubmodule (G := G) :=
+    (LinearMap.applyₗ f).comp (bruhatDiffAlgebra G).val.toLinearMap
+  have hspan : bruhatDiffDegreeOne ≤ LinearMap.ker ev := by
+    apply Submodule.span_le.mpr
+    rintro _ ⟨b, rfl⟩
+    apply LinearMap.mem_ker.mpr
+    apply Subtype.ext
+    funext x
+    change bruhatDirectionalDeriv b (fun _ ↦ 1) x = 0
+    exact deriv_const (0 : ℝ) (1 : ℂ)
+  intro h
+  have hz : ev 1 = 0 := LinearMap.mem_ker.mp (hspan h)
+  exact one_ne_zero (congrArg (fun g : bruhatSmoothSubmodule (G := G) ↦ g.val 1) hz)
 
 /-- Paper: Definition D.1.6.8(1), p. 768. The real degree-one space consists
 of individual first-order operators, by real linearity in the direction. -/
@@ -1192,7 +1215,35 @@ theorem bruhatDiffWord_singleton (a : LCATopologicalLie G) :
 /-- Paper: Definition D.1.6.8(2), p. 768. Each operator has a presentation
 as a finite linear combination of words in the first-order generators. -/
 theorem bruhatDiff_exists_presentation (D : bruhatDiffAlgebra G) :
-    ∃ c : List (LCATopologicalLie G) →₀ ℂ, c.sum (fun w z ↦ z • bruhatDiffWord w) = D := by sorry
+    ∃ c : List (LCATopologicalLie G) →₀ ℂ, c.sum (fun w z ↦ z • bruhatDiffWord w) = D := by
+  let incl := (bruhatDiffAlgebra G).val
+  have hWords :
+      ↑(Submonoid.closure (range (bruhatFirstOrder (G := G)))) ⊆
+        range (incl ∘ bruhatDiffWord) := by
+    intro A hA
+    induction hA using Submonoid.closure_induction with
+    | mem A hA =>
+        obtain ⟨a, rfl⟩ := hA
+        refine ⟨[a], ?_⟩
+        rw [Function.comp_apply, bruhatDiffWord_singleton]
+        rfl
+    | one =>
+        exact ⟨[], incl.map_one⟩
+    | mul A B _ _ hA hB =>
+        obtain ⟨u, rfl⟩ := hA
+        obtain ⟨v, rfl⟩ := hB
+        refine ⟨v ++ u, ?_⟩
+        simp only [Function.comp_apply, bruhatDiffWord, List.reverse_append, List.map_append,
+          List.prod_append, map_mul]
+  have hD : D.val ∈ Submodule.span ℂ (Submonoid.closure (range (bruhatFirstOrder (G := G))) :
+      Set (Module.End ℂ (bruhatSmoothSubmodule (G := G)))) := by
+    rw [← Algebra.adjoin_eq_span]
+    exact D.property
+  obtain ⟨c, hc⟩ := Finsupp.mem_span_range_iff_exists_finsupp.mp (Submodule.span_mono hWords hD)
+  refine ⟨c, Subtype.ext ?_⟩
+  change incl.toLinearMap (c.sum (fun w z ↦ z • bruhatDiffWord w)) = D.val
+  simpa only [Finsupp.sum, map_sum, map_smul, AlgHom.toLinearMap_apply, Function.comp_apply]
+    using hc
 
 /-- Paper: Definition D.1.6.8(2), p. 768. The degree is the smallest possible
 maximum word length among finite presentations of the operator.

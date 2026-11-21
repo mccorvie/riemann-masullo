@@ -8,6 +8,8 @@ public import Mathlib.Topology.Algebra.ProperAction.Basic
 import Mathlib.MeasureTheory.Covering.Vitali
 import Mathlib.MeasureTheory.Covering.OneDim
 import Mathlib.MeasureTheory.Measure.Haar.Extension
+import Mathlib.Topology.Algebra.Group.OpenMapping
+import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Algebra.IsUniformGroup.Basic
 import Mathlib.Topology.Algebra.ProperAction.CompactlyGenerated
 import Mathlib.Topology.Covering.Quotient
@@ -1012,6 +1014,7 @@ open IsDedekindDomain
 
 variable (F : Type*) [Field F] [NumberField F]
 
+local notation "𝕀∞" => (InfiniteAdeleRing F)ˣ
 local notation "N∞" => MonoidHom.ker (infiniteIdeleNorm F)
 local notation "N₁" => MonoidHom.ker (ideleNorm F)
 local notation "atInfinity" => Units.map (RingHom.toMonoidHom (RingHom.fst _ _))
@@ -1980,11 +1983,251 @@ theorem interior_centeredInfiniteIdeleDomain_mem_nhds :
   rw [neg_div]
   exact Ioo_subset_Ico_self hangle'
 
+/-- The norm of an infinite idele is the exponential of the sum of its logarithms. -/
+private theorem infiniteIdeleNorm_eq_exp_sum_log (g : 𝕀∞) :
+    ((infiniteIdeleNorm F g).val : ℝ) = Real.exp (∑ v, infiniteIdeleLog F g v) := by
+  simp only [infiniteIdeleNorm, MonoidHom.finsetProd_apply, Units.coe_prod, MonoidHom.pow_apply,
+    NNReal.coe_prod]
+  change (∏ v : InfinitePlace F, ‖g.val v‖ ^ v.mult) = _
+  rw [Real.exp_sum]
+  apply Finset.prod_congr rfl
+  intro v _
+  have hne : g.val v ≠ 0 := (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom
+    g).ne_zero
+  rw [infiniteIdeleLog, Real.exp_nat_mul, Real.exp_log (norm_pos_iff.mpr hne)]
+
+/-- On norm-one infinite ideles the logarithms with one place omitted form an open map. -/
+private theorem isOpenMap_infiniteIdeleLog_omit :
+    IsOpenMap (fun g : N∞ ↦ (fun w : {w : InfinitePlace F // w ≠ w₀} ↦
+      infiniteIdeleLog F g.val w.val) : N∞ → logSpace F) := by
+  classical
+  let L : N∞ →* Multiplicative (logSpace F) :=
+    MonoidHom.mk' (fun g ↦ Multiplicative.ofAdd (fun w ↦ infiniteIdeleLog F g.val w.val))
+      (fun g h ↦ congrArg (fun l : InfinitePlace F → ℝ ↦
+        Multiplicative.ofAdd (fun w : {w : InfinitePlace F // w ≠ w₀} ↦ l w.val))
+        (infiniteIdeleLog_mul F g.val h.val))
+  have hcont : Continuous L := continuous_pi fun w ↦
+    (continuous_apply w.val).comp ((infiniteIdeleLog_continuous F).comp continuous_subtype_val)
+  have hsurj : Surjective L := by
+    intro x
+    -- Restore the omitted coordinate so the full logarithm sums to zero.
+    let y (v : InfinitePlace F) := if hv : v = w₀ then -∑ w, x.toAdd w else x.toAdd ⟨v, hv⟩
+    have hy (v : {w : InfinitePlace F // w ≠ w₀}) : y v.val = x.toAdd v := dite_eq_right v.property
+    obtain ⟨g, hg⟩ := infiniteIdeleLog_surjective F y
+    have hs : ∑ v, y v = 0 := by
+      rw [Fintype.sum_eq_add_sum_subtype_ne _ w₀]
+      simp only [hy]
+      simp [y]
+    have hn : infiniteIdeleNorm F g = 1 := by
+      apply Units.ext
+      apply NNReal.coe_injective
+      rw [infiniteIdeleNorm_eq_exp_sum_log, hg, hs, Real.exp_zero]
+      rfl
+    refine ⟨⟨g, hn⟩, congrArg Multiplicative.ofAdd (funext fun v ↦ ?_)⟩
+    exact (congrFun hg v.val).trans (hy v)
+  have : SigmaCompactSpace 𝕀∞ :=
+    ⟨⟨fun n ↦ infiniteIdeleLog F ⁻¹' compactCovering (InfinitePlace F → ℝ) n,
+      fun n ↦ (infiniteIdeleLog_proper F).isCompact_preimage (isCompact_compactCovering _ n),
+      by rw [← preimage_iUnion, iUnion_compactCovering, preimage_univ]⟩⟩
+  have : SigmaCompactSpace N∞ := (infiniteIdeleNorm_ker_closed F).sigmaCompactSpace
+  exact L.isOpenMap_of_sigmaCompact hsurj hcont
+
+/-- Interior points of the centered domain have arguments strictly inside the angular sector. -/
+private theorem arg_mem_Ioo_of_mem_interior_centeredInfiniteIdeleDomain
+    (g : N∞) (hg : g ∈ interior (centeredInfiniteIdeleDomain F b v₀ σ)) :
+    (σ (extensionEmbedding v₀ (g.val.val v₀))).arg ∈
+      Ioo (-(Real.pi / (Units.torsionOrder F : ℝ))) (Real.pi / (Units.torsionOrder F : ℝ)) := by
+  classical
+  let a := Real.pi / (Units.torsionOrder F : ℝ)
+  have hn : (0 : ℝ) < Units.torsionOrder F := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have ha : 0 < a := div_pos Real.pi_pos hn
+  have hπ : a < Real.pi := by
+    have hn₂ : (2 : ℝ) ≤ Units.torsionOrder F := by
+      obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+      have := Units.torsionOrder_pos F
+      exact_mod_cast (show 2 ≤ Units.torsionOrder F by omega)
+    exact (div_lt_iff₀ hn).mpr (by nlinarith [Real.pi_pos])
+  let z (x : N∞) := σ (extensionEmbedding v₀ (x.val.val v₀))
+  have hsector (x : N∞) (hx : x ∈ centeredInfiniteIdeleDomain F b v₀ σ) :
+      (z x).arg ∈ Ico (-a) a := by
+    have hang : (z x).arg ∈ Ico (-Real.pi / (Units.torsionOrder F : ℝ)) a := hx.2
+    simpa only [neg_div] using hang
+  have hangle := hsector g (interior_subset hg)
+  change (z g).arg ∈ Ioo (-a) a
+  by_cases hv : v₀.IsReal
+  · have hpos := (inCenteredTorsionSector_real F v₀ σ hv _).mp (interior_subset hg).2
+    change 0 < extensionEmbeddingOfIsReal hv (g.val.val v₀) at hpos
+    have hz : (z g).arg = 0 := by
+      dsimp only [z]
+      rw [← extensionEmbeddingOfIsReal_apply hv]
+      have hσ (y : ℝ) : σ (y : ℂ) = (y : ℂ) := σ.commutes y
+      rw [hσ, Complex.arg_ofReal_of_nonneg hpos.le]
+    rw [hz]
+    exact ⟨neg_lt_zero.mpr ha, ha⟩
+  · -- Vary the argument at the chosen place while keeping every local norm fixed.
+    let e := isometryEquivComplexOfIsComplex (InfinitePlace.not_isReal_iff_isComplex.mp hv)
+    let p (t : ℝ) := (‖z g‖ : ℂ) * Complex.exp ((t : ℂ) * Complex.I)
+    let q (t : ℝ) := e.symm (σ.symm (p t))
+    have hp : Continuous p := by dsimp only [p]; fun_prop
+    have hq : Continuous q :=
+      e.symm.isometry.continuous.comp
+        (σ.symm.toLinearMap.continuous_of_finiteDimensional.comp hp)
+    have hσ : Isometry σ := by
+      change Isometry (σ.toAlgHom : ℂ → ℂ)
+      rcases Complex.real_algHom_eq_id_or_conj σ.toAlgHom with h | h
+      · rw [h]; exact isometry_id
+      · rw [h]; exact Complex.isometry_conj
+    have hz (t : ℝ) : σ (extensionEmbedding v₀ (q t)) = p t := by
+      change σ (e (e.symm (σ.symm (p t)))) = p t
+      rw [e.apply_symm_apply, AlgEquiv.apply_symm_apply]
+    have hnorm (t : ℝ) : ‖q t‖ = ‖g.val.val v₀‖ := by
+      have hf := hσ.comp (isometry_extensionEmbedding v₀)
+      have hzero : σ (extensionEmbedding v₀ 0) = 0 := by simp
+      rw [← hf.norm_map_of_map_zero hzero (q t),
+        ← hf.norm_map_of_map_zero hzero (g.val.val v₀)]
+      change ‖σ (extensionEmbedding v₀ (q t))‖ = ‖z g‖
+      rw [hz]
+      simp [p, Complex.norm_real, Complex.norm_exp_ofReal_mul_I]
+    have hne (t : ℝ) : q t ≠ 0 := norm_ne_zero_iff.mp
+      ((hnorm t).trans_ne (norm_ne_zero_iff.mpr (atPlace g.val).ne_zero))
+    let u (t : ℝ) := Units.mk0 (q t) (hne t)
+    have hu : Continuous u := Units.continuous_iff.mpr
+      ⟨hq, continuousOn_inv₀.comp_continuous hq hne⟩
+    let E := ContinuousMulEquiv.piUnits (M := InfinitePlace.Completion (K := F))
+    let r (t : ℝ) : 𝕀∞ := E.symm (Function.update (E g.val) v₀ (u t))
+    have hr : Continuous r :=
+      E.symm.continuous.comp ((continuous_update v₀).comp (continuous_const.prodMk hu))
+    have hrnorm (t : ℝ) (v : InfinitePlace F) : ‖(r t).val v‖ = ‖g.val.val v‖ := by
+      change ‖(Function.update (E g.val) v₀ (u t) v).val‖ = _
+      by_cases h : v = v₀
+      · subst v
+        rw [Function.update_self]
+        exact hnorm t
+      · rw [Function.update_of_ne h]
+        rfl
+    have hrone (t : ℝ) : infiniteIdeleNorm F (r t) = 1 := by
+      apply Units.ext
+      apply NNReal.coe_injective
+      rw [infiniteIdeleNorm_eq_exp_sum_log, show infiniteIdeleLog F (r t) =
+        infiniteIdeleLog F g.val from funext fun v ↦ by rw [infiniteIdeleLog, infiniteIdeleLog, hrnorm],
+        infiniteIdeleLog_sum_zero, Real.exp_zero]
+      rfl
+    let s (t : ℝ) : N∞ := ⟨r t, hrone t⟩
+    have hs : Continuous s := hr.subtype_mk _
+    have hsarg (t : ℝ) (ht : t ∈ Ioo (-Real.pi) Real.pi) : (z (s t)).arg = t := by
+      have hcoord : (s t).val.val v₀ = q t := by
+        change (Function.update (E g.val) v₀ (u t) v₀).val = _
+        rw [Function.update_self]
+        rfl
+      have hzp : z (s t) = p t := by
+        change σ (extensionEmbedding v₀ ((s t).val.val v₀)) = p t
+        rw [hcoord, hz]
+      have hzg : z g ≠ 0 := (map_ne_zero σ).mpr
+        ((map_ne_zero (extensionEmbedding v₀)).mpr (atPlace g.val).ne_zero)
+      rw [hzp]
+      change ((‖z g‖ : ℂ) * Complex.exp ((t : ℂ) * Complex.I)).arg = t
+      rw [Complex.arg_real_mul _ (norm_pos_iff.mpr hzg), ← Circle.coe_exp]
+      exact Circle.arg_exp ht.1 ht.2.le
+    have hsg : s ((z g).arg) = g := by
+      apply Subtype.ext
+      apply E.injective
+      change Function.update (E g.val) v₀ (u ((z g).arg)) = _
+      apply Function.update_eq_self_iff.mpr
+      apply Units.ext
+      apply (σ.injective.comp (isometry_extensionEmbedding v₀).injective)
+      change σ (extensionEmbedding v₀ (q ((z g).arg))) = z g
+      rw [hz]
+      exact Complex.norm_mul_exp_arg_mul_I _
+    have hev : ∀ᶠ t in 𝓝 ((z g).arg), s t ∈ centeredInfiniteIdeleDomain F b v₀ σ := by
+      apply hs.continuousAt.preimage_mem_nhds
+      rw [hsg]
+      exact mem_interior_iff_mem_nhds.mp hg
+    have hnear : Ioo (-Real.pi) Real.pi ∈ 𝓝 ((z g).arg) :=
+      isOpen_Ioo.mem_nhds ⟨(neg_lt_neg hπ).trans_le hangle.1, hangle.2.trans hπ⟩
+    have hIco : Ico (-a) a ∈ 𝓝 ((z g).arg) := by
+      filter_upwards [hev, hnear] with t ht htπ
+      simpa only [hsarg t htπ] using hsector (s t) ht
+    rwa [← interior_Ico, mem_interior_iff_mem_nhds]
+
 /-- Paper: Lemma A.5.2.13(1), p. 576. The interior of the centered archimedean
 domain is invariant under inversion. -/
 theorem inv_interior_centeredInfiniteIdeleDomain :
     (interior (centeredInfiniteIdeleDomain F b v₀ σ))⁻¹ =
-      interior (centeredInfiniteIdeleDomain F b v₀ σ) := by sorry
+      interior (centeredInfiniteIdeleDomain F b v₀ σ) := by
+  classical
+  let B := (b.map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ (Units.unitLattice F)
+  have hB (i : Fin (Units.rank F)) : Units.logEmbeddingQuot F (b i) = B i := by
+    rw [Module.Basis.ofZLatticeBasis_apply]
+    rfl
+  let p (g : N∞) : logSpace F := fun w ↦ infiniteIdeleLog F g.val w.val
+  let c (g : N∞) := B.equivFun (p g)
+  have hc : Continuous c :=
+    B.equivFun.toLinearMap.continuous_of_finiteDimensional.comp (continuous_pi fun w ↦
+      (continuous_apply w.val).comp ((infiniteIdeleLog_continuous F).comp continuous_subtype_val))
+  have hcOpen : IsOpenMap c :=
+    (B.equivFun.toLinearMap.isOpenMap_of_finiteDimensional B.equivFun.surjective).comp
+      (isOpenMap_infiniteIdeleLog_omit F)
+  let V : Set (Fin (Units.rank F) → ℝ) := Set.pi univ fun _ ↦ Ico (-(1 / 2)) (1 / 2)
+  let U : Set (Fin (Units.rank F) → ℝ) := Set.pi univ fun _ ↦ Ioo (-(1 / 2)) (1 / 2)
+  have hV : interior V = U := by
+    simp only [V, interior_pi_set finite_univ, interior_Ico, U]
+  have hlog (g : N∞) : p g ∈ centeredRegulatorParallelotope F b ↔ c g ∈ V := by
+    simp only [centeredRegulatorParallelotope, hB]
+    rw [Set.mem_vadd_set_iff_neg_vadd_mem, neg_neg, vadd_eq_add]
+    change (∑ i, (1 / 2 : ℝ) • B i) + p g ∈ ZSpan.fundamentalDomain B ↔ _
+    simp only [ZSpan.mem_fundamentalDomain, map_add, Finsupp.add_apply, B.repr_sum_self, V,
+      Set.mem_pi, mem_univ, forall_const, mem_Ico, c, Module.Basis.equivFun_apply]
+    exact forall_congr' fun i ↦ by constructor <;> intro h <;> constructor <;> linarith [h.1, h.2]
+  have hcinv (g : N∞) : c g⁻¹ = -c g := by
+    let L : 𝕀∞ →* Multiplicative (InfinitePlace F → ℝ) :=
+      MonoidHom.mk' (fun x ↦ Multiplicative.ofAdd (infiniteIdeleLog F x))
+        (infiniteIdeleLog_mul F)
+    have hinv : infiniteIdeleLog F (g.val⁻¹) = -infiniteIdeleLog F g.val := map_inv L g.val
+    change B.equivFun (p g⁻¹) = _
+    rw [show p g⁻¹ = -p g from funext fun w ↦ congrFun hinv w.val, map_neg]
+  let z (g : N∞) := σ (extensionEmbedding v₀ (g.val.val v₀))
+  have hz : Continuous z :=
+    σ.toLinearMap.continuous_of_finiteDimensional.comp
+      ((isometry_extensionEmbedding v₀).continuous.comp
+        ((continuous_apply v₀).comp (Units.continuous_val.comp continuous_subtype_val)))
+  have hzne (g : N∞) : z g ≠ 0 := (map_ne_zero σ).mpr
+    ((map_ne_zero (extensionEmbedding v₀)).mpr (atPlace g.val).ne_zero)
+  have hzinv (g : N∞) : z g⁻¹ = (z g)⁻¹ := by
+    let f : N∞ →* ℂˣ := (Units.map (σ.toRingHom.comp
+      (extensionEmbedding v₀)).toMonoidHom).comp ((atPlace).comp (N∞).subtype)
+    have hf (x : N∞) : (f x).val = z x := rfl
+    simpa only [Units.val_inv_eq_inv_val, hf] using congrArg Units.val (map_inv f g)
+  let a := Real.pi / (Units.torsionOrder F : ℝ)
+  have hle : a ≤ Real.pi := div_le_self Real.pi_pos.le (by exact_mod_cast Units.torsionOrder_pos F)
+  have hkey (g : N∞) (hg : g ∈ interior (centeredInfiniteIdeleDomain F b v₀ σ)) :
+      g⁻¹ ∈ interior (centeredInfiniteIdeleDomain F b v₀ σ) := by
+    have hlogmem : c g ∈ U := by
+      rw [← hV]
+      have hsubset : centeredInfiniteIdeleDomain F b v₀ σ ⊆ c ⁻¹' V :=
+        fun x hx ↦ (hlog x).mp hx.1
+      exact hcOpen.interior_preimage_subset_preimage_interior (interior_mono hsubset hg)
+    have hang : (z g).arg ∈ Ioo (-a) a :=
+      arg_mem_Ioo_of_mem_interior_centeredInfiniteIdeleDomain F b v₀ σ g hg
+    have hanginv : (z g⁻¹).arg ∈ Ioo (-a) a := by
+      rw [hzinv, Complex.arg_inv, ite_eq_right (hang.2.trans_le hle).ne]
+      exact ⟨neg_lt_neg hang.2, neg_lt_of_neg_lt hang.1⟩
+    let W : Set N∞ := (c ⁻¹' U) ∩ (z ⁻¹' (Complex.slitPlane ∩ Complex.arg ⁻¹' Ioo (-a) a))
+    have hW : IsOpen W := ((isOpen_set_pi finite_univ fun _ _ ↦ isOpen_Ioo).preimage hc).inter
+      ((Complex.continuousOn_arg.isOpen_inter_preimage Complex.isOpen_slitPlane isOpen_Ioo).preimage hz)
+    refine interior_maximal (t := W) ?_ hW ?_
+    · intro x hx
+      refine ⟨(hlog x).mpr (fun i hi ↦ Ioo_subset_Ico_self (hx.1 i hi)), ?_⟩
+      change (z x).arg ∈ Ico (-Real.pi / _) _
+      rw [neg_div]
+      exact Ioo_subset_Ico_self hx.2.2
+    · refine ⟨?_, Complex.mem_slitPlane_iff_arg.mpr
+        ⟨(hanginv.2.trans_le hle).ne, hzne _⟩, hanginv⟩
+      change c g⁻¹ ∈ U
+      rw [hcinv]
+      intro i hi
+      exact ⟨neg_lt_neg (hlogmem i hi).2, neg_lt_of_neg_lt (hlogmem i hi).1⟩
+  ext g
+  exact ⟨fun hg ↦ by simpa only [inv_inv] using hkey g⁻¹ hg, hkey g⟩
 
 /-- Paper: (A.5.2.19)–(A.5.2.20), p. 576. Pull back the shrinking open log cubes
 in regulator coordinates to the norm-one archimedean ideles. -/

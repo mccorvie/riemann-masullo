@@ -83,12 +83,38 @@ structure ElementaryLCAPresentation (G : Type*) [CommGroup G] [TopologicalSpace 
 attribute [instance] ElementaryLCAPresentation.finiteGroup ElementaryLCAPresentation.finiteFintype
   ElementaryLCAPresentation.finiteTopology ElementaryLCAPresentation.finiteDiscrete
 
+/-- The product of two groups of order two is not cyclic, since its exponent is two. -/
+private theorem zmodTwoProd_not_isAddCyclic : ¬ IsAddCyclic (ZMod 2 × ZMod 2) := by
+  intro h
+  have h1 : AddMonoid.exponent (ZMod 2 × ZMod 2) = Nat.card (ZMod 2 × ZMod 2) :=
+    IsAddCyclic.exponent_eq_card
+  have h2 : AddMonoid.exponent (ZMod 2 × ZMod 2) ∣ 2 :=
+    AddMonoid.exponent_dvd_of_forall_nsmul_eq_zero (by decide)
+  rw [h1, Nat.card_eq_fintype_card] at h2
+  revert h2
+  decide
+
 /-- Paper: (D.1.4.2), p. 757. The Klein four group admits an elementary presentation
 whose finite factor has order four and is noncyclic.
 Deviation: Sanity check for the finite abelian factor. -/
 theorem ElementaryLCAPresentation.exists_kleinFour :
     ∃ e : ElementaryLCAPresentation (Multiplicative (ZMod 2 × ZMod 2)),
-      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by sorry
+      Fintype.card e.finiteFactor = 4 ∧ ¬ IsAddCyclic e.finiteFactor := by
+  let a : (ZMod 2 × ZMod 2) ≃+ ElementaryLieGroup 0 0 0 (ZMod 2 × ZMod 2) :=
+    { toFun := fun x ↦ (0, 0, 0, x)
+      invFun := fun p ↦ p.2.2.2
+      left_inv := fun _ ↦ rfl
+      right_inv := fun p ↦ Prod.ext (by ext i; exact i.elim0)
+        (Prod.ext (by ext i; exact i.elim0) (Prod.ext (by ext i; exact i.elim0) rfl))
+      map_add' := fun x y ↦ Prod.ext (by ext i; exact i.elim0)
+        (Prod.ext (by ext i; exact i.elim0) (Prod.ext (by ext i; exact i.elim0) rfl)) }
+  refine ⟨{ realDim := 0, torusDim := 0, latticeRank := 0, finiteFactor := ZMod 2 × ZMod 2
+            equiv := { AddEquiv.toMultiplicative a with
+              continuous_toFun := continuous_of_discreteTopology
+              continuous_invFun := continuous_of_discreteTopology } }, ?_, ?_⟩
+  · change Fintype.card (ZMod 2 × ZMod 2) = 4
+    decide
+  · exact zmodTwoProd_not_isAddCyclic
 
 /-- A continuous homomorphism from a torus to a real vector group vanishes,
 since the multiples of a nonzero vector cannot all lie in a compact range. -/
@@ -1284,7 +1310,49 @@ theorem lca_openSubgroup_quotient_elementary (J : OpenCompactlyGeneratedSubgroup
     (H : OpenCompactlyGeneratedSubgroups (PontryaginDual G))
     (_h : lcaDualAnnihilator H.val ≤ J.val) :
     Nonempty (ElementaryLCAPresentation (J.val ⧸ (lcaDualAnnihilator H.val).comap J.val.subtype)) := by
-  sorry
+  let N := (lcaDualAnnihilator H.val).comap J.val.subtype
+  let : LocallyCompactSpace J.val :=
+    J.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : LocallyCompactSpace H.val :=
+    H.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let ι : H.val →ₜ* PontryaginDual G :=
+    ⟨H.val.subtype, continuous_subtype_val⟩
+  let f : J.val →ₜ* PontryaginDual H.val :=
+    (PontryaginDual.map ι).comp
+      (pontryaginDual_eval.comp
+        ⟨J.val.subtype, continuous_subtype_val⟩)
+  have hker : f.toMonoidHom.ker = N := by
+    ext x
+    rw [MonoidHom.mem_ker, Subgroup.mem_comap, Subgroup.coe_subtype,
+      mem_lcaDualAnnihilator_iff]
+    exact
+      ⟨fun hx χ ↦ congrArg (fun ψ : PontryaginDual H.val ↦ ψ χ) hx,
+        fun hx ↦ PontryaginDual.ext hx⟩
+  have hN : IsClosed (N : Set J.val) := by
+    rw [← hker]
+    exact isClosed_eq f.continuous continuous_const
+  let : T1Space (J.val ⧸ N) :=
+    QuotientGroup.t1Space_iff.mpr hN
+  refine lca_elementary_iff.mp
+    ⟨isCompactlyGeneratedGroup_quotient J.property.2 N hN, ?_⟩
+  let e : (J.val ⧸ N) →ₜ* PontryaginDual H.val :=
+    ⟨QuotientGroup.lift N f.toMonoidHom hker.ge,
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        f.continuous⟩
+  have he : Function.Injective e :=
+    (QuotientGroup.injective_lift_iff N f.toMonoidHom hker.ge).mpr
+      hker.symm
+  obtain ⟨W, hW, hPow⟩ := exists_nhds_one_of_isLocallyEuclidean
+    (isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp
+      H.property.2)
+  have hW' : W ∈ 𝓝 (e 1) := by
+    rwa [map_one]
+  refine isLocallyEuclidean_of_noSmallCyclicSubgroups
+    (e.continuous.continuousAt.preimage_mem_nhds hW') ?_
+  intro x hx
+  apply he
+  rw [map_one]
+  exact hPow (e x) fun n ↦ map_pow e x n ▸ hx n
 
 /-- Paper: Lemma D.1.4.7, p. 760. Each open compactly generated subgroup is the
 inverse limit of its quotients by the annihilators it contains.
@@ -2633,7 +2701,13 @@ theorem IsBruhatContDiff.add {p : ℕ} {f g : G → ℂ}
 /-- Paper: Definition D.1.5.3(1), p. 762. A complex scalar multiple of a function
 of class Cᵖ is of class Cᵖ. -/
 theorem IsBruhatContDiff.smul {p : ℕ} {f : G → ℂ}
-    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by sorry
+    (hf : IsBruhatContDiff p f) (z : ℂ) : IsBruhatContDiff p (z • f) := by
+  obtain ⟨k, hk, hInv, hDescend⟩ := hf
+  refine ⟨k, hk, fun h x ↦ congrArg (z • ·) (hInv h x), ?_⟩
+  intro a ha
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend a ha
+  exact ⟨z • f₀, fun x ↦ congrArg (z • ·) (hf₀ x),
+    fun e l b ↦ (hSmooth e l b).const_smul z⟩
 
 /-- Paper: Definition D.1.5.3(1), p. 762. The Cᵖ functions form a complex vector
 subspace of the functions on G. -/

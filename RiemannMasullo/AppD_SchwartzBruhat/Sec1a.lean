@@ -2222,11 +2222,308 @@ theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
   rw [← hsurj.image_preimage (f ⁻¹' s)]
   exact hq.measurableSet_image' (hrestrict hs)
 
+include hbij in
+/-- Every point has a unique right `H`-translate in the Borel section `Δ`. -/
+private lemma weilSection_existsUnique (x : G) : ∃! γ : H.op, γ • x ∈ Δ := by
+  obtain ⟨d, hd⟩ := hbij.2 (QuotientGroup.mk x)
+  have hmem : x⁻¹ * (d : G) ∈ H := by
+    simpa [mul_inv_rev, inv_inv] using H.inv_mem ((QuotientGroup.eq).mp hd)
+  let g : H.op := H.equivOp ⟨x⁻¹ * (d : G), hmem⟩
+  have hgx : g • x = (d : G) := by
+    have hg : (g : Gᵐᵒᵖ) = MulOpposite.op (x⁻¹ * (d : G)) := rfl
+    rw [Submonoid.smul_def, hg, MulOpposite.smul_eq_mul_unop]
+    simp
+  refine ExistsUnique.intro g (hgx ▸ d.property) ?_
+  intro g' hg'
+  have hmk (γ : H.op) :
+      QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+    rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+    simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+  let a : Δ := ⟨g • x, hgx ▸ d.property⟩
+  let b : Δ := ⟨g' • x, hg'⟩
+  have hab : a = b := hbij.1 ((hmk g).trans (hmk g').symm)
+  have hgx' : g • x = g' • x := congrArg Subtype.val hab
+  rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+    MulOpposite.smul_eq_mul_unop] at hgx'
+  exact Subtype.ext <| MulOpposite.unop_injective <| mul_left_cancel hgx'.symm
+
+include hΔ hbij in
+/-- A Borel set meeting every coset exactly once is a strict fundamental domain for the
+right action of `H`. -/
+private lemma weilSection_isFundamentalDomain :
+    IsFundamentalDomain H.op Δ μ :=
+  IsFundamentalDomain.mk' hΔ.nullMeasurableSet (weilSection_existsUnique H hbij)
+
+/-- Right multiplication by `H` does not change the coset. -/
+private lemma weilSection_mk_smul (γ : H.op) (x : G) :
+    QuotientGroup.mk (s := H) (γ • x) = QuotientGroup.mk (s := H) x := by
+  rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop, QuotientGroup.eq]
+  simpa [mul_inv_rev, mul_assoc] using H.inv_mem ((Subgroup.mem_op).mp γ.property)
+
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Integrability on the quotient
 can be tested on the pullback restricted to a Borel fundamental domain. -/
 theorem weilFundamentalDomain_integrable_iff (f : G ⧸ H → ℂ) :
-    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by sorry
+    Integrable f ν ↔ Integrable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) μ := by
+  haveI : IsClosed (H : Set G) := hH
+  letI : BorelSpace (G ⧸ H) := ⟨rfl⟩
+  haveI : Countable H :=
+    (TopologicalSpace.separableSpace_iff_countable (α := H)).1 inferInstance
+  haveI : Countable H.op := Countable.of_equiv H H.equivOp
+  haveI : MeasurableConstSMul H.op G :=
+    ⟨fun γ ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measurable_mul_const _⟩
+  haveI : SMulInvariantMeasure H.op G μ :=
+    ⟨fun γ s _hs ↦ by
+      have heq : (fun x ↦ γ • x) = fun x ↦ x * (γ : Gᵐᵒᵖ).unop := by
+        ext x
+        rw [Submonoid.smul_def, MulOpposite.smul_eq_mul_unop]
+      rw [heq]
+      exact measure_preimage_mul_right μ _ s⟩
+  let π : G → G ⧸ H := QuotientGroup.mk
+  have hπ : Measurable π := QuotientGroup.continuous_mk.measurable
+  have hfund : IsFundamentalDomain H.op Δ μ := weilSection_isFundamentalDomain H μ hΔ hbij
+  have hfundImage (g : G) : IsFundamentalDomain H.op ((fun y ↦ g * y) '' Δ) μ := by
+    refine IsFundamentalDomain.mk'
+      ((measurableEmbedding_mulLeft g).measurableSet_image.mpr hΔ).nullMeasurableSet fun x ↦ ?_
+    obtain ⟨γ, hγ, huniq⟩ := weilSection_existsUnique H hbij (g⁻¹ * x)
+    have hcomm : γ • x = g * (γ • (g⁻¹ * x)) := by
+      rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+        MulOpposite.smul_eq_mul_unop]
+      simp [mul_assoc]
+    refine ExistsUnique.intro γ ?_ ?_
+    · rw [hcomm]
+      exact ⟨γ • (g⁻¹ * x), hγ, rfl⟩
+    · intro γ' hγ'
+      apply huniq
+      have hcomm' : γ' • (g⁻¹ * x) = g⁻¹ * (γ' • x) := by
+        rw [Submonoid.smul_def, Submonoid.smul_def, MulOpposite.smul_eq_mul_unop,
+          MulOpposite.smul_eq_mul_unop]
+        simp [mul_assoc]
+      rw [hcomm']
+      obtain ⟨y, hy, hyx⟩ := hγ'
+      have hyx' : g⁻¹ * (γ' • x) = y := by
+        rw [← hyx]
+        simp
+      simpa [hyx'] using hy
+  have hpush (g : G) :
+      (μ.restrict ((fun y ↦ g * y) '' Δ)).map π = (μ.restrict Δ).map π := by
+    ext U hU
+    have hpre : MeasurableSet (π ⁻¹' U) := hU.preimage hπ
+    rw [Measure.map_apply hπ hU, Measure.restrict_apply hpre, Measure.map_apply hπ hU,
+      Measure.restrict_apply hpre]
+    refine (hfund.measure_set_eq (hfundImage g) hpre ?_).symm
+    intro γ
+    ext y
+    simp only [Set.mem_preimage, π]
+    rw [weilSection_mk_smul H γ y]
+  let νΔ : Measure (G ⧸ H) := (μ.restrict Δ).map π
+  haveI : νΔ.IsMulLeftInvariant := by
+    refine ⟨fun q ↦ ?_⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    let L : G → G := fun x ↦ g * x
+    let LQ : G ⧸ H → G ⧸ H := fun r ↦ π g * r
+    have hpres : MeasurePreserving L (μ.restrict Δ) (μ.restrict (L '' Δ)) :=
+      (measurePreserving_mul_left μ g).restrict_image_emb (measurableEmbedding_mulLeft g) Δ
+    have hcomp : LQ ∘ π = π ∘ L := by
+      ext x
+      simp [LQ, L, π, QuotientGroup.mk_mul]
+    calc
+      Measure.map LQ νΔ = Measure.map LQ (Measure.map π (μ.restrict Δ)) := rfl
+      _ = Measure.map (LQ ∘ π) (μ.restrict Δ) :=
+        Measure.map_map (measurable_const_mul (π g)) hπ
+      _ = Measure.map (π ∘ L) (μ.restrict Δ) := by rw [hcomp]
+      _ = Measure.map π (Measure.map L (μ.restrict Δ)) :=
+        (Measure.map_map hπ (measurable_const_mul g)).symm
+      _ = Measure.map π (μ.restrict (L '' Δ)) := by rw [hpres.map_eq]
+      _ = νΔ := by rw [hpush g]
+  have hdisc : IsDiscrete (H : Set G) :=
+    (SetLike.isDiscrete_iff_discreteTopology).2 inferInstance
+  obtain ⟨U, hU, -, hsep⟩ := hdisc.exists_nhds_eq_one_of_image_mulRight_inter_nonempty
+  obtain ⟨K0, hK0, hK0n⟩ := exists_compact_mem_nhds (1 : G)
+  have hmem : K0 ∩ U ∈ 𝓝 (1 : G) := Filter.inter_mem hK0n hU
+  obtain ⟨W, hWsub, hWo, hW1⟩ := mem_nhds_iff.mp hmem
+  have hWcl : IsCompact (closure W) :=
+    IsCompact.of_isClosed_subset hK0 isClosed_closure
+      (closure_minimal (hWsub.trans inter_subset_left) hK0.isClosed)
+  have hWlt : μ W < (⊤ : ℝ≥0∞) :=
+    lt_of_le_of_lt (measure_mono subset_closure) hWcl.measure_lt_top
+  have hWpos : 0 < μ W := hWo.measure_pos μ ⟨1, hW1⟩
+  have hWU : W ⊆ U := hWsub.trans inter_subset_right
+  let leftPiece (h : H) : Set G := W ∩ (fun x ↦ x * (h : G)) '' Δ
+  let rightPiece (h : H) : Set G := (fun x ↦ x * (h : G)) '' W ∩ Δ
+  have hleftMeas (h : H) : MeasurableSet (leftPiece h) :=
+    hWo.measurableSet.inter ((measurableEmbedding_mulRight (h : G)).measurableSet_image.mpr hΔ)
+  have hrightMeas (h : H) : MeasurableSet (rightPiece h) :=
+    ((Homeomorph.mulRight (h : G)).isOpenMap W hWo).measurableSet.inter hΔ
+  have hdisjL : Pairwise fun h₁ h₂ ↦ Disjoint (leftPiece h₁) (leftPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨-, d₁, hd₁, rfl⟩
+    rcases hz₂ with ⟨-, d₂, hd₂, hd₂eq⟩
+    have hsame : QuotientGroup.mk (s := H) d₁ = QuotientGroup.mk (s := H) d₂ := by
+      rw [QuotientGroup.eq]
+      have heq : d₂ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          d₂ * (h₂ : G) = d₁ * (h₁ : G) := hd₂eq
+          _ = d₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have heqd : d₁ = d₂ := by
+      have hsub : (⟨d₁, hd₁⟩ : Δ) = ⟨d₂, hd₂⟩ := hbij.1 (by simpa using hsame)
+      simpa using congrArg Subtype.val hsub
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := d₁)
+      calc d₁ * (h₁ : G) = d₂ * (h₂ : G) := hd₂eq.symm
+        _ = d₁ * (h₂ : G) := by rw [heqd]
+    exact hne (Subtype.ext hh)
+  have hdisjR : Pairwise fun h₁ h₂ ↦ Disjoint (rightPiece h₁) (rightPiece h₂) := by
+    intro h₁ h₂ hne
+    refine Set.disjoint_left.mpr fun z hz₁ hz₂ ↦ ?_
+    rcases hz₁ with ⟨⟨w₁, hw₁, rfl⟩, -⟩
+    rcases hz₂ with ⟨⟨w₂, hw₂, hw₂eq⟩, -⟩
+    have hmk : QuotientGroup.mk (s := H) w₁ = QuotientGroup.mk (s := H) w₂ := by
+      rw [QuotientGroup.eq]
+      have heq : w₂ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) := by
+        apply mul_right_cancel (b := (h₂ : G))
+        calc
+          w₂ * (h₂ : G) = w₁ * (h₁ : G) := hw₂eq
+          _ = w₁ * ((h₁ : G) * (h₂ : G)⁻¹) * (h₂ : G) := by simp [mul_assoc]
+      rw [heq]
+      simp
+      exact H.mul_mem h₁.property (H.inv_mem h₂.property)
+    have hrel : w₁⁻¹ * w₂ ∈ H := (QuotientGroup.eq).mp hmk
+    have hone : w₁⁻¹ * w₂ = 1 := by
+      apply hsep _ hrel
+      exact ⟨w₂, ⟨w₁, hWU hw₁, by simp⟩, hWU hw₂⟩
+    have hw12 : w₁ = w₂ := by
+      have : w₁ * (w₁⁻¹ * w₂) = w₁ := by simp [hone]
+      exact (by simpa using this : w₂ = w₁).symm
+    have hh : (h₁ : G) = h₂ := by
+      apply mul_left_cancel (a := w₁)
+      calc w₁ * (h₁ : G) = w₂ * (h₂ : G) := hw₂eq.symm
+        _ = w₁ * (h₂ : G) := by rw [hw12]
+    exact hne (Subtype.ext hh)
+  have hcoverL : ⋃ h : H, leftPiece h = W := by
+    ext w
+    constructor
+    · rintro ⟨-, ⟨h, rfl⟩, hw, -⟩
+      exact hw
+    · intro hw
+      obtain ⟨d, hd⟩ := hbij.2 (π w)
+      have hh : (d : G)⁻¹ * w ∈ H := (QuotientGroup.eq).mp hd
+      refine mem_iUnion.2 ⟨⟨(d : G)⁻¹ * w, hh⟩, hw, ⟨d, d.property, ?_⟩⟩
+      exact mul_inv_cancel_left (d : G) w
+  have hcoverR : ⋃ h : H, rightPiece h = π ⁻¹' (π '' W) ∩ Δ := by
+    ext z
+    constructor
+    · rintro ⟨_, ⟨h, rfl⟩, ⟨w, hw, rfl⟩, hz⟩
+      exact ⟨⟨w, hw, by simpa [π] using (QuotientGroup.mk_mul w (h : G)).symm⟩, hz⟩
+    · rintro ⟨⟨w, hw, hwz⟩, hz⟩
+      have hh : w⁻¹ * z ∈ H := (QuotientGroup.eq).mp (by simpa [π] using hwz)
+      refine mem_iUnion.2 ⟨⟨w⁻¹ * z, hh⟩, ⟨w, hw, ?_⟩, hz⟩
+      exact mul_inv_cancel_left w z
+  have hμ (h : H) : μ (leftPiece h) = μ (rightPiece h⁻¹) := by
+    have hpre : (fun y ↦ y * (h : G)⁻¹) ⁻¹' rightPiece h⁻¹ = leftPiece h := by
+      ext y
+      constructor
+      · intro hy
+        obtain ⟨⟨w, hw, hwz⟩, hyΔ⟩ := hy
+        have hwz' : w = y := by simpa using hwz
+        have hyw : y = w := hwz'.symm
+        subst hyw
+        exact ⟨hw, y * (h : G)⁻¹, hyΔ, by simp⟩
+      · rintro ⟨hyW, d, hd, hd'⟩
+        refine ⟨⟨y, hyW, rfl⟩, ?_⟩
+        have hd'' : d * (h : G) = y := by simpa using hd'
+        rw [← hd'']
+        simpa using hd
+    rw [← hpre]
+    exact measure_preimage_mul_right μ ((h : G)⁻¹) (rightPiece h⁻¹)
+  have hmass : νΔ (π '' W) = μ W := by
+    have hopen : IsOpen (π '' W) := QuotientGroup.isOpenMap_coe W hWo
+    rw [Measure.map_apply hπ hopen.measurableSet,
+      Measure.restrict_apply (hopen.measurableSet.preimage hπ), ← hcoverR,
+      measure_iUnion hdisjR hrightMeas]
+    have hre : (∑' h : H, μ (rightPiece h)) = ∑' h : H, μ (leftPiece h) := by
+      simp_rw [fun h : H ↦ (by simpa using (hμ h⁻¹).symm : μ (rightPiece h) = μ (leftPiece h⁻¹))]
+      exact (Equiv.inv H).tsum_eq (fun h ↦ μ (leftPiece h))
+    rw [hre, ← measure_iUnion hdisjL hleftMeas, hcoverL]
+  let S (g : G) : Set (G ⧸ H) := (fun r ↦ π g * r) '' (π '' W)
+  haveI : IsFiniteMeasureOnCompacts νΔ := by
+    refine ⟨fun K hK ↦ ?_⟩
+    have hsub : K ⊆ ⋃ g : G, S g := by
+      intro q _
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+      refine mem_iUnion.2 ⟨x, ⟨1, ?_, by simp [π]⟩⟩
+      exact ⟨1, hW1, by simp [π]⟩
+    have hSopen (g : G) : IsOpen (S g) :=
+      (Homeomorph.mulLeft (π g)).isOpenMap _ (QuotientGroup.isOpenMap_coe W hWo)
+    obtain ⟨t, ht⟩ := hK.elim_finite_subcover S hSopen hsub
+    have hpiece (g : G) : νΔ (S g) = νΔ (π '' W) := by
+      have him : S g = (fun r ↦ (π g)⁻¹ * r) ⁻¹' (π '' W) := by
+        ext r
+        constructor
+        · rintro ⟨r', hr', rfl⟩
+          have : (π g)⁻¹ * (π g * r') = r' := by
+            rw [← mul_assoc, inv_mul_cancel, one_mul]
+          simpa [this] using hr'
+        · intro hr
+          refine ⟨(π g)⁻¹ * r, hr, ?_⟩
+          change π g * ((π g)⁻¹ * r) = r
+          rw [← mul_assoc, mul_inv_cancel, one_mul]
+      rw [him, measure_preimage_mul]
+    have hle : νΔ K ≤ ∑ g ∈ t, νΔ (S g) :=
+      (measure_mono ht).trans (measure_biUnion_finset_le t S)
+    have hsum : ∑ g ∈ t, νΔ (S g) = (t.card : ℝ≥0∞) * νΔ (π '' W) := by
+      simp [hpiece, Finset.sum_const, nsmul_eq_mul]
+    rw [hsum, hmass] at hle
+    exact lt_of_le_of_lt hle (ENNReal.mul_lt_top (lt_top_iff_ne_top.mpr (ENNReal.natCast_ne_top _)) hWlt)
+  haveI : Measure.IsHaarMeasure ν := hν.1
+  have hscale : νΔ = Measure.haarScalarFactor νΔ ν • ν :=
+    Measure.isMulLeftInvariant_eq_smul νΔ ν
+  have hc0 : Measure.haarScalarFactor νΔ ν ≠ 0 := by
+    intro h0
+    have hzeroμ : νΔ = (0 : Measure (G ⧸ H)) := by simpa [h0] using hscale
+    have hzero : νΔ (π '' W) = 0 := by simp [hzeroμ]
+    exact hWpos.ne' (hmass.symm.trans hzero)
+  have hiffν : Integrable f ν ↔ Integrable f νΔ := by
+    rw [hscale]
+    exact (integrable_smul_measure (c := (Measure.haarScalarFactor νΔ ν : ℝ≥0∞))
+      (by exact_mod_cast hc0) ENNReal.coe_ne_top).symm
+  haveI : PolishSpace G := by
+    letI : UniformSpace G := IsTopologicalGroup.rightUniformSpace G
+    haveI : IsUniformGroup G := isUniformGroup_of_commGroup (G := G)
+    haveI : CompleteSpace G :=
+      IsRightUniformGroup.completeSpace_of_weaklyLocallyCompactSpace (G := G)
+    haveI := IsUniformGroup.uniformity_countably_generated (α := G)
+    infer_instance
+  have hinj : InjOn π Δ := by
+    intro a ha b hb hab
+    have hsub : (⟨a, ha⟩ : Δ) = ⟨b, hb⟩ := hbij.1 (by simpa using hab)
+    exact congrArg Subtype.val hsub
+  have hemb : MeasurableEmbedding (Δ.domRestrict π) :=
+    ContinuousOn.measurableEmbedding (f := π) hΔ QuotientGroup.continuous_mk.continuousOn hinj
+  have hmap : νΔ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := by
+    have hsub : (μ.comap ((↑) : Δ → G)).map ((↑) : Δ → G) = μ.restrict Δ := by
+      rw [(MeasurableEmbedding.subtype_coe hΔ).map_comap, Subtype.range_coe]
+    calc
+      νΔ = Measure.map π (μ.restrict Δ) := rfl
+      _ = Measure.map π (Measure.map ((↑) : Δ → G) (μ.comap ((↑) : Δ → G))) := by rw [← hsub]
+      _ = Measure.map (π ∘ ((↑) : Δ → G)) (μ.comap ((↑) : Δ → G)) :=
+        Measure.map_map hπ continuous_subtype_val.measurable
+      _ = Measure.map (Δ.domRestrict π) (μ.comap ((↑) : Δ → G)) := rfl
+  rw [hiffν, hmap, hemb.integrable_map_iff]
+  have hfun : (fun x : Δ ↦ f (π (x : G))) = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) := rfl
+  rw [show f ∘ Δ.domRestrict π = (fun x ↦ f (π x)) ∘ ((↑) : Δ → G) from hfun]
+  rw [← integrableOn_iff_comap_subtypeVal (f := fun x ↦ f (π x)) hΔ,
+    integrable_indicator_iff hΔ]
 
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. The integral on the quotient
@@ -2276,6 +2573,8 @@ theorem weilFundamentalDomain_integral {f : G ⧸ H → ℂ} (hf : Integrable f 
   rw [← hmap] at hf ⊢
   exact integral_map hπ.aemeasurable hf.aestronglyMeasurable
 
+-- Retain the existing topological and measure hypotheses in the signature.
+set_option linter.unusedSectionVars false in
 include hH hΔ hbij in
 /-- Paper: Corollary D.1.2.5, p. 748. The integral of a subgroup-invariant function
 over one Borel fundamental domain agrees with its integral over any other such domain. -/
@@ -2283,7 +2582,34 @@ theorem weilFundamentalDomain_integral_eq (hΔ' : MeasurableSet Δ')
     (hbij' : Function.Bijective (fun x : Δ' ↦ (QuotientGroup.mk x.val : G ⧸ H)))
     {f : G → ℂ} (hf : Measurable f) (hinv : ∀ (x : G) (h : H), f (x * (h : G)) = f x)
     (hint : IntegrableOn f Δ μ) :
-    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by sorry
+    IntegrableOn f Δ' μ ∧ (∫ x in Δ, f x ∂μ) = ∫ x in Δ', f x ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  have hdomain {D : Set G} (hD : MeasurableSet D)
+      (hDq : Function.Bijective (fun x : D ↦ (QuotientGroup.mk x.val : G ⧸ H))) :
+      IsFundamentalDomain H D μ := by
+    apply IsFundamentalDomain.mk' hD.nullMeasurableSet
+    intro x
+    obtain ⟨y, hy⟩ := hDq.surjective (QuotientGroup.mk x)
+    let h : H := ⟨x⁻¹ * (y : G), QuotientGroup.eq.mp hy.symm⟩
+    have hh : (h : G) * x = (y : G) := by
+      change (x⁻¹ * (y : G)) * x = (y : G)
+      rw [mul_comm, mul_inv_cancel_left]
+    refine ⟨h, ?_, ?_⟩
+    · change (h : G) * x ∈ D
+      rw [hh]
+      exact y.property
+    · intro k hk
+      have hkq : (QuotientGroup.mk ((k : G) * x) : G ⧸ H) = QuotientGroup.mk x := by
+        rw [mul_comm, QuotientGroup.mk_mul_of_mem x k.property]
+      have hky : (⟨(k : G) * x, hk⟩ : D) = y := hDq.injective (hkq.trans hy.symm)
+      exact Subtype.ext (mul_right_cancel ((congrArg Subtype.val hky).trans hh.symm))
+  have hs := hdomain hΔ hbij
+  have ht := hdomain hΔ' hbij'
+  have hsmul (h : H) (x : G) : f (h • x) = f x := by
+    change f ((h : G) * x) = f x
+    rw [mul_comm, hinv]
+  exact ⟨⟨hf.aestronglyMeasurable, (hs.hasFiniteIntegral_on_iff ht hsmul).mp hint.2⟩,
+    hs.setIntegral_eq ht hsmul⟩
 
 end FundamentalDomain
 

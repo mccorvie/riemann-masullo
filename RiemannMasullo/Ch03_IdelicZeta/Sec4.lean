@@ -285,7 +285,11 @@ This restates the large-norm bound in `homogeneousAdelicTheta_decay_bounded`. -/
 theorem weilTheta_decay_large (ω : PontryaginDual C₁)
     (B : Set ℬ(𝔸[F])) (hB : IsVonNBounded ℂ B) (N : ℕ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ f ∈ B, ∀ g : C_F, T < normℝ g →
-      ‖homogeneousAdelicTheta ω f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by sorry
+      ‖homogeneousAdelicTheta ω f g‖ ≤ C * ((normℝ g) ^ N)⁻¹ := by
+  obtain ⟨C, T, hC, -, h⟩ := homogeneousAdelicTheta_decay_bounded ω B hB N
+  refine ⟨C, Real.exp T, hC, Real.exp_pos T, fun f hf g hg ↦ (h f hf g).1 ?_⟩
+  have hpos : (0 : ℝ) < normℝ g := (Real.exp_pos T).trans hg
+  exact (Real.lt_log_iff_exp_lt hpos).2 hg
 
 -- TODO(paper-gap): Equation (3.4.2.4) drops the norm-one class volume
 -- included in Theorem 2.2.5.4 and in Equations (3.4.2.9)–(3.4.2.10).

@@ -433,7 +433,21 @@ topology.
 Deviation: Sanity check comparing the two norms the paper uses for W_b^{2N,2}. -/
 theorem lineSobolevDensity_le_interval (b : ℝ) (N : ℕ) (x : ℝ) :
     lineSobolevDensity b N x ≤ intervalSobolevDensity b b (2 * (N : ℝ)) x ∧
-      intervalSobolevDensity b b (2 * (N : ℝ)) x ≤ 2 ^ N * lineSobolevDensity b N x := by sorry
+      intervalSobolevDensity b b (2 * (N : ℝ)) x ≤ 2 ^ N * lineSobolevDensity b N x := by
+  have he : 0 ≤ Real.exp (2 * b * x) := (Real.exp_pos _).le
+  have hx (k : ℕ) : 0 ≤ x ^ (2 * k) := pow_mul x 2 k ▸ pow_nonneg (sq_nonneg x) k
+  have hpow : (1 + x ^ 2) ^ (2 * (N : ℝ) / 2) =
+      ∑ k ∈ Finset.range (N + 1), x ^ (2 * k) * (N.choose k : ℝ) := by
+    rw [mul_div_cancel_left₀ _ two_ne_zero, Real.rpow_natCast, add_comm, add_pow]
+    simp [pow_mul]
+  rw [lineSobolevDensity, intervalSobolevDensity, max_self, hpow]
+  refine ⟨mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun k hk ↦ ?_) he, ?_⟩
+  · exact le_mul_of_one_le_right (hx k)
+      (by exact_mod_cast Nat.choose_pos (Nat.lt_succ_iff.1 (Finset.mem_range.1 hk)))
+  · rw [mul_left_comm, Finset.mul_sum _ _ ((2 : ℝ) ^ N)]
+    refine mul_le_mul_of_nonneg_left (Finset.sum_le_sum fun k _ ↦ ?_) he
+    rw [mul_comm]
+    exact mul_le_mul_of_nonneg_right (by exact_mod_cast Nat.choose_le_two_pow N k) (hx k)
 
 -- TODO(paper-gap): The proposed test pairing on all of S_J × S_J can
 -- diverge, and S_J need not be contained in the reciprocal-density space.

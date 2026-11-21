@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.AppA_AlgebraicNT.Sec5a
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
 import Mathlib.Analysis.SpecificLimits.Normed
 import Mathlib.NumberTheory.NumberField.InfiniteAdeleRing
@@ -447,6 +450,320 @@ local notation "smallNorm" => smallNorm[F, S]
 -- outside the ball can grow without bound. The averaged estimate
 -- (2.4.2.4) alone does not give a pointwise bound.
 
+section LogGrowth
+
+open scoped Classical
+
+local notation "Uₛ" => (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ
+local notation "unitAtS" =>
+  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
+    (Subring.subtype (integralAdelesOutside F S)))))
+    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+local notation "sRank" => (Fintype.card (InfinitePlace F) + S.card - 1)
+
+/-- For every translate of the diagonal S-units, the set with all normalized logarithms
+bounded above by a common nonnegative cutoff is finite. Its cardinality grows at most
+with degree `|S| - 1` in the cutoff and the absolute log of the S-idelic norm. -/
+private theorem sUnit_log_box_count :
+    ∃ D : ℝ, 0 < D ∧ ∀ (g : Iₛ) (r : ℝ), 0 ≤ r →
+      let P : Set Uₛ := {u | ∀ v, sIdeleLog F S (unitAtS u * g) v ≤ r}
+      P.Finite ∧ (P.ncard : ℝ) ≤ D * (1 + |Real.log (normℝ g)| + r) ^ sRank := by
+  classical
+  let V := InfinitePlace F ⊕ S
+  let w : V := Sum.inl (Classical.choice (inferInstance : Nonempty (InfinitePlace F)))
+  -- The sum of the logarithms determines the omitted coordinate.
+  let W := {v : V // v ≠ w}
+  let d := Fintype.card W
+  have hd : d = sRank := by
+    dsimp [d, W]
+    rw [Fintype.card_subtype_compl (· = w), Fintype.card_sum, Fintype.card_coe]
+    simp
+  let n := Fintype.card V
+  let δ := (Real.log 2 / 2) / ((n : ℝ) + 1)
+  have hδ : 0 < δ := div_pos (div_pos (Real.log_pos (by norm_num)) (by norm_num)) (by positivity)
+  let E : Set Uₛ := {u | ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2}
+  have hE : E.Finite := sUnitLog_finite_near_zero F S
+  let K := 2 + ((n : ℝ) + 1) / δ
+  have hK : 0 < K := by positivity
+  refine ⟨(↑E.ncard + 1) * K ^ sRank, by positivity, ?_⟩
+  intro g r hr
+  let t := Real.log (normℝ g)
+  let P : Set Uₛ := {u | ∀ v, sIdeleLog F S (unitAtS u * g) v ≤ r}
+  let x (u : P) := sIdeleLog F S (unitAtS u.val * g)
+  have hsum (u : P) : ∑ v, x u v = t := by
+    have hu : sIdeleNorm F S (unitAtS u.val) = 1 :=
+      MonoidHom.mem_ker.mp ((sIdeleNorm_spec F S).2 ⟨u.val, rfl⟩)
+    rw [sIdeleLog_sum F S, map_mul, hu, one_mul]
+  have hlower (u : P) (v : V) : -|t| - (n : ℝ) * r ≤ x u v := by
+    have hrest : ∑ i ∈ Finset.univ.erase v, x u i ≤ (n : ℝ) * r := by
+      calc
+        _ ≤ ∑ _i ∈ Finset.univ.erase v, r := Finset.sum_le_sum fun i _ ↦ u.property i
+        _ ≤ _ := by
+          rw [Finset.sum_const, nsmul_eq_mul]
+          exact mul_le_mul_of_nonneg_right (by exact_mod_cast Finset.card_erase_le) hr
+    have h := (Finset.sum_erase_add Finset.univ (x u) (Finset.mem_univ v)).trans (hsum u)
+    linarith [neg_abs_le t]
+  let a := (-|t| - (n : ℝ) * r) / δ
+  let b := r / δ
+  let J := Finset.Icc ⌊a⌋ ⌊b⌋
+  let cell (u : P) (v : W) : J :=
+    ⟨⌊x u v / δ⌋, Finset.mem_Icc.mpr
+      ⟨Int.floor_le_floor (div_le_div_of_nonneg_right (hlower u v) hδ.le),
+        Int.floor_le_floor (div_le_div_of_nonneg_right (u.property v) hδ.le)⟩⟩
+  have hsame {u z : P} (h : cell u = cell z) (v : W) :
+      |x u v - x z v| ≤ δ := by
+    have heq := congrArg Subtype.val (congrFun h v)
+    change ⌊x u v / δ⌋ = ⌊x z v / δ⌋ at heq
+    have hu := Int.floor_le (x u v / δ)
+    have hu' := Int.lt_floor_add_one (x u v / δ)
+    have hz := Int.floor_le (x z v / δ)
+    have hz' := Int.lt_floor_add_one (x z v / δ)
+    rw [heq] at hu hu'
+    rw [abs_le]
+    constructor
+    · have hdiv : (x z v - x u v) / δ ≤ 1 := by rw [sub_div]; linarith
+      have hh := (div_le_iff₀ hδ).mp hdiv
+      linarith
+    · have hdiv : (x u v - x z v) / δ ≤ 1 := by rw [sub_div]; linarith
+      have hh := (div_le_iff₀ hδ).mp hdiv
+      linarith
+  have hclose {u z : P} (h : cell u = cell z) : u.val / z.val ∈ E := by
+    have heq : sIdeleLog F S (unitAtS (u.val / z.val)) = x u - x z := by
+      apply eq_sub_of_add_eq
+      rw [← sIdeleLog_mul F S]
+      let ι : Uₛ →* Iₛ := unitAtS
+      change sIdeleLog F S (ι (u.val / z.val) * (ι z.val * g)) =
+        sIdeleLog F S (ι u.val * g)
+      rw [← mul_assoc, ← ι.map_mul, div_mul_cancel]
+    change ‖sIdeleLog F S (unitAtS (u.val / z.val))‖ ≤ _
+    rw [heq, pi_norm_le_iff_of_nonneg (by positivity)]
+    have hnδ : (n : ℝ) * δ ≤ Real.log 2 / 2 := by
+      have he : ((n : ℝ) + 1) * δ = Real.log 2 / 2 := by
+        dsimp [δ]
+        field_simp
+      linarith
+    intro v
+    change |x u v - x z v| ≤ _
+    by_cases hv : v = w
+    · subst v
+      have hrest (y : P) := (Finset.sum_erase_add Finset.univ (x y)
+        (Finset.mem_univ w)).trans (hsum y)
+      have hw : x u w - x z w = -(∑ i ∈ Finset.univ.erase w, (x u i - x z i)) := by
+        rw [Finset.sum_sub_distrib]
+        linarith [hrest u, hrest z]
+      rw [hw, abs_neg]
+      calc
+        _ ≤ ∑ i ∈ Finset.univ.erase w, |x u i - x z i| := Finset.abs_sum_le_sum_abs _ _
+        _ ≤ ∑ _i ∈ Finset.univ.erase w, δ := Finset.sum_le_sum fun i hi ↦
+          hsame h ⟨i, (Finset.mem_erase.mp hi).1⟩
+        _ ≤ _ := by
+          rw [Finset.sum_const, nsmul_eq_mul]
+          exact (mul_le_mul_of_nonneg_right (by exact_mod_cast Finset.card_erase_le) hδ.le).trans hnδ
+    · have hn : (1 : ℝ) ≤ n := by
+        exact_mod_cast (Fintype.card_pos_iff.mpr (show Nonempty V from ⟨w⟩))
+      exact (hsame h ⟨v, hv⟩).trans ((le_mul_of_one_le_left hδ.le hn).trans hnδ)
+  -- Relative to a representative of its cell, each unit belongs to the fixed finite set E.
+  choose anchor hanchor using fun c : Set.range cell ↦ c.property
+  let key (u : P) : Set.range cell := ⟨cell u, ⟨u, rfl⟩⟩
+  let encode (u : P) : (W → J) × E :=
+    (cell u, ⟨u.val / (anchor (key u)).val, hclose (hanchor (key u)).symm⟩)
+  have hinj : Function.Injective encode := by
+    intro u z h
+    have hc : cell u = cell z := congrArg Prod.fst h
+    have hk : key u = key z := Subtype.ext hc
+    have he := congrArg (fun p : (W → J) × E ↦ p.2.val) h
+    change u.val / (anchor (key u)).val = z.val / (anchor (key z)).val at he
+    rw [hk] at he
+    exact Subtype.ext (div_left_injective he)
+  let _ := hE.fintype
+  let _ : Finite P := Finite.of_injective encode hinj
+  refine ⟨Set.toFinite P, ?_⟩
+  have hcard : P.ncard ≤ J.card ^ d * E.ncard := by
+    have hle := Nat.card_le_card_of_injective encode hinj
+    change Nat.card P ≤ J.card ^ d * Nat.card E
+    rw [Nat.card_prod] at hle
+    simpa [Nat.card_eq_fintype_card, Fintype.card_fun, d] using hle
+  have hJ : (J.card : ℝ) ≤ K * (1 + |t| + r) := by
+    have hab : a ≤ b := div_le_div_of_nonneg_right (by nlinarith [abs_nonneg t, mul_nonneg (Nat.cast_nonneg (α := ℝ) n) hr] :
+      -|t| - (n : ℝ) * r ≤ r) hδ.le
+    have hfloor := Int.floor_le_floor hab
+    have hnonneg : 0 ≤ ⌊b⌋ + 1 - ⌊a⌋ := by omega
+    have hcount : (J.card : ℝ) = (⌊b⌋ : ℝ) + 1 - (⌊a⌋ : ℝ) := by
+      rw [Int.card_Icc]
+      exact_mod_cast (Int.toNat_of_nonneg hnonneg)
+    rw [hcount]
+    calc
+      _ ≤ b - a + 2 := by linarith [Int.floor_le b, Int.lt_floor_add_one a]
+      _ ≤ K * (1 + |t| + r) := by
+        dsimp [a, b, K]
+        rw [← sub_div]
+        have hnum : r - (-|t| - (n : ℝ) * r) ≤ ((n : ℝ) + 1) * (1 + |t| + r) := by
+          nlinarith [mul_nonneg (Nat.cast_nonneg (α := ℝ) n) (abs_nonneg t), abs_nonneg t]
+        have hdiv := div_le_div_of_nonneg_right hnum hδ.le
+        rw [mul_comm ((n : ℝ) + 1), mul_div_assoc, mul_comm (1 + |t| + r)] at hdiv
+        rw [add_mul]
+        linarith [abs_nonneg t]
+  calc
+    (P.ncard : ℝ) ≤ (J.card : ℝ) ^ d * E.ncard := by exact_mod_cast hcard
+    _ ≤ (K * (1 + |t| + r)) ^ d * E.ncard :=
+      mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (by positivity) hJ _) (by positivity)
+    _ ≤ (↑E.ncard + 1) * K ^ sRank * (1 + |t| + r) ^ sRank := by
+      rw [hd, mul_pow]
+      calc
+        _ ≤ (K ^ sRank * (1 + |t| + r) ^ sRank) * (↑E.ncard + 1) :=
+          mul_le_mul_of_nonneg_left (le_add_of_nonneg_right zero_le_one) (by positivity)
+        _ = _ := by ring
+
+set_option quotPrecheck false in
+local notation "Aᶠₛ" => (∀ v : S, HeightOneSpectrum.adicCompletion F (Subtype.val v))
+local notation "arch" => InfiniteAdeleRing.ringEquiv_mixedSpace F
+
+/-- Compact support at the finite places and bounds on the unweighted and
+first-order weighted archimedean suprema control the theta series. The
+constant depends only on the compact set of finite coordinates. -/
+private theorem sLocalTheta_log_weighted_bound (K : Set Aᶠₛ) (hK : IsCompact K) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ (f : ℬₛ) (A : ℝ), 0 ≤ A →
+      (∀ x : SAdeleRing F S, x.2 ∉ K → f (Multiplicative.ofAdd x) = 0) →
+      (∀ x : SAdeleRing F S, ‖f (Multiplicative.ofAdd x)‖ ≤ A) →
+      (∀ x : SAdeleRing F S, ‖f (Multiplicative.ofAdd x)‖ * ‖arch x.1‖ ≤ A) →
+      ∀ g : Iₛ, ‖sLocalAdelicTheta F S f g‖ ≤ C * A * (1 + |Real.log (normℝ g)|) ^ sRank := by
+  classical
+  refine (sUnit_log_box_count F S).elim fun D hDcount ↦ ?_
+  have hD := hDcount.1
+  have hcount := hDcount.2
+  have hcoord (v : S) : ∃ R : ℝ, ∀ y ∈ K, ‖y v‖ ≤ R :=
+    hK.exists_bound_of_continuousOn (continuous_apply v).continuousOn
+  let R (v : S) := (hcoord v).choose
+  have hR (v : S) := (hcoord v).choose_spec
+  let H := ∑ v : S, max 0 (R v)
+  have hH : 0 ≤ H := Finset.sum_nonneg fun _ _ ↦ le_max_left _ _
+  have hfin (g : Iₛ) (hg : g.val.2 ∈ K) (v : S) :
+      sIdeleLog F S g (Sum.inr v) ≤ H := by
+    change Real.log ‖g.val.2 v‖ ≤ H
+    calc
+      _ ≤ ‖g.val.2 v‖ := Real.log_le_self (norm_nonneg _)
+      _ ≤ max 0 (R v) := (hR v _ hg).trans (le_max_right _ _)
+      _ ≤ H := Finset.single_le_sum (fun _ _ ↦ le_max_left _ _) (Finset.mem_univ v)
+  have harch (g : Iₛ) (v : InfinitePlace F) :
+      ‖g.val.1 v‖ ≤ ‖arch g.val.1‖ := by
+    rw [mixedEmbedding.norm_eq_sup'_normAtPlace]
+    apply Finset.le_sup'_of_le _ (Finset.mem_univ v)
+    by_cases hv : v.IsReal
+    · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+      exact ((InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero
+        (map_zero _) _).symm.le
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+      exact ((InfinitePlace.Completion.isometry_extensionEmbedding v).norm_map_of_map_zero
+        (map_zero _) _).symm.le
+  let m (k : ℕ) := ((k : ℝ) + 1) ^ sRank * Real.exp (-(k : ℝ))
+  have hm₀ (k : ℕ) : 0 ≤ m k := by dsimp [m]; positivity
+  have hm : Summable m := by
+    let a (j : ℕ) := (j : ℝ) ^ sRank * Real.exp (-(j : ℝ))
+    have ha : Summable a := by
+      simpa [a] using Real.summable_pow_mul_exp_neg_nat_mul sRank (r := 1) one_pos
+    have hs := ((summable_nat_add_iff (f := a) 1).mpr ha).mul_left (Real.exp 1)
+    have he (j : ℕ) : Real.exp 1 * a (j + 1) = m j := by
+      dsimp [a, m]
+      rw [Nat.cast_add, Nat.cast_one, mul_left_comm, ← Real.exp_add]
+      congr 2
+      ring
+    simpa only [he] using hs
+  refine ⟨D * (H + 3) ^ sRank * ∑' k, m k,
+    mul_nonneg (by positivity) (tsum_nonneg hm₀), ?_⟩
+  intro f A hA hsupport hbound hdecay g
+  let x (u : Uₛ) := unitAtS u * g
+  let term (u : Uₛ) := ‖f (Multiplicative.ofAdd (x u).val)‖
+  have hs : Summable term :=
+    (sLocalAdelicTheta_summableUniformlyOn_norm F S f {g} isCompact_singleton).summable
+      (by rfl)
+  let L := 1 + |Real.log (normℝ g)|
+  have hL : 1 ≤ L := by dsimp [L]; linarith [abs_nonneg (Real.log (normℝ g))]
+  let y (u : Uₛ) := max 1 ‖arch (x u).val.1‖
+  have hy (u : Uₛ) : 1 ≤ y u := le_max_left _ _
+  have hypos (u : Uₛ) : 0 < y u := zero_lt_one.trans_le (hy u)
+  -- In shell k the majorant decays as exp(-k), and the log cutoff grows linearly.
+  let k (u : Uₛ) := ⌊Real.log (y u)⌋₊
+  have hterm (u : Uₛ) : term u ≤ A * Real.exp (-(k u : ℝ)) := by
+    have hdec : term u * y u ≤ A := by
+      rw [show y u = max 1 ‖arch (x u).val.1‖ from rfl, mul_max_of_nonneg _ _ (norm_nonneg _)]
+      exact max_le (by simpa [term] using hbound (x u).val) (hdecay (x u).val)
+    have hflo : (k u : ℝ) ≤ Real.log (y u) := Nat.floor_le (Real.log_nonneg (hy u))
+    calc
+      _ ≤ A / y u := (le_div_iff₀ (hypos u)).mpr hdec
+      _ = A * Real.exp (-Real.log (y u)) := by
+        rw [Real.exp_neg, Real.exp_log (hypos u), div_eq_mul_inv]
+      _ ≤ _ := mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr (neg_le_neg hflo)) hA
+  let r (j : ℕ) := H + 2 * ((j : ℝ) + 1)
+  have hr (j : ℕ) : 0 ≤ r j := by dsimp [r]; positivity
+  let P (j : ℕ) : Set Uₛ := {u | ∀ v, sIdeleLog F S (x u) v ≤ r j}
+  have hP (j : ℕ) : (P j).Finite ∧ ((P j).ncard : ℝ) ≤ D * (L + r j) ^ sRank :=
+    hcount g (r j) (hr j)
+  have hmem (u : Uₛ) (hu : (x u).val.2 ∈ K) : u ∈ P (k u) := by
+    intro v
+    rcases v with w | v
+    · have hnz : (x u).val.1 w ≠ 0 :=
+        (((x u).isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ w)).ne_zero
+      have hle : Real.log ‖(x u).val.1 w‖ ≤ Real.log (y u) :=
+        Real.log_le_log (norm_pos_iff.mpr hnz) ((harch (x u) w).trans (le_max_right _ _))
+      have hlog : Real.log (y u) ≤ (k u : ℝ) + 1 := (Nat.lt_floor_add_one _).le
+      have hm : (w.mult : ℝ) ≤ 2 := by
+        by_cases hw : w.IsReal
+        · simp [hw.mult_eq_one]
+        · simp [(InfinitePlace.not_isReal_iff_isComplex.mp hw).mult_eq_two]
+      have hmul := mul_le_mul (hle.trans hlog) hm (by positivity : 0 ≤ (w.mult : ℝ))
+        (by positivity : 0 ≤ (k u : ℝ) + 1)
+      change (w.mult : ℝ) * Real.log ‖(x u).val.1 w‖ ≤ r (k u)
+      dsimp [r]
+      linarith
+    · exact (hfin (x u) hu v).trans (le_add_of_nonneg_right (by positivity))
+  let M := D * (H + 3) ^ sRank * A * L ^ sRank
+  have hM : 0 ≤ M := by dsimp [M]; positivity
+  have hweight (j : ℕ) :
+      ((P j).ncard : ℝ) * (A * Real.exp (-(j : ℝ))) ≤ M * m j := by
+    have hbase : L + r j ≤ L * ((H + 3) * ((j : ℝ) + 1)) := by
+      have h₁ : 1 + r j ≤ (H + 3) * ((j : ℝ) + 1) := by
+        dsimp [r]
+        nlinarith [mul_nonneg hH (Nat.cast_nonneg (α := ℝ) j)]
+      calc
+        _ ≤ L * (1 + r j) := by nlinarith [mul_nonneg (sub_nonneg.mpr hL) (hr j)]
+        _ ≤ _ := mul_le_mul_of_nonneg_left h₁ (zero_le_one.trans hL)
+    calc
+      _ ≤ D * (L + r j) ^ sRank * (A * Real.exp (-(j : ℝ))) :=
+        mul_le_mul_of_nonneg_right (hP j).2 (by positivity)
+      _ ≤ D * (L * ((H + 3) * ((j : ℝ) + 1))) ^ sRank * (A * Real.exp (-(j : ℝ))) :=
+        mul_le_mul_of_nonneg_right
+          (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by positivity) hbase _) hD.le)
+          (by positivity)
+      _ = _ := by dsimp [M, m]; rw [mul_pow, mul_pow]; ring
+  refine (congrArg norm (sLocalAdelicTheta_apply F S f g)).le.trans
+    ((norm_tsum_le_tsum_norm hs).trans ?_)
+  change (∑' u, term u) ≤ _
+  have heq : D * (H + 3) ^ sRank * (∑' j, m j) * A * L ^ sRank = ∑' j, M * m j := by
+    rw [tsum_mul_left]
+    dsimp [M]
+    ring
+  refine (hs.tsum_le_of_sum_le (fun t ↦ ?_)).trans heq.ge
+  let s := t.filter (fun u ↦ (x u).val.2 ∈ K)
+  have hsum : ∑ u ∈ s, term u = ∑ u ∈ t, term u := by
+    refine Finset.sum_subset (Finset.filter_subset _ _) fun u hu hn ↦ ?_
+    exact norm_eq_zero.mpr (hsupport _ fun hk ↦ hn (Finset.mem_filter.mpr ⟨hu, hk⟩))
+  refine hsum.ge.trans ((Finset.sum_fiberwise_of_maps_to (g := k) (s := s) (t := s.image k)
+    (fun u hu ↦ Finset.mem_image_of_mem k hu) term).ge.trans ?_)
+  refine (Finset.sum_le_sum (fun j _ ↦ ?_)).trans
+    ((hm.mul_left M).sum_le_tsum (s.image k) (fun j _ ↦ mul_nonneg hM (hm₀ j)))
+  have hsub : s.filter (fun u ↦ k u = j) ⊆ (hP j).1.toFinset := by
+    intro u hu
+    obtain ⟨hu, hk⟩ := Finset.mem_filter.mp hu
+    exact (hP j).1.mem_toFinset.mpr (hk ▸ hmem u (Finset.mem_filter.mp hu).2)
+  calc
+    _ ≤ ∑ u ∈ s with k u = j, A * Real.exp (-(j : ℝ)) :=
+      Finset.sum_le_sum fun u hu ↦ (Finset.mem_filter.mp hu).2 ▸ hterm u
+    _ ≤ ((P j).ncard : ℝ) * (A * Real.exp (-(j : ℝ))) := by
+      rw [Finset.sum_const, nsmul_eq_mul, Set.ncard_eq_toFinset_card _ (hP j).1]
+      exact mul_le_mul_of_nonneg_right (by exact_mod_cast Finset.card_le_card hsub) (by positivity)
+    _ ≤ _ := hweight j
+
 /-- Paper: Theorem 2.4.2.1, p. 111. Below S-idelic norm one, the theta
 function is bounded by a constant times the absolute log norm to the
 power `|S| - 1`, plus an additive constant. Both constants are uniform
@@ -454,7 +771,82 @@ on a bounded set of Schwartz–Bruhat functions. -/
 theorem sLocalAdelicTheta_log_growth_bounded (B : Set ℬₛ) (hB : IsVonNBounded ℂ B) :
     ∃ C₁ C₂ : ℝ, 0 < C₁ ∧ 0 < C₂ ∧ ∀ f ∈ B, ∀ g : Iₛ, normℝ g < 1 →
       ‖sLocalAdelicTheta F S f g‖ ≤
-        C₁ * |Real.log (normℝ g)| ^ (Fintype.card (InfinitePlace F) + S.card - 1) + C₂ := by sorry
+        C₁ * |Real.log (normℝ g)| ^ (Fintype.card (InfinitePlace F) + S.card - 1) + C₂ := by
+  classical
+  let weight (g : Iₛ) := (1 + |Real.log (normℝ g)|) ^ sRank
+  have hw (g : Iₛ) : 0 < weight g := by dsimp [weight]; positivity
+  let p (g : Iₛ) : Seminorm ℂ ℬₛ :=
+    let c : NNReal := ⟨(weight g)⁻¹, inv_nonneg.mpr (hw g).le⟩
+    c • (normSeminorm ℂ ℂ).comp ((ContinuousMap.evalCLM ℂ g).toLinearMap.comp
+      (sLocalAdelicTheta F S))
+  have hp (g : Iₛ) (f : ℬₛ) : p g f = ‖sLocalAdelicTheta F S f g‖ / weight g := by
+    change (weight g)⁻¹ * ‖sLocalAdelicTheta F S f g‖ = _
+    exact (mul_comm _ _).trans (div_eq_mul_inv _ _).symm
+  have hbdd : BddAbove (Set.range p) := Seminorm.bddAbove_range_iff.mpr fun f ↦ by
+    refine (sAdeleSchwartz_exists_decay_bound F S f).elim fun K hK ↦ ?_
+    refine (hK.2.2 0).elim fun A₀ hA₀ ↦ ?_
+    refine (hK.2.2 1).elim fun A₁ hA₁ ↦ ?_
+    refine (sLocalTheta_log_weighted_bound F S K hK.1).elim fun D hD ↦ ?_
+    refine ⟨D * (A₀ + A₁), Set.forall_mem_range.mpr fun g ↦ ?_⟩
+    refine (hp g f).le.trans ((div_le_iff₀ (hw g)).mpr ?_)
+    refine hD.2 f (A₀ + A₁) (add_nonneg hA₀.1 hA₁.1) hK.2.1 (fun x ↦ ?_) (fun x ↦ ?_) g
+    · refine le_trans ?_ (le_add_of_nonneg_right hA₁.1)
+      simpa only [pow_zero, mul_one] using hA₀.2 x
+    · refine le_trans ?_ (le_add_of_nonneg_left hA₀.1)
+      simpa only [pow_one] using hA₁.2 x
+  -- The normalized evaluations are dominated by one seminorm continuous on every stage.
+  let q : Seminorm ℂ ℬₛ := ⨆ g, p g
+  have hstage (a : BruhatStructuralPair (Multiplicative (SAdeleRing F S)))
+      (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (q ∘ schwartzBruhatStageInclusion a e) := by
+    refine (sAdeleStage_exists_compact_finite F S a).elim fun K hK ↦ ?_
+    refine (sLocalTheta_log_weighted_bound F S K hK.1).elim fun D hD ↦ ?_
+    refine (sAdeleStage_arch_decay_seminorm F S a e 0).elim fun r₀ hr₀ ↦ ?_
+    refine (sAdeleStage_arch_decay_seminorm F S a e 1).elim fun r₁ hr₁ ↦ ?_
+    let c : NNReal := ⟨D, hD.1⟩
+    let r : Seminorm ℂ (SchwartzBruhatStage e) := c • (r₀ + r₁)
+    have hr : Continuous r := continuous_const.mul (hr₀.1.add hr₁.1)
+    apply Seminorm.continuous_of_le (p := q.comp (schwartzBruhatStageInclusion a e)) hr
+    intro s
+    let f : ℬₛ := schwartzBruhatStageInclusion a e s
+    have hval (x : SAdeleRing F S) :
+        f (Multiplicative.ofAdd x) = schwartzBruhatStageRealization a e s (Multiplicative.ofAdd x) :=
+      schwartzBruhatStageInclusion_apply a e s _
+    change q f ≤ D * (r₀ s + r₁ s)
+    refine (Seminorm.iSup_apply hbdd).trans_le (ciSup_le fun g ↦ ?_)
+    refine (hp g f).le.trans ((div_le_iff₀ (hw g)).mpr ?_)
+    refine hD.2 f (r₀ s + r₁ s)
+      (add_nonneg (apply_nonneg r₀ s) (apply_nonneg r₁ s)) ?_ ?_ ?_ g
+    · intro x hx
+      exact (hval x).trans ((schwartzBruhatStageRealization_apply a e s
+        (Multiplicative.ofAdd x)).trans (dite_eq_right (fun h ↦ hx (hK.2 (Multiplicative.ofAdd x) h))))
+    · intro x
+      refine (congrArg norm (hval x)).le.trans
+        (le_trans ?_ (le_add_of_nonneg_right (apply_nonneg r₁ s)))
+      simpa only [pow_zero, mul_one] using hr₀.2 s x
+    · intro x
+      refine (congrArg (fun z : ℂ ↦ ‖z‖ * ‖arch x.1‖) (hval x)).le.trans
+        (le_trans ?_ (le_add_of_nonneg_left (apply_nonneg r₀ s)))
+      simpa only [pow_one] using hr₁.2 s x
+  let i : {r : Seminorm ℂ (schwartzBruhatSubmodule (Multiplicative (SAdeleRing F S))) //
+      ∀ (a : BruhatStructuralPair (Multiplicative (SAdeleRing F S)))
+        (e : ElementaryLCAPresentation a.quotient), Continuous (r ∘ schwartzBruhatStageInclusion a e)} :=
+    ⟨q, hstage⟩
+  refine (((withGeneratingSeminorms_spec _ _).isVonNBounded_iff_seminorm_bounded.mp hB) i).elim
+    fun C hC ↦ ?_
+  refine ⟨C * 2 ^ (sRank - 1), C * 2 ^ (sRank - 1), by have := hC.1; positivity,
+    by have := hC.1; positivity, ?_⟩
+  intro f hf g _
+  have hq : p g f ≤ q f := (le_ciSup hbdd g) f
+  have hCf : q f ≤ C := (hC.2 f hf).le
+  have hmain := (div_le_iff₀ (hw g)).mp ((hp g f).symm.trans_le (hq.trans hCf))
+  calc
+    _ ≤ C * weight g := hmain
+    _ ≤ C * (2 ^ (sRank - 1) * (1 ^ sRank + |Real.log (normℝ g)| ^ sRank)) :=
+      mul_le_mul_of_nonneg_left (add_pow_le zero_le_one (abs_nonneg _) _) hC.1.le
+    _ = _ := by rw [one_pow]; ring
+
+end LogGrowth
 
 /-! ## Order of growth -/
 

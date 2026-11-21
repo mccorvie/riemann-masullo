@@ -979,7 +979,19 @@ local notation "classIntegrand" => fun (ω : PontryaginDual J₁) (f : ℬₛ) (
 is absolutely convergent at each S-idele class. -/
 theorem sLocalHomogeneousAdelicTheta_integrable [Measure.IsHaarMeasure μ]
     (ω : PontryaginDual J₁) (f : ℬₛ) (g : Jₛ) :
-    Integrable (classIntegrand ω f g) μ := by sorry
+    Integrable (classIntegrand ω f g) μ := by
+  have hcompact : CompactSpace J₁ :=
+    isCompact_iff_compactSpace.mp
+      ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hopen : OpensMeasurableSpace J₁ := ⟨le_refl _⟩
+  have hchar : Continuous (fun h : J₁ ↦ (ω h : ℂ)) :=
+    continuous_subtype_val.comp ω.continuous_toFun
+  have hcont : Continuous (classIntegrand ω f g) :=
+    ((sLocalAdelicThetaOnClasses F S f).continuous_toFun.comp
+      (continuous_const.mul continuous_subtype_val)).mul hchar
+  obtain ⟨C, hC⟩ := isCompact_univ.exists_bound_of_continuousOn hcont.continuousOn
+  exact Integrable.of_bound (hcont.aestronglyMeasurable_of_compactSpace) C
+    (Eventually.of_forall fun h ↦ hC h (Set.mem_univ h))
 
 /-- Paper: Proposition 2.3.1.4(1), p. 105. On a compact set of S-ideles
 the integrands have a common constant majorant on the compact norm-one classes.
@@ -987,7 +999,21 @@ Deviation: Uniform absolute convergence is expressed by this integrable majorant
 theorem sLocalHomogeneousAdelicTheta_integrand_bounded [Measure.IsHaarMeasure μ]
     (ω : PontryaginDual J₁) (f : ℬₛ) (K : Set Iₛ) (hK : IsCompact K) :
     ∃ C : ℝ, 0 ≤ C ∧ Integrable (fun _ : J₁ ↦ C) μ ∧
-      ∀ g ∈ K, ∀ h : J₁, ‖classIntegrand ω f (classOf g) h‖ ≤ C := by sorry
+      ∀ g ∈ K, ∀ h : J₁, ‖classIntegrand ω f (classOf g) h‖ ≤ C := by
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton :
+      IsCompact (sIdeleQuotientNorm F S ⁻¹' {1}))
+  have hclass : Continuous (fun p : Iₛ × J₁ ↦ classOf p.1) :=
+    QuotientGroup.continuous_mk.comp continuous_fst
+  have hval : Continuous (fun p : Iₛ × J₁ ↦ (p.2.val : Jₛ)) :=
+    continuous_subtype_val.comp continuous_snd
+  have hcont : Continuous (fun p : Iₛ × J₁ ↦
+      sLocalAdelicThetaOnClasses F S f (classOf p.1 * p.2.val)) :=
+    (sLocalAdelicThetaOnClasses F S f).continuous.comp (hclass.mul hval)
+  obtain ⟨B, hB⟩ := (hK.prod isCompact_univ).exists_bound_of_continuousOn hcont.continuousOn
+  refine ⟨max B 0, le_max_right _ _, integrable_const _, fun g hg h ↦ ?_⟩
+  simp only [norm_mul, Circle.norm_coe, mul_one]
+  exact (hB (g, h) ⟨hg, mem_univ h⟩).trans (le_max_left _ _)
 
 /-- Paper: Proposition 2.3.1.4(1), p. 105. Integrating the character-weighted
 theta function gives a continuous function on the S-idele classes. -/
