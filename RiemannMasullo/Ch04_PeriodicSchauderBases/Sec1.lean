@@ -1221,12 +1221,10 @@ theorem strongDual_isShrinking_of_isAbsolute (hNuclear : IsNuclearTVS.{v, u} E) 
 
 end AbsoluteDuality
 
--- The proof only needs the continuity of the coefficient maps bundled in `StrongDual`.
-set_option linter.unusedVariables false in
-/-- Paper: Remark 4.1.2.5, p. 160. On a Fréchet space, the pointwise absolute
-summability of all coordinate series under continuous seminorms is equivalent
-to the absolute basis condition with continuous seminorm bounds. -/
-theorem isAbsolute_iff_summable_of_frechet (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f) :
+/-- On a barrelled space, pointwise absolute summability under each continuous
+seminorm gives a continuous seminorm bound on the absolute sums. -/
+private theorem isAbsolute_iff_summable_of_barrelled [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [BarrelledSpace ℂ E] :
     IsAbsolute x f ↔
       ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by
   constructor
@@ -1234,8 +1232,6 @@ theorem isAbsolute_iff_summable_of_frechet (hE : IsFrechetTVS E) (hb : IsSchaude
     obtain ⟨_, _, hbound⟩ := h q hq
     exact (hbound u).1
   · intro hsum q hq
-    have : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
-    obtain ⟨_, hpoly, _, _⟩ := hE
     let L (m : ℕ) : E →L[ℂ] E := (f m).smulRight (x m)
     let p (s : Finset ℕ) : Seminorm ℂ E := ∑ m ∈ s, q.comp (L m).toLinearMap
     have hp (s : Finset ℕ) : Continuous (p s) :=
@@ -1258,6 +1254,20 @@ theorem isAbsolute_iff_summable_of_frechet (hE : IsFrechetTVS E) (hb : IsSchaude
       rw [← hp_apply]
       exact (show p s ≤ ⨆ t, p t from le_ciSup hbdd s) u
 
+-- The proof only needs the continuity of the coefficient maps bundled in `StrongDual`.
+set_option linter.unusedVariables false in
+/-- Paper: Remark 4.1.2.5, p. 160. On a Fréchet space, the pointwise absolute
+summability of all coordinate series under continuous seminorms is equivalent
+to the absolute basis condition with continuous seminorm bounds. -/
+theorem isAbsolute_iff_summable_of_frechet (hE : IsFrechetTVS E) (hb : IsSchauderBasis x f) :
+    IsAbsolute x f ↔
+      ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by
+  have : BarrelledSpace ℂ E := isFrechetTVS_barrelled hE
+  obtain ⟨_, hpoly, _, _⟩ := hE
+  exact isAbsolute_iff_summable_of_barrelled
+
+-- Barrelledness follows from stagewise continuity in the final topology.
+set_option linter.unusedVariables false in
 /-- Paper: Remark 4.1.2.5, p. 161. The two absolute basis conditions also
 agree in a strict countable inductive limit of nuclear Fréchet spaces.
 Deviation: The defining sequence is given by its increasing images in the
@@ -1269,7 +1279,19 @@ theorem isAbsolute_iff_summable_of_strictLF_stages [T2Space E]
     (ht : (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology (fun n ↦ (S n).subtype))
     (hb : IsSchauderBasis x f) :
     IsAbsolute x f ↔
-      ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by sorry
+      ∀ (q : Seminorm ℂ E), Continuous q → ∀ u, Summable (fun m ↦ q (f m u • x m)) := by
+  have hP : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ E // ∀ n, Continuous (p ∘ (S n).subtype)} →
+        Seminorm ℂ E) := ⟨ht⟩
+  have : IsTopologicalAddGroup E := hP.isTopologicalAddGroup
+  have : ContinuousSMul ℂ E := hP.continuousSMul
+  have : BarrelledSpace ℂ E := by
+    refine ⟨fun p hp ↦ hP.continuous_seminorm ⟨p, ?_⟩⟩
+    intro n
+    have : BarrelledSpace ℂ (S n) := isFrechetTVS_barrelled (hFrechet n)
+    exact (p.comp (S n).subtype).continuous_of_lowerSemicontinuous
+      (hp.comp continuous_subtype_val)
+  exact isAbsolute_iff_summable_of_barrelled
 
 /-- Paper: Theorem 4.1.2.6(1), p. 161. Every equicontinuous Schauder basis of a
 nuclear space is absolute. -/
