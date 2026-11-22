@@ -248,7 +248,27 @@ The coordinate box bound implies the product bound with exponent the total numbe
 Both the unrestricted and the zero-moment level use the same comparison. -/
 theorem sLocalAbsolutePW_le_invariant (hST : S ⊆ T) (X : ℝ) (_hX : 0 < X)
     (D : Submodule ℂ (B(T))) (ω : PontryaginDual J₁(T)) :
-    sLocalAbsolutePW hST X D ω ≤ sLocalInvariantPW hST (X ^ count(S)) D ω := by sorry
+    sLocalAbsolutePW hST X D ω ≤ sLocalInvariantPW hST (X ^ count(S)) D ω := by
+  have hbox : sLocalPWBox S X ⊆ sLocalPWProductRegion S (X ^ count(S)) := by
+    intro x hx
+    have ha : (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ X ^ Fintype.card (InfinitePlace F) := by
+      simpa only [Finset.prod_const, Finset.card_univ] using
+        (Finset.prod_le_prod₀ (s := Finset.univ) (g := fun _ : InfinitePlace F ↦ X)
+          (fun w _ ↦ pow_nonneg (norm_nonneg (x.1 w)) w.mult) (fun w _ ↦ hx.1 w))
+    have hf : (∏ v : S, ‖x.2 v‖) ≤ X ^ S.card := by
+      simpa only [Finset.prod_const, Finset.card_univ, Fintype.card_coe] using
+        (Finset.prod_le_prod₀ (s := Finset.univ) (g := fun _ : S ↦ X)
+          (fun v _ ↦ norm_nonneg (x.2 v)) (fun v _ ↦ hx.2 v))
+    change _ * _ ≤ X ^ count(S)
+    rw [pow_add]
+    exact mul_le_mul ha hf (Finset.prod_nonneg fun v _ ↦ norm_nonneg (x.2 v))
+      (pow_nonneg _hX.le _)
+  have hgen : {f : B(S) | inBand(sLocalPWBox S X, f)} ⊆
+      {f : B(S) | inBand(sLocalPWProductRegion S (X ^ count(S)), f)} :=
+    fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩
+  have htests : sLocalPWTests hST (sLocalPWBox S X) ≤ sLocalPWTests hST (sLocalPWProductRegion S (X ^ count(S))) :=
+    Submodule.map_mono (Submodule.span_mono hgen)
+  exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
 section PrincipalValues
 
