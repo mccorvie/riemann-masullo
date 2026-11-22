@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import all RiemannMasullo.AppC_LCTVS.Sec1
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeVariables
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.TranslationDifference
@@ -1226,7 +1227,10 @@ theorem cyclicQuotientMellinCoeff_unconditionalBasis :
 /-- Paper: Remark 4.2.1.6, p. 165. Every bounded subset of a Hausdorff
 quotient of the exponential decay space has a bounded lift. -/
 theorem positiveRealExponentialDecay_liftsBoundedSets (M : Submodule ℂ E)
-    (hM : IsClosed (M : Set E)) : LiftsBoundedSets M.mkQL := by sorry
+    (hM : IsClosed (M : Set E)) : LiftsBoundedSets M.mkQL := by
+  have hE := positiveRealExponentialDecay_frechet (univ : Set ℝ) ordConnected_univ univ_nonempty
+  have hN := positiveRealExponentialDecay_nuclear.{0} (univ : Set ℝ) ordConnected_univ univ_nonempty
+  exact liftsBoundedSets_mkQL_of_schwartz_frechet hE (isSchwartzTVS_of_isNuclearTVS hN) M hM
 
 end Kernel
 
