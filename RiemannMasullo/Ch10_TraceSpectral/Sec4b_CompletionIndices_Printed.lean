@@ -132,7 +132,19 @@ def Printed.spectralStripZeroEnumeration : Prop :=
 Formula (10.4.3.38) forces the offset at index zero to be zero, so this
 entry would be a completed zeta zero on the zero-free line of real part 2. -/
 theorem Printed.spectralStripZeroEnumeration_false :
-    ¬ Printed.spectralStripZeroEnumeration := by sorry
+    ¬ Printed.spectralStripZeroEnumeration := by
+  intro hall
+  apply Printed.spectralLineZeroEnumeration_false
+  intro F _ _ a ha χ hχ ω
+  obtain ⟨z, hz⟩ := hall F a 0 ha le_rfl χ hχ ω
+  let Z := {p : ℝ × ℝ // p.2 ∈ Icc (-(0 : ℝ)) 0 ∧ 0 < zeroOrder(χ ω, a + p.2, p.1)}
+  have hzero (p : Z) : p.val.2 = 0 := by simpa using p.property.1
+  let e : Z ≃ lineZeros(χ ω, a) :=
+    { toFun := fun p ↦ ⟨p.val.1, by simpa only [hzero p, Complex.ofReal_zero, add_zero] using p.property.2⟩
+      invFun := fun t ↦ ⟨(t.val, 0), by simp, by simpa only [Complex.ofReal_zero, add_zero] using t.property⟩
+      left_inv := fun p ↦ Subtype.ext (Prod.ext rfl (hzero p).symm)
+      right_inv := fun _ ↦ rfl }
+  exact ⟨z.trans e, hz⟩
 
 /-- Paper: Theorem 10.4.3.1(2), pp. 467–468. As printed: for a sequence in
 the jet index set (10.4.3.11), escaping to the point of the one-point
