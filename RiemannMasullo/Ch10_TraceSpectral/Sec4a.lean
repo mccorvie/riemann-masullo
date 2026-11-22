@@ -330,7 +330,28 @@ theorem exists_biorthogonalBasisLift (x : ι → E ⧸ E₀) (f : ι → StrongD
     (_hdense : E₀ ≤ (V ⊓ E₀).topologicalClosure) (_himage : ∀ m, x m ∈ V.map E₀.mkQ) :
     ∃ u : ι → E,
       (∀ m, u m ∈ V ∧ E₀.mkQ (u m) = x m ∧ ‖u m‖ ∈ Ioo (r - ε) (r' + ε)) ∧
-      ∀ m n, f m (E₀.mkQ (u n)) = if m = n then 1 else 0 := by sorry
+      ∀ m n, f m (E₀.mkQ (u n)) = if m = n then 1 else 0 := by
+  classical
+  have lift (m : ι) : ∃ u : E, u ∈ V ∧ E₀.mkQ u = x m ∧ ‖u‖ ∈ Ioo (r - ε) (r' + ε) := by
+    obtain ⟨v, hv, hqv⟩ := _himage m
+    obtain ⟨z, hz, hn⟩ := Submodule.Quotient.norm_mk_lt (x m) (half_pos _hε)
+    have hdiff : v - z ∈ E₀ := (Submodule.Quotient.mk_eq_zero _).mp (by
+      change E₀.mkQ (v - z) = 0
+      rw [map_sub, hqv, show E₀.mkQ z = x m from hz, sub_self])
+    obtain ⟨d, hd, hdist⟩ := Metric.mem_closure_iff.mp (_hdense hdiff) (ε / 2) (half_pos _hε)
+    have hqd : E₀.mkQ d = 0 := (Submodule.Quotient.mk_eq_zero _).mpr hd.2
+    have hqu : E₀.mkQ (v - d) = x m := by rw [map_sub, hqv, hqd, sub_zero]
+    refine ⟨v - d, V.sub_mem hv hd.1, hqu, ?_, ?_⟩
+    · have hu := Submodule.Quotient.norm_mk_le E₀ (v - d)
+      change ‖E₀.mkQ (v - d)‖ ≤ _ at hu
+      rw [hqu] at hu
+      linarith [(_hcollar m).1]
+    · rw [dist_eq_norm] at hdist
+      have heq : v - d = z + (v - z - d) := by abel
+      rw [heq]
+      linarith [norm_add_le z (v - z - d), (_hcollar m).2]
+  choose u hu using lift
+  exact ⟨u, hu, fun m n ↦ (congrArg (f m) (hu n).2.1).trans (_hbio m n)⟩
 
 /-- Paper: Lemma 10.4.2.5, p. 461. Lifts can be chosen to remain inside the
 enlarged collar under sufficiently small kernel perturbations. Each perturbed
