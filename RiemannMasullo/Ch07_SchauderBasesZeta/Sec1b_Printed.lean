@@ -190,12 +190,45 @@ def Printed.sLocalPolarMultiplicity_greatest_smaller : Prop :=
       let orders : Set ℕ := {m | 0 < m ∧ ∃ s : ℂ, sLocalPolarMultiplicity f (chart s) = m}
       ∃ M m : ℕ, IsGreatest orders M ∧ IsGreatest (orders ∩ Iio M) m
 
+/-- The S-local Z-function of the zero test is identically zero: the zero function is
+meromorphic in normal form and agrees with the zero integral, and the continuation is unique. -/
+private theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false_zFunction_zero
+    (F : Type u) [Field F] [NumberField F] (S : Finset Places(F)) :
+    sLocalIdelicZFunction (F := F) (S := S) 0 = 0 :=
+  (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) 0).unique
+    (sLocalIdelicZetaIntegral_exists_continuation (F := F) (S := S) 0).exists.choose_spec
+    ⟨fun _ ↦ analyticOnNhd_const.meromorphicNFOn, fun c _ ↦ by
+      simp only [Pi.zero_apply, sLocalIdelicZetaIntegral]
+      exact (integral_eq_zero_of_ae (Eventually.of_forall fun _ ↦ zero_mul _)).symm⟩
+
+/-- The zero test has polar multiplicity zero at every quasi-character. -/
+private theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false_zero
+    (F : Type u) [Field F] [NumberField F] (S : Finset Places(F))
+    (c : QuasiCharacter Jₛ(F, S)) :
+    sLocalPolarMultiplicity (0 : SchwartzBruhat (Multiplicative (SAdeleRing F S))) c = 0 := by
+  rw [sLocalPolarMultiplicity_eq_zero_iff]
+  refine le_top.trans_eq (meromorphicOrderAt_eq_top_iff.mpr (Eventually.of_forall fun z ↦ ?_)).symm
+  rw [Printed.sLocalPolarMultiplicity_greatest_smaller_false_zFunction_zero F S]
+  rfl
+
 /-- Paper: Corollary 7.1.3.3, p. 326.
 Use ℚ with only the real place, the trivial character and the zero test, for which
 the set of pole orders is empty. The Gaussian `exp(-πx²)` gives a second example:
 Γℝ(s) has only simple poles, so there is no positive order below one. -/
 theorem Printed.sLocalPolarMultiplicity_greatest_smaller_false :
-    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by sorry
+    ¬ Printed.sLocalPolarMultiplicity_greatest_smaller := by
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  have hd : Module.finrank ℚ (ULift ℚ) = 1 := by simp
+  have hcard : Fintype.card (InfinitePlace (ULift ℚ)) = 1 := by
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces,
+      InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd,
+      InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd]
+  obtain ⟨M, m, hM, -⟩ := h (ULift ℚ) ∅ hcard 1 0
+  obtain ⟨hpos, s, hs⟩ := hM.1
+  rw [Printed.sLocalPolarMultiplicity_greatest_smaller_false_zero] at hs
+  omega
 
 /-- Paper: Theorem 7.1.4.2(1), equation (7.1.4.2), p. 326.
 As printed: The strong annihilator of the regularized completed Hecke ideal is linearly
