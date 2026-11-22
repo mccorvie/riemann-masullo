@@ -169,13 +169,333 @@ def Printed.distribution_coordinatePlane_decomposition_eq_sum : Prop :=
         coordinatePlaneDiracTensor normal
           ((-1 : ℂ) ^ degree(tangent) • (A α).comp ∂𝒟[κ, tangent])
 
+/-- Evaluation at zero is a distribution of order zero supported at zero. -/
+private theorem distribution_coordinatePlane_decomposition_eq_sum_false_delta
+    {E : Type} [NormedAddCommGroup E] [NormedSpace ℝ E] :
+    ∃ δ : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ), (∀ f, δ f = f 0) ∧
+      DistributionOrderLE (⇑δ) 0 ∧ Distribution.dsupport (⇑δ) ⊆ {0} := by
+  let δ : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ) :=
+    (BoundedContinuousFunction.evalCLM ℂ (0 : E)).comp (TestFunction.toBoundedContinuousFunctionCLM ℂ)
+  refine ⟨δ, fun _ ↦ rfl, distributionOrderLE_eval 0, fun x hx ↦ ?_⟩
+  by_contra hx0
+  refine (Distribution.notMem_dsupport_iff x).2
+    ⟨{0}ᶜ, fun ψ hψ ↦ ?_, isOpen_compl_singleton, hx0⟩ hx
+  show ψ 0 = 0
+  exact image_eq_zero_of_notMem_tsupport fun h ↦ hψ h rfl
+
+/-- The derivative at zero along `e` is a distribution. -/
+private theorem distribution_coordinatePlane_decomposition_eq_sum_false_deriv
+    {E : Type} [NormedAddCommGroup E] [NormedSpace ℝ E] (e : E) :
+    ∃ D : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ), ∀ f, D f = fderiv ℝ (f : E → ℂ) 0 e := by
+  let L : 𝓓((⊤ : Opens E), ℂ) →L[ℂ] 𝓓((⊤ : Opens E), ℂ) := TestFunction.lineDerivCLM ℂ e
+  refine ⟨(BoundedContinuousFunction.evalCLM ℂ (0 : E)).comp
+    ((TestFunction.toBoundedContinuousFunctionCLM ℂ).comp L), fun f ↦ ?_⟩
+  show (L f : E → ℂ) 0 = _
+  rw [TestFunction.lineDerivCLM_eq_fderivCLM, TestFunction.fderivCLM_apply]
+  split_ifs with hk
+  · rfl
+  · exact absurd le_top hk
+
+/-- There is a test function equal to `x ↦ ⟪e, x⟫` near zero. -/
+private theorem distribution_coordinatePlane_decomposition_eq_sum_false_linearTest
+    {E : Type} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E] (e : E) :
+    ∃ f : 𝓓((⊤ : Opens E), ℂ),
+      (f : E → ℂ) =ᶠ[nhds 0] fun x ↦ ((inner ℝ e x : ℝ) : ℂ) := by
+  let χ : ContDiffBump (0 : E) := ⟨1, 2, one_pos, one_lt_two⟩
+  let L : E →L[ℝ] ℂ := Complex.ofRealCLM.comp (innerSL ℝ e)
+  let φ : E → ℂ := fun x ↦ (χ x : ℂ) * L x
+  have hφc : ContDiff ℝ ∞ φ := (Complex.ofRealCLM.contDiff.comp χ.contDiff).mul L.contDiff
+  have hφs : HasCompactSupport φ :=
+    (χ.hasCompactSupport.comp_left Complex.ofReal_zero).mul_right
+  refine ⟨⟨φ, hφc, hφs, by simp⟩, ?_⟩
+  filter_upwards [Metric.ball_mem_nhds (0 : E) one_pos] with x hx
+  show (χ x : ℂ) * L x = _
+  rw [χ.one_of_mem_closedBall (Metric.ball_subset_closedBall hx), Complex.ofReal_one, one_mul]
+  rfl
+
+/-- A nonzero multiple of the derivative at zero along a unit vector `e` has order at most one,
+not order zero, and support in the origin. The tests `χₙ(x)⟪e, x⟫`, with `χₙ` a bump equal to
+one near zero and supported in the ball of radius `1/(n + 1)`, have sup norm at most
+`1/(n + 1)` while the functional takes the fixed value `c` on them. -/
+private theorem distribution_coordinatePlane_decomposition_eq_sum_false_order
+    {E : Type} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    (e : E) (he : ‖e‖ = 1) (c : ℂ) (hc : c ≠ 0) (S : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ))
+    (hS : ∀ f, S f = c * fderiv ℝ (f : E → ℂ) 0 e) :
+    DistributionOrderLE (⇑S) 1 ∧ ¬ DistributionOrderLE (⇑S) 0 ∧
+      Distribution.dsupport (⇑S) ⊆ {0} := by
+  refine ⟨?_, ?_, ?_⟩
+  · intro K
+    refine ⟨‖c‖, norm_nonneg _, fun f _ B _ hB ↦ ?_⟩
+    have h1 := hB 1 le_rfl 0
+    rw [norm_iteratedFDeriv_one] at h1
+    rw [hS, norm_mul]
+    refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg _)
+    calc ‖fderiv ℝ (f : E → ℂ) 0 e‖ ≤ ‖fderiv ℝ (f : E → ℂ) 0‖ * ‖e‖ :=
+          ContinuousLinearMap.le_opNorm _ _
+      _ = ‖fderiv ℝ (f : E → ℂ) 0‖ := by rw [he, mul_one]
+      _ ≤ B := h1
+  · intro hS0
+    obtain ⟨C, -, hC⟩ := hS0 ⟨Metric.closedBall 0 1, isCompact_closedBall 0 1⟩
+    obtain ⟨n, hn⟩ := exists_nat_gt (C / ‖c‖)
+    set r : ℝ := 1 / ((n : ℝ) + 1) with hr
+    have hr0 : 0 < r := by positivity
+    have hr1 : r ≤ 1 := by
+      rw [hr, div_le_one (by positivity)]
+      linarith [(Nat.cast_nonneg n : (0 : ℝ) ≤ n)]
+    let χ : ContDiffBump (0 : E) := ⟨r / 2, r, by positivity, by linarith⟩
+    let L : E →L[ℝ] ℂ := Complex.ofRealCLM.comp (innerSL ℝ e)
+    have hL : ∀ x, L x = ((inner ℝ e x : ℝ) : ℂ) := fun x ↦ rfl
+    let φ : E → ℂ := fun x ↦ (χ x : ℂ) * L x
+    have hφc : ContDiff ℝ ∞ φ :=
+      (Complex.ofRealCLM.contDiff.comp χ.contDiff).mul L.contDiff
+    have hχs : tsupport (fun x ↦ (χ x : ℂ)) ⊆ Metric.closedBall 0 r := by
+      refine (tsupport_comp_subset Complex.ofReal_zero _).trans ?_
+      rw [χ.tsupport_eq]
+    have hφs : tsupport φ ⊆ Metric.closedBall 0 r :=
+      (tsupport_mul_subset_left).trans hχs
+    let f : 𝓓((⊤ : Opens E), ℂ) :=
+      ⟨φ, hφc, (isCompact_closedBall 0 r).of_isClosed_subset (isClosed_tsupport _) hφs,
+        by simp⟩
+    have hfK : tsupport (f : E → ℂ) ⊆ Metric.closedBall 0 1 :=
+      hφs.trans (Metric.closedBall_subset_closedBall hr1)
+    have hbound : ∀ j ≤ 0, ∀ x, ‖iteratedFDeriv ℝ j (f : E → ℂ) x‖ ≤ r := by
+      intro j hj x
+      obtain rfl : j = 0 := by omega
+      rw [norm_iteratedFDeriv_zero]
+      show ‖(χ x : ℂ) * L x‖ ≤ r
+      rw [norm_mul, hL, Complex.norm_real, Complex.norm_real]
+      by_cases hx : x ∈ Metric.ball (0 : E) r
+      · have hχ1 : ‖χ x‖ ≤ 1 := by
+          rw [Real.norm_eq_abs, abs_of_nonneg (χ.nonneg)]
+          exact χ.le_one
+        have hin : ‖inner ℝ e x‖ < r := by
+          calc ‖inner ℝ e x‖ ≤ ‖e‖ * ‖x‖ := norm_inner_le_norm e x
+            _ = ‖x‖ := by rw [he, one_mul]
+            _ < r := by simpa using hx
+        calc ‖χ x‖ * ‖inner ℝ e x‖ ≤ 1 * r :=
+              mul_le_mul hχ1 hin.le (norm_nonneg _) zero_le_one
+          _ = r := one_mul r
+      · have hχ0 : χ x = 0 := by
+          rw [← Function.notMem_support, χ.support_eq]
+          exact hx
+        rw [hχ0, norm_zero, zero_mul]
+        exact hr0.le
+    have hloc : (f : E → ℂ) =ᶠ[nhds 0] L := by
+      filter_upwards [Metric.ball_mem_nhds (0 : E) (half_pos hr0)] with x hx
+      show (χ x : ℂ) * L x = L x
+      rw [χ.one_of_mem_closedBall (Metric.ball_subset_closedBall hx), Complex.ofReal_one, one_mul]
+    have hSf : S f = c := by
+      rw [hS, hloc.fderiv_eq, L.fderiv, hL, real_inner_self_eq_norm_sq, he]
+      norm_num
+    have := hC f hfK r hr0.le hbound
+    rw [hSf] at this
+    have hc0 : 0 < ‖c‖ := norm_pos_iff.2 hc
+    have hCr : C * r < ‖c‖ := by
+      rw [hr, mul_one_div, div_lt_iff₀ (by positivity)]
+      have := (div_lt_iff₀ hc0).1 hn
+      nlinarith
+    linarith
+  · intro x hx
+    by_contra hx0
+    refine (Distribution.notMem_dsupport_iff x).2
+      ⟨{0}ᶜ, fun ψ hψ ↦ ?_, isOpen_compl_singleton, hx0⟩ hx
+    have h0 : (ψ : E → ℂ) =ᶠ[nhds 0] 0 :=
+      notMem_tsupport_iff_eventuallyEq.1 fun h ↦ hψ h rfl
+    rw [hS, h0.fderiv_eq, fderiv_zero]
+    simp
+
 /-- Paper: Theorem 5.3.2.3(4), p. 245. With normal coordinate x, tangential coordinate y
 and N = 1, take A₍₀,₀₎(g) = g′(0) and A₍₁,₀₎ = A₍₀,₁₎ = δ₀. These have the printed
 exact orders, and (5.3.2.4) gives T(f) = ∂ₓf(0,0) + 2∂ᵧf(0,0). A product of compactly
 supported tests equal to x near (0,0) gives one for T and minus one for (5.3.2.6). -/
 theorem Printed.distribution_coordinatePlane_decomposition_eq_sum_false :
     ¬ Printed.distribution_coordinatePlane_decomposition_eq_sum := by
-  sorry
+  intro h
+  -- Coordinates: `x` is normal (`Sum.inl ()`), `y` is tangential (`Sum.inr ()`).
+  let ey : Eᵣ(Unit ⊕ Unit) := WithLp.toLp 2 (Pi.single (Sum.inr ()) 1)
+  let e1 : Eᵣ(Unit) := WithLp.toLp 2 (Pi.single () 1)
+  have hey : ‖ey‖ = 1 := by
+    rw [EuclideanSpace.norm_eq, Real.sqrt_eq_one]
+    simp [ey, Fintype.sum_sum_type]
+  have he1 : ‖e1‖ = 1 := by
+    rw [EuclideanSpace.norm_eq, Real.sqrt_eq_one]
+    simp [e1]
+  -- The restriction to the plane and the insertion map.
+  set R := (exists_testFunction_coordinatePlaneRestriction (ι := Unit) (κ := Unit)).choose
+    with hRdef
+  have hR := (exists_testFunction_coordinatePlaneRestriction (ι := Unit) (κ := Unit)).choose_spec
+  let ipₗ : Eᵣ(Unit) →ₗ[ℝ] Eᵣ(Unit ⊕ Unit) :=
+    { toFun := fun y ↦ WithLp.toLp 2 (Sum.elim (fun _ ↦ (0 : ℝ)) (fun j ↦ y j))
+      map_add' := fun y z ↦ PiLp.ext fun i ↦ by rcases i with _ | _ <;> simp
+      map_smul' := fun c y ↦ PiLp.ext fun i ↦ by rcases i with _ | _ <;> simp }
+  let ip : Eᵣ(Unit) →L[ℝ] Eᵣ(Unit ⊕ Unit) := LinearMap.toContinuousLinearMap ipₗ
+  have hip0 : (insertPlane (0 : Eᵣ(Unit)) : Eᵣ(Unit ⊕ Unit)) = 0 :=
+    PiLp.ext fun i ↦ by rcases i with _ | _ <;> simp
+  have hip1 : ip e1 = ey := PiLp.ext fun i ↦ by rcases i with _ | _ <;> simp [ip, ipₗ, e1, ey]
+  have hRf : ∀ g : 𝒟(Unit ⊕ Unit), (R g : Eᵣ(Unit) → ℂ) = (g : Eᵣ(Unit ⊕ Unit) → ℂ) ∘ ip :=
+    fun g ↦ funext fun y ↦ hR g y
+  have hdR : ∀ g : 𝒟(Unit ⊕ Unit), fderiv ℝ (R g : Eᵣ(Unit) → ℂ) 0 e1 =
+      fderiv ℝ (g : Eᵣ(Unit ⊕ Unit) → ℂ) 0 ey := by
+    intro g
+    have hg : DifferentiableAt ℝ (g : Eᵣ(Unit ⊕ Unit) → ℂ) (ip 0) :=
+      (g.contDiff.differentiable (by simp)).differentiableAt
+    rw [hRf, (hg.hasFDerivAt.comp 0 ip.hasFDerivAt).fderiv, ContinuousLinearMap.comp_apply,
+      hip1, map_zero]
+  -- Line derivatives of tests are directional derivatives.
+  have hline2 : ∀ (v : Eᵣ(Unit ⊕ Unit)) (g : 𝒟(Unit ⊕ Unit)) x,
+      (LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit ⊕ Unit) v g) x = fderiv ℝ (g : _ → ℂ) x v := by
+    intro v g x
+    rw [TestFunction.lineDerivOpCLM_eq_lineDerivCLM, TestFunction.lineDerivCLM_eq_fderivCLM,
+      TestFunction.fderivCLM_apply]
+    split_ifs with hk
+    · rfl
+    · exact absurd le_top hk
+  have hline1 : ∀ (v : Eᵣ(Unit)) (g : 𝒟(Unit)) x,
+      (LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit) v g) x = fderiv ℝ (g : _ → ℂ) x v := by
+    intro v g x
+    rw [TestFunction.lineDerivOpCLM_eq_lineDerivCLM, TestFunction.lineDerivCLM_eq_fderivCLM,
+      TestFunction.fderivCLM_apply]
+    split_ifs with hk
+    · rfl
+    · exact absurd le_top hk
+  -- The three multi-indices of total degree at most one.
+  let a00 : indices(Unit ⊕ Unit, 1) := ⟨fun _ ↦ 0, by simp⟩
+  let a10 : indices(Unit ⊕ Unit, 1) :=
+    ⟨Sum.elim (fun _ ↦ 1) (fun _ ↦ 0), by simp [Fintype.sum_sum_type]⟩
+  let a01 : indices(Unit ⊕ Unit, 1) :=
+    ⟨Sum.elim (fun _ ↦ 0) (fun _ ↦ 1), by simp [Fintype.sum_sum_type]⟩
+  have key : ∀ a b : Fin 2, (a : ℕ) + b ≤ 1 →
+      (a = 0 ∧ b = 0) ∨ (a = 1 ∧ b = 0) ∨ (a = 0 ∧ b = 1) := by decide
+  have hall : ∀ α : indices(Unit ⊕ Unit, 1), α = a00 ∨ α = a10 ∨ α = a01 := by
+    rintro ⟨v, hv⟩
+    have hv' : (v (.inl ()) : ℕ) + v (.inr ()) ≤ 1 := by
+      simpa [Fintype.sum_sum_type] using hv
+    rcases key _ _ hv' with ⟨ha, hb⟩ | ⟨ha, hb⟩ | ⟨ha, hb⟩
+    · exact .inl (Subtype.ext (funext fun i ↦ by rcases i with ⟨⟩ | ⟨⟩ <;> simp [a00, ha, hb]))
+    · exact .inr (.inl (Subtype.ext (funext fun i ↦ by
+        rcases i with ⟨⟩ | ⟨⟩ <;> simp [a10, ha, hb])))
+    · exact .inr (.inr (Subtype.ext (funext fun i ↦ by
+        rcases i with ⟨⟩ | ⟨⟩ <;> simp [a01, ha, hb])))
+  have hne1 : a00 ≠ a10 := fun h ↦ by
+    have := congrArg (fun α : indices(Unit ⊕ Unit, 1) ↦ ((α.val (.inl ()) : Fin 2) : ℕ)) h
+    simp [a00, a10] at this
+  have hne2 : a00 ≠ a01 := fun h ↦ by
+    have := congrArg (fun α : indices(Unit ⊕ Unit, 1) ↦ ((α.val (.inr ()) : Fin 2) : ℕ)) h
+    simp [a00, a01] at this
+  have hne3 : a10 ≠ a01 := fun h ↦ by
+    have := congrArg (fun α : indices(Unit ⊕ Unit, 1) ↦ ((α.val (.inl ()) : Fin 2) : ℕ)) h
+    simp [a10, a01] at this
+  have hsum3 : ∀ (inst : Fintype (indices(Unit ⊕ Unit, 1))) {M : Type} [AddCommMonoid M]
+      (F : indices(Unit ⊕ Unit, 1) → M),
+      @Finset.sum _ _ _ (@Finset.univ _ inst) F = F a00 + F a10 + F a01 := by
+    intro inst M _ F
+    have huniv : (@Finset.univ _ inst) = {a00, a10, a01} := by
+      ext α
+      simp only [Finset.mem_univ, Finset.mem_insert, Finset.mem_singleton, true_iff]
+      exact hall α
+    rw [huniv, Finset.sum_insert (by simp [hne1, hne2]), Finset.sum_insert (by simp [hne3]),
+      Finset.sum_singleton, add_assoc]
+  -- Distributions on the tangent line: `δ₀′` (exact order one) and `δ₀` (order zero).
+  obtain ⟨D1, hD1⟩ := distribution_coordinatePlane_decomposition_eq_sum_false_deriv e1
+  obtain ⟨δ1, hδ1, hδ1o, hδ1s⟩ :=
+    distribution_coordinatePlane_decomposition_eq_sum_false_delta (E := Eᵣ(Unit))
+  obtain ⟨hD1o1, hD1o0, hD1s⟩ := distribution_coordinatePlane_decomposition_eq_sum_false_order
+    e1 he1 1 one_ne_zero D1 fun g ↦ by rw [hD1, one_mul]
+  let A : indices(Unit ⊕ Unit, 1) → 𝒟'(Unit) := fun α ↦
+    if α = a00 then D1 else if α = a01 then δ1 else 0
+  have hA00 : A a00 = D1 := by simp [A]
+  have hA10 : A a10 = 0 := by simp [A, hne1.symm, hne3]
+  have hA01 : A a01 = δ1 := by simp [A, hne2.symm]
+  -- The distribution `T = δ₀′ ∘ R + δ₀ ∘ R ∘ ∂_y = 2 ∂_y` at the origin.
+  let dy : 𝒟(Unit ⊕ Unit) →L[ℂ] 𝒟(Unit ⊕ Unit) := LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit ⊕ Unit) ey
+  let T : 𝒟'(Unit ⊕ Unit) := D1.comp R + δ1.comp (R.comp dy)
+  have hT : ∀ g, T g = 2 * fderiv ℝ (g : Eᵣ(Unit ⊕ Unit) → ℂ) 0 ey := by
+    intro g
+    show D1 (R g) + δ1 (R (dy g)) = _
+    rw [hD1, hdR, hδ1, hR, hip0, hline2]
+    ring
+  obtain ⟨hT1, hT0, hTs⟩ :=
+    distribution_coordinatePlane_decomposition_eq_sum_false_order ey hey 2 two_ne_zero T hT
+  -- Coordinate derivatives of the three multi-indices, for any decidable-equality instance
+  -- (the statement was elaborated with classical ones).
+  have hd00 : ∀ inst : DecidableEq (Unit ⊕ Unit),
+      coordinateDerivative (fun i : Unit ⊕ Unit ↦ LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit ⊕ Unit)
+        (WithLp.toLp 2 (haveI := inst; Pi.single i (1 : ℝ)) : Eᵣ(Unit ⊕ Unit))) multi(a00) = 1 := by
+    intro inst
+    have : multi(a00) = (0 : Unit ⊕ Unit → ℕ) := funext fun i ↦ rfl
+    rw [this, coordinateDerivative_zero]
+  have hd01 : ∀ inst : DecidableEq (Unit ⊕ Unit),
+      coordinateDerivative (fun i : Unit ⊕ Unit ↦ LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit ⊕ Unit)
+        (WithLp.toLp 2 (haveI := inst; Pi.single i (1 : ℝ)) : Eᵣ(Unit ⊕ Unit))) multi(a01) = dy := by
+    intro inst
+    have : multi(a01) = (Pi.single (Sum.inr ()) 1 : Unit ⊕ Unit → ℕ) :=
+      funext fun i ↦ by rcases i with ⟨⟩ | ⟨⟩ <;> simp [a01]
+    rw [this]
+    convert (coordinateDerivative_single _ (Sum.inr ()) 1).trans (pow_one _)
+    infer_instance
+  have hdU : ∀ inst : DecidableEq Unit,
+      coordinateDerivative (fun i : Unit ↦ LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit)
+        (WithLp.toLp 2 (haveI := inst; Pi.single i (1 : ℝ)) : Eᵣ(Unit)))
+        (fun x : Unit ↦ ((a01.val (Sum.inr x) : Fin 2) : ℕ)) =
+        LineDeriv.lineDerivOpCLM ℂ 𝒟(Unit) e1 := by
+    intro inst
+    have : (fun x : Unit ↦ ((a01.val (Sum.inr x) : Fin 2) : ℕ)) = (Pi.single () 1 : Unit → ℕ) :=
+      funext fun x ↦ by simp [a01]
+    rw [this]
+    convert (coordinateDerivative_single _ () 1).trans (pow_one _)
+  have hzero_s : Distribution.dsupport ⇑(0 : 𝒟'(Unit)) ⊆ {0} := fun x hx ↦ by
+    by_contra hx0
+    exact (Distribution.notMem_dsupport_iff x).2
+      ⟨{0}ᶜ, fun ψ _ ↦ rfl, isOpen_compl_singleton, hx0⟩ hx
+  have hzero_o : DistributionOrderLE (⇑(0 : 𝒟'(Unit))) 0 :=
+    fun K ↦ ⟨0, le_rfl, fun f _ B _ _ ↦ by simp⟩
+  have hAo : ∀ α : indices(Unit ⊕ Unit, 1), exactOrder(A α, 1 - degree(multi(α))) ∧
+      IsCompact (Distribution.dsupport (⇑(A α))) := by
+    intro α
+    rcases hall α with rfl | rfl | rfl
+    · have : 1 - degree(multi(a00)) = 1 := by simp [a00]
+      rw [hA00, this]
+      exact ⟨⟨hD1o1, fun k hk ↦ by obtain rfl : k = 0 := (by omega); exact hD1o0⟩,
+        ((Set.finite_singleton 0).subset hD1s).isCompact⟩
+    · have : 1 - degree(multi(a10)) = 0 := by simp [a10, Fintype.sum_sum_type]
+      rw [hA10, this]
+      exact ⟨⟨hzero_o, fun k hk ↦ absurd hk (Nat.not_lt_zero k)⟩,
+        ((Set.finite_singleton 0).subset hzero_s).isCompact⟩
+    · have : 1 - degree(multi(a01)) = 0 := by simp [a01, Fintype.sum_sum_type]
+      rw [hA01, this]
+      exact ⟨⟨hδ1o, fun k hk ↦ absurd hk (Nat.not_lt_zero k)⟩,
+        ((Set.finite_singleton 0).subset hδ1s).isCompact⟩
+  have hEq := h Unit Unit T 1
+    ⟨hT1, fun k hk ↦ by obtain rfl : k = 0 := (by omega); exact hT0⟩
+    ((Set.finite_singleton 0).subset hTs).isCompact
+    (hTs.trans (Set.singleton_subset_iff.2 ⟨0, hip0⟩)) A hAo fun g ↦ by
+      rw [hsum3, hA00, hA10, hA01, hd00, hd01]
+      simp [T]
+      rfl
+  -- Evaluate both sides at a test equal to `y` near the origin.
+  obtain ⟨f0, hf0⟩ := distribution_coordinatePlane_decomposition_eq_sum_false_linearTest ey
+  have hTf0 : T f0 = 2 := by
+    rw [hT, hf0.fderiv_eq]
+    show 2 * (fderiv ℝ ⇑(Complex.ofRealCLM.comp (innerSL ℝ ey)) 0) ey = 2
+    rw [ContinuousLinearMap.fderiv]
+    simp [hey]
+  have hRHS := congrArg (fun S : 𝒟'(Unit ⊕ Unit) ↦ S f0) hEq
+  simp only [FunLike.coe_sum, Finset.sum_apply] at hRHS
+  rw [hsum3, hA00, hA10, hA01] at hRHS
+  -- The three terms of (5.3.2.6): `δ₀′(R f₀)`, zero, and `-(R f₀)′(0)`; they cancel.
+  have hn00 : (fun i : Unit ↦ ((a00.val (Sum.inl i) : Fin 2) : ℕ)) = 0 := funext fun _ ↦ rfl
+  have ht00 : (fun x : Unit ↦ ((a00.val (Sum.inr x) : Fin 2) : ℕ)) = 0 := funext fun _ ↦ rfl
+  have hn01 : (fun i : Unit ↦ ((a01.val (Sum.inl i) : Fin 2) : ℕ)) = 0 := funext fun _ ↦ rfl
+  have hw01 : (∑ x : Unit, ((a01.val (Sum.inr x) : Fin 2) : ℕ)) = 1 := by simp [a01]
+  rw [hn00, coordinatePlaneDiracTensor_zero, coordinateDerivative_zero, hn01,
+    coordinatePlaneDiracTensor_zero, hdU, hw01] at hRHS
+  simp only [coordinatePlaneDiracTensor, ContinuousLinearMap.zero_comp, smul_zero,
+    zero_apply, add_zero,
+    ContinuousLinearMap.comp_apply, one_apply_eq_self, pow_zero, pow_one,
+    one_smul, neg_smul, Finset.sum_const_zero, Pi.zero_apply,
+    neg_apply] at hRHS
+  rw [hD1, hδ1, hline1, hTf0] at hRHS
+  norm_num at hRHS
 
 local notation "factors(" f ", " g ", " x ")" =>
   f (WithLp.toLp 2 (fun i ↦ x (.inl i))) * g (WithLp.toLp 2 (fun j ↦ x (.inr j)))
