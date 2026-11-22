@@ -5,6 +5,8 @@ public import Mathlib.Analysis.Normed.Module.Bases
 public import Mathlib.Analysis.Normed.Module.DoubleDual
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch10_TraceSpectral.Sec3
+import all RiemannMasullo.AppC_LCTVS.Sec3a
+import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
 /-!
 # Spectral and geometric truncations
@@ -218,7 +220,13 @@ theorem hardySobolevTranslation_zeroBase_powers_unbounded (n : ℕ) (_hn : 0 < n
 /-- Paper: Remark 10.4.1.4, p. 457. By invariance of theta, an output
 geometric projection has no effect after convolution of a geometric vector. -/
 theorem geometricProjection_convolution_geometricProjection (φ : BruhatCompactSupport C𝔽) :
-    (Pgeom).comp ((A(φ)).comp Pgeom) = (A(φ)).comp Pgeom := by sorry
+    (Pgeom).comp ((A(φ)).comp Pgeom) = (A(φ)).comp Pgeom := by
+  apply ContinuousLinearMap.ext
+  intro u
+  apply geometricProjection_apply_of_mem a hα hs
+  apply (Submodule.Quotient.mk_eq_zero _).mp
+  exact hardySobolevTestAction_preserves_globalTheta (F := F) a (hStrip(hα)) hs φ
+    ((Θ₀).starProjection_apply_mem u)
 
 /-- Paper: Remark 10.4.1.4, p. 458. Spectral projection after convolution
 depends only on the input's spectral projection. -/
@@ -323,19 +331,42 @@ Deviation: Quotient nuclearity is explicit so the theorem applies at every
 nonnegative degree where this input holds. Section 10.3 states it for s > 1. Its proof is subject to ERRATA R5. -/
 theorem spectralProjection_convolution_nuclear (φ : BruhatCompactSupport C𝔽)
     (_hquot : quotientNuclear(φ)) :
-    IsNuclearOperator ((Pspec).comp (A(φ))) := by sorry
+    IsNuclearOperator ((Pspec).comp (A(φ))) := by
+  rw [spectralProjection_convolution_factor]
+  let e := (Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv
+  exact isNuclearOperator_comp_comp _hquot Qₐ ((Θ₀).orthogonal.subtypeL.comp e.toContinuousLinearMap)
+    (Subtype.val_injective.comp e.injective)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation of convolution is nuclear.
 Deviation: Quotient nuclearity is explicit, as for the untruncated operator. -/
 theorem spectralTruncatedConvolution_nuclear (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽)
     (_hquot : quotientNuclear(φ)) :
-    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) := by sorry
+    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) := by
+  exact mul_mem_nuclearEndomorphisms_left (M(hρ))
+    ⟨(Pspec).comp (A(φ)), spectralProjection_convolution_nuclear a hα hs φ _hquot⟩
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation of convolution is nuclear.
 Deviation: Quotient nuclearity is explicit, as for spectral truncation. -/
 theorem geometricTruncatedConvolution_nuclear (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (_hband : innerBand)
     (φ : BruhatCompactSupport C𝔽) (_hquot : quotientNuclear(φ)) :
-    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) := by sorry
+    IsNuclearOperator (geometricTruncatedConvolution a hα hs hρ φ) := by
+  have hφs : IsBruhatSmooth φ.val := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1
+  have hc := continuous_of_bruhatSmooth hφs
+  have hb := hc.bounded_above_of_compact_support (show HasCompactSupport φ.val from φ.property.2)
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hsur : Function.Surjective m𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  obtain ⟨hT, _, _⟩ := truncatedHardySobolevConvolution_trace μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ.val
+    hc.aemeasurable φ.property.2 hb hm hsur hφs hρ _hband
+  have hconv := hardySobolevConvolution_eq_testAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ hc.aemeasurable hb
+  let T : W₀ →L[ℂ] W₀ := (M(hρ)).comp (A(φ))
+  have hn : T ∈ nuclearEndomorphisms W₀ :=
+    (congrArg (fun U : W₀ →L[ℂ] W₀ ↦ IsNuclearOperator (E := W₀) (F := W₀) ((M(hρ)).comp U)) hconv).mp hT
+  let S : nuclearEndomorphisms W₀ := ⟨_, spectralTruncatedConvolution_nuclear a hα hs hρ φ _hquot⟩
+  have heq := truncatedConvolution_eq_geometric_add_spectral (F := F) a hα hs hρ φ
+  have hdiff : geometricTruncatedConvolution a hα hs hρ φ = T - S.val :=
+    eq_sub_of_add_eq heq.symm
+  exact (congrArg (fun U : W₀ →L[ℂ] W₀ ↦ IsNuclearOperator U) hdiff).mpr
+    ((nuclearEndomorphisms W₀).sub_mem hn S.property)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. The nuclear trace of cutoff convolution
 splits as the sum of the geometric and spectral traces.
@@ -429,7 +460,28 @@ theorem exists_biorthogonalBasisLift (x : ι → E ⧸ E₀) (f : ι → StrongD
     (_hdense : E₀ ≤ (V ⊓ E₀).topologicalClosure) (_himage : ∀ m, x m ∈ V.map E₀.mkQ) :
     ∃ u : ι → E,
       (∀ m, u m ∈ V ∧ E₀.mkQ (u m) = x m ∧ ‖u m‖ ∈ Ioo (r - ε) (r' + ε)) ∧
-      ∀ m n, f m (E₀.mkQ (u n)) = if m = n then 1 else 0 := by sorry
+      ∀ m n, f m (E₀.mkQ (u n)) = if m = n then 1 else 0 := by
+  classical
+  have lift (m : ι) : ∃ u : E, u ∈ V ∧ E₀.mkQ u = x m ∧ ‖u‖ ∈ Ioo (r - ε) (r' + ε) := by
+    obtain ⟨v, hv, hqv⟩ := _himage m
+    obtain ⟨z, hz, hn⟩ := Submodule.Quotient.norm_mk_lt (x m) (half_pos _hε)
+    have hdiff : v - z ∈ E₀ := (Submodule.Quotient.mk_eq_zero _).mp (by
+      change E₀.mkQ (v - z) = 0
+      rw [map_sub, hqv, show E₀.mkQ z = x m from hz, sub_self])
+    obtain ⟨d, hd, hdist⟩ := Metric.mem_closure_iff.mp (_hdense hdiff) (ε / 2) (half_pos _hε)
+    have hqd : E₀.mkQ d = 0 := (Submodule.Quotient.mk_eq_zero _).mpr hd.2
+    have hqu : E₀.mkQ (v - d) = x m := by rw [map_sub, hqv, hqd, sub_zero]
+    refine ⟨v - d, V.sub_mem hv hd.1, hqu, ?_, ?_⟩
+    · have hu := Submodule.Quotient.norm_mk_le E₀ (v - d)
+      change ‖E₀.mkQ (v - d)‖ ≤ _ at hu
+      rw [hqu] at hu
+      linarith [(_hcollar m).1]
+    · rw [dist_eq_norm] at hdist
+      have heq : v - d = z + (v - z - d) := by abel
+      rw [heq]
+      linarith [norm_add_le z (v - z - d), (_hcollar m).2]
+  choose u hu using lift
+  exact ⟨u, hu, fun m n ↦ (congrArg (f m) (hu n).2.1).trans (_hbio m n)⟩
 
 /-- Paper: Lemma 10.4.2.5, p. 461. Lifts can be chosen to remain inside the
 enlarged collar under sufficiently small kernel perturbations. Each perturbed
@@ -474,7 +526,15 @@ theorem isEpsilonBasisLift_of_mkQ_eq (x : ι → E ⧸ E₀) (f : ι → StrongD
 /-- Paper: Remark 10.4.2.6, p. 463. The image of the open unit ball under
 the quotient map is exactly the open unit ball in the quotient norm. -/
 theorem quotient_image_openUnitBall :
-    E₀.mkQ '' Metric.ball 0 1 = Metric.ball 0 1 := by sorry
+    E₀.mkQ '' Metric.ball 0 1 = Metric.ball 0 1 := by
+  ext y
+  simp only [Set.mem_image, Metric.mem_ball, dist_zero_right]
+  constructor
+  · rintro ⟨x, hx, rfl⟩
+    exact (Submodule.Quotient.norm_mk_le E₀ x).trans_lt hx
+  · intro hy
+    obtain ⟨x, hxy, hx⟩ := Submodule.Quotient.norm_mk_lt y (sub_pos.mpr hy)
+    exact ⟨x, by linarith, hxy⟩
 
 /-- Paper: Remark 10.4.2.6, p. 463. In a reflexive Banach space the quotient
 map also takes the closed unit ball onto the closed unit ball. -/
@@ -512,7 +572,18 @@ theorem exists_hilbertBasisLift_closedSpan_equiv {E : Type*} [NormedAddCommGroup
 obtained by spectral projection, convolution and cutoff is nuclear. -/
 theorem spectralRestriction_nuclear (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (_hband : innerBand)
     (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (spectralRestriction a hα hs hρ φ) := by sorry
+    IsNuclearOperator (spectralRestriction a hα hs hρ φ) := by
+  have hφs : IsBruhatSmooth φ.val := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1
+  have hc := continuous_of_bruhatSmooth hφs
+  have hb := hc.bounded_above_of_compact_support (show HasCompactSupport φ.val from φ.property.2)
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hsur : Function.Surjective m𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  obtain ⟨hT, _, _⟩ := truncatedHardySobolevConvolution_trace μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ.val
+    hc.aemeasurable φ.property.2 hb hm hsur hφs hρ _hband
+  have hconv := hardySobolevConvolution_eq_testAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ hc.aemeasurable hb
+  have hn : IsNuclearOperator ((M(hρ)).comp (A(φ))) :=
+    (congrArg (fun U : W₀ →L[ℂ] W₀ ↦ IsNuclearOperator ((M(hρ)).comp U)) hconv).mp hT
+  exact mul_mem_nuclearEndomorphisms_right (H := W₀) Pspec ⟨_, hn⟩
 
 -- In (10.4.2.21)–(10.4.2.24), use SpectralStripJetIndex and spectralZeroJet:
 -- the zero is at a + b + it and the jet exponent is b + it. Proposition
