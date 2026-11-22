@@ -215,7 +215,20 @@ def IsDiagonalIndentationSituation (μ : Measure G) (D : Set G) (U : ℕ → Set
 /-- Paper: Situation 12.2.2.1, p. 508. On the one-element group, the whole space
 is a fundamental domain and also supplies the constant neighborhood sequence. -/
 theorem isDiagonalIndentationSituation_subsingleton [Subsingleton G] :
-    IsDiagonalIndentationSituation (⊥ : Subgroup G) Measure.count univ (fun _ ↦ univ) := by sorry
+    IsDiagonalIndentationSituation (⊥ : Subgroup G) Measure.count univ (fun _ ↦ univ) := by
+  have hmass : (Measure.count : Measure G) univ = 1 := by
+    simp [Subsingleton.count_eq_dirac (1 : G)]
+  refine ⟨⟨by simp, fun x ↦ ⟨1, mem_univ _, fun h _ ↦ Subsingleton.elim _ _⟩,
+    fun h hh ↦ (hh (Subsingleton.elim _ _)).elim⟩, ⟨⟨?_, antitone_const, ?_⟩, ?_⟩, ?_⟩
+  · intro n
+    simp [hmass]
+  · refine ⟨2, by norm_num, fun n ↦ ?_⟩
+    simp [hmass]
+  · intro W hW
+    refine ⟨0, fun x _ ↦ ?_⟩
+    simpa only [Subsingleton.elim x (1 : G)] using mem_of_mem_nhds hW
+  · intro n
+    simp
 
 variable [DiscreteTopology H] (hH : IsClosed (H : Set G))
   {μ : Measure G} [μ.IsHaarMeasure] {ν : Measure (G ⧸ H)}
