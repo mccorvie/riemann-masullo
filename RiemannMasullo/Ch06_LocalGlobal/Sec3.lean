@@ -279,7 +279,37 @@ A unitary character trivial on the norm-one subgroup has a unique real
 norm-twist parameter. -/
 theorem globalConverse_existsUnique_normTwist (χ : U) (_hχ : χ₁(χ) = 1) :
     ∃! t : ℝ, χ₀(χ) = ideleClassNormTwist (1 : U) (shift(t)) := by
-  sorry
+  have hTriv (g : C𝔽) (hg : ideleClassNorm F g = 1) : χ g = 1 :=
+    DFunLike.congr_fun _hχ ⟨g, hg⟩
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  obtain ⟨z, ⟨hzre, hz⟩, huniq⟩ :=
+    existsUnique_unitaryComplexPower (j.comp (χ.comp σ)) (fun r ↦ Circle.norm_coe _)
+  have hval (ψ : U) (s : ℂ) (g : C𝔽) : ideleClassNormTwist ψ s g =
+      (ψ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ s := rfl
+  have hzI : z = shift(z.im) := by
+    apply Complex.ext <;> simp [hzre]
+  have hχg (g : C𝔽) : (χ g : ℂ) = (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ z := by
+    have hn : ideleClassNorm F (g * (σ (ideleClassNorm F g))⁻¹) = 1 := by
+      rw [map_mul, map_inv, hσ _, mul_inv_cancel]
+    have hg : g = (g * (σ (ideleClassNorm F g))⁻¹) * σ (ideleClassNorm F g) := by group
+    conv_lhs => rw [hg, map_mul, hTriv _ hn, one_mul]
+    exact hz (ideleClassNorm F g)
+  refine ⟨z.im, ?_, fun t ht ↦ ?_⟩
+  · ext g
+    rw [hval, hval, Complex.cpow_zero, mul_one, PontryaginDual.one_apply, Circle.coe_one, one_mul,
+      ← hzI]
+    exact hχg g
+  · have := huniq (shift(t)) ⟨by simp, fun r ↦ ?_⟩
+    · rw [← this]; simp
+    have h := DFunLike.congr_fun ht (σ r)
+    rw [hval, hval, Complex.cpow_zero, mul_one, PontryaginDual.one_apply, Circle.coe_one,
+      one_mul, hσ r] at h
+    exact h
+
 
 /-- Paper: Theorem 6.3.2.1(1), p. 304, equation (6.3.2.4).
 On tests with both polar values zero the Mellin transform is relatively open,
