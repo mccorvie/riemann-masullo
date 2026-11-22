@@ -339,7 +339,15 @@ A weighted test function lies in the isotype exactly when it obeys the
 norm-one translation law at every idele class. -/
 theorem mem_sLocalDecayIsotype (I : Set ℝ) (ω : PontryaginDual J₁) (φ : Ẽ(I)) :
     φ ∈ sLocalDecayIsotype (F := F) (S := S) I ω ↔
-      ∀ (u : J₁) (g : Jₛ), φ.val (u.val⁻¹ * g) = (ω u : ℂ) * φ.val g := by sorry
+      ∀ (u : J₁) (g : Jₛ), φ.val (u.val⁻¹ * g) = (ω u : ℂ) * φ.val g := by
+  have criterion {U X E : Type _} [AddCommGroup E] [Module ℂ E]
+      (ev : X → E →ₗ[ℂ] ℂ) (shift : U → X → X) (c : U → ℂ) (f : E) :
+      f ∈ (⨅ u, ⨅ x, LinearMap.ker (ev (shift u x) - c u • ev x)) ↔
+        ∀ u x, ev (shift u x) f = c u * ev x f := by
+    simp only [Submodule.mem_iInf, LinearMap.mem_ker, LinearMap.sub_apply,
+      LinearMap.smul_apply, smul_eq_mul, sub_eq_zero]
+  exact criterion (fun g : Jₛ ↦ decayEval(I, g)) (fun (u : J₁) g ↦ u.val⁻¹ * g)
+    (fun u ↦ (ω u : ℂ)) φ
 
 /-- Paper: (5.4.2.3), p. 275, and Proposition D.3.3.12, p. 811.
 The coordinate equations give the Appendix D isotype for its translation action. -/
