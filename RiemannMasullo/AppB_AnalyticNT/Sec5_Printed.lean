@@ -30,7 +30,15 @@ single frequency `1` is rationally independent, and times zero and one have the 
 image modulo one. -/
 theorem Printed.torusFlow_injective_of_linearIndependent_false :
     ¬ Printed.torusFlow_injective_of_linearIndependent := by
-  sorry
+  intro h
+  have hli : LinearIndependent ℚ (fun _ : Fin 1 ↦ (1 : ℝ)) :=
+    linearIndependent_unique_iff.mpr one_ne_zero
+  have h01 :
+      torusFlow (fun _ : Fin 1 ↦ (1 : ℝ)) 1 = torusFlow (fun _ : Fin 1 ↦ (1 : ℝ)) 0 := by
+    rw [torusFlow_one, map_zero]
+    funext i
+    exact AddCircle.coe_period (1 : ℝ)
+  exact one_ne_zero (h 1 le_rfl _ hli h01)
 
 /-- Paper: Theorem B.5.2.1(2), p. 627. As printed: for every frequency vector
 and every Riemann-integrable function on its orbit closure, the forward time average
