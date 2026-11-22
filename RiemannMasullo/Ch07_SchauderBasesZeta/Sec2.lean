@@ -383,7 +383,16 @@ theorem sLocalPrincipalPartCoeff_leading_formula (c : Xₛ) (hc : 0 < sLocalRhoP
 The leading principal-part functional transforms with weight given by the center. -/
 theorem sLocalPrincipalPartCoeff_leading_eigendistribution (c : Xₛ)
     (hc : 0 < sLocalRhoPoleOrder c) :
-    sLocalPrincipalPartCoeff c (sLocalRhoPoleOrder c) ∈ sLocalEigendistributions c := by sorry
+    sLocalPrincipalPartCoeff c (sLocalRhoPoleOrder c) ∈ sLocalEigendistributions c := by
+  have leading (m : ℕ) (hm : 0 < m) (a : ℕ → ℂ) (t : ℂ) :
+      (∑ j ∈ Finset.range (m - m + 1), a (m + j) * t ^ j / (j.factorial : ℂ)) = a m := by
+    obtain ⟨n, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hm.ne'
+    simp
+  apply (mem_sLocalEigendistributions (F := F) (S := S) c _).2
+  intro u f
+  have h := sLocalPrincipalPartCoeff_translate (F := F) (S := S) c (sLocalRhoPoleOrder c) le_rfl u f
+  exact h.trans (congrArg (c (QuotientGroup.mk u) * ·)
+    (leading _ hc (fun k ↦ sLocalPrincipalPartCoeff c k f) _))
 
 /-- Paper: Theorem 7.2.1.4(2), p. 337.
 Each lower coefficient is a convolution of Laurent coefficients of the correcting
