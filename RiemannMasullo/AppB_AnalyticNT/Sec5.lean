@@ -1201,6 +1201,183 @@ theorem exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow
     linarith [(hI k).2]
   · simpa only [T, hprod] using hbound k
 
+/-- Returns of a torus flow to a neighbourhood of zero fill a positive proportion of both
+`[0, T]` and `[-T, 0]` for all large `T`. This is the equidistribution input of
+Proposition B.5.3.3, taken from the continuous Kronecker–Weyl theorems on the orbit closure. -/
+private theorem reciprocalPartialHeckeEulerProduct_upperDensity_flowReturns (N : ℕ)
+    (τ : Fin N → ℝ) {W : Set (UnitAddTorus (Fin N))} (hW : W ∈ 𝓝 0) :
+    ∃ c : ℝ, 0 < c ∧ ∀ᶠ T : ℝ in atTop,
+      c * T ≤ volume.real (Icc 0 T ∩ {t | torusFlow τ t ∈ W}) ∧
+      c * T ≤ volume.real (Icc (-T) 0 ∩ {t | torusFlow τ t ∈ W}) := by
+  classical
+  rcases Nat.eq_zero_or_pos N with rfl | hN
+  · -- In dimension zero the torus is a point, so every time is a return.
+    have hall : {t : ℝ | torusFlow τ t ∈ W} = univ := by
+      ext t
+      simp only [mem_ofPred_eq, mem_univ, iff_true]
+      rw [Subsingleton.elim (torusFlow τ t) 0]
+      exact mem_of_mem_nhds hW
+    refine ⟨1, one_pos, (eventually_ge_atTop 0).mono fun T hT ↦ ?_⟩
+    rw [hall, inter_univ, inter_univ, Real.volume_real_Icc_of_le hT,
+      Real.volume_real_Icc_of_le (by linarith)]
+    constructor <;> linarith
+  have : NeZero N := ⟨hN.ne'⟩
+  obtain ⟨O, hOW, hO, h0O⟩ := mem_nhds_iff.mp hW
+  obtain ⟨φ, hφ0, hφ1, hφ01⟩ := exists_continuous_zero_one_of_isClosed hO.isClosed_compl
+    (isClosed_singleton (x := (0 : UnitAddTorus (Fin N))))
+    (disjoint_singleton_right.mpr fun h ↦ h h0O)
+  have : CompactSpace (torusFlowClosure τ) := isCompact_iff_compactSpace.mp
+    (AddSubgroup.isClosed_topologicalClosure _).isCompact
+  let μ : Measure (torusFlowClosure τ) := Measure.addHaarMeasure ⊤
+  have : IsProbabilityMeasure μ := ⟨Measure.addHaarMeasure_self⟩
+  let u : C(torusFlowClosure τ, ℂ) :=
+    ⟨fun x ↦ (φ x : ℂ), Complex.continuous_ofReal.comp (φ.continuous.comp continuous_subtype_val)⟩
+  -- The mean of the bump over the orbit closure is positive.
+  set c₀ : ℝ := ∫ x, φ (x : UnitAddTorus (Fin N)) ∂μ with hc₀
+  have hc₀pos : 0 < c₀ :=
+    (φ.continuous.comp continuous_subtype_val).integral_pos_of_hasCompactSupport_nonneg_ne_zero
+      (x := (0 : torusFlowClosure τ)) (HasCompactSupport.of_compactSpace _)
+      (fun x ↦ (hφ01 _).1) (by simp [hφ1 (mem_singleton (0 : UnitAddTorus (Fin N)))])
+  have hmean : (∫ x, u x ∂μ) = (c₀ : ℂ) := integral_ofReal
+  let g : ℝ → ℝ := fun t ↦ φ (torusFlow τ t)
+  have hg : Continuous g := φ.continuous.comp (torusFlow τ).continuous
+  have hcoe (a b : ℝ) : (∫ t in a..b, u (torusFlowInClosure τ t)) = ((∫ t in a..b, g t : ℝ) : ℂ) :=
+    intervalIntegral.integral_ofReal
+  have hre {f : ℝ → ℝ} {l : ℝ} (h : Tendsto (fun T : ℝ ↦ ((f T : ℝ) : ℂ)) atTop (𝓝 (l : ℂ))) :
+      Tendsto f atTop (𝓝 l) := by
+    simpa [Function.comp_def] using (Complex.continuous_re.tendsto _).comp h
+  have hfwd : Tendsto (fun T : ℝ ↦ T⁻¹ * ∫ t in (0 : ℝ)..T, g t) atTop (𝓝 c₀) := by
+    refine hre ?_
+    have h := kroneckerWeyl_continuous_forward τ μ u
+    rw [hmean] at h
+    refine h.congr fun T ↦ ?_
+    rw [hcoe, Complex.real_smul, Complex.ofReal_mul]
+  have hsym : Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ * ∫ t in -T..T, g t) atTop (𝓝 c₀) := by
+    refine hre ?_
+    have h := kroneckerWeyl_continuous_symmetric τ μ u
+    rw [hmean] at h
+    refine h.congr fun T ↦ ?_
+    rw [hcoe, Complex.real_smul, Complex.ofReal_mul]
+  have hII (a b : ℝ) : IntervalIntegrable g volume a b := hg.intervalIntegrable a b
+  have hbwd : Tendsto (fun T : ℝ ↦ T⁻¹ * ∫ t in -T..0, g t) atTop (𝓝 c₀) := by
+    have h := (hsym.const_mul 2).sub hfwd
+    rw [show 2 * c₀ - c₀ = c₀ by ring] at h
+    refine h.congr' ((eventually_ne_atTop 0).mono fun T hT ↦ ?_)
+    rw [← intervalIntegral.integral_add_adjacent_intervals (hII (-T) 0) (hII 0 T)]
+    field_simp
+    ring
+  -- Along the flow the bump is at most the indicator of the returns.
+  let P : Set ℝ := {t | torusFlow τ t ∈ O}
+  have hPmeas : MeasurableSet P := (hO.preimage (torusFlow τ).continuous).measurableSet
+  have hgP : ∀ t, g t ≤ P.indicator (fun _ ↦ (1 : ℝ)) t := by
+    intro t
+    by_cases ht : t ∈ P
+    · rw [indicator_of_mem ht]
+      exact (hφ01 _).2
+    · rw [indicator_of_notMem ht]
+      exact (hφ0 ht).le
+  have hbound {a b : ℝ} (hab : a ≤ b) :
+      ∫ t in a..b, g t ≤ volume.real (Icc a b ∩ {t | torusFlow τ t ∈ W}) := by
+    have : IsFiniteMeasure (volume.restrict (Ioc a b)) :=
+      isFiniteMeasure_restrict.mpr measure_Ioc_lt_top.ne
+    rw [intervalIntegral.integral_of_le hab]
+    calc ∫ t in Ioc a b, g t ≤ ∫ t in Ioc a b, P.indicator (fun _ ↦ (1 : ℝ)) t :=
+          integral_mono (hg.integrableOn_Icc.mono_set Ioc_subset_Icc_self)
+            ((integrable_const (1 : ℝ)).indicator hPmeas) hgP
+      _ = volume.real (P ∩ Ioc a b) := by
+          rw [integral_indicator_const _ hPmeas, smul_eq_mul, mul_one,
+            measureReal_restrict_apply hPmeas]
+      _ ≤ volume.real (Icc a b ∩ {t | torusFlow τ t ∈ W}) :=
+          measureReal_mono (fun t ht ↦ ⟨Ioc_subset_Icc_self ht.2, hOW ht.1⟩)
+            ((measure_mono inter_subset_left).trans_lt measure_Icc_lt_top).ne
+  refine ⟨c₀ / 2, half_pos hc₀pos, ?_⟩
+  filter_upwards [hfwd.eventually (lt_mem_nhds (half_lt_self hc₀pos)),
+    hbwd.eventually (lt_mem_nhds (half_lt_self hc₀pos)), eventually_gt_atTop 0] with T h₁ h₂ hT
+  rw [inv_mul_eq_div, lt_div_iff₀ hT] at h₁ h₂
+  exact ⟨h₁.le.trans (hbound hT.le), h₂.le.trans (hbound (by linarith))⟩
+
+/-- Vertical shifts whose phases at the primes of `S` are close to one uniformly approximate
+the reciprocal partial Euler product on a compact set, and such shifts fill a positive
+proportion of both `[0, T]` and `[-T, 0]` for all large `T`. -/
+private theorem reciprocalPartialHeckeEulerProduct_upperDensity_returns
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (hχ : ∀ v ∈ S, (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    {K : Set ℂ} (hK : IsCompact K) {ε : ℝ} (hε : 0 < ε) :
+    ∃ c : ℝ, 0 < c ∧ ∀ᶠ T : ℝ in atTop,
+      c * T ≤ volume.real
+        (Icc 0 T ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) ∧
+      c * T ≤ volume.real
+        (Icc (-T) 0 ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) := by
+  classical
+  let e := S.equivFin
+  let q (i : Fin S.card) : ℕ := (e.symm i).val.asIdeal.absNorm
+  have hq (i : Fin S.card) : (q i : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm (e.symm i).val)).ne'
+  let a (i : Fin S.card) : ℂ := (ideleClassNormTwist χ 0).localValue (e.symm i).val
+  let τ (i : Fin S.card) : ℝ := -Real.log (q i) / (2 * Real.pi)
+  let Φ (z : ℂ) (x : UnitAddTorus (Fin S.card)) : ℂ :=
+    ∏ i, (1 - a i * (q i : ℂ) ^ (-z) * fourier 1 (x i))
+  have hphase (i : Fin S.card) (t : ℝ) :
+      (fourier 1 ((torusFlow τ t) i) : ℂ) = (q i : ℂ) ^ (-((t : ℂ) * Complex.I)) := by
+    change (fourier 1 (((t * τ i : ℝ)) : AddCircle (1 : ℝ)) : ℂ) = _
+    rw [fourier_coe_apply, Complex.cpow_def_of_ne_zero (hq i), ← Complex.natCast_log]
+    congr 1
+    simp only [τ]
+    push_cast
+    field_simp
+  have hΦ (z : ℂ) (t : ℝ) :
+      reciprocalPartialHeckeEulerProduct χ S (z + (t : ℂ) * Complex.I) = Φ z (torusFlow τ t) := by
+    rw [reciprocalPartialHeckeEulerProduct, ← Finset.prod_coe_sort, ← e.symm.prod_comp]
+    refine Finset.prod_congr rfl fun i _ ↦ ?_
+    rw [finiteHeckeEulerFactor, ite_eq_left (hχ _ (e.symm i).property), inv_inv, hphase,
+      neg_add, Complex.cpow_add _ _ (hq i)]
+    ring
+  have hΦ0 (z : ℂ) : reciprocalPartialHeckeEulerProduct χ S z = Φ z 0 := by
+    simpa [map_zero] using hΦ z 0
+  have hcont : Continuous fun p : UnitAddTorus (Fin S.card) × ℂ ↦ ‖Φ p.2 p.1 - Φ p.2 0‖ := by
+    have hpow (i : Fin S.card) : Continuous fun z : ℂ ↦ (q i : ℂ) ^ (-z) :=
+      continuous_neg.const_cpow (Or.inl (hq i))
+    have hΦc : Continuous fun p : UnitAddTorus (Fin S.card) × ℂ ↦ Φ p.2 p.1 := by
+      refine continuous_finsetProd _ fun i _ ↦ ?_
+      exact continuous_const.sub ((continuous_const.mul ((hpow i).comp continuous_snd)).mul
+        ((fourier 1).continuous.comp ((continuous_apply i).comp continuous_fst)))
+    have hΦc0 : Continuous fun p : UnitAddTorus (Fin S.card) × ℂ ↦ Φ p.2 0 :=
+      hΦc.comp (continuous_const.prodMk continuous_snd)
+    exact (hΦc.sub hΦc0).norm
+  have hW : ∀ᶠ x in 𝓝 (0 : UnitAddTorus (Fin S.card)), ∀ z ∈ K, ‖Φ z x - Φ z 0‖ < ε / 2 :=
+    hK.eventually_forall_of_forall_eventually fun z _ ↦
+      (hcont.tendsto (0, z)).eventually (gt_mem_nhds (by simpa using half_pos hε))
+  have hsub : {t | torusFlow τ t ∈ {x | ∀ z ∈ K, ‖Φ z x - Φ z 0‖ < ε / 2}} ⊆
+      verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε := by
+    intro t ht
+    refine lt_of_le_of_lt (iSup_le fun z ↦ ?_)
+      ((ENNReal.ofReal_lt_ofReal_iff hε).mpr (half_lt_self hε))
+    rw [hΦ, hΦ0, ← eNorm_eq_nnNorm, ← ofReal_norm]
+    exact ENNReal.ofReal_le_ofReal (ht z z.2).le
+  obtain ⟨c, hc, hev⟩ := reciprocalPartialHeckeEulerProduct_upperDensity_flowReturns _ τ hW
+  have hfin (A B : Set ℝ) (a b : ℝ) (h : A ⊆ B) :
+      volume.real (Icc a b ∩ A) ≤ volume.real (Icc a b ∩ B) :=
+    measureReal_mono (inter_subset_inter_right _ h)
+      ((measure_mono inter_subset_left).trans_lt measure_Icc_lt_top).ne
+  exact ⟨c, hc, hev.mono fun T hT ↦ ⟨hT.1.trans (hfin _ _ _ _ hsub),
+    hT.2.trans (hfin _ _ _ _ hsub)⟩⟩
+
+/-- A set that fills a proportion `c` of `[0, T]` or of `[-T, 0]` for all large `T` has
+upper density at least `c / 2`. -/
+private theorem reciprocalPartialHeckeEulerProduct_upperDensity_of_le {X : Set ℝ} {c : ℝ}
+    (h : ∀ᶠ T : ℝ in atTop, c * T ≤ volume.real (Icc (-T) T ∩ X)) :
+    c / 2 ≤ upperDensity X := by
+  have hle : ∀ᶠ T : ℝ in atTop, volume.real (Icc (-T) T ∩ X) / (2 * T) ≤ 1 := by
+    filter_upwards [eventually_gt_atTop 0] with T hT
+    rw [div_le_one (by positivity)]
+    refine (measureReal_mono inter_subset_left measure_Icc_lt_top.ne).trans ?_
+    rw [Real.volume_real_Icc_of_le (by linarith)]
+    linarith
+  refine le_limsup_of_frequently_le ?_ (isBoundedUnder_of_eventually_le hle)
+  refine (h.and (eventually_gt_atTop 0)).frequently.mono fun T ⟨hT, hT0⟩ ↦ ?_
+  rw [le_div_iff₀ (by positivity)]
+  linarith
+
 /-- Paper: Proposition B.5.3.3, p. 632.
 The nonnegative vertical shifts that uniformly approximate the reciprocal partial Euler
 product on the compact set have positive symmetric upper density. -/
@@ -1210,8 +1387,12 @@ theorem reciprocalPartialHeckeEulerProduct_upperDensity_nonneg
     {a b : ℝ} (hI : (0 : ℝ) ∈ Ioo a b) {K : Set ℂ} (hK : IsCompact K)
     (hKI : K ⊆ verticalStrip a b) (hKint : (interior K).Nonempty)
     {ε : ℝ} (hε : 0 < ε) :
-    0 < upperDensity (Ici 0 ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) :=
-  by sorry
+    0 < upperDensity (Ici 0 ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) := by
+  obtain ⟨c, hc, hev⟩ := reciprocalPartialHeckeEulerProduct_upperDensity_returns χ S hχ hK hε
+  refine (half_pos hc).trans_le (reciprocalPartialHeckeEulerProduct_upperDensity_of_le ?_)
+  filter_upwards [hev, eventually_ge_atTop 0] with T hT hT0
+  exact hT.1.trans (measureReal_mono (fun t ht ↦ ⟨⟨by linarith [ht.1.1], ht.1.2⟩, ht.1.1, ht.2⟩)
+    ((measure_mono inter_subset_left).trans_lt measure_Icc_lt_top).ne)
 
 /-- Paper: Proposition B.5.3.3, p. 632.
 The nonpositive vertical shifts that uniformly approximate the reciprocal partial Euler
@@ -1222,8 +1403,12 @@ theorem reciprocalPartialHeckeEulerProduct_upperDensity_nonpos
     {a b : ℝ} (hI : (0 : ℝ) ∈ Ioo a b) {K : Set ℂ} (hK : IsCompact K)
     (hKI : K ⊆ verticalStrip a b) (hKint : (interior K).Nonempty)
     {ε : ℝ} (hε : 0 < ε) :
-    0 < upperDensity (Iic 0 ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) :=
-  by sorry
+    0 < upperDensity (Iic 0 ∩ verticalReturnTimes (reciprocalPartialHeckeEulerProduct χ S) K ε) := by
+  obtain ⟨c, hc, hev⟩ := reciprocalPartialHeckeEulerProduct_upperDensity_returns χ S hχ hK hε
+  refine (half_pos hc).trans_le (reciprocalPartialHeckeEulerProduct_upperDensity_of_le ?_)
+  filter_upwards [hev, eventually_ge_atTop 0] with T hT hT0
+  exact hT.2.trans (measureReal_mono (fun t ht ↦ ⟨⟨ht.1.1, by linarith [ht.1.2]⟩, ht.1.2, ht.2⟩)
+    ((measure_mono inter_subset_left).trans_lt measure_Icc_lt_top).ne)
 
 -- TODO(paper-gap): The proof of Proposition B.5.3.3 uses the ambient cube to infer Haar
 -- nullity on a possibly lower-dimensional orbit closure. The level set must be treated
