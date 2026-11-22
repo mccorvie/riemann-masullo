@@ -999,6 +999,8 @@ theorem modulatedLineSobolev_mellin (hm : IsModulation m)
             fun y ↦ iteratedDeriv (k : ℕ) (mellin (fun t ↦ f.val (Real.log t)))
               (verticalPoint b y)) ∧ M u = ↑(g ⊗ₜ[ℂ] v) := by sorry
 
+-- The coefficient only uses the probability measure on the kernel. Keep the ambient hypotheses.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem 9.2.1.5(2), p. 408, and Equation (9.2.1.25), p. 409.
 Taking the isotype coefficient of a line Mellin tensor multiplies the scalar trace
 by the kernel Fourier coefficient at the inverse character, as in (D.3.3.14). -/
@@ -1009,7 +1011,27 @@ theorem modulatedLineSobolev_mellin_isotype
     let H := ScalarLineHardySobolev b N
     ∃ coefficient : UniformSpace.Completion (Lp ℂ 2 μ₁ ⊗[ℂ] H) →L[ℂ] H,
       ∀ (g : Lp ℂ 2 μ₁) (v : H),
-        coefficient ↑(g ⊗ₜ[ℂ] v) = lcaFourier μ₁ g ω⁻¹ • v := by sorry
+        coefficient ↑(g ⊗ₜ[ℂ] v) = lcaFourier μ₁ g ω⁻¹ • v := by
+  intro H
+  let : IsProbabilityMeasure μ₁ := ⟨_hμ₁⟩
+  let ψ (x : m.toMonoidHom.ker) : ℂ := (ω⁻¹ x : Circle)
+  have hψ : MemLp ψ 2 μ₁ := MemLp.of_bound
+    (continuous_subtype_val.comp (ω⁻¹).continuous).aestronglyMeasurable 1
+    (.of_forall fun x ↦ (Circle.norm_coe (ω⁻¹ x)).le)
+  let L := innerSL ℂ (hψ.toLp ψ)
+  have hL (g : Lp ℂ 2 μ₁) : L g = lcaFourier μ₁ g ω⁻¹ := by
+    rw [lcaFourier]
+    change (∫ x, inner ℂ (hψ.toLp ψ x) (g x) ∂μ₁) = _
+    apply integral_congr_ae
+    filter_upwards [hψ.coeFn_toLp] with x hx
+    rw [hx]
+    rfl
+  let A : (Lp ℂ 2 μ₁ ⊗[ℂ] H) →L[ℂ] H :=
+    (TensorProduct.lidIsometry ℂ H).toContinuousLinearEquiv.toContinuousLinearMap.comp (L.rTensor H)
+  let : CompleteSpace H := inferInstanceAs (CompleteSpace (Submodule.topologicalClosure _))
+  refine ⟨A.fromCompletion, fun g v ↦ ?_⟩
+  rw [ContinuousLinearMap.fromCompletion_apply_coe]
+  simp [A, hL]
 
 -- TODO(paper-gap): Theorem 9.2.1.5(3) switches from the Hilbert tensor product
 -- to the projective tensor product in the middle of the bottom row. Its right-hand
