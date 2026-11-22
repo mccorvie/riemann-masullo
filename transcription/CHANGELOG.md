@@ -160,3 +160,37 @@ and a random sample by eye. All the checks in the README were run again afterwar
   four displayed formulas that had been run into the text (pp. 365, 367, 379, 552), the italic
   of Proposition B.6.1.1 running on into the next paragraph (p. 636), and italics and punctuation
   on pp. 354, 824.
+
+## 9. After the merge
+
+From the maintainers' spot check in #2471 and the checks it suggested.
+
+- **Hat over a subscripted symbol.** The print has $\widehat{\mathbf Q_p}$ (the hat over all of
+  Q_p) where the transcription had `\widehat{\mathbf{Q}}_p`: p. 558 (twice) and p. 557 (once;
+  the other `\widehat{\mathbf{Q}}_p` on p. 557 is as printed).
+- **Misprints kept as printed.** p. 634: the print ends `1-\chi_v(\pi_v)q_v^{-s}|` with one
+  stray bar, not `|\cdot|`; p. 733: the glyph after x in the excluded point is a ß (CMR), not a
+  β, so `\{x\text{ß}_0\}`.
+- **Diagrams that did not compile.** Every `latex` block was compiled with pdflatex and tikz-cd
+  (`tools/diagrams.py`): 11 of 84 failed, because of commas inside arrow labels (pp. 276, 899,
+  904) or a cell starting with `[`, which tikz-cd reads as options (pp. 20, 390, 391, 393, 930).
+  Such labels are now braced (`"{(a,b)}"`), and such cells are wrapped in `{…}`. All 84 compile.
+  The 11 were compared with the page image after rendering: labels drawn on the wrong side of
+  their arrow are fixed (pp. 276, 899, 904).
+- **Label sides.** For every diagram, the side of its arrow that each label is on was read from
+  the PDF (the arrows are drawn as line segments, the labels are small text beside them) and
+  compared with the compiled tikz-cd, with every arrow drawn in its own colour so that each
+  label could be traced back to its `\arrow`. 34 labels were on the other side and are moved
+  (pp. 200, 218, 236, 239, 270, 358, 415, 418, 437, 465, 546, 795, 812, 858, 863, 901, 911, 912);
+  the diagrams with changes were compared with the page image after rendering.
+- **Displayed formulas.** A formula displayed on its own line in the print had sometimes been
+  run into the sentence. Display lines were found in the PDF (centred, made of maths glyphs, with
+  extra space above and below) and matched with the transcription; 50 that were inline are now
+  `$$` blocks (pp. 148–852), each checked on the page image first. Punctuation after the formula
+  moves into the display, as printed.
+- **Italic paragraphs.** Each paragraph was aligned word by word with the PDF text and its font
+  (italic SFTI or upright SFRM) read off: 825 statement paragraphs that are italic in the print
+  are now in `*…*`, and 157 paragraphs that were in `*…*` but are upright in the print (whole
+  proofs on pp. 258–263, 796–800 and elsewhere) are not. 98.7% of paragraphs now agree with the
+  print; the rest mix italic and upright. Literal `(*)` in citations is escaped as `(\*)`.
+

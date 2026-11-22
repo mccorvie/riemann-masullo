@@ -1441,17 +1441,17 @@ LEMMA 2.2.4.1. *Let $F$ be a number field. Let $\gamma:\mathbf{R}_{>0}\to\mathrm
 
 **2.2. GLOBAL ADELIC $\theta$-FUNCTIONS** · **87**
 
-Then $\gamma(\mathbf{R}_{>0})$ is contained in the closed subgroup:
+*Then $\gamma(\mathbf{R}_{>0})$ is contained in the closed subgroup:*
 
 $$
 \mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\}\subset \mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times \mathrm{GL}_1(\mathbf{A}_F^f)=\mathrm{GL}_1(\mathbf{A}_F). \tag{2.2.4.1}
 $$
 
-Then $\gamma$ satisfies exactly one of the following two conditions:
+*Then $\gamma$ satisfies exactly one of the following two conditions:*
 
-(1) The composition $\lvert\cdot\rvert_F\circ\gamma$ is a smooth automorphism of the abelian Lie group $\mathbf{R}_{>0}$, and there exists a unique nonzero real number $\alpha$ such that $\lvert\gamma(t)\rvert_F=t^{\alpha}$ for all $t\in\mathbf{R}_{>0}$.
+(1) *The composition $\lvert\cdot\rvert_F\circ\gamma$ is a smooth automorphism of the abelian Lie group $\mathbf{R}_{>0}$, and there exists a unique nonzero real number $\alpha$ such that $\lvert\gamma(t)\rvert_F=t^{\alpha}$ for all $t\in\mathbf{R}_{>0}$.*
 
-(2) The image of $\gamma$ is contained in the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$ of $\mathrm{GL}_1(\mathbf{A}_F)$.
+(2) *The image of $\gamma$ is contained in the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$ of $\mathrm{GL}_1(\mathbf{A}_F)$.*
 
 PROOF. Since $\mathrm{GL}_1(\mathbf{A}_F)=\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times \mathrm{GL}_1(\mathbf{A}_F^f)$ as Hausdorff locally compact topological abelian groups, and $\mathrm{GL}_1(\mathbf{A}_F^f)$ is totally disconnected, then, as $\mathbf{R}_{>0}$ is connected, $\gamma(\mathbf{R}_{>0})$ is connected and hence contained in the identity component of $\mathrm{GL}_1(\mathbf{A}_F)$, which is indeed contained within the closed subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\}$ from (2.2.4.1).
 
@@ -1459,7 +1459,7 @@ The composition $\lvert\cdot\rvert_F\circ\gamma$ is a continuous group endomorph
 
 If $\alpha=0$, then $\gamma(\mathbf{R}_{>0})\subset \mathrm{GL}_1(\mathbf{A}_F)^1\cap(\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})\times\{1\})=\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1\times\{1\}$. $\square$
 
-LEMMA 2.2.4.2. Let $F$ be a number field, $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ a continuous $1$-parameter subgroup, $f\in\mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function.
+LEMMA 2.2.4.2. *Let $F$ be a number field, $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ a continuous $1$-parameter subgroup, $f\in\mathcal{S}(\mathbf{A}_F)$ a Schwartz-Bruhat function.*
 
 Then the limit:
 
@@ -1467,7 +1467,7 @@ $$
 (\partial_{\gamma}f)(x):=\lim_{t\to 1}\frac{f(\gamma(t)x)-f(x)}{t-1} \tag{2.2.4.2}
 $$
 
-exists for every $x\in\mathbf{A}_F$, and it is a Schwartz-Bruhat function on $\mathbf{A}_F$. Moreover, $\partial_{\gamma}:\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$ is continuous with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.
+*exists for every $x\in\mathbf{A}_F$, and it is a Schwartz-Bruhat function on $\mathbf{A}_F$. Moreover, $\partial_{\gamma}:\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$ is continuous with respect to the Hausdorff locally convex topology on $\mathcal{S}(\mathbf{A}_F)$.*
 
 PROOF. Since the continuous linear operator from (2.1.3.2) is a linear topological isomorphism by Proposition 2.1.3.2, for each Schwartz-Bruhat function $f\in\mathcal{S}(\mathbf{A}_F)$, there exist Schwartz-Bruhat functions $f_1,\ldots,f_m\in\mathcal{S}(\mathbf{A}_F)$, each of the form:
 
@@ -1531,7 +1531,7 @@ as linear endomorphisms of $\mathcal{S}(\mathbf{A}_F)$. Since $T$ and $T^{-1}$ a
 
 The identity in (2.2.4.6) as $\mathbf{C}$-linear endomorphisms of $\mathcal{S}(\mathbf{A}_F)$, holds because the composition $\gamma_\infty$ of $\gamma$ with the continuous homomorphism $\mathrm{GL}_1(\mathbf{A}_F)\to\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})$ remains injective by Lemma 2.2.4.1. $\square$
 
-LEMMA 2.2.4.3 (Existence of directional derivatives - global adelic $\theta$-functions). Let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function on $\mathbf{A}_F$. Let $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ be a continuous $1$-parameter subgroup. The directional derivative $\partial_{\gamma}\Phi_F(f)$ exists, it is continuous, and we have
+LEMMA 2.2.4.3 (Existence of directional derivatives - global adelic $\theta$-functions). *Let $f\in\mathcal{S}(\mathbf{A}_F)$ be a Schwartz-Bruhat function on $\mathbf{A}_F$. Let $\gamma:\mathbf{R}_{>0}\to\mathrm{GL}_1(\mathbf{A}_F)$ be a continuous $1$-parameter subgroup. The directional derivative $\partial_{\gamma}\Phi_F(f)$ exists, it is continuous, and we have*
 
 $$
 \Phi_F(\partial_{\gamma}f)=\partial_{\gamma}\Phi_F(f) \tag{2.2.4.7}

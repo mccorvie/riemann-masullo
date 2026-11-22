@@ -26,7 +26,7 @@ the physical PDF page markers kept (`## PDF page N`; printed page number = PDF p
 | φ/ϕ, ε/ϵ | every aligned glyph | the printed shape (the paper uses both phis) |
 | ⇒ and ⇉ | every double-arrow glyph of the PDF (the text layer reports both as ⇒; the font tells them apart) | 136 `\Rightarrow` and 131 `\rightrightarrows`, same count on every page |
 | ∅ shapes | every empty-set glyph of the PDF, by font | `\varnothing` and `\emptyset` as printed, same count on every page |
-| Commutative diagrams | all 83 diagrams on 60 pages | compared with the page image at 200 dpi |
+| Commutative diagrams | all 84 `latex` blocks | compared with the page image at 200 dpi; every block compiles with pdflatex + tikz-cd (`tools/diagrams.py`) |
 | Page-by-page visual review | all 940 pages | every page read against its image at 200–300 dpi by AI reviewers (Claude, and Gemini on 485 pages; 420 pages read by both); ≈ 1,030 corrections on 354 pages, then all the checks above run again |
 | Random sample | 45 tagged equations drawn at random (before the visual review) | 43 exact, 2 wrong (now corrected): read this as a residual error rate of a few percent per equation (95% interval roughly 1–15%) |
 
@@ -44,6 +44,7 @@ Run the checks yourself (from the repository root, needs `pip install pymupdf`):
 ```sh
 python3 transcription/tools/check.py          # summary; "new" flags should be 0
 python3 transcription/tools/check.py --list   # any flag not already reviewed
+python3 transcription/tools/diagrams.py       # every diagram block compiles (needs pdflatex, tikz-cd)
 ```
 
 Corrections made since the first version are listed in [`CHANGELOG.md`](CHANGELOG.md).
@@ -53,7 +54,11 @@ Errors found in the transcription go to `CHANGELOG.md` and the tracking issue �
 ## Conventions
 
 The text is verbatim: printed errors, placeholders, typos and unfinished passages are kept as
-printed (for example "logy" on p. 648). Typography is not reproduced. Mathematics is LaTeX:
+printed (for example "logy" on p. 648). Typography is mostly not reproduced, with two exceptions
+that carry meaning: a paragraph set in italic in the print (the statement of a theorem, lemma,
+proposition or corollary) is in `*…*`, and a paragraph set upright (a proof, a remark, a
+definition in this paper) is not; and a formula displayed on its own line in the print is a
+`$$` block. Mathematics is LaTeX:
 
 | Print | LaTeX | Notes |
 |---|---|---|
@@ -81,8 +86,11 @@ Recurring symbols, for orientation: `G^1` is the kernel of the module (superscri
   ````
 
   Nodes, arrows, directions, labels, `=`/`≃` marks, curved arrows and 2-cells follow the print.
-  Whether a label sits above or below (left or right of) an arrow is not significant. GitHub does
-  not render `tikzcd`; read the source or the PDF.
+  The side of its arrow that a label sits on follows the print where the PDF shows it (checked
+  by matching label positions in the PDF against the compiled diagram). Every block must
+  compile with pdflatex and tikz-cd (`tools/diagrams.py`): brace a label that contains a comma
+  (`"{(a,b)}"`) and wrap a cell that starts with `[` in braces (`{[X/G]}`). GitHub does not render
+  `tikzcd`; read the source, compile it, or look at the PDF.
 - **Figures** (the contour pictures on pp. 596, 602, 605, 798) are replaced by
   `*[Figure not reproduced; see the PDF, p. N. Labels in the figure: …]*`.
 - **Footnotes** are written `$^{n}$text` at the end of the page on which they are printed; the

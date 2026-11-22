@@ -224,19 +224,19 @@ Remark E.1.1.2. On Definition E.1.1.1, we make the following observations.
 
 Our definition of “compactly generated” space will rest on:
 
-Lemma E.1.1.3. Let $X$ be a topological space. The following four conditions are equivalent:
+Lemma E.1.1.3. *Let $X$ be a topological space. The following four conditions are equivalent:*
 
-(1) For all topological spaces $Y$ and any set-function $f : X \to Y$, the following conditions are equivalent:
-
-(a) $f$ is continuous.
-
-(b) For every compact Hausdorff space $K$ and every continuous map $g : K \to X$, the composition $f \circ g$ is continuous.
-
-(2) There exists a set $S_X$ of compact Hausdorff spaces such that for all topological spaces $Y$ and any set-function $f : X \to Y$, the following conditions are equivalent:
+(1) *For all topological spaces $Y$ and any set-function $f : X \to Y$, the following conditions are equivalent:*
 
 (a) $f$ is continuous.
 
-(b) For every element $K \in S_X$, and every continuous function $g : K \to X$, the composition $f \circ g$ is continuous.
+(b) *For every compact Hausdorff space $K$ and every continuous map $g : K \to X$, the composition $f \circ g$ is continuous.*
+
+(2) *There exists a set $S_X$ of compact Hausdorff spaces such that for all topological spaces $Y$ and any set-function $f : X \to Y$, the following conditions are equivalent:*
+
+(a) $f$ is continuous.
+
+(b) *For every element $K \in S_X$, and every continuous function $g : K \to X$, the composition $f \circ g$ is continuous.*
 
 $^2$Need to address, maybe with cross-reference, why no set-theoretic issues with this definition being over “all” pairs $(K, g)$.
 
@@ -244,21 +244,21 @@ $^2$Need to address, maybe with cross-reference, why no set-theoretic issues wit
 
 **E.1. COMPACTLY GENERATED SPACES** · **829**
 
-(3) A subspace $U \subset X$ is open if and only if for every compact Hausdorff space $K$ and every continuous function $g : K \to X$, the pre-image $g^{-1}(U)$ is open in $K$.
+(3) *A subspace $U \subset X$ is open if and only if for every compact Hausdorff space $K$ and every continuous function $g : K \to X$, the pre-image $g^{-1}(U)$ is open in $K$.*
 
-(4) There exists a set $I$, a compact Hausdorff space $K_i$ for each $i \in I$, and for $Y := \coprod_{i \in I} K_i$ the $I$-indexed co-product a submersive map $q : Y \to X$.
+(4) *There exists a set $I$, a compact Hausdorff space $K_i$ for each $i \in I$, and for $Y := \coprod_{i \in I} K_i$ the $I$-indexed co-product a submersive map $q : Y \to X$.*
 
 Before we can prove Lemma E.1.1.3, we need the following preparation:
 
 Lemma E.1.1.4 (On bouquets of traits and discrete two-point sets). Let $X$ be a topological space.
 
-(1) Assume that there exist $x, y \in X$, with $x \ne y$, such that for every subset $A \subset X$ containing $x$, respectively $y$, $A$ is closed. Then $X$ is discrete and satisfies all four conditions in Lemma E.1.1.3.
+(1) *Assume that there exist $x, y \in X$, with $x \ne y$, such that for every subset $A \subset X$ containing $x$, respectively $y$, $A$ is closed. Then $X$ is discrete and satisfies all four conditions in Lemma E.1.1.3.*
 
-(2) Assume that there exists a unique point $x \in X$ such that every subset $A \subset X$ containing $x$ is closed in $X$.
+(2) *Assume that there exists a unique point $x \in X$ such that every subset $A \subset X$ containing $x$ is closed in $X$.*
 
-(a) The subspace $X - \{x\} \subset X$ is open and has the discrete topology.
+(a) *The subspace $X - \{x\} \subset X$ is open and has the discrete topology.*
 
-(b) Let $Z \subset X$ be the connected component of $x$, and $V$ the closure of $X - Z$ in $X$. Then:
+(b) *Let $Z \subset X$ be the connected component of $x$, and $V$ the closure of $X - Z$ in $X$. Then:*
 
 (i) the natural continuous surjective map
 
@@ -272,7 +272,7 @@ $$
 
 (iii) *there exists a compact Hausdorff space $K$ and a submersive map $K \to Z$.*
 
-(c) If $X$ satisfies condition (1) in Lemma E.1.1.3 then it also satisfies condition (2).
+(c) *If $X$ satisfies condition (1) in Lemma E.1.1.3 then it also satisfies condition (2).*
 
 Proof. (1) : Note that $U := X - \{x\}$ is open in $X$ since $\{x\}$ is closed. We first show $U$ is discrete, by proving all subsets of $U$ are closed in $U$. Let $B$ be any subset of $U$ and $C$ be its closure in $X$. Since $B \cup \{x\}$ is closed (as it contains $x$), either $C = B$ or $C = B \cup \{x\}$. Either way, this closure meets $U$ in $B$, so $B$ is closed in $U$. It follows that $X - \{x\}$ is discrete. The same holds for $X - \{y\}$, and since $x \ne y$ we have that $X$ is covered by the open subsets $X - \{x\}$ and $X - \{y\}$ each of which has all points open, so all points of $X$ are open; i.e., $X$ is discrete. Discrete spaces are easily seen to satisfy all four conditions in Lemma E.1.1.3 (since any continuous map to such a space from a compact Hausdorff space has finite image and clopen fibers, and all maps from a discrete space are continuous).
 
@@ -400,9 +400,9 @@ $$
 
 *that satisfies the following properties:*
 
-(1) $k$ is right-adjoint to the forgetful functor $u_{\mathrm{cg}} : \mathbf{CG} \to \mathbf{Spaces}$. Explicitly, any continuous $f : X \to Y$ with $k$-closed $X$ uniquely factors continuously through the natural continuous bijection $k(Y) \to Y$.
+(1) *$k$ is right-adjoint to the forgetful functor $u_{\mathrm{cg}} : \mathbf{CG} \to \mathbf{Spaces}$. Explicitly, any continuous $f : X \to Y$ with $k$-closed $X$ uniquely factors continuously through the natural continuous bijection $k(Y) \to Y$.*
 
-(2) The unit $\eta : \mathrm{id} \to k \circ u_{\mathrm{cg}}$ of the adjunction $(u_{\mathrm{cg}}, k)$ is a natural isomorphism of functors; this is the inverse $X \to k(X)$ to the natural homeomorphism $k(X) \to X$ for $k$-closed $X$.
+(2) *The unit $\eta : \mathrm{id} \to k \circ u_{\mathrm{cg}}$ of the adjunction $(u_{\mathrm{cg}}, k)$ is a natural isomorphism of functors; this is the inverse $X \to k(X)$ to the natural homeomorphism $k(X) \to X$ for $k$-closed $X$.*
 
 *Proof.* We check functoriality of the formation of $k(\cdot)$, from which the rest is clear (as $k(X) \to X$ via $\mathrm{id}_X$ is a homeomorphism for $k$-closed $X$). We have to show that if $f : X \to Y$ is a continuous map of topological spaces then any $k$-closed subset $Z$ of $Y$ has $k$-closed pre-image in $X$. For any continuous map $g : K \to X$ from a compact Hausdorff space $K$, the pre-image $g^{-1}(f^{-1}(Z))$ of $f^{-1}(Z)$ in $K$ agrees with the pre-image $(f \circ g)^{-1}(Z)$ of $Z$ to $K$ under the composition with $f$, and it is therefore closed in $K$ by continuity of the composition $f \circ g$. It follows $f^{-1}(Z)$ is $k$-closed. $\square$
 
@@ -418,7 +418,7 @@ $$
 
 *upon evaluating $k(\cdot)$ on the limit of the small diagram $u_{\mathrm{cg}} \circ P$ in $\mathbf{Spaces}$.*
 
-(2) $\operatorname{colim}_I P$ in $\mathbf{CG}$ is computed in $\mathbf{Spaces}$, i.e. the forgetful functor $u_{\mathrm{cg}}$ reflects and commutes with small colimits.
+(2) *$\operatorname{colim}_I P$ in $\mathbf{CG}$ is computed in $\mathbf{Spaces}$, i.e. the forgetful functor $u_{\mathrm{cg}}$ reflects and commutes with small colimits.*
 
 *Proof.* Assertion (1) is immediate from the universal property of $\lim_I$ in $\mathbf{Spaces}$ and Lemma E.1.2.1(1). For (2), the task amounts to showing that the topological colimit $\operatorname{colim}_I(u_{\mathrm{cg}} \circ P)$ is compactly generated. A
 
@@ -994,23 +994,23 @@ Remark E.2.1.2. Clearly subspaces of weakly Hausdorff spaces are weakly Hausdorf
 
 Remark E.2.1.3. We recall that if $X$ is Hausdorff then any compact subspace is closed. In particular, Hausdorff spaces are weakly Hausdorff. For an example of a weakly Hausdorff (compact) topological space that is not Hausdorff, we refer the reader to Lemma E.2.4.9.
 
-Lemma E.2.1.4. Let $K$ be a compact weakly Hausdorff topological space. Assume that there exists a compact Hausdorff topological space $K'$ and a surjective continuous map $q:K'\to K$. Then $K$ is Hausdorff.
+Lemma E.2.1.4. *Let $K$ be a compact weakly Hausdorff topological space. Assume that there exists a compact Hausdorff topological space $K'$ and a surjective continuous map $q:K'\to K$. Then $K$ is Hausdorff.*
 
 Proof. Since $K$ is weakly Hausdorff, every point of $K$ is closed and so $q$ has compact fibers over $K$. Indeed, for every $x\in K$, $q^{-1}(\{x\})$ is closed in $K'$, and this latter is a compact Hausdorff topological space. It follows $q^{-1}(\{x\})$ is compact. It is moreover Hausdorff. For any $C\subset K'$ closed, $C$ is compact Hausdorff in $K'$ and so $q(C)$ is compact in $K$, and closed since $K$ is weakly Hausdorff by assumption. We deduce that $q$ is a closed map, and so $q$ is submersive. Let $x,x'\in K$ be distinct points. Since $K$ is weakly Hausdorff, its points are closed. As $K'$ is normal and $q^{-1}(\{x\})$ and $q^{-1}(\{x'\})$ are closed, there exist disjoint open subspaces $U,U'\subset K'$ such that $q^{-1}(\{x\})\subset U$ and $q^{-1}(\{x'\})\subset U'$. The subspaces of $K'$ given by $K'-U$ and $K'-U'$ are closed, and as $q$ is a closed map, then $C:=q(K'-U)$ and $C':=q(K'-U')$ are closed. It follows that $K-C$ and $K-C'$ are disjoint open subspaces of $K$ containing $x$ and $x'$ respectively. We deduce that $K$ is Hausdorff. $\square$
 
-Lemma E.2.1.5. If $X$ is a weakly Hausdorff topological space then so is $k(X)$.
+Lemma E.2.1.5. *If $X$ is a weakly Hausdorff topological space then so is $k(X)$.*
 
 Proof. Let $K$ be a compact Hausdorff topological space, and $g':K\to k(X)$ a continuous map. Compose with the continuous bijection $k(X)\to K$ to define a continuous $g:K\to X$. Since $X$ is weakly Hausdorff, $g(K)$ is closed in $X$. By continuity of $k(X)\to X$, it follows that $g'(K)$ is closed in $k(X)$. We deduce $k(X)$ is weakly Hausdorff. $\square$
 
-Lemma E.2.1.6. Let $X$ be a topological space. We consider the following conditions:
+Lemma E.2.1.6. *Let $X$ be a topological space. We consider the following conditions:*
 
 (1) $X$ is weakly Hausdorff,
 
-(2) the image $\Delta\subset X\times_0 X$ of the diagonal morphism $\Delta_X:X\to X\times_0 X$, is $k$-closed,
+(2) *the image $\Delta\subset X\times_0 X$ of the diagonal morphism $\Delta_X:X\to X\times_0 X$, is $k$-closed,*
 
-(3) for every compact Hausdorff space $K$ and every continuous map $g:K\to X$, the topological fibre product $K\times^0_{g,X,g}K$ is closed in $K\times_0 K$.
+(3) *for every compact Hausdorff space $K$ and every continuous map $g:K\to X$, the topological fibre product $K\times^0_{g,X,g}K$ is closed in $K\times_0 K$.*
 
-Then (1) $\Rightarrow$ (2) and (2) $\Leftrightarrow$ (3). Moreover, if $X$ is compactly generated then (1) $\Leftrightarrow$ (2).
+*Then (1) $\Rightarrow$ (2) and (2) $\Leftrightarrow$ (3). Moreover, if $X$ is compactly generated then (1) $\Leftrightarrow$ (2).*
 
 ## PDF page 847
 
@@ -1079,9 +1079,9 @@ Example E.2.1.10. We let $X$ be the one-point compactification of the Arens-Fort
 
 The following lemma concludes the preparations:
 
-Lemma E.2.1.11. Let $X$ be a compactly generated space, and $R\subset X\times X$ an equivalence relation. Then the following conditions are equivalent:
+Lemma E.2.1.11. *Let $X$ be a compactly generated space, and $R\subset X\times X$ an equivalence relation. Then the following conditions are equivalent:*
 
-(1) the quotient space $X/R$ is weakly Hausdorff,
+(1) *the quotient space $X/R$ is weakly Hausdorff,*
 
 (2) $R$ is a closed subspace of $X\times X$.
 
@@ -1093,13 +1093,13 @@ Example E.2.1.12. As a simple example of a non-closed $R\subset X\times X$ resul
 
 The following important structural result holds specifically for compactly generated weakly Hausdorff spaces.
 
-Proposition E.2.1.13. Let $X$ be a compactly generated topological space. The following conditions are equivalent:
+Proposition E.2.1.13. *Let $X$ be a compactly generated topological space. The following conditions are equivalent:*
 
 ## PDF page 849
 
 **E.2. COMPACTLY GENERATED WEAKLY HAUSDORFF SPACES** · **849**
 
-(1) There exists a subset $I$ of the set of all closed compact Hausdorff subspaces of $X$ such that upon denoting by $i_K:K\to X$ the closed immersion of $K$ in $X$ for each $K\in I$, the continuous map
+(1) *There exists a subset $I$ of the set of all closed compact Hausdorff subspaces of $X$ such that upon denoting by $i_K:K\to X$ the closed immersion of $K$ in $X$ for each $K\in I$, the continuous map*
 
 $$
 q:=\coprod_{K\in I}i_K:\coprod_{K\in I}K\to X
@@ -1119,7 +1119,13 @@ $$
 K\times^0_{i_K,X,i_{K'}}K'=(i_K,i_{K'})^{-1}(\Delta_X(X))
 $$
 
-and since $(i_K,i_{K'}):K\times_0 K'\to X\times_0 X$ is a closed immersion (as $K,K'\subset X$ are closed by hypothesis) $K\times^0_{i_K,X,i_{K'}}K'$ is a closed subspace of $\Delta_X(X)$. As the topological diagonal $\Delta_X$ is an immersion, it is a homeomorphism of $X$ onto the diagonal subspace in $X\times_0 X$. We call $\delta:X\to\Delta_X(X)$ the homeomorphism induced by the topological diagonal morphism $\Delta_X$. Under $\delta^{-1}$, $K\times^0_{i_K,X,i_{K'}}K'$ is mapped homeomorphically onto $K\cap K'$ as a subspace of $X$. As both $K$ and $K'$ are closed in $X$, $K\cap K'$ is a closed subspace of $X$, and hence a closed subspace of both $K$ and $K'$ by [Bou-GT, Ch. I, §3, Prop. 1]. As $K$ and $K'$ are compact Hausdorff, so is $K\cap K'$. It follows that $K\times^0_{i_K,X,i_{K'}}K'$ is compact Hausdorff, and the immersion $K\times^0_{i_K,X,i_{K'}}K'\to K\times_0 K'$ is closed. We deduce that $Y\times^0_{q,X,q}Y$ is a closed subspace of $Y\times_0 Y=\coprod_{(K,K')\in I\times I}(K\times_0 K')$.
+and since $(i_K,i_{K'}):K\times_0 K'\to X\times_0 X$ is a closed immersion (as $K,K'\subset X$ are closed by hypothesis) $K\times^0_{i_K,X,i_{K'}}K'$ is a closed subspace of $\Delta_X(X)$. As the topological diagonal $\Delta_X$ is an immersion, it is a homeomorphism of $X$ onto the diagonal subspace in $X\times_0 X$. We call $\delta:X\to\Delta_X(X)$ the homeomorphism induced by the topological diagonal morphism $\Delta_X$. Under $\delta^{-1}$, $K\times^0_{i_K,X,i_{K'}}K'$ is mapped homeomorphically onto $K\cap K'$ as a subspace of $X$. As both $K$ and $K'$ are closed in $X$, $K\cap K'$ is a closed subspace of $X$, and hence a closed subspace of both $K$ and $K'$ by [Bou-GT, Ch. I, §3, Prop. 1]. As $K$ and $K'$ are compact Hausdorff, so is $K\cap K'$. It follows that $K\times^0_{i_K,X,i_{K'}}K'$ is compact Hausdorff, and the immersion
+
+$$
+K\times^0_{i_K,X,i_{K'}}K'\to K\times_0 K'
+$$
+
+is closed. We deduce that $Y\times^0_{q,X,q}Y$ is a closed subspace of $Y\times_0 Y=\coprod_{(K,K')\in I\times I}(K\times_0 K')$.
 
 Since $Y$ is locally compact Hausdorff, Lemma E.1.2.19 implies that $k(Y\times_0 Y)=Y\times_0 Y$; since $Y\times^0_{q,X,q}Y$ is a closed subspace of $Y\times_0 Y$, it is compactly generated by Lemma E.1.2.25(1). By Lemma E.2.1.11, the quotient of $Y$ by the closed equivalence relation $R:=Y\times^0_{q,X,q}Y=Y\times Y$ is weakly Hausdorff. By Lemma E.1.2.14, such a quotient is homeomorphic to $X$. This proves (2).
 
@@ -1147,13 +1153,13 @@ In light of Proposition E.2.1.13, we see that compactly generated weakly Hausdor
 
 We need the following:
 
-Lemma E.2.1.15. Let $\{X_n\}_{n\ge 0}$ be a directed sequence of topological spaces. Assume:
+Lemma E.2.1.15. *Let $\{X_n\}_{n\ge 0}$ be a directed sequence of topological spaces. Assume:*
 
 (1) for every integer $n\ge 0$, $X_n$ is a $T_1$-space;
 
-(2) for $X=\operatorname{colim}_{n\ge 0}X_n$ in $\mathbf{Spaces}$, the canonical maps $f_n:X_n\to X$ have finite fibres.
+(2) *for $X=\operatorname{colim}_{n\ge 0}X_n$ in $\mathbf{Spaces}$, the canonical maps $f_n:X_n\to X$ have finite fibres.*
 
-Then for every compact subspace $K\subset X$, there exists an integer $n\ge 0$ such that $K$ is contained in the image of $X_n$.
+*Then for every compact subspace $K\subset X$, there exists an integer $n\ge 0$ such that $K$ is contained in the image of $X_n$.*
 
 We also refer the reader to [VLH, Lemma 2.4].
 
@@ -1171,7 +1177,7 @@ Then $X$ is locally compact.
 
 Proof. We let $\{K_n\}_{n\ge 0}$ be a sequence of compact subspaces such that every compact subspace $K\subset X$ is contained in $K_n$ for some integer $n\ge 0$. Let $x\in X$ be a point, and $\{U_m\}_{m\ge 0}$ a countable local base at $x$. We may and do assume that $U_{m+1}\subseteq U_m$ holds for every $m\ge 0$. Suppose that for every integer $n\ge 0$, $(X-K_n)\cap U_n\ne\varnothing$. We choose $x_n$ in the intersection and consider the union of the sequence and its limit point $F:=\{x_n\}_{n\ge 0}\cup\{x\}$. Then $F\subset X$ is compact, and hence contained in $K_N$, for some integer $N\ge 0$. However, since $x_N\in F$ is an element of $U_N$, it cannot be an element of $K_N$, a contradiction. It follows that there exists an integer $n\ge 0$ such that $U_n$ is contained in $K_n$, and hence $K_n$ is a compact neighborhood of $x$ in $X$. As $x\in X$ is arbitrary, $X$ is locally compact. $\square$
 
-Corollary E.2.1.17. Let $X$ be a weakly Hausdorff space. If $X$ is first-countable and countably compactly generated$^8$ then it is locally compact.
+Corollary E.2.1.17. *Let $X$ be a weakly Hausdorff space. If $X$ is first-countable and countably compactly generated$^8$ then it is locally compact.*
 
 $^5$This proof needs correction; either make a simple fix or give a literature reference for a correct proof.
 
@@ -1251,7 +1257,7 @@ $$
 
 We begin by proving an analog of Lemma E.1.2.1; see [Str, Prop. 2.22] and [Str, Cor. 2.23].
 
-Lemma E.2.2.4. Let $X$ be a compactly generated space, and $\Sigma\subset 2^{X\times X}$ the set of all subspaces $R\subset X\times X$ such that:
+Lemma E.2.2.4. *Let $X$ be a compactly generated space, and $\Sigma\subset 2^{X\times X}$ the set of all subspaces $R\subset X\times X$ such that:*
 
 (a) $R^{\mathrm{set}}$ is an equivalence relation on $X^{\mathrm{set}}\times X^{\mathrm{set}}$.
 
@@ -1264,15 +1270,15 @@ R_X:=\bigcap_{R\in\Sigma}R
 \tag{E.2.2.7}
 $$
 
-we have that $R_X^{\mathrm{set}}$ is an equivalence relation on $X^{\mathrm{set}}\times X^{\mathrm{set}}$, and $R_X$ is closed in $X\times X$. Moreover:
+*we have that $R_X^{\mathrm{set}}$ is an equivalence relation on $X^{\mathrm{set}}\times X^{\mathrm{set}}$, and $R_X$ is closed in $X\times X$. Moreover:*
 
 (1) formation of $h(X)$ is natural in $X$,
 
-(2) the functor $h:\mathbf{CG}\to\mathbf{CGWH}$ is left-adjoint to the forgetful functor $u_{\mathrm{wh}}:\mathbf{CGWH}\to\mathbf{CG}$,
+(2) *the functor $h:\mathbf{CG}\to\mathbf{CGWH}$ is left-adjoint to the forgetful functor $u_{\mathrm{wh}}:\mathbf{CGWH}\to\mathbf{CG}$,*
 
-(3) the natural map $\varepsilon_X:X\to h(X)$ is an isomorphism when $X$ is also weakly Hausdorff,
+(3) *the natural map $\varepsilon_X:X\to h(X)$ is an isomorphism when $X$ is also weakly Hausdorff,*
 
-(4) applying $h$ to the natural map $Y\to u_{\mathrm{wh}}(h(Y))$ for $Y\in\mathbf{CG}$ yields $\varepsilon_{h(Y)}$ and so is an isomorphism.
+(4) *applying $h$ to the natural map $Y\to u_{\mathrm{wh}}(h(Y))$ for $Y\in\mathbf{CG}$ yields $\varepsilon_{h(Y)}$ and so is an isomorphism.*
 
 Proof. We note that, as $X\times X$ is closed in itself, $\Sigma$ is non-empty. The set-theoretic intersection of equivalence relations on a set is an equivalence relation, so $R_X$ is a closed equivalence relation in $X\times X$. We now check part (1) and part (2).
 
@@ -1306,7 +1312,11 @@ q\circ f'=f
 \tag{E.2.2.11}
 $$
 
-In light of (E.2.2.11) and since the map $\psi$ from (E.2.2.9) satisfies $\psi\circ q_X=f'$, we deduce: $q\circ\psi\circ q_X=f$
+In light of (E.2.2.11) and since the map $\psi$ from (E.2.2.9) satisfies $\psi\circ q_X=f'$, we deduce:
+
+$$
+q\circ\psi\circ q_X=f
+$$
 
 ## PDF page 853
 
@@ -1314,9 +1324,9 @@ In light of (E.2.2.11) and since the map $\psi$ from (E.2.2.9) satisfies $\psi\c
 
 which means that $f$ factors through $q_X$. We further observe that both $q$ and $\psi$ are unique: $q$ by universality of topological quotients and Lemma E.1.2.14, and $\psi$ by the universal property of co-equalizers and the definition of the map $f'$ of (E.2.2.10). We have shown that for any compactly generated spaces $X,Y$ with $Y$ weakly Hausdorff, and any continuous map $f:X\to Y$, $f$ factors uniquely through $q_X:X\to h(X)$ from (E.2.2.5). This proves functoriality of $h(\cdot)$ and part (2). Part (3) is clear from the universal property, and (4) is part of the formalism of adjunction. $\square$
 
-Lemma E.2.2.5. The category $\mathbf{CGWH}$ contains all small limits and all small colimits. Moreover, for any small category $I$ and diagram $P:I\to\mathbf{CGWH}$:
+Lemma E.2.2.5. *The category $\mathbf{CGWH}$ contains all small limits and all small colimits. Moreover, for any small category $I$ and diagram $P:I\to\mathbf{CGWH}$:*
 
-(1) $\lim_I P$ in $\mathbf{CGWH}$ is computed in $\mathbf{CG}$, i.e. the forgetful functor $u_{\mathrm{wh}}$ reflects and commutes with small limits.
+(1) *$\lim_I P$ in $\mathbf{CGWH}$ is computed in $\mathbf{CG}$, i.e. the forgetful functor $u_{\mathrm{wh}}$ reflects and commutes with small limits.*
 
 (2) $\operatorname{colim}_I P$ in $\mathbf{CGWH}$ is computed as:
 
@@ -1325,7 +1335,7 @@ $$
 \tag{E.2.2.12}
 $$
 
-upon evaluating $h(\cdot)$ on the colimit of the small diagram $u_{\mathrm{wh}}\circ P$ in $\mathbf{CG}$.
+*upon evaluating $h(\cdot)$ on the colimit of the small diagram $u_{\mathrm{wh}}\circ P$ in $\mathbf{CG}$.*
 
 Proof. Assertion (2) is immediate from $h$ being a left-adjoint to $u_{\mathrm{wh}}$. For (1), we just have to show that the limit in $\mathbf{CG}$ of the diagram $u_{\mathrm{wh}}\circ P$ is weakly Hausdorff. To see this, we use Lemma E.2.1.6. We observe that the diagonal subspace $\Delta\subset(\lim_I(u_{\mathrm{wh}}\circ P))\times_0(\lim_I(u_{\mathrm{wh}}\circ P))$, as a subspace of $\prod^0_{i\in I}(u_{\mathrm{wh}}\circ P)(i)$, is the intersection:
 
@@ -1357,11 +1367,11 @@ Remark E.2.2.8. In Definition E.1.2.4, we introduced notation to distinguish arb
 
 We have the following:
 
-Corollary E.2.2.9. Let $I$ be a small category, and $P:I\to\mathbf{CGWH}$ a diagram. Then:
+Corollary E.2.2.9. *Let $I$ be a small category, and $P:I\to\mathbf{CGWH}$ a diagram. Then:*
 
-(1) The product $\prod_I u_{\mathrm{wh}}\circ P$ in $\mathbf{CG}$ computes the product $\prod_I P$ in $\mathbf{CGWH}$.
+(1) *The product $\prod_I u_{\mathrm{wh}}\circ P$ in $\mathbf{CG}$ computes the product $\prod_I P$ in $\mathbf{CGWH}$.*
 
-(2) The co-product $\coprod_I u_{\mathrm{cgwh}}\circ P$ in $\mathbf{Spaces}$ computes the co-product $\coprod_I P$ in $\mathbf{CGWH}$.
+(2) *The co-product $\coprod_I u_{\mathrm{cgwh}}\circ P$ in $\mathbf{Spaces}$ computes the co-product $\coprod_I P$ in $\mathbf{CGWH}$.*
 
 Proof. Part (1) is a consequence of Lemma E.2.2.5(1). To see part (2), we observe that $\coprod_I u_{\mathrm{cgwh}}\circ P$ in $\mathbf{Spaces}$ computes the co-product $\coprod_I u_{\mathrm{wh}}\circ P$ in $\mathbf{CG}$ by Lemma E.1.2.2(2). We need to check that the compactly generated (Lemma E.1.2.2(2))
 
@@ -1376,7 +1386,7 @@ Notation E.2.2.1. When $X$ and $Y$ are compactly generated weakly Hausdorff spac
 
 The above change in notation is justified by the following Lemma, for which we refer the reader to [Str, Prop.2.24].
 
-Proposition E.2.2.10. If $X$ and $Y$ are compactly generated topological spaces and $Y$ is weakly Hausdorff, then $\mathscr{C}ont_k(X,Y)$ is a compactly generated weakly Hausdorff topological space. The cartesian symmetric monoidal category $(\mathbf{CGWH},\times,*)$ inherits from the cartesian symmetric monoidal category $(\mathbf{CG},\times,*)$ the cartesian-closed monoidal category structure.
+Proposition E.2.2.10. *If $X$ and $Y$ are compactly generated topological spaces and $Y$ is weakly Hausdorff, then $\mathscr{C}ont_k(X,Y)$ is a compactly generated weakly Hausdorff topological space. The cartesian symmetric monoidal category $(\mathbf{CGWH},\times,*)$ inherits from the cartesian symmetric monoidal category $(\mathbf{CG},\times,*)$ the cartesian-closed monoidal category structure.*
 
 Proof. As $(\mathbf{CGWH},\times,*)$ is a full symmetric monoidal subcategory of $(\mathbf{CG},\times,*)$, the last assertion follows from the first. It is therefore enough to check that for $X$ and $Y$ compactly generated spaces, with $Y$ weakly Hausdorff, then the compactly generated function space $\mathscr{C}ont_k(X,Y)$ is weakly Hausdorff. We now let $W:=\mathscr{C}ont_k(X,Y)$, and for any $x\in X$ let $e_x:W\to Y$ be given by $e_x(f):=f(x)$. Since $e_x$ is obtained by $\mathscr{C}ont_k$-functoriality with respect to $\{x\}\to X$, $e_x$ is continuous. We now observe that as subspaces of $W\times_0 W$:
 
@@ -1544,7 +1554,7 @@ We prove (3). As $f'$ is an immersion, $f$ is injective by part (1). Let $Z$ be 
 
 ```latex
 \begin{tikzcd}
-Z_T := Z \times_{f \circ h,Y,g} T \arrow[r, dashed, "h'"] \arrow[d, "g''"'] \arrow[rr, "k", bend left] & X_T \arrow[d, "g'"] \arrow[r, "f'"] & Y \arrow[d, "g"] \\
+Z_T := Z \times_{f \circ h,Y,g} T \arrow[r, dashed, "h'"'] \arrow[d, "g''"'] \arrow[rr, "k", bend left] & X_T \arrow[d, "g'"] \arrow[r, "f'"'] & Y \arrow[d, "g"'] \\
 Z \arrow[r, "h"'] & X \arrow[r, "f"'] & Y
 \end{tikzcd}
 ```
@@ -1627,13 +1637,13 @@ $$
 
 *is a homeomorphism.*
 
-*Proof.* By Corollary E.2.2.9, co-products in $\mathbf{CGWH}$ are topological, and products in $\mathbf{CGWH}$ are computed in $\mathbf{CG}$. We observe that $Y$ is also the push-out in $\mathbf{CGWH}$ of the following two maps:*
+*Proof.* By Corollary E.2.2.9, co-products in $\mathbf{CGWH}$ are topological, and products in $\mathbf{CGWH}$ are computed in $\mathbf{CG}$. We observe that $Y$ is also the push-out in $\mathbf{CGWH}$ of the following two maps:
 
 $$
 p \coprod \mathrm{id}_X : P \coprod X \to Z \coprod X, \quad \phi_q : P \coprod X \to X \tag{E.2.3.8}
 $$
 
-*where $\phi_q$ is defined to be $q$ on $P$ and the identity on $X$. Since $\phi_q$ is submersive and $p \coprod \mathrm{id}_X$ is a closed immersion, we may rename $P \coprod X$ as $P$, $Z \coprod X$ as $Z$, $\phi_q$ as $q$ and $p \coprod \mathrm{id}_X$ as $p$, and assume that $q$ is, in addition, submersive.*
+where $\phi_q$ is defined to be $q$ on $P$ and the identity on $X$. Since $\phi_q$ is submersive and $p \coprod \mathrm{id}_X$ is a closed immersion, we may rename $P \coprod X$ as $P$, $Z \coprod X$ as $Z$, $\phi_q$ as $q$ and $p \coprod \mathrm{id}_X$ as $p$, and assume that $q$ is, in addition, submersive.
 
 ## PDF page 860
 
@@ -1812,7 +1822,7 @@ $$
 ```latex
 \begin{tikzcd}
 Z \arrow[r] \arrow[d, "i"'] & \{*\} \coprod Z \arrow[r, "a"] \arrow[d, "i"] & \{*\} \arrow[d] \\
-X \arrow[r] \arrow[rr, "q"', bend right] & \{*\} \coprod X \arrow[r, "b"'] & (X/Z)_*
+X \arrow[r] \arrow[rr, "q"', bend right] & \{*\} \coprod X \arrow[r, "b"] & (X/Z)_*
 \end{tikzcd}
 ```
 
@@ -2258,7 +2268,7 @@ Lemma E.3.3.1. *Let $X$ be a compact Hausdorff topological space. Then:*
 
 $$\mathrm{size}(X)\le\max\{\aleph_0,2^{|\mathrm{C}(X)|}\}.$$
 
-*See Definition E.3.1.1 for the definition of $\mathrm{size}(\cdot)$ on $\mathbf{CGWH}$.*
+See Definition E.3.1.1 for the definition of $\mathrm{size}(\cdot)$ on $\mathbf{CGWH}$.
 
 Proof. The number of compact Hausdorff subspaces of $X$ is at most $\max\{\aleph_0,2^{|\mathrm{C}(X)|}\}$ because if $K\subset X$ is compact Hausdorff then by Urysohn’s Lemma $K$ is the zero locus of an ideal $I\subset \mathrm{C}(X)$ (namely, $I$ is the ideal of $f$ vanishing on $X$), and the number of such ideals is at most $2^{|\mathrm{C}(X)|}$. $\square$
 
@@ -3827,7 +3837,7 @@ The bifunctors $c_{A,B,C}$ and the functor $u_A$ are assumed to satisfy the foll
 
 ```latex
 \begin{tikzcd}
-\mathbf{1}\times\mathbf{Hom}_{\mathcal{C}}(A,B) \arrow[d, "(u_A,\mathbf{id})"] & \mathbf{Hom}_{\mathcal{C}}(A,B) \arrow[r] \arrow[d, equal] \arrow[l] & \mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{1} \arrow[d, "(\mathbf{id},u_A)"] \\
+\mathbf{1}\times\mathbf{Hom}_{\mathcal{C}}(A,B) \arrow[d, "{(u_A,\mathbf{id})}"'] & \mathbf{Hom}_{\mathcal{C}}(A,B) \arrow[r] \arrow[d, equal] \arrow[l] & \mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{1} \arrow[d, "{(\mathbf{id},u_A)}"] \\
 \mathbf{Hom}_{\mathcal{C}}(A,A)\times\mathbf{Hom}_{\mathcal{C}}(A,B) \arrow[r, "c_{A,A,B}"'] & \mathbf{Hom}_{\mathcal{C}}(A,B) & \mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{Hom}_{\mathcal{C}}(B,B) \arrow[l, "c_{A,B,B}"]
 \end{tikzcd}
 ```
@@ -3840,7 +3850,7 @@ where the top horizontal arrows are equivalences of categories, and where $\math
 
 ```latex
 \begin{tikzcd}
-\mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{Hom}_{\mathcal{C}}(B,C)\times\mathbf{Hom}_{\mathcal{C}}(C,D) \arrow[r, "(\mathbf{id},c_{B,C,D})"] \arrow[d, "(c_{A,B,C},\mathbf{id})"] & \mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{Hom}_{\mathcal{C}}(B,D) \arrow[d, "c_{A,B,D}"] \\
+\mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{Hom}_{\mathcal{C}}(B,C)\times\mathbf{Hom}_{\mathcal{C}}(C,D) \arrow[r, "{(\mathbf{id},c_{B,C,D})}"] \arrow[d, "{(c_{A,B,C},\mathbf{id})}"'] & \mathbf{Hom}_{\mathcal{C}}(A,B)\times\mathbf{Hom}_{\mathcal{C}}(B,D) \arrow[d, "c_{A,B,D}"] \\
 \mathbf{Hom}_{\mathcal{C}}(A,C)\times\mathbf{Hom}_{\mathcal{C}}(C,D) \arrow[r, "c_{A,C,D}"'] & \mathbf{Hom}_{\mathcal{C}}(A,D)
 \end{tikzcd}
 ```
@@ -3935,7 +3945,7 @@ D \arrow[r, "k"'] & C
 ```latex
 \begin{tikzcd}
 A \arrow[r, bend left, "f"{name=U}] \arrow[r, bend right, "f'"'{name=L}] & B
-\arrow[from=U, to=L, Rightarrow, "\alpha"]
+\arrow[from=U, to=L, Rightarrow, "\alpha"']
 \end{tikzcd}
 ```
 
@@ -4090,7 +4100,7 @@ The datum $(F,F_{\bullet,\bullet},\gamma_{\bullet,\bullet,\bullet},\delta_{\bull
 
 ```latex
 \begin{tikzcd}
-F_{A,B}(f)\circ\mathbf{1}_{F(A)} \arrow[r, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}\star(\delta_A)_*"] \arrow[d, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"] & F_{A,B}(f)\circ F_{A,A}(\mathbf{1}_A) \arrow[d, Rightarrow, "\gamma_{A,A,B}(\mathbf{1}_A,f)"] \\
+F_{A,B}(f)\circ\mathbf{1}_{F(A)} \arrow[r, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}\star(\delta_A)_*"] \arrow[d, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"'] & F_{A,B}(f)\circ F_{A,A}(\mathbf{1}_A) \arrow[d, Rightarrow, "{\gamma_{A,A,B}(\mathbf{1}_A,f)}"] \\
 F_{A,B}(f) \arrow[r, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"'] & F_{A,B}(f\circ\mathbf{1}_A)
 \end{tikzcd}
 ```
@@ -4101,7 +4111,7 @@ where $(\delta_A)_*$ denotes the 2-morphism $\mathbf{1}_A\Rightarrow F_{A,A}(\ma
 
 ```latex
 \begin{tikzcd}
-\mathbf{1}_{F(B)}\circ F_{A,B}(f) \arrow[r, Rightarrow, "(\delta_B)_*\star F_{A,A}(f)"] \arrow[d, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"] & F_{B,B}(\mathbf{1}_B)\circ F_{A,B}(f) \arrow[d, Rightarrow, "\gamma_{A,B,B}(f,\mathbf{1}_B)"] \\
+\mathbf{1}_{F(B)}\circ F_{A,B}(f) \arrow[r, Rightarrow, "(\delta_B)_*\star F_{A,A}(f)"] \arrow[d, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"'] & F_{B,B}(\mathbf{1}_B)\circ F_{A,B}(f) \arrow[d, Rightarrow, "{\gamma_{A,B,B}(f,\mathbf{1}_B)}"] \\
 F_{A,B}(f) \arrow[r, Rightarrow, "\mathbf{1}_{F_{A,B}(f)}"'] & F_{A,B}(\mathbf{1}_B\circ f)
 \end{tikzcd}
 ```
@@ -4114,8 +4124,8 @@ where $(\delta_B)_*$ denotes the 2-morphism $\mathbf{1}_B\Rightarrow F_{B,B}(\ma
 
 ```latex
 \begin{tikzcd}
-F_{C,D}(h)\circ F_{B,C}(g)\circ F_{A,B}(f) \arrow[r, Rightarrow, "\mathbf{1}_{F_{C,D}(h)}\star\gamma_{A,B,C}(f,g)"] \arrow[d, Rightarrow, "\gamma_{B,C,D}(g,h)\star\mathbf{1}_{F_{A,B}(f)}"] & F_{C,D}(h)\circ F_{A,C}(g\circ f) \arrow[d, Rightarrow, "\gamma_{A,C,D}(g\circ f,h)"] \\
-F_{B,D}(h\circ g)\circ F_{A,B}(f) \arrow[r, Rightarrow, "\gamma_{A,B,D}(f,h\circ g)"'] & F_{A,D}(h\circ g\circ f)
+F_{C,D}(h)\circ F_{B,C}(g)\circ F_{A,B}(f) \arrow[r, Rightarrow, "{\mathbf{1}_{F_{C,D}(h)}\star\gamma_{A,B,C}(f,g)}"] \arrow[d, Rightarrow, "{\gamma_{B,C,D}(g,h)\star\mathbf{1}_{F_{A,B}(f)}}"'] & F_{C,D}(h)\circ F_{A,C}(g\circ f) \arrow[d, Rightarrow, "{\gamma_{A,C,D}(g\circ f,h)}"] \\
+F_{B,D}(h\circ g)\circ F_{A,B}(f) \arrow[r, Rightarrow, "{\gamma_{A,B,D}(f,h\circ g)}"'] & F_{A,D}(h\circ g\circ f)
 \end{tikzcd}
 ```
 
@@ -4498,7 +4508,7 @@ where condition (E.5.5.2) encodes commutativity of the following diagram of 2-(i
 ```latex
 \begin{tikzcd}
 f\circ c \arrow[r, Rightarrow, "{\mathbf 1}_{f}\star\alpha"] \arrow[d, Rightarrow, "\psi"'] & f\circ a\circ k \arrow[d, Rightarrow, "\phi\star{\mathbf 1}_{k}"] \\
-g\circ d \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta"] & g\circ b\circ k
+g\circ d \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta"'] & g\circ b\circ k
 \end{tikzcd}
 ```
 
@@ -4605,8 +4615,8 @@ PROOF. We have to check that indeed $c((k', \alpha', \beta'), (k, \alpha, \beta)
 
 ```latex
 \begin{tikzcd}
-f\circ r \arrow[r, Rightarrow, "{\mathbf 1}_{f}\star\alpha'"] \arrow[d, Rightarrow, "\lambda"'] & f\circ c\circ k' \arrow[r, Rightarrow, "{\mathbf 1}_{f}\star\alpha\star{\mathbf 1}_{k'}"] \arrow[d, Rightarrow, "\psi\star{\mathbf 1}_{k'}"] & f\circ a\circ(k\circ k') \arrow[d, Rightarrow, "\phi\star{\mathbf 1}_{k\circ k'}=\phi\star{\mathbf 1}_{k}\star{\mathbf 1}_{k'}"] \\
-g\circ s \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta'"] & g\circ d\circ k' \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta\star{\mathbf 1}_{k'}"] & g\circ b\circ(k\circ k')
+f\circ r \arrow[r, Rightarrow, "{\mathbf 1}_{f}\star\alpha'"] \arrow[d, Rightarrow, "\lambda"'] & f\circ c\circ k' \arrow[r, Rightarrow, "{\mathbf 1}_{f}\star\alpha\star{\mathbf 1}_{k'}"] \arrow[d, Rightarrow, "\psi\star{\mathbf 1}_{k'}"'] & f\circ a\circ(k\circ k') \arrow[d, Rightarrow, "\phi\star{\mathbf 1}_{k\circ k'}=\phi\star{\mathbf 1}_{k}\star{\mathbf 1}_{k'}"] \\
+g\circ s \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta'"'] & g\circ d\circ k' \arrow[r, Rightarrow, "{\mathbf 1}_{g}\star\beta\star{\mathbf 1}_{k'}"'] & g\circ b\circ(k\circ k')
 \end{tikzcd}
 ```
 
@@ -5331,7 +5341,7 @@ $$
 [X/\mathcal{G}] \simeq \underline{X/\mathcal{G}}.
 $$
 
-*The condition on the map $X \to X/\mathcal{G}$ being a quotient map is typically easy to arrange. The usual obstruction to representability is the discrepancy between the intrinsic topology on $\mathcal{G}$ and the induced topology on $\mathcal{G}$ from $X \times X$, with the latter product being in $\mathbf{Spaces}$. If $X$ is Hausdorff this is indeed the case. More generally, this can fail and then one can get a quotient stack in topological groupoids which is not representable despite having trivial inertia stack.*
+The condition on the map $X \to X/\mathcal{G}$ being a quotient map is typically easy to arrange. The usual obstruction to representability is the discrepancy between the intrinsic topology on $\mathcal{G}$ and the induced topology on $\mathcal{G}$ from $X \times X$, with the latter product being in $\mathbf{Spaces}$. If $X$ is Hausdorff this is indeed the case. More generally, this can fail and then one can get a quotient stack in topological groupoids which is not representable despite having trivial inertia stack.
 
 *Proof of Proposition E.6.3.8.* Under the assumptions of the Proposition, $X/\mathcal{G}$ is compactly generated and weakly Hausdorff. By Lemma E.6.3.7, the inertia stack of $[X/\mathcal{G}]$ is trivial. This implies that not only $X/\mathcal{G}$ is an object of $\mathbf{CGWH}_{\alpha}$ (it is $\alpha$-small since $X$ is), but that the morphism $[X/\mathcal{G}] \to X/\mathcal{G}$ is representable, and so $[X/\mathcal{G}]$ is itself representable. Let $T$ be the representing object. By Yoneda’s Lemma, the morphism $[X/\mathcal{G}] \to X/\mathcal{G}$ is therefore induced by a unique continuous map $T \to X/\mathcal{G}$. Moreover, the morphism $X \to [X/\mathcal{G}]$ is always representable by quotient maps, which forces $X \to T$ to be itself a quotient map. One checks, by assumption (1) and Lemma E.6.3.7, that the induced equivalence relation $R := X \times_T X$ on $X$ yields a trivial inertia stack $\mathcal{I}_{[R \rightrightarrows X]}$, which forces the map $R \to \mathcal{G}$ to be surjective. By the final assertion in Lemma E.2.3.5, the map $R \to \mathcal{G}$ is therefore a closed immersion and hence a homeomorphism, and $T$ receives a homeomorphic quotient map from $X/\mathcal{G}$ which is a section to the map $T \to X/\mathcal{G}$, so the Proposition is proved. $\square$
 
@@ -5570,7 +5580,7 @@ $$
 ```latex
 \begin{tikzcd}
 \mathcal{X} := [X/\mathcal{G}]\times_{[X'/\mathcal{G}']}\underline{X}' \arrow[r] \arrow[d] & \underline{X}' \arrow[d] \\
-{[X/\mathcal{G}]} \arrow[r] & [X'/\mathcal{G}']
+{[X/\mathcal{G}]} \arrow[r] & {[X'/\mathcal{G}']}
 \end{tikzcd}
 ```
 

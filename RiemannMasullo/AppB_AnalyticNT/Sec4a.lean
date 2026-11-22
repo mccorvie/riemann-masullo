@@ -15,6 +15,7 @@ import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.IntegralEqImproper
+import Mathlib.Topology.Algebra.InfiniteSum.ConditionalInt
 
 /-!
 # Complements on Poisson summation and Cauchy integrals
@@ -1019,6 +1020,67 @@ theorem summable_localEulerFactor_lattice :
   change ‖f ((m : ℝ) * Real.log q(v))‖ ≤ ‖f (Real.log q(v) * (m : ℝ))‖
   rw [mul_comm (m : ℝ)]
 
+open scoped Asymptotics in
+omit hχ hf in
+/-- Exponential decay of one more order at both ends gives the strict two-sided bound
+used in the definition of a Mellin test function. -/
+private lemma exists_strict_exp_bound_of_isBigO {u : ℝ → ℂ} (N : ℕ)
+    (htop : u =O[atTop] fun x : ℝ ↦ Real.exp (-((N : ℝ) + 1) * x))
+    (hbot : u =O[atBot] fun x : ℝ ↦ Real.exp (((N : ℝ) + 1) * x)) :
+    ∃ C > (0 : ℝ), ∃ T > (0 : ℝ), ∀ x : ℝ, T < |x| →
+      ‖u x‖ < C * Real.exp (-(N : ℝ) * |x|) := by
+  obtain ⟨c₁, hc₁, h₁⟩ := Asymptotics.isBigO_iff'.mp htop
+  obtain ⟨c₂, hc₂, h₂⟩ := Asymptotics.isBigO_iff'.mp hbot
+  obtain ⟨T₁, hT₁⟩ := eventually_atTop.mp h₁
+  obtain ⟨T₂, hT₂⟩ := eventually_atBot.mp h₂
+  refine ⟨c₁ + c₂, add_pos hc₁ hc₂, max (max T₁ (-T₂)) 1, lt_max_of_lt_right one_pos,
+    fun x hx ↦ ?_⟩
+  have hN0 : (0 : ℝ) ≤ N := Nat.cast_nonneg N
+  rcases abs_cases x with ⟨habs, hx0⟩ | ⟨habs, hx0⟩
+  · rw [habs] at hx ⊢
+    have hxT : T₁ ≤ x := ((le_max_left _ _).trans (le_max_left _ _)).trans hx.le
+    have h := hT₁ x hxT
+    rw [Real.norm_of_nonneg (Real.exp_pos _).le] at h
+    have hexp : Real.exp (-((N : ℝ) + 1) * x) ≤ Real.exp (-(N : ℝ) * x) :=
+      Real.exp_le_exp.mpr (by nlinarith)
+    calc ‖u x‖ ≤ c₁ * Real.exp (-((N : ℝ) + 1) * x) := h
+      _ ≤ c₁ * Real.exp (-(N : ℝ) * x) := mul_le_mul_of_nonneg_left hexp hc₁.le
+      _ < (c₁ + c₂) * Real.exp (-(N : ℝ) * x) :=
+          mul_lt_mul_of_pos_right (by linarith) (Real.exp_pos _)
+  · rw [habs] at hx ⊢
+    have hxT : x ≤ T₂ := by
+      have h := ((le_max_right T₁ (-T₂)).trans (le_max_left _ _)).trans hx.le
+      linarith
+    have h := hT₂ x hxT
+    rw [Real.norm_of_nonneg (Real.exp_pos _).le] at h
+    have hexp : Real.exp (((N : ℝ) + 1) * x) ≤ Real.exp (-(N : ℝ) * -x) :=
+      Real.exp_le_exp.mpr (by nlinarith)
+    calc ‖u x‖ ≤ c₂ * Real.exp (((N : ℝ) + 1) * x) := h
+      _ ≤ c₂ * Real.exp (-(N : ℝ) * -x) := mul_le_mul_of_nonneg_left hexp hc₂.le
+      _ < (c₁ + c₂) * Real.exp (-(N : ℝ) * -x) :=
+          mul_lt_mul_of_pos_right (by linarith) (Real.exp_pos _)
+
+omit hχ in
+/-- A Schwartz profile of exponential decay is a Mellin test function without jumps. -/
+private lemma isPiecewiseSmoothMellinTest_of_exponentialDecay :
+    IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) := by
+  refine ⟨⟨∅, (f.smooth ⊤).contDiffOn, fun j x hx ↦ absurd hx (Finset.notMem_empty x)⟩,
+    fun N ↦ ?_⟩
+  have hA : (0 : ℝ) < (N : ℝ) + 1 := by positivity
+  obtain ⟨C₀, hC₀, T₀, hT₀, h₀⟩ := exists_strict_exp_bound_of_isBigO (u := (f : ℝ → ℂ)) N
+    (by simpa only [iteratedDeriv_zero] using hf.1 0 _ hA)
+    (by simpa only [iteratedDeriv_zero] using hf.2 0 _ hA)
+  obtain ⟨C₁, hC₁, T₁, hT₁, h₁⟩ :=
+    exists_strict_exp_bound_of_isBigO (u := deriv (f : ℝ → ℂ)) N
+      (by simpa only [iteratedDeriv_one] using hf.1 1 _ hA)
+      (by simpa only [iteratedDeriv_one] using hf.2 1 _ hA)
+  refine ⟨max C₀ C₁, lt_max_of_lt_left hC₀, max T₀ T₁, lt_max_of_lt_left hT₀,
+    fun x hx ↦ ⟨?_, ?_⟩⟩
+  · exact (h₀ x ((le_max_left _ _).trans_lt hx)).trans_le
+      (mul_le_mul_of_nonneg_right (le_max_left _ _) (Real.exp_pos _).le)
+  · exact (h₁ x ((le_max_right _ _).trans_lt hx)).trans_le
+      (mul_le_mul_of_nonneg_right (le_max_right _ _) (Real.exp_pos _).le)
+
 /-- Paper: Lemma B.4.1.7, p. 611. The Mellin frequency samples sum
 absolutely to the two-sided local lattice sum multiplied by the logarithm of the norm.
 This is the first equality in (B.4.1.20). -/
@@ -1026,7 +1088,41 @@ theorem hasSum_localEulerFactor_mellinSamples (ℓ : ℂ)
     (hℓ : Complex.exp ℓ = χ₀(χ).localValue v) :
     HasSum (fun m : ℤ ↦ logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)))
       ((Real.log q(v) : ℂ) *
-        ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) := by sorry
+        ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) := by
+  have hq : (1 : ℝ) < q(v) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (0 : ℝ) < q(v) := zero_lt_one.trans hq
+  have hlog : 0 < Real.log q(v) := Real.log_pos hq
+  have htest : IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) :=
+    isPiecewiseSmoothMellinTest_of_exponentialDecay f hf
+  obtain ⟨c, hc⟩ : ∃ c : Circle, (c : ℂ) = χ₀(χ).localValue v :=
+    ⟨⟨_, mem_sphere_zero_iff_norm.2 (norm_ideleClassNormTwist_zero_localValue χ v)⟩, rfl⟩
+  have hℓc : Complex.exp ℓ = (c : ℂ) := hℓ.trans hc.symm
+  -- The samples are absolutely summable, so their sum is the limit of the symmetric sums
+  -- computed by Poisson summation.
+  have hS : Summable (fun m : ℤ ↦
+      logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ))) :=
+    (summable_mellinPoissonSamples_of_smooth htest (f.smooth ⊤) hq0 hq.ne' c ℓ hℓc).of_norm
+  have hlim := tendsto_mellinPoissonSum_of_piecewiseSmooth htest hq0 hq.ne' c ℓ hℓc
+  have hsym : Tendsto (fun N : ℕ ↦ ∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ),
+      logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ))) atTop
+      (𝓝 (∑' m : ℤ, logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)))) :=
+    SummationFilter.hasSum_symmetricIcc_iff.mp
+      (hS.hasSum.mono_left (SummationFilter.symmetricIcc ℤ).le_atTop)
+  have heq := tendsto_nhds_unique hsym hlim
+  have hmid (m : ℤ) : mellinJumpMidpoint (f : ℝ → ℂ) ((m : ℝ) * Real.log q(v)) =
+      f ((m : ℝ) * Real.log q(v)) := by
+    have hcont : ContinuousAt (f : ℝ → ℂ) ((m : ℝ) * Real.log q(v)) :=
+      f.continuous.continuousAt
+    rw [mellinJumpMidpoint_eq_average (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+      (hcont.tendsto.mono_left nhdsWithin_le_nhds), add_self_div_two]
+  have hval : (Real.log q(v) : ℂ) *
+      ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v)) =
+      ∑' m : ℤ, logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)) := by
+    rw [heq, abs_of_pos hlog, hc]
+    simp_rw [hmid]
+  rw [hval]
+  exact hS.hasSum
 
 local notation "eulerIntegrand" =>
   (fun (s : ℂ) ↦ logMellin f s * logDeriv (finiteHeckeEulerFactor χ v) s)

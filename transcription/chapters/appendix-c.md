@@ -566,7 +566,7 @@ $$
 U(T,V):=\{f\in F^E:f(T)\subset V\}. \tag{C.2.1.1}
 $$
 
-As explained in [Scha, Ch.III, §3, p. 79,(*)], if $\mathfrak B$ is neighborhood base at $0$ for $F$ then the collection
+As explained in [Scha, Ch.III, §3, p. 79,(\*)], if $\mathfrak B$ is neighborhood base at $0$ for $F$ then the collection
 
 $$
 \mathcal U(\mathfrak S,\mathfrak B):=\{U(T,V)\}_{(T,V)\in\mathfrak S\times\mathfrak B} \tag{C.2.1.2}
@@ -1132,7 +1132,7 @@ $$
 
 *(3) For Hausdorff locally convex topological $\mathbf C$-vector spaces $E$ and $F$, if they are barrelled respectively bornological then so is $E\overline{\otimes}F$.*
 
-*Nuclearity will be discussed in §C.2.4.*
+Nuclearity will be discussed in §C.2.4.
 
 Proof. Assertion (1) and all but the final assertion in (2) are [Gro-b, Ch. I, §3, No. 1, Prop. 14, p. 76]. For the last assertion in (2), we first note that since the topological embedding (C.2.3.27) has dense image, it suffices to check that the countable inductive limit on left side is complete. Since a countable strict inductive limit of complete Hausdorff locally convex spaces is Hausdorff and complete [Scha, Ch. II, 6.6], it suffices for the final assertion in (2) to verify that the countable inductive system $\{E_i\overline{\otimes}F_j\}$ is strict. By Corollary C.2.3.12 it agrees with the countable inductive system $E_i\widehat{\otimes}_\pi F_j$, and the nuclearity hypothesis ensures (by [Tre, Thm. 50.1(a)$\Leftrightarrow$(f)]) that this agrees with the inductive system $E_i\widehat{\otimes}_\varepsilon F_j$. The latter is strict by Lemma C.2.3.5(1).
 
@@ -2156,7 +2156,7 @@ S_p(E,F)\subset\mathscr K(E,F)
 \tag{C.3.6.3}
 $$
 
-*of those compact operators such that $\sum_{k\ge 1}\sigma_k(T)^p$ is convergent. We denote by $\lVert\cdot\rVert_{S_p}$ the function on $S_p(E,F)$ defined as*
+of those compact operators such that $\sum_{k\ge 1}\sigma_k(T)^p$ is convergent. We denote by $\lVert\cdot\rVert_{S_p}$ the function on $S_p(E,F)$ defined as
 
 $$
 \lVert T\rVert_{S_p}:=\left(\sum_{k\ge 1}\sigma_k(T)^p\right)^{1/p}.
@@ -2532,7 +2532,7 @@ THEOREM C.4.3.2 (Weakly closed convex hull of the value set of a continuous vect
 
 **712** · **CHAPTER C. PREPARATIONS ON LOCALLY CONVEX TOPOLOGICAL VECTOR SPACES**
 
-$X$, $\mathscr M^1_+(X)$ the subset of the positive Radon measures on $X$ satisfying $\lVert\mu\rVert=1$, $\mathscr M^{\le 1}(X)$ the compact subset of those complex Radon measures satisfying $\lVert\mu\rVert\le 1$.
+*$X$, $\mathscr M^1_+(X)$ the subset of the positive Radon measures on $X$ satisfying $\lVert\mu\rVert=1$, $\mathscr M^{\le 1}(X)$ the compact subset of those complex Radon measures satisfying $\lVert\mu\rVert\le 1$.*
 
 (1) *We have, as subsets of $(E')^*$:*
 
@@ -2665,7 +2665,7 @@ $$
 \nu\left(\int_X f\,\mathrm{d}\mu\right)\le\int_X\nu(f(x))\,\mathrm{d}\mu(x). \tag{C.4.3.9}
 $$
 
-*A variant is given in [Bou-I, Ch. VI, §1, no. 2, Prop. 6].*
+A variant is given in [Bou-I, Ch. VI, §1, no. 2, Prop. 6].
 
 Remark C.4.3.10. The measurability assumption on $\nu(f(x))$ as a function of $x\in X$ ensures that the right side of (C.4.3.9) makes sense as a Lebesgue integral. The integral on the right side of (C.4.3.9) may still be infinite.
 
@@ -3464,13 +3464,13 @@ In the Lemma below, we denote by $\mathrm{d}t$ the Lebesgue measure on the real 
 
 **C.5. MEROMORPHIC FUNCTIONS VALUED IN A QUASI-COMPLETE LOCALLY CONVEX TVS** · **731**
 
-**Lemma C.5.1.19 (Vector-valued Fundamental Theorem of Calculus).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $d \ge 1$ be an integer. Let $\Omega \subset k^d$ be an open subset, and $f : \Omega \to E$ a function. Let $\gamma : (a_0, b_0) \to \Omega$ a once-differentiable function, with $a_0, b_0 \in \mathbf{R}$, $a_0 < b_0$. Let $[a, b] \subset (a_0, b_0)$ be a non-empty closed interval. Assume:
+**Lemma C.5.1.19 (Vector-valued Fundamental Theorem of Calculus).** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $d \ge 1$ be an integer. Let $\Omega \subset k^d$ be an open subset, and $f : \Omega \to E$ a function. Let $\gamma : (a_0, b_0) \to \Omega$ a once-differentiable function, with $a_0, b_0 \in \mathbf{R}$, $a_0 < b_0$. Let $[a, b] \subset (a_0, b_0)$ be a non-empty closed interval. Assume:*
 
-(1) $f$ is continuously differentiable over an open neighborhood of $\gamma([a, b])$.
+(1) *$f$ is continuously differentiable over an open neighborhood of $\gamma([a, b])$.*
 
 (2) $E$ is quasi-complete.
 
-Then the $E$-valued derivative $(f \circ \gamma)'(t) = (\mathrm{D}f)(\gamma(t), \gamma'(t))$ is continuous on $[a, b]$ and integrable, and we have
+*Then the $E$-valued derivative $(f \circ \gamma)'(t) = (\mathrm{D}f)(\gamma(t), \gamma'(t))$ is continuous on $[a, b]$ and integrable, and we have*
 
 $$
 \int_{[a,b]} (\mathrm{D}f)(\gamma(t), \gamma'(t))\, \mathrm{d}t = f(\gamma(b)) - f(\gamma(a)). \tag{C.5.1.37}
@@ -3494,7 +3494,7 @@ by the Fundamental Theorem of Calculus. Since the space $E'$ separates the point
 
 We record here the following consequence of Lemma C.5.1.12, Lemma C.5.1.13, Lemma C.5.1.15 and Lemma C.5.1.16:
 
-**Theorem C.5.1.21 (Strong vector-valued differentiability).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $d \ge 1$ an integer, $k$ either one of the Archimedean topological fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k^d$ be an open subset, $f : \Omega \to E$ a function. The following conditions are equivalent:
+**Theorem C.5.1.21 (Strong vector-valued differentiability).** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $d \ge 1$ an integer, $k$ either one of the Archimedean topological fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k^d$ be an open subset, $f : \Omega \to E$ a function. The following conditions are equivalent:*
 
 ## PDF page 732
 
@@ -3502,17 +3502,17 @@ We record here the following consequence of Lemma C.5.1.12, Lemma C.5.1.13, Lemm
 
 (1) $f$ is continuously differentiable over $\Omega$.
 
-(2) $f$ is weakly differentiable, the weak differential $\mathrm{D}f : \Omega \times k^d \to (E')^*$ is valued in $E$ and continuous with respect to the product topology on the source and the initial topology on the target $E$.
+(2) *$f$ is weakly differentiable, the weak differential $\mathrm{D}f : \Omega \times k^d \to (E')^*$ is valued in $E$ and continuous with respect to the product topology on the source and the initial topology on the target $E$.*
 
-(3) $f$ is weakly differentiable in the $e_i$-direction for each $1 \le i \le d$, and each of the directional derivatives $\mathrm{D}_i f$ is valued in $E$ and continuous with respect to the Euclidean topology on $\Omega$ and the initial topology on $E$.
+(3) *$f$ is weakly differentiable in the $e_i$-direction for each $1 \le i \le d$, and each of the directional derivatives $\mathrm{D}_i f$ is valued in $E$ and continuous with respect to the Euclidean topology on $\Omega$ and the initial topology on $E$.*
 
-(4) $f$ is Gateaux-differentiable within $(E')^*$, and the limit
+(4) *$f$ is Gateaux-differentiable within $(E')^*$, and the limit*
 
 $$
 \lim_{h \to 0, h \in W} \frac{f(\xi_1 + h\xi_2) - f(\xi_1)}{h} \tag{C.5.1.38}
 $$
 
-(with $W \subset k$ the subset $W := \{h \in k : h \ne 0, \xi_1 + h\xi_2 \in \Omega\}$) is, as a function of $(\xi_1, \xi_2) \in \Omega \times k^d$, valued in $E$ and continuous with respect to the product topology on the source and the given topology on $E$.
+*(with $W \subset k$ the subset $W := \{h \in k : h \ne 0, \xi_1 + h\xi_2 \in \Omega\}$) is, as a function of $(\xi_1, \xi_2) \in \Omega \times k^d$, valued in $E$ and continuous with respect to the product topology on the source and the given topology on $E$.*
 
 *Proof.* If (1) holds then $f$ is weakly differentiable by Lemma C.5.1.12((2) $\Rightarrow$ (1)) and the weak differential $\mathrm{D}f$ agrees with the differential in (1), which implies the continuity assertion on $\mathrm{D}f$ as a function $\Omega \times k^d \to E$. Thus, (1) implies (2).
 
@@ -3528,7 +3528,7 @@ If (4) holds then by Lemma C.5.1.16(3) so does (1). If (1) holds then by Lemma C
 
 We will now be discussing an important differentiability criterion in the special case $E$ is quasi-complete, due to Grothendieck (see [Gro-a, §2, Footnote 4, p. 39]) and whose proof is recorded in more detail by Schwartz in [Sch-b, Appendice, Lemma II, p. 146]. We’ll give a somewhat different proof below. Before we do so, we include below a result on removable singularities for vector-valued functions, smooth away from an isolated point, adapting an argument from [Ga-2, §15.1].
 
-**Lemma C.5.1.22 (Removable singularities in dimension $d = 1$).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k$ be an open subset, and $\xi_0 \in \Omega$ a point. Let $f : \Omega - \{\xi_0\} \to E$ be a function. Assume:
+**Lemma C.5.1.22 (Removable singularities in dimension $d = 1$).** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k$ be an open subset, and $\xi_0 \in \Omega$ a point. Let $f : \Omega - \{\xi_0\} \to E$ be a function. Assume:*
 
 (1) $E$ is quasi-complete.
 
@@ -3538,9 +3538,9 @@ $$
 \langle f, \varphi \rangle_{E,E'} : \Omega - \{\xi_0\} \to \mathbf{C} \tag{C.5.1.39}
 $$
 
-defined as $\xi \mapsto \langle f(\xi), \varphi \rangle_{E,E'}$ is continuously differentiable, and it extends to a continuously differentiable scalar-valued function over $\Omega$.
+*defined as $\xi \mapsto \langle f(\xi), \varphi \rangle_{E,E'}$ is continuously differentiable, and it extends to a continuously differentiable scalar-valued function over $\Omega$.*
 
-Then there exists a unique continuous function $F : \Omega \to E$ extending $f$. Moreover, $F$ is weakly continuously differentiable over $\Omega$.
+*Then there exists a unique continuous function $F : \Omega \to E$ extending $f$. Moreover, $F$ is weakly continuously differentiable over $\Omega$.*
 
 *Proof.* By Lemma C.5.1.13, $f$ is continuous over $\Omega - \{\xi_0\}$ because it is weakly differentiable over $\Omega - \{\xi_0\}$. We let $B$ be a small open ball around $\xi_0$ whose closure is contained in $\Omega$.
 
@@ -3578,7 +3578,7 @@ which is a continuous function over $\Omega \times \Omega$ since the function $\
 
 It follows that $\langle G(C), \varphi \rangle_{E,E'}$ is a bounded subset of $\mathbf{C}$. Since $\varphi \in E'$ is arbitrary, $G(C)$ is bounded with respect to the $\sigma(E, E')$-topology on $E$, so it is bounded with respect to the given topology on $E$ [Scha, Ch. IV, 3.3].
 
-We let $A$ be its (bounded!) closed convex circled hull in $E$. For any $(\xi_1, \xi_2) \in B - \{x\beta_0\}$ we therefore have, in light of the design of $G$ from (C.5.1.41) (treating $\xi_1 \ne \xi_2$ separately from $\xi_1 = \xi_2$)
+We let $A$ be its (bounded!) closed convex circled hull in $E$. For any $(\xi_1, \xi_2) \in B - \{x\text{ß}_0\}$ we therefore have, in light of the design of $G$ from (C.5.1.41) (treating $\xi_1 \ne \xi_2$ separately from $\xi_1 = \xi_2$)
 
 $$
 f(\xi_1) - f(\xi_2) \in (\xi_1 - \xi_2)A \subset E. \tag{C.5.1.42}
@@ -3616,7 +3616,7 @@ We denote by $C^m(\Omega, E)$ the $\mathbf{C}$-vector space of $E$-valued functi
 
 The following result is due to Grothendieck, and it is recorded in [Sch-b, Appendice, Lemme II, p. 146].
 
-**Theorem C.5.1.24.** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k^d$ be an open subset and $f : \Omega \to E$ a function. Assume that $E$ is quasi-complete. Let $m \ge 1$ be an integer. If for every $\varphi \in E'$, the function $\langle f, \varphi \rangle_{E,E'}$ is continuously differentiable $m$ times, then $f$ is differentiable $m - 1$ times.
+**Theorem C.5.1.24.** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $k$ either one of the fields $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology. Let $\Omega \subset k^d$ be an open subset and $f : \Omega \to E$ a function. Assume that $E$ is quasi-complete. Let $m \ge 1$ be an integer. If for every $\varphi \in E'$, the function $\langle f, \varphi \rangle_{E,E'}$ is continuously differentiable $m$ times, then $f$ is differentiable $m - 1$ times.*
 
 *Proof.* Since $m \ge 1$, from Lemma C.5.1.13(1) we deduce that $f$ is Lipschitz-continuous. This proves the case $m = 1$.
 
@@ -3640,11 +3640,11 @@ We have shown that for each integer $1 \le i \le d$, $\mathrm{D}_i f$ is valued 
 
 **Corollary C.5.1.25 (On the agreement of the concepts of $E$-valued smoothness).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space. Let $d \ge 1$ be an integer, $k$ either one of the two Archimedean topological field $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology.
 
-Let $\Omega \subset k^d$ be an open subset, $f : \Omega \to E$ a function. Assume $E$ is quasi-complete. Then, the following conditions are equivalent:
+*Let $\Omega \subset k^d$ be an open subset, $f : \Omega \to E$ a function. Assume $E$ is quasi-complete. Then, the following conditions are equivalent:*
 
 (1) $f$ is infinitely differentiable.
 
-(2) For every $\varphi \in E'$, the $\mathbf{C}$-valued function $\langle f, \varphi \rangle_{E,E'}$ on $\Omega$ is infinitely differentiable, i.e. an element of $C^\infty(\Omega)$.
+(2) *For every $\varphi \in E'$, the $\mathbf{C}$-valued function $\langle f, \varphi \rangle_{E,E'}$ on $\Omega$ is infinitely differentiable, i.e. an element of $C^\infty(\Omega)$.*
 
 Note that for $d = 1$ and $k = \mathbf{C}$, this implies that the weakly infinitely differentiable $E$-valued functions on $\Omega$ are exactly the holomorphic $E$-valued functions (see Definition C.5.2.1(4)).
 
@@ -3702,19 +3702,19 @@ Most of the following properties of $\mathcal{S}(\mathbf{R}^d, E)$ are due to Sc
 
 **Theorem C.5.1.30 (Main properties of the function spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $d \ge 1$ an integer. Assume $E$ is quasi-complete.
 
-(1) The spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$ are quasi-complete.
+(1) *The spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$ are quasi-complete.*
 
-(2) If $E$ is complete then $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$ are complete.
+(2) *If $E$ is complete then $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$ are complete.*
 
-(3) If $E$ is a Fréchet space then so are $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$.
+(3) *If $E$ is a Fréchet space then so are $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$.*
 
-(4) For $d, d' \ge 1$ two integers, and $X = \mathbf{T}^d, \mathbf{R}^d$, $Y = \mathbf{T}^{d'}, \mathbf{R}^{d'}$ respectively, the injective linear map
+(4) *For $d, d' \ge 1$ two integers, and $X = \mathbf{T}^d, \mathbf{R}^d$, $Y = \mathbf{T}^{d'}, \mathbf{R}^{d'}$ respectively, the injective linear map*
 
 $$
 C^\infty(X \times Y) \to C^\infty(X, C^\infty(Y)) \tag{C.5.1.47}
 $$
 
-defined by sending a smooth complex-valued function $f(x, y)$ on $X \times Y$ to the smooth $C^\infty(Y)$-valued function $x \mapsto f(x, \cdot)$ is bijective and it is compatible with the linear subspaces $\mathcal{S}(X \times Y)$ and $\mathcal{S}(X, \mathcal{S}(Y))$, inducing a linear topological isomorphism
+*defined by sending a smooth complex-valued function $f(x, y)$ on $X \times Y$ to the smooth $C^\infty(Y)$-valued function $x \mapsto f(x, \cdot)$ is bijective and it is compatible with the linear subspaces $\mathcal{S}(X \times Y)$ and $\mathcal{S}(X, \mathcal{S}(Y))$, inducing a linear topological isomorphism*
 
 $$
 \mathcal{S}(X \times Y) \to \mathcal{S}(X, \mathcal{S}(Y)). \tag{C.5.1.48}
@@ -3780,11 +3780,11 @@ We record Grothendieck’s Theorem (see [Gro-a, Thm.1]) below. Throughout this w
 
 The following is immediate from complex analysis:
 
-**Theorem C.5.2.4.** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f : \Omega \to E$ be a function. The following conditions are equivalent:
+**Theorem C.5.2.4.** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f : \Omega \to E$ be a function. The following conditions are equivalent:*
 
 (1) The function $f$ is weakly holomorphic.
 
-(2) The function $f$ is weakly continuous in the sense of Definition C.5.2.1(1), and for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$ we have
+(2) *The function $f$ is weakly continuous in the sense of Definition C.5.2.1(1), and for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$ we have*
 
 $$
 \int_\Gamma f(\xi)\, \mathrm{d}\xi = 0 \tag{C.5.2.2}
@@ -3792,7 +3792,7 @@ $$
 
 as elements of $(E')^*$.
 
-(3) $f$ is weakly continuous, and for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$, and for any $\xi_0 \in \Omega$ enclosed in the interior of the contour $\Gamma$, we have
+(3) *$f$ is weakly continuous, and for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$, and for any $\xi_0 \in \Omega$ enclosed in the interior of the contour $\Gamma$, we have*
 
 $$
 f(\xi_0) = \frac{1}{2\pi i} \int_\Gamma \frac{f(\xi)}{\xi - \xi_0}\, \mathrm{d}\xi \tag{C.5.2.3}
@@ -3804,29 +3804,29 @@ as elements of $(E')^*$.
 
 If we assume that $E$ is quasi-complete, then the Theorem can be strengthen into the following:
 
-**Theorem C.5.2.6 (Grothendieck’s holomorphy criterion).** Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a complex domain of the complex $\xi$-plane. Let $f : \Omega \to E$ be a function. The following conditions are equivalent:
+**Theorem C.5.2.6 (Grothendieck’s holomorphy criterion).** *Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a complex domain of the complex $\xi$-plane. Let $f : \Omega \to E$ be a function. The following conditions are equivalent:*
 
 (1) $f$ is weakly holomorphic.
 
-(2) $f$ is weakly differentiable $k$ times for every integer $k \ge 1$.
+(2) *$f$ is weakly differentiable $k$ times for every integer $k \ge 1$.*
 
-(3) $f$ is complex-differentiable $k$ times for every integer $k \ge 1$, in which case for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$, and for any $\xi_0 \in \Omega$ enclosed in the interior of the contour $\Gamma$, we have
+(3) *$f$ is complex-differentiable $k$ times for every integer $k \ge 1$, in which case for any closed positively oriented simple curve $\Gamma \subset \Omega$ whose interior is contained within $\Omega$, and for any $\xi_0 \in \Omega$ enclosed in the interior of the contour $\Gamma$, we have*
 
 $$
 f^{(k)}(\xi_0) = \frac{k!}{2\pi i} \int_\Gamma \frac{f(\xi)}{(\xi - \xi_0)^{k+1}}\, \mathrm{d}\xi \tag{C.5.2.4}
 $$
 
-as elements of $(E')^*$ (the left side belongs to $E$).
+*as elements of $(E')^*$ (the left side belongs to $E$).*
 
-(4) Around every point $\xi_0 \in \Omega$, we have the following Taylor expansion
+(4) *Around every point $\xi_0 \in \Omega$, we have the following Taylor expansion*
 
 $$
 f(\xi) = \sum_{k \ge 0} a_k (\xi - \xi_0)^k \tag{C.5.2.5}
 $$
 
-where $a_k = (1/k!) f^{(k)}(\xi_0) \in E$ for every $k \ge 0$, where the series is uniformly convergent on every closed disc $D$ around $\xi_0$ such that $D \subset \Omega$.
+*where $a_k = (1/k!) f^{(k)}(\xi_0) \in E$ for every $k \ge 0$, where the series is uniformly convergent on every closed disc $D$ around $\xi_0$ such that $D \subset \Omega$.*
 
-In particular, if $f$ is weakly holomorphic then it is holomorphic.
+*In particular, if $f$ is weakly holomorphic then it is holomorphic.*
 
 **Remark C.5.2.7.** On Theorem C.5.2.6, we make the following observations:
 
@@ -3872,7 +3872,7 @@ We define $\mathscr{M}(\Omega, E)$ the complex vector space of meromorphic $E$-v
 
 We check the following, as an application of Theorem C.5.2.4
 
-**Lemma C.5.3.2.** Let $E$ be a Hausdorff quasi-complete locally convex topological vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f : \Omega \to E$ be a meromorphic function. For every $\xi_0 \in \Omega$, and every closed positively oriented simple curve $\Gamma \subset \Omega$ enclosing $\xi_0$ in its interior and with no other possible poles enclosed in its interior and on
+**Lemma C.5.3.2.** *Let $E$ be a Hausdorff quasi-complete locally convex topological vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f : \Omega \to E$ be a meromorphic function. For every $\xi_0 \in \Omega$, and every closed positively oriented simple curve $\Gamma \subset \Omega$ enclosing $\xi_0$ in its interior and with no other possible poles enclosed in its interior and on*
 
 ## PDF page 740
 
@@ -3884,7 +3884,7 @@ $$
 a_k(\xi_0, f) = \frac{1}{2\pi i} \int_\Gamma \frac{f(\xi)}{(\xi - \xi_0)^{k+1}}\, \mathrm{d}\xi \tag{C.5.3.3}
 $$
 
-for every $k \in \mathbf{Z}$, the identity being as elements of $E$.
+*for every $k \in \mathbf{Z}$, the identity being as elements of $E$.*
 
 *Proof.* The case $k \ge 0$ in (C.5.2.4), so we focus on $k < 0$. By definition of $f$ being meromorphic at $\xi_0 \in \Omega$ we have by (C.5.3.2)
 
@@ -3904,7 +3904,7 @@ $$
 \operatorname{Res}_\xi(f) := a_{-1}(\xi, f), \quad \xi \in \Omega. \tag{C.5.3.5}
 $$
 
-**Lemma C.5.3.3.** Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $f$ a meromorphic $E$-valued function on $\Omega$. Then:
+**Lemma C.5.3.3.** *Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $f$ a meromorphic $E$-valued function on $\Omega$. Then:*
 
 (1) For every $\xi \in \Omega$, the map
 
@@ -3912,17 +3912,17 @@ $$
 \operatorname{Res}_\xi : \mathscr{M}(\Omega, E) \to E \tag{C.5.3.6}
 $$
 
-assigned by the rule $f \mapsto \operatorname{Res}_\xi(f)$ as in (C.5.3.5) is $\mathbf{C}$-linear.
+*assigned by the rule $f \mapsto \operatorname{Res}_\xi(f)$ as in (C.5.3.5) is $\mathbf{C}$-linear.*
 
-(2) For every $\xi_0 \in \Omega$, we have the identity
+(2) *For every $\xi_0 \in \Omega$, we have the identity*
 
 $$
 \operatorname{Res}_{\xi_0}(f) = \frac{1}{2\pi i} \int_\Gamma f(\xi)\, \mathrm{d}\xi \tag{C.5.3.7}
 $$
 
-as $\mathbf{C}$-linear maps $\mathscr{M}(\Omega, E) \to E$ for every closed positively oriented simple curve contained within $\Omega$ and enclosing no further pole other than possibly $\xi_0$, neither in its interior nor on $\Gamma$ itself.
+*as $\mathbf{C}$-linear maps $\mathscr{M}(\Omega, E) \to E$ for every closed positively oriented simple curve contained within $\Omega$ and enclosing no further pole other than possibly $\xi_0$, neither in its interior nor on $\Gamma$ itself.*
 
-(3) If $\xi_0$ is a pole of $f$ of order $k \ge 1$ then
+(3) *If $\xi_0$ is a pole of $f$ of order $k \ge 1$ then*
 
 $$
 \operatorname{Res}_{\xi_0}(f) = \lim_{\xi \to \xi_0} \frac{1}{(k-1)!} \frac{\mathrm{d}^{k-1}}{\mathrm{d}\xi^{k-1}} ((\xi - \xi_0)^{k-1} f(\xi)) \tag{C.5.3.8}
@@ -3930,7 +3930,7 @@ $$
 
 as $\mathbf{C}$-linear operators $\mathscr{M}(\Omega, E) \to E$.
 
-(4) Let $E_1, E_2$ be two Hausdorff quasi-complete complex topological vector spaces, and $T : E_1 \to E_2$ a continuous $\mathbf{C}$-linear operator. Then
+(4) *Let $E_1, E_2$ be two Hausdorff quasi-complete complex topological vector spaces, and $T : E_1 \to E_2$ a continuous $\mathbf{C}$-linear operator. Then*
 
 $$
 \operatorname{Res}_\xi(T \circ (\cdot)) = T \circ \operatorname{Res}_\xi \tag{C.5.3.9}
@@ -3952,7 +3952,7 @@ $$
 \frac{1}{2\pi i} \int_\Gamma f(\xi)\, \mathrm{d}\xi = \sum_{\xi_0 \in D} n(\Gamma, \xi_0) \operatorname{Res}_{\xi_0}(f) \tag{C.5.4.1}
 $$
 
-as $\mathbf{C}$-linear operators $\mathscr{M}(\Omega, E) \to E$, where $n(\Gamma, \xi_0)$ is the winding number of $\Gamma$ around $\xi_0 \in D$.
+*as $\mathbf{C}$-linear operators $\mathscr{M}(\Omega, E) \to E$, where $n(\Gamma, \xi_0)$ is the winding number of $\Gamma$ around $\xi_0 \in D$.*
 
 *Proof.* By pairing both sides of (C.5.4.1) against a general $\varphi \in E'$, we reduce to the classical case with $E = \mathbf{C}$. $\square$
 
@@ -3960,7 +3960,7 @@ We see from Theorem C.5.4.1 how it is natural to constrain $E$ so as to ensure t
 
 The following is an analog of Riemann’s Theorem on removable singularities. We refer the reader to [Kruse, Thm. 7.4].
 
-**Lemma C.5.4.2 (On removable singularities).** Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $Z \subset \Omega$ a discrete subset and $f : \Omega - Z \to E$ a holomorphic function. If for every $\xi_0 \in \Omega$ there exists a disc $B \subset \Omega$ containing $\xi_0$, such that $f$ is bounded on $B - Z$, then $f$ uniquely extends to a holomorphic function $f : \Omega \to E$.
+**Lemma C.5.4.2 (On removable singularities).** *Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $Z \subset \Omega$ a discrete subset and $f : \Omega - Z \to E$ a holomorphic function. If for every $\xi_0 \in \Omega$ there exists a disc $B \subset \Omega$ containing $\xi_0$, such that $f$ is bounded on $B - Z$, then $f$ uniquely extends to a holomorphic function $f : \Omega \to E$.*
 
 Here too quasi-completeness is being used to know holomorphic is equivalent to weakly holomorphic. Finer analytic continuation results are available (see [Jor-b, Thms. 6, 8]) again under a local completeness assumption.
 
@@ -3968,13 +3968,13 @@ We will, throughout this work, always be able to assume quasi-completeness of th
 
 **C.5.4.1. Vector-valued Identity Theorem.** We record here below the following analog of the Identity Theorem from classical complex analysis:
 
-**Lemma C.5.4.3.** Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $(f_1, D_1)$ and $(f_2, D_2)$ two meromorphic $E$-valued functions on $\Omega$. Let $B \subset \Omega - (D_1 \cup D_2)$ be a non-empty open disc such that
+**Lemma C.5.4.3.** *Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $(f_1, D_1)$ and $(f_2, D_2)$ two meromorphic $E$-valued functions on $\Omega$. Let $B \subset \Omega - (D_1 \cup D_2)$ be a non-empty open disc such that*
 
 $$
 f_1|_B = f_2|_B. \tag{C.5.4.2}
 $$
 
-Then $f_1$ and $f_2$ agree as holomorphic functions on $\Omega - (D_1 \cup D_2)$.
+*Then $f_1$ and $f_2$ agree as holomorphic functions on $\Omega - (D_1 \cup D_2)$.*
 
 *Proof.* For $\varphi \in E'$, the classical Identity Theorem applies to $\langle f_1, \varphi \rangle$ and $\langle f_2, \varphi \rangle$, so $\langle f_1, \varphi \rangle = \langle f_2, \varphi \rangle$ for all $\varphi$. Thus, $f_1 = f_2$. $\square$
 

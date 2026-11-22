@@ -3075,6 +3075,52 @@ theorem schwartzBruhatStageInclusion_apply (a : BruhatStructuralPair G)
     (show SchwartzBruhat G from schwartzBruhatStageInclusion a e f) x =
       schwartzBruhatStageRealization a e f x := rfl
 
+/-- Membership in a double supremum of submodules whose sigma-indexed family is
+nonempty and directed is membership in one of the submodules. -/
+private theorem mem_iSup₂_iff_of_directed_sigma {M : Type*} [AddCommMonoid M] [Module ℂ M]
+    {ι : Type*} {κ : ι → Type*} (F : (i : ι) → κ i → Submodule ℂ M)
+    (hne : Nonempty ((i : ι) × κ i))
+    (hd : Directed (· ≤ ·) (fun s : (i : ι) × κ i ↦ F s.1 s.2)) (m : M) :
+    m ∈ ⨆ (i : ι) (j : κ i), F i j ↔ ∃ (i : ι) (j : κ i), m ∈ F i j := by
+  rw [iSup_sigma' F, Submodule.mem_iSup_of_directed _ hd, Sigma.exists]
+
+include hTop hT2 hLC in
+/-- The range of a stage realization grows along the order on structural pairs,
+for any choice of elementary presentations of the two quotients. -/
+private theorem schwartzBruhatStageRealization_range_mono {a b : BruhatStructuralPair G}
+    (h : a ≤ b) (e : ElementaryLCAPresentation a.quotient)
+    (e' : ElementaryLCAPresentation b.quotient) :
+    LinearMap.range (schwartzBruhatStageRealization a e) ≤
+      LinearMap.range (schwartzBruhatStageRealization b e') := by
+  obtain ⟨j, hj, -⟩ := schwartzBruhatStage_transition h e e'
+  rintro _ ⟨f, rfl⟩
+  exact ⟨j f, hj f⟩
+
+include hTop hT2 hLC in
+/-- Any two structural pairs have a common upper bound. -/
+private theorem bruhatStructuralPair_exists_ge (a b : BruhatStructuralPair G) :
+    ∃ c : BruhatStructuralPair G, a ≤ c ∧ b ≤ c :=
+  (bruhatStructuralPair_filtered (G := G)).2.directed a b
+
+include hTop hT2 hLC in
+/-- The ranges of the stage realizations, indexed by a pair and a presentation of
+its quotient, form a directed family of submodules. -/
+private theorem schwartzBruhatStageRealization_range_directed :
+    Directed (· ≤ ·)
+      (fun s : (a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient ↦
+        LinearMap.range (schwartzBruhatStageRealization s.1 s.2)) := fun s t ↦
+  (bruhatStructuralPair_exists_ge s.1 t.1).elim fun c hc ↦
+    ⟨⟨c, (BruhatStructuralPair.elementary c).some⟩,
+      schwartzBruhatStageRealization_range_mono hc.1 s.2 _,
+      schwartzBruhatStageRealization_range_mono hc.2 t.2 _⟩
+
+include hTop hT2 hLC in
+/-- Some structural pair with an elementary presentation exists. -/
+private theorem schwartzBruhatStage_index_nonempty :
+    Nonempty ((a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient) :=
+  (bruhatStructuralPair_filtered (G := G)).1.elim fun a ↦
+    ⟨⟨a, (BruhatStructuralPair.elementary a).some⟩⟩
+
 include hTop hT2 hLC
 
 /-- Paper: Definition D.1.5.3(2), p. 762. A function belongs to the
@@ -3083,7 +3129,13 @@ elementary Schwartz function realize it. -/
 theorem mem_schwartzBruhatSubmodule_iff (f : G → ℂ) :
     f ∈ schwartzBruhatSubmodule G ↔
       ∃ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
-        (s : SchwartzBruhatStage e), schwartzBruhatStageRealization a e s = f := by sorry
+        (s : SchwartzBruhatStage e), schwartzBruhatStageRealization a e s = f :=
+  (mem_iSup₂_iff_of_directed_sigma
+    (fun (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) ↦
+      LinearMap.range (schwartzBruhatStageRealization a e))
+    (schwartzBruhatStage_index_nonempty (G := G))
+    (schwartzBruhatStageRealization_range_directed (G := G)) f).trans
+    (exists_congr fun _ ↦ exists_congr fun _ ↦ LinearMap.mem_range)
 
 /-- Paper: (D.1.5.4), p. 763. The topology has the final locally convex property
 for the canonical linear stage maps. -/
@@ -3092,7 +3144,17 @@ theorem schwartzBruhat_topology_eq_final :
       locallyConvexFinalTopology
         (fun i : (a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient ↦
           (show SchwartzBruhatStage i.2 →ₗ[ℂ] SchwartzBruhat G from
-            schwartzBruhatStageInclusion i.1 i.2)) := by sorry
+            schwartzBruhatStageInclusion i.1 i.2)) := by
+  let E := schwartzBruhatSubmodule G
+  have h (p : Seminorm ℂ E) :
+      (∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion a e)) =
+      (∀ i : (a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient,
+        Continuous (p ∘ schwartzBruhatStageInclusion i.1 i.2)) :=
+    propext ⟨fun hp i ↦ hp i.1 i.2, fun hp a e ↦ hp ⟨a, e⟩⟩
+  exact congrArg (fun P : Seminorm ℂ E → Prop ↦
+    (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype P → Seminorm ℂ E)).topology)
+    (funext h)
 
 -- TODO(paper-gap): Remark D.1.5.5 identifies global smooth functions with a
 -- colimit of the smooth structural quotients. For the same extension-by-zero

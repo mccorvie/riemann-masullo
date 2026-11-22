@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.UniformSpace.CompactConvergence
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-!
 # Topological spaces of adelic theta functions and idelic Z-functions
@@ -385,12 +386,14 @@ theorem sLocalThetaToZ_isQuotientMap :
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is locally convex. -/
 theorem globalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (GlobalAdelicThetaSpace F) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬ𝔽 := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The S-local theta quotient is locally convex. -/
 theorem sLocalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬₛ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is Hausdorff if the global theta kernel is closed. -/

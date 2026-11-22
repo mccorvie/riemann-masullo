@@ -819,6 +819,56 @@ private theorem continuous_modulatedExponentialDecay_eval (hI : I.Nonempty) (g :
     rw [← mul_assoc, inv_mul_cancel₀ hw, one_mul]
   exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp ev (fun _ ↦ hp)
 
+/-- Continuous linear maps induce a uniformly continuous map on the inductive tensor product. -/
+private theorem uniformContinuous_inductiveTensorMap {U V : Type*}
+    [AddCommGroup U] [Module ℂ U] [TopologicalSpace U]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (A : U →L[ℂ] U) (B : V →L[ℂ] V) :
+    UniformContinuous (inductiveTensorMap A.toLinearMap B.toLinearMap :
+      InductiveTensor U V → InductiveTensor U V) := by
+  let M := inductiveTensorMap A.toLinearMap B.toLinearMap
+  apply uniformContinuous_addMonoidHom_of_continuous (f := M.toAddMonoidHom)
+  have hS := withGeneratingSeminorms_spec (U ⊗[ℂ] V)
+    (fun q : {q : Seminorm ℂ (U ⊗[ℂ] V) //
+      (∀ a : U, Continuous (fun b : V ↦ q (a ⊗ₜ[ℂ] b))) ∧
+      (∀ b : V, Continuous (fun a : U ↦ q (a ⊗ₜ[ℂ] b)))} ↦ q.val)
+  refine hS.continuous_of_continuous_comp M fun q ↦ ?_
+  exact hS.continuous_seminorm
+    ⟨q.val.comp M, fun a ↦ (q.property.1 (A a)).comp B.continuous,
+      fun b ↦ (q.property.2 (B b)).comp A.continuous⟩
+
+section
+
+universe u
+
+/-- Equality of two point evaluations after a tensor map can be checked on pure tensors. -/
+private theorem inductiveTensor_completion_eval_eq {U W : Type u} {V : Type}
+    [AddCommGroup U] [Module ℂ U] [TopologicalSpace U]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W]
+    (e : Completion (InductiveTensor U V) ≃L[ℂ] W)
+    (A : U →L[ℂ] U) (B : V →L[ℂ] V) (a b : W → ℂ)
+    (aL bL : W →ₗ[ℂ] ℂ) (ha : ∀ z, aL z = a z) (hb : ∀ z, bL z = b z)
+    (h : ∀ u v,
+      aL (e (Completion.coe' (α := InductiveTensor U V) (A u ⊗ₜ[ℂ] B v))) =
+        bL (e (Completion.coe' (α := InductiveTensor U V) (u ⊗ₜ[ℂ] v))))
+    (x : InductiveTensor U V) (y z : Completion (InductiveTensor U V))
+    (hy : y = Completion.coe' (inductiveTensorMap A.toLinearMap B.toLinearMap x))
+    (hz : z = Completion.coe' x) : a (e y) = b (e z) := by
+  let M := inductiveTensorMap A.toLinearMap B.toLinearMap
+  let J : InductiveTensor U V →ₗ[ℂ] W := e.toLinearEquiv.toLinearMap.comp
+    (Completion.toComplL : InductiveTensor U V →L[ℂ] Completion (InductiveTensor U V)).toLinearMap
+  have hEq : aL.comp (J.comp M) = bL.comp J := TensorProduct.ext' h
+  calc
+    _ = a (e (Completion.coe' (M x))) := congrArg (fun w ↦ a (e w)) hy
+    _ = aL (e (Completion.coe' (M x))) := (ha _).symm
+    _ = bL (e (Completion.coe' x)) := LinearMap.congr_fun hEq x
+    _ = b (e (Completion.coe' x)) := hb _
+    _ = _ := congrArg (fun w ↦ b (e w)) hz.symm
+
+
+end
+
 include hτ in
 /-- Equivariance on the image of the algebraic tensor product, where it follows
 from the split-coordinate formula on pure tensors and linearity. -/
@@ -833,7 +883,55 @@ private theorem modulatedExponentialDecay_tensor_equivariant_coe
     (x : T) (g : G) :
     (e (Completion.map (inductiveTensorMap
       ((schwartzBruhatTranslationAction (G := K)) u).toLinearMap L.toLinearMap : T → T)
-      (Completion.coe' x))).val g = (e (Completion.coe' x)).val (((u : G) * τ t)⁻¹ * g) := by sorry
+      (Completion.coe' x))).val g = (e (Completion.coe' x)).val (((u : G) * τ t)⁻¹ * g) := by
+  let A := schwartzBruhatTranslationAction (G := K) u
+  let g' := ((u : G) * τ t)⁻¹ * g
+  let ev (a : G) : E →ₗ[ℂ] ℂ :=
+    { toFun := fun f ↦ f.val a
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hPure (h : SchwartzBruhat K) (f : P) :
+      (e (Completion.coe' (α := T) (A h ⊗ₜ[ℂ] L f))).val g =
+        (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val g' := by
+    let v : K := ⟨g / τ (m g), by
+      change m (g / τ (m g)) = 1
+      rw [map_div, hτ (m g), div_self']⟩
+    let s := m g
+    have hg : g = (v : G) * τ s := (div_mul_cancel _ _).symm
+    have hg' : g' = ((u⁻¹ * v : K) : G) * τ (t⁻¹ * s) := by
+      change ((u : G) * τ t)⁻¹ * g = _
+      rw [hg, Subgroup.coe_mul, Subgroup.coe_inv, map_mul, map_inv, mul_inv_rev]
+      simp only [mul_assoc, mul_left_comm, mul_comm]
+    have hlog : Real.log ((t⁻¹ * s : ℝ≥0ˣ).val : ℝ) =
+        Real.log (s.val : ℝ) - Real.log (t.val : ℝ) := by
+      rw [mul_comm t⁻¹ s, Units.val_mul, NNReal.coe_mul, Units.val_inv_eq_inv_val,
+        NNReal.coe_inv, ← div_eq_mul_inv, Real.log_div
+          (NNReal.coe_ne_zero.mpr s.ne_zero) (NNReal.coe_ne_zero.mpr t.ne_zero)]
+    calc
+      _ = A h v * (L f).val (Real.log (s.val : ℝ)) :=
+        (congrArg (e (Completion.coe' (α := T) (A h ⊗ₜ[ℂ] L f))).val hg).trans (he _ _ v s)
+      _ = h (u⁻¹ * v) * f.val (Real.log ((t⁻¹ * s).val : ℝ)) :=
+        congrArg₂ (· * ·) (schwartzBruhatTranslationAction_apply u v h)
+          ((hL f _).trans (congrArg f.val hlog.symm))
+      _ = _ :=
+        ((congrArg (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val hg').trans (he h f _ _)).symm
+  have hev (a : G) (z : E) : ev a z = z.val a := rfl
+  have hPure' (h : SchwartzBruhat K) (f : P) :
+      ev g (e (Completion.coe' (α := T) (A h ⊗ₜ[ℂ] L f))) =
+        ev g' (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))) :=
+    (hev g _).trans ((hPure h f).trans (hev g' _).symm)
+  let M : T →ₗ[ℂ] T := inductiveTensorMap A.toLinearMap L.toLinearMap
+  let y : Completion T := Completion.map (inductiveTensorMap
+    ((schwartzBruhatTranslationAction (G := K)) u).toLinearMap L.toLinearMap : T → T)
+    (Completion.coe' x)
+  let z : Completion T := Completion.coe' x
+  have hUniform := uniformContinuous_inductiveTensorMap (U := SchwartzBruhat K) (V := P) A L
+  have hy : y = Completion.coe' (M x) := Completion.map_coe hUniform x
+  let H := inductiveTensor_completion_eval_eq (U := SchwartzBruhat K) (V := P) (W := E)
+    e A L (fun f : E ↦ f.val g) (fun f : E ↦ f.val (((u : G) * τ t)⁻¹ * g))
+    (ev g) (ev g') (hev g) (hev g')
+  have hResult := H hPure' x y z hy rfl
+  with_reducible exact hResult
 
 set_option linter.unusedSectionVars false in
 include hm hInt hne hτ in

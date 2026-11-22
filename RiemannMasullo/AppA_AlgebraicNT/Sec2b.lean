@@ -9,6 +9,7 @@ import Mathlib.Analysis.SpecialFunctions.Complex.LogDeriv
 import Mathlib.Analysis.InnerProductSpace.Calculus
 import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
+import Mathlib.NumberTheory.Padics.HeightOneSpectrum
 import Mathlib.Topology.Algebra.Group.Units
 import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
@@ -3551,7 +3552,37 @@ theorem exists_rat_prime_idele_outside (S : Finset (Primes(ℚ))) :
     ∃ (p : ℕ) (u : ℚˣ), p.Prime ∧ u.val = (p : ℚ) ∧
       let g := IdeleGroup.unitEmbedding (𝓞 ℚ) ℚ u
       g ∈ (ideleNorm ℚ).ker ∧ g ∉ (Units.map (integralAdelesOutside ℚ S).subtype.toMonoidHom).range := by
-  sorry
+  classical
+  -- Choose a finite place outside S and let p be its prime.
+  obtain ⟨v, hv⟩ : ∃ v : Primes(ℚ), v ∉ S := by
+    have : Infinite (Primes(ℚ)) :=
+      Infinite.of_injective Rat.HeightOneSpectrum.primesEquiv.symm
+        Rat.HeightOneSpectrum.primesEquiv.symm.injective
+    exact S.finite_toSet.infinite_compl.nonempty
+  let p : ℕ := (Rat.HeightOneSpectrum.primesEquiv v).val
+  have hp : p.Prime := (Rat.HeightOneSpectrum.primesEquiv v).property
+  let : Fact p.Prime := ⟨hp⟩
+  have hp0 : (p : ℚ) ≠ 0 := by exact_mod_cast hp.ne_zero
+  refine ⟨p, Units.mk0 (p : ℚ) hp0, hp, rfl, (ideleNorm_spec ℚ).2 ⟨_, rfl⟩, ?_⟩
+  rintro ⟨w, hw⟩
+  -- The inverse of the principal idele would be integral at v.
+  have hinv : (((w⁻¹ : (integralAdelesOutside ℚ S)ˣ) : integralAdelesOutside ℚ S) : (AdeleRing (𝓞 ℚ) ℚ)) =
+      algebraMap ℚ (AdeleRing (𝓞 ℚ) ℚ) ((p : ℚ)⁻¹) := by
+    have h := congrArg (fun z : (AdeleRing (𝓞 ℚ) ℚ)ˣ ↦ (z⁻¹ : (AdeleRing (𝓞 ℚ) ℚ)ˣ).val) hw
+    simp only [← map_inv] at h
+    exact h.trans (by simp [IdeleGroup.unitEmbedding])
+  have hmem := (((w⁻¹ : (integralAdelesOutside ℚ S)ˣ) : integralAdelesOutside ℚ S)).property
+  rw [hinv] at hmem
+  simp only [integralAdelesOutside, Subring.mem_iInf] at hmem
+  have hv' := (Rat.HeightOneSpectrum.adicCompletion.padicEquiv_bijOn v).mapsTo (hmem v hv)
+  have hcast : Rat.HeightOneSpectrum.adicCompletion.padicEquiv v
+      ((algebraMap ℚ (AdeleRing (𝓞 ℚ) ℚ) ((p : ℚ)⁻¹)).2 v) = (((p : ℚ)⁻¹ : ℚ) : ℚ_[p]) := by
+    have h : (algebraMap ℚ (AdeleRing (𝓞 ℚ) ℚ) ((p : ℚ)⁻¹)).2 v = (((p : ℚ)⁻¹ : ℚ) : v.adicCompletion ℚ) :=
+      eq_ratCast (algebraMap ℚ (v.adicCompletion ℚ)) _
+    rw [h, map_ratCast]
+  have hle : ‖(((p : ℚ)⁻¹ : ℚ) : ℚ_[p])‖ ≤ 1 := hcast ▸ hv'
+  rw [Rat.cast_inv, Rat.cast_natCast, norm_inv, Padic.norm_p, inv_inv] at hle
+  exact absurd hle (not_le.mpr (by exact_mod_cast hp.one_lt))
 
 end SLocal
 

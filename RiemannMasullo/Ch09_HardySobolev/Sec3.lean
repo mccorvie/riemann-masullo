@@ -174,6 +174,114 @@ theorem continuous_modulatedExponentialDecayTestAction (hm : IsModulation m) (hm
 -- The singleton polynomial-growth claim also omits the exponential twist for b ≠ 0.
 -- Borel measurability need not hold for arbitrary continuous operator seminorms.
 
+/-- The compact-interval density of a shifted logarithmic coordinate is at most the square of
+the endpoint twist times the polynomial factor of the shift, times the density. -/
+private theorem intervalSobolevDensity_add_le (a b s : ℝ) (hs : 0 ≤ s) (L t : ℝ) :
+    intervalSobolevDensity a b s (L + t) ≤
+      (max (Real.exp (a * L)) (Real.exp (b * L)) * (1 + |L|) ^ (s / 2)) ^ 2 *
+        intervalSobolevDensity a b s t := by
+  unfold intervalSobolevDensity
+  have key : ∀ c : ℝ,
+      Real.exp (2 * c * (L + t)) = Real.exp (c * L) ^ 2 * Real.exp (2 * c * t) := fun c ↦ by
+    rw [sq, ← Real.exp_add, ← Real.exp_add]
+    congr 1
+    ring
+  have hM : ∀ c : ℝ, Real.exp (c * L) ≤ max (Real.exp (a * L)) (Real.exp (b * L)) →
+      Real.exp (2 * c * t) ≤ max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) →
+      Real.exp (2 * c * (L + t)) ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+        max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) := fun c h1 h2 ↦ by
+    rw [key]
+    exact mul_le_mul (pow_le_pow_left₀ (Real.exp_pos _).le h1 2) h2 (Real.exp_pos _).le
+      (sq_nonneg _)
+  have h1 : max (Real.exp (2 * a * (L + t))) (Real.exp (2 * b * (L + t))) ≤
+      max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+        max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) :=
+    max_le (hM a (le_max_left _ _) (le_max_left _ _))
+      (hM b (le_max_right _ _) (le_max_right _ _))
+  have hL0 : 0 ≤ 1 + |L| := by positivity
+  have hbase : 1 + (L + t) ^ 2 ≤ (1 + |L|) ^ 2 * (1 + t ^ 2) := by
+    rcases le_total 0 L with hL | hL
+    · rw [abs_of_nonneg hL]
+      nlinarith [mul_nonneg hL (sq_nonneg (t - 1)), mul_nonneg hL (sq_nonneg t),
+        sq_nonneg (L * t)]
+    · rw [abs_of_nonpos hL]
+      nlinarith [mul_nonneg (neg_nonneg.2 hL) (sq_nonneg (t + 1)),
+        mul_nonneg (neg_nonneg.2 hL) (sq_nonneg t), sq_nonneg (L * t)]
+  have hpow : ((1 + |L|) ^ 2) ^ (s / 2) = ((1 + |L|) ^ (s / 2)) ^ 2 := by
+    rw [← Real.rpow_natCast _ 2, ← Real.rpow_natCast _ 2, ← Real.rpow_mul hL0,
+      ← Real.rpow_mul hL0, mul_comm]
+  have h2 : (1 + (L + t) ^ 2) ^ (s / 2) ≤
+      ((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2) :=
+    calc (1 + (L + t) ^ 2) ^ (s / 2) ≤ ((1 + |L|) ^ 2 * (1 + t ^ 2)) ^ (s / 2) :=
+          Real.rpow_le_rpow (by positivity) hbase (by linarith)
+      _ = ((1 + |L|) ^ 2) ^ (s / 2) * (1 + t ^ 2) ^ (s / 2) :=
+          Real.mul_rpow (by positivity) (by positivity)
+      _ = ((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2) := by rw [hpow]
+  have hmax : 0 ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+      max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) :=
+    mul_nonneg (sq_nonneg _) (le_max_of_le_left (Real.exp_pos _).le)
+  calc max (Real.exp (2 * a * (L + t))) (Real.exp (2 * b * (L + t))) *
+        (1 + (L + t) ^ 2) ^ (s / 2)
+      ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+          max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) *
+        (((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2)) :=
+        mul_le_mul h1 h2 (by positivity) hmax
+    _ = _ := by ring
+
+/-- A continuous endomorphism of a weighted L² space of a left-invariant measure that acts
+by left translation on representatives has norm at most `C` when the translated density is
+at most `C ^ 2` times the density. -/
+private theorem opNorm_le_of_translate_density {H : Type*} [Group H] [MeasurableSpace H]
+    [MeasurableMul H] (ν : Measure H) [ν.IsMulLeftInvariant] {d : H → ℝ≥0∞}
+    (hd : Measurable d) (hd' : ∀ x, d x < ⊤) (g : H) {C : ℝ} (hC : 0 ≤ C)
+    (hle : ∀ x, d (g * x) ≤ ENNReal.ofReal C ^ 2 * d x)
+    (T : Lp ℂ 2 (ν.withDensity d) →L[ℂ] Lp ℂ 2 (ν.withDensity d))
+    (hT : ∀ u, (T u : H → ℂ) =ᵐ[ν] fun x ↦ u (g⁻¹ * x)) : ‖T‖ ≤ C := by
+  refine T.opNorm_le_bound hC fun u ↦ ?_
+  have hae : (T u : H → ℂ) =ᵐ[ν.withDensity d] fun x ↦ u (g⁻¹ * x) :=
+    (withDensity_absolutelyContinuous ν d).ae_eq (hT u)
+  have hI : ∀ v : H → ℂ, ∫⁻ x, ‖v x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) =
+      ∫⁻ x, d x * ‖v x‖ₑ ^ (2 : ℝ) ∂ν := fun v ↦
+    lintegral_withDensity_eq_lintegral_mul_non_measurable ν hd (ae_of_all _ hd') _
+  have hmain : ∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) ≤
+      ENNReal.ofReal C ^ 2 * ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) :=
+    calc ∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)
+        = ∫⁻ x, d x * ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂ν := hI fun x ↦ u (g⁻¹ * x)
+      _ = ∫⁻ x, d (g * x) * ‖u (g⁻¹ * (g * x))‖ₑ ^ (2 : ℝ) ∂ν :=
+          (lintegral_mul_left_eq_self (fun x ↦ d x * ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ)) g).symm
+      _ ≤ ∫⁻ x, ENNReal.ofReal C ^ 2 * (d x * ‖u x‖ₑ ^ (2 : ℝ)) ∂ν :=
+          lintegral_mono fun x ↦ by
+            show d (g * x) * ‖u (g⁻¹ * (g * x))‖ₑ ^ (2 : ℝ) ≤
+              ENNReal.ofReal C ^ 2 * (d x * ‖u x‖ₑ ^ (2 : ℝ))
+            rw [inv_mul_cancel_left, ← mul_assoc]
+            exact mul_le_mul' (hle x) le_rfl
+      _ = ENNReal.ofReal C ^ 2 * ∫⁻ x, d x * ‖u x‖ₑ ^ (2 : ℝ) ∂ν :=
+          lintegral_const_mul' _ _ (ENNReal.pow_ne_top ENNReal.ofReal_ne_top)
+      _ = ENNReal.ofReal C ^ 2 * ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) := by rw [hI u]
+  have h2 : ((2 : ℕ) : ℝ) * (1 / 2) = 1 := by norm_num
+  have hhalf : (0 : ℝ) ≤ 1 / 2 := by norm_num
+  have hnorm : eLpNorm (T u) 2 (ν.withDensity d) ≤
+      ENNReal.ofReal C * eLpNorm u 2 (ν.withDensity d) := by
+    rw [eLpNorm_congr_ae hae, eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero
+      ENNReal.ofNat_ne_top ((Lp.aestronglyMeasurable (T u)).congr hae),
+      eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+      (Lp.aestronglyMeasurable u), ENNReal.toReal_ofNat]
+    calc (∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ))
+        ≤ (ENNReal.ofReal C ^ 2 *
+            ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ)) :=
+          ENNReal.rpow_le_rpow hmain hhalf
+      _ = ENNReal.ofReal C *
+            (∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ)) := by
+          rw [ENNReal.mul_rpow_of_nonneg _ _ hhalf, ← ENNReal.rpow_natCast,
+            ← ENNReal.rpow_mul, h2, ENNReal.rpow_one]
+  rw [Lp.norm_def, Lp.norm_def]
+  calc (eLpNorm (T u) 2 (ν.withDensity d)).toReal
+      ≤ (ENNReal.ofReal C * eLpNorm u 2 (ν.withDensity d)).toReal :=
+        ENNReal.toReal_mono
+          (ENNReal.mul_ne_top ENNReal.ofReal_ne_top (Lp.eLpNorm_ne_top u)) hnorm
+    _ = C * (eLpNorm u 2 (ν.withDensity d)).toReal := by
+        rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal hC]
+
 /-- Paper: Lemma 9.3.1.5, p. 421. Left translation is bounded by the maximum
 endpoint twist times a polynomial in the absolute log-module.
 Deviation: The factor at the identity is one. On a nonzero singleton base
@@ -181,7 +289,30 @@ the endpoint twist still occurs. -/
 theorem norm_hardySobolevTranslation_le (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s) (g : G) :
     ‖hardySobolevTranslation μ m a b s hab hs g‖ ≤
       max (Real.exp (a * logMod g)) (Real.exp (b * logMod g)) *
-        (1 + |logMod g|) ^ (s / 2) := by sorry
+        (1 + |logMod g|) ^ (s / 2) := by
+  have hD : Measurable fun t : ℝ ↦ intervalSobolevDensity a b s t := by
+    unfold intervalSobolevDensity
+    fun_prop
+  have hmeas : Measurable fun x : G ↦ Real.log ((m x).val : ℝ) :=
+    Real.measurable_log.comp
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp (map_continuous m))).measurable
+  have hlog : ∀ x : G, Real.log ((m (g * x)).val : ℝ) =
+      Real.log ((m g).val : ℝ) + Real.log ((m x).val : ℝ) := fun x ↦ by
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (m g).ne_zero) (NNReal.coe_ne_zero.2 (m x).ne_zero)]
+  have hC : 0 ≤ max (Real.exp (a * Real.log ((m g).val : ℝ)))
+      (Real.exp (b * Real.log ((m g).val : ℝ))) *
+      (1 + |Real.log ((m g).val : ℝ)|) ^ (s / 2) :=
+    mul_nonneg (le_max_of_le_left (Real.exp_pos _).le) (Real.rpow_nonneg (by positivity) _)
+  have key := opNorm_le_of_translate_density μ
+    (d := fun x ↦ ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m x).val : ℝ))))
+    (hD.comp hmeas).ennreal_ofReal (fun _ ↦ ENNReal.ofReal_lt_top) g hC fun x ↦ by
+      show ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m (g * x)).val : ℝ))) ≤
+        ENNReal.ofReal _ ^ 2 * ENNReal.ofReal _
+      rw [hlog x, ← ENNReal.ofReal_pow hC, ← ENNReal.ofReal_mul (sq_nonneg _)]
+      exact ENNReal.ofReal_le_ofReal (intervalSobolevDensity_add_le a b s hs _ _)
+  exact key (hardySobolevTranslation μ m a b s hab hs g)
+    (hardySobolevTranslation_apply μ m a b s hab hs g)
 
 /-- Paper: Lemma 9.3.1.5, p. 421. The operator norm of left translation is a
 measurable function of the translating element.

@@ -2798,6 +2798,30 @@ theorem bddAbove_norm_shiftedMellin_of_exponentialDecay (a b : ℝ) (hab : a < b
     rw [pow_one] at h
     exact (h.trans (div_le_self hC.le him'.le)).trans (le_max_left _ _)
 
+omit hδ hf in
+/-- Two-sided exponential decay makes every tilted symmetric exponential weight integrable. -/
+private theorem integrable_exp_add_mul_abs_mul_norm_of_exponentialDecay (g : 𝓢(ℝ, ℂ))
+    (hg : ExponentialDecay g) (d c : ℝ) :
+    Integrable fun x : ℝ ↦ Real.exp (d * x + c * |x|) * ‖g x‖ := by
+  obtain ⟨G₁, hG₁⟩ := exponentialDecay_weighted_schwartz g hg (d + c)
+  obtain ⟨G₂, hG₂⟩ := exponentialDecay_weighted_schwartz g hg (d - c)
+  refine ((G₁.integrable (μ := volume)).norm.add (G₂.integrable (μ := volume)).norm).mono'
+    ((Real.continuous_exp.comp ((continuous_const.mul continuous_id).add
+      (continuous_const.mul continuous_abs))).mul g.continuous.norm).aestronglyMeasurable
+    (Eventually.of_forall fun x ↦ ?_)
+  have e1 : ‖G₁ x‖ = Real.exp ((d + c) * x) * ‖g x‖ := by
+    rw [hG₁, norm_mul, Complex.norm_of_nonneg (Real.exp_pos _).le]
+  have e2 : ‖G₂ x‖ = Real.exp ((d - c) * x) * ‖g x‖ := by
+    rw [hG₂, norm_mul, Complex.norm_of_nonneg (Real.exp_pos _).le]
+  change ‖Real.exp (d * x + c * |x|) * ‖g x‖‖ ≤ ‖G₁ x‖ + ‖G₂ x‖
+  rw [e1, e2, Real.norm_of_nonneg (mul_nonneg (Real.exp_pos _).le (norm_nonneg _)), ← add_mul]
+  refine mul_le_mul_of_nonneg_right ?_ (norm_nonneg _)
+  rcases abs_cases x with ⟨hx, _⟩ | ⟨hx, _⟩
+  · rw [hx, show d * x + c * x = (d + c) * x by ring]
+    linarith [Real.exp_pos ((d - c) * x)]
+  · rw [hx, show d * x + c * -x = (d - c) * x by ring]
+    linarith [Real.exp_pos ((d + c) * x)]
+
 /-- Paper: Corollary B.2.1.10(1), p. 600. The inequality (B.2.1.28)
 applies to both shifts with the weighted, possibly reflected input.
 Deviation: The sign encodes both shifts. The L¹ term uses the logarithmic
@@ -2809,7 +2833,84 @@ theorem shiftedMellin_verticalLp_of_exponentialDecay
         eLpNorm (verticalTrace (shiftedMellin n δ) σ) (ENNReal.ofReal p) volume ≤
           ENNReal.ofReal
             (((∫ x : ℝ, Real.exp (((n : ℝ) * δ) * x + (max |a| |b| + (N : ℝ)) * |x|) *
-                  ‖f (δ * x)‖) ^ p + C ^ p * lpTail p N) ^ (1 / p)) := by sorry
+                  ‖f (δ * x)‖) ^ p + C ^ p * lpTail p N) ^ (1 / p)) := by
+  obtain ⟨M, hM⟩ : ∃ M : ℝ, M = max |a| |b| := ⟨_, rfl⟩
+  have hM0 : 0 < M := by
+    rw [hM, lt_max_iff, abs_pos, abs_pos]
+    by_contra h
+    rw [not_or, not_not, not_not] at h
+    rw [h.1, h.2] at hab
+    exact lt_irrefl _ hab
+  obtain ⟨C, hC, hBound⟩ := mellin_heightBound_of_exponentialDecay f hf
+    ((n : ℝ) - M) ((n : ℝ) + M) (by linarith) N (by omega)
+  have hpt (σ y : ℝ) : (n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I) =
+      (((n : ℝ) + δ * σ : ℝ) : ℂ) + ((δ * y : ℝ) : ℂ) * Complex.I := by
+    push_cast
+    ring
+  have hδσ (σ : ℝ) (hσ : σ ∈ Icc a b) : |δ * σ| ≤ M := by
+    have h : |σ| ≤ M := by
+      rw [hM]
+      exact abs_le_max_abs_abs hσ.1 hσ.2
+    rcases hδ with rfl | rfl <;> simpa using h
+  have hmem (σ : ℝ) (hσ : σ ∈ Icc a b) :
+      (n : ℝ) + δ * σ ∈ Icc ((n : ℝ) - M) ((n : ℝ) + M) := by
+    have h := abs_le.mp (hδσ σ hσ)
+    constructor <;> linarith
+  -- The height of `n + δ s` is `δ y`, of the same absolute value as the height of `s`.
+  have hheight : ∀ σ ∈ Icc a b, ∀ y : ℝ, y ≠ 0 →
+      ‖mellin (fromLog f) ((n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I))‖ ≤
+        C / |y| ^ N := by
+    intro σ hσ y hy
+    have hδy : δ * y ≠ 0 := mul_ne_zero (by rcases hδ with rfl | rfl <;> norm_num) hy
+    have habs : |δ * y| = |y| := by rcases hδ with rfl | rfl <;> simp
+    rw [hpt, ← habs]
+    exact hBound _ (hmem σ hσ) (δ * y) hδy
+  refine ⟨C, hC, hheight, fun p hp σ hσ ↦ ?_⟩
+  obtain ⟨c, hc⟩ : ∃ c : ℝ, c = M + (N : ℝ) := ⟨_, rfl⟩
+  have hH : Integrable (fun u : ℝ ↦ Real.exp ((n : ℝ) * u + c * |u|) * ‖f u‖) :=
+    integrable_exp_add_mul_abs_mul_norm_of_exponentialDecay f hf n c
+  -- The weighted `L¹` term of the statement is the integral of this majorant.
+  have hS : (∫ x : ℝ, Real.exp (((n : ℝ) * δ) * x + c * |x|) * ‖f (δ * x)‖) =
+      ∫ u : ℝ, Real.exp ((n : ℝ) * u + c * |u|) * ‖f u‖ := by
+    rcases hδ with rfl | rfl
+    · simp only [mul_one, one_mul]
+    · rw [← integral_neg_eq_self (fun u : ℝ ↦ Real.exp ((n : ℝ) * u + c * |u|) * ‖f u‖)]
+      refine integral_congr_ae (Eventually.of_forall fun x ↦ ?_)
+      simp only [mul_neg, mul_one, neg_mul, one_mul, abs_neg]
+  have hsup (y : ℝ) :
+      ‖mellin (fromLog f) ((n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I))‖ ≤
+        ∫ u : ℝ, Real.exp ((n : ℝ) * u + c * |u|) * ‖f u‖ := by
+    rw [mellin_fromLog_eq_integral_exp]
+    refine (norm_integral_le_integral_norm _).trans (integral_mono_of_nonneg
+      (Eventually.of_forall fun x ↦ norm_nonneg _) hH (Eventually.of_forall fun x ↦ ?_))
+    change ‖Complex.exp (((n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I)) * (x : ℂ)) *
+      f x‖ ≤ Real.exp ((n : ℝ) * x + c * |x|) * ‖f x‖
+    have h1 : (((n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I)) * (x : ℂ)).re =
+        ((n : ℝ) + δ * σ) * x := by
+      rw [hpt]
+      simp
+    rw [norm_mul, Complex.norm_exp, h1]
+    refine mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr ?_) (norm_nonneg _)
+    have hN0 : (0 : ℝ) ≤ N := Nat.cast_nonneg N
+    have h2 : δ * σ * x ≤ c * |x| :=
+      calc δ * σ * x ≤ |δ * σ * x| := le_abs_self _
+        _ = |δ * σ| * |x| := abs_mul _ _
+        _ ≤ c * |x| := by
+            rw [hc]
+            exact mul_le_mul_of_nonneg_right (by linarith [hδσ σ hσ]) (abs_nonneg x)
+    rw [add_mul]
+    linarith
+  have hline : Continuous (fun y : ℝ ↦
+      (n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I)) := by fun_prop
+  have hres := eLpNorm_le_of_bound_of_heightBound
+    (g := fun y : ℝ ↦ mellin (fromLog f)
+      ((n : ℂ) + (δ : ℂ) * ((σ : ℂ) + (y : ℂ) * Complex.I)))
+    ((differentiable_mellin_of_exponentialDecay f hf).continuous.comp
+      hline).aestronglyMeasurable hp hN
+    (integral_nonneg fun x ↦ mul_nonneg (Real.exp_pos _).le (norm_nonneg _)) hC.le hsup
+    (hheight σ hσ)
+  rw [← hS, hc, hM] at hres
+  exact hres
 
 /-- Paper: Corollary B.2.1.10(2), p. 600. Multiplying either shifted Mellin
 transform by a meromorphic function of polynomial growth gives rapid vertical decay.

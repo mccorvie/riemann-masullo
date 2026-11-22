@@ -553,9 +553,9 @@ and its suquotients $\mathscr{E}_{S,S_\infty}(\chi_S|_{J^1_{F,S}})$ and $\mathsc
 & \mathscr{E}_{S,S_\infty}\bigl(\chi_S|_{J^1_{F,S}}\bigr)\times\prod'_{p:S_p\subset S}\mathscr{E}_{S,S_p}\bigl(\chi_S|_{J^1_{F,S}}\bigr)
   \arrow[d]
 \\
-[D_{S,1}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
+{[D_{S,1}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]}
   \arrow[r,"j" below] \arrow[d,"\simeq" left]
-& [D_{F,S}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
+& {[D_{F,S}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]}
 & \coprod'_{v\in S}[D_{S,v}/\mathrm{GL}_1(\mathbf{A}_{F,S})^1]
   \arrow[l,"i" below] \arrow[d,"\simeq" right]
 \\

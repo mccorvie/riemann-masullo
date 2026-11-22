@@ -4,7 +4,7 @@
 # request that closes the ones it proved. Single provers leave a file's hard tail behind; a
 # sweeper has the whole file, more time and a stronger model.
 #
-#   scripts/sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--dry-run]
+#   scripts/sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--note-file F] [--dry-run]
 #
 # What it does:
 #   1. lists the file's open proof issues (by the `<!-- sorry: path::name -->` marker);
@@ -23,12 +23,13 @@ resume=""
 if [ "${1:-}" = --resume ]; then resume=${2:?the sweep issue number}; shift 2; set -- "resume" "$@"; fi
 file=${1:?usage: sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--dry-run]}
 shift
-model=gpt-6.2-astra; effort=xhigh; dry=0
+model=gpt-6.2-astra; effort=xhigh; dry=0; note=""
 while [ $# -gt 0 ]; do
   case $1 in
     --model) model=$2; shift 2 ;;
     --effort) effort=$2; shift 2 ;;
     --dry-run) dry=1; shift ;;
+    --note-file) note=$2; shift 2 ;;      # text added to the sweep issue: priorities, hints
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -119,6 +120,7 @@ open(f"{work}/mine.txt", "w").write("".join(f"{r['number']}\n" for r in mine))
 print(f"{path}: {len(mine)} to prove" + (f", {len(others)} left to others" if others else ""))
 EOF
 
+if [ -n "$note" ]; then { echo; echo "## From the integrator"; echo; cat "$note"; } >>"$work/body.md"; fi
 if [ $dry = 1 ]; then cat "$work/body.md"; exit 0; fi
 
 chapter=$(sed -nE 's#^RiemannMasullo/(Ch[0-9]+|App[A-E])_.*#\1#p' <<<"$file" | tr '[:upper:]' '[:lower:]' | sed 's/^app\(.\)/app\U\1/')

@@ -39,6 +39,7 @@ import Mathlib.MeasureTheory.Function.LpSpace.DomAct.Continuous
 import Mathlib.MeasureTheory.Function.Holder
 import Mathlib.MeasureTheory.Function.SimpleFuncDenseLp
 import Mathlib.Analysis.Normed.Operator.Mul
+import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Algebra.Support
 import RiemannMasullo.ForMathlib.MeasureTheory.Function.ContinuousMapDense
 import Mathlib.MeasureTheory.Constructions.Polish.StronglyMeasurable
@@ -5585,11 +5586,265 @@ theorem rapidDecaySequence_isFrechet : IsFrechetTVS (RapidDecaySequence r) := by
   simpa only [Function.comp_apply, dist_eq_norm] using h
 
 
+/-- On the pure lattice group `ℤ^r` (no real, torus or finite part), each weighted
+derivative bound is the supremum over the lattice of the monomial times the function. -/
+private theorem elementarySchwartzBound_lattice (f : ElementaryLieGroup 0 0 r PUnit → ℂ)
+    (i : ElementarySchwartzIndex 0 0 r) :
+    elementarySchwartzBound f i =
+      ⨆ a : Fin r → ℤ, (‖(∏ k, (a k : ℂ) ^ i.2.2.2 k) * f (0, 0, a, PUnit.unit)‖₊ : ℝ≥0∞) := by
+  obtain ⟨α, β, γ, δ⟩ := i
+  obtain rfl : β = 0 := Subsingleton.elim _ _
+  obtain rfl : γ = 0 := Subsingleton.elim _ _
+  simp only [elementarySchwartzBound, elementaryPartial_zero, Finset.univ_eq_empty,
+    Finset.prod_empty, one_mul]
+  have hcov (xt : EuclideanSpace ℝ (Fin 0) × EuclideanSpace ℝ (Fin 0)) (a : Fin r → ℤ)
+      (b : PUnit) : elementaryCover (F := PUnit) xt a b = (0, 0, a, b) :=
+    Prod.ext (Subsingleton.elim _ _) (Prod.ext (Subsingleton.elim _ _) rfl)
+  refine le_antisymm (iSup_le fun xt ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_)
+    (iSup_le fun a ↦ le_iSup_of_le 0 (le_iSup_of_le a (le_iSup_of_le PUnit.unit ?_)))
+  · rw [hcov]
+    exact le_iSup (fun a : Fin r → ℤ ↦ (‖(∏ k, (a k : ℂ) ^ δ k) * f (0, 0, a, b)‖₊ : ℝ≥0∞)) a
+  · rw [hcov]
+
+/-- The supremum of a monomial times a sequence is at most the weighted absolute sum
+whose order is the total degree of the monomial. -/
+private theorem lattice_sup_le_rapidDecaySequenceBound (s : (Fin r → ℤ) → ℂ) (δ : Fin r → ℕ) :
+    (⨆ a : Fin r → ℤ, (‖(∏ k, (a k : ℂ) ^ δ k) * s a‖₊ : ℝ≥0∞)) ≤
+      rapidDecaySequenceBound (∑ k, δ k) s := by
+  refine iSup_le fun a ↦ le_trans ?_ (le_tsum _ a)
+  let x : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ))
+  have h : ‖∏ k, (a k : ℂ) ^ δ k‖ ≤ (1 + ‖x‖) ^ ∑ k, δ k := by
+    have hx : ∏ k, |x k| ^ δ k = ‖∏ k, (a k : ℂ) ^ δ k‖ := by
+      simp [x, norm_prod, Complex.norm_intCast]
+    rw [← hx]
+    exact (prod_abs_pow_le_norm_pow x δ).trans
+      (pow_le_pow_left₀ (norm_nonneg _) (by linarith) _)
+  rw [nnNorm_mul, ENNReal.coe_mul]
+  gcongr
+  have h' : ‖∏ k, (a k : ℂ) ^ δ k‖₊ ≤ (1 + ‖x‖₊) ^ ∑ k, δ k := by
+    rw [← NNReal.coe_le_coe]; push_cast; exact h
+  calc ((‖∏ k, (a k : ℂ) ^ δ k‖₊ : ℝ≥0) : ℝ≥0∞) ≤ (((1 + ‖x‖₊) ^ ∑ k, δ k : ℝ≥0) : ℝ≥0∞) :=
+        ENNReal.coe_le_coe.2 h'
+    _ = _ := by push_cast; rfl
+
+/-- Pointwise lattice estimate: `(1 + |a|)^j` is at most the summable product weight
+`∏ 1 / (a_k + 1/2)^2` times a constant times a finite sum of monomials of degree `2r + j`. -/
+private theorem lattice_weight_le (a : Fin r → ℤ) (j : ℕ) :
+    (1 + ‖(WithLp.toLp 2 (fun i ↦ (a i : ℝ)) : EuclideanSpace ℝ (Fin r))‖) ^ j ≤
+      (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) * (((r : ℝ) + 1) ^ (2 * r + j) *
+        ∑ i : Option (Fin r),
+          ∏ k, |(a k : ℝ)| ^ (i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l (2 * r + j)) k)) := by
+  set N := 2 * r + j
+  let x : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ))
+  set M : ℝ := 1 + ∑ k, |(a k : ℝ)| with hM
+  have hS : 0 ≤ ∑ k, |(a k : ℝ)| := Finset.sum_nonneg fun _ _ ↦ abs_nonneg _
+  have hnorm : ‖x‖ ≤ ∑ k, |(a k : ℝ)| := by
+    conv_lhs => rw [← (EuclideanSpace.basisFun (Fin r) ℝ).sum_repr x]
+    refine (norm_sum_le _ _).trans_eq ?_
+    simp [norm_smul, x]
+  have hu (k : Fin r) : 0 < ((a k : ℝ) + 1 / 2) ^ 2 := by
+    have hne : (a k : ℝ) + 1 / 2 ≠ 0 := by
+      intro h
+      have : (2 * a k + 1 : ℤ) = 0 := by exact_mod_cast (by linarith : (2 * (a k : ℝ) + 1) = 0)
+      omega
+    exact lt_of_le_of_ne (sq_nonneg _) (pow_ne_zero 2 hne).symm
+  have huM (k : Fin r) : ((a k : ℝ) + 1 / 2) ^ 2 ≤ M ^ 2 := by
+    rw [← sq_abs]
+    apply pow_le_pow_left₀ (abs_nonneg _)
+    have : |(a k : ℝ)| ≤ ∑ k, |(a k : ℝ)| :=
+      Finset.single_le_sum (f := fun k ↦ |(a k : ℝ)|) (fun _ _ ↦ abs_nonneg _) (Finset.mem_univ k)
+    calc |(a k : ℝ) + 1 / 2| ≤ |(a k : ℝ)| + |1 / 2| := abs_add_le _ _
+      _ ≤ M := by rw [hM]; norm_num; linarith
+  set P := ∏ k, ((a k : ℝ) + 1 / 2) ^ 2
+  have hP : 0 < P := Finset.prod_pos fun k _ ↦ hu k
+  have hPM : P ≤ M ^ (2 * r) := by
+    calc P ≤ ∏ _k : Fin r, M ^ 2 := Finset.prod_le_prod₀ (fun k _ ↦ (hu k).le) fun k _ ↦ huM k
+      _ = M ^ (2 * r) := by rw [Finset.prod_const, Finset.card_univ, Fintype.card_fin, ← pow_mul]
+  have hxM : (1 + ‖x‖) ^ j ≤ M ^ j :=
+    pow_le_pow_left₀ (by positivity) (by rw [hM]; linarith) _
+  have hprod : (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) = P⁻¹ := by
+    simp only [P, one_div, Finset.prod_inv_distrib]
+  rw [hprod, le_inv_mul_iff₀ hP]
+  let c (i : Option (Fin r)) : ℝ := i.elim 1 (fun l ↦ |(a l : ℝ)|)
+  obtain ⟨i0, -, hi0⟩ := Finset.exists_max_image Finset.univ c Finset.univ_nonempty
+  have hc1 : 1 ≤ c i0 := hi0 none (Finset.mem_univ _)
+  have hMc : M ≤ ((r : ℝ) + 1) * c i0 := by
+    calc M ≤ c i0 + ∑ _k : Fin r, c i0 := by
+          rw [hM]; gcongr with k
+          · exact hi0 (some k) (Finset.mem_univ _)
+      _ = _ := by simp; ring
+  have hterm (i : Option (Fin r)) :
+      ∏ k, |(a k : ℝ)| ^ (i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l N) k) = c i ^ N := by
+    cases i with
+    | none => simp [c]
+    | some l => exact prod_abs_pow_single (fun k ↦ (a k : ℝ)) l N
+  simp only [hterm]
+  have hcnn (i : Option (Fin r)) : 0 ≤ c i ^ N :=
+    pow_nonneg (by cases i <;> simp [c]) _
+  calc P * (1 + ‖x‖) ^ j ≤ M ^ (2 * r) * M ^ j :=
+        mul_le_mul hPM hxM (by positivity) (by positivity)
+    _ = M ^ N := by rw [← pow_add]
+    _ ≤ (((r : ℝ) + 1) * c i0) ^ N := pow_le_pow_left₀ (by positivity) hMc _
+    _ = ((r : ℝ) + 1) ^ N * c i0 ^ N := mul_pow _ _ _
+    _ ≤ _ := by
+      gcongr
+      exact Finset.single_le_sum (fun i _ ↦ hcnn i) (Finset.mem_univ i0)
+
+/-- The sum over `ℤ^r` of a product of one-variable weights is the `r`-th power of the
+one-variable sum. -/
+private theorem tsum_pi_prod_eq_pow (w : ℤ → ℝ≥0∞) :
+    ∀ r : ℕ, ∑' a : Fin r → ℤ, ∏ k, w (a k) = (∑' n, w n) ^ r
+  | 0 => by simp
+  | r + 1 => by
+    rw [← (Fin.consEquiv (fun _ : Fin (r + 1) ↦ ℤ)).tsum_eq]
+    simp only [Fin.consEquiv_apply, Fin.prod_univ_succ, Fin.cons_zero, Fin.cons_succ]
+    rw [tsum_prod (f := fun x (y : Fin r → ℤ) ↦ w x * ∏ k, w (y k)), pow_succ']
+    simp only [ENNReal.tsum_mul_left, tsum_pi_prod_eq_pow w r, ENNReal.tsum_mul_right]
+
+/-- The product weight `∏ 1 / (a_k + 1/2)^2` has finite sum over `ℤ^r`. -/
+private theorem lattice_weight_tsum_ne_top :
+    ∑' a : Fin r → ℤ, ENNReal.ofReal (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) ≠ ⊤ := by
+  have hsum : Summable fun n : ℤ ↦ 1 / ((n : ℝ) + 1 / 2) ^ 2 := by
+    refine ((Real.summable_one_div_int_add_rpow (1 / 2) 2).2 (by norm_num)).congr fun n ↦ ?_
+    rw [Real.rpow_two, sq_abs]
+  have hprod (a : Fin r → ℤ) : ENNReal.ofReal (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) =
+      ∏ k, ENNReal.ofReal (1 / ((a k : ℝ) + 1 / 2) ^ 2) :=
+    ENNReal.ofReal_prod_of_nonneg fun _ _ ↦ by positivity
+  simp_rw [hprod]
+  rw [tsum_pi_prod_eq_pow (fun n : ℤ ↦ ENNReal.ofReal (1 / ((n : ℝ) + 1 / 2) ^ 2)) r,
+    ← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ by positivity) hsum]
+  exact ENNReal.pow_ne_top ENNReal.ofReal_ne_top
+
+/-- Each weighted absolute sum of a lattice sequence is bounded by a constant times
+finitely many suprema of monomials times the sequence. -/
+private theorem rapidDecaySequenceBound_le_lattice_sup (j : ℕ) :
+    ∃ C : ℝ≥0∞, C ≠ ⊤ ∧ ∀ s : (Fin r → ℤ) → ℂ, rapidDecaySequenceBound j s ≤
+      C * ∑ i : Option (Fin r), ⨆ a : Fin r → ℤ,
+        (‖(∏ k, (a k : ℂ) ^ (i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l (2 * r + j)) k)) *
+          s a‖₊ : ℝ≥0∞) := by
+  set N := 2 * r + j
+  let δ (i : Option (Fin r)) : Fin r → ℕ := i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l N)
+  let v (a : Fin r → ℤ) : ℝ≥0∞ := ENNReal.ofReal (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2)
+  let K : ℝ := ((r : ℝ) + 1) ^ N
+  refine ⟨(∑' a, v a) * ENNReal.ofReal K,
+    ENNReal.mul_ne_top lattice_weight_tsum_ne_top ENNReal.ofReal_ne_top, fun s ↦ ?_⟩
+  let B (i : Option (Fin r)) : ℝ≥0∞ :=
+    ⨆ a : Fin r → ℤ, (‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖₊ : ℝ≥0∞)
+  change _ ≤ _ * ∑ i, B i
+  unfold rapidDecaySequenceBound
+  calc _ ≤ ∑' a, v a * (ENNReal.ofReal K * ∑ i, B i) := tsum_le_tsum fun a ↦ ?_
+    _ = _ := by rw [ENNReal.tsum_mul_right, mul_assoc]
+  let x : EuclideanSpace ℝ (Fin r) := WithLp.toLp 2 (fun i ↦ (a i : ℝ))
+  have hW : 0 ≤ ∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2 := by positivity
+  have hreal : (1 + ‖x‖) ^ j * ‖s a‖ ≤
+      (∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) * (K * ∑ i, ‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖) := by
+    have hnorm (i : Option (Fin r)) :
+        ‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖ = (∏ k, |(a k : ℝ)| ^ δ i k) * ‖s a‖ := by
+      simp [norm_prod, Complex.norm_intCast]
+    simp only [hnorm, ← Finset.sum_mul]
+    rw [← mul_assoc, ← mul_assoc]
+    exact mul_le_mul_of_nonneg_right ((lattice_weight_le a j).trans_eq (by rw [mul_assoc])) (norm_nonneg _)
+  have hL : ((1 : ℝ≥0∞) + (‖x‖₊ : ℝ≥0∞)) ^ j * (‖s a‖₊ : ℝ≥0∞) =
+      ENNReal.ofReal ((1 + ‖x‖) ^ j * ‖s a‖) := by
+    rw [ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_pow (by positivity),
+      ENNReal.ofReal_add zero_le_one (norm_nonneg _), ENNReal.ofReal_one, ofReal_norm, ofReal_norm]
+    rfl
+  have hR : ENNReal.ofReal ((∏ k, 1 / ((a k : ℝ) + 1 / 2) ^ 2) *
+      (K * ∑ i, ‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖)) =
+      v a * (ENNReal.ofReal K * ∑ i, (‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖₊ : ℝ≥0∞)) := by
+    rw [ENNReal.ofReal_mul hW, ENNReal.ofReal_mul (by positivity),
+      ENNReal.ofReal_sum_of_nonneg (fun _ _ ↦ norm_nonneg _)]
+    simp only [v, ofReal_norm]
+    rfl
+  change ((1 : ℝ≥0∞) + (‖x‖₊ : ℝ≥0∞)) ^ j * (‖s a‖₊ : ℝ≥0∞) ≤ _
+  rw [hL]
+  refine (ENNReal.ofReal_le_ofReal hreal).trans ?_
+  rw [hR]
+  gcongr with i
+  exact le_iSup (fun a : Fin r → ℤ ↦ (‖(∏ k, (a k : ℂ) ^ δ i k) * s a‖₊ : ℝ≥0∞)) a
+
+/-- The identification of rapidly decreasing sequences with Schwartz functions on `ℤ^r`,
+stated with an explicit universe for the trivial finite factor. -/
+private theorem rapidDecaySequence_equiv_elementarySchwartz_aux.{u} :
+    ∃ e : RapidDecaySequence r ≃L[ℂ] ElementarySchwartz 0 0 r PUnit.{u + 1},
+      ∀ s (g : ElementaryLieGroup 0 0 r PUnit.{u + 1}), e s g = s g.2.2.1 := by
+  classical
+  let G := ElementaryLieGroup 0 0 r PUnit.{u + 1}
+  have hsmooth (f : G → ℂ) (a : Fin r → ℤ) (b : PUnit.{u + 1}) :
+      ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b)) := by
+    have : (fun xt ↦ f (elementaryCover xt a b)) = fun _ ↦ f (elementaryCover 0 a b) :=
+      funext fun _ ↦ congrArg _ (congrArg (elementaryCover · a b) (Subsingleton.elim _ _))
+    rw [this]
+    exact contDiff_const
+  have hΦ (s : rapidDecaySequenceSubmodule r) :
+      (fun g : G ↦ s.val g.2.2.1) ∈ elementarySchwartzSubmodule 0 0 r PUnit.{u + 1} := by
+    refine ⟨hsmooth (fun g : G ↦ s.val g.2.2.1), fun i ↦ ?_⟩
+    rw [elementarySchwartzBound_lattice]
+    exact (lattice_sup_le_rapidDecaySequenceBound s.val i.2.2.2).trans_lt (s.property _)
+  have hΨ (f : elementarySchwartzSubmodule 0 0 r PUnit.{u + 1}) :
+      (fun a ↦ f.val (0, 0, a, PUnit.unit)) ∈ rapidDecaySequenceSubmodule r := by
+    intro j
+    obtain ⟨C, hC, h⟩ := rapidDecaySequenceBound_le_lattice_sup (r := r) j
+    refine (h _).trans_lt (ENNReal.mul_lt_top hC.lt_top (ENNReal.sum_lt_top.2 fun i _ ↦ ?_))
+    have := f.property.2 (0, 0, 0, i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l (2 * r + j)))
+    rwa [elementarySchwartzBound_lattice] at this
+  let e₀ : RapidDecaySequence r ≃ₗ[ℂ] ElementarySchwartz 0 0 r PUnit.{u + 1} :=
+    { toFun := fun s ↦ (⟨_, hΦ s⟩ : elementarySchwartzSubmodule 0 0 r PUnit.{u + 1})
+      invFun := fun f ↦ (⟨_, hΨ f⟩ : rapidDecaySequenceSubmodule r)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      left_inv := fun _ ↦ rfl
+      right_inv := fun f ↦ by
+        apply Subtype.ext
+        funext g
+        exact congrArg (f.val) (Prod.ext (Subsingleton.elim _ _)
+          (Prod.ext (Subsingleton.elim _ _) (Prod.ext rfl (Subsingleton.elim _ _)))) }
+  have hto : Continuous e₀ := by
+    refine rapidDecaySequence_withSeminorms.continuous_of_isBounded
+      elementarySchwartz_withSeminorms e₀.toLinearMap
+      (Seminorm.IsBounded.of_real fun i ↦ ⟨{∑ k, i.2.2.2 k}, 1, fun s ↦ ?_⟩)
+    refine le_trans ?_ (le_of_eq (show rapidDecaySequenceSeminorm (∑ k, i.2.2.2 k) s = _ by
+      rw [one_mul]
+      exact (DFunLike.congr_fun (Finset.sup_singleton (f := rapidDecaySequenceSeminorm)
+        (b := ∑ k, i.2.2.2 k)) s).symm))
+    change (elementarySchwartzBound _ i).toReal ≤ (rapidDecaySequenceBound _ s.val).toReal
+    refine ENNReal.toReal_mono (s.property _).ne ?_
+    rw [elementarySchwartzBound_lattice]
+    exact lattice_sup_le_rapidDecaySequenceBound s.val i.2.2.2
+  have hinv : Continuous e₀.symm := by
+    refine elementarySchwartz_withSeminorms.continuous_of_isBounded
+      rapidDecaySequence_withSeminorms e₀.symm.toLinearMap
+      (Seminorm.IsBounded.of_real fun j ↦ ?_)
+    obtain ⟨C, hC, h⟩ := rapidDecaySequenceBound_le_lattice_sup (r := r) j
+    let idx (i : Option (Fin r)) : ElementarySchwartzIndex 0 0 r :=
+      (0, 0, 0, i.elim (0 : Fin r → ℕ) (fun l ↦ Pi.single l (2 * r + j)))
+    let S := Finset.univ.image idx
+    refine ⟨S, C.toReal * Fintype.card (Option (Fin r)), fun f ↦ ?_⟩
+    have hfin (i : Option (Fin r)) : elementarySchwartzBound f.val (idx i) ≠ ⊤ :=
+      (f.property.2 _).ne
+    change (rapidDecaySequenceBound j (fun a ↦ f.val (0, 0, a, PUnit.unit))).toReal ≤ _
+    calc _ ≤ (C * ∑ i, elementarySchwartzBound f.val (idx i)).toReal := by
+          refine ENNReal.toReal_mono
+            (ENNReal.mul_ne_top hC (ENNReal.sum_ne_top.2 fun i _ ↦ hfin i)) ?_
+          refine (h _).trans_eq ?_
+          simp only [idx, elementarySchwartzBound_lattice]
+      _ = C.toReal * ∑ i, elementarySchwartzSeminorm (idx i) f := by
+          rw [ENNReal.toReal_mul, ENNReal.toReal_sum fun i _ ↦ hfin i]
+          rfl
+      _ ≤ C.toReal * ∑ _i : Option (Fin r), (S.sup elementarySchwartzSeminorm) f := by
+          gcongr with i
+          exact Seminorm.le_finset_sup_apply (Finset.mem_image_of_mem idx (Finset.mem_univ i))
+      _ = _ := by
+          rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_assoc]
+          rfl
+  exact ⟨{ e₀ with continuous_toFun := hto, continuous_invFun := hinv }, fun _ _ ↦ rfl⟩
+
 /-- Paper: Remark D.1.3.6, p. 752. Reading a sequence as a function on the
 integer lattice identifies it with the elementary Schwartz space of that lattice. -/
 theorem rapidDecaySequence_equiv_elementarySchwartz :
     ∃ e : RapidDecaySequence r ≃L[ℂ] ElementarySchwartz 0 0 r PUnit,
-      ∀ s (g : ElementaryLieGroup 0 0 r PUnit), e s g = s g.2.2.1 := by sorry
+      ∀ s (g : ElementaryLieGroup 0 0 r PUnit), e s g = s g.2.2.1 :=
+  rapidDecaySequence_equiv_elementarySchwartz_aux
 
 -- TODO(later): needs §C.2.4 for the nuclearity assertion in Remark D.1.3.6.
 

@@ -7,10 +7,15 @@ public import Mathlib.MeasureTheory.Integral.Bochner.Basic
 public import Mathlib.MeasureTheory.Measure.Regular
 public import Mathlib.Topology.Algebra.Module.Complement
 public import Mathlib.Topology.ContinuousMap.Bounded.Normed
+import Mathlib.Data.Set.FiniteExhaustion
+import all RiemannMasullo.AppC_LCTVS.Sec1
+import Mathlib.Analysis.Normed.Group.FunctionSeries
 import Mathlib.Analysis.Normed.Module.Dual
+import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.AbsolutelySumming.Composition
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.Hilbert
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.Seminorm.DirectSum
 import RiemannMasullo.ForMathlib.Analysis.Normed.Module.WeakDual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.RieszMarkovKakutani.Real
 import Mathlib.Analysis.Normed.Module.HahnBanach
@@ -763,7 +768,19 @@ theorem localBanachMap_hasSeries_of_three_absolutelySumming
     ∃ (c : ℕ → ℂ) (φ : ℕ → LocalBanach p₃ →L[ℂ] ℂ) (y : ℕ → LocalBanach p₀),
       Summable (fun n ↦ ‖c n‖) ∧ Tendsto φ atTop (𝓝 0) ∧ Tendsto y atTop (𝓝 0) ∧
         ∀ x, HasSum (fun n ↦ (c n * φ n x) • y n) (localBanachMap p₃ p₀ (h₁.trans (h₂.trans h₃)) x) := by
-  sorry
+  obtain ⟨c, φ, y, hc, hφ, hy, hs⟩ := AbsolutelySumming.exists_series_comp_three
+    (localBanachMap p₁ p₀ h₁) (localBanachMap p₂ p₁ h₂) (localBanachMap p₃ p₂ h₃) s₁ s₂ s₃
+  refine ⟨c, φ, y, hc, hφ, hy, fun x ↦ ?_⟩
+  have heq : localBanachMap p₁ p₀ h₁ (localBanachMap p₂ p₁ h₂ (localBanachMap p₃ p₂ h₃ x)) =
+      localBanachMap p₃ p₀ (h₁.trans (h₂.trans h₃)) x := by
+    induction x using Completion.induction_on with
+    | hp => exact isClosed_eq (by fun_prop) (by fun_prop)
+    | ih x =>
+      rw [localBanachMap_coe p₃ p₂ h₃ x,
+        localBanachMap_coe p₂ p₁ h₂ (show WithLocalSeminorm p₂ from x),
+        localBanachMap_coe p₁ p₀ h₁ (show WithLocalSeminorm p₁ from x),
+        localBanachMap_coe p₃ p₀ _ x]
+  exact heq ▸ hs x
 
 /-- Paper: Theorem C.2.4.2(2), p. 686. Nuclearity is equivalent to the existence,
 inside each balanced convex zero-neighborhood, of another such neighborhood for
@@ -3344,21 +3361,6 @@ private theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Spa
   exact ⟨V₃, hV₃, bV₃, cV₃, h₃.trans (h₂.trans h₁),
     localBanachMap_hasSeries_of_three_absolutelySumming E _ _ _ s₁ s₂ s₃⟩
 
-/-- Paper: Lemma C.2.4.11, p. 689. In a nuclear Fréchet space, each bounded set is
-contained in the set of sums of an absolutely weighted bounded sequence, with
-coefficients in the complex unit disk. This is the bounded-set step of dual nuclearity.
-Total boundedness gives finite-valued approximations to the inclusion of the bounded
-set. Regard them as tensors of vectors with bounded scalar functions, using the
-indicators of the fibers as scalar factors. They converge in the completed injective
-tensor. Transport the limit to the completed projective tensor, expand it in a
-series, and evaluate the scalar factors at each point of the bounded set. -/
-theorem exists_bounded_series_cover_of_nuclear_frechet
-    (hE : IsFrechetTVS E) (hN : IsNuclearTVS.{v, u} E) (B : Set E) (hB : IsVonNBounded ℂ B) :
-    ∃ (c : ℕ → ℂ) (x : ℕ → E), Summable (fun k ↦ ‖c k‖) ∧ IsVonNBounded ℂ (range x) ∧
-      ∀ y ∈ B, ∃ a : ℕ → ℂ, (∀ k, ‖a k‖ ≤ 1) ∧
-        HasSum (fun k ↦ (c k * a k) • x k) y := by
-  sorry
-
 /-- Paper: Lemma C.2.4.11, p. 689. If the strong dual is nuclear, a bounded set
 containing all unit-disk linear combinations of a finite family controls the sum
 of the family's values under any fixed continuous seminorm. The bound is uniform
@@ -3661,23 +3663,6 @@ private theorem isNuclearTVS_strongDual_of_bounded_series_cover [IsTopologicalAd
         exact mul_le_of_le_one_right (norm_nonneg _) (hsum k)
       have hs' := Summable.of_nonneg_of_le (fun k ↦ Finset.sum_nonneg fun _ _ ↦ by positivity) hle hc
       exact mul_le_mul_of_nonneg_left (hs'.tsum_le_tsum hle hc) K.coe_nonneg
-
-/-- Paper: Lemma C.2.4.11, p. 689. A Fréchet space is nuclear exactly when its
-strong dual is nuclear. -/
-theorem isNuclearTVS_strongDual_iff (hE : IsFrechetTVS E) :
-    IsNuclearTVS.{v, u} (StrongDual ℂ E) ↔ IsNuclearTVS.{v, u} E := by
-  obtain ⟨hadd, hpoly, hmet, hcomplete⟩ := hE
-  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
-  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
-  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
-  constructor
-  · intro h
-    exact isNuclearTVS_of_signedSum_bound fun q hq ↦
-      exists_sum_bound_on_nhds_of_bounded q
-        (exists_sum_bound_on_bounded_sets_of_isNuclearTVS_strongDual h q hq)
-  · intro h
-    exact isNuclearTVS_strongDual_of_bounded_series_cover
-      (exists_bounded_series_cover_of_nuclear_frechet ⟨hadd, hpoly, hmet, hcomplete⟩ h)
 
 /-- A linear map from a final locally convex topology to a polynormable space is
 continuous if its composites with the defining maps are continuous. -/
@@ -4282,14 +4267,12 @@ theorem dense_finiteRank_iff_forall_sources :
       rw [tensorToFiniteRank_precomp_apply]
       exact hzG (hupCLM x) (mem_image_of_mem hupCLM hx)⟩
 
-/-- Paper: Lemma C.2.4.16(1), p. 690. A bounded set in a nuclear space has
-compact closure in the completion. -/
-theorem isPrecompactInCompletion_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
-    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by
+/-- For each continuous seminorm of a nuclear space, the map to its Banach
+completion sends some zero-neighborhood into a compact set. -/
+private theorem isCompactOperator_localBanach_coe (hE : IsNuclearTVS.{v, u} E)
+    (q : Seminorm ℂ E) (hq : Continuous q) :
+    IsCompactOperator (fun x : E ↦ ((show WithLocalSeminorm q from x) : LocalBanach q)) := by
   classical
-  apply (isPrecompactInCompletion_iff_totallyBounded S).mpr
-  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero.totallyBounded_iff.mpr ?_
-  intro q hq
   let U := q.ball 0 1
   have hU : U ∈ 𝓝 (0 : E) := q.ball_mem_nhds hq one_pos
   have bU : Balanced ℂ U := q.balanced_ball_zero 1
@@ -4348,29 +4331,41 @@ theorem isPrecompactInCompletion_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
     change J x = T (A (a' x))
     rw [hA, hj]
     exact (localBanachMap_coe p q' _ (show WithLocalSeminorm p from x)).symm
-  have htotal : TotallyBounded (J '' S) := by
-    rw [hJ, Set.image_comp]
-    obtain ⟨B, hB, hsub⟩ := hK.image_subset_compact_of_isVonNBounded
-      (f := K.toLinearMap) (hS.image a')
-    exact hB.totallyBounded.subset hsub
+  rw [← hq']
+  change IsCompactOperator J
+  rw [hJ]
+  exact hK.comp_clm a'
+
+/-- Paper: Lemma C.2.4.16(1), p. 690. A bounded set in a nuclear space has
+compact closure in the completion. -/
+theorem isPrecompactInCompletion_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
+    {S : Set E} (hS : IsVonNBounded ℂ S) : IsPrecompactInCompletion S := by
+  classical
+  apply (isPrecompactInCompletion_iff_totallyBounded S).mpr
+  refine (PolynormableSpace.hasBasis_zero_ball ℂ E).uniformity_of_nhds_zero.totallyBounded_iff.mpr ?_
+  intro q hq
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion q hq
+  have hc : IsCompactOperator j := (funext hj).symm ▸ isCompactOperator_localBanach_coe E hE q hq
+  obtain ⟨B, hB, hsub⟩ := hc.image_subset_compact_of_isVonNBounded (f := j.toLinearMap) hS
+  have htotal := hB.totallyBounded.subset hsub
   -- Lift the centers of a finite net back to the bounded set.
   obtain ⟨s, hs, hsf, hcover⟩ := htotal.exists_subset (Metric.dist_mem_uniformity one_pos)
-  have hpre (y : s) : ∃ x : E, x ∈ S ∧ J x = y := hs y.property
+  have hpre (y : s) : ∃ x : E, x ∈ S ∧ j x = y := hs y.property
   choose g hg using hpre
   let : Finite s := hsf.to_subtype
   refine ⟨range g, finite_range g, fun x hx ↦ ?_⟩
-  obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover (mem_image_of_mem J hx))
+  obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (hcover (mem_image_of_mem j hx))
   refine mem_iUnion₂.mpr ⟨g ⟨y, hy⟩, mem_range_self _, ?_⟩
-  change dist (J x) y < 1 at hxy
-  have hy' : J (g ⟨y, hy⟩) = y := (hg ⟨y, hy⟩).2
+  change dist (j x) y < 1 at hxy
+  have hy' : j (g ⟨y, hy⟩) = y := (hg ⟨y, hy⟩).2
   rw [← hy', dist_comm, dist_eq_norm] at hxy
-  change g ⟨y, hy⟩ - x ∈ U
+  change g ⟨y, hy⟩ - x ∈ q.ball 0 1
   apply q.mem_ball_zero.mpr
-  rw [← hq']
-  let x' : WithLocalSeminorm q' := x
-  let y' : WithLocalSeminorm q' := g ⟨y, hy⟩
-  change q' (y' - x') < 1
-  rw [← localBanach_norm_coe q' (y' - x'), Completion.coe_sub]
+  rw [hj, hj] at hxy
+  let x' : WithLocalSeminorm q := x
+  let y' : WithLocalSeminorm q := g ⟨y, hy⟩
+  change q (y' - x') < 1
+  rw [← localBanach_norm_coe q (y' - x'), Completion.coe_sub]
   exact hxy
 
 /-- Paper: Lemma C.2.4.16(1), p. 690. For a nuclear source, uniform convergence
@@ -4434,15 +4429,231 @@ dense in the strong operator space with uniform convergence on bounded sets. -/
 theorem dense_finiteRank_boundedConvergence_of_isNuclearTVS (hE : IsNuclearTVS.{v, u} E)
     (F : Type*) [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [IsTopologicalAddGroup F]
     [PolynormableSpace ℂ F] [T2Space F] :
-    DenseRange (tensorToFiniteRank (E := E) (F := F)) := by sorry
+    DenseRange (tensorToFiniteRank (E := E) (F := F)) := by
+  intro A
+  let S := {s : Set E | IsVonNBounded ℂ s}
+  let post : (E →Lᵤ[ℂ, S] E) →L[ℂ] (E →Lᵤ[ℂ, S] F) := A.postcompUniformConvergenceCLM S
+  have hd := (dense_finiteRank_of_isNuclearTVS E hE) (ContinuousLinearMap.id ℂ E)
+  let approximable (t : TopologicalSpace (E →L[ℂ] E)) :=
+    ContinuousLinearMap.id ℂ E ∈ @closure _ t (range (tensorToFiniteRank (E := E) (F := E)))
+  have hb := (congrArg approximable
+    (precompactConvergenceCLM_eq_bounded_of_isNuclearTVS E hE E)).mp hd
+  have hsub : post '' range (fun z ↦ tensorToFiniteRank z) ⊆
+      range (tensorToFiniteRank (E := E) (F := F)) := by
+    rintro _ ⟨_, ⟨z, rfl⟩, rfl⟩
+    refine ⟨TensorProduct.map LinearMap.id A.toLinearMap z, ?_⟩
+    ext x
+    change tensorToFiniteRank _ x = A (tensorToFiniteRank z x)
+    induction z using TensorProduct.inductionOn with
+    | tmul φ y => simp [tensorToFiniteRank_tmul]
+    | add z w hz hw => simp only [map_add, add_apply, hz, hw]
+  exact closure_mono hsub (image_closure_subset_closure_image post.continuous
+    (mem_image_of_mem post hb))
 
 /-- Paper: Remark C.2.4.17, p. 690. Bounded subsets of a quasi-complete nuclear
 space have compact closure in the space itself. -/
 theorem isCompact_closure_of_isNuclearTVS [QuasiCompleteSpace ℂ E]
     (hE : IsNuclearTVS.{v, u} E) {S : Set E} (hS : IsVonNBounded ℂ S) :
-    IsCompact (closure S) := by sorry
+    IsCompact (closure S) := by
+  have h := (isPrecompactInCompletion_iff_totallyBounded S).mp
+    (isPrecompactInCompletion_of_isNuclearTVS E hE hS)
+  exact h.closure.isCompact_of_isComplete
+    (QuasiCompleteSpace.quasiComplete hS.closure isClosed_closure)
 
 end ApproximationProperty
+
+section StrongDualNuclearity
+
+variable {E : Type u} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+
+open scoped BoundedContinuousFunction
+
+/-- Restriction to a bounded set takes continuous functionals to bounded continuous functions. -/
+private def restrictDualToBounded {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (B : Set E) (hB : IsVonNBounded ℂ B) : StrongDual ℂ E →ₗ[ℂ] (B →ᵇ ℂ) where
+  toFun φ := by
+    let h := (NormedSpace.image_isVonNBounded_iff ℂ).mp (hB.image φ)
+    exact BoundedContinuousFunction.ofNormedAddCommGroup (fun x : B ↦ φ x)
+      (φ.continuous.comp continuous_subtype_val) h.choose (fun x ↦ h.choose_spec x x.property)
+  map_add' _ _ := by ext; rfl
+  map_smul' _ _ := by ext; rfl
+
+/-- Evaluating the function factor of a tensor at a point of the bounded set. -/
+private def evalBoundedTensor {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [PolynormableSpace ℂ E] [T2Space E] {B : Set E} (x : B) :
+    ProjectiveTensor E (B →ᵇ ℂ) →L[ℂ] E := by
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let := PolynormableSpace.continuousSMul ℂ E
+  let Y := B →ᵇ ℂ
+  let T := TensorProduct.lift (LinearMap.mk₂ ℂ (fun (v : E) (g : Y) ↦ g x • v)
+    (fun _ _ _ ↦ smul_add _ _ _) (fun _ _ _ ↦ smul_comm _ _ _)
+    (fun _ _ _ ↦ add_smul _ _ _) (fun _ _ _ ↦ mul_smul _ _ _))
+  refine ⟨T, (continuous_projectiveTensor_iff (E := E) (F := Y) T).mpr ?_⟩
+  exact ((continuous_eval_const x).comp (continuous_snd : Continuous (Prod.snd : E × Y → Y))).smul
+    continuous_fst
+
+/-- Finite-rank approximations to the identity on a bounded set give a single completed
+tensor whose function factor evaluates to the inclusion at each point. -/
+private theorem exists_tensor_of_bounded_inclusion {E : Type u} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E]
+    [FirstCountableTopology E] [CompleteSpace E] (hN : IsNuclearTVS.{v} E)
+    (B : Set E) (hB : IsVonNBounded ℂ B) :
+    ∃ z : Completion (ProjectiveTensor E (B →ᵇ ℂ)), ∀ x : B,
+      (evalBoundedTensor x).fromCompletion z = x := by
+  classical
+  let Y := B →ᵇ ℂ
+  let P := ProjectiveTensor E Y
+  let S := equicontinuousCompactology E
+  let res := restrictDualToBounded B hB
+  let lift := (TensorProduct.map LinearMap.id res).comp (TensorProduct.comm ℂ (StrongDual ℂ E) E).toLinearMap
+  have hcontract (z : StrongDual ℂ E ⊗[ℂ] E) (φ : WeakDual ℂ E) (x : B) :
+      tensorDualOperator (lift z) φ.toStrongDual x = φ (tensorToFiniteRank z x) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul f y =>
+      change φ y * f x = φ (f x • y)
+      rw [map_smul, smul_eq_mul, mul_comm]
+    | add z w hz hw => simpa only [map_add, LinearMap.add_apply, add_apply] using congrArg₂ (· + ·) hz hw
+  have heval (z : StrongDual ℂ E ⊗[ℂ] E) (x : B) :
+      evalBoundedTensor x (lift z) = tensorToFiniteRank z x := by
+    let ev : E ⊗[ℂ] Y →ₗ[ℂ] E := (evalBoundedTensor x).toLinearMap
+    change ev (lift z) = _
+    induction z using TensorProduct.inductionOn with
+    | tmul f y => rfl
+    | add z w hz hw => simpa only [map_add, add_apply] using congrArg₂ (· + ·) hz hw
+  obtain ⟨U, hU⟩ := (𝓝 (0 : E)).exists_antitone_basis
+  have ht := (isPrecompactInCompletion_iff_totallyBounded B).mp
+    (isPrecompactInCompletion_of_isNuclearTVS E hN hB)
+  have happrox := (mem_closure_finiteRank_iff E (ContinuousLinearMap.id ℂ E)).mp
+    ((dense_finiteRank_of_isNuclearTVS E hN) (ContinuousLinearMap.id ℂ E)) B ht
+  choose z hz using fun n ↦ happrox (U n) (hU.1.mem_of_mem (i := n) trivial)
+  let seq (n : ℕ) : P := lift (z n)
+  let J₀ : (E ⊗[ℂ] Y) →+ (WeakDual ℂ E →ᵤ[S] Y) :=
+    { toFun := fun t ↦ UniformOnFun.ofFun S (fun φ ↦ tensorDualOperator t φ.toStrongDual)
+      map_zero' := funext fun φ ↦ by
+        change tensorDualOperator (0 : E ⊗[ℂ] Y) φ.toStrongDual = 0
+        rw [map_zero, LinearMap.zero_apply]
+      map_add' := fun t s ↦ funext fun φ ↦ by
+        change tensorDualOperator (t + s : E ⊗[ℂ] Y) _ = _; rw [map_add]; rfl }
+  let J : P →+ (WeakDual ℂ E →ᵤ[S] Y) := J₀
+  have hn : IsNuclearTVS.{0} E := (isNuclearTVS_iff_localBanach_integral E).mpr
+    ((isNuclearTVS_iff_localBanach_integral E).mp hN)
+  have hJ : IsUniformInducing J := AddMonoidHom.isUniformInducing_of_isInducing
+    ((tensorDualOperator_isEmbedding (E := E) (Y := Y)).isInducing.comp
+      (hn.2.2 Y inferInstance inferInstance inferInstance inferInstance inferInstance).isInducing)
+  have hconv : Tendsto (J ∘ seq) atTop
+      (𝓝 (UniformOnFun.ofFun S (fun φ : WeakDual ℂ E ↦ res φ.toStrongDual))) := by
+    apply UniformOnFun.tendsto_iff_tendstoUniformlyOn.mpr
+    intro A hA
+    apply Metric.tendstoUniformlyOn_iff.mpr
+    intro ε hε
+    obtain ⟨m, _, hm⟩ := hU.1.mem_iff.mp
+      (Metric.equicontinuousAt_iff_right.mp hA.1 (ε / 2) (half_pos hε))
+    filter_upwards [eventually_ge_atTop m] with n hn φ hφ
+    rw [dist_comm, dist_eq_norm]
+    refine lt_of_le_of_lt ((BoundedContinuousFunction.norm_le (half_pos hε).le).mpr fun x ↦ ?_)
+      (half_lt_self hε)
+    have h := hm (hU.antitone hn (hz n x x.property)) (⟨φ, hφ⟩ : A)
+    change ‖tensorDualOperator (lift (z n)) φ.toStrongDual x - φ x‖ ≤ _
+    rw [hcontract, ← map_sub]
+    simpa only [map_zero, dist_zero_left, ContinuousLinearMap.id_apply] using h.le
+  have hC : CauchySeq seq := hJ.cauchy_map_iff.mp (by
+    rw [Filter.map_map]; exact hconv.cauchySeq)
+  obtain ⟨w, hw⟩ := cauchySeq_tendsto_of_complete ((Completion.uniformContinuous_coe P).comp_cauchySeq hC)
+  refine ⟨w, fun x ↦ tendsto_nhds_unique (((evalBoundedTensor x).fromCompletion.continuous.tendsto w).comp hw) ?_⟩
+  have hx : Tendsto (fun n ↦ tensorToFiniteRank (z n) x - (x : E)) atTop (𝓝 0) := by
+    apply hU.1.tendsto_right_iff.mpr
+    intro m _
+    exact (eventually_ge_atTop m).mono fun n hn ↦ hU.antitone hn (hz n x x.property)
+  have ht := hx.add (tendsto_const_nhds (x := (x : E)) (f := atTop))
+  have ht' : Tendsto (fun n ↦ tensorToFiniteRank (z n) x) atTop (𝓝 (x : E)) := by
+    simpa only [zero_add, sub_add_cancel] using ht
+  apply ht'.congr
+  intro n
+  change tensorToFiniteRank (z n) x = (evalBoundedTensor x).fromCompletion (↑(seq n) : Completion P)
+  rw [ContinuousLinearMap.fromCompletion_apply_coe]
+  exact (heval (z n) x).symm
+
+/-- Paper: Lemma C.2.4.11, p. 689. In a nuclear Fréchet space, each bounded set is
+contained in the set of sums of an absolutely weighted bounded sequence, with
+coefficients in the complex unit disk. This is the bounded-set step of dual nuclearity.
+Finite-rank approximations to the inclusion converge uniformly on the bounded set.
+Their tensor limit has a series expansion whose point evaluations cover the set. -/
+theorem exists_bounded_series_cover_of_nuclear_frechet
+    (hE : IsFrechetTVS E) (hN : IsNuclearTVS.{v, u} E) (B : Set E) (hB : IsVonNBounded ℂ B) :
+    ∃ (c : ℕ → ℂ) (x : ℕ → E), Summable (fun k ↦ ‖c k‖) ∧ IsVonNBounded ℂ (range x) ∧
+      ∀ y ∈ B, ∃ a : ℕ → ℂ, (∀ k, ‖a k‖ ≤ 1) ∧
+        HasSum (fun k ↦ (c k * a k) • x k) y := by
+  obtain ⟨hadd, hpoly, hmet, hcomplete⟩ := hE
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let Y := B →ᵇ ℂ
+  obtain ⟨z, hz⟩ := exists_tensor_of_bounded_inclusion hN B hB
+  obtain ⟨c, x, g, hc, hx, hg, hs⟩ := completedProjectiveTensor_exists_series
+    ⟨hadd, hpoly, hmet, hcomplete⟩ (isFrechetTVS_of_banach Y) z
+  obtain ⟨M, hM⟩ := (show Tendsto (fun n ↦ ‖g n‖) atTop (𝓝 0) by simpa using hg.norm).bddAbove_range
+  let k : ℂ := (max 1 M : ℝ)
+  have hk : 0 < max 1 M := zero_lt_one.trans_le (le_max_left _ _)
+  have hnorm : ‖k‖ = max 1 M := Complex.norm_of_nonneg hk.le
+  have hk0 : k ≠ 0 := norm_pos_iff.mp (hnorm ▸ hk)
+  refine ⟨c, fun n ↦ k • x n, hc, ?_, fun y hy ↦ ?_⟩
+  · apply Filter.Tendsto.isVonNBounded_range ℂ (x := 0)
+    simpa using hx.const_smul k
+  · let b : B := ⟨y, hy⟩
+    refine ⟨fun n ↦ g n b / k, fun n ↦ ?_, ?_⟩
+    · rw [norm_div, hnorm, div_le_one hk]
+      exact ((g n).norm_coe_le_norm b).trans ((hM (mem_range_self n)).trans (le_max_right _ _))
+    · rw [← show (evalBoundedTensor b).fromCompletion z = y from hz b]
+      refine (hs.map (evalBoundedTensor b).fromCompletion (evalBoundedTensor b).fromCompletion.continuous).congr_fun ?_
+      intro n
+      change (c n * ((g n) b / k)) • k • x n =
+        (evalBoundedTensor b).fromCompletion (Completion.coe' (α := ProjectiveTensor E Y) _)
+      let v : ProjectiveTensor E Y := x n ⊗ₜ[ℂ] g n
+      change _ = (evalBoundedTensor b).fromCompletion (↑(c n • v) : Completion (ProjectiveTensor E Y))
+      rw [ContinuousLinearMap.fromCompletion_apply_coe, map_smul, smul_smul]
+      change _ = c n • (g n b) • x n
+      rw [smul_smul]
+      congr 1
+      field_simp
+
+/-- Paper: Lemma C.2.4.11, p. 689. A Fréchet space is nuclear exactly when its
+strong dual is nuclear. -/
+theorem isNuclearTVS_strongDual_iff (hE : IsFrechetTVS E) :
+    IsNuclearTVS.{v, u} (StrongDual ℂ E) ↔ IsNuclearTVS.{v, u} E := by
+  obtain ⟨hadd, hpoly, hmet, hcomplete⟩ := hE
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : ContinuousSMul ℂ E := PolynormableSpace.continuousSMul ℂ E
+  constructor
+  · intro h
+    exact isNuclearTVS_of_signedSum_bound fun q hq ↦
+      exists_sum_bound_on_nhds_of_bounded q
+        (exists_sum_bound_on_bounded_sets_of_isNuclearTVS_strongDual h q hq)
+  · intro h
+    exact isNuclearTVS_strongDual_of_bounded_series_cover
+      (exists_bounded_series_cover_of_nuclear_frechet ⟨hadd, hpoly, hmet, hcomplete⟩ h)
+
+end StrongDualNuclearity
+
+/-- Pulling back a bounded family of Banach-space functionals gives one continuous
+seminorm bounding every member of the resulting family. -/
+private theorem exists_seminorm_bound_comp {X H : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [NormedAddCommGroup H] [NormedSpace ℂ H]
+    (j : X →L[ℂ] H) (φ : ℕ → StrongDual ℂ H) (hφ : Tendsto φ atTop (𝓝 0)) :
+    ∃ p : Seminorm ℂ X, Continuous p ∧ ∀ n x, ‖φ n (j x)‖ ≤ p x := by
+  obtain ⟨A, hA⟩ := (show Tendsto (fun n ↦ ‖φ n‖) atTop (𝓝 0) by simpa using hφ.norm).bddAbove_range
+  let q := (normSeminorm ℂ H).comp j.toLinearMap
+  have hq : Continuous q := j.continuous.norm
+  refine ⟨A.toNNReal • q, hq.const_smul A.toNNReal, fun n x ↦ ?_⟩
+  exact ((φ n).le_opNorm _).trans (mul_le_mul_of_nonneg_right
+    ((hA (mem_range_self n)).trans (Real.le_coe_toNNReal A)) (norm_nonneg _))
+
+private theorem equicontinuousAt_of_seminorm_bound {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] (φ : ℕ → StrongDual ℂ X) (p : Seminorm ℂ X) (hp : Continuous p)
+    (h : ∀ n x, ‖φ n x‖ ≤ p x) : EquicontinuousAt (fun n ↦ (φ n : X → ℂ)) 0 := by
+  apply Metric.equicontinuousAt_iff_right.mpr
+  intro ε hε
+  filter_upwards [p.ball_mem_nhds hp hε] with x hx n
+  simpa only [map_zero, dist_zero_left] using (h n x).trans_lt (p.mem_ball_zero.mp hx)
 
 /-- Paper: Theorem C.2.4.18, p. 690. A jointly continuous bilinear form with
 nuclear first factor is an absolutely weighted sum of products of two equicontinuous
@@ -4458,7 +4669,70 @@ theorem schwartz_kernel_series {E : Type u} {F : Type*}
       EquicontinuousAt (fun n : ℕ ↦ (ψ n : F → ℂ)) 0 ∧ Summable (fun n ↦ ‖c n‖) ∧
       let S := {A : Set (E × F) | IsVonNBounded ℂ A}
       HasSum (fun n ↦ UniformOnFun.ofFun S (fun z : E × F ↦ c n * φ n z.1 * ψ n z.2))
-        (UniformOnFun.ofFun S (fun z : E × F ↦ B z.1 z.2)) := by sorry
+        (UniformOnFun.ofFun S (fun z : E × F ↦ B z.1 z.2)) := by
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let := PolynormableSpace.isTopologicalAddGroup ℂ F
+  let r := (normSeminorm ℂ ℂ).comp (TensorProduct.lift B)
+  obtain ⟨q, s, hq, hs, hrs⟩ := exists_projectiveSeminorm_pure_bound E r hB.norm.continuousAt
+  let U := q.ball 0 1
+  have hU : U ∈ 𝓝 (0 : E) := q.ball_mem_nhds hq one_pos
+  obtain ⟨V, hV, bV, cV, hVU, c, φ, b, hc, hφ, hb, hseries⟩ :=
+    (isNuclearTVS_iff_localBanach_series E).mp hE U hU (q.balanced_ball_zero 1) (q.convex_ball 0 1)
+  let p := gaugeSeminorm bV cV (absorbent_nhds_zero hV)
+  let q' := gaugeSeminorm (q.balanced_ball_zero 1) (q.convex_ball 0 1) (absorbent_nhds_zero hU)
+  have hq' : q' = q := DFunLike.coe_injective (q.restrictScalars ℝ).gauge_ball
+  obtain ⟨j, hj⟩ := exists_localBanach_inclusion p (continuous_gauge cV hV)
+  obtain ⟨k, hk⟩ := exists_localBanach_inclusion s hs
+  -- Extend the bilinear form to both seminorm completions.
+  let B₀ : WithLocalSeminorm q' →L[ℂ] WithLocalSeminorm s →L[ℂ] ℂ :=
+    (show WithLocalSeminorm q' →ₗ[ℂ] WithLocalSeminorm s →ₗ[ℂ] ℂ from B).mkContinuous₂ 1
+      (fun x y ↦ by
+        change ‖B x y‖ ≤ 1 * q' x * s y
+        rw [one_mul, hq']
+        exact hrs x y)
+  let D := B₀.fromCompletion.flip.fromCompletion.flip
+  let Φ (n : ℕ) := (φ n).comp j
+  let Ψ (n : ℕ) := (D (b n)).comp k
+  have hval (x : E) (y : F) :
+      HasSum (fun n ↦ c n * Φ n x * Ψ n y) (B x y) := by
+    have hle : q' ≤ p := gauge_mono (absorbent_nhds_zero hV) hVU
+    have he : D (localBanachMap p q' hle (j x)) (k y) = B x y := by
+      rw [hj, hk, localBanachMap_coe]
+      let x' : WithLocalSeminorm q' := x
+      let y' : WithLocalSeminorm s := y
+      change B₀.fromCompletion.flip.fromCompletion (y' : LocalBanach s) (x' : LocalBanach q') = B x y
+      rw [ContinuousLinearMap.fromCompletion_apply_coe, ContinuousLinearMap.flip_apply,
+        ContinuousLinearMap.fromCompletion_apply_coe]
+      rfl
+    rw [← he]
+    exact ((hseries (j x)).map (D.flip (k y)) (D.flip (k y)).continuous).congr_fun
+      (fun n ↦ by
+        change _ = D.flip (k y) ((c n * φ n (j x)) • b n)
+        rw [map_smul]
+        rfl)
+  obtain ⟨P, hP, hΦ⟩ := exists_seminorm_bound_comp j φ hφ
+  have hDb : Tendsto (fun n ↦ D (b n)) atTop (𝓝 0) := by
+    simpa only [Function.comp_def, map_zero] using (D.continuous.tendsto 0).comp hb
+  obtain ⟨Q, hQ, hΨ⟩ := exists_seminorm_bound_comp k _ hDb
+  refine ⟨Φ, Ψ, c, equicontinuousAt_of_seminorm_bound Φ P hP hΦ,
+    equicontinuousAt_of_seminorm_bound Ψ Q hQ hΨ, hc, ?_⟩
+  apply UniformOnFun.tendsto_iff_tendstoUniformlyOn.mpr
+  intro A hA
+  obtain ⟨M, hM, hm⟩ := (PolynormableSpace.withSeminorms ℂ E).isVonNBounded_iff_seminorm_bounded.mp
+    (hA.image (ContinuousLinearMap.fst ℂ E F)) ⟨P, hP⟩
+  obtain ⟨N, hN, hn⟩ := (PolynormableSpace.withSeminorms ℂ F).isVonNBounded_iff_seminorm_bounded.mp
+    (hA.image (ContinuousLinearMap.snd ℂ E F)) ⟨Q, hQ⟩
+  let term (n : ℕ) (z : E × F) := c n * Φ n z.1 * Ψ n z.2
+  have hmajor (n) (z : E × F) (hz : z ∈ A) : ‖term n z‖ ≤ ‖c n‖ * M * N := by
+    simp only [term, norm_mul]
+    gcongr
+    · exact (hΦ n z.1).trans (hm _ (mem_image_of_mem _ hz)).le
+    · exact (hΨ n z.2).trans (hn _ (mem_image_of_mem _ hz)).le
+  have hu := (tendstoUniformlyOn_tsum ((hc.mul_right M).mul_right N) hmajor).congr_right
+    (fun z _ ↦ (hval z.1 z.2).tsum_eq)
+  change TendstoUniformlyOn (fun t : Finset ℕ ↦ ∑ n ∈ t, term n)
+    (fun z ↦ B z.1 z.2) atTop A
+  exact hu.congr (Eventually.of_forall fun t z _ ↦ (Finset.sum_apply z t term).symm)
 
 -- TODO(paper-gap): After (C.2.4.9), continuity into the strong dual need not imply
 -- joint continuity of the associated form, even for a complete nuclear space.
@@ -4590,9 +4864,85 @@ theorem finestLocallyConvex_quotient_topology (S : Submodule ℂ (FinestLocallyC
   have e2 := continuous_id_iff_le.1 h2
   exact le_antisymm e1 e2
 
+open scoped NNReal
+
+/-- In a Hamel basis, the sum of weighted absolute values of the coordinates is a seminorm. -/
+private def basisWeightSeminorm {ι V : Type*} [AddCommGroup V] [Module ℂ V]
+    (b : Module.Basis ι ℂ V) (w : ι → ℝ≥0) : Seminorm ℂ V := by
+  classical
+  exact (directSumSeminorm (fun i ↦ w i • normSeminorm ℂ ℂ)).comp
+    (b.repr.trans (finsuppLEquivDirectSum ℂ ℂ ι)).toLinearMap
+
+private theorem sum_le_basisWeightSeminorm {ι V : Type*} [AddCommGroup V] [Module ℂ V]
+    (b : Module.Basis ι ℂ V) (w : ι → ℝ≥0) (s : Finset ι) (x : V) :
+    ∑ i ∈ s, (w i : ℝ) * ‖b.repr x i‖ ≤ basisWeightSeminorm b w x := by
+  classical
+  exact sum_le_directSumSeminorm (fun i ↦ w i • normSeminorm ℂ ℂ)
+    ((b.repr.trans (finsuppLEquivDirectSum ℂ ℂ ι)) x) s
+
+private theorem seminorm_le_sum_basis {ι V : Type*} [AddCommGroup V] [Module ℂ V]
+    (b : Module.Basis ι ℂ V) (p : Seminorm ℂ V) (x : V) :
+    p x ≤ ∑ i ∈ (b.repr x).support, p (b i) * ‖b.repr x i‖ := by
+  have hx := b.linearCombination_repr x
+  rw [Finsupp.linearCombination_apply, Finsupp.sum] at hx
+  calc
+    p x = p (∑ i ∈ (b.repr x).support, b.repr x i • b i) := congrArg p hx.symm
+    _ ≤ _ := (Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _).trans_eq
+      (Finset.sum_congr rfl fun i _ ↦ by rw [map_smul_eq_mul, mul_comm])
+
 /-- Paper: Proposition C.2.5.1(3), p. 691. The finest locally convex topology
 is complete. -/
-theorem finestLocallyConvex_completeSpace : CompleteSpace (FinestLocallyConvex E) := by sorry
+theorem finestLocallyConvex_completeSpace : CompleteSpace (FinestLocallyConvex E) := by
+  classical
+  let V := FinestLocallyConvex E
+  let b := Module.Free.chooseBasis ℂ V
+  let ι := Module.Free.ChooseBasisIndex ℂ V
+  let hp := finestLocallyConvex_withSeminorms E
+  refine ⟨fun {f} hf ↦ ?_⟩
+  have : f.NeBot := hf.1
+  let coord (i : ι) : V →L[ℂ] ℂ := ⟨b.coord i, continuous_of_finestLocallyConvex E _⟩
+  choose a ha using fun i ↦ CompleteSpace.complete (hf.map (coord i).uniformContinuous)
+  have hcoord (i : ι) : Tendsto (fun x : V ↦ b.repr x i) f (𝓝 (a i)) := ha i
+  -- Take the coordinatewise limit in each finite weighted sum of the Cauchy differences.
+  have hnear (w : ι → ℝ≥0) (δ : ℝ) (hδ : 0 < δ) :
+      ∀ᶠ x in f, ∀ s : Finset ι, ∑ i ∈ s, (w i : ℝ) * ‖b.repr x i - a i‖ ≤ δ := by
+    let p := basisWeightSeminorm b w
+    have hU : {z : V × V | p (z.2 - z.1) < δ} ∈ uniformity V := by
+      rw [uniformity_eq_comap_nhds_zero V]
+      exact preimage_mem_comap (show {x : V | p x < δ} ∈ 𝓝 0 by
+        simpa only [p.ball_zero_eq] using p.ball_mem_nhds (hp.continuous_seminorm p) hδ)
+    obtain ⟨A, hA, hpair⟩ := (cauchy_iff'.mp hf).2 _ hU
+    filter_upwards [hA] with x hx s
+    apply le_of_tendsto (tendsto_finsetSum s fun i _ ↦
+      (tendsto_const_nhds.sub (hcoord i)).norm.const_mul (w i : ℝ))
+    filter_upwards [hA] with y hy
+    have hxy := (sum_le_basisWeightSeminorm b w s (x - y)).trans (le_of_lt (hpair y hy x hx))
+    change ∑ i ∈ s, (w i : ℝ) * ‖b.repr x i - b.repr y i‖ ≤ δ
+    simpa only [map_sub, Finsupp.sub_apply] using hxy
+  -- Weights reciprocal to the nonzero limiting coordinates force finite support.
+  let w (i : ι) : ℝ≥0 := ‖a i‖₊⁻¹
+  obtain ⟨x, hx⟩ := (hnear w (1/2) (by norm_num)).exists
+  have hs : (Function.support a).Finite := (b.repr x).support.finite_toSet.subset (by
+    intro i hi
+    by_contra hout
+    have hzero : b.repr x i = 0 := Finsupp.notMem_support_iff.mp hout
+    have h := hx {i}
+    have hai : a i ≠ 0 := hi
+    simp [w, hzero, hai] at h
+    linarith)
+  let v := b.repr.symm (Finsupp.ofSupportFinite a hs)
+  have hv (i : ι) : b.repr v i = a i := by simp [v]
+  refine ⟨v, ?_⟩
+  apply ((PolynormableSpace.hasBasis_zero_ball ℂ V).nhds_of_zero v).ge_iff.mpr
+  intro p _
+  let weights (i : ι) : ℝ≥0 := ⟨p (b i), apply_nonneg p _⟩
+  filter_upwards [hnear weights (1/2) (by norm_num)] with y hy
+  apply p.mem_ball_zero.mpr
+  have h := hy (b.repr (y - v)).support
+  change ∑ i ∈ (b.repr (y - v)).support, p (b i) * ‖b.repr y i - a i‖ ≤ 1/2 at h
+  have hbound : p (y - v) ≤ 1/2 := (seminorm_le_sum_basis b p (y - v)).trans (by
+    simpa only [map_sub, Finsupp.sub_apply, hv] using h)
+  exact hbound.trans_lt (by norm_num)
 
 /-- Paper: Proposition C.2.5.1(4), p. 692. A set is bounded for the finest
 locally convex topology precisely when it lies in a finite-dimensional subspace
@@ -4646,33 +4996,242 @@ theorem finestLocallyConvex_isVonNBounded_iff (B : Set (FinestLocallyConvex E)) 
 finest locally convex topology precisely when each finite-dimensional section is closed. -/
 theorem finestLocallyConvex_isSeqClosed_iff (C : Set (FinestLocallyConvex E)) :
     IsSeqClosed C ↔ ∀ S : Submodule ℂ (FinestLocallyConvex E), FiniteDimensional ℂ S →
-      IsClosed ((Subtype.val : S → _) ⁻¹' C) := by sorry
+      IsClosed ((Subtype.val : S → _) ⁻¹' C) := by
+  have := finestLocallyConvex_t2 E
+  constructor
+  · intro h S hdim
+    let e := (Module.finBasis ℂ S).equivFunL
+    have := e.toHomeomorph.isEmbedding.metrizableSpace
+    exact isSeqClosed_iff_isClosed.mp fun _ _ hu ht ↦
+      h hu (continuous_subtype_val.continuousAt.tendsto.comp ht)
+  · intro h f x hf ht
+    obtain ⟨S, hdim, hS, -⟩ := (finestLocallyConvex_isVonNBounded_iff _).mp
+      ((ht.isVonNBounded_range ℂ).insert x)
+    let g (n : ℕ) : S := ⟨f n, hS (mem_insert_of_mem _ (mem_range_self n))⟩
+    let y : S := ⟨x, hS (mem_insert _ _)⟩
+    have hg : Tendsto g atTop (𝓝 y) := tendsto_subtype_rng.mpr ht
+    exact (h S hdim).mem_of_tendsto hg (Eventually.of_forall hf)
+
+/-- A countable Hamel basis gives an increasing exhaustion by finite-dimensional spans. -/
+private theorem exists_finiteDimensional_exhaustion (hE : Module.rank ℂ E ≤ ℵ₀) :
+    ∃ S : ℕ → Submodule ℂ (FinestLocallyConvex E), Monotone S ∧
+      (∀ n, FiniteDimensional ℂ (S n)) ∧ ∀ x, ∃ n, x ∈ S n := by
+  classical
+  let b := Module.Basis.ofVectorSpace ℂ (FinestLocallyConvex E)
+  have hc := Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hE)
+  let A := (countable_range b).finiteExhaustion
+  let S (n : ℕ) := Submodule.span ℂ (A n)
+  have hmono : Monotone S := fun _ _ h ↦ Submodule.span_mono (A.mono h)
+  refine ⟨S, hmono, fun n ↦ FiniteDimensional.span_of_finite ℂ (A.finite n), fun x ↦ ?_⟩
+  apply (Submodule.mem_iSup_of_directed S hmono.directed_le).mp
+  have htop : (⨆ n, S n) = ⊤ := by
+    change (⨆ n, Submodule.span ℂ (A n)) = ⊤
+    rw [Submodule.iSup_span, A.iUnion_eq, b.span_eq]
+  simp [htop]
+
+/-- Any family of subspaces of the finest space tests continuity of every seminorm. -/
+private theorem finestLocallyConvex_finalTopology (S : ℕ → Submodule ℂ (FinestLocallyConvex E)) :
+    (inferInstance : TopologicalSpace (FinestLocallyConvex E)) =
+      locallyConvexFinalTopology (fun n ↦ (S n).subtype) := by
+  let hp := finestLocallyConvex_withSeminorms E
+  let e : {p : Seminorm ℂ E // ∀ n, Continuous (p ∘ (S n).subtype)} ≃ Seminorm ℂ E :=
+    Equiv.subtypeUnivEquiv fun p n ↦ (hp.continuous_seminorm p).comp continuous_subtype_val
+  exact (hp.congr_equiv e).topology_eq_withSeminorms
 
 /-- Paper: Proposition C.2.5.1(6), p. 692. With its finest locally convex topology,
 a countably generated vector space is a strict LF-space. -/
 theorem finestLocallyConvex_isStrictLFSpace (hE : Module.rank ℂ E ≤ ℵ₀) :
-    IsStrictLFSpace (FinestLocallyConvex E) := by sorry
+    IsStrictLFSpace (FinestLocallyConvex E) := by
+  obtain ⟨S, hS, hdim, hcover⟩ := exists_finiteDimensional_exhaustion hE
+  refine ⟨finestLocallyConvex_t2 E, S, hS, fun n ↦ ?_, hcover,
+    finestLocallyConvex_finalTopology S⟩
+  have := finestLocallyConvex_t2 E
+  let e := (Module.finBasis ℂ (S n)).equivFunL
+  exact ⟨inferInstance, inferInstance, e.toHomeomorph.isEmbedding.metrizableSpace, by
+    let : UniformSpace (S n) := IsTopologicalAddGroup.rightUniformSpace (S n)
+    let : IsUniformAddGroup (S n) := isUniformAddGroup_of_addCommGroup
+    exact FiniteDimensional.completeSpace ℂ (S n)⟩
+
+/-- The local integral criterion is independent of the universe of test spaces. -/
+private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] (hX : IsNuclearTVS.{a} X) : IsNuclearTVS.{b} X := by
+  let := hX.1
+  let := hX.2.1
+  exact (isNuclearTVS_iff_localBanach_integral X).mpr
+    ((isNuclearTVS_iff_localBanach_integral X).mp hX)
+
+/-- Nuclearity is invariant under continuous linear equivalence, across carrier universes. -/
+private theorem nuclear_of_equiv {X : Type u} {Y : Type w}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y]
+    (e : X ≃L[ℂ] Y) (hX : IsNuclearTVS.{v} X) : IsNuclearTVS.{v} Y := by
+  let := hX.1
+  let := hX.2.1
+  have : T2Space Y := e.toHomeomorph.t2Space
+  have h := nuclear_changeUniverse.{v, max v w} hX
+  apply nuclear_changeUniverse.{max v u, v}
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro F _ _ _ _ _
+  let eX := (h.2.2 F inferInstance inferInstance inferInstance inferInstance inferInstance).homeomorph
+  have hback : Continuous (show InjectiveTensor X F → ProjectiveTensor X F from id) :=
+    eX.continuous_symm.congr fun z ↦ eX.apply_symm_apply z
+  let idF := ContinuousLinearMap.id ℂ F
+  have he : Continuous (show InjectiveTensor Y F → ProjectiveTensor Y F from id) := by
+    refine ((projectiveTensorMap_continuous e.toContinuousLinearMap idF).comp hback |>.comp
+      (injectiveTensorMap_continuous e.symm.toContinuousLinearMap idF)).congr fun z ↦ ?_
+    change Y ⊗[ℂ] F at z
+    change e.toLinearMap.rTensor F (e.symm.toLinearMap.rTensor F z) = z
+    rw [← LinearMap.rTensor_comp_apply, show e.toLinearMap.comp e.symm.toLinearMap =
+      LinearMap.id from LinearMap.ext e.apply_symm_apply, LinearMap.rTensor_id_apply]
+  exact (⟨Equiv.refl (Y ⊗[ℂ] F), (uniformContinuous_tensorComparison Y F).continuous, he⟩ :
+    ProjectiveTensor Y F ≃ₜ InjectiveTensor Y F).isHomeomorph
+
+/-- A Hausdorff injective limit is a Hausdorff quotient of the direct sum of its stages. -/
+private theorem nuclear_of_injectiveLCLimit {D : Type*} [AddCommGroup D] [Module ℂ D]
+    [TopologicalSpace D] [T2Space D] {X : ℕ → Type*}
+    [∀ k, AddCommGroup (X k)] [∀ k, Module ℂ (X k)] [∀ k, TopologicalSpace (X k)]
+    {j : ∀ k, X k →L[ℂ] X (k+1)} {i : ∀ k, X k →L[ℂ] D} (h : IsInjectiveLCLimit j i)
+    (hX : ∀ k, IsNuclearTVS.{v} (X k)) : IsNuclearTVS.{v} D := by
+  let P := ⨁ k, X k
+  let : TopologicalSpace P := locallyConvexFinalTopology (DirectSum.lof ℂ ℕ X)
+  have hP : IsNuclearTVS.{v} P := isNuclearTVS_directSum hX
+  let := hP.2.1
+  let := PolynormableSpace.isTopologicalAddGroup ℂ P
+  let hD : WithSeminorms (Subtype.val :
+      {p : Seminorm ℂ D // ∀ k, Continuous (p ∘ i k)} → Seminorm ℂ D) := ⟨h.topology_eq⟩
+  let := hD.toPolynormableSpace
+  let := hD.isTopologicalAddGroup
+  let : ∀ k, PolynormableSpace ℂ (X k) := fun k ↦ (hX k).2.1
+  let : ∀ k, IsTopologicalAddGroup (X k) := fun k ↦ PolynormableSpace.isTopologicalAddGroup ℂ _
+  let q : P →ₗ[ℂ] D := DirectSum.toModule ℂ ℕ D fun k ↦ (i k).toLinearMap
+  have hq : IsQuotientMap q := h.isQuotientMap_directSum
+  let e := q.quotKerEquivOfSurjective hq.surjective
+  have he : Continuous e := q.ker.isOpenQuotientMap_mkQ.isQuotientMap.continuous_iff.mpr hq.continuous
+  have hi : Continuous e.symm := hq.continuous_iff.mpr (by
+    exact q.ker.isOpenQuotientMap_mkQ.continuous.congr fun x ↦
+      (q.quotKerEquivOfSurjective_symm_apply hq.surjective x).symm)
+  let L : (P ⧸ q.ker) ≃L[ℂ] D := ⟨e, he, hi⟩
+  let := L.symm.toHomeomorph.t2Space
+  exact nuclear_of_equiv L (isNuclearTVS_quotient hP q.ker)
+
+/-- Increasing nuclear subspaces with the final locally convex topology have nuclear union. -/
+private theorem nuclear_of_submodule_exhaustion {D : Type*} [AddCommGroup D] [Module ℂ D]
+    [TopologicalSpace D] [T2Space D] (S : ℕ → Submodule ℂ D) (hS : Monotone S)
+    (hn : ∀ n, IsNuclearTVS.{v} (S n)) (hex : ∀ x, ∃ n, x ∈ S n)
+    (ht : (inferInstance : TopologicalSpace D) = locallyConvexFinalTopology (fun k ↦ (S k).subtype)) :
+    IsNuclearTVS.{v} D := by
+  let j (k : ℕ) := (S k).subtypeL.codRestrict (S (k+1)) fun x ↦ hS k.le_succ x.property
+  have h : IsInjectiveLCLimit j (fun k ↦ (S k).subtypeL) := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ ?_, ht⟩
+    obtain ⟨k, hk⟩ := hex x
+    exact ⟨k, ⟨⟨x, hk⟩, rfl⟩⟩
+  exact nuclear_of_injectiveLCLimit h hn
 
 /-- Paper: Proposition C.2.5.1(6), p. 692. With its finest locally convex topology,
 a countably generated vector space is nuclear. -/
 theorem finestLocallyConvex_isNuclearTVS (hE : Module.rank ℂ E ≤ ℵ₀) :
-    IsNuclearTVS.{v, u} (FinestLocallyConvex E) := by sorry
+    IsNuclearTVS.{v, u} (FinestLocallyConvex E) := by
+  have := finestLocallyConvex_t2 E
+  obtain ⟨S, hS, hdim, hcover⟩ := exists_finiteDimensional_exhaustion hE
+  exact nuclear_of_submodule_exhaustion S hS (fun n ↦ isNuclearTVS_of_finiteDimensional (S n))
+    hcover (finestLocallyConvex_finalTopology S)
 
 /-- Paper: Proposition C.2.5.1(6), p. 692. In countable dimension the finest locally
 convex topology has the Heine–Borel property. -/
 theorem finestLocallyConvex_montelSpace (hE : Module.rank ℂ E ≤ ℵ₀) :
-    MontelSpace ℂ (FinestLocallyConvex E) := by sorry
+    MontelSpace ℂ (FinestLocallyConvex E) := by
+  have := finestLocallyConvex_t2 E
+  refine ⟨fun B hclosed hb ↦ ?_⟩
+  obtain ⟨S, hdim, hBS, hbS⟩ := (finestLocallyConvex_isVonNBounded_iff B).mp hb
+  let e := (Module.finBasis ℂ S).equivFunL
+  let A := (Subtype.val : S → _) ⁻¹' B
+  have hc := e.toHomeomorph.isClosedMap A (hclosed.preimage continuous_subtype_val)
+  have hb' := hbS.image e.toContinuousLinearMap
+  have hk := Metric.isCompact_of_isClosed_isBounded hc ((NormedSpace.isVonNBounded_iff ℂ).mp hb')
+  have hA : IsCompact A := e.toHomeomorph.isEmbedding.isCompact_iff.mpr hk
+  simpa only [A, image_preimage_eq_of_subset (by simpa using hBS : B ⊆ range (Subtype.val : S → _))]
+    using hA.image continuous_subtype_val
 
 /-- Paper: Proposition C.2.5.1(6), p. 692. In countable dimension the evaluation
 map from the finest locally convex space onto its strong bidual is a homeomorphism.
 Together with the Heine–Borel property this states the paper's Montel conclusion. -/
 theorem finestLocallyConvex_strongBidual (hE : Module.rank ℂ E ≤ ℵ₀) :
-    IsHomeomorph (ContinuousLinearMap.applyₗ (E := FinestLocallyConvex E) ℂ (RingHom.id ℂ)) := by sorry
+    IsHomeomorph (ContinuousLinearMap.applyₗ (E := FinestLocallyConvex E) ℂ (RingHom.id ℂ)) := by
+  have := finestLocallyConvex_t2 E
+  have := finestLocallyConvex_montelSpace hE
+  have : BarrelledSpace ℂ (FinestLocallyConvex E) :=
+    ⟨fun p _ ↦ (finestLocallyConvex_withSeminorms E).continuous_seminorm p⟩
+  exact isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+
+/-- Evaluation on a Hamel basis identifies the strong dual of the finest space with
+the product of copies of the scalar field indexed by the basis. -/
+private def finestStrongDualEquiv (E : Type u) [AddCommGroup E] [Module ℂ E] :
+    StrongDual ℂ (FinestLocallyConvex E) ≃L[ℂ]
+      (Module.Free.ChooseBasisIndex ℂ (FinestLocallyConvex E) → ℂ) := by
+  classical
+  let W := FinestLocallyConvex E
+  let D := StrongDual ℂ W
+  let ι := Module.Free.ChooseBasisIndex ℂ W
+  let b : Module.Basis ι ℂ W := Module.Free.chooseBasis ℂ W
+  let : T2Space W := finestLocallyConvex_t2 E
+  let : ContinuousSMul ℂ W := (finestLocallyConvex_withSeminorms E).continuousSMul
+  let e : D ≃ₗ[ℂ] (ι → ℂ) :=
+    { toFun := fun f i ↦ f (b i)
+      invFun := fun z ↦ ⟨b.constr ℂ z, continuous_of_finestLocallyConvex E _⟩
+      left_inv := fun f ↦ ContinuousLinearMap.ext fun x ↦ LinearMap.congr_fun
+        (b.constr_eq ℂ (f := f.toLinearMap) fun _ ↦ rfl) x
+      right_inv := fun z ↦ funext (b.constr_basis ℂ z)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hEval : Continuous e := continuous_pi fun i ↦ continuous_eval_const (b i)
+  have hContValue (x : W) : Continuous (fun z : ι → ℂ ↦ e.symm z x) := by
+    change Continuous (fun z : ι → ℂ ↦ (b.constr ℂ z) x)
+    simp only [b.constr_apply, Finsupp.sum]
+    exact continuous_finsetSum _ fun i _ ↦
+      (continuous_apply i : Continuous (fun z : ι → ℂ ↦ z i)).const_smul (b.repr x i)
+  -- On a bounded set, uniform convergence is controlled by finitely many evaluations.
+  have hInv : Continuous e.symm := by
+    apply continuous_of_tendsto_nhds_zero e.symm
+    apply ContinuousLinearMap.hasBasis_nhds_zero.tendsto_right_iff.mpr
+    rintro ⟨B, U⟩ ⟨hB, hU⟩
+    obtain ⟨S, hdim, hBS, hbounded⟩ := (finestLocallyConvex_isVonNBounded_iff B).mp hB
+    -- Restrict to S by recording the evaluations on its basis.
+    let c := Module.finBasis ℂ S
+    let restrictBasis := (c.constr ℂ).trans
+      (LinearMap.toContinuousLinearMap : (S →ₗ[ℂ] ℂ) ≃ₗ[ℂ] StrongDual ℂ S)
+    let r (z : ι → ℂ) : StrongDual ℂ S := restrictBasis (fun i ↦ e.symm z (c i : W))
+    have hr : Continuous r := restrictBasis.toLinearMap.continuous_of_finiteDimensional.comp
+      (continuous_pi fun i ↦ hContValue (c i : W))
+    have hr_zero : r 0 = 0 := by simp [r]; rfl
+    have ht : Tendsto r (𝓝 0) (𝓝 0) := hr_zero ▸ hr.continuousAt
+    filter_upwards [ht.eventually (ContinuousLinearMap.eventually_nhds_zero_mapsTo hbounded hU)]
+      with z hz
+    intro x hx
+    let y : S := ⟨x, hBS hx⟩
+    have hy : r z y = e.symm z x := by
+      have heq : (r z).toLinearMap = (e.symm z).toLinearMap.comp S.subtype := by
+        apply c.ext
+        intro i
+        exact c.constr_basis ℂ (fun i ↦ e.symm z (c i : W)) i
+      exact LinearMap.congr_fun heq y
+    exact hy ▸ hz (show y ∈ Subtype.val ⁻¹' B from hx)
+  exact ⟨e, hEval, hInv⟩
 
 /-- Paper: Proposition C.2.5.1(6), p. 692. The strong dual of a countably generated
 space with the finest locally convex topology is Fréchet. -/
 theorem finestLocallyConvex_strongDual_isFrechetTVS (hE : Module.rank ℂ E ≤ ℵ₀) :
-    IsFrechetTVS (StrongDual ℂ (FinestLocallyConvex E)) := by sorry
+    IsFrechetTVS (StrongDual ℂ (FinestLocallyConvex E)) := by
+  let D := StrongDual ℂ (FinestLocallyConvex E)
+  let dualEquiv := finestStrongDualEquiv E
+  have := Cardinal.mk_le_aleph0_iff.mp
+    ((Module.Free.chooseBasis ℂ (FinestLocallyConvex E)).mk_eq_rank''.trans_le hE)
+  have hInd := dualEquiv.toHomeomorph.isInducing
+  refine ⟨inferInstance, dualEquiv.PolynormableSpace,
+    dualEquiv.toHomeomorph.isEmbedding.metrizableSpace, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := D)]
+  exact (AddMonoidHom.isUniformInducing_of_isInducing (f := dualEquiv.toLinearEquiv.toAddMonoidHom)
+    hInd).completeSpace_congr dualEquiv.surjective |>.mpr inferInstance
 
 -- TODO(paper-gap): In the proof of C.2.5.1(6), an infinite-dimensional countably
 -- generated space with the finest locally convex topology need not be Fréchet.
@@ -4680,9 +5239,33 @@ theorem finestLocallyConvex_strongDual_isFrechetTVS (hE : Module.rank ℂ E ≤ 
 /-- Paper: Proposition C.2.5.1(6), p. 692. The strong dual of a countably generated
 space with the finest locally convex topology is nuclear. -/
 theorem finestLocallyConvex_strongDual_isNuclearTVS (hE : Module.rank ℂ E ≤ ℵ₀) :
-    IsNuclearTVS.{v, u} (StrongDual ℂ (FinestLocallyConvex E)) := by sorry
+    IsNuclearTVS.{v, u} (StrongDual ℂ (FinestLocallyConvex E)) := by
+  let e := finestStrongDualEquiv E
+  let := e.PolynormableSpace
+  exact nuclear_of_equiv e.symm
+    (isNuclearTVS_pi (X := fun _ ↦ ℂ) (fun _ ↦ isNuclearTVS_of_finiteDimensional ℂ))
 
 variable {F : Type*} [AddCommGroup F] [Module ℂ F]
+
+/-- A nonnegative matrix on two countable index sets is bounded by a product
+of weights. Split the matrix into the two triangles given by numberings. -/
+private theorem exists_product_weights {I J : Type*} [Countable I] [Countable J]
+    (m : I → J → ℝ≥0) : ∃ w : I → ℝ≥0, ∃ v : J → ℝ≥0, ∀ i j, m i j ≤ w i * v j := by
+  classical
+  obtain ⟨a, ha⟩ := exists_injective_nat I
+  obtain ⟨b, hb⟩ := exists_injective_nat J
+  let A (n : ℕ) := ((finite_Iic n).preimage ha.injOn).toFinset
+  let B (n : ℕ) := ((finite_Iic n).preimage hb.injOn).toFinset
+  let w i := max 1 ((B (a i)).sup (m i))
+  let v j := max 1 ((A (b j)).sup (fun i ↦ m i j))
+  refine ⟨w, v, fun i j ↦ ?_⟩
+  rcases le_total (b j) (a i) with h | h
+  · have hj : j ∈ B (a i) := by simpa [B] using h
+    exact ((Finset.le_sup hj).trans (le_max_right _ _)).trans
+      (le_mul_of_one_le_right (show 0 ≤ w i from zero_le) (le_max_left 1 _))
+  · have hi : i ∈ A (b j) := by simpa [A] using h
+    exact ((Finset.le_sup hi).trans (le_max_right _ _)).trans
+      (le_mul_of_one_le_left (show 0 ≤ v j from zero_le) (le_max_left 1 _))
 
 /-- Paper: Lemma C.2.5.2, p. 692. The projective tensor topology of two countably
 generated spaces with the finest locally convex topologies is again the finest
@@ -4690,7 +5273,66 @@ locally convex topology, which is complete by Proposition C.2.5.1(3). -/
 theorem finestLocallyConvex_projectiveTensor (hE : Module.rank ℂ E ≤ ℵ₀)
     (hF : Module.rank ℂ F ≤ ℵ₀) :
     (inferInstance : TopologicalSpace (ProjectiveTensor (FinestLocallyConvex E) (FinestLocallyConvex F))) =
-      (inferInstance : TopologicalSpace (FinestLocallyConvex (E ⊗[ℂ] F))) := by sorry
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (E ⊗[ℂ] F))) := by
+  classical
+  let X := FinestLocallyConvex E
+  let Y := FinestLocallyConvex F
+  let b := Module.Free.chooseBasis ℂ X
+  let c := Module.Free.chooseBasis ℂ Y
+  have := Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hE)
+  have := Cardinal.mk_le_aleph0_iff.mp (c.mk_eq_rank''.trans_le hF)
+  let hP := withGeneratingSeminorms_spec (E ⊗[ℂ] F)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] F) //
+      ContinuousAt (fun z : X × Y ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0} ↦ p.val)
+  let hf := finestLocallyConvex_withSeminorms (E ⊗[ℂ] F)
+  suffices h : ∀ p : Seminorm ℂ (E ⊗[ℂ] F), ContinuousAt (fun z : X × Y ↦ p (z.1 ⊗ₜ[ℂ] z.2)) 0 by
+    let e := Equiv.subtypeUnivEquiv h
+    exact hP.topology_eq_withSeminorms.trans (hf.congr_equiv e).topology_eq_withSeminorms.symm
+  intro r
+  obtain ⟨w, v, hwv⟩ := exists_product_weights (fun i j ↦
+    (⟨r (b i ⊗ₜ[ℂ] c j), apply_nonneg r _⟩ : ℝ≥0))
+  let p := basisWeightSeminorm b w
+  let q := basisWeightSeminorm c v
+  have hrow (i) (y : Y) : r (b i ⊗ₜ[ℂ] y) ≤ w i * q y := by
+    let s := (c.repr y).support
+    calc
+      _ ≤ ∑ j ∈ s, r (b i ⊗ₜ[ℂ] c j) * ‖c.repr y j‖ :=
+        seminorm_le_sum_basis c (r.comp (TensorProduct.mk ℂ X Y (b i))) y
+      _ ≤ ∑ j ∈ s, (w i : ℝ) * ((v j : ℝ) * ‖c.repr y j‖) := by
+        apply Finset.sum_le_sum
+        intro j _
+        rw [← mul_assoc]
+        exact mul_le_mul_of_nonneg_right (show r (b i ⊗ₜ[ℂ] c j) ≤ w i * v j from hwv i j)
+          (norm_nonneg _)
+      _ ≤ _ := by
+        rw [← Finset.mul_sum]
+        exact mul_le_mul_of_nonneg_left (sum_le_basisWeightSeminorm c v s y) (w i).coe_nonneg
+  have hbound (x : X) (y : Y) : r (x ⊗ₜ[ℂ] y) ≤ p x * q y := by
+    let s := (b.repr x).support
+    calc
+      _ ≤ ∑ i ∈ s, r (b i ⊗ₜ[ℂ] y) * ‖b.repr x i‖ :=
+        seminorm_le_sum_basis b (r.comp ((TensorProduct.mk ℂ X Y).flip y)) x
+      _ ≤ ∑ i ∈ s, ((w i : ℝ) * ‖b.repr x i‖) * q y := by
+        apply Finset.sum_le_sum
+        intro i _
+        rw [mul_right_comm]
+        exact mul_le_mul_of_nonneg_right (hrow i y) (norm_nonneg _)
+      _ ≤ _ := by
+        rw [← Finset.sum_mul]
+        exact mul_le_mul_of_nonneg_right (sum_le_basisWeightSeminorm b w s x) (apply_nonneg q _)
+  have hp := ((finestLocallyConvex_withSeminorms E).continuous_seminorm p).comp
+    (continuous_fst : Continuous (Prod.fst : X × Y → X))
+  have hq := ((finestLocallyConvex_withSeminorms F).continuous_seminorm q).comp
+    (continuous_snd : Continuous (Prod.snd : X × Y → Y))
+  have hzero : r ((0 : X × Y).1 ⊗ₜ[ℂ] (0 : X × Y).2) = 0 := by
+    change r ((0 : E) ⊗ₜ[ℂ] (0 : F)) = 0
+    simp
+  rw [ContinuousAt, hzero]
+  refine squeeze_zero (fun z : X × Y ↦ apply_nonneg r (z.1 ⊗ₜ[ℂ] z.2)) (fun z ↦ hbound z.1 z.2) ?_
+  have hc : Continuous (fun z : X × Y ↦ p z.1 * q z.2) := hp.mul hq
+  have ht := hc.tendsto (0 : X × Y)
+  change Tendsto _ _ (𝓝 (p 0 * q 0)) at ht
+  simpa only [map_zero, zero_mul] using ht
 
 /-- Paper: Lemma C.2.5.2, p. 692. The injective tensor topology of two countably
 generated spaces with the finest locally convex topologies is again the finest
@@ -4698,7 +5340,15 @@ locally convex topology, which is complete by Proposition C.2.5.1(3). -/
 theorem finestLocallyConvex_injectiveTensor (hE : Module.rank ℂ E ≤ ℵ₀)
     (hF : Module.rank ℂ F ≤ ℵ₀) :
     (inferInstance : TopologicalSpace (InjectiveTensor (FinestLocallyConvex E) (FinestLocallyConvex F))) =
-      (inferInstance : TopologicalSpace (FinestLocallyConvex (E ⊗[ℂ] F))) := by sorry
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (E ⊗[ℂ] F))) := by
+  have := finestLocallyConvex_t2 E
+  have hN := finestLocallyConvex_isNuclearTVS.{0} hE
+  have hback := continuous_injectiveTensor_to_projectiveTensor_of_localSeries
+    (FinestLocallyConvex E) ((isNuclearTVS_iff_localBanach_series _).mp hN)
+    (FinestLocallyConvex F)
+  exact (le_antisymm (continuous_id_iff_le.mp hback)
+    (continuous_id_iff_le.mp (uniformContinuous_tensorComparison (FinestLocallyConvex E)
+      (FinestLocallyConvex F)).continuous)).trans (finestLocallyConvex_projectiveTensor hE hF)
 
 /-- Paper: Lemma C.2.5.2, p. 692. The inductive tensor topology of two countably
 generated spaces with the finest locally convex topologies is again the finest
@@ -4746,22 +5396,57 @@ theorem isNuclearTVS_of_strictLF_stages [T2Space E]
     (hFrechet : ∀ n, IsFrechetTVS (S n)) (hNuclear : ∀ n, IsNuclearTVS.{v} (S n))
     (hexhaustive : ∀ x : E, ∃ n, x ∈ S n)
     (ht : (inferInstance : TopologicalSpace E) = locallyConvexFinalTopology (fun n ↦ (S n).subtype)) :
-    IsNuclearTVS.{v} E := by sorry
+    IsNuclearTVS.{v} E := by
+  exact nuclear_of_submodule_exhaustion S hS hNuclear hexhaustive ht
 
 /-- Paper: Remark C.1.4.7, p. 663. A nuclear strict LF-space has the Heine–Borel
 property. Each stage in a strict presentation is nuclear by Remark C.1.5.12. -/
 theorem montelSpace_of_nuclear_strictLF (hLF : IsStrictLFSpace E) (hE : IsNuclearTVS.{v} E) :
-    MontelSpace ℂ E := by sorry
+    MontelSpace ℂ E := by
+  let := hE.1
+  let := hE.2.1
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let := hLF.completeSpace
+  refine ⟨fun B hc hb ↦ ?_⟩
+  simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS E hE hb
 
 /-- Paper: Remark C.1.4.7, p. 663. Evaluation from a nuclear strict LF-space to
 the strong bidual is a homeomorphism. Along with the Heine–Borel property, this
 states the paper's Montel conclusion. -/
 theorem strongBidual_of_nuclear_strictLF [ContinuousSMul ℂ E]
     (hLF : IsStrictLFSpace E) (hE : IsNuclearTVS.{v} E) :
-    IsHomeomorph (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)) := by sorry
+    IsHomeomorph (ContinuousLinearMap.applyₗ (E := E) ℂ (RingHom.id ℂ)) := by
+  let := hE.1
+  let := hE.2.1
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let := montelSpace_of_nuclear_strictLF hLF hE
+  obtain ⟨_, S, _, hF, _, ht⟩ := hLF
+  have hP : WithSeminorms (Subtype.val :
+      {p : Seminorm ℂ E // ∀ k, Continuous (p ∘ (S k).subtype)} → Seminorm ℂ E) := ⟨ht⟩
+  have : BarrelledSpace ℂ E := by
+    refine ⟨fun p hp ↦ hP.continuous_seminorm ⟨p, fun k ↦ ?_⟩⟩
+    have := isFrechetTVS_barrelled (hF k)
+    exact (p.comp (S k).subtype).continuous_of_lowerSemicontinuous (hp.comp continuous_subtype_val)
+  exact isHomeomorph_iff_isEmbedding_surjective.mpr
+    ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
 
 /-- Paper: Example C.1.5.10, p. 668. A nuclear locally convex space is Schwartz. -/
-theorem isSchwartzTVS_of_isNuclearTVS (hE : IsNuclearTVS.{v} E) : IsSchwartzTVS E := by sorry
+theorem isSchwartzTVS_of_isNuclearTVS (hE : IsNuclearTVS.{v} E) : IsSchwartzTVS E := by
+  let := hE.1
+  let := hE.2.1
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  refine ⟨inferInstance, fun q hq ↦ ?_⟩
+  obtain ⟨K, hK, hV⟩ := isCompactOperator_localBanach_coe E hE q hq
+  refine ⟨_, hV, ?_⟩
+  change TotallyBounded (((↑) : WithLocalSeminorm q → LocalBanach q) ⁻¹' K)
+  exact totallyBounded_preimage (Completion.isUniformInducing_coe (WithLocalSeminorm q))
+    hK.totallyBounded
 
 variable [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [T2Space E]
 variable {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)]
@@ -4773,7 +5458,10 @@ theorem isLimitSubspace_iff_liftsBoundedSets_of_nuclear
     (h : IsInjectiveLCLimit j i) (hj : ∀ n, IsEmbedding (j n))
     (hFrechet : ∀ n, IsFrechetTVS (X n)) (hNuclear : ∀ n, IsNuclearTVS.{v} (X n))
     (F : Submodule ℂ E) (hF : IsClosed (F : Set E)) :
-    IsLimitSubspace i F ↔ LiftsBoundedSets F.mkQL := by sorry
+    IsLimitSubspace i F ↔ LiftsBoundedSets F.mkQL := by
+  exact (and_iff_right hF).trans (limitSubspaceTopology_eq_iff_liftsBoundedSets hFrechet
+    (fun k ↦ isSchwartzTVS_of_isNuclearTVS (hNuclear k)) h hj F
+    (fun k ↦ hF.preimage (i k).continuous))
 
 -- TODO(paper-gap): The paragraph after Theorem C.1.5.11 reverses the implication
 -- of Example C.1.5.10. Nuclear spaces are Schwartz.
@@ -4784,7 +5472,90 @@ from any one strict presentation by nuclear Fréchet stages. -/
 theorem isNuclearTVS_strictLF_stage
     (h : IsInjectiveLCLimit j i) (hj : ∀ n, IsEmbedding (j n))
     (hFrechet : ∀ n, IsFrechetTVS (X n)) (hE : IsNuclearTVS.{v} E) (n : ℕ) :
-    IsNuclearTVS.{v} (X n) := by sorry
+    IsNuclearTVS.{v} (X n) := by
+  let : ∀ k, PolynormableSpace ℂ (X k) := fun k ↦ (hFrechet k).choose_spec.1
+  let : ∀ k, IsTopologicalAddGroup (X k) := fun k ↦ (hFrechet k).choose
+  have hi := h.isEmbedding_stage hj n
+  let e := LinearEquiv.ofInjective (i n).toLinearMap hi.injective
+  have he : IsInducing e := IsInducing.subtypeVal.of_comp_iff.mp hi.isInducing
+  let t := e.toEquiv.toHomeomorphOfIsInducing he
+  let L : X n ≃L[ℂ] (i n).toLinearMap.range := ⟨e, t.continuous, t.continuous_symm⟩
+  exact nuclear_of_equiv L.symm (isNuclearTVS_submodule hE (i n).toLinearMap.range)
+
+/-- In a strict LF presentation by subspaces a bounded set is the image of a bounded
+set in one of the given Fréchet stages. -/
+private theorem exists_bounded_stage_of_exhaustion {D : Type*} [AddCommGroup D] [Module ℂ D]
+    [TopologicalSpace D] (S : ℕ → Submodule ℂ D) (hS : Monotone S)
+    (hF : ∀ n, IsFrechetTVS (S n)) (hex : ∀ x, ∃ n, x ∈ S n)
+    (ht : (inferInstance : TopologicalSpace D) = locallyConvexFinalTopology (fun k ↦ (S k).subtype))
+    {B : Set D} (hb : IsVonNBounded ℂ B) :
+    ∃ k, ∃ A : Set (S k), IsVonNBounded ℂ A ∧ (S k).subtypeL '' A = B := by
+  choose hadd hpoly hmet hcomplete using hF
+  let := hadd
+  let := hpoly
+  let := hmet
+  let : ∀ k, UniformSpace (S k) := fun k ↦ IsTopologicalAddGroup.rightUniformSpace (S k)
+  let : ∀ k, IsUniformAddGroup (S k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (S k) := hcomplete
+  let j (k : ℕ) := (S k).subtypeL.codRestrict (S (k+1)) fun x ↦ hS k.le_succ x.property
+  have h : IsInjectiveLCLimit j (fun k ↦ (S k).subtypeL) := by
+    refine ⟨fun _ ↦ Subtype.val_injective, fun _ ↦ rfl, fun x ↦ ?_, ht⟩
+    obtain ⟨k, hk⟩ := hex x
+    exact ⟨k, ⟨⟨x, hk⟩, rfl⟩⟩
+  have hj (k : ℕ) : IsEmbedding (j k) :=
+    IsEmbedding.of_comp (j k).continuous continuous_subtype_val IsEmbedding.subtypeVal
+  exact (isVonNBounded_iff_bounded_stage h (fun k ↦
+    (AddMonoidHom.isUniformEmbedding_of_isEmbedding (hj k)).isClosedEmbedding) B).mp hb
+
+/-- If a closed limit subspace has the final topology of its intersections with the
+stages, the images of these Fréchet intersections give a strict LF presentation. -/
+private theorem strictLFSpace_of_limitSubspace
+    (h : IsInjectiveLCLimit j i) (hj : ∀ n, IsEmbedding (j n))
+    (hFrechet : ∀ n, IsFrechetTVS (X n)) (F : Submodule ℂ E) (hF : IsLimitSubspace i F) :
+    IsStrictLFSpace F := by
+  choose hadd hpoly hmet hcomplete using hFrechet
+  let := hadd
+  let := hpoly
+  let := hmet
+  let : ∀ k, UniformSpace (X k) := fun k ↦ IsTopologicalAddGroup.rightUniformSpace (X k)
+  let : ∀ k, IsUniformAddGroup (X k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (X k) := hcomplete
+  let K (k : ℕ) := F.comap (i k).toLinearMap
+  let l (k : ℕ) : K k →ₗ[ℂ] F := (i k).toLinearMap.restrict (fun _ hx ↦ hx)
+  have hl (k : ℕ) : IsEmbedding (l k) :=
+    IsEmbedding.subtypeVal.of_comp_iff.mp ((h.isEmbedding_stage hj k).comp IsEmbedding.subtypeVal)
+  let S (k : ℕ) := (l k).range
+  let e (k : ℕ) := LinearEquiv.ofInjective (l k) (hl k).injective
+  have he (k : ℕ) : IsInducing (e k) := IsInducing.subtypeVal.of_comp_iff.mp (hl k).isInducing
+  let t k := (e k).toEquiv.toHomeomorphOfIsInducing (he k)
+  have hc (k : ℕ) : IsClosed (K k : Set (X k)) := hF.1.preimage (i k).continuous
+  refine ⟨inferInstance, S, monotone_nat_of_le_succ (fun k ↦ ?_), fun k ↦ ?_, fun x ↦ ?_, ?_⟩
+  · rintro _ ⟨x, rfl⟩
+    have heq := DFunLike.congr_fun (h.compatible k) x.val
+    exact ⟨⟨j k x, show i (k+1) (j k x) ∈ F from heq.symm ▸ x.property⟩, Subtype.ext heq⟩
+  · have : TopologicalSpace.MetrizableSpace (X k) := hmet k
+    have : TopologicalSpace.MetrizableSpace (K k) := (K k).isEmbedding_subtype.metrizableSpace
+    let L : K k ≃L[ℂ] S k := ⟨e k, (t k).continuous, (t k).continuous_symm⟩
+    let : IsUniformAddGroup (K k) := IsUniformAddGroup.comap (f := (K k).subtype.toAddMonoidHom)
+    let : CompleteSpace (K k) := (hc k).completeSpace_coe
+    refine ⟨inferInstance, L.symm.PolynormableSpace, L.symm.toHomeomorph.isEmbedding.metrizableSpace, ?_⟩
+    let : UniformSpace (S k) := IsTopologicalAddGroup.rightUniformSpace (S k)
+    let : IsUniformAddGroup (S k) := isUniformAddGroup_of_addCommGroup
+    exact ((AddMonoidHom.isUniformInducing_of_isInducing (f := L.toLinearEquiv.toAddMonoidHom)
+      (he k)).completeSpace_congr L.surjective).mp inferInstance
+  · obtain ⟨k, y, hy⟩ := h.exhaustive x.val
+    exact ⟨k, ⟨⟨y, show i k y ∈ F from hy.symm ▸ x.property⟩, Subtype.ext hy⟩⟩
+  · have heq : (fun p : Seminorm ℂ F ↦ ∀ k, Continuous (p ∘ l k)) =
+        (fun p : Seminorm ℂ F ↦ ∀ k, Continuous (p ∘ (S k).subtype)) := by
+      funext p
+      apply propext
+      exact ⟨fun hp k ↦ ((t k).isQuotientMap.continuous_iff).mpr (hp k),
+        fun hp k ↦ (hp k).comp (t k).continuous⟩
+    refine hF.2.trans ?_
+    change (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ F // ∀ k, Continuous (p ∘ l k)} → _)).topology = _
+    rw [heq]
+    rfl
 
 /-- Paper: Corollary C.1.5.13, p. 668. If a strict countable limit of nuclear
 Fréchet spaces has a quotient of the same kind by a closed subspace, the quotient
@@ -4796,7 +5567,32 @@ theorem liftsBoundedSets_quotient_of_nuclear_strictLF
     (hFrechet : ∀ n, IsFrechetTVS (X n)) (hNuclear : ∀ n, IsNuclearTVS.{v} (X n))
     (F : Submodule ℂ E) (hF : IsClosed (F : Set E))
     (hQ : IsStrictLFSpace (E ⧸ F)) (hNuclearQ : IsNuclearTVS.{v} (E ⧸ F)) :
-    LiftsBoundedSets F.mkQL ∧ IsLimitSubspace i F ∧ IsStrictLFSpace F ∧ IsNuclearTVS.{v} F := by sorry
+    LiftsBoundedSets F.mkQL ∧ IsLimitSubspace i F ∧ IsStrictLFSpace F ∧ IsNuclearTVS.{v} F := by
+  have := hQ.1
+  let K := limitStageKernel i F
+  have hK (k : ℕ) : IsClosed (K k : Set (X k)) := (F.mkQL.comp (i k)).isClosed_ker
+  let q := limitQuotientStageMap i F
+  have hlim := isInjectiveLCLimit_quotientStages h F
+  have hP (k : ℕ) := isFrechetTVS_quotient (hFrechet k) (K k) (hK k)
+  have hlift : LiftsBoundedSets F.mkQL := by
+    intro B hb
+    obtain ⟨_, S, hS, hSF, hex, ht⟩ := hQ
+    obtain ⟨n, A, ha, rfl⟩ := exists_bounded_stage_of_exhaustion S hS hSF hex ht hb
+    have hinc (k : ℕ) : range (q k) ⊆ range (q (k+1)) := by
+      rintro _ ⟨x, rfl⟩
+      exact ⟨limitQuotientTransition h F k x, DFunLike.congr_fun (hlim.compatible k) x⟩
+    obtain ⟨k, v, hv⟩ := frechet_factorization hP q hlim.injective hinc hlim.exhaustive
+      (hSF n) (S n).subtypeL
+    obtain ⟨C, hc, hcover⟩ := liftsBoundedSets_mkQL_of_schwartz_frechet (hFrechet k)
+      (isSchwartzTVS_of_isNuclearTVS (hNuclear k)) (K k) (hK k) _ (ha.image v)
+    refine ⟨i k '' C, hc.image (i k), ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    obtain ⟨y, hy, heq⟩ := hcover (mem_image_of_mem v hx)
+    exact ⟨i k y, mem_image_of_mem _ hy,
+      (congrArg (q k) heq).trans (DFunLike.congr_fun hv x)⟩
+  have hsub := (isLimitSubspace_iff_liftsBoundedSets_of_nuclear h hj hFrechet hNuclear F hF).mpr hlift
+  exact ⟨hlift, hsub, strictLFSpace_of_limitSubspace h hj hFrechet F hsub,
+    isNuclearTVS_submodule (nuclear_of_injectiveLCLimit h hNuclear) F⟩
 
 end Deferred
 
