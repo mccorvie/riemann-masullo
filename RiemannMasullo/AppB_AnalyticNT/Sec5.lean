@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Fourier.AddCircleMulti
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Topology.MetricSpace.UniformConvergence
 import Mathlib.Analysis.Complex.Tietze
+import Mathlib.Analysis.Convex.Measure
 
 /-!
 # §B.5 Recurrence and equidistribution
@@ -682,13 +683,98 @@ theorem exists_continuous_sandwich_indicator {X : Type*} [TopologicalSpace X] [T
 -- Away from the coordinate seams the cube projection is a local homeomorphism, so the
 -- torus frontier lies in the image of the relative frontier together with the null seams.
 
+/-- Inside the window, a preimage of the image frontier lies on either the relative frontier or the window boundary. -/
+private theorem preimage_frontier_image_inter_subset {X Y : Type*}
+    [TopologicalSpace X] [TopologicalSpace Y] {q : X → Y} (hq : IsOpenMap q)
+    (hcont : Continuous q) {C D : Set X} (hinj : InjOn q C) (hDC : interior D ⊆ C)
+    (U : Set C) :
+    q ⁻¹' frontier (q '' (Subtype.val '' U)) ∩ D ⊆ Subtype.val '' frontier U ∪ frontier D := by
+  let S : Set X := Subtype.val '' U
+  have hSC : S ⊆ C := by
+    rintro x ⟨y, _, rfl⟩
+    exact y.property
+  have hlocal : (q ⁻¹' (q '' S)) ∩ interior D = S ∩ interior D := calc
+    _ = ((q ⁻¹' (q '' S)) ∩ C) ∩ interior D := by
+      rw [inter_assoc, inter_eq_self_of_subset_right hDC]
+    _ = _ := congrArg (· ∩ interior D) (hinj.preimage_image_inter hSC)
+  have hfront : frontier (q ⁻¹' (q '' S)) ∩ interior D = frontier S ∩ interior D := by
+    rw [← frontier_inter_open_inter (s := q ⁻¹' (q '' S)) isOpen_interior,
+      hlocal, frontier_inter_open_inter isOpen_interior]
+  intro x hx
+  by_cases hi : x ∈ interior D
+  · left
+    have hxS : x ∈ frontier S ∩ interior D := by
+      rw [← hfront, ← hq.preimage_frontier_eq_frontier_preimage hcont]
+      exact ⟨hx.1, hi⟩
+    rw [frontier_eq_closure_inter_closure] at hxS
+    refine ⟨⟨x, hDC hi⟩, ?_, rfl⟩
+    rw [frontier_eq_closure_inter_closure]
+    constructor
+    · rw [Topology.IsEmbedding.subtypeVal.closure_eq_preimage_closure_image]
+      exact hxS.1.1
+    · rw [Topology.IsEmbedding.subtypeVal.closure_eq_preimage_closure_image]
+      refine closure_mono ?_ (isOpen_interior.closure_inter ⟨hxS.1.2, hi⟩)
+      intro y hy
+      refine ⟨⟨y, hDC hy.2⟩, ?_, rfl⟩
+      intro hyU
+      exact hy.1 ⟨_, hyU, rfl⟩
+  · exact Or.inr ⟨subset_closure hx.2, hi⟩
+
+/-- Torus volume is measured on the preimage in a product of right-closed fundamental intervals. -/
+private theorem volume_torusQuotient_preimage_Ioc (a : Fin N → ℝ)
+    (V : Set (UnitAddTorus (Fin N))) (hV : MeasurableSet V) :
+    volume V = volume ((torusQuotient N ⁻¹' V) ∩ univ.pi (fun i ↦ Ioc (a i) (a i + 1))) := by
+  let I : Fin N → Set ℝ := fun i ↦ Ioc (a i) (a i + 1)
+  have hmp : MeasurePreserving (torusQuotient N) (Measure.pi fun i ↦ volume.restrict (I i))
+      (volume : Measure (UnitAddTorus (Fin N))) :=
+    measurePreserving_pi (fun i : Fin N ↦ (volume : Measure ℝ).restrict (I i))
+      (fun _ : Fin N ↦ (volume : Measure UnitAddCircle))
+      (f := fun _ ↦ ((↑) : ℝ → UnitAddCircle))
+      (fun i ↦ AddCircle.measurePreserving_mk 1 (a i))
+  have hmap : (volume.restrict (univ.pi I)).map (torusQuotient N) = volume := by
+    rw [show (volume : Measure (Fin N → ℝ)) = Measure.pi (fun _ ↦ volume) from rfl,
+      Measure.restrict_pi_pi]
+    exact hmp.map_eq
+  rw [← hmap, Measure.map_apply hmp.measurable hV, Measure.restrict_apply (hV.preimage hmp.measurable)]
+
 /-- Paper: Remark B.5.2.3(1), p. 628.
 A subset of the half-open cube with a null relative frontier has a torus image with null
 frontier. The restricted Lebesgue measure identifies relative null sets via their images
 in the ambient real vector space. -/
 theorem volume_frontier_torusQuotient_image [NeZero N] (U : Set (unitHalfOpenCube N))
     (hU : volume (Subtype.val '' frontier U) = 0) :
-    volume (frontier (torusQuotient N '' (Subtype.val '' U))) = 0 := by sorry
+    volume (frontier (torusQuotient N '' (Subtype.val '' U))) = 0 := by
+  let q : (Fin N → ℝ) → UnitAddTorus (Fin N) := torusQuotient N
+  have hqcont : Continuous q := (torusQuotient N).continuous
+  let C := unitHalfOpenCube N
+  let D : Set (Fin N → ℝ) := univ.pi fun _ ↦ Icc (0 : ℝ) 1
+  have hq : IsOpenMap q := by
+    change IsOpenMap (Pi.map (fun _ : Fin N ↦ ((↑) : ℝ → AddCircle (1 : ℝ))))
+    exact (IsOpenQuotientMap.piMap fun _ : Fin N ↦
+      QuotientAddGroup.isOpenQuotientMap_mk (N := AddSubgroup.zmultiples (1 : ℝ))).isOpenMap
+  have hinj : InjOn q C := by
+    intro x hx y hy hxy
+    funext i
+    exact AddCircle.injOn_coe_Ico (p := (1 : ℝ)) 0
+      (by simpa only [zero_add] using hx i) (by simpa only [zero_add] using hy i)
+      (congrFun hxy i)
+  have hDC : interior D ⊆ C := by
+    rw [show interior D = univ.pi (fun _ : Fin N ↦ Ioo (0 : ℝ) 1) by
+      simp only [D, interior_pi_set finite_univ, interior_Icc]]
+    intro x hx i
+    exact ⟨(hx i (mem_univ i)).1.le, (hx i (mem_univ i)).2⟩
+  have hD : volume (frontier D) = 0 :=
+    Convex.addHaar_frontier volume (convex_pi (fun _ _ ↦ convex_Icc _ _) : Convex ℝ D)
+  let a : Fin N → ℝ := 0
+  let B : Set (Fin N → ℝ) := univ.pi fun i ↦ Ioc (a i) (a i + 1)
+  have hBD : B ⊆ D := by
+    intro x hx i _
+    have hi : x i ∈ Ioc (0 : ℝ) 1 := by simpa [a] using hx i (mem_univ i)
+    exact ⟨hi.1.le, hi.2⟩
+  rw [volume_torusQuotient_preimage_Ioc a _ isClosed_frontier.measurableSet]
+  refine measure_mono_null ?_ (measure_union_null hU hD)
+  intro x hx
+  exact preimage_frontier_image_inter_subset hq hqcont hinj hDC U ⟨hx.1, hBD hx.2⟩
 
 /-- Paper: Remark B.5.2.3(2), p. 628.
 For a Jordan-measurable subset of the cube, its torus image and the interior of that
