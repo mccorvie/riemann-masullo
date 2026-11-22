@@ -482,7 +482,20 @@ two conditions agree with the existing §4.1 terminology. -/
 theorem spectralFamily_regular_normalized_iff {E : Type*} [NormedAddCommGroup E]
     [NormedSpace ℂ E] (x : ℕ → E) :
     (IsRegularSpectralFamily x ↔ SchauderBasis.IsRegular x) ∧
-    (IsNormalizedSpectralFamily x ↔ SchauderBasis.IsNormalized x) := by sorry
+    (IsNormalizedSpectralFamily x ↔ SchauderBasis.IsNormalized x) := by
+  have hr : IsRegularSpectralFamily x ↔ SchauderBasis.IsRegular x := by
+    constructor
+    · rintro ⟨c, hc, h⟩
+      exact ⟨Metric.ball 0 c, Metric.ball_mem_nhds _ hc, fun n hn ↦
+        (h n).not_gt (by simpa only [Metric.mem_ball, dist_zero_right] using hn)⟩
+    · rintro ⟨U, hU, hx⟩
+      obtain ⟨c, hc, hball⟩ := Metric.mem_nhds_iff.mp hU
+      refine ⟨c, hc, fun n ↦ le_of_not_gt fun hn ↦ hx n (hball ?_)⟩
+      simpa only [Metric.mem_ball, dist_zero_right] using hn
+  refine ⟨hr, ?_⟩
+  simp only [IsNormalizedSpectralFamily, SchauderBasis.IsNormalized, ← hr,
+    NormedSpace.isVonNBounded_iff' ℂ, Set.forall_mem_range]
+  exact and_comm
 
 /-- Paper: Terminology 10.2.1.2, p. 444. A nonzero vector defines a regular
 and normalized singleton family.
