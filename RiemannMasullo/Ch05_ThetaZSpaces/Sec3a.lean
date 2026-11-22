@@ -452,7 +452,34 @@ theorem temperedSupport_eq_bruhatSupport_preimage
     (he : ∀ (f : 𝓢(E, ℂ)) (x : E), e f (Multiplicative.ofAdd x) = f x)
     (T : StrongDual ℂ 𝓢(E, ℂ)) :
     Distribution.dsupport (⇑T) = Multiplicative.ofAdd ⁻¹'
-      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by sorry
+      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by
+  let a : E ≃ₜ Multiplicative E := Homeomorph.refl E
+  have hs (f : 𝓢(E, ℂ)) :
+      tsupport (f : E → ℂ) = a ⁻¹' tsupport (e f : Multiplicative E → ℂ) := by
+    have h : (e f : Multiplicative E → ℂ) ∘ a = (f : E → ℂ) := funext (he f)
+    rw [← tsupport_comp_eq_preimage _ a, h]
+  ext x
+  change x ∈ Distribution.dsupport (⇑T) ↔ a x ∈ schwartzBruhatDistributionSupport _
+  apply not_iff_not.mp
+  refine (Distribution.notMem_dsupport_iff (f := (T : 𝓢(E, ℂ) → ℂ)) x).trans ?_
+  simp only [schwartzBruhatDistributionSupport, Set.mem_compl_iff, not_not,
+    schwartzBruhatVanishingLocus, Set.mem_sUnion, Set.mem_setOf_eq]
+  constructor
+  · rintro ⟨U, hU, ho, hx⟩
+    refine ⟨a '' U, ⟨a.isOpenMap U ho, ?_⟩, ⟨x, hx, rfl⟩⟩
+    intro g hg
+    change T (e.symm g) = 0
+    apply hU
+    rw [hs, e.apply_symm_apply]
+    exact (Set.preimage_mono hg).trans (by rw [Set.preimage_image_eq _ a.injective])
+  · rintro ⟨U, ⟨ho, hU⟩, hx⟩
+    refine ⟨a ⁻¹' U, ?_, ho.preimage a.continuous, hx⟩
+    intro f hf
+    have h := hU (e f) (fun y hy ↦ by
+      obtain ⟨z, rfl⟩ := a.surjective y
+      exact hf (by rwa [hs]))
+    change T (e.symm (e f)) = 0 at h
+    simpa only [e.symm_apply_apply] using h
 
 end DistributionOrder
 

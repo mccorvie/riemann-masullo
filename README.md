@@ -83,7 +83,9 @@ proved. Some thirty people have had pull requests merged, about 1,360 pull reque
 - **Wave 2** (Chapters 5–7 and Appendix B) is being stated section by section, each statement
   reviewed against the paper before it is merged. Appendix B.1–B.6, §5.1–5.3, §6.1–6.2 and §7.1
   are on `main` with their proofs open; §5.4–5.5, §6.3 and §7.2–7.5 follow in dependency order.
-- **Wave 3** (Chapters 10–12, the trace formula) has not been started.
+- **Wave 3** (Chapters 10–12, the trace formula, then the two pages of Chapter 13) is seeded as
+  sixteen section issues, and the first three sections are being stated. Chapter 8 is not
+  needed for these statements.
 
 Every open `sorry` is an issue that anyone can take. The
 [progress map](https://claude.ai/artifact/CtQyX8qfYAF822bgHJHHE3) has the current numbers, and
@@ -169,7 +171,7 @@ trace formula:
 |---|---|---|
 | 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | all stated; most proofs done, the rest being closed out file by file: [open proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
 | 2 | Chapters 5–7, with Appendix B.1–B.6 | Appendix B.1–B.6, §5.1–5.3, §6.1–6.2 and §7.1 stated, proofs open; the remaining [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection) (§5.4–5.5, §6.3, §7.2–7.5) are being stated in dependency order |
-| 3 | Chapters 10–12: the trace formula | not yet seeded |
+| 3 | Chapters 10–12: the trace formula; then Chapter 13 | seeded as [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection); statements in progress, in dependency order |
 | later | Chapters 8 and 14, Appendix E, A.4, B.7 | only when something needs them |
 
 An issue labelled `blocked` is waiting for the sections it builds on. The appendices are mostly

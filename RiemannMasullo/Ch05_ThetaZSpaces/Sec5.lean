@@ -203,7 +203,29 @@ theorem adelicNormalizedEigendistribution_gaussian (χ : PontryaginDual C𝔽) (
 /-- Paper: Theorem 5.5.1.3(1), p. 279.
 The normalized global distribution spans the eigenspace of its weight. -/
 theorem adelicEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
-    adelicEigendistributions c = Submodule.span ℂ {adelicNormalizedEigendistribution c} := by sorry
+    adelicEigendistributions c = Submodule.span ℂ {adelicNormalizedEigendistribution c} := by
+  have spans {V : Type _} {I : Type _} [AddCommGroup V] [Module ℂ V]
+      (E : Submodule ℂ V) (T : V) (test : I → V → ℂ) (hzero : ∀ i, test i 0 = 0)
+      (hr : Module.finrank ℂ E = 1) (hT : T ∈ E) (hn : ∀ i, test i T = 1)
+      (unique : ∀ U ∈ E, (∀ i, test i U = 1) → U = T) : E = Submodule.span ℂ {T} := by
+    apply eq_span_singleton_of_mem_of_finrank_eq_one hr hT
+    intro hz
+    -- If zero were normalized, there could be no tests, so every vector would qualify.
+    have noTest (i : I) : False :=
+      zero_ne_one (((hzero i).symm.trans (congrArg (test i) hz).symm).trans (hn i))
+    have : Nontrivial E := Module.nontrivial_of_finrank_eq_succ hr
+    obtain ⟨U, hU⟩ := exists_ne (0 : E)
+    exact hU (Subtype.ext ((unique U U.property (fun i ↦ (noTest i).elim)).trans hz))
+  let Charts := {p : PontryaginDual C𝔽 × ℂ // ideleClassNormTwist p.1 p.2 = c}
+  have hT := (existsUnique_adelicNormalizedEigendistribution (F := F) c).exists.choose_spec
+  refine spans (V := D(ℬ(𝔸[F]))) (I := Charts) (adelicEigendistributions (F := F) c)
+    (adelicNormalizedEigendistribution (F := F) c)
+    (fun (p : Charts) (U : D(ℬ(𝔸[F]))) ↦ U (adelicStandardGaussian (F := F) p.val.1)) (fun _ ↦ rfl)
+    (Module.rank_eq_one_iff_finrank_eq_one.mp (adelicEigendistributions_rank (F := F) c)) hT.1
+    (fun p ↦ hT.2 p.val.1 p.val.2 p.property) ?_
+  intro U hU hn
+  exact (existsUnique_adelicNormalizedEigendistribution (F := F) c).unique
+    ⟨hU, fun χ s hc ↦ hn ⟨(χ, s), hc⟩⟩ hT
 
 /-- Paper: Theorem 5.5.1.3(1), p. 279.
 The normalized global distributions form a holomorphic family on each norm chart. -/
