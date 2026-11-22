@@ -110,15 +110,43 @@ Run `scripts/issues.py` to see what it would do, then `scripts/issues.py --apply
 proof issue for each new `sorry`, closes issues whose `sorry` is gone, and removes `blocked` from
 section issues whose prerequisites are closed. Run it from an up-to-date `main`.
 
-When an agent reports a blocker:
-- **A wrong statement** (label `statement-bug`): fix the statement yourself or relaunch a
-  digester, then check what was built on it.
-- **A gap or error in the paper**: read the passage yourself, then add an entry to
-  [`ERRATA.md`](../ERRATA.md) saying exactly what the paper says, why it fails or what is
-  missing, the page, and how the Lean handles it. Do this at every merge, from the report and
-  from the `TODO(paper-gap)` comments in the diff. Open a `paper-gap` issue as well only when
-  the problem blocks work. Do not paper over a gap with an extra hypothesis unless the
-  hypothesis is carried visibly up to the theorems that use it.
+### Findings: you carry the baton
+
+Contributors are asked to prove a statement, refute it, or write down what they tried. When a
+report says that something is wrong (on a proof issue, or under the labels `statement-bug`,
+`paper-gap` and `question`), what happens next is yours. `ERRATA.md` is yours too.
+
+1. **Check it.** Read the page image. Reproduce the counterexample or the failing step, or give
+   that to a helper agent that has the page and the Lean statement but not your conclusion. A
+   report that comes with a Lean proof of the negation needs only its `Printed` proposition
+   compared with the page. A claim that something is wrong needs its own evidence; "I could not
+   prove it" is not evidence. Take first what other work already rests on.
+2. **Decide which it is, and act.**
+
+   | Finding | The Lean | The issue |
+   |---|---|---|
+   | Our Lean misreads the paper | Correct the statement. Entry under "Errors of the formalization". | Stays open; the sync refreshes its text and tells whoever is working on it. |
+   | The printed statement is false | `def Printed.<name> : Prop` and `Printed.<name>_false` in the section's `_Printed.lean` file; the repair under the ordinary name with `Deviation:`. | Close it with a link to the entry. The sync opens issues for the repair and, if it is not yet proved, the refutation. |
+   | The printed proof fails, the statement is plausible | Unchanged. | Stays open, with the note. An entry under "Imprecise, inconsistent or wrongly justified". |
+   | Nobody can prove or refute it | A named gap theorem: proof `sorry`, a `Gap:` line in the docstring. | The sync labels it `gap`, and it leaves the provers' queue. |
+
+   Declare a gap only after serious attempts have failed and a dedicated investigation has
+   found neither a proof nor a counterexample. Make it the smallest statement that is missing,
+   and have it reviewed like any statement.
+3. **Record it** in [`ERRATA.md`](../ERRATA.md): the paper item and page, what is printed, why
+   it fails, the Lean declaration as it was (if there was one) and what replaces it, and the
+   state of the refutation (proved in Lean, open as an issue, or prose only). For a repair that
+   adds a hypothesis or weakens a conclusion, find its first use further on (the progress map's
+   dependencies list the users) and say whether the repaired result still suffices there. Do not
+   paper over a gap with an extra hypothesis unless the hypothesis is carried visibly up to the
+   theorems that use it.
+4. **Check what was built on it.** Proofs above a statement that changed may need to change.
+
+Do the recording at every merge as well, from the reports and from the `TODO(paper-gap)`
+comments in the diff. Cases that do not fit the table are decided one at a time; write down what
+was done.
+
+When an agent reports another kind of blocker:
 - A stale claim with no pull request: comment `Released: no activity` so the issue can be taken
   again. Claims and releases are comments (`Claiming`, `Releasing`); the Claims workflow turns
   them into the `claimed` label and an assignee, so people without write access can claim.

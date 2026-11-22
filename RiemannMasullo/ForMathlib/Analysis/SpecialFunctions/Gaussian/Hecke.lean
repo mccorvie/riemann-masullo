@@ -397,7 +397,12 @@ theorem realGaussianFourier (n : Fin 2) (y : ℝ) :
     dsimp [k]
     linear_combination -(2 * (Real.pi : ℂ) * y * g y) * Complex.I_sq
 
-/-- The real Gaussian with its parity monomial. -/
+/-- The real Gaussian with its parity monomial.
+
+This and `complexTest` are explicit test functions used inside proofs of §3.2, which cannot
+import §3.4. They are not the formalization of an object of the paper: the paper's standard
+Gaussians, Equations (3.4.3.3)–(3.4.3.6), p. 152, are `infiniteStandardGaussian` in
+`Ch03_IdelicZeta/Sec4.lean`, and that definition is the one to compare with the print. -/
 def realTest (n : Fin 2) (x : ℝ) : ℂ :=
   (x : ℂ) ^ n.val * (Real.exp (-(Real.pi * ‖x‖ ^ 2)) : ℂ)
 
@@ -405,7 +410,8 @@ def realTest (n : Fin 2) (x : ℝ) : ℂ :=
 def complexTestPoly (m : ℤ) (z : ℂ) : ℂ :=
   ((2 * Real.pi : ℝ) : ℂ)⁻¹ * (if 0 ≤ m then star z else z) ^ m.natAbs
 
-/-- The complex Gaussian with its normalized angular monomial. -/
+/-- The complex Gaussian with its normalized angular monomial. A proof device, like `realTest`:
+the paper's object is `infiniteStandardGaussian` in §3.4. -/
 def complexTest (m : ℤ) (z : ℂ) : ℂ :=
   complexTestPoly m z * (Real.exp (-(2 * Real.pi * ‖z‖ ^ 2)) : ℂ)
 

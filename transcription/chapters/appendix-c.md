@@ -1196,7 +1196,7 @@ Just as we showed strictness for each $\{E_i\widehat{\otimes}_\pi F_k\}_{k\ge 0}
 
 **C.2. COMPLEMENTS ON MAPPING SPACES, TOPOLOGICAL TENSOR PRODUCTS, AND NUCLEARITY** · **685**
 
-of an inductive limit via the corresponding direct sum as in (C.1.5.1) shows that for a compatible system of linear quotient maps $f_i:V_i\to\overline{V}_i$ the resulting map $\varinjlim_i V_i\to\varinjlim_i\overline{V}_i$ is also a quotient map. Thus, $\mathrm{coker}(j:E_1\overline{\otimes}F\to E_2\overline{\otimes}F)$ equipped with its quotient topology from $E_2\overline{\otimes}F$ is linearly and topologically identified with the strict locally convex inductive limit $(E_2/E_1)\overline{\otimes}F$ of the nuclear Fréchet spaces $(E_2/E_1)\widehat{\otimes}_\pi F_k$.
+of an inductive limit via the corresponding direct sum as in (C.1.5.1) shows that for a compatible system of linear quotient maps $f_i:V_i\to\overline{V}_i$ the resulting map $\varinjlim V_i\to\varinjlim\overline{V}_i$ is also a quotient map. Thus, $\mathrm{coker}(j:E_1\overline{\otimes}F\to E_2\overline{\otimes}F)$ equipped with its quotient topology from $E_2\overline{\otimes}F$ is linearly and topologically identified with the strict locally convex inductive limit $(E_2/E_1)\overline{\otimes}F$ of the nuclear Fréchet spaces $(E_2/E_1)\widehat{\otimes}_\pi F_k$.
 
 We deduce that the continuous linear map $q:E_2\overline{\otimes}F\to (E_2/E_1)\overline{\otimes}F$ between strict LF-space spaces is a quotient map whose closed kernel $\ker(q)$ received a continuous linear bijection from $E_1\overline{\otimes}F$. Since the source and target of $q$ are strict inductive limits of nuclear Fréchet spaces, Corollary C.1.5.13 (whose proof ultimately rests on the Open Mapping Theorem for LF-spaces) tells us that the closed subspace $\ker(q)$ is a limit subspace of $E_2\overline{\otimes}F$. More specifically, since $\ker(q)$ meets each layer $E_2\overline{\otimes}F_k=E_2\widehat{\otimes}_\pi F_k$ of $E_2\overline{\otimes}F$ in exactly $E_1\overline{\otimes}F_k=E_1\widehat{\otimes}F_k$, Corollary C.1.5.13 gives that $\varinjlim_k E_1\overline{\otimes}F_k\to\ker(q)$ is a topological isomorphism. This latter inductive limit is topologically $E_1\overline{\otimes}F$, so the continuous injective linear map (C.2.3.28) is a topological embedding as desired. $\square$
 
@@ -1220,7 +1220,7 @@ C.2.4.1. *Characterizations of nuclearity.* The first of the two questions at ha
 
 The second part of Grothendieck's doctoral dissertation is devoted to answering and studying this question, leading to the definition of nuclear spaces. The following is [Gro-b, Ch. II, §2.1, Def. 4].
 
-Definition C.2.4.1 (Nuclear Hausdorff locally convex topological $\mathbf C$-vector spaces). *Let $E$ be a Hausdorff locally convex topological $\mathbf C$-vector space. We say $E$ is nuclear if and only if the identity map $E\otimes_\pi F\to E\otimes_\varepsilon F$ is a linear topological isomorphism for every Hausdorff locally convex topological $\mathbf C$-vector space $F$.*
+Definition C.2.4.1 (Nuclear Hausdorff locally convex topological $\mathbf C$-vector spaces). Let $E$ be a Hausdorff locally convex topological $\mathbf C$-vector space. We say $E$ is nuclear if and only if the identity map $E\otimes_\pi F\to E\otimes_\varepsilon F$ is a linear topological isomorphism for every Hausdorff locally convex topological $\mathbf C$-vector space $F$.
 
 It is equivalent to work with the completed tensor products in this definition, since the uncompleted versions are Hausdorff (and so topologically embed into their completions). There is a different definition of nuclearity given in [Scha, Ch. III, p. 100], but this is equivalent to the above definition by combining [Scha, Ch. III, 7.2] with a long list of equivalents to Definition C.2.4.1 given in [Tre, Thm. 50.1].
 
@@ -2147,7 +2147,7 @@ $$
 \tag{C.3.6.2}
 $$
 
-DEFINITION C.3.6.2 (Schatten-von-Neumann classes). *Let $E,F$ be Hilbert space spaces. Let $p\ge 1$ be a real number. We define:*
+DEFINITION C.3.6.2 (Schatten-von-Neumann classes). Let $E,F$ be Hilbert space spaces. Let $p\ge 1$ be a real number. We define:
 
 (1) *The Schatten-von Neumann class of index $p$ to be the $\mathbf C$-linear subspace:*
 
@@ -2163,9 +2163,9 @@ $$
 \tag{C.3.6.4}
 $$
 
-(2) *The space of Hilbert-Schmidt operators $E\to F$, to be the $S_2(E,F)$.*
+(2) The space of Hilbert-Schmidt operators $E\to F$, to be the $S_2(E,F)$.
 
-(3) *The space of trace-class operators $E\to F$, to be $S_1(E,F)$.*
+(3) The space of trace-class operators $E\to F$, to be $S_1(E,F)$.
 
 We record here a generalization of Lemma C.3.5.4 for singular values of continuous operators $E\to F$ when $E$ and $F$ are general Hilbert spaces, allowing $E\ne F$.
 
@@ -3301,7 +3301,13 @@ We now define partial derivatives of a function $f:\Omega\to E$, with $\Omega\su
 
 DEFINITION C.5.1.14 (Weak partial derivative operators). Let $E$ be a Hausdorff locally convex topological $\mathbf C$-vector space, $d\ge 1$ an integer, $k$ either one of the Archimedean topological fields $k=\mathbf R,\mathbf C$, endowed with their Euclidean topology. Let $\Omega\subset k^d$ be a non-empty open subset, and $f:\Omega\to E$ a function. We call $e_i$ the $i$-th unit vector in the standard $k$-linear basis for $k^d$, for $1\le i\le d$.
 
-We say $f$ is *weakly differentiable in the $e_i$-direction* over $\Omega$ if and only if for every $\varphi\in E'$, the function $\langle f,\varphi\rangle_{E,E'}:\Omega\to\mathbf C$ is differentiable in the $e_i$-direction in the ordinary sense (i.e. real-differentiable if $k=\mathbf R$, and differentiable in the complex sense if $k=\mathbf C$).
+We say $f$ is *weakly differentiable in the $e_i$-direction* over $\Omega$ if and only if for every $\varphi\in E'$, the function
+
+$$
+\langle f,\varphi\rangle_{E,E'}:\Omega\to\mathbf C
+$$
+
+is differentiable in the $e_i$-direction in the ordinary sense (i.e. real-differentiable if $k=\mathbf R$, and differentiable in the complex sense if $k=\mathbf C$).
 
 For $f$ weakly differentiable in the $e_i$-direction over $\Omega$, we define the function $\mathrm{D}_if:\Omega\to (E')^*$ by
 
@@ -3490,7 +3496,7 @@ $$
 
 by the Fundamental Theorem of Calculus. Since the space $E'$ separates the points of $E$, (C.5.1.37) holds. $\square$
 
-**C.5.1.4. Vector-valued differentiability criterion.** We will now discuss a differentiability criterion, extending Lemma C.5.1.13 to higher order directional derivatives. Such a criterion will hold under the additional assumption on the Hausdorff locally convex topological $\mathbf{C}$-vector space $E$ being quasi-complete. The following Lemma is the key ingredient upon which the differentiability criterion of Theorem C.5.1.24 below rests.
+C.5.1.4. *Vector-valued differentiability criterion.* We will now discuss a differentiability criterion, extending Lemma C.5.1.13 to higher order directional derivatives. Such a criterion will hold under the additional assumption on the Hausdorff locally convex topological $\mathbf{C}$-vector space $E$ being quasi-complete. The following Lemma is the key ingredient upon which the differentiability criterion of Theorem C.5.1.24 below rests.
 
 We record here the following consequence of Lemma C.5.1.12, Lemma C.5.1.13, Lemma C.5.1.15 and Lemma C.5.1.16:
 
@@ -3638,7 +3644,7 @@ We claim $f$ satisfies the assumptions of Lemma C.5.1.16(3) with (C.5.1.32) equa
 
 We have shown that for each integer $1 \le i \le d$, $\mathrm{D}_i f$ is valued in $E$ and continuous with respect to the Euclidean topology on $\Omega$ and the initial topology on $E$. Note that for each integer $1 \le i \le d$, the function $\mathrm{D}_i f$ is $E$-valued, continuous, and weakly continuously differentiable $m - 1$ times. By inductive hypothesis, it is continuously differentiable $m - 2$ times. We have therefore shown that $f$ is continuously differentiable $m - 1$ times. $\square$
 
-**Corollary C.5.1.25 (On the agreement of the concepts of $E$-valued smoothness).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space. Let $d \ge 1$ be an integer, $k$ either one of the two Archimedean topological field $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology.
+**Corollary C.5.1.25 (On the agreement of the concepts of $E$-valued smoothness).** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space. Let $d \ge 1$ be an integer, $k$ either one of the two Archimedean topological field $k = \mathbf{R}, \mathbf{C}$, endowed with their Euclidean topology.*
 
 *Let $\Omega \subset k^d$ be an open subset, $f : \Omega \to E$ a function. Assume $E$ is quasi-complete. Then, the following conditions are equivalent:*
 
@@ -3658,7 +3664,7 @@ so for $E$ quasi-complete the two notions are equivalent by Corollary C.5.1.25. 
 
 For the purposes of this work, $E$ will always be quasi-complete. Thus, there will be no ambiguity as to the meaning of “smooth $E$-valued function”.
 
-**C.5.1.5. Spaces of smooth vector-valued functions.** In this subsection we record a few facts about spaces of smooth vector-valued functions with values in a Hausdorff locally convex quasi-complete topological $\mathbf{C}$-vector space $E$.
+C.5.1.5. *Spaces of smooth vector-valued functions.* In this subsection we record a few facts about spaces of smooth vector-valued functions with values in a Hausdorff locally convex quasi-complete topological $\mathbf{C}$-vector space $E$.
 
 Recall that we write $\mathbf{T}$ for the 1-dimensional compact real torus $\mathbf{R}/\mathbf{Z}$, which is smoothly isomorphic to $\mathrm{U}(1)$ under the exponential function $t \mapsto \exp(2\pi i t)$.
 
@@ -3700,7 +3706,7 @@ This latter way to define $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathb
 
 Most of the following properties of $\mathcal{S}(\mathbf{R}^d, E)$ are due to Schwartz, and we further refer the reader to [Sch-b, §1, p. 93].
 
-**Theorem C.5.1.30 (Main properties of the function spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$).** Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $d \ge 1$ an integer. Assume $E$ is quasi-complete.
+**Theorem C.5.1.30 (Main properties of the function spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$).** *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, $d \ge 1$ an integer. Assume $E$ is quasi-complete.*
 
 (1) *The spaces $\mathcal{S}(\mathbf{T}^d, E)$ and $\mathcal{S}(\mathbf{R}^d, E)$ are quasi-complete.*
 
@@ -3746,7 +3752,7 @@ We will be using Theorem C.5.1.30(4) in Appendix D (see the proof of Lemma D.1.3
 
 **C.5.2. Holomorphic vector-valued functions.** We start by defining basic concepts of continuity and holomorphy for vector-valued functions on open subsets of $\mathbf{C}$.
 
-**C.5.2.1. Grothendieck’s criterion for holomorphy.** For a Hausdorff locally convex topological $\mathbf{C}$-vector space $E$, we will be identifying $E$ as a linear subspace of $(E')^*$ (although not topologically) under the linear map $\iota_E : E \to (E')^*$ from (C.4.1.1) and studied in Lemma C.4.1.1, when saying that certain linear forms on $E'$ are “elements of $E$”, or are “contained in $E$”. These will ordinarily be integrals in the sense of Pettis, which, recall, are defined for general $E$ as elements of $(E')^*$. The concept of integrability was defined in Definition C.4.2.1(3) via such integrals being contained in $E$.
+C.5.2.1. *Grothendieck’s criterion for holomorphy.* For a Hausdorff locally convex topological $\mathbf{C}$-vector space $E$, we will be identifying $E$ as a linear subspace of $(E')^*$ (although not topologically) under the linear map $\iota_E : E \to (E')^*$ from (C.4.1.1) and studied in Lemma C.4.1.1, when saying that certain linear forms on $E'$ are “elements of $E$”, or are “contained in $E$”. These will ordinarily be integrals in the sense of Pettis, which, recall, are defined for general $E$ as elements of $(E')^*$. The concept of integrability was defined in Definition C.4.2.1(3) via such integrals being contained in $E$.
 
 Recall that we call $\Omega \subset \mathbf{C}$ a domain, or a complex domain, if $\Omega \subset \mathbf{C}$ is non-empty open and connected.
 
@@ -3898,7 +3904,7 @@ $$\frac{f(\xi)}{(\xi - \xi_0)^{k+1}} = \frac{(\xi - \xi_0)^N f(\xi)}{(\xi - \xi_
 
 we’re reduced to the settled holomorphic case. $\square$
 
-**C.5.3.1. Vector-valued residues.** We construct the following operators on $\mathscr{M}(\Omega, E)$:
+C.5.3.1. *Vector-valued residues.* We construct the following operators on $\mathscr{M}(\Omega, E)$:
 
 $$
 \operatorname{Res}_\xi(f) := a_{-1}(\xi, f), \quad \xi \in \Omega. \tag{C.5.3.5}
@@ -3946,7 +3952,7 @@ as $\mathbf{C}$-linear operators $\mathscr{M}(\Omega, E_2) \to E_2$, for every $
 
 **C.5. MEROMORPHIC FUNCTIONS VALUED IN A QUASI-COMPLETE LOCALLY CONVEX TVS** · **741**
 
-**Theorem C.5.4.1 (Residue Theorem for vector-valued meromorphic functions).** Let $E$ be a Hausdorff quasi-complete locally convex complex topological vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f$ be a meromorphic $E$-valued function on $\Omega$. Let $\Gamma \subset \Omega$ be a cycle which is homologous to zero and does not contain any poles of $f$. Then
+**Theorem C.5.4.1 (Residue Theorem for vector-valued meromorphic functions).** *Let $E$ be a Hausdorff quasi-complete locally convex complex topological vector space, $\Omega \subset \mathbf{C}$ a domain. Let $f$ be a meromorphic $E$-valued function on $\Omega$. Let $\Gamma \subset \Omega$ be a cycle which is homologous to zero and does not contain any poles of $f$. Then*
 
 $$
 \frac{1}{2\pi i} \int_\Gamma f(\xi)\, \mathrm{d}\xi = \sum_{\xi_0 \in D} n(\Gamma, \xi_0) \operatorname{Res}_{\xi_0}(f) \tag{C.5.4.1}
@@ -3966,7 +3972,7 @@ Here too quasi-completeness is being used to know holomorphic is equivalent to w
 
 We will, throughout this work, always be able to assume quasi-completeness of the Hausdorff locally convex topological $\mathbf{C}$-vector space of values of the holomorphic and meromorphic functions of interest since these spaces will always be the strong dual of a quotient of the Schwartz-Bruhat space of the global, respectively $S$-local, adeles of a number field $F$, for $F$ a finite set of places containing all the Archimedean places. Such duals are quasi-complete, and even complete.
 
-**C.5.4.1. Vector-valued Identity Theorem.** We record here below the following analog of the Identity Theorem from classical complex analysis:
+C.5.4.1. *Vector-valued Identity Theorem.* We record here below the following analog of the Identity Theorem from classical complex analysis:
 
 **Lemma C.5.4.3.** *Let $E$ be a Hausdorff quasi-complete locally convex topological $\mathbf{C}$-vector space, $\Omega \subset \mathbf{C}$ a domain, $(f_1, D_1)$ and $(f_2, D_2)$ two meromorphic $E$-valued functions on $\Omega$. Let $B \subset \Omega - (D_1 \cup D_2)$ be a non-empty open disc such that*
 
