@@ -191,7 +191,20 @@ complete and separable subspace of the ambient Hilbert space. -/
 theorem globalThetaSobolev_closed_complete_separable (a : ℝ) {α β s : ℝ}
     (hI : α ≤ β) (hs : 0 ≤ s) :
     IsClosed (H𝔽(a, hI, hs) : Set W𝔽(α, β, s)) ∧
-      CompleteSpace (H𝔽(a, hI, hs)) ∧ TopologicalSpace.SeparableSpace (H𝔽(a, hI, hs)) := by sorry
+      CompleteSpace (H𝔽(a, hI, hs)) ∧ TopologicalSpace.SeparableSpace (H𝔽(a, hI, hs)) := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  let : SecondCountableTopology C𝔽 := by
+    let := idele_secondCountable F
+    exact inferInstanceAs (SecondCountableTopology
+      (IdeleGroup (𝓞 F) F ⧸ IdeleGroup.principalSubgroup (𝓞 F) F))
+  let : (ideleClassTamagawaMeasure F).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  have hc : IsClosed (H𝔽(a, hI, hs) : Set W𝔽(α, β, s)) :=
+    Submodule.isClosed_topologicalClosure _
+  let : Fact ((2 : ENNReal) ≠ ⊤) := ⟨by norm_num⟩
+  let : SecondCountableTopology W𝔽(α, β, s) := Lp.SecondCountableTopology
+  exact ⟨hc, hc.completeSpace_coe, inferInstance⟩
 
 local instance instIdeleClassBorelSpaceSec1 : BorelSpace C𝔽 := ⟨rfl⟩
 local instance instSIdeleQuotientBorelSpaceSec1 : BorelSpace Jₛ := ⟨rfl⟩
