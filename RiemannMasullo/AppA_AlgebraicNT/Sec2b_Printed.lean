@@ -33,6 +33,12 @@ take S = T and pick a rational prime p outside S. Its principal idele has norm o
 and its inverse is nonintegral at p, as in `exists_rat_prime_idele_outside`.
 Every element of the subgroup on the left lies in the range of the inclusion. -/
 theorem Printed.sIdeleFundamentalDomain_cover_false :
-    ¬ Printed.sIdeleFundamentalDomain_cover := by sorry
+    ¬ Printed.sIdeleFundamentalDomain_cover := by
+  intro h
+  obtain ⟨T, hT⟩ := h ℚ
+  have hcover := (hT T (Finset.Subset.refl T)).2
+  obtain ⟨p, u, _, _, hnorm, hout⟩ := exists_rat_prime_idele_outside T
+  rw [← hcover] at hnorm
+  exact hout (Subgroup.map_le_range _ _ hnorm)
 
 end RiemannMasullo
