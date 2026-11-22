@@ -190,7 +190,13 @@ check for the sequence-independent definition. -/
 theorem sLocalCarvingLimit_eq_iInf {S : Finset V} (s : ℝ) (ω : PontryaginDual C₁)
     (J : Set ℝ) (hJ : MeasurableSet J)
     (A : ℕ → SLocalCarvingIndex (F := F) S) (_hA : IsSLocalCarvingCofinal A) :
-    sLocalCarvingLimit s ω S J hJ = ⨅ k, sLocalCutoffCarving s ω (A k).val J hJ := by sorry
+    sLocalCarvingLimit s ω S J hJ = ⨅ k, sLocalCutoffCarving s ω (A k).val J hJ := by
+  unfold sLocalCarvingLimit
+  apply le_antisymm
+  · exact le_iInf fun k ↦ iInf_le _ (A k)
+  · refine le_iInf fun i ↦ ?_
+    obtain ⟨k, hik⟩ := ((isSLocalCarvingCofinal_iff A).1 _hA).2 i
+    exact (iInf_le _ k).trans (sLocalCutoffCarving_antitone s ω J hJ hik)
 
 /-- Paper: Theorem 11.1.2.1(1), p. 480. The cofinal limit is closed in the
 ambient weighted L² space. -/
