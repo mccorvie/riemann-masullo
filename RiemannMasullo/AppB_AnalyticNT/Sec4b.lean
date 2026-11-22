@@ -7,6 +7,7 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
@@ -14,6 +15,7 @@ public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.Fini
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 import Mathlib.Topology.Algebra.IsOpenUnits
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
@@ -556,6 +558,329 @@ local notation "J∞(" w ")" =>
 local notation "logFourierIntegrand(" ν ", " ψ ", " J ", " f ")" =>
   (fun y ↦ ((J y : ℝ) : ℂ) * tamagawaFourier ν ψ f y)
 
+section LocalScaling
+
+open scoped Pointwise
+
+local instance instFiniteCompletionLocallyCompactSec4bScaling (v : Primes(F)) :
+    LocallyCompactSpace (v.adicCompletion F) :=
+  letI : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  inferInstance
+
+/-- The Haar character of multiplication by a unit on a finite completion is the norm.
+The multiplicative measure is invariant and has density the inverse norm, which compares
+the additive masses of the unit sphere and of its dilate. -/
+private theorem finiteLocalAdditive_distribHaarChar (v : Primes(F))
+    (w : (v.adicCompletion F)ˣ) :
+    distribHaarChar (v.adicCompletion F) w = ‖w.val‖₊ := by
+  let K := v.adicCompletion F
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : BorelSpace K := ⟨rfl⟩
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  let ν : Measure K := ν𝔭(v)
+  let : ν.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : ν.Regular := finiteLocalAdditiveTamagawaMeasure_regular F v
+  let : (μ𝔭(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_haar F v
+  have he := (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).measurableEmbedding
+  let C : ENNReal := (v.asIdeal.absNorm : ENNReal) / ((v.asIdeal.absNorm : ENNReal) - 1)
+  have hq : (1 : ENNReal) < v.asIdeal.absNorm := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hC0 : C ≠ 0 := ENNReal.div_ne_zero.mpr ⟨(zero_lt_one.trans hq).ne',
+    ENNReal.sub_ne_top (ENNReal.natCast_ne_top _)⟩
+  have hCtop : C ≠ ⊤ := ENNReal.div_ne_top (ENNReal.natCast_ne_top _)
+    (tsub_pos_of_lt hq).ne'
+  -- Away from zero the multiplicative mass is `C` times the inverse-norm integral.
+  have hmass (A : Set K) (hA : MeasurableSet A) (h0 : (0 : K) ∉ A) :
+      μ𝔭(v) (Units.val ⁻¹' A) = C * ∫⁻ x in A, (↑‖x‖₊ : ENNReal)⁻¹ ∂ν := by
+    have hsub : A ⊆ range (Units.val : Kˣ → K) := fun x hx ↦
+      ⟨Units.mk0 x (fun h ↦ h0 (h ▸ hx)), rfl⟩
+    rw [finiteLocalMultiplicativeTamagawaMeasure_eq_withDensity, smul_apply, smul_eq_mul,
+      he.comap_apply, image_preimage_eq_of_subset hsub, withDensity_apply _ hA]
+  let S : Set K := Metric.sphere 0 1
+  have hSo : IsOpen S := IsUltrametricDist.isOpen_sphere (0 : K) one_ne_zero
+  have hS0 : (0 : K) ∉ S := by simp [S]
+  have hSν0 : ν S ≠ 0 := (hSo.measure_pos ν ⟨1, by simp [S]⟩).ne'
+  have hSνtop : ν S ≠ ⊤ := (isCompact_sphere (0 : K) 1).measure_lt_top.ne
+  have hwS : w • S = Metric.sphere 0 ‖w.val‖ := by
+    ext x
+    rw [mem_smul_set_iff_inv_smul_mem, Units.smul_def, mem_sphere_zero_iff_norm,
+      mem_sphere_zero_iff_norm, smul_eq_mul, norm_mul, Units.val_inv_eq_inv_val, norm_inv,
+      inv_mul_eq_one₀ (norm_ne_zero_iff.mpr w.ne_zero), eq_comm]
+  have hwSm : MeasurableSet (w • S) := hSo.measurableSet.const_smul w
+  have hw0 : (0 : K) ∉ w • S := by
+    rw [hwS, mem_sphere_zero_iff_norm, norm_zero]
+    exact (norm_pos_iff.mpr w.ne_zero).ne
+  have hwn : (↑‖w.val‖₊ : ENNReal) ≠ 0 := by simp [w.ne_zero]
+  apply distribHaarChar_eq_of_measure_smul_eq_mul hSν0 hSνtop
+  have hinv : μ𝔭(v) (Units.val ⁻¹' (w • S)) = μ𝔭(v) (Units.val ⁻¹' S) := by
+    have hpre : Units.val ⁻¹' (w • S) = (fun u ↦ w⁻¹ * u) ⁻¹' (Units.val ⁻¹' S) := by
+      ext u
+      simp only [mem_preimage, Units.val_mul, Units.smul_def]
+      rw [Set.mem_smul_set_iff_inv_smul_mem₀ w.ne_zero, smul_eq_mul, Units.val_inv_eq_inv_val]
+    rw [hpre, measure_preimage_mul]
+  rw [hmass _ hwSm hw0, hmass _ hSo.measurableSet hS0,
+    setLIntegral_congr_fun hwSm (g := fun _ ↦ (↑‖w.val‖₊ : ENNReal)⁻¹) (fun x hx ↦ by
+      rw [hwS, mem_sphere_zero_iff_norm] at hx
+      simp only [show ‖x‖₊ = ‖w.val‖₊ from NNReal.eq hx]),
+    setLIntegral_congr_fun hSo.measurableSet (g := fun _ ↦ (1 : ENNReal)) (fun x hx ↦ by
+      rw [mem_sphere_zero_iff_norm] at hx
+      simp [show ‖x‖₊ = 1 from NNReal.eq hx]),
+    setLIntegral_const, setLIntegral_const, one_mul] at hinv
+  have h := (ENNReal.mul_right_inj hC0 hCtop).mp hinv
+  calc ν (w • S) = ↑‖w.val‖₊ * ((↑‖w.val‖₊ : ENNReal)⁻¹ * ν (w • S)) := by
+        rw [← mul_assoc, ENNReal.mul_inv_cancel hwn ENNReal.coe_ne_top, one_mul]
+    _ = _ := by rw [h]
+
+/-- Multiplication by a unit pushes additive Tamagawa measure forward to its multiple by
+the inverse norm. -/
+private theorem finiteLocalAdditive_map_mul (v : Primes(F)) (u : (v.adicCompletion F)ˣ) :
+    (ν𝔭(v)).map (u.val * ·) = ENNReal.ofReal ‖u.val‖⁻¹ • ν𝔭(v) := by
+  let K := v.adicCompletion F
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : BorelSpace K := ⟨rfl⟩
+  let ν : Measure K := ν𝔭(v)
+  let : ν.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : ν.Regular := finiteLocalAdditiveTamagawaMeasure_regular F v
+  ext s hs
+  rw [Measure.map_apply (measurable_const_mul _) hs, smul_apply, smul_eq_mul]
+  have hpre : (u.val * ·) ⁻¹' s = u⁻¹ • s := by
+    ext x
+    rw [mem_preimage, Set.mem_inv_smul_set_iff]
+    rfl
+  rw [hpre, ← distribHaarChar_mul, finiteLocalAdditive_distribHaarChar, Units.val_inv_eq_inv_val,
+    nnNorm_inv, ← ENNReal.ofReal_coe_nnreal, NNReal.coe_inv, coe_nnNorm]
+
+/-- Integrals against additive Tamagawa measure change by the inverse norm under dilation. -/
+private theorem finiteLocalAdditive_integral_comp_mul (v : Primes(F))
+    (u : (v.adicCompletion F)ˣ) (h : v.adicCompletion F → ℂ) :
+    (∫ y, h (u.val * y) ∂ν𝔭(v)) = (‖u.val‖⁻¹ : ℝ) • ∫ z, h z ∂ν𝔭(v) := by
+  let : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let e := (Homeomorph.mulLeft₀ u.val u.ne_zero).toMeasurableEquiv
+  calc (∫ y, h (u.val * y) ∂ν𝔭(v)) = ∫ y, h (e y) ∂ν𝔭(v) := rfl
+    _ = ∫ z, h z ∂((ν𝔭(v)).map e) := (integral_map_equiv e h).symm
+    _ = _ := by
+      rw [show ⇑e = (u.val * · : _ → _) from rfl, finiteLocalAdditive_map_mul,
+        integral_smul_measure, ENNReal.toReal_ofReal (inv_nonneg.mpr (norm_nonneg _))]
+
+/-- Integrability against additive Tamagawa measure is invariant under dilation. -/
+private theorem finiteLocalAdditive_integrable_comp_mul (v : Primes(F))
+    (u : (v.adicCompletion F)ˣ) {h : v.adicCompletion F → ℂ} (hh : Integrable h ν𝔭(v)) :
+    Integrable (fun y ↦ h (u.val * y)) ν𝔭(v) := by
+  let : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let e := (Homeomorph.mulLeft₀ u.val u.ne_zero).toMeasurableEquiv
+  have h' : Integrable h ((ν𝔭(v)).map e) := by
+    rw [show ⇑e = (u.val * · : _ → _) from rfl, finiteLocalAdditive_map_mul]
+    exact hh.smul_measure ENNReal.ofReal_ne_top
+  exact (integrable_map_equiv e h).mp h'
+
+/-- Fourier inversion at zero: the Fourier transform of an additive test is integrable,
+with integral the value of the test at zero. -/
+private theorem finiteLocal_integral_tamagawaFourier (v : Primes(F))
+    (f : 𝒮ₐ(v.adicCompletion F)) :
+    Integrable (tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f)) ν𝔭(v) ∧
+      (∫ y, tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y ∂ν𝔭(v)) = addTest(f) 0 := by
+  let K := v.adicCompletion F
+  let G := Multiplicative K
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : BorelSpace K := ⟨rfl⟩
+  let : MeasurableSpace (PontryaginDual G) := borel _
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  obtain ⟨e, he, hP⟩ := finiteLocalAdditiveTamagawaMeasure_selfDual F v
+  let μ : Measure G := ν𝔭(v)
+  have hHaar := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hHaar.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hHaar.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hHaar.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := finiteLocalAdditiveTamagawaMeasure_regular F v
+  have hinv := schwartzBruhat_inverse_integral μ _ hP f 1
+  have hF (y : K) : lcaFourier μ f (e (Multiplicative.ofAdd y)) =
+      tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y :=
+    (tamagawaFourier_eq_lcaFourier _ _ _ y _ fun x ↦ (he y x).trans
+      (congrArg _ (mul_comm y x))).symm
+  let E := e.toHomeomorph.toMeasurableEquiv
+  obtain ⟨hI, hval⟩ := hinv
+  simp only [map_one, Circle.coe_one, mul_one] at hI hval
+  change Integrable _ (Measure.map E μ) at hI
+  change _ = ∫ χ, _ ∂(Measure.map E μ) at hval
+  rw [integral_map_equiv] at hval
+  have hI' := (integrable_map_equiv E _).mp hI
+  refine ⟨hI'.congr (ae_of_all _ fun y ↦ hF y.toAdd), ?_⟩
+  refine (integral_congr_ae (ae_of_all _ fun y ↦ (hF y).symm)).trans (hval.symm.trans ?_)
+  rfl
+
+
+/-- The normalized logarithm transforms additively under dilation, away from zero. -/
+private theorem finiteLog_mul (v : Primes(F)) (a : (v.adicCompletion F)ˣ)
+    {y : v.adicCompletion F} (hy : y ≠ 0) :
+    (((J𝔭(v) (a.val * y)) : ℝ) : ℂ) =
+      ((J𝔭(v) y : ℝ) : ℂ) + ((Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) := by
+  simp only [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr a.ne_zero) (norm_ne_zero_iff.mpr hy),
+    add_div]
+  push_cast
+  ring
+
+/-- Dilating the argument of the Fourier transform against the normalized logarithm
+shifts the pairing by the logarithm of the dilation times the value at zero. -/
+private theorem finiteLogFourier_comp_mul (v : Primes(F)) (f : 𝒮ₐ(v.adicCompletion F))
+    (a : (v.adicCompletion F)ˣ)
+    (hint : Integrable (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) *
+      tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y) ν𝔭(v)) :
+    Integrable (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) *
+      tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) (a.val * y)) ν𝔭(v) ∧
+    (∫ y, ((J𝔭(v) y : ℝ) : ℂ) * tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) (a.val * y) ∂ν𝔭(v)) =
+      (‖a.val‖⁻¹ : ℝ) • ((∫ y, ((J𝔭(v) y : ℝ) : ℂ) *
+        tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y ∂ν𝔭(v)) -
+        ((Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * addTest(f) 0) := by
+  let : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let : (ν𝔭(v)).IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  obtain ⟨hFI, hF0⟩ := finiteLocal_integral_tamagawaFourier v f
+  let L : ℂ := ((Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ)
+  let φ := tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f)
+  let h : v.adicCompletion F → ℂ := fun z ↦ (((J𝔭(v) z : ℝ) : ℂ) - L) * φ z
+  have hh : Integrable h ν𝔭(v) := by
+    refine (hint.sub (hFI.const_mul L)).congr (ae_of_all _ fun z ↦ ?_)
+    simp only [Pi.sub_apply, h, sub_mul]
+    rfl
+  have hae : (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) * φ (a.val * y)) =ᵐ[ν𝔭(v)]
+      fun y ↦ h (a.val * y) := by
+    have h0 : ∀ᵐ y ∂ν𝔭(v), y ≠ 0 := by
+      have : (𝓝[≠] (0 : v.adicCompletion F)).NeBot := by
+        let := Valued.toNontriviallyNormedField (v.adicCompletion F) _
+        exact NormedField.nhdsNE_neBot 0
+      rw [ae_iff]
+      simp
+    filter_upwards [h0] with y hy0
+    simp only [h, finiteLog_mul v a hy0, L, add_sub_cancel_right]
+  refine ⟨(finiteLocalAdditive_integrable_comp_mul v a hh).congr hae.symm, ?_⟩
+  rw [integral_congr_ae hae, finiteLocalAdditive_integral_comp_mul v a h]
+  congr 1
+  simp only [h, sub_mul]
+  rw [integral_sub hint (hFI.const_mul L), integral_const_mul]
+  change _ - L * ∫ y, φ y ∂ν𝔭(v) = _
+  rw [hF0]
+
+/-- Multiplicative integrability on the units is additive integrability against the
+inverse norm. -/
+private theorem finiteLocal_units_integrable_iff (v : Primes(F)) {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] (g : v.adicCompletion F → E) :
+    Integrable (fun u : (v.adicCompletion F)ˣ ↦ g u.val) μ𝔭(v) ↔
+      Integrable (fun y ↦ ‖y‖⁻¹ • g y) ν𝔭(v) := by
+  let K := v.adicCompletion F
+  let : BorelSpace K := ⟨rfl⟩
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).measurableEmbedding
+  let c : ENNReal := (↑v.asIdeal.absNorm / (↑v.asIdeal.absNorm - 1) : ENNReal)
+  let d : K → ENNReal := fun x ↦ (↑‖x‖₊ : ENNReal)⁻¹
+  have hd : Measurable d := by fun_prop
+  have hdlt : ∀ᵐ y ∂(ν𝔭(v).restrict (range (Units.val : Kˣ → K))), d y < ⊤ := by
+    refine ae_restrict_of_forall_mem hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    exact ENNReal.inv_lt_top.mpr (by simp [← hu])
+  have hdy (y : K) : (d y).toReal = ‖y‖⁻¹ := by
+    rw [ENNReal.toReal_inv, ENNReal.coe_toReal, coe_nnNorm]
+  have hq : (1 : ENNReal) < v.asIdeal.absNorm := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hc0 : c ≠ 0 :=
+    (ENNReal.div_pos (zero_lt_one.trans hq).ne' (ENNReal.sub_ne_top (ENNReal.natCast_ne_top _))).ne'
+  have hct : c ≠ ⊤ :=
+    (ENNReal.div_lt_top (ENNReal.natCast_ne_top _) (tsub_pos_of_lt hq).ne').ne
+  have hsupp : support (fun y ↦ ‖y‖⁻¹ • g y) ⊆ range (Units.val : Kˣ → K) := by
+    intro y hy
+    have : y ≠ 0 := by rintro rfl; simp at hy
+    exact ⟨Units.mk0 y this, rfl⟩
+  rw [finiteLocalMultiplicativeTamagawaMeasure_eq_withDensity]
+  rw [integrable_smul_measure hc0 hct, show (fun u : Kˣ ↦ g u.val) = g ∘ Units.val from rfl,
+    ← hval.integrable_map_iff (g := g), hval.map_comap,
+    restrict_withDensity hval.measurableSet_range,
+    integrable_withDensity_iff_integrable_smul' hd hdlt,
+    ← integrableOn_iff_integrable_of_support_subset hsupp]
+  simp_rw [hdy]
+  rfl
+
+/-- The Fourier transform of an additive test is again an additive test. -/
+private theorem finiteLocal_exists_fourier_test (v : Primes(F)) (f : 𝒮ₐ(v.adicCompletion F)) :
+    ∃ g : 𝒮ₐ(v.adicCompletion F), ∀ y,
+      addTest(g) y = tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y := by
+  let K := v.adicCompletion F
+  let G := Multiplicative K
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : BorelSpace K := ⟨rfl⟩
+  obtain ⟨e, he, -⟩ := finiteLocalAdditiveTamagawaMeasure_selfDual F v
+  let μ : Measure G := ν𝔭(v)
+  have hHaar := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hHaar.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hHaar.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hHaar.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := finiteLocalAdditiveTamagawaMeasure_regular F v
+  obtain ⟨T, hT⟩ := schwartzBruhat_fourier_equiv μ
+  obtain ⟨P, hP⟩ := exists_schwartzBruhat_comp_equivCLM e
+  refine ⟨P (T f), fun y ↦ ?_⟩
+  calc P (T f) (Multiplicative.ofAdd y) = T f (e (Multiplicative.ofAdd y)) := hP _ _
+    _ = lcaFourier μ f (e (Multiplicative.ofAdd y)) := (hT f).2 _
+    _ = _ := (tamagawaFourier_eq_lcaFourier _ _ _ y _ fun x ↦ (he y x).trans
+      (congrArg _ (mul_comm y x))).symm
+
+/-- The logarithm of the norm is dominated by the sum of two square-root weights. -/
+private theorem abs_log_le_two_mul_rpow {t : ℝ} (ht : 0 < t) :
+    |Real.log t| ≤ 2 * (t⁻¹ * t ^ (1 / 2 : ℝ) + t⁻¹ * t ^ (3 / 2 : ℝ)) := by
+  have e1 : t⁻¹ * t ^ (1 / 2 : ℝ) = t⁻¹ ^ (1 / 2 : ℝ) := by
+    rw [Real.inv_rpow ht.le, ← Real.rpow_neg_one, ← Real.rpow_add ht, ← Real.rpow_neg ht.le]
+    norm_num
+  have e2 : t⁻¹ * t ^ (3 / 2 : ℝ) = t ^ (1 / 2 : ℝ) := by
+    rw [← Real.rpow_neg_one, ← Real.rpow_add ht]
+    norm_num
+  rw [e1, e2]
+  have h1 := Real.log_le_rpow_div ht.le (show (0 : ℝ) < 1 / 2 by norm_num)
+  have h2 := Real.log_le_rpow_div (inv_pos.mpr ht).le (show (0 : ℝ) < 1 / 2 by norm_num)
+  rw [Real.log_inv] at h2
+  have p1 : 0 ≤ t ^ (1 / 2 : ℝ) := Real.rpow_nonneg ht.le _
+  have p2 : 0 ≤ t⁻¹ ^ (1 / 2 : ℝ) := Real.rpow_nonneg (inv_pos.mpr ht).le _
+  rw [abs_le]
+  constructor <;> linarith
+
+/-- The normalized logarithm is integrable against every additive test. -/
+private theorem finiteLog_integrable_mul_test (v : Primes(F)) (g : 𝒮ₐ(v.adicCompletion F)) :
+    Integrable (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) * addTest(g) y) ν𝔭(v) := by
+  let K := v.adicCompletion F
+  let : BorelSpace K := ⟨rfl⟩
+  let : ProperSpace K := properSpace_adicCompletion v
+  let h : K → ℂ := addTest(g)
+  have hh : Continuous h := (schwartzBruhat_continuous g).comp continuous_ofAdd
+  have hw (s : ℝ) (hs : 0 < s) :
+      Integrable (fun y : K ↦ ‖y‖⁻¹ • (‖h y‖ * ‖y‖ ^ s)) ν𝔭(v) := by
+    refine (finiteLocal_units_integrable_iff v (fun y : K ↦ ‖h y‖ * ‖y‖ ^ s)).mp ?_
+    have hz := finiteLocalIdelicZetaIntegral_integrable v g 1 (s := (s : ℂ)) (by simpa using hs)
+    refine hz.norm.congr (ae_of_all _ fun u ↦ ?_)
+    change ‖h u.val * _‖ = ‖h u.val‖ * ‖u.val‖ ^ s
+    rw [norm_mul]
+    congr 1
+    change ‖((1 : PontryaginDual Kˣ) u : ℂ) *
+      ((((Units.map (nnNormHom : K →*₀ ℝ≥0).toMonoidHom u : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ (s : ℂ)‖ = _
+    rw [norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+      Complex.ofReal_re]
+    rfl
+  have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hlq : 0 < Real.log q(v) := Real.log_pos hq
+  refine (((hw _ (by norm_num : (0 : ℝ) < 1 / 2)).add
+    (hw _ (by norm_num : (0 : ℝ) < 3 / 2))).const_mul (2 / Real.log q(v))).mono' ?_
+    (ae_of_all _ fun y ↦ ?_)
+  · exact (Measurable.aestronglyMeasurable (by fun_prop)).mul hh.aestronglyMeasurable
+  · simp only [Pi.add_apply, smul_eq_mul]
+    rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_div, abs_of_pos hlq]
+    rcases eq_or_ne y 0 with rfl | hy
+    · simp
+    have ht : 0 < ‖y‖ := norm_pos_iff.mpr hy
+    have hl := abs_log_le_two_mul_rpow ht
+    calc |Real.log ‖y‖| / Real.log q(v) * ‖h y‖
+        ≤ 2 * (‖y‖⁻¹ * ‖y‖ ^ (1 / 2 : ℝ) + ‖y‖⁻¹ * ‖y‖ ^ (3 / 2 : ℝ)) / Real.log q(v) * ‖h y‖ := by
+          gcongr
+      _ = _ := by ring
+
+end LocalScaling
+
 section LocalFourier
 
 /-- Paper: Proposition B.4.3.1(1), p. 617. Dilation of the additive test
@@ -568,7 +893,41 @@ theorem finiteLogFourier_dilate (v : Primes(F)) (f : 𝒮ₐ(v.adicCompletion F)
       Integrable (K addTest(f)) ν𝔭(v) ∧
       (∫ y, K (addTest(f) ∘ (fun x ↦ a.inv * x)) y ∂ν𝔭(v)) =
         (∫ y, K addTest(f) y ∂ν𝔭(v)) -
-          (Real.log ‖a.val‖ / Real.log q(v) : ℝ) * addTest(f) 0 := by sorry
+          (Real.log ‖a.val‖ / Real.log q(v) : ℝ) * addTest(f) 0 := by
+  intro K
+  let : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let φ := tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f)
+  obtain ⟨g, hg⟩ := finiteLocal_exists_fourier_test v f
+  have hint : Integrable (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) * φ y) ν𝔭(v) :=
+    (finiteLog_integrable_mul_test v g).congr (ae_of_all _ fun y ↦ by
+      simp only [hg]; rfl)
+  obtain ⟨hI, hEq⟩ := finiteLogFourier_comp_mul v f a hint
+  -- Fourier transform of the dilated test.
+  have hFT (y : v.adicCompletion F) :
+      tamagawaFourier ν𝔭(v) ψ𝔭(v) (addTest(f) ∘ (fun x ↦ a.inv * x)) y =
+        ((‖a.val‖ : ℝ) : ℂ) * φ (a.val * y) := by
+    have h := finiteLocalAdditive_integral_comp_mul v a⁻¹
+      (fun z ↦ addTest(f) z * star (ψ𝔭(v) (z * (a.val * y)) : ℂ))
+    rw [Units.val_inv_eq_inv_val, norm_inv, inv_inv, Complex.real_smul] at h
+    unfold tamagawaFourier
+    refine Eq.trans ?_ h
+    refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+    have hx : (a.val)⁻¹ * x * (a.val * y) = x * y := by
+      rw [mul_mul_mul_comm, inv_mul_cancel₀ a.ne_zero, one_mul]
+    have ha : a.inv = (a.val)⁻¹ := Units.val_inv_eq_inv_val a
+    simp only [Function.comp_apply]
+    rw [hx, ha]
+  have hK (y : v.adicCompletion F) : K (addTest(f) ∘ (fun x ↦ a.inv * x)) y =
+      ((‖a.val‖ : ℝ) : ℂ) * (((J𝔭(v) y : ℝ) : ℂ) * φ (a.val * y)) := by
+    change ((J𝔭(v) y : ℝ) : ℂ) * tamagawaFourier ν𝔭(v) ψ𝔭(v)
+      (addTest(f) ∘ (fun x ↦ a.inv * x)) y = _
+    rw [hFT]
+    ring
+  have hne : ((‖a.val‖ : ℝ) : ℂ) ≠ 0 := by
+    exact_mod_cast (norm_pos_iff.mpr a.ne_zero).ne'
+  refine ⟨(hI.const_mul _).congr (ae_of_all _ fun y ↦ (hK y).symm), hint, ?_⟩
+  rw [integral_congr_ae (ae_of_all _ hK), integral_const_mul, hEq, Complex.real_smul,
+    ← mul_assoc, Complex.ofReal_inv, mul_inv_cancel₀ hne, one_mul]
 
 /-- Paper: Proposition B.4.3.1(2), p. 617. On additive tests vanishing at
 zero, the Fourier transform is minus multiplicative Haar measure divided by
@@ -777,20 +1136,825 @@ theorem realConnesPrincipalValue_of_apply_zero (w : InfinitePlace F) (_hw : w.Is
   rw [hT, tendsto_nhds_unique hlim hL]
   ring
 
+/-- Good subgroups of the units of a finite completion are open, because the dual
+quotient is locally connected and totally disconnected. -/
+private theorem finiteUnits_goodSubgroup_isOpen (v : Primes(F))
+    (k : Subgroup (v.adicCompletion F)ˣ) (hk : IsBruhatGoodSubgroup k) :
+    IsOpen (k : Set (v.adicCompletion F)ˣ) := by
+  let G := (v.adicCompletion F)ˣ
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator k, hk.2⟩
+  obtain ⟨γ, _, hγ, hker, _⟩ := lca_dualSubgroup_quotient A
+  let Q := PontryaginDual A.val
+  let : LocallyCompactSpace A.val := A.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨n, ⟨charts⟩⟩ := isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp A.property.2
+  let : ChartedSpace (EuclideanSpace ℝ (Fin n)) Q := charts
+  let : LocallyConnectedSpace Q := ChartedSpace.locallyConnectedSpace (EuclideanSpace ℝ (Fin n)) Q
+  let B : OpenSubgroup G :=
+    ⟨(v.adicCompletionIntegers F).units, Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)⟩
+  let : CompactSpace B.toSubgroup := isCompact_iff_compactSpace.mp
+    (Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)))
+  let j : B.toSubgroup → v.adicCompletion F := Units.val ∘ Subtype.val
+  have hj : Topology.IsEmbedding j :=
+    (Units.isEmbedding_val₀ (G₀ := v.adicCompletion F)).comp Topology.IsEmbedding.subtypeVal
+  let η : B.toSubgroup →ₜ* Q := γ.comp ⟨B.toSubgroup.subtype, continuous_subtype_val⟩
+  have hη : Continuous η := η.continuous
+  have hηOpen : IsOpenMap η := hγ.isOpenMap.comp B.isOpen.isOpenEmbedding_subtypeVal.isOpenMap
+  have hSmall (U : Set Q) (hU : U ∈ 𝓝 (1 : Q)) : ∃ V : OpenSubgroup Q, (V : Set Q) ⊆ U := by
+    have hpre : η ⁻¹' U ∈ 𝓝 (1 : B.toSubgroup) :=
+      hη.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+    rw [hj.isInducing.nhds_eq_comap] at hpre
+    obtain ⟨S, hS, hSsub⟩ := mem_comap.mp hpre
+    let ν : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨r, hr⟩ := (Valued.mem_nhds (Γ₀ := WithZero (Multiplicative ℤ))).mp hS
+    let W := (fun x : B.toSubgroup ↦ j x - j 1) ⁻¹' {y | ν.restrict y < r.val}
+    have hW : IsClopen W :=
+      (Valued.isClopen_ball (v.adicCompletion F) r.val).preimage
+        (hj.continuous.sub continuous_const)
+    have h1W : (1 : B.toSubgroup) ∈ W := by
+      change ν.restrict (j 1 - j 1) < r.val
+      rw [sub_self, map_zero]
+      exact pos_iff_ne_zero.mpr r.ne_zero
+    obtain ⟨V, hV⟩ := IsTopologicalGroup.exist_openSubgroup_sub_clopen_nhds_of_one hW h1W
+    refine ⟨⟨V.toSubgroup.map η.toMonoidHom, hηOpen _ V.isOpen⟩, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    exact hSsub (hr (hV hx))
+  have hComponent : connectedComponent (1 : Q) = {1} := by
+    refine subset_antisymm ?_ (singleton_subset_iff.mpr mem_connectedComponent)
+    intro y hy
+    by_contra hne
+    have h1y : (1 : Q) ∈ ({y} : Set Q)ᶜ :=
+      fun h ↦ hne (mem_singleton_iff.mpr (mem_singleton_iff.mp h).symm)
+    obtain ⟨V, hV⟩ := hSmall _ (isOpen_compl_singleton.mem_nhds h1y)
+    have hyV := isPreconnected_connectedComponent.subset_isClopen V.isClopen
+      ⟨1, mem_connectedComponent, V.one_mem⟩ hy
+    exact (hV hyV) (mem_singleton y)
+  have hOne : IsOpen ({1} : Set Q) := hComponent ▸ isOpen_connectedComponent
+  rw [← lcaDualAnnihilator_annihilator k hk.1, ← hker]
+  exact hOne.preimage γ.continuous
+
+/-- A test function on the units of a finite completion is locally constant. -/
+private theorem finiteUnits_test_isLocallyConstant (v : Primes(F))
+    (f : 𝒟((v.adicCompletion F)ˣ)) : IsLocallyConstant f.val := by
+  have hf : IsBruhatSmooth f.val := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1
+  obtain ⟨k, hk, hInv, _⟩ := hf 0
+  have hkOpen := finiteUnits_goodSubgroup_isOpen v k hk
+  refine (IsLocallyConstant.iff_exists_open _).2 fun x ↦ ?_
+  refine ⟨(fun y ↦ y * x⁻¹) ⁻¹' (k : Set _),
+    hkOpen.preimage (by fun_prop : Continuous fun y : (v.adicCompletion F)ˣ ↦ y * x⁻¹), by simp [k.one_mem], fun y hy ↦ ?_⟩
+  simpa using hInv ⟨_, hy⟩ x
+
+/-- The norm on the units of a finite completion is locally constant. -/
+private theorem finiteUnits_norm_isLocallyConstant (v : Primes(F)) :
+    IsLocallyConstant (fun u : (v.adicCompletion F)ˣ ↦ ‖u.val‖) := by
+  refine (IsLocallyConstant.iff_exists_open _).2 fun u ↦ ?_
+  refine ⟨(fun w : (v.adicCompletion F)ˣ ↦ w.val) ⁻¹' {y | ‖y - u.val‖ < ‖u.val‖},
+    (isOpen_lt (continuous_norm.comp (continuous_id.sub continuous_const)) continuous_const).preimage
+      Units.continuous_val, ?_, fun w hw ↦ ?_⟩
+  · change ‖u.val - u.val‖ < ‖u.val‖
+    rw [sub_self, norm_zero]
+    exact norm_pos_iff.mpr u.ne_zero
+  have hw' : ‖w.val - u.val‖ < ‖u.val‖ := hw
+  have hne : ‖w.val - u.val‖ ≠ ‖u.val‖ := hw'.ne
+  have h := IsUltrametricDist.norm_add_eq_max_of_norm_ne_norm hne
+  rw [sub_add_cancel, max_eq_right hw'.le] at h
+  exact h
+
+/-- The zero extension of a locally constant compactly supported function on the units
+of a finite completion is locally constant and compactly supported. -/
+private theorem finiteUnits_extend_regular (v : Primes(F)) (h : (v.adicCompletion F)ˣ → ℂ)
+    (hl : IsLocallyConstant h) (hc : HasCompactSupport h) :
+    IsLocallyConstant (Function.extend Units.val h (fun _ ↦ (0 : ℂ))) ∧
+      HasCompactSupport (Function.extend Units.val h (fun _ ↦ (0 : ℂ))) := by
+  have he : Topology.IsOpenEmbedding (Units.val : (v.adicCompletion F)ˣ → v.adicCompletion F) :=
+    Units.isOpenEmbedding_val
+  let E : v.adicCompletion F → ℂ := Function.extend Units.val h (fun _ ↦ (0 : ℂ))
+  have hEu (u : (v.adicCompletion F)ˣ) : E u.val = h u := Units.val_injective.extend_apply h _ u
+  let T := Units.val '' tsupport h
+  have hT : IsCompact T := hc.image he.continuous
+  have hE0 (y : v.adicCompletion F) (hy : y ∉ T) : E y = 0 := by
+    by_cases hr : ∃ u : (v.adicCompletion F)ˣ, u.val = y
+    · obtain ⟨u, rfl⟩ := hr
+      rw [hEu]
+      exact image_eq_zero_of_notMem_tsupport (fun hu ↦ hy ⟨u, hu, rfl⟩)
+    · exact extend_apply' _ _ _ hr
+  refine ⟨(IsLocallyConstant.iff_exists_open _).2 fun y ↦ ?_,
+    HasCompactSupport.of_support_subset_isCompact hT fun y hy ↦ by_contra fun h' ↦ hy (hE0 y h')⟩
+  by_cases hy : y ∈ T
+  · obtain ⟨u, -, rfl⟩ := hy
+    obtain ⟨U, hU, huU, hconst⟩ := (IsLocallyConstant.iff_exists_open _).1 hl u
+    refine ⟨Units.val '' U, he.isOpenMap _ hU, ⟨u, huU, rfl⟩, ?_⟩
+    rintro _ ⟨w, hw, rfl⟩
+    change E w.val = E u.val
+    rw [hEu, hEu]
+    exact hconst w hw
+  · refine ⟨Tᶜ, hT.isClosed.isOpen_compl, hy, fun z hz ↦ ?_⟩
+    change E z = E y
+    rw [hE0 z hz, hE0 y hy]
+
+/-- A fixed-support stage is finite-dimensional when the good subgroup of its structural
+pair is open: the compact support then meets finitely many of its cosets. -/
+private theorem bruhatCompactSupportStage_finiteDimensional_of_isOpen {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (C : TopologicalSpace.Compacts G) (hk : IsOpen ((OrderDual.ofDual a.val.2 : Subgroup G) : Set G)) :
+    FiniteDimensional ℂ (bruhatCompactSupportStage a e C) := by
+  classical
+  let k := OrderDual.ofDual a.val.2
+  let R := schwartzBruhatStageRealization a e
+  have hinv (s : SchwartzBruhatStage e) (h : G) (hh : h ∈ k) (x : G) : R s (h * x) = R s x :=
+    stage_realization_mul_kernel a e s hh x
+  have hRinj (s : SchwartzBruhatStage e) (hs : ∀ x, R s x = 0) : s = 0 := by
+    let s' : elementarySchwartzSubmodule e.realDim e.torusDim e.latticeRank e.finiteFactor := s
+    change s' = 0
+    refine Subtype.ext (funext fun p ↦ ?_)
+    let q : a.quotient := e.equiv.symm (Multiplicative.ofAdd p)
+    let x : a.val.1 := q.out
+    have hxq : (QuotientGroup.mk x : a.quotient) = q := QuotientGroup.out_eq' q
+    have h0 : R s x.val = 0 := hs x.val
+    rw [schwartzBruhatStageRealization_apply, dite_eq_left x.property] at h0
+    change s (Multiplicative.toAdd (e.equiv (QuotientGroup.mk x))) = 0 at h0
+    have h1 := congrArg (fun r : a.quotient ↦ s (Multiplicative.toAdd (e.equiv r))) hxq
+    have h2 : e.equiv q = Multiplicative.ofAdd p := e.equiv.apply_symm_apply _
+    simp only [h2] at h1
+    rw [Submodule.coe_zero]
+    exact h1.symm.trans h0
+  have hcov : (C : Set G) ⊆ ⋃ y : G, (fun z ↦ z * y⁻¹) ⁻¹' (k : Set G) := fun z _ ↦
+    mem_iUnion.mpr ⟨z, show z * z⁻¹ ∈ k by rw [mul_inv_cancel]; exact k.one_mem⟩
+  have hfin := C.isCompact.elim_finite_subcover
+    (fun y : G ↦ (fun z ↦ z * y⁻¹) ⁻¹' (k : Set G))
+    (fun y ↦ hk.preimage (continuous_id.mul continuous_const)) hcov
+  let t := hfin.choose
+  have ht := hfin.choose_spec
+  let X := bruhatCompactSupportStage a e C
+  let Ψ : bruhatCompactSupportStage a e C →ₗ[ℂ] (t → ℂ) :=
+    LinearMap.pi fun y ↦ (LinearMap.proj y.val).comp (R.comp (bruhatCompactSupportStage a e C).subtype)
+  have hΨ : Function.Injective Ψ := by
+    rw [← LinearMap.ker_eq_bot, LinearMap.ker_eq_bot']
+    intro s hs
+    refine Subtype.ext ((hRinj s.val fun x ↦ ?_).trans (Submodule.coe_zero (p := X)).symm)
+    by_cases hxC : x ∈ (C : Set G)
+    · obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp (ht hxC)
+      have h0 : R s.val y = 0 := congrFun hs ⟨y, hy⟩
+      have h1 := hinv s.val (x * y⁻¹) hxy y
+      rw [inv_mul_cancel_right] at h1
+      rw [h1, h0]
+    · exact image_eq_zero_of_notMem_tsupport fun h ↦
+        hxC ((mem_bruhatCompactSupportStage_iff a e C s.val).1 s.property h)
+  exact Module.Finite.of_injective Ψ hΨ
+
+/-- A fixed-support stage of test functions on the units of a finite completion is
+finite-dimensional, since good subgroups of the units are open. -/
+private theorem finiteUnits_stage_finiteDimensional (v : Primes(F))
+    (a : BruhatStructuralPair (v.adicCompletion F)ˣ) (e : ElementaryLCAPresentation a.quotient)
+    (C : TopologicalSpace.Compacts (v.adicCompletion F)ˣ) :
+    FiniteDimensional ℂ (bruhatCompactSupportStage a e C) :=
+  bruhatCompactSupportStage_finiteDimensional_of_isOpen a e C
+    (finiteUnits_goodSubgroup_isOpen v _ a.property.2.2.1)
+
 /-- Paper: Definition B.4.4.1(2), p. 620. Translation of the zero-extended
 test after inverse square-root weighting gives a continuous linear map to additive tests. -/
 theorem exists_finiteWeilTestMap (v : Primes(F)) :
     ∃ A : 𝒟((v.adicCompletion F)ˣ) →L[ℂ] 𝒮ₐ(v.adicCompletion F),
       ∀ (f : 𝒟((v.adicCompletion F)ˣ)) (x : v.adicCompletion F),
-        addTest(A f) x = weightedTranslate(norm, f.val) x := by sorry
+        addTest(A f) x = weightedTranslate(norm, f.val) x := by
+  let K := v.adicCompletion F
+  let G := Kˣ
+  let wt (f : 𝒟(G)) : G → ℂ := fun u ↦ f.val u / (Real.sqrt ‖u.val‖ : ℂ)
+  let Φ (f : 𝒟(G)) : K → ℂ := fun x ↦ Function.extend Units.val (wt f) (fun _ ↦ (0 : ℂ)) (1 + x)
+  have hΦ (f : 𝒟(G)) (x : K) : Φ f x = weightedTranslate(norm, f.val) x := by
+    change Function.extend Units.val (wt f) (fun _ ↦ (0 : ℂ)) (1 + x) =
+      Function.extend Units.val f.val (fun _ ↦ (0 : ℂ)) (1 + x) / (Real.sqrt ‖1 + x‖ : ℂ)
+    by_cases hr : ∃ u : G, u.val = 1 + x
+    · obtain ⟨u, hu⟩ := hr
+      rw [← hu, Units.val_injective.extend_apply, Units.val_injective.extend_apply]
+    · rw [extend_apply' _ _ _ hr, extend_apply' _ _ _ hr, zero_div]
+  have hreg (f : 𝒟(G)) : IsLocallyConstant (Φ f) ∧ HasCompactSupport (Φ f) := by
+    have hl : IsLocallyConstant (wt f) := (finiteUnits_test_isLocallyConstant v f).comp₂
+      ((finiteUnits_norm_isLocallyConstant v).comp fun t ↦ ((Real.sqrt t : ℝ) : ℂ)) (· / ·)
+    have hc : HasCompactSupport (wt f) := HasCompactSupport.mono f.property.2 fun u hu h0 ↦ hu (by
+      change f.val u / _ = 0
+      rw [h0, zero_div])
+    obtain ⟨hEl, hEc⟩ := finiteUnits_extend_regular v (wt f) hl hc
+    exact ⟨hEl.comp_continuous (continuous_const.add continuous_id),
+      hEc.comp_homeomorph (Homeomorph.addLeft (1 : K))⟩
+  have hmem (f : 𝒟(G)) : (fun y : Multiplicative K ↦ Φ f y.toAdd) ∈
+      schwartzBruhatSubmodule (Multiplicative K) := by
+    obtain ⟨g, hg⟩ := (mem_finitePlaceSchwartz_iff F v (Φ f)).mpr (hreg f)
+    have hgf : (fun y : Multiplicative K ↦ Φ f y.toAdd) = (g : Multiplicative K → ℂ) :=
+      funext fun y ↦ (hg y.toAdd).symm
+    rw [hgf]
+    exact (show schwartzBruhatSubmodule (Multiplicative K) from g).property
+  have hadd (f g : 𝒟(G)) (x : K) : Φ (f + g) x = Φ f x + Φ g x := by
+    by_cases hr : ∃ u : G, u.val = 1 + x
+    · obtain ⟨u, hu⟩ := hr
+      simp only [Φ, ← hu, Units.val_injective.extend_apply]
+      exact add_div _ _ _
+    · simp only [Φ, extend_apply' _ _ _ hr, add_zero]
+  have hsmul (c : ℂ) (f : 𝒟(G)) (x : K) : Φ (c • f) x = c • Φ f x := by
+    by_cases hr : ∃ u : G, u.val = 1 + x
+    · obtain ⟨u, hu⟩ := hr
+      simp only [Φ, ← hu, Units.val_injective.extend_apply]
+      exact mul_div_assoc _ _ _
+    · simp only [Φ, extend_apply' _ _ _ hr, smul_zero]
+  let Φlin : 𝒟(G) →ₗ[ℂ] (Multiplicative K → ℂ) :=
+    { toFun := fun f y ↦ Φ f y.toAdd
+      map_add' := fun f g ↦ funext fun y ↦ hadd f g y.toAdd
+      map_smul' := fun c f ↦ funext fun y ↦ hsmul c f y.toAdd }
+  let L : 𝒟(G) →ₗ[ℂ] 𝒮ₐ(K) := Φlin.codRestrict _ hmem
+  have hcont : Continuous L := by
+    let P := {q : Seminorm ℂ (bruhatCompactSupportSubmodule G) //
+      ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+        (C : TopologicalSpace.Compacts G), Continuous (q ∘ bruhatCompactSupportStageInclusion a e C)}
+    refine (PolynormableSpace.withSeminorms ℂ (𝒮ₐ(K))).continuous_of_continuous_comp L fun p ↦
+      (withGeneratingSeminorms_spec _ (Subtype.val : P → _)).continuous_seminorm
+        (⟨p.val.comp L, ?_⟩ : P)
+    intro a e C
+    let X := bruhatCompactSupportStage a e C
+    let : FiniteDimensional ℂ X := finiteUnits_stage_finiteDimensional v a e C
+    let : T2Space (SchwartzBruhatStage e) := elementarySchwartz_t2
+    let : ContinuousSMul ℂ (SchwartzBruhatStage e) :=
+      elementarySchwartz_withSeminorms.continuousSMul
+    let : ContinuousSMul ℂ 𝒮ₐ(K) := (PolynormableSpace.withSeminorms ℂ _).continuousSMul
+    let M : X →ₗ[ℂ] 𝒮ₐ(K) :=
+      L.comp (show X →ₗ[ℂ] 𝒟(G) from bruhatCompactSupportStageInclusion a e C)
+    exact p.property.comp M.continuous_of_finiteDimensional
+  exact ⟨⟨L, hcont⟩, fun f x ↦ hΦ f x⟩
+
+/-- Closed graph theorem from a closed subspace of a Fréchet space to a Fréchet space. -/
+private theorem weilTest_continuous_of_isClosed_graph {E Y : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [T2Space E]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [ContinuousSMul ℂ Y]
+    (hE : IsFrechetTVS E) (hY : IsFrechetTVS Y) (S : Submodule ℂ E) (hS : IsClosed (S : Set E))
+    (T : S →ₗ[ℂ] Y) (hT : IsClosed (T.graph : Set (S × Y))) : Continuous T := by
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace E := hE.2.2.2
+  have : CompleteSpace Y := hY.2.2.2
+  have : TopologicalSpace.MetrizableSpace E := hE.2.2.1
+  have : TopologicalSpace.MetrizableSpace Y := hY.2.2.1
+  have : CompleteSpace S := completeSpace_coe_iff_isComplete.mpr hS.isComplete
+  have : IsUniformAddGroup S := S.toAddSubgroup.isUniformAddGroup
+  let Γ := T.graph
+  have : CompleteSpace Γ := completeSpace_coe_iff_isComplete.mpr hT.isComplete
+  have : IsUniformAddGroup Γ := Γ.toAddSubgroup.isUniformAddGroup
+  have : TopologicalSpace.MetrizableSpace S :=
+    inferInstanceAs (TopologicalSpace.MetrizableSpace (S : Set E))
+  have : TopologicalSpace.MetrizableSpace (S × Y) := inferInstance
+  have : TopologicalSpace.MetrizableSpace Γ :=
+    inferInstanceAs (TopologicalSpace.MetrizableSpace (Γ : Set (S × Y)))
+  have : FirstCountableTopology Γ := inferInstance
+  have : FirstCountableTopology S := inferInstance
+  have : (uniformity S).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : BaireSpace S := BaireSpace.of_completelyPseudoMetrizable
+  let P : Γ →L[ℂ] S := (ContinuousLinearMap.fst ℂ S Y).comp Γ.subtypeL
+  have hmem (x : S) : (x, T x) ∈ Γ := (LinearMap.mem_graph_iff _ _).mpr rfl
+  have hval (p : Γ) : p.val.2 = T p.val.1 := (LinearMap.mem_graph_iff _ _).mp p.property
+  have hinj : Injective P := fun p q h ↦ by
+    have h1 : p.val.1 = q.val.1 := h
+    exact Subtype.ext (Prod.ext h1 (by rw [hval, hval, h1]))
+  have hsurj : Surjective P := fun x ↦ ⟨⟨(x, T x), hmem x⟩, rfl⟩
+  have ho : IsOpenMap P := by
+    apply isOpenMap_of_not_isMeagre_range P
+    rw [hsurj.range_eq]
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+  let h : Γ ≃ₜ S :=
+    (Equiv.ofBijective P ⟨hinj, hsurj⟩).toHomeomorphOfContinuousOpen P.continuous ho
+  refine (continuous_snd.comp (continuous_subtype_val.comp h.symm.continuous)).congr fun x ↦ ?_
+  have h1 : (h.symm x).val.1 = x := h.apply_symm_apply x
+  change (h.symm x).val.2 = T x
+  rw [hval, h1]
+
+/-- A real vector coordinate gives a structural pair with trivial kernel and whole
+open subgroup, presented by the real vector group. -/
+private theorem weilTest_vectorPresentation {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] {d : ℕ}
+    (c : G ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin d))) :
+    ∃ a : BruhatStructuralPair G, ∃ (hm : ∀ x : G, x ∈ a.val.1)
+        (w : a.quotient ≃ₜ* Multiplicative (ElementaryLieGroup d 0 0 PUnit)),
+        ∀ x : G, (w (QuotientGroup.mk ⟨x, hm x⟩)).toAdd.1 = (c x).toAdd := by
+  have : ConnectedSpace (Multiplicative (EuclideanSpace ℝ (Fin d))) :=
+    inferInstanceAs (ConnectedSpace (EuclideanSpace ℝ (Fin d)))
+  have : ConnectedSpace G := c.symm.surjective.connectedSpace c.symm.continuous
+  let chart : EuclideanSpace ℝ (Fin d) ≃ₜ G := c.symm.toHomeomorph
+  have hgood : IsBruhatGoodSubgroup (⊥ : Subgroup G) :=
+    isBruhatGoodSubgroup_bot_iff.mpr ⟨d, ⟨chart.chartedSpace⟩⟩
+  let H : Subgroup G := ⊤
+  let i : G ≃ₜ* H :=
+    ⟨Subgroup.topEquiv.symm, continuous_id.subtype_mk _, continuous_subtype_val⟩
+  have htop : IsOpen (H : Set G) := isOpen_univ
+  let : ConnectedSpace H := i.surjective.connectedSpace i.continuous
+  let : LocallyCompactSpace H := htop.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  have hgen : IsCompactlyGeneratedGroup H := by
+    obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : H)
+    have hOpen : IsOpen (Subgroup.closure U : Set H) :=
+      Subgroup.isOpen_of_mem_nhds _ (mem_of_superset hU Subgroup.subset_closure)
+    exact ⟨U, hU, hUc, SetLike.coe_injective
+      ((OpenSubgroup.isClopen ⟨Subgroup.closure U, hOpen⟩).eq_univ ⟨1, Subgroup.one_mem _⟩)⟩
+  let a : BruhatStructuralPair G := ⟨(H, OrderDual.toDual ⊥), htop, hgen, hgood, bot_le⟩
+  have hmem (x : G) : x ∈ a.val.1 := Subgroup.mem_top x
+  let p := (QuotientGroup.mk' _ : H →* a.quotient).comp i.toMulEquiv.toMonoidHom
+  have hp : IsOpenQuotientMap p :=
+    QuotientGroup.isOpenQuotientMap_mk.comp i.toHomeomorph.isOpenQuotientMap
+  have hinj : Injective p := (MonoidHom.ker_eq_bot_iff p).mp (le_antisymm (fun x hx ↦ by
+    change (QuotientGroup.mk (i x) : a.quotient) = 1 at hx
+    exact (a.quotient_mk_eq_one (i x)).mp hx) bot_le)
+  let q := (MulEquiv.ofBijective p ⟨hinj, hp.surjective⟩).toContinuousMulEquiv
+    (fun _ ↦ hp.isQuotientMap.isOpen_preimage)
+  let : Unique ((Fin 0 → AddCircle (1 : ℝ)) × (Fin 0 → ℤ) × PUnit) := uniqueOfSubsingleton 0
+  let w : Multiplicative (ElementaryLieGroup d 0 0 PUnit) ≃ₜ*
+      Multiplicative (EuclideanSpace ℝ (Fin d)) :=
+    ContinuousMulEquiv.mk' (Homeomorph.prodUnique _ _) (fun _ _ ↦ rfl)
+  refine ⟨a, hmem, q.symm.trans (c.trans w.symm), fun x ↦ ?_⟩
+  change (w (w.symm (c (q.symm (q x))))).toAdd = _
+  rw [q.symm_apply_apply, w.apply_symm_apply]
+
+/-- Extension by zero from the units evaluates the function off zero. -/
+private theorem weilTest_zeroExtend_apply {K : Type*} [GroupWithZero K] (f : Kˣ → ℂ) (x : K) :
+    Function.extend Units.val f (fun _ ↦ (0 : ℂ)) x =
+      if hx : x = 0 then 0 else f (Units.mk0 x hx) := by
+  split_ifs with hx
+  · subst hx
+    exact Function.extend_apply' _ _ _ fun ⟨u, hu⟩ ↦ u.ne_zero hu
+  · exact Units.val_injective.extend_apply f (fun _ ↦ (0 : ℂ)) (Units.mk0 x hx)
+
+
+/-- An exponential-type map with identity derivative has a smooth local inverse at one. -/
+private theorem weilTest_localLog {𝕂 : Type*} [RCLike 𝕂] (E : 𝕂 → 𝕂) (hE00 : E 0 = 1)
+    (hEs : ContDiff ℝ (⊤ : ℕ∞) E)
+    (hEd : HasFDerivAt E ((ContinuousLinearEquiv.refl ℝ 𝕂 : 𝕂 ≃L[ℝ] 𝕂) : 𝕂 →L[ℝ] 𝕂) 0) :
+    ∃ Λ : 𝕂 → 𝕂, ContDiffAt ℝ (⊤ : ℕ∞) Λ 1 ∧ ∀ᶠ y in 𝓝 1, E (Λ y) = y := by
+  have hn0 : ((⊤ : ℕ∞) : WithTop ℕ∞) ≠ 0 := by simp
+  have hEc : ContDiffAt ℝ (⊤ : ℕ∞) E 0 := hEs.contDiffAt
+  have hS := ContDiffAt.hasStrictFDerivAt hEc hEd hn0
+  have h0 : (hS.toOpenPartialHomeomorph E).symm (E 0) = 0 := hS.localInverse_apply_image
+  have hΛ : ContDiffAt ℝ (⊤ : ℕ∞) (hS.toOpenPartialHomeomorph E).symm (E 0) :=
+    (hS.toOpenPartialHomeomorph E).contDiffAt_symm hS.image_mem_toOpenPartialHomeomorph_target
+      (by rw [h0]; exact hEd) (by rw [h0]; exact hEc)
+  have hright : ∀ᶠ y in 𝓝 (E 0), E ((hS.toOpenPartialHomeomorph E).symm y) = y :=
+    hS.eventually_right_inverse
+  rw [hE00] at hΛ hright
+  exact ⟨_, hΛ, hright⟩
+
+
+/-- On an elementary presentation, a function smooth on the covers stays smooth along a
+continuous one-parameter family of translates given by an additive map from a real vector
+space. -/
+private theorem weilTest_elementary_curve {Q : Type*} [CommGroup Q] [TopologicalSpace Q]
+    {𝕂 : Type*} [RCLike 𝕂] {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (e : ElementaryLCAPresentation Q) (f₀ : Q → ℂ) {N : ℕ∞}
+    (hsm : ∀ (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor), ContDiff ℝ (N : WithTop ℕ∞)
+      (fun xt ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd (elementaryCover xt z b)))))
+    (θ : 𝕂 →+ ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor)
+    (hθ : Continuous θ) (q₀ : Q) :
+    ContDiff ℝ (N : WithTop ℕ∞)
+      (fun v ↦ f₀ (e.equiv.symm (e.equiv q₀ * Multiplicative.ofAdd (θ v)))) := by
+  obtain ⟨A, hA, hAv⟩ : ∃ A : ElementaryLieGroup d 0 0 PUnit.{1} →+
+      ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor,
+      Continuous A ∧ ∀ x, A x = θ (L.symm x.1) :=
+    ⟨θ.comp ((L.symm.toLinearMap.toAddMonoidHom).comp (AddMonoidHom.fst _ _)),
+      hθ.comp (L.symm.continuous.comp continuous_fst), fun _ ↦ rfl⟩
+  obtain ⟨θ₀, hθ₀⟩ : ∃ θ₀ : ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor,
+      Multiplicative.ofAdd θ₀ = e.equiv q₀ := ⟨_, rfl⟩
+  obtain ⟨f', hf'v⟩ : ∃ f' : ElementaryLieGroup e.realDim e.torusDim e.latticeRank
+      e.finiteFactor → ℂ, ∀ y, f' y = f₀ (e.equiv.symm (Multiplicative.ofAdd (θ₀ + y))) :=
+    ⟨_, fun _ ↦ rfl⟩
+  have hf' (z : Fin e.latticeRank → ℤ) (b : e.finiteFactor) :
+      ContDiff ℝ (N : WithTop ℕ∞) (fun u ↦ f' (elementaryCover u z b)) := by
+    obtain ⟨t, ht⟩ := elementaryCover_surjective θ₀.2.2.1 θ₀.2.2.2 θ₀.1 θ₀.2.1
+    have hθ : θ₀ = elementaryCover (θ₀.1, t) θ₀.2.2.1 θ₀.2.2.2 := ht.symm
+    have hshift (u : EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)) :
+        θ₀ + elementaryCover u z b =
+          elementaryCover ((θ₀.1, t) + u) (θ₀.2.2.1 + z) (θ₀.2.2.2 + b) := by
+      calc θ₀ + elementaryCover u z b
+          = elementaryCover (θ₀.1, t) θ₀.2.2.1 θ₀.2.2.2 + elementaryCover u z b :=
+            congrArg (· + elementaryCover u z b) hθ
+        _ = _ := by
+          simp only [elementaryCover, Prod.mk_add_mk, Prod.fst_add, Prod.snd_add,
+            PiLp.add_apply, AddCircle.coe_add]
+          rfl
+    simp only [hf'v, hshift]
+    exact (hsm _ _).comp (contDiff_const.add contDiff_id)
+  have hG := (contDiff_comp_elementaryHom A hA hf' 0 0).comp
+    (L.contDiff.prodMk (contDiff_const (c := (0 : EuclideanSpace ℝ (Fin 0)))))
+  have heq : ∀ v : 𝕂, f₀ (e.equiv.symm (e.equiv q₀ * Multiplicative.ofAdd (θ v))) =
+      f' (A (elementaryCover (m := d) (n := 0) (r := 0) (F := PUnit.{1})
+        (L v, (0 : EuclideanSpace ℝ (Fin 0))) 0 0)) := by
+    intro v
+    rw [hAv]
+    change _ = f' (θ (L.symm (L v)))
+    rw [L.symm_apply_apply, hf'v, ofAdd_add, hθ₀]
+  simp_rw [heq]
+  exact hG
+
+/-- A Bruhat smooth function on the units is smooth along every exponential curve. -/
+private theorem weilTest_units_curve (w : InfinitePlace F) {𝕂 : Type*} [RCLike 𝕂]
+    (φ : w.Completion ≃+* 𝕂) (hφs : Continuous φ.symm)
+    {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (E : 𝕂 → 𝕂) (hEadd : ∀ a b, E (a + b) = E a * E b) (hE0 : ∀ a, E a ≠ 0) (hE00 : E 0 = 1)
+    (hEc : Continuous E) (f : w.Completionˣ → ℂ) (hf : IsBruhatSmooth f)
+    (u₀ : w.Completionˣ) (n : ℕ) :
+    ContDiff ℝ ((n : ℕ∞) : WithTop ℕ∞) (fun v : 𝕂 ↦
+      Function.extend Units.val f (fun _ ↦ (0 : ℂ)) ((u₀ : w.Completion) * φ.symm (E v))) := by
+  have hne (y : 𝕂) (hy : y ≠ 0) : φ.symm y ≠ 0 := (map_ne_zero φ.symm).mpr hy
+  obtain ⟨k, hk, -, hdesc⟩ := hf n
+  have hkC : IsCompact (k : Set w.Completionˣ) := (lcaDualAnnihilator_annihilator k hk.1) ▸
+    isCompact_lcaDualAnnihilator (lcaAnnihilator k) hk.2.1
+  obtain ⟨H, hH⟩ := exists_openCompactlyGeneratedSubgroup_contains
+    ((isCompact_singleton (x := u₀)).union hkC)
+  obtain ⟨a, haH, hak⟩ : ∃ a : BruhatStructuralPair w.Completionˣ, a.val.1 = H.val ∧
+      OrderDual.ofDual a.val.2 = k :=
+    ⟨⟨(H.val, OrderDual.toDual k), H.property.1, H.property.2, hk, fun _ hx ↦ hH (Or.inr hx)⟩,
+      rfl, rfl⟩
+  obtain ⟨f₀, hf₀, hsm⟩ := hdesc a hak
+  obtain ⟨e⟩ := a.elementary
+  have hu₀ : u₀ ∈ a.val.1 := haH ▸ hH (Or.inl rfl)
+  -- The exponential lands in the identity component, hence in the open subgroup.
+  obtain ⟨Eu, hEuv⟩ : ∃ Eu : Multiplicative 𝕂 →* w.Completionˣ,
+      ∀ v, (Eu v : w.Completion) = φ.symm (E v.toAdd) :=
+    ⟨{ toFun := fun v ↦ Units.mk0 (φ.symm (E v.toAdd)) (hne _ (hE0 _))
+       map_one' := Units.ext (by simp [hE00])
+       map_mul' := fun a b ↦ Units.ext (by simp [hEadd]) }, fun _ ↦ rfl⟩
+  have hEu : Continuous Eu := Units.isEmbedding_val₀.continuous_iff.mpr
+    ((hφs.comp (hEc.comp continuous_toAdd)).congr fun v ↦ (hEuv v).symm)
+  have hEH (v : Multiplicative 𝕂) : Eu v ∈ a.val.1 := by
+    have hcl : IsClopen (a.val.1 : Set w.Completionˣ) :=
+      ⟨a.val.1.isClosed_of_isOpen a.property.1, a.property.1⟩
+    have : PreconnectedSpace (Multiplicative 𝕂) := inferInstanceAs (PreconnectedSpace 𝕂)
+    exact (isPreconnected_range hEu).subset_isClopen hcl ⟨1, ⟨1, map_one Eu⟩, a.val.1.one_mem⟩
+      ⟨v, rfl⟩
+  obtain ⟨θ, hθc, hθv⟩ : ∃ θ : 𝕂 →+ ElementaryLieGroup e.realDim e.torusDim e.latticeRank
+      e.finiteFactor, Continuous θ ∧ ∀ v, Multiplicative.ofAdd (θ v) =
+        e.equiv (QuotientGroup.mk ⟨Eu (Multiplicative.ofAdd v), hEH _⟩) := by
+    let θm : Multiplicative 𝕂 →* Multiplicative
+        (ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor) :=
+      e.equiv.toMulEquiv.toMonoidHom.comp ((QuotientGroup.mk' _).comp (Eu.codRestrict _ hEH))
+    have hθm : Continuous θm := e.equiv.continuous.comp (QuotientGroup.continuous_mk.comp
+      (hEu.subtype_mk _))
+    exact ⟨AddMonoidHom.toMultiplicative.symm θm, hθm, fun _ ↦ rfl⟩
+  have hc := weilTest_elementary_curve L e f₀ (hsm e) θ hθc (QuotientGroup.mk ⟨u₀, hu₀⟩)
+  have heq (v : 𝕂) : Function.extend Units.val f (fun _ ↦ (0 : ℂ))
+      ((u₀ : w.Completion) * φ.symm (E v)) =
+      f₀ (e.equiv.symm (e.equiv (QuotientGroup.mk ⟨u₀, hu₀⟩) *
+        Multiplicative.ofAdd (θ v))) := by
+    have hmem : u₀ * Eu (Multiplicative.ofAdd v) ∈ a.val.1 := mul_mem hu₀ (hEH _)
+    have hval : (u₀ : w.Completion) * φ.symm (E v) = ((u₀ * Eu (Multiplicative.ofAdd v) :
+        w.Completionˣ) : w.Completion) := by
+      rw [Units.val_mul, hEuv, toAdd_ofAdd]
+    have hmul : e.equiv (QuotientGroup.mk ⟨u₀ * Eu (Multiplicative.ofAdd v), hmem⟩) =
+        e.equiv (QuotientGroup.mk ⟨u₀, hu₀⟩) * Multiplicative.ofAdd (θ v) :=
+      calc e.equiv (QuotientGroup.mk ⟨u₀ * Eu (Multiplicative.ofAdd v), hmem⟩)
+          = e.equiv (QuotientGroup.mk ⟨u₀, hu₀⟩ *
+              QuotientGroup.mk ⟨Eu (Multiplicative.ofAdd v), hEH _⟩) := rfl
+        _ = e.equiv (QuotientGroup.mk ⟨u₀, hu₀⟩) *
+              e.equiv (QuotientGroup.mk ⟨Eu (Multiplicative.ofAdd v), hEH _⟩) :=
+            map_mul e.equiv _ _
+        _ = _ := congrArg (e.equiv (QuotientGroup.mk ⟨u₀, hu₀⟩) * ·) (hθv v).symm
+    calc Function.extend Units.val f (fun _ ↦ (0 : ℂ)) ((u₀ : w.Completion) * φ.symm (E v))
+        = Function.extend Units.val f (fun _ ↦ (0 : ℂ))
+            ((u₀ * Eu (Multiplicative.ofAdd v) : w.Completionˣ) : w.Completion) :=
+          congrArg _ hval
+      _ = f (u₀ * Eu (Multiplicative.ofAdd v)) := Units.val_injective.extend_apply _ _ _
+      _ = f₀ (QuotientGroup.mk ⟨_, hmem⟩) := (hf₀ ⟨_, hmem⟩).symm
+      _ = _ := congrArg f₀ ((e.equiv.symm_apply_eq.mpr hmul.symm).symm)
+  simp_rw [heq]
+  exact hc
+
+/-- A Bruhat smooth function on the units of an archimedean completion, extended by
+zero, is smooth at every nonzero point in a real coordinate. -/
+private theorem weilTest_source_contDiffAt (w : InfinitePlace F) {𝕂 : Type*} [RCLike 𝕂]
+    (φ : w.Completion ≃+* 𝕂) (hφs : Continuous φ.symm)
+    {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (E : 𝕂 → 𝕂) (hEadd : ∀ a b, E (a + b) = E a * E b) (hE0 : ∀ a, E a ≠ 0) (hE00 : E 0 = 1)
+    (hEs : ContDiff ℝ (⊤ : ℕ∞) E)
+    (hEd : HasFDerivAt E ((ContinuousLinearEquiv.refl ℝ 𝕂 : 𝕂 ≃L[ℝ] 𝕂) : 𝕂 →L[ℝ] 𝕂) 0)
+    (f : w.Completionˣ → ℂ) (hf : IsBruhatSmooth f)
+    (y₀ : 𝕂) (hy₀ : y₀ ≠ 0) :
+    ContDiffAt ℝ (⊤ : ℕ∞)
+      (fun y : 𝕂 ↦ Function.extend Units.val f (fun _ ↦ (0 : ℂ)) (φ.symm y)) y₀ := by
+  rw [contDiffAt_infty]
+  intro n
+  obtain ⟨u₀, hu₀v⟩ : ∃ u : w.Completionˣ, (u : w.Completion) = φ.symm y₀ :=
+    ⟨Units.mk0 _ ((map_ne_zero φ.symm).mpr hy₀), rfl⟩
+  have hcurve := weilTest_units_curve w φ hφs L E hEadd hE0 hE00 hEs.continuous f hf u₀ n
+  -- A local logarithm straightens the exponential curve near `y₀`.
+  obtain ⟨Λ, hΛ, hright⟩ := weilTest_localLog E hE00 hEs hEd
+  have hdiv : ContDiff ℝ (⊤ : ℕ∞) (fun y : 𝕂 ↦ y * y₀⁻¹) := contDiff_id.mul contDiff_const
+  have hlim : Tendsto (fun y : 𝕂 ↦ y * y₀⁻¹) (𝓝 y₀) (𝓝 1) := by
+    have := hdiv.continuous.tendsto y₀
+    rwa [mul_inv_cancel₀ hy₀] at this
+  have hle : ((n : ℕ∞) : WithTop ℕ∞) ≤ ((⊤ : ℕ∞) : WithTop ℕ∞) := WithTop.coe_le_coe.mpr le_top
+  have hloc : ContDiffAt ℝ ((n : ℕ∞) : WithTop ℕ∞) (fun y ↦ Function.extend Units.val f
+      (fun _ ↦ (0 : ℂ)) ((u₀ : w.Completion) * φ.symm (E (Λ (y * y₀⁻¹))))) y₀ := by
+    have hΛ' : ContDiffAt ℝ ((n : ℕ∞) : WithTop ℕ∞) Λ (y₀ * y₀⁻¹) := by
+      rw [mul_inv_cancel₀ hy₀]
+      exact hΛ.of_le hle
+    exact hcurve.contDiffAt.comp y₀ (hΛ'.comp y₀ (hdiv.contDiffAt.of_le hle))
+  refine hloc.congr_of_eventuallyEq ?_
+  filter_upwards [hlim.eventually hright] with y hy
+  rw [hu₀v, hy, ← map_mul, mul_left_comm, mul_inv_cancel₀ hy₀, mul_one]
+
+/-- The weighted translate of a test on the units is smooth with compact support in a
+real coordinate on the completion. -/
+private theorem weilTest_target_contDiff (w : InfinitePlace F) {𝕂 : Type*} [RCLike 𝕂]
+    (φ : w.Completion ≃+* 𝕂) (hφ : Continuous φ) (hφs : Continuous φ.symm)
+    (hnorm : ∀ x, ‖φ x‖ = ‖x‖) {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (E : 𝕂 → 𝕂) (hEadd : ∀ a b, E (a + b) = E a * E b) (hE0 : ∀ a, E a ≠ 0) (hE00 : E 0 = 1)
+    (hEs : ContDiff ℝ (⊤ : ℕ∞) E)
+    (hEd : HasFDerivAt E ((ContinuousLinearEquiv.refl ℝ 𝕂 : 𝕂 ≃L[ℝ] 𝕂) : 𝕂 →L[ℝ] 𝕂) 0)
+    (m : ℕ) (hW : ∀ z : 𝕂, z ≠ 0 →
+      ContDiffAt ℝ (⊤ : ℕ∞) (fun z : 𝕂 ↦ ((Real.sqrt (‖z‖ ^ m) : ℝ) : ℂ)) z)
+    (f : w.Completionˣ → ℂ) (hf : IsBruhatSmooth f) (hfc : HasCompactSupport f) :
+    ContDiff ℝ (⊤ : ℕ∞) (fun y : 𝕂 ↦ Function.extend Units.val f (fun _ ↦ (0 : ℂ))
+        (1 + φ.symm y) / ((Real.sqrt (‖1 + φ.symm y‖ ^ m) : ℝ) : ℂ)) ∧
+      HasCompactSupport (fun y : 𝕂 ↦ Function.extend Units.val f (fun _ ↦ (0 : ℂ))
+        (1 + φ.symm y) / ((Real.sqrt (‖1 + φ.symm y‖ ^ m) : ℝ) : ℂ)) := by
+  let h : 𝕂 → ℂ := fun y ↦ Function.extend Units.val f (fun _ ↦ (0 : ℂ)) (φ.symm y)
+  let W : 𝕂 → ℂ := fun z ↦ ((Real.sqrt (‖z‖ ^ m) : ℝ) : ℂ)
+  have hns (z : 𝕂) : ‖φ.symm z‖ = ‖z‖ := by rw [← hnorm, RingEquiv.apply_symm_apply]
+  have hfun : (fun y : 𝕂 ↦ Function.extend Units.val f (fun _ ↦ (0 : ℂ))
+      (1 + φ.symm y) / ((Real.sqrt (‖1 + φ.symm y‖ ^ m) : ℝ) : ℂ)) =
+      fun y ↦ h (1 + y) / W (1 + y) := by
+    funext y
+    have h1 : 1 + φ.symm y = φ.symm (1 + y) := by rw [map_add, map_one]
+    simp only [h, W, h1, hns]
+  rw [hfun]
+  let Z : Set 𝕂 := φ '' (Units.val '' tsupport f)
+  have hZ : IsCompact Z := (hfc.image Units.continuous_val).image hφ
+  have hzero (z : 𝕂) (hz : z ∉ Z) : h z = 0 := by
+    simp only [h]
+    rw [weilTest_zeroExtend_apply]
+    split_ifs with h0
+    · rfl
+    · refine image_eq_zero_of_notMem_tsupport fun hm ↦ hz ⟨_, ⟨_, hm, rfl⟩, ?_⟩
+      simp
+  have hWne (z : 𝕂) (hz : z ≠ 0) : W z ≠ 0 := by
+    simp only [W, ne_eq, Complex.ofReal_eq_zero]
+    exact (Real.sqrt_pos.mpr (pow_pos (norm_pos_iff.mpr hz) m)).ne'
+  have h0Z : (0 : 𝕂) ∉ Z := by
+    rintro ⟨_, ⟨u, -, rfl⟩, hu⟩
+    exact u.ne_zero ((map_eq_zero_iff φ φ.injective).mp hu)
+  have htr : Continuous (fun y : 𝕂 ↦ 1 + y) := continuous_const.add continuous_id
+  refine ⟨contDiff_iff_contDiffAt.mpr fun y ↦ ?_, ?_⟩
+  · by_cases hy : 1 + y ∈ Z
+    · have hy0 : 1 + y ≠ 0 := fun h ↦ h0Z (h ▸ hy)
+      have hs := weilTest_source_contDiffAt w φ hφs L E hEadd hE0 hE00 hEs hEd f
+        hf (1 + y) hy0
+      have hc : ContDiffAt ℝ (⊤ : ℕ∞) (fun y : 𝕂 ↦ 1 + y) y := contDiffAt_const.add contDiffAt_id
+      have hs' : ContDiffAt ℝ (⊤ : ℕ∞) (fun y ↦ h (1 + y)) y := hs.comp y hc
+      have hW' : ContDiffAt ℝ (⊤ : ℕ∞) (fun y ↦ W (1 + y)) y := (hW (1 + y) hy0).comp y hc
+      convert hs'.mul (hW'.inv (hWne _ hy0)) using 1
+      funext y
+      simp [div_eq_mul_inv]
+    · refine contDiffAt_const (c := (0 : ℂ)).congr_of_eventuallyEq ?_
+      filter_upwards [(htr.tendsto y).eventually (hZ.isClosed.isOpen_compl.mem_nhds hy)]
+        with y' hy'
+      simp [hzero _ hy']
+  · refine HasCompactSupport.intro (hZ.image (continuous_id.sub
+      (continuous_const (y := (1 : 𝕂))))) fun y hy ↦ ?_
+    have : 1 + y ∉ Z := fun h ↦ hy ⟨1 + y, h, by simp⟩
+    simp [hzero _ this]
+
+
+/-- The weighted translate is additive in the test. -/
+private theorem weilTest_weighted_add (w : InfinitePlace F) (m : ℕ)
+    (f f' : BruhatCompactSupport w.Completionˣ) (x : w.Completion) :
+    Function.extend Units.val ((f + f').val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ)) (1 + x) /
+        ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ) =
+      Function.extend Units.val (f.val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ)) (1 + x) /
+          ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ) +
+        Function.extend Units.val (f'.val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ)) (1 + x) /
+          ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ) := by
+  simp only [weilTest_zeroExtend_apply]
+  by_cases h0 : 1 + x = 0
+  · simp only [h0, dite_true, zero_div, add_zero]
+  · simp only [h0, dite_false]
+    have hadd : (f + f').val (Units.mk0 (1 + x) h0) =
+        f.val (Units.mk0 (1 + x) h0) + f'.val (Units.mk0 (1 + x) h0) := rfl
+    exact (congrArg (· / ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ)) hadd).trans (add_div _ _ _)
+
+/-- The weighted translate is homogeneous in the test. -/
+private theorem weilTest_weighted_smul (w : InfinitePlace F) (m : ℕ) (c : ℂ)
+    (f : BruhatCompactSupport w.Completionˣ) (x : w.Completion) :
+    Function.extend Units.val ((c • f).val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ)) (1 + x) /
+        ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ) =
+      c * (Function.extend Units.val (f.val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ)) (1 + x) /
+          ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ)) := by
+  simp only [weilTest_zeroExtend_apply]
+  by_cases h0 : 1 + x = 0
+  · simp only [h0, dite_true, zero_div, mul_zero]
+  · simp only [h0, dite_false]
+    have hsmul : (c • f).val (Units.mk0 (1 + x) h0) = c * f.val (Units.mk0 (1 + x) h0) := rfl
+    exact (congrArg (· / ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ)) hsmul).trans (mul_div_assoc _ _ _)
+
+/-- The weighted translate, read in real coordinates, defines a linear map into the
+elementary Schwartz space of the real vector group. -/
+private theorem weilTest_exists_linear (w : InfinitePlace F) {𝕂 : Type*} [RCLike 𝕂]
+    (φ : w.Completion ≃+* 𝕂) (hφ : Continuous φ) (hφs : Continuous φ.symm)
+    (hnorm : ∀ x, ‖φ x‖ = ‖x‖) {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (E : 𝕂 → 𝕂) (hEadd : ∀ a b, E (a + b) = E a * E b) (hE0 : ∀ a, E a ≠ 0) (hE00 : E 0 = 1)
+    (hEs : ContDiff ℝ (⊤ : ℕ∞) E)
+    (hEd : HasFDerivAt E ((ContinuousLinearEquiv.refl ℝ 𝕂 : 𝕂 ≃L[ℝ] 𝕂) : 𝕂 →L[ℝ] 𝕂) 0)
+    (m : ℕ) (hW : ∀ z : 𝕂, z ≠ 0 →
+      ContDiffAt ℝ (⊤ : ℕ∞) (fun z : 𝕂 ↦ ((Real.sqrt (‖z‖ ^ m) : ℝ) : ℂ)) z) :
+    ∃ T : BruhatCompactSupport w.Completionˣ →ₗ[ℂ] ElementarySchwartz d 0 0 PUnit.{1},
+      ∀ f g, T f g = Function.extend Units.val (f.val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ))
+        (1 + φ.symm (L.symm g.1)) / ((Real.sqrt (‖1 + φ.symm (L.symm g.1)‖ ^ m) : ℝ) : ℂ) := by
+  have hψ (f : BruhatCompactSupport w.Completionˣ) :=
+    weilTest_target_contDiff w φ hφ hφs hnorm L E hEadd hE0 hE00 hEs hEd m hW
+      f.val ((mem_bruhatSmoothSubmodule_iff _).mp f.property.1) f.property.2
+  have hψ' (f : BruhatCompactSupport w.Completionˣ) :=
+    And.intro ((hψ f).1.comp L.symm.contDiff)
+      ((hψ f).2.comp_isClosedEmbedding L.symm.toHomeomorph.isClosedEmbedding)
+  let toY (f : BruhatCompactSupport w.Completionˣ) : ElementarySchwartz d 0 0 PUnit.{1} :=
+    ⟨fun g ↦ (hψ' f).2.toSchwartzMap (hψ' f).1 g.1,
+      (elementarySchwartzSubmodule_real_iff _).mpr ⟨(hψ' f).2.toSchwartzMap (hψ' f).1, rfl⟩⟩
+  refine ⟨{ toFun := toY
+            map_add' := fun f f' ↦ Subtype.ext (funext fun g ↦
+              weilTest_weighted_add w m f f' (φ.symm (L.symm g.1)))
+            map_smul' := fun c f ↦ Subtype.ext (funext fun g ↦
+              weilTest_weighted_smul w m c f (φ.symm (L.symm g.1))) }, fun f g ↦ rfl⟩
+
+
+/-- Elementary Schwartz functions with the same values are equal. -/
+private theorem weilTest_elementarySchwartz_ext {d : ℕ}
+    {s t : ElementarySchwartz d 0 0 PUnit.{1}} (h : ∀ g, s g = t g) : s = t :=
+  Subtype.ext (funext h)
+
+/-- Evaluation of elementary Schwartz functions on the real vector group is continuous. -/
+private theorem weilTest_elementarySchwartz_eval {d : ℕ} (g : ElementaryLieGroup d 0 0 PUnit.{1}) :
+    Continuous (fun t : ElementarySchwartz d 0 0 PUnit.{1} ↦ t g) := by
+  obtain ⟨Lg, hLg⟩ := elementarySchwartz_eval_continuousLinear (d := d) (t := 0) (r := 0)
+    (F := PUnit.{1}) g
+  exact Lg.continuous.congr hLg
+
+/-- On a fixed-support stage, the weighted translate is continuous by the closed graph
+theorem. -/
+private theorem weilTest_stage_continuous (w : InfinitePlace F) {d : ℕ} (m : ℕ)
+    (ρ : ElementaryLieGroup d 0 0 PUnit.{1} → w.Completion)
+    (T : BruhatCompactSupport w.Completionˣ →ₗ[ℂ] ElementarySchwartz d 0 0 PUnit.{1})
+    (hT : ∀ f g, T f g = Function.extend Units.val (f.val : w.Completionˣ → ℂ)
+      (fun _ ↦ (0 : ℂ)) (1 + ρ g) / ((Real.sqrt (‖1 + ρ g‖ ^ m) : ℝ) : ℂ))
+    (a : BruhatStructuralPair w.Completionˣ) (e : ElementaryLCAPresentation a.quotient)
+    (C : TopologicalSpace.Compacts w.Completionˣ) :
+    Continuous (T ∘ bruhatCompactSupportStageInclusion a e C) := by
+  let G := w.Completionˣ
+  let Y := ElementarySchwartz d 0 0 PUnit.{1}
+  let X := bruhatCompactSupportStage a e C
+  let i : X →ₗ[ℂ] bruhatCompactSupportSubmodule G := bruhatCompactSupportStageInclusion a e C
+  let J : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a e
+  have hJ : Continuous J :=
+    (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _ (fun p ↦ p.2 a e)
+  have hev (x : G) :
+      Continuous (fun s : SchwartzBruhatStage e ↦ schwartzBruhatStageRealization a e s x) :=
+    (continuous_schwartzBruhat_eval_forEndpoints x).comp hJ
+  have hX : IsClosed (X : Set (SchwartzBruhatStage e)) := by
+    simp only [X, bruhatCompactSupportStage, Submodule.coe_iInf]
+    exact isClosed_iInter fun x ↦ isClosed_singleton.preimage (hev x.val)
+  let T' : X →ₗ[ℂ] Y := T.comp i
+  have hval (z : w.Completion) : Continuous (fun s : X ↦ Function.extend Units.val
+      ((i s : BruhatCompactSupport G).val : G → ℂ) (fun _ ↦ (0 : ℂ)) z) := by
+    simp only [weilTest_zeroExtend_apply]
+    by_cases h0 : z = 0
+    · simp only [h0, dite_true]
+      exact continuous_const
+    · simp only [h0, dite_false]
+      exact (hev _).comp continuous_subtype_val
+  have hgraph : IsClosed (T'.graph : Set (X × Y)) := by
+    have heq : (T'.graph : Set (X × Y)) = ⋂ g : ElementaryLieGroup d 0 0 PUnit.{1},
+        {p | p.2 g = Function.extend Units.val ((i p.1 : BruhatCompactSupport G).val : G → ℂ)
+          (fun _ ↦ (0 : ℂ)) (1 + ρ g) / ((Real.sqrt (‖1 + ρ g‖ ^ m) : ℝ) : ℂ)} := by
+      ext p
+      refine ⟨fun h ↦ mem_iInter.mpr fun g ↦ ?_, fun h ↦ ?_⟩
+      · have h' : p.2 = T' p.1 := (LinearMap.mem_graph_iff _ _).mp h
+        exact (congrArg (fun t : Y ↦ t g) h').trans (hT _ g)
+      · have hfun : ∀ g, p.2 g = T' p.1 g := fun g ↦ (mem_iInter.mp h g).trans (hT (i p.1) g).symm
+        exact (LinearMap.mem_graph_iff _ _).mpr (weilTest_elementarySchwartz_ext hfun)
+    have hc : IsClosed (⋂ g : ElementaryLieGroup d 0 0 PUnit.{1},
+        {p : X × Y | p.2 g = Function.extend Units.val
+          ((i p.1 : BruhatCompactSupport G).val : G → ℂ)
+          (fun _ ↦ (0 : ℂ)) (1 + ρ g) / ((Real.sqrt (‖1 + ρ g‖ ^ m) : ℝ) : ℂ)}) := by
+      refine isClosed_iInter fun g ↦ isClosed_eq ?_
+        (((hval _).div_const _).comp continuous_fst)
+      exact (weilTest_elementarySchwartz_eval g).comp continuous_snd
+    exact (congrArg IsClosed heq).mpr hc
+  have : T2Space (SchwartzBruhatStage e) := elementarySchwartz_t2
+  exact weilTest_continuous_of_isClosed_graph elementarySchwartz_isFrechet
+    elementarySchwartz_isFrechet X hX T' hgraph
+
+/-- A linear map from tests on the units to an elementary Schwartz space is continuous
+when each value is the weighted translate at a point given by a fixed function. -/
+private theorem weilTest_continuous_linear (w : InfinitePlace F) {d : ℕ} (m : ℕ)
+    (ρ : ElementaryLieGroup d 0 0 PUnit.{1} → w.Completion)
+    (T : BruhatCompactSupport w.Completionˣ →ₗ[ℂ] ElementarySchwartz d 0 0 PUnit.{1})
+    (hT : ∀ f g, T f g = Function.extend Units.val (f.val : w.Completionˣ → ℂ)
+      (fun _ ↦ (0 : ℂ)) (1 + ρ g) / ((Real.sqrt (‖1 + ρ g‖ ^ m) : ℝ) : ℂ)) :
+    Continuous T := by
+  let G := w.Completionˣ
+  let Y := ElementarySchwartz d 0 0 PUnit.{1}
+  have hstage := weilTest_stage_continuous w m ρ T hT
+  refine (elementarySchwartz_withSeminorms (m := d) (n := 0) (r := 0)
+    (F := PUnit.{1})).continuous_of_continuous_comp T fun j ↦ ?_
+  let P := {q : Seminorm ℂ (bruhatCompactSupportSubmodule G) //
+    ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+      (C : TopologicalSpace.Compacts G),
+      Continuous (q ∘ bruhatCompactSupportStageInclusion a e C)}
+  exact (withGeneratingSeminorms_spec _ (Subtype.val : P → _)).continuous_seminorm
+    (⟨(elementarySchwartzSeminorm j).comp T, fun a e C ↦
+      (elementarySchwartz_withSeminorms.continuous_seminorm j).comp (hstage a e C)⟩ : P)
+
+
+/-- In real coordinates on an archimedean completion, translation of the zero-extended
+test after weighting is a continuous linear map to additive Schwartz–Bruhat tests. -/
+private theorem weilTest_exists_map (w : InfinitePlace F) {𝕂 : Type*} [RCLike 𝕂]
+    (φ : w.Completion ≃+* 𝕂) (hφ : Continuous φ) (hφs : Continuous φ.symm)
+    (hnorm : ∀ x, ‖φ x‖ = ‖x‖) {d : ℕ} (L : 𝕂 ≃L[ℝ] EuclideanSpace ℝ (Fin d))
+    (E : 𝕂 → 𝕂) (hEadd : ∀ a b, E (a + b) = E a * E b) (hE0 : ∀ a, E a ≠ 0) (hE00 : E 0 = 1)
+    (hEs : ContDiff ℝ (⊤ : ℕ∞) E)
+    (hEd : HasFDerivAt E ((ContinuousLinearEquiv.refl ℝ 𝕂 : 𝕂 ≃L[ℝ] 𝕂) : 𝕂 →L[ℝ] 𝕂) 0)
+    (m : ℕ) (hW : ∀ z : 𝕂, z ≠ 0 →
+      ContDiffAt ℝ (⊤ : ℕ∞) (fun z : 𝕂 ↦ ((Real.sqrt (‖z‖ ^ m) : ℝ) : ℂ)) z) :
+    ∃ A : BruhatCompactSupport w.Completionˣ →L[ℂ]
+        SchwartzBruhat (Multiplicative w.Completion),
+      ∀ (f : BruhatCompactSupport w.Completionˣ) (x : w.Completion),
+        A f (Multiplicative.ofAdd x) = Function.extend Units.val (f.val : w.Completionˣ → ℂ)
+          (fun _ ↦ (0 : ℂ)) (1 + x) / ((Real.sqrt (‖1 + x‖ ^ m) : ℝ) : ℂ) := by
+  have hex := weilTest_exists_linear w φ hφ hφs hnorm L E hEadd hE0 hE00 hEs hEd m hW
+  refine hex.elim fun T hT ↦ ?_
+  have hTc := weilTest_continuous_linear w m (fun g ↦ φ.symm (L.symm g.1)) T hT
+  -- The completion is presented by its real coordinates.
+  let c₀ : w.Completion ≃ₜ EuclideanSpace ℝ (Fin d) :=
+    (Homeomorph.mk φ.toEquiv hφ hφs).trans L.toHomeomorph
+  let c : Multiplicative w.Completion ≃ₜ* Multiplicative (EuclideanSpace ℝ (Fin d)) :=
+    ContinuousMulEquiv.mk' c₀ (fun x y ↦ by
+      change L (φ (x.toAdd + y.toAdd)) = L (φ x.toAdd) + L (φ y.toAdd)
+      rw [map_add, map_add])
+  refine (weilTest_vectorPresentation c).elim fun a₁ h₁ ↦ h₁.elim fun hm₁ h₂ ↦
+    h₂.elim fun w₁ hw₁ ↦ ?_
+  let e₁ : ElementaryLCAPresentation a₁.quotient := ⟨d, 0, 0, PUnit, w₁⟩
+  let J₁ : SchwartzBruhatStage e₁ →ₗ[ℂ] SchwartzBruhat (Multiplicative w.Completion) :=
+    schwartzBruhatStageInclusion a₁ e₁
+  have hJ₁ : Continuous J₁ :=
+    (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp _ (fun p ↦ p.2 a₁ e₁)
+  refine ⟨⟨J₁.comp T, hJ₁.comp hTc⟩, fun f x ↦ ?_⟩
+  change (show SchwartzBruhat (Multiplicative w.Completion) from
+    schwartzBruhatStageInclusion a₁ e₁ (T f)) (Multiplicative.ofAdd x) = _
+  rw [schwartzBruhatStageInclusion_apply, schwartzBruhatStageRealization_apply,
+    dite_eq_left (hm₁ _)]
+  refine (hT f _).trans ?_
+  have hx : (w₁ (QuotientGroup.mk ⟨Multiplicative.ofAdd x, hm₁ _⟩)).toAdd.1 = L (φ x) :=
+    hw₁ (Multiplicative.ofAdd x)
+  change Function.extend Units.val (f.val : w.Completionˣ → ℂ) (fun _ ↦ (0 : ℂ))
+      (1 + φ.symm (L.symm (w₁ (QuotientGroup.mk ⟨Multiplicative.ofAdd x, hm₁ _⟩)).toAdd.1)) /
+        ((Real.sqrt (‖1 + φ.symm (L.symm
+          (w₁ (QuotientGroup.mk ⟨Multiplicative.ofAdd x, hm₁ _⟩)).toAdd.1)‖ ^ m) : ℝ) : ℂ) = _
+  rw [hx, L.symm_apply_apply, RingEquiv.symm_apply_apply]
+
+
+/-- The inverse square-root weight is smooth away from zero. -/
+private theorem weilTest_weight_contDiffAt {V : Type*} [NormedAddCommGroup V]
+    [InnerProductSpace ℝ V] (m : ℕ) (z : V) (hz : z ≠ 0) :
+    ContDiffAt ℝ (⊤ : ℕ∞) (fun z : V ↦ ((Real.sqrt (‖z‖ ^ m) : ℝ) : ℂ)) z := by
+  have h1 : ContDiffAt ℝ (⊤ : ℕ∞) (fun z : V ↦ ‖z‖ ^ m) z := (contDiffAt_norm ℝ hz).pow m
+  have h2 : ContDiffAt ℝ (⊤ : ℕ∞) (fun z : V ↦ Real.sqrt (‖z‖ ^ m)) z :=
+    (Real.contDiffAt_sqrt (pow_ne_zero m (norm_ne_zero_iff.mpr hz))).comp z h1
+  exact Complex.ofRealCLM.contDiff.contDiffAt.comp z h2
 
 /-- Paper: Definition B.4.4.1(2), p. 620. The weighted translate of a
 multiplicative test at an infinite place is an additive test, continuously in the original test. -/
 theorem exists_infiniteWeilTestMap (w : InfinitePlace F) :
     ∃ A : 𝒟(w.Completionˣ) →L[ℂ] 𝒮ₐ(w.Completion),
       ∀ (f : 𝒟(w.Completionˣ)) (x : w.Completion),
-        addTest(A f) x = weightedTranslate((fun y : w.Completion ↦ ‖y‖ ^ w.mult), f.val) x :=
-  by sorry
+        addTest(A f) x = weightedTranslate((fun y : w.Completion ↦ ‖y‖ ^ w.mult), f.val) x := by
+  by_cases hw : w.IsReal
+  · let e := InfinitePlace.Completion.isometryEquivRealOfIsReal hw
+    let L : ℝ ≃L[ℝ] EuclideanSpace ℝ (Fin 1) :=
+      (LinearEquiv.ofFinrankEq ℝ (EuclideanSpace ℝ (Fin 1)) (by simp)).toContinuousLinearEquiv
+    have hEd : HasFDerivAt Real.exp
+        ((ContinuousLinearEquiv.refl ℝ ℝ : ℝ ≃L[ℝ] ℝ) : ℝ →L[ℝ] ℝ) 0 :=
+      (Real.hasDerivAt_exp 0).hasFDerivAt.congr_fderiv (by ext; simp)
+    have hex := weilTest_exists_map w (InfinitePlace.Completion.ringEquivRealOfIsReal hw)
+      e.continuous e.symm.continuous (fun x ↦ e.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal hw)) x) L
+      Real.exp Real.exp_add (fun a ↦ (Real.exp_pos a).ne') Real.exp_zero Real.contDiff_exp hEd
+      w.mult (weilTest_weight_contDiffAt w.mult)
+    exact hex.elim fun A hA ↦ ⟨A, fun f x ↦ hA f x⟩
+  · have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    let e := InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc
+    let L : ℂ ≃L[ℝ] EuclideanSpace ℝ (Fin 2) :=
+      (LinearEquiv.ofFinrankEq ℂ (EuclideanSpace ℝ (Fin 2)) (by simp)).toContinuousLinearEquiv
+    have hEd : HasFDerivAt Complex.exp
+        ((ContinuousLinearEquiv.refl ℝ ℂ : ℂ ≃L[ℝ] ℂ) : ℂ →L[ℝ] ℂ) 0 :=
+      (Complex.hasDerivAt_exp 0).complexToReal_fderiv.congr_fderiv (by ext; simp)
+    have hex := weilTest_exists_map w (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc)
+      e.continuous e.symm.continuous (fun x ↦ e.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc)) x) L
+      Complex.exp Complex.exp_add Complex.exp_ne_zero Complex.exp_zero
+      (Complex.contDiff_exp (𝕜 := ℝ)) hEd w.mult (weilTest_weight_contDiffAt w.mult)
+    exact hex.elim fun A hA ↦ ⟨A, fun f x ↦ hA f x⟩
 
 /-- Paper: Definition B.4.4.1(2), p. 620. The finite multiplicative
 principal value applies Connes's functional to the weighted translated test.
@@ -956,7 +2120,94 @@ theorem infiniteCanonicalHaar_eq_smul_tamagawa (w : InfinitePlace F) :
       ⟨(Units.map nnNormHom.toMonoidHom) ^ w.mult, continuous_infiniteLocalModule w⟩
     ∃ hm : IsModulation m, canonicalModulatedHaar m hm =
       ENNReal.ofReal ((if w.IsReal then 2 else 2 * Real.pi)⁻¹) •
-        infiniteLocalMultiplicativeTamagawaMeasure F w := by sorry
+        infiniteLocalMultiplicativeTamagawaMeasure F w := by
+  intro m
+  let : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology w.Completionˣ :=
+    (Units.isEmbedding_val₀ (G₀ := w.Completion)).secondCountableTopology
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let μ := infiniteLocalMultiplicativeTamagawaMeasure F w
+  let : μ.IsHaarMeasure := infiniteLocalMultiplicativeTamagawaMeasure_haar F w
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding w
+  let : ProperSpace w.Completion :=
+    LipschitzWith.properSpace hi.isClosedEmbedding.isProperMap hi.lipschitzWith
+  have h2 : ‖(2 : w.Completion)‖ = 2 := by
+    rw [← hi.norm_map_of_map_zero (map_zero _) (2 : w.Completion), map_ofNat]
+    norm_num
+  have hmval (g : w.Completionˣ) : ((m g).val : ℝ) = ‖g.val‖ ^ w.mult := by
+    change (((Units.map nnNormHom.toMonoidHom g) ^ w.mult : ℝ≥0ˣ).val : ℝ) = _
+    rw [Units.val_pow_eq_pow_val, NNReal.coe_pow]
+    rfl
+  have hm : IsModulation m := by
+    refine ⟨isProperMap_units_nnNorm_pow w.mult w.mult_ne_zero, ⟨Units.mk0 2 (by rw [← norm_ne_zero_iff, h2]; norm_num), ?_⟩⟩
+    intro h
+    have h2' := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) h
+    simp only [hmval, Units.val_one, NNReal.coe_one] at h2'
+    rw [Units.val_mk0, h2] at h2'
+    exact absurd ((pow_eq_one_iff_of_nonneg zero_le_two w.mult_ne_zero).mp h2') (by norm_num)
+  let c : ℝ := if w.IsReal then 2 else 2 * Real.pi
+  have hc : 0 < c := by unfold c; split_ifs <;> positivity
+  refine ⟨hm, (existsUnique_canonicalModulatedHaar m hm).unique
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists)
+    ⟨Measure.IsHaarMeasure.smul _ (ENNReal.ofReal_pos.mpr (inv_pos.mpr hc)).ne'
+      ENNReal.ofReal_ne_top, ?_⟩⟩
+  refine (Asymptotics.isBigO_zero _ _).congr' ?_ EventuallyEq.rfl
+  filter_upwards [eventually_ge_atTop 1] with Λ hΛ
+  let S : Set w.Completionˣ := {g | ((m g).val : ℝ) ∈ Icc Λ⁻¹ Λ}
+  have hS : MeasurableSet S := by
+    have : Continuous fun g : w.Completionˣ ↦ ((m g).val : ℝ) :=
+      NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+    exact this.measurable measurableSet_Icc
+  let φ : ℝ → ℂ := fun r ↦ (((Icc Λ⁻¹ Λ).indicator 1 (r ^ w.mult) : ℝ) : ℂ)
+  have h1 : ((μ.real S : ℝ) : ℂ) = ∫ u, φ ‖u.val‖ ∂μ := by
+    rw [← integral_indicator_one hS, ← integral_complex_ofReal]
+    refine integral_congr_ae (ae_of_all _ fun u ↦ ?_)
+    simp only [φ, S, indicator, mem_ofPred_eq, hmval, Pi.one_apply]
+  have hrad {a b : ℝ} (ha : 0 < a) (hab : a ≤ b)
+      (hφ : ∀ r, 0 < r → φ r = (Icc a b).indicator (fun _ ↦ (1 : ℂ)) r) :
+      ∫ r in Ioi (0 : ℝ), r⁻¹ • φ r = (Real.log (b / a) : ℂ) := by
+    rw [setIntegral_congr_fun measurableSet_Ioi (g := (Icc a b).indicator
+      (fun r : ℝ ↦ ((r⁻¹ : ℝ) : ℂ))) (fun r hr ↦ by
+        rw [hφ r hr]
+        by_cases h : r ∈ Icc a b <;> simp [h, indicator, Complex.real_smul])]
+    rw [setIntegral_indicator measurableSet_Icc,
+      inter_eq_right.mpr (fun r (hr : r ∈ Icc a b) ↦ ha.trans_le hr.1),
+      integral_Icc_eq_integral_Ioc,
+      ← intervalIntegral.integral_of_le hab, intervalIntegral.integral_ofReal,
+      integral_inv_of_pos ha (ha.trans_le hab)]
+  have hΛpos : 0 < Λ := zero_lt_one.trans_le hΛ
+  have hval : μ.real S = 2 * c * Real.log Λ := by
+    apply Complex.ofReal_injective
+    rw [h1, localUnit_radial F w φ]
+    by_cases hw : w.IsReal
+    · rw [hrad (inv_pos.mpr hΛpos) (inv_le_one_of_one_le₀ hΛ |>.trans hΛ) (fun r _ ↦ by
+        simp only [φ, hw.mult_eq_one, pow_one, indicator]
+        split_ifs <;> simp)]
+      simp only [c, hw, ↓reduceIte, div_inv_eq_mul, Real.log_mul hΛpos.ne' hΛpos.ne',
+        Complex.real_smul]
+      push_cast; ring
+    · have hw' := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      have hs := Real.sqrt_pos.mpr hΛpos
+      rw [hrad (inv_pos.mpr hs) ((inv_le_one_of_one_le₀ (Real.one_le_sqrt.mpr hΛ)).trans
+        (Real.one_le_sqrt.mpr hΛ)) (fun r hr ↦ by
+          have : r ^ 2 ∈ Icc Λ⁻¹ Λ ↔ r ∈ Icc (√Λ)⁻¹ √Λ := by
+            rw [mem_Icc, mem_Icc, ← Real.sqrt_inv, Real.sqrt_le_iff, Real.le_sqrt' hr]
+            simp [hr.le]
+          simp only [φ, hw'.mult_eq_two]
+          by_cases h : r ∈ Icc (√Λ)⁻¹ √Λ <;>
+            simp only [indicator, this, h, ↓reduceIte, Pi.one_apply, Complex.ofReal_one,
+              Complex.ofReal_zero])]
+      simp only [c, hw, ↓reduceIte, div_inv_eq_mul, Real.mul_self_sqrt hΛpos.le,
+        Complex.real_smul]
+      push_cast; ring
+  rw [eq_comm]
+  change ((ENNReal.ofReal c⁻¹ • μ) S).toReal - 2 * Real.log Λ = 0
+  rw [smul_apply, smul_eq_mul, ENNReal.toReal_mul,
+    ENNReal.toReal_ofReal (inv_pos.mpr hc).le, ← measureReal_def, hval]
+  field_simp
+  ring
 
 /-- Paper: Lemma B.4.4.3, p. 620. If the locally constant test vanishes
 at one, the finite principal value is the ordinary integrable local term. -/
@@ -1083,7 +2334,38 @@ character by a multiplier adds a multiple of evaluation at zero to Connes's prin
 theorem finiteConnesPrincipalValue_changeCharacter (v : Primes(F))
     (a : (v.adicCompletion F)ˣ) (f : 𝒮ₐ(v.adicCompletion F)) :
     finiteConnesPrincipalValue v a f = finiteConnesPrincipalValue v 1 f +
-      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * addTest(f) 0 := by sorry
+      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * addTest(f) 0 := by
+  have ha := ((exists_finiteConnesPrincipalValue v a).choose_spec f).2
+  change finiteConnesPrincipalValue v a f = _ at ha
+  have h1 := (exists_finiteConnesPrincipalValue v 1).choose_spec f
+  have h1E := h1.2
+  change finiteConnesPrincipalValue v 1 f = _ at h1E
+  have h1I := h1.1
+  simp only [Units.val_one, norm_one, Real.sqrt_one, ENNReal.ofReal_one, one_smul,
+    one_mul] at h1I h1E
+  have h1I' : Integrable (fun y ↦ ((J𝔭(v) y : ℝ) : ℂ) *
+      tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) y) ν𝔭(v) := h1I
+  have hcE := (finiteLogFourier_comp_mul v f a h1I').2
+  have hc : (ENNReal.ofReal √‖a.val‖).toReal = √‖a.val‖ :=
+    ENNReal.toReal_ofReal (Real.sqrt_nonneg _)
+  -- Changing the character and the measure dilates the transform and scales it by `√‖a‖`.
+  have hF (y : v.adicCompletion F) :
+      tamagawaFourier (ENNReal.ofReal √‖a.val‖ • ν𝔭(v)) (fun x ↦ ψ𝔭(v) (a.val * x))
+        addTest(f) y = (√‖a.val‖ : ℝ) • tamagawaFourier ν𝔭(v) ψ𝔭(v) addTest(f) (a.val * y) := by
+    unfold tamagawaFourier
+    rw [integral_smul_measure, hc]
+    congr 1
+    refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+    simp only [mul_left_comm a.val x y]
+  beta_reduce at ha
+  refine ha.trans (Eq.trans ?_ (congrArg (· + _) h1E.symm))
+  rw [integral_smul_measure, hc]
+  simp only [hF, mul_smul_comm]
+  rw [integral_smul, hcE, smul_smul, mul_smul_comm, smul_smul, ← mul_assoc,
+    Real.mul_self_sqrt (norm_nonneg _), mul_inv_cancel₀ (norm_ne_zero_iff.mpr a.ne_zero),
+    one_smul]
+  push_cast
+  ring
 
 /-- Paper: Lemma B.4.4.4(2), p. 622. The same change of character
 adds a multiple of evaluation at one to the multiplicative principal value. -/
