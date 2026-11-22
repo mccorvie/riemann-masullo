@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+
 /-!
 # Printed completion and indexing claims in §10.4.3
 
@@ -112,7 +114,22 @@ choose the trivial extension of the trivial norm-one character and set
 `a = 2`. The completed zeta function has no zeros on this line, so the
 enumeration cannot give a value even at index zero. -/
 theorem Printed.spectralLineZeroEnumeration_false :
-    ¬ Printed.spectralLineZeroEnumeration := by sorry
+    ¬ Printed.spectralLineZeroEnumeration := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  let ω : PontryaginDual C₁[ℚ] := 1
+  obtain ⟨e, _⟩ := hall ℚ 2 (by norm_num) χ hχ ω
+  let t := e 0
+  let z : ℂ := 2 + (t.val : ℂ) * Complex.I
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ ω) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ ω) z = completedHeckeL (χ ω) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ ω)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ ω) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ ω) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ ω)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  have ht : 0 < meromorphicOrderAt (continuedCompletedHeckeL (χ ω)) z := t.property
+  exact (not_lt_of_ge horder.le) ht
 
 /-- Paper: Theorem 10.4.3.5, enumeration clauses (2)–(3), p. 472. As printed:
 the ordered enumeration of strip zero pairs has an entry for every natural
