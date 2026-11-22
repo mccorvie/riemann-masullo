@@ -375,7 +375,15 @@ theorem isEpsilonBasisLift_of_mkQ_eq (x : ι → E ⧸ E₀) (f : ι → StrongD
 /-- Paper: Remark 10.4.2.6, p. 463. The image of the open unit ball under
 the quotient map is exactly the open unit ball in the quotient norm. -/
 theorem quotient_image_openUnitBall :
-    E₀.mkQ '' Metric.ball 0 1 = Metric.ball 0 1 := by sorry
+    E₀.mkQ '' Metric.ball 0 1 = Metric.ball 0 1 := by
+  ext y
+  simp only [Set.mem_image, Metric.mem_ball, dist_zero_right]
+  constructor
+  · rintro ⟨x, hx, rfl⟩
+    exact (Submodule.Quotient.norm_mk_le E₀ x).trans_lt hx
+  · intro hy
+    obtain ⟨x, hxy, hx⟩ := Submodule.Quotient.norm_mk_lt y (sub_pos.mpr hy)
+    exact ⟨x, by linarith, hxy⟩
 
 /-- Paper: Remark 10.4.2.6, p. 463. In a reflexive Banach space the quotient
 map also takes the closed unit ball onto the closed unit ball. -/
