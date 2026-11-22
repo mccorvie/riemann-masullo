@@ -331,7 +331,38 @@ theorem integrable_diagonalIndentationWeight (p : G × G) :
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The averaged indentation weight is continuous. -/
 theorem continuous_diagonalIndentationWeight :
-    Continuous (diagonalIndentationWeight H countH b) := by sorry
+    Continuous (diagonalIndentationWeight H countH b) := by
+  classical
+  apply continuous_iff_continuousAt.mpr
+  intro p
+  obtain ⟨C, hC, hp⟩ := exists_compact_mem_nhds p.1
+  let K := tsupport b ∩ π ⁻¹' (π '' C)
+  have hK : IsCompact K := hb.2.2.1 C hC
+  let T := (Subtype.val : H → G) ⁻¹' ((fun z : G × G ↦ z.1 * z.2⁻¹) '' (C ×ˢ K))
+  have hT : T.Finite := (hH.isClosedEmbedding_subtypeVal.isCompact_preimage
+    ((hC.prod hK).image (continuous_fst.mul continuous_snd.inv))).finite_of_discrete
+  let term (h : H) (q : G × G) := b ((h : G)⁻¹ * q.1) * b ((h : G)⁻¹ * q.2)
+  have hc (h : H) : Continuous (term h) :=
+    (hb.1.comp (continuous_const.mul continuous_fst)).mul
+      (hb.1.comp (continuous_const.mul continuous_snd))
+  apply (continuous_finsetSum hT.toFinset fun h _ ↦ hc h).continuousAt.congr_of_eventuallyEq
+  filter_upwards [continuous_fst.continuousAt hp] with q hq
+  have hzero (h : H) (hh : h ∉ hT.toFinset) : term h q = 0 := by
+    suffices hz : b ((h : G)⁻¹ * q.1) = 0 by simp [term, hz]
+    by_contra hn
+    apply hh
+    refine hT.mem_toFinset.mpr ⟨(q.1, (h : G)⁻¹ * q.1), ⟨hq, ?_⟩, ?_⟩
+    · refine ⟨subset_tsupport b hn, q.1, hq, ?_⟩
+      have hπ : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+      simp [map_mul, map_inv, hπ]
+    · change q.1 * ((h : G)⁻¹ * q.1)⁻¹ = (h : G)
+      simp [mul_inv_rev, ← mul_assoc]
+  have hi : Integrable (fun h ↦ term h q) countH := integrable_count_iff.mpr
+    (summable_of_ne_finset_zero (s := hT.toFinset) fun h hh ↦ by simp [hzero h hh])
+  change (∫ h, term h q ∂countH) = _
+  rw [← setIntegral_eq_integral_of_forall_compl_eq_zero (s := (hT.toFinset : Set H)) hzero,
+    setIntegral_finset hT.toFinset hi.integrableOn]
+  simp only [count_real_singleton, one_smul]
 
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The averaged indentation weight is nonnegative. -/
