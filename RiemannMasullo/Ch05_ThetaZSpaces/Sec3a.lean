@@ -22,6 +22,138 @@ open scoped ContDiff Distributions NNReal NumberField.AdeleRing SchwartzMap Tens
 
 namespace RiemannMasullo
 
+/-- A series whose terms are dominated, seminorm by seminorm, by summable real sequences is
+summable in a complete space whose topology is given by those seminorms, and each seminorm of
+its sum is at most the sum of the dominating sequence. -/
+private theorem realSchwartzFlatQuotient_strongDual_summable {𝕜 E ι : Type*} [NormedField 𝕜]
+    [AddCommGroup E] [Module 𝕜 E] [UniformSpace E] [IsUniformAddGroup E] [CompleteSpace E]
+    {p : SeminormFamily 𝕜 E ι} (hp : WithSeminorms p) (x : ℕ → E) (u : ι → ℕ → ℝ)
+    (hu : ∀ i, Summable (u i)) (hx : ∀ i n, p i (x n) ≤ u i n) :
+    Summable x ∧ ∀ i, p i (∑' n, x n) ≤ ∑' n, u i n := by
+  have hu0 (i : ι) (n : ℕ) : 0 ≤ u i n := (apply_nonneg _ _).trans (hx i n)
+  have hsum : Summable x := by
+    rw [summable_iff_cauchySeq_finset, cauchySeq_finset_iff_sum_vanishing]
+    intro e he
+    obtain ⟨⟨I, r⟩, hr, hsub⟩ := hp.hasBasis_zero_ball.mem_iff.mp he
+    have hv (i : ι) : ∃ s : Finset ℕ, ∀ t : Finset ℕ, Disjoint t s → ∑ n ∈ t, u i n < r := by
+      obtain ⟨s, hs⟩ := (hu i).vanishing (Metric.ball_mem_nhds (0 : ℝ) hr)
+      refine ⟨s, fun t ht ↦ ?_⟩
+      have := hs t ht
+      rw [Metric.mem_ball, dist_zero_right, Real.norm_eq_abs] at this
+      exact (le_abs_self _).trans_lt this
+    choose s hs using hv
+    refine ⟨I.biUnion s, fun t ht ↦ hsub ?_⟩
+    rw [Seminorm.mem_ball_zero]
+    refine Seminorm.finset_sup_apply_lt hr fun i hi ↦ ?_
+    calc p i (∑ n ∈ t, x n) ≤ ∑ n ∈ t, p i (x n) :=
+          Finset.le_sum_of_subadditive (p i) (map_zero _).le (map_add_le_add _) _ _
+      _ ≤ ∑ n ∈ t, u i n := Finset.sum_le_sum fun n _ ↦ hx i n
+      _ < r := hs i t (Finset.disjoint_of_subset_right (Finset.subset_biUnion_of_mem s hi) ht)
+  refine ⟨hsum, fun i ↦ ?_⟩
+  have ht := ((hp.continuous_seminorm i).tendsto _).comp hsum.hasSum
+  refine le_of_tendsto' ht fun t ↦ ?_
+  calc p i (∑ n ∈ t, x n) ≤ ∑ n ∈ t, p i (x n) :=
+        Finset.le_sum_of_subadditive (p i) (map_zero _).le (map_add_le_add _) _ _
+    _ ≤ ∑ n ∈ t, u i n := Finset.sum_le_sum fun n _ ↦ hx i n
+    _ ≤ ∑' n, u i n := (hu i).sum_le_tsum t fun n _ ↦ hu0 i n
+
+/-- The derivatives at zero of a real power, viewed as a complex function. -/
+private theorem realSchwartzFlatQuotient_strongDual_pow (n j : ℕ) :
+    iteratedDeriv j (fun x : ℝ ↦ (x : ℂ) ^ n) 0 = if j = n then (n.factorial : ℂ) else 0 := by
+  have h : ∀ j, iteratedDeriv j (fun x : ℝ ↦ (x : ℂ) ^ n) =
+      fun x : ℝ ↦ (n.descFactorial j : ℂ) * (x : ℂ) ^ (n - j) := by
+    intro j
+    induction j with
+    | zero => funext x; simp
+    | succ j ih =>
+      rw [iteratedDeriv_succ, ih]
+      funext x
+      have h1 : HasDerivAt (fun y : ℝ ↦ (y : ℂ)) 1 x := by
+        simpa using (hasDerivAt_id x).ofReal_comp
+      have := (h1.pow (n - j)).const_mul (n.descFactorial j : ℂ)
+      rw [show (fun x : ℝ ↦ (n.descFactorial j : ℂ) * (x : ℂ) ^ (n - j)) =
+        fun y ↦ (n.descFactorial j : ℂ) * ((fun y : ℝ ↦ (y : ℂ)) ^ (n - j)) y from rfl,
+        this.deriv, Nat.descFactorial_succ, Nat.sub_sub, mul_one]
+      push_cast
+      ring
+  rw [h j]
+  rcases lt_trichotomy j n with hj | rfl | hj
+  · simp [hj.ne, Nat.sub_ne_zero_of_lt hj]
+  · simp [Nat.descFactorial_self]
+  · simp [hj.ne', Nat.descFactorial_eq_zero_iff_lt.mpr hj]
+
+/-- `y ↦ yⁿ χ(y)` is a Schwartz function. -/
+private theorem realSchwartzFlatQuotient_strongDual_exists_bump (χ : ContDiffBump (0 : ℝ))
+    (n : ℕ) : ∃ G : 𝓢(ℝ, ℂ), ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ) := by
+  have hc : HasCompactSupport (fun y : ℝ ↦ (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) :=
+    (χ.hasCompactSupport.comp_left Complex.ofReal_zero).mul_left
+  exact ⟨hc.toSchwartzMap ((Complex.ofRealCLM.contDiff.pow n).mul
+    (Complex.ofRealCLM.contDiff.comp χ.contDiff)), fun _ ↦ rfl⟩
+
+/-- `y ↦ yⁿ χ(y)` vanishes outside `[-1, 1]` when `χ` does. -/
+private theorem realSchwartzFlatQuotient_strongDual_bump_tsupport (χ : ContDiffBump (0 : ℝ))
+    (hχ : χ.rOut ≤ 1) (n : ℕ) (G : 𝓢(ℝ, ℂ)) (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) :
+    tsupport (G : ℝ → ℂ) ⊆ Metric.closedBall 0 1 := by
+  rw [show (G : ℝ → ℂ) = fun y : ℝ ↦ (y : ℂ) ^ n * ((χ y : ℝ) : ℂ) from funext hG]
+  refine tsupport_mul_subset_right.trans ((tsupport_comp_subset Complex.ofReal_zero _).trans ?_)
+  rw [χ.tsupport_eq]
+  exact Metric.closedBall_subset_closedBall hχ
+
+/-- `x ↦ εⁿ G(x / ε)` is a Schwartz function when `G` has compact support. -/
+private theorem realSchwartzFlatQuotient_strongDual_exists_scaled (G : 𝓢(ℝ, ℂ))
+    (hG : HasCompactSupport (G : ℝ → ℂ)) (n : ℕ) (ε : ℝ) (hε : ε ≠ 0) :
+    ∃ ψ : 𝓢(ℝ, ℂ), ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x) :=
+  ⟨HasCompactSupport.toSchwartzMap (f := fun x ↦ (ε : ℂ) ^ n * G (ε⁻¹ * x))
+    ((hG.comp_smul (inv_ne_zero hε)).mul_left (f := fun _ ↦ (ε : ℂ) ^ n))
+    (contDiff_const.mul ((G.smooth ⊤).comp (contDiff_const.mul contDiff_id))), fun _ ↦ rfl⟩
+
+/-- For `m < n` and `ε ≤ 1`, every seminorm of order `m` of `x ↦ xⁿ χ(x / ε)` is at most `ε`
+times a bound that does not depend on `ε`. -/
+private theorem realSchwartzFlatQuotient_strongDual_scaled_seminorm (χ : ContDiffBump (0 : ℝ))
+    (hχ : χ.rOut ≤ 1) (n m k : ℕ) (hmn : m < n) (G ψ : 𝓢(ℝ, ℂ))
+    (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) (ε : ℝ) (hε : 0 < ε) (hε1 : ε ≤ 1)
+    (hψ : ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x)) :
+    SchwartzMap.seminorm ℂ k m ψ ≤ ε * SchwartzMap.seminorm ℂ 0 m G := by
+  have hGb (y : ℝ) : ‖iteratedDeriv m (G : ℝ → ℂ) y‖ ≤ SchwartzMap.seminorm ℂ 0 m G := by
+    have h := SchwartzMap.le_seminorm' ℂ 0 m G y
+    rwa [pow_zero, one_mul] at h
+  have hC : 0 ≤ SchwartzMap.seminorm ℂ 0 m G := apply_nonneg _ _
+  refine SchwartzMap.seminorm_le_bound' ℂ k m _ (by positivity) fun x ↦ ?_
+  have hd : iteratedDeriv m (ψ : ℝ → ℂ) x =
+      (ε : ℂ) ^ n * ((ε⁻¹) ^ m • iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x)) := by
+    rw [show (ψ : ℝ → ℂ) = fun x ↦ (ε : ℂ) ^ n * G (ε⁻¹ * x) from funext hψ,
+      iteratedDeriv_const_mul_field, iteratedDeriv_comp_const_smul ((G.smooth ⊤).of_le (mod_cast le_top))]
+  have hpow : ε ^ n * (ε⁻¹) ^ m ≤ ε := by
+    rw [← pow_sub_mul_pow ε hmn.le, mul_assoc, ← mul_pow, mul_inv_cancel₀ hε.ne', one_pow,
+      mul_one]
+    calc ε ^ (n - m) ≤ ε ^ 1 := pow_le_pow_of_le_one hε.le hε1 (by omega)
+      _ = ε := pow_one ε
+  rw [hd, norm_mul, norm_smul, norm_pow, norm_pow, Complex.norm_real, Real.norm_eq_abs,
+    Real.norm_eq_abs, abs_of_pos hε, abs_of_pos (inv_pos.mpr hε)]
+  by_cases hx : |x| ≤ 1
+  · calc |x| ^ k * (ε ^ n * ((ε⁻¹) ^ m * ‖iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x)‖))
+        ≤ 1 * ((ε ^ n * (ε⁻¹) ^ m) * SchwartzMap.seminorm ℂ 0 m G) := by
+          rw [← mul_assoc (ε ^ n)]
+          gcongr
+          · exact pow_le_one₀ (abs_nonneg x) hx
+          · exact hGb _
+      _ ≤ ε * SchwartzMap.seminorm ℂ 0 m G := by
+          rw [one_mul]
+          gcongr
+  · have hout : ε⁻¹ * x ∉ tsupport (G : ℝ → ℂ) := by
+      intro h
+      have := realSchwartzFlatQuotient_strongDual_bump_tsupport χ hχ n G hG h
+      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
+        inv_mul_le_iff₀ hε] at this
+      exact hx (by nlinarith [abs_nonneg x])
+    have h0 : iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x) = 0 := by
+      rw [← norm_eq_zero, ← norm_iteratedFDeriv_eq_norm_iteratedDeriv, norm_eq_zero]
+      by_contra hne
+      exact hout (support_iteratedFDeriv_subset m hne)
+    rw [h0, norm_zero, mul_zero, mul_zero, mul_zero]
+    positivity
+
+
 set_option quotPrecheck false
 
 section FinitePlace
@@ -780,6 +912,137 @@ def realDiracDerivative (k : ℕ) : StrongDual ℂ 𝓢(ℝ, ℂ) :=
   (-1 : ℂ)^k •
     (TemperedDistribution.delta (0 : ℝ)).comp ((SchwartzMap.derivCLM ℂ ℂ)^k)
 
+/-- The kth Dirac derivative is `(-1)^k` times the kth derivative at zero. -/
+private theorem realSchwartzFlatQuotient_strongDual_dirac (k : ℕ) (f : 𝓢(ℝ, ℂ)) :
+    realDiracDerivative k f = (-1 : ℂ) ^ k * iteratedDeriv k (f : ℝ → ℂ) 0 := by
+  have hd : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k f := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
+      rw [ih]
+  change (-1 : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ ^ k) f) 0 = _
+  rw [congrFun hd 0]
+
+/-- The Dirac derivatives of `x ↦ xⁿ χ(x / ε)`, which agrees with `xⁿ` near zero. -/
+private theorem realSchwartzFlatQuotient_strongDual_scaled_dirac (χ : ContDiffBump (0 : ℝ))
+    (n : ℕ) (G ψ : 𝓢(ℝ, ℂ)) (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) (ε : ℝ)
+    (hε : 0 < ε) (hψ : ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x)) (j : ℕ) :
+    realDiracDerivative j ψ = (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0 := by
+  rw [realSchwartzFlatQuotient_strongDual_dirac, ← realSchwartzFlatQuotient_strongDual_pow]
+  congr 1
+  apply Filter.EventuallyEq.iteratedDeriv_eq
+  have hball : Metric.ball (0 : ℝ) (ε * χ.rIn) ∈ 𝓝 (0 : ℝ) :=
+    Metric.ball_mem_nhds 0 (mul_pos hε χ.rIn_pos)
+  filter_upwards [hball] with x hx
+  have hx' : ε⁻¹ * x ∈ Metric.closedBall (0 : ℝ) χ.rIn := by
+    rw [Metric.mem_ball, Real.dist_eq, sub_zero] at hx
+    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
+      inv_mul_le_iff₀ hε]
+    exact hx.le
+  rw [hψ, hG, χ.one_of_mem_closedBall hx', Complex.ofReal_one, mul_one, Complex.ofReal_mul,
+    mul_pow, ← mul_assoc, ← mul_pow, Complex.ofReal_inv, mul_inv_cancel₀ (by exact_mod_cast hε.ne'),
+    one_pow, one_mul]
+
+/-- Borel's lemma with uniform bounds: for every bound on the derivatives at zero, one bounded
+set of Schwartz functions realizes every sequence of Dirac derivatives within that bound. -/
+private theorem realSchwartzFlatQuotient_strongDual_borel (M : ℕ → ℝ) :
+    ∃ S : Set 𝓢(ℝ, ℂ), Bornology.IsVonNBounded ℂ S ∧ ∀ c : ℕ → ℂ, (∀ n, ‖c n‖ ≤ M n) →
+      ∃ f ∈ S, ∀ n, realDiracDerivative n f = c n := by
+  have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
+  let χ : ContDiffBump (0 : ℝ) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
+  have hχ : χ.rOut ≤ 1 := le_rfl
+  choose G hG using realSchwartzFlatQuotient_strongDual_exists_bump χ
+  have hGc (n : ℕ) : HasCompactSupport (G n : ℝ → ℂ) :=
+    (isCompact_closedBall (0 : ℝ) 1).of_isClosed_subset (isClosed_tsupport _)
+      (realSchwartzFlatQuotient_strongDual_bump_tsupport χ hχ n (G n) (hG n))
+  let C (n m : ℕ) : ℝ := SchwartzMap.seminorm ℂ 0 m (G n)
+  have hC (n m : ℕ) : 0 ≤ C n m := apply_nonneg _ _
+  let δ (n : ℕ) : ℝ := (1 / 2) ^ n / (|M n| + 1)
+  have hδ (n : ℕ) : 0 < δ n := by positivity
+  have hsC (n : ℕ) : 0 < ∑ m ∈ Finset.range n, C n m + 1 := by
+    have : 0 ≤ ∑ m ∈ Finset.range n, C n m := Finset.sum_nonneg fun m _ ↦ hC n m
+    linarith
+  let ε (n : ℕ) : ℝ := min 1 (δ n / (∑ m ∈ Finset.range n, C n m + 1))
+  have hε (n : ℕ) : 0 < ε n := lt_min one_pos (div_pos (hδ n) (hsC n))
+  choose φ hφe using fun n ↦
+    realSchwartzFlatQuotient_strongDual_exists_scaled (G n) (hGc n) n (ε n) (hε n).ne'
+  have hφ (n m k : ℕ) (hmn : m < n) : SchwartzMap.seminorm ℂ k m (φ n) ≤ δ n := by
+    have hS : C n m ≤ ∑ m ∈ Finset.range n, C n m + 1 := by
+      have := Finset.single_le_sum (fun m _ ↦ hC n m) (Finset.mem_range.mpr hmn)
+      linarith
+    calc SchwartzMap.seminorm ℂ k m (φ n) ≤ ε n * C n m :=
+          realSchwartzFlatQuotient_strongDual_scaled_seminorm χ hχ n m k hmn (G n) (φ n) (hG n)
+            (ε n) (hε n) (min_le_left _ _) (hφe n)
+      _ ≤ δ n / (∑ m ∈ Finset.range n, C n m + 1) * (∑ m ∈ Finset.range n, C n m + 1) := by
+          gcongr
+          · exact min_le_right _ _
+      _ = δ n := div_mul_cancel₀ _ (hsC n).ne'
+  let u (i : ℕ × ℕ) (n : ℕ) : ℝ :=
+    (1 / 2) ^ n + if n ≤ i.2 then |M n| * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) else 0
+  have hu (i : ℕ × ℕ) : Summable (u i) := by
+    refine (summable_geometric_of_lt_one (by norm_num) (by norm_num)).add ?_
+    refine summable_of_ne_finset_zero (s := Finset.range (i.2 + 1)) fun n hn ↦ ?_
+    rw [Finset.mem_range, not_lt] at hn
+    simp [show ¬ n ≤ i.2 by omega]
+  let b (c : ℕ → ℂ) (n : ℕ) : ℂ := c n * (-1 : ℂ) ^ n / (n.factorial : ℂ)
+  have hb (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) (n : ℕ) : ‖b c n‖ ≤ |M n| := by
+    have hf : (1 : ℝ) ≤ n.factorial := mod_cast n.factorial_pos
+    simp only [b, norm_div, norm_mul, norm_pow, norm_neg, norm_one, one_pow, mul_one,
+      Complex.norm_natCast]
+    calc ‖c n‖ / (n.factorial : ℝ) ≤ ‖c n‖ / 1 := by gcongr
+      _ = ‖c n‖ := div_one _
+      _ ≤ |M n| := (hc n).trans (le_abs_self _)
+  have hx (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) (i : ℕ × ℕ) (n : ℕ) :
+      schwartzSeminormFamily ℂ ℝ ℂ i (b c n • φ n) ≤ u i n := by
+    rw [SchwartzMap.schwartzSeminormFamily_apply, map_smul_eq_mul]
+    have h0 : 0 ≤ SchwartzMap.seminorm ℂ i.1 i.2 (φ n) := apply_nonneg _ _
+    have hg : (0 : ℝ) ≤ (1 / 2) ^ n := by positivity
+    by_cases hn : n ≤ i.2
+    · simp only [u, hn, ↓reduceIte]
+      have := mul_le_mul_of_nonneg_right (hb c hc n) h0
+      linarith
+    · simp only [u, hn, ↓reduceIte, add_zero]
+      calc ‖b c n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) ≤ |M n| * δ n :=
+            mul_le_mul (hb c hc n) (hφ n i.2 i.1 (by omega)) h0 (abs_nonneg _)
+        _ = (1 / 2) ^ n * (|M n| / (|M n| + 1)) := by simp only [δ]; ring
+        _ ≤ (1 / 2) ^ n * 1 := by
+            gcongr
+            rw [div_le_one (by positivity)]
+            linarith
+        _ = (1 / 2) ^ n := mul_one _
+  have hsum (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) :=
+    realSchwartzFlatQuotient_strongDual_summable (schwartz_withSeminorms ℂ ℝ ℂ)
+      (fun n ↦ b c n • φ n) u hu (hx c hc)
+  refine ⟨{f | ∃ c : ℕ → ℂ, (∀ n, ‖c n‖ ≤ M n) ∧ f = ∑' n, b c n • φ n}, ?_, fun c hc ↦ ?_⟩
+  · rw [(schwartz_withSeminorms ℂ ℝ ℂ).isVonNBounded_iff_seminorm_bounded]
+    intro i
+    have h0 : 0 ≤ ∑' n, u i n := tsum_nonneg fun n ↦ by
+      have : (0 : ℝ) ≤ (1 / 2) ^ n := by positivity
+      have : 0 ≤ if n ≤ i.2 then |M n| * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) else 0 := by
+        split_ifs
+        · exact mul_nonneg (abs_nonneg _) (apply_nonneg _ _)
+        · exact le_rfl
+      simp only [u]
+      linarith
+    refine ⟨∑' n, u i n + 1, by linarith, ?_⟩
+    rintro f ⟨c, hc, rfl⟩
+    exact ((hsum c hc).2 i).trans_lt (by linarith)
+  · refine ⟨∑' n, b c n • φ n, ⟨c, hc, rfl⟩, fun j ↦ ?_⟩
+    rw [ContinuousLinearMap.map_tsum _ (hsum c hc).1]
+    have hd (n : ℕ) : realDiracDerivative j (φ n) =
+        (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0 :=
+      realSchwartzFlatQuotient_strongDual_scaled_dirac χ n (G n) (φ n) (hG n) (ε n) (hε n)
+        (hφe n) j
+    simp only [map_smul, smul_eq_mul, hd]
+    rw [tsum_eq_single j fun n hn ↦ by simp [Ne.symm hn]]
+    simp only [↓reduceIte]
+    have hf : (j.factorial : ℂ) ≠ 0 := mod_cast Nat.factorial_ne_zero j
+    simp only [b]
+    field_simp
+    rw [← pow_mul, mul_comm j 2, pow_mul, neg_one_sq, one_pow, mul_one]
+
 /-- Paper: Theorem 5.3.2.1, p. 243.
 The first derivative of the real Dirac distribution evaluates to minus the derivative at zero. -/
 theorem realDiracDerivative_one (f : 𝓢(ℝ, ℂ)) :
@@ -856,41 +1119,6 @@ theorem realSchwartzTaylor_equiv :
         PowerSeries.coeff k (e (realSchwartzFlatAtOrigin.mkQ f)) =
           iteratedDeriv k (f : ℝ → ℂ) 0 / (k.factorial : ℂ) := by sorry
 
-/-- A series whose terms are dominated, seminorm by seminorm, by summable real sequences is
-summable in a complete space whose topology is given by those seminorms, and each seminorm of
-its sum is at most the sum of the dominating sequence. -/
-private theorem realSchwartzFlatQuotient_strongDual_summable {𝕜 E ι : Type*} [NormedField 𝕜]
-    [AddCommGroup E] [Module 𝕜 E] [UniformSpace E] [IsUniformAddGroup E] [CompleteSpace E]
-    {p : SeminormFamily 𝕜 E ι} (hp : WithSeminorms p) (x : ℕ → E) (u : ι → ℕ → ℝ)
-    (hu : ∀ i, Summable (u i)) (hx : ∀ i n, p i (x n) ≤ u i n) :
-    Summable x ∧ ∀ i, p i (∑' n, x n) ≤ ∑' n, u i n := by
-  have hu0 (i : ι) (n : ℕ) : 0 ≤ u i n := (apply_nonneg _ _).trans (hx i n)
-  have hsum : Summable x := by
-    rw [summable_iff_cauchySeq_finset, cauchySeq_finset_iff_sum_vanishing]
-    intro e he
-    obtain ⟨⟨I, r⟩, hr, hsub⟩ := hp.hasBasis_zero_ball.mem_iff.mp he
-    have hv (i : ι) : ∃ s : Finset ℕ, ∀ t : Finset ℕ, Disjoint t s → ∑ n ∈ t, u i n < r := by
-      obtain ⟨s, hs⟩ := (hu i).vanishing (Metric.ball_mem_nhds (0 : ℝ) hr)
-      refine ⟨s, fun t ht ↦ ?_⟩
-      have := hs t ht
-      rw [Metric.mem_ball, dist_zero_right, Real.norm_eq_abs] at this
-      exact (le_abs_self _).trans_lt this
-    choose s hs using hv
-    refine ⟨I.biUnion s, fun t ht ↦ hsub ?_⟩
-    rw [Seminorm.mem_ball_zero]
-    refine Seminorm.finset_sup_apply_lt hr fun i hi ↦ ?_
-    calc p i (∑ n ∈ t, x n) ≤ ∑ n ∈ t, p i (x n) :=
-          Finset.le_sum_of_subadditive (p i) (map_zero _).le (map_add_le_add _) _ _
-      _ ≤ ∑ n ∈ t, u i n := Finset.sum_le_sum fun n _ ↦ hx i n
-      _ < r := hs i t (Finset.disjoint_of_subset_right (Finset.subset_biUnion_of_mem s hi) ht)
-  refine ⟨hsum, fun i ↦ ?_⟩
-  have ht := ((hp.continuous_seminorm i).tendsto _).comp hsum.hasSum
-  refine le_of_tendsto' ht fun t ↦ ?_
-  calc p i (∑ n ∈ t, x n) ≤ ∑ n ∈ t, p i (x n) :=
-        Finset.le_sum_of_subadditive (p i) (map_zero _).le (map_add_le_add _) _ _
-    _ ≤ ∑ n ∈ t, u i n := Finset.sum_le_sum fun n _ ↦ hx i n
-    _ ≤ ∑' n, u i n := (hu i).sum_le_tsum t fun n _ ↦ hu0 i n
-
 open scoped UniformConvergence in
 /-- Pulling back the strong dual of a quotient is an embedding when every bounded set of the
 quotient is the image of a bounded set. -/
@@ -925,234 +1153,6 @@ private theorem realSchwartzFlatQuotient_strongDual_isEmbedding {𝕜 E : Type*}
   ext y
   obtain ⟨x, rfl⟩ := K.mkQ_surjective y
   exact congrArg (fun L : StrongDual 𝕜 E ↦ L x) hT
-
-/-- The kth Dirac derivative is `(-1)^k` times the kth derivative at zero. -/
-private theorem realSchwartzFlatQuotient_strongDual_dirac (k : ℕ) (f : 𝓢(ℝ, ℂ)) :
-    realDiracDerivative k f = (-1 : ℂ) ^ k * iteratedDeriv k (f : ℝ → ℂ) 0 := by
-  have hd : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k f := by
-    induction k with
-    | zero => rfl
-    | succ k ih =>
-      rw [pow_succ', iteratedDeriv_succ]
-      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
-      rw [ih]
-  change (-1 : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ ^ k) f) 0 = _
-  rw [congrFun hd 0]
-
-/-- The derivatives at zero of a real power, viewed as a complex function. -/
-private theorem realSchwartzFlatQuotient_strongDual_pow (n j : ℕ) :
-    iteratedDeriv j (fun x : ℝ ↦ (x : ℂ) ^ n) 0 = if j = n then (n.factorial : ℂ) else 0 := by
-  have h : ∀ j, iteratedDeriv j (fun x : ℝ ↦ (x : ℂ) ^ n) =
-      fun x : ℝ ↦ (n.descFactorial j : ℂ) * (x : ℂ) ^ (n - j) := by
-    intro j
-    induction j with
-    | zero => funext x; simp
-    | succ j ih =>
-      rw [iteratedDeriv_succ, ih]
-      funext x
-      have h1 : HasDerivAt (fun y : ℝ ↦ (y : ℂ)) 1 x := by
-        simpa using (hasDerivAt_id x).ofReal_comp
-      have := (h1.pow (n - j)).const_mul (n.descFactorial j : ℂ)
-      rw [show (fun x : ℝ ↦ (n.descFactorial j : ℂ) * (x : ℂ) ^ (n - j)) =
-        fun y ↦ (n.descFactorial j : ℂ) * ((fun y : ℝ ↦ (y : ℂ)) ^ (n - j)) y from rfl,
-        this.deriv, Nat.descFactorial_succ, Nat.sub_sub, mul_one]
-      push_cast
-      ring
-  rw [h j]
-  rcases lt_trichotomy j n with hj | rfl | hj
-  · simp [hj.ne, Nat.sub_ne_zero_of_lt hj]
-  · simp [Nat.descFactorial_self]
-  · simp [hj.ne', Nat.descFactorial_eq_zero_iff_lt.mpr hj]
-
-/-- `y ↦ yⁿ χ(y)` is a Schwartz function. -/
-private theorem realSchwartzFlatQuotient_strongDual_exists_bump (χ : ContDiffBump (0 : ℝ))
-    (n : ℕ) : ∃ G : 𝓢(ℝ, ℂ), ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ) := by
-  have hc : HasCompactSupport (fun y : ℝ ↦ (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) :=
-    (χ.hasCompactSupport.comp_left Complex.ofReal_zero).mul_left
-  exact ⟨hc.toSchwartzMap ((Complex.ofRealCLM.contDiff.pow n).mul
-    (Complex.ofRealCLM.contDiff.comp χ.contDiff)), fun _ ↦ rfl⟩
-
-/-- `y ↦ yⁿ χ(y)` vanishes outside `[-1, 1]` when `χ` does. -/
-private theorem realSchwartzFlatQuotient_strongDual_bump_tsupport (χ : ContDiffBump (0 : ℝ))
-    (hχ : χ.rOut ≤ 1) (n : ℕ) (G : 𝓢(ℝ, ℂ)) (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) :
-    tsupport (G : ℝ → ℂ) ⊆ Metric.closedBall 0 1 := by
-  rw [show (G : ℝ → ℂ) = fun y : ℝ ↦ (y : ℂ) ^ n * ((χ y : ℝ) : ℂ) from funext hG]
-  refine tsupport_mul_subset_right.trans ((tsupport_comp_subset Complex.ofReal_zero _).trans ?_)
-  rw [χ.tsupport_eq]
-  exact Metric.closedBall_subset_closedBall hχ
-
-/-- `x ↦ εⁿ G(x / ε)` is a Schwartz function when `G` has compact support. -/
-private theorem realSchwartzFlatQuotient_strongDual_exists_scaled (G : 𝓢(ℝ, ℂ))
-    (hG : HasCompactSupport (G : ℝ → ℂ)) (n : ℕ) (ε : ℝ) (hε : ε ≠ 0) :
-    ∃ ψ : 𝓢(ℝ, ℂ), ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x) :=
-  ⟨HasCompactSupport.toSchwartzMap (f := fun x ↦ (ε : ℂ) ^ n * G (ε⁻¹ * x))
-    ((hG.comp_smul (inv_ne_zero hε)).mul_left (f := fun _ ↦ (ε : ℂ) ^ n))
-    (contDiff_const.mul ((G.smooth ⊤).comp (contDiff_const.mul contDiff_id))), fun _ ↦ rfl⟩
-
-/-- The Dirac derivatives of `x ↦ xⁿ χ(x / ε)`, which agrees with `xⁿ` near zero. -/
-private theorem realSchwartzFlatQuotient_strongDual_scaled_dirac (χ : ContDiffBump (0 : ℝ))
-    (n : ℕ) (G ψ : 𝓢(ℝ, ℂ)) (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) (ε : ℝ)
-    (hε : 0 < ε) (hψ : ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x)) (j : ℕ) :
-    realDiracDerivative j ψ = (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0 := by
-  rw [realSchwartzFlatQuotient_strongDual_dirac, ← realSchwartzFlatQuotient_strongDual_pow]
-  congr 1
-  apply Filter.EventuallyEq.iteratedDeriv_eq
-  have hball : Metric.ball (0 : ℝ) (ε * χ.rIn) ∈ 𝓝 (0 : ℝ) :=
-    Metric.ball_mem_nhds 0 (mul_pos hε χ.rIn_pos)
-  filter_upwards [hball] with x hx
-  have hx' : ε⁻¹ * x ∈ Metric.closedBall (0 : ℝ) χ.rIn := by
-    rw [Metric.mem_ball, Real.dist_eq, sub_zero] at hx
-    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
-      inv_mul_le_iff₀ hε]
-    exact hx.le
-  rw [hψ, hG, χ.one_of_mem_closedBall hx', Complex.ofReal_one, mul_one, Complex.ofReal_mul,
-    mul_pow, ← mul_assoc, ← mul_pow, Complex.ofReal_inv, mul_inv_cancel₀ (by exact_mod_cast hε.ne'),
-    one_pow, one_mul]
-
-/-- For `m < n` and `ε ≤ 1`, every seminorm of order `m` of `x ↦ xⁿ χ(x / ε)` is at most `ε`
-times a bound that does not depend on `ε`. -/
-private theorem realSchwartzFlatQuotient_strongDual_scaled_seminorm (χ : ContDiffBump (0 : ℝ))
-    (hχ : χ.rOut ≤ 1) (n m k : ℕ) (hmn : m < n) (G ψ : 𝓢(ℝ, ℂ))
-    (hG : ∀ y, G y = (y : ℂ) ^ n * ((χ y : ℝ) : ℂ)) (ε : ℝ) (hε : 0 < ε) (hε1 : ε ≤ 1)
-    (hψ : ∀ x, ψ x = (ε : ℂ) ^ n * G (ε⁻¹ * x)) :
-    SchwartzMap.seminorm ℂ k m ψ ≤ ε * SchwartzMap.seminorm ℂ 0 m G := by
-  have hGb (y : ℝ) : ‖iteratedDeriv m (G : ℝ → ℂ) y‖ ≤ SchwartzMap.seminorm ℂ 0 m G := by
-    have h := SchwartzMap.le_seminorm' ℂ 0 m G y
-    rwa [pow_zero, one_mul] at h
-  have hC : 0 ≤ SchwartzMap.seminorm ℂ 0 m G := apply_nonneg _ _
-  refine SchwartzMap.seminorm_le_bound' ℂ k m _ (by positivity) fun x ↦ ?_
-  have hd : iteratedDeriv m (ψ : ℝ → ℂ) x =
-      (ε : ℂ) ^ n * ((ε⁻¹) ^ m • iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x)) := by
-    rw [show (ψ : ℝ → ℂ) = fun x ↦ (ε : ℂ) ^ n * G (ε⁻¹ * x) from funext hψ,
-      iteratedDeriv_const_mul_field, iteratedDeriv_comp_const_smul ((G.smooth ⊤).of_le (mod_cast le_top))]
-  have hpow : ε ^ n * (ε⁻¹) ^ m ≤ ε := by
-    rw [← pow_sub_mul_pow ε hmn.le, mul_assoc, ← mul_pow, mul_inv_cancel₀ hε.ne', one_pow,
-      mul_one]
-    calc ε ^ (n - m) ≤ ε ^ 1 := pow_le_pow_of_le_one hε.le hε1 (by omega)
-      _ = ε := pow_one ε
-  rw [hd, norm_mul, norm_smul, norm_pow, norm_pow, Complex.norm_real, Real.norm_eq_abs,
-    Real.norm_eq_abs, abs_of_pos hε, abs_of_pos (inv_pos.mpr hε)]
-  by_cases hx : |x| ≤ 1
-  · calc |x| ^ k * (ε ^ n * ((ε⁻¹) ^ m * ‖iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x)‖))
-        ≤ 1 * ((ε ^ n * (ε⁻¹) ^ m) * SchwartzMap.seminorm ℂ 0 m G) := by
-          rw [← mul_assoc (ε ^ n)]
-          gcongr
-          · exact pow_le_one₀ (abs_nonneg x) hx
-          · exact hGb _
-      _ ≤ ε * SchwartzMap.seminorm ℂ 0 m G := by
-          rw [one_mul]
-          gcongr
-  · have hout : ε⁻¹ * x ∉ tsupport (G : ℝ → ℂ) := by
-      intro h
-      have := realSchwartzFlatQuotient_strongDual_bump_tsupport χ hχ n G hG h
-      rw [Metric.mem_closedBall, Real.dist_eq, sub_zero, abs_mul, abs_inv, abs_of_pos hε,
-        inv_mul_le_iff₀ hε] at this
-      exact hx (by nlinarith [abs_nonneg x])
-    have h0 : iteratedDeriv m (G : ℝ → ℂ) (ε⁻¹ * x) = 0 := by
-      rw [← norm_eq_zero, ← norm_iteratedFDeriv_eq_norm_iteratedDeriv, norm_eq_zero]
-      by_contra hne
-      exact hout (support_iteratedFDeriv_subset m hne)
-    rw [h0, norm_zero, mul_zero, mul_zero, mul_zero]
-    positivity
-
-/-- Borel's lemma with uniform bounds: for every bound on the derivatives at zero, one bounded
-set of Schwartz functions realizes every sequence of Dirac derivatives within that bound. -/
-private theorem realSchwartzFlatQuotient_strongDual_borel (M : ℕ → ℝ) :
-    ∃ S : Set 𝓢(ℝ, ℂ), Bornology.IsVonNBounded ℂ S ∧ ∀ c : ℕ → ℂ, (∀ n, ‖c n‖ ≤ M n) →
-      ∃ f ∈ S, ∀ n, realDiracDerivative n f = c n := by
-  let χ : ContDiffBump (0 : ℝ) := ⟨1 / 2, 1, by norm_num, by norm_num⟩
-  have hχ : χ.rOut ≤ 1 := le_rfl
-  choose G hG using realSchwartzFlatQuotient_strongDual_exists_bump χ
-  have hGc (n : ℕ) : HasCompactSupport (G n : ℝ → ℂ) :=
-    (isCompact_closedBall (0 : ℝ) 1).of_isClosed_subset (isClosed_tsupport _)
-      (realSchwartzFlatQuotient_strongDual_bump_tsupport χ hχ n (G n) (hG n))
-  let C (n m : ℕ) : ℝ := SchwartzMap.seminorm ℂ 0 m (G n)
-  have hC (n m : ℕ) : 0 ≤ C n m := apply_nonneg _ _
-  let δ (n : ℕ) : ℝ := (1 / 2) ^ n / (|M n| + 1)
-  have hδ (n : ℕ) : 0 < δ n := by positivity
-  have hsC (n : ℕ) : 0 < ∑ m ∈ Finset.range n, C n m + 1 := by
-    have : 0 ≤ ∑ m ∈ Finset.range n, C n m := Finset.sum_nonneg fun m _ ↦ hC n m
-    linarith
-  let ε (n : ℕ) : ℝ := min 1 (δ n / (∑ m ∈ Finset.range n, C n m + 1))
-  have hε (n : ℕ) : 0 < ε n := lt_min one_pos (div_pos (hδ n) (hsC n))
-  choose φ hφe using fun n ↦
-    realSchwartzFlatQuotient_strongDual_exists_scaled (G n) (hGc n) n (ε n) (hε n).ne'
-  have hφ (n m k : ℕ) (hmn : m < n) : SchwartzMap.seminorm ℂ k m (φ n) ≤ δ n := by
-    have hS : C n m ≤ ∑ m ∈ Finset.range n, C n m + 1 := by
-      have := Finset.single_le_sum (fun m _ ↦ hC n m) (Finset.mem_range.mpr hmn)
-      linarith
-    calc SchwartzMap.seminorm ℂ k m (φ n) ≤ ε n * C n m :=
-          realSchwartzFlatQuotient_strongDual_scaled_seminorm χ hχ n m k hmn (G n) (φ n) (hG n)
-            (ε n) (hε n) (min_le_left _ _) (hφe n)
-      _ ≤ δ n / (∑ m ∈ Finset.range n, C n m + 1) * (∑ m ∈ Finset.range n, C n m + 1) := by
-          gcongr
-          · exact min_le_right _ _
-      _ = δ n := div_mul_cancel₀ _ (hsC n).ne'
-  let u (i : ℕ × ℕ) (n : ℕ) : ℝ :=
-    (1 / 2) ^ n + if n ≤ i.2 then |M n| * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) else 0
-  have hu (i : ℕ × ℕ) : Summable (u i) := by
-    refine (summable_geometric_of_lt_one (by norm_num) (by norm_num)).add ?_
-    refine summable_of_ne_finset_zero (s := Finset.range (i.2 + 1)) fun n hn ↦ ?_
-    rw [Finset.mem_range, not_lt] at hn
-    simp [show ¬ n ≤ i.2 by omega]
-  let b (c : ℕ → ℂ) (n : ℕ) : ℂ := c n * (-1 : ℂ) ^ n / (n.factorial : ℂ)
-  have hb (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) (n : ℕ) : ‖b c n‖ ≤ |M n| := by
-    have hf : (1 : ℝ) ≤ n.factorial :=
-      mod_cast Nat.one_le_iff_ne_zero.mpr (Nat.factorial_ne_zero n)
-    simp only [b, norm_div, norm_mul, norm_pow, norm_neg, norm_one, one_pow, mul_one,
-      Complex.norm_natCast]
-    calc ‖c n‖ / (n.factorial : ℝ) ≤ ‖c n‖ / 1 := by gcongr
-      _ = ‖c n‖ := div_one _
-      _ ≤ |M n| := (hc n).trans (le_abs_self _)
-  have hx (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) (i : ℕ × ℕ) (n : ℕ) :
-      schwartzSeminormFamily ℂ ℝ ℂ i (b c n • φ n) ≤ u i n := by
-    rw [SchwartzMap.schwartzSeminormFamily_apply, map_smul_eq_mul]
-    have h0 : 0 ≤ SchwartzMap.seminorm ℂ i.1 i.2 (φ n) := apply_nonneg _ _
-    have hg : (0 : ℝ) ≤ (1 / 2) ^ n := by positivity
-    by_cases hn : n ≤ i.2
-    · simp only [u, hn, ↓reduceIte]
-      have := mul_le_mul_of_nonneg_right (hb c hc n) h0
-      linarith
-    · simp only [u, hn, ↓reduceIte, add_zero]
-      calc ‖b c n‖ * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) ≤ |M n| * δ n :=
-            mul_le_mul (hb c hc n) (hφ n i.2 i.1 (by omega)) h0 (abs_nonneg _)
-        _ = (1 / 2) ^ n * (|M n| / (|M n| + 1)) := by simp only [δ]; ring
-        _ ≤ (1 / 2) ^ n * 1 := by
-            gcongr
-            rw [div_le_one (by positivity)]
-            linarith
-        _ = (1 / 2) ^ n := mul_one _
-  have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
-  have hsum (c : ℕ → ℂ) (hc : ∀ n, ‖c n‖ ≤ M n) :=
-    realSchwartzFlatQuotient_strongDual_summable (schwartz_withSeminorms ℂ ℝ ℂ)
-      (fun n ↦ b c n • φ n) u hu (hx c hc)
-  refine ⟨{f | ∃ c : ℕ → ℂ, (∀ n, ‖c n‖ ≤ M n) ∧ f = ∑' n, b c n • φ n}, ?_, fun c hc ↦ ?_⟩
-  · rw [(schwartz_withSeminorms ℂ ℝ ℂ).isVonNBounded_iff_seminorm_bounded]
-    intro i
-    have h0 : 0 ≤ ∑' n, u i n := tsum_nonneg fun n ↦ by
-      have : (0 : ℝ) ≤ (1 / 2) ^ n := by positivity
-      have : 0 ≤ if n ≤ i.2 then |M n| * SchwartzMap.seminorm ℂ i.1 i.2 (φ n) else 0 := by
-        split_ifs
-        · exact mul_nonneg (abs_nonneg _) (apply_nonneg _ _)
-        · exact le_rfl
-      simp only [u]
-      linarith
-    refine ⟨∑' n, u i n + 1, by linarith, ?_⟩
-    rintro f ⟨c, hc, rfl⟩
-    exact ((hsum c hc).2 i).trans_lt (by linarith)
-  · refine ⟨∑' n, b c n • φ n, ⟨c, hc, rfl⟩, fun j ↦ ?_⟩
-    rw [ContinuousLinearMap.map_tsum _ (hsum c hc).1]
-    have hd (n : ℕ) : realDiracDerivative j (φ n) =
-        (-1 : ℂ) ^ j * if j = n then (n.factorial : ℂ) else 0 :=
-      realSchwartzFlatQuotient_strongDual_scaled_dirac χ n (G n) (φ n) (hG n) (ε n) (hε n)
-        (hφe n) j
-    simp only [map_smul, smul_eq_mul, hd]
-    rw [tsum_eq_single j fun n hn ↦ by simp [Ne.symm hn]]
-    simp only [↓reduceIte]
-    have hf : (j.factorial : ℂ) ≠ 0 := mod_cast Nat.factorial_ne_zero j
-    simp only [b]
-    field_simp
-    rw [← pow_mul, mul_comm j 2, pow_mul, neg_one_sq, one_pow, mul_one]
 
 /-- Every bounded set of the flat quotient is the image of a bounded set of Schwartz
 functions. -/
