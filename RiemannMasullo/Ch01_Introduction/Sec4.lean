@@ -468,7 +468,16 @@ the line of real part one.
 Deviation: Meromorphic order allows the pole of a pure norm character on
 this line. A normal-form point value at a pole would be zero in Lean. -/
 theorem introTrace_finiteL_no_zeros_one_line (χ : U𝔽) (t : ℝ) :
-    meromorphicOrderAt finiteL(χ) ⟨1, t⟩ ≤ 0 := by sorry
+    meromorphicOrderAt finiteL(χ) ⟨1, t⟩ ≤ 0 := by
+  obtain ⟨A, hA, h⟩ := finiteHeckeL_zeroFreeRegion
+  obtain ⟨B, hB, hzero⟩ := h F χ
+  have hlog : 0 ≤ Real.log (B * (|t| + 3)) := Real.log_nonneg (by
+    have hBt : 0 ≤ B * |t| := mul_nonneg (by linarith) (abs_nonneg t)
+    nlinarith)
+  apply hzero _ (finiteHeckeL_exists_continuation χ).choose_spec.1
+    (finiteHeckeL_exists_continuation χ).choose_spec.2
+  change 1 - A / ((Module.finrank ℚ F : ℝ) ^ 4 * Real.log (B * (|t| + 3))) ≤ 1
+  exact sub_le_self _ (div_nonneg hA.le (mul_nonneg (by positivity) hlog))
 
 /-- Paper: §1.4.7, pp. 30–31. The outside Euler product has no zero on the
 line of real part one, so its reciprocal is holomorphic there.
