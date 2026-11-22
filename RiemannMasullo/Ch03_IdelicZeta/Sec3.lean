@@ -694,10 +694,114 @@ theorem sLocalIdelicZetaIntegral_tendstoUniformlyOn (f : ℬ(Aₛ))
         (fun g _ ↦ hle hc g)
     _ < ε := hn
 
+/-- A logarithm times a power with exponent in (σ/2, 3σ/2) is bounded by a multiple
+of the sum of the σ/4-th and 7σ/4-th powers. -/
+private theorem rpow_mul_abs_log_le_of_mem_Ioo {σ x r : ℝ} (hσ : 0 < σ)
+    (hx : x ∈ Ioo (σ / 2) (3 * σ / 2)) (hr : 0 < r) :
+    r ^ x * |Real.log r| ≤ 4 / σ * (r ^ (σ / 4) + r ^ (7 * σ / 4)) := by
+  have hε : 0 < σ / 4 := by positivity
+  rcases le_or_gt 1 r with h1 | h1
+  · have hlog := Real.log_le_rpow_div hr.le hε
+    have hpow : r ^ x ≤ r ^ (3 * σ / 2) := Real.rpow_le_rpow_of_exponent_le h1 hx.2.le
+    rw [abs_of_nonneg (Real.log_nonneg h1)]
+    calc r ^ x * Real.log r ≤ r ^ (3 * σ / 2) * (r ^ (σ / 4) / (σ / 4)) :=
+          mul_le_mul hpow hlog (Real.log_nonneg h1) (by positivity)
+      _ = 4 / σ * r ^ (7 * σ / 4) := by
+          rw [mul_div_assoc', ← Real.rpow_add hr]
+          field_simp
+          ring_nf
+      _ ≤ _ := by
+          have : 0 ≤ r ^ (σ / 4) := by positivity
+          nlinarith [show 0 < 4 / σ by positivity]
+  · have hlog := Real.log_le_rpow_div (inv_pos.mpr hr).le hε
+    have hpow : r ^ x ≤ r ^ (σ / 2) := Real.rpow_le_rpow_of_exponent_ge hr h1.le hx.1.le
+    rw [abs_of_neg (Real.log_neg hr h1), ← Real.log_inv]
+    calc r ^ x * Real.log r⁻¹ ≤ r ^ (σ / 2) * (r⁻¹ ^ (σ / 4) / (σ / 4)) :=
+          mul_le_mul hpow hlog (Real.log_nonneg ((one_le_inv₀ hr).mpr h1.le)) (by positivity)
+      _ = 4 / σ * r ^ (σ / 4) := by
+          rw [Real.inv_rpow hr.le, ← Real.rpow_neg hr.le, mul_div_assoc', ← Real.rpow_add hr]
+          field_simp
+          ring_nf
+      _ ≤ _ := by
+          have : 0 ≤ r ^ (7 * σ / 4) := by positivity
+          nlinarith [show 0 < 4 / σ by positivity]
+
 /-- Paper: Theorem 3.3.1.1(1), p. 129. The zeta integral is holomorphic in
 every norm-twist coordinate on the right half-plane. -/
 theorem sLocalIdelicZetaIntegral_analyticOn (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) :
-    AnalyticOnNhd ℂ (fun s ↦ sLocalIdelicZetaIntegral f (chartₛ(χ) s)) rightHalf := by sorry
+    AnalyticOnNhd ℂ (fun s ↦ sLocalIdelicZetaIntegral f (chartₛ(χ) s)) rightHalf := by
+  have hopen : IsOpen (rightHalf : Set ℂ) := isOpen_Ioi.preimage Complex.continuous_re
+  refine DifferentiableOn.analyticOnNhd (fun s hs ↦ ?_) hopen
+  refine DifferentiableAt.differentiableWithinAt ?_
+  have hσ : 0 < s.re := hs
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let : BorelSpace Aₛ := inferInstanceAs (BorelSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : BorelSpace Iₛ := ⟨by
+    change MeasurableSpace.comap Units.val (inferInstance : MeasurableSpace Aₛ) = _
+    rw [(sIdeleGroup_description F S).1.eq_induced, borel_comap,
+      BorelSpace.measurable_eq (α := Aₛ)]⟩
+  let r (g : Iₛ) : ℝ := ((mₛ (classOf g) : ℝ≥0) : ℝ)
+  have hr (g : Iₛ) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hrcont : Continuous r :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (Continuous.comp hmₛ QuotientGroup.continuous_mk))
+  let W (z : ℂ) (g : Iₛ) : ℂ := f (Multiplicative.ofAdd g.val) * chartₛ(χ) z (classOf g)
+  let D (z : ℂ) (g : Iₛ) : ℂ := W z g * Complex.log (r g : ℂ)
+  have hnormW (χ' : PontryaginDual Jₛ) (z : ℂ) (g : Iₛ) :
+      ‖f (Multiplicative.ofAdd g.val) * chartₛ(χ') z (classOf g)‖ =
+        ‖f (Multiplicative.ofAdd g.val)‖ * r g ^ z.re := by
+    change ‖f (Multiplicative.ofAdd g.val) * ((χ' (classOf g) : ℂ) * (r g : ℂ) ^ z)‖ = _
+    rw [norm_mul, norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (hr g)]
+  let V : Set ℂ := Complex.re ⁻¹' Ioo (s.re / 2) (3 * s.re / 2)
+  have hV : V ∈ 𝓝 s := (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+    (show s.re ∈ Ioo (s.re / 2) (3 * s.re / 2) from ⟨by linarith, by linarith⟩)
+  have hint (χ' : PontryaginDual Jₛ) (z : ℂ) (hz : 0 < z.re) :
+      Integrable (fun g : Iₛ ↦ f (Multiplicative.ofAdd g.val) * chartₛ(χ') z (classOf g)) μₛ :=
+    sLocalIdelicZetaIntegral_integrable f _ ⟨χ', z, hz, rfl⟩
+  have hmeas : ∀ᶠ z in 𝓝 s, AEStronglyMeasurable (W z) μₛ :=
+    Filter.mem_of_superset hV fun z hz ↦ (hint χ z (by
+      have h := hz.1
+      linarith)).aestronglyMeasurable
+  have hDmeas : AEStronglyMeasurable (D s) μₛ :=
+    (hint χ s hσ).aestronglyMeasurable.mul (Complex.measurable_log.comp
+      (Complex.continuous_ofReal.comp hrcont).measurable).aestronglyMeasurable
+  let P (a : ℝ) (g : Iₛ) : ℂ :=
+    f (Multiplicative.ofAdd g.val) * chartₛ((1 : PontryaginDual Jₛ)) (a : ℂ) (classOf g)
+  have hPint (a : ℝ) (ha : 0 < a) : Integrable (P a) μₛ :=
+    hint 1 (a : ℂ) (by simpa using ha)
+  let bound (g : Iₛ) : ℝ := 4 / s.re * (‖P (s.re / 4) g‖ + ‖P (7 * s.re / 4) g‖)
+  have hbound : Integrable bound μₛ :=
+    ((hPint _ (by positivity)).norm.add (hPint _ (by positivity)).norm).const_mul _
+  have hDbound : ∀ᵐ g ∂μₛ, ∀ z ∈ V, ‖D z g‖ ≤ bound g := Eventually.of_forall fun g z hz ↦ by
+    have hlog : Complex.log (r g : ℂ) = (Real.log (r g) : ℂ) :=
+      (Complex.ofReal_log (hr g).le).symm
+    change ‖W z g * Complex.log (r g : ℂ)‖ ≤
+      4 / s.re * (‖P (s.re / 4) g‖ + ‖P (7 * s.re / 4) g‖)
+    rw [norm_mul, hnormW, hlog, Complex.norm_real, Real.norm_eq_abs, hnormW, hnormW,
+      Complex.ofReal_re, Complex.ofReal_re, mul_assoc]
+    calc ‖f (Multiplicative.ofAdd g.val)‖ * (r g ^ z.re * |Real.log (r g)|)
+        ≤ ‖f (Multiplicative.ofAdd g.val)‖ *
+          (4 / s.re * (r g ^ (s.re / 4) + r g ^ (7 * s.re / 4))) :=
+          mul_le_mul_of_nonneg_left (rpow_mul_abs_log_le_of_mem_Ioo hσ hz (hr g))
+            (norm_nonneg _)
+      _ = _ := by ring
+  have hdiff : ∀ᵐ g ∂μₛ, ∀ z ∈ V, HasDerivAt (fun w ↦ W w g) (D z g) z :=
+    Eventually.of_forall fun g z _ ↦ by
+      have hg : (r g : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (hr g).ne'
+      change HasDerivAt (fun w : ℂ ↦ f (Multiplicative.ofAdd g.val) *
+          ((χ (classOf g) : ℂ) * (r g : ℂ) ^ w))
+        ((f (Multiplicative.ofAdd g.val) * ((χ (classOf g) : ℂ) * (r g : ℂ) ^ z)) *
+          Complex.log (r g : ℂ)) z
+      simpa only [id_eq, mul_assoc, mul_one] using
+        (((hasDerivAt_id z).const_cpow (Or.inl hg)).const_mul
+          (χ (classOf g) : ℂ)).const_mul (f (Multiplicative.ofAdd g.val))
+  exact (hasDerivAt_integral_of_dominated_loc_of_deriv_le hV hmeas (hint χ s hσ) hDmeas
+    hDbound hbound hdiff).2.differentiableAt
 
 section LocalFactors
 
@@ -951,12 +1055,199 @@ theorem sLocalIdelicZetaIntegral_functionalEquation (f : ℬ(Aₛ)) (χ : Pontry
       sLocalRhoFactor c * sLocalIdelicZetaIntegral (sAdeleSchwartzFourier f)
         (dualQuasiCharacter mₛ hmₛ c) := by sorry
 
+/-- The S-idelic module takes a value other than one. -/
+private theorem sIdeleQuotientNorm_ne_one' : ∃ x, mₛ x ≠ 1 := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  exact ⟨σ t, (hσ t).trans_ne ht⟩
+
+/-- Paper: Equation (3.1.1.2), p. 119. The abscissa of a norm twist of a unitary
+character of J_S is the real part of the exponent. -/
+private theorem sLocal_abscissa_chart (χ : PontryaginDual Jₛ) (s : ℂ) :
+    quasiCharacterAbscissa mₛ (isProperMap_sIdeleQuotientNorm F S) sIdeleQuotientNorm_ne_one'
+      (chartₛ(χ) s) = s.re :=
+  quasiCharacterAbscissa_of_unitary_twist mₛ (isProperMap_sIdeleQuotientNorm F S) _ _ χ s
+    (fun _ ↦ rfl)
+
+/-- Paper: §3.1.1, p. 119. If two norm-twist charts pass through the same
+quasi-character, adding the same increment to both coordinates gives the same
+quasi-character again. -/
+private theorem sLocal_chart_add_of_eq {χ χ' : PontryaginDual Jₛ} {s s' : ℂ}
+    (h : chartₛ(χ) s = chartₛ(χ') s') (z : ℂ) :
+    chartₛ(χ) (s + z) = chartₛ(χ') (s' + z) := by
+  ext1 g
+  have hg := DFunLike.congr_fun h g
+  have hn : (modℂ[mₛ, g]) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  change (χ g : ℂ) * (modℂ[mₛ, g]) ^ s = (χ' g : ℂ) * (modℂ[mₛ, g]) ^ s' at hg
+  change (χ g : ℂ) * (modℂ[mₛ, g]) ^ (s + z) = (χ' g : ℂ) * (modℂ[mₛ, g]) ^ (s' + z)
+  rw [Complex.cpow_add _ _ hn, Complex.cpow_add _ _ hn, ← mul_assoc, ← mul_assoc, hg]
+
+/-- Paper: Equation (3.1.1.4), p. 119. Duality in the norm-twist coordinate
+takes the inverse unitary character and reflects the exponent. -/
+private theorem sLocal_dual_chart (χ : PontryaginDual Jₛ) (s : ℂ) :
+    dualQuasiCharacter mₛ hmₛ (chartₛ(χ) s) = chartₛ(χ⁻¹) (1 - s) := by
+  ext1 g
+  let N : ℂ := modℂ[mₛ, g]
+  have hN : N ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  change N * chartₛ(χ) s g⁻¹ = chartₛ(χ⁻¹) (1 - s) g
+  rw [map_inv]
+  change N * ((χ g : ℂ) * N ^ s)⁻¹ = ((χ⁻¹ g : Circle) : ℂ) * N ^ (1 - s)
+  rw [show ((χ⁻¹ g : Circle) : ℂ) = (χ g : ℂ)⁻¹ from Circle.coe_inv (χ g), mul_inv_rev, Complex.cpow_sub 1 s hN,
+    Complex.cpow_one, div_eq_mul_inv]
+  ac_rfl
+
+/-- Two functions in meromorphic normal form on the plane that agree on the right
+half-plane agree everywhere. -/
+private theorem sLocal_eq_of_meromorphicNFOn {G H : ℂ → ℂ}
+    (hG : MeromorphicNFOn G univ) (hH : MeromorphicNFOn H univ)
+    (h : ∀ z : ℂ, 0 < z.re → G z = H z) (s : ℂ) : G s = H s := by
+  have hAt : meromorphicOrderAt (G - H) (1 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (h z hz)
+  have hOrd := (hG.meromorphicOn.sub hH.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (1 : ℂ)) (mem_univ s) hAt
+  have hNear : G =ᶠ[𝓝[≠] s] H :=
+    (meromorphicOrderAt_eq_top_iff.mp hOrd).mono fun _ h ↦ sub_eq_zero.mp h
+  exact (((hG (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hH (mem_univ s))).mp
+    hNear).eq_of_nhds
+
+/-- Paper: Theorem 3.3.1.1(1)(b), p. 129. Chart continuations of the zeta integral
+agree wherever two norm-twist charts pass through the same quasi-character. -/
+private theorem sLocalIdelicZetaIntegral_chartContinuation_eq (f : ℬ(Aₛ))
+    {χ χ' : PontryaginDual Jₛ} {G G' : ℂ → ℂ}
+    (hG : MeromorphicNFOn G univ) (hG' : MeromorphicNFOn G' univ)
+    (hGeq : ∀ s : ℂ, 0 < s.re → G s = sLocalIdelicZetaIntegral f (chartₛ(χ) s))
+    (hG'eq : ∀ s : ℂ, 0 < s.re → G' s = sLocalIdelicZetaIntegral f (chartₛ(χ') s))
+    {s s' : ℂ} (h : chartₛ(χ) s = chartₛ(χ') s') : G s = G' s' := by
+  let d := s' - s
+  have hRe : s.re = s'.re := by
+    rw [← sLocal_abscissa_chart χ s, h, sLocal_abscissa_chart]
+  have htw (z : ℂ) : chartₛ(χ') (z + d) = chartₛ(χ) z := by
+    have := (sLocal_chart_add_of_eq h (z - s)).symm
+    rwa [add_sub_cancel, show s' + (z - s) = z + d by ring] at this
+  have hH : MeromorphicNFOn (fun z ↦ G' (z + d)) univ := fun z _ ↦
+    (meromorphicNFAt_comp_add_const_iff_meromorphicNFAt (f := G')).mpr (hG' (mem_univ _))
+  have hs := sLocal_eq_of_meromorphicNFOn hG hH (fun z hz ↦ by
+    have hzd : 0 < (z + d).re := by
+      simpa only [d, Complex.add_re, Complex.sub_re, hRe, sub_self, add_zero] using hz
+    rw [hGeq z hz, hG'eq _ hzd, htw]) s
+  rw [hs]
+  change G' (s + (s' - s)) = G' s'
+  rw [add_sub_cancel]
+
+/-- Paper: Theorem 3.3.1.1(1)(b), p. 129. In each norm-twist coordinate, the zeta integral
+on the right half-plane and the correcting factor times the dual zeta integral on the
+half-plane left of one glue to a function with a normal-form meromorphic continuation. -/
+private theorem sLocalIdelicZetaIntegral_exists_chartContinuation (f : ℬ(Aₛ))
+    (χ : PontryaginDual Jₛ) :
+    ∃ G : ℂ → ℂ, MeromorphicNFOn G univ ∧
+      ∀ s : ℂ, 0 < s.re → G s = sLocalIdelicZetaIntegral f (chartₛ(χ) s) := by
+  classical
+  let Z (s : ℂ) := sLocalIdelicZetaIntegral f (chartₛ(χ) s)
+  let W (s : ℂ) := sLocalRhoFactor (chartₛ(χ) s) *
+    sLocalIdelicZetaIntegral (sAdeleSchwartzFourier f) (chartₛ(χ⁻¹) (1 - s))
+  let M (s : ℂ) := if 0 < s.re then Z s else W s
+  have hZ := sLocalIdelicZetaIntegral_analyticOn f χ
+  have hZd := sLocalIdelicZetaIntegral_analyticOn (sAdeleSchwartzFourier f) χ⁻¹
+  have hρ := sLocalRhoFactor_meromorphic χ
+  have hRight : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt continuous_const Complex.continuous_re
+  have hLeft : IsOpen {s : ℂ | s.re < 1} := isOpen_lt Complex.continuous_re continuous_const
+  have hMZ (s : ℂ) (hs : 0 < s.re) : M =ᶠ[𝓝 s] Z :=
+    Filter.mem_of_superset (hRight.mem_nhds hs) fun z hz ↦ if_pos hz
+  have hMW (s : ℂ) (hs : s.re < 1) : M =ᶠ[𝓝 s] W := by
+    refine Filter.mem_of_superset (hLeft.mem_nhds hs) fun z hz ↦ ?_
+    by_cases h0 : 0 < z.re
+    · change (if 0 < z.re then Z z else W z) = W z
+      rw [if_pos h0]
+      have hfe := sLocalIdelicZetaIntegral_functionalEquation f χ z ⟨h0, hz⟩
+      simp only at hfe
+      rw [sLocal_dual_chart] at hfe
+      exact hfe
+    · change (if 0 < z.re then Z z else W z) = W z
+      rw [if_neg h0]
+  have hZan (s : ℂ) (hs : 0 < s.re) : AnalyticAt ℂ Z s := hZ s hs
+  have hWmer (s : ℂ) (hs : s.re < 1) : MeromorphicAt W s := by
+    have h1 : (1 - s) ∈ rightHalf := by
+      change 0 < (1 - s).re
+      rw [Complex.sub_re, Complex.one_re]
+      linarith
+    have hA : AnalyticAt ℂ (fun z : ℂ ↦ sLocalIdelicZetaIntegral (sAdeleSchwartzFourier f)
+        (chartₛ(χ⁻¹) (1 - z))) s :=
+      (hZd (1 - s) h1).comp (by fun_prop)
+    exact (hρ s).mul hA.meromorphicAt
+  have hM : MeromorphicOn M univ := by
+    intro s _
+    by_cases hs : 0 < s.re
+    · exact (hZan s hs).meromorphicAt.congr
+        ((hMZ s hs).symm.filter_mono nhdsWithin_le_nhds)
+    · have hs' : s.re < 1 := by linarith [not_lt.mp hs]
+      exact (hWmer s hs').congr ((hMW s hs').symm.filter_mono nhdsWithin_le_nhds)
+  refine ⟨toMeromorphicNFOn M univ, meromorphicNFOn_toMeromorphicNFOn M univ, fun s hs ↦ ?_⟩
+  rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hM (mem_univ s),
+    toMeromorphicNFAt_eq_self.mpr ((hZan s hs).congr (hMZ s hs).symm).meromorphicNFAt]
+  exact if_pos hs
+
+/-- Paper: Equation (3.1.1.2), p. 119. Every quasi-character of J_S is a norm twist of a
+unitary character, with real exponent its abscissa. -/
+private theorem sLocal_exists_chart (c : Xₛ) :
+    ∃ (χ : PontryaginDual Jₛ) (s : ℂ), c = chartₛ(χ) s := by
+  have : IsClosed ((Subgroup.map (Units.map (RingHom.toMonoidHom (RingHom.comp
+      (adeleProjection F S) (Subring.subtype (integralAdelesOutside F S)))))
+      (MonoidHom.range (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S))))) :
+        Set Iₛ) := by
+    let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
+    let d := p.comp (integralAdeleDiagonal F S)
+    obtain ⟨hd, hc, _⟩ := sAdele_additive_quotient F S
+    rw [MonoidHom.map_range]
+    exact isClosed_range_unitsMap d.toMonoidHom hd hc
+  have : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
+  have hp := isProperMap_sIdeleQuotientNorm F S
+  let a := quasiCharacterAbscissa mₛ hp sIdeleQuotientNorm_ne_one' c
+  have hnorm := norm_quasiCharacter_eq_rpow_abscissa mₛ hp sIdeleQuotientNorm_ne_one' c
+  let q : Xₛ := c * chartₛ((1 : PontryaginDual Jₛ)) (-(a : ℂ))
+  have hmod (g : Jₛ) : 0 < ((mₛ g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hq (g : Jₛ) : ‖q g‖ = 1 := by
+    change ‖c g * ((((1 : PontryaginDual Jₛ) g : Circle) : ℂ) * (modℂ[mₛ, g]) ^ (-(a : ℂ)))‖ = 1
+    rw [norm_mul, norm_mul, Circle.norm_coe, one_mul, hnorm,
+      Complex.norm_cpow_eq_rpow_re_of_pos (hmod g), Complex.neg_re, Complex.ofReal_re,
+      ← Real.rpow_add (hmod g), add_neg_cancel, Real.rpow_zero]
+  let χ : PontryaginDual Jₛ :=
+    { toFun := fun g ↦ ⟨q g, mem_sphere_zero_iff_norm.mpr (hq g)⟩
+      map_one' := Circle.ext (map_one q)
+      map_mul' := fun g h ↦ Circle.ext (map_mul q g h)
+      continuous_toFun := q.continuous.subtype_mk _ }
+  refine ⟨χ, a, ?_⟩
+  ext1 g
+  have hn : (modℂ[mₛ, g]) ≠ 0 := Complex.ofReal_ne_zero.mpr (hmod g).ne'
+  change c g = (c g * ((((1 : PontryaginDual Jₛ) g : Circle) : ℂ) *
+    (modℂ[mₛ, g]) ^ (-(a : ℂ)))) * (modℂ[mₛ, g]) ^ (a : ℂ)
+  rw [PontryaginDual.one_apply, Circle.coe_one, one_mul, mul_assoc, ← Complex.cpow_add _ _ hn,
+    neg_add_cancel, Complex.cpow_zero, mul_one]
+
 /-- Paper: Theorem 3.3.1.1(1)(b), p. 129. The zeta integral has a unique
 meromorphic continuation in normal form on each norm-twist coordinate. -/
 theorem sLocalIdelicZetaIntegral_exists_continuation (f : ℬ(Aₛ)) :
     ∃! Z : Xₛ → ℂ, (∀ χ : PontryaginDual Jₛ,
       MeromorphicNFOn (fun s ↦ Z (chartₛ(χ) s)) univ) ∧
-      EqOn Z (sLocalIdelicZetaIntegral f) positive := by sorry
+      EqOn Z (sLocalIdelicZetaIntegral f) positive := by
+  classical
+  choose G hGNF hGeq using sLocalIdelicZetaIntegral_exists_chartContinuation f
+  choose χc sc hc using sLocal_exists_chart (F := F) (S := S)
+  let Z : Xₛ → ℂ := fun c ↦ G (χc c) (sc c)
+  have hZ (χ : PontryaginDual Jₛ) (s : ℂ) : Z (chartₛ(χ) s) = G χ s :=
+    sLocalIdelicZetaIntegral_chartContinuation_eq f (hGNF _) (hGNF χ) (hGeq _) (hGeq χ)
+      (hc (chartₛ(χ) s)).symm
+  refine ⟨Z, ⟨fun χ ↦ ?_, fun c hc' ↦ ?_⟩, fun Z' ⟨hZ'NF, hZ'eq⟩ ↦ funext fun c ↦ ?_⟩
+  · simpa only [hZ] using hGNF χ
+  · obtain ⟨χ, s, hs, rfl⟩ := hc'
+    exact (hZ χ s).trans (hGeq χ s hs)
+  · rw [hc c, hZ]
+    refine sLocal_eq_of_meromorphicNFOn (hZ'NF (χc c)) (hGNF (χc c)) (fun z hz ↦ ?_) (sc c)
+    exact (hZ'eq ⟨χc c, z, hz, rfl⟩).trans (hGeq _ z hz).symm
 
 /-- Paper: Theorem 3.3.1.1(1)(b), p. 129. The S-local Z-function is the
 meromorphic continuation of the zeta integral. -/

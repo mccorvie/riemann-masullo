@@ -7,7 +7,7 @@ Most entries were first reported by an AI agent. The **Checked** column says whe
 since read the passage and agrees: *integrator* means the integrating agent compared the report
 with the page; *reviewed* means a second, independent agent recomputed it against the page image; *reported*
 means nobody has yet. No entry has been reviewed by a specialist. The
-dispute over the main theorem is described in the [README](README.md#status), not here.
+dispute over the main theorem is described in the [README](README.md#concerns-about-the-main-theorem), not here.
 
 The author's preface says that he and Brian Conrad know of "several glitches here and there"
 still being fixed, and that the draft is unfinished. Most entries are in the appendices

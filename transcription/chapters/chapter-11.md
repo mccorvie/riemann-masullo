@@ -102,9 +102,21 @@ $$
 
 Remark 11.1.1.3. We note that the orbit of the Borel set $Z \subset \mathrm{GL}_1(\mathbf A_F)$ under the free and proper left-translation action of $F^\times$ on $\mathrm{GL}_1(\mathbf A_F)$ from Proposition 11.1.1.2, is also a Borel set, since $F^\times Z$ is a countable union of Borel sets.
 
-*Proof.* (1) : We let $g \in Z$ be fixed, and we denote by $\delta_{\{g\}}$ the finite, positive Radon measure on $\mathrm{GL}_1(\mathbf A_F)$ determined under [Fol, Thm.7.2] by the assignment of the functional $\delta_{\{g\}} : C_c(\mathrm{GL}_1(\mathbf A_F)) \to \mathbf C$ defined by $\delta_{\{g\}}(f) := f(g)$.
+*Proof.* (1) : We let $g \in Z$ be fixed, and we denote by $\delta_{\{g\}}$ the finite, positive Radon measure on $\mathrm{GL}_1(\mathbf A_F)$ determined under [Fol, Thm.7.2] by the assignment of the functional
 
-Since the continuous action of $F^\times$ on $\mathrm{GL}_1(\mathbf A_F)$ by left-translation is free and discrete, the orbit $F^\times g = \{\xi g\}_{\xi \in F^\times}$ is a discrete subset of $\mathrm{GL}_1(\mathbf A_F)$. We endow it with the following Radon measure. We consider the $\mathbf C$-linear space $C_c(F^\times g)$ of continuous compactly supported functions, and define: $\Delta_{\{g\}} : C_c(F^\times g) \to \mathbf C$ by $\Delta_{\{g\}}(\varphi) := \sum_{\xi \in F^\times} \varphi(\xi g)$. By [Fol, Thm.7.2], $\Delta_{\{g\}}$ determines a unique complex Radon measure on $F^\times g$, which we denote $\mu_g$. The Radon measure $\mu_g$ is real, positive, and it agrees with the counting measure on $F^\times g$ by uniqueness (see [Bou-II, INT VII.31, §2, Prop.4(a)], applied to $X = F^\times g$ endowed with the discrete topology, $H = F^\times$ as a discrete topological group acting freely and properly on $X$ by left-translation), since it is $F^\times$-invariant (in the sense of [Bou-II, INT VII.2, §1, Def.1(a)]).
+$$
+\delta_{\{g\}} : C_c(\mathrm{GL}_1(\mathbf A_F)) \to \mathbf C
+$$
+
+defined by $\delta_{\{g\}}(f) := f(g)$.
+
+Since the continuous action of $F^\times$ on $\mathrm{GL}_1(\mathbf A_F)$ by left-translation is free and discrete, the orbit $F^\times g = \{\xi g\}_{\xi \in F^\times}$ is a discrete subset of $\mathrm{GL}_1(\mathbf A_F)$. We endow it with the following Radon measure. We consider the $\mathbf C$-linear space $C_c(F^\times g)$ of continuous compactly supported functions, and define:
+
+$$
+\Delta_{\{g\}} : C_c(F^\times g) \to \mathbf C
+$$
+
+by $\Delta_{\{g\}}(\varphi) := \sum_{\xi \in F^\times} \varphi(\xi g)$. By [Fol, Thm.7.2], $\Delta_{\{g\}}$ determines a unique complex Radon measure on $F^\times g$, which we denote $\mu_g$. The Radon measure $\mu_g$ is real, positive, and it agrees with the counting measure on $F^\times g$ by uniqueness (see [Bou-II, INT VII.31, §2, Prop.4(a)], applied to $X = F^\times g$ endowed with the discrete topology, $H = F^\times$ as a discrete topological group acting freely and properly on $X$ by left-translation), since it is $F^\times$-invariant (in the sense of [Bou-II, INT VII.2, §1, Def.1(a)]).
 
 ## PDF page 477
 
@@ -248,7 +260,13 @@ $$
 \Phi_{F,\omega}(f_k)(g) = \int_{E^1_F} \Phi_F(f_k)(gh)\,\omega(gh)\,\mathrm{d}\mu_1(h)
 $$
 
-as $E^1_F$ is a fundamental domain for the continuous action of $F^\times$ by left translation on $\mathrm{GL}_1(\mathbf A_F)^1$, we have $\Phi_{F,\omega}(f)(x) - \Phi_{F,\omega}(f_k)(x) = \omega(x) \int_{E^1_F} (\Phi_F(f_k)(g') - \Phi_F(f)(g'))\,\omega(g'x^{-1})\,\mathrm{d}(\delta_x\otimes\mu_1)(g')$ and hence
+as $E^1_F$ is a fundamental domain for the continuous action of $F^\times$ by left translation on $\mathrm{GL}_1(\mathbf A_F)^1$, we have
+
+$$
+\Phi_{F,\omega}(f)(x) - \Phi_{F,\omega}(f_k)(x) = \omega(x) \int_{E^1_F} (\Phi_F(f_k)(g') - \Phi_F(f)(g'))\,\omega(g'x^{-1})\,\mathrm{d}(\delta_x\otimes\mu_1)(g')
+$$
+
+and hence
 
 $$
 \|\Phi_{F,\omega}(f) - \Phi_{F,\omega}(f_k)\|_{L^1(T_{v_0},\delta_x)} \le |c(x)|\,\|\Phi_F(f) - \Phi_F(f_k)\|_{L^1(T\cdot E^1_F,(\delta_x\otimes\mu_1))} \tag{11.1.1.15}
@@ -320,7 +338,7 @@ $$
 \rho(g) \sum_{\xi \in F^\times} (f \otimes \prod_{v\notin S} 1_{\mathcal O_{F_v}^\times})(\xi g) \tag{11.1.2.7}
 $$
 
-*for $f \in \mathcal S(\mathbf A_{F,S}) \cap \ker(\delta_0) \cap \ker(\hat\delta_0)$.*
+*for $f \in \mathcal S(\mathbf A_{F,S}) \cap \ker(\delta_0) \cap \ker(\widehat\delta_0)$.*
 
 Remark 11.1.2.2. We recall that a cofinal sequence $\{S_k\}_{k\ge 0} \subset I_S$ consists of the datum of a sequence $\{S_k\}_{k\ge 0} \subset I_S$, i.e. with each $S_k$ a finite subset of finite places of $F$, such that $S_k \subset S_{k+1}$ for each integer $k \ge 0$, and $\bigcup_{k\ge 0} S_k = \Sigma_F - S$.
 
@@ -349,7 +367,13 @@ $$
 
 To see this, it is enough to observe that since the topology on $W^{s,2}_0 \mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F))$ is induced by the $\|\cdot\|_{s,2}$-norm on $W^{s,2}(C_F)(\chi|_{C^1_F})$, then the pull-back of the norm $\|\cdot\|_{s,2}$ along $M_\rho$ from (11.1.2.8) is a seminorm $\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F))$, which generates a locally convex topology whose separated completion is closed and dense within $M_\rho W^{s,2}_0 \mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F))$, and hence agrees with it.
 
-Such pull-back seminorm is computed as: $\phi \mapsto \|\rho\cdot\phi\|_{s,2} = \left( \int_{C_F} |\rho(g)\phi(g)|^2 (1+|\log|g|_F|^2)^{s/2}\,\mathrm{d}\bar\mu(g) \right)^{1/2}$ which gives the formula for $\|\cdot\|_{s,2,\rho}$ in (11.1.2.9), since the indicator function $\rho$ of $C^{>1/\Lambda}_F$, respectively of $C^{(1/\Lambda,\Lambda)}_F$, is its own square.
+Such pull-back seminorm is computed as:
+
+$$
+\phi \mapsto \|\rho\cdot\phi\|_{s,2} = \left( \int_{C_F} |\rho(g)\phi(g)|^2 (1+|\log|g|_F|^2)^{s/2}\,\mathrm{d}\bar\mu(g) \right)^{1/2}
+$$
+
+which gives the formula for $\|\cdot\|_{s,2,\rho}$ in (11.1.2.9), since the indicator function $\rho$ of $C^{>1/\Lambda}_F$, respectively of $C^{(1/\Lambda,\Lambda)}_F$, is its own square.
 
 Since $\{g \in C_F : |g|_F = 1/\Lambda,\Lambda\}$ has $\bar\mu$-measure zero, indeed the formula in (11.1.2.9) for $\|\cdot\|_{s,2,\rho}$ computes the pull-back of $\|\cdot\|_{s,2}$ on $W^{s,2}_0 \mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F))$ along $M_\rho$ from (11.1.2.8).
 
@@ -955,7 +979,7 @@ Let $p$ be a prime number such that $\chi$ is unramified at every finite place o
 
 **11.3.1. Calculation of the Orbital Kernels by global to $S$-local degeneration on the orbital basis elements.**
 
-**11.3.1.1. Divisorial stratification of the ideles.** The next step now is to split $k_{\mathrm{geom},I,\varphi}(x,y)$ into an infinite sum of pieces indexed by the places of $F$:
+11.3.1.1. *Divisorial stratification of the ideles.* The next step now is to split $k_{\mathrm{geom},I,\varphi}(x,y)$ into an infinite sum of pieces indexed by the places of $F$:
 
 $$
 k_{\mathrm{geom},I,\varphi}(x,y)=k_{S,\varphi}(x,y)+\sum_{p\nmid S}k_{p,\varphi}(x,y)
@@ -967,7 +991,11 @@ This subsection is aimed at conveying the main ideas on how to accomplish this, 
 
 We start by identifying an interesting stratification of the global ideles $\mathrm{GL}_1(\mathbf A_F)$, which is found only on $\mathrm{GL}_1(\mathbf A_F)$ as opposed to its quotient $C_F$, since it is defined by leveraging crucially the restricted product nature of $\mathrm{GL}_1(\mathbf A_F)$.
 
-This stratification will adapt itself nicely to the structure of the Schwartz-Bruhat functions representing the global adelic $\theta$-functions in $\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal{S}_0(\mathbf A_F))$.
+This stratification will adapt itself nicely to the structure of the Schwartz-Bruhat functions representing the global adelic $\theta$-functions in
+
+$$
+\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal{S}_0(\mathbf A_F)).
+$$
 
 Recall that there exists a finite set of finite places $S$ of $F$ satisfying the following conditions:
 
@@ -999,7 +1027,13 @@ This is the last of the five Structure Theorems, proved at the end of Chapter 5 
 
 The stratification of the global ideles $\mathrm{GL}_1(\mathbf A_F)$ that we are about to define will weld itself perfectly well with the non-Archimedean “transversal” (i.e. tensor component) $\bigotimes_{v\notin S}1_{\mathcal O_{F_v}}$ which all the global Schwartz-Bruhat functions on $\mathbf A_F$ representing the $\chi|_{C^1_F}$-homogeneous global $\theta$-functions can be made to share in common.
 
-The guiding principle is simple: since $\mathcal O_{F_v}^\times\subset F_v^\times$ is compact and open, hence so it is in $F_v$, and we have $1_{\mathcal O_{F_v}^\times}\cdot 1_{\mathcal O_{F_v}}=1_{\mathcal O_{F_v}^\times}$ as Schwartz-Bruhat functions on $F_v$. Under the local Mellin transform, $Z_v(1_{\mathcal O_{F_v}^\times},c)$ and $Z_v(1_{\mathcal O_{F_v}},c)$ are related by “Weil’s Identity”:
+The guiding principle is simple: since $\mathcal O_{F_v}^\times\subset F_v^\times$ is compact and open, hence so it is in $F_v$, and we have
+
+$$
+1_{\mathcal O_{F_v}^\times}\cdot 1_{\mathcal O_{F_v}}=1_{\mathcal O_{F_v}^\times}
+$$
+
+as Schwartz-Bruhat functions on $F_v$. Under the local Mellin transform, $Z_v(1_{\mathcal O_{F_v}^\times},c)$ and $Z_v(1_{\mathcal O_{F_v}},c)$ are related by “Weil’s Identity”:
 
 $$
 \mu_v(\mathcal O_{F_v}^\times)\cdot Z_v(1_{\mathcal O_{F_v}^\times},\chi_v\lvert\cdot\rvert^s_v)=L_v(\chi_v\lvert\cdot\rvert^s_v)^{-1}Z_v(1_{\mathcal O_{F_v}},\chi_v\lvert\cdot\rvert^s_v)
@@ -1083,7 +1117,7 @@ and hence multiplication by $\alpha_k$ replaces the Zeta function of $f$ with th
 
 We call such multiplication process “restriction” from one stratum to the next, of the primary divisorial filtration.
 
-In particular, and this is the main observation of this subsection: the $(k+1)$st iteration of the restriction to the strata of the primary divisorial filtration is obtained from the $k$th, on the forward side of the Mellin transform, by multiplication by
+In particular, and this is the main observation of this subsection: *the $(k+1)$st iteration of the restriction to the strata of the primary divisorial filtration is obtained from the $k$th, on the forward side of the Mellin transform, by multiplication by*
 
 $$
 \prod_{v\in S_{p_{k+1}}}L_v(\chi_v\lvert\cdot\rvert^s_v)^{-1}.

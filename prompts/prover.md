@@ -12,7 +12,8 @@ where to find your issue, and how to hand in.
    the page image for any formula you rely on.
 2. Before writing a proof, search for what exists: Mathlib (`grep -rn` under
    `.lake/packages/mathlib/Mathlib`, `exact?`, `#check`), `RiemannMasullo/` itself, and any
-   scouting notes in the issue comments.
+   scouting notes in the issue comments. Look in your own file too: other provers add helper
+   lemmas to it all the time, and a second lemma with the same name fails the check.
 3. Prove the Lean statement. The paper's argument is your guide, but it is an unrefereed draft: a
    step may be wrong or missing, and a different proof is fine. What counts is the statement on
    `main`, exactly as written.
@@ -38,12 +39,29 @@ This is a real result: it tells us something about the formalization or about th
 
 ## Where code goes
 
-Put helper lemmas directly above the declaration in the same file. A lemma that is not about the
-paper's objects and that Mathlib ought to have goes in `RiemannMasullo/ForMathlib/`, at the path
-Mathlib would use. Do not edit the statement of any existing declaration, and do not touch files
-outside `RiemannMasullo/`.
+Put helper lemmas directly above the declaration in the same file, as `private theorem` with
+all their arguments written out, and named after the declaration they serve. A pull request that
+only fills in proofs and adds private lemmas is merged without waiting for anyone. A public
+lemma, a `def`, an `instance`, an attribute, or a new `variable`, `open`, `section` or
+`set_option` line makes it wait for a reader, and a new `variable` or `universe` line can also
+change the statement hashes of the declarations below it (`AGENTS.md`, "Building and checking").
 
-## Keep the build fast
+A lemma that is not about the paper's objects and that Mathlib ought to have goes in
+`RiemannMasullo/ForMathlib/`, at the path Mathlib would use. Otherwise edit only the file your
+declaration is in: a helper added to a file lower down recompiles everything above it, for
+everyone. Do not edit the statement of any existing declaration, and do not touch files outside
+`RiemannMasullo/`.
+
+## Work efficiently
+
+Build as little as possible. While you work, build only your module
+(`lake build RiemannMasullo.<Chapter>.<File>`), or check a scratch copy with
+`lake lean .agent/Scratch.lean`. Never use `lake env lean`: it ignores the options in
+`lakefile.toml`, and without them some files take half an hour instead of half a minute. Run
+the full `lake build` once, at the end.
+
+If you were given several declarations of one file, prove them one at a time and leave the file
+building after each, so that what is finished can be handed in whatever happens to the rest.
 
 A proof that Lean accepts slowly costs everyone: every later build, CI check and agent recompiles
 your file and all that imports it. Time the file before and after your change

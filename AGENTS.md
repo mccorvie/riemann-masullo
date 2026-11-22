@@ -18,7 +18,8 @@ Work is organized with GitHub issues and pull requests. There is no blueprint.
 4. When that merges, the integrator runs `scripts/issues.py`, which opens one **proof issue**
    (label `proof`) per `sorry`.
 5. A **prover** takes one proof issue and either proves the declaration or splits it into smaller
-   `sorry`s, which become new proof issues.
+   `sorry`s, which become new proof issues. A **sweeper** takes every open proof issue of one
+   file and closes as many as it can in a single pull request.
 6. The **integrator** reviews and merges. The project is finished when `lake comparator` accepts
    `Main.lean`.
 
@@ -51,7 +52,10 @@ These exist because many agents work in parallel and nobody rereads everything.
   State such a fact as a separate theorem with `sorry` and use that theorem in the definition.
   A definition whose data is `sorry` makes everything downstream meaningless while still
   compiling, and one with `sorry` in a proof field changes when the proof is filled in.
-  `scripts/signatures.sh --sorry-in-defs` lists offenders.
+  Nor inside a statement: a hypothesis kept in a `variable` can fail to elaborate in the theorem
+  that includes it and become `sorry` with no error message, so write a hypothesis that only one
+  or two theorems use as an argument of those theorems.
+  `scripts/signatures.sh --sorry-in-defs` lists offenders of both kinds.
 - **No `axiom`, `native_decide`, `implemented_by`, `extern`, `unsafe`, `opaque` or `debug.*`
   options.** A finished proof must show only `propext`, `Classical.choice` and `Quot.sound` under
   `#print axioms`. `scripts/lint.sh` checks the text; CI runs it.
@@ -110,6 +114,7 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
+lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
 lake build                                        # everything; must pass before you hand in
 scripts/lint.sh
 scripts/signatures.sh > after.txt                 # one line per declaration: name and statement hash
@@ -125,7 +130,9 @@ helpers in a `section` of their own, with their own variables, and the hashes re
 they were.
 
 To check axioms, put `#print axioms RiemannMasullo.your_theorem` in a scratch file under `.agent/`
-(which git ignores) and run `lake env lean .agent/Check.lean`.
+(which git ignores) and run `lake lean .agent/Check.lean`. Use `lake lean`, not `lake env lean`:
+only the former applies the options in `lakefile.toml`, and without them some files compile
+dozens of times more slowly (a linter the project turns off) and `autoImplicit` is on.
 
 ## Your issue, and handing in work
 
