@@ -273,6 +273,14 @@ theorem sLocalThetaRemovedPrincipalParts_ker (ω : PontryaginDual J₁)
     (sLocalThetaRemovedPrincipalParts ω SArch S₀).ker =
       sLocalThetaPoleBound ω remainingBound(SArch, S₀) := by sorry
 
+/-- A coefficient map identifies the quotient by its kernel with the attained values. -/
+private theorem sLocalThetaRemovedPrincipalParts_quotient_of_ker {V W : Type*}
+    [AddCommGroup V] [Module ℂ V] [AddCommGroup W] [Module ℂ W] (A : V →ₗ[ℂ] W)
+    (H : Submodule ℂ V) (h : A.ker = H) :
+    ∃ e : (V ⧸ H) ≃ₗ[ℂ] A.range, ∀ x, (e (H.mkQ x)).val = A x := by
+  subst H
+  exact ⟨A.quotKerEquivRange, fun x ↦ A.quotKerEquivRange_apply_mk x⟩
+
 /-- Paper: Remark 7.2.1.2, p. 335.
 The quotient by the remaining pole bound is identified by the coefficient map
 with the principal parts attained on the chosen Mellin component.
@@ -281,7 +289,12 @@ theorem sLocalThetaRemovedPrincipalParts_quotient (ω : PontryaginDual J₁)
     (SArch : Finset (InfinitePlace F)) (S₀ : Finset Places) :
     let H := sLocalThetaPoleBound ω remainingBound(SArch, S₀)
     let A := sLocalThetaRemovedPrincipalParts ω SArch S₀
-    ∃ e : (Θₛ(ω) ⧸ H) ≃ₗ[ℂ] A.range, ∀ x : Θₛ(ω), (e (H.mkQ x)).val = A x := by sorry
+    ∃ e : (Θₛ(ω) ⧸ H) ≃ₗ[ℂ] A.range, ∀ x : Θₛ(ω), (e (H.mkQ x)).val = A x := by
+  intro H A
+  have h := sLocalThetaRemovedPrincipalParts_ker (F := F) (S := S) ω SArch S₀
+  let I := removedIndices(ω, SArch, S₀)
+  with_reducible
+    exact sLocalThetaRemovedPrincipalParts_quotient_of_ker (V := Θₛ(ω)) (W := I → ℂ) A H h
 
 -- TODO(paper-gap): In Remark 7.2.1.3 the full bound H_{m_S} permits all poles.
 -- The image of S₀₀ has no poles and corresponds to H with bound zero.
