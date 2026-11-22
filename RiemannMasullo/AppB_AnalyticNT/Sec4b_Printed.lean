@@ -228,7 +228,75 @@ The constant is `-log(π)/2` from the gamma prefactor, while the printed constan
 local sign at the real place. It has the same exponent on positive reals as the
 trivial character, but its gamma argument is `(s + 1)/2` in place of `s/2`. -/
 theorem Printed.heckeArchimedean_logDeriv_false :
-    ¬ Printed.heckeArchimedean_logDeriv := by sorry
+    ¬ Printed.heckeArchimedean_logDeriv := by
+  intro h
+  have hw := Rat.isReal_infinitePlace
+  have hone : ((1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)).comp
+      ⟨IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ Rat.infinitePlace,
+        continuous_ideleClass_ofCompletion ℚ Rat.infinitePlace⟩) = 1 :=
+    ContinuousMonoidHom.ext fun _ ↦ rfl
+  have key :=
+    h ℚ 1 Rat.infinitePlace 0 (by rw [hone]; exact ⟨by simp, fun t ht ↦ by simp⟩) 2
+  simp only [hone] at key
+  have hfun : ∀ x, infiniteLocalEulerFactor Rat.infinitePlace
+      (quasiCharacterNormTwist ((Units.map nnNormHom.toMonoidHom) ^ Rat.infinitePlace.mult)
+        (continuous_infiniteLocalModule Rat.infinitePlace)
+        (ContinuousMonoidHom.comp (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ) 1)
+          x) =
+      Complex.Gammaℝ x := fun x ↦ infiniteLocalEulerFactor_real_norm _ hw x
+  simp only [Function.comp_def, hw, ite_true] at key
+  simp only [hfun] at key
+  have hz : ((2 : ℂ) - 0) / ((2 : ℝ) : ℂ) = 1 := by norm_num
+  rw [hz] at key
+  have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  have hdΓ : ∀ s : ℂ, 0 < s.re → DifferentiableAt ℂ Complex.Gamma s := fun s hs ↦
+    Complex.differentiableAt_Gamma s fun m hm ↦ by
+      have := congrArg Complex.re hm
+      simp at this
+      linarith [(Nat.cast_nonneg m : (0 : ℝ) ≤ m)]
+  have hopen : IsOpen {s : ℂ | 0 < s.re} := isOpen_lt continuous_const Complex.continuous_re
+  have hΓ1 : AnalyticAt ℂ Complex.Gamma 1 :=
+    DifferentiableOn.analyticAt (fun s hs ↦ (hdΓ s hs).differentiableWithinAt)
+      (hopen.mem_nhds (by simp))
+  have hdpow : ∀ s : ℂ, DifferentiableAt ℂ (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) s :=
+    fun s ↦
+    ((differentiableAt_id.neg.div_const 2).const_cpow (Or.inl hpi))
+  have hdhalf :
+      ∀ s : ℂ, 0 < s.re → DifferentiableAt ℂ (fun s : ℂ ↦ Complex.Gamma (s / 2)) s :=
+    fun s hs ↦ (hdΓ (s / 2) (by simpa using hs)).comp s (differentiableAt_id.div_const 2)
+  have hGR : AnalyticAt ℂ (fun x : ℂ ↦ x.Gammaℝ) 2 :=
+    DifferentiableOn.analyticAt (fun s hs ↦ ((hdpow s).mul (hdhalf s hs)).differentiableWithinAt)
+      (hopen.mem_nhds (by simp))
+  have hord1 := hGR.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr
+    (Complex.Gammaℝ_ne_zero_of_re_pos (by simp))
+  have hord2 := hΓ1.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr (by simp)
+  have k := key hord1 hord2
+  have hsplit : logDeriv (fun x : ℂ ↦ x.Gammaℝ) 2 =
+      logDeriv (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) 2 +
+        logDeriv (fun s : ℂ ↦ Complex.Gamma (s / 2)) 2 :=
+    logDeriv_mul (f := fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2))
+      (g := fun s : ℂ ↦ Complex.Gamma (s / 2))
+      2 (by simp [hpi]) (by norm_num) (hdpow 2) (hdhalf 2 (by simp))
+  have hpow :
+      logDeriv (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2)) 2 = -(Real.log Real.pi : ℂ) / 2 := by
+    have hd : HasDerivAt (fun s : ℂ ↦ (Real.pi : ℂ) ^ (-s / 2))
+        ((Real.pi : ℂ) ^ (-(2 : ℂ) / 2) * Complex.log Real.pi * (-1 / 2)) 2 :=
+      ((hasDerivAt_id' (2 : ℂ)).neg.div_const 2).const_cpow (Or.inl hpi)
+    have hne : (Real.pi : ℂ) ^ (-(2 : ℂ) / 2) ≠ 0 := by simp [hpi]
+    rw [logDeriv_apply, hd.deriv, ← Complex.ofReal_log Real.pi_pos.le]
+    field_simp
+  have hgam : logDeriv (fun s : ℂ ↦ Complex.Gamma (s / 2)) 2 =
+      logDeriv Complex.Gamma 1 * (1 / 2) := by
+    have := logDeriv_comp (f := Complex.Gamma) (g := fun s : ℂ ↦ s / 2) (x := 2)
+      (by norm_num; exact hdΓ 1 (by simp)) (differentiableAt_id.div_const 2)
+    simp only [Function.comp_def] at this
+    rw [this]
+    norm_num
+  rw [hsplit, hpow, hgam] at k
+  push_cast at k
+  have hlog : (Real.log Real.pi : ℂ) = 0 := by linear_combination -k
+  have := Real.log_pos (by linarith [Real.pi_gt_three] : (1 : ℝ) < Real.pi)
+  exact absurd (Complex.ofReal_eq_zero.mp hlog) this.ne'
 
 /-- Paper: Proposition B.4.2.1, proof, Equation (B.4.2.16), p. 616. As printed:
 the sum of the local contour integrals equals the centered contour with the two
