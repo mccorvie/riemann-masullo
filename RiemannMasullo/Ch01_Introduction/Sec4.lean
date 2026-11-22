@@ -251,7 +251,29 @@ theorem introTraceApprox_mellin_tendsto (h ρ : ℕ → ℝ → ℝ)
 radial power exists on the convergence half-plane and equals `1 / (z - s)`. -/
 theorem introTracePower_mellin (z s : ℂ) (_hs : s.re < z.re) :
     IntegrableOn (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) (Ioi 0) ∧
-      introTraceMellin (introTracePower z) s = 1 / (z - s) := by sorry
+      introTraceMellin (introTracePower z) s = 1 / (z - s) := by
+  let a := -z + (s - 1)
+  have ha : a.re < -1 := by
+    change -z.re + (s.re - 1) < -1
+    linarith
+  have he : (fun t : ℝ ↦ introTracePower z t * (t : ℂ) ^ (s - 1)) =ᵐ[volume]
+      (Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a) := by
+    filter_upwards [Measure.ae_ne volume (1 : ℝ)] with t ht
+    by_cases hgt : 1 < t
+    · rw [indicator_of_mem hgt, introTracePower, ite_eq_left hgt]
+      exact (Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (zero_lt_one.trans hgt).ne')).symm
+    · simp [introTracePower, ht, hgt]
+  have hsub : Ioi (1 : ℝ) ⊆ Ioi 0 := Ioi_subset_Ioi zero_le_one
+  have hI : IntegrableOn ((Ioi (1 : ℝ)).indicator (fun t : ℝ ↦ (t : ℂ) ^ a)) (Ioi 0) := by
+    rw [integrableOn_indicator_iff measurableSet_Ioi.nullMeasurableSet, inter_eq_left.mpr hsub]
+    exact integrableOn_Ioi_cpow_of_lt ha zero_lt_one
+  refine ⟨hI.congr (ae_restrict_of_ae he.symm), ?_⟩
+  unfold introTraceMellin mellin
+  simp_rw [smul_eq_mul, mul_comm _ (introTracePower z _)]
+  rw [integral_congr_ae (ae_restrict_of_ae he), setIntegral_indicator measurableSet_Ioi,
+    inter_eq_right.mpr hsub, integral_Ioi_cpow_of_lt ha zero_lt_one]
+  rw [show a + 1 = -(z - s) by dsimp [a]; ring]
+  simp only [Complex.ofReal_one, Complex.one_cpow, neg_div_neg_eq]
 
 end Tests
 
