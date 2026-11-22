@@ -106,7 +106,16 @@ theorem meromorphic_dirichletLFunction {N : ℕ} [NeZero N] (χ : DirichletChara
 zeta on the half-plane of absolute convergence. -/
 theorem dedekindZeta_rat_eq_riemannZeta {s : ℂ} (hs : 1 < s.re) :
     dedekindZeta ℚ s = riemannZeta s := by
-  sorry
+  have hc (n : ℕ) : Nat.card {I : Ideal (𝓞 ℚ) // I.absNorm = n} = 1 := by
+    let : Unique {I : Ideal (𝓞 ℚ) // I.absNorm = n} :=
+      { default := ⟨_, RatRingOfIntegers.absNorm_span_natCast n⟩
+        uniq := fun I ↦ by
+          apply Subtype.ext
+          obtain ⟨m, hm⟩ := RatRingOfIntegers.exists_eq_span_natCast I.val
+          have hmn : m = n := by simpa only [hm, RatRingOfIntegers.absNorm_span_natCast] using I.property
+          simpa only [hmn] using hm }
+    exact Nat.card_unique
+  simpa only [dedekindZeta, hc, Nat.cast_one, Pi.one_def] using LSeries_one_eq_riemannZeta hs
 
 /-- Riemann zeta zeros away from the negative even integers and the point one
 lie on the critical line. The Dedekind specialization over the rationals handles
