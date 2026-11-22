@@ -237,6 +237,9 @@ class Check:
             raise Stop("error", ["main sets the option doc.verso, which makes Lean elaborate code inside doc "
                                  "comments; scripts/ci/plain_proof.py ignores comments and has to be revised first"])
         status, log = self.build(sandboxed=False)
+        if status is None:
+            raise Stop("error", [f"building main did not finish in {BUILD_MINUTES} minutes, so the pull "
+                                 "request could not be checked; this is not a fault of the pull request"], log)
         if status != 0:
             raise Stop("error", ["main itself does not build at this commit, so the pull request "
                                  "could not be checked"], log)
