@@ -265,7 +265,23 @@ theorem truncatedConvolution_trace_split (hρ : IsModulatedCutoff m𝔽 Λ ε ρ
     let S := spectralTruncatedConvolution a hα hs hρ φ
     ∃ (hT : IsNuclearOperator T) (hG : IsNuclearOperator G) (hS : IsNuclearOperator S),
       hilbertTrace (H := W₀) ⟨T, hT⟩ =
-        hilbertTrace (H := W₀) ⟨G, hG⟩ + hilbertTrace (H := W₀) ⟨S, hS⟩ := by sorry
+        hilbertTrace (H := W₀) ⟨G, hG⟩ + hilbertTrace (H := W₀) ⟨S, hS⟩ := by
+  intro T G S
+  have heq : T = G + S := truncatedConvolution_eq_geometric_add_spectral (F := F) a hα hs hρ φ
+  have hG : IsNuclearOperator G := geometricTruncatedConvolution_nuclear (F := F) a hα hs hρ _hband φ _hquot
+  have hS : IsNuclearOperator S := spectralTruncatedConvolution_nuclear (F := F) a hα hs hρ φ _hquot
+  clear_value T G S
+  have addTrace {H : Type _} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+      (T G S : H →L[ℂ] H) (heq : T = G + S) (hG : IsNuclearOperator G) (hS : IsNuclearOperator S) :
+      ∃ (hT : IsNuclearOperator T) (hg : IsNuclearOperator G) (hs' : IsNuclearOperator S),
+        hilbertTrace (H := H) ⟨T, hT⟩ = hilbertTrace (H := H) ⟨G, hg⟩ + hilbertTrace (H := H) ⟨S, hs'⟩ := by
+    subst T
+    obtain ⟨L, hL⟩ := hilbertTrace_linear (H := H)
+    let g : nuclearEndomorphisms H := ⟨G, hG⟩
+    let s' : nuclearEndomorphisms H := ⟨S, hS⟩
+    refine ⟨(g + s').property, hG, hS, ?_⟩
+    exact (hL (g + s')).symm.trans ((L.map_add g s').trans (congrArg₂ (· + ·) (hL g) (hL s')))
+  exact addTrace (H := ↥W₀) T G S heq hG hS
 
 /-- Paper: Theorem 10.4.2.2, p. 460. As the cutoff radius tends to infinity
 with width times radius tending to zero, the trace of projection after
