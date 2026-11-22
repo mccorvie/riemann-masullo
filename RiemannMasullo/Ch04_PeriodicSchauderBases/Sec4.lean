@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
@@ -75,7 +76,61 @@ theorem modulatedMellin_split (f : D) (s : ℂ) (hs : s.re ∈ I) :
       positiveRealHaar ∧
     modulatedFourierMellin m I hm μ f.val (twist[s]) =
       ∫ t : ℝ≥0ˣ, ((t.val : ℝ) : ℂ) ^ s * (χ (τ t) : ℂ) * avg⟦f, t⟧ ∂positiveRealHaar := by
-  sorry
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let r (g : G) : ℝ := (m g).val
+  have hr (g : G) : 0 < r g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hrc : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+  -- The real twist controls the norm of the complex Mellin integrand.
+  let w := modulatedExponentialDecayTwist m I ⟨s.re, hs⟩ f
+  have hw (g : G) : w g = ((r g ^ s.re : ℝ) : ℂ) * f.val g := rfl
+  have hf : Continuous f.val := by
+    have hc := Complex.continuous_ofReal.comp
+      (hrc.rpow_const (p := s.re) (fun g ↦ Or.inl (hr g).ne'))
+    have hne (g : G) : ((r g ^ s.re : ℝ) : ℂ) ≠ 0 :=
+      Complex.ofReal_ne_zero.mpr (Real.rpow_pos_of_pos (hr g) _).ne'
+    refine ((schwartzBruhat_continuous w).div hc hne).congr fun g ↦ ?_
+    change w g / ((r g ^ s.re : ℝ) : ℂ) = f.val g
+    rw [hw, mul_div_cancel_left₀ _ (hne g)]
+  let H (g : G) := f.val g * (twist[s]) g
+  have hc : Continuous H := hf.mul (twist[s]).continuous
+  have hint : Integrable H μ := by
+    apply (schwartzBruhat_integrable μ w).norm.mono' hc.aestronglyMeasurable
+    filter_upwards with g
+    change ‖f.val g * ((χ g : ℂ) * (r g : ℂ) ^ s)‖ ≤ ‖w g‖
+    rw [hw, norm_mul, norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (hr g), norm_mul, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_pos (Real.rpow_pos_of_pos (hr g) _), mul_comm]
+  let φ (p : K × ℝ≥0ˣ) := p.1.val * τ p.2
+  have hφ : Continuous φ :=
+    (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+  have hprod : Integrable (H ∘ φ) (μ₁.prod positiveRealHaar) := by
+    rw [hμ] at hint
+    exact hint.comp_measurable hφ.measurable
+  -- The modulus is t along each compact fiber, so its complex power factors out.
+  have hfiber (t : ℝ≥0ˣ) : (∫ k : K, (H ∘ φ) (k, t) ∂μ₁) =
+      ((t.val : ℝ) : ℂ) ^ s * (χ (τ t) : ℂ) * avg⟦f, t⟧ := by
+    rw [← integral_const_mul]
+    refine integral_congr_ae (.of_forall fun k ↦ ?_)
+    change f.val (k.val * τ t) * ((χ (k.val * τ t) : ℂ) *
+      (((m (k.val * τ t)).val : ℝ) : ℂ) ^ s) = _
+    rw [map_mul χ, Circle.coe_mul, map_mul m, show m k.val = 1 from k.property,
+      hτ t, one_mul]
+    ring
+  have hstrip : twist[s] ∈ relativeVerticalStrip m.toMonoidHom hm.1 hm.2 I := by
+    change quasiCharacterAbscissa m.toMonoidHom hm.1 hm.2 (twist[s]) ∈ I
+    rwa [quasiCharacterAbscissa_of_unitary_twist m.toMonoidHom hm.1 hm.2 _ χ s (fun _ ↦ rfl)]
+  refine ⟨fun t ↦ ?_, hprod.integral_prod_right.congr (.of_forall hfiber), ?_⟩
+  · have hcontinuous : Continuous (fun k : K ↦ (χ k.val : ℂ) * f.val (k.val * τ t)) :=
+      (continuous_subtype_val.comp (χ.continuous.comp continuous_subtype_val)).mul
+        (hf.comp (continuous_subtype_val.mul continuous_const))
+    exact hcontinuous.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
+  · rw [modulatedFourierMellin, indicator_of_mem hstrip]
+    change (∫ g, H g ∂μ) = _
+    rw [hμ, integral_map hφ.measurable.aemeasurable hc.aestronglyMeasurable]
+    exact (integral_prod_symm (H ∘ φ) hprod).trans (integral_congr_ae (.of_forall hfiber))
 
 include hOpen hInt hne hms hτ hμ in
 /-- Paper: Equation (4.4.1.2), p. 190. The Mellin transform identifies the decay
