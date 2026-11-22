@@ -7,6 +7,8 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 
+import Mathlib.MeasureTheory.Measure.SeparableMeasure
+
 /-!
 # Hardy–Sobolev topologies on adelic theta spaces
 
@@ -314,7 +316,12 @@ theorem sLocalThetaSobolev_closed_complete_separable {a α β s : ℝ} (ha : 0 <
     (hI : α ≤ β) (hs : 0 ≤ s) (hp : 0 < a + α) :
     IsClosed (Hₛ(ha, hI, hs, hp) : Set Wₛ(α, β, s)) ∧
       CompleteSpace (Hₛ(ha, hI, hs, hp)) ∧
-      TopologicalSpace.SeparableSpace (Hₛ(ha, hI, hs, hp)) := by sorry
+      TopologicalSpace.SeparableSpace (Hₛ(ha, hI, hs, hp)) := by
+  have hc : IsClosed (Hₛ(ha, hI, hs, hp) : Set Wₛ(α, β, s)) :=
+    Submodule.isClosed_topologicalClosure _
+  let : Fact ((2 : ENNReal) ≠ ⊤) := ⟨by norm_num⟩
+  let : SecondCountableTopology Wₛ(α, β, s) := Lp.SecondCountableTopology
+  exact ⟨hc, hc.completeSpace_coe, inferInstance⟩
 
 /-- Paper: Lemma 10.1.1.4(4), p. 436. Ambient left translation preserves the
 S-local completion, acts jointly continuously there, and on weighted classes
