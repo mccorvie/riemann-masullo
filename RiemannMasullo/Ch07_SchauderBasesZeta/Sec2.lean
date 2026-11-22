@@ -212,7 +212,17 @@ def sLocalFinitePoleMultiplicity (S₀ : Finset Places) (c : Xₛ) : ℕ :=
 The selected divisor at the trivial character has multiplicity equal to the number
 of selected finite places. -/
 theorem sLocalFinitePoleMultiplicity_one (S₀ : Finset Places) (h₀ : S₀ ⊆ S) :
-    sLocalFinitePoleMultiplicity S₀ (1 : Xₛ) = S₀.card := by sorry
+    sLocalFinitePoleMultiplicity S₀ (1 : Xₛ) = S₀.card := by
+  classical
+  unfold sLocalFinitePoleMultiplicity
+  rw [(sLocalPolePlaces_one (F := F) (S := S)).2]
+  apply Finset.card_bij (fun v _ ↦ v.val)
+  · intro v hv
+    exact (Finset.mem_filter.mp hv).2
+  · intro _ _ _ _ h
+    exact Subtype.ext h
+  · intro v hv
+    exact ⟨⟨v, h₀ hv⟩, Finset.mem_filter.mpr ⟨Finset.mem_univ _, hv⟩, rfl⟩
 
 open Classical in
 /-- Paper: Equations (7.2.2.1)–(7.2.2.2), pp. 338–339.
