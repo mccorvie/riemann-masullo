@@ -8,6 +8,7 @@ public import Mathlib.RingTheory.MvPowerSeries.PiTopology
 public import Mathlib.RingTheory.PowerSeries.PiTopology
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -321,13 +322,76 @@ theorem finitePlacePrincipalValue_integrable (v : V) (π : Fᵥ(v)ˣ) (f : ℬ(F
       IntegrableOn
         (fun u : Fᵥ(v)ˣ ↦
           f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))))
-        Uᵥ(v) μᵥ(v) := by sorry
+        Uᵥ(v) μᵥ(v) := by
+  have : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  have : (μᵥ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  have hO : IsOpen (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hK : IsCompact (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr
+      (compactSpace_adicCompletionIntegers v))
+  refine ⟨ENNReal.toReal_pos (hO.measure_pos _ ⟨1, Uᵥ(v).one_mem⟩).ne' hK.measure_lt_top.ne, ?_⟩
+  refine ContinuousOn.integrableOn_compact hK (Continuous.continuousOn ?_)
+  exact (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp
+    ((Units.continuous_val.comp continuous_inv).mul continuous_const))
+
+/-- The unit average of a locally constant compactly supported function, after scaling by a
+fixed unit, is again locally constant with compact support. -/
+private theorem finitePlacePrincipalValue_mem_average {K : Type*} [Field K] [TopologicalSpace K]
+    [IsTopologicalRing K] [T2Space K] [MeasurableSpace Kˣ] [OpensMeasurableSpace Kˣ]
+    (μ : Measure Kˣ) (U : Set Kˣ) (hO : IsOpen U) (hK : IsCompact U) (c : Kˣ) (F0 : K → ℂ)
+    (hlc : IsLocallyConstant F0) (hcs : HasCompactSupport F0) :
+    IsLocallyConstant (fun y : K ↦ ∫ u in U, F0 ((↑u⁻¹ : K) * ((↑c⁻¹ : K) * y)) ∂μ) ∧
+      HasCompactSupport (fun y : K ↦ ∫ u in U, F0 ((↑u⁻¹ : K) * ((↑c⁻¹ : K) * y)) ∂μ) := by
+  have hinv : Continuous fun u : Kˣ ↦ (↑u⁻¹ : K) := Units.continuous_val.comp continuous_inv
+  refine ⟨(IsLocallyConstant.iff_exists_open _).mpr fun x ↦ ?_, ?_⟩
+  · have hΦ : IsLocallyConstant fun p : K × Kˣ ↦
+        (F0 ((↑p.2⁻¹ : K) * ((↑c⁻¹ : K) * p.1)), F0 ((↑p.2⁻¹ : K) * ((↑c⁻¹ : K) * x))) :=
+      (hlc.comp_continuous ((hinv.comp continuous_snd).mul
+        (continuous_const.mul continuous_fst))).prodMk
+        (hlc.comp_continuous ((hinv.comp continuous_snd).mul continuous_const))
+    obtain ⟨A, B, hA, -, hxA, hUB, hAB⟩ := generalized_tube_lemma isCompact_singleton hK
+      (hΦ {q | q.1 = q.2}) (fun p hp ↦ by
+        obtain ⟨hp1, -⟩ := hp
+        change F0 _ = F0 _
+        rw [Set.mem_singleton_iff.mp hp1])
+    exact ⟨A, hA, hxA rfl, fun x' hx' ↦
+      setIntegral_congr_fun hO.measurableSet fun u hu ↦
+        hAB (show ((x', u) : K × Kˣ) ∈ A ×ˢ B from ⟨hx', hUB hu⟩)⟩
+  · refine HasCompactSupport.intro
+      ((hK.prod hcs.isCompact).image (f := fun p : Kˣ × K ↦ (↑c : K) * ((↑p.1 : K) * p.2))
+        (continuous_const.mul ((Units.continuous_val.comp continuous_fst).mul continuous_snd)))
+      fun x hx ↦ setIntegral_eq_zero_of_forall_eq_zero fun u hu ↦ ?_
+    by_contra hne
+    refine hx ⟨(u, (↑u⁻¹ : K) * ((↑c⁻¹ : K) * x)), ⟨hu, subset_tsupport _ hne⟩, ?_⟩
+    change (↑c : K) * ((↑u : K) * ((↑u⁻¹ : K) * ((↑c⁻¹ : K) * x))) = x
+    rw [Units.mul_inv_cancel_left, Units.mul_inv_cancel_left]
 
 /-- Paper: Lemma 5.3.1.3, p. 241.
 The formula for the local principal value produces a Schwartz–Bruhat test function. -/
 theorem finitePlacePrincipalValue_mem (v : V) (π : Fᵥ(v)ˣ) (f : ℬ(Fᵥ(v))) :
     finitePlacePrincipalValueFun v π f ∈ schwartzBruhatSubmodule (Multiplicative Fᵥ(v)) :=
-  by sorry
+  by
+  have hlc := (mem_finitePlaceSchwartz_iff F v (fun y ↦ f (Multiplicative.ofAdd y))).mp
+    ⟨f, fun _ ↦ rfl⟩
+  have : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  have hO : IsOpen (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hK : IsCompact (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr
+      (compactSpace_adicCompletionIntegers v))
+  have h := finitePlacePrincipalValue_mem_average μᵥ(v) _ hO hK π _ hlc.1 hlc.2
+  obtain ⟨g, hg⟩ := (mem_finitePlaceSchwartz_iff F v _).mpr h
+  have heq : finitePlacePrincipalValueFun v π f =
+      (f : Multiplicative Fᵥ(v) → ℂ) -
+        (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ • (g : Multiplicative Fᵥ(v) → ℂ) :=
+    funext fun x ↦ by
+      change _ = f x - (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ * g (Multiplicative.ofAdd x.toAdd)
+      rw [hg]
+      rfl
+  rw [heq]
+  exact Submodule.sub_mem _ (show schwartzBruhatSubmodule _ from f).property
+    (Submodule.smul_mem _ _ (show schwartzBruhatSubmodule _ from g).property)
 
 local notation "pvBundle(" v ", " π ")" =>
   (fun f : ℬ(Fᵥ(v)) ↦
@@ -358,8 +422,14 @@ theorem finitePlacePrincipalValue_isLinear (v : V) (π : Fᵥ(v)ˣ) :
 The local principal value formula is continuous. -/
 theorem finitePlacePrincipalValue_continuous (v : V) (π : Fᵥ(v)ˣ) :
     @Continuous ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) _ _
-      ((finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))).toFun :=
-  by sorry
+      ((finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))).toFun := by
+  let E := FinestLocallyConvex ℬ(Fᵥ(v))
+  let L : E →ₗ[ℂ] E := (finitePlacePrincipalValue_isLinear v π).mk' (pvBundle(v, π))
+  apply (congrArg (fun t ↦ @Continuous ℬ(Fᵥ(v)) ℬ(Fᵥ(v)) t t L.toFun)
+    (finitePlaceSchwartz_finestTopology F v)).mpr
+  have h := finestLocallyConvex_withSeminorms ℬ(Fᵥ(v))
+  haveI : IsTopologicalAddGroup E := h.isTopologicalAddGroup
+  exact h.continuous_of_continuous_comp L fun p ↦ h.continuous_seminorm (p.comp L)
 
 /-- Paper: Definition 5.3.1.2, p. 241.
 The principal value is the identity minus the uniformizer pullback of the trivial-isotype
@@ -441,12 +511,101 @@ Weil's local principal value is a topological embedding with closed range. -/
 theorem finitePlacePrincipalValue_isClosedEmbedding (v : V) :
     IsClosedEmbedding (finitePlacePrincipalValue v) := by sorry
 
+private theorem finitePlacePrincipalValue_range_integral {G : Type*} [CommGroup G]
+    [MeasurableSpace G] [MeasurableMul G] (μ : Measure G) [μ.IsMulLeftInvariant]
+    (K : Subgroup G) (a : G) (ha : a ∈ K) (f : G → ℂ) :
+    ∫ x in K, f (a * x) ∂μ = ∫ x in K, f x ∂μ := by
+  have he : (fun x : G ↦ a * x) ⁻¹' (K : Set G) = K := by
+    ext x
+    simp only [mem_preimage]
+    constructor
+    · intro h
+      have := K.mul_mem (K.inv_mem ha) h
+      simpa using this
+    · exact K.mul_mem ha
+  have hp := (measurePreserving_mul_left μ a).setIntegral_preimage_emb
+    (MeasurableEquiv.mulLeft a).measurableEmbedding f (K : Set G)
+  rw [he] at hp
+  exact hp
+
+private theorem finitePlacePrincipalValue_range_zero (v : V) (f : ℬ(Fᵥ(v))) :
+    finitePlacePrincipalValue v f (Multiplicative.ofAdd 0) = 0 := by
+  let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  rw [finitePlacePrincipalValue_spec v π h.choose_spec]
+  unfold finitePlacePrincipalValueFun
+  simp only [show (Multiplicative.ofAdd (0 : Fᵥ(v))).toAdd = 0 from rfl, mul_zero,
+    setIntegral_const, Complex.real_smul]
+  have hm : (μᵥ(v).real Uᵥ(v) : ℂ) ≠ 0 := by
+    exact_mod_cast (finitePlacePrincipalValue_integrable v π f (Multiplicative.ofAdd 0)).1.ne'
+  field_simp
+  ring
+
+private theorem finitePlacePrincipalValue_range_invariant (v : V) (f : ℬ(Fᵥ(v))) :
+    ∀ u ∈ Uᵥ(v), schwartzBruhatUnitTranslate u (f - finitePlacePrincipalValue v f) =
+      f - finitePlacePrincipalValue v f := by
+  intro u hu
+  let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+  letI : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  let : (μᵥ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  apply Subtype.ext
+  funext x
+  change (f - finitePlacePrincipalValue v f) (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)) = _
+  change f _ - finitePlacePrincipalValue v f _ = f x - finitePlacePrincipalValue v f x
+  have hp1 := finitePlacePrincipalValue_spec v π h.choose_spec f
+    (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd))
+  have hp2 := finitePlacePrincipalValue_spec v π h.choose_spec f x
+  apply (congrArg₂ (fun a b : ℂ ↦
+    f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)) - a = f x - b) hp1 hp2).mpr
+  unfold finitePlacePrincipalValueFun
+  have hi := finitePlacePrincipalValue_range_integral (μᵥ(v)) Uᵥ(v) u hu
+    (fun a : Fᵥ(v)ˣ ↦ f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))))
+  have hi' : (∫ a : Fᵥ(v)ˣ in Uᵥ(v),
+      f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)))) ∂μᵥ(v)) =
+      ∫ a : Fᵥ(v)ˣ in Uᵥ(v), f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))) ∂μᵥ(v) := by
+    convert hi using 1
+    congr 1
+    funext a
+    simp only [mul_inv_rev, Units.val_mul]
+    ring
+  change _ - (_ - (μᵥ(v).real Uᵥ(v) : ℂ)⁻¹ *
+      (∫ a : Fᵥ(v)ˣ in Uᵥ(v), f (Multiplicative.ofAdd ((↑a⁻¹ : Fᵥ(v)) * ((↑π⁻¹ : Fᵥ(v)) * ((↑u⁻¹ : Fᵥ(v)) * x.toAdd)))) ∂μᵥ(v))) = _
+  rw [hi']
+  ring
+
 /-- Paper: Lemmas 5.3.1.1 and 5.3.1.3, pp. 240–241.
 Weil's operator maps onto all tests vanishing at zero.
 Deviation: The full evaluation kernel belongs to the averaged operator from (5.3.1.5). -/
 theorem finitePlacePrincipalValue_range (v : V) :
     Set.range (finitePlacePrincipalValue v) =
-      {f : ℬ(Fᵥ(v)) | f (Multiplicative.ofAdd 0) = 0} := by sorry
+      {f : ℬ(Fᵥ(v)) | f (Multiplicative.ofAdd 0) = 0} := by
+  ext f
+  constructor
+  · rintro ⟨g, rfl⟩
+    exact finitePlacePrincipalValue_range_zero v g
+  · intro hf
+    let h := (Valued.v : Valuation Fᵥ(v) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+    let π := Units.mk0 (h.choose : Fᵥ(v)) h.choose_spec.ne_zero
+    have hb : (f - finitePlacePrincipalValue v f) ∈
+        {f | (∀ u ∈ Uᵥ(v), schwartzBruhatUnitTranslate u f = f) ∧ f (Multiplicative.ofAdd 0) = 0} := by
+      refine ⟨finitePlacePrincipalValue_range_invariant v f, ?_⟩
+      change f (Multiplicative.ofAdd 0) - finitePlacePrincipalValue v f (Multiplicative.ofAdd 0) = 0
+      exact sub_eq_zero.mpr (hf.trans (finitePlacePrincipalValue_range_zero v f).symm)
+    have hb' := (Set.ext_iff.mp (finitePlaceDifference_range_on_unitInvariants v π h.choose_spec)
+      (f - finitePlacePrincipalValue v f)).mpr hb
+    obtain ⟨g, hg, hge⟩ := hb'
+    have hP : finitePlacePrincipalValue v g = finitePlaceDifference v π g := by
+      have huniq := (finitePlacePrincipalValue_unique v π h.choose_spec).1 1 g
+      have hh : ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val g = ((1 : PontryaginDual Uᵥ(v)) u : ℂ) • g := by
+        intro u
+        simpa using hg u.val u.property
+      simpa only [if_pos rfl, ite_true] using huniq hh
+    refine ⟨f + g, ?_⟩
+    calc
+      finitePlacePrincipalValue v (f + g) = finitePlacePrincipalValue v f + finitePlacePrincipalValue v g := map_add _ _ _
+      _ = finitePlacePrincipalValue v f + (f - finitePlacePrincipalValue v f) := congrArg (finitePlacePrincipalValue v f + ·) (hP.trans hge)
+      _ = f := by abel
 
 end FinitePlace
 
@@ -486,6 +645,26 @@ def adelePrincipalValue (S₀ : Finset V) : ℬ(𝔸[F]) →ₗ[ℂ] ℬ(𝔸[F]
     ((TensorProduct.map (sAdelePrincipalValue F (Finset.Subset.refl S₀)) idTail).comp
       e.symm.toLinearMap)
 
+private theorem sAdelePrincipalValue_tmul_aux {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (p : ι → Prop) [DecidablePred p] (T : ∀ i, D i →L[ℂ] D i) (f : A) (g : ∀ i, D i) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map fun i ↦
+      if p i then (T i).toLinearMap else LinearMap.id
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    (e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap))
+      (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i))) = e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, if p i then T i (g i) else g i)) := by
+  intro W P I
+  change e (TensorProduct.map I P (e.symm (e _))) = e _
+  erw [e.symm_apply_apply, TensorProduct.map_tmul]
+  apply congrArg e
+  apply congrArg (TensorProduct.tmul ℂ f)
+  exact (PiTensorProduct.map_tprod _ g).trans (congrArg (PiTensorProduct.tprod ℂ)
+    (funext fun i ↦ DFunLike.ite_apply (P := p i) (T i).toLinearMap LinearMap.id (g i)))
+
 open Classical in
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 On pure tensors the S-local operator acts by the local principal value in each selected factor. -/
@@ -493,8 +672,12 @@ theorem sAdelePrincipalValue_tmul {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     (f : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F)) :
     let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
     sAdelePrincipalValue F h₀ (e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) =
-      e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w)) :=
-  by sorry
+      e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w)) := by
+  intro e
+  unfold sAdelePrincipalValue
+  with_reducible
+    exact sAdelePrincipalValue_tmul_aux e (fun w : S ↦ w.val ∈ S₀)
+      (fun w ↦ finitePlacePrincipalValue w.val) f g
 
 /-- Paper: Definition 5.3.1.4(2), p. 242.
 Through any stage containing S₀ the global operator acts as the S-local operator on the stage
@@ -1312,19 +1495,89 @@ local notation "∂𝒮[" I ", " α "]" =>
 local notation "insertPlane" y =>
   WithLp.toLp 2 (Sum.elim (fun _ ↦ (0 : ℝ)) (fun j ↦ y j))
 
+/-- Precomposition with a closed-embedding continuous linear map of norm at most one is a
+continuous linear map between spaces of test functions. -/
+private theorem exists_testFunction_coordinatePlaneRestriction_comp {E E' : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [NormedAddCommGroup E'] [NormedSpace ℝ E']
+    (g : E' →L[ℝ] E) (hg : IsClosedEmbedding g) (hn : ‖g‖ ≤ 1) :
+    ∃ R : 𝓓((⊤ : TopologicalSpace.Opens E), ℂ) →L[ℂ] 𝓓((⊤ : TopologicalSpace.Opens E'), ℂ),
+      ∀ (f : 𝓓((⊤ : TopologicalSpace.Opens E), ℂ)) (y : E'), R f y = f (g y) := by
+  have hloc (K : TopologicalSpace.Compacts E) :
+      ∃ M : ContDiffMapSupportedIn E ℂ ⊤ K →L[ℂ]
+          ContDiffMapSupportedIn E' ℂ ⊤ ⟨g ⁻¹' K, hg.isCompact_preimage K.isCompact⟩,
+        ∀ f y, M f y = f (g y) := by
+    let M : ContDiffMapSupportedIn E ℂ ⊤ K →ₗ[ℂ]
+        ContDiffMapSupportedIn E' ℂ ⊤ ⟨g ⁻¹' K, hg.isCompact_preimage K.isCompact⟩ :=
+      { toFun := fun f ↦ ContDiffMapSupportedIn.of_support_subset
+          (f.contDiff.comp g.contDiff) (fun _ hy ↦ f.support_subset hy)
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl }
+    refine ⟨⟨M, WithSeminorms.continuous_of_isBounded
+      (ContDiffMapSupportedIn.withSeminorms ℂ _ ℂ _ _)
+      (ContDiffMapSupportedIn.withSeminorms ℂ _ ℂ _ _) _
+      (Seminorm.IsBounded.of_real fun i ↦ ⟨{i}, 1, fun f ↦ ?_⟩)⟩, fun _ _ ↦ rfl⟩
+    rw [Finset.sup_singleton, one_mul]
+    refine (ContDiffMapSupportedIn.seminorm_top_le_iff ℂ (apply_nonneg _ _) i _).mpr
+      fun y _ ↦ ?_
+    change ‖iteratedFDeriv ℝ i (⇑f ∘ g) y‖ ≤ _
+    rw [g.iteratedFDeriv_comp_right f.contDiff y (mod_cast le_top)]
+    refine (ContinuousMultilinearMap.norm_compContinuousLinearMap_le _ _).trans ?_
+    calc _ ≤ ‖iteratedFDeriv ℝ i f (g y)‖ * 1 := by
+          gcongr
+          exact Finset.prod_le_one₀ (fun _ _ ↦ norm_nonneg _) fun _ _ ↦ hn
+      _ ≤ _ := by
+          rw [mul_one]
+          exact ContDiffMapSupportedIn.norm_iteratedFDeriv_apply_le_seminorm_top ℂ
+  let L : 𝓓((⊤ : TopologicalSpace.Opens E), ℂ) →ₗ[ℂ] 𝓓((⊤ : TopologicalSpace.Opens E'), ℂ) :=
+    { toFun := fun f ↦ ⟨f ∘ g, f.contDiff.comp g.contDiff,
+        f.hasCompactSupport.comp_isClosedEmbedding hg, fun _ _ ↦ trivial⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hL : Continuous L := by
+    refine (TestFunction.continuous_iff_continuous_comp L).mpr fun K hK ↦ ?_
+    obtain ⟨M, hM⟩ := hloc K
+    have h : L ∘ TestFunction.ofSupportedIn hK =
+        TestFunction.ofSupportedIn (fun _ _ ↦ trivial) ∘ M :=
+      funext fun f ↦ TestFunction.ext fun y ↦ (hM f y).symm
+    rw [h]
+    exact (TestFunction.continuous_ofSupportedIn _).comp M.continuous
+  exact ⟨⟨L, hL⟩, fun _ _ ↦ rfl⟩
+
+/-- Inserting zeros into the normal coordinates is a continuous linear map of norm at most one
+whose norm is preserved, hence a closed embedding. -/
+private theorem exists_coordinatePlaneRestriction_inclusion :
+    ∃ g : Eᵣ(κ) →L[ℝ] Eᵣ(ι ⊕ κ), (∀ y : Eᵣ(κ), g y = insertPlane y) ∧
+      IsClosedEmbedding g ∧ ‖g‖ ≤ 1 ∧ ∀ y, ‖g y‖ = ‖y‖ := by
+  let g : Eᵣ(κ) →L[ℝ] Eᵣ(ι ⊕ κ) := LinearMap.toContinuousLinearMap
+    { toFun := fun y ↦ insertPlane y
+      map_add' := fun y y' ↦ by ext i; cases i <;> simp
+      map_smul' := fun c y ↦ by ext i; cases i <;> simp }
+  have hnorm (y : Eᵣ(κ)) : ‖g y‖ = ‖y‖ := by
+    simp [g, EuclideanSpace.norm_eq, Fintype.sum_sum_type]
+  exact ⟨g, fun _ ↦ rfl, (AddMonoidHomClass.isometry_of_norm _ hnorm).isClosedEmbedding,
+    ContinuousLinearMap.opNorm_le_bound _ zero_le_one fun y ↦ by rw [hnorm, one_mul], hnorm⟩
+
 /-- Paper: Theorem 5.3.2.3(1), p. 245.
 Inserting zeros into the normal coordinates gives a continuous linear restriction map
 on compactly supported smooth functions. -/
 theorem exists_testFunction_coordinatePlaneRestriction :
     ∃ R : 𝒟(ι ⊕ κ) →L[ℂ] 𝒟(κ), ∀ (f : 𝒟(ι ⊕ κ)) (y : Eᵣ(κ)),
-      R f y = f (insertPlane y) := by sorry
+      R f y = f (insertPlane y) := by
+  obtain ⟨g, hg, hce, hn, -⟩ := exists_coordinatePlaneRestriction_inclusion (ι := ι) (κ := κ)
+  obtain ⟨R, hR⟩ := exists_testFunction_coordinatePlaneRestriction_comp g hce hn
+  exact ⟨R, fun f y ↦ (hR f y).trans (congrArg f (hg y))⟩
 
 /-- Paper: Theorem 5.3.2.3(1), p. 245.
 Inserting zeros into the normal coordinates gives a continuous linear restriction map
 on Schwartz functions. -/
 theorem exists_schwartz_coordinatePlaneRestriction :
     ∃ R : 𝒮(ι ⊕ κ) →L[ℂ] 𝒮(κ), ∀ (f : 𝒮(ι ⊕ κ)) (y : Eᵣ(κ)),
-      R f y = f (insertPlane y) := by sorry
+      R f y = f (insertPlane y) := by
+  obtain ⟨g, hg, -, -, hnorm⟩ := exists_coordinatePlaneRestriction_inclusion (ι := ι) (κ := κ)
+  have hA : AntilipschitzWith 1 g := AntilipschitzWith.of_le_mul_dist fun y y' ↦ by
+    rw [dist_eq_norm, dist_eq_norm, ← map_sub, hnorm, NNReal.coe_one, one_mul]
+  exact ⟨SchwartzMap.compCLMOfAntilipschitz ℂ g.hasTemperateGrowth hA,
+    fun f y ↦ congrArg f (hg y)⟩
 
 local notation "R𝒟" => (exists_testFunction_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose
 local notation "R𝒮" => (exists_schwartz_coordinatePlaneRestriction (ι := ι) (κ := κ)).choose
@@ -1406,7 +1659,28 @@ theorem coordinateDerivative_testFunction_toSchwartz {ι : Type*} [Fintype ι]
     (β : ι → ℕ) (f : 𝒟(ι)) :
     let g := ∂𝒟[ι, β] f
     g.hasCompactSupport.toSchwartzMap g.contDiff =
-      ∂𝒮[ι, β] (f.hasCompactSupport.toSchwartzMap f.contDiff) := by sorry
+      ∂𝒮[ι, β] (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+  intro g
+  have hpow : ∀ i (k : ℕ) (f : 𝒟(ι)),
+      ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι) (eᵣ i : Eᵣ(ι)) ^ k) f).hasCompactSupport.toSchwartzMap
+          ((LineDeriv.lineDerivOpCLM ℂ 𝒟(ι) (eᵣ i : Eᵣ(ι)) ^ k) f).contDiff =
+        (LineDeriv.lineDerivOpCLM ℂ 𝒮(ι) (eᵣ i : Eᵣ(ι)) ^ k)
+          (f.hasCompactSupport.toSchwartzMap f.contDiff) := by
+    intro i k
+    induction k with
+    | zero => intro f; rfl
+    | succ k ih =>
+      intro f
+      rw [pow_succ, pow_succ, mul_apply_eq_comp, mul_apply_eq_comp, ih]
+      congr 1
+  show (∂𝒟[ι, β] f).hasCompactSupport.toSchwartzMap (∂𝒟[ι, β] f).contDiff = _
+  unfold coordinateDerivative
+  generalize (Finset.univ.toList : List ι) = l
+  induction l generalizing f with
+  | nil => rfl
+  | cons a t ih =>
+    simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
+    rw [← ih, ← hpow]
 
 open Classical in
 /-- Paper: Theorem 5.3.2.3(5), p. 245.

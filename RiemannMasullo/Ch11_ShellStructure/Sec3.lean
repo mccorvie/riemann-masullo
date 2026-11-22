@@ -103,7 +103,18 @@ of ideles satisfying the old conditions and failing a condition at some new plac
 The failure of a unit condition is the union of the nonzero valuation classes. -/
 theorem divisorialStratum_sdiff (T U : Finset V) (hTU : T ⊆ U) :
     divisorialStratum F T \ divisorialStratum F U =
-      ⋃ v ∈ U \ T, {g ∈ divisorialStratum F T | Valued.v (g.val.2 v) ≠ 1} := by sorry
+      ⋃ v ∈ U \ T, {g ∈ divisorialStratum F T | Valued.v (g.val.2 v) ≠ 1} := by
+  classical
+  ext g
+  simp only [Set.mem_diff, Set.mem_iUnion, Set.mem_setOf_eq, Finset.mem_sdiff]
+  constructor
+  · rintro ⟨hT, hU⟩
+    change ¬ ∀ v ∈ U, Valued.v (g.val.2 v) = 1 at hU
+    push_neg at hU
+    obtain ⟨v, hvU, hv⟩ := hU
+    exact ⟨v, ⟨hvU, fun hvT ↦ hv (hT v hvT)⟩, hT, hv⟩
+  · rintro ⟨v, ⟨hvU, _⟩, hT, hv⟩
+    exact ⟨hT, fun hU ↦ hv (hU v hvU)⟩
 
 /-- Paper: §11.3.1.1, pp. 492–493. The sequence of rational primes omitting the
 residue characteristics represented in the finite base consists of primes. -/
@@ -286,14 +297,44 @@ theorem mem_sLocalDivisorialStratum_iff (S : Finset V) (g : I𝔽) :
 /-- Paper: §11.3.2, p. 495, and (D.1.10.1), p. 783. The region of β is the range
 of the insertion of the ideles integral outside S. -/
 theorem sLocalDivisorialStratum_eq_range_integralIdeleInsertion (S : Finset V) :
-    sLocalDivisorialStratum F S = Set.range (integralIdeleInsertion F S) := by sorry
+    sLocalDivisorialStratum F S = Set.range (integralIdeleInsertion F S) := by
+  ext g
+  rw [mem_range_integralIdeleInsertion]
+  change (∀ v ∉ S, Valued.v (g.val.2 v) = 1) ↔ _
+  refine forall_congr' fun v ↦ imp_congr_right fun _ ↦ ?_
+  let u := Units.map ((RestrictedProduct.evalRingHom (fun w : V ↦ w.adicCompletion F) v).comp
+    (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))).toMonoidHom g
+  change Valued.v u.val = 1 ↔
+    u.val ∈ v.adicCompletionIntegers F ∧ u.inv ∈ v.adicCompletionIntegers F
+  simp only [HeightOneSpectrum.mem_adicCompletionIntegers]
+  have hinv : Valued.v u.inv = (Valued.v u.val)⁻¹ := by
+    rw [show u.inv = u.val⁻¹ from Units.val_inv_eq_inv_val u, map_inv₀]
+  rw [hinv, inv_le_one₀ (zero_lt_iff.mpr ((Valuation.ne_zero_iff _).mpr u.ne_zero))]
+  exact le_antisymm_iff
 
 /-- Paper: §11.3.1.1, pp. 492–493. At a saturated base, the limit of the
 descending primary strata is the S-local idelic region. -/
 theorem iInter_primaryDivisorialStratum (S : Finset V)
     (_hS : ∀ v ∈ S, ∀ w : V, w.under (𝓞 ℚ) = v.under (𝓞 ℚ) → w ∈ S) :
     (⋂ k, divisorialStratum F (primaryDivisorialPlaces F S k)) =
-      sLocalDivisorialStratum F S := by sorry
+      sLocalDivisorialStratum F S := by
+  have hplaces := iUnion_primaryDivisorialPlaces S _hS
+  ext g
+  rw [Set.mem_iInter]
+  change (∀ k v, v ∈ primaryDivisorialPlaces F S k → Valued.v (g.val.2 v) = 1) ↔
+    ∀ v ∉ S, Valued.v (g.val.2 v) = 1
+  constructor
+  · intro hg v hv
+    have hu : v ∈ ⋃ k, (primaryDivisorialPlaces F S k : Set V) := by
+      rw [hplaces]
+      exact hv
+    obtain ⟨k, hk⟩ := Set.mem_iUnion.mp hu
+    exact hg k v hk
+  · intro hg k v hv
+    apply hg v
+    have hu : v ∈ ⋃ k, (primaryDivisorialPlaces F S k : Set V) :=
+      Set.mem_iUnion.mpr ⟨k, hv⟩
+    rwa [hplaces] at hu
 
 /-- Paper: §11.3.1.1, p. 491 and (11.3.1.4), p. 494. The differences telescope
 pointwise to the S-local restriction minus the original kernel. For each pair
@@ -328,7 +369,8 @@ character, the Poisson term is the log residue size times the norm-one integral.
 theorem orbitalPlacePoissonTerm_trivial_zero (φ : 𝒟) (v : V) (π : (v.adicCompletion F)ˣ) :
     orbitalPlacePoissonTerm 1 φ v π 0 =
       (Real.log (q(v) : ℝ) : ℂ) * ∫ h : C₁, φ.val h.val
-        ∂normOneIdeleClassTamagawaMeasure F := by sorry
+        ∂normOneIdeleClassTamagawaMeasure F := by
+  simp [orbitalPlacePoissonTerm]
 
 /-- Paper: §11.3.1.1(2), p. 494, and (11.3.2.5), p. 496.
 The half-shifted Mellin values at the zeros of the reciprocal Euler product sum,
@@ -360,7 +402,22 @@ theorem finite_support_orbitalPlacePoisson (χ : PontryaginDual C𝔽) (φ : �
     (_hφ : tsupport φ.val ⊆ {g : C𝔽 | 1 < ((ideleClassNorm F g).val : ℝ)})
     (π : ∀ v : V, (v.adicCompletion F)ˣ)
     (_hπ : ∀ v, Valued.v.IsUniformizer (π v : v.adicCompletion F)) :
-    {v : V | ∃ n : ℤ, orbitalPlacePoissonTerm χ φ v (π v) n ≠ 0}.Finite := by sorry
+    {v : V | ∃ n : ℤ, orbitalPlacePoissonTerm χ φ v (π v) n ≠ 0}.Finite := by
+  let normReal : C𝔽 → ℝ := fun g ↦ ((ideleClassNorm F g).val : ℝ)
+  have hc : Continuous normReal :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have hcomp : IsCompact (tsupport φ.val) := φ.property.2
+  obtain ⟨B, hB⟩ := hcomp.bddAbove_image hc.continuousOn
+  obtain ⟨N, hN⟩ := exists_nat_gt B
+  refine (Ring.HasFiniteQuotients.finite_absNorm_heightOneSpectrum_le (S := 𝓞 F) N).subset ?_
+  intro v hv
+  change q(v) ≤ N
+  by_contra! hNv
+  obtain ⟨n, hn⟩ := hv
+  apply hn
+  apply orbitalPlacePoissonTerm_eq_zero χ φ v (π v) (_hπ v) _ n
+  intro g hg
+  exact ⟨_hφ hg, (hB ⟨g, hg, rfl⟩).trans_lt (hN.trans (by exact_mod_cast hNv))⟩
 
 /-- Paper: (11.3.2.2), p. 495. The printed weight averages products of the
 two translated section indicators over the norm-one fundamental domain and

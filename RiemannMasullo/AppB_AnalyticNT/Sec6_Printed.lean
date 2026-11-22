@@ -48,6 +48,97 @@ def Printed.finiteHeckeL_sq_entire_of_not_quadratic : Prop :=
     χ ^ 2 ≠ 1 → MeromorphicNFOn L univ →
       (∀ s : halfPlane, L s = finiteHeckeL (χ ^ 2) s) → Differentiable ℂ L
 
+/-- A field isomorphic to the rationals is a number field. -/
+private theorem finiteHeckeL_sq_entire_numberField (K : Type*) [Field K] (e : K ≃+* ℚ) :
+    NumberField K := by
+  let : CharZero K := charZero_of_injective_ringHom (f := e.symm.toRingHom) e.symm.injective
+  let : FiniteDimensional ℚ K := Module.Finite.of_injective e.toRatAlgEquiv.toLinearMap e.injective
+  exact ⟨⟩
+
+/-- An imaginary power of the idelic norm gives a nonquadratic character whose square
+is trivial on the norm-one subgroup. -/
+private theorem finiteHeckeL_sq_entire_char_exists (F : Type*) [Field F] [NumberField F] :
+    ∃ χ : U[F], χ ^ 2 ≠ 1 ∧
+    (χ ^ 2).toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 := by
+  let c := ideleClassNormTwist (1 : U[F]) Complex.I
+  have hnorm (g : IdeleClassGroup (𝓞 F) F) : ‖c g‖ = 1 := by
+    change ‖(1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I‖ = 1
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos
+      (NNReal.coe_pos.mpr (Units.zero_lt _)), Complex.I_re, Real.rpow_zero]
+  let χ : U[F] :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hnorm g)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' := fun x y ↦ Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  have hc (g : IdeleClassGroup (𝓞 F) F) :
+      (χ g : ℂ) = (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I := by
+    change (1 : ℂ) * (((↑(ideleClassNorm F g) : NNReal) : ℝ) : ℂ) ^ Complex.I = _
+    simp
+  refine ⟨χ, ?_, ?_⟩
+  · intro h
+    obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+    let u : Units NNReal := Units.mk0 ⟨Real.exp (Real.pi / 2), (Real.exp_pos _).le⟩
+      (by intro h; exact (Real.exp_ne_zero _) (congrArg (fun x : NNReal ↦ (x : ℝ)) h))
+    obtain ⟨g, hg⟩ := hsurj u
+    have hval := DFunLike.congr_fun h g
+    have he : (χ g : ℂ) ^ 2 = 1 := by
+      have hv := congrArg (fun x : Circle ↦ (x : ℂ)) hval
+      change ((χ g ^ 2 : Circle) : ℂ) = ((1 : Circle) : ℂ) at hv
+      simpa using hv
+    rw [hc, ← Complex.cpow_nat_mul, hg] at he
+    change ((Real.exp (Real.pi / 2) : ℝ) : ℂ) ^ (2 * Complex.I) = 1 at he
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_ne_zero _)),
+      ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp] at he
+    have hx : ((Real.pi / 2 : ℝ) : ℂ) * (2 * Complex.I) = Real.pi * Complex.I := by push_cast; ring
+    rw [hx, Complex.exp_pi_mul_I] at he
+    norm_num at he
+  · ext g
+    change (χ g.1 : ℂ) ^ 2 = 1
+    rw [hc]
+    have hg : ideleClassNorm F g.1 = 1 := MonoidHom.mem_ker.mp g.2
+    change (((↑(↑(ideleClassNorm F g.1) : NNReal) : ℝ) : ℂ) ^ Complex.I) ^ 2 = 1
+    rw [hg]
+    simp
+
+/-- The completed L-function has a pole on the one-line when the character is
+trivial on the norm-one subgroup, so its finite part cannot be entire. -/
+private theorem finiteHeckeL_sq_entire_pole_contra (F : Type*) [Field F] [NumberField F] (ψ : U[F])
+    (hψ : ψ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1)
+    (L : ℂ → ℂ) (hL : Differentiable ℂ L)
+    (heq : ∀ s : halfPlane, L s = finiteHeckeL ψ s) : False := by
+  let P : ℂ → ℂ := fun s ↦ heckeGammaFactor ψ s * L s
+  have hP : MeromorphicOn P univ := fun s _ ↦
+    (meromorphic_heckeGammaFactor ψ s).mul (hL.analyticAt s).meromorphicAt
+  let Q := toMeromorphicNFOn P univ
+  have hQ : MeromorphicNFOn Q univ := meromorphicNFOn_toMeromorphicNFOn _ _
+  have hEq : ∀ s : halfPlane, Q s = completedHeckeL ψ s := by
+    intro s
+    have hs : 0 < (s : ℂ).re := zero_lt_one.trans s.property
+    have ha : AnalyticAt ℂ (heckeGammaFactor ψ) s := by
+      apply DifferentiableOn.analyticAt (s := {z : ℂ | 0 < z.re})
+        (fun z hz ↦ (differentiableAt_heckeGammaFactor_of_re_pos ψ hz).differentiableWithinAt)
+      exact (isOpen_lt continuous_const Complex.continuous_re).mem_nhds hs
+    have hPa : AnalyticAt ℂ P s := ha.mul (hL.analyticAt s)
+    change toMeromorphicNFOn P univ s = _
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hP (mem_univ _),
+      toMeromorphicNFAt_eq_self.mpr hPa.meromorphicNFAt]
+    change heckeGammaFactor ψ s * L s = _
+    rw [heq s]
+    rfl
+  obtain ⟨t, ⟨_, _, hpole, _⟩, _⟩ := completedHeckeL_continuation_simplePoles ψ Q hQ hEq hψ
+  let p : ℂ := 1 + Complex.I * (t : ℂ)
+  have hp : 0 < p.re := by simp [p, Complex.mul_re]
+  have ha : AnalyticAt ℂ (heckeGammaFactor ψ) p := by
+    apply DifferentiableOn.analyticAt (s := {z : ℂ | 0 < z.re})
+      (fun z hz ↦ (differentiableAt_heckeGammaFactor_of_re_pos ψ hz).differentiableWithinAt)
+    exact (isOpen_lt continuous_const Complex.continuous_re).mem_nhds hp
+  have hPa : AnalyticAt ℂ P p := ha.mul (hL.analyticAt p)
+  have hord : meromorphicOrderAt Q p = meromorphicOrderAt P p :=
+    meromorphicOrderAt_congr (hP.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ p))
+  have hn := hPa.meromorphicOrderAt_nonneg
+  rw [← hord, hpole] at hn
+  exact (not_le_of_gt (show (-1 : WithTop ℤ) < 0 by decide)) hn
+
 /-- Paper: Paragraph following Proposition B.6.1.1, p. 636. Over the rational
 field take `χ = |·|^i`. Its square is nontrivial because the idelic norm is
 onto. The finite L-function of its square equals `ζ(s + 2i)` on `Re s > 1`.
@@ -55,7 +146,14 @@ Use the meromorphic normal form on the plane, setting the value at `1 - 2i` to z
 The germ there still has a simple pole, so this continuation is not entire. -/
 theorem Printed.finiteHeckeL_sq_entire_of_not_quadratic_false :
     ¬ Printed.finiteHeckeL_sq_entire_of_not_quadratic := by
-  sorry
+  intro h
+  let : Field (ULift ℚ) := (Equiv.ulift : ULift ℚ ≃ ℚ).field
+  let : NumberField (ULift ℚ) :=
+    finiteHeckeL_sq_entire_numberField _ (Equiv.ulift : ULift ℚ ≃ ℚ).ringEquiv
+  obtain ⟨χ, hχ, hk⟩ := finiteHeckeL_sq_entire_char_exists (ULift ℚ)
+  obtain ⟨L, hL, heq⟩ := finiteHeckeL_exists_continuation (χ ^ 2)
+  exact finiteHeckeL_sq_entire_pole_contra (ULift ℚ) (χ ^ 2) hk L
+    (h (ULift ℚ) χ L hχ hL heq) heq
 
 /-- Paper: Lemma B.6.1.2(1), p. 637. As printed: for every number field and
 continuous character trivial on the norm-one classes, after undoing its imaginary

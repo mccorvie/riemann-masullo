@@ -98,13 +98,40 @@ def sobolevProjectiveKernelOperator :
 
 local notation "ξ" => sobolevProjectiveKernelOperator (F := F) hα hs
 
+/-- The kernel composite of `sobolevProjectiveKernelOperator`, for general normed spaces,
+evaluated on an elementary tensor. -/
+private theorem sobolevProjectiveKernelOperator_tmul_aux {X E : Type*}
+    [NormedAddCommGroup X] [NormedSpace ℂ X] [NormedAddCommGroup E] [NormedSpace ℂ E]
+    [CompleteSpace E] (e : StrongDual ℂ E ≃ₗᵢ[ℂ] X) (u : X) (v x : E) :
+    (completedProjectiveTensorToOperators.comp
+      (⟨projectiveTensorMap e.symm.toContinuousLinearEquiv.toContinuousLinearMap.toLinearMap
+          (ContinuousLinearMap.id ℂ E).toLinearMap,
+        projectiveTensorMap_continuous e.symm.toContinuousLinearEquiv.toContinuousLinearMap
+          (ContinuousLinearMap.id ℂ E)⟩ :
+          ProjectiveTensor X E →L[ℂ] ProjectiveTensor (StrongDual ℂ E) E).completion)
+      ((show ProjectiveTensor X E from u ⊗ₜ[ℂ] v) : Completion (ProjectiveTensor X E)) x =
+      e.symm u x • v := by
+  exact congrArg (fun A : E →L[ℂ] E ↦ A x)
+    ((congrArg completedProjectiveTensorToOperators
+      (ContinuousLinearMap.completion_apply_coe _
+        (show ProjectiveTensor X E from u ⊗ₜ[ℂ] v))).trans
+      (completedProjectiveTensorToOperators_coe _))
+
 /-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
 On an elementary tensor the operator pairs the input with the reciprocal-weight
 factor and scales the positive-weight factor. -/
 theorem sobolevProjectiveKernelOperator_tmul
     (u : W'(α, s)) (v f : W(α, s)) :
     ξ (((show ProjectiveTensor W'(α, s) W(α, s) from u ⊗ₜ[ℂ] v) : Π(W'(α, s), W(α, s)))) f =
-      spectralSobolevPairing (F := F) f u • v := by sorry
+      spectralSobolevPairing (F := F) f u • v := by
+  have hspec := ((modulatedIntervalSobolev_dual m𝔽
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 (-α) α s (hStrip(hα)) hs).exists.choose_spec ((T).symm u) f).2
+  rw [LinearIsometryEquiv.apply_symm_apply] at hspec
+  have h := sobolevProjectiveKernelOperator_tmul_aux (T) u v f
+  refine h.trans ?_
+  rw [hspec]
+  rfl
 
 /-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
 The canonical map from completed projective kernels to operators is injective. -/

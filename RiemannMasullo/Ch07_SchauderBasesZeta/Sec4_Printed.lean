@@ -288,12 +288,96 @@ def Printed.archNuclearityStrongDual_not_nuclear : Prop :=
     tsupport φ.val ⊆ {g : C[F] | 1 < ((ideleClassNorm F g).val : ℝ)} →
     Printed.HasNonnuclearQuotientAction (archNuclearityDenominator χ) (Aθ(χ, τ, hτ, φ))
 
+/-- A zero endomorphism of any space with a uniformity has a nuclear presentation:
+zero coefficients and functionals, with the Banach disc `{0}`. -/
+private theorem archNuclearityStrongDual_not_nuclear_false_zero
+    {E : Type*} [AddCommGroup E] [Module ℂ E] {_ : UniformSpace E}
+    (T : E →L[ℂ] E) (hT : T = 0) : Nonempty (NuclearPresentation T) := by
+  let S := Submodule.span ℂ ({0} : Set E)
+  have hsub : ∀ x : S, x = 0 := by
+    rintro ⟨x, hx⟩
+    obtain ⟨a, rfl⟩ := Submodule.mem_span_singleton.mp hx
+    simp
+  have hpre : ((↑) ⁻¹' ({0} : Set E) : Set S) = univ := by
+    ext x
+    simp [hsub x]
+  have bB : Balanced ℂ ((↑) ⁻¹' ({0} : Set E) : Set S) := hpre ▸ balanced_univ
+  have cB : Convex ℝ ((↑) ⁻¹' ({0} : Set E) : Set S) := hpre ▸ convex_univ
+  have aB : Absorbent ℝ ((↑) ⁻¹' ({0} : Set E) : Set S) := hpre ▸ absorbent_univ
+  have hss : ∀ x y : WithLocalSeminorm (gaugeSeminorm bB cB aB), x = y :=
+    fun x y ↦ (hsub x).trans (hsub y).symm
+  have hdisc : IsBanachDisc ({0} : Set E) :=
+    { bounded := fun _ hV ↦ absorbs_zero_iff.mpr (mem_of_mem_nhds hV)
+      balanced := bB
+      convex := cB
+      absorbent := aB
+      separated := ⟨fun x y h ↦ (h (hss x y)).elim⟩
+      complete := ⟨fun {f} _ ↦ ⟨0, fun U hU ↦ by
+        have hU' : U = univ := Set.eq_univ_of_forall fun y ↦ hss 0 y ▸ mem_of_mem_nhds hU
+        exact hU' ▸ Filter.univ_mem⟩⟩ }
+  exact ⟨{ coeff := fun _ ↦ 0
+           functional := fun _ ↦ 0
+           disc := {0}
+           isBanachDisc := hdisc
+           vector := fun _ ↦ 0
+           vector_mem := fun _ ↦ by simp
+           summable_coeff := by simp
+           equicontinuous := fun U hU ↦ Filter.Eventually.of_forall fun _ _ ↦ by
+             simpa using refl_mem_uniformity hU
+           hasSum := fun x ↦ by simp [hT] }⟩
+
+/-- An endomorphism of a quotient module is zero when its graph is described by convolution
+with the zero function, through a linear transform of representatives. -/
+private theorem archNuclearityStrongDual_not_nuclear_false_action
+    {N : Type*} {_ : AddCommGroup N} {_ : Module ℂ N} (P : Submodule ℂ N) (p : Submodule ℂ P)
+    {_ : TopologicalSpace (P ⧸ p)}
+    {G : Type*} {_ : CommGroup G} {_ : TopologicalSpace G} {_ : MeasurableSpace G}
+    (μ : MeasureTheory.Measure G)
+    (Θ : N → C(G, ℂ)) (hΘ : IsLinearMap ℂ Θ) (φv : G → ℂ) (hφv : φv = 0)
+    (A : (P ⧸ p) →L[ℂ] (P ⧸ p))
+    (hA : ∀ f g : P, A (Submodule.Quotient.mk f) = Submodule.Quotient.mk g ↔
+      (Θ g.val : G → ℂ) = lcaConvolution μ φv (Θ f.val)) : A = 0 := by
+  refine ContinuousLinearMap.ext fun x ↦ ?_
+  rw [zero_apply]
+  induction x using Quotient.inductionOn' with
+  | h f =>
+    refine ((hA f 0).mpr ?_).trans (Submodule.Quotient.mk_zero _)
+    rw [ZeroMemClass.coe_zero, hΘ.map_zero, ContinuousMap.coe_zero, hφv]
+    funext y
+    simp [lcaConvolution]
+
+/-- An endomorphism of a quotient induced by the zero operator is zero. -/
+private theorem archNuclearityStrongDual_not_nuclear_false_induced
+    {M : Type*} {_ : AddCommGroup M} {_ : Module ℂ M} {_ : TopologicalSpace M}
+    (D : Submodule ℂ M) {_ : TopologicalSpace (M ⧸ D)}
+    (A : M →L[ℂ] M) (hA : A = 0) (T : (M ⧸ D) →L[ℂ] (M ⧸ D))
+    (hT : ∀ x : M, T (D.mkQ x) = D.mkQ (A x)) : T = 0 := by
+  refine ContinuousLinearMap.ext fun q ↦ ?_
+  obtain ⟨x, rfl⟩ := D.mkQ_surjective q
+  rw [hT x, hA, zero_apply, map_zero, zero_apply]
+
 /-- Paper: Remark 7.4.3.3, p. 373.
 Take F = ℚ, the trivial character, and the zero Bruhat test. Its support is empty
 and every multiplier derivative vanishes. The induced action and transpose have
 rank zero and admit nuclear presentations. -/
 theorem Printed.archNuclearityStrongDual_not_nuclear_false :
-    ¬ Printed.archNuclearityStrongDual_not_nuclear := by sorry
+    ¬ Printed.archNuclearityStrongDual_not_nuclear := by
+  intro h
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  let φ : BruhatCompactSupport C[ℚ] := ⟨0, (bruhatCompactSupportSubmodule C[ℚ]).zero_mem⟩
+  have hφ : φ.val = (0 : C[ℚ] → ℂ) := rfl
+  obtain ⟨T, hT, hnot⟩ := h ℚ 1 τ hτ φ (by rw [hφ, tsupport_zero]; exact empty_subset _)
+  have hspec := (exists_polarThetaNuclearityAction (1 : U[ℚ]) τ hτ φ).choose_spec.2
+  have hA : (exists_polarThetaNuclearityAction (1 : U[ℚ]) τ hτ φ).choose = 0 := by
+    refine archNuclearityStrongDual_not_nuclear_false_action _ _ _ _ ?_ _ ?_ _ hspec
+    · exact homogeneousAdelicTheta_isLinear _
+    · exact hφ
+  have hT0 : T = 0 :=
+    archNuclearityStrongDual_not_nuclear_false_induced _ _ hA T hT
+  apply hnot
+  apply archNuclearityStrongDual_not_nuclear_false_zero
+  exact hT0
 
 /-- Paper: Theorem 7.4.3.1(3)–(5), proof before (7.4.3.12), p. 371.
 As printed: the images of the tests with both polar moments zero have
