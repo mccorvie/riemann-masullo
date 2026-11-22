@@ -67,7 +67,14 @@ integrable on every subgroup fibre and its fibre integral recovers the quotient 
 theorem integral_indentationLift {b : G → ℝ} (hb : IsIndentation H μH b)
     (u : C(Q, ℂ)) (x : G) :
     Integrable (fun h : H ↦ indentationLift H b u ((h : G)⁻¹ * x)) μH ∧
-      (∫ h : H, indentationLift H b u ((h : G)⁻¹ * x) ∂μH) = u (π x) := by sorry
+      (∫ h : H, indentationLift H b u ((h : G)⁻¹ * x) ∂μH) = u (π x) := by
+  obtain ⟨hi, he⟩ := hb.2.2.2 x
+  have hcoset (h : H) : π ((h : G)⁻¹ * x) = π x := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    rw [map_mul, map_inv, h1, inv_one, one_mul]
+  simp only [indentationLift, hcoset]
+  refine ⟨hi.ofReal.mul_const _, ?_⟩
+  rw [integral_mul_const, integral_complex_ofReal, he, Complex.ofReal_one, one_mul]
 
 /-- Paper: (12.2.1.5), p. 505. Fibre integration of a compactly supported test
 commutes with complex scalar multiplication. -/
