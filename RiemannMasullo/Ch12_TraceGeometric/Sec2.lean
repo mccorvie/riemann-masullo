@@ -358,7 +358,16 @@ include hH hν hS hb hu hdiag hi in
 integral as translating the first. -/
 theorem integral_diagonalIndentationLift_swap_coordinates :
     (∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH) =
-      ∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH := by sorry
+      ∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH := by
+  have hweight (x y : G) :
+      diagonalIndentationWeight H countH b (x, y) = diagonalIndentationWeight H countH b (y, x) :=
+    integral_congr_ae (ae_of_all _ fun k ↦ mul_comm _ _)
+  have hswap (h : H) (x : G) :
+      Ψ uSmooth ((h : G)⁻¹ * x, x) = Ψ uSmooth (x, (h : G)⁻¹ * x) := by
+    have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+    have hπ : π ((h : G)⁻¹ * x) = π x := by rw [map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, Prod.map_apply, hπ, hweight ((h : G)⁻¹ * x) x]
+  simp only [hswap]
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.7), p. 508. The second skew-diagonal integral is unchanged by
