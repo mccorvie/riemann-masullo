@@ -177,7 +177,22 @@ theorem sLocalOrbitalPrincipalPart_hasSum_unique {T : Finset V} (_hT : T ⊆ S) 
     (u : StrongDual ℂ (Θₛ(ω)))
     (ha : HasSum (fun j ↦ a j • sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω) j) u)
     (hb : HasSum (fun j ↦ b j • sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω) j) u) :
-    a = b := by sorry
+    a = b := by
+  classical
+  obtain ⟨ψ, hψ⟩ := sLocalOrbitalPrincipalValue_biorthogonal (F := F) (S := S) _hT _hTne _hS _hPic ω
+  funext i
+  obtain ⟨x, hx⟩ := (PV(T, _hT, ω)).mkQ_surjective (ψ i)
+  let ev := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) x
+  have recover (t : I(T, ω) → ℂ)
+      (ht : HasSum (fun j ↦ t j • sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω) j) u) :
+      t i = u x := by
+    have hs : HasSum (fun j ↦ if j = i then t i else 0) (u x) := by
+      refine (ev.hasSum ht).congr_fun fun j ↦ ?_
+      change (if j = i then t i else 0) = t j * sLocalOrbitalPrincipalPart j x
+      rw [hψ j i x hx]
+      by_cases h : j = i <;> simp [h]
+    exact (hasSum_ite_eq i (t i)).unique hs
+  exact (recover a ha).trans (recover b hb).symm
 
 local notation "Sₚ(" p ")" => sLocalPrimaryPlaces (F := F) S p
 local notation "hₚ(" p ")" => sLocalPrimaryPlaces_subset (F := F) S p
