@@ -211,7 +211,11 @@ Deviation: The support statement uses topological support, so each individual
 cutoff vanishes in an open neighborhood of one. -/
 theorem introTraceApprox_support (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
-    tsupport (introTraceApprox (h n) (ρ n) z) ⊆ Ioi 1 := by sorry
+    tsupport (introTraceApprox (h n) (ρ n) z) ⊆ Ioi 1 := by
+  refine (closure_mono (s := Function.support (introTraceApprox (h n) (ρ n) z))
+    (t := Function.support (h n)) ?_).trans (_hA.1 n).2.2.1
+  intro t ht he
+  exact ht (by simp [introTraceApprox, he])
 
 /-- Paper: §1.4.2, p. 29. Every fixed positive norm other than one has
 the printed pointwise limit. -/
