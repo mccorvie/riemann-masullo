@@ -528,24 +528,28 @@ local notation "D[" B "]" => modulatedCompactSupportSubmodule m B
 -- with interior. Already G = ℝ_{>0}, χ = 1, B = [1, γ] misses the constant
 -- periodization, since a smooth function supported there vanishes at both endpoints.
 
-variable (hcover : q '' (m ⁻¹' interior B) = (univ : Set Q))
-
-include hB hcover in
+include hB in
 /-- Paper: Theorem 4.5.2.3 and Equation (4.5.2.2), p. 207. The supported
 homogeneous quotient is identified with the full quotient by inclusion.
 Deviation: The interior of the compact module window must cover the quotient.
 Every strict-width interval in part (2) satisfies this condition. -/
-theorem modulatedCompactSupport_isotypicQuotient_equiv (ω : PontryaginDual K) :
+theorem modulatedCompactSupport_isotypicQuotient_equiv
+    (hcover : (QuotientGroup.mk' (Subgroup.zpowers γ)) '' (m ⁻¹' interior B) =
+      (univ : Set (G ⧸ Subgroup.zpowers γ)))
+    (ω : PontryaginDual K) :
     let N := (Pχ[ω]).ker.comap (D[B]).subtype
     ∃ F : ((D[B]) ⧸ N) ≃L[ℂ] V[ω],
       ∀ f : D[B], F (N.mkQ f) = (Pχ[ω]).ker.mkQ f.val := by sorry
 
-include hk hperp hB hcover in
+include hk hperp hB in
 /-- Paper: Theorem 4.5.2.3 and Equation (4.5.2.2), p. 207. On a compact window
 whose interior covers the quotient, inclusion identifies the two quotients of
 k-invariant functions with their quotient topologies.
 Deviation: Uses the interior coverage condition on the window. -/
-theorem modulatedCompactSupportStage_isotypicQuotient_image (ω : PontryaginDual K) :
+theorem modulatedCompactSupportStage_isotypicQuotient_image
+    (hcover : (QuotientGroup.mk' (Subgroup.zpowers γ)) '' (m ⁻¹' interior B) =
+      (univ : Set (G ⧸ Subgroup.zpowers γ)))
+    (ω : PontryaginDual K) :
     let J : Submodule ℂ E := (schwartzBruhatInvariantSubmodule k).comap twist₀
     let W₀ := modulatedCompactSupportStage m B k
     let i : W₀ →ₗ[ℂ] J := Submodule.inclusion (inf_le_right : W₀ ≤ J)
