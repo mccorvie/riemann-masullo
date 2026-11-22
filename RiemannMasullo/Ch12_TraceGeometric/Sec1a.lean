@@ -61,7 +61,21 @@ def dSequenceKernelSmoothening (μ : Measure G) (U : ℕ → Set G) (k : G × G 
 theorem dSequenceKernelSmoothening_const [T2Space G] [LocallyCompactSpace G]
     [SecondCountableTopology G] [BorelSpace G]
     (μ : Measure G) [μ.IsHaarMeasure] {U : ℕ → Set G} (hU : IsDPrimeSequence μ U) (c : ℂ) :
-    dSequenceKernelSmoothening μ U (fun _ ↦ c) = fun _ ↦ c := by sorry
+    dSequenceKernelSmoothening μ U (fun _ ↦ c) = fun _ ↦ c := by
+  funext p
+  have havg (n : ℕ) :
+      dSequenceAverage (μ.prod μ) (U n ×ˢ U n) (fun _ ↦ c) p = c := by
+    obtain ⟨_, _, hpos, hfin⟩ := hU.1.1 n
+    unfold dSequenceAverage
+    apply setAverage_const <;> rw [measure_smul, Measure.prod_prod]
+    · exact mul_ne_zero hpos.ne' hpos.ne'
+    · exact ENNReal.mul_ne_top hfin.ne hfin.ne
+  have hlim : Tendsto
+      (fun n ↦ dSequenceAverage (μ.prod μ) (U n ×ˢ U n) (fun _ ↦ c) p) atTop (𝓝 c) := by
+    simpa only [havg] using (tendsto_const_nhds : Tendsto (fun _ : ℕ ↦ c) atTop (𝓝 c))
+  have hp : p ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n) (fun _ ↦ c) := ⟨c, hlim⟩
+  simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hp,
+    dSequenceSmoothening] using hlim.limUnder_eq
 
 end Smoothening
 
