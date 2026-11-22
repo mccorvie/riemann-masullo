@@ -535,7 +535,9 @@ include hH hν hS hb hu hdiag hi in
 exchanging the order of integration. -/
 theorem integral_diagonalIndentationLift_right_swap :
     (∫ h : H, ∫ x in D, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂μ ∂countH) =
-      ∫ x in D, ∫ h : H, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂countH ∂μ := by sorry
+      ∫ x in D, ∫ h : H, Ψ uSmooth (x, (h : G)⁻¹ * x) ∂countH ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  exact (integral_integral_swap (integrable_diagonalIndentationLift_right H hH hν hS hb hu hdiag hi)).symm
 
 include hH hν hS hb hu in
 /-- Paper: Proposition 12.2.2.2(3), p. 508. Multiplication by a compactly supported
