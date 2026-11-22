@@ -221,7 +221,11 @@ theorem truncatedConvolution_eq_geometric_add_spectral (hρ : IsModulatedCutoff 
     (φ : BruhatCompactSupport C𝔽) :
     (M(hρ)).comp (A(φ)) =
       geometricTruncatedConvolution a hα hs hρ φ + spectralTruncatedConvolution a hα hs hρ φ :=
-  by sorry
+  by
+  apply ContinuousLinearMap.ext
+  intro u
+  exact (DFunLike.congr_fun (geometricTruncation_add_spectralTruncation (F := F) a hα hs hρ)
+    (A(φ) u)).symm
 
 /-- Paper: (10.4.2.5), p. 459. Spectral projection after convolution is quotient
 convolution transported back along the isometric section of the quotient map. -/
