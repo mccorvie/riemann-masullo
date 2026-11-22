@@ -176,7 +176,8 @@ def sLocalPWProductRegion (S : Finset V) (Y : ℝ) : Set (SAdeleRing F S) :=
 /-- Paper: Definition 7.3.2.3(1), p. 355.
 On invertible adeles the product bound is the S-idelic norm bound. -/
 theorem mem_sLocalPWProductRegion_units (Y : ℝ) (u : (SAdeleRing F S)ˣ) :
-    u.val ∈ sLocalPWProductRegion S Y ↔ ((sIdeleNorm F S u).val : ℝ) ≤ Y := by sorry
+    u.val ∈ sLocalPWProductRegion S Y ↔ ((sIdeleNorm F S u).val : ℝ) ≤ Y := by
+  simp [sLocalPWProductRegion, sIdeleNorm, Units.coe_prod]
 
 /-- Paper: Definition 7.3.2.3(2), p. 355.
 The invariant PW level is the closure of the theta image of tests with compact Fourier
