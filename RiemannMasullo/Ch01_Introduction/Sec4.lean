@@ -119,7 +119,24 @@ def introTracePrimePower (χ : U𝔽) (h : ℝ → ℂ) (v : V) (k : ℕ) : ℂ 
 character have coefficient `log(q)/sqrt(q)`. -/
 theorem introTracePrimePower_one_first (h : ℝ → ℂ) (v : V) :
     introTracePrimePower (1 : U𝔽) h v 0 =
-      (Real.log q(v) : ℂ) * (h q(v) + h (q(v)⁻¹)) / (q(v) : ℂ) ^ (1 / 2 : ℂ) := by sorry
+      (Real.log q(v) : ℂ) * (h q(v) + h (q(v)⁻¹)) / (q(v) : ℂ) ^ (1 / 2 : ℂ) := by
+  classical
+  have htriv : ideleClassNormTwist (1 : U𝔽) 0 = 1 := by
+    ext1 g
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hunit (u : (v.adicCompletion F)ˣ) :
+      (1 : HeckeCharacter (𝓞 F) F).restrict v u = 1 := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    rfl
+  have hur : (1 : HeckeCharacter (𝓞 F) F).IsUnramifiedAt v :=
+    HeckeCharacter.isUnramifiedAt_iff.mpr fun x ↦
+      hunit (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x)
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  let u := Units.mk0 (val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose : v.adicCompletion F)
+    val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero
+  have hv : (1 : HeckeCharacter (𝓞 F) F).localValue v = 1 := hunit u
+  simp [introTracePrimePower, htriv, hur, hv]
 
 /-- Paper: §1.4.1, p. 28. The spectral side sums the full zero orders in the
 selected character and the open window centered at one half. -/
