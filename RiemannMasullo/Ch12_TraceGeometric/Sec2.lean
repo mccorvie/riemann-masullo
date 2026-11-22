@@ -510,7 +510,9 @@ include hH hν hS hb hu hdiag hi in
 exchanging the order of integration. -/
 theorem integral_diagonalIndentationLift_left_swap :
     (∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ) =
-      ∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH := by sorry
+      ∫ h : H, ∫ x in D, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂μ ∂countH := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  exact (integral_integral_swap (integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi))
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.6), p. 508. Translating the second coordinate gives the same
