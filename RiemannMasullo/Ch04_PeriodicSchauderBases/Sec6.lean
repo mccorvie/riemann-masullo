@@ -87,7 +87,17 @@ def modulatedDifferenceProduct (S : List G) :
 A repeated generator gives the second finite difference at every point. -/
 theorem modulatedDifferenceProduct_pair_apply (f : ModulatedExponentialDecay m I) (x : G) :
     (modulatedDifferenceProduct m hm hms I hInt hne [γ, γ] f).val x =
-      f.val x - 2 * f.val (γ * x) + f.val (γ ^ 2 * x) := by sorry
+      f.val x - 2 * f.val (γ * x) + f.val (γ ^ 2 * x) := by
+  let Δ := modulatedCyclicDifference m γ hm hms I hInt hne
+  have eval (g : ModulatedExponentialDecay m I) (y : G) :
+      (Δ g).val y = g.val y - g.val (γ * y) :=
+    modulatedCyclicDifference_apply m γ hm hms I hInt hne g y
+  calc
+    _ = (Δ f).val x - (Δ f).val (γ * x) := eval (Δ f) x
+    _ = (f.val x - f.val (γ * x)) -
+        (f.val (γ * x) - f.val (γ ^ 2 * x)) :=
+      congrArg₂ (· - ·) (eval f x) (by simpa only [pow_two, mul_assoc] using eval f (γ * x))
+    _ = _ := by ring
 
 end Difference
 
@@ -107,7 +117,22 @@ translation by each norm-one element acts by its character value. -/
 theorem mem_modulatedDecayIsotype_iff (I : Set ℝ) (h0 : 0 ∈ I)
     (f : ModulatedExponentialDecay m I) :
     f ∈ (modulatedDecayIsotype m I h0 ω) ↔ ∀ (u : K) (x : G),
-      f.val (u.val⁻¹ * x) = (ω u : ℂ) * f.val x := by sorry
+      f.val (u.val⁻¹ * x) = (ω u : ℂ) * f.val x := by
+  let z := modulatedExponentialDecayTwist m I ⟨0, h0⟩ f
+  have hz (x : G) : z x = f.val x :=
+    (modulatedExponentialDecayTwist_apply m I ⟨0, h0⟩ f x).trans (by simp)
+  let ρ := (schwartzBruhatTranslationAction (G := G)).comp m.toMonoidHom.ker.subtype
+  refine (mem_actionIsotype ρ ω z).trans ?_
+  have hl (u : K) (x : G) :
+      schwartzBruhatTranslationAction (G := G) u.val z x = f.val (u.val⁻¹ * x) :=
+    (schwartzBruhatTranslationAction_apply u.val x z).trans (hz _)
+  have hr (u : K) (x : G) : ((ω u : ℂ) • z) x = (ω u : ℂ) * f.val x :=
+    congrArg ((ω u : ℂ) * ·) (hz x)
+  constructor
+  · intro h u x
+    exact (hl u x).symm.trans ((congrArg (fun g : SchwartzBruhat G ↦ g x) (h u)).trans (hr u x))
+  · intro h u
+    exact Subtype.ext (funext fun x ↦ (hl u x).trans ((h u x).trans (hr u x).symm))
 
 /-- Paper: Lemma 4.6.1.3(1), p. 210. The difference product preserves each
 norm-one isotype. The same restriction is used for intervals containing zero
@@ -116,7 +141,23 @@ theorem modulatedDifferenceProduct_mem_isotype
     (I : Set ℝ) (hInt : OrdConnected I) (h0 : 0 ∈ I) (S : List G) :
     ∀ f ∈ modulatedDecayIsotype m I h0 ω,
       modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f ∈
-        modulatedDecayIsotype m I h0 ω := by sorry
+        modulatedDecayIsotype m I h0 ω := by
+  induction S with
+  | nil => exact fun f hf ↦ hf
+  | cons g S ih =>
+    intro f hf
+    have hP := (mem_modulatedDecayIsotype_iff m ω I h0 _).mp (ih f hf)
+    refine (mem_modulatedDecayIsotype_iff m ω I h0
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ (g :: S) f)).mpr fun u x ↦ ?_
+    have h1 := modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f) (u.val⁻¹ * x)
+    have h2 := modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f) x
+    have hcomm : g * (u.val⁻¹ * x) = u.val⁻¹ * (g * x) := mul_left_comm _ _ _
+    exact h1.trans ((congrArg₂ (· - ·) (hP u x)
+      ((congrArg (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f).val hcomm).trans
+        (hP u (g * x)))).trans
+      ((mul_sub _ _ _).symm.trans (congrArg ((ω u : ℂ) * ·) h2.symm)))
 
 /-- Paper: Equation (4.6.1.3), p. 210. The cyclic difference product on
 the isotype is the restriction of the ambient operator. -/
@@ -252,13 +293,18 @@ def modulatedPeriodicMultiplicity (m : G →ₜ* ℝ≥0ˣ) (ω : PontryaginDual
 /-- Paper: Equations (4.6.1.12)–(4.6.1.13), p. 212. The spectrum consists
 exactly of the characters of positive multiplicity. -/
 theorem mem_modulatedPeriodicSpectrum_iff (ξ : PontryaginDual G) :
-    ξ ∈ modulatedPeriodicSpectrum m ω γs ↔ 0 < modulatedPeriodicMultiplicity m ω γs ξ := by sorry
+    ξ ∈ modulatedPeriodicSpectrum m ω γs ↔ 0 < modulatedPeriodicMultiplicity m ω γs ξ := by
+  classical
+  simp only [modulatedPeriodicSpectrum, modulatedPeriodicMultiplicity, Set.mem_iUnion,
+    Finset.card_pos, Finset.Nonempty, Finset.mem_filter, Finset.mem_univ, true_and]
 
 /-- Paper: Equation (4.6.1.13) and Example 4.6.1.6, pp. 212, 217.
 Every character in the fiber for a twice-repeated generator has multiplicity two. -/
 theorem modulatedPeriodicMultiplicity_repeat (ξ : PontryaginDual G)
     (hξ : ξ ∈ modulatedCyclicAnnihilatorFiber m ω γ) :
-    modulatedPeriodicMultiplicity m ω (fun _ : Fin 2 ↦ γ) ξ = 2 := by sorry
+    modulatedPeriodicMultiplicity m ω (fun _ : Fin 2 ↦ γ) ξ = 2 := by
+  classical
+  simp [modulatedPeriodicMultiplicity, hξ]
 
 variable (hγs : ∀ k, 1 < (m (γs k)).val)
 
@@ -527,11 +573,45 @@ theorem schwartzBruhatDifferenceProduct_pair_apply (f : SchwartzBruhat G) (x : G
     schwartzBruhatDifferenceProduct [γ, γ] f x =
       f x - 2 * f (γ * x) + f (γ ^ 2 * x) := by sorry
 
+/-- A Schwartz–Bruhat function lies in the norm-one isotype exactly when translating its
+argument by a norm-one element multiplies its values by the character. -/
+private theorem mem_actionIsotype_translation_iff (φ : SchwartzBruhat G) :
+    φ ∈ actionIsotype ρK ω ↔ ∀ (u : K) (x : G), φ (u.val⁻¹ * x) = (ω u : ℂ) * φ x := by
+  refine (mem_actionIsotype ρK ω φ).trans (forall_congr' fun u ↦ ⟨fun h x ↦ ?_, fun h ↦ ?_⟩)
+  · have hx := congrArg (fun g : SchwartzBruhat G ↦ g x) h
+    change schwartzBruhatTranslationAction (G := G) u.val φ x = (ω u : ℂ) * φ x at hx
+    exact (schwartzBruhatTranslationAction_apply u.val x φ).symm.trans hx
+  · refine Subtype.ext (funext fun x ↦ ?_)
+    change schwartzBruhatTranslationAction (G := G) u.val φ x = (ω u : ℂ) * φ x
+    exact (schwartzBruhatTranslationAction_apply u.val x φ).trans (h x)
+
+/-- The ordinary cyclic difference at a point subtracts the value at the translate
+by the generator. -/
+private theorem schwartzBruhatCyclicDifference_eval (g : G) (f : SchwartzBruhat G) (x : G) :
+    schwartzBruhatCyclicDifference g f x = f x - f (g * x) :=
+  congrArg (f x - ·) ((schwartzBruhatTranslationAction_apply g⁻¹ x f).trans
+    (congrArg (fun y ↦ f (y * x)) (inv_inv g)))
+
 /-- Paper: Corollary 4.6.3.1, pp. 219–220. The ordinary Schwartz–Bruhat
 difference product preserves the norm-one isotype. -/
 theorem schwartzBruhatDifferenceProduct_mem_isotype :
     ∀ f ∈ actionIsotype ρK ω, schwartzBruhatDifferenceProduct S f ∈ actionIsotype ρK ω :=
-  by sorry
+  by
+  induction S with
+  | nil => exact fun f hf ↦ hf
+  | cons g S ih =>
+    intro f hf
+    have hP := (mem_actionIsotype_translation_iff m ω _).mp (ih f hf)
+    refine (mem_actionIsotype_translation_iff m ω
+      (schwartzBruhatDifferenceProduct (g :: S) f)).mpr fun u x ↦ ?_
+    have h1 := schwartzBruhatCyclicDifference_eval g (schwartzBruhatDifferenceProduct S f)
+      (u.val⁻¹ * x)
+    have h2 := schwartzBruhatCyclicDifference_eval g (schwartzBruhatDifferenceProduct S f) x
+    have hcomm : g * (u.val⁻¹ * x) = u.val⁻¹ * (g * x) := mul_left_comm _ _ _
+    exact h1.trans ((congrArg₂ (· - ·) (hP u x)
+      ((congrArg (fun y ↦ schwartzBruhatDifferenceProduct S f y) hcomm).trans
+        (hP u (g * x)))).trans
+      ((mul_sub _ _ _).symm.trans (congrArg ((ω u : ℂ) * ·) h2.symm)))
 
 variable (I : Set ℝ) (hOpen : IsOpen I) (hInt : OrdConnected I) (h0 : 0 ∈ I)
 

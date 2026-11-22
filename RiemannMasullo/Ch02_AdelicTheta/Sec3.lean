@@ -7,7 +7,9 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import Mathlib.Algebra.Module.ZLattice.Summable
+import Mathlib.Analysis.Calculus.SmoothSeries
 import Mathlib.Analysis.Normed.Group.FunctionSeries
+import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -1337,10 +1339,78 @@ local notation "expUnit" => fun s : ℝ ↦ Homeomorph.symm (Nonneg.unitsHomeomo
 local notation "orbitDeriv" => fun (f : ℬₛ) (x : Multiplicative Aₛ) ↦
   deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd (Units.val (γ (expUnit s)) * Multiplicative.toAdd x))) 0
 
+open scoped NumberField.AdeleRing in
+/-- Paper: Corollary 2.1.4.2, p. 72. Restricting a global Schwartz–Bruhat function to
+adeles whose omitted coordinates are zero gives an S-local Schwartz–Bruhat function.
+On a pure tensor, the restriction scales the S-local factor by the value of the
+complementary factor at zero. -/
+theorem sAdeleSchwartz_exists_zeroTailRestriction
+    (g : SchwartzBruhat (Multiplicative 𝔸[F])) :
+    ∃ h : ℬₛ, ∀ x : 𝔸[F], finiteAdeleTailProjection F S x.2 = 0 →
+      h (Multiplicative.ofAdd (adeleProjection F S x)) = g (Multiplicative.ofAdd x) := by
+  sorry
+
+open scoped NumberField.AdeleRing in
 /-- Paper: Lemma 2.3.2.1, p. 105. Pointwise differentiation along the
 one-parameter subgroup gives a Schwartz–Bruhat function. -/
 theorem sAdeleDirectionalDeriv_mem (f : ℬₛ) :
-    orbitDeriv f ∈ schwartzBruhatSubmodule (Multiplicative Aₛ) := by sorry
+    orbitDeriv f ∈ schwartzBruhatSubmodule (Multiplicative Aₛ) := by
+  classical
+  -- Lift the archimedean part of the subgroup, with finite component one.
+  have hFinite (t : ℝ≥0ˣ) : (γ t).val.2 = 1 := by
+    have : ConnectedSpace ℝ≥0ˣ :=
+      (Nonneg.unitsHomeomorphPos ℝ).connectedSpace_iff.mpr
+        (isConnected_iff_connectedSpace.mp (isConnected_Ioi (a := (0 : ℝ))))
+    funext v
+    have hCoord : Continuous (fun s : ℝ≥0ˣ ↦ (γ s).val.2 v) :=
+      (continuous_apply v).comp
+        (continuous_snd.comp (Units.continuous_val.comp γ.continuous))
+    calc
+      (γ t).val.2 v = (γ 1).val.2 v :=
+        TotallyDisconnectedSpace.eq_of_continuous _ hCoord t 1
+      _ = (1 : (v : S) → v.val.adicCompletion F) v := by rw [map_one]; rfl
+  let liftArch : Aₛ →* 𝔸[F] := (MonoidHom.fst _ _).prod 1
+  have hLiftArch : Continuous liftArch := continuous_fst.prodMk continuous_const
+  let Γ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F :=
+    ⟨(Units.map liftArch).comp γ.toMonoidHom, (hLiftArch.units_map _).comp γ.continuous⟩
+  have hΓ (t : ℝ≥0ˣ) : adeleProjection F S (Γ t).val = (γ t).val :=
+    Prod.ext rfl ((hFinite t).symm)
+  -- Extend an S-adele by zero at the omitted places.
+  obtain ⟨split, _, _, hsplit⟩ := integralAdelesOutside_factors F S
+  let j (x : Aₛ) : integralAdelesOutside F S := split.symm (x, 0)
+  have hj (x : Aₛ) : split (j x) = (x, 0) := split.apply_symm_apply _
+  have hproj (x : Aₛ) : adeleProjection F S (j x).val = x :=
+    ((hsplit (j x)).1).symm.trans (congrArg Prod.fst (hj x))
+  have houtside (x : Aₛ) (w : HeightOneSpectrum (𝓞 F)) (hw : w ∉ S) :
+      (j x).val.2 w = 0 := by
+    rw [← (hsplit (j x)).2 ⟨w, hw⟩, hj]
+    rfl
+  have htail (x : Aₛ) : finiteAdeleTailProjection F S (j x).val.2 = 0 := by
+    apply RestrictedProduct.ext
+    exact fun w ↦ houtside x w.val w.property
+  let d := adeleDirectionalDeriv Γ (sAdeleSchwartzToGlobal F S f)
+  obtain ⟨dₛ, hdₛ⟩ := sAdeleSchwartz_exists_zeroTailRestriction F S d
+  have hcurve (x : Aₛ) (s : ℝ) :
+      sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd ((Γ (expUnit s)).val * (j x).val)) =
+        f (Multiplicative.ofAdd ((γ (expUnit s)).val * x)) := by
+    have hIntegral (w : HeightOneSpectrum (𝓞 F)) (hw : w ∉ S) :
+        ((Γ (expUnit s)).val * (j x).val).2 w ∈ w.adicCompletionIntegers F := by
+      change 1 * (j x).val.2 w ∈ w.adicCompletionIntegers F
+      rw [one_mul, houtside x w hw]
+      exact Subring.zero_mem _
+    have hp : adeleProjection F S ((Γ (expUnit s)).val * (j x).val) =
+        (γ (expUnit s)).val * x :=
+      ((adeleProjection F S).map_mul _ _).trans (congrArg₂ (· * ·) (hΓ _) (hproj x))
+    exact (sAdeleSchwartzToGlobal_apply F S f _).trans
+      ((ite_eq_left hIntegral).trans (congrArg (fun y : Aₛ ↦ f (Multiplicative.ofAdd y)) hp))
+  have hd : (dₛ : Multiplicative Aₛ → ℂ) = orbitDeriv f := by
+    funext y
+    let x := y.toAdd
+    have hs := hdₛ (j x).val (htail x)
+    rw [hproj x] at hs
+    exact hs.trans (congrArg (fun c : ℝ → ℂ ↦ deriv c 0) (funext (hcurve x)))
+  rw [← hd]
+  exact dₛ.property
 
 /-- Inserting an S-idele and multiplying an adele integral outside S preserves integrality
 outside S, so evaluating the global extension reduces to evaluating on the S-coordinates. -/
@@ -1408,23 +1478,133 @@ def sAdeleDirectionalDeriv : ℬₛ →ₗ[ℂ] ℬₛ :=
   IsLinearMap.mk' (fun f ↦ ⟨orbitDeriv f, sAdeleDirectionalDeriv_mem F S γ f⟩)
     (sAdeleDirectionalDeriv_isLinear F S γ)
 
+/-- At the identity, a derivative in logarithmic coordinates gives the same slope
+in the positive real parameter, since the derivative of the logarithm at one is one. -/
+private theorem tendsto_unitSlope_of_hasDerivAt (u : ℝ≥0ˣ → ℂ) {d : ℂ}
+    (hd : HasDerivAt (fun s : ℝ ↦ u (expUnit s)) d 0) :
+    Tendsto (fun t : ℝ≥0ˣ ↦ (u t - u 1) / ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1) (𝓝 d) := by
+  have hLog := hd.scomp_of_eq (1 : ℝ) (Real.hasDerivAt_log one_ne_zero) Real.log_one.symm
+  rw [inv_one, one_smul] at hLog
+  have hVal : Tendsto valueℝ (𝓝[≠] (1 : ℝ≥0ˣ)) (𝓝[≠] (1 : ℝ)) := by
+    refine tendsto_nhdsWithin_iff.mpr ⟨?_, ?_⟩
+    · exact (NNReal.continuous_coe.comp Units.continuous_val).continuousAt.continuousWithinAt
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      exact fun he ↦ ht (Units.val_injective (NNReal.coe_injective he))
+  refine (hLog.tendsto_slope.comp hVal).congr' (.of_forall fun t ↦ ?_)
+  have ht : expUnit (Real.log (valueℝ t)) = t :=
+    Units.ext (NNReal.coe_inj.mp (Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))))
+  have h0 : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  simp only [Function.comp_apply, slope_def_module, Real.log_one, ht, h0, Complex.real_smul,
+    Complex.ofReal_inv, Complex.ofReal_sub, Complex.ofReal_one, div_eq_inv_mul]
+
 /-- Paper: Lemma 2.3.2.1, p. 105. The difference quotient in the positive
 real parameter converges to the S-adelic directional derivative. -/
 theorem sAdeleDirectionalDeriv_tendsto (f : ℬₛ) (x : Aₛ) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (f (Multiplicative.ofAdd ((γ t).val * x)) - f (Multiplicative.ofAdd x)) /
         ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1)
-      (𝓝 (sAdeleDirectionalDeriv F S γ f (Multiplicative.ofAdd x))) := by sorry
+      (𝓝 (sAdeleDirectionalDeriv F S γ f (Multiplicative.ofAdd x))) := by
+  change Tendsto _ _ (𝓝 (orbitDeriv f (Multiplicative.ofAdd x)))
+  simpa only [map_one, Units.val_one, one_mul] using
+    tendsto_unitSlope_of_hasDerivAt (fun t ↦ f (Multiplicative.ofAdd ((γ t).val * x)))
+      (sAdeleOrbit_differentiableAt F S γ f (Multiplicative.ofAdd x)).hasDerivAt
 
 /-- Paper: Lemma 2.3.2.1, p. 105. The directional derivative of a fixed
 test function is continuous in the S-adele argument. -/
 theorem sAdeleDirectionalDeriv_continuous_apply (f : ℬₛ) :
-    Continuous (fun x : Aₛ ↦ sAdeleDirectionalDeriv F S γ f (Multiplicative.ofAdd x)) := by sorry
+    Continuous (fun x : Aₛ ↦ sAdeleDirectionalDeriv F S γ f (Multiplicative.ofAdd x)) :=
+  (schwartzBruhat_continuous (sAdeleDirectionalDeriv F S γ f)).comp continuous_ofAdd
 
 /-- Paper: Lemma 2.3.2.1, p. 106. The directional derivative is continuous
 as an endomorphism of the S-local Schwartz–Bruhat space. -/
 theorem sAdeleDirectionalDeriv_continuous :
-    Continuous (sAdeleDirectionalDeriv F S γ) := by sorry
+    Continuous (sAdeleDirectionalDeriv F S γ) := by
+  classical
+  let Γ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F :=
+    ⟨(sIdeleInsertion F S).comp γ.toMonoidHom,
+      (isClosedEmbedding_sIdeleInsertion F S).continuous.comp γ.continuous⟩
+  have he := sAdeleSchwartzToGlobal_isEmbedding F S
+  apply he.isInducing.continuous_iff.mpr
+  refine ((adeleDirectionalDeriv_continuous Γ).comp he.continuous).congr fun f ↦ ?_
+  apply Subtype.ext
+  funext x
+  change deriv (fun s : ℝ ↦ sAdeleSchwartzToGlobal F S f
+    (Multiplicative.ofAdd ((sIdeleInsertion F S (γ (expUnit s))).val * x.toAdd))) 0 =
+      sAdeleSchwartzToGlobal F S (sAdeleDirectionalDeriv F S γ f) (Multiplicative.ofAdd x.toAdd)
+  refine Eq.trans ?_ (sAdeleSchwartzToGlobal_apply F S _ x.toAdd).symm
+  by_cases hx : ∀ v : HeightOneSpectrum (𝓞 F), v ∉ S → x.toAdd.2 v ∈ v.adicCompletionIntegers F
+  · refine Eq.trans ?_ (ite_eq_left hx).symm
+    have hy : x.toAdd ∈ integralAdelesOutside F S := by
+      simp only [integralAdelesOutside, Subring.mem_iInf]
+      intro v hv
+      exact hx v hv
+    exact congrArg (fun u : ℝ → ℂ ↦ deriv u 0) (funext fun s ↦
+      sAdeleSchwartzToGlobal_mul_sIdeleInsertion F S f (γ (expUnit s)) ⟨x.toAdd, hy⟩)
+  · refine Eq.trans ?_ (ite_eq_right hx).symm
+    have hz (s : ℝ) : sAdeleSchwartzToGlobal F S f
+          (Multiplicative.ofAdd ((sIdeleInsertion F S (γ (expUnit s))).val * x.toAdd)) = 0 := by
+      refine (sAdeleSchwartzToGlobal_apply F S f _).trans (ite_eq_right ?_)
+      intro h
+      apply hx
+      intro v hv
+      have hmem := h v hv
+      change (sIdeleInsertion F S (γ (expUnit s))).val.2 v * x.toAdd.2 v ∈ _ at hmem
+      rwa [(sIdeleInsertion_apply F S _).2.2 v hv, one_mul] at hmem
+    exact (congrArg (fun u : ℝ → ℂ ↦ deriv u 0) (funext hz)).trans (deriv_const _ _)
+
+/-- On a compact logarithmic orbit segment, the derivatives of the S-unit terms
+have a common summable majorant. Thus theta can be differentiated term by term. -/
+private theorem sLocalAdelicTheta_hasDerivAt (f : ℬₛ) (g : Iₛ) (s : ℝ) :
+    HasDerivAt (fun t : ℝ ↦ sLocalAdelicTheta F S f (γ (expUnit t) * g))
+      (sLocalAdelicTheta F S (sAdeleDirectionalDeriv F S γ f) (γ (expUnit s) * g)) s := by
+  let E : ℝ → ℝ≥0ˣ := expUnit
+  let a (t : ℝ) := γ (E t) * g
+  let d := sAdeleDirectionalDeriv F S γ f
+  let term (φ : ℬₛ) (ξ : Uₛ) (t : ℝ) := thetaTerm φ ξ (a t)
+  have hterm (ξ : Uₛ) (t : ℝ) : HasDerivAt (term f ξ) (term d ξ t) t := by
+    let x := (unitAtS ξ * a t).val
+    have h : HasDerivAt (fun r : ℝ ↦ f (Multiplicative.ofAdd ((γ (expUnit r)).val * x)))
+        (term d ξ t) (t - t) := by
+      rw [sub_self]
+      exact (sAdeleOrbit_differentiableAt F S γ f (Multiplicative.ofAdd x)).hasDerivAt
+    refine (h.comp_sub_const t t).congr_of_eventuallyEq (.of_forall fun r ↦ ?_)
+    have hAdd (v w : ℝ) : E (v + w) = E v * E w :=
+      Units.ext (NNReal.coe_inj.mp (Real.exp_add v w))
+    have hm : unitAtS ξ * a r = γ (E (r - t)) * (unitAtS ξ * a t) := by
+      change unitAtS ξ * (γ (E r) * g) = γ (E (r - t)) * (unitAtS ξ * (γ (E t) * g))
+      rw [mul_left_comm (γ (E (r - t))) (unitAtS ξ), ← mul_assoc (γ (E (r - t))) (γ (E t)) g,
+        ← map_mul γ, ← hAdd, sub_add_cancel]
+    exact congrArg (fun z : Iₛ ↦ f (Multiplicative.ofAdd z.val)) hm
+  have hE : Continuous E :=
+    (Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous
+  have ha : Continuous a := (γ.continuous.comp hE).mul_const g
+  let K := a '' Icc (s - 1) (s + 1)
+  have hK : IsCompact K := isCompact_Icc.image ha
+  refine (sLocalAdelicTheta_exists_summable_bound F S d K hK).elim fun u hu ↦ ?_
+  have hs : s ∈ Ioo (s - 1) (s + 1) :=
+    ⟨sub_lt_self _ zero_lt_one, lt_add_of_pos_right _ zero_lt_one⟩
+  change HasDerivAt (fun t ↦ ∑' ξ, term f ξ t) (∑' ξ, term d ξ s) s
+  have hsum : Summable (fun ξ ↦ term f ξ s) :=
+    ((sLocalAdelicTheta_hasSumUniformlyOn F S f {a s} isCompact_singleton).hasSum rfl).summable
+  have hle (ξ : Uₛ) (t : ℝ) (ht : t ∈ Ioo (s - 1) (s + 1)) : ‖term d ξ t‖ ≤ u ξ :=
+    hu.2 ξ (a t) (mem_image_of_mem a (Ioo_subset_Icc_self ht))
+  exact hasDerivAt_tsum_of_isPreconnected (g := term f) (g' := term d)
+    (t := Ioo (s - 1) (s + 1)) hu.1 isOpen_Ioo isPreconnected_Ioo
+    (fun ξ t _ ↦ hterm ξ t) hle hs hsum hs
+
+/-- Convert a logarithmic derivative along an S-idele orbit to its difference
+quotient at the base idele. -/
+private theorem sIdeleOrbit_tendsto_of_hasDerivAt (u v : Iₛ → ℂ) (g : Iₛ)
+    (h : HasDerivAt (fun s : ℝ ↦ u (γ (expUnit s) * g)) (v (γ (expUnit (0 : ℝ)) * g)) 0) :
+    Tendsto (fun t : ℝ≥0ˣ ↦ (u (γ t * g) - u g) / ((valueℝ t : ℂ) - 1))
+      (𝓝[≠] 1) (𝓝 (v g)) := by
+  let a (t : ℝ≥0ˣ) := γ t * g
+  have hOne : a 1 = g := (congrArg (· * g) (map_one γ)).trans (one_mul g)
+  have hZero : expUnit (0 : ℝ) = (1 : ℝ≥0ˣ) := Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hv : v (a (expUnit (0 : ℝ))) = v g := congrArg v ((congrArg a hZero).trans hOne)
+  have hd : HasDerivAt (fun s : ℝ ↦ u (a (expUnit s))) (v g) 0 := hv ▸ h
+  exact (tendsto_unitSlope_of_hasDerivAt (fun t ↦ u (a t)) hd).congr fun t ↦
+    congrArg (fun z ↦ (u (a t) - u z) / ((valueℝ t : ℂ) - 1)) hOne
 
 -- TODO(paper-gap): Equations (2.3.2.2)–(2.3.2.3) print τ(t) in both quotients.
 -- For ℚ, S = {∞}, f(x) = exp(-x²), g = 1, and trivial γ, the τ derivative
@@ -1438,7 +1618,10 @@ theorem sLocalAdelicTheta_directionalDeriv (f : ℬₛ) (g : Iₛ) :
     Tendsto (fun t : ℝ≥0ˣ ↦
       (sLocalAdelicTheta F S f (γ t * g) - sLocalAdelicTheta F S f g) /
         ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1)
-      (𝓝 (sLocalAdelicTheta F S (sAdeleDirectionalDeriv F S γ f) g)) := by sorry
+      (𝓝 (sLocalAdelicTheta F S (sAdeleDirectionalDeriv F S γ f) g)) := by
+  exact sIdeleOrbit_tendsto_of_hasDerivAt F S γ (sLocalAdelicTheta F S f)
+    (sLocalAdelicTheta F S (sAdeleDirectionalDeriv F S γ f)) g
+    (sLocalAdelicTheta_hasDerivAt F S γ f g 0)
 
 /-- Paper: Proposition 2.3.2.2, p. 106. The directional difference quotient
 of homogeneous theta converges to homogeneous theta of the differentiated test
@@ -1451,8 +1634,42 @@ theorem sLocalHomogeneousAdelicTheta_directionalDeriv
       (sLocalHomogeneousAdelicTheta F S μ ω f (classOf (γ t * g)) -
         sLocalHomogeneousAdelicTheta F S μ ω f (classOf g)) /
         ((valueℝ t : ℂ) - 1)) (𝓝[≠] 1)
-      (𝓝 (sLocalHomogeneousAdelicTheta F S μ ω (sAdeleDirectionalDeriv F S γ f) (classOf g))) :=
-  by sorry
+      (𝓝 (sLocalHomogeneousAdelicTheta F S μ ω (sAdeleDirectionalDeriv F S γ f) (classOf g))) := by
+  let E : ℝ → ℝ≥0ˣ := expUnit
+  let a (s : ℝ) := γ (E s) * g
+  let d := sAdeleDirectionalDeriv F S γ f
+  let term (φ : ℬₛ) (s : ℝ) (h : J₁) :=
+    sLocalAdelicThetaOnClasses F S φ (classOf (a s) * h.val) * (ω h : ℂ)
+  have hInt (φ : ℬₛ) (s : ℝ) : Integrable (term φ s) μ :=
+    sLocalHomogeneousAdelicTheta_integrable F S μ ω φ (classOf (a s))
+  have hTerm (h : J₁) (s : ℝ) : HasDerivAt (fun t ↦ term f t h) (term d s h) s := by
+    obtain ⟨k, hk⟩ := QuotientGroup.mk_surjective h.val
+    have hEval (φ : ℬₛ) (t : ℝ) : term φ t h =
+        sLocalAdelicTheta F S φ (γ (expUnit t) * (g * k)) * (ω h : ℂ) := by
+      have hclass : classOf (a t) * h.val = classOf (γ (expUnit t) * (g * k)) := by
+        rw [← hk, ← QuotientGroup.mk_mul, ← mul_assoc]
+      exact congrArg (· * (ω h : ℂ)) ((congrArg (sLocalAdelicThetaOnClasses F S φ) hclass).trans
+        (sLocalAdelicThetaOnClasses_mk F S φ _))
+    rw [hEval d s]
+    exact ((sLocalAdelicTheta_hasDerivAt F S γ f (g * k) s).mul_const (ω h : ℂ))
+      |>.congr_of_eventuallyEq (.of_forall (hEval f))
+  have hE : Continuous E :=
+    (Nonneg.unitsHomeomorphPos ℝ).symm.continuous.comp Real.expOrderIso.continuous
+  have ha : Continuous a := (γ.continuous.comp hE).mul_const g
+  let K := a '' Icc (-1 : ℝ) 1
+  have hK : IsCompact K := isCompact_Icc.image ha
+  refine (sLocalHomogeneousAdelicTheta_integrand_bounded F S μ ω d K hK).elim fun C hC ↦ ?_
+  have hDiff := (hasDerivAt_integral_of_dominated_loc_of_deriv_le (F := term f) (F' := term d)
+    (Icc_mem_nhds (by norm_num : (-1 : ℝ) < 0) zero_lt_one)
+    (.of_forall fun t ↦ (hInt f t).aestronglyMeasurable) (hInt f 0)
+    (hInt d 0).aestronglyMeasurable
+    (.of_forall fun h t ht ↦ hC.2.2 (a t) (mem_image_of_mem a ht) h) hC.2.1
+    (.of_forall fun h t _ ↦ hTerm h t)).2
+  change HasDerivAt (fun t ↦ sLocalHomogeneousAdelicTheta F S μ ω f (classOf (a t)))
+    (sLocalHomogeneousAdelicTheta F S μ ω d (classOf (a 0))) 0 at hDiff
+  exact sIdeleOrbit_tendsto_of_hasDerivAt F S γ
+    (fun k ↦ sLocalHomogeneousAdelicTheta F S μ ω f (classOf k))
+    (fun k ↦ sLocalHomogeneousAdelicTheta F S μ ω d (classOf k)) g hDiff
 
 -- Remark 2.3.2.3, p. 106, defers the comparison with global theta to the
 -- Mellin-transform constructions in Chapters 3–6.

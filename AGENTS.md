@@ -35,7 +35,7 @@ Role instructions are in [`prompts/`](prompts/README.md).
 | `Statements.lean`, `Challenge.lean`, `Main.lean`, `comparator.json` | the target theorems | integrator |
 | `scripts/land.sh`, `scripts/triage_prs.sh`, `scripts/check_pr.sh` | proof PR merging and triage | merger |
 | `lakefile.toml`, `lean-toolchain`, `lake-manifest.json`, `.github/`, remaining `scripts/`, `prompts/` | infrastructure | integrator |
-| `paper/` | the PDF and a text extraction | nobody |
+| `paper/`, `transcription/` | the PDF, a text extraction, and a Markdown transcription | nobody |
 
 Every module under `RiemannMasullo/` is built automatically, so a new file needs no entry in an
 import list. Declarations live in `namespace RiemannMasullo`.
@@ -91,12 +91,15 @@ projects are Apache-2.0, which requires the credit. Do not copy from a project w
 Printed page numbers equal PDF page numbers.
 
 ```sh
-scripts/paper.sh 59 62         # text of pages 59 to 62
+scripts/paper.sh 59 62         # pages 59 to 62 from the transcription (Markdown, formulas in LaTeX)
 scripts/paper.sh --png 63      # renders page 63 to .agent/pages/ and prints the path
+scripts/paper.sh --raw 59 62   # the old pdftotext extraction (drops subscripts, hats, primes, bars)
 ```
 
-The text extraction drops subscripts, hats, primes and the layout of displayed formulas. Before
-you formalize a formula, look at the page image.
+The transcription in [`transcription/`](transcription/README.md) is a reading aid, not an exact
+copy. In spot checks it was right on almost every formula, accents and subscripts included, but
+not all: a hat over the wrong part of a symbol, or a symbol tidied up where the print is
+garbled, does occur. The PDF decides. Before you formalize a formula, look at the page image.
 
 ## Building and checking
 

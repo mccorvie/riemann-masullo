@@ -4500,7 +4500,12 @@ theorem finestLocallyConvex_eq_finiteDimensionalFinalTopology :
     (inferInstance : TopologicalSpace (FinestLocallyConvex E)) =
       locallyConvexFinalTopology
         (X := fun S : {S : Submodule ℂ E // FiniteDimensional ℂ S} ↦ FinestLocallyConvex S.val)
-        (fun S ↦ S.val.subtype) := by sorry
+        (fun S ↦ S.val.subtype) := by
+  have hcont (p : Seminorm ℂ E) (S : {S : Submodule ℂ E // FiniteDimensional ℂ S}) :
+      Continuous (fun x : FinestLocallyConvex S.val ↦ p (S.val.subtype x)) :=
+    (finestLocallyConvex_withSeminorms S.val).continuous_seminorm (p.comp S.val.subtype)
+  exact ((finestLocallyConvex_withSeminorms E).congr_equiv
+    (Equiv.subtypeUnivEquiv hcont)).withSeminorms_eq
 
 /-- Paper: Proposition C.2.5.1(2), p. 691. Every linear map from a space with
 the finest locally convex topology to a Hausdorff locally convex space is continuous. -/

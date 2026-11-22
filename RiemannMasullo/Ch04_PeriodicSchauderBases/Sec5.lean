@@ -654,7 +654,11 @@ theorem modulatedExponentialDecay_zeroTwist_continuous :
 The zero twist preserves pointwise values and is the injective inclusion
 of the interval decay space into ordinary Schwartz–Bruhat functions. -/
 theorem modulatedExponentialDecay_zeroTwist_injective :
-    Injective j₀ ∧ ∀ (f : D) (x : G), j₀ f x = f.val x := by sorry
+    Injective j₀ ∧ ∀ (f : D) (x : G), j₀ f x = f.val x := by
+  have h (f : D) (x : G) : j₀ f x = f.val x := by
+    exact (modulatedExponentialDecayTwist_apply m I zeroI f x).trans (by simp)
+  refine ⟨fun f g hfg ↦ Subtype.ext (funext fun x ↦ ?_), h⟩
+  exact (h f x).symm.trans ((congrArg (fun u : S₀ ↦ u x) hfg).trans (h g x))
 
 /-- Paper: Equation (4.5.3.1), p. 208. Periodization at an interval containing
 zero composes the zero twist with ordinary Schwartz–Bruhat periodization. -/
@@ -741,7 +745,9 @@ local notation "Δ₀" => schwartzBruhatCyclicDifference γ
 /-- Paper: Equation (4.5.3.3), p. 208. The ordinary cyclic difference at x
 subtracts the function's value at γx. -/
 theorem schwartzBruhatCyclicDifference_apply (f : S₀) (x : G) :
-    Δ₀ f x = f x - f (γ * x) := by sorry
+    Δ₀ f x = f x - f (γ * x) := by
+  change f x - ρG γ⁻¹ f x = _
+  rw [schwartzBruhatTranslationAction_apply, inv_inv]
 
 include hm hms in
 /-- Paper: Corollary 4.5.3.1(2), pp. 208–209. On ordinary Schwartz–Bruhat

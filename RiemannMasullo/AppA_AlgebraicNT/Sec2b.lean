@@ -10,6 +10,7 @@ import Mathlib.Analysis.InnerProductSpace.Calculus
 import all Mathlib.Geometry.Manifold.Submersion
 import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.PolarCoord
 import Mathlib.Topology.Algebra.Group.Units
+import Mathlib.Topology.Baire.LocallyCompactRegular
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 import all RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -2414,7 +2415,21 @@ include hK in
 positive subgroup, the product has interior in the archimedean ideles. -/
 theorem infiniteIdele_product_interior (hi : (interior K).Nonempty) :
     (interior productLocus).Nonempty := by
-  sorry
+  have hsection : Continuous placeSection := by
+    change Continuous (atInfinity ∘ singlePlaceIdeleNormSection F v₀)
+    exact (continuous_fst.units_map _).comp (singlePlaceIdeleNormSection_continuous F v₀)
+  have hsplit : RightInverse placeSection (infiniteIdeleNorm F) := by
+    intro t
+    rw [infiniteIdeleNorm_eq_global]
+    exact singlePlaceIdeleNormSection_rightInverse F v₀ t
+  obtain ⟨e, he, -⟩ := infiniteIdeleNormSection_product F placeSection hsection hsplit
+  have hE := infiniteIdeleFundamentalDomain_interior F b v₀ σ
+  refine ((hi.prod hE).image e).mono (interior_maximal ?_ ?_)
+  · rintro _ ⟨⟨t, g⟩, ⟨ht, hg⟩, rfl⟩
+    rw [he]
+    exact Set.mul_mem_mul ⟨t, interior_subset ht, rfl⟩
+      ⟨g, subset_closure (interior_subset hg), rfl⟩
+  · exact e.toHomeomorph.isOpenMap _ (isOpen_interior.prod isOpen_interior)
 
 include hK in
 /-- Paper: Lemma A.2.3.13(2), p. 553. The product in the archimedean adele ring
@@ -3004,15 +3019,235 @@ theorem mem_sIdeleFundamentalDomain_of_classNumberOne [Subsingleton Picₛ(F, S)
     rw [h₁, one_smul]
     exact hg
 
+/-- In the finite-place factors both a unit and its inverse are bounded on bounded log
+intervals. Together with archimedean properness this makes the full S-logarithm proper. -/
+private theorem sIdeleLog_proper : IsProperMap (sIdeleLog F S) := by
+  let L (v : S) (u : (v.val.adicCompletion F)ˣ) := Real.log ‖u.val‖
+  have hL (v : S) : IsProperMap (L v) := by
+    let := properSpace_adicCompletion (K := F) v.val
+    have hn : IsProperMap (fun x : v.val.adicCompletion F ↦ ‖x‖) := by
+      convert isProperMap_dist (0 : v.val.adicCompletion F) using 1
+      exact funext fun x ↦ (dist_zero_left x).symm
+    let radii (x : ℝ) := (Real.exp x, Real.exp (-x))
+    refine isProperMap_of_comp_of_t2
+      (Units.continuous_val.norm.log (fun u ↦ norm_ne_zero_iff.mpr u.ne_zero))
+      (g := radii) (Real.continuous_exp.prodMk (Real.continuous_exp.comp continuous_neg)) ?_
+    convert (hn.prodMap (hn.comp MulOpposite.opHomeomorph.symm.isProperMap)).comp
+      (Units.isClosedEmbedding_embedProduct (α := v.val.adicCompletion F)).isProperMap using 1
+    funext u
+    change radii (L v u) = (‖u.val‖, ‖u.inv‖)
+    simp [radii, L, Real.exp_neg, Real.exp_log (norm_pos_iff.mpr u.ne_zero), Units.inv_eq_val_inv]
+  let e := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F)
+  let ef := ContinuousMulEquiv.piUnits (M := fun v : S ↦ v.val.adicCompletion F)
+  exact Homeomorph.sumArrowHomeomorphProdArrow.symm.isProperMap.comp
+    (((infiniteIdeleLog_proper F).prodMap ((IsProperMap.pi_map hL).comp
+      ef.toHomeomorph.isProperMap)).comp e.toHomeomorph.isProperMap)
+
+/-- The norm-one condition is the closed equation that the logarithms sum to zero. -/
+private theorem sIdeleNorm_ker_closed : IsClosed (Nₛ : Set 𝕀ₛ) := by
+  have heq : (Nₛ : Set 𝕀ₛ) = {g | ∑ i, sIdeleLog F S g i = 0} := by
+    ext g
+    change g ∈ Nₛ ↔ ∑ i, sIdeleLog F S g i = 0
+    rw [sIdeleLog_sum]
+    constructor
+    · intro hg
+      rw [MonoidHom.mem_ker.mp hg]
+      simp
+    · intro hg
+      apply Units.ext
+      apply NNReal.coe_injective
+      exact Real.eq_one_of_pos_of_log_eq_zero (NNReal.coe_pos.mpr (Units.zero_lt _)) hg
+  rw [heq]
+  exact isClosed_eq (continuous_finsetSum _ fun i _ ↦
+    (continuous_apply i).comp (sIdeleLog_proper F S).continuous) continuous_const
+
 /-- Paper: Proposition A.2.4.4(1), p. 555. The local domain has compact closure in
 the norm-one S-ideles. -/
 theorem sLocalIdeleFundamentalDomain_precompact : IsCompact (closure Eₛ) := by
-  sorry
+  let L := Fintype.linearCombination ℝ (fun i ↦ sIdeleLog F S (unitAtS (bₛ i).toMul.out))
+  have hL : Continuous L := L.continuous_of_finiteDimensional
+  have hbox := (sIdeleLog_proper F S).isCompact_preimage
+    ((isCompact_Icc (a := (0 : Fin sRank(F, S) → ℝ)) (b := 1)).image hL)
+  refine ((sIdeleNorm_ker_closed F S).isClosedEmbedding_subtypeVal.isCompact_preimage
+    hbox).closure_of_subset ?_
+  rintro g ⟨⟨t, ht, heq⟩, -⟩
+  exact ⟨t, ⟨fun i ↦ (ht i).1, fun i ↦ (ht i).2.le⟩, heq.symm⟩
+
+local notation "sBasisLog" => fun i ↦ sIdeleLog F S (unitAtS (Quotient.out (Additive.toMul (bₛ i))))
+local notation "sBasisMap" => Fintype.linearCombination ℝ sBasisLog
+
+/-- The logarithms of the chosen units span the sum-zero hyperplane. -/
+private theorem sIdeleLog_mem_basisMap_range (g : Nₛ) : sIdeleLog F S g.val ∈ (sBasisMap).range := by
+  let sumCoords : (InfinitePlace F ⊕ S → ℝ) →ₗ[ℝ] ℝ := ∑ i, LinearMap.proj i
+  have hsum (x) : sumCoords x = ∑ i, x i := by simp [sumCoords, LinearMap.sum_apply]
+  have hle : (sBasisMap).range ≤ sumCoords.ker := by
+    rw [Fintype.range_linearCombination]
+    apply Submodule.span_le.mpr
+    rintro _ ⟨i, rfl⟩
+    change sumCoords (sIdeleLog F S (unitAtS (bₛ i).toMul.out)) = 0
+    rw [hsum, sIdeleLog_sum]
+    have hu := (sIdeleNorm_spec F S).2 ⟨(bₛ i).toMul.out, rfl⟩
+    rw [show sIdeleNorm F S (unitAtS (bₛ i).toMul.out) = 1 from hu]
+    simp
+  have hn : sumCoords ≠ 0 := by
+    intro h
+    let i : InfinitePlace F ⊕ S := Sum.inl (Classical.arbitrary _)
+    have := congrArg (fun L : (_ → ℝ) →ₗ[ℝ] ℝ ↦ L (Pi.single i 1)) h
+    simp [hsum] at this
+  have hdim := Module.Dual.finrank_ker_add_one_of_ne_zero hn
+  rw [Module.finrank_fintype_fun_eq_card, Fintype.card_sum, Fintype.card_coe] at hdim
+  have heq : (sBasisMap).range = sumCoords.ker := by
+    apply Submodule.eq_of_le_of_finrank_le hle
+    have hr : Fintype.card (Fin sRank(F, S)) = Module.finrank ℝ (Submodule.span ℝ (Set.range sBasisLog)) :=
+      linearIndependent_iff_card_eq_finrank_span.mp (sUnitLog_basis_linearIndependent F S bₛ)
+    rw [Fintype.range_linearCombination, ← hr, Fintype.card_fin]
+    omega
+  rw [heq, LinearMap.mem_ker, hsum, sIdeleLog_sum, MonoidHom.mem_ker.mp g.property]
+  simp
+
+/-- In regulator coordinates the diagonal S-unit logarithms are precisely the integer vectors. -/
+private theorem sUnitLog_range_eq_integer_span :
+    Set.range (fun u : Oₛ(F, S)ˣ ↦ sIdeleLog F S (unitAtS u)) =
+      Set.range (fun k : Fin sRank(F, S) → ℤ ↦ sBasisMap (fun i ↦ (k i : ℝ))) := by
+  obtain ⟨L, hL⟩ := sUnitLogHom_exists F S
+  have hk : CommGroup.torsion Oₛ(F, S)ˣ ≤ L.ker := by
+    intro u hu
+    exact (hL u).trans ((sIdeleLog_unit_eq_zero F S u).2 hu)
+  let f := (QuotientGroup.lift _ L hk).toAdditiveLeft.toIntLinearMap
+  have hf (u : Oₛ(F, S)ˣ) : f (Additive.ofMul (QuotientGroup.mk u)) = sIdeleLog F S (unitAtS u) :=
+    hL u
+  have hb (i) : f (bₛ i) = sBasisLog i := by
+    have h := hf (bₛ i).toMul.out
+    rw [show QuotientGroup.mk (bₛ i).toMul.out = (bₛ i).toMul from Quotient.out_eq' _] at h
+    exact h
+  have hsum (k : Fin sRank(F, S) → ℤ) :
+      f (∑ i, k i • bₛ i) = sBasisMap (fun i ↦ (k i : ℝ)) := by
+    simp only [map_sum, map_zsmul, hb, Fintype.linearCombination_apply, Int.cast_smul_eq_zsmul]
+  apply Set.Subset.antisymm
+  · rintro _ ⟨u, rfl⟩
+    let a := Additive.ofMul (QuotientGroup.mk (s := CommGroup.torsion _) u)
+    exact ⟨fun i ↦ bₛ.repr a i, (hsum _).symm.trans (by rw [bₛ.sum_repr]; exact hf u)⟩
+  · rintro _ ⟨k, rfl⟩
+    let a := ∑ i, k i • bₛ i
+    obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective a.toMul
+    refine ⟨u, (hf u).symm.trans ?_⟩
+    rw [hu]
+    exact hsum k
+
+private theorem sIdeleLog_mul (g h : 𝕀ₛ) :
+    sIdeleLog F S (g * h) = sIdeleLog F S g + sIdeleLog F S h := by
+  funext v
+  rcases v with w | v
+  · let p := Units.map (RingHom.fst (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F)).toMonoidHom
+    exact congrFun (infiniteIdeleLog_mul F (p g) (p h)) w
+  · let p : 𝕀ₛ →* (v.val.adicCompletion F)ˣ :=
+      Units.map ((Pi.evalRingHom _ v).comp (RingHom.snd (InfiniteAdeleRing F) _)).toMonoidHom
+    change Real.log ‖(p g).val * (p h).val‖ = Real.log ‖(p g).val‖ + Real.log ‖(p h).val‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (p g).ne_zero) (norm_ne_zero_iff.mpr (p h).ne_zero)]
+
+private def sUnitNormOne : Oₛ(F, S)ˣ →* Nₛ :=
+  (unitAtS).codRestrict _ (fun u ↦ (sIdeleNorm_spec F S).2 ⟨u, rfl⟩)
+
+/-- Subtract the integer parts of the regulator coordinates, then rotate the chosen
+archimedean component by a torsion unit. -/
+private theorem exists_sUnit_mul_mem_localDomain (g : Nₛ) :
+    ∃ u : Oₛ(F, S)ˣ, sUnitNormOne F S u * g ∈ Eₛ := by
+  obtain ⟨c, hc⟩ := sIdeleLog_mem_basisMap_range F S bₛ g
+  let k (i : Fin sRank(F, S)) := -⌊c i⌋
+  have hmem : sBasisMap (fun i ↦ (k i : ℝ)) ∈ Set.range (fun u : Oₛ(F, S)ˣ ↦
+      sIdeleLog F S (unitAtS u)) := (sUnitLog_range_eq_integer_span F S bₛ).symm ▸ ⟨k, rfl⟩
+  obtain ⟨u, hu⟩ := hmem
+  dsimp only at hu
+  let x := sUnitNormOne F S u * g
+  have hx : sIdeleLog F S x.val ∈ sRegulatorParallelotope F S bₛ := by
+    refine ⟨fun i ↦ Int.fract (c i), fun i ↦ ⟨Int.fract_nonneg _, Int.fract_lt_one _⟩, ?_⟩
+    change sIdeleLog F S (unitAtS u * g.val) = sBasisMap _
+    rw [sIdeleLog_mul, hu, ← hc, ← map_add]
+    congr 1
+    funext i
+    simp [k, Int.fract, sub_eq_add_neg, add_comm]
+  let arch := Units.map (RingHom.fst (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F)).toMonoidHom
+  obtain ⟨ζ, hζ, hsector⟩ := exists_torsionUnit_inTorsionSector F v₀ σ (atPlace (arch x.val))
+  let t := Units.map (algebraMap (𝓞 F) Oₛ(F, S)).toMonoidHom ζ
+  have ht : t ∈ CommGroup.torsion Oₛ(F, S)ˣ := (sUnit_torsion_eq_image F S) ▸ ⟨ζ, hζ, rfl⟩
+  refine ⟨t * u, ?_⟩
+  rw [map_mul, mul_assoc]
+  change sIdeleLog F S (unitAtS t * x.val) ∈ sRegulatorParallelotope F S bₛ ∧
+    inTorsionSector F v₀ σ (atPlace (arch (unitAtS t * x.val)))
+  rw [sIdeleLog_mul, (sIdeleLog_unit_eq_zero F S t).2 ht, zero_add, map_mul, map_mul]
+  exact ⟨hx, hsector⟩
+
+/-- The half-open coordinate bounds and the half-open angular sector both give locally
+closed conditions, including on slices where a finite valuation is constant. -/
+private theorem sLocalIdeleFundamentalDomain_isLocallyClosed : IsLocallyClosed Eₛ := by
+  let B := {t : Fin sRank(F, S) → ℝ | ∀ i, t i ∈ Set.Ico 0 1}
+  have hB : IsLocallyClosed B := by
+    refine ⟨⋂ i, (fun t : Fin sRank(F, S) → ℝ ↦ t i) ⁻¹' Set.Iio 1,
+      Set.Ici 0, isOpen_iInter_of_finite (fun i ↦ isOpen_Iio.preimage (continuous_apply i)),
+      isClosed_Ici, ?_⟩
+    ext t
+    simp only [B, Set.mem_ofPred_eq, Set.mem_inter_iff, Set.mem_iInter, Set.mem_preimage,
+      Set.mem_Iio, Set.mem_Ici, Set.mem_Ico]
+    exact ⟨fun h ↦ ⟨fun i ↦ (h i).2, fun i ↦ (h i).1⟩,
+      fun ⟨hlt, hle⟩ i ↦ ⟨hle i, hlt i⟩⟩
+  have hP : IsLocallyClosed (sRegulatorParallelotope F S bₛ) := by
+    have he : IsClosedEmbedding sBasisMap := LinearMap.isClosedEmbedding_of_injective
+      (LinearMap.ker_eq_bot.mpr (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective)
+    have heq : sRegulatorParallelotope F S bₛ = sBasisMap '' B := by
+      ext x
+      exact ⟨fun ⟨t, ht, heq⟩ ↦ ⟨t, ht, heq.symm⟩, fun ⟨t, ht, heq⟩ ↦ ⟨t, ht, heq.symm⟩⟩
+    exact heq ▸ hB.image he.isInducing he.isClosed_range.isLocallyClosed
+  let z (g : Nₛ) := σ (extensionEmbedding v₀ (g.val.val.1 v₀))
+  have hz : Continuous z := σ.toLinearMap.continuous_of_finiteDimensional.comp
+    ((isometry_extensionEmbedding v₀).continuous.comp ((continuous_apply v₀).comp
+      (continuous_fst.comp (Units.continuous_val.comp continuous_subtype_val))))
+  let width := 2 * Real.pi / (Units.torsionOrder F : ℝ)
+  have hw : width ≤ Real.pi := by
+    obtain ⟨m, hm⟩ := Units.even_torsionOrder F
+    have hn := Units.torsionOrder_pos F
+    have hn' : (2 : ℝ) ≤ Units.torsionOrder F := by exact_mod_cast (by omega : 2 ≤ Units.torsionOrder F)
+    exact (div_le_iff₀ (Nat.cast_pos.mpr hn)).mpr (by nlinarith [Real.pi_pos])
+  have hsector : IsLocallyClosed {g : Nₛ | (z g).arg ∈ Set.Ico 0 width} := by
+    refine ⟨z ⁻¹' (Complex.slitPlane ∩ Complex.arg ⁻¹' Set.Iio width),
+      (Complex.im ∘ z) ⁻¹' Set.Ici 0, (Complex.continuousOn_arg.isOpen_inter_preimage
+        Complex.isOpen_slitPlane isOpen_Iio).preimage hz,
+      isClosed_Ici.preimage (Complex.continuous_im.comp hz), ?_⟩
+    ext g
+    have hne : z g ≠ 0 := ((g.val.isUnit.map (RingHom.fst _ _)).map
+      ((σ.toRingHom.comp (extensionEmbedding v₀)).comp (Pi.evalRingHom _ v₀))).ne_zero
+    exact ⟨fun h ↦ ⟨⟨Complex.mem_slitPlane_iff_arg.mpr ⟨(h.2.trans_le hw).ne, hne⟩, h.2⟩,
+      Complex.arg_nonneg_iff.mp h.1⟩,
+      fun h ↦ ⟨Complex.arg_nonneg_iff.mpr h.2, h.1.2⟩⟩
+  exact (hP.preimage ((sIdeleLog_proper F S).continuous.comp continuous_subtype_val)).inter hsector
 
 /-- Paper: Proposition A.2.4.4(1), p. 555. The local domain has nonempty interior in
 the norm-one S-ideles. -/
 theorem sLocalIdeleFundamentalDomain_interior : (interior Eₛ).Nonempty := by
-  sorry
+  have : T2Space 𝕀ₛ := (sIdeleGroup_description F S).2.1
+  have : LocallyCompactSpace 𝕀ₛ := (sIdeleGroup_description F S).2.2.1
+  have : LocallyCompactSpace Nₛ := (sIdeleNorm_ker_closed F S).locallyCompactSpace
+  have : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  have : Countable Oₛ(F, S)ˣ := (Subtype.val_injective.comp Units.val_injective).countable
+  -- Baire gives interior to the closure of one translate.
+  have hcover : (⋃ u : Oₛ(F, S)ˣ, sUnitNormOne F S u • closure Eₛ) = Set.univ := by
+    apply Set.eq_univ_of_forall
+    intro g
+    obtain ⟨u, hu⟩ := exists_sUnit_mul_mem_localDomain F v₀ σ S bₛ g
+    exact Set.mem_iUnion.mpr ⟨u⁻¹, Set.mem_smul_set.mpr ⟨_, subset_closure hu, by
+      change sUnitNormOne F S u⁻¹ * (sUnitNormOne F S u * g) = g
+      rw [map_inv, inv_mul_cancel_left]⟩⟩
+  obtain ⟨u, hu⟩ := nonempty_interior_of_iUnion_of_closed
+    (fun u ↦ isClosed_closure.smul (sUnitNormOne F S u)) hcover
+  rw [interior_smul, Set.smul_set_nonempty] at hu
+  obtain ⟨x, hx⟩ := hu
+  -- A locally closed set is open in its closure.
+  obtain ⟨U, Z, hU, hZ, heq⟩ := sLocalIdeleFundamentalDomain_isLocallyClosed F v₀ σ S bₛ
+  obtain ⟨y, hy, hyE⟩ := mem_closure_iff.mp (interior_subset hx) _ isOpen_interior hx
+  refine ⟨y, mem_interior_iff_mem_nhds.mpr ?_⟩
+  refine Filter.mem_of_superset ((isOpen_interior.inter hU).mem_nhds
+    ⟨hy, (heq ▸ hyE).1⟩) ?_
+  intro a ha
+  exact heq ▸ ⟨ha.2, closure_minimal (heq ▸ Set.inter_subset_right) hZ (interior_subset ha.1)⟩
 
 local notation "localDomain" => (Subgroup.subtype Nₛ '' Eₛ)
 
@@ -3020,40 +3255,189 @@ local notation "localDomain" => (Subgroup.subtype Nₛ '' Eₛ)
 domain cover exactly the norm-one S-ideles. -/
 theorem sLocalIdeleFundamentalDomain_cover :
     (⋃ u : Oₛ(F, S)ˣ, unitAtS u • localDomain) = Nₛ := by
-  sorry
+  apply Set.Subset.antisymm
+  · refine Set.iUnion_subset fun u ↦ ?_
+    rintro _ ⟨_, ⟨g, _, rfl⟩, rfl⟩
+    exact ((sUnitNormOne F S u) * g).property
+  · intro x hx
+    let g : Nₛ := ⟨x, hx⟩
+    obtain ⟨u, hu⟩ := exists_sUnit_mul_mem_localDomain F v₀ σ S bₛ g
+    refine Set.mem_iUnion.mpr ⟨u⁻¹, Set.mem_smul_set.mpr ⟨_, ⟨_, hu, rfl⟩, ?_⟩⟩
+    change unitAtS u⁻¹ * (unitAtS u * x) = x
+    rw [map_inv, inv_mul_cancel_left]
+
+/-- Two points of the half-open angular sector cannot differ by a nontrivial root of unity. -/
+private theorem torsionUnit_eq_one_of_sector_mul (ζ : (𝓞 F)ˣ) (hζ : ζ ∈ Units.torsion F)
+    (x : v₀.Completionˣ) (hx : inTorsionSector F v₀ σ x)
+    (hy : inTorsionSector F v₀ σ (atPlace (unitAtInfinity ζ) * x)) : ζ = 1 := by
+  let p := Units.map (σ.toRingHom.comp (extensionEmbedding v₀)).toMonoidHom
+  let a := (p x).val
+  let y := atPlace (unitAtInfinity ζ) * x
+  let b := (p y).val
+  let n := Units.torsionOrder F
+  have hn : 0 < (n : ℝ) := Nat.cast_pos.mpr (Units.torsionOrder_pos F)
+  have hpow : a ^ n = b ^ n := by
+    have hζn := Units.pow_torsionOrder_eq_one F hζ
+    change (p x).val ^ n = (p (atPlace (unitAtInfinity ζ) * x)).val ^ n
+    rw [← Units.val_pow_eq_pow_val, ← Units.val_pow_eq_pow_val, ← map_pow, ← map_pow,
+      mul_pow, ← map_pow, ← map_pow, hζn, map_one, map_one, one_mul]
+  have hbounds (t : ℝ) (ht : t ∈ Set.Ico 0 (2 * Real.pi / n)) :
+      (n : ℝ) * t ∈ Set.Ico 0 (2 * Real.pi) :=
+    ⟨mul_nonneg hn.le ht.1, mul_comm (n : ℝ) t ▸ (lt_div_iff₀ hn).mp ht.2⟩
+  have hang : (((n : ℝ) * a.arg : ℝ) : Real.Angle) = (((n : ℝ) * b.arg : ℝ) : Real.Angle) := by
+    rw [Real.Angle.natCast_mul_eq_nsmul, Real.Angle.natCast_mul_eq_nsmul,
+      ← Complex.arg_pow_coe_angle, ← Complex.arg_pow_coe_angle, hpow]
+  have hinj := AddCircle.injOn_coe_Ico (2 * Real.pi) (0 : ℝ)
+  rw [zero_add] at hinj
+  have hab : a = b := Complex.ext_norm_arg
+    ((pow_left_inj₀ (norm_nonneg a) (norm_nonneg b) (Units.torsionOrder_ne_zero F)).mp
+      (by rw [← norm_pow, ← norm_pow, hpow]))
+    (mul_left_cancel₀ hn.ne' (hinj (hbounds a.arg hx) (hbounds b.arg hy) hang))
+  have hxy : x = y := Units.ext ((extensionEmbedding v₀).injective (σ.injective hab))
+  have h1 : atPlace (unitAtInfinity ζ) = 1 := mul_right_cancel (hxy.symm.trans (one_mul x).symm)
+  exact Units.ext (RingOfIntegers.ext ((algebraMap F v₀.Completion).injective (congrArg Units.val h1)))
 
 /-- Paper: Proposition A.2.4.4(2), p. 555. Every nonidentity S-unit translates the
 local domain disjointly from itself. -/
 theorem sLocalIdeleFundamentalDomain_disjoint (u : Oₛ(F, S)ˣ) (hu : u ≠ 1) :
     Disjoint (unitAtS u • localDomain) localDomain := by
-  sorry
+  rw [Set.disjoint_left]
+  rintro z hz ⟨h, hh, rfl⟩
+  obtain ⟨_, ⟨g, hg, rfl⟩, heq⟩ := Set.mem_smul_set.mp hz
+  have heq' : unitAtS u * g.val = h.val := heq
+  obtain ⟨a, ha, ha'⟩ := hg.1
+  obtain ⟨b, hb, hb'⟩ := hh.1
+  have hmem : sIdeleLog F S (unitAtS u) ∈ Set.range (fun k : Fin sRank(F, S) → ℤ ↦
+      sBasisMap (fun i ↦ (k i : ℝ))) := (sUnitLog_range_eq_integer_span F S bₛ) ▸ ⟨u, rfl⟩
+  obtain ⟨k, hk⟩ := hmem
+  dsimp only at hk
+  have hshift : sBasisMap ((fun i ↦ (k i : ℝ)) + a) = sBasisMap b := by
+    rw [map_add, hk, ← (show sIdeleLog F S g.val = sBasisMap a from ha'),
+      ← sIdeleLog_mul, heq', hb']
+    rfl
+  have he := (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective hshift
+  have hk0 (i) : k i = 0 := by
+    have hi : (k i : ℝ) + a i = b i := congrFun he i
+    have hfloor := congrArg Int.floor hi
+    rw [Int.floor_intCast_add, Int.floor_eq_zero_iff.mpr (ha i), Int.floor_eq_zero_iff.mpr (hb i),
+      add_zero] at hfloor
+    exact hfloor
+  have ht := (sIdeleLog_unit_eq_zero F S u).mp (hk.symm.trans (by
+    simp_rw [hk0, Int.cast_zero]
+    exact map_zero sBasisMap))
+  rw [← sUnit_torsion_eq_image] at ht
+  obtain ⟨ζ, hζ, rfl⟩ := ht
+  let p := Units.map (RingHom.fst (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F)).toMonoidHom
+  have hsector : inTorsionSector F v₀ σ (atPlace (unitAtInfinity ζ) * atPlace (p g.val)) := by
+    have hsec := hh.2
+    change inTorsionSector F v₀ σ (atPlace (p h.val)) at hsec
+    rwa [← heq', map_mul, map_mul] at hsec
+  exact hu (by rw [torsionUnit_eq_one_of_sector_mul F v₀ σ ζ hζ _ hg.2 hsector, map_one])
 
 /-- Paper: Proposition A.2.4.4(3), p. 555. Only finitely many S-unit translates of
 the closure meet a given compact subset of the norm-one S-ideles. -/
 theorem sLocalIdeleFundamentalDomain_finite_translates (K : Set Nₛ) (hK : IsCompact K) :
     {u : Oₛ(F, S)ˣ | ((unitAtS u • (Subgroup.subtype Nₛ '' closure Eₛ)) ∩
       (Subgroup.subtype Nₛ '' K)).Nonempty}.Finite := by
-  sorry
+  let d := ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).comp
+    (integralAdeleDiagonal F S)
+  obtain ⟨hinj, hclosed, hdisc, _⟩ := sAdele_additive_quotient F S
+  let C := (Subgroup.subtype Nₛ '' K) / (Subgroup.subtype Nₛ '' closure Eₛ)
+  have hC : IsCompact C := by
+    change IsCompact (Set.image2 (· / ·) _ _)
+    rw [← Set.image_prod]
+    exact ((hK.image continuous_subtype_val).prod
+      ((sLocalIdeleFundamentalDomain_precompact F v₀ σ S bₛ).image continuous_subtype_val)).image
+        (continuous_fst.div' continuous_snd)
+  have hfin : (Units.val '' C ∩ Set.range d).Finite :=
+    ((hC.image Units.continuous_val).inter_right hclosed).finite
+      (hdisc.mono Set.inter_subset_right)
+  refine (hfin.preimage (hinj.comp Units.val_injective).injOn).subset ?_
+  rintro u ⟨z, hz, hKz⟩
+  obtain ⟨y, hy, heq⟩ := Set.mem_smul_set.mp hz
+  have hquot : z / y = unitAtS u := (div_eq_iff_eq_mul).mpr heq.symm
+  exact ⟨⟨unitAtS u, hquot ▸ Set.mem_div.mpr ⟨z, hKz, y, hy, rfl⟩, rfl⟩, ⟨u.val, rfl⟩⟩
 
 -- TODO(paper-gap): Proposition A.2.4.4(4) requires the nonexistent representatives
 -- of (A.2.4.4) in the nontrivial class group case. The identity represents the trivial case.
 
+/-- Projection away from the compact product of outside unit groups is proper and onto. -/
+private theorem outsideUnitProjection_properties :
+    let p := (projectS).comp outsideInclusion
+    IsProperMap p ∧ Surjective p := by
+  let B := (v : {v : Primes(F) // v ∉ S}) → v.val.adicCompletionIntegers F
+  have (v : {v : Primes(F) // v ∉ S}) : CompactSpace (v.val.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers v.val
+  have : CompactSpace B := inferInstanceAs (CompactSpace (∀ _, _))
+  obtain ⟨e, he, he', hcoord⟩ := integralAdelesOutside_factors F S
+  let f : (integralAdelesOutside F S)ˣ ≃ₜ 𝕀ₛ × Bˣ :=
+    ({ Units.mapEquiv e.toMulEquiv with
+       continuous_toFun := he.units_map e.toMonoidHom
+       continuous_invFun := he'.units_map e.symm.toMonoidHom } :
+      (integralAdelesOutside F S)ˣ ≃ₜ (SAdeleRing F S × B)ˣ).trans Homeomorph.prodUnits
+  have hp : ((projectS).comp outsideInclusion : _ → 𝕀ₛ) = Prod.fst ∘ f := by
+    funext x
+    exact Units.ext (hcoord x.val).1.symm
+  dsimp only
+  rw [hp]
+  exact ⟨isProperMap_fst_of_compactSpace.comp f.isProperMap, Prod.fst_surjective.comp f.surjective⟩
+
+/-- The norm identity restricts the outside projection to the two norm-one groups. -/
+private def outsideNormOneProjection : outsideNormOne(F, S) →* Nₛ :=
+  (((projectS).comp outsideInclusion).comp (Subgroup.subtype outsideNormOne(F, S))).codRestrict _
+    (fun g ↦ ((sIdeleNorm_spec F S).1 g.val).symm.trans g.property)
+
+private theorem outsideNormOneProjection_properties :
+    IsProperMap (outsideNormOneProjection F S) ∧ Surjective (outsideNormOneProjection F S) := by
+  have : T2Space 𝕀ₛ := (sIdeleGroup_description F S).2.1
+  obtain ⟨hp, hs⟩ := outsideUnitProjection_properties F S
+  have hclosed : IsClosed (outsideNormOne(F, S) : Set (integralAdelesOutside F S)ˣ) := by
+    have heq : (outsideNormOne(F, S) : Set _) = ((projectS).comp outsideInclusion) ⁻¹' Nₛ := by
+      ext g
+      change ideleNorm F (outsideInclusion g) = 1 ↔ sIdeleNorm F S (projectS (outsideInclusion g)) = 1
+      rw [(sIdeleNorm_spec F S).1 g]
+      rfl
+    exact heq ▸ (sIdeleNorm_ker_closed F S).preimage hp.continuous
+  constructor
+  · exact isProperMap_of_comp_of_t2
+      ((hp.continuous.comp continuous_subtype_val).subtype_mk _) continuous_subtype_val
+      (hp.comp hclosed.isClosedEmbedding_subtypeVal.isProperMap)
+  · intro g
+    obtain ⟨x, hx⟩ := hs g.val
+    refine ⟨⟨x, ?_⟩, Subtype.ext hx⟩
+    exact ((sIdeleNorm_spec F S).1 x).trans ((congrArg (sIdeleNorm F S) hx).trans g.property)
+
 variable [Subsingleton Picₛ(F, S)] (rₛ : Picₛ(F, S) → outsideNormOne(F, S)) (h₁ : rₛ 1 = 1)
 local notation "globalSDomain" => sIdeleFundamentalDomain F v₀ σ S bₛ rₛ
+
+include h₁ in
+private theorem sIdeleFundamentalDomain_eq_preimage :
+    globalSDomain = outsideNormOneProjection F S ⁻¹' Eₛ := by
+  ext g
+  rw [mem_sIdeleFundamentalDomain_of_classNumberOne F v₀ σ S bₛ rₛ h₁]
+  exact Subtype.val_injective.mem_set_image (a := outsideNormOneProjection F S g)
 
 include h₁ in
 /-- Paper: Proposition A.2.4.4(4), p. 555. The domain with outside unit factors has
 compact closure in the norm-one group integral and invertible outside S.
 Deviation: We state the case where the prescribed representatives exist. -/
 theorem sIdeleFundamentalDomain_precompact : IsCompact (closure globalSDomain) := by
-  sorry
+  rw [sIdeleFundamentalDomain_eq_preimage F v₀ σ S bₛ rₛ h₁]
+  exact ((outsideNormOneProjection_properties F S).1.isCompact_preimage
+    (sLocalIdeleFundamentalDomain_precompact F v₀ σ S bₛ)).closure_of_subset
+      (Set.preimage_mono subset_closure)
 
 include h₁ in
 /-- Paper: Proposition A.2.4.4(4), p. 555. The domain with outside unit factors has
 nonempty interior relative to that group.
 Deviation: We assume the S-class group is trivial. -/
 theorem sIdeleFundamentalDomain_interior : (interior globalSDomain).Nonempty := by
-  sorry
+  obtain ⟨hp, hs⟩ := outsideNormOneProjection_properties F S
+  rw [sIdeleFundamentalDomain_eq_preimage F v₀ σ S bₛ rₛ h₁]
+  obtain ⟨y, hy⟩ := sLocalIdeleFundamentalDomain_interior F v₀ σ S bₛ
+  obtain ⟨x, rfl⟩ := hs y
+  exact ⟨x, interior_maximal (Set.preimage_mono interior_subset)
+    (isOpen_interior.preimage hp.continuous) hy⟩
 
 include h₁ in
 /-- Paper: Proposition A.2.4.4(4), p. 555. S-unit translates cover the norm-one
@@ -3062,7 +3446,26 @@ Deviation: We assume the S-class group is trivial. -/
 theorem sIdeleFundamentalDomain_cover :
     (⋃ u : Oₛ(F, S)ˣ, diagonalS u • (Subgroup.subtype outsideNormOne(F, S) '' globalSDomain)) =
       outsideNormOne(F, S) := by
-  sorry
+  have hunit (u : Oₛ(F, S)ˣ) : diagonalS u ∈ outsideNormOne(F, S) :=
+    ((sIdeleNorm_spec F S).1 _).trans (sUnitNormOne F S u).property
+  apply Set.Subset.antisymm
+  · refine Set.iUnion_subset fun u ↦ ?_
+    rintro _ ⟨_, ⟨g, _, rfl⟩, rfl⟩
+    exact mul_mem (hunit u) g.property
+  · intro x hx
+    let g : outsideNormOne(F, S) := ⟨x, hx⟩
+    obtain ⟨u, hu⟩ := exists_sUnit_mul_mem_localDomain F v₀ σ S bₛ (outsideNormOneProjection F S g)
+    let d : outsideNormOne(F, S) := ⟨diagonalS u, hunit u⟩
+    let y := d * g
+    have hy : y ∈ globalSDomain := by
+      rw [sIdeleFundamentalDomain_eq_preimage F v₀ σ S bₛ rₛ h₁]
+      change outsideNormOneProjection F S (d * g) ∈ Eₛ
+      rw [map_mul]
+      have hd : outsideNormOneProjection F S d = sUnitNormOne F S u := rfl
+      rwa [hd]
+    refine Set.mem_iUnion.mpr ⟨u⁻¹, Set.mem_smul_set.mpr ⟨y.val, ⟨y, hy, rfl⟩, ?_⟩⟩
+    change diagonalS u⁻¹ * (diagonalS u * x) = x
+    rw [map_inv, inv_mul_cancel_left]
 
 include h₁ in
 /-- Paper: Proposition A.2.4.4(4), p. 555. A nonidentity S-unit translates the domain
@@ -3071,14 +3474,26 @@ Deviation: We assume the S-class group is trivial. -/
 theorem sIdeleFundamentalDomain_disjoint (u : Oₛ(F, S)ˣ) (hu : u ≠ 1) :
     let E := Subgroup.subtype outsideNormOne(F, S) '' globalSDomain
     Disjoint (diagonalS u • E) E := by
-  sorry
+  dsimp only
+  rw [Set.disjoint_left]
+  rintro x hx ⟨h, hh, rfl⟩
+  obtain ⟨_, ⟨g, hg, rfl⟩, heq⟩ := Set.mem_smul_set.mp hx
+  let p := (projectS).comp outsideInclusion
+  have heq' : p (diagonalS u * g.val) = p h.val := congrArg p heq
+  rw [map_mul] at heq'
+  have htest := mem_sIdeleFundamentalDomain_of_classNumberOne F v₀ σ S bₛ rₛ h₁
+  exact Set.disjoint_left.mp (sLocalIdeleFundamentalDomain_disjoint F v₀ σ S bₛ u hu)
+    (Set.mem_smul_set.mpr ⟨p g.val, (htest g).mp hg, heq'⟩) ((htest h).mp hh)
 
 /-- Paper: Remark A.2.4.5, p. 555. All sufficiently large finite sets of places have
 trivial S-ideal class group. The finite set parameter lists the finite places only. -/
 theorem eventually_trivial_sIdealClassGroup :
     ∃ T : Finset (Primes(F)), ∀ S : Finset (Primes(F)), T ⊆ S →
       Subsingleton (CommRing.Pic (Set.integer (S : Set (Primes(F))) F)) := by
-  sorry
+  obtain ⟨T, -, hT⟩ := (picard_uniformization F ∅).1
+  refine ⟨T, fun S hTS ↦ ?_⟩
+  obtain ⟨_, _, _, hsurj, _⟩ := picard_localization_exact F T S hTS
+  exact hsurj.subsingleton
 
 /-- Paper: Remark A.2.4.5, p. 555. When the S-class group is trivial the inclusion
 induces a topological isomorphism on idele classes, compatible with both norms. -/
@@ -3086,7 +3501,44 @@ theorem sIdeleClassGroup_equiv_of_classNumberOne :
     ∃ e : SIdeleClassGroup F S ≃ₜ* IdeleClassGroup (𝓞 F) F,
       (∀ g : (integralAdelesOutside F S)ˣ, e (QuotientGroup.mk g) =
         QuotientGroup.mk (outsideInclusion g)) ∧ ∀ c, ideleClassNorm F (e c) = sIdeleClassNorm F S c := by
-  sorry
+  obtain ⟨j, hj, hnorm, hjmk⟩ := sIdeleClassGroup_openEmbedding F S
+  suffices hs : Surjective j from
+    ⟨ContinuousMulEquiv.mk' (hj.isEmbedding.toHomeomorphOfSurjective hs) (map_mul j), hjmk, hnorm⟩
+  intro c
+  obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective c
+  let n := Finsupp.ofSupportFinite (ideleExponent F g) (eventually_ideleExponent_eq_zero F g)
+  obtain ⟨a, ha⟩ := (sInteger_divisorPic_eq_one_iff F S n).mp (Subsingleton.elim _ _)
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let x := (d a)⁻¹ * g
+  -- The principal idele has exactly the required valuations off S.
+  have hx (v : Primes(F)) (hv : v ∉ S) : Valued.v (x.val.2 v) = 1 := by
+    let ev := (RestrictedProduct.evalRingHom (fun w : Primes(F) ↦ w.adicCompletion F) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))
+    let u := Units.map ev.toMonoidHom
+    have hn := neg_injective (ha v hv)
+    change WithZero.log (Valued.v (g.val.2 v)) = WithZero.log (v.valuation F (a : F)) at hn
+    have heq := congrArg WithZero.exp hn
+    rw [WithZero.exp_log ((map_ne_zero _).mpr (u g).ne_zero),
+      WithZero.exp_log ((map_ne_zero _).mpr a.ne_zero)] at heq
+    change Valued.v (u x).val = 1
+    simp only [x, map_mul, map_inv, Units.val_mul, Units.val_inv_eq_inv_val, map_inv₀]
+    change (Valued.v ((a : F) : v.adicCompletion F))⁻¹ * Valued.v (g.val.2 v) = 1
+    rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation', heq,
+      inv_mul_cancel₀ ((map_ne_zero _).mpr a.ne_zero)]
+  have hmem : x.val ∈ integralAdelesOutside F S ∧ x.inv ∈ integralAdelesOutside F S := by
+    simp only [integralAdelesOutside, Subring.mem_iInf, Subring.mem_comap]
+    refine ⟨fun v hv ↦ (hx v hv).le, fun v hv ↦ ?_⟩
+    have hinv := congrArg (fun z : AdeleRing (𝓞 F) F ↦ Valued.v (z.2 v)) x.val_inv
+    change Valued.v (x.val.2 v * x.inv.2 v) = Valued.v (1 : v.adicCompletion F) at hinv
+    rw [map_mul, hx v hv, one_mul, map_one] at hinv
+    exact hinv.le
+  let y : (integralAdelesOutside F S)ˣ :=
+    ⟨⟨x.val, hmem.1⟩, ⟨x.inv, hmem.2⟩, Subtype.ext x.val_inv, Subtype.ext x.inv_val⟩
+  refine ⟨QuotientGroup.mk y, (hjmk y).trans ?_⟩
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  change q ((d a)⁻¹ * g) = q g
+  rw [map_mul, map_inv, show q (d a) = 1 from (QuotientGroup.eq_one_iff _).mpr ⟨a, rfl⟩,
+    inv_one, one_mul]
 
 -- TODO(paper-gap): Remark A.2.4.5 asserts coverage of the full norm-one ideles before
 -- taking classes. For F = ℚ a principal prime outside S is a norm-one idele and is

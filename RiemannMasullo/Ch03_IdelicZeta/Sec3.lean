@@ -1204,7 +1204,10 @@ theorem sLocalThetaMellinIntegral_tendstoUniformlyOn (f : ℬ(Aₛ))
 /-- Paper: Theorem 3.3.1.1(2), p. 129. The theta Mellin integral is
 holomorphic on the positive half-plane in each norm-twist coordinate. -/
 theorem sLocalThetaMellinIntegral_analyticOn (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) :
-    AnalyticOnNhd ℂ (fun s ↦ sLocalThetaMellinIntegral f (chartₛ(χ) s)) rightHalf := by sorry
+    AnalyticOnNhd ℂ (fun s ↦ sLocalThetaMellinIntegral f (chartₛ(χ) s)) rightHalf := by
+  exact AnalyticOnNhd.congr (isOpen_Ioi.preimage Complex.continuous_re)
+    (sLocalIdelicZetaIntegral_analyticOn f χ)
+    (fun s hs ↦ (sLocalThetaMellinIntegral_eq_zeta f ⟨χ, s, hs, rfl⟩).symm)
 
 local notation "normProduct(" τ ")" =>
   (fun x : J₁ × ℝ≥0ˣ ↦ (x.1 : Jₛ) * classOf (τ x.2))
@@ -1278,7 +1281,10 @@ holomorphic on each positive norm-twist half-plane. -/
 theorem sLocalRadialMellinIntegral_analyticOn
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) :
-    AnalyticOnNhd ℂ (sLocalRadialMellinIntegral (F := F) (S := S) τ f χ) rightHalf := by sorry
+    AnalyticOnNhd ℂ (sLocalRadialMellinIntegral (F := F) (S := S) τ f χ) rightHalf := by
+  exact AnalyticOnNhd.congr (isOpen_Ioi.preimage Complex.continuous_re)
+    (sLocalThetaMellinIntegral_analyticOn f χ)
+    (fun s hs ↦ (sLocalRadialMellinIntegral_eq_theta τ hτ f χ s hs).symm)
 
 end Homogeneous
 

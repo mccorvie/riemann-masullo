@@ -15,6 +15,7 @@ import Mathlib.LinearAlgebra.Dimension.LinearMap
 import Mathlib.MeasureTheory.Integral.Prod
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 import Mathlib.Topology.MetricSpace.UniformConvergence
+import all RiemannMasullo.AppC_LCTVS.Sec3a  -- projective seminorm model and its comparison maps
 import RiemannMasullo.ForMathlib.Analysis.Normed.Operator.Compact.NormAttainment
 
 /-!
@@ -2460,12 +2461,128 @@ theorem strongDual_inner_eq (φ ψ : StrongDual ℂ E) :
   simp only [RCLike.I_to_complex]
   rw [h1, h2, h3, h4]
 
+omit [CompleteSpace F] in
+private theorem hasSum_tensorColumn_inner {ι : Type*} (b : HilbertBasis ι ℂ E)
+    (z w : StrongDual ℂ E ⊗[ℂ] F) :
+    HasSum (fun i ↦ ⟪tensorToFiniteRank z (b i), tensorToFiniteRank w (b i)⟫_ℂ) ⟪z, w⟫_ℂ := by
+  induction z using TensorProduct.inductionOn with
+  | add z z' hz hz' =>
+    erw [inner_add_left (𝕜 := ℂ) z z' w]
+    simpa only [map_add, add_apply, inner_add_left] using hz.add hz'
+  | tmul φ y =>
+    induction w using TensorProduct.inductionOn with
+    | add w w' hw hw' =>
+      erw [inner_add_right (𝕜 := ℂ) (φ ⊗ₜ[ℂ] y) w w']
+      simpa only [map_add, add_apply, inner_add_right] using hw.add hw'
+    | tmul ψ v =>
+      let R := (InnerProductSpace.toDual ℂ E).symm
+      have h := (b.hasSum_inner_mul_inner (R ψ) (R φ)).mul_right ⟪y, v⟫_ℂ
+      rw [TensorProduct.inner_tmul, strongDual_inner_eq]
+      refine h.congr_fun fun i ↦ ?_
+      simp only [tensorToFiniteRank_tmul, inner_smul_left, inner_smul_right,
+        ← InnerProductSpace.toDual_symm_apply, R, ← inner_conj_symm (b i)]
+      ring
+
+omit [CompleteSpace F] in
+private theorem hasSum_tensorColumn_norm_sq {ι : Type*} (b : HilbertBasis ι ℂ E)
+    (z : StrongDual ℂ E ⊗[ℂ] F) :
+    HasSum (fun i ↦ ‖tensorToFiniteRank z (b i)‖ ^ 2) (‖z‖ ^ 2) := by
+  have h := (hasSum_tensorColumn_inner b z z).mapL Complex.reCLM
+  have hz : Complex.reCLM ⟪z, z⟫_ℂ = ‖z‖ ^ 2 :=
+    (@norm_sq_eq_re_inner ℂ (StrongDual ℂ E ⊗[ℂ] F) _ inferInstance inferInstance z).symm
+  rw [hz] at h
+  exact h.congr_fun fun i ↦ (norm_sq_eq_re_inner (𝕜 := ℂ) _)
+
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem SingularExpansion.apply_source {T : E →L[ℂ] F} (d : SingularExpansion T)
+    (i : {n // d.coeff n ≠ 0}) :
+    T (d.source i) = ((d.coeff i : ℝ) : ℂ) • d.target i := by
+  rw [(d.hasSum_apply (d.source i)).unique (hasSum_single i (fun k hk ↦ by
+    simp [d.orthonormal_source.inner_eq_zero hk]))]
+  simp [d.orthonormal_source.norm_eq_one]
+
+omit [CompleteSpace F] in
+private theorem SingularExpansion.exists_source_basis {T : E →L[ℂ] F} (d : SingularExpansion T) :
+    ∃ (w : Set E) (b : HilbertBasis w ℂ E) (j : {n // d.coeff n ≠ 0} → w),
+      Injective j ∧ (∀ i, b (j i) = d.source i) ∧ ∀ a ∉ range j, T (b a) = 0 := by
+  classical
+  obtain ⟨w, b, hw, hb⟩ := d.orthonormal_source.toSubtypeRange.exists_hilbertBasis_extension
+  let I := {n // d.coeff n ≠ 0}
+  let j (i : I) : w := ⟨d.source i, hw (mem_range_self i)⟩
+  refine ⟨w, b, j, fun i k h ↦ d.orthonormal_source.linearIndependent.injective
+    (congrArg Subtype.val h), fun i ↦ congrFun hb (j i), fun a ha ↦ ?_⟩
+  refine (d.hasSum_apply (b a)).unique ?_
+  convert (hasSum_zero (β := I) (α := F)) using 1
+  funext i
+  rw [show d.source i = b (j i) from (congrFun hb (j i)).symm,
+    b.orthonormal.inner_eq_zero (fun h ↦ ha ⟨i, h⟩)]
+  simp
+
+/-- In a basis extending the source singular vectors, the nonzero columns have
+norms equal to the corresponding approximation numbers. -/
+private theorem exists_basis_schattenNorm_eq_sqrt (T : hilbertSchmidtOperators E F) :
+    ∃ (w : Set E) (b : HilbertBasis w ℂ E),
+      schattenNorm T = Real.sqrt (∑' i, ‖T.val (b i)‖ ^ 2) := by
+  classical
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T.val).mp T.property.1
+  obtain ⟨w, b, j, hj, hb, hzero⟩ := d.exists_source_basis
+  have hsupp : support (fun n ↦ (d.coeff n : ℝ) ^ 2) ⊆ {n | d.coeff n ≠ 0} := by
+    intro n hn hz
+    exact hn (by simp [hz])
+  refine ⟨w, b, ?_⟩
+  rw [schattenNorm, ← Real.sqrt_eq_rpow, ← hj.tsum_eq (fun a ha ↦ by
+    by_contra hn
+    exact ha (by simp [hzero a hn]))]
+  simp only [Real.rpow_two, ← d.coeff_eq_approximationNumber, hb, d.apply_source, norm_smul, Complex.norm_real,
+    Real.norm_of_nonneg (NNReal.coe_nonneg _), d.orthonormal_target.norm_eq_one, mul_one]
+  exact congrArg Real.sqrt (tsum_subtype_eq_of_support_subset hsupp).symm
+
 /-- Paper: Proposition C.3.6.4(2), p. 705. The canonical image of an algebraic
 tensor has Hilbert-Schmidt norm equal to the norm from the tensor inner product
 of (C.3.6.8). Thus the two norms induce the same topology. -/
 theorem schattenNorm_tensorToFiniteRank_eq_hilbertTensorNorm (z : StrongDual ℂ E ⊗[ℂ] F) :
     schattenNorm ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_schattenClass one_le_two z⟩ =
-      ‖z‖ := by sorry
+      ‖z‖ := by
+  let T : hilbertSchmidtOperators E F :=
+    ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_schattenClass one_le_two z⟩
+  obtain ⟨w, b, hb⟩ := exists_basis_schattenNorm_eq_sqrt T
+  exact hb.trans (by rw [(hasSum_tensorColumn_norm_sq b z).tsum_eq, Real.sqrt_sq (norm_nonneg _)])
+
+private theorem hilbertSchmidt_extension {X : Type*} [NormedAddCommGroup X] [NormedSpace ℂ X]
+    (L : X →L[ℂ] (E →L[ℂ] F))
+    (hcols : ∀ {s : Set E} (b : HilbertBasis s ℂ E) (z : X),
+      HasSum (fun i ↦ ‖L z (b i)‖ ^ 2) (‖z‖ ^ 2)) :
+    ∃ e : Completion X →ₗ[ℂ] hilbertSchmidtOperators E F,
+      (∀ w : X, (e w).val = L w) ∧ ∀ z, schattenNorm (e z) = ‖z‖ := by
+  have henergy {w : Set E} (b : HilbertBasis w ℂ E) (z : Completion X) :
+      HasSum (fun i ↦ ‖L.fromCompletion z (b i)‖ ^ 2) (‖z‖ ^ 2) := by
+    let v (x : X) : lp (fun _ : w ↦ F) 2 := ⟨fun i ↦ L x (b i), memℓp_gen (by
+      simpa only [ENNReal.toReal_ofNat, Real.rpow_two] using (hcols b x).summable)⟩
+    let columns : X →ₗᵢ[ℂ] lp (fun _ : w ↦ F) 2 := {
+      toFun := v
+      map_add' := fun x y ↦ by ext i; simp [v]; rfl
+      map_smul' := fun c x ↦ by ext i; simp [v]
+      norm_map' := fun x ↦ by
+        apply (sq_eq_sq₀ (norm_nonneg _) (norm_nonneg _)).mp
+        have h : HasSum (fun i ↦ ‖v x i‖ ^ 2) (‖v x‖ ^ 2) := by
+          simpa only [ENNReal.toReal_ofNat, Real.rpow_two] using lp.hasSum_norm (by norm_num) (v x)
+        exact h.unique (hcols b x) }
+    have heval (i : w) : columns.fromCompletion z i = L.fromCompletion z (b i) := by
+      refine Completion.induction_on z (isClosed_eq
+        ((lp.evalCLM ℂ _ 2 i).continuous.comp columns.fromCompletion.continuous)
+        ((ContinuousLinearMap.apply ℂ F (b i)).continuous.comp L.fromCompletion.continuous)) ?_
+      intro w
+      rw [LinearIsometry.fromCompletion_apply_coe, ContinuousLinearMap.fromCompletion_apply_coe]
+      rfl
+    simpa only [ENNReal.toReal_ofNat, Real.rpow_two, heval, LinearIsometry.norm_map] using
+      lp.hasSum_norm (p := 2) (by norm_num) (columns.fromCompletion z)
+  have hmem (z : Completion X) : L.fromCompletion z ∈ hilbertSchmidtOperators E F := by
+    obtain ⟨w, b, _⟩ := exists_hilbertBasis ℂ E
+    exact (mem_hilbertSchmidtOperators_iff_summable_basis b _).mpr (henergy b z).summable
+  let e := L.fromCompletion.toLinearMap.codRestrict (hilbertSchmidtOperators E F) hmem
+  refine ⟨e, fun w ↦ L.fromCompletion_apply_coe w, fun z ↦ ?_⟩
+  obtain ⟨w, b, hb⟩ := exists_basis_schattenNorm_eq_sqrt (e z)
+  exact hb.trans ((congrArg Real.sqrt (henergy b z).tsum_eq).trans (Real.sqrt_sq (norm_nonneg z)))
 
 /-- Paper: Proposition C.3.6.4(2), p. 705. The canonical map extends from
 algebraic tensors to the Hilbert tensor completion as a linear isometry for
@@ -2473,7 +2590,230 @@ the Hilbert-Schmidt norm. -/
 theorem exists_hilbertTensorCompletion_schattenIsometry :
     ∃ e : Completion (StrongDual ℂ E ⊗[ℂ] F) →ₗ[ℂ] hilbertSchmidtOperators E F,
       (∀ z : StrongDual ℂ E ⊗[ℂ] F, (e z).val = tensorToFiniteRank z) ∧
-      ∀ z, schattenNorm (e z) = ‖z‖ := by sorry
+      ∀ z, schattenNorm (e z) = ‖z‖ := by
+  have hbound (z : StrongDual ℂ E ⊗[ℂ] F) : ‖tensorToFiniteRank z‖ ≤ 1 * ‖z‖ := by
+    let T : hilbertSchmidtOperators E F :=
+      ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_schattenClass one_le_two z⟩
+    have hs : Summable (fun n ↦ approximationNumber T.val n ^ (2 : ℕ)) := by
+      simpa only [← Real.rpow_two] using T.property.2
+    rw [one_mul, ← schattenNorm_tensorToFiniteRank_eq_hilbertTensorNorm]
+    change ‖T.val‖ ≤ (∑' n, approximationNumber T.val n ^ (2 : ℝ)) ^ (1 / (2 : ℝ))
+    simp only [Real.rpow_two, ← Real.sqrt_eq_rpow]
+    exact Real.le_sqrt_of_sq_le (by
+      simpa only [approximationNumber_zero_eq_norm] using hs.le_tsum 0 (fun i _ ↦ sq_nonneg _))
+  let L := LinearMap.mkContinuous (𝕜 := ℂ) (𝕜₂ := ℂ) (E := StrongDual ℂ E ⊗[ℂ] F) (F := E →L[ℂ] F)
+    tensorToFiniteRank 1 hbound
+  apply hilbertSchmidt_extension (E := E) (F := F) (X := StrongDual ℂ E ⊗[ℂ] F) L
+  exact fun b w ↦ hasSum_tensorColumn_norm_sq b w
+
+local notation "πS" => banachProjectiveSeminorm (X := StrongDual ℂ E) (Y := F)
+local notation "πW" => WithLocalSeminorm πS
+local notation "πP" => ProjectiveTensor (StrongDual ℂ E) F
+
+private def SingularExpansion.diagonalTest {A : E →L[ℂ] F} (d : SingularExpansion A)
+    (s : Finset {n // d.coeff n ≠ 0}) : (E →L[ℂ] F) →L[ℂ] ℂ :=
+  ∑ i ∈ s, (innerSL ℂ (d.target i)).comp (ContinuousLinearMap.apply ℂ F (d.source i))
+
+omit [CompleteSpace F] in
+/-- The singular vectors give norm-one tests on elementary tensors by Bessel's inequality. -/
+private theorem SingularExpansion.diagonalTest_rankOne_le {A : E →L[ℂ] F} (d : SingularExpansion A)
+    (s : Finset {n // d.coeff n ≠ 0}) (φ : StrongDual ℂ E) (y : F) :
+    ‖d.diagonalTest s (φ.smulRight y)‖ ≤ ‖φ‖ * ‖y‖ := by
+  let x := (InnerProductSpace.toDual ℂ E).symm φ
+  have hx (i) : ‖φ (d.source i)‖ = ‖⟪d.source i, x⟫_ℂ‖ := by
+    rw [← InnerProductSpace.toDual_symm_apply, norm_inner_symm]
+  calc
+    ‖d.diagonalTest s (φ.smulRight y)‖ ≤ ∑ i ∈ s, ‖φ (d.source i)‖ * ‖⟪d.target i, y⟫_ℂ‖ := by
+      simpa only [diagonalTest, sum_apply, ContinuousLinearMap.comp_apply, ContinuousLinearMap.apply_apply,
+        ContinuousLinearMap.smulRight_apply, innerSL_apply_apply, inner_smul_right, norm_mul] using
+        norm_sum_le s (fun i ↦ φ (d.source i) * ⟪d.target i, y⟫_ℂ)
+    _ ≤ ‖φ‖ * ‖y‖ := by
+      simp_rw [hx]
+      refine (Real.sum_mul_le_sqrt_mul_sqrt s _ _).trans (mul_le_mul ?_ ?_ (Real.sqrt_nonneg _) (norm_nonneg _))
+      · exact (Real.sqrt_le_iff.mpr ⟨norm_nonneg _, (d.orthonormal_source.sum_inner_products_le x).trans_eq
+          (by rw [show ‖x‖ = ‖φ‖ from (InnerProductSpace.toDual ℂ E).symm.norm_map _])⟩)
+      · exact Real.sqrt_le_iff.mpr ⟨norm_nonneg _, d.orthonormal_target.sum_inner_products_le y⟩
+
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem SingularExpansion.norm_diagonalTest_self {A : E →L[ℂ] F} (d : SingularExpansion A)
+    (s : Finset {n // d.coeff n ≠ 0}) :
+    ‖d.diagonalTest s A‖ = ∑ i ∈ s, (d.coeff i : ℝ) := by
+  simp only [diagonalTest, sum_apply, ContinuousLinearMap.comp_apply, ContinuousLinearMap.apply_apply,
+    innerSL_apply_apply, d.apply_source, inner_smul_right, inner_self_eq_norm_sq_to_K, d.orthonormal_target.norm_eq_one,
+    RCLike.ofReal_one, one_pow, mul_one, ← Complex.ofReal_sum, Complex.norm_real]
+  exact Real.norm_of_nonneg (Finset.sum_nonneg fun i _ ↦ (d.coeff i).2)
+
+omit [CompleteSpace E] [CompleteSpace F] in
+/-- Every test bounded on rank-one maps by their cost is bounded by the projective seminorm. -/
+private theorem test_tensorToFiniteRank_le (τ : (E →L[ℂ] F) →L[ℂ] ℂ)
+    (hτ : ∀ (φ : StrongDual ℂ E) (y : F), ‖τ (φ.smulRight y)‖ ≤ ‖φ‖ * ‖y‖)
+    (z : πW) : ‖τ (tensorToFiniteRank z)‖ ≤ ‖z‖ := by
+  let f : (StrongDual ℂ E ⊗[ℂ] F) →ₗ[ℂ] ℂ := τ.toLinearMap.comp (tensorToFiniteRank (E := E) (F := F))
+  let q : Seminorm ℂ (StrongDual ℂ E ⊗[ℂ] F) := (normSeminorm ℂ ℂ).comp f
+  exact (seminorm_le_banachProjectiveSeminorm q zero_le_one (fun φ y ↦ (hτ φ y).trans_eq (one_mul _).symm) z).trans_eq
+    (one_mul _)
+
+/-- The singular expansion of an algebraic tensor is finite. In tensor coordinates it
+attains the projective decomposition cost. -/
+private theorem exists_finite_singularTensor (z : πW) :
+    ∃ (d : SingularExpansion (tensorToFiniteRank z)) (s : Finset {n // d.coeff n ≠ 0}),
+      z = ∑ i ∈ s, ((d.coeff i : ℝ) : ℂ) •
+        (show πW from innerSL ℂ (d.source i) ⊗ₜ[ℂ] d.target i) ∧
+      ‖z‖ = ∑ i ∈ s, (d.coeff i : ℝ) := by
+  classical
+  let A := tensorToFiniteRank (show StrongDual ℂ E ⊗[ℂ] F from z)
+  have hfin (w : StrongDual ℂ E ⊗[ℂ] F) : FiniteDimensional ℂ (tensorToFiniteRank w).toLinearMap.range := by
+    induction w using TensorProduct.inductionOn with
+    | tmul φ y =>
+      have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton y)
+      exact Submodule.finiteDimensional_of_le (range_smulRight_le φ y)
+    | add w v hw hv =>
+      rw [map_add, ContinuousLinearMap.toLinearMap_add]
+      exact Submodule.finiteDimensional_of_le (LinearMap.range_add_le _ _)
+  have := hfin z
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion A).mp
+    (tensorToFiniteRank_mem_schattenClass one_le_two z).1
+  let r := Module.finrank ℂ A.toLinearMap.range
+  let s := (Finset.range r).subtype (fun n ↦ d.coeff n ≠ 0)
+  have hall (i : {n // d.coeff n ≠ 0}) : i ∈ s := by
+    apply Finset.mem_subtype.mpr
+    apply Finset.mem_range.mpr
+    by_contra! hi
+    apply i.property
+    apply NNReal.coe_injective
+    rw [d.coeff_eq_approximationNumber, approximationNumber_eq_zero_of_rank_le A (by
+      rw [← Module.finrank_eq_rank]; exact_mod_cast hi)]
+    rfl
+  let w (i : {n // d.coeff n ≠ 0}) : πW := innerSL ℂ (d.source i) ⊗ₜ[ℂ] d.target i
+  have hrepr : z = ∑ i ∈ s, ((d.coeff i : ℝ) : ℂ) • w i := by
+    let L : πW →ₗ[ℂ] (E →L[ℂ] F) := tensorToFiniteRank
+    apply tensorToFiniteRank_injective (E := E) (F := F)
+    change L z = L (∑ i ∈ s, ((d.coeff i : ℝ) : ℂ) • w i)
+    rw [map_sum]
+    simp only [map_smul]
+    exact d.hasSum_opNorm.unique (hasSum_sum_of_ne_finset_zero (fun i hi ↦ (hi (hall i)).elim))
+  refine ⟨d, s, hrepr, le_antisymm ?_ ?_⟩
+  · refine (congrArg norm hrepr).le.trans ?_
+    refine (norm_sum_le s _).trans (Finset.sum_le_sum fun i _ ↦ ?_)
+    simp only [norm_smul, Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _)]
+    refine mul_le_of_le_one_right (d.coeff i).2 ?_
+    exact (projectiveSeminorm_tmul_le _ _).trans_eq (by
+      rw [innerSL_apply_norm, d.orthonormal_source.norm_eq_one, d.orthonormal_target.norm_eq_one, one_mul])
+  · rw [← d.norm_diagonalTest_self s]
+    exact test_tensorToFiniteRank_le _ (d.diagonalTest_rankOne_le s) z
+
+private theorem projective_unitHull_eq_closedBall :
+    (convexHull ℝ (image2 (fun (φ : StrongDual ℂ E) (y : F) ↦ (show πW from φ ⊗ₜ[ℂ] y))
+      (Metric.closedBall 0 1) (Metric.closedBall 0 1))) = Metric.closedBall (0 : πW) 1 := by
+  classical
+  let U := image2 (fun (φ : StrongDual ℂ E) (y : F) ↦ (show πW from φ ⊗ₜ[ℂ] y))
+    (Metric.closedBall 0 1) (Metric.closedBall 0 1)
+  change convexHull ℝ U = _
+  have hz : (0 : πW) ∈ convexHull ℝ U := subset_convexHull _ _ <|
+    ⟨0, by simp, 0, by simp, TensorProduct.zero_tmul _ _⟩
+  apply le_antisymm
+  · refine convexHull_min ?_ (convex_closedBall _ _)
+    rintro _ ⟨φ, hφ, y, hy, rfl⟩
+    apply mem_closedBall_zero_iff.mpr
+    exact (projectiveSeminorm_tmul_le φ y).trans ((mul_le_of_le_one_right (norm_nonneg φ)
+      (mem_closedBall_zero_iff.mp hy)).trans (mem_closedBall_zero_iff.mp hφ))
+  · intro z hz'
+    obtain ⟨d, s, hrepr, hnorm⟩ := exists_finite_singularTensor z
+    let w (i : {n // d.coeff n ≠ 0}) : πW := innerSL ℂ (d.source i) ⊗ₜ[ℂ] d.target i
+    let c (i : {n // d.coeff n ≠ 0}) : ℝ := d.coeff i
+    have hw (i) : w i ∈ convexHull ℝ U := subset_convexHull _ _ <| mem_image2_of_mem
+      (mem_closedBall_zero_iff.mpr (by rw [innerSL_apply_norm, d.orthonormal_source.norm_eq_one]))
+      (mem_closedBall_zero_iff.mpr (d.orthonormal_target.norm_eq_one i).le)
+    rcases s.eq_empty_or_nonempty with rfl | hs
+    · simpa only [Finset.sum_empty] using hrepr ▸ hz
+    have hc : 0 < ∑ i ∈ s, c i := Finset.sum_pos (fun i _ ↦ NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr i.2)) hs
+    have hmem := (convex_convexHull ℝ U).centerMass_mem (t := s) (w := c) (z := w) (fun i _ ↦ (d.coeff i).2) hc (fun i _ ↦ hw i)
+    have hscaled := (convex_convexHull ℝ U).smul_mem_of_zero_mem hz hmem
+      ⟨hc.le, hnorm.ge.trans (mem_closedBall_zero_iff.mp hz')⟩
+    rw [Finset.centerMass, smul_inv_smul₀ hc.ne'] at hscaled
+    have hreal (i) : ((c i : ℝ) : ℂ) • w i = c i • w i := Complex.coe_smul _ _
+    rw [hrepr]
+    change (∑ i ∈ s, ((c i : ℝ) : ℂ) • w i) ∈ convexHull ℝ U
+    simpa only [hreal] using hscaled
+
+private def projectiveModelToOperator : Completion πW →L[ℂ] (E →L[ℂ] F) :=
+  completedProjectiveTensorToOperators.comp fromProjectiveSeminorm.completion
+
+private theorem projectiveModelToOperator_coe (w : πW) :
+    projectiveModelToOperator (w : Completion πW) = tensorToFiniteRank w :=
+  (congrArg completedProjectiveTensorToOperators
+    (fromProjectiveSeminorm.completion_apply_coe w)).trans (completedProjectiveTensorToOperators_coe _)
+
+private theorem test_projectiveModel_le (τ : (E →L[ℂ] F) →L[ℂ] ℂ)
+    (hτ : ∀ (φ : StrongDual ℂ E) (y : F), ‖τ (φ.smulRight y)‖ ≤ ‖φ‖ * ‖y‖)
+    (z : Completion πW) : ‖τ (projectiveModelToOperator z)‖ ≤ ‖z‖ := by
+  refine Completion.induction_on z (isClosed_le (τ.continuous.comp projectiveModelToOperator.continuous).norm
+    continuous_norm) fun w ↦ ?_
+  rw [projectiveModelToOperator_coe, Completion.norm_coe]
+  exact test_tensorToFiniteRank_le τ hτ w
+
+private theorem projectiveModel_singular_sum (z : Completion πW) :
+    ∃ d : SingularExpansion (projectiveModelToOperator z), HasSum (fun n ↦ (d.coeff n : ℝ)) ‖z‖ := by
+  classical
+  let K := projectiveModelToOperator (E := E) (F := F)
+  have hcompact : IsCompactOperator (K z) := by
+    refine Completion.induction_on z (isClosed_setOfPred_isCompactOperator.preimage K.continuous) fun w ↦ ?_
+    exact (projectiveModelToOperator_coe w).symm ▸ (tensorToFiniteRank_mem_schattenClass one_le_two w).1
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion (K z)).mp hcompact
+  let I := {n // d.coeff n ≠ 0}
+  let c (i : I) : ℝ := d.coeff i
+  have hbound (s : Finset I) : ∑ i ∈ s, c i ≤ ‖z‖ := by
+    rw [← d.norm_diagonalTest_self]
+    exact test_projectiveModel_le _ (d.diagonalTest_rankOne_le s) z
+  have hs : Summable c := summable_of_sum_le (fun i ↦ (d.coeff i).2) hbound
+  have htest (τ : (E →L[ℂ] F) →L[ℂ] ℂ)
+      (hτ : ∀ (φ : StrongDual ℂ E) (y : F), ‖τ (φ.smulRight y)‖ ≤ ‖φ‖ * ‖y‖) :
+      ‖τ (K z)‖ ≤ ∑' i, c i := by
+    apply le_of_tendsto' (τ.hasSum d.hasSum_opNorm).norm
+    intro s
+    refine (norm_sum_le _ _).trans ((Finset.sum_le_sum fun i _ ↦ ?_).trans
+      (hs.sum_le_tsum s fun i _ ↦ (d.coeff i).2))
+    simp only [map_smul, norm_smul, Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _)]
+    apply mul_le_of_le_one_right (d.coeff i).2
+    simpa [innerSL_apply_norm, d.orthonormal_source.norm_eq_one, d.orthonormal_target.norm_eq_one] using
+      hτ (innerSL ℂ (d.source i)) (d.target i)
+  -- Choose a norming finite test for each algebraic approximation to z.
+  have hreverse (u : Completion πW) : ‖u‖ ≤ ‖u - z‖ + ∑' i, c i := by
+    refine Completion.induction_on u (isClosed_le continuous_norm
+      ((continuous_id.sub continuous_const).norm.add continuous_const)) fun w ↦ ?_
+    obtain ⟨d', s, _, hw⟩ := exists_finite_singularTensor w
+    let τ := d'.diagonalTest s
+    have hτ := d'.diagonalTest_rankOne_le s
+    have hval : τ (K w) = τ (K ((w : Completion πW) - z)) + τ (K z) := by simp
+    rw [Completion.norm_coe, hw, ← d'.norm_diagonalTest_self]
+    refine (congrArg (fun A ↦ ‖τ A‖) (projectiveModelToOperator_coe w).symm).le.trans ?_
+    change ‖τ (K w)‖ ≤ _
+    rw [hval]
+    exact (norm_add_le _ _).trans (add_le_add (test_projectiveModel_le _ hτ _) (htest _ hτ))
+  have heq : (∑' i, c i) = ‖z‖ := le_antisymm (hs.tsum_le_of_sum_le hbound) (by simpa using hreverse z)
+  refine ⟨d, (hasSum_subtype_iff_of_support_subset (s := {n | d.coeff n ≠ 0}) ?_).mp (heq ▸ hs.hasSum)⟩
+  intro n hn hz
+  exact hn (by simp [hz])
+
+private theorem exists_projectiveModel_preimage (T : traceClassOperators E F) :
+    ∃ z : Completion πW, projectiveModelToOperator z = T.val := by
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T.val).mp T.property.1
+  let I := {n // d.coeff n ≠ 0}
+  let w (i : I) : πW := innerSL ℂ (d.source i) ⊗ₜ[ℂ] d.target i
+  have hs : Summable (fun n ↦ (d.coeff n : ℝ)) := by
+    simpa only [Real.rpow_one, d.coeff_eq_approximationNumber] using T.property.2
+  have hseries : Summable (fun i : I ↦ ((d.coeff i : ℝ) : ℂ) • (w i : Completion πW)) := by
+    refine (hs.subtype (fun n ↦ d.coeff n ≠ 0)).of_norm_bounded fun i ↦ ?_
+    simp only [norm_smul, Complex.norm_real, Real.norm_of_nonneg (NNReal.coe_nonneg _), Completion.norm_coe]
+    refine mul_le_of_le_one_right (d.coeff i).2 ?_
+    exact (projectiveSeminorm_tmul_le _ _).trans_eq (by
+      rw [innerSL_apply_norm, d.orthonormal_source.norm_eq_one, d.orthonormal_target.norm_eq_one, one_mul])
+  obtain ⟨z, hz⟩ := hseries
+  refine ⟨z, (projectiveModelToOperator.hasSum hz).unique ?_⟩
+  apply d.hasSum_opNorm.congr_fun
+  intro i
+  rw [map_smul, projectiveModelToOperator_coe]
+  rfl
 
 /-- Paper: Proposition C.3.6.4(3), p. 705. The completed projective tensor map
 is a linear isometry onto the trace-class operators. On algebraic tensors
@@ -2489,7 +2829,55 @@ theorem exists_projectiveTensorCompletion_traceClassIsometry :
     UniformContinuous projectiveNorm ∧
       ∃ e : Completion (ProjectiveTensor (StrongDual ℂ E) F) ≃ₗ[ℂ] traceClassOperators E F,
         (∀ z, (e z).val = completedProjectiveTensorToOperators z) ∧
-        ∀ z, schattenNorm (e z) = Completion.extension projectiveNorm z := by sorry
+        ∀ z, schattenNorm (e z) = Completion.extension projectiveNorm z := by
+  intro projectiveNorm
+  let i : πP →L[ℂ] πW := toProjectiveSeminorm
+  let j : πW →L[ℂ] πP := fromProjectiveSeminorm
+  let A := completedProjectiveTensorToOperators (E := E) (F := F)
+  have hji (z : Completion πP) : j.completion (i.completion z) = z := by
+    refine Completion.induction_on z (isClosed_eq (j.completion.continuous.comp i.completion.continuous)
+      continuous_id) fun w ↦ ?_
+    rw [i.completion_apply_coe, j.completion_apply_coe]
+    rfl
+  have hK (z : Completion πP) : projectiveModelToOperator (i.completion z) = A z :=
+    congrArg A (hji z)
+  let g : πP → ℝ := fun z ↦ ‖i z‖
+  have hg : UniformContinuous g := uniformContinuous_norm.comp i.uniformContinuous
+  have hext (z : Completion πP) : Completion.extension g z = ‖i.completion z‖ := by
+    refine Completion.induction_on z (isClosed_eq Completion.continuous_extension
+      i.completion.continuous.norm) fun w ↦ ?_
+    rw [Completion.extension_coe hg, i.completion_apply_coe, Completion.norm_coe]
+  have hgauge : projectiveNorm = g := by
+    funext z
+    change gauge (convexHull ℝ (image2 (fun (φ : StrongDual ℂ E) (y : F) ↦ (show πW from φ ⊗ₜ[ℂ] y))
+      (Metric.closedBall 0 1) (Metric.closedBall 0 1))) (i z) = ‖i z‖
+    rw [projective_unitHull_eq_closedBall, gauge_closedBall zero_le_one, div_one]
+  rw [hgauge]
+  have hsum (z : Completion πP) : HasSum (fun n ↦ approximationNumber (A z) n) ‖i.completion z‖ := by
+    obtain ⟨d, hd⟩ := projectiveModel_singular_sum (i.completion z)
+    simpa only [d.coeff_eq_approximationNumber, hK] using hd
+  have hmem (z : Completion πP) : A z ∈ traceClassOperators E F := by
+    obtain ⟨d, _⟩ := projectiveModel_singular_sum (i.completion z)
+    refine ⟨hK z ▸ (isCompactOperator_iff_nonempty_singularExpansion _).mpr ⟨d⟩, ?_⟩
+    simpa only [Real.rpow_one] using (hsum z).summable
+  let f := A.toLinearMap.codRestrict (traceClassOperators E F) hmem
+  have hf : Bijective f := by
+    constructor
+    · apply (injective_iff_map_eq_zero f).mpr
+      intro z hz
+      have hAz : A z = 0 := congrArg Subtype.val hz
+      have hz' := hsum z
+      rw [hAz] at hz'
+      have hzero (n : ℕ) : approximationNumber (0 : E →L[ℂ] F) n = 0 :=
+        approximationNumber_eq_zero_of_rank_le _ (by simp)
+      have hi : i.completion z = 0 := norm_eq_zero.mp (hz'.unique (by simp [hzero]))
+      rw [← hji z, hi, map_zero]
+    · intro T
+      obtain ⟨z, hz⟩ := exists_projectiveModel_preimage T
+      exact ⟨j.completion z, Subtype.ext hz⟩
+  refine ⟨hg, LinearEquiv.ofBijective f hf, fun z ↦ rfl, fun z ↦ ?_⟩
+  change (∑' n, approximationNumber (A z) n ^ (1 : ℝ)) ^ (1 / (1 : ℝ)) = Completion.extension g z
+  simpa only [Real.rpow_one, div_one, hext] using (hsum z).tsum_eq
 
 /-- Paper: Proposition C.3.6.4(3), p. 705. The canonical map extends to the
 injective tensor completion as a linear isometry onto the compact operators
@@ -2516,6 +2904,144 @@ variable {E F : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [Complet
 -- TODO(paper-gap): The proof uses the false Lemma C.3.6.3(1) for the triangle
 -- inequality and prints repeated factors in (C.3.6.13), (C.3.6.14) and (C.3.6.17).
 
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem approx_nonneg (T : E →L[ℂ] F) (n : ℕ) : 0 ≤ approximationNumber T n :=
+  le_csInf ⟨_, 0, by simp, rfl⟩ (fun _ ⟨S, _, h⟩ ↦ h ▸ norm_nonneg _)
+
+/-- Apply a bounded linear operation to every competing finite-rank approximant. -/
+private theorem approximationNumber_map_le (L : (E →L[ℂ] F) →L[ℂ] (E →L[ℂ] F))
+    (A : E →L[ℂ] F) {m n : ℕ}
+    (hr : ∀ S : E →L[ℂ] F, S.toLinearMap.rank ≤ (m : Cardinal) →
+      (L S).toLinearMap.rank ≤ (n : Cardinal)) :
+    approximationNumber (L A) n ≤ ‖L‖ * approximationNumber A m := by
+  refine le_mul_of_forall_lt₀ fun a ha b hb ↦ ?_
+  obtain ⟨S, hS, herr⟩ := exists_approximation_of_lt hb
+  calc
+    approximationNumber (L A) n ≤ ‖L S - L A‖ :=
+      csInf_le ⟨0, fun _ ⟨R, _, h⟩ ↦ h ▸ norm_nonneg _⟩ ⟨_, hr S hS, rfl⟩
+    _ ≤ ‖L‖ * ‖S - A‖ := by rw [← map_sub]; exact L.le_opNorm _
+    _ ≤ a * b := mul_le_mul ha.le herr.le (norm_nonneg _) ((norm_nonneg L).trans ha.le)
+
+private def composeBoth (C : F →L[ℂ] F) (B : E →L[ℂ] E) :
+    (E →L[ℂ] F) →L[ℂ] (E →L[ℂ] F) :=
+  (ContinuousLinearMap.compL ℂ E F F C).comp ((ContinuousLinearMap.compL ℂ E E F).flip B)
+
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem norm_composeBoth_le (C : F →L[ℂ] F) (B : E →L[ℂ] E) :
+    ‖composeBoth C B‖ ≤ ‖C‖ * ‖B‖ := by
+  refine ContinuousLinearMap.opNorm_le_bound _ (by positivity) fun S ↦ ?_
+  calc
+    ‖C.comp (S.comp B)‖ ≤ ‖C‖ * (‖S‖ * ‖B‖) :=
+      (C.opNorm_comp_le _).trans (mul_le_mul_of_nonneg_left (S.opNorm_comp_le _) (norm_nonneg _))
+    _ = _ := by ring
+
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem rank_composeBoth_le (C : F →L[ℂ] F) (B : E →L[ℂ] E) (S : E →L[ℂ] F) :
+    (composeBoth C B S).toLinearMap.rank ≤ S.toLinearMap.rank :=
+  (LinearMap.rank_comp_le_right (S.comp B).toLinearMap C.toLinearMap).trans
+    (LinearMap.rank_comp_le_left B.toLinearMap S.toLinearMap)
+
+private theorem composeBoth_mem (C : F →L[ℂ] F) (B : E →L[ℂ] E) (A : schattenClass E F p hp) :
+    composeBoth C B A.val ∈ schattenClass E F p hp := by
+  let L := composeBoth C B
+  refine ⟨(A.property.1.comp_clm B).clm_comp C, (A.property.2.mul_left (‖L‖ ^ p)).of_nonneg_of_le
+    (fun n ↦ Real.rpow_nonneg (approx_nonneg _ _) _) (fun n ↦ ?_)⟩
+  rw [← Real.mul_rpow (norm_nonneg L) (approx_nonneg A.val n)]
+  exact Real.rpow_le_rpow (approx_nonneg _ _)
+    (approximationNumber_map_le L A.val (fun S hS ↦ (rank_composeBoth_le C B S).trans hS))
+    (zero_le_one.trans hp)
+
+private theorem exists_opNorm_bound_of_pointwise (B : E →L[ℂ] E) (B' : ℕ → E →L[ℂ] E)
+    (h : ∀ x, Tendsto (fun k ↦ B' k x) atTop (𝓝 (B x))) :
+    ∃ M : ℝ≥0, ∀ k, ‖B' k‖ ≤ M := by
+  obtain ⟨M, hM⟩ := banach_steinhaus (g := B') fun x ↦ by
+    obtain ⟨m, hm⟩ := (Metric.isBounded_range_of_tendsto _ (h x)).exists_norm_le
+    exact ⟨m, fun k ↦ hm _ (mem_range_self k)⟩
+  exact ⟨⟨M, (norm_nonneg _).trans (hM 0)⟩, hM⟩
+
+private theorem tendsto_schatten_series {ι : Type*} {l : Filter ι}
+    (A : schattenClass E F p hp) (T : ι → E →L[ℂ] F) (hop : Tendsto T l (𝓝 0))
+    (M : ℝ≥0) (hbound : ∀ i n, approximationNumber (T i) n ≤ M * approximationNumber A.val (n / 2)) :
+    Tendsto (fun i ↦ (∑' n, approximationNumber (T i) n ^ p) ^ (1 / p)) l (𝓝 0) := by
+  have hp' : 0 < p := zero_lt_one.trans_le hp
+  have hterm (n : ℕ) : Tendsto (fun i ↦ approximationNumber (T i) n ^ p) l (𝓝 0) := by
+    have hzero : approximationNumber (0 : E →L[ℂ] F) n = 0 :=
+      approximationNumber_eq_zero_of_rank_le _ (by simp)
+    have hlim := squeeze_zero (fun i ↦ approx_nonneg (T i) n)
+      (fun i ↦ by simpa [hzero, abs_of_nonneg (approx_nonneg _ _)] using
+        abs_approximationNumber_sub_le (T i) (0 : E →L[ℂ] F) n) (by simpa using hop.norm)
+    simpa [Real.zero_rpow hp'.ne'] using hlim.rpow_const (Or.inr hp'.le)
+  let major (n : ℕ) := (M : ℝ) ^ p * approximationNumber A.val (n / 2) ^ p
+  have hmajor : Summable major := by
+    have hs := A.property.2.mul_left ((M : ℝ) ^ p)
+    apply Summable.even_add_odd
+    · simpa [major] using hs
+    · exact hs.congr fun n ↦ by simp [major, show (2 * n + 1) / 2 = n by omega]
+  have hsum := tendsto_tsum_of_dominated_convergence hmajor hterm (Eventually.of_forall fun i n ↦ by
+    rw [Real.norm_of_nonneg (Real.rpow_nonneg (approx_nonneg _ _) _)]
+    exact (Real.rpow_le_rpow (approx_nonneg _ _) (hbound i n) hp'.le).trans_eq
+      (Real.mul_rpow M.2 (approx_nonneg _ _)))
+  simpa only [tsum_zero, Real.zero_rpow (by positivity : (1 / p) ≠ 0)] using
+    hsum.rpow_const (Or.inr (by positivity : 0 ≤ 1 / p))
+
+omit [CompleteSpace E] [CompleteSpace F] in
+private theorem rank_sub_le (S T : E →L[ℂ] F) :
+    (S - T).toLinearMap.rank ≤ S.toLinearMap.rank + T.toLinearMap.rank := by
+  rw [sub_eq_add_neg, ContinuousLinearMap.toLinearMap_add, ContinuousLinearMap.toLinearMap_neg]
+  exact (LinearMap.rank_add_le S.toLinearMap (-T.toLinearMap)).trans_eq
+    (congrArg (fun V : Submodule ℂ F ↦ S.toLinearMap.rank + Module.rank ℂ V) (LinearMap.range_neg T.toLinearMap))
+
+/-- Uniformly bounded left factors and adjoints of right factors converge on
+rank-one operators, hence on compact operators in operator norm. The difference
+of two compositions sends a rank-n approximant to one of rank at most 2n. -/
+private theorem tendsto_schattenNorm_composeBoth {ι : Type*} {l : Filter ι}
+    (A : schattenClass E F p hp) (B' : ι → E →L[ℂ] E) (B : E →L[ℂ] E)
+    (C' : ι → F →L[ℂ] F) (C : F →L[ℂ] F)
+    (hB : ∀ x, Tendsto (fun i ↦ (B' i).adjoint x) l (𝓝 (B.adjoint x)))
+    (hC : ∀ y, Tendsto (fun i ↦ C' i y) l (𝓝 (C y)))
+    (b c : ℝ≥0) (hb : ∀ i, ‖B' i‖ ≤ b) (hc : ∀ i, ‖C' i‖ ≤ c) :
+    Tendsto (fun i ↦ schattenNorm
+      ((⟨composeBoth (C' i) (B' i) A.val, composeBoth_mem _ _ A⟩ : schattenClass E F p hp) -
+        ⟨composeBoth C B A.val, composeBoth_mem _ _ A⟩)) l (𝓝 0) := by
+  let D (i : ι) := composeBoth (C' i) (B' i) - composeBoth C B
+  let M := c * b + ‖composeBoth C B‖₊
+  have hD (i : ι) : ‖D i‖ ≤ M :=
+    (norm_sub_le (composeBoth (C' i) (B' i)) (composeBoth C B)).trans (add_le_add_left ((norm_composeBoth_le _ _).trans
+      (mul_le_mul (hc i) (hb i) (norm_nonneg _) c.2)) _)
+  have heq : Equicontinuous (fun i S ↦ D i S) :=
+    (LipschitzWith.uniformEquicontinuous _ M (fun i ↦
+      (D i).lipschitzWith.weaken (by exact_mod_cast hD i))).equicontinuous
+  have hclosed := heq.isClosed_setOfPred_tendsto (l := l) (continuous_const (y := (0 : E →L[ℂ] F)))
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion A.val).mp A.property.1
+  have hop : Tendsto (fun i ↦ D i A.val) l (𝓝 0) := by
+    apply hclosed.mem_of_tendsto d.hasSum_opNorm
+    refine Eventually.of_forall fun s ↦ ?_
+    change Tendsto (fun i ↦ D i (∑ j ∈ s, _)) l (𝓝 0)
+    simp only [map_sum, map_smul]
+    rw [← Finset.sum_const_zero (s := s) (M := E →L[ℂ] F)]
+    apply tendsto_finsetSum
+    intro j _
+    have h := ((ContinuousLinearMap.smulRightL ℂ E F).continuous₂.tendsto
+      (innerSL ℂ (B.adjoint (d.source j)), C (d.target j))).comp
+      ((((innerSL ℂ).continuous.tendsto _).comp (hB _)).prodMk_nhds (hC _))
+    change Tendsto (fun i ↦ InnerProductSpace.rankOne ℂ (C' i (d.target j)) ((B' i).adjoint (d.source j)))
+      l (𝓝 (InnerProductSpace.rankOne ℂ (C (d.target j)) (B.adjoint (d.source j)))) at h
+    have hsub := h.sub (tendsto_const_nhds (x := InnerProductSpace.rankOne ℂ (C (d.target j)) (B.adjoint (d.source j))))
+    change Tendsto (fun i ↦ ((d.coeff j : ℝ) : ℂ) • ((C' i).comp
+      ((InnerProductSpace.rankOne ℂ (d.target j) (d.source j)).comp (B' i)) -
+      C.comp ((InnerProductSpace.rankOne ℂ (d.target j) (d.source j)).comp B))) l (𝓝 0)
+    simp only [InnerProductSpace.rankOne_comp, InnerProductSpace.comp_rankOne]
+    simpa only [sub_self, smul_zero] using
+      hsub.const_smul (((d.coeff j : ℝ) : ℂ))
+  have hσ (i : ι) (n : ℕ) :
+      approximationNumber (D i A.val) n ≤ M * approximationNumber A.val (n / 2) := by
+    refine (approximationNumber_map_le (D i) A.val (fun S hS ↦ ?_)).trans
+      (mul_le_mul_of_nonneg_right (hD i) (approx_nonneg _ _))
+    have hr (C₀ : F →L[ℂ] F) (B₀ : E →L[ℂ] E) := (rank_composeBoth_le C₀ B₀ S).trans hS
+    refine (rank_sub_le _ _).trans ((add_le_add (hr (C' i) (B' i)) (hr C B)).trans ?_)
+    exact_mod_cast (show n / 2 + n / 2 ≤ n by omega)
+  exact tendsto_schatten_series A _ hop M hσ
+
 /-- Paper: Proposition C.3.6.5, p. 705. Left composition by a strongly convergent
 sequence of operators converges in the Schatten norm for a fixed right factor in
 the class. Each composition and its limit belong to the class.
@@ -2527,7 +3053,24 @@ theorem tendsto_schattenNorm_comp_left (A : schattenClass E F p hp)
       (hlim : C.comp A.val ∈ schattenClass E F p hp),
       Tendsto (fun j ↦ schattenNorm
         ((⟨(Cj j).comp A.val, hj j⟩ : schattenClass E F p hp) - ⟨C.comp A.val, hlim⟩))
-        atTop (𝓝 0) := by sorry
+        atTop (𝓝 0) := by
+  let I := ContinuousLinearMap.id ℂ E
+  obtain ⟨c, hc⟩ := exists_opNorm_bound_of_pointwise C Cj hC
+  refine ⟨fun j ↦ by simpa [composeBoth, I] using composeBoth_mem (Cj j) I A,
+    by simpa [composeBoth, I] using composeBoth_mem C I A, ?_⟩
+  simpa [composeBoth, I] using tendsto_schattenNorm_composeBoth A (fun _ ↦ I) I Cj C
+    (fun _ ↦ tendsto_const_nhds) hC ‖I‖₊ c (fun _ ↦ le_rfl) hc
+
+private theorem adjoint_eq_of_pointwise_selfAdjoint (B : E →L[ℂ] E) (B' : ℕ → E →L[ℂ] E)
+    (h : ∀ x, Tendsto (fun k ↦ B' k x) atTop (𝓝 (B x))) (hs : ∀ k, IsSelfAdjoint (B' k)) :
+    B.adjoint = B := by
+  apply ContinuousLinearMap.ext
+  intro x
+  apply ext_inner_right ℂ
+  intro y
+  rw [B.adjoint_inner_left]
+  exact tendsto_nhds_unique ((tendsto_const_nhds.inner (h y)).congr fun k ↦ by
+    rw [← (B' k).adjoint_inner_left, (hs k).adjoint_eq]) ((h x).inner tendsto_const_nhds)
 
 /-- Paper: Proposition C.3.6.5, p. 705. Right composition by a strongly
 convergent sequence of self-adjoint operators converges in the Schatten norm
@@ -2541,7 +3084,15 @@ theorem tendsto_schattenNorm_comp_right (A : schattenClass E F p hp)
       (hlim : A.val.comp B ∈ schattenClass E F p hp),
       Tendsto (fun k ↦ schattenNorm
         ((⟨A.val.comp (Bk k), hk k⟩ : schattenClass E F p hp) - ⟨A.val.comp B, hlim⟩))
-        atTop (𝓝 0) := by sorry
+        atTop (𝓝 0) := by
+  let I := ContinuousLinearMap.id ℂ F
+  obtain ⟨b, hb⟩ := exists_opNorm_bound_of_pointwise B Bk hB
+  have hadj (x : E) : Tendsto (fun k ↦ (Bk k).adjoint x) atTop (𝓝 (B.adjoint x)) := by
+    simpa only [(hself _).adjoint_eq, adjoint_eq_of_pointwise_selfAdjoint B Bk hB hself] using hB x
+  refine ⟨fun k ↦ by simpa [composeBoth, I] using composeBoth_mem I (Bk k) A,
+    by simpa [composeBoth, I] using composeBoth_mem I B A, ?_⟩
+  simpa [composeBoth, I] using tendsto_schattenNorm_composeBoth A Bk B (fun _ ↦ I) I
+    hadj (fun _ ↦ tendsto_const_nhds) b ‖I‖₊ hb (fun _ ↦ le_rfl)
 
 /-- Paper: Proposition C.3.6.5, p. 705. Simultaneous left and right
 composition converges in the Schatten norm as both indices tend to infinity.
@@ -2556,7 +3107,16 @@ theorem tendsto_schattenNorm_comp_both (A : schattenClass E F p hp)
       (hlim : C.comp (A.val.comp B) ∈ schattenClass E F p hp),
       Tendsto (fun jk : ℕ × ℕ ↦ schattenNorm
         ((⟨(Cj jk.1).comp (A.val.comp (Bk jk.2)), hjk jk.1 jk.2⟩ : schattenClass E F p hp) -
-          ⟨C.comp (A.val.comp B), hlim⟩)) atTop (𝓝 0) := by sorry
+          ⟨C.comp (A.val.comp B), hlim⟩)) atTop (𝓝 0) := by
+  obtain ⟨b, hb⟩ := exists_opNorm_bound_of_pointwise B Bk hB
+  obtain ⟨c, hc⟩ := exists_opNorm_bound_of_pointwise C Cj hC
+  refine ⟨fun j k ↦ composeBoth_mem (Cj j) (Bk k) A, composeBoth_mem C B A, ?_⟩
+  apply tendsto_schattenNorm_composeBoth A (fun jk : ℕ × ℕ ↦ Bk jk.2) B (fun jk ↦ Cj jk.1) C
+    _ _ b c (fun jk ↦ hb jk.2) (fun jk ↦ hc jk.1)
+  · intro x
+    simp only [(hself _).adjoint_eq, adjoint_eq_of_pointwise_selfAdjoint B Bk hB hself]
+    exact (hB x).comp (prod_atTop_atTop_eq (α := ℕ) (β := ℕ) ▸ tendsto_snd)
+  · exact fun y ↦ (hC y).comp (prod_atTop_atTop_eq (α := ℕ) (β := ℕ) ▸ tendsto_fst)
 
 end SchattenConvergence
 
@@ -2567,12 +3127,71 @@ variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteS
 -- TODO(paper-gap): Remark C.3.6.6 refers to Proposition C.3.6.5(2) for
 -- the cofinal finite subsets. They are introduced in Proposition C.3.5.1.
 
+omit [CompleteSpace H] in
+/-- The positive square root acts by c on an eigenvector of its square of eigenvalue c². -/
+private theorem apply_eq_smul_of_sq_apply {S : H →L[ℂ] H} (hS : S.IsPositive)
+    (x : H) {c : ℝ} (hc : 0 < c) (h : S (S x) = (c : ℂ) • ((c : ℂ) • x)) :
+    S x = (c : ℂ) • x := by
+  let v := S x - (c : ℂ) • x
+  have hv : S v = -(c : ℂ) • v := by
+    simp only [v, map_sub, map_smul, h, neg_smul, smul_sub]
+    abel
+  have hpos := hS.re_inner_nonneg_right v
+  rw [hv, inner_smul_right, inner_self_eq_norm_sq_to_K] at hpos
+  have hv0 : ‖v‖ = 0 := by
+    simp only [RCLike.ofReal_eq_complex_ofReal, ← Complex.ofReal_neg, ← Complex.ofReal_pow,
+      ← Complex.ofReal_mul] at hpos
+    change 0 ≤ -c * ‖v‖ ^ 2 at hpos
+    by_contra hn
+    nlinarith [sq_nonneg ‖v‖, mul_pos hc (sq_pos_of_ne_zero hn)]
+  exact sub_eq_zero.mp (norm_eq_zero.mp hv0)
+
 /-- Paper: Remark C.3.6.6, p. 707. The Schatten norm at index one equals
 the earlier trace norm on nuclear endomorphisms. This is the norm identification
 used when specializing Proposition C.3.6.5 to the projection results. -/
 theorem schattenNorm_one_eq_traceNorm (T : nuclearEndomorphisms H) :
     schattenNorm ⟨T.val, (mem_traceClassOperators_iff_isNuclearOperator T.val).2 T.property⟩ =
-      traceNorm T := by sorry
+      traceNorm T := by
+  classical
+  let S := CFC.sqrt (T.val.adjoint * T.val)
+  have hS := ContinuousLinearMap.nonneg_iff_isPositive.mp (CFC.sqrt_nonneg (T.val.adjoint * T.val))
+  have hsq : S * S = T.val.adjoint * T.val := CFC.sqrt_mul_sqrt_self _ <|
+    ContinuousLinearMap.nonneg_iff_isPositive.mpr T.val.isPositive_adjoint_comp_self
+  obtain ⟨d⟩ := (isCompactOperator_iff_nonempty_singularExpansion T.val).mp
+    (isCompactOperator_of_isNuclearOperator T.property)
+  obtain ⟨w, b, j, hj, hb, hvanish⟩ := d.exists_source_basis
+  let I := {n // d.coeff n ≠ 0}
+  have hadj (i : I) : T.val.adjoint (d.target i) = ((d.coeff i : ℝ) : ℂ) • d.source i := by
+    apply ext_inner_right ℂ
+    intro x
+    rw [T.val.adjoint_inner_left, inner_smul_left]
+    have hs := (innerSL ℂ (d.target i)).hasSum (d.hasSum_apply x)
+    change HasSum (fun k : I ↦ ⟪d.target i, _⟫_ℂ) ⟪d.target i, T.val x⟫_ℂ at hs
+    rw [hs.unique (hasSum_single i (fun k hk ↦ by simp [inner_smul_right,
+      d.orthonormal_target.inner_eq_zero hk.symm]))]
+    simp [inner_smul_right, d.orthonormal_target.norm_eq_one]
+  let diag (a : w) := (⟪b a, S (b a)⟫_ℂ).re
+  have hdiag (i : I) : diag (j i) = (d.coeff i : ℝ) := by
+    have heig : S (d.source i) = ((d.coeff i : ℝ) : ℂ) • d.source i := by
+      apply apply_eq_smul_of_sq_apply hS _ (NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr i.2))
+      change (S * S) (d.source i) = _
+      rw [hsq, mul_apply_eq_comp, d.apply_source, map_smul, hadj]
+    change (⟪b (j i), S (b (j i))⟫_ℂ).re = _
+    rw [hb, heig, inner_smul_right]
+    simp [d.orthonormal_source.norm_eq_one]
+  have hzero (a : w) (ha : a ∉ range j) : diag a = 0 := by
+    have hs : S (b a) = 0 := by
+      apply norm_eq_zero.mp
+      rw [S.apply_norm_eq_sqrt_inner_adjoint_right, hS.isSelfAdjoint.adjoint_eq,
+        ← ContinuousLinearMap.mul_def, hsq, mul_apply_eq_comp, hvanish a ha]
+      simp
+    simp [diag, hs]
+  have hs : HasSum diag (traceNorm T) := hasSum_traceNorm_diagonal b T
+  have hcoeff := ((hj.hasSum_iff hzero).mpr hs).congr_fun (fun i ↦ (hdiag i).symm)
+  have hfull : HasSum (fun n ↦ (d.coeff n : ℝ)) (traceNorm T) :=
+    (hasSum_subtype_iff_of_support_subset (s := {n | d.coeff n ≠ 0}) (by
+      intro n hn hz; exact hn (by simp [hz]))).mp hcoeff
+  simpa only [schattenNorm, Real.rpow_one, div_one, ← d.coeff_eq_approximationNumber] using hfull.tsum_eq
 
 end TraceClassEndomorphisms
 

@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 
 /-!
 # Exponential system on monogenic quotients
@@ -209,7 +211,15 @@ theorem modulatedMellin_profile_translate (p p' : P)
     (hp : ∀ x : ℝ, p'.val x = (χ (τ (m γ) * γ⁻¹) : ℂ) * p.val (L + x))
     (s : ℂ) (hs : s.re ∈ I) :
     (M p').val s =
-      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) * (M p).val s := by sorry
+      (χ (τ (m γ) * γ⁻¹) : ℂ) * (((m γ).val : ℝ) : ℂ) ^ (-s) * (M p).val s := by
+  have ha : 0 < ((m γ).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m γ))
+  rw [positiveRealFourierMellin_apply I hOpen hInt hne p' s hs,
+    positiveRealFourierMellin_apply I hOpen hInt hne p s hs, mul_assoc,
+    ← smul_eq_mul (a := (((m γ).val : ℝ) : ℂ) ^ (-s)),
+    ← mellin_comp_mul_left (fun u ↦ p.val (Real.log u)) s ha, ← smul_eq_mul,
+    ← mellin_const_smul]
+  refine setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_
+  simp only [hp, Real.log_mul ha.ne' (mem_Ioi.mp ht).ne', smul_eq_mul]
 
 /-- Paper: Discussion 4.4.1.1(5), p. 191. Translating the group multiplier in the
 spectral variable gives the compact character times the scalar multiplier. -/
@@ -279,7 +289,17 @@ include hm in
 /-- Paper: Definition 4.4.2.1, p. 192. For every lift and every integer
 translate the compact average is integrable. -/
 theorem modulatedIsotypicPeriodization_integrable (f : E) (n : ℤ) (x : G) :
-    Integrable (fun k : K ↦ (χ k.val : ℂ) * f.val (γ ^ n * (k.val * x))) μ₁ := by sorry
+    Integrable (fun k : K ↦ (χ k.val : ℂ) * f.val (γ ^ n * (k.val * x))) μ₁ := by
+  have hmem : f.val ∈ schwartzBruhatSubmodule G := by
+    have h := (Submodule.mem_iInf _).mp f.property ⟨0, mem_univ 0⟩
+    rwa [Submodule.mem_comap, modulationWeight_zero] at h
+  have hf : Continuous f.val := schwartzBruhat_continuous (G := G) ⟨f.val, hmem⟩
+  have : CompactSpace K :=
+    isCompact_iff_compactSpace.mp (hm.1.isCompact_preimage (isCompact_singleton (x := 1)))
+  have hcont : Continuous (fun k : K ↦ (χ k.val : ℂ) * f.val (γ ^ n * (k.val * x))) :=
+    (continuous_subtype_val.comp ((map_continuous χ).comp continuous_subtype_val)).mul
+      (hf.comp (continuous_const.mul (continuous_subtype_val.mul continuous_const)))
+  exact hcont.integrable_of_hasCompactSupport (HasCompactSupport.of_compactSpace _)
 
 /-- Paper: Definition 4.4.2.1, p. 192. At every lift the orbit series of the
 compact averages converges to the homogeneous periodization. -/
@@ -373,7 +393,39 @@ theorem modulatedCyclicSubgroup_closed (hγ : 1 < (m γ).val) :
 
 /-- Paper: Lemma 4.4.2.5, p. 193. The quotient by the cyclic subgroup is compact. -/
 theorem modulatedCyclicQuotient_compact (hm : IsModulation m) (hγ : 1 < (m γ).val) :
-    CompactSpace Q := by sorry
+    CompactSpace Q := by
+  have hpos (x : G) : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt (m x))
+  have hproper : IsProperMap (fun x : G ↦ Real.log ((m x).val : ℝ)) := by
+    let e : ℝ≥0ˣ ≃ₜ ℝ :=
+      (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+    have he : (e ∘ m) = fun x : G ↦ Real.log ((m x).val : ℝ) :=
+      funext fun g ↦ (Real.log_of_pos (hpos g)).symm
+    exact he ▸ e.isProperMap.comp hm.1
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγ)
+  have hC := hproper.isCompact_preimage (isCompact_Icc (a := (0 : ℝ)) (b := L))
+  have himg :
+      ((↑) : G → Q) '' ((fun x : G ↦ Real.log ((m x).val : ℝ)) ⁻¹' Icc 0 L) = univ := by
+    refine eq_univ_of_forall fun z ↦ ?_
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective z
+    have h1 := (le_div_iff₀ hL).mp (Int.floor_le (Real.log ((m x).val : ℝ) / L))
+    have h2 := (div_lt_iff₀ hL).mp (Int.lt_floor_add_one (Real.log ((m x).val : ℝ) / L))
+    generalize ⌊Real.log ((m x).val : ℝ) / L⌋ = n at h1 h2
+    rw [add_one_mul] at h2
+    refine ⟨γ ^ (-n) * x, ?_, ?_⟩
+    · have hlog : Real.log ((m (γ ^ (-n) * x)).val : ℝ) =
+          Real.log ((m x).val : ℝ) - n * L := by
+        rw [map_mul m, map_zpow m, Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul,
+          NNReal.coe_zpow, Real.log_mul (zpow_ne_zero _ (hpos γ).ne') (hpos x).ne',
+          Real.log_zpow]
+        push_cast
+        ring
+      change Real.log ((m (γ ^ (-n) * x)).val : ℝ) ∈ Icc 0 L
+      rw [hlog]
+      constructor <;> linarith
+    · rw [QuotientGroup.mk_mul,
+        (QuotientGroup.eq_one_iff _).mpr (Subgroup.zpow_mem_zpowers γ _), one_mul]
+  rw [← isCompact_univ_iff, ← himg]
+  exact hC.image QuotientGroup.continuous_mk
 
 include ht₀ hγ in
 /-- Paper: Lemma 4.4.2.5, p. 193. The exponential formula is a continuous
@@ -443,7 +495,10 @@ include hm hγ in
 /-- Paper: Lemma 4.4.2.5, p. 193. The annihilator carries the discrete topology
 induced by the dual of the original group. -/
 theorem modulatedCyclicAnnihilator_discrete :
-    DiscreteTopology (lcaAnnihilator Γ) := by sorry
+    DiscreteTopology (lcaAnnihilator Γ) := by
+  have := modulatedCyclicQuotient_compact m γ hm hγ
+  obtain ⟨d, -⟩ := lcaQuotientDual_equiv_annihilator Γ (modulatedCyclicSubgroup_closed m γ hγ)
+  exact d.toHomeomorph.discreteTopology_iff.mp inferInstance
 
 end CyclicCharacters
 
@@ -565,21 +620,180 @@ include hm hγ hτ hμ hν in
 /-- Paper: Remark 4.4.2.7, p. 194. The Weil quotient measure has total mass
 equal to the product of the logarithmic period and the volume of the norm-one group. -/
 theorem modulatedCyclicQuotient_measure_univ :
-    ν univ = ENNReal.ofReal L * μ₁ univ := by sorry
+    ν univ = ENNReal.ofReal L * μ₁ univ := by
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγ)
+  have : DiscreteTopology Γ := modulated_zpowers_discrete m γ hγ
+  have hΓ : IsClosed (Γ : Set G) := modulatedCyclicSubgroup_closed m γ hγ
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : (Measure.count : Measure Γ).IsHaarMeasure := count_isHaarMeasure_of_discreteTopology
+  have : (Measure.count : Measure Γ).Regular := count_regular_of_discreteTopology
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hφ : Continuous fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2 := by fun_prop
+  -- The measure `μ` is a Haar measure: a multiple of the canonical one.
+  let μ₀ : Measure K := Measure.haarMeasure ⊤
+  have hcan := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₀ Measure.haarMeasure_self
+  have : (canonicalModulatedHaar m hm).IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have : SFinite (positiveRealHaar : Measure ℝ≥0ˣ) := by unfold positiveRealHaar; infer_instance
+  have : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  have hscale := Measure.isMulLeftInvariant_eq_smul μ₁ μ₀
+  set c := Measure.haarScalarFactor μ₁ μ₀
+  have hc : (c : ℝ≥0∞) ≠ 0 := by
+    intro h
+    rw [ENNReal.coe_eq_zero] at h
+    rw [h, zero_smul] at hscale
+    exact NeZero.ne μ₁ hscale
+  have hprod : μ₁.prod positiveRealHaar = c • μ₀.prod positiveRealHaar := by
+    rw [← Measure.prod_smul_left, ← hscale]
+  have hμc : μ = (c : ℝ≥0∞) • canonicalModulatedHaar m hm := by
+    rw [hμ, hprod, Measure.map_smul _ hφ.aemeasurable, hcan, ENNReal.smul_def]
+  have : μ.IsHaarMeasure := hμc ▸ Measure.IsHaarMeasure.smul _ hc ENNReal.coe_ne_top
+  have : μ.Regular := by
+    let μH : Measure G := Measure.haarMeasure (Classical.arbitrary _)
+    rw [Measure.isMulLeftInvariant_eq_smul μ μH]
+    exact Measure.Regular.smul ENNReal.coe_ne_top
+  -- A Borel fundamental domain for the cyclic subgroup.
+  let ℓ : G → ℝ := fun x ↦ Real.log ((m x).val : ℝ)
+  have hpos (x : G) : (0 : ℝ) < (m x).val := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hℓ (x : G) (k : ℤ) : ℓ (x * γ ^ k) = ℓ x + k * L := by
+    simp only [ℓ, map_mul, map_zpow, Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul,
+      NNReal.coe_zpow, Real.log_mul (hpos x).ne' (zpow_pos (hpos γ) k).ne', Real.log_zpow]
+  let Δ : Set G := {x | ((m x).val : ℝ) ∈ Ico 1 ((m γ).val : ℝ)}
+  have hmemΔ (x : G) : x ∈ Δ ↔ ℓ x ∈ Ico 0 L := by
+    change ((m x).val : ℝ) ∈ Ico 1 ((m γ).val : ℝ) ↔ _
+    simp only [mem_Ico, ℓ, Real.log_nonneg_iff (hpos x), Real.log_lt_log_iff (hpos x) (hpos γ)]
+  have hcontm : Continuous fun x : G ↦ ((m x).val : ℝ) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+  have hΔ : MeasurableSet Δ := hcontm.measurable measurableSet_Ico
+  have hbij : Bijective (fun x : Δ ↦ (QuotientGroup.mk x.val : Q)) := by
+    constructor
+    · rintro ⟨x, hx⟩ ⟨y, hy⟩ hxy
+      obtain ⟨k, hk⟩ := Subgroup.mem_zpowers_iff.mp (QuotientGroup.eq.mp hxy)
+      have hyx : y = x * γ ^ k := by rw [hk, mul_inv_cancel_left]
+      have hx' := (hmemΔ x).mp hx
+      have hy' := (hmemΔ y).mp hy
+      rw [hyx, hℓ] at hy'
+      have h1 : (k : ℝ) < 1 := by
+        by_contra h
+        nlinarith [hx'.1, hy'.2]
+      have h2 : (-1 : ℝ) < k := by
+        by_contra h
+        nlinarith [hx'.2, hy'.1]
+      have hk0 : k = 0 := by
+        have : k < 1 := by exact_mod_cast h1
+        have : -1 < k := by exact_mod_cast h2
+        omega
+      exact Subtype.ext (show x = y by rw [hyx, hk0, zpow_zero, mul_one])
+    · intro q
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+      let k : ℤ := -⌊ℓ x / L⌋
+      refine ⟨⟨x * γ ^ k, (hmemΔ _).mpr ?_⟩, ?_⟩
+      · rw [hℓ]
+        have hf := Int.floor_le (ℓ x / L)
+        have hf' := Int.lt_floor_add_one (ℓ x / L)
+        rw [le_div_iff₀ hL] at hf
+        rw [div_lt_iff₀ hL] at hf'
+        constructor
+        · simp only [k, Int.cast_neg]; nlinarith
+        · simp only [k, Int.cast_neg]; nlinarith
+      · exact QuotientGroup.mk_mul_of_mem x (Subgroup.zpow_mem_zpowers γ k)
+  -- The mass of the fundamental domain.
+  have hPR : positiveRealHaar {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Ico 1 ((m γ).val : ℝ)} =
+      ENNReal.ofReal L := by
+    let ex (x : ℝ) := Units.mk0 (Real.exp x).toNNReal (by positivity)
+    have he : Measurable ex :=
+      measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+    have hset : MeasurableSet {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Ico 1 ((m γ).val : ℝ)} :=
+      measurableSet_Ico.preimage
+        (NNReal.continuous_coe.measurable.comp MeasurableSpace.le_map_comap)
+    change (volume.map ex) _ = _
+    rw [Measure.map_apply he hset]
+    have hpre : ex ⁻¹' {t | (t.val : ℝ) ∈ Ico 1 ((m γ).val : ℝ)} = Ico 0 L := by
+      ext x
+      change (1 ≤ ((Real.exp x).toNNReal : ℝ) ∧ ((Real.exp x).toNNReal : ℝ) < _) ↔ _
+      rw [Real.coe_toNNReal _ (Real.exp_pos x).le, Real.one_le_exp_iff,
+        ← Real.lt_log_iff_exp_lt (hpos γ)]
+      rfl
+    rw [hpre, Real.volume_Ico, sub_zero]
+  have hμΔ : μ Δ = μ₁ univ * ENNReal.ofReal L := by
+    rw [hμ, Measure.map_apply hφ.measurable hΔ]
+    have hpre : (fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2) ⁻¹' Δ =
+        univ ×ˢ {t : ℝ≥0ˣ | (t.val : ℝ) ∈ Ico 1 ((m γ).val : ℝ)} := by
+      ext ⟨k, t⟩
+      have hk : m (k : G) = 1 := k.property
+      change ((m ((k : G) * τ t)).val : ℝ) ∈ Ico 1 ((m γ).val : ℝ) ↔ _
+      rw [map_mul, hk, one_mul, hτ t]
+      simp
+    rw [hpre, Measure.prod_prod, hPR]
+  -- Weil's formula for the constant function one.
+  have hΔfin : μ Δ ≠ ∞ := by
+    rw [hμΔ]
+    exact ENNReal.mul_ne_top (measure_ne_top _ _) ENNReal.ofReal_ne_top
+  have hint : Integrable (fun _ : Q ↦ (1 : ℂ)) ν := by
+    rw [weilFundamentalDomain_integrable_iff Γ hΓ μ hΔ hbij ν hν]
+    exact (integrable_indicator_iff hΔ).mpr (integrableOn_const hΔfin)
+  have heq := weilFundamentalDomain_integral Γ hΓ μ hΔ hbij ν hν hint
+  have hνfin : ν univ ≠ ∞ := by
+    have := (integrable_const_iff.mp hint).resolve_left one_ne_zero
+    exact measure_ne_top ν univ
+  simp only [integral_const, measureReal_restrict_apply_univ, Complex.real_smul, mul_one,
+    Complex.ofReal_inj] at heq
+  have hreal : ν.real univ = μ.real Δ := heq
+  rw [← ENNReal.ofReal_toReal hνfin, ← measureReal_def, hreal, measureReal_def,
+    ENNReal.ofReal_toReal hΔfin, hμΔ, mul_comm]
 
 include hm hγ hτ hμ hν in
 /-- Paper: Remark 4.4.2.7, p. 194. Dividing the quotient Haar measure by its
 specified total mass gives the probability Haar measure. -/
 theorem modulatedCyclicQuotient_probabilityHaar :
-    IsProbabilityMeasure ((ENNReal.ofReal L * μ₁ univ)⁻¹ • ν) := by sorry
+    IsProbabilityMeasure ((ENNReal.ofReal L * μ₁ univ)⁻¹ • ν) := by
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγ)
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have h0 : ENNReal.ofReal L * μ₁ univ ≠ 0 :=
+    mul_ne_zero (ENNReal.ofReal_pos.mpr hL).ne' (Measure.measure_univ_ne_zero.mpr (NeZero.ne μ₁))
+  have htop : ENNReal.ofReal L * μ₁ univ ≠ ∞ :=
+    ENNReal.mul_ne_top ENNReal.ofReal_ne_top (measure_ne_top μ₁ univ)
+  constructor
+  rw [smul_apply, smul_eq_mul,
+    modulatedCyclicQuotient_measure_univ m γ hm hγ μ₁ ν τ hτ μ hμ hν,
+    ENNReal.inv_mul_cancel h0 htop]
 
 include hms hτ hμ hν in
 /-- Paper: Remark 4.4.2.7, p. 194. Normalizing the norm-one Haar measure to
 mass one gives the same Weil quotient measure as dividing by that mass
 after taking the quotient. -/
 theorem modulatedCyclicQuotient_canonicalHaar :
-    IsWeilQuotientMeasure Γ (canonicalModulatedHaar m hm) Measure.count ((μ₁ univ)⁻¹ • ν) :=
-  by sorry
+    IsWeilQuotientMeasure Γ (canonicalModulatedHaar m hm) Measure.count ((μ₁ univ)⁻¹ • ν) := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : SFinite (positiveRealHaar : Measure ℝ≥0ˣ) := by unfold positiveRealHaar; infer_instance
+  have : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  have hφ : Continuous fun z : K × ℝ≥0ˣ ↦ (z.1 : G) * τ z.2 := by fun_prop
+  -- The canonical measure is `μ` divided by the mass of the norm-one group.
+  let μ₀ : Measure K := Measure.haarMeasure ⊤
+  have hμ₀ : μ₀ univ = 1 := Measure.haarMeasure_self
+  have hcan := canonicalModulatedHaar_eq_map_prod m hm τ hτ μ₀ hμ₀
+  have hscale := Measure.isMulLeftInvariant_eq_smul μ₁ μ₀
+  set c := Measure.haarScalarFactor μ₁ μ₀
+  have hc : μ₁ univ = c := by
+    conv_lhs => rw [hscale]
+    rw [smul_apply, hμ₀, ENNReal.smul_def, smul_eq_mul, mul_one]
+  have h0 : μ₁ univ ≠ 0 := Measure.measure_univ_ne_zero.mpr (NeZero.ne μ₁)
+  have htop : μ₁ univ ≠ ∞ := measure_ne_top μ₁ univ
+  have hprod : μ₁.prod positiveRealHaar = c • μ₀.prod positiveRealHaar := by
+    rw [← Measure.prod_smul_left, ← hscale]
+  have hμc : μ = μ₁ univ • canonicalModulatedHaar m hm := by
+    rw [hμ, hprod, Measure.map_smul _ hφ.aemeasurable, hcan, ENNReal.smul_def, hc]
+  have hcanμ : canonicalModulatedHaar m hm = (μ₁ univ)⁻¹ • μ := by
+    rw [hμc, smul_smul, ENNReal.inv_mul_cancel h0 htop, one_smul]
+  -- Rescale both sides of Weil's formula.
+  obtain ⟨hνH, hνR, hW⟩ := hν
+  refine ⟨Measure.IsHaarMeasure.smul _ (ENNReal.inv_ne_zero.mpr htop)
+      (ENNReal.inv_ne_top.mpr h0), Measure.Regular.smul (ENNReal.inv_ne_top.mpr h0),
+    fun f hf ↦ ?_⟩
+  rw [hcanμ, integral_smul_measure, integral_smul_measure, hW f hf]
 
 -- TODO(paper-gap): Remark 4.4.2.8 gives no transport map for the topology of
 -- the multiplier space. Its algebraic membership is used in Lemma 4.4.2.6(2b).

@@ -3655,7 +3655,60 @@ theorem injectiveTensor_zero_basis :
       (fun AB : Set (StrongDual ℂ E) × Set (StrongDual ℂ F) ↦
         EquicontinuousAt (fun φ : AB.1 ↦ (φ.val : E → ℂ)) 0 ∧
         EquicontinuousAt (fun ψ : AB.2 ↦ (ψ.val : F → ℂ)) 0)
-      (fun AB ↦ {z | ∀ φ ∈ AB.1, ∀ ψ ∈ AB.2, ‖tensorDualForm φ ψ z‖ ≤ 1}) := by sorry
+      (fun AB ↦ {z | ∀ φ ∈ AB.1, ∀ ψ ∈ AB.2, ‖tensorDualForm φ ψ z‖ ≤ 1}) := by
+  let p (UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0}) :
+      Seminorm ℂ (InjectiveTensor E F) :=
+    injectiveTensorSeminorm UV.1 UV.2
+  have hp : WithSeminorms p := withGeneratingSeminorms_spec (E ⊗[ℂ] F) p
+  refine hp.hasBasis_zero_ball.to_hasBasis' ?_ ?_
+  · rintro ⟨s, r⟩ hr
+    change 0 < r at hr
+    obtain ⟨a, ha, har⟩ := NormedField.exists_norm_lt ℂ hr
+    have ha₀ := norm_pos_iff.mp ha
+    let U : Set E := ⋂ UV ∈ s, UV.1.val
+    have hU : U ∈ 𝓝 (0 : E) := s.iInter_mem_sets.mpr fun UV _ ↦ UV.1.property
+    let W : Set E := (fun x : E ↦ a⁻¹ • x) ⁻¹' U
+    have hW : W ∈ 𝓝 (0 : E) :=
+      (continuous_const_smul a⁻¹).continuousAt.preimage_mem_nhds (by simpa only [smul_zero] using hU)
+    let V : Set F := ⋂ UV ∈ s, UV.2.val
+    have hV : V ∈ 𝓝 (0 : F) := s.iInter_mem_sets.mpr fun UV _ ↦ UV.2.property
+    refine ⟨(StrongDual.polar ℂ W, StrongDual.polar ℂ V),
+      ⟨(weakDual_polar_mem_compactology hW).1, (weakDual_polar_mem_compactology hV).1⟩, ?_⟩
+    intro z hz
+    change z ∈ (s.sup p).ball 0 r
+    refine (Seminorm.mem_ball_zero _).mpr
+      ((Seminorm.finset_sup_apply_le ha.le fun UV hUV ↦ ?_).trans_lt har)
+    refine (injectiveTensorSeminorm_le_iff UV.1 UV.2 z ‖a‖).mpr fun φ hφ ψ hψ ↦ ?_
+    have hφ' : a⁻¹ • φ ∈ StrongDual.polar ℂ W :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun x hx ↦ by
+        have hx' : a⁻¹ • x ∈ U := hx
+        simpa only [smul_apply, map_smul] using
+          (StrongDual.mem_polar_iff ℂ _).mp hφ _ (mem_iInter₂.mp hx' UV hUV)
+    have hψ' : ψ ∈ StrongDual.polar ℂ V :=
+      (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦
+        (StrongDual.mem_polar_iff ℂ _).mp hψ _ (mem_iInter₂.mp hy UV hUV)
+    have hform : tensorDualForm φ ψ = a • tensorDualForm (a⁻¹ • φ) ψ := by
+      apply TensorProduct.ext'
+      intro x y
+      simp [tensorDualForm_tmul, smul_eq_mul, ← mul_assoc, ha₀]
+    change ∀ φ ∈ StrongDual.polar ℂ W, ∀ ψ ∈ StrongDual.polar ℂ V,
+      ‖tensorDualForm φ ψ z‖ ≤ 1 at hz
+    rw [hform]
+    change ‖a • tensorDualForm (a⁻¹ • φ) ψ z‖ ≤ ‖a‖
+    rw [norm_smul]
+    exact mul_le_of_le_one_right ha.le (hz _ hφ' _ hψ')
+  · rintro ⟨A, B⟩ ⟨hA, hB⟩
+    let U : {U : Set E // U ∈ 𝓝 0} := ⟨_, Metric.equicontinuousAt_iff_right.mp hA 1 one_pos⟩
+    let V : {V : Set F // V ∈ 𝓝 0} := ⟨_, Metric.equicontinuousAt_iff_right.mp hB 1 one_pos⟩
+    refine Filter.mem_of_superset
+      ((p (U, V)).ball_mem_nhds (hp.continuous_seminorm (U, V)) one_pos) ?_
+    intro z hz φ hφ ψ hψ
+    refine (injectiveTensorSeminorm_le_iff U V z 1).mp
+      ((p (U, V)).mem_ball_zero.mp hz).le φ ?_ ψ ?_
+    · refine (StrongDual.mem_polar_iff ℂ _).mpr fun x hx ↦ ?_
+      simpa only [map_zero, dist_zero_left] using (hx (⟨φ, hφ⟩ : A)).le
+    · refine (StrongDual.mem_polar_iff ℂ _).mpr fun y hy ↦ ?_
+      simpa only [map_zero, dist_zero_left] using (hy (⟨ψ, hψ⟩ : B)).le
 
 /-- Paper: Remark C.2.3.8, p. 679. An equicontinuous set in the ε-dual is exactly a subset
 of the bipolar of the pure functionals from two equicontinuous sets in the factor duals.

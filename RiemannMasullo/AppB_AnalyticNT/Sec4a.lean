@@ -5,14 +5,17 @@ public import Mathlib.Analysis.Distribution.TemperedDistribution
 public import Mathlib.Topology.Algebra.InfiniteSum.UniformOn
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
+import Mathlib.Analysis.MellinInversion
 import Mathlib.Analysis.Normed.Group.FunctionSeries
 import Mathlib.Analysis.SpecialFunctions.ImproperIntegrals
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 import Mathlib.Analysis.SpecialFunctions.Trigonometric.Cotangent
 import Mathlib.NumberTheory.ModularForms.EisensteinSeries.Summable
+import Mathlib.Topology.Algebra.InfiniteSum.TsumUniformlyOn
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform
 import RiemannMasullo.ForMathlib.MeasureTheory.Integral.IntegralEqImproper
+import Mathlib.Topology.Algebra.InfiniteSum.ConditionalInt
 
 /-!
 # Complements on Poisson summation and Cauchy integrals
@@ -1017,6 +1020,67 @@ theorem summable_localEulerFactor_lattice :
   change ‖f ((m : ℝ) * Real.log q(v))‖ ≤ ‖f (Real.log q(v) * (m : ℝ))‖
   rw [mul_comm (m : ℝ)]
 
+open scoped Asymptotics in
+omit hχ hf in
+/-- Exponential decay of one more order at both ends gives the strict two-sided bound
+used in the definition of a Mellin test function. -/
+private lemma exists_strict_exp_bound_of_isBigO {u : ℝ → ℂ} (N : ℕ)
+    (htop : u =O[atTop] fun x : ℝ ↦ Real.exp (-((N : ℝ) + 1) * x))
+    (hbot : u =O[atBot] fun x : ℝ ↦ Real.exp (((N : ℝ) + 1) * x)) :
+    ∃ C > (0 : ℝ), ∃ T > (0 : ℝ), ∀ x : ℝ, T < |x| →
+      ‖u x‖ < C * Real.exp (-(N : ℝ) * |x|) := by
+  obtain ⟨c₁, hc₁, h₁⟩ := Asymptotics.isBigO_iff'.mp htop
+  obtain ⟨c₂, hc₂, h₂⟩ := Asymptotics.isBigO_iff'.mp hbot
+  obtain ⟨T₁, hT₁⟩ := eventually_atTop.mp h₁
+  obtain ⟨T₂, hT₂⟩ := eventually_atBot.mp h₂
+  refine ⟨c₁ + c₂, add_pos hc₁ hc₂, max (max T₁ (-T₂)) 1, lt_max_of_lt_right one_pos,
+    fun x hx ↦ ?_⟩
+  have hN0 : (0 : ℝ) ≤ N := Nat.cast_nonneg N
+  rcases abs_cases x with ⟨habs, hx0⟩ | ⟨habs, hx0⟩
+  · rw [habs] at hx ⊢
+    have hxT : T₁ ≤ x := ((le_max_left _ _).trans (le_max_left _ _)).trans hx.le
+    have h := hT₁ x hxT
+    rw [Real.norm_of_nonneg (Real.exp_pos _).le] at h
+    have hexp : Real.exp (-((N : ℝ) + 1) * x) ≤ Real.exp (-(N : ℝ) * x) :=
+      Real.exp_le_exp.mpr (by nlinarith)
+    calc ‖u x‖ ≤ c₁ * Real.exp (-((N : ℝ) + 1) * x) := h
+      _ ≤ c₁ * Real.exp (-(N : ℝ) * x) := mul_le_mul_of_nonneg_left hexp hc₁.le
+      _ < (c₁ + c₂) * Real.exp (-(N : ℝ) * x) :=
+          mul_lt_mul_of_pos_right (by linarith) (Real.exp_pos _)
+  · rw [habs] at hx ⊢
+    have hxT : x ≤ T₂ := by
+      have h := ((le_max_right T₁ (-T₂)).trans (le_max_left _ _)).trans hx.le
+      linarith
+    have h := hT₂ x hxT
+    rw [Real.norm_of_nonneg (Real.exp_pos _).le] at h
+    have hexp : Real.exp (((N : ℝ) + 1) * x) ≤ Real.exp (-(N : ℝ) * -x) :=
+      Real.exp_le_exp.mpr (by nlinarith)
+    calc ‖u x‖ ≤ c₂ * Real.exp (((N : ℝ) + 1) * x) := h
+      _ ≤ c₂ * Real.exp (-(N : ℝ) * -x) := mul_le_mul_of_nonneg_left hexp hc₂.le
+      _ < (c₁ + c₂) * Real.exp (-(N : ℝ) * -x) :=
+          mul_lt_mul_of_pos_right (by linarith) (Real.exp_pos _)
+
+omit hχ in
+/-- A Schwartz profile of exponential decay is a Mellin test function without jumps. -/
+private lemma isPiecewiseSmoothMellinTest_of_exponentialDecay :
+    IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) := by
+  refine ⟨⟨∅, (f.smooth ⊤).contDiffOn, fun j x hx ↦ absurd hx (Finset.notMem_empty x)⟩,
+    fun N ↦ ?_⟩
+  have hA : (0 : ℝ) < (N : ℝ) + 1 := by positivity
+  obtain ⟨C₀, hC₀, T₀, hT₀, h₀⟩ := exists_strict_exp_bound_of_isBigO (u := (f : ℝ → ℂ)) N
+    (by simpa only [iteratedDeriv_zero] using hf.1 0 _ hA)
+    (by simpa only [iteratedDeriv_zero] using hf.2 0 _ hA)
+  obtain ⟨C₁, hC₁, T₁, hT₁, h₁⟩ :=
+    exists_strict_exp_bound_of_isBigO (u := deriv (f : ℝ → ℂ)) N
+      (by simpa only [iteratedDeriv_one] using hf.1 1 _ hA)
+      (by simpa only [iteratedDeriv_one] using hf.2 1 _ hA)
+  refine ⟨max C₀ C₁, lt_max_of_lt_left hC₀, max T₀ T₁, lt_max_of_lt_left hT₀,
+    fun x hx ↦ ⟨?_, ?_⟩⟩
+  · exact (h₀ x ((le_max_left _ _).trans_lt hx)).trans_le
+      (mul_le_mul_of_nonneg_right (le_max_left _ _) (Real.exp_pos _).le)
+  · exact (h₁ x ((le_max_right _ _).trans_lt hx)).trans_le
+      (mul_le_mul_of_nonneg_right (le_max_right _ _) (Real.exp_pos _).le)
+
 /-- Paper: Lemma B.4.1.7, p. 611. The Mellin frequency samples sum
 absolutely to the two-sided local lattice sum multiplied by the logarithm of the norm.
 This is the first equality in (B.4.1.20). -/
@@ -1024,21 +1088,267 @@ theorem hasSum_localEulerFactor_mellinSamples (ℓ : ℂ)
     (hℓ : Complex.exp ℓ = χ₀(χ).localValue v) :
     HasSum (fun m : ℤ ↦ logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)))
       ((Real.log q(v) : ℂ) *
-        ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) := by sorry
+        ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v))) := by
+  have hq : (1 : ℝ) < q(v) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (0 : ℝ) < q(v) := zero_lt_one.trans hq
+  have hlog : 0 < Real.log q(v) := Real.log_pos hq
+  have htest : IsPiecewiseSmoothMellinTest (f : ℝ → ℂ) :=
+    isPiecewiseSmoothMellinTest_of_exponentialDecay f hf
+  obtain ⟨c, hc⟩ : ∃ c : Circle, (c : ℂ) = χ₀(χ).localValue v :=
+    ⟨⟨_, mem_sphere_zero_iff_norm.2 (norm_ideleClassNormTwist_zero_localValue χ v)⟩, rfl⟩
+  have hℓc : Complex.exp ℓ = (c : ℂ) := hℓ.trans hc.symm
+  -- The samples are absolutely summable, so their sum is the limit of the symmetric sums
+  -- computed by Poisson summation.
+  have hS : Summable (fun m : ℤ ↦
+      logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ))) :=
+    (summable_mellinPoissonSamples_of_smooth htest (f.smooth ⊤) hq0 hq.ne' c ℓ hℓc).of_norm
+  have hlim := tendsto_mellinPoissonSum_of_piecewiseSmooth htest hq0 hq.ne' c ℓ hℓc
+  have hsym : Tendsto (fun N : ℕ ↦ ∑ m ∈ Finset.Icc (-(N : ℤ)) (N : ℤ),
+      logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ))) atTop
+      (𝓝 (∑' m : ℤ, logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)))) :=
+    SummationFilter.hasSum_symmetricIcc_iff.mp
+      (hS.hasSum.mono_left (SummationFilter.symmetricIcc ℤ).le_atTop)
+  have heq := tendsto_nhds_unique hsym hlim
+  have hmid (m : ℤ) : mellinJumpMidpoint (f : ℝ → ℂ) ((m : ℝ) * Real.log q(v)) =
+      f ((m : ℝ) * Real.log q(v)) := by
+    have hcont : ContinuousAt (f : ℝ → ℂ) ((m : ℝ) * Real.log q(v)) :=
+      f.continuous.continuousAt
+    rw [mellinJumpMidpoint_eq_average (hcont.tendsto.mono_left nhdsWithin_le_nhds)
+      (hcont.tendsto.mono_left nhdsWithin_le_nhds), add_self_div_two]
+  have hval : (Real.log q(v) : ℂ) *
+      ∑' m : ℤ, (χ₀(χ).localValue v) ^ m * f ((m : ℝ) * Real.log q(v)) =
+      ∑' m : ℤ, logMellin f ((ℓ + twoPiI * (m : ℂ)) / (Real.log q(v) : ℂ)) := by
+    rw [heq, abs_of_pos hlog, hc]
+    simp_rw [hmid]
+  rw [hval]
+  exact hS.hasSum
 
 local notation "eulerIntegrand" =>
   (fun (s : ℂ) ↦ logMellin f s * logDeriv (finiteHeckeEulerFactor χ v) s)
 
+omit hχ hf in
+/-- In the right half-plane a unimodular multiple of `q ^ (-s)` stays away from one. -/
+private lemma one_sub_le_norm_one_sub_mul_cpow {c : ℂ} {q : ℕ} (hq : 1 < q) (hc : ‖c‖ = 1)
+    (s : ℂ) : 1 - (q : ℝ) ^ (-s.re) ≤ ‖1 - c * (q : ℂ) ^ (-s)‖ := by
+  have h := norm_sub_norm_le (1 : ℂ) (c * (q : ℂ) ^ (-s))
+  rwa [norm_one, norm_mul, hc, one_mul,
+    Complex.norm_natCast_cpow_of_pos (zero_lt_one.trans hq), Complex.neg_re] at h
+
+omit hχ hf in
+/-- The logarithmic derivative of the Euler factor `(1 - c q ^ (-s))⁻¹` on the
+right half-plane. -/
+private lemma logDeriv_inv_one_sub_mul_cpow {c : ℂ} {q : ℕ} (hq : 1 < q) (hc : ‖c‖ = 1)
+    {s : ℂ} (hs : 0 < s.re) :
+    logDeriv (fun z : ℂ ↦ (1 - c * (q : ℂ) ^ (-z))⁻¹) s =
+      -(c * ((q : ℂ) ^ (-s) * Complex.log q)) / (1 - c * (q : ℂ) ^ (-s)) := by
+  have hq0 : (q : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (zero_lt_one.trans hq).ne'
+  have hr : (q : ℝ) ^ (-s.re) < 1 :=
+    Real.rpow_lt_one_of_one_lt_of_neg (by exact_mod_cast hq) (neg_neg_of_pos hs)
+  have hne : 1 - c * (q : ℂ) ^ (-s) ≠ 0 := by
+    intro h
+    have hle := one_sub_le_norm_one_sub_mul_cpow hq hc s
+    rw [h, norm_zero] at hle
+    linarith
+  have hpow : HasDerivAt (fun z : ℂ ↦ (q : ℂ) ^ (-z))
+      ((q : ℂ) ^ (-s) * Complex.log q * (-1)) s :=
+    (hasDerivAt_neg' s).const_cpow (Or.inl hq0)
+  have hd : HasDerivAt (fun z : ℂ ↦ 1 - c * (q : ℂ) ^ (-z))
+      (c * ((q : ℂ) ^ (-s) * Complex.log q)) s := by
+    convert (hpow.const_mul c).const_sub 1 using 1
+    ring
+  have hinv : HasDerivAt (fun z : ℂ ↦ (1 - c * (q : ℂ) ^ (-z))⁻¹)
+      (-(c * ((q : ℂ) ^ (-s) * Complex.log q)) / (1 - c * (q : ℂ) ^ (-s)) ^ 2) s := hd.inv hne
+  rw [logDeriv_apply, hinv.deriv, div_inv_eq_mul, sq, div_mul_eq_mul_div,
+    mul_div_mul_right _ _ hne]
+
+open MeasureTheory in
+omit hχ in
+/-- The Mellin transform of an exponentially decaying profile is integrable on
+every vertical line. -/
+private lemma verticalIntegrable_logMellin (a : ℝ) :
+    Complex.VerticalIntegrable (logMellin f) a := by
+  have hΦ : Continuous (logMellin f) := (differentiable_mellin_of_exponentialDecay f hf).continuous
+  have hline : Continuous (fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I) := by fun_prop
+  obtain ⟨C, hC, hBound⟩ :=
+    mellin_heightBound_of_exponentialDecay f hf a (a + 1) (by linarith) 2 one_le_two
+  obtain ⟨D, hD⟩ := isCompact_Icc.exists_bound_of_continuousOn (s := Icc (-1 : ℝ) 1)
+    (hΦ.comp hline).continuousOn
+  have hD0 : 0 ≤ D := (norm_nonneg _).trans (hD 0 ⟨by norm_num, by norm_num⟩)
+  refine (integrable_inv_one_add_sq.const_mul (2 * C + 2 * D)).mono'
+    (hΦ.comp hline).aestronglyMeasurable (Eventually.of_forall fun y ↦ ?_)
+  have hy2 : (0 : ℝ) < 1 + y ^ 2 := by positivity
+  obtain ⟨N, hN⟩ : ∃ N : ℝ, N = ‖logMellin f ((a : ℂ) + (y : ℂ) * Complex.I)‖ := ⟨_, rfl⟩
+  have hN0 : 0 ≤ N := by
+    rw [hN]
+    exact norm_nonneg _
+  change ‖logMellin f ((a : ℂ) + (y : ℂ) * Complex.I)‖ ≤ (2 * C + 2 * D) * (1 + y ^ 2)⁻¹
+  rw [← hN, ← div_eq_mul_inv, le_div_iff₀ hy2]
+  by_cases hy : |y| ≤ 1
+  · have h1 : y ^ 2 ≤ 1 := by
+      rw [← sq_abs]
+      exact pow_le_one₀ (abs_nonneg y) hy
+    have h2 : N ≤ D := by
+      rw [hN]
+      exact hD y (abs_le.mp hy)
+    nlinarith [mul_nonneg hN0 (sub_nonneg.mpr h1)]
+  · have hy1 : 1 < |y| := not_le.mp hy
+    have hy0 : y ≠ 0 := by
+      intro h
+      rw [h, abs_zero] at hy1
+      linarith
+    have h1 : 1 ≤ y ^ 2 := by
+      rw [← sq_abs]
+      exact one_le_pow₀ hy1.le
+    have hysq : (0 : ℝ) < y ^ 2 := by positivity
+    have h2 : N * y ^ 2 ≤ C := by
+      have h := hBound a (left_mem_Icc.mpr (by linarith)) y hy0
+      rw [sq_abs] at h
+      rw [hN]
+      exact (le_div_iff₀ hysq).mp h
+    nlinarith [mul_nonneg hN0 (sub_nonneg.mpr h1)]
+
+open MeasureTheory in
 /-- Paper: Lemma B.4.1.7, p. 611. The Mellin transform times the logarithmic
 derivative of the unramified Euler factor is integrable on the right vertical line. -/
 theorem verticalIntegrable_localEulerFactor_mellin (a : ℝ) (ha : 0 < a) :
-    Complex.VerticalIntegrable eulerIntegrand a := by sorry
+    Complex.VerticalIntegrable eulerIntegrand a := by
+  obtain ⟨c, hcdef⟩ : ∃ c : ℂ, c = χ₀(χ).localValue v := ⟨_, rfl⟩
+  obtain ⟨q, hqdef⟩ : ∃ q : ℕ, q = Ideal.absNorm v.asIdeal := ⟨_, rfl⟩
+  have hc : ‖c‖ = 1 := by
+    rw [hcdef]
+    exact norm_ideleClassNormTwist_zero_localValue χ v
+  have hq : 1 < q := by
+    rw [hqdef]
+    exact NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (q : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (zero_lt_one.trans hq).ne'
+  have hqR : (1 : ℝ) < q := by exact_mod_cast hq
+  have hEuler : finiteHeckeEulerFactor χ v = fun z : ℂ ↦ (1 - c * (q : ℂ) ^ (-z))⁻¹ := by
+    funext z
+    rw [finiteHeckeEulerFactor, ite_eq_left hχ, hcdef, hqdef]
+  obtain ⟨r, hrdef⟩ : ∃ r : ℝ, r = (q : ℝ) ^ (-a) := ⟨_, rfl⟩
+  have hr0 : 0 ≤ r := by
+    rw [hrdef]
+    exact Real.rpow_nonneg (zero_le_one.trans hqR.le) _
+  have hr1 : r < 1 := by
+    rw [hrdef]
+    exact Real.rpow_lt_one_of_one_lt_of_neg hqR (neg_neg_of_pos ha)
+  have hre (y : ℝ) : ((a : ℂ) + (y : ℂ) * Complex.I).re = a := by simp
+  have hs (y : ℝ) : 0 < ((a : ℂ) + (y : ℂ) * Complex.I).re := by
+    rw [hre]
+    exact ha
+  have hline : Continuous (fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I) := by fun_prop
+  have hΦint : Integrable (fun y : ℝ ↦ logMellin f ((a : ℂ) + (y : ℂ) * Complex.I)) :=
+    verticalIntegrable_logMellin f hf a
+  -- The logarithmic derivative of the Euler factor is continuous and bounded on the line.
+  have hden (y : ℝ) : 1 - r ≤ ‖1 - c * (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))‖ := by
+    have h := one_sub_le_norm_one_sub_mul_cpow hq hc ((a : ℂ) + (y : ℂ) * Complex.I)
+    rwa [hre, ← hrdef] at h
+  have hden0 (y : ℝ) : 1 - c * (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) ≠ 0 := by
+    intro h
+    have hle := hden y
+    rw [h, norm_zero] at hle
+    linarith
+  have hpow : Continuous (fun y : ℝ ↦ (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))) :=
+    hline.neg.const_cpow (Or.inl hq0)
+  have hLcont : Continuous (fun y : ℝ ↦
+      -(c * ((q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) * Complex.log q)) /
+        (1 - c * (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)))) :=
+    ((continuous_const.mul (hpow.mul continuous_const)).neg).div
+      (continuous_const.sub (continuous_const.mul hpow)) hden0
+  have hLbound (y : ℝ) :
+      ‖-(c * ((q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) * Complex.log q)) /
+        (1 - c * (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)))‖ ≤
+        r * ‖Complex.log q‖ / (1 - r) := by
+    rw [norm_div, norm_neg, norm_mul, norm_mul, hc, one_mul,
+      Complex.norm_natCast_cpow_of_pos (zero_lt_one.trans hq), Complex.neg_re, hre, ← hrdef]
+    exact div_le_div_of_nonneg_left (mul_nonneg hr0 (norm_nonneg _)) (sub_pos.mpr hr1) (hden y)
+  refine (hΦint.mul_bdd hLcont.aestronglyMeasurable (Eventually.of_forall hLbound)).congr
+    (Eventually.of_forall fun y ↦ ?_)
+  change _ = logMellin f _ * logDeriv (finiteHeckeEulerFactor χ v) _
+  rw [hEuler, logDeriv_inv_one_sub_mul_cpow hq hc (hs y)]
+
+omit hχ hf in
+/-- Powers of `q ^ (-s)` are the values at `-s` of the powers of `q`. -/
+private lemma natCast_cpow_neg_pow (q : ℕ) (s : ℂ) (n : ℕ) :
+    ((q : ℂ) ^ (-s)) ^ n = (((q : ℝ) ^ n : ℝ) : ℂ) ^ (-s) := by
+  rw [← Complex.cpow_nat_mul, Complex.natCast_cpow_natCast_mul, Complex.ofReal_pow,
+    Complex.ofReal_natCast]
+
+open MeasureTheory in
+omit hχ hf in
+/-- Termwise integration of the geometric expansion of the logarithmic derivative
+of an Euler factor against an integrable function. -/
+private lemma hasSum_integral_mul_geometric {Ψ w : ℝ → ℂ} {c L : ℂ} {r : ℝ}
+    (hΨ : Integrable Ψ) (hw : Continuous w) (hc : ‖c‖ = 1) (hr : r < 1)
+    (hwr : ∀ y, ‖w y‖ = r) :
+    HasSum (fun m : ℕ ↦ ∫ y : ℝ, -L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1))))
+      (∫ y : ℝ, Ψ y * (-(c * (w y * L)) / (1 - c * w y))) := by
+  have hr0 : 0 ≤ r := by
+    rw [← hwr 0]
+    exact norm_nonneg _
+  have hint (m : ℕ) :
+      Integrable (fun y : ℝ ↦ -L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1)))) := by
+    have hbdd : ∀ y : ℝ, ‖w y ^ (m + 1)‖ ≤ r ^ (m + 1) := fun y ↦ by
+      rw [norm_pow, hwr]
+    exact ((hΨ.mul_bdd (hw.pow _).aestronglyMeasurable
+      (Eventually.of_forall hbdd)).const_mul _).const_mul _
+  have hnorm (m : ℕ) : (∫ y : ℝ, ‖-L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1)))‖) =
+      ‖L‖ * (∫ y : ℝ, ‖Ψ y‖) * r ^ (m + 1) := by
+    have hfun : (fun y : ℝ ↦ ‖-L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1)))‖) =
+        fun y : ℝ ↦ ‖L‖ * r ^ (m + 1) * ‖Ψ y‖ := by
+      funext y
+      rw [norm_mul, norm_neg, norm_mul, norm_pow, hc, one_pow, one_mul, norm_mul, norm_pow,
+        hwr]
+      ring
+    rw [hfun, integral_const_mul]
+    ring
+  have hsum : Summable
+      (fun m : ℕ ↦ ∫ y : ℝ, ‖-L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1)))‖) := by
+    rw [funext hnorm]
+    exact ((summable_nat_add_iff 1).2 (summable_geometric_of_lt_one hr0 hr)).mul_left _
+  have hpt (y : ℝ) : ∑' m : ℕ, -L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1))) =
+      Ψ y * (-(c * (w y * L)) / (1 - c * w y)) := by
+    have hξ : ‖c * w y‖ < 1 := by
+      rw [norm_mul, hc, one_mul, hwr]
+      exact hr
+    have hgeo := (hasSum_geometric_of_norm_lt_one hξ).mul_left (-L * Ψ y * (c * w y))
+    have hfun : (fun m : ℕ ↦ -L * (c ^ (m + 1) * (Ψ y * w y ^ (m + 1)))) =
+        fun m : ℕ ↦ -L * Ψ y * (c * w y) * (c * w y) ^ m := by
+      funext m
+      ring
+    rw [hfun, hgeo.tsum_eq, div_eq_mul_inv]
+    ring
+  have h := hasSum_integral_of_summable_integral_norm hint hsum
+  rwa [funext hpt] at h
+
+open MeasureTheory in
+omit hχ hf in
+/-- A value of the inverse Mellin transform read as an integral over the vertical line. -/
+private lemma integral_mul_cpow_of_mellinInv_eq {Φ : ℂ → ℂ} {a x : ℝ} {b : ℂ}
+    (h : mellinInv a Φ x = b) :
+    ∫ y : ℝ, Φ ((a : ℂ) + (y : ℂ) * Complex.I) *
+      (x : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) = 2 * (Real.pi : ℂ) * b := by
+  have hcomm : (fun y : ℝ ↦ Φ ((a : ℂ) + (y : ℂ) * Complex.I) *
+      (x : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))) =
+      fun y : ℝ ↦ (x : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) •
+        Φ ((a : ℂ) + (y : ℂ) * Complex.I) := by
+    funext y
+    rw [smul_eq_mul, mul_comm]
+  have hpi : 2 * (Real.pi : ℂ) * ((1 / (2 * Real.pi) : ℝ) : ℂ) = 1 := by
+    push_cast
+    exact mul_one_div_cancel
+      (mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+  rw [hcomm, ← h]
+  unfold mellinInv
+  rw [Complex.real_smul, ← mul_assoc, hpi, one_mul]
 
 -- TODO(paper-gap): The second equality in (B.4.1.20) and (B.4.1.35) omit
 -- the left vertical integral needed for the full residue sum. The right
 -- vertical line alone gives only the strictly positive powers of the prime norm.
 -- On p. 614 the dropped integral of Φ is 2πi times the test function at one.
 
+open MeasureTheory in
 /-- Paper: Lemma B.4.1.7, p. 611. The negative normalized right-line
 integral is the logarithm of the norm times the local Dirac sum at weight zero.
 Deviation: The single right-line integral in (B.4.1.20) gives only strictly
@@ -1046,7 +1356,72 @@ positive powers, as follows from the Euler expansion (B.4.2.7) and Mellin invers
 theorem hasSum_localEulerFactor_cauchyIntegral (a : ℝ) (ha : 0 < a) :
     HasSum (fun m : ℕ ↦ (Real.log q(v) : ℂ) * (χ₀(χ).localValue v) ^ (m + 1) *
       f ((m + 1 : ℕ) * Real.log q(v))) (-verticalLineIntegral eulerIntegrand a / twoPiI) :=
-  by sorry
+  by
+  obtain ⟨c, hcdef⟩ : ∃ c : ℂ, c = χ₀(χ).localValue v := ⟨_, rfl⟩
+  obtain ⟨q, hqdef⟩ : ∃ q : ℕ, q = Ideal.absNorm v.asIdeal := ⟨_, rfl⟩
+  rw [← hcdef, ← hqdef]
+  have hc : ‖c‖ = 1 := by
+    rw [hcdef]
+    exact norm_ideleClassNormTwist_zero_localValue χ v
+  have hq : 1 < q := by
+    rw [hqdef]
+    exact NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (q : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (zero_lt_one.trans hq).ne'
+  have hqR : (1 : ℝ) < q := by exact_mod_cast hq
+  have hEuler : finiteHeckeEulerFactor χ v = fun z : ℂ ↦ (1 - c * (q : ℂ) ^ (-z))⁻¹ := by
+    funext z
+    rw [finiteHeckeEulerFactor, ite_eq_left hχ, hcdef, hqdef]
+  obtain ⟨r, hrdef⟩ : ∃ r : ℝ, r = (q : ℝ) ^ (-a) := ⟨_, rfl⟩
+  have hr1 : r < 1 := by
+    rw [hrdef]
+    exact Real.rpow_lt_one_of_one_lt_of_neg hqR (neg_neg_of_pos ha)
+  have hre (y : ℝ) : ((a : ℂ) + (y : ℂ) * Complex.I).re = a := by simp
+  have hs (y : ℝ) : 0 < ((a : ℂ) + (y : ℂ) * Complex.I).re := by
+    rw [hre]
+    exact ha
+  have hline : Continuous (fun y : ℝ ↦ (a : ℂ) + (y : ℂ) * Complex.I) := by fun_prop
+  have hΦint : Integrable (fun y : ℝ ↦ logMellin f ((a : ℂ) + (y : ℂ) * Complex.I)) :=
+    verticalIntegrable_logMellin f hf a
+  have hw : Continuous (fun y : ℝ ↦ (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))) :=
+    hline.neg.const_cpow (Or.inl hq0)
+  have hwr (y : ℝ) : ‖(q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))‖ = r := by
+    rw [Complex.norm_natCast_cpow_of_pos (zero_lt_one.trans hq), Complex.neg_re, hre, ← hrdef]
+  -- Expand the logarithmic derivative geometrically and integrate term by term.
+  have hS := hasSum_integral_mul_geometric (L := Complex.log q) hΦint hw hc hr1 hwr
+  have hlim : (∫ y : ℝ, logMellin f ((a : ℂ) + (y : ℂ) * Complex.I) *
+      (-(c * ((q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I)) * Complex.log q)) /
+        (1 - c * (q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))))) =
+      ∫ y : ℝ, eulerIntegrand ((a : ℂ) + (y : ℂ) * Complex.I) := by
+    refine integral_congr_ae (Eventually.of_forall fun y ↦ ?_)
+    change _ = logMellin f _ * logDeriv (finiteHeckeEulerFactor χ v) _
+    rw [hEuler, logDeriv_inv_one_sub_mul_cpow hq hc (hs y)]
+  -- Mellin inversion evaluates each term at a power of the prime norm.
+  have hterm (m : ℕ) : (∫ y : ℝ, -Complex.log q * (c ^ (m + 1) *
+      (logMellin f ((a : ℂ) + (y : ℂ) * Complex.I) *
+        ((q : ℂ) ^ (-((a : ℂ) + (y : ℂ) * Complex.I))) ^ (m + 1)))) =
+      -(2 * (Real.pi : ℂ)) *
+        ((Real.log q : ℂ) * c ^ (m + 1) * f ((m + 1 : ℕ) * Real.log q)) := by
+    have hx : (0 : ℝ) < (q : ℝ) ^ (m + 1) := pow_pos (zero_lt_one.trans hqR) _
+    have hinv : mellinInv a (logMellin f) ((q : ℝ) ^ (m + 1)) =
+        f (Real.log ((q : ℝ) ^ (m + 1))) :=
+      mellinInv_mellin_eq a (fun t : ℝ ↦ f (Real.log t)) hx
+        (mellinConvergent_of_exponentialDecay f hf a) hΦint
+        (f.continuous.continuousAt.comp (Real.continuousAt_log hx.ne'))
+    have hM := integral_mul_cpow_of_mellinInv_eq hinv
+    simp_rw [natCast_cpow_neg_pow]
+    rw [integral_const_mul, integral_const_mul, hM, Real.log_pow, Complex.natCast_log]
+    ring
+  rw [hlim, funext hterm] at hS
+  have hpi : (2 * (Real.pi : ℂ)) ≠ 0 :=
+    mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  convert hS.mul_left (-(2 * (Real.pi : ℂ))⁻¹) using 1
+  · funext m
+    rw [← mul_assoc, neg_mul_neg, inv_mul_cancel₀ hpi, one_mul]
+  · obtain ⟨J, hJ⟩ : ∃ J : ℂ, J = ∫ y : ℝ, eulerIntegrand ((a : ℂ) + (y : ℂ) * Complex.I) :=
+      ⟨_, rfl⟩
+    change -(Complex.I * ∫ y : ℝ, eulerIntegrand ((a : ℂ) + (y : ℂ) * Complex.I)) / twoPiI = _
+    rw [← hJ, neg_div, mul_comm Complex.I J, mul_div_mul_right _ _ Complex.I_ne_zero, neg_mul,
+      inv_mul_eq_div]
 
 end LocalFactor
 
@@ -1056,10 +1431,65 @@ local notation "poleTerm" =>
     let n : ℂ := (Subtype.val m : ℤ)
     1 / (z - n) + 1 / n)
 
+/-- The inverse squares of the nonzero integers are summable. -/
+private lemma summable_inv_sq_nonzero_int :
+    Summable (fun m : {m : ℤ // m ≠ 0} ↦ 1 / ((m : ℤ) : ℝ) ^ 2) :=
+  (Real.summable_one_div_int_pow.mpr one_lt_two).comp_injective Subtype.val_injective
+
+/-- A regularized pole term is `z / (m (z - m))`. -/
+private lemma norm_poleTerm_eq {z : ℂ} {m : ℤ} (hm : m ≠ 0) (hzm : z - (m : ℂ) ≠ 0) :
+    ‖1 / (z - (m : ℂ)) + 1 / (m : ℂ)‖ = ‖z‖ / (|(m : ℝ)| * ‖z - (m : ℂ)‖) := by
+  have hmC : (m : ℂ) ≠ 0 := by exact_mod_cast hm
+  have heq : 1 / (z - (m : ℂ)) + 1 / (m : ℂ) = z / ((m : ℂ) * (z - (m : ℂ))) := by
+    field_simp
+    ring
+  rw [heq, norm_div, norm_mul, ← Complex.ofReal_intCast, Complex.norm_real, Real.norm_eq_abs]
+
+/-- Far from a bounded set, a regularized pole term is bounded by an inverse square. -/
+private lemma norm_poleTerm_le_of_two_mul_le {R : ℝ} {z : ℂ} (hz : ‖z‖ ≤ R) {m : ℤ}
+    (hm0 : m ≠ 0) (hm : 2 * R ≤ |(m : ℝ)|) :
+    ‖1 / (z - (m : ℂ)) + 1 / (m : ℂ)‖ ≤ 2 * R * (1 / (m : ℝ) ^ 2) := by
+  have hR : 0 ≤ R := (norm_nonneg z).trans hz
+  have hmpos : 0 < |(m : ℝ)| := abs_pos.mpr (by exact_mod_cast hm0)
+  have hnorm_m : ‖(m : ℂ)‖ = |(m : ℝ)| := by
+    rw [← Complex.ofReal_intCast, Complex.norm_real, Real.norm_eq_abs]
+  have hsub : |(m : ℝ)| / 2 ≤ ‖z - (m : ℂ)‖ := by
+    have h := norm_sub_norm_le (m : ℂ) z
+    rw [norm_sub_rev, hnorm_m] at h
+    linarith
+  have hzm : z - (m : ℂ) ≠ 0 := by
+    intro h
+    rw [h, norm_zero] at hsub
+    linarith
+  rw [norm_poleTerm_eq hm0 hzm, div_le_iff₀ (by positivity)]
+  have hsq : (m : ℝ) ^ 2 = |(m : ℝ)| ^ 2 := (sq_abs _).symm
+  calc ‖z‖ ≤ R := hz
+    _ = 2 * R * (1 / (m : ℝ) ^ 2) * (|(m : ℝ)| * (|(m : ℝ)| / 2)) := by
+      rw [hsq]
+      field_simp
+    _ ≤ 2 * R * (1 / (m : ℝ) ^ 2) * (|(m : ℝ)| * ‖z - (m : ℂ)‖) := by gcongr
+
 /-- Paper: Lemma B.4.1.9, p. 612. The sum of the norms of the regularized
 pole terms in (B.4.1.21) converges locally uniformly off the integers. -/
 theorem summableLocallyUniformlyOn_expPoleTerms :
-    SummableLocallyUniformlyOn (fun m z ↦ ‖poleTerm m z‖) Complex.integerComplement := by sorry
+    SummableLocallyUniformlyOn (fun m z ↦ ‖poleTerm m z‖) Complex.integerComplement := by
+  refine SummableLocallyUniformlyOn.of_locally_bounded_eventually
+    Complex.isOpen_compl_range_intCast fun K _ hK ↦ ?_
+  obtain ⟨R, hR⟩ := hK.isBounded.exists_norm_le
+  refine ⟨fun m ↦ 2 * R * (1 / ((m : ℤ) : ℝ) ^ 2), summable_inv_sq_nonzero_int.mul_left _, ?_⟩
+  have hfin : {m : {m : ℤ // m ≠ 0} | ¬ 2 * R ≤ |((m : ℤ) : ℝ)|}.Finite := by
+    refine ((Set.finite_Icc (-⌈2 * R⌉) ⌈2 * R⌉).preimage Subtype.val_injective.injOn).subset ?_
+    intro m hm
+    have h := abs_lt.mp (not_le.mp hm)
+    have hceil := Int.le_ceil (2 * R)
+    refine ⟨?_, ?_⟩
+    · exact_mod_cast (show (-(⌈2 * R⌉ : ℝ)) ≤ ((m : ℤ) : ℝ) by linarith)
+    · exact_mod_cast (show ((m : ℤ) : ℝ) ≤ (⌈2 * R⌉ : ℝ) by linarith)
+  rw [Filter.eventually_cofinite]
+  refine hfin.subset fun m hm hle ↦ hm fun k hk ↦ ?_
+  change ‖‖1 / (k - ((m : ℤ) : ℂ)) + 1 / ((m : ℤ) : ℂ)‖‖ ≤ _
+  rw [norm_norm]
+  exact norm_poleTerm_le_of_two_mul_le (hR k hk) m.2 hle
 
 /-- The products `n * (z - n)` over the integers have summable reciprocals. -/
 theorem summable_inv_intCast_mul_sub (z : ℂ) :
@@ -1139,10 +1569,122 @@ theorem inv_one_sub_exp_eq_mittagLeffler {z : ℂ} (hz : z ∈ Complex.integerCo
   simp [Complex.I_sq]
   ring
 
+/-- A complex number off the real axis is not an integer. -/
+private lemma mem_integerComplement_of_im_ne_zero {z : ℂ} (hz : z.im ≠ 0) :
+    z ∈ Complex.integerComplement := by
+  rw [Complex.mem_integerComplement_iff]
+  rintro ⟨n, rfl⟩
+  exact hz (Complex.intCast_im n)
+
+/-- Solving the partial-fraction expansion for the sum of the pole terms. -/
+private lemma tsum_poleTerm_eq_of_mittagLeffler {T z S E : ℂ} (hT : T ≠ 0)
+    (h : E = 1 / 2 - 1 / (T * z) - (1 / T) * S) : S = T * (1 / 2 - 1 / (T * z) - E) := by
+  have hring : T * (1 / 2 - 1 / (T * z) - (1 / 2 - 1 / (T * z) - 1 / T * S)) =
+      T * (1 / T) * S := by ring
+  rw [h, hring, mul_one_div_cancel hT, one_mul]
+
 /-- Paper: Lemma B.4.1.9, p. 612. The norm of the sum of the regularized
 pole terms is bounded on each horizontal line of nonzero height, as in (B.4.1.22). -/
 theorem norm_tsum_expPoleTerms_le (a : ℝ) (ha : a ≠ 0) :
-    ∃ C > (0 : ℝ), ∀ z : ℂ, z.im = a → ‖∑' m, poleTerm m z‖ ≤ C := by sorry
+    ∃ C > (0 : ℝ), ∀ z : ℂ, z.im = a → ‖∑' m, poleTerm m z‖ ≤ C := by
+  have hexp : Real.exp (-(2 * Real.pi * a)) ≠ 1 := by
+    rw [Ne, Real.exp_eq_one_iff, neg_eq_zero]
+    exact mul_ne_zero (mul_ne_zero two_ne_zero Real.pi_ne_zero) ha
+  have hδ : 0 < |1 - Real.exp (-(2 * Real.pi * a))| := abs_pos.mpr (sub_ne_zero.mpr hexp.symm)
+  have hapos : 0 < |a| := abs_pos.mpr ha
+  have hpi := Real.pi_pos
+  refine ⟨2 * Real.pi * (1 / 2 + 1 / (2 * Real.pi * |a|) +
+    |1 - Real.exp (-(2 * Real.pi * a))|⁻¹), by positivity, fun z hz ↦ ?_⟩
+  have hzmem : z ∈ Complex.integerComplement :=
+    mem_integerComplement_of_im_ne_zero (hz ▸ ha)
+  have h2pi : twoPiI ≠ 0 :=
+    mul_ne_zero (mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero))
+      Complex.I_ne_zero
+  have hn2pi : ‖twoPiI‖ = 2 * Real.pi := by
+    rw [norm_mul, norm_mul, Complex.norm_I, mul_one, Complex.norm_real, Real.norm_of_nonneg hpi.le,
+      Complex.norm_ofNat]
+  have hsum : ∑' m, poleTerm m z =
+      twoPiI * (1 / 2 - 1 / (twoPiI * z) - (1 - Complex.exp (twoPiI * z))⁻¹) :=
+    tsum_poleTerm_eq_of_mittagLeffler h2pi (inv_one_sub_exp_eq_mittagLeffler hzmem)
+  have hnexp : ‖Complex.exp (twoPiI * z)‖ = Real.exp (-(2 * Real.pi * a)) := by
+    rw [Complex.norm_exp]
+    congr 1
+    simp [hz]
+  have hone : |1 - Real.exp (-(2 * Real.pi * a))| ≤ ‖1 - Complex.exp (twoPiI * z)‖ := by
+    have h := abs_norm_sub_norm_le (1 : ℂ) (Complex.exp (twoPiI * z))
+    rwa [norm_one, hnexp] at h
+  have hinv : ‖(1 - Complex.exp (twoPiI * z))⁻¹‖ ≤ |1 - Real.exp (-(2 * Real.pi * a))|⁻¹ := by
+    rw [norm_inv]
+    exact inv_anti₀ hδ hone
+  have hrec : ‖1 / (twoPiI * z)‖ ≤ 1 / (2 * Real.pi * |a|) := by
+    rw [norm_div, norm_one, norm_mul, hn2pi]
+    have hza : |a| ≤ ‖z‖ := hz ▸ Complex.abs_im_le_norm z
+    exact one_div_le_one_div_of_le (by positivity) (by gcongr)
+  rw [hsum, norm_mul, hn2pi]
+  refine mul_le_mul_of_nonneg_left ?_ (by positivity)
+  have h12 : ‖(1 / 2 : ℂ)‖ ≤ 1 / 2 := by
+    rw [norm_div, norm_one, Complex.norm_ofNat]
+  calc ‖1 / 2 - 1 / (twoPiI * z) - (1 - Complex.exp (twoPiI * z))⁻¹‖
+      ≤ ‖(1 / 2 : ℂ) - 1 / (twoPiI * z)‖ + ‖(1 - Complex.exp (twoPiI * z))⁻¹‖ :=
+        norm_sub_le _ _
+    _ ≤ ‖(1 / 2 : ℂ)‖ + ‖1 / (twoPiI * z)‖ + ‖(1 - Complex.exp (twoPiI * z))⁻¹‖ :=
+        add_le_add (norm_sub_le _ _) le_rfl
+    _ ≤ 1 / 2 + 1 / (2 * Real.pi * |a|) + |1 - Real.exp (-(2 * Real.pi * a))|⁻¹ :=
+        add_le_add (add_le_add h12 hrec) hinv
+
+/-- The reciprocals of `1 + k ^ 2` over the integers are summable. -/
+private lemma summable_inv_one_add_int_sq : Summable (fun k : ℤ ↦ 1 / (1 + (k : ℝ) ^ 2)) := by
+  refine (Real.summable_one_div_int_pow.mpr one_lt_two).of_norm_bounded_eventually ?_
+  rw [Filter.eventually_cofinite]
+  refine (Set.finite_singleton (0 : ℤ)).subset fun k hk ↦ ?_
+  by_contra hk0
+  have hk0' : (k : ℝ) ≠ 0 := by exact_mod_cast hk0
+  have hpos : (0 : ℝ) < (k : ℝ) ^ 2 := by positivity
+  refine hk ?_
+  rw [Real.norm_of_nonneg (by positivity)]
+  exact one_div_le_one_div_of_le hpos (by linarith)
+
+/-- On a horizontal line of nonzero height, the inverse squared distances to the integers
+are summable, with a sum bounded independently of the point on the line. -/
+private lemma summable_inv_norm_sub_int_sq {a : ℝ} (ha : a ≠ 0) {z : ℂ} (hz : z.im = a) :
+    Summable (fun m : ℤ ↦ 1 / ‖z - (m : ℂ)‖ ^ 2) ∧
+      ∑' m : ℤ, 1 / ‖z - (m : ℂ)‖ ^ 2 ≤
+        (2 + 3 / a ^ 2) * ∑' k : ℤ, 1 / (1 + (k : ℝ) ^ 2) := by
+  have ha2 : 0 < a ^ 2 := by positivity
+  obtain ⟨n, hn⟩ : ∃ n : ℤ, n = ⌊z.re⌋ := ⟨_, rfl⟩
+  obtain ⟨t, ht⟩ : ∃ t : ℝ, t = z.re - n := ⟨_, rfl⟩
+  have ht0 : 0 ≤ t := by
+    rw [ht, hn]
+    exact sub_nonneg.mpr (Int.floor_le z.re)
+  have ht1 : t < 1 := by
+    have := Int.lt_floor_add_one z.re
+    rw [ht, hn]
+    linarith
+  have hterm (k : ℤ) : 1 / ‖z - ((n + k : ℤ) : ℂ)‖ ^ 2 ≤
+      (2 + 3 / a ^ 2) * (1 / (1 + (k : ℝ) ^ 2)) := by
+    have hnorm : ‖z - ((n + k : ℤ) : ℂ)‖ ^ 2 = (t - k) ^ 2 + a ^ 2 := by
+      rw [Complex.sq_norm, Complex.normSq_apply, Complex.sub_re, Complex.sub_im,
+        Complex.intCast_re, Complex.intCast_im, hz, sub_zero, ht, Int.cast_add]
+      ring
+    have hden : 0 < (t - k) ^ 2 + a ^ 2 := by positivity
+    rw [hnorm, mul_one_div, div_le_div_iff₀ hden (by positivity), one_mul]
+    have h1 : 1 + (k : ℝ) ^ 2 ≤ 2 * (t - k) ^ 2 + 3 := by
+      nlinarith [sq_nonneg ((k : ℝ) - 2 * t), mul_nonneg ht0 ht0,
+        mul_le_mul ht1.le ht1.le ht0 zero_le_one]
+    have h3 : 3 / a ^ 2 * a ^ 2 = 3 := by field_simp
+    have h2 : 2 * (t - k) ^ 2 + 3 ≤ (2 + 3 / a ^ 2) * ((t - k) ^ 2 + a ^ 2) := by
+      have h4 : 0 ≤ 3 / a ^ 2 * (t - k) ^ 2 := by positivity
+      nlinarith
+    exact h1.trans h2
+  have hmaj : Summable (fun k : ℤ ↦ (2 + 3 / a ^ 2) * (1 / (1 + (k : ℝ) ^ 2))) :=
+    summable_inv_one_add_int_sq.mul_left _
+  have hshift : Summable (fun k : ℤ ↦ 1 / ‖z - ((n + k : ℤ) : ℂ)‖ ^ 2) :=
+    hmaj.of_nonneg_of_le (fun k ↦ by positivity) hterm
+  have hsumm : Summable (fun m : ℤ ↦ 1 / ‖z - (m : ℂ)‖ ^ 2) :=
+    ((Equiv.addLeft n).summable_iff (f := fun m : ℤ ↦ 1 / ‖z - (m : ℂ)‖ ^ 2)).mp hshift
+  refine ⟨hsumm, ?_⟩
+  rw [← (Equiv.addLeft n).tsum_eq (fun m : ℤ ↦ 1 / ‖z - (m : ℂ)‖ ^ 2), ← tsum_mul_left]
+  exact hshift.tsum_le_tsum hterm hmaj
 
 -- TODO(paper-gap): The squared reciprocal sum in the proof of (B.4.1.23)
 -- omits the index zero, so it is only bounded above by the full periodic sum.
@@ -1151,7 +1693,46 @@ theorem norm_tsum_expPoleTerms_le (a : ℝ) (ha : a ≠ 0) :
 the sum of the norms of the pole terms grows at most linearly in the modulus,
 as in (B.4.1.23). -/
 theorem tsum_norm_expPoleTerms_le (a : ℝ) (ha : a ≠ 0) :
-    ∃ C > (0 : ℝ), ∀ z : ℂ, z.im = a → (∑' m, ‖poleTerm m z‖) ≤ C * ‖z‖ := by sorry
+    ∃ C > (0 : ℝ), ∀ z : ℂ, z.im = a → (∑' m, ‖poleTerm m z‖) ≤ C * ‖z‖ := by
+  set G : ℝ := ∑' m : {m : ℤ // m ≠ 0}, 1 / ((m : ℤ) : ℝ) ^ 2 with hG
+  set H : ℝ := (2 + 3 / a ^ 2) * ∑' k : ℤ, 1 / (1 + (k : ℝ) ^ 2) with hH
+  have hG0 : 0 ≤ G := tsum_nonneg fun m ↦ by positivity
+  have hH0 : 0 ≤ H := mul_nonneg (by positivity) (tsum_nonneg fun k ↦ by positivity)
+  refine ⟨1 / 2 * (G + H) + 1, by positivity, fun z hz ↦ ?_⟩
+  obtain ⟨hsumm, hbound⟩ := summable_inv_norm_sub_int_sq ha hz
+  have hsub : Summable (fun m : {m : ℤ // m ≠ 0} ↦ 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2) :=
+    hsumm.comp_injective Subtype.val_injective
+  have hsub_le : ∑' m : {m : ℤ // m ≠ 0}, 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2 ≤ H :=
+    (Summable.tsum_subtype_le (fun m : ℤ ↦ 1 / ‖z - (m : ℂ)‖ ^ 2) {m : ℤ | m ≠ 0}
+      (fun m ↦ by positivity) hsumm).trans hbound
+  have hterm (m : {m : ℤ // m ≠ 0}) : ‖poleTerm m z‖ ≤
+      ‖z‖ * (1 / 2 * (1 / ((m : ℤ) : ℝ) ^ 2 + 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2)) := by
+    have hzm : z - ((m : ℤ) : ℂ) ≠ 0 := by
+      intro h
+      have := congrArg Complex.im h
+      simp [hz] at this
+      exact ha this
+    have hmpos : 0 < |((m : ℤ) : ℝ)| := abs_pos.mpr (by exact_mod_cast m.2)
+    have hnpos : 0 < ‖z - ((m : ℤ) : ℂ)‖ := norm_pos_iff.mpr hzm
+    change ‖1 / (z - ((m : ℤ) : ℂ)) + 1 / ((m : ℤ) : ℂ)‖ ≤ _
+    rw [norm_poleTerm_eq m.2 hzm, div_eq_mul_one_div]
+    refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg z)
+    have hsq : ((m : ℤ) : ℝ) ^ 2 = |((m : ℤ) : ℝ)| ^ 2 := (sq_abs _).symm
+    rw [hsq, one_div_mul_eq_div, ← one_div_mul_one_div, ← one_div_pow, ← one_div_pow]
+    nlinarith [sq_nonneg (1 / |((m : ℤ) : ℝ)| - 1 / ‖z - ((m : ℤ) : ℂ)‖)]
+  have hmaj : Summable (fun m : {m : ℤ // m ≠ 0} ↦
+      ‖z‖ * (1 / 2 * (1 / ((m : ℤ) : ℝ) ^ 2 + 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2))) :=
+    ((summable_inv_sq_nonzero_int.add hsub).mul_left _).mul_left _
+  have hsummable : Summable (fun m : {m : ℤ // m ≠ 0} ↦ ‖poleTerm m z‖) :=
+    hmaj.of_nonneg_of_le (fun m ↦ norm_nonneg _) hterm
+  calc (∑' m, ‖poleTerm m z‖)
+      ≤ ∑' m : {m : ℤ // m ≠ 0},
+          ‖z‖ * (1 / 2 * (1 / ((m : ℤ) : ℝ) ^ 2 + 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2)) :=
+        hsummable.tsum_le_tsum hterm hmaj
+    _ = ‖z‖ * (1 / 2 * (G + ∑' m : {m : ℤ // m ≠ 0}, 1 / ‖z - ((m : ℤ) : ℂ)‖ ^ 2)) := by
+        rw [tsum_mul_left, tsum_mul_left, summable_inv_sq_nonzero_int.tsum_add hsub]
+    _ ≤ ‖z‖ * (1 / 2 * (G + H)) := by gcongr
+    _ ≤ (1 / 2 * (G + H) + 1) * ‖z‖ := by nlinarith [norm_nonneg z]
 
 -- TODO(paper-gap): The left side of (B.4.1.33) is positive at t = 0, so
 -- the asserted majorant needs a constant term.
