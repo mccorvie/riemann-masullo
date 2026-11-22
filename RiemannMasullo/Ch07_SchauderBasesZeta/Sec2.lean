@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -90,7 +92,32 @@ Deviation: The weight equation for the leading coefficient is stated in
 Theorem 7.2.1.4(1). -/
 theorem sLocalPrincipalPartCoeff_ker (ω : PontryaginDual J₁) (c : Xₛ)
     (hc : onComponent(c, ω)) (k : ℕ) :
-    Kₛ(ω) ≤ (sLocalPrincipalPartCoeff c k).ker := by sorry
+    Kₛ(ω) ≤ (sLocalPrincipalPartCoeff c k).ker := by
+  have residue (Z : ℂ → ℂ) (p : ℤ) (hZ : ∀ z, Z z = 0) :
+      complexResidue (fun z : ℂ ↦ Z z / z ^ p) 0 = 0 := by
+    simp [hZ, complexResidue, circleIntegral]
+    exact tendsto_const_nhds.limUnder_eq
+  intro f hf
+  have hv := (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) ω f).mp hf
+  refine (exists_sLocalNormTwist (F := F) (S := S) c).elim fun χ ha ↦ ha.elim fun a hca ↦ ?_
+  let χ₀ : Xₛ := (circleToComplex).comp χ
+  have hω := (congrArg (normOneRestriction mₛ) hca).trans hc
+  have hr (z : ℂ) (g : J₁) : normOneRestriction mₛ (twistₛ χ₀ z) g = (ω g : ℂ) :=
+    (normOneRestriction_unitaryChart mₛ hmₛ χ z g).trans
+      ((normOneRestriction_unitaryChart mₛ hmₛ χ a g).symm.trans (DFunLike.congr_fun hω g))
+  have hz : (fun z : ℂ ↦ sLocalIdelicZFunction f (twistₛ χ₀ z)) = 0 := by
+    refine eq_of_agree_rightHalf (sLocalIdelicZFunction_meromorphic f χ)
+      (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 0 fun z hz ↦ ?_
+    let d := (⟨twistₛ χ₀ z, sLocalOrderBound_positive χ hz⟩ :
+      {q : Xₛ // 0 ≤ sLocalIdelicOrderBound q})
+    exact (sLocalIdelicMellin_apply f d).symm.trans (hv d (hr z))
+  change complexResidue (fun z : ℂ ↦
+    sLocalIdelicZFunction f (twistₛ c z) / z ^ (-(k : ℤ) + 1)) 0 = 0
+  apply residue
+  intro z
+  have shift := (congrArg (fun b : Xₛ ↦ twistₛ b z) hca.symm).trans
+    (normTwist_normTwist mₛ hmₛ χ₀ a z)
+  exact (congrArg (sLocalIdelicZFunction f) shift).trans (congrFun hz (z + a))
 
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 The coefficient acts on the homogeneous theta quotient of its norm-one character. -/
