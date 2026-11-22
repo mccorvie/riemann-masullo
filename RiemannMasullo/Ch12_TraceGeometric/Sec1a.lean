@@ -163,7 +163,17 @@ product L². The smoothenings represent the same sequence and limit there. -/
 theorem tendsto_dSequenceKernelSmoothening_L2 :
     Tendsto ks atTop (𝓝 k) ∧
       (∀ n, dSequenceKernelSmoothening μ U (κs n) =ᵐ[ν.prod ν] (ks n : G × G → ℂ)) ∧
-      dSequenceKernelSmoothening μ U κ =ᵐ[ν.prod ν] (k : G × G → ℂ) := by sorry
+      dSequenceKernelSmoothening μ U κ =ᵐ[ν.prod ν] (k : G × G → ℂ) := by
+  refine ⟨tendsto_iff_norm_sub_tendsto_zero.mpr ?_, fun n ↦
+    dSequenceKernelSmoothening_ae_eq (hκs n) hU hBorel hf hf_pos hν (hSn n),
+    dSequenceKernelSmoothening_ae_eq hκ hU hBorel hf hf_pos hν hT⟩
+  let swap := Lp.compMeasurePreservingₗ (E := ℂ) (p := 2) ℂ Prod.swap
+    (Measure.measurePreserving_swap (μ := ν) (ν := ν))
+  let A := (hilbertSchmidtOperators_equiv_Lp_prod ν ν).choose.toLinearMap.comp swap
+  have hsub (n : ℕ) :
+      integralKernelOperator ν (ks n - k) = integralKernelOperator ν (ks n) - integralKernelOperator ν k :=
+    map_sub A (ks n) k
+  simpa only [← hsub, schattenNorm_integralKernelOperator] using hS2
 
 /-- Paper: Theorem 12.1.1.2(3), p. 499. The smoothened diagonals converge
 weakly in weighted L¹, expressed by testing against all weighted L∞ classes. -/
