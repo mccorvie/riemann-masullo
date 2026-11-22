@@ -198,7 +198,9 @@ def adelicNormalizedEigendistribution (c : QuasiCharacter C𝔽) : D(ℬ(𝔸[F]
 The global normalized generator takes the value one on the Gaussian for its weight. -/
 theorem adelicNormalizedEigendistribution_gaussian (χ : PontryaginDual C𝔽) (s : ℂ) :
     adelicNormalizedEigendistribution (ideleClassNormTwist χ s) (adelicStandardGaussian χ) =
-      1 := by sorry
+      1 := by
+  exact (existsUnique_adelicNormalizedEigendistribution
+    (ideleClassNormTwist χ s)).exists.choose_spec.2 χ s rfl
 
 /-- Paper: Theorem 5.5.1.3(1), p. 279.
 The normalized global distribution spans the eigenspace of its weight. -/
