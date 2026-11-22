@@ -8,6 +8,8 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Topology.Algebra.IsOpenUnits
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-! # Structure Theorem V: isotypic exhaustiveness
 
 Masullo, §6.2, pp. 295–302. Finite sets of places index only the finite factors.
@@ -270,7 +272,54 @@ theorem finiteStandardGaussian_zeta_of_ramified (v : V) (c d : QuasiCharacter (L
       (Multiplicative.ofAdd g.val) * d g) (μ(v)) ∧
     (localIdelicZetaIntegral (μ(v)) (fun x ↦ finiteStandardGaussian v c
       (Multiplicative.ofAdd x)) d =
-      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by sorry
+      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by
+  classical
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let q (g : (L(v))ˣ) := d g / c g
+  have hc (g : (L(v))ˣ) : c g ≠ 0 := ((Group.isUnit g).map c).ne_zero
+  have hram : ¬ ∀ u ∈ U(v), c u = 1 := fun h ↦
+    _hc.elim fun u hu ↦ hu.2 (h u hu.1)
+  have hfun : (fun g : (L(v))ˣ ↦ finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g) =
+      (U(v)).indicator q := by
+    funext g
+    by_cases hg : g ∈ U(v)
+    · rw [Set.indicator_of_mem hg, finiteStandardGaussian_integerUnit v c g hg]
+      exact (mul_comm _ _).trans (div_eq_mul_inv _ _).symm
+    · rw [Set.indicator_of_notMem hg]
+      have hv : g.val ∉ Units.val '' U(v) := fun ⟨u, hu, h⟩ ↦ hg ((Units.ext h) ▸ hu)
+      have hz : finiteStandardGaussian v c (Multiplicative.ofAdd g.val) = 0 :=
+        (ite_eq_right hram).trans (Set.indicator_of_notMem hv _)
+      rw [hz, zero_mul]
+  have hopen : IsOpen (U(v)) := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hcompact : IsCompact (U(v)) := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hq : Continuous q := d.continuous.div c.continuous hc
+  constructor
+  · rw [hfun, integrable_indicator_iff hopen.measurableSet]
+    exact hq.continuousOn.integrableOn_compact hcompact
+  · change (∫ g : (L(v))ˣ, finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g ∂μ(v)) = _
+    rw [hfun, integral_indicator hopen.measurableSet]
+    split_ifs with hmatch
+    · have eqOne : Set.EqOn q (fun _ ↦ (1 : ℂ)) (U(v)) := fun u hu ↦
+        (div_eq_one_iff_eq (hc u)).mpr (hmatch u hu)
+      rw [setIntegral_congr_fun hopen.measurableSet eqOne, setIntegral_const]
+      simp [measureReal_def]
+    · push Not at hmatch
+      obtain ⟨a, ha, hne⟩ := hmatch
+      have hpre : (fun y : (L(v))ˣ ↦ a * y) ⁻¹' U(v) = U(v) := by
+        ext y
+        exact (O(v)).units.mul_mem_cancel_left ha
+      have hI := (measurePreserving_mul_left (μ(v)) a).setIntegral_preimage_emb
+        (Homeomorph.mulLeft a).toMeasurableEquiv.measurableEmbedding q (U(v))
+      rw [hpre] at hI
+      change (∫ y in U(v), q (a * y) ∂μ(v)) = ∫ y in U(v), q y ∂μ(v) at hI
+      have hmul (y : (L(v))ˣ) : q (a * y) = q a * q y := by
+        simp only [q, map_mul, mul_div_mul_comm]
+      simp_rw [hmul] at hI
+      rw [integral_const_mul, ← sub_eq_zero, ← sub_one_mul] at hI
+      exact (mul_eq_zero.mp hI).resolve_left
+        (sub_ne_zero.mpr (fun h ↦ hne ((div_eq_one_iff_eq (hc a)).mp h)))
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 Tensoring an archimedean test with the fixed standard tests at the finite places
