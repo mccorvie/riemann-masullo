@@ -160,7 +160,25 @@ def IsSpectralBasepointChoice (χ : PontryaginDual C₁ → PontryaginDual C𝔽
 provides unitary lifts for all the norm-one characters at once. -/
 theorem exists_spectralBasepointChoice (F : Type*) [Field F] [NumberField F] :
     ∃ χ : PontryaginDual (ideleClassNorm F).ker → PontryaginDual (IdeleClassGroup (𝓞 F) F),
-      IsSpectralBasepointChoice χ := by sorry
+      IsSpectralBasepointChoice χ := by
+  let C := IdeleClassGroup (𝓞 F) F
+  let n : C →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+  let q : IdeleGroup (𝓞 F) F →ₜ* C := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : Function.RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let P : C →ₜ* C := ContinuousMonoidHom.id C / σ.comp n
+  have hP (x : C) : P x ∈ (ideleClassNorm F).ker := by
+    change ideleClassNorm F (x / σ (ideleClassNorm F x)) = 1
+    rw [map_div, hσ, div_self']
+  let r : C →ₜ* (ideleClassNorm F).ker := ⟨P.toMonoidHom.codRestrict _ hP, P.continuous.subtype_mk _⟩
+  refine ⟨fun ω ↦ ω.comp r, fun ω ↦ ?_⟩
+  ext x : 1
+  change ω (r (x : C)) = ω x
+  apply congrArg ω
+  apply Subtype.ext
+  change (x : C) / σ (ideleClassNorm F x) = x
+  rw [show ideleClassNorm F (x : C) = 1 from x.property, map_one, div_one]
 
 /-- Paper: (10.2.1.4), p. 440. In each component the norm twists of the
 chosen extension give its unique complex parameter. -/
