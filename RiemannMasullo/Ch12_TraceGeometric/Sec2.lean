@@ -100,7 +100,18 @@ def IsIndentationMeasureLift (ν₀ : Measure Q) (μ₀ : Measure G) : Prop :=
 measure lift from the quotient. -/
 theorem isIndentationMeasureLift_of_weil {μ : Measure G} [μ.IsHaarMeasure]
     {ν : Measure Q} (hν : IsWeilQuotientMeasure H μ μH ν) :
-    IsIndentationMeasureLift H hH μH ν μ := by sorry
+    IsIndentationMeasureLift H hH μH ν μ := by
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  refine ⟨inferInstance, fun f ↦ ?_⟩
+  refine Eq.trans ?_ (hν.2.2 f.toContinuousMap f.hasCompactSupport).symm
+  apply integral_congr_ae
+  apply ae_of_all
+  intro q
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+  change _ = lcaCosetIntegral H μH f (QuotientGroup.mk x)
+  rw [lcaCosetIntegral_mk H μH f x]
+  · exact e.pushforward_apply_apply μH f x
+  · exact (e.pullback f x).integrable
 
 /-- Paper: Corollary 12.2.1.2(1), p. 506. Each positive Radon measure on the quotient
 has a unique positive Radon lift satisfying the normalization on compact tests.
