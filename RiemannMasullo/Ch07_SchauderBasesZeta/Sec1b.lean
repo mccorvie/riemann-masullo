@@ -75,7 +75,8 @@ private theorem reciprocalEulerProduct_over_prime_zero_norm (χ : U𝔽) (v : Pr
     rw [Valuation.IsUniformizer, h, map_zero] at h'
     exact (Units.ne_zero _) h'.symm
   rw [hv.localValue_eq π hπ, show (π : v.adicCompletion F) =
-    ((Units.mk0 _ hπ0 : (v.adicCompletion F)ˣ) : v.adicCompletion F) from rfl, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    ((Units.mk0 _ hπ0 : (v.adicCompletion F)ˣ) : v.adicCompletion F) from rfl,
+    HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
   change ‖(χ _ : ℂ) * (((ideleClassNorm F _ : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ)‖ = 1
   rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
 
@@ -224,7 +225,8 @@ private theorem reciprocalEulerProduct_over_prime_order_le_factor (χ : U𝔽) (
 
 /-- A reciprocal partial Euler product is analytic with zero order at most the number of
 places in it. -/
-private theorem reciprocalEulerProduct_over_prime_order_le_prod (χ : U𝔽) (T : Finset Primes) (s : ℂ) :
+private theorem reciprocalEulerProduct_over_prime_order_le_prod
+    (χ : U𝔽) (T : Finset Primes) (s : ℂ) :
     AnalyticAt ℂ (reciprocalPartialHeckeEulerProduct χ T) s ∧
       analyticOrderAt (reciprocalPartialHeckeEulerProduct χ T) s ≤ T.card := by
   classical
@@ -284,7 +286,8 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
   rw [reciprocalPartialHeckeEulerProduct, Finset.prod_congr rfl hfac, Finset.prod_const]
   congr 1
   obtain ⟨e, hev, he, hsurj⟩ := reciprocalEulerProduct_over_prime_order_le_map p S₀
-  rw [← Fintype.card_coe, Fintype.card_of_bijective ⟨he, hsurj hS₀⟩, ← reciprocalEulerProduct_over_prime_order_le_sum p,
+  rw [← Fintype.card_coe, Fintype.card_of_bijective ⟨he, hsurj hS₀⟩,
+    ← reciprocalEulerProduct_over_prime_order_le_sum p,
     Fintype.card_eq_sum_ones]
   refine Finset.sum_congr rfl fun q _ ↦ ?_
   obtain ⟨⟨w, hw⟩, rfl⟩ := hsurj hS₀ q
@@ -438,7 +441,8 @@ private theorem finiteHeckeEulerFactors_common_pole_subsingleton_norm (v : Prime
   simp
 
 /-- The rationals have a single prime above each nonzero prime of the integers. -/
-private theorem finiteHeckeEulerFactors_common_pole_subsingleton_unique (P : Ideal ℤ) [P.IsMaximal] (a b : HeightOneSpectrum (𝓞 ℚ))
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_unique
+    (P : Ideal ℤ) [P.IsMaximal] (a b : HeightOneSpectrum (𝓞 ℚ))
     (ha : a.asIdeal.under ℤ = P) (hb : b.asIdeal.under ℤ = P) : a = b := by
   have hsum := Ideal.sum_ramification_inertia_eq_finrank P (𝓞 ℚ)
   rw [RingOfIntegers.rank, Module.finrank_self] at hsum
@@ -455,7 +459,8 @@ private theorem finiteHeckeEulerFactors_common_pole_subsingleton_unique (P : Ide
   exact HeightOneSpectrum.ext (congrArg Subtype.val this)
 
 /-- Places with multiplicatively dependent absolute norms lie over the same rational prime. -/
-private theorem finiteHeckeEulerFactors_common_pole_subsingleton_eq (v w : Primes) {m n : ℕ} (hm : 0 < m) (_hn : 0 < n)
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_eq
+    (v w : Primes) {m n : ℕ} (hm : 0 < m) (_hn : 0 < n)
     (h : v.asIdeal.absNorm ^ m = w.asIdeal.absNorm ^ n) : v.under (𝓞 ℚ) = w.under (𝓞 ℚ) := by
   obtain ⟨ℓ, hℓ, hvP, f, hf, hvN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm v
   obtain ⟨ℓ', hℓ', hwP, g, hg, hwN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm w
@@ -473,10 +478,12 @@ private theorem finiteHeckeEulerFactors_common_pole_subsingleton_eq (v w : Prime
     rw [Ideal.under_under, hwP]
 
 /-- Any two poles of an unramified Euler factor differ by a multiple of `2πi / log q`. -/
-private theorem finiteHeckeEulerFactors_common_pole_subsingleton_pole (χ : U𝔽) (v : Primes) (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_pole
+    (χ : U𝔽) (v : Primes) (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v)
     {s : ℂ} (hs : meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0) :
     ∀ s' : ℂ, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s' < 0 →
-      ∃ k : ℤ, (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) * (s' - s) = k * (2 * Real.pi * Complex.I) := by
+      ∃ k : ℤ, (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) * (s' - s) =
+        k * (2 * Real.pi * Complex.I) := by
   classical
   have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
     exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
@@ -559,7 +566,8 @@ theorem finiteHeckeEulerFactors_common_pole_subsingleton
     apply Real.log_injOn_pos (Set.mem_Ioi.mpr (by positivity)) (Set.mem_Ioi.mpr (by positivity))
     rw [Real.log_pow, Real.log_pow]
     linarith
-  exact hp (finiteHeckeEulerFactors_common_pole_subsingleton_eq v.val w.val (Int.natAbs_pos.mpr hn0) (Int.natAbs_pos.mpr hm0)
+  exact hp (finiteHeckeEulerFactors_common_pole_subsingleton_eq v.val w.val
+    (Int.natAbs_pos.mpr hn0) (Int.natAbs_pos.mpr hm0)
     (by exact_mod_cast hpow))
 
 /-- Paper: Theorem 7.1.3.2(2)–(3), p. 324.
