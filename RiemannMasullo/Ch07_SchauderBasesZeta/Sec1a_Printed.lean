@@ -2,6 +2,11 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
 
+import Mathlib.Algebra.Field.ULift
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
+
 /-! # §7.1.1–7.1.2 Statements that are false as printed -/
 
 @[expose] public noncomputable section
@@ -123,6 +128,110 @@ def Printed.sLocalHomogeneousAdelicTheta_asymptotic : Prop :=
           (archSum g + finiteSum g))
         (fun g ↦ Real.rpow (normℝ g) A)
 
+/-- With no finite places and cutoff one half, the printed expansion has only its remainder. -/
+private theorem sLocalHomogeneousAdelicTheta_asymptotic_false_empty
+    (h : Printed.sLocalHomogeneousAdelicTheta_asymptotic.{u})
+    (F : Type u) [Field F] [NumberField F] (f : Tests(F, ∅)) :
+    let r (g : Jₛ(F, ∅)) : ℝ := (normₛ(F, ∅) g).val
+    IsBigO (comap r (𝓝[>] 0))
+      (sLocalHomogeneousAdelicTheta F ∅ (sLocalNormOneQuotientMeasure F ∅) 1 f : Jₛ(F, ∅) → ℂ)
+      (fun g ↦ r g ^ (1 / 2 : ℝ)) := by
+  classical
+  have H := h F ∅ 1 f (1 / 2) one_half_pos
+  extract_lets chart r ω term archPhase archSum phase places partialSum at H
+  obtain ⟨T, L, _, hlim, hO⟩ := H
+  have hL (g : Jₛ(F, ∅)) : L g = 0 := by
+    refine tendsto_nhds_unique ((hlim {g} isCompact_singleton).tendsto_at (mem_singleton g)) ?_
+    refine tendsto_const_nhds.congr fun n ↦ ?_
+    dsimp only [partialSum]
+    exact (Finset.sum_eq_zero fun v _ ↦ (Finset.notMem_empty _ v.val.property).elim).symm
+  have hm : Finset.Ioo 0 ⌈(1 / 2 : ℝ)⌉₊ = ∅ := by
+    have hceil : ⌈(1 / 2 : ℝ)⌉₊ ≤ 1 := Nat.ceil_le.mpr (by norm_num)
+    ext m
+    simp only [Finset.mem_Ioo, Finset.notMem_empty, iff_false]
+    omega
+  refine hO.congr_left fun g ↦ sub_eq_self.2 ?_
+  have ha : archSum g = 0 := by simp only [archSum, hm, Finset.sum_empty, Finset.sum_const_zero]
+  rw [ha, hL, add_zero]
+
+/-- At a single real place the pullback of the real Gaussian depends only on the idelic norm. -/
+private theorem sLocalHomogeneousAdelicTheta_asymptotic_false_gaussian
+    (F : Type u) [Field F] [NumberField F] [Unique (InfinitePlace F)]
+    (hw : (default : InfinitePlace F).IsReal) :
+    ∃ f : Tests(F, ∅), ∀ g : (SAdeleRing F ∅)ˣ, f (Multiplicative.ofAdd g.val) =
+      (Real.exp (-(((sIdeleNorm F ∅ g).val : ℝ) ^ 2)) : ℂ) := by
+  let w : InfinitePlace F := default
+  let j := InfinitePlace.Completion.isometryEquivRealOfIsReal hw
+  let e : SAdeleRing F ∅ ≃ₜ ℝ := ((Homeomorph.prodUnique _ _).trans
+    (Homeomorph.piUnique fun v : InfinitePlace F ↦ v.Completion)).trans j.toHomeomorph
+  let a : SAdeleRing F ∅ ≃+ ℝ :=
+    { e.toEquiv with
+      map_add' := fun x y ↦ map_add (InfinitePlace.Completion.ringEquivRealOfIsReal hw)
+        (x.1 w) (y.1 w) }
+  let E : Multiplicative (SAdeleRing F ∅) ≃ₜ* Multiplicative ℝ :=
+    { a.toMultiplicative with
+      continuous_toFun := e.continuous
+      continuous_invFun := e.symm.continuous }
+  have : T2Space (Multiplicative (SAdeleRing F ∅)) := e.isEmbedding.t2Space
+  have : LocallyCompactSpace (Multiplicative (SAdeleRing F ∅)) :=
+    e.isOpenEmbedding.locallyCompactSpace
+  have : T2Space (Multiplicative ℝ) := inferInstanceAs (T2Space ℝ)
+  have : LocallyCompactSpace (Multiplicative ℝ) := inferInstanceAs (LocallyCompactSpace ℝ)
+  obtain ⟨b, hb⟩ := exists_gaussian_schwartz (E := ℝ) 1 zero_lt_one
+  obtain ⟨T, hT⟩ := realSchwartzBruhat_equiv
+  refine ⟨⟨(T b).val ∘ E, schwartzBruhat_mem_comp_equiv E (T b).property⟩, fun g ↦ ?_⟩
+  change T b (Multiplicative.ofAdd (j (g.val.1 w))) = _
+  rw [hT, hb, neg_one_mul, j.isometry.norm_map_of_map_zero (map_zero
+    (InfinitePlace.Completion.ringEquivRealOfIsReal hw))]
+  rw [sIdeleNorm, Finset.univ_eq_empty (α := (∅ : Finset Places(F))), Finset.prod_empty,
+    mul_one, Fintype.prod_subsingleton _ w, hw.mult_eq_one, pow_one]
+  rfl
+
+/-- For a copy of ℚ the two unit translates of a radial Gaussian agree, and averaging
+over norm-one classes contributes the total Haar mass. -/
+private theorem sLocalHomogeneousAdelicTheta_asymptotic_false_average
+    (F : Type u) [Field F] [NumberField F] (e : F ≃+* ℚ) (f : Tests(F, ∅))
+    (hf : ∀ g : (SAdeleRing F ∅)ˣ, f (Multiplicative.ofAdd g.val) =
+      (Real.exp (-(((sIdeleNorm F ∅ g).val : ℝ) ^ 2)) : ℂ)) (g : Jₛ(F, ∅)) :
+    sLocalHomogeneousAdelicTheta F ∅ (sLocalNormOneQuotientMeasure F ∅) 1 f g =
+      ((sLocalNormOneQuotientMeasure F ∅).real univ : ℂ) *
+        (2 * (Real.exp (-(((normₛ(F, ∅) g).val : ℝ) ^ 2)) : ℂ)) := by
+  let φ (t : ℝ≥0ˣ) : ℂ := Real.exp (-((t.val : ℝ) ^ 2))
+  let U := (((∅ : Finset Places(F)) : Set Places(F)).integer F)ˣ
+  have hcard : Nat.card U = 2 := by
+    dsimp only [U]
+    rw [Finset.coe_empty, integer_empty]
+    let a := Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 F) F)
+    let b := (RingOfIntegers.mapRingEquiv e).trans Rat.ringOfIntegersEquiv
+    rw [Nat.card_congr (Units.mapEquiv (a.toRingEquiv.trans b).toMulEquiv).toEquiv,
+      Nat.card_eq_fintype_card, Fintype.card_units_int]
+  have hclass (x : Jₛ(F, ∅)) : sLocalAdelicThetaOnClasses F ∅ f x = 2 * φ (normₛ(F, ∅) x) := by
+    refine Quotient.inductionOn x fun y ↦ ?_
+    refine (sLocalAdelicThetaOnClasses_mk F ∅ f y).trans ((sLocalAdelicTheta_apply F ∅ f y).trans ?_)
+    calc
+      _ = ∑' _ : U, φ (sIdeleNorm F ∅ y) := by
+        apply tsum_congr
+        intro u
+        refine (hf (_ * y)).trans (congrArg φ ?_)
+        rw [map_mul, MonoidHom.comp_apply,
+          show sIdeleNorm F ∅ _ = 1 from (sIdeleNorm_spec F ∅).2 ⟨u, rfl⟩, one_mul]
+      _ = _ := by
+        rw [tsum_const, hcard, nsmul_eq_mul, Nat.cast_ofNat, sIdeleQuotientNorm_mk]
+  change (∫ h : (normₛ(F, ∅)).ker, sLocalAdelicThetaOnClasses F ∅ f (g * h.val) *
+    ((1 : PontryaginDual (normₛ(F, ∅)).ker) h : ℂ) ∂_) = _
+  have hker (h : (normₛ(F, ∅)).ker) : normₛ(F, ∅) h.val = 1 := h.property
+  simp only [hclass, map_mul, hker, mul_one, PontryaginDual.one_apply, Circle.coe_one,
+    integral_const, Complex.real_smul, φ]
+
+/-- Every type universe contains a number field isomorphic to ℚ. -/
+private theorem sLocalHomogeneousAdelicTheta_asymptotic_false_ratCopy :
+    ∃ (F : Type u) (_ : Field F) (_ : NumberField F), Nonempty (F ≃+* ℚ) := by
+  let e : ULift.{u} ℚ ≃+* ℚ := ULift.ringEquiv
+  have : CharZero (ULift.{u} ℚ) := RingHom.charZero e.toRingHom
+  have : FiniteDimensional ℚ (ULift.{u} ℚ) :=
+    Module.Finite.equiv e.toRatAlgEquiv.toLinearEquiv.symm
+  exact ⟨ULift.{u} ℚ, inferInstance, {}, ⟨e⟩⟩
+
 /-- Paper: Theorem 7.1.2.3, equation (7.1.2.3), p. 318.
 Over ℚ with only the real place, take the trivial character, `A = 1/2`, and a real
 Gaussian. Both sums are empty and theta has a positive limit at norm zero.
@@ -136,7 +245,32 @@ the printed logarithmic coefficient `-a₁`, whereas the inverse Mellin transfor
 coefficient `-a₋₂`. The ratio 2a₁/a₋₂ is the bump-weighted mean of
 (u + log 6)³/3, which exceeds one on (0,1). -/
 theorem Printed.sLocalHomogeneousAdelicTheta_asymptotic_false :
-    ¬ Printed.sLocalHomogeneousAdelicTheta_asymptotic := by sorry
+    ¬ Printed.sLocalHomogeneousAdelicTheta_asymptotic := by
+  classical
+  intro h
+  obtain ⟨F, _, _, ⟨e⟩⟩ := sLocalHomogeneousAdelicTheta_asymptotic_false_ratCopy
+  have hd : Module.finrank ℚ F = 1 :=
+    e.toRatAlgEquiv.toLinearEquiv.finrank_eq.trans (Module.finrank_self ℚ)
+  have hR := InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd
+  have hC := InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd
+  have : Subsingleton (InfinitePlace F) := Fintype.card_le_one_iff_subsingleton.mp
+    (by rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces, hR, hC])
+  obtain ⟨⟨w, hw⟩⟩ := Fintype.card_pos_iff.mp (show 0 < InfinitePlace.nrRealPlaces F by omega)
+  let : Unique (InfinitePlace F) := uniqueOfSubsingleton w
+  obtain ⟨f, hf⟩ := sLocalHomogeneousAdelicTheta_asymptotic_false_gaussian F hw
+  let r (g : Jₛ(F, ∅)) : ℝ := (normₛ(F, ∅) g).val
+  have hr : Ioi 0 ⊆ range r := by
+    intro t ht
+    obtain ⟨s, hs⟩ := sIdeleQuotientNorm_exists_section F ∅
+    let v : ℝ≥0ˣ := Units.mk0 ⟨t, ht.le⟩ (ne_of_gt (show (0 : ℝ≥0) < ⟨t, ht.le⟩ from ht))
+    exact ⟨s v, congrArg (fun v : ℝ≥0ˣ ↦ (v.val : ℝ)) (hs v)⟩
+  have : CompactSpace (normₛ(F, ∅)).ker := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F ∅).isCompact_preimage (isCompact_singleton (x := 1)))
+  have : IsFiniteMeasure (sLocalNormOneQuotientMeasure F ∅) := CompactSpace.isFiniteMeasure
+  exact sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_limit r hr _
+    (Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := sLocalNormOneQuotientMeasure F ∅)).ne') _
+    (sLocalHomogeneousAdelicTheta_asymptotic_false_average F e f hf)
+    (sLocalHomogeneousAdelicTheta_asymptotic_false_empty h F f)
 
 end Theta
 
