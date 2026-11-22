@@ -270,7 +270,13 @@ Over ℚ take χ = |·|^i and a nonzero nonnegative radial bump with log-norm
 support in (1/4,1/2). The selected gamma poles have parameters −i−2n, giving
 real diagonal values in any claimed derivative basis, by the product rule.
 The pole sum is real and the printed correction has strictly negative imaginary part. -/
-theorem Printed.archNuclearity_trace_false : ¬ Printed.archNuclearity_trace := by sorry
+theorem Printed.archNuclearity_trace_false : ¬ Printed.archNuclearity_trace := by
+  intro hall
+  apply Printed.archNuclearityJet_basis_false
+  intro F _ _ χ τ hτ
+  let φ : BruhatCompactSupport C[F] := ⟨0, (bruhatCompactSupportSubmodule C[F]).zero_mem⟩
+  have hφ : φ.val = (0 : C[F] → ℂ) := rfl
+  exact (hall F χ τ hτ φ (by rw [hφ, tsupport_zero]; exact empty_subset _)).1
 
 /-- Paper: Remark 7.4.3.3, p. 373.
 The remark asserts that the operator induced on the quotient is nonnuclear for
