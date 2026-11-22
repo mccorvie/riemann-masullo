@@ -195,6 +195,11 @@ def Printed.orbitalJets_not_subset_ball : Prop :=
 S₀ empty, and degree 2. The Euler product is one so the jet set is empty
 and is contained in every open ball. -/
 theorem Printed.orbitalJets_not_subset_ball_false :
-    ¬ Printed.orbitalJets_not_subset_ball := by sorry
+    ¬ Printed.orbitalJets_not_subset_ball := by
+  intro h
+  obtain ⟨C, _, _, hball⟩ := h ℚ 1 ∅ (by simp) 2 (by norm_num)
+  apply hball
+  intro t m hz
+  simp [reciprocalPartialHeckeEulerProduct] at hz
 
 end RiemannMasullo
