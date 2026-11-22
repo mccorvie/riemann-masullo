@@ -220,7 +220,17 @@ theorem adelicEigendistribution_descends (c : QuasiCharacter C𝔽) (T : D(ℬ(�
 The normalized adelic eigendistribution annihilates the global theta kernel,
 so its descent is a continuous linear quotient lift. -/
 theorem globalThetaKernel_le_eigendistribution (c : QuasiCharacter C𝔽) :
-    K𝔽 ≤ (adelicNormalizedEigendistribution c).ker := by sorry
+    K𝔽 ≤ (adelicNormalizedEigendistribution c).ker := by
+  have annihilates {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (T : StrongDual ℂ M)
+      (h : ∃ U : StrongDual ℂ (M ⧸ K), pull(K) U = T) : K ≤ T.ker := by
+    obtain ⟨U, rfl⟩ := h
+    intro f hf
+    change U (Submodule.Quotient.mk f) = 0
+    exact (congrArg U ((Submodule.Quotient.mk_eq_zero K).mpr hf)).trans (map_zero U)
+  exact annihilates (M := ℬ(𝔸[F])) (K𝔽) (adelicNormalizedEigendistribution (F := F) c)
+    (adelicEigendistribution_descends (F := F) c _
+      (existsUnique_adelicNormalizedEigendistribution (F := F) c).exists.choose_spec.1).exists
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 The generator on the global theta quotient is the continuous descent of the
