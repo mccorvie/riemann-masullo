@@ -228,7 +228,21 @@ convolution transported back along the isometric section of the quotient map. -/
 theorem spectralProjection_convolution_factor (φ : BruhatCompactSupport C𝔽) :
     (Pspec).comp (A(φ)) = ((Θ₀).orthogonal.subtypeL).comp
       ((Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap.comp
-        ((Aₛ(φ)).comp Qₐ)) := by sorry
+        ((Aₛ(φ)).comp Qₐ)) := by
+  let sectionMap : H₀ → W₀ := fun x ↦ ((Θ₀).quotientEquivOrthogonal x).val
+  have proj (w : W₀) : Pspec w = sectionMap ((Θ₀).mkQ w) := by
+    have hzero : (Θ₀).mkQ (Pgeom w) = 0 :=
+      (Submodule.Quotient.mk_eq_zero _).mpr ((Θ₀).starProjection_apply_mem w)
+    have hsame : (Θ₀).mkQ w = (Θ₀).mkQ (Pspec w) := calc
+      _ = (Θ₀).mkQ (Pgeom w + Pspec w) :=
+        congrArg (Θ₀).mkQ ((Θ₀).starProjection_add_starProjection_orthogonal w).symm
+      _ = _ := (map_add (Θ₀).mkQ _ _).trans (by rw [hzero, zero_add])
+    have hrep := (Θ₀).quotientEquivOrthogonal_mk (Pspec w) ((Θ₀).orthogonal.starProjection_apply_mem w)
+    exact (congrArg Subtype.val hrep).symm.trans (congrArg sectionMap hsame.symm)
+  apply ContinuousLinearMap.ext
+  intro u
+  exact (proj (A(φ) u)).trans (congrArg sectionMap
+    (spectralConvolution_mkQ (F := F) a (hStrip(hα)) hs φ u).symm)
 
 -- TODO(paper-gap): The printed unconditional assertion for 0 ≤ s ≤ 1 needs
 -- quotient nuclearity in that range. By (10.4.2.5) and Qₐ Sₐ = Id,
