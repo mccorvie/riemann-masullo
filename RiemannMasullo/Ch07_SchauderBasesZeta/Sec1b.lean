@@ -144,13 +144,121 @@ theorem reciprocalEulerProduct_over_prime_zero (χ : U𝔽) (S₀ : Finset Prime
   linear_combination -hn
 
 
+/-- The places over a rational prime in a finite set inject into the primes over it, and
+bijectively when the set contains all of them. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_map (p : RatPrimes) (T : Finset Primes) :
+    ∃ e : overₚ(T, p) → p.asIdeal.primesOver (𝓞 F), (∀ v, (e v).1 = v.1.asIdeal) ∧ Injective e ∧
+      ((∀ v : Primes, v.under (𝓞 ℚ) = p → v ∈ T) → Surjective e) := by
+  classical
+  refine ⟨fun v ↦ ⟨v.1.asIdeal, v.1.isPrime,
+    ⟨(congrArg HeightOneSpectrum.asIdeal (Finset.mem_filter.mp v.2).2).symm⟩⟩, fun _ ↦ rfl, ?_, ?_⟩
+  · intro a b h
+    exact Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+  · intro hT q
+    have hq0 : q.1 ≠ ⊥ := by
+      intro h
+      have := q.2.2.over
+      rw [h, Ideal.under_bot] at this
+      exact p.ne_bot this
+    let w : Primes := ⟨q.1, q.2.1, hq0⟩
+    have hw : w.under (𝓞 ℚ) = p := HeightOneSpectrum.ext q.2.2.over.symm
+    exact ⟨⟨w, Finset.mem_filter.mpr ⟨hT w hw, hw⟩⟩, rfl⟩
+
+/-- The fundamental identity for the places of `F` over a rational prime. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_sum (p : RatPrimes) :
+    ∑ q : p.asIdeal.primesOver (𝓞 F), q.1.ramificationIdx (𝓞 ℚ) * q.1.inertiaDeg (𝓞 ℚ) =
+      degree := by
+  rw [Ideal.sum_ramification_inertia_eq_finrank, IsFractionRing.finrank_eq (𝓞 ℚ) ℚ (𝓞 F) F]
+
+/-- A rational prime has at most `[F : ℚ]` primes of `F` above it. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_card_le (p : RatPrimes) :
+    Fintype.card (p.asIdeal.primesOver (𝓞 F)) ≤ degree := by
+  rw [← reciprocalEulerProduct_over_prime_order_le_sum p, Fintype.card_eq_sum_ones]
+  refine Finset.sum_le_sum fun q _ ↦ ?_
+  have := q.2.1
+  have := q.2.2
+  exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero
+    (Ideal.ramificationIdx_pos (𝓞 ℚ) q.1).ne' (Ideal.inertiaDeg_pos q.1 (𝓞 ℚ)).ne')
+
+/-- Each reciprocal finite Euler factor is entire with zeros of order at most one. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_factor (χ : U𝔽) (v : Primes) (s : ℂ) :
+    AnalyticAt ℂ (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) s ∧
+      analyticOrderAt (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) s ≤ 1 := by
+  classical
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · have hq1 : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+      exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    set L := Complex.log (v.asIdeal.absNorm : ℂ)
+    have hL : L ≠ 0 := by
+      simp only [L, ← Complex.natCast_log]
+      exact_mod_cast (Real.log_pos hq1).ne'
+    set a := (ideleClassNormTwist χ 0).localValue v
+    have hfun : (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) =
+        fun z ↦ 1 - a * Complex.exp (-(L * z)) := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv, Complex.cpow_def_of_ne_zero hN0]
+      congr 3
+      ring
+    rw [hfun]
+    refine ⟨by fun_prop, ?_⟩
+    by_cases h0 : 1 - a * Complex.exp (-(L * s)) = 0
+    · have hd : HasDerivAt (fun z ↦ 1 - a * Complex.exp (-(L * z)))
+          (-(a * (Complex.exp (-(L * s)) * -(L * 1)))) s :=
+        ((((hasDerivAt_id s).const_mul L).neg.cexp).const_mul a).const_sub 1
+      have ha : a ≠ 0 := by intro ha; rw [ha] at h0; simp at h0
+      exact (AnalyticAt.analyticOrderAt_eq_one_of_zero_deriv_ne_zero
+        (f := fun z ↦ 1 - a * Complex.exp (-(L * z))) (by fun_prop) h0
+        (by rw [hd.deriv]; simp [ha, hL, Complex.exp_ne_zero])).le
+    · rw [(analyticOrderAt_eq_zero (f := fun z ↦ 1 - a * Complex.exp (-(L * z))) (z₀ := s)).mpr
+        (Or.inr h0)]
+      exact zero_le_one
+  · have hfun : (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) = fun _ ↦ 1 := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_right hv, inv_one]
+    rw [hfun]
+    refine ⟨analyticAt_const, ?_⟩
+    rw [(analyticOrderAt_eq_zero (f := fun _ : ℂ ↦ (1 : ℂ)) (z₀ := s)).mpr (Or.inr one_ne_zero)]
+    exact zero_le_one
+
+/-- A reciprocal partial Euler product is analytic with zero order at most the number of
+places in it. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_prod (χ : U𝔽) (T : Finset Primes) (s : ℂ) :
+    AnalyticAt ℂ (reciprocalPartialHeckeEulerProduct χ T) s ∧
+      analyticOrderAt (reciprocalPartialHeckeEulerProduct χ T) s ≤ T.card := by
+  classical
+  induction T using Finset.induction with
+  | empty =>
+    have : reciprocalPartialHeckeEulerProduct χ ∅ = fun _ ↦ 1 := by
+      funext z; simp [reciprocalPartialHeckeEulerProduct]
+    rw [this, (analyticOrderAt_eq_zero (f := fun _ : ℂ ↦ (1 : ℂ)) (z₀ := s)).mpr
+      (Or.inr one_ne_zero)]
+    exact ⟨analyticAt_const, by simp⟩
+  | insert v T hvT ih =>
+    have hsplit : reciprocalPartialHeckeEulerProduct χ (insert v T) =
+        (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) * reciprocalPartialHeckeEulerProduct χ T := by
+      funext z
+      simp [reciprocalPartialHeckeEulerProduct, Finset.prod_insert hvT]
+    obtain ⟨hfa, hfo⟩ := reciprocalEulerProduct_over_prime_order_le_factor χ v s
+    rw [hsplit, analyticOrderAt_mul hfa ih.1, Finset.card_insert_of_notMem hvT]
+    refine ⟨hfa.mul ih.1, ?_⟩
+    push_cast
+    rw [add_comm]
+    exact add_le_add ih.2 hfo
+
 /-- Paper: Remark 7.1.3.1, p. 323.
 The zero multiplicity of a reciprocal Euler product over a single rational prime is
 bounded by the degree of the number field. -/
 theorem reciprocalEulerProduct_over_prime_order_le (χ : U𝔽) (S₀ : Finset Primes)
     (p : RatPrimes) (s : ℂ) :
     analyticOrderAt (reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p)) s ≤
-      (degree : ℕ∞) := by sorry
+      (degree : ℕ∞) := by
+  obtain ⟨e, -, he, -⟩ := reciprocalEulerProduct_over_prime_order_le_map p S₀
+  refine (reciprocalEulerProduct_over_prime_order_le_prod χ _ s).2.trans ?_
+  have h1 := Fintype.card_le_of_injective e he
+  rw [Fintype.card_coe] at h1
+  exact_mod_cast h1.trans (reciprocalEulerProduct_over_prime_order_le_card_le p)
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 At a completely split rational prime, the product of the reciprocal unramified factors
@@ -162,7 +270,26 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
       (ideleClassNormTwist χ 0).IsUnramifiedAt v ∧ (ideleClassNormTwist χ 0).localValue v = 1)
     (s : ℂ) :
     reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
-      (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ degree := by sorry
+      (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ degree := by
+  classical
+  have hfac : ∀ v ∈ overₚ(S₀, p),
+      (finiteHeckeEulerFactor χ v s)⁻¹ = 1 - (p.asIdeal.absNorm : ℂ) ^ (-s) := by
+    intro v hv
+    have hvp := (Finset.mem_filter.mp hv).2
+    obtain ⟨hun, h1⟩ := hχ v hvp
+    have hN : v.asIdeal.absNorm = p.asIdeal.absNorm := by
+      have : v.asIdeal.LiesOver p.asIdeal := ⟨(congrArg HeightOneSpectrum.asIdeal hvp).symm⟩
+      rw [← Ideal.absNorm_pow_inertiaDeg p.asIdeal v.asIdeal, (hp v hvp).2, pow_one]
+    rw [finiteHeckeEulerFactor, ite_eq_left hun, inv_inv, h1, one_mul, hN]
+  rw [reciprocalPartialHeckeEulerProduct, Finset.prod_congr rfl hfac, Finset.prod_const]
+  congr 1
+  obtain ⟨e, hev, he, hsurj⟩ := reciprocalEulerProduct_over_prime_order_le_map p S₀
+  rw [← Fintype.card_coe, Fintype.card_of_bijective ⟨he, hsurj hS₀⟩, ← reciprocalEulerProduct_over_prime_order_le_sum p,
+    Fintype.card_eq_sum_ones]
+  refine Finset.sum_congr rfl fun q _ ↦ ?_
+  obtain ⟨⟨w, hw⟩, rfl⟩ := hsurj hS₀ q
+  obtain ⟨he1, hf1⟩ := hp w (Finset.mem_filter.mp hw).2
+  rw [hev, he1, hf1]
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 There are infinitely many completely split rational primes at which the character
