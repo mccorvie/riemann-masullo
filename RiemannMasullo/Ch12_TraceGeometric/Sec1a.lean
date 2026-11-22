@@ -131,7 +131,39 @@ theorem integralKernelOperator_mul_dSequenceKernelSmoothening (ρ : Lp ℂ ∞ �
       (integralKernelOperator ν K).val = Mρ * (integralKernelOperator ν k).val ∧
         (K : G × G → ℂ) =ᵐ[ν.prod ν] (fun p ↦ ρ p.1 * κ p) ∧
         (K : G × G → ℂ) =ᵐ[ν.prod ν] (fun p ↦ ρ p.1 * dSequenceKernelSmoothening μ U κ p) :=
-  by sorry
+  by
+  intro Mρ
+  let a : G × G → ℂ := fun p ↦ ρ p.1
+  have ha : MemLp a ∞ (ν.prod ν) := by
+    have hmρ := Lp.aestronglyMeasurable ρ
+    have hm : AEStronglyMeasurable a (ν.prod ν) := hmρ.comp_fst
+    rw [memLp_iff, eLpNorm_exponent_top hm, eLpNormEssSup_lt_top_iff_isBoundedUnder]
+    have hb := (Lp.memLp ρ).eLpNorm_lt_top
+    rw [eLpNorm_exponent_top hmρ, eLpNormEssSup_lt_top_iff_isBoundedUnder] at hb
+    obtain ⟨C, hC⟩ := hb
+    exact ⟨C, Measure.quasiMeasurePreserving_fst.ae hC⟩
+  let b : G × G → ℂ := fun p ↦ a p * k p
+  have hb : MemLp b 2 (ν.prod ν) := ha.mul (Lp.memLp k)
+  let K := hb.toLp b
+  have hK : (K : G × G → ℂ) =ᵐ[ν.prod ν] b := hb.coeFn_toLp
+  refine ⟨K, ?_, ?_, ?_⟩
+  · ext1 g
+    apply Lp.ext
+    have hM : ⇑(Mρ ((integralKernelOperator ν k).val g)) =ᵐ[ν]
+        fun x ↦ ρ x * ((integralKernelOperator ν k).val g) x :=
+      (ContinuousLinearMap.mul ℂ ℂ).coeFn_holder (r := 2) ρ _
+    filter_upwards [integralKernelOperator_apply ν K g, integralKernelOperator_apply ν k g,
+      Measure.ae_ae_of_ae_prod hK, hM] with x hx hx' hrow hmult
+    change (integralKernelOperator ν K).val g x = Mρ ((integralKernelOperator ν k).val g) x
+    rw [hx.2, hmult, hx'.2, ← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards [hrow] with y hy
+    exact (congrArg (· * g y) hy).trans (mul_assoc _ _ _)
+  · filter_upwards [hK, hκ] with p hp hrep
+    exact hp.trans (congrArg (ρ p.1 * ·) hrep.symm)
+  · filter_upwards [hK, dSequenceKernelSmoothening_ae_eq hκ hU hBorel hf hf_pos hν hT]
+      with p hp hs
+    exact hp.trans (congrArg (ρ p.1 * ·) hs.symm)
 
 /-- Paper: Theorem 12.1.1.2(2), p. 499. The weighted integral of the
 smoothened diagonal against an essentially bounded symbol equals the trace
