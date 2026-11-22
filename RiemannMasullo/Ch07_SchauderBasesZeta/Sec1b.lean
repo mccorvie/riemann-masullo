@@ -381,7 +381,25 @@ def entireJetSpace (ρ : ℂ) (n : ℕ) : Submodule ℂ (StrongDual ℂ Entire) 
 There are exactly n independent jet coordinates at a point for order n.
 Deviation: States the dimension check for the span used in the definition. -/
 theorem entireJetSpace_finrank (ρ : ℂ) (n : ℕ) :
-    Module.finrank ℂ (entireJetSpace ρ n) = n := by sorry
+    Module.finrank ℂ (entireJetSpace ρ n) = n := by
+  classical
+  let J (i : Fin n) := entireJet ρ i.val
+  have hJ : LinearIndependent ℂ J := by
+    apply Fintype.linearIndependent_iff.mpr
+    intro c hc i
+    let p : Entire := ⟨⟨fun z ↦ (z - ρ) ^ i.val, by fun_prop⟩,
+      (differentiable_id.sub (differentiable_const ρ)).pow _⟩
+    have hp (j : Fin n) : J j p = if j = i then (i.val.factorial : ℂ) else 0 := by
+      change iteratedDeriv j.val (fun z : ℂ ↦ (z - ρ) ^ i.val) ρ = _
+      simp only [iteratedDeriv_comp_sub_const (f := fun z : ℂ ↦ z ^ i.val), sub_self,
+        iteratedDeriv_fun_pow_zero, Fin.val_inj, apply_ite Nat.cast, Nat.cast_zero]
+    have h := congrArg (fun ℓ : StrongDual ℂ Entire ↦ ℓ p) hc
+    simp only [sum_apply, smul_apply,
+      hp, zero_apply, smul_eq_mul, mul_ite, mul_zero,
+      Finset.sum_ite_eq', Finset.mem_univ, ite_true] at h
+    exact (mul_eq_zero.mp h).resolve_right (by exact_mod_cast Nat.factorial_ne_zero i.val)
+  change Module.finrank ℂ (Submodule.span ℂ (range J)) = n
+  exact (finrank_span_eq_card hJ).trans (Fintype.card_fin n)
 
 /-- Paper: Theorem 7.1.4.2(1), p. 326.
 The annihilator of a principal ideal consists of the continuous linear functionals
