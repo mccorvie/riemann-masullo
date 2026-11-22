@@ -522,7 +522,52 @@ theorem kroneckerWeyl_continuous_symmetric [NeZero N] (τ : Fin N → ℝ)
     (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
     (u : C(torusFlowClosure τ, ℂ)) :
     Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ • ∫ t in -T..T, u (torusFlowInClosure τ t))
-      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
+      atTop (𝓝 (∫ x, u x ∂μ)) := by
+  classical
+  have hce : Topology.IsClosedEmbedding ((↑) : torusFlowClosure τ → UnitAddTorus (Fin N)) :=
+    (AddSubgroup.isClosed_topologicalClosure _).isClosedEmbedding_subtypeVal
+  obtain ⟨φ, hφ⟩ := u.exists_extension' hce
+  have hu (x : torusFlowClosure τ) : u x = φ x := (congrFun hφ x).symm
+  have hII (φ : C(UnitAddTorus (Fin N), ℂ)) (a b : ℝ) :
+      IntervalIntegrable (fun t ↦ φ (torusFlow τ t)) volume a b :=
+    (φ.continuous.comp (torusFlow τ).continuous).intervalIntegrable _ _
+  let A : ℝ → C(UnitAddTorus (Fin N), ℂ) → ℂ :=
+    fun T φ ↦ (2 * T : ℂ)⁻¹ * ∫ t in -T..T, φ (torusFlow τ t)
+  have key := tendsto_of_mFourier τ μ A
+    (fun T φ ψ ↦ by
+      simp only [A, ContinuousMap.add_apply, intervalIntegral.integral_add (hII φ (-T) T)
+        (hII ψ (-T) T), mul_add])
+    (fun T a φ ↦ by
+      simp only [A, ContinuousMap.smul_apply, smul_eq_mul, intervalIntegral.integral_const_mul]
+      ring)
+    (fun T φ ↦ by
+      rcases eq_or_ne T 0 with rfl | hT
+      · simp [A]
+      simp only [A]
+      rw [show (2 * T : ℂ) = ((2 * T : ℝ) : ℂ) by push_cast; ring, norm_mul, norm_inv,
+        Complex.norm_real, Real.norm_eq_abs]
+      calc |2 * T|⁻¹ * ‖∫ t in -T..T, φ (torusFlow τ t)‖ ≤ |2 * T|⁻¹ * (‖φ‖ * |T - -T|) := by
+            gcongr
+            exact intervalIntegral.norm_integral_le_of_norm_le_const fun t _ ↦
+              φ.norm_coe_le_norm _
+        _ = ‖φ‖ := by
+          rw [show T - -T = 2 * T by ring]
+          field_simp [abs_ne_zero.mpr (mul_ne_zero two_ne_zero hT)])
+    (fun n ↦ by
+      rw [integral_mFourier_torusFlowClosure]
+      split_ifs with hc
+      · refine tendsto_const_nhds.congr' ((eventually_ne_atTop 0).mono fun T hT ↦ ?_)
+        have hT' : (T : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hT
+        simp [A, mFourier_torusFlow, hc]
+        field_simp
+        ring
+      · simp only [A, mFourier_torusFlow]
+        exact tendsto_symmAverage_exp hc) φ
+  simp only [hu]
+  convert key using 2 with T
+  simp only [A, Complex.real_smul]
+  push_cast
+  rfl
 
 /-- Paper: Theorem B.5.2.1(2), p. 627.
 Forward time averages of a continuous observable converge to its Haar probability integral.
