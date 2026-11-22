@@ -38,7 +38,9 @@ circle-valued character recovers the original Mathlib character. -/
 theorem ideleClassNormTwist_unitaryHeckeCharacter_zero (χ : HeckeCharacter (𝓞 K) K)
     (hχ : ∀ x, ‖χ x‖ = 1) :
     ideleClassNormTwist (unitaryHeckeCharacterToPontryaginDual χ hχ) 0 = χ := by
-  sorry
+  ext1 x
+  change χ x * (_ : ℂ) ^ (0 : ℂ) = χ x
+  rw [Complex.cpow_zero, mul_one]
 
 /-- The finite idelic Hecke L-function agrees with Mathlib's Hecke L-series
 on the half-plane of absolute convergence. -/
