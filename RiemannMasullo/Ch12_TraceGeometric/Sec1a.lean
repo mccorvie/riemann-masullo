@@ -196,7 +196,14 @@ complex conjugate gives the squared L² norm. -/
 theorem weightedL2Duality_conj (μ : Measure G) (u v : Lp ℂ 2 μ)
     (hv : (v : G → ℂ) =ᵐ[μ] fun x ↦ conj (u x)) :
     weightedL2Duality μ (f := fun _ ↦ 1) measurable_const (fun _ ↦ zero_lt_one)
-      (by simp) (by simp) u v = (‖u‖ ^ 2 : ℝ) := by sorry
+      (by simp) (by simp) u v = (‖u‖ ^ 2 : ℝ) := by
+  calc
+    _ = ∫ x, inner ℂ (u x) (u x) ∂μ := by
+      apply integral_congr_ae
+      filter_upwards [hv] with x hx
+      rw [hx, RCLike.inner_apply]
+    _ = inner ℂ u u := (L2.inner_def u u).symm
+    _ = _ := by simp [inner_self_eq_norm_sq_to_K]
 
 /-- Paper: (12.1.1.4)–(12.1.1.5), p. 499. Each continuous linear functional on
 the weighted L² space has a unique representing vector for the reciprocal weight.
