@@ -159,7 +159,17 @@ theorem LFunction_eq_zero_re_of_isPrimitive :
 character has real part zero. -/
 theorem dirichletEulerFactor_zero_re_eq_zero {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N)
     {p : ℕ} (hp : p.Prime) {s : ℂ} (hz : 1 - χ p * (p : ℂ) ^ (-s) = 0) : s.re = 0 := by
-  sorry
+  have he := (sub_eq_zero.mp hz).symm
+  have hc : χ (p : ZMod N) ≠ 0 := fun hc ↦ by simp [hc] at he
+  have hu := MulChar.apply_ne_zero_iff.mp hc
+  have hn : ‖χ (p : ZMod N)‖ = 1 := χ.unit_norm_eq_one hu.unit
+  have hp₁ : (1 : ℝ) < p := by exact_mod_cast hp.one_lt
+  have hpow := congrArg norm he
+  rw [norm_mul, hn, one_mul, norm_one, ← Complex.ofReal_natCast,
+    Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hp₁), Complex.neg_re] at hpow
+  have hneg := (Real.rpow_right_inj (zero_lt_one.trans hp₁) hp₁.ne').mp
+    (hpow.trans (Real.rpow_zero (p : ℝ)).symm)
+  exact neg_eq_zero.mp hneg
 
 /-- The omitted Euler factors of an imprimitive character have no zeros in
 the open critical strip. The zeros there lie on the critical line. -/
