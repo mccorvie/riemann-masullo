@@ -39,22 +39,6 @@ theorem Printed.globalThetaPolarValues_eq_eigendistributions_false :
     ¬ Printed.globalThetaPolarValues_eq_eigendistributions := by
   sorry
 
-/-- Paper: Remark 5.5.2.2, p. 281.
-The pointwise reading of “indeed, this series diverges” asserts divergence for every
-global test function after evaluating its translates by nonzero field elements at zero.
-The series of functionals itself diverges, as one sees by testing on a function nonzero at zero.
-`summable_globalZeroEval_orbit_iff` gives the condition for convergence. See ERRATA F66. -/
-def Printed.globalZeroEval_orbit_diverges : Prop :=
-  ∀ (F : Type) [Field F] [NumberField F] (f : SchwartzBruhat (Multiplicative 𝔸[F])),
-    ¬ Summable (fun a : Fˣ ↦ f (Multiplicative.ofAdd
-      ((algebraMap F 𝔸[F]) ((a⁻¹ : Fˣ) : F) * 0)))
-
-/-- Paper: Remark 5.5.2.2, p. 281.
-Take `F = ℚ` and the zero Schwartz–Bruhat test. Every summand is zero, so the family
-is summable with sum zero. The same holds for any test vanishing at the zero adele. -/
-theorem Printed.globalZeroEval_orbit_diverges_false : ¬ Printed.globalZeroEval_orbit_diverges := by
-  sorry
-
 /-- Paper: Remark 5.5.3.3, p. 285.
 As printed: if the weights range over a connected set containing an interval with
 nonempty one-dimensional interior, the corresponding eigendistributions have trivial
