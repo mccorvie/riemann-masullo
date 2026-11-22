@@ -543,7 +543,17 @@ The archimedean polar quotient is nuclear. -/
 theorem sLocalGammaOrbitalQuotient_nuclear (ω : PontryaginDual J₁(S)) :
     let P := Γker(ω)
     @IsNuclearTVS _ (Submodule.Quotient.addCommGroup P) (Submodule.Quotient.module P)
-      (QuotientModule.Quotient.topologicalSpace P) := by sorry
+      (QuotientModule.Quotient.topologicalSpace P) := by
+  intro P
+  have hR := isNuclearTVS_submodule
+    (sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) ω) (fullPV(ω))
+  let := hR.2.1
+  let : IsTopologicalAddGroup (fullPV(ω)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have hP : IsClosed (P : Set (fullPV(ω))) :=
+    (sLocalThetaPoleBound_isClosed (F := F) (S := S) ω (fun _ ↦ 0)).preimage continuous_subtype_val
+  let : T3Space (fullPV(ω) ⧸ P) := Submodule.t3_quotient_of_isClosed P
+  let : T2Space (fullPV(ω) ⧸ P) := @T25Space.t2Space _ _ T3Space.t25Space
+  exact isNuclearTVS_quotient hR P
 
 /-- Paper: Notation 7.3.4.1, p. 364.
 Increasing all local cutoffs decreases the corresponding subspace.
