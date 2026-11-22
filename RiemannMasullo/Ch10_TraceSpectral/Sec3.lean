@@ -502,7 +502,29 @@ theorem spectralStripConvolution_trace_distribution {α s : ℝ} (hα : 0 ≤ α
     ∃ D : StrongDual ℂ (BruhatCompactSupport C𝔽),
       ∀ (φ : BruhatCompactSupport C𝔽) (T : nuclearEndomorphisms H),
         T.val = spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ →
-        D φ = hilbertTrace (H := H) T := by sorry
+        D φ = hilbertTrace (H := H) T := by
+  have traceDistribution {X : Type _} {H : Type _} [AddCommGroup X] [Module ℂ X]
+      [TopologicalSpace X] [IsTopologicalAddGroup X] [NormedAddCommGroup H]
+      [InnerProductSpace ℂ H] [CompleteSpace H] (A : X → H →L[ℂ] H)
+      (h : ∃ T : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (T x).val = A x) ∧
+        Tendsto (fun x : X ↦ traceNorm (H := H) (T x)) (𝓝 0) (𝓝 0)) :
+      ∃ D : StrongDual ℂ X, ∀ (x : X) (U : nuclearEndomorphisms H),
+        U.val = A x → D x = hilbertTrace U := by
+    obtain ⟨T, hT, ht⟩ := h
+    obtain ⟨L, hL⟩ := hilbertTrace_linear (H := H)
+    let D : X →ₗ[ℂ] ℂ := L.comp T
+    have hb (x : X) : ‖D x‖ ≤ traceNorm (T x) :=
+      (congrArg (fun c : ℂ ↦ ‖c‖) (hL (T x))).le.trans (norm_hilbertTrace_le (T x))
+    have hd : Continuous D := continuous_of_continuousAt_zero D <| by
+      change Tendsto D (𝓝 0) (𝓝 (D 0))
+      rw [D.map_zero]
+      exact squeeze_zero_norm hb ht
+    refine ⟨⟨D, hd⟩, fun x U hU ↦ ?_⟩
+    have heq : T x = U := Subtype.ext ((hT x).trans hU.symm)
+    exact (hL (T x)).trans (congrArg (hilbertTrace (H := H)) heq)
+  exact traceDistribution (X := BruhatCompactSupport C𝔽) (H := Q(a, hStrip(hα), hs₀(hs)))
+    (spectralConvolution (F := F) a hStrip(hα) hs₀(hs))
+    (spectralStripConvolution_traceNorm_continuous (F := F) a hα hs)
 
 /-- Paper: Theorem 10.3.2.1(2) and (10.3.2.3)–(10.3.2.4), p. 454. The trace
 is the absolutely convergent sum of the Mellin values at the strip zeros with
