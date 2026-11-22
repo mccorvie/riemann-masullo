@@ -81,7 +81,13 @@ def IsStronglyNuclearOperator {E : Type*} [AddCommGroup E] [Module ℂ E] [Unifo
 Every continuous rank-one operator is of order zero. -/
 theorem isStronglyNuclearOperator_rankOne {E : Type*} [AddCommGroup E] [Module ℂ E]
     [UniformSpace E] [IsUniformAddGroup E] [PolynormableSpace ℂ E] [T2Space E]
-    (ℓ : StrongDual ℂ E) (x : E) : IsStronglyNuclearOperator (ℓ.smulRight x) := by sorry
+    (ℓ : StrongDual ℂ E) (x : E) : IsStronglyNuclearOperator (ℓ.smulRight x) := by
+  obtain ⟨r, hr, _, _, htail⟩ := nuclearPresentation_smulRight ℓ x 1 one_ne_zero
+  refine ⟨r, fun k ↦ ⟨1, ?_⟩⟩
+  intro n
+  cases n with
+  | zero => simp [hr]
+  | succ n => simp [htail n]
 
 section Spectral
 
