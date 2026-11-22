@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+
 /-!
 # General convergence criteria for adelic theta
 
@@ -229,7 +231,12 @@ theorem tendsto_adelicTheta_of_dominated
 -- The citation to part (1) of Lemma A.2.2.9 has no such numbered part.
 /-- Paper: Discussion preceding Corollary 11.1.1.5, p. 478. The section
 times the idelic fundamental domain is Borel. -/
-theorem measurableSet_normSection_fundamentalDomain : MeasurableSet TE₁ := by sorry
+theorem measurableSet_normSection_fundamentalDomain : MeasurableSet TE₁ := by
+  let : BorelSpace 𝕀[F] := ⟨rfl⟩
+  change MeasurableSet (e.toEquiv '' ((univ : Set ℝ≥0ˣ) ×ˢ E₁))
+  rw [e.toEquiv.image_eq_preimage_symm, univ_prod]
+  exact (measurableSet_ideleFundamentalDomain F v₀ σ b rep).preimage
+    (continuous_snd.comp e.symm.continuous).measurable
 
 local notation "classOfNormOne" => fun h : N[F] ↦
   (Subtype.mk (classOf (Subtype.val h)) (Subtype.property h) : C₁[F])
