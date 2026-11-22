@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.UniformSpace.CompactConvergence
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-!
 # Topological spaces of adelic theta functions and idelic Z-functions
@@ -385,12 +386,14 @@ theorem sLocalThetaToZ_isQuotientMap :
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is locally convex. -/
 theorem globalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (GlobalAdelicThetaSpace F) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬ𝔽 := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The S-local theta quotient is locally convex. -/
 theorem sLocalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬₛ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is Hausdorff if the global theta kernel is closed. -/
@@ -488,9 +491,46 @@ theorem adelicTheta_ker_isClosed : IsClosed (LinearMap.ker theta𝔽 : Set ℬ�
   exact (congrArg (IsClosed (X := ℬ𝔽)) hker).mp
     (isClosed_iInter fun c ↦ isClosed_singleton.preimage (adelicTheta_eval_continuous c))
 
+/-- On a barrelled Schwartz–Bruhat space, a functional that is the sum of the values of
+the test function at countably many points is continuous, by the Banach–Steinhaus theorem
+applied to the finite partial sums of point evaluations. -/
+private theorem schwartzBruhat_continuous_of_hasSum {G ι : Type*} [CommGroup G]
+    [TopologicalSpace G] [Countable ι] [BarrelledSpace ℂ (SchwartzBruhat G)]
+    (pt : ι → G) (φ : SchwartzBruhat G → ℂ)
+    (h : ∀ f : SchwartzBruhat G, HasSum (fun i ↦ f (pt i)) (φ f)) :
+    Continuous φ := by
+  let ev (i : ι) : SchwartzBruhat G →L[ℂ] ℂ :=
+    ⟨(LinearMap.proj (pt i)).comp (schwartzBruhatSubmodule _).subtype,
+      schwartzBruhat_eval_continuous (pt i)⟩
+  let L (s : Finset ι) : SchwartzBruhat G →L[ℂ] ℂ := ∑ i ∈ s, ev i
+  have hL (s : Finset ι) (f : SchwartzBruhat G) : L s f = ∑ i ∈ s, f (pt i) := by
+    simp only [L, ContinuousLinearMap.coe_sum', Finset.sum_apply]
+    rfl
+  have hT : Filter.Tendsto (fun s f ↦ L s f) Filter.atTop (𝓝 φ) :=
+    tendsto_pi_nhds.mpr fun f ↦ by
+      simp only [hL]
+      exact h f
+  exact (continuousLinearMapOfTendsto L hT).continuous
+
 /-- Paper: Theorem 5.1.1.3(1), p. 224.
 The S-local theta kernel is a closed subspace of the S-local Schwartz–Bruhat space. -/
-theorem sLocalAdelicTheta_ker_isClosed : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ) := by sorry
+theorem sLocalAdelicTheta_ker_isClosed : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ) := by
+  let : BarrelledSpace ℂ ℬₛ := (sAdeleSchwartz_montel (F := F) S).1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ :=
+    Units.val_injective.countable
+  have hcont (g : (SAdeleRing F S)ˣ) : Continuous (fun f : ℬₛ ↦ thetaₛ f g) :=
+    schwartzBruhat_continuous_of_hasSum _ _ fun f ↦
+      (sLocalAdelicTheta_hasSumUniformlyOn F S f {g} isCompact_singleton).hasSum rfl
+  have hker : (⋂ g : (SAdeleRing F S)ˣ, (fun f : ℬₛ ↦ thetaₛ f g) ⁻¹' {0}) =
+      (LinearMap.ker thetaₛ : Set ℬₛ) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h,
+      fun h g ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬₛ)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
 local notation "homogeneousTheta𝔽" =>
   fun ω : PontryaginDual (MonoidHom.ker m𝔽) ↦

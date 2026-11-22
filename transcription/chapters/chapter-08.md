@@ -322,13 +322,13 @@ equipped with the respective subspace topologies.
 
 We begin by describing the topology on $D^1_{F,S}$ and $D^1_F$.
 
-LEMMA 8.2.0.3. Let $F$ be a number field, $S$ a finite set of places of $F$ containing the Archimedean places. Then:
+LEMMA 8.2.0.3. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing the Archimedean places. Then:*
 
-(1) The subspace topology on $D^1_{F,S}$ inherited from $\mathbf A_{F,S}$ agrees with the quotient topology inherited from the product topology on $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}$ under the continuous surjective map $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}\to D^1_{F,S}$.
+(1) *The subspace topology on $D^1_{F,S}$ inherited from $\mathbf A_{F,S}$ agrees with the quotient topology inherited from the product topology on $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}$ under the continuous surjective map $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}\to D^1_{F,S}$.*
 
-(2) The subspace topology on $D^1_F$ inherited from $\mathbf A_F$ agrees with the quotient topology inherited from the product topology on $\mathrm{GL}_1(\mathbf A_F)^1\times Z_F$ under the continuous surjective map $\mathrm{GL}_1(\mathbf A_F)^1\times Z_F\to D^1_F$.
+(2) *The subspace topology on $D^1_F$ inherited from $\mathbf A_F$ agrees with the quotient topology inherited from the product topology on $\mathrm{GL}_1(\mathbf A_F)^1\times Z_F$ under the continuous surjective map $\mathrm{GL}_1(\mathbf A_F)^1\times Z_F\to D^1_F$.*
 
-Both $D^1_{F,S}$ and $D^1_F$ are Hausdorff, metrizable, second-countable, perfectly normal, separable, locally compact, $\sigma$-compact and paracompact.
+*Both $D^1_{F,S}$ and $D^1_F$ are Hausdorff, metrizable, second-countable, perfectly normal, separable, locally compact, $\sigma$-compact and paracompact.*
 
 PROOF. (1) : The map $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}\to D^1_{F,S}$ is continuous and surjective. The pre-images in $\mathrm{GL}_1(\mathbf A_{F,S})^1\times Z_{F,S}$ of $D^1_{S,1}$ and $D^1_{S,v}$ are, for each $v\in S$, $\mathrm{GL}_1(\mathbf A_{F,S})^1\times\{1\}$ and $\mathrm{GL}_1(\mathbf A_{F,S})^1\times\{e_v\}$, respectively.
 
@@ -352,39 +352,39 @@ Since $\{D^1_v\}_{v\in\Sigma_F}\cup\{D^1_1\}$ is a locally finite cover of $D^1_
 
 $D^1_{F,S}$ and $D^1_F$ are Hausdorff, metrizable and second-countable, since they are subspaces of $\mathbf A_{F,S}$, respectively $\mathbf A_F$, both Hausdorff, metrizable and second-countable. They are therefore separable, perfectly normal and paracompact. They are countable unions of Hausdorff quotients of $\mathrm{GL}_1(\mathbf A_{F,S})^1$, respectively $\mathrm{GL}_1(\mathbf A_F)^1$, and they are therefore $\sigma$-compact, since $\mathrm{GL}_1(\mathbf A_{F,S})^1$ and $\mathrm{GL}_1(\mathbf A_F)^1$ both are. Since each point $x$ of $D^1_{F,S}$, respectively $D^1_F$, is contained in some $D^1_{S,1}$, $D^1_{S,v}$, $D^1_1$, or $D^1_v$, respectively, and each of these is a locally compact space, then $x$ has a compact neighborhood, and since $D^1_{F,S}$ and $D^1_F$ are Hausdorff, they are locally compact and $\sigma$-compact. $\square$
 
-PROPOSITION 8.2.0.4. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\tau_S:\mathbf R_{>0}\to\mathrm{GL}_1(\mathbf A_{F,S})$ be a choice of continuous homomorphic section to the $S$-idelic norm, and $\tau:\mathbf R_{>0}\to\mathrm{GL}_1(\mathbf A_F)$ a choice of continuous homomorphic section to the idelic norm.
+PROPOSITION 8.2.0.4. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\tau_S:\mathbf R_{>0}\to\mathrm{GL}_1(\mathbf A_{F,S})$ be a choice of continuous homomorphic section to the $S$-idelic norm, and $\tau:\mathbf R_{>0}\to\mathrm{GL}_1(\mathbf A_F)$ a choice of continuous homomorphic section to the idelic norm.*
 
-We define, for every finite place $v\in S$ and $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ associated to $v$:
+*We define, for every finite place $v\in S$ and $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ associated to $v$:*
 
 $$
 \tau_S([1,N(\mathfrak p_v)))\cdot e_v\subset\mathbf A_{F,S} \tag{8.2.0.9}
 $$
 
-and for every finite place $v$ of $F$ and $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ associated to $v$:
+*and for every finite place $v$ of $F$ and $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ associated to $v$:*
 
 $$
 \tau([1,N(\mathfrak p_v)))\cdot e_v\subset\mathbf A_F \tag{8.2.0.10}
 $$
 
-each equipped with the subspace topology. Then:
+*each equipped with the subspace topology. Then:*
 
-(1) For every $x\in D_{S,v}$ there exists $g\in\mathrm{GL}_1(\mathbf A_{F,S})$, unique up to multiplication by $\mathcal O_{F_v}^\times\subset\mathrm{GL}_1(\mathbf A_{F,S})$, such that $g^{-1}x\in\tau_S([1,N(\mathfrak p_v)))\cdot e_v$.
+(1) *For every $x\in D_{S,v}$ there exists $g\in\mathrm{GL}_1(\mathbf A_{F,S})$, unique up to multiplication by $\mathcal O_{F_v}^\times\subset\mathrm{GL}_1(\mathbf A_{F,S})$, such that $g^{-1}x\in\tau_S([1,N(\mathfrak p_v)))\cdot e_v$.*
 
-(2) For every $x\in D_v$ there exists $g\in\mathrm{GL}_1(\mathbf A_F)$, unique up to multiplication by $\mathcal O_{F_v}^\times\subset\mathrm{GL}_1(\mathbf A_F)$, such that $g^{-1}x\in\tau([1,N(\mathfrak p_v)))\cdot e_v$.
+(2) *For every $x\in D_v$ there exists $g\in\mathrm{GL}_1(\mathbf A_F)$, unique up to multiplication by $\mathcal O_{F_v}^\times\subset\mathrm{GL}_1(\mathbf A_F)$, such that $g^{-1}x\in\tau([1,N(\mathfrak p_v)))\cdot e_v$.*
 
 PROOF. (1) : $D_{S,v}$ is homeomorphic to the quotient of $\mathrm{GL}_1(\mathbf A_{F,S})$ by the stabilizer of $e_v$, which is $F_v^\times\subset\mathrm{GL}_1(\mathbf A_{F,S})$ embedded through the $v$-indexed “coordinate”. $D_{S,v}$ is therefore continuously bijective to $\tau_S([1,N(\mathfrak p_v)))\cdot\mathrm{GL}_1(\mathbf A_{F,S})^1\cdot e_v$, and since the stabilizer of $e_v$ in $\mathrm{GL}_1(\mathbf A_{F,S})^1$ is $\mathcal O_{F_v}^\times$, (1) follows.
 
 (2) : $D_v$ is homeomorphic to the quotient of $\mathrm{GL}_1(\mathbf A_F)$ by the stabilizer of $e_v$, which is $F_v^\times\subset\mathrm{GL}_1(\mathbf A_F)$ embedded through the $v$-indexed “coordinate”. (2) therefore follows upon observing that the stabilizer of $e_v$ in $\mathrm{GL}_1(\mathbf A_F)^1$ is $\mathcal O_{F_v}^\times$. $\square$
 
-PROPOSITION 8.2.0.5. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. For every Archimedean place $v\in S$, the action of $\mathrm{GL}_1(\mathbf A_{F,S})^1$ on $D_{S,v}$ is transitive. For every Archimedean place $v$ of $F$, the action of $\mathrm{GL}_1(\mathbf A_F)^1$ on $D_v$ is transitive.
+PROPOSITION 8.2.0.5. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. For every Archimedean place $v\in S$, the action of $\mathrm{GL}_1(\mathbf A_{F,S})^1$ on $D_{S,v}$ is transitive. For every Archimedean place $v$ of $F$, the action of $\mathrm{GL}_1(\mathbf A_F)^1$ on $D_v$ is transitive.*
 
-(1) If $v$ is real, then every point of $D_{S,v}$, respectively of $D_v$, is stabilized by $\{\pm 1\}$ as a subgroup of $\mathrm{GL}_1(\mathbf A_{F,S})$, respectively $\mathrm{GL}_1(\mathbf A_F)$, embedded injectively as the subgroup of the units of $F_v^\times$.
+(1) *If $v$ is real, then every point of $D_{S,v}$, respectively of $D_v$, is stabilized by $\{\pm 1\}$ as a subgroup of $\mathrm{GL}_1(\mathbf A_{F,S})$, respectively $\mathrm{GL}_1(\mathbf A_F)$, embedded injectively as the subgroup of the units of $F_v^\times$.*
 
 ## PDF page 387
 
 **8.3. ON ORBITAL SUPPORTS - II** · **387**
 
-(2) If $v$ is complex, then every point of $D_{S,v}$, respectively $D_{v}$, is stabilized by $\mathrm{U}(1)$ as a subgroup of $\mathrm{GL}_{1}(\mathbf{A}_{F,S})$, respectively $\mathrm{GL}_{1}(\mathbf{A}_{F})$, embedded injectively as the subgroup of the units of $F_{v}^{\times}$.
+(2) *If $v$ is complex, then every point of $D_{S,v}$, respectively $D_{v}$, is stabilized by $\mathrm{U}(1)$ as a subgroup of $\mathrm{GL}_{1}(\mathbf{A}_{F,S})$, respectively $\mathrm{GL}_{1}(\mathbf{A}_{F})$, embedded injectively as the subgroup of the units of $F_{v}^{\times}$.*
 
 Proof. Since $v$ is Archimedean, we may choose a continuous homomorphic section $\tau_{v}$ to the $S$-idelic, respectively idelic norm, and hence $\tau_{v}(\mathbf{R}_{>0})\cdot\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}$ acts on $D_{S,v}$ only through $\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}$. Simiarly for $\tau_{v}(\mathbf{R}_{>0}) \cdot \mathrm{GL}_{1}(\mathbf{A}_{F})^{1}$ acting on $D_{v}$ only through $\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}$. Since $D_{S,v}$ is the orbit of $e_{v}$ under the continuous action of $\mathrm{GL}_{1}(\mathbf{A}_{F,S})$ on $\mathbf{A}_{F,S}$, as is $D_{v}$ of $e_{v}$ under the continuous action of $\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}$ on $\mathbf{A}_{F}$, we deduce that $\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}$, respectively $\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}$, acts transitively on $D_{S,v}$, respectively $D_{v}$.
 
@@ -398,7 +398,7 @@ PROPOSITION 8.2.0.6. *Let $F$ be a number field, $S$ a finite set of places of $
 
 *(2) The closure within $D_{F}$ of $\tau_{v_{0}}(\mathbf{R}_{>0}) \subset D_{1}$ is $\tau_{v_{0}}(\mathbf{R}_{>0}) \cup \{e_{v_{0}}\}$.*
 
-*Proof. In either case, $\tau_{v_{0}}(\mathbf{R}_{>0}) \cup \{e_{v_{0}}\}$ is homeomorphic to $[0,+\infty)$, a complete metric subspace of the metrizable spaces $D_{F,S}$, respectively $D_{F}$, and, as such, sequentially closed, hence closed, being the ambient second-countable, hence sequential, by Lemma 8.2.0.3.*
+Proof. In either case, $\tau_{v_{0}}(\mathbf{R}_{>0}) \cup \{e_{v_{0}}\}$ is homeomorphic to $[0,+\infty)$, a complete metric subspace of the metrizable spaces $D_{F,S}$, respectively $D_{F}$, and, as such, sequentially closed, hence closed, being the ambient second-countable, hence sequential, by Lemma 8.2.0.3.
 
 *$\square$*
 
@@ -440,9 +440,9 @@ $$
 
 **388** · **CHAPTER 8. PERIODIC ORBITS AND FIXED POINTS**
 
-and the support of $f_{0}$ is entirely contained within:
+*and the support of $f_{0}$ is entirely contained within:*
 
-(1) The union of the closed subsets:
+(1) *The union of the closed subsets:*
 
 $$
 H_{S,S_{p}} := \bigcup_{v\in S_{p}} \{x \in\mathbf{A}_{F,S} : x_{v} = 0, x_{w} \neq 0 \text{ for all } w \in S-\{v\}\} \subset \mathbf{A}_{F,S} \tag{8.3.0.2}
@@ -454,21 +454,21 @@ $$
 [H_{S,S_{p}}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] \tag{8.3.0.3}
 $$
 
-is $2$-isomorphic to the quotient stack:
+*is $2$-isomorphic to the quotient stack:*
 
 $$
 \coprod_{v\in S_{p}}[\mathbf{R}_{>0}/F_{v}^{\times}] \tag{8.3.0.4}
 $$
 
-where $F_{v}^{\times}$ acts on $\mathbf{R}_{>0}$ by left translation through the $S$-idelic norm, with $\mathcal{O}_{F_{v}}^{\times}$ inertia. Its coarse space is the topological disjoint union of compact Hausdorff loops:
+*where $F_{v}^{\times}$ acts on $\mathbf{R}_{>0}$ by left translation through the $S$-idelic norm, with $\mathcal{O}_{F_{v}}^{\times}$ inertia. Its coarse space is the topological disjoint union of compact Hausdorff loops:*
 
 $$
 \coprod_{v\in S_{p}}\mathbf{R}_{>0}/N(\mathfrak{p}_{v})^{\mathbf{Z}} \tag{8.3.0.5}
 $$
 
-where $\mathfrak{p}_{v} \subset \mathcal{O}_{F}$ is the unique prime ideal corresponding to the finite place $v \in S_{p}$.
+*where $\mathfrak{p}_{v} \subset \mathcal{O}_{F}$ is the unique prime ideal corresponding to the finite place $v \in S_{p}$.*
 
-(2) The union of the closed subsets:
+(2) *The union of the closed subsets:*
 
 $$
 H_{S,S_{\infty}}:= \bigcup_{v\in S_{\infty}} \{x \in\mathbf{A}_{F,S} : x_{v} = 0, x_{w} \neq 0 \text{ for all } w \in S-\{v\}\} \subset \mathbf{A}_{F,S} \tag{8.3.0.6}
@@ -480,13 +480,13 @@ $$
 [H_{S,S_{\infty}}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] \tag{8.3.0.7}
 $$
 
-is $2$-isomorphic to the quotient stack:
+*is $2$-isomorphic to the quotient stack:*
 
 $$
 \coprod_{v\in S_{\infty}}BU_{v} \tag{8.3.0.8}
 $$
 
-where $U_{v} \subset F_{v}^{\times}$ is the compact subgroup $\ker(|\cdot|_{v})$, and $BU_{v}$ is its topological classifying stack. Its coarse space is the disjoint union of $r_{1} + r_{2}$ points, one per each Archimedean place of $F$.
+*where $U_{v} \subset F_{v}^{\times}$ is the compact subgroup $\ker(|\cdot|_{v})$, and $BU_{v}$ is its topological classifying stack. Its coarse space is the disjoint union of $r_{1} + r_{2}$ points, one per each Archimedean place of $F$.*
 
 Proof. (1) : By Theorem 8.1.0.1(1), the continuous functionals in $\mathscr{E}_{S,S_{p}}(\chi_{S}|_{J^{1}_{F,S}})^{\prime}_{\beta}$ map under the continuous adjoint to the quotient map $\mathcal{S}(\mathbf{A}_{F,S}) \to \mathscr{E}_{S,S_{p}}(\chi_{S}|_{J^{1}_{F,S}})$ to the image of a unique continuous functional on $\mathrm{H}_{0,\mathrm{cont}}(\chi_{S}|_{J^{1}_{F,S}}, \mathcal{S}_{p}(\mathbf{A}_{F,S}))$, where $\mathcal{S}_{p}(\mathbf{A}_{F,S}) \subset \mathcal{S}(\mathbf{A}_{F,S})$ is the closed subspace defined in (8.1.0.4). This means that, for each such $T$ and for every $f \in \mathcal{S}(\mathbf{A}_{F,S})$, there exists $f_{1} \in \mathrm{PV}_{S,S_{p}}\mathrm{H}_{0,\mathrm{cont}}(\chi_{S}|_{J^{1}_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))$ such that $f -f_{1} \in \mathcal{S}_{p}(\mathbf{A}_{F,S})$, and $T(f -f_{1}) = T(f)$.
 
@@ -572,7 +572,7 @@ and its suquotients $\mathscr{E}_{S,S_{\infty}}(\chi_{S}|_{J^{1}_{F,S}})$ and $\
 ```latex
 \begin{tikzcd}
 \mathrm{H}_{0,\mathrm{cont}}(\chi_{S}|_{J^{1}_{F,S}}, \mathcal{S}_{00}(\mathbf{A}_{F,S})) \arrow[r] \arrow[d] & \mathrm{H}_{0,\mathrm{cont}}(\chi_{S}|_{J^{1}_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S})) \arrow[r] \arrow[d] & \mathscr{E}_{S,S_{\infty}}(\chi_{S}|_{J^{1}_{F,S}}) \times \prod^{\prime}_{p:S_{p}\subset S} \mathscr{E}_{S,S_{p}}(\chi_{S}|_{J^{1}_{F,S}}) \arrow[d] \\
-[D_{S,1}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] \arrow[r, "j"'] \arrow[d, "\simeq"'] & [D_{F,S}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] & \coprod^{\prime}_{v \in S} [D_{S,v}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
+{[D_{S,1}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}]} \arrow[r, "j"'] \arrow[d, "\simeq"'] & {[D_{F,S}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}]} & \coprod^{\prime}_{v \in S} [D_{S,v}/\mathrm{GL}_{1}(\mathbf{A}_{F,S})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
 \underline{J_{F,S}/J^{1}_{F,S}} &  & \left(\coprod_{v \in S_{\infty}} BU_{v}\right) \coprod \left(\coprod_{p:S_{p}\subset S} \coprod^{\prime}_{v \in S_{p}} [\mathbf{R}_{>0}/F^{\times}_{v}]\right)
 \end{tikzcd}
 ```
@@ -629,7 +629,7 @@ ORBITAL TRACES
 ```latex
 \begin{tikzcd}
 \mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^{1}_{F}}, \mathcal{S}_{00}(\mathbf{A}_{F})) \arrow[r] \arrow[d] & \mathrm{H}_{0,\mathrm{cont}}(\chi|_{C^{1}_{F}}, \mathcal{S}(\mathbf{A}_{F})) \arrow[r] \arrow[d] & \mathscr{E}_{S_{\infty}}(\chi|_{C^{1}_{F}}) \times \prod^{\prime}_{p} \mathscr{E}_{S_{p}}(\chi|_{C^{1}_{F}}) \arrow[d] \\
-[D_{F,1}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}] \arrow[r, "j"'] \arrow[d, "\simeq"'] & [D_{F}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}] & \coprod^{\prime}_{v \in \Sigma_{F}} [D_{F,v}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
+{[D_{F,1}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}]} \arrow[r, "j"'] \arrow[d, "\simeq"'] & {[D_{F}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}]} & \coprod^{\prime}_{v \in \Sigma_{F}} [D_{F,v}/\mathrm{GL}_{1}(\mathbf{A}_{F})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
 \underline{C_{F}/C^{1}_{F}} &  & \left(\coprod_{v \in S_{\infty}} BU_{v}\right) \coprod \left(\coprod_{p} \coprod^{\prime}_{v \in S_{p}} [\mathbf{R}_{>0}/F^{\times}_{v}]\right)
 \end{tikzcd}
 ```
@@ -772,7 +772,7 @@ We may therefore complete the diagram in (8.4.0.6) into the following:
 \begin{tikzcd}
 0 \arrow[r] \arrow[d] & \mathrm{PW}_{S,X}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}, \mathcal{S}(\mathbf{A}_{F,S^{\prime}})) \arrow[r] \arrow[d] & \mathscr{E}_{S^{\prime},S_{\infty}}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}) \times \prod^{\prime}_{p:S_{p}\subset S^{\prime}} \mathscr{E}^{\mathrm{ABS}}_{S^{\prime},S_{p},X}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}) \arrow[d] \\
 \mathrm{H}_{0,\mathrm{cont}}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}, \mathcal{S}_{00}(\mathbf{A}_{F,S^{\prime}})) \arrow[r] \arrow[d] & \mathrm{H}_{0,\mathrm{cont}}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}, \mathcal{S}(\mathbf{A}_{F,S^{\prime}})) \arrow[r] \arrow[d] & \mathscr{E}_{S^{\prime},S_{\infty}}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}) \times \prod^{\prime}_{p:S_{p}\subset S^{\prime}} \mathscr{E}_{S^{\prime},S_{p}}(\chi_{S^{\prime}}|_{J^{1}_{F,S^{\prime}}}) \arrow[d] \\
-[D_{S^{\prime},1}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}] \arrow[r, "j"'] \arrow[d, "\simeq"'] & [D_{F,S^{\prime}}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}] & \coprod^{\prime}_{v \in S^{\prime}} [D_{S^{\prime},v}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
+{[D_{S^{\prime},1}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}]} \arrow[r, "j"'] \arrow[d, "\simeq"'] & {[D_{F,S^{\prime}}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}]} & \coprod^{\prime}_{v \in S^{\prime}} [D_{S^{\prime},v}/\mathrm{GL}_{1}(\mathbf{A}_{F,S^{\prime}})^{1}] \arrow[d, "\simeq"] \arrow[l, "i"] \\
 \underline{J_{F,S^{\prime}}/J^{1}_{F,S^{\prime}}} &  & \left(\coprod_{v \in S_{\infty}} BU_{v}\right) \coprod \left(\coprod_{p:S_{p}\subset S^{\prime}} \coprod^{\prime}_{v \in S_{p}} [\mathbf{R}_{>0}/F^{\times}_{v}]\right)
 \end{tikzcd}
 ```

@@ -64,19 +64,19 @@ We will be discussing the resulting Banach spaces in the generality of $\mathbf{
 
 **9.1.1. Sobolev spaces of Hausdorff locally compact abelian groups.** We begin with a definition, following [GR, §1,2], with an eye on [Co, Appendix I, p.59].
 
-DEFINITION 9.1.1.1. *Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$, $\mu_{\hat G}$ the corresponding Plancherel measure. Let $s\in\mathbf{R}$ a real number. We define a Sobolev weight on $G$ to be a continuous function:*
+DEFINITION 9.1.1.1. Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$, $\mu_{\hat G}$ the corresponding Plancherel measure. Let $s\in\mathbf{R}$ a real number. We define a Sobolev weight on $G$ to be a continuous function:
 
 $$
 w:\hat G\to[0,+\infty) \tag{9.1.1.1}
 $$
 
-*such that there exists a real number $C_w>0$ such that:*
+such that there exists a real number $C_w>0$ such that:
 
 $$
 w(\chi\chi')\le C_w(w(\chi)+w(\chi')) \tag{9.1.1.2}
 $$
 
-*for all $\chi,\chi'\in\hat G$. We define $H^s_w(G,\mu_G)$ to be the completion of $C_c(\hat G)$ with respect to the linear topology induced by the norm:*
+for all $\chi,\chi'\in\hat G$. We define $H^s_w(G,\mu_G)$ to be the completion of $C_c(\hat G)$ with respect to the linear topology induced by the norm:
 
 $$
 \lVert f\rVert_{H^s_w(G,\mu_G)}:=\left(\int_{\hat G}\lvert\hat f(\chi)\rvert^2(1+w(\chi)^2)^{s/2}\,\mathrm{d}\mu_{\hat G}(\chi)\right)^{1/2}. \tag{9.1.1.3}
@@ -110,7 +110,7 @@ $$
 
 **9.1. SOBOLEV SPACES $W^{s,2}(G)$** · **397**
 
-(2) If $s'>s$, then for any $f\in H^s_w(G,\mu_G)$ we have:
+(2) *If $s'>s$, then for any $f\in H^s_w(G,\mu_G)$ we have:*
 
 $$
 \lVert f\rVert_{H^s_w(G,\mu_G)}\le\lVert f\rVert_{H^{s'}_w(G,\mu_G)} \tag{9.1.1.6}
@@ -118,13 +118,13 @@ $$
 
 and the inclusion $H^{s'}_w(G,\mu_G)\subset H^s_w(G,\mu_G)$ is continuous.
 
-(3) (Sobolev Embedding) If $(1+w^2)^{-s/2}\in L^1(\hat G,\mu_{\hat G})$, then every element of $H^s_w(G,\mu_G)$ is represented by a unique continuous function on $G$ vanishing at infinity, resulting in a canonical linear inclusion:
+(3) *(Sobolev Embedding) If $(1+w^2)^{-s/2}\in L^1(\hat G,\mu_{\hat G})$, then every element of $H^s_w(G,\mu_G)$ is represented by a unique continuous function on $G$ vanishing at infinity, resulting in a canonical linear inclusion:*
 
 $$
 H^s_w(G,\mu_G)\to C_0(G). \tag{9.1.1.7}
 $$
 
-There exists a real number $C(w,s)>0$ with the property that, for every $f\in H^s_w(G,\mu_G)$, we have:
+*There exists a real number $C(w,s)>0$ with the property that, for every $f\in H^s_w(G,\mu_G)$, we have:*
 
 $$
 \lVert f\rVert_u\le C(w,s)\,\lVert f\rVert_{H^s_w(G,\mu_G)}. \tag{9.1.1.8}
@@ -154,7 +154,7 @@ and we deduce that $u$ is uniformly bounded over $G$. By (1) and [DE, Thm.3.4.8]
 
 REMARK 9.1.1.4. We further refer the reader to [GR, Prop.1,2] for (1) and (2) in Proposition 9.1.1.3.
 
-LEMMA 9.1.1.5. Let $G$ be a Hausdorff locally compact abelian group. Let $s\ge 0$ be a real number. The pairing:
+LEMMA 9.1.1.5. *Let $G$ be a Hausdorff locally compact abelian group. Let $s\ge 0$ be a real number. The pairing:*
 
 $$
 C_c(\hat G)\times C_c(\hat G)\to\mathbf{C} \tag{9.1.1.9}
@@ -170,7 +170,7 @@ $$
 (\phi,\psi)\mapsto\int_{\hat G}\phi(\chi)\psi(\chi)\,\mathrm{d}\mu_{\hat G}(\chi) \tag{9.1.1.10}
 $$
 
-extends uniquely to a continuous non-degenerate bi-linear form:
+*extends uniquely to a continuous non-degenerate bi-linear form:*
 
 $$
 \langle\cdot,\cdot\rangle_{s,w}:H^s_w(G,\mu_G)\times H^{-s}_w(G,\mu_G)\to\mathbf{C} \tag{9.1.1.11}
@@ -182,7 +182,7 @@ $$
 H^s_w(G,\mu_G)'_\beta\to H^{-s}_w(G,\mu_G) \tag{9.1.1.12}
 $$
 
-from the strong dual of $H^s_w(G,\mu_G)$, whose topology is normed by the dual norm, to the Sobolev space $H^{-s}_w(G,\mu_G)$, whose topology is normed by the norm $\lVert\cdot\rVert_{H^{-s}_w(G,\mu_G)}$ from (9.1.1.3).
+*from the strong dual of $H^s_w(G,\mu_G)$, whose topology is normed by the dual norm, to the Sobolev space $H^{-s}_w(G,\mu_G)$, whose topology is normed by the norm $\lVert\cdot\rVert_{H^{-s}_w(G,\mu_G)}$ from (9.1.1.3).*
 
 PROOF. By [Fol, Thm.6.15], the pairing:
 
@@ -228,7 +228,13 @@ The linear endomorphism $C_c(\hat G)\to C_c(\hat G)$ sending $\psi$ to $(1+w^2)^
 
 **9.1. SOBOLEV SPACES $W^{s,2}(G)$** · **399**
 
-Indeed, for continuous functional $T\in H^s_w(G,\mu_G)'_\beta$, by [Fol, Prop.6.13] there exists a unique $\psi\in H^s_w(G,\mu_G)$ such that $T=T_\psi$, with $T_\psi$ the functional defined as: $T_\psi:\phi\mapsto T_\psi(\phi):=\langle\phi,\psi\rangle$.
+Indeed, for continuous functional $T\in H^s_w(G,\mu_G)'_\beta$, by [Fol, Prop.6.13] there exists a unique $\psi\in H^s_w(G,\mu_G)$ such that $T=T_\psi$, with $T_\psi$ the functional defined as:
+
+$$
+T_\psi:\phi\mapsto T_\psi(\phi):=\langle\phi,\psi\rangle.
+$$
+
+
 
 The functional on $H^s_w(G,\mu_G)$: $(1+w^2)^{-s/2}T$ assigned by: $(1+w^2)^{-s/2}T(\phi):=\langle(1+w^2)^{-s/2}\phi,\psi\rangle$ is continuous on $H^{-s}(G,\mu_G)$, and hence there exists a unique $\psi_0\in H^{-s}(G,\mu_G)$ representing it. The continuous linear operator $H^s_w(G,\mu_G)'_\beta\to H^{-s}_w(G,\mu_G)$ induced by $\langle\cdot,\cdot\rangle_{s,w}$ sends $T=T_\psi$ to $\psi_0$. We have $\psi_0=(1+w^2)^{s/2}\psi$, and we compute:
 
@@ -256,13 +262,13 @@ We do so by discussing the intermediate case of $\mathbf{R}_{>0}$-modulated Haus
 
 We refer the reader to Theorem D.3.3.7 for more on function spaces of Schwartz-Bruhat functions (with $I$-exponential decay) on $\mathbf{R}_{>0}$-modulated groups.
 
-DEFINITION 9.1.2.1 (Sobolev Spaces of $\mathbf{R}_{>0}$-modulated groups). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group, with module $\lvert\cdot\rvert_G$. We let $\mu_G$ be a choice of Haar measure on $G$, and $\mu_{\hat G}$ its Plancherel measure. Let $s\ge 0$ be a real number. We define:*
+DEFINITION 9.1.2.1 (Sobolev Spaces of $\mathbf{R}_{>0}$-modulated groups). Let $G$ be an $\mathbf{R}_{>0}$-modulated group, with module $\lvert\cdot\rvert_G$. We let $\mu_G$ be a choice of Haar measure on $G$, and $\mu_{\hat G}$ its Plancherel measure. Let $s\ge 0$ be a real number. We define:
 
 $$
 W^{s,2}(G):=H^s_w(\hat G,\mu_{\hat G}) \tag{9.1.2.2}
 $$
 
-*for $w$ the choice of Sobolev weight from (9.1.2.1). We denote by $\lVert\cdot\rVert_{s,2}$ the norm:*
+for $w$ the choice of Sobolev weight from (9.1.2.1). We denote by $\lVert\cdot\rVert_{s,2}$ the norm:
 
 $$
 \lVert f\rVert_{s,2}:=\left(\int_G\lvert f(g)\rvert^2(1+\lvert\log\lvert g\rvert_G\rvert^2)^{s/2}\,\mathrm{d}\mu_G(g)\right)^{1/2}. \tag{9.1.2.3}
@@ -428,13 +434,13 @@ PROPOSITION 9.1.2.6. *Let $G$ be an $\mathbf{R}_{>0}$-modulated group, with modu
 
 Let $s > 1$ be a real number.
 
-Then every $f\in W^{s,2}(G)$ is absolutely $\mu_G$-integrable. There exists a real number $C_s > 0$ such that:
+*Then every $f\in W^{s,2}(G)$ is absolutely $\mu_G$-integrable. There exists a real number $C_s > 0$ such that:*
 
 $$
 \|f\|_{L^1(G,\mu_G)}\le C_s\|f\|_{s,2}. \tag{9.1.2.17}
 $$
 
-In particular, the linear inclusion $W^{s,2}(G)\to L^1(G,\mu_G)$ is continuous.
+*In particular, the linear inclusion $W^{s,2}(G)\to L^1(G,\mu_G)$ is continuous.*
 
 Proof. We have:
 
@@ -514,31 +520,31 @@ We refer to the Hilbert space $\mathrm{HS}^{2N,2}_b(\mathbf C)$ as the $b$-line 
 
 In the next subsection, §9.2.2, we will rethink $\mathrm{HS}^{2N,2}_b(\mathbf C)$ as the special case of the Hardy-Sobolev space $\mathrm{HS}^{2N,2}_I(\mathbf C)$, to be defined therein, with base interval $I = \{b\}$, to be identified, under the Mellin transform, with the Hardy-Sobolev space $W^{2N,2}_I(\mathbf C)$, for $I = \{b\}$.
 
-Theorem 9.2.1.2 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - I). Let $a\in\mathbf R$ be a real number, $a > 1$. We denote by $M$ the Mellin transform $M_I\colon\mathcal S_I(\mathbf R_{>0})\to A\mathcal S(\mathbf C_I)$ for $I := (-\infty,+\infty)$. We denote by:
+Theorem 9.2.1.2 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - I). *Let $a\in\mathbf R$ be a real number, $a > 1$. We denote by $M$ the Mellin transform $M_I\colon\mathcal S_I(\mathbf R_{>0})\to A\mathcal S(\mathbf C_I)$ for $I := (-\infty,+\infty)$. We denote by:*
 
 $$
 \mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty))\subset\mathcal S_\mathrm{E}(\mathbf R_{>0}) \tag{9.2.1.4}
 $$
 
-the linear subspace of those Schwartz-Bruhat functions on $\mathbf R_{>0}$ of exponential decay, whose support is contained within the interval $(1/a,+\infty)$.
+*the linear subspace of those Schwartz-Bruhat functions on $\mathbf R_{>0}$ of exponential decay, whose support is contained within the interval $(1/a,+\infty)$.*
 
-Let, for $b\in\mathbf R$ a real number, and $N\ge 1$ an integer. Then:
+*Let, for $b\in\mathbf R$ a real number, and $N\ge 1$ an integer. Then:*
 
-(1) The closure of $\mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty))$ in the Sobolev space $W^{2N,2}_b(\mathbf R_{>0})$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}}\colon W^{2N,2}_b(\mathbf R_{>0})\to W^{2N,2}_b(\mathbf R_{>0})$ obtained by multiplying by the indicator function $\rho_{a,+}(t) := \mathrm{1}_{[1/a,+\infty)}(t)$.
+(1) *The closure of $\mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty))$ in the Sobolev space $W^{2N,2}_b(\mathbf R_{>0})$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}}\colon W^{2N,2}_b(\mathbf R_{>0})\to W^{2N,2}_b(\mathbf R_{>0})$ obtained by multiplying by the indicator function $\rho_{a,+}(t) := \mathrm{1}_{[1/a,+\infty)}(t)$.*
 
-(2) The Mellin transform $M$ extends by continuity to a linear isometric isomorphism:
+(2) *The Mellin transform $M$ extends by continuity to a linear isometric isomorphism:*
 
 $$
 M\colon W^{2N,2}_b(\mathbf R_{>0})\to\mathrm{HS}^{2N,2}_b(\mathbf C) \tag{9.2.1.5}
 $$
 
-where the target is the $b$-line Hardy-Sobolev space.
+*where the target is the $b$-line Hardy-Sobolev space.*
 
 ## PDF page 405
 
 **9.2. HARDY-SOBOLEV SPACES $W^s_I(G)$ AND PALEY-WIENER CONDITIONS** · **405**
 
-(3) The closure $\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$ of $M(\mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty)))$ in $\mathrm{HS}^2_b(\mathbf C)$ satisfies the following property: there exists a commutative diagram of continuous linear operators with linearly short exact rows:
+(3) *The closure $\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$ of $M(\mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty)))$ in $\mathrm{HS}^2_b(\mathbf C)$ satisfies the following property: there exists a commutative diagram of continuous linear operators with linearly short exact rows:*
 
 (9.2.1.6)
 
@@ -549,11 +555,11 @@ where the target is the $b$-line Hardy-Sobolev space.
 \end{tikzcd}
 ```
 
-where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.1.6) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are isometric isomorphisms induced by the Mellin transform, and where:
+*where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.1.6) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are isometric isomorphisms induced by the Mellin transform, and where:*
 
-(1) $H^{2N,2}(\mathbf C_{<b})$ is the Hardy-Sobolev space of the left half-plane.
+(1) *$H^{2N,2}(\mathbf C_{<b})$ is the Hardy-Sobolev space of the left half-plane.*
 
-(2) $\mathrm{PW}^{2N,2}_b(\mathbf C,a)$ is the closed linear subspace of the Hardy-Sobolev space $H^{2N,2}(\mathbf C_{>b})$ of those holomorphic functions $\phi(s)$ over $\mathbf C_{>b}$ that extend to entire functions and satisfy:
+(2) *$\mathrm{PW}^{2N,2}_b(\mathbf C,a)$ is the closed linear subspace of the Hardy-Sobolev space $H^{2N,2}(\mathbf C_{>b})$ of those holomorphic functions $\phi(s)$ over $\mathbf C_{>b}$ that extend to entire functions and satisfy:*
 
 $$
 \phi(s) = O\left(\frac{(1-a^{-2\,\mathrm{Re}(s)})^{1/2}}{(\mathrm{Re}(s))^{1/2}}\right). \tag{9.2.1.7}
@@ -631,15 +637,15 @@ We have therefore proved that $M$ is surjective onto $\mathrm{PW}^{2N,2}_b(\math
 
 $\square$
 
-Corollary 9.2.1.3. Let $a\in\mathbf R$ be a real number, $a > 1$. Let $b\in\mathbf R$ be a real number $N\ge 1$ an integer. We denote by $M$ the Mellin transform $M\colon W^{2N,2}_b(\mathbf R_{>0})\to\mathrm{HS}^{2N,2}_b(\mathbf C)$ provided by Theorem 9.2.1.2(2).
+Corollary 9.2.1.3. *Let $a\in\mathbf R$ be a real number, $a > 1$. Let $b\in\mathbf R$ be a real number $N\ge 1$ an integer. We denote by $M$ the Mellin transform $M\colon W^{2N,2}_b(\mathbf R_{>0})\to\mathrm{HS}^{2N,2}_b(\mathbf C)$ provided by Theorem 9.2.1.2(2).*
 
-Let $\phi\in W^{2N,2}_b(\mathbf R_{>0})$ be the arbitrary element. Then $M(\phi)(s)$ is a holomorphic function on $\mathbf C_{<b}$, square-integrable on all vertical lines of $\mathbf C_{<b}$ with all of its holomorphic derivatives of order $0\le k\le N$.
+*Let $\phi\in W^{2N,2}_b(\mathbf R_{>0})$ be the arbitrary element. Then $M(\phi)(s)$ is a holomorphic function on $\mathbf C_{<b}$, square-integrable on all vertical lines of $\mathbf C_{<b}$ with all of its holomorphic derivatives of order $0\le k\le N$.*
 
 ## PDF page 407
 
 **9.2. HARDY-SOBOLEV SPACES $W^s_I(G)$ AND PALEY-WIENER CONDITIONS** · **407**
 
-There exist a holomorphic function $u_1\in H^{2N,2}(\mathbf C_{<b})$ and an entire function $u_2\in H^{2N,2}(\mathbf C_{>b})$, canonically associated to $M(\phi)$, such that:
+*There exist a holomorphic function $u_1\in H^{2N,2}(\mathbf C_{<b})$ and an entire function $u_2\in H^{2N,2}(\mathbf C_{>b})$, canonically associated to $M(\phi)$, such that:*
 
 $$
 u_2(s) = O\left(\frac{(1-a^{-2\,\mathrm{Re}(s)})^{1/2}}{(\mathrm{Re}(s))^{1/2}}\right) \tag{9.2.1.12}
@@ -677,9 +683,9 @@ By Theorem 9.2.1.2(3), the functions $u_1 := M(\mathrm{1}_{[1,+\infty)}\cdot\phi
 
 $\square$
 
-Corollary 9.2.1.4. Let $a,b\in\mathbf R$ be real numbers, $a > 1$. We denote by $M$ the Mellin transform $M_I\colon\mathcal S_I(\mathbf R_{>0})\to A\mathcal S(\mathbf C_I)$ for $I := (-\infty,+\infty)$.
+Corollary 9.2.1.4. *Let $a,b\in\mathbf R$ be real numbers, $a > 1$. We denote by $M$ the Mellin transform $M_I\colon\mathcal S_I(\mathbf R_{>0})\to A\mathcal S(\mathbf C_I)$ for $I := (-\infty,+\infty)$.*
 
-For every point $z\in\mathbf C_{<b}$, the point-evaluation functional $\delta_z$ and its derivatives $\delta^{(m)}_z$ for $1\le m\le N-1$, are continuous on $\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$.
+*For every point $z\in\mathbf C_{<b}$, the point-evaluation functional $\delta_z$ and its derivatives $\delta^{(m)}_z$ for $1\le m\le N-1$, are continuous on $\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$.*
 
 For every $\phi\in M_{\rho_{a,+}}W^{2N,2}_b(\mathbf R_{>0})$, we have:
 
@@ -695,7 +701,7 @@ $\square$
 
 We can now incorporate the module-1 subgroup of a Hausdorff locally compact abelian $\mathbf R_{>0}$-modulated group into the assertions of Theorem 9.2.1.2 and Corollary 9.2.1.4.
 
-Theorem 9.2.1.5 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - II). Let $a\in\mathbf R$ be a real number, $a > 1$. Let $G$ be an $\mathbf R_{>0}$-modulated Hausdorff locally compact abelian group. We denote by $M$ the Mellin transform $M\colon\mathcal S_\mathrm{E}(G)\to A\mathcal S(\mathbf C)\overline{\otimes}\mathcal S(\widehat{G^1})$.
+Theorem 9.2.1.5 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - II). *Let $a\in\mathbf R$ be a real number, $a > 1$. Let $G$ be an $\mathbf R_{>0}$-modulated Hausdorff locally compact abelian group. We denote by $M$ the Mellin transform $M\colon\mathcal S_\mathrm{E}(G)\to A\mathcal S(\mathbf C)\overline{\otimes}\mathcal S(\widehat{G^1})$.*
 
 ## PDF page 408
 
@@ -707,33 +713,33 @@ $$
 \mathcal S_\mathrm{E}(G,(1/a,+\infty))\subset\mathcal S_\mathrm{E}(G) \tag{9.2.1.17}
 $$
 
-the linear subspace of those Schwartz-Bruhat functions on $G$ of exponential decay, whose support is sent by the module homomorphism $|\cdot|_G$ into the interval $(1/a,+\infty)\subset\mathbf R_{>0}$.
+*the linear subspace of those Schwartz-Bruhat functions on $G$ of exponential decay, whose support is sent by the module homomorphism $|\cdot|_G$ into the interval $(1/a,+\infty)\subset\mathbf R_{>0}$.*
 
-Let, for $b\in\mathbf R$ a real number, and $N\ge 0$ an integer:
+*Let, for $b\in\mathbf R$ a real number, and $N\ge 0$ an integer:*
 
 $$
 \|\cdot\|_{b,k}\colon \mathcal S_\mathrm{E}(G)\to\mathbf R_{\ge 0} \tag{9.2.1.18}
 $$
 
-be the continuous norm, for each $0\le k\le N$, defined by, upon choosing a continuous homomorphic section $\tau$ to the module $|\cdot|_G$:
+*be the continuous norm, for each $0\le k\le N$, defined by, upon choosing a continuous homomorphic section $\tau$ to the module $|\cdot|_G$:*
 
 $$
 \|\phi\|_{b,k} := \left(\int_{\mathbf R_{>0}} |\phi(\tau(t)g)\,(\log(t))^k|^2 t^{2b}\,\mathrm{d}\mu_1(g)\,\frac{\mathrm{d}t}{t}\right)^{1/2} \tag{9.2.1.19}
 $$
 
-where $\mu_1$ is the unique volume-1 Haar measure on $G^1$.
+*where $\mu_1$ is the unique volume-1 Haar measure on $G^1$.*
 
 Then:
 
-(1) The closure of $\mathcal S_\mathrm{E}(G,(1/a,+\infty))$ in the completion $W^{2N,2}_b(G)$ of $\mathcal S_\mathrm{E}(G)$ with respect to the metrizable topology induced by the norms $\{\|\cdot\|_{b,k},\,0\le k\le N\}$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}}\colon W^{2N,2}_b(G)\to W^{2N,2}_b(G)$ obtained by multiplying by the indicator function $\rho_{a,+}(g) := \mathrm{1}_{[1/a,+\infty)}(g)$, $g\in G$.
+(1) *The closure of $\mathcal S_\mathrm{E}(G,(1/a,+\infty))$ in the completion $W^{2N,2}_b(G)$ of $\mathcal S_\mathrm{E}(G)$ with respect to the metrizable topology induced by the norms $\{\|\cdot\|_{b,k},\,0\le k\le N\}$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}}\colon W^{2N,2}_b(G)\to W^{2N,2}_b(G)$ obtained by multiplying by the indicator function $\rho_{a,+}(g) := \mathrm{1}_{[1/a,+\infty)}(g)$, $g\in G$.*
 
-(2) The Mellin transform $M$ extends by continuity to the linear isometric isomorphism:
+(2) *The Mellin transform $M$ extends by continuity to the linear isometric isomorphism:*
 
 $$
 M\colon W^{2N,2}_b(G)\to L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C) \tag{9.2.1.20}
 $$
 
-where the target is the Hilbert-space tensor product obtained as the normed completion of the algebraic tensor product with respect to the Hilbert-space structure assigned by the inner product:
+*where the target is the Hilbert-space tensor product obtained as the normed completion of the algebraic tensor product with respect to the Hilbert-space structure assigned by the inner product:*
 
 $$
 \langle u_1\otimes\phi_1,u_2\otimes\phi_2\rangle_\sigma := \langle u_1,u_2\rangle_{L^2(G^1,\mu_1)}\,\langle\phi_1,\phi_2\rangle_{\mathrm{HS}^{2N,2}_b(\mathbf C)} \tag{9.2.1.21}
@@ -741,7 +747,7 @@ $$
 
 for $u_1,u_2\in L^2(G^1,\mu_1)$ and $\phi_1,\phi_2\in\mathrm{HS}^{2N,2}_b(\mathbf C)$.
 
-(3) The closure of $M(\mathcal S_\mathrm{E}(G,(1/a,+\infty)))$ in $L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C)$ satisfies the following property. There exists a commutative diagram of continuous linear operators with linearly short exact rows:
+(3) *The closure of $M(\mathcal S_\mathrm{E}(G,(1/a,+\infty)))$ in $L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C)$ satisfies the following property. There exists a commutative diagram of continuous linear operators with linearly short exact rows:*
 
 (9.2.1.22)
 
@@ -752,7 +758,7 @@ for $u_1,u_2\in L^2(G^1,\mu_1)$ and $\phi_1,\phi_2\in\mathrm{HS}^{2N,2}_b(\mathb
 \end{tikzcd}
 ```
 
-where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.1.22) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are isometric isomorphisms induced by the Mellin transform.
+*where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.1.22) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are isometric isomorphisms induced by the Mellin transform.*
 
 Proof. We observe that for $\phi = u\otimes\phi_0$, with $u\in W^{2N,2}_b(\mathbf R_{>0})$ and $\phi_0\in L^2(G^1,\mu_1)$, then $|\phi|^2$ satisfies the assumptions of Theorem D.1.2.1, exhibiting $W^{2N,2}_b(G)$ as the completion of $\mathcal S_\mathrm{E}(G,(1/a,+\infty))\simeq\mathcal S(G^1)\,\widehat{\otimes}_\pi\mathcal S_\mathrm{E}(\mathbf R_{>0},(1/a,+\infty))$ with respect to the tensor topology induced by the norm uniquely determined by the inner product in (9.2.2.46), since such norm restricts on elementary tensors, by Theorem D.1.2.1, to the norm $\|\cdot\|_{b,k}$.
 
@@ -762,17 +768,17 @@ $\square$
 
 The following Corollary follows from Theorem 9.2.1.5 and Corollary 9.2.1.3.
 
-Corollary 9.2.1.6. Let $a\in\mathbf R$ be a real number, $a > 1$. Let $b\in\mathbf R$ be a real number $N\ge 1$ an integer.
+Corollary 9.2.1.6. *Let $a\in\mathbf R$ be a real number, $a > 1$. Let $b\in\mathbf R$ be a real number $N\ge 1$ an integer.*
 
 ## PDF page 409
 
 **9.2. HARDY-SOBOLEV SPACES $W^s_I(G)$ AND PALEY-WIENER CONDITIONS** · **409**
 
-We denote by $M$ the Mellin transform $M\colon W^{2N,2}_b(G)\to L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C)$ provided by Theorem 9.2.1.5(2).
+*We denote by $M$ the Mellin transform $M\colon W^{2N,2}_b(G)\to L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C)$ provided by Theorem 9.2.1.5(2).*
 
-Let $\phi\in W^{2N,2}_b(G)$ be the arbitrary element. Then for each $\omega\in\widehat{G^1}$, the function $M(\phi)(s,\omega)$ is a holomorphic function on $\mathbf C_{<b}$, square-integrable on all vertical lines of $\mathbf C_{<b}$ with all of its holomorphic derivatives of order $0\le k\le N-1$.
+*Let $\phi\in W^{2N,2}_b(G)$ be the arbitrary element. Then for each $\omega\in\widehat{G^1}$, the function $M(\phi)(s,\omega)$ is a holomorphic function on $\mathbf C_{<b}$, square-integrable on all vertical lines of $\mathbf C_{<b}$ with all of its holomorphic derivatives of order $0\le k\le N-1$.*
 
-There exist a holomorphic function $u_1\in H^{2N,2}(\mathbf C_{<b})$ and an entire function $u_2\in H^{2N,2}(\mathbf C_{>b})$, canonically associated to $M(\phi,\omega)$, such that:
+*There exist a holomorphic function $u_1\in H^{2N,2}(\mathbf C_{<b})$ and an entire function $u_2\in H^{2N,2}(\mathbf C_{>b})$, canonically associated to $M(\phi,\omega)$, such that:*
 
 $$
 u_2(s) = O\left(\frac{(1-a^{-2\,\mathrm{Re}(s)})^{1/2}}{(\mathrm{Re}(s))^{1/2}}\right) \tag{9.2.1.23}
@@ -788,9 +794,9 @@ as holomorphic functions over $\mathbf C_{<b}$.
 
 The following is an analog of Corollary 9.2.1.4.
 
-Corollary 9.2.1.7. Let $G$ be a Hausdorff locally compact $\mathbf R_{>0}$-modulated group. Let $a,b\in\mathbf R$ be real numbers, $a > 1$. We denote by $M$ the Mellin transform $M\colon\mathcal S_\mathrm{E}(G)\to A\mathcal S(\mathbf C)\overline{\otimes}\mathcal S(\widehat{G^1})$.
+Corollary 9.2.1.7. *Let $G$ be a Hausdorff locally compact $\mathbf R_{>0}$-modulated group. Let $a,b\in\mathbf R$ be real numbers, $a > 1$. We denote by $M$ the Mellin transform $M\colon\mathcal S_\mathrm{E}(G)\to A\mathcal S(\mathbf C)\overline{\otimes}\mathcal S(\widehat{G^1})$.*
 
-For every point $z\in\mathbf C_{<b}$ and every continuous character $\omega\in\widehat{G^1}$, equivalently every point $c\in\Omega(G)_{<b}$ of the Riemann surface of continuous quasi-characters of $G$, the point-evaluation functional $\delta_{(z,\omega)}$ and its derivatives $\delta^{(m)}_{(z,\omega)}$ for $1\le m\le N-1$, induce continuous functionals on $L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$ uniquely determined by the following formula: for every $\phi\in M_{\rho_{a,+}}W^{2N,2}_b(G)$, we have, for a, equivalently any, choice of continuous homomorphic section $\tau$ to the module $|\cdot|_G$:
+*For every point $z\in\mathbf C_{<b}$ and every continuous character $\omega\in\widehat{G^1}$, equivalently every point $c\in\Omega(G)_{<b}$ of the Riemann surface of continuous quasi-characters of $G$, the point-evaluation functional $\delta_{(z,\omega)}$ and its derivatives $\delta^{(m)}_{(z,\omega)}$ for $1\le m\le N-1$, induce continuous functionals on $L^2(G^1,\mu_1)\,\widehat{\otimes}_\sigma\mathrm{HS}^{2N,2}_b(\mathbf C,(1/a,+\infty))$ uniquely determined by the following formula: for every $\phi\in M_{\rho_{a,+}}W^{2N,2}_b(G)$, we have, for a, equivalently any, choice of continuous homomorphic section $\tau$ to the module $|\cdot|_G$:*
 
 $$
 \delta^{(m)}_{(z,\omega)}(M(\phi)(s,\omega)) = \int_{\mathbf R_{>0}}\int_{G^1}\omega(g)\phi(\tau(t)g)(\log(t))^m t^z\,\mathrm{d}\mu_1(g)\,\frac{\mathrm{d}t}{t} \tag{9.2.1.25}
@@ -804,9 +810,9 @@ $\square$
 
 9.2.1.1. Duality. We now provide a description of the continuous dual of $W^s_I(G)$ for $G$ a second-countable $\mathbf R_{>0}$-modulated group, $I\subset\mathbf R$ a closed non-empty interval, $s\ge 0$ a real number. We discuss here below the special case $G = \mathbf R_{>0}$.
 
-Proposition 9.2.1.8 (Hardy-Sobolev duality - I). Let $I\subset\mathbf R$ be a closed non-empty interval, $s\ge 0$ a real number. Assume $I$ is compact, of the form $I = [a,b]$, for $a < b$ real numbers.
+Proposition 9.2.1.8 (Hardy-Sobolev duality - I). *Let $I\subset\mathbf R$ be a closed non-empty interval, $s\ge 0$ a real number. Assume $I$ is compact, of the form $I = [a,b]$, for $a < b$ real numbers.*
 
-For every open interval $J\subset\mathbf R$ containing $I$, the pairing:
+*For every open interval $J\subset\mathbf R$ containing $I$, the pairing:*
 
 $$
 \langle\cdot,\cdot\rangle_{I,s}\colon \mathcal S_J(\mathbf R_{>0})\times\mathcal S_J(\mathbf R_{>0})\to\mathbf C \tag{9.2.1.26}
@@ -818,13 +824,13 @@ $$
 \langle\phi,\psi\rangle_{I,s} := \int_{\mathbf R_{>0}} \phi(t)\psi(t)\,\frac{\mathrm{d}t}{t} \tag{9.2.1.27}
 $$
 
-is continuous and it extends to a continuous duality pairing:
+*is continuous and it extends to a continuous duality pairing:*
 
 $$
 \langle\cdot,\cdot\rangle_{I,s}\colon W^s_I(\mathbf R_{>0})\times W^{-s}_I(\mathbf R_{>0})\to\mathbf C \tag{9.2.1.28}
 $$
 
-where $W^{-s}_I(\mathbf R_{>0})$ is the completion of $\mathcal S_J(\mathbf R_{>0})$ with respect to the norm:
+*where $W^{-s}_I(\mathbf R_{>0})$ is the completion of $\mathcal S_J(\mathbf R_{>0})$ with respect to the norm:*
 
 $$
 \phi\mapsto \|\phi\|_{I,-s} := \left(\int_{\mathbf R_{>0}} |\phi(t)|^2\,w_{I,s}(t)^{-1}\,\frac{\mathrm{d}t}{t}\right)^{1/2} \tag{9.2.1.29}
@@ -840,7 +846,7 @@ $$
 w_{I,s}(t) := \max\{t^{2a},t^{2b}\}\,(1+|\log(t)|^2)^{s/2}. \tag{9.2.1.30}
 $$
 
-In particular, the induced linear map:
+*In particular, the induced linear map:*
 
 $$
 T_{I,s}\colon W^s_I(\mathbf R_{>0})'_\beta\to W^{-s}_I(\mathbf R_{>0}) \tag{9.2.1.31}
@@ -892,7 +898,13 @@ Since $W^s_I(\mathbf R_{>0})$ is a Banach space, being a Hilbert space by Lemma 
 
 The linear endomorphism $\mathcal S_\mathrm{E}(\mathbf R_{>0})\to\mathcal S_\mathrm{E}(\mathbf R_{>0})$ (i.e. we choose $J = \mathbf R$ for the rest of the argument) sending $\psi$ to $w^{-1}_{I,s}\psi$ therefore extends to a continuous linear operator $W^s_I(\mathbf R_{>0})'_\beta\to W^{-s}_I(\mathbf R_{>0})$.
 
-Indeed, for continuous functional $T\in W^s_I(\mathbf R_{>0})'_\beta$, by [Fol, Prop.6.13] there exists a unique $\psi\in W^s_I(\mathbf R_{>0})$ such that $T = T_\psi$, with $T_\psi$ the functional defined as: $T_\psi\colon\phi\mapsto T_\psi(\phi) := \langle\phi,\psi\rangle$.
+Indeed, for continuous functional $T\in W^s_I(\mathbf R_{>0})'_\beta$, by [Fol, Prop.6.13] there exists a unique $\psi\in W^s_I(\mathbf R_{>0})$ such that $T = T_\psi$, with $T_\psi$ the functional defined as:
+
+$$
+T_\psi\colon\phi\mapsto T_\psi(\phi) := \langle\phi,\psi\rangle.
+$$
+
+
 
 The functional on $W^s_I(\mathbf R_{>0})$:
 
@@ -966,23 +978,23 @@ and denote by $W^s_I(\mathbf{R}_{>0})$ the completion of $\mathcal{S}_{\mathrm{E
 
 We check the following basic properties of the Sobolev $W^s_I$-norms:
 
-LEMMA 9.2.2.2 (Sobolev $W^s_I$-norms - I). Let $I \subset \mathbf{R}$ be a closed interval, $s \ge 0$ a real number. Then:
+LEMMA 9.2.2.2 (Sobolev $W^s_I$-norms - I). *Let $I \subset \mathbf{R}$ be a closed interval, $s \ge 0$ a real number. Then:*
 
-(1) The Sobolev $W^s_I$-norm on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ is continuous on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ and it extends by continuity to $\mathcal{S}_J(\mathbf{R}_{>0})$ for any non-empty open interval $J \subset \mathbf{R}_{>0}$ containing $I$. The completion $W^s_I(\mathbf{R}_{>0})$ of $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ equals the completion of $\mathcal{S}_J(\mathbf{R}_{>0})$.
+(1) *The Sobolev $W^s_I$-norm on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ is continuous on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ and it extends by continuity to $\mathcal{S}_J(\mathbf{R}_{>0})$ for any non-empty open interval $J \subset \mathbf{R}_{>0}$ containing $I$. The completion $W^s_I(\mathbf{R}_{>0})$ of $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ equals the completion of $\mathcal{S}_J(\mathbf{R}_{>0})$.*
 
-(2) If $I$ is compact of the form $I = [a,b]$, for $a \le b$ real numbers, then for any $\phi \in \mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ we have:
+(2) *If $I$ is compact of the form $I = [a,b]$, for $a \le b$ real numbers, then for any $\phi \in \mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ we have:*
 
 $$
 \|\phi\|_{I,s} = \left( \int_{\mathbf{R}_{>0}} |\phi(t)|^2 \max\{t^{2a}, t^{2b}\} (1 + |\log(t)|^2)^{s/2} \frac{\mathrm{d}t}{t} \right)^{1/2}. \tag{9.2.2.4}
 $$
 
-If $s$ is an even integer, then the topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ generated by $\|\phi\|_{I,s}$ is equivalent to the metrizable topology generated by the finitely many continuous seminorms:
+*If $s$ is an even integer, then the topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ generated by $\|\phi\|_{I,s}$ is equivalent to the metrizable topology generated by the finitely many continuous seminorms:*
 
 $$
 \|\phi\|_{M,\sigma,k} := \left( \int_{\sigma - i\infty}^{\sigma + i\infty} |\partial^k_z M(\phi)(z)|^2\,|\mathrm{d}z| \right)^{1/2}, \quad \sigma \in \{a,b\},\ 0 \le k \le \left[\frac{s}{2}\right]. \tag{9.2.2.5}
 $$
 
-(3) Let $a,b \in \mathbf{R}$ be real numbers. If $I$ is of the form:
+(3) *Let $a,b \in \mathbf{R}$ be real numbers. If $I$ is of the form:*
 
 (a) $I = [a,+\infty)$, then we have, for any $\phi \in \mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$:
 
@@ -990,7 +1002,7 @@ $$
 \|\phi\|_{I,s} = \sup_{\sigma \ge a} \left( \int_{\mathbf{R}_{>0}} |\phi(t)|^2 \max\{t^{2a}, t^{2\sigma}\} (1 + |\log(t)|^2)^{s/2} \frac{\mathrm{d}t}{t} \right)^{1/2}. \tag{9.2.2.6}
 $$
 
-If $s$ is an even integer, then for any sequence $\{c_k\}_{k \ge 0} \subset [a,+\infty)$ such that $\limsup_{k \ge 0} c_k = +\infty$ and $c_0 = a$, the topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ generated by $\|\phi\|_{I,s}$ is equivalent to the metrizable topology generated by the countable family of continuous seminorms:
+*If $s$ is an even integer, then for any sequence $\{c_k\}_{k \ge 0} \subset [a,+\infty)$ such that $\limsup_{k \ge 0} c_k = +\infty$ and $c_0 = a$, the topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ generated by $\|\phi\|_{I,s}$ is equivalent to the metrizable topology generated by the countable family of continuous seminorms:*
 
 $$
 \|\phi\|_{M,\sigma,k} := \left( \int_{\sigma - i\infty}^{\sigma + i\infty} |\partial^k_z M(\phi)(z)|^2\,|\mathrm{d}z| \right)^{1/2}, \quad \sigma \in \{c_k, k \ge 0\},\ 0 \le k \le \left[\frac{s}{2}\right] \tag{9.2.2.7}
@@ -1088,23 +1100,23 @@ as $\sigma$ varies over a sequence $\{c_k\}_{k \ge 0} \subset \mathbf{R}$ such t
 
 PROPOSITION 9.2.2.4 (Fourier-Mellin transform on $W^s_I(\mathbf{R}_{>0})$). Let $s \ge 0$ be a real number. Then:
 
-(1) The topology on $A\mathcal{S}(\mathbf{C})$ generated by the countable family of continuous norms from (9.2.2.19) as $\sigma$ varies over $\{c_k\}_{k \ge 0}$ does not depend on the choice of $\{c_k\}_{k \ge 0}$ and it is Hilbertizable.
+(1) *The topology on $A\mathcal{S}(\mathbf{C})$ generated by the countable family of continuous norms from (9.2.2.19) as $\sigma$ varies over $\{c_k\}_{k \ge 0}$ does not depend on the choice of $\{c_k\}_{k \ge 0}$ and it is Hilbertizable.*
 
-(2) $\mathrm{HS}^s(\mathbf{C}_I) \subset \mathscr{O}(\mathbf{C}_{\mathrm{Int}(I)})$, and for every $u \in \mathrm{HS}^s(\mathbf{C}_I)$ and every $b \in \partial I$ finite, the limit:
+(2) *$\mathrm{HS}^s(\mathbf{C}_I) \subset \mathscr{O}(\mathbf{C}_{\mathrm{Int}(I)})$, and for every $u \in \mathrm{HS}^s(\mathbf{C}_I)$ and every $b \in \partial I$ finite, the limit:*
 
 $$
 u_b(\tau) := \lim_{\sigma \to b, \sigma \in \mathrm{Int}(I)} u(\sigma + i\tau) \tag{9.2.2.20}
 $$
 
-exists for almost all $\tau \in \mathbf{R}$ and it is an element of $W^{s,2}(\mathbf{R})$. If $s$ is an even integer, then $u_b$ is an element of $\mathrm{HS}^{s,2}_b(\mathbf{C})$, the $b$-line Hardy-Sobolev space.
+*exists for almost all $\tau \in \mathbf{R}$ and it is an element of $W^{s,2}(\mathbf{R})$. If $s$ is an even integer, then $u_b$ is an element of $\mathrm{HS}^{s,2}_b(\mathbf{C})$, the $b$-line Hardy-Sobolev space.*
 
-(3) Assume $s$ is an even integer. Then, for any non-empty open interval $J$ containing $I$, the Mellin transform:
+(3) *Assume $s$ is an even integer. Then, for any non-empty open interval $J$ containing $I$, the Mellin transform:*
 
 $$
 M : \mathcal{S}_J(\mathbf{R}_{>0}) \to A(\mathbf{C}_J) \tag{9.2.2.21}
 $$
 
-from (D.3.2.2) extends by continuity to a linear topological isomorphism:
+*from (D.3.2.2) extends by continuity to a linear topological isomorphism:*
 
 $$
 M : W^s_I(\mathbf{R}_{>0}) \to \mathrm{HS}^s(\mathbf{C}_I). \tag{9.2.2.22}
@@ -1112,9 +1124,9 @@ $$
 
 PROOF. Proposition 9.2.2.4 follows from Lemma 9.2.2.2 in the case $I$ is a compact connected interval, and the general case reduces to this special case using Lemma 9.2.2.2 again and the Asymptotic Cauchy Integral Formula (see Theorem B.2.2.4).$^1$ $\square$
 
-COROLLARY 9.2.2.5 (Continuous point-evaluation functionals on Hardy-Sobolev spaces). Let $I \subset \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ a real number. Let $z_0 \in \mathbf{C}_I$. Then:
+COROLLARY 9.2.2.5 (Continuous point-evaluation functionals on Hardy-Sobolev spaces). *Let $I \subset \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ a real number. Let $z_0 \in \mathbf{C}_I$. Then:*
 
-(1) if $z_0 \in \mathbf{C}_{\mathrm{Int}(I)}$, then for any integer $k \ge 0$, the functional:
+(1) *if $z_0 \in \mathbf{C}_{\mathrm{Int}(I)}$, then for any integer $k \ge 0$, the functional:*
 
 $$
 u \mapsto (\partial^k_z u)(z_0) \tag{9.2.2.23}
@@ -1128,7 +1140,7 @@ $$
 u \mapsto (\partial^k_z u)(z_0) \tag{9.2.2.24}
 $$
 
-is continuous if and only if the integer $k \ge 0$ satisfies: for every integer $0 \le k \le \left[\frac{s-1}{2}\right]$.
+*is continuous if and only if the integer $k \ge 0$ satisfies: for every integer $0 \le k \le \left[\frac{s-1}{2}\right]$.*
 
 PROOF. The proof of Corollary 9.2.2.5 mirrors the argument for Corollary 9.2.1.4, using Proposition 9.2.2.4.$^2$ $\square$
 
@@ -1141,7 +1153,7 @@ $^2$Return here.
 
 **9.2. HARDY-SOBOLEV SPACES $W^s_I(G)$ AND PALEY-WIENER CONDITIONS** · **415**
 
-THEOREM 9.2.2.6 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - III). Let $I \subset \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ an even integer. Let $J \subset \mathbf{R}$ be any non-empty open interval containing $I$. We denote by $M$ the Mellin transform $M : \mathcal{S}_J(\mathbf{R}_{>0}) \to A\mathcal{S}(\mathbf{C}_J)$.
+THEOREM 9.2.2.6 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - III). *Let $I \subset \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ an even integer. Let $J \subset \mathbf{R}$ be any non-empty open interval containing $I$. We denote by $M$ the Mellin transform $M : \mathcal{S}_J(\mathbf{R}_{>0}) \to A\mathcal{S}(\mathbf{C}_J)$.*
 
 We denote by:
 
@@ -1149,34 +1161,34 @@ $$
 \mathcal{S}_J(\mathbf{R}_{>0}, (1/a,+\infty)) \subset \mathcal{S}_J(\mathbf{R}_{>0}) \tag{9.2.2.25}
 $$
 
-the linear subspace of those Schwartz-Bruhat functions on $\mathbf{R}_{>0}$ of $J$-exponential decay, whose support is contained within the interval $(1/a,+\infty)$.
+*the linear subspace of those Schwartz-Bruhat functions on $\mathbf{R}_{>0}$ of $J$-exponential decay, whose support is contained within the interval $(1/a,+\infty)$.*
 
 Then:
 
-(1) The closure of $\mathcal{S}_J(\mathbf{R}_{>0}, (1/a,+\infty))$ in the Sobolev space $W^s_I(\mathbf{R}_{>0})$ is the closed subspace:
+(1) *The closure of $\mathcal{S}_J(\mathbf{R}_{>0}, (1/a,+\infty))$ in the Sobolev space $W^s_I(\mathbf{R}_{>0})$ is the closed subspace:*
 
 $$
 W^s_I(\mathbf{R}_{>0}, (1/a,+\infty)) \subset W^s_I(\mathbf{R}_{>0}) \tag{9.2.2.26}
 $$
 
-obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}} : W^s_I(\mathbf{R}_{>0}) \to W^s_I(\mathbf{R}_{>0})$ obtained by multiplying by the indicator function $\rho_{a,+}(t) := \mathrm{1}_{[1/a,+\infty)}(t)$.
+*obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}} : W^s_I(\mathbf{R}_{>0}) \to W^s_I(\mathbf{R}_{>0})$ obtained by multiplying by the indicator function $\rho_{a,+}(t) := \mathrm{1}_{[1/a,+\infty)}(t)$.*
 
-(2) The closure $\mathrm{HS}^s(\mathbf{C}_I, (1/a,+\infty))$ of $M(\mathcal{S}_J(\mathbf{R}_{>0}, (1/a,+\infty)))$ in the Hardy-Sobolev space $\mathrm{HS}^s(\mathbf{C}_I)$ satisfies the following property: there exists a commutative diagram of continuous linear operators with linearly short exact rows:
+(2) *The closure $\mathrm{HS}^s(\mathbf{C}_I, (1/a,+\infty))$ of $M(\mathcal{S}_J(\mathbf{R}_{>0}, (1/a,+\infty)))$ in the Hardy-Sobolev space $\mathrm{HS}^s(\mathbf{C}_I)$ satisfies the following property: there exists a commutative diagram of continuous linear operators with linearly short exact rows:*
 
 (9.2.2.27)
 
 ```latex
 \begin{tikzcd}
-0 \arrow[r] & M_{[1/a,1]}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"] & M_{\rho_{a,+}}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"] & M_{\rho_{1,+}}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"] & 0 \\
+0 \arrow[r] & M_{[1/a,1]}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"'] & M_{\rho_{a,+}}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"'] & M_{\rho_{1,+}}W^s_I(\mathbf{R}_{>0}) \arrow[r] \arrow[d, "M"] & 0 \\
 0 \arrow[r] & \mathrm{PW}^s(\mathbf{C}_I,a) \arrow[r] & \mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty)) \arrow[r] & \mathrm{HS}^s(\mathbf{C}_{I'}) \arrow[r] & 0
 \end{tikzcd}
 ```
 
-where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.2.27) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are linear topological isomorphisms induced by the Mellin transform, and where:
+*where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.2.27) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are linear topological isomorphisms induced by the Mellin transform, and where:*
 
-(1) $I' \subset \mathbf{R}$ is the non-empty closed interval $I' := (-\infty,\sup(I)]$.
+(1) *$I' \subset \mathbf{R}$ is the non-empty closed interval $I' := (-\infty,\sup(I)]$.*
 
-(2) $\mathrm{PW}^s(\mathbf{C}_I,a)$ is the closed linear subspace of the Hardy-Sobolev space $\mathrm{HS}^s(\mathbf{C}_I)$ of those holomorphic functions $\phi(s)$ over $\mathbf{C}_{\mathrm{Int}(I)}$ that extend to entire functions and satisfy:
+(2) *$\mathrm{PW}^s(\mathbf{C}_I,a)$ is the closed linear subspace of the Hardy-Sobolev space $\mathrm{HS}^s(\mathbf{C}_I)$ of those holomorphic functions $\phi(s)$ over $\mathbf{C}_{\mathrm{Int}(I)}$ that extend to entire functions and satisfy:*
 
 $$
 \phi(s) = O\left( \frac{(1 - a^{-2\,\mathrm{Re}(s)})^{1/2}}{(\mathrm{Re}(s))^{1/2}} \right). \tag{9.2.2.28}
@@ -1186,11 +1198,11 @@ DEFINITION 9.2.2.7 (Paley-Wiener space of weight $a$, degree $s$, base $I$). Let
 
 PROOF OF THEOREM 9.2.2.6. The proof of Theorem 9.2.2.6 proceeds similarly as the proof of Theorem 9.2.1.2.$^3$ $\square$
 
-COROLLARY 9.2.2.8. Let $I \in \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ an even integer. Let $a > 1$ be a real number.
+COROLLARY 9.2.2.8. *Let $I \in \mathbf{R}$ be a non-empty closed interval, $s \ge 0$ an even integer. Let $a > 1$ be a real number.*
 
 Let $z_0 \in \mathbf{C}_{\le \sup(I)}$. Then:
 
-(1) if $z_0 \in \mathbf{C}_{<\sup(I)}$, then for any integer $k \ge 0$, the functional:
+(1) *if $z_0 \in \mathbf{C}_{<\sup(I)}$, then for any integer $k \ge 0$, the functional:*
 
 $$
 u \mapsto (\partial^k_z u)(z_0) \tag{9.2.2.29}
@@ -1205,13 +1217,13 @@ $^3$Return here.
 
 **416** · **CHAPTER 9. HARDY-SOBOLEV TOPOLOGIES**
 
-(2) If $\sup(I)$ is finite and $\mathrm{Re}(z_0) = \sup(I)$, then the functional:
+(2) *If $\sup(I)$ is finite and $\mathrm{Re}(z_0) = \sup(I)$, then the functional:*
 
 $$
 u \mapsto (\partial^k_z u)(z_0) \tag{9.2.2.30}
 $$
 
-is continuous if and only if the integer $k \ge 0$ satisfies: for every integer $0 \le k \le \left[\frac{s-1}{2}\right]$.
+*is continuous if and only if the integer $k \ge 0$ satisfies: for every integer $0 \le k \le \left[\frac{s-1}{2}\right]$.*
 
 PROOF. This is a consequence of Corollary 9.2.2.5.$^4$ $\square$
 
@@ -1241,15 +1253,15 @@ and denote by $W^s_I(G)$ the completion of $\mathcal{S}_{\mathrm{E}}(G)$ with re
 
 We check the following basic properties of the Sobolev $W^s_I$-norms in the general case of $\mathbf{R}_{>0}$-modulated groups $G$, as opposed to the special case $G = \mathbf{R}_{>0}$, which is discussed in Lemma 9.2.2.2:
 
-LEMMA 9.2.2.10 (Sobolev $W^s_I$-norms - II). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I \subset \mathbf{R}$ be a closed interval, $s \ge 0$ a real number. Then:
+LEMMA 9.2.2.10 (Sobolev $W^s_I$-norms - II). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I \subset \mathbf{R}$ be a closed interval, $s \ge 0$ a real number. Then:*
 
-(1) The Sobolev $W^s_I$-norm on $\mathcal{S}_{\mathrm{E}}(G)$ is continuous on $\mathcal{S}_{\mathrm{E}}(G)$ and it extends by continuity to $\mathcal{S}_J(G)$ for any non-empty open interval $J \subset \mathbf{R}$ containing $I$. The completion $W^s_I(G)$ of $\mathcal{S}_{\mathrm{E}}(G)$ equals the completion of $\mathcal{S}_J(G)$. Moreover, if $s$ is an even integer, then for any choice of continuous homomorphic section $\tau$ to the module $|\cdot|_G$, the pull-back map:
+(1) *The Sobolev $W^s_I$-norm on $\mathcal{S}_{\mathrm{E}}(G)$ is continuous on $\mathcal{S}_{\mathrm{E}}(G)$ and it extends by continuity to $\mathcal{S}_J(G)$ for any non-empty open interval $J \subset \mathbf{R}$ containing $I$. The completion $W^s_I(G)$ of $\mathcal{S}_{\mathrm{E}}(G)$ equals the completion of $\mathcal{S}_J(G)$. Moreover, if $s$ is an even integer, then for any choice of continuous homomorphic section $\tau$ to the module $|\cdot|_G$, the pull-back map:*
 
 $$
 W^s_I(G) \to W^s_I(\mathbf{R}_{>0})\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \tag{9.2.2.32}
 $$
 
-where $\mu_1$ is the volume-$1$ Haar measure on $G^1$ and $\widehat{\mu}_1$ is its Plancherel measure. The Mellin transform on $\mathcal{S}_{\mathrm{E}}(G)$ induces a linear topological isomorphism:
+*where $\mu_1$ is the volume-$1$ Haar measure on $G^1$ and $\widehat{\mu}_1$ is its Plancherel measure. The Mellin transform on $\mathcal{S}_{\mathrm{E}}(G)$ induces a linear topological isomorphism:*
 
 $$
 W^s_I(G) \to \mathrm{HS}^s(\mathbf{C}_I)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \tag{9.2.2.33}
@@ -1262,21 +1274,21 @@ $^4$Return here.
 
 **9.2. HARDY-SOBOLEV SPACES $W^s_I(G)$ AND PALEY-WIENER CONDITIONS** · **417**
 
-where $\widehat{\mu}_1$ is the Plancherel measure of $\mu_1$, and the topology on the $\sigma$-tensor product is equivalent to the metrizable topology generated by the finitely many continuous seminorms:
+*where $\widehat{\mu}_1$ is the Plancherel measure of $\mu_1$, and the topology on the $\sigma$-tensor product is equivalent to the metrizable topology generated by the finitely many continuous seminorms:*
 
 $$
 \|\cdot\|'_{I,s} \otimes_\sigma \|\cdot\|_{L^2(\widehat{G^1},\widehat{\mu}_1)}
 $$
 
-where, for each $u \in \mathrm{HS}^s(\mathbf{C}_I)$, $\|u\|'_{I,\sigma,k} := \left( \int_{\sigma - i\infty}^{\sigma + i\infty} |\partial^k_z u(z)|^2\,|\mathrm{d}z| \right)^{1/2}$ as $\sigma$ varies over the countably many elements of a sequence $\{c_k\}_{k \ge 0} \subset \mathbf{R}$ such that the finite boundary points of $\partial I$ are limit points of $\{c_k\}_{k \ge 0}$, and such that the integer $k \ge 0$ satisfies $0 \le k \le \left[\frac{s}{2}\right]$.
+*where, for each $u \in \mathrm{HS}^s(\mathbf{C}_I)$, $\|u\|'_{I,\sigma,k} := \left( \int_{\sigma - i\infty}^{\sigma + i\infty} |\partial^k_z u(z)|^2\,|\mathrm{d}z| \right)^{1/2}$ as $\sigma$ varies over the countably many elements of a sequence $\{c_k\}_{k \ge 0} \subset \mathbf{R}$ such that the finite boundary points of $\partial I$ are limit points of $\{c_k\}_{k \ge 0}$, and such that the integer $k \ge 0$ satisfies $0 \le k \le \left[\frac{s}{2}\right]$.*
 
-(2) If $I$ is compact of the form $I = [a,b]$, for $a \le b$ real numbers, then for any $\phi \in \mathcal{S}_{\mathrm{E}}(G)$ we have:
+(2) *If $I$ is compact of the form $I = [a,b]$, for $a \le b$ real numbers, then for any $\phi \in \mathcal{S}_{\mathrm{E}}(G)$ we have:*
 
 $$
 \|\phi\|_{I,s} = \left( \int_G |\phi(g)|^2 \max\{|g|^{2a}_G, |g|^{2b}_G\} (1 + |\log|g|_G|^2)^{s/2}\,\mathrm{d}\mu_G(g) \right)^{1/2}. \tag{9.2.2.34}
 $$
 
-(3) Let $a,b \in \mathbf{R}$ be real numbers. If $I$ is of the form:
+(3) *Let $a,b \in \mathbf{R}$ be real numbers. If $I$ is of the form:*
 
 (a) $I = [a,+\infty)$, then we have, for any $\phi \in \mathcal{S}_{\mathrm{E}}(G)$:
 
@@ -1292,9 +1304,9 @@ $$
 
 PROOF. Upon proving (1), the rest of the Lemma follows from Lemma 9.2.2.2. Part (1) follows from the definition of the norm $\|\cdot\|_{I,s}$ combined with Theorem D.1.2.1.$^5$ $\square$
 
-PROPOSITION 9.2.2.11 (Hardy-Sobolev duality - II). Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Assume $G$ is second-countable. Let $\mu_G$ be a choice of Haar measure on $G$. Let $I \subset \mathbf{R}$ be a closed non-empty interval, $s \ge 0$ a real number. Assume $I$ is compact, of the form $I = [a,b]$, for $a < b$ real numbers.
+PROPOSITION 9.2.2.11 (Hardy-Sobolev duality - II). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Assume $G$ is second-countable. Let $\mu_G$ be a choice of Haar measure on $G$. Let $I \subset \mathbf{R}$ be a closed non-empty interval, $s \ge 0$ a real number. Assume $I$ is compact, of the form $I = [a,b]$, for $a < b$ real numbers.*
 
-For every open interval $J \subset \mathbf{R}$ containing $I$, the pairing:
+*For every open interval $J \subset \mathbf{R}$ containing $I$, the pairing:*
 
 $$
 \langle \cdot, \cdot \rangle_{I,s} : \mathcal{S}_J(G) \times \mathcal{S}_J(G) \to \mathbf{C} \tag{9.2.2.37}
@@ -1306,13 +1318,13 @@ $$
 \langle \phi, \psi \rangle_{I,s} := \int_G \phi(g)\,\psi(g)\,\mu_G(g) \tag{9.2.2.38}
 $$
 
-is continuous and it extends to a continuous duality pairing:
+*is continuous and it extends to a continuous duality pairing:*
 
 $$
 \langle \cdot, \cdot \rangle_{I,s} : W^s_I(G) \times W^{-s}_I(G) \to \mathbf{C} \tag{9.2.2.39}
 $$
 
-where $W^{-s}_I(G)$ is the completion of $\mathcal{S}_J(G)$ with respect to the norm:
+*where $W^{-s}_I(G)$ is the completion of $\mathcal{S}_J(G)$ with respect to the norm:*
 
 $$
 \phi \mapsto \|\phi\|_{I,-s} := \left( \int_G |\phi(g)|^2\,w_{I,s}(g)^{-1}\,\mu_G(g) \right)^{1/2} \tag{9.2.2.40}
@@ -1324,7 +1336,7 @@ $$
 w_{I,s}(g) := \max\{|g|^{2a}_G, |g|^{2b}_G\}\,(1 + |\log|g|_G|^2)^{s/2}. \tag{9.2.2.41}
 $$
 
-In particular, the induced linear map:
+*In particular, the induced linear map:*
 
 $$
 T_{I,s} : W^s_I(G)'_\beta \to W^{-s}_I(G) \tag{9.2.2.42}
@@ -1341,9 +1353,9 @@ $^5$Return here.
 
 The Proposition is proved in a manner analogous to the proof of Proposition 9.2.1.8, or by using Lemma 9.2.2.10(1).
 
-COROLLARY 9.2.2.12. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $a,s \in \mathbf{R}$ be real numbers, $a > 1$, $s \ge 0$. Let $I \subset \mathbf{R}$ be a non-empty closed interval. We denote by $M$ the Mellin transform $M : \mathcal{S}_I(G) \to A\mathcal{S}(\mathbf{C}_I) \overline{\otimes} \mathcal{S}(\widehat{G^1})$.
+COROLLARY 9.2.2.12. *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $a,s \in \mathbf{R}$ be real numbers, $a > 1$, $s \ge 0$. Let $I \subset \mathbf{R}$ be a non-empty closed interval. We denote by $M$ the Mellin transform $M : \mathcal{S}_I(G) \to A\mathcal{S}(\mathbf{C}_I) \overline{\otimes} \mathcal{S}(\widehat{G^1})$.*
 
-(1) For every point $z \in \mathbf{C}_{\mathrm{Int}(I)}$, the point-evaluation functional $\delta_z \otimes \delta_\omega$ and its derivatives $\delta^{(k)}_z \otimes \delta_\omega$, with $\omega \in \widehat{G^1}$ and $\delta_\omega$ the point-mass at $\omega$ on the space of square-summable sequences on the countable discrete abelian group $\widehat{G^1}$, are continuous on $\mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty))\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$.
+(1) *For every point $z \in \mathbf{C}_{\mathrm{Int}(I)}$, the point-evaluation functional $\delta_z \otimes \delta_\omega$ and its derivatives $\delta^{(k)}_z \otimes \delta_\omega$, with $\omega \in \widehat{G^1}$ and $\delta_\omega$ the point-mass at $\omega$ on the space of square-summable sequences on the countable discrete abelian group $\widehat{G^1}$, are continuous on $\mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty))\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$.*
 
 For every $\phi \in M_{\rho_{a,+}}W^s_I(G)$, we have:
 
@@ -1353,11 +1365,11 @@ $$
 
 for each integer $k \ge 0$.
 
-(2) For any $z \in \mathbf{C}_I$ with $\mathrm{Re}(z) \in \partial I$, the point-evaluation functional $\delta_z \otimes \delta_\omega$ and its derivatives $\delta^{(k)}_z \otimes \delta_\omega$ of order $0 \le k \le \left[\frac{s-1}{2}\right]$, are continuous on $\mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty))\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$.
+(2) *For any $z \in \mathbf{C}_I$ with $\mathrm{Re}(z) \in \partial I$, the point-evaluation functional $\delta_z \otimes \delta_\omega$ and its derivatives $\delta^{(k)}_z \otimes \delta_\omega$ of order $0 \le k \le \left[\frac{s-1}{2}\right]$, are continuous on $\mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty))\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$.*
 
 PROOF. The Corollary follows from Lemma 9.2.2.10 combined with Corollary 9.2.2.5. $\square$
 
-THEOREM 9.2.2.13 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - IV). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated abelian group. Let $a \in \mathbf{R}$ be a real number, $a > 1$. Let $I \subset \mathbf{R}$ be a non-empty closed interval. We denote by $M$ the Mellin transform $M : \mathcal{S}_I(G) \to A\mathcal{S}(\mathbf{C}_I) \overline{\otimes} \mathcal{S}(\widehat{G^1})$.
+THEOREM 9.2.2.13 (Paley-Wiener Theorem for Hardy-Sobolev Spaces - IV). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated abelian group. Let $a \in \mathbf{R}$ be a real number, $a > 1$. Let $I \subset \mathbf{R}$ be a non-empty closed interval. We denote by $M$ the Mellin transform $M : \mathcal{S}_I(G) \to A\mathcal{S}(\mathbf{C}_I) \overline{\otimes} \mathcal{S}(\widehat{G^1})$.*
 
 We denote by:
 
@@ -1365,33 +1377,33 @@ $$
 \mathcal{S}_I(G,(1/a,+\infty)) \subset \mathcal{S}_I(G) \tag{9.2.2.44}
 $$
 
-the linear subspace of those Schwartz-Bruhat functions on $G$ of $I$-exponential decay, whose support is sent by the module homomorphism $|\cdot|_G$ into the interval $(1/a,+\infty) \subset \mathbf{R}_{>0}$.
+*the linear subspace of those Schwartz-Bruhat functions on $G$ of $I$-exponential decay, whose support is sent by the module homomorphism $|\cdot|_G$ into the interval $(1/a,+\infty) \subset \mathbf{R}_{>0}$.*
 
 Then:
 
-(1) The closure of $\mathcal{S}_{\mathrm{E}}(G,(1/a,+\infty))$ in $W^s_I(G)$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}} : W^s_I(G) \to W^s_I(G)$ obtained by multiplying by the indicator function $\rho_{a,+}(g) := \mathrm{1}_{[1/a,+\infty)}(g)$, $g \in G$.
+(1) *The closure of $\mathcal{S}_{\mathrm{E}}(G,(1/a,+\infty))$ in $W^s_I(G)$ is the closed subspace obtained as the closed range of the idempotent multiplication operator $M_{\rho_{a,+}} : W^s_I(G) \to W^s_I(G)$ obtained by multiplying by the indicator function $\rho_{a,+}(g) := \mathrm{1}_{[1/a,+\infty)}(g)$, $g \in G$.*
 
-(2) The Mellin transform $M$ extends by continuity to the linear topological isomorphism:
+(2) *The Mellin transform $M$ extends by continuity to the linear topological isomorphism:*
 
 $$
 M : W^s_I(G) \to \mathrm{HS}^s(\mathbf{C}_I)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \tag{9.2.2.45}
 $$
 
-where the completion of the algebraic tensor product with respect to the Hausdorff locally topology generated by the family of seminorms associated to the inner products:
+*where the completion of the algebraic tensor product with respect to the Hausdorff locally topology generated by the family of seminorms associated to the inner products:*
 
 $$
 \langle \phi_1 \otimes u_1, \phi_2 \otimes u_2 \rangle_\sigma := \langle \phi_1, \phi_2 \rangle_{\mathrm{HS}^s_b(\mathbf{C})} \langle u_1, u_2 \rangle_{L^2(\widehat{G^1},\widehat{\mu}_1)},\ b \in I \tag{9.2.2.46}
 $$
 
-for $\phi_1,\phi_2 \in \mathrm{HS}^s(\mathbf{C}_I)$ and $u_1,u_2 \in L^2(\widehat{G^1},\widehat{\mu}_1)$, with $\phi_1,\phi_2$ elements of $\mathrm{HS}^s_b(\mathbf{C}_I)$ by restriction to the vertical lines $b + i\mathbf{R}$ for each $b \in I$.
+*for $\phi_1,\phi_2 \in \mathrm{HS}^s(\mathbf{C}_I)$ and $u_1,u_2 \in L^2(\widehat{G^1},\widehat{\mu}_1)$, with $\phi_1,\phi_2$ elements of $\mathrm{HS}^s_b(\mathbf{C}_I)$ by restriction to the vertical lines $b + i\mathbf{R}$ for each $b \in I$.*
 
-(3) The closure of $M(\mathcal{S}_I(G,(1/a,+\infty)))$ in $\mathrm{HS}^s(\mathbf{C}_I)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$ satisfies the following property. There exists a commutative diagram of continuous linear operators with linearly short exact rows:
+(3) *The closure of $M(\mathcal{S}_I(G,(1/a,+\infty)))$ in $\mathrm{HS}^s(\mathbf{C}_I)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1)$ satisfies the following property. There exists a commutative diagram of continuous linear operators with linearly short exact rows:*
 
 (9.2.2.47)
 
 ```latex
 \begin{tikzcd}
-0 \arrow[r] & M_{[1/a,1]}W^s_I(G) \arrow[r] \arrow[d, "M"] & M_{\rho_{a,+}}W^s_I(G) \arrow[r] \arrow[d, "M"] & M_{\rho_{1,+}}W^s_I(G) \arrow[r] \arrow[d, "M"] & 0 \\
+0 \arrow[r] & M_{[1/a,1]}W^s_I(G) \arrow[r] \arrow[d, "M"'] & M_{\rho_{a,+}}W^s_I(G) \arrow[r] \arrow[d, "M"'] & M_{\rho_{1,+}}W^s_I(G) \arrow[r] \arrow[d, "M"] & 0 \\
 0 \arrow[r] & \mathrm{PW}^s(\mathbf{C}_I,a)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \arrow[r] & \mathrm{HS}^s(\mathbf{C}_I,(1/a,+\infty))\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \arrow[r] & \mathrm{HS}^s(\mathbf{C}_I)\,\widehat{\otimes}_\sigma L^2(\widehat{G^1},\widehat{\mu}_1) \arrow[r] & 0
 \end{tikzcd}
 ```
@@ -1402,7 +1414,7 @@ for $\phi_1,\phi_2 \in \mathrm{HS}^s(\mathbf{C}_I)$ and $u_1,u_2 \in L^2(\wideha
 
 **9.3. MODULE STRUCTURES OVER $\mathcal{D}(G)$ AND APPROXIMATE UNITS** · **419**
 
-where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.2.47) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are linear topological isomorphisms induced by the Mellin transform.
+*where $M_{[1/a,1]}$ is the multiplication by $\mathrm{1}_{[1/a,1]}$ operator, the leftmost operators in (9.2.2.47) are continuous, with closed range, the rightmost are surjective and open, the vertical arrows are linear topological isomorphisms induced by the Mellin transform.*
 
 Proof. Part (2) of the Theorem is Lemma 9.2.2.10(1). The remaining assertions follow from Theorem 9.2.2.6.
 
@@ -1436,7 +1448,7 @@ where the integral is in the sense of Pettis. We further refer to $A(\varphi)$ a
 
 Remark 9.3.1.2. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, $E:=\mathcal{S}_I(G)$, $W^s_I(G)$ respectively, for $I$ a non-empty closed interval. Since $\varphi$ is compactly supported, we deduce that indeed $A$ is valued in $\mathscr{L}(E)$, the $\mathbf{C}$-algebra of continuous endomorphisms of $E$, by Theorem C.4.3.5, since $E$ is complete (see Theorem D.3.3.7(2) for the case $E=\mathcal{S}_I(G)$), hence quasi-complete.
 
-Lemma 9.3.1.3. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I\subset\mathbf{R}$ be a closed non-empty interval, $s\ge 0$ be a real number. Then the linear operators $A$ from (9.3.1.1) from $\mathcal{D}(G)$ to $\mathscr{L}(\mathcal{S}_I(G))$, and to $\mathscr{L}(W^s_I(G))$, respectively, is continuous with respect to the locally convex inductive limit topology on the source, and the topology of uniform convergence on bounded subsets on the target.
+Lemma 9.3.1.3. *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I\subset\mathbf{R}$ be a closed non-empty interval, $s\ge 0$ be a real number. Then the linear operators $A$ from (9.3.1.1) from $\mathcal{D}(G)$ to $\mathscr{L}(\mathcal{S}_I(G))$, and to $\mathscr{L}(W^s_I(G))$, respectively, is continuous with respect to the locally convex inductive limit topology on the source, and the topology of uniform convergence on bounded subsets on the target.*
 
 ## PDF page 420
 
@@ -1496,19 +1508,19 @@ Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. The continuous 
 
 over the Hausdorff locally compact abelian group $G$, is defined in terms of the function $g\mapsto |\log|g|_G|$, which measures rapid decay over $G$).
 
-Lemma 9.3.1.5. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I=[a,b]\subset\mathbf{R}$ be a compact non-empty interval, $s\ge 0$ a real number. The function:
+Lemma 9.3.1.5. *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I=[a,b]\subset\mathbf{R}$ be a compact non-empty interval, $s\ge 0$ a real number. The function:*
 
 $$
 f:G\to \mathscr{L}_\beta(W^s_I(G)) \tag{9.3.1.5}
 $$
 
-defined as $f(g):=\rho_G(g,\cdot)$, satisfies, for any continuous seminorm $p$ on $\mathscr{L}_\beta(W^s_I(G))$:
+*defined as $f(g):=\rho_G(g,\cdot)$, satisfies, for any continuous seminorm $p$ on $\mathscr{L}_\beta(W^s_I(G))$:*
 
 $$
 p(f(g))\le C_p\max\{|g|^a_G,|g|^b_G\}\,|\log|g|_G|^{s/2} \tag{9.3.1.6}
 $$
 
-for a positive real number $C_p$ depending on $p$ and on $G$, $I$ and $s$. Moreover, $p(f)$ is $\mu_G$-measurable as a real-valued function on $G$.
+*for a positive real number $C_p$ depending on $p$ and on $G$, $I$ and $s$. Moreover, $p(f)$ is $\mu_G$-measurable as a real-valued function on $G$.*
 
 In particular, for $I=\{b\}$, a single point, then the operator norm of $\rho_G(g,\cdot)$ as $g$ varies over the second-countable $\mathbf{R}_{>0}$-modulated group $G$, grows at most polynomially over $G$.
 
@@ -1568,21 +1580,21 @@ Within $W^s_I(G)$, we have the ability to approximate the identity with respect 
 
 9.3.2.1. The case $I=\{b\}$. The following Lemma is a consequence of [Co, Lemma 5].
 
-Lemma 9.3.2.1 (Bounded Approximation of the identity). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, $\mu_G$ a choice of Haar measure on $G$. Let $b,s\in\mathbf{R}$ be real numbers, $s\ge 0$. The continuous linear operator $A$ from (9.3.1.1) with target $\mathscr{L}_\beta(W^s_{\{b\}}(G))$, extends uniquely to a continuous linear operator
+Lemma 9.3.2.1 (Bounded Approximation of the identity). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, $\mu_G$ a choice of Haar measure on $G$. Let $b,s\in\mathbf{R}$ be real numbers, $s\ge 0$. The continuous linear operator $A$ from (9.3.1.1) with target $\mathscr{L}_\beta(W^s_{\{b\}}(G))$, extends uniquely to a continuous linear operator*
 
 $$
 A:\mathcal{S}(G)\to \mathscr{B}_{\mathrm{NT}}(W^s_{\{b\}}(G)). \tag{9.3.2.1}
 $$
 
-For each continuous character $\omega\in\widehat{G^1}$, we choose a continuous character $\chi\in\widehat{G}$ such that $\chi|_{G^1}=\omega$. There exists a countable subset $B=\{\varphi_{m,\omega}\}_{(m,\omega)\in\mathbf{N}\times\widehat{G^1}}\subset C^\infty(G)$ of smooth functions, such that $|\cdot|^b_G\cdot B\subset\mathcal{S}(G)$ (i.e. $B\subset\mathcal{S}_I(G)$ for $I=\{b\}$) satisfying the following properties:
+*For each continuous character $\omega\in\widehat{G^1}$, we choose a continuous character $\chi\in\widehat{G}$ such that $\chi|_{G^1}=\omega$. There exists a countable subset $B=\{\varphi_{m,\omega}\}_{(m,\omega)\in\mathbf{N}\times\widehat{G^1}}\subset C^\infty(G)$ of smooth functions, such that $|\cdot|^b_G\cdot B\subset\mathcal{S}(G)$ (i.e. $B\subset\mathcal{S}_I(G)$ for $I=\{b\}$) satisfying the following properties:*
 
 (1) $A(B)$ is norm-bounded by $2$ in $W^s_{\{b\}}(G)$.
 
 (2) For each $(m,\omega)\in\mathbf{N}\times\widehat{G^1}$, $\varphi_{m,\omega}$ is $\omega$-homogeneous.
 
-(3) For each integer $m\ge 0$, the Fourier transform of $|\cdot|^b_G\varphi_{m,\omega}\in B$ is supported over the compact subset of $\widehat{G}$ of characters of the form $\chi|\cdot|^{ix}_G$ for $x\in[-m,m]$.
+(3) *For each integer $m\ge 0$, the Fourier transform of $|\cdot|^b_G\varphi_{m,\omega}\in B$ is supported over the compact subset of $\widehat{G}$ of characters of the form $\chi|\cdot|^{ix}_G$ for $x\in[-m,m]$.*
 
-(4) The closure of $A(B)$ with respect to the strong operator topology on $\mathscr{L}(W^s_{\{b\}}(G))=\mathscr{B}(W^s_{\{b\}}(G))$, contains the identity.
+(4) *The closure of $A(B)$ with respect to the strong operator topology on $\mathscr{L}(W^s_{\{b\}}(G))=\mathscr{B}(W^s_{\{b\}}(G))$, contains the identity.*
 
 We note that $\mathscr{B}_{\mathrm{NT}}(W^s_{\{b\}}(G))$, the $\mathbf{C}$-algebra of continuous $\mathbf{C}$-linear endomorphisms of the Hilbert space $W^s_{\{b\}}(G)$ topologized with the operator-norm topology (see Remark C.2.1.8), is $\mathscr{L}_\beta(W^s_{\{b\}}(G))$ as per (9.3.1.1).
 
@@ -1702,11 +1714,11 @@ We record the following consequence of Lemma 9.3.2.1:
 
 **9.3. MODULE STRUCTURES OVER $\mathcal{D}(G)$ AND APPROXIMATE UNITS** · **425**
 
-Corollary 9.3.2.3. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, $\mu_G$ a choice of Haar measure on $G$. Let $b,s\in\mathbf{R}$ be real numbers, $s\ge 0$.
+Corollary 9.3.2.3. *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, $\mu_G$ a choice of Haar measure on $G$. Let $b,s\in\mathbf{R}$ be real numbers, $s\ge 0$.*
 
-(1) Let $\alpha,\beta\in\mathbf{R}$ be such that $\alpha<\beta$, and $\chi\in\widehat{G}$ a continuous character. Let $\varepsilon>0$ be a real number such that $\alpha+\varepsilon<\beta-\varepsilon$. There exists $u\in W^{s,2}(G)$ such that the Fourier transform $\widehat{u}$ is smooth, compactly supported over the subset $\chi|\cdot|^{i[\alpha,\beta]}_G$ of $\widehat{G^1}$, and is identically $1$ over the subset $\chi|\cdot|^{i[\alpha+\varepsilon,\beta-\varepsilon]}_G$.
+(1) *Let $\alpha,\beta\in\mathbf{R}$ be such that $\alpha<\beta$, and $\chi\in\widehat{G}$ a continuous character. Let $\varepsilon>0$ be a real number such that $\alpha+\varepsilon<\beta-\varepsilon$. There exists $u\in W^{s,2}(G)$ such that the Fourier transform $\widehat{u}$ is smooth, compactly supported over the subset $\chi|\cdot|^{i[\alpha,\beta]}_G$ of $\widehat{G^1}$, and is identically $1$ over the subset $\chi|\cdot|^{i[\alpha+\varepsilon,\beta-\varepsilon]}_G$.*
 
-(2) The set of those elements $u\in W^{s,2}(G)$ such that $\widehat{u}$ is compactly supported, is dense in $W^{s,2}(G)$.
+(2) *The set of those elements $u\in W^{s,2}(G)$ such that $\widehat{u}$ is compactly supported, is dense in $W^{s,2}(G)$.*
 
 Proof. (1): The indicator function $\mathrm{1}_{\{\chi|_{G^1}\}}$ of the subset $\{\chi|_{G^1}\}\subset\widehat{G^1}$ is continuous and compactly supported, being $\widehat{G^1}$ discrete by [DE, Thm.3.2.1], as $G^1$ is compact. As such, its inverse Fourier transform $F$ is continuous, and hence continuous and compactly supported.
 
@@ -1720,9 +1732,9 @@ $\square$
 
 We begin with the following:
 
-Lemma 9.3.2.4. Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Let $\chi\in\widehat{G}$ be a fixed continuous character. Let $I\subset\mathbf{R}$ be a compact interval with non-empty interior.
+Lemma 9.3.2.4. *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Let $\chi\in\widehat{G}$ be a fixed continuous character. Let $I\subset\mathbf{R}$ be a compact interval with non-empty interior.*
 
-Let $\phi\in\mathcal{S}_\mathrm{E}(G)$. Let $T\in\mathbf{R}$ be a real number. Then the number of zeros of $M(\phi)(\chi|\cdot|^z_G)$ contained in the box $I\times i[T,T+1]$ is $O(\log|T|)$, where the implied constant depends on $\phi$ and $I$.
+*Let $\phi\in\mathcal{S}_\mathrm{E}(G)$. Let $T\in\mathbf{R}$ be a real number. Then the number of zeros of $M(\phi)(\chi|\cdot|^z_G)$ contained in the box $I\times i[T,T+1]$ is $O(\log|T|)$, where the implied constant depends on $\phi$ and $I$.*
 
 Proof. Let $a\in\mathbf{R}$ be a real number such that $M(\phi)(\chi|\cdot|^z_G)$ has no zeros on the boundary of $\mathbf{C}_I$ and $a+i\mathbf{R}$ is not contained in $\mathbf{C}_I$. We define $z_0:=a+iT+i/2$, $r\ge 0$ a real number large enough so as to arrange that the closed ball centered at $z_0$ with radius $r$ contains the box $I+i[T,T+1]$. We fix a real number $R>r$. By [Lang-b, Ch.XVII, §2, Lemma 2.2, p.333], the Maximum Principle and since $R/r>1$, we have, upon calling $N(T)$ the number of zeros of $M(\phi)(\chi|\cdot|^z_G)$ contained in $B(z_0,r)$:
 
@@ -1734,23 +1746,23 @@ We deduce that $N(T)=O(\log|T|)$ holds, with a possibly different implied consta
 
 $\square$
 
-Lemma 9.3.2.5. Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $\chi\in\widehat{G}$ be a fixed continuous character. Let $I\subset\mathbf{R}$ be a compact interval with non-empty interior.
+Lemma 9.3.2.5. *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $\chi\in\widehat{G}$ be a fixed continuous character. Let $I\subset\mathbf{R}$ be a compact interval with non-empty interior.*
 
 ## PDF page 426
 
 **426** · **CHAPTER 9. HARDY-SOBOLEV TOPOLOGIES**
 
-Let $\phi \in \mathcal{S}_{\mathrm{E}}(G)$. Assume that all the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ are contained in the interior of the vertical strip $\mathbf{C}_I$. Then the quotient of $\mathcal{S}_{\mathrm{E}}(G)$ by the convolution ideal $\phi \ast \mathcal{S}_{\mathrm{E}}(G)$ admits an absolute Schauder basis whose set of coefficient functionals is given by the point-evaluation functionals at the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ and their derivatives, i.e. $\delta^{(k)}_{\rho}$ as $\rho$ varies over the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ and $0 \le k \le N(\rho)-1$, with $N(\rho)$ the multiplicity of $\rho$.
+*Let $\phi \in \mathcal{S}_{\mathrm{E}}(G)$. Assume that all the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ are contained in the interior of the vertical strip $\mathbf{C}_I$. Then the quotient of $\mathcal{S}_{\mathrm{E}}(G)$ by the convolution ideal $\phi \ast \mathcal{S}_{\mathrm{E}}(G)$ admits an absolute Schauder basis whose set of coefficient functionals is given by the point-evaluation functionals at the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ and their derivatives, i.e. $\delta^{(k)}_{\rho}$ as $\rho$ varies over the zeros of $M(\phi)(\chi\lvert\cdot\rvert^z_G)$ and $0 \le k \le N(\rho)-1$, with $N(\rho)$ the multiplicity of $\rho$.*
 
 Proof. The exponential decay condition defining $\mathcal{S}_{\mathrm{E}}(G)$ implies the convergence axiom defining Schauder bases, using Lemma 9.3.2.4 and Theorem D.3.3.13, combined with the description of the topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ provided by Lemma D.3.1.2. By Theorem 4.1.2.6(1) and (3), indeed the Schauder basis is absolute.$^6$ $\square$
 
-THEOREM 9.3.2.6 (Approximate units in $\mathscr{L}_{\sigma}(W^s_I(G))$). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I \subset \mathbf{R}$ be a closed interval with non-empty interior, $s \ge 0$ a real number. For $T > 0$ a real number, we define the closed subspace:
+THEOREM 9.3.2.6 (Approximate units in $\mathscr{L}_{\sigma}(W^s_I(G))$). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I \subset \mathbf{R}$ be a closed interval with non-empty interior, $s \ge 0$ a real number. For $T > 0$ a real number, we define the closed subspace:*
 
 $$
 W^s_I(G)_{\le T} := \bigcap_{\rho: M(\phi)(\chi\lvert\cdot\rvert^{\rho}_G)=0, \lvert\mathrm{Im}(\rho)\rvert \le T} \bigcap_{0 \le k \le N(\rho)-1} \ker(\delta^{(k)}_{\rho}). \tag{9.3.2.10}
 $$
 
-The orthogonal projectors $P_T$ onto each $W^s_I(G)_{\le T}$ form a net of orthogonal projectors whose limit as $T \to +\infty$ with respect to the topology of simple convergence is the identity, i.e. $P_T \to \mathrm{Id}$ as $T \to +\infty$ with respect to the strong operator topology on the space of continuous endomorphisms of the Hilbert space $W^s_I(G)$.
+*The orthogonal projectors $P_T$ onto each $W^s_I(G)_{\le T}$ form a net of orthogonal projectors whose limit as $T \to +\infty$ with respect to the topology of simple convergence is the identity, i.e. $P_T \to \mathrm{Id}$ as $T \to +\infty$ with respect to the strong operator topology on the space of continuous endomorphisms of the Hilbert space $W^s_I(G)$.*
 
 Proof. Using the basis projectors provided by Lemma 9.3.2.5 we see that $\bigcup_{T>0} W^s_I(G)_{\le T}$ is dense in $W^s_I(G)$, which implies that the net of orthogonal projectors $\{P_T\}_{T>0}$ indeed converges strongly to the identity, since $W^s_I(G)_{\le T} \subset W^s_I(G)_{\le T'}$ for every pair of real numbers $0 < T < T'$. $\square$
 
@@ -1890,19 +1902,19 @@ We refer the reader to §A.5.3, §A.5.4, and to [Bris-a, §3], where a generaliz
 
 9.3.3.2. Calculation of the trace of $M_{\rho} \circ A(\varphi)$. We have the following:
 
-THEOREM 9.3.3.5 (Nuclearity of the smoothly truncated regular representation on $W^s_I(G)$). Let $G$ be an $\mathbf{R}_{>0}$-modulated group, with module $\lvert\cdot\rvert_G$. Assume $G$ is second-countable. Let $I$ be a non-empty closed interval. We let $\mu_G$ be a choice of Haar measure on $G$. Let $\Lambda,\varepsilon > 0$ and $s \ge 0$ real numbers. Assume $0 < 1/\Lambda+\varepsilon < \Lambda-\varepsilon$. Let $\rho: G \to \mathbf{R}_{\ge 0}$ be a $(\Lambda,\varepsilon)$-cutoff. Then:
+THEOREM 9.3.3.5 (Nuclearity of the smoothly truncated regular representation on $W^s_I(G)$). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group, with module $\lvert\cdot\rvert_G$. Assume $G$ is second-countable. Let $I$ be a non-empty closed interval. We let $\mu_G$ be a choice of Haar measure on $G$. Let $\Lambda,\varepsilon > 0$ and $s \ge 0$ real numbers. Assume $0 < 1/\Lambda+\varepsilon < \Lambda-\varepsilon$. Let $\rho: G \to \mathbf{R}_{\ge 0}$ be a $(\Lambda,\varepsilon)$-cutoff. Then:*
 
-(1) for every bounded compactly supported complex-valued function $\varphi$ on $G$, the following endomorphism of $W^s_I(G)$:
+(1) *for every bounded compactly supported complex-valued function $\varphi$ on $G$, the following endomorphism of $W^s_I(G)$:*
 
 $$
 M_{\rho} \circ A_G(\varphi) \tag{9.3.3.8}
 $$
 
-is an integral Hilbert-Schmidt operator whose integral kernel has an absolutely $\mu_G$-integrable smoothening along the diagonal.
+*is an integral Hilbert-Schmidt operator whose integral kernel has an absolutely $\mu_G$-integrable smoothening along the diagonal.*
 
-(2) For every smooth compactly supported $\varphi \in \mathcal{D}(G)$ and every smooth $(\Lambda,\varepsilon)$-cutoff, then the Hilbert-Schmidt operator in (9.3.3.8) is nuclear, and its nuclear trace equals the integral of the integral kernel along the diagonal.
+(2) *For every smooth compactly supported $\varphi \in \mathcal{D}(G)$ and every smooth $(\Lambda,\varepsilon)$-cutoff, then the Hilbert-Schmidt operator in (9.3.3.8) is nuclear, and its nuclear trace equals the integral of the integral kernel along the diagonal.*
 
-(3) As $\rho \to 1$ pointwise over $G$ with $\varepsilon\Lambda = o(1)$ as $\Lambda \to +\infty$, then the integral of the smoothening along the diagonal of the integral kernel of the operator in (9.3.3.8) is:
+(3) *As $\rho \to 1$ pointwise over $G$ with $\varepsilon\Lambda = o(1)$ as $\Lambda \to +\infty$, then the integral of the smoothening along the diagonal of the integral kernel of the operator in (9.3.3.8) is:*
 
 $$
 \mathrm{Trace}(M_{\rho} \circ A_G(\varphi)) = 2\log(\Lambda)\,\mu_1(G^1)\,\varphi(1) + o(1). \tag{9.3.3.9}
@@ -1938,7 +1950,13 @@ $$
 K_{\varphi,\rho}(x,y) := \varphi(xy^{-1})(\rho(x)-\rho(y)). \tag{9.3.3.13}
 $$
 
-We check the square-integrability property of $K_{\varphi,\rho}(x,y)$ over $G \times G$ explicitly. Let $B \subset G$ be the compact support of $\varphi$. The support of $K_{\varphi,\rho}$ is the union within $(G)_x \times (G)_y$ $[1/\Lambda,\Lambda] \times (B^{-1} \cdot [1/\Lambda,\Lambda]) \cup (B \cdot [1/\Lambda,\Lambda]) \times [1/\Lambda,\Lambda]$ which is compact within $(G)_x \times (G)_y$. $K_{\varphi,\rho}$ is therefore $p$-integrable over $(G)_x \times (G)_y$ with respect to the product measure $\mu_G \otimes \mu_G$, for every $p \ge 1$.
+We check the square-integrability property of $K_{\varphi,\rho}(x,y)$ over $G \times G$ explicitly. Let $B \subset G$ be the compact support of $\varphi$. The support of $K_{\varphi,\rho}$ is the union within $(G)_x \times (G)_y$
+
+$$
+[1/\Lambda,\Lambda] \times (B^{-1} \cdot [1/\Lambda,\Lambda]) \cup (B \cdot [1/\Lambda,\Lambda]) \times [1/\Lambda,\Lambda]
+$$
+
+which is compact within $(G)_x \times (G)_y$. $K_{\varphi,\rho}$ is therefore $p$-integrable over $(G)_x \times (G)_y$ with respect to the product measure $\mu_G \otimes \mu_G$, for every $p \ge 1$.
 
 We now check the assertion that indeed the operator from (9.3.3.13) is Hilbert-Schmidt with $K_{\varphi,\rho}$ as its integral kernel. We have, for any $u \in L^2(G)$:
 

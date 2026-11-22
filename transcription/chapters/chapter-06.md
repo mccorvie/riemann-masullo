@@ -611,23 +611,23 @@ $$
 
 **6.2. STRUCTURE THEOREM V: ISOTYPIC EXHAUSTIVENESS** · **299**
 
-where, for each $1\le k\le h_F$, $g_{k,\infty}$ is the projection of $g_k$ onto $\mathrm{GL}_1(\mathbf A_{F,S_\infty})$, and
+*where, for each $1\le k\le h_F$, $g_{k,\infty}$ is the projection of $g_k$ onto $\mathrm{GL}_1(\mathbf A_{F,S_\infty})$, and*
 
 $$
 \Psi^v_{F,S,\chi_S}(f)(x):=\int_{F^\times_v}f(g^{-1}x)\chi_{S,v}(g)\,\mathrm d\mu_v(g) \tag{6.2.2.4}
 $$
 
-with $\chi_{S,\infty}$ and $\chi_{S,v}$ the restrictions to $\mathrm{GL}_1(\mathbf A_{F,S_\infty})$, respectively $F^\times_v$.
+*with $\chi_{S,\infty}$ and $\chi_{S,v}$ the restrictions to $\mathrm{GL}_1(\mathbf A_{F,S_\infty})$, respectively $F^\times_v$.*
 
 Then:
 
-(1) $\ker(\Psi^\infty_{F,S,\chi_S})$ and $\ker(\Psi^v_{F,S,\chi_S})$ are closed subspaces, and the operator from (6.2.2.1) agrees with the unique $\mathbf C$-linear extension of $\Psi^\infty_{F,S,\chi_S}\otimes\bigotimes_{v\in S_f}\Psi^v_{F,S,\chi_S}$ to $\mathcal S(\mathbf A_{F,S_\infty})\otimes_\pi\bigotimes_{v\in S_f}\mathcal S(F^\times_v)$, and it induces a linear topological isomorphism:
+(1) *$\ker(\Psi^\infty_{F,S,\chi_S})$ and $\ker(\Psi^v_{F,S,\chi_S})$ are closed subspaces, and the operator from (6.2.2.1) agrees with the unique $\mathbf C$-linear extension of $\Psi^\infty_{F,S,\chi_S}\otimes\bigotimes_{v\in S_f}\Psi^v_{F,S,\chi_S}$ to $\mathcal S(\mathbf A_{F,S_\infty})\otimes_\pi\bigotimes_{v\in S_f}\mathcal S(F^\times_v)$, and it induces a linear topological isomorphism:*
 
 $$
 (\mathcal S(\mathbf A_{F,S_\infty})/\ker(\Psi^\infty_{F,S,\chi_{S,\infty}}))\otimes\rho_{\omega_S}\to\mathrm H_{0,\mathrm{cont}}(\omega_S,\mathcal S(\mathbf A_{F,S})). \tag{6.2.2.5}
 $$
 
-(2) For any $f\in\mathcal S(\mathbf A_{F,S_\infty})$, $\Psi^\infty_{F,S,\chi_{S,\infty}}(f)$ has semi-exponential decay over $J_{F,S}/J^1_{F,S}$.
+(2) *For any $f\in\mathcal S(\mathbf A_{F,S_\infty})$, $\Psi^\infty_{F,S,\chi_{S,\infty}}(f)$ has semi-exponential decay over $J_{F,S}/J^1_{F,S}$.*
 
 EXAMPLE 6.2.2.2. For $F=\mathbf Q$ and $\omega=1$, Theorem 6.2.2.1 informs us that $\mathrm H_{0,\mathrm{cont}}(1,\mathcal S(\mathbf A_{\mathbf Q}))$ is linearly and topologically a quotient of $\mathcal S(\mathbf R)\otimes 1_{\widehat{\mathbf Z}}$. This is already a consequence of Theorem 6.2.1.1(2).
 
@@ -913,27 +913,27 @@ $$
 \delta_0 = \Delta_F(1),\quad \widehat{\delta}_0 = \Delta_F(|\cdot|_F).
 $$
 
-Theorem 6.3.2.1 (Global Converse Theorem). Let $F$ be a number field, $\chi\in \widehat{C_F}$ a continuous character. Let $A\mathcal S(\mathbf C)$ be the Schwartz-Bergman space as per Definition D.3.1.3. We parametrize $\Omega(C_F)(\chi|_{C^1_F})$ by the global holomorphic parametrization
+Theorem 6.3.2.1 (Global Converse Theorem). *Let $F$ be a number field, $\chi\in \widehat{C_F}$ a continuous character. Let $A\mathcal S(\mathbf C)$ be the Schwartz-Bergman space as per Definition D.3.1.3. We parametrize $\Omega(C_F)(\chi|_{C^1_F})$ by the global holomorphic parametrization*
 
 $$
 \chi|\cdot|^s_F,\ s\in\mathbf C.
 $$
 
-(1) If $\chi|_{C^1_F}\ne 1$, then the continuous linear map:
+(1) *If $\chi|_{C^1_F}\ne 1$, then the continuous linear map:*
 
 $$
 Z\colon \mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S(\mathbf A_F))\to A\mathcal S(\mathbf C) \tag{6.3.2.3}
 $$
 
-is a linear topological embedding with closed range. equal to $L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\subset A\mathcal S(\mathbf C)$. If $\chi|_{C^1_F} = 1$, then the continuous linear map:
+*is a linear topological embedding with closed range. equal to $L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\subset A\mathcal S(\mathbf C)$. If $\chi|_{C^1_F} = 1$, then the continuous linear map:*
 
 $$
 Z\circ\Phi_{F,1}\colon \mathcal S_0(\mathbf A_F)\to A\mathcal S(\mathbf C) \tag{6.3.2.4}
 $$
 
-is relatively open with closed range, equal to $((s+it_0)(1-s-it_0))^{\delta_{\chi|_{C^1_F}}}L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$, with $\delta_{\chi|_{C^1_F}} = 0$ if $\chi|_{C^1_F}\ne 1$, and kernel equal to $\ker(\Phi_{F,1})\cap\mathcal S_0(\mathbf A_F)$.
+*is relatively open with closed range, equal to $((s+it_0)(1-s-it_0))^{\delta_{\chi|_{C^1_F}}}L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$, with $\delta_{\chi|_{C^1_F}} = 0$ if $\chi|_{C^1_F}\ne 1$, and kernel equal to $\ker(\Phi_{F,1})\cap\mathcal S_0(\mathbf A_F)$.*
 
-(2) The following sequence of $\mathbf C$-linear operators:
+(2) *The following sequence of $\mathbf C$-linear operators:*
 
 $$
 0\to\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))\to\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S(\mathbf A_F))\to\mathbf C^{\oplus 2}\to 0 \tag{6.3.2.5}
@@ -941,35 +941,35 @@ $$
 
 where:
 
-(1) $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_F)\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.
+(1) *$\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_F)\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.*
 
-(2) $\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_{F,\chi|_{C^1_F}})\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.
+(2) *$\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_{F,\chi|_{C^1_F}})\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.*
 
-(3) The rightmost operator sends $\Phi_{F,\chi|_{C^1_F}}(f)$ to the pair of complex numbers:
+(3) *The rightmost operator sends $\Phi_{F,\chi|_{C^1_F}}(f)$ to the pair of complex numbers:*
 
 $$
 -\overline{\mu}_1(C^1_F)\,f(0)\,\delta_{\chi|_{C^1_F}},\quad \overline{\mu}_1(C^1_F)\,\widehat{f}(0)\,\delta_{\chi|_{C^1_F}} \tag{6.3.2.6}
 $$
 
-is strict exact, and under the Mellin transform $\phi\mapsto M(\phi)(s) := \int_{C_F}\phi(g)\chi(g)|g|^s_F\,\mathrm{d}\overline{\mu}(g)$ it is linearly and topologically isomorphic to the short exact sequence:
+*is strict exact, and under the Mellin transform $\phi\mapsto M(\phi)(s) := \int_{C_F}\phi(g)\chi(g)|g|^s_F\,\mathrm{d}\overline{\mu}(g)$ it is linearly and topologically isomorphic to the short exact sequence:*
 
 $$
 0\to L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to 0 \tag{6.3.2.7}
 $$
 
-if $\chi|_{C^1_F}\ne 1$, the middle operator in (6.3.2.7) being the identity, and the topology on $L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$ being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and to the short exact sequence:
+*if $\chi|_{C^1_F}\ne 1$, the middle operator in (6.3.2.7) being the identity, and the topology on $L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$ being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and to the short exact sequence:*
 
 $$
 0\to (s-it_0)(1-s-it_0)\,\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to\mathbf C\oplus\mathbf C\to 0 \tag{6.3.2.8}
 $$
 
-for a real number $t_0\in\mathbf R$ uniquely determined by $\chi$, where the rightmost operator sends an element of $\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$ to the pair of residues at $s = -it_0, 1-it_0$, the topology on the leftmost space of meromorphic functions from (6.3.2.8) being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and the
+*for a real number $t_0\in\mathbf R$ uniquely determined by $\chi$, where the rightmost operator sends an element of $\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$ to the pair of residues at $s = -it_0, 1-it_0$, the topology on the leftmost space of meromorphic functions from (6.3.2.8) being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and the*
 
 ## PDF page 305
 
 **6.3. LOCAL AND GLOBAL CONVERSE THEOREMS** · **305**
 
-topology on the middle space of meromorphic functions being the quotient topology induced by $L$ from $\mathrm H_{0,\mathrm{cont}}(|\cdot|^{it_0}_F, \mathcal S(\mathbf A_F))$.
+*topology on the middle space of meromorphic functions being the quotient topology induced by $L$ from $\mathrm H_{0,\mathrm{cont}}(|\cdot|^{it_0}_F, \mathcal S(\mathbf A_F))$.*
 
 Proof. We will use the First Structure Theorem (see Theorem 5.2.3.1), and specifically the assertion that the continuous linear operator $\overline{\pi}$ from (5.2.3.2), induced by the insertion operators:
 
@@ -1225,39 +1225,39 @@ $\square$
 
 The following is a version of Theorem 6.3.2.1, providing a description of the range of the Mellin transform $L$ from (5.2.3.14), restricted to closed subspaces of $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S(\mathbf A_F))$ defined to account for the removal of finitely many non-Archimedean “Euler factors” from $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S(\mathbf A_F))$. It can be viewed as an incarnation of a “non primitive version” of the Converse Theorem for $\mathrm{GL}_1$ (see [CPS, Thm.1,p.165]).
 
-Theorem 6.3.2.2 (Converse Theorem for $\mathrm{GL}_1$ - non-principal case). Let $F$ be a number field, $\chi\in \widehat{C_F}$ a continuous character. Let $A\mathcal S(\mathbf C)$ be the Schwartz-Bergman space as per Definition D.3.1.3. We parametrize $\Omega(C_F)(\chi|_{C^1_F})$ by the global holomorphic parametrization
+Theorem 6.3.2.2 (Converse Theorem for $\mathrm{GL}_1$ - non-principal case). *Let $F$ be a number field, $\chi\in \widehat{C_F}$ a continuous character. Let $A\mathcal S(\mathbf C)$ be the Schwartz-Bergman space as per Definition D.3.1.3. We parametrize $\Omega(C_F)(\chi|_{C^1_F})$ by the global holomorphic parametrization*
 
 $$
 \chi|\cdot|^s_F,\ s\in\mathbf C.
 $$
 
-Let $S_0$ be a finite set of finite places of $F$ and denote by $S_\chi$ the finite set of places of $F$ at which $\chi$ is ramified.
+*Let $S_0$ be a finite set of finite places of $F$ and denote by $S_\chi$ the finite set of places of $F$ at which $\chi$ is ramified.*
 
-Let $\mathrm{PV}_{S_0}$ the Weil’s Global Principal Value operator on $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S(\mathbf A_F))$.
+*Let $\mathrm{PV}_{S_0}$ the Weil’s Global Principal Value operator on $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S(\mathbf A_F))$.*
 
-We define $q_v := N(\mathfrak p_v)$, with $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ corresponding to the finite place $v\in S_0$.
+*We define $q_v := N(\mathfrak p_v)$, with $\mathfrak p_v$ the unique prime ideal of $\mathcal O_F$ corresponding to the finite place $v\in S_0$.*
 
 ## PDF page 310
 
 **310** · **CHAPTER 6. LOCAL-GLOBAL STRUCTURES**
 
-(1) If $\chi|_{C^1_F}\ne 1$, then the continuous linear map:
+(1) *If $\chi|_{C^1_F}\ne 1$, then the continuous linear map:*
 
 $$
 Z\colon \mathrm{PV}_{S_0}\,\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S(\mathbf A_F))\to A\mathcal S(\mathbf C) \tag{6.3.2.19}
 $$
 
-is a linear topological embedding with closed range equal to $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\subset A\mathcal S(\mathbf C)$.
+*is a linear topological embedding with closed range equal to $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\subset A\mathcal S(\mathbf C)$.*
 
-If $\chi|_{C^1_F} = 1$, then the continuous linear map:
+*If $\chi|_{C^1_F} = 1$, then the continuous linear map:*
 
 $$
 L\circ\Phi_{F,1}\colon \mathrm{PV}_{S_0}\,\mathcal S_0(\mathbf A_F)\to A\mathcal S(\mathbf C) \tag{6.3.2.20}
 $$
 
-is relatively open with closed range equal to $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)s(s-1)\widehat{\zeta}_F(s)\,\mathscr{O}(\mathbf C)\subset A\mathcal S(\mathbf C)$, and kernel equal to $\mathrm{PV}_{S_0}(\ker(\Phi_{F,1})\cap\mathcal S_0(\mathbf A_F))$.
+*is relatively open with closed range equal to $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)s(s-1)\widehat{\zeta}_F(s)\,\mathscr{O}(\mathbf C)\subset A\mathcal S(\mathbf C)$, and kernel equal to $\mathrm{PV}_{S_0}(\ker(\Phi_{F,1})\cap\mathcal S_0(\mathbf A_F))$.*
 
-(2) The following sequence of $\mathbf C$-linear operators:
+(2) *The following sequence of $\mathbf C$-linear operators:*
 
 $$
 0\to \mathrm{PV}_{S_0}\,\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))\to \mathrm{PV}_{S_0}\,\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S(\mathbf A_F))\to\mathbf C^{\oplus 2}\to 0 \tag{6.3.2.21}
@@ -1265,11 +1265,11 @@ $$
 
 where:
 
-(1) $\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_F)\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.
+(1) *$\mathrm H_{0,\mathrm{cont}}(F^\times, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_F)\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.*
 
-(2) $\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_{F,\chi|_{C^1_F}})\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.
+(2) *$\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F}, \mathcal S_0(\mathbf A_F))$ is the quotient of $\mathcal S_0(\mathbf A_F)$ by $\ker(\Phi_{F,\chi|_{C^1_F}})\cap\mathcal S_0(\mathbf A_F)$, endowed with the quotient topology.*
 
-(3) The rightmost operator sends $\Phi_{F,\chi|_{C^1_F}}(\mathrm{PV}_{S_0}(f))$ to the pair of complex numbers:
+(3) *The rightmost operator sends $\Phi_{F,\chi|_{C^1_F}}(\mathrm{PV}_{S_0}(f))$ to the pair of complex numbers:*
 
 $$
 -\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{it_0}_v)\overline{\mu}_1(C^1_F)\,f(0)\,\delta_{\chi|_{C^1_F}},\quad \prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-1+it_0}_v)\overline{\mu}_1(C^1_F)\,\widehat{f}(0)\,\delta_{\chi|_{C^1_F}} \tag{6.3.2.22}
@@ -1277,13 +1277,13 @@ $$
 
 with $\delta_{\chi|_{C^1_F}} = 0$ if $\chi|_{C^1_F}\ne 1$, and $\delta_1 = 1$.
 
-is strict exact, and under the Mellin transform $\phi\mapsto M(\phi)(s) := \int_{C_F}\phi(g)\chi(g)|g|^s_F\,\mathrm{d}\overline{\mu}(g)$ it is linearly and topologically isomorphic to the short exact sequence:
+*is strict exact, and under the Mellin transform $\phi\mapsto M(\phi)(s) := \int_{C_F}\phi(g)\chi(g)|g|^s_F\,\mathrm{d}\overline{\mu}(g)$ it is linearly and topologically isomorphic to the short exact sequence:*
 
 $$
 0\to\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)\to 0 \tag{6.3.2.23}
 $$
 
-if $\chi|_{C^1_F}\ne 1$, the middle operator in (6.3.2.23) being the identity, and the topology on $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)$ being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and to the short exact sequence:
+*if $\chi|_{C^1_F}\ne 1$, the middle operator in (6.3.2.23) being the identity, and the topology on $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)L(s,\chi)\,\mathscr{O}(\mathbf C)$ being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and to the short exact sequence:*
 
 $$
 0\to (s-it_0)(1-s-it_0)\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C) \tag{6.3.2.24}
@@ -1297,7 +1297,7 @@ $$
 \to\mathbf C\oplus\mathbf C\to 0 \tag{6.3.2.26}
 $$
 
-for a real number $t_0\in\mathbf R$ uniquely determined by $\chi$, where the rightmost operator sends an element of $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)$ to the pair of residues at $s = -it_0, 1-it_0$, the topology on the leftmost space of meromorphic functions from (6.3.2.24) being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and the topology on the middle space of meromorphic functions being the quotient topology induced by $L$ from $\mathrm H_{0,\mathrm{cont}}(|\cdot|^{it_0}_F, \mathcal S(\mathbf A_F))$.
+*for a real number $t_0\in\mathbf R$ uniquely determined by $\chi$, where the rightmost operator sends an element of $\prod_{v\in S_0-(S_0\cap S_\chi)}(1-q^{-s-it_v}_v)\widehat{\zeta}_F(s+it_0)\,\mathscr{O}(\mathbf C)$ to the pair of residues at $s = -it_0, 1-it_0$, the topology on the leftmost space of meromorphic functions from (6.3.2.24) being the subspace topology inherited from $A\mathcal S(\mathbf C)$, and the topology on the middle space of meromorphic functions being the quotient topology induced by $L$ from $\mathrm H_{0,\mathrm{cont}}(|\cdot|^{it_0}_F, \mathcal S(\mathbf A_F))$.*
 
 Proof. Both (1) and (2) follow from the combination of Lemma 5.3.1.5 and Theorem 6.3.2.1.
 

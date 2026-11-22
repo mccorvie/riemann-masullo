@@ -59,9 +59,14 @@ reached that part of the paper and has not hit a roadblock. The draft is also un
 author's own account: Chapter 13, which should deduce GRH from the trace formula, does not yet
 state its main theorem.
 
-**What the formalization has found.** Small errors and gaps met along the way are logged in
-[`ERRATA.md`](ERRATA.md). So far they are all in the appendices' and early chapters' accounts of
-standard material, and none touches the trace formula.
+**What the formalization has found.** Errors and gaps met along the way are logged in
+[`ERRATA.md`](ERRATA.md), each compared with the printed page. Most are in the appendices' and
+early chapters' accounts of standard material, and are repaired where they occur. The second
+wave has reached the first of the paper's own constructions: there the printed proof of the
+structure theorem for the spaces of adelic θ-functions (Theorem 5.2.1.1) does not work, and
+whether the theorem holds is now being tested in Lean; and the explicit formulas of §B.4, which
+Chapter 12 quotes, need their local terms and normalizations recomputed. None of the entries is
+about the trace formula itself.
 
 The prerequisites (adeles and ideles, Haar measures, locally convex and nuclear spaces,
 Schwartz–Bruhat functions) are standard mathematics worth having in Lean whatever becomes of the

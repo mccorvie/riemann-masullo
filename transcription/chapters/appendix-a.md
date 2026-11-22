@@ -162,19 +162,19 @@ We refer the reader to [RV, Ch. 5, §5.1], [DE, Ch. 13], [CF, Ch. II, §13-14], 
 
 We recall the following description of the topology on the restricted product of Hausdorff locally compact abelian groups:
 
-**Lemma A.1.1.2.** Let $I_0$ be a finite set, $I_1$ a set, and $I := I_0 \times I_1$. Let $\{(G_i, K_i)\}_{i \in I}$ be an $I$-indexed collection of pairs $(G_i, K_i)$ of Hausdorff locally compact abelian groups, where $K_i = 1$ for all $i \in I_0$ and $K_i \subset G_i$ is compact open for all $i \in I_1$. Then
+**Lemma A.1.1.2.** *Let $I_0$ be a finite set, $I_1$ a set, and $I := I_0 \times I_1$. Let $\{(G_i, K_i)\}_{i \in I}$ be an $I$-indexed collection of pairs $(G_i, K_i)$ of Hausdorff locally compact abelian groups, where $K_i = 1$ for all $i \in I_0$ and $K_i \subset G_i$ is compact open for all $i \in I_1$. Then*
 
-(1) The restricted product $\widehat{\prod}_{i \in I}(G_i, K_i)$ is a Hausdorff locally compact abelian group.
+(1) *The restricted product $\widehat{\prod}_{i \in I}(G_i, K_i)$ is a Hausdorff locally compact abelian group.*
 
 ## PDF page 540
 
 **540** · **CHAPTER A. PREPARATIONS FROM ALGEBRAIC NUMBER THEORY**
 
-(2) Let $\{K'_i\}_{i \in I}$ be an $I$-indexed collection of subgroups $K'_i \subset G_i$, with $K'_i = 1$ for all $i \in I_0$, $K'_i \subset G_i$ compact open for all $i \in I_1$, and $K'_i = K_i$ for all but finitely many $i \in I$. Then the restricted product $\widehat{\prod}_{i \in I}(G_i, K'_i)$ is canonically isomorphic, as a Hausdorff locally compact abelian group, to the restricted product $\widehat{\prod}_{i \in I}(G_i, K_i)$.
+(2) *Let $\{K'_i\}_{i \in I}$ be an $I$-indexed collection of subgroups $K'_i \subset G_i$, with $K'_i = 1$ for all $i \in I_0$, $K'_i \subset G_i$ compact open for all $i \in I_1$, and $K'_i = K_i$ for all but finitely many $i \in I$. Then the restricted product $\widehat{\prod}_{i \in I}(G_i, K'_i)$ is canonically isomorphic, as a Hausdorff locally compact abelian group, to the restricted product $\widehat{\prod}_{i \in I}(G_i, K_i)$.*
 
-(3) A subset $H \subset \widehat{\prod}_{i \in I}(G_i, K_i)$ has compact closure if and only if there exists an $I$-indexed collection $\{H_i\}_{i \in I}$ with $H_i \subset G_i$ a compact subset for every $i \in I$, and $H_i = K_i$ for all but finitely many $i \in I$, and we have $H \subset \prod_{i \in I} H_i$.
+(3) *A subset $H \subset \widehat{\prod}_{i \in I}(G_i, K_i)$ has compact closure if and only if there exists an $I$-indexed collection $\{H_i\}_{i \in I}$ with $H_i \subset G_i$ a compact subset for every $i \in I$, and $H_i = K_i$ for all but finitely many $i \in I$, and we have $H \subset \prod_{i \in I} H_i$.*
 
-(4) For any partition $I = J_1 \sqcup J_2$ with $J_1$ a finite subset, the canonical map
+(4) *For any partition $I = J_1 \sqcup J_2$ with $J_1$ a finite subset, the canonical map*
 
 $$
 \prod_{j \in J_1} G_i \times \widehat{\prod}_{j \in J_2}(G_j, K_j) \to \widehat{\prod}_{i \in I}(G_i, K_i) \tag{A.1.1.4}
@@ -182,7 +182,7 @@ $$
 
 *is an isomorphism of Hausdorff locally compact abelian groups.*
 
-(5) For any partition $I = J_1 \sqcup J_2$ with $J_1$ a finite subset, the subset
+(5) *For any partition $I = J_1 \sqcup J_2$ with $J_1$ a finite subset, the subset*
 
 $$
 \prod_{j \in J_1} U_i \times \prod_{j \in J_2} K_j \subset \widehat{\prod}_{i \in I}(G_i, K_i) \tag{A.1.1.5}
@@ -210,7 +210,7 @@ Each $\prod_{v \nmid \infty} H_v$ is in turn contained in a compact open subgrou
 
 **A.1.2.1. Finiteness results on $\mathbf{A}_F$.** We record below certain results on the topology of $\mathbf{A}_F$, its class group $\mathbf{A}_F/F$, and $S$-local analogs.
 
-**Lemma A.1.2.1.** Let $F$ be a number field. The following short exact sequence of abelian groups
+**Lemma A.1.2.1.** *Let $F$ be a number field. The following short exact sequence of abelian groups*
 
 $$
 0 \to F \xrightarrow{\iota} \mathbf{A}_F \to \mathbf{A}_F/F \to 0 \tag{A.1.2.1}
@@ -244,11 +244,11 @@ $$
 \mathbf{A}^\times_F \to \mathbf{A}_F \times \mathbf{A}_F \tag{A.1.3.1}
 $$
 
-*sending $x$ to $(x, x^{-1})$. We denote by $\mathrm{GL}_1(\mathbf{A}_F)$ the group $\mathbf{A}^\times_F$ endowed with the idelic topology, and refer to it as the idele group of $F$.*
+sending $x$ to $(x, x^{-1})$. We denote by $\mathrm{GL}_1(\mathbf{A}_F)$ the group $\mathbf{A}^\times_F$ endowed with the idelic topology, and refer to it as the idele group of $F$.
 
 We refer the reader to [CF, Ch. II, §16] and to [DE, §13.3], for more on the ideles of a number field. We will be recalling further facts on adeles and ideles as the need arises.
 
-**Remark A.1.3.2.** *The task of topologizing the adelic points of algebraic groups can be carried out following Weil's approach in [Weil-c] (see, specifically, [Weil-c, Ch. III]) by means of a process of "adelization", or Grothendieck's, by topologizing the adelic points of the underlying scheme. We refer the reader to [Conrad, §2] for an account of the methods and history around the task of topologizing the adelic points of an algebraic group, of which the first special non-trivial case of $(\mathrm{GL}_1)_F$ leads to the ideles $\mathrm{GL}_1(\mathbf{A}_F)$.*
+**Remark A.1.3.2.** The task of topologizing the adelic points of algebraic groups can be carried out following Weil's approach in [Weil-c] (see, specifically, [Weil-c, Ch. III]) by means of a process of "adelization", or Grothendieck's, by topologizing the adelic points of the underlying scheme. We refer the reader to [Conrad, §2] for an account of the methods and history around the task of topologizing the adelic points of an algebraic group, of which the first special non-trivial case of $(\mathrm{GL}_1)_F$ leads to the ideles $\mathrm{GL}_1(\mathbf{A}_F)$.
 
 One more piece of information about $\mathrm{GL}_1(\mathbf{A}_F)$ is that there exists a canonical homomorphism of abelian topological groups
 
@@ -310,7 +310,7 @@ $$
 
 *admits a continuous homomorphic section.*
 
-*Some explicit construction of the asserted section in (3) are given in §A.2.2.*
+Some explicit construction of the asserted section in (3) are given in §A.2.2.
 
 **A.1.4. The idele class group $C_F$.** In this subsection we recall the construction and main results on the class group $C_F$ of the idele group, and their consequences.
 
@@ -332,13 +332,13 @@ $$
 
 whose kernel we denote $C^1_F$, a compact Hausdorff subgroup by Lemma A.1.3.4(3).
 
-**Remark A.1.4.2.** *Let $F$ be a number field. The strict exact sequence of continuous homomorphisms of Hausdorff locally compact abelian groups from (A.1.3.5) induces the following short exact sequence*
+**Remark A.1.4.2.** Let $F$ be a number field. The strict exact sequence of continuous homomorphisms of Hausdorff locally compact abelian groups from (A.1.3.5) induces the following short exact sequence
 
 $$
 1 \to F^\times \xrightarrow{\iota} \mathrm{GL}_1(\mathbf{A}_F)^1 \to C^1_F \to 1 \tag{A.1.4.3}
 $$
 
-*which is topologically exact in the strict sense, i.e. $\iota$ is a closed homomorphism upon endowing $F^\times$ with the discrete topology. In particular, $C^1_F$ is isomorphic, as a Hausdorff locally abelian group, to $\mathrm{GL}_1(\mathbf{A}_F)^1/F^\times$.*
+which is topologically exact in the strict sense, i.e. $\iota$ is a closed homomorphism upon endowing $F^\times$ with the discrete topology. In particular, $C^1_F$ is isomorphic, as a Hausdorff locally abelian group, to $\mathrm{GL}_1(\mathbf{A}_F)^1/F^\times$.
 
 We recall the following fundamental result about the Hausdorff locally compact abelian group $C_F$ and its closed subgroup $C^1_F$.
 
@@ -512,9 +512,9 @@ $$
 \mathbf{A}_F = F + D_F \tag{A.2.1.3}
 $$
 
-where the right side of (A.2.1.3) is the union within $\mathbf{A}_F$ of the additive $F$-translates of the adelic fundamental domain $D_F$ from (A.2.1.2).
+*where the right side of (A.2.1.3) is the union within $\mathbf{A}_F$ of the additive $F$-translates of the adelic fundamental domain $D_F$ from (A.2.1.2).*
 
-(2) Upon denoting by $\overline{D}_F$ the closure of $D_F$ in $\mathbf{A}_F$, then for any compact subset $K \subset \mathbf{A}_F$, there exist at most finitely many elements $\xi \in F$ such that
+(2) *Upon denoting by $\overline{D}_F$ the closure of $D_F$ in $\mathbf{A}_F$, then for any compact subset $K \subset \mathbf{A}_F$, there exist at most finitely many elements $\xi \in F$ such that*
 
 $$
 (\xi + \overline{D}_F) \cap K \ne \varnothing. \tag{A.2.1.4}
@@ -582,22 +582,22 @@ $$
 s_{\mathbf{Q}} : \mathbf{R}_{>0} \to \mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}}) \tag{A.2.2.4}
 $$
 
-defined as $s_{\mathbf{Q}}(t) := \theta(t,1,1)$, is a canonical continuous section to the idelic norm $|\cdot|_{\mathbf{Q}} : C_{\mathbf{Q}} \to \mathbf{R}_{>0}$.
+*defined as $s_{\mathbf{Q}}(t) := \theta(t,1,1)$, is a canonical continuous section to the idelic norm $|\cdot|_{\mathbf{Q}} : C_{\mathbf{Q}} \to \mathbf{R}_{>0}$.*
 
-Lemma A.2.2.2. Let $F$ be a number field. The norm homomorphism renders the following diagram of continuous homomorphisms of Hausdorff locally compact abelian groups
+Lemma A.2.2.2. *Let $F$ be a number field. The norm homomorphism renders the following diagram of continuous homomorphisms of Hausdorff locally compact abelian groups*
 
 (A.2.2.5)
 
 ```latex
 \begin{tikzcd}
 \mathrm{GL}_1(\mathbf{A}_F) \arrow[r, "|\cdot|_F"]\arrow[d, "N_{F/\mathbf{Q}}"'] & \mathbf{R}_{>0} \arrow[d, equal] \\
-\mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}}) \arrow[r, "|\cdot|_{\mathbf{Q}}"] & \mathbf{R}_{>0}
+\mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}}) \arrow[r, "|\cdot|_{\mathbf{Q}}"'] & \mathbf{R}_{>0}
 \end{tikzcd}
 ```
 
-commutative, the rightmost vertical arrow being the identity.
+*commutative, the rightmost vertical arrow being the identity.*
 
-Moreover, the canonical closed continuous homomorphism
+*Moreover, the canonical closed continuous homomorphism*
 
 $$
 i_F : \mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}}) \to \mathrm{GL}_1(\mathbf{A}_F) \tag{A.2.2.6}
@@ -613,7 +613,7 @@ $$
 N_{F/\mathbf{Q}} \circ i_F = (\cdot)^{[F:\mathbf{Q}]} \tag{A.2.2.7}
 $$
 
-as continuous endomorphisms of $\mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}})$, where the right side in (A.2.2.7) is the endomorphism $g \mapsto g^{[F:\mathbf{Q}]}$.
+*as continuous endomorphisms of $\mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}})$, where the right side in (A.2.2.7) is the endomorphism $g \mapsto g^{[F:\mathbf{Q}]}$.*
 
 Definition A.2.2.3. Let $F$ be a number field. We define the function
 
@@ -629,7 +629,7 @@ $$
 
 We refer to $s_F$ as the canonical section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$.
 
-Lemma A.2.2.4. Let $F$ be a number field. The function $s_F$ from (A.2.2.8) is a continuous homomorphic section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$. Explicitly, $s_F(t)$ is the idele whose $v$-indexed component, for each Archimedean place $v$, is $t^{1/[F:\mathbf{Q}]}$, and for each non-Archimedean place $v$ is $1$.
+Lemma A.2.2.4. *Let $F$ be a number field. The function $s_F$ from (A.2.2.8) is a continuous homomorphic section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$. Explicitly, $s_F(t)$ is the idele whose $v$-indexed component, for each Archimedean place $v$, is $t^{1/[F:\mathbf{Q}]}$, and for each non-Archimedean place $v$ is $1$.*
 
 **A.2.2.2. The section along $F_{v_0}^{\times}$, for $v_0$ a choice of Archimedean place.** In the case $F = \mathbf{Q}$, the canonical isomorphism $\theta$ from (A.2.2.3) provides a canonical continuous homomorphic section $s_{\mathbf{Q}}$ to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_{\mathbf{Q}})$ (see Lemma A.2.2.1).
 
@@ -643,7 +643,7 @@ $$
 
 via insertion into $F_{v_0}^{\times}$ preceded by $t \mapsto t^{1/[F_{v_0}:\mathbf{R}]}$ on $\mathbf{R}_{>0}$.
 
-Lemma A.2.2.6. Let $F$ be a number field. The map $s_{F,v_0}$ from (A.2.2.10) is a continuous homomorphic section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$.
+Lemma A.2.2.6. *Let $F$ be a number field. The map $s_{F,v_0}$ from (A.2.2.10) is a continuous homomorphic section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$.*
 
 Proof. Indeed $\iota_{v_0}^{-1} : \mathbf{R}_{>0} \to T_{v_0}$ is an isomorphism of Hausdorff locally compact abelian groups, and $i_{v_0}$ is a closed injective continuous homomorphism. It follows that $s_{F,v_0}$ is a continuous homomorphism. Moreover, for every $t \in \mathbf{R}_{>0}$, we have $|s_{F,v_0}(t)|_F = |i_{v_0}(\iota_{v_0}^{-1}(t))|_F = |\iota_{v_0}^{-1}(t)|_{v_0}$. If $v_0$ is real, then $|\iota_{v_0}^{-1}(t)|_{v_0} = |t|_{\mathbf{R}} = t$. If $v_0$ is complex, then $|\iota_{v_0}^{-1}(t)|_{v_0} = |t^{1/2}|_{\mathbf{C}} = t$. $\square$
 
@@ -657,15 +657,15 @@ $$
 
 by sending the real number $t \in \mathbf{R}_{>0}$ to the idele $s_{F,\delta}(t)$ whose $v$-indexed component, for every non-Archimedean place $v$ of $F$, is $1$, and for every Archimedean place $v$, it is $t^{1/N_v(r_1+r_2)}$ with $N_v = 1$ if $v$ is real, and $N_v = 2$ if $v$ is complex. We refer to $s_{F,\delta}$ as the diagonal section to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$.
 
-Lemma A.2.2.8. Let $F$ be a number field. The function $s_{F,\delta}$ is a continuous homomorphic section to the idelic norm.
+Lemma A.2.2.8. *Let $F$ be a number field. The function $s_{F,\delta}$ is a continuous homomorphic section to the idelic norm.*
 
-Lemma A.2.2.9. Let $F$ be a number field. For any continuous section $s$ to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$, the continuous homomorphism
+Lemma A.2.2.9. *Let $F$ be a number field. For any continuous section $s$ to the idelic norm on $\mathrm{GL}_1(\mathbf{A}_F)$, the continuous homomorphism*
 
 $$
 \theta_{F,s} : \mathbf{R}_{>0} \times \mathrm{GL}_1(\mathbf{A}_F)^1 \to \mathrm{GL}_1(\mathbf{A}_F) \tag{A.2.2.12}
 $$
 
-defined as $\theta_{F,s}(t,g_0) := s(t)g_0$, is an isomorphism of Hausdorff locally compact abelian groups.
+*defined as $\theta_{F,s}(t,g_0) := s(t)g_0$, is an isomorphism of Hausdorff locally compact abelian groups.*
 
 ## PDF page 548
 
@@ -703,17 +703,17 @@ $$
 
 which is a surjective continuous homomorphism of abelian topological groups. The following is elementary.
 
-Lemma A.2.3.2. Let $F$ be a number field. Upon defining the hyperplane
+Lemma A.2.3.2. *Let $F$ be a number field. Upon defining the hyperplane*
 
 $$
 H_{\log} := \{(x_v)_{v\in S_{\infty}} \in \mathbf{R}^{S_{\infty}} : \sum_{v\in S_{\infty}} x_v = 0\} \subset \mathbf{R}^{S_{\infty}} \tag{A.2.3.5}
 $$
 
-the map $\mathscr{L}$ from (A.2.3.3) satisfies the following conditions:
+*the map $\mathscr{L}$ from (A.2.3.3) satisfies the following conditions:*
 
 (1) $\mathscr{L}$ is a continuous group homomorphism, and $\mathscr{L}(\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1) \subset H_{\log}$.
 
-(2) $\mathscr{L}$ is a smooth submersion whose kernel is isomorphic, as a Lie group, to the compact Lie group $(\mu_2)^{r_1} \times \mathrm{U}(1)^{r_2}$.
+(2) *$\mathscr{L}$ is a smooth submersion whose kernel is isomorphic, as a Lie group, to the compact Lie group $(\mu_2)^{r_1} \times \mathrm{U}(1)^{r_2}$.*
 
 (3) $\mathscr{L}$ is a proper smooth submersion.
 
@@ -725,13 +725,13 @@ $$
 
 of $\mathscr{L}$ from (A.2.3.3) to $\mathcal{O}_F^{\times} \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$.
 
-Lemma A.2.3.4. Let $F$ be a number field. The regulator homomorphism satisfies the following conditions:
+Lemma A.2.3.4. *Let $F$ be a number field. The regulator homomorphism satisfies the following conditions:*
 
-(1) $\mathrm{Reg}(\mathcal{O}_F^{\times})$ is a discrete and co-compact closed subgroup of $H_{\log}$.
+(1) *$\mathrm{Reg}(\mathcal{O}_F^{\times})$ is a discrete and co-compact closed subgroup of $H_{\log}$.*
 
-(2) The kernel $\ker(\mathrm{Reg})$ is the torsion subgroup of $\mathcal{O}_F^{\times}$, which is the finite cyclic group $\mu_F$ of size $w_F$ of the roots of unity contained in $F$.
+(2) *The kernel $\ker(\mathrm{Reg})$ is the torsion subgroup of $\mathcal{O}_F^{\times}$, which is the finite cyclic group $\mu_F$ of size $w_F$ of the roots of unity contained in $F$.*
 
-(3) $\mathcal{O}_F^{\times}$ is a finitely generated abelian group, and $\mathcal{O}_F^{\times}/\mu_F$ is finite free of rank $r_1+r_2-1$.
+(3) *$\mathcal{O}_F^{\times}$ is a finitely generated abelian group, and $\mathcal{O}_F^{\times}/\mu_F$ is finite free of rank $r_1+r_2-1$.*
 
 **A.2.3.2. The idelic fundamental domain $E_F^1$.** Upon denoting
 
@@ -761,9 +761,9 @@ $$
 Q := \{(x_i) \in \mathbf{R}^{r_1+r_2-1} : 0 \le x_i < 1\} \subset \mathbf{R}^{r_1+r_2-1}. \tag{A.2.3.10}
 $$
 
-Lemma A.2.3.5. Let $F$ be a hyperplane. The subset $P \subset H_{\log}$ satisfies the following conditions:
+Lemma A.2.3.5. *Let $F$ be a hyperplane. The subset $P \subset H_{\log}$ satisfies the following conditions:*
 
-(1) $P$ is relatively compact with non-empty interior within $H_{\log}$.
+(1) *$P$ is relatively compact with non-empty interior within $H_{\log}$.*
 
 (2) $\mathrm{Reg}(\mathcal{O}_F^{\times})P = H_{\log}$, and for every $\xi \in \mathrm{Reg}(\mathcal{O}_F^{\times})$, $\xi \ne 0$, we have
 
@@ -815,9 +815,9 @@ $$
 
 **A.2.3.3. Topological structure of $E_0$.** We now focus on $E_0$ (defined in (A.2.3.13)).
 
-Lemma A.2.3.8. The subset $E_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ satisfies the following conditions:
+Lemma A.2.3.8. *The subset $E_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ satisfies the following conditions:*
 
-(1) $E_0$ is relatively compact in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ and $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ and its interior within $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ is non-empty.
+(1) *$E_0$ is relatively compact in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ and $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ and its interior within $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ is non-empty.*
 
 (2) $\mathcal{O}_F^{\times} E_0 = \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$, and for every $\xi \in \mathcal{O}_F^{\times}$, $\xi \ne 1$, we have
 
@@ -825,9 +825,9 @@ $$
 \xi E_0 \cap E_0 = \varnothing \tag{A.2.3.17}
 $$
 
-where $\mathcal{O}_F^{\times}$ is diagonally embedded into $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$. Moreover, $\mathscr{L}^{-1}(P) = \mu_F E_0$.
+*where $\mathcal{O}_F^{\times}$ is diagonally embedded into $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$. Moreover, $\mathscr{L}^{-1}(P) = \mu_F E_0$.*
 
-(3) Upon denoting by $\overline{E}_0$ the closure of $E_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$, for any compact subset $K \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ there exist at most finitely many elements $\xi \in \mathcal{O}_F^{\times}$ such that
+(3) *Upon denoting by $\overline{E}_0$ the closure of $E_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$, for any compact subset $K \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$ there exist at most finitely many elements $\xi \in \mathcal{O}_F^{\times}$ such that*
 
 $$
 \xi \overline{E}_0 \cap \overline{E}_0 \ne \varnothing. \tag{A.2.3.18}
@@ -853,11 +853,23 @@ $$
 S_{\infty} = \{v_0,v_1,\dots,v_{r_1+r_2-1}\} \tag{A.2.3.19}
 $$
 
-where $v_0$ is a choice of Archimedean place made to define the closed subgroup $T_{v_0} := s_{F,v_0}(\mathbf{R}_{>0}) \subset \mathrm{GL}_1(\mathbf{A}_F)$ induced by the $v_0$-section $s_{F,v_0}$ to the idelic norm $|\cdot|_F$ (see Definition A.2.2.5).
+where $v_0$ is a choice of Archimedean place made to define the closed subgroup
+
+$$
+T_{v_0} := s_{F,v_0}(\mathbf{R}_{>0}) \subset \mathrm{GL}_1(\mathbf{A}_F)
+$$
+
+induced by the $v_0$-section $s_{F,v_0}$ to the idelic norm $|\cdot|_F$ (see Definition A.2.2.5).
 
 The choice of the ordering in (A.2.3.19), along with that of isomorphisms of topological fields $\iota_v : F_v \simeq \mathbf{R}$ if $v$ is real, $\iota_v : F_v \simeq \mathbf{C}$ if $v$ is complex (the same which, for $v = v_0$, were used in the definition of $s_{F,v_0}$ in Definition A.2.2.10) induces an isomorphism of $\mathbf{R}$-vector spaces $\mathbf{R}^{S_{\infty}} \simeq \mathbf{R}^{r_1+r_2}$ (upon choosing within each $F_v$ the $\mathbf{R}$-linear basis given by $1$ if $v$ is real, and $1$, $\iota_v^{-1}(i)$ if $v$ is complex).
 
-The subset $E_0 \subset \mathscr{L}^{-1}(P)$ was defined by the condition $\arg(\iota_{v_0}(g_{v_0})) \in [0,2\pi/w_F)$ for $g \in \mathscr{L}^{-1}(P)$ in (A.2.3.13) of Definition A.2.3.6. In other words, we have
+The subset $E_0 \subset \mathscr{L}^{-1}(P)$ was defined by the condition
+
+$$
+\arg(\iota_{v_0}(g_{v_0})) \in [0,2\pi/w_F)
+$$
+
+for $g \in \mathscr{L}^{-1}(P)$ in (A.2.3.13) of Definition A.2.3.6. In other words, we have
 
 $$
 E_0 = \mathscr{L}^{-1}(P) \cap \left(\iota_{v_0}^{-1}(\mathbf{R}_{>0}) \times \prod_{k=1}^{r_1+r_2-1} F_{v_k}^{\times}\right). \tag{A.2.3.20}
@@ -905,31 +917,31 @@ We therefore have (since $\mu_F$ splits off as a direct factor of $\mathcal{O}_F
 
 **A.2.3.4. Global description of $\mathrm{GL}_1(\mathbf{A}_F)$.** With no mention of the fundamental domains $E_F^1$ and $E_F$, we describe, in this subsection, the topological group $\mathrm{GL}_1(\mathbf{A}_F)$. Recall that we write $\widehat{\mathcal{O}}_F^{\times}$ for $\mathrm{GL}_1(\widehat{\mathcal{O}}_F)$, and not for the closure of $\mathcal{O}_F^{\times}$ in $\mathrm{GL}_1(\mathbf{A}_F)$.
 
-Proposition A.2.3.9. Let $F$ be a number field. The following sequences
+Proposition A.2.3.9. *Let $F$ be a number field. The following sequences*
 
 $$
 1 \to \mathcal{O}_F^{\times} \to \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \times F^{\times} \times \widehat{\mathcal{O}}_F^{\times} \to F^{\times}(\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \times \widehat{\mathcal{O}}_F^{\times}) \to 1 \tag{A.2.3.22}
 $$
 
-where the unit group $\mathcal{O}_F^{\times}$ is embedded diagonally as a discrete subgroup, and
+*where the unit group $\mathcal{O}_F^{\times}$ is embedded diagonally as a discrete subgroup, and*
 
 $$
 1 \to F^{\times}(\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \times \widehat{\mathcal{O}}_F^{\times}) \to \mathrm{GL}_1(\mathbf{A}_F) \to \mathrm{Pic}(\mathcal{O}_F) \to 1 \tag{A.2.3.23}
 $$
 
-are short exact sequences of Hausdorff locally compact abelian groups, in the strict sense. The short exact sequence in (A.2.3.23) induces the short exact sequence of Hausdorff locally compact abelian groups
+*are short exact sequences of Hausdorff locally compact abelian groups, in the strict sense. The short exact sequence in (A.2.3.23) induces the short exact sequence of Hausdorff locally compact abelian groups*
 
 $$
 1 \to F^{\times}(\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1 \times \widehat{\mathcal{O}}_F^{\times}) \to \mathrm{GL}_1(\mathbf{A}_F)^1 \to \mathrm{Pic}(\mathcal{O}_F) \to 1 \tag{A.2.3.24}
 $$
 
-which is exact in the strict sense.
+*which is exact in the strict sense.*
 
 **A.2.3.5. Topological structure of $E_F^1$.**
 
-Proposition A.2.3.10. The subset $E \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ satisfies the following conditions:
+Proposition A.2.3.10. *The subset $E \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ satisfies the following conditions:*
 
-(1) $E_F^1$ is relatively compact with non-empty interior in $\mathrm{GL}_1(\mathbf{A}_F)^1$.
+(1) *$E_F^1$ is relatively compact with non-empty interior in $\mathrm{GL}_1(\mathbf{A}_F)^1$.*
 
 (2) We have
 
@@ -943,7 +955,7 @@ $$
 \xi E_F^1 \cap E_F^1 = \varnothing. \tag{A.2.3.26}
 $$
 
-(3) Upon denoting by $\overline{E}_F^1 \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ the closure of $E_F^1$, for any compact subset $K \subset \mathrm{GL}_1(\mathbf{A}_F)^1$, there exist at most finitely many elements $\xi \in F^{\times}$ such that:
+(3) *Upon denoting by $\overline{E}_F^1 \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ the closure of $E_F^1$, for any compact subset $K \subset \mathrm{GL}_1(\mathbf{A}_F)^1$, there exist at most finitely many elements $\xi \in F^{\times}$ such that:*
 
 $$
 \xi \overline{E}_F^1 \cap K \ne \varnothing. \tag{A.2.3.27}
@@ -973,11 +985,11 @@ within $\mathrm{GL}_1(\mathbf{A}_F)^1$, which follows from $\mathcal{O}_F^{\time
 
 **A.2.3.6. Fundamental domain $E_F$ for the $F^{\times}$-action on $\mathrm{GL}_1(\mathbf{A}_F)$.**
 
-Lemma A.2.3.11. Let $F$ be a number field. Let $s_{\infty}$ be any continuous homomorphic section to the continuous homomorphism $|\cdot|_{\infty} : \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \to \mathbf{R}_{>0}$. Then $\mathbf{R}_{>0} \times \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1 \to \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ defined by $(t,g^1) \mapsto s_{\infty}(t)g^1$ is an isomorphism of Lie groups.
+Lemma A.2.3.11. *Let $F$ be a number field. Let $s_{\infty}$ be any continuous homomorphic section to the continuous homomorphism $|\cdot|_{\infty} : \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \to \mathbf{R}_{>0}$. Then $\mathbf{R}_{>0} \times \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1 \to \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ defined by $(t,g^1) \mapsto s_{\infty}(t)g^1$ is an isomorphism of Lie groups.*
 
 The following is immediate from Proposition A.2.3.10(2).
 
-Lemma A.2.3.12. Let $F$ be a number field. Let $s_{\infty}$ be any continuous homomorphic section to the continuous homomorphism $|\cdot|_{\infty} : \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \to \mathbf{R}_{>0}$. The natural map $F^{\times} \times \mathbf{R}_{>0} \times E_F^1 \to \mathrm{GL}_1(\mathbf{A}_F)$ via $(\xi,t,g_0) \mapsto \xi s_{\infty}(t) g_0$ is bijective.
+Lemma A.2.3.12. *Let $F$ be a number field. Let $s_{\infty}$ be any continuous homomorphic section to the continuous homomorphism $|\cdot|_{\infty} : \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}) \to \mathbf{R}_{>0}$. The natural map $F^{\times} \times \mathbf{R}_{>0} \times E_F^1 \to \mathrm{GL}_1(\mathbf{A}_F)$ via $(\xi,t,g_0) \mapsto \xi s_{\infty}(t) g_0$ is bijective.*
 
 **A.2.3.7. Product loci, interiors and compactness.** For each Archimedean place, we denote by
 
@@ -987,15 +999,21 @@ $$
 
 the hyperplane of those elements $x \in \mathbf{A}_{F,S_{\infty}}$ whose coordinate indexed by the Archimedean place $v$ is zero.
 
-Lemma A.2.3.13. We fix an Archimedean place $v_0$ of $F$, and let $T_{v_0} \subset F_{v_0}^{\times} \to \mathbf{A}_{F,S_{\infty}}^{\times}$ be the canonical copy of $\mathbf{R}_{>0}$. Let $K_{v_0} \subset T_{v_0,\infty}$ be a compact subset.
+Lemma A.2.3.13. *We fix an Archimedean place $v_0$ of $F$, and let $T_{v_0} \subset F_{v_0}^{\times} \to \mathbf{A}_{F,S_{\infty}}^{\times}$ be the canonical copy of $\mathbf{R}_{>0}$. Let $K_{v_0} \subset T_{v_0,\infty}$ be a compact subset.*
 
-(1) The subset $K_{v_0} \cdot \overline{E}_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ is compact. If $K_{v_0}$ has non-empty interior in $T_{v_0,\infty}$, then so does $K_{v_0} \cdot \overline{E}_0$ in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$.
+(1) *The subset $K_{v_0} \cdot \overline{E}_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ is compact. If $K_{v_0}$ has non-empty interior in $T_{v_0,\infty}$, then so does $K_{v_0} \cdot \overline{E}_0$ in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$.*
 
 (2) We have $(K_{v_0} \cdot \overline{E}_0) \cap (\bigcup_{v\in S_{\infty}} H_v) = \varnothing$.
 
-(3) If $K_{v_0}$ has non-empty interior in $T_{v_0,\infty}$, then so does $K_{v_0} \cdot \overline{E}_0$ in $\mathbf{A}_{F,S_{\infty}}$.
+(3) *If $K_{v_0}$ has non-empty interior in $T_{v_0,\infty}$, then so does $K_{v_0} \cdot \overline{E}_0$ in $\mathbf{A}_{F,S_{\infty}}$.*
 
-Proof. (1): Compactness of $K_{v_0} \cdot \overline{E}_0$ follows from Lemma A.2.3.8(1). The interior of $K_{v_0} \cdot \overline{E}_0$ in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ contains the open subset $\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0}) \times \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) \subset T_{v_0,\infty} \times \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1 = \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$. If $\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0})$ is non-empty then since $\mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) = \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(E_0)$ is also non-empty by Lemma A.2.3.8(1), so is $\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0}) \cdot \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) \subset \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})}(K_{v_0} \cdot \overline{E}_0)$.
+Proof. (1): Compactness of $K_{v_0} \cdot \overline{E}_0$ follows from Lemma A.2.3.8(1). The interior of $K_{v_0} \cdot \overline{E}_0$ in $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ contains the open subset
+
+$$
+\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0}) \times \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) \subset T_{v_0,\infty} \times \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1 = \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}}).
+$$
+
+If $\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0})$ is non-empty then since $\mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) = \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(E_0)$ is also non-empty by Lemma A.2.3.8(1), so is $\mathrm{Int}_{T_{v_0,\infty}}(K_{v_0}) \cdot \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1}(\overline{E}_0) \subset \mathrm{Int}_{\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})}(K_{v_0} \cdot \overline{E}_0)$.
 
 (2): Since $K_{v_0} \subset T_{v_0,\infty}$ and $\overline{E}_0 \subset \mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})^1$, we have $K_{v_0} \cdot \overline{E}_0$ is entirely contained within $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$, and the complement of $\mathrm{GL}_1(\mathbf{A}_{F,S_{\infty}})$ is $\bigcup_{v\in S_{\infty}} H_v$.
 
@@ -1019,7 +1037,7 @@ $$
 
 and refer to $D_{F,S}$ as the $S$-adelic fundamental domain.
 
-Lemma A.2.4.2. Let $F$ be a number field, $S$ a finite set of places containing all the Archimedean places of $F$.
+Lemma A.2.4.2. *Let $F$ be a number field, $S$ a finite set of places containing all the Archimedean places of $F$.*
 
 (1) The additive topological group $\mathbf{A}_{F,S}$ satisfies
 
@@ -1027,9 +1045,9 @@ $$
 \mathbf{A}_{F,S} = \mathcal{O}_{F,S} + D_{F,S} \tag{A.2.4.2}
 $$
 
-where the right side of (A.2.4.2) is the union within $\mathbf{A}_{F,S}$ of the additive $\mathcal{O}_{F,S}$-translates of the adelic fundamental domain $D_{F,S}$ from (A.2.4.1).
+*where the right side of (A.2.4.2) is the union within $\mathbf{A}_{F,S}$ of the additive $\mathcal{O}_{F,S}$-translates of the adelic fundamental domain $D_{F,S}$ from (A.2.4.1).*
 
-(2) Upon denoting by $\overline{D}_{F,S}$ the closure of $D_{F,S}$ in $\mathbf{A}_{F,S}$, then for any compact subset $K \subset \mathbf{A}_{F,S}$, there exist at most finitely many elements $\xi \in \mathcal{O}_{F,S}$ such that
+(2) *Upon denoting by $\overline{D}_{F,S}$ the closure of $D_{F,S}$ in $\mathbf{A}_{F,S}$, then for any compact subset $K \subset \mathbf{A}_{F,S}$, there exist at most finitely many elements $\xi \in \mathcal{O}_{F,S}$ such that*
 
 $$
 (\xi + \overline{D}_{F,S}) \cap K \ne \varnothing. \tag{A.2.4.3}
@@ -1081,9 +1099,9 @@ We endow $E^1_{F,S}$ with the subspace topology. We refer to $E^1_{F,S}$ as the 
 
 The following is an analog of Proposition A.2.3.10, and is proved in a closely analogous manner.
 
-Proposition A.2.4.4. The subsets $E_{S,0}\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$, and $E^1_{F,S}\subset \mathrm{GL}_1(\mathbf{A}_F)^1$, satisfy the following conditions:
+Proposition A.2.4.4. *The subsets $E_{S,0}\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$, and $E^1_{F,S}\subset \mathrm{GL}_1(\mathbf{A}_F)^1$, satisfy the following conditions:*
 
-(1) $E_{S,0}$ is relatively compact with non-empty interior in $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$.
+(1) *$E_{S,0}$ is relatively compact with non-empty interior in $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$.*
 
 (2) We have
 
@@ -1097,7 +1115,7 @@ $$
 \xi E_{S,0}\cap E_{S,0} = \varnothing. \tag{A.2.4.10}
 $$
 
-(3) Upon denoting by $\overline{E}_{S,0}\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$ the closure of $E_{S,0}$, for any compact subset $K\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$, there exist at most finitely many elements $\xi\in \mathcal{O}_{F,S}^{\times}$ such that:
+(3) *Upon denoting by $\overline{E}_{S,0}\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$ the closure of $E_{S,0}$, for any compact subset $K\subset \mathrm{GL}_1(\mathbf{A}_{F,S})^1$, there exist at most finitely many elements $\xi\in \mathcal{O}_{F,S}^{\times}$ such that:*
 
 $$
 \xi\overline{E}_{S,0}\cap K\ne\varnothing. \tag{A.2.4.11}
@@ -1157,7 +1175,7 @@ where $p$ is the residue characteristic of $F_v$ and $N(\mathfrak{a})$ is the $p
 
 We refer to $\nu_v$ as the *local additive Tamagawa measure* on $F_v$.
 
-Lemma A.3.1.3. Let $F$ be a number field. For every $v\in\Sigma_F$, let $\nu_v$ be the local Tamagawa measure. Let $S$ be a finite set of places of $F$ containing the Archimedean places. Then we have
+Lemma A.3.1.3. *Let $F$ be a number field. For every $v\in\Sigma_F$, let $\nu_v$ be the local Tamagawa measure. Let $S$ be a finite set of places of $F$ containing the Archimedean places. Then we have*
 
 $$
 \nu = \bigotimes_{v\in\Sigma_F}\nu_v,\quad \nu_S = \bigotimes_{v\in S}\nu_v \tag{A.3.1.3}
@@ -1173,7 +1191,7 @@ $$
 
 and $\nu_\infty(D_{F,\infty}) = N_{F/\mathbf{Q}}(\mathfrak{d}_{F/\mathbf{Q}})^{1/2} = |\mathrm{disc}(K/\mathbf{Q})|^{1/2}$ by [CF, Ch. XV, Lemma 4.1.4], we have $c = 1$ since $\nu(D_F) = \bar{\nu}(\mathbf{A}_F/F) = 1$ via Theorem C.4.4.3 applied to the characteristic function of $D_F\subset\mathbf{A}_F$. $\square$
 
-Lemma A.3.1.4. Let $F$ be a number field. Let $\mu$ be an arbitrary Haar measure on $\mathbf{A}_F$. For any idele $g\in\mathrm{GL}_1(\mathbf{A}_F)$ and any Borel set $B\subset\mathbf{A}_F$, we have
+Lemma A.3.1.4. *Let $F$ be a number field. Let $\mu$ be an arbitrary Haar measure on $\mathbf{A}_F$. For any idele $g\in\mathrm{GL}_1(\mathbf{A}_F)$ and any Borel set $B\subset\mathbf{A}_F$, we have*
 
 $$
 \mu(gB) = |g|_F\,\mu(B). \tag{A.3.1.4}
@@ -1225,7 +1243,7 @@ $$
 \psi_{\mathrm{std}} : \mathbf{Q}_p\to U(1)
 $$
 
-obtained as the composition of the quotient $\mathbf{Q}_p\to\mathbf{Q}_p/\mathbf{Z}_p$, followed the natural injective continuous homomorphism $\mathbf{Q}_p/\mathbf{Z}_p = (\mathbf{Q}/\mathbf{Z})[p^\infty]\subset\mathbf{R}/\mathbf{Z}$, followed by $\exp(2\pi it)$. Then $\chi(g) = \chi_{\mathrm{std}}(cg)$ for a unique $c\in\mathbf{Q}_p$ depending only on $\chi\in\widehat{\mathbf{Q}}_p$. This identifies, as Hausdorff locally compact abelian groups, $\mathbf{Q}_p$ with its dual group. Upon calling $f_0 := 1_{\mathbf{Z}_p}$, then $1_{p^N\mathbf{Z}_p} = f_0(p^{-N}x)$, and $f(x) = f_0(p^{-N}x-p^{-N}a)$. We then have
+obtained as the composition of the quotient $\mathbf{Q}_p\to\mathbf{Q}_p/\mathbf{Z}_p$, followed the natural injective continuous homomorphism $\mathbf{Q}_p/\mathbf{Z}_p = (\mathbf{Q}/\mathbf{Z})[p^\infty]\subset\mathbf{R}/\mathbf{Z}$, followed by $\exp(2\pi it)$. Then $\chi(g) = \chi_{\mathrm{std}}(cg)$ for a unique $c\in\mathbf{Q}_p$ depending only on $\chi\in\widehat{\mathbf{Q}_p}$. This identifies, as Hausdorff locally compact abelian groups, $\mathbf{Q}_p$ with its dual group. Upon calling $f_0 := 1_{\mathbf{Z}_p}$, then $1_{p^N\mathbf{Z}_p} = f_0(p^{-N}x)$, and $f(x) = f_0(p^{-N}x-p^{-N}a)$. We then have
 
 $$
 \widehat{f}(x) = p^{-N}\widehat{f}_0(p^N(x-a)) = p^{-N}\psi_{\mathrm{std}}(ax)\cdot 1_{p^{-N}\mathbf{Z}_p}(x), \tag{A.3.1.5}
@@ -1249,7 +1267,7 @@ Example A.3.1.7 (Local Plancherel measures). We exhibit the Plancherel measure f
 
 **558** · **CHAPTER A. PREPARATIONS FROM ALGEBRAIC NUMBER THEORY**
 
-is self-dual via $\psi_{\mathrm{std}}$, the Plancherel measure is a positive real multiple of $\mu_{\mathbf{Q}_p}$. Say $\mu_{\widehat{\mathbf{Q}}_p} = c\cdot\mu_{\mathbf{Q}_p}$ for some unique $c\in\mathbf{R}_{>0}$. It is enough to compute:
+is self-dual via $\psi_{\mathrm{std}}$, the Plancherel measure is a positive real multiple of $\mu_{\mathbf{Q}_p}$. Say $\mu_{\widehat{\mathbf{Q}_p}} = c\cdot\mu_{\mathbf{Q}_p}$ for some unique $c\in\mathbf{R}_{>0}$. It is enough to compute:
 
 $$
 \widehat{1_{\mathbf{Z}_p}}(y) = \int_{\mathbf{Q}_p}1_{\mathbf{Z}_p}(x)\overline{\psi_{\mathrm{std}}(xy)}\,\mathrm{d}\mu_{\mathbf{Q}_p}(x)
@@ -1257,7 +1275,7 @@ $$
 
 which is $1_{\mathbf{Z}_p}(y)$ by Example A.3.1.6.
 
-By Lemma D.1.1.2(5), this can only be so if $\mu_{\mathbf{Q}_p} = \mu_{\widehat{\mathbf{Q}}_p}$, and so $c = 1$. Note that $\mu_{\mathbf{Q}_p}$ is also the local Tamagawa measure for the local field $\mathbf{Q}_p$ chosen in Definition A.3.1.2(3).
+By Lemma D.1.1.2(5), this can only be so if $\mu_{\mathbf{Q}_p} = \mu_{\widehat{\mathbf{Q}_p}}$, and so $c = 1$. Note that $\mu_{\mathbf{Q}_p}$ is also the local Tamagawa measure for the local field $\mathbf{Q}_p$ chosen in Definition A.3.1.2(3).
 
 Example A.3.1.8 (Global standard additive character - I). The self-duality of $\mathbf{A}_{\mathbf{Q}}$ is defined by the standard character
 
@@ -1373,13 +1391,13 @@ where $p$ is the residue characteristic of $F_v$.
 
 We refer to $\mu_v$ as the *local multiplicative Tamagawa measure* on $F_v^{\times}$.
 
-Lemma A.3.2.3. Let $F$ be a number field. For every $v\in\Sigma_{F,f}$, let $\mu_v$ be the local multiplicative Tamagawa measure on $F_v^{\times}$. We have, as Haar measures on $F_v^{\times}$:
+Lemma A.3.2.3. *Let $F$ be a number field. For every $v\in\Sigma_{F,f}$, let $\mu_v$ be the local multiplicative Tamagawa measure on $F_v^{\times}$. We have, as Haar measures on $F_v^{\times}$:*
 
 $$
 \mu_v = \frac{q_v}{q_v-1}\frac{\nu_v}{|\cdot|_v} \tag{A.3.2.3}
 $$
 
-where $q_v$ is the size of the residue field at $v$ and $\nu_v$ is the local additive Tamagawa measure on $F_v$.
+*where $q_v$ is the size of the residue field at $v$ and $\nu_v$ is the local additive Tamagawa measure on $F_v$.*
 
 Proof. Since $|\cdot|_v$ is the normalized absolute value on $F_v$, the measure $|\cdot|_v^{-1}\nu_v$ for $\nu_v$ the local additive Tamagawa measure on $F_v$ is a Haar measure on $F_v^{\times}$. There therefore exists a unique real number $c > 0$ such that $\mu_v = c|\cdot|_v^{-1}\nu_v$. It is enough to compute the measure of $\mathcal{O}_{F_v}^{\times}$ with respect to each measure and show that we have $c = q_v/(q_v-1)$.
 
@@ -1401,7 +1419,7 @@ This gives $c = q_v/(q_v-1)$, so (A.3.2.3) holds. $\square$
 
 The measure $\mu$ is explicitly described in terms of the $\mu_v$'s:
 
-Lemma A.3.2.4. Let $F$ be a number field. For every $v\in\Sigma_F$, let $\mu_v$ be local multiplicative Tamagawa measure on $F_v^{\times}$. We have, as Haar measures on $\mathrm{GL}_1(\mathbf{A}_F)$,
+Lemma A.3.2.4. *Let $F$ be a number field. For every $v\in\Sigma_F$, let $\mu_v$ be local multiplicative Tamagawa measure on $F_v^{\times}$. We have, as Haar measures on $\mathrm{GL}_1(\mathbf{A}_F)$,*
 
 $$
 \mu = \bigotimes_{v\in\Sigma_F}\mu_v. \tag{A.3.2.5}
@@ -1672,15 +1690,15 @@ A.5.1.1. $1$-dimensional Hardy-Littlewood Maximal Theorem. In the $1$-dimensiona
 
 THEOREM A.5.1.1 (Hardy-Littlewood Maximal Theorem over $\mathbf{R}$). Let $f : \mathbf{R} \to \mathbf{C}$ be a measurable function.
 
-(1) If $f \in L^1_{\mathrm{loc}}(\mathbf{R},\mathrm{d}x)$ is such that $f \log^+|f|) \in L^1_{\mathrm{loc}}(\mathbf{R},\mathrm{d}x)$, with $\log^+(u) := \max\{\log(u),0\}$ for $u > 0$, then $Mf$ is measurable and finite almost everywhere.
+(1) *If $f \in L^1_{\mathrm{loc}}(\mathbf{R},\mathrm{d}x)$ is such that $f \log^+|f|) \in L^1_{\mathrm{loc}}(\mathbf{R},\mathrm{d}x)$, with $\log^+(u) := \max\{\log(u),0\}$ for $u > 0$, then $Mf$ is measurable and finite almost everywhere.*
 
-(2) If $f \in L^1(\mathbf{R},\mathrm{d}x)$ then for any real number $\alpha > 0$, we have:
+(2) *If $f \in L^1(\mathbf{R},\mathrm{d}x)$ then for any real number $\alpha > 0$, we have:*
 
 $$
 |\{x \in \mathbf{R} : (Mf)(x) > \alpha\}| \le \frac{3}{\alpha} \|f\|_{L^1(\mathbf{R},\mathrm{d}x)}. \tag{A.5.1.3}
 $$
 
-(3) For $p > 1$, if $f \in L^p(\mathbf{R},\mathrm{d}x)$ then there exists a real number $C_p > 0$ independent of $f$ such that
+(3) *For $p > 1$, if $f \in L^p(\mathbf{R},\mathrm{d}x)$ then there exists a real number $C_p > 0$ independent of $f$ such that*
 
 $$
 \|Mf\|^p_{L^p(\mathbf{R},\mathrm{d}x)} \le \frac{2^p \cdot 3p}{p-1} \|f\|^p_{L^p(\mathbf{R},\mathrm{d}x)}. \tag{A.5.1.4}
@@ -1856,11 +1874,11 @@ Before we state and prove analogs of the Hardy-Littlewood Maximal Theorem and th
 
 **570** · **CHAPTER A. PREPARATIONS FROM ALGEBRAIC NUMBER THEORY**
 
-PROPOSITION A.5.2.3. Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$.
+PROPOSITION A.5.2.3. *Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$.*
 
-(1) If $G$ is first countable and locally profinite, then it admits a $D''$-sequence of the form $\{U_k,V_k\}_{k \ge 0}$, with, for each integer $k \ge 0$, $U_k = U_k^{-1}$, $V_k = U_k^2$, $C' = 1$, and $U_k$ is a compact open subgroup of $G$.
+(1) *If $G$ is first countable and locally profinite, then it admits a $D''$-sequence of the form $\{U_k,V_k\}_{k \ge 0}$, with, for each integer $k \ge 0$, $U_k = U_k^{-1}$, $V_k = U_k^2$, $C' = 1$, and $U_k$ is a compact open subgroup of $G$.*
 
-(2) Let $H \subset G$ be an open subgroup. Let $\{U_k\}_{k \ge 0}$ be a sequence of subsets of $H$. Then $\{U_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $H$ if and only if it is so for $G$. It is open, respectively symmetric, for $H$ if and only if it is so for $G$.
+(2) *Let $H \subset G$ be an open subgroup. Let $\{U_k\}_{k \ge 0}$ be a sequence of subsets of $H$. Then $\{U_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $H$ if and only if it is so for $G$. It is open, respectively symmetric, for $H$ if and only if it is so for $G$.*
 
 PROOF. (1) : By [DE, Thm. 4.1.6] and [DE, Prop. 4.1.5], $G$ admits a unit-neighborhood base comprised of compact open subgroups. We may assume such base to be countable. Indeed, for every countable unit-neighborhood base $B$ of $e$ we may find for each $U \in B$ an open, hence closed (hence compact open) subgroup $N_U \subset U$. The subset $\{N_U : U \in B\}$ is a countable unit-neighborhood base comprised of compact open subgroups. We may extract a cofinal sequence $\{U_k\}_{k \ge 0}$ from it.
 
@@ -1876,19 +1894,25 @@ It follows that, under the above choices, $\lambda(U_k) = c$ for every $k \ge 0$
 
 Upon choosing $V_k := U_k$ for every integer $k \ge 0$, and $C' = 1$, then $\lambda(U_k) = \lambda(V_k)$, and hence (A.5.2.2) holds too, and $\{U_k,V_k\}_{k \ge 0}$ is a $D''$-sequence.
 
-LEMMA A.5.2.5. Let $G_1,G_2$ be Hausdorff locally compact abelian groups, and let $G := G_1 \times G_2$ be the product topological group. Let $\mu_1,\mu_2$ be Haar measures on $G_1$, respectively $G_2$. Let $\mu := \mu_1 \otimes \mu_2$ be the product Haar measure on $G$. Let $\{U_k\}_{k \ge 0}$ be a sequence of $\mu_1$-measurable subsets in $G_1$, and $\{U'_k\}_{k \ge 0}$ a sequence of $\mu_2$-measurable subsets in $G_2$. If $\{U_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G_1$, and $\{U'_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G_2$, then $\{U_k \times U'_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G$. For each integer $k \ge 0$, if $U_k$ and $U'_k$ are open, respectively symmetric, then so is $U_k \times U'_k$.
+LEMMA A.5.2.5. *Let $G_1,G_2$ be Hausdorff locally compact abelian groups, and let $G := G_1 \times G_2$ be the product topological group. Let $\mu_1,\mu_2$ be Haar measures on $G_1$, respectively $G_2$. Let $\mu := \mu_1 \otimes \mu_2$ be the product Haar measure on $G$. Let $\{U_k\}_{k \ge 0}$ be a sequence of $\mu_1$-measurable subsets in $G_1$, and $\{U'_k\}_{k \ge 0}$ a sequence of $\mu_2$-measurable subsets in $G_2$. If $\{U_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G_1$, and $\{U'_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G_2$, then $\{U_k \times U'_k\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G$. For each integer $k \ge 0$, if $U_k$ and $U'_k$ are open, respectively symmetric, then so is $U_k \times U'_k$.*
 
 PROOF. Since, for any two measurable subsets $B_1 \subset G_1$, $B_2 \subset G_2$, we have $\mu(B_1 \times B_2) = \mu_1(B_1)\mu_2(B_2)$, and since the property of being an open subset respectively a symmetric subset is stable under finite products, all defining conditions for $\{U_k \times U'_k\}_{k \ge 0}$ follow from those of $\{U_k\}_{k \ge 0}$, respectively $\{U'_k\}_{k \ge 0}$. $\square$
 
-PROPOSITION A.5.2.6. Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second-countable. Let $H \subset G$ be a closed subgroup. Let $\mu_H$ be a choice of Haar measure on $H$, $\mu_G$ a choice of Haar measure on $G$, and $\mu_{G/H}$ the unique Haar measure on $G/H$ induced by the choices $\mu_G$ on $G$ and $\mu_H$ on $H$ as per Theorem D.1.2.1. Assume $H$ is discrete, and normalize $\mu_H$ so as to have $\mu_H(\{1\}) = 1$. Let $q : G \to G/H$ be the continuous quotient homomorphism.
+PROPOSITION A.5.2.6. *Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second-countable. Let $H \subset G$ be a closed subgroup. Let $\mu_H$ be a choice of Haar measure on $H$, $\mu_G$ a choice of Haar measure on $G$, and $\mu_{G/H}$ the unique Haar measure on $G/H$ induced by the choices $\mu_G$ on $G$ and $\mu_H$ on $H$ as per Theorem D.1.2.1. Assume $H$ is discrete, and normalize $\mu_H$ so as to have $\mu_H(\{1\}) = 1$. Let $q : G \to G/H$ be the continuous quotient homomorphism.*
 
-Assume that there exists a relatively compact Borel subset $E \subset G$ whose interior is non-empty and contains the neutral element, and such that the continuous map $q|_E : E \to G/H$ is a bijection.
+*Assume that there exists a relatively compact Borel subset $E \subset G$ whose interior is non-empty and contains the neutral element, and such that the continuous map $q|_E : E \to G/H$ is a bijection.*
 
 ## PDF page 571
 
 **A.5. IDELIC HARDY-LITTLEWOOD MAXIMAL THEOREM AND LEBESGUE DIFFERENTIATION** · **571**
 
-Let $\{U_k\}_{k \ge 0}$ be a sequence of Borel sets in $G/H$ such that $U_{k+1} \subset U_k$ for every integer $k \ge 0$. Then $\{U_k\}_{k \ge 0}$ is a $D$-sequence for $G/H$, respectively a $D'$-sequence for $G/H$, if and only if $\{q^{-1}(U_k) \cap E\}_{k \ge 0}$ is a $D$-sequence, respectively a $D'$-sequence, for $G$. If $E$ is symmetric then $\{U_k\}_{k \ge 0}$ is symmetric if and only if $\{q^{-1}(U_k) \cap E\}_{k \ge 0}$ is.
+*Let $\{U_k\}_{k \ge 0}$ be a sequence of Borel sets in $G/H$ such that $U_{k+1} \subset U_k$ for every integer $k \ge 0$. Then $\{U_k\}_{k \ge 0}$ is a $D$-sequence for $G/H$, respectively a $D'$-sequence for $G/H$, if and only if*
+
+$$
+\{q^{-1}(U_k) \cap E\}_{k \ge 0}
+$$
+
+*is a $D$-sequence, respectively a $D'$-sequence, for $G$. If $E$ is symmetric then $\{U_k\}_{k \ge 0}$ is symmetric if and only if $\{q^{-1}(U_k) \cap E\}_{k \ge 0}$ is.*
 
 REMARK A.5.2.7. In light of Lemma A.5.2.10 below, if $H$ is discrete then there exists a Borel section to $q : X \to X/H$. Discreteness of $H$ is essential to ensure that such Borel section $F \subset X$ (i.e. a Borel subset $F$ such that $q|_F$ is a continuous bijection) can be used to compute the $\mu_{G/H}$-measure of measurable subsets $A$ in $X/H$, by computing the $\mu_G$-measure of $q^{-1}(A) \cap F$.
 
@@ -1896,7 +1920,7 @@ Before proving the Proposition, we record here the following result from [Kech, 
 
 THEOREM A.5.2.8 (Lusin-Souslin Theorem on Borel embeddings). Let $X,Y$ be separable and completely metrizable$^7$ topological spaces, $f : X \to Y$ a continuous map.
 
-For $B \subset X$ a Borel set, if $f|_B$ is injective then $f(B) \subset Y$ is a Borel set.
+*For $B \subset X$ a Borel set, if $f|_B$ is injective then $f(B) \subset Y$ is a Borel set.*
 
 We only need this for the quotient map $G \to G/H$ with $G$ a second-countable locally compact topological abelian group and $H$ a discrete subgroup. In such cases, we can pick a fundamental domain $F \subset G$ with $\mu(\partial F) = 0$ (for a Haar measure $\mu$ on $G$) such that $\mathrm{Int}(F) \to G/H$ is a homeomorphism onto an open image who complement in $G/H$ has measure $0$. In such cases. the conclusion of Theorem A.5.2.8 is clear when we complete the $\sigma$-algebra of Borel sets (i.e., we regard all measure-$0$ sets as Borel sets).
 
@@ -1921,9 +1945,9 @@ $^8$Why is this being recorded? It is never needed in such generality.
 
 **572** · **CHAPTER A. PREPARATIONS FROM ALGEBRAIC NUMBER THEORY**
 
-LEMMA A.5.2.10. Let $X$ be a Hausdorff locally compact topological space. Assume $X$ is second countable. Let $H$ be a countable discrete abelian group acting on $H$ properly and freely. Let $q : X \to X/H$ be the continuous quotient.
+LEMMA A.5.2.10. *Let $X$ be a Hausdorff locally compact topological space. Assume $X$ is second countable. Let $H$ be a countable discrete abelian group acting on $H$ properly and freely. Let $q : X \to X/H$ be the continuous quotient.*
 
-Let $E \subset X$ be a Borel subset such that $q|_E : E \to X/H$ is injective. Then there exists a Borel subset $F \subset X$ such that $E \subset F$ and the continuous $q|_F : F \to X/H$ is a bijection.
+*Let $E \subset X$ be a Borel subset such that $q|_E : E \to X/H$ is injective. Then there exists a Borel subset $F \subset X$ such that $E \subset F$ and the continuous $q|_F : F \to X/H$ is a bijection.*
 
 PROOF. Since $X$ is Hausdorff locally compact and second countable, there exists an exhaustion of $X$ by a sequence of compact subsets $\{K_m\}_{m \ge 0}$. We denote by $q_m : K_m \to X/H$ the composition of the continuous inclusion $K_m \subset X$ followed by the quotient map $q$. For each integer $m \ge 1$, $K_m$ is metrizable by the Urysohn Metrization Theorem, since it is Hausdorff, compact, second countable.
 
@@ -2098,13 +2122,13 @@ $$
 
 We endow $B^1_{F,S}$ with the subspace topology.
 
-LEMMA A.5.2.12. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.
+LEMMA A.5.2.12. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.*
 
-(1) For $g_1 := 1$ and $\{g_i\}_{1 \le i \le h_F} \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ a choice of representatives for the $h_F$ ideal classes in $\mathrm{Pic}(\mathcal{O}_F)$, $\bigcup_{1 \le i \le h_F} g_i B^1_F$ is a fundamental domain for the continuous left-translation action of $F^\times$ on $\mathrm{GL}_1(\mathbf{A}_F)^1$.
+(1) *For $g_1 := 1$ and $\{g_i\}_{1 \le i \le h_F} \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ a choice of representatives for the $h_F$ ideal classes in $\mathrm{Pic}(\mathcal{O}_F)$, $\bigcup_{1 \le i \le h_F} g_i B^1_F$ is a fundamental domain for the continuous left-translation action of $F^\times$ on $\mathrm{GL}_1(\mathbf{A}_F)^1$.*
 
-(2) $B^1_{F,S}$ is a fundamental domain for the continuous left-translation action of $\mathcal{O}^\times_{F,S}$ on $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$.
+(2) *$B^1_{F,S}$ is a fundamental domain for the continuous left-translation action of $\mathcal{O}^\times_{F,S}$ on $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$.*
 
-(3) For $g_1 := 1$ and $\{g_i\}_{1 \le i \le h_{F,S}} \subset \mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,S})^1$ a choice of representatives for the $h_{F,S}$ ideal classes in $\mathrm{Pic}(\mathcal{O}_{F,S})$, $\bigcup_{1 \le i \le h_{F,S}} g_i B^1_{F,S}$ is a fundamental domain for the continuous left-translation action of $\mathcal{O}^\times_{F,S}$ on $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1$.
+(3) *For $g_1 := 1$ and $\{g_i\}_{1 \le i \le h_{F,S}} \subset \mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,S})^1$ a choice of representatives for the $h_{F,S}$ ideal classes in $\mathrm{Pic}(\mathcal{O}_{F,S})$, $\bigcup_{1 \le i \le h_{F,S}} g_i B^1_{F,S}$ is a fundamental domain for the continuous left-translation action of $\mathcal{O}^\times_{F,S}$ on $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1$.*
 
 PROOF. (1) : We will be showing that $B^1_F$ is a fundamental domain within $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty} \times \widehat{\mathcal{O}}_F)^1$ for the continuous left-translation action of the global unit group $\mathcal{O}^\times_F$. To this end, we proceed as follows. The kernel of $\mathscr{L}_F := \mathscr{L} \times (\log|\cdot|_v)_{v \in \Sigma_{F,f}} : \mathrm{GL}_1(\mathbf{A}_{F,S_\infty} \times \widehat{\mathcal{O}}_F)^1 \to \mathbf{R}^{S_\infty}$ is the finite group of roots of unity $\mu_F \subset \mathcal{O}^\times_F$, while the image of $\mathscr{L}_F$ is the finite-dimensional Euclidean space $H = \{\sum_{v \mid \infty} x_v = 0\} \subset \mathbf{R}^{S_\infty}$. We know $\mathscr{L}_F(\mathcal{O}^\times_F/\mu_F)$ is a lattice in $H$, and $Q_1 \times \{0\} \simeq Q_1$ is a fundamental domain for the additive translation action of $\mathscr{L}_F(\mathcal{O}^\times_F/\mu_F) \simeq \mathscr{L}(\mathcal{O}^\times_F/\mu_F)$ on $H$.
 
@@ -2122,7 +2146,7 @@ We now let $\{g_1,\dots,g_{h_F}\}$ be representatives in $\mathrm{GL}_1(\mathbf{
 
 LEMMA A.5.2.13. Let $F$ be a number field.
 
-(1) The interior $\mathrm{Int}(E_1)$ of $E_1$ from (A.5.2.14) is a symmetric unit-neighborhood in $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$.
+(1) *The interior $\mathrm{Int}(E_1)$ of $E_1$ from (A.5.2.14) is a symmetric unit-neighborhood in $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$.*
 
 (2) The following sequence of subsets:
 
@@ -2136,7 +2160,7 @@ $$
 P_k = \{\sum_{i=1}^{r_1+r_2-1} x_i \mathscr{L}(\varepsilon_i) : -1/(k+1) < x_i < 1/(k+1) \text{ for all } 1 \le i \le r_1+r_2-1\} \tag{A.5.2.20}
 $$
 
-is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$, and $\{U_{S_\infty,k},U_{S_\infty,2k}\}_{k \ge 0}$ is a $D''$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$.
+*is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$, and $\{U_{S_\infty,k},U_{S_\infty,2k}\}_{k \ge 0}$ is a $D''$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$.*
 
 PROOF. (1) : Since $\mathrm{Int}(Q_1)$ from (A.5.2.12) is a symmetric unit-neighborhood in $\mathbf{R}^{r_1+r_2-1}$, then, for $\mathrm{Int}(E_1)$ to be a symmetric unit-neighborhood in $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1$, it is enough for the subset$^{10}$
 
@@ -2150,9 +2174,9 @@ Indeed, if $z \in U$, then $|z^{-1}| \in e^{(-1/4,1/4)}$ also holds. Since $\arg
 
 (2) : The logarithm homomorphism $\mathscr{L}$ is injective on each $P_k$, and $\mathscr{L}(P_k) \subset \mathscr{L}(P_1)$. It is therefore enough to show that$^{12}$ $\{Q_k\}_{k \ge 0}$ is a symmetric $D'$-sequence for $\mathbf{R}^{r_1+r_2-1}$, and $\{Q_k,Q_{2k}\}_{k \ge 0}$ is a $D''$-sequence for $\mathbf{R}^{r_1+r_2-1}$, which is indeed the case since $Q_k$ is an open cube in $\mathbf{R}^{r_1+r_2-1}$ whose baricenter is the origin, and every Haar measure on $\mathbf{R}^{r_1+r_2-1}$ is a positive multiple of the Lebesgue measure. $\square$
 
-LEMMA A.5.2.14. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.
+LEMMA A.5.2.14. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.*
 
-(1) Let $\{B_k\}_{k \ge 0}$ be a sequence of compact open subgroups in $\widehat{\mathcal{O}}^\times_{F,S}$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$, and $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_{F,S}$. Then the sequence $\{U_{S,k}\}_{k \ge 0}$ of subsets in $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$:
+(1) *Let $\{B_k\}_{k \ge 0}$ be a sequence of compact open subgroups in $\widehat{\mathcal{O}}^\times_{F,S}$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$, and $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_{F,S}$. Then the sequence $\{U_{S,k}\}_{k \ge 0}$ of subsets in $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$:*
 
 $$
 U_{S,k} := U_{S_\infty,k} \times B_k \tag{A.5.2.21}
@@ -2160,13 +2184,13 @@ $$
 
 is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$.
 
-(2) For each integer $k \ge 0$ and for $\overline{U}_{S,k}$ the image in $J^1_{F,S}$ of $U_{S,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1 \to J^1_{F,S}$, the sequence $\{\overline{U}_{S,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $J^1_{F,S}$.
+(2) *For each integer $k \ge 0$ and for $\overline{U}_{S,k}$ the image in $J^1_{F,S}$ of $U_{S,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1 \to J^1_{F,S}$, the sequence $\{\overline{U}_{S,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $J^1_{F,S}$.*
 
 PROOF. (1) holds by Lemma A.5.2.3(2), combined with Lemma A.5.2.3(1) and Lemma A.5.2.5.
 
 (2) : Since $B^1_{F,S}$ is a fundamental domain for the continuous left-translation action of $\mathcal{O}^\times_{F,S}$ on $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$, and for every integer $k \ge 0$ we have $U_{S,k} \subset B^1_{F,S}$, then (2) holds by Proposition A.5.2.6. $\square$
 
-LEMMA A.5.2.15. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\{B_k\}_{k \ge 0}$ be a choice of a sequence of compact open subgroups of $\widehat{\mathcal{O}}^\times_{F,S}$ such that $B_{k+1} \subset B_k$ for
+LEMMA A.5.2.15. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\{B_k\}_{k \ge 0}$ be a choice of a sequence of compact open subgroups of $\widehat{\mathcal{O}}^\times_{F,S}$ such that $B_{k+1} \subset B_k$ for*
 
 ---
 $^{10}$Why use $e^{(-1/4,1/4)}$ below rather than $(1/c,c)$ for general $c > 1$?
@@ -2179,9 +2203,9 @@ $^{12}$Need to define $Q_k$ somehow akin to $P_k$'s
 
 **A.5. IDELIC HARDY-LITTLEWOOD MAXIMAL THEOREM AND LEBESGUE DIFFERENTIATION** · **577**
 
-every integer $k \ge 0$ such that $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_{F,S}$, we let $\{U_{S,k}\}_{k \ge 0}$ be the sequence of open subsets of $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1 \times \widehat{\mathcal{O}}^\times_F$ defined in (A.5.2.21).
+*every integer $k \ge 0$ such that $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_{F,S}$, we let $\{U_{S,k}\}_{k \ge 0}$ be the sequence of open subsets of $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1 \times \widehat{\mathcal{O}}^\times_F$ defined in (A.5.2.21).*
 
-We let $\tau_S : \mathbf{R}_{>0} \to \mathrm{GL}_1(\mathbf{A}_{F,S})$ be a choice of continuous homomorphic section to the $S$-idelic norm.
+*We let $\tau_S : \mathbf{R}_{>0} \to \mathrm{GL}_1(\mathbf{A}_{F,S})$ be a choice of continuous homomorphic section to the $S$-idelic norm.*
 
 The sequence:
 
@@ -2189,23 +2213,23 @@ $$
 \{U_k := \tau_S((1-1/k,1+1/k)) \cdot U_{S,k}\}_{k \ge 0} \tag{A.5.2.22}
 $$
 
-is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S})$. For $\overline{U}_k$ the image of $U_k$ in $J_{F,S}$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $J_{F,S}$.
+*is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S})$. For $\overline{U}_k$ the image of $U_k$ in $J_{F,S}$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $J_{F,S}$.*
 
 PROOF. The Lemma follows upon combining Lemma A.5.2.5 with Lemma A.5.2.14. The assertions on $\{\overline{U}_k\}_{k \ge 0}$ follow from Lemma A.5.2.12(2) and Proposition A.5.2.6. $\square$
 
-LEMMA A.5.2.16. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.
+LEMMA A.5.2.16. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places.*
 
-(1) Let $\{B_k\}_{k \ge 0}$ be a sequence of compact open subgroups in $\widehat{\mathcal{O}}^\times_F$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$, and $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_F$. Then the sequence $\{U_{F,k}\}_{k \ge 0}$ of subsets in $\mathrm{GL}_1(\mathbf{A}_F)^1$:
+(1) *Let $\{B_k\}_{k \ge 0}$ be a sequence of compact open subgroups in $\widehat{\mathcal{O}}^\times_F$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$, and $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_F$. Then the sequence $\{U_{F,k}\}_{k \ge 0}$ of subsets in $\mathrm{GL}_1(\mathbf{A}_F)^1$:*
 
 $$
 U_{F,k} := U_{S_\infty,k} \times B_k \tag{A.5.2.23}
 $$
 
-is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_F)^1$ and for $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1$.
+*is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_F)^1$ and for $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1$.*
 
-(2) For each integer $k \ge 0$ and for $\overline{U}_{F,k}$ the image in $C^1_F$ of $U_{F,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_F)^1 \to C^1_F$, the sequence $\{\overline{U}_{F,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $C^1_F$.
+(2) *For each integer $k \ge 0$ and for $\overline{U}_{F,k}$ the image in $C^1_F$ of $U_{F,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_F)^1 \to C^1_F$, the sequence $\{\overline{U}_{F,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $C^1_F$.*
 
-(3) For each integer $k \ge 0$ and for $\overline{U}_{F,S,k}$ the image in $C^1_{F,S}$ of $U_{F,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1 \to C^1_{F,S}$, the sequence $\{\overline{U}_{F,S,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $C^1_{F,S}$.
+(3) *For each integer $k \ge 0$ and for $\overline{U}_{F,S,k}$ the image in $C^1_{F,S}$ of $U_{F,k}$ under the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})^1 \to C^1_{F,S}$, the sequence $\{\overline{U}_{F,S,k}\}_{k \ge 0}$ is a symmetric $D'$-sequence for $C^1_{F,S}$.*
 
 PROOF. (1) holds by Lemma A.5.2.3(2), combined with Lemma A.5.2.3(1) and Lemma A.5.2.5.
 
@@ -2213,9 +2237,9 @@ PROOF. (1) holds by Lemma A.5.2.3(2), combined with Lemma A.5.2.3(1) and Lemma A
 
 We conclude with the following:
 
-LEMMA A.5.2.17. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\{B_k\}_{k \ge 0}$ be a choice of a sequence of compact open subgroups of $\widehat{\mathcal{O}}^\times_F$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$ such that $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_F$, we let $\{U_{F,k}\}_{k \ge 0}$ be the sequence of open subsets of $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1 \times \widehat{\mathcal{O}}^\times_F$ defined in (A.5.2.23).
+LEMMA A.5.2.17. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We let $\{B_k\}_{k \ge 0}$ be a choice of a sequence of compact open subgroups of $\widehat{\mathcal{O}}^\times_F$ such that $B_{k+1} \subset B_k$ for every integer $k \ge 0$ such that $\{B_k\}_{k \ge 0}$ is a unit-neighborhood base in $\widehat{\mathcal{O}}^\times_F$, we let $\{U_{F,k}\}_{k \ge 0}$ be the sequence of open subsets of $\mathrm{GL}_1(\mathbf{A}_{F,S_\infty})^1 \times \widehat{\mathcal{O}}^\times_F$ defined in (A.5.2.23).*
 
-We let $\tau : \mathbf{R}_{>0} \to \mathrm{GL}_1(\mathbf{A}_F)$ be a choice of continuous homomorphic section to the idelic norm.
+*We let $\tau : \mathbf{R}_{>0} \to \mathrm{GL}_1(\mathbf{A}_F)$ be a choice of continuous homomorphic section to the idelic norm.*
 
 (1) The sequence:
 
@@ -2223,9 +2247,9 @@ $$
 \{U_k := \tau((1-1/k,1+1/k)) \cdot U_{F,k}\}_{k \ge 0} \tag{A.5.2.24}
 $$
 
-is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_F)$. For $\overline{U}_k$ the image of $U_k$ in $C_F$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $C_F$.
+*is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_F)$. For $\overline{U}_k$ the image of $U_k$ in $C_F$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $C_F$.*
 
-(2) If $\tau$ factors through $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S}) \subset \mathrm{GL}_1(\mathbf{A}_F)$, then the sequence $\{U_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})$. For $\overline{U}_k$ the image of $U_k$ in $C_{F,S}$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $C_{F,S}$.
+(2) *If $\tau$ factors through $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S}) \subset \mathrm{GL}_1(\mathbf{A}_F)$, then the sequence $\{U_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_{F,S} \times \widehat{\mathcal{O}}_{F,\Sigma_F-S})$. For $\overline{U}_k$ the image of $U_k$ in $C_{F,S}$ for each integer $k \ge 0$, $\{\overline{U}_k\}_{k \ge 0}$ is a symmetric open $D'$-sequence for $C_{F,S}$.*
 
 PROOF. (1) : By Lemma A.5.2.5, the sequence in (A.5.2.24) is a symmetric $D'$-sequence for $\mathrm{GL}_1(\mathbf{A}_F) \simeq \mathbf{R}_{>0} \times \mathrm{GL}_1(\mathbf{A}_F)^1$, the isomorphism of Hausdorff locally compact abelian groups being induced by the choice
 
@@ -2277,9 +2301,9 @@ We will now show how to construct an analog, for Hausdorff locally compact abeli
 
 We begin with the following result from [HR-2, Ch. XI, §44]:
 
-THEOREM A.5.3.1. Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a Haar measure on $G$. Let $\{U_k\}_{k \ge 0}$ be a $D$-sequence for $G$. We let $\mathcal{F} \subset \mathcal{P}(G)$ be the collection of all subsets of $G$ of the form $xU_k$, for $x \in G$ and $k \ge 0$ an integer. Let $\mathcal{F}' \subset \mathcal{F}$ be a subset.
+THEOREM A.5.3.1. *Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a Haar measure on $G$. Let $\{U_k\}_{k \ge 0}$ be a $D$-sequence for $G$. We let $\mathcal{F} \subset \mathcal{P}(G)$ be the collection of all subsets of $G$ of the form $xU_k$, for $x \in G$ and $k \ge 0$ an integer. Let $\mathcal{F}' \subset \mathcal{F}$ be a subset.*
 
-Let $B \subset G$ be a $\mu_G$-measurable subset such that:
+*Let $B \subset G$ be a $\mu_G$-measurable subset such that:*
 
 ---
 $^{13}$Should briefly explain calculation to get these sufficient constants.
@@ -2290,15 +2314,15 @@ $^{13}$Should briefly explain calculation to get these sufficient constants.
 
 (1) $\mu_G(B \cdot U_0)$ is finite.$^{14}$
 
-(2) For each $x \in B$, there exists an integer $k \ge 0$ such that $xU_k \in \mathcal{F}'$.
+(2) *For each $x \in B$, there exists an integer $k \ge 0$ such that $xU_k \in \mathcal{F}'$.*
 
-Then there exists a finite subset $\{x_i U_{k_i}\}_{1 \le i \le N} \subset \mathcal{F}'$ such that $x_i \in B$ for all $1 \le i \le N$, the subsets $x_i U_{k_i}$ are pairwise disjoint, and:
+*Then there exists a finite subset $\{x_i U_{k_i}\}_{1 \le i \le N} \subset \mathcal{F}'$ such that $x_i \in B$ for all $1 \le i \le N$, the subsets $x_i U_{k_i}$ are pairwise disjoint, and:*
 
 $$
 \sum_{1 \le i \le N} \mu_G(U_{k_i}) > \frac{\mu_G(B)}{C} \tag{A.5.3.1}
 $$
 
-where $C > 0$ is the structural constant from (A.5.2.1) associated to the $D$-sequence $\{U_k\}_{k \ge 0}$.
+*where $C > 0$ is the structural constant from (A.5.2.1) associated to the $D$-sequence $\{U_k\}_{k \ge 0}$.*
 
 REMARK A.5.3.2. The Theorem is [HR-2, Ch. XI, Thm. 44.11, p. 638], and it is a generalization of the Vitali Covering Lemma (see [StSha-III, Ch. 3, §1, Lemma.1.2, p. 102]).
 
@@ -2310,9 +2334,9 @@ We will be assuming the Hausdorff locally compact abelian group $G$ under consid
 
 We recall that, for a Hausdorff locally compact$^{15}$ topological space $X$, and a measure $\mu$ on $X$, a subset $A \subset X$ is locally $\mu$-negligible if and only if for every $x \in X$ there exists a neighborhood $U$ of $x$ such that $A \cap U$ is $\mu$-negligible (see [Bou-I, Ch. IV, §5, No. 2, Def. 4, INT IV.61]).
 
-LEMMA A.5.3.3. Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second countable. Let $\mu_G$ be a choice of Haar measure on $G$.
+LEMMA A.5.3.3. *Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second countable. Let $\mu_G$ be a choice of Haar measure on $G$.*
 
-Let $A \subset G$ be a subset. If $A$ is locally $\mu_G$-negligible, then $A$ is $\mu_G$ measurable and $\mu_G$-negligible.
+*Let $A \subset G$ be a subset. If $A$ is locally $\mu_G$-negligible, then $A$ is $\mu_G$ measurable and $\mu_G$-negligible.*
 
 PROOF. Let $\{K_m\}_{m \ge 0}$ be a countable exhaustion of $G$ by compact subsets. Then $A \cap K_m$ is $\mu_G$-negligible and $A = \bigcup_{m \ge 0} (A \cap K_m)$, which gives $\mu_G(A) = 0$. In particular, $A$ is $\mu_G$-measurable. $\square$
 
@@ -2320,21 +2344,21 @@ A.5.3.1. Hardy-Littlewood Maximal Theorems on Hausdorff locally compact abelian 
 
 THEOREM A.5.3.4 (Measure-theoretic Maximal Theorem - I). Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$. Assume $G$ is second countable.
 
-Let $\{U_k\}_{k \ge 0}$ be a Borel $D$-sequence in $G$. Let $\nu$ be a positive Radon measure on $G$. We define, for each $x \in G$:$^{16}$
+*Let $\{U_k\}_{k \ge 0}$ be a Borel $D$-sequence in $G$. Let $\nu$ be a positive Radon measure on $G$. We define, for each $x \in G$:$^{16}$*
 
 $$
 (M\nu)(x) := \limsup_{k \ge 0} \frac{\nu(xU_k)}{\mu_G(U_k)}. \tag{A.5.3.2}
 $$
 
-Let $B$ be a $\mu_G$-measurable subset of $G$ such that $\mu_G(B \cdot U_0)$ is finite.
+*Let $B$ be a $\mu_G$-measurable subset of $G$ such that $\mu_G(B \cdot U_0)$ is finite.*
 
-(1) For any real number $\alpha > 0$, we have:
+(1) *For any real number $\alpha > 0$, we have:*
 
 $$
 \mu_G(B \cap \{x \in G : (M\nu)(x) > \alpha\}) \le \frac{C}{\alpha} \nu((B \cap \{x \in G : (M\nu)(x) > \alpha\}) \cdot U_0) \tag{A.5.3.3}
 $$
 
-and equality holds if and only if $B \cap \{x \in G : (M\nu)(x) > \alpha\} = \varnothing$.
+*and equality holds if and only if $B \cap \{x \in G : (M\nu)(x) > \alpha\} = \varnothing$.*
 
 ---
 $^{14}$Should address why $B \cdot U_0$ is automatically measurable; maybe for this we need sufficiently small or somehow nice $U_0$?
@@ -2347,7 +2371,7 @@ $^{16}$Must address $M\nu$ being measurable. warn reader that $\nu(xU_k)$ may be
 
 **580** · **CHAPTER A. PREPARATIONS FROM ALGEBRAIC NUMBER THEORY**
 
-(2) If $\overline{U}_0$ is compact, then $M\nu$ is finite $\mu_G$-almost everywhere.
+(2) *If $\overline{U}_0$ is compact, then $M\nu$ is finite $\mu_G$-almost everywhere.*
 
 PROOF. (1) : As in the proof of [HR-2, Ch.XI,§44,Thm.44.13,p.640], we first assume $B \cap \{x \in G : (M\nu)(x) > \alpha\}$, and the Theorem is obtained by defining $\mathcal{F}$ to be the collection of the subsets of $G$ of the form $xU_k$ for $x \in G$ and each integer $k \ge 0$, and $\mathcal{F}' \subset \mathcal{F}$ the sub-collection of those subsets $xU_k$ with $x \in B \cap \{y \in G : (M\nu)(y) > \alpha\}$ satisfying $\nu(xU_k) > \alpha \mu_G(U_k)$. Indeed, then applying Theorem A.5.3.1 to the choice $\{U_k\}_{k \ge 0}$ of $D$-sequence for $G$, and to the above choices of $\mathcal{F}$ and $\mathcal{F}'$ gives (1).
 
@@ -2369,13 +2393,13 @@ In the presence of a $D'$-sequence in $G$, a more precise result is available. T
 
 THEOREM A.5.3.5 (Measure-theoretic Maximal Theorem - II). Let $G$ be a Hausdorff locally compact abelian group, $\mu_G$ a choice of Haar measure on $G$. Assume $G$ is second countable.
 
-Let $\{U_k\}_{k \ge 0}$ be a $D'$-sequence in $G$. Let $\nu$ be a positive Radon measure on $G$. We define, for each $x \in G$:$^{18}$
+*Let $\{U_k\}_{k \ge 0}$ be a $D'$-sequence in $G$. Let $\nu$ be a positive Radon measure on $G$. We define, for each $x \in G$:$^{18}$*
 
 $$
 (\overline{M}\nu)(x) := \limsup_{k \ge 0} \frac{\nu(xU_k)}{\mu_G(U_k)}. \tag{A.5.3.5}
 $$
 
-Let $K \subset G$ be a compact subset. For any real number $\alpha > 0$, we have:
+*Let $K \subset G$ be a compact subset. For any real number $\alpha > 0$, we have:*
 
 $$
 \mu_G(K \cap \{x \in G : (\overline{M}\nu)(x) > \alpha\}) \le \frac{C}{\alpha} \nu(K). \tag{A.5.3.6}

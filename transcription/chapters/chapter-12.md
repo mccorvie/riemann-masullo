@@ -96,37 +96,37 @@ For locally integrable functions on $G\times G$, if $\{U_k\}_{k\ge 0}$ is a $D'$
 
 The following Theorem explains the role of maximal functions and of the analogs of the Maximal Theorem of Hardy-Littlewood, and of the Differentiation Theorem of Lebesgue.
 
-Theorem 12.1.1.2. Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second countable. Let $\mu_G$ be a choice of Haar measure on $G$. Let $\{U_k\}_{k\ge 0}$ be a $D'$-sequence for $G$ in the sense of Definition A.5.2.1.
+Theorem 12.1.1.2. *Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second countable. Let $\mu_G$ be a choice of Haar measure on $G$. Let $\{U_k\}_{k\ge 0}$ be a $D'$-sequence for $G$ in the sense of Definition A.5.2.1.*
 
-Let $\lambda$ be a Radon measure on $G$ such that there exists a locally $\mu_G$-integrable function $f\colon G\to\mathbf R_{\ge 0}$ satisfying $\lambda = f\mu_G$ as Radon measures on $G$. Assume $f$ is continuous and nowhere vanishing on $G$.
+*Let $\lambda$ be a Radon measure on $G$ such that there exists a locally $\mu_G$-integrable function $f\colon G\to\mathbf R_{\ge 0}$ satisfying $\lambda = f\mu_G$ as Radon measures on $G$. Assume $f$ is continuous and nowhere vanishing on $G$.*
 
-Let $T\in \mathscr{L}_\beta(L^2(G,\lambda))$ be a nuclear operator, and $k\in L^2(G\times G,\lambda\otimes\lambda)$ a choice of representative for the Hilbert-Schmidt kernel of $T$.
+*Let $T\in \mathscr{L}_\beta(L^2(G,\lambda))$ be a nuclear operator, and $k\in L^2(G\times G,\lambda\otimes\lambda)$ a choice of representative for the Hilbert-Schmidt kernel of $T$.*
 
-Then, $\mu_G$-almost all points $(x,x)\in G\times G$ are regular for $k$.
+*Then, $\mu_G$-almost all points $(x,x)\in G\times G$ are regular for $k$.*
 
-(1) The function $\widetilde{k}(x,y)$ is a representative for the Hilbert-Schmidt kernel of $T$, and it is defined at $\mu_G$-almost all points of the diagonal in $G\times G$. The function $\widetilde{k}(x,x)$ of $x\in G$ is absolutely $\lambda$-integrable. We have:
+(1) *The function $\widetilde{k}(x,y)$ is a representative for the Hilbert-Schmidt kernel of $T$, and it is defined at $\mu_G$-almost all points of the diagonal in $G\times G$. The function $\widetilde{k}(x,x)$ of $x\in G$ is absolutely $\lambda$-integrable. We have:*
 
 $$
 \int_G \widetilde{k}(x,x)\,\mathrm{d}\lambda(x) = \mathrm{Trace}(T). \tag{12.1.1.2}
 $$
 
-(2) Let $\rho\in C_c(G)$, and $M_\rho$ the corresponding multiplication operator on $L^2(G,\lambda)$. The smoothening of $\rho(x)k(x,y)$ is $\rho(x)\widetilde{k}(x,y)$, and both functions are representatives for the Hilbert-Schmidt kernel of the operator $M_\rho\circ T$ on $L^2(G,\lambda)$. If $\rho\in L^\infty(G,\lambda)$, then the function $\rho(x)\widetilde{k}(x,y)$ is a representative for the Hilbert-Schmidt kernel of the operator $M_\rho\circ T$, and we have:
+(2) *Let $\rho\in C_c(G)$, and $M_\rho$ the corresponding multiplication operator on $L^2(G,\lambda)$. The smoothening of $\rho(x)k(x,y)$ is $\rho(x)\widetilde{k}(x,y)$, and both functions are representatives for the Hilbert-Schmidt kernel of the operator $M_\rho\circ T$ on $L^2(G,\lambda)$. If $\rho\in L^\infty(G,\lambda)$, then the function $\rho(x)\widetilde{k}(x,y)$ is a representative for the Hilbert-Schmidt kernel of the operator $M_\rho\circ T$, and we have:*
 
 $$
 \int_G \rho(x)\widetilde{k}(x,x)\,\mathrm{d}\lambda(x) = \mathrm{Trace}(M_\rho\circ T). \tag{12.1.1.3}
 $$
 
-(3) For each integer $m\ge 0$, let $T_m\in \mathscr{L}_\beta(L^2(G,\lambda))$ be a finite rank operator, such that the sequence $\{T_m\}_{m\ge 0}$ converges in $S_p(L^2(G,\lambda))$ for $p = 1,2$, to $T$. Let $k_m\in L^2(G\times G,\lambda\otimes\lambda)$ be a choice of representative for the Hilbert-Schmidt kernel of $T_m$.
+(3) *For each integer $m\ge 0$, let $T_m\in \mathscr{L}_\beta(L^2(G,\lambda))$ be a finite rank operator, such that the sequence $\{T_m\}_{m\ge 0}$ converges in $S_p(L^2(G,\lambda))$ for $p = 1,2$, to $T$. Let $k_m\in L^2(G\times G,\lambda\otimes\lambda)$ be a choice of representative for the Hilbert-Schmidt kernel of $T_m$.*
 
-Then $k_m\to k$ and $\widetilde{k}_m\to\widetilde{k}$ in $L^2(G\times G,\lambda\otimes\lambda)$, and $\widetilde{k}_m(x,x)\to\widetilde{k}(x,x)$ weakly in $L^1(G,\lambda)$.
+*Then $k_m\to k$ and $\widetilde{k}_m\to\widetilde{k}$ in $L^2(G\times G,\lambda\otimes\lambda)$, and $\widetilde{k}_m(x,x)\to\widetilde{k}(x,x)$ weakly in $L^1(G,\lambda)$.*
 
-(4) Assume that there exists $\{\phi_m\}_{m\ge 0}$ a simple, normalized Schauder basis for $L^2(G,\lambda)$. Let $\{\theta_m\}_{m\ge 0}$ be the dual basis with respect to the duality pairing:
+(4) *Assume that there exists $\{\phi_m\}_{m\ge 0}$ a simple, normalized Schauder basis for $L^2(G,\lambda)$. Let $\{\theta_m\}_{m\ge 0}$ be the dual basis with respect to the duality pairing:*
 
 $$
 \langle\cdot,\cdot\rangle_\lambda\colon L^2(G,\lambda)\times L^2(G,\lambda^\vee)\to\mathbf C \tag{12.1.1.4}
 $$
 
-where $\lambda^\vee$ is the Radon measure $(1/f)\mu_G$, defined by:
+*where $\lambda^\vee$ is the Radon measure $(1/f)\mu_G$, defined by:*
 
 $$
 \langle\phi,\psi\rangle_\lambda := \int_G \phi(x)\psi(x)\,\mathrm{d}\mu_G(x). \tag{12.1.1.5}
@@ -138,9 +138,9 @@ $$
 k_N(x,y) := \sum_{0\le m\le N}\frac{(T'\theta_m)(y)}{f(y)}\phi_m(x) \tag{12.1.1.6}
 $$
 
-where $T'\in \mathscr{L}_\beta(L^2(G,\lambda^\vee)$ is the adjoint of $T$ with respect to the duality $\langle L^2(G,\lambda),L^2(G,\lambda^\vee)\rangle_\lambda$.
+*where $T'\in \mathscr{L}_\beta(L^2(G,\lambda^\vee)$ is the adjoint of $T$ with respect to the duality $\langle L^2(G,\lambda),L^2(G,\lambda^\vee)\rangle_\lambda$.*
 
-Then $k_N\to k$ and $\widetilde{k}_N\to\widetilde{k}$ in $L^2(G\times G,\lambda\otimes\lambda)$, and $\widetilde{k}_N(x,x)\to\widetilde{k}(x,x)$ weakly in $L^1(G,\lambda)$.
+*Then $k_N\to k$ and $\widetilde{k}_N\to\widetilde{k}$ in $L^2(G\times G,\lambda\otimes\lambda)$, and $\widetilde{k}_N(x,x)\to\widetilde{k}(x,x)$ weakly in $L^1(G,\lambda)$.*
 
 Proof. (1) : $T$ can be written as $T = A_1-A_2+i(A_3-A_4)$ where $A_i$ is nuclear and positive, for $1\le i\le 4$. Since formation of the smoothening of locally $\mu_G$-integrable functions on $G\times G$ with respect to the
 
@@ -288,9 +288,9 @@ By Theorem A.5.4.1, $\widetilde{\phi}$ agrees with $\phi$ on a $\mu_G$-measurabl
 
 The set of points of $G$ at which the limit in (12.1.1.1) defining the smoothening of a locally $\mu_G$-integrable function $\phi$ exists, may be larger than the Lebesgue set $\mathcal{L}_\phi$. We will be applying the smoothening construction to representative functions of the Hilbert-Schmidt kernel of a nuclear operator on an $L^2$-space of $G$, and while the Lebesgue set of such function may not contain the diagonal of $G\times G$ (which is a null set with respect to the product measure $\mu_G\otimes\mu_G$), the smoothening may still be defined over the diagonal, and it is under the assumptions of Theorem A.5.4.1.
 
-Theorem 12.1.1.3 (Localization along the global diagonal). Let $F$ be a number field, $a,s,\Lambda$ real numbers, $s\ge 3$ and $a,\Lambda,\varepsilon > 0$. Assume $0 < 1/\Lambda+\varepsilon < \Lambda-\varepsilon$. Let $\varphi\in\mathcal D(C_F)$ be a test function.
+Theorem 12.1.1.3 (Localization along the global diagonal). *Let $F$ be a number field, $a,s,\Lambda$ real numbers, $s\ge 3$ and $a,\Lambda,\varepsilon > 0$. Assume $0 < 1/\Lambda+\varepsilon < \Lambda-\varepsilon$. Let $\varphi\in\mathcal D(C_F)$ be a test function.*
 
-(1) For $\overline{\mu}$-almost all $x\in C_F$, the point $(x,x)\in C_F\times C_F$ is a regular point for the functions $k^{\mathrm{geom}}_{\varphi,a,s}$, $k^{\mathrm{spec}}_{\varphi,a,s}$. For every $x\in C_F$, $(x,x)\in C_F\times C_F$ is a regular point for the function $\varphi(xy^{-1})$.
+(1) *For $\overline{\mu}$-almost all $x\in C_F$, the point $(x,x)\in C_F\times C_F$ is a regular point for the functions $k^{\mathrm{geom}}_{\varphi,a,s}$, $k^{\mathrm{spec}}_{\varphi,a,s}$. For every $x\in C_F$, $(x,x)\in C_F\times C_F$ is a regular point for the function $\varphi(xy^{-1})$.*
 
 (2) Let $\rho\in\mathcal D(C_F)$ be a $(\Lambda,\varepsilon)$-cutoff. We have:
 
@@ -308,7 +308,7 @@ $$
 \mathrm{Trace}\,(P^{\mathrm{spec}}_a\circ A(\varphi)) = \int_{C_F}\widetilde{k}^{\mathrm{spec}}_{\varphi,a,s}(x,x)\,\mathrm{d}\overline{\mu}(x). \tag{12.1.1.21}
 $$
 
-(3) Assume $\varphi(1) = 0$. Then $\widetilde{k}^{\mathrm{geom}}_{\varphi,a,s}(x,x)$ is absolutely $\overline{\mu}$-integrable over $C_F$, and we have:
+(3) *Assume $\varphi(1) = 0$. Then $\widetilde{k}^{\mathrm{geom}}_{\varphi,a,s}(x,x)$ is absolutely $\overline{\mu}$-integrable over $C_F$, and we have:*
 
 $$
 \lim_{\Lambda\to +\infty,\varepsilon\Lambda = o(1)}\mathrm{Trace}\,(P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)) = \int_{C_F}\widetilde{k}^{\mathrm{geom}}_{\varphi,a,s}(x,x)\,\mathrm{d}\overline{\mu}(x). \tag{12.1.1.22}
@@ -336,7 +336,13 @@ $$
 \lim_{\Lambda\to +\infty,\varepsilon\Lambda = o(1)}\int_{C_F}\rho(x)\widetilde{k}^{\mathrm{geom}}_{\varphi,a,s}(x,x)\,\mathrm{d}\overline{\mu}(x) = \int_{C_F}\widetilde{k}^{\mathrm{geom}}_{\varphi,a,s}(x,x)\,\mathrm{d}\overline{\mu}(x). \tag{12.1.1.24}
 $$
 
-By (10.4.3.32) and Theorem 12.1.1.2(1), the leftmost side of (12.1.1.24) equals $\lim_{\Lambda\to +\infty,\varepsilon\Lambda = o(1)}\mathrm{Trace}\,(P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi))$ and so (10.4.3.31) holds.
+By (10.4.3.32) and Theorem 12.1.1.2(1), the leftmost side of (12.1.1.24) equals
+
+$$
+\lim_{\Lambda\to +\infty,\varepsilon\Lambda = o(1)}\mathrm{Trace}\,(P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi))
+$$
+
+and so (10.4.3.31) holds.
 
 $\square$
 
@@ -1345,15 +1351,15 @@ $$
 \end{align}
 $$
 
-where $q_{v}:=|\pi_{v}|_{v}^{-1}$, for $v\in\Sigma_{F,f}$ and $\pi_{v}$ any choice of uniformizer at $v$ of the non-Archimedean local field $F_{v}$,
-and
+*where $q_{v}:=|\pi_{v}|_{v}^{-1}$, for $v\in\Sigma_{F,f}$ and $\pi_{v}$ any choice of uniformizer at $v$ of the non-Archimedean local field $F_{v}$,
+and*
 
 $$
 M(\varphi)(c):=\int_{C_{F}}\varphi(g)c(g)\,\mathrm{d}\overline{\mu}(g)
 $$
 
-is the Mellin transform of the test function $\varphi$, and $c\in\Omega(C_{F})$ varies over the zeros of the Hecke $L$-function
-$c\mapsto L(c)$ contained in the interior of the relative vertical strip
+*is the Mellin transform of the test function $\varphi$, and $c\in\Omega(C_{F})$ varies over the zeros of the Hecke $L$-function
+$c\mapsto L(c)$ contained in the interior of the relative vertical strip*
 
 $$
 \Omega(C_{F})_{I}=\{c\in\Omega(C_{F}):\sigma(c)\in 1/2+I\}.

@@ -1662,15 +1662,16 @@ private theorem isCompactlyGeneratedGroup_of_equiv {G H : Type*}
     rw [hgen, Subgroup.map_top, MonoidHom.range_eq_top.mpr e.surjective] at hmap
     exact hmap.symm
 
-/-- Pulling back a structural pair along a topological group isomorphism preserves its
-elementary quotient and carries its realized Schwartz functions to the pulled-back stage. -/
-private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
+/-- After transporting the structural pair and its coordinates, pullback is the
+identity on the elementary Schwartz functions. -/
+private theorem exists_schwartzBruhatStage_comp_equiv {G H : Type*}
     [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
     [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
     [LocallyCompactSpace G] [LocallyCompactSpace H]
-    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient)
-    (f : SchwartzBruhatStage p) :
-    schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule G := by
+    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient) :
+    ∃ (b : BruhatStructuralPair G) (q : ElementaryLCAPresentation b.quotient)
+      (j : SchwartzBruhatStage p →L[ℂ] SchwartzBruhatStage q),
+      ∀ f, schwartzBruhatStageRealization b q (j f) = schwartzBruhatStageRealization a p f ∘ e := by
   classical
   let J := a.val.1
   let K := OrderDual.ofDual a.val.2
@@ -1732,17 +1733,20 @@ private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
         (QuotientGroup.continuous_mk.comp eJ.symm.continuous)⟩
   let p' : ElementaryLCAPresentation a'.quotient :=
     { p with equiv := eQ.trans p.equiv }
-  have hreal : schwartzBruhatStageRealization a' p' f =
-      schwartzBruhatStageRealization a p f ∘ e := by
-    funext x
-    rw [Function.comp_apply, schwartzBruhatStageRealization_apply,
-      schwartzBruhatStageRealization_apply]
-    by_cases hx : e x ∈ J
-    · rw [dite_eq_left (show x ∈ a'.val.1 from hx), dite_eq_left hx]
-      rfl
-    · rw [dite_eq_right (show x ∉ a'.val.1 from hx), dite_eq_right hx]
-  rw [← hreal]
-  exact (schwartzBruhatStageInclusion a' p' f).property
+  exact ⟨a', p', ContinuousLinearMap.id ℂ _, fun _ ↦ rfl⟩
+
+/-- Pulling back a structural pair along a topological group isomorphism preserves its
+elementary quotient and carries its realized Schwartz functions to the pulled-back stage. -/
+private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H]
+    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient)
+    (f : SchwartzBruhatStage p) :
+    schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule G := by
+  obtain ⟨b, q, j, hj⟩ := exists_schwartzBruhatStage_comp_equiv e a p
+  rw [← hj f]
+  exact (schwartzBruhatStageInclusion b q (j f)).property
 
 /-- Pullback along a topological group isomorphism preserves Schwartz–Bruhat membership. -/
 private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
@@ -1759,13 +1763,30 @@ private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
     exact schwartzBruhat_stage_comp_equiv e a p f
   exact hle hg
 
+/-- Pullback by a topological group isomorphism is continuous because its restriction
+to every elementary stage factors continuously through a stage. -/
+private theorem exists_schwartzBruhat_comp_equivCLM {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H] (e : G ≃ₜ* H) :
+    ∃ T : SchwartzBruhat H →L[ℂ] SchwartzBruhat G, ∀ f x, T f x = f (e x) := by
+  let L := (LinearMap.funLeft ℂ ℂ e).comp (schwartzBruhatSubmodule H).subtype
+  let T : SchwartzBruhat H →ₗ[ℂ] SchwartzBruhat G :=
+    L.codRestrict _ fun f ↦ schwartzBruhat_mem_comp_equiv e f.property
+  refine ⟨⟨T, ?_⟩, fun _ _ ↦ rfl⟩
+  refine (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp T ?_
+  rintro ⟨s, hs⟩
+  refine (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨s.comp T, ?_⟩
+  intro a p
+  obtain ⟨b, q, j, hj⟩ := exists_schwartzBruhatStage_comp_equiv e a p
+  exact ((hs b q).comp j.continuous).congr fun f ↦ congrArg s (Subtype.ext (hj f))
+
 open scoped RestrictedProduct in
-/-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
-character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
-theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
-    (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
-      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
-      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+/-- The adelic Fourier integral is the continuous linear Fourier transform on the
+Pontryagin dual followed by pullback along the standard self-duality. -/
+private theorem exists_adeleSchwartzFourierCLM :
+    ∃ T : ℬ[F] →L[ℂ] ℬ[F], ∀ f y, T f y = tamagawaFourier (additiveTamagawaMeasure F)
+      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd := by
   let G := Multiplicative 𝔸[F]
   let μ : Measure G := additiveTamagawaMeasure F
   let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
@@ -1792,19 +1813,25 @@ theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
       toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
       map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
   let : μ.Regular := hμ.2.1
-  obtain ⟨e, he, -⟩ := additiveTamagawaMeasure_selfDual F
-  obtain ⟨Fourier, hFourier⟩ := schwartzBruhat_fourier_equiv μ
-  let g : schwartzBruhatSubmodule (PontryaginDual G) := Fourier f
-  have hg := schwartzBruhat_mem_comp_equiv e g.property
-  have hEq (y : G) : tamagawaFourier (additiveTamagawaMeasure F)
-      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd =
-        g.val (e y) := by
-    rw [tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
+  refine (additiveTamagawaMeasure_selfDual F).elim fun e he ↦ ?_
+  refine (schwartzBruhat_fourier_equiv μ).elim fun Fourier hFourier ↦ ?_
+  refine (exists_schwartzBruhat_comp_equivCLM e).elim fun P hP ↦ ?_
+  refine ⟨P.comp Fourier.toContinuousLinearMap, fun f y ↦ ?_⟩
+  calc
+    P (Fourier f) y = Fourier f (e y) := hP _ _
+    _ = lcaFourier μ f (e y) := (hFourier f).2 _
+    _ = _ := (tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
       rw [mul_comm x y.toAdd]
-      exact he y.toAdd x)]
-    exact ((hFourier f).2 (e y)).symm
-  rw [funext hEq]
-  exact hg
+      exact he.1 y.toAdd x)).symm
+
+/-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
+character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
+theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
+    (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
+      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
+      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+  refine (exists_adeleSchwartzFourierCLM (F := F)).elim fun T hT ↦ ?_
+  exact Set.mem_of_eq_of_mem (funext (hT f)).symm (T f).property
 
 /-- Paper: Theorem 2.2.3.2, p. 82. The Fourier transform in the theta identity
 uses the trace character and the covolume-one measure of Appendix A. -/
@@ -2792,7 +2819,10 @@ theorem adelicTheta_decay_bounded_large_threshold_one (B : Set ℬ[F])
 von Neumann bounded sets of Schwartz–Bruhat functions to bounded sets. -/
 theorem adeleSchwartzFourier_image_isVonNBounded (B : Set ℬ[F])
     (hB : IsVonNBounded ℂ B) :
-    IsVonNBounded ℂ ((adeleSchwartzFourier (F := F)) '' B) := by sorry
+    IsVonNBounded ℂ ((adeleSchwartzFourier (F := F)) '' B) := by
+  refine (exists_adeleSchwartzFourierCLM (F := F)).elim fun T hT ↦ ?_
+  apply (hB.image T).subset
+  exact Set.image_subset_iff.mpr fun f hf ↦ ⟨f, hf, Subtype.ext (funext (hT f))⟩
 
 /-- Paper: Theorem 2.2.3.4(5), p. 83. The uniform estimates on a bounded set
 hold with threshold one and a common constant. -/

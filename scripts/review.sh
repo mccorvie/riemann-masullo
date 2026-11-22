@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Have an agent review a pull request of statements against the paper, and post the review.
 #
-#   scripts/review.sh <pull request> [--pages A-B] [--model M] [--effort E] [--no-post]
+#   scripts/review.sh <pull request> [--pages A-B] [--only "FILES"] [--model M] [--effort E] [--no-post]
 #
 # The agent (Codex) works in a scratch directory, .agent/audit/pr-<n>/ in the main checkout, that
 # holds the pull request's library files, the paper pages as text and images, and the digester's
@@ -15,11 +15,11 @@ set -euo pipefail
 main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$main"
 pr=${1:?usage: review.sh <pull request> [--pages A-B] [--model M] [--effort E] [--no-post]}; shift
-pages=""; model=""; effort=""; post=1
+pages=""; model=""; effort=""; post=1; only=""
 while [ $# -gt 0 ]; do
   case $1 in
     --pages) pages=$2; shift 2 ;; --model) model=$2; shift 2 ;; --effort) effort=$2; shift 2 ;;
-    --no-post) post=0; shift ;; *) echo "unknown option $1" >&2; exit 2 ;;
+    --no-post) post=0; shift ;; --only) only=$2; shift 2 ;; *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
 [[ "$pr" =~ ^[0-9]+$ ]] || { echo "the pull request is a number" >&2; exit 2; }
@@ -28,7 +28,24 @@ mkdir -p "$dir/pages"
 
 git fetch -q origin main "+pull/$pr/head:refs/remotes/origin/pr-$pr"
 files=$(git diff --name-only --diff-filter=AM "origin/main...origin/pr-$pr" -- 'RiemannMasullo/*.lean' ':!RiemannMasullo/External')
+# A pull request stacked on sections still in review contains their files too. --only "F1 F2"
+# names the files to review; the others are given to the reviewer as context.
+context=""
+if [ -n "$only" ]; then
+  context=$(grep -vxF -f <(tr ' ' '\n' <<<"$only") <<<"$files" || true)
+  files=$(grep -xF -f <(tr ' ' '\n' <<<"$only") <<<"$files" || true)
+fi
 [ -n "$files" ] || { echo "the pull request changes no library file" >&2; exit 1; }
+ctxlisting=""
+if [ -n "$context" ]; then
+  mkdir -p "$dir/context"
+  while read -r f; do
+    git show "origin/pr-$pr:$f" >"$dir/context/$(basename "$f")"
+    ctxlisting+="- \`context/$(basename "$f")\`, which is \`$f\` in the pull request"$'\n'
+  done <<<"$context"
+  ctxlisting="- Not under review, for context only: statements of earlier sections that this pull request builds on and that are not on \`main\` yet. They are reviewed separately. Take them as they are; if something in them looks wrong, say so in one line.
+$ctxlisting"
+fi
 listing=""
 while read -r f; do
   git show "origin/pr-$pr:$f" >"$dir/$(basename "$f")"
@@ -63,7 +80,7 @@ prompt="$(cat prompts/reviewer.md)
 - Pull request #$pr: $title
 - Paper pages $first–$last: \`paper.txt\` and \`pages/p-$first.png\` … \`pages/p-$last.png\` in your working directory.
 - Files under review, in your working directory:
-$listing- The digester's report: \`DIGESTER_REPORT.md\` (it may be empty).
+$listing$ctxlisting- The digester's report: \`DIGESTER_REPORT.md\` (it may be empty).
 - Your working directory: \`$dir\`. The repository root (the current \`main\`, read-only for you): \`$main\`."
 
 who="codex${model:+, $model}${effort:+, $effort effort}"

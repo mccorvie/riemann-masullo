@@ -1915,10 +1915,55 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [hTop : IsTopologicalGro
 
 include hTop hT2 hLC
 
+omit hTop hT2 hLC in
+/-- Paper: Proposition D.1.9.2, p. 781. On an elementary group, shifting the argument
+by addition preserves the Schwartz space and is jointly continuous for the weighted
+derivative seminorm topology. -/
+theorem elementarySchwartz_translate_jointly {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
+    ∃ T : C(ElementaryLieGroup m n r F × ElementarySchwartz m n r F,
+        ElementarySchwartz m n r F),
+      ∀ g f x, T (g, f) x = f (g + x) := by
+  sorry
+
+/-- A stage can be enlarged to contain any prescribed translating element. -/
+private theorem exists_bruhatStructuralPair_le_mem (a : BruhatStructuralPair G) (g : G) :
+    ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
+  let I := OpenCompactlyGeneratedSubgroups G
+  have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
+  let : IsDirectedOrder I := hGroups.1
+  obtain ⟨J, hgJ⟩ := hGroups.2.1 g
+  let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
+  obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
+  let b : BruhatStructuralPair G := ⟨(H.val, a.val.2), H.property.1, H.property.2,
+    a.property.2.2.1, a.property.2.2.2.trans haH⟩
+  exact ⟨b, ⟨haH, le_rfl⟩, hJH hgJ⟩
+
 /-- Paper: Proposition D.1.9.2, p. 781. A left translate of a Schwartz–Bruhat
 function is again Schwartz–Bruhat. -/
 theorem schwartzBruhat_translate_mem (g : G) (f : SchwartzBruhat G) :
-    (fun x ↦ f (g⁻¹ * x)) ∈ schwartzBruhatSubmodule G := by sorry
+    (fun x ↦ f (g⁻¹ * x)) ∈ schwartzBruhatSubmodule G := by
+  classical
+  obtain ⟨a, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff (fun x ↦ f x)).mp f.property
+  obtain ⟨b, hab, hg⟩ := exists_bruhatStructuralPair_le_mem a g
+  obtain ⟨e'⟩ := b.elementary
+  obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition hab e e'
+  obtain ⟨T, hT⟩ := elementarySchwartz_translate_jointly
+    (m := e'.realDim) (n := e'.torusDim) (r := e'.latticeRank) (F := e'.finiteFactor)
+  let h : b.val.1 := ⟨g, hg⟩
+  let q (y : b.val.1) := (e'.equiv (QuotientGroup.mk y : b.quotient)).toAdd
+  apply (mem_schwartzBruhatSubmodule_iff _).mpr
+  refine ⟨b, e', T (q h⁻¹, j s), funext fun x ↦ ?_⟩
+  rw [← congrFun hs (g⁻¹ * x), ← congrFun (hj s) (g⁻¹ * x)]
+  have hmem := b.val.1.mul_mem_cancel_left (x := g⁻¹) (y := x) (b.val.1.inv_mem hg)
+  by_cases hx : x ∈ b.val.1
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_left hx, dite_eq_left (hmem.mpr hx), hT]
+    apply congrArg (fun y ↦ j s y)
+    change q h⁻¹ + q ⟨x, hx⟩ = q (h⁻¹ * ⟨x, hx⟩)
+    unfold q
+    rw [QuotientGroup.mk_mul, map_mul]
+    rfl
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx, dite_eq_right (hmem.not.mpr hx)]
 
 /-- Paper: Proposition D.1.9.2, p. 781. The left translation by g evaluates
 the original function at g⁻¹x. -/
@@ -1932,17 +1977,6 @@ theorem schwartzBruhatTranslate_apply_mul (g x : G) (f : SchwartzBruhat G) :
     schwartzBruhatTranslate g f (g * x) = f x := by
   change f.val (g⁻¹ * (g * x)) = f.val x
   rw [inv_mul_cancel_left]
-
-omit hTop hT2 hLC in
-/-- Paper: Proposition D.1.9.2, p. 781. On an elementary group, shifting the argument
-by addition preserves the Schwartz space and is jointly continuous for the weighted
-derivative seminorm topology. -/
-theorem elementarySchwartz_translate_jointly {m n r : ℕ} {F : Type*}
-    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
-    ∃ T : C(ElementaryLieGroup m n r F × ElementarySchwartz m n r F,
-        ElementarySchwartz m n r F),
-      ∀ g f x, T (g, f) x = f (g + x) := by
-  sorry
 
 omit hTop hT2 hLC in
 /-- The inclusion of a structural stage is continuous for the generating seminorms. -/
@@ -1981,19 +2015,6 @@ private theorem continuous_schwartzBruhatTranslate_on_subgroup (b : BruhatStruct
     rw [QuotientGroup.mk_mul, map_mul]
     rfl
   · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx, dite_eq_right (hmem.not.mpr hx)]
-
-/-- A stage can be enlarged to contain any prescribed translating element. -/
-private theorem exists_bruhatStructuralPair_le_mem (a : BruhatStructuralPair G) (g : G) :
-    ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
-  let I := OpenCompactlyGeneratedSubgroups G
-  have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
-  let : IsDirectedOrder I := hGroups.1
-  obtain ⟨J, hgJ⟩ := hGroups.2.1 g
-  let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
-  obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
-  let b : BruhatStructuralPair G := ⟨(H.val, a.val.2), H.property.1, H.property.2,
-    a.property.2.2.1, a.property.2.2.2.trans haH⟩
-  exact ⟨b, ⟨haH, le_rfl⟩, hJH hgJ⟩
 
 /-- Translation is jointly continuous when the function varies in a fixed structural stage.
 Locally the translating element and the function are handled in one larger stage. -/

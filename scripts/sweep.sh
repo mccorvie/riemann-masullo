@@ -4,7 +4,7 @@
 # request that closes the ones it proved. Single provers leave a file's hard tail behind; a
 # sweeper has the whole file, more time and a stronger model.
 #
-#   scripts/sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--dry-run]
+#   scripts/sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--note-file F] [--dry-run]
 #
 # What it does:
 #   1. lists the file's open proof issues (by the `<!-- sorry: path::name -->` marker);
@@ -14,22 +14,56 @@
 #      checks that no statement changed, and opens the pull request;
 #   4. releases the issues the pull request does not close.
 # Issues that someone else has claimed are left alone and named to the agent as such.
+#
+#   scripts/sweep.sh --resume <sweep issue> [--model M] [--effort E]
+# picks up a sweeper that was interrupted (its worktree, with whatever it had proved, is still
+# there): the agent continues in place, then the hand-in and the release run as usual.
 set -euo pipefail
+resume=""
+if [ "${1:-}" = --resume ]; then resume=${2:?the sweep issue number}; shift 2; set -- "resume" "$@"; fi
 file=${1:?usage: sweep.sh RiemannMasullo/<Chapter>/<File>.lean [--model M] [--effort E] [--dry-run]}
 shift
-model=gpt-6.2-astra; effort=xhigh; dry=0
+model=gpt-6.2-astra; effort=xhigh; dry=0; note=""
 while [ $# -gt 0 ]; do
   case $1 in
     --model) model=$2; shift 2 ;;
     --effort) effort=$2; shift 2 ;;
     --dry-run) dry=1; shift ;;
+    --note-file) note=$2; shift 2 ;;      # text added to the sweep issue: priorities, hints
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
 main=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 cd "$main"
-[ -f "$file" ] || { echo "no such file: $file" >&2; exit 2; }
 work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+
+release() {   # release what the sweeper's pull request does not close; $1 = sweep issue
+  local n=$1 closes kept=0 released=0 i
+  closes=$(gh pr list --head "sweeper/$n" --state all --json body --jq '.[0].body // ""' |
+    grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' | grep -oE '[0-9]+$' | sort -u || true)
+  while read -r i; do
+    if grep -qx "$i" <<<"$closes"; then kept=$((kept + 1)); continue; fi
+    gh issue edit "$i" --remove-label claimed >/dev/null 2>&1 || true
+    gh issue comment "$i" --body "The sweeper did not prove this one in its pass; what it tried and what blocked it is on #$n. Free to take." >/dev/null
+    released=$((released + 1))
+  done <"$work/mine.txt"
+  echo "sweep #$n: $kept proved in the pull request, $released released"
+}
+
+if [ -n "$resume" ]; then
+  n=$resume; wt="$(dirname "$main")/$(basename "$main")-wt/sweeper-$n"
+  [ -d "$wt" ] || { echo "no worktree at $wt to resume" >&2; exit 1; }
+  gh api "repos/{owner}/{repo}/issues/$n" --jq .body | grep -oE '^\| #[0-9]+' | grep -oE '[0-9]+' >"$work/mine.txt"
+  [ -s "$work/mine.txt" ] || { echo "#$n does not look like a sweep issue" >&2; exit 1; }
+  echo "resuming the sweeper of #$n in $wt"
+  codex exec --sandbox workspace-write -C "$wt" -o "$wt/.agent/last-message.md" -m "$model" \
+    -c "model_reasoning_effort=\"$effort\"" "You are the sweeper described in .agent/PROMPT.md in this directory, and you were interrupted part-way (the machine ran out of memory; nothing you did caused it). Your work so far is in the working tree and your notes are in .agent/NOTES.md. Read .agent/PROMPT.md again, look at what is already proved and whether the file still builds, repair anything left half-edited, and then carry on from where you stopped. You have about two more hours. Finish as the prompt says, with .agent/PR.md and, if anything is left, .agent/REPORT.md." \
+    >>"$wt/.agent/log.txt" 2>&1 </dev/null || true
+  scripts/agent.sh sweeper "$n" --handin --cli codex --model "$model" --effort "$effort" </dev/null || true
+  release "$n"
+  exit 0
+fi
+[ -f "$file" ] || { echo "no such file: $file" >&2; exit 2; }
 
 # The plan: which issues, and the text of the sweep issue. Only text written by the owner,
 # members or collaborators is quoted, as everywhere else that feeds an agent's prompt.
@@ -86,6 +120,7 @@ open(f"{work}/mine.txt", "w").write("".join(f"{r['number']}\n" for r in mine))
 print(f"{path}: {len(mine)} to prove" + (f", {len(others)} left to others" if others else ""))
 EOF
 
+if [ -n "$note" ]; then { echo; echo "## From the integrator"; echo; cat "$note"; } >>"$work/body.md"; fi
 if [ $dry = 1 ]; then cat "$work/body.md"; exit 0; fi
 
 chapter=$(sed -nE 's#^RiemannMasullo/(Ch[0-9]+|App[A-E])_.*#\1#p' <<<"$file" | tr '[:upper:]' '[:lower:]' | sed 's/^app\(.\)/app\U\1/')
@@ -101,14 +136,4 @@ done <"$work/mine.txt"
 
 scripts/agent.sh sweeper "$n" --model "$model" --effort "$effort" </dev/null || true
 
-# Release what the pull request does not close.
-closes=$(gh pr list --head "sweeper/$n" --state all --json body --jq '.[0].body // ""' |
-  grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?)[: ]+#[0-9]+' | grep -oE '[0-9]+$' | sort -u || true)
-kept=0; released=0
-while read -r i; do
-  if grep -qx "$i" <<<"$closes"; then kept=$((kept + 1)); continue; fi
-  gh issue edit "$i" --remove-label claimed >/dev/null 2>&1 || true
-  gh issue comment "$i" --body "The sweeper did not prove this one in its pass; what it tried and what blocked it is on #$n. Free to take." >/dev/null
-  released=$((released + 1))
-done <"$work/mine.txt"
-echo "sweep #$n of $file: $kept proved in the pull request, $released released"
+release "$n"

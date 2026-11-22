@@ -260,13 +260,13 @@ We will show in this subsection by means of examples, that in fact it does not o
 
 The following two conjectures can be found in the existing literature on automorphic $L$-functions. We write $L(s,\pi)$ for the completed and unitarily normalized $L$-function of a cuspidal automorphic representation $\pi$ of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$. In particular, the line of symmetry of the functional equation for $L(s,\pi)$ is $\mathrm{Re}(s)=1/2$, and the central zero of $L(s,\pi)$ is $s=1/2$, with multiplicity $N\ge 0$.
 
-CONJECTURE 14.1.2.1 (GRH and GSH). *Let $n\ge 1$ be an integer, and $\pi$ a cuspidal automorphic representation of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$.*
+CONJECTURE 14.1.2.1 (GRH and GSH). Let $n\ge 1$ be an integer, and $\pi$ a cuspidal automorphic representation of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$.
 
 *Then:*
 
-*(1) (GRH - Grand Riemann Hypothesis) All the zeros of the $L$-function $L(s,\pi)$ are located on $1/2+i\mathbf R$.*
+(1) (GRH - Grand Riemann Hypothesis) All the zeros of the $L$-function $L(s,\pi)$ are located on $1/2+i\mathbf R$.
 
-*(2) (GSH - Grand Simplicity Hypothesis) With the sole possible exception of $s=1/2$, all the zeros of $L(s,\pi)$ are simple.*
+(2) (GSH - Grand Simplicity Hypothesis) With the sole possible exception of $s=1/2$, all the zeros of $L(s,\pi)$ are simple.
 
 Our main references on the Grand Simplicity Hypothesis are the papers by Rudnick-Sarnak and Rubinstein-Sarnak (see [Rud-Sa] and [Ru-Sa, §5,p.195]). The methods contained in the former lead to the observation that the zeros of pairs of (unitarily normalized) completed $L$-functions of cuspidal automorphic representations of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$ (for possibly distinct integers $n\ge 1$) are, in a precise sense, uncorrelated, with the possible exception of central zeros, if any.
 
@@ -292,17 +292,17 @@ Let now $\overline{\mathbf Q}$ be a fixed choice of separable closure of $\mathb
 
 We further record here a form of Global Langlands for continuous finite dimensional complex representations of the Weil group $W_{\mathbf Q}$ of the field of rational numbers.
 
-CONJECTURE 14.1.2.2 (Global Langlands for $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$ - Weil representations). *Let $n\ge 1$ be an integer. Let $\rho:W_{\mathbf Q}\to\mathrm{GL}_n(\mathbf C)$ be a continuous finite dimensional complex representation of the Weil group $W_{\mathbf Q}$. Assume:*
+CONJECTURE 14.1.2.2 (Global Langlands for $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$ - Weil representations). Let $n\ge 1$ be an integer. Let $\rho:W_{\mathbf Q}\to\mathrm{GL}_n(\mathbf C)$ be a continuous finite dimensional complex representation of the Weil group $W_{\mathbf Q}$. Assume:
 
 *(1) $\rho$ is irreducible.*
 
-*(2) For each $g\in W_{\mathbf Q}$, $\rho(g)$ is semisimple.*
+(2) For each $g\in W_{\mathbf Q}$, $\rho(g)$ is semisimple.
 
-*Then there exists a cuspidal automorphic representation $\pi$ of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$ such that:*
+Then there exists a cuspidal automorphic representation $\pi$ of $\mathrm{GL}_n(\mathbf A_{\mathbf Q})$ such that:
 $$
 L(s,\rho)=L(s,\pi) \tag{14.1.2.1}
 $$
-*where $L(s,\rho)$ is the Artin-Weil $L$-function of $\rho$, normalized as in the discussion between [Langlands, Introduction,Thm.A,p.vii] and [Langlands, Introduction,Thm.B,p.vii], and $L(s,\pi)$ is the completed and unitarily normalized automorphic $L$-function of $\pi$.*
+where $L(s,\rho)$ is the Artin-Weil $L$-function of $\rho$, normalized as in the discussion between [Langlands, Introduction,Thm.A,p.vii] and [Langlands, Introduction,Thm.B,p.vii], and $L(s,\pi)$ is the completed and unitarily normalized automorphic $L$-function of $\pi$.
 
 We recall from the previous subsection that Artin-Weil $L$-functions are not assumed to be unitarily normalized throughout this work.
 
