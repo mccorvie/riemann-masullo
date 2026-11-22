@@ -292,7 +292,9 @@ the kernel lift is a product of the two indentation factors and the pulled-back 
 theorem diagonalIndentationLift_bot (b : G → ℝ)
     (u : (G ⧸ (⊥ : Subgroup G)) × (G ⧸ (⊥ : Subgroup G)) → ℂ) (x y : G) :
     diagonalIndentationLift (⊥ : Subgroup G) Measure.count b u (x, y) =
-      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by sorry
+      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by
+  simp [diagonalIndentationLift, diagonalIndentationWeight,
+    Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))]
 
 variable {u : (G ⧸ H) × (G ⧸ H) → ℂ} (hu : LocallyIntegrable u (ν.prod ν))
 
