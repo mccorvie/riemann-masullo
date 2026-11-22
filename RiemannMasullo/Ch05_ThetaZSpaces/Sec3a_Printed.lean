@@ -130,13 +130,143 @@ def Printed.distribution_coordinatePlane_coefficientOrder : Prop :=
       ∀ f : 𝒟(ι ⊕ κ), T f = ∑ α : indices(ι ⊕ κ, N),
         A α (restriction(ι, κ) (∂𝒟[ι ⊕ κ, multi(α)] f))
 
+/-- On a one-point space every distribution has order zero: each test is its value
+times the constant test one. -/
+private theorem distribution_coordinatePlane_coefficientOrder_false_point
+    {E : Type} [NormedAddCommGroup E] [NormedSpace ℝ E] [Subsingleton E]
+    (A : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ)) : DistributionOrderLE (⇑A) 0 := by
+  intro K
+  let g : 𝓓((⊤ : Opens E), ℂ) :=
+    ⟨fun _ ↦ 1, contDiff_const, (Set.toFinite _).isCompact, by simp⟩
+  refine ⟨‖A g‖, norm_nonneg _, fun f _ B _ hB ↦ ?_⟩
+  have hf : f = f 0 • g := TestFunction.ext fun x ↦ by
+    rw [Subsingleton.elim x 0]
+    simp only [FunLike.coe_smul, Pi.smul_apply, smul_eq_mul]
+    exact (mul_one _).symm
+  have h0 := hB 0 le_rfl 0
+  rw [norm_iteratedFDeriv_zero] at h0
+  rw [hf, map_smul, smul_eq_mul, norm_mul, mul_comm]
+  exact mul_le_mul_of_nonneg_left h0 (norm_nonneg _)
+
+/-- The derivative at zero along a unit vector `e` has exact order one and is supported
+at zero. Its order-one bound is the operator norm of the derivative. The tests
+`χₙ(x)⟪e, x⟫`, with `χₙ` a bump equal to one near zero and supported in the ball of
+radius `1/(n + 1)`, have sup norm at most `1/(n + 1)` but derivative one along `e`. -/
+private theorem distribution_coordinatePlane_coefficientOrder_false_deriv
+    {E : Type} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    (e : E) (he : ‖e‖ = 1) :
+    ∃ T : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ),
+      DistributionOrderLE (⇑T) 1 ∧ ¬ DistributionOrderLE (⇑T) 0 ∧
+        Distribution.dsupport (⇑T) ⊆ {0} := by
+  let D : 𝓓((⊤ : Opens E), ℂ) →L[ℂ] 𝓓((⊤ : Opens E), ℂ) := TestFunction.lineDerivCLM ℂ e
+  let T : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ) :=
+    (BoundedContinuousFunction.evalCLM ℂ (0 : E)).comp
+      ((TestFunction.toBoundedContinuousFunctionCLM ℂ).comp D)
+  have hT : ∀ f : 𝓓((⊤ : Opens E), ℂ), T f = fderiv ℝ (f : E → ℂ) 0 e := by
+    intro f
+    show (D f : E → ℂ) 0 = _
+    rw [TestFunction.lineDerivCLM_eq_fderivCLM, TestFunction.fderivCLM_apply]
+    split_ifs with hk
+    · rfl
+    · exact absurd le_top hk
+  refine ⟨T, ?_, ?_, ?_⟩
+  · intro K
+    refine ⟨1, zero_le_one, fun f _ B _ hB ↦ ?_⟩
+    have h1 := hB 1 le_rfl 0
+    rw [norm_iteratedFDeriv_one] at h1
+    rw [hT, one_mul]
+    calc ‖fderiv ℝ (f : E → ℂ) 0 e‖ ≤ ‖fderiv ℝ (f : E → ℂ) 0‖ * ‖e‖ :=
+          ContinuousLinearMap.le_opNorm _ _
+      _ = ‖fderiv ℝ (f : E → ℂ) 0‖ := by rw [he, mul_one]
+      _ ≤ B := h1
+  · intro hT0
+    obtain ⟨C, -, hC⟩ := hT0 ⟨Metric.closedBall 0 1, isCompact_closedBall 0 1⟩
+    obtain ⟨n, hn⟩ := exists_nat_gt C
+    set r : ℝ := 1 / ((n : ℝ) + 1) with hr
+    have hr0 : 0 < r := by positivity
+    have hr1 : r ≤ 1 := by
+      rw [hr, div_le_one (by positivity)]
+      linarith [(Nat.cast_nonneg n : (0 : ℝ) ≤ n)]
+    let χ : ContDiffBump (0 : E) := ⟨r / 2, r, by positivity, by linarith⟩
+    let L : E →L[ℝ] ℂ := Complex.ofRealCLM.comp (innerSL ℝ e)
+    have hL : ∀ x, L x = ((inner ℝ e x : ℝ) : ℂ) := fun x ↦ rfl
+    let φ : E → ℂ := fun x ↦ (χ x : ℂ) * L x
+    have hφc : ContDiff ℝ ∞ φ :=
+      (Complex.ofRealCLM.contDiff.comp χ.contDiff).mul L.contDiff
+    have hχs : tsupport (fun x ↦ (χ x : ℂ)) ⊆ Metric.closedBall 0 r := by
+      refine (tsupport_comp_subset Complex.ofReal_zero _).trans ?_
+      rw [χ.tsupport_eq]
+    have hφs : tsupport φ ⊆ Metric.closedBall 0 r :=
+      (tsupport_mul_subset_left).trans hχs
+    let f : 𝓓((⊤ : Opens E), ℂ) :=
+      ⟨φ, hφc, (isCompact_closedBall 0 r).of_isClosed_subset (isClosed_tsupport _) hφs,
+        by simp⟩
+    have hfK : tsupport (f : E → ℂ) ⊆ Metric.closedBall 0 1 :=
+      hφs.trans (Metric.closedBall_subset_closedBall hr1)
+    have hbound : ∀ j ≤ 0, ∀ x, ‖iteratedFDeriv ℝ j (f : E → ℂ) x‖ ≤ r := by
+      intro j hj x
+      obtain rfl : j = 0 := by omega
+      rw [norm_iteratedFDeriv_zero]
+      show ‖(χ x : ℂ) * L x‖ ≤ r
+      rw [norm_mul, hL, Complex.norm_real, Complex.norm_real]
+      by_cases hx : x ∈ Metric.ball (0 : E) r
+      · have hχ1 : ‖χ x‖ ≤ 1 := by
+          rw [Real.norm_eq_abs, abs_of_nonneg (χ.nonneg)]
+          exact χ.le_one
+        have hin : ‖inner ℝ e x‖ < r := by
+          calc ‖inner ℝ e x‖ ≤ ‖e‖ * ‖x‖ := norm_inner_le_norm e x
+            _ = ‖x‖ := by rw [he, one_mul]
+            _ < r := by simpa using hx
+        calc ‖χ x‖ * ‖inner ℝ e x‖ ≤ 1 * r :=
+              mul_le_mul hχ1 hin.le (norm_nonneg _) zero_le_one
+          _ = r := one_mul r
+      · have hχ0 : χ x = 0 := by
+          rw [← Function.notMem_support, χ.support_eq]
+          exact hx
+        rw [hχ0, norm_zero, zero_mul]
+        exact hr0.le
+    have hloc : (f : E → ℂ) =ᶠ[nhds 0] L := by
+      filter_upwards [Metric.ball_mem_nhds (0 : E) (half_pos hr0)] with x hx
+      show (χ x : ℂ) * L x = L x
+      rw [χ.one_of_mem_closedBall (Metric.ball_subset_closedBall hx), Complex.ofReal_one, one_mul]
+    have hTf : T f = 1 := by
+      rw [hT, hloc.fderiv_eq, L.fderiv, hL, real_inner_self_eq_norm_sq, he]
+      norm_num
+    have := hC f hfK r hr0.le hbound
+    rw [hTf, norm_one] at this
+    have hCr : C * r < 1 := by
+      rw [hr, mul_one_div, div_lt_one (by positivity)]
+      linarith
+    linarith
+  · intro x hx
+    by_contra hx0
+    refine (Distribution.notMem_dsupport_iff x).2
+      ⟨{0}ᶜ, fun ψ hψ ↦ ?_, isOpen_compl_singleton, hx0⟩ hx
+    have h0 : (ψ : E → ℂ) =ᶠ[nhds 0] 0 :=
+      notMem_tsupport_iff_eventuallyEq.1 fun h ↦ hψ h rfl
+    rw [hT, h0.fderiv_eq, fderiv_zero]
+    rfl
+
 /-- Paper: Theorem 5.3.2.3(2), p. 245. Take one normal coordinate, no tangential
 coordinates, N = 1 and T = δ₀ + δ₀′. A compactly supported test equal to one near zero
 forces the zero-index coefficient to send one to one. Every distribution on a point has
 order at most zero, while the formula requires exact order one for that coefficient. -/
 theorem Printed.distribution_coordinatePlane_coefficientOrder_false :
     ¬ Printed.distribution_coordinatePlane_coefficientOrder := by
-  sorry
+  intro h
+  have : Subsingleton Eᵣ(Empty) := ⟨fun x y ↦ PiLp.ext fun i ↦ i.elim⟩
+  obtain ⟨e, he⟩ := exists_norm_eq Eᵣ(Unit ⊕ Empty) zero_le_one
+  obtain ⟨T, h1, h0, hsupp⟩ := distribution_coordinatePlane_coefficientOrder_false_deriv e he
+  have hplane : (0 : Eᵣ(Unit ⊕ Empty)) ∈
+      Set.range (fun y : Eᵣ(Empty) ↦ (insertPlane y : Eᵣ(Unit ⊕ Empty))) :=
+    ⟨0, PiLp.ext fun i ↦ by rcases i with _ | i <;> simp⟩
+  obtain ⟨A, hA, -⟩ := h Unit Empty T 1
+    ⟨h1, fun k hk ↦ by obtain rfl : k = 0 := (by omega); exact h0⟩
+    ((Set.finite_singleton 0).subset hsupp).isCompact
+    (hsupp.trans (Set.singleton_subset_iff.2 hplane))
+  let α₀ : indices(Unit ⊕ Empty, 1) := ⟨fun _ ↦ 0, by simp⟩
+  exact (hA α₀).1.2 0 (by simp [α₀])
+    (distribution_coordinatePlane_coefficientOrder_false_point (A α₀))
 
 open Classical in
 /-- Paper: Theorem 5.3.2.3(4), p. 245. As printed: The coefficients of (5.3.2.4)
