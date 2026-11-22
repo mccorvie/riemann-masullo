@@ -2,8 +2,6 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 
-import all RiemannMasullo.AppA_AlgebraicNT.Sec1
-
 /-! # False claims printed in §7.4 -/
 
 @[expose] public noncomputable section
@@ -365,9 +363,8 @@ rank zero and admit nuclear presentations. -/
 theorem Printed.archNuclearityStrongDual_not_nuclear_false :
     ¬ Printed.archNuclearityStrongDual_not_nuclear := by
   intro h
-  obtain ⟨s, hs, hright⟩ := exists_ideleNorm_section ℚ
-  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨s, hs⟩
-  have hτ : RightInverse τ (ideleNorm ℚ) := hright
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
   let φ : BruhatCompactSupport C[ℚ] := ⟨0, (bruhatCompactSupportSubmodule C[ℚ]).zero_mem⟩
   have hφ : φ.val = (0 : C[ℚ] → ℂ) := rfl
   obtain ⟨T, hT, hnot⟩ := h ℚ 1 τ hτ φ (by rw [hφ, tsupport_zero]; exact empty_subset _)
