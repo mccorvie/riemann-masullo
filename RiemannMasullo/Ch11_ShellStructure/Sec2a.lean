@@ -5,6 +5,7 @@ import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import Mathlib.Analysis.SpecialFunctions.Complex.Analytic
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+public import RiemannMasullo.Ch11_ShellStructure.Sec1b
 
 /-! # Orbital Markushevich bases on the 0-line
 
@@ -53,11 +54,6 @@ local notation "q(" v ")" => (Ideal.absNorm (HeightOneSpectrum.asIdeal v))
 
 -- (11.2.0.1) is spectralSobolevPairing at the interval [0, 0].
 -- (11.2.0.2) recalls the quotient operator globalThetaPrincipalValue.
-
-/-- Paper: (11.2.0.2), p. 484. The global principal value preserves the two
-vanishing conditions on adelic tests, so it acts on the polar-free theta space. -/
-theorem adelePrincipalValue_mem_polarSubspace (S : Finset V) (f : ℬ₀) :
-    adelePrincipalValue F S f.val ∈ adelePolarSubspace F := by sorry
 
 local notation "pvTest(" S ", " f ")" =>
   (⟨adelePrincipalValue F S (f : ℬ₀).val, adelePrincipalValue_mem_polarSubspace S f⟩ : ℬ₀)
