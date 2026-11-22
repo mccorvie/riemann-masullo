@@ -337,7 +337,9 @@ Deviation: Swap the arguments of Mathlib's conjugate-linear-first inner product.
 theorem sIdeleIntervalSobolev_inner (α β s : ℝ)
     (u v : Lp ℂ 2 (sIdeleIntervalSobolevMeasure F S α β s)) :
     inner ℂ v u =
-      ∫ g : Iₛ, u g * star (v g) ∂(sIdeleIntervalSobolevMeasure F S α β s) := by sorry
+      ∫ g : Iₛ, u g * star (v g) ∂(sIdeleIntervalSobolevMeasure F S α β s) := by
+  rw [MeasureTheory.L2.inner_def]
+  simp only [RCLike.inner_apply, starRingEnd_apply]
 
 -- TODO(paper-gap): The global spaces in Proposition 10.1.1.5 drop the subscript 0.
 -- At weight zero the usual rational adelic Gaussian does not have square-integrable theta.
