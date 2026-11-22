@@ -371,7 +371,12 @@ In the fixed norm chart the archimedean pole set is the zero set of the reciproc
 product. The pole set in that chart is discrete and closed. -/
 theorem archNuclearityPoleSet_discrete :
     let S := {s : ℂ | 0 < gammaOrder(χ, s)}
-    IsClosed S ∧ IsDiscrete S := by sorry
+    IsClosed S ∧ IsDiscrete S := by
+  apply compl_mem_codiscrete_iff.mp
+  have ha : AnalyticOnNhd ℂ (fun z ↦ (heckeGammaFactor χ z)⁻¹) univ :=
+    fun z _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  filter_upwards [ha.codiscreteWithin_setOfPred_analyticOrderAt_eq_zero_or_top] with z hz
+  rcases hz with hz | hz <;> simp [Set.mem_compl_iff, hz]
 
 /-- Paper: Equations (7.4.3.2)–(7.4.3.3), p. 368.
 The raw order in the global chart counts the same places as the local
