@@ -368,31 +368,6 @@ theorem torusFlowClosure_equiv_torus [NeZero N] (τ : Fin N → ℝ) :
     Nonempty (torusFlowClosure τ ≃ₜ+
       UnitAddTorus (Fin (Module.finrank ℚ (Submodule.span ℚ (range τ))))) := by sorry
 
--- TODO(paper-gap): Theorem B.5.2.1(2) for arbitrary Riemann-integrable observables.
--- A function supported on a Haar-null orbit arc can pull back to a nonmeasurable time function.
--- TODO(paper-gap): The bound in (B.5.2.14) needs an absolute value around the frequency.
-
-/-- Paper: Theorem B.5.2.1(2), p. 627. Symmetric time averages of a
-Riemann-integrable observable converge to its Haar probability integral.
-Deviation: Requires Lebesgue measurability up to null sets along the orbit for the time integral. -/
-theorem kroneckerWeyl_riemannIntegrable_symmetric [NeZero N] (τ : Fin N → ℝ)
-    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
-    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
-    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t)) volume) :
-    Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ • ∫ t in -T..T, u (torusFlowInClosure τ t))
-      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
-
-/-- Paper: Theorem B.5.2.1(2), p. 627. Forward time averages of a
-Riemann-integrable observable converge to its Haar probability integral.
-Deviation: Requires Lebesgue measurability up to null sets on the forward orbit. -/
-theorem kroneckerWeyl_riemannIntegrable_forward [NeZero N] (τ : Fin N → ℝ)
-    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
-    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
-    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t))
-      (volume.restrict (Ici (0 : ℝ)))) :
-    Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (torusFlowInClosure τ t))
-      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
-
 section KroneckerWeyl
 
 open Real UnitAddTorus
@@ -615,6 +590,214 @@ theorem kroneckerWeyl_continuous_forward [NeZero N] (τ : Fin N → ℝ)
   convert key using 2 with T
   simp only [A, Complex.real_smul, Complex.ofReal_inv]
   rfl
+
+/-- Lipschitz upper envelopes of a bounded real function on the orbit closure: continuous
+majorants with the same bound that converge to the function at each of its continuity points. -/
+private theorem kroneckerWeyl_riemannIntegrable_envelope (τ : Fin N → ℝ)
+    (v : torusFlowClosure τ → ℝ) {C : ℝ} (hC : ∀ x, |v x| ≤ C) :
+    ∃ h : ℕ → torusFlowClosure τ → ℝ, (∀ k, Continuous (h k)) ∧ (∀ k x, v x ≤ h k x) ∧
+      (∀ k x, h k x ≤ C) ∧
+      ∀ x, ContinuousAt v x → Tendsto (fun k ↦ h k x) atTop (𝓝 (v x)) := by
+  have hk (k : ℕ) : (0 : ℝ) ≤ k := k.cast_nonneg
+  have hbound (k : ℕ) (x y : torusFlowClosure τ) : v y - k * dist x y ≤ C := by
+    nlinarith [le_abs_self (v y), hC y, dist_nonneg (x := x) (y := y), hk k]
+  have hbdd (k : ℕ) (x : torusFlowClosure τ) : BddAbove (range fun y ↦ v y - k * dist x y) :=
+    ⟨C, by rintro _ ⟨y, rfl⟩; exact hbound k x y⟩
+  refine ⟨fun k x ↦ ⨆ y, (v y - k * dist x y), fun k ↦ ?_, fun k x ↦ ?_,
+    fun k x ↦ ciSup_le (hbound k x), fun x hx ↦ ?_⟩
+  · refine (LipschitzWith.of_le_add_mul' (k : ℝ) fun x x' ↦ ?_).continuous
+    refine ciSup_le fun y ↦ ?_
+    have h₁ := le_ciSup (hbdd k x') y
+    have h₂ := dist_triangle x' x y
+    rw [dist_comm x' x] at h₂
+    nlinarith [hk k]
+  · simpa using le_ciSup (hbdd k x) x
+  · refine tendsto_order.2 ⟨fun a ha ↦ Eventually.of_forall fun k ↦
+      ha.trans_le (by simpa using le_ciSup (hbdd k x) x), fun b hb ↦ ?_⟩
+    obtain ⟨δ, hδ, hball⟩ := Metric.eventually_nhds_iff.mp
+      (hx.eventually (gt_mem_nhds (show v x < (v x + b) / 2 by linarith)))
+    have hk' : ∀ᶠ k : ℕ in atTop, 2 * C < k * δ :=
+      ((tendsto_natCast_atTop_atTop.atTop_mul_const hδ).eventually_gt_atTop (2 * C))
+    filter_upwards [hk'] with k hk'
+    refine lt_of_le_of_lt (ciSup_le fun y ↦ ?_) (show (v x + b) / 2 < b by linarith)
+    by_cases hy : dist y x < δ
+    · have := hball hy
+      nlinarith [hk k, dist_nonneg (x := x) (y := y)]
+    · rw [not_lt, dist_comm] at hy
+      have hvx : -C ≤ v x := neg_le_of_abs_le (hC x)
+      nlinarith [le_abs_self (v y), hC y, hk k, mul_le_mul_of_nonneg_left hy (hk k)]
+
+/-- A bounded real observable that is continuous almost everywhere is measurable for `μ`, and
+any averaging scheme along the flow that converges for continuous observables converges for it,
+when the time function is measurable for the averaging measures. -/
+private theorem kroneckerWeyl_riemannIntegrable_real (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [IsProbabilityMeasure μ]
+    (ρ : ℝ → Measure ℝ) (hρ : ∀ T, IsFiniteMeasure (ρ T)) (c : ℝ → ℝ)
+    (hc : ∀ᶠ T in atTop, 0 ≤ c T)
+    (hcont : ∀ w : torusFlowClosure τ → ℝ, Continuous w →
+      Tendsto (fun T ↦ c T * ∫ t, w (torusFlowInClosure τ t) ∂ρ T) atTop (𝓝 (∫ x, w x ∂μ)))
+    (v : torusFlowClosure τ → ℝ) {C : ℝ} (hC : ∀ x, |v x| ≤ C)
+    (hv : ∀ᵐ x ∂μ, ContinuousAt v x)
+    (hm : ∀ T, AEStronglyMeasurable (fun t ↦ v (torusFlowInClosure τ t)) (ρ T)) :
+    AEStronglyMeasurable v μ ∧
+      Tendsto (fun T ↦ c T * ∫ t, v (torusFlowInClosure τ t) ∂ρ T) atTop (𝓝 (∫ x, v x ∂μ)) := by
+  obtain ⟨h, hhc, hvh, hhC, hhlim⟩ := kroneckerWeyl_riemannIntegrable_envelope τ v hC
+  obtain ⟨g, hgc, hvg, hgC, hglim⟩ := kroneckerWeyl_riemannIntegrable_envelope τ (fun x ↦ -v x)
+    (C := C) fun x ↦ by simpa [abs_neg] using hC x
+  have hF : Continuous (torusFlowInClosure τ) := (torusFlow τ).continuous.subtype_mk _
+  have hlim_h : ∀ᵐ x ∂μ, Tendsto (fun k ↦ h k x) atTop (𝓝 (v x)) :=
+    hv.mono fun x hx ↦ hhlim x hx
+  have hlim_g : ∀ᵐ x ∂μ, Tendsto (fun k ↦ -g k x) atTop (𝓝 (v x)) :=
+    hv.mono fun x hx ↦ by simpa using (hglim x hx.neg).neg
+  have hmeas : AEStronglyMeasurable v μ :=
+    aestronglyMeasurable_of_tendsto_ae atTop (fun k ↦ (hhc k).aestronglyMeasurable) hlim_h
+  have habs_h (k : ℕ) (x : torusFlowClosure τ) : ‖h k x‖ ≤ C := by
+    rw [Real.norm_eq_abs, abs_le]
+    exact ⟨(neg_le_of_abs_le (hC x)).trans (hvh k x), hhC k x⟩
+  have habs_g (k : ℕ) (x : torusFlowClosure τ) : ‖-g k x‖ ≤ C := by
+    rw [Real.norm_eq_abs, abs_neg, abs_le]
+    exact ⟨(neg_le_of_abs_le (by simpa [abs_neg] using hC x)).trans (hvg k x), hgC k x⟩
+  have hint_h : Tendsto (fun k ↦ ∫ x, h k x ∂μ) atTop (𝓝 (∫ x, v x ∂μ)) :=
+    tendsto_integral_of_dominated_convergence (fun _ ↦ C)
+      (fun k ↦ (hhc k).aestronglyMeasurable) (integrable_const C)
+      (fun k ↦ Eventually.of_forall (habs_h k)) hlim_h
+  have hint_g : Tendsto (fun k ↦ ∫ x, -g k x ∂μ) atTop (𝓝 (∫ x, v x ∂μ)) :=
+    tendsto_integral_of_dominated_convergence (fun _ ↦ C)
+      (fun k ↦ (hgc k).neg.aestronglyMeasurable) (integrable_const C)
+      (fun k ↦ Eventually.of_forall (habs_g k)) hlim_g
+  have hvint (T : ℝ) : Integrable (fun t ↦ v (torusFlowInClosure τ t)) (ρ T) := by
+    have := hρ T
+    exact Integrable.of_bound (hm T) C (Eventually.of_forall fun t ↦ by
+      simpa [Real.norm_eq_abs] using hC _)
+  have hcint (T : ℝ) (w : torusFlowClosure τ → ℝ) (hw : Continuous w) (hwC : ∀ x, ‖w x‖ ≤ C) :
+      Integrable (fun t ↦ w (torusFlowInClosure τ t)) (ρ T) := by
+    have := hρ T
+    exact Integrable.of_bound (hw.comp hF).aestronglyMeasurable C
+      (Eventually.of_forall fun t ↦ hwC _)
+  refine ⟨hmeas, tendsto_order.2 ⟨fun a ha ↦ ?_, fun b hb ↦ ?_⟩⟩
+  · obtain ⟨k, hk⟩ := (hint_g.eventually (lt_mem_nhds ha)).exists
+    have hw : Continuous fun x ↦ -g k x := (hgc k).neg
+    filter_upwards [(hcont _ hw).eventually (lt_mem_nhds hk), hc] with T hT hcT
+    refine hT.trans_le (mul_le_mul_of_nonneg_left ?_ hcT)
+    exact integral_mono (hcint T _ hw (habs_g k)) (hvint T) fun t ↦ by
+      simpa using neg_le.mp (hvg k (torusFlowInClosure τ t))
+  · obtain ⟨k, hk⟩ := (hint_h.eventually (gt_mem_nhds hb)).exists
+    filter_upwards [(hcont _ (hhc k)).eventually (gt_mem_nhds hk), hc] with T hT hcT
+    refine lt_of_le_of_lt (mul_le_mul_of_nonneg_left ?_ hcT) hT
+    exact integral_mono (hvint T) (hcint T _ (hhc k) (habs_h k)) fun t ↦ hvh k _
+
+/-- Equidistribution of a Riemann-integrable complex observable, from its real and imaginary
+parts, for any averaging scheme along the flow that converges for continuous observables. -/
+private theorem kroneckerWeyl_riemannIntegrable_complex (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [IsProbabilityMeasure μ]
+    (ρ : ℝ → Measure ℝ) (hρ : ∀ T, IsFiniteMeasure (ρ T)) (c : ℝ → ℝ)
+    (hc : ∀ᶠ T in atTop, 0 ≤ c T)
+    (hcont : ∀ w : torusFlowClosure τ → ℝ, Continuous w →
+      Tendsto (fun T ↦ c T * ∫ t, w (torusFlowInClosure τ t) ∂ρ T) atTop (𝓝 (∫ x, w x ∂μ)))
+    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
+    (hm : ∀ T, AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t)) (ρ T)) :
+    Tendsto (fun T ↦ (c T : ℂ) * ∫ t, u (torusFlowInClosure τ t) ∂ρ T) atTop
+      (𝓝 (∫ x, u x ∂μ)) := by
+  obtain ⟨⟨C, hC⟩, hcu⟩ := hu
+  obtain ⟨hre_m, hre⟩ := kroneckerWeyl_riemannIntegrable_real τ μ ρ hρ c hc hcont
+    (fun x ↦ (u x).re) (C := C) (fun x ↦ (Complex.abs_re_le_norm _).trans (hC x))
+    (hcu.mono fun x hx ↦ Complex.continuous_re.continuousAt.comp hx)
+    fun T ↦ Complex.continuous_re.comp_aestronglyMeasurable (hm T)
+  obtain ⟨him_m, him⟩ := kroneckerWeyl_riemannIntegrable_real τ μ ρ hρ c hc hcont
+    (fun x ↦ (u x).im) (C := C) (fun x ↦ (Complex.abs_im_le_norm _).trans (hC x))
+    (hcu.mono fun x hx ↦ Complex.continuous_im.continuousAt.comp hx)
+    fun T ↦ Complex.continuous_im.comp_aestronglyMeasurable (hm T)
+  have humeas : AEStronglyMeasurable u μ := by
+    have := (Complex.continuous_ofReal.comp_aestronglyMeasurable hre_m).add
+      ((Complex.continuous_ofReal.comp_aestronglyMeasurable him_m).mul_const Complex.I)
+    refine this.congr (Eventually.of_forall fun x ↦ ?_)
+    simp [Complex.re_add_im]
+  have huint : Integrable u μ := Integrable.of_bound humeas C (Eventually.of_forall hC)
+  have htint (T : ℝ) : Integrable (fun t ↦ u (torusFlowInClosure τ t)) (ρ T) := by
+    have := hρ T
+    exact Integrable.of_bound (hm T) C (Eventually.of_forall fun t ↦ hC _)
+  have hsplit (ν : Measure (torusFlowClosure τ)) (f : torusFlowClosure τ → ℂ)
+      (hf : Integrable f ν) :
+      ∫ x, f x ∂ν = ((∫ x, (f x).re ∂ν : ℝ) : ℂ) + ((∫ x, (f x).im ∂ν : ℝ) : ℂ) * Complex.I := by
+    simpa using (integral_re_add_im hf).symm
+  have hsplitT (T : ℝ) : (∫ t, u (torusFlowInClosure τ t) ∂ρ T) =
+      ((∫ t, (u (torusFlowInClosure τ t)).re ∂ρ T : ℝ) : ℂ) +
+        ((∫ t, (u (torusFlowInClosure τ t)).im ∂ρ T : ℝ) : ℂ) * Complex.I := by
+    simpa using (integral_re_add_im (htint T)).symm
+  rw [hsplit μ u huint]
+  have hlim := ((Complex.continuous_ofReal.tendsto _).comp hre).add
+    (((Complex.continuous_ofReal.tendsto _).comp him).mul_const Complex.I)
+  refine hlim.congr fun T ↦ ?_
+  simp only [Function.comp_apply, hsplitT]
+  push_cast
+  ring
+
+-- TODO(paper-gap): Theorem B.5.2.1(2) for arbitrary Riemann-integrable observables.
+-- A function supported on a Haar-null orbit arc can pull back to a nonmeasurable time function.
+-- TODO(paper-gap): The bound in (B.5.2.14) needs an absolute value around the frequency.
+
+/-- Paper: Theorem B.5.2.1(2), p. 627. Symmetric time averages of a
+Riemann-integrable observable converge to its Haar probability integral.
+Deviation: Requires Lebesgue measurability up to null sets along the orbit for the time integral. -/
+theorem kroneckerWeyl_riemannIntegrable_symmetric [NeZero N] (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
+    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
+    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t)) volume) :
+    Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ • ∫ t in -T..T, u (torusFlowInClosure τ t))
+      atTop (𝓝 (∫ x, u x ∂μ)) := by
+  have hρ (T : ℝ) : IsFiniteMeasure (volume.restrict (Ioc (-T) T)) :=
+    isFiniteMeasure_restrict.mpr measure_Ioc_lt_top.ne
+  have hcont (w : torusFlowClosure τ → ℝ) (hw : Continuous w) :
+      Tendsto (fun T : ℝ ↦ (2 * T)⁻¹ * ∫ t in Ioc (-T) T, w (torusFlowInClosure τ t)) atTop
+        (𝓝 (∫ x, w x ∂μ)) := by
+    have h := kroneckerWeyl_continuous_symmetric τ μ
+      ⟨fun x ↦ (w x : ℂ), Complex.continuous_ofReal.comp hw⟩
+    have h' := (Complex.continuous_re.tendsto _).comp h
+    rw [show (∫ x, (⟨fun x ↦ (w x : ℂ), Complex.continuous_ofReal.comp hw⟩ :
+      C(torusFlowClosure τ, ℂ)) x ∂μ) = ((∫ x, w x ∂μ : ℝ) : ℂ) from integral_ofReal,
+      Complex.ofReal_re] at h'
+    refine h'.congr' ((eventually_ge_atTop 0).mono fun T hT ↦ ?_)
+    change ((2 * T)⁻¹ • ∫ t in -T..T, ((w (torusFlowInClosure τ t) : ℝ) : ℂ)).re = _
+    rw [intervalIntegral.integral_ofReal, Complex.real_smul, ← Complex.ofReal_mul,
+      Complex.ofReal_re, intervalIntegral.integral_of_le (by linarith)]
+  have key := kroneckerWeyl_riemannIntegrable_complex τ μ (fun T ↦ volume.restrict (Ioc (-T) T))
+    hρ (fun T ↦ (2 * T)⁻¹) ((eventually_ge_atTop 0).mono fun T hT ↦ by positivity) hcont u hu
+    fun T ↦ ht.restrict
+  refine key.congr' ((eventually_ge_atTop 0).mono fun T hT ↦ ?_)
+  dsimp only
+  rw [intervalIntegral.integral_of_le (by linarith), Complex.real_smul]
+
+/-- Paper: Theorem B.5.2.1(2), p. 627. Forward time averages of a
+Riemann-integrable observable converge to its Haar probability integral.
+Deviation: Requires Lebesgue measurability up to null sets on the forward orbit. -/
+theorem kroneckerWeyl_riemannIntegrable_forward [NeZero N] (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
+    (u : torusFlowClosure τ → ℂ) (hu : TorusRiemannIntegrable μ u)
+    (ht : AEStronglyMeasurable (fun t ↦ u (torusFlowInClosure τ t))
+      (volume.restrict (Ici (0 : ℝ)))) :
+    Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (torusFlowInClosure τ t))
+      atTop (𝓝 (∫ x, u x ∂μ)) := by
+  have hρ (T : ℝ) : IsFiniteMeasure (volume.restrict (Ioc 0 T)) :=
+    isFiniteMeasure_restrict.mpr measure_Ioc_lt_top.ne
+  have hcont (w : torusFlowClosure τ → ℝ) (hw : Continuous w) :
+      Tendsto (fun T : ℝ ↦ T⁻¹ * ∫ t in Ioc 0 T, w (torusFlowInClosure τ t)) atTop
+        (𝓝 (∫ x, w x ∂μ)) := by
+    have h := kroneckerWeyl_continuous_forward τ μ
+      ⟨fun x ↦ (w x : ℂ), Complex.continuous_ofReal.comp hw⟩
+    have h' := (Complex.continuous_re.tendsto _).comp h
+    rw [show (∫ x, (⟨fun x ↦ (w x : ℂ), Complex.continuous_ofReal.comp hw⟩ :
+      C(torusFlowClosure τ, ℂ)) x ∂μ) = ((∫ x, w x ∂μ : ℝ) : ℂ) from integral_ofReal,
+      Complex.ofReal_re] at h'
+    refine h'.congr' ((eventually_ge_atTop 0).mono fun T hT ↦ ?_)
+    change (T⁻¹ • ∫ t in (0 : ℝ)..T, ((w (torusFlowInClosure τ t) : ℝ) : ℂ)).re = _
+    rw [intervalIntegral.integral_ofReal, Complex.real_smul, ← Complex.ofReal_mul,
+      Complex.ofReal_re, intervalIntegral.integral_of_le hT]
+  have key := kroneckerWeyl_riemannIntegrable_complex τ μ (fun T ↦ volume.restrict (Ioc 0 T))
+    hρ (fun T ↦ T⁻¹) ((eventually_ge_atTop 0).mono fun T hT ↦ inv_nonneg.mpr hT) hcont u hu
+    fun T ↦ ht.mono_measure (Measure.restrict_mono (fun t (ht : t ∈ Ioc 0 T) ↦ mem_Ici.mpr ht.1.le) le_rfl)
+  refine key.congr' ((eventually_ge_atTop 0).mono fun T hT ↦ ?_)
+  dsimp only
+  rw [intervalIntegral.integral_of_le hT, Complex.real_smul]
 
 /-- Paper: Lemma B.5.2.2, p. 627.
 The indicator of an open set with null boundary can be sandwiched between continuous
