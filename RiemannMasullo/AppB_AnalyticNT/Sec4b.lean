@@ -1,8 +1,11 @@
 module
 
+public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
+public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
+public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
@@ -39,9 +42,18 @@ section MellinExplicitFormula
 -- TODO(paper-gap): The unnumbered residue identity on p. 614 reverses the
 -- signs in (B.4.2.2). Poles are present only for norm characters and may be shifted.
 
+/-- Paper: §B.4.2.1, p. 614. The logarithmic derivative of the completed
+function has slow growth near its poles on the strip used for the residue formula.
+Deviation: Uses the repaired height bounds of Definition B.3.1.1. -/
+theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv (χ : U[F]) (L : ℂ → ℂ)
+    (_hL : MeromorphicNFOn L univ) (_hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (a : ℝ) (_ha : 1 < a) (_haMax : a ≤ 2) :
+    HasSlowGrowthNearPoles (logDeriv L) (1 - a) a := by sorry
+
 /-- Paper: Equation (B.4.2.2), p. 614. The right vertical integral minus the
 left vertical integral is the signed divisor sum of Mellin values.
-Deviation: The meromorphic order includes the actual poles and zero multiplicities. -/
+Deviation: The meromorphic order includes the actual poles and zero multiplicities.
+The unordered sum strengthens the rectangular limit and uses zero counting for fixed χ. -/
 theorem hasSum_heckeAsymptoticResidue (χ : U[F]) (f : 𝓢(ℝ, ℂ)) (_hf : ExponentialDecay f)
     (L : ℂ → ℂ) (_hL : MeromorphicNFOn L univ)
     (_hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
@@ -51,9 +63,9 @@ theorem hasSum_heckeAsymptoticResidue (χ : U[F]) (f : 𝓢(ℝ, ℂ)) (_hf : Ex
       HasSum (fun ρ : ℂ ↦ (MeromorphicOn.divisor L univ ρ : ℂ) * logMellin f ρ)
         ((verticalLineIntegral H a - verticalLineIntegral H (1 - a)) / twoPiI) := by sorry
 
--- TODO(paper-gap): (B.4.2.3) misses the chain-rule sign and footnote 13
--- leaves the conductor factor unstated. The integral of Φ in (B.4.2.4)
--- gives the value at one in the multiplicative coordinate.
+-- TODO(paper-gap): (B.4.2.3) misses the chain-rule sign. The page specifies
+-- Aχ, but the identification ε'/ε = log Aχ needs the conductor calculation.
+-- The normalized integral of Φ in (B.4.2.4) gives the test value at one.
 
 local notation "conductorExponents(" χ ", " v ")" =>
   ({n : ℕ | ∀ u : (HeightOneSpectrum.adicCompletion F v)ˣ, ‖u.val‖ = 1 →
@@ -93,7 +105,9 @@ theorem completedHeckeL_logDeriv_reflection (χ : U[F]) (L Ldual : ℂ → ℂ)
 
 -- TODO(paper-gap): In (B.4.2.15) a compactly supported logarithmic profile
 -- with f(0) = 1 leaves Nᵥ/x at infinity. The gamma arguments also omit
--- the sign parity or angular weight. The digamma integral below includes both.
+-- the sign parity or angular weight. With the printed negative αᵥ on p. 616,
+-- the constant in (B.4.2.12) should be +αᵥ. The digamma integral below includes
+-- the parity or angular weight and the gamma prefactor.
 
 /-- Paper: Proposition B.4.2.1, p. 616. The combined digamma integrand uses
 the gamma arguments of the two local characters and the positive and negative
@@ -150,7 +164,8 @@ theorem complexHeckeArchimedean_mellinLogDeriv (w : InfinitePlace F) (hw : w.IsC
       verticalLineIntegral H a / twoPiI =
         (∫ t in Ioi (0 : ℝ), K t) - 2 * (Real.log (2 * Real.pi) : ℂ) * f 0 := by sorry
 
--- TODO(paper-gap): (B.4.2.10)–(B.4.2.11) have inconsistent contour factors.
+-- TODO(paper-gap): (B.4.2.10) needs dt/(2π). With upward ds/(2πi),
+-- (B.4.2.11) gives +log(q) χ̄(π)^m q^(-m) φ(q^(-m)).
 -- Theorem B.4.2.2 also subtracts two pole terms for every χ and uses the
 -- divergent archimedean integral from (B.4.2.15).
 
@@ -405,6 +420,33 @@ local notation "finiteWeilIntegrand(" v ", " f ")" =>
   (fun u : (HeightOneSpectrum.adicCompletion F v)ˣ ↦
     f u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ))
 
+/-- Paper: Remark B.4.4.2, p. 620. For the finite local norm the canonical
+multiplicative Haar measure gives an integer-unit shell mass equal to the log prime norm. -/
+theorem finiteCanonicalHaar_eq_smul_tamagawa (v : Primes(F)) :
+    letI : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+    letI : SecondCountableTopology (v.adicCompletion F)ˣ :=
+      (Units.isEmbedding_val₀ (G₀ := v.adicCompletion F)).secondCountableTopology
+    letI : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+    let m : (v.adicCompletion F)ˣ →ₜ* ℝ≥0ˣ :=
+      ⟨Units.map nnNormHom.toMonoidHom, continuous_finiteLocalModule v⟩
+    ∃ hm : IsModulation m, canonicalModulatedHaar m hm =
+      ENNReal.ofReal (Real.log q(v) / V𝔭(v)) • μ𝔭(v) := by sorry
+
+/-- Paper: Remark B.4.4.2, p. 620. For the infinite local module, dividing
+Tamagawa measure by two at a real place or by two pi at a complex place gives canonical Haar measure. -/
+theorem infiniteCanonicalHaar_eq_smul_tamagawa (w : InfinitePlace F) :
+    letI : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    letI : SecondCountableTopology w.Completionˣ :=
+      (Units.isEmbedding_val₀ (G₀ := w.Completion)).secondCountableTopology
+    letI : BorelSpace w.Completion := ⟨rfl⟩
+    letI : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+    let m : w.Completionˣ →ₜ* ℝ≥0ˣ :=
+      ⟨(Units.map nnNormHom.toMonoidHom) ^ w.mult, continuous_infiniteLocalModule w⟩
+    ∃ hm : IsModulation m, canonicalModulatedHaar m hm =
+      ENNReal.ofReal ((if w.IsReal then 2 else 2 * Real.pi)⁻¹) •
+        infiniteLocalMultiplicativeTamagawaMeasure F w := by sorry
+
 /-- Paper: Lemma B.4.4.3, p. 620. If the locally constant test vanishes
 at one, the finite principal value is the ordinary integrable local term. -/
 theorem finiteConnesWeilPrincipalValue_of_apply_one_zero (v : Primes(F))
@@ -420,15 +462,17 @@ theorem finiteConnesWeilPrincipalValue_of_apply_one_zero (v : Primes(F))
 distribution is normalized on the Fourier transform of the integer-unit indicator.
 It evaluates the finite multiplicative principal value on inverse square-root weighted tests.
 Deviation: The distribution is on the full additive test space. Its restriction away
-from one is minus the specified density divided by the mass of the integer units. -/
+from one is minus the specified density divided by the mass of the integer units.
+The evaluation identity extends to all multiplicative tests by the weighted translation. -/
 theorem existsUnique_finiteWeilFourierDistribution (v : Primes(F)) :
-    ∃! T : StrongDual ℂ (𝒮ₐ(v.adicCompletion F)),
+    let normalized := fun T : StrongDual ℂ (𝒮ₐ(v.adicCompletion F)) ↦
       (∀ f : 𝒮ₐ(v.adicCompletion F), addTest(f) 1 = 0 →
         T f = -((q(v) / (q(v) - 1) / V𝔭(v) : ℝ) : ℂ) *
           ∫ x, addTest(f) x / ((‖1 - x‖ : ℝ) : ℂ) ∂ν𝔭(v)) ∧
       (∃ g : 𝒮ₐ(v.adicCompletion F),
         addTest(g) = tamagawaFourier ν𝔭(v) ψ𝔭(v)
-          (indicator {x : v.adicCompletion F | ‖x‖ = 1} (fun _ ↦ 1)) ∧ T g = 0) ∧
+          (indicator {x : v.adicCompletion F | ‖x‖ = 1} (fun _ ↦ 1)) ∧ T g = 0)
+    ∃ T, normalized T ∧ (∀ S, normalized S → S = T) ∧
       (∀ f : 𝒟((v.adicCompletion F)ˣ), ∃ g : 𝒮ₐ(v.adicCompletion F),
         (∀ x, addTest(g) x = zeroExtend(f.val) x / (Real.sqrt ‖x‖ : ℂ)) ∧
         finiteConnesWeilPrincipalValue v 1 f = -(V𝔭(v) : ℂ) * T g) := by sorry
@@ -447,16 +491,16 @@ theorem finiteConnesWeilPrincipalValue_changeCharacter (v : Primes(F))
     finiteConnesWeilPrincipalValue v a f = finiteConnesWeilPrincipalValue v 1 f +
       ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * f.val 1 := by sorry
 
--- TODO(paper-gap): The prefactor of (B.4.4.14) applies the multiplicative
--- measure to the integer ring. Equations (B.4.4.15) and (B.4.4.21) use its units.
+-- TODO(paper-gap): In the proof on p. 623 (footnote 24), the annihilator of
+-- the maximal ideal is the inverse maximal ideal times the inverse different.
+-- The second indicator in the printed display uses the different itself.
 
 local notation "differentExp(" v ")" =>
   multiplicity (HeightOneSpectrum.asIdeal v) (differentIdeal ℤ (𝓞 F))
 
 
 /-- Paper: Lemma B.4.4.5, p. 622. The rescaled finite principal value is
-the unit-subtracted finite part with the different correction.
-Deviation: The prefactor uses the mass of the integer units as in (B.4.4.21). -/
+the unit-subtracted finite part with the different correction. -/
 theorem finiteConnesWeilPrincipalValue_eq_finitePart (v : Primes(F))
     (f : 𝒟((v.adicCompletion F)ˣ)) :
     let units : Set (v.adicCompletion F)ˣ := (O(v)).units
@@ -477,6 +521,11 @@ theorem finiteConnesWeilPrincipalValue_integerUnits (v : Primes(F)) :
       f.val = indicator ((O(v)).units : Set (v.adicCompletion F)ˣ) (fun _ ↦ 1) ∧
       finiteWeilScale(v) * finiteConnesWeilPrincipalValue v 1 f =
         -(((differentExp(v) : ℝ) * Real.log q(v) : ℝ) : ℂ) := by sorry
+
+/-- Paper: Remark B.4.4.6, p. 623. A finite local test agrees with its value at
+one on a neighborhood of one, so the unit-subtracted integrand vanishes there. -/
+theorem finiteWeilTest_eventually_eq_at_one (v : Primes(F)) (f : 𝒟((v.adicCompletion F)ˣ)) :
+    ∀ᶠ u in 𝓝 (1 : (v.adicCompletion F)ˣ), f.val u = f.val 1 := by sorry
 
 end PrincipalValues
 
@@ -510,6 +559,10 @@ local notation "infiniteClassMap(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F
 
 -- TODO(paper-gap): The printed sum omits zero multiplicity. In (B.4.4.16)
 -- the corrected archimedean Fourier pairing is already canonically normalized.
+-- The proof on p. 625 also needs the norm-one volume divisor in D(φ) and
+-- a comparison of the Mellin local terms with the principal values (footnote 27).
+-- For (B.4.4.22), compact norm support handles nonunit shells at large primes.
+-- Invariance under the local units at almost every prime makes the unit-shell test constant.
 
 /-- Paper: Theorem B.4.4.7, pp. 623–626. The sum over completed Hecke zeros
 equals the pole distributions minus the local principal value distributions.
@@ -540,6 +593,7 @@ theorem idelicExplicitFormula (τ : ℝ≥0ˣ →ₜ* C[F]) (_hτ : RightInverse
 
 -- TODO(paper-gap): Discreteness in each component imposes no bound on
 -- the number of points in consecutive height intervals, even for G = ℝ₊ˣ.
+-- In (B.4.4.18), c(τ(t)) already equals t^s. Use this radial character once.
 
 /-- Paper: Lemma B.4.4.8, p. 624. Compactly supported Bruhat tests have
 absolutely summable Mellin evaluations on polynomially counted samples in
@@ -563,6 +617,10 @@ theorem summable_bruhatMellin_of_polynomialCount
       (((e g).1.val : ℝ) : ℂ) ^ z.val.1 *
       (∏ j : Fin d, (((e g).2.1 j : Circle) : ℂ) ^ z.val.2.1 j) *
       (z.val.2.2 (e g).2.2 : ℂ) ∂μ‖) := by sorry
+
+-- TODO(paper-gap): On p. 625, passing to a Lie quotient eliminates other kernel
+-- characters. A uniform zero count with multiplicity for the remaining characters
+-- is still needed to apply the corrected Lemma B.4.4.8.
 
 /-- Paper: Lemma B.4.4.9, pp. 624–625. Mellin evaluations on any subset
 of the completed Hecke zeros are absolutely summable after a real norm twist.
