@@ -74,7 +74,12 @@ def sLocalPolarMultiplicity (f : ℬₛ) (c : QuasiCharacter Jₛ) : ℕ :=
 The multiplicity vanishes exactly at the quasi-characters with nonnegative meromorphic order. -/
 theorem sLocalPolarMultiplicity_eq_zero_iff (f : ℬₛ) (c : QuasiCharacter Jₛ) :
     sLocalPolarMultiplicity f c = 0 ↔
-      0 ≤ meromorphicOrderAt (zetaGerm(f, c)) 0 := by sorry
+      0 ≤ meromorphicOrderAt (zetaGerm(f, c)) 0 := by
+  unfold sLocalPolarMultiplicity
+  generalize meromorphicOrderAt (zetaGerm(f, c)) 0 = o
+  induction o using WithTop.recTopCoe with
+  | top => simp
+  | coe n => simp
 
 /-- Paper: Definition 7.1.2.1, p. 316.
 The integer-indexed Laurent coefficient is computed in the norm-twist coordinate centered

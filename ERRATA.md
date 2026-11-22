@@ -7,7 +7,7 @@ Most entries were first reported by an AI agent. The **Checked** column says whe
 since read the passage and agrees: *integrator* means the integrating agent compared the report
 with the page; *reviewed* means a second, independent agent recomputed it against the page image; *reported*
 means nobody has yet. No entry has been reviewed by a specialist. The
-dispute over the main theorem is described in the [README](README.md#status), not here.
+dispute over the main theorem is described in the [README](README.md#concerns-about-the-main-theorem), not here.
 
 The author's preface says that he and Brian Conrad know of "several glitches here and there"
 still being fixed, and that the draft is unfinished. Most entries are in the appendices
@@ -22,7 +22,7 @@ terms and normalizations recomputed. None of the entries is about the trace form
 | # | Where | What the paper says | Why it fails | In the Lean | Found in | Checked |
 |---|---|---|---|---|---|---|
 | F1 | Lemma A.1.1.2(5), p. 540 | For any partition I = J₁ ⊔ J₂ with J₁ finite, the box ∏_{J₁} Uᵢ × ∏_{J₂} Kⱼ with Uᵢ open is open in the restricted product. | An index with Kᵢ = 1 and Gᵢ not discrete may lie in J₂. With the single group ℝ, K = {0} and J₁ empty, the box is {0}, which is not open. | `restrictedProduct_topology` assumes Kᵢ is open for every i outside J₁ (true when J₁ contains all the exceptional indices). | #40 | integrator |
-| F2 | Lemma A.1.5.1, last sentence, p. 543 | "In particular, 𝔸_{F,S}/O_{F,S} is naturally a ℚ-vector space." | For F = ℚ and S = {∞} the group is ℝ/ℤ, which has torsion: the class of 1/2 has order two. | `sAdele_additive_quotient` keeps parts (1)–(3) and omits this consequence. | #40 | integrator |
+| F2 | Lemma A.1.5.1, last sentence, p. 543 | "In particular, 𝔸_{F,S}/O_{F,S} is naturally a ℚ-vector space." | For F = ℚ and S = {∞} the group is ℝ/ℤ, which has torsion: the class of 1/2 has order two. | `sAdele_additive_quotient` keeps parts (1)–(3) and omits this consequence. The printed sentence is kept as `Printed.sAdeleQuotient_isRatVectorSpace`; its refutation, `Printed.sAdeleQuotient_isRatVectorSpace_false`, is open as a proof issue. | #40 | integrator |
 | F3 | Remark after Theorem C.1.5.11, p. 668 | Each Fréchet stage "is assumed merely to be Schwartz (which implies nuclearity by Example C.1.5.10)". | The direction is reversed: Example C.1.5.10 shows that nuclear spaces are Schwartz, and Schwartz spaces need not be nuclear. | `limitSubspaceTopology_eq_iff_liftsBoundedSets` is stated for Schwartz stages, the more general form. | #41 | integrator |
 | F4 | Definition A.2.1.1 with Lemma A.2.1.2, p. 545 | The archimedean part of the fundamental domain is {x = Σ_{1≤i≤r₁+r₂} xᵢaᵢ : \|xᵢ\|_{vᵢ} ∈ [0,1)}, and its translates by nonzero field elements are disjoint from it. | The sum runs over r₁+r₂ of the [F:ℚ] basis vectors, and bounding absolute values gives a symmetric set. For F = ℚ the printed set is (−1,1), which meets its translate by 1. Example A.2.1.3 and the proof of Lemma A.2.4.2 (p. 554) use [0,1)^{[F:ℚ]}. | `infiniteAdeleFundamentalDomain` is the half-open parallelepiped of the whole integral basis. | #113 | integrator |
 | F5 | End of §C.2.2.2, p. 674 | "The condition under which the strong-dual topology β(E′,E) agrees with the Mackey topology τ(E′,E) is barreledness of E." | The roles of E and E′ are swapped: barrelledness of E says that E itself carries the strong topology β(E,E′). On the dual, β(E′,E) = τ(E′,E) characterizes semi-reflexive spaces. The Banach space c₀ is barrelled, yet the dual of (ℓ¹, β) is ℓ^∞ while the dual of (ℓ¹, τ(ℓ¹,c₀)) is c₀. | Not stated; `strongDualityTopology_le_mackeyTopology` gives the comparison that does hold. | #147 | integrator |
@@ -267,3 +267,20 @@ Digesters and provers mark a problem where they meet it with a comment `-- TODO(
 in the Lean file and describe it in their report. When the pull request is merged, the integrator
 reads the passage and adds an entry here. `grep -rn "TODO(paper-gap)" RiemannMasullo` lists every
 mark in the code.
+
+Contributors report what they find on the issue: a counterexample, a mismatch between the Lean
+and the print, or a step of a printed proof that fails. The integrator checks each report against
+the page and decides what becomes of the statement ([`AGENTS.md`](AGENTS.md), "False statements
+and gaps").
+
+A statement that is false as printed is also kept in Lean, in the section's `_Printed.lean`
+file: the printed claim as a proposition `Printed.<name>`, and a theorem `Printed.<name>_false`
+that proves its negation. Where that proof is finished, the entry's **Checked** column says
+*Lean* and names the theorem: such an entry rests on the proof checker, not on a reading. F2 is
+the first to have its proposition stated
+(`RiemannMasullo/AppA_AlgebraicNT/Sec1_Printed.lean`); the entries before this rule was made
+are being brought into this form.
+
+A statement that can be neither proved nor refuted is recorded as a gap: a named theorem left
+unproved, with a `Gap:` line in its docstring and an issue labelled `gap`. Gaps are listed under
+"Placeholders and missing material".

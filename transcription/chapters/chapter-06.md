@@ -34,13 +34,25 @@ We provide a description of the transition operators $\bar\pi_{S,S'}$ and $\bar\
 
 PROPOSITION 6.1.1.1. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. Assume $\mathrm{Pic}(\mathcal O_{F,S})=1$.*
 
-*Upon choosing a $\mathbf Z$-basis $\Xi_{S,S'}:=\{\xi_1,\dots,\xi_{\lvert S'\rvert-\lvert S\rvert}\}$ for $\mathcal O_{F,S'}^\times/\mathcal O_{F,S}^\times$, and upon denoting by $\theta_\xi:\mathcal S(\mathbf A_{F,S'})\to\mathcal S(\mathbf A_{F,S'})$ the continuous linear operator $f\mapsto\rho_{F,S}(\xi,f)=f(\xi^{-1}\cdot)$, we have, as elements of $\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))$ that the following identity holds:*
+*Upon choosing a $\mathbf Z$-basis $\Xi_{S,S'}:=\{\xi_1,\dots,\xi_{\lvert S'\rvert-\lvert S\rvert}\}$ for $\mathcal O_{F,S'}^\times/\mathcal O_{F,S}^\times$, and upon denoting by $\theta_\xi:\mathcal S(\mathbf A_{F,S'})\to\mathcal S(\mathbf A_{F,S'})$ the continuous linear operator $f\mapsto\rho_{F,S}(\xi,f)=f(\xi^{-1}\cdot)$, we have, as elements of*
+
+$$
+\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))
+$$
+
+*that the following identity holds:*
 
 $$
 \bar\pi_{S,S'}=\prod_{\xi\in\Xi_{S,S'}}(1-\theta_\xi)^{-1}. \tag{6.1.1.1}
 $$
 
-*Upon choosing a $\mathbf Z$-basis $\Xi_S:=\{\xi_k,k\ge 1\}$ for $F^\times/\mathcal O_{F,S}^\times$, and upon denoting by $\theta_\xi:\mathcal S(\mathbf A_F)\to\mathcal S(\mathbf A_F)$ the continuous linear operator $f\mapsto\rho_F(\xi,f)=f(\xi^{-1}\cdot)$, we have, as elements of $\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S(\mathbf A_F)))$ that the following identity holds:*
+*Upon choosing a $\mathbf Z$-basis $\Xi_S:=\{\xi_k,k\ge 1\}$ for $F^\times/\mathcal O_{F,S}^\times$, and upon denoting by $\theta_\xi:\mathcal S(\mathbf A_F)\to\mathcal S(\mathbf A_F)$ the continuous linear operator $f\mapsto\rho_F(\xi,f)=f(\xi^{-1}\cdot)$, we have, as elements of*
+
+$$
+\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S(\mathbf A_F)))
+$$
+
+*that the following identity holds:*
 
 $$
 \bar\pi_S=\prod_{\xi\in\Xi_S}(1-\theta_\xi)^{-1} \tag{6.1.1.2}
@@ -54,7 +66,11 @@ $$
 
 **288** · **CHAPTER 6. LOCAL-GLOBAL STRUCTURES**
 
-PROOF. This is a consequence of the fact that every element $\xi$ in $\mathcal O_{F,S'}^\times/\mathcal O_{F,S}^\times$ acts non-trivially by left multiplication only through the submonoid $\mathcal O_{F,S'}\cap\xi^{\mathbf Z}$, since for any $f\in\mathcal S(\mathbf A_{F,S})$, we have $\pi_{S,S'}(f)=f\otimes 1_K$ with $K=\prod_{v\in S'-S}1_{\mathcal O_{F_v}}$ with $K=\prod_{v\in S'-S}\mathcal O_{F_v}\subset\widehat{\prod}_{v\in S'-S}(F_v,\mathcal O_{F_v})$. Injectivity of $\bar\pi_{S,S'}$ (see Theorem 5.2.3.1(1)) implies that $\bar\pi_{S,S'}=\sum_{m\ge 0}\theta_\xi^m$ and $(1-\theta_\xi)^{-1}$ are the same element in $\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))$.
+PROOF. This is a consequence of the fact that every element $\xi$ in $\mathcal O_{F,S'}^\times/\mathcal O_{F,S}^\times$ acts non-trivially by left multiplication only through the submonoid $\mathcal O_{F,S'}\cap\xi^{\mathbf Z}$, since for any $f\in\mathcal S(\mathbf A_{F,S})$, we have $\pi_{S,S'}(f)=f\otimes 1_K$ with $K=\prod_{v\in S'-S}1_{\mathcal O_{F_v}}$ with $K=\prod_{v\in S'-S}\mathcal O_{F_v}\subset\widehat{\prod}_{v\in S'-S}(F_v,\mathcal O_{F_v})$. Injectivity of $\bar\pi_{S,S'}$ (see Theorem 5.2.3.1(1)) implies that $\bar\pi_{S,S'}=\sum_{m\ge 0}\theta_\xi^m$ and $(1-\theta_\xi)^{-1}$ are the same element in
+
+$$
+\mathscr L_\beta(\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S}^\times,\mathcal S(\mathbf A_{F,S})),\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))).
+$$
 
 Similarly, every $\xi\in F^\times/\mathcal O_{F,S}^\times$ is such that acts on $\pi_S(\mathcal S(\mathbf A_{F,S}))$ by left multiplication through the submonoid $\mathcal O_F\cap\xi^{\mathbf Z}$. The convergence assertion is a consequence of Lemma 2.2.2.1. $\square$
 
@@ -150,7 +166,13 @@ By [Tre, Part I,Ch.13,Thm.13.1], $\mathbf C[z^{\pm 1}]\cdot 1_{\mathcal O_{F_v}}
 
 **290** · **CHAPTER 6. LOCAL-GLOBAL STRUCTURES**
 
-(2) : Since, by Corollary 2.1.4.2, the continuous linear operator $\mathcal S(\mathbf A_{F,S})\otimes_\pi\mathcal S(\prod_{v\in S'-S}F_v)\to\mathcal S(\mathbf A_{F,S'})$ is a linear topological isomorphism, and $\mathrm H^0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathcal S(\mathbf A_{F,S'}))$ is endowed with the subspace topology inherited from the Hausdorff locally convex topology on $\mathcal S(\mathbf A_{F,S'})$, in order to prove (2) it is enough to show that the following assertions hold:
+(2) : Since, by Corollary 2.1.4.2, the continuous linear operator
+
+$$
+\mathcal S(\mathbf A_{F,S})\otimes_\pi\mathcal S(\prod_{v\in S'-S}F_v)\to\mathcal S(\mathbf A_{F,S'})
+$$
+
+is a linear topological isomorphism, and $\mathrm H^0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathcal S(\mathbf A_{F,S'}))$ is endowed with the subspace topology inherited from the Hausdorff locally convex topology on $\mathcal S(\mathbf A_{F,S'})$, in order to prove (2) it is enough to show that the following assertions hold:
 
 (1) The linear operator
 
@@ -388,7 +410,19 @@ $$
 \mathrm H_0(\mathcal O_{F,S'}^\times,\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathcal S(\mathbf A_{F,S'})))\to\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_0(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))) \tag{6.1.2.22}
 $$
 
-Since $\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_0(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))\to\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))$ is surjective, since $\mathrm H_0(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))\to\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$ is and $\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\cdot)$ is right-exact on $\mathbf C[\widehat{\mathcal O}_{F,S'-S}^\times]$-modules, we deduce that the range of $\bar\pi_{S,S'}$ is the image of $\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))$ in $\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$ under the linear surjective operator $N_G$ from Lemma 4.3.3.1, with $G=\widehat{\mathcal O}_{F,S'-S}^\times$, and $E=\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$, which is complete by Theorem 5.2.1.1, hence quasi-complete, implying that the Lemma applies. Note that to see that the action of $\widehat{\mathcal O}_{F,S'-S}^\times$ on $\mathcal S(\mathbf A_{F,S'})$, and hence on $\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$, is uniformly continuous, it is enough to show that it is so on $\mathcal S(\prod_{v\in S'-S}F_v)$. Since $\mathcal S(\prod_{v\in S'-S}F_v)$ is the strict locally convex inductive limit of a countable sequence of increasingly nested finite dimensional subspaces, and every convergent Cauchy net in $\mathcal S(\prod_{v\in S'-S}F_v)$ is eventually bounded $^1$ (i.e. for $\{f_i\}_{i\in I}$ such Cauchy net, there exists $i_0\in I$ such that $\{f_i\}_{i\in I,i\ge i_0}$ is bounded. We may rename $I_0:=\{i\in I:i\ge i_0\}$ as $I$) by
+Since
+
+$$
+\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_0(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))\to\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))
+$$
+
+is surjective, since $\mathrm H_0(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))\to\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$ is and $\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\cdot)$ is right-exact on $\mathbf C[\widehat{\mathcal O}_{F,S'-S}^\times]$-modules, we deduce that the range of $\bar\pi_{S,S'}$ is the image of
+
+$$
+\mathrm H_0(\widehat{\mathcal O}_{F,S'-S}^\times,\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'})))
+$$
+
+in $\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$ under the linear surjective operator $N_G$ from Lemma 4.3.3.1, with $G=\widehat{\mathcal O}_{F,S'-S}^\times$, and $E=\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$, which is complete by Theorem 5.2.1.1, hence quasi-complete, implying that the Lemma applies. Note that to see that the action of $\widehat{\mathcal O}_{F,S'-S}^\times$ on $\mathcal S(\mathbf A_{F,S'})$, and hence on $\mathrm H_{0,\mathrm{cont}}(\mathcal O_{F,S'}^\times,\mathcal S(\mathbf A_{F,S'}))$, is uniformly continuous, it is enough to show that it is so on $\mathcal S(\prod_{v\in S'-S}F_v)$. Since $\mathcal S(\prod_{v\in S'-S}F_v)$ is the strict locally convex inductive limit of a countable sequence of increasingly nested finite dimensional subspaces, and every convergent Cauchy net in $\mathcal S(\prod_{v\in S'-S}F_v)$ is eventually bounded $^1$ (i.e. for $\{f_i\}_{i\in I}$ such Cauchy net, there exists $i_0\in I$ such that $\{f_i\}_{i\in I,i\ge i_0}$ is bounded. We may rename $I_0:=\{i\in I:i\ge i_0\}$ as $I$) by
 
 ---
 
@@ -1037,18 +1071,18 @@ $$
 
 and observe that by the $S$-local functional equation (see (3.3.1.2) of Theorem 3.3.1.1) and the global functional equation (see (3.2.2.2) of Theorem 3.2.2.1), $T_{S,\chi}\circ U_{S,\chi}$ is valued in the kernel of $R_{S,\chi}$.
 
-The operator $T_{S,\chi}$ is sequentially closed. Indeed, for $\{(\phi_m,\psi_m)\}_{m\ge 0}\subset A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$ a sequence such that $\{T_{S,\chi}(\phi_m,\psi_m)\}_{m\ge 0}\subset A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$ is a Cauchy sequence with limit $(\tilde{\phi},\tilde{\psi})\in A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$, the convergence of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)\phi_m(s)$ to $\tilde{\phi}(s)$ and of $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)\psi_m(s)$ to $\tilde{\psi}_m(s)$ is uniform over the vertical strips of bounded width within $\mathbf C_{>0}$, respectively within $\mathbf C_{<1}$, by the polynomial growth of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$ and $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)$ and their derivatives of any order, uniformly on the vertical strips of bounded width within $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$.
+The operator $T_{S,\chi}$ is sequentially closed. Indeed, for $\{(\phi_m,\psi_m)\}_{m\ge 0}\subset A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$ a sequence such that $\{T_{S,\chi}(\phi_m,\psi_m)\}_{m\ge 0}\subset A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$ is a Cauchy sequence with limit $(\widetilde{\phi},\widetilde{\psi})\in A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$, the convergence of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)\phi_m(s)$ to $\widetilde{\phi}(s)$ and of $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)\psi_m(s)$ to $\widetilde{\psi}_m(s)$ is uniform over the vertical strips of bounded width within $\mathbf C_{>0}$, respectively within $\mathbf C_{<1}$, by the polynomial growth of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$ and $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)$ and their derivatives of any order, uniformly on the vertical strips of bounded width within $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$.
 
-In particular, $\tilde{\phi}(s)$ is divisible by $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$ and $\tilde{\psi}(s)$ is divisible by $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)$ as meromorphic functions over $\mathbf C_{<1}$, i.e. there exist meromorphic functions $\tilde{\phi}_0$ and $\tilde{\psi}_0$ over $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$, holomorphic away from the zeros of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$, respectively $(s+it_0)^{\delta_\chi}L_S(\widetilde{\chi},1-s)$, such that $\tilde{\phi}(s) = (1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)\tilde{\phi}_0(s)$ over $\mathbf C_{>0}$, and $\tilde{\psi}(s) = (s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)\tilde{\psi}_0(s)$ over $\mathbf C_{<0}$.
+In particular, $\widetilde{\phi}(s)$ is divisible by $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$ and $\widetilde{\psi}(s)$ is divisible by $(s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)$ as meromorphic functions over $\mathbf C_{<1}$, i.e. there exist meromorphic functions $\widetilde{\phi}_0$ and $\widetilde{\psi}_0$ over $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$, holomorphic away from the zeros of $(1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)$, respectively $(s+it_0)^{\delta_\chi}L_S(\widetilde{\chi},1-s)$, such that $\widetilde{\phi}(s) = (1-s-it_0)^{\delta_\chi}L_{\Sigma_F-S}(\chi,s)\widetilde{\phi}_0(s)$ over $\mathbf C_{>0}$, and $\widetilde{\psi}(s) = (s+it_0)^{\delta_\chi}L_{\Sigma_F-S}(\overline{\chi},1-s)\widetilde{\psi}_0(s)$ over $\mathbf C_{<0}$.
 
-We now prove that in fact both $\tilde{\phi}_0(s)$ and $\tilde{\psi}_0(s)$ are holomorphic. To this end, we use the Asymptotic Residue Theorem (see Theorem B.3.2.1), and the polynomial growth of the reciprocal of $L_{\Sigma_F-S}(\chi,s)$ and its derivatives, on a sequence of horizontal segments with growing absolute ordinates, of a vertical strip of the form $\mathbf C_{[-\varepsilon,1+\varepsilon]}$ for any $0<\varepsilon<1$ (see Corollary B.6.1.8).
+We now prove that in fact both $\widetilde{\phi}_0(s)$ and $\widetilde{\psi}_0(s)$ are holomorphic. To this end, we use the Asymptotic Residue Theorem (see Theorem B.3.2.1), and the polynomial growth of the reciprocal of $L_{\Sigma_F-S}(\chi,s)$ and its derivatives, on a sequence of horizontal segments with growing absolute ordinates, of a vertical strip of the form $\mathbf C_{[-\varepsilon,1+\varepsilon]}$ for any $0<\varepsilon<1$ (see Corollary B.6.1.8).
 
-Since the growth of $L_{\Sigma_F-S}(\chi,s)$, respectively $L_{\Sigma_F-S}(\overline{\chi},1-s)$, together with their holomorphic derivatives of any order, is at most polynomial uniformly over the vertical strips of bounded width of $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$, then $\tilde{\phi}_0(s)$ and $\tilde{\psi}_0(s)$ are again elements of $A\mathcal S(\mathbf C_{>0})$, respectively $A\mathcal S(\mathbf C_{<1})$, as a consequence of the Asymptotic Residue Theorem (see Theorem B.3.2.1) and Lemma D.3.1.1.
+Since the growth of $L_{\Sigma_F-S}(\chi,s)$, respectively $L_{\Sigma_F-S}(\overline{\chi},1-s)$, together with their holomorphic derivatives of any order, is at most polynomial uniformly over the vertical strips of bounded width of $\mathbf C_{>0}$, respectively $\mathbf C_{<1}$, then $\widetilde{\phi}_0(s)$ and $\widetilde{\psi}_0(s)$ are again elements of $A\mathcal S(\mathbf C_{>0})$, respectively $A\mathcal S(\mathbf C_{<1})$, as a consequence of the Asymptotic Residue Theorem (see Theorem B.3.2.1) and Lemma D.3.1.1.
 
 We have shown that we have:
 
 $$
-\lim_{m\to +\infty}T_{S,\chi}(\phi_m,\psi_m) = T_{S,\chi}(\tilde{\phi}_0,\tilde{\psi}_0)
+\lim_{m\to +\infty}T_{S,\chi}(\phi_m,\psi_m) = T_{S,\chi}(\widetilde{\phi}_0,\widetilde{\psi}_0)
 $$
 
 in $A\mathcal S(\mathbf C_{>0})\times A\mathcal S(\mathbf C_{<1})$, which shows that the range of $T_{S,\chi}$ is sequentially closed.
@@ -1123,7 +1157,11 @@ $$
 \phi(s) = u(s)((s+it_0)(1-s-it_0))^{\delta_{\chi|_{C^1_F}}}L(s,\chi)
 $$
 
-which shows that indeed the range of $L$ is contained within $((s+it_0)(1-s-it_0))^{\delta_{\chi|_{C^1_F}}}L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C)$.
+which shows that indeed the range of $L$ is contained within
+
+$$
+((s+it_0)(1-s-it_0))^{\delta_{\chi|_{C^1_F}}}L(s,\chi)\,\mathscr{O}(\mathbf C)\cap A\mathcal S(\mathbf C).
+$$
 
 Conversely, let $\phi\in A\mathcal S(\mathbf C)$ be of the form:
 

@@ -359,7 +359,8 @@ def decide(check, supplied_base):
     already = {l.split(" ")[1] for l in base_dump.split("\n") if l.endswith(" SORRY")}
     sorry_defs = sorted({l.split(" ")[1] for l in head_dump.split("\n") if l.endswith(" SORRY")} - already)
     if sorry_defs:
-        failures.append("definitions contain `sorry`: " + names(sorry_defs))
+        failures.append("definitions contain `sorry`, or declarations have one in their statement: "
+                        + names(sorry_defs))
     if failures:
         raise Stop("fail", failures, log)
 

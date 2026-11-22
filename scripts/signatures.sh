@@ -9,10 +9,13 @@
 # a proof is fine, changing or removing what others build on is not. Exit status 1 if anything
 # changed.
 #
-#   scripts/signatures.sh --sorry-in-defs [file]        # lists definitions whose body has a sorry
+#   scripts/signatures.sh --sorry-in-defs [file]        # lists definitions whose body has a sorry,
+#                                                       # and declarations with one in the statement
 #
 # A definition must not contain `sorry`, even in a proof field: its body would change when the
-# proof is filled in, and everything stated with it would shift. Exit status 1 if there are any.
+# proof is filled in, and everything stated with it would shift. A statement must not contain
+# one either: it says nothing, and its hash moves with every edit to the file, because such a
+# `sorry` carries its source position. Exit status 1 if there are any.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 if [ "${1:-}" = --compare ]; then
@@ -27,7 +30,7 @@ fi
 if [ "${1:-}" = --sorry-in-defs ]; then
   if [ -n "${2:-}" ]; then bad=$(awk '$NF == "SORRY" { print $2 }' "$2")
   else bad=$("$0" | awk '$NF == "SORRY" { print $2 }'); fi
-  [ -z "$bad" ] || { echo "definitions containing sorry:"; echo "$bad" | sed 's/^/  /'; }
+  [ -z "$bad" ] || { echo "definitions containing sorry, or declarations with one in their statement:"; echo "$bad" | sed 's/^/  /'; }
   [ -z "$bad" ]
   exit
 fi

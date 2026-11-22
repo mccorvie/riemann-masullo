@@ -497,7 +497,8 @@ theorem volume_interior_torusQuotient_image [NeZero N] (U : Set (unitHalfOpenCub
 The interior of the torus image of a Jordan-measurable set has null frontier. -/
 theorem volume_frontier_interior_torusQuotient_image [NeZero N] (U : Set (unitHalfOpenCube N))
     (hU : volume (Subtype.val '' frontier U) = 0) :
-    volume (frontier (interior (torusQuotient N '' (Subtype.val '' U)))) = 0 := by sorry
+    volume (frontier (interior (torusQuotient N '' (Subtype.val '' U)))) = 0 :=
+  measure_mono_null frontier_interior_subset (volume_frontier_torusQuotient_image U hU)
 
 /-- Paper: Corollary B.5.2.4, p. 631.
 For a relatively open subset of the unit cube, the symmetric frequency of visits converges
@@ -571,7 +572,57 @@ theorem torusHittingTimes_tendsto_forward [NeZero N] (τ : Fin N → ℝ)
     μ (frontier V) = 0 →
       Tendsto (fun T : ℝ ↦
         volume.real (torusHittingTimes (fun t ↦ t • τ) (Icc 0 T) (Subtype.val '' U)) /
-          T) atTop (𝓝 (μ.real V)) := by sorry
+          T) atTop (𝓝 (μ.real V)) := by
+  intro V hfront
+  let q : (Fin N → ℝ) → UnitAddTorus (Fin N) := torusQuotient N
+  have hq : Continuous q := (torusQuotient N).continuous
+  have hV : MeasurableSet V := by
+    have hC : MeasurableSet (unitHalfOpenCube N) :=
+      MeasurableSet.univ_pi' fun _ ↦ measurableSet_Ico
+    have hinj : InjOn q (unitHalfOpenCube N) := by
+      intro x hx y hy hxy
+      funext i
+      exact AddCircle.injOn_coe_Ico (p := (1 : ℝ)) 0
+        (by simpa only [zero_add] using hx i) (by simpa only [zero_add] using hy i)
+        (congrFun hxy i)
+    have hCU : MeasurableSet (Subtype.val '' U) :=
+      (MeasurableEmbedding.subtype_coe hC).measurableSet_image.2 hU.measurableSet
+    exact (hCU.image_of_measurable_injOn hq.measurable
+      (hinj.mono (Subtype.coe_image_subset _ _))).preimage measurable_subtype_coe
+  let F : ℝ → torusFlowClosure τ := torusFlowInClosure τ
+  have hF : Continuous F := (torusFlow τ).continuous.subtype_mk _
+  let u : torusFlowClosure τ → ℂ := V.indicator (fun _ ↦ 1)
+  have hu : TorusRiemannIntegrable μ u := by
+    refine ⟨⟨1, fun x ↦ ?_⟩, ?_⟩
+    · by_cases hx : x ∈ V <;> simp [u, hx]
+    · have hn : ∀ᵐ x ∂μ, x ∉ frontier V := by
+        simpa only [ae_iff, not_not, Set.ofPred_mem_eq] using hfront
+      filter_upwards [hn] with x hx
+      exact continuousOn_const.continuousAt_indicator hx
+  have hlim : Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (F t))
+      atTop (𝓝 (∫ x, u x ∂μ)) :=
+    kroneckerWeyl_riemannIntegrable_forward τ μ u hu
+      ((measurable_const.indicator hV).comp hF.measurable).aestronglyMeasurable
+  have hmean : (∫ x, u x ∂μ) = (μ.real V : ℂ) := by
+    change (∫ x, V.indicator (fun _ ↦ (1 : ℂ)) x ∂μ) = _
+    rw [integral_indicator_const _ hV, Complex.real_smul, mul_one]
+  rw [hmean] at hlim
+  have hlimRe : Tendsto (fun T : ℝ ↦ (T⁻¹ • ∫ t in 0..T, u (F t)).re)
+      atTop (𝓝 (μ.real V)) := by
+    simpa only [Function.comp_def, Complex.ofReal_re] using
+      (Complex.continuous_re.continuousAt (x := (μ.real V : ℂ))).tendsto.comp hlim
+  let W : Set ℝ := F ⁻¹' V
+  have hW : MeasurableSet W := hV.preimage hF.measurable
+  have hIndicator : (fun t ↦ u (F t)) = W.indicator (fun _ ↦ (1 : ℂ)) :=
+    funext fun t ↦ (Set.indicator_comp_right F (s := V) (g := fun _ ↦ (1 : ℂ)) (x := t)).symm
+  refine hlimRe.congr' ?_
+  filter_upwards [eventually_ge_atTop (0 : ℝ)] with T hT
+  have hHits : torusHittingTimes (fun t ↦ t • τ) (Icc 0 T) (Subtype.val '' U) =
+      W ∩ Icc 0 T := inter_comm _ _
+  rw [intervalIntegral.integral_of_le hT, ← integral_Icc_eq_integral_Ioc,
+    hIndicator, integral_indicator_const _ hW, measureReal_restrict_apply hW, ← hHits]
+  rw [Complex.real_smul, Complex.real_smul, mul_one, ← Complex.ofReal_mul, Complex.ofReal_re,
+    div_eq_mul_inv, mul_comm]
 
 -- TODO(paper-gap): Remark B.5.2.5 does not state the discrete versions. The discrete orbit
 -- closure can be disconnected, so the continuous-time dimension claim cannot be reused verbatim.
@@ -753,6 +804,55 @@ theorem reciprocalPartialHeckeEulerProduct_singleton
   classical
   simp [reciprocalPartialHeckeEulerProduct, finiteHeckeEulerFactor, hv]
 
+/-- Every initial phase vector admits a shift in `(0, 1)` at which the finite Euler
+product has norm at least a common positive constant. -/
+private theorem exists_eulerPhase_shift {ι : Type*} [Fintype ι] (a : ι → ℂ)
+    (ω : ι → ℝ) (hω : ∀ i, ω i ≠ 0) :
+    ∃ c : ℝ, 0 < c ∧ ∀ x : ι → Circle, ∃ t ∈ Ioo (0 : ℝ) 1,
+      c ≤ ‖∏ i, (1 - a i * (x i : ℂ) * (Circle.exp (t * ω i) : ℂ))‖ := by
+  classical
+  let P (t : ℝ) (x : ι → Circle) := ∏ i, (1 - a i * (x i : ℂ) * (Circle.exp (t * ω i) : ℂ))
+  have hP (t : ℝ) : Continuous (P t) := by
+    dsimp [P]
+    fun_prop
+  -- A factor that vanishes at zero becomes nonzero for all sufficiently small positive shifts.
+  have hfactor (i : ι) (z : ℂ) : ∀ᶠ t in 𝓝[>] (0 : ℝ),
+      1 - z * (Circle.exp (t * ω i) : ℂ) ≠ 0 := by
+    by_cases hz : z = 1
+    · subst z
+      have ht : Tendsto (fun t : ℝ ↦ t * ω i) (𝓝[>] 0) (𝓝 0) := by
+        simpa using ((continuous_id.mul_const (ω i)).tendsto (0 : ℝ)).mono_left nhdsWithin_le_nhds
+      obtain ⟨U, hU, h0, hinj⟩ := isLocalHomeomorph_circleExp.isLocallyInjective 0
+      filter_upwards [ht (hU.mem_nhds h0), self_mem_nhdsWithin] with t hsmall hpos
+      intro h
+      have he : Circle.exp (t * ω i) = Circle.exp 0 := by
+        apply Subtype.ext
+        simpa using (sub_eq_zero.mp h).symm
+      exact (mul_ne_zero (ne_of_gt hpos) (hω i)) (hinj hsmall h0 he)
+    · have h : Continuous (fun t : ℝ ↦ 1 - z * (Circle.exp (t * ω i) : ℂ)) := by fun_prop
+      exact ((h.tendsto 0).mono_left nhdsWithin_le_nhds).eventually_ne
+        (by simpa using sub_ne_zero.mpr (Ne.symm hz))
+  have hshift (x : ι → Circle) : ∃ t ∈ Ioo (0 : ℝ) 1, 0 < ‖P t x‖ := by
+    have hI : ∀ᶠ t in 𝓝[>] (0 : ℝ), t ∈ Ioo (0 : ℝ) 1 := Ioo_mem_nhdsGT zero_lt_one
+    obtain ⟨t, ht, hf⟩ := (hI.and
+      (eventually_all.mpr fun i ↦ hfactor i (a i * x i))).exists
+    exact ⟨t, ht, norm_pos_iff.mpr (Finset.prod_ne_zero_iff.mpr fun i _ ↦ hf i)⟩
+  -- Keep half the value at each chosen shift, then take the minimum on a finite subcover.
+  choose t ht hpos using hshift
+  let d (x : ι → Circle) := ‖P (t x) x‖ / 2
+  let U (x : ι → Circle) := {y | d x < ‖P (t x) y‖}
+  have hU (x) : U x ∈ 𝓝 x :=
+    (isOpen_lt continuous_const (hP (t x)).norm).mem_nhds (half_lt_self (hpos x))
+  obtain ⟨s, hs⟩ := CompactSpace.elim_nhds_subcover U hU
+  have cover (y : ι → Circle) : ∃ x ∈ s, y ∈ U x := by
+    have : y ∈ ⋃ x ∈ s, U x := hs ▸ mem_univ y
+    simpa only [mem_iUnion, exists_prop] using this
+  obtain ⟨x, hx, _⟩ := cover 1
+  obtain ⟨z, _, hz⟩ := s.exists_min_image d ⟨x, hx⟩
+  refine ⟨d z, half_pos (hpos z), fun y ↦ ?_⟩
+  obtain ⟨x, hx, hy⟩ := cover y
+  exact ⟨t x, ht x, (hz x hx).trans (le_of_lt hy)⟩
+
 /-- Paper: Proposition B.5.3.2, p. 632. There is a nondecreasing sequence
 escaping to infinity on both tails on which the reciprocal product is bounded away from zero.
 Deviation: Uses the negative sign condition for strictly negative indices. The height at
@@ -763,7 +863,51 @@ theorem exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow
     ∃ (c : ℝ) (T : ℤ → ℝ), 0 < c ∧ Monotone T ∧
       (∀ k, 0 ≤ k → 0 ≤ T k) ∧ (∀ k, k < 0 → T k ≤ 0) ∧
       Tendsto (fun k ↦ |T k|) (comap (abs : ℤ → ℤ) atTop) atTop ∧
-      ∀ k, c ≤ ‖reciprocalPartialHeckeEulerProduct χ S ((T k : ℂ) * Complex.I)‖ := by sorry
+      ∀ k, c ≤ ‖reciprocalPartialHeckeEulerProduct χ S ((T k : ℂ) * Complex.I)‖ := by
+  classical
+  let a (v : S) := (ideleClassNormTwist χ 0).localValue v.val
+  let ω (v : S) := -Real.log (v.val.asIdeal.absNorm : ℝ)
+  let phase (r : ℝ) (v : S) := Circle.exp (r * ω v)
+  have hω (v : S) : ω v ≠ 0 :=
+    neg_ne_zero.mpr (Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val)).ne'
+  have hpow (r : ℝ) (v : S) :
+      (v.val.asIdeal.absNorm : ℂ) ^ (-((r : ℂ) * Complex.I)) = (phase r v : ℂ) := by
+    have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v.val)).ne'
+    change _ = Complex.exp (((r * ω v : ℝ) : ℂ) * Complex.I)
+    rw [Complex.cpow_def_of_ne_zero hq, ← Complex.natCast_log]
+    congr 1
+    dsimp [ω]
+    push_cast
+    ring
+  have hprod (r t : ℝ) : reciprocalPartialHeckeEulerProduct χ S (((r + t : ℝ) : ℂ) * Complex.I) =
+      ∏ v : S, (1 - a v * (phase r v : ℂ) * (Circle.exp (t * ω v) : ℂ)) := by
+    rw [reciprocalPartialHeckeEulerProduct, ← Finset.prod_coe_sort]
+    refine Finset.prod_congr rfl fun v _ ↦ ?_
+    rw [finiteHeckeEulerFactor, ite_eq_left (hχ v.val v.property), inv_inv, hpow]
+    simp only [phase, add_mul, Circle.exp_add, Circle.coe_mul, a, mul_assoc]
+  obtain ⟨c, hc, hshift⟩ := exists_eulerPhase_shift a ω hω
+  choose t ht hbound using fun k : ℤ ↦ hshift (phase k)
+  let T (k : ℤ) : ℝ := k + t k
+  have hI (k : ℤ) : T k ∈ Ioo (k : ℝ) ((k : ℝ) + 1) :=
+    ⟨lt_add_of_pos_right _ (ht k).1, add_lt_add_right (ht k).2 _⟩
+  refine ⟨c, T, hc, ?_, ?_, ?_, ?_, fun k ↦ ?_⟩
+  · apply monotone_int_of_le_succ
+    intro k
+    exact ((hI k).2.trans (by simpa only [Int.cast_add, Int.cast_one] using (hI (k + 1)).1)).le
+  · intro k hk
+    exact (show 0 ≤ (k : ℝ) by exact_mod_cast hk).trans (hI k).1.le
+  · intro k hk
+    have h : (k : ℝ) + 1 ≤ 0 := by exact_mod_cast (show k + 1 ≤ 0 by omega)
+    exact (hI k).2.le.trans h
+  · have hlim : Tendsto (fun k : ℤ ↦ ((|k| : ℤ) : ℝ)) (comap (abs : ℤ → ℤ) atTop) atTop :=
+      tendsto_intCast_atTop_atTop.comp tendsto_comap
+    refine tendsto_atTop_mono (fun k ↦ ?_) (tendsto_atTop_add_const_right _ (-1) hlim)
+    rw [Int.cast_abs]
+    have h := abs_sub_abs_le_abs_sub (k : ℝ) (T k)
+    rw [abs_of_nonpos (sub_nonpos.mpr (hI k).1.le)] at h
+    linarith [(hI k).2]
+  · simpa only [T, hprod] using hbound k
 
 /-- Paper: Proposition B.5.3.3, p. 632.
 The nonnegative vertical shifts that uniformly approximate the reciprocal partial Euler

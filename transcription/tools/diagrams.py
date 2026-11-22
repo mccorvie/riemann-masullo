@@ -14,7 +14,7 @@ import pathlib, re, shutil, subprocess, sys, tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[1] / 'chapters'
 MARK = re.compile(r'^## PDF page (\d+)[ \t]*$', re.M)
 BLOCK = re.compile(r'```latex\n(.*?)```', re.S)
-PRE = ('\\documentclass{article}\n\\usepackage{amsmath,amssymb,mathrsfs,tikz-cd}\n'
+PRE = ('\\documentclass{article}\n\\usepackage{amsmath,amssymb,mathrsfs,tikz-cd}\n\\usetikzlibrary{decorations.markings}\n'
        '\\pagestyle{empty}\n\\begin{document}\n$$\n')
 POST = '\n$$\n\\end{document}\n'
 

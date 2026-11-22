@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
+import RiemannMasullo.ForMathlib.MeasureTheory.Measure.Count
 
 /-!
 # Periodic Schauder bases in the absence of multiplicity
@@ -171,7 +172,21 @@ include hSC hInt hne in
 /-- Paper: Equations (4.5.1.3) and (4.5.3.3), pp. 198, 208. Subtracting the
 translate by the inverse generator is linear and continuous on the decay space. -/
 theorem modulatedCyclicDifference_isLinearMap_continuous :
-    IsLinearMap ℂ diff ∧ Continuous diff := by sorry
+    IsLinearMap ℂ diff ∧ Continuous diff := by
+  have h := exists_modulatedExponentialDecay_translationAction (G := G) m I hm hms hInt hne
+  obtain ⟨ρ, hρ, -⟩ := h
+  let T : D →L[ℂ] D := ContinuousLinearMap.id ℂ D - ρ γ⁻¹
+  have hpt : ∀ f : D, diff f = T f := fun f ↦
+    congrArg (fun g : D ↦ f - g)
+      (@Subtype.ext _ _ (⟨fun x ↦ f.val ((γ⁻¹)⁻¹ * x),
+        modulatedExponentialDecaySubmodule_translate m I hm hms γ⁻¹ f⟩ :
+          modulatedExponentialDecaySubmodule m I) (ρ γ⁻¹ f)
+        (funext fun x ↦ (hρ γ⁻¹ f x).symm))
+  have hadd : ∀ x y : D, diff (x + y) = diff x + diff y := fun x y ↦
+    (hpt _).trans ((map_add T x y).trans (congrArg₂ (· + ·) (hpt x).symm (hpt y).symm))
+  have hsmul : ∀ (c : ℂ) (x : D), diff (c • x) = c • diff x := fun c x ↦
+    (hpt _).trans ((map_smul T c x).trans (congrArg (c • ·) (hpt x).symm))
+  exact ⟨⟨hadd, hsmul⟩, T.continuous.congr fun f ↦ (hpt f).symm⟩
 
 /-- Paper: Equations (4.5.1.3) and (4.5.3.3), pp. 198, 208. The cyclic
 difference sends a function to itself minus its translate by the inverse generator. -/
@@ -276,12 +291,64 @@ local notation "Ψ[" ω "]" => modulatedQuotientIsotypicProjector m γ hm hγ μ
 /-- Paper: Notation 4.5.1.1, p. 204. The normalized average fixes every
 function in the norm-one isotype. -/
 theorem modulatedQuotientIsotypicProjector_fix (ω : PontryaginDual K) (f : Sχ[ω]) :
-    Ψ[ω] f.val = f.val := by sorry
+    Ψ[ω] f.val = f.val := by
+  have : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  have : IsClosed (Γ : Set G) := modulatedCyclicSubgroup_closed m γ hγ
+  have hμ : (μ₁.real univ : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ₁)).ne'
+  have hf := (mem_actionIsotype _ ω f.val).mp f.property
+  -- Rewriting under `f.val` is very slow here, so the steps are explicit terms.
+  have hpt (u : K) (z : Q) : (ω u : ℂ) * f.val (qK u * z) = f.val z := by
+    have h : schwartzBruhatTranslationAction (G := Q) (qK u⁻¹) f.val z =
+        (ω u⁻¹ : ℂ) * f.val z :=
+      congrArg (fun g : S ↦ g z) (hf u⁻¹)
+    have e : (qK u⁻¹)⁻¹ * z = qK u * z := by rw [map_inv, inv_inv]
+    have h' : f.val (qK u * z) = (ω u⁻¹ : ℂ) * f.val z :=
+      (congrArg (fun x ↦ f.val x) e).symm.trans
+        ((schwartzBruhatTranslationAction_apply (G := Q) (qK u⁻¹) z f.val).symm.trans h)
+    have hω : (ω u : ℂ) * (ω u⁻¹ : ℂ) = 1 := by
+      rw [← Circle.coe_mul, ← map_mul, mul_inv_cancel, map_one, Circle.coe_one]
+    exact (congrArg (fun c ↦ (ω u : ℂ) * c) h').trans
+      ((mul_assoc _ _ _).symm.trans ((congrArg (· * f.val z) hω).trans (one_mul _)))
+  refine Subtype.ext (funext fun z ↦ ?_)
+  change (μ₁.real univ : ℂ)⁻¹ * ∫ u : K, (ω u : ℂ) * f.val (qK u * z) ∂μ₁ = f.val z
+  have hint : ∫ u : K, (ω u : ℂ) * f.val (qK u * z) ∂μ₁ = (μ₁.real univ : ℂ) * f.val z :=
+    (congrArg (fun g : K → ℂ ↦ ∫ u, g u ∂μ₁) (funext fun u ↦ hpt u z)).trans
+      ((integral_const _).trans (Complex.real_smul ..))
+  exact (congrArg (fun c ↦ (μ₁.real univ : ℂ)⁻¹ * c) hint).trans
+    ((mul_assoc _ _ _).symm.trans ((congrArg (· * f.val z) (inv_mul_cancel₀ hμ)).trans
+      (one_mul _)))
 
 /-- Paper: Notation 4.5.1.1 and Equation (4.5.1.9), p. 204. The projector
 has range exactly the norm-one isotype on the quotient. -/
 theorem modulatedQuotientIsotypicProjector_range (ω : PontryaginDual K) :
-    (Ψ[ω]).range = Sχ[ω] := by sorry
+    (Ψ[ω]).range = Sχ[ω] := by
+  have : IsClosed (Γ : Set G) := modulatedCyclicSubgroup_closed m γ hγ
+  refine le_antisymm ?_ fun f hf ↦ ⟨f, modulatedQuotientIsotypicProjector_fix m γ hm hγ μ₁ ω ⟨f, hf⟩⟩
+  rintro _ ⟨f, rfl⟩
+  refine (mem_actionIsotype _ ω _).mpr fun v ↦ Subtype.ext (funext fun z ↦ ?_)
+  change schwartzBruhatTranslationAction (G := Q) (qK v) (Ψ[ω] f) z = (ω v : ℂ) * Ψ[ω] f z
+  refine (schwartzBruhatTranslationAction_apply (G := Q) (qK v) z (Ψ[ω] f)).trans ?_
+  change (μ₁.real univ : ℂ)⁻¹ * ∫ u : K, (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) ∂μ₁ =
+    (ω v : ℂ) * ((μ₁.real univ : ℂ)⁻¹ * ∫ u : K, (ω u : ℂ) * f (qK u * z) ∂μ₁)
+  set g : K → ℂ := fun u ↦ (ω u : ℂ) * f (qK u * z) with hg
+  have hpt (u : K) : (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) = (ω v : ℂ) * g (u * v⁻¹) := by
+    have e : qK (u * v⁻¹) * z = qK u * ((qK v)⁻¹ * z) := by
+      rw [map_mul, map_inv, mul_assoc]
+    have hω : (ω (u * v⁻¹) : ℂ) = (ω u : ℂ) * (ω v : ℂ)⁻¹ := by
+      rw [map_mul, map_inv, Circle.coe_mul, Circle.coe_inv]
+    have hv : (ω v : ℂ) ≠ 0 := Circle.coe_ne_zero _
+    have h1 : g (u * v⁻¹) = (ω u : ℂ) * (ω v : ℂ)⁻¹ * f (qK u * ((qK v)⁻¹ * z)) :=
+      (congrArg (· * f (qK (u * v⁻¹) * z)) hω).trans (congrArg (fun x ↦ _ * f x) e)
+    rw [h1]
+    field_simp
+  have hint : ∫ u : K, (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) ∂μ₁ =
+      (ω v : ℂ) * ∫ u : K, g u ∂μ₁ :=
+    (congrArg (fun h : K → ℂ ↦ ∫ u, h u ∂μ₁) (funext hpt)).trans
+      ((integral_const_mul _ _).trans
+        (congrArg (fun c ↦ (ω v : ℂ) * c) (integral_mul_right_eq_self g v⁻¹)))
+  rw [hint]
+  ring
 
 /-- Paper: Notation 4.5.1.1, p. 204. The normalized quotient projector is idempotent. -/
 theorem modulatedQuotientIsotypicProjector_idempotent (ω : PontryaginDual K) :
@@ -425,11 +492,37 @@ def modulatedCompactSupportSubmodule : Submodule ℂ E :=
     ⨅ x : {x : G // m x ∉ B}, LinearMap.ker
       ((LinearMap.proj x.val).comp (modulatedExponentialDecaySubmodule m Set.univ).subtype)
 
+/-- An abstract form of `mem_modulatedCompactSupportSubmodule_iff`: in a function space with
+generating seminorms, membership in a submodule `Tf` that cuts out compact support, intersected
+with the kernels of evaluation off a closed set `Z`, means compact support with topological
+support in `Z`. Stated abstractly so that elaboration does not unfold the decay space. -/
+private theorem mem_comap_inf_iInf_ker_proj_iff {X : Type*} [TopologicalSpace X]
+    (Sf Tf : Submodule ℂ (X → ℂ)) {ι : Type*} (p : SeminormFamily ℂ Sf ι) (Z : Set X)
+    (hZ : IsClosed Z) (hT : ∀ g : Sf, g.val ∈ Tf ↔ HasCompactSupport g.val)
+    (f : WithGeneratingSeminorms Sf p) :
+    f ∈ (Tf.comap (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ)) ⊓
+        ⨅ x : {x : X // x ∉ Z}, LinearMap.ker
+          ((LinearMap.proj x.val).comp (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ))) :
+        Submodule ℂ (WithGeneratingSeminorms Sf p)) ↔
+      HasCompactSupport (f : Sf).val ∧ tsupport (f : Sf).val ⊆ Z := by
+  refine Submodule.mem_inf.trans (and_congr (hT f) (Submodule.mem_iInf _ |>.trans
+    ⟨fun h ↦ closure_minimal (fun x hx ↦ ?_) hZ, fun h x ↦ ?_⟩))
+  · by_contra hxZ
+    exact hx (LinearMap.mem_ker.mp (h ⟨x, hxZ⟩))
+  · exact LinearMap.mem_ker.mpr
+      (image_eq_zero_of_notMem_tsupport (f := (f : Sf).val) (x := x.val) fun hx ↦ x.2 (h hx))
+
+-- The section-variable linter scans the large elaborated decay types and takes minutes.
+set_option linter.unusedSectionVars false in
 /-- Paper: §4.5.2, p. 205. For a closed module window, membership in the
 fixed-support space is equivalent to the stated condition on topological support. -/
 theorem mem_modulatedCompactSupportSubmodule_iff (hB : IsClosed B) (f : E) :
     f ∈ modulatedCompactSupportSubmodule m B ↔
-      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B := by sorry
+      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B :=
+  mem_comap_inf_iInf_ker_proj_iff (modulatedExponentialDecaySubmodule m Set.univ)
+    (bruhatCompactSupportSubmodule G) _ (m ⁻¹' B) (hB.preimage m.continuous)
+    (fun g ↦ ⟨fun h ↦ h.2, fun h ↦
+      ⟨modulatedExponentialDecay_mem_bruhatSmooth m Set.univ Set.univ_nonempty g, h⟩⟩) f
 
 /-- Paper: §4.5.2, p. 205. The fixed-support k-stage imposes k-invariance
 on the supported decay space, with the topology inherited from the decay space. -/
@@ -441,7 +534,17 @@ whose values are unchanged by translation by elements of k. -/
 theorem mem_modulatedCompactSupportStage_iff (f : E) :
     f ∈ modulatedCompactSupportStage m B k ↔
       f ∈ modulatedCompactSupportSubmodule m B ∧
-        ∀ (x : G) (u : k), f.val (u.val * x) = f.val x := by sorry
+        ∀ (x : G) (u : k), f.val (u.val * x) = f.val x := by
+  have htwist (x : G) : twist₀ f x = f.val x :=
+    (modulatedExponentialDecayTwist_apply m Set.univ zeroUniv f x).trans
+      ((congrArg (fun r : ℝ ↦ (r : ℂ) * f.val x) (Real.rpow_zero _)).trans
+        ((congrArg (· * f.val x) Complex.ofReal_one).trans (one_mul _)))
+  change f ∈ modulatedCompactSupportSubmodule m B ∧
+    twist₀ f ∈ schwartzBruhatInvariantSubmodule k ↔ _
+  refine and_congr_right fun _ ↦
+    (mem_schwartzBruhatInvariantSubmodule_iff k (twist₀ f)).trans ?_
+  exact forall_congr' fun x ↦ forall_congr' fun u ↦ iff_of_eq (congrArg₂ Eq
+    ((htwist (x * u.val)).trans (congrArg f.val (mul_comm x u.val))) (htwist x))
 
 variable (hk : IsCompact (k : Set G))
 variable (hperp : IsCompactlyGeneratedGroup (lcaAnnihilator (k.comap m.toMonoidHom.ker.subtype)))
@@ -479,13 +582,83 @@ include hSC hm hms hγ ha hwidth in
 /-- Paper: Proposition 4.5.2.1(2), p. 205. A module window wider than one
 logarithmic period maps onto the cyclic quotient. -/
 theorem modulatedCompactSupport_quotient_image :
-    q '' (m ⁻¹' window) = (univ : Set Q) := by sorry
+    q '' (m ⁻¹' window) = (univ : Set Q) := by
+  have hpos (u : ℝ≥0ˣ) : 0 < ((u.val : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt u)
+  have hle (u v : ℝ≥0ˣ) : u ≤ v ↔ Real.log (u.val : ℝ) ≤ Real.log (v.val : ℝ) := by
+    rw [Real.log_le_log_iff (hpos u) (hpos v), NNReal.coe_le_coe, Units.val_le_val]
+  have hdiv : Real.log ((b / a).val : ℝ) = Real.log (b.val : ℝ) - Real.log (a.val : ℝ) := by
+    rw [Units.val_div_eq_div_val, NNReal.coe_div, Real.log_div (hpos b).ne' (hpos a).ne']
+  have hmul : Real.log ((b * a).val : ℝ) = Real.log (b.val : ℝ) + Real.log (a.val : ℝ) := by
+    rw [Units.val_mul, NNReal.coe_mul, Real.log_mul (hpos b).ne' (hpos a).ne']
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγ)
+  refine eq_univ_of_forall fun z ↦ ?_
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective z
+  have hx (n : ℤ) : Real.log ((m (γ ^ n * x)).val : ℝ) =
+      n * L + Real.log ((m x).val : ℝ) := by
+    rw [map_mul m, map_zpow m, Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul,
+      NNReal.coe_zpow, Real.log_mul (zpow_ne_zero _ (hpos (m γ)).ne') (hpos (m x)).ne',
+      Real.log_zpow]
+  generalize ht : (Real.log (b.val : ℝ) - Real.log (a.val : ℝ) -
+    Real.log ((m x).val : ℝ)) / L = t
+  have htL : t * L = Real.log (b.val : ℝ) - Real.log (a.val : ℝ) -
+      Real.log ((m x).val : ℝ) := by
+    rw [← ht, div_mul_cancel₀ _ hL.ne']
+  have h1 := mul_lt_mul_of_pos_right (Int.lt_floor_add_one t) hL
+  have h2 := mul_le_mul_of_nonneg_right (Int.floor_le t) hL.le
+  rw [add_one_mul] at h1
+  refine ⟨γ ^ (⌊t⌋ + 1) * x, ⟨?_, ?_⟩, ?_⟩
+  · rw [hle, hdiv, hx, Int.cast_add, Int.cast_one, add_one_mul]
+    linarith
+  · rw [hle, hmul, hx, Int.cast_add, Int.cast_one, add_one_mul]
+    linarith
+  · rw [QuotientGroup.mk'_apply, QuotientGroup.mk_mul,
+      (QuotientGroup.eq_one_iff _).mpr (Subgroup.zpow_mem_zpowers γ _), one_mul]
 
 include hγ hwidth in
 /-- Paper: Proposition 4.5.2.1(2), pp. 205–206. The interior of a strict-width
 window already meets every orbit. -/
 theorem modulatedCompactSupport_quotient_image_interior :
-    q '' (m ⁻¹' interior window) = (univ : Set Q) := by sorry
+    q '' (m ⁻¹' interior window) = (univ : Set Q) := by
+  let v : ℝ≥0ˣ → ℝ := fun t ↦ ((t.val : ℝ≥0) : ℝ)
+  have hv : Continuous v := NNReal.continuous_coe.comp Units.continuous_val
+  have hvpos (t : ℝ≥0ˣ) : 0 < v t := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hL : 0 < Real.log (v (m γ)) := Real.log_pos (by exact_mod_cast hγ)
+  -- The open window lies in the interior of the closed one.
+  have hsub : {t : ℝ≥0ˣ | v t ∈ Ioo (v (b / a)) (v (b * a))} ⊆ interior window := by
+    refine interior_maximal (fun t ht ↦ ⟨?_, ?_⟩) (isOpen_Ioo.preimage hv)
+    · exact Units.val_le_val.mp (NNReal.coe_le_coe.mp ht.1.le)
+    · exact Units.val_le_val.mp (NNReal.coe_le_coe.mp ht.2.le)
+  have hlo : Real.log (v (b / a)) = Real.log (v b) - Real.log (v a) := by
+    simp only [v, Units.val_div_eq_div_val, NNReal.coe_div]
+    exact Real.log_div (hvpos b).ne' (hvpos a).ne'
+  have hhi : Real.log (v (b * a)) = Real.log (v b) + Real.log (v a) := by
+    simp only [v, Units.val_mul, NNReal.coe_mul]
+    exact Real.log_mul (hvpos b).ne' (hvpos a).ne'
+  have hℓ (x : G) (n : ℤ) :
+      Real.log (v (m (x * γ ^ n))) = Real.log (v (m x)) + n * Real.log (v (m γ)) := by
+    simp only [v, map_mul, map_zpow, Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul,
+      NNReal.coe_zpow]
+    rw [Real.log_mul (hvpos (m x)).ne' (zpow_pos (hvpos (m γ)) n).ne', Real.log_zpow]
+  -- Every orbit meets the open window, since it is wider than one period.
+  refine eq_univ_of_forall fun z ↦ ?_
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective z
+  set lγ := Real.log (v (m γ))
+  set A₀ := Real.log (v b) - Real.log (v a)
+  let n : ℤ := ⌊(A₀ - Real.log (v (m x))) / lγ⌋ + 1
+  have hf := Int.floor_le ((A₀ - Real.log (v (m x))) / lγ)
+  have hf' := Int.lt_floor_add_one ((A₀ - Real.log (v (m x))) / lγ)
+  rw [le_div_iff₀ hL] at hf
+  rw [div_lt_iff₀ hL] at hf'
+  have hn : (n : ℝ) = ⌊(A₀ - Real.log (v (m x))) / lγ⌋ + 1 := by push_cast [n]; rfl
+  have hw : lγ < 2 * Real.log (v a) := hwidth
+  refine ⟨x * γ ^ n, hsub ?_, ?_⟩
+  · change v (m (x * γ ^ n)) ∈ Ioo (v (b / a)) (v (b * a))
+    constructor
+    · rw [← Real.log_lt_log_iff (hvpos _) (hvpos _), hlo, hℓ, hn]
+      nlinarith
+    · rw [← Real.log_lt_log_iff (hvpos _) (hvpos _), hhi, hℓ, hn]
+      nlinarith
+  · exact QuotientGroup.mk_mul_of_mem x (Subgroup.zpow_mem_zpowers γ n)
 
 include hk hperp ha hwidth in
 /-- Paper: Proposition 4.5.2.1(2) and Equation (4.5.2.1), p. 205. On a window
@@ -528,24 +701,28 @@ local notation "D[" B "]" => modulatedCompactSupportSubmodule m B
 -- with interior. Already G = ℝ_{>0}, χ = 1, B = [1, γ] misses the constant
 -- periodization, since a smooth function supported there vanishes at both endpoints.
 
-variable (hcover : q '' (m ⁻¹' interior B) = (univ : Set Q))
-
-include hB hcover in
+include hB in
 /-- Paper: Theorem 4.5.2.3 and Equation (4.5.2.2), p. 207. The supported
 homogeneous quotient is identified with the full quotient by inclusion.
 Deviation: The interior of the compact module window must cover the quotient.
 Every strict-width interval in part (2) satisfies this condition. -/
-theorem modulatedCompactSupport_isotypicQuotient_equiv (ω : PontryaginDual K) :
+theorem modulatedCompactSupport_isotypicQuotient_equiv
+    (hcover : (QuotientGroup.mk' (Subgroup.zpowers γ)) '' (m ⁻¹' interior B) =
+      (univ : Set (G ⧸ Subgroup.zpowers γ)))
+    (ω : PontryaginDual K) :
     let N := (Pχ[ω]).ker.comap (D[B]).subtype
     ∃ F : ((D[B]) ⧸ N) ≃L[ℂ] V[ω],
       ∀ f : D[B], F (N.mkQ f) = (Pχ[ω]).ker.mkQ f.val := by sorry
 
-include hk hperp hB hcover in
+include hk hperp hB in
 /-- Paper: Theorem 4.5.2.3 and Equation (4.5.2.2), p. 207. On a compact window
 whose interior covers the quotient, inclusion identifies the two quotients of
 k-invariant functions with their quotient topologies.
 Deviation: Uses the interior coverage condition on the window. -/
-theorem modulatedCompactSupportStage_isotypicQuotient_image (ω : PontryaginDual K) :
+theorem modulatedCompactSupportStage_isotypicQuotient_image
+    (hcover : (QuotientGroup.mk' (Subgroup.zpowers γ)) '' (m ⁻¹' interior B) =
+      (univ : Set (G ⧸ Subgroup.zpowers γ)))
+    (ω : PontryaginDual K) :
     let J : Submodule ℂ E := (schwartzBruhatInvariantSubmodule k).comap twist₀
     let W₀ := modulatedCompactSupportStage m B k
     let i : W₀ →ₗ[ℂ] J := Submodule.inclusion (inf_le_right : W₀ ≤ J)
@@ -602,7 +779,9 @@ include hγ in
 /-- Paper: Corollary 4.5.3.1 and Equation (4.5.3.2), p. 208. Counting
 measure on the discrete cyclic subgroup is regular Haar measure. -/
 theorem modulatedCyclic_countingMeasure :
-    (Measure.count : Measure Γ).IsHaarMeasure ∧ (Measure.count : Measure Γ).Regular := by sorry
+    (Measure.count : Measure Γ).IsHaarMeasure ∧ (Measure.count : Measure Γ).Regular := by
+  have : DiscreteTopology Γ := modulated_zpowers_discrete m γ hγ
+  exact ⟨count_isHaarMeasure_of_discreteTopology, count_regular_of_discreteTopology⟩
 
 local notation "cosetPeriodization" => (fun f : S₀ ↦
   letI := (modulatedCyclic_countingMeasure m γ hγ).1
