@@ -771,7 +771,9 @@ theorem mem_complexSchwartzFlatAtOrigin_iff (f : 𝓢(ℂ, ℂ)) :
 /-- Paper: Theorem 5.3.2.5(1), p. 246.
 The flat complex Schwartz subspace is closed. -/
 theorem complexSchwartzFlatAtOrigin_isClosed :
-    IsClosed (complexSchwartzFlatAtOrigin : Set 𝓢(ℂ, ℂ)) := by sorry
+    IsClosed (complexSchwartzFlatAtOrigin : Set 𝓢(ℂ, ℂ)) := by
+  simp only [complexSchwartzFlatAtOrigin, Submodule.coe_iInf]
+  exact isClosed_iInter fun k ↦ isClosed_iInter fun l ↦ (complexDiracDerivative k l).isClosed_ker
 
 /-- Paper: Theorem 5.3.2.5(1), p. 246.
 The quotient adjoint identifies the strong dual of the complex flat quotient with
