@@ -112,7 +112,30 @@ theorem existsUnique_indentationMeasureLift (ν₀ : Measure Q) [ν₀.Regular] 
 left translation by every subgroup element. -/
 theorem map_mul_indentationMeasureLift {ν₀ : Measure Q} [ν₀.Regular] {μ₀ : Measure G}
     (hμ₀ : IsIndentationMeasureLift H hH μH ν₀ μ₀) (h : H) :
-    μ₀.map (fun x : G ↦ (h : G) * x) = μ₀ := by sorry
+    μ₀.map (fun x : G ↦ (h : G) * x) = μ₀ := by
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  let L := Homeomorph.mulLeft (h : G)
+  let : μ₀.Regular := hμ₀.1
+  let : (μ₀.map L).Regular := Measure.Regular.map L
+  change μ₀.map L = μ₀
+  apply Measure.ext_of_integral_eq_on_compactlySupported
+  intro f
+  let F : C_c(G, ℂ) := ⟨⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩,
+    f.hasCompactSupport.comp_left Complex.ofReal_zero⟩
+  let Fh := F.comp L.toCocompactMap
+  have havg (q : Q) : indentationAverage H hH μH Fh q = indentationAverage H hH μH F q := by
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+    change e.pushforward μH Fh (π x) = e.pushforward μH F (π x)
+    rw [e.pushforward_apply_apply, e.pushforward_apply_apply]
+    change (∫ k : H, F ((h : G) * (x * (k : G))) ∂μH) = ∫ k : H, F (x * (k : G)) ∂μH
+    simpa only [Subgroup.coe_mul, mul_left_comm (h : G) x] using
+      (integral_mul_left_eq_self (μ := μH) (fun k : H ↦ F (x * (k : G))) h)
+  have hint := (hμ₀.2 Fh).symm.trans ((integral_congr_ae (ae_of_all ν₀ havg)).trans (hμ₀.2 F))
+  refine (integral_map (μ := μ₀) (f := fun x ↦ f x) L.continuous.measurable.aemeasurable
+    (map_continuous f).aestronglyMeasurable).trans ?_
+  apply Complex.ofReal_injective
+  simpa only [integral_complex_ofReal] using
+    (show (∫ x, (f (L x) : ℂ) ∂μ₀) = ∫ x, (f x : ℂ) ∂μ₀ from hint)
 
 /-- Paper: Corollary 12.2.1.2(2), p. 506. Fibre integration extends to a surjective
 continuous complex-linear map of L¹ spaces, agreeing with the original map on compact tests. -/
