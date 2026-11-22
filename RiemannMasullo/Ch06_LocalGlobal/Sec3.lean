@@ -5,6 +5,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
+public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # Local and global converse theorems
 
@@ -39,6 +40,37 @@ local notation "halfPlane" => Complex.re ⁻¹' Ioi (1 : ℝ)
 
 -- Equation (6.3.1.1) uses `ideleClassNormTwist` from §3.2.
 
+/-- At a place where a Hecke character is unramified, its value on a local unit is the value on
+a given uniformizer raised to the valuation exponent, and the norm is the same power of the
+norm of the uniformizer. -/
+private theorem unramifiedHeckeCharacter_existsUnique_phase_local (c : HeckeCharacter (𝓞 F) F) (v : HeightOneSpectrum (𝓞 F))
+    (hc : c.IsUnramifiedAt v) (π : (v.adicCompletion F)ˣ)
+    (hπ : Valued.v.IsUniformizer π.val) (x : (v.adicCompletion F)ˣ) :
+    ∃ n : ℤ, finitePlaceRestriction F v c x = finitePlaceRestriction F v c π ^ n ∧
+      ‖(x : v.adicCompletion F)‖ = ‖(π : v.adicCompletion F)‖ ^ n := by
+  have hval : Valued.v (π : v.adicCompletion F) = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (v.valuedAdicCompletion_surjective F)))
+  have hx0 : Valued.v (x : v.adicCompletion F) ≠ 0 := (Valuation.ne_zero_iff _).mpr x.ne_zero
+  set k := WithZero.log (Valued.v (x : v.adicCompletion F))
+  let y : (v.adicCompletion F)ˣ := x * π ^ k
+  have hv : Valued.v (y : v.adicCompletion F) = 1 := by
+    rw [Units.val_mul, Units.val_zpow_eq_zpow_val, map_mul, map_zpow₀, hval,
+      ← WithZero.exp_zsmul]
+    conv_lhs => rw [← WithZero.exp_log hx0]
+    rw [← WithZero.exp_add]
+    simp [k]
+  have hxy : x = y * π ^ (-k) := by simp [y]
+  have hy : finitePlaceRestriction F v c y = 1 := by
+    have := hc.restrict_apply_eq_one (y : v.adicCompletion F) hv
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at this
+    exact this
+  refine ⟨-k, ?_, ?_⟩
+  · rw [hxy, map_mul, map_zpow, hy, one_mul]
+  · have hn : ‖(y : v.adicCompletion F)‖ = 1 := by
+      rw [FinitePlace.norm_def, hv, map_one, NNReal.coe_one]
+    rw [hxy, Units.val_mul, norm_mul, hn, one_mul, Units.val_zpow_eq_zpow_val, norm_zpow]
+
 /-- Paper: Equations (6.3.1.2)–(6.3.1.3), p. 303.
 At an unramified place a uniformizer determines a unique local phase in the chosen
 half-open period. Every norm twist of the local character is then the indicated norm power.
@@ -52,7 +84,86 @@ theorem unramifiedHeckeCharacter_existsUnique_phase (χ : U) (v : V)
       ∀ (s : ℂ) (x : (v.adicCompletion F)ˣ),
         finitePlaceRestriction F v (ideleClassNormTwist χ s) x =
           ((‖x.val‖ : ℝ) : ℂ) ^ (s + (t : ℂ) * Complex.I) := by
-  sorry
+  set q : ℕ := Ideal.absNorm v.asIdeal with hqdef
+  have hq1 : 1 < (q : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq1).ne'
+  set ℓ := Real.log (q : ℝ) with hℓdef
+  have hℓ : 0 < ℓ := Real.log_pos hq1
+  have hP : 0 < 2 * Real.pi / ℓ := div_pos Real.two_pi_pos hℓ
+  set a := finitePlaceRestriction F v (ideleClassNormTwist χ 0) π with hadef
+  have htwist (s : ℂ) (x : (v.adicCompletion F)ˣ) :
+      finitePlaceRestriction F v (ideleClassNormTwist χ s) x =
+        (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) * ((‖x.val‖ : ℝ) : ℂ) ^ s := by
+    change (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) *
+      (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+    rw [ideleClassNorm_ofAdicCompletion]
+    rfl
+  have hχ0 (x : (v.adicCompletion F)ˣ) : finitePlaceRestriction F v (ideleClassNormTwist χ 0) x =
+      (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) := by
+    rw [htwist, Complex.cpow_zero, mul_one]
+  have ha1 : ‖a‖ = 1 := by rw [hadef, hχ0]; exact Circle.norm_coe _
+  have hlog : Complex.log (q : ℂ) = (ℓ : ℂ) := by rw [hℓdef, Complex.natCast_log]
+  have hcpow (t : ℝ) : (q : ℂ) ^ (-(t : ℂ) * Complex.I) =
+      Complex.exp (((-t * ℓ : ℝ) : ℂ) * Complex.I) := by
+    rw [Complex.cpow_def_of_ne_zero hq0, hlog]
+    congr 1
+    push_cast
+    ring
+  -- existence of the phase
+  set t₀ : ℝ := -Complex.arg a / ℓ
+  set t : ℝ := toIcoMod hP 0 t₀
+  have ht : t ∈ Ico 0 (2 * Real.pi / ℓ) := by simpa using toIcoMod_mem_Ico hP 0 t₀
+  have hta : a = (q : ℂ) ^ (-(t : ℂ) * Complex.I) := by
+    rw [hcpow]
+    have hm := toIcoMod_add_toIcoDiv_zsmul hP 0 t₀
+    set m := toIcoDiv hP 0 t₀
+    have : -t * ℓ = Complex.arg a + (m : ℝ) * (2 * Real.pi) := by
+      have h1 : t = t₀ - m * (2 * Real.pi / ℓ) := by rw [zsmul_eq_mul] at hm; linarith
+      rw [h1]
+      simp only [t₀]
+      field_simp
+      ring
+    rw [this]
+    push_cast
+    rw [add_mul, Complex.exp_add, show (m : ℂ) * (2 * Real.pi) * Complex.I =
+      m * (2 * Real.pi * Complex.I) by ring, Complex.exp_int_mul_two_pi_mul_I, mul_one]
+    conv_lhs => rw [← Complex.norm_mul_exp_arg_mul_I a, ha1]
+    simp
+  refine ⟨t, ⟨ht, hta, fun s x ↦ ?_⟩, ?_⟩
+  · obtain ⟨n, hn, hnorm⟩ := unramifiedHeckeCharacter_existsUnique_phase_local _ v hχ π _hπ x
+    rw [norm_uniformizer_adicCompletion v _ _hπ] at hnorm
+    rw [htwist, ← hχ0, hn]
+    have hr : (0 : ℝ) < ((q : ℝ)⁻¹) ^ n := zpow_pos (inv_pos.mpr (zero_lt_one.trans hq1)) n
+    rw [hnorm, Complex.cpow_add _ _ (by exact_mod_cast hr.ne'), mul_comm (_ ^ s)]
+    congr 1
+    rw [← hadef, hta, hcpow, ← Complex.exp_int_mul, ← hqdef, Complex.cpow_def_of_ne_zero (by exact_mod_cast hr.ne'),
+      ← Complex.ofReal_log hr.le, Real.log_zpow, Real.log_inv]
+    congr 1
+    push_cast
+    rw [hlog]
+    ring
+  · rintro t' ⟨ht', hta', -⟩
+    rw [hta, hcpow, hcpow, Complex.exp_eq_exp_iff_exists_int] at hta'
+    obtain ⟨n, hn⟩ := hta'
+    have h2 : (t' - t) * ℓ = n * (2 * Real.pi) := by
+      have := congrArg Complex.im hn
+      simp at this
+      linarith
+    have hd : t' - t = n * (2 * Real.pi / ℓ) := by field_simp; linarith
+    have hlt : (n : ℝ) * (2 * Real.pi / ℓ) < 1 * (2 * Real.pi / ℓ) := by
+      rw [← hd]; linarith [ht.1, ht'.2]
+    have hgt : (-1 : ℝ) * (2 * Real.pi / ℓ) < n * (2 * Real.pi / ℓ) := by
+      rw [← hd]; linarith [ht.2, ht'.1]
+    have h1 : (n : ℝ) < 1 := lt_of_mul_lt_mul_right hlt hP.le
+    have h3 : (-1 : ℝ) < n := lt_of_mul_lt_mul_right hgt hP.le
+    have : n = 0 := by
+      have : n < 1 := by exact_mod_cast h1
+      have : -1 < n := by exact_mod_cast h3
+      omega
+    subst this
+    simp at hd
+    linarith
+
 
 /-- Paper: Equation (6.3.1.4), p. 303.
 The reciprocal of the unramified Euler factor is the geometric denominator with
