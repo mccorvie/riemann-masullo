@@ -115,6 +115,15 @@ theorem sLocalNormOneCharacter_apply (ω : PontryaginDual C₁)
       (integralIdeleInsertion F S u))) :
     sLocalNormOneCharacter (F := F) S ω hω y = ω x := by sorry
 
+/-- Paper: Remark 5.2.3.3, p. 236.
+The descended character agrees on norm-one classes with the S-idelic restriction
+of any unramified extension from §3.1.2. -/
+theorem sLocalNormOneCharacter_eq_sIdeleRestriction
+    (ω : PontryaginDual C₁) (c : unramifiedOutside F S)
+    (hc : ∀ x : C₁, c.val x.val = (ω x : ℂ)) (y : J₁(S)) :
+    (sLocalNormOneCharacter (F := F) S ω ⟨c, hc⟩ y : ℂ) = sIdeleRestriction F S c y.val := by
+  sorry
+
 /-- Paper: Theorem 5.2.3.1, p. 233.
 Unramifiedness outside S implies unramifiedness outside every larger set of places. -/
 theorem NormOneCharacterUnramifiedOutside.mono {ω : PontryaginDual C₁}
@@ -161,19 +170,29 @@ theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
     IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by sorry
 
 /-- Paper: Theorem 5.2.3.1(1), p. 233.
-The homogeneous transition intertwines the S-idele class actions.
-Deviation: The equality is on test functions and integral-outside-S idele representatives. -/
+The S-idele quotient acts jointly continuously on each homogeneous theta quotient.
+Translation by a representative induces the action on its test-function class. -/
+theorem existsUnique_sLocalHomogeneousThetaAction (χ : PontryaginDual (J₁(S))) :
+    ∃! ρ : Jₛ(S) →* (Θₛω(S, χ) →L[ℂ] Θₛω(S, χ)),
+      Continuous (fun p : Jₛ(S) × Θₛω(S, χ) ↦ ρ p.1 p.2) ∧
+      ∀ (g : (SAdeleRing F S)ˣ) (f : ℬₛ(S)),
+        ρ (QuotientGroup.mk g) ((Kₛω(S, χ)).mkQ f) =
+          (Kₛω(S, χ)).mkQ (schwartzBruhatUnitTranslate g f) := by sorry
+
+/-- Paper: Theorem 5.2.3.1(1), p. 233.
+The homogeneous transition intertwines the descended actions on theta classes.
+Deviation: The acting class is represented by an idele integral and invertible outside S. -/
 theorem sLocalHomogeneousThetaTransition_equivariant
     (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T)
-    (u : (integralAdelesOutside F S)ˣ) (f : ℬₛ(S)) :
+    (u : (integralAdelesOutside F S)ˣ) (x : Θₛω(S, ωₛ(S, hω))) :
     let hT := NormOneCharacterUnramifiedOutside.mono (F := F) (ω := ω) hω hST
+    let ρS := (existsUnique_sLocalHomogeneousThetaAction (F := F) (S := S) (ωₛ(S, hω))).exists.choose
+    let ρT := (existsUnique_sLocalHomogeneousThetaAction (F := F) (S := T) (ωₛ(T, hT))).exists.choose
+    let π := sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST
     let g := integralIdeleInsertion F S u
     let gS := Units.map (adeleProjection F S).toMonoidHom g
     let gT := Units.map (adeleProjection F T).toMonoidHom g
-    sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST ((Kₛω(S, ωₛ(S, hω))).mkQ
-      (schwartzBruhatUnitTranslate gS f)) =
-    (Kₛω(T, ωₛ(T, hT))).mkQ
-      (schwartzBruhatUnitTranslate gT (sAdeleSchwartzTransition F hST f)) := by sorry
+    π (ρS (QuotientGroup.mk gS) x) = ρT (QuotientGroup.mk gT) (π x) := by sorry
 
 /-- Paper: Theorem 5.2.3.1(1), pp. 233–234.
 Insertion of test functions into the adeles preserves the homogeneous theta kernels. -/
@@ -212,15 +231,47 @@ theorem sLocalHomogeneousTheta_inductiveLimit (hω : NormOneCharacterUnramifiedO
     (inferInstance : TopologicalSpace Θ𝔽ω(ω)) = locallyConvexFinalTopology i := by sorry
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
-The global homogeneous theta space is an LF-space. Its Fréchet stages inherit nuclearity
-from the space by the nuclear subspace theorem. -/
-theorem globalHomogeneousThetaSpace_lf : IsLFSpace Θ𝔽ω(ω) := by sorry
+A Hausdorff space admits a countable locally convex inductive presentation whose
+stages, with their own topologies, are nuclear Fréchet spaces. -/
+def HasNuclearFrechetPresentation.{v,u} (E : Type u) [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] : Prop :=
+  T2Space E ∧ ∃ (X : ℕ → Type u) (_ : ∀ k, AddCommGroup (X k)) (_ : ∀ k, Module ℂ (X k))
+    (_ : ∀ k, TopologicalSpace (X k)), (∀ k, IsFrechetTVS (X k) ∧ IsNuclearTVS.{v} (X k)) ∧
+      ∃ (j : ∀ k, X k →L[ℂ] X (k+1)) (i : ∀ k, X k →L[ℂ] E), IsInjectiveLCLimit j i
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
-The S-local homogeneous theta space is an LF-space. Its Fréchet stages inherit nuclearity
-from the space by the nuclear subspace theorem. -/
+A countable nuclear Fréchet presentation gives an LF presentation. -/
+theorem HasNuclearFrechetPresentation.isLFSpace {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (h : HasNuclearFrechetPresentation E) : IsLFSpace E := by
+  obtain ⟨hE, X, a, m, t, hX, hlim⟩ := h
+  exact ⟨hE, X, a, m, t, fun k ↦ (hX k).1, hlim⟩
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The global homogeneous theta quotient is a locally convex inductive limit of nuclear
+Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
+theorem globalHomogeneousThetaSpace_nuclearFrechetPresentation :
+    HasNuclearFrechetPresentation Θ𝔽ω(ω) := by sorry
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The S-local homogeneous theta quotient is a locally convex inductive limit of nuclear
+Fréchet spaces. The test-function stages can be quotiented by the restricted kernel. -/
+theorem sLocalHomogeneousThetaSpace_nuclearFrechetPresentation (χ : PontryaginDual (J₁(S))) :
+    HasNuclearFrechetPresentation (Θₛω(S, χ)) := by sorry
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The global homogeneous theta space is an LF-space. -/
+theorem globalHomogeneousThetaSpace_lf : IsLFSpace Θ𝔽ω(ω) := by
+  have h : HasNuclearFrechetPresentation.{0} Θ𝔽ω(ω) :=
+    globalHomogeneousThetaSpace_nuclearFrechetPresentation
+  exact h.isLFSpace
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The S-local homogeneous theta space is an LF-space. -/
 theorem sLocalHomogeneousThetaSpace_lf (χ : PontryaginDual (J₁(S))) :
-    IsLFSpace (Θₛω(S, χ)) := by sorry
+    IsLFSpace (Θₛω(S, χ)) := by
+  have h : HasNuclearFrechetPresentation.{0} (Θₛω(S, χ)) :=
+    sLocalHomogeneousThetaSpace_nuclearFrechetPresentation χ
+  exact h.isLFSpace
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is complete for its additive uniformity. -/
