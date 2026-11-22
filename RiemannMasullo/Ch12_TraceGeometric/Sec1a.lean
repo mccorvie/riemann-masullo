@@ -87,7 +87,42 @@ theorem ae_diagonal_mem_dSequenceRegularSet :
 /-- Paper: Theorem 12.1.1.2(1), p. 499. The smoothened function represents the
 same Hilbert-Schmidt kernel in the weighted product measure. -/
 theorem dSequenceKernelSmoothening_ae_eq :
-    dSequenceKernelSmoothening μ U κ =ᵐ[ν.prod ν] (k : G × G → ℂ) := by sorry
+    dSequenceKernelSmoothening μ U κ =ᵐ[ν.prod ν] (k : G × G → ℂ) := by
+  let w (p : G × G) := f p.1 * f p.2
+  have hw : Continuous w := (hf.comp continuous_fst).mul (hf.comp continuous_snd)
+  have hwpos (p : G × G) : 0 < (w p : ℝ) := by
+    exact_mod_cast mul_pos (hf_pos p.1) (hf_pos p.2)
+  have hprod : ν.prod ν = (μ.prod μ).withDensity (fun p ↦ (w p : ℝ≥0∞)) := by
+    rw [hν]
+    have hm : Measurable (fun x ↦ (f x : ℝ≥0∞)) := (ENNReal.continuous_coe.comp hf).measurable
+    simpa only [w, ENNReal.coe_mul] using (prod_withDensity (μ := μ) (ν := μ) hm hm)
+  have hloc := ((Lp.memLp k).locallyIntegrable one_le_two).congr hκ.symm
+  have hweighted : LocallyIntegrable (fun p ↦ (w p : ℝ) • κ p) (μ.prod μ) := by
+    apply locallyIntegrable_iff.mpr
+    intro K hK
+    have hi := hloc.integrableOn_isCompact hK
+    rw [IntegrableOn, hprod, restrict_withDensity hK.measurableSet] at hi
+    exact (integrable_withDensity_iff_integrable_smul hw.measurable).mp hi
+  have hinv : Continuous (fun p ↦ (w p : ℝ)⁻¹) :=
+    (NNReal.continuous_coe.comp hw).inv₀ (fun p ↦ (hwpos p).ne')
+  have hhaar : LocallyIntegrable κ (μ.prod μ) := by
+    refine (hweighted.continuous_smul hinv).congr (Filter.Eventually.of_forall fun p ↦ ?_)
+    simp only [smul_smul, inv_mul_cancel₀ (hwpos p).ne', one_smul]
+  -- The product-sequence theorem uses the Borel measurable structure on the product.
+  have rectSeq [m : MeasurableSpace (G × G)] (hm : m = borel _)
+      (η : Measure (G × G)) [η.IsHaarMeasure]
+      (hrect : ∀ s t : Set G, MeasurableSet s → MeasurableSet t → η (s ×ˢ t) = μ s * μ t) :
+      IsDPrimeSequence η (fun n ↦ U n ×ˢ U n) := by
+    subst m
+    exact IsDPrimeSequence.prod hrect hU hU
+  have hseq : IsDPrimeSequence (μ.prod μ) (fun n ↦ U n ×ˢ U n) :=
+    rectSeq BorelSpace.measurable_eq _ (fun s t _ _ ↦ Measure.prod_prod s t)
+  have hac : ν.prod ν ≪ μ.prod μ := hprod ▸ withDensity_absolutelyContinuous _ _
+  refine Filter.EventuallyEq.trans ?_ hκ
+  filter_upwards [hac.ae_le (ae_tendsto_dSequenceAverage hseq hhaar)] with p hp
+  have hreg : p ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n) κ := ⟨κ p, hp⟩
+  simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hreg,
+    dSequenceSmoothening] using hp.limUnder_eq
 
 -- TODO(paper-gap): The proof on p. 500 uses projections onto individual eigenspaces
 -- as if they exhausted the operator. Cumulative spectral projections are needed.
