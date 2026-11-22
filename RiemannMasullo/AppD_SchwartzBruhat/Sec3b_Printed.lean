@@ -125,8 +125,8 @@ private theorem Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_
   have hg : (g * ·) = id := funext fun _ ↦ Subsingleton.elim _ _
   rw [hg, Measure.map_id]
 
-/-- The printed identity fails in each universe: lift the positive reals to it, with
-the zero test, the empty jump set and trivial characters. -/
+/-- The printed identity fails at every type level: lift the positive reals with `ULift`,
+and take the zero test, the empty jump set and trivial characters. -/
 private theorem Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_of
     (h : Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral.{u}) : False := by
   have : LocallyCompactSpace {x : ℝ // 0 < x} := isOpen_Ioi.locallyCompactSpace
