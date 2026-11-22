@@ -25,8 +25,8 @@ readings, not results of the formalization; the ones that have been checked are 
 ## Reference copies
 
 The launcher tells each agent where read-only copies of the following projects are, at the
-commits the reports cite. They use other Lean versions, so nothing can be imported; a proof can
-be ported with credit. All are Apache-2.0.
+commits the reports cite. Most use other Lean versions, so nothing can be imported; a proof can
+be ported with credit. All are Apache-2.0 except `grh`, which is MIT.
 
 | Project | Useful for |
 |---|---|
@@ -40,6 +40,7 @@ be ported with credit. All are Apache-2.0.
 | `gaussian-field` (mrdouglasny) | nuclear spaces, Hermite bases, periodization of Schwartz functions (Chapter 4) |
 | `carleson` (fpvandoorn) | maximal functions and covering arguments (Appendix A.5) |
 | `AINTLIB` (CBirkbeck) | analytic number theory library |
+| `grh` (thatnealpatel, MIT, commit `e55aab2`, same Lean and Mathlib as this project) | Neal Patel's own formalization of parts of the same paper. Mostly over ℚ, with newer all-field material on Hecke characters, finite Euler factors and archimedean factors: real and p-adic logarithmic Fourier terms, the finite Hecke Euler product and its logarithmic derivative on the right half-plane, archimedean Gamma contour terms, Gaussian test functions, the explicit formula for ζ, and rational witnesses for several counterexamples in `ERRATA.md`. The proof issues it bears on carry a note saying which of its files to read. |
 
 Larger projects the reports cite (Tau Ceti, AxiomMath/Stacks, anthropics/fermats-last-theorem,
 openai/math, physlib) are not copied locally; ask for one if a section needs it. The Alpöge RH

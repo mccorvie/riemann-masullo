@@ -4741,10 +4741,78 @@ theorem modulatedExponentialDecayStage_nuclear (I : Set ℝ) (hInt : OrdConnecte
   exact isNuclearTVS_of_linearEmbedding T hT
     (isNuclearTVS_pi fun _ : I ↦ schwartzBruhat_nuclear (G := Q))
 
+omit hm hms in
+/-- A first-countable Schwartz space is separable. For each continuous seminorm a
+totally bounded zero-neighborhood spans the space, so the space is separable for that
+seminorm, and countably many seminorm balls form a basis at zero. -/
+private theorem separableSpace_of_isSchwartzTVS_firstCountable {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [FirstCountableTopology E]
+    (hE : IsSchwartzTVS E) : SeparableSpace E := by
+  let _ : PolynormableSpace ℂ E := hE.1
+  have hsep (p : Seminorm ℂ E) (hp : Continuous p) : SeparableSpace (WithLocalSeminorm p) := by
+    obtain ⟨V, hV, htot⟩ := hE.2 p hp
+    let W : Set (WithLocalSeminorm p) := V
+    have hW : TotallyBounded W := htot
+    have hAbs : Absorbent ℂ W := by
+      change Absorbent ℂ V
+      exact absorbent_nhds_zero (𝕜 := ℂ) hV
+    have hspan : Submodule.span ℂ W = ⊤ :=
+      (hAbs.mono (Submodule.subset_span (R := ℂ))).submodule_eq_top
+    have hS := hW.isSeparable.span (R := ℂ)
+    rw [hspan, Submodule.top_coe] at hS
+    exact isSeparable_univ_iff.mp hS
+  obtain ⟨q, hq, hbasis⟩ :=
+    (PolynormableSpace.hasBasis_zero_ball ℂ E).exists_antitone_subbasis
+  have (n : ℕ) : SeparableSpace (WithLocalSeminorm (q n)) := hsep (q n) (hq n)
+  choose u hu using fun n ↦ exists_dense_seq (WithLocalSeminorm (q n))
+  refine ⟨⟨⋃ n, range (u n), countable_iUnion fun n ↦ countable_range _, fun x ↦ ?_⟩⟩
+  refine mem_closure_iff_nhds.mpr fun t ht ↦ ?_
+  rw [← map_add_left_nhds_zero x, Filter.mem_map] at ht
+  obtain ⟨n, -, hn⟩ := hbasis.toHasBasis.mem_iff.mp ht
+  let y : WithLocalSeminorm (q n) := x
+  obtain ⟨j, hj⟩ := (hu n).exists_mem_open (s := Metric.ball y 1) Metric.isOpen_ball
+    ⟨y, Metric.mem_ball_self one_pos⟩
+  let v : E := u n j
+  refine ⟨v, ?_, mem_iUnion.mpr ⟨n, mem_range_self j⟩⟩
+  have hmem : v - x ∈ (q n).ball 0 1 := by
+    rw [Seminorm.mem_ball_zero]
+    rw [Metric.mem_ball, dist_eq_norm] at hj
+    exact hj
+  simpa using hn hmem
+
+omit hm hms in
+/-- A decay stage is separable once the quotient is second countable, its
+Schwartz–Bruhat space is metrizable, and the stage embeds in a countable power of it. -/
+private theorem modulatedDecayStage_separable_of_embedding (I : Set ℝ) (k : GoodCompact)
+    (hQ : SecondCountableTopology (G ⧸ k.val))
+    (hM : MetrizableSpace (SchwartzBruhat (G ⧸ k.val)))
+    (hE : ∃ T : ModulatedExponentialDecayStage m I k →ₗ[ℂ] (ℕ ⊕ ℕ → SchwartzBruhat (G ⧸ k.val)),
+      IsClosedEmbedding T) :
+    SeparableSpace (ModulatedExponentialDecayStage m I k) := by
+  let Q := G ⧸ k.val
+  let _ : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let S := SchwartzBruhat Q
+  have : SecondCountableTopology Q := hQ
+  have : MetrizableSpace S := hM
+  have hN : IsNuclearTVS.{0} S := schwartzBruhat_nuclear
+  have : SeparableSpace S :=
+    separableSpace_of_isSchwartzTVS_firstCountable (isSchwartzTVS_of_isNuclearTVS hN)
+  have : SecondCountableTopology (univ : Set S) :=
+    (isSeparable_univ_iff.mpr ‹SeparableSpace S›).secondCountableTopology
+  have : SecondCountableTopology S :=
+    (Homeomorph.Set.univ S).symm.isEmbedding.secondCountableTopology
+  obtain ⟨T, hT⟩ := hE
+  have := hT.isEmbedding.secondCountableTopology
+  infer_instance
+
 /-- Paper: Example D.3.3.5, p. 805. For a nonempty interval, each stage is separable. -/
 theorem modulatedExponentialDecayStage_separable (I : Set ℝ) (hInt : OrdConnected I)
     (hne : I.Nonempty) (k : GoodCompact) :
-    SeparableSpace (ModulatedExponentialDecayStage m I k) := by sorry
+    SeparableSpace (ModulatedExponentialDecayStage m I k) :=
+  modulatedDecayStage_separable_of_embedding m I k
+    (modulatedDecayStage_quotient_secondCountable m hm k)
+    (modulatedDecayStage_schwartzBruhat_metrizable m hm hms k)
+    (modulatedDecayStage_countable_closedEmbedding m I hInt hne k)
 
 end ModulatedExamples
 

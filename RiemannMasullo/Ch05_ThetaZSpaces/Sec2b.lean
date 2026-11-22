@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 
 /-! # Homogeneous theta spaces and Fourier descent
 
@@ -300,12 +301,19 @@ theorem sLocalHomogeneousThetaSpace_complete (χ : PontryaginDual (J₁(S))) :
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is nuclear. -/
-theorem globalHomogeneousThetaSpace_nuclear : IsNuclearTVS Θ𝔽ω(ω) := by sorry
+theorem globalHomogeneousThetaSpace_nuclear : IsNuclearTVS Θ𝔽ω(ω) := by
+  have : IsClosed (K𝔽ω(ω) : Set ℬ𝔽) := homogeneousAdelicTheta_ker_isClosed ω
+  let : T2Space Θ𝔽ω(ω) := inferInstance
+  exact isNuclearTVS_quotient (adeleSchwartz_nuclear (F := F)).2 (K𝔽ω(ω))
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The S-local homogeneous quotient is nuclear. -/
 theorem sLocalHomogeneousThetaSpace_nuclear (χ : PontryaginDual (J₁(S))) :
-    IsNuclearTVS (Θₛω(S, χ)) := by sorry
+    IsNuclearTVS (Θₛω(S, χ)) := by
+  have : IsClosed (Kₛω(S, χ) : Set (SchwartzBruhat (Multiplicative (SAdeleRing F S)))) :=
+    sLocalHomogeneousAdelicTheta_ker_isClosed χ
+  let : T2Space (Θₛω(S, χ)) := inferInstance
+  exact isNuclearTVS_quotient (sAdeleSchwartz_nuclear F S) (Kₛω(S, χ))
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The global homogeneous quotient is Montel. -/
@@ -320,12 +328,18 @@ theorem sLocalHomogeneousThetaSpace_montel (χ : PontryaginDual (J₁(S))) :
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the global homogeneous quotient is complete. -/
 theorem globalHomogeneousThetaSpace_strongDual_complete :
-    CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
+    CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) := by
+  let : CompleteSpace (StrongDual ℂ (SchwartzBruhat (Multiplicative (𝔸[F])))) :=
+    (adeleSchwartz_strongDual_complete (F := F)).2
+  exact completeSpace_strongDual_quotient _
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is complete. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_complete (χ : PontryaginDual (J₁(S))) :
-    CompleteSpace (StrongDual ℂ (Θₛω(S, χ))) := by sorry
+    CompleteSpace (StrongDual ℂ (Θₛω(S, χ))) := by
+  let : CompleteSpace (StrongDual ℂ (SchwartzBruhat (Multiplicative (SAdeleRing F S)))) :=
+    sAdeleSchwartz_strongDual_complete F S
+  exact completeSpace_strongDual_quotient _
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the global homogeneous quotient is nuclear. -/
@@ -507,6 +521,53 @@ local notation "Vₛ(" S ")" => Submodule.span ℂ (Set.range (fun
 -- is in the global kernel. The bornological closure assertion on p. 238 needs a
 -- separate argument and the bornological quotient and module constructions.
 
+/-- For a closed submodule `K` and a submodule `V ≤ K`, the closure of `V` in the topology
+pulled back along the quotient map by `K` is `K`: the image of `V` is `{0}`, which is closed
+in the quotient, and its preimage is `K`. -/
+private theorem sLocalThetaKernel_eq_induced_closure_of_le {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (K V : Submodule ℂ E) (hK : IsClosed (K : Set E))
+    (hV : V ≤ K) :
+    @closure E (TopologicalSpace.induced K.mkQ inferInstance) (V : Set E) = (K : Set E) := by
+  have h0 : K.mkQ '' (V : Set E) = {0} := by
+    refine Set.eq_singleton_iff_unique_mem.mpr ⟨⟨0, V.zero_mem, map_zero _⟩, ?_⟩
+    rintro _ ⟨v, hv, rfl⟩
+    exact (Submodule.Quotient.mk_eq_zero K).mpr (hV hv)
+  have hc : IsClosed ({0} : Set (E ⧸ K)) := by
+    refine K.isQuotientMap_mkQ.isCoinducing.isClosed_preimage.mp ?_
+    convert hK using 1
+    ext f
+    exact Submodule.Quotient.mk_eq_zero K
+  ext f
+  rw [closure_induced, h0, hc.closure_eq, Set.mem_singleton_iff, Submodule.mkQ_apply,
+    Submodule.Quotient.mk_eq_zero, SetLike.mem_coe]
+
+/-- S-local theta of a translate is S-local theta evaluated at the inverse-translated idele. -/
+private theorem sLocalThetaKernel_eq_induced_closure_translate_apply
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (g x : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate g f) x =
+      sLocalAdelicTheta F S f (g⁻¹ * x) := by
+  let d := (Units.map ((adeleProjection F S).comp
+    (integralAdelesOutside F S).subtype).toMonoidHom).comp
+      (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  refine (sLocalAdelicTheta_apply F S (schwartzBruhatUnitTranslate g f) x).trans
+    (Eq.trans ?_ (sLocalAdelicTheta_apply F S f (g⁻¹ * x)).symm)
+  exact tsum_congr fun t ↦ congrArg (fun y ↦ f (Multiplicative.ofAdd y))
+    (mul_left_comm g.inv (d t).val x.val)
+
+/-- S-local theta is unchanged when a test function is translated by a diagonal S-unit,
+since S-local theta factors through the S-idele quotient. -/
+private theorem sLocalThetaKernel_eq_induced_closure_translate
+    (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (u : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate (R := SAdeleRing F S) (diagₛ(S) u) f) =
+      sLocalAdelicTheta F S f := by
+  refine ContinuousMap.ext fun x ↦
+    (sLocalThetaKernel_eq_induced_closure_translate_apply S _ x f).trans
+      (sLocalAdelicTheta_factorsThrough F S f ?_)
+  refine QuotientGroup.eq.mpr ?_
+  rw [mul_inv_rev, inv_inv, mul_comm _ x, mul_inv_cancel_left]
+  exact ⟨Units.map (integralAdeleDiagonal F S).toMonoidHom u, ⟨u, rfl⟩, Units.ext rfl⟩
+
 /-- Paper: Remark 5.2.3.4(1), p. 237.
 The S-local theta kernel is the closure of the span of S-unit translation differences
 for the topology pulled back from the theta quotient.
@@ -516,7 +577,33 @@ theorem sLocalThetaKernel_eq_induced_closure (S : Finset (HeightOneSpectrum (�
     let t : TopologicalSpace (ℬₛ(S)) := TopologicalSpace.induced q inferInstance
     let V := Vₛ(S)
     let K : Set (ℬₛ(S)) := (Kₛ(S) : Set (ℬₛ(S)))
-    @closure _ t V.carrier = K := by sorry
+    @closure _ t V.carrier = K := by
+  refine sLocalThetaKernel_eq_induced_closure_of_le (Kₛ(S)) _
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S)) (Submodule.span_le.mpr ?_)
+  rintro _ ⟨p, rfl⟩
+  exact LinearMap.sub_mem_ker_iff.mpr
+    (sLocalThetaKernel_eq_induced_closure_translate S p.1 p.2).symm
+
+/-- Global theta of a translate is global theta evaluated at the inverse-translated class. -/
+private theorem globalThetaKernel_eq_induced_closure_translate_apply (g : IdeleGroup (𝓞 F) F)
+    (f : ℬ𝔽) (a : C𝔽) :
+    adelicTheta (schwartzBruhatUnitTranslate g f) a =
+      adelicTheta f ((QuotientGroup.mk g)⁻¹ * a) := by
+  induction a using QuotientGroup.induction_on with | H x => ?_
+  change _ = adelicTheta f (QuotientGroup.mk (g⁻¹ * x))
+  rw [adelicTheta_mk (schwartzBruhatUnitTranslate g f) x, adelicTheta_mk f (g⁻¹ * x)]
+  exact tsum_congr fun t ↦ congrArg (fun y ↦ f (Multiplicative.ofAdd y))
+    (mul_left_comm g.inv (algebraMap F 𝔸[F] (t : F)) x.val)
+
+/-- Global theta is unchanged when a test function is translated by a principal idele,
+since principal ideles are trivial in the idele class group. -/
+private theorem globalThetaKernel_eq_induced_closure_translate (a : Fˣ) (f : ℬ𝔽) (c : C𝔽) :
+    adelicTheta (schwartzBruhatUnitTranslate (R := 𝔸[F]) (diag𝔽 a) f) c = adelicTheta f c := by
+  have h1 : (QuotientGroup.mk (diag𝔽 a) : C𝔽) = 1 := (QuotientGroup.eq_one_iff _).mpr ⟨a, rfl⟩
+  have h2 : (QuotientGroup.mk (diag𝔽 a) : C𝔽)⁻¹ * c = c := by
+    rw [h1, inv_one, one_mul]
+  exact (globalThetaKernel_eq_induced_closure_translate_apply (diag𝔽 a) f c).trans
+    (congrArg (adelicTheta f) h2)
 
 /-- Paper: Remark 5.2.3.4(2), p. 237.
 The global theta kernel is the closure of the span of principal translation differences
@@ -526,7 +613,72 @@ theorem globalThetaKernel_eq_induced_closure :
     let q : ℬ𝔽 → Θ𝔽 := (K𝔽).mkQ
     let t := TopologicalSpace.induced q inferInstance
     let V : Set ℬ𝔽 := (V𝔽).carrier
-    @closure _ t V = (K𝔽 : Set ℬ𝔽) := by sorry
+    @closure _ t V = (K𝔽 : Set ℬ𝔽) := by
+  refine sLocalThetaKernel_eq_induced_closure_of_le (K𝔽) _ (adelicTheta_ker_isClosed (F := F))
+    (Submodule.span_le.mpr ?_)
+  rintro _ ⟨p, rfl⟩
+  exact LinearMap.sub_mem_ker_iff.mpr ((adelicThetaLinearMap_apply (F := F) p.2).trans
+    ((ContinuousMap.ext fun c ↦
+      (globalThetaKernel_eq_induced_closure_translate p.1 p.2 c).symm).trans
+        (adelicThetaLinearMap_apply (F := F) _).symm))
+
+local notation "unitAtₛ(" S ")" =>
+  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
+    (Subring.subtype (integralAdelesOutside F S)))))
+    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+
+/-- A quotient by a smaller submodule maps onto the quotient by a larger one, compatibly
+with the quotient maps. -/
+private theorem exists_quotient_to_quotient_of_le {R M : Type*} [Ring R] [AddCommGroup M]
+    [Module R M] {V K : Submodule R M} (h : V ≤ K) :
+    ∃ q : (M ⧸ V) →ₗ[R] (M ⧸ K), Surjective q ∧ q.comp V.mkQ = K.mkQ :=
+  ⟨V.liftQ K.mkQ (by rwa [Submodule.ker_mkQ]),
+    fun y ↦ by obtain ⟨x, rfl⟩ := K.mkQ_surjective y; exact ⟨V.mkQ x, rfl⟩,
+    V.liftQ_mkQ _ _⟩
+
+/-- S-local theta is invariant under translation by a diagonal S-unit. -/
+private theorem sLocalAdelicTheta_translate_diag
+    (u : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ) (f : ℬₛ(S)) :
+    sLocalAdelicTheta F S (schwartzBruhatUnitTranslate (R := SAdeleRing F S) (diagₛ(S) u) f) =
+      sLocalAdelicTheta F S f := by
+  refine ContinuousMap.ext fun g ↦ ?_
+  change ∑' ξ : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ,
+      schwartzBruhatUnitTranslate (R := SAdeleRing F S) (diagₛ(S) u) f
+        (Multiplicative.ofAdd (Units.val (unitAtₛ(S) ξ * g))) =
+    ∑' ξ : ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)ˣ,
+      f (Multiplicative.ofAdd (Units.val (unitAtₛ(S) ξ * g)))
+  refine ((Equiv.mulLeft u).tsum_eq _).symm.trans (tsum_congr fun ξ ↦ ?_)
+  rw [Equiv.coe_mulLeft, schwartzBruhatUnitTranslate_apply]
+  refine congrArg (fun x : SAdeleRing F S ↦ f (Multiplicative.ofAdd x)) ?_
+  exact congrArg Units.val (show (diagₛ(S) u)⁻¹ * (unitAtₛ(S) (u * ξ) * g) =
+      unitAtₛ(S) ξ * g by
+    rw [map_mul, mul_assoc]; exact inv_mul_cancel_left (diagₛ(S) u) _)
+
+/-- The S-unit translation differences lie in the S-local theta kernel. -/
+private theorem sLocalSpan_le_ker : Vₛ(S) ≤ Kₛ(S) :=
+  Submodule.span_le.mpr (Set.range_subset_iff.mpr fun p ↦ LinearMap.mem_ker.mpr
+    (((sLocalAdelicTheta F S).map_sub _ _).trans
+      (sub_eq_zero.mpr (sLocalAdelicTheta_translate_diag p.1 p.2).symm)))
+
+/-- Global theta is invariant under translation by a principal idele. -/
+private theorem adelicThetaLinearMap_translate_diag (u : Fˣ) (f : ℬ𝔽) :
+    adelicThetaLinearMap F (schwartzBruhatUnitTranslate (R := 𝔸[F]) (diag𝔽 u) f) =
+      adelicThetaLinearMap F f := by
+  change adelicTheta (schwartzBruhatUnitTranslate (R := 𝔸[F]) (diag𝔽 u) f) = adelicTheta f
+  refine ContinuousMap.ext fun c ↦ ?_
+  induction c using QuotientGroup.induction_on with | H g => ?_
+  refine (adelicTheta_mk _ g).trans (Eq.trans ?_ (adelicTheta_mk f g).symm)
+  refine ((Equiv.mulLeft u).tsum_eq _).symm.trans (tsum_congr fun ξ ↦ ?_)
+  rw [Equiv.coe_mulLeft, schwartzBruhatUnitTranslate_apply]
+  refine congrArg (fun x : 𝔸[F] ↦ f (Multiplicative.ofAdd x)) ?_
+  exact congrArg Units.val (show (diag𝔽 u)⁻¹ * (diag𝔽 (u * ξ) * g) = diag𝔽 ξ * g by
+    rw [map_mul, mul_assoc, inv_mul_cancel_left])
+
+/-- The principal translation differences lie in the global theta kernel. -/
+private theorem globalSpan_le_ker : V𝔽 ≤ K𝔽 :=
+  Submodule.span_le.mpr (Set.range_subset_iff.mpr fun p ↦ LinearMap.mem_ker.mpr
+    (((adelicThetaLinearMap F).map_sub _ _).trans
+      (sub_eq_zero.mpr (adelicThetaLinearMap_translate_diag p.1 p.2).symm)))
 
 /-- Paper: Remark 5.2.3.4, p. 238.
 The algebraic S-unit coinvariants surject canonically onto the S-local theta quotient.
@@ -534,14 +686,19 @@ Deviation: The source is the quotient by the relation span. -/
 theorem exists_sLocalAlgebraicCoinvariants_to_theta (S : Finset (HeightOneSpectrum (𝓞 F))) :
     let V := Vₛ(S)
     ∃ q : (ℬₛ(S) ⧸ V) →ₗ[ℂ] Θₛ(S),
-      Surjective q ∧ q.comp V.mkQ = (Kₛ(S)).mkQ := by sorry
+      Surjective q ∧ q.comp V.mkQ = (Kₛ(S)).mkQ := by
+  intro V
+  exact exists_quotient_to_quotient_of_le (sLocalSpan_le_ker (S := S))
 
 /-- Paper: Remark 5.2.3.4, p. 238.
 The algebraic principal coinvariants surject canonically onto the global theta quotient.
 Deviation: The source is the quotient by the relation span. -/
 theorem exists_globalAlgebraicCoinvariants_to_theta :
     let V : Submodule ℂ ℬ𝔽 := V𝔽
-    ∃ q : (ℬ𝔽 ⧸ V) →ₗ[ℂ] Θ𝔽, Surjective q ∧ q.comp V.mkQ = (K𝔽).mkQ := by sorry
+    ∃ q : (ℬ𝔽 ⧸ V) →ₗ[ℂ] Θ𝔽, Surjective q ∧ q.comp V.mkQ = (K𝔽).mkQ := by
+  intro V
+  have h := globalSpan_le_ker (F := F)
+  exact exists_quotient_to_quotient_of_le h
 
 /-- Paper: Remark 5.2.3.4, pp. 237–238.
 The S-local theta quotient is bornological. Every seminorm bounded on all of its
@@ -551,12 +708,26 @@ theorem sLocalTheta_bornological :
       (∀ B : Set (Θₛ(S)), IsVonNBounded ℂ B → BddAbove (p '' B)) →
       Continuous p := by sorry
 
+private theorem bornological_quotient {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (K : Submodule ℂ E)
+    (hE : ∀ p : Seminorm ℂ E,
+      (∀ B : Set E, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p)
+    (p : Seminorm ℂ (E ⧸ K))
+    (hp : ∀ B : Set (E ⧸ K), IsVonNBounded ℂ B → BddAbove (p '' B)) :
+    Continuous p := by
+  apply K.isQuotientMap_mkQL.continuous_iff.mpr
+  refine hE (p.comp K.mkQ) ?_
+  intro B hB
+  change BddAbove ((fun x : E ↦ p (K.mkQL x)) '' B)
+  simpa only [Set.image_image] using hp (K.mkQL '' B) (hB.image K.mkQL)
+
 /-- Paper: Remark 5.2.3.4, pp. 237–238.
 The global theta quotient is bornological. Every seminorm bounded on all of its
 von Neumann bounded sets is continuous. -/
 theorem globalTheta_bornological :
     ∀ p : Seminorm ℂ Θ𝔽, (∀ B : Set Θ𝔽, IsVonNBounded ℂ B → BddAbove (p '' B)) →
-      Continuous p := by sorry
+      Continuous p :=
+  bornological_quotient (K𝔽) (adeleSchwartz_bornological (F := F))
 
 end TranslationRelations
 

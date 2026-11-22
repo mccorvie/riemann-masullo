@@ -5764,6 +5764,296 @@ local notation "archRegulatorMass(" F ")" =>
   ENNReal.ofReal ((2 : ℝ) ^ InfinitePlace.nrRealPlaces F *
     (2 * Real.pi) ^ InfinitePlace.nrComplexPlaces F * Units.regulator F)
 
+/-- The integral of `dt / t` over `(e^a, e^b]` is `b - a`. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_Ioc_exp {a b : ℝ} (hab : a ≤ b) :
+    ∫⁻ t in Ioc (Real.exp a) (Real.exp b), ENNReal.ofReal t⁻¹ = ENNReal.ofReal (b - a) := by
+  have hpos {t : ℝ} (ht : t ∈ Ioc (Real.exp a) (Real.exp b)) : 0 < t :=
+    (Real.exp_pos a).trans ht.1
+  have hint : IntegrableOn (fun t : ℝ ↦ t⁻¹) (Ioc (Real.exp a) (Real.exp b)) :=
+    (ContinuousOn.integrableOn_Icc (f := fun t : ℝ ↦ t⁻¹) (continuousOn_inv₀.mono
+      fun t ht ↦ ((Real.exp_pos a).trans_le ht.1).ne')).mono_set Ioc_subset_Icc_self
+  rw [← ofReal_integral_eq_lintegral_ofReal hint
+      ((ae_restrict_iff' measurableSet_Ioc).2 (Filter.Eventually.of_forall
+        fun _ ht ↦ inv_nonneg.mpr (hpos ht).le)),
+    ← intervalIntegral.integral_of_le (Real.exp_le_exp.mpr hab),
+    integral_inv_of_pos (Real.exp_pos a) (Real.exp_pos b), ← Real.exp_sub, Real.log_exp]
+
+/-- On the real line, `dt / |t|` gives the band `log |t| ∈ (a, b]` mass `2 (b - a)`. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_lintegral_real {a b : ℝ} (hab : a ≤ b) :
+    ∫⁻ t in {t : ℝ | t ≠ 0 ∧ Real.log ‖t‖ ∈ Ioc a b}, (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹ =
+      2 * ENNReal.ofReal (b - a) := by
+  set A := Ioc (Real.exp a) (Real.exp b)
+  have hS : {t : ℝ | t ≠ 0 ∧ Real.log ‖t‖ ∈ Ioc a b} = A ∪ Neg.neg ⁻¹' A := by
+    ext t
+    simp only [mem_ofPred_eq, mem_union, mem_preimage, A, mem_Ioc, Real.norm_eq_abs]
+    constructor
+    · rintro ⟨ht, h1, h2⟩
+      have h1' := Real.exp_lt_exp.mpr h1
+      have h2' := Real.exp_le_exp.mpr h2
+      rw [Real.exp_log (abs_pos.mpr ht)] at h1' h2'
+      rcases lt_or_gt_of_ne ht with h | h
+      · right; rw [abs_of_neg h] at h1' h2'; exact ⟨h1', h2'⟩
+      · left; rw [abs_of_pos h] at h1' h2'; exact ⟨h1', h2'⟩
+    · rintro (⟨h1, h2⟩ | ⟨h1, h2⟩)
+      · have ht : 0 < t := (Real.exp_pos a).trans h1
+        refine ⟨ht.ne', ?_, ?_⟩ <;> rw [abs_of_pos ht]
+        · exact (Real.lt_log_iff_exp_lt ht).mpr h1
+        · exact (Real.log_le_iff_le_exp ht).mpr h2
+      · have ht : 0 < -t := (Real.exp_pos a).trans h1
+        refine ⟨by linarith, ?_, ?_⟩ <;> rw [abs_of_neg (by linarith)]
+        · exact (Real.lt_log_iff_exp_lt ht).mpr h1
+        · exact (Real.log_le_iff_le_exp ht).mpr h2
+  have hdisj : Disjoint A (Neg.neg ⁻¹' A) := by
+    rw [Set.disjoint_left]
+    intro t ht ht'
+    have h1 : 0 < t := (Real.exp_pos a).trans ht.1
+    have h2 : 0 < -t := (Real.exp_pos a).trans ht'.1
+    linarith
+  have hf (t : ℝ) (ht : 0 < t) : (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹ = ENNReal.ofReal t⁻¹ := by
+    rw [pow_one, ← ENNReal.ofReal_coe_nnreal, coe_nnNorm, Real.norm_eq_abs, abs_of_pos ht,
+      ENNReal.ofReal_inv_of_pos ht]
+  have hA : ∫⁻ t in A, (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹ = ENNReal.ofReal (b - a) := by
+    rw [setLIntegral_congr_fun measurableSet_Ioc
+      (fun t ht ↦ hf t ((Real.exp_pos a).trans ht.1)), infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_Ioc_exp hab]
+  have hneg : ∫⁻ t in Neg.neg ⁻¹' A, (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹ =
+      ∫⁻ t in A, (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹ := by
+    have h := (Measure.measurePreserving_neg (volume : Measure ℝ)).setLIntegral_comp_preimage
+      (s := A) measurableSet_Ioc (f := fun t : ℝ ↦ (↑(‖t‖₊ ^ 1) : ℝ≥0∞)⁻¹) (by fun_prop)
+    simpa only [nnNorm_neg] using h
+  rw [hS, lintegral_union (measurableSet_Ioc.preimage measurable_neg) hdisj, hneg, hA, two_mul]
+
+/-- On the plane, `2 dA / |z|²` gives the band `2 log |z| ∈ (a, b]` mass `2π (b - a)`. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_lintegral_complex {a b : ℝ} (hab : a ≤ b) :
+    ∫⁻ z in {z : ℂ | z ≠ 0 ∧ 2 * Real.log ‖z‖ ∈ Ioc a b}, (↑(‖z‖₊ ^ 2) : ℝ≥0∞)⁻¹
+        ∂(2 • (volume : Measure ℂ)) =
+      ENNReal.ofReal (2 * Real.pi) * ENNReal.ofReal (b - a) := by
+  set S := {z : ℂ | z ≠ 0 ∧ 2 * Real.log ‖z‖ ∈ Ioc a b}
+  set A := Ioc (Real.exp (a / 2)) (Real.exp (b / 2))
+  have hSm : MeasurableSet S :=
+    show MeasurableSet ({(0 : ℂ)}ᶜ ∩ (fun z : ℂ ↦ 2 * Real.log ‖z‖) ⁻¹' Ioc a b) from
+      (measurableSet_singleton 0).compl.inter (measurableSet_Ioc.preimage
+        (measurable_const.mul (Real.measurable_log.comp measurable_norm)))
+  have hmemS (r θ : ℝ) (hr : 0 < r) : Complex.polarCoord.symm (r, θ) ∈ S ↔ r ∈ A := by
+    have hn : ‖Complex.polarCoord.symm (r, θ)‖ = r := by
+      rw [Complex.norm_polarCoord_symm, abs_of_pos hr]
+    have hz : Complex.polarCoord.symm (r, θ) ≠ 0 := by
+      rw [← norm_ne_zero_iff, hn]
+      exact hr.ne'
+    simp only [S, A, mem_ofPred_eq, mem_Ioc, hn]
+    constructor
+    · rintro ⟨-, h1, h2⟩
+      exact ⟨(Real.lt_log_iff_exp_lt hr).mp (by linarith), (Real.log_le_iff_le_exp hr).mp (by linarith)⟩
+    · rintro ⟨h1, h2⟩
+      have := (Real.lt_log_iff_exp_lt hr).mpr h1
+      have := (Real.log_le_iff_le_exp hr).mpr h2
+      exact ⟨hz, by linarith, by linarith⟩
+  rw [Measure.restrict_smul, lintegral_smul_measure, ← lintegral_indicator hSm,
+    ← Complex.lintegral_comp_polarCoord_symm]
+  have hcongr : ∀ p ∈ polarCoord.target, ENNReal.ofReal p.1 •
+      S.indicator (fun z : ℂ ↦ (↑(‖z‖₊ ^ 2) : ℝ≥0∞)⁻¹) (Complex.polarCoord.symm p) =
+      A.indicator (fun r ↦ ENNReal.ofReal r⁻¹) p.1 * (Ioo (-Real.pi) Real.pi).indicator 1 p.2 := by
+    rintro ⟨r, θ⟩ ⟨hr, hθ⟩
+    simp only [mem_Ioi] at hr
+    dsimp only
+    rw [indicator_of_mem (show θ ∈ Ioo (-Real.pi) Real.pi from hθ), Pi.one_apply, mul_one]
+    by_cases hA : r ∈ A
+    · rw [indicator_of_mem ((hmemS r θ hr).mpr hA), indicator_of_mem hA, smul_eq_mul]
+      have hn : ‖Complex.polarCoord.symm (r, θ)‖₊ = r.toNNReal := by
+        ext
+        simp only [coe_nnNorm, Complex.norm_polarCoord_symm, abs_of_pos hr,
+          Real.coe_toNNReal _ hr.le]
+      have hx : (((r.toNNReal ^ 2 : ℝ≥0) : ℝ≥0∞))⁻¹ = ENNReal.ofReal ((r ^ 2)⁻¹) := by
+        rw [ENNReal.ofReal_inv_of_pos (by positivity), ← ENNReal.ofReal_coe_nnreal]
+        congr 2
+        simp [hr.le]
+      rw [hn, hx, ← ENNReal.ofReal_mul hr.le]
+      congr 1
+      field_simp
+    · rw [indicator_of_notMem (fun h ↦ hA ((hmemS r θ hr).mp h)), indicator_of_notMem hA, smul_zero]
+  have htarget : MeasurableSet polarCoord.target := measurableSet_Ioi.prod measurableSet_Ioo
+  rw [setLIntegral_congr_fun htarget hcongr, show polarCoord.target =
+      Ioi (0 : ℝ) ×ˢ Ioo (-Real.pi) Real.pi from rfl, Measure.volume_eq_prod,
+    ← Measure.prod_restrict,
+    lintegral_prod_mul (f := A.indicator (fun r ↦ ENNReal.ofReal r⁻¹))
+      (g := (Ioo (-Real.pi) Real.pi).indicator 1)
+      ((Measurable.ennreal_ofReal measurable_inv).indicator measurableSet_Ioc).aemeasurable
+      (measurable_one.indicator measurableSet_Ioo).aemeasurable,
+    lintegral_indicator measurableSet_Ioc, Measure.restrict_restrict measurableSet_Ioc,
+    inter_eq_self_of_subset_left (fun r (hr : r ∈ A) ↦ mem_Ioi.mpr ((Real.exp_pos _).trans hr.1)),
+    infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_Ioc_exp (by linarith), lintegral_indicator_one measurableSet_Ioo,
+    Measure.restrict_apply_self, Real.volume_Ioo, nsmul_eq_mul, Nat.cast_ofNat,
+    show (2 : ℝ≥0∞) = ENNReal.ofReal 2 by simp,
+    ← ENNReal.ofReal_mul (by linarith), ← ENNReal.ofReal_mul zero_le_two,
+    ← ENNReal.ofReal_mul (by positivity)]
+  congr 1
+  ring
+
+/-- The regulator parallelotope has volume equal to the regulator. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_parallelotope :
+    volume (regulatorParallelotope F (Units.basisModTorsion F)) =
+      ENNReal.ofReal (Units.regulator F) := by
+  set B := ((Units.basisModTorsion F).map (Units.logEmbeddingEquiv F)).ofZLatticeBasis ℝ
+    (Units.unitLattice F)
+  have hspan : Submodule.span ℤ (Set.range B) = Units.unitLattice F :=
+    Module.Basis.ofZLatticeBasis_span ℝ (Units.unitLattice F) _
+  have hfd := ZSpan.isAddFundamentalDomain B (volume : Measure ({w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} → ℝ))
+  rw [hspan] at hfd
+  have hcov := ZLattice.covolume_eq_measure_fundamentalDomain (Units.unitLattice F) volume hfd
+  have hfin : volume (ZSpan.fundamentalDomain B) ≠ ⊤ :=
+    (ZSpan.fundamentalDomain_isBounded B).measure_lt_top.ne
+  change volume (ZSpan.fundamentalDomain B) = _
+  rw [Units.regulator, hcov, Measure.real, ENNReal.ofReal_toReal hfin]
+
+
+/-- At a real place, the band `log ‖x‖ ∈ (a, b]` has multiplicative mass `2 (b - a)`. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_real (w : InfinitePlace F) (h : w.IsReal) {a b : ℝ} (hab : a ≤ b) :
+    infiniteLocalMultiplicativeTamagawaMeasure F w
+      {x | (w.mult : ℝ) * Real.log ‖x.val‖ ∈ Ioc a b} = 2 * ENNReal.ofReal (b - a) := by
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let e := (isometryEquivRealOfIsReal h).toHomeomorph.toMeasurableEquiv
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).measurableEmbedding
+  have hnorm (t : ℝ) : ‖e.symm t‖ = ‖t‖ :=
+    (isometryEquivRealOfIsReal h).symm.isometry.norm_map_of_map_zero
+      (map_zero (ringEquivRealOfIsReal h).symm) t
+  set S : Set w.Completion := {x | x ≠ 0 ∧ (w.mult : ℝ) * Real.log ‖x‖ ∈ Ioc a b}
+  have hSm : MeasurableSet S :=
+    show MeasurableSet ({(0 : w.Completion)}ᶜ ∩ (fun x : w.Completion ↦ (w.mult : ℝ) * Real.log ‖x‖) ⁻¹' Ioc a b) from
+      (measurableSet_singleton 0).compl.inter (measurableSet_Ioc.preimage
+        (measurable_const.mul (Real.measurable_log.comp measurable_norm)))
+  have hsub : S ⊆ range (Units.val : w.Completionˣ → w.Completion) :=
+    fun x hx ↦ ⟨Units.mk0 x hx.1, rfl⟩
+  have hset : {x : w.Completionˣ | (w.mult : ℝ) * Real.log ‖x.val‖ ∈ Ioc a b} =
+      Units.val ⁻¹' S := by
+    ext x
+    simp [S]
+  rw [hset]
+  rw [infiniteLocalMultiplicativeTamagawaMeasure, hval.comap_preimage,
+    inter_eq_self_of_subset_left hsub, withDensity_apply _ hSm,
+    infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+  change (∫⁻ x in S, (↑(‖x‖₊ ^ w.mult) : ℝ≥0∞)⁻¹ ∂volume.map e.symm) = _
+  rw [e.symm.restrict_map, e.symm.measurableEmbedding.lintegral_map]
+  have hz (t : ℝ) : e.symm t ≠ 0 ↔ t ≠ 0 := by
+    rw [← norm_ne_zero_iff, hnorm, norm_ne_zero_iff]
+  have hpre : e.symm ⁻¹' S = {t : ℝ | t ≠ 0 ∧ Real.log ‖t‖ ∈ Ioc a b} := by
+    ext t
+    simp only [S, mem_preimage, mem_ofPred_eq, hnorm, h.mult_eq_one, Nat.cast_one, one_mul, hz]
+  have hnn (t : ℝ) : ‖e.symm t‖₊ = ‖t‖₊ := NNReal.eq (hnorm t)
+  rw [hpre]
+  simp only [hnn, h.mult_eq_one]
+  exact infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_lintegral_real hab
+
+/-- At a complex place, the band `2 log ‖x‖ ∈ (a, b]` has multiplicative mass `2π (b - a)`. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_complex (w : InfinitePlace F) (h : ¬ w.IsReal) {a b : ℝ} (hab : a ≤ b) :
+    infiniteLocalMultiplicativeTamagawaMeasure F w
+      {x | (w.mult : ℝ) * Real.log ‖x.val‖ ∈ Ioc a b} =
+        ENNReal.ofReal (2 * Real.pi) * ENNReal.ofReal (b - a) := by
+  have h' := InfinitePlace.not_isReal_iff_isComplex.mp h
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let e := (isometryEquivComplexOfIsComplex h').toHomeomorph.toMeasurableEquiv
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).measurableEmbedding
+  have hnorm (z : ℂ) : ‖e.symm z‖ = ‖z‖ :=
+    (isometryEquivComplexOfIsComplex h').symm.isometry.norm_map_of_map_zero
+      (map_zero (ringEquivComplexOfIsComplex h').symm) z
+  set S : Set w.Completion := {x | x ≠ 0 ∧ (w.mult : ℝ) * Real.log ‖x‖ ∈ Ioc a b}
+  have hSm : MeasurableSet S :=
+    show MeasurableSet ({(0 : w.Completion)}ᶜ ∩ (fun x : w.Completion ↦ (w.mult : ℝ) * Real.log ‖x‖) ⁻¹' Ioc a b) from
+      (measurableSet_singleton 0).compl.inter (measurableSet_Ioc.preimage
+        (measurable_const.mul (Real.measurable_log.comp measurable_norm)))
+  have hsub : S ⊆ range (Units.val : w.Completionˣ → w.Completion) :=
+    fun x hx ↦ ⟨Units.mk0 x hx.1, rfl⟩
+  have hset : {x : w.Completionˣ | (w.mult : ℝ) * Real.log ‖x.val‖ ∈ Ioc a b} =
+      Units.val ⁻¹' S := by
+    ext x
+    simp [S]
+  rw [hset]
+  rw [infiniteLocalMultiplicativeTamagawaMeasure, hval.comap_preimage,
+    inter_eq_self_of_subset_left hsub, withDensity_apply _ hSm,
+    infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
+  change (∫⁻ x in S, (↑(‖x‖₊ ^ w.mult) : ℝ≥0∞)⁻¹ ∂(2 • (volume : Measure ℂ)).map e.symm) = _
+  rw [e.symm.restrict_map, e.symm.measurableEmbedding.lintegral_map]
+  have hz (z : ℂ) : e.symm z ≠ 0 ↔ z ≠ 0 := by
+    rw [← norm_ne_zero_iff, hnorm, norm_ne_zero_iff]
+  have hpre : e.symm ⁻¹' S = {z : ℂ | z ≠ 0 ∧ 2 * Real.log ‖z‖ ∈ Ioc a b} := by
+    ext z
+    simp only [S, mem_preimage, mem_ofPred_eq, hnorm, h'.mult_eq_two, Nat.cast_ofNat, hz]
+  have hnn (z : ℂ) : ‖e.symm z‖₊ = ‖z‖₊ := NNReal.eq (hnorm z)
+  rw [hpre]
+  simp only [hnn, h'.mult_eq_two]
+  exact infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_lintegral_complex hab
+
+/-- The local multiplicative measure pushed forward by the normalized log norm is
+`2` or `2π` times Lebesgue measure. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_map (w : InfinitePlace F) :
+    (infiniteLocalMultiplicativeTamagawaMeasure F w).map
+      (fun x : w.Completionˣ ↦ (w.mult : ℝ) * Real.log ‖x.val‖) =
+        (if w.IsReal then (2 : ℝ≥0) else Real.toNNReal (2 * Real.pi)) • volume := by
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  have hmeas : Measurable (fun x : w.Completionˣ ↦ (w.mult : ℝ) * Real.log ‖x.val‖) :=
+    measurable_const.mul (Real.measurable_log.comp
+      (continuous_norm.comp Units.continuous_val).measurable)
+  symm
+  refine Measure.ext_of_Ioc' (α := ℝ) _ _ (fun a b _ ↦ ?_) (fun a b hab ↦ ?_)
+  · rw [smul_apply, Real.volume_Ioc, ENNReal.smul_def, smul_eq_mul]
+    exact ENNReal.mul_ne_top ENNReal.coe_ne_top ENNReal.ofReal_ne_top
+  · rw [Measure.map_apply hmeas measurableSet_Ioc, smul_apply, Real.volume_Ioc,
+      ENNReal.smul_def, smul_eq_mul]
+    split_ifs with h
+    · rw [ENNReal.coe_ofNat]
+      exact (infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_real F w h hab.le).symm
+    · exact (infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_complex F w h hab.le).symm
+
+/-- Splitting off the omitted place: the strip over a set of log coordinates has the
+volume of that set. -/
+private theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_volume (P : Set ({w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} → ℝ))
+    (hP : MeasurableSet P) :
+    volume {y : InfinitePlace F → ℝ | ∑ w, y w ∈ Icc 0 1 ∧
+      (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦ y w.val) ∈ P} =
+      volume P := by
+  let p : InfinitePlace F → Prop := (· ≠ Units.dirichletUnitTheorem.w₀)
+  have he := measurePreserving_piEquivPiSubtypeProd (fun _ : InfinitePlace F ↦ (volume : Measure ℝ)) p
+  let : Unique {w // ¬ p w} := ⟨⟨⟨Units.dirichletUnitTheorem.w₀ (K := F), not_not.mpr rfl⟩⟩, fun w ↦ Subtype.ext (not_not.mp w.2)⟩
+  set T : Set (({w // p w} → ℝ) × ({w // ¬ p w} → ℝ)) :=
+    {z | z.1 ∈ P ∧ ∑ w, z.1 w + ∑ w, z.2 w ∈ Icc 0 1}
+  have h1 : Measurable
+      (fun z : ({w // p w} → ℝ) × ({w // ¬ p w} → ℝ) ↦ ∑ w, z.1 w + ∑ w, z.2 w) :=
+    (Finset.measurable_sum Finset.univ fun (w : {w // p w}) _ ↦
+      (measurable_pi_apply w).comp measurable_fst).add
+    (Finset.measurable_sum Finset.univ fun (w : {w // ¬ p w}) _ ↦
+      (measurable_pi_apply w).comp measurable_snd)
+  have hT : MeasurableSet T := (hP.preimage measurable_fst).inter (measurableSet_Icc.preimage h1)
+  have hpre : {y : InfinitePlace F → ℝ | ∑ w, y w ∈ Icc 0 1 ∧
+      (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦ y w.val) ∈ P} =
+      MeasurableEquiv.piEquivPiSubtypeProd (fun _ ↦ ℝ) p ⁻¹' T := by
+    ext y
+    simp only [T, mem_preimage, mem_ofPred_eq, MeasurableEquiv.piEquivPiSubtypeProd,
+      MeasurableEquiv.coe_mk, Equiv.piEquivPiSubtypeProd_apply]
+    rw [Fintype.sum_subtype_add_sum_subtype p y]
+    exact and_comm
+  have hslice (z : {w // p w} → ℝ) :
+      Measure.pi (fun _ : {w // ¬ p w} ↦ (volume : Measure ℝ)) (Prod.mk z ⁻¹' T) =
+        P.indicator 1 z := by
+    by_cases hz : z ∈ P
+    · rw [indicator_of_mem hz, Pi.one_apply]
+      have hset : Prod.mk z ⁻¹' T = Set.univ.pi fun _ ↦ Icc (-∑ w, z w) (1 - ∑ w, z w) := by
+        ext u
+        simp only [T, mem_preimage, mem_ofPred_eq, mem_Icc, hz, true_and, mem_univ_pi,
+          Fintype.sum_unique, Unique.forall_iff]
+        constructor <;> rintro ⟨h1, h2⟩ <;> constructor <;> linarith
+      rw [hset, Measure.pi_pi, Finset.prod_const, Finset.card_univ, Fintype.card_unique, pow_one,
+        Real.volume_Icc]
+      norm_num
+    · rw [indicator_of_notMem hz]
+      have : Prod.mk z ⁻¹' T = ∅ := by
+        ext u
+        simp [T, hz]
+      rw [this, measure_empty]
+  rw [hpre, volume_pi, he.measure_preimage hT.nullMeasurableSet, Measure.prod_apply hT]
+  simp_rw [hslice]
+  exact lintegral_indicator_one hP
+
 /-- The archimedean product measure of the regulator strip is the regulator times the
 full sign and angular masses. In normalized radial logarithms each real place
 contributes `2 dx` and each complex place contributes `2π dx`. Splitting off the
@@ -5771,7 +6061,53 @@ sum coordinate has Jacobian of absolute value one. -/
 theorem infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip :
     Measure.pi (infiniteLocalMultiplicativeTamagawaMeasure F)
       (archimedeanRegulatorStrip F) = archRegulatorMass(F) := by
-  sorry
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (w : InfinitePlace F) : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  set f : (w : InfinitePlace F) → w.Completionˣ → ℝ :=
+    fun w x ↦ (w.mult : ℝ) * Real.log ‖x.val‖
+  set c : InfinitePlace F → ℝ≥0 :=
+    fun w ↦ if w.IsReal then (2 : ℝ≥0) else Real.toNNReal (2 * Real.pi)
+  have hf (w : InfinitePlace F) : Measurable (f w) :=
+    measurable_const.mul (Real.measurable_log.comp
+      (continuous_norm.comp Units.continuous_val).measurable)
+  have hmap (w : InfinitePlace F) :
+      (infiniteLocalMultiplicativeTamagawaMeasure F w).map (f w) = c w • volume :=
+    infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_map F w
+  have : ∀ w, SigmaFinite ((infiniteLocalMultiplicativeTamagawaMeasure F w).map (f w)) :=
+    fun w ↦ by rw [hmap w]; infer_instance
+  set P := regulatorParallelotope F (Units.basisModTorsion F)
+  have hP : MeasurableSet P := ZSpan.fundamentalDomain_measurableSet _
+  set T := {y : InfinitePlace F → ℝ | ∑ w, y w ∈ Icc 0 1 ∧
+      (fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦ y w.val) ∈ P}
+  have hT : MeasurableSet T :=
+    show MeasurableSet ((fun y : InfinitePlace F → ℝ ↦ ∑ w, y w) ⁻¹' Icc 0 1 ∩
+        (fun y : InfinitePlace F → ℝ ↦
+          fun w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀} ↦ y w.val) ⁻¹' P) from
+      (measurableSet_Icc.preimage (Finset.measurable_sum _ fun w _ ↦ measurable_pi_apply w)).inter
+        (hP.preimage (Measurable.of_eval
+          fun (w : {w : InfinitePlace F // w ≠ Units.dirichletUnitTheorem.w₀}) ↦
+            measurable_pi_apply w.val))
+  have hstrip : archimedeanRegulatorStrip F = (fun x w ↦ f w (x w)) ⁻¹' T := rfl
+  have hpi : Measure.pi (fun w ↦ (infiniteLocalMultiplicativeTamagawaMeasure F w).map (f w)) =
+      (∏ w, c w) • volume := by
+    refine Measure.pi_eq fun s hs ↦ ?_
+    rw [smul_apply, volume_pi_pi, ENNReal.smul_def, smul_eq_mul]
+    push_cast
+    rw [← Finset.prod_mul_distrib]
+    refine Finset.prod_congr rfl fun w _ ↦ ?_
+    rw [hmap w, smul_apply, ENNReal.smul_def, smul_eq_mul]
+  have hL : Measurable (fun (x : (w : InfinitePlace F) → w.Completionˣ) (w : InfinitePlace F) ↦
+      f w (x w)) := Measurable.of_eval fun w ↦ (hf w).comp (measurable_pi_apply w)
+  rw [hstrip, ← Measure.map_apply hL hT,
+    Measure.pi_map_pi (fun w ↦ (hf w).aemeasurable), hpi, smul_apply, ENNReal.smul_def,
+    smul_eq_mul, infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_volume F P hP, infiniteLocalMultiplicativeTamagawaMeasure_regulatorStrip_parallelotope F]
+  have hc : ((∏ w, c w : ℝ≥0) : ℝ) = (2 : ℝ) ^ InfinitePlace.nrRealPlaces F *
+      (2 * Real.pi) ^ InfinitePlace.nrComplexPlaces F := by
+    rw [NNReal.coe_prod]
+    simp only [c, apply_ite NNReal.toReal, NNReal.coe_ofNat, Real.coe_toNNReal _ (by positivity : (0:ℝ) ≤ 2 * Real.pi)]
+    rw [Finset.prod_ite]
+    simp only [Finset.prod_const, ← Fintype.card_subtype, InfinitePlace.not_isReal_iff_isComplex]
+  rw [← ENNReal.ofReal_coe_nnreal, hc, ← ENNReal.ofReal_mul (by positivity)]
 
 /-- The global idelic mass of the regulator strip with integral finite components.
 The strip lies over the principal ideal class and contains all torsion sectors.
