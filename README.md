@@ -83,7 +83,9 @@ proved. Some thirty people have had pull requests merged, about 1,360 pull reque
 - **Wave 2** (Chapters 5–7 and Appendix B) is being stated section by section, each statement
   reviewed against the paper before it is merged. Appendix B.1–B.6, §5.1–5.3, §6.1–6.2 and §7.1
   are on `main` with their proofs open; §5.4–5.5, §6.3 and §7.2–7.5 follow in dependency order.
-- **Wave 3** (Chapters 10–12, the trace formula) has not been started.
+- **Wave 3** (Chapters 10–12, the trace formula, then the two pages of Chapter 13) is seeded as
+  sixteen section issues, and the first three sections are being stated. Chapter 8 is not
+  needed for these statements.
 
 Every open `sorry` is an issue that anyone can take. The
 [progress map](https://claude.ai/artifact/CtQyX8qfYAF822bgHJHHE3) has the current numbers, and
@@ -91,15 +93,17 @@ the roadmap below the order of work.
 
 ### What the formalization has found
 
-[`ERRATA.md`](ERRATA.md) has about 200 entries: some 45 statements that are false as printed,
-135 that are imprecise, inconsistent or wrongly justified, 16 placeholders or missing pieces,
-and 9 reports from readers about parts not yet formalized. Most are in the appendices' and early
-chapters' accounts of standard material, and are repaired where they occur: the Lean states the
+[`ERRATA.md`](ERRATA.md) has about 350 entries: some 105 statements that are false as printed,
+220 that are imprecise, inconsistent or wrongly justified, 20 placeholders or missing pieces,
+and 9 reports from readers about parts not yet formalized. Those in the appendices' and early
+chapters' accounts of standard material are repaired where they occur: the Lean states the
 corrected form and says so.
 
-The second wave has reached the first of the paper's own constructions, and the findings there
-weigh more. The printed proof of the structure theorem for the spaces of adelic θ-functions
-(Theorem 5.2.1.1) does not work, and whether the theorem holds is being tested in Lean now. The
+The second wave has reached the paper's own constructions in Chapters 5–7, and the findings
+there weigh more. Most still come with a repair. Six steps have none so far, and later results
+use them; `ERRATA.md` lists them first. The main one is the structure theorem for the spaces of
+adelic θ-functions (Theorem 5.2.1.1): its printed proof does not work, the rest of §5.2 is now
+proved in Lean from its two central claims, and those two are neither proved nor refuted. The
 explicit formulas of §B.4, which Chapter 12 quotes, need their local terms and normalizations
 recomputed. None of the entries so far is about the trace formula itself.
 
@@ -167,7 +171,7 @@ trace formula:
 |---|---|---|
 | 1 | Appendices A.1–A.3, A.5, C, D; then Chapters 2–3 (adelic θ-functions, idelic zeta functions) and, independently, Chapters 4 and 9 (periodic Schauder bases, Hardy–Sobolev spaces) | all stated; most proofs done, the rest being closed out file by file: [open proof issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Aproof+-label%3Aclaimed) |
 | 2 | Chapters 5–7, with Appendix B.1–B.6 | Appendix B.1–B.6, §5.1–5.3, §6.1–6.2 and §7.1 stated, proofs open; the remaining [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection) (§5.4–5.5, §6.3, §7.2–7.5) are being stated in dependency order |
-| 3 | Chapters 10–12: the trace formula | not yet seeded |
+| 3 | Chapters 10–12: the trace formula; then Chapter 13 | seeded as [section issues](https://github.com/mccorvie/riemann-masullo/issues?q=is%3Aissue+is%3Aopen+label%3Asection); statements in progress, in dependency order |
 | later | Chapters 8 and 14, Appendix E, A.4, B.7 | only when something needs them |
 
 An issue labelled `blocked` is waiting for the sections it builds on. The appendices are mostly

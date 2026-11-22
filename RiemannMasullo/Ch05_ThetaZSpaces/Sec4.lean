@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-! # Second Structure Theorem and the S-local Čech sequence
 
@@ -64,7 +65,34 @@ Every norm-one character has a unique unitary lift trivial on the chosen norm se
 Its norm twists give the coordinates used for the Second Structure Theorem. -/
 theorem existsUnique_sLocalNormSectionCharacter (τ : ℝ≥0ˣ →ₜ* Jₛ)
     (_hτ : RightInverse τ mₛ) (ω : PontryaginDual J₁) :
-    ∃! χ : PontryaginDual Jₛ, restrict₁(χ) = ω ∧ ∀ t, χ (τ t) = 1 := by sorry
+    ∃! χ : PontryaginDual Jₛ, restrict₁(χ) = ω ∧ ∀ t, χ (τ t) = 1 := by
+  have hk (g : Jₛ) : g / τ (mₛ g) ∈ (mₛ).ker := by
+    simp [MonoidHom.mem_ker, _hτ (mₛ g)]
+  let p : Jₛ →ₜ* J₁ :=
+    { toFun := fun g ↦ ⟨g / τ (mₛ g), hk g⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' := fun g h ↦ Subtype.ext (by simp [mul_div_mul_comm])
+      continuous_toFun := (continuous_id.div' (τ.continuous.comp hmₛ)).subtype_mk hk }
+  have hp (u : J₁) : p u = u := by
+    apply Subtype.ext
+    change u.val / τ (mₛ u.val) = u.val
+    rw [u.property, map_one, div_one]
+  have hτp (t : ℝ≥0ˣ) : p (τ t) = 1 := by
+    apply Subtype.ext
+    change τ t / τ (mₛ (τ t)) = 1
+    simp [_hτ t]
+  refine ⟨ω.comp p, ⟨?_, ?_⟩, ?_⟩
+  · ext1 u
+    exact congrArg ω (hp u)
+  · intro t
+    change ω (p (τ t)) = 1
+    rw [hτp, map_one]
+  · rintro χ ⟨hker, hsec⟩
+    ext1 g
+    change χ g = ω (p g)
+    have he := DFunLike.congr_fun hker (p g)
+    change χ (g / τ (mₛ g)) = ω (p g) at he
+    simpa only [map_div, hsec, div_one] using he
 
 /-- Paper: (5.4.1.2), p. 265.
 The two zeta restrictions descend uniquely as a linear map on homogeneous theta classes.
@@ -91,7 +119,9 @@ theorem sLocalZetaPair_mk (χ : PontryaginDual Jₛ) (f : ℬₛ) :
     EqOn (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).1.val
       (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
     EqOn (sLocalZetaPair (F := F) (S := S) χ (Submodule.Quotient.mk f)).2.val
-      (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s))) leftHalf := by sorry
+      (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s))) leftHalf := by
+  have h := (existsUnique_sLocalZetaPair (F := F) (S := S) χ).exists.choose_spec f
+  exact h
 
 /-- Paper: (5.4.1.3), p. 266.
 Subtracting the corrected second component from the first on the overlap is a
@@ -193,7 +223,9 @@ homogeneous theta functions coincide. -/
 theorem sLocalPolarFreeThetaSpace_mk_eq_iff (r : RealModels) (c : ComplexModels)
     (ω : PontryaginDual J₁) (f g : polarTests(r, c)) :
     (polarKernel(polarTests(r, c), ω)).mkQ f = (polarKernel(polarTests(r, c), ω)).mkQ g ↔
-      φω(ω) f.val = φω(ω) g.val := by sorry
+      φω(ω) f.val = φω(ω) g.val := by
+  simp only [Submodule.mkQ_apply, Submodule.Quotient.eq, LinearMap.mem_ker, LinearMap.comp_apply,
+    Submodule.subtype_apply, Submodule.coe_sub, map_sub, sub_eq_zero]
 
 local notation "polarInclusion(" P ", " ω ")" =>
   (polarKernel(P, ω)).mapQ (LinearMap.ker (φω(ω))) (P).subtype
@@ -305,9 +337,24 @@ local notation "completionMap" => (show Θₛ →ₗ[ℂ] SLocalThetaL2 F S from
     (LinearMap.range (weightedTheta).toLinearMap).topologicalClosure
     (fun x ↦ Submodule.le_topologicalClosure _ (LinearMap.mem_range_self _ x)))
 
+section DenseHelper
+variable {M N : Type*} [AddCommGroup M] [Module ℂ M] [AddCommGroup N] [Module ℂ N]
+  [TopologicalSpace N] [ContinuousAdd N] [ContinuousConstSMul ℂ N]
+
+private theorem denseRange_codRestrict_topologicalClosure (f : M →ₗ[ℂ] N)
+    (h : ∀ x, f x ∈ (LinearMap.range f).topologicalClosure) :
+    DenseRange (f.codRestrict (LinearMap.range f).topologicalClosure h) := by
+  rw [DenseRange, Topology.IsInducing.subtypeVal.dense_iff]
+  intro x
+  rw [← Set.range_comp]
+  exact x.2
+
+end DenseHelper
+
 /-- Paper: (5.4.2.2), p. 274.
 The test-function image is dense in the chosen model of the completion. -/
-theorem sLocalThetaL2_dense : DenseRange completionMap := by sorry
+theorem sLocalThetaL2_dense : DenseRange completionMap :=
+  denseRange_codRestrict_topologicalClosure _ _
 
 /-- Paper: (5.4.2.1)–(5.4.2.2), p. 274.
 S-local Fourier transform has a unique unitary extension to the weighted completion,
@@ -339,7 +386,15 @@ A weighted test function lies in the isotype exactly when it obeys the
 norm-one translation law at every idele class. -/
 theorem mem_sLocalDecayIsotype (I : Set ℝ) (ω : PontryaginDual J₁) (φ : Ẽ(I)) :
     φ ∈ sLocalDecayIsotype (F := F) (S := S) I ω ↔
-      ∀ (u : J₁) (g : Jₛ), φ.val (u.val⁻¹ * g) = (ω u : ℂ) * φ.val g := by sorry
+      ∀ (u : J₁) (g : Jₛ), φ.val (u.val⁻¹ * g) = (ω u : ℂ) * φ.val g := by
+  have criterion {U X E : Type _} [AddCommGroup E] [Module ℂ E]
+      (ev : X → E →ₗ[ℂ] ℂ) (shift : U → X → X) (c : U → ℂ) (f : E) :
+      f ∈ (⨅ u, ⨅ x, LinearMap.ker (ev (shift u x) - c u • ev x)) ↔
+        ∀ u x, ev (shift u x) f = c u * ev x f := by
+    simp only [Submodule.mem_iInf, LinearMap.mem_ker, LinearMap.sub_apply,
+      LinearMap.smul_apply, smul_eq_mul, sub_eq_zero]
+  exact criterion (fun g : Jₛ ↦ decayEval(I, g)) (fun (u : J₁) g ↦ u.val⁻¹ * g)
+    (fun u ↦ (ω u : ℂ)) φ
 
 /-- Paper: (5.4.2.3), p. 275, and Proposition D.3.3.12, p. 811.
 The coordinate equations give the Appendix D isotype for its translation action. -/
@@ -444,7 +499,16 @@ Restriction of a unitary character to the norm section defines a unique real
 frequency in the Mellin coordinate. -/
 theorem existsUnique_sLocalCechFrequency (χ : PontryaginDual Jₛ) (τ : ℝ≥0ˣ →ₜ* Jₛ) :
     ∃! x : ℝ, ∀ t : ℝ≥0ˣ, (χ (τ t) : ℂ) = (normℝ(t) : ℂ) ^ ((x : ℂ) * Complex.I) :=
-  by sorry
+  by
+    let incl : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let c := incl.comp (χ.comp τ)
+    obtain ⟨z, ⟨hz, hval⟩, huniq⟩ := existsUnique_unitaryComplexPower c
+      (fun t ↦ Circle.norm_coe (χ (τ t)))
+    have him : (z.im : ℂ) * Complex.I = z := by
+      apply Complex.ext <;> simp [hz]
+    refine ⟨z.im, fun t ↦ (hval t).trans (by rw [him]), fun x hx ↦ ?_⟩
+    have he := huniq ((x : ℂ) * Complex.I) ⟨by simp, hx⟩
+    simpa using congrArg Complex.im he
 
 local notation "mellinIntegrand(" τ ", " φ ", " z ")" =>
   (fun t : ℝ≥0ˣ ↦ (φ) ((τ) t) * (normℝ(t) : ℂ) ^ (z))

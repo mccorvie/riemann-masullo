@@ -1179,7 +1179,7 @@ $$
 to the Hausdorff locally convex product factors through a continuous operator valued into the linear subspace
 
 $$
-\Pi_\tau : L^2(G,\nu) \to \widehat{\bigoplus}_{\omega \in \widehat{G^1}} L^2_\omega(\mathbf{R}_{>0},\mathrm{d}t/t) \tag{4.3.2.7}
+\Pi_\tau : L^2(G,\nu) \to \mathop{\widehat{\bigoplus}}\limits_{\omega \in \widehat{G^1}} L^2_\omega(\mathbf{R}_{>0},\mathrm{d}t/t) \tag{4.3.2.7}
 $$
 
 the Hilbert sum of the Hilbert spaces $L^2_\omega(\mathbf{R}_{>0},\mathrm{d}t/t)$.
@@ -2547,18 +2547,14 @@ where we used Proposition 4.5.1.1(5),(6) to deduce that we have $\ker(\Phi_{\gam
 
 Since we also have continuous linear bijections:
 
-(4.5.3.5)
-
 $$
-\mathcal{S}_{\mathrm{E}}(G)/P_{\gamma}\mathcal{S}_{\mathrm{E}}(G)\to\mathcal{S}_I(G)/V_{I,\gamma}\to\mathcal{S}(G)/V_{\gamma}
+\mathcal{S}_{\mathrm{E}}(G)/P_{\gamma}\mathcal{S}_{\mathrm{E}}(G)\to\mathcal{S}_I(G)/V_{I,\gamma}\to\mathcal{S}(G)/V_{\gamma} \tag{4.5.3.5}
 $$
 
 we deduce that the canonical continuous linear operators:
 
-(4.5.3.6)
-
 $$
-\mathcal{S}_I(G)/V_{I,\gamma}\to\mathcal{S}_I(G)/\ker(\Phi_{\gamma}),\ \mathcal{S}(G)/V_{\gamma}\to\mathcal{S}_I(G)/\ker(\Phi_{\gamma^{\mathbf{Z}}})
+\mathcal{S}_I(G)/V_{I,\gamma}\to\mathcal{S}_I(G)/\ker(\Phi_{\gamma}),\ \mathcal{S}(G)/V_{\gamma}\to\mathcal{S}_I(G)/\ker(\Phi_{\gamma^{\mathbf{Z}}}) \tag{4.5.3.6}
 $$
 
 induced by the inclusions $V_{I,\gamma}\subset\ker(\Phi_{\gamma})\subset\mathcal{S}_I(G)$, and $V_{\gamma}\subset\ker(\Phi_{\gamma^{\mathbf{Z}}})$, are also bijections. This gives $V_{I,\gamma}=\ker(\Phi_{\gamma})$ and $V_{\gamma}=\ker(\Phi_{\gamma^{\mathbf{Z}}})$, as closed subspaces of $\mathcal{S}_I(G)$, respectively $\mathcal{S}(G)$.
@@ -2587,10 +2583,8 @@ We adopt the notation $\widetilde{G^1}$ from Situation 4.4.2.3, for a fixed choi
 
 We define, for each $\chi\in\widetilde{G^1}$, the subset:
 
-(4.6.1.1)
-
 $$
-(\gamma^{\mathbf{Z}})^{\perp}_{\chi}\subset(\gamma^{\mathbf{Z}})^{\perp}\subset\widehat{G}
+(\gamma^{\mathbf{Z}})^{\perp}_{\chi}\subset(\gamma^{\mathbf{Z}})^{\perp}\subset\widehat{G} \tag{4.6.1.1}
 $$
 
 to be the subset of those continuous characters $\xi\in\widehat{G}$ such that $\xi(\gamma^{\mathbf{Z}})=1$, equivalently $\xi(\gamma)=1$, and such that $\xi|_{G^1}=\chi|_{G^1}$.
@@ -2615,10 +2609,8 @@ and hence $\Gamma^{\perp}$ is the intersection of the closed subgroups $\ker(\ch
 
 In particular, for each $\chi\in\widetilde{G^1}$, there exists a compact subgroup $k\subset G^1$ with finitely generated orthogonal $k^{\perp}$ such that $\chi(k)=1$. This implies that we have:
 
-(4.6.1.2)
-
 $$
-(\gamma^{\mathbf{Z}})^{\perp}_{\chi}\subset(\gamma^{\mathbf{Z}}\cdot k)^{\perp}
+(\gamma^{\mathbf{Z}})^{\perp}_{\chi}\subset(\gamma^{\mathbf{Z}}\cdot k)^{\perp} \tag{4.6.1.2}
 $$
 
 for such $\chi$.
@@ -2633,46 +2625,36 @@ Let $\chi\in\widetilde{G^1}$ be a continuous character. Let $S_0:=(\gamma_1,\dot
 
 (1) The operator
 
-(4.6.1.3)
-
 $$
-P_{S_0}:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+P_{S_0}:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.3}
 $$
 
 *defined as the continuous linear endomorphism assigned by the composition $P_{S_0}:=\prod_{1\le k\le N-1}P_{\gamma_k}$, where $P_{\gamma_k}$ is defined by the assignment:*
 
-(4.6.1.4)
-
 $$
-P_{\gamma_k}(\phi)(g):=\phi(x)-\phi(\gamma_k x)
+P_{\gamma_k}(\phi)(g):=\phi(x)-\phi(\gamma_k x) \tag{4.6.1.4}
 $$
 
 *on any $\phi\in\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$, as functions of $x\in G$, has closed range.*
 
 (2) The quotient
 
-(4.6.1.5)
-
 $$
-\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.5}
 $$
 
 is a separable nuclear Fréchet space.
 
 (3) The operator
 
-(4.6.1.6)
-
 $$
-P_{\gamma_N}:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+P_{\gamma_N}:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.6}
 $$
 
 induces a linear topological isomorphism:
 
-(4.6.1.7)
-
 $$
-Q:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+Q:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.7}
 $$
 
 *where both source and target are separable nuclear Fréchet space, compatibly with the continuous left-translation actions of $G$ on source and target.*
@@ -2685,10 +2667,8 @@ Since $P_{S_0}$ has closed range in $\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$ b
 
 (3) : The operator $P_{\gamma_N}$ from (4.6.1.6) followed by the quotient, induces a surjective continuous linear operator
 
-(4.6.1.8)
-
 $$
-Q:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+Q:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.8}
 $$
 
 ## PDF page 211
@@ -2707,10 +2687,8 @@ as entire functions on the complex $s$-plane and elements of $A\mathcal{S}(\math
 
 Since $P_{\gamma_N}(\phi)\in P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$, we have:
 
-(4.6.1.9)
-
 $$
-(1-\chi(\gamma_N)\lvert\gamma_N\rvert_G^{-s})\widetilde{M}(\phi))(\chi\lvert\cdot\rvert_G^s)=\prod_{1\le k\le N}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s})\widetilde{M}(\psi)(\chi\lvert\cdot\rvert_G^s)
+(1-\chi(\gamma_N)\lvert\gamma_N\rvert_G^{-s})\widetilde{M}(\phi))(\chi\lvert\cdot\rvert_G^s)=\prod_{1\le k\le N}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s})\widetilde{M}(\psi)(\chi\lvert\cdot\rvert_G^s) \tag{4.6.1.9}
 $$
 
 for some $\psi\in\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$.
@@ -2719,10 +2697,8 @@ By the Asymptotic Residue Theorem (see Theorem B.3.2.1), which applies because t
 
 It follows that the operator $Q$ from (4.6.1.8) induces a linear topological isomorphism:
 
-(4.6.1.10)
-
 $$
-\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
+\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \tag{4.6.1.10}
 $$
 
 which is the operator from (4.6.1.7). $\square$
@@ -2735,10 +2711,8 @@ LEMMA 4.6.1.4. *Let $N\ge 1$ be an integer, and $b_1,\dots,b_N\in\mathbf{R}_{>0}
 
 (2) *The set of nonzero complex numbers:*
 
-(4.6.1.11)
-
 $$
-\{b_k^{\frac{2\pi im}{\log(b_h)}},1\le k,h\le N,m\in\mathbf{Z}\}
+\{b_k^{\frac{2\pi im}{\log(b_h)}},1\le k,h\le N,m\in\mathbf{Z}\} \tag{4.6.1.11}
 $$
 
 is finite.
@@ -2846,7 +2820,7 @@ an entire function with zeros at the zeros of $\prod_{1\le k\le N}(1-\chi(\gamma
 We have
 
 $$
-\frac{\partial^j}{\partial s^j}\prod_{1\le k\le N}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s}) = \sum_{k_1+\dots+k_N=j}\frac{j!}{k_1!\cdots k_N!}\prod_{1\le k\le N}\partial_s^{k_r}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s})
+\frac{\partial^j}{\partial s^j}\prod_{1\le k\le N}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s}) = \sum_{k_1+\ldots+k_N=j}\frac{j!}{k_1!\cdots k_N!}\prod_{1\le k\le N}\partial_s^{k_r}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s})
 $$
 
 and since $\partial_s^{k_r}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s}) = (-1)^{k_r-1}\chi(\gamma_k)(\log\lvert\gamma_k\rvert_G)^{k_r}\lvert\gamma_k\rvert_G^{-s}$ is bounded on vertical strips of bounded width within the complex $s$-plane, we deduce that both $\prod_{1\le k\le N}(1-\chi(\gamma_k)\lvert\gamma_k\rvert_G^{-s})$ and its holomorphic derivatives of any order, are bounded uniformly over each vertical strip of bounded width of the complex $s$-plane.

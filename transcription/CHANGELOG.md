@@ -315,3 +315,49 @@ From the maintainers' spot check in #2471 and the checks it suggested.
   full stop that ends them in the print. Every display was then checked for a trailing full stop
   or comma, against the print: also fixed, p. 371 (`,` for the printed `.`) and p. 650 (a comma
   that is not in the print).
+
+
+## 11. After the second merge
+
+- **Positions inside displays.** For every displayed formula (4,003), each PDF glyph's height
+  relative to its neighbours was compared with the compiled transcription, which catches a
+  numerator and denominator, or upper and lower limits, swapped. No formula had its parts swapped.
+  The comparison did show limits typeset beside the operator where the print sets them below: the
+  restricted product `\widehat{\prod}` (8 displays, pp. 7, 290, 539, 540, 541; written
+  `\mathop{\widehat{\prod}}\limits`) and `\mathrm{Res}` (5 displays, pp. 138, 606); the prime of
+  the restricted product on p. 327 now beside the `\prod` with the index below, as printed.
+- **Low and centred dots.** Counted on every page: where the print has low dots between binary
+  operators (`+\ldots+`, `\cup\ldots\cup`, `\cap\ldots\cap`) the transcription had centred ones on
+  pp. 133, 213, 243, 336, 342, 450, 549, 571, 583, 631 (17 places), now `\ldots`.
+- **Digits.** Every difference of digits only inside a formula was listed (the earlier pass had
+  set digits aside with the footnote marks): none apart from footnote marks.
+- p. 628: `\varepsilon/2` (twice) printed as a fraction.
+- **Words, one to three at a time.** The prose was aligned word by word with the PDF text (words
+  in `\text{…}` inside formulas included), and every difference of one to three words was listed;
+  the earlier check had looked at runs of two or more words in context. Apart from words the
+  print sets in maths, there were four: "as" missing on p. 606 ("tend to 0 as |k|→∞"), the
+  print's doubled "is" on p. 345 that the transcription had tidied, and two misspellings of the
+  print ("neighorhood" p. 794, "completness" p. 797) that the transcription had corrected. All
+  four now as printed.
+- **Diagram layout.** Each diagram's glyphs were grouped into rows and compared, row by row and
+  left to right, with the print, to catch two nodes or labels swapped. Every diagram whose rows
+  did not match exactly (pages with several diagrams, mostly) was compared with the page image
+  again: none has a node or label in the wrong place.
+- **Equation numbers on the right formula.** For every equation number printed in the margin, the
+  formula on that line of the PDF was located in the transcription and checked to carry that
+  `\tag`. All do. Two numbered displays that hold two formulas on one line in the print had been
+  split into two displays (pp. 507, 639): each is one display again, with its number. 140 equation
+  numbers that had been written as a line of text above the display, `(D.1.4.15)`, are now
+  `\tag{D.1.4.15}` like the other 2,300; numbers of diagrams stay as text above the diagram.
+- **Fourth random sample.** 96 more inline formulas of 22 or more characters (seed 99) and 60
+  more numbered equations not drawn before (seed 4243), compiled and compared with the page image:
+  all agree with the print. The one layout difference, the index of a hatted direct sum set beside
+  it where the print sets it below (p. 178), is fixed, and the other two displayed hatted direct
+  sums (pp. 131, 179) are beside, as printed. The 17 displays with matrices, cases or several
+  aligned lines were also each compared with the page image: all agree.
+- **A figure that had not been redrawn.** Glyph runs of four or more that differ between the PDF and
+  the compiled transcription were listed; outside running heads, citation keys and words set in
+  maths, they showed that Figure 4 (p. 646, the rectangle for the contour shift in §B.7) was still
+  three lines of labels. It is now a TikZ picture with the points, labels and the direction of
+  every edge as printed, like the other four figures. Every page of the PDF with line drawings was
+  checked for a figure or diagram in the transcription: there are no others.

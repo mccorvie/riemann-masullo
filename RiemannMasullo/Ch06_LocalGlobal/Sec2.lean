@@ -311,7 +311,8 @@ theorem infiniteStandardThetaAverage_apply (χ : PontryaginDual Iₛ(S))
     infiniteStandardThetaAverage χ r f x = ∑ k, ∫ g : N∞,
       let a := archPart(S) (r k).val * archPart((∅ : Finset V)) g.val
       f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
-      ∂sNormOneIdeleTamagawaMeasure F ∅ := by sorry
+      ∂sNormOneIdeleTamagawaMeasure F ∅ :=
+  (exists_infiniteStandardThetaAverage χ r).choose_spec f x
 
 -- In §5.3.1 the punctured-field tests are additive tests vanishing at zero.
 -- Local constancy makes these vanish on a neighborhood of zero.
@@ -357,7 +358,9 @@ against the local character. -/
 theorem finiteStandardThetaAverage_one (v : V) (χ : PontryaginDual (L(v))ˣ)
     (f : ℬ₀(v)) :
     finiteStandardThetaAverage v χ f 1 =
-      ∫ g : (L(v))ˣ, f.val (Multiplicative.ofAdd (g⁻¹).val) * (χ g : ℂ) ∂μ(v) := by sorry
+      ∫ g : (L(v))ˣ, f.val (Multiplicative.ofAdd (g⁻¹).val) * (χ g : ℂ) ∂μ(v) := by
+  have h := (exists_finiteStandardThetaAverage v χ).choose_spec f 1
+  simpa [finiteStandardThetaAverage] using h
 
 /-- Paper: (6.2.2.11), p. 301.
 The finite convolution is the character times the Mellin integral with the inverse character.

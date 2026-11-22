@@ -213,7 +213,7 @@ is an isomorphism, being its cokernel $\mathrm{Pic}(\mathcal O_{F,S})$, the kern
 This in turn implies that the continuous homomorphism:
 
 $$
-F^\times/\mathcal O_{F,S}^\times\to\widehat{\prod}_{v\notin S}(F_v^\times,\mathcal O_{F_v}^\times)/\widehat{\mathcal O}_{F,\Sigma_F-S}^\times \tag{6.1.2.10}
+F^\times/\mathcal O_{F,S}^\times\to\mathop{\widehat{\prod}}\limits_{v\notin S}(F_v^\times,\mathcal O_{F_v}^\times)/\widehat{\mathcal O}_{F,\Sigma_F-S}^\times \tag{6.1.2.10}
 $$
 
 is also an isomorphism.

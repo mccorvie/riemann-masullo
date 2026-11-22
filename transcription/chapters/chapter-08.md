@@ -62,36 +62,28 @@ from (7.3.3.5) and (7.3.3.6).
 
 (1) *Let $p$ be a prime number such that $S_p \subset S$. The canonical continuous linear map:*
 
-(8.1.0.1)
-
 $$
-\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_{F,S}))/\mathrm{PV}_{S,S_p}\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_F)) \to \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))/\mathrm{PV}_{S,S_p}\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))
+\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_{F,S}))/\mathrm{PV}_{S,S_p}\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_F)) \to \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))/\mathrm{PV}_{S,S_p}\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S})) \tag{8.1.0.1}
 $$
 
 *where $\mathcal{S}_p(\mathbf{A}_{F,S}) \subset \mathcal{S}(\mathbf{A}_{F,S})$ is the closed subspace:*
 
-(8.1.0.2)
-
 $$
-\mathcal{S}_p(\mathbf{A}_{F,S}) := \mathcal{S}_{00}(\mathbf{A}_{F,S_\infty}) \otimes_{\pi} \bigotimes_{v \in S_f - S_p} \mathcal{S}(F_v^{\times}) \otimes_{\pi} \bigotimes_{v \in S_p} \mathcal{S}(F_v)
+\mathcal{S}_p(\mathbf{A}_{F,S}) := \mathcal{S}_{00}(\mathbf{A}_{F,S_\infty}) \otimes_{\pi} \bigotimes_{v \in S_f - S_p} \mathcal{S}(F_v^{\times}) \otimes_{\pi} \bigotimes_{v \in S_p} \mathcal{S}(F_v) \tag{8.1.0.2}
 $$
 
 *is a linear topological isomorphism.*
 
 (2) *Let $v \in S$ be a finite place. The canonical continuous linear map:*
 
-(8.1.0.3)
-
 $$
-\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_v(\mathbf{A}_{F,S}))/\mathrm{PV}_v\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_{F,S})) \to \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))/\mathrm{PV}_v\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))
+\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_v(\mathbf{A}_{F,S}))/\mathrm{PV}_v\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_p(\mathbf{A}_{F,S})) \to \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S}))/\mathrm{PV}_v\mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}(\mathbf{A}_{F,S})) \tag{8.1.0.3}
 $$
 
 *where $\mathcal{S}_v(\mathbf{A}_{F,S}) \subset \mathcal{S}(\mathbf{A}_{F,S})$ is the closed subspace:*
 
-(8.1.0.4)
-
 $$
-\mathcal{S}_v(\mathbf{A}_{F,S}) := \mathcal{S}_{00}(\mathbf{A}_{F,S_\infty}) \otimes_{\pi} \mathcal{S}(F_v) \otimes_{\pi} \bigotimes_{w \in S_f - \{v\}} \mathcal{S}(F_w^{\times})
+\mathcal{S}_v(\mathbf{A}_{F,S}) := \mathcal{S}_{00}(\mathbf{A}_{F,S_\infty}) \otimes_{\pi} \mathcal{S}(F_v) \otimes_{\pi} \bigotimes_{w \in S_f - \{v\}} \mathcal{S}(F_w^{\times}) \tag{8.1.0.4}
 $$
 
 *is a linear topological isomorphism.*
@@ -106,10 +98,8 @@ $$
 
 is a linear topological isomorphism. By Theorem 5.4.1.1, we deduce that $L_S$ from (5.1.1.2) induces a linear topological embedding:
 
-(8.1.0.5)
-
 $$
-U_S : \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_0(\mathbf{A}_{F,S})) \to A\mathcal{S}(\mathbf{C}_{>0}) \times A\mathcal{S}(\mathbf{C}_{>0})
+U_S : \mathrm{H}_{0,\mathrm{cont}}(\chi_S|_{J^1_{F,S}}, \mathcal{S}_0(\mathbf{A}_{F,S})) \to A\mathcal{S}(\mathbf{C}_{>0}) \times A\mathcal{S}(\mathbf{C}_{>0}) \tag{8.1.0.5}
 $$
 
 where, upon defining:
@@ -128,18 +118,14 @@ The unique analytic continuation of $\phi_0$ to a meromorphic function $\Phi(s)$
 
 function $m_S$ of $\mathcal{U}_S$ (see (7.2.2.2) and (3.3.1.3)), is contained in the linear subspace of $\mathscr{M}(\Omega(J_{F,S})(\chi_S|_{J^1_{F,S}}))$:
 
-(8.1.0.6)
-
 $$
-\frac{1}{L_{\Sigma_F-S}(\chi,s)} \cdot (\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C})) \subset \mathscr{M}(\Omega(J_{F,S})(\chi_S|_{J^1_{F,S}}))
+\frac{1}{L_{\Sigma_F-S}(\chi,s)} \cdot (\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C})) \subset \mathscr{M}(\Omega(J_{F,S})(\chi_S|_{J^1_{F,S}})) \tag{8.1.0.6}
 $$
 
 where:
 
-(8.1.0.7)
-
 $$
-L_{\Sigma_F-S}(\chi,s) := \prod_{v \in S_f} L_v(\chi_v|\cdot|^s_v)^{-1} \cdot L_f(s,\chi)
+L_{\Sigma_F-S}(\chi,s) := \prod_{v \in S_f} L_v(\chi_v|\cdot|^s_v)^{-1} \cdot L_f(s,\chi) \tag{8.1.0.7}
 $$
 
 where $L_f(s,\chi)$ is the finite Hecke $L$-function (see (3.2.1.7) from Definition 3.2.1.4), and where for each finite place $v \in S_f \subset S$, $L_v(\chi_v|\cdot|^s_v)$ is the Euler factor at $v$ of the Hecke $L$-function $L(s,\chi)$.
@@ -160,26 +146,20 @@ as meromorphic functions on the complex $s$-plane.
 
 Let $\phi \in \mathscr{O}(\mathbf{C})$ be such that $\Lambda(s,\chi)\phi(s) \in A\mathcal{S}(\mathbf{C})$, and such that
 
-(8.1.0.8)
-
 $$
-\frac{\Lambda(s,\chi)}{L_{\Sigma_F-S}(\chi,s)}\phi(s) = \Phi(s).
+\frac{\Lambda(s,\chi)}{L_{\Sigma_F-S}(\chi,s)}\phi(s) = \Phi(s). \tag{8.1.0.8}
 $$
 
 Then, since $\Phi$ is Schwartz uniformly on every open vertical strip of bounded width of $\mathbf{C}-i\mathbf{R}$, since $\rho_S(\chi|\cdot|^s_{F,S})$ and all of its meromorphic derivatives grow at most polynomially uniformly on such vertical strips by Proposition 3.3.1.5, and since $\frac{\Lambda(s,\chi)}{L_{\Sigma_F-S}(\chi,s)} = L_S(\chi,s)$ is bounded and holomorphic, as are all of its derivatives, on all such vertical strips, we deduce that we have, as linear subspaces of $\mathscr{M}(\Omega(J_{F,S})(\chi_S|_{J^1_{F,S}}))$:
 
-(8.1.0.9)
-
 $$
-\frac{1}{L_{\Sigma_F-S}(\chi,s)} \cdot (\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C})) = L_S(\chi,s)A\mathcal{S}(\mathbf{C}).
+\frac{1}{L_{\Sigma_F-S}(\chi,s)} \cdot (\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C})) = L_S(\chi,s)A\mathcal{S}(\mathbf{C}). \tag{8.1.0.9}
 $$
 
 By Theorem 7.5.0.1, we have:
 
-(8.1.0.10)
-
 $$
-\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C}) + \prod_{v \in S_p} L_v(\chi_v|\cdot|^s_v)^{-1} A\mathcal{S}(\mathbf{C}) = A\mathcal{S}(\mathbf{C}).
+\Lambda(s,\chi)\mathscr{O}(\mathbf{C}) \cap A\mathcal{S}(\mathbf{C}) + \prod_{v \in S_p} L_v(\chi_v|\cdot|^s_v)^{-1} A\mathcal{S}(\mathbf{C}) = A\mathcal{S}(\mathbf{C}). \tag{8.1.0.10}
 $$
 
 Let $\phi \in A\mathcal{S}(\mathbf{C})$ be the element satisfying (8.1.0.8).

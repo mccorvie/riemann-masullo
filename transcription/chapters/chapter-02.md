@@ -142,26 +142,20 @@ The space of *tempered distributions* on $\mathbf R$ is defined to be the Hausdo
 
 We define, for every $\alpha\in\mathbf N^m$, the $\mathbf C$-linear operator
 
-(2.1.1.1)
-
 $$
-D^\alpha_x:=\frac{\partial^{|\alpha|}}{\partial x_1^{\alpha_1}\cdots\partial x_m^{\alpha_m}}:C^\infty(\mathbf R^m)\to C^\infty(\mathbf R^m)
+D^\alpha_x:=\frac{\partial^{|\alpha|}}{\partial x_1^{\alpha_1}\cdots\partial x_m^{\alpha_m}}:C^\infty(\mathbf R^m)\to C^\infty(\mathbf R^m) \tag{2.1.1.1}
 $$
 
 with $|\alpha|:=\sum_{i=1}^m\alpha_i$. We write, for any $x\in\mathbf R^m$ and $\alpha\in\mathbf N^m$
 
-(2.1.1.2)
-
 $$
-x^\alpha:=\prod_{i=1}^m x_i^{\alpha_i}.
+x^\alpha:=\prod_{i=1}^m x_i^{\alpha_i}. \tag{2.1.1.2}
 $$
 
 **DEFINITION 2.1.1.4.** Let $f:\mathbf R^m\to\mathbf C$ be a smooth function. We say $f$ is of *rapid decay at infinity* if and only if for every $\alpha,\beta\in\mathbf N^m$, the function
 
-(2.1.1.3)
-
 $$
-\|\cdot\|_{\alpha,\beta}:C^\infty(\mathbf R^m)\to[0,+\infty]
+\|\cdot\|_{\alpha,\beta}:C^\infty(\mathbf R^m)\to[0,+\infty] \tag{2.1.1.3}
 $$
 
 ## PDF page 61
@@ -170,10 +164,8 @@ $$
 
 defined as
 
-(2.1.1.4)
-
 $$
-\|f\|_{\alpha,\beta}:\sup_{x\in\mathbf R^m}(1+|x^\alpha|)|D^\beta_x f(x)|
+\|f\|_{\alpha,\beta}:\sup_{x\in\mathbf R^m}(1+|x^\alpha|)|D^\beta_x f(x)| \tag{2.1.1.4}
 $$
 
 is finite on $f$.
@@ -422,10 +414,8 @@ As for the case of the $p$-adic rationals, and, in fact, as a consequence of the
 
 There is a canonical linear isomorphism
 
-(2.1.3.1)
-
 $$
-\mathcal S(\mathbf R)\otimes\mathcal S(\mathbf A^f_{\mathbf Q})\to\mathcal S(\mathbf A_{\mathbf Q})
+\mathcal S(\mathbf R)\otimes\mathcal S(\mathbf A^f_{\mathbf Q})\to\mathcal S(\mathbf A_{\mathbf Q}) \tag{2.1.3.1}
 $$
 
 leading to a description of the generic element of $\mathcal S(\mathbf A_{\mathbf Q})$: it is a finite linear combination of functions of the form:
@@ -452,10 +442,8 @@ Suffices here to say that inductive tensor products behave well with respect to 
 
 (2) *The canonical linear map*
 
-(2.1.3.2)
-
 $$
-\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota\mathcal S(\mathbf A^f_F)\to\mathcal S(\mathbf A_F)
+\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota\mathcal S(\mathbf A^f_F)\to\mathcal S(\mathbf A_F) \tag{2.1.3.2}
 $$
 
 *is a linear topological isomorphism. In particular, the inductive tensor product on the left side of (2.1.3.2) is complete.*
@@ -516,10 +504,8 @@ We call $\{V_m\}_{m\ge 0}$ a choice of sequence of finite dimensional $\mathbf C
 
 The induced $\mathbf C$-linear operators between inductive tensor products
 
-(2.1.3.3)
-
 $$
-\alpha_{\mathcal{S},m}:\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_m\to\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_{m+1}
+\alpha_{\mathcal{S},m}:\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_m\to\mathcal S(\mathbf A_{F,S_\infty})\otimes_\iota V_{m+1} \tag{2.1.3.3}
 $$
 
 are injective, since $\mathcal S(\mathbf A_{F,S_\infty})$ is a $\mathbf C$-linear space and the $\mathbf C$-linear spaces underlying the tensor products are algebraic tensor products, and continuous by [Jar, Part III,Ch.15,§15.2,Prop.1].

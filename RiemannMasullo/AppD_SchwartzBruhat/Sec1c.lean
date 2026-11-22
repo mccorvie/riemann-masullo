@@ -2904,6 +2904,157 @@ private theorem schwartzBruhat_fourier_linear {G : Type*} [CommGroup G] [Topolog
 
 end SchwartzIntegrability
 
+section FourierTransport
+
+variable {A B : Type*} [CommGroup A] [TopologicalSpace A]
+    [CommGroup B] [TopologicalSpace B]
+
+/-- A topological group isomorphism restricts to a subgroup and its image. -/
+private def fourierSubgroupMap (d : A ≃ₜ* B) (U : Subgroup A) :
+    U ≃ₜ* U.map d.toMulEquiv.toMonoidHom where
+  toMulEquiv := d.toMulEquiv.subgroupMap U
+  continuous_toFun := (d.continuous.comp continuous_subtype_val).subtype_mk _
+  continuous_invFun := (d.symm.continuous.comp continuous_subtype_val).subtype_mk _
+
+variable [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A]
+    [IsTopologicalGroup B] [T2Space B] [LocallyCompactSpace B]
+
+/-- Transport of structural pairs preserves their open subgroups and good kernels. -/
+private def fourierTransportPair (d : A ≃ₜ* B) (a : BruhatStructuralPair A) :
+    BruhatStructuralPair B := by
+  let U := a.val.1
+  let N := OrderDual.ofDual a.val.2
+  let D := d.toMulEquiv.toMonoidHom
+  let φ := PontryaginDual.map (d.symm : B →ₜ* A)
+  let ψ := PontryaginDual.map (d : A →ₜ* B)
+  let δ : PontryaginDual A ≃ₜ* PontryaginDual B :=
+    { φ with
+      toFun := φ
+      invFun := ψ
+      left_inv := fun χ ↦ PontryaginDual.ext fun x ↦ by
+        change χ (d.symm (d x)) = χ x
+        rw [d.symm_apply_apply]
+      right_inv := fun χ ↦ PontryaginDual.ext fun x ↦ by
+        change χ (d (d.symm x)) = χ x
+        rw [d.apply_symm_apply]
+      continuous_invFun := ψ.continuous }
+  have hann : (lcaAnnihilator N).map δ.toMulEquiv.toMonoidHom = lcaAnnihilator (N.map D) := by
+    ext χ
+    rw [Subgroup.map_equiv_eq_comap_symm', Subgroup.mem_comap, mem_lcaAnnihilator_iff,
+      mem_lcaAnnihilator_iff]
+    constructor
+    · intro h x
+      obtain ⟨y, hy, hxy⟩ := x.property
+      calc
+        χ (x : B) = χ (D y) := (congrArg χ hxy).symm
+        _ = 1 := h ⟨y, hy⟩
+    · intro h x
+      exact h ⟨D x, Subgroup.mem_map_of_mem D x.property⟩
+  refine ⟨(U.map D, OrderDual.toDual (N.map D)), ?_, ?_, ⟨?_, ?_, ?_⟩, ?_⟩
+  · exact d.toHomeomorph.isOpenMap _ a.property.1
+  · exact isCompactlyGeneratedGroup_of_continuousMulEquiv (fourierSubgroupMap d U)
+      a.property.2.1
+  · exact d.toHomeomorph.isClosedMap _ a.property.2.2.1.1
+  · change IsOpen (lcaAnnihilator (N.map D) : Set (PontryaginDual B))
+    rw [← hann]
+    exact δ.toHomeomorph.isOpenMap _ a.property.2.2.1.2.1
+  · change IsCompactlyGeneratedGroup (lcaAnnihilator (N.map D))
+    rw [← hann]
+    exact isCompactlyGeneratedGroup_of_continuousMulEquiv
+      (fourierSubgroupMap δ (lcaAnnihilator N)) a.property.2.2.1.2.2
+  · exact Subgroup.map_mono a.property.2.2.2
+
+/-- Transport of pairs induces the corresponding isomorphism on their quotients. -/
+private def fourierTransportQuotient (d : A ≃ₜ* B) (a : BruhatStructuralPair A) :
+    a.quotient ≃ₜ* (fourierTransportPair d a).quotient := by
+  let b := fourierTransportPair d a
+  let dU : a.val.1 ≃ₜ* b.val.1 := fourierSubgroupMap d a.val.1
+  let N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype
+  let M := (OrderDual.ofDual b.val.2).comap b.val.1.subtype
+  have hNM : N.map dU.toMulEquiv.toMonoidHom = M := by
+    ext y
+    rw [Subgroup.map_equiv_eq_comap_symm', Subgroup.mem_comap]
+    change d.symm (y : B) ∈ OrderDual.ofDual a.val.2 ↔
+      (y : B) ∈ (OrderDual.ofDual a.val.2).map d.toMulEquiv.toMonoidHom
+    exact Subgroup.mem_map_equiv.symm
+  let q := QuotientGroup.congr N M dU.toMulEquiv hNM
+  exact
+    { toMulEquiv := q
+      continuous_toFun := isQuotientMap_quotient_mk'.continuous_iff.mpr
+        (QuotientGroup.continuous_mk.comp dU.continuous)
+      continuous_invFun := isQuotientMap_quotient_mk'.continuous_iff.mpr
+        (QuotientGroup.continuous_mk.comp dU.symm.continuous) }
+
+/-- The transported presentation uses the same elementary coordinates. -/
+private abbrev fourierTransportPresentation (d : A ≃ₜ* B) (a : BruhatStructuralPair A)
+    (e : ElementaryLCAPresentation a.quotient) :
+    ElementaryLCAPresentation (fourierTransportPair d a).quotient :=
+  { e with equiv := (fourierTransportQuotient d a).symm.trans e.equiv }
+
+/-- Pushing a realized stage through a group isomorphism just changes its quotient
+presentation, leaving its elementary Schwartz space unchanged. -/
+private theorem fourierTransportStage (d : A ≃ₜ* B) (a : BruhatStructuralPair A)
+    (e : ElementaryLCAPresentation a.quotient) :
+    (LinearMap.funLeft ℂ ℂ d.symm).comp (schwartzBruhatStageRealization a e) =
+      schwartzBruhatStageRealization (fourierTransportPair d a) (fourierTransportPresentation d a e) := by
+  classical
+  let b := fourierTransportPair d a
+  let q := fourierTransportQuotient d a
+  let e' := fourierTransportPresentation d a e
+  refine LinearMap.ext fun s ↦ funext (d.surjective.forall.mpr ?_)
+  intro x
+  have hmem : d x ∈ b.val.1 ↔ x ∈ a.val.1 := by
+    change d x ∈ a.val.1.map d.toMulEquiv.toMonoidHom ↔ _
+    exact Subgroup.mem_map_iff_mem d.injective
+  change schwartzBruhatStageRealization a e s (d.symm (d x)) =
+    schwartzBruhatStageRealization b e' s (d x)
+  rw [d.symm_apply_apply, schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : x ∈ a.val.1
+  · rw [dite_eq_left hx, dite_eq_left (hmem.mpr hx)]
+    have hq : q (QuotientGroup.mk ⟨x, hx⟩) = QuotientGroup.mk ⟨d x, hmem.mpr hx⟩ := rfl
+    change s (Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))) =
+      s (Multiplicative.toAdd (e.equiv (q.symm (QuotientGroup.mk ⟨d x, hmem.mpr hx⟩))))
+    rw [← hq, q.symm_apply_apply]
+  · rw [dite_eq_right hx, dite_eq_right (hx ∘ hmem.mp)]
+
+/-- Pushing a function through a group isomorphism is continuous for the
+Schwartz–Bruhat topology because it carries each stage into a stage. -/
+private theorem schwartzBruhat_fourierTransport (d : A ≃ₜ* B) :
+    ∃ T : SchwartzBruhat A →L[ℂ] SchwartzBruhat B,
+      ∀ (f : SchwartzBruhat A) (y : B), T f y = f (d.symm y) := by
+  let L := LinearMap.funLeft ℂ ℂ d.symm
+  have hL : (schwartzBruhatSubmodule A).map L ≤ schwartzBruhatSubmodule B := by
+    simp only [schwartzBruhatSubmodule, Submodule.map_iSup, iSup_le_iff]
+    intro a e
+    rintro w ⟨_, ⟨s, rfl⟩, rfl⟩
+    exact Submodule.mem_iSup_of_mem (fourierTransportPair d a)
+      (Submodule.mem_iSup_of_mem (fourierTransportPresentation d a e)
+        ⟨s, (LinearMap.congr_fun (fourierTransportStage d a e) s).symm⟩)
+  let T : SchwartzBruhat A →ₗ[ℂ] SchwartzBruhat B :=
+    (L.comp (schwartzBruhatSubmodule A).subtype).codRestrict (schwartzBruhatSubmodule B)
+      (fun f ↦ hL ⟨f, f.property, rfl⟩)
+  refine ⟨⟨T, ?_⟩, fun _ _ ↦ rfl⟩
+  let pB : {p : Seminorm ℂ (schwartzBruhatSubmodule B) //
+      ∀ (b : BruhatStructuralPair B) (e : ElementaryLCAPresentation b.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion b e)} →
+          Seminorm ℂ (schwartzBruhatSubmodule B) := Subtype.val
+  refine (withGeneratingSeminorms_spec _ pB).continuous_of_continuous_comp T fun p ↦ ?_
+  let q := p.val.comp T
+  have hq (a : BruhatStructuralPair A) (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (q ∘ schwartzBruhatStageInclusion a e) := by
+    let b := fourierTransportPair d a
+    let e' := fourierTransportPresentation d a e
+    have heq (s : SchwartzBruhatStage e) :
+        schwartzBruhatStageInclusion b e' s = T (schwartzBruhatStageInclusion a e s) :=
+      Subtype.ext (LinearMap.congr_fun (fourierTransportStage d a e) s).symm
+    exact (p.property b e').congr fun s ↦ congrArg (fun f ↦ p.val f) (heq s)
+  let i : {p : Seminorm ℂ (schwartzBruhatSubmodule A) //
+      ∀ (a : BruhatStructuralPair A) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion a e)} := ⟨q, hq⟩
+  exact (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
+
+end FourierTransport
+
 section AveragingAndFourier
 
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [hTop : IsTopologicalGroup G]
@@ -3298,12 +3449,106 @@ theorem lcaFourier_bruhatDiff (D : bruhatDiffAlgebra G) (f : SchwartzBruhat G) :
   rw [hs]
   exact (hB g χ).symm.trans ((hF χ).trans (congrArg (c χ * ·) (hB f χ)))
 
+/-- Paper: Lemma D.1.6.19(2), p. 773. The Fourier integral maps Schwartz–Bruhat functions
+on `G` to Schwartz–Bruhat functions on the dual, by a continuous linear map.
+This is the first assertion of part (2); the isomorphism property is deduced from it below. -/
+theorem schwartzBruhat_fourier_continuousLinear :
+    ∃ T : SchwartzBruhat G →L[ℂ] SchwartzBruhat (PontryaginDual G),
+      ∀ (f : SchwartzBruhat G) χ, T f χ = lcaFourier μ f χ := by sorry
+
+/-- Once Fourier transforms of Schwartz–Bruhat functions are known to be Schwartz–Bruhat,
+they are integrable, so Plancherel inversion holds pointwise. -/
+private theorem schwartzBruhat_fourier_inversion (ν : Measure (PontryaginDual G))
+    (hν : IsLCAPlancherelMeasure μ ν) (g : SchwartzBruhat G) (x : G) :
+    g x = ∫ χ : PontryaginDual G, lcaFourier μ g χ * (χ x : ℂ) ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  obtain ⟨A, hA⟩ := schwartzBruhat_fourier_continuousLinear μ
+  have hg := SchwartzBruhat.integrable μ g
+  have hu : Integrable (lcaFourier μ g) ν :=
+    (SchwartzBruhat.integrable ν (A g)).congr (.of_forall (hA g))
+  obtain ⟨b,hb⟩ := schwartzBruhat_boundedContinuous g
+  have hg₂ : MemLp (g : G → ℂ) 2 μ := by
+    apply (memLp_two_iff_integrable_sq_norm hg.aestronglyMeasurable).mpr
+    simpa only [sq] using hg.norm.mul_bdd (c := ‖b‖) hg.norm.aestronglyMeasurable
+      (.of_forall fun y ↦ by simpa only [Real.norm_of_nonneg (norm_nonneg _), ← hb] using b.norm_coe_le_norm y)
+  have hv := (lcaFourier_unitary μ ν hν).exists.choose_spec (g : G → ℂ) hg hg₂
+  obtain ⟨F,hF,hFx⟩ := lcaInverseFourier_zeroAtInfty μ ν hν _ _ hu hv
+  have heq : (F : G → ℂ) = b :=
+    Measure.eq_of_ae_eq ((hF.trans hg₂.coeFn_toLp).trans (.of_forall fun y ↦ (hb y).symm)) F.continuous b.continuous
+  exact (hb x).symm.trans ((congrFun heq x).symm.trans (hFx x))
+
+/-- The inverse Fourier integral `g ↦ (x ↦ ∫ g χ · χ x dν)` maps Schwartz–Bruhat functions
+on the dual continuously to Schwartz–Bruhat functions on `G`: it is the Fourier transform on
+the dual followed by transport along `x ↦ (evaluation at x⁻¹)` to the double dual. -/
+private theorem exists_schwartzBruhat_inverseFourier (ν : Measure (PontryaginDual G))
+    [ν.IsHaarMeasure] [ν.Regular] :
+    ∃ S : SchwartzBruhat (PontryaginDual G) →L[ℂ] SchwartzBruhat G,
+      Function.Injective S ∧ ∀ g x, S g x = ∫ χ : PontryaginDual G, g χ * (χ x : ℂ) ∂ν := by
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  have hb₀ := pontryaginDual_bidual (G := G)
+  let b := hb₀.choose
+  have hb := hb₀.choose_spec
+  let c : G ≃ₜ* PontryaginDual (PontryaginDual G) :=
+    { toMulEquiv := (MulEquiv.inv G).trans b.toMulEquiv
+      continuous_toFun := b.continuous.comp continuous_inv
+      continuous_invFun := continuous_inv.comp b.symm.continuous }
+  have hc (x : G) (χ : PontryaginDual G) : c x χ = (χ x)⁻¹ := by
+    change b x⁻¹ χ = _
+    rw [hb, map_inv]
+  have hT'₀ := schwartzBruhat_fourier_continuousLinear ν
+  let T' := hT'₀.choose
+  have hT' := hT'₀.choose_spec
+  have hR₀ := schwartzBruhat_fourierTransport c.symm
+  let R := hR₀.choose
+  have hR := hR₀.choose_spec
+  refine ⟨R.comp T', ?_, fun g x ↦ ?_⟩
+  · rw [injective_iff_map_eq_zero]
+    intro g hg
+    have h0 (ξ : PontryaginDual (PontryaginDual G)) : lcaFourier ν g ξ = 0 := by
+      obtain ⟨x, rfl⟩ := c.surjective ξ
+      refine (hT' g (c x)).symm.trans ?_
+      exact (hR (T' g) x).symm.trans (congrArg (fun h : SchwartzBruhat G ↦ h x) hg)
+    have hae := ae_eq_zero_of_lcaFourier_eq_zero ν (SchwartzBruhat.integrable ν g) h0
+    obtain ⟨u, hu⟩ := schwartzBruhat_boundedContinuous g
+    have hu0 : (u : PontryaginDual G → ℂ) = 0 :=
+      Measure.eq_of_ae_eq (hae.mono fun ξ h ↦ (hu ξ).trans h) u.continuous continuous_const
+    apply Subtype.ext
+    funext ξ
+    exact (hu ξ).symm.trans (congrFun hu0 ξ)
+  refine (hR (T' g) x).trans ((hT' g _).trans ?_)
+  refine integral_congr_ae (.of_forall fun χ ↦ ?_)
+  change g χ * star ((c x χ : Circle) : ℂ) = g χ * (χ x : ℂ)
+  rw [hc, Circle.coe_inv_eq_conj, Complex.star_def, Complex.conj_conj]
+
 /-- Paper: Lemma D.1.6.19(2), p. 773. The Fourier integral gives a continuous
 linear isomorphism of the two Schwartz–Bruhat spaces. -/
 theorem schwartzBruhat_fourier_equiv :
     ∃ F : SchwartzBruhat G ≃L[ℂ] SchwartzBruhat (PontryaginDual G),
       ∀ f : SchwartzBruhat G, Integrable (f : G → ℂ) μ ∧
-        ∀ χ, F f χ = lcaFourier μ f χ := by sorry
+        ∀ χ, F f χ = lcaFourier μ f χ := by
+  have hν₀ := lcaPlancherelMeasure_existsUnique μ
+  let ν := hν₀.exists.choose
+  have hν : IsLCAPlancherelMeasure μ ν := hν₀.exists.choose_spec
+  let : BorelSpace (PontryaginDual G) := ⟨rfl⟩
+  let : ν.IsHaarMeasure := hν.1
+  let : ν.Regular := hν.2.1
+  have hT₀ := schwartzBruhat_fourier_continuousLinear μ
+  let T := hT₀.choose
+  have hT := hT₀.choose_spec
+  have hS₀ := exists_schwartzBruhat_inverseFourier μ ν
+  let S := hS₀.choose
+  have hSinj := hS₀.choose_spec.1
+  have hS := hS₀.choose_spec.2
+  have hST (f : SchwartzBruhat G) : S (T f) = f := by
+    apply Subtype.ext
+    funext x
+    refine (hS (T f) x).trans (Eq.trans ?_ (schwartzBruhat_fourier_inversion μ ν hν f x).symm)
+    refine integral_congr_ae (.of_forall fun χ ↦ ?_)
+    exact congrArg (· * (χ x : ℂ)) (hT f χ)
+  exact ⟨ContinuousLinearEquiv.equivOfInverse T S hST (fun g ↦ hSinj (hST (S g))),
+    fun f ↦ ⟨SchwartzBruhat.integrable μ f, fun χ ↦ hT f χ⟩⟩
 
 /-- Both Schwartz functions and their transforms are integrable, so Plancherel inversion holds pointwise. -/
 private theorem schwartzBruhat_inverse_integral (ν : Measure (PontryaginDual G)) (hν : IsLCAPlancherelMeasure μ ν)

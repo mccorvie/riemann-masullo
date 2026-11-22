@@ -133,6 +133,11 @@ If you adapt a proof or definition from one of them, say so in the pull request 
 to [`RiemannMasullo/External/ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md): the
 projects are Apache-2.0, which requires the credit. Do not copy from a project with no license.
 
+The launcher's prompt may also name a directory of outside documents about gaps in the paper
+and possible repairs, with an index by page. Nothing in them has been checked by this project.
+A report there is a lead: test it against the page and the Lean statement before relying on it,
+and name the document when a finding of yours started from one.
+
 ## Reading the paper
 
 Printed page numbers equal PDF page numbers.
