@@ -5,6 +5,7 @@ public import Mathlib.Analysis.Complex.MeanValue
 public import Mathlib.Analysis.Fourier.AddCircleMulti
 public import RiemannMasullo.Ch03_IdelicZeta.Sec2
 import Mathlib.Topology.MetricSpace.UniformConvergence
+import Mathlib.Analysis.Complex.Tietze
 
 /-!
 # §B.5 Recurrence and equidistribution
@@ -390,6 +391,129 @@ theorem kroneckerWeyl_riemannIntegrable_forward [NeZero N] (τ : Fin N → ℝ)
       (volume.restrict (Ici (0 : ℝ)))) :
     Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (torusFlowInClosure τ t))
       atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
+
+section KroneckerWeyl
+
+open Real UnitAddTorus
+
+/-- On the orbit closure, an exponential monomial integrates against a Haar probability
+measure to one when it is trivial along the flow, and to zero otherwise. -/
+private theorem integral_mFourier_torusFlowClosure (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
+    (n : Fin N → ℤ) :
+    ∫ x, mFourier n (x : UnitAddTorus (Fin N)) ∂μ =
+      if (∑ i, (n i : ℝ) * τ i) = 0 then 1 else 0 := by
+  set c := ∑ i, (n i : ℝ) * τ i
+  split_ifs with hc
+  · have hone : ∀ x ∈ (torusFlowClosure τ : Set (UnitAddTorus (Fin N))), mFourier n x = 1 := by
+      have hsub : range (torusFlow τ) ⊆ {x | mFourier n x = 1} := by
+        rintro _ ⟨t, rfl⟩
+        change mFourier n (torusFlow τ t) = 1
+        rw [mFourier_torusFlow]
+        simp [show (∑ i, (n i : ℝ) * τ i) = 0 from hc]
+      have := closure_minimal hsub (isClosed_eq (mFourier n).continuous continuous_const)
+      intro x hx
+      rw [torusFlowClosure, AddSubgroup.topologicalClosure_coe] at hx
+      exact this (by simpa using hx)
+    simp [fun x : torusFlowClosure τ ↦ hone x x.2]
+  · let h₀ : torusFlowClosure τ := torusFlowInClosure τ (1 / (2 * c))
+    have hw : mFourier n (h₀ : UnitAddTorus (Fin N)) = -1 := by
+      change mFourier n (torusFlow τ (1 / (2 * c))) = -1
+      rw [mFourier_torusFlow, show 2 * (π : ℂ) * Complex.I * (c : ℂ) * ((1 / (2 * c) : ℝ) : ℂ) =
+        π * Complex.I by
+          push_cast; field_simp [hc]]
+      exact Complex.exp_pi_mul_I
+    have h1 := integral_add_right_eq_self (μ := μ)
+      (fun x : torusFlowClosure τ ↦ mFourier n (x : UnitAddTorus (Fin N))) h₀
+    simp only [AddSubgroup.coe_add, mFourier_add_apply, hw, integral_mul_const] at h1
+    linear_combination (-1 / 2 : ℂ) * h1
+
+/-- Uniformly bounded linear time averages on the torus that converge to the orbit-closure
+integral on every exponential monomial converge to it on every continuous function. -/
+private theorem tendsto_of_mFourier (τ : Fin N → ℝ)
+    (μ : Measure (torusFlowClosure τ)) [IsProbabilityMeasure μ]
+    (A : ℝ → C(UnitAddTorus (Fin N), ℂ) → ℂ)
+    (hadd : ∀ T φ ψ, A T (φ + ψ) = A T φ + A T ψ) (hsmul : ∀ T (a : ℂ) φ, A T (a • φ) = a * A T φ)
+    (hnorm : ∀ T φ, ‖A T φ‖ ≤ ‖φ‖)
+    (hF : ∀ n, Tendsto (fun T ↦ A T (mFourier n)) atTop
+      (𝓝 (∫ x, mFourier n (x : UnitAddTorus (Fin N)) ∂μ)))
+    (φ : C(UnitAddTorus (Fin N), ℂ)) :
+    Tendsto (fun T ↦ A T φ) atTop (𝓝 (∫ x, φ (x : UnitAddTorus (Fin N)) ∂μ)) := by
+  have : CompactSpace (torusFlowClosure τ) := isCompact_iff_compactSpace.mp
+    (AddSubgroup.isClosed_topologicalClosure _).isCompact
+  have hInt (φ : C(UnitAddTorus (Fin N), ℂ)) :
+      Integrable (fun x : torusFlowClosure τ ↦ φ (x : UnitAddTorus (Fin N))) μ :=
+    integrableOn_univ.mp
+      ((φ.continuous.comp continuous_subtype_val).continuousOn.integrableOn_compact isCompact_univ)
+  have hsub (T : ℝ) (φ ψ : C(UnitAddTorus (Fin N), ℂ)) : A T φ - A T ψ = A T (φ - ψ) := by
+    rw [sub_eq_add_neg, sub_eq_add_neg, hadd, ← neg_one_smul ℂ ψ, hsmul]
+    ring
+  have hLip (T : ℝ) : LipschitzWith 1 (A T) := LipschitzWith.of_dist_le_mul fun φ ψ ↦ by
+    rw [dist_eq_norm, dist_eq_norm, hsub, NNReal.coe_one, one_mul]
+    exact hnorm T _
+  have hIcont : Continuous fun φ : C(UnitAddTorus (Fin N), ℂ) ↦
+      ∫ x, φ (x : UnitAddTorus (Fin N)) ∂μ := by
+    refine (LipschitzWith.of_dist_le_mul fun φ ψ ↦ ?_ : LipschitzWith 1 _).continuous
+    rw [dist_eq_norm, dist_eq_norm, ← integral_sub (hInt φ) (hInt ψ), NNReal.coe_one, one_mul]
+    calc ‖∫ x, (φ (x : UnitAddTorus (Fin N)) - ψ x) ∂μ‖ ≤ ‖φ - ψ‖ * (μ univ).toReal :=
+          norm_integral_le_of_norm_le_const (Eventually.of_forall fun x ↦
+            (φ - ψ).norm_coe_le_norm (x : UnitAddTorus (Fin N)))
+      _ = ‖φ - ψ‖ := by simp
+  let V : Set C(UnitAddTorus (Fin N), ℂ) :=
+    {φ | Tendsto (fun T ↦ A T φ) atTop (𝓝 (∫ x, φ (x : UnitAddTorus (Fin N)) ∂μ))}
+  have hVclosed : IsClosed V :=
+    ((LipschitzWith.uniformEquicontinuous A 1 hLip).equicontinuous).isClosed_setOfPred_tendsto
+      hIcont
+  have hzero (T : ℝ) : A T 0 = 0 := by simpa using hsmul T 0 0
+  have hspan : ((Submodule.span ℂ (range (mFourier (d := Fin N))) :
+      Set C(UnitAddTorus (Fin N), ℂ))) ⊆ V := by
+    intro φ hφ
+    induction hφ using Submodule.span_induction with
+    | mem x hx => obtain ⟨n, rfl⟩ := hx; exact hF n
+    | zero => simp [V, hzero]
+    | add φ ψ _ _ hφ hψ =>
+      change Tendsto _ _ _
+      simp only [hadd, ContinuousMap.add_apply, integral_add (hInt φ) (hInt ψ)]
+      exact hφ.add hψ
+    | smul a φ _ hφ =>
+      change Tendsto _ _ _
+      simp only [hsmul, ContinuousMap.smul_apply, smul_eq_mul, integral_const_mul]
+      exact hφ.const_mul a
+  have hmem : φ ∈ (Submodule.span ℂ (range (mFourier (d := Fin N)))).topologicalClosure := by
+    rw [span_mFourier_closure_eq_top]; trivial
+  exact closure_minimal hspan hVclosed hmem
+
+/-- The symmetric time averages of a nonconstant imaginary exponential tend to zero. -/
+private theorem tendsto_symmAverage_exp {c : ℝ} (hc : c ≠ 0) :
+    Tendsto (fun T : ℝ ↦ (2 * T : ℂ)⁻¹ * ∫ t in -T..T, Complex.exp (2 * π * Complex.I * c * t))
+      atTop (𝓝 0) := by
+  have ha : (2 * π * Complex.I * c : ℂ) ≠ 0 := by
+    simp [hc, Real.pi_ne_zero, Complex.I_ne_zero]
+  have hb (T : ℝ) : ‖Complex.exp (2 * π * Complex.I * c * T)‖ = 1 := by
+    rw [show (2 * π * Complex.I * c * T : ℂ) = ((2 * π * c * T : ℝ) : ℂ) * Complex.I by
+      push_cast; ring, Complex.norm_exp_ofReal_mul_I]
+  have hint (T : ℝ) : ‖∫ t in -T..T, Complex.exp (2 * π * Complex.I * c * t)‖ ≤
+      2 / ‖(2 * π * Complex.I * c : ℂ)‖ := by
+    rw [integral_exp_mul_complex ha, norm_div]
+    gcongr
+    calc _ ≤ ‖Complex.exp (2 * π * Complex.I * c * T)‖ +
+          ‖Complex.exp (2 * π * Complex.I * c * ((-T : ℝ) : ℂ))‖ := norm_sub_le _ _
+      _ = 2 := by rw [hb, hb]; norm_num
+  rw [tendsto_zero_iff_norm_tendsto_zero]
+  refine squeeze_zero' (Eventually.of_forall fun _ ↦ norm_nonneg _) ?_
+    (by simpa using (tendsto_inv_atTop_zero.const_mul (1 / ‖(2 * π * Complex.I * c : ℂ)‖)))
+  refine (eventually_gt_atTop 0).mono fun T hT ↦ ?_
+  rw [norm_mul, norm_inv, show (2 * T : ℂ) = ((2 * T : ℝ) : ℂ) by push_cast; ring,
+    Complex.norm_real, Real.norm_of_nonneg (by linarith)]
+  calc (2 * T)⁻¹ * ‖∫ t in -T..T, Complex.exp (2 * π * Complex.I * c * t)‖
+      ≤ (2 * T)⁻¹ * (2 / ‖(2 * π * Complex.I * c : ℂ)‖) := by gcongr; exact hint T
+    _ = |c|⁻¹ * (π⁻¹ * 2⁻¹) * T⁻¹ := by
+      have hna : ‖(2 * π * Complex.I * c : ℂ)‖ = 2 * π * |c| := by
+        simp [abs_of_pos Real.pi_pos]
+      rw [hna]
+      field_simp
+
+end KroneckerWeyl
 
 /-- Paper: Theorem B.5.2.1(2), p. 627.
 Symmetric time averages of a continuous observable converge to its Haar probability integral.
