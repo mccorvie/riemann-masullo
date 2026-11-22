@@ -43,7 +43,8 @@ local notation "halfPlane" => Complex.re ⁻¹' Ioi (1 : ℝ)
 /-- At a place where a Hecke character is unramified, its value on a local unit is the value on
 a given uniformizer raised to the valuation exponent, and the norm is the same power of the
 norm of the uniformizer. -/
-private theorem unramifiedHeckeCharacter_existsUnique_phase_local (c : HeckeCharacter (𝓞 F) F) (v : HeightOneSpectrum (𝓞 F))
+private theorem unramifiedHeckeCharacter_existsUnique_phase_local
+    (c : HeckeCharacter (𝓞 F) F) (v : HeightOneSpectrum (𝓞 F))
     (hc : c.IsUnramifiedAt v) (π : (v.adicCompletion F)ˣ)
     (hπ : Valued.v.IsUniformizer π.val) (x : (v.adicCompletion F)ˣ) :
     ∃ n : ℤ, finitePlaceRestriction F v c x = finitePlaceRestriction F v c π ^ n ∧
@@ -93,9 +94,11 @@ theorem unramifiedHeckeCharacter_existsUnique_phase (χ : U) (v : V)
   set a := finitePlaceRestriction F v (ideleClassNormTwist χ 0) π with hadef
   have htwist (s : ℂ) (x : (v.adicCompletion F)ˣ) :
       finitePlaceRestriction F v (ideleClassNormTwist χ s) x =
-        (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) * ((‖x.val‖ : ℝ) : ℂ) ^ s := by
+        (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) *
+          ((‖x.val‖ : ℝ) : ℂ) ^ s := by
     change (χ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℂ) *
-      (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+      (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v x) : ℝ≥0) : ℝ) : ℂ) ^ s =
+        _
     rw [ideleClassNorm_ofAdicCompletion]
     rfl
   have hχ0 (x : (v.adicCompletion F)ˣ) : finitePlaceRestriction F v (ideleClassNormTwist χ 0) x =
@@ -136,7 +139,8 @@ theorem unramifiedHeckeCharacter_existsUnique_phase (χ : U) (v : V)
     have hr : (0 : ℝ) < ((q : ℝ)⁻¹) ^ n := zpow_pos (inv_pos.mpr (zero_lt_one.trans hq1)) n
     rw [hnorm, Complex.cpow_add _ _ (by exact_mod_cast hr.ne'), mul_comm (_ ^ s)]
     congr 1
-    rw [← hadef, hta, hcpow, ← Complex.exp_int_mul, ← hqdef, Complex.cpow_def_of_ne_zero (by exact_mod_cast hr.ne'),
+    rw [← hadef, hta, hcpow, ← Complex.exp_int_mul, ← hqdef,
+      Complex.cpow_def_of_ne_zero (by exact_mod_cast hr.ne'),
       ← Complex.ofReal_log hr.le, Real.log_zpow, Real.log_inv]
     congr 1
     push_cast
@@ -336,7 +340,8 @@ elaborates without unfolding the Schwartz–Bruhat instances. -/
 private theorem globalPolarFreeThetaSpace_mk_eq_iff_quotient {R M N : Type*} [CommRing R]
     [AddCommGroup M] [Module R M] [AddCommGroup N] [Module R N] (Q : Submodule R M)
     (θ : M →ₗ[R] N) (f g : Q) :
-    (Submodule.Quotient.mk f : Q ⧸ (LinearMap.ker θ).comap Q.subtype) = Submodule.Quotient.mk g ↔
+    (Submodule.Quotient.mk f : Q ⧸ (LinearMap.ker θ).comap Q.subtype) =
+        Submodule.Quotient.mk g ↔
       θ f = θ g := by
   rw [Submodule.Quotient.eq, Submodule.mem_comap, LinearMap.mem_ker, map_sub,
     Submodule.subtype_apply, Submodule.subtype_apply, map_sub, sub_eq_zero]
@@ -346,8 +351,9 @@ Two pole-free tests give the same quotient class exactly when their ordinary
 theta functions agree. -/
 theorem globalPolarFreeThetaSpace_mk_eq_iff (f g : P) :
     (Submodule.Quotient.mk f : GlobalPolarFreeThetaSpace F) = Submodule.Quotient.mk g ↔
-      adelicThetaLinearMap F f.val = adelicThetaLinearMap F g.val :=
-  globalPolarFreeThetaSpace_mk_eq_iff_quotient (adelePolarSubspace F) (adelicThetaLinearMap F) f g
+      adelicThetaLinearMap F f.val = adelicThetaLinearMap F g.val := by
+  exact globalPolarFreeThetaSpace_mk_eq_iff_quotient (adelePolarSubspace F)
+    (adelicThetaLinearMap F) f g
 
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equation (6.3.2.5).
 The pole-free theta quotient is represented by the image of the polar test
