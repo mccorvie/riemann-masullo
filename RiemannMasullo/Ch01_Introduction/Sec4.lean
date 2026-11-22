@@ -236,7 +236,13 @@ standing hypothesis of the trace identity, vanishing at every norm-one class. -/
 theorem introTraceApprox_zero_on_normOne (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
     ∀ g : (ideleClassNorm F).ker,
-      introTraceTest χ (introTraceApprox (h n) (ρ n) z) g.val = 0 := by sorry
+      introTraceTest χ (introTraceApprox (h n) (ρ n) z) g.val = 0 := by
+  intro g
+  have hzero : introTraceApprox (h n) (ρ n) z 1 = 0 := by
+    apply image_eq_zero_of_notMem_tsupport
+    exact fun ht ↦ lt_irrefl (1 : ℝ) (introTraceApprox_support h ρ _hA n z ht)
+  have hg : ideleClassNorm F g.val = 1 := g.property
+  simp [introTraceTest, hg, hzero]
 
 /-- Paper: §§1.4.2–1.4.3, pp. 28–29. For a fixed Mellin exponent `s`,
 the approximant moments converge locally uniformly on `Re z > Re s`
