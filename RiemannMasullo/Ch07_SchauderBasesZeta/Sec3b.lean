@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # §7.3.2–7.3.4 Paley–Wiener levels and archimedean principal parts
 
@@ -54,7 +55,30 @@ def sLocalPWBox (_S : Finset V) (X : ℝ) : Set (SAdeleRing F _S) :=
 
 /-- Paper: Definition 7.3.2.1(1), p. 351.
 The Fourier box is compact. -/
-theorem isCompact_sLocalPWBox (X : ℝ) : IsCompact (sLocalPWBox S X) := by sorry
+theorem isCompact_sLocalPWBox (X : ℝ) : IsCompact (sLocalPWBox S X) := by
+  let A (w : InfinitePlace F) := {z : w.Completion | ‖z‖ ^ w.mult ≤ X}
+  let D (v : S) := Metric.closedBall (0 : v.val.adicCompletion F) X
+  have hA (w : InfinitePlace F) : IsCompact (A w) := by
+    have he := InfinitePlace.Completion.isometry_extensionEmbedding w
+    let : ProperSpace w.Completion :=
+      LipschitzWith.properSpace he.isClosedEmbedding.isProperMap he.lipschitzWith
+    refine (isCompact_closedBall (0 : w.Completion) (max 1 X)).of_isClosed_subset
+      (isClosed_le (continuous_norm.pow w.mult) continuous_const) ?_
+    intro z hz
+    rw [Metric.mem_closedBall, dist_zero_right]
+    by_cases h : ‖z‖ ≤ 1
+    · exact h.trans (le_max_left _ _)
+    · exact ((le_self_pow₀ (le_of_not_ge h) w.mult_ne_zero).trans hz).trans (le_max_right _ _)
+  have hD (v : S) : IsCompact (D v) := by
+    let := properSpace_adicCompletion v.val (K := F)
+    exact isCompact_closedBall _ _
+  have hbox : sLocalPWBox S X = (univ.pi A) ×ˢ (univ.pi D) := by
+    apply Set.ext
+    intro z
+    simp only [sLocalPWBox, A, D, mem_ofPred_eq, mem_prod, Set.mem_pi, mem_univ, forall_const,
+      Metric.mem_closedBall, dist_zero_right]
+  rw [hbox]
+  exact (isCompact_univ_pi hA).prod (isCompact_univ_pi hD)
 
 local notation "inBand(" K ", " f ")" =>
   (HasCompactSupport (sAdeleSchwartzFourier f).val ∧
