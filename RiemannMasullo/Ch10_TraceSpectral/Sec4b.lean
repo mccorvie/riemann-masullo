@@ -1,0 +1,550 @@
+module
+
+public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
+public import RiemannMasullo.AppC_LCTVS.Sec3b
+import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
+public import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
+
+/-!
+# Spectral kernels
+
+Masullo, §10.4.3, pp. 464–474. The first factor of a tensor is in the
+reciprocal-weight Sobolev space. A kernel written as a function of `(x,y)`
+has output coordinate `x` and input coordinate `y`.
+-/
+
+@[expose] public noncomputable section
+
+open Filter Function MeasureTheory NumberField Set UniformSpace
+open scoped NNReal NumberField.AdeleRing TensorProduct Topology
+
+namespace RiemannMasullo
+
+set_option quotPrecheck false
+set_option maxHeartbeats 900000
+
+attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorelSpaceSec1
+  instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
+  instIdeleClassHaarMeasureSec1
+
+attribute [local instance] uniformContinuousConstSMul_of_continuousConstSMul
+
+variable {F : Type*} [Field F] [NumberField F]
+
+local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
+local notation "C₁" => (ideleClassNorm F).ker
+local notation "μ𝔽" => ideleClassTamagawaMeasure F
+local notation "m𝔽" =>
+  (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ : C𝔽 →ₜ* ℝ≥0ˣ)
+local notation "logNorm" => (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "hStrip(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
+local notation "hs₀(" hs ")" => (le_of_lt (zero_lt_one.trans hs))
+local notation "w(" α ", " s ")" => (fun g : C𝔽 ↦ intervalSobolevDensity (-α) α s (logNorm g))
+local notation "ν(" α ", " s ")" => ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (w(α, s) g))
+local notation "ν'(" α ", " s ")" => ((μ𝔽).withDensity fun g ↦ ENNReal.ofReal (w(α, s) g)⁻¹)
+local notation "W(" α ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm (-α) α s
+local notation "W'(" α ", " s ")" => CompactIntervalSobolev μ𝔽 logNorm (-α) α s true
+local notation "Π(" E ", " G ")" => Completion (ProjectiveTensor E G)
+local notation "Θ(" a ", " hα ", " hs ")" => globalThetaSobolev F a (hStrip(hα)) hs
+local notation "H(" a ", " hα ", " hs ")" => spectralSobolevQuotient F a (hStrip(hα)) hs
+local notation "Q(" a ", " hα ", " hs ")" => (Θ(a, hα, hs)).mkQL
+local notation "S(" a ", " hα ", " hs ")" =>
+  (fun u : H(a, hα, hs) ↦
+    ((Θ(a, hα, hs)).quotientEquivOrthogonal u).val)
+local notation "A(" hα ", " hs ", " φ ")" =>
+  hardySobolevTestAction μ𝔽 m𝔽 _ _ _ (hStrip(hα)) hs φ
+local notation "Aq(" a ", " hα ", " hs ", " φ ")" =>
+  spectralConvolution (F := F) a (hStrip(hα)) hs φ
+local notation "Pspec(" a ", " hα ", " hs ")" => spectralProjection (F := F) a hα hs
+local notation "Pgeom(" a ", " hα ", " hs ")" => geometricProjection (F := F) a hα hs
+
+-- TODO(paper-gap): The displayed regularization (10.4.3.1) misses the translated
+-- poles for nonzero norm twists. Use the regularization of §7.1.
+-- TODO(paper-gap): In (10.4.3.2) injectivity on the quotient requires a closure
+-- intersection identity in the weaker Sobolev norm. First twist the whole
+-- middle row by multiplication by |.|^a, or take its quotient by the
+-- already twisted theta subspace. Bare completion need not descend from
+-- the quotient by the untwisted theta subspace.
+-- TODO(paper-gap): The biorthogonal Schwartz representatives in (10.4.3.5)
+-- can be changed by adding any polar-free theta vector. The construction
+-- below uses the quotient basis and its orthogonal representatives.
+
+section ProjectiveKernels
+
+variable {α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s)
+
+local notation "T" =>
+  (modulatedIntervalSobolev_dual m𝔽
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 (-α) α s (hStrip(hα)) hs).exists.choose
+
+/-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
+The canonical projective kernel map applies the inverse Sobolev duality
+to the first factor and sends the resulting tensor to an operator. -/
+def sobolevProjectiveKernelOperator :
+    Π(W'(α, s), W(α, s)) →L[ℂ] (W(α, s) →L[ℂ] W(α, s)) :=
+  let f := (T).symm.toContinuousLinearEquiv.toContinuousLinearMap
+  let g := ContinuousLinearMap.id ℂ (W(α, s))
+  completedProjectiveTensorToOperators.comp
+    (⟨projectiveTensorMap f.toLinearMap g.toLinearMap,
+      projectiveTensorMap_continuous f g⟩ :
+        ProjectiveTensor W'(α, s) W(α, s) →L[ℂ]
+          ProjectiveTensor (StrongDual ℂ W(α, s)) W(α, s)).completion
+
+local notation "ξ" => sobolevProjectiveKernelOperator (F := F) hα hs
+
+/-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
+On an elementary tensor the operator pairs the input with the reciprocal-weight
+factor and scales the positive-weight factor. -/
+theorem sobolevProjectiveKernelOperator_tmul
+    (u : W'(α, s)) (v f : W(α, s)) :
+    ξ (((show ProjectiveTensor W'(α, s) W(α, s) from u ⊗ₜ[ℂ] v) : Π(W'(α, s), W(α, s)))) f =
+      spectralSobolevPairing (F := F) f u • v := by sorry
+
+/-- Paper: Theorem 10.4.3.1(3), p. 467, and Theorem 10.4.3.5(3), p. 473.
+The canonical map from completed projective kernels to operators is injective. -/
+theorem sobolevProjectiveKernelOperator_injective : Injective ξ := by sorry
+
+end ProjectiveKernels
+
+section FiniteTensors
+
+variable {Z J E G : Type*}
+  [NormedAddCommGroup E] [NormedSpace ℂ E]
+  [NormedAddCommGroup G] [NormedSpace ℂ G]
+
+/-- Paper: (10.4.3.13)–(10.4.3.14), p. 467, and (10.4.3.42)–(10.4.3.43),
+p. 472. Sum the tensor terms for all jets of the zeros in the finite rectangle. -/
+def spectralKernelRectangle (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+    (jet : (z : Z) → Fin (N z) → J) (u : J → E) (v : J → G) (ij : ℕ × ℕ) :
+    Π(E, G) :=
+  ↑(∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+      ∑ m : Fin (N z), u (jet z m) ⊗ₜ[ℂ] v (jet z m) : ProjectiveTensor E G)
+
+/-- Paper: (10.4.3.13)–(10.4.3.14), p. 467. A rectangle with just one
+zero and one jet gives the elementary kernel tensor. -/
+theorem spectralKernelRectangle_single (e : Unit ↪ ℕ × ℕ) (ij : ℕ × ℕ)
+    (_h₁ : (e ()).1 ≤ ij.1) (_h₂ : (e ()).2 ≤ ij.2)
+    (j : J) (u : J → E) (v : J → G) :
+    spectralKernelRectangle e (fun _ ↦ 1) (fun _ _ ↦ j) u v ij =
+      ((show ProjectiveTensor E G from u j ⊗ₜ[ℂ] v j) : Π(E, G)) := by sorry
+
+end FiniteTensors
+
+section LineTensors
+
+variable (a : ℝ) {s : ℝ} (hs : 1 < s)
+
+local notation "Q₀" => Q(a, (le_refl (0 : ℝ)), hs₀(hs))
+local notation "S₀" => (fun u : H(a, (le_refl (0 : ℝ)), hs₀(hs)) ↦
+  ((Θ(a, (le_refl (0 : ℝ)), hs₀(hs))).quotientEquivOrthogonal u : W(0, s)))
+
+/-- Paper: Theorem 10.4.3.1(1), p. 467. The isometric image of a quotient
+basis vector is the spectral projection of any representative.
+Deviation: The identity is stated for any quotient vector. -/
+theorem spectralLineKernel_orthogonalLift (_ha : 0 < a)
+    (x : H(a, (le_refl (0 : ℝ)), hs₀(hs))) (v : W(0, s)) (_hv : Q₀ v = x) :
+    S₀ x = Pspec(a, (le_refl (0 : ℝ)), hs₀(hs)) v := by sorry
+
+local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
+local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL χ) z
+local notation "mult(" χ ", " z ")" => (order(χ, z)).untop₀.toNat
+local notation "Z(" χ ")" => {z : PontryaginDual C₁ × ℝ // 0 < order(χ z.1, shift(a, z.2))}
+local notation "N(" χ ", " z ")" => spectralBoundaryMultiplicity s (mult(χ (z).val.1,
+  shift(a, (z).val.2)))
+local notation "jet" => (fun z m ↦ ⟨(z.val.1, z.val.2, m.val), m.isLt⟩)
+local notation "A₀(" φ ")" => A((le_refl (0 : ℝ)), hs₀(hs), φ)
+local notation "Aq₀(" φ ")" => Aq(a, (le_refl (0 : ℝ)), hs₀(hs), φ)
+local notation "D₀" => spectralSobolevDualEmbedding F a
+  (hStrip(le_refl (0 : ℝ))) hs₀(hs)
+
+local notation "Bases₀(" χ ", " x ", " f ")" => (IsSpectralMarkushevichBasis x f ∧
+  ∀ j, D₀ (f j) =
+    cast (congrArg (fun l : ℝ ↦ CompactIntervalSobolev μ𝔽 logNorm l 0 s true) neg_zero.symm)
+      ((spectralLineJet_memLp χ hs j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) 0 j.val.2.1 j.val.2.2)))
+local notation "Order₀(" χ ", " e ")" => (∀ z z' : Z(χ), z.val.1 = z'.val.1 → (e z).2 ≤ (e z').2 →
+  |z.val.2| ≤ |z'.val.2|)
+
+-- TODO(paper-gap): The lexicographic initial segments need not be finite.
+-- The double limit uses rectangles with the product order on their end points.
+-- The convergence argument invokes the uniform estimate flagged in ERRATA R5.
+
+/-- Paper: Theorem 10.4.3.1(2), p. 467, equation (10.4.3.13). The quotient
+kernel tensors converge along the directed net of finite rectangles.
+Deviation: The injections allow empty and finite zero sets. Use the strict
+boundary multiplicity from §10.2 and the product order on rectangle endpoints. -/
+theorem spectralLineQuotientKernel_tendsto (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralLineJetIndex χ a s → H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (f : SpectralLineJetIndex χ a s → StrongDual ℂ H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order₀(χ, e)) (_hb : Bases₀(χ, x, f)) (φ : BruhatCompactSupport C𝔽) :
+    ∃ K, Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
+      (fun j ↦ (f j).comp (Aq₀(φ))) x) atTop (𝓝 K) := by sorry
+
+/-- Paper: Theorem 10.4.3.1(2), p. 467, equation (10.4.3.14). The ambient
+kernel tensors converge in the completed projective tensor product.
+Deviation: Use the same rectangles and strict boundary multiplicity. -/
+theorem spectralLineAmbientKernel_tendsto (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralLineJetIndex χ a s → H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (f : SpectralLineJetIndex χ a s → StrongDual ℂ H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order₀(χ, e)) (_hb : Bases₀(χ, x, f)) (φ : BruhatCompactSupport C𝔽) :
+    ∃ K, Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
+      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K) := by sorry
+
+/-- Paper: Theorem 10.4.3.1(3), p. 467. The limit of the ambient kernels
+represents spectral projection after convolution. -/
+theorem spectralLineAmbientKernel_operator (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralLineJetIndex χ a s → H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (f : SpectralLineJetIndex χ a s → StrongDual ℂ H(a, (le_refl (0 : ℝ)), hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order₀(χ, e)) (_hb : Bases₀(χ, x, f)) (φ : BruhatCompactSupport C𝔽)
+    (K : Π(W'(0, s), W(0, s)))
+    (_hK : Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
+      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K)) :
+    sobolevProjectiveKernelOperator (F := F) (le_refl (0 : ℝ)) hs₀(hs) K =
+      (Pspec(a, (le_refl (0 : ℝ)), hs₀(hs))).comp (A₀(φ)) := by sorry
+
+end LineTensors
+
+section MeasurableKernels
+
+variable {α s : ℝ}
+
+local notation "L²mixed" => Lp ℂ 2 ((ν(α, s)).prod (ν'(α, s)))
+local notation "integrates(" μ ", " B ", " k ")" =>
+  (∀ u : W(α, s), ∀ᵐ x ∂μ,
+    Integrable (fun y ↦ k (x, y) * u y) μ ∧
+    (B u : C𝔽 → ℂ) x = ∫ y, k (x, y) * u y ∂μ)
+
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. A projective kernel has a unique
+square-integrable mixed-weight kernel whose unweighted integral realizes its operator.
+Deviation: The product has positive weight in the output coordinate and reciprocal
+weight in the input coordinate. The Sobolev duality is already unweighted, so
+(10.4.3.25) needs no additional weight in the integral. The same correspondence
+is used on compact symmetric intervals. -/
+theorem sobolevProjectiveKernel_existsUnique_l2 (hα : 0 ≤ α) (hs : 0 ≤ s)
+    (K : Π(W'(α, s), W(α, s))) :
+    ∃! k : L²mixed, integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs K, k) :=
+  by sorry
+
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. An elementary tensor has
+mixed-weight representative given by the product of its factors.
+Deviation: The reciprocal-weight factor is evaluated at the input coordinate. -/
+theorem sobolevProjectiveKernel_l2_tmul (hα : 0 ≤ α) (hs : 0 ≤ s)
+    (v : W'(α, s)) (u : W(α, s)) :
+    ∃ k : L²mixed,
+      (k : C𝔽 × C𝔽 → ℂ) =ᵐ[(ν(α, s)).prod (ν'(α, s))] (fun p ↦ v p.2 * u p.1) ∧
+      integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs
+        ((show ProjectiveTensor W'(α, s) W(α, s) from v ⊗ₜ[ℂ] u) : Π(W'(α, s), W(α, s))), k) :=
+  by sorry
+
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. A projective tensor has
+a mixed-weight kernel class giving its operator under Haar integration.
+Deviation: The output coordinate comes first. -/
+def sobolevProjectiveKernelClass (hα : 0 ≤ α) (hs : 0 ≤ s)
+    (K : Π(W'(α, s), W(α, s))) : L²mixed :=
+  (sobolevProjectiveKernel_existsUnique_l2 hα hs K).exists.choose
+
+/-- Paper: (10.4.3.23)–(10.4.3.25), p. 470. The tensor kernel has the
+stated operator, and two classes giving that operator agree. -/
+theorem sobolevProjectiveKernelClass_spec (hα : 0 ≤ α) (hs : 0 ≤ s)
+    (K : Π(W'(α, s), W(α, s))) (k : L²mixed) :
+    integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs K, k) ↔
+      k = sobolevProjectiveKernelClass hα hs K := by sorry
+
+/-- The continuous Sobolev density is locally bounded on the idèle class group. -/
+theorem sobolevKernelWeight_locallyFinite (α s : ℝ) :
+    IsLocallyFiniteMeasure (ν(α, s)) := by
+  apply IsLocallyFiniteMeasure.withDensity_ofReal
+  have ht : Continuous (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) :=
+    ((NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous))).log fun g ↦
+        ne_of_gt (NNReal.coe_pos.mpr (Units.zero_lt _))
+  have hw : Continuous (intervalSobolevDensity (-α) α s) := by
+    unfold intervalSobolevDensity
+    refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+    positivity
+  exact hw.comp ht
+
+attribute [local instance] sobolevKernelWeight_locallyFinite
+
+/-- Paper: Theorem 10.4.3.4(2), pp. 470–471, and Theorem 10.4.3.6(2), p. 473.
+A representative of an operator's Hilbert-Schmidt kernel is square-integrable
+on the product with positive weights and gives the operator by integration in
+the input variable against the positive Sobolev measure. -/
+def IsSobolevHilbertSchmidtKernel (B : W(α, s) →L[ℂ] W(α, s))
+    (k : C𝔽 × C𝔽 → ℂ) : Prop :=
+  ∃ hk : MemLp k 2 ((ν(α, s)).prod (ν(α, s))),
+    (integralKernelOperator (ν(α, s)) (hk.toLp k)).val = B
+
+/-- Paper: Theorem 10.4.3.4(2), pp. 470–471, and Theorem 10.4.3.6(2), p. 473.
+The zero function represents the Hilbert-Schmidt kernel of the zero operator. -/
+theorem isSobolevHilbertSchmidtKernel_zero :
+    IsSobolevHilbertSchmidtKernel (0 : W(α, s) →L[ℂ] W(α, s)) 0 := by sorry
+
+-- Theorems 10.4.3.4 and 10.4.3.6 state s > 1. The measurable formulas work
+-- in that range once the mixed-weight spectral kernel exists.
+variable (a : ℝ) (hα : 0 ≤ α) (hs : 1 < s)
+  (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F))
+variable {Λ ε : ℝ} {ρ : IdeleClassGroup (𝓞 F) F → ℝ}
+
+local notation "hcut" => IsModulatedCutoff m𝔽 Λ ε ρ
+local notation "innerBand" => (0 < Λ⁻¹ + ε ∧ Λ⁻¹ + ε < Λ - ε)
+local notation "Ps" => Pspec(a, hα, hs₀(hs))
+local notation "Pg" => Pgeom(a, hα, hs₀(hs))
+local notation "B" => A(hα, hs₀(hs), φ)
+local notation "Bpre" => ((B).comp Ps)
+local notation "kernelFor(" k ", " U ")" => integrates(μ𝔽, U, k)
+local notation "weighted(" k ")" => (fun p : C𝔽 × C𝔽 ↦ ((w(α, s) p.2)⁻¹ : ℝ) • k p)
+local notation "cut(" k ")" => (fun p : C𝔽 × C𝔽 ↦ ρ p.1 • k p)
+
+section LineRepresentatives
+
+local notation "hline" => (le_refl (0 : ℝ))
+local notation "Θline" => Θ(a, hline, hs₀(hs))
+local notation "Aline" => A(hline, hs₀(hs), φ)
+local notation "Bline" => (Pspec(a, hline, hs₀(hs))).comp Aline
+local notation "L²line" => Lp ℂ 2 ((ν(0, s)).prod (ν'(0, s)))
+
+local notation "lineKernelFor(" k ")" =>
+  (∀ u : W(0, s), ∀ᵐ x ∂μ𝔽,
+    Integrable (fun y ↦ k (x, y) * u y) μ𝔽 ∧
+    Bline u x = ∫ y, k (x, y) * u y ∂μ𝔽)
+
+/-- Paper: Theorem 10.4.3.1(3) and Remark 10.4.3.3, pp. 467, 470. The line
+operator has a unique mixed-weight kernel. Existence also follows from the
+nuclearity and factorization of quotient convolution in §§10.3–10.4.2.
+Deviation: That factorization applies to every real twist. -/
+theorem spectralLineKernel_existsUnique :
+    ∃! k : L²line, lineKernelFor(k) := by sorry
+
+/-- Paper: Definition 10.4.3.2(1), p. 470. The global line spectral kernel
+is the representative of the unique kernel of projection after convolution.
+Deviation: Use the unweighted Haar formula for every s > 1. -/
+def globalLineSpectralKernel : L²line :=
+  (spectralLineKernel_existsUnique (F := F) a hs φ).exists.choose
+
+local notation "kLine" => globalLineSpectralKernel (F := F) a hs φ
+local notation "weightedLine(" f ")" => (fun p : C𝔽 × C𝔽 ↦ ((w(0, s) p.2)⁻¹ : ℝ) • f p)
+
+/-- Paper: Remark 10.4.3.3, p. 470. The global line kernel integrates to the
+spectral projection of the convolution against each input. -/
+theorem spectralLineKernel_apply : lineKernelFor(kLine) :=
+  (spectralLineKernel_existsUnique (F := F) a hs φ).exists.choose_spec
+
+/-- Paper: Definition 10.4.3.2(2), p. 470. Subtract the spectral kernel of
+this test from its Haar convolution kernel. -/
+def globalLineGeometricKernel (p : C𝔽 × C𝔽) : ℂ :=
+  φ.val (p.1 * p.2⁻¹) - kLine p
+
+local notation "geomLine" => globalLineGeometricKernel (F := F) a hs φ
+
+/-- Paper: Theorem 10.4.3.4(1), p. 470. On a theta vector the global
+geometric kernel represents convolution and geometric projection after convolution.
+The tested row is Haar integrable almost everywhere. -/
+theorem geometricLineKernel_apply (_ha : 0 < a)
+    (u : W(0, s)) (_hu : u ∈ Θline) :
+    ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ geomLine (x, y) * u y) μ𝔽 ∧
+      Aline u x = (Pgeom(a, hline, hs₀(hs))).comp Aline u x ∧
+      Aline u x = ∫ y, geomLine (x, y) * u y ∂μ𝔽 := by sorry
+
+/-- Paper: Theorem 10.4.3.4(2), pp. 470–471, first formula. Divide the
+global spectral kernel by the input weight to obtain the Hilbert-Schmidt
+representative of spectral projection after convolution. -/
+theorem spectralLineKernel_hilbertSchmidt (_ha : 0 < a) :
+    IsSobolevHilbertSchmidtKernel (F := F) Bline (weightedLine(kLine)) := by sorry
+
+/-- Paper: Theorem 10.4.3.4(2), pp. 470–471, second formula. Output
+multiplication gives the representative of truncated spectral convolution.
+Deviation: The target is spectral as in the proof on p. 471. The cutoff is
+real-valued as in §9.3 and is viewed as a scalar on complex functions. -/
+theorem spectralLineTruncatedKernel_hilbertSchmidt (_ha : 0 < a)
+    (hρ : hcut) (_hband : innerBand) :
+    IsSobolevHilbertSchmidtKernel (F := F) (spectralTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ)
+      (cut(weightedLine(kLine))) := by sorry
+
+/-- Paper: Theorem 10.4.3.4(3), p. 471. Applying the cutoff in the
+output variable and the reciprocal weight in the input variable gives the
+Hilbert-Schmidt representative of truncated geometric convolution. -/
+theorem geometricLineTruncatedKernel_hilbertSchmidt (_ha : 0 < a)
+    (hρ : hcut) (_hband : innerBand) :
+    IsSobolevHilbertSchmidtKernel (F := F) (geometricTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ)
+      (cut(weightedLine(geomLine))) := by sorry
+
+/-- Paper: Definition 10.4.3.2, p. 470. The two line representatives are measurable. -/
+theorem globalLineKernels_measurable :
+    Measurable (kLine : C𝔽 × C𝔽 → ℂ) ∧ Measurable geomLine := by sorry
+
+end LineRepresentatives
+
+section StripTensors
+
+/-- Paper: Theorem 10.4.3.5(1), p. 472. The canonical section of the strip
+quotient sends the class of a lift to its orthogonal spectral projection.
+Deviation: The identity is stated for any quotient vector. -/
+theorem spectralStripKernel_orthogonalLift (_ha : 0 < a)
+    (x : H(a, hα, hs₀(hs))) (v : W(α, s)) (_hv : Q(a, hα, hs₀(hs)) v = x) :
+    S(a, hα, hs₀(hs)) x = Ps v := by sorry
+
+local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
+local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL χ) z
+local notation "mult(" χ ", " z ")" => (order(χ, z)).untop₀.toNat
+local notation "Z(" χ ")" => {z : PontryaginDual C₁ × ℝ × ℝ //
+  z.2.1 ∈ Icc (-α) α ∧ 0 < order(χ z.1, shift(a + z.2.1, z.2.2))}
+local notation "N(" χ ", " z ")" => spectralStripMultiplicity α s (z).val.2.1
+  (mult(χ (z).val.1, shift(a + (z).val.2.1, (z).val.2.2)))
+local notation "jet(" z ", " m ")" => ⟨((z).val.1, (z).val.2.1, (z).val.2.2, (m).val), (m).isLt⟩
+local notation "D" => spectralSobolevDualEmbedding F a (hStrip(hα)) hs₀(hs)
+
+local notation "Bases(" χ ", " x ", " f ")" => (IsSpectralMarkushevichBasis x f ∧
+  ∀ j, D (f j) = (spectralStripJet_memLp χ hα hs₀(hs) j).toLp
+    (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2))
+local notation "Order(" χ ", " e ")" => (∀ z z' : Z(χ), z.val.1 = z'.val.1 → (e z).2 ≤ (e z').2 →
+  |z.val.2.2| ≤ |z'.val.2.2|)
+local notation "rectangle(" χ ", " e ")" =>
+  spectralKernelRectangle e (fun z ↦ N(χ, z)) (fun z m ↦ jet(z, m))
+
+/-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.42).
+The quotient tensors converge in the completed projective tensor topology.
+Deviation: The zero set is restricted to the strip, and its boundary and interior
+multiplicities are those of §10.2. The directed set consists of finite rectangles. -/
+theorem spectralStripQuotientKernel_tendsto (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
+    ∃ K, Tendsto (rectangle(χ, e)
+      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by sorry
+
+/-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
+The printed ambient rectangles with convolution transposed onto the input
+factor converge in the projective topology. Their outputs are spectral. -/
+theorem spectralStripTransposedKernel_tendsto (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
+    ∃ K : Π(W'(α, s), W(α, s)),
+      Tendsto (rectangle(χ, e) (fun j ↦ D ((f j).comp (Aq(a, hα, hs₀(hs), φ))))
+      (fun j ↦ S(a, hα, hs₀(hs)) (x j))) atTop (𝓝 K) := by sorry
+
+-- TODO(paper-gap): The estimate at the end of §10.4.2 does not prove convergence
+-- of the ambient net with convolution on the output factor. The quotient net
+-- only controls the part of that net with spectral output.
+
+/-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
+The ambient rectangles for convolution after spectral projection converge.
+Deviation: Convolution acts on the lifted output vector. The printed
+transposed input factor gives projection after convolution, as in (10.4.3.14).
+The geometric-output components are assumed Cauchy in the projective topology.
+Section 10.3 supplies the spectral components after grouping all jets of each zero. -/
+theorem spectralStripAmbientKernel_tendsto (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order(χ, e)) (_hb : Bases(χ, x, f))
+    (_hgeom : Cauchy (Filter.map (rectangle(χ, e) (fun j ↦ D (f j))
+      (fun j ↦ Pg (B (S(a, hα, hs₀(hs)) (x j))))) atTop)) :
+    ∃ K, Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
+      (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K) := by sorry
+
+/-- Paper: Theorem 10.4.3.5(3), p. 473. The ambient limit represents
+convolution after spectral projection.
+Deviation: The limit is taken in the ambient space of (10.4.3.43), with
+convolution on the output factor as required by this operator order.
+Equation (10.4.3.42) gives a limit in the quotient tensor space. -/
+theorem spectralStripAmbientKernel_operator (_ha : 0 < a)
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ) ↪ ℕ × ℕ)
+    (x : SpectralStripJetIndex χ a α s → H(a, hα, hs₀(hs)))
+    (f : SpectralStripJetIndex χ a α s → StrongDual ℂ H(a, hα, hs₀(hs)))
+    (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) (K : Π(W'(α, s), W(α, s)))
+    (_hK : Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
+      (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K)) :
+    sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre := by sorry
+
+end StripTensors
+
+/-- Paper: Definition 10.4.3.7(1), p. 473. The global strip kernel comes
+from the projective tensor of convolution after projection.
+Deviation: Require existence of a tensor for this specific operator. This
+permits any real twist and avoids assuming the missing geometric-block estimate. -/
+def globalStripSpectralKernel
+    (hK : ∃ K, sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre) : L²mixed :=
+  sobolevProjectiveKernelClass hα hs₀(hs) hK.choose
+
+local notation "stripTensorExists" =>
+  (∃ K, sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre)
+local notation "kStrip(" h ")" => globalStripSpectralKernel (F := F) a hα hs φ h
+
+/-- Paper: (10.4.3.45) and Definition 10.4.3.7, p. 473. Haar integration
+against the strip kernel gives convolution after projection. -/
+theorem spectralStripKernel_apply (hK : stripTensorExists) : kernelFor(kStrip(hK), Bpre) := by
+  rw [← hK.choose_spec]
+  exact (sobolevProjectiveKernelClass_spec hα hs₀(hs) hK.choose _).2 rfl
+
+/-- Paper: Definition 10.4.3.7(2), pp. 473–474. Subtract the spectral kernel of
+the given strip restriction from the Haar convolution kernel of the same test. -/
+def globalStripGeometricKernel (hK : stripTensorExists) (p : C𝔽 × C𝔽) : ℂ :=
+  φ.val (p.1 * p.2⁻¹) - kStrip(hK) p
+
+local notation "geomStrip(" h ")" => globalStripGeometricKernel (F := F) a hα hs φ h
+
+/-- Paper: Theorem 10.4.3.6(1), p. 473. On the strip theta subspace,
+convolution agrees with geometric projection followed by convolution and
+with the Haar integral against the global geometric kernel.
+Deviation: Use the weight of the actual interval [−α, α]. -/
+theorem geometricStripKernel_apply (_ha : 0 < a)
+    (hK : stripTensorExists) (u : W(α, s)) (_hu : u ∈ Θ(a, hα, hs₀(hs))) :
+    ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ geomStrip(hK) (x, y) * u y) μ𝔽 ∧
+      B u x = ((B).comp Pg) u x ∧
+      B u x = ∫ y, geomStrip(hK) (x, y) * u y ∂μ𝔽 := by sorry
+
+/-- Paper: Theorem 10.4.3.6(2), p. 473, first formula. Dividing the global spectral
+kernel by the input weight gives the Hilbert-Schmidt representative of convolution
+after spectral projection.
+Deviation: The exponent endpoints are −α and α, as in §9.2. -/
+theorem spectralStripKernel_hilbertSchmidt (_ha : 0 < a)
+    (hK : stripTensorExists) :
+    IsSobolevHilbertSchmidtKernel (F := F) Bpre (weighted(kStrip(hK))) := by sorry
+
+/-- Paper: Theorem 10.4.3.6(2), p. 473, second formula. Output multiplication
+gives the Hilbert-Schmidt representative of the strip spectral restriction.
+Deviation: The target uses the spectral projector, in agreement with the
+kernel in (10.4.3.47). The cutoff is real-valued as in §9.3. -/
+theorem spectralStripRestrictionKernel_hilbertSchmidt (_ha : 0 < a)
+    (hρ : hcut) (_hband : innerBand) (hK : stripTensorExists) :
+    IsSobolevHilbertSchmidtKernel (F := F) (spectralRestriction (F := F) a hα hs₀(hs) hρ φ)
+      (cut(weighted(kStrip(hK)))) := by sorry
+
+/-- Paper: Theorem 10.4.3.6(3), p. 473. The cutoff geometric kernel,
+divided by the input weight, is the Hilbert-Schmidt representative of
+the geometric restriction on the strip. -/
+theorem geometricStripRestrictionKernel_hilbertSchmidt (_ha : 0 < a)
+    (hρ : hcut) (_hband : innerBand) (hK : stripTensorExists) :
+    IsSobolevHilbertSchmidtKernel (F := F) (geometricRestriction (F := F) a hα hs₀(hs) hρ φ)
+      (cut(weighted(geomStrip(hK)))) := by sorry
+
+/-- Paper: Definition 10.4.3.7, pp. 473–474. The two strip representatives are measurable. -/
+theorem globalStripKernels_measurable (hK : stripTensorExists) :
+    Measurable (kStrip(hK) : C𝔽 × C𝔽 → ℂ) ∧ Measurable geomStrip(hK) := by sorry
+
+end MeasurableKernels
+
+end RiemannMasullo
