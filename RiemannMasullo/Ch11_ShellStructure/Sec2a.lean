@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import Mathlib.Analysis.SpecialFunctions.Complex.Analytic
 
 /-! # Orbital Markushevich bases on the 0-line
 
@@ -185,11 +186,45 @@ abbrev OrbitalJetIndex (χ : PontryaginDual C𝔽) (S : Finset V) (s : ℝ) :=
   {j : ℝ × ℕ //
     j.2 < spectralBoundaryMultiplicity s (orbitalEulerMultiplicity χ S (frequency(j.1)))}
 
+private theorem OrbitalJetIndex.isZero_analyticAt (χ : PontryaginDual C𝔽) (S : Finset V)
+    (z : ℂ) : AnalyticAt ℂ (reciprocalPartialHeckeEulerProduct χ S) z := by
+  have h : ∀ v ∈ S, AnalyticAt ℂ (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) z := by
+    intro v _
+    have hq : (Ideal.absNorm v.asIdeal : ℂ) ∈ Complex.slitPlane :=
+      Complex.natCast_mem_slitPlane.mpr ((Ideal.absNorm_eq_zero_iff).not.mpr v.ne_bot)
+    classical
+    by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+    · have : (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) = fun s ↦
+          1 - (ideleClassNormTwist χ 0).localValue v * (Ideal.absNorm v.asIdeal : ℂ) ^ (-s) := by
+        funext s
+        rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv]
+      rw [this]
+      exact analyticAt_const.sub
+        (analyticAt_const.mul (AnalyticAt.cpow analyticAt_const analyticAt_id.neg hq))
+    · have : (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) = fun _ ↦ 1 := by
+        funext s
+        rw [finiteHeckeEulerFactor, ite_eq_right hv, inv_one]
+      rw [this]
+      exact analyticAt_const
+  have := Finset.analyticAt_prod S h
+  convert this using 1
+  funext s
+  simp [reciprocalPartialHeckeEulerProduct]
+
+private theorem OrbitalJetIndex.isZero_of_order_pos {f : ℂ → ℂ} {z : ℂ} (hf : AnalyticAt ℂ f z)
+    (h : 0 < (meromorphicOrderAt f z).untop₀.toNat) : f z = 0 := by
+  by_contra hz
+  have h0 : analyticOrderAt f z = 0 := hf.analyticOrderAt_eq_zero.mpr hz
+  rw [hf.meromorphicOrderAt_eq, h0] at h
+  simp at h
+
 /-- Paper: Theorem 11.2.0.2(1)–(2), p. 485. An admitted jet has a zero of the
 reciprocal Euler product at its ordinate. -/
 theorem OrbitalJetIndex.isZero {χ : PontryaginDual C𝔽} {S : Finset V} {s : ℝ}
     (j : OrbitalJetIndex χ S s) :
-    reciprocalPartialHeckeEulerProduct χ S (frequency(j.val.1)) = 0 := by sorry
+    reciprocalPartialHeckeEulerProduct χ S (frequency(j.val.1)) = 0 :=
+  OrbitalJetIndex.isZero_of_order_pos (OrbitalJetIndex.isZero_analyticAt χ S _)
+    (Nat.zero_lt_of_lt (lt_of_lt_of_le j.property (min_le_left _ _)))
 
 /-- Paper: Theorem 11.2.0.2 and (11.2.0.5), p. 485. Each admitted jet gives a
 reciprocal-weight Sobolev vector.
