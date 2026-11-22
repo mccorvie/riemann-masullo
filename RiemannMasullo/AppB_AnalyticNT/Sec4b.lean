@@ -9,6 +9,7 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
+import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 
 /-!
@@ -378,7 +379,66 @@ are absolutely summable over the finite places and positive exponents.
 Deviation: Ramified Euler factors contribute zero. -/
 theorem summable_heckeExplicitPrimeTerms (χ : U[F]) (f : 𝓢(ℝ, ℂ))
     (_hf : ExponentialDecay f) :
-    Summable (fun j ↦ ‖primeTerm(χ, f) j‖) := by sorry
+    Summable (fun j ↦ ‖primeTerm(χ, f) j‖) := by
+  obtain ⟨g, hg⟩ := exponentialDecay_weighted_schwartz f _hf 3
+  obtain ⟨h, hh⟩ := exponentialDecay_weighted_schwartz f _hf (-3)
+  let C := SchwartzMap.seminorm ℂ 0 0 g + SchwartzMap.seminorm ℂ 0 0 h
+  have hdecay (x : ℝ) : ‖f x‖ + ‖f (-x)‖ ≤ C * Real.exp (-(3 * x)) := by
+    rw [Real.exp_neg, ← div_eq_mul_inv, le_div_iff₀ (Real.exp_pos _), add_mul]
+    have hg' := g.norm_le_seminorm ℂ x
+    have hh' := h.norm_le_seminorm ℂ (-x)
+    rw [hg, norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.exp_nonneg _)] at hg'
+    simp only [hh, neg_mul_neg, norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg (Real.exp_nonneg _)] at hh'
+    simpa only [mul_comm] using add_le_add hg' hh'
+  -- Index the majorant by the corresponding prime-power ideals.
+  let I (j : Primes(F) × ℕ) := j.1.asIdeal ^ (j.2 + 1)
+  have hI : Injective I := by
+    rintro ⟨v, n⟩ ⟨w, k⟩ he
+    change v.asIdeal ^ (n + 1) = w.asIdeal ^ (k + 1) at he
+    have hd : v.asIdeal ∣ w.asIdeal := v.prime.dvd_of_dvd_pow
+      (he ▸ dvd_pow_self _ (Nat.succ_ne_zero n))
+    have hvw : v = w := HeightOneSpectrum.ext
+      (w.isMaximal.eq_of_le v.isPrime.ne_top (Ideal.dvd_iff_le.mp hd)).symm
+    subst w
+    have hN := congrArg (Ideal.absNorm : Ideal (𝓞 F) → ℕ) he
+    simp only [map_pow] at hN
+    have hn := Nat.pow_right_injective (NumberField.HeightOneSpectrum.one_lt_absNorm v) hN
+    exact Prod.ext rfl (Nat.succ.inj hn)
+  have hsum := (summable_absNorm_rpow F (r := 2) (by norm_num)).comp_injective hI
+  refine (hsum.mul_left C).of_nonneg_of_le (fun _ ↦ norm_nonneg _) ?_
+  rintro ⟨v, k⟩
+  have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hlog := (Real.log_pos hq).le
+  let x := ((k + 1 : ℕ) : ℝ) * Real.log q(v)
+  have hx : Real.log q(v) ≤ x := by
+    dsimp [x]
+    push_cast
+    nlinarith [mul_nonneg (Nat.cast_nonneg (α := ℝ) k) hlog]
+  have hfactor : Real.log q(v) * Real.exp (-x / 2) ≤ Real.exp x :=
+    (mul_le_of_le_one_right hlog (Real.exp_le_one_iff.mpr (by linarith))).trans
+      (hx.trans (by linarith [Real.add_one_le_exp x]))
+  change ‖(if _ then _ else (0 : ℂ))‖ ≤ C * ((I (v, k)).absNorm : ℝ) ^ (-(2 : ℝ))
+  split_ifs
+  · rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (mul_nonneg hlog (Real.exp_nonneg _))]
+    calc
+      _ ≤ (Real.log q(v) * Real.exp (-x / 2)) * (‖f x‖ + ‖f (-x)‖) := by
+        apply mul_le_mul_of_nonneg_left _ (mul_nonneg hlog (Real.exp_nonneg _))
+        simpa only [norm_mul, norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow, one_mul]
+          using norm_add_le ((χ₀(χ).localValue v) ^ (k + 1) * f x)
+            ((χ₀(χ⁻¹).localValue v) ^ (k + 1) * f (-x))
+      _ ≤ Real.exp x * (C * Real.exp (-(3 * x))) :=
+        mul_le_mul hfactor (hdecay x) (by positivity) (Real.exp_nonneg _)
+      _ = C * Real.exp (x + -(3 * x)) := by rw [Real.exp_add]; ring
+      _ = _ := by
+        change _ = C * (((v.asIdeal ^ (k + 1)).absNorm : ℕ) : ℝ) ^ (-(2 : ℝ))
+        rw [map_pow, Nat.cast_pow, Real.rpow_def_of_pos (pow_pos (zero_lt_one.trans hq) _),
+          Real.log_pow]
+        dsimp [x]
+        ring_nf
+  · rw [norm_zero]
+    exact mul_nonneg (add_nonneg (apply_nonneg _ _) (apply_nonneg _ _))
+      (Real.rpow_nonneg (Nat.cast_nonneg _) _)
 
 /-- Paper: Theorem B.4.2.2, p. 616. The centered divisor sum equals the
 discriminant–conductor term, minus the prime-power series, plus the gamma terms.
