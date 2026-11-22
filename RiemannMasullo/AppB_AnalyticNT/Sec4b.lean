@@ -1,5 +1,8 @@
 module
 
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
+import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
@@ -625,7 +628,57 @@ theorem finiteCanonicalHaar_eq_smul_tamagawa (v : Primes(F)) :
     let m : (v.adicCompletion F)ˣ →ₜ* ℝ≥0ˣ :=
       ⟨Units.map nnNormHom.toMonoidHom, continuous_finiteLocalModule v⟩
     ∃ hm : IsModulation m, canonicalModulatedHaar m hm =
-      ENNReal.ofReal (Real.log q(v) / V𝔭(v)) • μ𝔭(v) := by sorry
+      ENNReal.ofReal (Real.log q(v) / V𝔭(v)) • μ𝔭(v) := by
+  classical
+  intro m
+  let K := v.adicCompletion F
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : SecondCountableTopology Kˣ := (Units.isEmbedding_val₀ (G₀ := K)).secondCountableTopology
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  let q : ℝ≥0ˣ := Units.mk0 (v.asIdeal.absNorm : ℝ≥0)
+    (by exact_mod_cast (zero_lt_one.trans (NumberField.HeightOneSpectrum.one_lt_absNorm v)).ne')
+  have hq : 1 < (q.val : ℝ) := by
+    change 1 < (v.asIdeal.absNorm : ℝ)
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  let val : Valuation K (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let p : Kˣ := Units.mk0 (π : K) hπ.ne_zero
+  have hp : ‖p.val‖ = q(v)⁻¹ := norm_uniformizer_adicCompletion v _ hπ
+  have hgen : m p⁻¹ = q := by
+    apply Units.ext
+    apply NNReal.eq
+    change ‖(p⁻¹).val‖ = q(v)
+    rw [Units.val_inv_eq_inv_val, norm_inv, hp, inv_inv]
+  have hm : IsModulation m := by
+    constructor
+    · change IsProperMap (Units.map nnNormHom.toMonoidHom : Kˣ →* ℝ≥0ˣ)
+      have h := isProperMap_units_nnNorm_pow (K := K) 1 one_ne_zero
+      simpa only [MonoidHom.pow_apply, pow_one] using h
+    · refine ⟨p⁻¹, fun he ↦ hq.ne' ?_⟩
+      exact congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) (hgen.symm.trans he)
+  -- The inverse uniformizer generates the range of the normalized absolute value.
+  have hrange : m.toMonoidHom.range = Subgroup.zpowers q := by
+    apply le_antisymm
+    · rintro _ ⟨u, rfl⟩
+      refine Subgroup.mem_zpowers_iff.mpr ⟨WithZero.log (Valued.v u.val), ?_⟩
+      apply Units.ext
+      apply NNReal.eq
+      change (((q ^ _).val : ℝ≥0) : ℝ) = ‖u.val‖
+      rw [Units.val_zpow_eq_zpow_val, NNReal.coe_zpow, FinitePlace.norm_def,
+        WithZeroMulInt.toNNReal_neg_apply _ (Valued.v.ne_zero_iff.mpr u.ne_zero)]
+      simp [q]
+    · exact Subgroup.zpowers_le.mpr ⟨p⁻¹, hgen⟩
+  have hker : (m.toMonoidHom.ker : Set Kˣ) = (O(v)).units := by
+    ext u
+    change m u = 1 ↔ u ∈ (O(v)).units
+    rw [HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one,
+      ← Valued.toNormedField.norm_eq_one_iff, ← Units.val_inj, ← NNReal.coe_inj]
+    rfl
+  let : (μ𝔭(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_haar F v
+  refine ⟨hm, (existsUnique_canonicalModulatedHaar m hm).unique
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists) ?_⟩
+  have hqval : (q.val : ℝ) = q(v) := by simp [q]
+  simpa only [hker, hqval] using haar_logGrowth_of_cyclic_range m hm hq hrange μ𝔭(v)
 
 /-- Paper: Remark B.4.4.2, p. 620. For the infinite local module, dividing
 Tamagawa measure by two at a real place or by two pi at a complex place gives canonical Haar measure. -/
