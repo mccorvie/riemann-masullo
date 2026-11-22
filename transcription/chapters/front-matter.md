@@ -183,7 +183,7 @@ For $v$ a finite place of $F$, we denote by $\mathcal O_{F_v}$ the subset define
 We denote by $\mathbf A_F$ the adele ring of the number field $F$. We recall that $\mathbf A_F$ is the topological ring obtained as the restricted product
 
 $$
-\mathbf A_F=\widehat{\prod}_v(F_v,R_v)
+\mathbf A_F=\mathop{\widehat{\prod}}\limits_v(F_v,R_v)
 $$
 
 topologized with the restricted product topology, where $v$ varies over all the places of $F$, including the Archimedean places, and with $R_v=\mathcal O_{F_v}$ for every finite place $v$, and $R_v=\{0\}$ for every infinite place $v$.

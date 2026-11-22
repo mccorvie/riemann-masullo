@@ -137,7 +137,7 @@ A.1.1.1. *Recollections on restricted products.* We recall the definition of res
 **Definition A.1.1.1.** Let $I_0$ be a finite set, $I_1$ a set, and write $I := I_0 \times I_1$. Let $\{G_i\}_{i \in I}$ be an $I$-indexed collection of Hausdorff locally compact abelian groups, and $\{K_i\}_{i \in I}$ an $I$-indexed collection of subgroups $K_i \subset G_i$ for each $i \in I$, where $K_i = 1$ for every $i \in I_0$, and $K_i$ is compact open in $G_i$ for every $i \in I_1$. We define
 
 $$
-\widehat{\prod}_{i \in I}(G_i, K_i) \subset \prod_{i \in I} G_i \tag{A.1.1.1}
+\mathop{\widehat{\prod}}\limits_{i \in I}(G_i, K_i) \subset \prod_{i \in I} G_i \tag{A.1.1.1}
 $$
 
 as the subset of those $I$-indexed tuples $(x_i) \in \prod_{i \in I} G_i$ such that $x_i \in K_i$ for all but finitely many $i \in I$. We topologize $\widehat{\prod}_{i \in I}(G_i, K_i)$ by defining a neighborhood base at $1$ to be given by the subsets of the form $\prod_{i \in I} U_i$, where $U_i$ is a neighborhood of $1$ in $G_i$ for every $i \in I$, and $U_i = K_i$ for all but finitely many $i \in I$. We refer to $\widehat{\prod}_{i \in I}(G_i, K_i)$ as the *restricted product* of the collection $\{(G_i, K_i)\}_{i \in I}$.
@@ -147,7 +147,7 @@ We write $\mathbf{A}_F$ for the adele ring of the number field $F$.
 Recall that, upon writing $v$ for the arbitrary place of $F$, this is the topological ring defined as the restricted direct product
 
 $$
-\mathbf{A}_F := \widehat{\prod}_v (F_v, R_v) \tag{A.1.1.2}
+\mathbf{A}_F := \mathop{\widehat{\prod}}\limits_v (F_v, R_v) \tag{A.1.1.2}
 $$
 
 of the local fields $F_v$, each a finite extension of either $\mathbf{R}$, $\mathbf{C}$, or $\mathbf{Q}_p$ for a unique prime number $p$, and where $R_v$ is the valuation ring $\mathcal{O}_{\mathfrak{p}}$ in case $v = v_{\mathfrak{p}}$ for a prime ideal $\mathfrak{p}$ of $\mathcal{O}_F$, and $R_v = F_v$ for $v$ Archimedean. We denote by
@@ -177,7 +177,7 @@ We recall the following description of the topology on the restricted product of
 (4) *For any partition $I = J_1 \coprod J_2$ with $J_1$ a finite subset, the canonical map*
 
 $$
-\prod_{j \in J_1} G_i \times \widehat{\prod}_{j \in J_2}(G_j, K_j) \to \widehat{\prod}_{i \in I}(G_i, K_i) \tag{A.1.1.4}
+\prod_{j \in J_1} G_i \times \mathop{\widehat{\prod}}\limits_{j \in J_2}(G_j, K_j) \to \mathop{\widehat{\prod}}\limits_{i \in I}(G_i, K_i) \tag{A.1.1.4}
 $$
 
 *is an isomorphism of Hausdorff locally compact abelian groups.*
@@ -185,7 +185,7 @@ $$
 (5) *For any partition $I = J_1 \coprod J_2$ with $J_1$ a finite subset, the subset*
 
 $$
-\prod_{j \in J_1} U_i \times \prod_{j \in J_2} K_j \subset \widehat{\prod}_{i \in I}(G_i, K_i) \tag{A.1.1.5}
+\prod_{j \in J_1} U_i \times \prod_{j \in J_2} K_j \subset \mathop{\widehat{\prod}}\limits_{i \in I}(G_i, K_i) \tag{A.1.1.5}
 $$
 
 *with $U_i \subset G_i$ an open subset, is open.*
@@ -279,7 +279,7 @@ An important feature of the idelic topology on $\mathrm{GL}_1(\mathbf{A}_F)$ is 
 **Lemma A.1.3.3.** *Let $F$ be a number field. The idele group $\mathrm{GL}_1(\mathbf{A}_F)$ is a Hausdorff locally compact abelian group with respect to the idelic topology, and isomorphic to the restricted product*
 
 $$
-\widehat{\prod}_{v \in \Sigma_F} (F^\times_v, \mathcal{O}^\times_{F_v}).
+\mathop{\widehat{\prod}}\limits_{v \in \Sigma_F} (F^\times_v, \mathcal{O}^\times_{F_v}).
 $$
 
 ## PDF page 542
@@ -818,7 +818,7 @@ with $g_{i,\infty} = \mathrm{pr}_{\infty}(g_i) \in \mathrm{GL}_1(\mathbf{A}_{F,S
 The subset $E_F^1 \subset \mathrm{GL}_1(\mathbf{A}_F)^1$ from (A.2.3.14) is therefore of the form
 
 $$
-E_F^1 = (E_0 \times \widehat{\mathcal{O}}_F^{\times}) \cup (g_{2,\infty}E_0 \times g_{2,f}\widehat{\mathcal{O}}_F^{\times}) \cup \cdots \cup (g_{h_F,\infty}E_0 \times g_{h_F,f}\widehat{\mathcal{O}}_F^{\times}) \subset \mathrm{GL}_1(\mathbf{A}_F)^1. \tag{A.2.3.16}
+E_F^1 = (E_0 \times \widehat{\mathcal{O}}_F^{\times}) \cup (g_{2,\infty}E_0 \times g_{2,f}\widehat{\mathcal{O}}_F^{\times}) \cup \ldots \cup (g_{h_F,\infty}E_0 \times g_{h_F,f}\widehat{\mathcal{O}}_F^{\times}) \subset \mathrm{GL}_1(\mathbf{A}_F)^1. \tag{A.2.3.16}
 $$
 
 ## PDF page 550
@@ -1978,7 +1978,7 @@ First countability is in fact a necessary and sufficient condition for a Hausdor
 
 The metric inducing the topology can be chosen to be left-invariant, and a direct construction is given in [Struble, Lemma 1, p. 217].
 
-The second axiom of countability for Hausdorff locally compact topological groups $G$ (not necessarily abelian) is characterized by boundedness of the spheres with respect to a left-invariant metric inducing the topology: this is [Struble, Theorem, p. 217]. Recall that a subset $B \subset G$ is called bounded if for any unit-neighborhood $U$, there exist finitely many $g_1,\dots,g_N$ such that $g_1U \cup \dots \cup g_NU$ contains $B$ (i.e. $B$ is "totally bounded" with respect to the uniform structure on $G$; we refer the reader to [Bou-GT, Ch. II, Exercises, §4,(7), p. 210]).
+The second axiom of countability for Hausdorff locally compact topological groups $G$ (not necessarily abelian) is characterized by boundedness of the spheres with respect to a left-invariant metric inducing the topology: this is [Struble, Theorem, p. 217]. Recall that a subset $B \subset G$ is called bounded if for any unit-neighborhood $U$, there exist finitely many $g_1,\dots,g_N$ such that $g_1U \cup \ldots \cup g_NU$ contains $B$ (i.e. $B$ is "totally bounded" with respect to the uniform structure on $G$; we refer the reader to [Bou-GT, Ch. II, Exercises, §4,(7), p. 210]).
 
 If $G$ is a Hausdorff locally compact second countable topological group, then there exists a family of open subsets $\{U_r\}_{r \in \mathbf{R}_{>0}}$ such that, for all real numbers $r_1,r_2 > 0$, $U_r$ is bounded and symmetric, and $U_{r_1}U_{r_2} \subset U_{r_1+r_2}$, and such that $\{U_r\}_{r > 0}$ is a unit-neighborhood base, and $\bigcup_{r > 0} U_r = G$. This is [Struble, Lemma 2, p. 218].
 
@@ -2654,7 +2654,7 @@ We note that $C_c(G)\subset L^1_{\mathrm{loc}}(G,\mu_G)$ is dense with respect t
 We now define $\rho_G:G\times L^1_{\mathrm{loc}}(G,\mu_G)\to L^1_{\mathrm{loc}}(G,\mu_G)$ the map $\rho_G(g,\phi)(x):=\phi(g^{-1}x)$ for $\mu_G$-almost all $x\in G$. Equivalently, we may define $\rho_G$ on $C_c(G)$ as the left-translation action by $G$ on compactly supported continuous complex-valued functions on $G$, and extend the left-translation action by continuity to $L^1_{\mathrm{loc}}(G,\mu_G)$. Such action is indeed continuous, since, for each $g\in G$, we have:
 
 $$
-\lVert\rho_G(g,\cdot)\rVert_{L^1(K_m,\mu_G)}\le\lVert\cdot\rVert_{L^1(K_0,\mu_G)}+\dots+\lVert\cdot\rVert_{L^1(K_{m_N},\mu_G)} \tag{A.5.4.6}
+\lVert\rho_G(g,\cdot)\rVert_{L^1(K_m,\mu_G)}\le\lVert\cdot\rVert_{L^1(K_0,\mu_G)}+\ldots+\lVert\cdot\rVert_{L^1(K_{m_N},\mu_G)} \tag{A.5.4.6}
 $$
 
 for finitely many integers $0,\dots,m_N$ determined by $K_{m_N}$ enclosing $g'K_m$ in its interior for all $g'$ near $g$.

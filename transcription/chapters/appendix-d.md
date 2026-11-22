@@ -765,9 +765,8 @@ DEFINITION D.1.4.1. A Hausdorff locally compact abelian group $G$ is called *com
 
 THEOREM D.1.4.2. *Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is locally Euclidean (as a topological space). There exist integers $m, n \ge 0$ and a discrete abelian group $D$ so that*
 
-(D.1.4.1)
 $$
-G \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times D.
+G \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times D. \tag{D.1.4.1}
 $$
 
 This is [DE, Thm. 4.2.4]. We record here the following structural result on Hausdorff locally compact abelian groups, combined with Pontryagin duality:
@@ -778,9 +777,8 @@ THEOREM D.1.4.3. *Let $G$ be a Hausdorff locally compact abelian group.*
 
 (2) *The group $G$ is compactly generated and locally Euclidean if and only if there exist integers $m, n, k \ge 0$, a finite abelian group $F$, and an isomorphism of Hausdorff locally compact abelian groups:*
 
-(D.1.4.2)
 $$
-G \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^k \times F.
+G \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^k \times F. \tag{D.1.4.2}
 $$
 
 $^2$briefly address calculation for this compatibility of $\phi$
@@ -793,18 +791,16 @@ The Theorem is [DE, Cors. 4.2.5, 4.2.6], apart from the assertions about $H$ and
 
 D.1.4.1. *Exhaustion by compactly generated open subgroups, approximation by abelian Lie groups.* Every Hausdorff locally compact abelian group $G$ can be written as a filtered colimit
 
-(D.1.4.3)
 $$
-G = \operatorname*{\mathrm{colim}}_{H \in \mathrm{CG}(G)} H
+G = \operatorname*{\mathrm{colim}}_{H \in \mathrm{CG}(G)} H \tag{D.1.4.3}
 $$
 
 where $\mathrm{CG}(G)$ is the set of all *open* compactly generated abelian subgroups of $G$, filtered under open inclusions. As a consequence of Theorem D.1.4.2 and Theorem D.1.4.3, combined with Pontryagin duality and (D.1.4.3) applied to $\widehat{G}$, we get:
 
 LEMMA D.1.4.4. *Let $G$ be a Hausdorff locally compact abelian group, and $\mathrm{CG}(\widehat{G})$ the set of all open compactly generated subgroups of $\widehat{G}$, cofiltered under open inclusions. Then the canonical continuous group homomorphism*
 
-(D.1.4.4)
 $$
-G \to \lim_{H \in \mathrm{CG}(\widehat{G})} \widehat{H}
+G \to \lim_{H \in \mathrm{CG}(\widehat{G})} \widehat{H} \tag{D.1.4.4}
 $$
 
 *is an isomorphism of topological groups.*
@@ -813,25 +809,22 @@ In particular, every Hausdorff locally compact abelian group is canonically isom
 
 D.1.4.2. *Basic properties of duals and orthogonals.* Recall that Pontryagin duality provides a perfect continuous pairing
 
-(D.1.4.5)
 $$
-\langle \cdot, \cdot \rangle_{G, \widehat{G}} : G \times \widehat{G} \to U(1) \subset \mathbf{C}^{\times}
+\langle \cdot, \cdot \rangle_{G, \widehat{G}} : G \times \widehat{G} \to U(1) \subset \mathbf{C}^{\times} \tag{D.1.4.5}
 $$
 
 enabling us to construct the following subgroups of $G$ and $\widehat{G}$:
 
 DEFINITION D.1.4.5. Let $G$ be a Hausdorff locally compact abelian group, and $H \subset G$ a subgroup. We define
 
-(D.1.4.6)
 $$
-H^{\perp} := \{\chi \in \widehat{G} : \chi(H) = 1\}
+H^{\perp} := \{\chi \in \widehat{G} : \chi(H) = 1\} \tag{D.1.4.6}
 $$
 
 and refer to it as the *annihilator* of $H$ in $\widehat{G}$. By Pontryagin duality, for $\Gamma \subset \widehat{G}$ a subgroup we have
 
-(D.1.4.7)
 $$
-\Gamma^{\perp} = \{g \in G : \chi(g) = 1 \text{ for all } \chi \in \Gamma\}.
+\Gamma^{\perp} = \{g \in G : \chi(g) = 1 \text{ for all } \chi \in \Gamma\}. \tag{D.1.4.7}
 $$
 
 LEMMA D.1.4.6. *Let $G$ be a Hausdorff locally compact abelian group, $H \subset G$ a closed subgroup. Then:*
@@ -852,23 +845,20 @@ PROOF. (1) and (2) are [DE, Prop.3.6.1]. By compact-discrete duality [DE, Prop. 
 
 D.1.4.3. *General structural results.* From Lemma D.1.4.4, if we denote by $i$ a general element of the set $\mathrm{CG}(\widehat{G})$ of open compactly generated abelian subgroups of $\widehat{G}$ and write $U_i$ for Pontryagin dual of the compactly generated open subgroup of $G$ that $i$ labels then
 
-(D.1.4.8)
 $$
-\gamma : G \xrightarrow{\simeq} \lim_{i \in \mathrm{CG}(\widehat{G})} U_i.
+\gamma : G \xrightarrow{\simeq} \lim_{i \in \mathrm{CG}(\widehat{G})} U_i. \tag{D.1.4.8}
 $$
 
 Using Lemma D.1.4.6, the natural continuous map
 
-(D.1.4.9)
 $$
-\gamma_i : G \to U_i
+\gamma_i : G \to U_i \tag{D.1.4.9}
 $$
 
 is a surjective quotient homomorphism with compact kernel
 
-(D.1.4.10)
 $$
-K_i := \ker(\gamma_i) \subset G
+K_i := \ker(\gamma_i) \subset G \tag{D.1.4.10}
 $$
 
 that is the annihilator of the open compactly generated subgroup $\widehat{U_i}$ of $\widehat{G}$. Since (D.1.4.8) is a topological isomorphism, the $U_i$'s become arbitrarily small around $1$ in $G$.
@@ -883,9 +873,8 @@ there exists a large enough (with respect to the partial ordering of $\mathrm{CG
 
 The compact $K_i$ is a closed subgroup of the open compactly generated subgroup $G_j$ of $G$ for every $j \ge j_0$. In particular, the quotient group
 
-(D.1.4.11)
 $$
-A_{ij} := G_j / K_i
+A_{ij} := G_j / K_i \tag{D.1.4.11}
 $$
 
 is Hausdorff, locally compact, compactly generated and the quotient map $G_j \to A_{ij}$ is clearly open. Since $K_i$ is the kernel of $\gamma_i$ from (D.1.4.9), $A_{ij}$ is a subgroup of $U_i$ for every $j \ge j_0$ and the natural continuous homomorphism
@@ -898,25 +887,22 @@ $$
 
 By Lemma D.1.4.3(2), there exist integers $m, n, k \ge 0$ and a finite group $F$, together with an isomorphism of Hausdorff locally compact abelian groups
 
-(D.1.4.12)
 $$
-A_{ij} \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^k \times F
+A_{ij} \xrightarrow{\simeq} \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^k \times F \tag{D.1.4.12}
 $$
 
 We associate to each $i \in \mathrm{CG}(\widehat{G})$ the set $J_i := \{j \in \mathrm{CG}(G) : K_i \subset G_j\}$. Then $J_i$ inherits a partial order by upwards inclusion of open compactly generated subgroups of $G$. The collection of open subgroups $A_{ij} \subset U_i$ for all $j \in J_i$ exhausts $U_i$ by open compactly generated subgroups, and each $A_{ij}$ is an abelian Lie group with finite component group.
 
 We therefore have, as Hausdorff locally compact abelian groups
 
-(D.1.4.13)
 $$
-\gamma : G \xrightarrow{\simeq} \lim_{i \in \mathrm{CG}(\widehat{G})} \operatorname*{\mathrm{colim}}_{j \in J_i} A_{ij}
+\gamma : G \xrightarrow{\simeq} \lim_{i \in \mathrm{CG}(\widehat{G})} \operatorname*{\mathrm{colim}}_{j \in J_i} A_{ij} \tag{D.1.4.13}
 $$
 
 (with open inclusions as transition maps in the colimit) because $U_i = \operatorname*{\mathrm{colim}}_{j \in J_i} A_{ij}$. The observation to make is as follows, as in [Wa, (1.3)]. For each $j \in \mathrm{CG}(G)$, we may form the set $I_j$ defined as
 
-(D.1.4.14)
 $$
-I_j := \{i \in \mathrm{CG}(\widehat{G}) : K_i \subset G_j\} \subset \mathrm{CG}(\widehat{G})
+I_j := \{i \in \mathrm{CG}(\widehat{G}) : K_i \subset G_j\} \subset \mathrm{CG}(\widehat{G}) \tag{D.1.4.14}
 $$
 
 ## PDF page 760
@@ -927,16 +913,14 @@ $$
 
 LEMMA D.1.4.7 (Structure of Hausdorff locally compact abelian groups). *Let $G$ be a Hausdorff locally compact abelian group, $j \in \mathrm{CG}(G)$, and $G_j$ the corresponding open compactly generated subgroup. Then, as Hausdorff locally compact abelian groups, we have a canonical isomorphism:*
 
-(D.1.4.15)
 $$
-\delta_j : G_j \xrightarrow{\simeq} \lim_{i \in I_j} A_{ij}.
+\delta_j : G_j \xrightarrow{\simeq} \lim_{i \in I_j} A_{ij}. \tag{D.1.4.15}
 $$
 
 *In particular, each $G_j$ is, canonically, a cofiltered limit of abelian Lie groups with finite component group, and the $\delta_j$'s induce a unique isomorphism of Hausdorff locally compact abelian groups*
 
-(D.1.4.16)
 $$
-\delta : G \xrightarrow{\simeq} \operatorname*{\mathrm{colim}}_{j \in \mathrm{CG}(G)} \lim_{i \in I_j} A_{ij}
+\delta : G \xrightarrow{\simeq} \operatorname*{\mathrm{colim}}_{j \in \mathrm{CG}(G)} \lim_{i \in I_j} A_{ij} \tag{D.1.4.16}
 $$
 
 *(with open inclusions as transition maps in the colimit).*
@@ -965,9 +949,8 @@ Note that if $k_1, k_2 \subset G$ are good subgroups then so is $k_1 \cap k_2$. 
 
 LEMMA D.1.5.2 (Properties of structural pairs). *Let $G$ be a Hausdorff locally compact abelian group. Then the set $\mathcal{F}$ of structural pairs of $G$ is filtered under the partial ordering:*
 
-(D.1.5.1)
 $$
-(k_1, \Gamma_1) \preceq (k_2, \Gamma_2)
+(k_1, \Gamma_1) \preceq (k_2, \Gamma_2) \tag{D.1.5.1}
 $$
 
 ## PDF page 761
@@ -1012,9 +995,8 @@ Applying the preceding with $H = \Gamma \subset G$ and then with $H = k^{\perp} 
 
 D.1.5.2. *The Schwartz-Bruhat space $\mathcal{S}(G)$.* For $G$ a Hausdorff locally compact abelian group, and $(k, \Gamma)$ a structural pair of $G$, we write:
 
-(D.1.5.2)
 $$
-r_{(k, \Gamma)} : \Gamma \to \Gamma/k
+r_{(k, \Gamma)} : \Gamma \to \Gamma/k \tag{D.1.5.2}
 $$
 
 for the continuous quotient homomorphism. Recall that $k$ is one of the compact groups $K_i$ of (D.1.4.10) and Lemma D.1.4.7, indexed by the set $\mathrm{CG}(\widehat{G})$ of open compactly generated subgroups of $\widehat{G}$ (by associating to $k$ its annihilator), and $r_{(k, \Gamma)}$ is the continuous quotient homomorphism induced by $\gamma_i$ from (D.1.4.9).
@@ -1033,9 +1015,8 @@ DEFINITION D.1.5.3 (Schwartz-Bruhat functions on Hausdorff locally compact abeli
 
 (2) The unique $f_0 \in C^{\infty}(\Gamma/k)$ such that $f = r_{(k, \Gamma)} \circ f_0$ satisfies the following condition: for a choice of isomorphism
 
-(D.1.5.3)
 $$
-\phi_0 : \Gamma/k \to \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^r \times F
+\phi_0 : \Gamma/k \to \mathbf{R}^m \times \mathbf{T}^n \times \mathbf{Z}^r \times F \tag{D.1.5.3}
 $$
 
 for unique integers $m, n, r \ge 0$ and a finite abelian group $F$, the smooth function $f_0 \circ \phi_0^{-1}$ is of rapid decay at infinity on $\Gamma/k$ in the sense of Definition D.1.3.1(2).
@@ -1072,9 +1053,8 @@ The “elementary divisor” description of $M \subset \mathbf{Z}^r$ allows us t
 
 We conclude that the directed system of $\mathcal{S}(k, \Gamma)$'s is *strict* in the sense that its transition maps are topological embeddings. Thus, the collection of all Schwartz-Bruhat functions on $G$ is a $\mathbf{C}$-vector space that we call the *Schwartz-Bruhat space* of $G$ and is made into a locally convex topological vector space via the locally convex inductive limit topology induced by the canonical linear isomorphism
 
-(D.1.5.4)
 $$
-\mathcal{S}(G) = \operatorname*{\mathrm{colim}}_{(k, \Gamma) \in \mathcal{F}} \mathcal{S}(k, \Gamma)
+\mathcal{S}(G) = \operatorname*{\mathrm{colim}}_{(k, \Gamma) \in \mathcal{F}} \mathcal{S}(k, \Gamma) \tag{D.1.5.4}
 $$
 
 whose injective transition maps are topological embeddings.
@@ -1129,9 +1109,8 @@ The following Theorem is a consequence of Proposition D.1.5.9:
 
 THEOREM D.1.5.10 (Acyclicity of $\mathcal{S}(G)$ - II). *Let $G$ be a Hausdorff locally compact abelian group. Assume $G$ is second-countable, and choose a sequence of structural pairs $(k_m, \Gamma_m)$ for $m\ge 0$ such that the short algebraically exact sequence*
 
-(D.1.5.5)
 $$
-0\to \bigoplus_{m\ge 0}\mathcal{S}(k_m,\Gamma_m) \xrightarrow{\sigma} \bigoplus_{m\ge 0}\mathcal{S}(k_m,\Gamma_m) \xrightarrow{q} \mathcal{S}(G)\to 0,
+0\to \bigoplus_{m\ge 0}\mathcal{S}(k_m,\Gamma_m) \xrightarrow{\sigma} \bigoplus_{m\ge 0}\mathcal{S}(k_m,\Gamma_m) \xrightarrow{q} \mathcal{S}(G)\to 0, \tag{D.1.5.5}
 $$
 
 *where $\sigma((f_m)_{m\ge 0}):=(f_m-f_{m-1})_{m\ge 0}$ (upon defining $f_{-1}:=0$) and $q$ is the quotient map, is topologically exact; i.e. $\sigma$ is a linear topological embedding with closed range, and $q$ is a quotient map.*
@@ -1140,9 +1119,8 @@ PROOF. The quotient map $q$ is, explicitly, assigned by $q((f_m)_{m\ge 0})=\sum_
 
 The linear inverse of $\sigma$ is, explicitly:
 
-(D.1.5.6)
 $$
-\sigma^{-1}((f_m)_{m\ge 0})=(\sum_{0\le j\le m}f_j)_{m\ge 0}.
+\sigma^{-1}((f_m)_{m\ge 0})=(\sum_{0\le j\le m}f_j)_{m\ge 0}. \tag{D.1.5.6}
 $$
 
 Indeed, we have $\sigma^{-1}(\sigma((f_m)_{m\ge 0}))=(\sum_{0\le j\le m}(f_j-f_{j-1}))_{m\ge 0}=(f_m)_{m\ge 0}$, following the convention $f_{-1}:=0$. Note that $\sigma^{-1}$ from (D.1.5.6) only makes sense on $\ker(q)$, which ensures that the sums $\sum_{0\le j\le m}f_j$ vanish for all large enough integers $m\ge 0$. The main difficulty is to show $\sigma^{-1}|_{\ker(q)}$ is continuous.
@@ -1155,25 +1133,22 @@ We refer the reader to §C.1.5, for a discussion of acyclicity for locally conve
 
 DEFINITION D.1.6.1. Let $G$ be a topological group. We define the *topological Lie algebra* of $G$ to be the set
 
-(D.1.6.1)
 $$
-\mathcal{L}(G):=\mathrm{Hom}_{\mathrm{cont}}(\mathbf{R},G)
+\mathcal{L}(G):=\mathrm{Hom}_{\mathrm{cont}}(\mathbf{R},G) \tag{D.1.6.1}
 $$
 
 of one-parameter subgroups of $G$, i.e. of all continuous homomorphisms $\mathbf{R}\to G$, topologized with the compact open topology.
 
 REMARK D.1.6.2. The space $\mathcal{L}(G)$ makes sense for non-commutative $G$ too, and is defined in Definition D.1.6.1 for arbitrary topological groups. In special cases, it carries finer structures that approximate the defining elements of the Lie algebra of a Lie group. In general, we may write
 
-(D.1.6.2)
 $$
-\exp_G:\mathcal{L}(G)\to G
+\exp_G:\mathcal{L}(G)\to G \tag{D.1.6.2}
 $$
 
 for the continuous map
 
-(D.1.6.3)
 $$
-\exp_G(a):=a(1),\, a\in\mathcal{L}(G)
+\exp_G(a):=a(1),\, a\in\mathcal{L}(G) \tag{D.1.6.3}
 $$
 
 ## PDF page 766
@@ -1186,18 +1161,16 @@ REMARK D.1.6.3. For $G$ a Hausdorff locally compact abelian group, $\mathcal{L}(
 
 The following description of $\mathcal{L}(G)$ for $G$ a Hausdorff locally compact abelian group is a consequence of Pontryagin duality. We endow
 
-(D.1.6.4)
 $$
-\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}})
+\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}}) \tag{D.1.6.4}
 $$
 
 with the compact-open topology. The topological space $\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}})$ from (D.1.6.4) is an abelian group upon defining the group operation pointwise.
 
 LEMMA D.1.6.4. *Let $G$ be a Hausdorff locally compact abelian group. Then $\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}})$ is a Hausdorff locally compact abelian group. The assignment:*
 
-(D.1.6.5)
 $$
-\Psi:\mathcal{L}(G)\to\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}})
+\Psi:\mathcal{L}(G)\to\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\widehat{\mathbf{R}}) \tag{D.1.6.5}
 $$
 
 *defined by $a\mapsto\widehat{a}$ is an isomorphism of Hausdorff locally compact abelian groups.*
@@ -1208,16 +1181,14 @@ D.1.6.1. *Degree-1 differential operators and differential characterization of s
 
 DEFINITION D.1.6.5. Let $G$ be a Hausdorff locally compact abelian group, and $a\in\mathcal{L}(G)$ a one-parameter subgroup. We define the following $\mathbf{C}$-linear map:
 
-(D.1.6.6)
 $$
-\partial_a:C^1(G)\to C(G)
+\partial_a:C^1(G)\to C(G) \tag{D.1.6.6}
 $$
 
 by the assignment:
 
-(D.1.6.7)
 $$
-(\partial_af)(g):=\lim_{t\to 0}\frac{f(ga(t))-f(g)}{t}
+(\partial_af)(g):=\lim_{t\to 0}\frac{f(ga(t))-f(g)}{t} \tag{D.1.6.7}
 $$
 
 the limit being formed within $\mathbf{C}$ (we’ll soon see this limit always exists). We refer to $\partial_a$ as the *invariant differential operator* of $a$.
@@ -1268,18 +1239,16 @@ DEFINITION D.1.6.8 (Differential operators on Hausdorff locally compact abelian 
 
 (2) Let $\mathcal{L}(G)^*$ be the set of (finite) words on the set $\mathcal{L}(G)$. For any $w\in\mathcal{L}(G)^*$, let $D_w\in\mathrm{Diff}(G)$ be the corresponding differential operator (understood to be the identity when $w$ is empty). For any $D\in\mathrm{Diff}(G)$, an identity of the form
 
-(D.1.6.8)
 $$
-D=\sum_{w\in\mathcal{L}(G)^*}c_wD_w
+D=\sum_{w\in\mathcal{L}(G)^*}c_wD_w \tag{D.1.6.8}
 $$
 
 with $w$ varying over all the words on the elements $\mathcal{L}(G)$, $c_w\in\mathbf{C}$ with $c_w=0$ for all but finitely many $w$, as a *presentation* for $D$.
 
 We define by $\mathcal{P}_D$ the set of all presentations of $D$ in $\mathrm{Diff}(G)$, and we define the *degree* of $D$ to be
 
-(D.1.6.9)
 $$
-\deg(D):=\inf_{\mathcal{P}_D}\max_{c_w\ne 0}\ell(w)
+\deg(D):=\inf_{\mathcal{P}_D}\max_{c_w\ne 0}\ell(w) \tag{D.1.6.9}
 $$
 
 where $\ell(w)$ is the length of the finite word $w$ on $\mathcal{L}(G)$, the maximum is formed over all the finitely many words $w$ in a given presentation of $D$ whose complex coefficient $c_w$ is nonzero, and the infimum is formed over the set of presentations of $D$ in $\mathrm{Diff}(G)$.
@@ -1290,16 +1259,14 @@ The following is [Wa, §2, Def. 2.4]:
 
 DEFINITION D.1.6.10. Let $G$ be a Hausdorff locally compact abelian group, $D\in\mathrm{Diff}(G)$ an invariant differential operator. We define the function
 
-(D.1.6.10)
 $$
-p(D):\widehat{G}\to\mathbf{C}
+p(D):\widehat{G}\to\mathbf{C} \tag{D.1.6.10}
 $$
 
 by the assignment
 
-(D.1.6.11)
 $$
-p(D)(\chi):=(D\chi)(e)
+p(D)(\chi):=(D\chi)(e) \tag{D.1.6.11}
 $$
 
 where $e\in G$ is the neutral element. We refer to $p(D)$ as the *polynomial* of $D$, or *symbol* of $D$.
@@ -1322,9 +1289,8 @@ $$
 
 The operator $\partial_{\lambda}$ is $\widetilde{c}\cdot\partial_{\widetilde{x}}+\widetilde{c}'\cdot\partial_{\widetilde{z}}$, so it is readily computed that
 
-(D.1.6.12)
 $$
-p(\partial_{\lambda})(\chi_{(x,z,a,b)})=2\pi i(x\cdot\widetilde{c}+a\cdot\widetilde{c}').
+p(\partial_{\lambda})(\chi_{(x,z,a,b)})=2\pi i(x\cdot\widetilde{c}+a\cdot\widetilde{c}'). \tag{D.1.6.12}
 $$
 
 We will see in Lemma D.1.6.19(1) with the aid of Fourier transform that for every open compactly generated subgroup $\Gamma'\subset\widehat{G}$, the restriction of $p(D):\widehat{G}\to\mathbf{C}$ to $\Gamma'$ belongs to $C^{\infty}(\Gamma')$. In particular, $p(D)$ is continuous.
@@ -1337,9 +1303,8 @@ $$
 
 *as functions $G\to\mathbf{C}$ (equivalently, $(\partial_{a_n}\cdots\partial_{a_1}(\chi))\chi^{-1}$ is a constant function on $G$). In particular,*
 
-(D.1.6.13)
 $$
-p(\partial_{a_n}\cdots\partial_{a_1})(\chi)=\prod p(\partial_{a_i})(\chi).
+p(\partial_{a_n}\cdots\partial_{a_1})(\chi)=\prod p(\partial_{a_i})(\chi). \tag{D.1.6.13}
 $$
 
 *Moreover, for every compact subgroup $k'\subset\widehat{G}$ and $D\in\mathrm{Diff}(G)$, the function $p(D):\widehat{G}\to\mathbf{C}$ is $k'$-invariant.*
@@ -1356,9 +1321,8 @@ For $k'$-invariance of $p(D)$, by $\mathbf{C}$-linearity in $D$ (and the fact th
 
 LEMMA D.1.6.14. *Let $G$ be a Hausdorff locally compact abelian group. Define the assignment:*
 
-(D.1.6.14)
 $$
-\sigma:\mathrm{Diff}^1_r(G)=\{\partial_a\}_{a\in\mathcal{L}(G)}\to\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\mathbf{R})
+\sigma:\mathrm{Diff}^1_r(G)=\{\partial_a\}_{a\in\mathcal{L}(G)}\to\mathrm{Hom}_{\mathrm{cont}}(\widehat{G},\mathbf{R}) \tag{D.1.6.14}
 $$
 
 *by setting $\sigma(\partial_a):\widehat{G}\to\mathbf{R}$ to be the continuous homomorphism satisfying*
@@ -1392,9 +1356,8 @@ The map $t\mapsto\langle a(t),\chi\rangle_{G,\widehat{G}}=\chi(a(t))$ is a conti
 
 The equation
 
-(D.1.6.16)
 $$
-\langle a(t),\chi\rangle_{G,\widehat{G}}=\exp(2\pi i(\sigma(\partial_a)(\chi))t)
+\langle a(t),\chi\rangle_{G,\widehat{G}}=\exp(2\pi i(\sigma(\partial_a)(\chi))t) \tag{D.1.6.16}
 $$
 
 determines the one-parameter subgroup $a:\mathbf{R}\to G$ uniquely by Theorem D.1.1.1(2). It follows that we have
@@ -1407,9 +1370,8 @@ for all $\chi\in\widehat{G}$, and hence $a\mapsto(\chi\mapsto\lambda_{a,\chi})$ 
 
 COROLLARY D.1.6.15 (Values of the polynomials of degree-1 differential operators). *Let $G$ be a Hausdorff locally compact abelian group, $a\in\mathcal{L}(G)$ a 1-parameter subgroup. Then:*
 
-(D.1.6.17)
 $$
-p(\partial_a)=2\pi i\sigma(\partial_a)
+p(\partial_a)=2\pi i\sigma(\partial_a) \tag{D.1.6.17}
 $$
 
 *as functions $\widehat{G}\to\mathbf{C}$. In particular, $p(\partial_a)$ takes values within $\mathbf{R}(1)$.*
@@ -1442,16 +1404,14 @@ $m,n,r\ge 0$ and a finite abelian group $F$. Any one-parameter subgroup $a:\math
 
 By $\mathbf{C}$-bilinearity in $D_1$ and $D_2$, we may focus on $D_1$ and $D_2$ that are each products of finitely many $\partial_a$’s for 1-parameter subgroups $a$ of $G$ and $\widehat{G}$ respectively. As a warm-up, let’s consider the case $D_1=\partial_{a_1}$ and $D_2=\partial_{a_2}$, with $a_1\in\mathcal{L}(G)$ and $a_2\in\mathcal{L}(\widehat{G})$. Viewing $\mathbf{T}$ as $\mathbf{R}/\mathbf{Z}$, we have $a_1(t)=(tc,tc'\bmod\mathbf{Z},0,0)$ for some unique $c\in\mathbf{R}^m$ and $c'\in\mathbf{R}^n$. Using the analogous description $\widehat{G}=\mathbf{R}^m\times\mathbf{Z}^n\times\mathbf{T}^r\times\widehat{F}$ (with elements denoted $(\widetilde{x},\widetilde{a},\widetilde{z},\widetilde{b})$), we likewise have $a_2(t)=(te,0,td,0)$ for unique $e\in\mathbf{R}^m$ and $d\in\mathbf{R}^r$. Then
 
-(D.1.6.18)
 $$
-(p(\partial_{a_2})\cdot\partial_{a_1}f)(x,z,a,b)=p(\partial_{a_2})(x,z,a,b)\cdot\left(\sum_{j=1}^m c_j\,\partial_{x_j}f(x,z,a,b)+\sum_{\ell=1}^n c'_{\ell}\,\partial_{z_{\ell}}f(x,z,a,b)\right)
+(p(\partial_{a_2})\cdot\partial_{a_1}f)(x,z,a,b)=p(\partial_{a_2})(x,z,a,b)\cdot\left(\sum_{j=1}^m c_j\,\partial_{x_j}f(x,z,a,b)+\sum_{\ell=1}^n c'_{\ell}\,\partial_{z_{\ell}}f(x,z,a,b)\right) \tag{D.1.6.18}
 $$
 
 where $p(\partial_{a_2})(x,z,a,b)=2\pi i(x\cdot e+a\cdot d)$ by (D.1.6.12). Thus, the right side of (D.1.6.18) equals
 
-(D.1.6.19)
 $$
-2\pi i\sum_{j=1}^m(x\cdot e+a\cdot d)c_j\,\partial_{x_j}f(x,z,a,b)+2\pi i\sum_{\ell=1}^n(x\cdot e+a\cdot d)c'_{\ell}\,\partial_{z_{\ell}}f(x,z,a,b)
+2\pi i\sum_{j=1}^m(x\cdot e+a\cdot d)c_j\,\partial_{x_j}f(x,z,a,b)+2\pi i\sum_{\ell=1}^n(x\cdot e+a\cdot d)c'_{\ell}\,\partial_{z_{\ell}}f(x,z,a,b) \tag{D.1.6.19}
 $$
 
 for $e\in\mathbf{R}^m$, $d\in\mathbf{R}^r$ encoding $a_2$ and $c\in\mathbf{R}^m$, $c'\in\mathbf{R}^n$ encoding $a_1$.
@@ -1464,9 +1424,8 @@ For a structural pair $(k,\Gamma)$ of $G$, we choose the volume-1 Haar measure o
 
 We use $\mu_k$ to define the continuous linear map $\pi_{(k,\Gamma)}:\mathcal{S}(G)\to\mathcal{S}(k,\Gamma)=\mathcal{S}(\Gamma/k)$ assigned by
 
-(D.1.6.20)
 $$
-\pi_{(k,\Gamma)}(f)(x):=\int_k f(gx)\,\mathrm{d}\mu_k(g),\, x\in\Gamma
+\pi_{(k,\Gamma)}(f)(x):=\int_k f(gx)\,\mathrm{d}\mu_k(g),\, x\in\Gamma \tag{D.1.6.20}
 $$
 
 on each $f\in\mathcal{S}(G)$. To check that this output really lies in $\mathcal{S}(\Gamma/k)$ and that the linear map is continuous, the inductive limit process defining the topology of $\mathcal{S}(G)$ reduces us to checking:
@@ -1483,9 +1442,8 @@ PROOF. Averaging over $k$ (say on continuous functions) is the composite of the 
 
 First we treat finite $k$. In this case the $k$-averaging involves only finite sums and so the output of such averaging is seen to be valued in $\mathcal{S}(A)^k$ and continuous as an $\mathcal{S}(A)$-valued operation. We then just need to show the inclusion $\mathcal{S}(A/k)\to\mathcal{S}(A)^k$ is an equality and the resulting map $\pi:\mathcal{S}(A)\to\mathcal{S}(A/k)$ is continuous. Fix an identification
 
-(D.1.6.21)
 $$
-A=\mathbf{R}^m\times\mathbf{T}^n\times\mathbf{Z}^r\times F
+A=\mathbf{R}^m\times\mathbf{T}^n\times\mathbf{Z}^r\times F \tag{D.1.6.21}
 $$
 
 for finite $F$. Letting $F'\subset F$ be the image of $k$ under $A\to(A/A^0)_{\mathrm{tor}}=F$, it suffices to separately treat the cases $F'=0$ and $k\simeq F'$. In the latter case the containment $k\subset\mathbf{T}^n\times F$ and the infinite divisibility of $\mathbf{T}$ allows us to use compatible decompositions of $k\simeq F'$ and $F$ as products of cyclic groups to possibly *change* the identification (D.1.6.21) to arrange that $k\subset F$ as subgroups of $A$. Then we have compatible linear topological descriptions
@@ -1544,9 +1502,8 @@ has Cauchy partial sums in $\mathcal{S}(A')=\mathcal{S}(A/k)$ and so converges i
 
 Since $\mu_k(k)=1$, it is clear that $\pi_{(k,\Gamma)}:\mathcal{S}(G)\to\mathcal{S}(k,\Gamma)=\mathcal{S}(\Gamma/k)$ is also a projector. We likewise use $\mu_{\Gamma^{\perp}}$ to define the continuous linear map $\pi_{(\Gamma^{\perp},k^{\perp})}:\mathcal{S}(\widehat{G})\to\mathcal{S}(\Gamma^{\perp},k^{\perp})=\mathcal{S}(k^{\perp}/\Gamma^{\perp})$ by
 
-(D.1.6.22)
 $$
-\pi_{(\Gamma^{\perp},k^{\perp})}(f)(x):=\int_{\Gamma^{\perp}}f(gx)\,\mathrm{d}\mu_{\Gamma^{\perp}}(g),\, x\in k^{\perp}
+\pi_{(\Gamma^{\perp},k^{\perp})}(f)(x):=\int_{\Gamma^{\perp}}f(gx)\,\mathrm{d}\mu_{\Gamma^{\perp}}(g),\, x\in k^{\perp} \tag{D.1.6.22}
 $$
 
 on each $f\in\mathcal{S}(\widehat{G})$. That $\pi_{(\Gamma^{\perp},k^{\perp})}$ is also a projector amounts to checking $\mu_{\Gamma^{\perp}}(\Gamma^{\perp})=1$, but rather than carry out such a direct verification (which seems a bit complicated)$^4$ we get it immediately from the projector property for $\pi_{(k,\Gamma)}$ via Lemma D.1.6.19(2, 3) below, with that part (3) a consequence of the Poisson Summation Formula (see Theorem D.1.2.7 or [DE, Thm. 3.6.3]).
@@ -1555,32 +1512,28 @@ LEMMA D.1.6.19 (Fourier transform and differential operators on Schwartz-Bruhat 
 
 (1) *For any invariant differential operator $D$ on $G$,*
 
-(D.1.6.23)
 $$
-\mathcal{F}_G(Df)=p(D)\cdot\widehat{f}
+\mathcal{F}_G(Df)=p(D)\cdot\widehat{f} \tag{D.1.6.23}
 $$
 
 *for every $f\in\mathcal{S}(G)$; i.e., as functions of $\chi\in\widehat{G}$, we have*
 
-(D.1.6.24)
 $$
-\widehat{Df}(\chi)=p(D)(\chi)\cdot\widehat{f}(\chi).
+\widehat{Df}(\chi)=p(D)(\chi)\cdot\widehat{f}(\chi). \tag{D.1.6.24}
 $$
 
 (2) *The linear map $\mathcal{F}_G:\mathcal{S}(G)\to C_0(\widehat{G})$ is valued in $\mathcal{S}(\widehat{G})$ and continuous with respect to the locally convex topologies on $\mathcal{S}(G)$ and $\mathcal{S}(\widehat{G})$. As such, it is a linear topological isomorphism.*
 
 (3) *The Fourier transform $\mathcal{F}$ interacts with the projectors $\pi_{(k,\Gamma)}$ and $\pi_{(\Gamma^{\perp},k^{\perp})}$ according to the following identity:*
 
-(D.1.6.25)
 $$
-\mathcal{F}_G\circ\pi_{(k,\Gamma)}(f)=\int_{k^{\perp}}\widehat{f}(\chi)\,\chi\,\mathrm{d}\mu_{k^{\perp}}(\chi)
+\mathcal{F}_G\circ\pi_{(k,\Gamma)}(f)=\int_{k^{\perp}}\widehat{f}(\chi)\,\chi\,\mathrm{d}\mu_{k^{\perp}}(\chi) \tag{D.1.6.25}
 $$
 
 *where $\mu_{k^{\perp}}$ is the Plancherel measure on $k^{\perp}$ uniquely determined by $\mu_{\Gamma/k}$ and $\mu_G$. In particular, we have*
 
-(D.1.6.26)
 $$
-\mathcal{F}_G\circ\pi_{(k,\Gamma)}(f)=\pi_{(\Gamma^{\perp},k^{\perp})}\circ\mathcal{F}_{\widehat{G}}
+\mathcal{F}_G\circ\pi_{(k,\Gamma)}(f)=\pi_{(\Gamma^{\perp},k^{\perp})}\circ\mathcal{F}_{\widehat{G}} \tag{D.1.6.26}
 $$
 
 *intertwining $\mathcal{S}(k,\Gamma)$ and $\mathcal{S}(\Gamma^{\perp},k^{\perp})$.*
@@ -2539,7 +2492,7 @@ $$
 
 where $\mathcal S(G)(\omega)$ is the linear quotient $\mathcal S(G)/\ker(\Phi_{G,\omega})$ equipped with the quotient topology. The kernel of $\Phi_{G,\omega}$ is the closure in $\mathcal S(G)$ of the subspace of differences $\{f-\overline{\omega}(g)\,g.f:f\in\mathcal S(G),g\in G^1\}$ by Lemma 4.3.3.1(3), so $\mathcal S(G)(\omega)$ is the maximal Hausdorff quotient of the space of $G^1$-coinvariants of $\mathcal S(G)$ under the action $f\mapsto\overline{\omega}(g)\,g.f$ ($g\in G^1$). For this reason, $\mathcal S(G)(\omega)$ is also denoted $\mathrm H_{0,\mathrm{cont}}(\omega,\mathcal S(G))$.
 
-For a Hausdorff locally convex topological $\mathbf C$-vector space $E$ equipped with a left action $\rho_G$ of $G$ by linear topological automorphisms, we say $\rho_G$ is *uniformly continuous* on a subset $\Sigma\subset G$ if and only if for every $0$-neighborhood $U\subset E$ there exists $0$-neighborhood $V\subset E$ so that $\rho_G(\sigma,x)\in U$ for all $\sigma\in\Sigma$. Equivalently, this says that for every net $\{x_i\}_{i\in I}\subset E$ converging to $x\in E$ and every $0$-neighborhood $U\subset E$ there exists $i_0$ so that $\rho_G(\sigma,x_i)-\rho_G(\sigma,x)=\rho_G(g,x_i-x)\in U$ for all $i\ge i_0$ and all $\sigma\in\Sigma$. For example, Proposition D.1.9.2 the $G$-action on $\mathcal S(G)$ is uniformly continuous on any compact subset $K\subset G$.
+For a Hausdorff locally convex topological $\mathbf C$-vector space $E$ equipped with a left action $\rho_G$ of $G$ by linear topological automorphisms, we say $\rho_G$ is *uniformly continuous* on a subset $\Sigma\subset G$ if and only if for every $0$-neighorhood $U\subset E$ there exists $0$-neighborhood $V\subset E$ so that $\rho_G(\sigma,x)\in U$ for all $\sigma\in\Sigma$. Equivalently, this says that for every net $\{x_i\}_{i\in I}\subset E$ converging to $x\in E$ and every $0$-neighborhood $U\subset E$ there exists $i_0$ so that $\rho_G(\sigma,x_i)-\rho_G(\sigma,x)=\rho_G(g,x_i-x)\in U$ for all $i\ge i_0$ and all $\sigma\in\Sigma$. For example, Proposition D.1.9.2 the $G$-action on $\mathcal S(G)$ is uniformly continuous on any compact subset $K\subset G$.
 
 LEMMA D.2.2.1 ($G^1$-isotypes under coarsening of the topology - I). *Let $G$ be a Hausdorff locally compact modulated abelian group equipped with a module*
 
@@ -2671,7 +2624,7 @@ PROOF. Assertion (1) is a special case of Lemma D.1.8.1(1). For assertion (2), w
 
 **D.3. SCHWARTZ-BRUHAT FUNCTIONS WITH $I$-EXPONENTIAL DECAY** · **797**
 
-Now we turn to the general case of (2). The assumed continuity of $M_{\chi}$ with respect to the topology on $\mathcal S(G)$ by $E$ under $i$ allows us to conclude by using Lemma D.2.2.1(4) with $T=M_{\chi}$ $^{10}$ provided that the Hausdorff quotient $E(\omega)$ of $E$ inherits completeness from $E$ and the continuous linear map $M_{\chi}(\mathcal S(\Gamma))\to E(\omega)$ is a topological embedding with dense image. Let us now verify these two properties.
+Now we turn to the general case of (2). The assumed continuity of $M_{\chi}$ with respect to the topology on $\mathcal S(G)$ by $E$ under $i$ allows us to conclude by using Lemma D.2.2.1(4) with $T=M_{\chi}$ $^{10}$ provided that the Hausdorff quotient $E(\omega)$ of $E$ inherits completness from $E$ and the continuous linear map $M_{\chi}(\mathcal S(\Gamma))\to E(\omega)$ is a topological embedding with dense image. Let us now verify these two properties.
 
 The completeness of $E(\omega)$ holds because the natural map $\mathrm H^0(\omega,E)\to E(\omega)$ is a topological isomorphism (see (4.3.3.2)) and $\mathrm H^0(\omega,E)$ inherits completeness due to its closedness inside $E$. The map $M_{\chi}(\mathcal S(\Gamma))\to E(\omega)$ (where $\mathcal S(\Gamma))$ is given the subspace topology from $E$) is topologically identified with the map $\mathrm H^0(\omega,\mathcal S(G))\to\mathrm H^0(\omega,E)\simeq E(\omega)$ that is a topological embedding when $\mathcal S(G)$ is given the subspace topology from $E$. The image of this map is also dense because the map is linearly identified with $\mathcal S(G)(\omega)\to E(\omega)$ whose image is dense since $\mathcal S(G)$ is dense in $E$.
 

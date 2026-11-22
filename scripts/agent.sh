@@ -343,7 +343,9 @@ $(tail -n 25 "$wt/.agent/build.txt")
 $diffout
 \`\`\`"
     baddefs=$("$main/scripts/signatures.sh" --sorry-in-defs "$wt/.agent/signatures.txt") ||
-      fail "A $role agent ($who) left \`sorry\` inside a definition. State the fact as a separate theorem with \`sorry\` and use that theorem in the definition. Nothing was pushed.
+      fail "A $role agent ($who) left \`sorry\` inside a definition, or in the statement of a declaration. Nothing was pushed.
+
+For a definition: state the fact as a separate theorem with \`sorry\` and use that theorem in the definition. For a theorem listed here, the \`sorry\` is in its statement, not its proof: a hypothesis or a term failed to elaborate and Lean put \`sorry\` in its place without an error. The usual cause is a hypothesis kept in a \`variable\` and written with local notations; write it as an explicit argument of each theorem that needs it (\`set_option pp.sorrySource true\` with \`#check\` shows where the \`sorry\` comes from).
 
 \`\`\`
 $baddefs

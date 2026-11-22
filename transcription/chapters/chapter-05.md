@@ -1099,7 +1099,7 @@ $$
 (1) *Let $\mathcal S_{00}(\mathbf R)$ be the closed subspace defined as $\bigcap_{k\ge 0}\ker(\delta_0^{(k)})$. The orthogonal in $\mathcal S(\mathbf R)'_\beta$ of $\mathcal S_{00}(\mathbf R)$ with respect to the duality $\langle\mathcal S(\mathbf R),\mathcal S(\mathbf R)'_\beta\rangle$ is a linear subspace of $\mathcal S(\mathbf R)'$ linearly isomorphic to the continuous dual of the quotient $\mathcal S(\mathbf R)/\mathcal S_{00}(\mathbf R)$, which, topologized with the strong topology on the continuous dual of the quotient, is linearly and topologically isomorphic to the $\mathbf C$-linear space underlying the polynomial algebra $\mathbf C[X]$ equipped with the finest locally convex topology, equivalently the topology induced by the family of seminorms $\{p_N\}_{N\ge 0}$ with:*
 
 $$
-p_N(c_0+c_1X+\dots+c_NX^N):=\sup_{0\le k\le N}\lvert c_k\rvert \tag{5.3.2.2}
+p_N(c_0+c_1X+\ldots+c_NX^N):=\sup_{0\le k\le N}\lvert c_k\rvert \tag{5.3.2.2}
 $$
 
 *the isomorphism being uniquely determined by the assignment $X^N\mapsto\frac{1}{N!}\delta_0^{(N)}$, and matching the degree of a polynomial with the finite order of the resulting distribution supported at $0\in\mathbf R$.*

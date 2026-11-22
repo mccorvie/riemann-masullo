@@ -14,10 +14,8 @@
 
 • Assume $G$ is a second-countable $\mathbf R_{>0}$-modulated group. For $I\subset\mathbf R$ a non-empty interval, $\mathcal S_I(G)$ is the space of *$I$-exponentially decaying* Schwartz-Bruhat functions, i.e. $\phi\in C^\infty(G)$ such that $\lvert\cdot\rvert_G^a\phi\in\mathcal S(G)$ for all $a\in I$. We topologize $\mathcal S_I(G)$ with the locally convex inductive limit topology of the nuclear Fréchet topologies on $\mathcal S_I(k,G)$ for $k\subset G$ varying over the compact subgroups of $G$ whose orthogonal $k^\perp\subset\widehat G$ is compactly generated. The topology on $\mathcal S_I(k,G)$ is the subspace topology induced by the linear injection
 
-(1.1.2.1)
-
 $$
-T:\mathcal S_I(k,G)\to\prod_{a\in I}\mathcal S(k,G)
+T:\mathcal S_I(k,G)\to\prod_{a\in I}\mathcal S(k,G) \tag{1.1.2.1}
 $$
 
 sending $\phi$ to $(\lvert\cdot\rvert_G^a\phi)_{a\in I}$. This is also $\mathcal S_I(\mathbf R_{>0})\widehat{\otimes}_\pi\mathcal S(G^1/k)$.
@@ -204,10 +202,8 @@ The convergence of the above displayed sum is in the sense of trace-class operat
 
 Since $\delta^{(m)}_z$ is the functional obtained by integration (with respect to $\bar\mu$ on $C_F$) of functions in $W_I^{s,2}(C_F)$ against the functions $\lvert\cdot\rvert_F^{z-1/2}(\log\lvert\cdot\rvert_F)^m$, the finite rank kernels given by finite sums of $\lvert\cdot\rvert_F^{z-1/2}(\log\lvert\cdot\rvert_F)^m\otimes\psi_{z,m}$ are actual smooth functions of two variables on $C_F\times C_F$, and their sum converges in $L^2(C_F\times C_F,\nu\otimes\nu^\vee)$, where
 
-(1.2.1.1)
-
 $$
-\nu=\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}\bar\mu,\quad\nu^\vee=\frac{1}{\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}}\bar\mu.
+\nu=\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}\bar\mu,\quad\nu^\vee=\frac{1}{\max\{\lvert\cdot\rvert_F^{-2a},\lvert\cdot\rvert_F^{2a}\}(1+\lvert\log\lvert\cdot\rvert_F\rvert^2)^{s/2}}\bar\mu. \tag{1.2.1.1}
 $$
 
 Such limit is, in particular, a measurable function of two variables on $C_F\times C_F$, which we call the “spectral” kernel and we denote by:
@@ -2120,10 +2116,8 @@ $$
 
 But now the subquotient:
 
-(1.8.3.9)
-
 $$
-\mathrm{PV}_{P_k}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))/\mathrm{PV}_{P_{k+1}}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))
+\mathrm{PV}_{P_k}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F))/\mathrm{PV}_{P_{k+1}}\mathrm{H}_{0,\mathrm{cont}}(\chi|_{C_F^1},\mathcal{S}_0(\mathbf{A}_F)) \tag{1.8.3.9}
 $$
 
 carries a Schauder basis that is analogous to the exponential system from the toy example (see Example 1.8.1.1)!
@@ -2328,10 +2322,8 @@ $$
 
 1.8.5.1. *Putting everything together.* Putting everything together from §5.1, we obtain that for $I=[-a,a]$ for a fixed real number $a>0$, the logarithmic derivative of $L_f(s,\chi)$ satisfies, over the interior of $K$:
 
-(1.8.5.1)
-
 $$
-\mathrm{holomorphic\ over\ Int}(K)+\frac{L_f'(s+1/2,\chi)}{L_f(s+1/2,\chi)}=\delta\cdot\left(\frac1{s+1/2}+\frac1{s-1/2}\right)-\mathrm{holomorphic\ over\ }\mathbf C_{>a}
+\mathrm{holomorphic\ over\ Int}(K)+\frac{L_f'(s+1/2,\chi)}{L_f(s+1/2,\chi)}=\delta\cdot\left(\frac1{s+1/2}+\frac1{s-1/2}\right)-\mathrm{holomorphic\ over\ }\mathbf C_{>a} \tag{1.8.5.1}
 $$
 
 with $\delta=0$ if $\chi|_{C_F^1}\neq1$ and $\delta=1$ otherwise. This is, ultimately, the main consequence of the Trace Formula. Everything else follows from this.
