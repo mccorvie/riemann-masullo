@@ -5,6 +5,8 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import Mathlib.Analysis.Meromorphic.Complex
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 import Mathlib.Topology.MetricSpace.ProperSpace.Lemmas
 
@@ -397,6 +399,686 @@ theorem sLocalZLaurentCoeff_hasLaurentSeries (f : ℬₛ) (c : QuasiCharacter J�
   exact (((sLocalIdelicZFunction_meromorphic f χ).meromorphicOn (s + 0) trivial)).comp_analyticAt
     (g := fun t ↦ s + t) (by fun_prop)
 
+/-- An analytic function of order at most one has a reciprocal of order `-1` at its zeros
+and of order `0` elsewhere. -/
+private theorem sLocalRhoFactor_poles_iff_order_inv {g : ℂ → ℂ} {x : ℂ}
+    (hg : AnalyticAt ℂ g x) (h1 : meromorphicOrderAt g x ≤ 1) :
+    meromorphicOrderAt (fun u ↦ (g u)⁻¹) x = if g x = 0 then -1 else 0 := by
+  change meromorphicOrderAt g⁻¹ x = _
+  rw [meromorphicOrderAt_inv]
+  split_ifs with h
+  · have hne : analyticOrderAt g x ≠ 0 := by
+      rw [Ne, analyticOrderAt_eq_zero]
+      push Not
+      exact ⟨hg, h⟩
+    have hge : (1 : WithTop ℤ) ≤ meromorphicOrderAt g x := by
+      rw [hg.meromorphicOrderAt_eq]
+      cases hn : analyticOrderAt g x with
+      | top => simp
+      | coe n =>
+        rw [hn] at hne
+        have : 1 ≤ n := Nat.one_le_iff_ne_zero.mpr (by exact_mod_cast hne)
+        simpa using (show ((1 : ℤ) : WithTop ℤ) ≤ ((n : ℤ) : WithTop ℤ) by exact_mod_cast this)
+    rw [le_antisymm h1 hge]
+  · rw [hg.meromorphicOrderAt_eq, analyticOrderAt_eq_zero.mpr (Or.inr h)]
+    simp
+
+/-- The order `-1` is negative. -/
+private theorem sLocalRhoFactor_poles_iff_neg_one_lt : (-1 : WithTop ℤ) < 0 :=
+  WithTop.coe_lt_coe.mpr (by norm_num)
+
+/-- The reciprocal Gamma function vanishes to order at most one. -/
+private theorem sLocalRhoFactor_poles_iff_invGamma_le_one (x : ℂ) :
+    meromorphicOrderAt (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) x ≤ 1 := by
+  have hg : ∀ y, AnalyticAt ℂ (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) y := fun y ↦
+    Complex.differentiable_one_div_Gamma.analyticAt y
+  have hzero : ∀ {f : ℂ → ℂ} {y : ℂ}, AnalyticAt ℂ f y → f y ≠ 0 →
+      meromorphicOrderAt f y = 0 := by
+    intro f y hf hy
+    rw [hf.meromorphicOrderAt_eq, analyticOrderAt_eq_zero.mpr (Or.inr hy), ENat.map_zero,
+      CharP.cast_eq_zero, WithTop.coe_zero]
+  have hstep : ∀ y : ℂ, meromorphicOrderAt (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) y =
+      meromorphicOrderAt (id : ℂ → ℂ) y +
+        meromorphicOrderAt (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) (y + 1) := by
+    intro y
+    have heq : (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) =
+        (id : ℂ → ℂ) * ((fun u : ℂ ↦ (Complex.Gamma u)⁻¹) ∘ (· + 1)) := by
+      funext u
+      exact Complex.one_div_Gamma_eq_self_mul_one_div_Gamma_add_one u
+    have hcomp : MeromorphicAt ((fun u : ℂ ↦ (Complex.Gamma u)⁻¹) ∘ (· + 1)) y :=
+      ((hg (y + 1)).comp (f := fun u : ℂ ↦ u + 1) (by fun_prop)).meromorphicAt
+    calc meromorphicOrderAt (fun u : ℂ ↦ (Complex.Gamma u)⁻¹) y
+        = meromorphicOrderAt ((id : ℂ → ℂ) *
+            ((fun u : ℂ ↦ (Complex.Gamma u)⁻¹) ∘ (· + 1))) y := by rw [← heq]
+      _ = _ := by
+        rw [meromorphicOrderAt_mul analyticAt_id.meromorphicAt hcomp,
+          meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt]
+  by_cases hx : ∃ m : ℕ, x = -(m : ℂ)
+  · obtain ⟨m, rfl⟩ := hx
+    refine le_of_eq ?_
+    induction m with
+    | zero =>
+      rw [hstep, Nat.cast_zero, neg_zero, zero_add, meromorphicOrderAt_id,
+        hzero (hg 1) (by simp [Complex.Gamma_one]), add_zero]
+    | succ m ih =>
+      rw [hstep, hzero analyticAt_id (neg_ne_zero.mpr (Nat.cast_ne_zero.mpr (Nat.add_one_ne_zero m))),
+        zero_add, show -((m + 1 : ℕ) : ℂ) + 1 = -(m : ℂ) by push_cast; ring]
+      exact ih
+  · rw [hzero (hg x) (inv_ne_zero (Complex.Gamma_ne_zero fun m hm ↦ hx ⟨m, hm⟩))]
+    exact zero_le_one
+
+/-- The Gamma function has order `-1` where its value is the junk value zero, that is at its
+poles, and order `0` elsewhere. -/
+private theorem sLocalRhoFactor_poles_iff_Gamma_order (x : ℂ) :
+    meromorphicOrderAt Complex.Gamma x = if Complex.Gamma x = 0 then -1 else 0 := by
+  have h := sLocalRhoFactor_poles_iff_order_inv
+    (Complex.differentiable_one_div_Gamma.analyticAt x) (sLocalRhoFactor_poles_iff_invGamma_le_one x)
+  simpa only [inv_inv, inv_eq_zero] using h
+
+/-- Order of a product `e * P * Q` with `e` a unit, `Q` analytic and nonvanishing in the closed
+left half-plane, and `P` with at most simple poles, all in the closed left half-plane. -/
+private theorem sLocalRhoFactor_poles_iff_order_of_eq {f e P Q : ℂ → ℂ} {s : ℂ}
+    (hf : f =ᶠ[𝓝[≠] s] fun z ↦ e z * P z * Q z) (he : AnalyticAt ℂ e s) (he0 : e s ≠ 0)
+    (hQ : AnalyticAt ℂ Q s) (hQ0 : s.re ≤ 0 → Q s ≠ 0) (hP : MeromorphicAt P s)
+    (hPo : meromorphicOrderAt P s = 0 ∨ meromorphicOrderAt P s = -1)
+    (hPre : meromorphicOrderAt P s < 0 → s.re ≤ 0) :
+    MeromorphicAt f s ∧ (meromorphicOrderAt f s < 0 ↔ meromorphicOrderAt P s < 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt f s = meromorphicOrderAt P s) := by
+  have hR : MeromorphicAt (fun z ↦ e z * P z * Q z) s :=
+    (he.meromorphicAt.mul hP).mul hQ.meromorphicAt
+  have hord : meromorphicOrderAt f s =
+      meromorphicOrderAt e s + meromorphicOrderAt P s + meromorphicOrderAt Q s := by
+    rw [meromorphicOrderAt_congr hf]
+    change meromorphicOrderAt (e * P * Q) s = _
+    rw [meromorphicOrderAt_mul (he.meromorphicAt.mul hP) hQ.meromorphicAt,
+      meromorphicOrderAt_mul he.meromorphicAt hP]
+  have he' : meromorphicOrderAt e s = 0 := by
+    rw [he.meromorphicOrderAt_eq, analyticOrderAt_eq_zero.mpr (Or.inr he0)]
+    simp
+  have hQnn : 0 ≤ meromorphicOrderAt Q s := hQ.meromorphicOrderAt_nonneg
+  have hQ' : s.re ≤ 0 → meromorphicOrderAt Q s = 0 := fun hs ↦ by
+    rw [hQ.meromorphicOrderAt_eq, analyticOrderAt_eq_zero.mpr (Or.inr (hQ0 hs))]
+    simp
+  rw [he', zero_add] at hord
+  refine ⟨hR.congr hf.symm, ⟨fun h ↦ ?_, fun h ↦ ?_⟩, fun hs ↦ by rw [hord, hQ' hs, add_zero]⟩
+  · rcases hPo with h0 | h1
+    · rw [hord, h0, zero_add] at h
+      exact absurd h (not_lt.mpr hQnn)
+    · rw [h1]; exact WithTop.coe_lt_coe.mpr (by norm_num)
+  · rw [hord, hQ' (hPre h), add_zero]
+    exact h
+
+/-- At a real place, the restricted local Tate factor is the epsilon factor times the ratio of
+real Gamma factors. Its poles are those of the Gamma factor of the quasi-character, they are
+simple and lie in the closed left half-plane, where the factor has no zeros. -/
+private theorem sLocalRhoFactor_poles_iff_real (χ : PontryaginDual Jₛ) (w : InfinitePlace F)
+    (hw : w.IsReal) (s : ℂ) :
+    let c := fun z : ℂ ↦ twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) z
+    let A := fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))
+    let p := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (c 0))).exists.choose
+    MeromorphicAt A s ∧
+      (meromorphicOrderAt A s < 0 ↔ ∃ n : ℕ, s = -p.1 - ((2 * n + p.2.val : ℕ) : ℂ)) ∧
+      (meromorphicOrderAt A s < 0 → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt A s = 0 ∨ meromorphicOrderAt A s = -1) := by
+  intro c A p
+  obtain ⟨η, ha, -⟩ := sLocalInfinite_charts χ w
+  obtain ⟨t, a, ht, hbase⟩ := realPlaceUnitary_shape w hw η
+  have hsh := realChart_shape w hw η t a hbase
+  have hp : p = (0 + t, a) := by
+    have h0 := hsh 0
+    rw [← ha 0] at h0
+    exact (realLocalEulerParameters w hw _).unique
+      (realLocalEulerParameters w hw _).exists.choose_spec h0
+  have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+  let L : ℂ → ℂ := fun z ↦ (z + t + (a.val : ℂ)) / 2
+  let e : ℂ → ℂ := fun z ↦ Complex.I ^ a.val * (Real.pi : ℂ) ^ (-(z + t + (a.val : ℂ)) / 2)
+  let P : ℂ → ℂ := fun z ↦ Complex.Gamma (L z)
+  let Q : ℂ → ℂ := fun z ↦ (Complex.Gammaℝ (1 - (z + t) + (a.val : ℂ)))⁻¹
+  have hstrip : ∀ z : ℂ, z.re ∈ Ioo (0 : ℝ) 1 → A z = e z * P z * Q z := by
+    intro z hz
+    have h := realTate_ratio_strip w hw η z hz
+    have h₁ := realEuler_of_shape w hw _ (z + t) a (hsh z)
+    have h₂ := realEuler_of_shape w hw _ (1 - (z + t)) a (realDual_shape w hw _ (z + t) a (hsh z))
+    change infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z)) = _
+    rw [ha z, h, h₁.1, h₁.2, h₂.1, Complex.Gammaℝ_def]
+    simp only [e, P, Q, L, div_eq_mul_inv]
+    ring_nf
+  have hAm : Meromorphic A := by
+    have hT := ((infiniteLocalTateFactor_spec w).1 η).meromorphicOn
+    have hA : A = fun z ↦ infiniteLocalTateFactor w (quasiCharacterNormTwist
+        ((Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w :
+          (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) (continuous_infiniteLocalModule w)
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) z) :=
+      funext fun z ↦ congrArg (infiniteLocalTateFactor w) (ha z)
+    intro z
+    rw [hA]
+    exact hT z (mem_univ z)
+  have hL : ∀ z, AnalyticAt ℂ L z := fun z ↦ by fun_prop
+  have he : ∀ z, AnalyticAt ℂ e z := fun z ↦ by
+    have : Differentiable ℂ e := by fun_prop (disch := exact Or.inl hpi)
+    exact this.analyticAt z
+  have hQ : ∀ z, AnalyticAt ℂ Q z := fun z ↦
+    (Complex.differentiable_Gammaℝ_inv.comp (by fun_prop :
+      Differentiable ℂ fun z : ℂ ↦ 1 - (z + t) + (a.val : ℂ))).analyticAt z
+  have hPm : ∀ z, MeromorphicAt P z := fun z ↦ (Meromorphic.Gamma (L z)).comp_analyticAt (hL z)
+  have hRm : Meromorphic fun z ↦ e z * P z * Q z := fun z ↦
+    ((he z).meromorphicAt.mul (hPm z)).mul (hQ z).meromorphicAt
+  have hmid : ∀ᶠ z : ℂ in 𝓝[≠] (1 / 2 : ℂ), z.re ∈ Ioo (0 : ℝ) 1 :=
+    nhdsWithin_le_nhds ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+      (by norm_num [mem_preimage, mem_Ioo]))
+  have hf : A =ᶠ[𝓝[≠] s] fun z ↦ e z * P z * Q z :=
+    nhdsNE_le_codiscrete s (meromorphic_eq_of_germ hAm hRm (hmid.mono fun z hz ↦ hstrip z hz))
+  have hdL : deriv L s ≠ 0 := by
+    have hd : HasDerivAt L (1 / 2) s :=
+      (((hasDerivAt_id' s).add_const t).add_const (a.val : ℂ)).div_const 2
+    rw [hd.deriv]
+    norm_num
+  have hPo : meromorphicOrderAt P s = if Complex.Gamma (L s) = 0 then -1 else 0 := by
+    rw [show P = Complex.Gamma ∘ L from rfl, meromorphicOrderAt_comp_of_deriv_ne_zero (hL s) hdL]
+    exact sLocalRhoFactor_poles_iff_Gamma_order (L s)
+  have hpole : meromorphicOrderAt P s < 0 ↔ ∃ n : ℕ, s = -p.1 - ((2 * n + p.2.val : ℕ) : ℂ) := by
+    rw [hPo, hp]
+    split_ifs with h
+    · rw [Complex.Gamma_eq_zero_iff] at h
+      simp only [sLocalRhoFactor_poles_iff_neg_one_lt, true_iff]
+      obtain ⟨m, hm⟩ := h
+      refine ⟨m, ?_⟩
+      simp only [L] at hm
+      push_cast
+      linear_combination 2 * hm
+    · rw [Complex.Gamma_eq_zero_iff] at h
+      simp only [lt_irrefl, false_iff, not_exists]
+      intro n hn
+      exact h ⟨n, by simp only [L]; rw [hn]; push_cast; ring⟩
+  have hPre : meromorphicOrderAt P s < 0 → s.re ≤ 0 := fun h ↦ by
+    obtain ⟨n, hn⟩ := hpole.mp h
+    rw [hp] at hn
+    rw [hn]
+    simp only [Complex.sub_re, Complex.neg_re, Complex.add_re, Complex.zero_re, ht,
+      Complex.natCast_re]
+    linarith [Nat.cast_nonneg (α := ℝ) (2 * n + a.val)]
+  have hPo' : meromorphicOrderAt P s = 0 ∨ meromorphicOrderAt P s = -1 := by
+    rw [hPo]; split_ifs <;> simp
+  have he0 : e s ≠ 0 := mul_ne_zero (pow_ne_zero _ Complex.I_ne_zero) (by simp [hpi])
+  have hQ0 : s.re ≤ 0 → Q s ≠ 0 := fun hs ↦ inv_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by
+    simp [ht]
+    linarith [show (0 : ℝ) ≤ (a.val : ℝ) from Nat.cast_nonneg _]))
+  obtain ⟨hm, hiff, hre⟩ := sLocalRhoFactor_poles_iff_order_of_eq hf (he s) he0 (hQ s) hQ0 (hPm s)
+    hPo' hPre
+  exact ⟨hm, hiff.trans hpole, fun h ↦ hPre (hiff.mp h), fun hs ↦ by rw [hre hs]; exact hPo'⟩
+
+/-- At a complex place, the restricted local Tate factor is the epsilon factor times the ratio
+of complex Gamma factors. Its poles are those of the Gamma factor of the quasi-character, they
+are simple and lie in the closed left half-plane, where the factor has no zeros. -/
+private theorem sLocalRhoFactor_poles_iff_complex (χ : PontryaginDual Jₛ) (w : InfinitePlace F)
+    (hw : w.IsComplex) (s : ℂ) :
+    let c := fun z : ℂ ↦ twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) z
+    let A := fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))
+    let p := (complexLocalEulerParameters w hw (sLocalInfiniteRestriction w (c 0))).exists.choose
+    MeromorphicAt A s ∧
+      (meromorphicOrderAt A s < 0 ↔ ∃ n : ℕ, s = -p.1 - (p.2.natAbs : ℂ) / 2 - (n : ℂ)) ∧
+      (meromorphicOrderAt A s < 0 → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt A s = 0 ∨ meromorphicOrderAt A s = -1) := by
+  intro c A p
+  obtain ⟨η, ha, -⟩ := sLocalInfinite_charts χ w
+  obtain ⟨t, r, ht, hbase⟩ := complexPlaceUnitary_shape w hw η
+  have hsh := complexChart_shape w hw η t r hbase
+  have hp : p = (0 + t, r) := by
+    have h0 := hsh 0
+    rw [← ha 0] at h0
+    exact (complexLocalEulerParameters w hw _).unique
+      (complexLocalEulerParameters w hw _).exists.choose_spec h0
+  have h2pi : (2 * Real.pi : ℂ) ≠ 0 :=
+    mul_ne_zero two_ne_zero (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)
+  let L : ℂ → ℂ := fun z ↦ z + t + (r.natAbs : ℂ) / 2
+  let e : ℂ → ℂ := fun z ↦ Complex.I ^ r.natAbs * (2 * Real.pi : ℂ) ^ (-(z + t + (r.natAbs : ℂ) / 2))
+  let P : ℂ → ℂ := fun z ↦ Complex.Gamma (L z)
+  let Q : ℂ → ℂ := fun z ↦ 2 * (Complex.Gammaℂ (1 - (z + t) + ((-r).natAbs : ℂ) / 2))⁻¹
+  have hstrip : ∀ z : ℂ, z.re ∈ Ioo (0 : ℝ) 1 → A z = e z * P z * Q z := by
+    intro z hz
+    have h := complexTate_ratio_strip w hw η z hz
+    have h₁ := complexEuler_of_shape w hw _ (z + t) r (hsh z)
+    have h₂ := complexEuler_of_shape w hw _ (1 - (z + t)) (-r)
+      (complexDual_shape w hw _ (z + t) r (hsh z))
+    change infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z)) = _
+    rw [ha z, h, h₁.1, h₁.2, h₂.1, Complex.Gammaℂ_def (z + t + (r.natAbs : ℂ) / 2)]
+    simp only [e, P, Q, L, div_eq_mul_inv]
+    ring
+  have hAm : Meromorphic A := by
+    have hT := ((infiniteLocalTateFactor_spec w).1 η).meromorphicOn
+    have hA : A = fun z ↦ infiniteLocalTateFactor w (quasiCharacterNormTwist
+        ((Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w :
+          (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) (continuous_infiniteLocalModule w)
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) z) :=
+      funext fun z ↦ congrArg (infiniteLocalTateFactor w) (ha z)
+    intro z
+    rw [hA]
+    exact hT z (mem_univ z)
+  have hL : ∀ z, AnalyticAt ℂ L z := fun z ↦ by fun_prop
+  have he : ∀ z, AnalyticAt ℂ e z := fun z ↦ by
+    have : Differentiable ℂ e := by fun_prop (disch := exact Or.inl h2pi)
+    exact this.analyticAt z
+  have hQ : ∀ z, AnalyticAt ℂ Q z := fun z ↦
+    ((Complex.differentiable_Gammaℂ_inv.comp (by fun_prop :
+      Differentiable ℂ fun z : ℂ ↦ 1 - (z + t) + ((-r).natAbs : ℂ) / 2)).const_mul 2).analyticAt z
+  have hPm : ∀ z, MeromorphicAt P z := fun z ↦ (Meromorphic.Gamma (L z)).comp_analyticAt (hL z)
+  have hRm : Meromorphic fun z ↦ e z * P z * Q z := fun z ↦
+    ((he z).meromorphicAt.mul (hPm z)).mul (hQ z).meromorphicAt
+  have hmid : ∀ᶠ z : ℂ in 𝓝[≠] (1 / 2 : ℂ), z.re ∈ Ioo (0 : ℝ) 1 :=
+    nhdsWithin_le_nhds ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds
+      (by norm_num [mem_preimage, mem_Ioo]))
+  have hf : A =ᶠ[𝓝[≠] s] fun z ↦ e z * P z * Q z :=
+    nhdsNE_le_codiscrete s (meromorphic_eq_of_germ hAm hRm (hmid.mono fun z hz ↦ hstrip z hz))
+  have hdL : deriv L s ≠ 0 := by
+    have hd : HasDerivAt L 1 s := ((hasDerivAt_id' s).add_const t).add_const ((r.natAbs : ℂ) / 2)
+    rw [hd.deriv]
+    exact one_ne_zero
+  have hPo : meromorphicOrderAt P s = if Complex.Gamma (L s) = 0 then -1 else 0 := by
+    rw [show P = Complex.Gamma ∘ L from rfl, meromorphicOrderAt_comp_of_deriv_ne_zero (hL s) hdL]
+    exact sLocalRhoFactor_poles_iff_Gamma_order (L s)
+  have hpole : meromorphicOrderAt P s < 0 ↔ ∃ n : ℕ, s = -p.1 - (p.2.natAbs : ℂ) / 2 - (n : ℂ) := by
+    rw [hPo, hp]
+    split_ifs with h
+    · rw [Complex.Gamma_eq_zero_iff] at h
+      simp only [sLocalRhoFactor_poles_iff_neg_one_lt, true_iff]
+      obtain ⟨m, hm⟩ := h
+      refine ⟨m, ?_⟩
+      simp only [L] at hm
+      linear_combination hm
+    · rw [Complex.Gamma_eq_zero_iff] at h
+      simp only [lt_irrefl, false_iff, not_exists]
+      intro n hn
+      exact h ⟨n, by simp only [L]; rw [hn]; ring⟩
+  have hPre : meromorphicOrderAt P s < 0 → s.re ≤ 0 := fun h ↦ by
+    obtain ⟨n, hn⟩ := hpole.mp h
+    rw [hp] at hn
+    rw [hn]
+    simp only [Complex.sub_re, Complex.neg_re, Complex.add_re, Complex.zero_re, ht,
+      Complex.natCast_re, Complex.div_ofNat_re]
+    linarith [Nat.cast_nonneg (α := ℝ) n, Nat.cast_nonneg (α := ℝ) r.natAbs]
+  have hPo' : meromorphicOrderAt P s = 0 ∨ meromorphicOrderAt P s = -1 := by
+    rw [hPo]; split_ifs <;> simp
+  have he0 : e s ≠ 0 := mul_ne_zero (pow_ne_zero _ Complex.I_ne_zero) (by simp [h2pi])
+  have hQ0 : s.re ≤ 0 → Q s ≠ 0 := fun hs ↦ by
+    refine mul_ne_zero two_ne_zero (inv_ne_zero ?_)
+    rw [Complex.Gammaℂ_def]
+    refine mul_ne_zero (mul_ne_zero two_ne_zero (by simp [h2pi])) (Complex.Gamma_ne_zero_of_re_pos ?_)
+    simp only [Complex.add_re, Complex.sub_re, Complex.one_re, ht, Complex.div_ofNat_re,
+      Complex.natCast_re]
+    linarith [Nat.cast_nonneg (α := ℝ) (-r).natAbs]
+  obtain ⟨hm, hiff, hre⟩ := sLocalRhoFactor_poles_iff_order_of_eq hf (he s) he0 (hQ s) hQ0 (hPm s)
+    hPo' hPre
+  exact ⟨hm, hiff.trans hpole, fun h ↦ hPre (hiff.mp h), fun hs ↦ by rw [hre hs]; exact hPo'⟩
+
+/-- At a finite place, the restricted local Tate factor is the epsilon factor times the ratio of
+the local Euler factors. It has a pole exactly when the restricted character is unramified and
+its Euler factor has a pole, which is simple and lies on the imaginary axis; in the closed left
+half-plane the factor has no zeros. -/
+private theorem sLocalRhoFactor_poles_iff_finite (χ : PontryaginDual Jₛ) (v : S) :
+    let c := fun z : ℂ ↦ twistₛ ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) z
+    let B := fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))
+    let ψ := sLocalFiniteRestriction v (c 0)
+    ∃ π : (v.val.adicCompletion F)ˣ, ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹ ∧ ∀ s : ℂ,
+      MeromorphicAt B s ∧
+      (meromorphicOrderAt B s < 0 ↔
+        (∀ u : (v.val.adicCompletionIntegers F)ˣ,
+          ψ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ∧
+        ψ π * ((‖π.val‖ : ℝ) : ℂ) ^ s = 1) ∧
+      (meromorphicOrderAt B s < 0 → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt B s = 0 ∨ meromorphicOrderAt B s = -1) := by
+  intro c B ψ
+  obtain ⟨η, ha, -⟩ := sLocalFinite_charts χ v
+  let hπ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ := Units.mk0 hπ.choose hπ.choose_spec.ne_zero
+  have hπn : ‖π.val‖ = (v.val.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v.val _ hπ.choose_spec
+  refine ⟨π, hπn, fun s ↦ ?_⟩
+  let ch : PontryaginDual (v.val.adicCompletion F)ˣ → ℂ → QuasiCharacter (v.val.adicCompletion F)ˣ :=
+    fun ξ z ↦ quasiCharacterNormTwist
+      (Units.map nnNormHom.toMonoidHom : (v.val.adicCompletion F)ˣ →* ℝ≥0ˣ)
+      (continuous_finiteLocalModule v.val)
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ξ) z
+  have hval : ∀ ξ z x, ch ξ z x = (ξ x : ℂ) * ((‖x.val‖ : ℝ) : ℂ) ^ z := fun _ _ _ ↦ rfl
+  have hq : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hb0 : 0 < ‖π.val‖ := norm_pos_iff.mpr π.ne_zero
+  have hb1 : ‖π.val‖ < 1 := by rw [hπn]; exact inv_lt_one_of_one_lt₀ hq
+  have hnorm : ∀ ξ z, ‖ch ξ z π‖ = ‖π.val‖ ^ z.re := fun ξ z ↦ by
+    rw [hval, norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hb0]
+  have hunit : ∀ ξ z (u : (v.val.adicCompletionIntegers F)ˣ),
+      ch ξ z (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) =
+        (ξ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) := by
+    intro ξ z u
+    rw [hval, finite_integer_unit_norm v.val u, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  let U : PontryaginDual (v.val.adicCompletion F)ˣ → Prop := fun ξ ↦
+    ∀ u : (v.val.adicCompletionIntegers F)ˣ,
+      (ξ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) : ℂ) = 1
+  have hEU : ∀ ξ z, U ξ → finiteLocalEulerFactor v.val (ch ξ z) = (1 - ch ξ z π)⁻¹ := by
+    intro ξ z hU
+    have h : ∀ u : (v.val.adicCompletionIntegers F)ˣ,
+        ch ξ z (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1 :=
+      fun u ↦ (hunit ξ z u).trans (hU u)
+    simp only [finiteLocalEulerFactor, h, implies_true, ite_true]
+    rfl
+  have hEN : ∀ ξ z, ¬ U ξ → finiteLocalEulerFactor v.val (ch ξ z) = 1 := by
+    intro ξ z hU
+    have h : ¬ ∀ u : (v.val.adicCompletionIntegers F)ˣ,
+        ch ξ z (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1 :=
+      fun h ↦ hU fun u ↦ (hunit ξ z u).symm.trans (h u)
+    simp only [finiteLocalEulerFactor, h, ite_false]
+  have hB : B = fun z ↦ finiteLocalTateFactor v.val (ch η z) :=
+    funext fun z ↦ congrArg (finiteLocalTateFactor v.val) (ha z)
+  have hψ : ψ = ch η 0 := ha 0
+  let g : PontryaginDual (v.val.adicCompletion F)ˣ → ℂ → ℂ := fun ξ z ↦ 1 - ch ξ z π
+  have hg : ∀ ξ z, HasDerivAt (g ξ) (ch ξ z π * (Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)) z :=
+    fun ξ z ↦ finite_den_hasDerivAt v.val ξ π hπn z
+  have hga : ∀ ξ z, AnalyticAt ℂ (g ξ) z := fun ξ z ↦
+    (show Differentiable ℂ (g ξ) from fun y ↦ (hg ξ y).differentiableAt).analyticAt z
+  let e : ℂ → ℂ := fun z ↦ finiteLocalEpsilonFactor v.val (ch η z)
+  let P : ℂ → ℂ := fun z ↦ finiteLocalEulerFactor v.val (ch η z)
+  let Q : ℂ → ℂ := fun z ↦ (finiteLocalEulerFactor v.val (ch η⁻¹ (1 - z)))⁻¹
+  have hgerm : ∀ᶠ z in 𝓝[≠] (1 / 2 : ℂ), B z = e z * P z * Q z := by
+    filter_upwards [finiteTate_ratio_germ v.val η] with z hz
+    rw [hB]
+    refine hz.trans ?_
+    rw [dual_norm_chart (Units.map nnNormHom.toMonoidHom : (v.val.adicCompletion F)ˣ →* ℝ≥0ˣ)
+      (continuous_finiteLocalModule v.val) η z]
+    simp only [e, P, Q, ch, div_eq_mul_inv, mul_assoc]
+    rfl
+  have hBm : Meromorphic B := by
+    have hT := ((finiteLocalTateFactor_spec v.val).1 η).meromorphicOn
+    intro z
+    rw [hB]
+    exact hT z (mem_univ z)
+  have he : ∀ z, AnalyticAt ℂ e z := fun z ↦ finiteLocalEpsilonFactor_entire v.val η z trivial
+  have hPm : ∀ z, MeromorphicAt P z := by
+    by_cases hU : U η
+    · have : P = fun z ↦ (g η z)⁻¹ := funext fun z ↦ hEU η z hU
+      intro z; rw [this]; exact (hga η z).meromorphicAt.inv
+    · have : P = fun _ ↦ 1 := funext fun z ↦ hEN η z hU
+      intro z; rw [this]; exact MeromorphicAt.const _ _
+  have hQ : ∀ z, AnalyticAt ℂ Q z := by
+    by_cases hU : U η⁻¹
+    · have : Q = fun z ↦ g η⁻¹ (1 - z) := funext fun z ↦ by
+        simp only [Q]; rw [hEU η⁻¹ (1 - z) hU, inv_inv]
+      intro z; rw [this]; exact (hga η⁻¹ (1 - z)).comp (by fun_prop)
+    · have : Q = fun _ ↦ 1 := funext fun z ↦ by simp only [Q]; rw [hEN η⁻¹ (1 - z) hU, inv_one]
+      intro z; rw [this]; exact analyticAt_const
+  have hRm : Meromorphic fun z ↦ e z * P z * Q z := fun z ↦
+    ((he z).meromorphicAt.mul (hPm z)).mul (hQ z).meromorphicAt
+  have hf : B =ᶠ[𝓝[≠] s] fun z ↦ e z * P z * Q z :=
+    nhdsNE_le_codiscrete s (meromorphic_eq_of_germ hBm hRm hgerm)
+  have he0 : e s ≠ 0 := by
+    have h := sLocalEpsilonFactor_ne_zero (S := S) (c s)
+    rw [sLocalEpsilonFactor] at h
+    have h' := Finset.prod_ne_zero_iff.mp (right_ne_zero_of_mul h) v (Finset.mem_univ v)
+    rwa [ha s] at h'
+  have hQ0 : s.re ≤ 0 → Q s ≠ 0 := fun hs ↦ by
+    by_cases hU : U η⁻¹
+    · simp only [Q]
+      rw [hEU η⁻¹ (1 - s) hU, inv_inv, sub_ne_zero]
+      intro h1
+      have := hnorm η⁻¹ (1 - s)
+      rw [← h1, norm_one, Complex.sub_re, Complex.one_re] at this
+      have hlt : ‖π.val‖ ^ (1 - s.re) < 1 := Real.rpow_lt_one hb0.le hb1 (by linarith)
+      linarith
+    · simp only [Q]; rw [hEN η⁻¹ (1 - s) hU, inv_one]; exact one_ne_zero
+  have hU0 : (∀ u : (v.val.adicCompletionIntegers F)ˣ,
+      ψ (Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ↔ U η := by
+    rw [hψ]; exact forall_congr' fun u ↦ by rw [hunit]
+  have hψπ : ψ π * ((‖π.val‖ : ℝ) : ℂ) ^ s = ch η s π := by
+    rw [hψ, hval, hval, Complex.cpow_zero, mul_one]
+  have hP : (meromorphicOrderAt P s = 0 ∨ meromorphicOrderAt P s = -1) ∧
+      (meromorphicOrderAt P s < 0 ↔ U η ∧ ch η s π = 1) := by
+    by_cases hU : U η
+    · have hPg : P = fun z ↦ (g η z)⁻¹ := funext fun z ↦ hEU η z hU
+      have h1 : meromorphicOrderAt (g η) s ≤ 1 := by
+        by_cases h0 : g η s = 0
+        · rw [(hga η s).meromorphicOrderAt_eq,
+            (hga η s).analyticOrderAt_eq_one_of_zero_deriv_ne_zero h0 ?_]
+          · simp
+          · rw [(hg η s).deriv]
+            have h1 : ch η s π = 1 := (sub_eq_zero.mp h0).symm
+            rw [h1, one_mul]
+            exact Complex.ofReal_ne_zero.mpr (Real.log_pos hq).ne'
+        · rw [(hga η s).meromorphicOrderAt_eq, analyticOrderAt_eq_zero.mpr (Or.inr h0)]
+          simp
+      have ho := sLocalRhoFactor_poles_iff_order_inv (hga η s) h1
+      rw [hPg, ho]
+      by_cases h0 : g η s = 0
+      · have h1 : ch η s π = 1 := (sub_eq_zero.mp h0).symm
+        simp [h0, hU, h1, sLocalRhoFactor_poles_iff_neg_one_lt]
+      · have h1 : ch η s π ≠ 1 := fun h ↦ h0 (sub_eq_zero.mpr h.symm)
+        simp [h0, h1]
+    · have hP1 : P = fun _ ↦ 1 := funext fun z ↦ hEN η z hU
+      have ho : meromorphicOrderAt P s = 0 := by
+        rw [hP1, meromorphicOrderAt_const]
+        simp
+      simp [ho, hU]
+  have hPre : meromorphicOrderAt P s < 0 → s.re ≤ 0 := fun h ↦ by
+    obtain ⟨-, h1⟩ := hP.2.mp h
+    by_contra hs
+    push Not at hs
+    have := hnorm η s
+    rw [h1, norm_one] at this
+    have hlt : ‖π.val‖ ^ s.re < 1 := Real.rpow_lt_one hb0.le hb1 hs
+    linarith
+  obtain ⟨hm, hiff, hre⟩ := sLocalRhoFactor_poles_iff_order_of_eq hf (he s) he0 (hQ s) hQ0 (hPm s)
+    hP.1 hPre
+  refine ⟨hm, hiff.trans (hP.2.trans ?_), fun h ↦ hPre (hiff.mp h), fun hs ↦ by
+    rw [hre hs]; exact hP.1⟩
+  rw [hU0, hψπ]
+
+/-- At a finite place, a unitary character is unramified with value `q^{s}` at a normalized
+uniformizer exactly when it is the norm to the power `i t` for a unique `t` in one period and `s`
+lies on the corresponding lattice of the imaginary axis. -/
+private theorem sLocalRhoFactor_poles_iff_finite_explicit (v : HeightOneSpectrum (𝓞 F))
+    (ψ : QuasiCharacter (v.adicCompletion F)ˣ) (hψ : ∀ x, ‖ψ x‖ = 1)
+    (π : (v.adicCompletion F)ˣ) (hπ : ‖π.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹) (s : ℂ) :
+    ((∀ u : (v.adicCompletionIntegers F)ˣ,
+        ψ (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u) = 1) ∧
+      ψ π * ((‖π.val‖ : ℝ) : ℂ) ^ s = 1) ↔
+    ∃ (m : ℤ) (t : ℝ),
+      let period := 2 * Real.pi / Real.log (v.asIdeal.absNorm : ℝ)
+      t ∈ Ico 0 period ∧
+        (∀ x : (v.adicCompletion F)ˣ,
+          ψ x = ((‖(x : v.adicCompletion F)‖ : ℝ) : ℂ) ^ ((t : ℂ) * Complex.I)) ∧
+        s = (((m : ℝ) * period - t : ℝ) : ℂ) * Complex.I := by
+  have hq : 1 < (v.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  set L := Real.log (v.asIdeal.absNorm : ℝ) with hL
+  have hL0 : 0 < L := Real.log_pos hq
+  set T := 2 * Real.pi / L with hT
+  have hT0 : 0 < T := div_pos (by positivity) hL0
+  have hTL : (L : ℂ) * (T : ℂ) = 2 * Real.pi := by
+    rw [hT]
+    push_cast
+    field_simp [Complex.ofReal_ne_zero.mpr hL0.ne']
+  have hb0 : 0 < ‖π.val‖ := norm_pos_iff.mpr π.ne_zero
+  have hcp : ∀ (k : ℤ) (w : ℂ), ((‖π.val‖ ^ k : ℝ) : ℂ) ^ w = Complex.exp (-(k : ℂ) * L * w) := by
+    intro k w
+    have hpos : 0 < ‖π.val‖ ^ k := zpow_pos hb0 k
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne'),
+      ← Complex.ofReal_log hpos.le, Real.log_zpow, hπ, Real.log_inv, ← hL]
+    push_cast
+    ring_nf
+  have hcp1 : ∀ w : ℂ, ((‖π.val‖ : ℝ) : ℂ) ^ w = Complex.exp (-L * w) := fun w ↦ by
+    simpa using hcp 1 w
+  obtain ⟨e, heπ, heι⟩ := finitePlace_unitDecomposition v π hπ
+  have hdec : ∀ x : (v.adicCompletion F)ˣ, x = π ^ (e x).1.toAdd *
+      Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom (e x).2 := by
+    intro x
+    apply e.injective
+    rw [map_mul, map_zpow, heπ, heι]
+    exact Prod.ext (by change (e x).1.toAdd = (e x).1.toAdd * 1 + 0; simp) (by simp)
+  have hnx : ∀ x : (v.adicCompletion F)ˣ, ‖x.val‖ = ‖π.val‖ ^ (e x).1.toAdd := by
+    intro x
+    conv_lhs => rw [hdec x]
+    rw [Units.val_mul, norm_mul, Units.val_zpow_eq_zpow_val, norm_zpow,
+      finite_integer_unit_norm v, mul_one]
+  constructor
+  · rintro ⟨hU, hs⟩
+    rw [hcp1] at hs
+    have hψπ : ψ π = Complex.exp (L * s) := by
+      have h2 : Complex.exp (-L * s) * Complex.exp (L * s) = 1 := by
+        rw [← Complex.exp_add]; ring_nf; exact Complex.exp_zero
+      calc ψ π = ψ π * (Complex.exp (-L * s) * Complex.exp (L * s)) := by rw [h2, mul_one]
+        _ = Complex.exp (L * s) := by rw [← mul_assoc, hs, one_mul]
+    have hre : s.re = 0 := by
+      have h := hψ π
+      rw [hψπ, Complex.norm_exp] at h
+      have : (L * s : ℂ).re = 0 := by simpa using Real.exp_eq_one_iff _ |>.mp h
+      simp only [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, zero_mul, sub_zero] at this
+      exact (mul_eq_zero.mp this).resolve_left hL0.ne'
+    have hsI : s = (s.im : ℂ) * Complex.I := Complex.ext (by simp [hre]) (by simp)
+    refine ⟨⌈s.im / T⌉, ⌈s.im / T⌉ * T - s.im, ⟨?_, ?_⟩, ?_, ?_⟩
+    · have := Int.le_ceil (s.im / T)
+      rw [div_le_iff₀ hT0] at this
+      linarith
+    · have := Int.ceil_lt_add_one (s.im / T)
+      rw [← sub_lt_iff_lt_add, lt_div_iff₀ hT0] at this
+      linarith
+    · intro x
+      rw [hnx x, hcp, show ψ x = ψ π ^ (e x).1.toAdd by
+        conv_lhs => rw [hdec x]
+        rw [map_mul, map_zpow, hU, mul_one], hψπ, ← Complex.exp_int_mul,
+        Complex.exp_eq_exp_iff_exists_int]
+      refine ⟨(e x).1.toAdd * ⌈s.im / T⌉, ?_⟩
+      push_cast
+      linear_combination ((e x).1.toAdd : ℂ) * L * hsI + ((e x).1.toAdd : ℂ) * (⌈s.im / T⌉ : ℂ) *
+        Complex.I * hTL
+    · rw [show ((⌈s.im / T⌉ : ℝ) * T - (⌈s.im / T⌉ * T - s.im) : ℝ) = s.im by ring]
+      exact hsI
+  · rintro ⟨m, t, -, hψt, hs⟩
+    refine ⟨fun u ↦ ?_, ?_⟩
+    · rw [hψt, finite_integer_unit_norm v, Complex.ofReal_one, Complex.one_cpow]
+    · rw [hψt, ← Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr hb0.ne'), hcp1, hs]
+      have : -(L : ℂ) * ((t : ℂ) * Complex.I + (((m : ℝ) * T - t : ℝ) : ℂ) *
+          Complex.I) = (-m : ℤ) * (2 * Real.pi * Complex.I) := by
+        push_cast
+        linear_combination (-(m : ℂ) * Complex.I) * hTL
+      rw [this, Complex.exp_int_mul_two_pi_mul_I]
+
+open Classical in
+/-- The order of the correcting factor is the sum of the orders of its local factors. Every pole
+of a local factor lies in the closed left half-plane, and there each local factor has order `0`
+or `-1`, so the order of the product counts the local poles. -/
+private theorem sLocalRhoFactor_poles_iff_count (χ : PontryaginDual Jₛ) (s : ℂ) :
+    let χ₀ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+    let c := fun z : ℂ ↦ twistₛ χ₀ z
+    let ρ := fun z : ℂ ↦ sLocalRhoFactor (c z)
+    let arch := Finset.univ.filter (fun w : InfinitePlace F ↦
+      meromorphicOrderAt (fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))) s < 0)
+    let fin := Finset.univ.filter (fun v : S ↦
+      meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))) s < 0)
+    (meromorphicOrderAt ρ s < 0 ∨ 0 < arch.card + fin.card → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt ρ s = ((-((arch.card + fin.card : ℕ) : ℤ) : ℤ) : WithTop ℤ)) ∧
+      (meromorphicOrderAt ρ s < 0 ↔
+        (∃ w : InfinitePlace F, meromorphicOrderAt
+          (fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))) s < 0) ∨
+        ∃ v : S, meromorphicOrderAt
+          (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))) s < 0) := by
+  intro χ₀ c ρ arch fin
+  let A := fun (w : InfinitePlace F) (z : ℂ) ↦
+    infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))
+  let B := fun (v : S) (z : ℂ) ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))
+  have hA : ∀ w, MeromorphicAt (A w) s ∧ (meromorphicOrderAt (A w) s < 0 → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt (A w) s = 0 ∨ meromorphicOrderAt (A w) s = -1) := by
+    intro w
+    by_cases hw : w.IsReal
+    · obtain ⟨h1, -, h3, h4⟩ := sLocalRhoFactor_poles_iff_real χ w hw s
+      exact ⟨h1, h3, h4⟩
+    · obtain ⟨h1, -, h3, h4⟩ := sLocalRhoFactor_poles_iff_complex χ w
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw) s
+      exact ⟨h1, h3, h4⟩
+  have hB : ∀ v, MeromorphicAt (B v) s ∧ (meromorphicOrderAt (B v) s < 0 → s.re ≤ 0) ∧
+      (s.re ≤ 0 → meromorphicOrderAt (B v) s = 0 ∨ meromorphicOrderAt (B v) s = -1) := by
+    intro v
+    obtain ⟨π, -, h⟩ := sLocalRhoFactor_poles_iff_finite χ v
+    obtain ⟨h1, -, h3, h4⟩ := h s
+    exact ⟨h1, h3, h4⟩
+  have hprodA : MeromorphicAt (fun z ↦ ∏ w, A w z) s := by
+    have h := MeromorphicAt.prod (s := Finset.univ) (fun w _ ↦ (hA w).1)
+    rwa [Finset.prod_fn] at h
+  have hprodB : MeromorphicAt (fun z ↦ ∏ v, B v z) s := by
+    have h := MeromorphicAt.prod (s := Finset.univ) (fun v _ ↦ (hB v).1)
+    rwa [Finset.prod_fn] at h
+  have hord : meromorphicOrderAt ρ s =
+      (∑ w, meromorphicOrderAt (A w) s) + ∑ v, meromorphicOrderAt (B v) s := by
+    change meromorphicOrderAt ((fun z ↦ ∏ w, A w z) * fun z ↦ ∏ v, B v z) s = _
+    rw [meromorphicOrderAt_mul hprodA hprodB, meromorphicOrderAt_fun_prod (fun w _ ↦ (hA w).1),
+      meromorphicOrderAt_fun_prod (fun v _ ↦ (hB v).1)]
+  have hreg : meromorphicOrderAt ρ s < 0 ∨ 0 < arch.card + fin.card → s.re ≤ 0 := by
+    intro h
+    by_contra hs
+    push Not at hs
+    have hA0 : ∀ w, 0 ≤ meromorphicOrderAt (A w) s := fun w ↦
+      not_lt.mp fun h' ↦ absurd ((hA w).2.1 h') (not_le.mpr hs)
+    have hB0 : ∀ v, 0 ≤ meromorphicOrderAt (B v) s := fun v ↦
+      not_lt.mp fun h' ↦ absurd ((hB v).2.1 h') (not_le.mpr hs)
+    rcases h with h | h
+    · rw [hord] at h
+      exact absurd h (not_lt.mpr (add_nonneg (Finset.sum_nonneg fun w _ ↦ hA0 w)
+        (Finset.sum_nonneg fun v _ ↦ hB0 v)))
+    · have harch : arch = ∅ := Finset.filter_eq_empty_iff.mpr fun w _ ↦ not_lt.mpr (hA0 w)
+      have hfin : fin = ∅ := Finset.filter_eq_empty_iff.mpr fun v _ ↦ not_lt.mpr (hB0 v)
+      rw [harch, hfin] at h
+      simp at h
+  have hcount : s.re ≤ 0 →
+      meromorphicOrderAt ρ s = ((-((arch.card + fin.card : ℕ) : ℤ) : ℤ) : WithTop ℤ) := by
+    intro hs
+    have hAv : ∀ w, meromorphicOrderAt (A w) s = ((if w ∈ arch then -1 else 0 : ℤ) : WithTop ℤ) := by
+      intro w
+      rcases (hA w).2.2 hs with h | h
+      · have hw : w ∉ arch := by simp [arch, A, h]
+        rw [h]
+        simp [hw]
+      · have hw : w ∈ arch := by
+          simp only [arch, Finset.mem_filter, Finset.mem_univ, true_and]
+          exact h ▸ (by decide : ((-1 : ℤ) : WithTop ℤ) < 0)
+        rw [h]
+        simp [hw]
+    have hBv : ∀ v, meromorphicOrderAt (B v) s = ((if v ∈ fin then -1 else 0 : ℤ) : WithTop ℤ) := by
+      intro v
+      rcases (hB v).2.2 hs with h | h
+      · have hv : v ∉ fin := by simp [fin, B, h]
+        rw [h]
+        simp [hv]
+      · have hv : v ∈ fin := by
+          simp only [fin, Finset.mem_filter, Finset.mem_univ, true_and]
+          exact h ▸ (by decide : ((-1 : ℤ) : WithTop ℤ) < 0)
+        rw [h]
+        simp [hv]
+    rw [hord, Finset.sum_congr rfl fun w _ ↦ hAv w, Finset.sum_congr rfl fun v _ ↦ hBv v,
+      ← WithTop.coe_sum, ← WithTop.coe_sum, ← WithTop.coe_add]
+    congr 1
+    simp only [Finset.sum_ite_mem, Finset.univ_inter, Finset.sum_const, smul_neg, nsmul_eq_mul,
+      mul_one]
+    push_cast
+    ring
+  refine ⟨hreg, hcount, fun h ↦ ?_, ?_⟩
+  · have hs := hreg (Or.inl h)
+    rw [hcount hs] at h
+    have hpos : 0 < arch.card + fin.card := by
+      by_contra h0
+      have h0' : arch.card + fin.card = 0 := by omega
+      rw [h0'] at h
+      exact absurd h (lt_irrefl _)
+    rcases Nat.eq_zero_or_pos arch.card with h1 | h1
+    · obtain ⟨v, hv⟩ := Finset.card_pos.mp (show 0 < fin.card by omega)
+      exact Or.inr ⟨v, (Finset.mem_filter.mp hv).2⟩
+    · obtain ⟨w, hw⟩ := Finset.card_pos.mp h1
+      exact Or.inl ⟨w, (Finset.mem_filter.mp hw).2⟩
+  · rintro (⟨w, hw⟩ | ⟨v, hv⟩)
+    · rw [hcount ((hA w).2.1 hw)]
+      have hc : 0 < arch.card :=
+        Finset.card_pos.mpr ⟨w, Finset.mem_filter.mpr ⟨Finset.mem_univ _, hw⟩⟩
+      exact_mod_cast (show -(((arch.card + fin.card : ℕ)) : ℤ) < 0 by omega)
+    · rw [hcount ((hB v).2.1 hv)]
+      have hc : 0 < fin.card :=
+        Finset.card_pos.mpr ⟨v, Finset.mem_filter.mpr ⟨Finset.mem_univ _, hv⟩⟩
+      exact_mod_cast (show -(((arch.card + fin.card : ℕ)) : ℤ) < 0 by omega)
+
 -- TODO(paper-gap): In Lemma 7.1.2.2(1), the complex-place shift has the wrong sign.
 -- The uniqueness of the contributing place stated on p. 317 fails when poles coincide.
 
@@ -421,7 +1103,32 @@ theorem sLocalRhoFactor_poles_iff (χ : PontryaginDual Jₛ) (s : ℂ) :
           (∀ x : (v.val.adicCompletion F)ˣ,
             sLocalFiniteRestriction v c x =
               ((‖(x : v.val.adicCompletion F)‖ : ℝ) : ℂ) ^ ((t : ℂ) * Complex.I)) ∧
-          s = (((m : ℝ) * period - t : ℝ) : ℂ) * Complex.I) := by sorry
+          s = (((m : ℝ) * period - t : ℝ) : ℂ) * Complex.I) := by
+  intro χ₀ c
+  have hψ : ∀ (v : S) (x : (v.val.adicCompletion F)ˣ), ‖sLocalFiniteRestriction v c x‖ = 1 := by
+    intro v x
+    change ‖((χ _ : Circle) : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+  refine (sLocalRhoFactor_poles_iff_count χ s).2.2.trans ?_
+  rw [← or_assoc]
+  refine or_congr ⟨?_, ?_⟩ ⟨?_, ?_⟩
+  · rintro ⟨w, hw⟩
+    by_cases hr : w.IsReal
+    · exact Or.inl ⟨w, hr, (sLocalRhoFactor_poles_iff_real χ w hr s).2.1.mp hw⟩
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hr
+      exact Or.inr ⟨w, hc, (sLocalRhoFactor_poles_iff_complex χ w hc s).2.1.mp hw⟩
+  · rintro (⟨w, hw, h⟩ | ⟨w, hw, h⟩)
+    · exact ⟨w, (sLocalRhoFactor_poles_iff_real χ w hw s).2.1.mpr h⟩
+    · exact ⟨w, (sLocalRhoFactor_poles_iff_complex χ w hw s).2.1.mpr h⟩
+  · rintro ⟨v, hv⟩
+    obtain ⟨π, hπ, h⟩ := sLocalRhoFactor_poles_iff_finite χ v
+    obtain ⟨m, t, ht⟩ :=
+      (sLocalRhoFactor_poles_iff_finite_explicit v.val _ (hψ v) π hπ s).mp ((h s).2.1.mp hv)
+    exact ⟨v, m, t, ht⟩
+  · rintro ⟨v, m, t, ht⟩
+    obtain ⟨π, hπ, h⟩ := sLocalRhoFactor_poles_iff_finite χ v
+    exact ⟨v, (h s).2.1.mpr
+      ((sLocalRhoFactor_poles_iff_finite_explicit v.val _ (hψ v) π hπ s).mpr ⟨m, t, ht⟩)⟩
 
 open Classical in
 /-- Paper: Lemma 7.1.2.2, p. 317.
@@ -437,7 +1144,10 @@ theorem sLocalRhoFactor_orderAt_pole (χ : PontryaginDual Jₛ) (s : ℂ) :
     let fin := Finset.univ.filter (fun v : S ↦
       meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))) s < 0)
     meromorphicOrderAt ρ s < 0 →
-      meromorphicOrderAt ρ s = ((-((arch.card + fin.card : ℕ) : ℤ) : ℤ) : WithTop ℤ) := by sorry
+      meromorphicOrderAt ρ s = ((-((arch.card + fin.card : ℕ) : ℤ) : ℤ) : WithTop ℤ) := by
+  intro χ₀ c ρ arch fin h
+  have H := sLocalRhoFactor_poles_iff_count χ s
+  exact H.2.1 (H.1 (Or.inl h))
 
 end SLocal
 
