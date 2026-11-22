@@ -140,7 +140,19 @@ Deviation: The range of the extension must also be closed up. -/
 theorem globalThetaSobolevPrincipalValue_range_closure (S : Finset V) (a : ℝ)
     {s : ℝ} (hs : 0 ≤ s) :
     closure (range (P(S, a, hs))) =
-      closure (range fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f)))) := by sorry
+      closure (range fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f)))) := by
+  have closure_image (i : ℬ₀ → H(a, hs)) (p : H(a, hs) → H(a, hs)) (t : ℬ₀ → H(a, hs)) (hi : DenseRange i) (hp : Continuous p)
+      (he : ∀ x, p (i x) = t x) : closure (range p) = closure (range t) := by
+    rw [← show p ∘ i = t from funext he, Set.range_comp p i]
+    exact le_antisymm (closure_minimal (hp.range_subset_closure_image_dense hi) isClosed_closure)
+      (closure_mono (Set.image_subset_range _ _))
+  let q : ℬ₀ → GlobalPolarFreeThetaSpace F := fun f ↦ theta(f)
+  have hq : Surjective q := Submodule.mkQ_surjective
+    ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype)
+  exact closure_image (fun f ↦ j(a, hs) (q f)) (P(S, a, hs))
+    (fun f : ℬ₀ ↦ j(a, hs) (theta(pvTest(S, f))))
+    ((globalThetaSobolev_dense (F := F) a hI hs).comp hq.denseRange (j(a, hs)).continuous)
+    (P(S, a, hs)).continuous (globalThetaSobolevPrincipalValue_apply S a hs)
 
 /-- Paper: Theorem 11.2.0.2(1), p. 485. The reciprocal partial Euler
 product is the product of the unramified factors in the phase coordinates
