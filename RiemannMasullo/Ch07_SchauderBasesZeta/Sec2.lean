@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -356,7 +358,17 @@ local correcting factor as a meromorphic identity.
 Deviation: The Fourier Euler product already incorporates the epsilon factor. -/
 theorem sLocalRhoFactor_eq_div_fourierEulerProduct (c : Xₛ) :
     (fun z : ℂ ↦ sLocalRhoFactor (twistₛ c z)) =ᶠ[codiscrete ℂ]
-      (fun z ↦ sLocalHeckeL (twistₛ c z) / sLocalFourierEulerProduct (twistₛ c z)) := by sorry
+      (fun z ↦ sLocalHeckeL (twistₛ c z) / sLocalFourierEulerProduct (twistₛ c z)) := by
+  have quotient (e x y : ℂ) : e * (x / y) = x / (y / e) := by
+    simp [div_eq_mul_inv, mul_left_comm]
+  obtain ⟨χ, a, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) c
+  simp only [normTwist_normTwist]
+  apply eventually_codiscrete_iff_forall_eventually_nhdsNE.mpr
+  intro z
+  have ht : Tendsto (fun w : ℂ ↦ w + a) (𝓝[≠] z) (𝓝[≠] (z + a)) :=
+    ((Homeomorph.addRight a).map_punctured_nhds_eq z).le
+  filter_upwards [ht.eventually (nhdsNE_le_codiscrete _ (sLocalRhoFactor_eq_epsilon_mul χ))] with w hw
+  exact hw.trans (quotient _ _ _)
 
 -- TODO(paper-gap): The change of unitary base point on p. 336 is
 -- χ' = χ |·|^(it₀). The printed identity omits the original base point χ.
