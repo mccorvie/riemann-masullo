@@ -52,7 +52,14 @@ meromorphic germ at every point, expressed as equality on a punctured neighborho
 theorem meromorphicContinuation_eventuallyEq {f g : ℂ → ℂ}
     (hf : MeromorphicOn f univ) (hg : MeromorphicOn g univ)
     (h : ∀ s : ℂ, 1 < s.re → f s = g s) (s : ℂ) : f =ᶠ[𝓝[≠] s] g := by
-  sorry
+  have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have hzero : meromorphicOrderAt (f - g) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr <|
+      (hnear.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (h z hz)
+  have hs := (hf.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected isPreconnected_univ
+    (mem_univ (2 : ℂ)) (mem_univ s) hzero
+  exact (meromorphicOrderAt_eq_top_iff.mp hs).mono fun _ hz ↦ sub_eq_zero.mp hz
 
 /-- The archimedean factor is holomorphic and nonvanishing in the positive
 half-plane, so every meromorphic continuation of the finite L-function has
