@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -271,7 +273,36 @@ Deviation: The remaining bound is `m_S - m_{S₀}`. -/
 theorem sLocalThetaRemovedPrincipalParts_ker (ω : PontryaginDual J₁)
     (SArch : Finset (InfinitePlace F)) (S₀ : Finset Places) :
     (sLocalThetaRemovedPrincipalParts ω SArch S₀).ker =
-      sLocalThetaPoleBound ω remainingBound(SArch, S₀) := by sorry
+      sLocalThetaPoleBound ω remainingBound(SArch, S₀) := by
+  have count (m : ℕ) (o : WithTop ℤ) (ho : ((-(m : ℤ) : ℤ) : WithTop ℤ) ≤ o) :
+      (-o.untop₀).toNat ≤ m := by
+    induction o using WithTop.recTopCoe with
+    | top => simp
+    | coe n =>
+      have hn : -(m : ℤ) ≤ n := WithTop.coe_le_coe.mp ho
+      simp only [WithTop.untop₀_coe]
+      omega
+  have bound (f : ℬₛ) (c : Xₛ) : sLocalPolarMultiplicity f c ≤ sLocalRhoPoleOrder c :=
+    count _ _ ((sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans (sLocalZ_centered f c).2.1)
+  let ord (c : Xₛ) := sLocalRhoPoleOrder c
+  have full (x : Θₛ(ω)) : x ∈ sLocalThetaPoleBound ω ord := by
+    refine ((Kₛ(ω)).mkQ_surjective x).elim fun f hf ↦ ?_
+    exact Submodule.subset_span ⟨f, hf, fun c _ ↦ bound f c⟩
+  let A := sLocalThetaRemovedPrincipalParts (F := F) (S := S) ω SArch S₀
+  let m := remainingBound(SArch, S₀)
+  refine Submodule.ext fun x ↦ Iff.trans ?_ (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω m x).symm
+  constructor
+  · intro hx c hc hp k hk
+    by_cases hle : k ≤ sLocalRhoPoleOrder c
+    · have hA : A x = 0 := hx
+      exact congrFun hA ⟨(c, k), hc, hk, hle⟩
+    · exact (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω ord x).mp (full x)
+        c hc hp k (Nat.lt_of_not_ge hle)
+  · intro hx
+    change A x = 0
+    funext i
+    exact hx i.val.1 i.property.1 ((Nat.zero_lt_of_lt i.property.2.1).trans_le i.property.2.2)
+      i.val.2 i.property.2.1
 
 /-- Paper: Remark 7.2.1.2, p. 335.
 The quotient by the remaining pole bound is identified by the coefficient map
