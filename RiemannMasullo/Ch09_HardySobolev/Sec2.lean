@@ -169,7 +169,44 @@ theorem gaussian_mem_hardySobolevTraceClosure {ι : Type*} [Fintype ι] (σ : ι
     ∃ u : hardySobolevTraceClosure σ N volume,
       ∀ i (k : Fin (N + 1)), (u.val i k : ℝ → ℂ) =ᵐ[volume]
         fun y ↦ iteratedDeriv (k : ℕ) (fun z : ℂ ↦ Complex.exp (z ^ 2))
-          (verticalPoint (σ i) y) := by sorry
+          (verticalPoint (σ i) y) := by
+  let g (z : ℂ) := Complex.exp (z ^ 2)
+  let F : SchwartzBergman (univ : Set ℝ) := ⟨g, by
+    simpa [g] using gaussian_mem_schwartzBergmanSubmodule (univ : Set ℝ) isOpen_univ⟩
+  have hpoly (k : ℕ) : ∃ p : Polynomial ℂ, iteratedDeriv k g = fun z ↦ p.eval z * g z := by
+    induction k with
+    | zero => exact ⟨1, by simp⟩
+    | succ k ih =>
+      obtain ⟨p, hp⟩ := ih
+      refine ⟨p.derivative + Polynomial.C 2 * Polynomial.X * p, ?_⟩
+      rw [iteratedDeriv_succ, hp]
+      funext z
+      have hg : HasDerivAt g (g z * (2 * z)) z := by
+        simpa [g] using ((hasDerivAt_id z).pow 2).cexp
+      refine ((p.hasDerivAt z).mul hg).deriv.trans ?_
+      simp only [Polynomial.eval_add, Polynomial.eval_mul, Polynomial.eval_C, Polynomial.eval_X]
+      ring
+  -- The vertical trace estimate applies to each monomial weight.
+  have hweighted (a : ℝ) (p : Polynomial ℂ) :
+      MemLp (fun y ↦ p.eval (verticalPoint a y) * g (verticalPoint a y)) 2 volume := by
+    induction p using Polynomial.induction_on' with
+    | add p q hp hq =>
+      simpa only [Polynomial.eval_add, add_mul, Pi.add_def] using hp.add hq
+    | monomial n c =>
+      have ht := schwartzBergman_trace_memLp univ ⟨a, mem_univ a⟩ 2 (by norm_num) (by norm_num) n F
+      simpa only [Polynomial.eval_monomial, weightedVerticalTrace, F, mul_assoc] using ht.const_mul c
+  have htrace (i : ι) (k : Fin (N + 1)) :
+      MemLp (fun y ↦ iteratedDeriv (k : ℕ) g (verticalPoint (σ i) y)) 2 volume := by
+    obtain ⟨p, hp⟩ := hpoly k
+    rw [hp]
+    exact hweighted (σ i) p
+  let u : PiLp 2 (fun _ : ι ↦ PiLp 2 (fun _ : Fin (N + 1) ↦ Lp ℂ 2 (volume : Measure ℝ))) :=
+    WithLp.toLp 2 fun i ↦ WithLp.toLp 2 fun k ↦ (htrace i k).toLp _
+  have hu (i : ι) (k : Fin (N + 1)) : (u i k : ℝ → ℂ) =ᵐ[volume]
+      fun y ↦ iteratedDeriv (k : ℕ) g (verticalPoint (σ i) y) :=
+    (htrace i k).coeFn_toLp
+  refine ⟨⟨u, ?_⟩, hu⟩
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨F, hu⟩)
 
 /-- Paper: Definition 9.2.1.1(2), p. 404. The scalar analytic space uses
 one line and derivatives of order zero through N, with the Plancherel measure `dy/(2π)`.
