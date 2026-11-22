@@ -294,7 +294,20 @@ theorem absolutePWCondensation_trace_tendsto (a : ℝ) (ω : PontryaginDual C₁
     let T := nuclearRestriction(a, ω, hρ, φ)
     Tendsto (fun Λ ↦ hilbertTrace
       (productTraceClass(T, absolutePWProjection (F := F) (S := S) hs a ω Λ))) atTop
-      (𝓝 (hilbertTrace T)) := by sorry
+      (𝓝 (hilbertTrace T)) := by
+  have limit {H : Type _} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+      (T : nuclearEndomorphisms H) (A : ℝ → nuclearEndomorphisms H)
+      (h : Tendsto (fun r ↦ traceNorm (A r - T)) atTop (𝓝 0)) :
+      Tendsto (fun r ↦ hilbertTrace (A r)) atTop (𝓝 (hilbertTrace T)) := by
+    obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    simp only [← htr, ← map_sub]
+    simp only [htr]
+    exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _) h
+  let T := nuclearRestriction(a, ω, hρ, φ)
+  exact limit (H := ↥(GeoIsotype(ω))) T
+    (fun r ↦ productTraceClass(T, absolutePWProjection (F := F) (S := S) hs a ω r))
+    (absolutePWCondensation_traceNorm_tendsto (F := F) (S := S) hs a ω _hω _hPic φ _hφ hρ)
 
 /-- Paper: Definition 11.2.1.3(1) and (11.2.1.6), p. 488.
 The local invariant level completes the weighted theta image of zero-moment
