@@ -60,7 +60,10 @@ def introTraceTest (χ : U𝔽) (h : ℝ → ℂ) (g : C𝔽) : ℂ :=
 test by the conjugate character value on that class. -/
 theorem introTraceTest_mul_normOne (χ : U𝔽) (h : ℝ → ℂ)
     (g : C𝔽) (u : (ideleClassNorm F).ker) :
-    introTraceTest χ h (g * u.val) = star (χ u.val : ℂ) * introTraceTest χ h g := by sorry
+    introTraceTest χ h (g * u.val) = star (χ u.val : ℂ) * introTraceTest χ h g := by
+  have hu : ideleClassNorm F u.val = 1 := u.property
+  simp only [introTraceTest, map_mul, hu, mul_one, Circle.coe_mul, star_mul]
+  ac_rfl
 
 /-- Paper: §1.4.1, p. 28. Mathlib's Mellin moment of the radial profile uses the
 positive norm coordinate with Haar density `dt/t`. -/
