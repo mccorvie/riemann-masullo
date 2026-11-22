@@ -171,7 +171,21 @@ include hSC hInt hne in
 /-- Paper: Equations (4.5.1.3) and (4.5.3.3), pp. 198, 208. Subtracting the
 translate by the inverse generator is linear and continuous on the decay space. -/
 theorem modulatedCyclicDifference_isLinearMap_continuous :
-    IsLinearMap ℂ diff ∧ Continuous diff := by sorry
+    IsLinearMap ℂ diff ∧ Continuous diff := by
+  have h := exists_modulatedExponentialDecay_translationAction (G := G) m I hm hms hInt hne
+  obtain ⟨ρ, hρ, -⟩ := h
+  let T : D →L[ℂ] D := ContinuousLinearMap.id ℂ D - ρ γ⁻¹
+  have hpt : ∀ f : D, diff f = T f := fun f ↦
+    congrArg (fun g : D ↦ f - g)
+      (@Subtype.ext _ _ (⟨fun x ↦ f.val ((γ⁻¹)⁻¹ * x),
+        modulatedExponentialDecaySubmodule_translate m I hm hms γ⁻¹ f⟩ :
+          modulatedExponentialDecaySubmodule m I) (ρ γ⁻¹ f)
+        (funext fun x ↦ (hρ γ⁻¹ f x).symm))
+  have hadd : ∀ x y : D, diff (x + y) = diff x + diff y := fun x y ↦
+    (hpt _).trans ((map_add T x y).trans (congrArg₂ (· + ·) (hpt x).symm (hpt y).symm))
+  have hsmul : ∀ (c : ℂ) (x : D), diff (c • x) = c • diff x := fun c x ↦
+    (hpt _).trans ((map_smul T c x).trans (congrArg (c • ·) (hpt x).symm))
+  exact ⟨⟨hadd, hsmul⟩, T.continuous.congr fun f ↦ (hpt f).symm⟩
 
 /-- Paper: Equations (4.5.1.3) and (4.5.3.3), pp. 198, 208. The cyclic
 difference sends a function to itself minus its translate by the inverse generator. -/
@@ -281,7 +295,33 @@ theorem modulatedQuotientIsotypicProjector_fix (ω : PontryaginDual K) (f : Sχ[
 /-- Paper: Notation 4.5.1.1 and Equation (4.5.1.9), p. 204. The projector
 has range exactly the norm-one isotype on the quotient. -/
 theorem modulatedQuotientIsotypicProjector_range (ω : PontryaginDual K) :
-    (Ψ[ω]).range = Sχ[ω] := by sorry
+    (Ψ[ω]).range = Sχ[ω] := by
+  have : IsClosed (Γ : Set G) := modulatedCyclicSubgroup_closed m γ hγ
+  refine le_antisymm ?_ fun f hf ↦ ⟨f, modulatedQuotientIsotypicProjector_fix m γ hm hγ μ₁ ω ⟨f, hf⟩⟩
+  rintro _ ⟨f, rfl⟩
+  refine (mem_actionIsotype _ ω _).mpr fun v ↦ Subtype.ext (funext fun z ↦ ?_)
+  change schwartzBruhatTranslationAction (G := Q) (qK v) (Ψ[ω] f) z = (ω v : ℂ) * Ψ[ω] f z
+  refine (schwartzBruhatTranslationAction_apply (G := Q) (qK v) z (Ψ[ω] f)).trans ?_
+  change (μ₁.real univ : ℂ)⁻¹ * ∫ u : K, (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) ∂μ₁ =
+    (ω v : ℂ) * ((μ₁.real univ : ℂ)⁻¹ * ∫ u : K, (ω u : ℂ) * f (qK u * z) ∂μ₁)
+  set g : K → ℂ := fun u ↦ (ω u : ℂ) * f (qK u * z) with hg
+  have hpt (u : K) : (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) = (ω v : ℂ) * g (u * v⁻¹) := by
+    have e : qK (u * v⁻¹) * z = qK u * ((qK v)⁻¹ * z) := by
+      rw [map_mul, map_inv, mul_assoc]
+    have hω : (ω (u * v⁻¹) : ℂ) = (ω u : ℂ) * (ω v : ℂ)⁻¹ := by
+      rw [map_mul, map_inv, Circle.coe_mul, Circle.coe_inv]
+    have hv : (ω v : ℂ) ≠ 0 := Circle.coe_ne_zero _
+    have h1 : g (u * v⁻¹) = (ω u : ℂ) * (ω v : ℂ)⁻¹ * f (qK u * ((qK v)⁻¹ * z)) :=
+      (congrArg (· * f (qK (u * v⁻¹) * z)) hω).trans (congrArg (fun x ↦ _ * f x) e)
+    rw [h1]
+    field_simp
+  have hint : ∫ u : K, (ω u : ℂ) * f (qK u * ((qK v)⁻¹ * z)) ∂μ₁ =
+      (ω v : ℂ) * ∫ u : K, g u ∂μ₁ :=
+    (congrArg (fun h : K → ℂ ↦ ∫ u, h u ∂μ₁) (funext hpt)).trans
+      ((integral_const_mul _ _).trans
+        (congrArg (fun c ↦ (ω v : ℂ) * c) (integral_mul_right_eq_self g v⁻¹)))
+  rw [hint]
+  ring
 
 /-- Paper: Notation 4.5.1.1, p. 204. The normalized quotient projector is idempotent. -/
 theorem modulatedQuotientIsotypicProjector_idempotent (ω : PontryaginDual K) :

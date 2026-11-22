@@ -69,6 +69,47 @@ def sorries():
     return found
 
 
+UNPROVED = re.compile(r"(?<![\w.'])(sorry|admit)(?![\w'])")
+
+
+def text_has_sorry(lines, i):
+    """Whether the declaration that starts on line `i` (0-based) has `sorry` in its text: from
+    that line to the next declaration or comment block, with `--` comments left out."""
+    end = i + 1
+    while end < len(lines) and not DECL.match(lines[end]) and not lines[end].lstrip().startswith("/-"):
+        end += 1
+    return bool(UNPROVED.search("\n".join(re.sub(r"--.*", "", line) for line in lines[i:end])))
+
+
+def still_sorry(key):
+    """Whether the declaration that an issue names (`path::name`) still has `sorry` in its text
+    on this checkout. False if the file or the declaration is gone."""
+    path, name = key.split("::", 1)
+    if not (ROOT / path).is_file():
+        return False
+    lines = (ROOT / path).read_text().splitlines()
+    for i, text in enumerate(lines):
+        m = DECL.match(text)
+        if m and re.match(rf"\s+{re.escape(name)}(?=$|[\s:({{\[])", text[m.end():]) and text_has_sorry(lines, i):
+            return True
+    return False
+
+
+def disagreements(current, new, stale):
+    """The build says what is proved; the text of the files is a second opinion, and the two
+    must agree before anything is changed. An issue to close whose declaration still reads
+    `sorry`, or one to open whose declaration does not, means the build output was read against
+    the wrong text. That is what happened on 2026-11-21: positions from a build of one commit
+    were looked up in the files of another, 110 issues were opened under names that were not
+    the unproved declarations, and 150 good ones were closed."""
+    bad = [f"would close the issue of {k}, which still has `sorry` in the file" for k in stale if still_sorry(k)]
+    for k in new:
+        lines = (ROOT / current[k]["path"]).read_text().splitlines()
+        if not text_has_sorry(lines, current[k]["line"] - 1):
+            bad.append(f"would open an issue for {k}, which has no `sorry` in the file")
+    return bad
+
+
 def chapter_label(path):
     m = re.match(r"RiemannMasullo/(Ch\d+|App[A-E])", path)
     return m.group(1)[0].lower() + m.group(1)[1:] if m else None
@@ -143,11 +184,20 @@ def main():
         print(f"note: {len(skipped)} left for the next run (changed on main after {sha})")
     print(f"{len(current)} sorries at {sha}; {len(open_issues)} open proof issues; "
           f"{len(new)} to open, {len(stale)} to close")
-    if apply and len(new) > 20 and len(stale) > 20 and "--force" not in sys.argv:
-        sys.exit(f"this would open {len(new)} issues and close {len(stale)} at once. That is what a "
-                 "mismatch between the build and the files looks like (2026-11-21: 110 issues with "
-                 "garbled names opened, 150 good ones closed). Look at the dry run; if it is right, "
-                 "pass --force.")
+    # Many issues at once are normal: a section's statements arrive sixty at a time, and a file
+    # that is closed out takes forty issues with it. What must not happen is a wrong one.
+    bad = disagreements(current, new, stale)
+    for line in bad[:30]:
+        print("  DISAGREES:", line)
+    force = "--force" in sys.argv
+    if apply and bad and not force:
+        sys.exit(f"{len(bad)} of these changes disagree with the text of the files (listed above). "
+                 "Nothing was changed. Either the build and the files do not match, or the text "
+                 "check is fooled by something unusual in those declarations: look at them, and "
+                 "pass --force only if the changes are right.")
+    if apply and len(stale) > max(60, len(open_issues) // 2) and not force:
+        sys.exit(f"this would close {len(stale)} of the {len(open_issues)} open proof issues at "
+                 "once. Nothing was changed; look at the dry run, and pass --force if it is right.")
     for key in new:
         s = current[key]
         title = f"Prove `{s['name']}`" + (f" ({s['paper']})" if s["paper"] else "")

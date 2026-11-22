@@ -993,12 +993,104 @@ theorem adelicStandardGaussian_trivial_zero :
     fun w ↦ ite_eq_right_iff.mpr fun h ↦ absurd h (InfinitePlace.not_isReal_iff_isComplex.mpr w.2)
   simp only [hR, hC, Finset.prod_const_one, Finset.prod_const, Finset.card_univ, one_mul]
 
+/-- Unitary characters of the complex units that agree on the unit circle have the same
+angular exponent. -/
+private theorem complexUnits_character_parameter_snd_congr (c d : ℂˣ →ₜ* ℂ)
+    (hc : ∀ x, ‖c x‖ = 1) (hd : ∀ x, ‖d x‖ = 1)
+    (h : ∀ x : ℂˣ, ‖(x : ℂ)‖ = 1 → c x = d x) :
+    (existsUnique_complexUnits_character_parameters c hc).exists.choose.2 =
+      (existsUnique_complexUnits_character_parameters d hd).exists.choose.2 := by
+  have hP := (existsUnique_complexUnits_character_parameters c hc).exists
+  have hQ := (existsUnique_complexUnits_character_parameters d hd).exists
+  change hP.choose.2 = hQ.choose.2
+  have key (x : ℂˣ) : ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ hP.choose.2 =
+      ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ hQ.choose.2 := by
+    have hr : ‖(x : ℂ)‖ ≠ 0 := norm_ne_zero_iff.mpr x.ne_zero
+    let u : ℂˣ := Units.mk0 ((x : ℂ) / (‖(x : ℂ)‖ : ℂ))
+      (div_ne_zero x.ne_zero (Complex.ofReal_ne_zero.mpr hr))
+    have hu : ‖(u : ℂ)‖ = 1 := by
+      change ‖(x : ℂ) / (‖(x : ℂ)‖ : ℂ)‖ = 1
+      rw [norm_div, Complex.norm_of_nonneg (norm_nonneg _), div_self hr]
+    have h1 := hP.choose_spec.2 u
+    have h2 := hQ.choose_spec.2 u
+    rw [hu, one_pow, Complex.ofReal_one, Complex.one_cpow, one_mul, div_one] at h1 h2
+    exact h1.symm.trans ((h u hu).trans h2)
+  have hpair := (existsUnique_complexUnits_character_parameters c hc).unique hP.choose_spec
+    (show (hP.choose.1, hQ.choose.2).1.re = 0 ∧ _ from
+      ⟨hP.choose_spec.1, fun x ↦ by rw [hP.choose_spec.2 x, key x]⟩)
+  exact (congrArg Prod.snd hpair :)
+
 /-- Paper: Definition 3.4.3.2, p. 152. The adelic Gaussian depends only on
 the restriction of the unitary representative to the norm-one classes. -/
 theorem adelicStandardGaussian_eq_of_restriction (χ ψ : PontryaginDual C_F)
     (h : normOneRestriction (G := C_F) (ideleClassNorm F) (ideleClassNormTwist χ 0) =
       normOneRestriction (G := C_F) (ideleClassNorm F) (ideleClassNormTwist ψ 0)) :
-    adelicStandardGaussian χ = adelicStandardGaussian ψ := by sorry
+    adelicStandardGaussian χ = adelicStandardGaussian ψ := by
+  classical
+  have hk : ∀ g : C_F, ideleClassNorm F g = 1 → χ g = ψ g := fun g hg ↦ by
+    have hg' := DFunLike.congr_fun h ⟨g, hg⟩
+    change (χ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) =
+      (ψ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ) at hg'
+    rw [Complex.cpow_zero, mul_one, mul_one] at hg'
+    exact Circle.coe_injective hg'
+  have hN (w : InfinitePlace F) (y : w.Completionˣ) (hy : ‖(y : w.Completion)‖ = 1) :
+      χ (IdeleClassGroup.ofCompletion (𝓞 F) F w y) =
+        ψ (IdeleClassGroup.ofCompletion (𝓞 F) F w y) :=
+    hk _ (by
+      rw [ideleClassNorm_ofCompletion, show Units.map nnNormHom.toMonoidHom y = 1 from
+        Units.ext (NNReal.coe_injective hy), one_pow])
+  have hInf (w : InfinitePlace F) (x : w.Completion) :
+      infiniteStandardGaussianValue w (infiniteUnitaryRestriction(χ,w)) x =
+        infiniteStandardGaussianValue w (infiniteUnitaryRestriction(ψ,w)) x := by
+    unfold infiniteStandardGaussianValue
+    by_cases hw : w.IsReal
+    · simp only [dite_eq_left hw]
+      congr 4
+      exact hN w (-1) (by rw [Units.val_neg, Units.val_one, norm_neg, norm_one])
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+      have hm := complexUnits_character_parameter_snd_congr
+        ((circleToComplex).comp ((infiniteUnitaryRestriction(χ,w)).comp
+          ⟨Units.map complexCoord(hc).symm.toMonoidHom,
+            (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+              hc).symm.continuous.units_map _⟩))
+        ((circleToComplex).comp ((infiniteUnitaryRestriction(ψ,w)).comp
+          ⟨Units.map complexCoord(hc).symm.toMonoidHom,
+            (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+              hc).symm.continuous.units_map _⟩))
+        (fun _ ↦ Circle.norm_coe _) (fun _ ↦ Circle.norm_coe _)
+        (fun x hx ↦ congrArg (fun z : Circle ↦ (z : ℂ))
+          (hN w (Units.map complexCoord(hc).symm.toMonoidHom x)
+            (((InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+              hc).symm.isometry.norm_map_of_map_zero
+                (map_zero complexCoord(hc).symm) (x : ℂ)).trans hx)))
+      simp only [dite_eq_right hw, hm]
+  have hFin (v : V) (x : v.adicCompletion F) :
+      finiteStandardGaussianValue v (finitePlaceRestriction F v (ideleClassNormTwist χ 0)) x =
+        finiteStandardGaussianValue v
+          (finitePlaceRestriction F v (ideleClassNormTwist ψ 0)) x := by
+    have hu : ∀ u ∈ integerUnits(v), finitePlaceRestriction F v (ideleClassNormTwist χ 0) u =
+        finitePlaceRestriction F v (ideleClassNormTwist ψ 0) u := fun u hu ↦
+      DFunLike.congr_fun h ⟨IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u, by
+        change ideleClassNorm F _ = 1
+        rw [ideleClassNorm_ofAdicCompletion]
+        exact Units.ext (NNReal.coe_injective (Valued.toNormedField.norm_eq_one_iff.mpr
+          (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)))⟩
+    have h1 : unramified(v, finitePlaceRestriction F v (ideleClassNormTwist χ 0)) ↔
+        unramified(v, finitePlaceRestriction F v (ideleClassNormTwist ψ 0)) :=
+      forall₂_congr fun u hu' ↦ by rw [hu u hu']
+    rw [finiteStandardGaussianValue, finiteStandardGaussianValue]
+    by_cases h0 : unramified(v, finitePlaceRestriction F v (ideleClassNormTwist χ 0))
+    · rw [ite_eq_left h0, ite_eq_left (h1.mp h0)]
+    · rw [ite_eq_right h0, ite_eq_right (mt h1.mpr h0)]
+      by_cases hx : x ∈ Units.val '' (integerUnits(v) : Set (v.adicCompletion F)ˣ)
+      · rw [Set.indicator_of_mem hx, Set.indicator_of_mem hx]
+        obtain ⟨u, hu', rfl⟩ := hx
+        rw [dite_eq_left u.ne_zero, dite_eq_left u.ne_zero, Units.mk0_val, hu u hu']
+      · rw [Set.indicator_of_notMem hx, Set.indicator_of_notMem hx]
+  apply Subtype.ext
+  funext x
+  exact congrArg₂ (· * ·) (Finset.prod_congr rfl fun w _ ↦ hInf w _)
+    (finprod_congr fun v ↦ hFin v _)
 
 -- TODO(paper-gap): Even with the corrected complex Gaussians, the Tamagawa
 -- zeta integral has an extra factor of |d_F|^(-1/2) relative to the Euler product of §3.2.

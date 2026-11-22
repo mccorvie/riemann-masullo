@@ -11,6 +11,7 @@ public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
+import Mathlib.Topology.Algebra.IsOpenUnits
 
 /-!
 # Explicit formulas for Hecke L-functions
@@ -669,7 +670,70 @@ theorem realConnesWeilPrincipalValue_of_apply_one_zero (w : InfinitePlace F)
     let μ := infiniteLocalMultiplicativeTamagawaMeasure F w
     (infiniteConnesWeilPrincipalValue w) f =
       (1 / 2 : ℂ) * ∫ u : w.Completionˣ,
-        f.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ := by sorry
+        f.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ := by
+  intro μ
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let r := InfinitePlace.Completion.ringEquivRealOfIsReal _hw
+  let e := InfinitePlace.Completion.isometryEquivRealOfIsReal _hw
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).measurableEmbedding
+  have hA := (exists_infiniteWeilTestMap w).choose_spec f
+  have hmult : w.mult = 1 := by simp [InfinitePlace.mult, _hw]
+  let Fz : w.Completion → ℂ := Function.extend Units.val (f.val : _ → ℂ) (fun _ ↦ 0)
+  have hFu (u : w.Completionˣ) : Fz u.val = f.val u := Units.val_injective.extend_apply _ _ u
+  have hFz (y : w.Completion) (hy : y ∉ range (Units.val : w.Completionˣ → w.Completion)) :
+      Fz y = 0 := by
+    simp only [Fz, Function.extend_apply' _ _ _ (fun ⟨u, hu⟩ ↦ hy ⟨u, hu⟩)]
+  have h0 : addTest((exists_infiniteWeilTestMap w).choose f) 0 = 0 := by
+    rw [hA]
+    change Fz (1 + 0) / _ = 0
+    rw [add_zero, ← Units.val_one, hFu, _hf, zero_div]
+  change infiniteConnesPrincipalValue w ((exists_infiniteWeilTestMap w).choose f) = _
+  rw [realConnesPrincipalValue_of_apply_zero w _hw _ h0]
+  congr 1
+  let G : w.Completion → ℂ := fun y ↦ Fz y / (Real.sqrt ‖y‖ : ℂ) / ((‖y - 1‖ : ℝ) : ℂ)
+  -- Translation invariance moves the singularity from zero to one.
+  have htr : ∫ x, addTest((exists_infiniteWeilTestMap w).choose f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w) =
+      ∫ y, G y ∂ν∞(w) := by
+    have hG : (fun x ↦ addTest((exists_infiniteWeilTestMap w).choose f) x / ((‖x‖ : ℝ) : ℂ)) =
+        fun x ↦ G (1 + x) := by
+      funext x
+      rw [hA]
+      change Fz (1 + x) / ((Real.sqrt (‖1 + x‖ ^ w.mult) : ℂ)) / _ =
+        Fz (1 + x) / (Real.sqrt ‖1 + x‖ : ℂ) / ((‖1 + x - 1‖ : ℝ) : ℂ)
+      rw [hmult, pow_one, add_sub_cancel_left]
+    rw [hG, infiniteLocalAdditiveTamagawaMeasure, dite_eq_left _hw]
+    let m := e.symm.toHomeomorph.toMeasurableEquiv
+    rw [show (r.symm : ℝ → w.Completion) = m from rfl, integral_map_equiv, integral_map_equiv]
+    have hm (t : ℝ) : 1 + m t = m (1 + t) := by
+      change 1 + r.symm t = r.symm (1 + t)
+      rw [map_add, map_one]
+    simp_rw [hm]
+    exact integral_add_left_eq_self (fun t ↦ G (m t)) 1
+  rw [htr]
+  -- The multiplicative measure is the additive one with density `1 / ‖y‖` on units.
+  let d : w.Completion → ENNReal := fun x ↦ (↑(‖x‖₊ ^ w.mult) : ENNReal)⁻¹
+  have hd : Measurable d := by fun_prop
+  simp only [← hFu]
+  change _ = ∫ u, _ ∂(ν∞(w).withDensity d).comap Units.val
+  rw [← hval.integral_map (g := fun y ↦ Fz y * (Real.sqrt ‖y‖ : ℂ) / ((‖1 - y‖ : ℝ) : ℂ)),
+    hval.map_comap, setIntegral_withDensity_eq_setIntegral_toReal_smul hd ?_ _
+      hval.measurableSet_range,
+    ← setIntegral_eq_integral_of_forall_compl_eq_zero (s := range Units.val)
+      (fun y hy ↦ by simp only [G, hFz y hy, zero_div])]
+  · refine setIntegral_congr_fun hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    have hn : 0 < ‖y‖ := norm_pos_iff.mpr (hu ▸ u.ne_zero)
+    simp only [G, d, hmult, pow_one]
+    rw [ENNReal.toReal_inv, ENNReal.coe_toReal, coe_nnNorm, Complex.real_smul, norm_sub_rev]
+    have hs : (Real.sqrt ‖y‖ : ℂ) ≠ 0 := by exact_mod_cast (Real.sqrt_pos.mpr hn).ne'
+    have hsq : (‖y‖ : ℂ) = (Real.sqrt ‖y‖ : ℂ) * (Real.sqrt ‖y‖ : ℂ) := by
+      exact_mod_cast (Real.mul_self_sqrt hn.le).symm
+    push_cast
+    rw [hsq]
+    field_simp
+  · refine ae_restrict_of_forall_mem hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    simp only [d, hmult, pow_one]
+    exact ENNReal.inv_lt_top.mpr (by simp [← hu])
 
 local notation "finiteWeilIntegrand(" v ", " f ")" =>
   (fun u : (HeightOneSpectrum.adicCompletion F v)ˣ ↦
