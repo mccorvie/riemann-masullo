@@ -36,13 +36,41 @@ def Printed.finiteEigendistribution_unitShell : Prop :=
         T ∈ schwartzBruhatEigendistributions c ∧
           T (finitePlaceDifference v π (finiteStandardGaussian v 1)) = 1
 
+/-- At any finite place with a uniformizer, the printed claim fails for the trivial
+character: every eigendistribution of the trivial character is invariant under the
+uniformizer, so it vanishes on the difference of a test and its translate. Stated for a
+general number field so that the argument is elaborated once, not at a concrete field. -/
+private theorem finiteEigendistribution_unitShell_false_of_uniformizer (F : Type) [Field F]
+    [NumberField F] (v : V(F)) (π : K(F, v)ˣ)
+    (hπ : (Valued.v : Valuation K(F, v) (WithZero (Multiplicative ℤ))).IsUniformizer π.val)
+    (h : Printed.finiteEigendistribution_unitShell) : False := by
+  obtain ⟨T, ⟨hT, h1⟩, -⟩ := h F v π hπ 1 fun _ _ ↦ rfl
+  let f : SchwartzBruhat (Multiplicative K(F, v)) := finiteStandardGaussian v 1
+  have heigen : ∀ (g : K(F, v)ˣ) (k : SchwartzBruhat (Multiplicative K(F, v))),
+      T (schwartzBruhatUnitTranslate g k) = (1 : QuasiCharacter K(F, v)ˣ) g * T k := hT
+  have hc : (1 : QuasiCharacter K(F, v)ˣ) π = 1 := by
+    rw [ContinuousMonoidHom.coe_one, Pi.one_apply]
+  have h0 : T (finitePlaceDifference v π f) = 0 := by
+    change T (f - schwartzBruhatUnitTranslate π f) = 0
+    calc
+      _ = T f - T (schwartzBruhatUnitTranslate π f) := map_sub T _ _
+      _ = T f - (1 : QuasiCharacter K(F, v)ˣ) π * T f := congrArg (fun a ↦ T f - a) (heigen π f)
+      _ = T f - 1 * T f := congrArg (fun b ↦ T f - b * T f) hc
+      _ = 0 := by ring
+  exact zero_ne_one (h0.symm.trans h1)
+
 /-- Paper: (5.3.1.3), p. 240. Take the 3-adic place of ℚ and the trivial quasi-character.
 Every invariant functional takes the same value on the integer-ring indicator and its
 translate by 3. By linearity its value on their difference is zero, so no functional
 satisfies the asserted normalization. -/
 theorem Printed.finiteEigendistribution_unitShell_false :
     ¬ Printed.finiteEigendistribution_unitShell := by
-  sorry
+  intro h
+  let v : V(ℚ) := Rat.HeightOneSpectrum.primesEquiv.symm ⟨3, Nat.prime_three⟩
+  obtain ⟨π, hπ⟩ : ∃ π : v.adicCompletionIntegers ℚ,
+      (Valued.v : Valuation K(ℚ, v) (WithZero (Multiplicative ℤ))).IsUniformizer (π : K(ℚ, v)) :=
+    Valuation.exists_isUniformizer_of_isCyclic_of_nontrivial _
+  exact finiteEigendistribution_unitShell_false_of_uniformizer ℚ v (Units.mk0 π.val hπ.ne_zero) hπ h
 
 end FinitePlace
 
