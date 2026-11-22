@@ -160,7 +160,37 @@ theorem outsideIntegralIdeleUnits_isCompact :
 /-- Paper: (6.1.2.1), p. 288.
 The group of integer units inserted at the additional finite places is compact in the T-ideles. -/
 theorem relativeIntegralIdeleUnits_isCompact :
-    IsCompact (relativeIntegralIdeleUnits F S T : Set (SAdeleRing F T)ˣ) := by sorry
+    IsCompact (relativeIntegralIdeleUnits F S T : Set (SAdeleRing F T)ˣ) := by
+  classical
+  let H (v : T) : Set (L(v.val))ˣ := if v.val ∈ S then {1} else U(v.val)
+  have hc (v : T) : IsCompact (H v) := by
+    by_cases hv : v.val ∈ S
+    · simpa only [H, ite_eq_left hv] using (isCompact_singleton (x := (1 : (L(v.val))ˣ)))
+    · have hO : IsCompact (O(v.val) : Set (L(v.val))) :=
+        isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val)
+      simpa only [H, ite_eq_right hv] using Submonoid.units_isCompact hO
+  have memH (v : T) (u : (L(v.val))ˣ) : u ∈ H v ↔
+      (v.val ∈ S → u.val = 1) ∧
+        (v.val ∉ S → u.val ∈ O(v.val) ∧ (u⁻¹).val ∈ O(v.val)) := by
+    by_cases hv : v.val ∈ S
+    · simp only [H, ite_eq_left hv, Set.mem_singleton_iff]
+      exact ⟨fun h ↦ ⟨fun _ ↦ congrArg Units.val h, fun hn ↦ (hn hv).elim⟩, fun h ↦ Units.ext (h.1 hv)⟩
+    · simp only [H, ite_eq_right hv]
+      exact ⟨fun h ↦ ⟨fun hs ↦ (hv hs).elim, fun _ ↦ h⟩, fun h ↦ h.2 hv⟩
+  let p := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((v : T) → L(v.val))
+  let q := ContinuousMulEquiv.piUnits (M := fun v : T ↦ L(v.val))
+  let e := p.toHomeomorph.trans ((Homeomorph.refl _).prodCongr q.toHomeomorph)
+  have he : (relativeIntegralIdeleUnits F S T : Set (SAdeleRing F T)ˣ) =
+      e ⁻¹' (({1} : Set (InfiniteAdeleRing F)ˣ) ×ˢ Set.univ.pi H) := by
+    ext g
+    refine (mem_relativeIntegralIdeleUnits_iff (F := F) (S := S) (T := T) g).trans ?_
+    change _ ↔ (p g).1 ∈ ({1} : Set (InfiniteAdeleRing F)ˣ) ∧ q (p g).2 ∈ Set.univ.pi H
+    rw [Set.mem_singleton_iff, Units.ext_iff, Set.mem_univ_pi]
+    refine and_congr_right fun _ ↦ ?_
+    simp_rw [memH]
+    exact ⟨fun ⟨hs, hd⟩ v ↦ ⟨hs v, hd v⟩, fun h ↦ ⟨fun v ↦ (h v).1, fun v ↦ (h v).2⟩⟩
+  exact (congrArg IsCompact he).mpr (e.isCompact_preimage.mpr
+    (isCompact_singleton.prod (isCompact_univ_pi hc)))
 
 -- TODO(paper-gap): The proof of Theorem 6.1.2.1 applies its invariant-space
 -- tensor identification to the full test space and has mismatched indices
