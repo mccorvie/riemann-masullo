@@ -322,7 +322,34 @@ def Printed.finiteLog_isSchwartzBruhat : Prop :=
 /-- Paper: Proposition B.4.3.1, uniqueness sentence, p. 618. In the completion
 of `ℚ` at two, the values at `2^n` are `-n`. They are unbounded as the arguments
 tend to zero, so no value at zero gives even a continuous representative. -/
-theorem Printed.finiteLog_isSchwartzBruhat_false : ¬ Printed.finiteLog_isSchwartzBruhat := by sorry
+theorem Printed.finiteLog_isSchwartzBruhat_false : ¬ Printed.finiteLog_isSchwartzBruhat := by
+  intro h
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 ℚ)
+  let v : HeightOneSpectrum (𝓞 ℚ) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  obtain ⟨J, hJ⟩ := h ℚ v
+  let val : Valuation (v.adicCompletion ℚ) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hlt : ‖(π : v.adicCompletion ℚ)‖ < 1 :=
+    Valued.toNormedField.norm_lt_one_iff.mpr hπ.val_lt_one
+  have hpos : 0 < ‖(π : v.adicCompletion ℚ)‖ := norm_pos_iff.mpr hπ.ne_zero
+  have hq : 0 < Real.log (Ideal.absNorm v.asIdeal : ℝ) :=
+    Real.log_pos (by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v)
+  have hc : Continuous fun x : v.adicCompletion ℚ ↦ J (Multiplicative.ofAdd x) :=
+    (schwartzBruhat_continuous J).comp continuous_ofAdd
+  have hlim : Tendsto (fun n : ℕ ↦ (π : v.adicCompletion ℚ) ^ n) atTop (𝓝 0) :=
+    tendsto_pow_atTop_nhds_zero_of_norm_lt_one hlt
+  have hre := (Complex.continuous_re.tendsto _).comp ((hc.tendsto 0).comp hlim)
+  have hbot : Tendsto (fun n : ℕ ↦ (n : ℝ) *
+      (Real.log ‖(π : v.adicCompletion ℚ)‖ / Real.log (Ideal.absNorm v.asIdeal : ℝ)))
+      atTop atBot :=
+    tendsto_natCast_atTop_atTop.atTop_mul_const_of_neg
+      (div_neg_of_neg_of_pos (Real.log_neg hpos hlt) hq)
+  refine not_tendsto_nhds_of_tendsto_atBot hbot _ (hre.congr fun n ↦ ?_)
+  have hn := hJ _ (pow_ne_zero n hπ.ne_zero)
+  simp only [Function.comp_apply]
+  rw [show J (Multiplicative.ofAdd ((π : v.adicCompletion ℚ) ^ n)) = _ from hn,
+    Complex.ofReal_re, norm_pow, Real.log_pow]
+  ring
 
 local notation "archLogPairing(" F ", " w ", " f ")" =>
   (∫ y : InfinitePlace.Completion w, (Real.log (‖y‖ ^ InfinitePlace.mult w) : ℂ) *
