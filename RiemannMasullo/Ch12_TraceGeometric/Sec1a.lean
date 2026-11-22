@@ -224,7 +224,8 @@ theorem schauderKernelPartialSum_zero {ν νdual : Measure G} (f : G → ℝ≥0
     (φ : ℕ → Lp ℂ 2 ν) (θ : ℕ → Lp ℂ 2 νdual) (transpose : Lp ℂ 2 νdual →L[ℂ] Lp ℂ 2 νdual)
     (x y : G) :
     schauderKernelPartialSum f φ θ transpose 0 (x, y) =
-      (transpose (θ 0) y / (f y : ℂ)) * φ 0 x := by sorry
+      (transpose (θ 0) y / (f y : ℂ)) * φ 0 x := by
+  simp [schauderKernelPartialSum]
 
 end Basis
 
