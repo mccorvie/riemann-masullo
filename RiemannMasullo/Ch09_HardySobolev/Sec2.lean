@@ -225,7 +225,27 @@ theorem scalarLineHardySobolev_gaussian (b : ℝ) (N : ℕ) :
     let F := fun y : ℝ ↦ Complex.exp (verticalPoint b y ^ 2)
     ∃ u : ScalarLineHardySobolev b N,
       (u.val () 0 : ℝ → ℂ) =ᵐ[volume] F ∧
-      ‖u.val () 0‖ = Real.sqrt ((1 / (2 * Real.pi)) * ∫ y, ‖F y‖ ^ 2) := by sorry
+      ‖u.val () 0‖ = Real.sqrt ((1 / (2 * Real.pi)) * ∫ y, ‖F y‖ ^ 2) := by
+  let c := ENNReal.ofReal (1 / (2 * Real.pi))
+  have hc : 0 < 1 / (2 * Real.pi) := by positivity
+  let g : SchwartzBergman (univ : Set ℝ) := ⟨fun z ↦ Complex.exp (z ^ 2), by
+    simpa using gaussian_mem_schwartzBergmanSubmodule (univ : Set ℝ) isOpen_univ⟩
+  let trace (k : Fin (N + 1)) (y : ℝ) := iteratedDeriv (k : ℕ) g.val (verticalPoint b y)
+  obtain ⟨v, hv⟩ := gaussian_mem_hardySobolevTraceClosure (fun _ : Unit ↦ b) N
+  have htrace (k : Fin (N + 1)) : MemLp (trace k) 2 (c • volume) :=
+    ((Lp.memLp (v.val () k)).ae_eq (hv () k)).smul_measure ENNReal.ofReal_ne_top
+  let u := WithLp.toLp 2 fun _ : Unit ↦ WithLp.toLp 2 fun k ↦ (htrace k).toLp (trace k)
+  have hu (i : Unit) (k : Fin (N + 1)) : (u i k : ℝ → ℂ) =ᵐ[c • volume] trace k :=
+    (htrace k).coeFn_toLp
+  refine ⟨⟨u, Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨g, hu⟩)⟩, ?_, ?_⟩
+  · simpa only [Measure.ae_ennreal_smul_measure_eq (c := c) (ENNReal.ofReal_pos.mpr hc).ne',
+      trace, Fin.val_zero, iteratedDeriv_zero] using hu () 0
+  · change ‖(htrace 0).toLp (trace 0)‖ = _
+    rw [Lp.norm_toLp, MemLp.eLpNorm_eq_integral_rpow_norm two_ne_zero ENNReal.ofNat_ne_top
+      (htrace 0), ENNReal.toReal_ofReal (by positivity)]
+    have hreal : c.toReal = 1 / (2 * Real.pi) := ENNReal.toReal_ofReal hc.le
+    simp only [ENNReal.toReal_ofNat, Real.rpow_two, integral_smul_measure, hreal, smul_eq_mul,
+      trace, Fin.val_zero, iteratedDeriv_zero, g, Real.sqrt_eq_rpow, one_div]
 
 /-- Paper: Theorem 9.2.1.2(1), p. 404. On L² the cutoff by a measurable set
 is the class of the product with its indicator. -/
