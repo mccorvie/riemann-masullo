@@ -302,7 +302,15 @@ local notation "jet(" n ", " x ", " v ")" =>
 Evaluation of the real derivative of order n at a point and a tuple of directions
 is complex-linear in the Schwartz function. -/
 theorem archimedeanSchwartzJet_isLinear (n : ℕ) (x : archAdd(ι, κ))
-    (v : Fin n → archAdd(ι, κ)) : IsLinearMap ℂ (jet(n, x, v)) := by sorry
+    (v : Fin n → archAdd(ι, κ)) : IsLinearMap ℂ (jet(n, x, v)) := by
+  constructor
+  · intro f g
+    change iteratedFDeriv ℝ n ((f : _ → ℂ) + (g : _ → ℂ)) x v = _
+    rw [iteratedFDeriv_add_apply (f.smooth n).contDiffAt (g.smooth n).contDiffAt,
+      ContinuousMultilinearMap.add_apply]
+  · intro a f
+    change iteratedFDeriv ℝ n (a • (f : _ → ℂ)) x v = _
+    rw [iteratedFDeriv_const_smul_apply (f.smooth n).contDiffAt, ContinuousMultilinearMap.smul_apply]
 
 /-- Paper: Lemma 5.3.3.3(3), p. 252.
 The flat Schwartz subspace is the intersection of the kernels of all jets on the
