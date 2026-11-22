@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.Complex.Liouville
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1152,8 +1153,64 @@ theorem infiniteLocalIdelicZetaIntegral_integrable (w : InfinitePlace F) (f : �
 absolutely convergent on the positive half-plane. -/
 theorem finiteLocalIdelicZetaIntegral_integrable (v : Primes) (f : ℬ(v.adicCompletion F))
     (χ : PontryaginDual (v.adicCompletion F)ˣ) {s : ℂ} (hs : s ∈ rightHalf) :
-    Integrable (fun g : (v.adicCompletion F)ˣ ↦ test(f) g.val * chart𝔭[v, χ] s g) μ𝔭(v) :=
-  by sorry
+    Integrable (fun g : (v.adicCompletion F)ˣ ↦ test(f) g.val * chart𝔭[v, χ] s g) μ𝔭(v) := by
+  let K := v.adicCompletion F
+  have : ProperSpace K := properSpace_adicCompletion v
+  have hσ : 0 < s.re := hs
+  -- The test function is bounded and vanishes off a compact set.
+  have hstage (a : BruhatStructuralPair (Multiplicative K)) :
+      ∃ C : Set K, IsCompact C ∧ ∀ x ∈ a.val.1, Multiplicative.toAdd x ∈ C := by
+    obtain ⟨V, _, hV, hgen⟩ := a.property.2.1
+    have hc : Continuous fun x : a.val.1 ↦ Multiplicative.toAdd (x : Multiplicative K) :=
+      continuous_toAdd.comp continuous_subtype_val
+    obtain ⟨r, hr⟩ := hV.exists_bound_of_continuousOn hc.continuousOn
+    let ρ := max r 0
+    let H : Subgroup (Multiplicative K) :=
+      { carrier := {x | ‖Multiplicative.toAdd x‖ ≤ ρ}
+        one_mem' := by simp [ρ]
+        mul_mem' := fun hx hy ↦
+          (IsUltrametricDist.norm_add_le_max _ _).trans (max_le hx hy)
+        inv_mem' := fun {x} hx ↦ by
+          change ‖Multiplicative.toAdd x⁻¹‖ ≤ ρ
+          rw [toAdd_inv, norm_neg]
+          exact hx }
+    have hle : Subgroup.closure V ≤ H.comap a.val.1.subtype :=
+      (Subgroup.closure_le _).2 fun x hx ↦ (hr x hx).trans (le_max_left _ _)
+    rw [hgen] at hle
+    refine ⟨Metric.closedBall 0 ρ, isCompact_closedBall _ _, fun x hx ↦ ?_⟩
+    have h := Subgroup.mem_subgroupOf.mp (hle (Subgroup.mem_top (x := (⟨x, hx⟩ : a.val.1))))
+    change ‖Multiplicative.toAdd x‖ ≤ ρ at h
+    rwa [Metric.mem_closedBall, dist_zero_right]
+  obtain ⟨C, hC, hsupp, hbd⟩ := schwartzBruhat_exists_coordinate_bounds
+    (G := Multiplicative K) (fun x ↦ Multiplicative.toAdd x)
+    (fun x ↦ ‖((1 : Multiplicative K →* Multiplicative ℝ) x).toAdd‖) (fun _ ↦ norm_nonneg _)
+    hstage (fun a e st N ↦ stage_exists_decay a e st N 1 continuous_const (by simp)) f
+  obtain ⟨B, hB, hB'⟩ := hbd 0
+  obtain ⟨R, hR⟩ := hC.exists_bound_of_continuousOn continuous_norm.continuousOn
+  -- Dominate by a multiple of the truncated norm power.
+  have : BorelSpace Kˣ := ⟨rfl⟩
+  have hb := finiteLocalTamagawa_integrable_norm_rpow v hσ R
+  refine (hb.2.const_mul B).mono' ?_ (ae_of_all _ fun g ↦ ?_)
+  · have hf : Continuous fun g : Kˣ ↦ f (Multiplicative.ofAdd g.val) :=
+      (schwartzBruhat_continuous (G := Multiplicative K) f).comp
+        (continuous_ofAdd.comp Units.continuous_val)
+    exact (hf.mul (chart𝔭[v, χ] s).continuous).aestronglyMeasurable
+  · have hchart : ‖chart𝔭[v, χ] s g‖ = ‖(g : K)‖ ^ s.re := by
+      change ‖(χ g : ℂ) * ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s‖ = _
+      rw [norm_mul, Circle.norm_coe, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+      rfl
+    rw [norm_mul, hchart]
+    change ‖f (Multiplicative.ofAdd (g : K))‖ * ‖(g : K)‖ ^ s.re ≤ _
+    by_cases hg : (g : K) ∈ C
+    · have hRg : ‖(g : K)‖ ≤ R := by simpa using hR _ hg
+      rw [indicator_of_mem (show g ∈ {u : Kˣ | ‖(u : K)‖ ≤ R} from hRg)]
+      have h := hB' (Multiplicative.ofAdd (g : K))
+      rw [pow_zero, mul_one] at h
+      exact mul_le_mul_of_nonneg_right h (by positivity)
+    · have h0 : f (Multiplicative.ofAdd (g : K)) = 0 := hsupp _ hg
+      rw [h0, norm_zero, zero_mul]
+      exact mul_nonneg hB (Set.indicator_nonneg (fun _ _ ↦ by positivity) _)
 
 local notation "normBand[" m "," n "]" =>
   {g | (((m g : ℝ≥0) : ℝ)) ∈ Icc (n + 1 : ℝ)⁻¹ (n + 1)}

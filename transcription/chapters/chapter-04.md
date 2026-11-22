@@ -122,7 +122,13 @@ where the series converges with respect to the smooth topology on $C^{\infty}(\m
 
 For any $\phi\in L^2(\mathbf{T})$, the Fourier series expansion $\phi(x)=\sum_{m\in\mathbf{Z}}a_m(\phi)e^{2\pi i m x}$ still converges, pointwise almost everywhere over $\mathbf{T}$, and with respect to the $L^2$-norm topology (this latter is a consequence of [Fol-2, Ch.3,§3.3,Thm.3.5,p.78]. The convergence almost everywhere is a Theorem of Carlson, for which we refer the reader to [Carleson, Thm.(c)]).
 
-Both in $C^{\infty}(\mathbf{T})$ and in $L^2(\mathbf{T})$, the datum $\{(e_m,a_m)\}_{m\in\mathbf{Z}}\in E\times E'$ with $E=C^{\infty}(\mathbf{T}),L^2(\mathbf{T})$, is an example of a Schauder basis.
+Both in $C^{\infty}(\mathbf{T})$ and in $L^2(\mathbf{T})$, the datum
+
+$$
+\{(e_m,a_m)\}_{m\in\mathbf{Z}}\in E\times E'
+$$
+
+with $E=C^{\infty}(\mathbf{T}),L^2(\mathbf{T})$, is an example of a Schauder basis.
 
 The defining property of a Schauder basis is extrapolated from this example: it is the existence of a series expansion as in (4.1.1.1), convergent with respect to the intrinsic Hausdorff locally convex topology on $E$, together with continuity of the coefficient functionals (without this latter condition, the resulting basis is termed a *topological basis*. We refer the reader to [Jar, Part II,Ch.14,§14.2,p.292]).
 
@@ -288,7 +294,7 @@ $$
 
 converges for every $u\in E$.
 
-If $E$ is a Fréchet space, this concept of absolute basis, which, a priori, differs from that defined in [Jar, Part II,Ch.14,§14.7,(*),p.314], which is the one we adopt throughout this work, agrees with it, by the Closed Graph Theorem (see [Jar, Part I,Ch.5,Cor.3,p.94]), since absolute summability of the sequence $\{f_m(u)x_m\}_{m\ge 0}\subset E$ for each $u\in E$ implies closedness of the induced linear operator $E\to\ell^1\{E\}$, and since $E$ is Fréchet, so is $\ell^1\{E\}$, the space of absolute Cauchy sequences in $E$ (see [Jar, Part II,Ch.15,§15.6]. Note that for $E=\mathbf{C}$, we obtain $\ell^1\{E\}=\ell^1$, the Banach space of absolutely summable sequences of complex numbers).
+If $E$ is a Fréchet space, this concept of absolute basis, which, a priori, differs from that defined in [Jar, Part II,Ch.14,§14.7,(\*),p.314], which is the one we adopt throughout this work, agrees with it, by the Closed Graph Theorem (see [Jar, Part I,Ch.5,Cor.3,p.94]), since absolute summability of the sequence $\{f_m(u)x_m\}_{m\ge 0}\subset E$ for each $u\in E$ implies closedness of the induced linear operator $E\to\ell^1\{E\}$, and since $E$ is Fréchet, so is $\ell^1\{E\}$, the space of absolute Cauchy sequences in $E$ (see [Jar, Part II,Ch.15,§15.6]. Note that for $E=\mathbf{C}$, we obtain $\ell^1\{E\}=\ell^1$, the Banach space of absolutely summable sequences of complex numbers).
 
 Similarly, if $E$ is a strict LF-space, it is strictly webbed (see [Jar, Part I,Ch.5,§5.6,Thm.2,p.97]), and so [Jar, Part I,Ch.5,§5.4,Thm.1,p.92] applies, so long as we show that $\ell^1\{E\}$ is webbed.
 
@@ -308,7 +314,7 @@ By Proposition C.2.3.13(2), $\ell^1\bar{\otimes}E$ is therefore the strict induc
 
 The foregoing further shows that $\ell^1\bar{\otimes}E\to\ell^1\widehat{\otimes}_{\pi}E$ is a linear topological isomorphism, and we deduce that $\ell^1\{E\}$ is webbed and strictly webbed.
 
-In particular, if $E$ is either a nuclear Fréchet space, or a strict inductive limit of nuclear Fréchet spaces, the concept of absolute Schauder basis in $E$ is unambiguous: the one implicitly used in [McAr, §9] is, in these special cases, equivalent to the one defined in [Jar, Part II,Ch.14,§14.7,(*),p.314].
+In particular, if $E$ is either a nuclear Fréchet space, or a strict inductive limit of nuclear Fréchet spaces, the concept of absolute Schauder basis in $E$ is unambiguous: the one implicitly used in [McAr, §9] is, in these special cases, equivalent to the one defined in [Jar, Part II,Ch.14,§14.7,(\*),p.314].
 
 THEOREM 4.1.2.6 (Dynin-Mityagin). *Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space.*
 
@@ -764,11 +770,11 @@ The argument rests on one of the forms of the Paley-Wiener Theorem, and specific
 
 In this form, recall that the Paley-Wiener asserts the following:
 
-THEOREM 4.2.2.1 (Paley-Wiener Theorem on compactly supported Fourier transforms). Let $A>0$ be a real number, $f\in\mathscr{H}(\mathbf{C})$ an entire function.
+THEOREM 4.2.2.1 (Paley-Wiener Theorem on compactly supported Fourier transforms). *Let $A>0$ be a real number, $f\in\mathscr{H}(\mathbf{C})$ an entire function.*
 
-The following conditions on $f$ are equivalent:
+*The following conditions on $f$ are equivalent:*
 
-(1) There exists $F\in L^2((-A,A),\lambda)$, for $\lambda$ the normalized Lebesgue measure, such that:
+(1) *There exists $F\in L^2((-A,A),\lambda)$, for $\lambda$ the normalized Lebesgue measure, such that:*
 
 $$
 f(z)=\int_{-A}^{A}F(x)e^{ixz}\,\mathrm{d}x \tag{4.2.2.1}
@@ -780,7 +786,7 @@ as entire functions of $z\in\mathbf{C}$.
 
 **4.2. BASES OF EXPONENTIALLY DECAYING SCHWARTZ-BRUHAT FUNCTIONS: THE CASE $G=\mathbf{R}_{>0}$** · **171**
 
-(2) There exists a real number $C>0$, such that for every $z\in\mathbf{C}$, we have $\lvert f(z)\rvert\le Ce^{A\lvert z\rvert}$, and the restriction of $f$ to the real line is in $L^2(\mathbf{R},\lambda)$.
+(2) *There exists a real number $C>0$, such that for every $z\in\mathbf{C}$, we have $\lvert f(z)\rvert\le Ce^{A\lvert z\rvert}$, and the restriction of $f$ to the real line is in $L^2(\mathbf{R},\lambda)$.*
 
 We refer the reader to [Ru-2, Ch.19,Thm.19.3,p.375]. Theorem 4.2.2.1 can be read through the lens of the smooth change of variables $x=-i\log(t)$: part (1) asserts the existence of $F\in L^2((1/A,A),\mathrm{d}t/t)$ such that:
 
@@ -794,23 +800,23 @@ Part (2) asserts the existence of a real number $C>0$ such that $\lvert f(s)\rve
 
 PROPOSITION 4.2.2.2. Let $\gamma\in\mathbf{R}_{>0}$ be a real number, $\gamma>1$.
 
-(1) If $K$ has non-empty interior and the quotient $\mathbf{R}_{>0}\to\mathbf{R}_{>0}/\gamma^{\mathbf{Z}}$ maps $K$ surjectively onto $\mathbf{R}_{>0}/\gamma^{\mathbf{Z}}$, then the induced continuous linear map:
+(1) *If $K$ has non-empty interior and the quotient $\mathbf{R}_{>0}\to\mathbf{R}_{>0}/\gamma^{\mathbf{Z}}$ maps $K$ surjectively onto $\mathbf{R}_{>0}/\gamma^{\mathbf{Z}}$, then the induced continuous linear map:*
 
 $$
 \Phi_\gamma:\mathcal{D}_K(\mathbf{R}_{>0})/(\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0}))\to\mathcal{S}(\mathbf{R}_{>0}/\gamma^{\mathbf{Z}}) \tag{4.2.2.2}
 $$
 
-is a linear topological isomorphism. The assumption on $K$ is satisfied by the compact subsets of the form $K=b\cdot[1/a,a]$ for $a,b>0$ real numbers, $a>1$ with $2\log(a)>\log(\gamma)$.
+*is a linear topological isomorphism. The assumption on $K$ is satisfied by the compact subsets of the form $K=b\cdot[1/a,a]$ for $a,b>0$ real numbers, $a>1$ with $2\log(a)>\log(\gamma)$.*
 
-(2) Under the assumption on $K$ from (1), assume that we have $K=b\cdot[1/a,a]$ for $a,b>0$ real numbers, $a>1$. Let $\phi$ be an element in the intersection $\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0})$. Let $A_0>0$ be a real number such that $K\subset[1/A_0,A_0]$, and define $A:=\lvert-\log(\gamma)+\log(A_0)\rvert$, and $K_A:=[e^{-A},e^{A}]\subset\mathbf{R}_{>0}$.
+(2) *Under the assumption on $K$ from (1), assume that we have $K=b\cdot[1/a,a]$ for $a,b>0$ real numbers, $a>1$. Let $\phi$ be an element in the intersection $\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0})$. Let $A_0>0$ be a real number such that $K\subset[1/A_0,A_0]$, and define $A:=\lvert-\log(\gamma)+\log(A_0)\rvert$, and $K_A:=[e^{-A},e^{A}]\subset\mathbf{R}_{>0}$.*
 
-There exists $\psi\in\mathcal{D}_{K_A}(\mathbf{R}_{>0})$ such that $\psi(x)-\psi(\gamma x)=\phi(x)$ as smooth compactly supported functions on $\mathbf{R}_{>0}$, the identity holding in $\mathcal{D}_{K_A\cup\gamma^{-1}K_A}(\mathbf{R}_{>0})$.
+*There exists $\psi\in\mathcal{D}_{K_A}(\mathbf{R}_{>0})$ such that $\psi(x)-\psi(\gamma x)=\phi(x)$ as smooth compactly supported functions on $\mathbf{R}_{>0}$, the identity holding in $\mathcal{D}_{K_A\cup\gamma^{-1}K_A}(\mathbf{R}_{>0})$.*
 
 REMARK 4.2.2.3. Note that the largeness condition on $K$ from (1) is satisfied, for instance, if $K$ contains an interval of the form $\gamma^N[1-\varepsilon,\gamma+\varepsilon]$ for some integer $N\ge 1$ and a real number $0<\varepsilon<1$.
 
 We begin with the following:
 
-LEMMA 4.2.2.4. For any compact subset $K\subset\mathbf{R}_{>0}$ with non-empty interior, the linear subspace $\mathcal{D}_K(\mathbf{R}_{>0})\subset\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ is closed, and the subspace topology agrees with the topology on $\mathcal{D}_K(\mathbf{R}_{>0})$ of uniform convergence of functions and their derivatives of arbitrary order.
+LEMMA 4.2.2.4. *For any compact subset $K\subset\mathbf{R}_{>0}$ with non-empty interior, the linear subspace $\mathcal{D}_K(\mathbf{R}_{>0})\subset\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})$ is closed, and the subspace topology agrees with the topology on $\mathcal{D}_K(\mathbf{R}_{>0})$ of uniform convergence of functions and their derivatives of arbitrary order.*
 
 PROOF. The subspace topology on $\mathcal{D}_K(\mathbf{R}_{>0})$ is stronger than the Fréchet topology of uniform convergence on functions and their derivatives of arbitrary order (because it is defined by a larger fundamental family of seminorms; see Definition D.3.3.1).
 
@@ -898,9 +904,9 @@ PROPOSITION 4.2.2.5. Let $\gamma\in\mathbf{R}_{>0}$ be a real number, $\gamma>1$
 
 Then:
 
-(1) the continuous functionals $\delta_{z_m}:\phi\mapsto\int_{\mathbf{R}_{>0}}\phi(t)t^{z_m}\,\frac{\mathrm{d}t}{t}$, for $z_m:=-\frac{2\pi im}{\log(\gamma)}$ with $m\in\mathbf{Z}$, are an absolute Schauder basis for the orthogonal of $\ker(\Phi_\gamma)$ with respect to the duality $\langle\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0}),\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})'\rangle$, equipped with the strong topology on the dual $(\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})/\ker(\Phi_\gamma))'$, equivalently with the subspace topology inherited from the strong topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})'_\beta$.
+(1) *the continuous functionals $\delta_{z_m}:\phi\mapsto\int_{\mathbf{R}_{>0}}\phi(t)t^{z_m}\,\frac{\mathrm{d}t}{t}$, for $z_m:=-\frac{2\pi im}{\log(\gamma)}$ with $m\in\mathbf{Z}$, are an absolute Schauder basis for the orthogonal of $\ker(\Phi_\gamma)$ with respect to the duality $\langle\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0}),\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})'\rangle$, equipped with the strong topology on the dual $(\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})/\ker(\Phi_\gamma))'$, equivalently with the subspace topology inherited from the strong topology on $\mathcal{S}_{\mathrm{E}}(\mathbf{R}_{>0})'_\beta$.*
 
-(2) The exponential system in $\mathcal{S}(\mathbf{R}_{>0}/\gamma^{\mathbf{Z}})$ can be lifted to a sequence of smooth compactly supported functions on $\mathbf{R}_{>0}$, whose support can be chosen to be contained in $\mathcal{D}_K(\mathbf{R}_{>0})$ for $K=b\cdot[1/a,a]$ and $a,b\in\mathbf{R}_{>0}$ satisfying $2\log(a)>\log(\gamma)$, and its image in the quotient Fréchet space $\mathcal{D}_K(\mathbf{R}_{>0})/(\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0}))$ is an absolute Schauder basis. Under this assumption on $a$, the image of the functionals $\delta_{z_m}$ is an absolute Schauder basis for the strong dual of $\mathcal{D}_K(\mathbf{R}_{>0})/(\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0}))$.
+(2) *The exponential system in $\mathcal{S}(\mathbf{R}_{>0}/\gamma^{\mathbf{Z}})$ can be lifted to a sequence of smooth compactly supported functions on $\mathbf{R}_{>0}$, whose support can be chosen to be contained in $\mathcal{D}_K(\mathbf{R}_{>0})$ for $K=b\cdot[1/a,a]$ and $a,b\in\mathbf{R}_{>0}$ satisfying $2\log(a)>\log(\gamma)$, and its image in the quotient Fréchet space $\mathcal{D}_K(\mathbf{R}_{>0})/(\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0}))$ is an absolute Schauder basis. Under this assumption on $a$, the image of the functionals $\delta_{z_m}$ is an absolute Schauder basis for the strong dual of $\mathcal{D}_K(\mathbf{R}_{>0})/(\ker(\Phi_\gamma)\cap\mathcal{D}_K(\mathbf{R}_{>0}))$.*
 
 PROOF. (1) is Lemma 4.2.1.5(3), and by Proposition 4.2.2.2(2) the assertion on the compact support of the bi-orthogonal sequence to $\{\delta_{z_m}\}_{m\in\mathbf{Z}}$ holds for $K=b\cdot[1/a,a]$. The assertion on the image of $\{\delta_{z_m}\}_{m\in\mathbf{Z}}$ under the continuous adjoint to the continuous linear map:
 
@@ -998,7 +1004,7 @@ As for $G=C_F,J_{F,S}$, a general $\mathbf{R}_{>0}$-modulated group admits conti
 
 We recall the following facts about the Haar measure $\nu$ on $G$.
 
-LEMMA 4.3.1.3. The measure $\nu$ on $G$ is regular, Radon and $\sigma$-finite.
+LEMMA 4.3.1.3. *The measure $\nu$ on $G$ is regular, Radon and $\sigma$-finite.*
 
 PROOF. Since $\nu$ is Radon as a Borel measure on $G$, as any Haar measure on a locally compact Hausdorff abelian group, $\nu$ is finite on compact subsets (see [DE, Thm.1.3.5]). It is therefore regular Radon by [Fol, Thm.7.8]. Since $G$ is second-countable, then it is $\sigma$-compact, and hence $\nu$ is $\sigma$-finite. $\square$
 
@@ -1024,11 +1030,11 @@ We will recall below that $\rho_G$ extends uniquely to $R(G)$ as a continuous re
 
 **176** · **CHAPTER 4. PERIODIC SCHAUDER BASES ON MODULATED GROUPS**
 
-LEMMA 4.3.1.5 (Basic properties of the left-regular representation $R(G)$). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $\tau$ be a choice of continuous homomorphic section to the module $\lvert\cdot\rvert_G$. The Hilbert space $R(G)$ satisfies the following conditions:
+LEMMA 4.3.1.5 (Basic properties of the left-regular representation $R(G)$). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $\tau$ be a choice of continuous homomorphic section to the module $\lvert\cdot\rvert_G$. The Hilbert space $R(G)$ satisfies the following conditions:*
 
 (1) $R(G)$ is separable.
 
-(2) $\rho_G$ from (4.3.1.4) uniquely extends to a continuous unitary representation of $G$ on $R(G)$. For every $\phi_1,\phi_2\in R(G)$ and every $g\in G$, we have
+(2) *$\rho_G$ from (4.3.1.4) uniquely extends to a continuous unitary representation of $G$ on $R(G)$. For every $\phi_1,\phi_2\in R(G)$ and every $g\in G$, we have*
 
 $$
 \langle\rho_G(g,\phi_1),\rho_G(g,\phi_2)\rangle_{R(G)}=\langle\phi_1,\phi_2\rangle_{R(G)}. \tag{4.3.1.5}
@@ -1040,7 +1046,7 @@ $$
 U_{G,\tau}:\mathbf{R}_{>0}\times R(G)\to R(G) \tag{4.3.1.6}
 $$
 
-as $U_{G,\tau}(t)(\phi):=\rho_G(\tau(t),\phi)$ for every $\phi\in R(G)$, then $U_{G,\tau}$ is a strongly continuous one-parameter group of unitary operators on $R(G)$.
+*as $U_{G,\tau}(t)(\phi):=\rho_G(\tau(t),\phi)$ for every $\phi\in R(G)$, then $U_{G,\tau}$ is a strongly continuous one-parameter group of unitary operators on $R(G)$.*
 
 On the concept of continuity for $\rho_G$ being used, we devote a few words.
 
@@ -1202,7 +1208,7 @@ The dual group of $\mathrm{Gal}(F^{\mathrm{ab}}/F)$ is also countable, since $\m
 
 For any finite set $S$ of places of $F$ containing all the Archimedean places, the dual group of $C^1_{F,S}$ is a quotient of the dual group of $C^1_F$, and it is therefore also countable. The dual group of $J^1_{F,S}$ is a closed subgroup of the dual group of $C^1_{F,S}$, and it is therefore also countable.
 
-Lemma 4.3.2.2 (Orthogonal decomposition into $G^1$-isotypes). The operator $\Pi_\tau$ from (4.3.2.7) is a surjective isometry.
+Lemma 4.3.2.2 (Orthogonal decomposition into $G^1$-isotypes). *The operator $\Pi_\tau$ from (4.3.2.7) is a surjective isometry.*
 
 Proof. By a consequence of the Peter-Weyl Theorem (see [Kn, Thm.1.12]), we have an isometry of complex Hilbert spaces, compatible with the structures of continuous unitary representations of $G^1$ on source and target:
 
@@ -1258,37 +1264,37 @@ This leads to $E$-valued integration, for $E$ quasi-complete, to exist and be we
 
 We refer the reader to §C.2, §C.5.1 and §C.3.3 for classes of examples of quasi-complete Hausdorff locally convex topological $\mathbf{C}$-vector spaces.
 
-Lemma 4.3.3.1 (Norm isomorphism of continuous representations of compact Hausdorff abelian groups). Let $G$ be a compact Hausdorff abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and that either one of the following two conditions is satisfied:
-(a) the action $\rho_G$ is uniformly continuous, i.e. for every $u \in E$ and for every net $\{u_i\}_{i\in I} \subset E$ converging to $u$, we have $\rho_G(g,u_i) \to \rho_G(g,u)$ uniformly as $g \in G$.
+Lemma 4.3.3.1 (Norm isomorphism of continuous representations of compact Hausdorff abelian groups). *Let $G$ be a compact Hausdorff abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and that either one of the following two conditions is satisfied:
+(a) the action $\rho_G$ is uniformly continuous, i.e. for every $u \in E$ and for every net $\{u_i\}_{i\in I} \subset E$ converging to $u$, we have $\rho_G(g,u_i) \to \rho_G(g,u)$ uniformly as $g \in G$.*
 
 ## PDF page 181
 
 **4.3. PREPARATIONS ON ISOTYPIC PROJECTORS** · **181**
 
-(b) $E$ is bornological, and condition (a) is satisfied for every $u \in E$ and for every sequence $\{u_m\}_{m\ge 0} \subset E$ converging to $u \in E$.
+(b) *$E$ is bornological, and condition (a) is satisfied for every $u \in E$ and for every sequence $\{u_m\}_{m\ge 0} \subset E$ converging to $u \in E$.*
 
-Then:
-(1) For every $u \in E$, the $\mathbf{C}$-linear form on $E'$:
+*Then:
+(1) For every $u \in E$, the $\mathbf{C}$-linear form on $E'$:*
 
 $$
 \Phi_G(u) : \varphi \mapsto \int_G \langle\rho_G(g,u),\varphi\rangle_{E,E'}\,\mathrm{d}\mu_G(g) \tag{4.3.3.1}
 $$
 
-is in the image of the canonical continuous linear operator $\iota_E : E \to (E')^{\ast}$, i.e. $\Phi_G(u)$ is the evaluation functional on $E'$ on a unique element of $E$. Equivalently, the linear operator $\Phi_G : E \to (E')^{\ast}$ assigned by $u \mapsto \Phi_G(u)$, factors through $\iota_E$.
+*is in the image of the canonical continuous linear operator $\iota_E : E \to (E')^{\ast}$, i.e. $\Phi_G(u)$ is the evaluation functional on $E'$ on a unique element of $E$. Equivalently, the linear operator $\Phi_G : E \to (E')^{\ast}$ assigned by $u \mapsto \Phi_G(u)$, factors through $\iota_E$.*
 
-Its formation is continuous with respect to the intrinsic topology on $E$, i.e. $\Phi_G : E \to E$ is a continuous linear operator.
+*Its formation is continuous with respect to the intrinsic topology on $E$, i.e. $\Phi_G : E \to E$ is a continuous linear operator.*
 
-(2) $\Phi_G$ surjects onto the closed subspace $\mathrm{H}^0(G,E)$ of $G$-invariant elements of $E$, and $\mu_G(G)^{-1}\Phi_G$ is idempotent.
+(2) *$\Phi_G$ surjects onto the closed subspace $\mathrm{H}^0(G,E)$ of $G$-invariant elements of $E$, and $\mu_G(G)^{-1}\Phi_G$ is idempotent.*
 
-Upon denoting by $\mathrm{H}_{0,\mathrm{cont}}(G,E)$ the quotient of $E$ by the kernel of $\Phi_G$, then $\Phi_G$ factors through a linear topological isomorphism:
+*Upon denoting by $\mathrm{H}_{0,\mathrm{cont}}(G,E)$ the quotient of $E$ by the kernel of $\Phi_G$, then $\Phi_G$ factors through a linear topological isomorphism:*
 
 $$
 N_G : \mathrm{H}_{0,\mathrm{cont}}(G,E) \to \mathrm{H}^0(G,E) \tag{4.3.3.2}
 $$
 
-with respect to the quotient topology on the source and the subspace topology on the target.
+*with respect to the quotient topology on the source and the subspace topology on the target.*
 
-(3) The closed subspace $\ker(\Phi_G) \subset E$ is the closure of the $\mathbf{C}$-linear subspace $V_E$ generated by the elements $\{u - \rho_G(g,u),\ u \in E,\ g \in G\}$ as $u$ varies over $E$.
+(3) *The closed subspace $\ker(\Phi_G) \subset E$ is the closure of the $\mathbf{C}$-linear subspace $V_E$ generated by the elements $\{u - \rho_G(g,u),\ u \in E,\ g \in G\}$ as $u$ varies over $E$.*
 
 Remark 4.3.3.2 (On $E$-valued integration). The reader may think of the operator $\Phi_G$ as an $E$-valued integral:
 
@@ -1412,7 +1418,7 @@ By [NB, Thm.8.9.2], it follows that the $\sigma(E,E')$-closure of $V_E$ is the $
 
 We record here for later use, a consequence of Lemma 4.3.3.1:
 
-Corollary 4.3.3.3 (Isotypes of the continuous action of a compact Hausdorff abelian group). Let $G$ be a compact Hausdorff abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and bornological, and that $\rho_G$ is sequentially uniformly continuous. Let $\omega \in \widehat{G}$ be a continuous character.
+Corollary 4.3.3.3 (Isotypes of the continuous action of a compact Hausdorff abelian group). *Let $G$ be a compact Hausdorff abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and bornological, and that $\rho_G$ is sequentially uniformly continuous. Let $\omega \in \widehat{G}$ be a continuous character.*
 
 Then:
 (1) the $\mathbf{C}$-linear form on $E'$:
@@ -1421,19 +1427,19 @@ $$
 \Phi_{G,\omega}(u) : \varphi \mapsto \int_G \langle\overline{\omega}(g)\rho_G(g,u),\varphi\rangle_{E,E'}\,\mathrm{d}\mu_G(g) \tag{4.3.3.8}
 $$
 
-defines a linear operator $\Phi_{G,\omega} : E \to (E')^{\ast}$ which factors uniquely through $\iota_E : E \to (E')^{\ast}$, and the resulting unique linear operator $\Phi_{G,\omega} : E \to E$ is continuous.
+*defines a linear operator $\Phi_{G,\omega} : E \to (E')^{\ast}$ which factors uniquely through $\iota_E : E \to (E')^{\ast}$, and the resulting unique linear operator $\Phi_{G,\omega} : E \to E$ is continuous.*
 
-(2) $\Phi_{G,\omega}$ surjects onto the closed subspace $\mathrm{H}^0(\omega,E)$ of $\omega$-homogeneous elements, i.e. $\mathrm{H}^0(\omega,E) := \{u \in E : \rho_G(g,u) = \omega(g)u\}$, and $\mu_G(G)^{-1}\Phi_{G,\omega}$ is idempotent.
+(2) *$\Phi_{G,\omega}$ surjects onto the closed subspace $\mathrm{H}^0(\omega,E)$ of $\omega$-homogeneous elements, i.e. $\mathrm{H}^0(\omega,E) := \{u \in E : \rho_G(g,u) = \omega(g)u\}$, and $\mu_G(G)^{-1}\Phi_{G,\omega}$ is idempotent.*
 
-Upon denoting by $\mathrm{H}_{0,\mathrm{cont}}(\omega,E)$ the quotient of $E$ by $\ker(\Phi_{G,\omega})$, then $\Phi_{G,\omega}$ factors through a linear topological isomorphism:
+*Upon denoting by $\mathrm{H}_{0,\mathrm{cont}}(\omega,E)$ the quotient of $E$ by $\ker(\Phi_{G,\omega})$, then $\Phi_{G,\omega}$ factors through a linear topological isomorphism:*
 
 $$
 N_{G,\omega} : \mathrm{H}_{0,\mathrm{cont}}(\omega,E) \to \mathrm{H}^0(\omega,E) \tag{4.3.3.9}
 $$
 
-with respect to the quotient topology on the source and the subspace topology on the target.
+*with respect to the quotient topology on the source and the subspace topology on the target.*
 
-(3) The closed subspace $\ker(\Phi_{G,\omega}) \subset E$ is the closure of the $\mathbf{C}$-linear subspace $V_{E,\omega}$ generated by the elements $\{u - \overline{\omega}(g)\rho_G(g,u),\ g \in G\}$ as $u$ varies over $E$.
+(3) *The closed subspace $\ker(\Phi_{G,\omega}) \subset E$ is the closure of the $\mathbf{C}$-linear subspace $V_{E,\omega}$ generated by the elements $\{u - \overline{\omega}(g)\rho_G(g,u),\ g \in G\}$ as $u$ varies over $E$.*
 
 ## PDF page 184
 
@@ -1473,17 +1479,17 @@ These observations having been made, Lemma 4.3.3.1 implies all the assertions of
 
 4.3.3.1. Hilbertian and locally convex isotypic projectors. We now show how to recover the orthogonal projectors $\Pi_{G,\omega}$ from (4.3.2.1) and Lemma 4.3.2.2, using Lemma 4.3.3.1 and Corollary 4.3.3.3.
 
-Corollary 4.3.3.4 (Hilbertian and locally convex isotypic projectors). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, with module $|\cdot|_G$ and compact Hausdorff closed subgroup of module-1 elements $G^1$. Let $R(G)$ be the Hilbert space $L^2(G,\nu)$, for $\mu_G$ a choice of Haar measure on $G$. Let $\nu_1$ be a choice of Haar measure on $G^1$.
+Corollary 4.3.3.4 (Hilbertian and locally convex isotypic projectors). *Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group, with module $|\cdot|_G$ and compact Hausdorff closed subgroup of module-1 elements $G^1$. Let $R(G)$ be the Hilbert space $L^2(G,\nu)$, for $\mu_G$ a choice of Haar measure on $G$. Let $\nu_1$ be a choice of Haar measure on $G^1$.*
 
-Then, as continuous $\mathbf{C}$-linear endomorphisms of $R(G)$, we have:
+*Then, as continuous $\mathbf{C}$-linear endomorphisms of $R(G)$, we have:*
 
 $$
 \Pi_{G^1,\omega} = \Phi_{G^1,\omega} \tag{4.3.3.10}
 $$
 
-where $\Pi_{G^1,\omega}$ is the continuous linear endomorphism of $R(G)$ defined in (4.3.2.1), and $\Phi_{G^1,\omega}$ is the continuous linear endomorphism of $R(G)$ defined in (4.3.3.17).
+*where $\Pi_{G^1,\omega}$ is the continuous linear endomorphism of $R(G)$ defined in (4.3.2.1), and $\Phi_{G^1,\omega}$ is the continuous linear endomorphism of $R(G)$ defined in (4.3.3.17).*
 
-Moreover, $\nu_1(G^1)^{-1}\Pi_{G^1,\omega}$, equivalently $\nu_1(G^1)^{-1}\Phi_{G^1,\omega}$, are orthogonal projectors, whose ranges are, for distinct continuous characters $\omega$ of $G^1$, mutually orthogonal.
+*Moreover, $\nu_1(G^1)^{-1}\Pi_{G^1,\omega}$, equivalently $\nu_1(G^1)^{-1}\Phi_{G^1,\omega}$, are orthogonal projectors, whose ranges are, for distinct continuous characters $\omega$ of $G^1$, mutually orthogonal.*
 
 ## PDF page 185
 
@@ -1523,26 +1529,26 @@ Let $E := \mathbf{C}[G]$, the finite dimensional regular representation of $G$, 
 
 vector-valued continuous functions obtained from the action of a Hausdorff locally compact abelian group $G$, acting continuously on a quasi-complete Hausdorff locally convex topological $\mathbf{C}$-vector space $E$, restricted to the compact subsets of $G$.
 
-Lemma 4.3.3.7 (Integrability and continuity of actions of relatively compact subsets). Let $G$ be a Hausdorff locally compact abelian group, $X \subset G$ a relatively compact locally closed subset with non-empty interior. Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$.
+Lemma 4.3.3.7 (Integrability and continuity of actions of relatively compact subsets). *Let $G$ be a Hausdorff locally compact abelian group, $X \subset G$ a relatively compact locally closed subset with non-empty interior. Let $E$ be a Hausdorff locally convex topological $\mathbf{C}$-vector space, equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ by linear topological automorphisms. Let $\mu_G$ be a choice of Haar measure on $G$.*
 
-Assume $E$ is quasi-complete, and that either of the following two conditions on $\rho_G$ and $E$ is satisfied:
+*Assume $E$ is quasi-complete, and that either of the following two conditions on $\rho_G$ and $E$ is satisfied:
 (a) the action $\rho_G$ is continuous, uniformly on the compact subsets of $G$, i.e. for every $u \in E$ and for every net $\{u_i\}_{i\in I} \subset E$ converging to $u$, we have, for every compact subset $K \subset G$, $\rho_G(g,u_i) \to \rho_G(g,u)$ uniformly as $g \in K$.
-(b) $E$ is bornological, and condition (a) is satisfied for every $u \in E$ and for every sequence $\{u_m\}_{m\ge 0} \subset E$ converging to $u \in E$.
+(b) $E$ is bornological, and condition (a) is satisfied for every $u \in E$ and for every sequence $\{u_m\}_{m\ge 0} \subset E$ converging to $u \in E$.*
 
-Then:
-(1) For every $u \in E$, the $\mathbf{C}$-linear form on $E'$:
+*Then:
+(1) For every $u \in E$, the $\mathbf{C}$-linear form on $E'$:*
 
 $$
 \Phi_X(u) : \varphi \mapsto \int_X \langle\rho_G(g,u),\varphi\rangle_{E,E'}\,\mathrm{d}\mu_G(g) \tag{4.3.3.11}
 $$
 
-is in the image of the canonical continuous linear operator $\iota_E : E \to (E')^{\ast}$, i.e. $\Phi_X(u)$ is the evaluation functional on $E'$ on a unique element of $E$. Equivalently, the linear operator $\Phi_X : E \to (E')^{\ast}$ assigned by $u \mapsto \Phi_X(u)$, factors through $\iota_E$.
+*is in the image of the canonical continuous linear operator $\iota_E : E \to (E')^{\ast}$, i.e. $\Phi_X(u)$ is the evaluation functional on $E'$ on a unique element of $E$. Equivalently, the linear operator $\Phi_X : E \to (E')^{\ast}$ assigned by $u \mapsto \Phi_X(u)$, factors through $\iota_E$.*
 
-Its formation is continuous with respect to the intrinsic topology on $E$, i.e. $\Phi_X : E \to E$ is a continuous linear operator.
+*Its formation is continuous with respect to the intrinsic topology on $E$, i.e. $\Phi_X : E \to E$ is a continuous linear operator.*
 
-(2) $\Phi_X$ surjects onto the closed subspace $\mathrm{H}^0(X,E)$ of elements $u$ of $E$ satisfying the equations $\rho_G(g,u) = u$ for all $g \in X$, and $\mu_G(X)^{-1}\Phi_X$ is idempotent.
+(2) *$\Phi_X$ surjects onto the closed subspace $\mathrm{H}^0(X,E)$ of elements $u$ of $E$ satisfying the equations $\rho_G(g,u) = u$ for all $g \in X$, and $\mu_G(X)^{-1}\Phi_X$ is idempotent.*
 
-(3) The $\sigma(E,E')$-closure of the closed subspace $\ker(\Phi_X) \subset E$ is the $\sigma(E,E')$-closure of the $\mathbf{C}$-linear subspace $V_E$ generated by the elements $\{u - \rho_G(g,u),\ u \in E,\ g \in X\}$ as $u$ varies over $E$.
+(3) *The $\sigma(E,E')$-closure of the closed subspace $\ker(\Phi_X) \subset E$ is the $\sigma(E,E')$-closure of the $\mathbf{C}$-linear subspace $V_E$ generated by the elements $\{u - \rho_G(g,u),\ u \in E,\ g \in X\}$ as $u$ varies over $E$.*
 
 Proof. (1) : By Theorem C.4.3.5, applied to $X$, $\mu = \mu_G|_X$ (the restriction of the Radon measure $\mu_G$ to $X$, itself a nonzero Radon measure, since $X$ is relatively compact and its interior is non-empty; see [Bou-I, Ch.III,§2,No.1,INT III.23] for the case $X$ is open, and [Bou-I, Ch IV,§5,No.7,Def.4,INT IV.74] for the general case $X$ is a locally compact subspace of $G$. In particular, if $X$ is locally closed), $f : X \to E$ defined as $f(g) := \rho_G(g,u)$ for each $u \in E$ fixed, we deduce that $f$ is $\mu$-integrable in the sense of Pettis, which implies that $\Phi_X(u)$, a priori only an element of $(E')^{\ast}$, is contained in $\iota_E(E)$. In particular, the assignment $u \mapsto \Phi_X(u)$ is $\iota_E(E)$-valued and linear, and hence it factors through $\iota_E$ as a $\mathbf{C}$-linear operator on $E \to (E')^{\ast}$. We denote by $\Phi_X$ the resulting unique linear operator $\Phi_X : E \to E$ such that its composition with $\iota_E$ is $\Phi_X : E \to (E')^{\ast}$.
 
@@ -1646,11 +1652,11 @@ By [NB, Thm.8.9.2], it follows that the $\sigma(E,E')$-closure of $V_E$ is the $
 
 The following Corollary is in analogy with Corollary 4.3.3.3:
 
-Corollary 4.3.3.8 (Isotypes of the continuous action of a relatively compact subset). Let $G$ be a Hausdorff locally compact abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms.
+Corollary 4.3.3.8 (Isotypes of the continuous action of a relatively compact subset). *Let $G$ be a Hausdorff locally compact abelian group, $E$ a Hausdorff locally convex topological $\mathbf{C}$-vector space equipped with a continuous $\mathbf{C}$-linear action $\rho_G$ of $G$ by linear topological automorphisms.*
 
-Let $X \subset G$ be a relatively compact subset with non-empty interior.
+*Let $X \subset G$ be a relatively compact subset with non-empty interior.*
 
-Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and bornological, and that $\rho_G$ is sequentially continuous uniformly on the compact subsets of $G$.
+*Let $\mu_G$ be a choice of Haar measure on $G$. Assume that $E$ is quasi-complete and bornological, and that $\rho_G$ is sequentially continuous uniformly on the compact subsets of $G$.*
 
 Let $\omega \in \widehat{G}$ be a continuous character.
 
@@ -1661,11 +1667,11 @@ $$
 \Phi_{X,\omega}(u) : \varphi \mapsto \int_X \langle\overline{\omega}(g)\rho_G(g,u),\varphi\rangle_{E,E'}\,\mathrm{d}\mu_G(g) \tag{4.3.3.17}
 $$
 
-defines a linear operator $\Phi_{X,\omega} : E \to (E')^{\ast}$ which factors uniquely through $\iota_E : E \to (E')^{\ast}$, and the resulting unique linear operator $\Phi_{X,\omega} : E \to E$ is continuous.
+*defines a linear operator $\Phi_{X,\omega} : E \to (E')^{\ast}$ which factors uniquely through $\iota_E : E \to (E')^{\ast}$, and the resulting unique linear operator $\Phi_{X,\omega} : E \to E$ is continuous.*
 
-(2) $\Phi_{X,\omega}$ surjects onto the closed subspace $\mathrm{H}^0(\omega|_X,E)$ of those elements $u \in E$ satisfying the equations $\rho_G(g,u) = \omega(g)u$ for all $g \in X$, and $\mu_G(X)^{-1}\Phi_{X,\omega}$ is idempotent.
+(2) *$\Phi_{X,\omega}$ surjects onto the closed subspace $\mathrm{H}^0(\omega|_X,E)$ of those elements $u \in E$ satisfying the equations $\rho_G(g,u) = \omega(g)u$ for all $g \in X$, and $\mu_G(X)^{-1}\Phi_{X,\omega}$ is idempotent.*
 
-(3) The $\sigma(E,E')$-closure of the closed subspace $\ker(\Phi_{X,\omega}) \subset E$ is the $\sigma(E,E')$-closure of the $\mathbf{C}$-linear subspace $V_{E,\omega}$ generated by the elements $\{u - \overline{\omega}(g)\rho_G(g,u),\ g \in X\}$ as $u$ varies over $E$.
+(3) *The $\sigma(E,E')$-closure of the closed subspace $\ker(\Phi_{X,\omega}) \subset E$ is the $\sigma(E,E')$-closure of the $\mathbf{C}$-linear subspace $V_{E,\omega}$ generated by the elements $\{u - \overline{\omega}(g)\rho_G(g,u),\ g \in X\}$ as $u$ varies over $E$.*
 
 Proof. The Corollary follows from the argument from the proof of Corollary 4.3.3.3, resting, in the role of Lemma 4.3.3.1 from therein, on Lemma 4.3.3.7. $\square$
 
@@ -1854,9 +1860,9 @@ $$
 
 This is a discrete subgroup of $\widehat{G}$, isomorphic to the dual group of the compact group $G/\gamma^{\mathbf{Z}}$ (see Lemma D.1.4.6).
 
-Lemma 4.4.2.5 (Orthogonal of a monogenic discrete group). Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Let $\gamma\in G$ be such that $\lvert\gamma\rvert_G>1$.
+Lemma 4.4.2.5 (Orthogonal of a monogenic discrete group). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Let $\gamma\in G$ be such that $\lvert\gamma\rvert_G>1$.
 We choose, for each continuous character $\omega\in\widehat{G^1}$, a continuous character $\chi\in\widehat{G}$ such that $\chi|_{G^1}=\omega$, and denote by $\widetilde{G^1}\subset\widehat{G}$ the set of the chosen representatives of the elements of $\widehat{G^1}$.
-We have, as discrete subsets of $\widehat{G}$:
+We have, as discrete subsets of $\widehat{G}$:*
 
 $$
 (\gamma^{\mathbf{Z}})^\perp=\{\bar\chi\lvert\cdot\rvert_G^{-\frac{2\pi im}{\log\lvert\gamma\rvert_G}+it_0(\chi)},\,\chi\in\widetilde{G^1},\,m\in\mathbf{Z}\} \tag{4.4.2.4}
@@ -1869,35 +1875,35 @@ The subspace topology on $(\gamma^{\mathbf{Z}})^\perp$ is the discrete topology 
 
 We prove the following analog of Lemma 4.2.1.2. It will be our source of absolute Schauder bases on subquotients of $\mathcal{S}_\mathrm{E}(G)$, for $G$ a second-countable $\mathbf{R}_{>0}$-modulated group.
 
-Lemma 4.4.2.6 (Exponential system on $\mathbf{R}_{>0}$-modulated groups). Let $G$ be an $\mathbf{R}_{>0}$-modulated group. We adopt the conditions and choices from Situation 4.4.2.3. In particular, we assume that $G$ is second-countable.
+Lemma 4.4.2.6 (Exponential system on $\mathbf{R}_{>0}$-modulated groups). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. We adopt the conditions and choices from Situation 4.4.2.3. In particular, we assume that $G$ is second-countable.*
 
-(1) Any enumeration of the countable set of smooth functions:
+(1) *Any enumeration of the countable set of smooth functions:*
 
 $$
 \left\{e_{\chi,m}(t,g):=\bar\omega(g)t^{\frac{-2\pi im}{\log(\lvert\gamma\rvert_G)}+it_0(\chi)-ix_0(\chi)}=\bar\chi\lvert\cdot\rvert_G^{-\frac{2\pi im}{\log(\lvert\gamma\rvert_G)}+it_0(\chi)}\right\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}=(\gamma^{\mathbf{Z}})^\perp\subset\widehat{G} \tag{4.4.2.5}
 $$
 
-on $G$, is an absolute Schauder basis for $\mathcal{S}(G/\gamma^{\mathbf{Z}})$.
-Its dual basis is the countable set of continuous functionals $\{a_{\chi,m}(\cdot)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$, where, for any $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$:
+*on $G$, is an absolute Schauder basis for $\mathcal{S}(G/\gamma^{\mathbf{Z}})$.
+Its dual basis is the countable set of continuous functionals $\{a_{\chi,m}(\cdot)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$, where, for any $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$:*
 
 $$
 a_{\chi,m}(\phi):=\frac{1}{\log(\lvert\gamma\rvert_G)\mu_1(G^1)}\int_{G/\gamma^{\mathbf{Z}}}\phi(g)\chi(g)\lvert g\rvert_G^{\frac{2\pi im}{\log(\gamma)}-it_0(\chi)}\,\mathrm{d}\bar\mu_\gamma(g) \tag{4.4.2.6}
 $$
 
-is the $m$th Fourier coefficient functional, and where $\bar\mu_\gamma$ is the unique Haar measure on $G/\gamma$ determined, as per Theorem D.1.2.1, by the choices of $\mu$ on $G$ and the counting measure on $\gamma^{\mathbf{Z}}\subset G$.
-(2) Let $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$ be the arbitrary element.
+*is the $m$th Fourier coefficient functional, and where $\bar\mu_\gamma$ is the unique Haar measure on $G/\gamma$ determined, as per Theorem D.1.2.1, by the choices of $\mu$ on $G$ and the counting measure on $\gamma^{\mathbf{Z}}\subset G$.
+(2) Let $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$ be the arbitrary element.*
 
 ## PDF page 194
 
 **194** · **CHAPTER 4. PERIODIC SCHAUDER BASES ON MODULATED GROUPS**
 
-(a) The countable set $\{a_{\chi,m}(\phi)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ uniquely determines a Schwartz-Bruhat function $v_\phi\in\mathcal{S}((\gamma^{\mathbf{Z}})^\perp)$ such that, for $\xi\in(\gamma^{\mathbf{Z}})^\perp$ the unique character corresponding to the pair $(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}$, we have
+(a) *The countable set $\{a_{\chi,m}(\phi)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ uniquely determines a Schwartz-Bruhat function $v_\phi\in\mathcal{S}((\gamma^{\mathbf{Z}})^\perp)$ such that, for $\xi\in(\gamma^{\mathbf{Z}})^\perp$ the unique character corresponding to the pair $(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}$, we have*
 
 $$
 v_\phi(\xi)=a_{\chi,m}(\phi). \tag{4.4.2.7}
 $$
 
-(b) Let $q$ be any continuous seminorm on $\mathcal{S}(G/\gamma^{\mathbf{Z}})$. Then, for each $\chi\in\widetilde{G^1}$, we have $\{q(e_{\chi,m})\}_{m\in\mathbf{Z}}$ is an element of $\mathcal{O}_M(\mathbf{Z})$, i.e. a complex-valued function $u\colon\mathbf{Z}\to\mathbf{C}$ such that for any Schwartz-Bruhat function $v\in\mathcal{S}(\mathbf{Z})$, we have $uv\in\mathcal{S}(\mathbf{Z})$.
+(b) *Let $q$ be any continuous seminorm on $\mathcal{S}(G/\gamma^{\mathbf{Z}})$. Then, for each $\chi\in\widetilde{G^1}$, we have $\{q(e_{\chi,m})\}_{m\in\mathbf{Z}}$ is an element of $\mathcal{O}_M(\mathbf{Z})$, i.e. a complex-valued function $u\colon\mathbf{Z}\to\mathbf{C}$ such that for any Schwartz-Bruhat function $v\in\mathcal{S}(\mathbf{Z})$, we have $uv\in\mathcal{S}(\mathbf{Z})$.*
 
 Remark 4.4.2.7. We note that the Haar measure on $G/\gamma^{\mathbf{Z}}$ given by $A^{-1}\bar\mu_\gamma$, for $A:=\mu_1(G^1)$, agrees with the unique Haar measure obtained from the canonical measure on the $\mathbf{R}_{>0}$-modulated group $G$, and the volume-1 measure on $G^1$, as per Theorem D.1.2.1. We further refer the reader to Definition D.2.1.1 for the normalization required for a Haar measure on an $\mathbf{R}_{>0}$-modulated group to be the canonical measure. In particular, the Haar measure on $G/\gamma^{\mathbf{Z}}$ obtained as $B^{-1}\bar\mu_\gamma$ for $B:=\log(\lvert\gamma\rvert_G)\mu_1(G^1)$, is the unique volume-1 Haar measure on the compact Hausdorff abelian group $G/\gamma^{\mathbf{Z}}$.
 
@@ -2007,7 +2013,7 @@ converge absolutely (see the discussion preceding [Jar, Part II,Ch.14,§14.2,Pro
 
 **4.5. PERIODIC SCHAUDER BASES IN THE ABSENCE OF MULTIPLICITY** · **197**
 
-It follows that $\{e_{\chi,m},a_{\chi,m}(\cdot))\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ is not only a bi-orthogonal sequence with respect to the duality $\langle\mathcal{S}(G/\gamma^{\mathbf{Z}}),\mathcal{S}(G/\gamma^{\mathbf{Z}})'\rangle$. It is also a topological basis, and hence a Schauder basis by [Jar, Part II,Ch.14,§14.2,Prop.3,p.292], and an absolute Schauder basis, either by the foregoing, which shows that the mode of convergence of the sum in (4.4.2.8), as $j,M\in\mathbf{N}$ tend to grow, is absolute (in the sense of [Jar, Part II,Ch.14,§14.7,(*),p.314]) for every $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$, or by Theorem 4.1.2.6(3), since $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ is nuclear and $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ is a strict inductive limit of a sequence of nuclear Fréchet spaces by Lemma D.1.5.6(2) and second-countability of $G$.
+It follows that $\{e_{\chi,m},a_{\chi,m}(\cdot))\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ is not only a bi-orthogonal sequence with respect to the duality $\langle\mathcal{S}(G/\gamma^{\mathbf{Z}}),\mathcal{S}(G/\gamma^{\mathbf{Z}})'\rangle$. It is also a topological basis, and hence a Schauder basis by [Jar, Part II,Ch.14,§14.2,Prop.3,p.292], and an absolute Schauder basis, either by the foregoing, which shows that the mode of convergence of the sum in (4.4.2.8), as $j,M\in\mathbf{N}$ tend to grow, is absolute (in the sense of [Jar, Part II,Ch.14,§14.7,(\*),p.314]) for every $\phi\in\mathcal{S}(G/\gamma^{\mathbf{Z}})$, or by Theorem 4.1.2.6(3), since $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ is nuclear and $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ is a strict inductive limit of a sequence of nuclear Fréchet spaces by Lemma D.1.5.6(2) and second-countability of $G$.
 By Lemma 4.1.2.4, which applies since $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ is Montel, and hence barrelled and reflexive, by Theorem D.1.5.7(2), the countable set of coefficient functionals $\{a_{\chi,m}(\cdot)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ is a Schauder basis (with respect to any choice of enumeration of the elements of $\widetilde{G^1}$). Since $\mathcal{S}(G/\gamma^{\mathbf{Z}})'_\beta$ is itself nuclear by Theorem D.1.5.7(1), then, with respect to any such enumeration of the countably many elements of $\widetilde{G^1}$, the resulting sequence $\{a_{\chi,m}(\cdot)\}_{(\chi,m)\in\widetilde{G^1}\times\mathbf{Z}}$ is an equicontinuous basis by [Jar, Part II,Ch.14,§14.3,Cor.3,p.296], and hence, by Theorem 4.1.2.6(1), it is an absolute Schauder basis. $\square$
 
 4.5. Periodic Schauder Bases in the absence of multiplicity
@@ -2032,8 +2038,8 @@ This, we will be doing throughout the following subsection, along with establish
 
 4.5.1.1. Monogenic periodization on $\mathbf{R}_{>0}$-modulated groups. In this section, we use the exponential system on $\mathcal{S}_\mathrm{E}(G/\gamma^{\mathbf{Z}})$ to source absolute Schauder bases for the ranges of the periodization operators $\Phi_\gamma$, $\Phi_{\gamma,\chi}$ from Definition 4.4.2.1, for then extending the constructions and results to the case of finitely many elements $\{\gamma_1,\dots,\gamma_N\}\subset G$ such that $\lvert\gamma_k\rvert_G>1$ for $1\le k\le N$, in the next subsection.
 
-Proposition 4.5.1.1 (Sourcing Periodic Schauder Bases - I). Let $G$ be an $\mathbf{R}_{>0}$-modulated group. We adopt the conditions and choices from Situation 4.4.2.3.
-Then:
+Proposition 4.5.1.1 (Sourcing Periodic Schauder Bases - I). *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. We adopt the conditions and choices from Situation 4.4.2.3.
+Then:*
 
 (1) The linear map:
 
@@ -2051,15 +2057,15 @@ $$
 
 **198** · **CHAPTER 4. PERIODIC SCHAUDER BASES ON MODULATED GROUPS**
 
-as a function of $x \in G$, is continuous, surjective, and sends the closed subspace $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G)) \subset \mathcal{S}_{\mathrm{E}}(G)$ of exponentially decaying Schwartz-Bruhat functions on $G$ that are $\chi|_{G^1}$-homogeneous with respect to the left-translation action by $G^1$, onto a closed subspace of $\mathcal{S}(G/\gamma^{\mathbf{Z}})$.
+*as a function of $x \in G$, is continuous, surjective, and sends the closed subspace $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G)) \subset \mathcal{S}_{\mathrm{E}}(G)$ of exponentially decaying Schwartz-Bruhat functions on $G$ that are $\chi|_{G^1}$-homogeneous with respect to the left-translation action by $G^1$, onto a closed subspace of $\mathcal{S}(G/\gamma^{\mathbf{Z}})$.*
 
-(2) $\Phi_{\chi,\gamma}(f)$ is a Schwartz-Bruhat function on the compact Hausdorff abelian group $G/\gamma^{\mathbf{Z}}$.
+(2) *$\Phi_{\chi,\gamma}(f)$ is a Schwartz-Bruhat function on the compact Hausdorff abelian group $G/\gamma^{\mathbf{Z}}$.*
 
-(3) The linear operator $\Phi_{\chi,\gamma}$ from (4.4.2.1) is continuous, relatively open, with closed range.
+(3) *The linear operator $\Phi_{\chi,\gamma}$ from (4.4.2.1) is continuous, relatively open, with closed range.*
 
-(4) $\ker(\Phi_{\chi,\gamma}) \cap \mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$ is the closure in $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$ of the linear subspace generated by the elements $\phi(x)-\phi(\gamma x)$ as functions of $x \in G$ and as $\phi$ varies over all the elements of $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$.
+(4) *$\ker(\Phi_{\chi,\gamma}) \cap \mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$ is the closure in $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$ of the linear subspace generated by the elements $\phi(x)-\phi(\gamma x)$ as functions of $x \in G$ and as $\phi$ varies over all the elements of $\mathrm{H}^0(\chi|_{G^1}, \mathcal{S}_{\mathrm{E}}(G))$.*
 
-(5) $\ker(\Phi_{\gamma})$ is the closure in $\mathcal{S}_{\mathrm{E}}(G)$ of the linear subspace generated by the elements $\phi(x)-\phi(\gamma x)$ as functions of $x \in G$ and as $\phi$ varies over all the elements of $\mathcal{S}_{\mathrm{E}}(G)$.
+(5) *$\ker(\Phi_{\gamma})$ is the closure in $\mathcal{S}_{\mathrm{E}}(G)$ of the linear subspace generated by the elements $\phi(x)-\phi(\gamma x)$ as functions of $x \in G$ and as $\phi$ varies over all the elements of $\mathcal{S}_{\mathrm{E}}(G)$.*
 
 (6) The linear map:
 
@@ -2068,7 +2074,7 @@ $$
 P_{\gamma} : \mathcal{S}_{\mathrm{E}}(G) \to \mathcal{S}_{\mathrm{E}}(G)
 $$
 
-assigned by $P_{\gamma}(\phi)(x) := \phi(x)-\phi(\gamma x)$ has closed range, and its formation commutes with passage to the $G^1$-isotypes for the continuous left-translation acton of $G^1$ on $\mathcal{S}_{\mathrm{E}}(G)$.
+*assigned by $P_{\gamma}(\phi)(x) := \phi(x)-\phi(\gamma x)$ has closed range, and its formation commutes with passage to the $G^1$-isotypes for the continuous left-translation acton of $G^1$ on $\mathcal{S}_{\mathrm{E}}(G)$.*
 
 REMARK 4.5.1.2 (On the non-bornologicity of $\mathcal{S}_I(\mathbf{R}_{>0})\, \widehat{\otimes}_{\pi} \mathcal{S}(G^1)$). Note that $\Phi_{\gamma}$ is itself open. Indeed, $\mathcal{S}_I(G)$ is linearly and topologically isomorphic to $\mathcal{S}_I(\mathbf{R}_{>0}) \overline{\otimes} \mathcal{S}(G^1)$ by Theorem D.3.3.7(3), and hence Köthe's Open Mapping Theorem (see [Gro-f, Ch.4,§5,Thm.2(1),p.148], and [SN, §2,Cor.3,p.8]) applies, being $\mathcal{S}(G/\gamma^{\mathbf{Z}})$ itself a strict LF-space, since $G$ is assumed to be second-countable.
 
@@ -2153,7 +2159,7 @@ $G/k$ is now an elementary $\mathbf{R}_{>0}$-modulated abelian Lie group, with $
 
 ```latex
 \begin{tikzcd}
-\mathcal{S}_{\mathrm{E}}(G/k) \arrow[r] \arrow[d, "\Phi_{\gamma,0}"] & \mathcal{S}_{\mathrm{E}}(G) \arrow[d, "\Phi_{\gamma}"] \\
+\mathcal{S}_{\mathrm{E}}(G/k) \arrow[r] \arrow[d, "\Phi_{\gamma,0}"'] & \mathcal{S}_{\mathrm{E}}(G) \arrow[d, "\Phi_{\gamma}"] \\
 \mathcal{S}(G/(\gamma^{\mathbf{Z}} \cdot k)) \arrow[r] & \mathcal{S}_{\mathrm{E}}(G/\gamma^{\mathbf{Z}})
 \end{tikzcd}
 ```
@@ -2408,7 +2414,13 @@ We note that $\mathcal{S}_K(k, G)$ is contained within the pre-image $\mathcal{S
 
 It is therefore enough to show that $\mathcal{S}_K(k, G)$ is closed as a linear subspace of $\mathcal{S}_{\mathrm{E}}(k, G)$. Since $\mathcal{S}_{\mathrm{E}}(k, G)$ is a Fréchet space by [Jar, Part III,Ch.15,§15.1,Cor.4,p.26], it is sequential, and hence $\mathcal{S}_K(k, G)$ is closed, being sequentially closed within the larger ambient, and since $\mathcal{S}_{\mathrm{E}}(k, G)$ is itself closed within the larger ambient by the foregoing.
 
-(2) : Let $x \in G/\gamma^{\mathbf{Z}}$ be an arbitrary point. The subset $\tau([1, |\gamma|_G)) \cdot G^1 \subset G$ tassellates $G$ under the proper and free action of the discrete subgroup $\gamma^{\mathbf{Z}} \subset G$, since $|\gamma|_G^{\mathbf{Z}} \cdot [1, |\gamma|_G) = \mathbf{R}_{>0}$.
+(2) : Let $x \in G/\gamma^{\mathbf{Z}}$ be an arbitrary point. The subset
+
+$$
+\tau([1, |\gamma|_G)) \cdot G^1 \subset G
+$$
+
+tassellates $G$ under the proper and free action of the discrete subgroup $\gamma^{\mathbf{Z}} \subset G$, since $|\gamma|_G^{\mathbf{Z}} \cdot [1, |\gamma|_G) = \mathbf{R}_{>0}$.
 
 Since $2\log(a) > \log(|\gamma|_G)$, there exists $b' \in \mathbf{R}_{>0}$ such that $b' \cdot [1, |\gamma|_G) \subset [1/a, a]$ (for instance, $b' := 1/a$) and hence $(b/a) \cdot [1, |\gamma|_G) \subset K$.
 
@@ -2611,11 +2623,11 @@ $$
 
 for such $\chi$.
 
-4.6.1.1. Polygenic periodization and absolute bases in the presence of multiplicity.
+*4.6.1.1. Polygenic periodization and absolute bases in the presence of multiplicity.*
 
-LEMMA 4.6.1.3. Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Assume the conditions and choices of Situation 4.6.1.1 are in force.
+LEMMA 4.6.1.3. *Let $G$ be an $\mathbf{R}_{>0}$-modulated group. Assume the conditions and choices of Situation 4.6.1.1 are in force.*
 
-Let $\gamma_1,\dots,\gamma_N\in G$ be such that $\lvert\gamma_k\rvert_G>1$ for all $1\le k\le N$.
+*Let $\gamma_1,\dots,\gamma_N\in G$ be such that $\lvert\gamma_k\rvert_G>1$ for all $1\le k\le N$.*
 
 Let $\chi\in\widetilde{G^1}$ be a continuous character. Let $S_0:=(\gamma_1,\dots,\gamma_{N-1})$.
 
@@ -2627,7 +2639,7 @@ $$
 P_{S_0}:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
 $$
 
-defined as the continuous linear endomorphism assigned by the composition $P_{S_0}:=\prod_{1\le k\le N-1}P_{\gamma_k}$, where $P_{\gamma_k}$ is defined by the assignment:
+*defined as the continuous linear endomorphism assigned by the composition $P_{S_0}:=\prod_{1\le k\le N-1}P_{\gamma_k}$, where $P_{\gamma_k}$ is defined by the assignment:*
 
 (4.6.1.4)
 
@@ -2635,7 +2647,7 @@ $$
 P_{\gamma_k}(\phi)(g):=\phi(x)-\phi(\gamma_k x)
 $$
 
-on any $\phi\in\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$, as functions of $x\in G$, has closed range.
+*on any $\phi\in\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})$, as functions of $x\in G$, has closed range.*
 
 (2) The quotient
 
@@ -2663,7 +2675,7 @@ $$
 Q:\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})\to P_{\gamma_N}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_0\cup\{\gamma_N\}}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
 $$
 
-where both source and target are separable nuclear Fréchet space, compatibly with the continuous left-translation actions of $G$ on source and target.
+*where both source and target are separable nuclear Fréchet space, compatibly with the continuous left-translation actions of $G$ on source and target.*
 
 PROOF. (1) : This is a consequence of Proposition 4.5.1.1(4).
 
@@ -2715,13 +2727,13 @@ $$
 
 which is the operator from (4.6.1.7). $\square$
 
-LEMMA 4.6.1.4. Let $N\ge 1$ be an integer, and $b_1,\dots,b_N\in\mathbf{R}_{>0}$ real numbers. Assume $b_k>1$ for each $1\le k\le N$.
+LEMMA 4.6.1.4. *Let $N\ge 1$ be an integer, and $b_1,\dots,b_N\in\mathbf{R}_{>0}$ real numbers. Assume $b_k>1$ for each $1\le k\le N$.*
 
-The following conditions on the set $\{b_1,\dots,b_N\}$ are equivalent:
+*The following conditions on the set $\{b_1,\dots,b_N\}$ are equivalent:*
 
-(1) There exists $b\in\mathbf{R}_{>0}$ with $b>1$ and $b_k\in\mathbf{Q}\cdot\log(b)$ for all $1\le k\le N$.
+(1) *There exists $b\in\mathbf{R}_{>0}$ with $b>1$ and $b_k\in\mathbf{Q}\cdot\log(b)$ for all $1\le k\le N$.*
 
-(2) The set of nonzero complex numbers:
+(2) *The set of nonzero complex numbers:*
 
 (4.6.1.11)
 
@@ -3120,7 +3132,7 @@ PROOF. The following diagram:
 
 ```latex
 \begin{tikzcd}
-P_{\gamma_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_S\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r] \arrow[d, "P_{\gamma_1}^{-1}"] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_S\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r] \arrow[d, equal] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{\gamma_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[d, equal] \\
+P_{\gamma_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_S\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r] \arrow[d, "P_{\gamma_1}^{-1}"'] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_S\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r] \arrow[d, equal] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{\gamma_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[d, equal] \\
 \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{S_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r, "P_{\gamma_1}"] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_S\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1}) \arrow[r] & \mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})/P_{\gamma_1}\mathcal{S}_{\mathrm{E}}(G)(\chi|_{G^1})
 \end{tikzcd}
 ```

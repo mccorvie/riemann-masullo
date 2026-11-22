@@ -16,6 +16,10 @@ of them ask for one thing: prove a single Lean declaration whose statement is al
    into smaller lemmas that are each left as `sorry`; or you show the statement is **wrong** and
    say so on the issue. The rules are in [`AGENTS.md`](AGENTS.md); the main one is that a proof
    never changes a statement.
+   Several statements of **one file** may go in one pull request, and that is welcome: it
+   means one check instead of many, and no collisions between your own pull requests. Comment
+   `Claiming` on each issue first, so that nobody else proves the same thing, and put one
+   `Closes #<issue>` line per statement in the description.
 5. Open a pull request against `main` with `Closes #<issue>` in the description. CI builds it on
    top of `main` and reports a verdict in the `PR check` run. A finished proof that changes
    nothing else is merged automatically; anything else (a split, a new definition or file,

@@ -467,7 +467,7 @@ $$
 \|\Phi(\sigma+iy)\|_{L^p(\mathbf{R},\mathrm{d}y)}\le\left\{B_{N,a,b}^p+C_{N,a,b}^p\int_{|y|\ge 1/2}\frac{1}{|y|^{pN}}\,\mathrm{d}y\right\}^{1/p}. \tag{B.2.1.5}
 $$
 
-*To prove this, we need the following:*
+To prove this, we need the following:
 
 Lemma B.2.1.6. *Let $\phi\in C^\infty(\mathbf{R}_{>0})$ be a smooth function. For every integer $N\ge 1$, we have:*
 
@@ -833,13 +833,13 @@ We have $M(\phi)(s+n)=M(t^n\phi)(s)$, and since $\phi$ is Schwartz with exponent
 
 B.2.2.1. *Cauchy Integrals.* We introduce a class of holomorphic functions that comprises the Mellin transforms of all Schwartz functions with exponential decay.
 
-Definition B.2.2.1. *Let $a<b$ be real numbers. Let $\Phi:\mathbf{C}_{(a,b)}\to\mathbf{C}$ be a holomorphic function. We say that $\Phi$ is uniformly Schwartz over the vertical strip $\mathbf{C}_{(a,b)}$ if and only if for every $\varepsilon>0$ such that $a+\varepsilon<b-\varepsilon$, and for every integer $N\ge 1$, there exists a real number $C_{N,\varepsilon}>0$ such that for all sufficiently large $|y|$ uniformly over all $a+\varepsilon\le\sigma\le b-\varepsilon$ we have*
+Definition B.2.2.1. Let $a<b$ be real numbers. Let $\Phi:\mathbf{C}_{(a,b)}\to\mathbf{C}$ be a holomorphic function. We say that $\Phi$ is uniformly Schwartz over the vertical strip $\mathbf{C}_{(a,b)}$ if and only if for every $\varepsilon>0$ such that $a+\varepsilon<b-\varepsilon$, and for every integer $N\ge 1$, there exists a real number $C_{N,\varepsilon}>0$ such that for all sufficiently large $|y|$ uniformly over all $a+\varepsilon\le\sigma\le b-\varepsilon$ we have
 
 $$
 |\Phi(\sigma+iy)|\le\frac{C_{N,\varepsilon}}{|y|^N} \tag{B.2.2.1}
 $$
 
-*(so in particular $\Phi$ is bounded on each $\mathbf{C}_{(a+\varepsilon,b-\varepsilon)}$).*
+(so in particular $\Phi$ is bounded on each $\mathbf{C}_{(a+\varepsilon,b-\varepsilon)}$).
 
 *If $\Phi$ is entire, we say it is Schwartz on vertical strips if and only if for every bounded open interval $(a,b)\subset\mathbf{R}$ it is uniformly Schwartz over the vertical strip $\mathbf{C}_{(a,b)}$. If $\Phi:\mathbf{C}_{<b}\to\mathbf{C}$ is holomorphic, we say it is Schwartz on the half-plane $\mathbf{C}_{<b}$ if and only if for every $\varepsilon>0$ and for every integer $N\ge 1$, $\Phi(\sigma+iy)$ satisfies condition (B.2.2.1) for all large enough $|y|$ uniformly over all $\sigma\le b-\varepsilon$.*
 
@@ -1565,7 +1565,13 @@ $$
 \delta_{\chi}(\Phi(0)+\Phi(1))-\sum_{\rho:L(\rho,\chi)=0}\Phi(\rho)=\lim_{T\to+\infty}\sum_{\rho:|\operatorname{Im}(\rho)|<T}\Phi(\rho)n_{\rho}
 $$
 
-where the right side has terms indexed by the poles of $L'(s,\chi)/L(s,\chi)$ (counted *without* multiplicity) contained within $\mathbf C_{(1-a,a)}$ and $n_{\rho}:=\operatorname{ord}_{\rho}(L(s,\chi))$ the residue at $\rho$, and the left side having terms indexed by the zeros of $L(s,\chi)$ (counted *with* multiplicity) and being shorthand notation for the limit: $\lim_{T\to+\infty}\sum_{\rho:L(\rho,\chi)=0,|\operatorname{Im}(\rho)|<T}\Phi(\rho)$.
+where the right side has terms indexed by the poles of $L'(s,\chi)/L(s,\chi)$ (counted *without* multiplicity) contained within $\mathbf C_{(1-a,a)}$ and $n_{\rho}:=\operatorname{ord}_{\rho}(L(s,\chi))$ the residue at $\rho$, and the left side having terms indexed by the zeros of $L(s,\chi)$ (counted *with* multiplicity) and being shorthand notation for the limit:
+
+$$
+\lim_{T\to+\infty}\sum_{\rho:L(\rho,\chi)=0,|\operatorname{Im}(\rho)|<T}\Phi(\rho).
+$$
+
+
 
 The Asymptotic Residue Formula says
 
@@ -1767,7 +1773,7 @@ $$
 
 **618** · **CHAPTER B. PREPARATIONS FROM ANALYTIC NUMBER THEORY**
 
-where $\mu_v$ is the local multiplicative Tamagawa measure on $F_v^\times$ from Definition A.3.2.2.
+*where $\mu_v$ is the local multiplicative Tamagawa measure on $F_v^\times$ from Definition A.3.2.2.*
 
 *The function $J_v \in \mathcal{S}(F_v)$ is unique for the properties of vanishing at 1 and satisfying (B.4.3.5).*
 
@@ -1871,17 +1877,17 @@ For the above calculations, we refer the reader to the proof of [Co, Appendix II
 
 B.4.4. Idelic Explicit Formulas. Let $F$ be a number field. We conclude this section by rephrasing the Explicit Formulas as an identity between continuous linear functionals on $\mathcal{D}(C_F) = C_c^\infty(C_F)$.
 
-B.4.4.1. Weil's Principal Values from the Explicit Formulas via additive local Fourier transform.
+*B.4.4.1. Weil's Principal Values from the Explicit Formulas via additive local Fourier transform.*
 
 DEFINITION B.4.4.1 (Connes-Weil Principal Values). *Let $F$ be a number field. For every place $v$ of $F$, we define, relative to the standard additive character $\alpha_{v,0}$ of $F_v$:$^{18}$*
 
-*(1) The continuous$^{19}$ functional on $\mathcal{S}(F_v)$ assigned by:$^{20}$*
+(1) The continuous$^{19}$ functional on $\mathcal{S}(F_v)$ assigned by:$^{20}$
 
 $$
 \tag{B.4.4.1} \mathrm{C}_{\alpha_{v,0}}\int_{F_v^\times} f(g)\,\mathrm{d}\mu_v(g) := \begin{cases} -\langle\widehat{J_v},f\rangle_{\mathcal{S}(F_v),\mathcal{S}(F_v)'}, & v\mid\infty, \\ -\mu_v(\mathcal{O}_{F_v}^\times)\langle\widehat{J_v},f\rangle_{\mathcal{S}(F_v),\mathcal{S}(F_v)'}, & v\nmid\infty \end{cases}
 $$
 
-*for all $f \in \mathcal{S}(F_v)$, where the notation $\langle\widehat{J_v},\cdot\rangle_{\mathcal{S}(F_v),\mathcal{S}(F_v)'}$ means $\int_{F_v} J_v\widehat{f}\,\mathrm{d}\nu_v$ by definition, where $\nu_v$ is the self-dual measure on $F_v$ with respect to $\alpha_{v,0}$ and the Fourier transform $\widehat{f}$ also rests on $\nu_v$.$^{21}$ We refer to $\mathrm{C}_{\alpha_{v,0}}\int_{F_v^\times}(\cdot)\,\mathrm{d}\mu_v$ as Connes' Principal Value relative to $\alpha_{v,0}$, for $\int_{F_v^\times}(\cdot)\,\mathrm{d}\mu_v$.*
+for all $f \in \mathcal{S}(F_v)$, where the notation $\langle\widehat{J_v},\cdot\rangle_{\mathcal{S}(F_v),\mathcal{S}(F_v)'}$ means $\int_{F_v} J_v\widehat{f}\,\mathrm{d}\nu_v$ by definition, where $\nu_v$ is the self-dual measure on $F_v$ with respect to $\alpha_{v,0}$ and the Fourier transform $\widehat{f}$ also rests on $\nu_v$.$^{21}$ We refer to $\mathrm{C}_{\alpha_{v,0}}\int_{F_v^\times}(\cdot)\,\mathrm{d}\mu_v$ as Connes' Principal Value relative to $\alpha_{v,0}$, for $\int_{F_v^\times}(\cdot)\,\mathrm{d}\mu_v$.
 
 $^{16}$Brian needs to recheck the proof, both for factors of 2 and $2\pi$ in the integrals and for the coefficient of $f(0)$ in both parts
 
@@ -2341,23 +2347,23 @@ $$
 
 since $[0,1)^N$ is a fundamental domain for the continuous action by left-translations of the closed discrete subgroup $\mathbf{Z}^N\subset\mathbf{R}^N$.
 
-THEOREM B.5.2.1 (Kronecker-Weyl). Let $\tau:=(\tau_1,\dots,\tau_N)\in\mathbf{R}^N$ be a vector. Let $0\le d\le N$ be the dimension of the $\mathbf{Q}$-linear subspace generated within $\mathbf{R}$ by the coordinates of $\tau$.
+THEOREM B.5.2.1 (Kronecker-Weyl). *Let $\tau:=(\tau_1,\dots,\tau_N)\in\mathbf{R}^N$ be a vector. Let $0\le d\le N$ be the dimension of the $\mathbf{Q}$-linear subspace generated within $\mathbf{R}$ by the coordinates of $\tau$.*
 
 Then
 
-(1) $\tau$ generates a continuous 1-parameter group $\overline{\gamma}_\tau:\mathbf{R}\to\mathbf{T}^N$ whose image has closure a $d$-dimensional closed torus $G$ within $\mathbf{T}^N$.
+(1) *$\tau$ generates a continuous 1-parameter group $\overline{\gamma}_\tau:\mathbf{R}\to\mathbf{T}^N$ whose image has closure a $d$-dimensional closed torus $G$ within $\mathbf{T}^N$.*
 
-(2) For every Riemann integrable function $u:G\to\mathbf{C}$, the following identity holds
+(2) *For every Riemann integrable function $u:G\to\mathbf{C}$, the following identity holds*
 
 $$
 \lim_{T\to+\infty}\frac{1}{2T}\int_{-T}^T u(\overline{\gamma}(t))\,\mathrm{d}t=\lim_{T\to+\infty}\frac{1}{T}\int_0^T u(\overline{\gamma}(t))\,\mathrm{d}t=\int_G u(\xi)\,\mathrm{d}\mu_G(\xi) \tag{B.5.2.1}
 $$
 
-where $\mu_G$ is the volume-1 Haar measure on $G$.
+*where $\mu_G$ is the volume-1 Haar measure on $G$.*
 
 We will use the following:
 
-LEMMA B.5.2.2. Let $X$ be a compact Hausdorff space, $\mu$ a regular Borel measure on $X$, and $U\subset X$ an open subset such that $\mu(\partial U)=0$. For every $\varepsilon>0$, there exist continuous functions $u_1,u_2:X\to[0,1]$ such that:
+LEMMA B.5.2.2. *Let $X$ be a compact Hausdorff space, $\mu$ a regular Borel measure on $X$, and $U\subset X$ an open subset such that $\mu(\partial U)=0$. For every $\varepsilon>0$, there exist continuous functions $u_1,u_2:X\to[0,1]$ such that:*
 
 $$
 u_1(x)\le\mathrm{1}_U(x)\le u_2(x) \tag{B.5.2.2}
@@ -2571,9 +2577,9 @@ by the Poisson summation formula (see Theorem D.1.2.7(3)). The case of $(1/T)\in
 
 $\square$
 
-COROLLARY B.5.2.4 (Uniform distribution). Pick $\tau=(\tau_1,\dots,\tau_N)\subset\mathbf{R}^N$. Let $\gamma_\tau:\mathbf{R}\to\mathbf{T}^N$ be the continuous 1-parameter group generated by $\tau$. Let $G$ be the closure of the image of $\gamma_\tau$ in $\mathbf{T}^N$, and $\mu_G$ the volume-1 Haar measure on $G$.
+COROLLARY B.5.2.4 (Uniform distribution). *Pick $\tau=(\tau_1,\dots,\tau_N)\subset\mathbf{R}^N$. Let $\gamma_\tau:\mathbf{R}\to\mathbf{T}^N$ be the continuous 1-parameter group generated by $\tau$. Let $G$ be the closure of the image of $\gamma_\tau$ in $\mathbf{T}^N$, and $\mu_G$ the volume-1 Haar measure on $G$.*
 
-For every open subset $U\subset[0,1)^N$, upon denoting by $\hat U$ the image of $U$ in $\mathbf{T}^N$ under the quotient map $\theta$, if $\mu_G(\partial(\hat U\cap G))=0$ then we have:
+*For every open subset $U\subset[0,1)^N$, upon denoting by $\hat U$ the image of $U$ in $\mathbf{T}^N$ under the quotient map $\theta$, if $\mu_G(\partial(\hat U\cap G))=0$ then we have:*
 
 $$
 \lim_{T\to+\infty}\frac{\lambda([-T,T]_U)}{2T}=\lim_{T\to+\infty}\frac{\lambda([0,T]_U)}{T}=\mu_G(\hat U\cap G). \tag{B.5.2.15}
@@ -2627,9 +2633,9 @@ We recall that the notion of (strong) "recurrence" for a holomorphic function on
 
 B.5.3.2. Strong recurrence of reciprocal partial Euler products on open strips containing $i\mathbf{R}$. The main result of this section is the following:
 
-PROPOSITION B.5.3.2. Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We write $S_f:=S\cap\Sigma_{F,f}$. For each $v\in S_f$, we denote by $\pi_v$ a choice of uniformizer at $v$. Let $\chi\in\widehat{C_F}$ be a continuous character unramified at the finite places of $F$ contained in $S$.
+PROPOSITION B.5.3.2. *Let $F$ be a number field, $S$ a finite set of places of $F$ containing all the Archimedean places. We write $S_f:=S\cap\Sigma_{F,f}$. For each $v\in S_f$, we denote by $\pi_v$ a choice of uniformizer at $v$. Let $\chi\in\widehat{C_F}$ be a continuous character unramified at the finite places of $F$ contained in $S$.*
 
-There exists a real number $N_S>0$ and a sequence $\{T_k\}_{k\in\mathbf{Z}}\subset\mathbf{R}$, such that:
+*There exists a real number $N_S>0$ and a sequence $\{T_k\}_{k\in\mathbf{Z}}\subset\mathbf{R}$, such that:*
 
 (1) $T_k\ge 0$ if $k\ge 0$, $T_k\le 0$ if $k\le 0$, and $T_k\le T_{k+1}|$ for every $k\in\mathbf{Z}$.
 
@@ -2651,7 +2657,7 @@ PROPOSITION B.5.3.3 (Strong recurrence of reciprocal partial Euler products). Le
 
 **B.5. RECURRENCE AND EQUIDISTRIBUTION** · **633**
 
-Let $I\subset\mathbf{R}$ be an open non-empty bounded interval containing $0\in\mathbf{R}$. Let $K\subset \mathbf{C}_I$ be an arbitrary compact subset with non-empty interior. Then for any real number $\varepsilon>0$, the subsets:
+*Let $I\subset\mathbf{R}$ be an open non-empty bounded interval containing $0\in\mathbf{R}$. Let $K\subset \mathbf{C}_I$ be an arbitrary compact subset with non-empty interior. Then for any real number $\varepsilon>0$, the subsets:*
 
 $$
 \left\{t\in[0,+\infty):\sup_{s\in K}\left|\prod_{v\in S}L_v(\chi_v|\cdot|_v^{s+it})^{-1}-\prod_{v\in S}L_v(\chi_v|\cdot|_v^s)^{-1}\right|<\varepsilon\right\}\subset\mathbf{R} \tag{B.5.3.4}
@@ -2667,15 +2673,21 @@ both have positive upper-density.
 
 B.5.3.3. Preparations on recurrence. We begin with a few permanence properties of strong recurrence for holomorphic functions on non-empty open vertical strips of bounded width.$^{28}$
 
-LEMMA B.5.3.4. Let $I\subset\mathbf{R}$ be an open non-empty bounded interval, and $f:\mathbf{C}_I\to\mathbf{C}$ a holomorphic function.
+LEMMA B.5.3.4. *Let $I\subset\mathbf{R}$ be an open non-empty bounded interval, and $f:\mathbf{C}_I\to\mathbf{C}$ a holomorphic function.*
 
-(1) If $f$ is strongly recurrent on the compact subset $K\subset \mathbf{C}_I$ then it is strongly recurrent on any compact subset $K'\subset K$.
+(1) *If $f$ is strongly recurrent on the compact subset $K\subset \mathbf{C}_I$ then it is strongly recurrent on any compact subset $K'\subset K$.*
 
-(2) If $f$ is strongly recurrent on any closed disc contained within $\mathbf{C}_I$ then it is strongly recurrent on any compact subset contained within $\mathbf{C}_I$.
+(2) *If $f$ is strongly recurrent on any closed disc contained within $\mathbf{C}_I$ then it is strongly recurrent on any compact subset contained within $\mathbf{C}_I$.*
 
 PROOF. We prove (1). If, for every $\varepsilon>0$, the set $X_K(\varepsilon)\subset\mathbf{R}$ has positive upper-density, then so does $X_{K'}(\varepsilon)$, since $X_K(\varepsilon)\subset X_{K'}(\varepsilon)$. This proves (1).
 
-Let $K\subset \mathbf{C}_I$ be an arbitrary compact subset. There exists $c_0>0$ such that $r_0:=\inf\{\sigma\in I:\sigma=\mathrm{Re}(s),\,s\in K\}>\inf I+c_0$.
+Let $K\subset \mathbf{C}_I$ be an arbitrary compact subset. There exists $c_0>0$ such that
+
+$$
+r_0:=\inf\{\sigma\in I:\sigma=\mathrm{Re}(s),\,s\in K\}>\inf I+c_0.
+$$
+
+
 
 We call $r_1:=\sup\{\sigma\in I:\sigma=\mathrm{Re}(s),\,s\in K\}$, and $r:=r_1-r_0$. Then $K$ is contained within a closed disc $D$ of radius $r$ centered at some $s\in \mathbf{C}_I$. By assumption, $f$ is strongly recurrent on $D$, and hence, by (2), so it is on $K$.
 
@@ -2687,11 +2699,11 @@ Sub-harmonicity of $|f|^2$ as a real valued function and on any domain of holomo
 
 We denote by $\mu_A$ the Radon measure associated to the area form $\mathrm{d}s\wedge \mathrm{d}\bar s$ on the complex $s$-plane.
 
-LEMMA B.5.3.5. Let $I\subset\mathbf{R}$ be a non-empty open bounded interval, and $f:\mathbf{C}_I\to\mathbf{C}$ a holomorphic function. Let $K\subset \mathbf{C}_I$ be a non-empty compact subset, and $U\subset \mathbf{C}_I$ an open subset, such that:
+LEMMA B.5.3.5. *Let $I\subset\mathbf{R}$ be a non-empty open bounded interval, and $f:\mathbf{C}_I\to\mathbf{C}$ a holomorphic function. Let $K\subset \mathbf{C}_I$ be a non-empty compact subset, and $U\subset \mathbf{C}_I$ an open subset, such that:*
 
-(1) The closure of $U$ is compact and contained within $\mathbf{C}_I$.
+(1) *The closure of $U$ is compact and contained within $\mathbf{C}_I$.*
 
-(2) $K\subset U$ and the distance $\delta$ between $K$ and the complement of $U$ is positive.
+(2) *$K\subset U$ and the distance $\delta$ between $K$ and the complement of $U$ is positive.*
 
 Fix $T>0$. Upon defining the subsets
 
@@ -2703,7 +2715,7 @@ $$
 A_K(X,T):=\{t\in[-T,T]:\sup_{s\in K}|f(s+it)-f(s)|<X\}\subset\mathbf{R} \tag{B.5.3.7}
 $$
 
-for $X>0$, and the function $c(X):=\pi\delta^2 X^2$, for $X>0$, we have
+*for $X>0$, and the function $c(X):=\pi\delta^2 X^2$, for $X>0$, we have*
 
 $$
 A_{\overline{U},2}(c(X),T)\subset A_K(X,T) \tag{B.5.3.8}
@@ -2753,7 +2765,7 @@ $$
 
 for $q_v:=N(\mathfrak{p}_v)$, with $\mathfrak{p}_v\subset\mathcal{O}_F$ the prime ideal corresponding to the finite place $v$ of $F$.
 
-Since $\chi$ is unramified at $v\in S$, we have $L_v(\chi_v|\cdot|_v^s)^{-1}=1-\chi_v(\pi_v)q_v^{-s}|\cdot|$. Thus, the function $u:\mathbf{C}\times\mathbf{T}^S\to\mathbf{C}$ is continuous and its holomorphic derivatives of arbitrary order with respect to $s$, formed pointwise over $\mathbf{C}\times\mathbf{T}^S$, are also continuous over $\mathbf{C}\times\mathbf{T}^S$.
+Since $\chi$ is unramified at $v\in S$, we have $L_v(\chi_v|\cdot|_v^s)^{-1}=1-\chi_v(\pi_v)q_v^{-s}|$. Thus, the function $u:\mathbf{C}\times\mathbf{T}^S\to\mathbf{C}$ is continuous and its holomorphic derivatives of arbitrary order with respect to $s$, formed pointwise over $\mathbf{C}\times\mathbf{T}^S$, are also continuous over $\mathbf{C}\times\mathbf{T}^S$.
 
 Let $K\subset \mathbf{C}_I$ be a compact subset with non-empty interior. We define, for every real number $\varepsilon>0$:
 
@@ -2885,7 +2897,13 @@ $$
 
 We have $a_{mn}=a_ma_n$ for coprime integers $m,n\ge 1$ because any ideal $I\subset\mathcal O_F$ satisfying $N(I)=mn$ can be uniquely written as $I=JK$ for ideals $J,K\subset\mathcal O_F$ with $N(J)=m$ and $N(K)=n$.
 
-The $m$th Dirichlet series coefficient $a_m$ of $L_f(\chi,s)$ satisfies $|a_m|\le\#\{I\subset\mathcal O_F:N(I)=m\}\le\tau(m)^{[F:\mathbf Q]}$ where $\tau(m):=\#\{d\mid m\}$, so $a_m=O_{F,\varepsilon}(m^\varepsilon)$ for all $\varepsilon>0$. By similar reasoning, for every $\varepsilon>0$ we have
+The $m$th Dirichlet series coefficient $a_m$ of $L_f(\chi,s)$ satisfies
+
+$$
+|a_m|\le\#\{I\subset\mathcal O_F:N(I)=m\}\le\tau(m)^{[F:\mathbf Q]}
+$$
+
+where $\tau(m):=\#\{d\mid m\}$, so $a_m=O_{F,\varepsilon}(m^\varepsilon)$ for all $\varepsilon>0$. By similar reasoning, for every $\varepsilon>0$ we have
 
 $$
 S_{F,\chi}(x)\ll_\varepsilon x^{1+\varepsilon}. \tag{B.6.1.6}
@@ -2977,7 +2995,13 @@ $$
 
 for some $A=A_F>0$ since $-\zeta'_F(s)/\zeta_F(s)=1/(s-1)+O(1)$ as $s\to 1$. By condition (3) on $\eta$, $A/\alpha\eta(t)=O(\log(t))$.
 
-Since $L_f(s,\chi)$ is holomorphic and nonzero over the domain $\Omega:=\{s=\sigma+it\in\mathbf C:\sigma>1-\eta(t),\,t>0\}$ and $\Omega$ is simply connected, the Dirichlet series
+Since $L_f(s,\chi)$ is holomorphic and nonzero over the domain
+
+$$
+\Omega:=\{s=\sigma+it\in\mathbf C:\sigma>1-\eta(t),\,t>0\}
+$$
+
+and $\Omega$ is simply connected, the Dirichlet series
 
 $$
 Z_{F,\chi}(s):=\sum_{\mathfrak p,m}\frac{\chi(\mathfrak p)^m}{mN(\mathfrak p)^{ms}} \tag{B.6.1.16}
@@ -3037,7 +3061,13 @@ $$
 
 *as $|t|\to+\infty$, where the implied constant depends only on $F$ and $\chi$.*
 
-*Proof.* Choose $A$ small enough so that $\eta(t):=\frac{A}{[F:\mathbf Q]^4\log(A_{F,\chi}(|t|+3))}$ satisfies $\eta(\mathbf R_{\ge 0})\subset(0,1/2]$. By Proposition B.6.1.1 and Theorem B.6.1.3, $L'_f(s,\chi)/L_f(s,\chi)=O((\log(t))^2)$ uniformly in the region $\sigma\ge 1-\alpha\eta(|t|)$ for some $\alpha\in(0,1)$, the implied constant depending on $\alpha$. In particular, (B.6.1.21) holds. $\square$
+*Proof.* Choose $A$ small enough so that
+
+$$
+\eta(t):=\frac{A}{[F:\mathbf Q]^4\log(A_{F,\chi}(|t|+3))}
+$$
+
+satisfies $\eta(\mathbf R_{\ge 0})\subset(0,1/2]$. By Proposition B.6.1.1 and Theorem B.6.1.3, $L'_f(s,\chi)/L_f(s,\chi)=O((\log(t))^2)$ uniformly in the region $\sigma\ge 1-\alpha\eta(|t|)$ for some $\alpha\in(0,1)$, the implied constant depending on $\alpha$. In particular, (B.6.1.21) holds. $\square$
 
 ## PDF page 640
 
@@ -3273,7 +3303,7 @@ $$
 
 *is absolutely convergent over $\mathbf{C}_{>1}$. Assume:*
 
-(1) $a_n=O(\psi(n))$ as $n\to+\infty$, where $\psi:\mathbf{N}\to\mathbf{R}_{>0}$ is a non-decreasing function,
+(1) *$a_n=O(\psi(n))$ as $n\to+\infty$, where $\psi:\mathbf{N}\to\mathbf{R}_{>0}$ is a non-decreasing function,*
 
 (2) *there exists $\alpha>0$ such that*
 
@@ -3703,7 +3733,7 @@ where the left side is defined in Remark B.7.2.2. Upon renaming $-f_{M-1}(s)/\lo
 
 (2) : The same method as in the proof of (1) gives (B.7.2.3) upon applying Theorem B.7.1.2(2) in place of Theorem B.7.1.2(1), and upon renaming $-f_{M-1}(s)/\log(M-1)-F_x(s)$ as $F_x(s)$. $\square$
 
-B.7.2.2. Uniform convergence away from the singularity.
+*B.7.2.2. Uniform convergence away from the singularity.*
 
 Corollary B.7.2.3 (Uniform convergence away from the singularity - I). *Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. Let $S_{\chi}$ be the finite set of finite places at which $\chi$ is ramified. As $x\to\infty$, the functions*
 
@@ -3809,7 +3839,7 @@ as functions over $1+i(\mathbf{R}-\{t_0\})$ when $\chi=|\cdot|^{-it_0}_F$ and ov
 
 The identity in (B.7.2.23) holds over the half-plane $\mathbf{C}_{>1}$ of absolute convergence of the Dirichlet series in the right side of (B.7.2.23), and by Theorem B.7.2.1 the right side converges as a Dirichlet series on $\sigma=1$ (away from $1+it_0$ in part (1)). Thus, by Abel's Theorem for Dirichlet series and continuity of the left side of (B.7.2.23) on $\sigma\ge 1$ we see (B.7.2.23) holds pointwise on the region $\sigma\ge 1$. $\square$
 
-B.7.2.4. Convergence of partial Euler products on the 1-line away from the singularity.
+*B.7.2.4. Convergence of partial Euler products on the 1-line away from the singularity.*
 
 Corollary B.7.2.5 (Convergence of partial Euler products on the 1-line). *Let $F$ be a number field, $\chi\in\widehat{C_F}$ a continuous character. Let $S_{\chi}$ be the finite set of finite places at which $\chi$ is ramified.*
 

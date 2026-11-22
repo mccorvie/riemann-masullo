@@ -1672,6 +1672,280 @@ theorem elementary_schwartzBruhat_average (e : ElementaryLCAPresentation G)
 
 end CompactAveraging
 
+section FibreIntegral
+
+omit hTop hT2 hLC in
+/-- Paper: Definition D.1.3.1, p. 750. An elementary Schwartz function is continuous
+on the elementary group. Its lifts along the covering map are smooth on each discrete
+fibre, and the covering map is open. -/
+theorem elementarySchwartz_continuous {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F] (f : ElementarySchwartz m n r F) :
+    Continuous (f : ElementaryLieGroup m n r F → ℂ) := by
+  have hf := (show elementarySchwartzSubmodule m n r F from f).property.1
+  let π : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) →
+      EuclideanSpace ℝ (Fin m) × (Fin n → AddCircle (1 : ℝ)) :=
+    fun xt ↦ (xt.1, fun i ↦ (xt.2 i : AddCircle (1 : ℝ)))
+  have hπ : IsOpenQuotientMap π := by
+    have h1 : IsOpenQuotientMap
+        (Pi.map fun _ : Fin n ↦ (QuotientAddGroup.mk : ℝ → AddCircle (1 : ℝ))) :=
+      IsOpenQuotientMap.piMap fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk
+    let e := (EuclideanSpace.equiv (Fin n) ℝ).toHomeomorph
+    have h2 : IsOpenQuotientMap e := ⟨e.surjective, e.continuous, e.isOpenMap⟩
+    exact IsOpenQuotientMap.id.prodMap (h1.comp h2)
+  have hfib : ∀ a b, Continuous
+      (fun p : EuclideanSpace ℝ (Fin m) × (Fin n → AddCircle (1 : ℝ)) ↦ f (p.1, p.2, a, b)) :=
+    fun a b ↦ by
+      rw [← hπ.continuous_comp_iff]
+      exact (hf a b).continuous
+  rw [continuous_iff_continuousAt]
+  rintro ⟨x, z, a, b⟩
+  have hopen : IsOpen {p : ElementaryLieGroup m n r F | p.2.2 = (a, b)} :=
+    (isOpen_discrete {(a, b)}).preimage (continuous_snd.comp continuous_snd)
+  have heq : (f : ElementaryLieGroup m n r F → ℂ) =ᶠ[𝓝 (x, z, a, b)]
+      fun p ↦ f (p.1, p.2.1, a, b) := by
+    filter_upwards [hopen.mem_nhds rfl] with p hp
+    obtain ⟨p1, p2, p3, p4⟩ := p
+    simp only [Prod.mk.injEq] at hp
+    obtain ⟨rfl, rfl⟩ := hp
+    rfl
+  exact ((hfib a b).comp
+    (continuous_fst.prodMk (continuous_fst.comp continuous_snd))).continuousAt.congr heq.symm
+
+omit hTop hT2 hLC in
+/-- Paper: Definition D.1.5.1(1), p. 760. A good subgroup is compact. It is the
+annihilator of its open annihilator (Lemma D.1.4.6(1)), and by duality the annihilator
+of an open subgroup of the dual is compact (Lemma D.1.4.6(4)). -/
+theorem IsBruhatGoodSubgroup.isCompact [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] {k : Subgroup G} (hk : IsBruhatGoodSubgroup k) :
+    IsCompact (k : Set G) := by
+  obtain ⟨hkc, hko, -⟩ := hk
+  have hJ := isCompact_lcaAnnihilator (G := PontryaginDual G) (lcaAnnihilator k) hko
+  have hpre : (k : Set G) = pontryaginDual_eval ⁻¹'
+      (lcaAnnihilator (lcaAnnihilator k) : Set (PontryaginDual (PontryaginDual G))) := by
+    conv_lhs => rw [← lcaDualAnnihilator_annihilator k hkc]
+    ext x
+    simp only [SetLike.mem_coe, Set.mem_preimage, mem_lcaDualAnnihilator_iff,
+      mem_lcaAnnihilator_iff]
+    rfl
+  rw [hpre]
+  exact isClosedEmbedding_pontryaginDual_eval.isCompact_preimage hJ
+
+omit hTop hT2 hLC in
+/-- Compact generation passes to the target of a continuous, open and surjective
+homomorphism. -/
+theorem isCompactlyGeneratedGroup_of_surjective {X : Type*} [CommGroup X] [TopologicalSpace X]
+    (f : X →* G) (hf : Continuous f) (hfo : IsOpenMap f) (hs : Function.Surjective f)
+    (h : IsCompactlyGeneratedGroup X) : IsCompactlyGeneratedGroup G := by
+  obtain ⟨U, hU, hUc, hGen⟩ := h
+  refine ⟨f '' U, ?_, hUc.image hf, ?_⟩
+  · have := hfo.image_mem_nhds hU
+    rwa [map_one] at this
+  · rw [← MonoidHom.map_closure, hGen, Subgroup.map_top_of_surjective f hs]
+
+/-- Paper: Theorem D.1.7.1, p. 776. The images of the two subgroups of a structural
+pair in the quotient by a closed subgroup form a structural pair of the quotient.
+The image of the good subgroup is compact, and its annihilator is a closed subgroup
+of the compactly generated annihilator of the good subgroup. -/
+theorem BruhatStructuralPair.exists_quotient (hK : IsClosed (K : Set G))
+    (a : BruhatStructuralPair G) :
+    ∃ b : BruhatStructuralPair (G ⧸ K),
+      b.val.1 = a.val.1.map (QuotientGroup.mk' K) ∧
+        OrderDual.ofDual b.val.2 = (OrderDual.ofDual a.val.2).map (QuotientGroup.mk' K) := by
+  obtain ⟨hHo, hHcg, hCgood, hCH⟩ := a.property
+  have : IsClosed (K : Set G) := hK
+  have hCc := hCgood.isCompact
+  let q := QuotientGroup.mk' K
+  have hqo : IsOpenMap q := QuotientGroup.isOpenMap_coe
+  have hqc : Continuous q := QuotientGroup.continuous_mk
+  refine ⟨⟨(a.val.1.map q, OrderDual.toDual ((OrderDual.ofDual a.val.2).map q)),
+    ?_, ?_, ?_, ?_⟩, rfl, rfl⟩
+  · change IsOpen ((a.val.1.map q : Subgroup (G ⧸ K)) : Set (G ⧸ K))
+    rw [Subgroup.coe_map]
+    exact hqo _ hHo
+  · -- The open subgroup of the quotient is compactly generated.
+    let f := q.subgroupMap a.val.1
+    have hfc : Continuous f := (hqc.comp continuous_subtype_val).subtype_mk _
+    have hfo : IsOpenMap f := by
+      intro O hO
+      have hO' : IsOpen (q '' (Subtype.val '' O)) := hqo _ (hHo.isOpenMap_subtype_val _ hO)
+      convert hO'.preimage continuous_subtype_val using 1
+      ext y
+      constructor
+      · rintro ⟨o, ho, rfl⟩
+        exact ⟨o.val, ⟨o, ho, rfl⟩, rfl⟩
+      · rintro ⟨_, ⟨o, ho, rfl⟩, hy⟩
+        exact ⟨o, ho, Subtype.ext hy⟩
+    exact isCompactlyGeneratedGroup_of_surjective f hfc hfo
+      (q.subgroupMap_surjective a.val.1) hHcg
+  · -- The image of the good subgroup is good.
+    have hCq : IsCompact (((OrderDual.ofDual a.val.2).map q : Subgroup (G ⧸ K)) : Set (G ⧸ K)) := by
+      rw [Subgroup.coe_map]
+      exact hCc.image hqc
+    refine ⟨hCq.isClosed, isOpen_lcaAnnihilator _ hCq, ?_⟩
+    obtain ⟨ε, hε⟩ := lcaQuotientDual_equiv_annihilator K hK
+    set C := OrderDual.ofDual a.val.2
+    obtain ⟨-, hCo, hCcg⟩ := hCgood
+    have : LocallyCompactSpace (lcaAnnihilator C) :=
+      hCo.isOpenEmbedding_subtypeVal.locallyCompactSpace
+    let M : Subgroup (lcaAnnihilator C) := (lcaAnnihilator K).comap (lcaAnnihilator C).subtype
+    have hKc : IsClosed (lcaAnnihilator K : Set (PontryaginDual G)) := by
+      have : (lcaAnnihilator K : Set (PontryaginDual G)) =
+          (PontryaginDual.map (⟨K.subtype, continuous_subtype_val⟩ : K →ₜ* G)) ⁻¹' {1} := rfl
+      rw [this]
+      exact isClosed_singleton.preimage (PontryaginDual.map _).continuous
+    have hMc : IsClosed (M : Set (lcaAnnihilator C)) := hKc.preimage continuous_subtype_val
+    have hM := isCompactlyGeneratedGroup_closedSubgroup hCcg M hMc
+    refine isCompactlyGeneratedGroup_of_continuousMulEquiv ?_ hM
+    have hto : ∀ ψ : M, ε.symm ⟨ψ.val.val, ψ.2⟩ ∈ lcaAnnihilator (C.map q) := by
+      intro ψ
+      rw [mem_lcaAnnihilator_iff]
+      rintro ⟨_, c, hc, rfl⟩
+      have h1 := hε (ε.symm ⟨ψ.val.val, ψ.2⟩) c
+      rw [ContinuousMulEquiv.apply_symm_apply] at h1
+      change (ε.symm ⟨ψ.val.val, ψ.2⟩) (QuotientGroup.mk c) = 1
+      rw [← h1]
+      exact (mem_lcaAnnihilator_iff C _).mp ψ.val.2 ⟨c, hc⟩
+    have hinv₁ : ∀ χ : lcaAnnihilator (C.map q), (ε χ.val).val ∈ lcaAnnihilator C := by
+      intro χ
+      rw [mem_lcaAnnihilator_iff]
+      intro c
+      rw [hε]
+      exact (mem_lcaAnnihilator_iff _ _).mp χ.2 ⟨q c, c, c.2, rfl⟩
+    exact
+      { toFun := fun ψ ↦ ⟨ε.symm ⟨ψ.val.val, ψ.2⟩, hto ψ⟩
+        invFun := fun χ ↦ ⟨⟨(ε χ.val).val, hinv₁ χ⟩, (ε χ.val).2⟩
+        left_inv := fun ψ ↦ by
+          apply Subtype.ext; apply Subtype.ext
+          simp
+        right_inv := fun χ ↦ by
+          apply Subtype.ext
+          change ε.symm ⟨(ε χ.val).val, (ε χ.val).2⟩ = χ.val
+          simp
+        map_mul' := fun ψ₁ ψ₂ ↦ by
+          apply Subtype.ext
+          simp only [Subgroup.coe_mul]
+          rw [← map_mul]
+          rfl
+        continuous_toFun := (ε.symm.continuous.comp
+          ((continuous_subtype_val.comp continuous_subtype_val).subtype_mk _)).subtype_mk _
+        continuous_invFun := ((continuous_subtype_val.comp
+          (ε.continuous.comp continuous_subtype_val)).subtype_mk _).subtype_mk _ }
+  · exact Subgroup.map_mono hCH
+
+/-- Paper: Theorem D.1.7.1, p. 776. When the structural pair `b` of the quotient by `K`
+is the image of the structural pair `a`, the quotient map of `G` induces a continuous,
+open and surjective homomorphism from the elementary quotient of `a` to that of `b`.
+Its kernel is the image of `K ∩ a.val.1`. -/
+theorem BruhatStructuralPair.exists_quotient_hom (a : BruhatStructuralPair G)
+    (b : BruhatStructuralPair (G ⧸ K))
+    (hb₁ : b.val.1 = a.val.1.map (QuotientGroup.mk' K))
+    (hb₂ : OrderDual.ofDual b.val.2 = (OrderDual.ofDual a.val.2).map (QuotientGroup.mk' K)) :
+    ∃ p : a.quotient →* b.quotient, Continuous p ∧ IsOpenMap p ∧ Function.Surjective p ∧
+      p.ker = (K.comap a.val.1.subtype).map
+        (QuotientGroup.mk' ((OrderDual.ofDual a.val.2).comap a.val.1.subtype)) ∧
+      ∀ (x : G) (hx : x ∈ a.val.1) (hq : (QuotientGroup.mk x : G ⧸ K) ∈ b.val.1),
+        p (QuotientGroup.mk ⟨x, hx⟩) = QuotientGroup.mk ⟨QuotientGroup.mk x, hq⟩ := by
+  obtain ⟨hHo, -, -, hCH⟩ := a.property
+  let H := a.val.1
+  let C := OrderDual.ofDual a.val.2
+  let N := C.comap H.subtype
+  let Nb := (OrderDual.ofDual b.val.2).comap b.val.1.subtype
+  let q := QuotientGroup.mk' K
+  have hqo : IsOpenMap q := QuotientGroup.isOpenMap_coe
+  have hqc : Continuous q := QuotientGroup.continuous_mk
+  let f₀ : H →* b.val.1 := (q.comp H.subtype).codRestrict b.val.1 fun h ↦ by
+    rw [hb₁]; exact ⟨h.val, h.2, rfl⟩
+  have hf₀ : ∀ h : H, (f₀ h).val = q h.val := fun h ↦ rfl
+  have hf₀c : Continuous f₀ := (hqc.comp continuous_subtype_val).subtype_mk _
+  have hf₀o : IsOpenMap f₀ := by
+    intro O hO
+    have hO' : IsOpen (q '' (Subtype.val '' O)) := hqo _ (hHo.isOpenMap_subtype_val _ hO)
+    convert hO'.preimage continuous_subtype_val using 1
+    ext y
+    constructor
+    · rintro ⟨o, ho, rfl⟩
+      exact ⟨o.val, ⟨o, ho, rfl⟩, rfl⟩
+    · rintro ⟨_, ⟨o, ho, rfl⟩, hy⟩
+      exact ⟨o, ho, Subtype.ext hy⟩
+  have hf₀s : Function.Surjective f₀ := by
+    rintro ⟨y, hy⟩
+    rw [hb₁] at hy
+    obtain ⟨x, hx, rfl⟩ := hy
+    exact ⟨⟨x, hx⟩, rfl⟩
+  let f₁ : H →* b.quotient := (QuotientGroup.mk' Nb).comp f₀
+  have hN : N ≤ f₁.ker := by
+    intro h hh
+    rw [MonoidHom.mem_ker, MonoidHom.comp_apply, QuotientGroup.mk'_apply,
+      QuotientGroup.eq_one_iff, Subgroup.mem_comap, Subgroup.coe_subtype, hf₀, hb₂]
+    exact ⟨h.val, hh, rfl⟩
+  let p : a.quotient →* b.quotient := QuotientGroup.lift N f₁ hN
+  have hpmk : ∀ h : H, p (QuotientGroup.mk h) = QuotientGroup.mk (f₀ h) := fun h ↦ rfl
+  have hcomp : (p ∘ (QuotientGroup.mk : H → a.quotient)) = (QuotientGroup.mk' Nb) ∘ f₀ :=
+    funext hpmk
+  refine ⟨p, ?_, ?_, ?_, ?_, ?_⟩
+  · refine (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr ?_
+    rw [hcomp]
+    exact QuotientGroup.continuous_mk.comp hf₀c
+  · intro U hU
+    have hU' : p '' U =
+        ((QuotientGroup.mk' Nb) ∘ f₀) '' ((QuotientGroup.mk : H → a.quotient) ⁻¹' U) := by
+      rw [← hcomp, Set.image_comp, Set.image_preimage_eq _ (QuotientGroup.mk_surjective)]
+    rw [hU', Set.image_comp]
+    exact QuotientGroup.isOpenMap_coe _ (hf₀o _ (hU.preimage QuotientGroup.continuous_mk))
+  · intro z
+    obtain ⟨y, rfl⟩ := QuotientGroup.mk_surjective z
+    obtain ⟨h, rfl⟩ := hf₀s y
+    exact ⟨QuotientGroup.mk h, rfl⟩
+  · ext y
+    obtain ⟨h, rfl⟩ := QuotientGroup.mk_surjective y
+    rw [MonoidHom.mem_ker, hpmk, QuotientGroup.eq_one_iff, Subgroup.mem_comap,
+      Subgroup.coe_subtype, hf₀, hb₂]
+    constructor
+    · rintro ⟨c, hc, hch⟩
+      have hk : c⁻¹ * h.val ∈ K := QuotientGroup.eq.mp hch
+      have hkH : c⁻¹ * h.val ∈ H := H.mul_mem (H.inv_mem (hCH hc)) h.2
+      refine ⟨⟨c⁻¹ * h.val, hkH⟩, hk, ?_⟩
+      rw [QuotientGroup.mk'_apply, QuotientGroup.eq]
+      change (c⁻¹ * h.val)⁻¹ * h.val ∈ C
+      simpa using hc
+    · rintro ⟨k, hk, hkh⟩
+      rw [QuotientGroup.mk'_apply, QuotientGroup.eq] at hkh
+      refine ⟨(k⁻¹ * h).val, hkh, ?_⟩
+      change (QuotientGroup.mk ((k⁻¹ * h : H) : G) : G ⧸ K) = QuotientGroup.mk h.val
+      rw [QuotientGroup.eq]
+      have : ((k⁻¹ * h : H) : G)⁻¹ * h.val = k.val := by
+        simp only [Subgroup.coe_mul, Subgroup.coe_inv, mul_inv_rev, inv_inv]
+        rw [mul_assoc, mul_comm (k : G), inv_mul_cancel_left]
+      rw [this]
+      exact hk
+  · intro x hx hq
+    rw [hpmk]
+    rfl
+
+-- TODO(paper-gap): The proof of D.1.7.1 cites Lemma D.1.6.18 for the elementary case,
+-- but that lemma only averages over compact subgroups. The kernel below can be
+-- noncompact, as for ℤ ⊂ ℝ, where the coset integral is a periodization.
+
+omit hTop hT2 hLC in
+/-- Paper: Lemma D.1.6.18 and Theorem D.1.7.1, pp. 772 and 776. On an elementary group,
+the integral of a Schwartz function along the kernel of a continuous, open and surjective
+homomorphism onto another elementary group exists on every coset, and is a Schwartz
+function on the target.
+Deviation: The kernel is any closed subgroup, not only a compact one. The target
+presentation is arbitrary. -/
+theorem elementary_fiberIntegral {A B : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [MeasurableSpace A]
+    [BorelSpace A] [CommGroup B] [TopologicalSpace B]
+    (e : ElementaryLCAPresentation A) (e' : ElementaryLCAPresentation B)
+    (p : A →* B) (hp : Continuous p) (hpo : IsOpenMap p) (hps : Function.Surjective p)
+    (ν : Measure p.ker) [ν.IsHaarMeasure] (φ : SchwartzBruhatStage e) :
+    (∀ y : A, Integrable (fun l : p.ker ↦ φ (Multiplicative.toAdd (e.equiv (y * l)))) ν) ∧
+      ∃ ψ : SchwartzBruhatStage e', ∀ y : A,
+        ψ (Multiplicative.toAdd (e'.equiv (p y))) =
+          ∫ l : p.ker, φ (Multiplicative.toAdd (e.equiv (y * l))) ∂ν := by sorry
+
+end FibreIntegral
+
 variable [MeasurableSpace G] [hBorel : BorelSpace G]
 
 local instance sec1cDualMeasurableSpace : MeasurableSpace (PontryaginDual G) := borel _
@@ -1734,11 +2008,291 @@ include hK hHaarK hRegularK
 -- TODO(paper-gap): The proof of D.1.7.1 uses properness of G → G/k and
 -- openness of k. For k = ℤ in G = ℝ both assertions fail.
 
+open Classical in
+/-- Paper: Theorem D.1.7.1, p. 776. Let `π` be the quotient of an open subgroup `H` by a
+compact subgroup, and `L` the image of `K ∩ H` under it. For a suitable Haar measure on `L`,
+integrating a function on `H`, extended by zero, over a coset of `K` through a point of `H`
+is the same as integrating its descent over the matching coset of `L`. -/
+theorem exists_haar_fiberIntegral_eq {A : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [MeasurableSpace A]
+    [BorelSpace A] (H : Subgroup G) (hH : IsOpen (H : Set G)) (π : H →* A) (hπ : Continuous π)
+    (hπo : IsOpenMap π) (hπs : Function.Surjective π) (hπk : IsCompact (π.ker : Set H))
+    (L : Subgroup A) (hL : L = (K.comap H.subtype).map π) :
+    ∃ ν : Measure L, ν.IsHaarMeasure ∧ ∀ g : A → ℂ, Continuous g → ∀ h : H,
+      (Integrable (fun k : K ↦ if hk : h.val * k.val ∈ H then g (π ⟨_, hk⟩) else 0) μK ↔
+        Integrable (fun l : L ↦ g (π h * l)) ν) ∧
+      ∫ k : K, (if hk : h.val * k.val ∈ H then g (π ⟨_, hk⟩) else 0) ∂μK =
+        ∫ l : L, g (π h * l) ∂ν := by
+  subst hL
+  -- `π` is proper: it is closed, with compact fibres.
+  have hπp : IsProperMap π := by
+    refine isProperMap_iff_isClosedMap_and_compact_fibers.2 ⟨hπ, fun F hF ↦ ?_, fun y ↦ ?_⟩
+    · have hq : IsQuotientMap π := hπo.isQuotientMap hπ hπs
+      rw [← hq.isClosed_preimage]
+      convert hF.mul_right_of_isCompact hπk using 1
+      ext x
+      simp only [Set.mem_preimage, Set.mem_image, Set.mem_mul, SetLike.mem_coe, MonoidHom.mem_ker]
+      constructor
+      · rintro ⟨f, hf, hfx⟩
+        exact ⟨f, hf, f⁻¹ * x, by rw [map_mul, map_inv, hfx, inv_mul_cancel], by simp⟩
+      · rintro ⟨f, hf, k, hk, rfl⟩
+        exact ⟨f, hf, by rw [map_mul, hk, mul_one]⟩
+    · obtain ⟨h₀, rfl⟩ := hπs y
+      convert hπk.image (Homeomorph.mulLeft h₀).continuous using 1
+      ext x
+      constructor
+      · intro hx
+        have hx' : π x = π h₀ := hx
+        refine ⟨h₀⁻¹ * x, ?_, by simp⟩
+        change π (h₀⁻¹ * x) = 1
+        rw [map_mul, map_inv, hx', inv_mul_cancel]
+      · rintro ⟨k, hk, rfl⟩
+        have hk' : π k = 1 := hk
+        change π (h₀ * k) = π h₀
+        rw [map_mul, hk', mul_one]
+  -- The open subgroup `K ∩ H` of `K` and the restricted Haar measure.
+  have : LocallyCompactSpace K := hK.isClosedEmbedding_subtypeVal.locallyCompactSpace
+  let K' : Subgroup K := H.comap K.subtype
+  have hK'o : IsOpen (K' : Set K) := hH.preimage continuous_subtype_val
+  have hK'c : IsClosed (K' : Set K) := Subgroup.isClosed_of_isOpen K' hK'o
+  have : LocallyCompactSpace K' := hK'o.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let μ' : Measure K' := Measure.comap Subtype.val μK
+  have hμ' : μ'.IsHaarMeasure := Measure.IsHaarMeasure.comap μK (mH := inferInstance)
+    (f := K'.subtype) hK'o.isOpenEmbedding_subtypeVal
+  let ι : K' →* H := (K.subtype.comp K'.subtype).codRestrict H fun k ↦ k.2
+  have hιc : Continuous ι :=
+    (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _
+  have hLc : IsClosed (((K.comap H.subtype).map π : Subgroup A) : Set A) := by
+    rw [Subgroup.coe_map]
+    exact hπp.isClosedMap _ (hK.preimage continuous_subtype_val)
+  have : LocallyCompactSpace ((K.comap H.subtype).map π) :=
+    hLc.isClosedEmbedding_subtypeVal.locallyCompactSpace
+  let ρ : K' →* (K.comap H.subtype).map π :=
+    (π.comp ι).codRestrict _ fun k ↦ ⟨ι k, k.val.2, rfl⟩
+  have hρc : Continuous ρ := (hπ.comp hιc).subtype_mk _
+  have hρs : Function.Surjective ρ := by
+    rintro ⟨_, x, hx, rfl⟩
+    exact ⟨⟨⟨x.val, hx⟩, x.2⟩, rfl⟩
+  have hK'G : IsClosedEmbedding (fun k : K' ↦ k.val.val) :=
+    hK.isClosedEmbedding_subtypeVal.comp hK'c.isClosedEmbedding_subtypeVal
+  have hρp : Tendsto ρ (cocompact K') (cocompact _) := by
+    refine (isProperMap_iff_tendsto_cocompact.mp
+      (isProperMap_iff_isCompact_preimage.mpr ⟨hρc, fun S hS ↦ ?_⟩)).2
+    have hT := (hπp.isCompact_preimage (hS.image continuous_subtype_val)).image
+      continuous_subtype_val
+    convert hK'G.isCompact_preimage hT using 1
+    ext k
+    simp only [Set.mem_preimage, Set.mem_image]
+    constructor
+    · intro hk
+      exact ⟨ι k, ⟨ρ k, hk, rfl⟩, rfl⟩
+    · rintro ⟨x, ⟨s, hs, hsx⟩, hxk⟩
+      have : x = ι k := Subtype.ext hxk
+      subst this
+      have : s = ρ k := Subtype.ext hsx
+      rwa [← this]
+  let ν : Measure ((K.comap H.subtype).map π) := μ'.map ρ
+  have hν : ν.IsHaarMeasure := Measure.isHaarMeasure_map μ' ρ hρc hρs hρp
+  refine ⟨ν, hν, fun g hg h ↦ ?_⟩
+  set F : K → ℂ := fun k ↦ if hk : h.val * k.val ∈ H then g (π ⟨_, hk⟩) else 0 with hFdef
+  let Φ : (K.comap H.subtype).map π → ℂ := fun l ↦ g (π h * l)
+  have hΦ : Continuous Φ := hg.comp (continuous_const.mul continuous_subtype_val)
+  have hF0 : ∀ k, k ∉ (K' : Set K) → F k = 0 := by
+    intro k hk
+    refine dite_eq_right fun hhk ↦ hk ?_
+    have : k.val = h.val⁻¹ * (h.val * k.val) := by group
+    change k.val ∈ H
+    rw [this]
+    exact H.mul_mem (H.inv_mem h.2) hhk
+  have hFρ : ∀ k : K', F k.val = Φ (ρ k) := by
+    intro k
+    have hhk : h.val * k.val.val ∈ H := H.mul_mem h.2 k.2
+    simp only [F, dite_eq_left hhk, Φ]
+    rw [show (⟨_, hhk⟩ : H) = h * ι k from rfl, map_mul]
+    rfl
+  have hmeas : MeasurableSet (K' : Set K) := hK'o.measurableSet
+  have hsupp : Function.support F ⊆ (K' : Set K) := fun k hk ↦ by
+    by_contra h'
+    exact hk (hF0 k h')
+  have hcomp : F ∘ (Subtype.val : K' → K) = Φ ∘ ρ := funext hFρ
+  constructor
+  · rw [← integrableOn_iff_integrable_of_support_subset hsupp,
+      integrableOn_iff_comap_subtypeVal hmeas]
+    change _ ↔ Integrable Φ (μ'.map ρ)
+    rw [integrable_map_measure hΦ.aestronglyMeasurable hρc.aemeasurable]
+    exact iff_of_eq (congrArg (fun f : K' → ℂ ↦ Integrable f μ') hcomp)
+  · calc ∫ k : K, F k ∂μK = ∫ k in (K' : Set K), F k ∂μK :=
+          (setIntegral_eq_integral_of_forall_compl_eq_zero hF0).symm
+      _ = ∫ k : K', F k.val ∂μ' := (integral_subtype_comap hmeas F).symm
+      _ = ∫ k : K', Φ (ρ k) ∂μ' := integral_congr_ae (Eventually.of_forall hFρ)
+      _ = ∫ l, Φ l ∂ν :=
+          (integral_map hρc.aemeasurable hΦ.aestronglyMeasurable).symm
+
+/-- Paper: Theorem D.1.7.1, p. 776. A single stage function, pulled back from the
+elementary quotient of a structural pair and extended by zero, is integrable on every
+coset, and its coset integral is a Schwartz–Bruhat function on the quotient.
+Deviation: This is the case of one stage of the inductive limit; the general case
+follows by additivity. -/
+theorem lcaCosetIntegral_stageRealization_mem (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (φ : SchwartzBruhatStage e) :
+    (∀ x : G, Integrable (fun k : K ↦ schwartzBruhatStageRealization a e φ (x * k.val)) μK) ∧
+      lcaCosetIntegral K μK (schwartzBruhatStageRealization a e φ) ∈
+        schwartzBruhatSubmodule (G ⧸ K) := by
+  classical
+  let H := a.val.1
+  let C := OrderDual.ofDual a.val.2
+  obtain ⟨hHo, -, hCgood, hCH⟩ := a.property
+  have hCc : IsCompact (C : Set G) := hCgood.isCompact
+  have : IsClosed (K : Set G) := hK
+  obtain ⟨b, hb₁, hb₂⟩ := a.exists_quotient K hK
+  have : LocallyCompactSpace H := hHo.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨e'⟩ := BruhatStructuralPair.elementary b
+  let : MeasurableSpace a.quotient := borel _
+  have : BorelSpace a.quotient := ⟨rfl⟩
+  let N := C.comap H.subtype
+  have : IsClosed (N : Set H) := hCc.isClosed.preimage continuous_subtype_val
+  let π : H →* a.quotient := QuotientGroup.mk' N
+  have hπ : Continuous π := QuotientGroup.continuous_mk
+  have hπo : IsOpenMap π := QuotientGroup.isOpenMap_coe
+  have hπs : Function.Surjective π := QuotientGroup.mk'_surjective N
+  have hπk : IsCompact (π.ker : Set H) := by
+    rw [QuotientGroup.ker_mk', Subtype.isCompact_iff]
+    convert hCc using 1
+    ext x
+    simp only [Set.mem_image, SetLike.mem_coe]
+    exact ⟨fun ⟨y, hy, hyx⟩ ↦ hyx ▸ hy, fun hx ↦ ⟨⟨x, hCH hx⟩, hx, rfl⟩⟩
+  obtain ⟨p, hpc, hpo, hps, hpker, hpmk⟩ := a.exists_quotient_hom K b hb₁ hb₂
+  obtain ⟨ν, hν, hfib⟩ := exists_haar_fiberIntegral_eq K μK hK H hHo π hπ hπo hπs hπk p.ker hpker
+  obtain ⟨hint, ψ, hψ⟩ :=
+    elementary_fiberIntegral (A := a.quotient) (B := b.quotient) e e' p hpc hpo hps ν φ
+  let g : a.quotient → ℂ := fun y ↦ φ (Multiplicative.toAdd (e.equiv y))
+  have hg : Continuous g :=
+    (elementarySchwartz_continuous φ).comp (continuous_toAdd.comp e.equiv.continuous)
+  have hR : ∀ x : G, schwartzBruhatStageRealization a e φ x =
+      if hx : x ∈ H then g (π ⟨x, hx⟩) else 0 := fun x ↦ by
+    rw [schwartzBruhatStageRealization_apply]
+    rfl
+  -- On a coset through a point of `H`, the integral is computed in the elementary quotient.
+  have hkey : ∀ h : H,
+      Integrable (fun k : K ↦ schwartzBruhatStageRealization a e φ (h.val * k.val)) μK ∧
+        ∫ k : K, schwartzBruhatStageRealization a e φ (h.val * k.val) ∂μK =
+          ψ (Multiplicative.toAdd (e'.equiv (p (π h)))) := fun h ↦ by
+    have hh := hfib g hg h
+    have hfun : (fun k : K ↦ schwartzBruhatStageRealization a e φ (h.val * k.val)) =
+        fun k ↦ if hk : h.val * k.val ∈ H then g (π ⟨_, hk⟩) else 0 := by
+      funext k
+      rw [schwartzBruhatStageRealization_apply]
+      split_ifs with hk
+      · exact congrArg (fun y ↦ φ (Multiplicative.toAdd (e.equiv y)))
+          (QuotientGroup.mk'_apply N _).symm
+      · rfl
+    exact ⟨(congrArg (fun F : K → ℂ ↦ Integrable F μK) hfun).mpr (hh.1.mpr (hint (π h))),
+      (congrArg (fun F : K → ℂ ↦ ∫ k, F k ∂μK) hfun).trans (hh.2.trans (hψ (π h)).symm)⟩
+  -- A point whose coset meets `H` is a point of `H` times a point of `K`.
+  have hsplit : ∀ x : G, (QuotientGroup.mk x : G ⧸ K) ∈ b.val.1 →
+      ∃ h : H, ∃ k₀ : K, x = h.val * k₀.val := fun x hx ↦ by
+    rw [hb₁] at hx
+    obtain ⟨y, hy, hyx⟩ := hx
+    refine ⟨⟨y, hy⟩, ⟨y⁻¹ * x, QuotientGroup.eq.mp hyx⟩, ?_⟩
+    simp
+  -- Off the cosets meeting `H` the function vanishes.
+  have hzero : ∀ x : G, (QuotientGroup.mk x : G ⧸ K) ∉ b.val.1 →
+      ∀ k : K, schwartzBruhatStageRealization a e φ (x * k.val) = 0 := fun x hx k ↦ by
+    rw [hR]
+    refine dite_eq_right fun hxk ↦ hx ?_
+    rw [hb₁]
+    exact ⟨x * k.val, hxk, by simp⟩
+  have htrans : ∀ (h : H) (k₀ : K),
+      (fun k : K ↦ schwartzBruhatStageRealization a e φ (h.val * k₀.val * k.val)) =
+        fun k ↦ schwartzBruhatStageRealization a e φ (h.val * (k₀ * k).val) := fun h k₀ ↦ by
+    funext k
+    simp [mul_assoc]
+  have hintegrable : ∀ x : G,
+      Integrable (fun k : K ↦ schwartzBruhatStageRealization a e φ (x * k.val)) μK := by
+    intro x
+    by_cases hx : (QuotientGroup.mk x : G ⧸ K) ∈ b.val.1
+    · obtain ⟨h, k₀, rfl⟩ := hsplit x hx
+      rw [htrans h k₀]
+      exact (hkey h).1.comp_mul_left k₀
+    · simp_rw [hzero x hx]
+      exact integrable_zero _ _ _
+  refine ⟨hintegrable, ?_⟩
+  have hfun : lcaCosetIntegral K μK (schwartzBruhatStageRealization a e φ) =
+      schwartzBruhatStageRealization b e' ψ := by
+    funext q
+    have h1 := schwartzBruhatStageRealization_apply b e' ψ q
+    show (∫ k : K, schwartzBruhatStageRealization a e φ ((Quotient.out q) * k.val) ∂μK) = _
+    have hq : (QuotientGroup.mk (Quotient.out q) : G ⧸ K) = q := QuotientGroup.out_eq' q
+    split_ifs at h1 with hqb
+    · have hqb' : (QuotientGroup.mk (Quotient.out q) : G ⧸ K) ∈ b.val.1 := by rw [hq]; exact hqb
+      refine Eq.trans ?_ h1.symm
+      have hs := hsplit (Quotient.out q) hqb'
+      let h : H := Classical.choose hs
+      have hs' := Classical.choose_spec hs
+      let k₀ : K := Classical.choose hs'
+      have hx : Quotient.out q = h.val * k₀.val := Classical.choose_spec hs'
+      clear_value h k₀
+      have hhq : (QuotientGroup.mk h.val : G ⧸ K) = q := by
+        rw [← hq, hx, QuotientGroup.eq]
+        simp
+      have hhb : (QuotientGroup.mk h.val : G ⧸ K) ∈ b.val.1 := by rw [hhq]; exact hqb
+      have hpq : p (π h) = QuotientGroup.mk ⟨q, hqb⟩ :=
+        (hpmk h.val h.2 hhb).trans (congrArg _ (Subtype.ext hhq))
+      have e1 : (fun k : K ↦ schwartzBruhatStageRealization a e φ (Quotient.out q * k.val)) =
+          fun k ↦ schwartzBruhatStageRealization a e φ (h.val * (k₀ * k).val) := by
+        funext k
+        simp only [hx, mul_assoc, Subgroup.coe_mul]
+      calc ∫ k : K, schwartzBruhatStageRealization a e φ (Quotient.out q * k.val) ∂μK
+          = ∫ k : K, schwartzBruhatStageRealization a e φ (h.val * (k₀ * k).val) ∂μK :=
+            congrArg (fun F : K → ℂ ↦ ∫ k, F k ∂μK) e1
+        _ = ∫ k : K, schwartzBruhatStageRealization a e φ (h.val * k.val) ∂μK :=
+            integral_mul_left_eq_self
+              (fun k : K ↦ schwartzBruhatStageRealization a e φ (h.val * k.val)) k₀
+        _ = ψ (Multiplicative.toAdd (e'.equiv (p (π h)))) := (hkey h).2
+        _ = _ := congrArg (fun y ↦ ψ (Multiplicative.toAdd (e'.equiv y))) hpq
+    · have hqb' : (QuotientGroup.mk (Quotient.out q) : G ⧸ K) ∉ b.val.1 := by rw [hq]; exact hqb
+      refine Eq.trans ?_ h1.symm
+      simp_rw [hzero (Quotient.out q) hqb']
+      exact integral_zero _ _
+  rw [hfun]
+  exact Submodule.mem_iSup_of_mem b (Submodule.mem_iSup_of_mem e' ⟨ψ, rfl⟩)
+
+omit [TopologicalSpace G] hTop hT2 hLC hBorel hK hHaarK hRegularK in
+/-- The coset integral is additive on functions whose restrictions to all cosets
+are integrable. -/
+theorem lcaCosetIntegral_add (f g : G → ℂ)
+    (hf : ∀ x : G, Integrable (fun k : K ↦ f (x * k.val)) μK)
+    (hg : ∀ x : G, Integrable (fun k : K ↦ g (x * k.val)) μK) :
+    lcaCosetIntegral K μK (f + g) = lcaCosetIntegral K μK f + lcaCosetIntegral K μK g := by
+  funext q
+  simp only [lcaCosetIntegral, Pi.add_apply]
+  exact integral_add (hf _) (hg _)
+
 /-- Paper: Theorem D.1.7.1, p. 776. The integral of a Schwartz–Bruhat function
 over each coset exists and gives a Schwartz–Bruhat function on the quotient. -/
 theorem lcaCosetIntegral_mem_schwartzBruhat (f : SchwartzBruhat G) :
     (∀ x : G, Integrable (fun k : K ↦ f (x * k.val)) μK) ∧
-      lcaCosetIntegral K μK f ∈ schwartzBruhatSubmodule (G ⧸ K) := by sorry
+      lcaCosetIntegral K μK f ∈ schwartzBruhatSubmodule (G ⧸ K) := by
+  have hf := (show schwartzBruhatSubmodule G from f).property
+  generalize (show schwartzBruhatSubmodule G from f).val = g at hf ⊢
+  let P : (G → ℂ) → Prop := fun g ↦
+    (∀ x : G, Integrable (fun k : K ↦ g (x * k.val)) μK) ∧
+      lcaCosetIntegral K μK g ∈ schwartzBruhatSubmodule (G ⧸ K)
+  have hzero : P 0 := by
+    refine ⟨fun x ↦ integrable_zero _ _ _, ?_⟩
+    have : lcaCosetIntegral K μK (0 : G → ℂ) = 0 := by
+      funext q
+      simp [lcaCosetIntegral]
+    rw [this]
+    exact zero_mem _
+  have hadd : ∀ g₁ g₂, P g₁ → P g₂ → P (g₁ + g₂) := fun g₁ g₂ h₁ h₂ ↦ by
+    refine ⟨fun x ↦ (h₁.1 x).add (h₂.1 x), ?_⟩
+    rw [lcaCosetIntegral_add K μK g₁ g₂ h₁.1 h₂.1]
+    exact add_mem h₁.2 h₂.2
+  refine Submodule.iSup_induction (motive := P) _ hf (fun a g ha ↦ ?_) hzero hadd
+  refine Submodule.iSup_induction (motive := P) _ ha (fun e g he ↦ ?_) hzero hadd
+  obtain ⟨φ, rfl⟩ := LinearMap.mem_range.mp he
+  exact lcaCosetIntegral_stageRealization_mem K μK hK a e φ
 
 /-- Paper: (D.1.7.1)–(D.1.7.2), p. 776. Take the existing coset integral with
 values in the Schwartz–Bruhat space on the quotient. -/
@@ -1915,10 +2469,55 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [hTop : IsTopologicalGro
 
 include hTop hT2 hLC
 
+omit hTop hT2 hLC in
+/-- Paper: Proposition D.1.9.2, p. 781. On an elementary group, shifting the argument
+by addition preserves the Schwartz space and is jointly continuous for the weighted
+derivative seminorm topology. -/
+theorem elementarySchwartz_translate_jointly {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
+    ∃ T : C(ElementaryLieGroup m n r F × ElementarySchwartz m n r F,
+        ElementarySchwartz m n r F),
+      ∀ g f x, T (g, f) x = f (g + x) := by
+  sorry
+
+/-- A stage can be enlarged to contain any prescribed translating element. -/
+private theorem exists_bruhatStructuralPair_le_mem (a : BruhatStructuralPair G) (g : G) :
+    ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
+  let I := OpenCompactlyGeneratedSubgroups G
+  have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
+  let : IsDirectedOrder I := hGroups.1
+  obtain ⟨J, hgJ⟩ := hGroups.2.1 g
+  let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
+  obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
+  let b : BruhatStructuralPair G := ⟨(H.val, a.val.2), H.property.1, H.property.2,
+    a.property.2.2.1, a.property.2.2.2.trans haH⟩
+  exact ⟨b, ⟨haH, le_rfl⟩, hJH hgJ⟩
+
 /-- Paper: Proposition D.1.9.2, p. 781. A left translate of a Schwartz–Bruhat
 function is again Schwartz–Bruhat. -/
 theorem schwartzBruhat_translate_mem (g : G) (f : SchwartzBruhat G) :
-    (fun x ↦ f (g⁻¹ * x)) ∈ schwartzBruhatSubmodule G := by sorry
+    (fun x ↦ f (g⁻¹ * x)) ∈ schwartzBruhatSubmodule G := by
+  classical
+  obtain ⟨a, e, s, hs⟩ := (mem_schwartzBruhatSubmodule_iff (fun x ↦ f x)).mp f.property
+  obtain ⟨b, hab, hg⟩ := exists_bruhatStructuralPair_le_mem a g
+  obtain ⟨e'⟩ := b.elementary
+  obtain ⟨j, hj, _⟩ := schwartzBruhatStage_transition hab e e'
+  obtain ⟨T, hT⟩ := elementarySchwartz_translate_jointly
+    (m := e'.realDim) (n := e'.torusDim) (r := e'.latticeRank) (F := e'.finiteFactor)
+  let h : b.val.1 := ⟨g, hg⟩
+  let q (y : b.val.1) := (e'.equiv (QuotientGroup.mk y : b.quotient)).toAdd
+  apply (mem_schwartzBruhatSubmodule_iff _).mpr
+  refine ⟨b, e', T (q h⁻¹, j s), funext fun x ↦ ?_⟩
+  rw [← congrFun hs (g⁻¹ * x), ← congrFun (hj s) (g⁻¹ * x)]
+  have hmem := b.val.1.mul_mem_cancel_left (x := g⁻¹) (y := x) (b.val.1.inv_mem hg)
+  by_cases hx : x ∈ b.val.1
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_left hx, dite_eq_left (hmem.mpr hx), hT]
+    apply congrArg (fun y ↦ j s y)
+    change q h⁻¹ + q ⟨x, hx⟩ = q (h⁻¹ * ⟨x, hx⟩)
+    unfold q
+    rw [QuotientGroup.mk_mul, map_mul]
+    rfl
+  · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx, dite_eq_right (hmem.not.mpr hx)]
 
 /-- Paper: Proposition D.1.9.2, p. 781. The left translation by g evaluates
 the original function at g⁻¹x. -/
@@ -1932,17 +2531,6 @@ theorem schwartzBruhatTranslate_apply_mul (g x : G) (f : SchwartzBruhat G) :
     schwartzBruhatTranslate g f (g * x) = f x := by
   change f.val (g⁻¹ * (g * x)) = f.val x
   rw [inv_mul_cancel_left]
-
-omit hTop hT2 hLC in
-/-- Paper: Proposition D.1.9.2, p. 781. On an elementary group, shifting the argument
-by addition preserves the Schwartz space and is jointly continuous for the weighted
-derivative seminorm topology. -/
-theorem elementarySchwartz_translate_jointly {m n r : ℕ} {F : Type*}
-    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
-    ∃ T : C(ElementaryLieGroup m n r F × ElementarySchwartz m n r F,
-        ElementarySchwartz m n r F),
-      ∀ g f x, T (g, f) x = f (g + x) := by
-  sorry
 
 omit hTop hT2 hLC in
 /-- The inclusion of a structural stage is continuous for the generating seminorms. -/
@@ -1981,19 +2569,6 @@ private theorem continuous_schwartzBruhatTranslate_on_subgroup (b : BruhatStruct
     rw [QuotientGroup.mk_mul, map_mul]
     rfl
   · simp only [schwartzBruhatStageRealization_apply, dite_eq_right hx, dite_eq_right (hmem.not.mpr hx)]
-
-/-- A stage can be enlarged to contain any prescribed translating element. -/
-private theorem exists_bruhatStructuralPair_le_mem (a : BruhatStructuralPair G) (g : G) :
-    ∃ b : BruhatStructuralPair G, a ≤ b ∧ g ∈ b.val.1 := by
-  let I := OpenCompactlyGeneratedSubgroups G
-  have hGroups := openCompactlyGeneratedSubgroups_colimit (G := G)
-  let : IsDirectedOrder I := hGroups.1
-  obtain ⟨J, hgJ⟩ := hGroups.2.1 g
-  let aGroup : I := ⟨a.val.1, a.property.1, a.property.2.1⟩
-  obtain ⟨H, haH, hJH⟩ := exists_ge_ge aGroup J
-  let b : BruhatStructuralPair G := ⟨(H.val, a.val.2), H.property.1, H.property.2,
-    a.property.2.2.1, a.property.2.2.2.trans haH⟩
-  exact ⟨b, ⟨haH, le_rfl⟩, hJH hgJ⟩
 
 /-- Translation is jointly continuous when the function varies in a fixed structural stage.
 Locally the translating element and the function are handled in one larger stage. -/

@@ -640,13 +640,6 @@ private theorem completedHeckeL_one_order_one (L : ℂ → ℂ) (hL : Meromorphi
   have he : (-(1 : ℤ) : WithTop ℤ) + (1 : WithTop ℤ) = 0 := by norm_num
   simpa [← add_assoc, he] using congrArg (fun x : WithTop ℤ ↦ (-1) + x) horder
 
-/-- Paper: Proposition 3.2.1.3(2), p. 123. A continuation of the completed
-Dedekind zeta function in the trivial Hecke character normalization is
-holomorphic away from zero and one. -/
-theorem completedHeckeL_one_analyticOnNhd (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
-    (h : ∀ s : halfPlane, L s = completedHeckeL (1 : U[F]) s) :
-    AnalyticOnNhd ℂ L ({0, 1}ᶜ : Set ℂ) := by sorry
-
 /-- Paper: Definition 3.2.1.4, pp. 123–124. The finite Euler product
 converges uniformly on each compact subset of the half-plane. -/
 theorem finiteHeckeL_hasProdUniformlyOn (χ : U[F]) (K : Set halfPlane) (hK : IsCompact K) :
@@ -1452,14 +1445,6 @@ theorem globalIdelicZFunction_residue_zero (f : ℬ[F]) :
       (𝓝[≠] 0)
       (𝓝 (-((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ) * f zeroAdele)) := by sorry
 
-/-- Paper: Theorem 3.2.2.1(1)(a), p. 124. The residue at the norm character
-is the norm-one class volume times the Fourier transform evaluated at zero. -/
-theorem globalIdelicZFunction_residue_one (f : ℬ[F]) :
-    Tendsto (fun s : ℂ ↦ (s - 1) * globalIdelicZFunction f (ideleClassNormTwist (1 : U[F]) s))
-      (𝓝[≠] 1)
-      (𝓝 (((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ) *
-        adeleSchwartzFourier f zeroAdele)) := by sorry
-
 /-- Paper: Theorem 3.2.2.1(1)(b), p. 124. Fourier transforming the test function
 and taking the norm times the inverse character preserves its global Z-function value. -/
 theorem globalIdelicZFunction_functionalEquation (f : ℬ[F]) (c : 𝒳[F]) :
@@ -1538,6 +1523,48 @@ private theorem globalIdelicZFunction_eq_mul_completedHeckeL_of_integral
   exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
     (hAL (mem_univ s))).mp hPunctured).eq_of_nhds
 
+/-- Paper: Proposition 3.2.1.3(2), p. 123. A continuation of the completed
+Dedekind zeta function in the trivial Hecke character normalization is
+holomorphic away from zero and one. -/
+theorem completedHeckeL_one_analyticOnNhd (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (h : ∀ s : halfPlane, L s = completedHeckeL (1 : U[F]) s) :
+    AnalyticOnNhd ℂ L ({0, 1}ᶜ : Set ℂ) := by
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, ⟨σ, hσ, hnorm⟩, _⟩ := ideleGroup_quotient.{_, 0} F
+  have hinj : Injective (ideleClassNormTwist (1 : U[F])) := by
+    intro z w he
+    let c : ℝ≥0ˣ →ₜ* ℂ := (ideleClassNormTwist (1 : U[F]) z).comp ⟨σ, hσ⟩
+    let valℝ (u : ℝ≥0ˣ) : ℝ := u.val
+    obtain ⟨v, _, hv⟩ := existsUnique_complexPower c
+    have hz (u : ℝ≥0ˣ) : c u = (valℝ u : ℂ) ^ z := by
+      change 1 * (classNormℝ (σ u) : ℂ) ^ z = _
+      rw [one_mul, show classNormℝ (σ u) = valℝ u from congrArg valℝ (hnorm u)]
+    have hw (u : ℝ≥0ˣ) : c u = (valℝ u : ℂ) ^ w := by
+      change ideleClassNormTwist (1 : U[F]) z (σ u) = _
+      rw [he]
+      change 1 * (classNormℝ (σ u) : ℂ) ^ w = _
+      rw [one_mul, show classNormℝ (σ u) = valℝ u from congrArg valℝ (hnorm u)]
+    exact (hv z hz).trans (hv w hw).symm
+  have hzero : ideleClassNormTwist (1 : U[F]) 0 = 1 := by
+    ext1 g
+    change 1 * (classNormℝ g : ℂ) ^ (0 : ℂ) = 1
+    simp
+  obtain ⟨fArch, hArch⟩ := exists_archimedeanHeckeTest (1 : U[F])
+  obtain ⟨f, a, ha, hf⟩ := exists_globalHeckeTest (1 : U[F]) fArch
+  have hZ (s : ℂ) : globalIdelicZFunction f (ideleClassNormTwist (1 : U[F]) s) = a * L s :=
+    globalIdelicZFunction_eq_mul_completedHeckeL_of_integral f _ L (fun _ ↦ a)
+      hL h (differentiable_const a) (fun _ ↦ ha) (fun z ↦ by
+        rw [hf z, hArch z]
+        rfl) s
+  intro s hs
+  simp only [mem_compl_iff, mem_insert_iff, mem_singleton_iff, not_or] at hs
+  have han := (globalIdelicZFunction_poles f (1 : U[F])).1 s
+    ⟨fun he ↦ hs.1 (hinj (he.trans hzero.symm)), fun he ↦ hs.2 (hinj he)⟩
+  have he : (fun z ↦ a⁻¹ * globalIdelicZFunction f (ideleClassNormTwist (1 : U[F]) z)) = L := by
+    funext z
+    rw [hZ, ← mul_assoc, inv_mul_cancel₀ ha, one_mul]
+  rw [← he]
+  exact analyticAt_const.mul han
+
 /-- Paper: Equation (3.1.1.4), p. 119. Duality in the norm-twist coordinate
 takes the inverse unitary character and reflects the exponent. -/
 private theorem dualQuasiCharacter_ideleClassNormTwist (χ : U[F]) (s : ℂ) :
@@ -1552,6 +1579,31 @@ private theorem dualQuasiCharacter_ideleClassNormTwist (χ : U[F]) (s : ℂ) :
   change N * ((χ g : ℂ) * N ^ s)⁻¹ = (χ g : ℂ)⁻¹ * N ^ (1 - s)
   rw [mul_inv_rev, Complex.cpow_sub 1 s hN, Complex.cpow_one, div_eq_mul_inv]
   ac_rfl
+
+/-- Paper: Theorem 3.2.2.1(1)(a), p. 124. The residue at the norm character
+is the norm-one class volume times the Fourier transform evaluated at zero. -/
+theorem globalIdelicZFunction_residue_one (f : ℬ[F]) :
+    Tendsto (fun s : ℂ ↦ (s - 1) * globalIdelicZFunction f (ideleClassNormTwist (1 : U[F]) s))
+      (𝓝[≠] 1)
+      (𝓝 (((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ) *
+        adeleSchwartzFourier f zeroAdele)) := by
+  have hreflect : Tendsto (fun s : ℂ ↦ 1 - s) (𝓝[≠] 1) (𝓝[≠] 0) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨?_, ?_⟩
+    · have hc : ContinuousAt (fun s : ℂ ↦ 1 - s) 1 :=
+        (continuous_const.sub continuous_id).continuousAt
+      have ht : Tendsto (fun s : ℂ ↦ 1 - s) (𝓝 1) (𝓝 (1 - 1)) := hc.tendsto
+      simpa only [sub_self] using ht.mono_left nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin] with s hs
+      exact fun he ↦ hs (sub_eq_zero.mp he).symm
+  have h := ((globalIdelicZFunction_residue_zero (adeleSchwartzFourier f)).comp hreflect).neg
+  rw [neg_mul, neg_neg] at h
+  refine h.congr fun s ↦ ?_
+  have hZ := globalIdelicZFunction_functionalEquation f (ideleClassNormTwist (1 : U[F]) s)
+  rw [dualQuasiCharacter_ideleClassNormTwist, inv_one] at hZ
+  change -((1 - s) * globalIdelicZFunction (adeleSchwartzFourier f)
+    (ideleClassNormTwist (1 : U[F]) (1 - s))) = _
+  rw [← hZ, ← neg_mul, neg_sub]
 
 /-- Paper: Proposition 3.2.1.3(3), p. 123. Reflecting the continuation of the
 inverse unitary character gives the original continuation times a nowhere-vanishing
@@ -1706,7 +1758,55 @@ theorem globalThetaMellinIntegral_entire_of_vanishing (f : ℬ[F])
 vanish, the entire theta Mellin transform agrees everywhere with the global Z-function. -/
 theorem globalThetaMellinIntegral_eq_continuation_of_vanishing (f : ℬ[F])
     (hf : f zeroAdele = 0) (hFourier : adeleSchwartzFourier f zeroAdele = 0) :
-    globalThetaMellinIntegral f = globalIdelicZFunction f := by sorry
+    globalThetaMellinIntegral f = globalIdelicZFunction f := by
+  let : T2Space C[F] := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C[F] := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  funext c
+  let s := quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+    (ideleClassNorm_ne_one (F := F)) c
+  let d := c * ideleClassNormTwist (1 : U[F]) (-(s : ℂ))
+  have hpos (g : C[F]) : 0 < classNormℝ g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hd (g : C[F]) : ‖d g‖ = 1 := by
+    change ‖c g * (1 * (classNormℝ g : ℂ) ^ (-(s : ℂ)))‖ = 1
+    rw [one_mul, norm_mul, norm_quasiCharacter_eq_rpow_abscissa _
+      (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)),
+      Complex.norm_cpow_eq_rpow_re_of_pos (hpos g), Complex.neg_re, Complex.ofReal_re]
+    change classNormℝ g ^ s * classNormℝ g ^ (-s) = 1
+    rw [← Real.rpow_add (hpos g), add_neg_cancel, Real.rpow_zero]
+  let χ : U[F] :=
+    { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+      map_one' := Circle.ext (map_one d)
+      map_mul' := fun g h ↦ Circle.ext (map_mul d g h)
+      continuous_toFun := d.continuous.subtype_mk _ }
+  have hc : ideleClassNormTwist χ s = c := by
+    ext1 g
+    change (c g * (1 * (classNormℝ g : ℂ) ^ (-(s : ℂ)))) *
+      (classNormℝ g : ℂ) ^ (s : ℂ) = c g
+    rw [one_mul, mul_assoc, ← Complex.cpow_add _ _
+      (Complex.ofReal_ne_zero.mpr (hpos g).ne'), neg_add_cancel, Complex.cpow_zero, mul_one]
+  let A (z : ℂ) := globalThetaMellinIntegral f (ideleClassNormTwist χ z)
+  let Z (z : ℂ) := globalIdelicZFunction f (ideleClassNormTwist χ z)
+  have hA : Differentiable ℂ A := globalThetaMellinIntegral_entire_of_vanishing f hf hFourier χ
+  have hZ : MeromorphicNFOn Z univ := globalIdelicZFunction_meromorphic f χ
+  have hEq (z : ℂ) (hz : 1 < z.re) : A z = Z z := by
+    have hm : ideleClassNormTwist χ z ∈ rightHalf := by
+      change 1 < quasiCharacterAbscissa _ _ _ _
+      rwa [quasiCharacterAbscissa_ideleClassNormTwist]
+    exact (globalThetaMellinIntegral_eq_idelic f hm).trans
+      (globalIdelicZFunction_eq_integral f hm).symm
+  have hnear : ∀ᶠ z in 𝓝 (2 : ℂ), 1 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have htop : meromorphicOrderAt (A - Z) 2 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr (eventuallyEq_iff_sub.mp
+      ((hnear.mono hEq).filter_mono nhdsWithin_le_nhds))
+  have hmA : MeromorphicNFOn A univ := fun z _ ↦ (hA.analyticAt z).meromorphicNFAt
+  have ho := (hmA.meromorphicOn.sub hZ.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ (s : ℂ)) htop
+  have hlocal : A =ᶠ[𝓝[≠] (s : ℂ)] Z :=
+    eventuallyEq_iff_sub.mpr (meromorphicOrderAt_eq_top_iff.mp ho)
+  rw [← hc]
+  exact (((hmA (mem_univ _)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (hZ (mem_univ _))).mp hlocal).eq_of_nhds
 
 -- TODO(paper-gap): The absolute convergence asserted in Theorem 3.2.2.1(2)(b)
 -- fails for nontrivial norm-one characters. The modulus of the quasi-character is
@@ -1717,7 +1817,26 @@ integral is the global Z-function and is entire on every nontrivial norm-one com
 Deviation: Entireness concerns the continuation of the integral from its region of convergence. -/
 theorem globalIdelicZFunction_entire_of_nontrivial (f : ℬ[F]) (χ : U[F])
     (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype ≠ 1) :
-    Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
+    Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by
+  have hrestrict (s w : ℂ)
+      (he : ideleClassNormTwist χ s = ideleClassNormTwist (1 : U[F]) w) :
+      χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 := by
+    ext g
+    have hg := DFunLike.congr_fun he g.val
+    change (χ g.val : ℂ) * (classNormℝ g.val : ℂ) ^ s =
+      1 * (classNormℝ g.val : ℂ) ^ w at hg
+    have hn : classNormℝ g.val = 1 := by
+      change (((ideleClassNorm F g.val).val : ℝ≥0) : ℝ) = 1
+      rw [MonoidHom.mem_ker.mp g.property]
+      rfl
+    change (χ g.val : ℂ) = 1
+    simpa [hn] using hg
+  intro s
+  apply ((globalIdelicZFunction_poles f χ).1 s ?_).differentiableAt
+  refine ⟨fun he ↦ hχ (hrestrict s 0 (he.trans ?_)), fun he ↦ hχ (hrestrict s 1 he)⟩
+  ext1 g
+  change (1 : ℂ) = 1 * (classNormℝ g : ℂ) ^ (0 : ℂ)
+  simp
 
 set_option maxHeartbeats 1000000 in
 /-- Paper: §3.4.3.1, p. 152. On the half-plane of absolute convergence, the idelic
@@ -2195,13 +2314,45 @@ theorem homogeneousThetaMellinIntegral_meromorphicContinuation
     (hχ : ∀ g : (ideleClassNorm F).ker, χ g.val = ω g) (M : ℂ → ℂ) :
     (MeromorphicNFOn M univ ∧ EqOn M (fun s ↦
       homogeneousThetaMellinIntegral τ ω f (ideleClassNormTwist χ s)) halfPlane) ↔
-    M = fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s) := by sorry
+    M = fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s) := by
+  have hstrip (s : ℂ) (hs : 1 < s.re) :
+      ideleClassNormTwist χ s ∈ componentStrip ω (Ioi 1) := by
+    constructor
+    · change 1 < quasiCharacterAbscissa _ _ _ _
+      rwa [quasiCharacterAbscissa_ideleClassNormTwist]
+    · intro g
+      change (χ g.val : ℂ) * (classNormℝ g.val : ℂ) ^ s = (ω g : ℂ)
+      have hn : classNormℝ g.val = 1 := by
+        change (((ideleClassNorm F g.val).val : ℝ≥0) : ℝ) = 1
+        rw [MonoidHom.mem_ker.mp g.property]
+        rfl
+      simp [hn, hχ g]
+  have hZ (s : ℂ) (hs : 1 < s.re) :
+      globalIdelicZFunction f (ideleClassNormTwist χ s) =
+        globalIdelicZetaIntegral f (ideleClassNormTwist χ s) :=
+    globalIdelicZFunction_eq_integral f (hstrip s hs).1
+  have hHom (s : ℂ) (hs : 1 < s.re) :
+      homogeneousThetaMellinIntegral τ ω f (ideleClassNormTwist χ s) =
+        globalIdelicZetaIntegral f (ideleClassNormTwist χ s) :=
+    ((globalThetaMellinIntegral_eq_homogeneous τ ω f hτ) (hstrip s hs)).symm.trans
+      (globalThetaMellinIntegral_eq_idelic f (hstrip s hs).1)
+  constructor
+  · rintro ⟨hM, hEq⟩
+    funext s
+    exact globalIdelicZetaIntegral_chartContinuation_eq f hM
+      (globalIdelicZFunction_meromorphic f χ) (fun z hz ↦ (hEq hz).trans (hHom z hz))
+      hZ (show ideleClassNormTwist χ s = ideleClassNormTwist χ s from rfl)
+  · rintro rfl
+    exact ⟨globalIdelicZFunction_meromorphic f χ, fun s hs ↦ (hZ s hs).trans (hHom s hs).symm⟩
 
 /-- Paper: Theorem 3.2.2.1(3), p. 125. If both zero terms vanish, the global
 Z-function is entire in the norm-twist coordinate of every component. -/
 theorem globalIdelicZFunction_entire_of_vanishing
     (h : f ∈ adelePolarSubspace F) (χ : U[F]) :
-    Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by sorry
+    Differentiable ℂ (fun s ↦ globalIdelicZFunction f (ideleClassNormTwist χ s)) := by
+  obtain ⟨hf, hFourier⟩ := (mem_adelePolarSubspace f).mp h
+  rw [← globalThetaMellinIntegral_eq_continuation_of_vanishing f hf hFourier]
+  exact globalThetaMellinIntegral_entire_of_vanishing f hf hFourier χ
 
 end HomogeneousMellin
 

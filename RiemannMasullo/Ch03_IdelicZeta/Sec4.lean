@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # Eigendistributions and Weil's identity
@@ -63,7 +64,12 @@ integral of the test function weighted by the archimedean module. -/
 theorem weilArchimedeanIntegral_norm (fArch : ℬ(AArch)) :
     weilArchimedeanIntegral fArch (ideleClassNormTwist 1 1) =
       ∫ g : AArchˣ, fArch (Multiplicative.ofAdd g.val) *
-        (((sIdeleNorm F ∅ g : ℝ≥0) : ℝ) : ℂ) ∂μArch := by sorry
+        (((sIdeleNorm F ∅ g : ℝ≥0) : ℝ) : ℂ) ∂μArch := by
+  unfold weilArchimedeanIntegral
+  congr with g
+  rw [ideleClassNormTwist_one_one]
+  change _ * (((ideleNorm F (sIdeleInsertion F ∅ g) : ℝ≥0) : ℝ) : ℂ) = _
+  rw [ideleNorm_sIdeleInsertion]
 
 /-- Paper: Theorem 3.4.1.1, p. 143. The archimedean integrand is absolutely
 integrable at each quasi-character of positive abscissa. -/
@@ -101,7 +107,95 @@ theorem weilModifiedFiniteIntegral_integerRing (v : V) (π : (v.adicCompletion F
     (hc : c.IsUnramifiedAt v) :
     weilModifiedFiniteIntegral v π
         ((v.adicCompletionIntegers F : Set (v.adicCompletion F)).indicator (fun _ ↦ 1)) c =
-      ((μv v) (v.adicCompletionIntegers F).units).toReal := by sorry
+      ((μv v) (v.adicCompletionIntegers F).units).toReal := by
+  let K := v.adicCompletion F
+  let O : Set K := v.adicCompletionIntegers F
+  let U : Set Kˣ := (v.adicCompletionIntegers F).units
+  let val := (valuation(v))
+  -- The uniformizer has valuation `exp (-1)`, the largest value below one.
+  have hval : val (π : K) = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (v.valuedAdicCompletion_surjective F)))
+  have hlt (y : WithZero (Multiplicative ℤ)) (hy : y < 1) : y ≤ WithZero.exp (-1) := by
+    rcases eq_or_ne y 0 with rfl | h0
+    · exact zero_le
+    rw [← WithZero.exp_log h0] at hy ⊢
+    rw [WithZero.exp_lt_one_iff] at hy
+    rw [WithZero.exp_le_exp]
+    omega
+  have hmemO (x : K) : x ∈ O ↔ val x ≤ 1 := HeightOneSpectrum.mem_adicCompletionIntegers _ _ _
+  have hmemU (x : K) : x ∈ Units.val '' U ↔ val x = 1 := by
+    constructor
+    · rintro ⟨g, hg, rfl⟩
+      have h1 : val (g : K) ≤ 1 := (hmemO _).mp hg.1
+      have h2 : val ((g⁻¹ : Kˣ) : K) ≤ 1 := (hmemO _).mp hg.2
+      rw [Units.val_inv_eq_inv_val, map_inv₀] at h2
+      have hg0 : val (g : K) ≠ 0 := (Valuation.ne_zero_iff _).mpr g.ne_zero
+      exact le_antisymm h1 ((inv_le_one₀ (zero_lt_iff.mpr hg0)).mp h2)
+    · intro hx
+      have hx0 : x ≠ 0 := by
+        intro h
+        rw [h, map_zero] at hx
+        exact zero_ne_one hx
+      refine ⟨Units.mk0 x hx0, ⟨(hmemO _).mpr hx.le, (hmemO _).mpr ?_⟩, rfl⟩
+      simp only [Units.coeHom_apply, Units.val_inv_eq_inv_val, Units.val_mk0, map_inv₀, hx,
+        inv_one, le_refl]
+  have hπinv (x : K) : val ((↑π⁻¹ : K) * x) = WithZero.exp 1 * val x := by
+    rw [map_mul, Units.val_inv_eq_inv_val, map_inv₀, hval, ← WithZero.exp_neg, neg_neg]
+  -- The modified integer-ring indicator is the indicator of the integer units.
+  have htest : (fun x : K ↦ O.indicator (fun _ ↦ (1 : ℂ)) x -
+      O.indicator (fun _ ↦ (1 : ℂ)) ((↑π⁻¹ : K) * x)) =
+        (Units.val '' U).indicator (fun _ ↦ 1) := by
+    funext x
+    have he1 : (1 : WithZero (Multiplicative ℤ)) < WithZero.exp 1 := by simp
+    rcases lt_trichotomy (val x) 1 with h | h | h
+    · have hx : x ∈ O := (hmemO x).mpr h.le
+      have hx' : (↑π⁻¹ : K) * x ∈ O := by
+        rw [hmemO, hπinv]
+        calc WithZero.exp 1 * val x ≤ WithZero.exp 1 * WithZero.exp (-1) := by
+              gcongr
+              exact hlt _ h
+          _ = 1 := by rw [← WithZero.exp_add]; simp
+      have hU : x ∉ Units.val '' U := fun hU ↦ h.ne ((hmemU x).mp hU)
+      rw [indicator_of_mem hx, indicator_of_mem hx', indicator_of_notMem hU, sub_self]
+    · have hx : x ∈ O := (hmemO x).mpr h.le
+      have hx' : (↑π⁻¹ : K) * x ∉ O := by
+        rw [hmemO, hπinv, h, mul_one, not_le]
+        exact he1
+      have hU : x ∈ Units.val '' U := (hmemU x).mpr h
+      rw [indicator_of_mem hx, indicator_of_notMem hx', indicator_of_mem hU, sub_zero]
+    · have hx : x ∉ O := by rw [hmemO, not_le]; exact h
+      have hx' : (↑π⁻¹ : K) * x ∉ O := by
+        rw [hmemO, hπinv, not_le]
+        calc (1 : WithZero (Multiplicative ℤ)) = 1 * 1 := (mul_one 1).symm
+          _ < WithZero.exp 1 * val x := mul_lt_mul'' he1 h zero_le zero_le
+      have hU : x ∉ Units.val '' U := fun hU ↦ h.ne' ((hmemU x).mp hU)
+      rw [indicator_of_notMem hx, indicator_of_notMem hx', indicator_of_notMem hU, sub_zero]
+  -- The integer units are a compact open set on which the character is trivial.
+  have : BorelSpace Kˣ := ⟨rfl⟩
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := by
+    have : ProperSpace K := properSpace_adicCompletion v
+    apply Submonoid.units_isCompact
+    change IsCompact (v.adicCompletionIntegers F : Set K)
+    convert isCompact_closedBall (0 : K) 1 using 1
+    ext x
+    simp only [SetLike.mem_coe, Metric.mem_closedBall, dist_zero_right,
+      Valued.toNormedField.norm_le_one_iff]
+    exact hmemO x
+  have : (μv v).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  have hcU (g : Kˣ) (hg : g ∈ U) : finitePlaceRestriction F v c g = 1 := by
+    let x := (v.adicCompletionIntegers F).toSubmonoid.unitsEquivUnitsType ⟨g, hg⟩
+    have h := HeckeCharacter.isUnramifiedAt_iff.mp hc x
+    simp only [HeckeCharacter.restrict, x] at h
+    have hxg : (((v.adicCompletionIntegers F).unitsEquivUnitsType ⟨g, hg⟩ :
+        v.adicCompletionIntegers F) : K) = (g : K) := rfl
+    rw [hxg, MulChar.ofUnitHom_coe, MonoidHom.comp_apply, MonoidHom.coe_toHomUnits] at h
+    exact h
+  unfold weilModifiedFiniteIntegral
+  simp only [hc, ↓reduceIte]
+  rw [htest]
+  exact localIdelicZetaIntegral_indicator (μv v) _ U hUo.measurableSet hUc.measure_ne_top hcU
 
 /-- Paper: Equation (3.4.1.1), p. 143. The modified zeta function is the
 archimedean integral times the product of the modified finite integrals. -/
@@ -411,7 +505,16 @@ theorem schwartzBruhatEigendistributions_zeroEval :
 /-- Paper: Definition 3.4.3.1(1)–(2), p. 151. The weight subspace is
 closed in the strong topology of the continuous dual. -/
 theorem schwartzBruhatEigendistributions_isClosed (c : QuasiCharacter Rˣ) :
-    IsClosed (schwartzBruhatEigendistributions c : Set (StrongDual ℂ ℬ(R))) := by sorry
+    IsClosed (schwartzBruhatEigendistributions c : Set (StrongDual ℂ ℬ(R))) := by
+  have h : (schwartzBruhatEigendistributions c : Set (StrongDual ℂ ℬ(R))) =
+      ⋂ (g : Rˣ) (f : ℬ(R)), {T | T (schwartzBruhatUnitTranslate g f) = c g * T f} := by
+    ext T
+    simp only [Set.mem_iInter]
+    rfl
+  -- Rewriting with `h` takes minutes, so transport closedness along it instead.
+  exact (congrArg (fun s : Set (StrongDual ℂ ℬ(R)) ↦ IsClosed s) h).mpr
+    (isClosed_iInter fun g ↦ isClosed_iInter fun f ↦
+      isClosed_eq (continuous_eval_const _) ((continuous_eval_const f).const_mul _))
 
 end Eigendistributions
 
@@ -425,7 +528,18 @@ def adelicEigendistributions (c : X) : Submodule ℂ (StrongDual ℂ ℬ(𝔸[F]
 evaluation at the zero adele is an eigendistribution. -/
 theorem adelicEigendistributions_zeroEval :
     ∃ T : StrongDual ℂ ℬ(𝔸[F]), T ∈ adelicEigendistributions (1 : X) ∧
-      ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) := by sorry
+      ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) := by
+  have h1 : ((1 : X).comp ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩ :
+      QuasiCharacter I_F) = 1 := ContinuousMonoidHom.ext fun _ ↦ rfl
+  have h2 : adelicEigendistributions (1 : X) =
+      schwartzBruhatEigendistributions (1 : QuasiCharacter 𝔸[F]ˣ) :=
+    congrArg schwartzBruhatEigendistributions h1
+  -- Destructuring the existential with `obtain` unfolds the membership and takes minutes.
+  exact (show ∃ T : StrongDual ℂ ℬ(𝔸[F]),
+      T ∈ schwartzBruhatEigendistributions (1 : QuasiCharacter 𝔸[F]ˣ) ∧
+        ∀ f : ℬ(𝔸[F]), T f = f (Multiplicative.ofAdd 0) from
+    schwartzBruhatEigendistributions_zeroEval).imp
+    fun T hT ↦ ⟨(congrArg (T ∈ ·) h2).mpr hT.1, hT.2⟩
 
 section Gaussians
 
@@ -558,7 +672,43 @@ def adelicStandardGaussian (χ : PontryaginDual C_F) : ℬ(𝔸[F]) :=
 at the zero adele has one factor of one over two pi per complex place. -/
 theorem adelicStandardGaussian_trivial_zero :
     adelicStandardGaussian (1 : PontryaginDual C_F) (Multiplicative.ofAdd 0) =
-      (2 * (Real.pi : ℂ))⁻¹ ^ InfinitePlace.nrComplexPlaces F := by sorry
+      (2 * (Real.pi : ℂ))⁻¹ ^ InfinitePlace.nrComplexPlaces F := by
+  classical
+  have hInf (w : InfinitePlace F) :
+      ((1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)).comp
+        ⟨IdeleClassGroup.ofCompletion (𝓞 F) F w, continuous_ideleClass_ofCompletion F w⟩) = 1 :=
+    ContinuousMonoidHom.ext fun _ ↦ rfl
+  have hFin (v : HeightOneSpectrum (𝓞 F)) :
+      finiteStandardGaussian v (finitePlaceRestriction F v (ideleClassNormTwist 1 0))
+        (Multiplicative.ofAdd 0) = 1 := by
+    have hc : ∀ u, finitePlaceRestriction F v (ideleClassNormTwist 1 0) u = 1 := fun u ↦ by
+      change (((1 : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+        (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) : Circle) : ℂ) *
+        (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) : NNReal) : ℝ) : ℂ) ^
+          (0 : ℂ) = 1
+      simp
+    change finiteStandardGaussianValue v _ 0 = 1
+    simp [finiteStandardGaussianValue, hc]
+  change (∏ w : InfinitePlace F,
+      infiniteStandardGaussian w _ (Multiplicative.ofAdd ((0 : 𝔸[F]).1 w))) *
+    ∏ᶠ v : HeightOneSpectrum (𝓞 F),
+      finiteStandardGaussian v _ (Multiplicative.ofAdd ((0 : 𝔸[F]).2 v)) = _
+  simp only [hInf]
+  have h2 (v : HeightOneSpectrum (𝓞 F)) : (0 : 𝔸[F]).2 v = 0 := rfl
+  have hI (w : InfinitePlace F) :
+      infiniteStandardGaussian w 1 (Multiplicative.ofAdd ((0 : 𝔸[F]).1 w)) =
+        if w.IsReal then (1 : ℂ) else (2 * (Real.pi : ℂ))⁻¹ :=
+    infiniteStandardGaussian_trivial_zero w
+  simp only [h2, hFin, finprod_one, mul_one]
+  refine (Finset.prod_congr rfl fun w _ ↦ hI w).trans ?_
+  rw [InfinitePlace.prod_eq_prod_mul_prod]
+  have hR : ∀ w : {w : InfinitePlace F // w.IsReal},
+      (if w.1.IsReal then (1 : ℂ) else (2 * (Real.pi : ℂ))⁻¹) = 1 :=
+    fun w ↦ ite_eq_left_iff.mpr fun h ↦ absurd w.2 h
+  have hC : ∀ w : {w : InfinitePlace F // w.IsComplex},
+      (if w.1.IsReal then (1 : ℂ) else (2 * (Real.pi : ℂ))⁻¹) = (2 * (Real.pi : ℂ))⁻¹ :=
+    fun w ↦ ite_eq_right_iff.mpr fun h ↦ absurd h (InfinitePlace.not_isReal_iff_isComplex.mpr w.2)
+  simp only [hR, hC, Finset.prod_const_one, Finset.prod_const, Finset.card_univ, one_mul]
 
 /-- Paper: Definition 3.4.3.2, p. 152. The adelic Gaussian depends only on
 the restriction of the unitary representative to the norm-one classes. -/

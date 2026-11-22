@@ -274,7 +274,7 @@ $$
 
 ```latex
 \begin{tikzcd}
-\mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F)) \arrow[r, "E_{a,I}"] \arrow[d, "\mathcal{F}"] & W_{a,I}^s\,\mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F)) \arrow[d, "\mathcal{F}"] \\
+\mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F)) \arrow[r, "E_{a,I}"] \arrow[d, "\mathcal{F}"'] & W_{a,I}^s\,\mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F)) \arrow[d, "\mathcal{F}"] \\
 \mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F)) \arrow[r, "E_{a,I}"'] & W_{a,I}^s\,\mathrm{H}_{0,\mathrm{cont}}(F^\times,\mathcal{S}_0(\mathbf{A}_F))
 \end{tikzcd}
 ```
@@ -353,7 +353,13 @@ $^5$Return here.
 
 and its subquotients, and on $\mathrm H_{0,\mathrm{cont}}(\chi|_{J^1_{F,S}},\mathcal S(\mathbf A_{F,S}))$ and its orbital subquotients, remain bases with respect to the coarser Sobolev topologies introduced in Definition 10.1.1.1.
 
-**10.2.1. The $a$-line Spectral Markushevich Basis.** In the special case the compact non-empty interval $I\subset\mathbf R$ from the definition of the Hardy-Sobolev spaces $W^s_I(C_F)$ is of the form $I=\{0\}$, we have $W^s_I(C_F)=W^{s,2}(C_F)$ for any real number $s\ge 0$. In this special case, we denote the Hardy-Sobolev completion on the $a$-line of the space of global adelic $\theta$-functions by:
+**10.2.1. The $a$-line Spectral Markushevich Basis.** In the special case the compact non-empty interval $I\subset\mathbf R$ from the definition of the Hardy-Sobolev spaces $W^s_I(C_F)$ is of the form $I=\{0\}$, we have
+
+$$
+W^s_I(C_F)=W^{s,2}(C_F)
+$$
+
+for any real number $s\ge 0$. In this special case, we denote the Hardy-Sobolev completion on the $a$-line of the space of global adelic $\theta$-functions by:
 
 $$
 W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F))=W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F)).
@@ -437,7 +443,7 @@ We will be denoting by $\widetilde{C^1_F}\subset\widehat{C_F}$ the chosen set of
 
 We will be writing $\sum'_{\omega\in\widehat{C^1_F}}$ to denote the sum of $\mathbf C$-valued functions depending on $\chi$ (such as countable sums of $M(\varphi)(\chi|\cdot|^{it}_F)$ for $t\in\mathbf R$ varying over a suitable discrete subset, for $\varphi\in\mathcal D(C_F)$ fixed, and interpreting the value of the sum as a function of $\chi$), to mean the sum indexed by the choices $\{\chi\in\widehat{C_F}\}$ lifting each point $\omega\in\widehat{C^1_F}$, choices which we fixed at the outset when parametrizing $\Omega(C_F)$ as $\chi|\cdot|^z_F$, $z\in\mathbf C$.
 
-Theorem 10.2.1.1 ($a$-line Spectral Markushevich Basis). Let $F$ be a number field, $s,a\in\mathbf R$ real numbers, $s>1$. The functions:
+Theorem 10.2.1.1 ($a$-line Spectral Markushevich Basis). *Let $F$ be a number field, $s,a\in\mathbf R$ real numbers, $s>1$. The functions:*
 
 $$
 \eta_{\chi,t,m}(g):=\chi(g)|g|^{it}_F(\log|g|_F)^m \tag{10.2.1.5}
@@ -445,7 +451,7 @@ $$
 
 such that:
 
-(1) for $t\in\mathbf R$ such that $\rho_{\chi,t}:=\chi|\cdot|^{a+it}_F$ is a zero of $L(s,\chi)$ of multiplicity $N(\rho_{\chi,t})$.
+(1) *for $t\in\mathbf R$ such that $\rho_{\chi,t}:=\chi|\cdot|^{a+it}_F$ is a zero of $L(s,\chi)$ of multiplicity $N(\rho_{\chi,t})$.*
 
 (2) $m\ge 0$ is an integer satisfying $m\le N_s(\rho_{\chi,t})-1$ with:
 
@@ -453,9 +459,15 @@ $$
 N_s(\rho_{\chi,t})=\min\left\{N(\rho_{\chi,t}),\left[\frac{s-1}{2}+1\right]\right\} \tag{10.2.1.6}
 $$
 
-are elements of $W^{-s,2}(C_F)$, any enumeration admits a bi-orthogonal sequence, and the resulting sequence of pairs is a Markushevich basis for $\mathscr H^s_{F,a}$, for the image of $(\mathscr H^s_{F,a})'_\beta$ in $W^{-s,2}(C_F)$ under $T_s$ from (9.1.2.14), and with respect to the duality pairing $\langle\cdot,\cdot\rangle_{s,2}$ from (10.2.1.3).
+*are elements of $W^{-s,2}(C_F)$, any enumeration admits a bi-orthogonal sequence, and the resulting sequence of pairs is a Markushevich basis for $\mathscr H^s_{F,a}$, for the image of $(\mathscr H^s_{F,a})'_\beta$ in $W^{-s,2}(C_F)$ under $T_s$ from (9.1.2.14), and with respect to the duality pairing $\langle\cdot,\cdot\rangle_{s,2}$ from (10.2.1.3).*
 
-Terminology 10.2.1.1 ($a$-line Spectral Markushevich Basis). We refer to any sequence of pairs $\{(\psi_m,u_m)\}_{m\ge 0}\subset\mathscr H^s_{F,a}\times T_s((\mathscr H^s_{F,a})'_\beta)$ obtained from a choice of enumeration of the elements from (10.2.1.5) of $W^{-s,2}(C_F)$ and their bi-orthogonal sequence, as the $a$-line Spectral Markushevich Basis.
+Terminology 10.2.1.1 ($a$-line Spectral Markushevich Basis). We refer to any sequence of pairs
+
+$$
+\{(\psi_m,u_m)\}_{m\ge 0}\subset\mathscr H^s_{F,a}\times T_s((\mathscr H^s_{F,a})'_\beta)
+$$
+
+obtained from a choice of enumeration of the elements from (10.2.1.5) of $W^{-s,2}(C_F)$ and their bi-orthogonal sequence, as the $a$-line Spectral Markushevich Basis.
 
 Remark 10.2.1.2 (On Markushevich Bases). Since, by [Jar, Part II,Ch.14,§14.1,Prop.2,p.290], bi-orthogonal sequences are unique, for a Markushevich basis $\{(x_m,f_m)\}_{m\ge 0}$ for the duality $\langle E,E'\rangle$ with $E$ a Hausdorff locally convex topological $\mathbf C$-vector space, we will be omitting either $\{x_m\}_{m\ge 0}$ or $\{f_m\}_{m\ge 0}$ from the notation, referring to the former as a Markushevich basis for $E$, and to the latter as a Markushevich basis for $E'_\sigma$. If $E$ is a Hilbert space, then so is $E'_\beta$, and then $\{f_m\}_{m\ge 0}$ linearly generates a subspace of $E'$ which is dense in the strong topology too, by [Jar, Part II,Ch.8,§8.2,Prop.1,p.149] and reflexivity. The
 
@@ -490,7 +502,13 @@ on $\mathcal{S}_{\mathrm{E}}(\mathbf R_{>0})$).
 
 The bottom horizontal arrow in (10.2.1.7) is the duality pairing $\langle\cdot,\cdot\rangle_{s,2}:W^{s,2}(C_F)\times W^{-s,2}(C_F)\to\mathbf C$ from (10.2.1.3).
 
-The leftmost vertical arrow is the completion map, and the arrow $W^{-s,2}(C_F)(\omega)\to \mathcal{S}_{\mathrm{E}}(C_F)(\omega)'_\beta$ is the continuous linear operator induced as the continuous adjoint of the completion map $\mathcal S(C_F)(\omega)\to W^{s,2}(C_F)(\omega)$.
+The leftmost vertical arrow is the completion map, and the arrow $W^{-s,2}(C_F)(\omega)\to \mathcal{S}_{\mathrm{E}}(C_F)(\omega)'_\beta$ is the continuous linear operator induced as the continuous adjoint of the completion map
+
+$$
+\mathcal S(C_F)(\omega)\to W^{s,2}(C_F)(\omega).
+$$
+
+
 
 As a consequence of commutativity of (10.2.1.7), we obtain a continuous linear map:
 
@@ -584,7 +602,7 @@ The range of $\overline{Q}'_{\chi,m}$ in $(\mathscr H^s_{F,a}(C_F)(\chi|_{C^1_F}
 
 We note that the subspace topology on such orthogonal inherited from the normed topology on $W^{-s,2}(C_F)$, is equivalent to the strong topology on the continuous dual of the quotient $\mathscr H^s_{F,a}$ equipped with its normed quotient topology: indeed, the latter is, a priori, finer, by [NB, Thm.8.11.3(d)]. By [NB, Thm.8.12.1(a)] combined with the Open Mapping Theorem, the two topologies are equivalent.
 
-Proposition 10.2.1.3. Let $F$ be a number field, let $a,s$ be real numbers, $s>1$. There exists a real number $C>0$ such that the functions:
+Proposition 10.2.1.3. *Let $F$ be a number field, let $a,s$ be real numbers, $s>1$. There exists a real number $C>0$ such that the functions:*
 
 $$
 \eta_{\chi,t,m}(g):=\chi(g)|g|^{it}_F(\log|g|_F)^m \tag{10.2.1.11}
@@ -592,9 +610,9 @@ $$
 
 as:
 
-(1) $\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).
+(1) *$\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).*
 
-(2) $t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N(\rho_{\chi,t})-1$, where $N_s(\rho_{\chi,t})$ is the function defined in (10.2.1.6).
+(2) *$t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N(\rho_{\chi,t})-1$, where $N_s(\rho_{\chi,t})$ is the function defined in (10.2.1.6).*
 
 all satisfy:
 
@@ -602,7 +620,7 @@ $$
 \{\chi(g)|g|^{it}_F(\log|g|_F)^m\}_{t,m}\subset B_{C}:=\{\phi\in W^{-s,2}(C_F):1/C\le||\phi||_{-s,2}\le C\}. \tag{10.2.1.12}
 $$
 
-In particular, the set of functions from (10.2.1.11) is not contained in the open ball in $W^{-s,2}(C_F)$ of radius $1/C$.
+*In particular, the set of functions from (10.2.1.11) is not contained in the open ball in $W^{-s,2}(C_F)$ of radius $1/C$.*
 
 Proof. As for Proposition 11.2.0.4, we proceed as follows. For $s>1$, then:
 
@@ -636,7 +654,7 @@ Let $E$ be Banach space, and $\{(x_m,f_m)\}_{m\ge 0}\subset E\times E'_\beta$ a 
 
 We have the following:
 
-Corollary 10.2.1.4. Let $F$ be a number field, $s>1$ a real number. Any enumeration of the set of functions:
+Corollary 10.2.1.4. *Let $F$ be a number field, $s>1$ a real number. Any enumeration of the set of functions:*
 
 $$
 \eta_{\chi,t,m}(g):=\chi(g)|g|^{it}_F(\log|g|_F)^m \tag{10.2.1.13}
@@ -644,11 +662,11 @@ $$
 
 as:
 
-(1) $\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).
+(1) *$\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).*
 
-(2) $t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N_s(\rho_{\chi,t})-1$, where $N_s(\rho_{\chi,t})$ is the function defined in (10.2.1.6).
+(2) *$t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N_s(\rho_{\chi,t})-1$, where $N_s(\rho_{\chi,t})$ is the function defined in (10.2.1.6).*
 
-is a normalized Markushevich basis for the image of $(\mathscr H^s_{F,a})'_\beta$ in $W^{-s,2}(C_F)$ under $T_s$ from (9.1.2.14), i.e. for the orthogonal $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S_0(\mathbf A_F))^\perp$ in $W^{-s,2}(C_F)$ with respect to the pairing $\langle\cdot,\cdot\rangle_{s,2}$ from (10.2.1.3).
+*is a normalized Markushevich basis for the image of $(\mathscr H^s_{F,a})'_\beta$ in $W^{-s,2}(C_F)$ under $T_s$ from (9.1.2.14), i.e. for the orthogonal $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S_0(\mathbf A_F))^\perp$ in $W^{-s,2}(C_F)$ with respect to the pairing $\langle\cdot,\cdot\rangle_{s,2}$ from (10.2.1.3).*
 
 Proof. As a subset of $W^{-s,2}(C_F)$, there exists a real number $C>0$ such that the set of functions $\{\eta_{\chi,t,m}\}_{\chi,t,m}$ is contained in the annulus $B_{C}$ from (10.2.1.12) of Proposition 10.2.1.3.
 
@@ -728,7 +746,7 @@ We will be writing $\sum'_{\omega\in\widehat{C^1_F}}$ to denote the sum of $\mat
 
 **446** · **CHAPTER 10. TRACE FORMULA: SPECTRAL SIDE**
 
-Theorem 10.2.2.1 (Spectral Markushevich Basis on the $I$-based strip). Let $F$ be a number field, $s,a\in\mathbf R$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]$ be a compact interval, $\alpha\ge 0$ a real number. The functions:
+Theorem 10.2.2.1 (Spectral Markushevich Basis on the $I$-based strip). *Let $F$ be a number field, $s,a\in\mathbf R$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]$ be a compact interval, $\alpha\ge 0$ a real number. The functions:*
 
 $$
 \eta_{\chi,t,b,m}(g):=\chi(g)|g|^{it+b}_F(\log|g|_F)^m \tag{10.2.2.4}
@@ -736,7 +754,7 @@ $$
 
 such that:
 
-(1) for $t\in\mathbf R$ such that $\rho_{\chi,t,b}:=\chi|\cdot|^{a+it+b}_F$ is a zero of $L(s,\chi)$ of multiplicity $N(\rho_{\chi,t,b})$.
+(1) *for $t\in\mathbf R$ such that $\rho_{\chi,t,b}:=\chi|\cdot|^{a+it+b}_F$ is a zero of $L(s,\chi)$ of multiplicity $N(\rho_{\chi,t,b})$.*
 
 (2) $m\ge 0$ is an integer satisfying $m\le N_{I,s}(\rho_{\chi,t,b})-1$ with:
 
@@ -750,19 +768,25 @@ $$
 N_{I,s}(\rho_{\chi,t,b})=N(\rho_{\chi,t,b}),\quad b\in(-\alpha,\alpha) \tag{10.2.2.6}
 $$
 
-are elements of $W^{-s}_I(C_F)$, any enumeration admits a bi-orthogonal sequence, and the resulting sequence of pairs is a Markushevich basis for $\mathscr H^s_{F,a,I}$, for the image of $(\mathscr H^s_{F,a,I})'_\beta$ in $W^{-s}_I(C_F)$ under $T_{I,s}$ from (9.2.1.31), and with respect to the duality pairing $\langle\cdot,\cdot\rangle_{I,s}$ from (10.2.2.3).
+*are elements of $W^{-s}_I(C_F)$, any enumeration admits a bi-orthogonal sequence, and the resulting sequence of pairs is a Markushevich basis for $\mathscr H^s_{F,a,I}$, for the image of $(\mathscr H^s_{F,a,I})'_\beta$ in $W^{-s}_I(C_F)$ under $T_{I,s}$ from (9.2.1.31), and with respect to the duality pairing $\langle\cdot,\cdot\rangle_{I,s}$ from (10.2.2.3).*
 
 Terminology 10.2.2.1 (Spectral Markushevich Basis on the $I$-bases strip). We refer to any sequence of pairs $\{(\psi_m,u_m)\}_{m\ge 0}\subset\mathscr H^s_{F,a,I}\times T_{I,s}((\mathscr H^s_{F,a,I})'_\beta)$ obtained from a choice of enumeration of the elements from (10.2.2.4) of $W^{-s}_I(C_F)$ and their bi-orthogonal sequence, as the Spectral Markushevich Basis on the $I$-based strip.
 
 Proof. The proof of Theorem 10.2.2.1 rests on the same method as in the proof of Theorem 10.2.1.1, with Theorem 9.3.2.6 replacing Lemma 9.3.2.1.$^6$ $\square$
 
-**10.2.2.2. Basic properties of the Spectral Markushevich Basis on the $I$-based strip.** We prove the following properties of the Markushevich basis $\{\eta_{\chi,t,b,m}\}$ introduced in (10.2.2.4) of Theorem 10.2.2.1, for the orthogonal $W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S_0(\mathbf A_F))^\perp$ in $W^{-s}_I(C_F)$ with respect to the pairing $\langle\cdot,\cdot\rangle_{I,s}$ from (10.2.2.3).
+**10.2.2.2. Basic properties of the Spectral Markushevich Basis on the $I$-based strip.** We prove the following properties of the Markushevich basis $\{\eta_{\chi,t,b,m}\}$ introduced in (10.2.2.4) of Theorem 10.2.2.1, for the orthogonal
+
+$$
+W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^\times,\mathcal S_0(\mathbf A_F))^\perp
+$$
+
+in $W^{-s}_I(C_F)$ with respect to the pairing $\langle\cdot,\cdot\rangle_{I,s}$ from (10.2.2.3).
 
 We note that the subspace topology on such orthogonal inherited from the normed topology on $W^{-s}_I(C_F)$, is equivalent to the strong topology on the continuous dual of the quotient $\mathscr H^s_{F,a,I}$ equipped with its normed quotient topology by the Open Mapping Theorem.
 
-Proposition 10.2.2.2. Let $F$ be a number field, let $a,s$ be real numbers, $s>1$. Let $I=[-\alpha,\alpha]\subset\mathbf R$ be a compact non-empty interval, $\alpha\ge 0$ a real number.
+Proposition 10.2.2.2. *Let $F$ be a number field, let $a,s$ be real numbers, $s>1$. Let $I=[-\alpha,\alpha]\subset\mathbf R$ be a compact non-empty interval, $\alpha\ge 0$ a real number.*
 
-There exists a real number $C>0$ such that the functions:
+*There exists a real number $C>0$ such that the functions:*
 
 $$
 \eta_{\chi,t,b,m}(g):=\chi(g)|g|^{it+b}_F(\log|g|_F)^m \tag{10.2.2.7}
@@ -770,9 +794,9 @@ $$
 
 as:
 
-(1) $\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).
+(1) *$\chi$ ranges over the base-points for the chosen holomorphic parametrization for $\Omega(C_F)$ from (6.3.1.1).*
 
-(2) $t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N_{I,s}(\rho_{\chi,t,b})-1$, where $N_{I,s}(\rho_{\chi,t})$ is the function defined in (10.2.2.5) and (10.2.2.5).
+(2) *$t$ ranges over the imaginary parts of the zeros of the Hecke $L$-function $L(s,\chi)$ on the vertical line $\mathrm{Re}(s)=a$, with $0\le m\le N_{I,s}(\rho_{\chi,t,b})-1$, where $N_{I,s}(\rho_{\chi,t})$ is the function defined in (10.2.2.5) and (10.2.2.5).*
 
 all satisfy:
 
@@ -1216,25 +1240,25 @@ $$\mathrm{Trace}\,A(\varphi)=\sum_{t\in\mathbf{R},\,b\in[-\alpha,\alpha]:\,L(a+b
 
 *for $\chi\in\widetilde{C_F^1}$ the unique element of $\widetilde{C_F^1}$ such that $\chi|_{C_F^1}=\omega$, i.e. where $\chi$ is the base-point of $\Omega(C_F)(\omega)$ for the chosen holomorphic parametrization of $\Omega(C_F)$ from* (10.2.1.4).
 
-Proof. *The argument for Theorem 10.3.2.1 follows the same method as in the proof of Theorem 10.3.1.1 upon replacing $N_s(\rho)$ defined in (10.3.1.4) with the truncated multiplicity function $N_{I,s}(\rho)$ defined in (10.2.2.5) and (10.2.2.6), noting that $N_{I,s}$, contrary to $N_s$, is unbounded if $\alpha>0$. In this case, we need to refine the estimate on:*
+Proof. The argument for Theorem 10.3.2.1 follows the same method as in the proof of Theorem 10.3.1.1 upon replacing $N_s(\rho)$ defined in (10.3.1.4) with the truncated multiplicity function $N_{I,s}(\rho)$ defined in (10.2.2.5) and (10.2.2.6), noting that $N_{I,s}$, contrary to $N_s$, is unbounded if $\alpha>0$. In this case, we need to refine the estimate on:
 
 (10.3.2.6)
 
 $$\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_s(\rho_{\chi_k,t_{k,j}})-1}|M(\varphi)^{(i)}(it_{k,j})|\right)^{p}$$
 
-*is convergent for every $p\ge 1$, which is used in the proof of Theorem 10.3.1.1 to infer that the sequence from* (10.3.1.1) *of finite rank operators converges in the $S_1$-norm topology.*
+is convergent for every $p\ge 1$, which is used in the proof of Theorem 10.3.1.1 to infer that the sequence from (10.3.1.1) of finite rank operators converges in the $S_1$-norm topology.
 
-*We aim at deducing that the sequence of finite rank operators in* (10.3.2.1) *also converges in the $S_1$-norm, as $N_1,N_2\to+\infty$.*
+We aim at deducing that the sequence of finite rank operators in (10.3.2.1) also converges in the $S_1$-norm, as $N_1,N_2\to+\infty$.
 
-*The sum that replaces* (10.3.2.6) *is:*
+The sum that replaces (10.3.2.6) is:
 
 (10.3.2.7)
 
 $$\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}|M(\varphi)^{(i)}(b_{k,j}+it_{k,j})|\right)^{p}.$$
 
-*In order to prove that it converges for every $p>1$, we proceed as follows. We let $N>1$ be a fixed integer, to be chosen later.*
+In order to prove that it converges for every $p>1$, we proceed as follows. We let $N>1$ be a fixed integer, to be chosen later.
 
-*We assume for simplicity and without loss of generality that we have $i\ge N$.*
+We assume for simplicity and without loss of generality that we have $i\ge N$.
 
 ## PDF page 455
 
@@ -1308,13 +1332,13 @@ $$
 
 assigned by sending $\phi\in W^s_I(C_F)$ to the orthogonal projection onto the closed subspace of $W^s_I(C_F)$ defined as the orthogonal complement of the closed subspace $W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F))$ within $W^s_I(C_F)$.
 
-Lemma 10.4.1.2. Let $F$ be a number field, let $s,a$ be real numbers, $s\ge 0$, $a>0$. Let
+Lemma 10.4.1.2. *Let $F$ be a number field, let $s,a$ be real numbers, $s\ge 0$, $a>0$. Let*
 
 $$
 Q_a: W^s_I(C_F)\to \mathscr{H}^s_{F,a,I}:=W^s_I(C_F)/W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F)) \tag{10.4.1.3}
 $$
 
-be the quotient continuous linear operator by the closed $C_F$-invariant subspace $W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F))\subset W^s_I(C_F)$.
+*be the quotient continuous linear operator by the closed $C_F$-invariant subspace $W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F))\subset W^s_I(C_F)$.*
 
 Then we have:
 
@@ -1322,7 +1346,7 @@ $$
 Q_a=Q_a\circ P^{\mathrm{spec}}_a,\quad Q_a\circ P^{\mathrm{geom}}_a=0 \tag{10.4.1.4}
 $$
 
-and for every $\psi\in \mathscr{H}^s_{F,a,I}$, the unique $\phi\in W^s_I(C_F)$ orthogonal within $W^s_I(C_F)$ to $W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F))$ and such that $Q_a(\phi)=\psi$ is, for any choice $\tilde\psi\in W^s_I(C_F)$ such that $Q_a(\tilde\psi)=\psi$, the element $\phi=P^{\mathrm{spec}}_a(\tilde\psi)$. The assignment $S_a:\phi\mapsto P^{\mathrm{spec}}_a(\tilde\psi)$ does not depend on the choice of $\tilde\psi$, and it is an isometric linear topological isomorphism:
+*and for every $\psi\in \mathscr{H}^s_{F,a,I}$, the unique $\phi\in W^s_I(C_F)$ orthogonal within $W^s_I(C_F)$ to $W^s_{a,I}\mathrm{H}_{0,\mathrm{cont}}(F^{\times},\mathcal{S}_0(\mathbf{A}_F))$ and such that $Q_a(\phi)=\psi$ is, for any choice $\tilde\psi\in W^s_I(C_F)$ such that $Q_a(\tilde\psi)=\psi$, the element $\phi=P^{\mathrm{spec}}_a(\tilde\psi)$. The assignment $S_a:\phi\mapsto P^{\mathrm{spec}}_a(\tilde\psi)$ does not depend on the choice of $\tilde\psi$, and it is an isometric linear topological isomorphism:*
 
 $$
 S_a: \mathscr{H}^s_{F,a,I}\to P^{\mathrm{spec}}_a W^s_I(C_F). \tag{10.4.1.5}
@@ -1460,9 +1484,9 @@ To study $P^{\mathrm{spec}}_{\rho,a}\circ A(\varphi)$, we first prove that it is
 
 **10.4. TRACE FORMULA: SPECTRAL SIDE** · **459**
 
-Theorem 10.4.2.1. Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]$ be a compact non-empty interval, with $\alpha\ge 0$ a real number. Let $\Lambda,\varepsilon>0$ be real numbers such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho$ be a $(\Lambda,\varepsilon)$-cutoff.
+Theorem 10.4.2.1. *Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]$ be a compact non-empty interval, with $\alpha\ge 0$ a real number. Let $\Lambda,\varepsilon>0$ be real numbers such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho$ be a $(\Lambda,\varepsilon)$-cutoff.*
 
-Then for any $\varphi\in\mathcal{D}(C_F)$, the operator $P^{\mathrm{spec}}_a\circ A(\varphi)$, and the operators $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ from (10.4.1.7) and $P^{\mathrm{spec}}_{\rho,a}\circ A(\varphi)$ from (10.4.1.9) are nuclear.
+*Then for any $\varphi\in\mathcal{D}(C_F)$, the operator $P^{\mathrm{spec}}_a\circ A(\varphi)$, and the operators $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ from (10.4.1.7) and $P^{\mathrm{spec}}_{\rho,a}\circ A(\varphi)$ from (10.4.1.9) are nuclear.*
 
 Their traces satisfy the identity:
 
@@ -1540,13 +1564,13 @@ Such identifications are all compatible with the continuous left-translation act
 
 The following is the first of the two main Theorems of this section (the second being Theorem 10.4.2.8:
 
-Theorem 10.4.2.2 (Spectral side: projection after convolution). Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]\subset\mathbf{R}$ be a compact interval, $\alpha\ge 0$ a real number. We have, for all real numbers $\Lambda,\varepsilon>0$ satisfying $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$, and $\varepsilon\Lambda=o(1)$ as $\Lambda\to+\infty$, and for a $(\Lambda,\varepsilon)$-cutoff $\rho$ for each pair $(\Lambda,\varepsilon)$:
+Theorem 10.4.2.2 (Spectral side: projection after convolution). *Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]\subset\mathbf{R}$ be a compact interval, $\alpha\ge 0$ a real number. We have, for all real numbers $\Lambda,\varepsilon>0$ satisfying $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$, and $\varepsilon\Lambda=o(1)$ as $\Lambda\to+\infty$, and for a $(\Lambda,\varepsilon)$-cutoff $\rho$ for each pair $(\Lambda,\varepsilon)$:*
 
 $$
 \mathrm{Trace}\,(P^{\mathrm{spec}}_{\rho,a}\circ A(\varphi))=\mathrm{Trace}\,(A^{\mathrm{spec}}_a(\varphi))+o(1) \tag{10.4.2.9}
 $$
 
-as $\Lambda\to+\infty$, where $A^{\mathrm{spec}}_a(\varphi)$ is the nuclear operator from (10.3.1.2), whose trace is computed by the formula in (10.3.1.3) of Theorem 10.3.1.1.
+*as $\Lambda\to+\infty$, where $A^{\mathrm{spec}}_a(\varphi)$ is the nuclear operator from (10.3.1.2), whose trace is computed by the formula in (10.3.1.3) of Theorem 10.3.1.1.*
 
 Remark 10.4.2.3. Theorem 10.4.2.2 will be proved throughout the remainder of this section. The rest of this Chapter will be devoted to computing the trace of the geometric truncation of $A(\varphi)$ of level $\rho$, for then using the formula from (10.4.2.3) of Theorem 10.4.2.1 to obtain an asymptotic identity between $\mathrm{Trace}\,(A^{\mathrm{spec}}_a(\varphi))$, which involves the zeros of all Hecke $L$-functions of $F$, and the quantity:
 
@@ -1560,9 +1584,9 @@ Note that for the moment the unknown value of the expression in (10.4.2.10) can 
 
 Before we can prove Theorem 10.4.2.2, we need the following:
 
-Proposition 10.4.2.4. Let $F$ be a number field, $a,s$ real numbers, $s\ge 3$. Let $\varphi\in\mathcal{D}(C_F)$ be a test function.
+Proposition 10.4.2.4. *Let $F$ be a number field, $a,s$ real numbers, $s\ge 3$. Let $\varphi\in\mathcal{D}(C_F)$ be a test function.*
 
-The following identity between the traces of the two nuclear operators $P^{\mathrm{spec}}_a\circ A(\varphi)$ on $W^s_I(C_F)$ and $A^{\mathrm{spec}}_a(\varphi)$ on $\mathscr{H}^s_{F,a,I}$ from Theorem 10.3.1.1:
+*The following identity between the traces of the two nuclear operators $P^{\mathrm{spec}}_a\circ A(\varphi)$ on $W^s_I(C_F)$ and $A^{\mathrm{spec}}_a(\varphi)$ on $\mathscr{H}^s_{F,a,I}$ from Theorem 10.3.1.1:*
 
 $$
 \mathrm{Trace}\,(P^{\mathrm{spec}}_a\circ A(\varphi))=\mathrm{Trace}\,(A^{\mathrm{spec}}_a(\varphi)) \tag{10.4.2.11}
@@ -1620,37 +1644,37 @@ $\square$
 
 10.4.2.1. $\varepsilon$-approximate Kernels. We record here the following Lemma:
 
-Lemma 10.4.2.5. Let $E$ be a Banach space, $E_0\subset E$ a closed subspace. Let $||\cdot||_E$ be a norm on $E$ generating the Banach space topology on $E$.
+Lemma 10.4.2.5. *Let $E$ be a Banach space, $E_0\subset E$ a closed subspace. Let $||\cdot||_E$ be a norm on $E$ generating the Banach space topology on $E$.*
 
-Assume $E/E_0$, endowed with the quotient topology, admits a normalized Schauder, respectively Markushevich, basis $\{x_m\}_{m\ge 0}$. Let $\{\varphi_m\}_{m\ge 0}$ be its bi-orthogonal sequence.
+*Assume $E/E_0$, endowed with the quotient topology, admits a normalized Schauder, respectively Markushevich, basis $\{x_m\}_{m\ge 0}$. Let $\{\varphi_m\}_{m\ge 0}$ be its bi-orthogonal sequence.*
 
-Let $r,r'>0$ be real numbers such that, upon denoting by $||\cdot||_{E/E_0}$ the induced norm on the quotient $E/E_0$, we have:
+*Let $r,r'>0$ be real numbers such that, upon denoting by $||\cdot||_{E/E_0}$ the induced norm on the quotient $E/E_0$, we have:*
 
 $$
 \{x_m\}_{m\ge 0}\subset\{x\in E/E_0:||x||_{E/E_0}\in[r,r']\}. \tag{10.4.2.16}
 $$
 
-Let $F\subset E$ be a linear subspace such that $F_0:=F\cap E_0$ is dense in $E_0$ with respect to the normed topology inherited from $E$. Assume $\{x_m\}_{m\ge 0}\subset F/F_0$.
+*Let $F\subset E$ be a linear subspace such that $F_0:=F\cap E_0$ is dense in $E_0$ with respect to the normed topology inherited from $E$. Assume $\{x_m\}_{m\ge 0}\subset F/F_0$.*
 
-We denote by $\tilde\varphi_m$ the image of $\varphi_m$ under $(E/E_0)'_{\beta}\to E'_{\beta}$, i.e. the composition of $\varphi_m$ with the quotient $E\to E/E_0$.
+*We denote by $\tilde\varphi_m$ the image of $\varphi_m$ under $(E/E_0)'_{\beta}\to E'_{\beta}$, i.e. the composition of $\varphi_m$ with the quotient $E\to E/E_0$.*
 
-There exists a subset $\{u_m\}_{m\ge 0}\subset F$ satisfying the following properties:
+*There exists a subset $\{u_m\}_{m\ge 0}\subset F$ satisfying the following properties:*
 
-(1) For every pair of integers $m,n\ge 0$, we have:
+(1) *For every pair of integers $m,n\ge 0$, we have:*
 
 $$
 \tilde\varphi_m(u_n)=\delta_{m,n}. \tag{10.4.2.17}
 $$
 
-(2) There exists a number $\varepsilon>0$, with $r>\varepsilon$, such that $\{u_m\}_{m\ge 0}\subset E$ satisfies:
+(2) *There exists a number $\varepsilon>0$, with $r>\varepsilon$, such that $\{u_m\}_{m\ge 0}\subset E$ satisfies:*
 
 $$
 \{u_m\}_{m\ge 0}\subset\{u\in E:||u||_E\in[r-\varepsilon,r'+\varepsilon]\}. \tag{10.4.2.18}
 $$
 
-In particular, $\{u_m\}_{m\ge 0}$ is a bounded subset of $E$ contained in $F$, and a normalized Schauder basis in the closure of its linear span in $E$.
+*In particular, $\{u_m\}_{m\ge 0}$ is a bounded subset of $E$ contained in $F$, and a normalized Schauder basis in the closure of its linear span in $E$.*
 
-There exists a sequence $\{\delta_m\}$ of small enough positive real numbers such that for any $\{y_m\}_{m\ge 0}\subset F_0$ satisfying $||y_m||_E<\delta_m$ for every integer $m\ge 0$, then $\{u_m+y_m\}_{m\ge 0}$ also satisfies (1) and (2), and the assignment $u_m\mapsto u_m+y_m$ uniquely extends to a linear topological isomorphism from the closure of the linear span of $\{u_m\}_{m\ge 0}$ in $E$, to the closure of the linear span of $\{u_m+y_m\}_{m\ge 0}$ in $E$.
+*There exists a sequence $\{\delta_m\}$ of small enough positive real numbers such that for any $\{y_m\}_{m\ge 0}\subset F_0$ satisfying $||y_m||_E<\delta_m$ for every integer $m\ge 0$, then $\{u_m+y_m\}_{m\ge 0}$ also satisfies (1) and (2), and the assignment $u_m\mapsto u_m+y_m$ uniquely extends to a linear topological isomorphism from the closure of the linear span of $\{u_m\}_{m\ge 0}$ in $E$, to the closure of the linear span of $\{u_m+y_m\}_{m\ge 0}$ in $E$.*
 
 ## PDF page 462
 
@@ -1719,13 +1743,13 @@ If $E$ is a Hilbert space, then we can find $\{u_m\}_{m\ge 0}$ such that its clo
 
 10.4.2.2. Spectral Side: convolution after projection. We can now state and prove the last of the main Theorems of this section:
 
-Theorem 10.4.2.8 (Spectral side: convolution after projection). Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]\subset\mathbf{R}$ be a compact interval, $\alpha\ge 0$ a real number. We have, for all real numbers $\Lambda,\varepsilon>0$ satisfying $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$, and $\varepsilon\Lambda=o(1)$ as $\Lambda\to+\infty$, and for a $(\Lambda,\varepsilon)$-cutoff $\rho$ for each pair $(\Lambda,\varepsilon)$:
+Theorem 10.4.2.8 (Spectral side: convolution after projection). *Let $F$ be a number field, $a,s$ real numbers, $s\ge 0$. Let $I=[-\alpha,\alpha]\subset\mathbf{R}$ be a compact interval, $\alpha\ge 0$ a real number. We have, for all real numbers $\Lambda,\varepsilon>0$ satisfying $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$, and $\varepsilon\Lambda=o(1)$ as $\Lambda\to+\infty$, and for a $(\Lambda,\varepsilon)$-cutoff $\rho$ for each pair $(\Lambda,\varepsilon)$:*
 
 $$
 \mathrm{Trace}\,(M_{\rho}\circ A(\varphi)\circ P^{\mathrm{spec}}_a)=\mathrm{Trace}\,(A^{\mathrm{spec}}_a(\varphi))+o(1) \tag{10.4.2.20}
 $$
 
-as $\Lambda\to+\infty$, where $A^{\mathrm{spec}}_a(\varphi)$ is the nuclear operator from (10.3.2.2), whose trace is computed by the formula in (10.3.2.3) of Theorem 10.3.2.1.
+*as $\Lambda\to+\infty$, where $A^{\mathrm{spec}}_a(\varphi)$ is the nuclear operator from (10.3.2.2), whose trace is computed by the formula in (10.3.2.3) of Theorem 10.3.2.1.*
 
 Proof. We fix a real number $\varepsilon>0$. Let $\chi\in\widehat{C_F}$ be also fixed. We pick a lift of the Spectral Markushevich basis
 
@@ -1840,7 +1864,7 @@ The completion map $\mathcal S_{\mathrm E}(C_F)(\chi|_{C^1_F})\to W^{s,2}(C_F)(\
 
 ```latex
 \begin{tikzcd}
-0 \arrow[r] & W_{\chi} \arrow[r] \arrow[d, "L^{-1}"] & A\mathcal S(\mathbf C) \arrow[r] \arrow[d, "M^{-1}"] & K_{\chi}:=A\mathcal S(\mathbf C)/W_{\chi} \arrow[r] \arrow[d, "M^{-1}"] & 0 \\
+0 \arrow[r] & W_{\chi} \arrow[r] \arrow[d, "L^{-1}"'] & A\mathcal S(\mathbf C) \arrow[r] \arrow[d, "M^{-1}"'] & K_{\chi}:=A\mathcal S(\mathbf C)/W_{\chi} \arrow[r] \arrow[d, "M^{-1}"] & 0 \\
 0 \arrow[r] & \mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F)) \arrow[r] \arrow[d] & \mathcal S_{\mathrm E}(C_F)(\chi|_{C^1_F}) \arrow[r] \arrow[d] & \check K_{\chi} \arrow[r] \arrow[d] & 0 \\
 0 \arrow[r] & W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(\chi|_{C^1_F},\mathcal S_0(\mathbf A_F)) \arrow[r] & W^{s,2}(C_F)(\chi|_{C^1_F}) \arrow[r] & \mathscr{H}^s_{F,a}(\chi|_{C^1_F}) \arrow[r] & 0
 \end{tikzcd}
@@ -1926,35 +1950,35 @@ We further refer the reader to [Jar, Part III,Ch.17,§17.6,p.391], to (C.3.6.5) 
 
 Theorem 10.4.3.1 (Spectral and Geometric kernels - I). Let $F$ be a number field.
 
-Let $a,s$ be real numbers, with $a>0$ and $s>1$. Let $\varphi\in\mathcal D(C_F)$ be a test function.
+*Let $a,s$ be real numbers, with $a>0$ and $s>1$. Let $\varphi\in\mathcal D(C_F)$ be a test function.*
 
-We choose an enumeration for the set of triples $Z:=\{\chi,t,m\}$ as follows:
+*We choose an enumeration for the set of triples $Z:=\{\chi,t,m\}$ as follows:*
 
-(1) We choose an enumeration for the set of continuous characters $\chi$ of the base-points of the connected components of $\Omega(C_F)$ chosen in the holomorphic parametrization from (10.2.1.4) of Notation 10.2.1.1, and denote it $\{\chi_k\}_{k\ge 0}$.
+(1) *We choose an enumeration for the set of continuous characters $\chi$ of the base-points of the connected components of $\Omega(C_F)$ chosen in the holomorphic parametrization from (10.2.1.4) of Notation 10.2.1.1, and denote it $\{\chi_k\}_{k\ge 0}$.*
 
-(2) For each integer $k\ge 0$, we choose an enumeration $\{t_{k,j}\}_{j\ge 0}$, for the set of real numbers $t\in\mathbf R$ such that $\rho_{\chi_k,t}:=\chi_k|\cdot|^{a+it}_F$ is a zero of $L(s,\chi_k)$, of multiplicity denoted by $N(\rho_{\chi_k,t})$, and we choose the enumeration for the $t_{k,j}$ so as to have $|t_{k,j}|\le|t_{k,j+1}|$ for all integers $j\ge 0$.
+(2) *For each integer $k\ge 0$, we choose an enumeration $\{t_{k,j}\}_{j\ge 0}$, for the set of real numbers $t\in\mathbf R$ such that $\rho_{\chi_k,t}:=\chi_k|\cdot|^{a+it}_F$ is a zero of $L(s,\chi_k)$, of multiplicity denoted by $N(\rho_{\chi_k,t})$, and we choose the enumeration for the $t_{k,j}$ so as to have $|t_{k,j}|\le|t_{k,j+1}|$ for all integers $j\ge 0$.*
 
 ## PDF page 467
 
 **10.4. TRACE FORMULA: SPECTRAL SIDE** · **467**
 
-(3) For each pair $(\chi_k,t_{k,j})$, we enumerate the finitely many integers $m\ge 0$ satisfying $m\le N_s(\rho_{\chi_k,t_{k,j}})-1$, with $N_s(\rho_{\chi_k,t_{k,j}})$ defined in (10.2.1.6) by:
+(3) *For each pair $(\chi_k,t_{k,j})$, we enumerate the finitely many integers $m\ge 0$ satisfying $m\le N_s(\rho_{\chi_k,t_{k,j}})-1$, with $N_s(\rho_{\chi_k,t_{k,j}})$ defined in (10.2.1.6) by:*
 
 $$
 N_s(\rho_{\chi_k,t_{k,j}})=\min\left\{N(\rho_{\chi_k,t_{k,j}}),\left[\frac{s-1}{2}+1\right]\right\} \tag{10.4.3.9}
 $$
 
-according to their natural increasing ordering.
+*according to their natural increasing ordering.*
 
-(4) For each such $\chi$, the induced enumeration of the subset $Z_{\chi}\subset Z$ of those triples such that the first entry is $\chi$, is lexicographical.
+(4) *For each such $\chi$, the induced enumeration of the subset $Z_{\chi}\subset Z$ of those triples such that the first entry is $\chi$, is lexicographical.*
 
-and denote by $\{\psi_{\chi,t,m}\}_{\chi,t,m}\subset \mathscr{H}^s_{F,a}$ the dual Markushevich basis in $\mathscr{H}^s_{F,a}$ to the Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$ obtained as the image of the functions:
+*and denote by $\{\psi_{\chi,t,m}\}_{\chi,t,m}\subset \mathscr{H}^s_{F,a}$ the dual Markushevich basis in $\mathscr{H}^s_{F,a}$ to the Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$ obtained as the image of the functions:*
 
 $$
 \eta_{\chi,t,m}:=\chi|\cdot|^{it}_F(\log|\cdot|_F)^m \tag{10.4.3.10}
 $$
 
-under the inverse of the isometry $T_s:W^{s,2}(C_F)'_{\beta}\to W^{-s,2}(C_F)$ from (9.1.2.14), provided by Theorem 10.2.1.1 for the strong dual $(\mathscr{H}^s_{F,a})'_{\beta}$, where $\mathscr{H}^s_{F,a}$ is the Hilbert space quotient of $W^{s,2}(C_F)$ by $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$ defined in (10.2.1.1).
+*under the inverse of the isometry $T_s:W^{s,2}(C_F)'_{\beta}\to W^{-s,2}(C_F)$ from (9.1.2.14), provided by Theorem 10.2.1.1 for the strong dual $(\mathscr{H}^s_{F,a})'_{\beta}$, where $\mathscr{H}^s_{F,a}$ is the Hilbert space quotient of $W^{s,2}(C_F)$ by $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$ defined in (10.2.1.1).*
 
 We denote by:
 
@@ -1962,17 +1986,17 @@ $$
 I:=\{(k,j,m_{k,j})\in\mathbf N^3:k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1\} \tag{10.4.3.11}
 $$
 
-ordered lexicographically from the lexicographic ordering on $\mathbf N^3$.
+*ordered lexicographically from the lexicographic ordering on $\mathbf N^3$.*
 
 Then:
 
-(1) The effect of the canonical linear isometry $S_a:\mathscr{H}^s_{F,a}\to P^{\mathrm{spec}}_aW^{s,2}(C_F)$ from (10.4.1.5), inverse to the quotient $P^{\mathrm{spec}}_aW^{s,2}(C_F)\to \mathscr{H}^s_{F,a}$, on the basis elements $\{\psi_{\chi,t,m}\}_{\chi,t,m}\subset \mathscr{H}^s_{F,a}$, is described as follows: for each $(\chi,t,m)\in Z$ according to the chosen enumeration, we make a choice of an element $\tilde\psi_{\chi,t,m}\in W^{s,2}(C_F)$ whose image in $\mathscr{H}^s_{F,a}$ is $\psi_{\chi,t,m}$. Then:
+(1) *The effect of the canonical linear isometry $S_a:\mathscr{H}^s_{F,a}\to P^{\mathrm{spec}}_aW^{s,2}(C_F)$ from (10.4.1.5), inverse to the quotient $P^{\mathrm{spec}}_aW^{s,2}(C_F)\to \mathscr{H}^s_{F,a}$, on the basis elements $\{\psi_{\chi,t,m}\}_{\chi,t,m}\subset \mathscr{H}^s_{F,a}$, is described as follows: for each $(\chi,t,m)\in Z$ according to the chosen enumeration, we make a choice of an element $\tilde\psi_{\chi,t,m}\in W^{s,2}(C_F)$ whose image in $\mathscr{H}^s_{F,a}$ is $\psi_{\chi,t,m}$. Then:*
 
 $$
 S_a(\psi_{\chi,t,m})=P^{\mathrm{spec}}_a(\tilde\psi_{\chi,t,m}). \tag{10.4.3.12}
 $$
 
-(2) The sequences of finite rank kernels:
+(2) *The sequences of finite rank kernels:*
 
 $$
 \sum_{i\in I}\langle A(\varphi)'\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2}\otimes\psi_{(\chi,t,m)_i}=\sum_{0\le k\le N_1}\sum_{0\le j\le N_2}\sum_{0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}\langle A(\varphi)'\eta_{\chi_k,t_{k,j},m_{k,j}},\cdot\rangle_{s,2}\otimes\psi_{\chi_k,t_{k,j},m_{k,j}} \tag{10.4.3.13}
@@ -1984,7 +2008,7 @@ $$
 \sum_{i\in I}A(\varphi)'\eta_{(\chi,t,m)_i}\otimes S_a(\psi_{(\chi,t,m)_i})=\sum_{0\le k\le N_1}\sum_{0\le j\le N_2}\sum_{0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}A(\varphi)'\eta_{\chi_k,t_{k,j},m_{k,j}}\otimes S_a(\psi_{\chi_k,t_{k,j},m_{k,j}}) \tag{10.4.3.14}
 $$
 
-in $W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)$, converge as $(N_1,N_2)\to(+\infty,+\infty)$ in $\mathbf N\times\mathbf N$, equivalently $i\to+\infty$ in $I$, with respect to the respective projective tensor product topologies.
+*in $W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)$, converge as $(N_1,N_2)\to(+\infty,+\infty)$ in $\mathbf N\times\mathbf N$, equivalently $i\to+\infty$ in $I$, with respect to the respective projective tensor product topologies.*
 
 (3) Let:
 
@@ -1992,7 +2016,7 @@ $$
 \xi_{\pi}:W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)\to\mathscr{L}_{\beta}(W^{s,2}(C_F)) \tag{10.4.3.15}
 $$
 
-be the composition of $T^{-1}_s\hat\otimes_{\pi}\mathrm{Id}$ and the continuous injective linear operator $\chi_{\pi}$ from Proposition C.3.6.4, whose effect on finite rank kernels is that of associating to $\sum_{1\le k\le N}\phi_k\otimes\psi_k$ the finite rank operator $\sum_{1\le k\le N}\langle\phi_k,\cdot\rangle_{s,2}\psi_k$. Upon denoting by $K^{\mathrm{spec}}_{\varphi,a,s}$ the limit in $W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)$ of the finite rank kernels from (10.4.3.14), then we have, within $\mathscr{L}_{\beta}(W^{s,2}(C_F))$:
+*be the composition of $T^{-1}_s\hat\otimes_{\pi}\mathrm{Id}$ and the continuous injective linear operator $\chi_{\pi}$ from Proposition C.3.6.4, whose effect on finite rank kernels is that of associating to $\sum_{1\le k\le N}\phi_k\otimes\psi_k$ the finite rank operator $\sum_{1\le k\le N}\langle\phi_k,\cdot\rangle_{s,2}\psi_k$. Upon denoting by $K^{\mathrm{spec}}_{\varphi,a,s}$ the limit in $W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)$ of the finite rank kernels from (10.4.3.14), then we have, within $\mathscr{L}_{\beta}(W^{s,2}(C_F))$:*
 
 $$
 \xi_{\pi}(K^{\mathrm{spec}}_{\varphi,a,s})=P^{\mathrm{spec}}_a\circ A(\varphi). \tag{10.4.3.16}
@@ -2028,9 +2052,27 @@ and so (10.4.3.12) holds.
 
 (2) : Since $S_a$ is a linear isometry, the image of a Markushevich basis for $\mathscr{H}^s_{F,a}$ is a Schauder basis for $P^{\mathrm{spec}}_aW^{s,2}(C_F)$, since linear isometries respect topologically free sequences (the duality $\langle P^{\mathrm{spec}}_aW^{s,2}(C_F),(P^{\mathrm{spec}}_a)'W^{-s,2}(C_F)\rangle$ is induced by the duality $\langle\cdot,\cdot\rangle_{s,2}$, with respect to which the continuous adjoint of $P^{\mathrm{spec}}_a$ is being defined).
 
-By Theorem 10.2.1.1 $\{\eta_{\chi_k,t_{k,j},m_{k,j}}\}_{k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}$ is the image under the isometric isomorphism $T_s:W^{s,2}(C_F)'_{\beta}\to W^{-s,2}(C_F)$ of (9.1.2.14), of a Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$, and $\{\psi_{\chi_k,t_{k,j},m_{k,j}}\}_{k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}$ is its dual basis in $\mathscr{H}^s_{F,a}$, itself a Markushevich basis, for $\mathscr{H}^s_{F,a}$, with the dualities on sources and targets defined accordingly.
+By Theorem 10.2.1.1
 
-This means that the functionals: $\langle\eta_{\chi_k,t_{k,j},m_{k,j}},\cdot\rangle_{s,2}:W^{s,2}(C_F)\to\mathbf C$ each of which factors through $\mathscr{H}^s_{F,a}$ defining a unique continuous functional on $\mathscr{H}^s_{F,a}$, i.e. an element of the strong dual $(\mathscr{H}^s_{F,a})'_{\beta}$, are a Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$, as $(k,j,m_{k,j})$ ranges over the countable set $I:=\{(k,j,m_{k,j})\in\mathbf N^3:k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1\}$ as in (10.4.3.11).
+$$
+\{\eta_{\chi_k,t_{k,j},m_{k,j}}\}_{k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}
+$$
+
+is the image under the isometric isomorphism $T_s:W^{s,2}(C_F)'_{\beta}\to W^{-s,2}(C_F)$ of (9.1.2.14), of a Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$, and $\{\psi_{\chi_k,t_{k,j},m_{k,j}}\}_{k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1}$ is its dual basis in $\mathscr{H}^s_{F,a}$, itself a Markushevich basis, for $\mathscr{H}^s_{F,a}$, with the dualities on sources and targets defined accordingly.
+
+This means that the functionals:
+
+$$
+\langle\eta_{\chi_k,t_{k,j},m_{k,j}},\cdot\rangle_{s,2}:W^{s,2}(C_F)\to\mathbf C
+$$
+
+each of which factors through $\mathscr{H}^s_{F,a}$ defining a unique continuous functional on $\mathscr{H}^s_{F,a}$, i.e. an element of the strong dual $(\mathscr{H}^s_{F,a})'_{\beta}$, are a Markushevich basis for $(\mathscr{H}^s_{F,a})'_{\beta}$, as $(k,j,m_{k,j})$ ranges over the countable set
+
+$$
+I:=\{(k,j,m_{k,j})\in\mathbf N^3:k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1\}
+$$
+
+as in (10.4.3.11).
 
 We note that the concept of “diverging to infinity” for sequences in $I$ is already intrinsically defined, inherited from $\mathbf N\times\mathbf N\times\mathbf N$. It reads as follows: $i\to+\infty$ if and only if, writing $i=(k(i),j(i),m_{k(i),j(i)})$, we have $(k(i),j(i))\to(+\infty,+\infty)$ in $\mathbf N\times\mathbf N$. In other words, “infinity” within $I$ is the subset of the closure $\bar I$ of $I$ within the one-point compactification of the countable discrete set $\mathbf N\times\mathbf N\times(\mathbf N\cap[0,C_s])$ with $C_s:=[(s-1)/2+1]$, obtained as $\bar I-I$, which is contained within $(+\infty,+\infty)\times(\mathbf N\cap[0,C_s])$.
 
@@ -2058,7 +2100,13 @@ The Hilbert space $(\mathscr{H}^s_{F,a})'_{\beta}$ is a closed Hilbert subspace 
 
 The effect of $T_s$ on the continuous functional $\langle\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2}$ on $\mathscr{H}^s_{F,a}$ is that of sending it to the function $\eta_{(\chi,t,m)_i}\in W^{-s,2}(C_F)$, for each index $i\in I$.
 
-$T_s$ is compatible with the adjoint action of $C_F$ on $(\mathscr{H}^s_{F,a})'_{\beta}$ (induced by the action on $W^{s,2}(C_F)$, on the closed $C_F$-invariant subspace $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, and hence on the quotient $\mathscr{H}^s_{F,a}$), and so we have: $T_s(\langle A(\varphi)'\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2})=T_s(A(\varphi)'\langle\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2})=A(\varphi)'\eta_{(\chi,t,m)_i}$ for every index $i\in I$.
+$T_s$ is compatible with the adjoint action of $C_F$ on $(\mathscr{H}^s_{F,a})'_{\beta}$ (induced by the action on $W^{s,2}(C_F)$, on the closed $C_F$-invariant subspace $W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, and hence on the quotient $\mathscr{H}^s_{F,a}$), and so we have:
+
+$$
+T_s(\langle A(\varphi)'\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2})=T_s(A(\varphi)'\langle\eta_{(\chi,t,m)_i},\cdot\rangle_{s,2})=A(\varphi)'\eta_{(\chi,t,m)_i}
+$$
+
+for every index $i\in I$.
 
 Since $S_a:\mathscr{H}^s_{F,a}\to P^{\mathrm{spec}}_aW^{s,2}(C_F)$ is a surjective linear isometry, as is $T_s$ onto its own image in $W^{-s,2}(C_F)$, we deduce that the topology induced on the tensor product on the source of
 
@@ -2104,7 +2152,13 @@ The rest of the assertions in (3) are a consequence of Proposition C.3.6.4.
 
 $\square$
 
-The continuous linear map: $\xi_{\pi}:W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)\to\mathscr{L}_{\beta}(W^{s,2}(C_F))$ from (10.4.3.15) factors through the continuous linear operator
+The continuous linear map:
+
+$$
+\xi_{\pi}:W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)\to\mathscr{L}_{\beta}(W^{s,2}(C_F))
+$$
+
+from (10.4.3.15) factors through the continuous linear operator
 
 $$
 W^{-s,2}(C_F)\hat\otimes_{\pi}W^{s,2}(C_F)\to W^{-s,2}(C_F)\hat\otimes_{\sigma}W^{s,2}(C_F) \tag{10.4.3.23}
@@ -2118,7 +2172,13 @@ $$
 W^{-s,2}(C_F)\hat\otimes_{\sigma}W^{s,2}(C_F)\to L^2(C_F\times C_F,(1+|\log|\cdot|_F|^2)^{-s/2}\overline{\mu}\otimes(1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu}) \tag{10.4.3.24}
 $$
 
-The image of $K^{\mathrm{spec}}_{\varphi,a,s}$ under the composition of the continuous linear operator from (10.4.3.23) with the continuous linear isometry from (10.4.3.24) is the unique element $k\in L^2(C_F\times C_F,(1+|\log|\cdot|_F|^2)^{-s/2}\overline{\mu}\otimes(1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})$ such that, for every $\phi\in W^{s,2}(C_F)$:
+The image of $K^{\mathrm{spec}}_{\varphi,a,s}$ under the composition of the continuous linear operator from (10.4.3.23) with the continuous linear isometry from (10.4.3.24) is the unique element
+
+$$
+k\in L^2(C_F\times C_F,(1+|\log|\cdot|_F|^2)^{-s/2}\overline{\mu}\otimes(1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})
+$$
+
+such that, for every $\phi\in W^{s,2}(C_F)$:
 
 $$
 \int_{C_F}k(x,y)\phi(y)\,(1+|\log|y|_F|^2)^{-s/2}\mathrm{d}\overline{\mu}(y)=(P^{\mathrm{spec}}_a\circ A(\varphi))(\phi)(x) \tag{10.4.3.25}
@@ -2154,9 +2214,9 @@ $$
 
 for $\overline{\mu}$-almost all $x\in C_F$, as a consequence of (10.4.3.25).
 
-Theorem 10.4.3.4. Let $F$ be a number field, $a,s$ real numbers, $a>0$, $s>1$. Let $\Lambda,\varepsilon>0$ be real numbers, such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho:C_F\to\mathbf C$ be a $(\Lambda,\varepsilon)$-cutoff.
+Theorem 10.4.3.4. *Let $F$ be a number field, $a,s$ real numbers, $a>0$, $s>1$. Let $\Lambda,\varepsilon>0$ be real numbers, such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho:C_F\to\mathbf C$ be a $(\Lambda,\varepsilon)$-cutoff.*
 
-(1) For any $\phi\in W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, we have, for $\overline{\mu}$-almost all $x\in C_F$:
+(1) *For any $\phi\in W^{s,2}_a\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, we have, for $\overline{\mu}$-almost all $x\in C_F$:*
 
 $$
 A(\varphi)(\phi)(x)=(P^{\mathrm{geom}}_a\circ A(\varphi))(\phi)(x)=\int_{C_F}k^{\mathrm{geom}}_{\varphi,a,s}(x,y)\phi(y)\,\mathrm{d}\overline{\mu}(y). \tag{10.4.3.29}
@@ -2172,7 +2232,7 @@ $$
 
 **10.4. TRACE FORMULA: SPECTRAL SIDE** · **471**
 
-are representative functions for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,((1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})^{\otimes 2})$ of the operator $P^{\mathrm{spec}}_a\circ A(\varphi)$ on $W^{s,2}(C_F)$, respectively for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,((1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})^{\otimes 2})$ of the operator $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ on $W^{s,2}(C_F)$.
+*are representative functions for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,((1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})^{\otimes 2})$ of the operator $P^{\mathrm{spec}}_a\circ A(\varphi)$ on $W^{s,2}(C_F)$, respectively for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,((1+|\log|\cdot|_F|^2)^{s/2}\overline{\mu})^{\otimes 2})$ of the operator $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ on $W^{s,2}(C_F)$.*
 
 (3) The function:
 
@@ -2180,7 +2240,7 @@ $$
 (1+|\log|y|_F|^2)^{-s/2}\rho(x)\,k^{\mathrm{geom}}_{\varphi,a,s}(x,y) \tag{10.4.3.31}
 $$
 
-is a representative function for the Hilbert-Schmidt kernel of the operator $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ on $W^{s,2}(C_F)$.
+*is a representative function for the Hilbert-Schmidt kernel of the operator $P^{\mathrm{geom}}_{\rho,a}\circ A(\varphi)$ on $W^{s,2}(C_F)$.*
 
 Proof. (1) : We compute:
 
@@ -2234,31 +2294,31 @@ $\square$
 
 Theorem 10.4.3.5 (Spectral and Geometric kernels - II). Let $F$ be a number field.
 
-Let $a,s$ be real numbers, with $a>0$ and $s>1$. Let $I=[-\alpha,\alpha]$ be a compact interval, $\alpha\ge 0$ a real number. Let $\varphi\in\mathcal D(C_F)$ be a test function.
+*Let $a,s$ be real numbers, with $a>0$ and $s>1$. Let $I=[-\alpha,\alpha]$ be a compact interval, $\alpha\ge 0$ a real number. Let $\varphi\in\mathcal D(C_F)$ be a test function.*
 
-We choose an enumeration for the set of tuples $Z:=\{\chi,t,b,m\}$ as follows:
+*We choose an enumeration for the set of tuples $Z:=\{\chi,t,b,m\}$ as follows:*
 
-(1) We choose an enumeration for the set of continuous characters $\chi$ of the base-points of the connected components of $\Omega(C_F)$ chosen in the holomorphic parametrization from (10.2.1.4) of Notation 10.2.1.1, and denote it $\{\chi_k\}_{k\ge 0}$.
+(1) *We choose an enumeration for the set of continuous characters $\chi$ of the base-points of the connected components of $\Omega(C_F)$ chosen in the holomorphic parametrization from (10.2.1.4) of Notation 10.2.1.1, and denote it $\{\chi_k\}_{k\ge 0}$.*
 
-(2) For each integer $k\ge 0$, we choose an enumeration $\{t_{k,j},b_{k,j}\}_{j\ge 0}$, for the set of pairs of real numbers $(t,b)\in\mathbf R$ such that $\rho_{\chi_k,t,b}:=\chi_k|\cdot|^{a+b+it}_F$ is a zero of $L(s,\chi_k)$, of multiplicity denoted by $N(\rho_{\chi_k,t,b})$, and we choose the enumeration for the $(t_{k,j},b_{k,j})$ so as to have $|t_{k,j}|\le|t_{k,j+1}|$ for all integers $j\ge 0$.
+(2) *For each integer $k\ge 0$, we choose an enumeration $\{t_{k,j},b_{k,j}\}_{j\ge 0}$, for the set of pairs of real numbers $(t,b)\in\mathbf R$ such that $\rho_{\chi_k,t,b}:=\chi_k|\cdot|^{a+b+it}_F$ is a zero of $L(s,\chi_k)$, of multiplicity denoted by $N(\rho_{\chi_k,t,b})$, and we choose the enumeration for the $(t_{k,j},b_{k,j})$ so as to have $|t_{k,j}|\le|t_{k,j+1}|$ for all integers $j\ge 0$.*
 
-(3) For each triple $(\chi_k,t_{k,j},b_{k,j})$, we enumerate the finitely many integers $m\ge 0$ satisfying $m\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1$, with $N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})$ defined in (10.2.2.5) and (10.2.2.6) by:
+(3) *For each triple $(\chi_k,t_{k,j},b_{k,j})$, we enumerate the finitely many integers $m\ge 0$ satisfying $m\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1$, with $N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})$ defined in (10.2.2.5) and (10.2.2.6) by:*
 
 $$
 N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})=\min\left\{N(\rho_{\chi_k,t_{k,j},b_{k,j}}),\left[\frac{s-1}{2}+1\right]\right\},\;b_{k,j}=\pm\alpha,\;N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})=N(\rho_{\chi_k,t_{k,j},b_{k,j}}),\;b_{k,j}\in(-\alpha,\alpha) \tag{10.4.3.38}
 $$
 
-according to their natural increasing ordering.
+*according to their natural increasing ordering.*
 
-(4) For each such $\chi$, the induced enumeration of the subset $Z_{\chi}\subset Z$ of those tuples such that the first entry is $\chi$, is lexicographical.
+(4) *For each such $\chi$, the induced enumeration of the subset $Z_{\chi}\subset Z$ of those tuples such that the first entry is $\chi$, is lexicographical.*
 
-and denote by $\{\psi_{\chi,t,b,m}\}_{\chi,t,b,m}\subset \mathscr{H}^s_{F,a,I}$ the dual Markushevich basis in $\mathscr{H}^s_{F,a,I}$ to the Spectral Markushevich basis for $(\mathscr{H}^s_{F,a,I})'_{\beta}$ obtained as the image of the functions:
+*and denote by $\{\psi_{\chi,t,b,m}\}_{\chi,t,b,m}\subset \mathscr{H}^s_{F,a,I}$ the dual Markushevich basis in $\mathscr{H}^s_{F,a,I}$ to the Spectral Markushevich basis for $(\mathscr{H}^s_{F,a,I})'_{\beta}$ obtained as the image of the functions:*
 
 $$
 \eta_{\chi,t,b,m}:=\chi|\cdot|^{b+it}_F(\log|\cdot|_F)^m \tag{10.4.3.39}
 $$
 
-under the inverse of the isometry $T_{I,s}:W^s_I(C_F)'_{\beta}\to W^{-s}_I(C_F)$ from (9.2.2.42), provided by Proposition 9.2.2.11 for the strong dual $(\mathscr{H}^s_{F,a,I})'_{\beta}$, where $\mathscr{H}^s_{F,a,I}$ is the Hilbert space quotient of $W^s_I(C_F)$ by $W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$ defined in (10.2.2.1).
+*under the inverse of the isometry $T_{I,s}:W^s_I(C_F)'_{\beta}\to W^{-s}_I(C_F)$ from (9.2.2.42), provided by Proposition 9.2.2.11 for the strong dual $(\mathscr{H}^s_{F,a,I})'_{\beta}$, where $\mathscr{H}^s_{F,a,I}$ is the Hilbert space quotient of $W^s_I(C_F)$ by $W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$ defined in (10.2.2.1).*
 
 We denote by:
 
@@ -2266,17 +2326,17 @@ $$
 I:=\{(k,j,m_{k,j})\in\mathbf N^3:k\ge 0,j\ge 0,0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j}})-1\} \tag{10.4.3.40}
 $$
 
-ordered lexicographically from the lexicographic ordering on $\mathbf N^3$.
+*ordered lexicographically from the lexicographic ordering on $\mathbf N^3$.*
 
 Then:
 
-(1) The effect of the canonical linear isometry $S_a:\mathscr{H}^s_{F,a,I}\to P^{\mathrm{spec}}_aW^s_I(C_F)$ from (10.4.1.5), inverse to the quotient $P^{\mathrm{spec}}_aW^s_I(C_F)\to \mathscr{H}^s_{F,a,I}$, on the basis elements $\{\psi_{\chi,t,b,m}\}_{\chi,t,b,m}\subset \mathscr{H}^s_{F,a,I}$, is described as follows: for each $(\chi,t,b,m)\in Z$ according to the chosen enumeration, we make a choice of an element $\tilde\psi_{\chi,t,b,m}\in W^s_I(C_F)$ whose image in $\mathscr{H}^s_{F,a,I}$ is $\psi_{\chi,t,b,m}$. Then:
+(1) *The effect of the canonical linear isometry $S_a:\mathscr{H}^s_{F,a,I}\to P^{\mathrm{spec}}_aW^s_I(C_F)$ from (10.4.1.5), inverse to the quotient $P^{\mathrm{spec}}_aW^s_I(C_F)\to \mathscr{H}^s_{F,a,I}$, on the basis elements $\{\psi_{\chi,t,b,m}\}_{\chi,t,b,m}\subset \mathscr{H}^s_{F,a,I}$, is described as follows: for each $(\chi,t,b,m)\in Z$ according to the chosen enumeration, we make a choice of an element $\tilde\psi_{\chi,t,b,m}\in W^s_I(C_F)$ whose image in $\mathscr{H}^s_{F,a,I}$ is $\psi_{\chi,t,b,m}$. Then:*
 
 $$
 S_a(\psi_{\chi,t,b,m})=P^{\mathrm{spec}}_a(\tilde\psi_{\chi,t,b,m}). \tag{10.4.3.41}
 $$
 
-(2) The sequences of finite rank kernels:
+(2) *The sequences of finite rank kernels:*
 
 $$
 \sum_{i\in I}\langle A(\varphi)'\eta_{(\chi,t,b,m)_i},\cdot\rangle_{I,s}\otimes\psi_{(\chi,t,b,m)_i}=\sum_{0\le k\le N_1}\sum_{0\le j\le N_2}\sum_{0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}\langle A(\varphi)'\eta_{\chi_k,t_{k,j},b_{k,j},m_{k,j}},\cdot\rangle_{I,s}\otimes\psi_{\chi_k,t_{k,j},b_{k,j},m_{k,j}} \tag{10.4.3.42}
@@ -2292,7 +2352,7 @@ $$
 
 **10.4. TRACE FORMULA: SPECTRAL SIDE** · **473**
 
-in $W^{-s}_I(C_F)\hat\otimes_{\pi}W^s_I(C_F)$, converge as $(N_1,N_2)\to(+\infty,+\infty)$ in $\mathbf N\times\mathbf N$, equivalently $i\to+\infty$ in $I$, with respect to the respective projective tensor product topologies.
+*in $W^{-s}_I(C_F)\hat\otimes_{\pi}W^s_I(C_F)$, converge as $(N_1,N_2)\to(+\infty,+\infty)$ in $\mathbf N\times\mathbf N$, equivalently $i\to+\infty$ in $I$, with respect to the respective projective tensor product topologies.*
 
 (3) Let:
 
@@ -2300,7 +2360,7 @@ $$
 \xi_{\pi}:W^{-s}_I(C_F)\hat\otimes_{\pi}W^s_I(C_F)\to\mathscr{L}_{\beta}(W^s_I(C_F)) \tag{10.4.3.44}
 $$
 
-be the composition of $T^{-1}_{I,s}\hat\otimes_{\pi}\mathrm{Id}$ and the continuous injective linear operator $\chi_{\pi}$ from Proposition C.3.6.4, whose effect on finite rank kernels is that of associating to $\sum_{1\le k\le N}\phi_k\otimes\psi_k$ the finite rank operator $\sum_{1\le k\le N}\langle\phi_k,\cdot\rangle_{I,s}\psi_k$. Upon denoting by $K^{\mathrm{spec}}_{\varphi,a,I,s}$ the limit in $W^{-s}_I(C_F)\hat\otimes_{\pi}W^s_I(C_F)$ of the finite rank kernels from (10.4.3.42), then we have, within $\mathscr{L}_{\beta}(W^s_I(C_F))$:
+*be the composition of $T^{-1}_{I,s}\hat\otimes_{\pi}\mathrm{Id}$ and the continuous injective linear operator $\chi_{\pi}$ from Proposition C.3.6.4, whose effect on finite rank kernels is that of associating to $\sum_{1\le k\le N}\phi_k\otimes\psi_k$ the finite rank operator $\sum_{1\le k\le N}\langle\phi_k,\cdot\rangle_{I,s}\psi_k$. Upon denoting by $K^{\mathrm{spec}}_{\varphi,a,I,s}$ the limit in $W^{-s}_I(C_F)\hat\otimes_{\pi}W^s_I(C_F)$ of the finite rank kernels from (10.4.3.42), then we have, within $\mathscr{L}_{\beta}(W^s_I(C_F))$:*
 
 $$
 \xi_{\pi}(K^{\mathrm{spec}}_{\varphi,a,I,s})=A(\varphi)\circ P^{\mathrm{spec}}_a. \tag{10.4.3.45}
@@ -2308,13 +2368,13 @@ $$
 
 As a Corollary, we obtain:
 
-Theorem 10.4.3.6. Let $F$ be a number field, $a,s$ real numbers, $a>0$, $s>1$. Let $\Lambda,\varepsilon>0$ be real numbers, such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho:C_F\to\mathbf C$ be a $(\Lambda,\varepsilon)$-cutoff.
+Theorem 10.4.3.6. *Let $F$ be a number field, $a,s$ real numbers, $a>0$, $s>1$. Let $\Lambda,\varepsilon>0$ be real numbers, such that $0<1/\Lambda+\varepsilon<\Lambda-\varepsilon$. Let $\rho:C_F\to\mathbf C$ be a $(\Lambda,\varepsilon)$-cutoff.*
 
-Let $w_{I,s}$ is the weight function defined in (9.2.2.41) as: $w_{I,s}(g):=\max\{|g|^{2a}_F,|g|^{2b}_F\}\,(1+|\log|g|_F|^2)^{s/2}$, $g\in C_F$.
+*Let $w_{I,s}$ is the weight function defined in (9.2.2.41) as: $w_{I,s}(g):=\max\{|g|^{2a}_F,|g|^{2b}_F\}\,(1+|\log|g|_F|^2)^{s/2}$, $g\in C_F$.*
 
 Then:
 
-(1) For any $\phi\in W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, we have, for $\overline{\mu}$-almost all $x\in C_F$:
+(1) *For any $\phi\in W^s_{a,I}\mathrm H_{0,\mathrm{cont}}(F^{\times},\mathcal S_0(\mathbf A_F))$, we have, for $\overline{\mu}$-almost all $x\in C_F$:*
 
 $$
 A(\varphi)(\phi)(x)=(A(\varphi)\circ P^{\mathrm{geom}}_a)(\phi)(x)=\int_{C_F}k^{\mathrm{geom}}_{\varphi,a,I,s}(x,y)\phi(y)\,\mathrm{d}\overline{\mu}(y). \tag{10.4.3.46}
@@ -2326,7 +2386,7 @@ $$
 w_{I,s}(y)^{-1}k^{\mathrm{spec}}_{\varphi,a,I,s}(x,y),\quad \rho(x)\,w_{I,s}(y)^{-1}k^{\mathrm{spec}}_{\varphi,a,I,s}(x,y) \tag{10.4.3.47}
 $$
 
-are representative functions for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,(w_{I,s}\overline{\mu})^{\otimes 2})$ of the operator $A(\varphi)\circ P^{\mathrm{spec}}_a$ on $W^s_I(C_F)$, respectively for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,(w_{I,s}\overline{\mu})^{\otimes 2})$ of the operator $M_{\rho}\circ A(\varphi)\circ P^{\mathrm{geom}}_a$ on $W^s_I(C_F)$.
+*are representative functions for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,(w_{I,s}\overline{\mu})^{\otimes 2})$ of the operator $A(\varphi)\circ P^{\mathrm{spec}}_a$ on $W^s_I(C_F)$, respectively for the Hilbert-Schmidt kernel in $L^2(C_F\times C_F,(w_{I,s}\overline{\mu})^{\otimes 2})$ of the operator $M_{\rho}\circ A(\varphi)\circ P^{\mathrm{geom}}_a$ on $W^s_I(C_F)$.*
 
 (3) The function:
 
@@ -2334,7 +2394,7 @@ $$
 w_{I,s}(y)^{-1}\rho(x)\,k^{\mathrm{geom}}_{\varphi,a,I,s}(x,y) \tag{10.4.3.48}
 $$
 
-is a representative function for the Hilbert-Schmidt kernel of the operator $M_{\rho}\circ A(\varphi)\circ P^{\mathrm{geom}}_a$ on $W^s_I(C_F)$.
+*is a representative function for the Hilbert-Schmidt kernel of the operator $M_{\rho}\circ A(\varphi)\circ P^{\mathrm{geom}}_a$ on $W^s_I(C_F)$.*
 
 The following is the resulting general case of Definition 10.4.3.2, allowing arbitrary compact intervals $I=[-\alpha,\alpha]$, for $\alpha\ge 0$ a real number.
 
