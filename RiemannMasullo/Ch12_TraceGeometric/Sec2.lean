@@ -331,7 +331,15 @@ include hH hν hS hb in
 subgroup element leaves the averaged weight invariant. -/
 theorem diagonalIndentationWeight_mul (h : H) (p : G × G) :
     diagonalIndentationWeight H countH b ((h : G) * p.1, (h : G) * p.2) =
-      diagonalIndentationWeight H countH b p := by sorry
+      diagonalIndentationWeight H countH b p := by
+  let w (k : H) := b ((k : G)⁻¹ * p.1) * b ((k : G)⁻¹ * p.2)
+  change (∫ k : H, b ((k : G)⁻¹ * ((h : G) * p.1)) *
+    b ((k : G)⁻¹ * ((h : G) * p.2)) ∂countH) = ∫ k, w k ∂countH
+  calc
+    _ = ∫ k : H, w (h⁻¹ * k) ∂countH := by
+      apply integral_congr_ae
+      exact ae_of_all _ fun k ↦ by simp [w, mul_assoc]
+    _ = _ := integral_mul_left_eq_self w h⁻¹
 
 /-- Paper: (12.2.2.2), p. 508. Lift a quotient kernel by pulling it back in both
 coordinates and multiplying by the subgroup-averaged indentation weight. -/
