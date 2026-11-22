@@ -4443,6 +4443,491 @@ private theorem finiteLocalAdditiveTamagawaMeasure_inverseDifferentBall (v : Pri
     (ENNReal.ofReal_pos.mpr (Real.sqrt_pos_of_pos (pow_pos hq _))).ne' ENNReal.ofReal_ne_top,
     mul_one, inv_inv]
 
+section FiniteLocalTraceDual
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct
+
+local notation "O(" F ")" => (fun w : Primes(F) ↦ HeightOneSpectrum.adicCompletionIntegers F w)
+
+/-- Norms on a completion at a finite place are integral powers of the residue cardinality. -/
+private theorem norm_adicCompletion_eq_zpow (v : Primes(F)) {z : v.adicCompletion F} (hz : z ≠ 0) :
+    ‖z‖ = (v.asIdeal.absNorm : ℝ) ^ (WithZero.log (Valued.v z)) := by
+  rw [FinitePlace.norm_def, WithZeroMulInt.toNNReal_neg_apply _ ((Valuation.ne_zero_iff _).mpr hz)]
+  push_cast
+  rfl
+
+private theorem norm_coe_le_zpow_iff (v : Primes(F)) (r : 𝓞 F) (n : ℕ) :
+    ‖(algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F r))‖ ≤
+      (v.asIdeal.absNorm : ℝ) ^ (-(n : ℤ)) ↔ r ∈ v.asIdeal ^ n := by
+  rw [← HeightOneSpectrum.intValuation_le_pow_iff_mem, FinitePlace.norm_def]
+  have hq : (1 : ℝ≥0) < v.asIdeal.absNorm := HeightOneSpectrum.one_lt_absNorm_nnreal v
+  have hval : Valued.v (algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F r)) =
+      v.intValuation r := by
+    rw [show algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F r) =
+      ((algebraMap (𝓞 F) F r : F) : v.adicCompletion F) from rfl,
+      HeightOneSpectrum.valuedAdicCompletion_eq_valuation',
+      HeightOneSpectrum.valuation_of_algebraMap]
+  rw [hval, ← (WithZeroMulInt.toNNReal_strictMono hq).le_iff_le,
+    WithZeroMulInt.toNNReal_neg_apply _ WithZero.exp_ne_zero, WithZero.log_exp]
+  rw [← NNReal.coe_le_coe]
+  push_cast
+  rfl
+
+private theorem exists_ball_trace_mem (v : Primes(F)) (u : Primes(ℚ))
+    (j : u.adicCompletion ℚ →+* v.adicCompletion F) (hj : Continuous j) :
+    letI := j.toAlgebra
+    Module.Finite (u.adicCompletion ℚ) (v.adicCompletion F) →
+      ∃ ε > 0, ∀ z : v.adicCompletion F, ‖z‖ < ε →
+        Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) z ∈ u.adicCompletionIntegers ℚ := by
+  intro hfin
+  let := j.toAlgebra
+  let K := u.adicCompletion ℚ
+  obtain ⟨π, hπ⟩ : ∃ π : u.adicCompletionIntegers ℚ, (Valued.v : Valuation K _).IsUniformizer (π : K) :=
+    (Valued.v : Valuation K _).exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hπn : ‖(π : K)‖ = (u.asIdeal.absNorm : ℝ)⁻¹ := norm_uniformizer_adicCompletion u _ hπ
+  let : NontriviallyNormedField K :=
+    { (inferInstance : NormedField K) with
+      non_trivial := ⟨(π : K)⁻¹, by
+        rw [norm_inv, hπn, inv_inv]
+        exact_mod_cast HeightOneSpectrum.one_lt_absNorm u⟩ }
+  let : ContinuousSMul K (v.adicCompletion F) :=
+    ⟨(hj.comp continuous_fst).mul continuous_snd⟩
+  let : FiniteDimensional K (v.adicCompletion F) := hfin
+  have hc : Continuous (Algebra.trace K (v.adicCompletion F)) :=
+    LinearMap.continuous_of_finiteDimensional _
+  have hopen : IsOpen ((Algebra.trace K (v.adicCompletion F)) ⁻¹'
+      (u.adicCompletionIntegers ℚ : Set K)) :=
+    (Valued.isOpen_valuationSubring _).preimage hc
+  have h0 : (0 : v.adicCompletion F) ∈ (Algebra.trace K (v.adicCompletion F)) ⁻¹'
+      (u.adicCompletionIntegers ℚ : Set K) := by
+    simp only [mem_preimage, map_zero]
+    exact (u.adicCompletionIntegers ℚ).zero_mem
+  obtain ⟨ε, hε, hball⟩ := Metric.isOpen_iff.mp hopen 0 h0
+  refine ⟨ε, hε, fun z hz ↦ hball ?_⟩
+  simpa [Metric.mem_ball, dist_zero_right] using hz
+
+/-- The adelic trace of a diagonal element is the diagonal image of its field trace. -/
+private theorem adeleTrace_algebraMap (x : F) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    Algebra.trace 𝔸[ℚ] 𝔸[F] (algebraMap F 𝔸[F] x) =
+      algebraMap ℚ 𝔸[ℚ] (Algebra.trace ℚ F x) := by
+  classical
+  let ι := Module.Free.ChooseBasisIndex ℤ (𝓞 F)
+  let dQ := algebraMap ℚ 𝔸[ℚ]
+  let dF := algebraMap F 𝔸[F]
+  let : Algebra 𝔸[ℚ] 𝔸[F] := (rationalAdeleEmbedding F).toAlgebra
+  obtain ⟨b, hb⟩ := exists_adelicIntegralBasis F
+  let c := integralBasis F
+  have hdiag (q : ι → ℚ) : b.equivFun.symm (dQ ∘ q) = dF (c.equivFun.symm q) := by
+    rw [Module.Basis.equivFun_symm_apply, Module.Basis.equivFun_symm_apply, map_sum]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    simp only [hb, Function.comp_apply, Algebra.smul_def, map_mul]
+    exact congrArg (· * dF (c i)) ((rationalAdeleEmbedding_spec F).2.1 (q i))
+  have hrepr (x : F) (i : ι) : b.repr (dF x) i = dQ (c.repr x i) := by
+    have h := hdiag (c.equivFun x)
+    rw [LinearEquiv.symm_apply_apply] at h
+    rw [← h, ← Module.Basis.equivFun_apply, LinearEquiv.apply_symm_apply]
+    rfl
+  change Algebra.trace 𝔸[ℚ] 𝔸[F] (dF x) = _
+  rw [Algebra.trace_eq_matrix_trace b, Algebra.trace_eq_matrix_trace c, AddMonoidHom.map_trace]
+  congr 1
+  ext i j
+  change (Algebra.leftMulMatrix b (dF x)) i j = dQ ((Algebra.leftMulMatrix c x) i j)
+  rw [Algebra.leftMulMatrix_eq_repr_mul, Algebra.leftMulMatrix_eq_repr_mul, hb, ← map_mul, hrepr]
+
+/-- The component at a rational prime of an adelic trace only sees the places above it. -/
+private theorem adeleTrace_eval_eq_sum (u : Primes(ℚ)) (S : Finset (Primes(F)))
+    (hS : ∀ w : Primes(F),
+      u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)) → w ∈ S)
+    (a : 𝔸[F]) :
+    letI := (rationalAdeleEmbedding F).toAlgebra
+    finiteAdeleEval ℚ u (Algebra.trace 𝔸[ℚ] 𝔸[F] a) =
+      ∑ w ∈ S, finiteAdeleEval ℚ u (Algebra.trace 𝔸[ℚ] 𝔸[F]
+        (finiteAdeleSingle F w (finiteAdeleEval F w a))) := by
+  let := (rationalAdeleEmbedding F).toAlgebra
+  let T := Algebra.trace 𝔸[ℚ] 𝔸[F]
+  let e : 𝔸[ℚ] := finiteAdeleSingle ℚ u 1
+  let a' : 𝔸[F] := ∑ w ∈ S, finiteAdeleSingle F w (finiteAdeleEval F w a)
+  have hs := rationalAdeleEmbedding_spec F
+  have hz : rationalAdeleEmbedding F e * (a - a') = 0 := by
+    apply Prod.ext
+    · funext w
+      change (rationalAdeleEmbedding F e).1 w * (a - a').1 w = 0
+      rw [hs.2.2.1 w e rfl, zero_mul]
+    · apply FiniteAdeleRing.ext
+      intro w
+      change finiteAdeleEval F w (rationalAdeleEmbedding F e * (a - a')) = 0
+      by_cases hw : w ∈ S
+      · have h : finiteAdeleEval F w a' = finiteAdeleEval F w a := by
+          rw [map_sum, Finset.sum_eq_single w]
+          · exact RestrictedProduct.single_eq_same (O(F)) w _
+          · intro w' _ hw'
+            exact RestrictedProduct.single_eq_of_ne (O(F)) _ (Ne.symm hw')
+          · exact fun h ↦ (h hw).elim
+        rw [map_mul, map_sub, h, sub_self, mul_zero]
+      · have h : finiteAdeleEval F w (rationalAdeleEmbedding F e) = 0 := by
+          refine hs.2.2.2 (w.under (𝓞 ℚ)) w rfl e ?_
+          change RestrictedProduct.single (O(ℚ)) u 1 (w.under (𝓞 ℚ)) = 0
+          refine RestrictedProduct.single_eq_of_ne (O(ℚ)) _ fun h ↦ hw (hS w ?_)
+          rw [← h]
+          rfl
+        rw [map_mul, h, zero_mul]
+  have hT : e • T (a - a') = 0 := by
+    rw [← map_smul, Algebra.smul_def]
+    change T (rationalAdeleEmbedding F e * (a - a')) = 0
+    rw [hz, map_zero]
+  have he : finiteAdeleEval ℚ u e = 1 := RestrictedProduct.single_eq_same (O(ℚ)) u 1
+  have h0 : finiteAdeleEval ℚ u (T (a - a')) = 0 := by
+    have := congrArg (finiteAdeleEval ℚ u) hT
+    rwa [smul_eq_mul, map_mul, he, one_mul, map_zero] at this
+  rw [map_sub, map_sub, sub_eq_zero] at h0
+  change finiteAdeleEval ℚ u (T a) = _
+  rw [h0, map_sum, map_sum]
+
+/-- Only finitely many primes lie above a given rational prime. -/
+private theorem finite_primesAbove (u : Primes(ℚ)) :
+    {w : Primes(F) |
+      u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))}.Finite := by
+  let I : Ideal (𝓞 F) := u.asIdeal.map (RingOfIntegers.mapRingHom (algebraMap ℚ F))
+  have hI : I ≠ 0 := by
+    intro h
+    apply u.ne_bot
+    refine (Ideal.map_eq_bot_iff_of_injective (f := RingOfIntegers.mapRingHom (algebraMap ℚ F))
+      fun a b hab ↦ RingOfIntegers.ext ((algebraMap ℚ F).injective ?_)).mp h
+    rw [← RingOfIntegers.mapRingHom_apply, ← RingOfIntegers.mapRingHom_apply, hab]
+  refine (Ideal.finite_factors hI).subset fun w hw ↦ ?_
+  change w.asIdeal ∣ I
+  rw [Ideal.dvd_iff_le]
+  exact Ideal.map_le_iff_le_comap.mpr (le_of_eq hw)
+
+/-- Local-global compatibility of traces: up to local integers, the local trace at `v`
+of a global element is its field trace once it is small at the other places above `u`. -/
+private theorem trace_localGlobal (v : Primes(F)) (u : Primes(ℚ))
+    (hu : u.asIdeal = v.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)))
+    (j : u.adicCompletion ℚ →+* v.adicCompletion F) (hj : Continuous j)
+    (hdiag : ∀ r : ℚ, j (algebraMap ℚ (u.adicCompletion ℚ) r) =
+      algebraMap F (v.adicCompletion F) (algebraMap ℚ F r)) :
+    letI := j.toAlgebra
+    ∃ ε : Primes(F) → ℝ, (∀ w, 0 < ε w) ∧ ∀ x : F,
+      (∀ w : Primes(F), w ≠ v →
+        u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)) →
+          ‖algebraMap F (w.adicCompletion F) x‖ < ε w) →
+      Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) (algebraMap F (v.adicCompletion F) x) -
+        algebraMap ℚ (u.adicCompletion ℚ) (Algebra.trace ℚ F x) ∈ u.adicCompletionIntegers ℚ := by
+  let := j.toAlgebra
+  let := (rationalAdeleEmbedding F).toAlgebra
+  let T := Algebra.trace 𝔸[ℚ] 𝔸[F]
+  let P := finiteAdeleEval ℚ u
+  obtain ⟨b⟩ := rationalAdeleEmbedding_hasBasis F
+  have hp : Surjective P := fun z ↦
+    ⟨finiteAdeleSingle ℚ u z, RestrictedProduct.single_eq_same (O(ℚ)) u z⟩
+  have hloc (w : Primes(F))
+      (hw : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))) :
+      ∃ ε > 0, ∀ z : w.adicCompletion F, ‖z‖ < ε →
+        P (T (finiteAdeleSingle F w z)) ∈ u.adicCompletionIntegers ℚ := by
+    obtain ⟨jw, hjw, -, hlocalw⟩ := exists_finiteAdeleEmbedding F w u hw
+    let := jw.toAlgebra
+    obtain ⟨hfinite, htrace⟩ := trace_of_algebra_projection b P hp (finiteAdeleEval F w)
+      (finiteAdeleSingle F w) (fun z ↦ RestrictedProduct.single_eq_same (O(F)) w z) hlocalw
+      (finiteAdeleSingle_mul F w)
+    obtain ⟨ε, hε, hball⟩ := exists_ball_trace_mem F w u jw hjw hfinite
+    exact ⟨ε, hε, fun z hz ↦ (htrace z).symm ▸ hball z hz⟩
+  have hv (z : v.adicCompletion F) : P (T (finiteAdeleSingle F v z)) =
+      Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) z := by
+    obtain ⟨jv, hjv, hdiagv, hlocalv⟩ := exists_finiteAdeleEmbedding F v u hu
+    have hjj : j = jv := by
+      apply RingHom.ext
+      intro r
+      exact congrFun ((HeightOneSpectrum.denseRange_algebraMap (K := ℚ) (v := u)).equalizer
+        hj hjv (funext fun q ↦ (hdiag q).trans (hdiagv q).symm)) r
+    subst hjj
+    exact (trace_of_algebra_projection b P hp (finiteAdeleEval F v)
+      (finiteAdeleSingle F v) (fun z ↦ RestrictedProduct.single_eq_same (O(F)) v z) hlocalv
+      (finiteAdeleSingle_mul F v)).2 z
+  let ε (w : Primes(F)) : ℝ :=
+    if hw : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F)) then
+      Classical.choose (hloc w hw) else 1
+  have hε (w : Primes(F)) : 0 < ε w := by
+    by_cases hw : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))
+    · simp only [ε, dite_eq_left hw]
+      exact (Classical.choose_spec (hloc w hw)).1
+    · simp only [ε, dite_eq_right hw]
+      exact one_pos
+  refine ⟨ε, hε, fun x hx ↦ ?_⟩
+  let S := (finite_primesAbove F u).toFinset
+  have hS (w : Primes(F))
+      (hw : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))) : w ∈ S :=
+    (finite_primesAbove F u).mem_toFinset.mpr hw
+  have hsum := adeleTrace_eval_eq_sum F u S hS (algebraMap F 𝔸[F] x)
+  rw [adeleTrace_algebraMap] at hsum
+  change algebraMap ℚ (u.adicCompletion ℚ) (Algebra.trace ℚ F x) =
+    ∑ w ∈ S, P (T (finiteAdeleSingle F w (algebraMap F (w.adicCompletion F) x))) at hsum
+  rw [hsum, ← Finset.add_sum_erase S _ (hS v hu), hv, sub_add_cancel_left]
+  refine neg_mem (sum_mem fun w hw ↦ ?_)
+  obtain ⟨hwv, hwS⟩ := Finset.mem_erase.mp hw
+  have hwu := (finite_primesAbove F u).mem_toFinset.mp hwS
+  refine (Classical.choose_spec (hloc w hwu)).2 _ ?_
+  have h := hx w hwv hwu
+  have hεw : ε w = Classical.choose (hloc w hwu) := dite_eq_left hwu
+  rwa [hεw] at h
+
+private theorem norm_algebraMap_adicCompletion (v : Primes(F)) (k : F) :
+    ‖algebraMap F (v.adicCompletion F) k‖ =
+      (WithZeroMulInt.toNNReal (HeightOneSpectrum.absNorm_ne_zero v) (v.valuation F k) : ℝ) := by
+  rw [FinitePlace.norm_def, show algebraMap F (v.adicCompletion F) k = (k : v.adicCompletion F)
+    from rfl, HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+
+/-- Global integers are dense in the local integers. -/
+private theorem exists_integer_near (v : Primes(F)) (b : v.adicCompletion F) (hb : ‖b‖ ≤ 1)
+    {η : ℝ} (hη : 0 < η) :
+    ∃ a : 𝓞 F, ‖b - algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)‖ < η := by
+  have hq : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  obtain ⟨f, hf⟩ : ∃ f : F, ‖b - algebraMap F (v.adicCompletion F) f‖ < min (η / 2) 1 := by
+    obtain ⟨f, hf⟩ := Metric.denseRange_iff.mp
+      (HeightOneSpectrum.denseRange_algebraMap (K := F) (v := v)) b _
+      (lt_min (half_pos hη) one_pos)
+    exact ⟨f, by rwa [dist_eq_norm] at hf⟩
+  have hf1 : ‖algebraMap F (v.adicCompletion F) f‖ ≤ 1 := by
+    have h := IsUltrametricDist.norm_add_le_max b (algebraMap F (v.adicCompletion F) f - b)
+    rw [add_sub_cancel] at h
+    refine h.trans (max_le hb ?_)
+    rw [norm_sub_rev]
+    exact (hf.trans_le (min_le_right _ _)).le
+  have hfv : v.valuation F f ≤ 1 := by
+    rw [norm_algebraMap_adicCompletion] at hf1
+    exact (WithZeroMulInt.toNNReal_le_one_iff (HeightOneSpectrum.one_lt_absNorm_nnreal v)).mp
+      (by exact_mod_cast hf1)
+  obtain ⟨n, hn⟩ := exists_pow_lt_of_lt_one (half_pos hη) (inv_lt_one_of_one_lt₀ hq)
+  obtain ⟨a, ha⟩ := HeightOneSpectrum.exists_valuation_sub_lt_of_integer (K := F) v hfv
+    (Units.mk0 (WithZero.exp (-(n : ℤ))) WithZero.exp_ne_zero)
+  refine ⟨a, ?_⟩
+  have hfa : ‖algebraMap F (v.adicCompletion F) f -
+      algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)‖ < η / 2 := by
+    rw [norm_sub_rev, ← map_sub, norm_algebraMap_adicCompletion]
+    have h1 := (WithZeroMulInt.toNNReal_strictMono (HeightOneSpectrum.one_lt_absNorm_nnreal v)) ha
+    rw [Units.val_mk0, WithZeroMulInt.toNNReal_neg_apply _ WithZero.exp_ne_zero,
+      WithZero.log_exp] at h1
+    calc _ < (((v.asIdeal.absNorm : ℝ≥0) ^ (-(n : ℤ)) : ℝ≥0) : ℝ) := NNReal.coe_lt_coe.mpr h1
+      _ = (v.asIdeal.absNorm : ℝ)⁻¹ ^ n := by
+        push_cast
+        rw [zpow_neg, zpow_natCast, inv_pow]
+      _ < η / 2 := hn
+  calc _ ≤ ‖b - algebraMap F (v.adicCompletion F) f‖ + ‖algebraMap F (v.adicCompletion F) f -
+        algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)‖ := norm_sub_le_norm_sub_add_norm_sub _ _ _
+    _ < η / 2 + η / 2 := add_lt_add (hf.trans_le (min_le_left _ _)) hfa
+    _ = η := add_halves η
+
+/-- An element of a given ideal that is a unit at `v` and small at finitely many other places. -/
+private theorem exists_mem_notMem_small (v : Primes(F)) (I : Ideal (𝓞 F)) (hI : ¬ I ≤ v.asIdeal)
+    (T : Finset (Primes(F))) (η : Primes(F) → ℝ) (hη : ∀ w, 0 < η w) :
+    ∃ s ∈ I, s ∉ v.asIdeal ∧ ∀ w ∈ T, w ≠ v →
+      ‖algebraMap F (w.adicCompletion F) (algebraMap (𝓞 F) F s)‖ < η w := by
+  have hL (w : Primes(F)) : ∃ L : ℕ, (w.asIdeal.absNorm : ℝ) ^ (-(L : ℤ)) < η w := by
+    have hq : (1 : ℝ) < w.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm w
+    obtain ⟨n, hn⟩ := exists_pow_lt_of_lt_one (hη w) (inv_lt_one_of_one_lt₀ hq)
+    exact ⟨n, by rwa [zpow_neg, zpow_natCast, ← inv_pow]⟩
+  choose L hL using hL
+  have hM : ¬ (∏ w ∈ T.erase v, w.asIdeal ^ L w) ≤ v.asIdeal := by
+    rw [Ideal.IsPrime.prod_le v.isPrime]
+    rintro ⟨w, hw, hle⟩
+    have hwv := (Finset.mem_erase.mp hw).1
+    have hwle : w.asIdeal ≤ v.asIdeal := v.isPrime.le_of_pow_le hle
+    exact hwv (HeightOneSpectrum.ext (w.isMaximal.eq_of_le v.isPrime.ne_top hwle))
+  have hIM : ¬ I * (∏ w ∈ T.erase v, w.asIdeal ^ L w) ≤ v.asIdeal := by
+    rw [Ideal.IsPrime.mul_le v.isPrime]
+    exact not_or.mpr ⟨hI, hM⟩
+  obtain ⟨s, hs, hsv⟩ : ∃ s ∈ I * (∏ w ∈ T.erase v, w.asIdeal ^ L w), s ∉ v.asIdeal := by
+    by_contra hcon
+    exact hIM fun s hs ↦ by_contra fun hsv ↦ hcon ⟨s, hs, hsv⟩
+  have hsI : s ∈ I := (Ideal.mul_le_left : I * (∏ w ∈ T.erase v, w.asIdeal ^ L w) ≤ I) hs
+  have hsM : s ∈ ∏ w ∈ T.erase v, w.asIdeal ^ L w :=
+    (Ideal.mul_le_right : I * (∏ w ∈ T.erase v, w.asIdeal ^ L w) ≤ _) hs
+  refine ⟨s, hsI, hsv, fun w hw hwv ↦ ?_⟩
+  have hsw : s ∈ w.asIdeal ^ L w :=
+    Ideal.le_of_dvd (Finset.dvd_prod_of_mem (fun w : Primes(F) ↦ w.asIdeal ^ L w)
+      (Finset.mem_erase.mpr ⟨hwv, hw⟩)) hsM
+  exact ((norm_coe_le_zpow_iff F w s (L w)).mpr hsw).trans_lt (hL w)
+
+/-- An element of the different with the exact `v`-adic order. -/
+private theorem exists_different_witness (v : Primes(F)) :
+    ∃ δ ∈ differentIdeal ℤ (𝓞 F), δ ∈ v.asIdeal ^ differentExp(F, v) ∧
+      δ ∉ v.asIdeal ^ (differentExp(F, v) + 1) := by
+  have hD : differentIdeal ℤ (𝓞 F) ≠ ⊥ := differentIdeal_ne_bot
+  have hfin : FiniteMultiplicity v.asIdeal (differentIdeal ℤ (𝓞 F)) :=
+    FiniteMultiplicity.of_prime_left v.prime hD
+  have hle : differentIdeal ℤ (𝓞 F) ≤ v.asIdeal ^ differentExp(F, v) :=
+    Ideal.le_of_dvd (pow_multiplicity_dvd _ _)
+  have hnle : ¬ differentIdeal ℤ (𝓞 F) ≤ v.asIdeal ^ (differentExp(F, v) + 1) := fun h ↦
+    hfin.not_pow_dvd_of_multiplicity_lt (Nat.lt_succ_self _) (Ideal.dvd_iff_le.mpr h)
+  obtain ⟨δ, hδ, hδv⟩ := IsConcreteLE.not_le_iff_exists.mp hnle
+  exact ⟨δ, hδ, hle hδ, hδv⟩
+
+private theorem norm_of_exact_order (v : Primes(F)) (δ : 𝓞 F) (n : ℕ) (h1 : δ ∈ v.asIdeal ^ n)
+    (h2 : δ ∉ v.asIdeal ^ (n + 1)) :
+    ‖algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F δ)‖ =
+      (v.asIdeal.absNorm : ℝ) ^ (-(n : ℤ)) := by
+  have hq : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hle := (norm_coe_le_zpow_iff F v δ n).mpr h1
+  have hlt : ¬ _ := mt (norm_coe_le_zpow_iff F v δ (n + 1)).mp h2
+  have hne : algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F δ) ≠ 0 := by
+    intro h0
+    apply hlt
+    rw [h0, norm_zero]
+    positivity
+  rw [norm_adicCompletion_eq_zpow F v hne] at hle hlt ⊢
+  rw [zpow_le_zpow_iff_right₀ hq] at hle
+  rw [not_le, zpow_lt_zpow_iff_right₀ hq] at hlt
+  congr 1
+  push_cast at hlt
+  omega
+
+open scoped nonZeroDivisors in
+/-- Membership in the inverse different, as a trace condition and as a multiplier condition. -/
+private theorem trace_int_iff_mul_different (x : F) :
+    (∀ a : 𝓞 F, Algebra.trace ℚ F (x * algebraMap (𝓞 F) F a) ∈ (algebraMap ℤ ℚ).range) ↔
+      ∀ δ ∈ differentIdeal ℤ (𝓞 F), x * algebraMap (𝓞 F) F δ ∈ (algebraMap (𝓞 F) F).range := by
+  have hD : (differentIdeal ℤ (𝓞 F) : FractionalIdeal (𝓞 F)⁰ F) ≠ 0 := by
+    rw [ne_eq, FractionalIdeal.coeIdeal_eq_zero]
+    exact differentIdeal_ne_bot
+  have h1 : x ∈ FractionalIdeal.dual ℤ ℚ (1 : FractionalIdeal (𝓞 F)⁰ F) ↔
+      ∀ a : 𝓞 F, Algebra.trace ℚ F (x * algebraMap (𝓞 F) F a) ∈ (algebraMap ℤ ℚ).range := by
+    rw [FractionalIdeal.mem_dual one_ne_zero]
+    constructor
+    · intro h a
+      exact h _ (FractionalIdeal.mem_one_iff _ |>.mpr ⟨a, rfl⟩)
+    · intro h a ha
+      obtain ⟨a', rfl⟩ := (FractionalIdeal.mem_one_iff _).mp ha
+      exact h a'
+  have h2 : x ∈ FractionalIdeal.dual ℤ ℚ (1 : FractionalIdeal (𝓞 F)⁰ F) ↔
+      ∀ δ ∈ differentIdeal ℤ (𝓞 F), x * algebraMap (𝓞 F) F δ ∈ (algebraMap (𝓞 F) F).range := by
+    rw [← inv_inv (FractionalIdeal.dual ℤ ℚ (1 : FractionalIdeal (𝓞 F)⁰ F)),
+      ← coeIdeal_differentIdeal (A := ℤ) (K := ℚ) (L := F) (B := 𝓞 F), FractionalIdeal.mem_inv_iff hD]
+    constructor
+    · intro h δ hδ
+      obtain ⟨y, hy⟩ := (FractionalIdeal.mem_one_iff _).mp
+        (h _ (FractionalIdeal.mem_coeIdeal _ |>.mpr ⟨δ, hδ, rfl⟩))
+      exact ⟨y, hy⟩
+    · intro h y hy
+      obtain ⟨δ, hδ, rfl⟩ := (FractionalIdeal.mem_coeIdeal _).mp hy
+      obtain ⟨z, hz⟩ := h δ hδ
+      exact (FractionalIdeal.mem_one_iff _).mpr ⟨z, hz⟩
+  rw [← h1, h2]
+
+private theorem norm_coe_int_le_one (v : Primes(F)) (a : 𝓞 F) :
+    ‖algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)‖ ≤ 1 := by
+  rw [norm_algebraMap_adicCompletion, HeightOneSpectrum.valuation_of_algebraMap]
+  exact_mod_cast (WithZeroMulInt.toNNReal_le_one_iff
+    (HeightOneSpectrum.one_lt_absNorm_nnreal v)).mpr (v.intValuation_le_one a)
+
+private theorem norm_coe_int_eq_one (v : Primes(F)) (a : 𝓞 F) (ha : a ∉ v.asIdeal) :
+    ‖algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)‖ = 1 := by
+  rw [norm_algebraMap_adicCompletion, HeightOneSpectrum.valuation_of_algebraMap,
+    (v.intValuation_eq_one_iff_mem_primeCompl a).mpr ha, map_one, NNReal.coe_one]
+
+/-- Elements of the inverse different have `v`-adic norm at most `qᵥ^dᵥ`. -/
+private theorem norm_le_of_mul_different (v : Primes(F)) (x : F)
+    (hx : ∀ δ ∈ differentIdeal ℤ (𝓞 F), x * algebraMap (𝓞 F) F δ ∈ (algebraMap (𝓞 F) F).range) :
+    ‖algebraMap F (v.adicCompletion F) x‖ ≤ (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v) := by
+  obtain ⟨δ, hδ, h1, h2⟩ := exists_different_witness F v
+  have hn := norm_of_exact_order F v δ _ h1 h2
+  obtain ⟨a, ha⟩ := hx δ hδ
+  have hq : (0 : ℝ) < v.asIdeal.absNorm := by
+    exact_mod_cast zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)
+  have hle : ‖algebraMap F (v.adicCompletion F) x‖ *
+      ‖algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F δ)‖ ≤ 1 := by
+    rw [← norm_mul, ← map_mul, ← ha]
+    exact norm_coe_int_le_one F v a
+  rw [hn, zpow_neg, zpow_natCast, ← div_eq_mul_inv, div_le_one (pow_pos hq _)] at hle
+  exact hle
+
+/-- An element of the inverse different of exact `v`-adic norm `qᵥ^dᵥ`, small at finitely
+many other places. -/
+private theorem exists_inverseDifferent_small (v : Primes(F)) (T : Finset (Primes(F)))
+    (η : Primes(F) → ℝ) (hη : ∀ w, 0 < η w) :
+    ∃ x : F, (∀ δ ∈ differentIdeal ℤ (𝓞 F),
+        x * algebraMap (𝓞 F) F δ ∈ (algebraMap (𝓞 F) F).range) ∧
+      ‖algebraMap F (v.adicCompletion F) x‖ = (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v) ∧
+      ∀ w ∈ T, w ≠ v → ‖algebraMap F (w.adicCompletion F) x‖ < η w := by
+  obtain ⟨δ, hδ, h1, h2⟩ := exists_different_witness F v
+  have hδ0 : δ ≠ 0 := by
+    rintro rfl
+    exact h2 (Ideal.zero_mem _)
+  have hδF : algebraMap (𝓞 F) F δ ≠ 0 := fun h ↦ hδ0 (RingOfIntegers.coe_injective (by
+    rw [h, map_zero]))
+  obtain ⟨E, hE⟩ : differentIdeal ℤ (𝓞 F) ∣ Ideal.span {δ} :=
+    Ideal.dvd_iff_le.mpr ((Ideal.span_singleton_le_iff_mem _).mpr hδ)
+  have hEv : ¬ E ≤ v.asIdeal := by
+    intro hle
+    apply h2
+    have hspan : Ideal.span {δ} ≤ v.asIdeal ^ (differentExp(F, v) + 1) := by
+      rw [hE, pow_succ]
+      exact Ideal.mul_mono (Ideal.le_of_dvd (pow_multiplicity_dvd _ _)) hle
+    exact hspan (Ideal.mem_span_singleton_self δ)
+  have hδw (w : Primes(F)) : 0 < ‖algebraMap F (w.adicCompletion F) (algebraMap (𝓞 F) F δ)‖ :=
+    norm_pos_iff.mpr ((map_ne_zero _).mpr hδF)
+  obtain ⟨c, hcE, hcv, hcw⟩ := exists_mem_notMem_small F v E hEv T
+    (fun w ↦ η w * ‖algebraMap F (w.adicCompletion F) (algebraMap (𝓞 F) F δ)‖)
+    (fun w ↦ mul_pos (hη w) (hδw w))
+  refine ⟨algebraMap (𝓞 F) F c / algebraMap (𝓞 F) F δ, ?_, ?_, ?_⟩
+  · intro δ' hδ'
+    have hmem : c * δ' ∈ Ideal.span {δ} := by
+      rw [hE, mul_comm c]
+      exact Ideal.mul_mem_mul hδ' hcE
+    obtain ⟨t, ht⟩ := Ideal.mem_span_singleton'.mp hmem
+    refine ⟨t, ?_⟩
+    rw [div_mul_eq_mul_div, eq_div_iff hδF, ← map_mul, ← map_mul, ht]
+  · rw [map_div₀, norm_div, norm_coe_int_eq_one F v c hcv, norm_of_exact_order F v δ _ h1 h2,
+      zpow_neg, zpow_natCast, one_div, inv_inv]
+  · intro w hw hwv
+    rw [map_div₀, norm_div, div_lt_iff₀ (hδw w)]
+    exact hcw w hw hwv
+
+private theorem natGenerator_dvd_iff' (u : Primes(ℚ)) (n : ℕ) :
+    Rat.HeightOneSpectrum.natGenerator u ∣ n ↔ (n : 𝓞 ℚ) ∈ u.asIdeal := by
+  rw [Rat.HeightOneSpectrum.natGenerator_dvd_iff, Ideal.mem_map_of_equiv]
+  constructor
+  · rintro ⟨y, hy, hy'⟩
+    have hyn : y = (n : 𝓞 ℚ) :=
+      (Rat.IsIntegralClosure.intEquiv (𝓞 ℚ)).injective (by rw [hy', map_natCast])
+    rwa [← hyn]
+  · intro h
+    exact ⟨n, h, map_natCast _ n⟩
+
+/-- A rational number which is integral at `u` and has a denominator dividing a power
+of the prime below `u` is an integer. -/
+private theorem rat_mem_range_of (u : Primes(ℚ)) (r : ℚ) (k : ℕ)
+    (hk : ((Rat.HeightOneSpectrum.natGenerator u : ℚ) ^ k * r) ∈ (algebraMap ℤ ℚ).range)
+    (hr : algebraMap ℚ (u.adicCompletion ℚ) r ∈ u.adicCompletionIntegers ℚ) :
+    r ∈ (algebraMap ℤ ℚ).range := by
+  have hp : (Rat.HeightOneSpectrum.natGenerator u).Prime :=
+    Rat.HeightOneSpectrum.prime_natGenerator u
+  have hval : u.valuation ℚ r ≤ 1 := by
+    have h := (HeightOneSpectrum.mem_adicCompletionIntegers (𝓞 ℚ) ℚ u).mp hr
+    have hcoe : algebraMap ℚ (u.adicCompletion ℚ) r = FinitePlace.embedding u r :=
+      RingHom.congr_fun (Subsingleton.elim (algebraMap ℚ (u.adicCompletion ℚ))
+        (FinitePlace.embedding u)) r
+    rwa [hcoe, FinitePlace.embedding_apply,
+      HeightOneSpectrum.valuedAdicCompletion_eq_valuation'] at h
+  have hden : ((r.den : ℕ) : 𝓞 ℚ) ∉ u.asIdeal := Rat.valuation_le_one_iff_den.mp hval
+  obtain ⟨n, hn⟩ := hk
+  have hdvd : r.den ∣ Rat.HeightOneSpectrum.natGenerator u ^ k := by
+    have hpk : ((Rat.HeightOneSpectrum.natGenerator u : ℚ) ^ k) ≠ 0 :=
+      pow_ne_zero _ (by exact_mod_cast hp.ne_zero)
+    have hr' : r = Rat.divInt n ((Rat.HeightOneSpectrum.natGenerator u : ℤ) ^ k) := by
+      rw [Rat.divInt_eq_div]
+      push_cast
+      rw [eq_div_iff hpk, mul_comm]
+      simpa using hn.symm
+    have h := Rat.den_dvd n ((Rat.HeightOneSpectrum.natGenerator u : ℤ) ^ k)
+    rw [← hr'] at h
+    exact_mod_cast h
+  have hndvd : ¬ Rat.HeightOneSpectrum.natGenerator u ∣ r.den := fun h ↦
+    hden ((natGenerator_dvd_iff' u r.den).mp h)
+  have hcop : Nat.Coprime r.den (Rat.HeightOneSpectrum.natGenerator u ^ k) :=
+    (Nat.Coprime.pow_left k (hp.coprime_iff_not_dvd.mpr hndvd)).symm
+  have hden1 : r.den = 1 := hcop.eq_one_of_dvd hdvd
+  exact ⟨r.num, by simpa using Rat.intCast_num_of_den_eq_one hden1⟩
+
 /-- Paper: Example A.3.1.10, p. 558. The trace dual of the local integer ring consists
 of the elements that pair integrally with every local integer. It is the closed ball
 of radius `qᵥ^dᵥ`, where `dᵥ` is the exponent in the global different. -/
@@ -4458,7 +4943,172 @@ theorem finiteLocalTraceDual_eq_closedBall (v : Primes(F)) (u : Primes(ℚ))
           Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F) (x * y) ∈
             u.adicCompletionIntegers ℚ) ↔
         ‖y‖ ≤ (v.asIdeal.absNorm : ℝ) ^ differentExp(F, v) := by
-  sorry
+  let := j.toAlgebra
+  intro hfinite y
+  have hq1 : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (0 : ℝ) < v.asIdeal.absNorm := zero_lt_one.trans hq1
+  obtain ⟨ε, hε, hLG⟩ := trace_localGlobal F v u hu j hj hdiag
+  obtain ⟨εv, hεv, hball⟩ := exists_ball_trace_mem F v u j hj hfinite
+  have hT (w : Primes(F))
+      (hw : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))) :
+      w ∈ (finite_primesAbove F u).toFinset :=
+    (finite_primesAbove F u).mem_toFinset.mpr hw
+  have hmemO (z : v.adicCompletion F) : z ∈ v.adicCompletionIntegers F ↔ ‖z‖ ≤ 1 := by
+    rw [HeightOneSpectrum.mem_adicCompletionIntegers (𝓞 F) F v]
+    exact Valued.toNormedField.norm_le_one_iff.symm
+  have hmod (y z : v.adicCompletion F)
+      (hy : ∀ x ∈ v.adicCompletionIntegers F, Algebra.trace (u.adicCompletion ℚ)
+        (v.adicCompletion F) (x * y) ∈ u.adicCompletionIntegers ℚ) (hzy : ‖z‖ ≤ ‖y‖) :
+      ∀ x ∈ v.adicCompletionIntegers F, Algebra.trace (u.adicCompletion ℚ)
+        (v.adicCompletion F) (x * z) ∈ u.adicCompletionIntegers ℚ := by
+    intro x hx
+    by_cases hy0 : y = 0
+    · rw [hy0, norm_zero, norm_le_zero_iff] at hzy
+      rw [hzy, mul_zero, map_zero]
+      exact (u.adicCompletionIntegers ℚ).zero_mem
+    · have hzy' : z / y ∈ v.adicCompletionIntegers F := (hmemO _).mpr (by
+        rw [norm_div, div_le_one (norm_pos_iff.mpr hy0)]
+        exact hzy)
+      have h := hy (x * (z / y)) (mul_mem hx hzy')
+      rwa [mul_assoc, div_mul_cancel₀ z hy0] at h
+  have hintZ (t : ℚ) (ht : t ∈ (algebraMap ℤ ℚ).range) :
+      algebraMap ℚ (u.adicCompletion ℚ) t ∈ u.adicCompletionIntegers ℚ := by
+    obtain ⟨n, rfl⟩ := ht
+    rw [show algebraMap ℚ (u.adicCompletion ℚ) (algebraMap ℤ ℚ n) = (n : u.adicCompletion ℚ) by
+      simp]
+    exact intCast_mem _ n
+  have hsmall (x : F) (hx : ∀ w ∈ (finite_primesAbove F u).toFinset, w ≠ v →
+      ‖algebraMap F (w.adicCompletion F) x‖ < ε w) (a : 𝓞 F) (w : Primes(F)) (hwv : w ≠ v)
+      (hwu : u.asIdeal = w.asIdeal.comap (RingOfIntegers.mapRingHom (algebraMap ℚ F))) :
+      ‖algebraMap F (w.adicCompletion F) (x * algebraMap (𝓞 F) F a)‖ < ε w := by
+    rw [map_mul, norm_mul]
+    exact (mul_le_of_le_one_right (norm_nonneg _) (norm_coe_int_le_one F w a)).trans_lt
+      (hx w (hT w hwu) hwv)
+  constructor
+  · intro hy
+    by_contra hlt'
+    have hlt := not_le.mp hlt'
+    have hy0 : y ≠ 0 := by
+      rintro rfl
+      rw [norm_zero] at hlt
+      exact (pow_pos hq0 _).not_gt hlt
+    let p := Rat.HeightOneSpectrum.natGenerator u
+    have hp : p.Prime := Rat.HeightOneSpectrum.prime_natGenerator u
+    have hpF : (p : F) ≠ 0 := by exact_mod_cast hp.ne_zero
+    have hpL : (p : v.adicCompletion F) ≠ 0 := by
+      rw [← map_natCast (algebraMap F (v.adicCompletion F))]
+      exact (map_ne_zero _).mpr hpF
+    have hpv : (p : 𝓞 F) ∈ v.asIdeal := by
+      have h := (natGenerator_dvd_iff' u p).mp dvd_rfl
+      rw [hu, Ideal.mem_comap, map_natCast] at h
+      exact h
+    have hpn : ‖(p : v.adicCompletion F)‖ < 1 := by
+      have h := (norm_coe_le_zpow_iff F v (p : 𝓞 F) 1).mpr (by rw [pow_one]; exact hpv)
+      rw [map_natCast, map_natCast, Nat.cast_one, zpow_neg, zpow_one] at h
+      exact h.trans_lt (inv_lt_one_of_one_lt₀ hq1)
+    obtain ⟨k, hk⟩ := exists_pow_lt_of_lt_one (inv_pos.mpr (norm_pos_iff.mpr hy0)) hpn
+    let b : v.adicCompletion F := (p : v.adicCompletion F) ^ k * y
+    have hbn : ‖b‖ = ‖(p : v.adicCompletion F)‖ ^ k * ‖y‖ := by
+      rw [norm_mul, norm_pow]
+    have hb : ‖b‖ ≤ 1 := by
+      rw [hbn]
+      calc _ ≤ ‖y‖⁻¹ * ‖y‖ := mul_le_mul_of_nonneg_right hk.le (norm_nonneg _)
+        _ = 1 := inv_mul_cancel₀ (norm_ne_zero_iff.mpr hy0)
+    have hbpos : 0 < ‖b‖ := norm_pos_iff.mpr (mul_ne_zero (pow_ne_zero _ hpL) hy0)
+    obtain ⟨a, ha⟩ := exists_integer_near F v b hb hbpos
+    let x1 : F := algebraMap (𝓞 F) F a / (p : F) ^ k
+    have hx1 : ‖algebraMap F (v.adicCompletion F) x1 - y‖ < ‖y‖ := by
+      have heq : algebraMap F (v.adicCompletion F) x1 - y =
+          (algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a) - b) /
+            (p : v.adicCompletion F) ^ k := by
+        rw [eq_div_iff (pow_ne_zero _ hpL)]
+        simp only [x1, b, map_div₀, map_pow, map_natCast]
+        field_simp
+      rw [heq, norm_div, norm_sub_rev, norm_pow,
+        div_lt_iff₀ (pow_pos (norm_pos_iff.mpr hpL) k)]
+      calc _ < ‖b‖ := ha
+        _ = ‖y‖ * ‖(p : v.adicCompletion F)‖ ^ k := by rw [hbn, mul_comm]
+    have hx1n : ‖algebraMap F (v.adicCompletion F) x1‖ = ‖y‖ := by
+      have h1 := IsUltrametricDist.norm_add_le_max y (algebraMap F (v.adicCompletion F) x1 - y)
+      rw [add_sub_cancel] at h1
+      have h2 := IsUltrametricDist.norm_add_le_max (algebraMap F (v.adicCompletion F) x1)
+        (y - algebraMap F (v.adicCompletion F) x1)
+      rw [add_sub_cancel, norm_sub_rev] at h2
+      refine le_antisymm (h1.trans (max_le le_rfl hx1.le)) ?_
+      rcases le_max_iff.mp h2 with h | h
+      · exact h
+      · exact absurd (h.trans_lt hx1) (lt_irrefl _)
+    obtain ⟨s, -, hsv, hsw⟩ := exists_mem_notMem_small F v ⊤
+      (fun h ↦ v.isPrime.ne_top (top_le_iff.mp h)) (finite_primesAbove F u).toFinset
+      (fun w ↦ ε w / (‖algebraMap F (w.adicCompletion F) x1‖ + 1))
+      (fun w ↦ div_pos (hε w) (by positivity))
+    let x : F := x1 * algebraMap (𝓞 F) F s
+    have hxv : ‖algebraMap F (v.adicCompletion F) x‖ = ‖y‖ := by
+      rw [map_mul, norm_mul, hx1n, norm_coe_int_eq_one F v s hsv, mul_one]
+    have hxw : ∀ w ∈ (finite_primesAbove F u).toFinset, w ≠ v →
+        ‖algebraMap F (w.adicCompletion F) x‖ < ε w := by
+      intro w hw hwv
+      have h := hsw w hw hwv
+      rw [lt_div_iff₀ (by positivity)] at h
+      rw [map_mul, norm_mul]
+      nlinarith [norm_nonneg (algebraMap F (w.adicCompletion F) (algebraMap (𝓞 F) F s)),
+        norm_nonneg (algebraMap F (w.adicCompletion F) x1)]
+    have hxD := hmod y _ hy hxv.le
+    have htr (a' : 𝓞 F) :
+        Algebra.trace ℚ F (x * algebraMap (𝓞 F) F a') ∈ (algebraMap ℤ ℚ).range := by
+      have h1 := hLG (x * algebraMap (𝓞 F) F a') (hsmall x hxw a')
+      have h2 : Algebra.trace (u.adicCompletion ℚ) (v.adicCompletion F)
+          (algebraMap F (v.adicCompletion F) (x * algebraMap (𝓞 F) F a')) ∈
+            u.adicCompletionIntegers ℚ := by
+        rw [map_mul, mul_comm]
+        exact hxD _ ((hmemO _).mpr (norm_coe_int_le_one F v a'))
+      have h3 := (u.adicCompletionIntegers ℚ).sub_mem h2 h1
+      rw [sub_sub_cancel] at h3
+      refine rat_mem_range_of u _ k ?_ h3
+      have hint := (trace_int_iff_mul_different F 1).mpr
+        (fun δ _ ↦ ⟨δ, by rw [one_mul]⟩) (a * s * a')
+      rw [one_mul] at hint
+      have hpk : (p : ℚ) ^ k * Algebra.trace ℚ F (x * algebraMap (𝓞 F) F a') =
+          Algebra.trace ℚ F (algebraMap (𝓞 F) F (a * s * a')) := by
+        rw [← smul_eq_mul, ← LinearMap.map_smul, Algebra.smul_def]
+        congr 1
+        simp only [x, x1, map_mul, map_pow, map_natCast]
+        field_simp
+      rw [hpk]
+      exact hint
+    exact (not_lt.mpr (norm_le_of_mul_different F v x
+      ((trace_int_iff_mul_different F x).mp htr))) (hxv ▸ hlt)
+  · intro hy
+    obtain ⟨x, hxD, hxv, hxw⟩ := exists_inverseDifferent_small F v
+      (finite_primesAbove F u).toFinset ε hε
+    have hx0 : algebraMap F (v.adicCompletion F) x ≠ 0 := by
+      intro h
+      rw [h, norm_zero] at hxv
+      exact (pow_pos hq0 _).ne' hxv.symm
+    have hxloc : ∀ b ∈ v.adicCompletionIntegers F, Algebra.trace (u.adicCompletion ℚ)
+        (v.adicCompletion F) (b * algebraMap F (v.adicCompletion F) x) ∈
+          u.adicCompletionIntegers ℚ := by
+      intro b hb
+      obtain ⟨a, ha⟩ := exists_integer_near F v b ((hmemO b).mp hb)
+        (div_pos hεv (norm_pos_iff.mpr hx0))
+      have hsplit : b * algebraMap F (v.adicCompletion F) x =
+          (b - algebraMap F (v.adicCompletion F) (algebraMap (𝓞 F) F a)) *
+            algebraMap F (v.adicCompletion F) x +
+          algebraMap F (v.adicCompletion F) (x * algebraMap (𝓞 F) F a) := by
+        rw [map_mul]
+        ring
+      rw [hsplit, map_add]
+      refine add_mem (hball _ ?_) ?_
+      · rw [norm_mul, ← lt_div_iff₀ (norm_pos_iff.mpr hx0)]
+        exact ha
+      · have h1 := hLG (x * algebraMap (𝓞 F) F a) (hsmall x hxw a)
+        have h2 := hintZ _ ((trace_int_iff_mul_different F x).mpr hxD a)
+        have h3 := add_mem h1 h2
+        rwa [sub_add_cancel] at h3
+    exact hmod _ y hxloc (hy.trans hxv.symm.le)
+
+
+end FiniteLocalTraceDual
 
 /-- Paper: Example A.3.1.10, p. 558. The annihilator of the local integer ring
 under the standard trace pairing is the inverse different.

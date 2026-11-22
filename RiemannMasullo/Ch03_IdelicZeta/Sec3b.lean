@@ -1218,11 +1218,6 @@ theorem sLocalEpsilonFactor_archimedean_trivial (s : ℂ) :
       (complexLocalEulerParameters w hc _).exists.choose_spec (y₂ := (s, 0)) hshape
     simp only [infiniteLocalEpsilonFactor, hw, ↓reduceDIte, h, Int.natAbs_zero, pow_zero]
 
-/-- Paper: Lemma 3.3.1.7(3)(b), p. 136. The S-local epsilon factor has
-modulus one on the critical line. -/
-theorem sLocalEpsilonFactor_norm_criticalLine (χ : PontryaginDual Jₛ) {s : ℂ} (hs : s.re = 1 / 2) :
-    ‖sLocalEpsilonFactor (chartₛ(χ) s)‖ = 1 := by sorry
-
 section InfiniteTrace
 
 open InfinitePlace.Completion
@@ -5541,6 +5536,129 @@ theorem sLocalEpsilonFactor_ne_zero (c : QuasiCharacter Jₛ) :
   have h := tendsto_nhds_unique_of_eventuallyEq
     ((h₁.mul h₂).tendsto.mono_left nhdsWithin_le_nhds) (h₃.tendsto.mono_left nhdsWithin_le_nhds) heq
   exact left_ne_zero_of_mul ((h.trans_ne ((Group.isUnit x).map _).ne_zero))
+
+/-- A nonnegative real base commutes with conjugating the exponent. -/
+private theorem star_ofReal_cpow_of_nonneg {r : ℝ} (hr : 0 ≤ r) (z : ℂ) :
+    star ((r : ℂ) ^ z) = (r : ℂ) ^ (star z) := by
+  have h := Complex.cpow_conj (r : ℂ) z (by rw [Complex.arg_ofReal_of_nonneg hr]; exact Real.pi_ne_zero.symm)
+  rw [Complex.conj_ofReal] at h
+  exact h.symm
+
+/-- The archimedean Euler factor of the pointwise conjugate quasi-character
+is the conjugate Euler factor. -/
+private theorem infiniteLocalEulerFactor_conj (w : InfinitePlace F)
+    (c d : QuasiCharacter w.Completionˣ) (h : ∀ g, d g = star (c g)) :
+    infiniteLocalEulerFactor w d = star (infiniteLocalEulerFactor w c) := by
+  by_cases hw : w.IsReal
+  · have hp := (realLocalEulerParameters w hw c).exists.choose_spec
+    have hshape : realShape[hw, d, star (realLocalEulerParameters w hw c).exists.choose.1,
+        (realLocalEulerParameters w hw c).exists.choose.2] := by
+      intro x
+      rw [h, hp x, star_mul', star_pow, star_ofReal_cpow_of_nonneg (norm_nonneg _)]
+      congr 2
+      split_ifs <;> simp
+    have hu := (realLocalEulerParameters w hw d).unique
+      (realLocalEulerParameters w hw d).exists.choose_spec
+      (y₂ := (star (realLocalEulerParameters w hw c).exists.choose.1,
+        (realLocalEulerParameters w hw c).exists.choose.2)) hshape
+    simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hu]
+    rw [Complex.star_def, ← Complex.Gammaℝ_conj, map_add, Complex.conj_natCast, ← Complex.star_def]
+  · have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    have hp := (complexLocalEulerParameters w hc c).exists.choose_spec
+    have hshape : complexShape[hc, d, star (complexLocalEulerParameters w hc c).exists.choose.1,
+        -(complexLocalEulerParameters w hc c).exists.choose.2] := by
+      intro x
+      have hx : (‖(x : ℂ)‖ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr x.ne_zero)
+      have hn : ‖(x : ℂ) / (‖(x : ℂ)‖ : ℂ)‖ = 1 := by
+        rw [norm_div, Complex.norm_real, norm_norm, div_self (norm_ne_zero_iff.mpr x.ne_zero)]
+      rw [h, hp x, star_mul', star_ofReal_cpow_of_nonneg (by positivity), zpow_neg, ← inv_zpow,
+        Complex.inv_eq_conj hn, ← Complex.star_def, star_zpow₀]
+    have hu := (complexLocalEulerParameters w hc d).unique
+      (complexLocalEulerParameters w hc d).exists.choose_spec
+      (y₂ := (star (complexLocalEulerParameters w hc c).exists.choose.1,
+        -(complexLocalEulerParameters w hc c).exists.choose.2)) hshape
+    simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, hu, Int.natAbs_neg]
+    rw [Complex.star_def, map_div₀, ← Complex.Gammaℂ_conj, map_add, map_div₀, Complex.conj_natCast,
+      map_ofNat]
+
+/-- The finite Euler factor of the pointwise conjugate quasi-character is the
+conjugate Euler factor. -/
+private theorem finiteLocalEulerFactor_conj (v : Primes)
+    (c d : QuasiCharacter (v.adicCompletion F)ˣ) (h : ∀ g, d g = star (c g)) :
+    finiteLocalEulerFactor v d = star (finiteLocalEulerFactor v c) := by
+  have hiff : unramified[v, d] ↔ unramified[v, c] := by
+    refine forall_congr' fun u ↦ ?_
+    rw [h]
+    exact ⟨fun e ↦ by simpa using congrArg star e, fun e ↦ by rw [e, star_one]⟩
+  unfold finiteLocalEulerFactor
+  by_cases hc : unramified[v, c]
+  · rw [if_pos hc, if_pos (hiff.mpr hc)]
+    dsimp only
+    rw [h, star_inv₀, star_sub, star_one]
+  · rw [if_neg hc, if_neg (fun e ↦ hc (hiff.mp e)), star_one]
+
+/-- The partial Euler product of the pointwise conjugate quasi-character is
+the conjugate partial Euler product. -/
+private theorem sLocalHeckeL_conj (c d : QuasiCharacter Jₛ) (h : ∀ g, d g = star (c g)) :
+    sLocalHeckeL d = star (sLocalHeckeL c) := by
+  unfold sLocalHeckeL
+  rw [Complex.star_def, map_mul, map_prod, map_prod]
+  congr 1
+  · refine Finset.prod_congr rfl fun w _ ↦ ?_
+    rw [← Complex.star_def]
+    exact infiniteLocalEulerFactor_conj w _ _ fun g ↦ h _
+  · refine Finset.prod_congr rfl fun v _ ↦ ?_
+    rw [← Complex.star_def]
+    exact finiteLocalEulerFactor_conj v.val _ _ fun g ↦ h _
+
+/-- Paper: Lemma 3.3.1.7(3)(b), p. 136. The S-local epsilon factor has
+modulus one on the critical line. -/
+theorem sLocalEpsilonFactor_norm_criticalLine (χ : PontryaginDual Jₛ) {s : ℂ} (hs : s.re = 1 / 2) :
+    ‖sLocalEpsilonFactor (chartₛ(χ) s)‖ = 1 := by
+  let E (z : ℂ) := sLocalEpsilonFactor (chartₛ(χ) z)
+  have hE : Continuous E :=
+    continuousOn_univ.mp (sLocalEpsilonFactor_entire χ).continuousOn
+  let γ (t : ℝ) : ℂ := s + (t : ℂ) * Complex.I
+  have hγc : Continuous γ := by fun_prop
+  have hγ0 : γ 0 = s := by simp [γ]
+  have hγ : Tendsto γ (𝓝[≠] 0) (𝓝[≠] s) := by
+    apply tendsto_nhdsWithin_of_tendsto_nhds_of_eventually_within
+    · exact hγ0 ▸ (hγc.tendsto 0).mono_left nhdsWithin_le_nhds
+    · filter_upwards [self_mem_nhdsWithin] with t ht
+      intro he
+      apply ht
+      have h1 : (t : ℂ) * Complex.I = 0 := by
+        have := congrArg (· - s) he
+        simpa [γ] using this
+      simpa using h1
+  have hkey (z : ℂ) (hz : z.re = 1 / 2)
+      (hρ : sLocalRhoFactor (chartₛ(χ) z) = sLocalEpsilonFactor (chartₛ(χ) z) *
+        (sLocalHeckeL (chartₛ(χ) z) /
+          sLocalHeckeL (dualQuasiCharacter (G := Jₛ) mₛ hmₛ (chartₛ(χ) z)))) :
+      ‖E z‖ = 1 := by
+    have hn := sLocalRhoFactor_norm_criticalLine χ z hz
+    have hreflect : 1 - z = star z := by
+      apply Complex.ext <;> norm_num [Complex.sub_re, hz]
+    have hd : dualQuasiCharacter (G := Jₛ) mₛ hmₛ (chartₛ(χ) z) = chartₛ(χ⁻¹) (star z) := by
+      rw [sLocal_dual_chart, hreflect]
+    have hL : sLocalHeckeL (chartₛ(χ⁻¹) (star z)) = star (sLocalHeckeL (chartₛ(χ) z)) :=
+      sLocalHeckeL_conj _ _ (sLocal_chart_conj χ z)
+    rw [hd, hL] at hρ
+    have hL0 : sLocalHeckeL (chartₛ(χ) z) ≠ 0 := by
+      intro h0
+      rw [h0, zero_div, mul_zero] at hρ
+      rw [hρ, norm_zero] at hn
+      exact zero_ne_one hn
+    rw [hρ, norm_mul, norm_div, norm_star, div_self (norm_ne_zero_iff.mpr hL0), mul_one] at hn
+    exact hn
+  have hev : (fun t : ℝ ↦ ‖E (γ t)‖) =ᶠ[𝓝[≠] 0] fun _ ↦ (1 : ℝ) := by
+    filter_upwards [hγ.eventually (nhdsNE_le_codiscrete s (sLocalRhoFactor_eq_epsilon_mul χ))]
+      with t ht
+    exact hkey (γ t) (by simp [γ, hs]) ht
+  have hlim := tendsto_nhds_unique_of_eventuallyEq
+    (((hE.comp hγc).norm.tendsto 0).mono_left nhdsWithin_le_nhds) tendsto_const_nhds hev
+  change ‖E (γ 0)‖ = 1 at hlim
+  rwa [hγ0] at hlim
 
 /-- If a function on the plane is meromorphic with no poles, then normalizing each
 of its translates and evaluating at the origin gives an entire function. -/
