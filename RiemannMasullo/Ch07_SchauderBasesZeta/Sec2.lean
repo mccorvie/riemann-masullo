@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -462,7 +464,14 @@ local notation "polarValuesₛ" =>
 
 /-- Paper: Equation (7.2.2.3), p. 340.
 Evaluation at zero before and after S-adelic Fourier transform is complex linear. -/
-theorem sAdelePolarValues_isLinear : IsLinearMap ℂ polarValuesₛ := by sorry
+theorem sAdelePolarValues_isLinear : IsLinearMap ℂ polarValuesₛ := by
+  refine (sLocal_fourier_continuousLinear (F := F) (S := S)).elim fun T hT ↦ ?_
+  let ev : ℬₛ →ₗ[ℂ] ℂ := (LinearMap.proj (Multiplicative.ofAdd (0 : Aₛ))).comp
+    (schwartzBruhatSubmodule (Multiplicative Aₛ)).subtype
+  let L := ev.prod (ev.comp T.toLinearMap)
+  have h : (L : ℬₛ → ℂ × ℂ) = polarValuesₛ :=
+    funext fun f ↦ Prod.ext rfl (congrArg ev (hT f))
+  exact (congrArg (IsLinearMap ℂ) h).mp L.isLinear
 
 variable (F S) in
 /-- Paper: Equation (7.2.2.3), p. 340.
