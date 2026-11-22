@@ -678,7 +678,44 @@ theorem spectralStripJet_denseInterpolants (χ : PontryaginDual C₁ → Pontrya
 /-- Paper: Theorem 10.2.2.1, p. 446. The discrete divisor in each norm
 chart gives countably many strip jets over the countable norm-one dual. -/
 theorem spectralStripJet_countable (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (a α s : ℝ) :
-    Countable (SpectralStripJetIndex χ a α s) := by sorry
+    Countable (SpectralStripJetIndex χ a α s) := by
+  have hK : IsCompact ((ideleClassNorm F).ker : Set C𝔽) :=
+    IsModulation.isCompact_ker (m := m𝔽) hm𝔽
+  let : CompactSpace C₁ := isCompact_iff_compactSpace.mp hK
+  let : LocallyCompactSpace C₁ := hK.isClosed.locallyCompactSpace
+  let : SecondCountableTopology C₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : SecondCountableTopology Circle :=
+    inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual C₁) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap C₁ Circle).secondCountableTopology
+  let : Countable (PontryaginDual C₁) := countable_of_Lindelof_of_discrete
+  let Z (ω : PontryaginDual C₁) := {z : ℂ | 0 < multiplicity(χ ω, z)}
+  have hc (ω : PontryaginDual C₁) : (Z ω).Countable := by
+    have hm := (continuedCompletedHeckeL_spec (χ ω)).1.meromorphicOn
+    have hcod : (Z ω)ᶜ ∈ Filter.codiscrete ℂ := by
+      filter_upwards [hm.codiscreteWithin_setOfPred_meromorphicOrderAt_eq_zero_or_top] with z hz
+      rcases hz.2 with h | h <;> simp [Z, h]
+    let : DiscreteTopology (Z ω) := isDiscrete_iff_discreteTopology.mp
+      (compl_mem_codiscrete_iff.mp hcod).2
+    exact Set.countable_coe_iff.mp countable_of_Lindelof_of_discrete
+  let W := ⋃ ω, Z ω
+  let : Countable W := (Set.countable_iUnion hc).to_subtype
+  have hz (j : SpectralStripJetIndex χ a α s) : shift(a + j.val.2.1, j.val.2.2.1) ∈ W := by
+    apply Set.mem_iUnion.mpr
+    refine ⟨j.val.1, ?_⟩
+    have h := j.property
+    change 0 < multiplicity(χ j.val.1, shift(a + j.val.2.1, j.val.2.2.1))
+    unfold spectralStripMultiplicity spectralBoundaryMultiplicity at h
+    split_ifs at h <;> omega
+  let e (j : SpectralStripJetIndex χ a α s) : PontryaginDual C₁ × W × ℕ :=
+    (j.val.1, ⟨shift(a + j.val.2.1, j.val.2.2.1), hz j⟩, j.val.2.2.2)
+  apply Function.Injective.countable (f := e)
+  intro i j hij
+  have hre := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.1.val.re) hij
+  have him := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.1.val.im) hij
+  have hω := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.1) hij
+  have hk := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.2) hij
+  exact Subtype.ext (Prod.ext hω (Prod.ext (by simpa [e] using hre) (Prod.ext (by simpa [e] using him) hk)))
 
 /-- Paper: Theorem 10.2.2.1 and Terminology 10.2.2.1, p. 446. The strip
 jets represent quotient functionals and admit a Markushevich biorthogonal family.
