@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
@@ -494,7 +496,20 @@ theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J�
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the global homogeneous quotient is Montel. -/
 theorem globalHomogeneousThetaSpace_strongDual_montel :
-    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
+  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
+    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  let : T2Space Θ𝔽ω(ω) := hN.1
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
+  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
+  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
+  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
+  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
+  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using
+    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is Montel. -/
