@@ -420,6 +420,91 @@ variable (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
 -- distinct residue characteristics. For the trivial character of ℚ(i), both
 -- Euler factors over 5 have a pole at 2πi/log 5.
 
+/-- The absolute norm of a finite place is a positive power of the rational prime below it. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_norm (v : Primes) :
+    ∃ ℓ : ℕ, ℓ.Prime ∧ v.asIdeal.under ℤ = Ideal.span {(ℓ : ℤ)} ∧
+      ∃ f : ℕ, 0 < f ∧ v.asIdeal.absNorm = ℓ ^ f := by
+  set P := v.asIdeal.under ℤ with hPdef
+  have hP : P.IsPrime := Ideal.IsPrime.under ℤ v.asIdeal
+  have hP0 : P ≠ ⊥ := mt Ideal.eq_bot_of_under_eq_bot v.ne_bot
+  obtain ⟨g, hg⟩ := (IsPrincipalIdealRing.principal P).principal
+  have hg' : P = Ideal.span {g} := hg
+  have hg0 : g ≠ 0 := by rintro rfl; exact hP0 (by rw [hg']; simp)
+  have hgp : Prime g := (Ideal.span_singleton_prime hg0).mp (hg' ▸ hP)
+  refine ⟨g.natAbs, Int.prime_iff_natAbs_prime.mp hgp, by rw [hg', Int.span_natAbs], ?_⟩
+  have : v.asIdeal.LiesOver P := ⟨rfl⟩
+  refine ⟨v.asIdeal.inertiaDeg ℤ, Ideal.inertiaDeg_pos v.asIdeal ℤ, ?_⟩
+  rw [← Ideal.absNorm_pow_inertiaDeg P v.asIdeal, hg', Ideal.absNorm_span_singleton]
+  simp
+
+/-- The rationals have a single prime above each nonzero prime of the integers. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_unique (P : Ideal ℤ) [P.IsMaximal] (a b : HeightOneSpectrum (𝓞 ℚ))
+    (ha : a.asIdeal.under ℤ = P) (hb : b.asIdeal.under ℤ = P) : a = b := by
+  have hsum := Ideal.sum_ramification_inertia_eq_finrank P (𝓞 ℚ)
+  rw [RingOfIntegers.rank, Module.finrank_self] at hsum
+  have hcard : Fintype.card (P.primesOver (𝓞 ℚ)) ≤ 1 := by
+    rw [← hsum, Fintype.card_eq_sum_ones]
+    refine Finset.sum_le_sum fun q _ ↦ ?_
+    have := q.2.1
+    have := q.2.2
+    exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero
+      (Ideal.ramificationIdx_pos ℤ q.1).ne' (Ideal.inertiaDeg_pos q.1 ℤ).ne')
+  let ea : P.primesOver (𝓞 ℚ) := ⟨a.asIdeal, a.isPrime, ⟨ha.symm⟩⟩
+  let eb : P.primesOver (𝓞 ℚ) := ⟨b.asIdeal, b.isPrime, ⟨hb.symm⟩⟩
+  have := Fintype.card_le_one_iff.mp hcard ea eb
+  exact HeightOneSpectrum.ext (congrArg Subtype.val this)
+
+/-- Places with multiplicatively dependent absolute norms lie over the same rational prime. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_eq (v w : Primes) {m n : ℕ} (hm : 0 < m) (_hn : 0 < n)
+    (h : v.asIdeal.absNorm ^ m = w.asIdeal.absNorm ^ n) : v.under (𝓞 ℚ) = w.under (𝓞 ℚ) := by
+  obtain ⟨ℓ, hℓ, hvP, f, hf, hvN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm v
+  obtain ⟨ℓ', hℓ', hwP, g, hg, hwN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm w
+  rw [hvN, hwN, ← pow_mul, ← pow_mul] at h
+  have hdvd : ℓ ∣ ℓ' := hℓ.dvd_of_dvd_pow (h ▸ dvd_pow_self ℓ (by positivity))
+  have hll : ℓ = ℓ' := (Nat.prime_dvd_prime_iff_eq hℓ hℓ').mp hdvd
+  subst hll
+  have hpr : (Ideal.span {(ℓ : ℤ)}).IsPrime := hvP ▸ Ideal.IsPrime.under ℤ v.asIdeal
+  have : (Ideal.span {(ℓ : ℤ)}).IsMaximal := hpr.isMaximal (by
+    rw [Ne, Ideal.span_singleton_eq_bot]; exact_mod_cast hℓ.ne_zero)
+  apply finiteHeckeEulerFactors_common_pole_subsingleton_unique (Ideal.span {(ℓ : ℤ)})
+  · change (v.asIdeal.under (𝓞 ℚ)).under ℤ = _
+    rw [Ideal.under_under, hvP]
+  · change (w.asIdeal.under (𝓞 ℚ)).under ℤ = _
+    rw [Ideal.under_under, hwP]
+
+/-- Any two poles of an unramified Euler factor differ by a multiple of `2πi / log q`. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_pole (χ : U𝔽) (v : Primes) (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    {s : ℂ} (hs : meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0) :
+    ∀ s' : ℂ, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s' < 0 →
+      ∃ k : ℤ, (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) * (s' - s) = k * (2 * Real.pi * Complex.I) := by
+  classical
+  have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  set L := Complex.log (v.asIdeal.absNorm : ℂ) with hLdef
+  have hL : (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) = L := by rw [hLdef, Complex.natCast_log]
+  set a := (ideleClassNormTwist χ 0).localValue v
+  have hfun : finiteHeckeEulerFactor χ v = fun z ↦ (1 - a * Complex.exp (-(L * z)))⁻¹ := by
+    funext z
+    rw [finiteHeckeEulerFactor, ite_eq_left hv, Complex.cpow_def_of_ne_zero hN0]
+    congr 4
+    ring
+  have hzero (z : ℂ) (hz : meromorphicOrderAt (finiteHeckeEulerFactor χ v) z < 0) :
+      a * Complex.exp (-(L * z)) = 1 := by
+    by_contra h
+    have h0 : 1 - a * Complex.exp (-(L * z)) ≠ 0 := sub_ne_zero.mpr (Ne.symm h)
+    have han : AnalyticAt ℂ (finiteHeckeEulerFactor χ v) z := by
+      rw [hfun]
+      exact (by fun_prop : AnalyticAt ℂ (fun z ↦ 1 - a * Complex.exp (-(L * z))) z).inv h0
+    exact absurd hz (not_lt.mpr han.meromorphicOrderAt_nonneg)
+  intro s' hs'
+  have e1 := hzero s hs
+  have e2 := hzero s' hs'
+  have ha : a ≠ 0 := by intro ha; rw [ha, zero_mul] at e1; exact zero_ne_one e1
+  have : Complex.exp (-(L * s')) = Complex.exp (-(L * s)) :=
+    mul_left_cancel₀ ha (e2.trans e1.symm)
+  obtain ⟨k, hk⟩ := Complex.exp_eq_exp_iff_exists_int.mp this
+  exact ⟨-k, by rw [hL]; push_cast; linear_combination -hk⟩
+
 /-- Paper: Theorem 7.1.3.2(1), p. 324.
 Two unramified finite places above different rational primes have at most one shared
 pole of their local Euler factors. -/
@@ -429,7 +514,53 @@ theorem finiteHeckeEulerFactors_common_pole_subsingleton
     (hw : (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt w.val)
     (hp : (v.val : Primes).under (𝓞 ℚ) ≠ w.val.under (𝓞 ℚ)) :
     {s : ℂ | meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ v.val) s < 0 ∧
-      meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ w.val) s < 0}.Subsingleton := by sorry
+      meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ w.val) s < 0}.Subsingleton := by
+  intro s₁ hs₁ s₂ hs₂
+  by_contra hne
+  have hkv := finiteHeckeEulerFactors_common_pole_subsingleton_pole χ v.val hv hs₁.1
+  have hkw := finiteHeckeEulerFactors_common_pole_subsingleton_pole χ w.val hw hs₁.2
+  obtain ⟨m, hm⟩ := hkv s₂ hs₂.1
+  obtain ⟨n, hn⟩ := hkw s₂ hs₂.2
+  set lv := Real.log (v.val.asIdeal.absNorm : ℝ)
+  set lw := Real.log (w.val.asIdeal.absNorm : ℝ)
+  have hqv : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hqw : 1 < (w.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm w.val
+  have hlv : 0 < lv := Real.log_pos hqv
+  have hlw : 0 < lw := Real.log_pos hqw
+  have h2pi : (2 * Real.pi * Complex.I : ℂ) ≠ 0 := by
+    simp [Real.pi_ne_zero, Complex.I_ne_zero]
+  have hreal : lw * m = lv * n := by
+    have : ((lw * m - lv * n : ℝ) : ℂ) * (2 * Real.pi * Complex.I) = 0 := by
+      push_cast
+      linear_combination -(lw : ℂ) * hm + (lv : ℂ) * hn
+    have := (mul_eq_zero.mp this).resolve_right h2pi
+    exact_mod_cast sub_eq_zero.mp (by exact_mod_cast this)
+  have hm0 : m ≠ 0 := by
+    rintro rfl
+    apply hne
+    have : (lv : ℂ) * (s₂ - s₁) = 0 := by simpa using hm
+    have hlv0 : (lv : ℂ) ≠ 0 := by exact_mod_cast hlv.ne'
+    exact (sub_eq_zero.mp ((mul_eq_zero.mp this).resolve_left hlv0)).symm
+  have hn0 : n ≠ 0 := by
+    rintro rfl
+    simp only [Int.cast_zero, mul_zero, mul_eq_zero, hlw.ne', false_or] at hreal
+    exact hm0 (by exact_mod_cast hreal)
+  have habs : (m.natAbs : ℝ) * lw = (n.natAbs : ℝ) * lv := by
+    have := congrArg abs hreal
+    rw [abs_mul, abs_mul, abs_of_pos hlw, abs_of_pos hlv] at this
+    rw [Nat.cast_natAbs, Nat.cast_natAbs]
+    push_cast
+    linarith
+  have hpow : ((v.val.asIdeal.absNorm ^ n.natAbs : ℕ) : ℝ) =
+      ((w.val.asIdeal.absNorm ^ m.natAbs : ℕ) : ℝ) := by
+    push_cast
+    apply Real.log_injOn_pos (Set.mem_Ioi.mpr (by positivity)) (Set.mem_Ioi.mpr (by positivity))
+    rw [Real.log_pow, Real.log_pow]
+    linarith
+  exact hp (finiteHeckeEulerFactors_common_pole_subsingleton_eq v.val w.val (Int.natAbs_pos.mpr hn0) (Int.natAbs_pos.mpr hm0)
+    (by exact_mod_cast hpow))
 
 /-- Paper: Theorem 7.1.3.2(2)–(3), p. 324.
 The pole order is bounded by the number of places in S, including all infinite places.
