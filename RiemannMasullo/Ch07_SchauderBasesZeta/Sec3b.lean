@@ -549,7 +549,12 @@ theorem sLocalGammaOrbitalQuotient_nuclear (ω : PontryaginDual J₁(S)) :
 Increasing all local cutoffs decreases the corresponding subspace.
 Deviation: Uses the pointwise order. Lexicographic order need not give nested stages. -/
 theorem sLocalGammaFiltration_antitone (ω : PontryaginDual J₁(S)) :
-    Antitone (sLocalGammaFiltration ω) := by sorry
+    Antitone (sLocalGammaFiltration ω) := by
+  intro N N' hN
+  unfold sLocalGammaFiltration
+  refine le_iInf fun j ↦ iInf_le_of_le ⟨j.val, j.property.1, ?_, j.property.2.2⟩ le_rfl
+  obtain ⟨hc, w, hw, hcard⟩ := j.property.2.1
+  exact ⟨hc, w, hw, hcard.trans (by exact_mod_cast hN w)⟩
 
 /-- Paper: Theorem 7.3.4.1(1), p. 364.
 Each stage of the archimedean pole filtration is closed. -/
