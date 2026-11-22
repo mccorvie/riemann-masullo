@@ -207,7 +207,13 @@ theorem adelicEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
 The normalized global distributions form a holomorphic family on each norm chart. -/
 theorem adelicNormalizedEigendistribution_holomorphic (χ : PontryaginDual C𝔽) :
     VectorHolomorphicOn (fun s ↦ adelicNormalizedEigendistribution (ideleClassNormTwist χ s))
-      univ := by sorry
+      univ := by
+  let D := (adelicEigendistribution_normalized χ).choose
+  have h := (adelicEigendistribution_normalized χ).choose_spec
+  have he (s : ℂ) : adelicNormalizedEigendistribution (ideleClassNormTwist χ s) = D s := by
+    have hs := (existsUnique_adelicNormalizedEigendistribution (ideleClassNormTwist χ s)).exists.choose_spec
+    exact (h.2.1 s _).mpr ⟨hs.1, hs.2 χ s rfl⟩
+  exact (congrArg (fun G : ℂ → D(ℬ(𝔸[F])) ↦ VectorHolomorphicOn G univ) (funext he)).mpr h.1
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 Each global eigendistribution descends uniquely to the theta quotient. The pullback
