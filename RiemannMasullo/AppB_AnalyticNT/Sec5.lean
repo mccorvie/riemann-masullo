@@ -531,7 +531,44 @@ theorem kroneckerWeyl_continuous_forward [NeZero N] (τ : Fin N → ℝ)
     (μ : Measure (torusFlowClosure τ)) [μ.IsAddHaarMeasure] [IsProbabilityMeasure μ]
     (u : C(torusFlowClosure τ, ℂ)) :
     Tendsto (fun T : ℝ ↦ T⁻¹ • ∫ t in 0..T, u (torusFlowInClosure τ t))
-      atTop (𝓝 (∫ x, u x ∂μ)) := by sorry
+      atTop (𝓝 (∫ x, u x ∂μ)) := by
+  classical
+  have hce : Topology.IsClosedEmbedding ((↑) : torusFlowClosure τ → UnitAddTorus (Fin N)) :=
+    (AddSubgroup.isClosed_topologicalClosure _).isClosedEmbedding_subtypeVal
+  obtain ⟨φ, hφ⟩ := u.exists_extension' hce
+  have hu (x : torusFlowClosure τ) : u x = φ x := (congrFun hφ x).symm
+  have hII (φ : C(UnitAddTorus (Fin N), ℂ)) (a b : ℝ) :
+      IntervalIntegrable (fun t ↦ φ (torusFlow τ t)) volume a b :=
+    (φ.continuous.comp (torusFlow τ).continuous).intervalIntegrable _ _
+  let A : ℝ → C(UnitAddTorus (Fin N), ℂ) → ℂ :=
+    fun T φ ↦ (T : ℂ)⁻¹ * ∫ t in (0 : ℝ)..T, φ (torusFlow τ t)
+  have key := tendsto_of_mFourier τ μ A
+    (fun T φ ψ ↦ by
+      simp only [A, ContinuousMap.add_apply, intervalIntegral.integral_add (hII φ 0 T)
+        (hII ψ 0 T), mul_add])
+    (fun T a φ ↦ by
+      simp only [A, ContinuousMap.smul_apply, smul_eq_mul, intervalIntegral.integral_const_mul]
+      ring)
+    (fun T φ ↦ by
+      rcases eq_or_ne T 0 with rfl | hT
+      · simp [A]
+      simp only [A, norm_mul, norm_inv, Complex.norm_real, Real.norm_eq_abs]
+      calc |T|⁻¹ * ‖∫ t in (0 : ℝ)..T, φ (torusFlow τ t)‖ ≤ |T|⁻¹ * (‖φ‖ * |T - 0|) := by
+            gcongr
+            exact intervalIntegral.norm_integral_le_of_norm_le_const fun t _ ↦
+              φ.norm_coe_le_norm _
+        _ = ‖φ‖ := by rw [sub_zero]; field_simp [abs_ne_zero.mpr hT])
+    (fun n ↦ by
+      rw [integral_mFourier_torusFlowClosure]
+      split_ifs with hc
+      · refine tendsto_const_nhds.congr' ((eventually_ne_atTop 0).mono fun T hT ↦ ?_)
+        simp [A, mFourier_torusFlow, hc, hT]
+      · simp only [A, mFourier_torusFlow]
+        exact tendsto_average_exp hc) φ
+  simp only [hu]
+  convert key using 2 with T
+  simp only [A, Complex.real_smul, Complex.ofReal_inv]
+  rfl
 
 /-- Paper: Lemma B.5.2.2, p. 627.
 The indicator of an open set with null boundary can be sandwiched between continuous
