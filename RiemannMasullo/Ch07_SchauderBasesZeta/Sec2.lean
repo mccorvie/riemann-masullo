@@ -165,13 +165,90 @@ def sLocalThetaPoleBound (ω : PontryaginDual J₁) (m : Xₛ → ℕ) : Submodu
   Submodule.span ℂ {x | ∃ f : ℬₛ, (Kₛ(ω)).mkQ f = x ∧
     ∀ c : Xₛ, onComponent(c, ω) → sLocalPolarMultiplicity f c ≤ m c}
 
+/-- Residues only depend on the germ on a punctured neighbourhood. -/
+private theorem mem_sLocalThetaPoleBound_iff_residue_congr {g h : ℂ → ℂ}
+    (he : g =ᶠ[𝓝[≠] (0 : ℂ)] h) : complexResidue g 0 = complexResidue h 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- The leading polar coefficient of a meromorphic germ with a pole of order `N` is nonzero. -/
+private theorem mem_sLocalThetaPoleBound_iff_leading {Z : ℂ → ℂ} (hZ : MeromorphicAt Z 0)
+    {N : ℕ} (hN : 0 < N) (ho : (-(meromorphicOrderAt Z 0).untop₀).toNat = N) :
+    complexResidue (fun z ↦ Z z / z ^ (-(N : ℤ) + 1)) 0 ≠ 0 := by
+  have hord : meromorphicOrderAt Z 0 = ((-(N : ℤ) : ℤ) : WithTop ℤ) := by
+    generalize meromorphicOrderAt Z 0 = o at ho ⊢
+    induction o using WithTop.recTopCoe with
+    | top => simp at ho; omega
+    | coe n =>
+      simp only [WithTop.untop₀_coe] at ho
+      congr 1
+      omega
+  obtain ⟨g, hg, hg0, hev⟩ := (meromorphicOrderAt_eq_int_iff hZ).mp hord
+  have he : (fun z ↦ Z z / z ^ (-(N : ℤ) + 1)) =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ g z / (z - 0)) := by
+    filter_upwards [hev, self_mem_nhdsWithin] with z hz hz0
+    have hz0' : z ≠ 0 := hz0
+    rw [hz, sub_zero, smul_eq_mul, zpow_add₀ hz0', zpow_one, zpow_neg, zpow_natCast]
+    field_simp
+  rw [mem_sLocalThetaPoleBound_iff_residue_congr he, complexResidue_div_sub hg]
+  exact hg0
+
 /-- Paper: Equation (7.2.1.9), p. 334.
 Membership in the pole-bound subspace is equivalent to vanishing of every coefficient
 on the component above its allowed pole order. -/
 theorem mem_sLocalThetaPoleBound_iff (ω : PontryaginDual J₁) (m : Xₛ → ℕ) (x : Θₛ(ω)) :
     x ∈ sLocalThetaPoleBound ω m ↔
       ∀ (c : Xₛ) (hc : onComponent(c, ω)), 0 < sLocalRhoPoleOrder c →
-        ∀ k : ℕ, m c < k → sLocalThetaPrincipalPartCoeff ω c hc k x = 0 := by sorry
+        ∀ k : ℕ, m c < k → sLocalThetaPrincipalPartCoeff ω c hc k x = 0 := by
+  constructor
+  · intro hx c hc _ k hk
+    have hle : sLocalThetaPoleBound ω m ≤ (sLocalThetaPrincipalPartCoeff ω c hc k).ker := by
+      refine Submodule.span_le.mpr ?_
+      rintro _ ⟨f, rfl, hf⟩
+      have e : sLocalThetaPrincipalPartCoeff ω c hc k ((Kₛ(ω)).mkQ f) =
+          sLocalZLaurentCoeff f c (-(k : ℤ)) := sLocalThetaPrincipalPartCoeff_mk ω c hc k f
+      have hz : sLocalZLaurentCoeff f c (-(k : ℤ)) = 0 := by
+        by_contra hne
+        have hne' : sLocalPrincipalPartCoeff c k f ≠ 0 := by
+          exact fun h ↦ hne ((sLocalPrincipalPartCoeff_apply c k f).symm.trans h)
+        have h := (sLocalPrincipalPartCoeff_ne_zero_imp_pole c k (by omega) f hne').2
+        have := hf c hc
+        omega
+      exact e.trans hz
+    exact hle hx
+  · intro hx
+    have count (m : ℕ) (o : WithTop ℤ) (ho : ((-(m : ℤ) : ℤ) : WithTop ℤ) ≤ o) :
+        (-o.untop₀).toNat ≤ m := by
+      induction o using WithTop.recTopCoe with
+      | top => simp
+      | coe n =>
+        have hn : -(m : ℤ) ≤ n := WithTop.coe_le_coe.mp ho
+        simp only [WithTop.untop₀_coe]
+        omega
+    refine ((Kₛ(ω)).mkQ_surjective x).elim fun f hf ↦ ?_
+    refine Submodule.subset_span ⟨f, hf, fun c hc ↦ ?_⟩
+    refine Nat.le_of_not_lt fun hlt ↦ ?_
+    have hcount : sLocalPolarMultiplicity f c ≤ sLocalRhoPoleOrder c :=
+      count _ _ ((sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans (sLocalZ_centered f c).2.1)
+    have hmer : MeromorphicAt (fun z ↦ sLocalIdelicZFunction f (twistₛ c z)) 0 :=
+      (sLocalZ_centered f c).1
+    have hpos : 0 < sLocalRhoPoleOrder c := by omega
+    have h0 := hx c hc hpos (sLocalPolarMultiplicity f c) hlt
+    rw [← hf] at h0
+    have e : sLocalThetaPrincipalPartCoeff ω c hc (sLocalPolarMultiplicity f c) ((Kₛ(ω)).mkQ f) =
+        sLocalZLaurentCoeff f c (-(sLocalPolarMultiplicity f c : ℤ)) :=
+      sLocalThetaPrincipalPartCoeff_mk ω c hc (sLocalPolarMultiplicity f c) f
+    have h1 := e.symm.trans h0
+    have h2 : complexResidue (fun z ↦ sLocalIdelicZFunction f (twistₛ c z) /
+        z ^ (-(sLocalPolarMultiplicity f c : ℤ) + 1)) 0 = 0 := h1
+    exact mem_sLocalThetaPoleBound_iff_leading (N := sLocalPolarMultiplicity f c) hmer
+      (by omega) rfl h2
 
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 The homogeneous theta classes with the prescribed bounds on pole order form a closed subspace. -/
@@ -223,12 +300,182 @@ restricted local Euler factors have a pole in the norm coordinate. -/
 def sLocalFinitePolePlaces (c : Xₛ) : Finset S :=
   Finset.univ.filter (fun v : S ↦ meromorphicOrderAt (finEuler(v, c)) 0 < 0)
 
+/-- The norm twist of the trivial quasi-character is the chart of the trivial unitary character. -/
+private theorem sLocalPolePlaces_one_twist_eq (z : ℂ) :
+    twistₛ (1 : Xₛ) z = quasiCharacterNormTwist (G := Jₛ) mₛ hmₛ
+      ((circleToComplex).comp (1 : PontryaginDual Jₛ)) z := by
+  congr 1
+
+/-- At a real place the twisted trivial character has Euler factor `Γℝ`. -/
+private theorem sLocalPolePlaces_one_arch_real (w : InfinitePlace F) (hw : w.IsReal) (z : ℂ) :
+    infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z)) =
+      Complex.Gammaℝ z := by
+  have hval (g : w.Completionˣ) : sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z) g =
+      (((((Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w :
+        (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) ^ z := by
+    rw [sLocalPolePlaces_one_twist_eq]
+    exact sLocalInfiniteRestriction_normTwist w z g
+  have hshape : ∀ x : ℝˣ, sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z)
+      (Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom x) =
+      (‖(x : ℝ)‖ : ℂ) ^ (z : ℂ) *
+        (if 0 < (x : ℝ) then 1 else (-1 : ℂ)) ^ ((0 : Fin 2) : Fin 2).val := by
+    intro x
+    have hn : ‖((InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm (x : ℝ) :
+        w.Completion)‖ = ‖(x : ℝ)‖ :=
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm) (x : ℝ)
+    rw [hval]
+    simp [InfinitePlace.mult, hw, hn]
+  have h := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z))).unique
+    (realLocalEulerParameters w hw _).exists.choose_spec (y₂ := (z, 0)) hshape
+  simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, h, Fin.val_zero,
+    Nat.cast_zero, add_zero]
+
+/-- At a complex place the twisted trivial character has Euler factor `Γℂ / 2`. -/
+private theorem sLocalPolePlaces_one_arch_complex (w : InfinitePlace F) (hw : ¬ w.IsReal)
+    (z : ℂ) :
+    infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z)) =
+      Complex.Gammaℂ z / 2 := by
+  have hval (g : w.Completionˣ) : sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z) g =
+      (((((Units.map nnNormHom.toMonoidHom) ^ InfinitePlace.mult w :
+        (InfinitePlace.Completion w)ˣ →* ℝ≥0ˣ) g : ℝ≥0) : ℝ) : ℂ) ^ z := by
+    rw [sLocalPolePlaces_one_twist_eq]
+    exact sLocalInfiniteRestriction_normTwist w z g
+  have hc : w.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hw
+  have hshape : ∀ x : ℂˣ, sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z)
+      (Units.map (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc).symm.toMonoidHom x) =
+      ((‖(x : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ (z : ℂ) * ((x : ℂ) / (‖(x : ℂ)‖ : ℂ)) ^ ((0 : ℤ) : ℤ) := by
+    intro x
+    have hn : ‖((InfinitePlace.Completion.ringEquivComplexOfIsComplex hc).symm (x : ℂ) :
+        w.Completion)‖ = ‖(x : ℂ)‖ :=
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).symm.isometry.norm_map_of_map_zero
+        (map_zero (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc).symm) (x : ℂ)
+    rw [hval]
+    simp [InfinitePlace.mult, hw, hn]
+  have h := (complexLocalEulerParameters w hc (sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z))).unique
+    (complexLocalEulerParameters w hc _).exists.choose_spec (y₂ := (z, 0)) hshape
+  simp only [infiniteLocalEulerFactor, hw, ↓reduceDIte, h, Int.natAbs_zero,
+    Nat.cast_zero, zero_div, add_zero]
+
+/-- The twisted trivial character restricts at a finite place to a power of the norm. -/
+private theorem sLocalPolePlaces_one_fin_val (v : S) (z : ℂ) (g : (v.val.adicCompletion F)ˣ) :
+    sLocalFiniteRestriction v (twistₛ (1 : Xₛ) z) g = ((‖g.val‖ : ℝ) : ℂ) ^ z := by
+  obtain ⟨y, hy⟩ : ∃ y : Jₛ, ∀ c : Xₛ, sLocalFiniteRestriction v c g = c y := ⟨_, fun c ↦ rfl⟩
+  have h1 := sLocalFiniteRestriction_norm v g
+  rw [hy] at h1
+  rw [hy, sLocalPolePlaces_one_twist_eq]
+  change (((1 : PontryaginDual Jₛ) y : Circle) : ℂ) * ((((mₛ y : ℝ≥0) : ℝ) : ℂ)) ^ z = _
+  change (((1 : PontryaginDual Jₛ) y : Circle) : ℂ) * ((((mₛ y : ℝ≥0) : ℝ) : ℂ)) ^ (1 : ℂ) = _
+    at h1
+  rw [PontryaginDual.one_apply, Circle.coe_one, one_mul] at h1 ⊢
+  rw [Complex.cpow_one] at h1
+  rw [h1]
+  rfl
+
+/-- At a finite place the twisted trivial character has Euler factor `(1 - q ^ (-z))⁻¹`. -/
+private theorem sLocalPolePlaces_one_fin (v : S) (z : ℂ) :
+    finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (twistₛ (1 : Xₛ) z)) =
+      (1 - ((Ideal.absNorm v.val.asIdeal : ℕ) : ℂ) ^ (-z))⁻¹ := by
+  have hunr : ∀ u : (HeightOneSpectrum.adicCompletionIntegers F v.val)ˣ,
+      sLocalFiniteRestriction v (twistₛ (1 : Xₛ) z)
+        (Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom u) =
+        1 := by
+    intro u
+    rw [sLocalPolePlaces_one_fin_val]
+    have hu : ‖(Units.map (HeightOneSpectrum.adicCompletionIntegers F v.val).subtype.toMonoidHom
+        u : (v.val.adicCompletion F)ˣ).val‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+          (a := Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom u)).mp
+          ⟨u.val.property, u.inv.property⟩)
+    rw [hu, Complex.ofReal_one, Complex.one_cpow]
+  unfold finiteLocalEulerFactor
+  rw [ite_eq_left hunr]
+  dsimp only
+  have harg : (((Ideal.absNorm v.val.asIdeal : ℕ) : ℝ) : ℂ).arg ≠ Real.pi := by
+    rw [Complex.arg_ofReal_of_nonneg (by positivity)]
+    exact Real.pi_ne_zero.symm
+  rw [sLocalPolePlaces_one_fin_val, Units.val_mk0, norm_uniformizer_adicCompletion v.val _
+    (Valued.v : Valuation (v.val.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec,
+    Complex.ofReal_inv, Complex.inv_cpow _ _ harg, ← Complex.cpow_neg, Complex.ofReal_natCast]
+
+/-- The reciprocal of an analytic function vanishing at `0`, but not on the positive reals,
+has a pole at `0`. -/
+private theorem sLocalPolePlaces_one_order (f h : ℂ → ℂ) (hf : ∀ z, f z = (h z)⁻¹)
+    (hh : AnalyticAt ℂ h 0) (h0 : h 0 = 0) (hpos : ∀ x : ℝ, 0 < x → h x ≠ 0) :
+    meromorphicOrderAt f 0 < 0 := by
+  have hne : ¬ ∀ᶠ z in 𝓝 (0 : ℂ), h z = 0 := by
+    intro hev
+    obtain ⟨ε, hε, hball⟩ := Metric.eventually_nhds_iff.mp hev
+    refine hpos (ε / 2) (by linarith) (hball ?_)
+    rw [dist_zero_right, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by linarith)]
+    linarith
+  rw [show f = fun z ↦ (h z)⁻¹ from funext hf,
+    show meromorphicOrderAt (fun z ↦ (h z)⁻¹) 0 = -meromorphicOrderAt h 0 from
+      meromorphicOrderAt_inv, hh.meromorphicOrderAt_eq]
+  have h1 : analyticOrderAt h 0 ≠ 0 := by
+    rw [Ne, analyticOrderAt_eq_zero]
+    simp [hh, h0]
+  have h2 : analyticOrderAt h 0 ≠ ⊤ := by rwa [Ne, analyticOrderAt_eq_top]
+  obtain ⟨n, hn⟩ := ENat.ne_top_iff_exists.mp h2
+  rw [← hn] at h1 ⊢
+  have : (0 : ℕ) < n := Nat.pos_of_ne_zero (by exact_mod_cast h1)
+  simp only [ENat.map_natCast]
+  exact_mod_cast (by omega : -(n : ℤ) < 0)
+
+/-- Every archimedean Euler factor of the twisted trivial character has a pole at `0`. -/
+private theorem sLocalPolePlaces_one_arch (w : InfinitePlace F) :
+    meromorphicOrderAt (fun z : ℂ ↦
+      infiniteLocalEulerFactor w (sLocalInfiniteRestriction w (twistₛ (1 : Xₛ) z))) 0 < 0 := by
+  by_cases hw : w.IsReal
+  · refine sLocalPolePlaces_one_order _ (fun z ↦ (Complex.Gammaℝ z)⁻¹)
+      (fun z ↦ by rw [sLocalPolePlaces_one_arch_real w hw z, inv_inv])
+      (Complex.differentiable_Gammaℝ_inv.analyticAt 0) (by simp [Complex.Gammaℝ])
+      fun x hx ↦ inv_ne_zero (Complex.Gammaℝ_ne_zero_of_re_pos (by simpa using hx))
+  · refine sLocalPolePlaces_one_order _ (fun z ↦ 2 * (Complex.Gammaℂ z)⁻¹)
+      (fun z ↦ by rw [sLocalPolePlaces_one_arch_complex w hw z, mul_inv, inv_inv]; ring)
+      (analyticAt_const.mul (Complex.differentiable_Gammaℂ_inv.analyticAt 0))
+      (by simp [Complex.Gammaℂ]) fun x hx ↦ ?_
+    have hr : 0 < (x : ℂ).re := by simpa using hx
+    rw [Complex.Gammaℂ]
+    exact mul_ne_zero two_ne_zero (inv_ne_zero (mul_ne_zero (mul_ne_zero two_ne_zero
+      (by simp [Real.pi_ne_zero])) (Complex.Gamma_ne_zero_of_re_pos hr)))
+
+/-- Every finite Euler factor of the twisted trivial character has a pole at `0`. -/
+private theorem sLocalPolePlaces_one_finite (v : S) :
+    meromorphicOrderAt (fun z : ℂ ↦
+      finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (twistₛ (1 : Xₛ) z))) 0 < 0 := by
+  have hq : 1 < Ideal.absNorm v.val.asIdeal := by
+    have h1 : Ideal.absNorm v.val.asIdeal ≠ 1 :=
+      Ideal.absNorm_eq_one_iff.not.mpr v.val.isPrime.ne_top
+    have h0 : Ideal.absNorm v.val.asIdeal ≠ 0 :=
+      Ideal.absNorm_eq_zero_iff.not.mpr v.val.ne_bot
+    omega
+  have hq' : (1 : ℝ) < (Ideal.absNorm v.val.asIdeal : ℝ) := by exact_mod_cast hq
+  have hq0 : ((Ideal.absNorm v.val.asIdeal : ℕ) : ℂ) ≠ 0 := by exact_mod_cast (by omega)
+  refine sLocalPolePlaces_one_order _
+    (fun z ↦ 1 - Complex.exp (Complex.log ((Ideal.absNorm v.val.asIdeal : ℕ) : ℂ) * (-z)))
+    (fun z ↦ by rw [sLocalPolePlaces_one_fin v z, Complex.cpow_def_of_ne_zero hq0])
+    ((by fun_prop : Differentiable ℂ fun z : ℂ ↦
+      1 - Complex.exp (Complex.log ((Ideal.absNorm v.val.asIdeal : ℕ) : ℂ) * (-z))).analyticAt 0)
+    (by simp) fun x hx ↦ ?_
+  rw [← Complex.cpow_def_of_ne_zero hq0]
+  rw [sub_ne_zero, ← Complex.ofReal_natCast, ← Complex.ofReal_neg,
+    ← Complex.ofReal_cpow (by positivity)]
+  intro h
+  have h' : (Ideal.absNorm v.val.asIdeal : ℝ) ^ (-x) = 1 := by exact_mod_cast h.symm
+  have := Real.rpow_lt_one_of_one_lt_of_neg hq' (by linarith : -x < 0)
+  linarith
+
 /-- Paper: Equation (7.2.1.11), p. 335.
 At the trivial quasi-character every archimedean and every selected finite place
 contributes a pole. -/
 theorem sLocalPolePlaces_one :
     sLocalArchPolePlaces (1 : Xₛ) = Finset.univ ∧
-      sLocalFinitePolePlaces (1 : Xₛ) = Finset.univ := by sorry
+      sLocalFinitePolePlaces (1 : Xₛ) = Finset.univ :=
+  ⟨Finset.filter_true_of_mem fun w _ ↦ sLocalPolePlaces_one_arch w,
+    Finset.filter_true_of_mem fun v _ ↦ sLocalPolePlaces_one_finite v⟩
 
 /-- Paper: Theorem 7.2.1.4, p. 336.
 The allowed pole multiplicity at a character counts the contributing places,

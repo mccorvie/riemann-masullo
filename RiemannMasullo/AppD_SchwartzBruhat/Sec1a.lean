@@ -6529,7 +6529,8 @@ theorem elementarySchwartz_strongDual_isCompact_of_isClosed_isVonNBounded
   exact MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ hA hb
 
 /-- Paper: Lemma D.1.3.7(3), p. 753. The elementary Schwartz space is barrelled. -/
-theorem elementarySchwartz_barrelled : BarrelledSpace ℂ (ElementarySchwartz m n r F) := by sorry
+theorem elementarySchwartz_barrelled : BarrelledSpace ℂ (ElementarySchwartz m n r F) :=
+  isFrechetTVS_barrelled (elementarySchwartz_frechet_montel (m := m) (n := n) (r := r) (F := F)).1
 
 open scoped ComplexOrder in
 /-- Paper: Lemma D.1.3.7(3), p. 753. The strong dual of the elementary Schwartz

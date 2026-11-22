@@ -158,7 +158,66 @@ theorem isIndentationMeasureLift_of_weil {μ : Measure G} [μ.IsHaarMeasure]
 has a unique positive Radon lift satisfying the normalization on compact tests.
 Deviation: Regularity of the lift is explicit, as in the proof. -/
 theorem existsUnique_indentationMeasureLift (ν₀ : Measure Q) [ν₀.Regular] :
-    ∃! μ₀ : Measure G, IsIndentationMeasureLift H hH μH ν₀ μ₀ := by sorry
+    ∃! μ₀ : Measure G, IsIndentationMeasureLift H hH μH ν₀ μ₀ := by
+  let : BorelSpace Q := ⟨rfl⟩
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  let L : C_c(G, ℝ) →ₚ[ℝ] ℝ :=
+    ⟨{ toFun := fun f ↦ ∫ q, e.pushforward μH f q ∂ν₀
+       map_add' := fun f g ↦ by
+         rw [map_add]
+         exact integral_add (e.pushforward μH f).integrable (e.pushforward μH g).integrable
+       map_smul' := fun c f ↦ by
+         rw [map_smul]
+         exact integral_smul c (e.pushforward μH f) },
+      fun f g h ↦ integral_mono (e.pushforward μH f).integrable
+        (e.pushforward μH g).integrable (e.pushforward_mono μH h)⟩
+  let μ := RealRMK.rieszMeasure L
+  have hreal (f : C_c(G, ℝ)) :
+      (∫ x, f x ∂μ) = ∫ q, e.pushforward μH f q ∂ν₀ :=
+    RealRMK.integral_rieszMeasure L f
+  have hcomplex (f : C_c(G, ℂ)) :
+      (∫ x, f x ∂μ) = ∫ q, indentationAverage H hH μH f q ∂ν₀ := by
+    let fr : C_c(G, ℝ) := ⟨⟨fun x ↦ (f x).re, Complex.continuous_re.comp f.continuous⟩,
+      f.hasCompactSupport.comp_left (g := Complex.re) (by simp)⟩
+    let fi : C_c(G, ℝ) := ⟨⟨fun x ↦ (f x).im, Complex.continuous_im.comp f.continuous⟩,
+      f.hasCompactSupport.comp_left (g := Complex.im) (by simp)⟩
+    apply Complex.ext
+    · change RCLike.re (∫ x, f x ∂μ) = RCLike.re (∫ q, indentationAverage H hH μH f q ∂ν₀)
+      rw [← integral_re f.integrable, ← integral_re (indentationAverage H hH μH f).integrable]
+      change (∫ x, fr x ∂μ) = ∫ q, (indentationAverage H hH μH f q).re ∂ν₀
+      rw [hreal fr]
+      apply integral_congr_ae
+      apply ae_of_all
+      intro q
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H q
+      change e.pushforward μH fr (π x) = (e.pushforward μH f (π x)).re
+      rw [e.pushforward_apply_apply, e.pushforward_apply_apply]
+      simpa only [TopologicalGroup.IsSES.pullback_def, fr, CompactlySupportedContinuousMap.coe_mk,
+        ContinuousMap.coe_mk, RCLike.re_eq_complex_re] using
+        (integral_re ((e.pullback f x).integrable (μ := μH)))
+    · change RCLike.im (∫ x, f x ∂μ) = RCLike.im (∫ q, indentationAverage H hH μH f q ∂ν₀)
+      rw [← integral_im f.integrable, ← integral_im (indentationAverage H hH μH f).integrable]
+      change (∫ x, fi x ∂μ) = ∫ q, (indentationAverage H hH μH f q).im ∂ν₀
+      rw [hreal fi]
+      apply integral_congr_ae
+      apply ae_of_all
+      intro q
+      obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H q
+      change e.pushforward μH fi (π x) = (e.pushforward μH f (π x)).im
+      rw [e.pushforward_apply_apply, e.pushforward_apply_apply]
+      simpa only [TopologicalGroup.IsSES.pullback_def, fi, CompactlySupportedContinuousMap.coe_mk,
+        ContinuousMap.coe_mk, RCLike.im_eq_complex_im] using
+        (integral_im ((e.pullback f x).integrable (μ := μH)))
+  refine ⟨μ, ⟨inferInstance, fun f ↦ (hcomplex f).symm⟩, ?_⟩
+  intro μ' hμ'
+  let : μ'.Regular := hμ'.1
+  apply Measure.ext_of_integral_eq_on_compactlySupported
+  intro f
+  let F : C_c(G, ℂ) := ⟨⟨fun x ↦ (f x : ℂ), Complex.continuous_ofReal.comp f.continuous⟩,
+    f.hasCompactSupport.comp_left Complex.ofReal_zero⟩
+  apply Complex.ofReal_injective
+  simpa only [F, CompactlySupportedContinuousMap.coe_mk, ContinuousMap.coe_mk,
+    integral_complex_ofReal] using (hμ'.2 F).symm.trans (hcomplex F).symm
 
 /-- Paper: Corollary 12.2.1.2(1), p. 506. The lifted measure is invariant under
 left translation by every subgroup element. -/

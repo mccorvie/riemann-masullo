@@ -1073,6 +1073,332 @@ theorem finiteHeckeL_logDeriv_isBigO_oneLine (χ : U[F]) (L : ℂ → ℂ)
       (fun t : ℝ ↦ logDeriv L ⟨1, t⟩) =O[atAbsTop] (fun t ↦ (Real.log |t|) ^ 2) := by
   sorry
 
+open Complex in
+/-- The inequality for the three Euler factors with a common radius and a unit phase. -/
+private theorem finiteHeckeL_inv_isBigO_oneLine_one_le_norm_eulerFactor_product {r : ℝ} (hr : 0 ≤ r) (hr₁ : r < 1) {z : ℂ} (hz : ‖z‖ = 1) :
+    1 ≤ ‖(1 - (r : ℂ))⁻¹ ^ 3 * (1 - (r : ℂ) * z)⁻¹ ^ 4 *
+      (1 - (r : ℂ) * z ^ 2)⁻¹‖ := by
+  have h₀ : ‖(r : ℂ)‖ < 1 := by rw [Complex.norm_of_nonneg hr]; exact hr₁
+  have h₁ : ‖(r : ℂ) * z‖ < 1 := by simpa [norm_mul, hz] using h₀
+  have h₂ : ‖(r : ℂ) * z ^ 2‖ < 1 := by simpa [norm_mul, norm_pow, hz] using h₀
+  have hinv {w : ℂ} (hw : ‖w‖ < 1) : (1 - w)⁻¹ = exp (-log (1 - w)) := by
+    rw [exp_neg, exp_log (fun h ↦ hw.ne (by rw [← sub_eq_zero.mp h, norm_one]))]
+  rw [hinv h₀, hinv h₁, hinv h₂, ← exp_nat_mul, ← exp_nat_mul, ← exp_add, ← exp_add,
+    norm_exp, Real.one_le_exp_iff]
+  simp only [add_re, mul_re, re_ofNat, im_ofNat, Nat.cast_ofNat, zero_mul, sub_zero]
+  rw [← ((hasSum_re (hasSum_taylorSeries_neg_log h₀)).mul_left 3 |>.add
+    ((hasSum_re (hasSum_taylorSeries_neg_log h₁)).mul_left 4) |>.add
+    (hasSum_re (hasSum_taylorSeries_neg_log h₂))).tsum_eq]
+  apply tsum_nonneg
+  intro n
+  simp only [mul_pow, ← ofReal_pow, div_natCast_re, ofReal_re, mul_re, ofReal_im, zero_mul,
+    sub_zero, ← mul_div_assoc, ← add_div]
+  apply div_nonneg _ (Nat.cast_nonneg _)
+  have hnorm : ‖z ^ n‖ = 1 := by rw [norm_pow, hz, one_pow]
+  have him := sq_norm_sub_sq_re (z ^ n)
+  rw [hnorm, one_pow] at him
+  rw [← pow_mul, Nat.mul_comm 2 n, pow_mul, pow_two (z ^ n), mul_re]
+  have hident :
+      3 * r ^ n + 4 * (r ^ n * (z ^ n).re) + r ^ n *
+        ((z ^ n).re * (z ^ n).re - (z ^ n).im * (z ^ n).im) =
+      2 * r ^ n * ((z ^ n).re + 1) ^ 2 := by
+    rw [← sq ((z ^ n).im), ← him]
+    ring
+  rw [hident]
+  positivity
+
+/-- The de la Vallée Poussin Euler-product inequality for the trivial character, a unitary
+character, and its square at ordinates in the ratio zero, one, and two. -/
+private theorem finiteHeckeL_inv_isBigO_oneLine_norm_finiteHeckeL_product_ge_one (χ : U[F]) {x : ℝ} (hx : 1 < x)
+    (a : ℂ) (ha : a.re = 0) :
+    1 ≤ ‖(ideleClassNormTwist (1 : U[F]) 0).LSeries (x : ℂ) ^ 3 * (ideleClassNormTwist χ 0).LSeries ((x : ℂ) + a) ^ 4 *
+      (ideleClassNormTwist (χ ^ 2) 0).LSeries ((x : ℂ) + 2 * a)‖ := by
+  classical
+  have h₂a : (2 * a).re = 0 := by simp [Complex.mul_re, ha]
+  let s₀ : halfPlane := ⟨(x : ℂ), hx⟩
+  let s₁ : halfPlane := ⟨(x : ℂ) + a, by simpa [mem_preimage, Complex.add_re, ha]⟩
+  let s₂ : halfPlane := ⟨(x : ℂ) + 2 * a, by simpa [mem_preimage, Complex.add_re, h₂a]⟩
+  have hp := (((finiteHeckeL_hasProd (1 : U[F]) s₀).pow 3).mul
+    ((finiteHeckeL_hasProd χ s₁).pow 4)).mul (finiteHeckeL_hasProd (χ ^ 2) s₂)
+  apply ge_of_tendsto' hp.norm
+  intro T
+  simp only [norm_prod]
+  refine Finset.one_le_prod₀ fun v _ ↦ ?_
+  change 1 ≤ ‖finiteHeckeEulerFactor (1 : U[F]) v x ^ 3 *
+    finiteHeckeEulerFactor χ v ((x : ℂ) + a) ^ 4 *
+    finiteHeckeEulerFactor (χ ^ 2) v ((x : ℂ) + 2 * a)‖
+  have hres (ψ : U[F]) (u : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist ψ 0).restrict v (u : v.adicCompletion F) =
+        (ψ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u) : ℂ) := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (ψ _ : ℂ) * _ ^ (0 : ℂ) = _
+    rw [Complex.cpow_zero, mul_one]
+  have hres_one (u : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist (1 : U[F]) 0).restrict v (u : v.adicCompletion F) = 1 := by
+    rw [hres, PontryaginDual.one_apply, Circle.coe_one]
+  have hres_sq (u : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist (χ ^ 2) 0).restrict v (u : v.adicCompletion F) =
+        ((ideleClassNormTwist χ 0).restrict v (u : v.adicCompletion F)) ^ 2 := by
+    rw [hres, hres]
+    rfl
+  have hu₀ : (ideleClassNormTwist (1 : U[F]) 0).IsUnramifiedAt v := HeckeCharacter.isUnramifiedAt_iff.mpr
+    fun u ↦ hres_one (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u)
+  have hu₂ (hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v) : (ideleClassNormTwist (χ ^ 2) 0).IsUnramifiedAt v :=
+    HeckeCharacter.isUnramifiedAt_iff.mpr fun u ↦ by
+      rw [show (ideleClassNormTwist (χ ^ 2) 0).restrict v u = ((ideleClassNormTwist χ 0).restrict v u) ^ 2 from
+        hres_sq (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom u),
+        hu.restrict_apply_unit_eq_one, one_pow]
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  let u := Units.mk0 (val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose : v.adicCompletion F)
+    val.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero
+  have hv₀ : (ideleClassNormTwist (1 : U[F]) 0).localValue v = 1 := hres_one u
+  have hv₂ : (ideleClassNormTwist (χ ^ 2) 0).localValue v = ((ideleClassNormTwist χ 0).localValue v) ^ 2 := hres_sq u
+  let q : ℝ := v.asIdeal.absNorm
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ := zero_lt_one.trans hq
+  have hqC : (q : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hq₀.ne'
+  let r := q ^ (-x)
+  have hr : 0 ≤ r := Real.rpow_nonneg hq₀.le _
+  have hr₁ : r < 1 := Real.rpow_lt_one_of_one_lt_of_neg hq (by linarith)
+  let z (ψ : U[F]) (b : ℂ) := (ideleClassNormTwist ψ 0).localValue v * (q : ℂ) ^ (-b)
+  have hz (ψ : U[F]) (b : ℂ) (hb : b.re = 0) : ‖z ψ b‖ = 1 := by
+    simp [z, norm_ideleClassNormTwist_zero_localValue,
+      Complex.norm_cpow_eq_rpow_re_of_pos hq₀, Complex.neg_re, hb]
+  have hphase (ψ : U[F]) (b : ℂ) :
+      (ideleClassNormTwist ψ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-((x : ℂ) + b)) =
+        (r : ℂ) * z ψ b := by
+    change (ideleClassNormTwist ψ 0).localValue v * (q : ℂ) ^ (-((x : ℂ) + b)) = _
+    rw [neg_add, Complex.cpow_add _ _ hqC, ← Complex.ofReal_neg,
+      ← Complex.ofReal_cpow hq₀.le]
+    exact mul_left_comm ..
+  have hsq : z (χ ^ 2) (2 * a) = z χ a ^ 2 := by
+    simp only [z, hv₂, mul_pow, neg_mul_eq_mul_neg]
+    rw [show (2 : ℂ) = (↑(2 : ℕ) : ℂ) by norm_num, Complex.cpow_nat_mul]
+  rw [finiteHeckeEulerFactor, ite_eq_left hu₀, hv₀, one_mul]
+  change 1 ≤ ‖(1 - (q : ℂ) ^ (-(x : ℂ)))⁻¹ ^ 3 * _ * _‖
+  rw [← Complex.ofReal_neg, ← Complex.ofReal_cpow hq₀.le]
+  by_cases hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · rw [finiteHeckeEulerFactor, ite_eq_left hu, finiteHeckeEulerFactor, ite_eq_left (hu₂ hu),
+      hphase χ a, hphase (χ ^ 2) (2 * a), hsq]
+    exact finiteHeckeL_inv_isBigO_oneLine_one_le_norm_eulerFactor_product hr hr₁ (hz χ a ha)
+  · rw [finiteHeckeEulerFactor, ite_eq_right hu, one_pow, mul_one, finiteHeckeEulerFactor]
+    have hrnorm : ‖(1 : ℂ) - (r : ℂ)‖ = 1 - r := by
+      rw [← Complex.ofReal_one, ← Complex.ofReal_sub, Complex.norm_of_nonneg (sub_nonneg.mpr hr₁.le)]
+    split_ifs
+    · rw [hphase (χ ^ 2) (2 * a)]
+      let w := (r : ℂ) * z (χ ^ 2) (2 * a)
+      change 1 ≤ ‖(1 - (r : ℂ))⁻¹ ^ 3 * (1 - w)⁻¹‖
+      have hw : ‖w‖ = r := by
+        rw [show ‖w‖ = ‖(r : ℂ)‖ * ‖z (χ ^ 2) (2 * a)‖ from norm_mul _ _,
+          hz _ _ h₂a, Complex.norm_of_nonneg hr, mul_one]
+      have hpos : 0 < ‖(1 : ℂ) - w‖ := norm_pos_iff.mpr fun h ↦
+        hr₁.ne (by rw [← hw, ← sub_eq_zero.mp h, norm_one])
+      rw [norm_mul, norm_pow, norm_inv, norm_inv, hrnorm, inv_pow, ← mul_inv,
+        one_le_inv₀ (mul_pos (pow_pos (sub_pos.mpr hr₁) 3) hpos)]
+      have hle : ‖(1 : ℂ) - w‖ ≤ 1 + r := by
+        simpa only [hw, norm_one] using norm_sub_le (1 : ℂ) w
+      calc
+        (1 - r) ^ 3 * ‖(1 : ℂ) - w‖ ≤ (1 - r) ^ 3 * (1 + r) :=
+          mul_le_mul_of_nonneg_left hle (pow_nonneg (sub_nonneg.mpr hr₁.le) _)
+        _ = (1 - r) ^ 2 * (1 - r ^ 2) := by ring
+        _ ≤ (1 - r) ^ 2 * 1 :=
+          mul_le_mul_of_nonneg_left (by nlinarith [sq_nonneg r]) (sq_nonneg _)
+        _ ≤ 1 := by
+          rw [mul_one]
+          exact pow_le_one₀ (sub_nonneg.mpr hr₁.le) (by linarith)
+    · rw [mul_one, norm_pow, norm_inv, hrnorm, inv_pow,
+        one_le_inv₀ (pow_pos (sub_pos.mpr hr₁) 3)]
+      exact pow_le_one₀ (sub_nonneg.mpr hr₁.le) (by linarith)
+
+/-- Euler product inequality in the exact variables used in the bound. -/
+private theorem finiteHeckeL_inv_isBigO_oneLine_euler (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    {x : ℝ} (hx : 1 < x) (t : ℝ) :
+    1 ≤ ‖dedekindZeta F x‖ ^ 3 * ‖L ⟨x,t⟩‖ ^ 4 *
+      ‖finiteHeckeL (χ ^ 2) ⟨⟨x,2*t⟩,hx⟩‖ := by
+  let a : ℂ := ⟨0,t⟩
+  have h := finiteHeckeL_inv_isBigO_oneLine_norm_finiteHeckeL_product_ge_one χ hx a rfl
+  have h1 : (x : ℂ) + a = ⟨x,t⟩ := by apply Complex.ext <;> simp [a]
+  have h2 : (x : ℂ) + 2 * a = ⟨x,2*t⟩ := by apply Complex.ext <;> simp [a, Complex.mul_re, Complex.mul_im]
+  have hζ := completedHeckeL_one_eq_dedekindZeta (F := F) (⟨x,hx⟩ : halfPlane)
+  change heckeGammaFactor (1 : U[F]) x * _ = _ at hζ
+  rw [← heckeGammaFactor_one] at hζ
+  have hz := mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U[F]) (zero_lt_one.trans hx)) hζ
+  rw [h1, h2, norm_mul, norm_mul, norm_pow, norm_pow] at h
+  rw [hSeries ⟨⟨x,t⟩,hx⟩]
+  simpa only [finiteHeckeL, hz] using h
+
+private theorem finiteHeckeL_inv_isBigO_oneLine_scalar {V B X L Q : ℝ} (hV : 3 ≤ V) (hB : 0 ≤ B) (hX : 0 ≤ X) (hQ : 0 ≤ Q)
+    (hzeta : B ≤ V ^ 13) (hsq : Q ≤ V) (hdiff : X ≤ L + (V ^ 11)⁻¹)
+    (hprod : 1 ≤ B ^ 3 * X ^ 4 * Q) : (V ^ 11)⁻¹ ≤ L := by
+  by_contra! hbad
+  have hpos : 0 < V := by linarith
+  have ht : X ≤ 2 / V ^ 11 := by rw [div_eq_mul_inv]; linarith
+  have h := calc
+    1 ≤ B ^ 3 * X ^ 4 * Q := hprod
+    _ ≤ (V ^ 13) ^ 3 * (2 / V ^ 11) ^ 4 * V := by gcongr
+    _ = 16 / V ^ 4 := by field_simp; ring
+  have hh : 3 ^ 4 ≤ V ^ 4 := by gcongr
+  have := (le_div_iff₀ (pow_pos hpos 4)).mp h
+  norm_num at hh
+  linarith
+
+/-- A local version of the strip bounds sufficient for the reciprocal estimate. -/
+private theorem finiteHeckeL_inv_isBigO_oneLine_reciprocal_of_bounds (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (m : ℕ) (hm : m ≠ 0)
+    (ha : ∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1,t⟩)
+    (h₁ : ∀ᶠ t : ℝ in atAbsTop, ∀ d ∈ Ioc (0:ℝ) 1,
+      ‖L ⟨1 + d,t⟩ - L ⟨1,t⟩‖ ≤ |t| ^ m * d)
+    (h₂ : ∀ᶠ t : ℝ in atAbsTop, ∀ d ∈ Ioc (0:ℝ) 1, ∀ hd : 1 < 1+d,
+      ‖finiteHeckeL (χ ^ 2) ⟨⟨1+d,2*t⟩,hd⟩‖ ≤ |t| ^ m) :
+    (∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1,t⟩ ∧ L ⟨1,t⟩ ≠ 0) ∧
+      ∃ N : ℕ, 0 < N ∧ (fun t : ℝ ↦ (L ⟨1,t⟩)⁻¹) =O[atAbsTop] (fun t ↦ |t| ^ N) := by
+  let V (t : ℝ) := |t| ^ m
+  let d (t : ℝ) := (V t ^ 12)⁻¹
+  have hV : Tendsto V atAbsTop atTop :=
+    (tendsto_pow_atTop (α := ℝ) hm).comp tendsto_comap
+  have hd : Tendsto d atAbsTop (𝓝 (0:ℝ)) :=
+    tendsto_inv_atTop_zero.comp ((tendsto_pow_atTop (α := ℝ) (by decide : 12 ≠ 0)).comp hV)
+  have hx : Tendsto (fun t ↦ 1+d t) atAbsTop (𝓝[>] (1:ℝ)) := by
+    apply tendsto_nhdsWithin_iff.mpr
+    refine ⟨by simpa using hd.const_add 1, ?_⟩
+    filter_upwards [hV.eventually_gt_atTop 0] with t ht
+    change 1 < 1 + (V t ^ 12)⁻¹
+    exact lt_add_of_pos_right _ (inv_pos.mpr (pow_pos ht 12))
+  obtain ⟨C,hC⟩ := ((NumberField.tendsto_sub_one_mul_dedekindZeta_nhdsGT F).norm.comp hx).isBoundedUnder_le.eventually_le
+  have hbound : ∀ᶠ t : ℝ in atAbsTop, (V t ^ 11)⁻¹ ≤ ‖L ⟨1,t⟩‖ := by
+    filter_upwards [hC, hV.eventually_ge_atTop C, hV.eventually_ge_atTop 3,
+      hd.eventually_le_const zero_lt_one, h₁, h₂] with t hζ hCV hv hdle hdiff hsq
+    have hv' : 0 < V t := by linarith
+    have hdt : 0 < d t := inv_pos.mpr (pow_pos hv' 12)
+    have hxt : 1 < 1 + d t := lt_add_of_pos_right _ hdt
+    have hz : d t * ‖dedekindZeta F (1 + d t : ℝ)‖ ≤ C := by
+      simpa [Function.comp_def, norm_mul, Real.norm_of_nonneg hdt.le] using hζ
+    apply finiteHeckeL_inv_isBigO_oneLine_scalar hv (norm_nonneg _) (norm_nonneg _) (norm_nonneg _) _ (hsq (d t) ⟨hdt,hdle⟩ hxt) _
+      (finiteHeckeL_inv_isBigO_oneLine_euler χ L hSeries hxt t)
+    · have hvBound : ‖dedekindZeta F (1 + d t : ℝ)‖ ≤ V t / d t :=
+        (le_div_iff₀ hdt).mpr (by simpa only [mul_comm (d t)] using hz.trans hCV)
+      exact hvBound.trans_eq (show V t / d t = V t ^ 13 by dsimp only [d]; rw [div_inv_eq_mul, pow_succ (V t) 12, mul_comm])
+    · calc
+        _ ≤ ‖L ⟨1,t⟩‖ + ‖L ⟨1+d t,t⟩ - L ⟨1,t⟩‖ := by
+          linarith [norm_sub_norm_le (L ⟨1+d t,t⟩) (L ⟨1,t⟩)]
+        _ ≤ ‖L ⟨1,t⟩‖ + V t * d t := add_le_add_right (hdiff _ ⟨hdt,hdle⟩) _
+        _ = _ := by dsimp [d]; field_simp
+  refine ⟨?_, m*11, Nat.mul_pos (Nat.pos_of_ne_zero hm) (by decide), Asymptotics.IsBigO.of_bound 1 ?_⟩
+  · filter_upwards [ha, hbound, hV.eventually_gt_atTop 0] with t ht hb hv
+    exact ⟨ht, norm_pos_iff.mp ((inv_pos.mpr (pow_pos hv 11)).trans_le hb)⟩
+  · filter_upwards [hbound, hV.eventually_gt_atTop 0] with t ht hv
+    rw [norm_inv, Real.norm_of_nonneg (pow_nonneg (abs_nonneg _) _), one_mul, pow_mul]
+    exact (inv_le_comm₀ ((inv_pos.mpr (pow_pos hv 11)).trans_le ht) (pow_pos hv 11)).mpr ht
+
+
+private theorem finiteHeckeL_inv_isBigO_oneLine_strip_bound_nat (G : ℂ → ℂ) (a b M : ℝ)
+    (hO : G =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc a b)] fun s ↦ |s.im| ^ M) :
+    ∃ n : ℕ, ∃ T : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → T ≤ |z.im| → ‖G z‖ ≤ |z.im| ^ n := by
+  obtain ⟨n,hn⟩ := exists_nat_gt M
+  obtain ⟨c,hc⟩ := Asymptotics.isBigO_iff.mp hO
+  simp only [eventually_inf_principal, eventually_comap, eventually_atTop] at hc
+  obtain ⟨T,hT⟩ := hc
+  refine ⟨n+1, max T (max 1 c), fun z hz htz ↦ ?_⟩
+  have hz₁ : 1 ≤ |z.im| := (le_max_left 1 c).trans ((le_max_right ..).trans htz)
+  have hzc : c ≤ |z.im| := (le_max_right 1 c).trans ((le_max_right ..).trans htz)
+  have h := hT |z.im| ((le_max_left ..).trans htz) z rfl hz
+  rw [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _)] at h
+  calc
+    ‖G z‖ ≤ c * |z.im| ^ M := h
+    _ ≤ |z.im| * |z.im| ^ M := by gcongr
+    _ ≤ |z.im| * |z.im| ^ (n:ℝ) := by gcongr
+    _ = _ := by rw [Real.rpow_natCast, pow_succ, mul_comm]
+
+private theorem finiteHeckeL_inv_isBigO_oneLine_analytic_and_deriv_strip (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    {n : ℕ} {T : ℝ} (hT : ∀ z : ℂ, z.re ∈ Icc (-1:ℝ) 4 → T ≤ |z.im| → ‖L z‖ ≤ |z.im| ^ n)
+    (t : ℝ) (ht : max 2 (T + 2) ≤ |t|) {σ : ℝ} (hσ : σ ∈ Icc (1:ℝ) 2) :
+    AnalyticAt ℂ L ⟨σ,t⟩ ∧ ‖deriv L ⟨σ,t⟩‖ ≤ (2*|t|)^n := by
+  let s : ℂ := ⟨σ,t⟩
+  have him := (le_max_left 2 (T+2)).trans ht
+  have hlarge := (le_max_right 2 (T+2)).trans ht
+  have hDisk {w : ℂ} (hw : w ∈ Metric.closedBall s 1) :
+      w.re ∈ Ioo (-1:ℝ) 4 ∧ T < |w.im| ∧ |w.im| ≤ 2 * |t| := by
+    have dist := mem_closedBall_iff_norm.mp hw
+    have hre := (Complex.abs_re_le_norm (w - s)).trans dist
+    have him' := (Complex.abs_im_le_norm (w - s)).trans dist
+    change |w.re - σ| ≤ 1 at hre
+    change |w.im - t| ≤ 1 at him'
+    rw [abs_le] at hre
+    refine ⟨⟨by linarith [hre.1,hσ.1], by linarith [hre.2,hσ.2]⟩, ?_, ?_⟩
+    · linarith [(abs_sub_abs_le_abs_sub t w.im).trans (by simpa [abs_sub_comm] using him')]
+    · linarith [(abs_sub_abs_le_abs_sub w.im t).trans him']
+  have han {w : ℂ} (hw : w ∈ Metric.closedBall s 1) : AnalyticAt ℂ L w := by
+    obtain ⟨hRe,hLo,hHi⟩ := hDisk hw
+    apply (hL (mem_univ w)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    by_contra! hp
+    have hre := (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hRe
+    have him := (isOpen_Ioo.preimage Complex.continuous_im.abs).mem_nhds
+      (show w ∈ (fun z : ℂ ↦ |z.im|) ⁻¹' Ioo T (|w.im|+1) from ⟨hLo, by linarith⟩)
+    have hb : ∀ᶠ z in 𝓝 w, ‖L z‖ ≤ (|w.im|+1)^n := by
+      filter_upwards [hre,him] with z hz h'z
+      exact (hT z (Ioo_subset_Icc_self hz) h'z.1.le).trans (pow_le_pow_left₀ (abs_nonneg _) h'z.2.le _)
+    have hp' := (tendsto_norm_cobounded_atTop.comp (tendsto_cobounded_of_meromorphicOrderAt_neg hp)).eventually_gt_atTop ((|w.im|+1)^n)
+    obtain ⟨_,h,h'⟩ := ((hb.filter_mono nhdsWithin_le_nhds).and hp').exists
+    exact h'.not_ge h
+  refine ⟨han (Metric.mem_closedBall_self zero_le_one), ?_⟩
+  have hDiff : DiffContOnCl ℂ L (Metric.ball s 1) :=
+    (show DifferentiableOn ℂ L (Metric.closedBall s 1) from fun w hw ↦
+      (han hw).differentiableAt.differentiableWithinAt).diffContOnCl_ball subset_rfl
+  have hCircle : ∀ w ∈ Metric.sphere s 1, ‖L w‖ ≤ (2 * |t|)^n := by
+    intro w hw
+    obtain ⟨hRe,hLo,hHi⟩ := hDisk (Metric.sphere_subset_closedBall hw)
+    exact (hT w (Ioo_subset_Icc_self hRe) hLo.le).trans (pow_le_pow_left₀ (abs_nonneg _) hHi _)
+  simpa only [div_one] using Complex.norm_deriv_le_of_forall_mem_sphere_norm_le zero_lt_one hDiff hCircle
+
+/-- Reduction to polynomial *upper* bounds. No log derivative or zero-free region is needed. -/
+private theorem finiteHeckeL_inv_isBigO_oneLine_reciprocal_of_strip_growth (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (hG : ∃ M : ℝ, L =O[atHeight ⊓ 𝓟 (Complex.re ⁻¹' Icc (-1:ℝ) 4)] fun s ↦ |s.im| ^ M)
+    (hG₂ : ∃ n : ℕ, ∃ T : ℝ, ∀ z : halfPlane, (z:ℂ).re ≤ 2 → T ≤ |(z:ℂ).im| →
+      ‖finiteHeckeL (χ^2) z‖ ≤ |(z:ℂ).im| ^ n) :
+    (∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1,t⟩ ∧ L ⟨1,t⟩ ≠ 0) ∧
+      ∃ N : ℕ, 0 < N ∧ (fun t : ℝ ↦ (L ⟨1,t⟩)⁻¹) =O[atAbsTop] (fun t ↦ |t| ^ N) := by
+  obtain ⟨M,hM⟩ := hG
+  obtain ⟨n,T,hT⟩ := finiteHeckeL_inv_isBigO_oneLine_strip_bound_nat L _ _ _ hM
+  obtain ⟨k,T₂,hT₂⟩ := hG₂
+  let m := 2 * (n+k) + 1
+  have hb {x : ℝ} (hx : 2 ≤ x) {j : ℕ} (hj : j ≤ n + k) : (2 * x) ^ j ≤ x ^ m := by
+    have hx₁ : 1 ≤ x := by linarith
+    calc
+      (2*x) ^ j ≤ (x*x) ^ j := by gcongr
+      _ = x ^ (2*j) := by rw [← sq, pow_mul]
+      _ ≤ x ^ m := pow_le_pow_right₀ hx₁ (by dsimp [m]; omega)
+  have hlim : Tendsto abs atAbsTop atTop := tendsto_comap
+  have hev := hlim.eventually_ge_atTop (max 2 (T+2))
+  apply finiteHeckeL_inv_isBigO_oneLine_reciprocal_of_bounds χ L hSeries m (Nat.succ_ne_zero _)
+  · filter_upwards [hev] with t ht
+    exact (finiteHeckeL_inv_isBigO_oneLine_analytic_and_deriv_strip L hL hT t ht ⟨le_rfl,one_le_two⟩).1
+  · filter_upwards [hev] with t ht
+    have hs (σ : ℝ) (hσ : σ ∈ Icc (1:ℝ) 2) := finiteHeckeL_inv_isBigO_oneLine_analytic_and_deriv_strip L hL hT t ht hσ
+    have hd (σ : ℝ) (hσ : σ ∈ Icc (1:ℝ) 2) : HasDerivAt (fun u : ℝ ↦ L ⟨u,t⟩) (deriv L ⟨σ,t⟩) σ := by
+      have he (u : ℝ) : (u:ℂ) + ⟨0,t⟩ = ⟨u,t⟩ := by apply Complex.ext <;> simp
+      have hd := ((hs σ hσ).1.differentiableAt.hasDerivAt.comp_of_eq (x := (σ:ℂ))
+        ((hasDerivAt_id (σ:ℂ)).add_const (⟨0,t⟩:ℂ)) (he σ).symm).comp_ofReal
+      simpa only [he,mul_one,id_eq,Function.comp_def] using hd
+    intro d hd'
+    have hu : 1+d ∈ Icc (1:ℝ) 2 := ⟨by linarith [hd'.1], by linarith [hd'.2]⟩
+    have h := norm_image_sub_le_of_norm_deriv_le_segment' (a := 1) (b := 2)
+      (fun σ hσ ↦ (hd σ hσ).hasDerivWithinAt)
+      (fun σ hσ ↦ (hs σ (Ico_subset_Icc_self hσ)).2.trans (hb ((le_max_left ..).trans ht) (by omega))) _ hu
+    simpa using h
+  · filter_upwards [hev, hlim.eventually_ge_atTop T₂] with t ht ht₂
+    intro d hd hd'
+    have h := hT₂ (⟨⟨1+d,2*t⟩,hd'⟩ : halfPlane) (by change 1+d ≤ 2; linarith [hd.2])
+      (by change T₂ ≤ |2*t|; rw [abs_mul, abs_of_nonneg (by norm_num : (0:ℝ) ≤ 2)]; linarith [abs_nonneg t])
+    change _ ≤ |2*t| ^ k at h
+    rw [abs_mul, abs_of_nonneg (by norm_num : (0:ℝ) ≤ 2)] at h
+    exact h.trans (hb ((le_max_left ..).trans ht) (by omega))
+
+
 /-- Paper: Theorem B.6.1.6, p. 640. The reciprocal of the finite Hecke
 L-function grows at most polynomially on `Re(s) = 1` at large absolute heights.
 Deviation: Eventual analyticity and nonvanishing make the reciprocal well-defined. -/
@@ -1080,7 +1406,13 @@ theorem finiteHeckeL_inv_isBigO_oneLine (χ : U[F]) (L : ℂ → ℂ)
     (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
     (∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1, t⟩ ∧ L ⟨1, t⟩ ≠ 0) ∧
       ∃ N : ℕ, 0 < N ∧ (fun t : ℝ ↦ (L ⟨1, t⟩)⁻¹) =O[atAbsTop] (fun t ↦ |t| ^ N) := by
-  sorry
+  apply finiteHeckeL_inv_isBigO_oneLine_reciprocal_of_strip_growth χ L hL hSeries
+  · obtain ⟨M,_,hM⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries (-1) 4 (by norm_num)
+    exact ⟨M,hM⟩
+  · obtain ⟨G,hG,hAgree⟩ := finiteHeckeL_exists_continuation (χ^2)
+    obtain ⟨M,_,hM⟩ := finiteHeckeL_continuation_isBigO_rpow (χ^2) G hG hAgree 1 2 one_lt_two
+    obtain ⟨n,T,hT⟩ := finiteHeckeL_inv_isBigO_oneLine_strip_bound_nat G _ _ _ hM
+    exact ⟨n,T,fun z hz ht ↦ hAgree z ▸ hT z ⟨z.2.le,hz⟩ ht⟩
 
 -- TODO(paper-gap): Equation (B.6.1.23) uses the finite L-factors. Its χ²
 -- argument has height 2t, which (B.6.1.28) must retain.

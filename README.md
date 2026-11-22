@@ -93,9 +93,10 @@ the roadmap below the order of work.
 
 ### What the formalization has found
 
-[`ERRATA.md`](ERRATA.md) has about 580 entries: some 225 statements that are false as printed,
-320 that are imprecise, inconsistent or wrongly justified, 28 placeholders or missing pieces,
-and 5 reports from readers about parts not yet formalized. Those in the appendices' and early
+[`ERRATA.md`](ERRATA.md) has about 660 entries: some 245 statements that are false as printed,
+345 that are imprecise, inconsistent or wrongly justified, 49 placeholders or missing pieces,
+and 25 reports about parts of the paper that are not stated in Lean. Five outside audits have
+been compared with it report by report, and it names them where they found the same thing. Those in the appendices' and early
 chapters' accounts of standard material are repaired where they occur: the Lean states the
 corrected form and says so.
 
@@ -219,7 +220,7 @@ The target statements are checked with [Comparator](https://github.com/leanprove
 |---|---|
 | [`Statements.lean`](Statements.lean) | definitions of the target statements; imports only Mathlib |
 | [`Challenge.lean`](Challenge.lean) | the theorems, with `sorry` |
-| [`Main.lean`](Main.lean) | the same theorems, to be proved from `RiemannMasullo` |
+| [`Main.lean`](Main.lean) | the same theorems, each obtained from `RiemannMasullo` |
 | [`comparator.json`](comparator.json) | the Comparator config |
 
 | Theorem | Statement |
@@ -233,11 +234,24 @@ The target statements are checked with [Comparator](https://github.com/leanprove
 lake comparator              # needs bubblewrap; add --paranoid for the extra kernels
 ```
 
-It currently rejects with `Illegal axiom detected: 'sorryAx'`, as it should until `Main.lean` has
-no `sorry`.
+It currently rejects with `Illegal axiom detected: 'sorryAx'`, as it should for as long as anything
+the proofs rest on is open.
 
-The paper's own main theorem (Theorem 13.3.1.2) is a placeholder in the current draft, so the last
-two statements were reconstructed from the introduction and have not been reviewed.
+`Main.lean` no longer contains a `sorry` of its own. Each of the seven theorems is one line that
+appeals to the library, and the route from there back to the paper is explicit:
+
+| Step | Where | State |
+|---|---|---|
+| The seven targets from the paper's main claim: translation to Mathlib's Hecke characters, and the classical reductions (Hecke to Dedekind to zeta, and to Dirichlet characters) | [`Ch13_ZerosHecke/Targets.lean`](RiemannMasullo/Ch13_ZerosHecke/Targets.lean) | stated and reviewed; nine supporting statements open, all classical |
+| The paper's main claim, `heckeL_zero_re_eq_half`: for every number field and every unitary character of its idele class group, the zeros of the completed Hecke L-function in the open critical strip lie on the line | [`Ch01_Introduction/Sec4.lean`](RiemannMasullo/Ch01_Introduction/Sec4.lean) | derived in Lean from the steps of §1.4 of the paper |
+| The steps of §1.4: the family of test functions, the uniform bound and Montel's theorem, the logarithmic derivative, the functional equation | the same file, and `Sec4_Printed.lean` | the uniform bound of §1.4.3 is false as printed (the objection raised by Jenny Lorraine Nielsen, confirmed here with a counterexample for the trivial rational character); the holomorphic extension that §1.4.5 needs is isolated as an open statement |
+| The trace formula, Theorem 12.5.1.1 | [`Ch12_TraceGeometric/Sec5.lean`](RiemannMasullo/Ch12_TraceGeometric/Sec5.lean) | stated in corrected form; the steps behind it with no known repair are listed at the head of [`ERRATA.md`](ERRATA.md) |
+
+The paper has no numbered statement of its main theorem: Theorem 13.3.1.2 is a title in the
+current draft, and the claim is argued in the introduction (§1.4, pp. 27–31). The two targets
+beyond the Alpoge challenge, for Dedekind zeta functions and for Hecke L-functions, were written
+from that introduction; a reviewer has since checked that the bridge proves them at exactly
+their Comparator types.
 
 ## Acknowledgments
 

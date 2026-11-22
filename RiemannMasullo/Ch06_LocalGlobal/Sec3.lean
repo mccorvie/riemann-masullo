@@ -287,6 +287,79 @@ def heckeEulerProductOutside (S : Finset V) (χ : U)
   toMeromorphicNFOn
     (fun s ↦ continuedCompletedHeckeL χ s / sLocalHeckeL (twist s)) univ
 
+/-- The descended restriction of a unitary character is unitary. -/
+private theorem heckeEulerProductOutside_eq_finite_unitary (S : Finset V) (χ : U)
+    (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) :
+    ∃ η : PontryaginDual (SIdeleQuotient F S),
+      sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩ =
+        quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+          (isProperMap_sIdeleQuotientNorm F S).continuous
+          ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) 0 := by
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hc (x : SIdeleQuotient F S) : ‖c x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c (QuotientGroup.mk g) = ideleClassNormTwist χ 0
+      (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    change ‖(χ _ : ℂ) * _ ^ (0 : ℂ)‖ = 1
+    simp
+  let η : PontryaginDual (SIdeleQuotient F S) :=
+    { toFun := fun x ↦ ⟨c x, mem_sphere_zero_iff_norm.mpr (hc x)⟩
+      map_one' := Subtype.ext (map_one c)
+      map_mul' x y := Subtype.ext (map_mul c x y)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  refine ⟨η, ?_⟩
+  ext x
+  change c x = (η x : ℂ) * _ ^ (0 : ℂ)
+  rw [Complex.cpow_zero, mul_one]
+  rfl
+
+/-- The descended local product consists of the archimedean and selected finite factors. -/
+private theorem heckeEulerProductOutside_eq_finite_local_factor (S : Finset V) (χ : U)
+    (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) :
+    ∀ s, sLocalHeckeL (quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s) =
+      heckeGammaFactor χ s * ∏ v : S, finiteHeckeEulerFactor χ v.val s := by
+  obtain ⟨η, hη⟩ := heckeEulerProductOutside_eq_finite_unitary S χ hχ
+  intro s
+  have heq : quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s =
+      quasiCharacterNormTwist (G := SIdeleQuotient F S)
+      (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η) s := by
+    ext x
+    have h := DFunLike.congr_fun hη x
+    change _ = (η x : ℂ) * _ ^ (0 : ℂ) at h
+    rw [Complex.cpow_zero, mul_one] at h
+    change (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) x *
+      (((sIdeleQuotientNorm F S x : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (η x : ℂ) * (((sIdeleQuotientNorm F S x : ℝ≥0) : ℝ) : ℂ) ^ s
+    rw [h]
+  rw [heq]
+  exact sLocalHeckeL_eq_partialEulerProduct η χ hχ hη s
+
+/-- Meromorphic functions equal on a right half-plane have the same normal form. -/
+private theorem heckeEulerProductOutside_eq_finite_nf_eq (f g : ℂ → ℂ) (hf : MeromorphicOn f univ)
+    (hg : MeromorphicOn g univ) (hfg : ∀ z : ℂ, 1 < z.re → f z = g z) :
+    toMeromorphicNFOn f univ = toMeromorphicNFOn g univ := by
+  have hAtTwo : meromorphicOrderAt (f - g) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (2 : ℂ), 1 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (hfg z hz)
+  ext z
+  have ho := (hf.sub hg).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ z) hAtTwo
+  have hnear : f =ᶠ[𝓝[≠] z] g :=
+    (meromorphicOrderAt_eq_top_iff.mp ho).mono fun _ h ↦ sub_eq_zero.mp h
+  have hn : toMeromorphicNFOn f univ =ᶠ[𝓝[≠] z] toMeromorphicNFOn g univ :=
+    (hf.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z)).trans
+      (hnear.trans (hg.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ z)).symm)
+  exact (((meromorphicNFOn_toMeromorphicNFOn f univ (mem_univ z)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (meromorphicNFOn_toMeromorphicNFOn g univ (mem_univ z))).mp hn).eq_of_nhds
+
+
 /-- Paper: Equation (6.3.1.6), p. 303.
 The outside product equals the finite continuation with the finite factors in S removed,
 as used in Appendix B.6. -/
@@ -295,7 +368,46 @@ theorem heckeEulerProductOutside_eq_finite (S : Finset V) (χ : U)
     (_hL : MeromorphicNFOn L univ) (_hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
     heckeEulerProductOutside S χ hχ = toMeromorphicNFOn
       (fun s ↦ reciprocalPartialHeckeEulerProduct χ S s * L s) univ := by
-  sorry
+  classical
+  have hfactor (v : V) : Differentiable ℂ (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) := by
+    unfold finiteHeckeEulerFactor
+    split_ifs
+    · simp_rw [inv_inv]
+      have hq : (Ideal.absNorm v.asIdeal : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+        ((Ideal.absNorm_eq_zero_iff).not.mpr v.ne_bot)
+      exact (differentiable_const _).sub ((differentiable_const _).mul
+        ((differentiable_neg).const_cpow (Or.inl hq)))
+    · simp_rw [inv_one]
+      exact differentiable_const _
+  have hp : Differentiable ℂ (reciprocalPartialHeckeEulerProduct χ S) := by
+    unfold reciprocalPartialHeckeEulerProduct
+    exact Differentiable.fun_finsetProd fun v _ ↦ hfactor v
+  have hlocal : MeromorphicOn (fun s ↦ sLocalHeckeL
+      (quasiCharacterNormTwist (G := SIdeleQuotient F S) (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        (sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩) s)) univ := by
+    simp_rw [heckeEulerProductOutside_eq_finite_local_factor S χ hχ]
+    apply (meromorphic_heckeGammaFactor χ).meromorphicOn.mul
+    apply MeromorphicOn.fun_prod
+    intro v _ z _
+    convert ((hfactor v.val).analyticAt z).meromorphicAt.inv using 1
+    ext w
+    simp
+  unfold heckeEulerProductOutside
+  apply heckeEulerProductOutside_eq_finite_nf_eq
+  · exact (continuedCompletedHeckeL_spec χ).1.meromorphicOn.div hlocal
+  · exact (fun z _ ↦ (hp.analyticAt z).meromorphicAt.mul (_hL.meromorphicOn z (mem_univ z)))
+  · intro z hz
+    rw [heckeEulerProductOutside_eq_finite_local_factor S χ hχ, (continuedCompletedHeckeL_spec χ).2 ⟨z, hz⟩,
+      _hSeries ⟨z, hz⟩]
+    change (heckeGammaFactor χ z * finiteHeckeL χ ⟨z, hz⟩) / _ = _
+    have hn := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)
+    have hprod : reciprocalPartialHeckeEulerProduct χ S z =
+        (∏ v : S, finiteHeckeEulerFactor χ v.val z)⁻¹ := by
+      unfold reciprocalPartialHeckeEulerProduct
+      rw [← Finset.prod_coe_sort, Finset.prod_inv_distrib]
+    rw [hprod]
+    field_simp
 
 section GlobalConverse
 
@@ -314,6 +426,45 @@ local notation "regularizedL(" χ ", " t ")" =>
 local notation "zeroAdele" => Multiplicative.ofAdd (0 : 𝔸[F])
 local notation "mass" => ((normOneIdeleClassTamagawaMeasure F univ).toReal : ℂ)
 
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
+/-- The rational adele ring is second countable, by its countable open cover. -/
+private theorem homogeneousTheta_classMellin_rat_countable : SecondCountableTopology (Multiplicative 𝔸[ℚ]) := by
+  let I := HeightOneSpectrum (𝓞 ℚ)
+  let K (v : I) := v.adicCompletion ℚ
+  let O (v : I) : Set (K v) := v.adicCompletionIntegers ℚ
+  let : Countable I := Rat.HeightOneSpectrum.primesEquiv.injective.countable
+  let (v : I) : SecondCountableTopology (K v) := by
+    let p := Rat.HeightOneSpectrum.primesEquiv v
+    let : Fact p.val.Prime := ⟨p.property⟩
+    let : TopologicalSpace.SeparableSpace ℚ_[p.val] :=
+      ⟨⟨range ((↑) : ℚ → ℚ_[p.val]), countable_range _, Padic.denseRange_ratCast _⟩⟩
+    exact (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v).toHomeomorph.isEmbedding
+      |>.secondCountableTopology
+  let Vset := fun s : Finset I ↦ {a : FiniteAdeleRing (𝓞 ℚ) ℚ | ∀ v ∉ s, a v ∈ O v}
+  have hopen (v : I) : IsOpen (O v) := Valued.isOpen_integer (K v)
+  let (s : Finset I) : SecondCountableTopology (Vset s) := by
+    have hs : Filter.cofinite ≤ Filter.principal (s : Set I)ᶜ :=
+      Filter.le_principal_iff.mpr s.finite_toSet.compl_mem_cofinite
+    have he := RestrictedProduct.isOpenEmbedding_inclusion_principal (R := K) (A := O) hopen hs
+    let : SecondCountableTopology (Πʳ v : I, [K v, O v]_[Filter.principal (s : Set I)ᶜ]) :=
+      (RestrictedProduct.isEmbedding_coe_of_principal (R := K) (A := O)).secondCountableTopology
+    have hrange : range (RestrictedProduct.inclusion K O hs) = Vset s := by
+      rw [RestrictedProduct.range_inclusion]
+      rfl
+    exact hrange ▸ he.toIsEmbedding.toHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (FiniteAdeleRing (𝓞 ℚ) ℚ) := by
+    refine TopologicalSpace.secondCountableTopology_of_countable_cover («U» := Vset)
+      (fun _ ↦ RestrictedProduct.isOpen_forall_imp_mem hopen) (eq_univ_of_forall fun a ↦ ?_)
+    have he := Filter.eventually_cofinite.mp a.2
+    exact mem_iUnion.mpr ⟨he.toFinset, fun v hv ↦ by
+      by_contra h
+      exact hv (he.mem_toFinset.mpr h)⟩
+  let (v : InfinitePlace ℚ) : SecondCountableTopology v.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  change SecondCountableTopology (((v : InfinitePlace ℚ) → v.Completion) × FiniteAdeleRing (𝓞 ℚ) ℚ)
+  infer_instance
+
+
 /-- Paper: Theorem 6.3.2.1(2), p. 304, following equation (6.3.2.6).
 Integrating the homogeneous theta representative over the full class group
 multiplies its component Mellin transform by the norm-one class mass.
@@ -326,7 +477,70 @@ theorem homogeneousTheta_classMellin_eq_mass_mul (χ : U) (f : ℬ) (s : halfPla
     let integrand := fun g : C𝔽 ↦ homogeneousAdelicTheta χ₁(χ) f g * c g
     Integrable integrand (ideleClassTamagawaMeasure F) ∧
       (∫ g, integrand g ∂ideleClassTamagawaMeasure F) = mass * Z(f, χ, (s : ℂ)) := by
-  sorry
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
+  let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
+  let : SecondCountableTopology (Multiplicative 𝔸[ℚ]) := homogeneousTheta_classMellin_rat_countable
+  obtain ⟨u, _, _⟩ := exists_adeleTrace_dualCoordinates F
+  let : SecondCountableTopology 𝔸[F] := u.symm.toHomeomorph.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology 𝔸[F]ᵐᵒᵖ := MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (IdeleGroup (𝓞 F) F) := Units.isEmbedding_embedProduct.secondCountableTopology
+  let : SecondCountableTopology C𝔽 := inferInstanceAs (SecondCountableTopology (IdeleGroup (𝓞 F) F ⧸ IdeleGroup.principalSubgroup (𝓞 F) F))
+  let ν := normOneIdeleClassTamagawaMeasure F
+  let μ := ideleClassTamagawaMeasure F
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : ν.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil F).1
+  let ω : PontryaginDual C₁ := χ.comp (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁ →ₜ* C𝔽)
+  let c := ideleClassNormTwist χ (s : ℂ)
+  let W (g : C𝔽) := adelicTheta f g * c g
+  let A (g : C𝔽) := homogeneousAdelicTheta ω f g * c g
+  let Φ (p : C𝔽 × C₁) := W (p.2.val * p.1)
+  have hc : c ∈ relativeRightHalfPlane (ideleClassNorm F) (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F)) 1 := by
+    change 1 < quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F) ideleClassNorm_ne_one c
+    rw [quasiCharacterAbscissa_ideleClassNormTwist]
+    exact s.property
+  have hi : Integrable W μ := globalThetaMellinIntegral_integrable f c hc
+  have hP : AEStronglyMeasurable Φ (μ.prod ν) := by
+    apply Continuous.aestronglyMeasurable
+    exact ((adelicTheta f).continuous.mul c.continuous).comp ((continuous_subtype_val.comp continuous_snd).mul continuous_fst)
+  have hp : Integrable Φ (μ.prod ν) := by
+    apply (integrable_prod_iff' hP).mpr
+    constructor
+    · filter_upwards with u
+      change Integrable (fun g ↦ W (u.val * g)) μ
+      have hm : Measure.map (fun g : C𝔽 ↦ u.val * g) μ = μ := map_mul_left_eq_self μ u.val
+      have hw : AEStronglyMeasurable W (Measure.map (fun g : C𝔽 ↦ u.val * g) μ) := by
+        rw [hm]; exact hi.aestronglyMeasurable
+      have hi' : Integrable W (Measure.map (fun g : C𝔽 ↦ u.val * g) μ) := by rw [hm]; exact hi
+      have h := (integrable_map_measure hw ((continuous_const.mul continuous_id).measurable.aemeasurable)).mp hi'
+      exact h
+    · have he : (fun u : C₁ ↦ ∫ g, ‖Φ (g,u)‖ ∂μ) = fun _ ↦ ∫ g, ‖W g‖ ∂μ := by
+        funext u
+        change (∫ g, ‖W (u.val * g)‖ ∂μ) = _
+        exact integral_mul_left_eq_self (fun g ↦ ‖W g‖) u.val
+      rw [he]
+      exact integrable_const _
+  have ha (g : C𝔽) : (∫ u, Φ (g,u) ∂ν) = A g := by
+    have hu (u : C₁) : c u.val = (ω u : ℂ) := by
+      change (χ u.val : ℂ) * (((ideleClassNorm F u.val : ℝ≥0) : ℝ) : ℂ) ^ (s : ℂ) = _
+      simp only [MonoidHom.mem_ker.mp u.property, Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+      rfl
+    change (∫ u, adelicTheta f (u.val * g) * c (u.val * g) ∂ν) = _
+    simp_rw [map_mul c, hu, ← mul_assoc, integral_mul_const]
+    rfl
+  have hI : Integrable A μ := hp.integral_prod_left.congr (Filter.Eventually.of_forall ha)
+  refine ⟨hI, ?_⟩
+  change (∫ g, A g ∂μ) = ((ν univ).toReal : ℂ) * globalIdelicZFunction f c
+  rw [← integral_congr_ae (Filter.Eventually.of_forall ha), ← integral_prod Φ hp, integral_prod_symm Φ hp]
+  have he (u : C₁) : (∫ g, Φ (g,u) ∂μ) = ∫ g, W g ∂μ := integral_mul_left_eq_self W u.val
+  simp_rw [he, integral_const]
+  rw [RCLike.real_smul_eq_coe_mul]
+  congr 1
+  have hh := globalThetaMellinIntegral_eq_idelic f hc
+  have hz := globalIdelicZFunction_eq_integral f hc
+  exact hh.trans hz.symm
 
 -- Equation (6.3.2.1) is `adelePolarSubspace`. Equation (6.3.2.2) is
 -- `globalThetaPolarValues_fst_translate` and `globalThetaPolarValues_snd_translate`.
@@ -438,6 +652,88 @@ theorem mem_globalPolarFreeThetaSubmodule (ω : PontryaginDual C₁) (x : Θ(ω)
 -- TODO(paper-gap): The codomain in (6.3.2.5) is zero on a nontrivial norm-one
 -- component. The map (6.3.2.6) is identically zero there.
 
+private theorem globalConverse_nontrivial_exact_polar_translate (g : IdeleGroup (𝓞 F) F)
+    (hg : ideleNorm F g = 1) (f : ℬ) :
+    adelePolarValues (F := F) (schwartzBruhatUnitTranslate g f) = adelePolarValues (F := F) f := by
+  apply Prod.ext
+  · change f (Multiplicative.ofAdd (g.inv * 0)) = f zeroAdele
+    rw [mul_zero]
+  · change adeleSchwartzFourier (schwartzBruhatUnitTranslate g f) zeroAdele =
+      adeleSchwartzFourier f zeroAdele
+    rw [(adeleSchwartzFourier_apply_zero _).2, (adeleSchwartzFourier_apply_zero f).2]
+    let : MeasurableSpace 𝔸[F] := borel _
+    let : BorelSpace 𝔸[F] := ⟨rfl⟩
+    let μ := additiveTamagawaMeasure F
+    let : μ.IsAddHaarMeasure := (additiveTamagawaMeasure_existsUnique F).exists.choose_spec.1
+    let d := (Homeomorph.smul (α := 𝔸[F]) g⁻¹).toMeasurableEquiv
+    have hmap : μ.map d = μ := by
+      ext s hs
+      rw [Measure.map_apply d.measurable hs]
+      change μ ((fun x : 𝔸[F] ↦ g⁻¹ • x) ⁻¹' s) = μ s
+      rw [Set.preimage_smul_inv]
+      change μ ((fun x : 𝔸[F] ↦ g.val * x) '' s) = μ s
+      simpa [hg] using adeleHaar_mul_image F μ g s hs
+    change (∫ x, (fun y ↦ f (Multiplicative.ofAdd y)) (d x) ∂μ) = _
+    rw [← integral_map_equiv d (fun y : 𝔸[F] ↦ f (Multiplicative.ofAdd y)), hmap]
+
+private theorem globalConverse_nontrivial_exact_theta_translate (ω : PontryaginDual C₁)
+    (h : C₁) (g : IdeleGroup (𝓞 F) F) (hg : QuotientGroup.mk g = h.val) (f : ℬ) :
+    homogeneousAdelicThetaLinearMap F ω (schwartzBruhatUnitTranslate g f) =
+      (ω h : ℂ) • homogeneousAdelicThetaLinearMap F ω f := by
+  have ht (a : C𝔽) : adelicTheta (schwartzBruhatUnitTranslate g f) a =
+      adelicTheta f ((QuotientGroup.mk g)⁻¹ * a) := by
+    induction a using QuotientGroup.induction_on with | H x => ?_
+    change _ = adelicTheta f (QuotientGroup.mk (g⁻¹ * x))
+    rw [adelicTheta_mk, adelicTheta_mk]
+    exact tsum_congr fun t ↦ congrArg (fun y ↦ f (Multiplicative.ofAdd y))
+      (mul_left_comm g.inv (algebraMap F 𝔸[F] (t : F)) x.val)
+  apply ContinuousMap.ext
+  intro a
+  change homogeneousAdelicTheta ω (schwartzBruhatUnitTranslate g f) a =
+    (ω h : ℂ) * homogeneousAdelicTheta ω f a
+  rw [← homogeneousAdelicTheta_homogeneous]
+  apply integral_congr_ae (.of_forall fun k ↦ ?_)
+  have he : (QuotientGroup.mk g)⁻¹ * (k.val * a) = k.val * (h.val⁻¹ * a) := by
+    rw [hg, mul_left_comm]
+  exact congrArg (· * (ω k : ℂ)) ((ht (k.val * a)).trans (congrArg (adelicTheta f) he))
+
+private theorem globalConverse_nontrivial_exact_of_translate.{u, v} {E : Type u} {W : Type v}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E]
+    [AddCommGroup W] [Module ℂ W] (p : E →ₗ[ℂ] ℂ × ℂ) (θ : E →ₗ[ℂ] W) (hp : Continuous p)
+    (hsurj : Surjective p) (T : E → E) (a : ℂ) (ha : a ≠ 1)
+    (hpT : ∀ f, p (T f) = p f) (hθT : ∀ f, θ (T f) = a • θ f) :
+    IsOpenQuotientMap (θ.ker.mkQ.comp p.ker.subtype) := by
+  -- The twisted difference is in the theta kernel and retains both polar values.
+  have hK : Surjective (p.comp θ.ker.subtype) := by
+    intro z
+    obtain ⟨f, hf⟩ := hsurj z
+    let k := (a - 1)⁻¹ • (a • f - T f)
+    have hk : k ∈ θ.ker := by simp [LinearMap.mem_ker, k, hθT]
+    refine ⟨⟨k, hk⟩, ?_⟩
+    change p ((a - 1)⁻¹ • (a • f - T f)) = z
+    rw [map_smul, map_sub, map_smul, hpT, hf]
+    simpa only [sub_smul, one_smul] using inv_smul_smul₀ (sub_ne_zero.mpr ha) z
+  -- A section of the polar map on that kernel is continuous, since its domain is ℂ².
+  obtain ⟨s, hs⟩ := (p.comp θ.ker.subtype).exists_rightInverse_of_surjective
+    (LinearMap.range_eq_top.mpr hK)
+  have hs' (z : ℂ × ℂ) : p (s z).val = z := LinearMap.congr_fun hs z
+  let r (f : E) : p.ker := ⟨f - (s (p f)).val, show p _ = 0 by rw [map_sub, hs', sub_self]⟩
+  have hr : Continuous r := (continuous_id.sub (continuous_subtype_val.comp
+    (s.continuous_of_finiteDimensional.comp hp))).subtype_mk _
+  let q := θ.ker.mkQ.comp p.ker.subtype
+  have he : q ∘ r = θ.ker.mkQ := by
+    funext f
+    change θ.ker.mkQ (f - (s (p f)).val) = θ.ker.mkQ f
+    have hz : θ.ker.mkQ (s (p f)).val = 0 :=
+      (Submodule.Quotient.mk_eq_zero _).mpr (s (p f)).property
+    rw [map_sub, hz, sub_zero]
+  apply AddMonoidHom.isOpenQuotientMap_of_isQuotientMap (φ := q)
+  apply IsQuotientMap.of_comp hr (θ.ker.mkQL.continuous.comp continuous_subtype_val)
+  change IsQuotientMap (q ∘ r)
+  rw [he]
+  exact θ.ker.isQuotientMap_mkQ
+
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equations (6.3.2.5) and (6.3.2.7).
 On a nontrivial norm-one component the polar test subspace maps openly and
 surjectively onto the full homogeneous theta space. In Mellin coordinates
@@ -445,7 +741,20 @@ the inclusion becomes the identity of the range in (6.3.2.3).
 Deviation: The terminal residue space is zero on this component, as in (6.3.2.7). -/
 theorem globalConverse_nontrivial_exact (ω : PontryaginDual C₁) (_hω : ω ≠ 1) :
     IsOpenQuotientMap ((K(ω)).mkQ.comp (P).subtype) := by
-  sorry
+  have hex : ∃ h : C₁, (ω h : ℂ) ≠ 1 :=
+    not_forall.mp fun hall ↦ _hω (PontryaginDual.ext fun x ↦ Subtype.ext (hall x))
+  refine hex.elim fun h hh ↦ ?_
+  refine (QuotientGroup.mk_surjective (s := IdeleGroup.principalSubgroup (𝓞 F) F) h.val).elim
+    fun g hg ↦ ?_
+  have hnorm : ideleNorm F g = 1 := by
+    change ideleClassNorm F (QuotientGroup.mk g) = 1
+    rw [hg, MonoidHom.mem_ker.mp h.property]
+  exact globalConverse_nontrivial_exact_of_translate (E := ℬ) (W := C(C𝔽, ℂ))
+    (adelePolarValues (F := F)) (homogeneousAdelicThetaLinearMap F ω)
+    (adelePolarValues_continuous (F := F)) (adelePolarValues_surjective (F := F))
+    (schwartzBruhatUnitTranslate (R := 𝔸[F]) g) (ω h : ℂ) hh
+    (globalConverse_nontrivial_exact_polar_translate (F := F) g hnorm)
+    (globalConverse_nontrivial_exact_theta_translate (F := F) ω h g hg)
 
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equations (6.3.2.5)–(6.3.2.6).
 The signed polar evaluations descend to a continuous residue map on the trivial

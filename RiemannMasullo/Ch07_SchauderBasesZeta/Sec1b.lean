@@ -6,8 +6,10 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
+import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import Mathlib.Analysis.Complex.LocallyUniformLimit
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # §7.1.3–7.1.4 Polar multiplicities and spectral biorthogonal sequences
@@ -676,13 +678,472 @@ theorem sLocalRhoPoleOrder_exceptions_encard_le :
       ∃ v ∈ S₀, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0}.encard ≤
         (archCount + S₀.card.choose 2 : ℕ) := by sorry
 
+-- On a radial subgroup, taking a power kills the finite-order part of the character.
+
+private theorem excess_gamma_radial_inj {a b : ℂ} {n : ℕ} (hn : 0 < n)
+    (h : ∀ r : ℝ, 0 < r → ((r : ℂ) ^ a) ^ n = ((r : ℂ) ^ b) ^ n) : a = b := by
+  have he : (n : ℂ) * a - n * b = 0 := by
+    apply (existsUnique_complexPower (1 : ℝ≥0ˣ →ₜ* ℂ)).unique
+    · intro t
+      let r : ℝ := (t : ℝ≥0)
+      have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt t)
+      change (1 : ℂ) = (r : ℂ) ^ _
+      have hr' := Complex.ofReal_ne_zero.mpr hr.ne'
+      rw [Complex.cpow_sub _ _ hr', Complex.cpow_nat_mul, Complex.cpow_nat_mul, h r hr,
+        div_self (pow_ne_zero _ (Complex.cpow_ne_zero_iff.mpr (.inl hr')))]
+    · simp
+  exact mul_left_cancel₀ (Nat.cast_ne_zero.mpr hn.ne') (sub_eq_zero.mp he)
+
+private theorem excess_gamma_twist_power (χ χ₀ : U𝔽) {a : ℂ}
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ a) {n : ℕ}
+    (hn : χ₀ ^ n = 1) (g : C𝔽) :
+    (ideleClassNormTwist χ 0 g) ^ n =
+      ((((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ a) ^ n := by
+  have hv : (χ₀ g : ℂ) ^ n = 1 := by
+    rw [← Circle.coe_pow]
+    have hp : (χ₀ g) ^ n = (χ₀ ^ n) g := (ContinuousMonoidHom.pow_apply χ₀ n g).symm
+    rw [hp, hn, PontryaginDual.one_apply, Circle.coe_one]
+  rw [hx]
+  change ((χ₀ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ a) ^ n = _
+  rw [mul_pow, hv, one_mul]
+
+private theorem excess_gamma_real_parameter (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) {a : ℂ}
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ a)
+    (v : InfinitePlace F) (hv : v.IsReal) :
+    (realHeckeCharacter_parameters χ v hv).exists.choose.1 = a := by
+  obtain ⟨n, hn, hp⟩ := hχ₀.exists_pow_eq_one
+  apply excess_gamma_radial_inj hn
+  intro r hr
+  let t := Units.mk0 r hr.ne'
+  let e := (InfinitePlace.Completion.ringEquivRealOfIsReal hv).symm
+  let u := Units.map e.toMonoidHom t
+  let g := IdeleClassGroup.ofCompletion (𝓞 F) F v u
+  have hloc := (realHeckeCharacter_parameters χ v hv).exists.choose_spec.2 t
+  change ideleClassNormTwist χ 0 g = (‖r‖ : ℂ) ^ _ * (if 0 < r then 1 else (-1 : ℂ)) ^ _ at hloc
+  rw [ite_eq_left hr, one_pow, mul_one, Real.norm_eq_abs, abs_of_pos hr] at hloc
+  rw [← hloc, excess_gamma_twist_power χ χ₀ hx hp]
+  have hnorm : (((ideleClassNorm F g : ℝ≥0) : ℝ)) = r := by
+    dsimp only [g]
+    rw [ideleClassNorm_ofCompletion, hv.mult_eq_one, pow_one]
+    change ‖e r‖ = r
+    exact ((InfinitePlace.Completion.isometryEquivRealOfIsReal hv).symm.isometry.norm_map_of_map_zero
+      (map_zero e) r).trans (abs_of_pos hr)
+  rw [hnorm]
+
+private theorem excess_gamma_complex_parameter (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) {a : ℂ}
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ a)
+    (v : InfinitePlace F) (hv : v.IsComplex) :
+    (complexHeckeCharacter_parameters χ v hv).exists.choose.1 = a := by
+  obtain ⟨n, hn, hp⟩ := hχ₀.exists_pow_eq_one
+  apply excess_gamma_radial_inj hn
+  intro r hr
+  let y := Real.sqrt r
+  have hy : 0 < y := Real.sqrt_pos.2 hr
+  have hy' := Complex.ofReal_ne_zero.mpr hy.ne'
+  have hsq : y ^ 2 = r := Real.sq_sqrt hr.le
+  let t := Units.mk0 (y : ℂ) hy'
+  let e := (InfinitePlace.Completion.ringEquivComplexOfIsComplex hv).symm
+  let u := Units.map e.toMonoidHom t
+  let g := IdeleClassGroup.ofCompletion (𝓞 F) F v u
+  have hloc := (complexHeckeCharacter_parameters χ v hv).exists.choose_spec.2 t
+  change ideleClassNormTwist χ 0 g = ((‖(y : ℂ)‖ ^ 2 : ℝ) : ℂ) ^ _ *
+    ((y : ℂ) / (‖(y : ℂ)‖ : ℂ)) ^ _ at hloc
+  rw [Complex.norm_of_nonneg hy.le, div_self hy', one_zpow, mul_one, hsq] at hloc
+  rw [← hloc, excess_gamma_twist_power χ χ₀ hx hp]
+  have hnorm : (((ideleClassNorm F g : ℝ≥0) : ℝ)) = r := by
+    dsimp only [g]
+    rw [ideleClassNorm_ofCompletion, hv.mult_eq_two, Units.val_pow_eq_pow_val, NNReal.coe_pow]
+    change ‖e (y : ℂ)‖ ^ 2 = r
+    have hi := (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv).symm.isometry.norm_map_of_map_zero
+      (map_zero e) (y : ℂ)
+    change ‖e (y : ℂ)‖ = ‖(y : ℂ)‖ at hi
+    rw [hi, Complex.norm_of_nonneg hy.le, hsq]
+  rw [hnorm]
+
+private theorem excess_gamma_real_ne_zero (z : ℂ) (hz : 0 ≤ z.re) (hne : z ≠ 0)
+    (r : ℝ) (hr : 0 ≤ r) : Complex.Gammaℝ (z + (r : ℂ)) ≠ 0 := by
+  intro h
+  obtain ⟨n, h⟩ := Complex.Gammaℝ_eq_zero_iff.mp h
+  have hre := congrArg Complex.re h
+  norm_num [Complex.mul_re] at hre
+  have hn : n = 0 := by exact_mod_cast (show (n : ℝ) = 0 by linarith [Nat.cast_nonneg (α := ℝ) n])
+  have hr0 : r = 0 := by subst n; simp at hre; linarith
+  exact hne (by simpa [hr0, hn] using h)
+
+private theorem excess_gamma_analytic (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I))
+    (s : ℂ) (hs : 0 ≤ s.re) (hne : s ≠ -((x : ℂ) * Complex.I)) :
+    AnalyticAt ℂ (heckeGammaFactor χ) s := by
+  classical
+  let z := s + (x : ℂ) * Complex.I
+  have hz : 0 ≤ z.re := by simpa [z] using hs
+  have hnz : z ≠ 0 := fun h ↦ hne (eq_neg_of_add_eq_zero_left h)
+  have hΓ : heckeGammaFactor χ s ≠ 0 := by
+    unfold heckeGammaFactor
+    apply Finset.prod_ne_zero_iff.mpr
+    intro v _
+    split_ifs with hv
+    · dsimp only
+      rw [excess_gamma_real_parameter χ χ₀ hχ₀ hx v hv]
+      exact_mod_cast excess_gamma_real_ne_zero z hz hnz _ (Nat.cast_nonneg _)
+    · dsimp only
+      have hv' := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      rw [excess_gamma_complex_parameter χ χ₀ hχ₀ hx v hv']
+      let k := (complexHeckeCharacter_parameters χ v hv').exists.choose.2.natAbs
+      change Complex.Gammaℂ (z + (k : ℂ) / 2) / 2 ≠ 0
+      apply (div_ne_zero · two_ne_zero)
+      rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+      refine mul_ne_zero ?_ (Complex.Gammaℝ_ne_zero_of_re_pos ?_)
+      · simpa only [Complex.ofReal_div, Complex.ofReal_ofNat, Complex.ofReal_natCast] using
+          excess_gamma_real_ne_zero z hz hnz ((k : ℝ) / 2) (by positivity)
+      · simp only [Complex.add_re, Complex.div_ofNat_re, Complex.natCast_re, Complex.one_re]
+        positivity
+  simpa only [inv_inv] using (((differentiable_inv_heckeGammaFactor χ).analyticAt s).fun_inv
+    (inv_ne_zero hΓ))
+
+-- A common pole translates, after taking a power, to a common pole of trivial-character
+-- Euler factors. Those factors already have a common pole at zero.
+
+private theorem excess_geometric_pole (q : ℕ) (hq : 1 < q) (a s : ℂ) :
+    meromorphicOrderAt (fun z : ℂ ↦ (1 - a * (q : ℂ) ^ (-z))⁻¹) s < 0 ↔
+      a * (q : ℂ) ^ (-s) = 1 := by
+  let D (z : ℂ) := 1 - a * (q : ℂ) ^ (-z)
+  have hq0 : (q : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr (zero_lt_one.trans hq).ne'
+  have hd (z : ℂ) : HasDerivAt D (a * (q : ℂ) ^ (-z) * Complex.log q) z := by
+    have hpow := (hasDerivAt_neg' z).const_cpow (Or.inl hq0)
+    convert (hpow.const_mul a).const_sub 1 using 1
+    ring
+  have ha : AnalyticAt ℂ D s := (show Differentiable ℂ D from fun z ↦ (hd z).differentiableAt).analyticAt s
+  change meromorphicOrderAt D⁻¹ s < 0 ↔ _
+  constructor
+  · intro h
+    by_contra hne
+    exact (not_lt_of_ge (ha.inv (sub_ne_zero.mpr (Ne.symm hne))).meromorphicOrderAt_nonneg) h
+  · intro h
+    have hlog : Complex.log (q : ℂ) ≠ 0 := by
+      rw [← Complex.ofReal_natCast, ← Complex.ofReal_log (Nat.cast_nonneg q)]
+      exact Complex.ofReal_ne_zero.mpr (Real.log_pos (by exact_mod_cast hq)).ne'
+    have hzero : D s = 0 := sub_eq_zero.mpr h.symm
+    have hderiv : deriv D s ≠ 0 := by rwa [(hd s).deriv, h, one_mul]
+    rw [meromorphicOrderAt_inv, ha.meromorphicOrderAt_eq,
+      ha.analyticOrderAt_eq_one_of_zero_deriv_ne_zero hzero hderiv]
+    exact WithTop.coe_lt_coe.mpr (show (-1 : ℤ) < 0 by decide)
+
+private theorem excess_finite_pole (χ : U𝔽) (v : Primes) (s : ℂ) :
+    meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0 ↔
+      (ideleClassNormTwist χ 0).IsUnramifiedAt v ∧
+      (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s) = 1 := by
+  classical
+  by_cases hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · have he : finiteHeckeEulerFactor χ v = fun z : ℂ ↦
+        (1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z))⁻¹ := by
+      funext z; rw [finiteHeckeEulerFactor, ite_eq_left hu]
+    rw [he, excess_geometric_pole _ (HeightOneSpectrum.one_lt_absNorm v)]
+    simp [hu]
+  · have he : finiteHeckeEulerFactor χ v = fun _ : ℂ ↦ 1 := by
+      funext z; rw [finiteHeckeEulerFactor, ite_eq_right hu]
+    simp [he, hu, meromorphicOrderAt_const]
+
+private theorem excess_trivial_local (v : Primes) :
+    (ideleClassNormTwist (1 : U𝔽) 0).IsUnramifiedAt v ∧
+      (ideleClassNormTwist (1 : U𝔽) 0).localValue v = 1 := by
+  have hval (u : (v.adicCompletion F)ˣ) : (ideleClassNormTwist (1 : U𝔽) 0).restrict v u = 1 := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hu := HeckeCharacter.isUnramifiedAt_iff.mpr fun x ↦
+    hval (Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x)
+  refine ⟨hu, ?_⟩
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  rw [hu.localValue_eq π hπ]
+  exact hval (Units.mk0 π hπ.ne_zero)
+
+private theorem excess_kill_phase (χ χ₀ : U𝔽) (N : ℕ) (hN : χ₀ ^ N = 1) (b s : ℂ)
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ b) (v : Primes)
+    (hv : meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0) :
+    (v.asIdeal.absNorm : ℂ) ^ (-((s + b) * (N : ℂ))) = 1 := by
+  obtain ⟨hu, hp⟩ := (excess_finite_pole χ v s).mp hv
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+  let g := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u
+  have hnorm : (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) = ((v.asIdeal.absNorm : ℝ)⁻¹ : ℝ) := by
+    apply congrArg Complex.ofReal
+    dsimp only [g]
+    rw [ideleClassNorm_ofAdicCompletion]
+    have hval : Valued.v (π : v.adicCompletion F) = WithZero.exp (-1 : ℤ) := hπ.trans
+      (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+        (v.valuedAdicCompletion_surjective F)))
+    change ‖(π : v.adicCompletion F)‖ = (v.asIdeal.absNorm : ℝ)⁻¹
+    rw [FinitePlace.norm_def, hval, WithZeroMulInt.toNNReal_neg_apply _ (by simp)]
+    simp
+  have he : (ideleClassNormTwist χ 0).localValue v =
+      (χ₀ g : ℂ) * (v.asIdeal.absNorm : ℂ) ^ (-b) := by
+    rw [hu.localValue_eq u hπ, hx, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    change (χ₀ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ b = _
+    rw [hnorm, Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) b,
+      ← Complex.cpow_neg, Complex.ofReal_natCast]
+  have hq0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+    (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  rw [he, mul_assoc, ← Complex.cpow_add _ _ hq0, ← neg_add, add_comm b s] at hp
+  have hroot : (χ₀ g : ℂ) ^ N = 1 := by
+    have hunit : (χ₀ g) ^ N = 1 := by
+      exact (ContinuousMonoidHom.pow_apply (χ₀ : C𝔽 →ₜ* Circle) N g).symm.trans
+        (DFunLike.congr_fun hN g)
+    exact (map_pow Circle.coeHom (χ₀ g) N).symm.trans (by rw [hunit, map_one])
+  have hpN := congrArg (fun z : ℂ ↦ z ^ N) hp
+  rw [← neg_mul, Complex.cpow_mul_nat]
+  simpa only [mul_pow, hroot, one_mul, one_pow] using hpN
+
+private theorem excess_same_prime (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I))
+    (S : Finset Primes) (s : ℂ) (hne : s ≠ -((x : ℂ) * Complex.I)) (v w : S)
+    (hv : meromorphicOrderAt (finiteHeckeEulerFactor χ v.val) s < 0)
+    (hw : meromorphicOrderAt (finiteHeckeEulerFactor χ w.val) s < 0) :
+    (v.val : Primes).under (𝓞 ℚ) = w.val.under (𝓞 ℚ) := by
+  by_contra hp
+  obtain ⟨N, hpos, hN⟩ := hχ₀.exists_pow_eq_one
+  have hS : ideleClassNormTwist (1 : U𝔽) 0 ∈ unramifiedOutside F S :=
+    fun t _ ↦ (excess_trivial_local t).1
+  have hsub := finiteHeckeEulerFactors_common_pole_subsingleton (1 : U𝔽) hS v w
+    (excess_trivial_local v.val).1 (excess_trivial_local w.val).1 hp
+  have htriv (t : Primes) (z : ℂ) (hz : (t.asIdeal.absNorm : ℂ) ^ (-z) = 1) :
+      meromorphicOrderAt (finiteHeckeEulerFactor (1 : U𝔽) t) z < 0 := by
+    obtain ⟨hu, hval⟩ := excess_trivial_local t
+    exact (excess_finite_pole _ _ _).mpr ⟨hu, by rw [hval, one_mul, hz]⟩
+  have hzero : (s + (x : ℂ) * Complex.I) * N = 0 := hsub
+    ⟨htriv v.val _ (excess_kill_phase χ χ₀ N hN _ s hx v.val hv),
+     htriv w.val _ (excess_kill_phase χ χ₀ N hN _ s hx w.val hw)⟩
+    ⟨htriv v.val 0 (by simp), htriv w.val 0 (by simp)⟩
+  exact hne (eq_neg_of_add_eq_zero_left ((mul_eq_zero.mp hzero).resolve_right
+    (Nat.cast_ne_zero.mpr hpos.ne')))
+
+private theorem excess_finite_inv_analyticAt (χ : U𝔽) (v : Primes) (s : ℂ) :
+    AnalyticAt ℂ (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) s := by
+  apply Differentiable.analyticAt
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · simp only [inv_inv]
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    fun_prop (disch := simp [hq])
+  · exact differentiable_const _
+
+private theorem excess_finite_meromorphicAt (χ : U𝔽) (v : Primes) (s : ℂ) :
+    MeromorphicAt (finiteHeckeEulerFactor χ v) s := by
+  simpa only [Pi.inv_def, inv_inv] using (excess_finite_inv_analyticAt χ v s).meromorphicAt.inv
+
+private theorem excess_finite_product_meromorphicAt (χ : U𝔽) (S : Finset Primes) (s : ℂ) :
+    MeromorphicAt (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) s :=
+  MeromorphicAt.fun_prod fun v _ ↦ excess_finite_meromorphicAt χ v.val s
+
+private theorem excess_finite_order_over_prime (χ : U𝔽) (S : Finset Primes) (p : RatPrimes)
+    (s : ℂ) : -(degree : WithTop ℤ) ≤
+      ∑ v ∈ overₚ(S, p), meromorphicOrderAt (finiteHeckeEulerFactor χ v) s := by
+  let T := overₚ(S, p)
+  let R := reciprocalPartialHeckeEulerProduct χ T
+  have hR : AnalyticAt ℂ R s :=
+    T.analyticAt_fun_prod fun v _ ↦ excess_finite_inv_analyticAt χ v s
+  have hprod : (fun z ↦ ∏ v ∈ T, finiteHeckeEulerFactor χ v z) = R⁻¹ := by
+    funext z
+    simp [R, reciprocalPartialHeckeEulerProduct, Finset.prod_inv_distrib]
+  have hbound : analyticOrderAt R s ≤ (degree : ℕ∞) :=
+    reciprocalEulerProduct_over_prime_order_le χ S p s
+  change _ ≤ ∑ v ∈ T, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s
+  rw [← meromorphicOrderAt_fun_prod (fun v (_ : v ∈ T) ↦ excess_finite_meromorphicAt χ v s),
+    hprod, meromorphicOrderAt_inv, hR.meromorphicOrderAt_eq]
+  lift analyticOrderAt R s to ℕ using ne_top_of_le_ne_top (ENat.natCast_ne_top _) hbound with n
+  have hn : n ≤ degree := by exact_mod_cast hbound
+  change ((-((degree : ℕ) : ℤ) : ℤ) : WithTop ℤ) ≤ ((-(n : ℤ) : ℤ) : WithTop ℤ)
+  exact WithTop.coe_le_coe.mpr (neg_le_neg (by exact_mod_cast hn))
+
+private theorem excess_finite_order (χ χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
+    (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I))
+    (S : Finset Primes) (s : ℂ) (hne : s ≠ -((x : ℂ) * Complex.I)) :
+    -(degree : WithTop ℤ) ≤ meromorphicOrderAt (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) s := by
+  classical
+  have hprod : (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) =
+      (fun z ↦ ∏ v ∈ S, finiteHeckeEulerFactor χ v z) :=
+    funext fun z ↦ Finset.prod_coe_sort S (fun v ↦ finiteHeckeEulerFactor χ v z)
+  rw [hprod, meromorphicOrderAt_fun_prod (fun v (_ : v ∈ S) ↦ excess_finite_meromorphicAt χ v s)]
+  by_cases h : ∃ v : S, meromorphicOrderAt (finiteHeckeEulerFactor χ v.val) s < 0
+  · obtain ⟨v, hv⟩ := h
+    refine (excess_finite_order_over_prime χ S (v.val.under (𝓞 ℚ)) s).trans ?_
+    apply Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _)
+    intro w hw houtside
+    exact le_of_not_gt fun hwneg ↦ houtside (Finset.mem_filter.mpr
+      ⟨hw, excess_same_prime χ χ₀ hχ₀ x hx S s hne ⟨w, hw⟩ v hwneg hv⟩)
+  · have hdeg : -(degree : WithTop ℤ) ≤ 0 := by
+      change ((-((degree : ℕ) : ℤ) : ℤ) : WithTop ℤ) ≤ ((0 : ℤ) : WithTop ℤ)
+      exact WithTop.coe_le_coe.mpr (neg_nonpos.mpr (Int.natCast_nonneg _))
+    exact hdeg.trans (Finset.sum_nonneg fun w hw ↦ le_of_not_gt fun hn ↦ h ⟨⟨w, hw⟩, hn⟩)
+
+-- The epsilon factor and the reciprocal dual Euler product are holomorphic, so passing
+-- from the Euler product to the correcting factor cannot increase a pole order.
+
+private theorem excess_center (c : QuasiCharacter Jₛ) (s z : ℂ) :
+    twistₛ (twistₛ c s) z = twistₛ c (z + s) := by
+  ext1 g
+  let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+  change c g * N ^ s * N ^ z = c g * N ^ (z + s)
+  have hn : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+  rw [add_comm z s, Complex.cpow_add _ _ hn, mul_assoc]
+
+private theorem excess_orderBound_eq (c : QuasiCharacter Jₛ) (s : ℂ) :
+    sLocalIdelicOrderBound (twistₛ c s) =
+      min 0 (meromorphicOrderAt (fun z ↦ sLocalRhoFactor (twistₛ c z)) s) := by
+  unfold sLocalIdelicOrderBound
+  simp only [excess_center]
+  rw [← zero_add s, ← meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt (x := (0 : ℂ))
+    (f := fun z ↦ sLocalRhoFactor (twistₛ c z))]
+  simp only [zero_add]
+  rfl
+
+private theorem excess_differentiable_inv (η : PontryaginDual Jₛ) :
+    let j := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ)
+    Differentiable ℂ (fun z ↦ (sLocalHeckeL (F := F) (S := S) (twistₛ (j.comp η) z))⁻¹) := by
+  classical
+  obtain ⟨ψ, h, hη, -⟩ := sLocal_character_extension (F := F) (S := S) η
+  dsimp only
+  simp_rw [sLocalHeckeL_eq_partialEulerProduct η ψ h hη, mul_inv, ← Finset.prod_inv_distrib]
+  refine (differentiable_inv_heckeGammaFactor ψ).mul (Differentiable.fun_finsetProd fun v _ ↦ ?_)
+  unfold finiteHeckeEulerFactor
+  split_ifs
+  · simp_rw [inv_inv]
+    have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := Nat.cast_ne_zero.mpr
+      (Ideal.absNorm_eq_zero_iff.not.mpr v.val.ne_bot)
+    exact (differentiable_const _).sub ((differentiable_const _).mul
+      (differentiable_neg.const_cpow (Or.inl hq)))
+  · simp_rw [inv_one]
+    exact differentiable_const _
+
+private theorem excess_unitary_restriction :
+    ∃ η : PontryaginDual Jₛ, sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩ =
+      (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp η := by
+  let c := sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩
+  have hn (g : Jₛ) : ‖c g‖ = 1 := by
+    induction g using QuotientGroup.induction_on with
+    | H a =>
+      change ‖(χ (QuotientGroup.mk (sIdeleInsertion F S a)) : ℂ) * _ ^ (0 : ℂ)‖ = 1
+      rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+  let η : PontryaginDual Jₛ :=
+    { toFun := fun g ↦ ⟨c g, mem_sphere_zero_iff_norm.mpr (hn g)⟩
+      map_one' := Circle.ext (map_one c)
+      map_mul' := fun u v ↦ Circle.ext (map_mul c u v)
+      continuous_toFun := c.continuous.subtype_mk _ }
+  exact ⟨η, ContinuousMonoidHom.ext fun _ ↦ rfl⟩
+
+private theorem excess_dual (η : PontryaginDual Jₛ) (z : ℂ) :
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    dualQuasiCharacter mₛ (isProperMap_sIdeleQuotientNorm F S).continuous (twistₛ (j.comp η) z) =
+      twistₛ (j.comp η⁻¹) (1 - z) := by
+  dsimp only
+  ext1 u
+  let N : ℂ := (((mₛ u : ℝ≥0) : ℝ) : ℂ)
+  have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ u).ne_zero)
+  change N * twistₛ _ z u⁻¹ = (η⁻¹ u : ℂ) * N ^ (1 - z)
+  rw [map_inv]
+  change N * ((η u : ℂ) * N ^ z)⁻¹ = (η u : ℂ)⁻¹ * N ^ (1 - z)
+  rw [mul_inv_rev, Complex.cpow_sub 1 z hN, Complex.cpow_one, div_eq_mul_inv]
+  ac_rfl
+
+private theorem excess_euler_ratio (η : PontryaginDual Jₛ) (s : ℂ) :
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let C := twistₛ (j.comp η)
+    let D (z : ℂ) := twistₛ (j.comp η⁻¹) (1 - z)
+    (fun z ↦ sLocalRhoFactor (C z)) =ᶠ[𝓝[≠] s]
+      fun z ↦ (sLocalEpsilonFactor (C z) * (sLocalHeckeL (D z))⁻¹) * sLocalHeckeL (C z) := by
+  intro j C D
+  filter_upwards [(sLocalRhoFactor_eq_epsilon_mul η).filter_mono (nhdsNE_le_codiscrete s)] with z hz
+  change sLocalRhoFactor (C z) = sLocalEpsilonFactor (C z) * (_ / _) at hz
+  rw [hz, excess_dual η z]
+  rw [div_eq_mul_inv, mul_assoc, mul_comm (sLocalHeckeL (C z))]
+
+private theorem excess_correction_analytic (η : PontryaginDual Jₛ) (s : ℂ) :
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let C := twistₛ (j.comp η)
+    let D (z : ℂ) := twistₛ (j.comp η⁻¹) (1 - z)
+    AnalyticAt ℂ (fun z ↦ sLocalEpsilonFactor (C z) * (sLocalHeckeL (D z))⁻¹) s := by
+  intro j C D
+  let I (z : ℂ) := (sLocalHeckeL (twistₛ (j.comp η⁻¹) z))⁻¹
+  have hI : AnalyticAt ℂ I (1 - s) := (excess_differentiable_inv (η⁻¹)).analyticAt (1 - s)
+  have hR : AnalyticAt ℂ (fun z : ℂ ↦ 1 - z) s := by fun_prop
+  have hIR : AnalyticAt ℂ (I ∘ (fun z : ℂ ↦ 1 - z)) s := hI.comp hR
+  have hE : AnalyticAt ℂ (fun z ↦ sLocalEpsilonFactor (C z)) s := (sLocalEpsilonFactor_entire η) s trivial
+  exact hE.mul hIR
+
+private theorem excess_L_meromorphic (η : PontryaginDual Jₛ) (s : ℂ) :
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let C := twistₛ (j.comp η)
+    MeromorphicAt (fun z ↦ sLocalHeckeL (C z)) s := by
+  intro j C
+  let L (z : ℂ) := sLocalHeckeL (C z)
+  have hm : MeromorphicAt L⁻¹ s := ((excess_differentiable_inv η).analyticAt s).meromorphicAt
+  simpa only [inv_inv] using hm.inv
+
+private theorem excess_order_ge_L (η : PontryaginDual Jₛ) (s : ℂ) :
+    let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let C := twistₛ (j.comp η)
+    meromorphicOrderAt (fun z ↦ sLocalHeckeL (C z)) s ≤
+      meromorphicOrderAt (fun z ↦ sLocalRhoFactor (C z)) s := by
+  intro j C
+  let D (z : ℂ) := twistₛ (j.comp η⁻¹) (1 - z)
+  let A (z : ℂ) := sLocalEpsilonFactor (C z) * (sLocalHeckeL (D z))⁻¹
+  let L (z : ℂ) := sLocalHeckeL (C z)
+  have hA : AnalyticAt ℂ A s := excess_correction_analytic η s
+  have hm : MeromorphicAt L s := excess_L_meromorphic η s
+  have heq : (fun z ↦ sLocalRhoFactor (C z)) =ᶠ[𝓝[≠] s] A * L := excess_euler_ratio η s
+  rw [meromorphicOrderAt_congr heq, meromorphicOrderAt_mul hA.meromorphicAt hm]
+  exact le_add_of_nonneg_left hA.meromorphicOrderAt_nonneg
+
+private theorem excess_order_le_of_factors (s : ℂ)
+    (hΓ : AnalyticAt ℂ (heckeGammaFactor (F := F) χ) s)
+    (hmer : MeromorphicAt (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) s)
+    (hb : -(degree : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) s) :
+    sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ≤ degree := by
+  obtain ⟨η, hη⟩ := excess_unitary_restriction χ hχ
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let C := twistₛ (j.comp η)
+  have hc : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩ = C 0 := by
+    rw [hη]
+    ext1 g
+    change (η g : ℂ) = (η g : ℂ) * _ ^ (0 : ℂ)
+    rw [Complex.cpow_zero, mul_one]
+  have he : (fun z ↦ sLocalHeckeL (C z)) = (heckeGammaFactor χ) *
+      (fun z ↦ ∏ v : S, finiteHeckeEulerFactor χ v.val z) :=
+    funext (sLocalHeckeL_eq_partialEulerProduct η χ hχ hc)
+  have hle := excess_order_ge_L η s
+  change meromorphicOrderAt (fun z ↦ sLocalHeckeL (C z)) s ≤ _ at hle
+  rw [he, meromorphicOrderAt_mul hΓ.meromorphicAt hmer] at hle
+  have h := (add_le_add hΓ.meromorphicOrderAt_nonneg hb).trans hle
+  rw [zero_add] at h
+  have hdeg : -(degree : WithTop ℤ) ≤ 0 :=
+    WithTop.coe_le_coe.mpr (neg_nonpos.mpr (Int.natCast_nonneg degree))
+  have hmin := le_min hdeg h
+  rw [← excess_orderBound_eq, sLocalIdelicOrderBound_eq_neg_poleOrder] at hmin
+  rw [hη]
+  exact_mod_cast neg_le_neg_iff.mp (WithTop.coe_le_coe.mp hmin)
+
 /-- Paper: Theorem 7.1.3.2(3)(a), p. 324.
 For a finite-order character twisted by an imaginary norm power, an excess pole order
 can occur only at the negative of that twist parameter. -/
 theorem sLocalRhoPoleOrder_excess_eq_neg_normTwist (χ₀ : U𝔽) (hχ₀ : IsOfFinOrder χ₀) (x : ℝ)
     (hx : ideleClassNormTwist χ 0 = ideleClassNormTwist χ₀ ((x : ℂ) * Complex.I))
     {s : ℂ} (hs : degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s)) :
-    s = -((x : ℂ) * Complex.I) := by sorry
+    s = -((x : ℂ) * Complex.I) := by
+  by_contra hne
+  apply (not_le.mpr hs)
+  by_cases hneg : s.re < 0
+  · refine (sLocalRhoPoleOrder_le_archimedean_of_re_neg χ hχ hneg).trans ?_
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces,
+      ← InfinitePlace.card_add_two_mul_card_eq_rank]
+    omega
+  · exact excess_order_le_of_factors χ hχ s
+      (excess_gamma_analytic χ χ₀ hχ₀ x hx s (le_of_not_gt hneg) hne)
+      (excess_finite_product_meromorphicAt χ S s)
+      (excess_finite_order χ χ₀ hχ₀ x hx S s hne)
 
 -- TODO(prerequisite): Theorem 7.1.3.2(3)(b) needs the algebraic Hecke-character
 -- predicate used also in §1.7 and the statement of Schanuel's Conjecture.
@@ -754,7 +1215,35 @@ theorem exists_globalPolarThetaMellin (χ : U𝔽) (τ : ℝ≥0ˣ →ₜ* I𝔽
       (Z (Submodule.Quotient.mk f)).val s =
         homogeneousThetaMellinIntegral τ ω f.val (ideleClassNormTwist χ s) ∧
       (Z (Submodule.Quotient.mk f)).val s =
-        globalIdelicZFunction f.val (ideleClassNormTwist χ s) := by sorry
+        globalIdelicZFunction f.val (ideleClassNormTwist χ s) := by
+  intro ω P T
+  -- The polar section integral is entire, so it is already its own continuation.
+  have hM (f : P) : (fun s ↦ homogeneousThetaMellinIntegral τ ω f.val (ideleClassNormTwist χ s)) =
+      (fun s ↦ globalIdelicZFunction f.val (ideleClassNormTwist χ s)) := by
+    have h := homogeneousThetaMellinIntegral_entire_on_component τ ω f.val _hτ
+      (Or.inl f.property) χ (fun _ ↦ rfl)
+    exact (homogeneousThetaMellinIntegral_meromorphicContinuation τ ω f.val _hτ χ
+      (fun _ ↦ rfl) _).mp ⟨fun s _ ↦ (h.analyticAt s).meromorphicNFAt, fun _ _ ↦ rfl⟩
+  -- On the trivial component use the pole-free converse theorem. On every other
+  -- component restrict the transform on the full homogeneous quotient to polar tests.
+  have hex : ∃ M : P →L[ℂ] Aℂ, T.ker ≤ M.ker ∧
+      ∀ (f : P) (s : ℂ), (M f).val s = globalIdelicZFunction f.val (ideleClassNormTwist χ s) := by
+    by_cases hω : ω = 1
+    · have ht := (globalConverse_existsUnique_normTwist χ hω).exists
+      refine (globalConverse_normTwist χ ht.choose ht.choose_spec).elim fun M h ↦ ?_
+      refine ⟨M, ?_, h.2.2.1⟩
+      exact (congrArg (fun ψ ↦ (homogeneousAdelicThetaLinearMap F ψ).ker.comap P.subtype)
+        hω).le.trans h.2.2.2.2.ge
+    · refine (globalConverse_nontrivial χ hω).elim fun B h ↦ ?_
+      let K := (homogeneousAdelicThetaLinearMap F ω).ker
+      refine ⟨B.comp (K.mkQL.comp P.subtypeL), ?_, fun f s ↦ h.2.1 f.val s⟩
+      intro f hf
+      change B (K.mkQ f.val) = 0
+      exact (congrArg B ((Submodule.Quotient.mk_eq_zero K).mpr hf)).trans B.map_zero
+  refine hex.elim fun M h ↦ ?_
+  refine ⟨T.ker.liftQL M h.1, fun f s ↦ ?_⟩
+  change (M f).val s = _ ∧ (M f).val s = _
+  exact ⟨(h.2 f s).trans (congrFun (hM f) s).symm, h.2 f s⟩
 
 /-- Paper: §7.1.4, p. 326.
 The entire functions in the compact-open continuous function algebra are closed under
@@ -1079,10 +1568,73 @@ def schwartzBergmanDivisible (g : Entire) : Submodule ℂ Aℂ :=
   ((Ideal.span ({g} : Set Entire)).restrictScalars ℂ).comap
     schwartzBergmanEntireInclusion.toLinearMap
 
+/-- An entire function is divisible by `g` exactly when it vanishes to at least the order of
+`g` at every point. In that case the normalized quotient gives an entire factor. -/
+private theorem schwartzBergmanDivisible_isClosed_dvd (g f : Entire) :
+    g ∣ f ↔ ∀ z, analyticOrderAt (g.val : ℂ → ℂ) z ≤ analyticOrderAt (f.val : ℂ → ℂ) z := by
+  have ha (a : Entire) (z : ℂ) : AnalyticAt ℂ (a.val : ℂ → ℂ) z :=
+    (show Differentiable ℂ a.val from a.property).analyticAt z
+  constructor
+  · rintro ⟨k, rfl⟩ z
+    change _ ≤ analyticOrderAt ((g.val : ℂ → ℂ) * (k.val : ℂ → ℂ)) z
+    rw [analyticOrderAt_mul (ha g z) (ha k z)]
+    exact self_le_add_right _ _
+  · intro hord
+    let q := (f.val : ℂ → ℂ) / (g.val : ℂ → ℂ)
+    have hq : MeromorphicOn q univ := fun z _ ↦ (ha f z).meromorphicAt.div (ha g z).meromorphicAt
+    have hdiff : Differentiable ℂ (toMeromorphicNFOn q univ) := by
+      intro z
+      apply AnalyticAt.differentiableAt
+      have hnf := meromorphicNFOn_toMeromorphicNFOn q univ (mem_univ z)
+      apply hnf.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      rw [meromorphicOrderAt_toMeromorphicNFOn hq (mem_univ z),
+        meromorphicOrderAt_div (ha f z).meromorphicAt (ha g z).meromorphicAt,
+        (ha f z).meromorphicOrderAt_eq, (ha g z).meromorphicOrderAt_eq]
+      have hle := hord z
+      generalize analyticOrderAt (f.val : ℂ → ℂ) z = m at hle ⊢
+      generalize analyticOrderAt (g.val : ℂ → ℂ) z = n at hle ⊢
+      cases m using ENat.recTopCoe with
+      | top => simp
+      | coe m =>
+        cases n using ENat.recTopCoe with
+        | top => simp at hle
+        | coe n =>
+          exact WithTop.coe_le_coe.mpr (sub_nonneg.mpr (by exact_mod_cast hle : (n : ℤ) ≤ m))
+    refine ⟨⟨⟨_, hdiff.continuous⟩, hdiff⟩, Subtype.ext (ContinuousMap.ext fun z ↦ ?_)⟩
+    change f.val z = g.val z * toMeromorphicNFOn q univ z
+    by_cases hz : g.val z = 0
+    · have hpos := lt_of_lt_of_le (pos_iff_ne_zero.mpr ((ha g z).analyticOrderAt_ne_zero.mpr hz))
+          (hord z)
+      rw [hz, zero_mul]
+      exact (ha f z).analyticOrderAt_ne_zero.mp hpos.ne'
+    · rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hq (mem_univ z),
+        toMeromorphicNFAt_eq_self.mpr ((ha f z).div (ha g z) hz).meromorphicNFAt]
+      exact (mul_div_cancel₀ _ hz).symm
+
+/-- A principal ideal of entire functions is the intersection of its vanishing jet kernels. -/
+private theorem schwartzBergmanDivisible_isClosed_span (g : Entire) :
+    IsClosed (Ideal.span ({g} : Set Entire) : Set Entire) := by
+  have heq : (Ideal.span ({g} : Set Entire) : Set Entire) =
+      ⋂ (z : ℂ) (n : ℕ) (_ : (n : ℕ∞) ≤ analyticOrderAt (g.val : ℂ → ℂ) z)
+        (i : ℕ) (_ : i < n), ((entireJet z i).ker : Set Entire) := by
+    ext f
+    simp only [SetLike.mem_coe, Ideal.mem_span_singleton,
+      schwartzBergmanDivisible_isClosed_dvd, mem_iInter, LinearMap.mem_ker,
+      ContinuousLinearMap.coe_coe, entireJet_apply]
+    apply forall_congr'
+    intro z
+    rw [← ENat.forall_natCast_le_iff_le]
+    simp_rw [natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero
+      ((show Differentiable ℂ f.val from f.property).analyticAt z)]
+  rw [heq]
+  exact isClosed_iInter fun z ↦ isClosed_iInter fun n ↦ isClosed_iInter fun _ ↦
+    isClosed_iInter fun i ↦ isClosed_iInter fun _ ↦ (entireJet z i).isClosed_ker
+
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–328. Divisibility defines a closed subspace,
 so its quotient with the Schwartz–Bergman quotient topology is Hausdorff. -/
 theorem schwartzBergmanDivisible_isClosed (g : Entire) :
-    IsClosed (schwartzBergmanDivisible g : Set Aℂ) := by sorry
+    IsClosed (schwartzBergmanDivisible g : Set Aℂ) :=
+  (schwartzBergmanDivisible_isClosed_span g).preimage schwartzBergmanEntireInclusion.continuous
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327 and Theorem 7.1.4.3(2), p. 331.
 Restriction to Schwartz–Bergman functions induces an injective map with dense image
@@ -1181,6 +1733,39 @@ theorem orbitalHeckeGenerator_empty :
   intro s
   simp [orbitalHeckeGenerator, reciprocalPartialHeckeEulerProduct]
 
+private theorem orbitalHeckeGenerator_order_at_canceled_pole_factor (χ : U𝔽) (b : ℂ)
+    (hχ : ∀ g : C𝔽, (χ g : ℂ) = (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ b)
+    (v : Primes) (s : ℂ) :
+    (finiteHeckeEulerFactor χ v s)⁻¹ = 1 - (v.asIdeal.absNorm : ℂ) ^ (-(s + b)) := by
+  classical
+  have hval (u : (v.adicCompletion F)ˣ) :
+      (ideleClassNormTwist χ 0).restrict v u = (‖(u : v.adicCompletion F)‖ : ℂ) ^ b := by
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    let g := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v u
+    change (χ g : ℂ) * _ ^ (0 : ℂ) = _
+    rw [Complex.cpow_zero, mul_one, hχ,
+      show ideleClassNorm F g = _ from ideleClassNorm_ofAdicCompletion F v u]
+    rfl
+  have hu : (ideleClassNormTwist χ 0).IsUnramifiedAt v := by
+    apply HeckeCharacter.isUnramifiedAt_iff.mpr
+    intro x
+    let u := Units.map (v.adicCompletionIntegers F).subtype.toMonoidHom x
+    change (ideleClassNormTwist χ 0).restrict v u = 1
+    rw [hval, show ‖(u : v.adicCompletion F)‖ = 1 from ?_, Complex.ofReal_one, Complex.one_cpow]
+    apply Valued.toNormedField.norm_eq_one_iff.mpr
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp
+      (show u ∈ (v.adicCompletionIntegers F).units from ⟨x.val.property, x.inv.property⟩)
+  let val : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π, hπ⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let u := Units.mk0 (π : v.adicCompletion F) hπ.ne_zero
+  have hn : ‖(u : v.adicCompletion F)‖ = (v.asIdeal.absNorm : ℝ)⁻¹ :=
+    norm_uniformizer_adicCompletion v _ hπ
+  have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  rw [finiteHeckeEulerFactor, ite_eq_left hu, inv_inv, hu.localValue_eq u hπ, hval, hn,
+    Complex.ofReal_inv, Complex.inv_cpow_ofReal_nonneg (Nat.cast_nonneg _) b, ← Complex.cpow_neg,
+    Complex.ofReal_natCast, ← Complex.cpow_add _ _ hq, neg_add, add_comm (-b)]
+
 /-- Paper: Theorem 7.1.4.3(1), pp. 331–332. At the canceled pole on the
 imaginary axis of a pure norm power, every removed finite place adds one jet.
 Deviation: Records the total order at a point where indexing by the raw product loses a jet. -/
@@ -1188,7 +1773,52 @@ theorem orbitalHeckeGenerator_order_at_canceled_pole (S₀ : Finset Primes)
     (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1) :
     let x := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
     let g := orbitalHeckeGenerator χ τ hτ L hL hEq S₀
-    analyticOrderAt (g.val : ℂ → ℂ) (-((x : ℂ) * Complex.I)) = (S₀.card : ℕ∞) := by sorry
+    analyticOrderAt (g.val : ℂ → ℂ) (-((x : ℂ) * Complex.I)) = (S₀.card : ℕ∞) := by
+  classical
+  let x := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
+  let b := (x : ℂ) * Complex.I
+  have hpower (g : C𝔽) : (χ g : ℂ) = (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ b := by
+    let t := ideleClassNorm F g
+    let k : C𝔽 := QuotientGroup.mk (τ t)
+    have hk : ideleClassNorm F k = t := hτ t
+    have hg : g / k ∈ (ideleClassNorm F).ker := by simp [MonoidHom.mem_ker, hk, t]
+    have h1 : χ (g / k) = 1 := DFunLike.congr_fun hχ (⟨_, hg⟩ : (ideleClassNorm F).ker)
+    have he : χ g = χ k := div_eq_one.mp ((map_div χ g k).symm.trans h1)
+    rw [he]
+    exact (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose_spec t
+  let G (T : Finset Primes) : ℂ → ℂ := (orbitalHeckeGenerator χ τ hτ L hL hEq T).val
+  change analyticOrderAt (G S₀) (-b) = _
+  induction S₀ using Finset.induction_on with
+  | empty =>
+    change analyticOrderAt ((orbitalHeckeGenerator χ τ hτ L hL hEq ∅).val : ℂ → ℂ) (-b) = 0
+    rw [orbitalHeckeGenerator_empty]
+    exact analyticOrderAt_eq_zero.mpr (.inr
+      (regularizedCompletedHeckeL_ne_zero_at_canceled_poles χ τ hτ L hL hEq hχ).1)
+  | @insert v T hv ih =>
+    let q : ℂ := v.asIdeal.absNorm
+    let f (s : ℂ) := 1 - q ^ (-(s + b))
+    have hq : q ≠ 0 := by
+      dsimp only [q]
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    have hlog : Complex.log q ≠ 0 := by
+      dsimp only [q]
+      rw [← Complex.natCast_log]
+      exact_mod_cast (Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v)).ne'
+    have hdiff : Differentiable ℂ f :=
+      (differentiable_const _).sub (((differentiable_id.add_const b).neg).const_cpow (.inl hq))
+    have hder : HasDerivAt f (Complex.log q) (-b) := by
+      simpa [f] using (hasDerivAt_const (-b) (1 : ℂ)).fun_sub
+        ((((hasDerivAt_id (-b)).add_const b).neg).const_cpow (.inl hq))
+    have ho := (hdiff.analyticAt (-b)).analyticOrderAt_eq_one_of_zero_deriv_ne_zero
+      (by simp [f]) (hder.deriv ▸ hlog)
+    have hmul : G (insert v T) = f * G T := by
+      funext s
+      change (∏ w ∈ insert v T, (finiteHeckeEulerFactor χ w s)⁻¹) * _ = f s * ((∏ w ∈ T, _) * _)
+      rw [Finset.prod_insert hv, mul_assoc,
+        orbitalHeckeGenerator_order_at_canceled_pole_factor χ b hpower]
+    have hG : Differentiable ℂ (G T) := (orbitalHeckeGenerator χ τ hτ L hL hEq T).property
+    rw [hmul, analyticOrderAt_mul (hdiff.analyticAt _) (hG.analyticAt _), ho, ih,
+      Finset.card_insert_of_notMem hv, Nat.cast_add_one, add_comm]
 
 open Classical in
 /-- Paper: Theorem 7.1.4.3(1), p. 331.

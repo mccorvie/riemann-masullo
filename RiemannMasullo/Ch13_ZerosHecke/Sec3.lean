@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.AppB_AnalyticNT.Sec4b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 
 /-! # The divisor of the Hecke L-function
 
@@ -52,15 +54,48 @@ def criticalTraceMultiplicity (χ : U𝔽) (s : ℂ) (_hs : 0 < ord(χ, s)) : �
 counted with weight equal to the degree. -/
 theorem criticalTraceMultiplicity_of_degree_le (χ : U𝔽) (s : ℂ) (hs : 0 < ord(χ, s))
     (_h : Module.finrank ℚ F ≤ (ord(χ, s)).toNat) :
-    criticalTraceMultiplicity χ s hs = Module.finrank ℚ F := by sorry
+    criticalTraceMultiplicity χ s hs = Module.finrank ℚ F := by
+  unfold criticalTraceMultiplicity
+  exact min_eq_right _h
 
 local notation "momentIntegrand(" χ ", " k ", " φ ")" =>
   (fun g : C𝔽 ↦ (φ : D𝔽).val g * spectralZeroJet (F := F) χ 0 0 k g)
 
+private theorem criticalTraceMoment_isLinearMap_integrable (χ : U𝔽) (k : ℕ) (φ : D𝔽) :
+    Integrable (fun g : C𝔽 ↦ (φ : D𝔽).val g * spectralZeroJet (F := F) χ 0 0 k g) μ𝔽 := by
+  have hφ : Continuous (φ : D𝔽).val :=
+    continuous_schwartzBruhat
+      (⟨φ.val, bruhatCompactSupport_mem_schwartz φ.property⟩ : SchwartzBruhat C𝔽)
+  have hc : HasCompactSupport (φ : D𝔽).val := φ.property.2
+  have hlog : Continuous (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ)) :=
+    ((NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous))).log fun g ↦
+        ne_of_gt (NNReal.coe_pos.mpr (Units.zero_lt _))
+  have hj : Continuous (spectralZeroJet (F := F) χ 0 0 k) := by
+    unfold spectralZeroJet
+    exact (ideleClassNormTwist χ _).continuous.mul
+      ((Complex.continuous_ofReal.comp hlog).pow k)
+  exact (hφ.mul hj).integrable_of_hasCompactSupport (hc.mul_right)
+
 /-- Paper: (13.3.1.2), p. 522. A fixed character and jet order give a linear
 functional by integration against the character times a power of the log norm. -/
 theorem criticalTraceMoment_isLinearMap (χ : U𝔽) (k : ℕ) :
-    IsLinearMap ℂ (fun φ : D𝔽 ↦ ∫ g, momentIntegrand(χ, k, φ) g ∂μ𝔽) := by sorry
+    IsLinearMap ℂ (fun φ : D𝔽 ↦ ∫ g, momentIntegrand(χ, k, φ) g ∂μ𝔽) := by
+  refine ⟨fun φ ψ ↦ ?_, fun c φ ↦ ?_⟩
+  · have e : (fun g : C𝔽 ↦ ((φ + ψ : D𝔽)).val g * spectralZeroJet (F := F) χ 0 0 k g) =
+        fun g ↦ φ.val g * spectralZeroJet (F := F) χ 0 0 k g +
+          ψ.val g * spectralZeroJet (F := F) χ 0 0 k g := by
+      ext g
+      exact add_mul _ _ _
+    simp only [e]
+    exact integral_add (criticalTraceMoment_isLinearMap_integrable χ k φ)
+      (criticalTraceMoment_isLinearMap_integrable χ k ψ)
+  · have e : (fun g : C𝔽 ↦ ((c • φ : D𝔽)).val g * spectralZeroJet (F := F) χ 0 0 k g) =
+        fun g ↦ c * (φ.val g * spectralZeroJet (F := F) χ 0 0 k g) := by
+      ext g
+      exact mul_assoc _ _ _
+    simp only [e]
+    exact integral_const_mul c _
 
 /-- Paper: (13.3.1.2), p. 522. The test subspace is the common kernel of the
 first `[F : ℚ]` log-norm moments for each unitary character trivial on the section.

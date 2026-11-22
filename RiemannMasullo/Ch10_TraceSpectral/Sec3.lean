@@ -83,7 +83,45 @@ theorem isStronglyNuclearBanachOperator_smulRight (Λ : StrongDual ℂ E) (y : G
 
 /-- Paper: §10.3, p. 448. Strong nuclearity implies nuclearity. -/
 theorem IsStronglyNuclearBanachOperator.isNuclearOperator [CompleteSpace E]
-    {A : E →L[ℂ] G} (_hA : IsStronglyNuclearBanachOperator A) : IsNuclearOperator A := by sorry
+    {A : E →L[ℂ] G} (_hA : IsStronglyNuclearBanachOperator A) : IsNuclearOperator A := by
+  obtain ⟨c, Λ, y, hb, hc, hs⟩ := _hA
+  rw [isNuclearOperator_iff_isBanachNuclear]
+  let d : ℕ → ℂ := fun n ↦ (n : ℂ) + 1
+  have hd (n : ℕ) : ‖d n‖ = (n : ℝ) + 1 := by
+    simp only [d]; exact_mod_cast Complex.norm_natCast (n + 1)
+  have hd0 (n : ℕ) : d n ≠ 0 := by
+    intro h; have := hd n; rw [h, norm_zero] at this; linarith [(n.cast_nonneg : (0:ℝ) ≤ n)]
+  have hinv : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) atTop (𝓝 0) :=
+    tendsto_inv_atTop_zero.comp (tendsto_atTop_add_const_right _ 1 tendsto_natCast_atTop_atTop)
+  refine ⟨fun n ↦ c n * d n ^ 2, fun n ↦ (d n)⁻¹ • Λ n, fun n ↦ (d n)⁻¹ • y n, ?_, ?_, ?_, ?_⟩
+  · have h4 := (tendsto_zero_iff_norm_tendsto_zero.mp (hc 4)).eventually (gt_mem_nhds one_pos)
+    refine Summable.of_norm_bounded_eventually_nat
+      ((Real.summable_one_div_nat_pow.mpr one_lt_two).mul_left 4) ?_
+    filter_upwards [h4, eventually_ge_atTop 1] with n hn h1
+    have hn1 : (1 : ℝ) ≤ n := by exact_mod_cast h1
+    rw [norm_mul, norm_pow, Complex.norm_natCast] at hn
+    rw [norm_norm, norm_mul, norm_pow, hd]
+    have hcn := norm_nonneg (c n)
+    rw [mul_one_div, le_div_iff₀ (by positivity)]
+    have : ((n : ℝ) + 1) ^ 2 ≤ 4 * (n : ℝ) ^ 2 := by nlinarith
+    calc ‖c n‖ * ((n : ℝ) + 1) ^ 2 * (n : ℝ) ^ 2
+        ≤ ‖c n‖ * (4 * (n : ℝ) ^ 2) * (n : ℝ) ^ 2 := by gcongr
+      _ = 4 * ((n : ℝ) ^ 4 * ‖c n‖) := by ring
+      _ ≤ 4 := by nlinarith
+  · rw [tendsto_zero_iff_norm_tendsto_zero]
+    refine squeeze_zero (fun n ↦ norm_nonneg _) (fun n ↦ ?_) hinv
+    rw [norm_smul, norm_inv, hd]
+    exact mul_le_of_le_one_right (by positivity) (hb n).1
+  · rw [tendsto_zero_iff_norm_tendsto_zero]
+    refine squeeze_zero (fun n ↦ norm_nonneg _) (fun n ↦ ?_) hinv
+    rw [norm_smul, norm_inv, hd]
+    exact mul_le_of_le_one_right (by positivity) (hb n).2
+  · intro x
+    refine (hs.mapL (ContinuousLinearMap.apply ℂ G x)).congr_fun fun n ↦ ?_
+    simp only [ContinuousLinearMap.apply_apply, FunLike.coe_smul, Pi.smul_apply,
+      ContinuousLinearMap.smulRight_apply, smul_smul, smul_eq_mul]
+    congr 1
+    field_simp [hd0 n]
 
 end StrongNuclearity
 
@@ -154,16 +192,83 @@ theorem spectralConvolution_mkQ (φ : BruhatCompactSupport C𝔽) (v : W(l, r, s
     (hardySobolevTestAction_preserves_globalTheta (F := F) a hI hs φ) v)
   with_reducible_and_instances exact h.trans (Submodule.mkQL_apply _ _)
 
+open scoped UniformConvergenceCLM in
+/-- Descending a linear family of operators through a fixed quotient is linear. -/
+private theorem spectralConvolution_isLinear_aux {P M : Type*} [AddCommGroup P] [Module ℂ P]
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M] [IsTopologicalAddGroup M]
+    [ContinuousSMul ℂ M] {𝔖 : Set (Set M)} (S : Submodule ℂ M)
+    (T : P →ₗ[ℂ] (M →Lᵤ[ℂ, 𝔖] M)) (h : ∀ p, S ≤ (S.mkQL.comp (T p)).ker) :
+    IsLinearMap ℂ (fun p ↦ S.liftQL (S.mkQL.comp (T p)) (h p)) := by
+  constructor
+  · intro p q
+    refine ContinuousLinearMap.coe_injective (Submodule.linearMap_qext S (LinearMap.ext fun x ↦ ?_))
+    change S.mkQ (T (p + q) x) = S.mkQ (T p x) + S.mkQ (T q x)
+    rw [← map_add, T.map_add]
+    rfl
+  · intro c p
+    refine ContinuousLinearMap.coe_injective (Submodule.linearMap_qext S (LinearMap.ext fun x ↦ ?_))
+    change S.mkQ (T (c • p) x) = c • S.mkQ (T p x)
+    rw [← map_smul, T.map_smul]
+    rfl
+
 /-- Paper: (10.3.1.2), p. 448, and (10.3.2.2), p. 454. The descended action
 is complex linear in the test. -/
 theorem spectralConvolution_isLinear :
-    IsLinearMap ℂ (spectralConvolution (F := F) a hI hs) := by sorry
+    IsLinearMap ℂ (spectralConvolution (F := F) a hI hs) :=
+  spectralConvolution_isLinear_aux (Θ(a, hI, hs)) (testAction(l, r, s, hI, hs))
+    (hardySobolevTestAction_preserves_globalTheta (F := F) a hI hs)
+
+/-- A continuous endomorphism commuting with the translation action intertwines the
+two regularized vectors obtained from Pettis integrals of the corresponding orbits. -/
+private theorem hardySobolevTestAction_preserves_spectralIsotype_aux {X V : Type*}
+    [CommGroup X] [MeasurableSpace X] (μ : Measure X) [AddCommGroup V] [Module ℂ V]
+    [TopologicalSpace V] [IsTopologicalAddGroup V] [ContinuousSMul ℂ V] [SeparatingDual ℂ V]
+    (τ : X →* (V →L[ℂ] V)) {ψ : X → ℂ} (k : X) (u w : V) (hk : τ k u = w) {a b : V}
+    (ha : HasPettisIntegral (.positive μ) (fun g ↦ ψ g • τ g u) a)
+    (hb : HasPettisIntegral (.positive μ) (fun g ↦ ψ g • τ g w) b) : τ k a = b := by
+  have ev {f : X → V} {v : V} (h : HasPettisIntegral (.positive μ) f v) (δ : StrongDual ℂ V) :
+      δ v = ∫ g, δ (f g) ∂μ :=
+    congrArg (fun z : PettisWeakCompletion V ↦ (show Module.Dual ℂ (StrongDual ℂ V) from z) δ) h.2
+  refine (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2 fun δ ↦ ?_
+  have hδ := ev ha (δ.comp (τ k))
+  rw [ContinuousLinearMap.comp_apply] at hδ
+  rw [hδ, ev hb]
+  refine integral_congr_ae (.of_forall fun g ↦ ?_)
+  change δ (τ k (ψ g • τ g u)) = δ (ψ g • τ g w)
+  congr 1
+  rw [(τ k).map_smul, ← hk]
+  congr 1
+  exact congrArg (fun T : V →L[ℂ] V ↦ T u)
+    (show τ k * τ g = τ g * τ k by rw [← map_mul, ← map_mul, mul_comm])
+
+/-- The regularized action of a commutative group commutes with its translations, so it
+preserves every isotype of a restricted translation action. -/
+private theorem hardySobolevTestAction_preserves_spectralIsotype_aux₂ {X V : Type*}
+    [CommGroup X] [TopologicalSpace X] [IsTopologicalGroup X] [T2Space X]
+    [LocallyCompactSpace X] [MeasurableSpace X] [BorelSpace X] [SecondCountableTopology X]
+    (μ : Measure X) [μ.IsHaarMeasure] [AddCommGroup V] [Module ℂ V] [UniformSpace V]
+    [IsUniformAddGroup V] [PolynormableSpace ℂ V] [T2Space V] [CompleteSpace V]
+    [SeparatingDual ℂ V] (τ : X →* (V →L[ℂ] V)) (hτ : Continuous (fun p : X × V ↦ τ p.1 p.2))
+    (φ : BruhatCompactSupport X) (K : Subgroup X) (ω : PontryaginDual K) :
+    ∀ v ∈ actionIsotype (τ.comp K.subtype) ω,
+      bruhatRegularizedAction μ τ hτ φ v ∈ actionIsotype (τ.comp K.subtype) ω := by
+  intro v hv
+  rw [mem_actionIsotype] at hv ⊢
+  intro k
+  have h := hardySobolevTestAction_preserves_spectralIsotype_aux μ τ k.val v ((ω k : ℂ) • v)
+    (hv k) (bruhatRegularizedAction_apply μ τ hτ φ v)
+    (bruhatRegularizedAction_apply μ τ hτ φ ((ω k : ℂ) • v))
+  change τ k.val (bruhatRegularizedAction μ τ hτ φ v) = _
+  exact h.trans (map_smul (bruhatRegularizedAction μ τ hτ φ) _ _)
 
 /-- Paper: Theorems 10.3.1.1(3), p. 449, and 10.3.2.1(3), p. 454.
 Convolution preserves the ambient norm-one isotype. -/
 theorem hardySobolevTestAction_preserves_spectralIsotype (ω : PontryaginDual C₁)
     (φ : BruhatCompactSupport C𝔽) :
-    ∀ v ∈ Wω(hI, hs, ω), testAction(l, r, s, hI, hs) φ v ∈ Wω(hI, hs, ω) := by sorry
+    ∀ v ∈ Wω(hI, hs, ω), testAction(l, r, s, hI, hs) φ v ∈ Wω(hI, hs, ω) :=
+  hardySobolevTestAction_preserves_spectralIsotype_aux₂ μ𝔽
+    (hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs)
+    (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2 φ C₁ ω
 
 local notation "Nω(" ω ")" => (Θ(a, hI, hs)).comap (Wω(hI, hs, ω)).subtype
 local notation "Aω(" ω ", " φ ")" =>

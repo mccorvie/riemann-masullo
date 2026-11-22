@@ -37,6 +37,9 @@ import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Compact
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import RiemannMasullo.ForMathlib.Topology.Covering.AddCircle
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.TensorProduct.Bounded
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.TensorProduct.StrongDual
+import Mathlib.Topology.ContinuousMap.SecondCountableSpace
 
 /-!
 # Differential operators, Poisson summation, supports and translations
@@ -7017,6 +7020,523 @@ theorem schwartzBruhat_kernel_equiv [SecondCountableTopology G] [SecondCountable
           (f ⊗ₜ[ℂ] g)) (x, y) = f x * g y := by
   exact global_product_kernel (G := G) (H := H)
 
+section DualKernelStages
+
+omit hTop hT2 hLC
+open TopologicalSpace Bornology
+
+section Pullback
+
+variable {m n r m' n' r' : ℕ} {F F' : Type}
+  [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+  [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
+
+omit [DiscreteTopology F] [Finite F] in
+/-- The ambient noncompact coordinates descend through an open surjection with compact kernel.
+Consequently their monomials are polynomial weights in the quotient coordinates. -/
+private lemma stage_pullback_weight
+    (H : AddSubgroup (ElementaryLieGroup m n r F))
+    (φ : H →+ ElementaryLieGroup m' n' r' F') (hφ : IsOpenQuotientMap φ)
+    (hK : IsCompact (φ.ker : Set H)) (α : Fin m → ℕ) (δ : Fin r → ℕ) :
+    ∃ p : MvPolynomial (Fin m' ⊕ Fin r') ℂ, ∀ w : H,
+      MvPolynomial.eval (Sum.elim (fun i ↦ ((φ w).1 i : ℂ)) (fun j ↦ ((φ w).2.2.1 j : ℂ))) p =
+        (∏ i, (w.val.1 i : ℂ) ^ α i) * ∏ j, (w.val.2.2.1 j : ℂ) ^ δ j := by
+  let coord (j : Fin m ⊕ Fin r) : H →+ ℝ := Sum.elim
+    (fun i : Fin m ↦ ⟨⟨fun w : H ↦ w.val.1 i, rfl⟩, fun _ _ ↦ rfl⟩)
+    (fun i : Fin r ↦ (Int.castAddHom ℝ).comp
+      ⟨⟨fun w : H ↦ w.val.2.2.1 i, rfl⟩, fun _ _ ↦ rfl⟩) j
+  have hc (j) : Continuous (coord j) := by
+    cases j with
+    | inl i => exact (PiLp.continuous_apply 2 _ i).comp continuous_subtype_val.fst
+    | inr i =>
+      exact (continuous_of_discreteTopology (f := Int.castAddHom ℝ)).comp
+        ((continuous_apply i).comp continuous_subtype_val.snd.snd.fst)
+  let : CompactSpace φ.ker := isCompact_iff_compactSpace.mp hK
+  have hk (j) : φ.ker ≤ (coord j).ker := fun w hw ↦
+    compact_hom_real_zero ((coord j).comp φ.ker.subtype) ((hc j).comp continuous_subtype_val) ⟨w,hw⟩
+  let l (j) := φ.liftOfRightInverseAux (Function.surjInv hφ.surjective)
+    (Function.rightInverse_surjInv _) (coord j) (hk j)
+  have he (j) (w : H) : l j (φ w) = coord j w := φ.liftOfRightInverseAux_comp_apply _ _ _ _ _
+  have hl (j) : Continuous (l j) := hφ.isQuotientMap.continuous_iff.mpr
+    ((hc j).congr fun w ↦ (he j w).symm)
+  choose P hP using fun j ↦ elementary_real_hom_polynomial (l j) (hl j)
+  refine ⟨(∏ i, P (.inl i) ^ α i) * ∏ j, P (.inr j) ^ δ j, fun w ↦ ?_⟩
+  simp only [map_mul, map_prod, map_pow, hP, he]
+  change _ * (∏ j, ((w.val.2.2.1 j : ℝ) : ℂ) ^ δ j) = _
+  simp only [Complex.ofReal_intCast]
+  rfl
+
+omit [Finite F] in
+/-- On a discrete fibre an open-subgroup cutoff either vanishes identically or
+its quotient coordinate lifts to an affine map with fibre-independent linear part. -/
+private lemma stage_pullback_charts
+    (H : AddSubgroup (ElementaryLieGroup m n r F)) (hH : IsOpen (H : Set (ElementaryLieGroup m n r F)))
+    (φ : H →+ ElementaryLieGroup m' n' r' F') (hc : Continuous φ) :
+    ∃ L : (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) →L[ℝ]
+        (EuclideanSpace ℝ (Fin m') × EuclideanSpace ℝ (Fin n')),
+      ∀ a b, (∀ x, elementaryCover x a b ∉ H) ∨
+        ∃ y a' b', ∀ x, ∃ hw : elementaryCover x a b ∈ H,
+          φ ⟨_, hw⟩ = elementaryCover (L x + y) a' b' := by
+  let q := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+  have hq := (elementaryCoverZeroHom_continuous_isOpenMap (m := m) (n := n) (r := r) (F := F)).1
+  have hmem (x) : q x ∈ H := by
+    have he := ((show IsClopen (H : Set (ElementaryLieGroup m n r F)) from ⟨H.isClosed_of_isOpen hH, hH⟩).preimage hq).eq_univ
+      (show (q ⁻¹' (H : Set _)).Nonempty from ⟨0, by simp [q]⟩)
+    exact eq_univ_iff_forall.mp he x
+  let A := φ.comp (q.codRestrict H hmem)
+  have hA : Continuous A := hc.comp (hq.subtype_mk _)
+  let R := (AddMonoidHom.fst _ _).comp A
+  let T := (AddMonoidHom.fst _ _).comp ((AddMonoidHom.snd _ _).comp A)
+  choose l hl using fun i : Fin n' ↦ exists_addCircle_coe_linearMap_eq
+    ((Pi.evalAddMonoidHom _ i).comp T) ((continuous_apply i).comp hA.snd.fst)
+  let L := (R.toRealLinearMap hA.fst).prod
+    ((EuclideanSpace.equiv (Fin n') ℝ).symm.toContinuousLinearMap.comp
+      (ContinuousLinearMap.pi l))
+  refine ⟨L, fun a b ↦ ?_⟩
+  have hshift (x) : q x + elementaryCover 0 a b = elementaryCover x a b := by
+    simp [q, elementaryCoverZeroHom, elementaryCover, Pi.zero_def]
+  by_cases hb : elementaryCover 0 a b ∈ H
+  · right
+    let c := φ ⟨_, hb⟩
+    obtain ⟨t, ht⟩ := elementaryCover_surjective c.2.2.1 c.2.2.2 c.1 c.2.1
+    refine ⟨(c.1, t), c.2.2.1, c.2.2.2, fun x ↦ ⟨(hshift x) ▸ H.add_mem (hmem x) hb, ?_⟩⟩
+    have hs : (⟨elementaryCover x a b, (hshift x) ▸ H.add_mem (hmem x) hb⟩ : H) = q.codRestrict H hmem x + ⟨_,hb⟩ :=
+      Subtype.ext (hshift x).symm
+    rw [hs, map_add]
+    change A x + c = _
+    symm
+    refine Prod.ext rfl (Prod.ext ?_ ?_)
+    · funext i
+      have hti := congrArg (fun y : ElementaryLieGroup m' n' r' F' ↦ y.2.1 i) ht
+      change ((l i x + t i : ℝ) : AddCircle (1 : ℝ)) = (A x).2.1 i + c.2.1 i
+      rw [AddCircle.coe_add, hl i x]
+      exact congrArg ((A x).2.1 i + ·) hti
+    · have h := hA.snd.snd.isConst_of_preconnectedSpace x 0
+      rw [map_zero A] at h
+      change c.2.2 = (A x).2.2 + c.2.2
+      rw [h]
+      exact (zero_add _).symm
+  · left
+    intro x
+    rwa [← hshift, H.add_mem_cancel_left (hmem x)]
+
+omit [Finite F] in
+/-- A Schwartz function pulled back by a quotient with compact kernel and extended by zero
+from an open subgroup is still Schwartz. -/
+private lemma stage_pullback_elementary
+    (H : AddSubgroup (ElementaryLieGroup m n r F)) (hH : IsOpen (H : Set (ElementaryLieGroup m n r F)))
+    (φ : H →+ ElementaryLieGroup m' n' r' F') (hφ : IsOpenQuotientMap φ)
+    (hK : IsCompact (φ.ker : Set H)) (s : ElementarySchwartz m' n' r' F')
+    (g : ElementaryLieGroup m n r F → ℂ) (hon : ∀ w : H, g w.val = s (φ w))
+    (hoff : ∀ w ∉ H, g w = 0) : g ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  obtain ⟨L, hL⟩ := stage_pullback_charts H hH φ hφ.continuous
+  refine ⟨fun a b ↦ ?_, fun i ↦ ?_⟩
+  · rcases hL a b with h | ⟨y, a', b', h⟩
+    · simpa only [funext (fun x ↦ hoff _ (h x))] using (contDiff_const (c := (0 : ℂ)))
+    · have he (x) : g (elementaryCover x a b) = s (elementaryCover (L x + y) a' b') := by
+        obtain ⟨hw, hp⟩ := h x
+        exact (hon ⟨_, hw⟩).trans (congrArg s.val hp)
+      rw [funext he]
+      exact (s.property.1 a' b').comp (L.contDiff.add contDiff_const)
+  obtain ⟨p, hp⟩ := stage_pullback_weight H φ hφ hK i.1 i.2.2.2
+  obtain ⟨T, c, hT⟩ := elementaryPartial_comp_lift (r := r') (r' := r) (F := F') (F' := F)
+    L i.2.1 i.2.2.1
+  let M (v : (Fin m' → ℕ) × (Fin n' → ℕ)) := ∑ d ∈ p.support, ‖p.coeff d‖ *
+    elementarySchwartzSeminorm (fun k ↦ d (Sum.inl k), v.1, v.2, fun j ↦ d (Sum.inr j)) s
+  refine lt_of_le_of_lt ?_ (ENNReal.ofReal_lt_top (r := ∑ v ∈ T, ‖c v‖ * M v))
+  refine iSup_le fun x ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  rcases hL a b with h | ⟨y, a', b', h⟩
+  · simp [elementaryPartial, funext (fun u ↦ hoff _ (h u))]
+  have he (x) : g (elementaryCover x a b) = s (elementaryCover (L x + y) a' b') := by
+    obtain ⟨hw, hp⟩ := h x
+    exact (hon ⟨_, hw⟩).trans (congrArg s.val hp)
+  have hpart := hT s g y a b a' b' (s.property.1 a' b') he x
+  obtain ⟨hw, hφw⟩ := h x
+  have hwgt := hp ⟨_, hw⟩
+  rw [hφw] at hwgt
+  let vcoord := Sum.elim (fun k : Fin m' ↦ ((L x + y).1 k : ℂ)) (fun j : Fin r' ↦ (a' j : ℂ))
+  change MvPolynomial.eval vcoord p =
+    (∏ k, (x.1 k : ℂ) ^ i.1 k) * ∏ j, (a j : ℂ) ^ i.2.2.2 j at hwgt
+  rw [← ENNReal.ofReal_coe_nnreal]
+  apply ENNReal.ofReal_le_ofReal
+  change ‖_ * elementaryPartial g i.2.1 i.2.2.1 x a b‖ ≤ _
+  rw [← hwgt, hpart, Finset.mul_sum]
+  refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun v _ ↦ ?_)
+  rw [norm_mul, norm_smul, mul_left_comm]
+  exact mul_le_mul_of_nonneg_left
+    (elementarySchwartz_polynomial_weight_le_monomial_sum p s v.1 v.2 (L x + y) a' b') (norm_nonneg _)
+
+omit [Finite F] in
+/-- Two open coordinate maps from a common group produce the elementary representative, with
+zero extension off the range of the larger-stage coordinate map. -/
+private lemma stage_pullback_common {A : Type*} [AddCommGroup A] [TopologicalSpace A]
+    (p : A →+ ElementaryLieGroup m n r F) (pc : Continuous p) (po : IsOpenMap p)
+    (q : A →+ ElementaryLieGroup m' n' r' F') (hq : IsOpenQuotientMap q)
+    (hk : p.ker ≤ q.ker) (hK : IsCompact (q.ker : Set A)) (s : ElementarySchwartz m' n' r' F') :
+    ∃ t : ElementarySchwartz m n r F, (∀ x, t (p x) = s (q x)) ∧ ∀ w ∉ p.range, t w = 0 := by
+  classical
+  let H := p.range
+  have hH : IsOpen (H : Set (ElementaryLieGroup m n r F)) := by
+    rw [AddMonoidHom.coe_range, ← image_univ]
+    exact po _ isOpen_univ
+  let j := p.rangeRestrict
+  have hj : IsOpenQuotientMap j := by
+    refine ⟨p.rangeRestrict_surjective, pc.subtype_mk _, ?_⟩
+    intro U hU
+    have he : j '' U = Subtype.val ⁻¹' (p '' U) := Set.ext fun w ↦
+      ⟨fun ⟨x,hx,h⟩ ↦ ⟨x,hx,congrArg Subtype.val h⟩, fun ⟨x,hx,h⟩ ↦ ⟨x,hx,Subtype.ext h⟩⟩
+    exact he ▸ (po _ hU).preimage continuous_subtype_val
+  have hker : j.ker ≤ q.ker := fun x hx ↦ hk (congrArg Subtype.val (show j x = 0 from hx))
+  let φ := j.liftOfRightInverseAux (Function.surjInv hj.surjective) (Function.rightInverse_surjInv _) q hker
+  have he (x) : φ (j x) = q x := j.liftOfRightInverseAux_comp_apply _ _ _ _ x
+  have hφ : IsOpenQuotientMap φ := by
+    refine ⟨fun y ↦ (hq.surjective y).elim fun x hx ↦ ⟨j x, (he x).trans hx⟩,
+      hj.isQuotientMap.continuous_iff.mpr (hq.continuous.congr (fun x ↦ (he x).symm)), ?_⟩
+    intro U hU
+    rw [← image_preimage_eq U hj.surjective, ← image_comp, show φ ∘ j = q from funext he]
+    exact hq.isOpenMap _ (hU.preimage hj.continuous)
+  have hKφ : IsCompact (φ.ker : Set H) := by
+    have hEq : j ⁻¹' (φ.ker : Set H) = (q.ker : Set A) := Set.ext fun x ↦ by
+      change φ (j x) = 0 ↔ q x = 0
+      rw [he]
+    rw [← image_preimage_eq (φ.ker : Set H) hj.surjective, hEq]
+    exact hK.image hj.continuous
+  let g (w : ElementaryLieGroup m n r F) := if hw : w ∈ H then s (φ ⟨_,hw⟩) else 0
+  have hon (w : H) : g w = s (φ w) := dite_eq_left w.property
+  have hoff (w) (hw : w ∉ H) : g w = 0 := dite_eq_right hw
+  exact ⟨⟨g, stage_pullback_elementary H hH φ hφ hKφ s g hon hoff⟩,
+    fun x ↦ (hon (j x)).trans (congrArg s.val (he x)), hoff⟩
+
+end Pullback
+
+section Stages
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G]
+/-- Range inclusion, constructed in elementary coordinates, without using a transition map. -/
+private lemma kernelStage_realization_mono {a b : BruhatStructuralPair G} (h : a ≤ b)
+    (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient)
+    (s : SchwartzBruhatStage e) : ∃ t : SchwartzBruhatStage d,
+      schwartzBruhatStageRealization b d t = schwartzBruhatStageRealization a e s := by
+  classical
+  let inc := Subgroup.inclusion h.1
+  let π := d.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _)
+  let p := MonoidHom.toAdditive (π.comp inc)
+  let q := MonoidHom.toAdditive (e.equiv.toMulEquiv.toMonoidHom.comp (QuotientGroup.mk' _))
+  have pc : Continuous p := d.equiv.continuous.comp (QuotientGroup.continuous_mk.comp
+    (show Continuous inc from continuous_subtype_val.subtype_mk _))
+  have po : IsOpenMap p := d.equiv.toHomeomorph.isOpenMap.comp
+    ((QuotientGroup.isOpenMap_coe (N := (OrderDual.ofDual b.val.2).comap b.val.1.subtype)).comp
+      (a.property.1.isOpenMap_inclusion h.1))
+  have hq : IsOpenQuotientMap q := by
+    refine ⟨fun w ↦ (e.equiv.surjective (Multiplicative.ofAdd w)).elim fun t ht ↦
+      (QuotientGroup.mk_surjective t).elim fun x hx ↦ ⟨Additive.ofMul x, (congrArg e.equiv hx).trans ht⟩,
+      e.equiv.continuous.comp (QuotientGroup.continuous_mk
+        (N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype)),
+      e.equiv.toHomeomorph.isOpenMap.comp (QuotientGroup.isOpenMap_coe
+        (N := (OrderDual.ofDual a.val.2).comap a.val.1.subtype))⟩
+  have hkle : OrderDual.ofDual b.val.2 ≤ OrderDual.ofDual a.val.2 := h.2
+  have hker (x : Additive a.val.1) : x ∈ q.ker ↔ (Additive.toMul x).val ∈ OrderDual.ofDual a.val.2 := by
+    change e.equiv (QuotientGroup.mk (Additive.toMul x)) = 1 ↔ _
+    rw [← map_one e.equiv, e.equiv.injective.eq_iff, a.quotient_mk_eq_one]
+  have hk : p.ker ≤ q.ker := by
+    intro x hx
+    apply (hker x).2
+    apply hkle
+    apply (b.quotient_mk_eq_one (inc (Additive.toMul x))).mp
+    apply d.equiv.injective
+    exact (show d.equiv (QuotientGroup.mk (inc (Additive.toMul x))) = 1 from hx).trans (map_one d.equiv).symm
+  have hK : IsCompact (q.ker : Set (Additive a.val.1)) := by
+    have heq : (q.ker : Set (Additive a.val.1)) =
+        Subtype.val ⁻¹' ((OrderDual.ofDual a.val.2 : Subgroup G) : Set G) := Set.ext hker
+    rw [heq]
+    exact (a.val.1.isClosed_of_isOpen a.property.1).isClosedEmbedding_subtypeVal.isCompact_preimage
+      (compact_bruhat_kernel a)
+  obtain ⟨t, hon, hoff⟩ := stage_pullback_common p pc po q hq hk hK s
+  refine ⟨t, funext fun x ↦ ?_⟩
+  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  by_cases ha : x ∈ a.val.1
+  · rw [dite_eq_left ha, dite_eq_left (h.1 ha)]
+    exact hon (Additive.ofMul ⟨x, ha⟩)
+  rw [dite_eq_right ha]
+  split_ifs with hb
+  · let z : b.val.1 := ⟨x,hb⟩
+    apply hoff
+    rintro ⟨w, hw⟩
+    change π (inc (Additive.toMul w)) = π z at hw
+    have hkz : π (z / inc (Additive.toMul w)) = 1 := by rw [map_div, hw, div_self']
+    have hk' := (b.quotient_mk_eq_one (z / inc (Additive.toMul w))).mp
+      (d.equiv.injective (hkz.trans (map_one d.equiv).symm))
+    apply ha
+    have he := a.val.1.mul_mem (a.property.2.2.2 (hkle hk')) (Additive.toMul w).property
+    change x / (Additive.toMul w).val * (Additive.toMul w).val ∈ a.val.1 at he
+    simpa only [div_mul_cancel] using he
+  · rfl
+
+/-- The forward lift is continuous: both stages map continuously into the pointwise
+range of the second, so Fréchet factorization applies to the constant second stage. -/
+private lemma kernelStage_transitionMap {a b : BruhatStructuralPair G} (h : a ≤ b)
+    (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient) :
+    ∃ j : SchwartzBruhatStage e →L[ℂ] SchwartzBruhatStage d,
+      ∀ s, schwartzBruhatStageRealization b d (j s) = schwartzBruhatStageRealization a e s := by
+  let A := schwartzBruhatStageRealization a e
+  let B := schwartzBruhatStageRealization b d
+  have hcA : Continuous A := continuous_pi (continuous_schwartzBruhatStage_eval a e)
+  have hcB : Continuous B := continuous_pi (continuous_schwartzBruhatStage_eval b d)
+  let i : SchwartzBruhatStage d →L[ℂ] B.range := ⟨B.rangeRestrict, hcB.subtype_mk _⟩
+  let u : SchwartzBruhatStage e →L[ℂ] B.range :=
+    ⟨A.codRestrict _ (kernelStage_realization_mono h e d), hcA.subtype_mk _⟩
+  have hi : Function.Injective i := fun _ _ hz ↦
+    schwartzBruhatStageInclusion_injective b d (Subtype.ext (congrArg (fun z : B.range ↦ z.val) hz))
+  obtain ⟨_, j, hj⟩ := frechet_factorization (X := fun _ ↦ SchwartzBruhatStage d)
+    (fun _ ↦ elementarySchwartz_isFrechet) (fun _ ↦ i) (fun _ ↦ hi) (fun _ ↦ Subset.rfl)
+    (fun z ↦ ⟨0, z.property.elim fun t ht ↦ ⟨t, Subtype.ext ht⟩⟩) elementarySchwartz_isFrechet u
+  exact ⟨j, fun s ↦ congrArg Subtype.val (DFunLike.congr_fun hj s)⟩
+
+omit [T2Space G] [LocallyCompactSpace G] in
+/-- Inside the larger stage, support and invariance are closed pointwise equations.
+Descent identifies their common solution space with the range of the transition. -/
+private lemma stage_clm_closed_range {a b : BruhatStructuralPair G} (h : a ≤ b)
+    (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient)
+    (j : SchwartzBruhatStage e →L[ℂ] SchwartzBruhatStage d)
+    (hj : ∀ s, schwartzBruhatStageRealization b d (j s) = schwartzBruhatStageRealization a e s) :
+    IsClosed (range j) := by
+  classical
+  let B := schwartzBruhatStageRealization b d
+  let S := ⋂ x ∉ a.val.1, {t : SchwartzBruhatStage d | B t x = 0}
+  let T := ⋂ (k : (OrderDual.ofDual a.val.2 : Subgroup G)), ⋂ x, {t : SchwartzBruhatStage d | B t (k.val*x) = B t x}
+  have hEq : range j = S ∩ T := by
+    ext t
+    simp only [S, T, mem_inter_iff, mem_iInter, mem_ofPred_eq]
+    refine ⟨?_, fun ⟨hs,ht⟩ ↦ ?_⟩
+    · rintro ⟨s,rfl⟩
+      rw [show B (j s) = _ from hj s]
+      exact ⟨fun x hx ↦ by rw [schwartzBruhatStageRealization_apply, dite_eq_right hx],
+        fun k x ↦ stage_realization_mul_kernel a e s k.property x⟩
+    · obtain ⟨s,he⟩ := schwartzBruhatStage_descend_of_invariant h e d t (B t) rfl hs
+        (fun k hk ↦ ht ⟨k,hk⟩)
+      exact ⟨s, schwartzBruhatStageInclusion_injective b d (Subtype.ext ((hj s).trans he))⟩
+  rw [hEq]
+  exact (isClosed_iInter fun x ↦ isClosed_iInter fun _ ↦ isClosed_eq
+    (continuous_schwartzBruhatStage_eval b d x) continuous_const).inter
+    (isClosed_iInter fun k ↦ isClosed_iInter fun x ↦ isClosed_eq
+      (continuous_schwartzBruhatStage_eval b d (k.val*x)) (continuous_schwartzBruhatStage_eval b d x))
+
+/-- An injective continuous linear map between Fréchet spaces with closed range is a closed
+embedding: apply open mapping to its corestriction onto that complete subspace. -/
+private lemma stage_frechet_closed_embedding {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (hX : IsFrechetTVS X) (hY : IsFrechetTVS Y) (j : X →L[ℂ] Y) (hi : Function.Injective j)
+    (hc : IsClosed (range j)) : IsClosedEmbedding j := by
+  obtain ⟨hTX, hPX, hMX, hCX⟩ := hX
+  obtain ⟨hTY, hPY, hMY, hCY⟩ := hY
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace X := hCX
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Y := hCY
+  let Z := j.range
+  have hZ : IsClosed (Z : Set Y) := hc
+  have : CompleteSpace Z := completeSpace_coe_iff_isComplete.mpr hZ.isComplete
+  have : IsUniformAddGroup Z := Z.toAddSubgroup.isUniformAddGroup
+  have : FirstCountableTopology Z := inferInstanceAs (FirstCountableTopology (Z : Set Y))
+  have : (uniformity Z).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero Z]
+    infer_instance
+  have : BaireSpace Z := by
+    let := UniformSpace.metricSpace Z
+    infer_instance
+  let p : X →L[ℂ] Z := j.rangeRestrict
+  have hs : Function.Surjective p := fun z ↦ z.property.elim fun x hx ↦ ⟨x, Subtype.ext hx⟩
+  have hop := isOpenMap_of_not_isMeagre_range p (hs.range_eq ▸ not_isMeagre_of_isOpen isOpen_univ univ_nonempty)
+  let eqv := Equiv.ofBijective p ⟨fun _ _ h ↦ hi (congrArg (fun z : Z ↦ z.val) h), hs⟩
+  let homeo : X ≃ₜ Z := ⟨eqv, p.continuous, eqv.continuous_symm_iff.mpr hop⟩
+  exact hZ.isClosedEmbedding_subtypeVal.comp homeo.isClosedEmbedding
+
+/-- Paper: Lemma D.1.5.4, p. 762. Pullback and extension by zero give a closed
+embedding between the elementary stages. -/
+private lemma kernelStage_transition {a b : BruhatStructuralPair G} (h : a ≤ b)
+    (e : ElementaryLCAPresentation a.quotient) (e' : ElementaryLCAPresentation b.quotient) :
+    ∃ j : SchwartzBruhatStage e →L[ℂ] SchwartzBruhatStage e',
+      (∀ f, schwartzBruhatStageRealization b e' (j f) = schwartzBruhatStageRealization a e f) ∧
+        IsClosedEmbedding j := by
+  obtain ⟨j,hj⟩ := kernelStage_transitionMap h e e'
+  refine ⟨j,hj, stage_frechet_closed_embedding elementarySchwartz_isFrechet elementarySchwartz_isFrechet
+    j (fun x y hxy ↦ ?_) (stage_clm_closed_range h e e' j hj)⟩
+  apply schwartzBruhatStageInclusion_injective a e
+  exact Subtype.ext ((hj x).symm.trans ((congrArg (schwartzBruhatStageRealization b e') hxy).trans (hj y)))
+
+
+/-- Recover an open subgroup of the dual by separating in its quotient and writing every
+separating bidual character as evaluation. -/
+private lemma stage_ann_dualAnn {D : Subgroup (PontryaginDual G)} (hD : IsOpen (D : Set (PontryaginDual G))) :
+    lcaAnnihilator (lcaDualAnnihilator D) = D := by
+  obtain ⟨e, he⟩ := pontryaginDual_bidual (G := G)
+  ext χ
+  constructor
+  · intro hχ
+    rw [← lcaDualAnnihilator_annihilator D (D.isClosed_of_isOpen hD), mem_lcaDualAnnihilator_iff]
+    intro η
+    obtain ⟨x, hx⟩ := e.surjective η.val
+    have hη (ψ) : η.val ψ = ψ x := (hx ▸ he x ψ)
+    rw [hη]
+    exact (mem_lcaAnnihilator_iff _ _).mp hχ ⟨x, (mem_lcaDualAnnihilator_iff _ _).mpr fun ψ ↦
+      (hη ψ.val).symm.trans ((mem_lcaAnnihilator_iff _ _).mp η.property ψ)⟩
+  · intro hχ
+    exact (mem_lcaAnnihilator_iff _ _).mpr fun x ↦ (mem_lcaDualAnnihilator_iff _ _).mp x.property ⟨χ,hχ⟩
+
+/-- Compact exhaustion followed by taking successive upper bounds gives a cofinal sequence
+of compactly generated open subgroups. -/
+private lemma stage_cofinal_open_chain [SecondCountableTopology G] :
+    ∃ H : ℕ → OpenCompactlyGeneratedSubgroups G, Monotone H ∧ ∀ J, ∃ n, J ≤ H n := by
+  classical
+  let C := CompactExhaustion.choice G
+  choose B hB using fun n ↦ exists_openCompactlyGeneratedSubgroup_contains (C.isCompact n)
+  choose upper hleft hright using (openCompactlyGeneratedSubgroups_colimit (G := G)).1.directed
+  let chain : ℕ → OpenCompactlyGeneratedSubgroups G := Nat.rec (B 0) fun n prev ↦ upper prev (B (n+1))
+  have hdom (n : ℕ) : B n ≤ chain n := by cases n <;> first | exact le_rfl | exact hright _ _
+  refine ⟨chain, monotone_nat_of_le_succ fun n ↦ hleft _ _, fun J ↦ ?_⟩
+  obtain ⟨D, _, hDc, hDgen⟩ := J.property.2
+  obtain ⟨n, hn⟩ := C.exists_superset_of_isCompact (hDc.image continuous_subtype_val)
+  have hD : D ⊆ ((B n).val.comap J.val.subtype : Set J.val) :=
+    fun x hx ↦ hB n (hn ⟨x,hx,rfl⟩)
+  have htop : ⊤ ≤ (B n).val.comap J.val.subtype := hDgen ▸ (Subgroup.closure_le _).mpr hD
+  exact ⟨n, (show J ≤ B n from fun x hx ↦ htop (Subgroup.mem_top ⟨x,hx⟩)).trans (hdom n)⟩
+
+/-- Exhaust the group and its dual simultaneously. Taking annihilators reverses the latter
+chain, and shifting the former puts even the first compact kernel in every open subgroup. -/
+private lemma kernelStage_cofinal_pairs [SecondCountableTopology G] :
+    ∃ a : ℕ → BruhatStructuralPair G, Monotone a ∧ ∀ b, ∃ n, b ≤ a n := by
+  let : SecondCountableTopology Circle := inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let : SecondCountableTopology (PontryaginDual G) :=
+    (ContinuousMonoidHom.isEmbedding_toContinuousMap G Circle).secondCountableTopology
+  obtain ⟨H, hm, hcof⟩ := stage_cofinal_open_chain (G := G)
+  obtain ⟨D, dm, dcof⟩ := stage_cofinal_open_chain (G := PontryaginDual G)
+  let K (n : ℕ) := lcaDualAnnihilator (D n).val
+  have hc n : IsCompact (K n : Set G) := isCompact_lcaDualAnnihilator _ (D n).property.1
+  have hg n : IsBruhatGoodSubgroup (K n) :=
+    ⟨(hc n).isClosed, (stage_ann_dualAnn (D n).property.1).symm ▸ (D n).property⟩
+  have anti {A B : Subgroup (PontryaginDual G)} (h : A ≤ B) : lcaDualAnnihilator B ≤ lcaDualAnnihilator A :=
+    fun x hx ↦ (mem_lcaDualAnnihilator_iff _ _).mpr fun χ ↦ (mem_lcaDualAnnihilator_iff _ _).mp hx ⟨χ.val,h χ.property⟩
+  have hK : Antitone K := fun _ _ h ↦ anti (dm h)
+  obtain ⟨J,hJ⟩ := exists_openCompactlyGeneratedSubgroup_contains (hc 0)
+  obtain ⟨m,hmJ⟩ := hcof J
+  let a (n : ℕ) : BruhatStructuralPair G := ⟨((H (m+n)).val, OrderDual.toDual (K n)),
+    (H (m+n)).property.1, (H (m+n)).property.2, hg n,
+    (hK (Nat.zero_le n)).trans (hJ.trans (hmJ.trans (hm (Nat.le_add_right m n))))⟩
+  refine ⟨a, fun i j h ↦ ⟨hm (Nat.add_le_add_left h m), hK h⟩, fun b ↦ ?_⟩
+  let Kb := OrderDual.ofDual b.val.2
+  obtain ⟨i,hi⟩ := hcof ⟨b.val.1,b.property.1,b.property.2.1⟩
+  obtain ⟨j,hj⟩ := dcof ⟨lcaAnnihilator Kb, b.property.2.2.1.2⟩
+  refine ⟨max i j, hi.trans (hm ((le_max_left i j).trans (Nat.le_add_left _ _))), ?_⟩
+  change K (max i j) ≤ Kb
+  rw [← lcaDualAnnihilator_annihilator Kb b.property.2.2.1.1]
+  exact anti (hj.trans (dm (le_max_right i j)))
+
+/-- Cofinality gives precisely the generating topology and the exhaustive union. -/
+private lemma kernelStage_is_limit (a : ℕ → BruhatStructuralPair G) (e : ∀ n, ElementaryLCAPresentation (a n).quotient)
+    (hcof : ∀ b, ∃ n, b ≤ a n)
+    (j : ∀ n, SchwartzBruhatStage (e n) →L[ℂ] SchwartzBruhatStage (e (n + 1)))
+    (hj : ∀ n x, schwartzBruhatStageRealization (a (n + 1)) (e (n + 1)) (j n x) =
+      schwartzBruhatStageRealization (a n) (e n) x) :
+    IsInjectiveLCLimit j (fun n ↦ schwartzBruhatStageCLM (a n) (e n)) := by
+  refine ⟨fun n ↦ schwartzBruhatStageInclusion_injective _ _,
+    fun n ↦ ContinuousLinearMap.ext (fun x ↦ Subtype.ext (hj n x)), ?_, ?_⟩
+  · let R (n : ℕ) := (schwartzBruhatStageRealization (a n) (e n)).range
+    have hR : Monotone R := monotone_nat_of_le_succ fun n _ ⟨s, hs⟩ ↦ ⟨j n s, (hj n s).trans hs⟩
+    have hle : schwartzBruhatSubmodule G ≤ ⨆ n, R n := by
+      refine iSup_le fun b ↦ iSup_le fun d ↦ ?_
+      obtain ⟨n, hn⟩ := hcof b
+      refine le_trans ?_ (le_iSup R n)
+      rintro _ ⟨s,rfl⟩
+      exact kernelStage_realization_mono hn d (e n) s
+    intro f
+    have hf : f.val ∈ ⨆ n, R n := hle f.property
+    exact ((Submodule.mem_iSup_of_directed R hR.directed_le).mp hf).elim fun n hn ↦
+      hn.elim fun s hs ↦ ⟨n,s,Subtype.ext hs⟩
+  · apply congrArg (fun P : Seminorm ℂ (schwartzBruhatSubmodule G) → Prop ↦
+      (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype P → Seminorm ℂ _)).topology)
+    funext p
+    apply propext
+    refine ⟨fun h n ↦ h (a n) (e n), fun h b d ↦ ?_⟩
+    exact (hcof b).elim fun n hn ↦ (kernelStage_transitionMap hn d (e n)).elim fun t ht ↦
+      ((h n).comp t.continuous).congr fun x ↦ congrArg p (Subtype.ext (ht x))
+
+/-- Paper: Lemma D.1.5.6, p. 763. A strict inductive presentation by a countable
+cofinal family of stages, with exhaustive union and the prescribed seminorm topology. -/
+private lemma kernelStage_exists_strict_limit [SecondCountableTopology G] :
+    ∃ (a : ℕ → BruhatStructuralPair G) (e : ∀ n, ElementaryLCAPresentation (a n).quotient)
+      (j : ∀ n, SchwartzBruhatStage (e n) →L[ℂ] SchwartzBruhatStage (e (n + 1))),
+      Monotone a ∧ (∀ b, ∃ n, b ≤ a n) ∧
+      (∀ n f, schwartzBruhatStageRealization (a (n + 1)) (e (n + 1)) (j n f) =
+        schwartzBruhatStageRealization (a n) (e n) f) ∧
+      (∀ n, IsClosedEmbedding (j n)) ∧
+      IsInjectiveLCLimit j (fun n ↦ schwartzBruhatStageCLM (a n) (e n)) := by
+  have hs := kernelStage_cofinal_pairs (G := G)
+  let a := hs.choose
+  let e (n : ℕ) := (a n).elementary.some
+  have step (n : ℕ) := kernelStage_transition (hs.choose_spec.1 (Nat.le_succ n)) (e n) (e (n+1))
+  let j (n : ℕ) := (step n).choose
+  have hj (n : ℕ) := (step n).choose_spec.1
+  exact ⟨a, e, j, hs.choose_spec.1, hs.choose_spec.2, hj, fun n ↦ (step n).choose_spec.2,
+    kernelStage_is_limit a e hs.choose_spec.2 j hj⟩
+
+end Stages
+
+section KernelStages
+universe v
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+  [LocallyCompactSpace G] [SecondCountableTopology G]
+
+omit [SecondCountableTopology G] in
+private theorem kernel_barrelled : BarrelledSpace ℂ (SchwartzBruhat G) := by
+  refine ⟨fun p hp ↦ schwartzBruhat_continuous_seminorm p ?_⟩
+  intro a e
+  let : BarrelledSpace ℂ (SchwartzBruhatStage e) := isFrechetTVS_barrelled elementarySchwartz_isFrechet
+  exact (p.comp (schwartzBruhatStageInclusion a e)).continuous_of_lowerSemicontinuous
+    (hp.comp (continuous_schwartzBruhatStageInclusion a e))
+
+/-- A strict cofinal presentation by elementary Schwartz stages gives completeness
+and nuclearity on both sides of strong duality. -/
+private theorem kernel_stage_properties
+    (a : ℕ → BruhatStructuralPair G) (e : ∀ n, ElementaryLCAPresentation (a n).quotient)
+    (j : ∀ n, SchwartzBruhatStage (e n) →L[ℂ] SchwartzBruhatStage (e (n+1)))
+    (hj : ∀ n, IsClosedEmbedding (j n))
+    (hlim : IsInjectiveLCLimit j (fun n ↦ schwartzBruhatStageCLM (a n) (e n))) :
+    CompleteSpace (SchwartzBruhat G) ∧ CompleteSpace (StrongDual ℂ (SchwartzBruhat G)) ∧
+    IsNuclearTVS.{v} (SchwartzBruhat G) ∧ IsNuclearTVS.{v} (StrongDual ℂ (SchwartzBruhat G)) := by
+  let : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+  let : ∀ n, T2Space (SchwartzBruhatStage (e n)) := fun _ ↦ elementarySchwartz_t2
+  let : ∀ n, CompleteSpace (StrongDual ℂ (SchwartzBruhatStage (e n))) :=
+    fun _ ↦ elementarySchwartz_strongDual_complete
+  let i n := schwartzBruhatStageCLM (a n) (e n)
+  let res : StrongDual ℂ (SchwartzBruhat G) →L[ℂ] ((n : ℕ) → StrongDual ℂ (SchwartzBruhatStage (e n))) :=
+    ContinuousLinearMap.pi fun n ↦ ContinuousLinearMap.precomp ℂ (i n)
+  have hr : IsClosedEmbedding res := strongDual_closedEmbedding_of_strict_limit hlim hj
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · have hC := (strictLCLimit_complete_nonmetrizable (fun n ↦ (elementarySchwartz_isFrechet
+        (m := (e n).realDim) (n := (e n).torusDim) (r := (e n).latticeRank) (F := (e n).finiteFactor)).choose_spec.2.2)
+        hlim (fun n ↦ (hj n).isEmbedding)).1
+    rwa [IsUniformAddGroup.rightUniformSpace_eq] at hC
+  · exact (completeSpace_iff_isComplete_range (AddMonoidHom.isUniformInducing_of_isInducing
+      (f := res.toLinearMap.toAddMonoidHom) hr.isInducing)).mpr hr.isClosed_range.isComplete
+  · exact nuclear_of_injective_frechet_sequence (fun _ ↦ elementarySchwartz_isFrechet)
+      (fun _ ↦ elementarySchwartz_nuclear) j i hlim (fun n ↦ (hj n).isEmbedding)
+  · exact schwartzBruhat_nuclear_of_embedding res.toLinearMap hr.isEmbedding
+      (isNuclearTVS_pi fun n ↦ (isNuclearTVS_strongDual_iff elementarySchwartz_isFrechet).mpr elementarySchwartz_nuclear)
+
+/-- Analytic properties of the countable strict elementary presentation. -/
+private theorem kernel_space_properties :
+    CompleteSpace (SchwartzBruhat G) ∧ CompleteSpace (StrongDual ℂ (SchwartzBruhat G)) ∧
+    IsNuclearTVS.{0} (SchwartzBruhat G) ∧ IsNuclearTVS.{0} (StrongDual ℂ (SchwartzBruhat G)) := by
+  refine (kernelStage_exists_strict_limit (G := G)).elim fun a ha ↦ ha.elim fun d hd ↦ hd.elim fun j hj ↦ ?_
+  exact kernel_stage_properties a d j hj.2.2.2.1 hj.2.2.2.2
+
+end KernelStages
+
+end DualKernelStages
+
 /-- Paper: Lemma D.1.8.1(2), p. 778. The completed projective tensor product
 of the strong duals is the strong dual on the product. On pure tensors
 the identification multiplies the two evaluations. -/
@@ -7034,7 +7554,41 @@ theorem schwartzBruhat_strongDual_kernel_equiv [SecondCountableTopology G]
         E (Completion.coe' (α := ProjectiveTensor (StrongDual ℂ (SchwartzBruhat G))
           (StrongDual ℂ (SchwartzBruhat H))) (S ⊗ₜ[ℂ] T))
           (e (Completion.coe' (α := InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H))
-            (f ⊗ₜ[ℂ] g))) = S f * T g := by sorry
+            (f ⊗ₜ[ℂ] g))) = S f * T g := by
+  -- The evaluation formula is on images under `e`; it does not need their pointwise description.
+  clear he
+  let X := SchwartzBruhat G
+  let Y := SchwartzBruhat H
+  let Z := SchwartzBruhat (G × H)
+  have hG := kernel_space_properties (G := G)
+  have hH := kernel_space_properties (G := H)
+  have hZ := kernel_space_properties (G := G × H)
+  let : T2Space X := schwartzBruhat_t2 (G := G)
+  let : T2Space Y := schwartzBruhat_t2 (G := H)
+  let : T2Space Z := schwartzBruhat_t2 (G := G × H)
+  let : BarrelledSpace ℂ X := kernel_barrelled (G := G)
+  let : CompleteSpace X := hG.1
+  let : CompleteSpace (StrongDual ℂ X) := hG.2.1
+  let : CompleteSpace (StrongDual ℂ Y) := hH.2.1
+  let : CompleteSpace Z := hZ.1
+  let : PolynormableSpace ℂ (StrongDual ℂ Y) := hH.2.2.2.2.1
+  with_reducible
+    refine dualKernel_of_bounded_rectangles (X := X) (Y := Y) (Z := Z) hG.2.2.2 (fun B hB ↦ ?_) e
+  -- In the complete nuclear product space, bounded sets have compact closure. Transport
+  -- this compactness back to the tensor product, where we can work in a single pair of stages.
+  have hcZ : IsCompact (closure (e '' B)) :=
+    isCompact_closure_of_isNuclearTVS Z hZ.2.2.1 (hB.image e.toContinuousLinearMap)
+  have hcB : IsCompact (closure B) :=
+    e.toHomeomorph.isInducing.isCompact_iff.mpr (by rwa [e.toHomeomorph.image_closure])
+  refine (kernelStage_exists_strict_limit (G := G)).elim fun a h ↦ h.elim fun d h ↦ h.elim fun j hj ↦ ?_
+  refine (kernelStage_exists_strict_limit (G := H)).elim fun b h ↦ h.elim fun f h ↦ h.elim fun k hk ↦ ?_
+  with_reducible
+    exact completedInductiveTensor_bounded_rectangle
+      (i := fun n ↦ schwartzBruhatStageCLM (a n) (d n))
+      (l := fun n ↦ schwartzBruhatStageCLM (b n) (f n)) hj.2.2.2.2 hk.2.2.2.2
+      (fun n ↦ (hj.2.2.2.1 n).isEmbedding) (fun n ↦ (hk.2.2.2.1 n).isEmbedding)
+      (fun _ ↦ elementarySchwartz_isFrechet) (fun _ ↦ elementarySchwartz_isFrechet)
+      (fun _ ↦ elementarySchwartz_nuclear) hcB
 
 -- TODO(paper-gap): The proof after (D.1.8.3) cites part (1) for the strong-dual
 -- tensor identification at the Fréchet stages. That step uses the nuclear Fréchet result.

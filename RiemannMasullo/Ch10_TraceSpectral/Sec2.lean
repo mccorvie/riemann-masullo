@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import all RiemannMasullo.Ch09_HardySobolev.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
 /-!
@@ -121,7 +122,8 @@ integrable and evaluates the ambient strong dual under its Sobolev isometry. -/
 theorem spectralSobolevPairing_dual {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
     (Λ : StrongDual ℂ W(l, r, s)) (f : W(l, r, s)) :
     let T := T(l, r, s, hI, hs)
-    Integrable (fun g ↦ f g * T Λ g) μ𝔽 ∧ Λ f = pair(f, T Λ) := by sorry
+    Integrable (fun g ↦ f g * T Λ g) μ𝔽 ∧ Λ f = pair(f, T Λ) := by
+  exact (modulatedIntervalSobolev_dual m𝔽 hm𝔽 μ𝔽 l r s hI hs).exists.choose_spec Λ f
 
 /-- Paper: (10.2.1.3), p. 440, and (10.2.2.3), p. 445. The pairing on a
 positive Sobolev isotype and the conjugate reciprocal-weight isotype is nondegenerate.
@@ -143,12 +145,74 @@ def spectralSobolevDualEmbedding (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 
   (T(l, r, s, hI, hs)).toLinearEquiv.toLinearMap.comp
     ((Θ(a, hI, hs)).mkQL.precomp ℂ).toLinearMap
 
+/-- A Hilbert quotient dual maps isometrically to the annihilator under an ambient duality. -/
+private theorem spectralSobolevDualEmbedding_isometry_range_hilbert
+    {E V : Type*} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    [NormedAddCommGroup V] [NormedSpace ℂ V]
+    (N : Submodule ℂ E) [IsClosed (N : Set E)]
+    (T : StrongDual ℂ E ≃ₗᵢ[ℂ] V) (B : E → V → ℂ)
+    (hB : ∀ (Λ : StrongDual ℂ E) (x : E), Λ x = B x (T Λ)) :
+    Isometry (fun Λ : StrongDual ℂ (E ⧸ N) ↦ T (Λ.comp N.mkQL)) ∧
+      Set.range (fun Λ : StrongDual ℂ (E ⧸ N) ↦ T (Λ.comp N.mkQL)) =
+        {v : V | ∀ x ∈ N, B x v = 0} := by
+  let P : StrongDual ℂ (E ⧸ N) →ₗ[ℂ] StrongDual ℂ E :=
+    (N.mkQL.precomp ℂ).toLinearMap
+  have hnorm (Λ : StrongDual ℂ (E ⧸ N)) : ‖P Λ‖ = ‖Λ‖ := by
+    apply le_antisymm
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg Λ)
+      intro x
+      exact (Λ.le_opNorm (N.mkQL x)).trans
+        (mul_le_mul_of_nonneg_left (Submodule.Quotient.norm_mk_le N x) (norm_nonneg Λ))
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg (P Λ))
+      intro q
+      let v : Nᗮ := N.quotientEquivOrthogonal q
+      have hv : N.mkQL v.val = q := by
+        change (Submodule.Quotient.mk v.val : E ⧸ N) = q
+        exact (N.quotientEquivOrthogonal_symm_eq_mk v.val v.property).symm.trans
+          (N.quotientEquivOrthogonal.symm_apply_apply q)
+      have hn : ‖v.val‖ = ‖q‖ := N.quotientEquivOrthogonal.norm_map q
+      calc
+        ‖Λ q‖ = ‖(P Λ) v.val‖ := by
+          change ‖Λ q‖ = ‖Λ (N.mkQL v.val)‖
+          rw [hv]
+        _ ≤ ‖P Λ‖ * ‖v.val‖ := (P Λ).le_opNorm v.val
+        _ = ‖P Λ‖ * ‖q‖ := by rw [hn]
+  have hP : Isometry P := AddMonoidHomClass.isometry_of_norm P hnorm
+  refine ⟨T.isometry.comp hP, ?_⟩
+  ext v
+  constructor
+  · rintro ⟨Λ, rfl⟩ x hx
+    rw [← hB (Λ.comp N.mkQL) x]
+    change Λ (Submodule.Quotient.mk x) = 0
+    rw [(Submodule.Quotient.mk_eq_zero N).mpr hx, map_zero]
+  · intro hv
+    let φ : StrongDual ℂ E := T.symm v
+    have hφ : N ≤ φ.ker := by
+      intro x hx
+      change φ x = 0
+      rw [hB φ x]
+      change B x (T (T.symm v)) = 0
+      rw [T.apply_symm_apply]
+      exact hv x hx
+    refine ⟨N.liftQL φ hφ, ?_⟩
+    have hcomp : (N.liftQL φ hφ).comp N.mkQL = φ := by
+      ext x
+      rfl
+    change T ((N.liftQL φ hφ).comp N.mkQL) = v
+    rw [hcomp]
+    exact T.apply_symm_apply v
+
 /-- Paper: (10.2.1.3), p. 440, and (10.2.2.3), p. 445. Pullback along the
 quotient identifies its strong dual isometrically with the theta annihilator. -/
 theorem spectralSobolevDualEmbedding_isometry_range (a : ℝ) {l r s : ℝ} (hI : l ≤ r)
     (hs : 0 ≤ s) :
     let D := spectralSobolevDualEmbedding F a hI hs
-    Isometry D ∧ range D = {u | ∀ f ∈ Θ(a, hI, hs), pair(f, u) = 0} := by sorry
+    Isometry D ∧ range D = {u | ∀ f ∈ Θ(a, hI, hs), pair(f, u) = 0} := by
+  exact spectralSobolevDualEmbedding_isometry_range_hilbert
+    (E := W(l, r, s)) (V := W'(l, r, s))
+    (Θ(a, hI, hs)) (T(l, r, s, hI, hs))
+    (spectralSobolevPairing (F := F))
+    (fun Λ f ↦ (spectralSobolevPairing_dual hI hs Λ f).2)
 
 end Quotients
 
@@ -318,12 +382,83 @@ local notation "L2μ'(" l ", " r ", " s ")" => (μ𝔽 |>.withDensity fun g ↦
 -- for s = 2 on the rational trivial component the Gram kernel is
 -- proportional to exp(-|t-u|). The claimed orthogonal adjoint range fails.
 
+/-- A logarithmic power below the strict cutoff is square-integrable for the reciprocal weight. -/
+private theorem spectralLineJet_memLp_of_norm_sq
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hms : Surjective m)
+    (μ : Measure G) [μ.IsHaarMeasure] (s : ℝ) (k : ℕ)
+    (hk : 2 * (k : ℝ) + 1 < s) (u : G → ℂ) (hu : Continuous u)
+    (hnorm : ∀ g : G, ‖u g‖ ^ 2 = (Real.log ((m g).val : ℝ)) ^ (2 * k)) :
+    MemLp u 2 (μ.withDensity fun g ↦
+      ENNReal.ofReal (((1 + (Real.log ((m g).val : ℝ)) ^ 2) ^ (s / 2))⁻¹)) := by
+  let ν : Measure G := canonicalModulatedHaar m hm
+  let : ν.IsHaarMeasure :=
+    (existsUnique_canonicalModulatedHaar m hm).exists.choose_spec.1
+  have hν : Integrable (fun g : G ↦ (Real.log ((m g).val : ℝ)) ^ (2 * k) *
+      ((1 + (Real.log ((m g).val : ℝ)) ^ 2) ^ (s / 2))⁻¹) ν :=
+    (sobolev_log_preserving m hm hms).integrable_comp_of_integrable
+      (integrable_pow_mul_rpow_inv hk)
+  have hμ : Integrable (fun g : G ↦ (Real.log ((m g).val : ℝ)) ^ (2 * k) *
+      ((1 + (Real.log ((m g).val : ℝ)) ^ 2) ^ (s / 2))⁻¹) μ := by
+    rw [Measure.isMulLeftInvariant_eq_smul μ ν]
+    exact hν.smul_measure_nnreal
+  have hρpos (g : G) : 0 < (1 + (Real.log ((m g).val : ℝ)) ^ 2) ^ (s / 2) :=
+    Real.rpow_pos_of_pos (by positivity) _
+  have hρ : Continuous (fun g : G ↦ (1 + (Real.log ((m g).val : ℝ)) ^ 2) ^ (s / 2)) :=
+    ((continuous_const : Continuous (fun _ : G ↦ (1 : ℝ))).add
+      ((continuous_logModule' m).pow 2)).rpow_const (fun g ↦ Or.inl (by
+        change (1 : ℝ) + (Real.log ((m g).val : ℝ)) ^ 2 ≠ 0
+        positivity))
+  apply (memLp_two_iff_integrable_sq_norm hu.aestronglyMeasurable).2
+  apply (integrable_withDensity_iff
+    (hρ.inv₀ (fun g ↦ (hρpos g).ne')).measurable.ennreal_ofReal
+    (ae_of_all μ fun _ ↦ ENNReal.ofReal_lt_top)).2
+  refine hμ.congr (ae_of_all μ fun g ↦ ?_)
+  dsimp only [Pi.inv_apply]
+  rw [hnorm g, ENNReal.toReal_ofReal (inv_nonneg.mpr (hρpos g).le)]
+
 /-- Paper: Theorem 10.2.1.1, p. 440. The admitted a-line jets are elements of
 the reciprocal-weight Hilbert space.
 Deviation: Exclude the divergent endpoint of (10.2.1.6). -/
 theorem spectralLineJet_memLp (χ : PontryaginDual C₁ → PontryaginDual C𝔽) {a s : ℝ}
     (_hs : 1 < s) (j : SpectralLineJetIndex χ a s) :
-    MemLp (lineJet(χ, j)) 2 (L2μ'(0, 0, s)) := by sorry
+    MemLp (lineJet(χ, j)) 2 (L2μ'(0, 0, s)) := by
+  have horder : (j.val.2.2 : ℝ) < (s - 1) / 2 :=
+    ((lt_spectralBoundaryMultiplicity s _ _).mp j.property).2
+  have hk : 2 * (j.val.2.2 : ℝ) + 1 < s := by linarith
+  let u : C𝔽 → ℂ := spectralZeroJet (χ j.val.1) 0 j.val.2.1 j.val.2.2
+  have hu : Continuous u :=
+    (ideleClassNormTwist (χ j.val.1)
+      ((0 : ℂ) + (j.val.2.1 : ℂ) * Complex.I)).continuous.mul
+      ((Complex.continuous_ofReal.comp (continuous_logModule' m𝔽)).pow j.val.2.2)
+  have hnorm (g : C𝔽) : ‖u g‖ ^ 2 = (logNorm g) ^ (2 * j.val.2.2) := by
+    have htwist : ‖ideleClassNormTwist (χ j.val.1)
+        ((0 : ℂ) + (j.val.2.1 : ℂ) * Complex.I) g‖ = 1 := by
+      change ‖(χ j.val.1 g : ℂ) *
+        (((ideleClassNorm F g).val : ℝ) : ℂ) ^
+          ((0 : ℂ) + (j.val.2.1 : ℂ) * Complex.I)‖ = 1
+      rw [norm_mul, Circle.norm_coe, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos
+          (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g)))]
+      simp
+    change ‖ideleClassNormTwist (χ j.val.1)
+      ((0 : ℂ) + (j.val.2.1 : ℂ) * Complex.I) g *
+        (logNorm g : ℂ) ^ j.val.2.2‖ ^ 2 = _
+    rw [norm_mul, htwist, one_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs]
+    calc
+      (|logNorm g| ^ j.val.2.2) ^ 2 =
+          (|logNorm g| ^ 2) ^ j.val.2.2 := by
+        rw [← pow_mul, ← pow_mul, Nat.mul_comm j.val.2.2 2]
+      _ = ((logNorm g) ^ 2) ^ j.val.2.2 :=
+        congrArg (fun y : ℝ ↦ y ^ j.val.2.2) (sq_abs (logNorm g))
+      _ = (logNorm g) ^ (2 * j.val.2.2) := (pow_mul _ _ _).symm
+  have h := spectralLineJet_memLp_of_norm_sq m𝔽 hm𝔽 hms𝔽 μ𝔽 s j.val.2.2 hk u hu hnorm
+  change MemLp u 2 ((μ𝔽).withDensity fun g ↦
+    ENNReal.ofReal (((1 + (logNorm g) ^ 2) ^ (s / 2))⁻¹)) at h
+  simpa only [intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero,
+    max_self, one_mul, u] using h
 
 -- For a family of admitted jets u, these are the two analytic inputs to
 -- the Hilbert-space argument. Interpolants are lifted to the ambient space.
@@ -335,6 +470,60 @@ local notation "JetInterpolation(" J ", " a ", " hI ", " hs ", " u ")" =>
     Dense (Submodule.span ℂ (range (fun i ↦ (Θ(a, hI, hs)).mkQ (v i))) :
       Set (spectralSobolevQuotient F a hI hs)))
 
+/-- A total family of continuous functionals on a Hilbert space has norm-dense span. -/
+private theorem spectralSobolevQuotient_basis_of_interpolation_dense_dual
+    {Q J : Type*} [NormedAddCommGroup Q] [InnerProductSpace ℂ Q] [CompleteSpace Q]
+    (Λ : J → StrongDual ℂ Q)
+    (h : ∀ q : Q, (∀ j, Λ j q = 0) → q = 0) :
+    Dense (Submodule.span ℂ (Set.range Λ) : Set (StrongDual ℂ Q)) := by
+  let R := InnerProductSpace.toDual ℂ Q
+  let v : J → Q := fun j ↦ R.symm (Λ j)
+  have hv : Dense (Submodule.span ℂ (Set.range v) : Set Q) := by
+    rw [Submodule.dense_iff_topologicalClosure_eq_top,
+      Submodule.topologicalClosure_eq_top_iff, Submodule.eq_bot_iff]
+    intro q hq
+    apply h q
+    intro j
+    have hz := (Submodule.mem_orthogonal (Submodule.span ℂ (Set.range v)) q).mp hq
+      (v j) (Submodule.subset_span (Set.mem_range_self j))
+    simpa only [v, R, InnerProductSpace.toDual_symm_apply] using hz
+  apply (R.surjective.denseRange.dense_image R.continuous hv).mono
+  apply (Submodule.image_span_subset R.toLinearEquiv.toLinearMap
+    (Set.range v) (Submodule.span ℂ (Set.range Λ))).mpr
+  rintro _ ⟨j, rfl⟩
+  change R (R.symm (Λ j)) ∈ Submodule.span ℂ (Set.range Λ)
+  rw [R.apply_symm_apply]
+  exact Submodule.subset_span (Set.mem_range_self j)
+
+/-- Dense interpolants and a total lifted dual family form a spectral Markushevich basis. -/
+private theorem spectralSobolevQuotient_basis_of_interpolation_construct
+    {J E Q U : Type*} [NormedAddCommGroup Q] [InnerProductSpace ℂ Q] [CompleteSpace Q]
+    (q : E → Q) (hq : Function.Surjective q)
+    (D : StrongDual ℂ Q → U) (b : E → U → ℂ) (u : J → U)
+    (hpair : ∀ (Λ : StrongDual ℂ Q) (f : E), Λ (q f) = b f (D Λ))
+    (hu : ∀ j, ∃ Λ : StrongDual ℂ Q, D Λ = u j)
+    (hzero : ∀ f : E, (∀ j, b f (u j) = 0) → q f = 0)
+    (hV : ∃ v : J → E,
+      (∀ i, b (v i) (u i) = 1) ∧
+      (∀ i j, i ≠ j → b (v i) (u j) = 0) ∧
+      Dense (Submodule.span ℂ (Set.range (fun i ↦ q (v i))) : Set Q)) :
+    ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
+      ∀ j, D (Λ j) = u j := by
+  classical
+  choose Λ hΛ using hu
+  obtain ⟨v, hvself, hvcross, hvdense⟩ := hV
+  have he (j : J) (f : E) : Λ j (q f) = b f (u j) :=
+    (hpair (Λ j) f).trans (congrArg (b f) (hΛ j))
+  refine ⟨fun j ↦ q (v j), Λ, ?_, hΛ⟩
+  refine ⟨fun i ↦ (he i (v i)).trans (hvself i),
+    fun i j hij ↦ (he j (v i)).trans (hvcross i j hij), hvdense, ?_⟩
+  apply spectralSobolevQuotient_basis_of_interpolation_dense_dual Λ
+  intro z hz
+  obtain ⟨f, rfl⟩ := hq z
+  apply hzero f
+  intro j
+  exact (he j f).symm.trans (hz j)
+
 /-- Paper: Theorems 10.2.1.1 and 10.2.2.1, pp. 440, 446. A common kernel
 identifies the closed dual span in the Hilbert quotient. A dense family of
 interpolants then supplies the other half of the Markushevich basis. -/
@@ -344,7 +533,25 @@ theorem spectralSobolevQuotient_basis_of_interpolation {J : Type*}
     let Q := spectralSobolevQuotient F a hI hs
     let D := spectralSobolevDualEmbedding F a hI hs
     ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
-      ∀ j, D (Λ j) = u j := by sorry
+      ∀ j, D (Λ j) = u j := by
+  classical
+  let N := globalThetaSobolev F a hI hs
+  let D := spectralSobolevDualEmbedding F a hI hs
+  have hpair (Λ : StrongDual ℂ (spectralSobolevQuotient F a hI hs))
+      (f : W(l, r, s)) :
+      Λ (N.mkQ f) = spectralSobolevPairing f (D Λ) := by
+    exact (spectralSobolevPairing_dual hI hs (Λ.comp N.mkQL) f).2
+  have hu (j : J) :
+      ∃ Λ : StrongDual ℂ (spectralSobolevQuotient F a hI hs), D Λ = u j := by
+    have hj : u j ∈ Set.range (spectralSobolevDualEmbedding F a hI hs) := by
+      rw [(spectralSobolevDualEmbedding_isometry_range (F := F) a hI hs).2]
+      exact fun f hf ↦ (_hK f).mp hf j
+    exact hj
+  refine spectralSobolevQuotient_basis_of_interpolation_construct
+    (Q := spectralSobolevQuotient F a hI hs)
+    N.mkQ N.mkQ_surjective D (spectralSobolevPairing (F := F)) u hpair hu ?_ _hV
+  intro f hf
+  exact (spectralSobolevQuotient_eq_zero a hI hs f).mpr ((_hK f).mpr hf)
 
 local notation "lineHs(" hs ")" => le_of_lt (zero_lt_one.trans hs)
 local notation "lineU(" χ ", " hs ")" =>

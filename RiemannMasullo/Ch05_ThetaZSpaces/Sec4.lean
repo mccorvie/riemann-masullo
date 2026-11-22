@@ -94,6 +94,163 @@ theorem existsUnique_sLocalNormSectionCharacter (τ : ℝ≥0ˣ →ₜ* Jₛ)
     change χ (g / τ (mₛ g)) = ω (p g) at he
     simpa only [map_div, hsec, div_one] using he
 
+/-- On a closed positive strip, rapid decay controls the tails and continuity controls
+the remaining compact rectangle. -/
+private theorem existsUnique_sLocalZetaPair_right (χ : PontryaginDual Jₛ) (f : ℬₛ) :
+    ∃ u : B⁺, EqOn u.val (fun z ↦ Zₛ f (normChart(χ) z)) rightHalf := by
+  let G := fun z ↦ Zₛ f (normChart(χ) z)
+  have hG : DifferentiableOn ℂ G rightHalf :=
+    (sLocalIdelicZetaIntegral_analyticOn f χ).differentiableOn.congr fun z hz ↦
+      sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩
+  refine ⟨⟨(rightHalf).indicator G, fun z hz ↦ indicator_of_notMem hz _,
+    hG.congr (fun z hz ↦ indicator_of_mem hz _), ?_⟩, fun z hz ↦ indicator_of_mem hz _⟩
+  intro a b hab hsub N
+  have ha : 0 < a := hsub (left_mem_Icc.mpr hab)
+  have hstrip : UniformlySchwartzOnStrip G (a / 2) (b + a) := by
+    simpa only [iteratedDeriv_zero] using
+      sLocalIdelicZFunction_schwartzOnStrip f χ (a / 2) (b + a) (by linarith) (by linarith) 0
+  obtain ⟨C, hC, htail⟩ := hstrip.2.2 (a / 2) (by linarith) (by linarith) (N+1) (by omega)
+  obtain ⟨T, hT⟩ := eventually_atTop.mp (eventually_comap.mp htail)
+  let M := max T (max 1 b)
+  let K := Complex.reProdIm (Icc a b) (Icc (-M) M)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  have hc : ContinuousOn (fun z : ℂ ↦ ‖z ^ N * G z‖) K :=
+    ((continuous_id.pow N).continuousOn.mul (hG.continuousOn.mono (show K ⊆ rightHalf from fun _ hz ↦ hsub hz.1))).norm
+  obtain ⟨B, hB⟩ := hK.bddAbove_image hc
+  refine ⟨max B (2 ^ N * C), ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  change ‖z ^ N * (rightHalf).indicator G z‖ ≤ _
+  rw [indicator_of_mem (show z ∈ rightHalf from hsub hz)]
+  by_cases hy : |z.im| ≤ M
+  · exact (hB ⟨z, ⟨hz, abs_le.mp hy⟩, rfl⟩).trans (le_max_left _ _)
+  have hy' := (lt_of_not_ge hy).le
+  have hy1 : 1 ≤ |z.im| := (le_max_left _ _).trans ((le_max_right _ _).trans hy')
+  have hy0 : 0 < |z.im| := zero_lt_one.trans_le hy1
+  have hz' : z.re ∈ Icc a b := hz
+  have hdec := hT |z.im| ((le_max_left _ _).trans hy') z.im rfl z.re
+    (show z.re ∈ Icc (a / 2 + a / 2) (b + a - a / 2) from ⟨by linarith [hz'.1], by linarith [hz'.2]⟩)
+  simp only [Complex.re_add_im] at hdec
+  have hnorm : ‖z‖ ≤ 2 * |z.im| := by
+    apply (Complex.norm_le_abs_re_add_abs_im z).trans
+    rw [abs_of_nonneg (ha.le.trans hz'.1)]
+    linarith [hz'.2.trans ((le_max_right 1 b).trans ((le_max_right T _).trans hy'))]
+  have hpow : |z.im| ^ N ≤ |z.im| ^ (N + 1) := pow_le_pow_right₀ hy1 (by omega)
+  apply le_trans _ (le_max_right _ _)
+  rw [norm_mul, norm_pow]
+  calc
+    _ ≤ (2 * |z.im|) ^ N * (C / |z.im| ^ N) :=
+      mul_le_mul (pow_le_pow_left₀ (norm_nonneg _) hnorm _) (hdec.trans
+        (div_le_div_of_nonneg_left hC.le (pow_pos hy0 _) hpow)) (norm_nonneg _) (by positivity)
+    _ = 2 ^ N * C := by rw [mul_pow]; field_simp
+
+private theorem existsUnique_sLocalZetaPair_reflect (u : B⁺) :
+    ∃ v : B⁻, ∀ z, v.val z = u.val (1 - z) := by
+  have hpos (z : ℂ) : 1 - z ∈ rightHalf ↔ z ∈ leftHalf := by
+    change 0 < (1 - z).re ↔ z.re < 1
+    simp
+  refine ⟨⟨fun z ↦ u.val (1-z), fun z hz ↦ u.property.1 (mt (hpos z).mp hz),
+    u.property.2.1.comp (by fun_prop) (fun z hz ↦ (hpos z).mpr hz), ?_⟩, fun z ↦ rfl⟩
+  intro a b hab hsub N
+  have hb : b < 1 := hsub (right_mem_Icc.mpr hab)
+  have hi : Icc (1-b) (1-a) ⊆ rightInterval := fun _ hw ↦ (sub_pos.mpr hb).trans_le hw.1
+  obtain ⟨A, hA⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi 0
+  obtain ⟨B, hB⟩ := u.property.2.2 (1-b) (1-a) (by linarith) hi N
+  refine ⟨2 ^ N * max A B, ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  let w := 1 - z
+  have hw : w ∈ Complex.re ⁻¹' Icc (1-b) (1-a) := by
+    change 1-b ≤ (1-z).re ∧ (1-z).re ≤ 1-a
+    simp only [Complex.sub_re, Complex.one_re]
+    exact ⟨sub_le_sub_left hz.2 _, sub_le_sub_left hz.1 _⟩
+  have hbound : ‖z‖ ≤ 1 + ‖w‖ := by simpa [w] using norm_sub_le (1 : ℂ) w
+  change ‖z ^ N * u.val w‖ ≤ _
+  rw [norm_mul, norm_pow]
+  rcases le_total ‖w‖ 1 with h | h
+  · have hA' : ‖u.val w‖ ≤ A := by simpa using hA (mem_image_of_mem _ hw)
+    exact mul_le_mul (pow_le_pow_left₀ (norm_nonneg _) (by linarith : ‖z‖ ≤ 2) N)
+      (hA'.trans (le_max_left _ _)) (norm_nonneg _) (by positivity)
+  · have hB' := hB (mem_image_of_mem _ hw)
+    rw [norm_mul, norm_pow] at hB'
+    calc
+      _ ≤ (2 * ‖w‖) ^ N * ‖u.val w‖ := by gcongr; linarith
+      _ = 2 ^ N * (‖w‖ ^ N * ‖u.val w‖) := by rw [mul_pow, mul_assoc]
+      _ ≤ _ := mul_le_mul_of_nonneg_left (hB'.trans (le_max_right _ _)) (by positivity)
+
+private theorem existsUnique_sLocalZetaPair_eval (χ : PontryaginDual Jₛ) (s : ℂ)
+    (hs : s ∈ rightHalf) : ∃ E : Θω(restrict₁(χ)) →ₗ[ℂ] ℂ,
+      ∀ f : ℬₛ, E (Submodule.Quotient.mk f) = Zₛ f (normChart(χ) s) := by
+  let c := normChart(χ) s
+  have htwist (z : ℂ) : quasiCharacterNormTwist mₛ hmₛ c z = normChart(χ) (z + s) := by
+    ext1 g
+    let N : ℂ := (normℝ(mₛ g) : ℂ)
+    change (χ g : ℂ) * N ^ s * N ^ z = (χ g : ℂ) * N ^ (z + s)
+    rw [add_comm, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr
+      (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)), mul_assoc]
+  have hc : 0 ≤ sLocalIdelicOrderBound c := by
+    simp only [sLocalIdelicOrderBound, htwist, le_min_iff]
+    have hρ := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0 s hs
+    rw [iteratedDeriv_zero] at hρ
+    exact ⟨le_rfl, ((show AnalyticAt ℂ (fun w ↦ ρₛ(χ, w)) (0 + s) by simpa using hρ).comp
+      (f := fun z : ℂ ↦ z + s) (by fun_prop)).meromorphicOrderAt_nonneg⟩
+  let x : {d // 0 ≤ sLocalIdelicOrderBound (F := F) (S := S) d} := ⟨c, hc⟩
+  let E : ℬₛ →ₗ[ℂ] ℂ :=
+    { toFun := fun f ↦ Zₛ f c
+      map_add' := fun f g ↦ congrArg (fun h ↦ DFunLike.coe h x)
+        (sLocalIdelicZFunction_isLinear.map_add f g)
+      map_smul' := fun a f ↦ congrArg (fun h ↦ DFunLike.coe h x)
+        (sLocalIdelicZFunction_isLinear.map_smul a f) }
+  refine ⟨(LinearMap.ker (φω(restrict₁(χ)))).liftQ E ?_, fun _ ↦ rfl⟩
+  intro f hf
+  apply (mem_sLocalHomogeneousAdelicTheta_ker_iff (restrict₁(χ)) f).mp hf x
+  intro u
+  change (χ u.val : ℂ) * (normℝ(mₛ u.val) : ℂ) ^ s = (χ u.val : ℂ)
+  rw [u.prop]
+  simp
+
+private theorem existsUnique_sLocalZetaPair_equation (χ : PontryaginDual Jₛ) (f : ℬₛ)
+    (s : ℂ) (hs : s ∈ overlap) :
+    Zₛ f (normChart(χ) s) = ρₛ(χ, s) * Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s)) := by
+  have ht : 1 - s ∈ rightHalf := by simpa [mem_preimage, mem_Ioi] using sub_pos.mpr hs.2
+  have hd : dualQuasiCharacter mₛ hmₛ (normChart(χ) s) = normChart(χ⁻¹) (1 - s) := by
+    ext1 g
+    let N : ℂ := (normℝ(mₛ g) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+    change N * normChart(χ) s g⁻¹ = ((χ g : ℂ)⁻¹ * N ^ (1-s))
+    rw [map_inv]
+    change N * ((χ g : ℂ) * N ^ s)⁻¹ = (χ g : ℂ)⁻¹ * N ^ (1-s)
+    rw [Complex.cpow_sub _ _ hN, Complex.cpow_one, div_eq_mul_inv, mul_inv_rev]
+    ac_rfl
+  have he := sLocalIdelicZetaIntegral_functionalEquation f χ s hs
+  exact (sLocalIdelicZFunction_eq_integral f ⟨χ, s, hs.1, rfl⟩).trans <| he.trans <|
+    congrArg (ρₛ(χ, s) * ·) ((congrArg (sLocalIdelicZetaIntegral (Fourierₛ f)) hd).trans
+      (sLocalIdelicZFunction_eq_integral (Fourierₛ f) ⟨χ⁻¹, 1-s, ht, rfl⟩).symm)
+
+private theorem existsUnique_sLocalZetaPair_ext {I : Set ℝ} {u v : SchwartzBergman I}
+    (h : EqOn u.val v.val (Complex.re ⁻¹' I)) : u = v := by
+  apply Subtype.ext
+  funext z
+  by_cases hz : z ∈ Complex.re ⁻¹' I
+  · exact h hz
+  · exact (u.property.1 hz).trans (v.property.1 hz).symm
+
+/-- Multiplication by the functional-equation factor and restriction to the overlap
+still detect a left component, by the holomorphic identity theorem. -/
+private theorem existsUnique_sLocalZetaPair_left_ext (χ : PontryaginDual Jₛ) (u v : B⁻)
+    (h : ∀ z ∈ overlap, ρₛ(χ, z) * u.val z = ρₛ(χ, z) * v.val z) : u = v := by
+  have hol (w : B⁻) : AnalyticOnNhd ℂ w.val leftHalf :=
+    w.property.2.1.analyticOnNhd (isOpen_Iio.preimage Complex.continuous_re)
+  have hband : ∀ᶠ s : ℂ in 𝓝[≠] (1 / 2 : ℂ), s ∈ overlap :=
+    nhdsWithin_le_nhds ((isOpen_Ioo.preimage Complex.continuous_re).mem_nhds (by
+      norm_num [mem_preimage, mem_Ioo]))
+  apply existsUnique_sLocalZetaPair_ext
+  apply (hol u).eqOn_of_preconnected_of_frequently_eq (hol v)
+    (convex_halfSpace_re_lt 1).isPreconnected (z₀ := 1/2) (by norm_num [mem_preimage])
+  apply Filter.Eventually.frequently
+  filter_upwards [hband, nhdsNE_le_codiscrete _ (sLocalRhoFactor_mul_dual χ)] with z hz hprod
+  have hne : ρₛ(χ, z) ≠ 0 := left_ne_zero_of_mul
+    (hprod.trans_ne ((Group.isUnit (QuotientGroup.mk (-1 : Aₛˣ) : Jₛ)).map (normChart(χ) z)).ne_zero)
+  exact mul_left_cancel₀ hne (h z hz)
+
 /-- Paper: (5.4.1.2), p. 265.
 The two zeta restrictions descend uniquely as a linear map on homogeneous theta classes.
 Deviation: We use the unitary-lift coordinates of Remark 5.4.1.2. The normalized lift
@@ -104,7 +261,51 @@ theorem existsUnique_sLocalZetaPair (χ : PontryaginDual Jₛ) :
     ∃! U : Θω(restrict₁(χ)) →ₗ[ℂ] B⁺ × B⁻, ∀ (f : ℬₛ),
       EqOn (U (Submodule.Quotient.mk f)).1.val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
       EqOn (U (Submodule.Quotient.mk f)).2.val
-        (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s))) leftHalf := by sorry
+        (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s))) leftHalf := by
+  classical
+  choose E hE using fun s : rightHalf ↦ existsUnique_sLocalZetaPair_eval χ s.val s.property
+  -- The right evaluations descend individually to the quotient. On the overlap they
+  -- are also the evaluations of the reflected component multiplied by the Tate factor.
+  let T : B⁺ →ₗ[ℂ] (rightHalf → ℂ) :=
+    LinearMap.pi fun s ↦ (LinearMap.proj s.val).comp (schwartzBergmanSubmodule rightInterval).subtype
+  let D : B⁻ →ₗ[ℂ] (overlap → ℂ) :=
+    LinearMap.pi fun s ↦ ρₛ(χ, s.val) •
+      ((LinearMap.proj s.val).comp (schwartzBergmanSubmodule leftInterval).subtype)
+  have hT : Injective T := fun _ _ he ↦ existsUnique_sLocalZetaPair_ext
+    (fun z hz ↦ congrFun he ⟨z, hz⟩)
+  have hD : Injective D := fun u v he ↦ existsUnique_sLocalZetaPair_left_ext χ u v
+    (fun z hz ↦ congrFun he ⟨z, hz⟩)
+  let A := T.leftInverse.comp (LinearMap.pi E)
+  let B := D.leftInverse.comp (LinearMap.pi fun s : overlap ↦ E ⟨s.val, s.property.1⟩)
+  have spec (f : ℬₛ) : EqOn (A (Submodule.Quotient.mk f)).val
+        (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
+      EqOn (B (Submodule.Quotient.mk f)).val
+        (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1 - s))) leftHalf := by
+    refine (existsUnique_sLocalZetaPair_right (F := F) (S := S) χ f).elim fun u hu ↦ ?_
+    refine (existsUnique_sLocalZetaPair_right (F := F) (S := S) χ⁻¹ (Fourierₛ f)).elim fun w hw ↦ ?_
+    refine (existsUnique_sLocalZetaPair_reflect w).elim fun v hv ↦ ?_
+    have hv' : EqOn v.val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) (1-s))) leftHalf :=
+      fun s hs ↦ (hv s).trans (hw (show 1 - s ∈ rightHalf by
+        simpa [mem_preimage, mem_Ioi] using sub_pos.mpr hs))
+    have eA : (LinearMap.pi E) (Submodule.Quotient.mk f) = T u :=
+      funext fun s ↦ (hE s f).trans (hu s.property).symm
+    have eB : (LinearMap.pi fun s : overlap ↦ E ⟨s.val, s.property.1⟩) (Submodule.Quotient.mk f) = D v :=
+      funext fun s ↦ (hE ⟨s.val, s.property.1⟩ f).trans
+        ((existsUnique_sLocalZetaPair_equation χ f s s.property).trans
+          (congrArg (ρₛ(χ, s.val) * ·) (hv' s.property.2).symm))
+    have hA : A (Submodule.Quotient.mk f) = u :=
+      (congrArg T.leftInverse eA).trans (LinearMap.leftInverse_apply_of_inj (LinearMap.ker_eq_bot.mpr hT) u)
+    have hB : B (Submodule.Quotient.mk f) = v :=
+      (congrArg D.leftInverse eB).trans (LinearMap.leftInverse_apply_of_inj (LinearMap.ker_eq_bot.mpr hD) v)
+    exact ⟨fun s hs ↦ (congrArg (fun g : B⁺ ↦ g.val s) hA).trans (hu hs),
+      fun s hs ↦ (congrArg (fun g : B⁻ ↦ g.val s) hB).trans (hv' hs)⟩
+  refine ⟨A.prod B, spec, ?_⟩
+  intro V hV
+  apply Submodule.linearMap_qext
+  apply LinearMap.ext
+  intro f
+  exact Prod.ext (existsUnique_sLocalZetaPair_ext ((hV f).1.trans (spec f).1.symm))
+    (existsUnique_sLocalZetaPair_ext ((hV f).2.trans (spec f).2.symm))
 
 /-- Paper: (5.4.1.2), p. 265.
 The map pairs the zeta transform with the reflected zeta transform of the Fourier transform.

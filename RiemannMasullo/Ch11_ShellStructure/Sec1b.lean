@@ -135,13 +135,69 @@ def sLocalUncutCarving (s : ℝ) (ω : PontryaginDual C₁) (T : Finset V) :
     Submodule ℂ (W(s)) :=
   (Submodule.span ℂ (range (fun f : ℬ₀ ↦ θ(s, ω, P(T, f))))).topologicalClosure
 
+/-- Conjugating `map id P` by an equivalence gives the identity when `P` fixes every vector.
+Stated in the shape of `sAdelePrincipalValue`, so that it applies syntactically. -/
+private theorem sLocalUncutCarving_empty_conj_left {E G N : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E G ≃L[ℂ] N) (P : G →ₗ[ℂ] G) (hP : ∀ x, P x = x) :
+    e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp
+      e.symm.toLinearMap) = LinearMap.id := by
+  have hP' : P = LinearMap.id := LinearMap.ext hP
+  subst hP'
+  refine LinearMap.ext fun x ↦ ?_
+  have h := LinearMap.congr_fun (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x)
+  exact (congrArg e h).trans (e.apply_symm_apply x)
+
+/-- Conjugating `map P id` by an equivalence gives the identity when `P` fixes every vector.
+Stated in the shape of `adelePrincipalValue`, so that it applies syntactically. -/
+private theorem sLocalUncutCarving_empty_conj_right {E G N : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E G ≃L[ℂ] N) (P : E →ₗ[ℂ] E) (hP : ∀ x, P x = x) :
+    e.toLinearMap.comp ((TensorProduct.map P (LinearMap.id : G →ₗ[ℂ] G)).comp
+      e.symm.toLinearMap) = LinearMap.id := by
+  have hP' : P = LinearMap.id := LinearMap.ext hP
+  subst hP'
+  refine LinearMap.ext fun x ↦ ?_
+  have h := LinearMap.congr_fun (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x)
+  exact (congrArg e h).trans (e.apply_symm_apply x)
+
+open scoped TensorProduct in
+/-- A tensor power of identity maps fixes every vector of the finest locally convex copy. -/
+private theorem sLocalUncutCarving_empty_piMap {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {M : ι → Type*} [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    (f : ∀ i, M i →ₗ[ℂ] M i) (hf : ∀ i, f i = LinearMap.id)
+    (x : FinestLocallyConvex (⨂[ℂ] i, M i)) :
+    (PiTensorProduct.map f : FinestLocallyConvex (⨂[ℂ] i, M i) →ₗ[ℂ]
+      FinestLocallyConvex (⨂[ℂ] i, M i)) x = x := by
+  have : f = fun _ ↦ LinearMap.id := funext hf
+  subst this
+  rw [PiTensorProduct.map_id]
+  rfl
+
+/-- With no selected places the S-local principal value is the identity. -/
+private theorem sLocalUncutCarving_empty_sPV (h : (∅ : Finset V) ⊆ ∅) :
+    sAdelePrincipalValue F h = LinearMap.id := by
+  unfold sAdelePrincipalValue
+  exact sLocalUncutCarving_empty_conj_left _ _
+    (sLocalUncutCarving_empty_piMap _ fun w ↦ absurd w.2 (Finset.notMem_empty _))
+
+/-- With no selected places the global principal value is the identity. -/
+private theorem sLocalUncutCarving_empty_PV : adelePrincipalValue F (∅ : Finset V) = LinearMap.id := by
+  unfold adelePrincipalValue
+  exact sLocalUncutCarving_empty_conj_right _ _ fun x ↦
+    LinearMap.congr_fun (sLocalUncutCarving_empty_sPV _) x
+
 /-- Paper: (11.1.2.5), p. 480. The empty stage is the closure of the unrestricted
 homogeneous polar-free theta image.
 Deviation: Sanity check for the uncut stage. -/
 theorem sLocalUncutCarving_empty (s : ℝ) (ω : PontryaginDual C₁) :
     sLocalUncutCarving s ω ∅ =
       (Submodule.span ℂ (range (fun f : ℬ₀ ↦ θ(s, ω, f)))).topologicalClosure := by
-  sorry
+  have hP : ∀ f : ℬ₀, adelePrincipalValue F ∅ f.val = f.val := fun f ↦
+    LinearMap.ext_iff.mp sLocalUncutCarving_empty_PV f.val
+  simp only [sLocalUncutCarving, hP]
 
 /-- Paper: (11.1.2.5), p. 480. Before any prime condition the uncut stage is the
 norm-one isotype of the global theta completion from Definition 10.1.1.1. -/
@@ -249,12 +305,137 @@ theorem exists_sLocalCarvingCofinal (S : Finset V) :
       exact ⟨Encodable.encode v + 1,
         ⟨Encodable.encode v, Nat.lt_succ_self _, Encodable.mem_decode₂.2 rfl⟩, h⟩
 
+ 
+open scoped TensorProduct in
+/-- Two linear maps agree once they agree on the pure tensors of an
+inductive tensor product with a finite tensor product. -/
+private theorem sLocalCutoffCarving_antitone_extPi {ι : Type*} [Fintype ι] {E N : Type*}
+    {M : ι → Type*} [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E (FinestLocallyConvex (⨂[ℂ] i, M i)) ≃L[ℂ] N) (L₁ L₂ : N →ₗ[ℂ] N)
+    (h : ∀ (a : E) (g : ∀ i, M i), L₁ (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i))) = L₂ (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i)))) :
+    L₁ = L₂ := by
+  have key : ∀ y : E ⊗[ℂ] (⨂[ℂ] i, M i), L₁ (e y) = L₂ (e y) := by
+    intro y
+    induction y using TensorProduct.induction_on with
+    | zero =>
+      exact (congrArg L₁ (map_zero e)).trans ((map_zero L₁).trans
+        ((map_zero L₂).symm.trans (congrArg L₂ (map_zero e)).symm))
+    | tmul a b =>
+      induction b using PiTensorProduct.induction_on with
+      | smul_tprod r g =>
+        rw [show a ⊗ₜ[ℂ] (r • PiTensorProduct.tprod ℂ g) = r • (a ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g)
+            from TensorProduct.tmul_smul r a _,
+          show e (r • (a ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g)) =
+            r • e (a ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g) from map_smul e r _,
+          map_smul, map_smul, h]
+      | add b c hb hc =>
+        rw [TensorProduct.tmul_add]
+        exact (congrArg L₁ (map_add e _ _)).trans ((map_add L₁ _ _).trans
+          ((congrArg₂ (· + ·) hb hc).trans ((map_add L₂ _ _).symm.trans
+            (congrArg L₂ (map_add e _ _)).symm)))
+    | add y z hy hz =>
+      exact (congrArg L₁ (map_add e y z)).trans ((map_add L₁ _ _).trans
+        ((congrArg₂ (· + ·) hy hz).trans ((map_add L₂ _ _).symm.trans
+          (congrArg L₂ (map_add e y z)).symm)))
+  refine LinearMap.ext fun x ↦ ?_
+  calc L₁ x = L₁ (e (e.symm x)) := by rw [e.apply_symm_apply]
+    _ = L₂ (e (e.symm x)) := key (e.symm x)
+    _ = L₂ x := by rw [e.apply_symm_apply]
+
+/-- The S-local principal values compose over disjoint sets of selected places. -/
+private theorem sLocalCutoffCarving_antitone_sPV {T T' : Finset (HeightOneSpectrum (𝓞 F))} (hT : T ⊆ T') :
+    sAdelePrincipalValue F (Finset.Subset.refl T') =
+      (sAdelePrincipalValue F hT).comp (sAdelePrincipalValue F (Finset.sdiff_subset (s := T') (t := T))) := by
+  refine sLocalCutoffCarving_antitone_extPi (sAdeleSchwartz_inductiveTensor_equiv F T').choose _ _ fun a g ↦ ?_
+  have h1 := sAdelePrincipalValue_tmul (F := F) (Finset.Subset.refl T') a g
+  have h2 := sAdelePrincipalValue_tmul (F := F) (Finset.sdiff_subset (s := T') (t := T)) a g
+  have h3 := sAdelePrincipalValue_tmul (F := F) hT a
+    (fun w : T' ↦ if (w : HeightOneSpectrum (𝓞 F)) ∈ T' \ T then
+      finitePlacePrincipalValue (F := F) w.val (g w) else g w)
+  refine h1.trans ?_
+  refine Eq.trans ?_ (LinearMap.comp_apply _ _ _).symm
+  refine Eq.trans ?_ (congrArg (sAdelePrincipalValue F hT) h2.symm)
+  refine Eq.trans ?_ h3.symm
+  apply congrArg
+  apply congrArg
+  apply congrArg
+  funext w
+  by_cases hw : (w : HeightOneSpectrum (𝓞 F)) ∈ T
+  · simp [hw, w.2, Finset.mem_sdiff]
+  · simp [hw, w.2, Finset.mem_sdiff]
+
+/-- Two linear maps agree once they agree on the pure tensors of an inductive tensor product. -/
+private theorem sLocalCutoffCarving_antitone_extTail {E G N : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E G ≃L[ℂ] N) (L₁ L₂ : N →ₗ[ℂ] N)
+    (h : ∀ (a : E) (b : G), L₁ (e (a ⊗ₜ[ℂ] b)) = L₂ (e (a ⊗ₜ[ℂ] b))) :
+    L₁ = L₂ := by
+  have key : ∀ y : TensorProduct ℂ E G, L₁ (e y) = L₂ (e y) := by
+    intro y
+    induction y using TensorProduct.induction_on with
+    | zero =>
+      exact (congrArg L₁ (map_zero e)).trans ((map_zero L₁).trans
+        ((map_zero L₂).symm.trans (congrArg L₂ (map_zero e)).symm))
+    | tmul a b => exact h a b
+    | add y z hy hz =>
+      exact (congrArg L₁ (map_add e y z)).trans ((map_add L₁ _ _).trans
+        ((congrArg₂ (· + ·) hy hz).trans ((map_add L₂ _ _).symm.trans
+          (congrArg L₂ (map_add e y z)).symm)))
+  refine LinearMap.ext fun x ↦ ?_
+  calc L₁ x = L₁ (e (e.symm x)) := by rw [e.apply_symm_apply]
+    _ = L₂ (e (e.symm x)) := key (e.symm x)
+    _ = L₂ x := by rw [e.apply_symm_apply]
+
+/-- The global principal value at a larger set is the one at the smaller set after the one
+at the difference. -/
+private theorem sLocalCutoffCarving_antitone_PV {T T' : Finset (HeightOneSpectrum (𝓞 F))} (hT : T ⊆ T') :
+    adelePrincipalValue F T' =
+      (adelePrincipalValue F T).comp (adelePrincipalValue F (T' \ T)) := by
+  refine sLocalCutoffCarving_antitone_extTail (sAdeleTailSchwartz_inductiveTensor_equiv F T').choose _ _ fun a b ↦ ?_
+  have h1 := adelePrincipalValue_tmul (F := F) (Finset.Subset.refl T') a b
+  have h2 := adelePrincipalValue_tmul (F := F) (Finset.sdiff_subset (s := T') (t := T)) a b
+  have h3 := adelePrincipalValue_tmul (F := F) hT
+    (sAdelePrincipalValue F (Finset.sdiff_subset (s := T') (t := T)) a) b
+  refine h1.trans ?_
+  refine Eq.trans ?_ (LinearMap.comp_apply _ _ _).symm
+  refine Eq.trans ?_ (congrArg (adelePrincipalValue F T) h2.symm)
+  refine Eq.trans ?_ h3.symm
+  apply congrArg
+  apply congrArg₂ _ _ rfl
+  exact (LinearMap.ext_iff.mp (sLocalCutoffCarving_antitone_sPV hT) a).trans (LinearMap.comp_apply _ _ _)
+
+/-- Generic range inclusion: no project definitions occur, so nothing is unfolded. -/
+private theorem sLocalCutoffCarving_antitone_range {A β : Type*} [AddCommMonoid A] [Module ℂ A]
+    (B : Submodule ℂ A) (Φ : B → β) (L L' R : A → A)
+    (h : ∀ f : B, L f.val ∈ B) (h' : ∀ f : B, L' f.val ∈ B) (hR : ∀ f : B, R f.val ∈ B)
+    (hc : ∀ f : B, L (R f.val) = L' f.val) :
+    range (fun f : B ↦ Φ ⟨L' f.val, h' f⟩) ⊆ range (fun f : B ↦ Φ ⟨L f.val, h f⟩) := by
+  rintro _ ⟨f, rfl⟩
+  exact ⟨⟨R f.val, hR f⟩, congrArg Φ (Subtype.ext (hc f))⟩
+
 /-- Paper: (11.1.2.12), p. 481. Adding finite-place conditions gives a smaller
 cutoff stage in the inclusion order.
 Deviation: The monotonicity applies to any measurable norm band. -/
 theorem sLocalCutoffCarving_antitone (s : ℝ) (ω : PontryaginDual C₁)
     (J : Set ℝ) (hJ : MeasurableSet J) :
-    Antitone (fun T : Finset V ↦ sLocalCutoffCarving s ω T J hJ) := by sorry
+    Antitone (fun T : Finset V ↦ sLocalCutoffCarving s ω T J hJ) := by
+  intro T T' hTT'
+  have hP : ∀ f : ℬ₀, adelePrincipalValue F T (adelePrincipalValue F (T' \ T) f.val) =
+      adelePrincipalValue F T' f.val := fun f ↦
+    ((LinearMap.ext_iff.mp (sLocalCutoffCarving_antitone_PV hTT') f.val).trans
+      (LinearMap.comp_apply _ _ _)).symm
+  show sLocalCutoffCarving s ω T' J hJ ≤ sLocalCutoffCarving s ω T J hJ
+  unfold sLocalCutoffCarving
+  have key := sLocalCutoffCarving_antitone_range (adelePolarSubspace F)
+    (fun g : ℬ₀ ↦ M(s, J, hJ) (θ(s, ω, g)))
+    (adelePrincipalValue F T) (adelePrincipalValue F T') (adelePrincipalValue F (T' \ T))
+    (adelePrincipalValue_mem_polarSubspace T) (adelePrincipalValue_mem_polarSubspace T')
+    (adelePrincipalValue_mem_polarSubspace (T' \ T)) hP
+  with_reducible exact Submodule.topologicalClosure_mono (Submodule.span_mono key)
 
 local notation "ωOf(" χ ")" =>
   (χ).comp (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ :
@@ -295,7 +476,10 @@ theorem sLocalCarvingLimit_le_cutoffIsotype {S : Finset V} (χ : PontryaginDual 
     (s : ℝ) (hs : DegreeBound(s)) (twoSided : Bool) (Λ : ℝ) (_hΛ : 0 < Λ) :
     let hs₀ : 0 ≤ s := (mul_nonneg zero_le_two (Nat.cast_nonneg _)).trans hs
     sLocalCarvingLimit s (ωOf(χ)) S (J(twoSided, Λ)) (hJ(twoSided, Λ)) ≤
-      (Wω(s, hs₀, ωOf(χ))).map (M(s, J(twoSided, Λ), hJ(twoSided, Λ))).toLinearMap := by sorry
+      (Wω(s, hs₀, ωOf(χ))).map (M(s, J(twoSided, Λ), hJ(twoSided, Λ))).toLinearMap := by
+  intro hs₀
+  exact (iInf_le _ (⟨∅, Finset.disjoint_empty_right S⟩ : SLocalCarvingIndex (F := F) S)).trans
+    (sLocalCutoffCarving_le_cutoffIsotype _ _ _ _ _ _)
 
 -- TODO(paper-gap): On p. 482 the basis conclusion of Theorem 11.2.0.2
 -- requires s ≥ 2 * card(i'), while (11.1.2.2) bounds the field degree.
