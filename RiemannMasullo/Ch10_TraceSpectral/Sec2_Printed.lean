@@ -87,7 +87,12 @@ def Printed.spectralLineJet_annulus : Prop :=
 use the trivial character and a nontrivial zero of its squared two-dimensional
 Artin factor. For s = 3 the printed full multiplicity includes k = 1 and the
 squared norm diverges logarithmically. -/
-theorem Printed.spectralLineJet_annulus_false : ¬ Printed.spectralLineJet_annulus := by sorry
+theorem Printed.spectralLineJet_annulus_false : ¬ Printed.spectralLineJet_annulus := by
+  intro hall
+  apply Printed.spectralLineJet_memLp_false
+  intro F _ _ χ hχ a s hs ω t k hk
+  obtain ⟨_, _, h⟩ := hall F χ hχ a s hs
+  exact (h ω t k (lt_of_lt_of_le hk (min_le_left _ _))).choose
 
 /-- Paper: Proposition 10.2.1.3, p. 443. As printed, the a-line family
 fails to be contained in an open ball of some positive radius. -/
