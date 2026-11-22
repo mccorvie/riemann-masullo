@@ -64,7 +64,34 @@ Every norm-one character has a unique unitary lift trivial on the chosen norm se
 Its norm twists give the coordinates used for the Second Structure Theorem. -/
 theorem existsUnique_sLocalNormSectionCharacter (τ : ℝ≥0ˣ →ₜ* Jₛ)
     (_hτ : RightInverse τ mₛ) (ω : PontryaginDual J₁) :
-    ∃! χ : PontryaginDual Jₛ, restrict₁(χ) = ω ∧ ∀ t, χ (τ t) = 1 := by sorry
+    ∃! χ : PontryaginDual Jₛ, restrict₁(χ) = ω ∧ ∀ t, χ (τ t) = 1 := by
+  have hk (g : Jₛ) : g / τ (mₛ g) ∈ (mₛ).ker := by
+    simp [MonoidHom.mem_ker, _hτ (mₛ g)]
+  let p : Jₛ →ₜ* J₁ :=
+    { toFun := fun g ↦ ⟨g / τ (mₛ g), hk g⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' := fun g h ↦ Subtype.ext (by simp [mul_div_mul_comm])
+      continuous_toFun := (continuous_id.div' (τ.continuous.comp hmₛ)).subtype_mk hk }
+  have hp (u : J₁) : p u = u := by
+    apply Subtype.ext
+    change u.val / τ (mₛ u.val) = u.val
+    rw [u.property, map_one, div_one]
+  have hτp (t : ℝ≥0ˣ) : p (τ t) = 1 := by
+    apply Subtype.ext
+    change τ t / τ (mₛ (τ t)) = 1
+    simp [_hτ t]
+  refine ⟨ω.comp p, ⟨?_, ?_⟩, ?_⟩
+  · ext1 u
+    exact congrArg ω (hp u)
+  · intro t
+    change ω (p (τ t)) = 1
+    rw [hτp, map_one]
+  · rintro χ ⟨hker, hsec⟩
+    ext1 g
+    change χ g = ω (p g)
+    have he := DFunLike.congr_fun hker (p g)
+    change χ (g / τ (mₛ g)) = ω (p g) at he
+    simpa only [map_div, hsec, div_one] using he
 
 /-- Paper: (5.4.1.2), p. 265.
 The two zeta restrictions descend uniquely as a linear map on homogeneous theta classes.
