@@ -335,7 +335,23 @@ The argument in print establishes density there. -/
 theorem sLocalCutoffCarving_eq_closure_map (s : ℝ) (ω : PontryaginDual C₁)
     (T : Finset V) (J : Set ℝ) (hJ : MeasurableSet J) :
     sLocalCutoffCarving s ω T J hJ =
-      ((sLocalUncutCarving s ω T).map (M(s, J, hJ)).toLinearMap).topologicalClosure := by sorry
+      ((sLocalUncutCarving s ω T).map (M(s, J, hJ)).toLinearMap).topologicalClosure := by
+  have closureImage {E G ι : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [ContinuousAdd E] [ContinuousSMul ℂ E] [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+      [ContinuousAdd G] [ContinuousSMul ℂ G] (L : E →L[ℂ] G) (f : ι → E) :
+      (Submodule.span ℂ (range (fun i ↦ L (f i)))).topologicalClosure =
+        ((Submodule.span ℂ (range f)).topologicalClosure.map L.toLinearMap).topologicalClosure := by
+    let B := Submodule.span ℂ (range f)
+    have h : Submodule.span ℂ (range (fun i ↦ L (f i))) = B.map L.toLinearMap :=
+      (congrArg (Submodule.span ℂ) (Set.range_comp' (L : E → G) f)).trans
+        (Submodule.map_span L.toLinearMap (range f)).symm
+    refine (congrArg Submodule.topologicalClosure h).trans (le_antisymm ?_ ?_)
+    · exact Submodule.topologicalClosure_mono (Submodule.map_mono B.le_topologicalClosure)
+    · exact Submodule.topologicalClosure_minimal _ (B.topologicalClosure_map L) (Submodule.isClosed_topologicalClosure _)
+  dsimp only [sLocalCutoffCarving, sLocalUncutCarving, IdeleClassZeroLineSobolev, CompactIntervalSobolev, Bool.false_eq_true, ite_false]
+  with_reducible_and_instances
+    exact closureImage (E := Lp ℂ 2 (ν(s))) (G := Lp ℂ 2 (ν(s))) (ι := ℬ₀)
+      (M(s, J, hJ)) (fun g : ℬ₀ ↦ θ(s, ω, P(T, g)))
 
 -- TODO(paper-gap): For (11.1.2.11), closed range of the cutoff on the ambient space
 -- does not establish closed range on each completed uncut stage.
