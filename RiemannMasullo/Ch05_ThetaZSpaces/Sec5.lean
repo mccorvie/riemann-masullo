@@ -449,7 +449,29 @@ of all normalized S-local eigendistributions pulled back from the theta quotient
 theorem sLocalThetaTranspose_closure_range :
     closure (Set.range (pull(Kₛ))) =
       closure (Submodule.span ℂ (Set.range (sLocalNormalizedEigendistribution (F := F) (S := S))) :
-        Set D(ℬ(Aₛ))) := by sorry
+        Set D(ℬ(Aₛ))) := by
+  have denseImage {X Y I : Type _} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (L : X →L[ℂ] Y)
+      (D : I → X) (G : I → Y) (hd : Dense (Submodule.span ℂ (range D) : Set X))
+      (hG : ∀ i, L (D i) = G i) :
+      closure (range L) = closure (Submodule.span ℂ (range G) : Set Y) := by
+    have hs : L.toLinearMap '' range D = range G :=
+      (Set.range_comp L.toLinearMap D).symm.trans (congrArg Set.range (funext hG))
+    have hi := congrArg (fun p : Submodule ℂ Y ↦ (p : Set Y))
+      ((Submodule.map_span L.toLinearMap (range D)).trans (congrArg (Submodule.span ℂ) hs))
+    change L '' (Submodule.span ℂ (range D) : Set X) = _ at hi
+    rw [← hi]
+    exact le_antisymm (closure_minimal (L.continuous.range_subset_closure_image_dense hd) isClosed_closure)
+      (closure_mono (Set.image_subset_range _ _))
+  have pullEq {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (U : StrongDual ℂ (M ⧸ K)) (T : StrongDual ℂ M)
+      (h : ∀ f, U (K.mkQL f) = T f) : pull(K) U = T :=
+    ContinuousLinearMap.ext h
+  with_reducible_and_instances
+    exact denseImage (X := D(SLocalAdelicThetaSpace F S)) (Y := D(ℬ(Aₛ))) (I := QuasiCharacter Jₛ)
+      (pull(Kₛ)) (sLocalThetaEigendistribution (F := F) (S := S))
+      (sLocalNormalizedEigendistribution (F := F) (S := S)) (sLocalThetaEigendistributions_dense_span (F := F) (S := S))
+      (fun c ↦ pullEq (M := ℬ(Aₛ)) (Kₛ) _ _ (sLocalThetaEigendistribution_mk (F := F) (S := S) c))
 
 -- TODO(paper-gap): Remark 5.5.3.3, p. 285, claims that one connected subset of weights
 -- with an interval in it detects the whole theta space. A subset of a single component
