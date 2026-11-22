@@ -110,7 +110,39 @@ function is bounded by a constant times `x^(1 + ε)`, uniformly in unitary chara
 theorem heckeIdealSummatory_bound (F : Type*) [Field F] [NumberField F] {ε : ℝ} (hε : 0 < ε) :
     ∃ C : ℝ, 0 < C ∧ ∀ᶠ x : ℝ in atTop, ∀ χ : U[F],
       ‖heckeIdealSummatory (ideleClassNormTwist χ 0) x‖ ≤ C * x ^ (1 + ε) := by
-  sorry
+  classical
+  have hvalue (χ : U[F]) {I : Ideal (𝓞 F)} (hI : I ≠ ⊥) :
+      ‖heckeIdealValue (ideleClassNormTwist χ 0) I‖ ≤ 1 := by
+    rw [heckeIdealValue, ite_eq_right hI]
+    refine finprod_induction (fun z : ℂ ↦ ‖z‖ ≤ 1) (by simp) (fun _ w hz hw ↦ ?_) (fun v ↦ ?_)
+    · rw [norm_mul]
+      exact (mul_le_of_le_one_left (norm_nonneg w) hz).trans hw
+    · rw [norm_pow]
+      apply pow_le_one₀ (norm_nonneg _)
+      split_ifs <;> simp [norm_ideleClassNormTwist_zero_localValue]
+  obtain ⟨B, hB⟩ := (NumberField.Ideal.tendsto_norm_le_div_atTop F).isBoundedUnder_le.eventually_le
+  have hC : 0 < max 1 B := lt_of_lt_of_le zero_lt_one (le_max_left _ _)
+  refine ⟨max 1 B, hC, ?_⟩
+  filter_upwards [hB, eventually_ge_atTop (1 : ℝ)] with x hcount hx
+  have hxpos : 0 < x := zero_lt_one.trans_le hx
+  let ideals := {I : Ideal (𝓞 F) | (I.absNorm : ℝ) ≤ x}
+  let nonzeroIdeals := {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x}
+  have hfinite : ideals.Finite := by
+    simp only [ideals, ← Nat.le_floor_iff hxpos.le]
+    exact Ring.HasFiniteQuotients.finite_absNorm_le _
+  have hsub : nonzeroIdeals ⊆ ideals := fun _ hI ↦ hI.2
+  let : Fintype nonzeroIdeals := (hfinite.subset hsub).fintype
+  intro χ
+  calc
+    ‖heckeIdealSummatory (ideleClassNormTwist χ 0) x‖ ≤ ∑ _ : nonzeroIdeals, (1 : ℝ) := by
+      change ‖∑ᶠ I : nonzeroIdeals, heckeIdealValue (ideleClassNormTwist χ 0) I.1‖ ≤ _
+      rw [finsum_eq_sum_of_fintype]
+      exact norm_sum_le_of_le _ fun I _ ↦ hvalue χ I.2.1
+    _ = (nonzeroIdeals.ncard : ℝ) := by simp
+    _ ≤ (ideals.ncard : ℝ) := by exact_mod_cast Set.ncard_le_ncard hsub hfinite
+    _ ≤ max 1 B * x := (div_le_iff₀ hxpos).mp (hcount.trans (le_max_right 1 B))
+    _ ≤ max 1 B * x ^ (1 + ε) := mul_le_mul_of_nonneg_left
+      (Real.self_le_rpow_of_one_le hx (le_add_of_nonneg_right hε.le)) hC.le
 
 -- TODO(paper-gap): Equation (B.6.1.7) multiplies the norm-one class volume by an
 -- extra inverse square root of the discriminant under the normalization in §A.3.
