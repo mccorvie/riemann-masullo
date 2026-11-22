@@ -238,7 +238,8 @@ def diagonalIndentationWeight (μH : Measure H) (b : G → ℝ) (p : G × G) : �
 /-- Paper: (12.2.2.1), p. 508. Averaging over the trivial subgroup with unit counting
 measure returns the product of the two indentation factors. -/
 theorem diagonalIndentationWeight_bot (b : G → ℝ) (p : G × G) :
-    diagonalIndentationWeight (⊥ : Subgroup G) Measure.count b p = b p.1 * b p.2 := by sorry
+    diagonalIndentationWeight (⊥ : Subgroup G) Measure.count b p = b p.1 * b p.2 := by
+  simp [diagonalIndentationWeight, Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))]
 
 variable {b : G → ℝ} (hb : IsIndentation H Measure.count b)
 
