@@ -132,7 +132,14 @@ local notation "Aω(" ω ", " φ ")" =>
 Convolution preserves the theta intersection in each norm-one isotype. -/
 theorem hardySobolevTestAction_preserves_spectralIsotypeTheta (ω : PontryaginDual C₁)
     (φ : BruhatCompactSupport C𝔽) :
-    Nω(ω) ≤ ((Nω(ω)).mkQL.comp Aω(ω, φ)).ker := by sorry
+    Nω(ω) ≤ ((Nω(ω)).mkQL.comp Aω(ω, φ)).ker := by
+  intro v hv
+  have hz := hardySobolevTestAction_preserves_globalTheta (F := F) a hI hs φ
+    (show v.val ∈ Θ(a, hI, hs) from hv)
+  have hout : testAction(l, r, s, hI, hs) φ v.val ∈ Θ(a, hI, hs) :=
+    (Submodule.Quotient.mk_eq_zero (Θ(a, hI, hs))).mp hz
+  apply (Submodule.Quotient.mk_eq_zero (Nω(ω))).mpr
+  exact hout
 
 /-- Paper: Theorems 10.3.1.1(3), p. 449, and 10.3.2.1(3), p. 454.
 The isotype operator descends ambient convolution restricted to that isotype. -/
