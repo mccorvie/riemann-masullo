@@ -190,7 +190,21 @@ theorem isIndentationFundamentalDomain_univ_punit (μ : Measure X) :
 measure, the paper's exact tiling gives a measure-theoretic fundamental domain. -/
 theorem IsIndentationFundamentalDomain.isFundamentalDomain [Countable A] [BorelSpace X]
     {μ : Measure X} {D : Set X} (hD : IsIndentationFundamentalDomain A μ D) :
-    IsFundamentalDomain A D μ := by sorry
+    IsFundamentalDomain A D μ := by
+  have hnull : μ (closure D \ D) = 0 := by
+    refine measure_mono_null (t := ⋃ a : {g : A // g ≠ 1}, closure D ∩ a.val • closure D) ?_
+      (measure_iUnion_null fun a ↦ hD.2.2 a.val a.property)
+    rintro x ⟨hx, hxD⟩
+    obtain ⟨g, hg, -⟩ := hD.2.1 x
+    have hg1 : g ≠ 1 := by
+      rintro rfl
+      exact hxD (by simpa only [one_smul] using hg)
+    refine mem_iUnion.mpr ⟨⟨g⁻¹, inv_ne_one.mpr hg1⟩, hx, ?_⟩
+    exact ⟨g • x, subset_closure hg, inv_smul_smul g x⟩
+  have heq : closure D =ᵐ[μ] D := ae_eq_set.mpr
+    ⟨hnull, by rw [sdiff_eq_empty.mpr subset_closure, measure_empty]⟩
+  exact IsFundamentalDomain.mk' (isClosed_closure.measurableSet.nullMeasurableSet.congr heq)
+    hD.2.1
 
 end FundamentalDomains
 
