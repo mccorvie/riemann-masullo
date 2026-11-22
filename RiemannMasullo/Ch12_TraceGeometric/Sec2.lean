@@ -44,7 +44,21 @@ def IsIndentation (μH : Measure H) (b : G → ℝ) : Prop :=
 /-- Paper: Definition 12.2.1.3, p. 506. For the trivial subgroup with unit counting
 measure, the indentations are exactly the constant one function. -/
 theorem isIndentation_bot_iff (b : G → ℝ) :
-    IsIndentation (⊥ : Subgroup G) Measure.count b ↔ b = fun _ ↦ 1 := by sorry
+    IsIndentation (⊥ : Subgroup G) Measure.count b ↔ b = fun _ ↦ 1 := by
+  have hcount := Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))
+  constructor
+  · intro hb
+    funext x
+    simpa [hcount] using (hb.2.2.2 x).2
+  · rintro rfl
+    refine ⟨continuous_const, fun _ ↦ zero_le_one, ?_, ?_⟩
+    · intro K hK
+      have hinj : Function.Injective (QuotientGroup.mk' (⊥ : Subgroup G)) :=
+        (QuotientGroup.quotientBot (G := G)).symm.injective
+      rw [Set.preimage_image_eq _ hinj]
+      exact hK.inter_left (isClosed_tsupport _)
+    · intro x
+      simp [hcount]
 
 variable [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
   [SecondCountableTopology G] [BorelSpace G]
