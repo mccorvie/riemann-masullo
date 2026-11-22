@@ -43,13 +43,97 @@ def Printed.thetaIsotypeSum_strictlyFiner : Prop :=
       let _ := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
       ¬ IsInducing (DirectSum.toModule ℂ _ (GlobalAdelicThetaSpace F) fun ω ↦ (E ω).subtype))
 
+/-- A norm-one rational idele at the archimedean stage is represented by a diagonal sign. -/
+private theorem thetaIsotypeSum_strictlyFiner_false_rat :
+    Subsingleton (sIdeleQuotientNorm ℚ ∅).ker := by
+  classical
+  refine subsingleton_of_forall_eq 1 ?_
+  rintro ⟨q, hq⟩
+  apply Subtype.ext
+  change q = 1
+  revert hq
+  refine Quotient.inductionOn q fun g hg ↦ ?_
+  change sIdeleNorm ℚ ∅ g = 1 at hg
+  let w := Rat.infinitePlace
+  let coord : SAdeleRing ℚ ∅ ≃+* ℝ :=
+    ((RingEquiv.prodZeroRing _ _).symm.trans
+      (RingEquiv.piUnique fun v : InfinitePlace ℚ ↦ v.Completion)).trans
+      (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)
+  have hn : ‖g.val.1 w‖ = 1 := by
+    have h := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) hg
+    rwa [sIdeleNorm, Finset.univ_eq_empty (α := (∅ : Finset (Places(ℚ)))),
+      Finset.prod_empty, mul_one, Fintype.prod_subsingleton _ w,
+      Rat.isReal_infinitePlace.mult_eq_one, pow_one] at h
+  have ha : |coord g.val| = 1 :=
+    ((InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal
+      Rat.isReal_infinitePlace).norm_map_of_map_zero (map_zero _) _).trans hn
+  apply (sIdeleQuotient_mk_eq_one ℚ ∅ g).mpr
+  rcases eq_or_eq_neg_of_abs_eq ha with h | h
+  · refine ⟨1, Units.ext (coord.injective ?_)⟩
+    simpa only [map_one, Units.val_one] using h
+  · refine ⟨-1, Units.ext (coord.injective ?_)⟩
+    change coord g.val = coord (((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype)
+      (integralAdeleDiagonal ℚ ∅ (-1)))
+    simpa only [map_neg, map_one] using h
+
+/-- For a single submodule, the locally convex direct sum induces the subspace topology. -/
+private theorem thetaIsotypeSum_strictlyFiner_false_single
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    [Subsingleton I] [DecidableEq I] (X : I → Submodule ℂ E) (k : I) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ I fun i ↦ ↥(X i))
+    IsInducing (DirectSum.toModule ℂ I E fun i ↦ (X i).subtype) := by
+  let D := ⨁ i, ↥(X i)
+  let j := DirectSum.lof ℂ I fun i ↦ ↥(X i)
+  let : TopologicalSpace D := locallyConvexFinalTopology j
+  have hD : WithSeminorms
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ j i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let := hD.isTopologicalAddGroup
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let c := DirectSum.component ℂ I (fun i ↦ ↥(X i)) k
+  have hj : Continuous (j k) := hD.continuous_of_continuous_comp _ fun p ↦ p.property k
+  have hc : Continuous c := by
+    apply (PolynormableSpace.withSeminorms ℂ (X k)).continuous_of_continuous_comp c
+    intro p
+    apply hD.continuous_seminorm ⟨p.val.comp c, ?_⟩
+    intro i
+    obtain rfl := Subsingleton.elim i k
+    change Continuous fun x : X i ↦ p.val ((j i x) i)
+    simp only [j, DirectSum.lof_apply]
+    exact p.property
+  -- Projection onto the only component is inverse to its inclusion.
+  have hleft : LeftInverse (j k) c := by
+    intro x
+    apply DFinsupp.ext
+    intro i
+    obtain rfl := Subsingleton.elim i k
+    exact DFinsupp.single_eq_same
+  have hsum : ⇑(DirectSum.toModule ℂ I E fun i ↦ (X i).subtype) = Subtype.val ∘ c := by
+    funext x
+    conv_lhs => rw [← hleft x]
+    exact DirectSum.toModule_lof (M := fun i ↦ ↥(X i)) (φ := fun i ↦ (X i).subtype) ℂ k (c x)
+  rw [hsum]
+  exact IsInducing.subtypeVal.comp (hleft.isEmbedding hj hc).isInducing
+
 /-- Paper: Remark 6.2.1.4(1), (6.2.1.2), p. 297. Over ℚ at the archimedean stage the norm-one
 quotient is `{±1}/{±1}`, so the sole summand is the entire theta space with its own topology.
 Globally over ℚ, the action of the profinite norm-one group factors through a finite group on
 each finite test level. The finite character projections extend through the inductive limit and
 the theta quotient to a continuous inverse to the sum map. -/
 theorem Printed.thetaIsotypeSum_strictlyFiner_false :
-    ¬ Printed.thetaIsotypeSum_strictlyFiner := by sorry
+    ¬ Printed.thetaIsotypeSum_strictlyFiner := by
+  classical
+  intro h
+  apply (h ℚ).1 ∅
+  let G := (sIdeleQuotientNorm ℚ ∅).ker
+  let : Subsingleton G := thetaIsotypeSum_strictlyFiner_false_rat
+  let : Subsingleton (PontryaginDual G) := subsingleton_of_forall_eq 1 fun χ ↦
+    PontryaginDual.ext fun g ↦ by rw [Subsingleton.elim g 1, map_one, map_one]
+  let : DecidableEq (PontryaginDual G) := Classical.decEq _
+  let : PolynormableSpace ℂ (SLocalAdelicThetaSpace ℚ ∅) := sLocalAdelicThetaSpace_polynormable
+  let ρ := (existsUnique_sLocalThetaAction (F := ℚ) (S := ∅)).exists.choose
+  let X := actionIsotype (ρ.comp (sIdeleQuotientNorm ℚ ∅).ker.subtype)
+  exact thetaIsotypeSum_strictlyFiner_false_single (E := SLocalAdelicThetaSpace ℚ ∅)
+    (I := PontryaginDual G) X 1
 
 /-- Paper: Remark 6.2.1.4(2), p. 298. As printed: the S-local theta quotient has nonclosed
 image in the product of its homogeneous theta quotients, and the topology induced by the product
