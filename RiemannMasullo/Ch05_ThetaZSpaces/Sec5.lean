@@ -247,7 +247,27 @@ The eigenspace in the global theta dual is the line through the descended genera
 with the weight condition tested on the pullback. -/
 theorem globalThetaEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
     (adelicEigendistributions c).comap (pull(K𝔽)).toLinearMap =
-      Submodule.span ℂ {globalThetaEigendistribution c} := by sorry
+      Submodule.span ℂ {globalThetaEigendistribution c} := by
+  have quotientLine {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (W : Submodule ℂ (StrongDual ℂ M))
+      (T : StrongDual ℂ M) (U : StrongDual ℂ (M ⧸ K)) (hW : W = Submodule.span ℂ {T})
+      (hU : ∀ f, U (K.mkQL f) = T f) :
+      W.comap (pull(K)).toLinearMap = Submodule.span ℂ {U} := by
+    let L := (pull(K)).toLinearMap
+    have hinj : Injective L := by
+      intro a b h
+      apply ContinuousLinearMap.ext
+      intro x
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+      exact congrArg (fun t : StrongDual ℂ M ↦ t f) h
+    have he : L U = T := ContinuousLinearMap.ext hU
+    have hm : (Submodule.span ℂ {U}).map L = W := by
+      rw [Submodule.map_span, Set.image_singleton, he, hW]
+    exact (congrArg (fun p : Submodule ℂ (StrongDual ℂ M) ↦ p.comap L) hm.symm).trans
+      (Submodule.comap_map_eq_of_injective hinj _)
+  exact quotientLine (M := ℬ(𝔸[F])) (K𝔽) (adelicEigendistributions (F := F) c)
+    (adelicNormalizedEigendistribution (F := F) c) (globalThetaEigendistribution (F := F) c)
+    (adelicEigendistributions_eq_span (F := F) c) (globalThetaEigendistribution_mk (F := F) c)
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 The normalized global family in the strong dual of the theta quotient is holomorphic. -/
