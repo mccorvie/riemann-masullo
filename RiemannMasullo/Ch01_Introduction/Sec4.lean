@@ -132,7 +132,10 @@ theorem introTraceSpectralSum_eq_single (χ : U𝔽) (h : ℝ → ℂ) (a : ℝ)
     (_hρ : 0 < zeroOrder(χ, ρ) ∧ |ρ.re - 1 / 2| < a)
     (_honly : ∀ w : windowZeros(χ, a), w.val = ρ) :
     introTraceSpectralSum χ h a =
-      (zeroOrder(χ, ρ) : ℂ) * introTraceMellin h (ρ - 1 / 2) := by sorry
+      (zeroOrder(χ, ρ) : ℂ) * introTraceMellin h (ρ - 1 / 2) := by
+  let w : windowZeros(χ, a) := ⟨ρ, _hρ⟩
+  unfold introTraceSpectralSum
+  exact tsum_eq_single w fun v hv ↦ (hv (Subtype.ext (_honly v))).elim
 
 open Classical in
 /-- Paper: §1.4.1, p. 28. In a single isotype, the local terms equal the
