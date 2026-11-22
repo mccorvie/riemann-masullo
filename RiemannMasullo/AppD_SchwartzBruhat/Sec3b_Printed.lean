@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 
 /-! # Appendix D.3.5: the printed Poisson summation formula -/
 
@@ -110,11 +111,66 @@ def Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral : Prop :=
       (∫ t, ψτ t * star (χ (τ t) : ℂ) ∂positiveRealHaar) =
         ∫ g : m.toMonoidHom.ker, star (χ g.val : ℂ) ∂μ₁
 
+/-- On a subsingleton topological group, the Dirac measure at the identity is a Haar
+measure. -/
+private theorem Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_dirac
+    {K : Type*} [Group K] [TopologicalSpace K] [MeasurableSpace K] [Subsingleton K] :
+    (Measure.dirac (1 : K)).IsHaarMeasure := by
+  have hsub : ∀ U : Set K, U.Nonempty → U = univ := fun U ⟨x, hx⟩ ↦
+    eq_univ_of_forall fun y ↦ Subsingleton.elim x y ▸ hx
+  refine { toIsFiniteMeasureOnCompacts := ⟨fun _ _ ↦ measure_lt_top _ _⟩
+           toIsMulLeftInvariant := ⟨fun g ↦ ?_⟩
+           toIsOpenPosMeasure := ⟨fun U _ hne ↦ by
+             rw [hsub U hne, measure_univ]; exact one_ne_zero⟩ }
+  have hg : (g * ·) = id := funext fun _ ↦ Subsingleton.elim _ _
+  rw [hg, Measure.map_id]
+
+/-- The printed identity fails in each universe: lift the positive reals to it, with
+the zero test, the empty jump set and trivial characters. -/
+private theorem Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_of
+    (h : Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral.{u}) : False := by
+  have : LocallyCompactSpace {x : ℝ // 0 < x} := isOpen_Ioi.locallyCompactSpace
+  have : LocallyCompactSpace ℝ≥0ˣ :=
+    (Nonneg.unitsHomeomorphPos ℝ).isOpenEmbedding.locallyCompactSpace
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : LocallyCompactSpace (ULift.{u} ℝ≥0ˣ) :=
+    Homeomorph.ulift.isClosedEmbedding.locallyCompactSpace
+  have : SecondCountableTopology (ULift.{u} ℝ≥0ˣ) :=
+    Homeomorph.ulift.isEmbedding.secondCountableTopology
+  let m : ULift.{u} ℝ≥0ˣ →ₜ* ℝ≥0ˣ := ⟨MulEquiv.ulift.toMonoidHom, continuous_uliftDown⟩
+  let τ : ℝ≥0ˣ →ₜ* ULift.{u} ℝ≥0ˣ := ⟨(MulEquiv.ulift (α := ℝ≥0ˣ)).symm.toMonoidHom, continuous_uliftUp⟩
+  let two : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+  have htwo : two ≠ 1 := fun h2 ↦ by
+    have := congrArg Units.val h2
+    norm_num [two] at this
+  have hm : IsModulation m := ⟨Homeomorph.ulift.isProperMap, ⟨ULift.up two, htwo⟩⟩
+  have hγ : 1 < (m (ULift.up two)).val := by
+    change (1 : ℝ≥0) < 2
+    norm_num
+  let f : ULift.{u} ℝ≥0ˣ → ℂ := fun _ ↦ 0
+  have hyp : Printed.ModulatedPoissonHypotheses m 1 τ f ∅ :=
+    { bounded := ⟨0, fun _ ↦ by simp [f]⟩
+      decay := fun _ _ ↦ ⟨1, 1, one_pos, one_pos, fun _ _ ↦ by simp only [f, norm_zero]; positivity⟩
+      regularity := ⟨fun _ ↦ ⟨continuous_const, contDiffOn_const⟩, fun _ ↦ by
+        simp only [f, iteratedDeriv_const]
+        exact continuousOn_const⟩
+      leftLimit := fun t ↦ (Finset.notMem_empty _ t.2).elim
+      rightLimit := fun t ↦ (Finset.notMem_empty _ t.2).elim
+      homogeneous := fun _ _ ↦ (mul_zero _).symm }
+  have : Subsingleton m.toMonoidHom.ker := ⟨fun x y ↦ Subtype.ext
+    (MulEquiv.ulift.injective ((MonoidHom.mem_ker.mp x.2).trans (MonoidHom.mem_ker.mp y.2).symm))⟩
+  have := Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_dirac
+    (K := m.toMonoidHom.ker)
+  have hEq := h (ULift.{u} ℝ≥0ˣ) m hm (ULift.up two) hγ 1 τ (fun _ ↦ rfl) f ∅ hyp
+    (Measure.dirac 1) 1
+  simp [modulatedJumpMidpointProfile, f] at hEq
+
 /-- Paper: (D.3.5.5), p. 819. Take the identity modulation and section on the
 positive reals, γ = exp(1), both characters trivial, S empty and φ identically
 zero. The radial integral is zero and the probability Haar integral of one is one. -/
 theorem Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false :
-    ¬ Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral := by
-  sorry
+    ¬ Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral :=
+  fun h ↦ Printed.modulatedPoisson_radialIntegral_eq_kernelIntegral_false_of h
 
 end RiemannMasullo
