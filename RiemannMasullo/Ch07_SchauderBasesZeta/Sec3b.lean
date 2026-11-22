@@ -101,7 +101,9 @@ belongs to the absolute level.
 Deviation: Uses the integer-ring insertion of the cited transition. -/
 theorem sLocalAbsolutePW_mk_mem (hST : S ⊆ T) (X : ℝ) (D : Submodule ℂ (B(T)))
     (ω : PontryaginDual J₁(T)) (f : B(S)) (_hf : inBand(sLocalPWBox S X, f))
-    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalAbsolutePW hST X D ω := by sorry
+    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalAbsolutePW hST X D ω :=
+  Submodule.le_topologicalClosure _
+    (Submodule.mem_map_of_mem ⟨Submodule.mem_map_of_mem (Submodule.subset_span _hf), _hD⟩)
 
 section AbsoluteLevels
 
@@ -193,7 +195,9 @@ chosen test constraint represents an element of the invariant level.
 Deviation: Uses the integer-ring insertion of the cited transition. -/
 theorem sLocalInvariantPW_mk_mem (hST : S ⊆ T) (Y : ℝ) (D : Submodule ℂ (B(T)))
     (ω : PontryaginDual J₁(T)) (f : B(S)) (_hf : inBand(sLocalPWProductRegion S Y, f))
-    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalInvariantPW hST Y D ω := by sorry
+    (_hD : Π(hST) f ∈ D) : q(T, ω) (Π(hST) f) ∈ sLocalInvariantPW hST Y D ω :=
+  Submodule.le_topologicalClosure _
+    (Submodule.mem_map_of_mem ⟨Submodule.mem_map_of_mem (Submodule.subset_span _hf), _hD⟩)
 
 /-- Paper: Proposition 7.3.2.4(1), p. 355.
 Increasing the product bound enlarges each of the two invariant PW levels. -/
