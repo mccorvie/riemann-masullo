@@ -179,7 +179,12 @@ theorem introTracePower_contDiffOn (z : ℂ) :
 /-- Paper: §1.4.2, p. 28. The limiting power depends holomorphically
 on the complex parameter at each fixed radial coordinate. -/
 theorem introTracePower_differentiable (t : ℝ) :
-    Differentiable ℂ (fun z ↦ introTracePower z t) := by sorry
+    Differentiable ℂ (fun z ↦ introTracePower z t) := by
+  by_cases ht : 1 < t
+  · simp only [introTracePower, ite_eq_left ht]
+    exact differentiable_neg.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr (by linarith)))
+  · simp only [introTracePower, ite_eq_right ht]
+    exact differentiable_const _
 
 /-- Paper: §1.4.2, pp. 28–29. The cutoffs increase pointwise to the indicator
 of `(1, ∞)` and the mollifiers have nonnegative unit mass and shrinking support.
