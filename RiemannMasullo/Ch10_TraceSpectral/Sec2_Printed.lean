@@ -122,7 +122,14 @@ def Printed.spectralLineJet_annulus_and_noncontainment : Prop :=
 /-- Paper: Proposition 10.2.1.3, p. 443. For ℚ at a = 2 the zero
 family is empty and hence lies in the open ball for every C > 0. -/
 theorem Printed.spectralLineJet_annulus_and_noncontainment_false :
-    ¬ Printed.spectralLineJet_annulus_and_noncontainment := by sorry
+    ¬ Printed.spectralLineJet_annulus_and_noncontainment := by
+  intro hall
+  apply Printed.spectralLineJet_not_subset_ball_false
+  intro F _ _ χ hχ a s hs
+  obtain ⟨C, hC, _, hn⟩ := hall F χ hχ a s hs
+  refine ⟨C, hC, fun h ↦ hn ?_⟩
+  intro j
+  exact h j.val.1 j.val.2.1 j.val.2.2 j.property
 
 /-- Paper: Terminology 10.2.1.2(2), p. 444. The printed implication says
 that the functionals paired with a regular Markushevich family are bounded. -/
