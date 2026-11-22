@@ -175,7 +175,19 @@ at the selected places, every zero of the reciprocal product has real part zero.
 The complex argument is the norm-twist parameter, independent of the Sobolev degree. -/
 theorem orbitalEulerZero_re_eq_zero (χ : PontryaginDual C𝔽) (S : Finset V)
     (_hχ : ∀ v ∈ S, (ideleClassNormTwist χ 0).IsUnramifiedAt v) {z : ℂ}
-    (_hz : reciprocalPartialHeckeEulerProduct χ S z = 0) : z.re = 0 := by sorry
+    (_hz : reciprocalPartialHeckeEulerProduct χ S z = 0) : z.re = 0 := by
+  classical
+  have hprod : (∏ v ∈ S, (finiteHeckeEulerFactor χ v z)⁻¹) = 0 := _hz
+  obtain ⟨v, hv, hzero⟩ := Finset.prod_eq_zero_iff.mp hprod
+  rw [finiteHeckeEulerFactor, ite_eq_left (_hχ v hv), inv_inv, sub_eq_zero] at hzero
+  have hq : 1 < (q(v) : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hn := congrArg (fun w : ℂ ↦ ‖w‖) hzero.symm
+  simp only [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+    Complex.norm_natCast_cpow_of_pos (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)),
+    Complex.neg_re, norm_one] at hn
+  have he : -z.re = 0 := (Real.rpow_right_inj (zero_lt_one.trans hq) hq.ne').mp
+    (hn.trans (Real.rpow_zero _).symm)
+  exact neg_eq_zero.mp he
 
 /-- Paper: Theorem 11.2.0.2(1)–(2) and (11.2.0.6), p. 485. Index jets by their
 0-line ordinate and surviving log-power order.
