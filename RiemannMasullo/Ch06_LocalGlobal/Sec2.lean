@@ -252,7 +252,23 @@ theorem sLocalStandardThetaTensor_apply (c : QuasiCharacter Jₛ(S)) (f : ℬ∞
     (x : SAdeleRing F S) :
     sLocalStandardThetaTensor c f (Multiplicative.ofAdd x) =
       f (Multiplicative.ofAdd x.1) * ∏ v : S, finiteStandardGaussian v.val
-        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by sorry
+        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by
+  let factors (v : S) : ℬ(L(v.val)) :=
+    finiteStandardGaussian (F := F) v.val (sLocalFiniteRestriction (F := F) v c)
+  let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(L(v.val)))
+  let b : W := ⨂ₜ[ℂ] v : S, factors v
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have slice {X Y Z : Type _} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+      [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+      (E : InductiveTensor X Y ≃L[ℂ] Z) (a : X) (b : Y) (p : Z → ℂ) (r : ℂ)
+      (h : p (E (a ⊗ₜ[ℂ] b)) = r) :
+      p (E.toLinearMap.comp ((TensorProduct.mk ℂ X Y).flip b) a) = r := h
+  have hx := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec f factors x
+  unfold sLocalStandardThetaTensor
+  with_reducible_and_instances
+    exact slice (X := ℬ∞) (Y := W) (Z := ℬₛ(S)) e f b
+      (fun φ : ℬₛ(S) ↦ φ (Multiplicative.ofAdd x)) _ hx
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 For trivial S-integer Picard group, the archimedean test space maps continuously,
