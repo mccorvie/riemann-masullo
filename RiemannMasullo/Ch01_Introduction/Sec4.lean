@@ -5,6 +5,8 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec6
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+
 /-! # From the trace formula to GRH
 
 Masullo, §1.4, pp. 27–31, repeated in §§1.8.4–1.8.5. The introductory trace
@@ -475,7 +477,24 @@ line of real part one, so its reciprocal is holomorphic there.
 Deviation: Multiplying by inverse local Euler factors creates no zeros
 on this line. The reciprocal at a pole is interpreted in normal form. -/
 theorem introTrace_outside_inv_analytic_one_line (χ : U𝔽) (S : Finset V) (t : ℝ) :
-    AnalyticAt ℂ (fun s ↦ (outside(χ, S) s)⁻¹) ⟨1, t⟩ := by sorry
+    AnalyticAt ℂ (fun s ↦ (outside(χ, S) s)⁻¹) ⟨1, t⟩ := by
+  let L := finiteL(χ)
+  let z : ℂ := ⟨1, t⟩
+  obtain ⟨ha, hn⟩ := strongCoprimalityJetMatrix_det_ne_zero_euler χ S
+  have hm : MeromorphicOn (fun w ↦ reciprocalPartialHeckeEulerProduct χ S w * L w) univ :=
+    fun w hw ↦ (ha w).meromorphicAt.mul ((finiteHeckeL_exists_continuation χ).choose_spec.1 hw).meromorphicAt
+  have hnf := meromorphicNFOn_toMeromorphicNFOn (fun w ↦ reciprocalPartialHeckeEulerProduct χ S w * L w) univ
+  apply (hnf (mem_univ z)).inv.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+  rw [meromorphicOrderAt_inv, meromorphicOrderAt_toMeromorphicNFOn hm (mem_univ z)]
+  change 0 ≤ -meromorphicOrderAt (reciprocalPartialHeckeEulerProduct χ S * L) z
+  rw [meromorphicOrderAt_mul_of_ne_zero (ha z) (hn z (by norm_num [z]))]
+  have hle : meromorphicOrderAt L z ≤ 0 := introTrace_finiteL_no_zeros_one_line χ t
+  cases he : meromorphicOrderAt L z with
+  | top => simp [he] at hle
+  | coe k =>
+    rw [he] at hle
+    have hk : k ≤ 0 := by exact_mod_cast hle
+    exact_mod_cast neg_nonneg.mpr hk
 
 /-- Paper: §1.4.7, p. 31. Multiplication by the reciprocal of the outside
 Euler product undoes the transition multiplier as a meromorphic identity.
