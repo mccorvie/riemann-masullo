@@ -184,7 +184,13 @@ theorem spectralProjection_convolution_spectralProjection (φ : BruhatCompactSup
 /-- Paper: Remark 10.4.1.4, p. 458. There is no convolution block from
 the geometric subspace to the spectral subspace. -/
 theorem spectralProjection_convolution_geometricProjection (φ : BruhatCompactSupport C𝔽) :
-    (Pspec).comp ((A(φ)).comp Pgeom) = 0 := by sorry
+    (Pspec).comp ((A(φ)).comp Pgeom) = 0 := by
+  apply ContinuousLinearMap.ext
+  intro u
+  apply Submodule.starProjection_orthogonal_apply_eq_zero
+  apply (Submodule.Quotient.mk_eq_zero _).mp
+  exact hardySobolevTestAction_preserves_globalTheta (F := F) a (hStrip(hα)) hs φ
+    ((Θ₀).starProjection_apply_mem u)
 
 -- The reverse off-diagonal block on p. 458 can be nonzero. Its nonvanishing
 -- cannot be universal in the test function, since the zero test kills every block.
