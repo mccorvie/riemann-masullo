@@ -79,7 +79,8 @@ abbrev spectralSobolevQuotient (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 �
 /-- Paper: (10.2.1.1), p. 439, and (10.2.2.1), p. 445. A Sobolev vector has
 zero spectral class exactly when it is in the closed weighted theta subspace. -/
 theorem spectralSobolevQuotient_eq_zero (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
-    (f : W(l, r, s)) : Θ(a, hI, hs).mkQ f = 0 ↔ f ∈ Θ(a, hI, hs) := by sorry
+    (f : W(l, r, s)) : Θ(a, hI, hs).mkQ f = 0 ↔ f ∈ Θ(a, hI, hs) :=
+  Submodule.Quotient.mk_eq_zero _
 
 variable (F) in
 /-- Paper: (10.2.1.2), p. 439, and (10.2.2.2), p. 445. Divide the ambient
@@ -457,7 +458,8 @@ theorem spectralFamily_regular_normalized_iff {E : Type*} [NormedAddCommGroup E]
 and normalized singleton family.
 Deviation: Sanity check for the two predicates. -/
 theorem spectralFamily_singleton_normalized {E : Type*} [NormedAddCommGroup E] (x : E)
-    (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by sorry
+    (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by
+  exact ⟨⟨‖x‖, fun _ ↦ le_rfl⟩, ‖x‖, norm_pos_iff.mpr _hx, fun _ ↦ le_rfl⟩
 
 /-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
 is normalized in the norm of its realization in the negative space.

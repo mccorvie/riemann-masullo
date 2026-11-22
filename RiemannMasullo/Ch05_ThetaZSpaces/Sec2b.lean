@@ -700,13 +700,28 @@ theorem exists_globalAlgebraicCoinvariants_to_theta :
   have h := globalSpan_le_ker (F := F)
   exact exists_quotient_to_quotient_of_le h
 
+private theorem sLocalBornologicalOfQuotient {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (K : Submodule ℂ E)
+    (hE : ∀ p : Seminorm ℂ E,
+      (∀ B : Set E, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p)
+    (p : Seminorm ℂ (E ⧸ K))
+    (hp : ∀ B : Set (E ⧸ K), IsVonNBounded ℂ B → BddAbove (p '' B)) :
+    Continuous p := by
+  apply K.isQuotientMap_mkQL.continuous_iff.mpr
+  refine hE (p.comp K.mkQ) ?_
+  intro B hB
+  change BddAbove ((fun x : E ↦ p (K.mkQL x)) '' B)
+  simpa only [Set.image_image] using hp (K.mkQL '' B) (hB.image K.mkQL)
+
 /-- Paper: Remark 5.2.3.4, pp. 237–238.
 The S-local theta quotient is bornological. Every seminorm bounded on all of its
 von Neumann bounded sets is continuous. -/
 theorem sLocalTheta_bornological :
     ∀ p : Seminorm ℂ (Θₛ(S)),
       (∀ B : Set (Θₛ(S)), IsVonNBounded ℂ B → BddAbove (p '' B)) →
-      Continuous p := by sorry
+      Continuous p :=
+  sLocalBornologicalOfQuotient (LinearMap.ker (sLocalAdelicTheta F S))
+    (sAdeleSchwartz_bornological F S)
 
 private theorem bornological_quotient {E : Type*} [AddCommGroup E] [Module ℂ E]
     [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] (K : Submodule ℂ E)

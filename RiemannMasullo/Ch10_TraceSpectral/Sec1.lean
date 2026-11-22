@@ -153,7 +153,13 @@ dense in the local Sobolev completion.
 Deviation: Sanity check for the closure model at the admissible exponents. -/
 theorem sLocalThetaSobolev_dense {a α β s : ℝ} (ha : 0 < a) (hI : α ≤ β)
     (hs : 0 ≤ s) (hp : 0 < a + α) :
-    DenseRange (jₛ(ha, hI, hs, hp)) := by sorry
+    DenseRange (jₛ(ha, hI, hs, hp)) := by
+  intro x
+  have hr : Set.range (Eₛ(ha, hI, hs, hp)) =
+      Subtype.val '' Set.range (jₛ(ha, hI, hs, hp)) :=
+    Set.range_comp (Subtype.val : Hₛ(ha, hI, hs, hp) → Wₛ(α, β, s)) (jₛ(ha, hI, hs, hp))
+  apply closure_subtype.mpr
+  exact (congrArg (fun R : Set Wₛ(α, β, s) ↦ x.val ∈ closure R) hr).mp x.property
 
 /-- Paper: Remark 10.1.1.2, pp. 434–435. The original S-local left action
 extends jointly continuously to the norm completion via the completion map.

@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+
 /-! # Orbital Markushevich bases on the 0-line
 
 Masullo, §11.2 before §11.2.1, pp. 483–487.
@@ -169,7 +171,27 @@ open Classical in
 one to the multiplicity, including when several places lie over the same prime. -/
 theorem orbitalEulerMultiplicity_eq_card (χ : PontryaginDual C𝔽) (S : Finset V) (z : ℂ) :
     orbitalEulerMultiplicity χ S z =
-      (S.filter fun v ↦ (finiteHeckeEulerFactor χ v z)⁻¹ = 0).card := by sorry
+      (S.filter fun v ↦ (finiteHeckeEulerFactor χ v z)⁻¹ = 0).card := by
+  classical
+  let f (v : V) (w : ℂ) := (finiteHeckeEulerFactor χ v w)⁻¹
+  have hfac (v : V) : meromorphicOrderAt (f v) z = if f v z = 0 then 1 else 0 := by
+    obtain ⟨ha, ho⟩ := reciprocalEulerProduct_over_prime_order_le_factor χ v z
+    change AnalyticAt ℂ (f v) z at ha
+    change analyticOrderAt (f v) z ≤ 1 at ho
+    rw [ha.meromorphicOrderAt_eq]
+    split_ifs with hv
+    · have hone : analyticOrderAt (f v) z = 1 :=
+        le_antisymm ho (Order.one_le_iff_ne_zero.mpr (ha.analyticOrderAt_ne_zero.mpr hv))
+      simp [hone]
+    · simp [ha.analyticOrderAt_eq_zero.mpr hv]
+  have horder : meromorphicOrderAt (reciprocalPartialHeckeEulerProduct χ S) z =
+      ((S.filter fun v ↦ f v z = 0).card : WithTop ℤ) := by
+    change meromorphicOrderAt (fun w ↦ ∏ v ∈ S, f v w) z = _
+    rw [meromorphicOrderAt_fun_prod (f := f) (fun v _ ↦
+      (reciprocalEulerProduct_over_prime_order_le_factor χ v z).1.meromorphicAt)]
+    simp only [hfac, Finset.sum_boole]
+  rw [orbitalEulerMultiplicity, horder]
+  simp [f]
 
 /-- Paper: Theorem 11.2.0.2(1), p. 485. For a unitary character unramified
 at the selected places, every zero of the reciprocal product has real part zero.

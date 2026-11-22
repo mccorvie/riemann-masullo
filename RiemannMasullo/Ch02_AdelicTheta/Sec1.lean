@@ -5168,6 +5168,13 @@ theorem sAdeleSchwartz_strictLF (S : Finset (Places(F))) :
     IsStrictLFSpace 𝒮(S) := by
   exact schwartzBruhat_strictLF_of_secondCountable
 
+/-- A seminorm on the S-adelic Schwartz–Bruhat space is continuous if it is
+bounded on every von Neumann bounded set. -/
+theorem sAdeleSchwartz_bornological (S : Finset (Places(F))) :
+    ∀ p : Seminorm ℂ 𝒮(S),
+      (∀ B : Set 𝒮(S), IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p :=
+  schwartzBruhat_bornological (G := Multiplicative (SAdeleRing F S))
+
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is complete. -/
 theorem sAdeleSchwartz_complete (S : Finset (Places(F))) :
     CompleteSpace 𝒮(S) := by

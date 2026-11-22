@@ -329,7 +329,9 @@ the kernel lift is a product of the two indentation factors and the pulled-back 
 theorem diagonalIndentationLift_bot (b : G → ℝ)
     (u : (G ⧸ (⊥ : Subgroup G)) × (G ⧸ (⊥ : Subgroup G)) → ℂ) (x y : G) :
     diagonalIndentationLift (⊥ : Subgroup G) Measure.count b u (x, y) =
-      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by sorry
+      (b x : ℂ) * (b y : ℂ) * u (QuotientGroup.mk x, QuotientGroup.mk y) := by
+  simp [diagonalIndentationLift, diagonalIndentationWeight,
+    Subsingleton.count_eq_dirac (1 : (⊥ : Subgroup G))]
 
 variable {u : (G ⧸ H) × (G ⧸ H) → ℂ} (hu : LocallyIntegrable u (ν.prod ν))
 
@@ -425,7 +427,10 @@ include hH hν hS hb hu in
 continuous quotient function commutes almost everywhere with the kernel lift after
 pullback of the multiplier. -/
 theorem diagonalIndentationLift_mul (ρ : C_c(Q × Q, ℂ)) :
-    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by sorry
+    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by
+  apply ae_of_all
+  intro p
+  exact mul_left_comm _ _ _
 
 -- TODO(paper-gap): The continuous multiplier step on p. 511 applies Corollary
 -- A.5.4.3 at every regular point. The printed equivalence fails (ERRATA R8).
