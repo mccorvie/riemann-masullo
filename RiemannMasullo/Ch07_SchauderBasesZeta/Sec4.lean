@@ -95,7 +95,8 @@ local notation "Λ(" χ ", " τ ", " hτ ")" => regularizedCompletedHeckeL χ τ
 In Mellin coordinates the norm-power twist shifts the regularized completed generator
 by translation of the argument by a. The shifted generator is entire. -/
 theorem spectralNuclearityGenerator_differentiable (a : ℝ) :
-    Differentiable ℂ (fun s ↦ (Λ(χ, τ, hτ)).val (s + (a : ℂ))) := by sorry
+    Differentiable ℂ (fun s ↦ (Λ(χ, τ, hτ)).val (s + (a : ℂ))) := by
+  exact (Λ(χ, τ, hτ)).property.comp (differentiable_id.add_const (a : ℂ))
 
 /-- Paper: Equation (7.4.0.1), p. 366.
 The denominator is the shifted theta image in the Schwartz–Bergman model of the
