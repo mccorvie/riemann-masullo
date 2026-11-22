@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
+import Mathlib.Algebra.Field.ULift
 
 /-! # §7.1.1–7.1.2 Statements that are false as printed -/
 
@@ -240,7 +241,19 @@ The zero test over ℚ with only the real place has no pole. Over ℚ with the r
 place and the place above 2, the Gaussian times the indicator of ℤ₂ instead
 has a double pole from Γℝ(s) and the Euler factor at 2. -/
 theorem Printed.sLocalPolarMultiplicity_trivial_origin_false :
-    ¬ Printed.sLocalPolarMultiplicity_trivial_origin := by sorry
+    ¬ Printed.sLocalPolarMultiplicity_trivial_origin := by
+  intro h
+  let F := ULift ℚ
+  let : NumberField F := NumberField.of_ringEquiv ℚ F ULift.ringEquiv.symm
+  let f : Tests(F, ∅) := ⟨0, (schwartzBruhatSubmodule _).zero_mem⟩
+  have hZ : sLocalIdelicZFunction f = fun _ ↦ 0 := by
+    have hcont := sLocalIdelicZetaIntegral_exists_continuation f
+    exact hcont.unique hcont.exists.choose_spec
+      ⟨fun _ _ _ ↦ analyticAt_const.meromorphicNFAt, fun c _ ↦ by
+        simp [sLocalIdelicZetaIntegral, f]⟩
+  have hmult : sLocalPolarMultiplicity f 1 = 0 := by
+    simp [sLocalPolarMultiplicity, hZ, meromorphicOrderAt_const]
+  exact Fintype.card_ne_zero ((h F ∅ f).symm.trans hmult)
 
 /-- Paper: Coefficient formula after Theorem 7.1.2.3, p. 323.
 As printed: The Laurent coefficient of index k − 1 is given by the contour integral
