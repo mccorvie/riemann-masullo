@@ -196,7 +196,9 @@ theorem sLocalCarvingLimit_eq_iInf {S : Finset V} (s : ℝ) (ω : PontryaginDual
 ambient weighted L² space. -/
 theorem isClosed_sLocalCarvingLimit (S : Finset V) (s : ℝ) (ω : PontryaginDual C₁)
     (J : Set ℝ) (hJ : MeasurableSet J) :
-    IsClosed (sLocalCarvingLimit s ω S J hJ : Set (W(s))) := by sorry
+    IsClosed (sLocalCarvingLimit s ω S J hJ : Set (W(s))) := by
+  rw [sLocalCarvingLimit, Submodule.coe_iInf]
+  exact isClosed_iInter fun i ↦ Submodule.isClosed_topologicalClosure _
 
 /-- Paper: Theorem 11.1.2.1(1), p. 480. The cofinal limit lies in the image
 of the ambient isotype under the cutoff. -/
