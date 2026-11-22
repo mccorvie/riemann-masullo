@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.AppB_AnalyticNT.Sec5
+import Mathlib.Algebra.Field.ULift
 
 /-!
 # Appendix B.5: statements that are false as printed
@@ -80,13 +81,53 @@ def Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow : Pro
         (∀ k, 0 ≤ k → 0 ≤ T k) ∧ (∀ k, k ≤ 0 → T k ≤ 0) ∧
         ∀ k, c ≤ ‖reciprocalPartialHeckeEulerProduct χ S ((T k : ℂ) * Complex.I)‖
 
+/-- Every number field refutes the printed bound: the trivial character has a zero
+factor at time zero. -/
+private theorem
+    Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow_false_of_numberField.{u}
+    (F : Type u) [Field F] [NumberField F]
+    (h : Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow.{u}) : False := by
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 F)
+  let v : HeightOneSpectrum (𝓞 F) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  have hone :
+      ∀ g, ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0 g = 1 := by
+    intro g
+    change ((1 : Circle) : ℂ) * (_ : ℂ) ^ (0 : ℂ) = 1
+    simp
+  have hres : ∀ x : v.adicCompletion F, x ≠ 0 →
+      (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0).restrict v x =
+        1 := by
+    intro x hx
+    rw [show x = ((Units.mk0 x hx : (v.adicCompletion F)ˣ) : v.adicCompletion F) from rfl,
+      HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+    simp [hone]
+  have hunr :
+      (ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 0).IsUnramifiedAt
+        v := by
+    rw [HeckeCharacter.isUnramifiedAt_iff]
+    intro x
+    exact hres _ (by simp)
+  obtain ⟨c, T, hc, hpos, hneg, hbound⟩ := h F {v} 1 (by simpa using hunr)
+  have hT : T 0 = 0 := le_antisymm (hneg 0 le_rfl) (hpos 0 le_rfl)
+  have h0 := hbound 0
+  rw [hT, reciprocalPartialHeckeEulerProduct_singleton _ v hunr,
+    hunr.localValue_eq _ Valued.v.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec,
+    hres _ (Valued.v.exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec.ne_zero)] at h0
+  simp at h0
+  linarith
+
 /-- Paper: Proposition B.5.3.2(1),(3), p. 632. Take the rational field,
 the trivial character, and the places consisting of infinity and the prime above two.
 Both sign conditions apply at index zero, so `T 0 = 0`. The only finite factor
 in the denominator is then `|1 - 2^0| = 0`. -/
 theorem Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow_false :
     ¬ Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow := by
-  sorry
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  exact
+    Printed.exists_heights_reciprocalPartialHeckeEulerProduct_boundedBelow_false_of_numberField
+      (ULift ℚ) h
 
 /-- Paper: Lemma B.5.3.4(2), p. 633. As printed: if a holomorphic function on a
 bounded nonempty open vertical strip is strongly recurrent on every closed disc it
