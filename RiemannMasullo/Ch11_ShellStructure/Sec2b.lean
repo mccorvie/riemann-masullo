@@ -6,6 +6,8 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+
 /-! # Sobolev Paley–Wiener levels and orbital nuclearity
 
 Masullo, §§11.2.1–11.2.2, pp. 487–491. The stage parameter lists the finite
@@ -576,7 +578,27 @@ include h₁ in
 The degree bound admits all jet orders below the multiplicity of a prime Euler zero.
 The strict integrability cutoff then leaves that multiplicity unchanged. -/
 theorem primeOrbitalMultiplicity_saturates (z : zeros) :
-    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by sorry
+    spectralBoundaryMultiplicity s (mult(z.val)) = mult(z.val) := by
+  classical
+  let S := Sₚ(p)
+  have hcard : S.card ≤ Module.finrank ℚ F := by
+    let e (v : S) : p.asIdeal.primesOver (𝓞 F) :=
+      ⟨v.val.asIdeal, v.val.isPrime, ⟨(congrArg HeightOneSpectrum.asIdeal
+        (show v.val.under (𝓞 ℚ) = p from (finite_nuclearityPlacesAbove (F := F) p).mem_toFinset.mp v.property)).symm⟩⟩
+    have hi : Function.Injective e := fun v w h ↦
+      Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+    simpa only [Fintype.card_coe] using (Fintype.card_le_of_injective e hi).trans
+      (reciprocalEulerProduct_over_prime_order_le_card_le (F := F) p)
+  have hm : mult(z.val) ≤ Module.finrank ℚ F := by
+    rw [orbitalEulerMultiplicity_eq_card]
+    exact (Finset.card_filter_le _ _).trans hcard
+  apply Nat.le_antisymm (min_le_left _ _)
+  by_contra! hlt
+  have hk : (spectralBoundaryMultiplicity s (mult(z.val)) : ℝ) + 1 ≤ Module.finrank ℚ F := by
+    exact_mod_cast (Nat.succ_le_of_lt hlt).trans hm
+  have himp := (lt_spectralBoundaryMultiplicity s (mult(z.val))
+    (spectralBoundaryMultiplicity s (mult(z.val)))).mpr ⟨hlt, by linarith only [hk, _hdeg]⟩
+  exact (lt_irrefl _ himp)
 
 /-- Paper: Remark 11.2.2.2 and (11.2.2.13), p. 491.
 The prime orbital convolution trace is independent of the Sobolev degree
