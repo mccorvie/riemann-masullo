@@ -27,6 +27,24 @@ real component 1/2 and finite component zero belongs to D. Subtracting the diago
 one leaves real component -1/2 and finite components -1, so the difference also
 belongs to D. Both coefficients are rational already. -/
 theorem Printed.ratAdeleFundamentalDomain_disjoint_false :
-    ¬ Printed.ratAdeleFundamentalDomain_disjoint := by sorry
+    ¬ Printed.ratAdeleFundamentalDomain_disjoint := by
+  intro h
+  have hd := h 1 one_ne_zero
+  rw [map_one, Set.disjoint_left] at hd
+  let a : 𝔸[ℚ] := (fun v ↦ (1 / 2 : v.Completion), 0)
+  have ha : a ∈ integralAdelesOutside ℚ ∅ := by
+    simp only [integralAdelesOutside, Subring.mem_iInf, Finset.notMem_empty, not_false_eq_true,
+      true_implies]
+    exact fun v ↦ (v.adicCompletionIntegers ℚ).zero_mem
+  have hhalf : extensionEmbeddingOfIsReal Rat.isReal_infinitePlace (a.1 Rat.infinitePlace) =
+      1 / 2 := by simp only [a, map_div₀, map_one, map_ofNat]
+  apply hd (a := a)
+  · refine Set.mem_vadd_set.mpr ⟨a - 1, ⟨?_, (integralAdelesOutside ℚ ∅).sub_mem ha
+      (integralAdelesOutside ℚ ∅).one_mem⟩, ?_⟩
+    · change |extensionEmbeddingOfIsReal _ (a.1 Rat.infinitePlace - 1)| ∈ Set.Ico (0 : ℝ) 1
+      norm_num [map_sub, hhalf, Set.mem_Ico]
+    · change 1 + (a - 1) = a
+      simp
+  · exact ⟨by rw [hhalf]; norm_num [Set.mem_Ico], ha⟩
 
 end RiemannMasullo
