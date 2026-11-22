@@ -215,7 +215,18 @@ theorem IsSpectralMarkushevichBasis.unique_vectors {ι E : Type*}
     [NormedAddCommGroup E] [NormedSpace ℂ E]
     {x y : ι → E} {Λ : ι → StrongDual ℂ E}
     (_hx : IsSpectralMarkushevichBasis x Λ) (_hy : IsSpectralMarkushevichBasis y Λ) :
-    x = y := by sorry
+    x = y := by
+  funext i
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+  have he : ContinuousLinearMap.apply ℂ ℂ (x i) = ContinuousLinearMap.apply ℂ ℂ (y i) := by
+    apply ContinuousLinearMap.ext_on _hx.2.2.2
+    rintro _ ⟨j, rfl⟩
+    change Λ j (x i) = Λ j (y i)
+    by_cases hij : i = j
+    · subst j
+      exact (_hx.1 i).trans (_hy.1 i).symm
+    · exact (_hx.2.1 i j hij).trans (_hy.2.1 i j hij).symm
+  exact fun ℓ ↦ DFunLike.congr_fun he ℓ
 
 local notation "multiplicity(" χ ", " z ")" => (vanishingOrder(χ, z)).untop₀.toNat
 
