@@ -1,5 +1,7 @@
 module
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 
 /-! # §7.3.2–7.3.4 Paley–Wiener levels and archimedean principal parts
@@ -536,7 +538,14 @@ The archimedean polar quotient is Fréchet. -/
 theorem sLocalGammaOrbitalQuotient_frechet (ω : PontryaginDual J₁(S)) :
     let P := Γker(ω)
     @IsFrechetTVS _ (Submodule.Quotient.addCommGroup P) (Submodule.Quotient.module P)
-      (QuotientModule.Quotient.topologicalSpace P) := by sorry
+      (QuotientModule.Quotient.topologicalSpace P) := by
+  intro P
+  have hP : IsClosed (P : Set (fullPV(ω))) :=
+    (sLocalThetaPoleBound_isClosed (F := F) (S := S) ω (fun _ ↦ 0)).preimage continuous_subtype_val
+  have hR := (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding (Finset.Subset.refl S) ω).isClosed_range
+  exact isFrechetTVS_quotient
+    (frechet_of_closed_embedding (fullPV(ω)).subtypeL ((fullPV(ω)).isClosedEmbedding_subtypeL hR)
+      (sLocalHomogeneousThetaSpace_frechet (F := F) (S := S) ω)) P hP
 
 /-- Paper: Notation 7.3.4.1, p. 364.
 The archimedean polar quotient is nuclear. -/
