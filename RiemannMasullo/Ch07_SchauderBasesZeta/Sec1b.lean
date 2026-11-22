@@ -320,7 +320,18 @@ Complex conjugation is excluded from the algebra of entire functions.
 Deviation: States a sanity check distinguishing the entire subalgebra from the ambient space. -/
 theorem conj_not_mem_entireContinuousMapSubalgebra :
     (⟨starRingEnd ℂ, Complex.continuous_conj⟩ : C(ℂ, ℂ)) ∉ entireContinuousMapSubalgebra :=
-  by sorry
+  by
+  intro h
+  change Differentiable ℂ (starRingEnd ℂ : ℂ → ℂ) at h
+  let D := fderiv ℂ (starRingEnd ℂ : ℂ → ℂ) 0
+  have hD : D.restrictScalars ℝ = Complex.conjCLE.toContinuousLinearMap :=
+    ((h 0).hasFDerivAt.restrictScalars ℝ).unique Complex.conjCLE.hasFDerivAt
+  have hval (z : ℂ) : D z = (starRingEnd ℂ) z := DFunLike.congr_fun hD z
+  have he : D Complex.I = Complex.I * D 1 := by
+    simpa only [smul_eq_mul, mul_one] using D.map_smul Complex.I (1 : ℂ)
+  rw [hval, hval] at he
+  have hIm := congrArg Complex.im he
+  norm_num at hIm
 
 local notation "Entire" => Subtype (fun f : C(ℂ, ℂ) ↦ f ∈ entireContinuousMapSubalgebra)
 
