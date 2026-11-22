@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
+import Mathlib.Analysis.Complex.LocallyUniformLimit
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
@@ -368,7 +369,27 @@ functional in the compact-open topology. -/
 theorem entireJet_properties (ρ : ℂ) (m : ℕ) :
     let jet (f : Entire) := iteratedDeriv m (f.val : ℂ → ℂ) ρ
     (∀ f g : Entire, jet (f + g) = jet f + jet g) ∧
-      (∀ (a : ℂ) (f : Entire), jet (a • f) = a • jet f) ∧ Continuous jet := by sorry
+      (∀ (a : ℂ) (f : Entire), jet (a • f) = a • jet f) ∧ Continuous jet := by
+  dsimp only
+  have hd (f : Entire) : Differentiable ℂ (f.val : ℂ → ℂ) := f.property
+  refine ⟨fun f g ↦ iteratedDeriv_add (hd f).contDiff.contDiffAt (hd g).contDiff.contDiffAt,
+    fun a f ↦ iteratedDeriv_const_smul_field a (f.val : ℂ → ℂ), ?_⟩
+  apply continuous_iff_continuousAt.mpr
+  intro f
+  have hlim (n : ℕ) : TendstoLocallyUniformlyOn
+      (fun g : Entire ↦ iteratedDeriv n (g.val : ℂ → ℂ))
+      (iteratedDeriv n (f.val : ℂ → ℂ)) (𝓝 f) univ := by
+    induction n with
+    | zero =>
+      exact tendstoLocallyUniformlyOn_univ.mpr
+        (ContinuousMap.tendsto_iff_tendstoLocallyUniformly.mp
+          (show Tendsto (fun g : Entire ↦ g.val) (𝓝 f) (𝓝 f.val) from
+            continuous_subtype_val.continuousAt))
+    | succ n ih =>
+      simpa only [iteratedDeriv_succ, Function.comp_def] using
+        ih.deriv (Filter.Eventually.of_forall fun g ↦
+          ((hd g).contDiff.differentiable_iteratedDeriv' n).differentiableOn) isOpen_univ
+  exact (hlim m).tendsto_at (mem_univ ρ)
 
 /-- Paper: Equation (7.1.4.4), p. 326.
 The jet functional takes the m-th derivative of an entire function at the indicated point. -/
