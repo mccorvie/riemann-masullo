@@ -230,7 +230,10 @@ theorem sLocalSelectedPoleMultiplicity_finite (S₀ : Finset Places) (c : Xₛ) 
 /-- Paper: Equations (7.2.2.1)–(7.2.2.2), pp. 338–339.
 Selecting every place recovers the full pole order. -/
 theorem sLocalSelectedPoleMultiplicity_full (c : Xₛ) :
-    sLocalSelectedPoleMultiplicity Finset.univ S c = sLocalRhoPoleOrder c := by sorry
+    sLocalSelectedPoleMultiplicity Finset.univ S c = sLocalRhoPoleOrder c := by
+  classical
+  simp [sLocalSelectedPoleMultiplicity, sLocalFinitePoleMultiplicity,
+    sLocalRhoPoleOrder_eq_card_polePlaces]
 
 -- TODO(paper-gap): For D = U_S and E = U_{S₀}, the sheaf target in Remark 7.2.1.2
 -- is O(D)/O(D-E), with stalk length mult(E), whereas the printed P_{X,D-E} has
