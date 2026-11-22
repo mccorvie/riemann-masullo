@@ -145,7 +145,9 @@ basis vector is the spectral projection of any representative.
 Deviation: The identity is stated for any quotient vector. -/
 theorem spectralLineKernel_orthogonalLift (_ha : 0 < a)
     (x : H(a, (le_refl (0 : ℝ)), hs₀(hs))) (v : W(0, s)) (_hv : Q₀ v = x) :
-    S₀ x = Pspec(a, (le_refl (0 : ℝ)), hs₀(hs)) v := by sorry
+    S₀ x = Pspec(a, (le_refl (0 : ℝ)), hs₀(hs)) v := by
+  subst x
+  exact (spectralQuotient_orthogonalRepresentative (F := F) a (le_refl (0 : ℝ)) hs₀(hs) _ha v).1
 
 local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
 local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL χ) z
