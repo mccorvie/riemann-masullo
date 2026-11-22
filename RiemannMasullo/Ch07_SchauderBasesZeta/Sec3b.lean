@@ -111,7 +111,15 @@ open Classical
 Increasing the box size enlarges each of the two absolute PW levels. -/
 theorem sLocalAbsolutePW_mono (hST : S ⊆ T) {X Y : ℝ} (_hXY : X ≤ Y)
     (D : Submodule ℂ (B(T))) (ω : PontryaginDual J₁(T)) :
-    sLocalAbsolutePW hST X D ω ≤ sLocalAbsolutePW hST Y D ω := by sorry
+    sLocalAbsolutePW hST X D ω ≤ sLocalAbsolutePW hST Y D ω := by
+  have hbox : sLocalPWBox S X ⊆ sLocalPWBox S Y := fun _ hx ↦
+    ⟨fun w ↦ (hx.1 w).trans _hXY, fun v ↦ (hx.2 v).trans _hXY⟩
+  have hgen : {f : B(S) | inBand(sLocalPWBox S X, f)} ⊆
+      {f : B(S) | inBand(sLocalPWBox S Y, f)} :=
+    fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩
+  have htests : sLocalPWTests hST (sLocalPWBox S X) ≤ sLocalPWTests hST (sLocalPWBox S Y) :=
+    Submodule.map_mono (Submodule.span_mono hgen)
+  exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
 /-- Paper: Proposition 7.3.2.2(1), p. 352.
 The union of the absolute PW levels is sequentially dense in the full or zero-moment
