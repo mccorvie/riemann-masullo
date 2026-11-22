@@ -853,7 +853,17 @@ theorem cyclicFourierCoeff_absolute :
 /-- Paper: Corollary 4.2.1.7, p. 169. The Fourier coefficient functionals
 are bounded in the strong dual. -/
 theorem cyclicFourierCoeff_bounded :
-    IsVonNBounded ℂ (range cyclicFourierCoeff) := by sorry
+    IsVonNBounded ℂ (range cyclicFourierCoeff) := by
+  apply ContinuousLinearMap.isVonNBounded_iff.mpr
+  intro B hB
+  obtain ⟨C, _, hC⟩ := elementarySchwartz_withSeminorms.isVonNBounded_iff_seminorm_bounded.mp
+    hB (0, 0, fun _ ↦ 0, 0)
+  apply (NormedSpace.isVonNBounded_iff' ℂ).mpr
+  refine ⟨C, ?_⟩
+  rintro _ ⟨_, ⟨m, rfl⟩, f, hf, rfl⟩
+  have h := norm_fourierCoeffOn_iteratedDeriv_cyclic f m 0
+  rw [iteratedDeriv_zero, ← cyclicFourierCoeff_eq_on] at h
+  exact h.trans (hC f hf).le
 
 /-- Paper: Corollary 4.2.1.7, p. 169. The Fourier coefficient functionals are
 equicontinuous as maps on the circle Schwartz space. -/
