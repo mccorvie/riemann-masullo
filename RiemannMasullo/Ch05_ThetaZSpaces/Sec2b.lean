@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
+
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.Sigma
 
 import all RiemannMasullo.AppC_LCTVS.Sec1
@@ -499,7 +501,20 @@ theorem globalHomogeneousThetaSpace_strongDual_montel :
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is Montel. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_montel (χ : PontryaginDual (J₁(S))) :
-    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) ∧ MontelSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := by
+  have hN : IsNuclearTVS.{0} (Θₛω(S, χ)) :=
+    sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) χ
+  let : T2Space (Θₛω(S, χ)) := hN.1
+  let : PolynormableSpace ℂ (Θₛω(S, χ)) := hN.2.1
+  let : MontelSpace ℂ (Θₛω(S, χ)) := (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) χ).2
+  let : CompleteSpace (StrongDual ℂ (Θₛω(S, χ))) :=
+    sLocalHomogeneousThetaSpace_strongDual_complete (F := F) (S := S) χ
+  have hdual : IsNuclearTVS.{0} (StrongDual ℂ (Θₛω(S, χ))) :=
+    sLocalHomogeneousThetaSpace_strongDual_nuclear (F := F) (S := S) χ
+  let : PolynormableSpace ℂ (StrongDual ℂ (Θₛω(S, χ))) := hdual.2.1
+  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using
+    isCompact_closure_of_isNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) hdual hb
 
 /-- Paper: Theorem 5.2.3.1(3), p. 233.
 There are continuous idempotents onto the stage images. The net of these idempotents
