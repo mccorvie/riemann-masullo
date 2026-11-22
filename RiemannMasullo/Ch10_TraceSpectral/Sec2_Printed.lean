@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
+
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 /-! # §10.2 assertions that are false as printed -/
@@ -250,7 +252,23 @@ def Printed.spectralStripJet_annulus_and_noncontainment : Prop :=
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. In ℚ take a = 2, s = 2
 and α = 0. The family is empty, so it is contained in every open ball. -/
 theorem Printed.spectralStripJet_annulus_and_noncontainment_false :
-    ¬ Printed.spectralStripJet_annulus_and_noncontainment := by sorry
+    ¬ Printed.spectralStripJet_annulus_and_noncontainment := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  obtain ⟨_, _, _, hn⟩ := hall ℚ χ hχ 2 0 2 (by norm_num) (by norm_num)
+  apply hn
+  intro j
+  have hj := j.property.1
+  let z := shift((2 : ℝ), j.val.2.2.1)
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ j.val.1) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ j.val.1) z = completedHeckeL (χ j.val.1) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ j.val.1)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ j.val.1) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ j.val.1) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ j.val.1)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  simp [z] at horder
+  simp [horder] at hj
 
 /-- Paper: Proposition 10.2.2.2, p. 447. The asserted noncontainment in an
 open ball is specialized to the allowed singleton interval, where the
