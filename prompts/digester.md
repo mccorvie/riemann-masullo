@@ -59,8 +59,15 @@ one, because provers will build on it.
 The draft has placeholders ("Insert statement"), footnotes such as "Correct statement", and
 references to results that are not there. Do not fill these in from your own judgment. Leave a
 comment `-- TODO(paper-gap): <what is wrong or missing>` at that point in the file and list it
-in the report; these go into the project's errata log. If you find a statement that is false,
-give the counterexample.
+in the report; these go into the project's errata log.
+
+If you find a statement that is false as printed, do three things (`AGENTS.md`, "False
+statements and gaps"). State the repaired form in the section file, with a `Deviation:` line.
+Keep the printed claim in `Sec<N>_Printed.lean` as `def Printed.<name> : Prop`, exactly as
+printed and with its quantifiers, followed by
+`theorem Printed.<name>_false : ¬ Printed.<name> := by sorry`. And give the counterexample, with
+explicit objects, in that theorem's docstring and in your report. Never state a claim you know
+to be false as a `theorem`.
 
 A statement that only has to wait for a later section (it uses a notion defined there) is not a
 gap in the paper. Mark it `-- TODO(later): needs §<section>` and list it in the report, so it

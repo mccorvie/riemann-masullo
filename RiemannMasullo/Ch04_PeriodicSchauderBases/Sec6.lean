@@ -70,7 +70,46 @@ theorem modulatedCyclicAnnihilatorFiber_subset :
     ∃ k : Subgroup K, IsCompact (k : Set K) ∧ (lcaAnnihilator k).FG ∧
       ω ∈ lcaAnnihilator k ∧
       modulatedCyclicAnnihilatorFiber m ω γ ⊆
-        (lcaAnnihilator (Subgroup.zpowers γ ⊔ k.map (K).subtype) : Set (PontryaginDual G)) := by sorry
+        (lcaAnnihilator (Subgroup.zpowers γ ⊔ k.map (K).subtype) : Set (PontryaginDual G)) := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let J := Subgroup.zpowers ω
+  let k := lcaDualAnnihilator J
+  have hk : IsClosed (k : Set K) := by
+    rw [show (k : Set K) = ⋂ χ : J, χ.val ⁻¹' ({1} : Set Circle) by
+      ext x
+      change x ∈ k ↔ _
+      simpa only [mem_iInter, mem_preimage, mem_singleton_iff] using
+        mem_lcaDualAnnihilator_iff J x]
+    exact isClosed_iInter fun χ ↦ isClosed_singleton.preimage χ.val.continuous
+  have hAnn : lcaAnnihilator k = J := by
+    obtain ⟨e, he⟩ := pontryaginDual_bidual (G := K)
+    have hEval (x : K) : e x ∈ lcaAnnihilator J ↔ x ∈ k := by
+      change _ ↔ x ∈ lcaDualAnnihilator J
+      simp only [mem_lcaAnnihilator_iff, mem_lcaDualAnnihilator_iff, he]
+    ext χ
+    conv_rhs => rw [← lcaDualAnnihilator_annihilator J (isClosed_discrete _)]
+    rw [mem_lcaAnnihilator_iff, mem_lcaDualAnnihilator_iff]
+    constructor
+    · intro h ψ
+      obtain ⟨x, hx⟩ := e.surjective ψ.val
+      have hmem : x ∈ k := (hEval x).mp (hx.symm ▸ ψ.property)
+      rw [← hx, he]
+      exact h ⟨x, hmem⟩
+    · intro h x
+      have hx := h ⟨e x.val, (hEval x.val).mpr x.property⟩
+      change e x.val χ = 1 at hx
+      rwa [he] at hx
+  have hω : ω ∈ lcaAnnihilator k := hAnn.symm ▸ Subgroup.mem_zpowers ω
+  refine ⟨k, hk.isCompact, ?_, hω, ?_⟩
+  · rw [hAnn]
+    infer_instance
+  · intro ξ hξ
+    obtain ⟨hγ, hres⟩ := (mem_modulatedCyclicAnnihilatorFiber_iff m ω γ ξ).mp hξ
+    have hker : Subgroup.zpowers γ ⊔ k.map (K).subtype ≤ ξ.toMonoidHom.ker := by
+      refine sup_le (Subgroup.zpowers_le.mpr hγ) (Subgroup.map_le_iff_le_comap.mpr ?_)
+      intro y hy
+      exact (hres y).trans ((mem_lcaAnnihilator_iff k ω).mp hω ⟨y, hy⟩)
+    exact (mem_lcaAnnihilator_iff _ ξ).mpr fun x ↦ hker x.property
 
 section Difference
 
@@ -347,6 +386,21 @@ local notation "freq[" k "," n "]" =>
       G →ₜ* (G ⧸ Subgroup.zpowers (γs k)))
     (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)))⁻¹)
 
+/-- Every unitary character of the positive reals is `t ↦ exp(i s log t)` for some real `s`. -/
+private theorem exists_circleExp_freq (ψ : PontryaginDual ℝ≥0ˣ) :
+    ∃ s : ℝ, ∀ t, ψ t = Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ)) := by
+  let c : ℝ≥0ˣ →ₜ* ℂ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ
+  obtain ⟨z, ⟨hz0, hz⟩, -⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe (ψ t))
+  have hz' : (z.im : ℂ) * Complex.I = z := by apply Complex.ext <;> simp [hz0]
+  refine ⟨z.im, fun t ↦ Circle.ext ((hz t).trans ?_)⟩
+  have hpos : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne'),
+    ← Complex.ofReal_log hpos.le]
+  conv_lhs => rw [← hz']
+  congr 1
+  push_cast
+  ring
+
 include hm hms hχ in
 /-- Paper: Situation 4.6.1.1(5) and Theorem 4.6.1.5, pp. 209, 212.
 The integer frequency parametrizes each cyclic fiber bijectively.
@@ -354,7 +408,74 @@ Deviation: Frequencies have denominator log |γₖ| and use the normalized phase
 The character is the inverse of the pulled-back basis character of §4.4. -/
 theorem modulatedPeriodicFrequency_bijective (k : Fin N) :
     Injective (fun n : ℤ ↦ freq[k, n]) ∧
-      range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by sorry
+      range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by
+  have hpos (x : G) : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hL : 0 < Real.log ((m (γs k)).val : ℝ) := Real.log_pos (by exact_mod_cast hγs k)
+  have hlog (l : ℝ) : ∃ x : G, Real.log ((m x).val : ℝ) = l := by
+    obtain ⟨x, hx⟩ := hms (Units.mk0 ⟨Real.exp l, (Real.exp_pos l).le⟩
+      fun h ↦ (Real.exp_pos l).ne' (congrArg Subtype.val h))
+    exact ⟨x, by rw [hx]; exact Real.log_exp l⟩
+  have hfreq (n : ℤ) (x : G) : freq[k, n] x = χ ω x * Circle.exp
+      (-((t₀ k ω - 2 * Real.pi * (n : ℝ) / Real.log ((m (γs k)).val : ℝ)) *
+        Real.log ((m x).val : ℝ))) := by
+    change (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)
+      (QuotientGroup.mk x))⁻¹ = _
+    rw [modulatedCyclicCharacter_mk, Circle.exp_neg, mul_inv, inv_inv]
+  refine ⟨fun n₁ n₂ h ↦ ?_, ?_⟩
+  · by_contra hne
+    have hd : ((n₁ : ℝ) - n₂) ≠ 0 := sub_ne_zero.mpr (by exact_mod_cast hne)
+    obtain ⟨x, hx⟩ := hlog (Real.log ((m (γs k)).val : ℝ) / (2 * ((n₁ : ℝ) - n₂)))
+    have hx' := DFunLike.congr_fun h x
+    simp only [hfreq, hx] at hx'
+    have key (a b : ℝ) (hab : Circle.exp a = Circle.exp b) (hπ : a - b = Real.pi) : False :=
+      Circle.exp_pi_ne_one (by rw [← hπ, Circle.exp_sub, hab, div_self'])
+    refine key _ _ (mul_left_cancel hx') ?_
+    field_simp
+    ring
+  · ext ξ
+    rw [mem_modulatedCyclicAnnihilatorFiber_iff]
+    constructor
+    · rintro ⟨n, rfl⟩
+      refine ⟨?_, fun u ↦ ?_⟩
+      · rw [hfreq, ← (ht₀ k ω).2, ← Circle.exp_add]
+        convert Circle.exp_two_pi_mul_int n using 2
+        field_simp
+        ring
+      · rw [hfreq, show m u.val = 1 from u.2, hχ]
+        simp
+    · rintro ⟨hγ, hK⟩
+      obtain ⟨τ₀, hτ₀⟩ := hm.exists_section
+      let τ : ℝ≥0ˣ →ₜ* G := τ₀.comp
+        ⟨(MonoidHom.id ℝ≥0ˣ).codRestrict _ fun t ↦ MonoidHom.mem_range.mpr (hms t),
+          continuous_id.subtype_mk _⟩
+      have hτ (t : ℝ≥0ˣ) : m (τ t) = t := hτ₀ _
+      let φ : PontryaginDual G := ξ * (χ ω)⁻¹
+      have hφ (x : G) : φ x = ξ x * (χ ω x)⁻¹ := rfl
+      obtain ⟨s, hs⟩ := exists_circleExp_freq (φ.comp τ)
+      have hξx (x : G) : ξ x = χ ω x * Circle.exp (s * Real.log ((m x).val : ℝ)) := by
+        have hmem : x * (τ (m x))⁻¹ ∈ K := by
+          rw [MonoidHom.mem_ker, map_mul, map_inv]
+          change m x * (m (τ (m x)))⁻¹ = 1
+          rw [hτ, mul_inv_cancel]
+        have h1 : φ (x * (τ (m x))⁻¹) = 1 := by
+          rw [hφ]
+          exact mul_inv_eq_one.mpr ((hK ⟨_, hmem⟩).trans (hχ ω ⟨_, hmem⟩).symm)
+        rw [map_mul, map_inv, mul_inv_eq_one] at h1
+        have h2 : φ (τ (m x)) = Circle.exp (s * Real.log ((m x).val : ℝ)) := hs (m x)
+        rw [← h2, ← h1, hφ, mul_comm, inv_mul_cancel_right]
+      have h3 := hξx (γs k)
+      rw [hγ, ← (ht₀ k ω).2, ← Circle.exp_add, eq_comm, Circle.exp_eq_one] at h3
+      obtain ⟨n, hn⟩ := h3
+      refine ⟨n, DFunLike.ext _ _ fun x ↦ ?_⟩
+      rw [hfreq, hξx]
+      have hs' : s = (n * (2 * Real.pi) - t₀ k ω * Real.log ((m (γs k)).val : ℝ)) /
+          Real.log ((m (γs k)).val : ℝ) := by
+        rw [eq_div_iff hL.ne']
+        linarith
+      congr 2
+      rw [hs']
+      field_simp
+      ring
 
 variable [MeasurableSpace G] [BorelSpace G]
 variable (μ : Measure G) [hμHaar : μ.IsHaarMeasure]
@@ -378,10 +499,32 @@ def modulatedLogMoment (ξ : PontryaginDual G) (r : ℕ) : StrongDual ℂ H₀[�
   let h := modulatedLogMoment_linearContinuous (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) ξ r
   ⟨IsLinearMap.mk' (fun f : H₀[ω] ↦ ∫ g, integrand[ξ, r, f] g ∂μ) h.2.1, h.2.2⟩
 
+/-- An integrand weighted by a function equal to one and a zeroth power integrates to the
+unweighted integral. -/
+private theorem integral_mul_one_mul_pow_zero {X : Type*} [MeasurableSpace X] (ν : Measure X)
+    (φ ξ L : X → ℂ) (hξ : ∀ x, ξ x = 1) : ∫ x, φ x * ξ x * L x ^ (0 : ℕ) ∂ν = ∫ x, φ x ∂ν := by
+  simp [hξ]
+
+/-- The trivial character takes the value one. -/
+private theorem coe_one_pontryaginDual_apply {H : Type*} [CommGroup H] [TopologicalSpace H]
+    (g : H) : (((1 : PontryaginDual H) g : Circle) : ℂ) = 1 := by
+  simp
+
+-- The binders below are the section variables, written out. Stated with the section
+-- variables themselves, every complete proof of this theorem fails to finish elaborating
+-- (even a one-term application of a lemma with the same type), while this form takes seconds.
+-- The universe is named `u_1` to keep the statement identical to the section-variable form.
 /-- Paper: Equation (4.6.1.14), p. 212. The zeroth moment at the trivial
 character is the integral of the test function. -/
-theorem modulatedLogMoment_one_zero (f : H₀[ω]) :
-    modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) 1 0 f = ∫ g, f.val.val g ∂μ := by sorry
+theorem modulatedLogMoment_one_zero {G : Type u_1} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [hSC : SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hms : Surjective m)
+    (ω : PontryaginDual m.toMonoidHom.ker) [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [hμHaar : μ.IsHaarMeasure]
+    (f : modulatedDecayIsotype m (Set.univ : Set ℝ) (Set.mem_univ (0 : ℝ)) ω) :
+    modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) 1 0 f = ∫ g, f.val.val g ∂μ := by
+  unfold modulatedLogMoment
+  exact integral_mul_one_mul_pow_zero μ _ _ _ fun g ↦ coe_one_pontryaginDual_apply g
 
 local notation "J" => {p : PontryaginDual G × ℕ // p.2 < modulatedPeriodicMultiplicity m ω γs p.1}
 local notation "S" => List.ofFn γs

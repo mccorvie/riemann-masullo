@@ -563,10 +563,12 @@ def section_meta(issue):
     claimed = "claimed" in labels or bool(issue["assignees"])
     if issue["state"] == "CLOSED":
         state = "stated"
+    elif claimed:
+        # Also when it is still labelled `blocked`: a digester may start on top of statements
+        # that are in review, before the sections it needs are closed.
+        state = "digesting"
     elif "blocked" in labels:
         state = "blocked"
-    elif claimed:
-        state = "digesting"
     else:
         state = "ready"
     return dict(id=issue["number"], num=num.replace("§ ", "§"), title=rest, pages=pages,
@@ -895,7 +897,7 @@ def build_model(repo, section_issues, proof_issues, rows, files, warnings, head)
         if s["state"] == "blocked" and all(by_id[n]["state"] == "stated" for n in s["needs"] if n in by_id):
             note(notes, f"#{s['id']} ({s['num']}) is labelled blocked, but everything it needs is closed; "
                         "`scripts/issues.py --apply` will unblock it.")
-        if s["state"] in ("ready", "digesting") and any(
+        if s["state"] == "ready" and any(
                 by_id[n]["state"] != "stated" for n in s["needs"] if n in by_id):
             note(notes, f"#{s['id']} ({s['num']}) is not labelled blocked although it needs a section "
                         "that is still open.")

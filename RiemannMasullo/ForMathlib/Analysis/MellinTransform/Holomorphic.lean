@@ -13,7 +13,7 @@ namespace RiemannMasullo
 
 /-- Integrating a complex power of a positive measurable function against a fixed weight
 is holomorphic in every open strip in which the weighted integrand is integrable. -/
-theorem analyticOnNhd_integral_mul_cpow {α : Type*} [MeasurableSpace α]
+theorem analyticOnNhd_integral_mul_cpow_of_integrable {α : Type*} [MeasurableSpace α]
     (μ : Measure α) (f : α → ℂ) (n : α → ℝ) (hn : Measurable n) (hp : ∀ x, 0 < n x)
     {I : Set ℝ} (hI : IsOpen I)
     (hint : ∀ z : ℂ, z.re ∈ I → Integrable (fun x ↦ f x * (n x : ℂ) ^ z) μ) :

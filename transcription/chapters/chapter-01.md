@@ -653,7 +653,7 @@ $^{3}$P. Sarnak. *Asymptotic Behavior of Periodic Orbits of the Horocycle Flow a
 (3) For all $x\in G$, the integral:
 
 $$
-\mathrm{(1.3.1.1)}\qquad\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h)
+\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h) \tag{1.3.1.1}
 $$
 
 converges, and upon denoting $u_0^H$ its value function on $G$, we have that $u_0^H$ is continuous on $G$, invariant under the continuous left-translation action by $H$ on $G$, and identically $1$ as a function on $G/H$.
@@ -661,7 +661,7 @@ converges, and upon denoting $u_0^H$ its value function on $G$, we have that $u_
 For every continuous function $u\in C(G/H)$, we have that for all $x\in G$, the integral
 
 $$
-\mathrm{(1.3.1.2)}\qquad\int_H\bigl(u_0\cdot(u\circ\pi)\bigr)(h^{-1}x)\,\mathrm{d}\mu_H(h)
+\int_H\bigl(u_0\cdot(u\circ\pi)\bigr)(h^{-1}x)\,\mathrm{d}\mu_H(h) \tag{1.3.1.2}
 $$
 
 converges, and its value is $u(\pi(x))$.
@@ -1520,7 +1520,7 @@ Such topologies, however, render *all* point-masses (and their derivatives) at a
 
 Now look at the situation with our chosen Schwartz-Bruhat function. We choose an enumeration $\{v_k\}_{k\ge 0}$ of all the places of $F$ outside $S$.
 
-Assume we have fixed a continuous (unitary) character $\chi\in\widehat{C_F}$, and that $S$ contains all the Archimedean places, all the primes at which $\chi$ is ramified, and all the ramified places of $F$ over $\mathbf Q$ (for other technical reasons it is also important in the main work to make $S$ big enough to ensure $\mathrm{Pic}(\mathcal O_{F,S})=1$, but the need for this isn't addressed here). Going from $f=f_S\otimes(\bigotimes_{v\notin S}1_{\mathcal O_{F_v}})$ restricted to the idele group to
+Assume we have fixed a continuous (unitary) character $\chi\in\widehat{C_F}$, and that $S$ contains all the Archimedean places, all the primes at which $\chi$ is ramified, and all the ramified places of $F$ over $\mathbf Q$ (for other technical reasons it is also important in the main work to make $S$ big enough to ensure $\mathrm{Pic}(\mathcal O_{F,S})=1$, but the need for this isn't addressed here). Going from $f=f_S\otimes(\otimes_{v\notin S}1_{\mathcal O_{F_v}})$ restricted to the idele group to
 
 $$
 f':=f_S\otimes\otimes\bigotimes_{k\ge 0}1_{\mathcal O_{F_{v_k}}^\times} \tag{1.8.1.1}
@@ -2244,7 +2244,7 @@ The assumptions on the test function are as follows:
 
 (2) $\varphi(C_F^1)=0$.
 
-**1.8.4.1. Character by character.** For $\varphi$ homogeneous with respect to the right-translation action of $C_F^1$ on $\mathcal D(C_F)$, with weight $\overline{\chi}|_{C_F^1}$, for $\chi\in\widehat{C_F}$ fixed, and satisfying assumptions (a) and (b) above, the Trace Formula turns into:
+1.8.4.1. *Character by character.* For $\varphi$ homogeneous with respect to the right-translation action of $C_F^1$ on $\mathcal D(C_F)$, with weight $\overline{\chi}|_{C_F^1}$, for $\chi\in\widehat{C_F}$ fixed, and satisfying assumptions (a) and (b) above, the Trace Formula turns into:
 
 $$
 \begin{aligned}
@@ -2256,7 +2256,7 @@ $$
 
 where $M(\varphi)(\lvert\cdot\rvert_F^{1/2})+M(\varphi)(\lvert\cdot\rvert_F^{-1/2})$ vanishes if $\varphi$ is not $C_F^1$-invariant.
 
-**1.8.4.2. An explicit holomorphic family of test functions.** The idea now is to consider the following holomorphic family of piece-wise smooth functions on $C_F$:
+1.8.4.2. *An explicit holomorphic family of test functions.* The idea now is to consider the following holomorphic family of piece-wise smooth functions on $C_F$:
 
 $$
 \varphi_z(t):=t^{-z}
@@ -2278,7 +2278,7 @@ $$
 
 tends to $\varphi_z(t)$ point-wise (for $t\neq1$) as $\varepsilon\to 0$ and $h\to 1_{(1,+\infty)}$ pointwise, as $h$ (which will be an explicit collection of bump functions) remains valued in $[0,1]$ and below $1_{(1,+\infty)}$, converging point-wise monotonically.
 
-**1.8.4.3. Montel’s Theorem.** Fix a compact subset $K\subset\mathbf C_{>\sup(I)}$ with nonempty interior intersecting with nonempty interior the half-plane $\mathbf C_{>1}$.
+1.8.4.3. *Montel’s Theorem.* Fix a compact subset $K\subset\mathbf C_{>\sup(I)}$ with nonempty interior intersecting with nonempty interior the half-plane $\mathbf C_{>1}$.
 
 Write $\varphi=\chi\cdot(\varphi_{h,\varepsilon,z}\circ\lvert\cdot\rvert_F)$; note the dependence on $z\in\mathbf C$.
 
@@ -2326,7 +2326,7 @@ $$
 
 1.8. A VIEW FROM THE SKY: FROM A LETTER TO PETER SARNAK    55
 
-**1.8.5.1. Putting everything together.** Putting everything together from §5.1, we obtain that for $I=[-a,a]$ for a fixed real number $a>0$, the logarithmic derivative of $L_f(s,\chi)$ satisfies, over the interior of $K$:
+1.8.5.1. *Putting everything together.* Putting everything together from §5.1, we obtain that for $I=[-a,a]$ for a fixed real number $a>0$, the logarithmic derivative of $L_f(s,\chi)$ satisfies, over the interior of $K$:
 
 (1.8.5.1)
 

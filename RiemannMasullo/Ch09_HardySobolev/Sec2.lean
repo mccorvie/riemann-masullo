@@ -698,44 +698,45 @@ private theorem weightedL2_moment_functional {ρ : ℝ → ℝ} (hρc : Continuo
   · rw [Set.indicator_of_notMem hx, norm_zero, zero_pow two_ne_zero, zero_mul]
     exact mul_nonneg hK (by positivity)
 
-/-- Differentiation under the integral sign for exponential moments: if every moment of `h`
-against `exp (σ * x)` is integrable for `σ` in an open interval, then on the corresponding
-vertical strip the integral of `h x * exp (w * x)` is holomorphic, and its `k`th derivative
-is the `k`th moment. -/
-private theorem iteratedDeriv_exp_moment {h : ℝ → ℂ} {α β : ℝ}
+/-- Differentiation under the integral sign for exponential moments on a measure space: if
+every moment of `h` against `exp (σ * ℓ x)` is integrable for `σ` in an open interval, then on
+the corresponding vertical strip the integral of `h x * exp (w * ℓ x)` is holomorphic, and its
+`k`th derivative is the `k`th moment. -/
+private theorem iteratedDeriv_exp_moment_of_measurable {X : Type*} [MeasurableSpace X]
+    {μ : Measure X} {h : X → ℂ} {ℓ : X → ℝ} (hℓ : Measurable ℓ) {α β : ℝ}
     (hint : ∀ σ ∈ Ioo α β, ∀ n : ℕ,
-      Integrable (fun x : ℝ ↦ h x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume)
+      Integrable (fun x ↦ h x * (ℓ x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (ℓ x : ℂ))) μ)
     (k : ℕ) {z : ℂ} (hz : z.re ∈ Ioo α β) :
-    AnalyticAt ℂ (fun w : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (w * (x : ℂ))) z ∧
-      Integrable (fun x : ℝ ↦ h x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) volume ∧
-      iteratedDeriv k (fun w : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (w * (x : ℂ))) z =
-        ∫ x : ℝ, h x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by
-  let F : ℕ → ℂ → ℝ → ℂ := fun n w x ↦ h x * (x : ℂ) ^ n * Complex.exp (w * (x : ℂ))
-  have hexpc : ∀ w : ℂ, Continuous fun x : ℝ ↦ Complex.exp (w * (x : ℂ)) := fun w ↦
-    Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal)
-  have hm : AEStronglyMeasurable h volume := by
+    AnalyticAt ℂ (fun w : ℂ ↦ ∫ x, h x * Complex.exp (w * (ℓ x : ℂ)) ∂μ) z ∧
+      Integrable (fun x ↦ h x * (ℓ x : ℂ) ^ k * Complex.exp (z * (ℓ x : ℂ))) μ ∧
+      iteratedDeriv k (fun w : ℂ ↦ ∫ x, h x * Complex.exp (w * (ℓ x : ℂ)) ∂μ) z =
+        ∫ x, h x * (ℓ x : ℂ) ^ k * Complex.exp (z * (ℓ x : ℂ)) ∂μ := by
+  let F : ℕ → ℂ → X → ℂ := fun n w x ↦ h x * (ℓ x : ℂ) ^ n * Complex.exp (w * (ℓ x : ℂ))
+  have hℓc : Measurable fun x ↦ (ℓ x : ℂ) := Complex.measurable_ofReal.comp hℓ
+  have hexpc : ∀ w : ℂ, Measurable fun x ↦ Complex.exp (w * (ℓ x : ℂ)) := fun w ↦
+    Complex.measurable_exp.comp (hℓc.const_mul w)
+  have hm : AEStronglyMeasurable h μ := by
     refine ((hint z.re hz 0).aestronglyMeasurable.mul
       (hexpc (-(z.re : ℂ))).aestronglyMeasurable).congr (ae_of_all _ fun x ↦ ?_)
-    show h x * (x : ℂ) ^ 0 * Complex.exp ((z.re : ℂ) * (x : ℂ)) *
-      Complex.exp (-(z.re : ℂ) * (x : ℂ)) = h x
+    show h x * (ℓ x : ℂ) ^ 0 * Complex.exp ((z.re : ℂ) * (ℓ x : ℂ)) *
+      Complex.exp (-(z.re : ℂ) * (ℓ x : ℂ)) = h x
     rw [pow_zero, mul_one, mul_assoc, ← Complex.exp_add, neg_mul, add_neg_cancel,
       Complex.exp_zero, mul_one]
-  have hFm : ∀ n w, AEStronglyMeasurable (F n w) volume := fun n w ↦
-    (hm.mul (Complex.continuous_ofReal.pow n).aestronglyMeasurable).mul
-      (hexpc w).aestronglyMeasurable
-  have hnorm : ∀ n (w : ℂ) (x : ℝ),
-      ‖F n w x‖ = ‖h x‖ * |x| ^ n * Real.exp (w.re * x) := by
+  have hFm : ∀ n w, AEStronglyMeasurable (F n w) μ := fun n w ↦
+    (hm.mul (hℓc.pow_const n).aestronglyMeasurable).mul (hexpc w).aestronglyMeasurable
+  have hnorm : ∀ n (w : ℂ) (x : X),
+      ‖F n w x‖ = ‖h x‖ * |ℓ x| ^ n * Real.exp (w.re * ℓ x) := by
     intro n w x
-    have hre : (w * (x : ℂ)).re = w.re * x := by simp
-    show ‖h x * (x : ℂ) ^ n * Complex.exp (w * (x : ℂ))‖ = _
+    have hre : (w * (ℓ x : ℂ)).re = w.re * ℓ x := by simp
+    show ‖h x * (ℓ x : ℂ) ^ n * Complex.exp (w * (ℓ x : ℂ))‖ = _
     rw [norm_mul, norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, Complex.norm_exp,
       hre]
-  have hFi : ∀ n (w : ℂ), w.re ∈ Ioo α β → Integrable (F n w) volume := fun n w hw ↦
+  have hFi : ∀ n (w : ℂ), w.re ∈ Ioo α β → Integrable (F n w) μ := fun n w hw ↦
     (hint w.re hw n).mono (hFm n w) (ae_of_all _ fun x ↦ le_of_eq (by
       show ‖F n w x‖ = ‖F n (w.re : ℂ) x‖
       rw [hnorm, hnorm, Complex.ofReal_re]))
   have hderiv : ∀ n (w : ℂ), w.re ∈ Ioo α β →
-      HasDerivAt (fun w ↦ ∫ x, F n w x) (∫ x, F (n + 1) w x) w := by
+      HasDerivAt (fun w ↦ ∫ x, F n w x ∂μ) (∫ x, F (n + 1) w x ∂μ) w := by
     intro n w hw
     obtain ⟨ε, hε, hεa, hεb⟩ : ∃ ε : ℝ, 0 < ε ∧ α < w.re - ε ∧ w.re + ε < β := by
       have h0 : 0 < min (w.re - α) (β - w.re) := lt_min (sub_pos.2 hw.1) (sub_pos.2 hw.2)
@@ -762,34 +763,34 @@ private theorem iteratedDeriv_exp_moment {h : ℝ → ℂ} {α β : ℝ}
       have h1 := (Complex.abs_re_le_norm (w' - w)).trans_lt h2
       rw [Complex.sub_re] at h1
       obtain ⟨hl, hu⟩ := abs_lt.1 h1
-      have hexp : Real.exp (w'.re * x) ≤
-          Real.exp ((w.re - ε) * x) + Real.exp ((w.re + ε) * x) := by
-        rcases le_total 0 x with hx | hx
+      have hexp : Real.exp (w'.re * ℓ x) ≤
+          Real.exp ((w.re - ε) * ℓ x) + Real.exp ((w.re + ε) * ℓ x) := by
+        rcases le_total 0 (ℓ x) with hx | hx
         · have hp := mul_nonneg (by linarith : (0 : ℝ) ≤ w.re + ε - w'.re) hx
           exact (Real.exp_le_exp.2 (by nlinarith)).trans
             (le_add_of_nonneg_left (Real.exp_pos _).le)
         · have hp := mul_nonneg (by linarith : (0 : ℝ) ≤ w'.re - w.re + ε) (neg_nonneg.2 hx)
           exact (Real.exp_le_exp.2 (by nlinarith)).trans
             (le_add_of_nonneg_right (Real.exp_pos _).le)
-      calc ‖h x‖ * |x| ^ (n + 1) * Real.exp (w'.re * x)
-          ≤ ‖h x‖ * |x| ^ (n + 1) *
-            (Real.exp ((w.re - ε) * x) + Real.exp ((w.re + ε) * x)) :=
+      calc ‖h x‖ * |ℓ x| ^ (n + 1) * Real.exp (w'.re * ℓ x)
+          ≤ ‖h x‖ * |ℓ x| ^ (n + 1) *
+            (Real.exp ((w.re - ε) * ℓ x) + Real.exp ((w.re + ε) * ℓ x)) :=
             mul_le_mul_of_nonneg_left hexp (by positivity)
         _ = _ := mul_add _ _ _
-    · exact (((hasDerivAt_id' w').mul_const (x : ℂ)).cexp.const_mul
-        (h x * (x : ℂ) ^ n)).congr_deriv (by
-          show h x * (x : ℂ) ^ n * (Complex.exp (w' * (x : ℂ)) * (1 * (x : ℂ))) =
-            h x * (x : ℂ) ^ (n + 1) * Complex.exp (w' * (x : ℂ))
+    · exact (((hasDerivAt_id' w').mul_const (ℓ x : ℂ)).cexp.const_mul
+        (h x * (ℓ x : ℂ) ^ n)).congr_deriv (by
+          show h x * (ℓ x : ℂ) ^ n * (Complex.exp (w' * (ℓ x : ℂ)) * (1 * (ℓ x : ℂ))) =
+            h x * (ℓ x : ℂ) ^ (n + 1) * Complex.exp (w' * (ℓ x : ℂ))
           ring)
   have hS : IsOpen {w : ℂ | w.re ∈ Ioo α β} := isOpen_Ioo.preimage Complex.continuous_re
-  have hM : (fun w : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (w * (x : ℂ))) =
-      fun w ↦ ∫ x, F 0 w x := by
+  have hM : (fun w : ℂ ↦ ∫ x, h x * Complex.exp (w * (ℓ x : ℂ)) ∂μ) =
+      fun w ↦ ∫ x, F 0 w x ∂μ := by
     funext w
     refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
-    show h x * Complex.exp (w * (x : ℂ)) = h x * (x : ℂ) ^ 0 * Complex.exp (w * (x : ℂ))
+    show h x * Complex.exp (w * (ℓ x : ℂ)) = h x * (ℓ x : ℂ) ^ 0 * Complex.exp (w * (ℓ x : ℂ))
     rw [pow_zero, mul_one]
   have hiter : ∀ n (w : ℂ), w.re ∈ Ioo α β →
-      iteratedDeriv n (fun w ↦ ∫ x, F 0 w x) w = ∫ x, F n w x := by
+      iteratedDeriv n (fun w ↦ ∫ x, F 0 w x ∂μ) w = ∫ x, F n w x ∂μ := by
     intro n
     induction n with
     | zero =>
@@ -797,7 +798,8 @@ private theorem iteratedDeriv_exp_moment {h : ℝ → ℂ} {α β : ℝ}
       rw [iteratedDeriv_zero]
     | succ n ih =>
       intro w hw
-      have hev : iteratedDeriv n (fun w ↦ ∫ x, F 0 w x) =ᶠ[𝓝 w] fun w ↦ ∫ x, F n w x :=
+      have hev : iteratedDeriv n (fun w ↦ ∫ x, F 0 w x ∂μ) =ᶠ[𝓝 w]
+          fun w ↦ ∫ x, F n w x ∂μ :=
         (hS.eventually_mem hw).mono fun w' hw' ↦ ih w' hw'
       rw [iteratedDeriv_succ, hev.deriv_eq]
       exact (hderiv n w hw).deriv
@@ -805,6 +807,110 @@ private theorem iteratedDeriv_exp_moment {h : ℝ → ℂ} {α β : ℝ}
   exact ⟨DifferentiableOn.analyticAt (s := {w : ℂ | w.re ∈ Ioo α β}) (fun w hw ↦
     (hderiv 0 w hw).differentiableAt.differentiableWithinAt) (hS.mem_nhds hz),
     hFi k z hz, hiter k z hz⟩
+
+/-- Differentiation under the integral sign for exponential moments on the real line with
+Lebesgue measure. -/
+private theorem iteratedDeriv_exp_moment {h : ℝ → ℂ} {α β : ℝ}
+    (hint : ∀ σ ∈ Ioo α β, ∀ n : ℕ,
+      Integrable (fun x : ℝ ↦ h x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume)
+    (k : ℕ) {z : ℂ} (hz : z.re ∈ Ioo α β) :
+    AnalyticAt ℂ (fun w : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (w * (x : ℂ))) z ∧
+      Integrable (fun x : ℝ ↦ h x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) volume ∧
+      iteratedDeriv k (fun w : ℂ ↦ ∫ x : ℝ, h x * Complex.exp (w * (x : ℂ))) z =
+        ∫ x : ℝ, h x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) :=
+  iteratedDeriv_exp_moment_of_measurable measurable_id hint k hz
+/-- The line density dominates its exponential factor. -/
+private theorem exp_le_lineSobolevDensity (b : ℝ) (N : ℕ) (x : ℝ) :
+    Real.exp (2 * b * x) ≤ lineSobolevDensity b N x := by
+  unfold lineSobolevDensity
+  refine le_mul_of_one_le_right (Real.exp_pos _).le ?_
+  calc (1 : ℝ) = x ^ (2 * 0) := by rw [mul_zero, pow_zero]
+    _ ≤ ∑ k ∈ Finset.range (N + 1), x ^ (2 * k) :=
+      Finset.single_le_sum (f := fun k ↦ x ^ (2 * k))
+        (fun k _ ↦ (even_two_mul k).pow_nonneg x) (Finset.mem_range.2 N.succ_pos)
+
+/-- The line density is continuous. -/
+private theorem continuous_lineSobolevDensity (b : ℝ) (N : ℕ) :
+    Continuous (lineSobolevDensity b N) := by
+  show Continuous fun x : ℝ ↦ Real.exp (2 * b * x) * ∑ k ∈ Finset.range (N + 1), x ^ (2 * k)
+  exact (Real.continuous_exp.comp (continuous_const.mul continuous_id)).mul
+    (continuous_finsetSum _ fun k _ ↦ continuous_id.pow (2 * k))
+
+/-- To the left of the line, every moment kernel cut off above a point gives a continuous
+functional on the line space. -/
+private theorem lineSobolev_cutoff_moment_functional (a b : ℝ) (ha : 1 < a) (N k : ℕ)
+    (z : ℂ) (hz : z.re < b) :
+    ∃ Λ : Lp ℂ 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (lineSobolevDensity b N x)) →L[ℂ] ℂ,
+      ∀ f : Lp ℂ 2 (volume.withDensity fun x ↦ ENNReal.ofReal (lineSobolevDensity b N x)),
+        Integrable (fun x : ℝ ↦ (Ici (-Real.log a)).indicator (⇑f) x *
+          (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) volume ∧
+        Λ f = ∫ x : ℝ, (Ici (-Real.log a)).indicator (⇑f) x *
+          (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by
+  have hlogA : 0 < Real.log a := Real.log_pos ha
+  have hbz : 0 < b - z.re := sub_pos.2 hz
+  obtain ⟨Λ, hΛ⟩ := weightedL2_moment_functional (continuous_lineSobolevDensity b N)
+    (fun x ↦ (Real.exp_pos _).trans_le (exp_le_lineSobolevDensity b N x)) z k
+    (measurableSet_Ici (a := -Real.log a)) (δ := 2 * (b - z.re))
+    (K := Real.exp (4 * (b - z.re) * Real.log a)) (mul_pos two_pos hbz) (Real.exp_pos _).le
+    fun x hx ↦ by
+      have hx' : -Real.log a ≤ x := hx
+      have hle : 2 * z.re * x + 2 * (b - z.re) * |x| ≤
+          4 * (b - z.re) * Real.log a + 2 * b * x := by
+        rcases le_total 0 x with h0 | h0
+        · rw [abs_of_nonneg h0]
+          nlinarith [mul_pos hbz hlogA]
+        · rw [abs_of_nonpos h0]
+          nlinarith [mul_nonneg hbz.le (by linarith : 0 ≤ Real.log a + x)]
+      calc Real.exp (2 * z.re * x + 2 * (b - z.re) * |x|)
+          ≤ Real.exp (4 * (b - z.re) * Real.log a + 2 * b * x) := Real.exp_le_exp.2 hle
+        _ = Real.exp (4 * (b - z.re) * Real.log a) * Real.exp (2 * b * x) := Real.exp_add _ _
+        _ ≤ Real.exp (4 * (b - z.re) * Real.log a) * lineSobolevDensity b N x :=
+          mul_le_mul_of_nonneg_left (exp_le_lineSobolevDensity b N x) (Real.exp_pos _).le
+  refine ⟨Λ, fun f ↦ ?_⟩
+  have hfun : (fun x : ℝ ↦ (Ici (-Real.log a)).indicator (⇑f) x *
+      (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) = fun x : ℝ ↦ f x *
+      (Ici (-Real.log a)).indicator (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x := by
+    funext x
+    by_cases hx : x ∈ Ici (-Real.log a)
+    · rw [Set.indicator_of_mem hx, Set.indicator_of_mem hx, mul_assoc]
+    · rw [Set.indicator_of_notMem hx, Set.indicator_of_notMem hx, zero_mul, zero_mul, mul_zero]
+  rw [hfun]
+  exact hΛ f
+
+/-- The Mellin transform of a profile in the logarithmic coordinate is its two-sided
+exponential integral. -/
+private theorem mellin_comp_log_eq (h : ℝ → ℂ) (s : ℂ) :
+    mellin (fun t ↦ h (Real.log t)) s = ∫ x : ℝ, h x * Complex.exp (s * (x : ℂ)) := by
+  rw [mellin, ← integral_comp_exp]
+  refine integral_congr_ae (ae_of_all _ fun y ↦ ?_)
+  show Real.exp y • (((Real.exp y : ℝ) : ℂ) ^ (s - 1) • h (Real.log (Real.exp y))) =
+    h y * Complex.exp (s * (y : ℂ))
+  have hexp : (y : ℂ) + (y : ℂ) * (s - 1) = s * (y : ℂ) := by ring
+  rw [Real.log_exp, Complex.real_smul, smul_eq_mul,
+    Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.2 (Real.exp_pos y).ne'),
+    ← Complex.ofReal_log (Real.exp_pos y).le, Real.log_exp, Complex.ofReal_exp, ← mul_assoc,
+    ← Complex.exp_add, hexp]
+  exact mul_comm _ _
+
+/-- Every exponential moment of an exponential-decay profile is integrable. -/
+private theorem integrable_logExponentialDecay_moment (f : logExponentialDecaySubmodule univ)
+    (σ : ℝ) (n : ℕ) :
+    Integrable (fun x : ℝ ↦ f.val x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume := by
+  have hfun : (fun x : ℝ ↦ f.val x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) =
+      fun x : ℝ ↦ (x : ℂ) ^ n * logExponentialDecayTwist univ ⟨σ, mem_univ σ⟩ f x := by
+    funext x
+    rw [logExponentialDecayTwist_apply]
+    show f.val x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ)) =
+      (x : ℂ) ^ n * (((Real.exp (σ * x) : ℝ) : ℂ) * f.val x)
+    rw [Complex.ofReal_exp, Complex.ofReal_mul]
+    ring
+  rw [hfun]
+  refine (SchwartzMap.integrable_pow_mul volume
+    (logExponentialDecayTwist univ ⟨σ, mem_univ σ⟩ f) n).mono'
+    ((Complex.continuous_ofReal.pow n).mul (SchwartzMap.continuous _)).aestronglyMeasurable
+    (ae_of_all _ fun x ↦ le_of_eq ?_)
+  rw [norm_mul, norm_pow, Complex.norm_real]
 
 /-- Paper: Corollary 9.2.1.4, p. 407. In the left half-plane each indicated derivative
 evaluation is bounded on the part supported above the cutoff and is given by the moment integral.
@@ -819,7 +925,23 @@ theorem scalarLineSobolev_cutoff_eval (a b : ℝ) (_ha : 1 < a)
           (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) ∧
       ∀ (f : PositiveRealExponentialDecay univ) (u : ScalarLineSobolev b N),
         tsupport f.val ⊆ Ioi (-Real.log a) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
-        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z := by sorry
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z := by
+  obtain ⟨Λ, hΛ⟩ := lineSobolev_cutoff_moment_functional a b _ha N k z _hz
+  refine ⟨Λ, hΛ, fun f u hsupp hu ↦ ?_⟩
+  have hint : ∀ σ ∈ Ioo (z.re - 1) (z.re + 1), ∀ n : ℕ, Integrable
+      (fun x : ℝ ↦ f.val x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume :=
+    fun σ _ n ↦ integrable_logExponentialDecay_moment f σ n
+  have hmel : mellin (fun t ↦ f.val (Real.log t)) =
+      fun w : ℂ ↦ ∫ x : ℝ, f.val x * Complex.exp (w * (x : ℂ)) :=
+    funext fun w ↦ mellin_comp_log_eq f.val w
+  rw [hmel, (iteratedDeriv_exp_moment hint k ⟨by linarith, by linarith⟩).2.2]
+  refine (hΛ u).2.trans (integral_congr_ae ?_)
+  filter_upwards [hu] with x hx
+  by_cases hmem : x ∈ Ici (-Real.log a)
+  · rw [Set.indicator_of_mem hmem, hx]
+  · have h0 : f.val x = 0 :=
+      image_eq_zero_of_notMem_tsupport fun h ↦ hmem (Ioi_subset_Ici_self (hsupp h))
+    rw [Set.indicator_of_notMem hmem, h0]
 
 /-- Paper: Corollary 9.2.1.4, p. 407. The cutoff Mellin integral is holomorphic to
 the left of the line and has the stated derivatives for every completed source class.
@@ -829,7 +951,111 @@ theorem scalarLineSobolev_cutoff_iteratedDeriv_mellin (a b : ℝ) (_ha : 1 < a)
     let u := (Ici (-Real.log a)).indicator (f : ℝ → ℂ)
     let M := fun w : ℂ ↦ ∫ x : ℝ, u x * Complex.exp (w * (x : ℂ))
     AnalyticAt ℂ M z ∧ iteratedDeriv k M z =
-      ∫ x : ℝ, u x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by sorry
+      ∫ x : ℝ, u x * (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) := by
+  intro u M
+  have h := iteratedDeriv_exp_moment (h := u) (α := z.re - 1) (β := b) (fun σ hσ n ↦ by
+    obtain ⟨_, hΛ⟩ := lineSobolev_cutoff_moment_functional a b _ha N n (σ : ℂ)
+      (by rw [Complex.ofReal_re]; exact hσ.2)
+    exact (hΛ f).1) k ⟨by linarith, _hz⟩
+  exact ⟨h.1, h.2.2⟩
+
+/-- Below the abscissa `b`, the squared moment kernel divided by a number that dominates
+`exp (2 * b * x)` decays exponentially on a half-line that is bounded below. -/
+private theorem sq_moment_div_le {b σ L : ℝ} (hσ : σ < b) (hL : 0 ≤ L) (k : ℕ) {x r : ℝ}
+    (hx : -L ≤ x) (hr : Real.exp (2 * b * x) ≤ r) :
+    (|x| ^ k * Real.exp (σ * x)) ^ 2 * r⁻¹ ≤
+      ((2 * k).factorial : ℝ) / (b - σ) ^ (2 * k) * Real.exp (2 * (b - σ) * L) *
+        Real.exp (-((b - σ) * x)) := by
+  have hη : 0 < b - σ := sub_pos.2 hσ
+  have hrpos : 0 < r := (Real.exp_pos _).trans_le hr
+  have hinv : r⁻¹ ≤ Real.exp (-(2 * b * x)) := by
+    rw [Real.exp_neg]
+    exact inv_anti₀ (Real.exp_pos _) hr
+  have hfact : ((b - σ) * |x|) ^ (2 * k) ≤
+      Real.exp ((b - σ) * |x|) * ((2 * k).factorial : ℝ) :=
+    (div_le_iff₀ (Nat.cast_pos.2 (Nat.factorial_pos _))).1
+      (Real.pow_div_factorial_le_exp _ (mul_nonneg hη.le (abs_nonneg x)) (2 * k))
+  have hηk : 0 < (b - σ) ^ (2 * k) := pow_pos hη _
+  have habs : |x| ^ (2 * k) ≤
+      ((2 * k).factorial : ℝ) / (b - σ) ^ (2 * k) * Real.exp ((b - σ) * |x|) := by
+    rw [mul_pow] at hfact
+    rw [div_mul_eq_mul_div, le_div_iff₀ hηk]
+    linarith
+  have habsle : |x| ≤ x + 2 * L := abs_le.2 ⟨by linarith, by linarith⟩
+  have hexp : Real.exp ((b - σ) * |x|) ≤ Real.exp ((b - σ) * (x + 2 * L)) :=
+    Real.exp_le_exp.2 (mul_le_mul_of_nonneg_left habsle hη.le)
+  have he : Real.exp (σ * x) ^ 2 = Real.exp (2 * σ * x) := by
+    rw [← Real.exp_nat_mul]
+    congr 1
+    push_cast
+    ring
+  have hcomb : Real.exp ((b - σ) * (x + 2 * L)) *
+      (Real.exp (2 * σ * x) * Real.exp (-(2 * b * x))) =
+      Real.exp (2 * (b - σ) * L) * Real.exp (-((b - σ) * x)) := by
+    rw [← Real.exp_add, ← Real.exp_add, ← Real.exp_add]
+    congr 1
+    ring
+  calc (|x| ^ k * Real.exp (σ * x)) ^ 2 * r⁻¹
+      = |x| ^ (2 * k) * (Real.exp (2 * σ * x) * r⁻¹) := by
+        rw [mul_pow, he, ← pow_mul, mul_comm k 2, mul_assoc]
+    _ ≤ ((2 * k).factorial : ℝ) / (b - σ) ^ (2 * k) * Real.exp ((b - σ) * (x + 2 * L)) *
+          (Real.exp (2 * σ * x) * Real.exp (-(2 * b * x))) :=
+        mul_le_mul (habs.trans (mul_le_mul_of_nonneg_left hexp (by positivity)))
+          (mul_le_mul_of_nonneg_left hinv (Real.exp_pos _).le)
+          (mul_nonneg (Real.exp_pos _).le (inv_nonneg.2 hrpos.le)) (by positivity)
+    _ = ((2 * k).factorial : ℝ) / (b - σ) ^ (2 * k) * Real.exp (2 * (b - σ) * L) *
+          Real.exp (-((b - σ) * x)) := by
+        rw [mul_assoc, hcomb]
+        exact (mul_assoc _ _ _).symm
+
+/-- The norm twist of a quasi-character is the quasi-character times the exponential of the
+logarithmic module. -/
+private theorem quasiCharacterNormTwist_eq_exp {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (m : G →ₜ* ℝ≥0ˣ) (χ : QuasiCharacter G) (w : ℂ) (g : G) :
+    quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g =
+      χ g * Complex.exp (w * (logModule m g : ℂ)) := by
+  have hpos : 0 < ((m g).val : ℝ) := NNReal.coe_pos.mpr (pos_of_ne_zero (m g).ne_zero)
+  change χ g * ((((m g : ℝ≥0) : ℝ) : ℂ)) ^ w =
+    χ g * Complex.exp (w * (Real.log ((m g).val : ℝ) : ℂ))
+  rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.2 hpos.ne'),
+    ← Complex.ofReal_log hpos.le, mul_comm w]
+
+/-- Differentiation under the integral sign for the norm twists of a quasi-character: if
+every logarithmic moment against the real twists in an open interval is integrable, then the
+twisted integral is holomorphic on the strip, and its `k`th derivative is the `k`th moment. -/
+private theorem iteratedDeriv_normTwist_moment {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [MeasurableSpace G] [BorelSpace G] (m : G →ₜ* ℝ≥0ˣ) (μ : Measure G)
+    (χ : QuasiCharacter G) {u : G → ℂ} {α β : ℝ}
+    (hint : ∀ σ ∈ Ioo α β, ∀ n : ℕ, Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ n *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ)
+    (k : ℕ) {z : ℂ} (hz : z.re ∈ Ioo α β) :
+    AnalyticAt ℂ (fun w : ℂ ↦
+        ∫ g, u g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ) z ∧
+      Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ k *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) μ ∧
+      iteratedDeriv k (fun w : ℂ ↦
+          ∫ g, u g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ) z =
+        ∫ g, u g * (logModule m g : ℂ) ^ k *
+          quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g ∂μ := by
+  have hlog : Measurable (fun g ↦ Real.log ((m g).val : ℝ)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable.log
+  have hmom (n : ℕ) (w : ℂ) : (fun g ↦ u g * (logModule m g : ℂ) ^ n *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g) =
+      fun g ↦ u g * χ g * (logModule m g : ℂ) ^ n * Complex.exp (w * (logModule m g : ℂ)) := by
+    funext g
+    rw [quasiCharacterNormTwist_eq_exp]
+    ring
+  have hM : (fun w : ℂ ↦
+      ∫ g, u g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ) =
+      fun w ↦ ∫ g, u g * χ g * Complex.exp (w * (logModule m g : ℂ)) ∂μ := by
+    funext w
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    show u g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g = _
+    rw [quasiCharacterNormTwist_eq_exp, ← mul_assoc]
+  have key := iteratedDeriv_exp_moment_of_measurable (μ := μ) (h := fun g ↦ u g * χ g) hlog
+    (fun σ hσ n ↦ (hmom n (σ : ℂ)) ▸ hint σ hσ n) k hz
+  rw [hM, hmom k z]
+  exact key
 
 section ModulatedLine
 
@@ -837,6 +1063,168 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
   [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
   [MeasurableSpace G] [BorelSpace G]
   (m : G →ₜ* ℝ≥0ˣ)
+
+/-- For a Haar measure, a decaying exponential of the logarithmic module is integrable on
+the part of the group where the logarithmic module is bounded below: translation by an
+element of nontrivial module moves one compact band onto the next. -/
+private theorem integrableOn_exp_neg_logModule (hm : IsModulation m) (μ : Measure G)
+    [μ.IsHaarMeasure] {η : ℝ} (hη : 0 < η) (c : ℝ) :
+    IntegrableOn (fun g ↦ Real.exp (-(η * logModule m g))) (logModule m ⁻¹' Ici c) μ := by
+  let f (g : G) := Real.log ((m g).val : ℝ)
+  have hpos (g : G) : 0 < ((m g).val : ℝ) :=
+    NNReal.coe_pos.mpr (pos_of_ne_zero (m g).ne_zero)
+  have hmul (g h : G) : f (g * h) = f g + f h := by
+    simp only [f, map_mul, Units.val_mul, NNReal.coe_mul]
+    exact Real.log_mul (hpos g).ne' (hpos h).ne'
+  have hone : f 1 = 0 := by simp [f]
+  have hproper : IsProperMap f := by
+    let e : ℝ≥0ˣ ≃ₜ ℝ :=
+      (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+    have he : (e ∘ m) = f := funext fun g ↦ (Real.log_of_pos (hpos g)).symm
+    exact he ▸ e.isProperMap.comp hm.1
+  have hfm : Measurable f := hproper.continuous.measurable
+  obtain ⟨u, hu⟩ : ∃ u : G, 0 < f u := by
+    obtain ⟨g, hg⟩ := hm.2
+    have hn : f g ≠ 0 := by
+      intro hz
+      apply hg
+      apply Units.ext
+      apply NNReal.eq
+      change ((m g).val : ℝ) = 1
+      calc ((m g).val : ℝ) = Real.exp (f g) := (Real.exp_log (hpos g)).symm
+        _ = 1 := by rw [hz, Real.exp_zero]
+    rcases hn.lt_or_gt with h | h
+    · refine ⟨g⁻¹, ?_⟩
+      have hsum := hmul g⁻¹ g
+      rw [inv_mul_cancel, hone] at hsum
+      linarith
+    · exact ⟨g, h⟩
+  have hpow (j : ℕ) (g : G) : f (u ^ j * g) = j * f u + f g := by
+    induction j with
+    | zero => simp
+    | succ n ih =>
+      rw [pow_succ', mul_assoc, hmul, ih]
+      push_cast
+      ring
+  let B (j : ℕ) : Set G := f ⁻¹' Icc (c + j * f u) (c + (j + 1) * f u)
+  have hB0 : μ (f ⁻¹' Icc c (c + f u)) < ⊤ :=
+    (hproper.isCompact_preimage isCompact_Icc).measure_lt_top
+  have hBj (j : ℕ) : μ (B j) = μ (f ⁻¹' Icc c (c + f u)) := by
+    rw [← measure_preimage_mul μ (u ^ j) (B j)]
+    congr 1
+    ext g
+    simp only [B, mem_preimage, mem_Icc, hpow]
+    constructor <;> rintro ⟨h1, h2⟩ <;> constructor <;> linarith
+  have hcover : f ⁻¹' Ici c ⊆ ⋃ j, B j := by
+    intro g hg
+    have hg' : c ≤ f g := hg
+    have h0 : 0 ≤ (f g - c) / f u := div_nonneg (sub_nonneg.2 hg') hu.le
+    have h1 := Nat.floor_le h0
+    have h2 := Nat.lt_floor_add_one ((f g - c) / f u)
+    rw [le_div_iff₀ hu] at h1
+    rw [div_lt_iff₀ hu] at h2
+    have hmem : f g ∈ Icc (c + (⌊(f g - c) / f u⌋₊ : ℝ) * f u)
+        (c + ((⌊(f g - c) / f u⌋₊ : ℝ) + 1) * f u) := ⟨by linarith, by linarith⟩
+    exact mem_iUnion.2 ⟨_, hmem⟩
+  have hr : Real.exp (-(η * f u)) < 1 :=
+    Real.exp_lt_one_iff.2 (neg_lt_zero.2 (mul_pos hη hu))
+  have hsum : Summable fun j : ℕ ↦ Real.exp (-(η * (c + j * f u))) := by
+    refine ((summable_geometric_of_lt_one (Real.exp_pos _).le hr).mul_left
+      (Real.exp (-(η * c)))).congr fun j ↦ ?_
+    rw [← Real.exp_nat_mul, ← Real.exp_add]
+    congr 1
+    ring
+  have hfin : ∫⁻ g in f ⁻¹' Ici c, ENNReal.ofReal (Real.exp (-(η * f g))) ∂μ < ⊤ :=
+    calc ∫⁻ g in f ⁻¹' Ici c, ENNReal.ofReal (Real.exp (-(η * f g))) ∂μ
+        ≤ ∫⁻ g in ⋃ j, B j, ENNReal.ofReal (Real.exp (-(η * f g))) ∂μ :=
+          lintegral_mono_set hcover
+      _ ≤ ∑' j, ∫⁻ g in B j, ENNReal.ofReal (Real.exp (-(η * f g))) ∂μ :=
+          lintegral_iUnion_le B _
+      _ ≤ ∑' j : ℕ, ENNReal.ofReal (Real.exp (-(η * (c + j * f u)))) *
+            μ (f ⁻¹' Icc c (c + f u)) := by
+          refine tsum_le_tsum fun j ↦ ?_
+          rw [← hBj j, ← setLIntegral_const]
+          refine setLIntegral_mono' (hfm measurableSet_Icc) fun g hg ↦ ?_
+          exact ENNReal.ofReal_le_ofReal (Real.exp_le_exp.2
+            (neg_le_neg (mul_le_mul_of_nonneg_left hg.1 hη.le)))
+      _ < ⊤ := by
+          rw [ENNReal.tsum_mul_right]
+          exact ENNReal.mul_lt_top hsum.tsum_ofReal_ne_top.lt_top hB0
+  have hint : Integrable (fun g ↦ Real.exp (-(η * f g))) (μ.restrict (f ⁻¹' Ici c)) :=
+    ⟨(Real.measurable_exp.comp (hfm.const_mul η).neg).aestronglyMeasurable,
+      (hasFiniteIntegral_iff_ofReal (ae_of_all _ fun g ↦ (Real.exp_pos _).le)).2 hfin⟩
+  exact hint
+
+/-- Above a cutoff of the logarithmic module, the moment kernel of a unitary quasi-character
+twisted to an abscissa below `b` gives a continuous functional on the weighted L² space of a
+Haar measure, for every density that dominates `exp (2 * b * x)`. -/
+private theorem modulated_cutoff_moment_functional (hm : IsModulation m) (μ : Measure G)
+    [μ.IsHaarMeasure] {ρ : ℝ → ℝ} (hρ : Measurable ρ) {b : ℝ}
+    (hρge : ∀ x, Real.exp (2 * b * x) ≤ ρ x) {A : ℝ} (hA : 1 < A) (z : ℂ) (hz : z.re < b)
+    (k : ℕ) (χ : QuasiCharacter G) (hχ : ∀ g, ‖χ g‖ = 1) :
+    ∃ Λ : Lp ℂ 2 (μ.withDensity fun g ↦ ENNReal.ofReal (ρ (logModule m g))) →L[ℂ] ℂ,
+      ∀ f : Lp ℂ 2 (μ.withDensity fun g ↦ ENNReal.ofReal (ρ (logModule m g))),
+        Integrable (fun g ↦ (logModule m ⁻¹' Ici (-Real.log A)).indicator (⇑f) g *
+          (logModule m g : ℂ) ^ k *
+          quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) μ ∧
+        Λ f = ∫ g, (logModule m ⁻¹' Ici (-Real.log A)).indicator (⇑f) g *
+          (logModule m g : ℂ) ^ k *
+          quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g ∂μ := by
+  have hρpos (x : ℝ) : 0 < ρ x := (Real.exp_pos _).trans_le (hρge x)
+  have hlog : Measurable (fun g ↦ Real.log ((m g).val : ℝ)) :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable.log
+  have hρm : Measurable fun g ↦ ρ (logModule m g) := hρ.comp hlog
+  have hU : MeasurableSet (logModule m ⁻¹' Ici (-Real.log A)) := hlog measurableSet_Ici
+  have hker : Measurable fun g ↦ (logModule m g : ℂ) ^ k *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g :=
+    ((Complex.measurable_ofReal.comp hlog).pow_const k).mul (map_continuous _).measurable
+  have hη : 0 < b - z.re := sub_pos.2 hz
+  have hint : Integrable (fun g ↦ ‖(logModule m ⁻¹' Ici (-Real.log A)).indicator
+      (fun g ↦ (logModule m g : ℂ) ^ k *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) g‖ ^ 2 *
+      (ρ (logModule m g))⁻¹) μ := by
+    refine ((integrable_indicator_iff hU).2 (Integrable.const_mul
+      (integrableOn_exp_neg_logModule m hm μ hη (-Real.log A))
+      (((2 * k).factorial : ℝ) / (b - z.re) ^ (2 * k) *
+        Real.exp (2 * (b - z.re) * Real.log A)))).mono'
+      (((hker.indicator hU).norm.pow_const 2).mul hρm.inv).aestronglyMeasurable
+      (Eventually.of_forall fun g ↦ ?_)
+    beta_reduce
+    rw [Real.norm_of_nonneg (mul_nonneg (sq_nonneg _) (inv_nonneg.2 (hρpos _).le))]
+    by_cases hg : g ∈ logModule m ⁻¹' Ici (-Real.log A)
+    · have hc : ‖quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g‖ =
+          Real.exp (z.re * logModule m g) := by
+        rw [quasiCharacterNormTwist_eq_exp, norm_mul, hχ g, one_mul, Complex.norm_exp]
+        simp
+      rw [Set.indicator_of_mem hg, Set.indicator_of_mem hg, norm_mul, norm_pow,
+        Complex.norm_real, Real.norm_eq_abs, hc]
+      exact sq_moment_div_le hz (Real.log_pos hA).le k
+        (show -Real.log A ≤ logModule m g from hg) (hρge _)
+    · rw [Set.indicator_of_notMem hg, Set.indicator_of_notMem hg, norm_zero]
+      simp
+  obtain ⟨Λ, hΛ⟩ := weightedL2_pairing μ hρm (fun g ↦ hρpos _)
+    (hker.indicator hU).aestronglyMeasurable hint
+  refine ⟨Λ, fun f ↦ ?_⟩
+  have hfun : (fun g ↦ (logModule m ⁻¹' Ici (-Real.log A)).indicator (⇑f) g *
+      (logModule m g : ℂ) ^ k * quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) =
+      fun g ↦ f g * (logModule m ⁻¹' Ici (-Real.log A)).indicator (fun g ↦
+        (logModule m g : ℂ) ^ k *
+          quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) g := by
+    funext g
+    by_cases hg : g ∈ logModule m ⁻¹' Ici (-Real.log A)
+    · rw [Set.indicator_of_mem hg, Set.indicator_of_mem hg, mul_assoc]
+    · rw [Set.indicator_of_notMem hg, Set.indicator_of_notMem hg, zero_mul, zero_mul, mul_zero]
+  rw [hfun]
+  exact hΛ f
+
+/-- Over the full exponent line, the Fourier–Mellin integral is the integral against the
+quasi-character. -/
+private theorem modulatedFourierMellin_univ (hm : IsModulation m) (μ : Measure G)
+    (f : G → ℂ) (c : QuasiCharacter G) :
+    modulatedFourierMellin m univ hm μ f c = ∫ g, f g * c g ∂μ := by
+  unfold modulatedFourierMellin
+  rw [Set.indicator_of_mem]
+  exact mem_univ (quasiCharacterAbscissa m.toMonoidHom hm.1 hm.2 c)
 
 /-- Paper: Theorem 9.2.1.5(1), p. 408. With canonical Haar measure, the
 exponential-decay tests complete to the weighted L² on the group.
@@ -884,6 +1272,8 @@ theorem modulatedLineSobolev_mellin (hm : IsModulation m)
             fun y ↦ iteratedDeriv (k : ℕ) (mellin (fun t ↦ f.val (Real.log t)))
               (verticalPoint b y)) ∧ M u = ↑(g ⊗ₜ[ℂ] v) := by sorry
 
+-- The coefficient only uses the probability measure on the kernel. Keep the ambient hypotheses.
+set_option linter.unusedSectionVars false in
 /-- Paper: Theorem 9.2.1.5(2), p. 408, and Equation (9.2.1.25), p. 409.
 Taking the isotype coefficient of a line Mellin tensor multiplies the scalar trace
 by the kernel Fourier coefficient at the inverse character, as in (D.3.3.14). -/
@@ -894,7 +1284,27 @@ theorem modulatedLineSobolev_mellin_isotype
     let H := ScalarLineHardySobolev b N
     ∃ coefficient : UniformSpace.Completion (Lp ℂ 2 μ₁ ⊗[ℂ] H) →L[ℂ] H,
       ∀ (g : Lp ℂ 2 μ₁) (v : H),
-        coefficient ↑(g ⊗ₜ[ℂ] v) = lcaFourier μ₁ g ω⁻¹ • v := by sorry
+        coefficient ↑(g ⊗ₜ[ℂ] v) = lcaFourier μ₁ g ω⁻¹ • v := by
+  intro H
+  let : IsProbabilityMeasure μ₁ := ⟨_hμ₁⟩
+  let ψ (x : m.toMonoidHom.ker) : ℂ := (ω⁻¹ x : Circle)
+  have hψ : MemLp ψ 2 μ₁ := MemLp.of_bound
+    (continuous_subtype_val.comp (ω⁻¹).continuous).aestronglyMeasurable 1
+    (.of_forall fun x ↦ (Circle.norm_coe (ω⁻¹ x)).le)
+  let L := innerSL ℂ (hψ.toLp ψ)
+  have hL (g : Lp ℂ 2 μ₁) : L g = lcaFourier μ₁ g ω⁻¹ := by
+    rw [lcaFourier]
+    change (∫ x, inner ℂ (hψ.toLp ψ x) (g x) ∂μ₁) = _
+    apply integral_congr_ae
+    filter_upwards [hψ.coeFn_toLp] with x hx
+    rw [hx]
+    rfl
+  let A : (Lp ℂ 2 μ₁ ⊗[ℂ] H) →L[ℂ] H :=
+    (TensorProduct.lidIsometry ℂ H).toContinuousLinearEquiv.toContinuousLinearMap.comp (L.rTensor H)
+  let : CompleteSpace H := inferInstanceAs (CompleteSpace (Submodule.topologicalClosure _))
+  refine ⟨A.fromCompletion, fun g v ↦ ?_⟩
+  rw [ContinuousLinearMap.fromCompletion_apply_coe]
+  simp [A, hL]
 
 -- TODO(paper-gap): Theorem 9.2.1.5(3) switches from the Hilbert tensor product
 -- to the projective tensor product in the middle of the bottom row. Its right-hand
@@ -920,9 +1330,42 @@ theorem modulatedLineSobolev_cutoff_eval (hm : IsModulation m) (_hms : Surjectiv
       ∀ (f : ModulatedExponentialDecay m univ) (u : E),
         tsupport f.val ⊆ (logModule m) ⁻¹' Ioi (-Real.log a) →
         (u : G → ℂ) =ᵐ[μ] f.val →
-        Λ u = iteratedDeriv k (fun w ↦ modulatedFourierMellin m univ hm μ f.val (c w)) z :=
-  by sorry
-
+        Λ u = iteratedDeriv k (fun w ↦ modulatedFourierMellin m univ hm μ f.val (c w)) z := by
+  intro μ E U c
+  have hμ : μ.IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  obtain ⟨Λ, hΛ⟩ := modulated_cutoff_moment_functional m hm μ
+    (continuous_lineSobolevDensity b N).measurable (exp_le_lineSobolevDensity b N) _ha z _hz
+    k χ _hχ
+  refine ⟨Λ, ⟨hΛ, fun f u hsupp hu ↦ ?_⟩,
+    fun Λ' hΛ' ↦ ContinuousLinearMap.ext fun f ↦ (hΛ'.1 f).2.trans (hΛ f).2.symm⟩
+  have hind : (logModule m ⁻¹' Ici (-Real.log a)).indicator (⇑u) =ᵐ[μ] f.val := by
+    filter_upwards [hu] with g hg
+    by_cases hgU : g ∈ logModule m ⁻¹' Ici (-Real.log a)
+    · rw [Set.indicator_of_mem hgU, hg]
+    · rw [Set.indicator_of_notMem hgU]
+      exact (image_eq_zero_of_notMem_tsupport fun h ↦ hgU (Ioi_subset_Ici_self
+        (show logModule m g ∈ Ioi (-Real.log a) from hsupp h))).symm
+  have hint : ∀ σ ∈ Ioo (z.re - 1) b, ∀ n : ℕ,
+      Integrable (fun g ↦ f.val g * (logModule m g : ℂ) ^ n *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ := fun σ hσ n ↦ by
+    obtain ⟨_, hΛσ⟩ := modulated_cutoff_moment_functional m hm μ
+      (continuous_lineSobolevDensity b N).measurable (exp_le_lineSobolevDensity b N) _ha
+      (σ : ℂ) (by rw [Complex.ofReal_re]; exact hσ.2) n χ _hχ
+    refine (hΛσ u).1.congr ?_
+    filter_upwards [hind] with g hg
+    exact congrArg (fun t : ℂ ↦ t * (logModule m g : ℂ) ^ n *
+      quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) hg
+  have hFM : (fun w ↦ modulatedFourierMellin m univ hm μ f.val (c w)) = fun w ↦
+      ∫ g, f.val g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ :=
+    funext fun w ↦ modulatedFourierMellin_univ m hm μ f.val _
+  obtain ⟨_, _, hderiv⟩ := iteratedDeriv_normTwist_moment m μ χ hint k
+    (show z.re ∈ Ioo (z.re - 1) b from ⟨by linarith, _hz⟩)
+  refine ((hΛ u).2.trans (integral_congr_ae ?_)).trans
+    (hderiv.symm.trans (congrArg (fun F : ℂ → ℂ ↦ iteratedDeriv k F z) hFM.symm))
+  filter_upwards [hind] with g hg
+  exact congrArg (fun t : ℂ ↦ t * (logModule m g : ℂ) ^ k *
+    quasiCharacterNormTwist m.toMonoidHom m.continuous χ z g) hg
 /-- Paper: Corollary 9.2.1.7, p. 409. In each unitary chart the cutoff Mellin
 integral of a completed line class is holomorphic and its derivatives are log moments.
 Deviation: Apply the source cutoff as in `modulatedLineSobolev_cutoff_eval`. -/
@@ -935,10 +1378,26 @@ theorem modulatedLineSobolev_cutoff_iteratedDeriv_mellin (hm : IsModulation m) (
     let c := quasiCharacterNormTwist m.toMonoidHom m.continuous χ
     let M := fun w : ℂ ↦ modulatedFourierMellin m univ hm μ u (c w)
     AnalyticAt ℂ M z ∧ iteratedDeriv k M z =
-      ∫ g, u g * (logModule m g : ℂ) ^ k * c z g ∂μ := by sorry
+      ∫ g, u g * (logModule m g : ℂ) ^ k * c z g ∂μ := by
+  intro μ u c M
+  have hμ : μ.IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hint : ∀ σ ∈ Ioo (z.re - 1) b, ∀ n : ℕ,
+      Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ n *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ := fun σ hσ n ↦ by
+    obtain ⟨_, hΛ⟩ := modulated_cutoff_moment_functional m hm μ
+      (continuous_lineSobolevDensity b N).measurable (exp_le_lineSobolevDensity b N) _ha
+      (σ : ℂ) (by rw [Complex.ofReal_re]; exact hσ.2) n χ _hχ
+    exact (hΛ f).1
+  have hM : M = fun w ↦
+      ∫ g, u g * quasiCharacterNormTwist m.toMonoidHom m.continuous χ w g ∂μ :=
+    funext fun w ↦ modulatedFourierMellin_univ m hm μ u _
+  obtain ⟨h1, _, h3⟩ := iteratedDeriv_normTwist_moment m μ χ hint k
+    (show z.re ∈ Ioo (z.re - 1) b from ⟨by linarith, _hz⟩)
+  rw [hM]
+  exact ⟨h1, h3⟩
 
 end ModulatedLine
-
 section Interval
 
 /-- Paper: Proposition 9.2.1.8, p. 410. The density on a compact base interval
@@ -1469,6 +1928,52 @@ theorem scalarIntervalSobolev_enorm_Ici_eq_top (a s : ℝ) (_hs : 0 ≤ s)
     linarith [Real.add_one_le_exp (max (max a 0) (K.toReal / x₀) * x₀)]
   exact absurd (hKle _ (le_max_left _ _)) (not_le.2 ((ENNReal.lt_ofReal_iff_toReal_lt hK).2 hlt))
 
+/-- An integrable function on the real line whose Fourier transform vanishes identically is
+zero almost everywhere: pair it with the Fourier transforms of Schwartz functions. -/
+private theorem ae_eq_zero_of_fourier_eq_zero {h : ℝ → ℂ} (hh : Integrable h)
+    (hF : ∀ y : ℝ, FourierTransform.fourier h y = 0) : h =ᵐ[volume] 0 := by
+  refine ae_eq_zero_of_integral_contDiff_smul_eq_zero hh.locallyIntegrable fun g hg hgc ↦ ?_
+  have hg₁ : HasCompactSupport (Complex.ofRealCLM ∘ g) := hgc.comp_left rfl
+  let ψ : SchwartzMap ℝ ℂ := hg₁.toSchwartzMap (Complex.ofRealCLM.contDiff.comp hg)
+  let φ : SchwartzMap ℝ ℂ := FourierTransform.fourierInv ψ
+  have hφ : FourierTransform.fourier φ = ψ := FourierTransform.fourier_fourierInv_eq ψ
+  have key : ∫ ξ, FourierTransform.fourier (φ : ℝ → ℂ) ξ • h ξ =
+      ∫ x, φ x • FourierTransform.fourier h x := by
+    simpa using! VectorFourier.integral_bilin_fourierIntegral_eq_flip
+      (ContinuousLinearMap.lsmul ℂ ℂ) (L := innerₗ ℝ) Real.continuous_fourierChar
+      continuous_inner φ.integrable hh
+  calc ∫ x, g x • h x = ∫ x, ψ x • h x := by
+        refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+        exact (Complex.coe_smul (g x) (h x)).symm
+    _ = ∫ ξ, FourierTransform.fourier (φ : ℝ → ℂ) ξ • h ξ := by
+        rw [← SchwartzMap.fourier_coe, hφ]
+    _ = ∫ x, φ x • FourierTransform.fourier h x := key
+    _ = 0 := by simp [hF]
+
+/-- On the open strip of a compact base interval, each moment of a weighted L² class against
+a real exponential is integrable. -/
+private theorem intervalSobolev_integrable_moment (a b s : ℝ) (hs : 0 ≤ s)
+    (f : CompactIntervalSobolev volume id a b s) {σ : ℝ} (hσ : σ ∈ Ioo a b) (n : ℕ) :
+    Integrable (fun x : ℝ ↦ f x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume := by
+  obtain ⟨δ, hδ, hδa, hδb⟩ : ∃ δ : ℝ, 0 < δ ∧ δ ≤ σ - a ∧ δ ≤ b - σ :=
+    ⟨min (σ - a) (b - σ), lt_min (sub_pos.2 hσ.1) (sub_pos.2 hσ.2),
+      min_le_left _ _, min_le_right _ _⟩
+  obtain ⟨_, hΛ⟩ := weightedL2_moment_functional (continuous_intervalSobolevDensity' a b s)
+    (intervalSobolevDensity_pos a b s) (σ : ℂ) n MeasurableSet.univ (δ := 2 * δ) (K := 1)
+    (mul_pos two_pos hδ) zero_le_one fun x _ ↦ by
+      have h1 : (1 : ℝ) ≤ (1 + x ^ 2) ^ (s / 2) :=
+        Real.one_le_rpow (by nlinarith [sq_nonneg x]) (by linarith)
+      rw [one_mul, Complex.ofReal_re]
+      unfold intervalSobolevDensity
+      refine le_trans ?_ (le_mul_of_one_le_right (le_max_of_le_left (Real.exp_pos _).le) h1)
+      rcases le_total 0 x with hx | hx
+      · rw [abs_of_nonneg hx]
+        exact le_max_of_le_right (Real.exp_le_exp.2
+          (by nlinarith [mul_nonneg (sub_nonneg.2 hδb) hx]))
+      · rw [abs_of_nonpos hx]
+        exact le_max_of_le_left (Real.exp_le_exp.2
+          (by nlinarith [mul_nonneg (sub_nonneg.2 hδa) (neg_nonneg.2 hx)]))
+  simpa only [Set.indicator_univ, mul_assoc] using (hΛ f).1
 -- TODO(paper-gap): Lemma 9.2.2.2(3) treats the infinite supremum as a finite
 -- norm and identifies it with the topology of individual line norms.
 -- TODO(paper-gap): Definition 9.2.2.3 does not specify how the derivative index k
@@ -1492,7 +1997,49 @@ theorem scalarIntervalSobolev_mellin_holomorphic (a b s : ℝ) (_hab : a < b) (_
     let M := fun (f : E) z ↦ ∫ x : ℝ, f x * Complex.exp (z * (x : ℂ))
     (∀ f : E, (∀ z ∈ strip, Integrable (fun x : ℝ ↦ f x * Complex.exp (z * (x : ℂ)))) ∧
       DifferentiableOn ℂ (M f) strip) ∧ Injective (fun f ↦ fun z : strip ↦ M f z.val) := by
-  sorry
+  intro E strip M
+  have hmom (f : E) (z : ℂ) (hz : z ∈ strip) :=
+    iteratedDeriv_exp_moment (h := (f : ℝ → ℂ))
+      (fun σ hσ n ↦ intervalSobolev_integrable_moment a b s _hs f hσ n) 0 (z := z) hz
+  have hint (f : E) (z : ℂ) (hz : z ∈ strip) :
+      Integrable (fun x : ℝ ↦ f x * Complex.exp (z * (x : ℂ))) := by
+    simpa only [pow_zero, mul_one] using (hmom f z hz).2.1
+  refine ⟨fun f ↦ ⟨hint f, fun z hz ↦ ?_⟩, fun f₁ f₂ heq ↦ ?_⟩
+  · exact (hmom f z hz).1.differentiableAt.differentiableWithinAt
+  · have hσ : ((a + b) / 2 : ℝ) ∈ Ioo a b := ⟨by linarith, by linarith⟩
+    have hzmem (y : ℝ) : (((a + b) / 2 : ℝ) : ℂ) + ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I ∈
+        strip := by
+      change (_ : ℂ).re ∈ Ioo a b
+      simpa using hσ
+    have hσmem : (((a + b) / 2 : ℝ) : ℂ) ∈ strip := by
+      change (_ : ℂ).re ∈ Ioo a b
+      simpa using hσ
+    have hh : Integrable (fun x : ℝ ↦ (f₁ x - f₂ x) *
+        Complex.exp ((((a + b) / 2 : ℝ) : ℂ) * (x : ℂ))) :=
+      ((hint f₁ _ hσmem).sub (hint f₂ _ hσmem)).congr
+        (ae_of_all _ fun x ↦ (sub_mul _ _ _).symm)
+    have hzero := ae_eq_zero_of_fourier_eq_zero hh fun y ↦ by
+      rw [Real.fourier_real_eq_integral_exp_smul]
+      have hfun : (fun v : ℝ ↦ Complex.exp (((-2 * Real.pi * v * y : ℝ) : ℂ) * Complex.I) •
+          ((f₁ v - f₂ v) * Complex.exp ((((a + b) / 2 : ℝ) : ℂ) * (v : ℂ)))) = fun v : ℝ ↦
+          f₁ v * Complex.exp (((((a + b) / 2 : ℝ) : ℂ) +
+            ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I) * (v : ℂ)) -
+          f₂ v * Complex.exp (((((a + b) / 2 : ℝ) : ℂ) +
+            ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I) * (v : ℂ)) := by
+        funext v
+        have hz : ((((a + b) / 2 : ℝ) : ℂ) + ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I) * (v : ℂ) =
+            ((-2 * Real.pi * v * y : ℝ) : ℂ) * Complex.I + (((a + b) / 2 : ℝ) : ℂ) * (v : ℂ) := by
+          push_cast
+          ring
+        rw [smul_eq_mul, hz, Complex.exp_add]
+        ring
+      rw [hfun, integral_sub (hint f₁ _ (hzmem y)) (hint f₂ _ (hzmem y))]
+      exact sub_eq_zero.2 (congrFun heq ⟨_, hzmem y⟩)
+    have hvol : (f₁ : ℝ → ℂ) =ᵐ[volume] f₂ := by
+      filter_upwards [hzero] with x hx
+      have hx' : (f₁ x - f₂ x) * Complex.exp ((((a + b) / 2 : ℝ) : ℂ) * (x : ℂ)) = 0 := hx
+      exact sub_eq_zero.1 ((mul_eq_zero.1 hx').resolve_right (Complex.exp_ne_zero _))
+    exact Lp.ext ((withDensity_absolutelyContinuous _ _).ae_le hvol)
 
 /-- Paper: Proposition 9.2.2.4(2), p. 414. On either endpoint line of a
 nondegenerate compact base interval, the interior Mellin integral has an almost-everywhere
@@ -1597,6 +2144,324 @@ theorem scalarIntervalSobolev_iteratedDeriv_mellin (a b s : ℝ) (_hs : 0 ≤ s)
     (by rwa [Complex.ofReal_re]) n
   exact (hΛ f).1
 
+/-- A class that agrees almost everywhere with a test profile vanishing outside `U` has the
+Mellin derivative of the profile as its moment against the kernel cut off to `U`. -/
+private theorem integral_cutoff_moment_eq_iteratedDeriv_mellin
+    (f : PositiveRealExponentialDecay univ) {u : ℝ → ℂ} (hu : u =ᵐ[volume] f.val)
+    {U : Set ℝ} (hU : ∀ x, x ∉ U → f.val x = 0) (k : ℕ) (z : ℂ) :
+    ∫ x : ℝ, u x * U.indicator (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x =
+      iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z := by
+  have hint : ∀ σ ∈ Ioo (z.re - 1) (z.re + 1), ∀ n : ℕ, Integrable
+      (fun x : ℝ ↦ f.val x * (x : ℂ) ^ n * Complex.exp ((σ : ℂ) * (x : ℂ))) volume :=
+    fun σ _ n ↦ integrable_logExponentialDecay_moment f σ n
+  have hmel : mellin (fun t ↦ f.val (Real.log t)) =
+      fun w : ℂ ↦ ∫ x : ℝ, f.val x * Complex.exp (w * (x : ℂ)) :=
+    funext fun w ↦ mellin_comp_log_eq f.val w
+  rw [hmel, (iteratedDeriv_exp_moment hint k ⟨by linarith, by linarith⟩).2.2]
+  refine integral_congr_ae ?_
+  filter_upwards [hu] with x hx
+  by_cases hmem : x ∈ U
+  · rw [Set.indicator_of_mem hmem, hx, mul_assoc]
+  · rw [Set.indicator_of_notMem hmem, hU x hmem, mul_zero, zero_mul, zero_mul]
+
+/-- The squared modulus of the moment kernel. -/
+private theorem norm_sq_moment_kernel (k : ℕ) (z : ℂ) (x : ℝ) :
+    ‖(x : ℂ) ^ k * Complex.exp (z * (x : ℂ))‖ ^ 2 = x ^ (2 * k) * Real.exp (2 * z.re * x) := by
+  have hre : (z * (x : ℂ)).re = z.re * x := by simp
+  have h1 : ‖(x : ℂ) ^ k * Complex.exp (z * (x : ℂ))‖ = |x| ^ k * Real.exp (z.re * x) := by
+    rw [norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, Complex.norm_exp, hre]
+  have h2 : (|x| ^ k) ^ 2 = x ^ (2 * k) := by
+    rw [← pow_mul, mul_comm, pow_mul, sq_abs, ← pow_mul]
+  have h3 : Real.exp (z.re * x) ^ 2 = Real.exp (2 * z.re * x) := by
+    rw [← Real.exp_nat_mul]
+    congr 1
+    push_cast
+    ring
+  rw [h1, mul_pow, h2, h3]
+
+/-- For an abscissa in the base interval, the squared moment kernel divided by the
+compact-interval density is at most a quotient of powers. -/
+private theorem sq_moment_kernel_div_density_le {a b s : ℝ} (k : ℕ) (z : ℂ)
+    (hz : z.re ∈ Icc a b) (x : ℝ) :
+    ‖(x : ℂ) ^ k * Complex.exp (z * (x : ℂ))‖ ^ 2 * (intervalSobolevDensity a b s x)⁻¹ ≤
+      x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+  have hy : 0 < (1 + x ^ 2) ^ (s / 2) := Real.rpow_pos_of_pos (by positivity) _
+  have hmpos : 0 < max (Real.exp (2 * a * x)) (Real.exp (2 * b * x)) :=
+    lt_max_of_lt_left (Real.exp_pos _)
+  have hm : Real.exp (2 * z.re * x) ≤ max (Real.exp (2 * a * x)) (Real.exp (2 * b * x)) := by
+    rcases le_total 0 x with hx | hx
+    · exact le_max_of_le_right (Real.exp_le_exp.2
+        (by nlinarith [mul_nonneg (sub_nonneg.2 hz.2) hx]))
+    · exact le_max_of_le_left (Real.exp_le_exp.2
+        (by nlinarith [mul_nonneg (sub_nonneg.2 hz.1) (neg_nonneg.2 hx)]))
+  rw [norm_sq_moment_kernel]
+  unfold intervalSobolevDensity
+  rw [mul_inv, mul_assoc, ← mul_assoc (Real.exp _)]
+  refine mul_le_mul_of_nonneg_left ?_ (Even.pow_nonneg (even_two_mul k) x)
+  refine mul_le_of_le_one_left (inv_nonneg.2 hy.le) ?_
+  rw [← div_eq_mul_inv]
+  exact (div_le_one hmpos).2 hm
+
+/-- On the half-line where the exponential of an endpoint abscissa is the larger endpoint
+weight, the squared moment kernel divided by the density is a quotient of powers. -/
+private theorem sq_moment_kernel_div_density_eq {a b s : ℝ} (hab : a ≤ b) (k : ℕ) (z : ℂ)
+    {x : ℝ} (hx : (z.re = b ∧ 0 ≤ x) ∨ (z.re = a ∧ x ≤ 0)) :
+    ‖(x : ℂ) ^ k * Complex.exp (z * (x : ℂ))‖ ^ 2 * (intervalSobolevDensity a b s x)⁻¹ =
+      x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+  have hmax : max (Real.exp (2 * a * x)) (Real.exp (2 * b * x)) = Real.exp (2 * z.re * x) := by
+    rcases hx with ⟨h, hx⟩ | ⟨h, hx⟩
+    · rw [h]
+      exact max_eq_right (Real.exp_le_exp.2
+        (by nlinarith [mul_nonneg (sub_nonneg.2 hab) hx]))
+    · rw [h]
+      exact max_eq_left (Real.exp_le_exp.2
+        (by nlinarith [mul_nonneg (sub_nonneg.2 hab) (neg_nonneg.2 hx)]))
+  rw [norm_sq_moment_kernel]
+  unfold intervalSobolevDensity
+  rw [hmax, mul_inv, mul_assoc, ← mul_assoc (Real.exp _),
+    mul_inv_cancel₀ (Real.exp_pos _).ne', one_mul]
+
+/-- The quotient of powers is integrable exactly above the critical degree: sufficiency. -/
+private theorem integrable_pow_mul_rpow_inv {k : ℕ} {s : ℝ} (h : 2 * (k : ℝ) + 1 < s) :
+    Integrable (fun x : ℝ ↦ x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹) volume := by
+  have hr : ((Module.finrank ℝ ℝ : ℕ) : ℝ) < s - 2 * k := by
+    rw [Module.finrank_self]
+    push_cast
+    linarith
+  refine (integrable_rpow_neg_one_add_norm_sq (E := ℝ) (μ := volume) hr).mono'
+    ((measurable_id.pow_const (2 * k)).mul
+      ((measurable_const.add (measurable_id.pow_const 2)).pow_const
+        (s / 2)).inv).aestronglyMeasurable (ae_of_all _ fun x ↦ ?_)
+  have hy : 0 < 1 + x ^ 2 := by positivity
+  have h1 : x ^ (2 * k) ≤ (1 + x ^ 2) ^ k := by
+    rw [pow_mul]
+    exact pow_le_pow_left₀ (sq_nonneg x) (by linarith) k
+  have h2 : (1 + x ^ 2) ^ (-(s - 2 * k) / 2) = (1 + x ^ 2) ^ k * ((1 + x ^ 2) ^ (s / 2))⁻¹ := by
+    rw [← Real.rpow_natCast (1 + x ^ 2) k, ← Real.rpow_neg hy.le, ← Real.rpow_add hy]
+    congr 1
+    ring
+  rw [Real.norm_of_nonneg (mul_nonneg (Even.pow_nonneg (even_two_mul k) x)
+    (inv_nonneg.2 (Real.rpow_nonneg hy.le _))), Real.norm_eq_abs, sq_abs, h2]
+  exact mul_le_mul_of_nonneg_right h1 (inv_nonneg.2 (Real.rpow_nonneg hy.le _))
+
+/-- The quotient of powers is integrable exactly above the critical degree: necessity. -/
+private theorem lt_of_integrableOn_pow_mul_rpow_inv {k : ℕ} {s : ℝ} (hs : 0 ≤ s)
+    (h : IntegrableOn (fun x : ℝ ↦ x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹) (Ioi 1)) :
+    2 * (k : ℝ) + 1 < s := by
+  have key : IntegrableOn (fun x : ℝ ↦ x ^ (2 * (k : ℝ) - s)) (Ioi 1) := by
+    refine Integrable.mono' (Integrable.const_mul h ((2 : ℝ) ^ (s / 2)))
+      (measurable_id.pow_const _).aestronglyMeasurable
+      ((ae_restrict_iff' measurableSet_Ioi).2 (ae_of_all _ fun x hx ↦ ?_))
+    have hx1 : (1 : ℝ) < x := hx
+    have hx0 : 0 < x := by linarith
+    have hpos : 0 < (1 + x ^ 2) ^ (s / 2) := Real.rpow_pos_of_pos (by positivity) _
+    have hcast : ((2 : ℕ) : ℝ) * (s / 2) = s := by
+      push_cast
+      ring
+    have h1 : (1 + x ^ 2) ^ (s / 2) ≤ 2 ^ (s / 2) * x ^ s :=
+      calc (1 + x ^ 2) ^ (s / 2) ≤ (2 * x ^ 2) ^ (s / 2) :=
+            Real.rpow_le_rpow (by positivity) (by nlinarith) (by linarith)
+        _ = 2 ^ (s / 2) * x ^ s := by
+            rw [Real.mul_rpow (by norm_num) (by positivity), ← Real.rpow_natCast x 2,
+              ← Real.rpow_mul hx0.le, hcast]
+    have e : x ^ (2 * (k : ℝ) - s) = x ^ (2 * k) / x ^ s := by
+      rw [Real.rpow_sub hx0, ← Real.rpow_natCast x (2 * k)]
+      push_cast
+      rfl
+    rw [Real.norm_of_nonneg (Real.rpow_nonneg hx0.le _), e, div_eq_mul_inv, mul_left_comm]
+    refine mul_le_mul_of_nonneg_left ?_ (Even.pow_nonneg (even_two_mul k) x)
+    rw [← div_eq_mul_inv, le_div_iff₀ hpos, ← div_eq_inv_mul,
+      div_le_iff₀ (Real.rpow_pos_of_pos hx0 s)]
+    exact h1
+  have hlt := (integrableOn_Ioi_rpow_iff zero_lt_one).1 key
+  linarith
+
+/-- At an abscissa of the base interval and above the critical degree, the moment kernel cut
+off to a measurable set gives a continuous functional on the compact-interval space. -/
+private theorem intervalSobolev_boundary_moment_functional (a b s : ℝ) (k : ℕ) (z : ℂ)
+    (hz : z.re ∈ Icc a b) (hk : 2 * (k : ℝ) + 1 < s) {U : Set ℝ} (hU : MeasurableSet U) :
+    ∃ Λ : Lp ℂ 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x)) →L[ℂ] ℂ,
+      ∀ f, Integrable (fun x : ℝ ↦ f x *
+          U.indicator (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x) volume ∧
+        Λ f = ∫ x : ℝ, f x *
+          U.indicator (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x := by
+  have hker : Continuous fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) :=
+    (Complex.continuous_ofReal.pow k).mul
+      (Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal))
+  have hρm := (continuous_intervalSobolevDensity' a b s).measurable
+  refine weightedL2_pairing volume hρm (intervalSobolevDensity_pos a b s)
+    (hker.measurable.indicator hU).aestronglyMeasurable ?_
+  refine (integrable_pow_mul_rpow_inv hk).mono'
+    (((hker.measurable.indicator hU).norm.pow_const 2).mul hρm.inv).aestronglyMeasurable
+    (ae_of_all _ fun x ↦ ?_)
+  have hpos := intervalSobolevDensity_pos a b s x
+  rw [Real.norm_of_nonneg (mul_nonneg (sq_nonneg _) (inv_nonneg.2 hpos.le))]
+  exact (mul_le_mul_of_nonneg_right (pow_le_pow_left₀ (norm_nonneg _)
+    (norm_indicator_le_norm_self _ _) 2) (inv_nonneg.2 hpos.le)).trans
+    (sq_moment_kernel_div_density_le k z hz x)
+
+/-- Below the upper endpoint, the moment kernel cut off above a point gives a continuous
+functional on the compact-interval space. -/
+private theorem intervalSobolev_cutoff_moment_functional (a b s : ℝ) (hs : 0 ≤ s) {A : ℝ}
+    (hA : 1 < A) (z : ℂ) (hz : z.re < b) (k : ℕ) :
+    ∃ Λ : Lp ℂ 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x)) →L[ℂ] ℂ,
+      ∀ f, Integrable (fun x : ℝ ↦ f x * (Ici (-Real.log A)).indicator
+          (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x) volume ∧
+        Λ f = ∫ x : ℝ, f x * (Ici (-Real.log A)).indicator
+          (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x := by
+  have hlogA : 0 < Real.log A := Real.log_pos hA
+  have hbz : 0 < b - z.re := sub_pos.2 hz
+  exact intervalSobolev_moment_functional a b s hs z k
+    (measurableSet_Ici (a := -Real.log A)) (δ := 2 * (b - z.re))
+    (K := Real.exp (4 * (b - z.re) * Real.log A)) (mul_pos two_pos hbz) (Real.exp_pos _).le
+    fun x hx ↦ by
+      have hx' : -Real.log A ≤ x := hx
+      have hle : 2 * z.re * x + 2 * (b - z.re) * |x| ≤
+          4 * (b - z.re) * Real.log A + 2 * b * x := by
+        rcases le_total 0 x with h0 | h0
+        · rw [abs_of_nonneg h0]
+          nlinarith [mul_pos hbz hlogA]
+        · rw [abs_of_nonpos h0]
+          nlinarith [mul_nonneg hbz.le (by linarith : 0 ≤ Real.log A + x)]
+      calc Real.exp (2 * z.re * x + 2 * (b - z.re) * |x|)
+          ≤ Real.exp (4 * (b - z.re) * Real.log A + 2 * b * x) := Real.exp_le_exp.2 hle
+        _ = Real.exp (4 * (b - z.re) * Real.log A) * Real.exp (2 * b * x) := Real.exp_add _ _
+        _ ≤ Real.exp (4 * (b - z.re) * Real.log A) *
+            max (Real.exp (2 * a * x)) (Real.exp (2 * b * x)) :=
+          mul_le_mul_of_nonneg_left (le_max_right _ _) (Real.exp_pos _).le
+
+/-- If a continuous functional on the compact-interval space evaluates the Mellin derivative
+of each test supported in an open set, then the squared moment kernel is integrable on that
+set against the reciprocal density: the functional is integration against a class of the dual
+space, and this class agrees with the kernel almost everywhere on the set. -/
+private theorem integrableOn_sq_moment_kernel_of_eval (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s)
+    (k : ℕ) (z : ℂ) {V : Set ℝ} (hV : IsOpen V)
+    (Λ : CompactIntervalSobolev volume id a b s →L[ℂ] ℂ)
+    (hΛ : ∀ (f : PositiveRealExponentialDecay univ)
+      (u : CompactIntervalSobolev volume id a b s),
+      tsupport f.val ⊆ V → (u : ℝ → ℂ) =ᵐ[volume] f.val →
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) :
+    IntegrableOn (fun x : ℝ ↦ ‖(x : ℂ) ^ k * Complex.exp (z * (x : ℂ))‖ ^ 2 *
+      (intervalSobolevDensity a b s x)⁻¹) V := by
+  have hρc := continuous_intervalSobolevDensity' a b s
+  have hρpos := intervalSobolevDensity_pos a b s
+  have hρi : Measurable fun x ↦ (intervalSobolevDensity a b s x)⁻¹ := hρc.measurable.inv
+  have hρipos : ∀ x, 0 < (intervalSobolevDensity a b s x)⁻¹ := fun x ↦ inv_pos.2 (hρpos x)
+  have hker : Continuous fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)) :=
+    (Complex.continuous_ofReal.pow k).mul
+      (Complex.continuous_exp.comp (continuous_const.mul Complex.continuous_ofReal))
+  obtain ⟨T, hT, -⟩ := scalarIntervalSobolev_dual a b s hab hs
+  have hv2 := (weightedL2_norm_eq volume hρi hρipos (T Λ)).1
+  have hvloc : LocallyIntegrable (T Λ : ℝ → ℂ) volume := by
+    refine locallyIntegrable_iff.2 fun K hK ↦ ?_
+    obtain ⟨_, hpair⟩ := weightedL2_pairing volume hρi hρipos
+      (w := K.indicator fun _ ↦ (1 : ℂ))
+      (measurable_const.indicator hK.measurableSet).aestronglyMeasurable
+      (((integrable_indicator_iff hK.measurableSet).2
+        (hρc.continuousOn.integrableOn_compact hK (μ := volume))).congr
+        (ae_of_all _ fun x ↦ by
+          by_cases hx : x ∈ K
+          · simp [Set.indicator_of_mem hx]
+          · simp [Set.indicator_of_notMem hx]))
+    refine (integrable_indicator_iff hK.measurableSet).1
+      ((hpair (T Λ)).1.congr (ae_of_all _ fun x ↦ ?_))
+    by_cases hx : x ∈ K
+    · simp [Set.indicator_of_mem hx]
+    · simp [Set.indicator_of_notMem hx]
+  have hloc : LocallyIntegrableOn
+      (fun x : ℝ ↦ T Λ x - (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) V volume :=
+    (hvloc.sub hker.locallyIntegrable).locallyIntegrableOn V
+  have hae := hV.ae_eq_zero_of_integral_contDiff_smul_eq_zero hloc fun g hg hgc hgV ↦ by
+    have hg₁ : HasCompactSupport fun x ↦ (g x : ℂ) := hgc.comp_left Complex.ofReal_zero
+    have hcont : Continuous fun x ↦ (g x : ℂ) := Complex.continuous_ofReal.comp hg.continuous
+    let fT : PositiveRealExponentialDecay univ := ⟨fun x ↦ (g x : ℂ),
+      mem_logExponentialDecaySubmodule_of_hasCompactSupport univ hg₁
+        (Complex.ofRealCLM.contDiff.comp hg)⟩
+    have : IsLocallyFiniteMeasure (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x)) :=
+      IsLocallyFiniteMeasure.withDensity_ofReal hρc
+    have hmem : MemLp (fun x ↦ (g x : ℂ)) 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x)) :=
+      hcont.memLp_of_hasCompactSupport hg₁
+    have hbase : (volume : Measure ℝ) ≪ volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x) :=
+      withDensity_absolutelyContinuous' hρc.measurable.ennreal_ofReal.aemeasurable
+        (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hρpos x)).ne')
+    let u : CompactIntervalSobolev volume id a b s := hmem.toLp _
+    have hu : (u : ℝ → ℂ) =ᵐ[volume] fun x ↦ (g x : ℂ) := hbase.ae_le hmem.coeFn_toLp
+    have h1 := hΛ fT u ((tsupport_comp_subset Complex.ofReal_zero g).trans hgV) hu
+    have h3 := integral_cutoff_moment_eq_iteratedDeriv_mellin fT
+      (u := fun x ↦ (g x : ℂ)) (ae_eq_refl _) (U := univ)
+      (fun x hx ↦ absurd (mem_univ x) hx) k z
+    have hint1 : Integrable (fun x ↦ (g x : ℂ) * T Λ x) volume :=
+      (hT Λ u).1.congr (hu.mono fun x hx ↦ congrArg (· * T Λ x) hx)
+    have hint2 : Integrable (fun x : ℝ ↦ (g x : ℂ) *
+        ((x : ℂ) ^ k * Complex.exp (z * (x : ℂ)))) volume :=
+      (hcont.mul hker).integrable_of_hasCompactSupport hg₁.mul_right
+    have heq : ∫ x, (g x : ℂ) * T Λ x =
+        ∫ x : ℝ, (g x : ℂ) * ((x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) :=
+      calc ∫ x, (g x : ℂ) * T Λ x = ∫ x, u x * T Λ x :=
+            (integral_congr_ae (hu.mono fun x hx ↦ congrArg (· * T Λ x) hx)).symm
+        _ = Λ u := (hT Λ u).2.symm
+        _ = iteratedDeriv k (mellin (fun t ↦ fT.val (Real.log t))) z := h1
+        _ = ∫ x : ℝ, (g x : ℂ) * (univ : Set ℝ).indicator
+              (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x := h3.symm
+        _ = _ := by simp only [Set.indicator_univ]
+    calc ∫ x, g x • (T Λ x - (x : ℂ) ^ k * Complex.exp (z * (x : ℂ)))
+        = ∫ x, ((g x : ℂ) * T Λ x -
+            (g x : ℂ) * ((x : ℂ) ^ k * Complex.exp (z * (x : ℂ)))) :=
+          integral_congr_ae (ae_of_all _ fun x ↦ by
+            simp only [Complex.real_smul, mul_sub])
+      _ = 0 := by rw [integral_sub hint1 hint2, heq, sub_self]
+  refine hv2.integrableOn.congr
+    ((ae_restrict_iff' hV.measurableSet).2 (hae.mono fun x hx hxV ↦ ?_))
+  beta_reduce
+  rw [sub_eq_zero.1 (hx hxV)]
+
+/-- On supported tests the Mellin derivative evaluation at an endpoint abscissa extends
+continuously exactly below the upper endpoint or above the critical degree. -/
+private theorem intervalSobolev_cutoff_eval_endpoints_iff (a b A s : ℝ)
+    (hab : a ≤ b) (hA : 1 < A) (hs : 0 ≤ s) (k : ℕ) (z : ℂ)
+    (hz : z.re ∈ ({a, b} : Set ℝ)) :
+    (∃ Λ : CompactIntervalSobolev volume id a b s →L[ℂ] ℂ,
+      ∀ (f : PositiveRealExponentialDecay univ) (u : CompactIntervalSobolev volume id a b s),
+      tsupport f.val ⊆ Ioi (-Real.log A) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔
+      z.re < b ∨ 2 * (k : ℝ) + 1 < s := by
+  have hlogA : 0 < Real.log A := Real.log_pos hA
+  have hzI : z.re ∈ Icc a b := by
+    rcases hz with h | h
+    · rw [h]
+      exact ⟨le_rfl, hab⟩
+    · rw [show z.re = b from h]
+      exact ⟨hab, le_rfl⟩
+  constructor
+  · rintro ⟨Λ, hΛ⟩
+    by_cases hzb : z.re < b
+    · exact Or.inl hzb
+    · have h : z.re = b := le_antisymm hzI.2 (not_lt.1 hzb)
+      have hint := integrableOn_sq_moment_kernel_of_eval a b s hab hs k z (V := Ioi 1)
+        isOpen_Ioi Λ fun f u hsupp hu ↦
+          hΛ f u (hsupp.trans (Ioi_subset_Ioi (by linarith))) hu
+      exact Or.inr (lt_of_integrableOn_pow_mul_rpow_inv hs (hint.congr_fun (fun x hx ↦
+        sq_moment_kernel_div_density_eq hab k z
+          (Or.inl ⟨h, by linarith [show (1 : ℝ) < x from hx]⟩)) measurableSet_Ioi))
+  · intro h
+    have hfun : ∃ Λ : Lp ℂ 2 (volume.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s x)) →L[ℂ] ℂ,
+        ∀ f, Integrable (fun x : ℝ ↦ f x * (Ici (-Real.log A)).indicator
+            (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x) volume ∧
+          Λ f = ∫ x : ℝ, f x * (Ici (-Real.log A)).indicator
+            (fun x : ℝ ↦ (x : ℂ) ^ k * Complex.exp (z * (x : ℂ))) x := by
+      rcases h with h | h
+      · exact intervalSobolev_cutoff_moment_functional a b s hs hA z h k
+      · exact intervalSobolev_boundary_moment_functional a b s k z hzI h measurableSet_Ici
+    obtain ⟨Λ, hΛ⟩ := hfun
+    refine ⟨Λ, fun f u hsupp hu ↦ ?_⟩
+    exact (hΛ u).2.trans (integral_cutoff_moment_eq_iteratedDeriv_mellin f hu (fun x hx ↦
+      image_eq_zero_of_notMem_tsupport fun h' ↦ hx (Ioi_subset_Ici_self (hsupp h'))) k z)
 -- TODO(paper-gap): Corollary 9.2.2.5(2) includes the divergent critical case s = 2k + 1.
 
 /-- Paper: Corollary 9.2.2.5(2), p. 414. At either endpoint, a Mellin derivative
@@ -1610,7 +2475,37 @@ theorem scalarIntervalSobolev_eval_boundary_iff (a b s : ℝ) (_hab : a ≤ b) (
     (∃ Λ : E →L[ℂ] ℂ, ∀ (f : PositiveRealExponentialDecay univ) (u : E),
       (u : ℝ → ℂ) =ᵐ[volume] f.val →
         Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔ 2 * (k : ℝ) + 1 < s :=
-  by sorry
+  by
+  intro E
+  have hzI : z.re ∈ Icc a b := by
+    rcases _hz with h | h
+    · rw [h]
+      exact ⟨le_rfl, _hab⟩
+    · rw [show z.re = b from h]
+      exact ⟨_hab, le_rfl⟩
+  constructor
+  · rintro ⟨Λ, hΛ⟩
+    rcases _hz with h | h
+    · have hint := integrableOn_sq_moment_kernel_of_eval a b s _hab _hs k z (V := Iio (-1))
+        isOpen_Iio Λ fun f u _ hu ↦ hΛ f u hu
+      have hG : IntegrableOn (fun x : ℝ ↦ x ^ (2 * k) * ((1 + x ^ 2) ^ (s / 2))⁻¹)
+          (Iio (-1)) :=
+        hint.congr_fun (fun x hx ↦ sq_moment_kernel_div_density_eq _hab k z
+          (Or.inr ⟨h, by linarith [show x < -1 from hx]⟩)) measurableSet_Iio
+      refine lt_of_integrableOn_pow_mul_rpow_inv _hs
+        (hG.comp_neg_Ioi.congr_fun (fun x _ ↦ ?_) measurableSet_Ioi)
+      simp only [Even.neg_pow (even_two_mul k), neg_sq]
+    · have hint := integrableOn_sq_moment_kernel_of_eval a b s _hab _hs k z (V := Ioi 1)
+        isOpen_Ioi Λ fun f u _ hu ↦ hΛ f u hu
+      exact lt_of_integrableOn_pow_mul_rpow_inv _hs (hint.congr_fun (fun x hx ↦
+        sq_moment_kernel_div_density_eq _hab k z
+          (Or.inl ⟨h, by linarith [show (1 : ℝ) < x from hx]⟩)) measurableSet_Ioi)
+  · intro hk
+    obtain ⟨Λ, hΛ⟩ := intervalSobolev_boundary_moment_functional a b s k z hzI hk
+      MeasurableSet.univ
+    refine ⟨Λ, fun f u hu ↦ ?_⟩
+    exact (hΛ u).2.trans (integral_cutoff_moment_eq_iteratedDeriv_mellin f hu
+      (fun x hx ↦ absurd (mem_univ x) hx) k z)
 
 /-- Paper: Theorem 9.2.2.6(1), p. 415. On a compact base interval of even
 degree the supported test closure is the same as the indicator range.
@@ -1704,7 +2599,15 @@ theorem scalarIntervalSobolev_cutoff_eval_boundary_iff (a b A : ℝ)
     (∃ Λ : CompactIntervalSobolev volume id a b (2 * (N : ℝ)) →L[ℂ] ℂ,
       ∀ (f : PositiveRealExponentialDecay univ) (u : CompactIntervalSobolev volume id a b (2 * (N : ℝ))),
         tsupport f.val ⊆ Ioi (-Real.log A) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
-        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔ k < N := by sorry
+        Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔ k < N := by
+  refine (intervalSobolev_cutoff_eval_endpoints_iff a b A (2 * (N : ℝ)) _hab _hA
+    (by positivity) k z (by rw [_hz]; simp)).trans ⟨fun h ↦ ?_, fun h ↦ Or.inr ?_⟩
+  · rcases h with h | h
+    · exact absurd h (by rw [_hz]; exact lt_irrefl b)
+    · have h2 : 2 * k + 1 < 2 * N := by exact_mod_cast h
+      omega
+  · have h2 : 2 * k + 1 < 2 * N := by omega
+    exact_mod_cast h2
 
 /-- Paper: Corollary 9.2.2.8(1)–(2), p. 415. On supported scalar tests every order
 extends at a distinct lower endpoint. At the upper endpoint the degree must exceed
@@ -1718,7 +2621,9 @@ theorem scalarIntervalSobolev_cutoff_eval_endpoints_iff (a b A s : ℝ)
     (∃ Λ : E →L[ℂ] ℂ, ∀ (f : PositiveRealExponentialDecay univ) (u : E),
       tsupport f.val ⊆ Ioi (-Real.log A) → (u : ℝ → ℂ) =ᵐ[volume] f.val →
         Λ u = iteratedDeriv k (mellin (fun t ↦ f.val (Real.log t))) z) ↔
-      z.re < b ∨ 2 * (k : ℝ) + 1 < s := by sorry
+      z.re < b ∨ 2 * (k : ℝ) + 1 < s := by
+  intro E
+  exact intervalSobolev_cutoff_eval_endpoints_iff a b A s _hab _hA _hs k z _hz
 
 end Interval
 
@@ -1926,6 +2831,15 @@ theorem modulatedIntervalSobolev_dual (_hm : IsModulation m)
     (fun g ↦ inv_pos.mpr (intervalSobolevDensity_pos a b s _))
     (fun g ↦ mul_inv_cancel₀ (intervalSobolevDensity_pos a b s _).ne')
 
+/-- For a nonnegative degree, the compact-interval density dominates the exponential of its
+upper endpoint. -/
+private theorem exp_le_intervalSobolevDensity (a b s : ℝ) (hs : 0 ≤ s) (x : ℝ) :
+    Real.exp (2 * b * x) ≤ intervalSobolevDensity a b s x := by
+  have h1 : (1 : ℝ) ≤ (1 + x ^ 2) ^ (s / 2) :=
+    Real.one_le_rpow (by nlinarith [sq_nonneg x]) (by linarith)
+  unfold intervalSobolevDensity
+  exact (le_max_right _ _).trans
+    (le_mul_of_one_le_right (le_max_of_le_left (Real.exp_pos _).le) h1)
 -- TODO(paper-gap): Corollary 9.2.2.12(1) omits the kernel character in the integral
 -- for a general isotype and uses m rather than k for the power of the logarithm.
 
@@ -1942,7 +2856,14 @@ theorem modulatedIntervalSobolev_cutoff_eval (a b A s : ℝ)
     let c := quasiCharacterNormTwist m.toMonoidHom m.continuous χ z
     ∃! Λ : E →L[ℂ] ℂ,
       ∀ f : E, Integrable (fun g ↦ U.indicator (⇑f) g * (logModule m g : ℂ) ^ k * c g) μ ∧
-        Λ f = ∫ g, U.indicator (⇑f) g * (logModule m g : ℂ) ^ k * c g ∂μ := by sorry
+        Λ f = ∫ g, U.indicator (⇑f) g * (logModule m g : ℂ) ^ k * c g ∂μ := by
+  intro μ E U c
+  have hμ : μ.IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  obtain ⟨Λ, hΛ⟩ := modulated_cutoff_moment_functional m hm μ
+    (continuous_intervalSobolevDensity' a b s).measurable
+    (exp_le_intervalSobolevDensity a b s _hs) _hA z _hz.2 k χ _hχ
+  exact ⟨Λ, hΛ, fun Λ' hΛ' ↦ ContinuousLinearMap.ext fun f ↦ (hΛ' f).2.trans (hΛ f).2.symm⟩
 
 /-- Paper: Corollary 9.2.2.12(1), p. 418. In the norm-twist coordinate of a unitary
 quasi-character, the kth derivative of the cutoff Mellin integral equals its kth moment.
@@ -1958,8 +2879,20 @@ theorem modulatedIntervalSobolev_cutoff_iteratedDeriv_mellin (a b A s : ℝ)
     AnalyticAt ℂ (fun w : ℂ ↦ ∫ g, u g * c w g ∂μ) z ∧
       Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ k * c z g) μ ∧
       iteratedDeriv k (fun w : ℂ ↦ ∫ g, u g * c w g ∂μ) z =
-        ∫ g, u g * (logModule m g : ℂ) ^ k * c z g ∂μ := by sorry
-
+        ∫ g, u g * (logModule m g : ℂ) ^ k * c z g ∂μ := by
+  intro μ u c
+  have hμ : μ.IsHaarMeasure :=
+    (Classical.choose_spec (existsUnique_canonicalModulatedHaar m hm).exists).1
+  have hint : ∀ σ ∈ Ioo (z.re - 1) b, ∀ n : ℕ,
+      Integrable (fun g ↦ u g * (logModule m g : ℂ) ^ n *
+        quasiCharacterNormTwist m.toMonoidHom m.continuous χ (σ : ℂ) g) μ := fun σ hσ n ↦ by
+    obtain ⟨_, hΛ⟩ := modulated_cutoff_moment_functional m hm μ
+      (continuous_intervalSobolevDensity' a b s).measurable
+      (exp_le_intervalSobolevDensity a b s _hs) _hA (σ : ℂ)
+      (by rw [Complex.ofReal_re]; exact hσ.2) n χ _hχ
+    exact (hΛ f).1
+  exact iteratedDeriv_normTwist_moment m μ χ hint k
+    (show z.re ∈ Ioo (z.re - 1) b from ⟨by linarith, _hz⟩)
 -- TODO(paper-gap): Corollary 9.2.2.12(2) includes the divergent critical case
 -- s = 2k + 1 at the upper endpoint, even for the trivial kernel character.
 

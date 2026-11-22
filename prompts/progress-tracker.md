@@ -16,9 +16,9 @@ git fetch -q origin main &&
   ln -s "$PWD/.lake/packages" "$tracker/.lake/packages"
 ```
 
-Refresh on startup, after you see a merge pass finish, and at least every half hour while
-running. Issue claims and closures can change even when the commit stays the same.
-Start each refresh in the main checkout.
+Refresh on startup and then every 20 minutes, on a timer, while running. Do not refresh on
+every merge: main moves every few minutes. Issue claims and closures can change even when the
+commit stays the same. Start each refresh in the main checkout.
 
 ```sh
 tracker=../riemann-masullo-wt/progress-tracker
@@ -28,9 +28,37 @@ git -C "$tracker" fetch -q origin main &&
 ```
 
 The generator builds the library in the tracker worktree, reads the live issues, and checks
-the totals. The output path keeps the page beside its existing `history.jsonl`. The merger
-and integrator sync issues after their merges. If a discrepancy persists across refreshes,
-report it to the integrator with the commit and issue numbers.
+the totals. The output path keeps the page beside its existing `history.jsonl`.
+
+## Sync the issues after every refresh
+
+After each refresh, so about every 20 minutes, run the issue sync from the main checkout:
+
+```sh
+scripts/sync_issues.sh
+```
+
+It opens a proof issue for each `sorry` that has none, closes the issues whose `sorry` is gone,
+and unblocks section issues whose prerequisites are stated. It works in a worktree of its own
+(`../riemann-masullo-wt/sync`), so it does not disturb your tracker worktree or anyone's
+checkout, and it takes a few minutes because it builds the library first.
+
+Many changes at once are normal: a section's statements arrive sixty at a time. The script
+checks each change against the text of the files before it makes any, and that check, not the
+number of changes, is what stops it.
+
+- Only one sync runs at a time. If it prints that another sync is running, skip this run; do
+  not wait for it or start a second one.
+- It stops without changing anything if the checkout moves under it. Run it again after the
+  next refresh.
+- If it says that changes **disagree with the text of the files**, or that it would close more
+  than half of the open issues, **do not pass `--force`**. Send the integrator the lines it
+  printed; the integrator decides.
+- If it says that main does not build, report that to the integrator and the merger at once.
+
+The integrator and the merger also sync after merging statements. If a discrepancy between the
+map and the issues persists across two refreshes after a sync, report it to the integrator with
+the commit and issue numbers.
 
 ## Publish the map
 

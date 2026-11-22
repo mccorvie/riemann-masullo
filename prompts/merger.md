@@ -87,8 +87,11 @@ git fetch -q origin && git checkout -q --detach origin/main &&
   finished: do not check out another commit there, or edit files, while it builds or applies.
   (On 2026-11-21 a checkout during the run made it read declaration names off the wrong lines:
   110 issues with garbled names were opened and 150 good ones closed.) It now stops if the
-  checkout changes under it, if a reported `sorry` is not on a declaration line, or if it is
-  about to open and close more than 20 issues each in one run; `--force` overrides the last. It refuses to run from a checkout that is not at the tip of `main`;
+  checkout changes under it, if a reported `sorry` is not on a declaration line, or if a change
+  disagrees with the text of the files: an issue to close whose declaration still reads `sorry`,
+  or one to open whose declaration does not. Many changes at once no longer stop it. `--force`
+  overrides the text check; use it only after looking at the declarations it lists. It refuses
+  to run from a checkout that is not at the tip of `main`;
   if `main` moved while it ran, update and run it again. The integrator runs it too, after
   merging statements; a lock keeps the two apart.
 

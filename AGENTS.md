@@ -18,9 +18,14 @@ Work is organized with GitHub issues and pull requests. There is no blueprint.
 4. When that merges, the integrator runs `scripts/issues.py`, which opens one **proof issue**
    (label `proof`) per `sorry`.
 5. A **prover** takes one proof issue and either proves the declaration or splits it into smaller
-   `sorry`s, which become new proof issues.
-6. The **integrator** reviews and merges. The project is finished when `lake comparator` accepts
-   `Main.lean`.
+   `sorry`s, which become new proof issues. A **sweeper** takes every open proof issue of one
+   file and closes as many as it can in a single pull request.
+6. Anyone who finds that a statement is false, that the Lean does not say what the paper says,
+   or that a printed argument has a gap **reports it on the issue**. That is a result in its
+   own right. The integrator checks the report, records it in [`ERRATA.md`](ERRATA.md) and
+   decides what becomes of the statement (see "False statements and gaps" below).
+7. The **integrator** reviews and merges. The project is finished when `lake comparator` accepts
+   `Main.lean`, or when every `sorry` that is left is a recorded gap.
 
 Role instructions are in [`prompts/`](prompts/README.md).
 
@@ -29,6 +34,7 @@ Role instructions are in [`prompts/`](prompts/README.md).
 | Path | Contents | Who edits |
 |---|---|---|
 | `RiemannMasullo/<Chapter>/Sec<N>.lean` | paper section N of that chapter; a long section is split into `Sec<N>a.lean`, `Sec<N>b.lean`, …, and the section issue names the file | digesters, provers |
+| `RiemannMasullo/<Chapter>/Sec<N>_Printed.lean` | statements of that section that are false as printed, each kept as a proposition with a proof of its negation; it imports the section file, and nothing imports it | integrator (the propositions), provers (the refutations) |
 | `RiemannMasullo/<Chapter>.lean` | chapter index (docstring only) | nobody |
 | `RiemannMasullo/ForMathlib/` | general lemmas missing from Mathlib, at the path Mathlib would use | provers |
 | `RiemannMasullo/External/` | vendored third-party Lean, see its README | integrator |
@@ -51,7 +57,10 @@ These exist because many agents work in parallel and nobody rereads everything.
   State such a fact as a separate theorem with `sorry` and use that theorem in the definition.
   A definition whose data is `sorry` makes everything downstream meaningless while still
   compiling, and one with `sorry` in a proof field changes when the proof is filled in.
-  `scripts/signatures.sh --sorry-in-defs` lists offenders.
+  Nor inside a statement: a hypothesis kept in a `variable` can fail to elaborate in the theorem
+  that includes it and become `sorry` with no error message, so write a hypothesis that only one
+  or two theorems use as an argument of those theorems.
+  `scripts/signatures.sh --sorry-in-defs` lists offenders of both kinds.
 - **No `axiom`, `native_decide`, `implemented_by`, `extern`, `unsafe`, `opaque` or `debug.*`
   options.** A finished proof must show only `propext`, `Classical.choice` and `Quot.sound` under
   `#print axioms`. `scripts/lint.sh` checks the text; CI runs it.
@@ -70,6 +79,39 @@ These exist because many agents work in parallel and nobody rereads everything.
   statement here, twice, taking the machine down once. To compare statements use
   `scripts/signatures.sh --compare`, or print `info.type.hash`; to read one, `#check` or
   `ppExpr` with `set_option pp.maxSteps`.
+
+## False statements and gaps
+
+Three things look alike in the code, a `sorry`, and are kept apart: a statement that is not
+proved yet, a statement known to be false, and a statement nobody can prove or refute.
+
+- **A statement known to be false is never left as a theorem**, with or without a `sorry`:
+  everything above it could use it and still compile. The paper's claim is kept as a
+  proposition, `def Printed.<name> : Prop`, exactly as printed and with all its quantifiers,
+  which asserts nothing. Next to it stands `theorem Printed.<name>_false : ¬ Printed.<name>`,
+  and its proof is the refutation: Lean, not prose. Until that proof is written it is a `sorry`
+  with a proof issue (label `refutation`) like any other. Both go in
+  `RiemannMasullo/<Chapter>/Sec<N>_Printed.lean`, which imports the section file and which
+  nothing may import, so that adding to it rebuilds nothing else. The repaired statement keeps
+  the ordinary name in the section file, with a `Deviation:` line.
+  `RiemannMasullo/AppA_AlgebraicNT/Sec1_Printed.lean` is the model.
+- **A gap is a named theorem.** When a statement can be neither proved nor refuted, the smallest
+  statement that is missing is isolated as a theorem of its own, whose proof is `sorry` and
+  whose docstring has a line starting `Gap:` that says what is missing. Its issue is labelled
+  `gap` and leaves the provers' queue. Everything else is proved from it by name, so that it is
+  plain what rests on each gap. Never leave a `sorry` in the middle of a larger proof. Only the
+  integrator declares a gap, and a gap is reviewed like any statement: one that is too strong
+  makes everything above it empty.
+- **Only the integrator changes a statement**, after checking the report against the page. What
+  a contributor hands in is the finding: the paper item and page, exactly what fails, and the
+  evidence, which is a concrete counterexample or the exact step that fails, and best of all a
+  Lean proof of the negation. "I could not prove it" is a note for the next person, not a
+  finding. Three findings are different and should be told apart: the Lean statement is false;
+  the Lean does not say what the paper says; a step of the printed proof fails while the
+  statement may still be true.
+
+There will be cases that do not fit. The integrator decides those one at a time and writes down
+what was done in `ERRATA.md`.
 
 ## Whose instructions count
 
@@ -91,6 +133,11 @@ If you adapt a proof or definition from one of them, say so in the pull request 
 to [`RiemannMasullo/External/ATTRIBUTION.md`](RiemannMasullo/External/ATTRIBUTION.md): the
 projects are Apache-2.0, which requires the credit. Do not copy from a project with no license.
 
+The launcher's prompt may also name a directory of outside documents about gaps in the paper
+and possible repairs, with an index by page. Nothing in them has been checked by this project.
+A report there is a lead: test it against the page and the Lean statement before relying on it,
+and name the document when a finding of yours started from one.
+
 ## Reading the paper
 
 Printed page numbers equal PDF page numbers.
@@ -110,6 +157,7 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
+lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
 lake build                                        # everything; must pass before you hand in
 scripts/lint.sh
 scripts/signatures.sh > after.txt                 # one line per declaration: name and statement hash
@@ -125,7 +173,9 @@ helpers in a `section` of their own, with their own variables, and the hashes re
 they were.
 
 To check axioms, put `#print axioms RiemannMasullo.your_theorem` in a scratch file under `.agent/`
-(which git ignores) and run `lake env lean .agent/Check.lean`.
+(which git ignores) and run `lake lean .agent/Check.lean`. Use `lake lean`, not `lake env lean`:
+only the former applies the options in `lakefile.toml`, and without them some files compile
+dozens of times more slowly (a linter the project turns off) and `autoImplicit` is on.
 
 ## Your issue, and handing in work
 

@@ -1900,7 +1900,8 @@ def globalThetaMellinIntegral (f : ℬ[F]) (c : 𝒳[F]) : ℂ :=
 /-- Paper: Theorem 3.2.2.1(2), p. 124. The theta Mellin integral is absolutely
 convergent on the right half-plane. -/
 theorem globalThetaMellinIntegral_integrable (f : ℬ[F]) (c : 𝒳[F]) (hc : c ∈ rightHalf) :
-    Integrable (fun g : C[F] ↦ adelicTheta f g * c g) (ideleClassTamagawaMeasure F) := by sorry
+    Integrable (fun g : C[F] ↦ adelicTheta f g * c g) (ideleClassTamagawaMeasure F) := by
+  exact (globalIdelicZetaIntegral_eq_thetaIntegral f c hc).1
 
 /-- Paper: Theorem 3.2.2.1(2), p. 124. Truncating the theta Mellin integral to
 norm bands converges uniformly on every compact subset of the right half-plane. -/
@@ -1915,7 +1916,9 @@ theorem globalThetaMellinIntegral_tendstoUniformlyOn (f : ℬ[F]) (K : Set 𝒳[
 /-- Paper: Equation (3.2.2.11), p. 127. Unfolding theta on the right half-plane
 identifies its Mellin integral with the zeta integral on the ideles. -/
 theorem globalThetaMellinIntegral_eq_idelic (f : ℬ[F]) :
-    EqOn (globalThetaMellinIntegral f) (globalIdelicZetaIntegral f) rightHalf := by sorry
+    EqOn (globalThetaMellinIntegral f) (globalIdelicZetaIntegral f) rightHalf := by
+  intro c hc
+  exact (globalIdelicZetaIntegral_eq_thetaIntegral f c hc).2.symm
 
 /-- Paper: Theorem 3.2.2.1(2)(a), p. 124. If the test function and its Fourier
 transform vanish at zero, the theta Mellin integral converges absolutely everywhere. -/

@@ -102,7 +102,7 @@ def main(argv):
         file = m.group(1) if m else "-"
         if "claimed" in issue["labels"] or issue["number"] in taken_already:
             busy[file] += 1
-        elif not {"blocked", "stuck"} & set(issue["labels"]):
+        elif not {"blocked", "stuck", "gap"} & set(issue["labels"]):
             free.append((file, issue["number"]))
     if label != "proof":
         order = sorted(free, key=lambda fn: fn[1])
