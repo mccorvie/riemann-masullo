@@ -4,6 +4,9 @@ public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Topology.Algebra.IsOpenUnits
+
 /-! # Structure Theorem V: isotypic exhaustiveness
 
 Masullo, §6.2, pp. 295–302. Finite sets of places index only the finite factors.
@@ -368,7 +371,31 @@ Deviation: On the test χ times the unit indicator, the coefficient is the integ
 theorem finiteStandardThetaAverage_eq_character_mul_integral (v : V)
     (χ : PontryaginDual (L(v))ˣ) (f : ℬ₀(v)) (x : (L(v))ˣ) :
     finiteStandardThetaAverage v χ f x = (χ x : ℂ) *
-      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by sorry
+      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let : ProperSpace (L(v)) := properSpace_adicCompletion v
+  let : LocallyCompactSpace (L(v))ˣ :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := L(v))).locallyCompactSpace
+  have : (μ(v)).IsInvInvariant := by
+    constructor
+    unfold finiteLocalMultiplicativeTamagawaMeasure
+    rw [Measure.inv_def, Measure.map_smul, Measure.map_inv_eq_self]
+    exact measurable_inv.aemeasurable
+  have factor {G : Type _} [CommGroup G] [MeasurableSpace G] [MeasurableMul G] [MeasurableInv G]
+      (ν : Measure G) [ν.IsInvInvariant] [ν.IsMulLeftInvariant]
+      (φ : G → ℂ) (c : G →* Circle) (x : G) :
+      (∫ g, φ (g⁻¹ * x) * (c g : ℂ) ∂ν) = (c x : ℂ) * ∫ y, φ y * (c y : ℂ)⁻¹ ∂ν := by
+    let k (g : G) := φ (g⁻¹ * x) * (c g : ℂ)
+    refine (integral_div_left_eq_self k ν x).symm.trans ?_
+    rw [← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards with y
+    change φ ((x / y)⁻¹ * x) * (c (x / y) : ℂ) = _
+    rw [inv_div, div_mul_cancel, map_div, Circle.coe_div, div_eq_mul_inv]
+    ring
+  exact ((exists_finiteStandardThetaAverage v χ).choose_spec f x).trans
+    (factor (μ(v)) (fun y ↦ f.val (Multiplicative.ofAdd y.val)) χ.toMonoidHom x)
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 The kernel of the archimedean operator is closed in the archimedean test space. -/
