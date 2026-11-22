@@ -5696,11 +5696,44 @@ private theorem finiteLocalMultiplicativeTamagawaMeasure_haar (v : Primes(F)) :
       hK.measure_ne_top (μ := μ)⟩)
     (ENNReal.div_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr hsqrt).ne') hmass.ne')
 
+omit [NumberField F] in
+private theorem infiniteLocalMultiplicative_isHaar (w : InfinitePlace F) :
+    (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure := by
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let := infiniteLocalAdditiveTamagawaMeasure_haar F w
+  apply isHaarMeasure_comap_units_withDensity
+  intro a ha
+  by_cases h : w.IsReal
+  · rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+    let e := (ringEquivRealOfIsReal h).symm
+    have he : Measurable e := (isometryEquivRealOfIsReal h).symm.continuous.measurable
+    rw [map_mul_left_map_ringEquiv e he volume _ real_map_mul_left_volume a ha, h.mult_eq_one]
+    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
+      ext
+      exact (isometry_extensionEmbeddingOfIsReal h).norm_map_of_map_zero (map_zero _) a
+    rw [hn]
+  · let h' := InfinitePlace.not_isReal_iff_isComplex.mp h
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
+    let e := (ringEquivComplexOfIsComplex h').symm
+    have he : Measurable e := (isometryEquivComplexOfIsComplex h').symm.continuous.measurable
+    have hscale (b : ℂ) (hb : b ≠ 0) : ((2 : ℕ) • (volume : Measure ℂ)).map (b * ·) =
+        ((↑(‖b‖₊ ^ 2) : ℝ≥0∞))⁻¹ • ((2 : ℕ) • (volume : Measure ℂ)) := by
+      rw [Measure.map_smul, complex_map_mul_left_volume b hb, ← Nat.cast_smul_eq_nsmul ENNReal,
+        ← Nat.cast_smul_eq_nsmul ENNReal, smul_smul, smul_smul, mul_comm]
+      exact (measurable_const_mul b).aemeasurable
+    rw [map_mul_left_map_ringEquiv e he _ _ hscale a ha, h'.mult_eq_two]
+    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
+      ext
+      exact (isometry_extensionEmbedding w).norm_map_of_map_zero (map_zero _) a
+    rw [hn]
+
+-- The public statement specializes the preceding lemma to number fields.
+set_option linter.unusedSectionVars false in
 /-- The weighted additive measure on a real or complex completion is multiplicative Haar
 measure. The additive Jacobian of multiplication by a unit cancels the change in density. -/
 theorem infiniteLocalMultiplicativeTamagawaMeasure_haar (w : InfinitePlace F) :
-    (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure := by
-  sorry
+    (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure :=
+  infiniteLocalMultiplicative_isHaar F w
 
 /-- In logarithmic coordinates the omitted place is recovered from the sum.
 The strip has total log norm in `[0,1]` and the remaining logs in the regulator
@@ -6195,37 +6228,6 @@ private theorem finiteLocalMultiplicative_isHaar (v : Primes(F)) :
       hcompact.measure_ne_top⟩)
     (ENNReal.div_ne_top (ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr
       (Real.sqrt_pos_of_pos (pow_pos hq _))).ne') hpos.ne')
-
-omit [NumberField F] in
-private theorem infiniteLocalMultiplicative_isHaar (w : InfinitePlace F) :
-    (infiniteLocalMultiplicativeTamagawaMeasure F w).IsHaarMeasure := by
-  let : BorelSpace w.Completion := ⟨rfl⟩
-  let := infiniteLocalAdditiveTamagawaMeasure_haar F w
-  apply isHaarMeasure_comap_units_withDensity
-  intro a ha
-  by_cases h : w.IsReal
-  · rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
-    let e := (ringEquivRealOfIsReal h).symm
-    have he : Measurable e := (isometryEquivRealOfIsReal h).symm.continuous.measurable
-    rw [map_mul_left_map_ringEquiv e he volume _ real_map_mul_left_volume a ha, h.mult_eq_one]
-    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
-      ext
-      exact (isometry_extensionEmbeddingOfIsReal h).norm_map_of_map_zero (map_zero _) a
-    rw [hn]
-  · let h' := InfinitePlace.not_isReal_iff_isComplex.mp h
-    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_right h]
-    let e := (ringEquivComplexOfIsComplex h').symm
-    have he : Measurable e := (isometryEquivComplexOfIsComplex h').symm.continuous.measurable
-    have hscale (b : ℂ) (hb : b ≠ 0) : ((2 : ℕ) • (volume : Measure ℂ)).map (b * ·) =
-        ((↑(‖b‖₊ ^ 2) : ℝ≥0∞))⁻¹ • ((2 : ℕ) • (volume : Measure ℂ)) := by
-      rw [Measure.map_smul, complex_map_mul_left_volume b hb, ← Nat.cast_smul_eq_nsmul ENNReal,
-        ← Nat.cast_smul_eq_nsmul ENNReal, smul_smul, smul_smul, mul_comm]
-      exact (measurable_const_mul b).aemeasurable
-    rw [map_mul_left_map_ringEquiv e he _ _ hscale a ha, h'.mult_eq_two]
-    have hn : ‖e.symm a‖₊ = ‖a‖₊ := by
-      ext
-      exact (isometry_extensionEmbedding w).norm_map_of_map_zero (map_zero _) a
-    rw [hn]
 
 private def sIdeleUnitsEquiv :
     (((w : InfinitePlace F) → w.Completionˣ) × ((v : S) → (v.val.adicCompletion F)ˣ)) ≃ₜ* 𝕀ₛ :=
