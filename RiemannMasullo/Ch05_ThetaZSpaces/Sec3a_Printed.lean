@@ -100,7 +100,15 @@ coordinates and N = 0. The zero multi-index is the sole slot and supplies the
 coefficient for the point mass at zero. The printed count is 0¹. -/
 theorem Printed.distribution_coordinatePlane_coefficientCount_false :
     ¬ Printed.distribution_coordinatePlane_coefficientCount := by
-  sorry
+  intro h
+  have h0 := h Unit Empty 0
+  have hne : Nonempty {α : Unit ⊕ Empty → Fin (0 + 1) // (∑ i, (α i : ℕ)) ≤ 0} :=
+    ⟨⟨0, by simp⟩⟩
+  -- The statement's instance uses classical decidable equality, so match it up to `Subsingleton`.
+  have hpos : 0 < 0 ^ Fintype.card (Unit ⊕ Empty) := by
+    rw [← h0]
+    convert Fintype.card_pos (α := {α : Unit ⊕ Empty → Fin (0 + 1) // (∑ i, (α i : ℕ)) ≤ 0})
+  simp at hpos
 
 local notation "multi(" α ")" => (fun i ↦ (((α).val i).val : ℕ))
 local notation "degree(" β ")" => (∑ i, β i)
