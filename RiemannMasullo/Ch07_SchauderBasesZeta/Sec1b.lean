@@ -63,6 +63,22 @@ local notation "overₚ(" T "," p ")" =>
   @Finset.filter Primes (fun v : Primes ↦ HeightOneSpectrum.under (𝓞 ℚ) v = p)
     (Classical.decPred _) T
 
+/-- The local value of a unitary character at an unramified place has norm one. -/
+private theorem reciprocalEulerProduct_over_prime_zero_norm (χ : U𝔽) (v : Primes)
+    (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v) :
+    ‖(ideleClassNormTwist χ 0).localValue v‖ = 1 := by
+  obtain ⟨π, hπ⟩ :=
+    (Valued.v : Valuation (v.adicCompletion F) _).exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hπ0 : (π : v.adicCompletion F) ≠ 0 := by
+    intro h
+    have h' := hπ
+    rw [Valuation.IsUniformizer, h, map_zero] at h'
+    exact (Units.ne_zero _) h'.symm
+  rw [hv.localValue_eq π hπ, show (π : v.adicCompletion F) =
+    ((Units.mk0 _ hπ0 : (v.adicCompletion F)ˣ) : v.adicCompletion F) from rfl, HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+  change ‖(χ _ : ℂ) * (((ideleClassNorm F _ : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ)‖ = 1
+  rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
+
 /-- Paper: Remark 7.1.3.1, p. 323.
 A zero of the reciprocal Euler product over a rational prime belongs to the phase lattice
 of some unramified place over that prime. -/
@@ -75,7 +91,58 @@ theorem reciprocalEulerProduct_over_prime_zero (χ : U𝔽) (S₀ : Finset Prime
         let period := 2 * Real.pi / Real.log (q : ℝ)
         t ∈ Ico 0 period ∧
         (ideleClassNormTwist χ 0).localValue v = (q : ℂ) ^ (-(t : ℂ) * Complex.I) ∧
-        s = (((k : ℝ) * period - t : ℝ) : ℂ) * Complex.I := by sorry
+        s = (((k : ℝ) * period - t : ℝ) : ℂ) * Complex.I := by
+  obtain ⟨v, hvS, hv0⟩ := Finset.prod_eq_zero_iff.mp hs
+  by_cases hun : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  swap
+  · rw [finiteHeckeEulerFactor, ite_eq_right hun, inv_one] at hv0
+    exact absurd hv0 one_ne_zero
+  refine ⟨v, hvS, hun, ?_⟩
+  rw [finiteHeckeEulerFactor, ite_eq_left hun, inv_inv] at hv0
+  set q : ℕ := v.asIdeal.absNorm with hqdef
+  have hq1 : 1 < (q : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq1).ne'
+  set ℓ := Real.log (q : ℝ) with hℓdef
+  have hℓ : 0 < ℓ := Real.log_pos hq1
+  have hP : 0 < 2 * Real.pi / ℓ := div_pos Real.two_pi_pos hℓ
+  set a := (ideleClassNormTwist χ 0).localValue v with hadef
+  have ha1 : ‖a‖ = 1 := reciprocalEulerProduct_over_prime_zero_norm χ v hun
+  have hlog : Complex.log (q : ℂ) = (ℓ : ℂ) := by rw [hℓdef, Complex.natCast_log]
+  have hcpow (t : ℝ) : (q : ℂ) ^ (-(t : ℂ) * Complex.I) =
+      Complex.exp (((-t * ℓ : ℝ) : ℂ) * Complex.I) := by
+    rw [Complex.cpow_def_of_ne_zero hq0, hlog]
+    congr 1
+    push_cast
+    ring
+  set t₀ : ℝ := -Complex.arg a / ℓ
+  set t : ℝ := toIcoMod hP 0 t₀
+  have ht : t ∈ Ico 0 (2 * Real.pi / ℓ) := by simpa using toIcoMod_mem_Ico hP 0 t₀
+  have hta : a = (q : ℂ) ^ (-(t : ℂ) * Complex.I) := by
+    rw [hcpow]
+    have hm := toIcoMod_add_toIcoDiv_zsmul hP 0 t₀
+    set m := toIcoDiv hP 0 t₀
+    have : -t * ℓ = Complex.arg a + (m : ℝ) * (2 * Real.pi) := by
+      have h1 : t = t₀ - m * (2 * Real.pi / ℓ) := by rw [zsmul_eq_mul] at hm; linarith
+      rw [h1]
+      simp only [t₀]
+      field_simp
+      ring
+    rw [this]
+    push_cast
+    rw [add_mul, Complex.exp_add, show (m : ℂ) * (2 * Real.pi) * Complex.I =
+      m * (2 * Real.pi * Complex.I) by ring, Complex.exp_int_mul_two_pi_mul_I, mul_one]
+    conv_lhs => rw [← Complex.norm_mul_exp_arg_mul_I a, ha1]
+    simp
+  rw [hta, sub_eq_zero, ← Complex.cpow_add _ _ hq0, eq_comm,
+    Complex.cpow_def_of_ne_zero hq0, hlog, Complex.exp_eq_one_iff] at hv0
+  obtain ⟨n, hn⟩ := hv0
+  have hℓ0 : (ℓ : ℂ) ≠ 0 := by exact_mod_cast hℓ.ne'
+  refine ⟨-n, t, ht, hta, ?_⟩
+  push_cast
+  rw [hlog]
+  field_simp
+  linear_combination -hn
+
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 The zero multiplicity of a reciprocal Euler product over a single rational prime is
