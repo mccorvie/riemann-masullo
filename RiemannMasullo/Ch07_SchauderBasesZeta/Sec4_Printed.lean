@@ -289,4 +289,99 @@ rank zero and admit nuclear presentations. -/
 theorem Printed.archNuclearityStrongDual_not_nuclear_false :
     ¬ Printed.archNuclearityStrongDual_not_nuclear := by sorry
 
+/-- Paper: Theorem 7.4.3.1(3)–(5), proof before (7.4.3.12), p. 371.
+As printed: the images of the tests with both polar moments zero have
+codimension two in the source and target homogeneous theta spaces.
+This is the codimension assertion. See `globalThetaPolarValues_vanish_on_isotype_iff`,
+`globalThetaPolarValues_surjective_on_trivial_isotype` and ERRATA F136. -/
+def Printed.archNuclearity_polar_codimension_two : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (χ : U[F]),
+    Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)) →
+    ∀ hχ : ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) ∈
+        unramifiedOutside F S,
+      let hω : NormOneCharacterUnramifiedOutside (ω[F, χ]) S := ⟨⟨_, hχ⟩, fun _ ↦ rfl⟩
+      let ωₛ := sLocalNormOneCharacter S (ω[F, χ]) hω
+      let Kₛ := LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S ωₛ)
+      let Pₛ := (sAdelePolarSubspace F S).map Kₛ.mkQ
+      Module.finrank ℂ (SLocalHomogeneousThetaSpace F S ωₛ ⧸ Pₛ) = 2 ∧
+        Module.finrank ℂ (GlobalHomogeneousThetaSpace F (ω[F, χ]) ⧸
+          globalPolarFreeThetaSubmodule (ω[F, χ])) = 2
+
+/-- Paper: Theorem 7.4.3.1(3)–(5), proof before (7.4.3.12), p. 371.
+Take F = ℚ, S with just the finite place over 5, and the even quadratic
+character modulo 5. The idèle with component 2 at 5 and 1 elsewhere has norm
+one and acts by −1 on the homogeneous component. If T is translation by
+this idèle, (f − Tf)/2 has the class of f and both polar moments vanish.
+The polar image is the whole target component, of codimension zero. -/
+theorem Printed.archNuclearity_polar_codimension_two_false :
+    ¬ Printed.archNuclearity_polar_codimension_two := by sorry
+
+/-- Paper: Theorem 7.4.3.1(3)–(5), proof before (7.4.3.12), p. 371.
+Each class of the flat tensor space displayed in (7.4.3.1) has a unique
+S-local function in the tensor space (5.3.4.1) representing it. The graph
+requires an additive Schwartz representative to which the theta map applies.
+The prose following (7.4.3.1) also describes an archimedean moment condition.
+The zero class used in F137 belongs to both readings. -/
+def Printed.archNuclearity_existsUnique_localFlatRepresentative : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (χ : U[F]),
+    Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)) →
+    ∀ hχ : ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ) ∈
+        unramifiedOutside F S,
+      let hω : NormOneCharacterUnramifiedOutside (ω[F, χ]) S := ⟨⟨_, hχ⟩, fun _ ↦ rfl⟩
+      let ωₛ := sLocalNormOneCharacter S (ω[F, χ]) hω
+      let Kₛ := LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S ωₛ)
+      let K := LinearMap.ker (homogeneousAdelicThetaLinearMap F (ω[F, χ]))
+      let flat := Submodule.span ℂ {f : SAdeleRing F S → ℂ |
+        ∃ (h : archimedeanFlatSchwartz (ι := {v : InfinitePlace F // v.IsReal})
+            (κ := {v : InfinitePlace F // v.IsComplex}))
+          (g : (v : S) → SchwartzBruhat (v.val.adicCompletion F)ˣ), ∀ a, f a =
+            h.val (fun v ↦ InfinitePlace.Completion.ringEquivRealOfIsReal v.property (a.1 v.val),
+              fun v ↦ InfinitePlace.Completion.ringEquivComplexOfIsComplex v.property (a.1 v.val)) *
+              ∏ v : S, (if hv : a.2 v ≠ 0 then g v (Units.mk0 (a.2 v) hv) else 0)}
+      ∀ x ∈ (globalArchimedeanFlatTests F).map K.mkQ,
+        ∃! f : flat, ∃ (test : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
+            (y : SLocalHomogeneousThetaSpace F S ωₛ),
+          (∀ a, test (Multiplicative.ofAdd a) = f.val a) ∧
+            sLocalHomogeneousThetaToGlobal hω y = x ∧
+            sLocalHomogeneousThetaPrincipalValue (Finset.Subset.refl S) ωₛ y = Kₛ.mkQ test
+
+/-- Paper: Theorem 7.4.3.1(3)–(5), proof before (7.4.3.12), p. 371.
+Take F = ℚ, S consisting of the real place, χ = 1 and the zero global class.
+For a nonzero smooth bump h supported in (2, 3), use the local tests 0 and
+x ↦ h(x) − h(−x). The latter is flat at zero and has integral zero.
+Its S-unit theta sum at u is f(u) + f(−u) = 0. Finite principal value with
+the empty selection is the identity, so both tests represent the zero class. -/
+theorem Printed.archNuclearity_existsUnique_localFlatRepresentative_false :
+    ¬ Printed.archNuclearity_existsUnique_localFlatRepresentative := by sorry
+
+open MeasureTheory in
+/-- Paper: Theorem 7.4.3.2(2), proof, equation (7.4.3.15), p. 373.
+As printed: for any a, b > 0, the right upward integral minus the left upward
+integral of the test Mellin transform times the gamma logarithmic derivative,
+divided by 2πi, sums the positive gamma pole multiplicities in the open strip.
+The ordinary line integrals must exist. See `archNuclearity_trace` and ERRATA F140. -/
+def Printed.archNuclearity_gammaContour : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (χ : U[F]) (φ : BruhatCompactSupport C[F]),
+    tsupport φ.val ⊆ {g : C[F] | 1 < ((ideleClassNorm F g).val : ℝ)} →
+    ∀ (a b : ℝ), 0 < a → 0 < b →
+      let Γ := heckeGammaFactor χ
+      let Φ := nuclearityTestMellin χ φ
+      let integrand := fun z ↦ Φ z * (deriv Γ z / Γ z)
+      let poles := {z : ℂ // z.re ∈ Ioo (-a) b ∧ 0 < gammaOrder(χ, z)}
+      let onLine (σ y : ℝ) := integrand ((σ : ℂ) + (y : ℂ) * Complex.I)
+      Integrable (onLine (-a)) ∧ Integrable (onLine b) ∧
+        HasSum (fun z : poles ↦ (gammaOrder(χ, z.val) : ℂ) * Φ z.val)
+          ((verticalLineIntegral integrand b - verticalLineIntegral integrand (-a)) /
+            (2 * (Real.pi : ℂ) * Complex.I))
+
+/-- Paper: Theorem 7.4.3.2(2), proof, equation (7.4.3.15), p. 373.
+For F = ℚ, χ = 1 and a = b = 1, take a nonzero nonnegative radial bump
+supported at norms in (2, 3). The only enclosed gamma pole is at zero, with
+logarithmic derivative residue −1. The normalized integral gives −Φ(0)
+and the printed sum gives Φ(0) > 0. Also, a = 2 puts a pole on the left line. -/
+theorem Printed.archNuclearity_gammaContour_false : ¬ Printed.archNuclearity_gammaContour :=
+  by sorry
+
 end RiemannMasullo

@@ -68,4 +68,34 @@ sequence spaces, quotiented by a closed subspace, is Fréchet and hence Baire. -
 theorem Printed.strongCoprimalityPrimaryQuotient_strongDual_subquotient_false :
     ¬ Printed.strongCoprimalityPrimaryQuotient_strongDual_subquotient := by sorry
 
+/-- Paper: Theorem 7.5.0.1, proof, equation (7.5.0.8), p. 377.
+At each reciprocal Euler zero for a place in the primary set S₀ = Sₚ of
+p. 376, the zeroth reflected Fourier jet defines a continuous linear functional
+on the full homogeneous theta space. This is the assertion at order zero.
+Analyticity at the evaluation point
+expresses ordinary evaluation of the meromorphic continuation there.
+See `strongCoprimalityFourierJet_mk`, `exists_strongCoprimalityFourierJet_full`
+and ERRATA F142. -/
+def Printed.strongCoprimalityFourierJet_zero_full : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (χ : U[F]) (p : V[ℚ]) (S : Finset V[F]),
+    let S₀ := (finite_nuclearityPlacesAbove (F := F) p).toFinset
+    S₀ ⊆ S → Subsingleton (CommRing.Pic ((S : Set V[F]).integer F)) →
+      ideleClassNormTwist χ 0 ∈ unramifiedOutside F S →
+      ∀ v ∈ S₀, ∀ s : ℂ, (finiteHeckeEulerFactor χ v s)⁻¹ = 0 →
+        let ω := ω[F, χ]
+        let q := (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ
+        ∃ d : StrongDual ℂ (GlobalHomogeneousThetaSpace F ω),
+          ∀ f : SchwartzBruhat (Multiplicative (𝔸[F])),
+            let Z := fun z ↦ globalIdelicZFunction (adeleSchwartzFourier f)
+              (ideleClassNormTwist χ⁻¹ z)
+            AnalyticAt ℂ Z (1 - s) ∧ d (q f) = Z (1 - s)
+
+/-- Paper: Theorem 7.5.0.1, proof, equation (7.5.0.8), p. 377.
+Take F = ℚ, χ = 1, S₀ = S with finite part {2}, and s = 0.
+The factor 1 − 2⁻ˢ has a simple zero there. The adelic Gaussian with real
+factor exp(−πx²) and finite integer indicators is self-dual. Its reflected
+zeta function Γℝ(z)ζ(z) has a simple pole at z = 1. -/
+theorem Printed.strongCoprimalityFourierJet_zero_full_false :
+    ¬ Printed.strongCoprimalityFourierJet_zero_full := by sorry
+
 end RiemannMasullo

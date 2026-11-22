@@ -12,6 +12,7 @@ open scoped NNReal NumberField.AdeleRing
 namespace RiemannMasullo
 
 set_option quotPrecheck false
+set_option maxSynthPendingDepth 3
 
 local notation "chart(" field ", " places ", " χ ")" =>
   quasiCharacterNormTwist (sIdeleQuotientNorm field places)
@@ -73,5 +74,31 @@ and discriminant of X³ - 2 prime to 5. The local residue sizes are 5 and 25.
 With T = 2π/log 5 and χ = |·|^(3iT/4), take the common pole c = 1.
 The local phases are 3T/4 and T/4, so their difference is T/2. -/
 theorem Printed.sLocalOrbitalPhase_sub_false : ¬ Printed.sLocalOrbitalPhase_sub := by sorry
+
+open Classical in
+/-- Paper: Definition 7.3.1.4, equations (7.3.1.6)–(7.3.1.7), p. 343.
+As printed: on the primary pole locus, the natural-number count of contributing
+places equals the sum of the signed meromorphic orders of the restricted local
+Tate factors. See `sLocalPrimaryPoleMultiplicity` and ERRATA F119. -/
+def Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F]
+    (S : Finset (HeightOneSpectrum (𝓞 F))) (p : HeightOneSpectrum (𝓞 ℚ)),
+    IsSaturatedPlaceSet S → (sLocalPrimaryPlaces S p).Nonempty →
+    Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)) →
+    ∀ c : QuasiCharacter (SIdeleQuotient F S),
+      0 < sLocalPrimaryPoleMultiplicity p c →
+      let twist := quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous c
+      ((sLocalPrimaryPoleMultiplicity p c : ℤ) : WithTop ℤ) =
+        ∑ v ∈ S.attach.filter (fun v ↦ v.val ∈ sLocalPrimaryPlaces S p),
+          meromorphicOrderAt
+            (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (twist z))) 0
+
+/-- Paper: Definition 7.3.1.4, equations (7.3.1.6)–(7.3.1.7), p. 343.
+Take F = ℚ, S with just the finite place over 2, p = 2, and c = 1.
+The local numerator has a simple pole and the reflected denominator is
+regular and nonzero at c, giving signed order −1. The primary count is 1. -/
+theorem Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders_false :
+    ¬ Printed.sLocalPrimaryPoleMultiplicity_eq_sum_orders := by sorry
 
 end RiemannMasullo
