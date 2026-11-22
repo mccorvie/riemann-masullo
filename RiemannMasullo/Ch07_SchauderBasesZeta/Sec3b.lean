@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
+
 /-! # §7.3.2–7.3.4 Paley–Wiener levels and archimedean principal parts
 
 The finsets in this file list the finite places. Each S-local stage also
@@ -68,12 +70,44 @@ as in the proofs on pp. 352–359. Equations (7.3.2.2) and (7.3.2.13) print unit
 def sLocalPWTests (hST : S ⊆ T) (K : Set (SAdeleRing F S)) : Submodule ℂ (B(T)) :=
   (Submodule.span ℂ {f : B(S) | inBand(K, f)}).map (Π(hST))
 
+/-- The compactly supported functions with support in a fixed set form a submodule.
+Consequently, taking the span of their preimages under a linear map preserves the set. -/
+private theorem mem_sLocalPWTests_map_span {G E E' : Type*} [TopologicalSpace G]
+    [AddCommMonoid E] [Module ℂ E] [AddCommMonoid E'] [Module ℂ E']
+    (s : Set G) (L : E →ₗ[ℂ] (G → ℂ)) (φ : E → G → ℂ) (hL : ∀ g, L g = φ g)
+    (j : E →ₗ[ℂ] E') (f : E') :
+    f ∈ (Submodule.span ℂ {g : E | HasCompactSupport (φ g) ∧ tsupport (φ g) ⊆ s}).map j ↔
+      ∃ g, j g = f ∧ HasCompactSupport (φ g) ∧ tsupport (φ g) ⊆ s := by
+  obtain rfl : φ = L := (funext hL).symm
+  let Q : Submodule ℂ (G → ℂ) :=
+    { carrier := {g | HasCompactSupport g ∧ tsupport g ⊆ s}
+      zero_mem' := ⟨HasCompactSupport.zero, by simp⟩
+      add_mem' := by
+        rintro x y ⟨hx, hx'⟩ ⟨hy, hy'⟩
+        exact ⟨hx.add hy, (tsupport_add x y).trans (union_subset hx' hy')⟩
+      smul_mem' := by
+        rintro c x ⟨hx, hx'⟩
+        exact ⟨hx.smul_left (f := fun _ ↦ c), (tsupport_smul_subset_right (fun _ ↦ c) x).trans hx'⟩ }
+  have hgen : {g : E | HasCompactSupport (L g) ∧ tsupport (L g) ⊆ s} = (Q.comap L : Set E) := rfl
+  rw [hgen, Submodule.span_eq]
+  exact ⟨fun ⟨g, hg, hf⟩ ↦ ⟨g, hf, hg⟩, fun ⟨g, hf, hg⟩ ↦ ⟨g, hg, hf⟩⟩
+
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Every test in the Fourier level is the insertion of a single small-stage test
 satisfying both Fourier-support conditions.
 Deviation: The insertion uses the integer-ring indicators of (2.1.4.2). -/
 theorem mem_sLocalPWTests (hST : S ⊆ T) (K : Set (SAdeleRing F S)) (f : B(T)) :
-    f ∈ sLocalPWTests hST K ↔ ∃ g : B(S), Π(hST) g = f ∧ inBand(K, g) := by sorry
+    f ∈ sLocalPWTests hST K ↔ ∃ g : B(S), Π(hST) g = f ∧ inBand(K, g) := by
+  let hF := sLocal_fourier_continuousLinear (F := F) (S := S)
+  let A : B(S) →L[ℂ] B(S) := hF.choose
+  have hA (g : B(S)) : A g = sAdeleSchwartzFourier g := hF.choose_spec g
+  let L : B(S) →ₗ[ℂ] (Multiplicative (SAdeleRing F S) → ℂ) :=
+    (schwartzBruhatSubmodule _).subtype.comp A.toLinearMap
+  have hL (g : B(S)) : L g = (sAdeleSchwartzFourier g).val :=
+    congrArg (fun f : B(S) ↦ f.val) (hA g)
+  unfold sLocalPWTests
+  exact mem_sLocalPWTests_map_span (Multiplicative.toAdd ⁻¹' K) L
+    (fun g : B(S) ↦ (sAdeleSchwartzFourier g).val) hL (Π(hST)) f
 
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 The two moments on the inserted test space can be specified independently whenever
