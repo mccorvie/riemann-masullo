@@ -524,7 +524,20 @@ reciprocal factors of the selected places, with factor one at ramified places. -
 theorem orbitalHeckeGenerator_differentiable (S₀ : Finset Primes) :
     Differentiable ℂ (fun s ↦
       reciprocalPartialHeckeEulerProduct χ S₀ s *
-        (regularizedCompletedHeckeL χ τ hτ L hL hEq).val s) := by sorry
+        (regularizedCompletedHeckeL χ τ hτ L hL hEq).val s) := by
+  classical
+  refine Differentiable.mul ?_ (regularizedCompletedHeckeL χ τ hτ L hL hEq).property
+  unfold reciprocalPartialHeckeEulerProduct
+  apply Differentiable.fun_finsetProd
+  intro v _
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · simp only [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv]
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot)
+    exact (differentiable_const _).sub ((differentiable_const _).mul
+      (differentiable_id.neg.const_cpow (.inl hq)))
+  · simp only [finiteHeckeEulerFactor, ite_eq_right hv, inv_one]
+    exact differentiable_const _
 
 /-- Paper: Theorem 7.1.4.3(1), p. 331.
 The entire generator of the orbital ideal is the finite Euler correction of the regularized
