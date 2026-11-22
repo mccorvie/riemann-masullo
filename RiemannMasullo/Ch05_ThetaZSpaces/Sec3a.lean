@@ -156,6 +156,41 @@ private theorem realSchwartzFlatQuotient_strongDual_scaled_seminorm (χ : ContDi
 
 set_option quotPrecheck false
 
+open scoped UniformConvergence in
+/-- Pulling back the strong dual of a quotient is an embedding when every bounded set of the
+quotient is the image of a bounded set. -/
+private theorem realSchwartzFlatQuotient_strongDual_isEmbedding {𝕜 E : Type*}
+    [NontriviallyNormedField 𝕜] [AddCommGroup E] [Module 𝕜 E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul 𝕜 E] (K : Submodule 𝕜 E)
+    (h : ∀ B : Set (E ⧸ K), Bornology.IsVonNBounded 𝕜 B →
+      ∃ S : Set E, Bornology.IsVonNBounded 𝕜 S ∧ B ⊆ K.mkQ '' S) :
+    IsEmbedding (fun T : StrongDual 𝕜 (E ⧸ K) ↦ T.comp K.mkQL) := by
+  let A := {s : Set E | Bornology.IsVonNBounded 𝕜 s}
+  let B := {s : Set (E ⧸ K) | Bornology.IsVonNBounded 𝕜 s}
+  let R (f : (E ⧸ K) →ᵤ[B] 𝕜) : E →ᵤ[A] 𝕜 :=
+    UniformOnFun.ofFun A (UniformOnFun.toFun B f ∘ K.mkQL)
+  have hRc : UniformContinuous R :=
+    UniformOnFun.precomp_uniformContinuous (f := K.mkQL) (𝔖 := B) (𝔗 := A)
+      (fun _ hs ↦ hs.image K.mkQL)
+  have hR : IsUniformInducing R := by
+    refine isUniformInducing_iff'.mpr ⟨hRc, ?_⟩
+    conv_rhs => rw [UniformOnFun.uniformity_eq]
+    refine le_iInf₂ fun s hs ↦ le_iInf₂ fun V hV ↦ ?_
+    obtain ⟨S, hS, hsS⟩ := h s hs
+    rw [le_principal_iff]
+    refine ⟨_, UniformOnFun.gen_mem_uniformity (α := E) (β := 𝕜) (𝔖 := A) (hs := hS) (hV := hV),
+      fun fg hfg y hy ↦ ?_⟩
+    obtain ⟨x, hx, rfl⟩ := hsS hy
+    exact hfg x hx
+  let ie := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id 𝕜) 𝕜 A
+  let iq := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id 𝕜) 𝕜 B
+  have hpull : IsUniformInducing (fun T : StrongDual 𝕜 (E ⧸ K) ↦ T.comp K.mkQL) :=
+    (IsUniformInducing.of_comp_iff ie).mp (hR.comp iq)
+  refine ⟨hpull.isInducing, fun T T' hT ↦ ?_⟩
+  ext y
+  obtain ⟨x, rfl⟩ := K.mkQ_surjective y
+  exact congrArg (fun L : StrongDual 𝕜 E ↦ L x) hT
+
 section FinitePlace
 
 variable {F : Type*} [Field F] [NumberField F]
@@ -1090,6 +1125,31 @@ theorem realSchwartzFlatAtOrigin_isClosed :
   rw [realSchwartzFlatAtOrigin, Submodule.coe_iInf]
   exact isClosed_iInter fun k ↦ (realDiracDerivative k).isClosed_ker
 
+/-- Every bounded set of the flat quotient is the image of a bounded set of Schwartz
+functions. -/
+private theorem realSchwartzFlatQuotient_strongDual_lift
+    (B : Set (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin)) (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ S : Set 𝓢(ℝ, ℂ), Bornology.IsVonNBounded ℂ S ∧ B ⊆ realSchwartzFlatAtOrigin.mkQ '' S := by
+  have hle (n : ℕ) : realSchwartzFlatAtOrigin ≤ (realDiracDerivative n).ker := fun f hf ↦
+    (Submodule.mem_iInf _).mp hf n
+  have hM (n : ℕ) : ∃ M : ℝ, ∀ y ∈ B,
+      ‖realSchwartzFlatAtOrigin.liftQL (realDiracDerivative n) (hle n) y‖ ≤ M := by
+    have := hB.image (realSchwartzFlatAtOrigin.liftQL (realDiracDerivative n) (hle n))
+    rw [NormedSpace.isVonNBounded_iff] at this
+    obtain ⟨M, hM⟩ := isBounded_iff_forall_norm_le.mp this
+    exact ⟨M, fun y hy ↦ hM _ ⟨y, hy, rfl⟩⟩
+  choose M hM using hM
+  obtain ⟨S, hS, hlift⟩ := realSchwartzFlatQuotient_strongDual_borel M
+  refine ⟨S, hS, fun y hy ↦ ?_⟩
+  obtain ⟨g, rfl⟩ := realSchwartzFlatAtOrigin.mkQ_surjective y
+  obtain ⟨f, hf, hfd⟩ := hlift (fun n ↦ realDiracDerivative n g) (fun n ↦ hM n _ hy)
+  refine ⟨f, hf, ?_⟩
+  rw [Submodule.mkQ_apply, Submodule.mkQ_apply, Submodule.Quotient.eq]
+  refine (Submodule.mem_iInf _).mpr fun n ↦ ?_
+  rw [LinearMap.mem_ker, map_sub]
+  change realDiracDerivative n f - realDiracDerivative n g = 0
+  rw [hfd n, sub_self]
+
 -- TODO(paper-gap): The coefficient seminorms in (5.3.2.2) give the coefficientwise
 -- topology on the whole polynomial space and do not give its finest locally convex topology.
 
@@ -1354,66 +1414,6 @@ theorem realSchwartzTaylor_equiv :
   refine ⟨eL, fun f k ↦ ?_⟩
   change PowerSeries.coeff k (TL f) = _
   rw [hTL, ha]
-
-open scoped UniformConvergence in
-/-- Pulling back the strong dual of a quotient is an embedding when every bounded set of the
-quotient is the image of a bounded set. -/
-private theorem realSchwartzFlatQuotient_strongDual_isEmbedding {𝕜 E : Type*}
-    [NontriviallyNormedField 𝕜] [AddCommGroup E] [Module 𝕜 E] [TopologicalSpace E]
-    [IsTopologicalAddGroup E] [ContinuousSMul 𝕜 E] (K : Submodule 𝕜 E)
-    (h : ∀ B : Set (E ⧸ K), Bornology.IsVonNBounded 𝕜 B →
-      ∃ S : Set E, Bornology.IsVonNBounded 𝕜 S ∧ B ⊆ K.mkQ '' S) :
-    IsEmbedding (fun T : StrongDual 𝕜 (E ⧸ K) ↦ T.comp K.mkQL) := by
-  let A := {s : Set E | Bornology.IsVonNBounded 𝕜 s}
-  let B := {s : Set (E ⧸ K) | Bornology.IsVonNBounded 𝕜 s}
-  let R (f : (E ⧸ K) →ᵤ[B] 𝕜) : E →ᵤ[A] 𝕜 :=
-    UniformOnFun.ofFun A (UniformOnFun.toFun B f ∘ K.mkQL)
-  have hRc : UniformContinuous R :=
-    UniformOnFun.precomp_uniformContinuous (f := K.mkQL) (𝔖 := B) (𝔗 := A)
-      (fun _ hs ↦ hs.image K.mkQL)
-  have hR : IsUniformInducing R := by
-    refine isUniformInducing_iff'.mpr ⟨hRc, ?_⟩
-    conv_rhs => rw [UniformOnFun.uniformity_eq]
-    refine le_iInf₂ fun s hs ↦ le_iInf₂ fun V hV ↦ ?_
-    obtain ⟨S, hS, hsS⟩ := h s hs
-    rw [le_principal_iff]
-    refine ⟨_, UniformOnFun.gen_mem_uniformity (α := E) (β := 𝕜) (𝔖 := A) (hs := hS) (hV := hV),
-      fun fg hfg y hy ↦ ?_⟩
-    obtain ⟨x, hx, rfl⟩ := hsS hy
-    exact hfg x hx
-  let ie := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id 𝕜) 𝕜 A
-  let iq := UniformConvergenceCLM.isUniformInducing_coeFn (RingHom.id 𝕜) 𝕜 B
-  have hpull : IsUniformInducing (fun T : StrongDual 𝕜 (E ⧸ K) ↦ T.comp K.mkQL) :=
-    (IsUniformInducing.of_comp_iff ie).mp (hR.comp iq)
-  refine ⟨hpull.isInducing, fun T T' hT ↦ ?_⟩
-  ext y
-  obtain ⟨x, rfl⟩ := K.mkQ_surjective y
-  exact congrArg (fun L : StrongDual 𝕜 E ↦ L x) hT
-
-/-- Every bounded set of the flat quotient is the image of a bounded set of Schwartz
-functions. -/
-private theorem realSchwartzFlatQuotient_strongDual_lift
-    (B : Set (𝓢(ℝ, ℂ) ⧸ realSchwartzFlatAtOrigin)) (hB : Bornology.IsVonNBounded ℂ B) :
-    ∃ S : Set 𝓢(ℝ, ℂ), Bornology.IsVonNBounded ℂ S ∧ B ⊆ realSchwartzFlatAtOrigin.mkQ '' S := by
-  have hle (n : ℕ) : realSchwartzFlatAtOrigin ≤ (realDiracDerivative n).ker := fun f hf ↦
-    (Submodule.mem_iInf _).mp hf n
-  have hM (n : ℕ) : ∃ M : ℝ, ∀ y ∈ B,
-      ‖realSchwartzFlatAtOrigin.liftQL (realDiracDerivative n) (hle n) y‖ ≤ M := by
-    have := hB.image (realSchwartzFlatAtOrigin.liftQL (realDiracDerivative n) (hle n))
-    rw [NormedSpace.isVonNBounded_iff] at this
-    obtain ⟨M, hM⟩ := isBounded_iff_forall_norm_le.mp this
-    exact ⟨M, fun y hy ↦ hM _ ⟨y, hy, rfl⟩⟩
-  choose M hM using hM
-  obtain ⟨S, hS, hlift⟩ := realSchwartzFlatQuotient_strongDual_borel M
-  refine ⟨S, hS, fun y hy ↦ ?_⟩
-  obtain ⟨g, rfl⟩ := realSchwartzFlatAtOrigin.mkQ_surjective y
-  obtain ⟨f, hf, hfd⟩ := hlift (fun n ↦ realDiracDerivative n g) (fun n ↦ hM n _ hy)
-  refine ⟨f, hf, ?_⟩
-  rw [Submodule.mkQ_apply, Submodule.mkQ_apply, Submodule.Quotient.eq]
-  refine (Submodule.mem_iInf _).mpr fun n ↦ ?_
-  rw [LinearMap.mem_ker, map_sub]
-  change realDiracDerivative n f - realDiracDerivative n g = 0
-  rw [hfd n, sub_self]
 
 /-- Paper: Remark 5.3.2.2, p. 243.
 Pullback from the strong dual of the real flat quotient embeds it in the strong dual of the
