@@ -409,7 +409,9 @@ quotient sends the class of a lift to its orthogonal spectral projection.
 Deviation: The identity is stated for any quotient vector. -/
 theorem spectralStripKernel_orthogonalLift (_ha : 0 < a)
     (x : H(a, hα, hs₀(hs))) (v : W(α, s)) (_hv : Q(a, hα, hs₀(hs)) v = x) :
-    S(a, hα, hs₀(hs)) x = Ps v := by sorry
+    S(a, hα, hs₀(hs)) x = Ps v := by
+  subst x
+  exact (spectralQuotient_orthogonalRepresentative (F := F) a hα hs₀(hs) _ha v).1
 
 local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + ((t : ℝ) : ℂ) * Complex.I
 local notation "order(" χ ", " z ")" => meromorphicOrderAt (continuedCompletedHeckeL χ) z
