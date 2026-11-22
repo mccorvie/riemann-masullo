@@ -49,6 +49,7 @@ theorem exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow
 
 -- TODO(paper-gap): The proof on p. 315 uses a different reflection for each place,
 -- and positive symmetric upper density alone does not guarantee visits on both tails.
+-- The zero list on p. 313 also omits the shift by -itᵥ in (7.1.1.1).
 
 section SLocal
 
@@ -113,6 +114,22 @@ theorem sLocalRhoFactor_poles_iff (χ : PontryaginDual Jₛ) (s : ℂ) :
               ((‖(x : v.val.adicCompletion F)‖ : ℝ) : ℂ) ^ ((t : ℂ) * Complex.I)) ∧
           s = (((m : ℝ) * period - t : ℝ) : ℂ) * Complex.I) := by sorry
 
+open Classical in
+/-- Paper: Lemma 7.1.2.2, p. 317.
+At a pole of the correcting factor, its order counts all the places where the
+restricted local Tate factor has a pole.
+Deviation: Each local pole is simple. The count includes coincident poles. -/
+theorem sLocalRhoFactor_orderAt_pole (χ : PontryaginDual Jₛ) (s : ℂ) :
+    let χ₀ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+    let c := fun z : ℂ ↦ twistₛ χ₀ z
+    let ρ := fun z : ℂ ↦ sLocalRhoFactor (c z)
+    let arch := Finset.univ.filter (fun w : InfinitePlace F ↦
+      meromorphicOrderAt (fun z ↦ infiniteLocalTateFactor w (sLocalInfiniteRestriction w (c z))) s < 0)
+    let fin := Finset.univ.filter (fun v : S ↦
+      meromorphicOrderAt (fun z ↦ finiteLocalTateFactor v.val (sLocalFiniteRestriction v (c z))) s < 0)
+    meromorphicOrderAt ρ s < 0 →
+      meromorphicOrderAt ρ s = ((-((arch.card + fin.card : ℕ) : ℤ) : ℤ) : WithTop ℤ) := by sorry
+
 end SLocal
 
 -- TODO(paper-gap): Theorem 7.1.2.3 omits the real Gaussian's constant term, uses
@@ -133,8 +150,8 @@ local instance instHaarNormOneRatSec1a : Measure.IsHaarMeasure μℚ₁ :=
   (sLocalNormOneQuotientMeasure_normProduct (F := ℚ) (S := ∅)).1
 
 /-- Paper: Theorem 7.1.2.3, p. 317.
-Over the rationals with only the real place, the homogeneous theta function for a Gaussian
-and the trivial character does not have the claimed square-root decay at norm zero.
+Over the rationals with only the real place and the trivial character, the square-root
+bound at norm zero fails for some test function. The real Gaussian gives a witness.
 Deviation: States a counterexample to (7.1.2.3) at `A = 1/2`, where both printed sums are empty. -/
 theorem sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt :
     ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)),
@@ -175,8 +192,17 @@ theorem finiteHeckeEulerProduct_poles_iff (χ : PontryaginDual C𝔽) (S : Finse
 
 -- TODO(prerequisite): The induced Euler-factor identity in Remark 7.1.2.4 needs
 -- global Weil groups and their induction and local L-factor constructions.
--- TODO(later): needs §7.2.1 for the strong-dual Laurent coefficient operators.
+-- TODO(later): needs §7.2.1 for continuity of the Laurent coefficient operators and
+-- their descent to the coinvariants (Theorem 7.2.1.1(1)–(2)).
+-- TODO(paper-gap): The eigendistribution interpretation on pp. 319–321 fails for
+-- general Laurent coefficients. For the real Gaussian at the trivial character,
+-- scaling f(x) to f(x/r) adds log(r) * a₋₁ to a₀. At a multiple pole, lower polar
+-- coefficients also mix under dilation. The leading polar coefficient transforms by
+-- the character, and all coefficients have the character law on norm-one elements.
+-- On p. 321 the lattice index is also used as a Laurent index. At index zero a
+-- test function compactly supported in the S-ideles can have nonzero a₀.
 -- TODO(paper-gap): The contour formula on p. 323 needs positive orientation and
--- exclusion of the other poles, as in Lemma C.5.3.2.
+-- exclusion of the other poles, as in Lemma C.5.3.2. Compare scalar normal forms
+-- away from the distributional poles, as in infiniteLocalIdelicZFunction_distribution.
 
 end RiemannMasullo
