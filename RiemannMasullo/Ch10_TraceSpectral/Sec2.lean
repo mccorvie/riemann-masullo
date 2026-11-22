@@ -198,7 +198,8 @@ the boundary cutoff exactly when it is below the zero multiplicity and strictly
 below the reciprocal-weight integrability threshold.
 Deviation: The limiting jet is excluded. -/
 theorem lt_spectralBoundaryMultiplicity (s : ℝ) (N k : ℕ) :
-    k < spectralBoundaryMultiplicity s N ↔ k < N ∧ (k : ℝ) < (s - 1) / 2 := by sorry
+    k < spectralBoundaryMultiplicity s N ↔ k < N ∧ (k : ℝ) < (s - 1) / 2 := by
+  rw [spectralBoundaryMultiplicity, lt_min_iff, Nat.lt_ceil]
 
 /-- Paper: Remark 10.2.1.2, pp. 440–441. A Markushevich system in the paper's
 Hilbert setting is biorthogonal and both linear spans are norm dense.
