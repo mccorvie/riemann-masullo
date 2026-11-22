@@ -100,7 +100,16 @@ section Rational
 /-- Mathlib's Dirichlet L-function is meromorphic on the whole plane. -/
 theorem meromorphic_dirichletLFunction {N : ℕ} [NeZero N] (χ : DirichletCharacter ℂ N) :
     MeromorphicOn (DirichletCharacter.LFunction χ) univ := by
-  sorry
+  rcases eq_or_ne χ 1 with rfl | hχ
+  · intro s _
+    have ha := (DirichletCharacter.differentiable_LFunctionTrivChar₁ N).analyticAt s
+    have hm : MeromorphicAt (fun z : ℂ ↦ DirichletCharacter.LFunctionTrivChar₁ N z / (z - 1)) s :=
+      ha.meromorphicAt.div (analyticAt_id.sub analyticAt_const).meromorphicAt
+    apply hm.congr
+    filter_upwards [(eventually_cofinite_ne (1 : ℂ)).filter_mono (nhdsNE_le_cofinite s)] with z hz
+    rw [DirichletCharacter.LFunctionTrivChar₁, Function.update_of_ne hz]
+    exact mul_div_cancel_left₀ _ (sub_ne_zero.mpr hz)
+  · exact fun s _ ↦ ((DirichletCharacter.differentiable_LFunction hχ).analyticAt s).meromorphicAt
 
 /-- Over the rational field, the Dedekind zeta series agrees with Riemann
 zeta on the half-plane of absolute convergence. -/
