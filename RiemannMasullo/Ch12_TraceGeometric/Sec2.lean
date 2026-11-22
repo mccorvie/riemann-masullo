@@ -246,7 +246,12 @@ include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The product of simultaneous translates is
 integrable in the subgroup variable at every pair. -/
 theorem integrable_diagonalIndentationWeight (p : G × G) :
-    Integrable (fun h : H ↦ b ((h : G)⁻¹ * p.1) * b ((h : G)⁻¹ * p.2)) countH := by sorry
+    Integrable (fun h : H ↦ b ((h : G)⁻¹ * p.1) * b ((h : G)⁻¹ * p.2)) countH := by
+  have hx := (hb.2.2.2 p.1).1
+  have hy := (hb.2.2.2 p.2).1
+  have hs := integrable_count_iff.mp hy
+  exact hx.mul_bdd hy.aestronglyMeasurable
+    (ae_of_all _ fun h ↦ hs.le_tsum h fun k _ ↦ norm_nonneg _)
 
 include hH hν hS hb in
 /-- Paper: Proposition 12.2.2.2(1), p. 508. The averaged indentation weight is continuous. -/
