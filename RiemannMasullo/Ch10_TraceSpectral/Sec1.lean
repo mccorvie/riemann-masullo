@@ -463,7 +463,28 @@ local notation "fourier₀(" f ")" =>
 equals inversion of the theta function at complementary weight 1-a. -/
 theorem globalThetaSobolev_fourier_weight (a : ℝ) (f : ℬ₀) (g : C𝔽) :
     modulationWeight m𝔽 a (θ𝔽(fourier₀(f))) g =
-      modulationWeight m𝔽 (1 - a) (θ𝔽(f)) g⁻¹ := by sorry
+      modulationWeight m𝔽 (1 - a) (θ𝔽(f)) g⁻¹ := by
+  have weights (r t : ℝ) (x y : ℂ) (hr : 0 < r) (ht : t = r⁻¹) (hy : y = r • x) :
+      (↑(r ^ a) : ℂ) * x = (↑(t ^ (1 - a)) : ℂ) * y := by
+    have hpow : (r⁻¹) ^ (1 - a) * r = r ^ a := by
+      rw [← Real.rpow_neg_eq_inv_rpow]
+      calc
+        _ = r ^ (-(1 - a)) * r ^ (1 : ℝ) := by rw [Real.rpow_one]
+        _ = r ^ a := by
+          rw [← Real.rpow_add hr]
+          congr 1
+          ring
+    rw [ht, hy, Complex.real_smul, ← mul_assoc, ← Complex.ofReal_mul, hpow]
+  let r : ℝ := ((ideleClassNorm F g).val : ℝ)
+  have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm F g))
+  have hinv : ((ideleClassNorm F g⁻¹).val : ℝ) = r⁻¹ := by
+    simp only [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, r]
+  have hz := (mem_adelePolarSubspace (F := F) f.val).mp f.property
+  have hθ : adelicTheta (F := F) f.val g⁻¹ =
+      r • adelicTheta (F := F) (adeleSchwartzFourier (F := F) f.val) g := by
+    simpa only [hz.1, hz.2, smul_zero, add_zero, sub_zero, inv_inv, hinv]
+      using adelicTheta_riemannRoch (F := F) f.val g⁻¹
+  exact weights r ((ideleClassNorm F g⁻¹).val : ℝ) _ _ hr hinv hθ
 
 /-- Paper: Theorem 10.1.2.1, pp. 437–438. The polar-free theta quotient has the
 continuous Fourier automorphism induced by the adelic transform of its tests. -/
