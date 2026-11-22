@@ -149,6 +149,104 @@ def sLocalThetaPoleBound_low_coefficients_exact : Prop :=
       Function.Surjective A ∧ ∀ (f : ℬₛ(F, S)) (i : I),
         A ((Kₛ(F, S, ω)).mkQ f) i = sLocalNonnegativeLaurentCoeff i.val.1 i.val.2 f
 
+private theorem ulift_rat_numberField : NumberField (ULift.{u} ℚ) :=
+  NumberField.of_ringEquiv ℚ (ULift.{u} ℚ) (ULift.ringEquiv.{0, u} (R := ℚ)).symm
+
+/-- Every test has at most the allowed pole order of the correcting factor. -/
+private theorem sLocalThetaPoleBound_low_coefficients_exact_polar_le {F : Type u} [Field F]
+    [NumberField F] {S : Finset Places(F)} (f : ℬₛ(F, S)) (c : Xₛ(F, S)) :
+    sLocalPolarMultiplicity f c ≤ sLocalRhoPoleOrder c := by
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  have hne : ∃ g, mₛ(F, S) g ≠ 1 := ⟨σ t, (hσ t).trans_ne ht⟩
+  have hpos (g : Jₛ(F, S)) : 0 < ((mₛ(F, S) g : ℝ≥0) : ℝ) :=
+    NNReal.coe_pos.mpr (Units.zero_lt _)
+  -- Write the character as a norm twist of a unitary character.
+  let a := quasiCharacterAbscissa mₛ(F, S) (isProperMap_sIdeleQuotientNorm F S) hne c
+  let d := twistₛ(F, S) c (-(a : ℂ))
+  have hd (g : Jₛ(F, S)) : ‖d g‖ = 1 := by
+    change ‖c g * (((mₛ(F, S) g : ℝ≥0) : ℝ) : ℂ) ^ (-(a : ℂ))‖ = 1
+    rw [norm_mul, norm_quasiCharacter_eq_rpow_abscissa mₛ(F, S)
+        (isProperMap_sIdeleQuotientNorm F S) hne,
+      Complex.norm_cpow_eq_rpow_re_of_pos (hpos g), Complex.neg_re, Complex.ofReal_re]
+    exact (Real.rpow_add (hpos g) a (-a)).symm.trans (by simp)
+  let χ : PontryaginDual Jₛ(F, S) :=
+    { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+      map_one' := Circle.ext (map_one d)
+      map_mul' := fun x y ↦ Circle.ext (map_mul d x y)
+      continuous_toFun := d.continuous.subtype_mk _ }
+  have htwist (z : ℂ) : twistₛ(F, S) c z = twistₛ(F, S) ((circleToComplex).comp χ) (z + a) := by
+    ext1 g
+    change c g * _ ^ z = c g * _ ^ (-(a : ℂ)) * _ ^ (z + a)
+    rw [mul_assoc, ← Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr (hpos g).ne')]
+    ring_nf
+  -- Recenter the chart at the abscissa and compare orders there.
+  have hZ : meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ(F, S) c z)) 0 =
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f
+        (twistₛ(F, S) ((circleToComplex).comp χ) z)) a := by
+    simp only [htwist]
+    exact (meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt (x := (0 : ℂ))
+      (c := (a : ℂ)) (f := fun z ↦ sLocalIdelicZFunction f
+        (twistₛ(F, S) ((circleToComplex).comp χ) z))).trans (by rw [zero_add])
+  have hB : sLocalIdelicOrderBound c = min 0 (meromorphicOrderAt (fun z ↦
+      sLocalRhoFactor (twistₛ(F, S) ((circleToComplex).comp χ) z)) a) := by
+    simp only [sLocalIdelicOrderBound, htwist]
+    exact congrArg (min 0) ((meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt
+      (x := (0 : ℂ)) (c := (a : ℂ)) (f := fun z ↦ sLocalRhoFactor
+        (twistₛ(F, S) ((circleToComplex).comp χ) z))).trans (by rw [zero_add]))
+  have hle := sLocalIdelicZFunction_poles f χ a
+  rw [← hB, ← hZ, sLocalIdelicOrderBound_eq_neg_poleOrder] at hle
+  unfold sLocalPolarMultiplicity
+  generalize meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ(F, S) c z)) 0 = o at hle
+  induction o using WithTop.recTopCoe with
+  | top => simp
+  | coe k =>
+    have hk : -(sLocalRhoPoleOrder c : ℤ) ≤ k := WithTop.coe_le_coe.mp hle
+    simp only [WithTop.untop₀_coe]
+    omega
+
+/-- A span of images of all vectors under a surjective linear map is everything. -/
+private theorem sLocalThetaPoleBound_low_coefficients_exact_span_eq_top {M N : Type u}
+    {_ : AddCommGroup M} {_ : Module ℂ M} {_ : AddCommGroup N} {_ : Module ℂ N} (q : M →ₗ[ℂ] N)
+    (hq : Function.Surjective q) (P : M → Prop) (hP : ∀ f, P f) :
+    Submodule.span ℂ {x | ∃ f, q f = x ∧ P f} = ⊤ := by
+  refine eq_top_iff.mpr fun x _ ↦ ?_
+  obtain ⟨f, rfl⟩ := hq x
+  exact Submodule.subset_span ⟨f, rfl, hP f⟩
+
+/-- A linear map onto a nonzero product cannot have full kernel. -/
+private theorem sLocalThetaPoleBound_low_coefficients_exact_not_surjective {M ι : Type u}
+    {_ : AddCommGroup M} {_ : Module ℂ M} (A : M →ₗ[ℂ] ι → ℂ) (hker : A.ker = ⊤)
+    (hs : Function.Surjective A) (i : ι) : False := by
+  obtain ⟨x, hx⟩ := hs fun _ ↦ 1
+  have hx0 : A x = 0 := LinearMap.mem_ker.mp (hker ▸ Submodule.mem_top)
+  exact one_ne_zero ((congrFun hx i).symm.trans (congrFun hx0 i))
+
+/-- With every place selected the bound is the full pole order, which every test
+satisfies, so the kernel is everything. The coefficient map would then vanish while
+mapping onto a nonzero product. -/
+private theorem sLocalThetaPoleBound_low_coefficients_exact_false_aux :
+    ¬ sLocalThetaPoleBound_low_coefficients_exact.{u} := by
+  intro h
+  let := ulift_rat_numberField.{u}
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  obtain ⟨A, hker, hsurj, -⟩ := h F S 1 Finset.univ S subset_rfl
+  have hn (c : Xₛ(F, S)) : sLocalSelectedPoleMultiplicity Finset.univ S c =
+      sLocalRhoPoleOrder c :=
+    sLocalSelectedPoleMultiplicity_full c
+  have hpos : 0 < sLocalRhoPoleOrder (1 : Xₛ(F, S)) := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  refine sLocalThetaPoleBound_low_coefficients_exact_not_surjective A (hker.trans ?_) hsurj
+    ⟨((1 : Xₛ(F, S)), 1), Nat.one_pos, by rw [hn]; exact hpos⟩
+  unfold sLocalThetaPoleBound
+  refine sLocalThetaPoleBound_low_coefficients_exact_span_eq_top _
+    (Submodule.mkQ_surjective _) _ fun f c _ ↦ ?_
+  exact (sLocalThetaPoleBound_low_coefficients_exact_polar_le f c).trans_eq (hn c).symm
+
 /-- Paper: Remark 7.2.1.2, p. 335.
 Over ℚ with the real place and p, select p. The product of a nonzero nonnegative
 even bump supported on 2 < |x| < 3 with the indicator of integer units has entire
@@ -156,7 +254,8 @@ trivial-component transform and positive first Taylor coefficient at zero.
 Under the polar reading, use a real bump equal to one near zero instead.
 Its simple pole there is allowed by the selected bound and has nonzero residue. -/
 theorem sLocalThetaPoleBound_low_coefficients_exact_false :
-    ¬ sLocalThetaPoleBound_low_coefficients_exact := by sorry
+    ¬ sLocalThetaPoleBound_low_coefficients_exact :=
+  sLocalThetaPoleBound_low_coefficients_exact_false_aux
 
 open Classical in
 /-- Paper: Remark 7.2.1.2, p. 335, second sequence.
@@ -189,12 +288,36 @@ def sLocalThetaPoleBound_printed_mellin_sequence : Prop :=
       (∀ (f : ℬₛ(F, S)) (c : Xₛ(F, S)) (j : Fin (n c)),
         E (P (M ((Kₛ(F, S, ω)).mkQ f))) c j = sLocalNonnegativeLaurentCoeff c (j.val + 1) f)
 
+/-- Selecting every place makes the selected divisor the full pole order, so the
+remaining divisor vanishes while the selected multiplicity at the trivial character
+is positive. A linear equivalence between the two stalks would compare dimensions
+zero and positive. -/
+private theorem sLocalThetaPoleBound_printed_mellin_sequence_false_aux :
+    ¬ sLocalThetaPoleBound_printed_mellin_sequence.{u} := by
+  intro h
+  let := ulift_rat_numberField.{u}
+  let F := ULift.{u} ℚ
+  let S : Finset Places(F) := ∅
+  obtain ⟨_, _, _, _, -, -, -, -, -, -, he, -⟩ :=
+    h F S 1 Finset.univ S subset_rfl
+  have hn : sLocalSelectedPoleMultiplicity Finset.univ S (1 : Xₛ(F, S)) =
+      sLocalRhoPoleOrder (1 : Xₛ(F, S)) :=
+    sLocalSelectedPoleMultiplicity_full 1
+  have hpos : 0 < sLocalRhoPoleOrder (1 : Xₛ(F, S)) := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces, sLocalPolePlaces_one.1, Finset.card_univ]
+    exact Nat.add_pos_left Fintype.card_pos _
+  obtain ⟨e, -⟩ := he 1 (hn ▸ hpos)
+  have hdim := e.finrank_eq
+  simp only [Module.finrank_fin_fun, hn, Nat.sub_self] at hdim
+  omega
+
 /-- Paper: Remark 7.2.1.2, p. 335.
 Over ℚ with the real place and p, select p. At 2πi/log p on the trivial
 component the full and selected multiplicities both equal one. The last
 identification would take the zero-dimensional stalk to a one-dimensional one. -/
 theorem sLocalThetaPoleBound_printed_mellin_sequence_false :
-    ¬ sLocalThetaPoleBound_printed_mellin_sequence := by sorry
+    ¬ sLocalThetaPoleBound_printed_mellin_sequence :=
+  sLocalThetaPoleBound_printed_mellin_sequence_false_aux
 
 /-- Paper: Remark 7.2.1.2, p. 335.
 The middle-term surjectivity consequence on each component takes the whole
