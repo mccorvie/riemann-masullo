@@ -162,7 +162,12 @@ def Printed.spectralLineMarkushevichBasis_normalized : Prop :=
 /-- Paper: Corollary 10.2.1.4, p. 444. The splitting-field example at
 s = 3 includes a positive-order jet of infinite squared integral. -/
 theorem Printed.spectralLineMarkushevichBasis_normalized_false :
-    ¬ Printed.spectralLineMarkushevichBasis_normalized := by sorry
+    ¬ Printed.spectralLineMarkushevichBasis_normalized := by
+  intro hall
+  apply Printed.spectralLineMarkushevichBasis_false
+  intro F _ _ χ hχ a s hs
+  obtain ⟨hc, h, x, Λ, hb, hΛ, _⟩ := hall F χ hχ a s hs
+  exact ⟨hc, h, x, Λ, hb, hΛ⟩
 
 /-- Paper: Theorem 10.2.1.1 and Remark 10.2.1.5, pp. 440, 444. The
 asserted basis and its claimed primal normalization together give a bounded
