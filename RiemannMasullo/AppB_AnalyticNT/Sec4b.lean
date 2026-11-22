@@ -3,13 +3,13 @@ module
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 
 /-!
