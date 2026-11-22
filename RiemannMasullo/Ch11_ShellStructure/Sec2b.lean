@@ -554,7 +554,31 @@ theorem primeOrbitalSobolevConvolution_trace_distribution :
     onClosedPrimeQuotient(hs₁, ω(χ),
       ∃ D : StrongDual ℂ (BruhatCompactSupport C𝔽),
         ∀ (φ : BruhatCompactSupport C𝔽) (T : nuclearEndomorphisms OrbQ),
-          T.val = OrbA(φ) → D φ = hilbertTrace T) := by sorry
+          T.val = OrbA(φ) → D φ = hilbertTrace T) := by
+  have traceDistribution {X : Type _} {H : Type _} [AddCommGroup X] [Module ℂ X]
+      [TopologicalSpace X] [IsTopologicalAddGroup X] [NormedAddCommGroup H]
+      [InnerProductSpace ℂ H] [CompleteSpace H] (A : X → H →L[ℂ] H)
+      (h : ∃ T : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (T x).val = A x) ∧
+        Tendsto (fun x : X ↦ traceNorm (H := H) (T x)) (𝓝 0) (𝓝 0)) :
+      ∃ D : StrongDual ℂ X, ∀ (x : X) (U : nuclearEndomorphisms H),
+        U.val = A x → D x = hilbertTrace U := by
+    obtain ⟨T, hT, ht⟩ := h
+    obtain ⟨L, hL⟩ := hilbertTrace_linear (H := H)
+    let D : X →ₗ[ℂ] ℂ := L.comp T
+    have hb (x : X) : ‖D x‖ ≤ traceNorm (T x) :=
+      (congrArg (fun c : ℂ ↦ ‖c‖) (hL (T x))).le.trans (norm_hilbertTrace_le (T x))
+    have hd : Continuous D := continuous_of_continuousAt_zero D <| by
+      change Tendsto D (𝓝 0) (𝓝 (D 0))
+      rw [D.map_zero]
+      exact squeeze_zero_norm hb ht
+    refine ⟨⟨D, hd⟩, fun x U hU ↦ ?_⟩
+    have heq : T x = U := Subtype.ext ((hT x).trans hU.symm)
+    exact (hL (T x)).trans (congrArg (hilbertTrace (H := H)) heq)
+  have hn := primeOrbitalSobolevConvolution_traceNorm_continuous (F := F) (p := p)
+    (χ := χ) (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ)
+  exact onClosedPrimeQuotient(hs₁, ω(χ), by
+    apply traceDistribution (X := BruhatCompactSupport C𝔽) (H := OrbQ) (fun φ ↦ OrbA(φ))
+    exact hn)
 
 local notation "zeros" => {z : ℂ // reciprocalPartialHeckeEulerProduct χ (Sₚ(p)) z = 0}
 local notation "mult(" z ")" => orbitalEulerMultiplicity χ (Sₚ(p)) z
