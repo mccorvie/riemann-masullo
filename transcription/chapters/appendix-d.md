@@ -974,7 +974,7 @@ $$
 
 **D.1. SCHWARTZ-BRUHAT SPACE OF A HAUSDORFF LOCALLY COMPACT ABELIAN GROUP** · **761**
 
-when $\Gamma_1 \subset \Gamma_2$ and $k_1 \supset k_2$. Moreover, upon denoting by $\mu_G$ a fixed choice of Haar measure on $G$ and by $\mu_{\widehat{G}}$ the induced Plancherel measure on $\widehat{G}$, we have:
+*when $\Gamma_1 \subset \Gamma_2$ and $k_1 \supset k_2$. Moreover, upon denoting by $\mu_G$ a fixed choice of Haar measure on $G$ and by $\mu_{\widehat{G}}$ the induced Plancherel measure on $\widehat{G}$, we have:*
 
 (1) *For any structural pair $(k, \Gamma)$ of $G$, $\Gamma/k$ is an elementary abelian Lie group.*
 
@@ -1228,7 +1228,11 @@ We verify below that $g\mapsto(\partial_af)(g)$, for $f\in C^1(G)$, is defined f
 
 **D.1. SCHWARTZ-BRUHAT SPACE OF A HAUSDORFF LOCALLY COMPACT ABELIAN GROUP** · **767**
 
-LEMMA D.1.6.6. *Let $G$ be a Hausdorff locally compact abelian group, and $f\in C^1(G)$. Then $\partial_af$ is a continuous function on $G$. Moreover, $\partial_a$ preserves the $\mathbf{C}$-linear subspace $C^{\infty}(G)\subset C^1(G)$ and satisfies $\partial_a(f_1f_2)=f_1\partial_a(f_2)+f_2\partial_a(f_1)$.*
+LEMMA D.1.6.6. *Let $G$ be a Hausdorff locally compact abelian group, and $f\in C^1(G)$. Then $\partial_af$ is a continuous function on $G$. Moreover, $\partial_a$ preserves the $\mathbf{C}$-linear subspace $C^{\infty}(G)\subset C^1(G)$ and satisfies*
+
+$$
+\partial_a(f_1f_2)=f_1\partial_a(f_2)+f_2\partial_a(f_1).
+$$
 
 We call the operators $\partial_a:C^{\infty}(G)\to C^{\infty}(G)$ *first-order differential operators.*
 
@@ -1788,7 +1792,7 @@ $$
 
 *which is a topological isomorphism.*
 
-*In (D.1.8.2) it is equivalent by Corollary C.2.3.12 to use $\widehat{\otimes}_{\varepsilon}$ since the spaces $\mathcal{S}(G_j)'_{\beta}$ are nuclear by Theorem D.1.5.7. For the proof of (2), we further refer the reader to [Al-B, Lemma 3, p. 803].*
+In (D.1.8.2) it is equivalent by Corollary C.2.3.12 to use $\widehat{\otimes}_{\varepsilon}$ since the spaces $\mathcal{S}(G_j)'_{\beta}$ are nuclear by Theorem D.1.5.7. For the proof of (2), we further refer the reader to [Al-B, Lemma 3, p. 803].
 
 Proof. (1) : Assume first that $G_1$ and $G_2$ are elementary abelian Lie groups. In this case $\mathcal{S}(G_1)$ and $\mathcal{S}(G_2)$ are Fréchet spaces, so the inductive tensot product topology on $\mathcal{S}(G_1)\otimes\mathcal{S}(G_2)$ coincides with the projective tensor product topology by [Scha, Ch. III, 5.1]. Hence, the desired result in these cases is immediate from Lemma D.1.3.7(2).
 
@@ -2057,7 +2061,13 @@ $$
 $$
 *The family of seminorms $\{\nu_{m,n}\}_{m,n\ge 0}$ defines the usual locally convex topology on $\mathcal{S}(\mathbf{R})$.*
 
-*In particular, for a subset $B\subset\mathcal{S}(\mathbf{R})$ to be bounded in the topological vector space $\mathcal{S}(\mathbf{R})$ it is necessary and sufficient that for each pair of integers $m,n\ge 0$ the subset $\nu_{m,n}(B)\subset\mathbf{R}_{\ge 0}$ is bounded.*
+*In particular, for a subset $B\subset\mathcal{S}(\mathbf{R})$ to be bounded in the topological vector space $\mathcal{S}(\mathbf{R})$ it is necessary and sufficient that for each pair of integers $m,n\ge 0$ the subset*
+
+$$
+\nu_{m,n}(B)\subset\mathbf{R}_{\ge 0}
+$$
+
+*is bounded.*
 
 Proof. The assertion on boundedness within $\mathcal{S}(\mathbf{R})$ follows from the rest because by [Scha, Ch. IV, 3.3] boundedness for a subset of a Hausdorff locally convex topological vector space is the same as weak boundedness (i.e., boundedness in the weak topology defined by continuous linear functionals).
 
@@ -2199,7 +2209,7 @@ Proposition D.1.10.6. *Let $G$ be an elementary abelian Lie group. For each inva
 
 *(4) for a fixed integer $1\le q<\infty$, a basis $\{\partial_j\}_{1\le j\le d}$ of $\mathcal{L}(G)=\mathcal{L}(G^0)$, and a basis $\{\partial'_i\}_{1\le i\le d'}$ of $\mathcal{L}(\widehat{G})$, $\lVert p(\partial'^{\beta})\cdot\partial^{\alpha}(f)\rVert_{L^q(G)}$ for $\alpha\in\mathbf{N}^d$, $\beta\in\mathbf{N}^{d'}$.*
 
-*By Lemma D.1.6.16, for any $f\in\mathcal{S}(G)$ the sup-norms in (1) and (3) are finite. Likewise, by Remark D.1.6.20 we see that $p(D')\cdot D(f)\in\mathcal{S}(G)$ for all pairs $(D,D')$, so the $L^q$-norms in (2) and (4) are finite.*
+By Lemma D.1.6.16, for any $f\in\mathcal{S}(G)$ the sup-norms in (1) and (3) are finite. Likewise, by Remark D.1.6.20 we see that $p(D')\cdot D(f)\in\mathcal{S}(G)$ for all pairs $(D,D')$, so the $L^q$-norms in (2) and (4) are finite.
 
 Proof. Since the formation of $p(D')$ is linear in $D'$, it is clear that (1) and (3) define the same locally convex topology on $\mathcal{S}(G)$, as do (2) and (4). In particular, (3) and (4) are independent of the choice of such bases and it suffices to show (3) and (4) define the usual topology on $\mathcal{S}(G)$ for some common choice of such bases. Fixing an isomorphism
 $$
@@ -2403,7 +2413,7 @@ $$
 
 **792** · **CHAPTER D. SCHWARTZ-BRUHAT FUNCTIONS**
 
-(3) For the above sets of seminorms, the seminorms obtained upon replacing $\{1+|\log(\cdot)|^r\}_{r\in\mathbf N}$ by the absolute value of the polynomials in $|\log(t)|$ of arbitrary degree.
+(3) *For the above sets of seminorms, the seminorms obtained upon replacing $\{1+|\log(\cdot)|^r\}_{r\in\mathbf N}$ by the absolute value of the polynomials in $|\log(t)|$ of arbitrary degree.*
 
 The proof of Proposition D.1.10.10 proceeds as for Proposition D.1.10.9, upon noting that we have $C^0_{F,S}=C^0_F$ for all $S$ by Lemma D.1.10.1(3). We further note that the seminorms in (D.1.10.20) agree with the seminorms in (D.1.10.17) for all large enough $S$, since $C_{F,S}=C_F$ for all sufficiently large $S$ by Lemma D.1.10.1(3).
 
@@ -2559,35 +2569,35 @@ $$
 
 **D.2. SCHWARTZ-BRUHAT FUNCTIONS ON MODULATED GROUPS** · **795**
 
-(1) $i^{-1}(\ker(\Phi^E_{G,\omega}))=\ker(\Phi_{G,\omega})$ as closed subspaces of $\mathcal S(G)$, and $i$ induces continuous injective linear maps (each also denoted as $i$)
+(1) *$i^{-1}(\ker(\Phi^E_{G,\omega}))=\ker(\Phi_{G,\omega})$ as closed subspaces of $\mathcal S(G)$, and $i$ induces continuous injective linear maps (each also denoted as $i$)*
 
 $$
 \mathcal S(G)(\omega)\to E(\omega):=E/\ker(\Phi^E_{G,\omega}),\ \mathrm H^0(\omega,\mathcal S(G))\to\mathrm H^0(\omega,E) \tag{D.2.2.5}
 $$
 
-(2) We have $i^{-1}(\mathrm H^0(\omega,E))=\mathrm H^0(\omega,\mathcal S(G))$ as closed subspaces of $\mathcal S(G)$.
+(2) *We have $i^{-1}(\mathrm H^0(\omega,E))=\mathrm H^0(\omega,\mathcal S(G))$ as closed subspaces of $\mathcal S(G)$.*
 
-(3) If $i$ has dense range then so do the continuous linear maps in (D.2.2.5).
+(3) *If $i$ has dense range then so do the continuous linear maps in (D.2.2.5).*
 
-(4) For any $T\in\mathscr L(\mathcal S(G))$ continuous with respect to the Hausdorff locally convex topology induced on $\mathcal S(G)$ by $i$, if $i$ has dense range then $T$ extends by continuity to a unique $\overline{T}\in\mathscr L(E)$. If, furthermore, there exists a topological automorphism $\alpha$ of $G$ leaving $|\cdot|_G$ unaffected such that $T$ satisfies
+(4) *For any $T\in\mathscr L(\mathcal S(G))$ continuous with respect to the Hausdorff locally convex topology induced on $\mathcal S(G)$ by $i$, if $i$ has dense range then $T$ extends by continuity to a unique $\overline{T}\in\mathscr L(E)$. If, furthermore, there exists a topological automorphism $\alpha$ of $G$ leaving $|\cdot|_G$ unaffected such that $T$ satisfies*
 
 $$
 T\circ\rho_G(g,\cdot)=\rho_G(\alpha(g),T(\cdot)) \tag{D.2.2.6}
 $$
 
-for every $g\in G^1$ then the map $\overline{T}$ satisfies
+*for every $g\in G^1$ then the map $\overline{T}$ satisfies*
 
 $$
 \overline{T}\circ\rho_G(g,\cdot)=\rho_G(\alpha(g),\overline{T}(\cdot)) \tag{D.2.2.7}
 $$
 
-and for $\alpha^*\omega:=\omega\circ\alpha^{-1}$ $^{9}$ there exist unique continuous linear maps $T_{\omega}$, $\overline{T}_{\omega}$ making the diagrams
+*and for $\alpha^*\omega:=\omega\circ\alpha^{-1}$ $^{9}$ there exist unique continuous linear maps $T_{\omega}$, $\overline{T}_{\omega}$ making the diagrams*
 
 (D.2.2.8)
 
 ```latex
 \begin{tikzcd}
-\mathcal S(G) \arrow[r] \arrow[d, "T"] & \mathcal S(G)(\omega) \arrow[r, "\Phi_{G,\omega}", "\simeq"'] \arrow[d, "T_{\omega}"] & \mathrm H^0(\omega,\mathcal S(G)) \arrow[d, "T"] \\
+\mathcal S(G) \arrow[r] \arrow[d, "T"'] & \mathcal S(G)(\omega) \arrow[r, "\Phi_{G,\omega}", "\simeq"'] \arrow[d, "T_{\omega}"] & \mathrm H^0(\omega,\mathcal S(G)) \arrow[d, "T"] \\
 \mathcal S(G) \arrow[r] & \mathcal S(G)(\alpha^*\omega) \arrow[r, "\simeq", "\Phi_{G,\alpha^*\omega}"'] & \mathrm H^0(\alpha^*\omega,\mathcal S(G))
 \end{tikzcd}
 ```
@@ -2598,12 +2608,12 @@ and
 
 ```latex
 \begin{tikzcd}
-E \arrow[r] \arrow[d, "\overline{T}"] & E(\omega) \arrow[r, "\Phi^E_{G,\omega}", "\simeq"'] \arrow[d, "\overline{T}_{\omega}"] & \mathrm H^0(\omega,E) \arrow[d, "\overline{T}"] \\
+E \arrow[r] \arrow[d, "\overline{T}"'] & E(\omega) \arrow[r, "\Phi^E_{G,\omega}", "\simeq"'] \arrow[d, "\overline{T}_{\omega}"'] & \mathrm H^0(\omega,E) \arrow[d, "\overline{T}"] \\
 E \arrow[r] & E(\alpha^*\omega) \arrow[r, "\simeq", "\Phi^E_{G,\alpha^*\omega}"'] & \mathrm H^0(\alpha^*\omega,E)
 \end{tikzcd}
 ```
 
-commute. The operator $\overline{T}_{\omega}$ is the unique extension by continuity of $T_{\omega}$.
+*commute. The operator $\overline{T}_{\omega}$ is the unique extension by continuity of $T_{\omega}$.*
 
 In both diagrams, the composites across the rows are the actual averaging operators $\Phi_{G,\omega}$, $\Phi^E_{G,\omega}$, etc., with the induced isomorphisms as the right arrows in the rows (denoted as $\Phi_{G,\omega}$, etc. via abuse of notation) due to the isomorphism in (4.3.3.2) (where the group denoted $G$ there is $G^1$ in the present setting).
 
@@ -2647,9 +2657,9 @@ $$
 
 *Letting $\chi:G=G^1\times\Gamma\to\mathbf C^{\times}$ be defined by $\chi(g^1\tau(\gamma))=\overline{\omega}(g^1)$, the composite injective continuous linear map $\mathcal S(\Gamma)\xrightarrow{\tau}\mathcal S(G)\xrightarrow{i}E$ gives $\mathcal S(\Gamma)$ a (necessarily coarser Hausdorff locally convex) subspace topology whose completion maps isomorphically via $M_{\chi}$ onto the Hausdorff quotient $E(\omega)$ of $E$.*
 
-*The meaning of the final assertion is that under the linear topological automorphism $M_{\chi}$ of $\mathcal S(G)$ equipped with the subspace topology from $E$, the natural map $M_{\chi}(\mathcal S(\Gamma))\to E(\omega)$ identifies the target with the completion of the source.*
+The meaning of the final assertion is that under the linear topological automorphism $M_{\chi}$ of $\mathcal S(G)$ equipped with the subspace topology from $E$, the natural map $M_{\chi}(\mathcal S(\Gamma))\to E(\omega)$ identifies the target with the completion of the source.
 
-*PROOF. Assertion (1) is a special case of Lemma D.1.8.1(1). For assertion (2), we first treat the case $E=\mathcal S(G)$ with $i$ the identity. We have $\mathcal S(\Gamma)=\mathrm H^0(G^1,\mathcal S(G))$ (functions independent of the second component in $G=\Gamma\times G^1$), and $M_{\chi}(g.f)=\chi(g)(g.M_{\chi}(f))$ for $g\in G$, so $M_{\chi}$ carries the space of $G^1$-invariants onto the space of $\omega$-isotypic vectors. In other words, $M_{\chi}(\mathcal S(\Gamma))=\mathrm H^0(\omega,\mathcal S(G))$, Thus, the composite map $M_{\chi}(\mathcal S(\Gamma))\to\mathcal S(G)\hookrightarrow\mathcal S(G)(\omega)$ is a topological isomorphism due to (4.3.3.2) applied to $E=\mathcal S(G)$ and the group $G^1$ acting by $f\mapsto\overline{\omega}(g)\,g.f$ for $g\in G^1$. This settles the special case $E=\mathcal S(G)$ with $i$ the identity.*
+PROOF. Assertion (1) is a special case of Lemma D.1.8.1(1). For assertion (2), we first treat the case $E=\mathcal S(G)$ with $i$ the identity. We have $\mathcal S(\Gamma)=\mathrm H^0(G^1,\mathcal S(G))$ (functions independent of the second component in $G=\Gamma\times G^1$), and $M_{\chi}(g.f)=\chi(g)(g.M_{\chi}(f))$ for $g\in G$, so $M_{\chi}$ carries the space of $G^1$-invariants onto the space of $\omega$-isotypic vectors. In other words, $M_{\chi}(\mathcal S(\Gamma))=\mathrm H^0(\omega,\mathcal S(G))$, Thus, the composite map $M_{\chi}(\mathcal S(\Gamma))\to\mathcal S(G)\hookrightarrow\mathcal S(G)(\omega)$ is a topological isomorphism due to (4.3.3.2) applied to $E=\mathcal S(G)$ and the group $G^1$ acting by $f\mapsto\overline{\omega}(g)\,g.f$ for $g\in G^1$. This settles the special case $E=\mathcal S(G)$ with $i$ the identity.
 
 ## PDF page 797
 
@@ -2683,7 +2693,7 @@ We now relate spaces of Schwartz-Bruhat functions on the positive real line with
 
 LEMMA D.3.1.1. *Let $I\subset\mathbf R$ be a non-empty open bounded interval, and $N\ge 0$ an integer. Let $\phi$ be a holomorphic function on the open vertical strip $\mathbf C_I$ of bounded width. Assume that for every non-empty open interval $J\subset\mathbf R$ strictly contained within $I$ (i.e., $\overline{J}\subset I$), $s^N\phi(s)$ is bounded over $\mathbf C_J$. Then for every integer $k\ge 0$, $\partial_s^k\phi$ satisfies the same condition.*
 
-*PROOF. We write $I:=(a,b)$ for real numbers $a<b$. For any non-empty open interval $J\subset\mathbf R$ strictly contained within $I$, there exists $\varepsilon>0$ small enough such that $a+2\varepsilon<b-2\varepsilon$ and $J\subset[a+2\varepsilon,b-2\varepsilon]$. By hypothesis, $s^N\phi$ is bounded over $\mathbf C_{[a+\varepsilon,b-\varepsilon]}$. We fix a point $z\in\mathbf C_{(a+2\varepsilon,b-2\varepsilon)}$.*
+PROOF. We write $I:=(a,b)$ for real numbers $a<b$. For any non-empty open interval $J\subset\mathbf R$ strictly contained within $I$, there exists $\varepsilon>0$ small enough such that $a+2\varepsilon<b-2\varepsilon$ and $J\subset[a+2\varepsilon,b-2\varepsilon]$. By hypothesis, $s^N\phi$ is bounded over $\mathbf C_{[a+\varepsilon,b-\varepsilon]}$. We fix a point $z\in\mathbf C_{(a+2\varepsilon,b-2\varepsilon)}$.
 
 $^{10}$No, that cited Lemma is not what we need since automorphisms $\alpha$ of $G$ are not relevant here; we are using a variant of the Lemma where $T$ intertwines the isotypic subspaces for two characters of $G^1$ without any automorphism of $G$ being relevant. For $\chi$ as just defined, $T(g.f)=\chi(g)\,g.(Tf)$, so $T$ carries $G^1$-invariants exactly onto $\mathrm H^0(\omega,\mathcal S(G))$.
 
@@ -2771,7 +2781,7 @@ LEMMA D.3.1.2 (Uniform Schwartz topology and $L^p$-convergence on vertical lines
 
 *When $\mathcal S(\mathbf C_I)$ is endowed with the topology of $L^p$-convergence on all vertical lines $a_m+i\mathbf R$ for all $\{s^N\phi\}_{N\ge 0}$ for $\phi\in\mathcal S(\mathbf C_I)$ then it is a separable Fréchet space. This topology is equal to the Hausdorff locally convex topology of Schwartz convergence on every vertical line of $\mathbf C_I$. In particular, this topology does not depend on the choice of $p>1$ nor on the choice of $a_{\bullet}$.*
 
-*PROOF. We will treat the case $I=(0,+\infty)$ for the sake of clarity, the general case being established with the same method, with only notational differences. Let $a_{\bullet}:=\{a_m\}_{m\ge 0}\subset\mathbf Q_{>0}$ be a sequence of positive rational numbers such that $0$ is an accumulation point, and $\limsup_{m\ge 0}a_m=+\infty$. Consider the linear map*
+PROOF. We will treat the case $I=(0,+\infty)$ for the sake of clarity, the general case being established with the same method, with only notational differences. Let $a_{\bullet}:=\{a_m\}_{m\ge 0}\subset\mathbf Q_{>0}$ be a sequence of positive rational numbers such that $0$ is an accumulation point, and $\limsup_{m\ge 0}a_m=+\infty$. Consider the linear map
 
 $$
 A_{a_{\bullet}}:\mathcal S(\mathbf C_{>0})\to\prod_{m\ge 0}\prod_{N\ge 0}L^p(\mathbf R,\mathrm{d}x) \tag{D.3.1.7}
@@ -2779,9 +2789,9 @@ $$
 
 *defined as $A_{a_{\bullet}}(\phi):=(s^N\phi(s)|_{\mathrm{Re}(s)=a_m})_{m,N\ge 0}$.*
 
-*The map $A_{a_{\bullet}}$ is injective since elements of $\mathcal S(\mathbf C_{>0})$ are holomorphic by definition . Let $\{\phi_k\}_{k\ge 0}\subset\mathcal S(\mathbf C_{>0})$ be a sequence, and assume that the sequence $\{A_{a_{\bullet}}(\phi_k)\}_{k\ge 0}$ converges, so $\{\phi_k|_{a_m+i\mathbf R}\}_{m\ge 0}$ converges to some $(\alpha_m)_{m\ge 0}\in\prod_{m\ge 0}L^p(\mathbf R,\mathrm{d}x)$.*
+The map $A_{a_{\bullet}}$ is injective since elements of $\mathcal S(\mathbf C_{>0})$ are holomorphic by definition . Let $\{\phi_k\}_{k\ge 0}\subset\mathcal S(\mathbf C_{>0})$ be a sequence, and assume that the sequence $\{A_{a_{\bullet}}(\phi_k)\}_{k\ge 0}$ converges, so $\{\phi_k|_{a_m+i\mathbf R}\}_{m\ge 0}$ converges to some $(\alpha_m)_{m\ge 0}\in\prod_{m\ge 0}L^p(\mathbf R,\mathrm{d}x)$.
 
-*Let $0<A<B$ be arbitrary real numbers, and consider the vertical strip $\mathbf C_{(A,B)}$ of bounded width within $\mathbf C_{>0}$ for $\mathrm{Re}(s)\in(A,B)$. There exist integers $m_1,m_2$ such that $a_{m_1}<A<B<a_{m_2}$. Since each $\phi_k$ is holomorphic over the vertical strip $\mathbf C_{(a_{m_1},a_{m_2})}$ and is uniformly Schwartz, by Theorem B.2.2.4 we obtain*
+Let $0<A<B$ be arbitrary real numbers, and consider the vertical strip $\mathbf C_{(A,B)}$ of bounded width within $\mathbf C_{>0}$ for $\mathrm{Re}(s)\in(A,B)$. There exist integers $m_1,m_2$ such that $a_{m_1}<A<B<a_{m_2}$. Since each $\phi_k$ is holomorphic over the vertical strip $\mathbf C_{(a_{m_1},a_{m_2})}$ and is uniformly Schwartz, by Theorem B.2.2.4 we obtain
 
 $$
 \phi_k(s)=-\frac{1}{2\pi i}\int_{a_{m_1}-i\infty}^{a_{m_1}+i\infty}\frac{\phi_k(z)}{z-s}\,\mathrm{d}z+\frac{1}{2\pi i}\int_{a_{m_2}-i\infty}^{a_{m_2}+i\infty}\frac{\phi_k(z)}{z-s}\,\mathrm{d}z \tag{D.3.1.8}
@@ -2789,59 +2799,59 @@ $$
 
 *for any $s\in\mathbf C_{(A,B)}$.*
 
-*Since $a_{m_1}<A$ and $a_{m_2}>B$, the function $(z-s)^{-1}$ for $z\in(a_{m_1}+i\mathbf R)\cup(a_{m_2}+i\mathbf R)$ and $s\in\mathbf C_{(A,B)}$ is uniformly bounded. Since $\{\phi_k|_{a_{m_j}+i\mathbf R}\}_{k\ge 0}$ converges in $L^p(\mathbf R,\mathrm{d}x)$ for $j=1,2$, both integrals in (D.3.1.8) as*
+Since $a_{m_1}<A$ and $a_{m_2}>B$, the function $(z-s)^{-1}$ for $z\in(a_{m_1}+i\mathbf R)\cup(a_{m_2}+i\mathbf R)$ and $s\in\mathbf C_{(A,B)}$ is uniformly bounded. Since $\{\phi_k|_{a_{m_j}+i\mathbf R}\}_{k\ge 0}$ converges in $L^p(\mathbf R,\mathrm{d}x)$ for $j=1,2$, both integrals in (D.3.1.8) as
 
 ## PDF page 800
 
 **800** · **CHAPTER D. SCHWARTZ-BRUHAT FUNCTIONS**
 
-*sequences of functions of $s\in\mathbf C_{(A,B)}$ satisfy*
+sequences of functions of $s\in\mathbf C_{(A,B)}$ satisfy
 
 $$
 \int_{a_{m_j}-i\infty}^{a_{m_j}+i\infty}\left|\frac{\phi_k(z)-\alpha_{m_j}(\mathrm{Im}(z))}{z-s}\right||\mathrm{d}z|\le\left(\int_{\mathbf R}|\phi_k(a_{m_j}+ix)-\alpha_{m_j}(x)|^p\,\mathrm{d}x\right)^{1/p}\left(\int_{\mathbf R}\left|\frac{1}{a_{m_j}+ix-s}\right|^q\,\mathrm{d}x\right)^{1/q} \tag{D.3.1.9}
 $$
 
-*for $j=1,2$ by Hölder’s Inequality, with $1/p+1/q=1$ (we have $q=p/(p-1)>1$).*
+for $j=1,2$ by Hölder’s Inequality, with $1/p+1/q=1$ (we have $q=p/(p-1)>1$).
 
-*The first of the two factors on the right side of (D.3.1.9) is arbitrarily small for $j=1,2$ as $k\to+\infty$ since $\phi_k\to\alpha_{m_j}$ on $a_{m_j}+i\mathbf R$ in the $L^p$-sense. The second factor on the right side, namely*
+The first of the two factors on the right side of (D.3.1.9) is arbitrarily small for $j=1,2$ as $k\to+\infty$ since $\phi_k\to\alpha_{m_j}$ on $a_{m_j}+i\mathbf R$ in the $L^p$-sense. The second factor on the right side, namely
 
 $$
 \left(\int_{\mathbf R}\left|\frac{1}{a_{m_j}+ix-s}\right|^q\,\mathrm{d}x\right)^{1/q}, \tag{D.3.1.10}
 $$
 
-*is bounded above (upon writing $s=\sigma+i\tau$) by*
+is bounded above (upon writing $s=\sigma+i\tau$) by
 
 $$
 \left(\int_{\mathbf R}\left(\frac{1}{|a_{m_j}-\sigma|^2+|x-\tau|^2}\right)^{q/2}\,\mathrm{d}x\right)^{1/q}\le\left(\int_{\mathbf R}\frac{1}{(|a_{m_j}-A|^2+x^2)^{q/2}}\,\mathrm{d}x\right)^{1/q}<\infty. \tag{D.3.1.11}
 $$
 
-*The final upper bound is a positive constant depending only on $a_{m_j}$, $A$, $B$ but not on $s\in\mathbf C_{(A,B)}$.*
+The final upper bound is a positive constant depending only on $a_{m_j}$, $A$, $B$ but not on $s\in\mathbf C_{(A,B)}$.
 
-*In particular, $\{\phi_k\}_{k\ge 0}$ as a sequence of holomorphic functions on the vertical strip $\mathbf C_{(A,B)}$ converges pointwise to some function $\phi(s)$, namely on the strip $a_{m_1}<\sigma<a_{m_2}$ we have*
+In particular, $\{\phi_k\}_{k\ge 0}$ as a sequence of holomorphic functions on the vertical strip $\mathbf C_{(A,B)}$ converges pointwise to some function $\phi(s)$, namely on the strip $a_{m_1}<\sigma<a_{m_2}$ we have
 
 $$
 \phi(s)=-\frac{1}{2\pi i}\int_{a_{m_1}+i\mathbf R}\frac{\alpha_{m_1}(\mathrm{Im}(z))}{s-z}\,\mathrm{d}z+\frac{1}{2\pi i}\int_{a_{m_2}+i\mathbf R}\frac{\alpha_{m_2}(\mathrm{Im}(z))}{s-z}\,\mathrm{d}z
 $$
 
-*where both integrals are oriented upward and are absolutely convergent by Hölder’s Inequality: the corresponding $L^1$-norms for $j=1,2$ are bounded above by*
+where both integrals are oriented upward and are absolutely convergent by Hölder’s Inequality: the corresponding $L^1$-norms for $j=1,2$ are bounded above by
 
 $$
 \frac{1}{2\pi}\left(\int_{\mathbf R}|\alpha_{m_j}(y)|^p\,\mathrm{d}y\right)^{1/p}\left(\int_{a_{m_j}+i\mathbf R}\frac{|\mathrm{d}z|}{|z-s|^q}\right)^{1/q}<\infty.
 $$
 
-*The convergence to $\phi$ is uniform on $\mathbf C_{(A,B)}$, so $\phi$ holomorphic over the vertical strip $\mathbf C_{(A,B)}$.*
+The convergence to $\phi$ is uniform on $\mathbf C_{(A,B)}$, so $\phi$ holomorphic over the vertical strip $\mathbf C_{(A,B)}$.
 
-*Since $(A,B)\subset\mathbf R_{>0}$ is arbitrary (here we use that $0$ is an accumulation point of $a_{\bullet}$ and $\limsup_{m\ge 0}a_m=+\infty$, so given any $(A,B)\subset\mathbf R_{>0}$ we can always find $a_{m_1}<A$ and $a_{m_2}>B$ belonging to $a_{\bullet}$), we see that the limit in $\prod_{m\ge 0}L^p(\mathbf R,\mathrm{d}x)$ of the image under $A_{a_{\bullet}}$ from (D.3.1.7) of the sequence $\{\phi_k\}_{k\ge 0}\subset\mathcal S(\mathbf C_{>0})$, remains in $\mathscr{O}(\mathbf C_{>0})$; i.e., it is holomorphic over $\mathbf C_{>0}$.*
+Since $(A,B)\subset\mathbf R_{>0}$ is arbitrary (here we use that $0$ is an accumulation point of $a_{\bullet}$ and $\limsup_{m\ge 0}a_m=+\infty$, so given any $(A,B)\subset\mathbf R_{>0}$ we can always find $a_{m_1}<A$ and $a_{m_2}>B$ belonging to $a_{\bullet}$), we see that the limit in $\prod_{m\ge 0}L^p(\mathbf R,\mathrm{d}x)$ of the image under $A_{a_{\bullet}}$ from (D.3.1.7) of the sequence $\{\phi_k\}_{k\ge 0}\subset\mathcal S(\mathbf C_{>0})$, remains in $\mathscr{O}(\mathbf C_{>0})$; i.e., it is holomorphic over $\mathbf C_{>0}$.
 
-*Using (D.3.1.8) and adapting the preceding considerations with $s^N\phi_k$ in place of $\phi_k$ for each $N\ge 1$, the uniform Schwartz condition on the limit holomorphic function $\phi$ over the vertical strips within $\mathbf C_{>0}$ of bounded width is verified using the convergence of the sequence of integrals (for each integer $N\ge 1$) in*
+Using (D.3.1.8) and adapting the preceding considerations with $s^N\phi_k$ in place of $\phi_k$ for each $N\ge 1$, the uniform Schwartz condition on the limit holomorphic function $\phi$ over the vertical strips within $\mathbf C_{>0}$ of bounded width is verified using the convergence of the sequence of integrals (for each integer $N\ge 1$) in
 
 $$
 |s^N\phi_k(s)|\le\frac{1}{2\pi}\int_{\mathbf R}\left|\frac{(a_{m_1}+ix)^N\phi_k(a_{m_1}+ix)}{a_{m_1}+ix-s}\right|\,\mathrm{d}x+\frac{1}{2\pi}\int_{\mathbf R}\left|\frac{(a_{m_2}+ix)^N\phi_k(a_{m_2}+ix)}{a_{m_2}+ix-s}\right|\,\mathrm{d}x. \tag{D.3.1.12}
 $$
 
-*We note that since each $s^N\phi$ is bounded over the vertical strips of bounded width in $\mathbf C_{>0}$ (staying away from the left edge), so is each $s^N(\partial_s^k\phi)$ for each integer $k\ge 0$, as a consequence of Lemma D.3.1.1. It follows that we have $\phi\in\mathcal S(\mathbf C_{>0})$. It follows that $A_{a_{\bullet}}$ has (sequentially) closed range in $\prod_{m\ge 0}\prod_{N\ge 0}L^p(\mathbf R,\mathrm{d}x)$. Thus, $\mathcal S(\mathbf C_{>0})$ is a Fréchet space.*
+We note that since each $s^N\phi$ is bounded over the vertical strips of bounded width in $\mathbf C_{>0}$ (staying away from the left edge), so is each $s^N(\partial_s^k\phi)$ for each integer $k\ge 0$, as a consequence of Lemma D.3.1.1. It follows that we have $\phi\in\mathcal S(\mathbf C_{>0})$. It follows that $A_{a_{\bullet}}$ has (sequentially) closed range in $\prod_{m\ge 0}\prod_{N\ge 0}L^p(\mathbf R,\mathrm{d}x)$. Thus, $\mathcal S(\mathbf C_{>0})$ is a Fréchet space.
 
-*The preceding work (especially on the strip $a_{m_1}<\sigma<a_{m_2}$ with uniformity) shows that the topology on $\mathcal S(\mathbf C_I)$ agrees with $L^p$-convergence on every vertical line of $\mathbf C_I$. This in turn agrees with convergence in $\mathcal S(\mathbf R)$ on every such vertical line due to Example D.1.10.3, so it agrees with the topology defined via $A_{a_{\bullet}}$.*
+The preceding work (especially on the strip $a_{m_1}<\sigma<a_{m_2}$ with uniformity) shows that the topology on $\mathcal S(\mathbf C_I)$ agrees with $L^p$-convergence on every vertical line of $\mathbf C_I$. This in turn agrees with convergence in $\mathcal S(\mathbf R)$ on every such vertical line due to Example D.1.10.3, so it agrees with the topology defined via $A_{a_{\bullet}}$.
 
 $\square$
 
@@ -3315,18 +3325,18 @@ $$
 
 **812** · **CHAPTER D. SCHWARTZ-BRUHAT FUNCTIONS**
 
-to the space of $\omega$-isotypic vectors in $\mathcal{S}_I(G)$ making the following diagram of continuous linear maps commute
+*to the space of $\omega$-isotypic vectors in $\mathcal{S}_I(G)$ making the following diagram of continuous linear maps commute*
 
 (D.3.3.10)
 
 ```latex
 \begin{tikzcd}
-\mathcal{S}_I(G) \arrow[r, "\prod_{a\in I}T_a"]\arrow[d, "\Phi^I_{G,\omega}"'] & \prod_{a\in I}\mathcal{S}(G)\arrow[d, "\prod_{a\in I}\Phi_{G,\omega}"'] \\
-\mathrm{H}^0(\omega,\mathcal{S}_I(G)) \arrow[r, "\prod_{a\in I}T_a"] & \prod_{a\in I}\mathrm{H}^0(\omega,\mathcal{S}(G))
+\mathcal{S}_I(G) \arrow[r, "\prod_{a\in I}T_a"]\arrow[d, "\Phi^I_{G,\omega}"'] & \prod_{a\in I}\mathcal{S}(G)\arrow[d, "\prod_{a\in I}\Phi_{G,\omega}"] \\
+\mathrm{H}^0(\omega,\mathcal{S}_I(G)) \arrow[r, "\prod_{a\in I}T_a"'] & \prod_{a\in I}\mathrm{H}^0(\omega,\mathcal{S}(G))
 \end{tikzcd}
 ```
 
-where $\Phi_{G,\omega} : \mathcal{S}(G)\to\mathrm{H}^0(\omega,\mathcal{S}(G))$ is the projector from (D.2.1.1). Moreover $\Phi^I_{G,\omega}$ is a continuous projector (so surjective) and open.
+*where $\Phi_{G,\omega} : \mathcal{S}(G)\to\mathrm{H}^0(\omega,\mathcal{S}(G))$ is the projector from (D.2.1.1). Moreover $\Phi^I_{G,\omega}$ is a continuous projector (so surjective) and open.*
 
 Terminology D.3.3.1 (Passage to $G^1$-isotypes). We will refer to the linear map $\Phi^I_{G,\omega} : \mathcal{S}_I(G)\to \mathrm{H}^0(\omega,\mathcal{S}_I(G))$ as the passage to the $\omega$-isotype operator.
 
@@ -3344,21 +3354,21 @@ D.3.3.2. Fourier-Melllin transform on $\mathcal{S}_I(G)$. We conclude this subse
 
 Theorem D.3.3.13 (Fourier-Mellin transform on $\mathcal{S}_I(G)$). Let $G$ be a second-countable $\mathbf{R}_{>0}$-modulated group. Let $I\subset\mathbf{R}$ be a non-empty open interval, and let $\mu$ be a choice of Haar measure on $G$.
 
-For $\phi\in\mathcal{S}_I(G)$, its Fourier-Mellin transform $M(\phi) : c\mapsto \int_G\phi(g)c(g)\,\mathrm{d}\mu(g)$ for $c\in\Omega(G)$ is absolutely convergent on $\Omega(G)_I$ and is holomorphic in $c$, defining a linear map
+*For $\phi\in\mathcal{S}_I(G)$, its Fourier-Mellin transform $M(\phi) : c\mapsto \int_G\phi(g)c(g)\,\mathrm{d}\mu(g)$ for $c\in\Omega(G)$ is absolutely convergent on $\Omega(G)_I$ and is holomorphic in $c$, defining a linear map*
 
 $$
 M_I : \mathcal{S}_I(G)\to\mathscr{H}(\Omega(G)_I) \tag{D.3.3.11}
 $$
 
-that is $G$-equivariant where we use the left-translation action of $G$ on source and the $G$-action $(g.f)(c)=c(g)f(c)$ on the target.
+*that is $G$-equivariant where we use the left-translation action of $G$ on source and the $G$-action $(g.f)(c)=c(g)f(c)$ on the target.*
 
-Under the linear topological isomorphism from (D.3.3.3), $M_I$ matches the linear topological isomorphism
+*Under the linear topological isomorphism from (D.3.3.3), $M_I$ matches the linear topological isomorphism*
 
 $$
 \check{\mathcal{F}}_{G^1}\overline{\otimes} M_I : \mathcal{S}(G^1)\overline{\otimes}\mathcal{S}_I(\mathbf{R}_{>0})\to\mathcal{S}(\widehat{G^1})\overline{\otimes} A\mathcal{S}(\mathbf{C}_I) \tag{D.3.3.12}
 $$
 
-where $\mathcal{F}_{G^1}$ is the Fourier transform on $\mathcal{S}(G^1)$ and $\check{\mathcal{F}}_{G^1}$ is the composition of $\mathcal{F}_{G^1}$ with the inversion automorphism on $G^1$.
+*where $\mathcal{F}_{G^1}$ is the Fourier transform on $\mathcal{S}(G^1)$ and $\check{\mathcal{F}}_{G^1}$ is the composition of $\mathcal{F}_{G^1}$ with the inversion automorphism on $G^1$.*
 
 Proof. Pick a continuous section $\tau$ to $|\cdot|_G$ and use it to define a linear topological isomorphism $C^\infty(G^1)\overline{\otimes}\mathcal{S}_I(\mathbf{R}_{>0})=\mathcal{S}(G^1)\overline{\otimes}\mathcal{S}_I(\mathbf{R}_{>0})\simeq\mathcal{S}_I(G)$
 
@@ -3500,15 +3510,15 @@ $$
 p_D(c):=(Dc)(e) \tag{D.3.4.1}
 $$
 
-for $e\in G$ the neutral element (on $\widehat{G}\subset\Omega(G)$ this recovers the symbol $p(D)$ from Definition D.1.6.10). Fix a Haar measure $\mu$ on $G$ to define the Fourier-Mellin transform $M : \mathcal{S}_{\overline{I}}G)\to\mathcal{S}_I(G)\xrightarrow{M_I}\mathscr{H}(\Omega(G)_I)$ by $M(\phi) : c\mapsto\int_G\phi(g)c(g)\,\mathrm{d}\mu(g)$.
+*for $e\in G$ the neutral element (on $\widehat{G}\subset\Omega(G)$ this recovers the symbol $p(D)$ from Definition D.1.6.10). Fix a Haar measure $\mu$ on $G$ to define the Fourier-Mellin transform $M : \mathcal{S}_{\overline{I}}G)\to\mathcal{S}_I(G)\xrightarrow{M_I}\mathscr{H}(\Omega(G)_I)$ by $M(\phi) : c\mapsto\int_G\phi(g)c(g)\,\mathrm{d}\mu(g)$.*
 
-For every bounded subset $\mathcal{B}\subset\mathcal{S}_{\overline{I}}(G)$ and a fixed choice of $\omega\in\widehat{G^1}$ there exist constants $C_{\mathcal{B},D,I}>0$ and $M_{\omega,\mathcal{B},D,I}>0$ such that
+*For every bounded subset $\mathcal{B}\subset\mathcal{S}_{\overline{I}}(G)$ and a fixed choice of $\omega\in\widehat{G^1}$ there exist constants $C_{\mathcal{B},D,I}>0$ and $M_{\omega,\mathcal{B},D,I}>0$ such that*
 
 $$
 |M(\phi)(c)|\le\frac{C_{\mathcal{B},D,I}}{|p_D(c)|} \tag{D.3.4.2}
 $$
 
-for all $\phi\in \mathcal{B}$ and all $c\in\Omega(G)_{I,\omega}$ such that $|p_D(c)|\ge M_{\omega,\mathcal{B},D,I}$.
+*for all $\phi\in \mathcal{B}$ and all $c\in\Omega(G)_{I,\omega}$ such that $|p_D(c)|\ge M_{\omega,\mathcal{B},D,I}$.*
 
 Proof. We let $a_1,\dots,a_n : \mathbf{R}\to G$ be $1$-parameter subgroups that give a basis for $\mathcal{L}(G)$ ($n\ge 1$ since $G$ is $\mathbf{R}_{>0}$-modulated), so $D=\sum b_J\partial^J_a$ as a sum over finitely many multi-indices $J=(j_1,\dots,j_n)$ with $b_J\in\mathbf{C}$ and $j_i\in\mathbf{N}$, where $\partial^J_a:=\partial^{j_1}_{a_1}\cdots\partial^{j_n}_{a_n}$. Suppose there are $N$ terms occurring in $D$, so for any $c\in\Omega(G)$ we have
 
@@ -3534,7 +3544,13 @@ By using Weil’s coset integration formula from Theorem D.1.2.1 exactly as in t
 
 **D.3. SCHWARTZ-BRUHAT FUNCTIONS WITH I-EXPONENTIAL DECAY** · **817**
 
-except possibly when $c\in k^\perp=\widehat{G/k}$, and that if $c\in k^\perp$ then $M(\phi)(c)=M(\bar\phi)(\bar c)$ where $\bar c\in\Omega(G/k)$ corresponds to $c$ and the Fourier-Mellin transform on $G/k$ is defined using the Haar measure associated to the initial choice of $\mu$ on $G$ (used to define $M$ for $G$) and the volume-$1$ Haar measure on $k$. Since it is also clear from the definitions that $p_D(c)=p_{\bar D}(\bar c)$, we may rename $G/k$ as $G$ to reduce to the case that $G$ is an elementary abelian Lie group.
+except possibly when $c\in k^\perp=\widehat{G/k}$, and that if $c\in k^\perp$ then
+
+$$
+M(\phi)(c)=M(\bar\phi)(\bar c)
+$$
+
+where $\bar c\in\Omega(G/k)$ corresponds to $c$ and the Fourier-Mellin transform on $G/k$ is defined using the Haar measure associated to the initial choice of $\mu$ on $G$ (used to define $M$ for $G$) and the volume-$1$ Haar measure on $k$. Since it is also clear from the definitions that $p_D(c)=p_{\bar D}(\bar c)$, we may rename $G/k$ as $G$ to reduce to the case that $G$ is an elementary abelian Lie group.
 
 Since $G$ is $\mathbf{R}_{>0}$-modulated, any choice $\tau$ of continuous homomorphic section to the module $|\cdot|_G$ induces an isomorphism of Hausdorff locally compact abelian groups $G\simeq\mathbf{R}_{>0}\times G^1$, and hence the compact Hausdorff abelian group $G^1=\ker(|\cdot|_G)$ is an elementary abelian Lie group: $G^1\simeq\mathbf{T}^m\times F$ for an integer $m=n-1\ge 0$ and a finite abelian group $F$ (with $\mathbf{T}=\mathbf{R}/\mathbf{Z}$). We have $F=\pi_0(G)$ and the $1$-parameter subgroups of $G$ are all contained in the identity component, so by treating the restrictions of $\phi$ to each of the finitely many connected components of $G$ separately we may and do assume $G$ is connected: $G=\mathbf{R}_{>0}\times\mathbf{T}^m$.
 
@@ -3576,7 +3592,7 @@ Proposition D.3.5.1 (Poisson Summation Formula - jump singularities on $\mathbf{
 
 Let $\phi : G\to\mathbf{C}$ be a function. Assume:
 
-(1) $\phi$ is bounded, and for every integer $N\ge 1$, there exist real numbers $T>0$ and $C_N>0$, such that
+(1) *$\phi$ is bounded, and for every integer $N\ge 1$, there exist real numbers $T>0$ and $C_N>0$, such that*
 
 $$
 |\phi(g)|\le C_N e^{-N|\log|g|_G|} \tag{D.3.5.1}
@@ -3584,17 +3600,23 @@ $$
 
 for all $g\in G$ with $|\log|g|_G|>T$,
 
-(2) for every $g\in G^1$, the continuous function $\phi(\tau(t)g)$ of $t\in\mathbf{R}_{>0}$ is smooth away from finitely many points $\{t_1,\dots,t_m\}\subset\mathbf{R}_{>0}$ and admits one-sided limits at each of them for each $g\in G^1$, and the derivatives $(t\partial_t)^k\phi(\tau(t)g)$ are continuous functions of $(t,g)\in(\mathbf{R}_{>0}-\{t_1,\dots,t_m\})\times G^1$ for each integer $k\ge 0$,
+(2) *for every $g\in G^1$, the continuous function $\phi(\tau(t)g)$ of $t\in\mathbf{R}_{>0}$ is smooth away from finitely many points $\{t_1,\dots,t_m\}\subset\mathbf{R}_{>0}$ and admits one-sided limits at each of them for each $g\in G^1$, and the derivatives $(t\partial_t)^k\phi(\tau(t)g)$ are continuous functions of*
 
-(3) $\phi$ is $\chi_0|_{G^1}$-homogeneous with respect to the left-translation action by $G^1$.
+$$
+(t,g)\in(\mathbf{R}_{>0}-\{t_1,\dots,t_m\})\times G^1
+$$
 
-Then upon redefining $\phi$ on the finitely many fibres of $|\cdot|_G$ over $\{t_1,\dots,t_m\}$ to be
+for each integer $k\ge 0$,
+
+(3) *$\phi$ is $\chi_0|_{G^1}$-homogeneous with respect to the left-translation action by $G^1$.*
+
+*Then upon redefining $\phi$ on the finitely many fibres of $|\cdot|_G$ over $\{t_1,\dots,t_m\}$ to be*
 
 $$
 \phi(\tau(t_k)g):=\frac{\lim_{t\to t_k^+}\phi(\tau(t)g)+\lim_{t\to t_k^-}\phi(\tau(t)g)}{2} \tag{D.3.5.2}
 $$
 
-for $1\le k\le m$ and for all $g\in G^1$, the following identity holds for all $x\in G$:
+*for $1\le k\le m$ and for all $g\in G^1$, the following identity holds for all $x\in G$:*
 
 $$
 \sum_{n\in\mathbf{Z}}\chi_0(\gamma^n x)\phi(\gamma^n x)=\frac{1}{\log|\gamma|_G}\sum_{m\in\mathbf{Z}}\widehat{\phi}\left(\overline{\chi}_0|\cdot|^{-\frac{2\pi im}{\log|\gamma|_G}+it_0}_G\right)|x|^{\frac{2\pi im}{\log|\gamma|_G}}_G \tag{D.3.5.3}

@@ -19,6 +19,10 @@
 #   --dry-run            print the prompt and change nothing
 #   --force              take an issue that is labelled `claimed` or `blocked`, or discard an
 #                        existing worktree
+#   --on B1,B2           start from main plus these branches of this repository merged in: the
+#                        statements of earlier sections that are still in review. For a digester
+#                        whose section builds on them; its pull request then contains them too
+#                        until they are merged.
 #
 # The agent needs no git access, and only scouts need the network: this script does the building,
 # committing, pushing and commenting. Relaunching on an issue that has an open pull request
@@ -46,7 +50,7 @@ usage="usage: agent.sh <prover|digester|scout|sweeper> <issue|next> [--setup|--h
 role=${1:?$usage}
 target=${2:?$usage}
 shift 2
-cli=""; model=""; effort=""; mode=all; dry=0; force=0
+cli=""; model=""; effort=""; mode=all; dry=0; force=0; on=""
 while [ $# -gt 0 ]; do
   case $1 in
     --setup) mode=setup; shift ;;
@@ -56,6 +60,7 @@ while [ $# -gt 0 ]; do
     --effort) effort=$2; shift 2 ;;
     --dry-run) dry=1; shift ;;
     --force) force=1; shift ;;
+    --on) on=$2; shift 2 ;;
     *) echo "unknown option $1" >&2; echo "$usage" >&2; exit 2 ;;
   esac
 done
@@ -220,6 +225,20 @@ ${review:-(none)}"
       cp -a --reflink=auto "$from" "$wt/.lake/build" 2>/dev/null || rm -rf "$wt/.lake/build"
     fi
   fi
+  if [ -n "$on" ] && [ -z "$pr" ]; then
+    for b in ${on//,/ }; do
+      git fetch -q origin "$b"
+      git -C "$wt" merge -q --no-edit "origin/$b" ||
+        { echo "could not merge origin/$b into the worktree" >&2; exit 1; }
+    done
+    prompt="$prompt
+
+---
+
+## Statements still in review
+
+This worktree also holds the statements of earlier sections that are not on \`main\` yet (branches: $on). They are being reviewed separately, and a detail of a theorem there may still change. Build on them as they are and do not edit their files. If something in them looks wrong, say so in your report."
+  fi
   printf '%s\n' "$prompt" >"$wt/.agent/PROMPT.md"
   # Record every declaration's signature before the agent touches anything. It is kept outside
   # the worktree so the agent cannot alter it. This also builds the project once for the agent.
@@ -294,7 +313,9 @@ $(tail -n 25 "$wt/.agent/build.txt")
   # proofs made one module take over half an hour and the whole project waited on it. Compile
   # each changed file once more on its own, and refuse work that needs more than ten minutes.
   for f in $(git diff --cached --name-only | grep -E '^RiemannMasullo/.*\.lean$' || true); do
-    rc=0; sandboxed timeout 600 lake env lean "$f" >/dev/null 2>&1 || rc=$?
+    # `lake lean`, not `lake env lean`: only the former passes the lakefile's options, and
+    # without them a linter that the project turns off makes some files take half an hour.
+    rc=0; sandboxed timeout 600 lake lean "$f" >/dev/null 2>&1 || rc=$?
     [ $rc != 124 ] || fail "A $role agent ($who) left \`$f\` taking more than ten minutes to compile. Nothing was pushed. Find the slow proof (\`set_option profiler true in\`, or compile the file up to each declaration in turn) and restructure it; see \"Keep the build fast\" in \`prompts/prover.md\`."
   done
   check="Statement check: not run (no record of the starting point)."

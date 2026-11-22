@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec2
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import all RiemannMasullo.AppB_AnalyticNT.Sec2
 import Mathlib.Analysis.Complex.Liouville
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
@@ -1146,14 +1147,139 @@ theorem infiniteLocalAdditiveTamagawaMeasure_selfDual (w : InfinitePlace F) :
 absolutely convergent on the positive half-plane. -/
 theorem infiniteLocalIdelicZetaIntegral_integrable (w : InfinitePlace F) (f : ℬ(w.Completion))
     (χ : PontryaginDual w.Completionˣ) {s : ℂ} (hs : s ∈ rightHalf) :
-    Integrable (fun g : w.Completionˣ ↦ test(f) g.val * chart∞[w, χ] s g) μ∞(w) := by sorry
+    Integrable (fun g : w.Completionˣ ↦ test(f) g.val * chart∞[w, χ] s g) μ∞(w) := by
+  let K := w.Completion
+  have hσ : 0 < s.re := hs
+  -- Measure the test function through the isometric embedding into the complex numbers.
+  let ι := InfinitePlace.Completion.extensionEmbedding w
+  have hι : Isometry ι := InfinitePlace.Completion.isometry_extensionEmbedding w
+  have hιn (x : K) : ‖ι x‖ = ‖x‖ := hι.norm_map_of_map_zero (map_zero ι) x
+  let m : Multiplicative K →* Multiplicative ℂ := ι.toAddMonoidHom.toMultiplicative
+  have hm : Continuous m := continuous_ofAdd.comp (hι.continuous.comp continuous_toAdd)
+  -- Compact subgroups of the completion are trivial, so every good subgroup is in the kernel.
+  have hk (a : BruhatStructuralPair (Multiplicative K)) : OrderDual.ofDual a.val.2 ≤ m.ker := by
+    let k := OrderDual.ofDual a.val.2
+    have hkc := isCompact_lcaDualAnnihilator (lcaAnnihilator k) a.property.2.2.1.2.1
+    rw [lcaDualAnnihilator_annihilator k a.property.2.2.1.1] at hkc
+    obtain ⟨B, hB⟩ := hkc.exists_bound_of_continuousOn (continuous_toAdd.comp hm).continuousOn
+    intro x hx
+    rw [MonoidHom.mem_ker]
+    by_contra h
+    have hy : 0 < ‖(m x).toAdd‖ := norm_pos_iff.mpr (fun h0 ↦ h (toAdd_eq_zero.mp h0))
+    obtain ⟨n, hn⟩ := exists_nat_gt (B / ‖(m x).toAdd‖)
+    have hn' := hB (x ^ n) (k.pow_mem hx n)
+    change ‖(m (x ^ n)).toAdd‖ ≤ B at hn'
+    rw [map_pow, toAdd_pow, RCLike.norm_nsmul ℝ, nsmul_eq_mul] at hn'
+    exact (not_lt_of_ge hn') ((div_lt_iff₀ hy).mp hn)
+  obtain ⟨-, -, -, hdecay⟩ := schwartzBruhat_exists_coordinate_bounds
+    (G := Multiplicative K) (T := PUnit.{1}) (fun _ ↦ PUnit.unit) (fun x ↦ ‖(m x).toAdd‖)
+    (fun _ ↦ norm_nonneg _) (fun _ ↦ ⟨univ, isCompact_univ, fun _ _ ↦ mem_univ _⟩)
+    (fun a e st N ↦ stage_exists_decay a e st N m hm (hk a)) f
+  -- A power of the norm larger than the exponent controls the growth of the character.
+  obtain ⟨k, hkσ⟩ := exists_nat_gt (2 * s.re)
+  have hwk : (w.mult : ℝ) * s.re < k := by
+    have hmult : (w.mult : ℝ) ≤ 2 := by
+      by_cases h : w.IsReal
+      · simp [h.mult_eq_one]
+      · simp [(InfinitePlace.not_isReal_iff_isComplex.mp h).mult_eq_two]
+    exact (mul_le_mul_of_nonneg_right hmult hσ.le).trans_lt hkσ
+  obtain ⟨B₀, hB₀, hb₀⟩ := hdecay 0
+  obtain ⟨B₁, hB₁, hb₁⟩ := hdecay k
+  have hBd (x : K) : ‖f (Multiplicative.ofAdd x)‖ * (max 1 ‖x‖) ^ k ≤ max B₀ B₁ := by
+    have hmx : ‖(m (Multiplicative.ofAdd x)).toAdd‖ = ‖x‖ := hιn x
+    rcases le_total ‖x‖ 1 with hx | hx
+    · have h := hb₀ (Multiplicative.ofAdd x)
+      rw [pow_zero, mul_one] at h
+      rw [max_eq_left hx, one_pow, mul_one]
+      exact h.trans (le_max_left _ _)
+    · have h := hb₁ (Multiplicative.ofAdd x)
+      rw [hmx] at h
+      rw [max_eq_right hx]
+      exact h.trans (le_max_right _ _)
+  have : BorelSpace K := ⟨rfl⟩
+  have : BorelSpace Kˣ := borelSpace_units_of_continuousInv₀ K
+  have ha := infiniteLocalTamagawa_integrable_norm_rpow w hσ k hwk
+  refine (ha.2.const_mul (max B₀ B₁)).mono' ?_ (ae_of_all _ fun g ↦ ?_)
+  · have hf : Continuous fun g : Kˣ ↦ f (Multiplicative.ofAdd g.val) :=
+      (schwartzBruhat_continuous (G := Multiplicative K) f).comp
+        (continuous_ofAdd.comp Units.continuous_val)
+    exact (hf.mul (chart∞[w, χ] s).continuous).aestronglyMeasurable
+  · have hchart : ‖chart∞[w, χ] s g‖ = ‖(g : K)‖ ^ ((w.mult : ℝ) * s.re) := by
+      change ‖(χ g : ℂ) * ((((m∞(w) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s‖ = _
+      rw [norm_mul, Circle.norm_coe, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+      have hval : (((m∞(w) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) = ‖(g : K)‖ ^ w.mult := by
+        simp [MonoidHom.pow_apply, Units.val_pow_eq_pow_val]
+      rw [hval, ← Real.rpow_natCast, ← Real.rpow_mul (norm_nonneg _)]
+    rw [norm_mul, hchart]
+    change ‖f (Multiplicative.ofAdd (g : K))‖ * ‖(g : K)‖ ^ ((w.mult : ℝ) * s.re) ≤
+      max B₀ B₁ * (‖(g : K)‖ ^ ((w.mult : ℝ) * s.re) / (max 1 ‖(g : K)‖) ^ k)
+    have hD : 0 < (max 1 ‖(g : K)‖) ^ k := by positivity
+    rw [← mul_div_assoc, le_div_iff₀ hD, mul_right_comm]
+    exact mul_le_mul_of_nonneg_right (hBd _) (by positivity)
 
 /-- Paper: Equation (3.3.2.1), p. 137. The finite local zeta integral is
 absolutely convergent on the positive half-plane. -/
 theorem finiteLocalIdelicZetaIntegral_integrable (v : Primes) (f : ℬ(v.adicCompletion F))
     (χ : PontryaginDual (v.adicCompletion F)ˣ) {s : ℂ} (hs : s ∈ rightHalf) :
-    Integrable (fun g : (v.adicCompletion F)ˣ ↦ test(f) g.val * chart𝔭[v, χ] s g) μ𝔭(v) :=
-  by sorry
+    Integrable (fun g : (v.adicCompletion F)ˣ ↦ test(f) g.val * chart𝔭[v, χ] s g) μ𝔭(v) := by
+  let K := v.adicCompletion F
+  have : ProperSpace K := properSpace_adicCompletion v
+  have hσ : 0 < s.re := hs
+  -- The test function is bounded and vanishes off a compact set.
+  have hstage (a : BruhatStructuralPair (Multiplicative K)) :
+      ∃ C : Set K, IsCompact C ∧ ∀ x ∈ a.val.1, Multiplicative.toAdd x ∈ C := by
+    obtain ⟨V, _, hV, hgen⟩ := a.property.2.1
+    have hc : Continuous fun x : a.val.1 ↦ Multiplicative.toAdd (x : Multiplicative K) :=
+      continuous_toAdd.comp continuous_subtype_val
+    obtain ⟨r, hr⟩ := hV.exists_bound_of_continuousOn hc.continuousOn
+    let ρ := max r 0
+    let H : Subgroup (Multiplicative K) :=
+      { carrier := {x | ‖Multiplicative.toAdd x‖ ≤ ρ}
+        one_mem' := by simp [ρ]
+        mul_mem' := fun hx hy ↦
+          (IsUltrametricDist.norm_add_le_max _ _).trans (max_le hx hy)
+        inv_mem' := fun {x} hx ↦ by
+          change ‖Multiplicative.toAdd x⁻¹‖ ≤ ρ
+          rw [toAdd_inv, norm_neg]
+          exact hx }
+    have hle : Subgroup.closure V ≤ H.comap a.val.1.subtype :=
+      (Subgroup.closure_le _).2 fun x hx ↦ (hr x hx).trans (le_max_left _ _)
+    rw [hgen] at hle
+    refine ⟨Metric.closedBall 0 ρ, isCompact_closedBall _ _, fun x hx ↦ ?_⟩
+    have h := Subgroup.mem_subgroupOf.mp (hle (Subgroup.mem_top (x := (⟨x, hx⟩ : a.val.1))))
+    change ‖Multiplicative.toAdd x‖ ≤ ρ at h
+    rwa [Metric.mem_closedBall, dist_zero_right]
+  obtain ⟨C, hC, hsupp, hbd⟩ := schwartzBruhat_exists_coordinate_bounds
+    (G := Multiplicative K) (fun x ↦ Multiplicative.toAdd x)
+    (fun x ↦ ‖((1 : Multiplicative K →* Multiplicative ℝ) x).toAdd‖) (fun _ ↦ norm_nonneg _)
+    hstage (fun a e st N ↦ stage_exists_decay a e st N 1 continuous_const (by simp)) f
+  obtain ⟨B, hB, hB'⟩ := hbd 0
+  obtain ⟨R, hR⟩ := hC.exists_bound_of_continuousOn continuous_norm.continuousOn
+  -- Dominate by a multiple of the truncated norm power.
+  have : BorelSpace Kˣ := ⟨rfl⟩
+  have hb := finiteLocalTamagawa_integrable_norm_rpow v hσ R
+  refine (hb.2.const_mul B).mono' ?_ (ae_of_all _ fun g ↦ ?_)
+  · have hf : Continuous fun g : Kˣ ↦ f (Multiplicative.ofAdd g.val) :=
+      (schwartzBruhat_continuous (G := Multiplicative K) f).comp
+        (continuous_ofAdd.comp Units.continuous_val)
+    exact (hf.mul (chart𝔭[v, χ] s).continuous).aestronglyMeasurable
+  · have hchart : ‖chart𝔭[v, χ] s g‖ = ‖(g : K)‖ ^ s.re := by
+      change ‖(χ g : ℂ) * ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s‖ = _
+      rw [norm_mul, Circle.norm_coe, one_mul,
+        Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+      rfl
+    rw [norm_mul, hchart]
+    change ‖f (Multiplicative.ofAdd (g : K))‖ * ‖(g : K)‖ ^ s.re ≤ _
+    by_cases hg : (g : K) ∈ C
+    · have hRg : ‖(g : K)‖ ≤ R := by simpa using hR _ hg
+      rw [indicator_of_mem (show g ∈ {u : Kˣ | ‖(u : K)‖ ≤ R} from hRg)]
+      have h := hB' (Multiplicative.ofAdd (g : K))
+      rw [pow_zero, mul_one] at h
+      exact mul_le_mul_of_nonneg_right h (by positivity)
+    · have h0 : f (Multiplicative.ofAdd (g : K)) = 0 := hsupp _ hg
+      rw [h0, norm_zero, zero_mul]
+      exact mul_nonneg hB (Set.indicator_nonneg (fun _ _ ↦ by positivity) _)
 
 local notation "normBand[" m "," n "]" =>
   {g | (((m g : ℝ≥0) : ℝ)) ∈ Icc (n + 1 : ℝ)⁻¹ (n + 1)}
@@ -1176,7 +1302,118 @@ theorem finiteLocalIdelicZetaIntegral_tendstoUniformlyOn (v : Primes)
     (hK : IsCompact K) (hKpos : K ⊆ rightHalf) :
     TendstoUniformlyOn (fun (n : ℕ) (s : ℂ) ↦
       ∫ g in normBand[m𝔭(v), n], test(f) g.val * chart𝔭[v, χ] s g ∂μ𝔭(v))
-      (fun s ↦ localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s)) atTop K := by sorry
+      (fun s ↦ localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s)) atTop K := by
+  let L := v.adicCompletion F
+  have : ProperSpace L := properSpace_adicCompletion v
+  have : BorelSpace Lˣ := ⟨rfl⟩
+  rcases K.eq_empty_or_nonempty with rfl | hne
+  · exact tendstoUniformlyOn_empty
+  -- The real parts of the exponents lie in a compact interval of positive numbers.
+  obtain ⟨s₁, hs₁, hmin⟩ := hK.exists_isMinOn hne Complex.continuous_re.continuousOn
+  obtain ⟨s₂, -, hmax⟩ := hK.exists_isMaxOn hne Complex.continuous_re.continuousOn
+  let a := s₁.re
+  let b := s₂.re
+  have ha : 0 < a := hKpos hs₁
+  have hb : 0 < b := ha.trans_le (hmax hs₁)
+  -- The test function is bounded and vanishes outside a ball.
+  have hstage (p : BruhatStructuralPair (Multiplicative L)) :
+      ∃ C : Set L, IsCompact C ∧ ∀ x ∈ p.val.1, Multiplicative.toAdd x ∈ C := by
+    obtain ⟨V, _, hV, hgen⟩ := p.property.2.1
+    have hc : Continuous fun x : p.val.1 ↦ Multiplicative.toAdd (x : Multiplicative L) :=
+      continuous_toAdd.comp continuous_subtype_val
+    obtain ⟨r, hr⟩ := hV.exists_bound_of_continuousOn hc.continuousOn
+    let ρ := max r 0
+    let H : Subgroup (Multiplicative L) :=
+      { carrier := {x | ‖Multiplicative.toAdd x‖ ≤ ρ}
+        one_mem' := by simp [ρ]
+        mul_mem' := fun hx hy ↦
+          (IsUltrametricDist.norm_add_le_max _ _).trans (max_le hx hy)
+        inv_mem' := fun {x} hx ↦ by
+          change ‖Multiplicative.toAdd x⁻¹‖ ≤ ρ
+          rw [toAdd_inv, norm_neg]
+          exact hx }
+    have hle : Subgroup.closure V ≤ H.comap p.val.1.subtype :=
+      (Subgroup.closure_le _).2 fun x hx ↦ (hr x hx).trans (le_max_left _ _)
+    rw [hgen] at hle
+    refine ⟨Metric.closedBall 0 ρ, isCompact_closedBall _ _, fun x hx ↦ ?_⟩
+    have h := Subgroup.mem_subgroupOf.mp (hle (Subgroup.mem_top (x := (⟨x, hx⟩ : p.val.1))))
+    change ‖Multiplicative.toAdd x‖ ≤ ρ at h
+    rwa [Metric.mem_closedBall, dist_zero_right]
+  obtain ⟨C, hC, hsupp, hbd⟩ := schwartzBruhat_exists_coordinate_bounds
+    (G := Multiplicative L) (fun x ↦ Multiplicative.toAdd x)
+    (fun x ↦ ‖((1 : Multiplicative L →* Multiplicative ℝ) x).toAdd‖) (fun _ ↦ norm_nonneg _)
+    hstage (fun p e st N ↦ stage_exists_decay p e st N 1 continuous_const (by simp)) f
+  obtain ⟨B, hB, hB'⟩ := hbd 0
+  obtain ⟨R, hR⟩ := hC.exists_bound_of_continuousOn continuous_norm.continuousOn
+  -- A majorant that works for every exponent in the compact set.
+  let ind (σ : ℝ) := {u : Lˣ | ‖(u : L)‖ ≤ R}.indicator (fun u ↦ ‖(u : L)‖ ^ σ)
+  let M : Lˣ → ℝ := fun u ↦ B * (ind a u + ind b u)
+  have hM : Integrable M μ𝔭(v) :=
+    ((finiteLocalTamagawa_integrable_norm_rpow v ha R).2.add
+      (finiteLocalTamagawa_integrable_norm_rpow v hb R).2).const_mul B
+  have hchart (s : ℂ) (g : Lˣ) : ‖chart𝔭[v, χ] s g‖ = ‖(g : L)‖ ^ s.re := by
+    change ‖(χ g : ℂ) * ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s‖ = _
+    rw [norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    rfl
+  have hdom (s : ℂ) (hs : s ∈ K) (g : Lˣ) :
+      ‖test(f) g.val * chart𝔭[v, χ] s g‖ ≤ M g := by
+    rw [norm_mul, hchart]
+    change ‖f (Multiplicative.ofAdd (g : L))‖ * ‖(g : L)‖ ^ s.re ≤ M g
+    by_cases hg : (g : L) ∈ C
+    · have hRg : ‖(g : L)‖ ≤ R := by simpa using hR _ hg
+      have hmem : g ∈ {u : Lˣ | ‖(u : L)‖ ≤ R} := hRg
+      have hpos : 0 < ‖(g : L)‖ := norm_pos_iff.mpr g.ne_zero
+      have hpow : ‖(g : L)‖ ^ s.re ≤ ind a g + ind b g := by
+        simp only [ind, indicator_of_mem hmem]
+        rcases le_total ‖(g : L)‖ 1 with h1 | h1
+        · exact (Real.rpow_le_rpow_of_exponent_ge hpos h1 (hmin hs)).trans
+            (le_add_of_nonneg_right (by positivity))
+        · exact (Real.rpow_le_rpow_of_exponent_le h1 (hmax hs)).trans
+            (le_add_of_nonneg_left (by positivity))
+      have h := hB' (Multiplicative.ofAdd (g : L))
+      rw [pow_zero, mul_one] at h
+      exact mul_le_mul h hpow (by positivity) hB
+    · have h0 : f (Multiplicative.ofAdd (g : L)) = 0 := hsupp _ hg
+      rw [h0, norm_zero, zero_mul]
+      exact mul_nonneg hB (add_nonneg (Set.indicator_nonneg (fun _ _ ↦ by positivity) _)
+        (Set.indicator_nonneg (fun _ _ ↦ by positivity) _))
+  -- The bands are measurable, increase, and exhaust the units.
+  let band (n : ℕ) : Set Lˣ := normBand[m𝔭(v), n]
+  have hcont : Continuous fun g : Lˣ ↦ (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (continuous_finiteLocalModule v))
+  have hbandm (n : ℕ) : MeasurableSet (band n) := hcont.measurable measurableSet_Icc
+  have hmono : Monotone band := by
+    intro n k hnk g hg
+    have h : (n + 1 : ℝ) ≤ k + 1 := by exact_mod_cast Nat.succ_le_succ hnk
+    exact ⟨(inv_anti₀ (by positivity) h).trans hg.1, hg.2.trans h⟩
+  have hunion : (⋃ n, band n) = univ := by
+    refine eq_univ_of_forall fun g ↦ mem_iUnion.mpr ?_
+    have hpos : 0 < (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    obtain ⟨n, hn⟩ := exists_nat_ge (max (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ)
+      ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ))⁻¹)
+    refine ⟨n, ?_, ?_⟩
+    · rw [inv_le_comm₀ (by positivity) hpos]
+      exact (le_max_right _ _).trans (hn.trans (by linarith))
+    · exact (le_max_left _ _).trans (hn.trans (by linarith))
+  -- The tails of the majorant tend to zero.
+  have htail : Tendsto (fun n ↦ ∫ g in (band n)ᶜ, M g ∂μ𝔭(v)) atTop (𝓝 0) := by
+    have h := tendsto_setIntegral_of_monotone (μ := μ𝔭(v)) hbandm hmono
+      (by rw [hunion]; exact hM.integrableOn)
+    rw [hunion, Measure.restrict_univ] at h
+    have heq (n : ℕ) : ∫ g in (band n)ᶜ, M g ∂μ𝔭(v) =
+        ∫ g, M g ∂μ𝔭(v) - ∫ g in band n, M g ∂μ𝔭(v) := by
+      rw [← integral_add_compl (hbandm n) hM, add_sub_cancel_left]
+    simp_rw [heq]
+    simpa using (tendsto_const_nhds (x := ∫ g, M g ∂μ𝔭(v))).sub h
+  rw [Metric.tendstoUniformlyOn_iff]
+  intro ε hε
+  filter_upwards [(tendsto_order.1 htail).2 ε hε] with n hn s hs
+  have hint := finiteLocalIdelicZetaIntegral_integrable v f χ (hKpos hs)
+  rw [dist_eq_norm, localIdelicZetaIntegral, ← integral_add_compl (hbandm n) hint,
+    add_sub_cancel_left]
+  refine lt_of_le_of_lt (norm_integral_le_of_norm_le hM.integrableOn
+    (ae_of_all _ fun g ↦ hdom s hs g)) hn
 
 /-- Paper: §3.3.2, p. 137. The archimedean integral (3.3.2.1) has a unique
 meromorphic continuation, in normal form in every norm-twist chart. -/

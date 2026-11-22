@@ -1662,15 +1662,16 @@ private theorem isCompactlyGeneratedGroup_of_equiv {G H : Type*}
     rw [hgen, Subgroup.map_top, MonoidHom.range_eq_top.mpr e.surjective] at hmap
     exact hmap.symm
 
-/-- Pulling back a structural pair along a topological group isomorphism preserves its
-elementary quotient and carries its realized Schwartz functions to the pulled-back stage. -/
-private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
+/-- After transporting the structural pair and its coordinates, pullback is the
+identity on the elementary Schwartz functions. -/
+private theorem exists_schwartzBruhatStage_comp_equiv {G H : Type*}
     [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
     [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
     [LocallyCompactSpace G] [LocallyCompactSpace H]
-    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient)
-    (f : SchwartzBruhatStage p) :
-    schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule G := by
+    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient) :
+    ∃ (b : BruhatStructuralPair G) (q : ElementaryLCAPresentation b.quotient)
+      (j : SchwartzBruhatStage p →L[ℂ] SchwartzBruhatStage q),
+      ∀ f, schwartzBruhatStageRealization b q (j f) = schwartzBruhatStageRealization a p f ∘ e := by
   classical
   let J := a.val.1
   let K := OrderDual.ofDual a.val.2
@@ -1732,17 +1733,20 @@ private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
         (QuotientGroup.continuous_mk.comp eJ.symm.continuous)⟩
   let p' : ElementaryLCAPresentation a'.quotient :=
     { p with equiv := eQ.trans p.equiv }
-  have hreal : schwartzBruhatStageRealization a' p' f =
-      schwartzBruhatStageRealization a p f ∘ e := by
-    funext x
-    rw [Function.comp_apply, schwartzBruhatStageRealization_apply,
-      schwartzBruhatStageRealization_apply]
-    by_cases hx : e x ∈ J
-    · rw [dite_eq_left (show x ∈ a'.val.1 from hx), dite_eq_left hx]
-      rfl
-    · rw [dite_eq_right (show x ∉ a'.val.1 from hx), dite_eq_right hx]
-  rw [← hreal]
-  exact (schwartzBruhatStageInclusion a' p' f).property
+  exact ⟨a', p', ContinuousLinearMap.id ℂ _, fun _ ↦ rfl⟩
+
+/-- Pulling back a structural pair along a topological group isomorphism preserves its
+elementary quotient and carries its realized Schwartz functions to the pulled-back stage. -/
+private theorem schwartzBruhat_stage_comp_equiv {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H]
+    (e : G ≃ₜ* H) (a : BruhatStructuralPair H) (p : ElementaryLCAPresentation a.quotient)
+    (f : SchwartzBruhatStage p) :
+    schwartzBruhatStageRealization a p f ∘ e ∈ schwartzBruhatSubmodule G := by
+  obtain ⟨b, q, j, hj⟩ := exists_schwartzBruhatStage_comp_equiv e a p
+  rw [← hj f]
+  exact (schwartzBruhatStageInclusion b q (j f)).property
 
 /-- Pullback along a topological group isomorphism preserves Schwartz–Bruhat membership. -/
 private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
@@ -1759,13 +1763,30 @@ private theorem schwartzBruhat_mem_comp_equiv {G H : Type*}
     exact schwartzBruhat_stage_comp_equiv e a p f
   exact hle hg
 
+/-- Pullback by a topological group isomorphism is continuous because its restriction
+to every elementary stage factors continuously through a stage. -/
+private theorem exists_schwartzBruhat_comp_equivCLM {G H : Type*}
+    [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H]
+    [LocallyCompactSpace G] [LocallyCompactSpace H] (e : G ≃ₜ* H) :
+    ∃ T : SchwartzBruhat H →L[ℂ] SchwartzBruhat G, ∀ f x, T f x = f (e x) := by
+  let L := (LinearMap.funLeft ℂ ℂ e).comp (schwartzBruhatSubmodule H).subtype
+  let T : SchwartzBruhat H →ₗ[ℂ] SchwartzBruhat G :=
+    L.codRestrict _ fun f ↦ schwartzBruhat_mem_comp_equiv e f.property
+  refine ⟨⟨T, ?_⟩, fun _ _ ↦ rfl⟩
+  refine (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp T ?_
+  rintro ⟨s, hs⟩
+  refine (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨s.comp T, ?_⟩
+  intro a p
+  obtain ⟨b, q, j, hj⟩ := exists_schwartzBruhatStage_comp_equiv e a p
+  exact ((hs b q).comp j.continuous).congr fun f ↦ congrArg s (Subtype.ext (hj f))
+
 open scoped RestrictedProduct in
-/-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
-character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
-theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
-    (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
-      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
-      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+/-- The adelic Fourier integral is the continuous linear Fourier transform on the
+Pontryagin dual followed by pullback along the standard self-duality. -/
+private theorem exists_adeleSchwartzFourierCLM :
+    ∃ T : ℬ[F] →L[ℂ] ℬ[F], ∀ f y, T f y = tamagawaFourier (additiveTamagawaMeasure F)
+      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd := by
   let G := Multiplicative 𝔸[F]
   let μ : Measure G := additiveTamagawaMeasure F
   let (v : IsDedekindDomain.HeightOneSpectrum (𝓞 F)) :
@@ -1792,19 +1813,25 @@ theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
       toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
       map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
   let : μ.Regular := hμ.2.1
-  obtain ⟨e, he, -⟩ := additiveTamagawaMeasure_selfDual F
-  obtain ⟨Fourier, hFourier⟩ := schwartzBruhat_fourier_equiv μ
-  let g : schwartzBruhatSubmodule (PontryaginDual G) := Fourier f
-  have hg := schwartzBruhat_mem_comp_equiv e g.property
-  have hEq (y : G) : tamagawaFourier (additiveTamagawaMeasure F)
-      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd =
-        g.val (e y) := by
-    rw [tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
+  refine (additiveTamagawaMeasure_selfDual F).elim fun e he ↦ ?_
+  refine (schwartzBruhat_fourier_equiv μ).elim fun Fourier hFourier ↦ ?_
+  refine (exists_schwartzBruhat_comp_equivCLM e).elim fun P hP ↦ ?_
+  refine ⟨P.comp Fourier.toContinuousLinearMap, fun f y ↦ ?_⟩
+  calc
+    P (Fourier f) y = Fourier f (e y) := hP _ _
+    _ = lcaFourier μ f (e y) := (hFourier f).2 _
+    _ = _ := (tamagawaFourier_eq_lcaFourier _ _ _ _ (e y) (fun x ↦ by
       rw [mul_comm x y.toAdd]
-      exact he y.toAdd x)]
-    exact ((hFourier f).2 (e y)).symm
-  rw [funext hEq]
-  exact hg
+      exact he.1 y.toAdd x)).symm
+
+/-- Paper: Theorem 2.2.3.2, p. 82. The Fourier integral for the standard adelic
+character and the additive Tamagawa measure gives a Schwartz–Bruhat function. -/
+theorem adeleSchwartzFourier_mem (f : ℬ[F]) :
+    (fun y : Multiplicative 𝔸[F] ↦ tamagawaFourier (additiveTamagawaMeasure F)
+      (adeleStandardCharacter F) (fun x ↦ f (Multiplicative.ofAdd x)) y.toAdd) ∈
+      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+  refine (exists_adeleSchwartzFourierCLM (F := F)).elim fun T hT ↦ ?_
+  exact Set.mem_of_eq_of_mem (funext (hT f)).symm (T f).property
 
 /-- Paper: Theorem 2.2.3.2, p. 82. The Fourier transform in the theta identity
 uses the trace character and the covolume-one measure of Appendix A. -/
@@ -2561,6 +2588,434 @@ theorem adelicTheta_decay_large (f : ℬ[F]) (N : ℕ) :
   exact (Summable.tsum_le_tsum (fun ξ => hbound ξ t ht k hk)
     (hs.mul_right _) hu).trans (le_max_left _ _)
 
+/-- A lattice sum of an inverse power of the scaled norm grows at most like the inverse
+of the scale to the power of the rank, as the scale tends to zero. -/
+private theorem zlattice_tsum_inv_one_add_mul_norm_pow_le {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℝ E] [FiniteDimensional ℝ E] (L : Submodule ℤ E) [DiscreteTopology L]
+    (M : ℕ) (hM : Module.finrank ℤ L < M) :
+    ∃ C : ℝ, 0 < C ∧ ∀ ρ : ℝ, 0 < ρ → ρ ≤ 1 →
+      Summable (fun x : L ↦ ((1 + ρ * ‖x‖) ^ M)⁻¹) ∧
+      ∑' x : L, ((1 + ρ * ‖x‖) ^ M)⁻¹ ≤ C * (ρ ^ Module.finrank ℤ L)⁻¹ := by
+  classical
+  set d := Module.finrank ℤ L
+  let b : Module.Basis (Fin d) ℤ L := Module.finBasis ℤ L
+  let e := b.equivFun.symm
+  have he (m : Fin d → ℤ) : e m = ∑ i, m i • b i := b.equivFun_symm_apply m
+  let D : ℝ := ∑ i, ‖b i‖
+  have hD : 0 ≤ D := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+  let H (x : L) : ℝ := ((1 + ‖x‖) ^ M)⁻¹
+  have hH (x : L) : 0 ≤ H x := by positivity
+  have hHsum : Summable H := by
+    refine Summable.of_norm_bounded_eventually (ZLattice.summable_norm_pow_inv L M hM) ?_
+    filter_upwards [(Set.finite_singleton (0 : L)).compl_mem_cofinite] with x hx
+    have hx0 : 0 < ‖x‖ := norm_pos_iff.mpr hx
+    rw [Real.norm_of_nonneg (hH x), inv_pow]
+    exact inv_anti₀ (by positivity) (pow_le_pow_left₀ hx0.le (by linarith) M)
+  let S := ∑' x, H x
+  have hS : 0 ≤ S := tsum_nonneg hH
+  refine ⟨2 ^ d * (1 + D) ^ M * (S + 1), by positivity, fun ρ hρ hρ1 ↦ ?_⟩
+  let n : ℕ := ⌈ρ⁻¹⌉₊
+  have hρ' : 1 ≤ ρ⁻¹ := one_le_inv_iff₀.mpr ⟨hρ, hρ1⟩
+  have hρn : 1 ≤ ρ * n := by
+    rw [← div_le_iff₀' hρ, one_div]
+    exact Nat.le_ceil _
+  have hn : (n : ℝ) ≤ 2 * ρ⁻¹ := by
+    have := Nat.ceil_lt_add_one (inv_nonneg.mpr hρ.le)
+    linarith
+  have hn0 : (0 : ℝ) < n := by
+    have := Nat.le_ceil ρ⁻¹
+    linarith
+  have hnpos : (0 : ℤ) < n := by exact_mod_cast hn0
+  let G (x : L) : ℝ := ((1 + ρ * ‖x‖) ^ M)⁻¹
+  have hG (x : L) : 0 ≤ G x := by positivity
+  let Q (m : Fin d → ℤ) : Fin d → ℤ := fun i ↦ m i / n
+  let R (m : Fin d → ℤ) : Fin d → ℤ := fun i ↦ m i % n
+  have hQR (m : Fin d → ℤ) : m = (n : ℤ) • Q m + R m := by
+    funext i
+    simp only [Pi.add_apply, Pi.smul_apply, smul_eq_mul, Q, R]
+    exact (Int.mul_ediv_add_emod (m i) n).symm
+  have hR (m : Fin d → ℤ) (i : Fin d) : 0 ≤ R m i ∧ R m i < n :=
+    ⟨Int.emod_nonneg _ hnpos.ne', Int.emod_lt_of_pos _ hnpos⟩
+  -- Each term is bounded by the unscaled term at the quotient coordinate.
+  have hpt (m : Fin d → ℤ) : G (e m) ≤ (1 + D) ^ M * H (e (Q m)) := by
+    have hsplit : e m = (n : ℤ) • e (Q m) + e (R m) := by
+      conv_lhs => rw [hQR m]
+      rw [map_add, map_zsmul]
+    have hRn : ‖e (R m)‖ ≤ n * D := by
+      rw [he, Finset.mul_sum]
+      refine (norm_sum_le _ _).trans (Finset.sum_le_sum fun i _ ↦ (norm_zsmul_le _ _).trans ?_)
+      rw [Int.norm_eq_abs]
+      refine mul_le_mul_of_nonneg_right ?_ (norm_nonneg _)
+      have := hR m i
+      rw [abs_of_nonneg (by exact_mod_cast this.1)]
+      exact_mod_cast this.2.le
+    set X := ‖e (Q m)‖
+    have hX : 0 ≤ X := norm_nonneg _
+    have hlow : (n : ℝ) * X - n * D ≤ ‖e m‖ := by
+      have h1 : ‖(n : ℤ) • e (Q m)‖ = n * X := by
+        change ‖(n : ℤ) • ((e (Q m) : L) : E)‖ = _
+        rw [← Int.cast_smul_eq_zsmul ℝ, norm_smul, Int.cast_natCast, Real.norm_of_nonneg hn0.le]
+        rfl
+      have h2 := norm_sub_le ((n : ℤ) • e (Q m) + e (R m)) (e (R m))
+      rw [add_sub_cancel_right, h1] at h2
+      rw [hsplit]
+      linarith
+    have hkey : 1 + X ≤ (1 + D) * (1 + ρ * ‖e m‖) := by
+      have hm0 := norm_nonneg (e m)
+      rcases le_total D X with hDX | hDX
+      · have h3 : X - D ≤ ρ * ‖e m‖ := by
+          have : ρ * (n * X - n * D) ≤ ρ * ‖e m‖ := mul_le_mul_of_nonneg_left hlow hρ.le
+          nlinarith
+        nlinarith
+      · nlinarith [mul_nonneg hρ.le hm0]
+    change ((1 + ρ * ‖e m‖) ^ M)⁻¹ ≤ (1 + D) ^ M * ((1 + X) ^ M)⁻¹
+    have hpos : 0 < 1 + ρ * ‖e m‖ := by positivity
+    calc ((1 + ρ * ‖e m‖) ^ M)⁻¹ = (1 + D) ^ M * (((1 + D) * (1 + ρ * ‖e m‖)) ^ M)⁻¹ := by
+          rw [mul_pow, mul_inv, ← mul_assoc, mul_inv_cancel₀ (by positivity), one_mul]
+      _ ≤ (1 + D) ^ M * ((1 + X) ^ M)⁻¹ := by gcongr
+  -- Each fibre of the quotient coordinate has at most `n ^ d` points.
+  have hcard (s : Finset (Fin d → ℤ)) (q : Fin d → ℤ) :
+      ((s.filter (fun m ↦ Q m = q)).card : ℝ) ≤ (n : ℝ) ^ d := by
+    have h : (s.filter (fun m ↦ Q m = q)).card ≤
+        (Fintype.piFinset fun _ : Fin d ↦ Finset.Ico (0 : ℤ) n).card := by
+      refine Finset.card_le_card_of_injOn R (fun m _ ↦ ?_) (fun m hm m' hm' hRm ↦ ?_)
+      · exact Fintype.mem_piFinset.mpr fun i ↦ Finset.mem_Ico.mpr (hR m i)
+      · have hq : Q m = Q m' := (Finset.mem_filter.mp hm).2.trans (Finset.mem_filter.mp hm').2.symm
+        rw [hQR m, hQR m', hq, hRm]
+    rw [Fintype.card_piFinset, Finset.prod_const, Int.card_Ico, sub_zero, Int.toNat_natCast,
+      Finset.card_univ, Fintype.card_fin] at h
+    exact_mod_cast h
+  have hfin (s : Finset (Fin d → ℤ)) : ∑ m ∈ s, G (e m) ≤ n ^ d * (1 + D) ^ M * S := by
+    have hT (T : Finset (Fin d → ℤ)) : ∑ q ∈ T, H (e q) ≤ S := by
+      have := (hHsum.comp_injective e.injective).sum_le_tsum T (fun _ _ ↦ hH _)
+      exact this.trans_eq (e.toEquiv.tsum_eq H)
+    calc ∑ m ∈ s, G (e m) = ∑ q ∈ s.image Q, ∑ m ∈ s with Q m = q, G (e m) :=
+          (Finset.sum_fiberwise_of_maps_to (fun m hm ↦ Finset.mem_image_of_mem Q hm) _).symm
+      _ ≤ ∑ q ∈ s.image Q, ∑ m ∈ s with Q m = q, (1 + D) ^ M * H (e q) := by
+          refine Finset.sum_le_sum fun q _ ↦ Finset.sum_le_sum fun m hm ↦ ?_
+          rw [← (Finset.mem_filter.mp hm).2]
+          exact hpt m
+      _ = ∑ q ∈ s.image Q, ((s.filter (fun m ↦ Q m = q)).card : ℝ) * ((1 + D) ^ M * H (e q)) := by
+          simp only [Finset.sum_const, nsmul_eq_mul]
+      _ ≤ ∑ q ∈ s.image Q, (n : ℝ) ^ d * ((1 + D) ^ M * H (e q)) :=
+          Finset.sum_le_sum fun q _ ↦ mul_le_mul_of_nonneg_right (hcard s q) (by positivity)
+      _ = n ^ d * (1 + D) ^ M * ∑ q ∈ s.image Q, H (e q) := by
+          rw [Finset.mul_sum]
+          refine Finset.sum_congr rfl fun q _ ↦ ?_
+          ring
+      _ ≤ n ^ d * (1 + D) ^ M * S := mul_le_mul_of_nonneg_left (hT _) (by positivity)
+  have hsumG : Summable (G ∘ e) := summable_of_sum_le (fun _ ↦ hG _) hfin
+  have htsumG : ∑' m, (G ∘ e) m ≤ n ^ d * (1 + D) ^ M * S := hsumG.tsum_le_of_sum_le hfin
+  refine ⟨(e.toEquiv.summable_iff).mp hsumG, ?_⟩
+  change ∑' x, G x ≤ _
+  rw [← e.toEquiv.tsum_eq G]
+  refine htsumG.trans ?_
+  have hnd : (n : ℝ) ^ d ≤ 2 ^ d * (ρ ^ d)⁻¹ := by
+    rw [← inv_pow, ← mul_pow]
+    exact pow_le_pow_left₀ hn0.le hn d
+  calc (n : ℝ) ^ d * (1 + D) ^ M * S ≤ 2 ^ d * (ρ ^ d)⁻¹ * (1 + D) ^ M * (S + 1) := by
+        gcongr
+        linarith
+    _ = _ := by ring
+
+set_option maxHeartbeats 4000000 in
+open scoped Classical in
+open IsDedekindDomain in
+/-- Along the norm-section rays from a compact set, below norm one, the sampled
+summands of a Schwartz stage have a sum of norms bounded by a constant times the
+inverse norm. -/
+private theorem realization_normSection_small_bound
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F]))
+    (e : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage e)
+    (K : Set 𝕀[F]) (hK : IsCompact K) :
+    ∃ C : ℝ, 0 < C ∧ ∀ t : ℝ≥0ˣ, (t.val : ℝ) ≤ 1 → ∀ k ∈ K,
+      Summable (fun ξ : Fˣ ↦ ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val *
+          algebraMap F 𝔸[F] (ξ : F)))‖) ∧
+      ∑' ξ : Fˣ, ‖schwartzBruhatStageRealization a e s
+        (Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val *
+          algebraMap F 𝔸[F] (ξ : F)))‖ ≤ C * (t.val : ℝ)⁻¹ := by
+  let E := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  let d := Module.finrank ℚ F
+  let L := mixedEmbedding.integerLattice F
+  have hdL : Module.finrank ℤ L = d := by
+    have := ZLattice.rank ℝ (E := mixedEmbedding.mixedSpace F) L
+    rw [mixedEmbedding.finrank] at this
+    exact this
+  let M := d + 1
+  have HL := zlattice_tsum_inv_one_add_mul_norm_pow_le L M (by omega)
+  obtain ⟨CL, hCL, hlat⟩ := HL
+  have HC := realization_decay (F := F) a e s M
+  obtain ⟨C, hC⟩ := HC
+  obtain ⟨b₀, hb₀, h₀⟩ :=
+    exists_mul_mem_adicCompletionIntegers_of_compactlyGenerated a.property.2.1
+  obtain ⟨b₁, hb₁, h₁⟩ := exists_mul_mem_adicCompletionIntegers_of_isCompact
+    (hK.image (continuous_snd.comp Units.continuous_coe_inv))
+  obtain ⟨A₀, hA₀⟩ := hK.exists_bound_of_continuousOn
+    ((continuous_ringEquiv_mixedSpace.comp (continuous_fst.comp
+      Units.continuous_coe_inv)).continuousOn)
+  let A := max A₀ 1
+  have hA : 1 ≤ A := le_max_right _ _
+  let b := b₀ * b₁
+  let B := max ‖mixedEmbedding F (algebraMap (𝓞 F) F b)‖ 1
+  have hB : 1 ≤ B := le_max_right _ _
+  have hb : algebraMap (𝓞 F) F b ≠ 0 := by
+    simpa [b] using mul_ne_zero hb₀ hb₁
+  let S : Set Fˣ := {ξ | algebraMap (𝓞 F) F b * (ξ : F) ∈ (algebraMap (𝓞 F) F).range}
+  let z (ξ : Fˣ) := mixedEmbedding F (algebraMap (𝓞 F) F b * (ξ : F))
+  let i (ξ : S) : L := ⟨z ξ.val, by
+    obtain ⟨c, hc⟩ := ξ.property
+    exact ⟨c, by simp [z, hc]⟩⟩
+  have hi : Injective i := by
+    intro ξ η h
+    exact Subtype.ext (Units.ext (mul_left_cancel₀ hb
+      (mixedEmbedding_injective F (congrArg Subtype.val h))))
+  let C' := max C 1
+  have hC' : 0 < C' := zero_lt_one.trans_le (le_max_right _ _)
+  have hAB : 1 ≤ A * B := one_le_mul_of_one_le_of_one_le hA hB
+  refine ⟨C' * (CL * (A * B) ^ d), mul_pos hC' (mul_pos hCL (pow_pos (by linarith) _)),
+    fun t ht k hk => ?_⟩
+  have ht0 : 0 < (t.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  let r := (t.val : ℝ) ^ (d : ℝ)⁻¹
+  have hd : (d : ℝ) ≠ 0 := by exact_mod_cast (Module.finrank_pos (R := ℚ) (M := F)).ne'
+  have hr0 : 0 < r := Real.rpow_pos_of_pos ht0 _
+  have hr1 : r ≤ 1 := Real.rpow_le_one ht0.le ht (inv_nonneg.mpr (Nat.cast_nonneg _))
+  have hrd : r ^ d = (t.val : ℝ) := by
+    dsimp [r]
+    rw [← Real.rpow_natCast, ← Real.rpow_mul ht0.le, inv_mul_cancel₀ hd, Real.rpow_one]
+  let ρ := r / (A * B)
+  have hAB0 : (0 : ℝ) < A * B := zero_lt_one.trans_le hAB
+  have hρ0 : 0 < ρ := div_pos hr0 hAB0
+  have hρ1 : ρ ≤ 1 := (div_le_one hAB0).mpr (hr1.trans hAB)
+  have hL2 := hlat ρ hρ0 hρ1
+  have hsumL := hL2.1
+  have htsumL : ∑' x : L, ((1 + ρ * ‖x‖) ^ M)⁻¹ ≤ CL * (ρ ^ d)⁻¹ := hdL ▸ hL2.2
+  have hnn (q : ℝ) (hq : 0 ≤ q) : 0 < 1 + ρ * q :=
+    add_pos_of_pos_of_nonneg one_pos (mul_nonneg hρ0.le hq)
+  let G (ξ : Fˣ) : ℝ := C' * ((1 + ρ * ‖z ξ‖) ^ M)⁻¹
+  let u := S.indicator G
+  have hu : Summable u := by
+    rw [← summable_subtype_iff_indicator]
+    have hs := (hsumL.comp_injective hi).mul_left C'
+    exact hs
+  have hu0 (ξ : Fˣ) : 0 ≤ u ξ := indicator_nonneg
+    (fun η _ => mul_nonneg hC'.le (inv_nonneg.mpr (pow_pos (hnn _ (norm_nonneg _)) _).le)) _
+  have htsum : ∑' ξ, u ξ ≤ C' * (CL * (ρ ^ d)⁻¹) := by
+    calc ∑' ξ, u ξ = ∑' ξ : S, G ξ := (tsum_subtype S G).symm
+      _ = C' * ∑' ξ : S, ((1 + ρ * ‖z ξ‖) ^ M)⁻¹ := tsum_mul_left
+      _ ≤ C' * (CL * (ρ ^ d)⁻¹) := mul_le_mul_of_nonneg_left
+          ((tsum_comp_le_tsum_of_inj hsumL
+            (fun x => inv_nonneg.mpr (pow_pos (hnn _ (norm_nonneg _)) _).le) hi).trans htsumL)
+          hC'.le
+  have hpt (ξ : Fˣ) : ‖schwartzBruhatStageRealization a e s
+      (Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val *
+        algebraMap F 𝔸[F] (ξ : F)))‖ ≤ u ξ := by
+    let x : 𝔸[F] := k.val * algebraMap F 𝔸[F] (ξ : F)
+    let y : 𝔸[F] := (canonicalIdeleNormSection F t).val * x
+    have hyeq : (canonicalIdeleNormSection F t * k).val * algebraMap F 𝔸[F] (ξ : F) = y := by
+      change (canonicalIdeleNormSection F t).val * k.val * algebraMap F 𝔸[F] (ξ : F) = _
+      exact mul_assoc _ _ _
+    calc ‖schwartzBruhatStageRealization a e s
+          (Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val *
+            algebraMap F 𝔸[F] (ξ : F)))‖ =
+          ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd y)‖ :=
+          congrArg (fun v ↦ ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd v)‖) hyeq
+      _ ≤ u ξ := ?_
+    by_cases hy : Multiplicative.ofAdd y ∈ a.val.1
+    · have hf : y.2 = x.2 := by
+        change (canonicalIdeleNormSection F t).val.2 * x.2 = x.2
+        rw [canonicalIdeleNormSection_finite, one_mul]
+      have hξ : ξ ∈ S := by
+        change algebraMap (𝓞 F) F (b₀ * b₁) * (ξ : F) ∈ (algebraMap (𝓞 F) F).range
+        simpa only [mul_one] using
+          (mul_mem_integers_of_adele (b₂ := 1) k 0 (ξ : F)
+            (by
+              intro v
+              have h := h₀ _ hy v
+              change (algebraMap (𝓞 F) (FiniteAdeleRing (𝓞 F) F) b₀ * y.2) v ∈
+                v.adicCompletionIntegers F at h
+              rw [hf] at h
+              simpa only [add_zero] using h)
+            (h₁ _ ⟨k, hk, rfl⟩) (fun v => by
+              change algebraMap (𝓞 F) (v.adicCompletion F) 1 * 0 ∈ v.adicCompletionIntegers F
+              rw [mul_zero]
+              exact zero_mem _))
+      have hyNorm : ‖E y.1‖ = r * ‖E x.1‖ := by
+        change ‖E ((canonicalIdeleNormSection F t).val * x).1‖ = _
+        rw [canonicalIdeleNormSection_smul_mixedSpace, norm_smul,
+          Real.norm_of_nonneg hr0.le]
+      have hξNorm : ‖mixedEmbedding F (ξ : F)‖ ≤ A * ‖E x.1‖ := by
+        have h := norm_mixedEmbedding_le_of_adele k 0 (ξ : F)
+        rw [add_zero] at h
+        have h' : ‖mixedEmbedding F (ξ : F)‖ ≤ ‖E (k⁻¹ : 𝕀[F]).val.1‖ * ‖E x.1‖ := by
+          simpa only [E, x, Prod.fst_zero, map_zero, norm_zero, add_zero] using h
+        exact h'.trans (mul_le_mul_of_nonneg_right ((hA₀ k hk).trans (le_max_left _ _))
+          (norm_nonneg _))
+      have hzMul : ‖z ξ‖ ≤ B * ‖mixedEmbedding F (ξ : F)‖ := by
+        have h := norm_mul_le (mixedEmbedding F (algebraMap (𝓞 F) F b)) (mixedEmbedding F (ξ : F))
+        rw [← map_mul] at h
+        exact h.trans (mul_le_mul_of_nonneg_right (le_max_left _ _) (norm_nonneg _))
+      have hscale : ρ * ‖z ξ‖ ≤ ‖E y.1‖ := by
+        calc ρ * ‖z ξ‖ ≤ ρ * (B * (A * ‖E x.1‖)) :=
+              mul_le_mul_of_nonneg_left
+                (hzMul.trans (mul_le_mul_of_nonneg_left hξNorm (zero_le_one.trans hB))) hρ0.le
+          _ = r * ‖E x.1‖ := by
+              change r / (A * B) * (B * (A * ‖E x.1‖)) = r * ‖E x.1‖
+              field_simp
+          _ = ‖E y.1‖ := hyNorm.symm
+      let w := ‖schwartzBruhatStageRealization a e s (Multiplicative.ofAdd y)‖
+      have hw : 0 ≤ w := norm_nonneg _
+      have hdecay : w * (1 + ‖E y.1‖) ^ M ≤ C' := (hC _ hy).trans (le_max_left _ _)
+      have hpos : 0 < (1 + ρ * ‖z ξ‖) ^ M := pow_pos (hnn _ (norm_nonneg _)) _
+      have hmono : (1 + ρ * ‖z ξ‖) ^ M ≤ (1 + ‖E y.1‖) ^ M :=
+        pow_le_pow_left₀ (hnn _ (norm_nonneg _)).le (by linarith) M
+      have hwle : w * (1 + ρ * ‖z ξ‖) ^ M ≤ C' :=
+        (mul_le_mul_of_nonneg_left hmono hw).trans hdecay
+      calc w ≤ C' / (1 + ρ * ‖z ξ‖) ^ M := (le_div_iff₀ hpos).mpr hwle
+        _ = G ξ := div_eq_mul_inv _ _
+        _ = u ξ := (indicator_of_mem hξ G).symm
+    · have h0 : schwartzBruhatStageRealization a e s (Multiplicative.ofAdd y) = 0 := by
+        rw [schwartzBruhatStageRealization_apply_dite, dite_eq_right hy]
+      exact (norm_eq_zero.mpr h0).le.trans (hu0 ξ)
+  have hsum := hu.of_nonneg_of_le (fun _ => norm_nonneg _) hpt
+  have hρd : (ρ ^ d)⁻¹ = (A * B) ^ d * (t.val : ℝ)⁻¹ := by
+    change ((r / (A * B)) ^ d)⁻¹ = _
+    rw [div_pow, inv_div, hrd, div_eq_mul_inv]
+  refine ⟨hsum, (hsum.tsum_le_tsum hpt hu).trans (htsum.trans (le_of_eq ?_))⟩
+  rw [hρd]
+  ring
+
+/-- Multiplying an idele by a principal idele permutes the terms of the absolute
+theta series. -/
+private theorem normSum_mul_principal (f : ℬ[F]) (x : 𝕀[F]) (η : Fˣ) :
+    ∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd ((x * IdeleGroup.unitEmbedding (𝓞 F) F η).val *
+        algebraMap F 𝔸[F] (ξ : F)))‖ =
+      ∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (x.val * algebraMap F 𝔸[F] (ξ : F)))‖ := by
+  refine Eq.trans ?_ ((Equiv.mulLeft η).tsum_eq
+    (fun ξ : Fˣ ↦ ‖f (Multiplicative.ofAdd (x.val * algebraMap F 𝔸[F] (ξ : F)))‖))
+  refine tsum_congr fun ξ ↦ ?_
+  simp only [Equiv.coe_mulLeft, Units.val_mul, map_mul, mul_assoc]
+  rfl
+
+/-- Paper: Theorem 2.2.3.4(1), p. 83. The series of absolute values of the theta
+terms decays faster than any inverse power of the idelic norm as that norm tends to
+infinity.
+Deviation: The bound is for the series of absolute values, at every idele of norm at
+least one. Theorem 3.2.2.1(1), p. 124, needs it for absolute convergence. -/
+theorem adelicTheta_normSum_decay_large (f : ℬ[F]) (N : ℕ) :
+    ∃ C : ℝ, 0 < C ∧ ∀ g : 𝕀[F], 1 ≤ ((ideleNorm F g : ℝ≥0) : ℝ) →
+      ∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (g.val * algebraMap F 𝔸[F] (ξ : F)))‖ ≤
+        C * ((((ideleNorm F g : ℝ≥0) : ℝ)) ^ N)⁻¹ := by
+  obtain ⟨K, hK, hRep⟩ := exists_compact_idele_representatives (F := F)
+  let point (ξ : Fˣ) (t : ℝ≥0ˣ) (k : 𝕀[F]) :=
+    Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val * algebraMap F 𝔸[F] (ξ : F))
+  let P (φ : Multiplicative 𝔸[F] → ℂ) := ∃ u : Fˣ → ℝ, Summable u ∧
+    ∀ (ξ : Fˣ) (t : ℝ≥0ˣ), 1 ≤ (t.val : ℝ) → ∀ k ∈ K,
+      ‖φ (point ξ t k)‖ * (t.val : ℝ) ^ N ≤ u ξ
+  have hzero : P 0 := ⟨0, summable_zero, fun _ _ _ _ _ => by simp⟩
+  have hadd (φ ψ : Multiplicative 𝔸[F] → ℂ) : P φ → P ψ → P (φ + ψ) := by
+    rintro ⟨u, hu, hφ⟩ ⟨v, hv, hψ⟩
+    refine ⟨u + v, hu.add hv, fun ξ t ht k hk => ?_⟩
+    change ‖φ (point ξ t k) + ψ (point ξ t k)‖ * (t.val : ℝ) ^ N ≤ u ξ + v ξ
+    calc
+      _ ≤ (‖φ (point ξ t k)‖ + ‖ψ (point ξ t k)‖) * (t.val : ℝ) ^ N :=
+        mul_le_mul_of_nonneg_right (norm_add_le _ _) (by positivity)
+      _ ≤ _ := by rw [add_mul]; exact add_le_add (hφ ξ t ht k hk) (hψ ξ t ht k hk)
+  have hP : P (show schwartzBruhatSubmodule (Multiplicative 𝔸[F]) from f).val := by
+    refine Submodule.iSup_induction (motive := P) _ f.property ?_ hzero hadd
+    intro a φ hφ
+    refine Submodule.iSup_induction (motive := P) _ hφ ?_ hzero hadd
+    intro e ψ hψ
+    obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hψ
+    exact realization_normSection_summable_bound a e s K hK N
+  obtain ⟨u, hu, hbound⟩ := hP
+  refine ⟨max (∑' ξ, u ξ) 1, zero_lt_one.trans_le (le_max_right _ _), ?_⟩
+  intro g hg
+  let t := ideleNorm F g
+  let a := canonicalIdeleNormSection F t
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hker : q (a⁻¹ * g) ∈ (ideleClassNorm F).ker := by
+    change ideleNorm F (a⁻¹ * g) = 1
+    rw [map_mul, map_inv, canonicalIdeleNormSection_rightInverse F t]
+    exact inv_mul_cancel t
+  obtain ⟨k, hk, hq⟩ := hRep (q (a⁻¹ * g)) hker
+  obtain ⟨η, hη⟩ := QuotientGroup.eq.mp hq
+  have hg' : g = a * k * IdeleGroup.unitEmbedding (𝓞 F) F η := by
+    rw [hη]
+    group
+  have hs : Summable (fun ξ => ‖f (point ξ t k)‖) := by
+    simpa only [point, add_zero] using
+      ((adelicAverage_summableUniformlyOn f {(a * k, 0)} isCompact_singleton).summable rfl)
+  have hsum : (∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (g.val * algebraMap F 𝔸[F] (ξ : F)))‖) =
+      ∑' ξ, ‖f (point ξ t k)‖ := by
+    conv_lhs => rw [hg']
+    exact normSum_mul_principal f (a * k) η
+  rw [hsum]
+  change (∑' ξ, ‖f (point ξ t k)‖) ≤ max (∑' ξ, u ξ) 1 * ((t.val : ℝ) ^ N)⁻¹
+  have ht : 1 ≤ (t.val : ℝ) := hg
+  rw [← div_eq_mul_inv, le_div_iff₀ (pow_pos (zero_lt_one.trans_le ht) N)]
+  rw [← tsum_mul_right]
+  exact (Summable.tsum_le_tsum (fun ξ => hbound ξ t ht k hk)
+    (hs.mul_right _) hu).trans (le_max_left _ _)
+
+/-- Paper: Theorem 2.2.3.4(2), p. 83. The series of absolute values of the theta
+terms grows at most like the inverse of the idelic norm as that norm tends to zero.
+Deviation: The paper bounds theta itself, through Poisson summation, and the proof of
+Theorem 3.2.2.1(1), p. 126, uses an Euler product. Here the bound is for the series
+of absolute values, which Poisson summation does not control, at every idele of norm at
+most one. The proof counts the points of a fixed lattice in balls. -/
+theorem adelicTheta_normSum_le_small (f : ℬ[F]) :
+    ∃ C : ℝ, 0 < C ∧ ∀ g : 𝕀[F], ((ideleNorm F g : ℝ≥0) : ℝ) ≤ 1 →
+      ∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (g.val * algebraMap F 𝔸[F] (ξ : F)))‖ ≤
+        C * (((ideleNorm F g : ℝ≥0) : ℝ))⁻¹ := by
+  obtain ⟨K, hK, hRep⟩ := exists_compact_idele_representatives (F := F)
+  let point (ξ : Fˣ) (t : ℝ≥0ˣ) (k : 𝕀[F]) :=
+    Multiplicative.ofAdd ((canonicalIdeleNormSection F t * k).val * algebraMap F 𝔸[F] (ξ : F))
+  let P (φ : Multiplicative 𝔸[F] → ℂ) := ∃ C : ℝ, 0 < C ∧
+    ∀ t : ℝ≥0ˣ, (t.val : ℝ) ≤ 1 → ∀ k ∈ K,
+      Summable (fun ξ ↦ ‖φ (point ξ t k)‖) ∧ ∑' ξ, ‖φ (point ξ t k)‖ ≤ C * (t.val : ℝ)⁻¹
+  have hzero : P 0 := ⟨1, one_pos, fun t _ _ _ ↦ by
+    simp only [Pi.zero_apply, norm_zero, tsum_zero]
+    exact ⟨summable_zero, by positivity⟩⟩
+  have hadd (φ ψ : Multiplicative 𝔸[F] → ℂ) : P φ → P ψ → P (φ + ψ) := by
+    rintro ⟨C₁, hC₁, hφ⟩ ⟨C₂, hC₂, hψ⟩
+    refine ⟨C₁ + C₂, add_pos hC₁ hC₂, fun t ht k hk ↦ ?_⟩
+    obtain ⟨hs₁, hb₁⟩ := hφ t ht k hk
+    obtain ⟨hs₂, hb₂⟩ := hψ t ht k hk
+    have hle (ξ : Fˣ) : ‖(φ + ψ) (point ξ t k)‖ ≤ ‖φ (point ξ t k)‖ + ‖ψ (point ξ t k)‖ :=
+      norm_add_le _ _
+    have hs := (hs₁.add hs₂).of_nonneg_of_le (fun _ ↦ norm_nonneg _) hle
+    refine ⟨hs, (hs.tsum_le_tsum hle (hs₁.add hs₂)).trans ?_⟩
+    rw [hs₁.tsum_add hs₂, add_mul]
+    exact add_le_add hb₁ hb₂
+  have hP : P (show schwartzBruhatSubmodule (Multiplicative 𝔸[F]) from f).val := by
+    refine Submodule.iSup_induction (motive := P) _ f.property ?_ hzero hadd
+    intro a φ hφ
+    refine Submodule.iSup_induction (motive := P) _ hφ ?_ hzero hadd
+    intro e ψ hψ
+    obtain ⟨s, rfl⟩ := LinearMap.mem_range.mp hψ
+    exact realization_normSection_small_bound a e s K hK
+  obtain ⟨C, hC, hbound⟩ := hP
+  refine ⟨C, hC, fun g hg ↦ ?_⟩
+  let t := ideleNorm F g
+  let a := canonicalIdeleNormSection F t
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)
+  have hker : q (a⁻¹ * g) ∈ (ideleClassNorm F).ker := by
+    change ideleNorm F (a⁻¹ * g) = 1
+    rw [map_mul, map_inv, canonicalIdeleNormSection_rightInverse F t]
+    exact inv_mul_cancel t
+  obtain ⟨k, hk, hq⟩ := hRep (q (a⁻¹ * g)) hker
+  obtain ⟨η, hη⟩ := QuotientGroup.eq.mp hq
+  have hg' : g = a * k * IdeleGroup.unitEmbedding (𝓞 F) F η := by
+    rw [hη]
+    group
+  have hsum : (∑' ξ : Fˣ, ‖f (Multiplicative.ofAdd (g.val * algebraMap F 𝔸[F] (ξ : F)))‖) =
+      ∑' ξ, ‖f (point ξ t k)‖ := by
+    conv_lhs => rw [hg']
+    exact normSum_mul_principal f (a * k) η
+  rw [hsum]
+  exact (hbound t hg k hk).2
+
 /-- Paper: Theorem 2.2.3.4(2), p. 83. After subtracting the explicit polar
 terms, theta decays faster than any power of the norm as it tends to zero. -/
 theorem adelicTheta_decay_small (f : ℬ[F]) (N : ℕ) :
@@ -2792,7 +3247,10 @@ theorem adelicTheta_decay_bounded_large_threshold_one (B : Set ℬ[F])
 von Neumann bounded sets of Schwartz–Bruhat functions to bounded sets. -/
 theorem adeleSchwartzFourier_image_isVonNBounded (B : Set ℬ[F])
     (hB : IsVonNBounded ℂ B) :
-    IsVonNBounded ℂ ((adeleSchwartzFourier (F := F)) '' B) := by sorry
+    IsVonNBounded ℂ ((adeleSchwartzFourier (F := F)) '' B) := by
+  refine (exists_adeleSchwartzFourierCLM (F := F)).elim fun T hT ↦ ?_
+  apply (hB.image T).subset
+  exact Set.image_subset_iff.mpr fun f hf ↦ ⟨f, hf, Subtype.ext (funext (hT f))⟩
 
 /-- Paper: Theorem 2.2.3.4(5), p. 83. The uniform estimates on a bounded set
 hold with threshold one and a common constant. -/

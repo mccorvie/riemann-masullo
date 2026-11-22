@@ -15,7 +15,7 @@ CHAPTER 13
 
 522                    CHAPTER 13.   ZEROS OF HECKE L-FUNCTIONS
 
-*In this Chapter, we show how to deduce information about the zeros of Hecke $L$-functions of an arbitrary number field $F$, from the Trace Formula proved in Theorem 12.5.1.1.*
+In this Chapter, we show how to deduce information about the zeros of Hecke $L$-functions of an arbitrary number field $F$, from the Trace Formula proved in Theorem 12.5.1.1.
 
 **13.1.  Recollections on the Explicit Formulas**
 
@@ -23,9 +23,9 @@ CHAPTER 13
 
 **13.3.  Main Theorems on the location of the zeros**
 
-*Let $F$ be a number field.*
+Let $F$ be a number field.
 
-*We will then be showing how to use the Trace Formula from Theorem 12.5.1.1 to deduce information on the zeros of the Hecke $L$-functions of $F$.*
+We will then be showing how to use the Trace Formula from Theorem 12.5.1.1 to deduce information on the zeros of the Hecke $L$-functions of $F$.
 
 **13.3.1.  The Divisor of the Hecke $L$-function $L$ on $\Omega(C_F)$.** We record here below the statement of the Trace Formula, established in Theorem 12.5.1.1
 

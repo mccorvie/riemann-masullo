@@ -9,6 +9,7 @@ import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import Mathlib.Algebra.Module.ZLattice.Summable
 import Mathlib.Analysis.Calculus.SmoothSeries
 import Mathlib.Analysis.Normed.Group.FunctionSeries
+import Mathlib.Topology.Algebra.Nonarchimedean.TotallyDisconnected
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -1338,10 +1339,78 @@ local notation "expUnit" => fun s : ℝ ↦ Homeomorph.symm (Nonneg.unitsHomeomo
 local notation "orbitDeriv" => fun (f : ℬₛ) (x : Multiplicative Aₛ) ↦
   deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd (Units.val (γ (expUnit s)) * Multiplicative.toAdd x))) 0
 
+open scoped NumberField.AdeleRing in
+/-- Paper: Corollary 2.1.4.2, p. 72. Restricting a global Schwartz–Bruhat function to
+adeles whose omitted coordinates are zero gives an S-local Schwartz–Bruhat function.
+On a pure tensor, the restriction scales the S-local factor by the value of the
+complementary factor at zero. -/
+theorem sAdeleSchwartz_exists_zeroTailRestriction
+    (g : SchwartzBruhat (Multiplicative 𝔸[F])) :
+    ∃ h : ℬₛ, ∀ x : 𝔸[F], finiteAdeleTailProjection F S x.2 = 0 →
+      h (Multiplicative.ofAdd (adeleProjection F S x)) = g (Multiplicative.ofAdd x) := by
+  sorry
+
+open scoped NumberField.AdeleRing in
 /-- Paper: Lemma 2.3.2.1, p. 105. Pointwise differentiation along the
 one-parameter subgroup gives a Schwartz–Bruhat function. -/
 theorem sAdeleDirectionalDeriv_mem (f : ℬₛ) :
-    orbitDeriv f ∈ schwartzBruhatSubmodule (Multiplicative Aₛ) := by sorry
+    orbitDeriv f ∈ schwartzBruhatSubmodule (Multiplicative Aₛ) := by
+  classical
+  -- Lift the archimedean part of the subgroup, with finite component one.
+  have hFinite (t : ℝ≥0ˣ) : (γ t).val.2 = 1 := by
+    have : ConnectedSpace ℝ≥0ˣ :=
+      (Nonneg.unitsHomeomorphPos ℝ).connectedSpace_iff.mpr
+        (isConnected_iff_connectedSpace.mp (isConnected_Ioi (a := (0 : ℝ))))
+    funext v
+    have hCoord : Continuous (fun s : ℝ≥0ˣ ↦ (γ s).val.2 v) :=
+      (continuous_apply v).comp
+        (continuous_snd.comp (Units.continuous_val.comp γ.continuous))
+    calc
+      (γ t).val.2 v = (γ 1).val.2 v :=
+        TotallyDisconnectedSpace.eq_of_continuous _ hCoord t 1
+      _ = (1 : (v : S) → v.val.adicCompletion F) v := by rw [map_one]; rfl
+  let liftArch : Aₛ →* 𝔸[F] := (MonoidHom.fst _ _).prod 1
+  have hLiftArch : Continuous liftArch := continuous_fst.prodMk continuous_const
+  let Γ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F :=
+    ⟨(Units.map liftArch).comp γ.toMonoidHom, (hLiftArch.units_map _).comp γ.continuous⟩
+  have hΓ (t : ℝ≥0ˣ) : adeleProjection F S (Γ t).val = (γ t).val :=
+    Prod.ext rfl ((hFinite t).symm)
+  -- Extend an S-adele by zero at the omitted places.
+  obtain ⟨split, _, _, hsplit⟩ := integralAdelesOutside_factors F S
+  let j (x : Aₛ) : integralAdelesOutside F S := split.symm (x, 0)
+  have hj (x : Aₛ) : split (j x) = (x, 0) := split.apply_symm_apply _
+  have hproj (x : Aₛ) : adeleProjection F S (j x).val = x :=
+    ((hsplit (j x)).1).symm.trans (congrArg Prod.fst (hj x))
+  have houtside (x : Aₛ) (w : HeightOneSpectrum (𝓞 F)) (hw : w ∉ S) :
+      (j x).val.2 w = 0 := by
+    rw [← (hsplit (j x)).2 ⟨w, hw⟩, hj]
+    rfl
+  have htail (x : Aₛ) : finiteAdeleTailProjection F S (j x).val.2 = 0 := by
+    apply RestrictedProduct.ext
+    exact fun w ↦ houtside x w.val w.property
+  let d := adeleDirectionalDeriv Γ (sAdeleSchwartzToGlobal F S f)
+  obtain ⟨dₛ, hdₛ⟩ := sAdeleSchwartz_exists_zeroTailRestriction F S d
+  have hcurve (x : Aₛ) (s : ℝ) :
+      sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd ((Γ (expUnit s)).val * (j x).val)) =
+        f (Multiplicative.ofAdd ((γ (expUnit s)).val * x)) := by
+    have hIntegral (w : HeightOneSpectrum (𝓞 F)) (hw : w ∉ S) :
+        ((Γ (expUnit s)).val * (j x).val).2 w ∈ w.adicCompletionIntegers F := by
+      change 1 * (j x).val.2 w ∈ w.adicCompletionIntegers F
+      rw [one_mul, houtside x w hw]
+      exact Subring.zero_mem _
+    have hp : adeleProjection F S ((Γ (expUnit s)).val * (j x).val) =
+        (γ (expUnit s)).val * x :=
+      ((adeleProjection F S).map_mul _ _).trans (congrArg₂ (· * ·) (hΓ _) (hproj x))
+    exact (sAdeleSchwartzToGlobal_apply F S f _).trans
+      ((ite_eq_left hIntegral).trans (congrArg (fun y : Aₛ ↦ f (Multiplicative.ofAdd y)) hp))
+  have hd : (dₛ : Multiplicative Aₛ → ℂ) = orbitDeriv f := by
+    funext y
+    let x := y.toAdd
+    have hs := hdₛ (j x).val (htail x)
+    rw [hproj x] at hs
+    exact hs.trans (congrArg (fun c : ℝ → ℂ ↦ deriv c 0) (funext (hcurve x)))
+  rw [← hd]
+  exact dₛ.property
 
 /-- Inserting an S-idele and multiplying an adele integral outside S preserves integrality
 outside S, so evaluating the global extension reduces to evaluating on the S-coordinates. -/

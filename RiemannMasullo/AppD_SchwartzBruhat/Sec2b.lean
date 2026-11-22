@@ -1182,11 +1182,68 @@ private theorem compact_schwartzBruhat_one {H : Type*} [CommGroup H] [Topologica
   rw [schwartzBruhatStageInclusion_apply, schwartzBruhatStageRealization_apply,
     dite_eq_left (show k ∈ a.val.1 from Subgroup.mem_top k)]
 
+omit hm in
+/-- Contracting the first tensor factor by a continuous functional gives a map to the
+complete second factor. Its scalar evaluations are determined on pure tensors. -/
+private theorem exists_tensor_restriction {U V W ι : Type*}
+    [AddCommGroup U] [Module ℂ U] [TopologicalSpace U] [PolynormableSpace ℂ U] [T2Space U]
+    [AddCommGroup V] [Module ℂ V] [UniformSpace V] [IsUniformAddGroup V]
+    [PolynormableSpace ℂ V] [T2Space V] [ContinuousSMul ℂ V] [CompleteSpace V]
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W]
+    (φ : U →L[ℂ] ℂ) (ev : ι → V →L[ℂ] ℂ) (res : ι → W →L[ℂ] ℂ)
+    (e : Completion (InductiveTensor U V) ≃L[ℂ] W)
+    (h : ∀ u v i, res i (e (Completion.coe' (α := InductiveTensor U V) (u ⊗ₜ[ℂ] v))) =
+      φ u * ev i v) :
+    ∃ r : W →L[ℂ] V, ∀ w i, ev i (r w) = res i w := by
+  let L : InductiveTensor U V →ₗ[ℂ] V :=
+    TensorProduct.lift ((LinearMap.lsmul ℂ V).comp φ.toLinearMap)
+  let T : InductiveTensor U V →L[ℂ] V :=
+    ⟨L, (continuous_inductiveTensor_iff L).2
+      ⟨fun u ↦ continuous_id.const_smul (φ u), fun v ↦ φ.continuous.smul (continuous_const (y := v))⟩⟩
+  refine ⟨T.fromCompletion.comp e.symm.toContinuousLinearMap, fun w i ↦ ?_⟩
+  let A := (ev i).comp T.fromCompletion
+  let B := (res i).comp e.toContinuousLinearMap
+  let j : InductiveTensor U V →L[ℂ] Completion (InductiveTensor U V) := Completion.toComplL
+  have hAB : (A.comp j).toLinearMap = (B.comp j).toLinearMap := by
+    apply TensorProduct.ext'
+    intro u v
+    calc
+      _ = ev i (T (u ⊗ₜ[ℂ] v)) := congrArg (ev i) (T.fromCompletion_apply_coe (u ⊗ₜ[ℂ] v))
+      _ = φ u * ev i v := (ev i).map_smul (φ u) v
+      _ = _ := (h u v i).symm
+  have hEq := Completion.ext' A.continuous B.continuous (LinearMap.congr_fun hAB) (e.symm w)
+  exact hEq.trans (congrArg (res i) (e.apply_symm_apply w))
+
+omit hm in
+/-- Point evaluation as a continuous linear functional on Schwartz–Bruhat functions. -/
+private abbrev schwartzBruhatEvalCLM {A : Type*} [CommGroup A] [TopologicalSpace A] (x : A) :
+    SchwartzBruhat A →L[ℂ] ℂ :=
+  { toFun := fun f ↦ f x
+    map_add' := fun _ _ ↦ rfl
+    map_smul' := fun _ _ ↦ rfl
+    cont := continuous_schwartzBruhat_eval x }
+
 /-- Restriction to the splitting section sends Schwartz–Bruhat functions to
 Schwartz–Bruhat functions on the image of the module and is continuous linear. -/
 theorem schwartzBruhat_modulation_section_restriction (τ : Γ →ₜ* G)
     (hτ : ∀ t, m (τ t) = (t : ℝ≥0ˣ)) :
-    ∃ r : S →L[ℂ] SΓ, ∀ (f : S) (t : Γ), r f t = f (τ t) := by sorry
+    ∃ r : S →L[ℂ] SΓ, ∀ (f : S) (t : Γ), r f t = f (τ t) := by
+  have hTensor := @schwartzBruhat_modulation_tensor G _ _ _ _ _ _ m hm τ hτ
+  rcases hTensor with ⟨e, he, _⟩
+  let : LocallyCompactSpace Γ := hm.isClosed_range.locallyCompactSpace
+  let : T2Space SK := schwartzBruhat_eval_t2 (A := K)
+  let : T2Space SΓ := schwartzBruhat_eval_t2 (A := Γ)
+  let : CompleteSpace SΓ := schwartzBruhat_complete (G := Γ)
+  with_reducible_and_instances
+    refine exists_tensor_restriction (U := SK) (V := SΓ) (W := S) (ι := Γ)
+      (schwartzBruhatEvalCLM (1 : K)) (fun t ↦ schwartzBruhatEvalCLM t)
+      (fun t ↦ schwartzBruhatEvalCLM (τ t)) e ?_
+  intro u v t
+  let F : G → ℂ := e (Completion.coe' (α := HS) (u ⊗ₜ[ℂ] v))
+  have h : F ((1 : G) * τ t) = u 1 * v t := he u v 1 t
+  with_reducible_and_instances change F (τ t) = u 1 * v t
+  clear_value F
+  exact (congrArg F (one_mul (τ t))).symm.trans h
 
 set_option linter.unusedSectionVars false in
 /-- The tensor isomorphism gives pullback of profiles and restriction to the section. -/

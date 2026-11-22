@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3
 public import Mathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
 public import Mathlib.Topology.UniformSpace.CompactConvergence
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-!
 # Topological spaces of adelic theta functions and idelic Z-functions
@@ -385,12 +386,14 @@ theorem sLocalThetaToZ_isQuotientMap :
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is locally convex. -/
 theorem globalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (GlobalAdelicThetaSpace F) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬ𝔽 := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The S-local theta quotient is locally convex. -/
 theorem sLocalAdelicThetaSpace_polynormable : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
-  by sorry
+  let : PolynormableSpace ℂ ℬₛ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  polynormableSpace_quotient _
 
 /-- Paper: Remark 5.1.1.2, p. 223.
 The global theta quotient is Hausdorff if the global theta kernel is closed. -/
@@ -488,9 +491,80 @@ theorem adelicTheta_ker_isClosed : IsClosed (LinearMap.ker theta𝔽 : Set ℬ�
   exact (congrArg (IsClosed (X := ℬ𝔽)) hker).mp
     (isClosed_iInter fun c ↦ isClosed_singleton.preimage (adelicTheta_eval_continuous c))
 
+/-- On a barrelled Schwartz–Bruhat space, a functional that is the sum of the values of
+the test function at countably many points is continuous, by the Banach–Steinhaus theorem
+applied to the finite partial sums of point evaluations. -/
+private theorem schwartzBruhat_continuous_of_hasSum {G ι : Type*} [CommGroup G]
+    [TopologicalSpace G] [Countable ι] [BarrelledSpace ℂ (SchwartzBruhat G)]
+    (pt : ι → G) (φ : SchwartzBruhat G → ℂ)
+    (h : ∀ f : SchwartzBruhat G, HasSum (fun i ↦ f (pt i)) (φ f)) :
+    Continuous φ := by
+  let ev (i : ι) : SchwartzBruhat G →L[ℂ] ℂ :=
+    ⟨(LinearMap.proj (pt i)).comp (schwartzBruhatSubmodule _).subtype,
+      schwartzBruhat_eval_continuous (pt i)⟩
+  let L (s : Finset ι) : SchwartzBruhat G →L[ℂ] ℂ := ∑ i ∈ s, ev i
+  have hL (s : Finset ι) (f : SchwartzBruhat G) : L s f = ∑ i ∈ s, f (pt i) := by
+    simp only [L, ContinuousLinearMap.coe_sum', Finset.sum_apply]
+    rfl
+  have hT : Filter.Tendsto (fun s f ↦ L s f) Filter.atTop (𝓝 φ) :=
+    tendsto_pi_nhds.mpr fun f ↦ by
+      simp only [hL]
+      exact h f
+  exact (continuousLinearMapOfTendsto L hT).continuous
+
 /-- Paper: Theorem 5.1.1.3(1), p. 224.
 The S-local theta kernel is a closed subspace of the S-local Schwartz–Bruhat space. -/
-theorem sLocalAdelicTheta_ker_isClosed : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ) := by sorry
+theorem sLocalAdelicTheta_ker_isClosed : IsClosed (LinearMap.ker thetaₛ : Set ℬₛ) := by
+  let : BarrelledSpace ℂ ℬₛ := (sAdeleSchwartz_montel (F := F) S).1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ :=
+    Units.val_injective.countable
+  have hcont (g : (SAdeleRing F S)ˣ) : Continuous (fun f : ℬₛ ↦ thetaₛ f g) :=
+    schwartzBruhat_continuous_of_hasSum _ _ fun f ↦
+      (sLocalAdelicTheta_hasSumUniformlyOn F S f {g} isCompact_singleton).hasSum rfl
+  have hker : (⋂ g : (SAdeleRing F S)ˣ, (fun f : ℬₛ ↦ thetaₛ f g) ⁻¹' {0}) =
+      (LinearMap.ker thetaₛ : Set ℬₛ) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h,
+      fun h g ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬₛ)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
+
+/-- On a barrelled space, the integral over a compact space against a finite measure of
+a family of continuous linear functionals is continuous if each test vector gives a
+continuous function of the parameter. The pointwise supremum of the absolute values of
+the functionals is then a continuous seminorm, and the integral is bounded by the
+total mass times this seminorm. -/
+private theorem continuous_integral_of_continuous_eval {E H : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousConstSMul ℂ E]
+    [BarrelledSpace ℂ E] [TopologicalSpace H] [CompactSpace H] {m : MeasurableSpace H}
+    (μ : Measure H) [IsFiniteMeasure μ]
+    (Φ : E → H → ℂ) (hlin : ∀ h, IsLinearMap ℂ fun f ↦ Φ f h)
+    (hE : ∀ h, Continuous fun f ↦ Φ f h) (hH : ∀ f, Continuous (Φ f))
+    (hint : ∀ f, Integrable (Φ f) μ) : Continuous fun f ↦ ∫ h, Φ f h ∂μ := by
+  let p (h : H) : Seminorm ℂ E := (normSeminorm ℂ ℂ).comp (IsLinearMap.mk' _ (hlin h))
+  have hp (h : H) : Continuous (p h) := continuous_norm.comp (hE h)
+  have hpt (f : E) : BddAbove (Set.range fun h ↦ p h f) :=
+    (isCompact_range (hH f).norm).bddAbove
+  have hbdd : BddAbove (Set.range p) := Seminorm.bddAbove_range_iff.mpr hpt
+  have hsup : Continuous (⨆ h, p h : Seminorm ℂ E) :=
+    (congrArg Continuous (Seminorm.coe_iSup_eq hbdd)).mpr (Seminorm.continuous_iSup p hp hbdd)
+  let I : E →ₗ[ℂ] ℂ := IsLinearMap.mk' (fun f ↦ ∫ h, Φ f h ∂μ)
+    ⟨fun f f' ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_add f f')).trans
+        (integral_add (hint f) (hint f')),
+      fun c f ↦ (integral_congr_ae (.of_forall fun h ↦ (hlin h).map_smul c f)).trans
+        (integral_smul c _)⟩
+  have hq : Continuous ((μ Set.univ).toNNReal • ⨆ h, p h : Seminorm ℂ E) :=
+    hsup.const_smul _
+  refine (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp I fun _ ↦
+    Seminorm.continuous_of_le hq fun f ↦ ?_
+  have hle (h : H) : ‖Φ f h‖ ≤ (⨆ h, p h) f := by
+    rw [Seminorm.coe_iSup_eq hbdd, iSup_apply]
+    exact le_ciSup (hpt f) h
+  exact (norm_integral_le_of_norm_le_const (.of_forall hle)).trans_eq
+    (mul_comm _ ((μ Set.univ).toNNReal : ℝ))
 
 local notation "homogeneousTheta𝔽" =>
   fun ω : PontryaginDual (MonoidHom.ker m𝔽) ↦
@@ -500,7 +574,36 @@ local notation "homogeneousTheta𝔽" =>
 /-- Paper: Theorem 5.1.1.3(2), p. 224.
 The kernel of global homogeneous theta at each norm-one character is closed. -/
 theorem homogeneousAdelicTheta_ker_isClosed (ω : PontryaginDual (MonoidHom.ker m𝔽)) :
-    IsClosed (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by sorry
+    IsClosed (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by
+  let : BarrelledSpace ℂ ℬ𝔽 := (adeleSchwartz_montel (F := F)).2.1
+  let : MeasurableSpace C𝔽 := borel _
+  let : CompactSpace (MonoidHom.ker m𝔽) := (ideleClassGroup_finiteness F).2.1
+  let : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hθ := adelicTheta_isLinear (F := F)
+  have hlin (c : C𝔽) : IsLinearMap ℂ fun f : ℬ𝔽 ↦ adelicTheta f c :=
+    ⟨fun f f' ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_add f f'),
+      fun a f ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ c) (hθ.map_smul a f)⟩
+  have hcont (g : C𝔽) : Continuous (fun f : ℬ𝔽 ↦ homogeneousAdelicTheta ω f g) :=
+    continuous_integral_of_continuous_eval (normOneIdeleClassTamagawaMeasure F)
+      (fun f h ↦ adelicTheta f (h.val * g) * (ω h : ℂ))
+      (fun h ↦ ⟨fun f f' ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_add f f')).trans
+          (add_mul _ _ _),
+        fun a f ↦ (congrArg (· * (ω h : ℂ)) ((hlin _).map_smul a f)).trans
+          (smul_mul_assoc _ _ _)⟩)
+      (fun h ↦ (adelicTheta_eval_continuous (h.val * g)).mul continuous_const)
+      (fun f ↦ ((adelicTheta f).continuous.comp
+        (continuous_subtype_val.mul continuous_const)).mul
+          (continuous_subtype_val.comp ω.continuous))
+      (fun f ↦ homogeneousAdelicTheta_integrable ω f g)
+  have hker : (⋂ g : C𝔽, (fun f : ℬ𝔽 ↦ homogeneousAdelicTheta ω f g) ⁻¹' {0}) =
+      (LinearMap.ker (homogeneousTheta𝔽 ω) : Set ℬ𝔽) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h, fun h g ↦ congrArg (fun φ : C(C𝔽, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬ𝔽)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
 /-- Paper: Theorem 5.1.1.3(3), p. 224.
 The norm-one S-idele quotient carries the Borel measurable structure used in §3.3. -/
@@ -517,7 +620,41 @@ local notation "homogeneousThetaₛ" =>
 /-- Paper: Theorem 5.1.1.3(3), p. 224.
 The kernel of S-local homogeneous theta at each norm-one character is closed. -/
 theorem sLocalHomogeneousAdelicTheta_ker_isClosed (ω : PontryaginDual (MonoidHom.ker mₛ)) :
-    IsClosed (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by sorry
+    IsClosed (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by
+  let : BarrelledSpace ℂ ℬₛ := (sAdeleSchwartz_montel (F := F) S).1
+  let : Countable F := Countable.of_moduleFinite (R := ℚ)
+  let : Countable (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ :=
+    Units.val_injective.countable
+  have : CompactSpace (MonoidHom.ker mₛ) := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  have hθ (c : Jₛ) : IsLinearMap ℂ (fun f : ℬₛ ↦ sLocalAdelicThetaOnClasses F S f c) ∧
+      Continuous (fun f : ℬₛ ↦ sLocalAdelicThetaOnClasses F S f c) := by
+    induction c using QuotientGroup.induction_on with | H x => ?_
+    simp only [sLocalAdelicThetaOnClasses_mk]
+    exact ⟨⟨fun f f' ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ x) (map_add thetaₛ f f'),
+        fun a f ↦ congrArg (fun φ : C((SAdeleRing F S)ˣ, ℂ) ↦ φ x) (map_smul thetaₛ a f)⟩,
+      schwartzBruhat_continuous_of_hasSum _ _ fun f ↦
+        (sLocalAdelicTheta_hasSumUniformlyOn F S f {x} isCompact_singleton).hasSum rfl⟩
+  have hcont (g : Jₛ) : Continuous (fun f : ℬₛ ↦ homogeneousThetaₛ ω f g) :=
+    continuous_integral_of_continuous_eval (sLocalNormOneQuotientMeasure F S)
+      (fun f h ↦ sLocalAdelicThetaOnClasses F S f (g * h.val) * (ω h : ℂ))
+      (fun h ↦ ⟨fun f f' ↦ (congrArg (· * (ω h : ℂ)) ((hθ _).1.map_add f f')).trans
+          (add_mul _ _ _),
+        fun a f ↦ (congrArg (· * (ω h : ℂ)) ((hθ _).1.map_smul a f)).trans
+          (smul_mul_assoc _ _ _)⟩)
+      (fun h ↦ (hθ _).2.mul continuous_const)
+      (fun f ↦ ((sLocalAdelicThetaOnClasses F S f).continuous.comp
+        (continuous_const.mul continuous_subtype_val)).mul
+          (continuous_subtype_val.comp ω.continuous))
+      (fun f ↦ sLocalHomogeneousAdelicTheta_integrable F S _ ω f g)
+  have hker : (⋂ g : Jₛ, (fun f : ℬₛ ↦ homogeneousThetaₛ ω f g) ⁻¹' {0}) =
+      (LinearMap.ker (homogeneousThetaₛ ω) : Set ℬₛ) := by
+    refine Set.ext fun f ↦ Set.mem_iInter.trans
+      ((forall_congr' fun g ↦ Set.mem_singleton_iff).trans
+        (Iff.trans ?_ (SetLike.mem_coe.trans LinearMap.mem_ker).symm))
+    exact ⟨fun h ↦ ContinuousMap.ext h, fun h g ↦ congrArg (fun φ : C(Jₛ, ℂ) ↦ φ g) h⟩
+  exact (congrArg (IsClosed (X := ℬₛ)) hker).mp
+    (isClosed_iInter fun g ↦ isClosed_singleton.preimage (hcont g))
 
 /-- Paper: Lemma 5.1.2.1(1), p. 224.
 The kernels of the global zeta and global theta transforms agree. -/

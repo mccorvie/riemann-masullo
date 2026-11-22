@@ -6,6 +6,7 @@ public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 import Mathlib.Analysis.InnerProductSpace.ProdL2
 import Mathlib.Analysis.PSeries
+import Mathlib.Analysis.SpecialFunctions.SmoothTransition
 import Mathlib.Topology.Baire.CompleteMetrizable
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
@@ -783,9 +784,95 @@ theorem cyclicPeriodization_continuous : Continuous (cyclicPeriodization γ hγ)
     continuous_pi_iff.mp (positiveRealExponentialDecay_isEmbedding (univ : Set ℝ) univ_nonempty).continuous a
   exact (cyclicSchwartzPeriodization γ hγ).continuous.comp h
 
+/-- An integer sequence that is zero up to `A` and one from `A + n` on has consecutive
+differences summing to one: the finite telescoping sum is all that is left. -/
+private theorem hasSum_int_sub_of_zero_of_one {a : ℤ → ℝ} (A : ℤ) (n : ℕ)
+    (h0 : ∀ k ≤ A, a k = 0) (h1 : ∀ k, A + n ≤ k → a k = 1) :
+    HasSum (fun k ↦ a (k + 1) - a k) 1 := by
+  have hs : ∀ k ∉ (Finset.range n).image (fun i : ℕ ↦ A + i), a (k + 1) - a k = 0 := by
+    intro k hk
+    simp only [Finset.mem_image, Finset.mem_range, not_exists, not_and] at hk
+    by_cases hkA : k < A
+    · rw [h0 k hkA.le, h0 (k + 1) (by omega), sub_zero]
+    · have hk' : A + n ≤ k := by
+        by_contra hlt
+        exact hk (k - A).toNat (by omega) (by omega)
+      rw [h1 k hk', h1 (k + 1) (by omega), sub_self]
+  convert hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℤ) hs using 1
+  have ht := Finset.sum_range_sub (fun i : ℕ ↦ a (A + i)) n
+  simp only [Nat.cast_add, Nat.cast_one, Nat.cast_zero, add_zero, ← add_assoc] at ht
+  rw [Finset.sum_image (fun i _ j _ h ↦ by simpa using h), ht, h1 _ le_rfl, h0 _ le_rfl,
+    sub_zero]
+
+/-- The differences of the smooth step `smoothTransition` along integer translates form a
+partition of unity: for every `u`, the sum over `k : ℤ` of
+`smoothTransition (u + k + 1) - smoothTransition (u + k)` is one. -/
+private theorem hasSum_smoothTransition_sub (u : ℝ) :
+    HasSum (fun k : ℤ ↦ Real.smoothTransition (u + k + 1) - Real.smoothTransition (u + k)) 1 := by
+  have h := hasSum_int_sub_of_zero_of_one (a := fun k : ℤ ↦ Real.smoothTransition (u + k))
+    ⌊-u⌋ (⌈1 - u⌉ - ⌊-u⌋).toNat (fun k hk ↦ ?_) (fun k hk ↦ ?_)
+  · simpa only [Int.cast_add, Int.cast_one, ← add_assoc] using h
+  · apply Real.smoothTransition.zero_of_nonpos
+    have hk' : (k : ℝ) ≤ ⌊-u⌋ := by exact_mod_cast hk
+    linarith [Int.floor_le (-u)]
+  · apply Real.smoothTransition.one_of_one_le
+    have hk' : (⌈1 - u⌉ : ℝ) ≤ k := by exact_mod_cast (show ⌈1 - u⌉ ≤ k by omega)
+    linarith [Int.le_ceil (1 - u)]
+
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Every smooth quotient function has an
 exponentially decaying lift under periodization. -/
-theorem cyclicPeriodization_surjective : Surjective (cyclicPeriodization γ hγ) := by sorry
+theorem cyclicPeriodization_surjective : Surjective (cyclicPeriodization γ hγ) := by
+  -- Cut the periodic lift of `g` off with a smooth bump whose translates by `log γ` sum
+  -- to one; the result has compact support, and its periodization is `g` again.
+  intro g
+  set L := Real.log γ
+  have hL : 0 < L := Real.log_pos hγ
+  let F (u : ℝ) : ℂ := ((Real.smoothTransition (u + 1) - Real.smoothTransition u : ℝ) : ℂ)
+  let φ (x : ℝ) : ℂ := F (x / L) * cyclicLift g (x / L)
+  have hcoe : ContDiff ℝ ∞ ((↑) : ℝ → ℂ) := Complex.ofRealCLM.contDiff
+  have hst : ContDiff ℝ ∞ Real.smoothTransition := Real.smoothTransition.contDiff
+  have hdiv : ContDiff ℝ ∞ (fun x : ℝ ↦ x / L) := contDiff_id.div_const L
+  have hF : ContDiff ℝ ∞ F :=
+    hcoe.comp ((hst.comp (contDiff_id.add contDiff_const)).sub hst)
+  have hφd : ContDiff ℝ ∞ φ := (hF.comp hdiv).mul ((cyclicLift_contDiff g).comp hdiv)
+  have hφs : HasCompactSupport φ := by
+    refine HasCompactSupport.intro (isCompact_Icc (a := -L) (b := L)) fun x hx ↦ ?_
+    have hF0 : F (x / L) = 0 := by
+      rw [mem_Icc, not_and_or, not_le, not_le] at hx
+      simp only [F, Complex.ofReal_eq_zero, sub_eq_zero]
+      rcases hx with hx | hx
+      · have hu : x / L < -1 := by rw [div_lt_iff₀ hL]; linarith
+        rw [Real.smoothTransition.zero_of_nonpos (by linarith),
+          Real.smoothTransition.zero_of_nonpos (by linarith)]
+      · have hu : 1 < x / L := by rw [lt_div_iff₀ hL]; linarith
+        rw [Real.smoothTransition.one_of_one_le (by linarith),
+          Real.smoothTransition.one_of_one_le (by linarith)]
+    simp only [φ, hF0, zero_mul]
+  have hmem := mem_logExponentialDecaySubmodule_of_hasCompactSupport univ hφs hφd
+  refine ⟨⟨φ, hmem⟩, ?_⟩
+  apply Subtype.ext
+  funext y
+  -- Every point of the circle group is the image of a real logarithmic coordinate.
+  obtain ⟨u, hu⟩ := QuotientAddGroup.mk_surjective (y.2.1 0)
+  have hy : y = point (u : T) := by
+    refine Prod.ext (Subsingleton.elim _ _) (Prod.ext ?_ (Subsingleton.elim _ _))
+    funext j
+    have : j = 0 := Subsingleton.elim _ _
+    subst j
+    exact hu.symm
+  subst hy
+  have h1 := cyclicPeriodization_hasSum γ hγ ⟨φ, hmem⟩ (u * L)
+  rw [mul_div_cancel_right₀ u hL.ne'] at h1
+  have h2 : HasSum (fun k : ℤ ↦ φ (u * L + (k : ℝ) * L)) (g (point (u : T))) := by
+    have hsum := (Complex.hasSum_ofReal.mpr (hasSum_smoothTransition_sub u)).mul_right
+      (cyclicLift g u)
+    rw [Complex.ofReal_one, one_mul] at hsum
+    refine hsum.congr_fun fun k ↦ ?_
+    have hk : (u * L + (k : ℝ) * L) / L = u + k := by field_simp
+    have hper : cyclicLift g (u + k) = cyclicLift g u := by
+      simpa only [mul_one] using (cyclicLift_periodic g).int_mul k u
+    simp only [φ, F, hk, hper, add_assoc]
+  exact h1.unique h2
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Periodization sends open sets to open sets. -/
 theorem cyclicPeriodization_isOpenMap : IsOpenMap (cyclicPeriodization γ hγ) := by sorry
@@ -858,7 +945,18 @@ theorem cyclicFourierCoeff_bounded :
 /-- Paper: Corollary 4.2.1.7, p. 169. The Fourier coefficient functionals are
 equicontinuous as maps on the circle Schwartz space. -/
 theorem cyclicFourierCoeff_equicontinuous :
-    Equicontinuous (fun m : ℤ ↦ (cyclicFourierCoeff m : S → ℂ)) := by sorry
+    Equicontinuous (fun m : ℤ ↦ (cyclicFourierCoeff m : S → ℂ)) := by
+  -- Every coefficient is bounded by the uniform norm, uniformly in the frequency.
+  let i : ElementarySchwartzIndex 0 1 0 := (0, 0, fun _ ↦ 0, 0)
+  intro f₀
+  rw [Metric.equicontinuousAt_iff_right]
+  intro ε hε
+  filter_upwards [(elementarySchwartz_withSeminorms.tendsto_nhds id f₀).mp Filter.tendsto_id i ε hε]
+    with f hf m
+  have h := norm_fourierCoeffOn_iteratedDeriv_cyclic (f - f₀) m 0
+  rw [iteratedDeriv_zero, ← cyclicFourierCoeff_eq_on, map_sub] at h
+  rw [dist_comm, dist_eq_norm]
+  exact h.trans_lt hf
 
 -- TODO(paper-gap): The proof on p. 169 gives the positive Mellin frequency
 -- and drops the Haar normalization factor. Formula (4.2.1.5) fixes both.
@@ -873,12 +971,42 @@ theorem cyclicPeriodization_quotient_equiv (γ : ℝ) (hγ : 1 < γ) :
 /-- Paper: Remark 4.2.1.8, p. 170. The exponential system is regular in
 the smooth topology. -/
 theorem cyclicExponential_regular :
-    SchauderBasis.IsRegular (cyclicExponential ∘ freq) := by sorry
+    SchauderBasis.IsRegular (cyclicExponential ∘ freq) := by
+  -- A monomial has its own coefficient one, and coefficients are bounded by the uniform norm,
+  -- so no monomial lies in the open unit ball of that norm.
+  let i : ElementarySchwartzIndex 0 1 0 := (0, 0, fun _ ↦ 0, 0)
+  have hp : Continuous (fun f : S ↦ elementarySchwartzSeminorm i f) :=
+    elementarySchwartz_withSeminorms.continuous_seminorm i
+  refine ⟨{f | elementarySchwartzSeminorm i f < 1},
+    (isOpen_lt hp continuous_const).mem_nhds
+      ((map_zero (elementarySchwartzSeminorm i)).trans_lt one_pos), fun n hn ↦ ?_⟩
+  have h := norm_fourierCoeffOn_iteratedDeriv_cyclic (cyclicExponential (freq n)) (freq n) 0
+  rw [iteratedDeriv_zero, ← cyclicFourierCoeff_eq_on, cyclicFourierCoeff_exponential,
+    ite_eq_left rfl, norm_one] at h
+  exact lt_irrefl _ (h.trans_lt hn)
 
 /-- Paper: Remark 4.2.1.8, p. 170. The exponential system is unbounded
 in the smooth topology. -/
 theorem cyclicExponential_not_bounded :
-    ¬ IsVonNBounded ℂ (range cyclicExponential) := by sorry
+    ¬ IsVonNBounded ℂ (range cyclicExponential) := by
+  -- The first-derivative seminorm of the monomial of frequency m is at least 2π|m|.
+  intro hb
+  let i : ElementarySchwartzIndex 0 1 0 := (0, 0, fun _ ↦ 1, 0)
+  obtain ⟨r, -, hr⟩ :=
+    (elementarySchwartz_withSeminorms.isVonNBounded_iff_seminorm_bounded).mp hb i
+  let m : ℤ := ⌈r⌉₊
+  have h := norm_fourierCoeffOn_iteratedDeriv_cyclic (cyclicExponential m) m 1
+  rw [fourierCoeffOn_iteratedDeriv_cyclic, cyclicFourierCoeff_exponential, ite_eq_left rfl,
+    mul_one, pow_one] at h
+  have hnorm : ‖cyclicFrequency m‖ = 2 * Real.pi * ⌈r⌉₊ := by
+    simp [cyclicFrequency, m, abs_of_pos Real.pi_pos]
+  have hm : r ≤ ‖cyclicFrequency m‖ := by
+    rw [hnorm]
+    have h1 : r ≤ (⌈r⌉₊ : ℝ) := Nat.le_ceil r
+    have h2 : (⌈r⌉₊ : ℝ) ≤ 2 * Real.pi * ⌈r⌉₊ :=
+      le_mul_of_one_le_left (Nat.cast_nonneg _) (by linarith [Real.pi_gt_three])
+    exact h1.trans h2
+  exact (hm.trans h).not_gt (hr _ ⟨m, rfl⟩)
 
 section CompactSupport
 

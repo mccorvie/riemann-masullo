@@ -13,6 +13,9 @@ one, because provers will build on it.
 1. Read the whole section (`scripts/paper.sh <first> <last>`) and the issue's comments, which may
    hold a scout's list of what already exists. Look at the page image for every formula you
    formalize: the transcription that `paper.sh` prints is good but not exact, and the PDF decides.
+   Cover the whole section the issue names, in this one pass. If it is really too long to
+   finish, say in your report exactly where you stopped (page and item), so that a
+   continuation can be issued; do not stop early for any other reason.
 2. Write `RiemannMasullo/<Chapter>/Sec<N>.lean` (the issue gives the path). Follow the paper's
    order. Each numbered Definition, Lemma, Proposition, Theorem and Corollary becomes one
    declaration. Definitions are written out in full; every proof is `by sorry`. A definition

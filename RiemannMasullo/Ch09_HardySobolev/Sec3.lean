@@ -174,6 +174,114 @@ theorem continuous_modulatedExponentialDecayTestAction (hm : IsModulation m) (hm
 -- The singleton polynomial-growth claim also omits the exponential twist for b ≠ 0.
 -- Borel measurability need not hold for arbitrary continuous operator seminorms.
 
+/-- The compact-interval density of a shifted logarithmic coordinate is at most the square of
+the endpoint twist times the polynomial factor of the shift, times the density. -/
+private theorem intervalSobolevDensity_add_le (a b s : ℝ) (hs : 0 ≤ s) (L t : ℝ) :
+    intervalSobolevDensity a b s (L + t) ≤
+      (max (Real.exp (a * L)) (Real.exp (b * L)) * (1 + |L|) ^ (s / 2)) ^ 2 *
+        intervalSobolevDensity a b s t := by
+  unfold intervalSobolevDensity
+  have key : ∀ c : ℝ,
+      Real.exp (2 * c * (L + t)) = Real.exp (c * L) ^ 2 * Real.exp (2 * c * t) := fun c ↦ by
+    rw [sq, ← Real.exp_add, ← Real.exp_add]
+    congr 1
+    ring
+  have hM : ∀ c : ℝ, Real.exp (c * L) ≤ max (Real.exp (a * L)) (Real.exp (b * L)) →
+      Real.exp (2 * c * t) ≤ max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) →
+      Real.exp (2 * c * (L + t)) ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+        max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) := fun c h1 h2 ↦ by
+    rw [key]
+    exact mul_le_mul (pow_le_pow_left₀ (Real.exp_pos _).le h1 2) h2 (Real.exp_pos _).le
+      (sq_nonneg _)
+  have h1 : max (Real.exp (2 * a * (L + t))) (Real.exp (2 * b * (L + t))) ≤
+      max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+        max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) :=
+    max_le (hM a (le_max_left _ _) (le_max_left _ _))
+      (hM b (le_max_right _ _) (le_max_right _ _))
+  have hL0 : 0 ≤ 1 + |L| := by positivity
+  have hbase : 1 + (L + t) ^ 2 ≤ (1 + |L|) ^ 2 * (1 + t ^ 2) := by
+    rcases le_total 0 L with hL | hL
+    · rw [abs_of_nonneg hL]
+      nlinarith [mul_nonneg hL (sq_nonneg (t - 1)), mul_nonneg hL (sq_nonneg t),
+        sq_nonneg (L * t)]
+    · rw [abs_of_nonpos hL]
+      nlinarith [mul_nonneg (neg_nonneg.2 hL) (sq_nonneg (t + 1)),
+        mul_nonneg (neg_nonneg.2 hL) (sq_nonneg t), sq_nonneg (L * t)]
+  have hpow : ((1 + |L|) ^ 2) ^ (s / 2) = ((1 + |L|) ^ (s / 2)) ^ 2 := by
+    rw [← Real.rpow_natCast _ 2, ← Real.rpow_natCast _ 2, ← Real.rpow_mul hL0,
+      ← Real.rpow_mul hL0, mul_comm]
+  have h2 : (1 + (L + t) ^ 2) ^ (s / 2) ≤
+      ((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2) :=
+    calc (1 + (L + t) ^ 2) ^ (s / 2) ≤ ((1 + |L|) ^ 2 * (1 + t ^ 2)) ^ (s / 2) :=
+          Real.rpow_le_rpow (by positivity) hbase (by linarith)
+      _ = ((1 + |L|) ^ 2) ^ (s / 2) * (1 + t ^ 2) ^ (s / 2) :=
+          Real.mul_rpow (by positivity) (by positivity)
+      _ = ((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2) := by rw [hpow]
+  have hmax : 0 ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+      max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) :=
+    mul_nonneg (sq_nonneg _) (le_max_of_le_left (Real.exp_pos _).le)
+  calc max (Real.exp (2 * a * (L + t))) (Real.exp (2 * b * (L + t))) *
+        (1 + (L + t) ^ 2) ^ (s / 2)
+      ≤ max (Real.exp (a * L)) (Real.exp (b * L)) ^ 2 *
+          max (Real.exp (2 * a * t)) (Real.exp (2 * b * t)) *
+        (((1 + |L|) ^ (s / 2)) ^ 2 * (1 + t ^ 2) ^ (s / 2)) :=
+        mul_le_mul h1 h2 (by positivity) hmax
+    _ = _ := by ring
+
+/-- A continuous endomorphism of a weighted L² space of a left-invariant measure that acts
+by left translation on representatives has norm at most `C` when the translated density is
+at most `C ^ 2` times the density. -/
+private theorem opNorm_le_of_translate_density {H : Type*} [Group H] [MeasurableSpace H]
+    [MeasurableMul H] (ν : Measure H) [ν.IsMulLeftInvariant] {d : H → ℝ≥0∞}
+    (hd : Measurable d) (hd' : ∀ x, d x < ⊤) (g : H) {C : ℝ} (hC : 0 ≤ C)
+    (hle : ∀ x, d (g * x) ≤ ENNReal.ofReal C ^ 2 * d x)
+    (T : Lp ℂ 2 (ν.withDensity d) →L[ℂ] Lp ℂ 2 (ν.withDensity d))
+    (hT : ∀ u, (T u : H → ℂ) =ᵐ[ν] fun x ↦ u (g⁻¹ * x)) : ‖T‖ ≤ C := by
+  refine T.opNorm_le_bound hC fun u ↦ ?_
+  have hae : (T u : H → ℂ) =ᵐ[ν.withDensity d] fun x ↦ u (g⁻¹ * x) :=
+    (withDensity_absolutelyContinuous ν d).ae_eq (hT u)
+  have hI : ∀ v : H → ℂ, ∫⁻ x, ‖v x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) =
+      ∫⁻ x, d x * ‖v x‖ₑ ^ (2 : ℝ) ∂ν := fun v ↦
+    lintegral_withDensity_eq_lintegral_mul_non_measurable ν hd (ae_of_all _ hd') _
+  have hmain : ∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) ≤
+      ENNReal.ofReal C ^ 2 * ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) :=
+    calc ∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)
+        = ∫⁻ x, d x * ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂ν := hI fun x ↦ u (g⁻¹ * x)
+      _ = ∫⁻ x, d (g * x) * ‖u (g⁻¹ * (g * x))‖ₑ ^ (2 : ℝ) ∂ν :=
+          (lintegral_mul_left_eq_self (fun x ↦ d x * ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ)) g).symm
+      _ ≤ ∫⁻ x, ENNReal.ofReal C ^ 2 * (d x * ‖u x‖ₑ ^ (2 : ℝ)) ∂ν :=
+          lintegral_mono fun x ↦ by
+            show d (g * x) * ‖u (g⁻¹ * (g * x))‖ₑ ^ (2 : ℝ) ≤
+              ENNReal.ofReal C ^ 2 * (d x * ‖u x‖ₑ ^ (2 : ℝ))
+            rw [inv_mul_cancel_left, ← mul_assoc]
+            exact mul_le_mul' (hle x) le_rfl
+      _ = ENNReal.ofReal C ^ 2 * ∫⁻ x, d x * ‖u x‖ₑ ^ (2 : ℝ) ∂ν :=
+          lintegral_const_mul' _ _ (ENNReal.pow_ne_top ENNReal.ofReal_ne_top)
+      _ = ENNReal.ofReal C ^ 2 * ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d) := by rw [hI u]
+  have h2 : ((2 : ℕ) : ℝ) * (1 / 2) = 1 := by norm_num
+  have hhalf : (0 : ℝ) ≤ 1 / 2 := by norm_num
+  have hnorm : eLpNorm (T u) 2 (ν.withDensity d) ≤
+      ENNReal.ofReal C * eLpNorm u 2 (ν.withDensity d) := by
+    rw [eLpNorm_congr_ae hae, eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero
+      ENNReal.ofNat_ne_top ((Lp.aestronglyMeasurable (T u)).congr hae),
+      eLpNorm_eq_lintegral_rpow_eNorm_toReal two_ne_zero ENNReal.ofNat_ne_top
+      (Lp.aestronglyMeasurable u), ENNReal.toReal_ofNat]
+    calc (∫⁻ x, ‖u (g⁻¹ * x)‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ))
+        ≤ (ENNReal.ofReal C ^ 2 *
+            ∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ)) :=
+          ENNReal.rpow_le_rpow hmain hhalf
+      _ = ENNReal.ofReal C *
+            (∫⁻ x, ‖u x‖ₑ ^ (2 : ℝ) ∂(ν.withDensity d)) ^ (1 / (2 : ℝ)) := by
+          rw [ENNReal.mul_rpow_of_nonneg _ _ hhalf, ← ENNReal.rpow_natCast,
+            ← ENNReal.rpow_mul, h2, ENNReal.rpow_one]
+  rw [Lp.norm_def, Lp.norm_def]
+  calc (eLpNorm (T u) 2 (ν.withDensity d)).toReal
+      ≤ (ENNReal.ofReal C * eLpNorm u 2 (ν.withDensity d)).toReal :=
+        ENNReal.toReal_mono
+          (ENNReal.mul_ne_top ENNReal.ofReal_ne_top (Lp.eLpNorm_ne_top u)) hnorm
+    _ = C * (eLpNorm u 2 (ν.withDensity d)).toReal := by
+        rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal hC]
+
 /-- Paper: Lemma 9.3.1.5, p. 421. Left translation is bounded by the maximum
 endpoint twist times a polynomial in the absolute log-module.
 Deviation: The factor at the identity is one. On a nonzero singleton base
@@ -181,7 +289,30 @@ the endpoint twist still occurs. -/
 theorem norm_hardySobolevTranslation_le (a b s : ℝ) (hab : a ≤ b) (hs : 0 ≤ s) (g : G) :
     ‖hardySobolevTranslation μ m a b s hab hs g‖ ≤
       max (Real.exp (a * logMod g)) (Real.exp (b * logMod g)) *
-        (1 + |logMod g|) ^ (s / 2) := by sorry
+        (1 + |logMod g|) ^ (s / 2) := by
+  have hD : Measurable fun t : ℝ ↦ intervalSobolevDensity a b s t := by
+    unfold intervalSobolevDensity
+    fun_prop
+  have hmeas : Measurable fun x : G ↦ Real.log ((m x).val : ℝ) :=
+    Real.measurable_log.comp
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp (map_continuous m))).measurable
+  have hlog : ∀ x : G, Real.log ((m (g * x)).val : ℝ) =
+      Real.log ((m g).val : ℝ) + Real.log ((m x).val : ℝ) := fun x ↦ by
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (m g).ne_zero) (NNReal.coe_ne_zero.2 (m x).ne_zero)]
+  have hC : 0 ≤ max (Real.exp (a * Real.log ((m g).val : ℝ)))
+      (Real.exp (b * Real.log ((m g).val : ℝ))) *
+      (1 + |Real.log ((m g).val : ℝ)|) ^ (s / 2) :=
+    mul_nonneg (le_max_of_le_left (Real.exp_pos _).le) (Real.rpow_nonneg (by positivity) _)
+  have key := opNorm_le_of_translate_density μ
+    (d := fun x ↦ ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m x).val : ℝ))))
+    (hD.comp hmeas).ennreal_ofReal (fun _ ↦ ENNReal.ofReal_lt_top) g hC fun x ↦ by
+      show ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m (g * x)).val : ℝ))) ≤
+        ENNReal.ofReal _ ^ 2 * ENNReal.ofReal _
+      rw [hlog x, ← ENNReal.ofReal_pow hC, ← ENNReal.ofReal_mul (sq_nonneg _)]
+      exact ENNReal.ofReal_le_ofReal (intervalSobolevDensity_add_le a b s hs _ _)
+  exact key (hardySobolevTranslation μ m a b s hab hs g)
+    (hardySobolevTranslation_apply μ m a b s hab hs g)
 
 /-- Paper: Lemma 9.3.1.5, p. 421. The operator norm of left translation is a
 measurable function of the translating element.
@@ -497,7 +628,56 @@ group, including at module values where the piecewise smooth definition permits 
 Deviation: Sanity check on the smoothness requirement. -/
 theorem IsSmoothModulatedCutoff.continuous {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsSmoothModulatedCutoff m Λ ε ρ) :
-    Continuous ρ := by sorry
+    Continuous ρ := by
+  obtain ⟨k, hk, _, hDescend⟩ := hρ.2 0
+  have hkCompact : IsCompact (k : Set G) := by
+    let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator k, hk.2⟩
+    obtain ⟨_, _, _, hker, hCompact⟩ := lca_dualSubgroup_quotient A
+    rwa [hker, show lcaDualAnnihilator A.val = k from lcaDualAnnihilator_annihilator k hk.1]
+      at hCompact
+  rw [continuous_iff_continuousAt]
+  intro x
+  -- Use a compact generating set containing the point, a neighborhood, and the good subgroup.
+  obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : G)
+  let L := insert x (U ∪ (k : Set G))
+  let H := Subgroup.closure L
+  have hLH : L ⊆ (H : Set G) := Subgroup.subset_closure
+  have hL : L ∈ 𝓝 (1 : G) :=
+    mem_of_superset hU (subset_union_left.trans (subset_insert _ _))
+  have hH : IsOpen (H : Set G) := H.isOpen_of_mem_nhds (mem_of_superset hL hLH)
+  have hGen : IsCompactlyGeneratedGroup H :=
+    ⟨Subtype.val ⁻¹' L, continuous_subtype_val.continuousAt.preimage_mem_nhds hL,
+      (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal.isCompact_preimage
+        ((hUc.union hkCompact).insert x), Subgroup.closure_preimage_eq_top L⟩
+  let p : BruhatStructuralPair G :=
+    ⟨(H, OrderDual.toDual k), hH, hGen, hk,
+      subset_union_right.trans ((subset_insert _ _).trans hLH)⟩
+  obtain ⟨e⟩ := p.elementary
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend p rfl
+  let RealCoords := EuclideanSpace ℝ (Fin e.realDim)
+  let TorusCover := EuclideanSpace ℝ (Fin e.torusDim)
+  let DiscreteCoords := (Fin e.latticeRank → ℤ) × e.finiteFactor
+  let Elementary := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let cover : (RealCoords × TorusCover) × DiscreteCoords → Elementary := fun u ↦ elementaryCover u.1 u.2.1 u.2.2
+  have hq : IsOpenQuotientMap (fun u : TorusCover ↦ fun i ↦ (u i : AddCircle (1 : ℝ))) :=
+    (IsOpenQuotientMap.piMap fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk).comp
+      (PiLp.homeomorph 2 (fun _ : Fin e.torusDim ↦ ℝ)).isOpenQuotientMap
+  have hCover : IsOpenQuotientMap cover :=
+    (Homeomorph.prodAssoc RealCoords (Fin e.torusDim → AddCircle (1 : ℝ)) DiscreteCoords).isOpenQuotientMap.comp
+      ((IsOpenQuotientMap.id.prodMap hq).prodMap IsOpenQuotientMap.id)
+  let g : Elementary → ℂ := fun y ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd y))
+  have hg : Continuous g := by
+    apply hCover.continuous_comp_iff.mp
+    exact continuous_prod_of_discrete_right.mpr fun d ↦ (hSmooth e d.1 d.2).continuous
+  have hf₀c : Continuous f₀ := by
+    have hc : Continuous (fun y : p.quotient ↦ g (e.equiv y).toAdd) := hg.comp e.equiv.continuous
+    simpa only [g, ofAdd_toAdd, e.equiv.symm_apply_apply] using hc
+  have hlocal : Continuous (fun y : H ↦ ρ y.val) := by
+    have hc : Continuous (fun y : H ↦ (f₀ (QuotientGroup.mk y)).re) :=
+      Complex.continuous_re.comp (hf₀c.comp QuotientGroup.continuous_mk)
+    simpa only [hf₀, Complex.ofReal_re] using hc
+  exact hH.isOpenEmbedding_subtypeVal.continuousAt_iff.mp
+    (hlocal.continuousAt (x := (⟨x, hLH (mem_insert _ _)⟩ : H)))
 
 /-- Paper: Definition 9.3.3.1, p. 427. A positive real modulation admits a
 smooth cutoff with outer radius two and width one quarter.
@@ -624,6 +804,64 @@ theorem modulatedCutoffOperator_norm (ν : Measure G) [SigmaFinite ν] {Λ ε : 
       · simp [hxout hx]
     exact (mul_lt_mul_of_pos_right hc hu).not_ge (hlow.trans (T.le_opNorm u))
 
+/-- Reflecting the logarithmic coordinate exchanges the base interval with its negative. -/
+private theorem intervalSobolevDensity_neg (a b s t : ℝ) :
+    intervalSobolevDensity a b s (-t) = intervalSobolevDensity (-b) (-a) s t := by
+  have ha : 2 * a * -t = 2 * -a * t := by ring
+  have hb : 2 * b * -t = 2 * -b * t := by ring
+  unfold intervalSobolevDensity
+  rw [max_comm, neg_sq, ha, hb]
+
+/-- Inversion carries the measure with the reflected density to the measure with the
+original density, for an inversion-invariant base measure. -/
+private theorem measurePreserving_inv_withDensity {H : Type*} [Group H] [MeasurableSpace H]
+    [MeasurableInv H] (ν : Measure H) [ν.IsInvInvariant] {f : H → ℝ≥0∞} (hf : Measurable f) :
+    MeasurePreserving Inv.inv (ν.withDensity fun x ↦ f x⁻¹) (ν.withDensity f) := by
+  refine ⟨measurable_inv, Measure.ext fun t ht ↦ ?_⟩
+  rw [Measure.map_apply measurable_inv ht, withDensity_apply _ (measurable_inv ht),
+    withDensity_apply _ ht]
+  exact (Measure.measurePreserving_inv ν).setLIntegral_comp_preimage ht hf
+
+/-- Composition with inversion is an isometric isomorphism between the square-integrable
+classes of two measures that inversion exchanges. -/
+private theorem exists_lpInversion {H : Type*} [InvolutiveInv H] [MeasurableSpace H]
+    {ν₁ ν₂ : Measure H} (h₁ : MeasurePreserving Inv.inv ν₂ ν₁)
+    (h₂ : MeasurePreserving Inv.inv ν₁ ν₂) :
+    ∃ J : Lp ℂ 2 ν₁ ≃ₗᵢ[ℂ] Lp ℂ 2 ν₂, ∀ u, (J u : H → ℂ) =ᵐ[ν₂] fun x ↦ u x⁻¹ := by
+  let F : Lp ℂ 2 ν₁ →ₗᵢ[ℂ] Lp ℂ 2 ν₂ := Lp.compMeasurePreservingₗᵢ ℂ Inv.inv h₁
+  let B : Lp ℂ 2 ν₂ →ₗᵢ[ℂ] Lp ℂ 2 ν₁ := Lp.compMeasurePreservingₗᵢ ℂ Inv.inv h₂
+  have hF (u : Lp ℂ 2 ν₁) : (F u : H → ℂ) =ᵐ[ν₂] fun x ↦ u x⁻¹ :=
+    Lp.coeFn_compMeasurePreserving u h₁
+  have hB (v : Lp ℂ 2 ν₂) : (B v : H → ℂ) =ᵐ[ν₁] fun x ↦ v x⁻¹ :=
+    Lp.coeFn_compMeasurePreserving v h₂
+  have hBF (u : Lp ℂ 2 ν₁) : B (F u) = u := by
+    apply Lp.ext
+    filter_upwards [hB (F u), h₂.quasiMeasurePreserving.ae_eq_comp (hF u)] with x hx hx'
+    rw [hx]
+    simpa only [comp_apply, inv_inv] using hx'
+  have hFB (v : Lp ℂ 2 ν₂) : F (B v) = v := by
+    apply Lp.ext
+    filter_upwards [hF (B v), h₁.quasiMeasurePreserving.ae_eq_comp (hB v)] with x hx hx'
+    rw [hx]
+    simpa only [comp_apply, inv_inv] using hx'
+  exact ⟨{ toLinearEquiv := LinearEquiv.ofLinearMap F.toLinearMap B.toLinearMap
+            (LinearMap.ext hFB) (LinearMap.ext hBF)
+           norm_map' := F.norm_map }, hF⟩
+
+/-- An isometry acting by inversion on representatives intertwines the multipliers
+of an inversion-invariant symbol. -/
+private theorem lpCutoffMultiplier_inversion {ν₁ ν₂ : Measure G}
+    (h₁ : MeasurePreserving Inv.inv ν₂ ν₁) (J : Lp ℂ 2 ν₁ ≃ₗᵢ[ℂ] Lp ℂ 2 ν₂)
+    (hJ : ∀ u, (J u : G → ℂ) =ᵐ[ν₂] fun x ↦ u x⁻¹) (ρ : G → ℝ) (hm : Measurable ρ)
+    (hb : ∀ x, |ρ x| ≤ 1) (hinv : ∀ x, ρ x = ρ x⁻¹) (u : Lp ℂ 2 ν₁) :
+    J (lpCutoffMultiplier ν₁ ρ hm hb u) = lpCutoffMultiplier ν₂ ρ hm hb (J u) := by
+  apply Lp.ext
+  filter_upwards [hJ (lpCutoffMultiplier ν₁ ρ hm hb u),
+    h₁.quasiMeasurePreserving.ae_eq_comp (lpCutoffMultiplier_apply ν₁ ρ hm hb u),
+    lpCutoffMultiplier_apply ν₂ ρ hm hb (J u), hJ u] with x hx₁ hx₂ hx₃ hx₄
+  rw [hx₁, hx₃, hx₄, hinv x]
+  exact hx₂
+
 /-- Paper: (9.3.3.3), p. 427. Inversion interchanges the two reflected
 interval spaces and intertwines their cutoff multipliers. -/
 theorem modulatedCutoffOperator_inversion (a b s : ℝ) (_hab : a ≤ b) (_hs : 0 ≤ s)
@@ -631,7 +869,42 @@ theorem modulatedCutoffOperator_inversion (a b s : ℝ) (_hab : a ≤ b) (_hs : 
     ∃ J : W a b s ≃ₗᵢ[ℂ] W (-b) (-a) s,
       (∀ u, (J u : G → ℂ) =ᵐ[μ] fun x ↦ u x⁻¹) ∧
       ∀ u, J (modulatedCutoffOperator m (weightedMeasure a b s) hρ u) =
-        modulatedCutoffOperator m (weightedMeasure (-b) (-a) s) hρ (J u) := by sorry
+        modulatedCutoffOperator m (weightedMeasure (-b) (-a) s) hρ (J u) := by
+  have hmeas (a b : ℝ) : Measurable fun x : G ↦
+      ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m x).val : ℝ))) := by
+    have hlog : Measurable fun x : G ↦ Real.log ((m x).val : ℝ) :=
+      Real.measurable_log.comp
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).measurable
+    have hdensity : Measurable (intervalSobolevDensity a b s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact (hdensity.comp hlog).ennreal_ofReal
+  have hpres (a b : ℝ) : MeasurePreserving Inv.inv
+      (μ.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity (-b) (-a) s (Real.log ((m x).val : ℝ))))
+      (μ.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m x).val : ℝ)))) := by
+    have hreflect : (fun x : G ↦
+        ENNReal.ofReal (intervalSobolevDensity (-b) (-a) s (Real.log ((m x).val : ℝ)))) =
+        fun x ↦ ENNReal.ofReal (intervalSobolevDensity a b s (Real.log ((m x⁻¹).val : ℝ))) := by
+      funext x
+      rw [map_inv, Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv,
+        intervalSobolevDensity_neg]
+    have h := measurePreserving_inv_withDensity μ (hmeas a b)
+    rw [hreflect]
+    exact h
+  have h₁ := hpres a b
+  have h₂ := hpres (-b) (-a)
+  rw [neg_neg, neg_neg] at h₂
+  obtain ⟨J, hJ⟩ := exists_lpInversion h₁ h₂
+  refine ⟨J, fun u ↦ ?_, fun u ↦ ?_⟩
+  · refine (withDensity_absolutelyContinuous' (hmeas (-b) (-a)).aemeasurable
+      (.of_forall fun x ↦ ?_)).ae_eq (hJ u)
+    have hpos : 0 < intervalSobolevDensity (-b) (-a) s (Real.log ((m x).val : ℝ)) := by
+      unfold intervalSobolevDensity
+      exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+    exact (ENNReal.ofReal_pos.mpr hpos).ne'
+  · exact lpCutoffMultiplier_inversion h₁ J hJ ρ hρ.measurable hρ.abs_le_one hρ.inv_eq u
 
 /-- Paper: Definition 9.3.3.3, p. 428. The absolute cutoff associated to a set
 of module values is the indicator of its inverse image.

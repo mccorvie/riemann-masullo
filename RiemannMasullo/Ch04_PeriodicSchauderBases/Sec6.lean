@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+
 /-!
 # Periodic Schauder bases in the presence of multiplicity
 
@@ -87,7 +89,17 @@ def modulatedDifferenceProduct (S : List G) :
 A repeated generator gives the second finite difference at every point. -/
 theorem modulatedDifferenceProduct_pair_apply (f : ModulatedExponentialDecay m I) (x : G) :
     (modulatedDifferenceProduct m hm hms I hInt hne [γ, γ] f).val x =
-      f.val x - 2 * f.val (γ * x) + f.val (γ ^ 2 * x) := by sorry
+      f.val x - 2 * f.val (γ * x) + f.val (γ ^ 2 * x) := by
+  let Δ := modulatedCyclicDifference m γ hm hms I hInt hne
+  have eval (g : ModulatedExponentialDecay m I) (y : G) :
+      (Δ g).val y = g.val y - g.val (γ * y) :=
+    modulatedCyclicDifference_apply m γ hm hms I hInt hne g y
+  calc
+    _ = (Δ f).val x - (Δ f).val (γ * x) := eval (Δ f) x
+    _ = (f.val x - f.val (γ * x)) -
+        (f.val (γ * x) - f.val (γ ^ 2 * x)) :=
+      congrArg₂ (· - ·) (eval f x) (by simpa only [pow_two, mul_assoc] using eval f (γ * x))
+    _ = _ := by ring
 
 end Difference
 
@@ -107,7 +119,22 @@ translation by each norm-one element acts by its character value. -/
 theorem mem_modulatedDecayIsotype_iff (I : Set ℝ) (h0 : 0 ∈ I)
     (f : ModulatedExponentialDecay m I) :
     f ∈ (modulatedDecayIsotype m I h0 ω) ↔ ∀ (u : K) (x : G),
-      f.val (u.val⁻¹ * x) = (ω u : ℂ) * f.val x := by sorry
+      f.val (u.val⁻¹ * x) = (ω u : ℂ) * f.val x := by
+  let z := modulatedExponentialDecayTwist m I ⟨0, h0⟩ f
+  have hz (x : G) : z x = f.val x :=
+    (modulatedExponentialDecayTwist_apply m I ⟨0, h0⟩ f x).trans (by simp)
+  let ρ := (schwartzBruhatTranslationAction (G := G)).comp m.toMonoidHom.ker.subtype
+  refine (mem_actionIsotype ρ ω z).trans ?_
+  have hl (u : K) (x : G) :
+      schwartzBruhatTranslationAction (G := G) u.val z x = f.val (u.val⁻¹ * x) :=
+    (schwartzBruhatTranslationAction_apply u.val x z).trans (hz _)
+  have hr (u : K) (x : G) : ((ω u : ℂ) • z) x = (ω u : ℂ) * f.val x :=
+    congrArg ((ω u : ℂ) * ·) (hz x)
+  constructor
+  · intro h u x
+    exact (hl u x).symm.trans ((congrArg (fun g : SchwartzBruhat G ↦ g x) (h u)).trans (hr u x))
+  · intro h u
+    exact Subtype.ext (funext fun x ↦ (hl u x).trans ((h u x).trans (hr u x).symm))
 
 /-- Paper: Lemma 4.6.1.3(1), p. 210. The difference product preserves each
 norm-one isotype. The same restriction is used for intervals containing zero
@@ -116,7 +143,23 @@ theorem modulatedDifferenceProduct_mem_isotype
     (I : Set ℝ) (hInt : OrdConnected I) (h0 : 0 ∈ I) (S : List G) :
     ∀ f ∈ modulatedDecayIsotype m I h0 ω,
       modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f ∈
-        modulatedDecayIsotype m I h0 ω := by sorry
+        modulatedDecayIsotype m I h0 ω := by
+  induction S with
+  | nil => exact fun f hf ↦ hf
+  | cons g S ih =>
+    intro f hf
+    have hP := (mem_modulatedDecayIsotype_iff m ω I h0 _).mp (ih f hf)
+    refine (mem_modulatedDecayIsotype_iff m ω I h0
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ (g :: S) f)).mpr fun u x ↦ ?_
+    have h1 := modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f) (u.val⁻¹ * x)
+    have h2 := modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩
+      (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f) x
+    have hcomm : g * (u.val⁻¹ * x) = u.val⁻¹ * (g * x) := mul_left_comm _ _ _
+    exact h1.trans ((congrArg₂ (· - ·) (hP u x)
+      ((congrArg (modulatedDifferenceProduct m hm hms I hInt ⟨0, h0⟩ S f).val hcomm).trans
+        (hP u (g * x)))).trans
+      ((mul_sub _ _ _).symm.trans (congrArg ((ω u : ℂ) * ·) h2.symm)))
 
 /-- Paper: Equation (4.6.1.3), p. 210. The cyclic difference product on
 the isotype is the restriction of the ambient operator. -/
@@ -261,15 +304,35 @@ theorem mem_modulatedPeriodicSpectrum_iff (ξ : PontryaginDual G) :
 Every character in the fiber for a twice-repeated generator has multiplicity two. -/
 theorem modulatedPeriodicMultiplicity_repeat (ξ : PontryaginDual G)
     (hξ : ξ ∈ modulatedCyclicAnnihilatorFiber m ω γ) :
-    modulatedPeriodicMultiplicity m ω (fun _ : Fin 2 ↦ γ) ξ = 2 := by sorry
+    modulatedPeriodicMultiplicity m ω (fun _ : Fin 2 ↦ γ) ξ = 2 := by
+  classical
+  simp [modulatedPeriodicMultiplicity, hξ]
 
 variable (hγs : ∀ k, 1 < (m (γs k)).val)
+
+omit hSC in
+/-- The annihilator of a subgroup is closed in the dual group. -/
+private theorem isClosed_lcaAnnihilator_coe (H : Subgroup G) :
+    IsClosed (lcaAnnihilator H : Set (PontryaginDual G)) := by
+  have : (lcaAnnihilator H : Set (PontryaginDual G)) = ⋂ x : H, {ξ | ξ x.val = 1} := by
+    ext ξ; simp [mem_lcaAnnihilator_iff]
+  rw [this]
+  exact isClosed_iInter fun x ↦ isClosed_eq
+    (continuous_eval_const (F := ContinuousMonoidHom G Circle) x.val) continuous_const
 
 include hm hγs in
 /-- Paper: Equation (4.6.1.12), p. 212. The finite union of the cyclic
 fibers is discrete in the unitary dual. -/
 theorem modulatedPeriodicSpectrum_isDiscrete :
-    IsDiscrete (modulatedPeriodicSpectrum m ω γs) := by sorry
+    IsDiscrete (modulatedPeriodicSpectrum m ω γs) := by
+  have hann (k : Fin N) :
+      IsDiscrete (lcaAnnihilator (Subgroup.zpowers (γs k)) : Set (PontryaginDual G)) :=
+    isDiscrete_iff_discreteTopology.mpr
+      (modulatedCyclicAnnihilator_discrete m (γs k) hm (hγs k))
+  have hsub (k : Fin N) : modulatedCyclicAnnihilatorFiber m ω (γs k) ⊆
+      lcaAnnihilator (Subgroup.zpowers (γs k)) := fun _ h ↦ h.1
+  exact IsDiscrete.iUnion (fun k ↦ (hann k).mono (hsub k)) fun k ↦
+    isClosed_of_subset_discrete_closed (hsub k) (hann k) (isClosed_lcaAnnihilator_coe _)
 
 variable (χ : PontryaginDual m.toMonoidHom.ker → PontryaginDual G)
 variable (hχ : ∀ (ω' : PontryaginDual m.toMonoidHom.ker) (u : m.toMonoidHom.ker), χ ω' u.val = ω' u)
@@ -284,6 +347,21 @@ local notation "freq[" k "," n "]" =>
       G →ₜ* (G ⧸ Subgroup.zpowers (γs k)))
     (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)))⁻¹)
 
+/-- Every unitary character of the positive reals is `t ↦ exp(i s log t)` for some real `s`. -/
+private theorem exists_circleExp_freq (ψ : PontryaginDual ℝ≥0ˣ) :
+    ∃ s : ℝ, ∀ t, ψ t = Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ)) := by
+  let c : ℝ≥0ˣ →ₜ* ℂ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ
+  obtain ⟨z, ⟨hz0, hz⟩, -⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe (ψ t))
+  have hz' : (z.im : ℂ) * Complex.I = z := by apply Complex.ext <;> simp [hz0]
+  refine ⟨z.im, fun t ↦ Circle.ext ((hz t).trans ?_)⟩
+  have hpos : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne'),
+    ← Complex.ofReal_log hpos.le]
+  conv_lhs => rw [← hz']
+  congr 1
+  push_cast
+  ring
+
 include hm hms hχ in
 /-- Paper: Situation 4.6.1.1(5) and Theorem 4.6.1.5, pp. 209, 212.
 The integer frequency parametrizes each cyclic fiber bijectively.
@@ -291,7 +369,74 @@ Deviation: Frequencies have denominator log |γₖ| and use the normalized phase
 The character is the inverse of the pulled-back basis character of §4.4. -/
 theorem modulatedPeriodicFrequency_bijective (k : Fin N) :
     Injective (fun n : ℤ ↦ freq[k, n]) ∧
-      range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by sorry
+      range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by
+  have hpos (x : G) : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hL : 0 < Real.log ((m (γs k)).val : ℝ) := Real.log_pos (by exact_mod_cast hγs k)
+  have hlog (l : ℝ) : ∃ x : G, Real.log ((m x).val : ℝ) = l := by
+    obtain ⟨x, hx⟩ := hms (Units.mk0 ⟨Real.exp l, (Real.exp_pos l).le⟩
+      fun h ↦ (Real.exp_pos l).ne' (congrArg Subtype.val h))
+    exact ⟨x, by rw [hx]; exact Real.log_exp l⟩
+  have hfreq (n : ℤ) (x : G) : freq[k, n] x = χ ω x * Circle.exp
+      (-((t₀ k ω - 2 * Real.pi * (n : ℝ) / Real.log ((m (γs k)).val : ℝ)) *
+        Real.log ((m x).val : ℝ))) := by
+    change (modulatedCyclicCharacter m (γs k) (hγs k) χ (t₀ k) (ht₀ k) (ω, n)
+      (QuotientGroup.mk x))⁻¹ = _
+    rw [modulatedCyclicCharacter_mk, Circle.exp_neg, mul_inv, inv_inv]
+  refine ⟨fun n₁ n₂ h ↦ ?_, ?_⟩
+  · by_contra hne
+    have hd : ((n₁ : ℝ) - n₂) ≠ 0 := sub_ne_zero.mpr (by exact_mod_cast hne)
+    obtain ⟨x, hx⟩ := hlog (Real.log ((m (γs k)).val : ℝ) / (2 * ((n₁ : ℝ) - n₂)))
+    have hx' := DFunLike.congr_fun h x
+    simp only [hfreq, hx] at hx'
+    have key (a b : ℝ) (hab : Circle.exp a = Circle.exp b) (hπ : a - b = Real.pi) : False :=
+      Circle.exp_pi_ne_one (by rw [← hπ, Circle.exp_sub, hab, div_self'])
+    refine key _ _ (mul_left_cancel hx') ?_
+    field_simp
+    ring
+  · ext ξ
+    rw [mem_modulatedCyclicAnnihilatorFiber_iff]
+    constructor
+    · rintro ⟨n, rfl⟩
+      refine ⟨?_, fun u ↦ ?_⟩
+      · rw [hfreq, ← (ht₀ k ω).2, ← Circle.exp_add]
+        convert Circle.exp_two_pi_mul_int n using 2
+        field_simp
+        ring
+      · rw [hfreq, show m u.val = 1 from u.2, hχ]
+        simp
+    · rintro ⟨hγ, hK⟩
+      obtain ⟨τ₀, hτ₀⟩ := hm.exists_section
+      let τ : ℝ≥0ˣ →ₜ* G := τ₀.comp
+        ⟨(MonoidHom.id ℝ≥0ˣ).codRestrict _ fun t ↦ MonoidHom.mem_range.mpr (hms t),
+          continuous_id.subtype_mk _⟩
+      have hτ (t : ℝ≥0ˣ) : m (τ t) = t := hτ₀ _
+      let φ : PontryaginDual G := ξ * (χ ω)⁻¹
+      have hφ (x : G) : φ x = ξ x * (χ ω x)⁻¹ := rfl
+      obtain ⟨s, hs⟩ := exists_circleExp_freq (φ.comp τ)
+      have hξx (x : G) : ξ x = χ ω x * Circle.exp (s * Real.log ((m x).val : ℝ)) := by
+        have hmem : x * (τ (m x))⁻¹ ∈ K := by
+          rw [MonoidHom.mem_ker, map_mul, map_inv]
+          change m x * (m (τ (m x)))⁻¹ = 1
+          rw [hτ, mul_inv_cancel]
+        have h1 : φ (x * (τ (m x))⁻¹) = 1 := by
+          rw [hφ]
+          exact mul_inv_eq_one.mpr ((hK ⟨_, hmem⟩).trans (hχ ω ⟨_, hmem⟩).symm)
+        rw [map_mul, map_inv, mul_inv_eq_one] at h1
+        have h2 : φ (τ (m x)) = Circle.exp (s * Real.log ((m x).val : ℝ)) := hs (m x)
+        rw [← h2, ← h1, hφ, mul_comm, inv_mul_cancel_right]
+      have h3 := hξx (γs k)
+      rw [hγ, ← (ht₀ k ω).2, ← Circle.exp_add, eq_comm, Circle.exp_eq_one] at h3
+      obtain ⟨n, hn⟩ := h3
+      refine ⟨n, DFunLike.ext _ _ fun x ↦ ?_⟩
+      rw [hfreq, hξx]
+      have hs' : s = (n * (2 * Real.pi) - t₀ k ω * Real.log ((m (γs k)).val : ℝ)) /
+          Real.log ((m (γs k)).val : ℝ) := by
+        rw [eq_div_iff hL.ne']
+        linarith
+      congr 2
+      rw [hs']
+      field_simp
+      ring
 
 variable [MeasurableSpace G] [BorelSpace G]
 variable (μ : Measure G) [hμHaar : μ.IsHaarMeasure]
@@ -353,11 +498,157 @@ theorem modulatedQuotientLogMoment_mkQ (j : J) (f : H₀[ω]) :
 -- hypothesis, but their distinct lattice frequencies can approach each other
 -- faster than any inverse power. See the report for the counterexample.
 
+/-- A circle exponential of a multiple of the logarithm is a purely imaginary complex power. -/
+private theorem coe_circleExp_mul_log (s : ℝ) (t : ℝ≥0ˣ) :
+    (Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ)) : ℂ) =
+      (((t : ℝ≥0) : ℝ) : ℂ) ^ ((s : ℂ) * Complex.I) := by
+  have hpos : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  rw [Circle.coe_exp, Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hpos.ne'),
+    ← Complex.ofReal_log hpos.le]
+  congr 1
+  push_cast
+  ring
+
+/-- For each real frequency, `t ↦ exp(i s log t)` is a unitary character of the positive reals. -/
+private theorem exists_positiveRealCharacter (s : ℝ) :
+    ∃ ψ : PontryaginDual ℝ≥0ˣ, ∀ t, ψ t = Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ)) := by
+  have hpos (t : ℝ≥0ˣ) : 0 < ((t : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  refine ⟨{ toFun := fun t ↦ Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ))
+            map_one' := by simp
+            map_mul' := fun t u ↦ by
+              simp only [Units.val_mul, NNReal.coe_mul]
+              rw [Real.log_mul (hpos t).ne' (hpos u).ne', mul_add, Circle.exp_add]
+            continuous_toFun := Circle.exp.continuous.comp (continuous_const.mul
+              ((NNReal.continuous_coe.comp Units.continuous_val).log
+                fun t ↦ (hpos t).ne')) }, fun _ ↦ rfl⟩
+
+/-- Every unitary character of the positive reals is `t ↦ exp(i s log t)` for a unique `s`. -/
+private theorem existsUnique_positiveRealCharacter_freq (ψ : PontryaginDual ℝ≥0ˣ) :
+    ∃! s : ℝ, ∀ t, ψ t = Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ)) := by
+  let c : ℝ≥0ˣ →ₜ* ℂ := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ
+  obtain ⟨z, ⟨hz0, hz⟩, -⟩ := existsUnique_unitaryComplexPower c (fun t ↦ Circle.norm_coe (ψ t))
+  obtain ⟨w, -, hw⟩ := existsUnique_complexPower c
+  have hz' : (z.im : ℂ) * Complex.I = z := by apply Complex.ext <;> simp [hz0]
+  refine ⟨z.im, fun t ↦ Circle.ext ?_, fun s hs ↦ ?_⟩
+  · rw [coe_circleExp_mul_log, hz']
+    exact hz t
+  · have h1 := hw _ fun t ↦ (congrArg Subtype.val (hs t)).trans (coe_circleExp_mul_log s t)
+    have h2 := hw _ fun t ↦ (hz t).trans (congrArg _ hz'.symm)
+    have := mul_right_cancel₀ Complex.I_ne_zero (h1.trans h2.symm)
+    exact_mod_cast this
+
+/-- Through a section of the modulation, a character of the norm-one subgroup extends to a
+character trivial on the section, and every extension is that one times a character of the
+section. -/
+private theorem exists_baseCharacter_of_section (τ : ℝ≥0ˣ →ₜ* G)
+    (hτ : ∀ t, m (τ t) = t) :
+    ∃ ξ₀ : PontryaginDual G, (∀ u : K, ξ₀ u.val = ω u) ∧ (∀ t, ξ₀ (τ t) = 1) ∧
+      ∀ ξ : PontryaginDual G, (∀ u : K, ξ u.val = ω u) → ∀ g, ξ g = ξ₀ g * ξ (τ (m g)) := by
+  have hmem (g : G) : g * (τ (m g))⁻¹ ∈ K := by
+    rw [MonoidHom.mem_ker, map_mul, map_inv]
+    change m g * (m (τ (m g)))⁻¹ = 1
+    rw [hτ, mul_inv_cancel]
+  let r : G →ₜ* K :=
+    { toFun := fun g ↦ ⟨g * (τ (m g))⁻¹, hmem g⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' := fun g h ↦ Subtype.ext (by
+        simp only [map_mul, Subgroup.coe_mul, mul_inv]
+        ac_rfl)
+      continuous_toFun := (continuous_id.mul (τ.continuous.comp m.continuous).inv).subtype_mk _ }
+  have hr (g : G) : ((r g : K) : G) = g * (τ (m g))⁻¹ := rfl
+  have hsplit (g : G) : g = (r g : G) * τ (m g) := by rw [hr, inv_mul_cancel_right]
+  refine ⟨ω.comp r, fun u ↦ ?_, fun t ↦ ?_, fun ξ hξ g ↦ ?_⟩
+  · change ω (r u) = ω u
+    congr 1
+    apply Subtype.ext
+    rw [hr, show m u.val = 1 from u.2, map_one, inv_one, mul_one]
+  · change ω (r (τ t)) = 1
+    rw [show r (τ t) = 1 from Subtype.ext (by rw [hr, hτ, mul_inv_cancel]; rfl), map_one]
+  · conv_lhs => rw [hsplit g, map_mul, hξ]
+    rfl
+
+
 include hm hms hγs in
 /-- Paper: Theorem 4.6.1.5, p. 212. The moment index is countably infinite,
 so the arbitrary enumerations used for the bases exist. -/
 theorem modulatedPeriodicMomentIndex_enumerable (hN : 0 < N) :
-    Nonempty (ℕ ≃ J) := by sorry
+    Nonempty (ℕ ≃ J) := by
+  classical
+  obtain ⟨τ₀, hτ₀⟩ := hm.exists_section
+  let τ : ℝ≥0ˣ →ₜ* G := τ₀.comp
+    ⟨(MonoidHom.id ℝ≥0ˣ).codRestrict _ fun t ↦ MonoidHom.mem_range.mpr (hms t),
+      continuous_id.subtype_mk _⟩
+  have hτ (t : ℝ≥0ˣ) : m (τ t) = t := hτ₀ _
+  obtain ⟨ξ₀, hξ₀K, hξ₀τ, hξ₀⟩ := exists_baseCharacter_of_section m ω τ hτ
+  set L : Fin N → ℝ := fun k ↦ Real.log ((m (γs k) : ℝ≥0) : ℝ)
+  have hL (k : Fin N) : L k ≠ 0 :=
+    (Real.log_pos (show (1 : ℝ) < ((m (γs k) : ℝ≥0) : ℝ) by exact_mod_cast hγs k)).ne'
+  choose c hc using fun k ↦ Circle.exp_surjective (ξ₀ (γs k))⁻¹
+  -- Characters in the fibers are determined by a frequency on the section.
+  have hfreq (j : J) :
+      ∃ k : Fin N, ∃ n : ℤ, ∃ s : ℝ, (∀ u : K, j.val.1 u.val = ω u) ∧
+        (∀ t, j.val.1 (τ t) = Circle.exp (s * Real.log ((t : ℝ≥0) : ℝ))) ∧
+        s * L k = c k + n * (2 * Real.pi) := by
+    have hpos := (mem_modulatedPeriodicSpectrum_iff m ω γs j.val.1).mpr
+      (lt_of_le_of_lt (Nat.zero_le _) j.2)
+    obtain ⟨k, hk⟩ := mem_iUnion.mp hpos
+    obtain ⟨hγ, hK⟩ := (mem_modulatedCyclicAnnihilatorFiber_iff m ω (γs k) _).mp hk
+    obtain ⟨s, hs, -⟩ := existsUnique_positiveRealCharacter_freq (j.val.1.comp τ)
+    have h1 : Circle.exp (s * L k) = Circle.exp (c k) := by
+      show Circle.exp (s * Real.log ((m (γs k) : ℝ≥0) : ℝ)) = _
+      rw [hc, ← hs (m (γs k))]
+      change j.val.1 (τ (m (γs k))) = (ξ₀ (γs k))⁻¹
+      rw [eq_inv_iff_mul_eq_one, mul_comm, ← hξ₀ _ hK, hγ]
+    obtain ⟨n, hn⟩ := Circle.exp_eq_exp.mp h1
+    exact ⟨k, n, s, hK, hs, hn⟩
+  choose k n s hK hs hn using hfreq
+  have hcount : Injective fun j ↦ (k j, n j, j.val.2) := by
+    intro i j hij
+    simp only [Prod.mk.injEq] at hij
+    obtain ⟨hk, hnij, h2⟩ := hij
+    have hss : s i = s j := by
+      have := hn i
+      rw [hk, hnij, ← hn j] at this
+      exact mul_right_cancel₀ (hL _) this
+    apply Subtype.ext
+    refine Prod.ext (PontryaginDual.ext fun g ↦ ?_) h2
+    rw [hξ₀ _ (hK i), hξ₀ _ (hK j), hs, hs, hss]
+  have : Countable J := hcount.countable
+  -- Infinitely many characters lie in the first fiber.
+  let k₀ : Fin N := ⟨0, hN⟩
+  let sₙ : ℕ → ℝ := fun n ↦ (c k₀ + n * (2 * Real.pi)) / L k₀
+  choose ψ hψ using fun n ↦ exists_positiveRealCharacter (sₙ n)
+  let ξ : ℕ → PontryaginDual G := fun n ↦ ξ₀ * PontryaginDual.map m (ψ n)
+  have hξ (n : ℕ) : ξ n ∈ modulatedCyclicAnnihilatorFiber m ω (γs k₀) := by
+    rw [mem_modulatedCyclicAnnihilatorFiber_iff]
+    refine ⟨?_, fun u ↦ ?_⟩
+    · change ξ₀ (γs k₀) * ψ n (m (γs k₀)) = 1
+      rw [hψ, show sₙ n * Real.log ((m (γs k₀) : ℝ≥0) : ℝ) = c k₀ + (n : ℤ) * (2 * Real.pi) by
+        simp only [sₙ]; field_simp [hL k₀]; push_cast; ring]
+      rw [show Circle.exp (c k₀ + (n : ℤ) * (2 * Real.pi)) = Circle.exp (c k₀) from
+        Circle.exp_eq_exp.mpr ⟨n, rfl⟩, hc, mul_inv_cancel]
+    · change ξ₀ u.val * ψ n (m u.val) = ω u
+      rw [show m u.val = 1 from u.2, map_one, mul_one, hξ₀K]
+  let f : ℕ → J :=
+    fun n ↦ ⟨(ξ n, 0), (mem_modulatedPeriodicSpectrum_iff m ω γs (ξ n)).mp
+      (mem_iUnion.mpr ⟨k₀, hξ n⟩)⟩
+  have hf : Injective f := by
+    intro a b hab
+    have hξab : ξ a = ξ b := congrArg (fun j ↦ j.val.1) hab
+    have hτξ (n : ℕ) (t : ℝ≥0ˣ) :
+        ξ n (τ t) = Circle.exp (sₙ n * Real.log ((t : ℝ≥0) : ℝ)) := by
+      change ξ₀ (τ t) * ψ n (m (τ t)) = _
+      rw [hξ₀τ, one_mul, hτ, hψ]
+    obtain ⟨_, -, huniq⟩ := existsUnique_positiveRealCharacter_freq ((ξ a).comp τ)
+    have hab' : sₙ a = sₙ b :=
+      (huniq _ (hτξ a)).trans (huniq _ fun t ↦ (congrArg (fun χ ↦ χ (τ t)) hξab).trans
+        (hτξ b t)).symm
+    simp only [sₙ] at hab'
+    rw [div_left_inj₀ (hL k₀)] at hab'
+    have := mul_right_cancel₀ (mul_ne_zero two_ne_zero Real.pi_ne_zero) (add_left_cancel hab')
+    exact_mod_cast this
+  have : Infinite J := Infinite.of_injective f hf
+  exact nonempty_equiv_of_countable
 
 variable (hcomm : ∃ a : ℝ, 0 < a ∧ ∀ k, ∃ r : ℚ, Real.log ((m (γs k)).val : ℝ) = (r : ℝ) * a)
 
@@ -461,7 +752,31 @@ a lattice zero equals the derivative of the numerator divided by the
 logarithm of the generator. -/
 theorem repeatedCyclicDifference_mellin_division_eval (f : A) (n : ℤ) :
     let z : ℂ := ((2 * Real.pi * (n : ℝ) / Real.log (a.val : ℝ) : ℝ) : ℂ) * Complex.I
-    f.val z = deriv (T f).val z / (Real.log (a.val : ℝ) : ℂ) := by sorry
+    f.val z = deriv (T f).val z / (Real.log (a.val : ℝ) : ℂ) := by
+  intro z
+  let L : ℝ := Real.log (a.val : ℝ)
+  have hL : L ≠ 0 := (Real.log_pos (by exact_mod_cast ha)).ne'
+  have hLc : (L : ℂ) ≠ 0 := by exact_mod_cast hL
+  have hz : -((L : ℂ) * z) = ((-n : ℤ) : ℂ) * (2 * Real.pi * Complex.I) := by
+    dsimp [z, L] at *
+    push_cast
+    field_simp
+    <;> ring
+  have hexp : Complex.exp (-((L : ℂ) * z)) = 1 :=
+    hz ▸ Complex.exp_int_mul_two_pi_mul_I (-n)
+  have hlin : HasDerivAt (fun w : ℂ ↦ -((L : ℂ) * w)) (-(L : ℂ)) z :=
+    ((hasDerivAt_id z).const_mul (L : ℂ)).neg.congr_deriv (by simp)
+  have hfactor : HasDerivAt (fun w : ℂ ↦ 1 - Complex.exp (-((L : ℂ) * w))) (L : ℂ) z := by
+    simpa only [hexp, one_mul, neg_neg, zero_sub] using!
+      (hasDerivAt_const z (1 : ℂ)).sub hlin.cexp
+  have hf : Differentiable ℂ f.val := by
+    apply differentiableOn_univ.mp
+    simpa using f.property.2.1
+  have hderiv : HasDerivAt (T f).val ((L : ℂ) * f.val z) z := by
+    rw [show (T f).val = _ from funext (hT f)]
+    simpa only [hexp, sub_self, zero_mul, add_zero] using!
+      hfactor.mul (hf z).hasDerivAt
+  rw [hderiv.deriv, mul_div_cancel_left₀ _ hLc]
 
 include ha hT in
 /-- Paper: Example 4.6.1.6, p. 218. The normalized Fourier coefficient of
@@ -528,13 +843,63 @@ def schwartzBruhatDifferenceProduct (S : List G) : SchwartzBruhat G →L[ℂ] Sc
 Schwartz–Bruhat difference product is the second finite difference. -/
 theorem schwartzBruhatDifferenceProduct_pair_apply (f : SchwartzBruhat G) (x : G) :
     schwartzBruhatDifferenceProduct [γ, γ] f x =
-      f x - 2 * f (γ * x) + f (γ ^ 2 * x) := by sorry
+      f x - 2 * f (γ * x) + f (γ ^ 2 * x) := by
+  -- `schwartzBruhatCyclicDifference_apply` was stated with a Borel structure in scope; its
+  -- conclusion does not depend on it, so any Borel structure will do.
+  let _ : MeasurableSpace G := borel G
+  have _ : BorelSpace G := ⟨rfl⟩
+  have h : schwartzBruhatDifferenceProduct [γ, γ] f =
+      schwartzBruhatCyclicDifference γ (schwartzBruhatCyclicDifference γ f) := by
+    simp only [schwartzBruhatDifferenceProduct, List.map_cons, List.map_nil, List.prod_cons,
+      List.prod_nil, mul_one, mul_apply_eq_comp]
+  have h0 := congrArg (fun g : SchwartzBruhat G ↦ g x) h
+  have h1 := schwartzBruhatCyclicDifference_apply γ (schwartzBruhatCyclicDifference γ f) x
+  have h2 := schwartzBruhatCyclicDifference_apply γ f x
+  have h3 := schwartzBruhatCyclicDifference_apply γ f (γ * x)
+  have h4 : f (γ ^ 2 * x) = f (γ * (γ * x)) := congrArg f (by rw [sq, mul_assoc])
+  -- No `rw` on the main goal: its closing `rfl` check, like rewriting with `h2`, makes Lean
+  -- unfold the translation action defining the cyclic difference, which times out.
+  linear_combination h0 + h1 + h2 - h3 - h4
+
+/-- A Schwartz–Bruhat function lies in the norm-one isotype exactly when translating its
+argument by a norm-one element multiplies its values by the character. -/
+private theorem mem_actionIsotype_translation_iff (φ : SchwartzBruhat G) :
+    φ ∈ actionIsotype ρK ω ↔ ∀ (u : K) (x : G), φ (u.val⁻¹ * x) = (ω u : ℂ) * φ x := by
+  refine (mem_actionIsotype ρK ω φ).trans (forall_congr' fun u ↦ ⟨fun h x ↦ ?_, fun h ↦ ?_⟩)
+  · have hx := congrArg (fun g : SchwartzBruhat G ↦ g x) h
+    change schwartzBruhatTranslationAction (G := G) u.val φ x = (ω u : ℂ) * φ x at hx
+    exact (schwartzBruhatTranslationAction_apply u.val x φ).symm.trans hx
+  · refine Subtype.ext (funext fun x ↦ ?_)
+    change schwartzBruhatTranslationAction (G := G) u.val φ x = (ω u : ℂ) * φ x
+    exact (schwartzBruhatTranslationAction_apply u.val x φ).trans (h x)
+
+/-- The ordinary cyclic difference at a point subtracts the value at the translate
+by the generator. -/
+private theorem schwartzBruhatCyclicDifference_eval (g : G) (f : SchwartzBruhat G) (x : G) :
+    schwartzBruhatCyclicDifference g f x = f x - f (g * x) :=
+  congrArg (f x - ·) ((schwartzBruhatTranslationAction_apply g⁻¹ x f).trans
+    (congrArg (fun y ↦ f (y * x)) (inv_inv g)))
 
 /-- Paper: Corollary 4.6.3.1, pp. 219–220. The ordinary Schwartz–Bruhat
 difference product preserves the norm-one isotype. -/
 theorem schwartzBruhatDifferenceProduct_mem_isotype :
     ∀ f ∈ actionIsotype ρK ω, schwartzBruhatDifferenceProduct S f ∈ actionIsotype ρK ω :=
-  by sorry
+  by
+  induction S with
+  | nil => exact fun f hf ↦ hf
+  | cons g S ih =>
+    intro f hf
+    have hP := (mem_actionIsotype_translation_iff m ω _).mp (ih f hf)
+    refine (mem_actionIsotype_translation_iff m ω
+      (schwartzBruhatDifferenceProduct (g :: S) f)).mpr fun u x ↦ ?_
+    have h1 := schwartzBruhatCyclicDifference_eval g (schwartzBruhatDifferenceProduct S f)
+      (u.val⁻¹ * x)
+    have h2 := schwartzBruhatCyclicDifference_eval g (schwartzBruhatDifferenceProduct S f) x
+    have hcomm : g * (u.val⁻¹ * x) = u.val⁻¹ * (g * x) := mul_left_comm _ _ _
+    exact h1.trans ((congrArg₂ (· - ·) (hP u x)
+      ((congrArg (fun y ↦ schwartzBruhatDifferenceProduct S f y) hcomm).trans
+        (hP u (g * x)))).trans
+      ((mul_sub _ _ _).symm.trans (congrArg ((ω u : ℂ) * ·) h2.symm)))
 
 variable (I : Set ℝ) (hOpen : IsOpen I) (hInt : OrdConnected I) (h0 : 0 ∈ I)
 

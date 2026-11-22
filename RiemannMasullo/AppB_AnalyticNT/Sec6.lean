@@ -103,7 +103,34 @@ norm gives the absolutely convergent Dirichlet series with coefficients `aₘ`. 
 theorem finiteHeckeL_hasSum_normCoefficients (χ : U[F]) (s : halfPlane) :
     LSeriesHasSum (fun m : ℕ ↦ heckeNormCoefficient (ideleClassNormTwist χ 0) (m : ℝ))
       (s : ℂ) (finiteHeckeL χ s) := by
-  sorry
+  let normIndex (I : {I : Ideal (𝓞 F) // I ≠ ⊥}) : ℕ := I.val.absNorm
+  let value := heckeIdealValue (ideleClassNormTwist χ 0)
+  have hs : (s : ℂ) ≠ 0 := by
+    intro h
+    have hr : 1 < (s : ℂ).re := s.property
+    norm_num [h] at hr
+  refine ((finiteHeckeL_hasSum_ideals χ s).tsum_fiberwise normIndex).congr_fun ?_
+  intro n
+  symm
+  rw [LSeries.term_of_ne_zero' hs]
+  let normFiber : Set (Ideal (𝓞 F)) := {I | I ≠ ⊥ ∧ (I.absNorm : ℝ) = (n : ℝ)}
+  let e : (normIndex ⁻¹' ({n} : Set ℕ) : Set {I : Ideal (𝓞 F) // I ≠ ⊥}) ≃ normFiber :=
+    { toFun := fun I ↦ ⟨I.val.val, I.val.property,
+        by exact_mod_cast (show I.val.val.absNorm = n from I.property)⟩
+      invFun := fun I ↦ ⟨⟨I.val, I.property.1⟩, by
+        change I.val.absNorm = n
+        exact_mod_cast I.property.2⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  have hnorm (I : normFiber) : I.val.absNorm = n := by exact_mod_cast I.property.2
+  rw [← e.symm.tsum_eq]
+  change (∑' I : normFiber, value I.val / (I.val.absNorm : ℂ) ^ (s : ℂ)) =
+    heckeNormCoefficient (ideleClassNormTwist χ 0) (n : ℝ) / (n : ℂ) ^ (s : ℂ)
+  let : Finite normFiber :=
+    ((Ring.HasFiniteQuotients.finite_absNorm_eq n).subset
+      (show normFiber ⊆ {I | I.absNorm = n} from fun I hI ↦ hnorm ⟨I, hI⟩)).to_subtype
+  simp_rw [hnorm, tsum_div_const, tsum_eq_finsum (Set.toFinite _)]
+  rfl
 
 /-- Paper: Equation (B.6.1.6), p. 637. For each positive `ε`, the summatory
 function is bounded by a constant times `x^(1 + ε)`, uniformly in unitary characters. -/

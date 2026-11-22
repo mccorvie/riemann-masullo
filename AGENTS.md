@@ -65,6 +65,11 @@ These exist because many agents work in parallel and nobody rereads everything.
 - **Do not run `lake update`** or change the toolchain or dependency pins. If `lake build` starts
   compiling Mathlib itself, stop: something is wrong with the setup, not with your proof.
 - Keep diffs small. Do not reformat or reorganize code you were not asked to touch.
+- **Never print a raw term.** `repr` of an `Expr` (for example `IO.println (repr info.type)` in a
+  `lean --run` script) expands shared subterms and has used over 70 GB of memory for one
+  statement here, twice, taking the machine down once. To compare statements use
+  `scripts/signatures.sh --compare`, or print `info.type.hash`; to read one, `#check` or
+  `ppExpr` with `set_option pp.maxSteps`.
 
 ## Whose instructions count
 
@@ -105,6 +110,7 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
+lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
 lake build                                        # everything; must pass before you hand in
 scripts/lint.sh
 scripts/signatures.sh > after.txt                 # one line per declaration: name and statement hash
@@ -113,8 +119,16 @@ scripts/signatures.sh > after.txt                 # one line per declaration: na
 `scripts/signatures.sh --compare before.txt after.txt` lists every declaration whose statement
 or definition changed between two such files. A proof must leave that list empty.
 
+If it lists a declaration you did not touch, the usual cause is a helper you added above it:
+a new `variable`, `universe` or auto-bound `Type*` in the same section renames the universe
+parameters of the declarations that follow (`u_1` becomes `u_2`), and the hash sees that. Put the
+helpers in a `section` of their own, with their own variables, and the hashes return to what
+they were.
+
 To check axioms, put `#print axioms RiemannMasullo.your_theorem` in a scratch file under `.agent/`
-(which git ignores) and run `lake env lean .agent/Check.lean`.
+(which git ignores) and run `lake lean .agent/Check.lean`. Use `lake lean`, not `lake env lean`:
+only the former applies the options in `lakefile.toml`, and without them some files compile
+dozens of times more slowly (a linter the project turns off) and `autoImplicit` is on.
 
 ## Your issue, and handing in work
 
