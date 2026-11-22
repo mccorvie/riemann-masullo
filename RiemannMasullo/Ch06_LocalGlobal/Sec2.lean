@@ -93,7 +93,26 @@ maps over the compact norm-one quotient. -/
 theorem sLocalThetaAction_tendstoUniformly {ι : Type*} (l : Filter ι)
     (f : ι → Θₛ(S)) (x : Θₛ(S)) (hf : Tendsto f l (𝓝 x)) :
     ∀ U ∈ 𝓝 (0 : Θₛ(S)), ∀ᶠ i in l, ∀ g : J₁(S),
-      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by sorry
+      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by
+  have uniform {G X : Type _} [TopologicalSpace G] [AddCommGroup X] [TopologicalSpace X]
+      [IsTopologicalAddGroup X] {K : Set G} (hK : IsCompact K)
+      (A : G → X → X) (hA : Continuous (fun p : G × X ↦ A p.1 p.2))
+      (u : ι → X) (v : X) (hu : Tendsto u l (𝓝 v)) (U : Set X) (hU : U ∈ 𝓝 0) :
+      ∀ᶠ i in l, ∀ g ∈ K, A g (u i) - A g v ∈ U := by
+    have hd : Continuous (fun p : X × G ↦ A p.2 p.1 - A p.2 v) :=
+      (hA.comp (continuous_snd.prodMk continuous_fst)).sub
+        (hA.comp (continuous_snd.prodMk continuous_const))
+    exact hu.eventually (hK.eventually_forall_of_forall_eventually (P := fun y g ↦ A g y - A g v ∈ U)
+      fun g _ ↦
+        hd.continuousAt (x := (v, g)) (by simpa only [sub_self] using hU))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have hc := (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage
+    (isCompact_singleton (x := (1 : ℝ≥0ˣ)))
+  have hA := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1
+  intro U hU
+  have h := uniform (G := Jₛ(S)) (X := Θₛ(S)) hc (fun g y ↦ ρₛ(S) g y) hA f x hf U hU
+  exact h.mono fun i hi g ↦ hi g.val g.property
 
 /-- Paper: Lemma 6.2.1.3(2), p. 296.
 Uniform convergence over the norm-one quotient also holds after twisting the action
