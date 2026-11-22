@@ -3,6 +3,12 @@ module
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
+import all RiemannMasullo.Ch02_AdelicTheta.Sec1
+
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Topology.Algebra.IsOpenUnits
+
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-! # Structure Theorem V: isotypic exhaustiveness
 
@@ -93,7 +99,38 @@ maps over the compact norm-one quotient. -/
 theorem sLocalThetaAction_tendstoUniformly {ι : Type*} (l : Filter ι)
     (f : ι → Θₛ(S)) (x : Θₛ(S)) (hf : Tendsto f l (𝓝 x)) :
     ∀ U ∈ 𝓝 (0 : Θₛ(S)), ∀ᶠ i in l, ∀ g : J₁(S),
-      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by sorry
+      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by
+  have uniform {G X : Type _} [TopologicalSpace G] [AddCommGroup X] [TopologicalSpace X]
+      [IsTopologicalAddGroup X] {K : Set G} (hK : IsCompact K)
+      (A : G → X → X) (hA : Continuous (fun p : G × X ↦ A p.1 p.2))
+      (u : ι → X) (v : X) (hu : Tendsto u l (𝓝 v)) (U : Set X) (hU : U ∈ 𝓝 0) :
+      ∀ᶠ i in l, ∀ g ∈ K, A g (u i) - A g v ∈ U := by
+    have hd : Continuous (fun p : X × G ↦ A p.2 p.1 - A p.2 v) :=
+      (hA.comp (continuous_snd.prodMk continuous_fst)).sub
+        (hA.comp (continuous_snd.prodMk continuous_const))
+    exact hu.eventually (hK.eventually_forall_of_forall_eventually (P := fun y g ↦ A g y - A g v ∈ U)
+      fun g _ ↦
+        hd.continuousAt (x := (v, g)) (by simpa only [sub_self] using hU))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have hc := (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage
+    (isCompact_singleton (x := (1 : ℝ≥0ˣ)))
+  have hA := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1
+  intro U hU
+  have h := uniform (G := Jₛ(S)) (X := Θₛ(S)) hc (fun g y ↦ ρₛ(S) g y) hA f x hf U hU
+  exact h.mono fun i hi g ↦ hi g.val g.property
+
+/-- Multiplication by scalars of norm at most one keeps uniform convergence of differences. -/
+private theorem smul_sub_eventually_mem_of_norm_le_one {E ι κ : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [ContinuousSMul ℂ E] (l : Filter ι) (u : ι → κ → E)
+    (w : κ → E) (c : κ → ℂ) (hc : ∀ k, ‖c k‖ ≤ 1)
+    (h : ∀ U ∈ 𝓝 (0 : E), ∀ᶠ i in l, ∀ k, u i k - w k ∈ U) :
+    ∀ U ∈ 𝓝 (0 : E), ∀ᶠ i in l, ∀ k, c k • u i k - c k • w k ∈ U := by
+  intro U hU
+  obtain ⟨W, ⟨hW, hWb⟩, hWU⟩ := (nhds_basis_balanced ℂ E).mem_iff.mp hU
+  filter_upwards [h W hW] with i hi k
+  rw [← smul_sub]
+  exact hWU (hWb.smul_mem (hc k) (hi k))
 
 /-- Paper: Lemma 6.2.1.3(2), p. 296.
 Uniform convergence over the norm-one quotient also holds after twisting the action
@@ -101,7 +138,9 @@ by a unitary character. -/
 theorem sLocalThetaAction_twist_tendstoUniformly {ι : Type*} (l : Filter ι)
     (f : ι → Θₛ(S)) (x : Θₛ(S)) (hf : Tendsto f l (𝓝 x)) (χ : PontryaginDual J₁(S)) :
     ∀ U ∈ 𝓝 (0 : Θₛ(S)), ∀ᶠ i in l, ∀ g : J₁(S),
-      (χ g : ℂ) • ρₛ(S) g.val (f i) - (χ g : ℂ) • ρₛ(S) g.val x ∈ U := by sorry
+      (χ g : ℂ) • ρₛ(S) g.val (f i) - (χ g : ℂ) • ρₛ(S) g.val x ∈ U :=
+  smul_sub_eventually_mem_of_norm_le_one l _ _ (fun g ↦ (χ g : ℂ))
+    (fun g ↦ (Circle.norm_coe (χ g)).le) (sLocalThetaAction_tendstoUniformly l f x hf)
 
 end Exhaustiveness
 
@@ -233,7 +272,54 @@ theorem finiteStandardGaussian_zeta_of_ramified (v : V) (c d : QuasiCharacter (L
       (Multiplicative.ofAdd g.val) * d g) (μ(v)) ∧
     (localIdelicZetaIntegral (μ(v)) (fun x ↦ finiteStandardGaussian v c
       (Multiplicative.ofAdd x)) d =
-      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by sorry
+      if (∀ u ∈ U(v), d u = c u) then ((μ(v)) (U(v))).toReal else 0) := by
+  classical
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let q (g : (L(v))ˣ) := d g / c g
+  have hc (g : (L(v))ˣ) : c g ≠ 0 := ((Group.isUnit g).map c).ne_zero
+  have hram : ¬ ∀ u ∈ U(v), c u = 1 := fun h ↦
+    _hc.elim fun u hu ↦ hu.2 (h u hu.1)
+  have hfun : (fun g : (L(v))ˣ ↦ finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g) =
+      (U(v)).indicator q := by
+    funext g
+    by_cases hg : g ∈ U(v)
+    · rw [Set.indicator_of_mem hg, finiteStandardGaussian_integerUnit v c g hg]
+      exact (mul_comm _ _).trans (div_eq_mul_inv _ _).symm
+    · rw [Set.indicator_of_notMem hg]
+      have hv : g.val ∉ Units.val '' U(v) := fun ⟨u, hu, h⟩ ↦ hg ((Units.ext h) ▸ hu)
+      have hz : finiteStandardGaussian v c (Multiplicative.ofAdd g.val) = 0 :=
+        (ite_eq_right hram).trans (Set.indicator_of_notMem hv _)
+      rw [hz, zero_mul]
+  have hopen : IsOpen (U(v)) := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hcompact : IsCompact (U(v)) := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hq : Continuous q := d.continuous.div c.continuous hc
+  constructor
+  · rw [hfun, integrable_indicator_iff hopen.measurableSet]
+    exact hq.continuousOn.integrableOn_compact hcompact
+  · change (∫ g : (L(v))ˣ, finiteStandardGaussian v c (Multiplicative.ofAdd g.val) * d g ∂μ(v)) = _
+    rw [hfun, integral_indicator hopen.measurableSet]
+    split_ifs with hmatch
+    · have eqOne : Set.EqOn q (fun _ ↦ (1 : ℂ)) (U(v)) := fun u hu ↦
+        (div_eq_one_iff_eq (hc u)).mpr (hmatch u hu)
+      rw [setIntegral_congr_fun hopen.measurableSet eqOne, setIntegral_const]
+      simp [measureReal_def]
+    · push Not at hmatch
+      obtain ⟨a, ha, hne⟩ := hmatch
+      have hpre : (fun y : (L(v))ˣ ↦ a * y) ⁻¹' U(v) = U(v) := by
+        ext y
+        exact (O(v)).units.mul_mem_cancel_left ha
+      have hI := (measurePreserving_mul_left (μ(v)) a).setIntegral_preimage_emb
+        (Homeomorph.mulLeft a).toMeasurableEquiv.measurableEmbedding q (U(v))
+      rw [hpre] at hI
+      change (∫ y in U(v), q (a * y) ∂μ(v)) = ∫ y in U(v), q y ∂μ(v) at hI
+      have hmul (y : (L(v))ˣ) : q (a * y) = q a * q y := by
+        simp only [q, map_mul, mul_div_mul_comm]
+      simp_rw [hmul] at hI
+      rw [integral_const_mul, ← sub_eq_zero, ← sub_one_mul] at hI
+      exact (mul_eq_zero.mp hI).resolve_left
+        (sub_ne_zero.mpr (fun h ↦ hne ((div_eq_one_iff_eq (hc a)).mp h)))
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 Tensoring an archimedean test with the fixed standard tests at the finite places
@@ -252,7 +338,23 @@ theorem sLocalStandardThetaTensor_apply (c : QuasiCharacter Jₛ(S)) (f : ℬ∞
     (x : SAdeleRing F S) :
     sLocalStandardThetaTensor c f (Multiplicative.ofAdd x) =
       f (Multiplicative.ofAdd x.1) * ∏ v : S, finiteStandardGaussian v.val
-        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by sorry
+        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by
+  let factors (v : S) : ℬ(L(v.val)) :=
+    finiteStandardGaussian (F := F) v.val (sLocalFiniteRestriction (F := F) v c)
+  let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(L(v.val)))
+  let b : W := ⨂ₜ[ℂ] v : S, factors v
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have slice {X Y Z : Type _} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+      [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+      (E : InductiveTensor X Y ≃L[ℂ] Z) (a : X) (b : Y) (p : Z → ℂ) (r : ℂ)
+      (h : p (E (a ⊗ₜ[ℂ] b)) = r) :
+      p (E.toLinearMap.comp ((TensorProduct.mk ℂ X Y).flip b) a) = r := h
+  have hx := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec f factors x
+  unfold sLocalStandardThetaTensor
+  with_reducible_and_instances
+    exact slice (X := ℬ∞) (Y := W) (Z := ℬₛ(S)) e f b
+      (fun φ : ℬₛ(S) ↦ φ (Multiplicative.ofAdd x)) _ hx
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 For trivial S-integer Picard group, the archimedean test space maps continuously,
@@ -330,12 +432,53 @@ theorem mem_finitePuncturedThetaTestSpace (v : V) (f : ℬ(L(v))) :
 
 local notation "ℬ₀(" v ")" => ↥(finitePuncturedThetaTestSpace v)
 
+/-- A locally constant compactly supported field test vanishing at zero is integrable
+after inverse translation on the unit group and multiplication by a continuous factor. -/
+private theorem finiteStandardThetaAverage_integrable_of_locallyConstant
+    {K : Type*} [NormedField K] [MeasurableSpace Kˣ] [BorelSpace Kˣ]
+    (μ : Measure Kˣ) [IsFiniteMeasureOnCompacts μ] (test : K → ℂ)
+    (hloc : IsLocallyConstant test) (hcompact : HasCompactSupport test) (hzero : test 0 = 0)
+    (c : Kˣ → ℂ) (hc : Continuous c) (x : Kˣ) :
+    Integrable (fun g : Kˣ ↦ test (g⁻¹ * x).val * c g) μ := by
+  have hclosed : IsClosed (Function.support test) := (hloc.isClopen_fiber 0).2.isClosed_compl
+  have hrange : tsupport test ⊆ Set.range (Units.val : Kˣ → K) := by
+    intro y hy
+    have hmem : y ∈ Function.support test := by
+      rwa [tsupport, hclosed.closure_eq] at hy
+    have hy0 : y ≠ 0 := by
+      rintro rfl
+      exact hmem hzero
+    exact ⟨Units.mk0 y hy0, rfl⟩
+  have hpre : IsCompact (Units.val ⁻¹' tsupport test : Set Kˣ) := by
+    rw [(Units.isEmbedding_val₀ (G₀ := K)).isCompact_iff,
+      Set.image_preimage_eq_of_subset hrange]
+    exact hcompact
+  let unitTest : Kˣ → ℂ := test ∘ Units.val
+  have hsupport : HasCompactSupport unitTest :=
+    hpre.of_isClosed_subset (isClosed_tsupport _)
+      (tsupport_comp_subset_preimage test Units.continuous_val)
+  let shift : Kˣ ≃ₜ Kˣ := (Homeomorph.inv Kˣ).trans (Homeomorph.mulRight x)
+  have hcont : Continuous (unitTest ∘ shift) :=
+    (hloc.continuous.comp Units.continuous_val).comp shift.continuous
+  change Integrable (fun g : Kˣ ↦ (unitTest ∘ shift) g * c g) μ
+  exact (hcont.mul hc).integrable_of_hasCompactSupport (hsupport.comp_homeomorph shift).mul_right
+
 /-- Paper: (6.2.2.4), p. 299.
 The finite-place integral of a compactly supported test on the punctured field is absolutely
 integrable for every translation and unitary character. -/
 theorem finiteStandardThetaAverage_integrable (v : V) (χ : PontryaginDual (L(v))ˣ)
     (f : ℬ₀(v)) (x : (L(v))ˣ) :
-    Integrable (fun g : (L(v))ˣ ↦ f.val (Multiplicative.ofAdd (g⁻¹ * x).val) * (χ g : ℂ)) (μ(v)) := by sorry
+    Integrable (fun g : (L(v))ˣ ↦ f.val (Multiplicative.ofAdd (g⁻¹ * x).val) * (χ g : ℂ)) (μ(v)) := by
+  let test (y : L(v)) : ℂ := f.val (Multiplicative.ofAdd y)
+  have htest : IsLocallyConstant test ∧ HasCompactSupport test :=
+    (mem_finitePlaceSchwartz_iff F v test).mp ⟨f.val, fun _ ↦ rfl⟩
+  have hzero : test 0 = 0 := (mem_finitePuncturedThetaTestSpace v f.val).mp f.property
+  have hχ : Continuous (fun g : (L(v))ˣ ↦ (χ g : ℂ)) :=
+    continuous_subtype_val.comp χ.continuous
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  exact finiteStandardThetaAverage_integrable_of_locallyConstant (μ(v)) test htest.1 htest.2 hzero
+    (fun g : (L(v))ˣ ↦ (χ g : ℂ)) hχ x
 
 /-- Paper: (6.2.2.4), p. 299.
 The finite-place convolution formula specifies a continuous linear map on
@@ -368,18 +511,44 @@ Deviation: On the test χ times the unit indicator, the coefficient is the integ
 theorem finiteStandardThetaAverage_eq_character_mul_integral (v : V)
     (χ : PontryaginDual (L(v))ˣ) (f : ℬ₀(v)) (x : (L(v))ˣ) :
     finiteStandardThetaAverage v χ f x = (χ x : ℂ) *
-      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by sorry
+      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let : ProperSpace (L(v)) := properSpace_adicCompletion v
+  let : LocallyCompactSpace (L(v))ˣ :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := L(v))).locallyCompactSpace
+  have : (μ(v)).IsInvInvariant := by
+    constructor
+    unfold finiteLocalMultiplicativeTamagawaMeasure
+    rw [Measure.inv_def, Measure.map_smul, Measure.map_inv_eq_self]
+    exact measurable_inv.aemeasurable
+  have factor {G : Type _} [CommGroup G] [MeasurableSpace G] [MeasurableMul G] [MeasurableInv G]
+      (ν : Measure G) [ν.IsInvInvariant] [ν.IsMulLeftInvariant]
+      (φ : G → ℂ) (c : G →* Circle) (x : G) :
+      (∫ g, φ (g⁻¹ * x) * (c g : ℂ) ∂ν) = (c x : ℂ) * ∫ y, φ y * (c y : ℂ)⁻¹ ∂ν := by
+    let k (g : G) := φ (g⁻¹ * x) * (c g : ℂ)
+    refine (integral_div_left_eq_self k ν x).symm.trans ?_
+    rw [← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards with y
+    change φ ((x / y)⁻¹ * x) * (c (x / y) : ℂ) = _
+    rw [inv_div, div_mul_cancel, map_div, Circle.coe_div, div_eq_mul_inv]
+    ring
+  exact ((exists_finiteStandardThetaAverage v χ).choose_spec f x).trans
+    (factor (μ(v)) (fun y ↦ f.val (Multiplicative.ofAdd y.val)) χ.toMonoidHom x)
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 The kernel of the archimedean operator is closed in the archimedean test space. -/
 theorem infiniteStandardThetaAverage_isClosed_ker (χ : PontryaginDual Iₛ(S))
     (r : Fin (classNumber F) → Nₛ(S)) :
-    IsClosed ((infiniteStandardThetaAverage χ r).ker : Set ℬ∞) := by sorry
+    IsClosed ((infiniteStandardThetaAverage χ r).ker : Set ℬ∞) :=
+  ContinuousLinearMap.isClosed_ker _
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 The kernel of the finite convolution is closed in the multiplicative test space. -/
 theorem finiteStandardThetaAverage_isClosed_ker (v : V) (χ : PontryaginDual (L(v))ˣ) :
-    IsClosed ((finiteStandardThetaAverage v χ).ker : Set (ℬ₀(v))) := by sorry
+    IsClosed ((finiteStandardThetaAverage v χ).ker : Set (ℬ₀(v))) :=
+  ContinuousLinearMap.isClosed_ker _
 
 -- TODO(paper-gap): The tensor agreement in Theorem 6.2.2.1(1), p. 299, fails.
 -- For ℚ at S = {∞, p} with trivial character, take a finite test 1_{pℤₚˣ}
@@ -464,6 +633,28 @@ theorem infiniteStandardThetaAverage_logBound (χ : PontryaginDual Iₛ(S))
 
 end StandardFunctions
 
+/-- Pullback along the unique real coordinate identifies real Schwartz functions with
+the rational adelic test functions at the stage with no finite places. -/
+private theorem ratTrivialHomogeneousTheta_quotient_realEquiv :
+    ∃ E : SchwartzMap ℝ ℂ ≃L[ℂ] ℬ(SAdeleRing ℚ ∅),
+      ∀ (f : SchwartzMap ℝ ℂ) (x : SAdeleRing ℚ ∅),
+        E f (Multiplicative.ofAdd x) = f (InfinitePlace.Completion.ringEquivRealOfIsReal
+          Rat.isReal_infinitePlace (x.1 Rat.infinitePlace)) := by
+  let D : Type := (v : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))) → v.val.adicCompletion ℚ
+  let _ : Unique D := uniqueOfSubsingleton 0
+  let real : Rat.infinitePlace.Completion ≃ᵢ ℝ :=
+    InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  let coord : SAdeleRing ℚ ∅ ≃ₜ ℝ := (Homeomorph.prodUnique (InfiniteAdeleRing ℚ) D).trans
+    ((Homeomorph.piUnique (fun v : InfinitePlace ℚ ↦ v.Completion)).trans real.toHomeomorph)
+  let e : Multiplicative (SAdeleRing ℚ ∅) ≃ₜ* Multiplicative ℝ :=
+    ContinuousMulEquiv.mk' coord fun x y ↦
+      (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).map_add
+        (x.toAdd.1 Rat.infinitePlace) (y.toAdd.1 Rat.infinitePlace)
+  with_reducible refine realSchwartzBruhat_equiv.elim fun R hR ↦ ?_
+  refine ⟨R.trans (schwartzBruhatPullbackEquiv e), ?_⟩
+  intro f x
+  exact hR f (coord x)
+
 /-- Paper: Example 6.2.2.2, p. 299.
 The trivial homogeneous theta space over the rationals is a topological linear
 quotient of real Schwartz functions, inserted with the integer indicator at every finite place. -/
@@ -475,6 +666,37 @@ theorem ratTrivialHomogeneousTheta_quotient :
           f (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
             (x Rat.infinitePlace))) →
         q f = (LinearMap.ker (homogeneousAdelicThetaLinearMap ℚ 1)).mkQ
-          (sAdeleSchwartzToGlobal ℚ ∅ (sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g)) := by sorry
+          (sAdeleSchwartzToGlobal ℚ ∅ (sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g)) := by
+  have hω : NormOneCharacterUnramifiedOutside (F := ℚ) 1 ∅ := by
+    refine ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ ?_⟩
+    rfl
+  with_reducible refine ratTrivialHomogeneousTheta_quotient_realEquiv.elim fun E hE ↦ ?_
+  with_reducible refine (sLocalHomogeneousThetaToGlobal_equiv_of_unramified
+    (F := ℚ) (S := ∅) (ω := 1) ?_ hω).elim fun T hT ↦ ?_
+  · rw [Finset.coe_empty, integer_empty]
+    let e := (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)).toRingEquiv
+    let i := Rat.ringOfIntegersEquiv.symm.trans e.symm
+    let := IsPrincipalIdealRing.of_surjective i i.surjective
+    infer_instance
+  let K := (sLocalHomogeneousAdelicThetaLinearMap ℚ ∅
+    (sLocalNormOneCharacter (F := ℚ) ∅ 1 hω)).ker
+  refine ⟨T.toContinuousLinearMap.comp (K.mkQL.comp E.toContinuousLinearMap), ?_, ?_⟩
+  · change IsOpenQuotientMap (T.toHomeomorph ∘ (K.mkQL ∘ E.toHomeomorph))
+    exact T.toHomeomorph.isOpenQuotientMap.comp
+      (K.isOpenQuotientMap_mkQL.comp E.toHomeomorph.isOpenQuotientMap)
+  intro f g hg
+  have hfg : E f = sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g := by
+    refine Subtype.ext (funext fun (x : Multiplicative (SAdeleRing ℚ ∅)) ↦ ?_)
+    have h := sLocalStandardThetaTensor_apply (F := ℚ) (S := ∅) 1 g x.toAdd
+    have ht : sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g x =
+        g (Multiplicative.ofAdd x.toAdd.1) :=
+      h.trans ((congrArg (g (Multiplicative.ofAdd x.toAdd.1) * ·)
+        (Fintype.prod_empty _)).trans (mul_one _))
+    exact ((hE f x.toAdd).trans (hg x.toAdd.1).symm).trans ht.symm
+  let t := sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g
+  change T.toLinearMap (K.mkQ (E f)) = _
+  have hrep := sLocalHomogeneousThetaToGlobal_mk (F := ℚ) (S := ∅) (ω := 1) hω t
+  have hglobal := LinearMap.congr_fun hT (K.mkQ t)
+  with_reducible exact (congrArg (fun b ↦ T.toLinearMap (K.mkQ b)) hfg).trans (hglobal.trans hrep)
 
 end RiemannMasullo

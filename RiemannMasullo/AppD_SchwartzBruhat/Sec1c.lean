@@ -2,11 +2,17 @@ module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import Mathlib.Analysis.Calculus.Deriv.Basic
+import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
+import RiemannMasullo.AppC_LCTVS.Sec3a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import Mathlib.Topology.Algebra.MvPolynomial
+import Mathlib.Algebra.Category.Grp.Injective
 import Mathlib.Analysis.PSeries
 import Mathlib.Analysis.SpecialFunctions.JapaneseBracket
+import Mathlib.Analysis.Calculus.ContDiff.FiniteDimension
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
+import Mathlib.MeasureTheory.Function.Floor
 import Mathlib.MeasureTheory.Integral.Pi
 import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
@@ -1508,7 +1514,9 @@ theorem bruhatDiffWord_character (w : List (LCATopologicalLie G))
 of its first-order symbols. -/
 theorem bruhatDiffSymbol_word (w : List (LCATopologicalLie G)) (χ : PontryaginDual G) :
     bruhatDiffSymbol (bruhatDiffWord w) χ =
-      (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod := by sorry
+      (w.map (fun a ↦ bruhatDiffSymbol (bruhatDiffGenerator a) χ)).prod := by
+  simpa only [bruhatDiffSymbol, map_one, Circle.coe_one, mul_one] using
+    bruhatDiffWord_character w χ 1
 
 /-- Paper: Lemma D.1.6.13, p. 769. The symbol is invariant under every
 compact subgroup of the dual. -/
@@ -3384,6 +3392,347 @@ theorem BruhatStructuralPair.exists_quotient_hom (a : BruhatStructuralPair G)
     rw [hpmk]
     rfl
 
+section
+
+omit hTop hT2 hLC
+open Function
+open scoped Pointwise
+
+/-- Translating a compact set gives a uniform bound on the Haar mass of its intersection
+with a closed subgroup. Translate a point in the intersection to the identity. -/
+private theorem fiberIntegral_measure_translate {A : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [MeasurableSpace A] [BorelSpace A]
+    (K : Subgroup A) (hK : IsClosed (K : Set A)) (ν : Measure K) [ν.IsHaarMeasure]
+    (C : Set A) (hC : IsCompact C) :
+    ∃ M : ℝ≥0∞, M < ⊤ ∧ ∀ x : A, ν {k : K | x * k.val ∈ C} ≤ M := by
+  let D := (Subtype.val : K → A) ⁻¹' (C⁻¹ * C)
+  have hD : IsCompact D := hK.isClosedEmbedding_subtypeVal.isCompact_preimage (hC.inv.mul hC)
+  refine ⟨ν D, hD.measure_lt_top, fun x ↦ ?_⟩
+  by_cases h : ∃ k : K, x * k.val ∈ C
+  · obtain ⟨k₀, hk₀⟩ := h
+    calc ν {k : K | x * k.val ∈ C} ≤ ν ((k₀⁻¹ * ·) ⁻¹' D) := by
+          apply measure_mono
+          intro k hk
+          exact ⟨(x * k₀.val)⁻¹, Set.inv_mem_inv.mpr hk₀, x*k.val, hk, by
+            change (x * k₀.val)⁻¹ * (x * k.val) = k₀.val⁻¹ * k.val
+            group⟩
+      _ = _ := measure_preimage_mul _ _ _
+  · rw [show {k : K | x * k.val ∈ C} = ∅ from Set.eq_empty_iff_forall_notMem.mpr
+      (fun k hk ↦ h ⟨k,hk⟩), measure_empty]
+    exact bot_le
+
+private def fiberCoord {m n r : ℕ} {F : Type*} (g : ElementaryLieGroup m n r F) :
+    Fin m ⊕ Fin r → ℝ := Sum.elim (fun i ↦ g.1 i) (fun j ↦ (g.2.2.1 j : ℝ))
+
+private def fiberWeight {J : Type*} [Fintype J] (x : J → ℝ) : ℝ := ∏ j, (1 + (x j)^2)⁻¹
+
+/-- The reciprocal quadratic product weight has uniformly bounded integrals on all cosets.
+Partition the real and lattice coordinates into unit boxes indexed by an integer lattice. -/
+private theorem fiberIntegral_weight {A : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [MeasurableSpace A] [BorelSpace A]
+    (e : ElementaryLCAPresentation A) (K : Subgroup A) (hK : IsClosed (K : Set A))
+    (ν : Measure K) [ν.IsHaarMeasure] :
+    ∃ C : ℝ, ∀ y : A,
+      let w := fun k : K ↦ fiberWeight (fiberCoord (e.equiv (y * k.val)).toAdd)
+      Integrable w ν ∧ (∫ k, w k ∂ν) ≤ C := by
+  classical
+  let J := Fin e.realDim ⊕ Fin e.latticeRank
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let coord (x : A) := fiberCoord (e.equiv x).toAdd
+  have hc : Continuous coord := by
+    apply continuous_pi
+    intro j
+    cases j with
+    | inl i => exact (PiLp.continuous_apply 2 _ i).comp e.equiv.continuous.fst
+    | inr i =>
+      exact (continuous_of_discreteTopology (f := fun z : ℤ ↦ (z : ℝ))).comp
+        ((continuous_apply i).comp e.equiv.continuous.snd.snd.fst)
+  let box : Set E := ((EuclideanSpace.equiv (Fin e.realDim) ℝ) ⁻¹'
+      (Set.pi univ fun _ : Fin e.realDim ↦ Icc (0:ℝ) 1)) ×ˢ (univ ×ˢ ({0} ×ˢ univ))
+  have hbox : IsCompact box := (((EuclideanSpace.equiv (Fin e.realDim) ℝ).toHomeomorph.isProperMap.isCompact_preimage
+      (isCompact_univ_pi fun _ ↦ isCompact_Icc)).prod
+      (isCompact_univ.prod (isCompact_singleton.prod isCompact_univ)))
+  obtain ⟨M,hM,hm⟩ := fiberIntegral_measure_translate K hK ν _ (e.equiv.toHomeomorph.isProperMap.isCompact_preimage hbox)
+  let label (x : A) (j : J) := ⌊coord x j⌋
+  have hlabel : Measurable label := Measurable.of_eval fun j ↦
+    ((continuous_apply j).comp hc).measurable.floor
+  have hcell (y : A) (i : J → ℤ) : ν {k : K | label (y*k.val) = i} ≤ M := by
+    let c : A := e.equiv.symm (.ofAdd ((WithLp.toLp 2 (fun j ↦ (i (.inl j) : ℝ))), 0,
+      (fun j ↦ i (.inr j)), 0))
+    apply le_trans (measure_mono ?_) (hm (c⁻¹*y))
+    intro k hk
+    have he : label (y*k.val) = i := hk
+    have htrans : e.equiv (c⁻¹ * y * k.val) = (e.equiv c)⁻¹ * e.equiv (y*k.val) := by simp [mul_assoc]
+    change (e.equiv (c⁻¹*y*k.val)).toAdd ∈ box
+    rw [htrans,show e.equiv c = _ from e.equiv.apply_symm_apply _]
+    refine ⟨fun j _ ↦ ⟨?_,?_⟩, trivial, ?_, trivial⟩
+    · change 0 ≤ -(i (.inl j) : ℝ) + coord (y*k.val) (.inl j)
+      rw [← he]
+      dsimp [label]
+      linarith [Int.floor_le (coord (y*k.val) (.inl j))]
+    · change -(i (.inl j) : ℝ) + coord (y*k.val) (.inl j) ≤ 1
+      rw [← he]
+      have := Int.lt_floor_add_one (coord (y*k.val) (.inl j))
+      dsimp [label]
+      linarith
+    · change -(fun j ↦ i (Sum.inr j)) + (e.equiv (y*k.val)).toAdd.2.2.1 = 0
+      ext j
+      have h := congrFun he (Sum.inr j)
+      change ⌊((e.equiv (y*k.val)).toAdd.2.2.1 j : ℝ)⌋ = i (.inr j) at h
+      simp [Pi.add_apply, Pi.neg_apply, ← h]
+  let d (i : J → ℤ) := fiberWeight fun j ↦ (i j : ℝ)
+  have hd : Summable d := summable_lattice_product
+  have hd0 i : 0 ≤ d i := Finset.prod_nonneg fun _ _ ↦ by positivity
+  let B : ℝ := 8 ^ Fintype.card J
+  have hB : 0 ≤ B := by positivity
+  refine ⟨(B * M.toReal) * ∑' i, d i, fun y ↦ ?_⟩
+  let w (k : K) := fiberWeight (coord (y * k.val))
+  let S (i : J → ℤ) := {k : K | label (y*k.val) = i}
+  have hS (i) : MeasurableSet (S i) := measurableSet_singleton i |>.preimage
+    (hlabel.comp (continuous_const.mul continuous_subtype_val).measurable)
+  have hcov : ⋃ i, S i = univ := iUnion_eq_univ_iff.mpr fun k ↦ ⟨_,rfl⟩
+  have hw (k : K) : 0 ≤ w k := Finset.prod_nonneg fun _ _ ↦ by positivity
+  have hwc : Continuous w := continuous_finsetProd _ fun j _ ↦
+    (continuous_const.add ((((continuous_apply j).comp hc).comp
+      (continuous_const.mul continuous_subtype_val)).pow 2)).inv₀ (fun k ↦ by change 1 + coord (y*k.val) j ^ 2 ≠ 0; positivity)
+  have hbound (i) (k : K) (hk : k ∈ S i) : w k ≤ B * d i := by
+    change label (y*k.val) = i at hk
+    subst i
+    dsimp [w,d,B,fiberWeight]
+    rw [show (8:ℝ) ^ Fintype.card J = ∏ _ : J, (8:ℝ) from by simp, ← Finset.prod_mul_distrib]
+    apply Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) (fun j _ ↦ ?_)
+    let t := coord (y*k.val) j
+    change (1+t^2)⁻¹ ≤ 8 * (1+(⌊t⌋:ℝ)^2)⁻¹
+    rw [← div_eq_mul_inv, le_div_iff₀ (by positivity), inv_mul_eq_div, div_le_iff₀ (by positivity)]
+    have h1 := Int.floor_le t
+    have h2 := Int.lt_floor_add_one t
+    nlinarith [sq_nonneg (t - 2*(⌊t⌋:ℝ)), mul_nonneg (sub_nonneg.mpr h1) (sub_nonneg.mpr h2.le),
+      sq_nonneg t]
+  have hm' (i) : ν (S i) < ⊤ := (hcell y i).trans_lt hM
+  have hi (i) : IntegrableOn w (S i) ν :=
+    (integrableOn_const (C := B * d i) (hs := (hm' i).ne)).mono' hwc.aestronglyMeasurable
+      (ae_restrict_mem (hS i) |>.mono fun k hk ↦ by
+        simpa [Real.norm_of_nonneg (hw k)] using hbound i k hk)
+  have hI (i) : ∫ k in S i, ‖w k‖ ∂ν ≤ (B*M.toReal)*d i := by
+    calc _ ≤ ∫ _ in S i, B * d i ∂ν := integral_mono_ae (hi i).norm
+          (integrableOn_const (C := B * d i) (hs := (hm' i).ne))
+          ((ae_restrict_mem (hS i)).mono fun k hk ↦ by simpa [Real.norm_of_nonneg (hw k)] using hbound i k hk)
+      _ = (ν (S i)).toReal * (B*d i) := by rw [setIntegral_const, smul_eq_mul]; rfl
+      _ ≤ _ := by
+        calc _ ≤ M.toReal * (B*d i) := mul_le_mul_of_nonneg_right (ENNReal.toReal_mono hM.ne (hcell y i)) (mul_nonneg hB (hd0 _))
+          _ = _ := by ring
+  have hsum := hd.mul_left (B*M.toReal)
+  have hs := hsum.of_nonneg_of_le (fun i ↦ integral_nonneg fun k ↦ norm_nonneg (w k)) hI
+  have hint := integrableOn_iUnion_of_summable_integral_norm hi hs
+  rw [hcov, integrableOn_univ] at hint
+  refine ⟨hint,?_⟩
+  change ∫ k, w k ∂ν ≤ _
+  have hdj : Pairwise (Disjoint on S) := fun i j hij ↦ Set.disjoint_left.mpr
+    fun k hi hj ↦ hij ((show label (y*k.val) = i from hi).symm.trans hj)
+  calc _ = ∑' i, ∫ k in S i, w k ∂ν := by
+          rw [← integral_iUnion (fun i ↦ hS i) hdj, hcov, setIntegral_univ]
+          rwa [hcov, integrableOn_univ]
+    _ ≤ ∑' i, (B*M.toReal)*d i := by
+          simpa only [Real.norm_of_nonneg (hw _)] using hs.tsum_le_tsum hI hsum
+    _ = _ := tsum_mul_left
+
+/-- In a finite-dimensional parameter, differentiate a family of integrals whose
+directional derivatives again belong to the family, with local integrable majorants. -/
+private theorem integral_family_fderiv {V T X : Type*} [NormedAddCommGroup V] [NormedSpace ℝ V]
+    [FiniteDimensional ℝ V] [MeasurableSpace X] (ν : Measure X) (F : T → V → X → ℂ)
+    (hm : ∀ t u, AEStronglyMeasurable (F t u) ν)
+    (hd : ∀ t u k, DifferentiableAt ℝ (fun v ↦ F t v k) u)
+    (D : T → V → T) (hD : ∀ t u k v, fderiv ℝ (fun w ↦ F t w k) u v = F (D t v) u k)
+    (hb : ∀ t u, ∃ b : X → ℝ, Integrable b ν ∧ ∀ᶠ z in 𝓝 u, ∀ k, ‖F t z k‖ ≤ b k) :
+    (∀ t, ContDiff ℝ ∞ (fun u ↦ ∫ k, F t u k ∂ν)) ∧
+      ∀ t u v, fderiv ℝ (fun w ↦ ∫ k, F t w k ∂ν) u v = ∫ k, F (D t v) u k ∂ν := by
+  classical
+  let I := Fin (Module.finrank ℝ V)
+  let B := Module.finBasis ℝ V
+  let ℓ (i : I) := (ContinuousLinearMap.proj i).comp B.equivFunL.toContinuousLinearMap
+  let d t u k := fderiv ℝ (fun w ↦ F t w k) u
+  have hmeas (t u) : AEStronglyMeasurable (d t u) ν := by
+    have he (k) : d t u k = ∑ i : I, (ContinuousLinearMap.smulRightL ℝ V ℂ (ℓ i)) (F (D t (B i)) u k) := by
+      ext v
+      change d t u k v = _
+      conv_lhs => rw [← B.sum_repr v, map_sum]
+      simp only [map_smul, sum_apply, ContinuousLinearMap.smulRightL_apply_apply]
+      exact Finset.sum_congr rfl fun i _ ↦ congrArg ((B.repr v i) • ·) (hD t u k (B i))
+    rw [show d t u = _ from funext he]
+    exact Finset.aestronglyMeasurable_fun_sum _ fun i _ ↦
+      (ContinuousLinearMap.smulRightL ℝ V ℂ (ℓ i)).continuous.comp_aestronglyMeasurable (hm _ _)
+  have hcalc (t u) : HasFDerivAt (fun w ↦ ∫ k, F t w k ∂ν) (∫ k, d t u k ∂ν) u ∧ Integrable (d t u) ν := by
+    obtain ⟨c,hc,hB⟩ := B.exists_opNorm_le (F := ℂ)
+    choose b hi hle using fun i : I ↦ hb (D t (B i)) u
+    let bound (k : X) := c * ∑ i : I, |b i k|
+    have hbi : Integrable bound ν := (integrable_finsetSum _ fun i _ ↦ (hi i).abs).const_mul _
+    have hev : ∀ᶠ w in 𝓝 u, ∀ k, ‖d t w k‖ ≤ bound k := by
+      filter_upwards [eventually_all.mpr hle] with w hw k
+      apply hB (Finset.sum_nonneg fun _ _ ↦ abs_nonneg _)
+      intro i
+      exact (hD t w k (B i) ▸ hw i k : ‖fderiv ℝ (fun v ↦ F t v k) w (B i)‖ ≤ b i k) |>.trans
+        ((le_abs_self _).trans (Finset.single_le_sum (f := fun i ↦ |b i k|) (fun j _ ↦ abs_nonneg _) (Finset.mem_univ i)))
+    obtain ⟨b₀,hi₀,h₀⟩ := hb t u
+    have hfi := hi₀.mono' (hm t u) (.of_forall (mem_of_mem_nhds h₀))
+    refine ⟨hasFDerivAt_integral_of_dominated_of_fderiv_le (s := {w | ∀ k, ‖d t w k‖ ≤ bound k})
+      (bound := bound) hev (.of_forall (hm t)) hfi (hmeas t u) (.of_forall fun k w hw ↦ hw k)
+      hbi (.of_forall fun k w _ ↦ (hd t w k).hasFDerivAt), hbi.mono' (hmeas t u) (.of_forall (mem_of_mem_nhds hev))⟩
+  have hval (t u v) : fderiv ℝ (fun w ↦ ∫ k, F t w k ∂ν) u v = ∫ k, F (D t v) u k ∂ν := by
+    rw [(hcalc t u).1.fderiv, ContinuousLinearMap.integral_apply (hcalc t u).2]
+    exact integral_congr_ae (.of_forall fun k ↦ hD t u k v)
+  refine ⟨fun t ↦ contDiff_infty.mpr (fun n ↦ ?_), hval⟩
+  induction n generalizing t with
+  | zero => exact contDiff_zero.mpr (continuous_iff_continuousAt.mpr fun u ↦ (hcalc t u).1.continuousAt)
+  | succ n ih =>
+    rw [Nat.cast_succ]
+    apply contDiff_succ_iff_fderiv_apply.mpr
+    refine ⟨fun u ↦ (hcalc t u).1.differentiableAt, by simp, fun v ↦ ?_⟩
+    simp only [hval]
+    exact ih _
+
+private theorem fiberCoord_add {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    (x y : ElementaryLieGroup m n r F) : fiberCoord (x+y) = fiberCoord x + fiberCoord y := by
+  funext j
+  cases j with
+  | inl i => rfl
+  | inr i => exact Int.cast_add ..
+
+private theorem fiberWeight_shift {J : Type*} [Fintype J] (x z : J → ℝ)
+    (hz : ∀ j, |z j| ≤ 1) : fiberWeight (x+z) ≤ 3 ^ Fintype.card J * fiberWeight x := by
+  unfold fiberWeight
+  rw [show (3:ℝ) ^ Fintype.card J = ∏ _ : J, (3:ℝ) from by simp, ← Finset.prod_mul_distrib]
+  apply Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) (fun j _ ↦ ?_)
+  rw [← div_eq_mul_inv, le_div_iff₀ (by positivity), inv_mul_eq_div, div_le_iff₀ (by positivity)]
+  simp only [Pi.add_apply]
+  obtain ⟨h₁,h₂⟩ := abs_le.mp (hz j)
+  nlinarith [sq_nonneg (x j + 2*z j), sq_nonneg (x j + z j),
+    mul_nonneg (sub_nonneg.mpr h₂) (show 0 ≤ 1 + z j by linarith)]
+
+private theorem fiberIntegral_decay {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (P : MvPolynomial (Fin m ⊕ Fin r) ℂ) (s : ElementarySchwartz m n r F) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ y : ElementaryLieGroup m n r F,
+      ‖MvPolynomial.eval (Sum.elim (fun i ↦ (y.1 i : ℂ)) (fun j ↦ (y.2.2.1 j : ℂ))) P * s y‖ ≤
+        C * fiberWeight (fiberCoord y) := by
+  let R : MvPolynomial (Fin m ⊕ Fin r) ℂ := ∏ j, (1 + MvPolynomial.X j ^ 2)
+  obtain ⟨C,hC⟩ := polynomial_weight_bounded (R*P) s
+  refine ⟨C, (norm_nonneg _).trans (hC 0), fun y ↦ ?_⟩
+  let coord := Sum.elim (fun i ↦ (y.1 i : ℂ)) (fun j ↦ (y.2.2.1 j : ℂ))
+  let W := ∏ j, (1 + (fiberCoord y j)^2)
+  have he (i) : coord i = (fiberCoord y i : ℂ) := by
+    cases i with
+    | inl i => rfl
+    | inr i => exact (Complex.ofReal_intCast _).symm
+  have hW : 0 < W := Finset.prod_pos fun _ _ ↦ by positivity
+  have hR : MvPolynomial.eval coord R = (W : ℂ) := by simp [R,W,he]
+  have h := hC y
+  change ‖MvPolynomial.eval coord (R*P) * s y‖ ≤ C at h
+  rw [MvPolynomial.eval_mul, mul_assoc, norm_mul, hR, Complex.norm_real, Real.norm_of_nonneg hW.le] at h
+  rw [show fiberWeight (fiberCoord y) = W⁻¹ from by simp [fiberWeight,W, Finset.prod_inv_distrib], ← div_eq_mul_inv,
+    le_div_iff₀ hW, mul_comm]
+  exact h
+
+private theorem fiberIntegral_orbit_deriv {V : Type*} [NormedAddCommGroup V] [NormedSpace ℝ V]
+    {m n r : ℕ} {F : Type*} [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (L : V →L[ℝ] EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
+    ∀ (s : ElementarySchwartz m n r F) (v : V), ∃ t : ElementarySchwartz m n r F,
+      ∀ (z : ElementaryLieGroup m n r F) u,
+        let Fz := fun w ↦ s (z + elementaryCover (L w) 0 0)
+        DifferentiableAt ℝ Fz u ∧ fderiv ℝ Fz u v = t (z + elementaryCover (L u) 0 0) := by
+  intro s v
+  let q := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+  let l : ℝ →L[ℝ] _ := (ContinuousLinearMap.id ℝ ℝ).smulRight (L v)
+  let c := q.comp l.toLinearMap.toAddMonoidHom
+  obtain ⟨B,hB⟩ := elementarySchwartz_orbitDeriv c (elementaryCoverZeroHom_continuous_isOpenMap.1.comp l.continuous)
+  refine ⟨B s, fun z u ↦ ?_⟩
+  obtain ⟨w,hw⟩ := elementaryCover_surjective z.2.2.1 z.2.2.2 z.1 z.2.1
+  change elementaryCover (z.1,w) z.2.2.1 z.2.2.2 = z at hw
+  let Fz (a : V) := s (z + q (L a))
+  have he (a) : Fz a = s (elementaryCover ((z.1,w) + L a) z.2.2.1 z.2.2.2) := by
+    change s (z + elementaryCover (L a) 0 0) = _
+    conv_lhs => rw [← hw]
+    rw [elementaryCover_add, add_zero, add_zero]
+  have hd : DifferentiableAt ℝ Fz u :=
+    (funext he) ▸ (((s.property.1 _ _).comp (contDiff_const.add L.contDiff)).differentiable (by simp) u)
+  refine ⟨hd, ?_⟩
+  have hline : HasDerivAt (fun a : ℝ ↦ u + a • v) v 0 := by
+    simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+  have h := hd.hasFDerivAt.comp_hasDerivAt_of_eq 0 hline (by simp)
+  have hh (a : ℝ) : Fz (u+a•v) = s ((z + q (L u)) + c a) := by
+    simp only [Fz, map_add, map_smul, ← add_assoc]
+    rfl
+  change HasDerivAt (fun a : ℝ ↦ Fz (u+a•v)) _ 0 at h
+  rw [show (fun a : ℝ ↦ Fz (u+a•v)) = _ from funext hh] at h
+  exact h.unique (hB s _)
+
+/-- On each affine lift, mixed partials of the integral are integrals of Schwartz derivatives.
+The derivative test depends only on the original test and the list of directions. -/
+private theorem fiberIntegral_charts {A V : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [MeasurableSpace A] [BorelSpace A]
+    [NormedAddCommGroup V] [NormedSpace ℝ V] [FiniteDimensional ℝ V]
+    (e : ElementaryLCAPresentation A) (K : Subgroup A) (ν : Measure K)
+    (L : V →L[ℝ] EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim))
+    (hw : ∀ y : A, Integrable (fun k : K ↦ fiberWeight (fiberCoord (e.equiv (y * k.val)).toAdd)) ν) :
+    let Ψ (s : SchwartzBruhatStage e) (y : A) (u : V) := ∫ k : K,
+      s ((e.equiv (y*k.val)).toAdd + elementaryCover (L u) 0 0) ∂ν
+    (∀ s y, ContDiff ℝ ∞ (Ψ s y)) ∧ ∀ (dirs : List V) (s : SchwartzBruhatStage e),
+      ∃ t : SchwartzBruhatStage e, ∀ y u, iteratedFDeriv ℝ dirs.length (Ψ s y) u dirs.get = Ψ t y u := by
+  classical
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let J := Fin e.realDim ⊕ Fin e.latticeRank
+  let σ := (elementaryCoverZeroHom (r := e.latticeRank) (F := e.finiteFactor)).comp L.toLinearMap.toAddMonoidHom
+  let g (u : V) := e.equiv.symm (.ofAdd (σ u))
+  have hg (u) : e.equiv (g u) = .ofAdd (σ u) := e.equiv.apply_symm_apply _
+  let z (y : A) (u : V) (k : K) : E := (e.equiv (y*k.val)).toAdd + σ u
+  have hz (y u k) : z y u k = (e.equiv (y*g u*k.val)).toAdd := by
+    rw [mul_right_comm y, map_mul _ (y*k.val), hg]
+    rfl
+  let F (y : A) (s : SchwartzBruhatStage e) (u : V) (k : K) := s (z y u k)
+  let Ψ (s : SchwartzBruhatStage e) (y : A) (u : V) := ∫ k, F y s u k ∂ν
+  choose D hD using fiberIntegral_orbit_deriv (r := e.latticeRank) (F := e.finiteFactor) L
+  have hcalc (y : A) : (∀ s, ContDiff ℝ ∞ (Ψ s y)) ∧ ∀ s u v,
+      fderiv ℝ (Ψ s y) u v = Ψ (D s v) y u := by
+    refine integral_family_fderiv ν (F y) ?_ ?_ D ?_ ?_
+    · intro s u
+      exact ((elementarySchwartz_continuousFunction s).comp
+        ((show Continuous (fun k : K ↦ (e.equiv (y*k.val)).toAdd) from
+          e.equiv.continuous.comp (continuous_const.mul continuous_subtype_val)).add continuous_const)).aestronglyMeasurable
+    · exact fun s u k ↦ (hD s 0 (e.equiv (y*k.val)).toAdd u).1
+    · exact fun s u k v ↦ (hD s v (e.equiv (y*k.val)).toAdd u).2
+    · intro s u
+      obtain ⟨C,hC,hCs⟩ := fiberIntegral_decay 1 s
+      let M : ℝ := 3 ^ Fintype.card J
+      let w (k : K) := fiberWeight (fiberCoord (z y u k))
+      have hw' : Integrable w ν := by simpa only [w,hz] using hw (y*g u)
+      refine ⟨fun k ↦ (C*M) * w k, hw'.const_mul _, ?_⟩
+      have hc (j : J) : Continuous (fun v : V ↦ fiberCoord (σ v) j) := by
+        cases j with
+        | inl i => exact (PiLp.continuous_apply 2 _ i).comp L.continuous.fst
+        | inr i => exact (show Continuous (fun _ : V ↦ (0:ℝ)) from continuous_const).congr (fun _ ↦ by simp [σ, elementaryCoverZeroHom, elementaryCover, fiberCoord])
+      have hev (j : J) : ∀ᶠ v in 𝓝 u, |fiberCoord (σ v) j - fiberCoord (σ u) j| ≤ 1 :=
+        ((Metric.tendsto_nhds.mp ((hc j).tendsto u)) 1 one_pos).mono fun _ h ↦ h.le
+      filter_upwards [eventually_all.mpr hev] with v hv k
+      have he : fiberCoord (z y v k) = fiberCoord (z y u k) + (fiberCoord (σ v) - fiberCoord (σ u)) := by
+        dsimp only [z]
+        rw [fiberCoord_add,fiberCoord_add]
+        abel
+      calc ‖F y s v k‖ ≤ C * fiberWeight (fiberCoord (z y v k)) := by simpa [F] using hCs (z y v k)
+        _ ≤ C * (M * w k) := mul_le_mul_of_nonneg_left (he ▸ fiberWeight_shift _ _ hv) hC
+        _ = _ := (mul_assoc ..).symm
+  refine ⟨fun s y ↦ (hcalc y).1 s, fun dirs ↦ ?_⟩
+  induction dirs using List.reverseRecOn with
+  | nil => exact fun s ↦ ⟨s,fun _ _ ↦ rfl⟩
+  | append_singleton l v ih =>
+    intro s
+    obtain ⟨t,ht⟩ := ih (D s v)
+    refine ⟨t, fun y u ↦ ?_⟩
+    change iteratedFDeriv ℝ _ (Ψ s y) u _ = Ψ t y u
+    rw [iteratedFDeriv_append_singleton ((hcalc y).1 s), show (fun w ↦ fderiv ℝ (Ψ s y) w v) = Ψ (D s v) y
+      from funext fun w ↦ (hcalc y).2 s w v]
+    exact ht y u
+
+end
+
 -- TODO(paper-gap): The proof of D.1.7.1 cites Lemma D.1.6.18 for the elementary case,
 -- but that lemma only averages over compact subgroups. The kernel below can be
 -- noncompact, as for ℤ ⊂ ℝ, where the coset integral is a periodization.
@@ -3404,7 +3753,106 @@ theorem elementary_fiberIntegral {A B : Type*} [CommGroup A] [TopologicalSpace A
     (∀ y : A, Integrable (fun l : p.ker ↦ φ (Multiplicative.toAdd (e.equiv (y * l)))) ν) ∧
       ∃ ψ : SchwartzBruhatStage e', ∀ y : A,
         ψ (Multiplicative.toAdd (e'.equiv (p y))) =
-          ∫ l : p.ker, φ (Multiplicative.toAdd (e.equiv (y * l))) ∂ν := by sorry
+          ∫ l : p.ker, φ (Multiplicative.toAdd (e.equiv (y * l))) ∂ν := by
+  classical
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let E' := ElementaryLieGroup e'.realDim e'.torusDim e'.latticeRank e'.finiteFactor
+  let V := EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim)
+  let V' := EuclideanSpace ℝ (Fin e'.realDim) × EuclideanSpace ℝ (Fin e'.torusDim)
+  let π : E →+ E' := AddMonoidHom.toMultiplicative.symm
+    ((e'.equiv.toMonoidHom.comp p).comp e.equiv.symm.toMonoidHom)
+  have hc : Continuous π := e'.equiv.continuous.comp (hp.comp e.equiv.symm.continuous)
+  have ho : IsOpenMap π := e'.equiv.isOpenMap.comp (hpo.comp e.equiv.symm.isOpenMap)
+  have hker : IsClosed (p.ker : Set A) := by
+    let : T2Space (Multiplicative E') := inferInstanceAs (T2Space (EuclideanSpace ℝ (Fin e'.realDim) ×
+      (Fin e'.torusDim → AddCircle (1:ℝ)) × (Fin e'.latticeRank → ℤ) × e'.finiteFactor))
+    have : T2Space B := e'.equiv.toHomeomorph.isEmbedding.t2Space
+    exact isClosed_singleton.preimage hp
+  obtain ⟨M,hM⟩ := fiberIntegral_weight e p.ker hker ν
+  let val (y : A) := (e.equiv y).toAdd
+  let W (y : A) := fiberWeight (fiberCoord (val y))
+  have hi (t : SchwartzBruhatStage e) (y : A) : Integrable (fun k : p.ker ↦ t (val (y*k.val))) ν := by
+    obtain ⟨C,_,h⟩ := fiberIntegral_decay 1 t
+    exact ((hM y).1.const_mul C).mono'
+      (((elementarySchwartz_continuousFunction t).comp (e.equiv.continuous.comp
+        (continuous_const.mul continuous_subtype_val))).aestronglyMeasurable)
+      (.of_forall fun k ↦ by simpa [val] using h (val (y*k.val)))
+  refine ⟨hi φ, ?_⟩
+  let Aφ (y : A) := ∫ k : p.ker, φ (val (y*k.val)) ∂ν
+  have hinv {y y' : A} (h : p y = p y') : Aφ y = Aφ y' := by
+    let k₀ : p.ker := ⟨y'⁻¹*y, by change p (y'⁻¹*y) = 1; simp [h]⟩
+    calc Aφ y = ∫ k : p.ker, φ (val (y' * (k₀ * k).val)) ∂ν := by
+          apply integral_congr_ae
+          exact .of_forall fun k ↦ congrArg (fun x ↦ φ (val x)) (by dsimp [k₀]; group)
+      _ = Aφ y' := integral_mul_left_eq_self (fun k : p.ker ↦ φ (val (y' * k.val))) k₀
+  let inv (b : E') := Function.surjInv hps (e'.equiv.symm (.ofAdd b))
+  let f (b : E') := Aφ (inv b)
+  have hf (y : A) : f (e'.equiv (p y)).toAdd = Aφ y := hinv (by
+    change p (Function.surjInv hps _) = p y
+    rw [Function.rightInverse_surjInv hps]
+    exact e'.equiv.symm_apply_apply _)
+  let q := elementaryCoverZeroHom (m := e.realDim) (n := e.torusDim) (r := e.latticeRank) (F := e.finiteFactor)
+  obtain ⟨L,hL⟩ := elementary_linear_section (π.comp q) (hc.comp elementaryCoverZeroHom_continuous_isOpenMap.1)
+    (ho.comp elementaryCoverZeroHom_continuous_isOpenMap.2)
+  let Y (y : A) (u : V') := y * e.equiv.symm (.ofAdd (q (L u)))
+  let Ψ (t : SchwartzBruhatStage e) (y : A) (u : V') := ∫ k : p.ker, t (val (y*k.val) + q (L u)) ∂ν
+  have hYk (y u) (k : p.ker) : val (Y y u * k.val) = val (y*k.val) + q (L u) := by
+    dsimp only [Y,val]
+    rw [mul_right_comm, map_mul, e.equiv.apply_symm_apply]
+    rfl
+  have hY (a b u) : (e'.equiv (p (Y (inv (elementaryCover 0 a b)) u))).toAdd = elementaryCover u a b := by
+    let y := inv (elementaryCover 0 a b)
+    have hpy : (e'.equiv (p y)).toAdd = elementaryCover 0 a b :=
+      congrArg Multiplicative.toAdd ((congrArg e'.equiv (Function.rightInverse_surjInv hps _)).trans
+        (e'.equiv.apply_symm_apply _))
+    have hpu : (e'.equiv (p (e.equiv.symm (.ofAdd (q (L u)))))).toAdd = elementaryCover u 0 0 := hL u
+    change (e'.equiv (p (y * _))).toAdd = _
+    rw [map_mul, map_mul]
+    change (e'.equiv (p y)).toAdd + _ = _
+    rw [hpy,hpu,elementaryCover_add,zero_add,add_zero,add_zero]
+  have hΨ (a b) : (fun u ↦ f (elementaryCover u a b)) = Ψ φ (inv (elementaryCover 0 a b)) := by
+    funext u
+    rw [← hY a b u, hf]
+    apply integral_congr_ae
+    exact .of_forall fun k ↦ congrArg φ.val (hYk _ _ k)
+  obtain ⟨hcd,hdirs⟩ := fiberIntegral_charts e p.ker ν L (fun y ↦ (hM y).1)
+  refine ⟨⟨f, fun a b ↦ hΨ a b ▸ hcd φ _, fun i ↦ ?_⟩,hf⟩
+  let dirs : List V' := (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1,0)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0,EuclideanSpace.single j 1)).flatten
+  obtain ⟨t,ht⟩ := hdirs dirs φ
+  obtain ⟨P,hP⟩ := elementary_open_quotient_weight (⊤ : AddSubgroup E) isOpen_univ
+    (π.comp (⊤ : AddSubgroup E).subtype) (hc.comp continuous_subtype_val) i.1 i.2.2.2
+  obtain ⟨C,hC,hdec⟩ := fiberIntegral_decay P t
+  refine lt_of_le_of_lt (b := ENNReal.ofReal (C*M)) (iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_)
+    ENNReal.ofReal_lt_top
+  rw [← ENNReal.ofReal_coe_nnreal]
+  apply ENNReal.ofReal_le_ofReal
+  let y := inv (elementaryCover 0 a b)
+  let y₁ := Y y u
+  let wt : ℂ := (∏ j, (u.1 j : ℂ)^i.1 j) * ∏ j, (a j : ℂ)^i.2.2.2 j
+  have hder : elementaryPartial f i.2.1 i.2.2.1 u a b = ∫ k : p.ker, t (val (y₁*k.val)) ∂ν := by
+    change iteratedFDeriv ℝ dirs.length (fun w ↦ f (elementaryCover w a b)) u dirs.get = _
+    rw [hΨ a b]
+    refine (ht y u).trans ?_
+    exact integral_congr_ae (.of_forall fun k ↦ congrArg t.val (hYk _ _ k).symm)
+  have htarget (k : p.ker) : π (val (y₁ * k.val)) = elementaryCover u a b := by
+    have hk : p k.val = 1 := k.property
+    change (e'.equiv (p (e.equiv.symm (e.equiv (y₁ * k.val))))).toAdd = _
+    rw [e.equiv.symm_apply_apply, map_mul, hk, mul_one]
+    exact hY a b u
+  have hpt (k : p.ker) : ‖wt * t (val (y₁*k.val))‖ ≤ C * W (y₁*k.val) := by
+    let z := val (y₁*k.val)
+    have h := hP (⟨z, AddSubgroup.mem_top _⟩ : (⊤ : AddSubgroup E))
+    change MvPolynomial.eval _ P = (∏ j, ((π z).1 j : ℂ)^i.1 j) * ∏ j, ((π z).2.2.1 j : ℂ)^i.2.2.2 j at h
+    rw [htarget k] at h
+    have hh := hdec z
+    change MvPolynomial.eval (Sum.elim (fun i ↦ (z.1 i : ℂ)) (fun j ↦ (z.2.2.1 j : ℂ))) P = wt at h
+    rwa [h] at hh
+  change ‖wt * elementaryPartial f _ _ u a b‖ ≤ C * M
+  rw [hder, ← integral_const_mul]
+  calc _ ≤ ∫ k : p.ker, ‖wt * t (val (y₁*k.val))‖ ∂ν := norm_integral_le_integral_norm _
+    _ ≤ ∫ k : p.ker, C * W (y₁*k.val) ∂ν := integral_mono ((hi t y₁).const_mul wt).norm ((hM y₁).1.const_mul C) hpt
+    _ ≤ _ := by rw [integral_const_mul]; exact mul_le_mul_of_nonneg_left (hM y₁).2 hC
 
 end FibreIntegral
 
@@ -3449,12 +3897,557 @@ theorem lcaFourier_bruhatDiff (D : bruhatDiffAlgebra G) (f : SchwartzBruhat G) :
   rw [hs]
   exact (hB g χ).symm.trans ((hF χ).trans (congrArg (c χ * ·) (hB f χ)))
 
+section FourierTransform
+
+omit hTop hT2 hLC hBorel hHaar hRegular
+
+open Function
+open scoped Pointwise
+
+private theorem stageRealization_mul_kernel (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage e) (x u : G) (hu : u ∈ OrderDual.ofDual a.val.2) :
+    schwartzBruhatStageRealization a e s (x * u) = schwartzBruhatStageRealization a e s x := by
+  have hu' := a.property.2.2.2 hu
+  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : x ∈ a.val.1
+  · rw [dite_eq_left (a.val.1.mul_mem hx hu'), dite_eq_left hx]
+    let v : a.val.1 := ⟨u,hu'⟩
+    have hv : v ∈ (OrderDual.ofDual a.val.2).comap a.val.1.subtype := hu
+    exact congrArg (fun z : a.quotient ↦ s (e.equiv z).toAdd) (QuotientGroup.mk_mul_of_mem ⟨x,hx⟩ hv)
+  · rw [dite_eq_right (fun h ↦ hx ((a.val.1.mul_mem_cancel_right hu').mp h)), dite_eq_right hx]
+
+private theorem continuous_to_stage_of_realization {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E] [BarrelledSpace ℂ E]
+    (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) (B : E →ₗ[ℂ] SchwartzBruhatStage d)
+    (h : ∀ x : G, ∃ L : E →L[ℂ] ℂ, ∀ s, L s = schwartzBruhatStageRealization b d (B s) x) :
+    Continuous B := by
+  apply continuous_toElementarySchwartz_of_eval
+  intro y
+  obtain ⟨q,hq⟩ := d.equiv.surjective (Multiplicative.ofAdd y)
+  obtain ⟨x,rfl⟩ := QuotientGroup.mk_surjective q
+  obtain ⟨L,hL⟩ := h x.val
+  refine ⟨L,fun s ↦ ?_⟩
+  exact (hL s).trans ((schwartzBruhatStageRealization_apply b d (B s) _).trans
+    ((dite_eq_left x.property).trans (congrArg (fun t ↦ B s (Multiplicative.toAdd t)) hq)))
+
+/-- Multiplication by a continuous real additive functional preserves elementary tests. -/
+private theorem elementary_frequency_mul {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (ρ : ElementaryLieGroup m n r F →+ ℝ) (hρ : Continuous ρ) (s : ElementarySchwartz m n r F) :
+    (fun x ↦ (ρ x : ℂ) * s x) ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  let E := ElementaryLieGroup m n r F
+  let V := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let q := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+  let l := (ρ.comp q).toRealLinearMap (hρ.comp elementaryCoverZeroHom_continuous_isOpenMap.1)
+  let R (u : V) (a : Fin r → ℤ) (b : F) : ℂ := ρ (elementaryCover u a b)
+  have hR (u a b) : R u a b = (l u : ℂ) + (ρ (elementaryCover (0 : V) a b) : ℂ) := by
+    change (ρ (elementaryCover u a b) : ℂ) = (ρ (elementaryCover u 0 0) : ℂ) + _
+    rw [← Complex.ofReal_add, ← map_add, elementaryCover_add,add_zero,zero_add,zero_add]
+  let L := Complex.ofRealCLM.comp l
+  have hsm (a b) : ContDiff ℝ ∞ (fun u ↦ R u a b) := by
+    simp_rw [hR]
+    exact L.contDiff.add contDiff_const
+  have hD (u a b v) : fderiv ℝ (fun w ↦ R w a b) u v = L v := by
+    simp_rw [hR]
+    exact congrArg (fun D : V →L[ℝ] ℂ ↦ D v) ((L.hasFDerivAt.add_const _).fderiv)
+  let X (s t : ElementarySchwartz m n r F) (a : Fin r → ℤ) (b : F) (u : V) :=
+    R u a b * s (elementaryCover u a b) + t (elementaryCover u a b)
+  have hX (s t : ElementarySchwartz m n r F) (a b) : ContDiff ℝ ∞ (X s t a b) :=
+    ((hsm a b).mul (s.property.1 a b)).add (t.property.1 a b)
+  have hdir (s : ElementarySchwartz m n r F) (v : V) : ∃ t : ElementarySchwartz m n r F, ∀ u a b,
+      fderiv ℝ (fun w ↦ s (elementaryCover w a b)) u v = t (elementaryCover u a b) := by
+    obtain ⟨t,h⟩ := fiberIntegral_orbit_deriv (ContinuousLinearMap.id ℝ V) s v
+    refine ⟨t,fun u a b ↦ ?_⟩
+    simpa only [ContinuousLinearMap.id_apply,elementaryCover_add,zero_add,add_zero] using
+      (h (elementaryCover 0 a b) u).2
+  have hit (dirs : List V) (s t : ElementarySchwartz m n r F) : ∃ s' t' : ElementarySchwartz m n r F,
+      ∀ a b u, iteratedFDeriv ℝ dirs.length (X s t a b) u dirs.get = X s' t' a b u := by
+    induction dirs using List.reverseRecOn generalizing s t with
+    | nil => exact ⟨s,t,fun a b u ↦ by simp⟩
+    | append_singleton dirs v ih =>
+      obtain ⟨s₁,hs⟩ := hdir s v
+      obtain ⟨t₁,ht⟩ := hdir t v
+      obtain ⟨s',t',h⟩ := ih s₁ (L v • s + t₁)
+      refine ⟨s',t',fun a b u ↦ ?_⟩
+      have he : (fun w ↦ fderiv ℝ (X s t a b) w v) = X s₁ (L v • s + t₁) a b := by
+        funext w
+        dsimp only [X]
+        have h₁ := (hsm a b).differentiable (by simp) w
+        have h₂ := (s.property.1 a b).differentiable (by simp) w
+        have h₃ := (t.property.1 a b).differentiable (by simp) w
+        have hm : DifferentiableAt ℝ (fun u ↦ R u a b * s (elementaryCover u a b)) w := h₁.mul h₂
+        rw [fderiv_fun_add hm h₃, fderiv_fun_mul h₁ h₂]
+        simp only [add_apply,smul_apply,hD,hs,ht,smul_eq_mul]
+        change _ = _ + (L v * s _ + t₁ _)
+        ring
+      rw [iteratedFDeriv_append_singleton (hX s t a b),he,h]
+  obtain ⟨P,hP⟩ := elementary_real_hom_polynomial ρ hρ
+  refine ⟨fun a b ↦ (hsm a b).mul (s.property.1 a b),fun i ↦ ?_⟩
+  let dirs : List V := (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1,0)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0,EuclideanSpace.single j 1)).flatten
+  obtain ⟨s',t',h⟩ := hit dirs s 0
+  let W : MvPolynomial (Fin m ⊕ Fin r) ℂ := (∏ j, MvPolynomial.X (Sum.inl j)^i.1 j) *
+    ∏ j, MvPolynomial.X (Sum.inr j)^i.2.2.2 j
+  obtain ⟨C,hC⟩ := polynomial_weight_bounded (W*P) s'
+  obtain ⟨D,hD'⟩ := polynomial_weight_bounded W t'
+  refine lt_of_le_of_lt (b := ENNReal.ofReal (C+D)) (iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_) ENNReal.ofReal_lt_top
+  rw [← ENNReal.ofReal_coe_nnreal]
+  apply ENNReal.ofReal_le_ofReal
+  let x := elementaryCover u a b
+  have he := h a b u
+  have hzero : X s 0 a b = fun w ↦ R w a b * s (elementaryCover w a b) := by
+    funext w
+    exact add_zero _
+  rw [hzero] at he
+  change ‖_ * iteratedFDeriv ℝ dirs.length _ u dirs.get‖ ≤ _
+  rw [he]
+  have h₁ := hC x
+  have h₂ := hD' x
+  simp only [MvPolynomial.eval_mul,hP,W,map_prod,map_pow,MvPolynomial.eval_X,Sum.elim_inl,Sum.elim_inr] at h₁ h₂
+  dsimp only [X,R]
+  rw [mul_add,←mul_assoc]
+  exact (norm_add_le ..).trans (add_le_add h₁ h₂)
+
+private theorem dualStagePairing {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] (a : BruhatStructuralPair G) (b : BruhatStructuralPair (PontryaginDual G))
+    (hJ : b.val.1 = lcaAnnihilator (OrderDual.ofDual a.val.2))
+    (hK : OrderDual.ofDual b.val.2 = lcaAnnihilator a.val.1) :
+    ∃ d : b.quotient →ₜ* PontryaginDual a.quotient, ∀ (χ : b.val.1) (x : a.val.1),
+      d (QuotientGroup.mk χ) (QuotientGroup.mk x) = χ.val x.val := by
+  let J := a.val.1
+  let N := (OrderDual.ofDual a.val.2).comap J.subtype
+  let M := (OrderDual.ofDual b.val.2).comap b.val.1.subtype
+  let : LocallyCompactSpace J := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let ι : J →ₜ* G := ⟨J.subtype,continuous_subtype_val⟩
+  let res := PontryaginDual.map ι
+  let h (χ : b.val.1) : res χ.val ∈ lcaAnnihilator N := by
+    have hχ : χ.val ∈ lcaAnnihilator (OrderDual.ofDual a.val.2) := hJ ▸ χ.property
+    rw [mem_lcaAnnihilator_iff] at hχ
+    exact (mem_lcaAnnihilator_iff _ _).mpr fun x ↦ hχ ⟨x.val.val,x.property⟩
+  let toAnn : b.val.1 →ₜ* lcaAnnihilator N :=
+    ⟨(res.toMonoidHom.comp b.val.1.subtype).codRestrict _ h,
+      (res.continuous.comp continuous_subtype_val).subtype_mk h⟩
+  obtain ⟨e,he⟩ := lcaQuotientDual_equiv_annihilator N (a.property.2.2.1.1.preimage continuous_subtype_val)
+  let t : b.val.1 →ₜ* PontryaginDual a.quotient := (e.symm : _ →ₜ* _).comp toAnn
+  have ht (χ : b.val.1) (x : J) : t χ (QuotientGroup.mk x) = χ.val x.val := by
+    rw [←he]
+    change (e (e.symm (toAnn χ))).val x = _
+    rw [e.apply_symm_apply]
+    rfl
+  have hk : M ≤ t.toMonoidHom.ker := by
+    intro χ hχ
+    change χ.val ∈ OrderDual.ofDual b.val.2 at hχ
+    rw [hK,mem_lcaAnnihilator_iff] at hχ
+    apply PontryaginDual.ext
+    intro z
+    obtain ⟨x,rfl⟩ := QuotientGroup.mk'_surjective N z
+    exact (ht χ x).trans (hχ x)
+  let d := QuotientGroup.lift M t.toMonoidHom hk
+  have hd : Continuous d := (QuotientGroup.isQuotientMap_mk M).continuous_iff.mpr t.continuous
+  exact ⟨⟨d,hd⟩,ht⟩
+
+section
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+  (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+
+private theorem fourier_mul_frequency (ρ : PontryaginDual G →ₜ* Multiplicative ℝ)
+    (f : SchwartzBruhat G) :
+    ∃ g : SchwartzBruhat G, ∀ χ, lcaFourier μ g χ = ((ρ χ).toAdd : ℂ) * lcaFourier μ f χ := by
+  obtain ⟨σ,_,_,hσ⟩ := bruhatDiffDegreeOne_frequency (G := G)
+  let D := σ.symm ρ
+  obtain ⟨a,ha⟩ := (mem_bruhatDiffDegreeOneReal_iff D.val).mp D.property
+  let z : ℂ := 2 * ↑Real.pi * Complex.I
+  have hz : z ≠ 0 := mul_ne_zero (mul_ne_zero (by norm_num) (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)) Complex.I_ne_zero
+  have hdir (χ) : bruhatDiffSymbol (bruhatDiffGenerator a) χ = z * ((ρ χ).toAdd : ℂ) :=
+    bruhatDiffSymbol_generator a χ _ (fun t ↦ by simpa [D] using hσ a D ha χ t)
+  obtain ⟨_,g,_,_,_,hg⟩ := lcaFourier_bruhatDiff μ (bruhatDiffGenerator a) f
+  obtain ⟨B,hB⟩ := schwartzBruhat_fourier_linear μ
+  refine ⟨z⁻¹ • g,fun χ ↦ ?_⟩
+  rw [← hB, B.map_smul,Pi.smul_apply,smul_eq_mul,hB,congrFun hg χ,Pi.mul_apply,hdir]
+  field_simp
+
+private theorem fourier_mul_polynomial {ι : Type*} (ρ : ι → PontryaginDual G →ₜ* Multiplicative ℝ)
+    (P : MvPolynomial ι ℂ) (f : SchwartzBruhat G) :
+    ∃ g : SchwartzBruhat G, ∀ χ, lcaFourier μ g χ =
+      MvPolynomial.eval (fun i ↦ ((ρ i χ).toAdd : ℂ)) P * lcaFourier μ f χ := by
+  classical
+  obtain ⟨B,hB⟩ := schwartzBruhat_fourier_linear μ
+  induction P using MvPolynomial.induction_on with
+  | C c =>
+    exact ⟨c • f,fun χ ↦ by rw [MvPolynomial.eval_C,← hB,B.map_smul,Pi.smul_apply,smul_eq_mul,hB]⟩
+  | add p q hp hq =>
+    obtain ⟨g,hg⟩ := hp
+    obtain ⟨k,hk⟩ := hq
+    refine ⟨g+k,fun χ ↦ ?_⟩
+    calc
+      lcaFourier μ (g+k) χ = (B g + B k) χ :=
+        (hB (g+k) χ).symm.trans (congrFun (B.map_add g k) χ)
+      _ = _ + _ := congrArg₂ (· + ·) ((hB g χ).trans (hg χ)) ((hB k χ).trans (hk χ))
+      _ = _ := by rw [MvPolynomial.eval_add,add_mul]
+  | mul_X p i hp =>
+    obtain ⟨g,hg⟩ := hp
+    obtain ⟨k,hk⟩ := fourier_mul_frequency μ (ρ i) g
+    refine ⟨k,fun χ ↦ (hk χ).trans ?_⟩
+    rw [hg χ, MvPolynomial.eval_mul, MvPolynomial.eval_X, mul_left_comm, mul_assoc]
+
+private theorem extend_real_character_open {A : Type*} [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A]
+    (J : Subgroup A) (hJ : IsOpen (J : Set A)) (ρ : J →ₜ* Multiplicative ℝ) :
+    ∃ τ : A →ₜ* Multiplicative ℝ, ∀ x : J, τ x.val = ρ x := by
+  obtain ⟨L,hL⟩ := (Module.Baer.of_divisible ℝ).extension_property_addMonoidHom
+    J.subtype.toAdditive (show Function.Injective J.subtype.toAdditive from @Subtype.val_injective _ _) ρ.toMonoidHom.toAdditiveLeft
+  let τ := L.toMultiplicativeRight
+  have he (x : J) : τ x.val = ρ x := DFunLike.congr_fun hL (Additive.ofMul x)
+  have hc : Continuous τ := by
+    apply continuous_of_continuousAt_one τ
+    have hn : Filter.map Subtype.val (𝓝 (1 : J)) = 𝓝 (1 : A) := hJ.isOpenEmbedding_subtypeVal.map_nhds_eq 1
+    rw [ContinuousAt,map_one,← hn,tendsto_map'_iff]
+    have ht : Tendsto ρ (𝓝 (1 : J)) (𝓝 1) := (show Continuous ρ from ρ.continuous).tendsto' 1 1 (map_one ρ)
+    exact ht.congr (fun x ↦ (he x).symm)
+  exact ⟨⟨τ,hc⟩,he⟩
+private theorem frequency_of_dual_direction (a : LCATopologicalLie (PontryaginDual G)) :
+    ∃ ρ : G →ₜ* Multiplicative ℝ, ∀ t : ℝ, ∀ x, a (.ofAdd t) x = Real.fourierChar ((ρ x).toAdd * t) := by
+  let b := (pontryaginDual_bidual (G := G)).choose
+  have hb := (pontryaginDual_bidual (G := G)).choose_spec
+  obtain ⟨σ,_,_,hσ⟩ := bruhatDiffDegreeOne_frequency (G := PontryaginDual G)
+  let D : bruhatDiffDegreeOneReal (G := PontryaginDual G) :=
+    ⟨bruhatFirstOrder a,Submodule.subset_span ⟨a,rfl⟩⟩
+  refine ⟨(σ D).comp (b : G →ₜ* _), fun t x ↦ ?_⟩
+  exact (hb x (a (.ofAdd t))).symm.trans (hσ a D rfl (b x) t).symm
+
+end
+/-- In an affine family of characters every dual derivative is a Fourier integral of another
+test on the same source stage. The new test is independent of the base character. -/
+private theorem fourier_charts {A V X : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A]
+    [NormedAddCommGroup V] [NormedSpace ℝ V] [FiniteDimensional ℝ V]
+    [MeasurableSpace X] [MeasurableSpace A] [BorelSpace A] (ν : Measure X) (q : X → A) (hq : Measurable q)
+    (e : ElementaryLCAPresentation A) (α : Multiplicative V →ₜ* PontryaginDual A)
+    (hi : ∀ s : SchwartzBruhatStage e, Integrable (fun k ↦ s (e.equiv (q k)).toAdd) ν) :
+    let Ψ (s : SchwartzBruhatStage e) (χ : PontryaginDual A) (u : V) := ∫ k,
+      s (e.equiv (q k)).toAdd * star ((χ * α (.ofAdd u)) (q k) : ℂ) ∂ν
+    (∀ s χ, ContDiff ℝ ∞ (Ψ s χ)) ∧ ∀ (dirs : List V) (s : SchwartzBruhatStage e),
+      ∃ t : SchwartzBruhatStage e, ∀ χ u, iteratedFDeriv ℝ dirs.length (Ψ s χ) u dirs.get = Ψ t χ u := by
+  classical
+  let c : ℂ := -(2 * ↑Real.pi * Complex.I)
+  let F (χ : PontryaginDual A) (s : SchwartzBruhatStage e) (u : V) (k : X) :=
+    s (e.equiv (q k)).toAdd * star ((χ * α (.ofAdd u)) (q k) : ℂ)
+  let Ψ (s : SchwartzBruhatStage e) (χ : PontryaginDual A) (u : V) := ∫ k, F χ s u k ∂ν
+  let line (v : V) := (ContinuousLinearMap.id ℝ ℝ).smulRight v
+  let a (v : V) : LCATopologicalLie (PontryaginDual A) := α.comp
+    ⟨AddMonoidHom.toMultiplicative (line v).toLinearMap.toAddMonoidHom,(line v).continuous⟩
+  choose ρ hρ using fun v ↦ frequency_of_dual_direction (a v)
+  have hmul (s : SchwartzBruhatStage e) (v : V) : ∃ t : SchwartzBruhatStage e, ∀ x : A,
+      t (e.equiv x).toAdd = c * ((ρ v x).toAdd : ℂ) * s (e.equiv x).toAdd := by
+    let L := (ρ v).comp (ContinuousMonoidHom.toContinuousMonoidHom e.equiv.symm)
+    let r := AddMonoidHom.toMultiplicative.symm L.toMonoidHom
+    let t : SchwartzBruhatStage e := ⟨_,elementary_frequency_mul r L.continuous s⟩
+    refine ⟨c • t,fun x ↦ ?_⟩
+    have he : r (e.equiv x).toAdd = (ρ v x).toAdd := congrArg (fun w ↦ (ρ v w).toAdd) (e.equiv.symm_apply_apply x)
+    change c * ((r (e.equiv x).toAdd : ℂ) * _) = _
+    rw [he,mul_assoc]
+  choose D hD using hmul
+  have hd (χ : PontryaginDual A) (s : SchwartzBruhatStage e) (u : V) (k : X) :
+      DifferentiableAt ℝ (fun w ↦ F χ s w k) u := by
+    let ψ : PontryaginDual (Multiplicative V) := (pontryaginDual_eval (q k)).comp α
+    have hψ : ContDiff ℝ ∞ (fun w : V ↦ (ψ (.ofAdd w) : ℂ)) := contDiff_vector_character ψ
+    exact (contDiff_const.mul (Complex.conjCLE.contDiff.comp ((contDiff_const (c := (χ (q k) : ℂ))).mul hψ))).differentiable (by simp) u
+  have hcalc (χ : PontryaginDual A) : (∀ s, ContDiff ℝ ∞ (Ψ s χ)) ∧ ∀ s u v,
+      fderiv ℝ (Ψ s χ) u v = Ψ (D s v) χ u := by
+    refine integral_family_fderiv ν (F χ) ?_ (hd χ) D ?_ ?_
+    · intro s u
+      exact (hi s).aestronglyMeasurable.mul
+        (((continuous_subtype_val.comp (χ * α (.ofAdd u)).continuous).star.measurable).comp hq).aestronglyMeasurable
+    · intro s u k v
+      let z := q k
+      let r := (ρ v z).toAdd
+      have he (t : ℝ) : F χ s (u + t • v) k = F χ s u k * (Real.fourierChar (-r*t) : ℂ) := by
+        have hα : α (.ofAdd (u+t•v)) = α (.ofAdd u) * a v (.ofAdd t) := map_mul α _ _
+        change _ * star ((χ * α (.ofAdd (u+t•v))) z : ℂ) = _
+        rw [hα,←mul_assoc]
+        change _ * star (((χ * α (.ofAdd u)) z * a v (.ofAdd t) z : Circle) : ℂ) = _
+        rw [hρ,Circle.coe_mul,star_mul,neg_mul,Real.fourierChar.map_neg_eq_inv,Circle.coe_inv_eq_conj]
+        simp only [F,r,z,Complex.star_def,mul_assoc]
+        ring
+      have hline : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+        simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+      have h := (hd χ s u k).hasFDerivAt.comp_hasDerivAt_of_eq 0 hline (by simp)
+      change HasDerivAt (fun t : ℝ ↦ F χ s (u+t•v) k) _ 0 at h
+      rw [show (fun t : ℝ ↦ F χ s (u+t•v) k) = _ from funext he] at h
+      have h' := ((Real.hasDerivAt_fourierChar (-r*0)).scomp 0 ((hasDerivAt_id (0:ℝ)).const_mul (-r))).const_mul (F χ s u k)
+      rw [h.unique h']
+      change _ = _ * star _
+      rw [hD]
+      simp only [F,mul_zero,AddChar.map_zero_eq_one,Circle.coe_one,mul_one,Complex.real_smul,Complex.ofReal_neg,r,c,z]
+      ring
+    · intro s u
+      refine ⟨fun k ↦ ‖s (e.equiv (q k)).toAdd‖,(hi s).norm,.of_forall fun w k ↦ ?_⟩
+      simp [F]
+  refine ⟨fun s χ ↦ (hcalc χ).1 s, fun dirs ↦ ?_⟩
+  induction dirs using List.reverseRecOn with
+  | nil => exact fun s ↦ ⟨s,fun _ _ ↦ rfl⟩
+  | append_singleton l v ih =>
+    intro s
+    obtain ⟨t,ht⟩ := ih (D s v)
+    refine ⟨t,fun χ u ↦ ?_⟩
+    change iteratedFDeriv ℝ _ (Ψ s χ) u _ = Ψ t χ u
+    rw [iteratedFDeriv_append_singleton ((hcalc χ).1 s), show (fun w ↦ fderiv ℝ (Ψ s χ) w v) = Ψ (D s v) χ
+      from funext fun w ↦ (hcalc χ).2 s w v]
+    exact ht χ u
+
+/-- Polynomial decay of the transforms of all tests on a stage bounds the mixed
+partials of their transforms on the dual stage. -/
+private theorem elementary_fourier_mem {A B X : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [CommGroup B] [TopologicalSpace B]
+    [MeasurableSpace A] [BorelSpace A] [MeasurableSpace X] (ν : Measure X) (q : X → A) (hq : Measurable q)
+    (e : ElementaryLCAPresentation A) (d : ElementaryLCAPresentation B) (p : B →ₜ* PontryaginDual A)
+    (hi : ∀ s : SchwartzBruhatStage e, Integrable (fun k ↦ s (e.equiv (q k)).toAdd) ν) :
+    let F (s : SchwartzBruhatStage e) (y : ElementaryLieGroup d.realDim d.torusDim d.latticeRank d.finiteFactor) :=
+      ∫ k, s (e.equiv (q k)).toAdd * star (p (d.equiv.symm (.ofAdd y)) (q k) : ℂ) ∂ν
+    (∀ (s : SchwartzBruhatStage e) (P : MvPolynomial (Fin d.realDim ⊕ Fin d.latticeRank) ℂ), ∃ M : ℝ, ∀ y,
+      ‖MvPolynomial.eval (Sum.elim (fun j ↦ (y.1 j : ℂ)) (fun j ↦ (y.2.2.1 j : ℂ))) P * F s y‖ ≤ M) →
+      ∀ s, F s ∈ elementarySchwartzSubmodule d.realDim d.torusDim d.latticeRank d.finiteFactor := by
+  intro F hbound s
+  let V := EuclideanSpace ℝ (Fin d.realDim) × EuclideanSpace ℝ (Fin d.torusDim)
+  let γ := elementaryCoverZeroHom (m := d.realDim) (n := d.torusDim) (r := d.latticeRank) (F := d.finiteFactor)
+  let α : Multiplicative V →ₜ* PontryaginDual A := p.comp ((ContinuousMonoidHom.toContinuousMonoidHom d.equiv.symm).comp
+    ⟨AddMonoidHom.toMultiplicative γ,elementaryCoverZeroHom_continuous_isOpenMap.1⟩)
+  let χ (a : Fin d.latticeRank → ℤ) (b : d.finiteFactor) := p (d.equiv.symm (.ofAdd (elementaryCover (0:V) a b)))
+  let Ψ (t : SchwartzBruhatStage e) (c : PontryaginDual A) (u : V) := ∫ k,
+    t (e.equiv (q k)).toAdd * star ((c * α (.ofAdd u)) (q k) : ℂ) ∂ν
+  have he (a b u) : χ a b * α (.ofAdd u) = p (d.equiv.symm (.ofAdd (elementaryCover u a b))) := by
+    change p (d.equiv.symm (.ofAdd (elementaryCover (0:V) a b))) * p (d.equiv.symm (.ofAdd (elementaryCover u 0 0))) = _
+    rw [←map_mul,←map_mul]
+    congr 2
+    change Multiplicative.ofAdd (elementaryCover (0:V) a b + elementaryCover u 0 0) = _
+    rw [elementaryCover_add,zero_add,add_zero,add_zero]
+  have hF (t : SchwartzBruhatStage e) (a b u) : F t (elementaryCover u a b) = Ψ t (χ a b) u := by simp only [Ψ,he,F]
+  obtain ⟨hsm,hder⟩ := fourier_charts ν q hq e α hi
+  refine ⟨fun a b ↦ by simp_rw [hF]; exact hsm s _,fun i ↦ ?_⟩
+  let dirs : List V := (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1,0)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0,EuclideanSpace.single j 1)).flatten
+  obtain ⟨t,ht⟩ := hder dirs s
+  let W : MvPolynomial (Fin d.realDim ⊕ Fin d.latticeRank) ℂ :=
+    (∏ j, MvPolynomial.X (Sum.inl j)^i.1 j) * ∏ j, MvPolynomial.X (Sum.inr j)^i.2.2.2 j
+  obtain ⟨M,hM⟩ := hbound t W
+  refine lt_of_le_of_lt (b := ENNReal.ofReal M) (iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_) ENNReal.ofReal_lt_top
+  rw [← ENNReal.ofReal_coe_nnreal]
+  apply ENNReal.ofReal_le_ofReal
+  change ‖_ * iteratedFDeriv ℝ dirs.length (fun w ↦ F s (elementaryCover w a b)) u dirs.get‖ ≤ M
+  simp_rw [hF]
+  rw [ht (χ a b)]
+  change ‖_ * Ψ t (χ a b) u‖ ≤ M
+  rw [←hF]
+  simpa only [W,MvPolynomial.eval_mul,map_prod,map_pow,MvPolynomial.eval_X,Sum.elim_inl,Sum.elim_inr,elementaryCover]
+    using hM (elementaryCover u a b)
+
+/-- A linear map of functions that has continuous Schwartz lifts on every source stage
+has a continuous lift to the full Schwartz–Bruhat spaces. -/
+private theorem schwartzBruhat_lift_stages {G H : Type*} [CommGroup G] [CommGroup H]
+    [TopologicalSpace G] [TopologicalSpace H] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (T : SchwartzBruhat G →ₗ[ℂ] (H → ℂ)) (h : ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+      ∃ B : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat H, ∀ s, (B s).val = T (schwartzBruhatStageInclusion a e s)) :
+    ∃ L : SchwartzBruhat G →L[ℂ] SchwartzBruhat H, ∀ s, (L s).val = T s := by
+  have hmem (f : SchwartzBruhat G) : T f ∈ schwartzBruhatSubmodule H := by
+    obtain ⟨a,e,s,hs⟩ := (mem_schwartzBruhatSubmodule_iff f.val).mp f.property
+    let B := (h a e).choose
+    have hB := (h a e).choose_spec
+    have he : schwartzBruhatStageInclusion a e s = f := Subtype.ext hs
+    rw [←he,← hB s]
+    exact (B s).property
+  let L : SchwartzBruhat G →ₗ[ℂ] SchwartzBruhat H := T.codRestrict _ hmem
+  have hc : Continuous L := by
+    apply (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp L fun p ↦ ?_
+    let P : SeminormFamily ℂ (SchwartzBruhat G) {q : Seminorm ℂ (schwartzBruhatSubmodule G) //
+        ∀ (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient),
+          Continuous (q ∘ schwartzBruhatStageInclusion a e)} := Subtype.val
+    have hP : WithSeminorms P := ⟨rfl⟩
+    refine hP.continuous_seminorm ⟨p.val.comp L,?_⟩
+    intro a e
+    let B := (h a e).choose
+    have hB := (h a e).choose_spec
+    have he (s : SchwartzBruhatStage e) : B s = L (schwartzBruhatStageInclusion a e s) := Subtype.ext (hB s)
+    exact (((withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm p).comp B.continuous).congr
+      fun s ↦ congrArg (fun x ↦ p.val x) (he s)
+  exact ⟨⟨L,hc⟩,fun _ ↦ rfl⟩
+
+section FourierStages
+
+variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+  [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+  (μ : Measure G) [μ.IsHaarMeasure] [μ.Regular]
+
+private theorem fourierStage_weight (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (b : BruhatStructuralPair (PontryaginDual G))
+    (d : ElementaryLCAPresentation b.quotient)
+    (F : SchwartzBruhatStage e → ElementaryLieGroup d.realDim d.torusDim d.latticeRank d.finiteFactor → ℂ)
+    (hf : ∀ (s : SchwartzBruhatStage e) (χ : b.val.1), F s (d.equiv (QuotientGroup.mk χ)).toAdd =
+      lcaFourier μ (schwartzBruhatStageRealization a e s) χ.val) (s : SchwartzBruhatStage e)
+    (P : MvPolynomial (Fin d.realDim ⊕ Fin d.latticeRank) ℂ) : ∃ M : ℝ, ∀ y,
+      ‖MvPolynomial.eval (Sum.elim (fun j ↦ (y.1 j : ℂ)) (fun j ↦ (y.2.2.1 j : ℂ))) P * F s y‖ ≤ M := by
+  let ζ := Sum.elim (coordinateRealHom d) (coordinateLatticeHom d)
+  let qb : b.val.1 →ₜ* b.quotient := ⟨QuotientGroup.mk' _,QuotientGroup.continuous_mk⟩
+  choose γ hγ using fun i ↦ extend_real_character_open b.val.1 b.property.1 ((ζ i).comp qb)
+  obtain ⟨g,hg⟩ := fourier_mul_polynomial μ γ P (schwartzBruhatStageInclusion a e s)
+  refine ⟨∫ x, ‖g x‖ ∂μ,fun y ↦ ?_⟩
+  obtain ⟨χ,hχ⟩ := QuotientGroup.mk'_surjective ((OrderDual.ofDual b.val.2).comap b.val.1.subtype)
+    (d.equiv.symm (.ofAdd y))
+  have hy : d.equiv (qb χ) = .ofAdd y := hχ ▸ d.equiv.apply_symm_apply _
+  have hcoords : (fun i ↦ ((γ i χ.val).toAdd : ℂ)) =
+      Sum.elim (fun i ↦ (y.1 i : ℂ)) (fun i ↦ (y.2.2.1 i : ℂ)) := by
+    funext i
+    rw [hγ]
+    cases i with
+    | inl i =>
+      change (((d.equiv (qb χ)).toAdd.1 i : ℝ) : ℂ) = _
+      rw [hy]; rfl
+    | inr i =>
+      change ((((d.equiv (qb χ)).toAdd.2.2.1 i : ℤ) : ℝ) : ℂ) = _
+      rw [hy]; simp
+  have he : F s y = lcaFourier μ (schwartzBruhatStageRealization a e s) χ.val :=
+    (congrArg (fun z ↦ F s (Multiplicative.toAdd z)) hy).symm.trans (hf s χ)
+  have hg' := hg χ.val
+  rw [hcoords] at hg'
+  change ‖_ * F s y‖ ≤ _
+  rw [he]
+  exact (congrArg norm hg'.symm).le.trans (norm_lcaFourier_le_integral_norm μ g χ.val)
+
+private theorem fourierStage_coordinates (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (b : BruhatStructuralPair (PontryaginDual G))
+    (d : ElementaryLCAPresentation b.quotient) (p : b.quotient →ₜ* PontryaginDual a.quotient)
+    (hp : ∀ (χ : b.val.1) (x : a.val.1), p (QuotientGroup.mk χ) (QuotientGroup.mk x) = χ.val x.val) :
+    let J := a.val.1
+    let q : J →* a.quotient := QuotientGroup.mk' _
+    let F (s : SchwartzBruhatStage e) (y : ElementaryLieGroup d.realDim d.torusDim d.latticeRank d.finiteFactor) :=
+      ∫ x : J, s (e.equiv (q x)).toAdd * star (p (d.equiv.symm (.ofAdd y)) (q x) : ℂ) ∂μ.comap J.subtype
+    (∀ s (χ : b.val.1), F s (d.equiv (QuotientGroup.mk χ)).toAdd =
+      lcaFourier μ (schwartzBruhatStageRealization a e s) χ.val) ∧
+      ∀ s, F s ∈ elementarySchwartzSubmodule d.realDim d.torusDim d.latticeRank d.finiteFactor := by
+  intro J q F
+  let : LocallyCompactSpace J := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : T1Space a.quotient := QuotientGroup.t1Space_iff.mpr (a.property.2.2.1.1.preimage continuous_subtype_val)
+  let : MeasurableSpace a.quotient := borel _
+  let : BorelSpace a.quotient := ⟨rfl⟩
+  let ν := μ.comap J.subtype
+  have hJ : IsOpen (J : Set G) := a.property.1
+  have hon (s : SchwartzBruhatStage e) (x : J) :
+      schwartzBruhatStageRealization a e s x.val = s (e.equiv (q x)).toAdd :=
+    (schwartzBruhatStageRealization_apply a e s _).trans (dite_eq_left x.property)
+  have hoff (s : SchwartzBruhatStage e) {x : G} (hx : x ∉ J) : schwartzBruhatStageRealization a e s x = 0 :=
+    (schwartzBruhatStageRealization_apply a e s _).trans (dite_eq_right hx)
+  have hi (s : SchwartzBruhatStage e) : Integrable (fun x : J ↦ s (e.equiv (q x)).toAdd) ν :=
+    ((integrableOn_iff_comap_subtypeVal hJ.measurableSet).mp (schwartzBruhatStage_integrable μ a e s).integrableOn).congr
+      (.of_forall (hon s))
+  have hf (s : SchwartzBruhatStage e) (χ : b.val.1) : F s (d.equiv (QuotientGroup.mk χ)).toAdd =
+      lcaFourier μ (schwartzBruhatStageRealization a e s) χ.val := by
+    let g (x : G) := schwartzBruhatStageRealization a e s x * star (χ.val x : ℂ)
+    calc _ = ∫ x : J, g x.val ∂ν := by
+           apply integral_congr_ae
+           refine .of_forall fun x ↦ ?_
+           change _ * star (p (d.equiv.symm (d.equiv (QuotientGroup.mk χ))) (q x) : ℂ) = _ * _
+           rw [d.equiv.symm_apply_apply, ←hon]
+           exact congrArg (fun z : Circle ↦ _ * star (z : ℂ)) (hp χ x)
+         _ = ∫ x in J, g x ∂μ := integral_subtype_comap hJ.measurableSet g
+         _ = _ := setIntegral_eq_integral_of_forall_compl_eq_zero fun x hx ↦ by simp [g,hoff s hx]
+  refine ⟨hf, elementary_fourier_mem ν q QuotientGroup.continuous_mk.measurable e d p hi ?_⟩
+  exact fourierStage_weight μ a e b d F hf
+
+private def linearMapOfInjectiveRealization {E U V : Type*} [AddCommGroup E] [Module ℂ E]
+    [AddCommGroup U] [Module ℂ U] [AddCommGroup V] [Module ℂ V]
+    {f : U →ₗ[ℂ] V} (hf : Injective f) (T : E →ₗ[ℂ] V) (t : E → U) (ht : ∀ x, f (t x) = T x) : E →ₗ[ℂ] U where
+  toFun := t
+  map_add' x y := hf (by rw [ht,map_add,map_add,ht,ht])
+  map_smul' c x := hf (by rw [ht,map_smul,map_smul,ht]; rfl)
+
+private theorem fourierStage_realizes (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+    ∀ (b : BruhatStructuralPair (PontryaginDual G)) (d : ElementaryLCAPresentation b.quotient),
+      b.val.1 = lcaAnnihilator (OrderDual.ofDual a.val.2) → OrderDual.ofDual b.val.2 = lcaAnnihilator a.val.1 → ∃ B : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhatStage d,
+      ∀ s, schwartzBruhatStageRealization b d (B s) = lcaFourier μ (schwartzBruhatStageRealization a e s) := by
+  intro b d hJ hK
+  let p := (dualStagePairing a b hJ hK).choose
+  have hp := (dualStagePairing a b hJ hK).choose_spec
+  have hf := (fourierStage_coordinates μ a e b d p hp).1
+  have hm := (fourierStage_coordinates μ a e b d p hp).2
+  let t (s : SchwartzBruhatStage e) : SchwartzBruhatStage d := ⟨_,hm s⟩
+  have hval (s : SchwartzBruhatStage e) : schwartzBruhatStageRealization b d (t s) =
+      lcaFourier μ (schwartzBruhatStageRealization a e s) := by
+    funext χ
+    rw [schwartzBruhatStageRealization_apply]
+    split_ifs with h
+    · exact hf s ⟨χ,h⟩
+    · have hχ : χ ∉ lcaAnnihilator (OrderDual.ofDual a.val.2) := hJ ▸ h
+      obtain ⟨k,hk⟩ := not_forall.mp (mt (mem_lcaAnnihilator_iff _ χ).mpr hχ)
+      let g := schwartzBruhatStageRealization a e s
+      have htr := lcaFourier_translate μ g k.val χ
+      have hfun : (fun x ↦ g (k.val * x)) = g := funext fun x ↦ by
+        rw [mul_comm]
+        exact stageRealization_mul_kernel a e s x k.val k.property
+      rw [hfun] at htr
+      by_contra hn
+      exact hk (Circle.ext ((mul_eq_right₀ (Ne.symm hn)).mp htr.symm))
+  let L := (schwartzBruhat_fourier_linear μ).choose
+  have hL := (schwartzBruhat_fourier_linear μ).choose_spec
+  let T := L.comp (schwartzBruhatStageInclusion a e)
+  have he (s : SchwartzBruhatStage e) : schwartzBruhatStageRealization b d (t s) = T s :=
+    (hval s).trans (funext fun χ ↦ (hL (schwartzBruhatStageInclusion a e s) χ).symm)
+  have hi : Function.Injective (schwartzBruhatStageRealization b d) := fun _ _ h ↦
+    schwartzBruhatStageInclusion_injective b d (Subtype.ext h)
+  let B := linearMapOfInjectiveRealization (f := schwartzBruhatStageRealization b d) hi T t he
+  exact ⟨B,hval⟩
+
+private theorem fourierStage_eval (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
+    (χ : PontryaginDual G) : ∃ f : SchwartzBruhatStage e →L[ℂ] ℂ,
+      ∀ s, f s = lcaFourier μ (schwartzBruhatStageRealization a e s) χ := by
+  let X := SchwartzBruhatStage e
+  let : TopologicalSpace.MetrizableSpace X := elementarySchwartz_isFrechet.choose_spec.2.1
+  let : BarrelledSpace ℂ X := elementarySchwartz_barrelled
+  let C : X →ₗ[ℂ] (G → ℂ) :=
+    { toFun := fun s x ↦ schwartzBruhatStageRealization a e s x * star (χ x : ℂ)
+      map_add' := fun s t ↦ funext fun x ↦ by simp only [map_add, Pi.add_apply,add_mul]
+      map_smul' := fun c s ↦ funext fun x ↦ by simp only [map_smul,Pi.smul_apply,smul_eq_mul,RingHom.id_apply,mul_assoc] }
+  exact exists_integralCLM_of_pointwise_continuous μ C (fun x ↦ (continuous_schwartzBruhatStage_eval a e x).mul_const _)
+    (fun s ↦ integrable_fourierIntegrand μ (schwartzBruhatStage_integrable μ a e s) χ)
+
+private theorem fourierStage_clm (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+    ∃ B : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat (PontryaginDual G), ∀ s,
+      (B s).val = lcaFourier μ (schwartzBruhatStageRealization a e s) := by
+  let b := a.dual.choose
+  let d := b.elementary.some
+  have h := fourierStage_realizes μ a e b d a.dual.choose_spec.1 a.dual.choose_spec.2
+  let B := h.choose
+  have hval (s) : schwartzBruhatStageRealization b d (B s) = lcaFourier μ (schwartzBruhatStageRealization a e s) := h.choose_spec s
+  let : BarrelledSpace ℂ (SchwartzBruhatStage e) := elementarySchwartz_barrelled
+  have hc : Continuous B := by
+    refine continuous_to_stage_of_realization b d B fun χ ↦ ?_
+    let h := fourierStage_eval μ a e χ
+    exact ⟨h.choose,fun s ↦ (h.choose_spec s).trans (congrFun (hval s) χ).symm⟩
+  exact ⟨(schwartzBruhatStageCLM b d).comp ⟨B,hc⟩,hval⟩
+
+private theorem fourierSchwartzCLM :
+    ∃ L : SchwartzBruhat G →L[ℂ] SchwartzBruhat (PontryaginDual G), ∀ s, (L s).val = lcaFourier μ s := by
+  let T := (schwartzBruhat_fourier_linear μ).choose
+  have hT := (schwartzBruhat_fourier_linear μ).choose_spec
+  have h := schwartzBruhat_lift_stages T (fun a e ↦ by
+    let h := fourierStage_clm μ a e
+    exact ⟨h.choose,fun s ↦ (h.choose_spec s).trans (funext (hT (schwartzBruhatStageInclusion a e s))).symm⟩)
+  exact ⟨h.choose,fun s ↦ (h.choose_spec s).trans (funext (hT s))⟩
+
+end FourierStages
+
+end FourierTransform
+
 /-- Paper: Lemma D.1.6.19(2), p. 773. The Fourier integral maps Schwartz–Bruhat functions
 on `G` to Schwartz–Bruhat functions on the dual, by a continuous linear map.
 This is the first assertion of part (2); the isomorphism property is deduced from it below. -/
 theorem schwartzBruhat_fourier_continuousLinear :
     ∃ T : SchwartzBruhat G →L[ℂ] SchwartzBruhat (PontryaginDual G),
-      ∀ (f : SchwartzBruhat G) χ, T f χ = lcaFourier μ f χ := by sorry
+      ∀ (f : SchwartzBruhat G) χ, T f χ = lcaFourier μ f χ := by
+  let T := (fourierSchwartzCLM μ).choose
+  have hT := (fourierSchwartzCLM μ).choose_spec
+  refine ⟨T, fun f χ ↦ ?_⟩
+  change (T f).val χ = lcaFourier μ f χ
+  exact congrFun (hT f) χ
 
 /-- Once Fourier transforms of Schwartz–Bruhat functions are known to be Schwartz–Bruhat,
 they are integrable, so Plancherel inversion holds pointwise. -/
@@ -4070,18 +5063,6 @@ private theorem bruhatStructuralPair_quotient_map (K : Subgroup G) (hK : IsClose
   exact ⟨⟨(M,OrderDual.toDual ((OrderDual.ofDual a.val.2).map q)),ho,hM,
     isBruhatGoodSubgroup_quotient_map K hK _ a.property.2.2.1,Subgroup.map_mono a.property.2.2.2⟩,rfl,rfl⟩
 
-private theorem stageRealization_mul_kernel (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient)
-    (s : SchwartzBruhatStage e) (x u : G) (hu : u ∈ OrderDual.ofDual a.val.2) :
-    schwartzBruhatStageRealization a e s (x * u) = schwartzBruhatStageRealization a e s x := by
-  have hu' := a.property.2.2.2 hu
-  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
-  by_cases hx : x ∈ a.val.1
-  · rw [dite_eq_left (a.val.1.mul_mem hx hu'), dite_eq_left hx]
-    let v : a.val.1 := ⟨u,hu'⟩
-    have hv : v ∈ (OrderDual.ofDual a.val.2).comap a.val.1.subtype := hu
-    exact congrArg (fun z : a.quotient ↦ s (e.equiv z).toAdd) (QuotientGroup.mk_mul_of_mem ⟨x,hx⟩ hv)
-  · rw [dite_eq_right (fun h ↦ hx ((a.val.1.mul_mem_cancel_right hu').mp h)), dite_eq_right hx]
-
 /-- Normalized averaging fixes a supported, kernel-invariant function. -/
 private theorem stageAverage_eq_self_of_invariant (b : BruhatStructuralPair G) (f : G → ℂ)
     (hzero : ∀ x ∉ b.val.1, f x = 0) (hinv : ∀ x k, k ∈ OrderDual.ofDual b.val.2 → f (x*k) = f x)
@@ -4102,20 +5083,6 @@ private theorem stageAverage_eq_self_of_invariant (b : BruhatStructuralPair G) (
     simp
   · unfold schwartzBruhatStageAverage
     rw [ite_eq_right hx,hzero x hx]
-
-private theorem continuous_to_stage_of_realization {E : Type*} [AddCommGroup E] [Module ℂ E]
-    [UniformSpace E] [IsUniformAddGroup E] [ContinuousSMul ℂ E] [BarrelledSpace ℂ E]
-    (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) (B : E →ₗ[ℂ] SchwartzBruhatStage d)
-    (h : ∀ x : G, ∃ L : E →L[ℂ] ℂ, ∀ s, L s = schwartzBruhatStageRealization b d (B s) x) :
-    Continuous B := by
-  apply continuous_toElementarySchwartz_of_eval
-  intro y
-  obtain ⟨q,hq⟩ := d.equiv.surjective (Multiplicative.ofAdd y)
-  obtain ⟨x,rfl⟩ := QuotientGroup.mk_surjective q
-  obtain ⟨L,hL⟩ := h x.val
-  refine ⟨L,fun s ↦ ?_⟩
-  exact (hL s).trans ((schwartzBruhatStageRealization_apply b d (B s) _).trans
-    ((dite_eq_left x.property).trans (congrArg (fun t ↦ B s (Multiplicative.toAdd t)) hq)))
 
 variable [MeasurableSpace G] [BorelSpace G] (K : Subgroup G) (μK : Measure K) [μK.IsHaarMeasure] [μK.Regular]
 variable (hK : IsClosed (K : Set G))
@@ -4276,10 +5243,539 @@ theorem schwartzBruhatCosetIntegral_continuousLinear :
       (cosetIntegral_continuous_on_stage K μK hK a e)
   exact ⟨⟨A,hA⟩,fun _ ↦ rfl⟩
 
+section CosetLifts
+
+omit hK hHaarK hRegularK hBorel hTop hT2 hLC
+
+open Function
+open scoped Pointwise
+
+section
+
+variable {m n r : ℕ} {F : Type*} [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+
+/-- A compactly supported function smooth on every fiber has finite weighted partials. -/
+private theorem elementarySchwartz_of_compactSupport {f : ElementaryLieGroup m n r F → ℂ}
+    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b))) (hc : HasCompactSupport f) :
+    f ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  refine ⟨hf, fun i ↦ ?_⟩
+  let E := EuclideanSpace ℝ (Fin m)
+  let N := EuclideanSpace ℝ (Fin n)
+  let T := Fin n → AddCircle (1 : ℝ)
+  let Z := Fin r → ℤ
+  let q (v : N) : T := fun j ↦ (v j : AddCircle (1 : ℝ))
+  have hq : IsOpenQuotientMap q := (IsOpenQuotientMap.piMap
+    (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
+    (PiLp.homeomorph 2 (fun _ : Fin n ↦ ℝ)).isOpenQuotientMap
+  let lift (t : T) := hq.surjective.hasRightInverse.choose t
+  have hl (t : T) : q (lift t) = t := hq.surjective.hasRightInverse.choose_spec t
+  let d (y : ElementaryLieGroup m n r F) := elementaryPartial f i.2.1 i.2.2.1
+    (y.1, lift y.2.1) y.2.2.1 y.2.2.2
+  have hd (v : E × N) (z : Z) (b : F) :
+      d (elementaryCover v z b) = elementaryPartial f i.2.1 i.2.2.1 v z b := by
+    apply (elementaryPartial_descends _ _ _ _ _ (hf z b)).2
+    exact Prod.ext rfl (Prod.ext (hl (q v.2)) rfl)
+  have hdc : Continuous d := by
+    apply (Homeomorph.prodAssoc E T (Z × F)).isQuotientMap.continuous_iff.mpr
+    apply continuous_prod_of_discrete_right.mpr
+    intro z
+    apply (IsOpenQuotientMap.id.prodMap hq).continuous_comp_iff.mp
+    exact ((elementaryPartial_descends _ _ _ _ _ (hf z.1 z.2)).1.continuous).congr
+      (fun w ↦ (hd w z.1 z.2).symm)
+  have hdz {y : ElementaryLieGroup m n r F} (hy : y ∉ tsupport f) : d y = 0 := by
+    let v : E × N := (y.1, lift y.2.1)
+    let p (w : E × N) := elementaryCover w y.2.2.1 y.2.2.2
+    have hp : Continuous p := continuous_fst.prodMk ((hq.continuous.comp continuous_snd).prodMk continuous_const)
+    have hpv : p v = y := Prod.ext rfl (Prod.ext (hl y.2.1) rfl)
+    have hv : v ∉ tsupport (f ∘ p) := fun hv ↦ hy (hpv ▸ tsupport_comp_subset_preimage f hp hv)
+    have h0 (j : ℕ) : iteratedFDeriv ℝ j (f ∘ p) v = 0 := by
+      by_contra hn
+      exact hv (support_iteratedFDeriv_subset j hn)
+    dsimp only [d, elementaryPartial]
+    change (iteratedFDeriv ℝ _ (f ∘ p) v) _ = 0
+    rw [h0]
+    rfl
+  let w (y : ElementaryLieGroup m n r F) : ℂ :=
+    ((∏ j, (y.1 j : ℂ) ^ i.1 j) * (∏ j, (y.2.2.1 j : ℂ) ^ i.2.2.2 j)) * d y
+  have hw : Continuous w := by
+    apply Continuous.mul _ hdc
+    apply Continuous.mul
+    · fun_prop
+    · exact (continuous_of_discreteTopology (f := fun z : Z ↦ ∏ j, (z j : ℂ) ^ i.2.2.2 j)).comp
+        (continuous_fst.comp (continuous_snd.comp continuous_snd))
+  have hwK : HasCompactSupport w := HasCompactSupport.intro hc fun y hy ↦ by simp [w, hdz hy]
+  obtain ⟨C,hC⟩ := hw.bounded_above_of_compact_support hwK
+  apply lt_of_le_of_lt (b := ENNReal.ofReal C) _ ENNReal.ofReal_lt_top
+  refine iSup_le fun v ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  rw [ENNReal.coe_nnreal_eq]
+  apply ENNReal.ofReal_le_ofReal
+  have h := hC (elementaryCover v a b)
+  dsimp only [w] at h
+  rw [hd] at h
+  exact h
+
+end
+
+private theorem elementary_orbit_deriv_comp {m n r m' n' r' : ℕ} {F F' : Type}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
+    (p : ElementaryLieGroup m n r F →+ ElementaryLieGroup m' n' r' F') (hp : Continuous p)
+    (v : EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) (s : ElementarySchwartz m' n' r' F') :
+    ∃ t : ElementarySchwartz m' n' r' F', ∀ u a b,
+      fderiv ℝ (fun w ↦ s (p (elementaryCover w a b))) u v = t (p (elementaryCover u a b)) := by
+  let l := (ContinuousLinearMap.id ℝ ℝ).smulRight v
+  let q := (elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F))
+  let c := p.comp (q.comp l.toLinearMap.toAddMonoidHom)
+  obtain ⟨D,hD⟩ := elementarySchwartz_orbitDeriv c (hp.comp (elementaryCoverZeroHom_continuous_isOpenMap.1.comp l.continuous))
+  refine ⟨D s,fun u a b ↦ ?_⟩
+  have hsm := contDiff_comp_elementaryHom p hp s.property.1 a b
+  have hline : HasDerivAt (fun t : ℝ ↦ u + t • v) v 0 := by
+    simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add u
+  have h := ((hsm.differentiable (by simp) u).hasFDerivAt.comp_hasDerivAt_of_eq 0 hline (by simp))
+  have he (t : ℝ) : p (elementaryCover u a b) + c t = p (elementaryCover (u+t•v) a b) := by
+    change _ + p (elementaryCover (t•v) 0 0) = _
+    rw [← map_add, elementaryCover_add, add_zero, add_zero]
+  have h' := hD s (p (elementaryCover u a b))
+  simp_rw [he] at h'
+  exact h.unique h'
+
+section Graph
+
+variable {m n r m₁ n₁ r₁ m₂ n₂ r₂ : ℕ} {F F₁ F₂ : Type}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    [AddCommGroup F₁] [TopologicalSpace F₁] [DiscreteTopology F₁] [Finite F₁]
+    [AddCommGroup F₂] [TopologicalSpace F₂] [DiscreteTopology F₂] [Finite F₂]
+local notation "A₀" => ElementaryLieGroup m n r F
+local notation "B₀" => ElementaryLieGroup m₁ n₁ r₁ F₁
+local notation "C₀" => ElementaryLieGroup m₂ n₂ r₂ F₂
+local notation "S₁" => ElementarySchwartz m₁ n₁ r₁ F₁
+local notation "S₂" => ElementarySchwartz m₂ n₂ r₂ F₂
+
+/-- Products of two pullbacks are Schwartz when their noncompact coordinates control the source coordinates. -/
+private theorem elementary_graph_mem (p : A₀ →+ B₀) (q : A₀ →+ C₀) (hp : Continuous p) (hq : Continuous q)
+    (hcoord : ∀ j : Fin m ⊕ Fin r, ∃ (a : B₀ →+ ℝ) (b : C₀ →+ ℝ), Continuous a ∧ Continuous b ∧
+      ∀ x, fiberCoord x j = a (p x) + b (q x)) (s : S₁) (t : S₂) :
+    (fun x ↦ s (p x) * t (q x)) ∈ elementarySchwartzSubmodule m n r F := by
+  classical
+  let J := Fin m ⊕ Fin r
+  let V := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let ev {m n r : ℕ} {F : Type} (P : MvPolynomial (Fin m ⊕ Fin r) ℂ) (y : ElementaryLieGroup m n r F) :=
+    MvPolynomial.eval (Sum.elim (fun i ↦ (y.1 i : ℂ)) (fun j ↦ (y.2.2.1 j : ℂ))) P
+  choose a b ha hb hab using hcoord
+  choose P hP using fun j ↦ elementary_real_hom_polynomial (a j) (ha j)
+  choose Q hQ using fun j ↦ elementary_real_hom_polynomial (b j) (hb j)
+  let w (l : List J) (x : A₀) := (l.map (fun j ↦ (fiberCoord x j : ℂ))).prod
+  have hw (l : List J) (R : MvPolynomial (Fin m₁ ⊕ Fin r₁) ℂ) (T : MvPolynomial (Fin m₂ ⊕ Fin r₂) ℂ)
+      (s : S₁) (t : S₂) : ∃ C : ℝ, ∀ x : A₀,
+        ‖w l x * ((ev R (p x)*s (p x)) * (ev T (q x)*t (q x)))‖ ≤ C := by
+    induction l generalizing R T with
+    | nil =>
+      obtain ⟨c,hc⟩ := polynomial_weight_bounded R s
+      obtain ⟨d,hd⟩ := polynomial_weight_bounded T t
+      refine ⟨c*d,fun x ↦ ?_⟩
+      change ‖1 * ((_ * s (p x)) * (_ * t (q x)))‖ ≤ c*d
+      rw [one_mul,norm_mul]
+      exact mul_le_mul (hc (p x)) (hd (q x)) (norm_nonneg _) ((norm_nonneg _).trans (hc (p x)))
+    | cons j l ih =>
+      obtain ⟨c,hc⟩ := ih (P j * R) T
+      obtain ⟨d,hd⟩ := ih R (Q j * T)
+      refine ⟨c+d,fun x ↦ ?_⟩
+      refine le_trans (le_of_eq (congrArg norm (show _ =
+        w l x * ((ev (P j * R) (p x)*s (p x))*(ev T (q x)*t (q x))) +
+        w l x * ((ev R (p x)*s (p x))*(ev (Q j * T) (q x)*t (q x))) from ?_))) ((norm_add_le ..).trans (add_le_add (hc x) (hd x)))
+      simp only [w,List.map_cons,List.prod_cons, hab j x, Complex.ofReal_add, ev,MvPolynomial.eval_mul, hP, hQ]
+      ring
+  let X (s : S₁) (t : S₂) (a : Fin r → ℤ) (b : F) (u : V) :=
+    s (p (elementaryCover u a b)) * t (q (elementaryCover u a b))
+  have hs (s : S₁) (a : Fin r → ℤ) (b : F) := contDiff_comp_elementaryHom p hp s.property.1 a b
+  have ht (t : S₂) (a : Fin r → ℤ) (b : F) := contDiff_comp_elementaryHom q hq t.property.1 a b
+  have hdiff (dirs : List V) (l : List J) (s : S₁) (t : S₂) : ∃ C : ℝ, ∀ u a b,
+      ‖w l (elementaryCover u a b) * iteratedFDeriv ℝ dirs.length (X s t a b) u dirs.get‖ ≤ C := by
+    induction dirs using List.reverseRecOn generalizing s t with
+    | nil =>
+      obtain ⟨C,h⟩ := hw l 1 1 s t
+      exact ⟨C, fun u a b ↦ by simpa [X,ev] using h (elementaryCover u a b)⟩
+    | append_singleton dirs v ih =>
+      obtain ⟨s',h₁⟩ := elementary_orbit_deriv_comp p hp v s
+      obtain ⟨t',h₂⟩ := elementary_orbit_deriv_comp q hq v t
+      obtain ⟨c,hc⟩ := ih s' t
+      obtain ⟨d,hd⟩ := ih s t'
+      refine ⟨c+d,fun u a b ↦ ?_⟩
+      have he : (fun w ↦ fderiv ℝ (X s t a b) w v) = X s' t a b + X s t' a b := by
+        funext w
+        dsimp only [X,Pi.add_apply]
+        rw [fderiv_fun_mul ((hs s a b).differentiable (by simp) w) ((ht t a b).differentiable (by simp) w)]
+        simp only [add_apply, smul_apply, h₁, h₂, smul_eq_mul]
+        ring
+      rw [iteratedFDeriv_append_singleton ((hs s a b).mul (ht t a b)),he,
+        iteratedFDeriv_add_apply (((hs s' a b).mul (ht t a b)).contDiffAt.of_le (mod_cast le_top))
+          (((hs s a b).mul (ht t' a b)).contDiffAt.of_le (mod_cast le_top)),add_apply,mul_add]
+      exact (norm_add_le ..).trans (add_le_add (hc u a b) (hd u a b))
+  refine ⟨fun a b ↦ (hs s a b).mul (ht t a b), fun i ↦ ?_⟩
+  let dirs : List V := (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1,0)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0,EuclideanSpace.single j 1)).flatten
+  let l : List J := (List.ofFn fun j ↦ List.replicate (i.1 j) (Sum.inl j)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.2 j) (Sum.inr j)).flatten
+  obtain ⟨C,hC⟩ := hdiff dirs l s t
+  refine lt_of_le_of_lt (b := ENNReal.ofReal C) (iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_) ENNReal.ofReal_lt_top
+  rw [← ENNReal.ofReal_coe_nnreal]
+  apply ENNReal.ofReal_le_ofReal
+  have hwgt : w l (elementaryCover u a b) = (∏ j, (u.1 j : ℂ)^i.1 j) * ∏ j, (a j : ℂ)^i.2.2.2 j := by
+    simp [w,l,List.map_flatten,List.prod_flatten,List.map_ofFn, Function.comp_def,List.prod_ofFn,fiberCoord,elementaryCover]
+  exact hwgt ▸ hC u a b
+
+end Graph
+
+private def fiberCoordHom {m n r : ℕ} {F : Type} [AddCommGroup F] (j : Fin m ⊕ Fin r) :
+    ElementaryLieGroup m n r F →+ ℝ where
+  toFun x := fiberCoord x j
+  map_zero' := by cases j <;> simp [fiberCoord]
+  map_add' x y := congrFun (fiberCoord_add x y) j
+
+private theorem fiberCoordHom_continuous {m n r : ℕ} {F : Type} [AddCommGroup F] [TopologicalSpace F]
+    (j : Fin m ⊕ Fin r) : Continuous (fiberCoordHom (n := n) (F := F) j) := by
+  cases j with
+  | inl i => exact (PiLp.continuous_apply 2 _ i).comp continuous_fst
+  | inr i =>
+    exact (continuous_of_discreteTopology (f := fun z : ℤ ↦ (z : ℝ))).comp
+      ((continuous_apply i).comp continuous_snd.snd.fst)
+
+private theorem elementary_positive_test {m n r : ℕ} {F : Type} [AddCommGroup F] [TopologicalSpace F]
+    [DiscreteTopology F] [Finite F] : ∃ s : ElementarySchwartz m n r F,
+      ∀ x, ∃ t : ℝ, 0 < t ∧ s x = (t : ℂ) := by
+  let E := ElementaryLieGroup m n r F
+  let R (l : ℕ) := ElementaryLieGroup l 0 0 PUnit
+  let p : E →+ R m := (AddMonoidHom.inl _ _).comp (AddMonoidHom.fst _ _)
+  let lattice : E →+ EuclideanSpace ℝ (Fin r) :=
+    { toFun := fun x ↦ WithLp.toLp 2 (fun i ↦ (x.2.2.1 i : ℝ))
+      map_zero' := by ext; simp
+      map_add' := fun x y ↦ by ext i; exact Int.cast_add .. }
+  let q : E →+ R r := (AddMonoidHom.inl _ _).comp lattice
+  have hp : Continuous p := continuous_fst.prodMk continuous_const
+  have hq : Continuous q :=
+    ((continuous_of_discreteTopology (f := fun z : Fin r → ℤ ↦ WithLp.toLp 2 (fun i ↦ (z i : ℝ)))).comp
+      continuous_snd.snd.fst).prodMk continuous_const
+  have hcoord (j : Fin m ⊕ Fin r) : ∃ (a : R m →+ ℝ) (b : R r →+ ℝ), Continuous a ∧ Continuous b ∧
+      ∀ x, fiberCoord x j = a (p x) + b (q x) := by
+    cases j with
+    | inl i => exact ⟨fiberCoordHom (.inl i),0,fiberCoordHom_continuous _,continuous_zero,fun x ↦ (add_zero _).symm⟩
+    | inr i => exact ⟨0,fiberCoordHom (.inl i),continuous_zero,fiberCoordHom_continuous _,fun x ↦ (zero_add _).symm⟩
+  have hr (l : ℕ) : ∃ s : ElementarySchwartz l 0 0 PUnit, ∀ x, s x = (Real.exp (-‖x.1‖^2) : ℝ) := by
+    obtain ⟨g,hg⟩ := exists_gaussian_schwartz (E := EuclideanSpace ℝ (Fin l)) 1 one_pos
+    refine ⟨⟨_, (elementarySchwartzSubmodule_real_iff (g : _ → ℂ)).mpr ⟨g,rfl⟩⟩,fun x ↦ ?_⟩
+    simpa using hg x.1
+  obtain ⟨s,hs⟩ := hr m
+  obtain ⟨t,ht⟩ := hr r
+  refine ⟨⟨_,elementary_graph_mem p q hp hq hcoord s t⟩, fun x ↦
+    ⟨Real.exp (-‖(p x).1‖^2) * Real.exp (-‖(q x).1‖^2), by positivity, ?_⟩⟩
+  change s (p x)*t (q x) = _
+  rw [hs,ht,Complex.ofReal_mul]
+
+/-- Lift the vector and free lattice factors through an open quotient. The remaining
+coordinates lie in the compact torus and finite factors. -/
+private theorem elementary_split_noncompact {m n r m' n' r' : ℕ} {F F' : Type}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    [AddCommGroup F'] [TopologicalSpace F'] [DiscreteTopology F'] [Finite F']
+    (p : ElementaryLieGroup m n r F →+ ElementaryLieGroup m' n' r' F')
+    (hp : Continuous p) (ho : IsOpenMap p) (hs : Surjective p) :
+    ∃ τ : ElementaryLieGroup m' n' r' F' →+ ElementaryLieGroup m n r F, Continuous τ ∧
+      ∀ z, p (τ z) = (z.1,0,z.2.2.1,0) := by
+  let A := ElementaryLieGroup m n r F
+  let B := ElementaryLieGroup m' n' r' F'
+  let q := elementaryCoverZeroHom (m := m) (n := n) (r := r) (F := F)
+  obtain ⟨L,hL⟩ := elementary_linear_section (p.comp q) (hp.comp elementaryCoverZeroHom_continuous_isOpenMap.1)
+    (ho.comp elementaryCoverZeroHom_continuous_isOpenMap.2)
+  let v : EuclideanSpace ℝ (Fin m') →+ A :=
+    q.comp ((L.comp (ContinuousLinearMap.inl ℝ _ _)).toLinearMap.toAddMonoidHom)
+  have hv : Continuous v := elementaryCoverZeroHom_continuous_isOpenMap.1.comp
+    (L.continuous.comp (ContinuousLinearMap.inl ℝ _ _).continuous)
+  let j : (Fin r' → ℤ) →+ B := (AddMonoidHom.inr _ _).comp ((AddMonoidHom.inr _ _).comp (AddMonoidHom.inl _ _))
+  let b := Pi.basisFun ℤ (Fin r')
+  choose w hw using fun i ↦ hs (j (b i))
+  let k := (b.constr ℤ w).toAddMonoidHom
+  have hk : p.comp k = j := by
+    have he : (p.comp k).toIntLinearMap = j.toIntLinearMap := by
+      apply b.ext
+      intro i
+      change p (b.constr ℤ w (b i)) = _
+      rw [b.constr_basis]
+      exact hw i
+    exact DFunLike.ext _ _ fun z ↦ DFunLike.congr_fun he z
+  let T : B →+ A := v.comp (AddMonoidHom.fst _ _) + k.comp ((AddMonoidHom.fst _ _).comp
+    ((AddMonoidHom.snd _ _).comp (AddMonoidHom.snd _ _)))
+  refine ⟨T,(hv.comp continuous_fst).add ((continuous_of_discreteTopology (f := k)).comp continuous_snd.snd.fst),fun z ↦ ?_⟩
+  change p (v z.1 + k z.2.2.1) = _
+  rw [map_add, show p (k z.2.2.1) = _ from DFunLike.congr_fun hk z.2.2.1,
+    show p (v z.1) = elementaryCover (z.1,0) 0 0 from hL _]
+  simp [j,elementaryCover,Pi.zero_def]
+
+/-- Split off the real and lattice factors, then normalize a positive test over the compact remainder. -/
+private theorem elementary_fiberIntegral_lift {A B : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [MeasurableSpace A]
+    [BorelSpace A] [CommGroup B] [TopologicalSpace B]
+    (e : ElementaryLCAPresentation A) (e' : ElementaryLCAPresentation B)
+    (p : A →* B) (hp : Continuous p) (ho : IsOpenMap p) (hs : Function.Surjective p)
+    (ν : Measure p.ker) [ν.IsHaarMeasure] (s : SchwartzBruhatStage e') :
+    ∃ t : SchwartzBruhatStage e, ∀ y : A,
+      (∫ k : p.ker, t (e.equiv (y*k.val)).toAdd ∂ν) = s (e'.equiv (p y)).toAdd := by
+  classical
+  let E := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let E' := ElementaryLieGroup e'.realDim e'.torusDim e'.latticeRank e'.finiteFactor
+  let C := ElementaryLieGroup 0 e'.torusDim 0 e'.finiteFactor
+  let π : E →+ E' := AddMonoidHom.toMultiplicative.symm
+    ((e'.equiv.toMonoidHom.comp p).comp e.equiv.symm.toMonoidHom)
+  have hc : Continuous π := e'.equiv.continuous.comp (hp.comp e.equiv.symm.continuous)
+  have hπ (y : A) : π (e.equiv y).toAdd = (e'.equiv (p y)).toAdd :=
+    congrArg (fun x ↦ (e'.equiv (p x)).toAdd) (e.equiv.symm_apply_apply y)
+  obtain ⟨τ,hτ,hsec⟩ := elementary_split_noncompact π hc
+    (e'.equiv.isOpenMap.comp (ho.comp e.equiv.symm.isOpenMap)) (e'.equiv.surjective.comp (hs.comp e.equiv.symm.surjective))
+  let r := AddMonoidHom.id E - τ.comp π
+  have hr : Continuous r := continuous_id.sub (hτ.comp hc)
+  let c : E' →+ C := {
+    toFun z := (0,z.2.1,0,z.2.2.2)
+    map_zero' := rfl
+    map_add' _ _ := Prod.ext (zero_add _).symm (Prod.ext rfl (Prod.ext (zero_add _).symm rfl)) }
+  let j : C →+ E' := {
+    toFun z := (0,z.2.1,0,z.2.2.2)
+    map_zero' := rfl
+    map_add' _ _ := Prod.ext (zero_add _).symm (Prod.ext rfl (Prod.ext (zero_add _).symm rfl)) }
+  have hc' : Continuous c := continuous_const.prodMk (continuous_snd.fst.prodMk (continuous_const.prodMk continuous_snd.snd.snd))
+  have hj : Continuous j := continuous_const.prodMk (continuous_snd.fst.prodMk (continuous_const.prodMk continuous_snd.snd.snd))
+  have hrπ (z : E) : π (r z) = j (c (π z)) := by
+    change π (z-τ (π z)) = _
+    rw [map_sub,hsec]
+    exact Prod.ext (sub_self _) (Prod.ext (sub_zero _) (Prod.ext (sub_self _) (sub_zero _)))
+  obtain ⟨θ,hθ⟩ := elementary_positive_test (m := e.realDim) (n := e.torusDim) (r := e.latticeRank) (F := e.finiteFactor)
+  obtain ⟨hint,η,hη⟩ := elementary_fiberIntegral e e' p hp ho hs ν θ
+  have hne (z : E') : η z ≠ 0 := by
+    obtain ⟨y,hy⟩ := hs (e'.equiv.symm (.ofAdd z))
+    have hy' : (e'.equiv (p y)).toAdd = z := by rw [hy,e'.equiv.apply_symm_apply]; rfl
+    rw [←hy',hη]
+    let f (k : p.ker) := θ (e.equiv (y*k.val)).toAdd
+    have hpos (k) : 0 < (f k).re := by
+      obtain ⟨t,ht,he⟩ := hθ (e.equiv (y*k.val)).toAdd
+      change 0 < (θ _).re
+      rwa [he,Complex.ofReal_re]
+    have h : 0 < ∫ k, (f k).re ∂ν := by
+      apply (integral_pos_iff_support_of_nonneg (fun k ↦ (hpos k).le) (hint y).re).mpr
+      rw [show support (fun k ↦ (f k).re) = univ from eq_univ_of_forall fun k ↦ (hpos k).ne']
+      exact isOpen_univ.measure_pos ν univ_nonempty
+    intro hz
+    change 0 < ∫ k, RCLike.re (f k) ∂ν at h
+    rw [integral_re (show Integrable f ν from hint y)] at h
+    exact (ne_of_gt h) (congrArg Complex.re hz)
+  let d (z : C) := (η (j z))⁻¹
+  have hd : d ∈ elementarySchwartzSubmodule 0 e'.torusDim 0 e'.finiteFactor := by
+    apply elementarySchwartz_of_compactSupport _ (HasCompactSupport.of_compactSpace _)
+    exact fun a b ↦ (contDiff_comp_elementaryHom j hj η.property.1 a b).inv fun u ↦ hne _
+  let d' : ElementarySchwartz 0 e'.torusDim 0 e'.finiteFactor := ⟨d,hd⟩
+  have hs' : (fun z ↦ s z * d' (c z)) ∈
+      elementarySchwartzSubmodule e'.realDim e'.torusDim e'.latticeRank e'.finiteFactor :=
+    elementary_graph_mem (AddMonoidHom.id E') c continuous_id hc'
+      (fun i ↦ ⟨fiberCoordHom i,0,fiberCoordHom_continuous _,continuous_zero, fun z ↦ (add_zero _).symm⟩) s d'
+  let s' : SchwartzBruhatStage e' := ⟨_,hs'⟩
+  have hcoord (i) : ∃ (a : E' →+ ℝ) (b : E →+ ℝ), Continuous a ∧ Continuous b ∧
+      ∀ x, fiberCoord x i = a (π x) + b (r x) := by
+    let b := fiberCoordHom (n := e.torusDim) (F := e.finiteFactor) i
+    refine ⟨b.comp τ,b,(fiberCoordHom_continuous _).comp hτ,fiberCoordHom_continuous _,fun x ↦ ?_⟩
+    change b x = b (τ (π x)) + b (x - τ (π x))
+    rw [map_sub]; abel
+  refine ⟨⟨_,elementary_graph_mem π r hc hr hcoord s' θ⟩, fun y ↦ ?_⟩
+  let z := (e.equiv y).toAdd
+  let z' := π z
+  let y' := e.equiv.symm (.ofAdd (r z))
+  have hkπ (k : p.ker) : π (e.equiv k.val).toAdd = 0 := by
+    rw [hπ,show p k.val = 1 from k.property,map_one]
+    rfl
+  have hy' : (e.equiv y').toAdd = r z := congrArg Multiplicative.toAdd (e.equiv.apply_symm_apply _)
+  have hpr : (e'.equiv (p y')).toAdd = j (c z') := (hπ y').symm.trans (hy' ▸ hrπ z)
+  have hfun (k : p.ker) : s' (π (e.equiv (y*k.val)).toAdd) * θ (r (e.equiv (y*k.val)).toAdd) =
+      s' z' * θ (e.equiv (y'*k.val)).toAdd := by
+    rw [map_mul e.equiv y _, map_mul e.equiv y' _]
+    change s' (π (z + (e.equiv k.val).toAdd)) * θ (r (z + (e.equiv k.val).toAdd)) = _ * θ ((e.equiv y').toAdd + _)
+    rw [map_add, hkπ, add_zero, map_add,hy']
+    have hrk : r (e.equiv k.val).toAdd = (e.equiv k.val).toAdd := by
+      change (e.equiv k.val).toAdd - τ (π (e.equiv k.val).toAdd) = _
+      rw [hkπ, map_zero,sub_zero]
+    rw [hrk]
+  change (∫ k : p.ker, s' (π (e.equiv (y*k.val)).toAdd) * θ (r (e.equiv (y*k.val)).toAdd) ∂ν) = _
+  simp_rw [hfun,integral_const_mul, ← hη y',hpr,← hπ y]
+  change (s z' * (η (j (c z')))⁻¹) * η (j (c z')) = s z'
+  field_simp [hne]
+
+section
+variable {G H : Type*} [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+  [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H] [LocallyCompactSpace G] [LocallyCompactSpace H]
+
+private theorem exists_good_subgroup_image_in_kernel (f : G →ₜ* H) (b : BruhatStructuralPair H) :
+    ∃ k : Subgroup G, IsBruhatGoodSubgroup k ∧ k.map f.toMonoidHom ≤ OrderDual.ofDual b.val.2 := by
+  let : LocallyCompactSpace b.val.1 := b.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : T1Space b.quotient := QuotientGroup.t1Space_iff.mpr (b.property.2.2.1.1.preimage continuous_subtype_val)
+  obtain ⟨e⟩ := b.elementary
+  obtain ⟨W,hW,hpowers⟩ := exists_nhds_one_of_isLocallyEuclidean (locallyEuclidean_of_elementaryPresentation e)
+  let π : b.val.1 →* b.quotient := QuotientGroup.mk' _
+  have hpre : π ⁻¹' W ∈ 𝓝 (1 : b.val.1) := QuotientGroup.continuous_mk.continuousAt.preimage_mem_nhds
+    (by change W ∈ 𝓝 (π 1); rwa [map_one])
+  have him : Subtype.val '' (π ⁻¹' W) ∈ 𝓝 (1 : H) :=
+    b.property.1.isOpenEmbedding_subtypeVal.isOpenMap.image_mem_nhds hpre
+  obtain ⟨A,hA⟩ := exists_lcaDualAnnihilator_subset_nhds (f.continuous.continuousAt.preimage_mem_nhds
+    (show Subtype.val '' (π ⁻¹' W) ∈ 𝓝 (f 1) by rwa [map_one]))
+  let k := lcaDualAnnihilator A.val
+  have hk : IsBruhatGoodSubgroup k := by
+    refine ⟨(isCompact_lcaDualAnnihilator _ A.property.1).isClosed,?_⟩
+    rw [show lcaAnnihilator k = A.val from lcaAnnihilator_dualAnnihilator_of_open _ A.property.1]
+    exact A.property
+  refine ⟨k,hk,?_⟩
+  rintro _ ⟨x,hx,rfl⟩
+  obtain ⟨y,_,hy⟩ := hA hx
+  change (f x) ∈ OrderDual.ofDual b.val.2
+  change y.val = f x at hy
+  rw [←hy]
+  apply (b.quotient_mk_eq_one y).mp
+  apply hpowers
+  intro n
+  obtain ⟨z,hz,hz'⟩ := hA (k.pow_mem hx n)
+  change z.val = f (x^n) at hz'
+  have he : z = y^n := Subtype.ext (by simpa only [map_pow, Subgroup.coe_pow,hy] using hz')
+  exact (show (QuotientGroup.mk y : b.quotient)^n = π z by rw [he,map_pow];rfl) ▸ hz
+
+omit [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] in
+private theorem exists_image_open_subgroup (p : G →ₜ* H) (hp : IsOpenQuotientMap p)
+    (J : OpenCompactlyGeneratedSubgroups H) :
+    ∃ L : OpenCompactlyGeneratedSubgroups G, J.val ≤ L.val.map p.toMonoidHom := by
+  obtain ⟨C,_,hc,hgen⟩ := J.property.2
+  let I := OpenCompactlyGeneratedSubgroups G
+  let : IsDirectedOrder I := (openCompactlyGeneratedSubgroups_colimit (G := G)).1
+  let : Nonempty I := ⟨((openCompactlyGeneratedSubgroups_colimit (G := G)).2.1 1).choose⟩
+  let V (i : I) := p '' (i.val : Set G)
+  have hcvr : Subtype.val '' C ⊆ ⋃ i, V i := by
+    rintro _ ⟨x,_,rfl⟩
+    obtain ⟨g,hg⟩ := hp.surjective x.val
+    obtain ⟨i,hi⟩ := (openCompactlyGeneratedSubgroups_colimit (G := G)).2.1 g
+    exact mem_iUnion.mpr ⟨i,g,hi,hg⟩
+  obtain ⟨i,hi⟩ := (hc.image continuous_subtype_val).elim_directed_cover V
+    (fun j ↦ hp.isOpenMap _ j.property.1) hcvr (directed_of_isDirected_le (fun _ _ h ↦ image_mono h))
+  have hsub : C ⊆ ((i.val.map p.toMonoidHom).comap J.val.subtype : Set J.val) :=
+    fun x hx ↦ hi ⟨x,hx,rfl⟩
+  have htop : ⊤ ≤ (i.val.map p.toMonoidHom).comap J.val.subtype := hgen ▸ (Subgroup.closure_le _).mpr hsub
+  exact ⟨i,fun x hx ↦ htop (Subgroup.mem_top ⟨x,hx⟩)⟩
+
+private theorem exists_cofinal_image_stage (K : Subgroup G) (hK : IsClosed (K : Set G))
+    (b : BruhatStructuralPair (G ⧸ K)) :
+    ∃ a : BruhatStructuralPair G, b ≤ (bruhatStructuralPair_quotient_map K hK a).choose := by
+  let : T1Space (G ⧸ K) := QuotientGroup.t1Space_iff.mpr hK
+  let q : G →ₜ* G ⧸ K := ⟨QuotientGroup.mk' K,QuotientGroup.continuous_mk⟩
+  obtain ⟨k,hk,hsmall⟩ := exists_good_subgroup_image_in_kernel q b
+  obtain ⟨L,hL⟩ := exists_image_open_subgroup q QuotientGroup.isOpenQuotientMap_mk ⟨b.val.1,b.property.1,b.property.2.1⟩
+  obtain ⟨M,hM⟩ := exists_openCompactlyGeneratedSubgroup_contains (isCompact_of_bruhatGoodSubgroup k hk)
+  let := (openCompactlyGeneratedSubgroups_colimit (G := G)).1
+  obtain ⟨J,hLJ,hMJ⟩ := exists_ge_ge L M
+  let a : BruhatStructuralPair G := ⟨(J.val,OrderDual.toDual k),J.property.1,J.property.2,hk,hM.trans hMJ⟩
+  refine ⟨a,?_,?_⟩
+  · rw [(bruhatStructuralPair_quotient_map K hK a).choose_spec.1]
+    exact hL.trans (Subgroup.map_mono hLJ)
+  · change OrderDual.ofDual (bruhatStructuralPair_quotient_map K hK a).choose.val.2 ≤ _
+    rw [(bruhatStructuralPair_quotient_map K hK a).choose_spec.2]
+    exact hsmall
+
+end
+
+private theorem cosetIntegral_local_lift {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (K : Subgroup G) (μK : Measure K) [μK.IsHaarMeasure] [μK.Regular] (hK : IsClosed (K : Set G))
+    (a : BruhatStructuralPair G) (b : BruhatStructuralPair (G ⧸ K))
+    (hJ : b.val.1 = a.val.1.map (QuotientGroup.mk' K))
+    (hk : OrderDual.ofDual b.val.2 = (OrderDual.ofDual a.val.2).map (QuotientGroup.mk' K))
+    (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient) (s : SchwartzBruhatStage d) :
+    ∃ t : SchwartzBruhatStage e, ∀ (y : G) (_hy : y ∈ a.val.1) (hz : QuotientGroup.mk y ∈ b.val.1),
+      (∫ k : K, schwartzBruhatStageRealization a e t (y*k.val) ∂μK) =
+        s (d.equiv (QuotientGroup.mk ⟨QuotientGroup.mk y,hz⟩)).toAdd := by
+  classical
+  let : IsClosed (K : Set G) := hK
+  let H := a.val.1
+  let C := OrderDual.ofDual a.val.2
+  let : LocallyCompactSpace H := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : MeasurableSpace a.quotient := borel _
+  let : BorelSpace a.quotient := ⟨rfl⟩
+  let N := C.comap H.subtype
+  let : IsClosed (N : Set H) := a.property.2.2.1.1.preimage continuous_subtype_val
+  let : T1Space a.quotient := QuotientGroup.t1Space_iff.mpr (inferInstance : IsClosed (N : Set H))
+  let q : H →* a.quotient := QuotientGroup.mk' N
+  have hqc : IsCompact (q.ker : Set H) := by
+    rw [QuotientGroup.ker_mk']
+    exact (H.isClosed_of_isOpen a.property.1).isClosedEmbedding_subtypeVal.isCompact_preimage
+      (isCompact_of_bruhatGoodSubgroup C a.property.2.2.1)
+  let : LocallyCompactSpace a.val.1 := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let : LocallyCompactSpace a.quotient := inferInstanceAs (LocallyCompactSpace (H ⧸ N))
+  let : T2Space a.quotient := inferInstanceAs (T2Space (H ⧸ N))
+  obtain ⟨p,hp,ho,hs,hker,hmk⟩ := a.exists_quotient_hom K b hJ hk
+  obtain ⟨ν,hν,hfib⟩ := exists_haar_fiberIntegral_eq (A := a.quotient) K μK hK H a.property.1 q QuotientGroup.continuous_mk
+    QuotientGroup.isOpenMap_coe (QuotientGroup.mk'_surjective N) hqc p.ker hker
+  let : ν.IsHaarMeasure := hν
+  have hLift := elementary_fiberIntegral_lift (A := a.quotient) (B := b.quotient) e d p hp ho hs ν s
+  obtain ⟨t,ht⟩ := hLift
+  refine ⟨t, fun y hy hz ↦ ?_⟩
+  let v : H := ⟨y,hy⟩
+  let f (x : a.quotient) := t (e.equiv x).toAdd
+  have hc : Continuous f := (elementarySchwartz_continuousFunction t).comp e.equiv.continuous
+  have hi := (hfib f hc v).2
+  have he (k : K) : schwartzBruhatStageRealization a e t (y*k.val) =
+      if h : y*k.val ∈ H then f (q ⟨_,h⟩) else 0 := by
+    rw [schwartzBruhatStageRealization_apply]
+    rfl
+  simp_rw [he]
+  exact hi.trans ((ht (q v)).trans (congrArg (fun w ↦ s (d.equiv w).toAdd) (hmk y hy hz)))
+
+private theorem cosetIntegral_lift_stage {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (K : Subgroup G) (μK : Measure K) [μK.IsHaarMeasure] [μK.Regular] (hK : IsClosed (K : Set G))
+    (a : BruhatStructuralPair G) (b : BruhatStructuralPair (G ⧸ K))
+    (hJ : b.val.1 = a.val.1.map (QuotientGroup.mk' K))
+    (hk : OrderDual.ofDual b.val.2 = (OrderDual.ofDual a.val.2).map (QuotientGroup.mk' K))
+    (e : ElementaryLCAPresentation a.quotient) (d : ElementaryLCAPresentation b.quotient) (s : SchwartzBruhatStage d) :
+    ∃ f : SchwartzBruhat G, (schwartzBruhatCosetIntegral K μK hK f).val = schwartzBruhatStageRealization b d s := by
+  classical
+  let : IsClosed (K : Set G) := hK
+  obtain ⟨t,ht⟩ := cosetIntegral_local_lift K μK hK a b hJ hk e d s
+  let T : SchwartzBruhat G := schwartzBruhatStageInclusion a e t
+  refine ⟨T,funext fun z ↦ ?_⟩
+  by_cases hz : z ∈ b.val.1
+  · have hzmap : z ∈ a.val.1.map (QuotientGroup.mk' K) := hJ ▸ hz
+    obtain ⟨y,hy,hyz⟩ := hzmap
+    change (QuotientGroup.mk y : G ⧸ K) = z at hyz
+    subst z
+    refine (schwartzBruhatCosetIntegral_mk K μK hK T y).trans ((ht y hy hz).trans ?_)
+    exact ((schwartzBruhatStageRealization_apply b d s _).trans (dite_eq_left hz)).symm
+  · obtain ⟨y,hyz⟩ := QuotientGroup.mk'_surjective K z
+    change (QuotientGroup.mk y : G ⧸ K) = z at hyz
+    subst z
+    have hzero (k : K) : T (y*k.val) = 0 := by
+      refine (schwartzBruhatStageRealization_apply a e t _).trans (dite_eq_right ?_)
+      intro h
+      apply hz
+      rw [hJ]
+      exact ⟨y*k.val,h,by simp⟩
+    refine (schwartzBruhatCosetIntegral_mk K μK hK T y).trans (Eq.trans ?_
+      (((schwartzBruhatStageRealization_apply b d s _).trans (dite_eq_right hz)).symm))
+    simp_rw [hzero,integral_zero]
+
+end CosetLifts
+
 /-- Paper: Theorem D.1.7.1(2), p. 776. Every Schwartz–Bruhat function on the
 quotient is the coset integral of a Schwartz–Bruhat function on the group. -/
 theorem schwartzBruhatCosetIntegral_surjective :
-    Function.Surjective (schwartzBruhatCosetIntegral K μK hK) := by sorry
+    Function.Surjective (schwartzBruhatCosetIntegral K μK hK) := by
+  intro s
+  let : IsClosed (K : Set G) := hK
+  obtain ⟨b,d,t,ht⟩ := (mem_schwartzBruhatSubmodule_iff s.val).mp s.property
+  obtain ⟨a,ha⟩ := exists_cofinal_image_stage K hK b
+  let hex := bruhatStructuralPair_quotient_map K hK a
+  obtain ⟨e⟩ := hex.choose.elementary
+  obtain ⟨j,hj,_⟩ := schwartzBruhatStage_transition ha d e
+  obtain ⟨e₀⟩ := a.elementary
+  obtain ⟨f,hf⟩ := cosetIntegral_lift_stage K μK hK a hex.choose hex.choose_spec.1 hex.choose_spec.2 e₀ e (j t)
+  exact ⟨f,Subtype.ext (hf.trans ((hj t).trans ht))⟩
 
 omit hK hHaarK hRegularK hBorel hTop hT2 hLC in
 /-- An embedded Fréchet stage gives its range the same additive uniformity. -/
@@ -4379,6 +5875,1122 @@ theorem schwartzBruhatCosetIntegral_isQuotientMap [SecondCountableTopology G] :
 
 end AveragingAndFourier
 
+section DistributionKernels
+
+open UniformSpace Function Bornology
+open scoped Pointwise ComplexOrder
+
+section StageTensors
+
+variable {G H : Type*} [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H] [LocallyCompactSpace G] [LocallyCompactSpace H]
+
+private theorem exists_stage_for_map {L : Type*} [CommGroup L] [TopologicalSpace L] [IsTopologicalGroup L]
+    [T2Space L] [LocallyCompactSpace L] (f : G →ₜ* H) (b : BruhatStructuralPair H)
+    (g : L →ₜ* G) (hL : IsCompactlyGeneratedGroup L) :
+    ∃ a : BruhatStructuralPair G, (∀ l, g l ∈ a.val.1) ∧
+      (OrderDual.ofDual a.val.2).map f.toMonoidHom ≤ OrderDual.ofDual b.val.2 := by
+  obtain ⟨k,hk,hsmall⟩ := exists_good_subgroup_image_in_kernel f b
+  obtain ⟨C,_,hc,hgen⟩ := hL
+  obtain ⟨J,hJ⟩ := exists_openCompactlyGeneratedSubgroup_contains
+    ((hc.image g.continuous).union (isCompact_of_bruhatGoodSubgroup k hk))
+  have hkJ : k ≤ J.val := fun x hx ↦ hJ (Or.inr hx)
+  have hsub : C ⊆ (J.val.comap g.toMonoidHom : Set L) := fun x hx ↦ hJ (Or.inl ⟨x,hx,rfl⟩)
+  have htop : ⊤ ≤ J.val.comap g.toMonoidHom := hgen ▸ (Subgroup.closure_le _).mpr hsub
+  exact ⟨⟨(J.val,OrderDual.toDual k),J.property.1,J.property.2,hk,hkJ⟩,fun x ↦ htop (Subgroup.mem_top x),hsmall⟩
+
+private theorem exists_rectangular_stage_bounds (a : BruhatStructuralPair (G × H)) :
+    ∃ (u : BruhatStructuralPair G) (v : BruhatStructuralPair H),
+      a.val.1 ≤ u.val.1.prod v.val.1 ∧
+        (OrderDual.ofDual u.val.2).prod (OrderDual.ofDual v.val.2) ≤ OrderDual.ofDual a.val.2 := by
+  let : LocallyCompactSpace a.val.1 := a.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  let left : a.val.1 →ₜ* G := ⟨(MonoidHom.fst G H).comp a.val.1.subtype,continuous_fst.comp continuous_subtype_val⟩
+  let right : a.val.1 →ₜ* H := ⟨(MonoidHom.snd G H).comp a.val.1.subtype,continuous_snd.comp continuous_subtype_val⟩
+  obtain ⟨u,hJ,hk⟩ := exists_stage_for_map (ContinuousMonoidHom.inl G H) a left a.property.2.1
+  obtain ⟨v,hL,hl⟩ := exists_stage_for_map (ContinuousMonoidHom.inr G H) a right a.property.2.1
+  refine ⟨u,v,fun x hx ↦ ⟨hJ ⟨x,hx⟩,hL ⟨x,hx⟩⟩,?_⟩
+  rintro ⟨x,y⟩ ⟨hx,hy⟩
+  have h₁ : (x,1) ∈ OrderDual.ofDual a.val.2 := hk ⟨x,hx,rfl⟩
+  have h₂ : (1,y) ∈ OrderDual.ofDual a.val.2 := hl ⟨y,hy,rfl⟩
+  simpa using (OrderDual.ofDual a.val.2).mul_mem h₁ h₂
+
+private def completedInductiveMap {A B C D : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [TopologicalSpace C] [PolynormableSpace ℂ C] [T2Space C]
+    [AddCommGroup D] [Module ℂ D] [TopologicalSpace D] [PolynormableSpace ℂ D] [T2Space D]
+    (f : A →L[ℂ] C) (g : B →L[ℂ] D) :
+    Completion (InductiveTensor A B) →L[ℂ] Completion (InductiveTensor C D) :=
+  (show InductiveTensor A B →L[ℂ] InductiveTensor C D from
+    ⟨inductiveTensorMap f.toLinearMap g.toLinearMap,inductiveTensorMap_continuous f g⟩).completion
+
+private theorem completedInductiveMap_pure {A B C D : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [TopologicalSpace C] [PolynormableSpace ℂ C] [T2Space C]
+    [AddCommGroup D] [Module ℂ D] [TopologicalSpace D] [PolynormableSpace ℂ D] [T2Space D]
+    (f : A →L[ℂ] C) (g : B →L[ℂ] D) (x : A) (y : B) :
+    completedInductiveMap f g (Completion.coe' (α := InductiveTensor A B) (x ⊗ₜ[ℂ] y)) =
+      Completion.coe' (α := InductiveTensor C D) (f x ⊗ₜ[ℂ] g y) :=
+  ContinuousLinearMap.completion_apply_coe _ _
+
+private theorem stageTensor_change {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    (ha : IsFrechetTVS A) (hb : IsFrechetTVS B) :
+    ∃ e : Completion (InductiveTensor A B) ≃L[ℂ] Completion (ProjectiveTensor A B), ∀ (x : A) (y : B),
+      e (Completion.coe' (α := InductiveTensor A B) (x ⊗ₜ[ℂ] y)) =
+        Completion.coe' (α := ProjectiveTensor A B) (x ⊗ₜ[ℂ] y) := by
+  let L : InductiveTensor A B →L[ℂ] ProjectiveTensor A B := ⟨LinearMap.id, continuous_inductiveTensor_to_projectiveTensor⟩
+  have he : IsHomeomorph L.completion := completedInductiveTensor_to_projectiveTensor_of_frechet ha hb
+  exact ⟨ContinuousLinearEquiv.ofIsHomeomorph (LinearEquiv.ofBijective L.completion.toLinearMap he.bijective) he,
+    fun x y ↦ L.completion_apply_coe (show InductiveTensor A B from x ⊗ₜ[ℂ] y)⟩
+
+end StageTensors
+
+section ElementarySlices
+
+variable {m n r m₁ n₁ r₁ m₂ n₂ r₂ : ℕ} {F F₁ F₂ : Type}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    [AddCommGroup F₁] [TopologicalSpace F₁] [DiscreteTopology F₁] [Finite F₁]
+    [AddCommGroup F₂] [TopologicalSpace F₂] [DiscreteTopology F₂] [Finite F₂]
+local notation "Z" => ElementaryLieGroup m n r F
+local notation "X" => ElementaryLieGroup m₁ n₁ r₁ F₁
+local notation "Y" => ElementaryLieGroup m₂ n₂ r₂ F₂
+local notation "SZ" => ElementarySchwartz m n r F
+local notation "SX" => ElementarySchwartz m₁ n₁ r₁ F₁
+local notation "SY" => ElementarySchwartz m₂ n₂ r₂ F₂
+local notation "VX" => EuclideanSpace ℝ (Fin m₁) × EuclideanSpace ℝ (Fin n₁)
+
+private theorem slice_smooth (p : X →+ Z) (hp : Continuous p) (s : SZ) (z : Z) (a : Fin r₁ → ℤ) (b : F₁) :
+    ContDiff ℝ ∞ (fun u ↦ s (p (elementaryCover u a b) + z)) := by
+  apply contDiff_comp_elementaryHom p hp (f := fun v ↦ s (v+z)) _ a b
+  intro c d
+  obtain ⟨w,hw⟩ := elementaryCover_surjective z.2.2.1 z.2.2.2 z.1 z.2.1
+  have he (u) : elementaryCover u c d + z = elementaryCover (u+(z.1,w)) (c+z.2.2.1) (d+z.2.2.2) := by
+    change elementaryCover (z.1,w) z.2.2.1 z.2.2.2 = z at hw
+    conv_lhs => rw [← hw]
+    rw [elementaryCover_add]
+  simp_rw [he]
+  exact (s.property.1 _ _).comp (contDiff_id.add contDiff_const)
+
+/-- Differentiating a slice in a fixed list of directions differentiates the same ambient
+test for every translate. -/
+private theorem slice_derivatives (p : X →+ Z) (hp : Continuous p) (dirs : List VX) (s : SZ) :
+    ∃ t : SZ, ∀ (z : Z) a b u,
+      iteratedFDeriv ℝ dirs.length (fun w ↦ s (p (elementaryCover w a b) + z)) u dirs.get =
+        t (p (elementaryCover u a b) + z) := by
+  induction dirs using List.reverseRecOn generalizing s with
+  | nil => exact ⟨s,fun _ _ _ _ ↦ by simp⟩
+  | append_singleton dirs v ih =>
+    let l := (ContinuousLinearMap.id ℝ ℝ).smulRight v
+    let q := elementaryCoverZeroHom (m := m₁) (n := n₁) (r := r₁) (F := F₁)
+    let c := p.comp (q.comp l.toLinearMap.toAddMonoidHom)
+    obtain ⟨D,hD⟩ := elementarySchwartz_orbitDeriv c (hp.comp (elementaryCoverZeroHom_continuous_isOpenMap.1.comp l.continuous))
+    obtain ⟨t,ht⟩ := ih (D s)
+    refine ⟨t,fun z a b u ↦ ?_⟩
+    have hs := slice_smooth p hp s z a b
+    have hder (w : VX) : fderiv ℝ (fun v ↦ s (p (elementaryCover v a b) + z)) w v = D s (p (elementaryCover w a b) + z) := by
+      have hline : HasDerivAt (fun k : ℝ ↦ w + k • v) v 0 := by
+        simpa using ((hasDerivAt_id (0 : ℝ)).smul_const v).const_add w
+      have h := ((hs.differentiable (by simp) w).hasFDerivAt.comp_hasDerivAt_of_eq 0 hline (by simp))
+      have he (k : ℝ) : p (elementaryCover w a b) + z + c k = p (elementaryCover (w+k•v) a b) + z := by
+        change _ + z + p (elementaryCover (k•v) 0 0) = _
+        rw [add_right_comm,←map_add,elementaryCover_add,add_zero,add_zero]
+      have h' := hD s (p (elementaryCover w a b) + z)
+      simp_rw [he] at h'
+      exact h.unique h'
+    rw [iteratedFDeriv_append_singleton hs,funext hder]
+    exact ht z a b u
+
+private theorem slice_partial (e : X × Y ≃ₜ+ Z) (s : SZ) (β : Fin m₁ → ℕ) (γ : Fin n₁ → ℕ) :
+    ∃ t : SZ, ∀ (y : Y) u a b,
+      elementaryPartial (fun x ↦ s (e (x,y))) β γ u a b = t (e (elementaryCover u a b,y)) := by
+  let p := e.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl X Y)
+  let dirs : List VX := (List.ofFn fun i ↦ List.replicate (β i) (EuclideanSpace.single i 1,0)).flatten ++
+    (List.ofFn fun i ↦ List.replicate (γ i) (0,EuclideanSpace.single i 1)).flatten
+  obtain ⟨t,ht⟩ := slice_derivatives p (e.continuous.comp (continuous_id.prodMk continuous_const)) dirs s
+  have he (x : X) (y : Y) : p x + e (0,y) = e (x,y) := by
+    change e (x,0) + e (0,y) = _
+    rw [←map_add]; simp
+  refine ⟨t,fun y u a b ↦ ?_⟩
+  simpa only [elementaryPartial,dirs,he] using ht (e (0,y)) a b u
+
+private def sliceWeight {m n r : ℕ} {F : Type} (i : ElementarySchwartzIndex m n r)
+    (y : ElementaryLieGroup m n r F) := elementarySchwartzMonomial i.1 i.2.2.2 y.1 y.2.2.1
+
+private theorem weight_of_hom (p : Z →+ X) (hp : Continuous p) (i : ElementarySchwartzIndex m₁ n₁ r₁) :
+    ∃ P : MvPolynomial (Fin m ⊕ Fin r) ℂ, ∀ z : Z,
+      MvPolynomial.eval (Sum.elim (fun j ↦ (z.1 j : ℂ)) (fun j ↦ (z.2.2.1 j : ℂ))) P = sliceWeight i (p z) := by
+  choose P hP using fun j : Fin m₁ ⊕ Fin r₁ ↦ elementary_real_hom_polynomial ((fiberCoordHom j).comp p)
+    ((fiberCoordHom_continuous j).comp hp)
+  refine ⟨(∏ j, (P (.inl j))^(i.1 j)) * ∏ j, (P (.inr j))^(i.2.2.2 j),fun z ↦ ?_⟩
+  simp [sliceWeight,elementarySchwartzMonomial,hP,fiberCoordHom,fiberCoord]
+
+/-- All rows of a fixed test, multiplied by any fixed weight in the column variables,
+lie in a bounded subset of the row Schwartz space. -/
+private theorem bounded_weighted_rows (e : X × Y ≃ₜ+ Z) (s : SZ) (j : ElementarySchwartzIndex m₂ n₂ r₂) :
+    ∃ T : Y → SX, (∀ y x, T y x = sliceWeight j y * s (e (x,y))) ∧ IsVonNBounded ℂ (range T) := by
+  let p := (AddMonoidHom.fst X Y).comp e.symm.toAddEquiv.toAddMonoidHom
+  let q := (AddMonoidHom.snd X Y).comp e.symm.toAddEquiv.toAddMonoidHom
+  let k := e.toAddEquiv.toAddMonoidHom.comp (AddMonoidHom.inl X Y)
+  have hk : Continuous k := e.continuous.comp (continuous_id.prodMk continuous_const)
+  let row (y : Y) (x : X) := s (e (x,y))
+  have hrow (y : Y) (a : Fin r₁ → ℤ) (b : F₁) : ContDiff ℝ ∞ (fun u ↦ row y (elementaryCover u a b)) := by
+    have he (x : X) : k x + e (0,y) = e (x,y) := by change e (x,0) + e (0,y) = _; rw [←map_add]; simp
+    simpa only [he] using slice_smooth k hk s (e (0,y)) a b
+  let f (y : Y) := sliceWeight j y • row y
+  have hf (i : ElementarySchwartzIndex m₁ n₁ r₁) : ∃ C : ℝ, ∀ y, elementarySchwartzBound (f y) i ≤ ENNReal.ofReal C := by
+    obtain ⟨t,ht⟩ := slice_partial e s i.2.1 i.2.2.1
+    obtain ⟨P,hP⟩ := weight_of_hom p (continuous_fst.comp e.symm.continuous) i
+    obtain ⟨Q,hQ⟩ := weight_of_hom q (continuous_snd.comp e.symm.continuous) j
+    obtain ⟨C,hC⟩ := polynomial_weight_bounded (P*Q) t
+    refine ⟨C,fun y ↦ iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_⟩
+    rw [← ENNReal.ofReal_coe_nnreal]
+    apply ENNReal.ofReal_le_ofReal
+    let x : X := elementaryCover u a b
+    have h := hC (e (x,y))
+    rw [MvPolynomial.eval_mul,hP,hQ,show p (e (x,y)) = x from congrArg Prod.fst (e.symm_apply_apply _),
+      show q (e (x,y)) = y from congrArg Prod.snd (e.symm_apply_apply _),mul_assoc] at h
+    rw [show elementaryPartial (f y) _ _ u a b = sliceWeight j y * t (e (x,y)) from
+      (elementaryPartial_smul _ (hrow y) _ _ u a b).trans (congrArg (sliceWeight j y * ·) (ht y u a b))]
+    exact h
+  let T (y : Y) : SX := ⟨f y,fun a b ↦ contDiff_const.mul (hrow y a b),fun i ↦ (hf i).choose_spec y |>.trans_lt ENNReal.ofReal_lt_top⟩
+  refine ⟨T,fun _ _ ↦ rfl,elementarySchwartz_withSeminorms.isVonNBounded_iff_seminorm_bounded.mpr fun i ↦ ?_⟩
+  refine ⟨(ENNReal.ofReal (hf i).choose).toReal + 1,by positivity,?_⟩
+  rintro _ ⟨y,rfl⟩
+  exact (ENNReal.toReal_mono ENNReal.ofReal_ne_top ((hf i).choose_spec y)).trans_lt (lt_add_one _)
+
+private def elementaryJet (i : ElementarySchwartzIndex m₂ n₂ r₂)
+    (u : EuclideanSpace ℝ (Fin m₂) × EuclideanSpace ℝ (Fin n₂)) (a : Fin r₂ → ℤ) (b : F₂) : SY →ₗ[ℂ] ℂ where
+  toFun t := sliceWeight i (elementaryCover u a b) * elementaryPartial t.val i.2.1 i.2.2.1 u a b
+  map_add' s t := by
+    change _ * elementaryPartial (s.val+t.val) _ _ _ _ _ = _
+    rw [elementaryPartial_add s.property.1 t.property.1,mul_add]
+  map_smul' c s := by
+    change _ * elementaryPartial (c • s.val) _ _ _ _ _ = _
+    rw [elementaryPartial_smul c s.property.1]
+    simp only [RingHom.id_apply,smul_eq_mul]
+    ring
+
+private def elementaryDelta (x : X) : StrongDual ℂ SX := (elementarySchwartz_eval x).choose
+
+private theorem elementaryDelta_apply (x : X) (s : SX) : elementaryDelta x s = s x :=
+  (elementarySchwartz_eval x).choose_spec s
+
+private theorem elementaryDelta_dense :
+    DenseRange (Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)))).subtypeL := by
+  let : T2Space SX := elementarySchwartz_t2
+  let D := StrongDual ℂ SX
+  let V := Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)))
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : PolynormableSpace ℂ D := uniformConvergenceCLM_polynormable (F := ℂ) _ (fun _ h ↦ h)
+    (by rw [sUnion_isVonNBounded_eq_univ,Submodule.span_univ]; simp)
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  intro L
+  rw [show range V.subtypeL = (V : Set D) from Subtype.range_coe]
+  by_contra hn
+  obtain ⟨φ,hne,hzero⟩ := exists_dual_eq_zero_on_submodule_of_notMem V.topologicalClosure V.isClosed_topologicalClosure hn
+  obtain ⟨e,he⟩ := elementarySchwartz_reflexive (m := m₁) (n := n₁) (r := r₁) (F := F₁)
+  obtain ⟨s,rfl⟩ := e.surjective φ
+  have hs : s = 0 := by
+    apply Subtype.ext
+    funext x
+    exact (elementaryDelta_apply x s).symm.trans ((he s (elementaryDelta x)).symm.trans
+      (hzero _ (V.le_topologicalClosure (Submodule.subset_span (mem_range_self x)))))
+  exact hne (by rw [hs,map_zero]; rfl)
+
+/-- The weighted rows of a product test let a distribution on the first factor act on
+its slices, producing a Schwartz test on the second factor. -/
+private theorem elementary_kernel_operator (e : X × Y ≃ₜ+ Z) (s : SZ) :
+    ∃ T : StrongDual ℂ SX →L[ℂ] SY, ∀ x y, T (elementaryDelta x) y = s (e (x,y)) := by
+  classical
+  let flip : Y × X ≃ₜ+ Z := (show Y × X ≃ₜ+ X × Y from ⟨AddEquiv.prodComm,continuous_swap,continuous_swap⟩).trans e
+  have hf (y : Y) (x : X) : flip (y,x) = e (x,y) := rfl
+  let zeroX : ElementarySchwartzIndex m₁ n₁ r₁ := (0,0,0,0)
+  let zeroY : ElementarySchwartzIndex m₂ n₂ r₂ := (0,0,0,0)
+  obtain ⟨row,hrow,_⟩ := bounded_weighted_rows e s zeroY
+  obtain ⟨col,hcol,_⟩ := bounded_weighted_rows flip s zeroX
+  have hr (y : Y) (x : X) : row y x = s (e (x,y)) := by simpa [sliceWeight,elementarySchwartzMonomial,zeroY] using hrow y x
+  have hc (x : X) (y : Y) : col x y = s (e (x,y)) := by simpa [sliceWeight,elementarySchwartzMonomial,zeroX,hf] using hcol x y
+  let VX₂ := EuclideanSpace ℝ (Fin m₂) × EuclideanSpace ℝ (Fin n₂)
+  let U := VX₂ × (Fin r₂ → ℤ) × F₂
+  let jet (i : ElementarySchwartzIndex m₂ n₂ r₂) (u : U) := elementaryJet i u.1 u.2.1 u.2.2
+  have hjet (i : ElementarySchwartzIndex m₂ n₂ r₂) :
+      ∃ B : U → SX, IsVonNBounded ℂ (range B) ∧ ∀ u x, B u x = jet i u (col x) := by
+    obtain ⟨t,ht⟩ := slice_partial flip s i.2.1 i.2.2.1
+    obtain ⟨S,hS,hB⟩ := bounded_weighted_rows e t i
+    let y (u : U) : Y := elementaryCover u.1 u.2.1 u.2.2
+    refine ⟨fun u ↦ S (y u),hB.subset (range_comp_subset_range _ _),fun u x ↦ ?_⟩
+    rw [hS]
+    change _ = _ * elementaryPartial (col x).val _ _ _ _ _
+    rw [show (col x).val = fun y ↦ s (flip (y,x)) from funext (hc x),ht,hf]
+  choose B hB hjet using hjet
+  let V := Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)))
+  have hliftAux (L : StrongDual ℂ SX) (hL : L ∈ V) : ∃ t : SY, (∀ y, t y = L (row y)) ∧ ∀ i u, jet i u t = L (B i u) := by
+    induction hL using Submodule.span_induction with
+    | mem l h =>
+      obtain ⟨x,rfl⟩ := h
+      exact ⟨col x,fun y ↦ (hc x y).trans ((hr y x).symm.trans (elementaryDelta_apply x _).symm),
+        fun i u ↦ (hjet i u x).symm.trans (elementaryDelta_apply x _).symm⟩
+    | zero => exact ⟨0,fun _ ↦ rfl,fun i u ↦ (jet i u).map_zero⟩
+    | add l k _ _ hl hk =>
+      obtain ⟨t,ht,hj⟩ := hl
+      obtain ⟨w,hw,hk⟩ := hk
+      exact ⟨t+w,fun y ↦ congrArg₂ (·+·) (ht y) (hw y),
+        fun i u ↦ ((jet i u).map_add _ _).trans (congrArg₂ (·+·) (hj i u) (hk i u))⟩
+    | smul c l _ hl =>
+      obtain ⟨t,ht,hj⟩ := hl
+      exact ⟨c • t,fun y ↦ congrArg (c • ·) (ht y),
+        fun i u ↦ ((jet i u).map_smul c _).trans (congrArg (c • ·) (hj i u))⟩
+  let hlift (L : V) := hliftAux L.val L.property
+  let T : V →ₗ[ℂ] SY :=
+    { toFun := fun L ↦ (hlift L).choose
+      map_add' := fun L M ↦ Subtype.ext (funext fun y ↦ ((hlift (L+M)).choose_spec.1 y).trans
+        (congrArg₂ (·+·) ((hlift L).choose_spec.1 y) ((hlift M).choose_spec.1 y)).symm)
+      map_smul' := fun c L ↦ Subtype.ext (funext fun y ↦ ((hlift (c•L)).choose_spec.1 y).trans
+        (congrArg (c • ·) ((hlift L).choose_spec.1 y)).symm) }
+  have hcont : Continuous T := by
+    apply elementarySchwartz_withSeminorms.continuous_of_continuous_comp
+    intro i
+    apply Seminorm.continuous' (r := 1)
+    have h := ContinuousLinearMap.eventually_nhds_zero_mapsTo (σ := RingHom.id ℂ) (hB i)
+      (Metric.closedBall_mem_nhds (0 : ℂ) one_pos)
+    filter_upwards [V.subtypeL.continuous.continuousAt.preimage_mem_nhds (show _ ∈ 𝓝 (V.subtypeL 0) from h)] with L hL
+    apply ((elementarySchwartzSeminorm i).comp T).mem_closedBall_zero.mpr
+    change (elementarySchwartzBound (T L).val i).toReal ≤ 1
+    apply (ENNReal.toReal_mono (b := 1) (by simp) _).trans_eq ENNReal.toReal_one
+    refine iSup_le fun u ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+    have h := (hlift L).choose_spec.2 i (u,a,b)
+    have hb := mem_closedBall_zero_iff.mp (hL (mem_range_self (⟨u,a,b⟩ : U)))
+    change ‖L.val (B i (u,a,b))‖ ≤ 1 at hb
+    rw [← h] at hb
+    change (‖jet i (u,a,b) (T L)‖₊ : ℝ≥0∞) ≤ 1
+    rw [← ENNReal.ofReal_coe_nnreal, show (1 : ℝ≥0∞) = ENNReal.ofReal 1 by simp]
+    exact ENNReal.ofReal_le_ofReal hb
+  let : CompleteSpace SY := elementarySchwartz_isFrechet.choose_spec.2.2
+  let : T2Space SY := elementarySchwartz_t2
+  let : IsUniformAddGroup V := V.toAddSubgroup.isUniformAddGroup
+  let S : V →L[ℂ] SY := ⟨T,hcont⟩
+  refine ⟨S.extend V.subtypeL,fun x y ↦ ?_⟩
+  let v : V := ⟨elementaryDelta x,Submodule.subset_span (mem_range_self x)⟩
+  change S.extend V.subtypeL (V.subtypeL v) y = _
+  rw [S.extend_eq elementaryDelta_dense isUniformEmbedding_subtype_val.isUniformInducing]
+  exact ((hlift v).choose_spec.1 y).trans ((elementaryDelta_apply x _).trans (hr y x))
+
+/-- The two projective tensor completions obtained by a change of first factor are canonically equivalent. -/
+private theorem projective_change_first {A B C : Type*}
+    [AddCommGroup A] [Module ℂ A] [UniformSpace A] [IsUniformAddGroup A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [UniformSpace B] [IsUniformAddGroup B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [UniformSpace C] [IsUniformAddGroup C] [PolynormableSpace ℂ C] [T2Space C]
+    (e : A ≃L[ℂ] B) :
+    ∃ U : Completion (ProjectiveTensor A C) ≃L[ℂ] Completion (ProjectiveTensor B C), ∀ x y,
+      U (Completion.coe' (α := ProjectiveTensor A C) (x ⊗ₜ[ℂ] y)) =
+        Completion.coe' (α := ProjectiveTensor B C) (e x ⊗ₜ[ℂ] y) := by
+  let idC := ContinuousLinearMap.id ℂ C
+  let T : ProjectiveTensor A C →L[ℂ] ProjectiveTensor B C :=
+    ⟨projectiveTensorMap e.toLinearMap idC.toLinearMap,projectiveTensorMap_continuous e.toContinuousLinearMap idC⟩
+  let S : ProjectiveTensor B C →L[ℂ] ProjectiveTensor A C :=
+    ⟨projectiveTensorMap e.symm.toLinearMap idC.toLinearMap,projectiveTensorMap_continuous e.symm.toContinuousLinearMap idC⟩
+  have hT : LeftInverse S T := fun t ↦ DFunLike.congr_fun (show S.toLinearMap.comp T.toLinearMap = LinearMap.id from
+    TensorProduct.ext' (fun x y ↦ by change e.symm (e x) ⊗ₜ[ℂ] y = _; rw [e.symm_apply_apply]; rfl)) t
+  have hS : LeftInverse T S := fun t ↦ DFunLike.congr_fun (show T.toLinearMap.comp S.toLinearMap = LinearMap.id from
+    TensorProduct.ext' (fun x y ↦ by change e (e.symm x) ⊗ₜ[ℂ] y = _; rw [e.apply_symm_apply]; rfl)) t
+  refine ⟨ContinuousLinearEquiv.equivOfInverse T.completion S.completion (fun z ↦ Completion.induction_on z
+    (isClosed_eq (S.completion.continuous.comp T.completion.continuous) continuous_id) (fun t ↦ ?_))
+    (fun z ↦ Completion.induction_on z (isClosed_eq (T.completion.continuous.comp S.completion.continuous) continuous_id) (fun t ↦ ?_)),
+    fun x y ↦ T.completion_apply_coe (show ProjectiveTensor A C from x ⊗ₜ[ℂ] y)⟩
+  · change S.completion (T.completion _) = _
+    rw [T.completion_apply_coe,S.completion_apply_coe,hT t]
+  · change T.completion (S.completion _) = _
+    rw [S.completion_apply_coe,T.completion_apply_coe,hS t]
+
+private theorem completed_projective_frechet {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [UniformSpace A] [IsUniformAddGroup A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [UniformSpace B] [IsUniformAddGroup B] [PolynormableSpace ℂ B] [T2Space B]
+    [TopologicalSpace.MetrizableSpace A] [TopologicalSpace.MetrizableSpace B] :
+    IsFrechetTVS (Completion (ProjectiveTensor A B)) := by
+  let T := ProjectiveTensor A B
+  obtain ⟨U,hU⟩ := (𝓝 (0:A)).exists_antitone_basis
+  obtain ⟨V,hV⟩ := (𝓝 (0:B)).exists_antitone_basis
+  let : (𝓝 (0:T)).IsCountablyGenerated := (projectiveTensor_zero_basis hU.1 hV.1).isCountablyGenerated
+  let : (uniformity T).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  let : T2Space T := projectiveTensor_t2
+  let : MetricSpace T := UniformSpace.metricSpace T
+  let : PolynormableSpace ℂ (Completion T) := polynormableSpace_completion
+  refine ⟨inferInstance,inferInstance,inferInstance,?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq]
+  infer_instance
+
+private theorem projective_extension_of_separate {A B C : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [UniformSpace C] [IsUniformAddGroup C] [ContinuousSMul ℂ C]
+    [PolynormableSpace ℂ C] [T2Space C] [CompleteSpace C]
+    (hA : IsFrechetTVS A) (hB : IsFrechetTVS B) (M : A →ₗ[ℂ] B →ₗ[ℂ] C)
+    (hl : ∀ x, Continuous (M x)) (hr : ∀ y, Continuous (M.flip y)) :
+    ∃ T : Completion (ProjectiveTensor A B) →L[ℂ] C, ∀ x y,
+      T (Completion.coe' (α := ProjectiveTensor A B) (x ⊗ₜ[ℂ] y)) = M x y := by
+  let L : InductiveTensor A B →ₗ[ℂ] C := TensorProduct.lift M
+  let D : InductiveTensor A B →L[ℂ] C := ⟨L,(continuous_inductiveTensor_iff L).mpr ⟨hl,hr⟩⟩
+  obtain ⟨e,he⟩ := stageTensor_change hA hB
+  refine ⟨D.fromCompletion.comp e.symm.toContinuousLinearMap,fun x y ↦ ?_⟩
+  change D.fromCompletion (e.symm _) = _
+  rw [←he,e.symm_apply_apply]
+  exact D.fromCompletion_apply_coe (show InductiveTensor A B from x ⊗ₜ[ℂ] y)
+
+private theorem tensor_of_reflexive_nuclear {A B : Type}
+    [AddCommGroup A] [Module ℂ A] [UniformSpace A] [IsUniformAddGroup A] [PolynormableSpace ℂ A] [T2Space A] [CompleteSpace A]
+    [AddCommGroup B] [Module ℂ B] [UniformSpace B] [IsUniformAddGroup B] [PolynormableSpace ℂ B] [T2Space B] [CompleteSpace B]
+    [ContinuousSMul ℂ A] [ContinuousSMul ℂ B]
+    [BarrelledSpace ℂ (StrongDual ℂ A)] [CompleteSpace (StrongDual ℂ A)]
+    (e : A ≃L[ℂ] StrongDual ℂ (StrongDual ℂ A)) (he : ∀ f L, e f L = L f) (hA : IsNuclearTVS.{0} A) :
+    ∃ U : Completion (ProjectiveTensor A B) ≃L[ℂ] (StrongDual ℂ A →L[ℂ] B),
+      ∀ (f : A) (g : B) (L : StrongDual ℂ A),
+        U (Completion.coe' (α := ProjectiveTensor A B) (f ⊗ₜ[ℂ] g)) L = L f • g := by
+  let D := StrongDual ℂ A
+  let : PolynormableSpace ℂ D := uniformConvergenceCLM_polynormable (F := ℂ) _ (fun _ h ↦ h)
+    (by rw [sUnion_isVonNBounded_eq_univ,Submodule.span_univ]; simp)
+  have hn := schwartzBruhat_nuclear_of_embedding.{0} e.symm.toLinearMap e.symm.toHomeomorph.isEmbedding hA
+  let : T2Space (StrongDual ℂ D) := hn.1
+  let : PolynormableSpace ℂ (StrongDual ℂ D) := hn.2.1
+  let u : A ≃ᵤ StrongDual ℂ D := ⟨e.toEquiv,e.toContinuousLinearMap.uniformContinuous,e.symm.toContinuousLinearMap.uniformContinuous⟩
+  let : CompleteSpace (StrongDual ℂ D) := u.completeSpace_iff.mp inferInstance
+  obtain ⟨U,hU⟩ := projective_change_first (C := B) e
+  obtain ⟨V,hV⟩ := (completedProjectiveTensorToOperators_equiv (E := D) (F := B) hn).2
+  refine ⟨U.trans V,fun f g L ↦ ?_⟩
+  change V (U _) L = _
+  exact (congrArg (fun z ↦ V z L) (hU f g)).trans ((congrArg (fun v : D →L[ℂ] B ↦ v L)
+    (hV (e f ⊗ₜ[ℂ] g))).trans ((projectiveTensorToOperators_tmul (e f) g L).trans (congrArg (· • g) (he f L))))
+
+private theorem elementary_product_map (e : X × Y ≃ₜ+ Z) :
+    ∃ L : Completion (ProjectiveTensor SX SY) →L[ℂ] SZ, ∀ (s : SX) (t : SY) (x : X) (y : Y),
+      L (Completion.coe' (α := ProjectiveTensor SX SY) (s ⊗ₜ[ℂ] t)) (e (x,y)) = s x * t y := by
+  let p := (AddMonoidHom.fst X Y).comp e.symm.toAddEquiv.toAddMonoidHom
+  let q := (AddMonoidHom.snd X Y).comp e.symm.toAddEquiv.toAddMonoidHom
+  let hp : Continuous p := continuous_fst.comp e.symm.continuous
+  let hq : Continuous q := continuous_snd.comp e.symm.continuous
+  have hcoord (j : Fin m ⊕ Fin r) : ∃ (a : X →+ ℝ) (b : Y →+ ℝ), Continuous a ∧ Continuous b ∧
+      ∀ z, fiberCoord z j = a (p z) + b (q z) := by
+    let c := (fiberCoordHom j).comp e.toAddEquiv.toAddMonoidHom
+    have hc : Continuous c := (fiberCoordHom_continuous _).comp e.continuous
+    refine ⟨c.comp (AddMonoidHom.inl X Y),c.comp (AddMonoidHom.inr X Y),
+      hc.comp (continuous_id.prodMk continuous_const),hc.comp (continuous_const.prodMk continuous_id),fun z ↦ ?_⟩
+    change _ = c (p z,0) + c (0,q z)
+    rw [←map_add,show (p z,0) + (0,q z) = e.symm z by exact Prod.ext (add_zero _) (zero_add _)]
+    exact congrArg (fun z ↦ fiberCoord z j) (e.apply_symm_apply z).symm
+  let hprod := elementary_graph_mem p q hp hq hcoord
+  let B : SX →ₗ[ℂ] SY →ₗ[ℂ] SZ :=
+    LinearMap.mk₂ ℂ (fun s t ↦ (⟨fun z ↦ s (p z) * t (q z),hprod s t⟩ : SZ))
+      (fun s t v ↦ Subtype.ext (funext fun z ↦ add_mul (s (p z)) (t (p z)) (v (q z))))
+      (fun c s t ↦ Subtype.ext (funext fun z ↦ mul_assoc c (s (p z)) (t (q z))))
+      (fun s t v ↦ Subtype.ext (funext fun z ↦ mul_add (s (p z)) (t (q z)) (v (q z))))
+      (fun c s t ↦ Subtype.ext (funext fun z ↦ mul_left_comm (s (p z)) c (t (q z))))
+  let : BarrelledSpace ℂ SX := isFrechetTVS_barrelled elementarySchwartz_isFrechet
+  let : BarrelledSpace ℂ SY := isFrechetTVS_barrelled elementarySchwartz_isFrechet
+  let : ContinuousSMul ℂ SX := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : ContinuousSMul ℂ SY := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : T2Space SX := elementarySchwartz_t2
+  let : T2Space SY := elementarySchwartz_t2
+  let : T2Space SZ := elementarySchwartz_t2
+  let : CompleteSpace SZ := elementarySchwartz_isFrechet.choose_spec.2.2
+  let : PolynormableSpace ℂ SX := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SY := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SZ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  have hl (s : SX) : Continuous (B s) := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro z
+    let h := elementarySchwartz_eval (q z)
+    exact ⟨s (p z) • h.choose,fun t ↦ congrArg (s (p z) * ·) (h.choose_spec t)⟩
+  have hr (t : SY) : Continuous (B.flip t) := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro z
+    let h := elementarySchwartz_eval (p z)
+    exact ⟨t (q z) • h.choose,fun s ↦ (congrArg (t (q z) * ·) (h.choose_spec s)).trans (mul_comm ..)⟩
+  obtain ⟨L,hL⟩ := projective_extension_of_separate elementarySchwartz_isFrechet elementarySchwartz_isFrechet B hl hr
+  refine ⟨L,fun s t x y ↦ ?_⟩
+  rw [hL]
+  exact congrArg₂ (·*·) (congrArg (fun v : X × Y ↦ s v.1) (e.symm_apply_apply _))
+    (congrArg (fun v : X × Y ↦ t v.2) (e.symm_apply_apply _))
+
+private theorem elementary_operator_tensor :
+    ∃ E : Completion (ProjectiveTensor SX SY) ≃L[ℂ] (StrongDual ℂ SX →L[ℂ] SY),
+      ∀ (f : SX) (g : SY) (L : StrongDual ℂ SX),
+        E (Completion.coe' (α := ProjectiveTensor SX SY) (f ⊗ₜ[ℂ] g)) L = L f • g := by
+  let : T2Space SX := elementarySchwartz_t2
+  let : T2Space SY := elementarySchwartz_t2
+  let : PolynormableSpace ℂ SX := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SY := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : CompleteSpace SY := elementarySchwartz_isFrechet.choose_spec.2.2
+  let : CompleteSpace SX := elementarySchwartz_isFrechet.choose_spec.2.2
+  let : ContinuousSMul ℂ SX := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : ContinuousSMul ℂ SY := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : CompleteSpace (StrongDual ℂ SX) := elementarySchwartz_strongDual_complete
+  let : BarrelledSpace ℂ (StrongDual ℂ SX) := elementarySchwartz_strongDual_barrelled
+  obtain ⟨e,he⟩ := elementarySchwartz_reflexive (m := m₁) (n := n₁) (r := r₁) (F := F₁)
+  exact tensor_of_reflexive_nuclear (A := SX) (B := SY) e he elementarySchwartz_nuclear
+
+private theorem elementary_kernel_value (e : X × Y ≃ₜ+ Z)
+    (L : Completion (ProjectiveTensor SX SY) →L[ℂ] SZ)
+    (hL : ∀ (s : SX) (t : SY) (x : X) (y : Y), L (Completion.coe' (α := ProjectiveTensor SX SY) (s ⊗ₜ[ℂ] t)) (e (x,y)) = s x * t y)
+    (A : Completion (ProjectiveTensor SX SY) ≃L[ℂ] (StrongDual ℂ SX →L[ℂ] SY))
+    (hA : ∀ (s : SX) (t : SY) (l : StrongDual ℂ SX), A (Completion.coe' (α := ProjectiveTensor SX SY) (s ⊗ₜ[ℂ] t)) l = l s • t)
+    (z : Completion (ProjectiveTensor SX SY)) (x : X) (y : Y) : L z (e (x,y)) = A z (elementaryDelta x) y := by
+  let P := ProjectiveTensor SX SY
+  let ev := (elementarySchwartz_eval (e (x,y))).choose
+  let δ := (elementarySchwartz_eval y).choose
+  let left := ev.comp L
+  let right := δ.comp ((ContinuousLinearMap.applyₗ SY (RingHom.id ℂ) (elementaryDelta x)).comp A.toContinuousLinearMap)
+  have h : left.toLinearMap.comp (Completion.toComplL : P →L[ℂ] _).toLinearMap =
+      right.toLinearMap.comp (Completion.toComplL : P →L[ℂ] _).toLinearMap := by
+    apply TensorProduct.ext'
+    intro s t
+    have h := (elementarySchwartz_eval (e (x,y))).choose_spec (L (Completion.coe' (α := P) (s ⊗ₜ[ℂ] t)))
+    have hv := hA s t (elementaryDelta x)
+    have hv' : (A (Completion.coe' (α := P) (s ⊗ₜ[ℂ] t)) (elementaryDelta x)) y = s x * t y := by
+      rw [hv,elementaryDelta_apply]
+      rfl
+    exact h.trans ((hL s t x y).trans (hv'.symm.trans ((elementarySchwartz_eval y).choose_spec _).symm))
+  have hz : left z = right z := Completion.induction_on z (isClosed_eq left.continuous right.continuous)
+    (fun t ↦ DFunLike.congr_fun h t)
+  exact ((elementarySchwartz_eval (e (x,y))).choose_spec _).symm.trans (hz.trans ((elementarySchwartz_eval y).choose_spec _))
+
+private theorem elementary_kernel_bijective {T : Type*} [AddCommGroup T] [Module ℂ T] [TopologicalSpace T]
+    (e : X × Y ≃ₜ+ Z) (L : T →L[ℂ] SZ) (A : T ≃L[ℂ] (StrongDual ℂ SX →L[ℂ] SY))
+    (hvalue : ∀ z x y, L z (e (x,y)) = A z (elementaryDelta x) y) : Bijective L := by
+  let D := StrongDual ℂ SX
+  let : T2Space SY := elementarySchwartz_t2
+  have hinj : Injective L := by
+    intro z w h
+    apply A.injective
+    let a := A z - A w
+    have hz : Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁))) ≤ a.ker := by
+      apply Submodule.span_le.mpr
+      rintro _ ⟨x,rfl⟩
+      apply sub_eq_zero.mpr
+      exact Subtype.ext (funext fun y ↦ (hvalue z x y).symm.trans ((congrArg (fun f : SZ ↦ f (e (x,y))) h).trans (hvalue w x y)))
+    apply ContinuousLinearMap.ext
+    intro x
+    apply sub_eq_zero.mp
+    apply a.isClosed_ker.closure_subset_iff.mpr (fun _ h ↦ hz h)
+    exact (show Dense (Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁))) : Set D) by
+      simpa only [DenseRange,show range (Submodule.span ℂ (range (elementaryDelta (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)))).subtypeL = _ from Subtype.range_coe] using elementaryDelta_dense (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)) x
+  have hsur : Surjective L := by
+    intro f
+    obtain ⟨T,hT⟩ := elementary_kernel_operator e f
+    refine ⟨A.symm T,Subtype.ext (funext fun g ↦ ?_)⟩
+    let x := (e.symm g).1
+    let y := (e.symm g).2
+    have hg : e (x,y) = g := e.apply_symm_apply g
+    exact (congrArg (fun w : Z ↦ L (A.symm T) w) hg).symm.trans ((hvalue _ x y).trans
+      ((congrArg (fun B : D →L[ℂ] SY ↦ B (elementaryDelta x) y) (A.apply_symm_apply T)).trans
+      ((hT x y).trans (congrArg (fun w : Z ↦ f w) hg))))
+  exact ⟨hinj,hsur⟩
+
+private theorem frechet_product_equiv_of_bijective {A B C : Type*}
+    [AddCommGroup A] [Module ℂ A] [UniformSpace A] [IsUniformAddGroup A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [UniformSpace B] [IsUniformAddGroup B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [TopologicalSpace C]
+    (hA : IsFrechetTVS A) (hB : IsFrechetTVS B) (hC : IsFrechetTVS C)
+    (L : Completion (ProjectiveTensor A B) →L[ℂ] C) (hL : Bijective L) :
+    ∃ e : Completion (InductiveTensor A B) ≃L[ℂ] C, ∀ x y,
+      e (Completion.coe' (α := InductiveTensor A B) (x ⊗ₜ[ℂ] y)) =
+        L (Completion.coe' (α := ProjectiveTensor A B) (x ⊗ₜ[ℂ] y)) := by
+  let : TopologicalSpace.MetrizableSpace A := hA.choose_spec.2.1
+  let : TopologicalSpace.MetrizableSpace B := hB.choose_spec.2.1
+  let P := ProjectiveTensor A B
+  let : PolynormableSpace ℂ (Completion P) := polynormableSpace_completion
+  let : ContinuousSMul ℂ (Completion P) := PolynormableSpace.continuousSMul ℂ _
+  have hq := quotientMap_of_LF_surjection (isLFSpace_of_isFrechetTVS (completed_projective_frechet (A := A) (B := B)))
+    (isLFSpace_of_isFrechetTVS hC) L ⟨L,fun _ ↦ rfl⟩ hL.surjective
+  obtain ⟨e,he⟩ := stageTensor_change hA hB
+  exact ⟨e.trans (ContinuousLinearEquiv.ofIsHomeomorph (LinearEquiv.ofBijective L.toLinearMap hL)
+    (isHomeomorph_iff_isQuotientMap_injective.mpr ⟨hq,hL.injective⟩)),fun x y ↦ congrArg L (he x y)⟩
+
+/-- A product chart identifies the elementary product test space with the completed
+inductive tensor of its factors. Point evaluation identifies its action on pure tensors. -/
+private theorem elementary_kernel_equiv (e : X × Y ≃ₜ+ Z) :
+    ∃ L : Completion (InductiveTensor SX SY) ≃L[ℂ] SZ, ∀ (s : SX) (t : SY) (x : X) (y : Y),
+      L (Completion.coe' (α := InductiveTensor SX SY) (s ⊗ₜ[ℂ] t)) (e (x,y)) = s x * t y := by
+  let : T2Space SX := elementarySchwartz_t2
+  let : T2Space SY := elementarySchwartz_t2
+  let : T2Space SZ := elementarySchwartz_t2
+  let : PolynormableSpace ℂ SX := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SY := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SZ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  refine (elementary_product_map e).elim fun L hL ↦ ?_
+  refine (elementary_operator_tensor (m₁ := m₁) (n₁ := n₁) (r₁ := r₁) (F₁ := F₁)
+    (m₂ := m₂) (n₂ := n₂) (r₂ := r₂) (F₂ := F₂)).elim fun A hA ↦ ?_
+  have hb := elementary_kernel_bijective e L A (elementary_kernel_value e L hL A hA)
+  refine (frechet_product_equiv_of_bijective (A := SX) (B := SY) (C := SZ) elementarySchwartz_isFrechet elementarySchwartz_isFrechet
+    elementarySchwartz_isFrechet L hb).elim fun U hU ↦ ?_
+  exact ⟨U,fun s t x y ↦ (congrArg (fun z : SZ ↦ z (e (x,y))) (hU s t)).trans (hL s t x y)⟩
+
+end ElementarySlices
+
+/-- Glue stage maps on an exhaustive directed family of linear images by taking the union
+of their graphs. Injectivity in each stage makes the union a graph. -/
+private theorem directed_stage_linear_map {I E F : Type*} [Nonempty I] [Preorder I] [IsDirectedOrder I]
+    [AddCommGroup E] [Module ℂ E] [AddCommGroup F] [Module ℂ F]
+    {X : I → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
+    (u : ∀ i, X i →ₗ[ℂ] E) (v : ∀ i, X i →ₗ[ℂ] F) (hinj : ∀ i, Injective (u i))
+    (hex : ∀ x, ∃ i t, u i t = x)
+    (hm : ∀ i j, i ≤ j → ∀ t, ∃ s, u j s = u i t ∧ v j s = v i t) :
+    ∃ L : E →ₗ[ℂ] F, ∀ i t, L (u i t) = v i t := by
+  let R (i : I) := ((u i).prod (v i)).range
+  have hmono : Monotone R := by
+    rintro i j hij _ ⟨t,rfl⟩
+    obtain ⟨s,hs,hs'⟩ := hm i j hij t
+    exact ⟨s,Prod.ext hs hs'⟩
+  let M := ⨆ i, R i
+  let p := (LinearMap.fst ℂ E F).comp M.subtype
+  let q := (LinearMap.snd ℂ E F).comp M.subtype
+  have hi : Injective p := by
+    apply LinearMap.ker_eq_bot.mp
+    apply le_antisymm _ bot_le
+    rintro ⟨⟨x,y⟩,h⟩ hx
+    obtain ⟨i,t,ht⟩ := (Submodule.mem_iSup_of_directed R hmono.directed_le).mp h
+    have hx' : u i t = 0 := (congrArg Prod.fst ht).trans hx
+    have ht' : t = 0 := hinj i (hx'.trans (map_zero _).symm)
+    apply Subtype.ext
+    change (x,y) = (0,0)
+    exact ht.symm.trans (ht' ▸ map_zero _)
+  have hs : Surjective p := by
+    intro x
+    obtain ⟨i,t,rfl⟩ := hex x
+    exact ⟨⟨_,(le_iSup R i) (show (u i t,v i t) ∈ R i from ⟨t,rfl⟩)⟩,rfl⟩
+  let e := LinearEquiv.ofBijective p ⟨hi,hs⟩
+  refine ⟨q.comp e.symm.toLinearMap,fun i t ↦ ?_⟩
+  let z : M := ⟨(u i t,v i t),(le_iSup R i) (show (u i t,v i t) ∈ R i from ⟨t,rfl⟩)⟩
+  exact congrArg q (e.symm_apply_apply z)
+
+/-- Compatible lifts along an exhaustive directed union produce a continuous inverse.
+The continuity criterion and the determining family for the inverse are supplied separately. -/
+private theorem kernel_equiv_of_stage_lifts {I Z W : Type*} [Preorder I] [IsDirectedOrder I] [Nonempty I]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [AddCommGroup W] [Module ℂ W] [TopologicalSpace W]
+    {T : I → Type*} [∀ i, AddCommGroup (T i)] [∀ i, Module ℂ (T i)] [∀ i, TopologicalSpace (T i)]
+    (K : Z →L[ℂ] W) (v : ∀ i, T i →L[ℂ] Z) (u : ∀ i, T i →L[ℂ] W) (hu : ∀ i, K.comp (v i) = u i)
+    (hi : ∀ i, Injective (u i)) (hex : ∀ x, ∃ i t, u i t = x)
+    (hm : ∀ i j, i ≤ j → ∀ t, ∃ s, v j s = v i t)
+    (hc : ∀ J : W →ₗ[ℂ] Z, (∀ i t, J (u i t) = v i t) → Continuous J)
+    (hdet : ∀ J : Z →L[ℂ] Z, (∀ i t, J (v i t) = v i t) → J = ContinuousLinearMap.id ℂ Z) :
+    ∃ E : Z ≃L[ℂ] W, ∀ z, E z = K z := by
+  have hd (i j : I) (hij : i ≤ j) (t : T i) : ∃ s, u j s = u i t ∧ v j s = v i t := by
+    obtain ⟨s,hs⟩ := hm i j hij t
+    exact ⟨s,(DFunLike.congr_fun (hu j) s).symm.trans ((congrArg K hs).trans (DFunLike.congr_fun (hu i) t)),hs⟩
+  obtain ⟨J,hJ⟩ := directed_stage_linear_map (fun i ↦ (u i).toLinearMap) (fun i ↦ (v i).toLinearMap) hi hex hd
+  let Q : W →L[ℂ] Z := ⟨J,hc J hJ⟩
+  have hleft := hdet (Q.comp K) fun i t ↦ (congrArg Q (DFunLike.congr_fun (hu i) t)).trans (hJ i t)
+  refine ⟨ContinuousLinearEquiv.equivOfInverse K Q (fun z ↦ DFunLike.congr_fun hleft z) ?_,fun _ ↦ rfl⟩
+  intro w
+  obtain ⟨i,t,rfl⟩ := hex w
+  exact (congrArg K (hJ i t)).trans (DFunLike.congr_fun (hu i) t)
+
+private theorem continuous_out_of_schwartzBruhat {A : Type*} [CommGroup A] [TopologicalSpace A]
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    (L : SchwartzBruhat A →ₗ[ℂ] E)
+    (h : ∀ (a : BruhatStructuralPair A) (e : ElementaryLCAPresentation a.quotient),
+      Continuous (L ∘ schwartzBruhatStageCLM a e)) : Continuous L := by
+  let P : SeminormFamily ℂ (SchwartzBruhat A) {q : Seminorm ℂ (schwartzBruhatSubmodule A) //
+      ∀ (a : BruhatStructuralPair A) (e : ElementaryLCAPresentation a.quotient),
+        Continuous (q ∘ schwartzBruhatStageInclusion a e)} := Subtype.val
+  have hP : WithSeminorms P := ⟨rfl⟩
+  apply (PolynormableSpace.withSeminorms ℂ E).continuous_of_continuous_comp
+  intro p
+  exact hP.continuous_seminorm ⟨p.val.comp L,fun a e ↦ p.property.comp (h a e)⟩
+
+/-- Two continuous linear maps on a completed inductive tensor agree if they agree on
+the images of all pure tensors. -/
+private theorem completed_tensor_ext {X Y V : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V] [T2Space V]
+    {S T : Completion (InductiveTensor X Y) →L[ℂ] V}
+    (h : ∀ (x : X) (y : Y), S (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y)) =
+      T (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y))) : S = T := by
+  let j : InductiveTensor X Y →L[ℂ] Completion (InductiveTensor X Y) := Completion.toComplL
+  have he : S.toLinearMap.comp j.toLinearMap = T.toLinearMap.comp j.toLinearMap := TensorProduct.ext' h
+  exact DFunLike.ext _ _ fun z ↦ Completion.induction_on z (isClosed_eq S.continuous T.continuous)
+    (fun t ↦ DFunLike.congr_fun he t)
+
+section ProductStages
+
+variable {G H : Type*} [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H] [LocallyCompactSpace G] [LocallyCompactSpace H]
+
+private theorem quotient_locallyEuclidean_of_good (k : Subgroup G) (hk : IsBruhatGoodSubgroup k) :
+    IsLocallyEuclidean (G ⧸ k) := by
+  let : T1Space (G ⧸ k) := QuotientGroup.t1Space_iff.mpr hk.1
+  obtain ⟨e,_⟩ := lcaQuotientDual_equiv_annihilator k hk.1
+  exact isLocallyEuclidean_of_isCompactlyGeneratedGroup_dual
+    (isCompactlyGeneratedGroup_of_continuousMulEquiv e.symm hk.2.2)
+
+private theorem prod_bruhat_good (k : Subgroup G) (j : Subgroup H)
+    (hk : IsBruhatGoodSubgroup k) (hj : IsBruhatGoodSubgroup j) :
+    IsBruhatGoodSubgroup (k.prod j) := by
+  let : T1Space (G ⧸ k) := QuotientGroup.t1Space_iff.mpr hk.1
+  let : T1Space (H ⧸ j) := QuotientGroup.t1Space_iff.mpr hj.1
+  have hc : IsCompact (k.prod j : Set (G × H)) :=
+    (isCompact_of_bruhatGoodSubgroup k hk).prod (isCompact_of_bruhatGoodSubgroup j hj)
+  let : T1Space ((G × H) ⧸ k.prod j) := QuotientGroup.t1Space_iff.mpr hc.isClosed
+  obtain ⟨W,hW,hW'⟩ := exists_nhds_one_of_isLocallyEuclidean (quotient_locallyEuclidean_of_good k hk)
+  obtain ⟨V,hV,hV'⟩ := exists_nhds_one_of_isLocallyEuclidean (quotient_locallyEuclidean_of_good j hj)
+  let e := QuotientGroup.prodMulEquiv k j
+  have hcont : Continuous e := (QuotientGroup.isQuotientMap_mk (k.prod j)).continuous_iff.mpr
+    ((QuotientGroup.continuous_mk.comp continuous_fst).prodMk (QuotientGroup.continuous_mk.comp continuous_snd))
+  have hN : e ⁻¹' (W ×ˢ V) ∈ 𝓝 1 := hcont.continuousAt.preimage_mem_nhds
+    (by rw [map_one]; exact prod_mem_nhds hW hV)
+  have hloc := isLocallyEuclidean_of_noSmallCyclicSubgroups hN (fun x hx ↦ by
+    apply e.injective
+    rw [map_one]
+    exact Prod.ext (hW' _ fun n ↦ by simpa only [mem_preimage,map_pow,Prod.pow_fst] using (hx n).1)
+      (hV' _ fun n ↦ by simpa only [mem_preimage,map_pow,Prod.pow_snd] using (hx n).2))
+  obtain ⟨v,_⟩ := lcaQuotientDual_equiv_annihilator (k.prod j) hc.isClosed
+  exact ⟨hc.isClosed,isOpen_lcaAnnihilator _ hc,isCompactlyGeneratedGroup_of_continuousMulEquiv v
+    (isCompactlyGeneratedGroup_dual_of_isLocallyEuclidean hloc)⟩
+
+private def rectangularStructuralPair (u : BruhatStructuralPair G) (v : BruhatStructuralPair H) : BruhatStructuralPair (G × H) := by
+  let i := u.val.1
+  let j := v.val.1
+  let K := OrderDual.ofDual u.val.2
+  let L := OrderDual.ofDual v.val.2
+  refine ⟨(i.prod j,OrderDual.toDual (K.prod L)),u.property.1.prod v.property.1,?_,
+    prod_bruhat_good K L u.property.2.2.1 v.property.2.2.1,
+    fun x hx ↦ ⟨u.property.2.2.2 hx.1,v.property.2.2.2 hx.2⟩⟩
+  have hi : IsCompactlyGeneratedGroup i := u.property.2.1
+  have hj : IsCompactlyGeneratedGroup j := v.property.2.1
+  obtain ⟨C,hC,hCc,hCg⟩ := hi
+  obtain ⟨D,hD,hDc,hDg⟩ := hj
+  have hprod : IsCompactlyGeneratedGroup (i × j) :=
+    ⟨C ×ˢ D, prod_mem_nhds hC hD, hCc.prod hDc, by rw [Subgroup.closure_prod (mem_of_mem_nhds hC) (mem_of_mem_nhds hD),hCg,hDg]; exact Subgroup.top_prod_top⟩
+  let equiv : i.prod j ≃ₜ* i × j := ⟨Subgroup.prodEquiv i j,
+    (continuous_subtype_val.fst.subtype_mk _).prodMk (continuous_subtype_val.snd.subtype_mk _),
+    (continuous_fst.subtype_val.prodMk continuous_snd.subtype_val).subtype_mk _⟩
+  exact isCompactlyGeneratedGroup_of_continuousMulEquiv equiv.symm hprod
+
+private theorem rectangular_quotient (a : BruhatStructuralPair G) (b : BruhatStructuralPair H) :
+    let c := rectangularStructuralPair a b
+    ∃ v : c.quotient ≃ₜ* a.quotient × b.quotient,
+      ∀ (x : a.val.1) (y : b.val.1), v (QuotientGroup.mk (⟨(x.val,y.val),x.property,y.property⟩ : c.val.1)) =
+        (QuotientGroup.mk x,QuotientGroup.mk y) := by
+  let c := rectangularStructuralPair a b
+  let equiv : c.val.1 ≃ₜ* a.val.1 × b.val.1 := ⟨Subgroup.prodEquiv _ _,
+    (continuous_subtype_val.fst.subtype_mk _).prodMk (continuous_subtype_val.snd.subtype_mk _),
+    (continuous_fst.subtype_val.prodMk continuous_snd.subtype_val).subtype_mk _⟩
+  let p := QuotientGroup.mk' ((OrderDual.ofDual a.val.2).comap a.val.1.subtype)
+  let q := QuotientGroup.mk' ((OrderDual.ofDual b.val.2).comap b.val.1.subtype)
+  let t := (p.prodMap q).comp equiv.toMonoidHom
+  have ht : IsOpenQuotientMap t := (QuotientGroup.isOpenQuotientMap_mk.prodMap QuotientGroup.isOpenQuotientMap_mk).comp equiv.toHomeomorph.isOpenQuotientMap
+  let K := (OrderDual.ofDual c.val.2).comap c.val.1.subtype
+  have hker : K = t.ker := by
+    ext x
+    change (x.val.1 ∈ OrderDual.ofDual a.val.2 ∧ x.val.2 ∈ OrderDual.ofDual b.val.2) ↔ (p (equiv x).1,q (equiv x).2) = 1
+    rw [Prod.ext_iff]
+    exact and_congr (a.quotient_mk_eq_one (equiv x).1).symm (b.quotient_mk_eq_one (equiv x).2).symm
+  let E := (QuotientGroup.quotientMulEquivOfEq hker).trans (QuotientGroup.quotientKerEquivOfSurjective t ht.surjective)
+  let v := E.toContinuousMulEquiv fun s ↦ by
+    rw [← (QuotientGroup.isQuotientMap_mk _).isOpen_preimage]
+    exact ht.isQuotientMap.isOpen_preimage
+  exact ⟨v,fun _ _ ↦ rfl⟩
+
+end ProductStages
+private theorem kernel_extension {A B C : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A] [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [UniformSpace C] [IsUniformAddGroup C] [ContinuousSMul ℂ C] [T2Space C]
+    [CompleteSpace C] [PolynormableSpace ℂ C] (M : A →ₗ[ℂ] B →ₗ[ℂ] C)
+    (ha : ∀ a, Continuous (M a)) (hb : ∀ b, Continuous (M.flip b)) :
+    ∃ T : Completion (InductiveTensor A B) →L[ℂ] C, ∀ a b,
+      T (Completion.coe' (α := InductiveTensor A B) (a ⊗ₜ[ℂ] b)) = M a b := by
+  let t : InductiveTensor A B →ₗ[ℂ] C := TensorProduct.lift M
+  let L : InductiveTensor A B →L[ℂ] C := ⟨t,(continuous_inductiveTensor_iff t).mpr ⟨ha,hb⟩⟩
+  exact ⟨L.fromCompletion,fun a b ↦ L.fromCompletion_apply_coe (show InductiveTensor A B from a ⊗ₜ[ℂ] b)⟩
+
+private theorem tensor_slices_continuous {A B C : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A] [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [TopologicalSpace C] [PolynormableSpace ℂ C] [T2Space C]
+    (T : Completion (InductiveTensor A B) →L[ℂ] C) :
+    let v := fun (a : A) (b : B) ↦ T (Completion.coe' (α := InductiveTensor A B) (a ⊗ₜ[ℂ] b))
+    (∀ a, Continuous (v a)) ∧ (∀ b, Continuous (fun a ↦ v a b)) := by
+  let L := T.comp (Completion.toComplL : InductiveTensor A B →L[ℂ] _)
+  exact (continuous_inductiveTensor_iff L.toLinearMap).mp L.continuous
+
+private def HasProductStages (G H : Type*) [CommGroup G] [TopologicalSpace G] [CommGroup H] [TopologicalSpace H]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] : Prop :=
+  ∀ (a : BruhatStructuralPair G) (d : ElementaryLCAPresentation a.quotient) (b : BruhatStructuralPair H)
+    (l : ElementaryLCAPresentation b.quotient),
+    ∃ v : SchwartzBruhatStage d → SchwartzBruhatStage l → SchwartzBruhat (G × H),
+      (∀ s, Continuous (v s)) ∧ (∀ t, Continuous (fun s ↦ v s t)) ∧
+        ∀ s t x y, v s t (x,y) = schwartzBruhatStageCLM a d s x * schwartzBruhatStageCLM b l t y
+
+private theorem test_from_stage {A : Type*} [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A]
+    [T2Space A] [LocallyCompactSpace A] (v : SchwartzBruhat A) :
+    ∃ (a : BruhatStructuralPair A) (d : ElementaryLCAPresentation a.quotient) (s : SchwartzBruhatStage d),
+      schwartzBruhatStageCLM a d s = v := by
+  refine ((mem_schwartzBruhatSubmodule_iff (G := A) v.val).mp v.property).elim fun a h ↦ h.elim fun d h ↦ h.elim fun s h ↦ ?_
+  exact ⟨a,d,s,Subtype.ext h⟩
+
+private theorem test_from_chosen_stage {A : Type*} [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A]
+    [T2Space A] [LocallyCompactSpace A]
+    (d : ∀ a : BruhatStructuralPair A, ElementaryLCAPresentation a.quotient) (f : SchwartzBruhat A) :
+    ∃ a s, schwartzBruhatStageCLM a (d a) s = f := by
+  refine (test_from_stage (A := A) f).elim fun a h ↦ h.elim fun l h ↦ h.elim fun s hs ↦ ?_
+  refine (schwartzBruhatStage_transition (le_refl a) l (d a)).elim fun P hP ↦ ?_
+  exact ⟨a,P s,(Subtype.ext (hP.1 s)).trans hs⟩
+
+private theorem completed_tensor_map_exists {A B X Y : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    (i : A →L[ℂ] X) (j : B →L[ℂ] Y) :
+    ∃ v : Completion (InductiveTensor A B) →L[ℂ] Completion (InductiveTensor X Y), ∀ s t,
+      v (Completion.coe' (α := InductiveTensor A B) (s ⊗ₜ[ℂ] t)) =
+        Completion.coe' (α := InductiveTensor X Y) (i s ⊗ₜ[ℂ] j t) :=
+  ⟨completedInductiveMap i j,completedInductiveMap_pure i j⟩
+
+private theorem inclusion_tensor_range {A B C D X Y Z : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup C] [Module ℂ C] [TopologicalSpace C] [PolynormableSpace ℂ C] [T2Space C]
+    [AddCommGroup D] [Module ℂ D] [TopologicalSpace D] [PolynormableSpace ℂ D] [T2Space D]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [T2Space Z]
+    (p : X → Y → Z) (i : A → X) (j : B → Y) (k : C → X) (l : D → Y)
+    (v : Completion (InductiveTensor A B) →L[ℂ] Z) (w : Completion (InductiveTensor C D) →L[ℂ] Z)
+    (hv : ∀ s t, v (Completion.coe' (α := InductiveTensor A B) (s ⊗ₜ[ℂ] t)) = p (i s) (j t))
+    (hw : ∀ s t, w (Completion.coe' (α := InductiveTensor C D) (s ⊗ₜ[ℂ] t)) = p (k s) (l t))
+    (P : A →L[ℂ] C) (Q : B →L[ℂ] D) (hP : ∀ s, k (P s) = i s) (hQ : ∀ t, l (Q t) = j t)
+    (z : Completion (InductiveTensor A B)) : ∃ t, w t = v z := by
+  let J := completedInductiveMap P Q
+  have h : w.comp J = v := completed_tensor_ext (X := A) (Y := B) fun s t ↦
+    (congrArg w (completedInductiveMap_pure P Q s t)).trans ((hw _ _).trans
+      ((congrArg₂ p (hP s) (hQ t)).trans (hv _ _).symm))
+  exact ⟨J z,DFunLike.congr_fun h z⟩
+
+private theorem stage_continuous_of_le {A Z : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [TopologicalSpace Z]
+    (J : SchwartzBruhat A → Z) {a b : BruhatStructuralPair A} (hab : a ≤ b)
+    (d : ElementaryLCAPresentation a.quotient) (m : ElementaryLCAPresentation b.quotient)
+    (h : Continuous (J ∘ schwartzBruhatStageCLM b m)) : Continuous (J ∘ schwartzBruhatStageCLM a d) := by
+  refine (schwartzBruhatStage_transition hab d m).elim fun P hP ↦ ?_
+  exact (h.comp P.continuous).congr fun t ↦ congrArg J (Subtype.ext (hP.1 t))
+
+private theorem completion_t2 (X : Type*) [UniformSpace X] : T2Space (Completion X) :=
+  inferInstance
+
+universe uι vι
+
+/-- Use the universal mapping property of the completed tensor to apply a gluing
+criterion for a kernel. The stage inclusions may come from any two test spaces. -/
+private theorem product_kernel_from_stages {X : Type uι} {Y : Type vι} {W : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W] [ContinuousSMul ℂ W]
+    [PolynormableSpace ℂ W] [T2Space W] [CompleteSpace W]
+    (good : X → Y → W → Prop) (M : X →ₗ[ℂ] Y →ₗ[ℂ] W)
+    (hm : ∀ x y, good x y (M x y)) (ha : ∀ x, Continuous (M x)) (hb : ∀ y, Continuous (M.flip y))
+    (glue : ∀ {Z : Type (max uι vι)} [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [T2Space Z]
+        [PolynormableSpace ℂ Z] (pure : X → Y → Z),
+      (∀ J : Z →L[ℂ] Z, (∀ x y, J (pure x y) = pure x y) → J = ContinuousLinearMap.id ℂ Z) →
+      (∀ {A B : Type} [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+        [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+        (i : A →L[ℂ] X) (j : B →L[ℂ] Y), ∃ v : Completion (InductiveTensor A B) →L[ℂ] Z,
+           ∀ s t, v (Completion.coe' (α := InductiveTensor A B) (s ⊗ₜ[ℂ] t)) = pure (i s) (j t)) →
+      ∀ K : Z →L[ℂ] W, (∀ x y, good x y (K (pure x y))) →
+        ∃ E : Z ≃L[ℂ] W, ∀ x y, good x y (E (pure x y))) :
+    ∃ E : Completion (InductiveTensor X Y) ≃L[ℂ] W,
+      ∀ x y, good x y (E (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y))) := by
+  let Z := Completion (InductiveTensor X Y)
+  let : T2Space Z := completion_t2 (InductiveTensor X Y)
+  let : PolynormableSpace ℂ Z := polynormableSpace_completion
+  let pure (x : X) (y : Y) : Z := Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y)
+  obtain ⟨K,hK⟩ := kernel_extension M ha hb
+  apply glue pure (fun J h ↦ completed_tensor_ext (S := J) (T := ContinuousLinearMap.id ℂ Z) h)
+    (fun i j ↦ completed_tensor_map_exists i j) K
+  exact fun x y ↦ (hK x y).symm ▸ hm x y
+
+section RectangularKernels
+
+variable {G H : Type*} [CommGroup G] [CommGroup H] [TopologicalSpace G] [TopologicalSpace H]
+    [IsTopologicalGroup G] [IsTopologicalGroup H] [T2Space G] [T2Space H] [LocallyCompactSpace G] [LocallyCompactSpace H]
+
+private theorem rectangular_chart (a : BruhatStructuralPair G) (b : BruhatStructuralPair H)
+    (d : ElementaryLCAPresentation a.quotient) (l : ElementaryLCAPresentation b.quotient)
+    (m : ElementaryLCAPresentation (rectangularStructuralPair a b).quotient) :
+    let X := ElementaryLieGroup d.realDim d.torusDim d.latticeRank d.finiteFactor
+    let Y := ElementaryLieGroup l.realDim l.torusDim l.latticeRank l.finiteFactor
+    let Z := ElementaryLieGroup m.realDim m.torusDim m.latticeRank m.finiteFactor
+    let c := rectangularStructuralPair a b
+    ∃ B : X × Y ≃ₜ+ Z, ∀ (x : a.val.1) (y : b.val.1),
+      B ((d.equiv (QuotientGroup.mk x)).toAdd,(l.equiv (QuotientGroup.mk y)).toAdd) =
+        (m.equiv (QuotientGroup.mk (⟨(x.val,y.val),x.property,y.property⟩ : c.val.1))).toAdd := by
+  intro X Y Z c
+  refine (rectangular_quotient a b).elim fun v hv ↦ ?_
+  let A := ((d.equiv.symm.toMulEquiv.prodCongr l.equiv.symm.toMulEquiv).trans v.symm.toMulEquiv).trans m.equiv.toMulEquiv
+  let B : X × Y ≃ₜ+ Z := ⟨{ A.toEquiv with map_add' := A.map_mul },
+    m.equiv.continuous.comp (v.symm.continuous.comp (d.equiv.symm.continuous.prodMap l.equiv.symm.continuous)),
+    (d.equiv.continuous.prodMap l.equiv.continuous).comp (v.continuous.comp m.equiv.symm.continuous)⟩
+  refine ⟨B,fun x y ↦ ?_⟩
+  change (m.equiv (v.symm (d.equiv.symm (d.equiv _),l.equiv.symm (l.equiv _)))).toAdd = _
+  rw [d.equiv.symm_apply_apply,l.equiv.symm_apply_apply,← hv x y,v.symm_apply_apply]
+
+private theorem stage_value_on (a : BruhatStructuralPair G) (d : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage d) (x : a.val.1) :
+    schwartzBruhatStageCLM a d s x.val = s (d.equiv (QuotientGroup.mk x)).toAdd :=
+  (schwartzBruhatStageRealization_apply a d s x.val).trans (dite_eq_left x.property)
+
+private theorem stage_value_off (a : BruhatStructuralPair G) (d : ElementaryLCAPresentation a.quotient)
+    (s : SchwartzBruhatStage d) (x : G) (hx : x ∉ a.val.1) : schwartzBruhatStageCLM a d s x = 0 :=
+  (schwartzBruhatStageRealization_apply a d s x).trans (dite_eq_right hx)
+
+private theorem rectangular_stage_values (a : BruhatStructuralPair G) (b : BruhatStructuralPair H)
+    (d : ElementaryLCAPresentation a.quotient) (l : ElementaryLCAPresentation b.quotient)
+    (m : ElementaryLCAPresentation (rectangularStructuralPair a b).quotient)
+    (s : SchwartzBruhatStage d) (t : SchwartzBruhatStage l) (w : SchwartzBruhatStage m)
+    (h : ∀ (x : a.val.1) (y : b.val.1), w (m.equiv (QuotientGroup.mk
+      (⟨(x.val,y.val),x.property,y.property⟩ : (rectangularStructuralPair a b).val.1))).toAdd =
+        s (d.equiv (QuotientGroup.mk x)).toAdd * t (l.equiv (QuotientGroup.mk y)).toAdd)
+    (x : G) (y : H) :
+    schwartzBruhatStageCLM (rectangularStructuralPair a b) m w (x,y) =
+      schwartzBruhatStageCLM a d s x * schwartzBruhatStageCLM b l t y := by
+  let c := rectangularStructuralPair a b
+  by_cases hx : x ∈ a.val.1
+  · by_cases hy : y ∈ b.val.1
+    · let u : a.val.1 := ⟨x,hx⟩
+      let v : b.val.1 := ⟨y,hy⟩
+      let z : c.val.1 := ⟨(x,y),hx,hy⟩
+      exact (stage_value_on c m w z).trans ((h u v).trans
+        (congrArg₂ (· * ·) (stage_value_on a d s u).symm (stage_value_on b l t v).symm))
+    · exact (stage_value_off c m w (x,y) (fun hz ↦ hy hz.2)).trans
+        ((congrArg (schwartzBruhatStageCLM a d s x * ·) (stage_value_off b l t y hy)).trans (mul_zero _)).symm
+  · exact (stage_value_off c m w (x,y) (fun hz ↦ hx hz.1)).trans
+      ((congrArg (· * schwartzBruhatStageCLM b l t y) (stage_value_off a d s x hx)).trans (zero_mul _)).symm
+
+/-- Transport the elementary kernel equivalence through a rectangular quotient and
+extension by zero. -/
+private theorem rectangular_stage_kernel (a : BruhatStructuralPair G) (b : BruhatStructuralPair H)
+    (d : ElementaryLCAPresentation a.quotient) (l : ElementaryLCAPresentation b.quotient)
+    (m : ElementaryLCAPresentation (rectangularStructuralPair a b).quotient) :
+    let c := rectangularStructuralPair a b
+    ∃ E : Completion (InductiveTensor (SchwartzBruhatStage d) (SchwartzBruhatStage l)) ≃L[ℂ] SchwartzBruhatStage m,
+      ∀ (s : SchwartzBruhatStage d) (t : SchwartzBruhatStage l) (x : G) (y : H),
+        schwartzBruhatStageCLM c m (E (Completion.coe' (α := InductiveTensor (SchwartzBruhatStage d) (SchwartzBruhatStage l)) (s ⊗ₜ[ℂ] t))) (x,y) =
+        schwartzBruhatStageCLM a d s x * schwartzBruhatStageCLM b l t y := by
+  refine (rectangular_chart a b d l m).elim fun B hB ↦ ?_
+  refine (elementary_kernel_equiv B).elim fun E hE ↦ ?_
+  refine ⟨E,fun s t x y ↦ rectangular_stage_values a b d l m s t _ (fun u v ↦ ?_) x y⟩
+  let w := E (Completion.coe' (α := InductiveTensor (SchwartzBruhatStage d) (SchwartzBruhatStage l)) (s ⊗ₜ[ℂ] t))
+  exact (congrArg (fun z ↦ w z) (hB u v)).symm.trans (hE s t _ _)
+
+private theorem exists_rectangular_bound (c : BruhatStructuralPair (G × H)) :
+    ∃ a b, c ≤ rectangularStructuralPair a b :=
+  (exists_rectangular_stage_bounds c).elim fun a h ↦ h.elim fun b hb ↦ ⟨a,b,hb.1,hb.2⟩
+
+variable [scG : SecondCountableTopology G] [scH : SecondCountableTopology H]
+include scG scH
+local notation "SG" => SchwartzBruhat G
+local notation "SH" => SchwartzBruhat H
+local notation "SW" => SchwartzBruhat (G × H)
+local notation "I₀" => InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H)
+local notation "Z₀" => Completion (InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H))
+
+private theorem kernel_bilinear (hs : HasProductStages G H) :
+    ∃ B : SG →ₗ[ℂ] SH →ₗ[ℂ] SW, ∀ f g x y, B f g (x,y) = f x * g y := by
+  have mem (f : SG) (g : SH) : (fun z : G × H ↦ f z.1 * g z.2) ∈ schwartzBruhatSubmodule (G × H) := by
+    refine (test_from_stage (A := G) f).elim fun a h ↦ h.elim fun d h ↦ h.elim fun s hf ↦ ?_
+    refine (test_from_stage (A := H) g).elim fun b h ↦ h.elim fun l h ↦ h.elim fun t hg ↦ ?_
+    obtain ⟨v,_,_,hv⟩ := hs a d b l
+    have h : (v s t).val = fun z : G × H ↦ f z.1 * g z.2 := funext fun ⟨x,y⟩ ↦
+      (hv s t x y).trans (congrArg₂ (· * ·) (congrArg (fun u : SG ↦ u x) hf) (congrArg (fun u : SH ↦ u y) hg))
+    exact h ▸ (v s t).property
+  refine ⟨LinearMap.mk₂ ℂ (fun f g ↦ (⟨_,mem f g⟩ : SW)) ?_ ?_ ?_ ?_,fun _ _ _ _ ↦ rfl⟩
+  · exact fun f g t ↦ Subtype.ext (funext fun z ↦ add_mul (f z.1) (g z.1) (t z.2))
+  · exact fun c s t ↦ Subtype.ext (funext fun z ↦ mul_assoc c (s z.1) (t z.2))
+  · exact fun s t v ↦ Subtype.ext (funext fun z ↦ mul_add (s z.1) (t z.2) (v z.2))
+  · exact fun c s t ↦ Subtype.ext (funext fun z ↦ mul_left_comm (s z.1) c (t z.2))
+
+private theorem kernel_stage_slices (hs : HasProductStages G H) (B : SG →ₗ[ℂ] SH →ₗ[ℂ] SW)
+    (hB : ∀ f g x y, B f g (x,y) = f x * g y)
+    (a : BruhatStructuralPair G) (d : ElementaryLCAPresentation a.quotient)
+    (b : BruhatStructuralPair H) (l : ElementaryLCAPresentation b.quotient) :
+    (∀ s, Continuous ((B (schwartzBruhatStageCLM a d s)) ∘ schwartzBruhatStageCLM b l)) ∧
+      (∀ t, Continuous ((B.flip (schwartzBruhatStageCLM b l t)) ∘ schwartzBruhatStageCLM a d)) := by
+  refine (hs a d b l).elim fun v h ↦ ?_
+  have he (s : SchwartzBruhatStage d) (t : SchwartzBruhatStage l) : v s t = B (schwartzBruhatStageCLM a d s) (schwartzBruhatStageCLM b l t) :=
+    Subtype.ext (funext fun ⟨x,y⟩ ↦ (h.2.2 s t x y).trans (hB (schwartzBruhatStageCLM a d s) (schwartzBruhatStageCLM b l t) x y).symm)
+  exact ⟨fun s ↦ (h.1 s).congr (he s),fun t ↦ (h.2.1 t).congr (fun s ↦ he s t)⟩
+
+private theorem kernel_separate (hs : HasProductStages G H) (B : SG →ₗ[ℂ] SH →ₗ[ℂ] SW)
+    (hB : ∀ f g x y, B f g (x,y) = f x * g y) :
+    (∀ f, Continuous (B f)) ∧ (∀ g, Continuous (B.flip g)) := by
+  let : PolynormableSpace ℂ SW := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  constructor
+  · intro f
+    refine (test_from_stage (A := G) f).elim fun a h ↦ h.elim fun d h ↦ h.elim fun s hf ↦ ?_
+    have hc := continuous_out_of_schwartzBruhat (A := H) (E := SW) (B (schwartzBruhatStageCLM a d s))
+      (fun b l ↦ (kernel_stage_slices hs B hB a d b l).1 s)
+    exact (congrArg (fun v : SG ↦ Continuous (B v)) hf).mp hc
+  · intro g
+    refine (test_from_stage (A := H) g).elim fun b h ↦ h.elim fun l h ↦ h.elim fun t hg ↦ ?_
+    have hc := continuous_out_of_schwartzBruhat (A := G) (E := SW) (B.flip (schwartzBruhatStageCLM b l t))
+      (fun a d ↦ (kernel_stage_slices hs B hB a d b l).2 t)
+    exact (congrArg (fun v : SH ↦ Continuous (B.flip v)) hg).mp hc
+
+private theorem rectangular_stage_continuity {Z : Type*} [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [PolynormableSpace ℂ Z]
+    (J : SW →ₗ[ℂ] Z) (hc : ∀ (a : BruhatStructuralPair G) (b : BruhatStructuralPair H),
+      let w := rectangularStructuralPair a b
+      ∃ m : ElementaryLCAPresentation w.quotient, Continuous (J ∘ schwartzBruhatStageCLM w m)) :
+    Continuous J := by
+  refine continuous_out_of_schwartzBruhat (A := G × H) (E := Z) J fun c d ↦ ?_
+  refine (exists_rectangular_bound (G := G) (H := H) c).elim fun a h ↦ h.elim fun b hcw ↦ ?_
+  refine (hc a b).elim fun m hm ↦ ?_
+  exact stage_continuous_of_le J hcw d m hm
+
+private theorem rectangular_stage_exhausts
+    (m : ∀ (a : BruhatStructuralPair G) (b : BruhatStructuralPair H), ElementaryLCAPresentation (rectangularStructuralPair a b).quotient)
+    (s : SW) : ∃ a b t, schwartzBruhatStageCLM (rectangularStructuralPair a b) (m a b) t = s := by
+  refine (test_from_stage (A := G × H) s).elim fun c h ↦ h.elim fun l h ↦ h.elim fun t ht ↦ ?_
+  refine (exists_rectangular_bound (G := G) (H := H) c).elim fun a h ↦ h.elim fun b hcw ↦ ?_
+  refine (schwartzBruhatStage_transition hcw l (m a b)).elim fun P hP ↦ ?_
+  exact ⟨a,b,P t,(Subtype.ext (hP.1 t)).trans ht⟩
+
+private theorem rectangular_product_stages : HasProductStages G H := by
+  intro a d b l
+  let w := rectangularStructuralPair a b
+  let m := w.elementary.some
+  refine (rectangular_stage_kernel a b d l m).elim fun e he ↦ ?_
+  let T := (schwartzBruhatStageCLM w m).comp e.toContinuousLinearMap
+  let A := SchwartzBruhatStage d
+  let B := SchwartzBruhatStage l
+  let : T2Space A := elementarySchwartz_t2
+  let : T2Space B := elementarySchwartz_t2
+  let : PolynormableSpace ℂ A := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ B := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : T2Space SW := schwartzBruhat_t2
+  let : PolynormableSpace ℂ SW := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  have h := tensor_slices_continuous (A := A) (B := B) (C := SW) T
+  exact ⟨_,h.1,h.2,he⟩
+/-- A compatible family of rectangular kernel inverses defines a continuous inverse
+on the directed union of product stages. -/
+private theorem glue_on_rectangles {Z : Type*} [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [PolynormableSpace ℂ Z] (pure : SG → SH → Z)
+    (det : ∀ J : Z →L[ℂ] Z, (∀ f g, J (pure f g) = pure f g) → J = ContinuousLinearMap.id ℂ Z)
+    (K : Z →L[ℂ] SW)
+    (d : ∀ a : BruhatStructuralPair G, ElementaryLCAPresentation a.quotient)
+    (l : ∀ b : BruhatStructuralPair H, ElementaryLCAPresentation b.quotient)
+    (m : ∀ i : BruhatStructuralPair G × BruhatStructuralPair H, ElementaryLCAPresentation (rectangularStructuralPair i.1 i.2).quotient)
+    {T : BruhatStructuralPair G × BruhatStructuralPair H → Type*}
+    [∀ i, AddCommGroup (T i)] [∀ i, Module ℂ (T i)] [∀ i, TopologicalSpace (T i)]
+    (v : ∀ i, T i →L[ℂ] Z) (e : ∀ i, T i ≃L[ℂ] SchwartzBruhatStage (m i))
+    (hu : ∀ i, K.comp (v i) = (schwartzBruhatStageCLM (rectangularStructuralPair i.1 i.2) (m i)).comp (e i).toContinuousLinearMap)
+    (hm : ∀ i j, i ≤ j → ∀ z : T i, ∃ w, v j w = v i z)
+    (hp : ∀ (i : BruhatStructuralPair G × BruhatStructuralPair H) (s : SchwartzBruhatStage (d i.1)) (t : SchwartzBruhatStage (l i.2)),
+      ∃ z, v i z = pure (schwartzBruhatStageCLM i.1 (d i.1) s) (schwartzBruhatStageCLM i.2 (l i.2) t)) :
+    ∃ E : Z ≃L[ℂ] SW, ∀ z, E z = K z := by
+  let I := BruhatStructuralPair G × BruhatStructuralPair H
+  let : IsDirectedOrder (BruhatStructuralPair G) := (bruhatStructuralPair_filtered (G := G)).2
+  let : IsDirectedOrder (BruhatStructuralPair H) := (bruhatStructuralPair_filtered (G := H)).2
+  let : Nonempty (BruhatStructuralPair G) := (bruhatStructuralPair_filtered (G := G)).1
+  let : Nonempty (BruhatStructuralPair H) := (bruhatStructuralPair_filtered (G := H)).1
+  let : IsDirectedOrder I := ⟨fun i j ↦ by
+    obtain ⟨a,h₁,h₂⟩ := exists_ge_ge i.1 j.1
+    obtain ⟨b,h₃,h₄⟩ := exists_ge_ge i.2 j.2
+    exact ⟨(a,b),⟨h₁,h₃⟩,⟨h₂,h₄⟩⟩⟩
+  let c (i : I) := schwartzBruhatStageCLM (rectangularStructuralPair i.1 i.2) (m i)
+  let u (i : I) := (c i).comp (e i).toContinuousLinearMap
+  have hi (i : I) : Injective (u i) :=
+    (schwartzBruhatStageInclusion_injective (rectangularStructuralPair i.1 i.2) (m i)).comp (e i).injective
+  refine kernel_equiv_of_stage_lifts (I := I) (T := T) K v u hu hi ?_ hm ?_ ?_
+  · intro s
+    refine (rectangular_stage_exhausts (G := G) (H := H) (fun a b ↦ m (a,b)) s).elim
+      fun a h ↦ h.elim fun b h ↦ h.elim fun t ht ↦ ?_
+    let i : I := (a,b)
+    exact ⟨i,(e i).symm t,(congrArg (c i) ((e i).apply_symm_apply t)).trans ht⟩
+  · intro J hJ
+    apply rectangular_stage_continuity (G := G) (H := H) J
+    intro a b
+    let i : I := (a,b)
+    refine ⟨m i,((v i).continuous.comp (e i).symm.continuous).congr fun t ↦ ?_⟩
+    exact (hJ i ((e i).symm t)).symm.trans (congrArg J (congrArg (c i) ((e i).apply_symm_apply t)))
+  · intro J hJ
+    apply det J
+    intro s t
+    refine (test_from_chosen_stage d s).elim fun a h ↦ h.elim fun s' hs ↦ ?_
+    refine (test_from_chosen_stage l t).elim fun b h ↦ h.elim fun t' ht ↦ ?_
+    refine (hp (a,b) s' t').elim fun z hz ↦ ?_
+    have ht' := hz.trans (congrArg₂ pure hs ht)
+    exact (congrArg J ht'.symm).trans ((hJ (a,b) z).trans ht')
+private theorem rectangular_kernel_glue {Z : Type*} [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [T2Space Z]
+    [PolynormableSpace ℂ Z] (pure : SG → SH → Z)
+    (det : ∀ J : Z →L[ℂ] Z, (∀ f g, J (pure f g) = pure f g) → J = ContinuousLinearMap.id ℂ Z)
+    (maps : ∀ (a : BruhatStructuralPair G) (d : ElementaryLCAPresentation a.quotient)
+        (b : BruhatStructuralPair H) (l : ElementaryLCAPresentation b.quotient),
+      ∃ v : Completion (InductiveTensor (SchwartzBruhatStage d) (SchwartzBruhatStage l)) →L[ℂ] Z, ∀ s t,
+        v (Completion.coe' (α := InductiveTensor (SchwartzBruhatStage d) (SchwartzBruhatStage l)) (s ⊗ₜ[ℂ] t)) =
+          pure (schwartzBruhatStageCLM a d s) (schwartzBruhatStageCLM b l t))
+    (K : Z →L[ℂ] SW) (hK : ∀ f g x y, K (pure f g) (x,y) = f x * g y) :
+    ∃ E : Z ≃L[ℂ] SW, ∀ f g x y, E (pure f g) (x,y) = f x * g y := by
+  let I := BruhatStructuralPair G × BruhatStructuralPair H
+  let d (a : BruhatStructuralPair G) := a.elementary.some
+  let l (b : BruhatStructuralPair H) := b.elementary.some
+  let w (i : I) := rectangularStructuralPair i.1 i.2
+  let m (i : I) := (w i).elementary.some
+  let A (a : BruhatStructuralPair G) := SchwartzBruhatStage (d a)
+  let B (b : BruhatStructuralPair H) := SchwartzBruhatStage (l b)
+  let T (i : I) := Completion (InductiveTensor (A i.1) (B i.2))
+  let : T2Space SW := schwartzBruhat_t2
+  let : ∀ a, T2Space (A a) := fun _ ↦ elementarySchwartz_t2
+  let : ∀ b, T2Space (B b) := fun _ ↦ elementarySchwartz_t2
+  let : ∀ a, PolynormableSpace ℂ (A a) := fun _ ↦ (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : ∀ b, PolynormableSpace ℂ (B b) := fun _ ↦ (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let f (a : BruhatStructuralPair G) := schwartzBruhatStageCLM a (d a)
+  let g (b : BruhatStructuralPair H) := schwartzBruhatStageCLM b (l b)
+  let c (i : I) := schwartzBruhatStageCLM (w i) (m i)
+  let v (i : I) : T i →L[ℂ] Z := (maps i.1 (d i.1) i.2 (l i.2)).choose
+  have hv (i : I) := (maps i.1 (d i.1) i.2 (l i.2)).choose_spec
+  let e (i : I) := (rectangular_stage_kernel i.1 i.2 (d i.1) (l i.2) (m i)).choose
+  have he (i : I) := (rectangular_stage_kernel i.1 i.2 (d i.1) (l i.2) (m i)).choose_spec
+  let u (i : I) := (c i).comp (e i).toContinuousLinearMap
+  have hu (i : I) : K.comp (v i) = u i := by
+    refine completed_tensor_ext (X := A i.1) (Y := B i.2) fun s t ↦ Subtype.ext (funext fun ⟨x,y⟩ ↦ ?_)
+    exact (congrArg (fun z : Z ↦ K z (x,y)) (hv i s t)).trans ((hK _ _ x y).trans (he i s t x y).symm)
+  refine (glue_on_rectangles (Z := Z) (T := T) pure det K d l m v e hu ?_ ?_).elim
+    fun E hE ↦ ⟨E,fun s t x y ↦ (congrArg (fun w : SW ↦ w (x,y)) (hE _)).trans (hK s t x y)⟩
+  · intro i j hij z
+    refine (schwartzBruhatStage_transition hij.1 (d i.1) (d j.1)).elim fun P hP ↦ ?_
+    refine (schwartzBruhatStage_transition hij.2 (l i.2) (l j.2)).elim fun Q hQ ↦ ?_
+    exact inclusion_tensor_range (A := A i.1) (B := B i.2) (C := A j.1) (D := B j.2)
+      pure (f i.1) (g i.2) (f j.1) (g j.2) (v i) (v j) (hv i) (hv j) P Q
+      (fun t ↦ Subtype.ext (hP.1 t)) (fun t ↦ Subtype.ext (hQ.1 t)) z
+  · intro i s t
+    exact ⟨Completion.coe' (α := InductiveTensor (A i.1) (B i.2)) (s ⊗ₜ[ℂ] t),hv i s t⟩
+
+private theorem global_product_kernel :
+    ∃ E : Z₀ ≃L[ℂ] SW, ∀ (f : SG) (g : SH) (x : G) (y : H),
+      E (Completion.coe' (α := I₀) (f ⊗ₜ[ℂ] g)) (x,y) = f x * g y := by
+  let : T2Space SG := schwartzBruhat_t2 (G := G)
+  let : T2Space SH := schwartzBruhat_t2 (G := H)
+  let : T2Space SW := schwartzBruhat_t2 (G := G × H)
+  let : CompleteSpace SW := schwartzBruhat_complete (G := G × H)
+  let : PolynormableSpace ℂ SG := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SH := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : PolynormableSpace ℂ SW := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  let : ContinuousSMul ℂ SW := PolynormableSpace.continuousSMul ℂ SW
+  let hs := rectangular_product_stages (G := G) (H := H)
+  refine (kernel_bilinear hs).elim fun M hM ↦ ?_
+  have hc := kernel_separate hs M hM
+  let good (f : SG) (g : SH) (w : SW) := ∀ x y, w (x,y) = f x * g y
+  apply product_kernel_from_stages (X := SG) (Y := SH) (W := SW) good M hM hc.1 hc.2
+  intro Z _ _ _ _ _ pure hdet hmaps K hK
+  refine rectangular_kernel_glue (G := G) (H := H) (Z := Z) pure hdet ?_ K hK
+  intro a d b l
+  let : T2Space (SchwartzBruhatStage d) := elementarySchwartz_t2
+  let : T2Space (SchwartzBruhatStage l) := elementarySchwartz_t2
+  exact hmaps (schwartzBruhatStageCLM a d) (schwartzBruhatStageCLM b l)
+
+end RectangularKernels
+
+end DistributionKernels
+
 section Supports
 
 open UniformSpace
@@ -4402,7 +7014,8 @@ theorem schwartzBruhat_kernel_equiv [SecondCountableTopology G] [SecondCountable
         SchwartzBruhat (G × H),
       ∀ (f : SchwartzBruhat G) (g : SchwartzBruhat H) (x : G) (y : H),
         e (Completion.coe' (α := InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H))
-          (f ⊗ₜ[ℂ] g)) (x, y) = f x * g y := by sorry
+          (f ⊗ₜ[ℂ] g)) (x, y) = f x * g y := by
+  exact global_product_kernel (G := G) (H := H)
 
 /-- Paper: Lemma D.1.8.1(2), p. 778. The completed projective tensor product
 of the strong duals is the strong dual on the product. On pure tensors
@@ -4441,67 +7054,6 @@ section ElementaryTests
 omit hTop hT2 hLC
 
 variable {m n r : ℕ} {F : Type*} [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
-
-/-- A compactly supported function smooth on every fiber has finite weighted partials. -/
-private theorem elementarySchwartz_of_compactSupport {f : ElementaryLieGroup m n r F → ℂ}
-    (hf : ∀ a b, ContDiff ℝ ∞ (fun xt ↦ f (elementaryCover xt a b))) (hc : HasCompactSupport f) :
-    f ∈ elementarySchwartzSubmodule m n r F := by
-  classical
-  refine ⟨hf, fun i ↦ ?_⟩
-  let E := EuclideanSpace ℝ (Fin m)
-  let N := EuclideanSpace ℝ (Fin n)
-  let T := Fin n → AddCircle (1 : ℝ)
-  let Z := Fin r → ℤ
-  let q (v : N) : T := fun j ↦ (v j : AddCircle (1 : ℝ))
-  have hq : IsOpenQuotientMap q := (IsOpenQuotientMap.piMap
-    (fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk)).comp
-    (PiLp.homeomorph 2 (fun _ : Fin n ↦ ℝ)).isOpenQuotientMap
-  let lift (t : T) := hq.surjective.hasRightInverse.choose t
-  have hl (t : T) : q (lift t) = t := hq.surjective.hasRightInverse.choose_spec t
-  let d (y : ElementaryLieGroup m n r F) := elementaryPartial f i.2.1 i.2.2.1
-    (y.1, lift y.2.1) y.2.2.1 y.2.2.2
-  have hd (v : E × N) (z : Z) (b : F) :
-      d (elementaryCover v z b) = elementaryPartial f i.2.1 i.2.2.1 v z b := by
-    apply (elementaryPartial_descends _ _ _ _ _ (hf z b)).2
-    exact Prod.ext rfl (Prod.ext (hl (q v.2)) rfl)
-  have hdc : Continuous d := by
-    apply (Homeomorph.prodAssoc E T (Z × F)).isQuotientMap.continuous_iff.mpr
-    apply continuous_prod_of_discrete_right.mpr
-    intro z
-    apply (IsOpenQuotientMap.id.prodMap hq).continuous_comp_iff.mp
-    exact ((elementaryPartial_descends _ _ _ _ _ (hf z.1 z.2)).1.continuous).congr
-      (fun w ↦ (hd w z.1 z.2).symm)
-  have hdz {y : ElementaryLieGroup m n r F} (hy : y ∉ tsupport f) : d y = 0 := by
-    let v : E × N := (y.1, lift y.2.1)
-    let p (w : E × N) := elementaryCover w y.2.2.1 y.2.2.2
-    have hp : Continuous p := continuous_fst.prodMk ((hq.continuous.comp continuous_snd).prodMk continuous_const)
-    have hpv : p v = y := Prod.ext rfl (Prod.ext (hl y.2.1) rfl)
-    have hv : v ∉ tsupport (f ∘ p) := fun hv ↦ hy (hpv ▸ tsupport_comp_subset_preimage f hp hv)
-    have h0 (j : ℕ) : iteratedFDeriv ℝ j (f ∘ p) v = 0 := by
-      by_contra hn
-      exact hv (support_iteratedFDeriv_subset j hn)
-    dsimp only [d, elementaryPartial]
-    change (iteratedFDeriv ℝ _ (f ∘ p) v) _ = 0
-    rw [h0]
-    rfl
-  let w (y : ElementaryLieGroup m n r F) : ℂ :=
-    ((∏ j, (y.1 j : ℂ) ^ i.1 j) * (∏ j, (y.2.2.1 j : ℂ) ^ i.2.2.2 j)) * d y
-  have hw : Continuous w := by
-    apply Continuous.mul _ hdc
-    apply Continuous.mul
-    · fun_prop
-    · exact (continuous_of_discreteTopology (f := fun z : Z ↦ ∏ j, (z j : ℂ) ^ i.2.2.2 j)).comp
-        (continuous_fst.comp (continuous_snd.comp continuous_snd))
-  have hwK : HasCompactSupport w := HasCompactSupport.intro hc fun y hy ↦ by simp [w, hdz hy]
-  obtain ⟨C,hC⟩ := hw.bounded_above_of_compact_support hwK
-  apply lt_of_le_of_lt (b := ENNReal.ofReal C) _ ENNReal.ofReal_lt_top
-  refine iSup_le fun v ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
-  rw [ENNReal.coe_nnreal_eq]
-  apply ENNReal.ofReal_le_ofReal
-  have h := hC (elementaryCover v a b)
-  dsimp only [w] at h
-  rw [hd] at h
-  exact h
 
 /-- Embed the real and torus factors in a vector space and localize a bump on one discrete fiber. -/
 private theorem elementarySchwartz_exists_test {U : Set (ElementaryLieGroup m n r F)}

@@ -4,6 +4,9 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec5
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
+
 /-!
 # §7.1.1–7.1.2 Almost periodic functions and S-local theta asymptotics
 
@@ -307,6 +310,99 @@ local instance instMeasurableNormOneRatSec1a : MeasurableSpace Jℚ₁ := borel 
 local instance instHaarNormOneRatSec1a : Measure.IsHaarMeasure μℚ₁ :=
   (sLocalNormOneQuotientMeasure_normProduct (F := ℚ) (S := ∅)).1
 
+/-- At the rational archimedean stage, the real Gaussian evaluated on an idele
+depends only on its idelic norm. -/
+private theorem sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_gaussian :
+    ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)),
+      ∀ g : (SAdeleRing ℚ ∅)ˣ, f (Multiplicative.ofAdd g.val) =
+        (Real.exp (-(((sIdeleNorm ℚ ∅ g).val : ℝ) ^ 2)) : ℂ) := by
+  let w := Rat.infinitePlace
+  let j := InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  let e : SAdeleRing ℚ ∅ ≃ₜ ℝ := ((Homeomorph.prodUnique _ _).trans
+    (Homeomorph.piUnique fun v : InfinitePlace ℚ ↦ v.Completion)).trans j.toHomeomorph
+  let a : SAdeleRing ℚ ∅ ≃+ ℝ :=
+    { e.toEquiv with
+      map_add' := fun x y ↦
+        map_add (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)
+          (x.1 w) (y.1 w) }
+  let E : Multiplicative (SAdeleRing ℚ ∅) ≃ₜ* Multiplicative ℝ :=
+    { a.toMultiplicative with
+      continuous_toFun := e.continuous
+      continuous_invFun := e.symm.continuous }
+  have : T2Space (Multiplicative (SAdeleRing ℚ ∅)) := e.isEmbedding.t2Space
+  have : LocallyCompactSpace (Multiplicative (SAdeleRing ℚ ∅)) :=
+    e.isOpenEmbedding.locallyCompactSpace
+  have : T2Space (Multiplicative ℝ) := inferInstanceAs (T2Space ℝ)
+  have : LocallyCompactSpace (Multiplicative ℝ) := inferInstanceAs (LocallyCompactSpace ℝ)
+  obtain ⟨b, hb⟩ := exists_gaussian_schwartz (E := ℝ) 1 zero_lt_one
+  obtain ⟨T, hT⟩ := realSchwartzBruhat_equiv
+  refine ⟨⟨(T b).val ∘ E, schwartzBruhat_mem_comp_equiv E (T b).property⟩, fun g ↦ ?_⟩
+  change T b (Multiplicative.ofAdd (j (g.val.1 w))) = _
+  rw [hT, hb, neg_one_mul, j.isometry.norm_map_of_map_zero (map_zero
+    (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace))]
+  have hn : ((sIdeleNorm ℚ ∅ g).val : ℝ) = ‖g.val.1 w‖ := by
+    rw [sIdeleNorm, Finset.univ_eq_empty (α := (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))),
+      Finset.prod_empty, mul_one, Fintype.prod_subsingleton _ w,
+      Rat.isReal_infinitePlace.mult_eq_one, pow_one]
+    rfl
+  rw [hn]
+
+/-- Both rational unit translates have the same Gaussian value. Averaging the
+result over norm-one classes multiplies it by their total Haar mass. -/
+private theorem sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_eval
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing ℚ ∅)))
+    (hf : ∀ g : (SAdeleRing ℚ ∅)ˣ, f (Multiplicative.ofAdd g.val) =
+      (Real.exp (-(((sIdeleNorm ℚ ∅ g).val : ℝ) ^ 2)) : ℂ)) (g : Jℚ) :
+    sLocalHomogeneousAdelicTheta ℚ ∅ μℚ₁ (1 : PontryaginDual Jℚ₁) f g =
+      ((μℚ₁).real univ : ℂ) * (2 * (Real.exp (-(((sIdeleQuotientNorm ℚ ∅ g).val : ℝ) ^ 2)) : ℂ)) := by
+  let φ (t : ℝ≥0ˣ) : ℂ := Real.exp (-((t.val : ℝ) ^ 2))
+  have hclass (x : Jℚ) : sLocalAdelicThetaOnClasses ℚ ∅ f x = 2 * φ (sIdeleQuotientNorm ℚ ∅ x) := by
+    refine Quotient.inductionOn x fun y ↦ ?_
+    refine (sLocalAdelicThetaOnClasses_mk ℚ ∅ f y).trans ((sLocalAdelicTheta_apply ℚ ∅ f y).trans ?_)
+    let U := (((∅ : Finset (HeightOneSpectrum (𝓞 ℚ))) : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ)ˣ
+    have hcard : Nat.card U = 2 := by
+      dsimp only [U]
+      rw [Finset.coe_empty, integer_empty]
+      let e := Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)
+      let units := Units.mapEquiv (e.toRingEquiv.trans Rat.ringOfIntegersEquiv).toMulEquiv
+      rw [Nat.card_congr units.toEquiv, Nat.card_eq_fintype_card, Fintype.card_units_int]
+    calc
+      _ = ∑' _ : U, φ (sIdeleNorm ℚ ∅ y) := by
+        apply tsum_congr
+        intro u
+        let d := Units.map
+          ((adeleProjection ℚ ∅).comp (integralAdelesOutside ℚ ∅).subtype).toMonoidHom
+          (Units.map (integralAdeleDiagonal ℚ ∅).toMonoidHom u)
+        have hu : sIdeleNorm ℚ ∅ d = 1 := (sIdeleNorm_spec ℚ ∅).2 ⟨u, rfl⟩
+        exact (hf (d * y)).trans (congrArg φ (by rw [map_mul, hu, one_mul]))
+      _ = _ := by
+        change (∑' _ : U, φ (sIdeleNorm ℚ ∅ y)) = 2 * φ (sIdeleNorm ℚ ∅ y)
+        rw [tsum_const, hcard, nsmul_eq_mul, Nat.cast_ofNat]
+  change (∫ h : Jℚ₁, sLocalAdelicThetaOnClasses ℚ ∅ f (g * h.val) *
+    ((1 : PontryaginDual Jℚ₁) h : ℂ) ∂μℚ₁) = _
+  have hker (h : Jℚ₁) : sIdeleQuotientNorm ℚ ∅ h.val = 1 := h.property
+  simp only [hclass, map_mul, hker, mul_one,
+    PontryaginDual.one_apply, Circle.coe_one, integral_const, Complex.real_smul, φ]
+
+/-- A radial Gaussian profile with nonzero mass has a nonzero limit along the
+norm, whereas a square-root bound would force its limit to be zero. -/
+private theorem sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_limit
+    {X : Type*} (r : X → ℝ) (hr : Ioi 0 ⊆ range r) (c : ℂ) (hc : c ≠ 0)
+    (θ : X → ℂ) (hθ : ∀ x, θ x = c * (2 * (Real.exp (-(r x ^ 2)) : ℂ))) :
+    ¬ Asymptotics.IsBigO (comap r (𝓝[>] (0 : ℝ))) θ (fun x ↦ r x ^ (1 / 2 : ℝ)) := by
+  let l := comap r (𝓝[>] (0 : ℝ))
+  have : l.NeBot := (inferInstance : (𝓝[>] (0 : ℝ)).NeBot).comap_of_range_mem
+    (mem_of_superset self_mem_nhdsWithin hr)
+  have hr₀ : Tendsto r l (𝓝 0) := tendsto_comap.mono_right nhdsWithin_le_nhds
+  have hroot : Tendsto (fun x ↦ r x ^ (1 / 2 : ℝ)) l (𝓝 0) := by
+    simpa only [Function.comp_def, ← Real.sqrt_eq_rpow, Real.sqrt_zero] using
+      (Real.continuous_sqrt.tendsto 0).comp hr₀
+  have hlim : Tendsto θ l (𝓝 (c * 2)) := by
+    rw [funext hθ]
+    have h : Continuous (fun t : ℝ ↦ c * (2 * (Real.exp (-(t ^ 2)) : ℂ))) := by fun_prop
+    simpa [Function.comp_def] using (h.tendsto 0).comp hr₀
+  exact fun hO ↦ (mul_ne_zero hc (by norm_num)) (tendsto_nhds_unique hlim (hO.trans_tendsto hroot))
+
 /-- Paper: Theorem 7.1.2.3, p. 317.
 Over the rationals with only the real place and the trivial character, the square-root
 bound at norm zero fails for some test function. The real Gaussian gives a witness.
@@ -316,7 +412,23 @@ theorem sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt :
       let normℝ (g : Jℚ) := ((sIdeleQuotientNorm ℚ ∅ g : ℝ≥0) : ℝ)
       ¬ Asymptotics.IsBigO (comap normℝ (𝓝[>] (0 : ℝ)))
         (sLocalHomogeneousAdelicTheta ℚ ∅ μℚ₁ (1 : PontryaginDual Jℚ₁) f : Jℚ → ℂ)
-        (fun g ↦ (normℝ g) ^ (1 / 2 : ℝ)) := by sorry
+        (fun g ↦ (normℝ g) ^ (1 / 2 : ℝ)) := by
+  let r (g : Jℚ) : ℝ := (sIdeleQuotientNorm ℚ ∅ g).val
+  have hr : Ioi 0 ⊆ range r := by
+    intro t ht
+    obtain ⟨s, hs⟩ := sIdeleQuotientNorm_exists_section ℚ ∅
+    let u : ℝ≥0ˣ := Units.mk0 ⟨t, ht.le⟩ (ne_of_gt (show (0 : ℝ≥0) < ⟨t, ht.le⟩ from ht))
+    exact ⟨s u, congrArg (fun v : ℝ≥0ˣ ↦ (v.val : ℝ)) (hs u)⟩
+  have : CompactSpace Jℚ₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm ℚ ∅).isCompact_preimage (isCompact_singleton (x := 1)))
+  have : IsFiniteMeasure μℚ₁ := CompactSpace.isFiniteMeasure (μ := μℚ₁)
+  let c : ℂ := (μℚ₁).real univ
+  have hc : c ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μℚ₁)).ne'
+  refine sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_gaussian.elim fun f hf ↦ ?_
+  let θ : Jℚ → ℂ := sLocalHomogeneousAdelicTheta ℚ ∅ μℚ₁ (1 : PontryaginDual Jℚ₁) f
+  have he : ∀ g, θ g = c * (2 * (Real.exp (-(r g ^ 2)) : ℂ)) :=
+    sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_eval f hf
+  exact ⟨f, sLocalHomogeneousAdelicTheta_rat_not_isBigO_sqrt_limit r hr c hc θ he⟩
 
 end Counterexample
 

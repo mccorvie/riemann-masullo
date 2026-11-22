@@ -227,7 +227,8 @@ class Merger:
 
     def since(self, base):
         """What main has done since `base`, or None if `base` is not a commit of main."""
-        ahead = self.api.call(f"compare/{base}...{BRANCH}")
+        # The first page contains the change list for the whole comparison.
+        ahead = self.api.call(f"compare/{base}...{BRANCH}?per_page=1")
         if ahead.get("status") not in ("identical", "ahead") or ahead.get("behind_by"):
             return None
         return ahead

@@ -346,7 +346,14 @@ $(tail -n 25 "$wt/.agent/build.txt")
   done
   check="Statement check: not run (no record of the starting point)."
   if [ -s "$main/.agent/base/$role-$n.txt" ]; then
-    sandboxed scripts/signatures.sh >"$wt/.agent/signatures.txt" 2>>"$wt/.agent/build.txt"
+    sandboxed scripts/signatures.sh >"$wt/.agent/signatures.txt" 2>>"$wt/.agent/build.txt" ||
+      fail "A $role agent ($who) left the library in a state that cannot be loaded as a whole, although each file builds. Nothing was pushed.
+
+\`\`\`
+$(grep -v '^+' "$wt/.agent/build.txt" | tail -n 2 | cut -c1-700)
+\`\`\`
+
+The usual cause is a declaration whose name already exists in another file of the library that this file does not import: the two files build separately but cannot be loaded together. Rename yours, or import that file and use its declaration. An instance without a name can collide in the same way: give it one."
     diffout=$("$main/scripts/signatures.sh" --compare "$main/.agent/base/$role-$n.txt" "$wt/.agent/signatures.txt") ||
       fail "A $role agent ($who) changed or removed declarations that already existed. Nothing was pushed.
 

@@ -1,0 +1,222 @@
+module
+
+public import RiemannMasullo.Ch10_TraceSpectral.Sec1
+
+/-! # §10.1 assertions that are false as printed -/
+
+@[expose] public noncomputable section
+
+open Filter IsDedekindDomain MeasureTheory NumberField Set
+open scoped NNReal NumberField.AdeleRing
+
+namespace RiemannMasullo
+
+local instance instSIdeleQuotientMeasurableSpaceSec1Printed
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    MeasurableSpace (SIdeleQuotient F S) := borel _
+
+local instance instIdeleClassMeasurableSpaceSec1Printed (F : Type*) [Field F] [NumberField F] :
+    MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+
+local instance instNormOneSIdeleQuotientMeasurableSpaceSec1Printed
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    MeasurableSpace (sIdeleQuotientNorm F S).ker := borel _
+
+/-- Paper: Before (10.1.1.2), p. 434. The interval norm is finite on every
+weighted global polar-free theta function for every closed interval with interior. -/
+def Printed.globalThetaSobolev_closedIntervals_finite : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (a s : ℝ), 0 ≤ s →
+    ∀ I : Set ℝ, IsClosed I → OrdConnected I → (interior I).Nonempty →
+    ∀ f : adelePolarSubspace F,
+      let m := (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
+        IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ)
+      intervalSobolevENorm (ideleClassTamagawaMeasure F) (fun g ↦ Real.log ((m g).val : ℝ))
+        I s (modulationWeight m a (adelicTheta f.val)) ≠ ⊤
+
+/-- Paper: Before (10.1.1.2), p. 434. Take ℚ, I = [0,∞), a = s = 0, finite
+integer indicators and the real test (3x² − 2πx⁴) exp(-πx²). It is the derivative
+of x³ exp(-πx²) and vanishes at zero. Its theta is strictly negative on [2,3].
+The integral over that shell grows at least as a positive constant times 2^(2b)
+when the subinterval is [0,b]. -/
+theorem Printed.globalThetaSobolev_closedIntervals_finite_false :
+    ¬ Printed.globalThetaSobolev_closedIntervals_finite := by sorry
+
+/-- Paper: Before Lemma 10.1.1.4, p. 435. A positive twist of every local theta
+test is asserted to belong to the Sobolev space for the whole half-line (-a,∞). -/
+def Printed.sLocalThetaSobolev_openHalfLine_finite : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a s : ℝ), 0 < a → 0 ≤ s → ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
+      let m := (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
+        SIdeleQuotient F S →ₜ* ℝ≥0ˣ)
+      intervalSobolevENorm (sLocalQuotientTamagawaMeasure F S)
+        (fun g ↦ Real.log ((m g).val : ℝ)) (Ioi (-a)) s
+        (modulationWeight m a (sLocalAdelicThetaOnClasses F S f)) ≠ ⊤
+
+/-- Paper: Before Lemma 10.1.1.4, p. 435. For ℚ, S = {∞}, a = 1, s = 0,
+and the real Gaussian, the weighted theta is positive throughout [2,3].
+Already the intervals [0,b] give unbounded norms as b tends to infinity. -/
+theorem Printed.sLocalThetaSobolev_openHalfLine_finite_false :
+    ¬ Printed.sLocalThetaSobolev_openHalfLine_finite := by sorry
+
+/-- Paper: Definition 10.1.1.1(2) and Remark 10.1.1.2, p. 434. As printed,
+the integral defining the local norm is finite at every positive weight and
+every compact nonempty interval. -/
+def Printed.sLocalThetaSobolev_integrable : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a α β s : ℝ), 0 < a → α ≤ β → 0 ≤ s →
+    ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
+      Integrable (fun g : SIdeleQuotient F S ↦ ‖sLocalAdelicThetaOnClasses F S f g‖ ^ 2 *
+        intervalSobolevDensity (a + α) (a + β) s
+          (Real.log ((sIdeleQuotientNorm F S g).val : ℝ))) (sLocalQuotientTamagawaMeasure F S)
+
+/-- Paper: Definition 10.1.1.1(2) and Remark 10.1.1.2, p. 434.
+For ℚ with S consisting of the real place, take f(x) = exp(-πx²), a = 1,
+I = {-1} and s = 0. The two S-units give theta(t) = 2 exp(-πt²), whose
+square is not integrable near zero against dt/t. -/
+theorem Printed.sLocalThetaSobolev_integrable_false :
+    ¬ Printed.sLocalThetaSobolev_integrable := by sorry
+
+/-- Paper: Proof of Lemma 10.1.1.4(1), p. 436. As printed, the density of
+the weighted S-idele measure vanishes at infinity. -/
+def Printed.sIdeleIntervalSobolevDensity_vanishesAtInfinity : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (α β s : ℝ), α ≤ β → 0 ≤ s →
+    Tendsto (fun g : (SAdeleRing F S)ˣ ↦
+      intervalSobolevDensity α β s (Real.log ((sIdeleNorm F S g).val : ℝ)))
+      (cocompact _) (nhds 0)
+
+/-- Paper: Proof of Lemma 10.1.1.4(1), p. 436. For ℚ with S the real place,
+I = {1} and s = 0, the density is t² on the positive ideles t, so it
+grows without bound as t tends to infinity. -/
+theorem Printed.sIdeleIntervalSobolevDensity_vanishesAtInfinity_false :
+    ¬ Printed.sIdeleIntervalSobolevDensity_vanishesAtInfinity := by sorry
+
+/-- Paper: Proposition 10.1.1.5, pp. 436–437. As printed, the global Sobolev
+completion in the proposition uses theta functions of all Schwartz–Bruhat tests.
+The proposed completion requires their weighted square integrability. -/
+def Printed.globalThetaSobolev_allTests_integrable : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (a α β s : ℝ), α ≤ β → 0 ≤ s →
+    ∀ f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)),
+      Integrable (fun g : IdeleClassGroup (𝓞 F) F ↦ ‖adelicTheta f g‖ ^ 2 *
+        intervalSobolevDensity (a + α) (a + β) s
+          (Real.log ((ideleClassNorm F g).val : ℝ))) (ideleClassTamagawaMeasure F)
+
+/-- Paper: Proposition 10.1.1.5, pp. 436–437. For ℚ, set a = s = 0
+and I = {0}. The real Gaussian times the characteristic functions of the finite
+integer rings has theta(t) = Σ_{n ≠ 0} exp(-πn²t²), asymptotic to 1/t at zero
+on each norm-one fibre, so its square is not integrable. -/
+theorem Printed.globalThetaSobolev_allTests_integrable_false :
+    ¬ Printed.globalThetaSobolev_allTests_integrable := by sorry
+
+/-- A test quotient completes in its weighted function norm when its evaluation on
+representatives gives an injective dense map to a closed subspace of the ambient L². -/
+def Printed.IsFunctionCompletionMap {G B X W : Type*} [MeasurableSpace G]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [NormedAddCommGroup W] [NormedSpace ℂ W]
+    (μ : Measure G) (rep : W → G → ℂ) (H : Submodule ℂ W)
+    (q : B → X) (θ : B → G → ℂ) (j : X →L[ℂ] H) : Prop :=
+  IsClosed (H : Set W) ∧ Function.Injective j ∧ DenseRange j ∧
+    ∀ f, rep (j (q f)).val =ᵐ[μ] θ f
+
+/-- The product of the test quotient maps extends to a continuous injection of
+the function-norm completions and factors through a surjective Hilbert-sum isometry.
+The completions are quantified so the statement also makes sense when a proposed
+test function fails to belong to the ambient L². -/
+def Printed.HasHomogeneousSobolevFactorization {G B X W Ω : Type*} {Y : Ω → Type*}
+    [MeasurableSpace G] [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    [NormedAddCommGroup W] [NormedSpace ℂ W]
+    (μ : Measure G) (rep : W → G → ℂ) (q : B → X) (qω : ∀ i, B → Y i)
+    (θ : B → G → ℂ) (θω : Ω → B → G → ℂ) : Prop :=
+  ∃ (H : Submodule ℂ W) (K : Ω → Submodule ℂ W)
+    (j : X →L[ℂ] H) (k : ∀ i, Y i →L[ℂ] K i)
+    (Q : H →L[ℂ] (∀ i, K i)) (T : H ≃ₗᵢ[ℂ] lp (fun i ↦ ↥(K i)) 2),
+    Printed.IsFunctionCompletionMap μ rep H q θ j ∧
+    (∀ i, Printed.IsFunctionCompletionMap μ rep (K i) (qω i) (θω i) (k i)) ∧
+    Function.Injective Q ∧ (∀ f i, Q (j (q f)) i = k i (qω i f)) ∧
+    ∀ u i, Q u i = T u i
+
+/-- Paper: Proposition 10.1.1.5(2), p. 437, (10.1.1.14). The product of the
+global homogeneous quotient maps factors isometrically through the Hilbert sum.
+The factors carry the norm of their weighted homogeneous functions. -/
+def Printed.globalThetaSobolev_rawIsotypeDecomposition : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (a α β s : ℝ), α ≤ β → 0 ≤ s →
+    let G := IdeleClassGroup (𝓞 F) F
+    let m : G →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩
+    let μ := ideleClassTamagawaMeasure F
+    let W := CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) α β s
+    Printed.HasHomogeneousSobolevFactorization (X := GlobalAdelicThetaSpace F)
+      (Y := GlobalHomogeneousThetaSpace F) μ (fun u : W ↦ ⇑u)
+      Submodule.Quotient.mk (fun _ ↦ Submodule.Quotient.mk)
+      (fun f ↦ modulationWeight m a (adelicTheta f))
+      (fun ω f ↦ modulationWeight m a (homogeneousAdelicTheta ω f))
+
+/-- Paper: Proposition 10.1.1.5(2), p. 437. Take ℚ(i), a = s = 0 and I = {0}.
+Use the finite integer indicators and a radial smooth archimedean bump equal to 1
+at radius 1 and supported in (0.9, 1.1). Subtract a radial bump supported in (0.4, 0.6)
+scaled to cancel the integral. Both zero terms vanish and theta at the identity is 4.
+This theta lies in the trivial isotype. The norm-one mass π/4 scales its only
+nonzero coordinate and prevents an isometry. -/
+theorem Printed.globalThetaSobolev_rawIsotypeDecomposition_false :
+    ¬ Printed.globalThetaSobolev_rawIsotypeDecomposition := by sorry
+
+/-- Paper: Proposition 10.1.1.5(2), p. 437, (10.1.1.15). The product of the
+S-local homogeneous quotient maps factors isometrically through the Hilbert sum.
+The factors carry the norm of their weighted homogeneous functions. -/
+def Printed.sLocalThetaSobolev_rawIsotypeDecomposition : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a α β s : ℝ), 0 < a → α ≤ β → 0 ≤ s → 0 < α →
+    let G := SIdeleQuotient F S
+    let m : G →ₜ* ℝ≥0ˣ := ⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+    let μ := sLocalQuotientTamagawaMeasure F S
+    let W := CompactIntervalSobolev μ (fun g ↦ Real.log ((m g).val : ℝ)) α β s
+    Printed.HasHomogeneousSobolevFactorization (X := SLocalAdelicThetaSpace F S)
+      (Y := SLocalHomogeneousThetaSpace F S) μ (fun u : W ↦ ⇑u)
+      Submodule.Quotient.mk (fun _ ↦ Submodule.Quotient.mk)
+      (fun f ↦ modulationWeight m a (sLocalAdelicThetaOnClasses F S f))
+      (fun ω f ↦ modulationWeight m a (sLocalHomogeneousAdelicThetaLinearMap F S ω f))
+
+/-- Paper: Proposition 10.1.1.5(2), p. 437. Take ℚ(i), S consisting of the
+complex place, a = 1, I = {1}, and s = 0. A nonzero radial Gaussian theta
+function lies in the trivial isotype. Its raw average is π/2 times itself
+and every other character average is zero, so the Hilbert sum norm grows by π/2. -/
+theorem Printed.sLocalThetaSobolev_rawIsotypeDecomposition_false :
+    ¬ Printed.sLocalThetaSobolev_rawIsotypeDecomposition := by sorry
+
+/-- Paper: Theorem 10.1.2.1, p. 437. As printed, inversion in the idele class
+group defines a continuous linear automorphism of the same ambient Sobolev space
+for every compact nonempty interval. -/
+def Printed.ideleClassSobolev_inversion_automorphism : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (α β s : ℝ), α ≤ β → 0 ≤ s →
+    let μ := ideleClassTamagawaMeasure F
+    let W := CompactIntervalSobolev μ
+      (fun g ↦ Real.log ((ideleClassNorm F g).val : ℝ)) α β s
+    ∃ J : W ≃L[ℂ] W, ∀ u : W,
+      (J u : IdeleClassGroup (𝓞 F) F → ℂ) =ᵐ[μ] fun g ↦ u g⁻¹
+
+/-- Paper: Theorem 10.1.2.1, p. 437. Take ℚ, I = {1} and s = 0. The indicator
+of |g| < 1 is square integrable for t² dt/t in the norm coordinate t, while its
+inverse pullback is the indicator of |g| > 1, which has infinite squared integral. -/
+theorem Printed.ideleClassSobolev_inversion_automorphism_false :
+    ¬ Printed.ideleClassSobolev_inversion_automorphism := by sorry
+
+/-- Paper: Announcement before Lemma 10.1.1.3, p. 435. In the a-line
+notation the local Fourier transform extends at precisely the half weight. -/
+def Printed.sLocalThetaSobolev_fourier_on_line : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a s : ℝ) (ha : 0 < a) (hs : 0 ≤ s),
+    let hp : 0 < a + 0 := by simpa using ha
+    let H := ↥(sLocalThetaSobolev F S ha (le_refl (0 : ℝ)) hs hp)
+    let j := sLocalThetaSobolevInclusion F S ha (le_refl (0 : ℝ)) hs hp
+    (∃ T : H →L[ℂ] H, ∀ f : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
+      T (j (Submodule.Quotient.mk f)) =
+        j (Submodule.Quotient.mk (sAdeleSchwartzFourier (F := F) (S := S) f))) ↔ a = 1 / 2
+
+/-- Paper: Announcement before Lemma 10.1.1.3, p. 435. Take ℚ, S = {∞},
+a = 1/2 and s = 2. For the even tests exp(-πx²) cos(2πNx) the input
+norms are bounded, while the Fourier Gaussian peak at N gives a squared
+norm growing at least as fast as (log N)². -/
+theorem Printed.sLocalThetaSobolev_fourier_on_line_false :
+    ¬ Printed.sLocalThetaSobolev_fourier_on_line := by sorry
+
+end RiemannMasullo

@@ -100,7 +100,7 @@ class FakeApi:
             return dict(workflow_runs=[r for r in self.runs.values() if r["head_sha"] == sha])
         if m := re.fullmatch(r"compare/([0-9a-f]{40})\.\.\.([0-9a-f]{40})\?per_page=1", path):
             return dict(merge_base_commit=dict(sha=MERGE_BASE))
-        if m := re.fullmatch(r"compare/([0-9a-f]{40})\.\.\.main", path):
+        if m := re.fullmatch(r"compare/([0-9a-f]{40})\.\.\.main\?per_page=1", path):
             if m.group(1) in self.not_on_main:
                 return dict(status="diverged", ahead_by=3, behind_by=2, files=[])
             if not self.main_files:
@@ -227,7 +227,7 @@ class AutoMerge(unittest.TestCase):
 
     def test_main_changed_the_same_file(self):
         self.api.pull_request(7, {LEAN: (OLD, NEW)})
-        self.api.main_files = [LEAN]
+        self.api.main_files = ["README.md", LEAN]
         self.assertIn("checking again", self.drain()[7])
         self.assertEqual(self.merged(), [])
         self.assertTrue(self.api.did("POST", r"actions/runs/1007/rerun"))

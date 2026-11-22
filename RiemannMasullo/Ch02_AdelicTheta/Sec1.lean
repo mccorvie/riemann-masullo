@@ -3877,6 +3877,13 @@ theorem adeleSchwartz_strictLF :
     IsStrictLFSpace ℬ(𝔸ᶠ[F]) ∧ IsStrictLFSpace ℬ(𝔸[F]) := by
   exact ⟨schwartzBruhat_strictLF_of_secondCountable, schwartzBruhat_strictLF_of_secondCountable⟩
 
+/-- A seminorm on the adelic Schwartz–Bruhat space is continuous if it is bounded
+on every von Neumann bounded set. -/
+theorem adeleSchwartz_bornological :
+    ∀ p : Seminorm ℂ ℬ(𝔸[F]),
+      (∀ B : Set ℬ(𝔸[F]), IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p :=
+  schwartzBruhat_bornological (G := Multiplicative 𝔸[F])
+
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The finite and global adelic Schwartz–Bruhat
 spaces are complete. -/
 theorem adeleSchwartz_complete :

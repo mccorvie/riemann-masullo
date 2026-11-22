@@ -53,7 +53,50 @@ Deviation: The integer-ring indicator is represented by the trivial standard Gau
 theorem finitePlaceDifference_integerIndicator (v : V) (π : Fᵥ(v)ˣ)
     (hπ : vval(v).IsUniformizer π.val) (x : Fᵥ(v)) :
     finitePlaceDifference v π (finiteStandardGaussian v 1) (Multiplicative.ofAdd x) =
-      (Units.val '' (Uᵥ(v) : Set Fᵥ(v)ˣ)).indicator (fun _ ↦ (1 : ℂ)) x := by sorry
+      (Units.val '' (Uᵥ(v) : Set Fᵥ(v)ˣ)).indicator (fun _ ↦ (1 : ℂ)) x := by
+  classical
+  have hG (y : Fᵥ(v)) : finiteStandardGaussian v 1 (Multiplicative.ofAdd y) =
+      (v.adicCompletionIntegers F : Set Fᵥ(v)).indicator (fun _ ↦ (1 : ℂ)) y := by
+    change finiteStandardGaussianValue v 1 y = _
+    unfold finiteStandardGaussianValue
+    exact ite_eq_left fun u _ ↦ rfl
+  have hval : vval(v) π.val = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (v.valuedAdicCompletion_surjective F)))
+  have hmem (y : Fᵥ(v)) : y ∈ Units.val '' (Uᵥ(v) : Set Fᵥ(v)ˣ) ↔ vval(v) y = 1 := by
+    refine ⟨?_, fun hy ↦ ?_⟩
+    · rintro ⟨u, hu, rfl⟩
+      exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu
+    · have hy0 : y ≠ 0 := fun h0 ↦ by simp [h0] at hy
+      exact ⟨Units.mk0 y hy0,
+        HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr hy, rfl⟩
+  have hπx : vval(v) ((↑π⁻¹ : Fᵥ(v)) * x) = WithZero.exp (1 : ℤ) * vval(v) x := by
+    rw [map_mul, Units.val_inv_eq_inv_val, map_inv₀, hval, ← WithZero.exp_neg, neg_neg]
+  change finiteStandardGaussian v 1 (Multiplicative.ofAdd x) -
+    finiteStandardGaussian v 1 (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x)) = _
+  rw [hG, hG]
+  rcases lt_trichotomy (vval(v) x) 1 with h | h | h
+  · have h1 : vval(v) ((↑π⁻¹ : Fᵥ(v)) * x) ≤ 1 := by
+      have h2 := (WithZero.lt_mul_exp_iff_le (x := vval(v) x * WithZero.exp (1 : ℤ)) (y := 1)
+        one_ne_zero).mp
+      rw [one_mul] at h2
+      rw [hπx, mul_comm]
+      exact h2 (mul_lt_mul_of_pos_right h (by simp))
+    rw [indicator_of_mem (show x ∈ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h.le),
+      indicator_of_mem (show _ ∈ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h1),
+      indicator_of_notMem fun hx ↦ h.ne ((hmem x).mp hx), sub_self]
+  · have h1 : ¬ vval(v) ((↑π⁻¹ : Fᵥ(v)) * x) ≤ 1 := by
+      rw [hπx, h, mul_one]
+      simp
+    rw [indicator_of_mem (show x ∈ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h.le),
+      indicator_of_notMem (show _ ∉ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h1),
+      indicator_of_mem ((hmem x).mpr h), sub_zero]
+  · have h1 : ¬ vval(v) ((↑π⁻¹ : Fᵥ(v)) * x) ≤ 1 := by
+      rw [hπx, not_le]
+      exact h.trans_le (le_mul_of_one_le_left zero_le (by simp))
+    rw [indicator_of_notMem (show x ∉ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h.not_ge),
+      indicator_of_notMem (show _ ∉ (v.adicCompletionIntegers F : Set Fᵥ(v)) from h1),
+      indicator_of_notMem fun hx ↦ h.ne' ((hmem x).mp hx), sub_zero]
 
 /-- Paper: Lemma 5.3.1.1, p. 240.
 For each fixed uniformizer the local difference is a topological embedding. -/
@@ -75,7 +118,18 @@ Deviation: The independence claim is restricted to integer-unit invariants by ER
 theorem finitePlaceDifference_eq_of_unitInvariant (v : V) (π π' : Fᵥ(v)ˣ)
     (hπ : vval(v).IsUniformizer π.val) (hπ' : vval(v).IsUniformizer π'.val) (f : ℬ(Fᵥ(v)))
     (hf : ∀ u ∈ Uᵥ(v), schwartzBruhatUnitTranslate u f = f) :
-    finitePlaceDifference v π f = finitePlaceDifference v π' f := by sorry
+    finitePlaceDifference v π f = finitePlaceDifference v π' f := by
+  have hu : π * π'⁻¹ ∈ Uᵥ(v) :=
+    HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr (by
+      rw [Units.val_mul, Units.val_inv_eq_inv_val, map_mul, map_inv₀, hπ.val, ← hπ'.val]
+      exact mul_inv_cancel₀ hπ'.val_ne_zero)
+  refine Subtype.ext (funext fun x ↦ ?_)
+  have h : f (Multiplicative.ofAdd ((↑(π * π'⁻¹)⁻¹ : Fᵥ(v)) * ((↑π'⁻¹ : Fᵥ(v)) * x.toAdd))) =
+      f (Multiplicative.ofAdd ((↑π'⁻¹ : Fᵥ(v)) * x.toAdd)) :=
+    congrArg (fun k : ℬ(Fᵥ(v)) ↦ k (Multiplicative.ofAdd ((↑π'⁻¹ : Fᵥ(v)) * x.toAdd))) (hf _ hu)
+  rw [← mul_assoc, ← Units.val_mul, show (π * π'⁻¹)⁻¹ * π'⁻¹ = π⁻¹ by
+    rw [mul_inv_rev, inv_inv, mul_right_comm, mul_inv_cancel, one_mul]] at h
+  exact congrArg (fun a ↦ f x - a) h
 
 /-- Paper: Lemma 5.3.1.1, p. 240.
 The image of the integer-unit-invariant subspace under the local difference consists of the
@@ -452,7 +506,34 @@ theorem temperedSupport_eq_bruhatSupport_preimage
     (he : ∀ (f : 𝓢(E, ℂ)) (x : E), e f (Multiplicative.ofAdd x) = f x)
     (T : StrongDual ℂ 𝓢(E, ℂ)) :
     Distribution.dsupport (⇑T) = Multiplicative.ofAdd ⁻¹'
-      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by sorry
+      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by
+  let a : E ≃ₜ Multiplicative E := Homeomorph.refl E
+  have hs (f : 𝓢(E, ℂ)) :
+      tsupport (f : E → ℂ) = a ⁻¹' tsupport (e f : Multiplicative E → ℂ) := by
+    have h : (e f : Multiplicative E → ℂ) ∘ a = (f : E → ℂ) := funext (he f)
+    rw [← tsupport_comp_eq_preimage _ a, h]
+  ext x
+  change x ∈ Distribution.dsupport (⇑T) ↔ a x ∈ schwartzBruhatDistributionSupport _
+  apply not_iff_not.mp
+  refine (Distribution.notMem_dsupport_iff (f := (T : 𝓢(E, ℂ) → ℂ)) x).trans ?_
+  simp only [schwartzBruhatDistributionSupport, Set.mem_compl_iff, not_not,
+    schwartzBruhatVanishingLocus, Set.mem_sUnion, Set.mem_setOf_eq]
+  constructor
+  · rintro ⟨U, hU, ho, hx⟩
+    refine ⟨a '' U, ⟨a.isOpenMap U ho, ?_⟩, ⟨x, hx, rfl⟩⟩
+    intro g hg
+    change T (e.symm g) = 0
+    apply hU
+    rw [hs, e.apply_symm_apply]
+    exact (Set.preimage_mono hg).trans (by rw [Set.preimage_image_eq _ a.injective])
+  · rintro ⟨U, ⟨ho, hU⟩, hx⟩
+    refine ⟨a ⁻¹' U, ?_, ho.preimage a.continuous, hx⟩
+    intro f hf
+    have h := hU (e f) (fun y hy ↦ by
+      obtain ⟨z, rfl⟩ := a.surjective y
+      exact hf (by rwa [hs]))
+    change T (e.symm (e f)) = 0 at h
+    simpa only [e.symm_apply_apply] using h
 
 end DistributionOrder
 
