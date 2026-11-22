@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
@@ -81,7 +82,52 @@ a least conductor exponent, and only finitely many exponents are nonzero.
 Deviation: The exponent is given by the local unit filtration of §3.3.1. -/
 theorem exists_heckeConductorExponents (χ : U[F]) :
     ∃ n : Primes(F) → ℕ, (Function.support n).Finite ∧
-      ∀ v, IsLeast (conductorExponents(χ, v)) (n v) := by sorry
+      ∀ v, IsLeast (conductorExponents(χ, v)) (n v) := by
+  classical
+  have hlocal (v : Primes(F)) : (conductorExponents(χ, v)).Nonempty := by
+    let η : (v.adicCompletion F)ˣ →ₜ* Circle := χ.comp
+      ⟨IdeleClassGroup.ofAdicCompletion (𝓞 F) F v, continuous_ideleClass_ofAdicCompletion F v⟩
+    have harc : Circle.centeredArc (Real.pi / 2) ∈ 𝓝 (1 : Circle) := by
+      simpa using Circle.hasBasis_centeredArc_div_two_pow.mem_of_mem (i := 0) trivial
+    have hpre : η ⁻¹' Circle.centeredArc (Real.pi / 2) ∈ 𝓝 (1 : (v.adicCompletion F)ˣ) :=
+      η.continuous.continuousAt.preimage_mem_nhds (by
+        change Circle.centeredArc (Real.pi / 2) ∈ 𝓝 (η 1)
+        rwa [map_one])
+    rw [Units.isEmbedding_val₀.isInducing.nhds_eq_comap] at hpre
+    obtain ⟨W, hW, hsub⟩ := mem_comap.mp hpre
+    obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp hW
+    have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+    obtain ⟨n, hn⟩ := exists_pow_lt_of_lt_one hr (inv_lt_one_of_one_lt₀ hq)
+    refine ⟨n, fun u hu hclose ↦ ?_⟩
+    -- Every power stays close to one, so its character lies in the same half circle.
+    change η u = 1
+    apply Circle.eq_one_of_forall_pow_mem_centeredArc_pi_div_two
+    intro k _
+    rw [← map_pow]
+    apply hsub
+    apply hball
+    change dist (u.val ^ k) 1 < r
+    rw [dist_eq_norm]
+    apply (local_unit_pow_bound u.val hu.le k).trans_lt
+    exact hclose.trans_lt (by simpa only [zpow_neg, zpow_natCast, inv_pow] using hn)
+  let c := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ
+  have hcover : c ∈ ⋃ T : Finset (Primes(F)), (unramifiedOutside F T : Set _) := by
+    rw [iUnion_unramifiedOutside]
+    exact mem_univ _
+  obtain ⟨T, hT⟩ := mem_iUnion.mp hcover
+  refine ⟨fun v ↦ sInf (conductorExponents(χ, v)), T.finite_toSet.subset ?_,
+    fun v ↦ ⟨Nat.sInf_mem (hlocal v), fun _ hn ↦ Nat.sInf_le hn⟩⟩
+  intro v hv
+  by_contra hvT
+  have hzero : 0 ∈ conductorExponents(χ, v) := by
+    intro u hu _
+    have hunit : u ∈ (v.adicCompletionIntegers F).units :=
+      HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr
+        (Valued.toNormedField.norm_eq_one_iff.mp hu)
+    let u' := (v.adicCompletionIntegers F).toSubmonoid.unitsEquivUnitsType ⟨u, hunit⟩
+    have h := (mem_unramifiedOutside_iff F T c).mp hT v hvT u'
+    exact Subtype.ext h
+  exact hv (Nat.eq_zero_of_le_zero (Nat.sInf_le hzero))
 
 /-- Paper: Equation (B.4.2.3), p. 614. The logarithm of the
 discriminant–conductor product adds the finite conductor exponents weighted by log prime norm.

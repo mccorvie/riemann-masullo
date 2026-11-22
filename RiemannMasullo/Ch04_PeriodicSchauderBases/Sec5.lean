@@ -492,11 +492,37 @@ def modulatedCompactSupportSubmodule : Submodule ℂ E :=
     ⨅ x : {x : G // m x ∉ B}, LinearMap.ker
       ((LinearMap.proj x.val).comp (modulatedExponentialDecaySubmodule m Set.univ).subtype)
 
+/-- An abstract form of `mem_modulatedCompactSupportSubmodule_iff`: in a function space with
+generating seminorms, membership in a submodule `Tf` that cuts out compact support, intersected
+with the kernels of evaluation off a closed set `Z`, means compact support with topological
+support in `Z`. Stated abstractly so that elaboration does not unfold the decay space. -/
+private theorem mem_comap_inf_iInf_ker_proj_iff {X : Type*} [TopologicalSpace X]
+    (Sf Tf : Submodule ℂ (X → ℂ)) {ι : Type*} (p : SeminormFamily ℂ Sf ι) (Z : Set X)
+    (hZ : IsClosed Z) (hT : ∀ g : Sf, g.val ∈ Tf ↔ HasCompactSupport g.val)
+    (f : WithGeneratingSeminorms Sf p) :
+    f ∈ (Tf.comap (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ)) ⊓
+        ⨅ x : {x : X // x ∉ Z}, LinearMap.ker
+          ((LinearMap.proj x.val).comp (Sf.subtype : WithGeneratingSeminorms Sf p →ₗ[ℂ] (X → ℂ))) :
+        Submodule ℂ (WithGeneratingSeminorms Sf p)) ↔
+      HasCompactSupport (f : Sf).val ∧ tsupport (f : Sf).val ⊆ Z := by
+  refine Submodule.mem_inf.trans (and_congr (hT f) (Submodule.mem_iInf _ |>.trans
+    ⟨fun h ↦ closure_minimal (fun x hx ↦ ?_) hZ, fun h x ↦ ?_⟩))
+  · by_contra hxZ
+    exact hx (LinearMap.mem_ker.mp (h ⟨x, hxZ⟩))
+  · exact LinearMap.mem_ker.mpr
+      (image_eq_zero_of_notMem_tsupport (f := (f : Sf).val) (x := x.val) fun hx ↦ x.2 (h hx))
+
+-- The section-variable linter scans the large elaborated decay types and takes minutes.
+set_option linter.unusedSectionVars false in
 /-- Paper: §4.5.2, p. 205. For a closed module window, membership in the
 fixed-support space is equivalent to the stated condition on topological support. -/
 theorem mem_modulatedCompactSupportSubmodule_iff (hB : IsClosed B) (f : E) :
     f ∈ modulatedCompactSupportSubmodule m B ↔
-      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B := by sorry
+      HasCompactSupport f.val ∧ tsupport f.val ⊆ m ⁻¹' B :=
+  mem_comap_inf_iInf_ker_proj_iff (modulatedExponentialDecaySubmodule m Set.univ)
+    (bruhatCompactSupportSubmodule G) _ (m ⁻¹' B) (hB.preimage m.continuous)
+    (fun g ↦ ⟨fun h ↦ h.2, fun h ↦
+      ⟨modulatedExponentialDecay_mem_bruhatSmooth m Set.univ Set.univ_nonempty g, h⟩⟩) f
 
 /-- Paper: §4.5.2, p. 205. The fixed-support k-stage imposes k-invariance
 on the supported decay space, with the topology inherited from the decay space. -/
@@ -508,7 +534,17 @@ whose values are unchanged by translation by elements of k. -/
 theorem mem_modulatedCompactSupportStage_iff (f : E) :
     f ∈ modulatedCompactSupportStage m B k ↔
       f ∈ modulatedCompactSupportSubmodule m B ∧
-        ∀ (x : G) (u : k), f.val (u.val * x) = f.val x := by sorry
+        ∀ (x : G) (u : k), f.val (u.val * x) = f.val x := by
+  have htwist (x : G) : twist₀ f x = f.val x :=
+    (modulatedExponentialDecayTwist_apply m Set.univ zeroUniv f x).trans
+      ((congrArg (fun r : ℝ ↦ (r : ℂ) * f.val x) (Real.rpow_zero _)).trans
+        ((congrArg (· * f.val x) Complex.ofReal_one).trans (one_mul _)))
+  change f ∈ modulatedCompactSupportSubmodule m B ∧
+    twist₀ f ∈ schwartzBruhatInvariantSubmodule k ↔ _
+  refine and_congr_right fun _ ↦
+    (mem_schwartzBruhatInvariantSubmodule_iff k (twist₀ f)).trans ?_
+  exact forall_congr' fun x ↦ forall_congr' fun u ↦ iff_of_eq (congrArg₂ Eq
+    ((htwist (x * u.val)).trans (congrArg f.val (mul_comm x u.val))) (htwist x))
 
 variable (hk : IsCompact (k : Set G))
 variable (hperp : IsCompactlyGeneratedGroup (lcaAnnihilator (k.comap m.toMonoidHom.ker.subtype)))
@@ -546,7 +582,37 @@ include hSC hm hms hγ ha hwidth in
 /-- Paper: Proposition 4.5.2.1(2), p. 205. A module window wider than one
 logarithmic period maps onto the cyclic quotient. -/
 theorem modulatedCompactSupport_quotient_image :
-    q '' (m ⁻¹' window) = (univ : Set Q) := by sorry
+    q '' (m ⁻¹' window) = (univ : Set Q) := by
+  have hpos (u : ℝ≥0ˣ) : 0 < ((u.val : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt u)
+  have hle (u v : ℝ≥0ˣ) : u ≤ v ↔ Real.log (u.val : ℝ) ≤ Real.log (v.val : ℝ) := by
+    rw [Real.log_le_log_iff (hpos u) (hpos v), NNReal.coe_le_coe, Units.val_le_val]
+  have hdiv : Real.log ((b / a).val : ℝ) = Real.log (b.val : ℝ) - Real.log (a.val : ℝ) := by
+    rw [Units.val_div_eq_div_val, NNReal.coe_div, Real.log_div (hpos b).ne' (hpos a).ne']
+  have hmul : Real.log ((b * a).val : ℝ) = Real.log (b.val : ℝ) + Real.log (a.val : ℝ) := by
+    rw [Units.val_mul, NNReal.coe_mul, Real.log_mul (hpos b).ne' (hpos a).ne']
+  have hL : 0 < L := Real.log_pos (by exact_mod_cast hγ)
+  refine eq_univ_of_forall fun z ↦ ?_
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective z
+  have hx (n : ℤ) : Real.log ((m (γ ^ n * x)).val : ℝ) =
+      n * L + Real.log ((m x).val : ℝ) := by
+    rw [map_mul m, map_zpow m, Units.val_mul, Units.val_zpow_eq_zpow_val, NNReal.coe_mul,
+      NNReal.coe_zpow, Real.log_mul (zpow_ne_zero _ (hpos (m γ)).ne') (hpos (m x)).ne',
+      Real.log_zpow]
+  generalize ht : (Real.log (b.val : ℝ) - Real.log (a.val : ℝ) -
+    Real.log ((m x).val : ℝ)) / L = t
+  have htL : t * L = Real.log (b.val : ℝ) - Real.log (a.val : ℝ) -
+      Real.log ((m x).val : ℝ) := by
+    rw [← ht, div_mul_cancel₀ _ hL.ne']
+  have h1 := mul_lt_mul_of_pos_right (Int.lt_floor_add_one t) hL
+  have h2 := mul_le_mul_of_nonneg_right (Int.floor_le t) hL.le
+  rw [add_one_mul] at h1
+  refine ⟨γ ^ (⌊t⌋ + 1) * x, ⟨?_, ?_⟩, ?_⟩
+  · rw [hle, hdiv, hx, Int.cast_add, Int.cast_one, add_one_mul]
+    linarith
+  · rw [hle, hmul, hx, Int.cast_add, Int.cast_one, add_one_mul]
+    linarith
+  · rw [QuotientGroup.mk'_apply, QuotientGroup.mk_mul,
+      (QuotientGroup.eq_one_iff _).mpr (Subgroup.zpow_mem_zpowers γ _), one_mul]
 
 include hγ hwidth in
 /-- Paper: Proposition 4.5.2.1(2), pp. 205–206. The interior of a strict-width

@@ -288,7 +288,9 @@ theorem entireContinuousMap_subalgebra_properties :
     (∀ f g : C(ℂ, ℂ), Differentiable ℂ f → Differentiable ℂ g →
       Differentiable ℂ (f + g : C(ℂ, ℂ))) ∧
     (∀ f g : C(ℂ, ℂ), Differentiable ℂ f → Differentiable ℂ g →
-      Differentiable ℂ (f * g : C(ℂ, ℂ))) := by sorry
+      Differentiable ℂ (f * g : C(ℂ, ℂ))) := by
+  exact ⟨fun c ↦ differentiable_const c, fun _ _ hf hg ↦ hf.add hg,
+    fun _ _ hf hg ↦ hf.mul hg⟩
 
 /-- Paper: §7.1.4, p. 326.
 The ring of entire functions carries the compact-open topology of uniform convergence
