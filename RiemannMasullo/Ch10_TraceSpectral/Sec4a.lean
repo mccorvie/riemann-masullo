@@ -179,7 +179,20 @@ theorem geometricProjection_convolution_geometricProjection (φ : BruhatCompactS
 /-- Paper: Remark 10.4.1.4, p. 458. Spectral projection after convolution
 depends only on the input's spectral projection. -/
 theorem spectralProjection_convolution_spectralProjection (φ : BruhatCompactSupport C𝔽) :
-    (Pspec).comp ((A(φ)).comp Pspec) = (Pspec).comp (A(φ)) := by sorry
+    (Pspec).comp ((A(φ)).comp Pspec) = (Pspec).comp (A(φ)) := by
+  apply ContinuousLinearMap.ext
+  intro u
+  let L := (Pspec).comp (A(φ))
+  have hz : L (Pgeom u) = 0 := by
+    apply Submodule.starProjection_orthogonal_apply_eq_zero
+    apply (Submodule.Quotient.mk_eq_zero (Θ₀)).mp
+    exact hardySobolevTestAction_preserves_globalTheta (F := F) a (hStrip(hα)) hs φ
+      ((Θ₀).starProjection_apply_mem u)
+  calc
+    L (Pspec u) = 0 + L (Pspec u) := (zero_add _).symm
+    _ = L (Pgeom u) + L (Pspec u) := congrArg (fun v : W₀ ↦ v + L (Pspec u)) hz.symm
+    _ = L (Pgeom u + Pspec u) := (map_add L _ _).symm
+    _ = L u := congrArg L ((Θ₀).starProjection_add_starProjection_orthogonal u)
 
 /-- Paper: Remark 10.4.1.4, p. 458. There is no convolution block from
 the geometric subspace to the spectral subspace. -/
