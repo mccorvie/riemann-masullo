@@ -9,6 +9,7 @@ import Mathlib.RingTheory.Ideal.Int
 import Mathlib.RingTheory.RamificationInertia.Basic
 import Mathlib.Analysis.Complex.LocallyUniformLimit
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.NumberTheory.EulerProduct.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
@@ -470,6 +471,83 @@ theorem heckeIdealSummatory_bound (F : Type*) [Field F] [NumberField F] {ε : �
 -- TODO(paper-gap): Equation (B.6.1.7) multiplies the norm-one class volume by an
 -- extra inverse square root of the discriminant under the normalization in §A.3.
 
+/-- A unitary character trivial on the norm-one subgroup is a unique imaginary power of
+the norm. -/
+private theorem heckeIdealSummatory_tendsto_of_trivial_on_normOne_existsUnique (χ : U[F])
+    (hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1) :
+    ∃! t : ℝ, ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * (t : ℂ)) := by
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, ⟨σ, hσ, hnorm⟩, _⟩ := ideleGroup_quotient.{_, 0} F
+  let c : NNRealˣ →ₜ* ℂ := (ideleClassNormTwist χ 0).comp ⟨σ, hσ⟩
+  have hunit (g : IdeleClassGroup (𝓞 F) F) : ideleClassNormTwist χ 0 g = (χ g : ℂ) := by
+    change (χ g : ℂ) * _ ^ (0 : ℂ) = _
+    simp
+  obtain ⟨z, ⟨hzre, hz⟩, huniq⟩ :=
+    existsUnique_unitaryComplexPower c (fun u ↦ by
+      change ‖ideleClassNormTwist χ 0 (σ u)‖ = 1
+      rw [hunit, Circle.norm_coe])
+  have hparam : -Complex.I * ((-z.im : ℝ) : ℂ) = z := by
+    apply Complex.ext <;> simp [Complex.mul_re, Complex.mul_im, hzre]
+  refine ⟨-z.im, ?_, ?_⟩
+  · change ideleClassNormTwist χ 0 =
+      ideleClassNormTwist (1 : U[F]) (-Complex.I * ((-z.im : ℝ) : ℂ))
+    rw [hparam]
+    ext1 g
+    let u := ideleClassNorm F g
+    have hk : g / σ u ∈ (ideleClassNorm F).ker := MonoidHom.mem_ker.mpr (by
+      rw [map_div, hnorm u, div_self'])
+    have hkχ : χ (g / σ u) = 1 :=
+      DFunLike.congr_fun hχ (⟨g / σ u, hk⟩ : (ideleClassNorm F).ker)
+    have he : ideleClassNormTwist χ 0 (g / σ u) = 1 := by rw [hunit, hkχ, Circle.coe_one]
+    calc
+      ideleClassNormTwist χ 0 g = ideleClassNormTwist χ 0 (g / σ u) * c u := by
+        change ideleClassNormTwist χ 0 g =
+          ideleClassNormTwist χ 0 (g / σ u) * ideleClassNormTwist χ 0 (σ u)
+        rw [← map_mul, div_mul_cancel]
+      _ = ideleClassNormTwist (1 : U[F]) z g := by
+        change ideleClassNormTwist χ 0 (g / σ u) * c u =
+          1 * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ z
+        rw [he, hz u]
+  · intro t ht
+    have he : -Complex.I * (t : ℂ) = z := huniq _ ⟨by simp [Complex.mul_re], fun u ↦ by
+      change ideleClassNormTwist χ 0 (σ u) = _
+      rw [ht]
+      change (1 : ℂ) * (((ideleClassNorm F (σ u) : NNReal) : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ)) = _
+      rw [one_mul, hnorm u]⟩
+    apply neg_eq_iff_eq_neg.mp
+    simpa [Complex.mul_im] using congrArg Complex.im he
+
+/-- Undoing the imaginary norm twist of such a character gives the trivial character. -/
+private theorem heckeIdealSummatory_tendsto_of_trivial_on_normOne_eq_one (χ : U[F]) (t₀ : ℝ)
+    (ht : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀))
+    (g : IdeleClassGroup (𝓞 F) F) : ideleClassNormTwist χ (Complex.I * t₀) g = 1 := by
+  have h := DFunLike.congr_fun ht g
+  change (χ g : ℂ) * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ (0 : ℂ) =
+    1 * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ (-Complex.I * t₀) at h
+  change (χ g : ℂ) * (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ^ (Complex.I * t₀) = 1
+  have hne : (((ideleClassNorm F g : NNReal) : ℝ) : ℂ) ≠ 0 := by
+    exact_mod_cast (ideleClassNorm F g).ne_zero
+  rw [Complex.cpow_zero, mul_one, one_mul] at h
+  rw [h, ← Complex.cpow_add _ _ hne, neg_mul, neg_add_cancel, Complex.cpow_zero]
+
+/-- A character that is identically one has value one at every nonzero ideal. -/
+private theorem heckeIdealSummatory_tendsto_of_trivial_on_normOne_value (χ : 𝒳[F])
+    (hχ : ∀ g, χ g = 1) {I : Ideal (𝓞 F)} (hI : I ≠ ⊥) : heckeIdealValue χ I = 1 := by
+  classical
+  have hres : ∀ v : HeightOneSpectrum (𝓞 F), ∀ x : v.adicCompletion F, x ≠ 0 →
+      χ.restrict v x = 1 := fun v x hx ↦ by
+    have hu : IsUnit x := isUnit_iff_ne_zero.mpr hx
+    rw [← hu.unit_spec, HeckeCharacter.restrict_apply]
+    simp [hχ, hx]
+  have hun : ∀ v : HeightOneSpectrum (𝓞 F), χ.IsUnramifiedAt v := fun v ↦
+    HeckeCharacter.isUnramifiedAt_iff.mpr fun x ↦ hres v _ (by simp)
+  have hloc : ∀ v : HeightOneSpectrum (𝓞 F), χ.localValue v = 1 := fun v ↦ by
+    rw [HeckeCharacter.localValue]
+    apply hres
+    exact (Valued.v.exists_isUniformizer_of_isCyclic_of_nontrivial).choose_spec.ne_zero
+  unfold heckeIdealValue
+  rw [ite_eq_right hI]
+  exact finprod_eq_one_of_forall_eq_one fun v ↦ by simp [hun v, hloc v]
+
 /-- Paper: Lemma B.6.1.2(1), p. 637. For a unitary character trivial on
 norm-one classes, undoing its imaginary norm twist gives the ideal-counting
 limit at the residue of Dedekind zeta.
@@ -481,7 +559,31 @@ theorem heckeIdealSummatory_tendsto_of_trivial_on_normOne (χ : U[F])
       ∀ t₀ : ℝ, ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀) →
         Tendsto (fun x : ℝ ↦ heckeIdealSummatory (ideleClassNormTwist χ (Complex.I * t₀)) x / x)
           atTop (𝓝 (dedekindZeta_residue F : ℂ)) := by
-  sorry
+  refine ⟨heckeIdealSummatory_tendsto_of_trivial_on_normOne_existsUnique χ hχ, fun t₀ ht ↦ ?_⟩
+  have hval {I : Ideal (𝓞 F)} (hI : I ≠ ⊥) :
+      heckeIdealValue (ideleClassNormTwist χ (Complex.I * t₀)) I = 1 :=
+    heckeIdealSummatory_tendsto_of_trivial_on_normOne_value _
+      (heckeIdealSummatory_tendsto_of_trivial_on_normOne_eq_one χ t₀ ht) hI
+  have hlim := (Complex.continuous_ofReal.tendsto _).comp (Ideal.tendsto_norm_le_div_atTop₀ F)
+  rw [← dedekindZeta_residue_def] at hlim
+  refine hlim.congr' ?_
+  filter_upwards [eventually_ge_atTop 0] with x hx
+  rw [Function.comp_apply, Complex.ofReal_div, Complex.ofReal_natCast]
+  congr 1
+  let e : {I : nonZeroDivisors (Ideal (𝓞 F)) // Ideal.absNorm (I : Ideal (𝓞 F)) ≤ x} ≃
+      {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x} :=
+    { toFun := fun I ↦ ⟨I.1.1, by simpa using mem_nonZeroDivisors_iff_ne_zero.mp I.1.2, I.2⟩
+      invFun := fun I ↦ ⟨⟨I.1, mem_nonZeroDivisors_iff_ne_zero.mpr (by simpa using I.2.1)⟩, I.2.2⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x}.Finite :=
+    (Ring.HasFiniteQuotients.finite_absNorm_le (S := 𝓞 F) ⌊x⌋₊).subset
+      fun I hI ↦ Nat.le_floor hI.2
+  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x} := hfin.to_subtype
+  have : Fintype {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ (I.absNorm : ℝ) ≤ x} := Fintype.ofFinite _
+  unfold heckeIdealSummatory
+  rw [Nat.card_congr e, Nat.card_eq_fintype_card, finsum_eq_sum_of_fintype, Finset.sum_congr rfl fun I _ ↦ hval I.2.1, Finset.sum_const,
+    Finset.card_univ, nsmul_eq_mul, mul_one]
 
 /-- Paper: Lemma B.6.1.2(2), p. 637. If the character is nontrivial on norm-one
 classes, its summatory function divided by `x` tends to zero. -/
