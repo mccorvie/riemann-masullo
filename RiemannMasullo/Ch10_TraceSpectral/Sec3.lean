@@ -245,7 +245,22 @@ theorem spectralConvolutionFiniteSum_approximationNumber_le {ι Z E : Type*}
     (A : E →L[ℂ] E) (x : ι → E) (Λ : ι → StrongDual ℂ E)
     (K : Finset Z) (N : Z → ℕ) (jet : (z : Z) → Fin (N z) → ι) (n : ℕ) :
     approximationNumber (spectralConvolutionFiniteSum A x Λ K N jet) n ≤
-      ∑ z ∈ K, ∑ m : Fin (N z), ‖(Λ (jet z m)).comp A‖ * ‖x (jet z m)‖ := by sorry
+      ∑ z ∈ K, ∑ m : Fin (N z), ‖(Λ (jet z m)).comp A‖ * ‖x (jet z m)‖ := by
+  classical
+  let T := spectralConvolutionFiniteSum A x Λ K N jet
+  have h : approximationNumber T n ≤ ‖T‖ := by
+    unfold approximationNumber
+    apply csInf_le
+    · refine ⟨0, ?_⟩
+      rintro _ ⟨S, _, rfl⟩
+      exact norm_nonneg _
+    · exact ⟨0, by simp, by simp⟩
+  apply h.trans
+  unfold T spectralConvolutionFiniteSum
+  apply (norm_sum_le _ _).trans
+  refine Finset.sum_le_sum fun z _ ↦ ?_
+  simpa only [ContinuousLinearMap.norm_smulRight_apply] using
+    (norm_sum_le Finset.univ (fun m : Fin (N z) ↦ ((Λ (jet z m)).comp A).smulRight (x (jet z m))))
 
 /-- Paper: (10.3.1.17), p. 450. Compactly supported Bruhat tests have
 an integrable Fourier–Mellin pairing at every norm twist. The pairing is
