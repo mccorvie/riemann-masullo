@@ -361,7 +361,49 @@ theorem regularizedCompletedHeckeL_ne_zero_at_canceled_poles
     let x₀ := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
     let b := (x₀ : ℂ) * Complex.I
     let Λ := regularizedCompletedHeckeL χ τ hτ L hL hEq
-    Λ.val (-b) ≠ 0 ∧ Λ.val (1 - b) ≠ 0 := by sorry
+    Λ.val (-b) ≠ 0 ∧ Λ.val (1 - b) ≠ 0 := by
+  classical
+  have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+  let x := hphase.exists.choose
+  let b := (x : ℂ) * Complex.I
+  obtain ⟨t, ⟨hchar, hzero, hone, _⟩, _⟩ :=
+    completedHeckeL_continuation_simplePoles χ L hL hEq hχ
+  have hx : -t = x := by
+    refine hphase.unique ?_ hphase.exists.choose_spec
+    intro u
+    have he := DFunLike.congr_fun hchar (QuotientGroup.mk (τ u))
+    change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+      1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+    rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+    rw [Complex.ofReal_neg, show -(t : ℂ) * Complex.I = -Complex.I * (t : ℂ) by ring]
+    exact he
+  have hb : b = -(Complex.I * (t : ℂ)) := by
+    dsimp only [b]
+    rw [← hx, Complex.ofReal_neg]
+    ring
+  let P (z : ℂ) := (z + b) * (1 - z - b)
+  have hP (s : ℂ) : AnalyticAt ℂ P s := by
+    dsimp only [P]
+    fun_prop
+  have hD (s : ℂ) : HasDerivAt P ((1 - s - b) - (s + b)) s := by
+    simpa [P, sub_eq_add_neg] using ((hasDerivAt_id s).add_const b).fun_mul
+      (((hasDerivAt_const s (1 : ℂ)).fun_sub (hasDerivAt_id s)).sub_const b)
+  have hmer : MeromorphicOn (P * L) univ :=
+    fun s hs ↦ (hP s).meromorphicAt.mul (hL hs).meromorphicAt
+  have cancel (s : ℂ) (hz : P s = 0) (hd : (1 - s - b) - (s + b) ≠ 0)
+      (hord : meromorphicOrderAt L s = -1) : toMeromorphicNFOn (P * L) univ s ≠ 0 := by
+    have h1 := (hP s).analyticOrderAt_eq_one_of_zero_deriv_ne_zero hz (by rwa [(hD s).deriv])
+    apply (meromorphicNFOn_toMeromorphicNFOn (P * L) univ (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hmer (mem_univ s),
+      meromorphicOrderAt_mul (hP s).meromorphicAt (hL (mem_univ s)).meromorphicAt,
+      (hP s).meromorphicOrderAt_eq, h1, hord]
+    norm_num
+  change toMeromorphicNFOn _ univ (-b) ≠ 0 ∧ toMeromorphicNFOn _ univ (1 - b) ≠ 0
+  simp only [ite_eq_left hχ, pow_one]
+  refine ⟨cancel _ (by dsimp only [P]; ring) (by ring_nf <;> norm_num) ?_,
+    cancel _ (by dsimp only [P]; ring) (by ring_nf <;> norm_num) ?_⟩
+  · simpa [hb] using hzero
+  · simpa [hb] using hone
 
 /-- Paper: Equation (7.1.4.4), p. 326.
 Evaluation of the m-th complex derivative at a point defines a continuous linear
