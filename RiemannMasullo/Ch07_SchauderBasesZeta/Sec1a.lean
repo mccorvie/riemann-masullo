@@ -30,6 +30,100 @@ local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
 -- the phase in the printed product is undefined. Equation (7.1.1.3) also reverses
 -- the phase sign in (7.1.1.1).
 
+/-- A factor `1 - u r` with `r ∈ [m, M]` and `0 < m` has norm at least
+`max (m |Im u|) (1 - M max (Re u) 0)`, a continuous function of `u` alone. -/
+private theorem exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_factor
+    (u : ℂ) {m M r : ℝ} (hm : 0 < m) (hr : r ∈ Icc m M) :
+    max (m * |u.im|) (1 - M * max u.re 0) ≤ ‖1 - u * (r : ℂ)‖ := by
+  have hr0 : 0 ≤ r := hm.le.trans hr.1
+  refine max_le ?_ ?_
+  · calc m * |u.im| ≤ r * |u.im| := mul_le_mul_of_nonneg_right hr.1 (abs_nonneg _)
+      _ = |(1 - u * (r : ℂ)).im| := by
+          simp [abs_mul, abs_of_nonneg hr0, mul_comm]
+      _ ≤ ‖1 - u * (r : ℂ)‖ := Complex.abs_im_le_norm _
+  · have h1 : r * u.re ≤ r * max u.re 0 := mul_le_mul_of_nonneg_left (le_max_left _ _) hr0
+    have h2 : r * max u.re 0 ≤ M * max u.re 0 :=
+      mul_le_mul_of_nonneg_right hr.2 (le_max_right _ _)
+    calc 1 - M * max u.re 0 ≤ 1 - u.re * r := by nlinarith
+      _ = (1 - u * (r : ℂ)).re := by simp
+      _ ≤ ‖1 - u * (r : ℂ)‖ := Complex.re_le_norm _
+
+private theorem exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_eventually_pos
+    (z : ℂ) {ω m M : ℝ} (hω : ω ≠ 0) (hm : 0 < m) :
+    ∀ᶠ t in 𝓝[>] (0 : ℝ), 0 < max (m * |(z * (Circle.exp (t * ω) : ℂ)).im|)
+      (1 - M * max (z * (Circle.exp (t * ω) : ℂ)).re 0) := by
+  have hc : Continuous (fun t : ℝ ↦ max (m * |(z * (Circle.exp (t * ω) : ℂ)).im|)
+      (1 - M * max (z * (Circle.exp (t * ω) : ℂ)).re 0)) := by fun_prop
+  by_cases h0 : 0 < max (m * |z.im|) (1 - M * max z.re 0)
+  · have h0' : 0 < (fun t : ℝ ↦ max (m * |(z * (Circle.exp (t * ω) : ℂ)).im|)
+        (1 - M * max (z * (Circle.exp (t * ω) : ℂ)).re 0)) 0 := by simpa using h0
+    exact ((hc.tendsto 0).mono_left nhdsWithin_le_nhds).eventually (lt_mem_nhds h0')
+  · rw [not_lt, max_le_iff] at h0
+    have him : z.im = 0 := by
+      have := h0.1
+      have : |z.im| ≤ 0 := by nlinarith [abs_nonneg z.im]
+      exact abs_nonpos_iff.mp this
+    have hre : 0 < z.re := by
+      by_contra h
+      rw [max_eq_right (not_lt.mp h)] at h0
+      linarith [h0.2]
+    have hI : ∀ᶠ t in 𝓝[>] (0 : ℝ), t ∈ Ioo 0 (Real.pi / |ω|) :=
+      Ioo_mem_nhdsGT (by positivity)
+    filter_upwards [hI] with t ht
+    apply lt_max_of_lt_left
+    apply mul_pos hm
+    apply abs_pos.mpr
+    rw [Circle.coe_exp, Complex.mul_im, Complex.exp_ofReal_mul_I_re,
+      Complex.exp_ofReal_mul_I_im, him, zero_mul, add_zero]
+    refine mul_ne_zero hre.ne' ?_
+    have hω' : 0 < |ω| := abs_pos.mpr hω
+    have hlt : |t * ω| < Real.pi := by
+      rw [abs_mul, abs_of_pos ht.1]
+      have := ht.2
+      rwa [lt_div_iff₀ hω'] at this
+    intro hs
+    rw [Real.sin_eq_zero_iff_of_lt_of_lt (by linarith [neg_abs_le (t * ω)])
+      (lt_of_le_of_lt (le_abs_self _) hlt)] at hs
+    exact (mul_ne_zero ht.1.ne' hω) hs
+
+private theorem exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_phaseShift
+    {ι : Type*} [Fintype ι] (a : ι → ℂ) (ω : ι → ℝ) (hω : ∀ i, ω i ≠ 0) (m M : ι → ℝ)
+    (hm : ∀ i, 0 < m i) :
+    ∃ c : ℝ, 0 < c ∧ ∀ x : ι → Circle, ∃ t ∈ Ioo (0 : ℝ) 1, ∀ r : ι → ℝ,
+      (∀ i, r i ∈ Icc (m i) (M i)) →
+      c ≤ ‖∏ i, (1 - a i * (x i : ℂ) * (Circle.exp (t * ω i) : ℂ) * (r i : ℂ))‖ := by
+  classical
+  let h (i : ι) (u : ℂ) : ℝ := max (m i * |u.im|) (1 - M i * max u.re 0)
+  let Q (t : ℝ) (x : ι → Circle) : ℝ :=
+    ∏ i, h i (a i * (x i : ℂ) * (Circle.exp (t * ω i) : ℂ))
+  have hQ (t : ℝ) : Continuous (Q t) := by
+    dsimp [Q, h]
+    fun_prop
+  have hshift (x : ι → Circle) : ∃ t ∈ Ioo (0 : ℝ) 1, 0 < Q t x := by
+    have hI : ∀ᶠ t in 𝓝[>] (0 : ℝ), t ∈ Ioo (0 : ℝ) 1 := Ioo_mem_nhdsGT zero_lt_one
+    obtain ⟨t, ht, hf⟩ := (hI.and (eventually_all.mpr fun i ↦
+      exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_eventually_pos
+        (a i * x i) (M := M i) (hω i) (hm i))).exists
+    exact ⟨t, ht, Finset.prod_pos fun i _ ↦ hf i⟩
+  choose t ht hpos using hshift
+  let d (x : ι → Circle) := Q (t x) x / 2
+  let U (x : ι → Circle) := {y | d x < Q (t x) y}
+  have hU (x) : U x ∈ 𝓝 x :=
+    (isOpen_lt continuous_const (hQ (t x))).mem_nhds (half_lt_self (hpos x))
+  obtain ⟨s, hs⟩ := CompactSpace.elim_nhds_subcover U hU
+  have cover (y : ι → Circle) : ∃ x ∈ s, y ∈ U x := by
+    have : y ∈ ⋃ x ∈ s, U x := hs ▸ mem_univ y
+    simpa only [mem_iUnion, exists_prop] using this
+  obtain ⟨x, hx, _⟩ := cover 1
+  obtain ⟨z, _, hz⟩ := s.exists_min_image d ⟨x, hx⟩
+  refine ⟨d z, half_pos (hpos z), fun y ↦ ?_⟩
+  obtain ⟨x, hx, hy⟩ := cover y
+  refine ⟨t x, ht x, fun r hr ↦ (hz x hx).trans ((le_of_lt hy).trans ?_)⟩
+  rw [norm_prod]
+  exact Finset.prod_le_prod₀ (fun i _ ↦ le_max_of_le_left (mul_nonneg (hm i).le (abs_nonneg _)))
+    fun i _ ↦ exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_factor
+      _ (hm i) (hr i)
+
 /-- Paper: Lemma 7.1.1.1, p. 313.
 There are ordered heights escaping to infinity on both tails at which the finite Euler
 product is uniformly bounded on the closed strip from `-δ` to `1 + δ`.
@@ -45,7 +139,66 @@ theorem exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow
       Tendsto (fun k ↦ |T k|) (comap (abs : ℤ → ℤ) atTop) atTop ∧
       ∀ k : ℤ, ∀ σ ∈ Icc (-δ) (1 + δ),
         c ≤ ‖reciprocalPartialHeckeEulerProduct χ S ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ := by
-  sorry
+  classical
+  let q (v : S) : ℝ := (v.val.asIdeal.absNorm : ℝ)
+  have hq1 (v : S) : 1 < q v := by
+    dsimp only [q]; exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  let a (v : S) : ℂ := if (ideleClassNormTwist χ 0).IsUnramifiedAt v.val then
+    (ideleClassNormTwist χ 0).localValue v.val else 0
+  let ω (v : S) := -Real.log (q v)
+  let phase (r : ℝ) (v : S) := Circle.exp (r * ω v)
+  have hω (v : S) : ω v ≠ 0 := neg_ne_zero.mpr (Real.log_pos (hq1 v)).ne'
+  have hpow (σ r : ℝ) (v : S) :
+      (v.val.asIdeal.absNorm : ℂ) ^ (-((σ : ℂ) + (r : ℂ) * Complex.I)) =
+        (phase r v : ℂ) * ((q v ^ (-σ) : ℝ) : ℂ) := by
+    have hq : (v.val.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v.val)).ne'
+    rw [Complex.cpow_def_of_ne_zero hq, ← Complex.natCast_log, Circle.coe_exp,
+      Real.rpow_def_of_pos (zero_lt_one.trans (hq1 v)), Complex.ofReal_exp, ← Complex.exp_add]
+    congr 1
+    dsimp [ω, q]
+    push_cast
+    ring
+  have hfac (σ r t : ℝ) (v : S) :
+      (finiteHeckeEulerFactor χ v.val ((σ : ℂ) + ((r + t : ℝ) : ℂ) * Complex.I))⁻¹ =
+        1 - a v * (phase r v : ℂ) * (Circle.exp (t * ω v) : ℂ) * ((q v ^ (-σ) : ℝ) : ℂ) := by
+    by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v.val
+    · rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv, hpow]
+      simp only [a, ite_eq_left hv, phase, add_mul, Circle.exp_add, Circle.coe_mul]
+      ring
+    · rw [finiteHeckeEulerFactor, ite_eq_right hv]
+      simp [a, hv]
+  obtain ⟨c, hc, hshift⟩ :=
+    exists_heights_reciprocalPartialHeckeEulerProduct_strip_boundedBelow_phaseShift
+      a ω hω (fun v ↦ q v ^ (-(1 + δ))) (fun v ↦ q v ^ δ)
+      (fun v ↦ Real.rpow_pos_of_pos (zero_lt_one.trans (hq1 v)) _)
+  choose t ht hbound using fun k : ℤ ↦ hshift (phase k)
+  let T (k : ℤ) : ℝ := k + t k
+  have hI (k : ℤ) : T k ∈ Ioo (k : ℝ) ((k : ℝ) + 1) :=
+    ⟨lt_add_of_pos_right _ (ht k).1, add_lt_add_right (ht k).2 _⟩
+  refine ⟨c, T, hc, ?_, ?_, ?_, ?_, fun k σ hσ ↦ ?_⟩
+  · apply monotone_int_of_le_succ
+    intro k
+    exact ((hI k).2.trans (by simpa only [Int.cast_add, Int.cast_one] using (hI (k + 1)).1)).le
+  · intro k hk
+    exact (show 0 ≤ (k : ℝ) by exact_mod_cast hk).trans (hI k).1.le
+  · intro k hk
+    have h : (k : ℝ) + 1 ≤ 0 := by exact_mod_cast (show k + 1 ≤ 0 by omega)
+    exact (hI k).2.le.trans h
+  · have hlim : Tendsto (fun k : ℤ ↦ ((|k| : ℤ) : ℝ)) (comap (abs : ℤ → ℤ) atTop) atTop :=
+      tendsto_intCast_atTop_atTop.comp tendsto_comap
+    refine tendsto_atTop_mono (fun k ↦ ?_) (tendsto_atTop_add_const_right _ (-1) hlim)
+    rw [Int.cast_abs]
+    have h := abs_sub_abs_le_abs_sub (k : ℝ) (T k)
+    rw [abs_of_nonpos (sub_nonpos.mpr (hI k).1.le)] at h
+    linarith [(hI k).2]
+  · have hr (v : S) : q v ^ (-σ) ∈ Icc (q v ^ (-(1 + δ))) (q v ^ δ) :=
+      ⟨Real.rpow_le_rpow_of_exponent_le (hq1 v).le (by linarith [hσ.2]),
+        Real.rpow_le_rpow_of_exponent_le (hq1 v).le (by linarith [hσ.1])⟩
+    have h := hbound k (fun v ↦ q v ^ (-σ)) hr
+    rw [reciprocalPartialHeckeEulerProduct, ← Finset.prod_coe_sort]
+    simpa only [T, hfac] using h
+
 
 -- TODO(paper-gap): The proof on p. 315 uses a different reflection for each place,
 -- and positive symmetric upper density alone does not guarantee visits on both tails.
@@ -170,6 +323,74 @@ end Counterexample
 -- TODO(paper-gap): Remark 7.1.2.4 drops the imaginary-unit conversion in the phase
 -- and reverses the phase sign in the displayed list for the saturated product.
 
+/-- The reciprocal of `1 - b exp(-L z)`, with `exp(-L) ≠ 1`, is meromorphic with a nonpositive
+integer order, which is negative exactly at the zeros of `1 - b exp(-L z)`. -/
+private theorem finiteHeckeEulerFactor_poles_iff_exp
+    (b L : ℂ) (hL : Complex.exp (-L) ≠ 1) (s : ℂ) :
+    MeromorphicAt (fun z ↦ (1 - b * Complex.exp (-(L * z)))⁻¹) s ∧ ∃ k : ℤ, k ≤ 0 ∧
+      meromorphicOrderAt (fun z ↦ (1 - b * Complex.exp (-(L * z)))⁻¹) s = k ∧
+      (k < 0 ↔ 1 - b * Complex.exp (-(L * s)) = 0) := by
+  let g : ℂ → ℂ := fun z ↦ 1 - b * Complex.exp (-(L * z))
+  have hg : ∀ z, AnalyticAt ℂ g z := fun z ↦ by fun_prop
+  have hne : analyticOrderAt g s ≠ ⊤ := by
+    intro htop
+    have h0 := (AnalyticOnNhd.analyticOrderAt_eq_top_iff_eq_zero s hg).mp htop
+    have e0 := congrFun h0 0
+    have e1 := congrFun h0 1
+    simp only [g, Pi.zero_apply, mul_zero, neg_zero, Complex.exp_zero, mul_one,
+      sub_eq_zero] at e0 e1
+    subst e0
+    exact hL (by simpa using e1.symm)
+  obtain ⟨k, hk⟩ := ENat.ne_top_iff_exists.mp hne
+  refine ⟨(hg s).meromorphicAt.inv, -(k : ℤ), by omega, ?_, ?_⟩
+  · change meromorphicOrderAt g⁻¹ s = _
+    rw [meromorphicOrderAt_inv, (hg s).meromorphicOrderAt_eq, ← hk]
+    simp
+  · have : (-(k : ℤ) < 0) ↔ analyticOrderAt g s ≠ 0 := by
+      rw [← hk]; simp; omega
+    rw [this, analyticOrderAt_ne_zero]
+    exact ⟨fun h ↦ h.2, fun h ↦ ⟨hg s, h⟩⟩
+
+/-- Every finite Hecke Euler factor is meromorphic with a nonpositive integer order, negative
+exactly at the zeros of the Euler polynomial at an unramified place. -/
+private theorem finiteHeckeEulerFactor_poles_iff_order
+    (χ : PontryaginDual C𝔽) (v : Primes) (s : ℂ) :
+    MeromorphicAt (finiteHeckeEulerFactor χ v) s ∧ ∃ k : ℤ, k ≤ 0 ∧
+      meromorphicOrderAt (finiteHeckeEulerFactor χ v) s = k ∧
+      (k < 0 ↔ (ideleClassNormTwist χ 0).IsUnramifiedAt v ∧
+        1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s) = 0) := by
+  classical
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    let L := Complex.log (v.asIdeal.absNorm : ℂ)
+    have hpow (z : ℂ) : (v.asIdeal.absNorm : ℂ) ^ (-z) = Complex.exp (-(L * z)) := by
+      rw [Complex.cpow_def_of_ne_zero hN0]
+      congr 1
+      ring
+    have hL : Complex.exp (-L) ≠ 1 := by
+      rw [Complex.exp_neg, Complex.exp_log hN0]
+      intro h
+      have := inv_eq_one.mp h
+      have h2 := HeightOneSpectrum.one_lt_absNorm v
+      have : (v.asIdeal.absNorm : ℕ) = 1 := by exact_mod_cast this
+      omega
+    have hfun : finiteHeckeEulerFactor χ v = fun z ↦
+        (1 - (ideleClassNormTwist χ 0).localValue v * Complex.exp (-(L * z)))⁻¹ := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_left hv, hpow]
+    obtain ⟨hm, k, hk, ho, hiff⟩ :=
+      finiteHeckeEulerFactor_poles_iff_exp ((ideleClassNormTwist χ 0).localValue v) L hL s
+    rw [hfun]
+    exact ⟨hm, k, hk, ho, by rw [hiff, hpow]; simp [hv]⟩
+  · have hfun : finiteHeckeEulerFactor χ v = fun _ ↦ 1 := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_right hv]
+    rw [hfun]
+    refine ⟨MeromorphicAt.const _ _, 0, le_rfl, ?_, by simp [hv]⟩
+    rw [meromorphicOrderAt_const]
+    simp
+
 /-- Paper: Remark 7.1.2.4, p. 318.
 At an unramified finite place the poles of the Hecke Euler factor are equally spaced on
 the imaginary axis. The phase is specified by the value at a local uniformizer.
@@ -181,7 +402,31 @@ theorem finiteHeckeEulerFactor_poles_iff (χ : PontryaginDual C𝔽) (v : Primes
       (v.asIdeal.absNorm : ℂ) ^ (-(t : ℂ) * Complex.I)) (s : ℂ) :
     meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0 ↔
       ∃ m : ℤ, s = (((m : ℝ) * (2 * Real.pi / Real.log (v.asIdeal.absNorm : ℝ)) - t : ℝ) : ℂ) *
-        Complex.I := by sorry
+        Complex.I := by
+  obtain ⟨-, k, -, ho, hiff⟩ := finiteHeckeEulerFactor_poles_iff_order χ v s
+  have hq : 1 < (v.asIdeal.absNorm : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hℓ : 0 < Real.log (v.asIdeal.absNorm : ℝ) := Real.log_pos hq
+  have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  set ℓ := Real.log (v.asIdeal.absNorm : ℝ) with hℓdef
+  have hlog : Complex.log (v.asIdeal.absNorm : ℂ) = (ℓ : ℂ) := by
+    rw [hℓdef, Complex.natCast_log]
+  rw [ho, show ((k : WithTop ℤ) < 0 ↔ k < 0) from by exact_mod_cast Iff.rfl, hiff, _ht,
+    and_iff_right _hv, sub_eq_zero, ← Complex.cpow_add _ _ hN0, eq_comm,
+    Complex.cpow_def_of_ne_zero hN0, hlog, Complex.exp_eq_one_iff]
+  have hℓ0 : (ℓ : ℂ) ≠ 0 := by exact_mod_cast hℓ.ne'
+  constructor
+  · rintro ⟨n, hn⟩
+    refine ⟨-n, ?_⟩
+    push_cast
+    field_simp
+    linear_combination -hn
+  · rintro ⟨m, hm⟩
+    refine ⟨-m, ?_⟩
+    rw [hm]
+    push_cast
+    field_simp
+    ring
 
 open Classical in
 /-- Paper: Remark 7.1.2.4, p. 318.
@@ -193,7 +438,27 @@ theorem finiteHeckeEulerProduct_poles_iff (χ : PontryaginDual C𝔽) (S : Finse
     (s : ℂ) :
     let Sₚ := S.filter (fun v ↦ v.under (𝓞 ℚ) = p)
     meromorphicOrderAt (fun z ↦ ∏ v ∈ Sₚ, finiteHeckeEulerFactor χ v z) s < 0 ↔
-      ∃ v ∈ Sₚ, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0 := by sorry
+      ∃ v ∈ Sₚ, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0 := by
+  intro Sₚ
+  choose hm k hk ho _ using fun v ↦ finiteHeckeEulerFactor_poles_iff_order χ v s
+  have hfun : (fun z ↦ ∏ v ∈ Sₚ, finiteHeckeEulerFactor χ v z) =
+      ∏ v ∈ Sₚ, finiteHeckeEulerFactor χ v := by
+    funext z
+    simp [Finset.prod_apply]
+  rw [hfun, meromorphicOrderAt_prod (fun v _ ↦ hm v)]
+  simp only [ho]
+  norm_cast
+  constructor
+  · intro h
+    by_contra hne
+    push Not at hne
+    have : ∑ v ∈ Sₚ, k v = 0 :=
+      Finset.sum_eq_zero fun v hv ↦ le_antisymm (hk v) (hne v hv)
+    omega
+  · rintro ⟨v, hv, hlt⟩
+    have h := Finset.single_le_sum (f := fun w ↦ -k w) (fun w _ ↦ neg_nonneg.mpr (hk w)) hv
+    rw [Finset.sum_neg_distrib] at h
+    omega
 
 -- TODO(prerequisite): The induced Euler-factor identity in Remark 7.1.2.4 needs
 -- global Weil groups and their induction and local L-factor constructions.
