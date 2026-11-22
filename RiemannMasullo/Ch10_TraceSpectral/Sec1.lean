@@ -146,7 +146,11 @@ local notation "jₛ(" ha ", " hI ", " hs ", " hp ")" => sLocalThetaSobolevInclu
 dense image in their respective completions.
 Deviation: Sanity checks for the closure models. -/
 theorem globalThetaSobolev_dense (a : ℝ) {α β s : ℝ} (hI : α ≤ β) (hs : 0 ≤ s) :
-    DenseRange (j𝔽(a, hI, hs)) := by sorry
+    DenseRange (j𝔽(a, hI, hs)) := by
+  intro x
+  apply closure_subtype.mpr
+  rw [← Set.range_comp]
+  exact x.property
 
 /-- Paper: Definition 10.1.1.1(2), p. 434. The weighted S-local test classes are
 dense in the local Sobolev completion.
