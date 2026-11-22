@@ -6,6 +6,8 @@ public import Mathlib.Analysis.Normed.Module.DoubleDual
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch10_TraceSpectral.Sec3
 
+import all RiemannMasullo.AppC_LCTVS.Sec3a
+
 /-!
 # Spectral and geometric truncations
 
@@ -240,7 +242,11 @@ Deviation: Quotient nuclearity is explicit so the theorem applies at every
 nonnegative degree where this input holds. Section 10.3 states it for s > 1. Its proof is subject to ERRATA R5. -/
 theorem spectralProjection_convolution_nuclear (φ : BruhatCompactSupport C𝔽)
     (_hquot : quotientNuclear(φ)) :
-    IsNuclearOperator ((Pspec).comp (A(φ))) := by sorry
+    IsNuclearOperator ((Pspec).comp (A(φ))) := by
+  rw [spectralProjection_convolution_factor]
+  let e := (Θ₀).quotientEquivOrthogonal.toContinuousLinearEquiv
+  exact isNuclearOperator_comp_comp _hquot Qₐ ((Θ₀).orthogonal.subtypeL.comp e.toContinuousLinearMap)
+    (Subtype.val_injective.comp e.injective)
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Spectral truncation of convolution is nuclear.
 Deviation: Quotient nuclearity is explicit, as for the untruncated operator. -/
