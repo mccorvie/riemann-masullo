@@ -61,7 +61,11 @@ theorem finiteHeckeEulerFactor_inv_eq_phase (χ : U) (v : V)
     (hχ : χ₀(χ).IsUnramifiedAt v) (t : ℝ)
     (ht : χ₀(χ).localValue v = (q(v) : ℂ) ^ (-(t : ℂ) * Complex.I)) (s : ℂ) :
     (finiteHeckeEulerFactor χ v s)⁻¹ = 1 - (q(v) : ℂ) ^ (-s - (t : ℂ) * Complex.I) := by
-  sorry
+  classical
+  have hq : (q(v) : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  rw [finiteHeckeEulerFactor, ite_eq_left hχ, inv_inv, ht, ← Complex.cpow_add _ _ hq]
+  ring_nf
 
 -- The ramified and infinite factors are already given by `finiteHeckeEulerFactor`,
 -- `realHeckeCharacter_parameters`, `complexHeckeCharacter_parameters` and `heckeGammaFactor`.
@@ -185,13 +189,24 @@ test subspace by the restriction of the ordinary theta kernel. -/
 abbrev GlobalPolarFreeThetaSpace (F : Type*) [Field F] [NumberField F] :=
   (adelePolarSubspace F) ⧸ (LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype
 
+/-- In a quotient of a submodule by the pullback of a kernel, two classes agree exactly when
+the linear map agrees on their representatives. Stated for abstract modules, so that it
+elaborates without unfolding the Schwartz–Bruhat instances. -/
+private theorem globalPolarFreeThetaSpace_mk_eq_iff_quotient {R M N : Type*} [CommRing R]
+    [AddCommGroup M] [Module R M] [AddCommGroup N] [Module R N] (Q : Submodule R M)
+    (θ : M →ₗ[R] N) (f g : Q) :
+    (Submodule.Quotient.mk f : Q ⧸ (LinearMap.ker θ).comap Q.subtype) = Submodule.Quotient.mk g ↔
+      θ f = θ g := by
+  rw [Submodule.Quotient.eq, Submodule.mem_comap, LinearMap.mem_ker, map_sub,
+    Submodule.subtype_apply, Submodule.subtype_apply, map_sub, sub_eq_zero]
+
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equation (6.3.2.5).
 Two pole-free tests give the same quotient class exactly when their ordinary
 theta functions agree. -/
 theorem globalPolarFreeThetaSpace_mk_eq_iff (f g : P) :
     (Submodule.Quotient.mk f : GlobalPolarFreeThetaSpace F) = Submodule.Quotient.mk g ↔
-      adelicThetaLinearMap F f.val = adelicThetaLinearMap F g.val := by
-  sorry
+      adelicThetaLinearMap F f.val = adelicThetaLinearMap F g.val :=
+  globalPolarFreeThetaSpace_mk_eq_iff_quotient (adelePolarSubspace F) (adelicThetaLinearMap F) f g
 
 /-- Paper: Theorem 6.3.2.1(2), p. 304, equation (6.3.2.5).
 The pole-free theta quotient is represented by the image of the polar test
@@ -206,7 +221,7 @@ a representative with both polar values zero. -/
 theorem mem_globalPolarFreeThetaSubmodule (ω : PontryaginDual C₁) (x : Θ(ω)) :
     x ∈ globalPolarFreeThetaSubmodule ω ↔
       ∃ f : ℬ, f zeroAdele = 0 ∧ adeleSchwartzFourier f zeroAdele = 0 ∧ (K(ω)).mkQ f = x := by
-  sorry
+  simp only [globalPolarFreeThetaSubmodule, Submodule.mem_map, mem_adelePolarSubspace, and_assoc]
 
 -- TODO(paper-gap): The codomain in (6.3.2.5) is zero on a nontrivial norm-one
 -- component. The map (6.3.2.6) is identically zero there.
