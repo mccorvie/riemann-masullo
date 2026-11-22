@@ -463,7 +463,20 @@ A real Schwartz function lies in the flat subspace exactly when every derivative
 vanishes. -/
 theorem mem_realSchwartzFlatAtOrigin_iff (f : 𝓢(ℝ, ℂ)) :
     f ∈ realSchwartzFlatAtOrigin ↔
-      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by sorry
+      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by
+  have hd (k : ℕ) : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k f := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
+      rw [ih]
+  rw [realSchwartzFlatAtOrigin, Submodule.mem_iInf]
+  apply forall_congr'
+  intro k
+  change (-1 : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ ^ k) f) 0 = 0 ↔ _
+  rw [congrFun (hd k) 0, mul_eq_zero]
+  simp
 
 /-- Paper: Theorem 5.3.2.1(1), p. 243.
 The flat real Schwartz subspace is closed. -/
