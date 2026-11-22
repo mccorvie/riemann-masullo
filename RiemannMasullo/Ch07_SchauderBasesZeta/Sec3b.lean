@@ -298,7 +298,33 @@ theorem sLocalInvariantPW_seqDense {S₀ : Finset (HeightOneSpectrum (𝓞 F))}
     (D : Submodule ℂ (B(T))) (_hD : D = ⊤ ∨ D = Z₀(T)) :
     ∀ (x : Θ(T, χ)), x ∈ D.map (q(T, χ)) → ∃ u : ℕ → Θ(T, χ),
       (∀ n, ∃ Y > 0, u n ∈ sLocalInvariantPW hST Y D χ) ∧
-        Tendsto u atTop (𝓝 x) := by sorry
+        Tendsto u atTop (𝓝 x) := by
+  intro x hx
+  have seq := sLocalAbsolutePW_seqDense (F := F) hST _hT _hdis _hsat _hPic ω hu χ _hχ D _hD x hx
+  refine ⟨seq.choose, fun n ↦ ?_, seq.choose_spec.2⟩
+  let X := (seq.choose_spec.1 n).choose
+  have hn := (seq.choose_spec.1 n).choose_spec.2
+  let m : SAdeleRing F S → ℝ := fun y ↦
+    (∏ w : InfinitePlace F, ‖y.1 w‖ ^ w.mult) * (∏ v : S, ‖y.2 v‖)
+  have hm : Continuous m := by
+    dsimp only [m]
+    exact (continuous_finsetProd Finset.univ (fun w _ ↦
+      ((continuous_apply w).comp continuous_fst).norm.pow w.mult)).mul
+      (continuous_finsetProd Finset.univ (fun v _ ↦ ((continuous_apply v).comp continuous_snd).norm))
+  have bounded := ((isCompact_sLocalPWBox (F := F) (S := S) X).image hm).bddAbove
+  let Y : ℝ := bounded.choose
+  have hY : Y ∈ upperBounds (m '' sLocalPWBox S X) := bounded.choose_spec
+  have hbox : sLocalPWBox S X ⊆ sLocalPWProductRegion S (max 1 Y) :=
+    fun y hy ↦ (hY (Set.mem_image_of_mem m hy)).trans (le_max_right _ _)
+  have hgen : {f : B(S) | inBand(sLocalPWBox S X, f)} ⊆
+      {f : B(S) | inBand(sLocalPWProductRegion S (max 1 Y), f)} :=
+    fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩
+  have htests : sLocalPWTests hST (sLocalPWBox S X) ≤
+      sLocalPWTests hST (sLocalPWProductRegion S (max 1 Y)) :=
+    Submodule.map_mono (Submodule.span_mono hgen)
+  have hlevel : sLocalAbsolutePW hST X D χ ≤ sLocalInvariantPW hST (max 1 Y) D χ :=
+    Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests (le_refl D)))
+  exact ⟨max 1 Y, zero_lt_one.trans_le (le_max_left _ _), hlevel hn⟩
 
 /-- Paper: Proposition 7.3.2.4(2), p. 356.
 At fixed finite stages, the global theta of the invariant zero-moment level tests has
