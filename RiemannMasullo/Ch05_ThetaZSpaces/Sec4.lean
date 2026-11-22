@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-! # Second Structure Theorem and the S-local Čech sequence
 
@@ -444,7 +445,16 @@ Restriction of a unitary character to the norm section defines a unique real
 frequency in the Mellin coordinate. -/
 theorem existsUnique_sLocalCechFrequency (χ : PontryaginDual Jₛ) (τ : ℝ≥0ˣ →ₜ* Jₛ) :
     ∃! x : ℝ, ∀ t : ℝ≥0ˣ, (χ (τ t) : ℂ) = (normℝ(t) : ℂ) ^ ((x : ℂ) * Complex.I) :=
-  by sorry
+  by
+    let incl : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+    let c := incl.comp (χ.comp τ)
+    obtain ⟨z, ⟨hz, hval⟩, huniq⟩ := existsUnique_unitaryComplexPower c
+      (fun t ↦ Circle.norm_coe (χ (τ t)))
+    have him : (z.im : ℂ) * Complex.I = z := by
+      apply Complex.ext <;> simp [hz]
+    refine ⟨z.im, fun t ↦ (hval t).trans (by rw [him]), fun x hx ↦ ?_⟩
+    have he := huniq ((x : ℂ) * Complex.I) ⟨by simp, hx⟩
+    simpa using congrArg Complex.im he
 
 local notation "mellinIntegrand(" τ ", " φ ", " z ")" =>
   (fun t : ℝ≥0ˣ ↦ (φ) ((τ) t) * (normℝ(t) : ℂ) ^ (z))
