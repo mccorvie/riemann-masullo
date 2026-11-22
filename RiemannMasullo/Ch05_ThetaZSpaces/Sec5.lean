@@ -150,7 +150,21 @@ theorem sLocalEigendistribution_descends (c : QuasiCharacter Jₛ) (T : D(ℬ(A�
 /-- Paper: Equation (5.5.1.12), p. 279.
 The normalized S-local eigendistribution annihilates the theta kernel. -/
 theorem sLocalThetaKernel_le_eigendistribution (c : QuasiCharacter Jₛ) :
-    Kₛ ≤ (sLocalNormalizedEigendistribution c).ker := by sorry
+    Kₛ ≤ (sLocalNormalizedEigendistribution c).ker := by
+  have annihilates {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (W : Submodule ℂ (StrongDual ℂ M)) (T : StrongDual ℂ M)
+      (hW : W = Submodule.span ℂ {T})
+      (hd : ∀ D ∈ W, ∃! U : StrongDual ℂ (M ⧸ K), pull(K) U = D) : K ≤ T.ker := by
+    have hT : T ∈ W := hW ▸ Submodule.subset_span (Set.mem_singleton T)
+    obtain ⟨U, rfl⟩ := (hd T hT).exists
+    intro f hf
+    change U (Submodule.Quotient.mk f) = 0
+    exact (congrArg U ((Submodule.Quotient.mk_eq_zero K).mpr hf)).trans (map_zero U)
+  with_reducible_and_instances
+    exact annihilates (M := ℬ(Aₛ)) (Kₛ) (sLocalEigendistributions (F := F) (S := S) c)
+      (sLocalNormalizedEigendistribution (F := F) (S := S) c)
+      (sLocalEigendistributions_eq_span (F := F) (S := S) c)
+      (sLocalEigendistribution_descends (F := F) (S := S) c)
 
 /-- Paper: Theorem 5.5.1.2(2), p. 278.
 The generator on the S-local theta quotient is the continuous descent of the
