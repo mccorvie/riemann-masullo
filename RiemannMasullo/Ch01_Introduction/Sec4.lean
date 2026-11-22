@@ -5,6 +5,8 @@ public import RiemannMasullo.AppB_AnalyticNT.Sec6
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 
+import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
+
 /-! # From the trace formula to GRH
 
 Masullo, §1.4, pp. 27–31, repeated in §§1.8.4–1.8.5. The introductory trace
@@ -458,7 +460,21 @@ theorem introTrace_transition_mellin (S : Finset V) (χ : U𝔽)
     (fun s ↦ globalIdelicZFunction (sAdeleSchwartzToGlobal F S f) (ideleClassNormTwist χ s))
       =ᶠ[codiscrete ℂ] (fun s ↦
         outsideMass(S) * sLocalIdelicZFunction f (twist s) * heckeEulerProductOutside S χ hχ s) :=
-  by sorry
+  by
+  let L := finiteL(χ)
+  obtain ⟨hL, hs⟩ := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hraw := weilIdentity_unramifiedOutside_meromorphic (F := F) S f χ hχ L hL
+    (fun z hz ↦ hs ⟨z, hz⟩)
+  have hm : MeromorphicOn (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z) univ :=
+    fun z hz ↦ ((strongCoprimalityJetMatrix_det_ne_zero_euler χ S).1 z).meromorphicAt.mul
+      (hL hz).meromorphicAt
+  have he : (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z)
+      =ᶠ[codiscrete ℂ] heckeEulerProductOutside S χ hχ := by
+    rw [heckeEulerProductOutside_eq_finite S χ hχ L hL hs]
+    simpa only [Filter.codiscrete] using toMeromorphicNFOn_eqOn_codiscrete hm
+  filter_upwards [hraw, he] with z htrans heuler
+  rw [htrans, ← heuler]
+  simp only [reciprocalPartialHeckeEulerProduct, mul_assoc]
 
 -- On theta classes this is the representative formula for sLocalThetaToGlobal_mk,
 -- globalThetaMellin_mk and sLocalThetaMellin_mk from §§5.1–5.2.
