@@ -403,7 +403,20 @@ theorem invariantPWCondensation_trace_tendsto (a : ℝ) (ω : PontryaginDual C�
     let T := nuclearRestriction(a, ω, hρ, φ)
     Tendsto (fun Λ ↦ hilbertTrace
       (productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω Λ))) atTop
-      (𝓝 (hilbertTrace T)) := by sorry
+      (𝓝 (hilbertTrace T)) := by
+  have limit {H : Type _} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+      (T : nuclearEndomorphisms H) (A : ℝ → nuclearEndomorphisms H)
+      (h : Tendsto (fun r ↦ traceNorm (A r - T)) atTop (𝓝 0)) :
+      Tendsto (fun r ↦ hilbertTrace (A r)) atTop (𝓝 (hilbertTrace T)) := by
+    obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := H)
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    simp only [← htr, ← map_sub]
+    simp only [htr]
+    exact squeeze_zero (fun _ ↦ norm_nonneg _) (fun _ ↦ norm_hilbertTrace_le _) h
+  let T := nuclearRestriction(a, ω, hρ, φ)
+  exact limit (H := ↥(GeoIsotype(ω))) T
+    (fun r ↦ productTraceClass(T, invariantPWProjection (F := F) (S := S) hs a ω r))
+    (invariantPWCondensation_traceNorm_tendsto (F := F) (S := S) hs a ω _hω _hPic φ _hφ hρ)
 
 end Levels
 
