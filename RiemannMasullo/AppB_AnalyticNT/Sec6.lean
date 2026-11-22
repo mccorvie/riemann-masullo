@@ -5,6 +5,8 @@ public import RiemannMasullo.ForMathlib.RingTheory.DedekindDomain.Ideal.Lemmas
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Basic
 public import Mathlib.Analysis.Calculus.LogDeriv
 public import Mathlib.NumberTheory.ArithmeticFunction.VonMangoldt
+import Mathlib.Analysis.Complex.LocallyUniformLimit
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.ForMathlib.NumberTheory.EulerProduct.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
@@ -545,6 +547,129 @@ theorem heckeIdealVonMangoldt_prime_pow (χ : 𝒳[F]) (v : HeightOneSpectrum (�
   rw [heckeIdealVonMangoldt, heckeIdealValue_prime_pow χ v hk, ite_eq_left hv,
     idealVonMangoldt_prime_pow v hk]
 
+/-- A positive prime power has twisted weight of norm at most the logarithm of its norm.
+The weight vanishes on all other ideals. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_weight (χ : U[F])
+    (I : Ideal (𝓞 F)) :
+    ‖heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I‖ ≤ Real.log I.absNorm := by
+  classical
+  by_cases h : ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ I = v.asIdeal ^ k
+  · obtain ⟨v, k, hk, rfl⟩ := h
+    have hq : (1 : ℝ) ≤ v.asIdeal.absNorm := by
+      exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).le
+    rw [heckeIdealVonMangoldt, heckeIdealValue_prime_pow _ v hk, idealVonMangoldt_prime_pow v hk,
+      norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.log_nonneg hq), map_pow, Nat.cast_pow]
+    split_ifs <;> simp only [norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow, one_mul,
+      norm_zero, zero_mul]
+    · exact Real.log_le_log (zero_lt_one.trans_le hq) (le_self_pow₀ hq hk.ne')
+    · exact Real.log_nonneg (one_le_pow₀ hq)
+  · simp [heckeIdealVonMangoldt, idealVonMangoldt, h, Real.log_natCast_nonneg]
+
+/-- The logarithmic weight is absorbed by the difference between two exponents greater than one. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_summable (χ : U[F]) (s : halfPlane) :
+    Summable (fun I : {I : Ideal (𝓞 F) // I ≠ ⊥} ↦
+      -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ) ^ (s : ℂ)) := by
+  obtain ⟨r, hr, hrs⟩ := exists_between (show 1 < (s : ℂ).re from s.property)
+  let ε := (s : ℂ).re - r
+  have hε : 0 < ε := sub_pos.mpr hrs
+  have hs := ((summable_absNorm_rpow F hr).subtype (fun I ↦ I ≠ ⊥)).div_const ε
+  apply hs.of_norm_bounded
+  intro I
+  let q : ℝ := I.val.absNorm
+  have hq : 0 < q := by
+    dsimp [q]
+    exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr I.property)
+  change ‖-heckeIdealVonMangoldt _ I.val / (q : ℂ) ^ (s : ℂ)‖ ≤ q ^ (-r) / ε
+  rw [norm_div, norm_neg, Complex.norm_cpow_eq_rpow_re_of_pos hq]
+  calc
+    _ ≤ (q ^ ε / ε) / q ^ (s : ℂ).re := by
+      apply div_le_div_of_nonneg_right _ (Real.rpow_nonneg hq.le _)
+      exact (finiteHeckeL_logDeriv_hasSum_ideals_weight χ I.val).trans
+        (Real.log_le_rpow_div hq.le hε)
+    _ = q ^ (-r) / ε := by
+      rw [div_right_comm, ← Real.rpow_sub hq]
+      congr 2
+      dsimp [ε]
+      ring
+
+/-- At one finite place, the logarithmic derivative sums the weights of its positive powers. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_local (χ : U[F])
+    (v : HeightOneSpectrum (𝓞 F)) (s : halfPlane) :
+    DifferentiableAt ℂ (finiteHeckeEulerFactor χ v) s ∧ finiteHeckeEulerFactor χ v s ≠ 0 ∧
+      HasSum (fun k : ℕ ↦ -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) (v.asIdeal ^ (k + 1)) /
+        ((v.asIdeal ^ (k + 1)).absNorm : ℂ) ^ (s : ℂ)) (logDeriv (finiteHeckeEulerFactor χ v) s) := by
+  classical
+  let ψ := ideleClassNormTwist χ 0
+  let a := if ψ.IsUnramifiedAt v then ψ.localValue v else 0
+  let q := v.asIdeal.absNorm
+  let z (w : ℂ) := a * (q : ℂ) ^ (-w)
+  have hq : (1 : ℝ) < q := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq).ne'
+  have ha : ‖a‖ ≤ 1 := by
+    by_cases h : ψ.IsUnramifiedAt v <;> simp [a, h, ψ, norm_ideleClassNormTwist_zero_localValue]
+  have hz : ‖z s‖ < 1 := by
+    change ‖a * ((q : ℝ) : ℂ) ^ (-(s : ℂ))‖ < 1
+    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hq), Complex.neg_re]
+    exact (mul_le_of_le_one_left (Real.rpow_nonneg (Nat.cast_nonneg _) _) ha).trans_lt
+      (Real.rpow_lt_one_of_one_lt_of_neg hq (neg_lt_zero.mpr (zero_lt_one.trans s.property)))
+  have hden : 1 - z s ≠ 0 := fun h ↦ hz.ne (by rw [← sub_eq_zero.mp h, norm_one])
+  have hfactor : finiteHeckeEulerFactor χ v = fun w ↦ (1 - z w)⁻¹ := by
+    funext w
+    by_cases h : (ideleClassNormTwist χ 0).IsUnramifiedAt v <;>
+      simp [finiteHeckeEulerFactor, z, a, q, ψ, h]
+  rw [hfactor]
+  have dz := ((hasDerivAt_id (s : ℂ)).neg.const_cpow (Or.inl hq₀)).const_mul a
+  change HasDerivAt z _ (s : ℂ) at dz
+  have df := (dz.const_sub 1).inv hden
+  change HasDerivAt (fun w ↦ (1 - z w)⁻¹) _ (s : ℂ) at df
+  refine ⟨df.differentiableAt, inv_ne_zero hden, ?_⟩
+  have hlog : logDeriv (fun w ↦ (1 - z w)⁻¹) s =
+      (-Complex.log q * z s) * (1 - z s)⁻¹ := by
+    rw [logDeriv_apply, df.deriv]
+    change _ / (1 - z s)⁻¹ = _
+    field_simp [hden]
+    dsimp [z]
+    ring
+  rw [hlog]
+  apply ((hasSum_geometric_of_norm_lt_one hz).mul_left (-Complex.log q * z s)).congr_fun
+  intro k
+  have hv : heckeIdealValue ψ (v.asIdeal ^ (k + 1)) = a ^ (k + 1) := by
+    rw [heckeIdealValue_prime_pow _ v (Nat.succ_pos k)]
+    by_cases h : ψ.IsUnramifiedAt v <;> simp [a, h]
+  rw [heckeIdealVonMangoldt, hv, idealVonMangoldt_prime_pow v (Nat.succ_pos k),
+    map_pow, Nat.cast_pow, ← Complex.natCast_cpow_natCast_mul, Complex.cpow_nat_mul,
+    Complex.natCast_log]
+  change -(a ^ (k + 1) * Complex.log q) / ((q : ℂ) ^ (s : ℂ)) ^ (k + 1) =
+    (-Complex.log q * z s) * z s ^ k
+  rw [mul_assoc (-Complex.log q), ← pow_succ',
+    show z s = a * ((q : ℂ) ^ (s : ℂ))⁻¹ by simp [z, Complex.cpow_neg],
+    mul_pow, inv_pow, div_eq_mul_inv]
+  ring
+
+/-- On the right half-plane, the logarithmic derivatives of the local Euler factors sum
+to the logarithmic derivative of the continuation. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_places (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) (s : halfPlane) :
+    L s ≠ 0 ∧ HasSum (fun v ↦ logDeriv (finiteHeckeEulerFactor χ v) s) (logDeriv L s) := by
+  have hlocal := finiteHeckeL_logDeriv_hasSum_ideals_local χ
+  have hn : L s ≠ 0 := by
+    rw [hSeries s]
+    exact finiteHeckeL_ne_zero_of_one_lt_re χ s
+  refine ⟨hn, ?_⟩
+  obtain ⟨r, hr, hrs⟩ := exists_between (show 1 < (s : ℂ).re from s.property)
+  let D := Complex.re ⁻¹' Ioi r
+  have hD : IsOpen D := isOpen_Ioi.preimage Complex.continuous_re
+  have hconv := (finiteHeckeEulerProduct_tendstoUniformlyOn_halfPlane χ hr).mono
+    (show D ⊆ {w : ℂ | r ≤ w.re} from fun w (hw : r < w.re) ↦ show r ≤ w.re from hw.le)
+  have hconvL := hconv.congr_right
+    (show EqOn _ L D from fun w hw ↦ (hSeries ⟨w, hr.trans hw⟩).symm)
+  have hd (v : HeightOneSpectrum (𝓞 F)) : DifferentiableOn ℂ (finiteHeckeEulerFactor χ v) D :=
+    fun w hw ↦ (hlocal v ⟨w, hr.trans hw⟩).1.differentiableWithinAt
+  apply (Complex.logDeriv_tendsto hD hrs hconvL.tendstoLocallyUniformlyOn
+    (.of_forall fun S ↦ DifferentiableOn.fun_finsetProd fun v _ ↦ hd v) hn).congr
+  intro S
+  exact logDeriv_fun_prod (fun v _ ↦ (hlocal v s).2.1) (fun v _ ↦ (hlocal v s).1)
+
 /-- Paper: Equation (B.6.1.12), p. 638. To the right of one, the negative of
 the Dirichlet series weighted by the ideal von Mangoldt function converges
 absolutely to the logarithmic derivative of the finite Hecke L-function. -/
@@ -555,7 +680,30 @@ theorem finiteHeckeL_logDeriv_hasSum_ideals (χ : U[F]) (L : ℂ → ℂ)
       HasSum (fun I : {I : Ideal (𝓞 F) // I ≠ ⊥} ↦
         -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val /
           (I.val.absNorm : ℂ) ^ (s : ℂ)) (logDeriv L s) := by
-  sorry
+  obtain ⟨hne, hplaces⟩ := finiteHeckeL_logDeriv_hasSum_ideals_places χ L hSeries s
+  have hNF := hL (mem_univ (s : ℂ))
+  refine ⟨hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (hNF.meromorphicOrderAt_eq_zero_iff.mpr hne).ge, hne, ?_⟩
+  let P (p : HeightOneSpectrum (𝓞 F) × ℕ) : {I : Ideal (𝓞 F) // I ≠ ⊥} :=
+    ⟨p.1.asIdeal ^ (p.2 + 1), pow_ne_zero _ p.1.ne_bot⟩
+  have hP : Injective P := by
+    rintro ⟨v, k⟩ ⟨w, j⟩ he
+    have heq : v.asIdeal ^ (k + 1) = w.asIdeal ^ (j + 1) := congrArg Subtype.val he
+    obtain rfl := HeightOneSpectrum.eq_of_dvd_pow ((dvd_pow_self _ k.succ_ne_zero).trans heq.dvd)
+    exact Prod.ext rfl (Nat.succ.inj (pow_injective_of_not_isUnit v.prime.not_isUnit v.ne_bot heq))
+  let f (I : {I : Ideal (𝓞 F) // I ≠ ⊥}) :=
+    -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ) ^ (s : ℂ)
+  have hout (I) (hI : I ∉ range P) : f I = 0 := by
+    have h : ¬ ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ I.val = v.asIdeal ^ k := by
+      rintro ⟨v, _ | k, hk, he⟩
+      · exact hk.false
+      · exact hI ⟨(v, k), Subtype.ext he.symm⟩
+    simp [f, heckeIdealVonMangoldt, idealVonMangoldt, h]
+  have hsum : Summable (f ∘ P) :=
+    (finiteHeckeL_logDeriv_hasSum_ideals_summable χ s).comp_injective hP
+  have hvalue := hsum.hasSum.prod_fiberwise fun v ↦
+    (finiteHeckeL_logDeriv_hasSum_ideals_local χ v s).2.2
+  exact (hP.hasSum_iff hout).mp (hvalue.unique hplaces ▸ hsum.hasSum)
 
 /-- Paper: Equation (B.6.1.14), p. 638. The coefficient `Aₘ` sums the
 character-weighted von Mangoldt values over nonzero ideals of norm `m`.
