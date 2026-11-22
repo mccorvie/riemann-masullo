@@ -311,7 +311,8 @@ theta vector in the local invariant level.
 Deviation: Use the positive local twist of the repaired definition. -/
 theorem sLocalInvariantPWSobolev_mem {a : ℝ} (ha : 0 < a) (ω : PontryaginDual J₁) (Λ : ℝ)
     (f : Zₛ) (_hf : f ∈ band(sLocalPWProductRegion S Λ)) :
-    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ := by sorry
+    sLocalPWThetaSobolevMap (F := F) (S := S) (s := s) ha ω f ∈ sLocalInvariantPWSobolev (F := F) (S := S) hs ha ω Λ := by
+  exact Submodule.le_topologicalClosure _ (Submodule.subset_span ⟨⟨f, _hf⟩, rfl⟩)
 
 /-- Paper: Definition 11.2.1.3(1) and (11.2.1.7), p. 488.
 The global invariant level completes the weighted homogeneous theta image
