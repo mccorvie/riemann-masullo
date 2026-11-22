@@ -259,7 +259,12 @@ stated operator, and two classes giving that operator agree. -/
 theorem sobolevProjectiveKernelClass_spec (hα : 0 ≤ α) (hs : 0 ≤ s)
     (K : Π(W'(α, s), W(α, s))) (k : L²mixed) :
     integrates(μ𝔽, sobolevProjectiveKernelOperator (F := F) hα hs K, k) ↔
-      k = sobolevProjectiveKernelClass hα hs K := by sorry
+      k = sobolevProjectiveKernelClass hα hs K := by
+  have hu := sobolevProjectiveKernel_existsUnique_l2 (F := F) hα hs K
+  constructor
+  · exact fun hk ↦ hu.unique hk hu.exists.choose_spec
+  · rintro rfl
+    exact hu.exists.choose_spec
 
 /-- The continuous Sobolev density is locally bounded on the idèle class group. -/
 theorem sobolevKernelWeight_locallyFinite (α s : ℝ) :
