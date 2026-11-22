@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+import Mathlib.LinearAlgebra.Matrix.Rank
+import Mathlib.LinearAlgebra.Vandermonde
 
 /-!
 # §5.3.1–5.3.2: statements that are false as printed
@@ -178,6 +180,44 @@ def Printed.testFunction_inductiveTensor_equiv : Prop :=
     ∃ e : InductiveTensor 𝒟(ι) 𝒟(κ) ≃L[ℂ] 𝒟(ι ⊕ κ),
       ∀ (f : 𝒟(ι)) (g : 𝒟(κ)) (x : Eᵣ(ι ⊕ κ)), e (f ⊗ₜ[ℂ] g) x = factors(f, g, x)
 
+/-- A matrix of samples `Σ_{s ∈ S} F s (xₖ) G s (yₗ)` of a finite sum of products has rank
+at most `|S|`, so it is singular once it has more than `|S|` rows. -/
+private theorem testFunction_inductiveTensor_equiv_false_det {X Y σ : Type} (S : Finset σ)
+    (F : σ → X → ℂ) (G : σ → Y → ℂ) (n : ℕ) (hn : S.card < n) (xs : Fin n → X)
+    (ys : Fin n → Y) :
+    (Matrix.of fun k l ↦ ∑ s ∈ S, F s (xs k) * G s (ys l)).det = 0 := by
+  classical
+  let A : Matrix (Fin n) S ℂ := Matrix.of fun k s ↦ F s (xs k)
+  let B : Matrix S (Fin n) ℂ := Matrix.of fun s l ↦ G s (ys l)
+  have hAB : (Matrix.of fun k l ↦ ∑ s ∈ S, F s (xs k) * G s (ys l)) = A * B := by
+    ext k l
+    simp only [Matrix.of_apply, Matrix.mul_apply, A, B]
+    exact (Finset.sum_coe_sort S (fun s ↦ F s (xs k) * G s (ys l))).symm
+  by_contra hdet
+  rw [hAB] at hdet
+  have hunit : IsUnit (A * B) := (Matrix.isUnit_iff_isUnit_det _).2 (isUnit_iff_ne_zero.2 hdet)
+  have h2 := (Matrix.rank_mul_le_left A B).trans (Matrix.rank_le_card_width A)
+  rw [Matrix.rank_of_isUnit _ hunit, Fintype.card_fin, Fintype.card_coe] at h2
+  omega
+
+/-- The samples `exp((k/n)(l/n)) = (exp(k/n²))ˡ` form a Vandermonde matrix with
+distinct nodes, so they are not singular. -/
+private theorem testFunction_inductiveTensor_equiv_false_vandermonde (n : ℕ) (hn : 0 < n) :
+    (Matrix.of fun k l : Fin n ↦
+      ((Real.exp ((k : ℝ) / n * ((l : ℝ) / n)) : ℝ) : ℂ)).det ≠ 0 := by
+  have hn' : (n : ℝ) ≠ 0 := by positivity
+  have hV : (Matrix.of fun k l : Fin n ↦ ((Real.exp ((k : ℝ) / n * ((l : ℝ) / n)) : ℝ) : ℂ)) =
+      Matrix.vandermonde (fun k : Fin n ↦ ((Real.exp ((k : ℝ) / n / n) : ℝ) : ℂ)) := by
+    ext k l
+    rw [Matrix.of_apply, Matrix.vandermonde_apply, ← Complex.ofReal_pow, ← Real.exp_nat_mul]
+    congr 2
+    ring
+  rw [hV, Matrix.det_vandermonde_ne_zero_iff]
+  intro p q hpq
+  have h := Real.exp_injective (Complex.ofReal_injective hpq)
+  rw [div_left_inj₀ hn', div_left_inj₀ hn'] at h
+  exact Fin.ext (by exact_mod_cast h)
+
 /-- Paper: Remark 5.3.2.4, p. 246. Take one normal and one tangential coordinate and
 a smooth compactly supported real bump χ equal to one near zero. The test
 χ(x)χ(y) exp(xy) has x-derivatives at zero equal to the linearly independent functions
@@ -185,7 +225,63 @@ a smooth compactly supported real bump χ equal to one near zero. The test
 of the tangential factors. -/
 theorem Printed.testFunction_inductiveTensor_equiv_false :
     ¬ Printed.testFunction_inductiveTensor_equiv := by
-  sorry
+  intro h
+  obtain ⟨e, he⟩ := h Unit Unit
+  -- A test equal to `exp(xy)` on the ball of radius 10.
+  let χ : ContDiffBump (0 : Eᵣ(Unit ⊕ Unit)) := ⟨10, 11, by norm_num, by norm_num⟩
+  let c : Eᵣ(Unit ⊕ Unit) → ℝ := fun z ↦ z (.inl ()) * z (.inr ())
+  have hc : ContDiff ℝ ∞ c :=
+    (EuclideanSpace.proj (𝕜 := ℝ) (Sum.inl () : Unit ⊕ Unit)).contDiff.mul
+      (EuclideanSpace.proj (𝕜 := ℝ) (Sum.inr () : Unit ⊕ Unit)).contDiff
+  let φ : Eᵣ(Unit ⊕ Unit) → ℂ := fun z ↦ (χ z : ℂ) * (Real.exp (c z) : ℂ)
+  have hφc : ContDiff ℝ ∞ φ :=
+    (Complex.ofRealCLM.contDiff.comp χ.contDiff).mul (Complex.ofRealCLM.contDiff.comp hc.exp)
+  have hφs : HasCompactSupport φ :=
+    (χ.hasCompactSupport.comp_left Complex.ofReal_zero).mul_right
+  let H : 𝒟(Unit ⊕ Unit) := ⟨φ, hφc, hφs, by simp⟩
+  obtain ⟨t, ht⟩ := e.surjective H
+  obtain ⟨S, hS⟩ := TensorProduct.exists_finset (R := ℂ) (M := 𝒟(Unit)) (N := 𝒟(Unit)) t
+  let ev (z : Eᵣ(Unit ⊕ Unit)) : 𝒟(Unit ⊕ Unit) →L[ℂ] ℂ :=
+    (BoundedContinuousFunction.evalCLM ℂ z).comp (TestFunction.toBoundedContinuousFunctionCLM ℂ)
+  have hev : ∀ z (g : 𝒟(Unit ⊕ Unit)), ev z g = g z := fun _ _ ↦ rfl
+  have hsum : ∀ z, H z = ∑ i ∈ S, i.1 (WithLp.toLp 2 (fun j ↦ z (.inl j))) *
+      i.2 (WithLp.toLp 2 (fun j ↦ z (.inr j))) := by
+    intro z
+    -- Evaluation after `e`, as a linear map on the algebraic tensor product.
+    let L : 𝒟(Unit) ⊗[ℂ] 𝒟(Unit) →ₗ[ℂ] ℂ :=
+      (ev z).toLinearMap ∘ₗ (e : InductiveTensor 𝒟(Unit) 𝒟(Unit) →L[ℂ] 𝒟(Unit ⊕ Unit)).toLinearMap
+    have hL : H z = L t := by rw [← ht]; rfl
+    rw [hL, hS, map_sum]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    exact he i.1 i.2 z
+  -- Sample at the grid `(k/n, l/n)`, with more points than pure tensors.
+  set n := S.card + 1 with hn
+  let a : Fin n → ℝ := fun k ↦ (k : ℝ) / n
+  have ha : ∀ k, 0 ≤ a k ∧ a k ≤ 1 := fun k ↦
+    ⟨by positivity, by
+      rw [div_le_one (by positivity)]
+      exact_mod_cast k.isLt.le⟩
+  let z : Fin n → Fin n → Eᵣ(Unit ⊕ Unit) := fun k l ↦
+    WithLp.toLp 2 (Sum.elim (fun _ ↦ a k) (fun _ ↦ a l))
+  have hHz : ∀ k l, H (z k l) = (Real.exp (a k * a l) : ℂ) := by
+    intro k l
+    have hnorm : z k l ∈ Metric.closedBall (0 : Eᵣ(Unit ⊕ Unit)) 10 := by
+      rw [mem_closedBall_zero_iff, EuclideanSpace.norm_eq, Real.sqrt_le_left (by norm_num)]
+      simp only [z, Fintype.sum_sum_type, Finset.univ_unique, Finset.sum_singleton,
+        Sum.elim_inl, Sum.elim_inr, Real.norm_eq_abs, sq_abs]
+      nlinarith [ha k, ha l]
+    show (χ (z k l) : ℂ) * (Real.exp (c (z k l)) : ℂ) = _
+    rw [χ.one_of_mem_closedBall hnorm, Complex.ofReal_one, one_mul]
+    simp [c, z]
+  have hdet := testFunction_inductiveTensor_equiv_false_det S
+    (fun i x ↦ i.1 x) (fun i y ↦ i.2 y) n (by omega)
+    (fun k ↦ WithLp.toLp 2 (fun _ ↦ a k)) (fun l ↦ WithLp.toLp 2 (fun _ ↦ a l))
+  refine testFunction_inductiveTensor_equiv_false_vandermonde n (by omega) ?_
+  rw [← hdet]
+  congr 1
+  ext k l
+  rw [Matrix.of_apply, Matrix.of_apply, ← hHz, hsum]
+  rfl
 
 /-- Paper: Remark 5.3.2.4, p. 246. As printed: The product of test functions induces no
 linear homeomorphism for either the projective or the injective tensor topology. The set of
