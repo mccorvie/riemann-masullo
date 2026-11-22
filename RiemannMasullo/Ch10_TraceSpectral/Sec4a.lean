@@ -174,7 +174,13 @@ theorem hardySobolevTranslation_zeroBase_powers_unbounded (n : ℕ) (_hn : 0 < n
 /-- Paper: Remark 10.4.1.4, p. 457. By invariance of theta, an output
 geometric projection has no effect after convolution of a geometric vector. -/
 theorem geometricProjection_convolution_geometricProjection (φ : BruhatCompactSupport C𝔽) :
-    (Pgeom).comp ((A(φ)).comp Pgeom) = (A(φ)).comp Pgeom := by sorry
+    (Pgeom).comp ((A(φ)).comp Pgeom) = (A(φ)).comp Pgeom := by
+  apply ContinuousLinearMap.ext
+  intro u
+  apply geometricProjection_apply_of_mem a hα hs
+  apply (Submodule.Quotient.mk_eq_zero _).mp
+  exact hardySobolevTestAction_preserves_globalTheta (F := F) a (hStrip(hα)) hs φ
+    ((Θ₀).starProjection_apply_mem u)
 
 /-- Paper: Remark 10.4.1.4, p. 458. Spectral projection after convolution
 depends only on the input's spectral projection. -/
