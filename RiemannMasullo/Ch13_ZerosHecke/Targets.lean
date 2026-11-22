@@ -61,7 +61,19 @@ theorem meromorphicOrderAt_finiteHeckeL_continuation (χ : U[K]) {f : ℂ → �
     (hf : MeromorphicOn f univ) (h : ∀ s : halfPlane, f s = finiteHeckeL χ s)
     {s : ℂ} (hs : 0 < s.re) :
     meromorphicOrderAt f s = meromorphicOrderAt (continuedCompletedHeckeL χ) s := by
-  sorry
+  let L := continuedCompletedHeckeL χ
+  have hL := (completedHeckeL_exists_continuation χ).choose_spec
+  let G (z : ℂ) := (heckeGammaFactor χ z)⁻¹
+  have hG : Differentiable ℂ G := differentiable_inv_heckeGammaFactor χ
+  have hm : MeromorphicOn (fun z ↦ G z * L z) univ :=
+    fun z hz ↦ (hG.analyticAt z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have he := meromorphicContinuation_eventuallyEq hf hm (fun z hz ↦ by
+    rw [h ⟨z, hz⟩]
+    change finiteHeckeL χ ⟨z, hz⟩ = (heckeGammaFactor χ z)⁻¹ * continuedCompletedHeckeL χ z
+    rw [show continuedCompletedHeckeL χ z = completedHeckeL χ ⟨z, hz⟩ from hL.2 ⟨z, hz⟩]
+    exact (inv_mul_cancel_left₀ (heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)) _).symm) s
+  rw [meromorphicOrderAt_congr he]
+  exact meromorphicOrderAt_mul_of_ne_zero (hG.analyticAt s) (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ hs))
 
 /-- Paper: §1.4.5, p. 30. Every zero in the open critical strip of any
 meromorphic continuation of a unitary Hecke L-series lies on the critical line.
