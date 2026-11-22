@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
 # §7.1.3–7.1.4 Polar multiplicities and spectral biorthogonal sequences
@@ -263,7 +264,17 @@ purely imaginary power with a unique real frequency. -/
 theorem existsUnique_ideleNormSection_character_phase (χ : U𝔽) (τ : ℝ≥0ˣ →ₜ* I𝔽)
     (_hτ : RightInverse τ (ideleNorm F)) :
     ∃! x : ℝ, ∀ t : ℝ≥0ˣ, (χ (QuotientGroup.mk (τ t)) : ℂ) =
-      (((t : ℝ≥0) : ℝ) : ℂ) ^ ((x : ℂ) * Complex.I) := by sorry
+      (((t : ℝ≥0) : ℝ) : ℂ) ^ ((x : ℂ) * Complex.I) := by
+  let q : I𝔽 →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let incl : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let c := (incl.comp χ).comp (q.comp τ)
+  obtain ⟨z, ⟨hz, hval⟩, huniq⟩ := existsUnique_unitaryComplexPower c
+    (fun t ↦ Circle.norm_coe (χ (q (τ t))))
+  have him : (z.im : ℂ) * Complex.I = z := by
+    apply Complex.ext <;> simp [hz]
+  refine ⟨z.im, fun t ↦ (hval t).trans (by rw [him]), fun x hx ↦ ?_⟩
+  have he := huniq ((x : ℂ) * Complex.I) ⟨by simp, hx⟩
+  simpa using congrArg Complex.im he
 
 /-- Paper: Situation 7.1.4.1, p. 326. The Mellin transform on the polar
 subspace descends through homogeneous theta to the entire Schwartz–Bergman space.
