@@ -73,7 +73,15 @@ theorem integral_indentationLift {b : G → ℝ} (hb : IsIndentation H μH b)
 commutes with complex scalar multiplication. -/
 theorem indentationAverage_smul (c : ℂ) (f : C_c(G, ℂ)) :
     (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH (c • f) =
-      c • (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH f := by sorry
+      c • (TopologicalGroup.IsSES.ofClosedSubgroup H hH).pushforward μH f := by
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  apply DFunLike.ext
+  intro q
+  obtain ⟨x, rfl⟩ := QuotientGroup.mk'_surjective H q
+  change e.pushforward μH (c • f) (π x) = c • e.pushforward μH f (π x)
+  rw [e.pushforward_apply_apply, e.pushforward_apply_apply]
+  simp only [TopologicalGroup.IsSES.pullback_def, CompactlySupportedContinuousMap.smul_apply,
+    integral_smul]
 
 /-- Paper: (12.2.1.5), p. 505. The quotient average of a compactly supported
 continuous function integrates over the subgroup fibres and is a complex-linear
