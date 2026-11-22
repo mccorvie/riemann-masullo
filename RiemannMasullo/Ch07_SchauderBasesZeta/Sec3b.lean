@@ -199,7 +199,15 @@ theorem sLocalInvariantPW_mk_mem (hST : S ⊆ T) (Y : ℝ) (D : Submodule ℂ (B
 Increasing the product bound enlarges each of the two invariant PW levels. -/
 theorem sLocalInvariantPW_mono (hST : S ⊆ T) {Y Y' : ℝ} (_hYY' : Y ≤ Y')
     (D : Submodule ℂ (B(T))) (ω : PontryaginDual J₁(T)) :
-    sLocalInvariantPW hST Y D ω ≤ sLocalInvariantPW hST Y' D ω := by sorry
+    sLocalInvariantPW hST Y D ω ≤ sLocalInvariantPW hST Y' D ω := by
+  have hbox : sLocalPWProductRegion S Y ⊆ sLocalPWProductRegion S Y' :=
+    fun _ hx ↦ le_trans hx _hYY'
+  have hgen : {f : B(S) | inBand(sLocalPWProductRegion S Y, f)} ⊆
+      {f : B(S) | inBand(sLocalPWProductRegion S Y', f)} :=
+    fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩
+  have htests : sLocalPWTests hST (sLocalPWProductRegion S Y) ≤ sLocalPWTests hST (sLocalPWProductRegion S Y') :=
+    Submodule.map_mono (Submodule.span_mono hgen)
+  exact Submodule.topologicalClosure_mono (Submodule.map_mono (inf_le_inf htests le_rfl))
 
 section InvariantLevels
 
