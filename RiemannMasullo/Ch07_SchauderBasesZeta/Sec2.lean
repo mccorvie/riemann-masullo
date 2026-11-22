@@ -149,7 +149,17 @@ theorem mem_sLocalThetaPoleBound_iff (ω : PontryaginDual J₁) (m : Xₛ → �
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 The homogeneous theta classes with the prescribed bounds on pole order form a closed subspace. -/
 theorem sLocalThetaPoleBound_isClosed (ω : PontryaginDual J₁) (m : Xₛ → ℕ) :
-    IsClosed (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) := by sorry
+    IsClosed (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) := by
+  let I := {i : Xₛ × ℕ // onComponent(i.1, ω) ∧ 0 < sLocalRhoPoleOrder i.1 ∧ m i.1 < i.2}
+  let T (i : I) : StrongDual ℂ (Θₛ(ω)) :=
+    sLocalThetaPrincipalPartCoeff (F := F) (S := S) ω i.val.1 i.property.1 i.val.2
+  let Z (i : I) : Set (Θₛ(ω)) := {x | T i x = 0}
+  have h : (sLocalThetaPoleBound ω m : Set (Θₛ(ω))) = ⋂ i, Z i := by
+    refine Set.ext fun x ↦ (mem_sLocalThetaPoleBound_iff (F := F) (S := S) ω m x).trans ?_
+    refine Iff.trans ?_ (Set.mem_iInter (s := Z) (x := x)).symm
+    exact ⟨fun hx i ↦ hx i.val.1 i.property.1 i.property.2.1 i.val.2 i.property.2.2,
+      fun hx c hc hp k hk ↦ hx ⟨(c, k), hc, hp, hk⟩⟩
+  exact (congrArg IsClosed h).mpr (isClosed_iInter fun i ↦ (T i).isClosed_ker)
 
 /-- Paper: Theorem 7.2.1.1(4), p. 334.
 The annihilator of the pole-bound subspace is the strong closure of the span of the
