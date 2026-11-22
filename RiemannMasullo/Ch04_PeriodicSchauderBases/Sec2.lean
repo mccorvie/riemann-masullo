@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import Mathlib.Analysis.Distribution.ContDiffMapSupportedIn
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import Mathlib.Analysis.Fourier.PoissonSummation
 import Mathlib.Analysis.InnerProductSpace.ProdL2
 import Mathlib.Analysis.PSeries
 import Mathlib.Topology.Baire.CompleteMetrizable
@@ -823,7 +824,61 @@ def cyclicQuotientMellinCoeff (m : ℤ) : StrongDual ℂ Q :=
 is the Mellin integral with exponent −2πim/log γ. -/
 theorem cyclicQuotientMellinCoeff_mk (m : ℤ) (f : E) :
     cyclicQuotientMellinCoeff γ hγ m (Submodule.mkQL Mγ f) =
-      mellin (fun t ↦ f.val (Real.log t)) (-phase[γ, m]) := by sorry
+      mellin (fun t ↦ f.val (Real.log t)) (-phase[γ, m]) := by
+  let L := Real.log γ
+  have hL : 0 < L := Real.log_pos hγ
+  -- Rescale the logarithmic profile so its periodization has period one.
+  let e := ContinuousLinearEquiv.unitsEquivAut ℝ (Units.mk0 L hL.ne')
+  let g := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ e
+    (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ f)
+  let u : C(ℝ, ℂ) := ⟨g, g.continuous⟩
+  have hu (x : ℝ) : u x = f.val (x * L) := by
+    change logExponentialDecayTwist univ ⟨0, mem_univ _⟩
+      (show logExponentialDecaySubmodule univ from f) (x * L) = _
+    rw [logExponentialDecayTwist_apply]
+    simp
+  have hs (K : Compacts ℝ) :
+      Summable fun n : ℤ ↦ ‖(u.comp (ContinuousMap.addRight n)).restrict K‖ := by
+    have h := isBigO_norm_restrict_cocompact u (by norm_num) (g.isBigO_cocompact_rpow (-2)) K
+    exact summable_of_isBigO (Real.summable_abs_int_rpow one_lt_two)
+      (h.comp_tendsto Int.tendsto_coe_cofinite)
+  have hperiod : (fun z : T ↦ Φ f (point z)) = (u.periodic_tsum_comp_add_zsmul 1).lift := by
+    funext z
+    obtain ⟨x, rfl⟩ := QuotientAddGroup.mk_surjective z
+    rw [Function.Periodic.lift_coe]
+    simp only [zsmul_one]
+    rw [← ContinuousMap.tsum_apply (ContinuousMap.summable_of_locally_summable_norm hs)]
+    have hsum := (cyclicPeriodization_hasSum γ hγ f (x * L)).tsum_eq.symm
+    rw [show x * L / Real.log γ = x from mul_div_cancel_right₀ x hL.ne'] at hsum
+    refine hsum.trans (tsum_congr fun n ↦ ?_)
+    change f.val (x * L + (n : ℝ) * L) = u (x + n)
+    rw [hu, add_mul]
+  -- Logarithmic substitution in the Mellin integral and dilation in the Fourier integral
+  -- give the same integral, with the Jacobian of the dilation as the only factor.
+  let phase := -(2 * (Real.pi : ℂ) * Complex.I * (m : ℂ) / (L : ℂ))
+  let w (x : ℝ) := Complex.exp (phase * (x : ℂ)) * f.val x
+  have hmellin : mellin (fun t ↦ f.val (Real.log t)) phase = ∫ x, w x := by
+    rw [mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with x
+    change Real.exp x • (((Real.exp x : ℝ) : ℂ) ^ (phase - 1) • f.val (Real.log (Real.exp x))) = _
+    rw [Real.log_exp, Complex.real_smul, smul_eq_mul,
+      Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, Complex.ofReal_exp,
+      ← mul_assoc, ← Complex.exp_add, show (x : ℂ) + x * (phase - 1) = phase * x by ring]
+  have hFourier : FourierTransform.fourier (u : ℝ → ℂ) (m : ℝ) = |L⁻¹| • ∫ x, w x := by
+    rw [← Measure.integral_comp_mul_left w, Real.fourier_real_eq_integral_exp_smul]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [hu, w, smul_eq_mul, mul_comm L x, Complex.ofReal_mul, Complex.ofReal_neg,
+      Complex.ofReal_ofNat, Complex.ofReal_intCast]
+    congr 2
+    dsimp [phase]
+    field_simp [Complex.ofReal_ne_zero.mpr hL.ne']
+  change (L : ℂ) * fourierCoeff (fun z : T ↦ Φ f (point z)) m = _
+  rw [hperiod, Real.fourierCoeff_tsum_comp_add hs, hFourier, hmellin, abs_of_pos (inv_pos.mpr hL),
+    Complex.real_smul, Complex.ofReal_inv, ← mul_assoc,
+    mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hL.ne'), one_mul]
 
 -- TODO(paper-gap): In the continuity proof, (4.2.1.14) cannot hold for fixed T
 -- and arbitrary ε. At t = T γⁿ the term k = -n alone equals T⁻ᴺ.
