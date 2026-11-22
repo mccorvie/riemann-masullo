@@ -3229,6 +3229,197 @@ theorem infiniteEigendistribution_entire_family (w : InfinitePlace F)
         infiniteLocalIdelicZFunction w f (twist s) = infiniteLocalEulerFactor w (twist s) * E s f := by
   sorry
 
+private theorem infiniteLocalIdelicZFunction_standardGaussian_real (w : InfinitePlace F)
+    (hw : w.IsReal) (χ : PontryaginDual w.Completionˣ) (s : ℂ) (hs : 0 < s.re) :
+    infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ)
+        (quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) s) =
+      infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s) := by
+  classical
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  let c := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp χ) s
+  obtain ⟨t, a, ht, hχ⟩ := realPlaceUnitary_shape w hw χ
+  have hc := realChart_shape w hw χ t a hχ s
+  have hz : 0 < (s + t).re := by rw [Complex.add_re, ht, add_zero]; exact hs
+  have hE : infiniteLocalEulerFactor w c = Complex.Gammaℝ (s + t + (a.val : ℂ)) := by
+    have hp := (realLocalEulerParameters w hw c).unique
+      (realLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s + t, a)) hc
+    simp only [infiniteLocalEulerFactor, hw, dite_true]
+    rw [hp]
+  have hm1 : ((χ (-1) : Circle) : ℂ) = (-1 : ℂ) ^ a.val := by
+    have h := hχ (-1)
+    have hu : Units.map e.symm.toMonoidHom (-1 : ℝˣ) = -1 := Units.ext (by simp [e])
+    rw [hu] at h
+    change ((χ (-1) : Circle) : ℂ) = _ at h
+    rw [h]
+    norm_num
+  obtain ⟨g, hg⟩ := realModelSchwartz w hw (infiniteStandardGaussian w χ)
+  have hgv (x : ℝ) : g x =
+      (((if χ (-1) = 1 then (1 : ℝ) else x) * Real.exp (-Real.pi * x ^ 2) : ℝ) : ℂ) := by
+    rw [hg x]
+    simp only [infiniteStandardGaussian, infiniteStandardGaussianValue, hw, dite_true]
+    change (((if χ (-1) = 1 then (1 : ℝ) else e (e.symm x)) *
+      Real.exp (-Real.pi * (e (e.symm x)) ^ 2) : ℝ) : ℂ) = _
+    rw [e.apply_symm_apply]
+  rw [infiniteLocalIdelicZFunction_eq_integral w _ χ (show s ∈ Complex.re ⁻¹' Ioi 0 from hs)]
+  have he : (fun x : w.Completion ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
+      fun x ↦ g (e x) := by
+    funext x
+    simpa only [e, RingEquiv.symm_apply_apply] using (hg (e x)).symm
+  rw [he, realIntegral_shape w hw g c (s + t) a hc hz, hE]
+  have hgauss := mellin_gaussian Real.pi_pos hz
+  obtain rfl | rfl : a = 0 ∨ a = 1 := by fin_cases a <;> simp
+  · have h1 : χ (-1) = 1 := by
+      apply Circle.coe_injective
+      simpa using hm1
+    have hfun : (fun x : ℝ ↦ g x + (-1 : ℂ) ^ (0 : Fin 2).val * g (-x)) =
+        fun x : ℝ ↦ (2 : ℂ) • (Real.exp (-Real.pi * x ^ 2) : ℂ) := by
+      funext x
+      simp only [hgv, h1, ite_true, one_mul, neg_sq, Fin.val_zero, pow_zero, smul_eq_mul]
+      ring
+    rw [hfun, mellin_const_smul, hgauss, Complex.Gammaℝ_def]
+    simp only [Fin.val_zero, Nat.cast_zero, add_zero, smul_eq_mul, neg_div]
+    ring
+  · have h1 : χ (-1) ≠ 1 := by
+      intro h
+      rw [h] at hm1
+      norm_num at hm1
+    have hfun : (fun x : ℝ ↦ g x + (-1 : ℂ) ^ (1 : Fin 2).val * g (-x)) =
+        fun x : ℝ ↦ (x : ℂ) ^ (1 : ℂ) • ((2 : ℂ) • (Real.exp (-Real.pi * x ^ 2) : ℂ)) := by
+      funext x
+      simp only [hgv, h1, ite_false, neg_sq, Fin.val_one, pow_one, smul_eq_mul, Complex.cpow_one]
+      push_cast
+      ring
+    have hz1 : 0 < (s + t + 1).re := by simp only [Complex.add_re, Complex.one_re]; linarith
+    rw [hfun, mellin_cpow_smul, mellin_const_smul, mellin_gaussian Real.pi_pos hz1,
+      Complex.Gammaℝ_def]
+    simp only [Fin.val_one, Nat.cast_one, smul_eq_mul, neg_div]
+    ring
+
+private theorem infiniteLocalIdelicZFunction_standardGaussian_angular (r : ℤ) (u θ : ℝ) :
+    Complex.exp ((r : ℂ) * (θ : ℂ) * Complex.I) *
+      ((if 0 ≤ r then star ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) ^ r.natAbs
+        else ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) ^ r.natAbs) *
+        Complex.exp (-2 * (Real.pi : ℂ) * ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I)) *
+          star ((u : ℂ) * Complex.exp (((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I))) / (2 * (Real.pi : ℂ))) =
+      (u : ℂ) ^ r.natAbs * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) / (2 * (Real.pi : ℂ)) := by
+  set E := Complex.exp ((θ : ℂ) * Complex.I) with hEdef
+  have hE1 : ((1 : ℤ) : ℂ) * (θ : ℂ) * Complex.I = (θ : ℂ) * Complex.I := by push_cast; ring
+  have hstar : star E = Complex.exp (-((θ : ℂ) * Complex.I)) := by
+    rw [hEdef, Complex.star_def, ← Complex.exp_conj]
+    congr 1
+    simp [Complex.conj_ofReal]
+  have hEE : E * star E = 1 := by
+    rw [hstar, hEdef, ← Complex.exp_add, add_neg_cancel, Complex.exp_zero]
+  have hsq : (u : ℂ) * E * star ((u : ℂ) * E) = ((u ^ 2 : ℝ) : ℂ) := by
+    rw [star_mul', Complex.star_def, Complex.conj_ofReal]
+    calc (u : ℂ) * E * ((u : ℂ) * star E) = (u : ℂ) ^ 2 * (E * star E) := by ring
+      _ = _ := by rw [hEE]; push_cast; ring
+  have hexp : Complex.exp (-2 * (Real.pi : ℂ) * ((u : ℂ) * E) * star ((u : ℂ) * E)) =
+      (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) := by
+    rw [mul_assoc (-2 * (Real.pi : ℂ)), hsq, Complex.ofReal_exp]
+    push_cast
+    ring_nf
+  rw [hE1, ← hEdef, hexp]
+  rcases Int.eq_nat_or_neg r with ⟨n, rfl | rfl⟩
+  · have hr : Complex.exp (((n : ℤ) : ℂ) * (θ : ℂ) * Complex.I) = E ^ n := by
+      rw [hEdef, ← Complex.exp_nat_mul]
+      push_cast
+      ring_nf
+    rw [hr, ite_eq_left (Int.natCast_nonneg n), Int.natAbs_natCast, star_mul', Complex.star_def,
+      Complex.conj_ofReal, mul_pow]
+    calc E ^ n * ((u : ℂ) ^ n * star E ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) =
+        (E * star E) ^ n * ((u : ℂ) ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) := by rw [mul_pow]; ring
+      _ = _ := by rw [hEE, one_pow, one_mul]
+  · rcases Nat.eq_zero_or_pos n with rfl | hn
+    · simp
+    have hr : Complex.exp (((-(n : ℤ)) : ℤ) * (θ : ℂ) * Complex.I) = star E ^ n := by
+      rw [hstar, ← Complex.exp_nat_mul]
+      push_cast
+      ring_nf
+    have hneg : ¬ (0 ≤ -(n : ℤ)) := by omega
+    rw [hr, ite_eq_right hneg, Int.natAbs_neg, Int.natAbs_natCast, mul_pow]
+    calc star E ^ n * ((u : ℂ) ^ n * E ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) =
+        (E * star E) ^ n * ((u : ℂ) ^ n * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) /
+          (2 * (Real.pi : ℂ))) := by rw [mul_pow]; ring
+      _ = _ := by rw [hEE, one_pow, one_mul]
+
+private theorem infiniteLocalIdelicZFunction_standardGaussian_complex (w : InfinitePlace F)
+    (hw : w.IsComplex) (χ : PontryaginDual w.Completionˣ) (s : ℂ) (hs : 0 < s.re) :
+    infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ)
+        (quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) s) =
+      infiniteLocalEulerFactor w (quasiCharacterNormTwist (infiniteNorm(w))
+        (continuous_infiniteLocalModule w) ((circleToComplex).comp χ) s) := by
+  have hnr : ¬ w.IsReal := InfinitePlace.not_isReal_iff_isComplex.mpr hw
+  let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hw
+  let c := quasiCharacterNormTwist (infiniteNorm(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp χ) s
+  obtain ⟨t, r, ht, hχ⟩ := complexPlaceUnitary_shape w hw χ
+  have hc := complexChart_shape w hw χ t r hχ s
+  have hz : 0 < (s + t).re := by rw [Complex.add_re, ht, add_zero]; exact hs
+  have hE : infiniteLocalEulerFactor w c = Complex.Gammaℂ (s + t + (r.natAbs : ℂ) / 2) / 2 := by
+    have hp := (complexLocalEulerParameters w hw c).unique
+      (complexLocalEulerParameters w hw c).exists.choose_spec (y₂ := (s + t, r)) hc
+    simp only [infiniteLocalEulerFactor, hnr, dite_false]
+    rw [hp]
+  have hm (c' : ℂˣ →ₜ* ℂ) (hc' : ∀ x, ‖c' x‖ = 1)
+      (hcc : ∀ x, c' x = ((circleToComplex).comp χ) (Units.map e.symm.toMonoidHom x)) :
+      (existsUnique_complexUnits_character_parameters c' hc').exists.choose.2 = r := by
+    have h := (existsUnique_complexUnits_character_parameters c' hc').unique
+      (existsUnique_complexUnits_character_parameters c' hc').exists.choose_spec
+      (y₂ := (t, r)) ⟨ht, fun x ↦ (hcc x).trans (hχ x)⟩
+    rw [h]
+  obtain ⟨g, hg⟩ := complexModelSchwartz w hw (infiniteStandardGaussian w χ)
+  have hgv (x : ℂ) : g x = (if 0 ≤ r then (star x) ^ r.natAbs else x ^ r.natAbs) *
+      Complex.exp (-2 * (Real.pi : ℂ) * x * star x) / (2 * (Real.pi : ℂ)) := by
+    rw [congrFun hg x]
+    simp only [infiniteStandardGaussian, infiniteStandardGaussianValue, hnr, dite_false]
+    rw [hm]
+    · change (if 0 ≤ r then (star (e (e.symm x))) ^ r.natAbs else (e (e.symm x)) ^ r.natAbs) *
+        Complex.exp (-2 * (Real.pi : ℂ) * e (e.symm x) * star (e (e.symm x))) /
+          (2 * (Real.pi : ℂ)) = _
+      rw [e.apply_symm_apply]
+    · intro x
+      exact Circle.norm_coe _
+    · intro x
+      rfl
+  rw [infiniteLocalIdelicZFunction_eq_integral w _ χ (show s ∈ Complex.re ⁻¹' Ioi 0 from hs)]
+  have he : (fun x : w.Completion ↦ infiniteStandardGaussian w χ (Multiplicative.ofAdd x)) =
+      fun x ↦ g (e x) := by
+    funext x
+    simpa only [e, RingEquiv.symm_apply_apply] using (congrFun hg (e x)).symm
+  rw [he, complexIntegral_shape w hw g c (s + t) r hc hz, hE]
+  have hprof : angularProfile g r = fun u : ℝ ↦
+      (u : ℂ) ^ ((r.natAbs : ℕ) : ℂ) • (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) := by
+    funext u
+    have hpt (θ : ℝ) : angularWeight r θ * g ((u : ℂ) * angularWeight 1 θ) =
+        (u : ℂ) ^ r.natAbs * (Real.exp (-(2 * Real.pi) * u ^ 2) : ℂ) / (2 * (Real.pi : ℂ)) := by
+      rw [hgv]
+      exact infiniteLocalIdelicZFunction_standardGaussian_angular r u θ
+    simp only [angularProfile, hpt, setIntegral_const, Complex.cpow_natCast, smul_eq_mul,
+      Real.volume_real_Ioo_of_le (by linarith [Real.pi_pos] : -Real.pi ≤ Real.pi)]
+    rw [Complex.real_smul]
+    have hpi : (Real.pi : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr Real.pi_ne_zero
+    push_cast
+    field_simp
+    ring
+  have h2pi : (0 : ℝ) < 2 * Real.pi := by positivity
+  have hv : 0 < (2 * (s + t) + ((r.natAbs : ℕ) : ℂ)).re := by
+    simp only [Complex.add_re, Complex.mul_re, Complex.natCast_re]
+    norm_num
+    positivity
+  rw [hprof, mellin_cpow_smul, mellin_gaussian h2pi hv, Complex.Gammaℂ_def]
+  have hw2 : (2 * (s + t) + ((r.natAbs : ℕ) : ℂ)) / 2 = s + t + (r.natAbs : ℂ) / 2 := by ring
+  rw [hw2]
+  push_cast
+  ring
+
 /-- Paper: Definition 3.4.3.2 and the line after (3.4.3.9), p. 152. On the half-plane
 `0 < re s`, the local zeta function of the standard Gaussian of `χ` at `χ‖·‖^s` is the local
 Euler factor (the real or complex gamma factor).
@@ -3239,7 +3430,10 @@ theorem infiniteLocalIdelicZFunction_standardGaussian (w : InfinitePlace F)
       ((circleToComplex).comp χ)
     infiniteLocalIdelicZFunction w (infiniteStandardGaussian w χ) (twist s) =
       infiniteLocalEulerFactor w (twist s) := by
-  sorry
+  by_cases hw : w.IsReal
+  · exact infiniteLocalIdelicZFunction_standardGaussian_real w hw χ s hs
+  · exact infiniteLocalIdelicZFunction_standardGaussian_complex w
+      (InfinitePlace.not_isReal_iff_isComplex.mp hw) χ s hs
 
 /-- Paper: Definition 3.4.3.1, p. 151, for the local zeta integral (3.3.2.1), p. 137. On the
 half-plane `0 < re s`, translating the test function by a unit `g` (`f ↦ f(g⁻¹ ·)`)
