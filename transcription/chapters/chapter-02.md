@@ -754,7 +754,13 @@ $$
 \Pi_S : \mathcal{S}(\mathbf{A}_F) \to \pi_S(\mathcal{S}(\mathbf{A}_{F,S})) \tag{2.1.4.14}
 $$
 
-*be any continuous projection onto the linear image of $\pi_S$ from (2.1.4.5) satisfying $\Pi_S\circ\pi_S = \pi_S$. Then the net $\{\Pi_S\}_{S\subset\Sigma_F}\subset \mathscr{L}_\beta(\mathcal{S}(\mathbf{A}_F))$ indexed by the finite subsets of $\Sigma_F$ containing $S_\infty$, converges to the identity on $\mathcal{S}(\mathbf{A}_F)$ with respect to the topology of uniform convergence on bounded susbsets.*
+*be any continuous projection onto the linear image of $\pi_S$ from (2.1.4.5) satisfying $\Pi_S\circ\pi_S = \pi_S$. Then the net*
+
+$$
+\{\Pi_S\}_{S\subset\Sigma_F}\subset \mathscr{L}_\beta(\mathcal{S}(\mathbf{A}_F))
+$$
+
+*indexed by the finite subsets of $\Sigma_F$ containing $S_\infty$, converges to the identity on $\mathcal{S}(\mathbf{A}_F)$ with respect to the topology of uniform convergence on bounded susbsets.*
 
 PROOF. To see this, we let $B\subset\mathcal{S}(\mathbf{A}_F)$ be a bounded subset. By Proposition 2.1.4.1(4), and by [Scha, Ch.II,§6,6.5], there exits $B_0\subset\mathcal{S}(\mathbf{A}_{F,S_0})$ bounded, for $S_0$ large enough, such that $B = \pi_{S_0}(B_0)$.
 
@@ -2537,7 +2543,7 @@ $$
 
 as functions of $g\in\mathrm{GL}_1(\mathbf{A}_{F,S})$. We refer to $\Phi_{F,S,\omega}$ as the *$\omega$-homogeneous $S$-local adelic $\theta$-function of $f$*.
 
-2.3.1.3. *Estimates over $J_{F,S}/J^1_{F,S}$.* It is indeed a consequence of Proposition 2.3.1.4 below, that formation of $\Phi_{F,S,\omega}$ is well-defined, linear and valued in continuous functions on $\mathrm{GL}_1(\mathbf{A}_{F,S})$, $\tilde{\omega}$-homogeneous under the left-translation action by the closed abelian subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$, for $\tilde{\omega}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$. Equivalently, $\mathcal{O}_{F,S}^{\times}$-invariant and $\omega$-homogeneous, as continuous functions on $J_{F,S}$, under the continuous left-translation action of $J^1_{F,S}$.
+2.3.1.3. *Estimates over $J_{F,S}/J^1_{F,S}$.* It is indeed a consequence of Proposition 2.3.1.4 below, that formation of $\Phi_{F,S,\omega}$ is well-defined, linear and valued in continuous functions on $\mathrm{GL}_1(\mathbf{A}_{F,S})$, $\widetilde{\omega}$-homogeneous under the left-translation action by the closed abelian subgroup $\mathrm{GL}_1(\mathbf{A}_{F,S})^1$, for $\widetilde{\omega}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$. Equivalently, $\mathcal{O}_{F,S}^{\times}$-invariant and $\omega$-homogeneous, as continuous functions on $J_{F,S}$, under the continuous left-translation action of $J^1_{F,S}$.
 
 PROPOSITION 2.3.1.4 (Estimates over the $S$-idele classes - II). *Let $F$ be a number field, $S$ a finite set of places containing all the Archimedean places. Let $\omega$ be a continuous character of $\mathrm{GL}_1(\mathbf{A}_{F,S})^1/\mathcal{O}_{F,S}^{\times}$. We denote by $\widetilde{\omega}\in\widehat{\mathrm{GL}_1(\mathbf{A}_{F,S})^1}$ the composition of $\omega$ with the continuous quotient homomorphism $\mathrm{GL}_1(\mathbf{A}_{F,S})^1\to J^1_{F,S}$.*
 

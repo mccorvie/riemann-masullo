@@ -9,6 +9,10 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
+import all RiemannMasullo.AppB_AnalyticNT.Sec2
+import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
+import Mathlib.Topology.Algebra.IsOpenUnits
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 
 /-!
 # Explicit formulas for Hecke L-functions
@@ -90,7 +94,8 @@ def heckeLogDiscriminantConductor (χ : U[F]) : ℝ :=
 discriminant contribution. -/
 theorem heckeLogDiscriminantConductor_one :
     heckeLogDiscriminantConductor (1 : U[F]) =
-      Real.log (Int.natAbs (NumberField.discr F)) := by sorry
+      Real.log (Int.natAbs (NumberField.discr F)) := by
+  simp [heckeLogDiscriminantConductor]
 
 /-- Paper: Equation (B.4.2.3), p. 614. The reflected logarithmic derivative
 and the discriminant–conductor term give the logarithmic derivative of the continuation.
@@ -118,13 +123,206 @@ def heckeArchimedeanDigammaKernel (k : ℝ) (zPlus zMinus : ℂ) (f : ℝ → �
     (f (k * t) * Complex.exp (-zPlus * (t : ℂ)) +
       f (-(k * t)) * Complex.exp (-zMinus * (t : ℂ))) / (1 - (Real.exp (-t) : ℂ)))
 
+section GaussDigamma
+
+open Real
+
+/-- The factor `1 / t - 1 / (1 - e^{-t})` lies in `[-1, 0]` for positive `t`. -/
+private lemma digamma_remainder_bounds {t : ℝ} (ht : 0 < t) :
+    -1 ≤ 1 / t - 1 / (1 - exp (-t)) ∧ 1 / t - 1 / (1 - exp (-t)) ≤ 0 := by
+  have hq : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+  have hd : 0 < 1 - exp (-t) := by linarith
+  have h1 : 1 - exp (-t) ≤ t := by linarith [add_one_le_exp (-t)]
+  have h2 : t * exp (-t) ≤ 1 - exp (-t) := by
+    have h := add_one_le_exp t
+    have he : exp t * exp (-t) = 1 := by rw [← exp_add]; simp
+    nlinarith [exp_pos (-t)]
+  constructor
+  · rw [div_sub_div _ _ ht.ne' hd.ne', le_div_iff₀ (mul_pos ht hd)]
+    nlinarith
+  · rw [sub_nonpos]
+    exact one_div_le_one_div_of_le hd h1
+
+/-- The real Gauss kernel `e^{-t}/t - e^{-t}/(1 - e^{-t})` of `ψ(1)`. -/
+private noncomputable def gaussDigammaKernel (t : ℝ) : ℝ :=
+  exp (-t) / t - exp (-t) / (1 - exp (-t))
+
+private lemma exp_neg_natCast_mul (m : ℕ) (t : ℝ) : exp (-((m : ℝ) * t)) = exp (-t) ^ m := by
+  rw [← exp_nat_mul]
+  ring_nf
+
+/-- Splitting off the first `n` terms of the geometric series. -/
+private lemma gaussDigammaKernel_eq (n : ℕ) {t : ℝ} (ht : 0 < t) :
+    gaussDigammaKernel t =
+      t⁻¹ * (exp (-(1 * t)) - exp (-(((n + 1 : ℕ) : ℝ) * t))) -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t))) := by
+  have hq : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+  have hd : 1 - exp (-t) ≠ 0 := by linarith
+  simp only [exp_neg_natCast_mul, one_mul, gaussDigammaKernel]
+  set q := exp (-t)
+  have hgeom : (∑ i ∈ Finset.range n, q ^ (i + 1)) * (1 - q) = q - q ^ (n + 1) := by
+    induction n with
+    | zero => simp
+    | succ n ih => rw [Finset.sum_range_succ, add_mul, ih]; ring
+  have hsum : ∑ i ∈ Finset.range n, q ^ (i + 1) = (q - q ^ (n + 1)) / (1 - q) := by
+    rw [← hgeom, mul_div_cancel_right₀ _ hd]
+  rw [hsum]
+  field_simp
+  ring
+
+private lemma integrableOn_exp_neg_natCast_mul (m : ℕ) (hm : 0 < m) :
+    IntegrableOn (fun t : ℝ ↦ exp (-((m : ℝ) * t))) (Ioi 0) := by
+  simpa [neg_mul] using integrableOn_exp_mul_Ioi (a := -(m : ℝ)) (by simp [hm]) 0
+
+private lemma integral_exp_neg_natCast_mul (m : ℕ) (hm : 0 < m) :
+    ∫ t in Ioi (0 : ℝ), exp (-((m : ℝ) * t)) = 1 / m := by
+  have := integral_exp_mul_Ioi (a := -(m : ℝ)) (by simp [hm]) 0
+  simp only [neg_mul, mul_zero, exp_zero] at this
+  rw [this]
+  field_simp
+
+private lemma integrableOn_gaussDigammaKernel : IntegrableOn gaussDigammaKernel (Ioi 0) := by
+  refine Integrable.mono' (integrableOn_exp_neg_Ioi 0) ?_ ?_
+  · refine ContinuousOn.aestronglyMeasurable ?_ measurableSet_Ioi
+    intro t ht
+    have ht : (0 : ℝ) < t := ht
+    have hd : 1 - exp (-t) ≠ 0 := by
+      have : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+      linarith
+    have ht' : t ≠ 0 := ht.ne'
+    unfold gaussDigammaKernel
+    apply ContinuousAt.continuousWithinAt
+    fun_prop (disch := assumption)
+  · refine (ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_)
+    have ht : (0 : ℝ) < t := ht
+    obtain ⟨h1, h2⟩ := digamma_remainder_bounds ht
+    have : gaussDigammaKernel t = exp (-t) * (1 / t - 1 / (1 - exp (-t))) := by
+      unfold gaussDigammaKernel; ring
+    rw [this, norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+    have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+    nlinarith [exp_pos (-t)]
+
+private lemma integral_gaussDigammaKernel :
+    ∫ t in Ioi (0 : ℝ), gaussDigammaKernel t = -eulerMascheroniConstant := by
+  set I := ∫ t in Ioi (0 : ℝ), gaussDigammaKernel t
+  -- The remainder after `n` geometric terms.
+  let R : ℕ → ℝ := fun n ↦
+    ∫ t in Ioi (0 : ℝ), exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))
+  have hRint : ∀ n : ℕ, IntegrableOn
+      (fun t ↦ exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) (Ioi 0) := by
+    intro n
+    refine Integrable.mono' (integrableOn_exp_neg_natCast_mul (n + 1) n.succ_pos) ?_ ?_
+    · refine ContinuousOn.aestronglyMeasurable ?_ measurableSet_Ioi
+      intro t ht
+      have ht : (0 : ℝ) < t := ht
+      have hd : 1 - exp (-t) ≠ 0 := by
+        have : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+        linarith
+      have ht' : t ≠ 0 := ht.ne'
+      apply ContinuousAt.continuousWithinAt
+      fun_prop (disch := assumption)
+    · refine (ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_)
+      obtain ⟨h1, h2⟩ := digamma_remainder_bounds (show (0 : ℝ) < t from ht)
+      rw [norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+      have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+      nlinarith [exp_pos (-(((n + 1 : ℕ) : ℝ) * t))]
+  have hRle : ∀ n : ℕ, ‖R n‖ ≤ 1 / ((n : ℝ) + 1) := by
+    intro n
+    calc ‖R n‖ ≤ ∫ t in Ioi (0 : ℝ), exp (-(((n + 1 : ℕ) : ℝ) * t)) := by
+          refine norm_integral_le_of_norm_le (integrableOn_exp_neg_natCast_mul (n + 1) n.succ_pos)
+            ((ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_))
+          obtain ⟨h1, h2⟩ := digamma_remainder_bounds (show (0 : ℝ) < t from ht)
+          rw [norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+          have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+          nlinarith [exp_pos (-(((n + 1 : ℕ) : ℝ) * t))]
+      _ = 1 / ((n : ℝ) + 1) := by
+          rw [integral_exp_neg_natCast_mul (n + 1) n.succ_pos]; push_cast; rfl
+  -- The finite expansion of the integral.
+  have hexp : ∀ n : ℕ, I = -(harmonic n - log ((n : ℝ) + 1)) + R n := by
+    intro n
+    have hsumint : ∀ i ∈ Finset.range n,
+        IntegrableOn (fun t : ℝ ↦ exp (-(((i + 1 : ℕ) : ℝ) * t))) (Ioi 0) :=
+      fun i _ ↦ integrableOn_exp_neg_natCast_mul (i + 1) i.succ_pos
+    have hsumint' : IntegrableOn
+        (fun t : ℝ ↦ ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) (Ioi 0) :=
+      integrable_finsetSum _ hsumint
+    let Fr : ℝ → ℝ := fun t ↦ t⁻¹ * (exp (-(1 * t)) - exp (-(((n + 1 : ℕ) : ℝ) * t)))
+    have hFr : EqOn Fr (fun t ↦ gaussDigammaKernel t +
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) -
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) (Ioi 0) := by
+      intro t ht
+      simp only [Fr, gaussDigammaKernel_eq n (show (0 : ℝ) < t from ht)]
+      ring
+    have hFrint : IntegrableOn Fr (Ioi 0) :=
+      ((integrableOn_gaussDigammaKernel.add hsumint').sub (hRint n)).congr_fun hFr.symm
+        measurableSet_Ioi
+    have hFrval : ∫ t in Ioi (0 : ℝ), Fr t = log ((n : ℝ) + 1) := by
+      have hc : Continuous fun x : ℝ ↦ exp (-x) := by fun_prop
+      have hL : Tendsto (fun x : ℝ ↦ exp (-x)) (𝓝[>] 0) (𝓝 1) := by
+        have := (hc.tendsto 0).mono_left (nhdsWithin_le_nhds (s := Ioi 0))
+        simpa using this
+      have := Frullani.integral_Ioi_eq (f := fun x : ℝ ↦ exp (-x)) (a := 1)
+        (b := ((n + 1 : ℕ) : ℝ)) (hc.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+        one_pos (by positivity) hL tendsto_exp_neg_atTop_nhds_zero hFrint
+      simpa [Fr] using this
+    have hsumval : ∫ t in Ioi (0 : ℝ), ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)) =
+        harmonic n := by
+      rw [integral_finsetSum _ hsumint, harmonic, Rat.cast_sum]
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      rw [integral_exp_neg_natCast_mul (i + 1) i.succ_pos]
+      push_cast
+      ring
+    have hI : I = ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) :=
+      setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ gaussDigammaKernel_eq n ht
+    have e1 : ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) =
+        (∫ t in Ioi (0 : ℝ), (Fr t -
+          (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))))) + R n :=
+      integral_add (hFrint.sub hsumint') (hRint n)
+    have e2 : ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)))) =
+        (∫ t in Ioi (0 : ℝ), Fr t) -
+          ∫ t in Ioi (0 : ℝ), ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)) :=
+      integral_sub hFrint hsumint'
+    rw [hI, e1, e2, hFrval, hsumval]
+    ring
+  -- Let `n → ∞`.
+  have hR0 : Tendsto R atTop (𝓝 0) :=
+    squeeze_zero_norm hRle tendsto_one_div_add_atTop_nhds_zero_nat
+  have hlim : Tendsto (fun n : ℕ ↦ -(harmonic n - log ((n : ℝ) + 1)) + R n) atTop
+      (𝓝 (-eulerMascheroniConstant + 0)) :=
+    tendsto_harmonic_sub_log_add_one.neg.add hR0
+  rw [add_zero] at hlim
+  refine tendsto_nhds_unique ?_ hlim
+  simp_rw [← hexp]
+  exact tendsto_const_nhds
+
+end GaussDigamma
+
 /-- Paper: Proposition B.4.2.1, p. 616. At unit scale and unit gamma
 arguments the integrable kernel for the constant test gives twice the digamma value at one.
 Deviation: This is a sanity check for the corrected kernel. -/
 theorem heckeArchimedeanDigammaKernel_one :
     let K := heckeArchimedeanDigammaKernel 1 1 1 (fun _ ↦ 1)
     IntegrableOn K (Ioi 0) ∧
-      (∫ t in Ioi (0 : ℝ), K t) = -2 * (Real.eulerMascheroniConstant : ℂ) := by sorry
+      (∫ t in Ioi (0 : ℝ), K t) = -2 * (Real.eulerMascheroniConstant : ℂ) := by
+  intro K
+  have hK : K = fun t ↦ ((2 * gaussDigammaKernel t : ℝ) : ℂ) := by
+    funext t
+    simp only [K, heckeArchimedeanDigammaKernel, gaussDigammaKernel]
+    push_cast
+    simp only [neg_mul, one_mul]
+    ring
+  rw [hK]
+  simp only []
+  refine ⟨(integrableOn_gaussDigammaKernel.const_mul 2).ofReal, ?_⟩
+  rw [integral_complex_ofReal, integral_const_mul, integral_gaussDigammaKernel]
+  push_cast
+  ring
 
 local notation "circleToComplex" =>
   (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ)
@@ -183,7 +381,66 @@ are absolutely summable over the finite places and positive exponents.
 Deviation: Ramified Euler factors contribute zero. -/
 theorem summable_heckeExplicitPrimeTerms (χ : U[F]) (f : 𝓢(ℝ, ℂ))
     (_hf : ExponentialDecay f) :
-    Summable (fun j ↦ ‖primeTerm(χ, f) j‖) := by sorry
+    Summable (fun j ↦ ‖primeTerm(χ, f) j‖) := by
+  obtain ⟨g, hg⟩ := exponentialDecay_weighted_schwartz f _hf 3
+  obtain ⟨h, hh⟩ := exponentialDecay_weighted_schwartz f _hf (-3)
+  let C := SchwartzMap.seminorm ℂ 0 0 g + SchwartzMap.seminorm ℂ 0 0 h
+  have hdecay (x : ℝ) : ‖f x‖ + ‖f (-x)‖ ≤ C * Real.exp (-(3 * x)) := by
+    rw [Real.exp_neg, ← div_eq_mul_inv, le_div_iff₀ (Real.exp_pos _), add_mul]
+    have hg' := g.norm_le_seminorm ℂ x
+    have hh' := h.norm_le_seminorm ℂ (-x)
+    rw [hg, norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.exp_nonneg _)] at hg'
+    simp only [hh, neg_mul_neg, norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg (Real.exp_nonneg _)] at hh'
+    simpa only [mul_comm] using add_le_add hg' hh'
+  -- Index the majorant by the corresponding prime-power ideals.
+  let I (j : Primes(F) × ℕ) := j.1.asIdeal ^ (j.2 + 1)
+  have hI : Injective I := by
+    rintro ⟨v, n⟩ ⟨w, k⟩ he
+    change v.asIdeal ^ (n + 1) = w.asIdeal ^ (k + 1) at he
+    have hd : v.asIdeal ∣ w.asIdeal := v.prime.dvd_of_dvd_pow
+      (he ▸ dvd_pow_self _ (Nat.succ_ne_zero n))
+    have hvw : v = w := HeightOneSpectrum.ext
+      (w.isMaximal.eq_of_le v.isPrime.ne_top (Ideal.dvd_iff_le.mp hd)).symm
+    subst w
+    have hN := congrArg (Ideal.absNorm : Ideal (𝓞 F) → ℕ) he
+    simp only [map_pow] at hN
+    have hn := Nat.pow_right_injective (NumberField.HeightOneSpectrum.one_lt_absNorm v) hN
+    exact Prod.ext rfl (Nat.succ.inj hn)
+  have hsum := (summable_absNorm_rpow F (r := 2) (by norm_num)).comp_injective hI
+  refine (hsum.mul_left C).of_nonneg_of_le (fun _ ↦ norm_nonneg _) ?_
+  rintro ⟨v, k⟩
+  have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hlog := (Real.log_pos hq).le
+  let x := ((k + 1 : ℕ) : ℝ) * Real.log q(v)
+  have hx : Real.log q(v) ≤ x := by
+    dsimp [x]
+    push_cast
+    nlinarith [mul_nonneg (Nat.cast_nonneg (α := ℝ) k) hlog]
+  have hfactor : Real.log q(v) * Real.exp (-x / 2) ≤ Real.exp x :=
+    (mul_le_of_le_one_right hlog (Real.exp_le_one_iff.mpr (by linarith))).trans
+      (hx.trans (by linarith [Real.add_one_le_exp x]))
+  change ‖(if _ then _ else (0 : ℂ))‖ ≤ C * ((I (v, k)).absNorm : ℝ) ^ (-(2 : ℝ))
+  split_ifs
+  · rw [norm_mul, Complex.norm_real, Real.norm_of_nonneg (mul_nonneg hlog (Real.exp_nonneg _))]
+    calc
+      _ ≤ (Real.log q(v) * Real.exp (-x / 2)) * (‖f x‖ + ‖f (-x)‖) := by
+        apply mul_le_mul_of_nonneg_left _ (mul_nonneg hlog (Real.exp_nonneg _))
+        simpa only [norm_mul, norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow, one_mul]
+          using norm_add_le ((χ₀(χ).localValue v) ^ (k + 1) * f x)
+            ((χ₀(χ⁻¹).localValue v) ^ (k + 1) * f (-x))
+      _ ≤ Real.exp x * (C * Real.exp (-(3 * x))) :=
+        mul_le_mul hfactor (hdecay x) (by positivity) (Real.exp_nonneg _)
+      _ = C * Real.exp (x + -(3 * x)) := by rw [Real.exp_add]; ring
+      _ = _ := by
+        change _ = C * (((v.asIdeal ^ (k + 1)).absNorm : ℕ) : ℝ) ^ (-(2 : ℝ))
+        rw [map_pow, Nat.cast_pow, Real.rpow_def_of_pos (pow_pos (zero_lt_one.trans hq) _),
+          Real.log_pow]
+        dsimp [x]
+        ring_nf
+  · rw [norm_zero]
+    exact mul_nonneg (add_nonneg (apply_nonneg _ _) (apply_nonneg _ _))
+      (Real.rpow_nonneg (Nat.cast_nonneg _) _)
 
 /-- Paper: Theorem B.4.2.2, p. 616. The centered divisor sum equals the
 discriminant–conductor term, minus the prime-power series, plus the gamma terms.
@@ -357,7 +614,19 @@ additive principal value for the standard character is ordinary multiplicative i
 theorem finiteConnesPrincipalValue_one_of_apply_zero (v : Primes(F))
     (f : 𝒮ₐ(v.adicCompletion F)) (_hf : addTest(f) 0 = 0) :
     finiteConnesPrincipalValue v 1 f =
-      ∫ u : (v.adicCompletion F)ˣ, addTest(f) u.val ∂μ𝔭(v) := by sorry
+      ∫ u : (v.adicCompletion F)ˣ, addTest(f) u.val ∂μ𝔭(v) := by
+  have hT := ((exists_finiteConnesPrincipalValue v 1).choose_spec f).2
+  have hK := (finiteLogFourier_eq_neg_haar v f _hf).2.2
+  have hV : V𝔭(v) ≠ 0 := by
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_ne_zero]
+    refine ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top, ENNReal.inv_ne_top.mpr ?_⟩
+    refine (ENNReal.ofReal_pos.mpr (Real.sqrt_pos.mpr (pow_pos ?_ _))).ne'
+    exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).trans' zero_lt_one
+  change finiteConnesPrincipalValue v 1 f = _ at hT
+  simp only [Units.val_one, norm_one, Real.sqrt_one, ENNReal.ofReal_one, one_smul,
+    one_mul] at hT
+  rw [hT, hK, mul_div, neg_mul_neg]
+  exact mul_div_cancel_left₀ _ (Complex.ofReal_ne_zero.mpr hV)
 
 /-- Paper: Definition B.4.4.1(1), p. 619. The archimedean Fourier pairing
 defines a continuous linear functional on additive tests. -/
@@ -377,7 +646,87 @@ Deviation: The factor one half is the real case of the correction to Proposition
 theorem realConnesPrincipalValue_of_apply_zero (w : InfinitePlace F) (_hw : w.IsReal)
     (f : 𝒮ₐ(w.Completion)) (_hf : addTest(f) 0 = 0) :
     infiniteConnesPrincipalValue w f =
-      (1 / 2 : ℂ) * ∫ x, addTest(f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w) := by sorry
+      (1 / 2 : ℂ) * ∫ x, addTest(f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w) := by
+  have hT := ((exists_infiniteConnesPrincipalValue w).choose_spec f).2
+  change infiniteConnesPrincipalValue w f = _ at hT
+  have hL := (realLogFourier_finitePart w _hw f).2.2
+  simp only [_hf, mul_zero, zero_mul, add_zero] at hL
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  -- Real coordinates turn the test into a classical Schwartz function vanishing at zero.
+  let e := InfinitePlace.Completion.isometryEquivRealOfIsReal _hw
+  let c : Multiplicative w.Completion ≃ₜ* Multiplicative ℝ :=
+    { toMulEquiv := (InfinitePlace.Completion.ringEquivRealOfIsReal _hw).toAddEquiv.toMultiplicative
+      continuous_toFun := e.continuous
+      continuous_invFun := e.symm.continuous }
+  have hc := schwartzBruhat_realCoordinate_equiv c
+  have hE := hc.choose_spec
+  let s := hc.choose.symm f
+  have hs (t : ℝ) : s t = addTest(f) (e.symm t) := by
+    have := hE s (Multiplicative.ofAdd (e.symm t))
+    rw [ContinuousLinearEquiv.apply_symm_apply] at this
+    refine Eq.trans ?_ this.symm
+    exact congrArg s (e.apply_symm_apply t).symm
+  have h0 : e.symm 0 = 0 := map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal _hw).symm
+  have hnorm (t : ℝ) : ‖e.symm t‖ = ‖t‖ := by
+    rw [← dist_zero_right, ← dist_zero_right t, ← e.symm.dist_eq t 0, h0]
+  have hs0 : s 0 = 0 := by rw [hs, h0]; exact _hf
+  -- The weighted test is integrable on the real line: Lipschitz near zero, decaying at infinity.
+  let C := SchwartzMap.seminorm ℝ 0 1 s
+  have hlip (t : ℝ) : ‖s t‖ ≤ C * ‖t‖ := by
+    have := Convex.norm_image_sub_le_of_norm_fderiv_le (𝕜 := ℝ) (f := s) (s := univ) (C := C)
+      (fun x _ ↦ s.differentiableAt) (fun x _ ↦ ?_) convex_univ (mem_univ 0) (mem_univ t)
+    · simpa [hs0] using this
+    · rw [← norm_iteratedFDeriv_one]
+      exact s.norm_iteratedFDeriv_le_seminorm ℝ 1 x
+  have hR : Integrable (fun t : ℝ ↦ s t / ((‖t‖ : ℝ) : ℂ)) := by
+    refine Integrable.mono' (g := fun t ↦ (Icc (-1 : ℝ) 1).indicator (fun _ ↦ C) t + ‖s t‖)
+      ((continuous_const.integrableOn_Icc.integrable_indicator measurableSet_Icc).add
+        s.integrable.norm)
+      (s.continuous.measurable.div
+        (Complex.measurable_ofReal.comp measurable_norm)).aestronglyMeasurable
+      (Eventually.of_forall fun t ↦ ?_)
+    rw [norm_div, Complex.norm_real, norm_norm]
+    by_cases ht : t ∈ Icc (-1 : ℝ) 1
+    · rw [indicator_of_mem ht]
+      rcases eq_or_ne t 0 with rfl | ht0
+      · simp [hs0, C]
+      · have : ‖s t‖ / ‖t‖ ≤ C := (div_le_iff₀ (norm_pos_iff.mpr ht0)).mpr (hlip t)
+        linarith [norm_nonneg (s t)]
+    · rw [indicator_of_notMem ht, zero_add]
+      have h1 : 1 ≤ ‖t‖ := by
+        simp only [mem_Icc, not_and_or, not_le] at ht
+        rw [Real.norm_eq_abs]
+        rcases ht with h | h
+        · rw [abs_of_neg (by linarith)]; linarith
+        · rw [abs_of_pos (by linarith)]; linarith
+      exact div_le_self (norm_nonneg _) h1
+  have hG : Integrable (fun x : w.Completion ↦ addTest(f) x / ((‖x‖ : ℝ) : ℂ)) ν∞(w) := by
+    rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left _hw]
+    let m := e.symm.toHomeomorph.toMeasurableEquiv
+    rw [show ((InfinitePlace.Completion.ringEquivRealOfIsReal _hw).symm : ℝ → w.Completion) = m
+      from rfl, integrable_map_equiv]
+    refine hR.congr (Eventually.of_forall fun t ↦ ?_)
+    change s t / ((‖t‖ : ℝ) : ℂ) = addTest(f) (e.symm t) / ((‖e.symm t‖ : ℝ) : ℂ)
+    rw [hs, hnorm]
+  -- Dominated convergence removes the cutoff.
+  have hmeas (ε : ℝ) : MeasurableSet {x : w.Completion | ε ≤ ‖x‖} :=
+    measurableSet_le measurable_const measurable_norm
+  have hlim : Tendsto (fun ε : ℝ ↦ ∫ x in {x : w.Completion | ε ≤ ‖x‖},
+      addTest(f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w)) (𝓝[>] 0)
+      (𝓝 (∫ x, addTest(f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w))) := by
+    simp_rw [← integral_indicator (hmeas _)]
+    refine tendsto_integral_filter_of_dominated_convergence
+      (fun x ↦ ‖addTest(f) x / ((‖x‖ : ℝ) : ℂ)‖)
+      (Eventually.of_forall fun ε ↦ hG.aestronglyMeasurable.indicator (hmeas ε))
+      (Eventually.of_forall fun ε ↦ Eventually.of_forall fun x ↦ norm_indicator_le_norm_self _ _)
+      hG.norm (Eventually.of_forall fun x ↦ ?_)
+    rcases eq_or_ne x 0 with rfl | hx
+    · simp [Set.indicator_apply]
+    · refine tendsto_const_nhds.congr' ?_
+      filter_upwards [nhdsWithin_le_nhds (eventually_lt_nhds (norm_pos_iff.mpr hx))] with ε hε
+      rw [indicator_of_mem (show ε ≤ ‖x‖ from hε.le)]
+  rw [hT, tendsto_nhds_unique hlim hL]
+  ring
 
 /-- Paper: Definition B.4.4.1(2), p. 620. Translation of the zero-extended
 test after inverse square-root weighting gives a continuous linear map to additive tests. -/
@@ -414,7 +763,70 @@ theorem realConnesWeilPrincipalValue_of_apply_one_zero (w : InfinitePlace F)
     let μ := infiniteLocalMultiplicativeTamagawaMeasure F w
     (infiniteConnesWeilPrincipalValue w) f =
       (1 / 2 : ℂ) * ∫ u : w.Completionˣ,
-        f.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ := by sorry
+        f.val u * (Real.sqrt ‖u.val‖ : ℂ) / ((‖1 - u.val‖ : ℝ) : ℂ) ∂μ := by
+  intro μ
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let : BorelSpace w.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let r := InfinitePlace.Completion.ringEquivRealOfIsReal _hw
+  let e := InfinitePlace.Completion.isometryEquivRealOfIsReal _hw
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := w.Completion)).measurableEmbedding
+  have hA := (exists_infiniteWeilTestMap w).choose_spec f
+  have hmult : w.mult = 1 := by simp [InfinitePlace.mult, _hw]
+  let Fz : w.Completion → ℂ := Function.extend Units.val (f.val : _ → ℂ) (fun _ ↦ 0)
+  have hFu (u : w.Completionˣ) : Fz u.val = f.val u := Units.val_injective.extend_apply _ _ u
+  have hFz (y : w.Completion) (hy : y ∉ range (Units.val : w.Completionˣ → w.Completion)) :
+      Fz y = 0 := by
+    simp only [Fz, Function.extend_apply' _ _ _ (fun ⟨u, hu⟩ ↦ hy ⟨u, hu⟩)]
+  have h0 : addTest((exists_infiniteWeilTestMap w).choose f) 0 = 0 := by
+    rw [hA]
+    change Fz (1 + 0) / _ = 0
+    rw [add_zero, ← Units.val_one, hFu, _hf, zero_div]
+  change infiniteConnesPrincipalValue w ((exists_infiniteWeilTestMap w).choose f) = _
+  rw [realConnesPrincipalValue_of_apply_zero w _hw _ h0]
+  congr 1
+  let G : w.Completion → ℂ := fun y ↦ Fz y / (Real.sqrt ‖y‖ : ℂ) / ((‖y - 1‖ : ℝ) : ℂ)
+  -- Translation invariance moves the singularity from zero to one.
+  have htr : ∫ x, addTest((exists_infiniteWeilTestMap w).choose f) x / ((‖x‖ : ℝ) : ℂ) ∂ν∞(w) =
+      ∫ y, G y ∂ν∞(w) := by
+    have hG : (fun x ↦ addTest((exists_infiniteWeilTestMap w).choose f) x / ((‖x‖ : ℝ) : ℂ)) =
+        fun x ↦ G (1 + x) := by
+      funext x
+      rw [hA]
+      change Fz (1 + x) / ((Real.sqrt (‖1 + x‖ ^ w.mult) : ℂ)) / _ =
+        Fz (1 + x) / (Real.sqrt ‖1 + x‖ : ℂ) / ((‖1 + x - 1‖ : ℝ) : ℂ)
+      rw [hmult, pow_one, add_sub_cancel_left]
+    rw [hG, infiniteLocalAdditiveTamagawaMeasure, dite_eq_left _hw]
+    let m := e.symm.toHomeomorph.toMeasurableEquiv
+    rw [show (r.symm : ℝ → w.Completion) = m from rfl, integral_map_equiv, integral_map_equiv]
+    have hm (t : ℝ) : 1 + m t = m (1 + t) := by
+      change 1 + r.symm t = r.symm (1 + t)
+      rw [map_add, map_one]
+    simp_rw [hm]
+    exact integral_add_left_eq_self (fun t ↦ G (m t)) 1
+  rw [htr]
+  -- The multiplicative measure is the additive one with density `1 / ‖y‖` on units.
+  let d : w.Completion → ENNReal := fun x ↦ (↑(‖x‖₊ ^ w.mult) : ENNReal)⁻¹
+  have hd : Measurable d := by fun_prop
+  simp only [← hFu]
+  change _ = ∫ u, _ ∂(ν∞(w).withDensity d).comap Units.val
+  rw [← hval.integral_map (g := fun y ↦ Fz y * (Real.sqrt ‖y‖ : ℂ) / ((‖1 - y‖ : ℝ) : ℂ)),
+    hval.map_comap, setIntegral_withDensity_eq_setIntegral_toReal_smul hd ?_ _
+      hval.measurableSet_range,
+    ← setIntegral_eq_integral_of_forall_compl_eq_zero (s := range Units.val)
+      (fun y hy ↦ by simp only [G, hFz y hy, zero_div])]
+  · refine setIntegral_congr_fun hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    have hn : 0 < ‖y‖ := norm_pos_iff.mpr (hu ▸ u.ne_zero)
+    simp only [G, d, hmult, pow_one]
+    rw [ENNReal.toReal_inv, ENNReal.coe_toReal, coe_nnNorm, Complex.real_smul, norm_sub_rev]
+    have hs : (Real.sqrt ‖y‖ : ℂ) ≠ 0 := by exact_mod_cast (Real.sqrt_pos.mpr hn).ne'
+    have hsq : (‖y‖ : ℂ) = (Real.sqrt ‖y‖ : ℂ) * (Real.sqrt ‖y‖ : ℂ) := by
+      exact_mod_cast (Real.mul_self_sqrt hn.le).symm
+    push_cast
+    rw [hsq]
+    field_simp
+  · refine ae_restrict_of_forall_mem hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    simp only [d, hmult, pow_one]
+    exact ENNReal.inv_lt_top.mpr (by simp [← hu])
 
 local notation "finiteWeilIntegrand(" v ", " f ")" =>
   (fun u : (HeightOneSpectrum.adicCompletion F v)ˣ ↦
@@ -489,7 +901,17 @@ adds a multiple of evaluation at one to the multiplicative principal value. -/
 theorem finiteConnesWeilPrincipalValue_changeCharacter (v : Primes(F))
     (a : (v.adicCompletion F)ˣ) (f : 𝒟((v.adicCompletion F)ˣ)) :
     finiteConnesWeilPrincipalValue v a f = finiteConnesWeilPrincipalValue v 1 f +
-      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * f.val 1 := by sorry
+      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * f.val 1 := by
+  let A := (exists_finiteWeilTestMap v).choose
+  have hunit := Units.val_injective.extend_apply f.val (fun _ ↦ 0)
+    (1 : (v.adicCompletion F)ˣ)
+  have hzero : addTest(A f) 0 = f.val 1 := by
+    have h := (exists_finiteWeilTestMap v).choose_spec f 0
+    simp only [add_zero, norm_one, Real.sqrt_one, Complex.ofReal_one, div_one] at h
+    exact h.trans hunit
+  exact (finiteConnesPrincipalValue_changeCharacter v a (A f)).trans
+    (congrArg (fun z : ℂ ↦ finiteConnesWeilPrincipalValue v 1 f +
+      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * z) hzero)
 
 -- TODO(paper-gap): In the proof on p. 623 (footnote 24), the annihilator of
 -- the maximal ideal is the inverse maximal ideal times the inverse different.
@@ -525,7 +947,62 @@ theorem finiteConnesWeilPrincipalValue_integerUnits (v : Primes(F)) :
 /-- Paper: Remark B.4.4.6, p. 623. A finite local test agrees with its value at
 one on a neighborhood of one, so the unit-subtracted integrand vanishes there. -/
 theorem finiteWeilTest_eventually_eq_at_one (v : Primes(F)) (f : 𝒟((v.adicCompletion F)ˣ)) :
-    ∀ᶠ u in 𝓝 (1 : (v.adicCompletion F)ˣ), f.val u = f.val 1 := by sorry
+    ∀ᶠ u in 𝓝 (1 : (v.adicCompletion F)ˣ), f.val u = f.val 1 := by
+  let G := (v.adicCompletion F)ˣ
+  have hf : IsBruhatSmooth f.val := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1
+  obtain ⟨k, hk, hInv, _⟩ := hf 0
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator k, hk.2⟩
+  obtain ⟨γ, _, hγ, hker, _⟩ := lca_dualSubgroup_quotient A
+  let Q := PontryaginDual A.val
+  let : LocallyCompactSpace A.val := A.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨n, ⟨charts⟩⟩ := isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp A.property.2
+  let : ChartedSpace (EuclideanSpace ℝ (Fin n)) Q := charts
+  let : LocallyConnectedSpace Q := ChartedSpace.locallyConnectedSpace (EuclideanSpace ℝ (Fin n)) Q
+  let B : OpenSubgroup G :=
+    ⟨(v.adicCompletionIntegers F).units, Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)⟩
+  let : CompactSpace B.toSubgroup := isCompact_iff_compactSpace.mp
+    (Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)))
+  let j : B.toSubgroup → v.adicCompletion F := Units.val ∘ Subtype.val
+  have hj : Topology.IsEmbedding j :=
+    (Units.isEmbedding_val₀ (G₀ := v.adicCompletion F)).comp Topology.IsEmbedding.subtypeVal
+  let η : B.toSubgroup →ₜ* Q := γ.comp ⟨B.toSubgroup.subtype, continuous_subtype_val⟩
+  have hη : Continuous η := η.continuous
+  have hηOpen : IsOpenMap η := hγ.isOpenMap.comp B.isOpen.isOpenEmbedding_subtypeVal.isOpenMap
+  have hSmall (U : Set Q) (hU : U ∈ 𝓝 (1 : Q)) : ∃ V : OpenSubgroup Q, (V : Set Q) ⊆ U := by
+    have hpre : η ⁻¹' U ∈ 𝓝 (1 : B.toSubgroup) :=
+      hη.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+    rw [hj.isInducing.nhds_eq_comap] at hpre
+    obtain ⟨S, hS, hSsub⟩ := mem_comap.mp hpre
+    let ν : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨r, hr⟩ := (Valued.mem_nhds (Γ₀ := WithZero (Multiplicative ℤ))).mp hS
+    let W := (fun x : B.toSubgroup ↦ j x - j 1) ⁻¹' {y | ν.restrict y < r.val}
+    have hW : IsClopen W :=
+      (Valued.isClopen_ball (v.adicCompletion F) r.val).preimage
+        (hj.continuous.sub continuous_const)
+    have h1W : (1 : B.toSubgroup) ∈ W := by
+      change ν.restrict (j 1 - j 1) < r.val
+      rw [sub_self, map_zero]
+      exact pos_iff_ne_zero.mpr r.ne_zero
+    obtain ⟨V, hV⟩ := IsTopologicalGroup.exist_openSubgroup_sub_clopen_nhds_of_one hW h1W
+    refine ⟨⟨V.toSubgroup.map η.toMonoidHom, hηOpen _ V.isOpen⟩, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    exact hSsub (hr (hV hx))
+  have hComponent : connectedComponent (1 : Q) = {1} := by
+    refine subset_antisymm ?_ (singleton_subset_iff.mpr mem_connectedComponent)
+    intro y hy
+    by_contra hne
+    have h1y : (1 : Q) ∈ ({y} : Set Q)ᶜ :=
+      fun h ↦ hne (mem_singleton_iff.mpr (mem_singleton_iff.mp h).symm)
+    obtain ⟨V, hV⟩ := hSmall _ (isOpen_compl_singleton.mem_nhds h1y)
+    have hyV := isPreconnected_connectedComponent.subset_isClopen V.isClopen
+      ⟨1, mem_connectedComponent, V.one_mem⟩ hy
+    exact (hV hyV) (mem_singleton y)
+  have hOne : IsOpen ({1} : Set Q) := hComponent ▸ isOpen_connectedComponent
+  have hkOpen : IsOpen (k : Set G) := by
+    rw [← lcaDualAnnihilator_annihilator k hk.1, ← hker]
+    exact hOne.preimage γ.continuous
+  filter_upwards [hkOpen.mem_nhds k.one_mem] with u hu
+  simpa only [mul_one] using hInv ⟨u, hu⟩ 1
 
 end PrincipalValues
 
@@ -540,7 +1017,8 @@ def explicitFormulaCompletedHeckeL (χ : U[F]) : ℂ → ℂ :=
 meromorphic normal form and agrees with the completed Euler product on the right half-plane. -/
 theorem explicitFormulaCompletedHeckeL_spec (χ : U[F]) :
     MeromorphicNFOn (explicitFormulaCompletedHeckeL χ) univ ∧
-      ∀ s : halfPlane, explicitFormulaCompletedHeckeL χ s = completedHeckeL χ s := by sorry
+      ∀ s : halfPlane, explicitFormulaCompletedHeckeL χ s = completedHeckeL χ s :=
+  (completedHeckeL_exists_continuation χ).choose_spec
 
 local notation "chartZeros(" τ ")" =>
   {z : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //

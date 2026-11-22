@@ -94,7 +94,7 @@ for issue in sorted(issues, key=lambda i: i["number"]):
     if at is None:
         continue                                  # already proved or renamed on this checkout
     row = dict(number=issue["number"], name=name, line=at)
-    (others if {"claimed", "stuck", "blocked"} & set(issue["labels"]) else mine).append(row)
+    (others if {"claimed", "stuck", "blocked", "gap"} & set(issue["labels"]) else mine).append(row)
 if not mine:
     sys.exit(f"{path}: no open, unclaimed proof issue")
 

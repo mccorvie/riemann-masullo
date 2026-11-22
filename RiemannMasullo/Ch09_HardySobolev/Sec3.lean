@@ -628,7 +628,56 @@ group, including at module values where the piecewise smooth definition permits 
 Deviation: Sanity check on the smoothness requirement. -/
 theorem IsSmoothModulatedCutoff.continuous {Λ ε : ℝ} {ρ : G → ℝ}
     (hρ : IsSmoothModulatedCutoff m Λ ε ρ) :
-    Continuous ρ := by sorry
+    Continuous ρ := by
+  obtain ⟨k, hk, _, hDescend⟩ := hρ.2 0
+  have hkCompact : IsCompact (k : Set G) := by
+    let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator k, hk.2⟩
+    obtain ⟨_, _, _, hker, hCompact⟩ := lca_dualSubgroup_quotient A
+    rwa [hker, show lcaDualAnnihilator A.val = k from lcaDualAnnihilator_annihilator k hk.1]
+      at hCompact
+  rw [continuous_iff_continuousAt]
+  intro x
+  -- Use a compact generating set containing the point, a neighborhood, and the good subgroup.
+  obtain ⟨U, hUc, hU⟩ := exists_compact_mem_nhds (1 : G)
+  let L := insert x (U ∪ (k : Set G))
+  let H := Subgroup.closure L
+  have hLH : L ⊆ (H : Set G) := Subgroup.subset_closure
+  have hL : L ∈ 𝓝 (1 : G) :=
+    mem_of_superset hU (subset_union_left.trans (subset_insert _ _))
+  have hH : IsOpen (H : Set G) := H.isOpen_of_mem_nhds (mem_of_superset hL hLH)
+  have hGen : IsCompactlyGeneratedGroup H :=
+    ⟨Subtype.val ⁻¹' L, continuous_subtype_val.continuousAt.preimage_mem_nhds hL,
+      (H.isClosed_of_isOpen hH).isClosedEmbedding_subtypeVal.isCompact_preimage
+        ((hUc.union hkCompact).insert x), Subgroup.closure_preimage_eq_top L⟩
+  let p : BruhatStructuralPair G :=
+    ⟨(H, OrderDual.toDual k), hH, hGen, hk,
+      subset_union_right.trans ((subset_insert _ _).trans hLH)⟩
+  obtain ⟨e⟩ := p.elementary
+  obtain ⟨f₀, hf₀, hSmooth⟩ := hDescend p rfl
+  let RealCoords := EuclideanSpace ℝ (Fin e.realDim)
+  let TorusCover := EuclideanSpace ℝ (Fin e.torusDim)
+  let DiscreteCoords := (Fin e.latticeRank → ℤ) × e.finiteFactor
+  let Elementary := ElementaryLieGroup e.realDim e.torusDim e.latticeRank e.finiteFactor
+  let cover : (RealCoords × TorusCover) × DiscreteCoords → Elementary := fun u ↦ elementaryCover u.1 u.2.1 u.2.2
+  have hq : IsOpenQuotientMap (fun u : TorusCover ↦ fun i ↦ (u i : AddCircle (1 : ℝ))) :=
+    (IsOpenQuotientMap.piMap fun _ ↦ QuotientAddGroup.isOpenQuotientMap_mk).comp
+      (PiLp.homeomorph 2 (fun _ : Fin e.torusDim ↦ ℝ)).isOpenQuotientMap
+  have hCover : IsOpenQuotientMap cover :=
+    (Homeomorph.prodAssoc RealCoords (Fin e.torusDim → AddCircle (1 : ℝ)) DiscreteCoords).isOpenQuotientMap.comp
+      ((IsOpenQuotientMap.id.prodMap hq).prodMap IsOpenQuotientMap.id)
+  let g : Elementary → ℂ := fun y ↦ f₀ (e.equiv.symm (Multiplicative.ofAdd y))
+  have hg : Continuous g := by
+    apply hCover.continuous_comp_iff.mp
+    exact continuous_prod_of_discrete_right.mpr fun d ↦ (hSmooth e d.1 d.2).continuous
+  have hf₀c : Continuous f₀ := by
+    have hc : Continuous (fun y : p.quotient ↦ g (e.equiv y).toAdd) := hg.comp e.equiv.continuous
+    simpa only [g, ofAdd_toAdd, e.equiv.symm_apply_apply] using hc
+  have hlocal : Continuous (fun y : H ↦ ρ y.val) := by
+    have hc : Continuous (fun y : H ↦ (f₀ (QuotientGroup.mk y)).re) :=
+      Complex.continuous_re.comp (hf₀c.comp QuotientGroup.continuous_mk)
+    simpa only [hf₀, Complex.ofReal_re] using hc
+  exact hH.isOpenEmbedding_subtypeVal.continuousAt_iff.mp
+    (hlocal.continuousAt (x := (⟨x, hLH (mem_insert _ _)⟩ : H)))
 
 /-- Paper: Definition 9.3.3.1, p. 427. A positive real modulation admits a
 smooth cutoff with outer radius two and width one quarter.
