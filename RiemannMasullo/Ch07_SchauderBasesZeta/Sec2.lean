@@ -4,6 +4,10 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+
 /-!
 # §7.2 Poles of the S-idelic zeta functions
 
@@ -482,7 +486,30 @@ theorem mem_sAdelePolarSubspace (f : ℬₛ) :
 Insertion with integer indicators outside S preserves the two zero evaluations
 that define the polar subspaces. -/
 theorem sAdeleSchwartzToGlobal_mem_polarSubspace (f : sAdelePolarSubspace F S) :
-    sAdeleSchwartzToGlobal F S f.val ∈ adelePolarSubspace F := by sorry
+    sAdeleSchwartzToGlobal F S f.val ∈ adelePolarSubspace F := by
+  classical
+  have hv := (mem_sAdelePolarSubspace (F := F) (S := S) f.val).mp f.property
+  let I := (integralAdelesOutside F S : Set 𝔸[F])
+  let g (x : Aₛ) := f.val (Multiplicative.ofAdd x)
+  have lift : (fun x : 𝔸[F] ↦ sAdeleSchwartzToGlobal F S f.val (Multiplicative.ofAdd x)) =
+      I.indicator (g ∘ adeleProjection F S) :=
+    funext fun x ↦ (toGlobal_apply_integral (F := F) (S := S) f.val x).trans
+      (Set.indicator_apply I (g ∘ adeleProjection F S) x).symm
+  apply (mem_adelePolarSubspace _).mpr
+  constructor
+  · exact (congrFun lift 0).trans (Set.indicator_apply_eq_zero.mpr fun _ ↦
+      (congrArg g (map_zero (adeleProjection F S))).trans hv.1)
+  · let : MeasurableSpace 𝔸[F] := borel _
+    refine (sAdeleProjection_dual_masses F S).elim fun a ha ↦ ?_
+    have h := congrFun (tamagawaFourier_sAdeleLift F S a ha.2.2.1 g
+      (partialTensor_integrable F S f.val)) 0
+    refine ((congrArg (fun b : 𝔸[F] → ℂ ↦
+      tamagawaFourier (additiveTamagawaMeasure F) (adeleStandardCharacter F) b 0) lift).trans h).trans ?_
+    apply Set.indicator_apply_eq_zero.mpr
+    intro _
+    have hz := (congrArg (fun x : Aₛ ↦ sAdeleSchwartzFourier f.val (Multiplicative.ofAdd x))
+      (map_zero (adeleProjection F S))).trans hv.2
+    exact (congrArg (fun z : ℂ ↦ (a : ℝ) • z) hz).trans (smul_zero _)
 
 open Classical in
 /-- Paper: Corollary 7.2.2.2, p. 340.
