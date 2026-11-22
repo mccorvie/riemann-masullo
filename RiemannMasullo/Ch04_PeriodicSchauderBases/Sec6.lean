@@ -438,7 +438,7 @@ private theorem isotypicDifference_closedEmbedding (g : G) (hg : 1 < (m g).val)
   have hinj : Injective (P[ω, [g]]) := by
     intro x y h
     exact Subtype.ext (hi ((he x).symm.trans ((congrArg Subtype.val h).trans (he y))))
-  have hc : IsClosed (range δ[g]) := modulatedCyclicDifference_isClosed_range m g hm hms
+  have hc : IsClosed (range δ[g]) := modulatedCyclicDifference_isClosed_range m g hm hms hg
   have hh := cyclicDifference_range_inf_isotype m hm hms ω g
   have hclosed := isClosed_range_submodule_restriction (X := E) H₀[ω] δ[g] (P[ω, [g]]) he hh hc
   exact frechet_closedEmbedding_of_injective hF (P[ω, [g]]) hinj hclosed
@@ -1425,7 +1425,7 @@ private theorem cyclicMellin_model (hmId : IsModulation mPos) (hsId : Surjective
     exact (hcalc hz (hshift.trans (congrArg (· * (Mellin p).val z)
       ((one_mul _).trans hpow)))).trans (congrArg (factor[z] * ·) heval)
   have hcl : IsClosedEmbedding T := by
-    have hc := modulatedCyclicDifference_isClosed_range mPos a hmId hsId
+    have hc := modulatedCyclicDifference_isClosed_range mPos a hmId hsId ha
     have hi := cyclicDifference_injective mPos hmId hsId a ha
     apply frechet_closedEmbedding_of_injective (schwartzBergman_frechet univ isOpen_univ
       ordConnected_univ univ_nonempty)

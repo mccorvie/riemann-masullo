@@ -822,7 +822,10 @@ local notation "Pχ" => modulatedIsotypicPeriodizationCLM m γ hm hms hγ μ₁ 
 -- with the actual difference range. Part (5) only identifies its closure.
 
 omit [MeasurableSpace G] [BorelSpace G] in
-/-- Paper: Proposition 4.5.1.1(6), p. 198. The cyclic difference has closed range. -/
+include hγ in
+/-- Paper: Proposition 4.5.1.1(6), p. 198. The cyclic difference has closed range, for a
+generator of module greater than one as in Situation 4.4.2.3. Without that hypothesis the
+statement is false: a rotation by a Liouville number on ℝ_{>0} × S¹ has non-closed range. -/
 theorem modulatedCyclicDifference_isClosed_range : IsClosed (range Δ) := by sorry
 
 omit [MeasurableSpace G] [BorelSpace G] in
