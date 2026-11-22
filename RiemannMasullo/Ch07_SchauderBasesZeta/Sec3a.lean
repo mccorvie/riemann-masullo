@@ -304,7 +304,25 @@ theorem sLocalOrbitalPhase_sub (χ : PontryaginDual Jₛ) (p : Vℚ)
     (tᵥ t_w : ℝ) (_htᵥ : phase(χ, v, uᵥ, tᵥ)) (_ht_w : phase(χ, w, u_w, t_w))
     (c : Xₛ) (_hc : ∃ s, c = chart(χ) s)
     (_hvc : v ∈ sLocalFinitePolePlaces c) (_hwc : w ∈ sLocalFinitePolePlaces c) :
-    ∃ a b : ℤ, tᵥ - t_w = (a : ℝ) * period(v) - (b : ℝ) * period(w) := by sorry
+    ∃ a b : ℤ, tᵥ - t_w = (a : ℝ) * period(v) - (b : ℝ) * period(w) := by
+  have hinj : Injective (chart(χ)) := by
+    intro s t he
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    let P := quasiCharacterNormTwist (MonoidHom.id ℝ≥0ˣ) continuous_id 1 s
+    have hs (u : ℝ≥0ˣ) : P u = ((u.val : ℝ) : ℂ) ^ s := one_mul _
+    apply (existsUnique_complexPower P).unique hs
+    intro u
+    have h := DFunLike.congr_fun he (σ u)
+    change (χ (σ u) : ℂ) * (((mₛ (σ u) : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ (σ u) : ℂ) * (((mₛ (σ u) : ℝ≥0) : ℝ) : ℂ) ^ t at h
+    rw [hσ u] at h
+    exact (hs u).trans (mul_left_cancel₀ (Circle.coe_ne_zero _) h)
+  obtain ⟨a, ha⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ v uᵥ _hᵥ tᵥ _htᵥ c _hc _hvc).exists
+  obtain ⟨b, hb⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ w u_w _h_w t_w _ht_w c _hc _hwc).exists
+  refine ⟨a, b, ?_⟩
+  have he := congrArg Complex.im (hinj (ha.symm.trans hb))
+  simp only [Complex.mul_I_im, Complex.ofReal_re] at he
+  linarith
 
 local notation "fourierZeta(" c ")" =>
   (fun (f : ℬₛ) (z : ℂ) ↦ sLocalIdelicZFunction (sAdeleSchwartzFourier f)
