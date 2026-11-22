@@ -1,8 +1,10 @@
 module
 
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.TestFunction
 public import Mathlib.LinearAlgebra.PiTensorProduct.Basic
+import Mathlib.LinearAlgebra.PiTensorProduct.Generators
 import Mathlib.Algebra.BigOperators.Fin
 import Mathlib.Algebra.Group.Pointwise.Set.Scalar
 import Mathlib.Analysis.InnerProductSpace.l2Space
@@ -3347,7 +3349,18 @@ theorem finiteProduct_tailSchwartz_montel (S T : Finset (Places(F))) :
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both strong duals are Fréchet. -/
 theorem finiteProduct_tailSchwartz_strongDual_frechet (S T : Finset (Places(F))) :
     IsFrechetTVS (StrongDual ℂ ℬ((FinitePlaceProduct F S))) ∧
-      IsFrechetTVS (StrongDual ℂ ℬ(FiniteAdeleTail F T)) := by sorry
+      IsFrechetTVS (StrongDual ℂ ℬ(FiniteAdeleTail F T)) := by
+  have of_finest (E : Type u) [AddCommGroup E] [Module ℂ E] [t : TopologicalSpace E]
+      (hRank : Module.rank ℂ E ≤ ℵ₀)
+      (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E))) :
+      IsFrechetTVS (StrongDual ℂ E) :=
+    Eq.mpr (congrArg (fun t' : TopologicalSpace E ↦
+      letI := t'
+      IsFrechetTVS (StrongDual ℂ E)) ht)
+      (finestLocallyConvex_dual_frechet_of_countableRank E hRank)
+  have hRank := finiteProduct_tailSchwartz_countableRank F S T
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨of_finest _ hRank.1 hTop.1, of_finest _ hRank.2 hTop.2⟩
 
 /-- Paper: Proposition 2.1.2.8(2), p. 65. Both strong duals are nuclear. -/
 theorem finiteProduct_tailSchwartz_strongDual_nuclear (S T : Finset (Places(F))) :
@@ -3358,7 +3371,12 @@ theorem finiteProduct_tailSchwartz_strongDual_nuclear (S T : Finset (Places(F)))
 space has a continuous linear retraction. -/
 theorem finiteProduct_tailSchwartz_complemented (S T : Finset (Places(F))) :
     (∀ W : Submodule ℂ ℬ((FinitePlaceProduct F S)), W.ClosedComplemented) ∧
-      (∀ W : Submodule ℂ ℬ(FiniteAdeleTail F T), W.ClosedComplemented) := by sorry
+      (∀ W : Submodule ℂ ℬ(FiniteAdeleTail F T), W.ClosedComplemented) := by
+  have hTop := finiteProduct_tailSchwartz_finestTopology F S T
+  exact ⟨fun W ↦ (congrArg (fun t ↦ @Submodule.ClosedComplemented ℂ _ _ t _ _ W)
+    hTop.1).mpr (finestLocallyConvex_submodule_closedComplemented W),
+    fun W ↦ (congrArg (fun t ↦ @Submodule.ClosedComplemented ℂ _ _ t _ _ W)
+    hTop.2).mpr (finestLocallyConvex_submodule_closedComplemented W)⟩
 
 -- TODO(paper-gap): Remark 2.1.2.9 claims countable dimension under separability
 -- for arbitrary locally profinite groups. A separable uncountable product of
@@ -3368,12 +3386,114 @@ section UnitAction
 
 variable {R : Type*} [CommRing R] [TopologicalSpace R] [IsTopologicalRing R]
 
+private theorem mem_annihilator_iff_for_pullback {K : Type*} [CommGroup K] [TopologicalSpace K] (H : Subgroup K)
+      (χ : PontryaginDual K) : χ ∈ lcaAnnihilator H ↔ ∀ x : H, χ x.val = 1 := by
+  rw [lcaAnnihilator, MonoidHom.mem_ker]
+  exact ⟨fun h x ↦ congrArg (fun ψ : PontryaginDual H ↦ ψ x) h, fun h ↦ PontryaginDual.ext (fun x ↦ h x)⟩
+
+/-- Transport a structural pair along a group isomorphism, retaining its elementary coordinates. -/
+private theorem schwartzBruhat_stage_pullback {A B : Type*} [CommGroup A] [CommGroup B]
+    [TopologicalSpace A] [TopologicalSpace B] [IsTopologicalGroup A] [IsTopologicalGroup B]
+    (e : A ≃ₜ* B)
+    (a : BruhatStructuralPair B) (p : ElementaryLCAPresentation a.quotient) :
+    ∃ (a' : BruhatStructuralPair A) (p' : ElementaryLCAPresentation a'.quotient)
+      (j : SchwartzBruhatStage p →L[ℂ] SchwartzBruhatStage p'),
+      ∀ f, schwartzBruhatStageRealization a p f ∘ e =
+        schwartzBruhatStageRealization a' p' (j f) := by
+  classical
+  let dual : PontryaginDual B ≃ₜ* PontryaginDual A :=
+    { toFun := PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e)
+      invFun := PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e.symm)
+      left_inv := fun χ ↦ PontryaginDual.ext fun y ↦ congrArg χ (e.apply_symm_apply y)
+      right_inv := fun χ ↦ PontryaginDual.ext fun x ↦ congrArg χ (e.symm_apply_apply x)
+      map_mul' := map_mul (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e))
+      continuous_toFun := (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e)).continuous
+      continuous_invFun := (PontryaginDual.map (ContinuousMonoidHom.toContinuousMonoidHom e.symm)).continuous }
+  let J := a.val.1
+  let D := OrderDual.ofDual a.val.2
+  let J' := J.comap e.toMulEquiv.toMonoidHom
+  let D' := D.comap e.toMulEquiv.toMonoidHom
+  let eJ : J' ≃ₜ* J := ContinuousMulEquiv.mk'
+    (e.toHomeomorph.subtype fun _ ↦ Iff.rfl)
+    (fun x y ↦ Subtype.ext (map_mul e (x : A) (y : A)))
+  have hAnn (χ : PontryaginDual B) : χ ∈ lcaAnnihilator D ↔ dual χ ∈ lcaAnnihilator D' := by
+    rw [mem_annihilator_iff_for_pullback, mem_annihilator_iff_for_pullback]
+    refine ⟨fun h x ↦ h ⟨e x, x.property⟩, fun h y ↦ ?_⟩
+    have hy : e.symm y ∈ D' := by
+      change e (e.symm y) ∈ D
+      simpa only [e.apply_symm_apply] using y.property
+    have heval : χ (e (e.symm y)) = 1 := h ⟨e.symm y, hy⟩
+    simpa only [e.apply_symm_apply] using heval
+  let eAnn : lcaAnnihilator D ≃ₜ* lcaAnnihilator D' := ContinuousMulEquiv.mk'
+    (dual.toHomeomorph.subtype hAnn)
+    (fun x y ↦ Subtype.ext (map_mul dual (x : PontryaginDual B) y))
+  have hopen : IsOpen (lcaAnnihilator D' : Set (PontryaginDual A)) := by
+    have heq : (lcaAnnihilator D' : Set (PontryaginDual A)) =
+        dual.symm ⁻¹' (lcaAnnihilator D : Set (PontryaginDual B)) := by
+      ext χ
+      change χ ∈ lcaAnnihilator D' ↔ dual.symm χ ∈ lcaAnnihilator D
+      rw [hAnn (dual.symm χ), dual.apply_symm_apply]
+    rw [heq]
+    exact a.property.2.2.1.2.1.preimage dual.symm.continuous
+  let a' : BruhatStructuralPair A :=
+    ⟨(J', OrderDual.toDual D'), a.property.1.preimage e.continuous,
+      isCompactlyGeneratedGroup_of_continuousMulEquiv eJ.symm a.property.2.1,
+      ⟨a.property.2.2.1.1.preimage e.continuous, hopen,
+        isCompactlyGeneratedGroup_of_continuousMulEquiv eAnn a.property.2.2.1.2.2⟩,
+      Subgroup.comap_mono a.property.2.2.2⟩
+  let N := D.comap J.subtype
+  let N' := D'.comap J'.subtype
+  have hN : N'.map eJ.toMulEquiv.toMonoidHom = N := by
+    change N'.map (eJ.toMulEquiv : J' →* J) = N
+    rw [Subgroup.map_equiv_eq_comap_symm eJ.toMulEquiv]
+    ext y
+    change e (e.symm y) ∈ D ↔ (y : B) ∈ D
+    rw [e.apply_symm_apply]
+  let q := QuotientGroup.congr N' N eJ.toMulEquiv hN
+  let eQ : a'.quotient ≃ₜ* a.quotient :=
+    ⟨q, (QuotientGroup.isQuotientMap_mk N').continuous_iff.mpr
+      (QuotientGroup.continuous_mk.comp eJ.continuous),
+      (QuotientGroup.isQuotientMap_mk N).continuous_iff.mpr
+        (QuotientGroup.continuous_mk.comp eJ.symm.continuous)⟩
+  let p' : ElementaryLCAPresentation a'.quotient := { p with equiv := eQ.trans p.equiv }
+  refine ⟨a', p', ContinuousLinearMap.id ℂ _, fun f ↦ funext fun x ↦ ?_⟩
+  change schwartzBruhatStageRealization a p f (e x) = schwartzBruhatStageRealization a' p' f x
+  rw [schwartzBruhatStageRealization_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : e x ∈ J
+  · rw [dite_eq_left hx, dite_eq_left (show x ∈ a'.val.1 from hx)]
+    rfl
+  · rw [dite_eq_right hx, dite_eq_right (show x ∉ a'.val.1 from hx)]
+
+/-- Pullback along a topological group isomorphism carries the span of stages to the span of stages. -/
+private theorem schwartzBruhat_pullback_mem {A B : Type*} [CommGroup A] [CommGroup B]
+    [TopologicalSpace A] [TopologicalSpace B] [IsTopologicalGroup A] [IsTopologicalGroup B]
+    (e : A ≃ₜ* B) (f : SchwartzBruhat B) : (f ∘ e) ∈ schwartzBruhatSubmodule A := by
+  let L := LinearMap.funLeft ℂ ℂ e
+  have h : schwartzBruhatSubmodule B ≤ (schwartzBruhatSubmodule A).comap L := by
+    unfold schwartzBruhatSubmodule
+    refine iSup_le fun a ↦ iSup_le fun p ↦ ?_
+    rintro _ ⟨s, rfl⟩
+    obtain ⟨a', p', j, hj⟩ := schwartzBruhat_stage_pullback e a p
+    change schwartzBruhatStageRealization a p s ∘ e ∈ schwartzBruhatSubmodule A
+    rw [hj]
+    exact (schwartzBruhatStageInclusion a' p' (j s)).property
+  exact h f.property
+
 /-- Paper: (2.1.2.2), p. 65. Pullback by multiplication by an inverse unit
 preserves additive Schwartz–Bruhat functions.
 Deviation: The common membership check is stated for any commutative topological ring. -/
 theorem schwartzBruhat_unitTranslate_mem (g : Rˣ) (f : ℬ(R)) :
     (fun x : Multiplicative R ↦ f (Multiplicative.ofAdd ((↑g⁻¹ : R) * x.toAdd))) ∈
-      schwartzBruhatSubmodule (Multiplicative R) := by sorry
+      schwartzBruhatSubmodule (Multiplicative R) := by
+  let e : Multiplicative R ≃ₜ* Multiplicative R :=
+    { toFun := fun x ↦ Multiplicative.ofAdd ((↑g⁻¹ : R) * x.toAdd)
+      invFun := fun x ↦ Multiplicative.ofAdd ((g : R) * x.toAdd)
+      left_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
+      right_inv := fun x ↦ Multiplicative.ext (by simp [← mul_assoc])
+      map_mul' := fun x y ↦ Multiplicative.ext (mul_add _ _ _)
+      continuous_toFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd)
+      continuous_invFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd) }
+  exact schwartzBruhat_pullback_mem e f
 
 /-- Paper: (2.1.2.2), p. 65. A unit acts on a Schwartz–Bruhat function by
 pullback along multiplication by its inverse. -/
@@ -3388,6 +3508,97 @@ theorem schwartzBruhatUnitTranslate_apply (g : Rˣ) (f : ℬ(R)) (x : R) :
 
 end UnitAction
 
+/-- On a fixed compact set of inputs, only finitely many dilates of a locally
+constant function occur as the multiplier varies in a compact set. -/
+private theorem finite_restricted_dilates {R : Type*} [CommRing R]
+    [TopologicalSpace R] [IsTopologicalRing R] {C D : Set R}
+    (hC : IsCompact C) (hD : IsCompact D) {f : R → ℂ} (hf : IsLocallyConstant f) :
+    (range (fun a : C ↦ fun x : D ↦ f (a.val * x.val))).Finite := by
+  let : CompactSpace C := isCompact_iff_compactSpace.mp hC
+  apply IsLocallyConstant.range_finite
+  apply (IsLocallyConstant.iff_exists_open _).mpr
+  intro a
+  let W := {z : R × R | f (z.1 * z.2) = f (a.val * z.2)}
+  have hW : IsOpen W := by
+    exact ((hf.comp_continuous continuous_mul).prodMk
+      (hf.comp_continuous (continuous_const.mul continuous_snd))) {p | p.1 = p.2}
+  obtain ⟨U, V, hU, _, haU, hDV, hUV⟩ :=
+    generalized_tube_lemma (isCompact_singleton (x := a.val)) hD hW
+      (show {a.val} ×ˢ D ⊆ W by rintro ⟨_, y⟩ ⟨rfl, _⟩; rfl)
+  exact ⟨Subtype.val ⁻¹' U, hU.preimage continuous_subtype_val, haU (mem_singleton _),
+    fun b hb ↦ funext fun x ↦ hUV (mk_mem_prod hb (hDV x.property))⟩
+
+/-- All unit translates with the unit and inverse in a compact set have common
+compact support. Restriction to that support distinguishes their finite orbit. -/
+private theorem finite_unit_dilates {R : Type*} [CommRing R] [TopologicalSpace R]
+    [IsTopologicalRing R] (C : Set R) (hC : IsCompact C) (f : ℬ(R))
+    (hf : IsLocallyConstant (fun x : R ↦ f (Multiplicative.ofAdd x)))
+    (hc : HasCompactSupport (fun x : R ↦ f (Multiplicative.ofAdd x))) :
+    (range (fun g : {g : Rˣ // (g : R) ∈ C ∧ (↑g⁻¹ : R) ∈ C} ↦
+      schwartzBruhatUnitTranslate g.val f)).Finite := by
+  let F₀ := fun x : R ↦ f (Multiplicative.ofAdd x)
+  let D := Set.image2 (· * ·) C (tsupport F₀)
+  have hD : IsCompact D := hC.mul hc
+  let r := fun h : ℬ(R) ↦ fun x : D ↦ h (Multiplicative.ofAdd x.val)
+  have hzero (g : Rˣ) (hg : (g : R) ∈ C) (x : R) (hx : x ∉ D) :
+      schwartzBruhatUnitTranslate g f (Multiplicative.ofAdd x) = 0 := by
+    apply notMem_support.mp
+    intro hs
+    apply hx
+    refine ⟨g, hg, (↑g⁻¹ : R) * x, subset_tsupport F₀ hs, ?_⟩
+    simp [← mul_assoc]
+  apply Set.Finite.of_finite_image (f := r)
+  · refine (finite_restricted_dilates hC hD hf).subset ?_
+    rintro _ ⟨_, ⟨g, rfl⟩, rfl⟩
+    exact ⟨⟨↑g.val⁻¹, g.property.2⟩, rfl⟩
+  · rintro _ ⟨g, rfl⟩ _ ⟨h, rfl⟩ heq
+    apply Subtype.ext
+    funext x
+    by_cases hx : x.toAdd ∈ D
+    · exact congrFun heq ⟨x.toAdd, hx⟩
+    · exact (hzero g.val g.property.1 _ hx).trans (hzero h.val h.property.1 _ hx).symm
+
+private theorem equicontinuous_of_finite_orbits {E I : Type*} [AddCommGroup E] [Module ℂ E]
+    [t : TopologicalSpace E] [IsTopologicalAddGroup E] (L : I → E →ₗ[ℂ] E)
+    (hL : ∀ x, (range fun i ↦ L i x).Finite)
+    (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex E)))
+    (f : ℕ → E) (l : E) (hf : Tendsto f atTop (𝓝 l)) (p : Seminorm ℂ E)
+    (ε : ℝ) (hε : 0 < ε) : ∀ᶠ n in atTop, ∀ i, p (L i (f n - l)) < ε := by
+  let q (i : I) := p.comp (L i)
+  have hq : BddAbove (range q) := by
+    apply Seminorm.bddAbove_range_iff.mpr
+    intro x
+    have hfin := (hL x).image p
+    rw [← range_comp] at hfin
+    exact hfin.bddAbove
+  let Q := ⨆ i, q i
+  have hc : Continuous Q := Eq.mpr (congrArg (fun t ↦ @Continuous E ℝ t _ Q) ht)
+    ((finestLocallyConvex_withSeminorms E).continuous_seminorm Q)
+  have hz : Tendsto (fun n ↦ f n - l) atTop (𝓝 0) := sub_self l ▸ hf.sub_const l
+  have hsmall := (hc.tendsto 0 |>.comp hz).eventually_lt_const (show Q 0 < ε by simpa using hε)
+  exact hsmall.mono fun n hn i ↦ ((le_ciSup hq i : q i ≤ Q) (f n - l)).trans_lt hn
+
+/-- The supremum over integral unit translates is a continuous seminorm in the
+finest locally convex topology, since every test function has finite orbit. -/
+private theorem unitTranslate_tendsto_of_compact {R : Type*} [CommRing R] [TopologicalSpace R]
+    [IsTopologicalRing R] (C : Set R) (hC : IsCompact C)
+    (hfun : ∀ f : ℬ(R), IsLocallyConstant (fun x : R ↦ f (Multiplicative.ofAdd x)) ∧
+      HasCompactSupport (fun x : R ↦ f (Multiplicative.ofAdd x)))
+    (ht : (inferInstance : TopologicalSpace ℬ(R)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex ℬ(R))))
+    (f : ℕ → ℬ(R)) (l : ℬ(R)) (hf : Tendsto f atTop (𝓝 l))
+    (p : Seminorm ℂ ℬ(R)) (ε : ℝ) (hε : 0 < ε) :
+    ∀ᶠ n in atTop, ∀ g : Rˣ, (g : R) ∈ C → (↑g⁻¹ : R) ∈ C →
+      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by
+  let U := {g : Rˣ // (g : R) ∈ C ∧ (↑g⁻¹ : R) ∈ C}
+  let L (g : U) : ℬ(R) →ₗ[ℂ] ℬ(R) :=
+    { toFun := schwartzBruhatUnitTranslate g.val
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have h := equicontinuous_of_finite_orbits L
+    (fun x ↦ finite_unit_dilates C hC x (hfun x).1 (hfun x).2) ht f l hf p ε hε
+  exact h.mono fun n hn g hg hi ↦ hn ⟨g, hg, hi⟩
+
 /-- Paper: Lemma 2.1.2.10(1), p. 66. Local unit translations of a converging
 sequence converge uniformly over the integer units, for each continuous seminorm.
 Deviation: Uniform convergence is expressed by its eventual epsilon bounds. -/
@@ -3398,7 +3609,29 @@ theorem finitePlaceSchwartz_unitTranslate_tendsto (w : Places(F))
     ∀ᶠ n in atTop, ∀ g : (w.adicCompletion F)ˣ,
       (↑g : w.adicCompletion F) ∈ w.adicCompletionIntegers F →
       (↑g⁻¹ : w.adicCompletion F) ∈ w.adicCompletionIntegers F →
-      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by sorry
+      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by
+  exact unitTranslate_tendsto_of_compact (w.adicCompletionIntegers F : Set (w.adicCompletion F))
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w))
+    (fun x ↦ (mem_finitePlaceSchwartz_iff F w _).mp ⟨x, fun _ ↦ rfl⟩)
+    (finitePlaceSchwartz_finestTopology F w) f l hf p ε hε
+
+/-- Every Bruhat function in these totally disconnected groups has compact support
+and is locally constant. Both properties extend from stages to their linear span. -/
+private theorem schwartzBruhat_locallyConstant_compactSupport {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [TotallyDisconnectedSpace G]
+    (hcompact : ∀ K : Set G, IsCompact K → ∃ H : Subgroup G, IsCompact (H : Set G) ∧ K ⊆ H)
+    (f : SchwartzBruhat G) : IsLocallyConstant (f : G → ℂ) ∧ HasCompactSupport (f : G → ℂ) := by
+  let S : Submodule ℂ (G → ℂ) :=
+    { carrier := {h | IsLocallyConstant h ∧ HasCompactSupport h}
+      zero_mem' := ⟨IsLocallyConstant.const 0, HasCompactSupport.zero⟩
+      add_mem' := fun hf hg ↦ ⟨hf.1.comp₂ hg.1 (· + ·), hf.2.add hg.2⟩
+      smul_mem' := fun c _ hf ↦ ⟨hf.1.comp (c • ·), hf.2.smul_left⟩ }
+  have hle : schwartzBruhatSubmodule G ≤ S := by
+    refine iSup_le fun a ↦ iSup_le fun p ↦ ?_
+    rintro _ ⟨x, rfl⟩
+    exact bruhatStage_locallyConstant_compactSupport hcompact a p x
+  exact hle f.property
 
 /-- Paper: Lemma 2.1.2.10(2), p. 66. For a finite product of local fields,
 convergence is uniform over the product of integer unit groups.
@@ -3410,7 +3643,29 @@ theorem finiteProductSchwartz_unitTranslate_tendsto (S : Finset (Places(F)))
     ∀ᶠ n in atTop, ∀ g : (FinitePlaceProduct F S)ˣ,
       (∀ w : S, (g.val w) ∈ w.val.adicCompletionIntegers F ∧
         (g.inv w) ∈ w.val.adicCompletionIntegers F) →
-      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by sorry
+      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by
+  let C := univ.pi (fun w : S ↦ (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F)))
+  have hC : IsCompact C := isCompact_univ_pi
+    (fun w : S ↦ isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w.val))
+  let : TotallyDisconnectedSpace (Multiplicative (FinitePlaceProduct F S)) :=
+    inferInstanceAs (TotallyDisconnectedSpace (∀ w : S, w.val.adicCompletion F))
+  have h := unitTranslate_tendsto_of_compact C hC
+    (schwartzBruhat_locallyConstant_compactSupport (finitePlaceProduct_compact_subset_subgroup F S))
+    (finiteProduct_tailSchwartz_finestTopology F S ∅).1 f l hf p ε hε
+  exact h.mono fun n hn g hg ↦ hn g (fun w _ ↦ (hg w).1) (fun w _ ↦ (hg w).2)
+
+/-- The integral elements of a finite adelic tail form a compact set. -/
+private theorem finiteAdeleTail_isCompact_integral (S : Finset (Places(F))) :
+    IsCompact {x : FiniteAdeleTail F S | ∀ w, x w ∈ w.val.adicCompletionIntegers F} := by
+  let I := {w : Places(F) // w ∉ S}
+  let (w : I) : CompactSpace (w.val.adicCompletionIntegers F) := compactSpace_adicCompletionIntegers w.val
+  let j (a : ∀ w : I, w.val.adicCompletionIntegers F) : FiniteAdeleTail F S :=
+    ⟨fun w ↦ a w, .of_forall fun w ↦ (a w).property⟩
+  have hj : Continuous j := continuous_restrictedProduct_of_uniform
+    (fun w ↦ continuous_subtype_val.comp (continuous_apply w)) (.of_forall fun w a ↦ (a w).property)
+  convert isCompact_range hj using 1
+  ext x
+  exact ⟨fun hx ↦ ⟨fun w ↦ ⟨x w, hx w⟩, rfl⟩, fun ⟨a, ha⟩ w ↦ ha ▸ (a w).property⟩
 
 /-- Paper: Lemma 2.1.2.10(3), p. 66. For a restricted product of local fields,
 convergence is uniform over the full product of integer unit groups.
@@ -3423,7 +3678,21 @@ theorem finiteAdeleTailSchwartz_unitTranslate_tendsto (S : Finset (Places(F)))
     ∀ᶠ n in atTop, ∀ g : (FiniteAdeleTail F S)ˣ,
       (∀ w : {w : Places(F) // w ∉ S}, (g.val w) ∈ w.val.adicCompletionIntegers F ∧
         (g.inv w) ∈ w.val.adicCompletionIntegers F) →
-      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by sorry
+      p (schwartzBruhatUnitTranslate g (f n - l)) < ε := by
+  let : IsTopologicalRing (FiniteAdeleTail F S) :=
+    RestrictedProduct.isTopologicalRing (fun w : {w // w ∉ S} ↦ w.val.adicCompletion F)
+  let : T2Space (Multiplicative (FiniteAdeleTail F S)) :=
+    inferInstanceAs (T2Space (Πʳ w : {w : Places(F) // w ∉ S},
+      [w.val.adicCompletion F, w.val.adicCompletionIntegers F]))
+  let : TotallyDisconnectedSpace (Multiplicative (FiniteAdeleTail F S)) :=
+    ⟨isTotallyDisconnected_of_image
+      (RestrictedProduct.continuous_coe.comp continuous_toAdd).continuousOn
+      (DFunLike.coe_injective.comp Multiplicative.toAdd.injective)
+      (isTotallyDisconnected_of_totallyDisconnectedSpace _)⟩
+  have h := unitTranslate_tendsto_of_compact _ (finiteAdeleTail_isCompact_integral F S)
+    (schwartzBruhat_locallyConstant_compactSupport (finiteAdeleTail_compact_subset_subgroup F S))
+    (finiteProduct_tailSchwartz_finestTopology F ∅ S).2 f l hf p ε hε
+  exact h.mono fun n hn g hg ↦ hn g (fun w ↦ (hg w).1) (fun w ↦ (hg w).2)
 
 -- TODO(later): needs §4.3.3 and §D.2 for the application in Remark 2.1.2.12.
 -- TODO(paper-gap): The remark also allows arbitrary closed subspaces for the
@@ -3435,48 +3704,445 @@ section Adeles
 
 variable (F : Type u) [Field F] [NumberField F]
 
+local instance (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+  (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+
+local instance : SecondCountableTopology (Multiplicative (InfiniteAdeleRing F)) := by
+  change SecondCountableTopology ((w : InfinitePlace F) → w.Completion)
+  infer_instance
+
+local instance : SecondCountableTopology (Multiplicative 𝔸ᶠ[F]) := by
+  let := finiteAdeleTail_secondCountable F ∅
+  obtain ⟨e, he, _⟩ := finiteAdeleTail_empty F
+  change SecondCountableTopology 𝔸ᶠ[F]
+  exact he.homeomorph.symm.isEmbedding.secondCountableTopology
+
+local instance adeleGroupSecondCountable : SecondCountableTopology (Multiplicative 𝔸[F]) := by
+  change SecondCountableTopology (Multiplicative (InfiniteAdeleRing F) × Multiplicative 𝔸ᶠ[F])
+  infer_instance
+
+local instance : LocallyCompactSpace (Multiplicative 𝔸ᶠ[F]) := by
+  let (w : Places(F)) : CompactSpace (w.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers w
+  let : Fact (∀ w : Places(F), IsOpen (w.adicCompletionIntegers F : Set (w.adicCompletion F))) :=
+    ⟨fun _ ↦ Valued.isOpen_valuationSubring _⟩
+  change LocallyCompactSpace (Πʳ w : Places(F), [w.adicCompletion F, w.adicCompletionIntegers F])
+  infer_instance
+
+local instance adeleGroupLocallyCompact : LocallyCompactSpace (Multiplicative 𝔸[F]) := by
+  change LocallyCompactSpace (InfiniteAdeleRing F × Multiplicative 𝔸ᶠ[F])
+  infer_instance
+
+local instance : T2Space (Multiplicative 𝔸ᶠ[F]) := by
+  change T2Space (Πʳ w : Places(F), [w.adicCompletion F, w.adicCompletionIntegers F])
+  infer_instance
+
+local instance adeleGroupT2 : T2Space (Multiplicative 𝔸[F]) := by
+  change T2Space (((w : InfinitePlace F) → w.Completion) × Multiplicative 𝔸ᶠ[F])
+  infer_instance
+
+/-- A linear homeomorphism transports a Fréchet structure, including completeness
+for the additive uniformity. -/
+private theorem frechet_of_equiv {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    (e : X ≃L[ℂ] Y) (h : IsFrechetTVS X) : IsFrechetTVS Y := by
+  obtain ⟨hX, hp, hm, hc⟩ := h
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  let : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  exact ⟨inferInstance, e.symm.PolynormableSpace, e.symm.toHomeomorph.isEmbedding.metrizableSpace,
+    (e.isUniformEmbedding.isUniformInducing.completeSpace_congr e.surjective).mp hc⟩
+
+private theorem schwartzBruhat_inclusion_factor {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] {a b : BruhatStructuralPair G}
+    (h : a ≤ b) (p : ElementaryLCAPresentation a.quotient) (q : ElementaryLCAPresentation b.quotient) :
+    let i : SchwartzBruhatStage q →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion b q
+    ∃ L : SchwartzBruhatStage p →L[ℂ] i.range,
+      ∀ x, (L x : SchwartzBruhat G) = schwartzBruhatStageInclusion a p x := by
+  intro i
+  have ht := schwartzBruhatStage_transition h p q
+  let j := ht.choose
+  let k : SchwartzBruhatStage q →L[ℂ] SchwartzBruhat G :=
+    ⟨i, (schwartzBruhatStage_isEmbedding b q).continuous⟩
+  let L := k.comp j
+  exact ⟨L.codRestrict i.range (fun x ↦ ⟨j x, rfl⟩), fun x ↦ Subtype.ext (ht.choose_spec.1 x)⟩
+
+/-- The subspace topology on the range of an embedded Fréchet stage is Fréchet. -/
+private theorem frechet_range_of_embedding {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] (i : X →ₗ[ℂ] E)
+    (hi : IsEmbedding i) (hX : IsFrechetTVS X) : IsFrechetTVS i.range := by
+  let e := LinearEquiv.ofInjective i hi.injective
+  let h : X ≃L[ℂ] i.range :=
+    ⟨e, hi.continuous.subtype_mk _, hi.isInducing.continuous_iff.mpr
+      (continuous_subtype_val.congr fun z ↦ (congrArg Subtype.val (e.apply_symm_apply z)).symm)⟩
+  exact frechet_of_equiv h hX
+
+private theorem strictLF_of_cofinal_stages {E ι : Type*} [AddCommGroup E] [Module ℂ E]
+    [t : TopologicalSpace E] [IsTopologicalAddGroup E] [T2Space E]
+    {X : ι → Type*} [∀ b, AddCommGroup (X b)] [∀ b, Module ℂ (X b)]
+    [∀ b, TopologicalSpace (X b)] (inc : ∀ b, X b →ₗ[ℂ] E) (s : ℕ → ι)
+    (hex : ∀ x : E, ∃ b, x ∈ (inc b).range)
+    (hfinal : t = locallyConvexFinalTopology inc)
+    (hfre : ∀ n, IsFrechetTVS (X (s n))) (hemb : ∀ n, IsEmbedding (inc (s n)))
+    (hmono : Monotone (fun n ↦ (inc (s n)).range))
+    (hfac : ∀ b, ∃ n, ∃ j : X b →L[ℂ] (inc (s n)).range, ∀ x, (j x : E) = inc b x) :
+    IsStrictLFSpace E := by
+  let S (n : ℕ) := (inc (s n)).range
+  refine ⟨inferInstance, S, hmono, fun n ↦ frechet_range_of_embedding _ (hemb n) (hfre n), ?_, ?_⟩
+  · intro x
+    obtain ⟨b, y, rfl⟩ := hex x
+    obtain ⟨n, j, hj⟩ := hfac b
+    exact ⟨n, hj y ▸ (j y).property⟩
+  · apply hfinal.trans
+    apply congrArg (fun P : Seminorm ℂ E → Prop ↦
+      (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype P → Seminorm ℂ E)).topology)
+    funext q
+    apply propext
+    refine ⟨fun h n ↦ ?_, fun h b ↦ ?_⟩
+    · let f := inc (s n)
+      let e := LinearEquiv.ofInjective f (hemb n).injective
+      have hd (z : S n) : f (e.symm z) = z.val := congrArg Subtype.val (e.apply_symm_apply z)
+      have hc : Continuous e.symm := (hemb n).isInducing.continuous_iff.mpr
+        (continuous_subtype_val.congr fun z ↦ (hd z).symm)
+      exact ((h (s n)).comp hc).congr fun z ↦ congrArg q (hd z)
+    · obtain ⟨n, j, hj⟩ := hfac b
+      exact ((h n).comp j.continuous).congr fun x ↦ congrArg q (hj x)
+
+private theorem range_le_of_factor {E X Y : Type*} [AddCommGroup E] [Module ℂ E]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y]
+    [TopologicalSpace E] (f : X →ₗ[ℂ] E) (g : Y →ₗ[ℂ] E)
+    (h : ∃ j : X →L[ℂ] g.range, ∀ x, (j x : E) = f x) : f.range ≤ g.range := by
+  rintro _ ⟨x, rfl⟩
+  exact h.choose_spec x ▸ (h.choose x).property
+
+/-- The ranges of a cofinal sequence of structural stages give a strict LF presentation. -/
+private theorem schwartzBruhat_strictLF_of_secondCountable {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] : IsStrictLFSpace (SchwartzBruhat G) := by
+  let : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+  let I := (a : BruhatStructuralPair G) × ElementaryLCAPresentation a.quotient
+  let X (b : I) := SchwartzBruhatStage b.2
+  let i (b : I) : X b →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion b.1 b.2
+  have hex (f : SchwartzBruhat G) : ∃ b, f ∈ (i b).range := by
+    have hf := (mem_schwartzBruhatSubmodule_iff _).mp
+      (show schwartzBruhatSubmodule G from f).property
+    exact hf.elim fun c hc ↦ hc.elim fun p hp ↦ hp.elim fun x hx ↦
+      ⟨⟨c, p⟩, x, Subtype.ext hx⟩
+  have hseq := exists_cofinal_bruhatStructuralPairs (G := G)
+  let a := hseq.choose
+  let s (n : ℕ) : I := ⟨a n, Classical.choice (a n).elementary⟩
+  have hfac (b c : I) (h : b.1 ≤ c.1) :
+      ∃ j : X b →L[ℂ] (i c).range, ∀ x, (j x : SchwartzBruhat G) = i b x :=
+    schwartzBruhat_inclusion_factor h b.2 c.2
+  refine strictLF_of_cofinal_stages (X := X) i s hex schwartzBruhat_topology_eq_final
+    (fun n ↦ elementarySchwartz_isFrechet) (fun n ↦ schwartzBruhatStage_isEmbedding (s n).1 (s n).2) ?_ ?_
+  · exact fun n m h ↦ range_le_of_factor (i (s n)) (i (s m)) (hfac _ _ (hseq.choose_spec.1 h))
+  · intro b
+    have hc := hseq.choose_spec.2 b.1
+    exact ⟨hc.choose, hfac b (s hc.choose) hc.choose_spec⟩
+
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The finite and global adelic Schwartz–Bruhat
 spaces are strict LF-spaces.
 Deviation: The nuclearity statements below imply that every strict Fréchet
 presentation has nuclear stages by Remark C.1.5.12. -/
 theorem adeleSchwartz_strictLF :
-    IsStrictLFSpace ℬ(𝔸ᶠ[F]) ∧ IsStrictLFSpace ℬ(𝔸[F]) := by sorry
+    IsStrictLFSpace ℬ(𝔸ᶠ[F]) ∧ IsStrictLFSpace ℬ(𝔸[F]) := by
+  exact ⟨schwartzBruhat_strictLF_of_secondCountable, schwartzBruhat_strictLF_of_secondCountable⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The finite and global adelic Schwartz–Bruhat
 spaces are complete. -/
 theorem adeleSchwartz_complete :
-    CompleteSpace ℬ(𝔸ᶠ[F]) ∧ CompleteSpace ℬ(𝔸[F]) := by sorry
+    CompleteSpace ℬ(𝔸ᶠ[F]) ∧ CompleteSpace ℬ(𝔸[F]) := by
+  exact ⟨schwartzBruhat_complete, schwartzBruhat_complete⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The finite and global adelic Schwartz–Bruhat
 spaces are Hausdorff, locally convex and nuclear. -/
 theorem adeleSchwartz_nuclear :
-    IsNuclearTVS.{v} ℬ(𝔸ᶠ[F]) ∧ IsNuclearTVS.{v} ℬ(𝔸[F]) := by sorry
+    IsNuclearTVS.{v} ℬ(𝔸ᶠ[F]) ∧ IsNuclearTVS.{v} ℬ(𝔸[F]) := by
+  exact ⟨schwartzBruhat_nuclear, schwartzBruhat_nuclear⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. Both adelic Schwartz–Bruhat spaces are Montel. -/
 theorem adeleSchwartz_montel :
     (BarrelledSpace ℂ ℬ(𝔸ᶠ[F]) ∧ MontelSpace ℂ ℬ(𝔸ᶠ[F])) ∧
-      (BarrelledSpace ℂ ℬ(𝔸[F]) ∧ MontelSpace ℂ ℬ(𝔸[F])) := by sorry
+      (BarrelledSpace ℂ ℬ(𝔸[F]) ∧ MontelSpace ℂ ℬ(𝔸[F])) := by
+  exact ⟨⟨schwartzBruhat_barrelled, schwartzBruhat_montel⟩, ⟨schwartzBruhat_barrelled, schwartzBruhat_montel⟩⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. Both adelic strong duals are complete. -/
 theorem adeleSchwartz_strongDual_complete :
     CompleteSpace (StrongDual ℂ ℬ(𝔸ᶠ[F])) ∧
-      CompleteSpace (StrongDual ℂ ℬ(𝔸[F])) := by sorry
+      CompleteSpace (StrongDual ℂ ℬ(𝔸[F])) := by
+  exact ⟨schwartzBruhat_strongDual_complete, schwartzBruhat_strongDual_complete⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. Both adelic strong duals are Hausdorff,
 locally convex and nuclear. -/
 theorem adeleSchwartz_strongDual_nuclear :
     IsNuclearTVS.{v} (StrongDual ℂ ℬ(𝔸ᶠ[F])) ∧
-      IsNuclearTVS.{v} (StrongDual ℂ ℬ(𝔸[F])) := by sorry
+      IsNuclearTVS.{v} (StrongDual ℂ ℬ(𝔸[F])) := by
+  exact ⟨schwartzBruhat_strongDual_nuclear, schwartzBruhat_strongDual_nuclear⟩
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. Both adelic strong duals are Montel. -/
 theorem adeleSchwartz_strongDual_montel :
     (BarrelledSpace ℂ (StrongDual ℂ ℬ(𝔸ᶠ[F])) ∧ MontelSpace ℂ (StrongDual ℂ ℬ(𝔸ᶠ[F]))) ∧
-      (BarrelledSpace ℂ (StrongDual ℂ ℬ(𝔸[F])) ∧ MontelSpace ℂ (StrongDual ℂ ℬ(𝔸[F]))) := by sorry
+      (BarrelledSpace ℂ (StrongDual ℂ ℬ(𝔸[F])) ∧ MontelSpace ℂ (StrongDual ℂ ℬ(𝔸[F]))) := by
+  exact ⟨⟨schwartzBruhat_strongDual_barrelled, schwartzBruhat_strongDual_montel⟩, ⟨schwartzBruhat_strongDual_barrelled, schwartzBruhat_strongDual_montel⟩⟩
+
+private def schwartzBruhatPullbackLinear {X Y : Type*} [CommGroup X] [CommGroup Y] [TopologicalSpace X] [TopologicalSpace Y]
+      [IsTopologicalGroup X] [IsTopologicalGroup Y] (d : X ≃ₜ* Y) :
+      SchwartzBruhat Y →ₗ[ℂ] SchwartzBruhat X :=
+    { toFun := fun f ↦ ⟨_, schwartzBruhat_pullback_mem d f⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+
+private theorem continuous_schwartzBruhatPullbackLinear {X Y : Type*} [CommGroup X] [CommGroup Y] [TopologicalSpace X] [TopologicalSpace Y]
+      [IsTopologicalGroup X] [IsTopologicalGroup Y] (d : X ≃ₜ* Y) : Continuous (schwartzBruhatPullbackLinear d) := by
+    apply (withGeneratingSeminorms_spec _ Subtype.val).continuous_of_continuous_comp (schwartzBruhatPullbackLinear d)
+    rintro ⟨q, hq⟩
+    let p := q.comp (schwartzBruhatPullbackLinear d)
+    have hp (a : BruhatStructuralPair Y) (u : ElementaryLCAPresentation a.quotient) :
+        Continuous (p ∘ schwartzBruhatStageInclusion a u) := by
+      have hj := schwartzBruhat_stage_pullback d a u
+      obtain ⟨b, v, j, hj⟩ := hj
+      exact ((hq b v).comp j.continuous).congr fun x ↦ congrArg q (Subtype.ext (hj x).symm)
+    exact (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨p, hp⟩
+
+/-- Pullback is a linear homeomorphism. Continuity is tested on each structural
+stage, where pullback factors through the transported presentation. -/
+private def schwartzBruhatPullbackEquiv {A B : Type*} [CommGroup A] [CommGroup B]
+    [TopologicalSpace A] [TopologicalSpace B] [IsTopologicalGroup A] [IsTopologicalGroup B]
+    (e : A ≃ₜ* B) : SchwartzBruhat B ≃L[ℂ] SchwartzBruhat A := by
+  exact ⟨LinearEquiv.ofLinearMap (schwartzBruhatPullbackLinear e) (schwartzBruhatPullbackLinear e.symm)
+    (LinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ congrArg f (e.symm_apply_apply x)))
+    (LinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ congrArg f (e.apply_symm_apply x))),
+    continuous_schwartzBruhatPullbackLinear e, continuous_schwartzBruhatPullbackLinear e.symm⟩
+
+/-- Reindexing the empty tail induces a linear homeomorphism of test functions. -/
+private def finiteAdeleSchwartzEquivTail :
+    ℬ(𝔸ᶠ[F]) ≃L[ℂ] ℬ(FiniteAdeleTail F ∅) := by
+  let h := finiteAdeleTail_empty F
+  let d := h.choose
+  have hd := h.choose_spec.1
+  let : Fact (∀ w : {w : Places(F) // w ∉ (∅ : Finset (Places(F)))},
+      IsOpen (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F))) :=
+    ⟨fun w ↦ Valued.isOpen_valuationSubring (w.val.adicCompletion F)⟩
+  let : IsTopologicalRing (FiniteAdeleTail F ∅) := RestrictedProduct.isTopologicalRing _
+  let e : Multiplicative (FiniteAdeleTail F ∅) ≃ₜ* Multiplicative 𝔸ᶠ[F] :=
+    ⟨d.toAddEquiv.toMultiplicative, hd.continuous, hd.homeomorph.symm.continuous.congr
+      fun x ↦ d.injective (hd.homeomorph.apply_symm_apply x |>.trans (d.apply_symm_apply x).symm)⟩
+  exact schwartzBruhatPullbackEquiv e
 
 /-- Paper: Lemma 2.1.3.2(1), p. 68. The strong dual of the finite adelic
 Schwartz–Bruhat space is Fréchet. -/
 theorem finiteAdeleSchwartz_strongDual_frechet :
-    IsFrechetTVS (StrongDual ℂ ℬ(𝔸ᶠ[F])) := by sorry
+    IsFrechetTVS (StrongDual ℂ ℬ(𝔸ᶠ[F])) := by
+  let u := (finiteAdeleSchwartzEquivTail F).symm
+  exact frechet_of_equiv (u.arrowCongr (ContinuousLinearEquiv.refl ℂ ℂ))
+    (finiteProduct_tailSchwartz_strongDual_frechet F ∅ ∅).2
+
+/-- The empty-tail reindexing transports the countable rank and continuity of
+all seminorms to the finite adele ring. -/
+private theorem finiteAdeleSchwartz_countable_finest :
+    Module.rank ℂ ℬ(𝔸ᶠ[F]) ≤ ℵ₀ ∧
+    (inferInstance : TopologicalSpace ℬ(𝔸ᶠ[F])) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex ℬ(𝔸ᶠ[F]))) := by
+  let e := finiteAdeleSchwartzEquivTail F
+  refine ⟨e.toLinearEquiv.rank_eq.trans_le (finiteProduct_tailSchwartz_countableRank F ∅ ∅).2, ?_⟩
+  let E := ℬ(𝔸ᶠ[F])
+  let V := ℬ(FiniteAdeleTail F ∅)
+  have hV := (finiteProduct_tailSchwartz_finestTopology F ∅ ∅).2
+  have hall (q : Seminorm ℂ E) : Continuous q := by
+    let p := q.comp e.symm.toLinearMap
+    have hp : Continuous p := Eq.mpr (congrArg (fun t ↦ @Continuous V ℝ t _ p) hV)
+      ((finestLocallyConvex_withSeminorms V).continuous_seminorm p)
+    exact (hp.comp e.continuous).congr fun x ↦ congrArg q (e.symm_apply_apply x)
+  let t (q : Seminorm ℂ E) := q.toSeminormedAddCommGroup.toUniformSpace.toTopologicalSpace
+  have hsur : Surjective (Subtype.val : {q : Seminorm ℂ E // Continuous q} → Seminorm ℂ E) :=
+    fun q ↦ ⟨⟨q, hall q⟩, rfl⟩
+  exact (PolynormableSpace.withSeminorms ℂ E).topologicalSpace_eq_iInf.trans
+    ((hsur.iInf_comp t).trans (finestLocallyConvex_withSeminorms E).topologicalSpace_eq_iInf.symm)
+
+private theorem finalTopology_of_continuous_seminorms {E ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [t : TopologicalSpace E] [PolynormableSpace ℂ E]
+    {X : ι → Type*} [∀ j, AddCommGroup (X j)] [∀ j, Module ℂ (X j)]
+    [∀ j, TopologicalSpace (X j)] (L : ∀ j, X j →L[ℂ] E)
+    (h : ∀ p : Seminorm ℂ E, (∀ j, Continuous (p ∘ L j)) → Continuous p) :
+    t = locallyConvexFinalTopology (fun j ↦ (L j).toLinearMap) := by
+  apply (PolynormableSpace.withSeminorms ℂ E).withSeminorms_eq.trans
+  apply congrArg (fun P : Seminorm ℂ E → Prop ↦
+    (SeminormFamily.moduleFilterBasis (Subtype.val : Subtype P → Seminorm ℂ E)).topology)
+  funext p
+  exact propext ⟨fun hp j ↦ hp.comp (L j).continuous, h p⟩
+
+/-- Tensoring a complete space with a countably generated space carrying the finest
+locally convex topology gives a strict union of finite powers of the complete space. -/
+private theorem complete_inductiveTensor_of_countable_basis {E V ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    [PolynormableSpace ℂ E] [T2Space E] [CompleteSpace E]
+    [AddCommGroup V] [Module ℂ V] [t : TopologicalSpace V] [PolynormableSpace ℂ V] [T2Space V]
+    [Countable ι] (b : Module.Basis ι ℂ V)
+    (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex V))) :
+    CompleteSpace (InductiveTensor E V) := by
+  classical
+  let W := InductiveTensor E V
+  let c : W ≃ₗ[ℂ] (ι →₀ E) := TensorProduct.equivFinsuppOfBasisRight b
+  let hcoe (i : ι) : V →ₗ[ℂ] ℂ := b.coord i
+  have hcc (i : ι) : Continuous (hcoe i) := Eq.mpr
+    (congrArg (fun t' ↦ @Continuous V ℂ t' _ (hcoe i)) ht) (continuous_of_finestLocallyConvex V _)
+  let coord (i : ι) : W →ₗ[ℂ] E := (Finsupp.lapply i).comp c.toLinearMap
+  have hcoord (i : ι) (x : E) (y : V) : coord i (x ⊗ₜ[ℂ] y) = b.repr y i • x :=
+    TensorProduct.equivFinsuppOfBasisRight_apply_tmul_apply b x y i
+  have hcont (i : ι) : Continuous (coord i) := by
+    apply (continuous_inductiveTensor_iff (E := E) (F := V) _).mpr
+    exact ⟨fun x ↦ ((hcc i).smul continuous_const).congr fun y ↦ (hcoord i x y).symm,
+      fun y ↦ (continuous_const.smul continuous_id).congr fun x ↦ (hcoord i x y).symm⟩
+  have hsp := withGeneratingSeminorms_spec (E ⊗[ℂ] V)
+    (fun p : {p : Seminorm ℂ (E ⊗[ℂ] V) //
+      (∀ x : E, Continuous (fun y : V ↦ p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : V, Continuous (fun x : E ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
+  let : PolynormableSpace ℂ W := hsp.toPolynormableSpace
+  let : IsTopologicalAddGroup W := hsp.isTopologicalAddGroup
+  have hcol (v : V) : @Continuous E W _ _ (fun x ↦ x ⊗ₜ[ℂ] v) :=
+    hsp.continuous_of_continuous_comp
+      ((TensorProduct.mk ℂ E V).flip v) (fun p ↦ p.property.2 v)
+  let A := (countable_univ (α := ι)).finiteExhaustion
+  let s (n : ℕ) := (A.finite n).toFinset
+  have hmono : Monotone s := fun m n h i hi ↦ (A.finite n).mem_toFinset.mpr
+    (A.mono h ((A.finite m).mem_toFinset.mp hi))
+  have cover (d : Finset ι) : ∃ n, d ⊆ s n := by
+    induction d using Finset.induction_on with
+    | empty => exact ⟨0, Finset.empty_subset _⟩
+    | insert i d _ ih =>
+      obtain ⟨n, hn⟩ := ih
+      obtain ⟨m, hm⟩ : ∃ m, i ∈ A m := mem_iUnion.mp (A.iUnion_eq.symm ▸ mem_univ i)
+      exact ⟨max m n, Finset.insert_subset ((hmono (le_max_left m n)) ((A.finite m).mem_toFinset.mpr hm))
+        (hn.trans (hmono (le_max_right m n)))⟩
+  let X (n : ℕ) := (s n) → E
+  let I (n : ℕ) : X n →ₗ[ℂ] W := ∑ j : s n,
+    ((TensorProduct.mk ℂ E V).flip (b j.val)).comp (LinearMap.proj j)
+  have hI (n : ℕ) (x : X n) : I n x = ∑ j : s n, (show W from x j ⊗ₜ[ℂ] b j.val) :=
+    LinearMap.sum_apply (R := ℂ) (R₂ := ℂ) (M := X n) (M₂ := E ⊗[ℂ] V)
+      (σ₁₂ := RingHom.id ℂ) Finset.univ
+      (fun j : s n ↦ ((TensorProduct.mk ℂ E V).flip (b j.val)).comp (LinearMap.proj j)) x
+  let L (n : ℕ) : X n →L[ℂ] W := ⟨I n, (continuous_finsetSum _ fun j _ ↦
+    (hcol (b j.val)).comp (continuous_apply j)).congr fun x ↦ (hI n x).symm⟩
+  let R (n : ℕ) : W →L[ℂ] X n := ContinuousLinearMap.pi fun j ↦ ⟨coord j.val, hcont j.val⟩
+  have hcoeff (n : ℕ) (x : X n) (i : ι) :
+      coord i (L n x) = if hi : i ∈ s n then x ⟨i, hi⟩ else 0 := by
+    change coord i (I n x) = _
+    rw [hI, map_sum]
+    simp only [hcoord, b.repr_self, Finsupp.single_apply, ite_smul, one_smul, zero_smul]
+    split_ifs with hi
+    · exact Finset.sum_eq_single_of_mem (⟨i, hi⟩ : s n) (Finset.mem_univ _) (fun j _ hj ↦
+        ite_eq_right fun h ↦ hj (Subtype.ext h)) |>.trans (ite_eq_left rfl)
+    · exact Finset.sum_eq_zero fun j _ ↦ ite_eq_right (show j.val ≠ i from fun h ↦ hi (h ▸ j.property))
+  have hRL (n : ℕ) (x : X n) : R n (L n x) = x := funext fun i ↦
+    (hcoeff n x i.val).trans (dite_eq_left i.property)
+  have hLR (n : ℕ) (z : W) (hz : (c z).support ⊆ s n) : L n (R n z) = z := by
+    apply c.injective
+    ext i
+    change coord i _ = coord i z
+    rw [hcoeff]
+    split_ifs with hi
+    · rfl
+    · exact (Finsupp.notMem_support_iff.mp (fun h ↦ hi (hz h))).symm
+  have hsupport (n : ℕ) (x : X n) : (c (L n x)).support ⊆ s n := by
+    intro i hi
+    by_contra hn
+    exact (Finsupp.mem_support_iff.mp hi) ((hcoeff n x i).trans (dite_eq_right hn))
+  let step (n : ℕ) := (R (n+1)).comp (L n)
+  have hstep (n : ℕ) : (L (n+1)).comp (step n) = L n :=
+    ContinuousLinearMap.ext fun x ↦ hLR _ _ ((hsupport n x).trans (hmono n.le_succ))
+  have hemb (n : ℕ) : IsEmbedding (L n) :=
+    (show LeftInverse (R n) (L n) from hRL n).isEmbedding (R n).continuous (L n).continuous
+  have hlim : IsInjectiveLCLimit (X := X) step L := by
+    refine ⟨fun n ↦ (hemb n).injective, hstep, fun z ↦ ?_, ?_⟩
+    · obtain ⟨n, hn⟩ := cover (c z).support
+      exact ⟨n, R n z, hLR n z hn⟩
+    · apply finalTopology_of_continuous_seminorms (fun n ↦ L n)
+      intro p hp
+      refine hsp.continuous_seminorm ⟨p, ?_⟩
+      constructor
+      · intro x
+        exact Eq.mpr (congrArg (fun t' ↦ @Continuous V ℝ t' _ (fun y ↦ p (x ⊗ₜ[ℂ] y))) ht)
+          ((finestLocallyConvex_withSeminorms V).continuous_seminorm (p.comp (TensorProduct.mk ℂ E V x)))
+      · intro y
+        obtain ⟨n, hn⟩ := cover (b.repr y).support
+        have hR (x : E) : R n (x ⊗ₜ[ℂ] y) = fun i ↦ b.repr y i.val • x :=
+          funext fun i ↦ hcoord i.val x y
+        refine ((hp n).comp (continuous_pi fun i : s n ↦ (continuous_const (y := b.repr y i.val)).smul (continuous_id (X := E)))).congr
+          fun x ↦ congrArg p ?_
+        change L n (fun i : s n ↦ b.repr y i.val • x) = _
+        rw [← hR]
+        apply hLR
+        intro i hi
+        apply hn
+        by_contra hy
+        exact (Finsupp.notMem_support_iff.mpr ((hcoord i x y).trans (by
+          rw [Finsupp.notMem_support_iff.mp hy, zero_smul]))) hi
+  rw [← IsUniformAddGroup.rightUniformSpace_eq (G := W)]
+  apply (strictLCLimit_complete_nonmetrizable (X := X) ?_ hlim ?_).1
+  · intro n
+    rw [IsUniformAddGroup.rightUniformSpace_eq (G := X n)]
+    exact inferInstanceAs (CompleteSpace ((s n) → E))
+  · intro n
+    apply IsEmbedding.of_comp (step n).continuous (L (n+1)).continuous
+    change IsEmbedding ((L (n+1)).comp (step n))
+    rw [hstep]
+    exact hemb n
+
+open UniformSpace in
+private theorem algebraic_kernel_of_complete {E V Z : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [T2Space (InductiveTensor E V)] [CompleteSpace (InductiveTensor E V)]
+    [UniformContinuousConstSMul ℂ (InductiveTensor E V)]
+    (k : Completion (InductiveTensor E V) ≃L[ℂ] Z) :
+    ∃ e : InductiveTensor E V ≃L[ℂ] Z, ∀ z, e z = k (Completion.coe' z) := by
+  let W := InductiveTensor E V
+  let c : W →L[ℂ] Completion W := Completion.toComplL
+  have hc : IsUniformEmbedding c := Completion.isUniformEmbedding_coe W
+  have hsur : Surjective c := range_eq_univ.mp
+    (hc.isClosedEmbedding.isClosed_range.closure_eq.symm.trans Completion.denseRange_coe.closure_range)
+  let u := LinearEquiv.ofBijective c.toLinearMap ⟨hc.injective, hsur⟩
+  let e : W ≃L[ℂ] Completion W :=
+    ⟨u, c.continuous, hc.isEmbedding.isInducing.continuous_iff.mpr
+      (continuous_id.congr fun z ↦ (u.apply_symm_apply z).symm)⟩
+  exact ⟨e.trans k, fun _ ↦ rfl⟩
+
+open UniformSpace in
+/-- A countable-dimensional finest-topology factor makes the tensor product in
+the Schwartz kernel theorem already complete. -/
+private theorem schwartzBruhat_kernel_of_finest {G H K : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [SecondCountableTopology G] [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H]
+    [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K] (d : K ≃ₜ* G × H)
+    (hr : Module.rank ℂ (SchwartzBruhat H) ≤ ℵ₀)
+    (ht : (inferInstance : TopologicalSpace (SchwartzBruhat H)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (SchwartzBruhat H)))) :
+    ∃ e : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2 := by
+  let E := SchwartzBruhat G
+  let V := SchwartzBruhat H
+  let W := InductiveTensor E V
+  let : T2Space E := schwartzBruhat_t2
+  let : T2Space V := schwartzBruhat_t2
+  let : CompleteSpace E := schwartzBruhat_complete
+  let b := Module.Free.chooseBasis ℂ V
+  let : Countable (Module.Free.ChooseBasisIndex ℂ V) :=
+    Cardinal.mk_le_aleph0_iff.mp (b.mk_eq_rank''.trans_le hr)
+  let : CompleteSpace W := complete_inductiveTensor_of_countable_basis b ht
+  let : ContinuousSMul ℂ W := (withGeneratingSeminorms_spec _ _).continuousSMul
+  let : UniformContinuousConstSMul ℂ W := uniformContinuousConstSMul_of_continuousConstSMul ℂ W
+  have hk := schwartzBruhat_kernel_equiv (G := G) (H := H)
+  have hn := algebraic_kernel_of_complete hk.choose
+  refine ⟨hn.choose.trans (schwartzBruhatPullbackEquiv d), fun f g x ↦ ?_⟩
+  exact (congrArg (fun t : SchwartzBruhat (G × H) ↦ t (d x)) (hn.choose_spec _)).trans
+    (hk.choose_spec f g (d x).1 (d x).2)
 
 /-- Paper: Lemma 2.1.3.2(2), p. 68. The canonical map from the uncompleted
 inductive tensor product to global adelic Schwartz–Bruhat functions is an
@@ -3485,15 +4151,299 @@ theorem adeleSchwartz_inductiveTensor_equiv :
     ∃ e : InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F]) ≃L[ℂ] ℬ(𝔸[F]),
       ∀ (f : ℬ(InfiniteAdeleRing F)) (g : ℬ(𝔸ᶠ[F])) (x : 𝔸[F]),
         e (f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x) =
-          f (Multiplicative.ofAdd x.1) * g (Multiplicative.ofAdd x.2) := by sorry
+          f (Multiplicative.ofAdd x.1) * g (Multiplicative.ofAdd x.2) := by
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let d : Multiplicative 𝔸[F] ≃ₜ* Multiplicative (InfiniteAdeleRing F) × Multiplicative 𝔸ᶠ[F] :=
+    ⟨MulEquiv.prodMultiplicative _ _, continuous_id, continuous_id⟩
+  have h := finiteAdeleSchwartz_countable_finest F
+  exact schwartzBruhat_kernel_of_finest d h.1 h.2
+
+private theorem completeSpace_of_linearHomeomorph {E V : Type*}
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    [AddCommGroup V] [Module ℂ V] [UniformSpace V] [IsUniformAddGroup V]
+    (e : E ≃L[ℂ] V) (hc : CompleteSpace V) : CompleteSpace E :=
+  (e.isUniformEmbedding.isUniformInducing.completeSpace_congr e.surjective).mpr hc
 
 /-- Paper: Lemma 2.1.3.2(2), p. 68. The inductive tensor product of the
 Archimedean and finite adelic Schwartz–Bruhat spaces is complete. -/
 theorem adeleSchwartz_inductiveTensor_complete :
-    CompleteSpace (InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) := by sorry
+    CompleteSpace (InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) := by
+  exact completeSpace_of_linearHomeomorph (adeleSchwartz_inductiveTensor_equiv F).choose
+    (adeleSchwartz_complete F).2
 
 -- ERRATA F11: Subgroup indicators are even in each finite coordinate.
 -- The compact open subsets used below allow the coset indicators needed in the proof.
+
+/-- A zero neighborhood in the finite adeles contains a compact open product
+subgroup whose local factors are integral away from a finite set. -/
+private theorem finiteAdele_small_rectangular_subgroup {V : Set 𝔸ᶠ[F]} (hV : V ∈ 𝓝 0) :
+    ∃ (L : AddSubgroup 𝔸ᶠ[F]) (D : (w : Places(F)) → AddSubgroup (w.adicCompletion F)),
+      IsOpen (L : Set 𝔸ᶠ[F]) ∧ IsCompact (L : Set 𝔸ᶠ[F]) ∧ (L : Set 𝔸ᶠ[F]) ⊆ V ∧
+      (∀ x : 𝔸ᶠ[F], x ∈ L ↔ ∀ w, x w ∈ D w) ∧
+      (∀ w, IsCompact (D w : Set (w.adicCompletion F)) ∧ IsOpen (D w : Set (w.adicCompletion F))) ∧
+      ∀ᶠ w in cofinite, (D w : Set (w.adicCompletion F)) = (w.adicCompletionIntegers F : Set (w.adicCompletion F)) := by
+  classical
+  let K (w : Places(F)) := w.adicCompletion F
+  let O (w : Places(F)) := (w.adicCompletionIntegers F).toSubring.toAddSubgroup
+  let A (w : Places(F)) : Set (K w) := O w
+  have ho (w) : IsOpen (A w) := Valued.isOpen_valuationSubring (K w)
+  have hc (w) : IsCompact (A w) := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w)
+  let J := Πʳ w, [K w, A w]_[𝓟 (univ : Set (Places(F)))]
+  have hu : Filter.cofinite ≤ 𝓟 (univ : Set (Places(F))) := by rw [principal_univ]; exact le_top
+  let i : J → 𝔸ᶠ[F] := RestrictedProduct.inclusion K A hu
+  have hz : i 0 = 0 := by ext; rfl
+  have hpre : i ⁻¹' V ∈ 𝓝 (0 : J) :=
+    (RestrictedProduct.continuous_inclusion hu).continuousAt.preimage_mem_nhds (show V ∈ 𝓝 (i 0) by rw [hz]; exact hV)
+  rw [(RestrictedProduct.isEmbedding_coe_of_principal (R := K) (A := A)).nhds_eq_comap] at hpre
+  obtain ⟨W, hW, hWV⟩ := Filter.mem_comap.mp hpre
+  rw [nhds_pi] at hW
+  obtain ⟨I, hI, t, ht, hsub⟩ := Filter.mem_pi.mp hW
+  choose B hB using fun w ↦ NonarchimedeanAddGroup.is_nonarchimedean (t w) (ht w)
+  let D (w : Places(F)) : AddSubgroup (K w) := if w ∈ I then O w ⊓ (B w).toAddSubgroup else O w
+  have hDO (w) : D w ≤ O w := by
+    by_cases hw : w ∈ I
+    · simpa only [D, ite_eq_left hw] using (inf_le_left : O w ⊓ (B w).toAddSubgroup ≤ O w)
+    · simp only [D, ite_eq_right hw, le_refl]
+  have hDo (w) : IsOpen (D w : Set (w.adicCompletion F)) := by
+    dsimp [D]; split
+    · exact (ho w).inter (B w).isOpen
+    · exact ho w
+  have hDc (w) : IsCompact (D w : Set (w.adicCompletion F)) :=
+    (hc w).of_isClosed_subset ((D w).isClosed_of_isOpen (hDo w)) (hDO w)
+  let L : AddSubgroup 𝔸ᶠ[F] :=
+    { carrier := {x | ∀ w, x w ∈ D w}
+      zero_mem' := fun w ↦ (D w).zero_mem
+      add_mem' := fun hx hy w ↦ (D w).add_mem (hx w) (hy w)
+      neg_mem' := fun hx w ↦ (D w).neg_mem (hx w) }
+  let j (a : ∀ w, D w) : 𝔸ᶠ[F] :=
+    ⟨fun w ↦ a w, .of_forall fun w ↦ hDO w (a w).property⟩
+  let (w : Places(F)) : CompactSpace (D w) := isCompact_iff_compactSpace.mp (hDc w)
+  have hj : Continuous j := continuous_restrictedProduct_of_uniform
+    (fun w ↦ continuous_subtype_val.comp (continuous_apply w)) (.of_forall fun w a ↦ hDO w (a w).property)
+  have hL : (L : Set 𝔸ᶠ[F]) = range j := Set.ext fun x ↦
+    ⟨fun hx ↦ ⟨fun w ↦ ⟨x w, hx w⟩, rfl⟩, fun ⟨a, ha⟩ w ↦ ha ▸ (a w).property⟩
+  have hO : IsOpen (L : Set 𝔸ᶠ[F]) := by
+    have heq : (L : Set 𝔸ᶠ[F]) =
+        {x : 𝔸ᶠ[F] | ∀ w, x w ∈ A w} ∩ (((↑) : 𝔸ᶠ[F] → ∀ w, K w) ⁻¹' I.pi (fun w ↦ (D w : Set (w.adicCompletion F)))) := by
+      ext x
+      exact ⟨fun hx ↦ ⟨fun w ↦ hDO w (hx w), fun w _ ↦ hx w⟩, fun hx w ↦
+        if hw : w ∈ I then hx.2 w hw else (by simpa only [D, ite_eq_right hw] using (show x w ∈ O w from hx.1 w))⟩
+    rw [heq]
+    exact (RestrictedProduct.isOpen_forall_mem ho).inter
+      ((isOpen_set_pi hI fun w _ ↦ hDo w).preimage RestrictedProduct.continuous_coe)
+  refine ⟨L, D, hO, hL ▸ isCompact_range hj, ?_, fun _ ↦ Iff.rfl, fun w ↦ ⟨hDc w, hDo w⟩, ?_⟩
+  · intro x hx
+    let y : J := ⟨fun w ↦ x w, Filter.eventually_principal.mpr fun w _ ↦ hDO w (hx w)⟩
+    apply hWV (a := y)
+    apply hsub
+    intro w hw
+    exact hB w ((show x w ∈ O w ⊓ (B w).toAddSubgroup from (ite_eq_left hw : D w = _ ) ▸ hx w).2)
+  · exact (show ∀ᶠ w in Filter.cofinite, w ∉ I from hI.compl_mem_cofinite).mono fun w hw ↦ (show (D w : Set (K w)) = (O w : Set (K w)) by rw [show D w = O w from ite_eq_right hw])
+
+/-- Finite adelic test functions are locally constant with compact support. -/
+private theorem finiteAdele_locallyConstant_compactSupport (f : ℬ(𝔸ᶠ[F])) :
+    IsLocallyConstant (fun x : 𝔸ᶠ[F] ↦ f (Multiplicative.ofAdd x)) ∧
+      HasCompactSupport (fun x : 𝔸ᶠ[F] ↦ f (Multiplicative.ofAdd x)) := by
+  let : TotallyDisconnectedSpace (Multiplicative 𝔸ᶠ[F]) :=
+    ⟨isTotallyDisconnected_of_image
+      (RestrictedProduct.continuous_coe.comp continuous_toAdd).continuousOn
+      (DFunLike.coe_injective.comp Multiplicative.toAdd.injective)
+      (isTotallyDisconnected_of_totallyDisconnectedSpace _)⟩
+  apply schwartzBruhat_locallyConstant_compactSupport _ f
+  intro C hC
+  have h := finiteAdeleTail_empty F
+  let d := h.choose
+  have hd := h.choose_spec.1
+  let e := d.toAddEquiv.toMultiplicative
+  have he : @IsHomeomorph (Multiplicative (FiniteAdeleTail F ∅)) (Multiplicative 𝔸ᶠ[F]) _ _ e := hd
+  obtain ⟨L, hL, hsub⟩ := finiteAdeleTail_compact_subset_subgroup F ∅ (e ⁻¹' C)
+    (he.homeomorph.isCompact_preimage.mpr hC)
+  refine ⟨L.map e.toMonoidHom, hL.image he.continuous, fun x hx ↦ ?_⟩
+  exact ⟨e.symm x, hsub (show e (e.symm x) ∈ C from (e.apply_symm_apply x).symm ▸ hx), e.apply_symm_apply x⟩
+
+/-- Representatives of the finitely many support cosets give a finite indicator
+expansion when translating within the subgroup fixes values on the support. -/
+private theorem sum_quotient_indicators {X : Type*} [AddCommGroup X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] (g : X → ℂ) (hc : HasCompactSupport g) (L : AddSubgroup X)
+    (ho : IsOpen (L : Set X)) (hinv : ∀ x ∈ tsupport g, ∀ y ∈ L, g (x + y) = g x) :
+    ∃ (n : ℕ) (a : Fin n → X), ∀ x, g x =
+      ∑ i, g (a i) * Set.indicator {z : X | z - a i ∈ L} (fun _ ↦ (1 : ℂ)) x := by
+  classical
+  let q : X → X ⧸ L := QuotientAddGroup.mk
+  let : DiscreteTopology (X ⧸ L) := QuotientAddGroup.discreteTopology ho
+  let A := q '' tsupport g
+  have hfinite : A.Finite := (hc.image QuotientAddGroup.continuous_mk).finite_of_discrete
+  let : Fintype A := hfinite.fintype
+  let e := (Fintype.equivFin A).symm
+  let a (i : Fin (Fintype.card A)) : X := (e i).property.choose
+  have ha (i : Fin (Fintype.card A)) : a i ∈ tsupport g ∧ q (a i) = (e i).val :=
+    (e i).property.choose_spec
+  have hfiber (x y : X) : x-y ∈ L ↔ q x = q y := QuotientAddGroup.eq_iff_sub_mem.symm
+  refine ⟨_, a, fun x ↦ ?_⟩
+  simp only [Set.indicator, Set.mem_ofPred_eq, hfiber, fun i ↦ (ha i).2]
+  by_cases hx : q x ∈ A
+  · let i := e.symm ⟨q x, hx⟩
+    have hi : (e i).val = q x := congrArg Subtype.val (e.apply_symm_apply ⟨q x, hx⟩)
+    rw [Finset.sum_eq_single_of_mem i (Finset.mem_univ _)]
+    · rw [ite_eq_left hi.symm, mul_one]
+      have hmem := (hfiber x (a i)).mpr (hi.symm.trans (ha i).2.symm)
+      simpa only [add_sub_cancel] using hinv (a i) (ha i).1 (x-a i) hmem
+    · intro j _ hj
+      have hne : q x ≠ (e j).val := fun h ↦ hj (e.injective (Subtype.ext (h.symm.trans hi.symm)))
+      rw [ite_eq_right hne, mul_zero]
+  · have hgx : g x = 0 := notMem_support.mp fun hs ↦ hx ⟨x, subset_tsupport g hs, rfl⟩
+    rw [hgx]
+    symm
+    apply Finset.sum_eq_zero
+    intro i _
+    have hne : q x ≠ (e i).val := fun h ↦ hx (h.symm ▸ (e i).property)
+    rw [ite_eq_right hne, mul_zero]
+
+open Classical in
+/-- The compact open subgroup indicator is the constant function on its trivial
+structural quotient, extended by zero. -/
+private theorem exists_schwartzBruhat_indicator {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (H : Subgroup G) (ho : IsOpen (H : Set G)) (hc : IsCompact (H : Set G)) :
+    ∃ c : SchwartzBruhat G, ∀ x, c x = if x ∈ H then 1 else 0 := by
+  let : CompactSpace H := isCompact_iff_compactSpace.mp hc
+  let : CompactSpace (lcaAnnihilator H) := isCompact_iff_compactSpace.mp (isCompact_lcaAnnihilator H ho)
+  let a : BruhatStructuralPair G :=
+    ⟨(H, OrderDual.toDual H), ho, isCompactlyGeneratedGroup_of_compact,
+      ⟨H.isClosed_of_isOpen ho, isOpen_lcaAnnihilator H hc,
+        isCompactlyGeneratedGroup_of_compact (G := lcaAnnihilator H)⟩, le_rfl⟩
+  let : Subsingleton a.quotient := by
+    change Subsingleton (H ⧸ H.comap H.subtype)
+    have ht : H.comap H.subtype = ⊤ := eq_top_iff.mpr fun x _ ↦ x.property
+    rw [ht]
+    exact QuotientGroup.subsingleton_quotient_top
+  let A := Multiplicative (ElementaryLieGroup 0 0 0 PUnit)
+  let : Subsingleton A := inferInstanceAs (Subsingleton (ElementaryLieGroup 0 0 0 PUnit))
+  let j : a.quotient ≃* A := MulEquiv.ofBijective (1 : a.quotient →* A)
+    ⟨fun _ _ _ ↦ Subsingleton.elim _ _, fun y ↦ ⟨1, Subsingleton.elim _ y⟩⟩
+  let e : ElementaryLCAPresentation a.quotient :=
+    { realDim := 0, torusDim := 0, latticeRank := 0, finiteFactor := PUnit
+      equiv := { j with
+        continuous_toFun := (continuous_const (y := (1 : A))).congr fun _ ↦ Subsingleton.elim _ _
+        continuous_invFun := (continuous_const (y := (1 : a.quotient))).congr fun _ ↦ Subsingleton.elim _ _ } }
+  let s : SchwartzBruhatStage e := ⟨fun _ ↦ 1, by
+    refine ⟨fun _ _ ↦ contDiff_const, fun i ↦ ?_⟩
+    rw [Subsingleton.elim i (0, 0, 0, 0)]
+    simp [elementarySchwartzBound_zero]⟩
+  refine ⟨schwartzBruhatStageInclusion a e s, fun x ↦ ?_⟩
+  rw [schwartzBruhatStageInclusion_apply, schwartzBruhatStageRealization_apply]
+  by_cases hx : x ∈ H
+  · rw [dite_eq_left (show x ∈ a.val.1 from hx), ite_eq_left hx]
+  · rw [dite_eq_right (show x ∉ a.val.1 from hx), ite_eq_right hx]
+
+private theorem locallyConstant_fix_support {X : Type*} [AddCommGroup X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] {u : X → ℂ} (hl : IsLocallyConstant u) (hc : HasCompactSupport u) :
+    ∃ V ∈ 𝓝 (0 : X), ∀ x ∈ tsupport u, ∀ y ∈ V, u (x+y) = u x := by
+  have hopen : IsOpen {p : X × X | u (p.1 + p.2) = u p.1} :=
+    ((hl.comp_continuous continuous_add).prodMk (hl.comp_continuous continuous_fst)) {z | z.1 = z.2}
+  obtain ⟨U,V,_,ho,hU,hV,hUV⟩ := generalized_tube_lemma hc (isCompact_singleton (x := (0 : X))) hopen
+    (show tsupport u ×ˢ {0} ⊆ _ by rintro ⟨x, y⟩ ⟨_, rfl⟩; exact congrArg u (add_zero x))
+  exact ⟨V, ho.mem_nhds (hV rfl), fun x hx y hy ↦ hUV (mk_mem_prod (hU hx) hy)⟩
+
+private theorem schwartzBruhat_eval_sum {G ι : Type*} [CommGroup G] [TopologicalSpace G] [Fintype ι]
+    (c : ι → ℂ) (g : ι → SchwartzBruhat G) (x : G) :
+    (∑ i, c i • g i : SchwartzBruhat G) x = ∑ i, c i * g i x := by
+  let ev : SchwartzBruhat G →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  exact (map_sum ev _ Finset.univ).trans (Finset.sum_congr rfl fun i _ ↦ map_smul ev (c i) (g i))
+
+/-- Finite adelic test functions are finite sums of indicators of translated
+product subgroups. The coordinates of each translate are integral almost everywhere. -/
+private theorem finiteAdeleSchwartz_rectangle_sum (f : ℬ(𝔸ᶠ[F])) :
+    ∃ (n : ℕ) (c : Fin n → ℂ) (K : Fin n → (w : Places(F)) → Set (w.adicCompletion F))
+      (g : Fin n → ℬ(𝔸ᶠ[F])),
+      (∀ i, (∀ w, IsCompact (K i w) ∧ IsOpen (K i w)) ∧
+        (∀ᶠ w in cofinite, K i w = (w.adicCompletionIntegers F : Set (w.adicCompletion F))) ∧
+        ∀ x : 𝔸ᶠ[F], g i (Multiplicative.ofAdd x) =
+          Set.indicator {y : 𝔸ᶠ[F] | ∀ w, y w ∈ K i w} (fun _ ↦ (1 : ℂ)) x) ∧
+      f = ∑ i, c i • g i := by
+  classical
+  let u (x : 𝔸ᶠ[F]) := f (Multiplicative.ofAdd x)
+  have hf := finiteAdele_locallyConstant_compactSupport F f
+  have tube := locallyConstant_fix_support (u := u) hf.1 hf.2
+  have sub := finiteAdele_small_rectangular_subgroup F (V := tube.choose) tube.choose_spec.1
+  let L := sub.choose
+  let D := sub.choose_spec.choose
+  have hs := sub.choose_spec.choose_spec
+  have hL := hs.2.2.2.1
+  have hD := hs.2.2.2.2.1
+  have hev := hs.2.2.2.2.2
+  have cosets := sum_quotient_indicators u hf.2 L hs.1 (fun x hx y hy ↦ tube.choose_spec.2 x hx y (hs.2.2.1 hy))
+  let n := cosets.choose
+  let a := cosets.choose_spec.choose
+  have ha := cosets.choose_spec.choose_spec
+  have hχ := exists_schwartzBruhat_indicator (G := Multiplicative 𝔸ᶠ[F]) L.toSubgroup hs.1 hs.2.1
+  let g (i : Fin n) := schwartzBruhatTranslate (Multiplicative.ofAdd (a i)) hχ.choose
+  let K (i : Fin n) (w : Places(F)) := {z : w.adicCompletion F | z - a i w ∈ D w}
+  have hK (i w) : IsCompact (K i w) ∧ IsOpen (K i w) :=
+    ⟨(Homeomorph.subRight (a i w)).isCompact_preimage.mpr (hD w).1,
+      (hD w).2.preimage (Homeomorph.subRight (a i w)).continuous⟩
+  have he (i : Fin n) : ∀ᶠ w in cofinite, K i w = (w.adicCompletionIntegers F : Set (w.adicCompletion F)) := by
+    filter_upwards [hev, (a i).cofinite_mem_adicCompletionIntegers] with w hw ha
+    ext x
+    change x - a i w ∈ (D w : Set _) ↔ x ∈ w.adicCompletionIntegers F
+    rw [hw]
+    let O := (w.adicCompletionIntegers F).toSubring.toAddSubgroup
+    exact ⟨fun hx ↦ (sub_add_cancel x (a i w)) ▸ O.add_mem hx ha, fun hx ↦ O.sub_mem hx ha⟩
+  have hcos (i : Fin n) (x : 𝔸ᶠ[F]) : x - a i ∈ L ↔ ∀ w, x w ∈ K i w := hL _
+  have hg (i : Fin n) (x : 𝔸ᶠ[F]) : g i (Multiplicative.ofAdd x) =
+      if x - a i ∈ L then 1 else 0 := by
+    change hχ.choose (Multiplicative.ofAdd (-a i + x)) = _
+    rw [show -a i + x = x - a i by abel]
+    exact hχ.choose_spec _
+  refine ⟨n, fun i ↦ u (a i), K, g, fun i ↦ ⟨hK i, he i, fun x ↦ ?_⟩, ?_⟩
+  · change g i (Multiplicative.ofAdd x) = if ∀ w, x w ∈ K i w then 1 else 0
+    rw [hg, hcos]
+  · apply Subtype.ext
+    funext x
+    exact (ha x.toAdd).trans ((Finset.sum_congr rfl fun i _ ↦
+      congrArg (u (a i) * ·) (hg i x.toAdd).symm).trans
+      (schwartzBruhat_eval_sum (fun i ↦ u (a i)) g x).symm)
+
+/-- A finite linear combination can be enumerated by a nonempty finite interval
+even when it represents zero. -/
+private theorem exists_positive_sum_of_mem_span {E : Type*} [AddCommGroup E] [Module ℂ E]
+    {A : Set E} (hne : A.Nonempty) {f : E} (hf : f ∈ Submodule.span ℂ A) :
+    ∃ (r : ℕ) (c : Fin r → ℂ) (v : Fin r → A), 1 ≤ r ∧ f = ∑ i, c i • (v i).val := by
+  classical
+  induction hf using Submodule.span_induction with
+  | mem x hx => exact ⟨1, fun _ ↦ 1, fun _ ↦ ⟨x, hx⟩, le_rfl, by simp⟩
+  | zero => exact ⟨1, fun _ ↦ 0, fun _ ↦ ⟨hne.choose, hne.choose_spec⟩, le_rfl, by simp⟩
+  | add x y _ _ hx hy =>
+    obtain ⟨m, c, v, hm, h⟩ := hx
+    obtain ⟨n, d, w, _, h'⟩ := hy
+    exact ⟨m+n, Fin.addCases c d, Fin.addCases v w, by omega, by simp [Fin.sum_univ_add, h, h']⟩
+  | smul z x _ hx =>
+    obtain ⟨n, c, v, hn, h⟩ := hx
+    exact ⟨n, fun i ↦ z*c i, v, hn, by rw [h, Finset.smul_sum]; simp only [smul_smul]⟩
+
+/-- To generate a tensor product, it suffices to generate every right factor
+by vectors whose products with an arbitrary left factor lie in the target span. -/
+private theorem span_of_tensor_factors {X V E : Type*} [AddCommGroup X] [Module ℂ X]
+    [AddCommGroup V] [Module ℂ V] [AddCommGroup E] [Module ℂ E]
+    (e : (X ⊗[ℂ] V) ≃ₗ[ℂ] E) (A : Set E)
+    (h : ∀ a : X, ∀ v : V, ∃ (n : ℕ) (c : Fin n → ℂ) (g : Fin n → V),
+      (∀ i, e (a ⊗ₜ[ℂ] g i) ∈ A) ∧ v = ∑ i, c i • g i) (f : E) :
+    f ∈ Submodule.span ℂ A := by
+  have ht (a : X) (v : V) : e (a ⊗ₜ[ℂ] v) ∈ Submodule.span ℂ A := by
+    obtain ⟨n,c,g,hg,rfl⟩ := h a v
+    let L := e.toLinearMap.comp ((TensorProduct.mk ℂ X V) a)
+    change L (∑ i, c i • g i) ∈ _
+    rw [map_sum]
+    exact Submodule.sum_mem _ fun i _ ↦ (map_smul L (c i) (g i)).symm ▸
+      Submodule.smul_mem _ _ (Submodule.subset_span (hg i))
+  have hm (z : X ⊗[ℂ] V) : e z ∈ Submodule.span ℂ A := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y => exact ht x y
+    | add x y hx hy => exact (map_add e x y).symm ▸ Submodule.add_mem _ hx hy
+  exact e.apply_symm_apply f ▸ hm (e.symm f)
 
 /-- Paper: Lemma 2.1.3.2(3), p. 68. Every adelic Schwartz–Bruhat function is a
 finite linear combination of Archimedean Schwartz functions times finite adelic
@@ -3508,23 +4458,328 @@ theorem adeleSchwartz_eq_sum_compactOpen_rectangles (f : ℬ(𝔸[F])) :
         ∀ x : 𝔸[F], φ i (Multiplicative.ofAdd x) =
           arch i (Multiplicative.ofAdd x.1) *
             Set.indicator {y : 𝔸ᶠ[F] | ∀ v, y v ∈ K i v} (fun _ ↦ (1 : ℂ)) x.2) ∧
-      f = ∑ i, c i • φ i := by sorry
+      f = ∑ i, c i • φ i := by
+  classical
+  let A : Set ℬ(𝔸[F]) := {φ | ∃ (a : ℬ(InfiniteAdeleRing F))
+    (K : (w : Places(F)) → Set (w.adicCompletion F)),
+    (∀ w, IsCompact (K w) ∧ IsOpen (K w)) ∧
+      (∀ᶠ w in cofinite, K w = (w.adicCompletionIntegers F : Set (w.adicCompletion F))) ∧
+      ∀ x : 𝔸[F], φ (Multiplicative.ofAdd x) = a (Multiplicative.ofAdd x.1) *
+        Set.indicator {y : 𝔸ᶠ[F] | ∀ w, y w ∈ K w} (fun _ ↦ (1 : ℂ)) x.2}
+  have hzero : (0 : ℬ(𝔸[F])) ∈ A := by
+    refine ⟨0, fun w ↦ w.adicCompletionIntegers F, fun w ↦ ⟨?_, Valued.isOpen_valuationSubring _⟩,
+      .of_forall (fun _ ↦ rfl), fun x ↦ (zero_mul _).symm⟩
+    exact isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w)
+  have h := adeleSchwartz_inductiveTensor_equiv F
+  let e := h.choose
+  have ht (a : ℬ(InfiniteAdeleRing F)) (v : ℬ(𝔸ᶠ[F])) :
+      ∃ (n : ℕ) (c : Fin n → ℂ) (g : Fin n → ℬ(𝔸ᶠ[F])),
+        (∀ i, e (a ⊗ₜ[ℂ] g i) ∈ A) ∧ v = ∑ i, c i • g i := by
+    have s := finiteAdeleSchwartz_rectangle_sum F v
+    let K := s.choose_spec.choose_spec.choose
+    let g := s.choose_spec.choose_spec.choose_spec.choose
+    have hg := s.choose_spec.choose_spec.choose_spec.choose_spec
+    refine ⟨s.choose, s.choose_spec.choose, g, fun i ↦ ?_, hg.2⟩
+    exact ⟨a, K i, (hg.1 i).1, (hg.1 i).2.1, fun x ↦ (h.choose_spec a (g i) x).trans
+      (congrArg (a (Multiplicative.ofAdd x.1) * ·) ((hg.1 i).2.2 x.2))⟩
+  have hf := span_of_tensor_factors e.toLinearEquiv A ht f
+  have hs := exists_positive_sum_of_mem_span ⟨0, hzero⟩ hf
+  let v := hs.choose_spec.choose_spec.choose
+  have H (i) := (v i).property
+  exact ⟨hs.choose,hs.choose_spec.choose,fun i ↦ (H i).choose,
+    fun i ↦ (H i).choose_spec.choose,fun i ↦ (v i).val,hs.choose_spec.choose_spec.choose_spec.1,
+    fun i ↦ (H i).choose_spec.choose_spec,hs.choose_spec.choose_spec.choose_spec.2⟩
 
 -- TODO(paper-gap): The proof on p. 69 cites “Lemma ??” for second countability
 -- and Proposition 2.1.2.8(6), which has only three parts.
+
+open scoped DirectSum in
+/-- The sum of one continuous seminorm per basis coordinate is continuous for the inductive tensor topology. -/
+private theorem tensor_seminorm_of_family {E V ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    [AddCommGroup V] [Module ℂ V] [t : TopologicalSpace V]
+    (b : Module.Basis ι ℂ V)
+    (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex V)))
+    (p : ι → Seminorm ℂ E) (hp : ∀ i, Continuous (p i)) :
+    ∃ q : Seminorm ℂ (InductiveTensor E V), Continuous q ∧ ∀ i x, q (x ⊗ₜ[ℂ] b i) = p i x := by
+  classical
+  let c := (TensorProduct.equivFinsuppOfBasisRight (M := E) b).trans (finsuppLequivDFinsupp ℂ)
+  let q := (directSumSeminorm p).comp c.toLinearMap
+  have hcoord (x : E) (y : V) (i : ι) : c (x ⊗ₜ[ℂ] y) i = b.repr y i • x :=
+    TensorProduct.equivFinsuppOfBasisRight_apply_tmul_apply b x y i
+  have hq (x : E) (y : V) : q (x ⊗ₜ[ℂ] y) = ∑ i ∈ (b.repr y).support, p i (b.repr y i • x) := by
+    change directSumSeminorm p (c _) = _
+    rw [directSumSeminorm_apply p (c _) (b.repr y).support (fun i hi ↦ ?_)]
+    · exact Finset.sum_congr rfl fun i _ ↦ congrArg (p i) (hcoord x y i)
+    · by_contra hn
+      exact (DFinsupp.mem_support_iff.mp hi) ((hcoord x y i).trans (by
+        rw [Finsupp.notMem_support_iff.mp hn, zero_smul]))
+  have hsp := withGeneratingSeminorms_spec (E ⊗[ℂ] V)
+    (fun j : {r : Seminorm ℂ (E ⊗[ℂ] V) // (∀ x : E, Continuous (fun y : V ↦ r (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : V, Continuous (fun x : E ↦ r (x ⊗ₜ[ℂ] y)))} ↦ j.val)
+  have := PolynormableSpace.continuousSMul ℂ E
+  refine ⟨q, hsp.continuous_seminorm ⟨q, fun x ↦ ?_, fun y ↦ ?_⟩, fun i x ↦ ?_⟩
+  · let r := q.comp (TensorProduct.mk ℂ E V x)
+    exact Eq.mpr (congrArg (fun t' ↦ @Continuous V ℝ t' _ r) ht)
+      ((finestLocallyConvex_withSeminorms V).continuous_seminorm r)
+  · exact (continuous_finsetSum _ fun i _ ↦ (hp i).comp
+      (continuous_const.smul (continuous_id (X := E)))).congr (fun x ↦ (hq x y).symm)
+  · exact (hq x (b i)).trans (by simp)
+
+/-- Joint continuity would bound each coordinate seminorm on the same zero neighborhood. -/
+private theorem tensor_not_embedding_of_seminorms {E V ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup V] [Module ℂ V] [t : TopologicalSpace V] [PolynormableSpace ℂ V] [T2Space V]
+    (b : Module.Basis ι ℂ V) (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex V)))
+    (p : ι → Seminorm ℂ E) (hp : ∀ i, Continuous (p i))
+    (hno : ∀ U ∈ 𝓝 (0 : E), ∃ i, ¬ BddAbove (p i '' U)) :
+    ¬ @IsEmbedding (InductiveTensor E V) (ProjectiveTensor E V) _ _ id := by
+  intro he
+  obtain ⟨q, hq, hqv⟩ := tensor_seminorm_of_family b ht p hp
+  have hback : @Continuous (ProjectiveTensor E V) (InductiveTensor E V) _ _ id :=
+    he.isInducing.continuous_iff.mpr continuous_id
+  let L : ProjectiveTensor E V →ₗ[ℂ] InductiveTensor E V := LinearMap.id
+  have hjoint := (continuous_projectiveTensor_iff (E := E) (F := V) L).mp hback
+  have h := (hq.comp hjoint).continuousAt (x := ((0 : E), (0 : V)))
+  have hz : (fun z : E × V ↦ q (L (z.1 ⊗ₜ[ℂ] z.2))) ⁻¹' Iio 1 ∈ 𝓝 ((0 : E), (0 : V)) :=
+    h.preimage_mem_nhds (Iio_mem_nhds (by
+      change q (L ((0 : E) ⊗ₜ[ℂ] (0 : V))) < 1
+      exact lt_of_eq_of_lt ((congrArg (fun z ↦ q (L z)) (TensorProduct.zero_tmul E (0 : V))).trans
+        ((congrArg q L.map_zero).trans (map_zero q))) zero_lt_one))
+  obtain ⟨U, hU, W, hW, hUW⟩ := mem_nhds_prod_iff.1 hz
+  obtain ⟨i, hi⟩ := hno U hU
+  have := PolynormableSpace.continuousSMul ℂ V
+  have hc : ∀ᶠ c : ℂ in 𝓝 0, c • b i ∈ W :=
+    (continuous_id.smul (continuous_const (y := b i))).continuousAt.preimage_mem_nhds
+      (by simpa using hW)
+  obtain ⟨c, hcW, hc0⟩ := ((hc.filter_mono (nhdsWithin_le_nhds (s := ({0}ᶜ : Set ℂ)))).and
+    (self_mem_nhdsWithin (a := (0 : ℂ)) (s := {0}ᶜ))).exists
+  have hcpos : 0 < ‖c‖ := norm_pos_iff.mpr hc0
+  apply hi
+  refine ⟨1 / ‖c‖, ?_⟩
+  rintro _ ⟨x, hx, rfl⟩
+  have hl : q (x ⊗ₜ[ℂ] (c • b i)) < 1 := hUW (Set.mk_mem_prod hx hcW)
+  have hh : q (x ⊗ₜ[ℂ] (c • b i)) = ‖c‖ * p i x :=
+    (congrArg q (TensorProduct.tmul_smul _ _ _)).trans
+      ((map_smul_eq_mul q _ _).trans (congrArg (‖c‖ * ·) (hqv i x)))
+  exact (le_div_iff₀' hcpos).mpr (hh ▸ hl).le
+
+/-- Dirac evaluations at the points of an infinite group are linearly independent. -/
+private theorem schwartzBruhat_not_finiteDimensional {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [LocallyCompactSpace G] [T2Space G] [Infinite G] :
+    ¬ FiniteDimensional ℂ (SchwartzBruhat G) := by
+  classical
+  intro hfin
+  let d (x : G) := (schwartzBruhat_dirac_support x).choose
+  have hev (x : G) (f : SchwartzBruhat G) : d x f = f x := (schwartzBruhat_dirac_support x).choose_spec.1 f
+  have hSep (x : G) (U : Set G) (hU : IsOpen U) (hx : x ∈ U) :
+      ∃ f : SchwartzBruhat G, tsupport (f : G → ℂ) ⊆ U ∧ f x ≠ 0 := by
+    by_contra! h
+    have hx' : x ∈ schwartzBruhatVanishingLocus (d x) :=
+      Set.mem_sUnion.mpr ⟨U, ⟨hU, fun f hf ↦ (hev x f).trans (h f hf)⟩, hx⟩
+    exact ((schwartzBruhat_dirac_support x).choose_spec.2.1 ▸ hx') (Set.mem_singleton x)
+  let l (x : G) : Module.Dual ℂ (SchwartzBruhat G) := (d x).toLinearMap
+  have hlin : LinearIndependent ℂ l := by
+    apply linearIndependent_iff'.mpr
+    intro s g he i hi
+    let t := s.erase i
+    obtain ⟨f, hf, hfi⟩ := hSep i (t : Set G)ᶜ t.finite_toSet.isClosed.isOpen_compl
+      (Finset.notMem_erase i s)
+    have hz (j : G) (hj : j ∈ s) (hne : j ≠ i) : l j f = 0 := by
+      rw [show l j f = f j from hev j f]
+      by_contra h
+      exact hf (subset_tsupport _ h) (Finset.mem_erase.mpr ⟨hne, hj⟩)
+    have hsum : ∑ j ∈ s, g j * l j f = 0 := by
+      simpa only [LinearMap.sum_apply, LinearMap.smul_apply, smul_eq_mul, LinearMap.zero_apply]
+        using DFunLike.congr_fun he f
+    rw [Finset.sum_eq_single_of_mem i hi (fun j hj hji ↦ by rw [hz j hj hji, mul_zero])] at hsum
+    exact (mul_eq_zero.mp hsum).resolve_right fun ht ↦ hfi ((hev i f).symm.trans ht)
+  exact @_root_.not_finite G inferInstance hlin.finite
+
+/-- A bounded neighborhood in a Montel space would give a compact neighborhood and hence finite dimension. -/
+private theorem unbounded_seminorms_of_montel {X Y ι : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y] [IsUniformAddGroup Y] [ContinuousSMul ℂ Y] [T2Space Y]
+    [MontelSpace ℂ Y] (e : X ≃L[ℂ] Y) (p : ι → Seminorm ℂ X) (hp : WithSeminorms p)
+    (hd : ¬ FiniteDimensional ℂ Y) : ∃ q : ι → Seminorm ℂ Y, (∀ i, Continuous (q i)) ∧
+      ∀ U ∈ 𝓝 (0 : Y), ∃ i, ¬ BddAbove (q i '' U) := by
+  refine ⟨fun i ↦ (p i).comp e.symm.toLinearMap, fun i ↦ (hp.continuous_seminorm i).comp e.symm.continuous, ?_⟩
+  intro U hU
+  by_contra! hn
+  have hb : IsVonNBounded ℂ (e.symm '' U) := hp.isVonNBounded_iff_seminorm_bddAbove.mpr
+    (fun i ↦ Set.image_image (p i) e.symm U ▸ hn i)
+  have hUbounded : IsVonNBounded ℂ U := by
+    have h := hb.image e.toContinuousLinearMap
+    simpa only [ContinuousLinearEquiv.coe_coe, Set.image_image, e.apply_symm_apply, Set.image_id'] using h
+  have hc := MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ isClosed_closure hUbounded.closure
+  exact hd (FiniteDimensional.of_totallyBounded_nhds_zero ℂ hU (hc.totallyBounded.subset subset_closure))
+
+private theorem realSchwartzBruhat_seminorms_unbounded :
+    ∃ p : (ℕ × ℕ) → Seminorm ℂ ℬ(ℝ), (∀ i, Continuous (p i)) ∧
+      ∀ U ∈ 𝓝 (0 : ℬ(ℝ)), ∃ i, ¬ BddAbove (p i '' U) := by
+  let : T2Space ℬ(ℝ) := schwartzBruhat_t2
+  let : MontelSpace ℂ ℬ(ℝ) := schwartzBruhat_montel
+  exact unbounded_seminorms_of_montel realSchwartzBruhat_equiv.choose (schwartzSeminormFamily ℂ ℝ ℂ)
+    (schwartz_withSeminorms ℂ ℝ ℂ) (schwartzBruhat_not_finiteDimensional (G := Multiplicative ℝ))
+
+private theorem openMap_linear_quotient {E Y : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [IsTopologicalAddGroup E] [AddCommGroup Y] [Module ℂ Y]
+    [TopologicalSpace Y] (L : E →ₗ[ℂ] Y) (hL : IsQuotientMap L) : IsOpenMap L := by
+  intro U hU
+  apply hL.isCoinducing.isOpen_preimage.mp
+  apply isOpen_iff_mem_nhds.mpr
+  rintro x ⟨y, hy, hxy⟩
+  let f (z : E) := z - x + y
+  have hf : Continuous f := (continuous_id.sub continuous_const).add continuous_const
+  have hv : U ∈ 𝓝 (f x) := by simpa [f] using hU.mem_nhds hy
+  filter_upwards [hf.continuousAt.preimage_mem_nhds hv] with z hz
+  exact ⟨f z, hz, by simp [f, map_sub, map_add, hxy]⟩
+
+private theorem pullback_unbounded_seminorms {E Y ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (L : E →L[ℂ] Y) (hL : IsOpenMap L)
+    (h : ∃ p : ι → Seminorm ℂ Y, (∀ i, Continuous (p i)) ∧
+      ∀ U ∈ 𝓝 (0 : Y), ∃ i, ¬ BddAbove (p i '' U)) :
+    ∃ p : ι → Seminorm ℂ E, (∀ i, Continuous (p i)) ∧
+      ∀ U ∈ 𝓝 (0 : E), ∃ i, ¬ BddAbove (p i '' U) := by
+  obtain ⟨p, hp, hu⟩ := h
+  refine ⟨fun i ↦ (p i).comp L.toLinearMap, fun i ↦ (hp i).comp L.continuous, fun U hU ↦ ?_⟩
+  have hv : L '' U ∈ 𝓝 (0 : Y) := L.map_zero ▸ hL.image_mem_nhds hU
+  obtain ⟨i, hi⟩ := hu _ hv
+  exact ⟨i, fun hb ↦ hi (Set.image_image (p i) L U ▸ hb)⟩
+
+private theorem open_linear_map_of_quotient_equiv {X Y Z : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] (f : X → Y) (hf : IsQuotientMap f)
+    (h : ∃ k : X →L[ℂ] Y, ∀ x, k x = f x) (r : Y ≃L[ℂ] Z) : ∃ P : X →L[ℂ] Z, IsOpenMap P := by
+  obtain ⟨k, hk⟩ := h
+  have hl : IsQuotientMap k := (funext hk : (k : X → Y) = f) ▸ hf
+  exact ⟨r.toContinuousLinearMap.comp k, r.isOpenMap.comp (openMap_linear_quotient k.toLinearMap hl)⟩
+
+open MeasureTheory in
+/-- A split quotient of groups gives an open quotient of their test spaces by coset integration. -/
+private theorem open_schwartzBruhat_quotient {G H : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H]
+    (q : G →ₜ* H) (s : H → G) (hs : Continuous s) (hq : RightInverse s q) :
+    ∃ P : SchwartzBruhat G →L[ℂ] SchwartzBruhat H, IsOpenMap P := by
+  let K := q.toMonoidHom.ker
+  have hK : IsClosed (K : Set G) := (isClosed_singleton (x := (1 : H))).preimage q.continuous
+  let : LocallyCompactSpace K := hK.locallyCompactSpace
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  let μ : Measure K := Measure.haar
+  let e := QuotientGroup.quotientKerEquivOfRightInverse q.toMonoidHom s hq
+  let d : (G ⧸ K) ≃ₜ* H :=
+    ⟨e, (QuotientGroup.isQuotientMap_mk K).continuous_iff.mpr q.continuous, continuous_quotient_mk'.comp hs⟩
+  exact open_linear_map_of_quotient_equiv (X := SchwartzBruhat G) (Y := SchwartzBruhat (G ⧸ K))
+    (Z := SchwartzBruhat H) (schwartzBruhatCosetIntegral K μ hK) (schwartzBruhatCosetIntegral_isQuotientMap K μ hK)
+    (schwartzBruhatCosetIntegral_continuousLinear K μ hK) (schwartzBruhatPullbackEquiv d.symm)
+
+private theorem finiteAdele_infinite : Infinite 𝔸ᶠ[F] := by
+  classical
+  obtain ⟨M, hM⟩ := Ideal.exists_maximal (α := 𝓞 F)
+  let w : Places(F) := ⟨M, hM.isPrime, Ring.ne_bot_of_isMaximal_of_not_isField hM (RingOfIntegers.not_isField F)⟩
+  apply Infinite.of_injective (algebraMap F 𝔸ᶠ[F])
+  intro a b h
+  exact (algebraMap F (w.adicCompletion F)).injective (congrArg (fun z : 𝔸ᶠ[F] ↦ z w) h)
+
+private theorem basis_finest_not_embedding {E V ι : Type*} [Countable ι] [Nonempty ι]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup V] [Module ℂ V] [t : TopologicalSpace V] [PolynormableSpace ℂ V] [T2Space V]
+    (hr : ¬ FiniteDimensional ℂ V) (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex V)))
+    (h : ∃ p : ι → Seminorm ℂ E, (∀ i, Continuous (p i)) ∧ ∀ U ∈ 𝓝 (0 : E), ∃ i, ¬ BddAbove (p i '' U)) :
+    ¬ @IsEmbedding (InductiveTensor E V) (ProjectiveTensor E V) _ _ id := by
+  classical
+  let b := Module.Free.chooseBasis ℂ V
+  have : Infinite (Module.Free.ChooseBasisIndex ℂ V) := by
+    apply not_finite_iff_infinite.mp
+    intro h
+    exact hr (Module.Finite.of_basis b)
+  obtain ⟨a, ha⟩ := exists_injective_nat ι
+  let j := (⟨a, ha⟩ : ι ↪ ℕ).trans (Infinite.natEmbedding (Module.Free.ChooseBasisIndex ℂ V))
+  let k := Function.invFun j
+  obtain ⟨p, hp, hno⟩ := h
+  apply tensor_not_embedding_of_seminorms b ht (fun v ↦ p (k v)) (fun v ↦ hp _)
+  intro U hU
+  obtain ⟨i, hi⟩ := hno U hU
+  refine ⟨j i, ?_⟩
+  simpa only [k, Function.leftInverse_invFun j.injective i] using hi
+
+private theorem completion_projects_to_real (v : InfinitePlace F) :
+    ∃ (q : v.Completion →+ ℝ) (s : ℝ → v.Completion), Continuous q ∧ Continuous s ∧ RightInverse s q := by
+  by_cases hv : v.IsReal
+  · let e := InfinitePlace.Completion.ringEquivRealOfIsReal hv
+    let h := InfinitePlace.Completion.isometryEquivRealOfIsReal hv
+    exact ⟨e.toAddMonoidHom, e.symm, h.continuous, h.symm.continuous, e.apply_symm_apply⟩
+  · have hv' : v.IsComplex := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex hv'
+    let h := InfinitePlace.Completion.isometryEquivComplexOfIsComplex hv'
+    let re : ℂ →+ ℝ := ⟨⟨Complex.re, rfl⟩, fun _ _ ↦ rfl⟩
+    exact ⟨re.comp e.toAddMonoidHom, fun x ↦ e.symm x, Complex.continuous_re.comp h.continuous,
+      h.symm.continuous.comp Complex.continuous_ofReal, fun x ↦ congrArg Complex.re (e.apply_symm_apply (x : ℂ))⟩
+
+private theorem arch_projects_to_real :
+    ∃ (q : Multiplicative (InfiniteAdeleRing F) →ₜ* Multiplicative ℝ)
+      (s : Multiplicative ℝ → Multiplicative (InfiniteAdeleRing F)), Continuous s ∧ RightInverse s q := by
+  classical
+  let v : InfinitePlace F := Classical.choice inferInstance
+  obtain ⟨q, s, hq, hs, hqs⟩ := completion_projects_to_real F v
+  let p := q.comp (Pi.evalAddMonoidHom (fun w : InfinitePlace F ↦ w.Completion) v)
+  let i (x : ℝ) : InfiniteAdeleRing F := Pi.single v (s x)
+  have hi : Continuous i := by
+    apply continuous_pi
+    intro w
+    by_cases hw : w = v
+    · subst w
+      simpa only [i, Pi.single_eq_same] using hs
+    · simpa only [i, Pi.single_eq_of_ne hw] using (continuous_const (X := ℝ) (y := (0 : w.Completion)))
+  exact ⟨⟨p.toMultiplicative, hq.comp (continuous_apply v)⟩, i, hi, fun x ↦ by
+    change q (Pi.single v (s x.toAdd) v) = x.toAdd
+    rw [Pi.single_eq_same, hqs]⟩
 
 /-- Paper: Remark 2.1.3.3, p. 69. The identity from the inductive to the
 projective tensor product of the adelic factors is a continuous bijection
 whose topology is strictly weakened. -/
 theorem adeleSchwartz_inductiveTensor_not_isEmbedding :
     ¬ @IsEmbedding (InductiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F]))
-      (ProjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) _ _ id := by sorry
+      (ProjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) _ _ id := by
+  let A := Multiplicative (InfiniteAdeleRing F)
+  let : T2Space A := inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace A := inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let : T2Space (SchwartzBruhat A) := schwartzBruhat_t2
+  let : T2Space ℬ(𝔸ᶠ[F]) := schwartzBruhat_t2
+  let : Infinite (Multiplicative 𝔸ᶠ[F]) := finiteAdele_infinite F
+  have q := arch_projects_to_real F
+  have k := open_schwartzBruhat_quotient (G := A) (H := Multiplicative ℝ) q.choose q.choose_spec.choose
+    q.choose_spec.choose_spec.1 q.choose_spec.choose_spec.2
+  exact basis_finest_not_embedding (E := SchwartzBruhat A) (V := ℬ(𝔸ᶠ[F])) (ι := ℕ × ℕ)
+    (schwartzBruhat_not_finiteDimensional (G := Multiplicative 𝔸ᶠ[F])) (finiteAdeleSchwartz_countable_finest F).2
+    (pullback_unbounded_seminorms k.choose k.choose_spec realSchwartzBruhat_seminorms_unbounded)
+
+private theorem reverse_identity_homeomorph {X : Type*} (t s : TopologicalSpace X)
+    (h : @IsHomeomorph X X t s id) : @IsHomeomorph X X s t id := by
+  have heq : t = s := (@IsInducing.eq_induced X X t s id
+    (@IsEmbedding.isInducing X X id t s (@IsHomeomorph.isEmbedding X X t s id h))).trans (@induced_id X s)
+  subst t
+  exact @IsHomeomorph.id X s
 
 /-- Paper: Remark 2.1.3.4, p. 70. The injective and projective tensor topologies
 on the tensor product of the adelic factors coincide. -/
 theorem adeleSchwartz_injectiveTensor_projectiveTensor :
     @IsHomeomorph (InjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F]))
-      (ProjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) _ _ id := by sorry
+      (ProjectiveTensor ℬ(InfiniteAdeleRing F) ℬ(𝔸ᶠ[F])) _ _ id := by
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) := by
+    change T2Space ((w : InfinitePlace F) → w.Completion)
+    infer_instance
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) := by
+    change LocallyCompactSpace ((w : InfinitePlace F) → w.Completion)
+    infer_instance
+  let : T2Space ℬ(𝔸ᶠ[F]) := schwartzBruhat_t2
+  have h := (schwartzBruhat_nuclear.{0} (G := Multiplicative (InfiniteAdeleRing F))).2.2
+    ℬ(𝔸ᶠ[F]) _ _ _ inferInstance inferInstance
+  exact reverse_identity_homeomorph _ _ h
 
 end Adeles
 
@@ -3547,6 +4802,287 @@ theorem finiteAdeleTailProjection_apply (S : Finset (Places(F))) (x : 𝔸ᶠ[F]
     finiteAdeleTailProjection F S x w = x w.val := by
   rfl
 
+section FiniteTensorKernel
+
+section
+
+open Classical in
+/-- Splitting off a newly inserted index sends a pure tensor to the old tensor
+times its factor at the new index. -/
+private theorem piTensor_insert_split {ι : Type*} (M : ι → Type*) [∀ i, AddCommGroup (M i)]
+    [∀ i, Module ℂ (M i)] (S : Finset ι) (v : ι) (hv : v ∉ S) :
+    ∃ e : (⨂[ℂ] w : ↥(insert v S), M w.val) ≃ₗ[ℂ] (⨂[ℂ] w : S, M w.val) ⊗[ℂ] M v,
+      ∀ g : (w : ↥(insert v S)) → M w.val, e (⨂ₜ[ℂ] w, g w) =
+        (⨂ₜ[ℂ] w : S, g ⟨w.val, Finset.mem_insert_of_mem w.property⟩) ⊗ₜ[ℂ]
+          g ⟨v, Finset.mem_insert_self ..⟩ := by
+  classical
+  let i : ↥(insert v S) := ⟨v, Finset.mem_insert_self ..⟩
+  let C := ({i}ᶜ : Set (↥(insert v S)))
+  let b : C ≃ ↥S :=
+    { toFun := fun w ↦ ⟨w.val.val, (Finset.mem_insert.mp w.val.property).resolve_left
+        (fun h ↦ w.property (Subtype.ext h))⟩
+      invFun := fun w ↦ ⟨⟨w.val, Finset.mem_insert_of_mem w.property⟩,
+        fun h ↦ hv ((show w.val = v from congrArg Subtype.val h) ▸ w.property)⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  let e := PiTensorProduct.equivPiTensorComplSingletonTensor ℂ (fun w : ↥(insert v S) ↦ M w.val) i
+  let r := PiTensorProduct.reindex ℂ (fun w : C ↦ M w.val.val) b
+  refine ⟨e.trans (r.rTensor (M v)), fun g ↦ ?_⟩
+  change r.rTensor (M v) (e (⨂ₜ[ℂ] w, g w)) = _
+  rw [PiTensorProduct.equivPiTensorComplSingletonTensor_tprod, LinearEquiv.rTensor_tmul,
+    PiTensorProduct.reindex_tprod]
+  rfl
+
+open Classical in
+private def finitePlaceProduct_insert_equiv (S : Finset (Places(F))) (v : Places(F)) (hv : v ∉ S) :
+    Multiplicative (FinitePlaceProduct F (insert v S)) ≃ₜ*
+      Multiplicative (FinitePlaceProduct F S) × Multiplicative (v.adicCompletion F) := by
+  classical
+  let i : ↥(insert v S) := ⟨v, Finset.mem_insert_self ..⟩
+  let C := {w : ↥(insert v S) // w ≠ i}
+  let b : S ≃ C :=
+    { toFun := fun w ↦ ⟨⟨w.val, Finset.mem_insert_of_mem w.property⟩,
+        fun h ↦ hv ((show w.val = v from congrArg Subtype.val h) ▸ w.property)⟩
+      invFun := fun w ↦ ⟨w.val.val, (Finset.mem_insert.mp w.val.property).resolve_left
+        (fun h ↦ w.property (Subtype.ext h))⟩
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl }
+  let r := (Homeomorph.piCongrLeft (Y := fun w : C ↦ w.val.val.adicCompletion F) b).symm
+  let h := (Homeomorph.piSplitAt i (fun w : ↥(insert v S) ↦ w.val.adicCompletion F)).trans
+    ((Homeomorph.prodComm ..).trans (r.prodCongr (Homeomorph.refl _)))
+  exact { toEquiv := h.toEquiv, map_mul' := fun _ _ ↦ rfl,
+          continuous_toFun := h.continuous, continuous_invFun := h.symm.continuous }
+
+private theorem schwartzBruhat_of_subsingleton {H : Type*} [CommGroup H] [TopologicalSpace H]
+    [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [CompactSpace H] [Subsingleton H] :
+    ∃ e : ℂ ≃ₗ[ℂ] SchwartzBruhat H, ∀ z x, e z x = z := by
+  have h := exists_schwartzBruhat_indicator (⊤ : Subgroup H) isOpen_univ isCompact_univ
+  let c := h.choose
+  have hc (x : H) : c x = 1 := (h.choose_spec x).trans (ite_eq_left (Subgroup.mem_top x))
+  let L := LinearMap.toSpanSingleton ℂ (SchwartzBruhat H) c
+  have hL (z : ℂ) (x : H) : L z x = z := by change z * c x = z; rw [hc, mul_one]
+  have hinj : Injective L := fun a b he ↦ (hL a 1).symm.trans
+    ((congrArg (fun f : SchwartzBruhat H ↦ f 1) he).trans (hL b 1))
+  have hsur : Surjective L := fun f ↦ ⟨f 1, Subtype.ext (funext fun x ↦
+    (hL (f 1) x).trans (congrArg f (Subsingleton.elim _ _)))⟩
+  exact ⟨LinearEquiv.ofBijective L ⟨hinj, hsur⟩, hL⟩
+
+local instance (S : Finset (Places(F))) : T2Space (Multiplicative (FinitePlaceProduct F S)) :=
+  inferInstanceAs (T2Space (∀ w : S, w.val.adicCompletion F))
+
+local instance (S : Finset (Places(F))) : LocallyCompactSpace (Multiplicative (FinitePlaceProduct F S)) := by
+  let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  exact inferInstanceAs (LocallyCompactSpace (∀ w : S, w.val.adicCompletion F))
+
+local instance (S : Finset (Places(F))) : SecondCountableTopology (Multiplicative (FinitePlaceProduct F S)) := by
+  let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  exact inferInstanceAs (SecondCountableTopology (∀ w : S, w.val.adicCompletion F))
+
+private theorem kernel_with_finitePlace {G K : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K] (v : Places(F))
+    (d : K ≃ₜ* G × Multiplicative (v.adicCompletion F)) :
+    ∃ e : InductiveTensor (SchwartzBruhat G) ℬ(v.adicCompletion F) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2 := by
+  let : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let : T2Space (Multiplicative (v.adicCompletion F)) := inferInstanceAs (T2Space (v.adicCompletion F))
+  let : SecondCountableTopology (Multiplicative (v.adicCompletion F)) :=
+    inferInstanceAs (SecondCountableTopology (v.adicCompletion F))
+  let : LocallyCompactSpace (Multiplicative (v.adicCompletion F)) :=
+    inferInstanceAs (LocallyCompactSpace (v.adicCompletion F))
+  exact schwartzBruhat_kernel_of_finest (G := G) (H := Multiplicative (v.adicCompletion F)) d
+    (finitePlaceSchwartz_countableRank F v) (finitePlaceSchwartz_finestTopology F v)
+
+open Classical in
+private theorem finitePlaceProduct_insert_fst (S : Finset (Places(F))) (v : Places(F)) (hv : v ∉ S)
+    (x : FinitePlaceProduct F (insert v S)) :
+    ((finitePlaceProduct_insert_equiv F S v hv) (Multiplicative.ofAdd x)).1 =
+      Multiplicative.ofAdd (fun w : S ↦ x ⟨w.val, Finset.mem_insert_of_mem w.property⟩) := by
+  rfl
+
+open Classical in
+private theorem finitePlaceProduct_insert_snd (S : Finset (Places(F))) (v : Places(F)) (hv : v ∉ S)
+    (x : FinitePlaceProduct F (insert v S)) :
+    ((finitePlaceProduct_insert_equiv F S v hv) (Multiplicative.ofAdd x)).2 =
+      Multiplicative.ofAdd (x ⟨v, Finset.mem_insert_self ..⟩) := by
+  rfl
+open Classical in
+private theorem prod_subtype_insert {ι : Type*} (S : Finset ι) (v : ι) (hv : v ∉ S)
+    (g : ↥(insert v S) → ℂ) :
+    (∏ w : S, g ⟨w.val, Finset.mem_insert_of_mem w.property⟩) * g ⟨v, Finset.mem_insert_self ..⟩ =
+      ∏ w, g w := by
+  classical
+  let f (w : ι) := if h : w ∈ insert v S then g ⟨w,h⟩ else 1
+  have h₁ : ∀ w : S, g ⟨w.val, Finset.mem_insert_of_mem w.property⟩ = f w.val :=
+    fun w ↦ by simp only [f, dite_eq_left (Finset.mem_insert_of_mem w.property)]
+  have h₂ : ∀ w : ↥(insert v S), g w = f w.val := fun w ↦ by simp only [f, dite_eq_left w.property]
+  rw [Finset.prod_congr rfl (fun w _ ↦ h₁ w), Finset.prod_congr rfl (fun w _ ↦ h₂ w),
+    Finset.prod_coe_sort, Finset.prod_coe_sort, Finset.prod_insert hv, mul_comm]
+  exact congrArg (· * ∏ w ∈ S, f w) (h₂ ⟨v, Finset.mem_insert_self ..⟩)
+
+private theorem finitePlaceProduct_piTensor_equiv (S : Finset (Places(F))) :
+    ∃ e : (⨂[ℂ] w : S, ℬ(w.val.adicCompletion F)) ≃ₗ[ℂ] ℬ(FinitePlaceProduct F S),
+      ∀ (g : (w : S) → ℬ(w.val.adicCompletion F)) (x : FinitePlaceProduct F S),
+        e (⨂ₜ[ℂ] w, g w) (Multiplicative.ofAdd x) = ∏ w, g w (Multiplicative.ofAdd (x w)) := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    let I := ↥(∅ : Finset (Places(F)))
+    let H := Multiplicative (FinitePlaceProduct F ∅)
+    let : Subsingleton H := inferInstanceAs (Subsingleton ((w : I) → w.val.adicCompletion F))
+    let : CompactSpace H := Finite.compactSpace
+    let r := PiTensorProduct.isEmptyEquiv (R := ℂ) (s := fun w : I ↦ ℬ(w.val.adicCompletion F)) I
+    have h := schwartzBruhat_of_subsingleton (H := H)
+    refine ⟨r.trans h.choose, fun g x ↦ ?_⟩
+    exact (h.choose_spec _ _).trans ((PiTensorProduct.isEmptyEquiv_apply_tprod I g).trans (Finset.prod_of_isEmpty Finset.univ).symm)
+  | insert v S hv ih =>
+    have h := kernel_with_finitePlace F (G := Multiplicative (FinitePlaceProduct F S))
+      (K := Multiplicative (FinitePlaceProduct F (insert v S))) v (finitePlaceProduct_insert_equiv F S v hv)
+    have t := piTensor_insert_split (fun w : Places(F) ↦ ℬ(w.adicCompletion F)) S v hv
+    let m := ih.choose.rTensor ℬ(v.adicCompletion F)
+    refine ⟨(t.choose.trans m).trans h.choose.toLinearEquiv, fun g x ↦ ?_⟩
+    let g₀ (w : S) := g ⟨w.val, Finset.mem_insert_of_mem w.property⟩
+    let i : ↥(insert v S) := ⟨v, Finset.mem_insert_self ..⟩
+    let y : FinitePlaceProduct F S := fun w ↦ x ⟨w.val, Finset.mem_insert_of_mem w.property⟩
+    let f₀ := ih.choose (⨂ₜ[ℂ] w, g₀ w)
+    let x' := Multiplicative.ofAdd x
+    let d := finitePlaceProduct_insert_equiv F S v hv
+    have hv₀ : f₀ (d x').1 = ∏ w : S, g₀ w (Multiplicative.ofAdd (y w)) :=
+      (congrArg f₀ (finitePlaceProduct_insert_fst F S v hv x)).trans (ih.choose_spec g₀ y)
+    have hv₁ : g i (d x').2 = g i (Multiplicative.ofAdd (x i)) :=
+      congrArg (g i) (finitePlaceProduct_insert_snd F S v hv x)
+    have hr : m ((⨂ₜ[ℂ] w, g₀ w) ⊗ₜ[ℂ] g i) = f₀ ⊗ₜ[ℂ] g i :=
+      LinearEquiv.rTensor_tmul _ _ _ _
+    calc
+      h.choose (m (t.choose (⨂ₜ[ℂ] w, g w))) x' =
+          h.choose (m ((⨂ₜ[ℂ] w, g₀ w) ⊗ₜ[ℂ] g i)) x' :=
+        congrArg (fun z ↦ h.choose (m z) x') (t.choose_spec g)
+      _ = h.choose (f₀ ⊗ₜ[ℂ] g i) x' := congrArg (fun z ↦ h.choose z x') hr
+      _ = f₀ (d x').1 * g i (d x').2 := h.choose_spec f₀ (g i) x'
+      _ = _ := (congrArg₂ (· * ·) hv₀ hv₁).trans
+        (prod_subtype_insert S v hv (fun w ↦ g w (Multiplicative.ofAdd (x w))))
+
+end
+
+private def finest_equiv_of_linearEquiv {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [AddCommGroup B] [Module ℂ B] [t : TopologicalSpace B]
+    [PolynormableSpace ℂ B] [T2Space B] (e : A ≃ₗ[ℂ] B)
+    (ht : t = (inferInstance : TopologicalSpace (FinestLocallyConvex B))) :
+    FinestLocallyConvex A ≃L[ℂ] B := by
+  let poly : PolynormableSpace ℂ (FinestLocallyConvex A) :=
+    (finestLocallyConvex_withSeminorms A).toPolynormableSpace
+  let sep : T2Space (FinestLocallyConvex A) := finestLocallyConvex_t2 A
+  let u := (inferInstance : TopologicalSpace (FinestLocallyConvex A))
+  have hi : @Continuous (FinestLocallyConvex B) (FinestLocallyConvex A)
+      (inferInstance : TopologicalSpace (FinestLocallyConvex B)) u e.symm := by
+    exact @continuous_of_finestLocallyConvex B _ _ (FinestLocallyConvex A) _ _ u poly sep e.symm.toLinearMap
+  exact ⟨e, continuous_of_finestLocallyConvex A (M := B) e.toLinearMap,
+    Eq.mpr (congrArg (fun t' ↦ @Continuous B (FinestLocallyConvex A) t' u e.symm) ht) hi⟩
+
+/-- Changing a tensor factor by a linear homeomorphism preserves the inductive tensor topology. -/
+private def inductiveTensor_change_right {E X Y : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    (e : X ≃L[ℂ] Y) : InductiveTensor E X ≃L[ℂ] InductiveTensor E Y := by
+  let i := ContinuousLinearMap.id ℂ E
+  exact ⟨e.toLinearEquiv.lTensor E, inductiveTensorMap_continuous i e.toContinuousLinearMap,
+    inductiveTensorMap_continuous i e.symm.toContinuousLinearMap⟩
+
+private theorem kernel_with_finitePlaceProduct {G K : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K] (D : Finset (Places(F)))
+    (d : K ≃ₜ* G × Multiplicative (FinitePlaceProduct F D)) :
+    ∃ e : InductiveTensor (SchwartzBruhat G) ℬ(FinitePlaceProduct F D) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2 := by
+  let (w : D) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  let : T2Space (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (T2Space (∀ w : D, w.val.adicCompletion F))
+  let : SecondCountableTopology (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (SecondCountableTopology (∀ w : D, w.val.adicCompletion F))
+  let : LocallyCompactSpace (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (LocallyCompactSpace (∀ w : D, w.val.adicCompletion F))
+  exact schwartzBruhat_kernel_of_finest (G := G) (H := Multiplicative (FinitePlaceProduct F D)) d
+    (finiteProduct_tailSchwartz_countableRank F D ∅).1 (finiteProduct_tailSchwartz_finestTopology F D ∅).1
+
+/-- Transport a product kernel along a linear equivalence from a finest-topology factor. -/
+private theorem kernel_change_finest_right {A H K V : Type*}
+    [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [SecondCountableTopology A]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K]
+    [AddCommGroup V] [Module ℂ V] (d : K ≃ₜ* A × H)
+    (hk : ∃ e : InductiveTensor (SchwartzBruhat A) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2)
+    (v : V ≃ₗ[ℂ] SchwartzBruhat H) (ht : (inferInstance : TopologicalSpace (SchwartzBruhat H)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (SchwartzBruhat H)))) :
+    ∃ e : InductiveTensor (SchwartzBruhat A) (FinestLocallyConvex V) ≃L[ℂ] SchwartzBruhat K,
+      ∀ (f : SchwartzBruhat A) (g : V) (x : K), e (f ⊗ₜ[ℂ] g) x = f (d x).1 * v g (d x).2 := by
+  let : T2Space (SchwartzBruhat H) := schwartzBruhat_t2
+  let : T2Space (SchwartzBruhat A) := schwartzBruhat_t2
+  let : PolynormableSpace ℂ (FinestLocallyConvex V) :=
+    (finestLocallyConvex_withSeminorms V).toPolynormableSpace
+  let : T2Space (FinestLocallyConvex V) := finestLocallyConvex_t2 _
+  let r := finest_equiv_of_linearEquiv v ht
+  let t := inductiveTensor_change_right (E := SchwartzBruhat A) r
+  exact ⟨t.trans hk.choose, fun f g x ↦ hk.choose_spec f (r g) x⟩
+
+/-- Transport a product kernel along a linear equivalence from a finest-topology factor. -/
+private theorem kernel_change_finest_generators {A H K V I : Type*}
+    [CommGroup A] [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A] [LocallyCompactSpace A] [SecondCountableTopology A]
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K]
+    [AddCommGroup V] [Module ℂ V] (d : K ≃ₜ* A × H)
+    (hk : ∃ e : InductiveTensor (SchwartzBruhat A) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2)
+    (v : V ≃ₗ[ℂ] SchwartzBruhat H) (ht : (inferInstance : TopologicalSpace (SchwartzBruhat H)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (SchwartzBruhat H))))
+    (tgen : I → V) (val : I → H → ℂ) (hv : ∀ i x, v (tgen i) x = val i x) :
+    ∃ e : InductiveTensor (SchwartzBruhat A) (FinestLocallyConvex V) ≃L[ℂ] SchwartzBruhat K,
+      ∀ (f : SchwartzBruhat A) (i : I) (x : K), e (f ⊗ₜ[ℂ] tgen i) x = f (d x).1 * val i (d x).2 := by
+  with_reducible
+    refine (kernel_change_finest_right d hk v ht).elim
+      (fun e he ↦ ⟨e, fun f i x ↦ (he f (tgen i) x).trans ?_⟩)
+    exact congrArg (f (d x).1 * ·) (hv i (d x).2)
+
+private theorem mul_eval_toAdd {T : Type*} (q : Multiplicative T → ℂ) (x : Multiplicative T) :
+    q x = q (Multiplicative.ofAdd x.toAdd) := rfl
+
+private theorem kernel_with_multiple_finite_factors {G K : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [CommGroup K] [TopologicalSpace K] [IsTopologicalGroup K] (S : Finset (Places(F)))
+    (d : K ≃ₜ* G × Multiplicative (FinitePlaceProduct F S)) :
+    ∃ e : InductiveTensor (SchwartzBruhat G) (FinestLocallyConvex (⨂[ℂ] w : S, ℬ(w.val.adicCompletion F)))
+          ≃L[ℂ] SchwartzBruhat K,
+      ∀ (f : SchwartzBruhat G) (g : (w : S) → ℬ(w.val.adicCompletion F)) (x : K),
+        e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) x =
+          f (d x).1 * ∏ w, g w (Multiplicative.ofAdd ((d x).2.toAdd w)) := by
+  let H := Multiplicative (FinitePlaceProduct F S)
+  let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  let : T2Space H := inferInstanceAs (T2Space (∀ w : S, w.val.adicCompletion F))
+  let : SecondCountableTopology H := inferInstanceAs (SecondCountableTopology (∀ w : S, w.val.adicCompletion F))
+  let : LocallyCompactSpace H := inferInstanceAs (LocallyCompactSpace (∀ w : S, w.val.adicCompletion F))
+  let V := (⨂[ℂ] w : S, ℬ(w.val.adicCompletion F))
+  with_reducible
+    refine (finitePlaceProduct_piTensor_equiv F S).elim (fun v hv ↦ ?_)
+    refine kernel_change_finest_generators (A := G) (H := H) (K := K) (V := V)
+      (I := (w : S) → ℬ(w.val.adicCompletion F)) d
+      (kernel_with_finitePlaceProduct F (G := G) (K := K) S d) v (finiteProduct_tailSchwartz_finestTopology F S ∅).1
+      (fun g ↦ PiTensorProduct.tprod ℂ g) (fun g x ↦ ∏ w, g w (Multiplicative.ofAdd (x.toAdd w))) ?_
+    intro g x
+    exact (mul_eval_toAdd (v ((PiTensorProduct.tprod ℂ) g)) x).trans (hv g x.toAdd)
+
+private def archFiniteProductEquiv (S : Finset (Places(F))) :
+    Multiplicative (SAdeleRing F S) ≃ₜ*
+      Multiplicative (InfiniteAdeleRing F) × Multiplicative (FinitePlaceProduct F S) :=
+  ⟨MulEquiv.prodMultiplicative _ _, continuous_id, continuous_id⟩
+
+
+private theorem archFiniteProductEquiv_fst (S : Finset (Places(F))) (x : SAdeleRing F S) :
+    ((archFiniteProductEquiv F S) (Multiplicative.ofAdd x)).1 = Multiplicative.ofAdd x.1 := rfl
+
+private theorem archFiniteProductEquiv_snd (S : Finset (Places(F))) (x : SAdeleRing F S) :
+    ((archFiniteProductEquiv F S) (Multiplicative.ofAdd x)).2.toAdd = x.2 := rfl
+
 /-- Paper: Proposition 2.1.4.1(1), p. 71. The inductive tensor product of the
 Archimedean factor with the finite tensor product of the local factors is
 canonically the Schwartz–Bruhat space of the S-adeles.
@@ -3558,42 +5094,82 @@ theorem sAdeleSchwartz_inductiveTensor_equiv (S : Finset (Places(F))) :
       ∀ (f : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F))
         (x : SAdeleRing F S),
         e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd x) =
-          f (Multiplicative.ofAdd x.1) * ∏ w : S, g w (Multiplicative.ofAdd (x.2 w)) := by sorry
+          f (Multiplicative.ofAdd x.1) * ∏ w : S, g w (Multiplicative.ofAdd (x.2 w)) := by
+  intro V
+  let A := Multiplicative (InfiniteAdeleRing F)
+  let H := Multiplicative (FinitePlaceProduct F S)
+  let : T2Space A := inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace A := inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology A := inferInstanceAs (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+  with_reducible
+    refine (kernel_with_multiple_finite_factors F (G := Multiplicative (InfiniteAdeleRing F))
+      (K := Multiplicative (SAdeleRing F S)) S (archFiniteProductEquiv F S)).elim
+      (fun e he ↦ ⟨e, fun f g x ↦ (he f g (Multiplicative.ofAdd x)).trans ?_⟩)
+    exact congrArg₂ (· * ·) (congrArg f (archFiniteProductEquiv_fst F S x))
+      (congrArg (fun z : FinitePlaceProduct F S ↦ ∏ w : S, g w (Multiplicative.ofAdd (z w)))
+        (archFiniteProductEquiv_snd F S x))
+
+end FiniteTensorKernel
+
+local instance (S : Finset (Places(F))) : SecondCountableTopology (Multiplicative (SAdeleRing F S)) := by
+  let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  change SecondCountableTopology (((w : InfinitePlace F) → w.Completion) × FinitePlaceProduct F S)
+  infer_instance
+
+local instance (S : Finset (Places(F))) : LocallyCompactSpace (Multiplicative (SAdeleRing F S)) := by
+  let (w : S) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  change LocallyCompactSpace (InfiniteAdeleRing F × FinitePlaceProduct F S)
+  infer_instance
+
+local instance (S : Finset (Places(F))) : T2Space (Multiplicative (SAdeleRing F S)) := by
+  change T2Space (((w : InfinitePlace F) → w.Completion) × FinitePlaceProduct F S)
+  infer_instance
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is a strict
 LF-space.
 Deviation: Nuclearity below implies that its strict Fréchet stages are nuclear
 by Remark C.1.5.12. -/
 theorem sAdeleSchwartz_strictLF (S : Finset (Places(F))) :
-    IsStrictLFSpace 𝒮(S) := by sorry
+    IsStrictLFSpace 𝒮(S) := by
+  exact schwartzBruhat_strictLF_of_secondCountable
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is complete. -/
 theorem sAdeleSchwartz_complete (S : Finset (Places(F))) :
-    CompleteSpace 𝒮(S) := by sorry
+    CompleteSpace 𝒮(S) := by
+  exact schwartzBruhat_complete
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is
 Hausdorff, locally convex and nuclear. -/
 theorem sAdeleSchwartz_nuclear (S : Finset (Places(F))) :
-    IsNuclearTVS.{v} 𝒮(S) := by sorry
+    IsNuclearTVS.{v} 𝒮(S) := by
+  exact schwartzBruhat_nuclear
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The S-adelic Schwartz–Bruhat space is Montel. -/
 theorem sAdeleSchwartz_montel (S : Finset (Places(F))) :
-    BarrelledSpace ℂ 𝒮(S) ∧ MontelSpace ℂ 𝒮(S) := by sorry
+    BarrelledSpace ℂ 𝒮(S) ∧ MontelSpace ℂ 𝒮(S) := by
+  exact ⟨schwartzBruhat_barrelled, schwartzBruhat_montel⟩
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The strong dual of the S-adelic
 Schwartz–Bruhat space is complete. -/
 theorem sAdeleSchwartz_strongDual_complete (S : Finset (Places(F))) :
-    CompleteSpace (StrongDual ℂ 𝒮(S)) := by sorry
+    CompleteSpace (StrongDual ℂ 𝒮(S)) := by
+  exact schwartzBruhat_strongDual_complete
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The strong dual of the S-adelic
 Schwartz–Bruhat space is Hausdorff, locally convex and nuclear. -/
 theorem sAdeleSchwartz_strongDual_nuclear (S : Finset (Places(F))) :
-    IsNuclearTVS.{v} (StrongDual ℂ 𝒮(S)) := by sorry
+    IsNuclearTVS.{v} (StrongDual ℂ 𝒮(S)) := by
+  exact schwartzBruhat_strongDual_nuclear
 
 /-- Paper: Proposition 2.1.4.1(2), p. 71. The strong dual of the S-adelic
 Schwartz–Bruhat space is Montel. -/
 theorem sAdeleSchwartz_strongDual_montel (S : Finset (Places(F))) :
-    BarrelledSpace ℂ (StrongDual ℂ 𝒮(S)) ∧ MontelSpace ℂ (StrongDual ℂ 𝒮(S)) := by sorry
+    BarrelledSpace ℂ (StrongDual ℂ 𝒮(S)) ∧ MontelSpace ℂ (StrongDual ℂ 𝒮(S)) := by
+  exact ⟨schwartzBruhat_strongDual_barrelled, schwartzBruhat_strongDual_montel⟩
 
 open Classical in
 /-- Paper: (2.1.4.3), p. 71. The extension formula gives a linear map into
@@ -3607,11 +5183,114 @@ def sAdeleSchwartzTransitionFunctions {S T : Finset (Places(F))} (hST : S ⊆ T)
         (x.toAdd.1, fun w : S ↦ x.toAdd.2 ⟨w.val, hST w.property⟩))).comp
     (schwartzBruhatSubmodule (Multiplicative (SAdeleRing F S))).subtype
 
+open Classical in
+/-- Split the coordinates of a larger finite stage into the old and new places. -/
+private def sAdeleDifferenceEquiv {S T : Finset (Places(F))} (hST : S ⊆ T) :
+    Multiplicative (SAdeleRing F T) ≃ₜ*
+      Multiplicative (SAdeleRing F S) × Multiplicative (FinitePlaceProduct F (T \ S)) := by
+  classical
+  let split (x : SAdeleRing F T) : SAdeleRing F S × FinitePlaceProduct F (T \ S) :=
+    ((x.1, fun w ↦ x.2 ⟨w.val, hST w.property⟩),
+      fun w ↦ x.2 ⟨w.val, (Finset.mem_sdiff.mp w.property).1⟩)
+  let join (y : SAdeleRing F S × FinitePlaceProduct F (T \ S)) : SAdeleRing F T :=
+    (y.1.1, fun w ↦ if h : w.val ∈ S then y.1.2 ⟨w.val, h⟩
+      else y.2 ⟨w.val, Finset.mem_sdiff.mpr ⟨w.property, h⟩⟩)
+  refine { toFun := split, invFun := join, map_mul' := fun _ _ ↦ rfl,
+           left_inv := ?_, right_inv := ?_, continuous_toFun := ?_, continuous_invFun := ?_ }
+  · intro x
+    change join (split x.toAdd) = x.toAdd
+    refine Prod.ext (by rfl) ?_
+    funext w
+    change (if h : w.val ∈ S then _ else _) = _
+    split <;> rfl
+  · rintro ⟨x, y⟩
+    refine Prod.ext (Prod.ext rfl (funext fun w ↦ ?_)) (funext fun w ↦ ?_)
+    · exact dite_eq_left w.property
+    · exact dite_eq_right (Finset.mem_sdiff.mp w.property).2
+  · exact (continuous_fst.prodMk (continuous_pi fun w ↦ (continuous_apply _).comp continuous_snd)).prodMk
+      (continuous_pi fun w ↦ (continuous_apply _).comp continuous_snd)
+  · refine (continuous_fst.comp continuous_fst).prodMk (continuous_pi fun w ↦ ?_)
+    by_cases hw : w.val ∈ S
+    · simp only [dite_eq_left hw]
+      exact (continuous_apply (⟨w.val, hw⟩ : S)).comp (continuous_snd.comp continuous_fst)
+    · simp only [dite_eq_right hw]
+      exact (continuous_apply (⟨w.val, Finset.mem_sdiff.mpr ⟨w.property, hw⟩⟩ : ↥(T \ S))).comp continuous_snd
+
+open Classical in
+private theorem sAdeleDifference_kernel {S T : Finset (Places(F))} (hST : S ⊆ T) :
+    ∃ e : InductiveTensor 𝒮(S) ℬ(FinitePlaceProduct F (T \ S)) ≃L[ℂ] 𝒮(T),
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f ((sAdeleDifferenceEquiv F hST x).1) *
+        g ((sAdeleDifferenceEquiv F hST x).2) := by
+  exact kernel_with_finitePlaceProduct F (G := Multiplicative (SAdeleRing F S))
+    (K := Multiplicative (SAdeleRing F T)) (T \ S) (sAdeleDifferenceEquiv F hST)
+
+open Classical in
+private theorem finitePlaceProduct_indicator (D : Finset (Places(F))) :
+    ∃ c : ℬ(FinitePlaceProduct F D), ∀ x : FinitePlaceProduct F D,
+      c (Multiplicative.ofAdd x) = if ∀ w, x w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
+  let (w : D) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  let : LocallyCompactSpace (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (LocallyCompactSpace (∀ w : D, w.val.adicCompletion F))
+  let : T2Space (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (T2Space (∀ w : D, w.val.adicCompletion F))
+  let H := (AddSubgroup.pi univ (fun w : D ↦ (w.val.adicCompletionIntegers F).toAddSubgroup)).toSubgroup
+  let O := univ.pi (fun w : D ↦ (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F)))
+  have hHO : (H : Set (Multiplicative (FinitePlaceProduct F D))) = O := rfl
+  have ho : IsOpen O := isOpen_set_pi (finite_univ) (fun w _ ↦ Valued.isOpen_valuationSubring _)
+  have hc : IsCompact O := isCompact_univ_pi
+    (fun w : D ↦ isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w.val))
+  obtain ⟨c, h⟩ := exists_schwartzBruhat_indicator H (hHO ▸ ho) (hHO ▸ hc)
+  exact ⟨c, fun x ↦ (h _).trans (if_congr (by simp [H, AddSubgroup.mem_pi]) rfl rfl)⟩
+
+private theorem mul_indicator_value {P Q : Prop} [Decidable P] [Decidable Q]
+    (h : P ↔ Q) (z : ℂ) : z * (if P then 1 else 0) = (if Q then (1 : ℂ) else 0) • z := by
+  by_cases hp : P
+  · rw [ite_eq_left hp, ite_eq_left (h.mp hp), mul_one, one_smul]
+  · rw [ite_eq_right hp, ite_eq_right (fun hq ↦ hp (h.mpr hq)), mul_zero, zero_smul]
+
+open Classical in
+private theorem kernel_slice_with_indicator {G H K : Type*}
+    [CommGroup G] [TopologicalSpace G] [CommGroup H] [TopologicalSpace H] [CommGroup K] [TopologicalSpace K]
+    (d : K ≃ₜ* G × H) (k : H → ℂ) (o : H) (ho : k o = 1)
+    (j : SchwartzBruhat G → K → ℂ)
+    (hk : ∃ e : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K,
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f (d x).1 * g (d x).2)
+    (hc : ∃ c : SchwartzBruhat H, ∀ y, c y = k y)
+    (hj : ∀ (f : SchwartzBruhat G) x, f (d x).1 * k (d x).2 = j f x) :
+    ∃ (e : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K)
+      (c : SchwartzBruhat H), c o = 1 ∧ ∀ f, (e (f ⊗ₜ[ℂ] c)).val = j f := by
+  obtain ⟨e, he⟩ := hk
+  obtain ⟨c, hc⟩ := hc
+  exact ⟨e,c,(hc o).trans ho, fun f ↦ funext fun x ↦ (he f c x).trans
+    ((congrArg (f (d x).1 * ·) (hc (d x).2)).trans (hj f x))⟩
+
+open Classical in
+private theorem sAdeleDifference_indicator_slice {S T : Finset (Places(F))} (hST : S ⊆ T) :
+    ∃ (e : InductiveTensor 𝒮(S) ℬ(FinitePlaceProduct F (T \ S)) ≃L[ℂ] 𝒮(T))
+      (c : ℬ(FinitePlaceProduct F (T \ S))),
+      c (Multiplicative.ofAdd 0) = 1 ∧ ∀ f : 𝒮(S),
+        (e (f ⊗ₜ[ℂ] c)).val = sAdeleSchwartzTransitionFunctions F hST f := by
+  let k (y : Multiplicative (FinitePlaceProduct F (T \ S))) : ℂ :=
+    if ∀ w, y.toAdd w ∈ w.val.adicCompletionIntegers F then 1 else 0
+  apply kernel_slice_with_indicator (sAdeleDifferenceEquiv F hST) k (Multiplicative.ofAdd 0)
+    (ite_eq_left (fun w ↦ (w.val.adicCompletionIntegers F).zero_mem)) (sAdeleSchwartzTransitionFunctions F hST)
+    (sAdeleDifference_kernel F hST) (finitePlaceProduct_indicator F (T \ S))
+  intro f x
+  let y : FinitePlaceProduct F (T \ S) := fun w ↦ x.toAdd.2 ⟨w.val, (Finset.mem_sdiff.mp w.property).1⟩
+  let z : SAdeleRing F S := (x.toAdd.1, fun w ↦ x.toAdd.2 ⟨w.val, hST w.property⟩)
+  have iff_mem : (∀ w, y w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ w : T, w.val ∉ S → x.toAdd.2 w ∈ w.val.adicCompletionIntegers F :=
+    ⟨fun h w hw ↦ h ⟨w.val, Finset.mem_sdiff.mpr ⟨w.property, hw⟩⟩,
+      fun h w ↦ h ⟨w.val, (Finset.mem_sdiff.mp w.property).1⟩ (Finset.mem_sdiff.mp w.property).2⟩
+  exact mul_indicator_value iff_mem (f (Multiplicative.ofAdd z))
+
 /-- Paper: (2.1.4.3), p. 71. Multiplying the pulled-back function by the
 integer-coordinate indicators at newly selected places gives a Schwartz–Bruhat function. -/
 theorem sAdeleSchwartz_transition_mem {S T : Finset (Places(F))} (hST : S ⊆ T) (f : 𝒮(S)) :
     sAdeleSchwartzTransitionFunctions F hST f ∈
-      schwartzBruhatSubmodule (Multiplicative (SAdeleRing F T)) := by sorry
+      schwartzBruhatSubmodule (Multiplicative (SAdeleRing F T)) := by
+  have h := sAdeleDifference_indicator_slice F hST
+  exact (h.choose_spec.choose_spec.2 f) ▸ (h.choose (f ⊗ₜ[ℂ] h.choose_spec.choose)).property
 
 /-- Paper: (2.1.4.2)–(2.1.4.3), p. 71. The transition map keeps the old variables
 and multiplies by the indicator that every new place's coordinate is integral. -/
@@ -3635,10 +5314,92 @@ theorem sAdeleSchwartzTransition_apply {S T : Finset (Places(F))} (hST : S ⊆ T
   simp only [toAdd_ofAdd]
   split_ifs <;> simp
 
+/-- Inserting a fixed tensor factor with a normalized continuous functional
+has a continuous left inverse, given by contraction against the functional. -/
+private theorem tensor_slice_retraction {X Y Z : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] (e : InductiveTensor X Y ≃L[ℂ] Z)
+    (j : X →ₗ[ℂ] Z) (c : Y) (φ : Y →L[ℂ] ℂ) (hφ : φ c = 1)
+    (hj : ∀ x, e (x ⊗ₜ[ℂ] c) = j x) :
+    Continuous j ∧ ∃ r : Z →L[ℂ] X, ∀ x, r (j x) = x := by
+  let W := InductiveTensor X Y
+  let : IsTopologicalAddGroup X := PolynormableSpace.isTopologicalAddGroup ℂ X
+  let L : W →ₗ[ℂ] X := (TensorProduct.rid ℂ X).toLinearMap.comp (TensorProduct.map LinearMap.id φ.toLinearMap)
+  have hL (x : X) (y : Y) : L (x ⊗ₜ[ℂ] y) = φ y • x := by
+    exact TensorProduct.rid_tmul x (φ y)
+  let r : W →L[ℂ] X := ⟨L, (continuous_inductiveTensor_iff L).mpr
+    ⟨fun x ↦ (φ.continuous.smul continuous_const).congr (fun y ↦ (hL x y).symm),
+      fun y ↦ (continuous_const.smul continuous_id).congr (fun x ↦ (hL x y).symm)⟩⟩
+  have hsp := withGeneratingSeminorms_spec (X ⊗[ℂ] Y)
+    (fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      (∀ x : X, Continuous (fun y : Y ↦ p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : Y, Continuous (fun x : X ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
+  have hcol : @Continuous X W _ _ (fun x ↦ x ⊗ₜ[ℂ] c) :=
+    hsp.continuous_of_continuous_comp ((TensorProduct.mk ℂ X Y).flip c) (fun p ↦ p.property.2 c)
+  refine ⟨(e.continuous.comp hcol).congr hj, r.comp e.symm.toContinuousLinearMap, fun x ↦ ?_⟩
+  change L (e.symm (j x)) = x
+  have he : e.symm (j x) = x ⊗ₜ[ℂ] c :=
+    (congrArg e.symm (hj x).symm).trans (e.symm_apply_apply _)
+  exact (congrArg L he).trans ((hL x c).trans (hφ ▸ one_smul ℂ x))
+
+private theorem continuous_eval_of_finest {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (ht : (inferInstance : TopologicalSpace (SchwartzBruhat G)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (SchwartzBruhat G)))) (x : G) :
+    ∃ φ : SchwartzBruhat G →L[ℂ] ℂ, ∀ f, φ f = f x := by
+  let E := SchwartzBruhat G
+  let L : E →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  exact ⟨⟨L, Eq.mpr (congrArg (fun t ↦ @Continuous E ℂ t _ L) ht) (continuous_of_finestLocallyConvex E L)⟩,
+    fun _ ↦ rfl⟩
+
+private theorem retraction_of_schwartz_slice {G H K : Type*}
+    [CommGroup G] [TopologicalSpace G] [CommGroup H] [TopologicalSpace H] [CommGroup K] [TopologicalSpace K]
+    [T2Space (SchwartzBruhat G)] [T2Space (SchwartzBruhat H)]
+    (j : SchwartzBruhat G →ₗ[ℂ] SchwartzBruhat K) (k : SchwartzBruhat G → K → ℂ)
+    (hj : ∀ f, (j f).val = k f) (o : H)
+    (ht : (inferInstance : TopologicalSpace (SchwartzBruhat H)) =
+      (inferInstance : TopologicalSpace (FinestLocallyConvex (SchwartzBruhat H))))
+    (s : ∃ (e : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K)
+      (c : SchwartzBruhat H), c o = 1 ∧ ∀ f, (e (f ⊗ₜ[ℂ] c)).val = k f) :
+    Continuous j ∧ ∃ r : SchwartzBruhat K →L[ℂ] SchwartzBruhat G, ∀ x, r (j x) = x := by
+  let e := s.choose
+  let c := s.choose_spec.choose
+  have hc := s.choose_spec.choose_spec
+  have hφ := continuous_eval_of_finest (G := H) ht o
+  exact tensor_slice_retraction (X := SchwartzBruhat G) (Y := SchwartzBruhat H) (Z := SchwartzBruhat K)
+    e j c hφ.choose ((hφ.choose_spec c).trans hc.1) (fun f ↦ Subtype.ext ((hc.2 f).trans (hj f).symm))
+
+private theorem isEmbedding_of_linear_retraction {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (j : X →ₗ[ℂ] E) (h : Continuous j ∧ ∃ r : E →L[ℂ] X, ∀ x, r (j x) = x) :
+    IsEmbedding j := (show LeftInverse h.2.choose j from h.2.choose_spec).isEmbedding h.2.choose.continuous h.1
+
+private theorem finitePlaceProduct_slice_embedding (D S T : Finset (Places(F)))
+    (j : 𝒮(S) →ₗ[ℂ] 𝒮(T)) (k : 𝒮(S) →ₗ[ℂ] (Multiplicative (SAdeleRing F T) → ℂ))
+    (hj : ∀ x, (j x).val = k x)
+    (hs : ∃ (e : InductiveTensor 𝒮(S) ℬ(FinitePlaceProduct F D) ≃L[ℂ] 𝒮(T))
+      (c : ℬ(FinitePlaceProduct F D)), c (Multiplicative.ofAdd 0) = 1 ∧
+        ∀ f : 𝒮(S), (e (f ⊗ₜ[ℂ] c)).val = k f) : IsEmbedding j := by
+  let (w : D) : ProperSpace (w.val.adicCompletion F) := properSpace_adicCompletion w.val
+  let : T2Space (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (T2Space (∀ w : D, w.val.adicCompletion F))
+  let : LocallyCompactSpace (Multiplicative (FinitePlaceProduct F D)) :=
+    inferInstanceAs (LocallyCompactSpace (∀ w : D, w.val.adicCompletion F))
+  let : T2Space 𝒮(S) := schwartzBruhat_t2
+  let : T2Space ℬ(FinitePlaceProduct F D) := schwartzBruhat_t2
+  have h := retraction_of_schwartz_slice (G := Multiplicative (SAdeleRing F S))
+    (H := Multiplicative (FinitePlaceProduct F D)) (K := Multiplicative (SAdeleRing F T))
+    j k hj (Multiplicative.ofAdd (0 : FinitePlaceProduct F D))
+    (finiteProduct_tailSchwartz_finestTopology F D ∅).1 hs
+  exact isEmbedding_of_linear_retraction (X := 𝒮(S)) (E := 𝒮(T)) j h
+
 /-- Paper: Proposition 2.1.4.1(3)–(4), p. 71. The transition map is a topological
 embedding, so it is continuous and injective and induces the intrinsic topology. -/
 theorem sAdeleSchwartzTransition_isEmbedding {S T : Finset (Places(F))} (hST : S ⊆ T) :
-    IsEmbedding (sAdeleSchwartzTransition F hST) := by sorry
+    IsEmbedding (sAdeleSchwartzTransition F hST) := by
+  classical
+  exact finitePlaceProduct_slice_embedding F (T \ S) S T (sAdeleSchwartzTransition F hST)
+    (sAdeleSchwartzTransitionFunctions F hST) (fun _ ↦ rfl) (sAdeleDifference_indicator_slice F hST)
 
 /-- Paper: Proposition 2.1.4.1(1), p. 71. Enlarging the place set inserts the
 integer indicators in a pure tensor. The functions realizing the two tensors
@@ -3679,11 +5440,87 @@ def sAdeleSchwartzToGlobalFunctions (S : Finset (Places(F))) :
       then (1 : ℂ) else 0) • LinearMap.proj (Multiplicative.ofAdd (adeleProjection F S x.toAdd))).comp
     (schwartzBruhatSubmodule (Multiplicative (SAdeleRing F S))).subtype
 
+/-- The global additive group is the product of the selected stage and its restricted tail. -/
+private def sAdeleTailEquiv (S : Finset (Places(F))) :
+    Multiplicative 𝔸[F] ≃ₜ* Multiplicative (SAdeleRing F S) × Multiplicative (FiniteAdeleTail F S) := by
+  let O (w : Places(F)) : Subgroup (Multiplicative (w.adicCompletion F)) :=
+    (w.adicCompletionIntegers F).toAddSubgroup.toSubgroup
+  let d := restrictedProductSplitFinset (K := O)
+    (.of_forall fun w ↦ Valued.isOpen_valuationSubring (w.adicCompletion F)) S
+  let e := ((Homeomorph.refl (InfiniteAdeleRing F)).prodCongr d.toHomeomorph).trans
+    (Homeomorph.prodAssoc _ _ _).symm
+  exact ContinuousMulEquiv.mk' e (fun _ _ ↦ rfl)
+
+local instance (S : Finset (Places(F))) :
+    Fact (∀ w : {w : Places(F) // w ∉ S},
+      IsOpen (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F))) :=
+  ⟨fun w ↦ Valued.isOpen_valuationSubring (w.val.adicCompletion F)⟩
+
+local instance (S : Finset (Places(F))) : T2Space (Multiplicative (FiniteAdeleTail F S)) :=
+  inferInstanceAs (T2Space (Πʳ w : {w : Places(F) // w ∉ S},
+    [w.val.adicCompletion F, w.val.adicCompletionIntegers F]))
+
+local instance (S : Finset (Places(F))) : SecondCountableTopology (Multiplicative (FiniteAdeleTail F S)) :=
+  finiteAdeleTail_secondCountable F S
+
+local instance (S : Finset (Places(F))) : LocallyCompactSpace (Multiplicative (FiniteAdeleTail F S)) := by
+  let (w : {w : Places(F) // w ∉ S}) : CompactSpace (w.val.adicCompletionIntegers F) :=
+    compactSpace_adicCompletionIntegers w.val
+  change LocallyCompactSpace (Πʳ w : {w : Places(F) // w ∉ S},
+    [w.val.adicCompletion F, w.val.adicCompletionIntegers F])
+  infer_instance
+
+local instance (S : Finset (Places(F))) : IsTopologicalRing (FiniteAdeleTail F S) :=
+  RestrictedProduct.isTopologicalRing (fun w : {w // w ∉ S} ↦ w.val.adicCompletion F)
+
+private theorem sAdeleTail_kernel (S : Finset (Places(F))) :
+    ∃ e : InductiveTensor 𝒮(S) ℬ(FiniteAdeleTail F S) ≃L[ℂ] ℬ(𝔸[F]),
+      ∀ f g x, e (f ⊗ₜ[ℂ] g) x = f ((sAdeleTailEquiv F S x).1) * g ((sAdeleTailEquiv F S x).2) := by
+  exact schwartzBruhat_kernel_of_finest (sAdeleTailEquiv F S)
+    (finiteProduct_tailSchwartz_countableRank F ∅ S).2 (finiteProduct_tailSchwartz_finestTopology F ∅ S).2
+
+open Classical in
+private theorem finiteAdeleTail_indicator (S : Finset (Places(F))) :
+    ∃ c : ℬ(FiniteAdeleTail F S), ∀ x : FiniteAdeleTail F S,
+      c (Multiplicative.ofAdd x) = if ∀ w, x w ∈ w.val.adicCompletionIntegers F then 1 else 0 := by
+  let I := {w : Places(F) // w ∉ S}
+  let E := FiniteAdeleTail F S
+  let H : AddSubgroup E :=
+    { carrier := {x | ∀ w : I, x w ∈ w.val.adicCompletionIntegers F}
+      zero_mem' := fun w ↦ (w.val.adicCompletionIntegers F).zero_mem
+      add_mem' := fun ha hb w ↦ (w.val.adicCompletionIntegers F).toSubring.add_mem (ha w) (hb w)
+      neg_mem' := fun ha w ↦ (w.val.adicCompletionIntegers F).toSubring.neg_mem (ha w) }
+  have ho : IsOpen (H : Set E) := by
+    exact RestrictedProduct.isOpen_forall_mem (R := fun w : I ↦ w.val.adicCompletion F)
+      (A := fun w ↦ (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F)))
+      (fun w ↦ Valued.isOpen_valuationSubring _)
+  exact exists_schwartzBruhat_indicator H.toSubgroup ho (finiteAdeleTail_isCompact_integral F S)
+
+open Classical in
+private theorem sAdeleTail_indicator_slice (S : Finset (Places(F))) :
+    ∃ (e : InductiveTensor 𝒮(S) ℬ(FiniteAdeleTail F S) ≃L[ℂ] ℬ(𝔸[F])) (c : ℬ(FiniteAdeleTail F S)),
+      c (Multiplicative.ofAdd 0) = 1 ∧ ∀ f : 𝒮(S),
+        (e (f ⊗ₜ[ℂ] c)).val = sAdeleSchwartzToGlobalFunctions F S f := by
+  let k (y : Multiplicative (FiniteAdeleTail F S)) : ℂ :=
+    if ∀ w, y.toAdd w ∈ w.val.adicCompletionIntegers F then 1 else 0
+  apply kernel_slice_with_indicator (sAdeleTailEquiv F S) k (Multiplicative.ofAdd 0)
+    (ite_eq_left (fun w ↦ (w.val.adicCompletionIntegers F).zero_mem)) (sAdeleSchwartzToGlobalFunctions F S)
+    (sAdeleTail_kernel F S) (finiteAdeleTail_indicator F S)
+  intro f x
+  let y := finiteAdeleTailProjection F S x.toAdd.2
+  let z := adeleProjection F S x.toAdd
+  have iff_mem : (∀ w, y w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ w : Places(F), w ∉ S → x.toAdd.2 w ∈ w.adicCompletionIntegers F :=
+    ⟨fun h w hw ↦ h ⟨w, hw⟩, fun h w ↦ h w.val w.property⟩
+  exact mul_indicator_value iff_mem (f (Multiplicative.ofAdd z))
+
 /-- Paper: (2.1.4.5), p. 71. The pullback of an S-adelic test function
 multiplied by the indicator of integral coordinates outside S is Schwartz–Bruhat. -/
 theorem sAdeleSchwartz_toGlobal_mem (S : Finset (Places(F))) (f : 𝒮(S)) :
     sAdeleSchwartzToGlobalFunctions F S f ∈
-      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by sorry
+      schwartzBruhatSubmodule (Multiplicative 𝔸[F]) := by
+  have h := sAdeleTail_indicator_slice F S
+  exact (h.choose_spec.choose_spec.2 f) ▸ (h.choose (f ⊗ₜ[ℂ] h.choose_spec.choose)).property
 
 /-- Paper: (2.1.4.5), p. 71. The global inclusion extends an S-adelic
 function by the indicator of the product of integer rings outside S. -/
@@ -3703,10 +5540,22 @@ theorem sAdeleSchwartzToGlobal_apply (S : Finset (Places(F))) (f : 𝒮(S)) (x :
   simp only [toAdd_ofAdd]
   split_ifs <;> simp
 
+private theorem sAdeleSchwartzToGlobal_retraction (S : Finset (Places(F))) :
+    Continuous (sAdeleSchwartzToGlobal F S) ∧
+      ∃ r : ℬ(𝔸[F]) →L[ℂ] 𝒮(S), ∀ x, r (sAdeleSchwartzToGlobal F S x) = x := by
+  let : T2Space 𝒮(S) := schwartzBruhat_t2
+  let : T2Space ℬ(FiniteAdeleTail F S) := schwartzBruhat_t2
+  exact retraction_of_schwartz_slice (G := Multiplicative (SAdeleRing F S))
+    (H := Multiplicative (FiniteAdeleTail F S)) (K := Multiplicative 𝔸[F])
+    (sAdeleSchwartzToGlobal F S) (sAdeleSchwartzToGlobalFunctions F S) (fun _ ↦ rfl)
+    (Multiplicative.ofAdd (0 : FiniteAdeleTail F S))
+    (finiteProduct_tailSchwartz_finestTopology F ∅ S).2 (sAdeleTail_indicator_slice F S)
+
 /-- Paper: Proposition 2.1.4.1(5), p. 71. Each S-local space embeds topologically
 in the global Schwartz–Bruhat space by extension with the integer indicator. -/
 theorem sAdeleSchwartzToGlobal_isEmbedding (S : Finset (Places(F))) :
-    IsEmbedding (sAdeleSchwartzToGlobal F S) := by sorry
+    IsEmbedding (sAdeleSchwartzToGlobal F S) := by
+  exact isEmbedding_of_linear_retraction _ (sAdeleSchwartzToGlobal_retraction F S)
 
 /-- Paper: Proposition 2.1.4.1(5), p. 71. The global inclusions are compatible
 with the transition maps, so they induce the canonical colimit map. -/
@@ -3733,12 +5582,174 @@ theorem sAdeleSchwartzToGlobal_comp {S T : Finset (Places(F))} (hST : S ⊆ T) :
   · exact absurd (fun w hw ↦ h₁ w fun h ↦ hw (hST h)) hT
   · rfl
 
+/-- The indicator of a compact open subset of a finite completion is a local test function. -/
+private theorem finitePlaceSchwartz_compactOpen_indicator (w : Places(F))
+    (U : Set (w.adicCompletion F)) (hc : IsCompact U) (ho : IsOpen U) :
+    ∃ g : ℬ(w.adicCompletion F), ∀ x, g (Multiplicative.ofAdd x) = U.indicator (1 : w.adicCompletion F → ℂ) x := by
+  apply (mem_finitePlaceSchwartz_iff F w _).2
+  exact ⟨(LocallyConstant.charFn ℂ ⟨hc.isClosed, ho⟩).isLocallyConstant,
+    hc.of_isClosed_subset isClosed_closure (closure_minimal support_indicator_subset hc.isClosed)⟩
+
+open Classical in
+private theorem rectangle_indicator_product {ι X : Type*} (S : Finset ι)
+    (P Q : ι → Prop) (A : Set X) (x : X) (hx : x ∈ A ↔ ∀ i, P i)
+    (hout : ∀ i ∉ S, P i ↔ Q i) (z : ℂ) (g : S → ℂ)
+    (hone : ∀ w, P w.val → g w = 1) (hzero : ∀ w, ¬ P w.val → g w = 0) :
+    (if ∀ i ∉ S, Q i then z * ∏ w, g w else 0) =
+      z * A.indicator (fun _ ↦ (1 : ℂ)) x := by
+  classical
+  by_cases hall : ∀ i, P i
+  · rw [ite_eq_left (fun i hi ↦ (hout i hi).mp (hall i)), Set.indicator_of_mem (hx.mpr hall),
+      Finset.prod_eq_one (fun w _ ↦ hone w (hall w.val))]
+  · rw [Set.indicator_of_notMem (fun h ↦ hall (hx.mp h)), mul_zero]
+    split_ifs with h
+    · obtain ⟨i, hi⟩ := not_forall.mp hall
+      have hiS : i ∈ S := by
+        by_contra hn
+        exact hi ((hout i hn).mpr (h i hn))
+      rw [Finset.prod_eq_zero (Finset.mem_univ (⟨i, hiS⟩ : S)) (hzero _ hi), mul_zero]
+    · rfl
+
+/-- A rectangle integral off S extends from the product of its S-local factors. -/
+private theorem rectangle_mem_sAdele_range (S : Finset (Places(F))) (a : ℬ(InfiniteAdeleRing F))
+    (K : (w : Places(F)) → Set (w.adicCompletion F)) (φ : ℬ(𝔸[F]))
+    (hc : ∀ w, IsCompact (K w) ∧ IsOpen (K w))
+    (hint : ∀ w ∉ S, K w = (w.adicCompletionIntegers F : Set (w.adicCompletion F)))
+    (hφ : ∀ x : 𝔸[F], φ (Multiplicative.ofAdd x) = a (Multiplicative.ofAdd x.1) *
+      Set.indicator {y : 𝔸ᶠ[F] | ∀ w, y w ∈ K w} (fun _ ↦ (1 : ℂ)) x.2) :
+    φ ∈ (sAdeleSchwartzToGlobal F S).range := by
+  classical
+  let g (w : S) := (finitePlaceSchwartz_compactOpen_indicator F w.val (K w.val) (hc w.val).1 (hc w.val).2).choose
+  have hg (w : S) (x : w.val.adicCompletion F) :
+      g w (Multiplicative.ofAdd x) = (K w.val).indicator (1 : w.val.adicCompletion F → ℂ) x :=
+    (finitePlaceSchwartz_compactOpen_indicator F w.val (K w.val) (hc w.val).1 (hc w.val).2).choose_spec x
+  let h := sAdeleSchwartz_inductiveTensor_equiv F S
+  let y := h.choose (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))
+  refine ⟨y, Subtype.ext (funext fun x ↦ ?_)⟩
+  let b := x.toAdd
+  let z := adeleProjection F S b
+  let Q (w : Places(F)) := b.2 w ∈ w.adicCompletionIntegers F
+  have hterm := h.choose_spec a g z
+  have hsplit := rectangle_indicator_product S (fun w ↦ b.2 w ∈ K w) Q
+    {t : 𝔸ᶠ[F] | ∀ w, t w ∈ K w} b.2 Iff.rfl
+    (fun w hw ↦ (hint w hw) ▸ Iff.rfl) (a (Multiplicative.ofAdd b.1))
+    (fun w ↦ g w (Multiplicative.ofAdd (b.2 w.val)))
+    (fun w hw ↦ (hg w _).trans (Set.indicator_of_mem hw _))
+    (fun w hw ↦ (hg w _).trans (Set.indicator_of_notMem hw _))
+  exact (sAdeleSchwartzToGlobal_apply F S y b).trans
+    ((congrArg (fun v : ℂ ↦ if ∀ w ∉ S, Q w then v else 0) hterm).trans (hsplit.trans (hφ b).symm))
+
 /-- Paper: Proposition 2.1.4.1(5), p. 71. Every global Schwartz–Bruhat function
 lies in one of the embedded S-local spaces.
 Deviation: The algebraic colimit of the injective system is expressed as the
 directed union of the images. -/
 theorem sAdeleSchwartzToGlobal_exhaustive (f : ℬ(𝔸[F])) :
-    ∃ S : Finset (Places(F)), f ∈ LinearMap.range (sAdeleSchwartzToGlobal F S) := by sorry
+    ∃ S : Finset (Places(F)), f ∈ LinearMap.range (sAdeleSchwartzToGlobal F S) := by
+  classical
+  have decomp := adeleSchwartz_eq_sum_compactOpen_rectangles F f
+  let r := decomp.choose
+  let c := decomp.choose_spec.choose
+  let a := decomp.choose_spec.choose_spec.choose
+  let K := decomp.choose_spec.choose_spec.choose_spec.choose
+  let φ := decomp.choose_spec.choose_spec.choose_spec.choose_spec.choose
+  have h := decomp.choose_spec.choose_spec.choose_spec.choose_spec.choose_spec
+  have he : ∀ᶠ w in cofinite, ∀ i : Fin r, K i w = (w.adicCompletionIntegers F : Set (w.adicCompletion F)) :=
+    eventually_all.mpr fun i ↦ (h.2.1 i).2.1
+  let bad := (Filter.eventually_cofinite.mp he).toFinset
+  have hbad (w) (hw : w ∉ bad) (i : Fin r) :
+      K i w = (w.adicCompletionIntegers F : Set (w.adicCompletion F)) := by
+    by_contra hn
+    exact hw ((Filter.eventually_cofinite.mp he).mem_toFinset.mpr fun hall ↦ hn (hall i))
+  have hm (i : Fin r) : φ i ∈ (sAdeleSchwartzToGlobal F bad).range :=
+    rectangle_mem_sAdele_range F bad (a i) (K i) (φ i) (h.2.1 i).1 (fun w hw ↦ hbad w hw i) (h.2.1 i).2.2
+  refine ⟨bad, ?_⟩
+  rw [h.2.2]
+  exact Submodule.sum_mem _ fun i _ ↦ Submodule.smul_mem _ _ (hm i)
+
+attribute [local instance] adeleGroupSecondCountable adeleGroupLocallyCompact adeleGroupT2
+
+/-- A continuous image of a Fréchet space lies in one member of a countable
+closed subspace cover, by the Baire category theorem on the source. -/
+private theorem frechet_image_in_countable_cover {X E ι : Type*} [Countable ι]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (hX : IsFrechetTVS X) (L : X →L[ℂ] E) (S : ι → Submodule ℂ E)
+    (hc : ∀ j, IsClosed (S j : Set E)) (he : ∀ x : E, ∃ j, x ∈ S j) :
+    ∃ j, L.toLinearMap.range ≤ S j := by
+  obtain ⟨ha, hp, hm, hcomp⟩ := hX
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : (uniformity X).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  let V (j : ι) := (S j).comap L.toLinearMap
+  have hcover : ⋃ j, (V j : Set X) = univ := eq_univ_of_forall fun x ↦ mem_iUnion.mpr (he (L x))
+  obtain ⟨j, hj⟩ := nonempty_interior_of_iUnion_of_closed
+    (fun j ↦ (hc j).preimage L.continuous) hcover
+  exact ⟨j, LinearMap.range_le_iff_comap.mpr ((V j).eq_top_of_nonempty_interior' hj)⟩
+
+private theorem continuous_lift_of_range_le {X E Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (L : X →L[ℂ] E) (i : Y →ₗ[ℂ] E) (hi : IsEmbedding i) (h : L.toLinearMap.range ≤ i.range) :
+    ∃ j : X →L[ℂ] Y, ∀ x, i (j x) = L x := by
+  let e := LinearEquiv.ofInjective i hi.injective
+  let j := e.symm.toLinearMap.comp (L.toLinearMap.codRestrict _ fun x ↦ h ⟨x, rfl⟩)
+  have hj (x) : i (j x) = L x := congrArg Subtype.val (e.apply_symm_apply _)
+  exact ⟨⟨j, hi.isInducing.continuous_iff.mpr (L.continuous.congr fun x ↦ (hj x).symm)⟩, hj⟩
+
+private theorem isClosed_range_of_complete_embedding {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X] [CompleteSpace X]
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [T2Space E]
+    (L : X →ₗ[ℂ] E) (he : IsEmbedding L) : IsClosed (L.range : Set E) :=
+  (AddMonoidHom.isUniformEmbedding_of_isEmbedding (f := L.toAddMonoidHom) he).isClosedEmbedding.isClosed_range
+
+private theorem frechet_lift_in_countable_cover {X E ι : Type*} [Countable ι]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    {Y : ι → Type*} [∀ j, AddCommGroup (Y j)] [∀ j, Module ℂ (Y j)] [∀ j, TopologicalSpace (Y j)]
+    (hX : IsFrechetTVS X) (L : X →L[ℂ] E) (i : ∀ j, Y j →ₗ[ℂ] E)
+    (hi : ∀ j, IsEmbedding (i j)) (hc : ∀ j, IsClosed ((i j).range : Set E))
+    (he : ∀ x : E, ∃ j, x ∈ (i j).range) :
+    ∃ j, ∃ k : X →L[ℂ] Y j, ∀ x, i j (k x) = L x := by
+  have hs := frechet_image_in_countable_cover hX L (fun j ↦ (i j).range) hc he
+  exact ⟨hs.choose, continuous_lift_of_range_le L (i hs.choose) (hi hs.choose) hs.choose_spec⟩
+
+/-- Each elementary global stage factors continuously through one finite-place stage. -/
+private theorem schwartzBruhatStage_factors_sAdele
+    (a : BruhatStructuralPair (Multiplicative 𝔸[F])) (p : ElementaryLCAPresentation a.quotient) :
+    ∃ (S : Finset (Places(F))) (j : SchwartzBruhatStage p →L[ℂ] 𝒮(S)),
+      ∀ x, sAdeleSchwartzToGlobal F S (j x) = schwartzBruhatStageInclusion a p x := by
+  let E := ℬ(𝔸[F])
+  let : T2Space E := schwartzBruhat_t2
+  let : Countable (Places(F)) := finitePlaces_countable F
+  let i := sAdeleSchwartzToGlobal F
+  have hi (S) : IsEmbedding (i S) := sAdeleSchwartzToGlobal_isEmbedding F S
+  have hclosed (S) : IsClosed ((i S).range : Set E) := by
+    let : CompleteSpace 𝒮(S) := sAdeleSchwartz_complete F S
+    exact isClosed_range_of_complete_embedding (i S) (hi S)
+  let L : SchwartzBruhatStage p →L[ℂ] E :=
+    ⟨schwartzBruhatStageInclusion a p, (schwartzBruhatStage_isEmbedding a p).continuous⟩
+  exact frechet_lift_in_countable_cover (Y := fun S ↦ 𝒮(S)) (X := SchwartzBruhatStage p)
+    (E := E) elementarySchwartz_isFrechet L i hi hclosed (sAdeleSchwartzToGlobal_exhaustive F)
+
+/-- A family of continuous inclusions gives the final topology if each structural
+stage factors through it. -/
+private theorem schwartzBruhat_final_of_factors {G ι : Type*} [CommGroup G] [TopologicalSpace G]
+    {X : ι → Type*} [∀ j, AddCommGroup (X j)] [∀ j, Module ℂ (X j)] [∀ j, TopologicalSpace (X j)]
+    (i : ∀ j, X j →ₗ[ℂ] SchwartzBruhat G) (hi : ∀ j, Continuous (i j))
+    (hf : ∀ (a : BruhatStructuralPair G) (p : ElementaryLCAPresentation a.quotient),
+      ∃ j, ∃ L : SchwartzBruhatStage p →L[ℂ] X j, ∀ x, i j (L x) = schwartzBruhatStageInclusion a p x) :
+    (inferInstance : TopologicalSpace (SchwartzBruhat G)) = locallyConvexFinalTopology i := by
+  let j (k : ι) : X k →L[ℂ] SchwartzBruhat G := ⟨i k, hi k⟩
+  apply finalTopology_of_continuous_seminorms (E := SchwartzBruhat G) (X := X) j
+  intro q hq
+  have h (a : BruhatStructuralPair G) (p : ElementaryLCAPresentation a.quotient) :
+      Continuous (q ∘ schwartzBruhatStageInclusion a p) := by
+    have f := hf a p
+    exact ((hq f.choose).comp f.choose_spec.choose.continuous).congr fun x ↦ congrArg q (f.choose_spec.choose_spec x)
+  let P := {p : Seminorm ℂ (schwartzBruhatSubmodule G) // ∀ (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient), Continuous (p ∘ schwartzBruhatStageInclusion a e)}
+  exact (withGeneratingSeminorms_spec (schwartzBruhatSubmodule G)
+    (Subtype.val : P → _)).continuous_seminorm ⟨q, h⟩
 
 /-- Paper: Proposition 2.1.4.1(5), p. 71. The global Schwartz–Bruhat topology is
 the locally convex final topology of the S-local embeddings.
@@ -3746,7 +5757,10 @@ Deviation: Together with the directed union of the images, this states the
 canonical colimit isomorphism on the global carrier. -/
 theorem sAdeleSchwartzToGlobal_finalTopology :
     (inferInstance : TopologicalSpace ℬ(𝔸[F])) =
-      locallyConvexFinalTopology (sAdeleSchwartzToGlobal F) := by sorry
+      locallyConvexFinalTopology (sAdeleSchwartzToGlobal F) := by
+  exact schwartzBruhat_final_of_factors (G := Multiplicative 𝔸[F]) (X := fun S ↦ 𝒮(S))
+    (sAdeleSchwartzToGlobal F) (fun S ↦ (sAdeleSchwartzToGlobal_isEmbedding F S).continuous)
+    (schwartzBruhatStage_factors_sAdele F)
 
 /-- Paper: Corollary 2.1.4.2, p. 72. Multiplying S-local and complementary
 test functions identifies their inductive tensor product with global test functions. -/
@@ -3755,7 +5769,8 @@ theorem sAdeleTailSchwartz_inductiveTensor_equiv (S : Finset (Places(F))) :
       ∀ (f : 𝒮(S)) (g : ℬ(FiniteAdeleTail F S)) (x : 𝔸[F]),
         e (f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x) =
           f (Multiplicative.ofAdd (adeleProjection F S x)) *
-            g (Multiplicative.ofAdd (finiteAdeleTailProjection F S x.2)) := by sorry
+            g (Multiplicative.ofAdd (finiteAdeleTailProjection F S x.2)) := by
+  exact sAdeleTail_kernel F S
 
 open Classical in
 /-- Paper: Corollary 2.1.4.2, p. 72. Multiplication of test functions in the old
@@ -3767,24 +5782,41 @@ theorem sAdeleDifferenceSchwartz_inductiveTensor_equiv
         e (f ⊗ₜ[ℂ] g) (Multiplicative.ofAdd x) =
           f (Multiplicative.ofAdd (x.1, fun w : S ↦ x.2 ⟨w.val, hST w.property⟩)) *
             g (Multiplicative.ofAdd (fun w : ↥(T \ S) ↦ x.2 ⟨w.val, (Finset.mem_sdiff.mp w.property).1⟩)) :=
-  by sorry
+  by
+  exact sAdeleDifference_kernel F hST
 
 /-- Paper: Corollary 2.1.4.2, p. 72. The inductive tensor product of the
 S-adelic and complementary Schwartz–Bruhat spaces is complete. -/
 theorem sAdeleTailSchwartz_inductiveTensor_complete (S : Finset (Places(F))) :
-    CompleteSpace (InductiveTensor 𝒮(S) ℬ(FiniteAdeleTail F S)) := by sorry
+    CompleteSpace (InductiveTensor 𝒮(S) ℬ(FiniteAdeleTail F S)) := by
+  exact completeSpace_of_linearHomeomorph (sAdeleTailSchwartz_inductiveTensor_equiv F S).choose
+    (adeleSchwartz_complete F).2
 
 open Classical in
 /-- Paper: Corollary 2.1.4.2, p. 72. The inductive tensor product for the
 old and added places is complete. -/
 theorem sAdeleDifferenceSchwartz_inductiveTensor_complete (S T : Finset (Places(F)))
     (_hST : S ⊆ T) :
-    CompleteSpace (InductiveTensor 𝒮(S) ℬ(FinitePlaceProduct F (T \ S))) := by sorry
+    CompleteSpace (InductiveTensor 𝒮(S) ℬ(FinitePlaceProduct F (T \ S))) := by
+  exact completeSpace_of_linearHomeomorph (sAdeleDifferenceSchwartz_inductiveTensor_equiv F _hST).choose
+    (sAdeleSchwartz_complete F T)
 
 -- TODO(paper-gap): Lemma 2.1.4.3(1) cites (2.1.4.4) for the complemented image.
 -- The image in the projection statement is that of the stage map (2.1.4.5).
 -- The proof also switches from the inductive to the projective tensor topology
 -- when identifying the image, although Corollary 2.1.4.2 uses the inductive topology.
+
+private theorem projection_of_linear_retraction {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (k : X →ₗ[ℂ] E) (h : Continuous k ∧ ∃ r : E →L[ℂ] X, ∀ x, r (k x) = x) :
+    ∃ P : E →L[ℂ] E, P.toLinearMap.range = k.range ∧ P.toLinearMap.comp k = k ∧ P.comp P = P := by
+  obtain ⟨hc,r,hr⟩ := h
+  let j : X →L[ℂ] E := ⟨k, hc⟩
+  let P := j.comp r
+  have hfix (x : X) : P (j x) = j x := congrArg j (hr x)
+  exact ⟨P, le_antisymm (fun _ ⟨x, hx⟩ ↦ ⟨r x, hx⟩)
+    (fun _ ⟨x, hx⟩ ↦ ⟨j x, (hfix x).trans hx⟩), LinearMap.ext hfix,
+    ContinuousLinearMap.ext (fun x ↦ hfix (r x))⟩
 
 /-- Paper: Lemma 2.1.4.3(1), p. 73. Each global stage inclusion has a continuous
 projection onto its range, acting as the identity there and idempotent on the whole space. -/
@@ -3792,7 +5824,43 @@ theorem sAdeleSchwartzToGlobal_projection (S : Finset (Places(F))) :
     ∃ P : ℬ(𝔸[F]) →L[ℂ] ℬ(𝔸[F]),
       LinearMap.range P.toLinearMap = LinearMap.range (sAdeleSchwartzToGlobal F S) ∧
       P.toLinearMap.comp (sAdeleSchwartzToGlobal F S) = sAdeleSchwartzToGlobal F S ∧
-      P.comp P = P := by sorry
+      P.comp P = P := by
+  exact projection_of_linear_retraction _ (sAdeleSchwartzToGlobal_retraction F S)
+
+/-- Restrict a projection to an embedded intermediate space containing its range. -/
+private theorem projection_factors_of_embedding {X Y E : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (j : X →ₗ[ℂ] Y) (i : Y →ₗ[ℂ] E) (k : X →ₗ[ℂ] E) (hi : IsEmbedding i)
+    (hcomp : i.comp j = k) (P : E →L[ℂ] E)
+    (hRange : P.toLinearMap.range = k.range) (hFix : P.toLinearMap.comp k = k) :
+    ∃ Q : Y →L[ℂ] Y, i.comp Q.toLinearMap = P.toLinearMap.comp i ∧
+      Q.toLinearMap.range = j.range ∧ Q.comp Q = Q := by
+  have hr (x : Y) : P (i x) ∈ i.range := by
+    obtain ⟨y, hy⟩ := hRange.le (LinearMap.mem_range_self P.toLinearMap (i x))
+    exact ⟨j y, (DFunLike.congr_fun hcomp y).trans hy⟩
+  let e := LinearEquiv.ofInjective i hi.injective
+  let q := e.symm.toLinearMap.comp ((P.toLinearMap.comp i).codRestrict i.range hr)
+  have hq (x : Y) : i (q x) = P (i x) := congrArg Subtype.val (e.apply_symm_apply _)
+  let Q : Y →L[ℂ] Y := ⟨q, hi.isInducing.continuous_iff.mpr
+    ((P.continuous.comp hi.continuous).congr fun x ↦ (hq x).symm)⟩
+  have hfixed (y : X) : Q (j y) = j y := by
+    apply hi.injective
+    change i (q (j y)) = i (j y)
+    rw [hq, show i (j y) = k y from DFunLike.congr_fun hcomp y]
+    exact DFunLike.congr_fun hFix y
+  have hmem (x : Y) : Q x ∈ j.range := by
+    obtain ⟨y, hy⟩ := hRange.le (LinearMap.mem_range_self P.toLinearMap (i x))
+    exact ⟨y, hi.injective ((DFunLike.congr_fun hcomp y).trans (hy.trans (hq x).symm))⟩
+  refine ⟨Q, LinearMap.ext hq, le_antisymm ?_ ?_, ?_⟩
+  · rintro _ ⟨x, rfl⟩
+    exact hmem x
+  · rintro _ ⟨y, rfl⟩
+    exact ⟨j y, hfixed y⟩
+  · apply ContinuousLinearMap.ext
+    intro x
+    obtain ⟨y, hy⟩ := hmem x
+    exact (congrArg Q hy.symm).trans ((hfixed y).trans hy)
 
 /-- Paper: Lemma 2.1.4.3(2), p. 73. A global projection onto the S-stage
 restricts to an idempotent projection on each larger stage, with the S-stage as its image. -/
@@ -3804,16 +5872,53 @@ theorem sAdeleSchwartz_projection_factors {S T : Finset (Places(F))} (hST : S �
       (sAdeleSchwartzToGlobal F T).comp Q.toLinearMap =
         P.toLinearMap.comp (sAdeleSchwartzToGlobal F T) ∧
       LinearMap.range Q.toLinearMap = LinearMap.range (sAdeleSchwartzTransition F hST) ∧
-      Q.comp Q = Q := by sorry
+      Q.comp Q = Q := by
+  exact projection_factors_of_embedding _ _ _ (sAdeleSchwartzToGlobal_isEmbedding F T)
+    (sAdeleSchwartzToGlobal_comp F hST) P hRange hFix
+
+private theorem closedComplemented_of_projection {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] (Q : E →L[ℂ] E)
+    {S : Submodule ℂ E} (hr : Q.toLinearMap.range = S) (hid : Q.comp Q = Q) : S.ClosedComplemented := by
+  subst S
+  refine ⟨Q.codRestrict _ (fun x ↦ ⟨x, rfl⟩), ?_⟩
+  rintro ⟨_, y, rfl⟩
+  exact Subtype.ext (DFunLike.congr_fun hid y)
+
+private theorem complemented_of_factoring_projections {X Y E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (i : X →ₗ[ℂ] E) (j : Y →ₗ[ℂ] E) (k : X →ₗ[ℂ] Y)
+    (P : E →L[ℂ] E) (hp : P.toLinearMap.range = i.range) (hi : P.toLinearMap.comp i = i)
+    (factor : ∀ (T : E →L[ℂ] E), T.toLinearMap.range = i.range → T.toLinearMap.comp i = i →
+      ∃ Q : Y →L[ℂ] Y, j.comp Q.toLinearMap = T.toLinearMap.comp j ∧
+        Q.toLinearMap.range = k.range ∧ Q.comp Q = Q) : k.range.ClosedComplemented :=
+  (factor P hp hi).elim fun Q h ↦ closedComplemented_of_projection Q h.2.1 h.2.2
 
 /-- Paper: Lemma 2.1.4.3(2), p. 73. The image of a transition map admits a
 continuous linear retraction. -/
 theorem sAdeleSchwartzTransition_complemented {S T : Finset (Places(F))} (hST : S ⊆ T) :
-    (LinearMap.range (sAdeleSchwartzTransition F hST)).ClosedComplemented := by sorry
+    (LinearMap.range (sAdeleSchwartzTransition F hST)).ClosedComplemented := by
+  have h := sAdeleSchwartzToGlobal_projection F S
+  exact complemented_of_factoring_projections _ _ _ h.choose h.choose_spec.1 h.choose_spec.2.1
+    (sAdeleSchwartz_projection_factors F hST)
 
 -- TODO(paper-gap): Equation (2.1.4.13) equates maps with different codomains.
 -- The preceding factorization and the compatible global inclusions identify
 -- the transition map that is missing on its left side.
+
+private theorem compatible_of_common_projection {X Y E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (j : X →ₗ[ℂ] Y) (i : Y →ₗ[ℂ] E) (k : X →ₗ[ℂ] E) (hi : Injective i)
+    (hcomp : i.comp j = k) (P : E →L[ℂ] E) (Q : X →L[ℂ] X) (R : Y →L[ℂ] Y)
+    (hQ : k.comp Q.toLinearMap = P.toLinearMap.comp k)
+    (hR : i.comp R.toLinearMap = P.toLinearMap.comp i) :
+    j.comp Q.toLinearMap = R.toLinearMap.comp j := by
+  refine LinearMap.ext fun x ↦ hi ?_
+  exact (DFunLike.congr_fun hcomp (Q x)).trans ((DFunLike.congr_fun hQ x).trans
+    ((congrArg P (DFunLike.congr_fun hcomp x).symm).trans (DFunLike.congr_fun hR (j x)).symm))
 
 /-- Paper: Lemma 2.1.4.3(3), p. 73. Stage projections factoring the same global
 projection commute with enlargement of the containing stage.
@@ -3827,7 +5932,71 @@ theorem sAdeleSchwartz_projection_compatible {T U : Finset (Places(F))} (hTU : T
     (hR : (sAdeleSchwartzToGlobal F U).comp R.toLinearMap =
       P.toLinearMap.comp (sAdeleSchwartzToGlobal F U)) :
     (sAdeleSchwartzTransition F hTU).comp Q.toLinearMap =
-      R.toLinearMap.comp (sAdeleSchwartzTransition F hTU) := by sorry
+      R.toLinearMap.comp (sAdeleSchwartzTransition F hTU) := by
+  exact compatible_of_common_projection _ _ _ (sAdeleSchwartzToGlobal_isEmbedding F U).injective
+    (sAdeleSchwartzToGlobal_comp F hTU) P Q R hQ hR
+
+/-- Uniform convergence holds when each member of the convergence family is
+eventually fixed pointwise. -/
+private theorem uniform_limit_of_eventual_fix {E ι : Type*}
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    {l : Filter ι} (P : ι → E →L[ℂ] E) (B : Set (Set E))
+    (h : ∀ s ∈ B, ∀ᶠ i in l, ∀ x ∈ s, P i x = x) :
+    let e := UniformConvergenceCLM.ofFun (RingHom.id ℂ) E B
+    Tendsto (fun i ↦ e (P i)) l (𝓝 (e (ContinuousLinearMap.id ℂ E))) := by
+  intro e
+  apply (UniformConvergenceCLM.tendsto_iff_tendstoUniformlyOn _ _ B).mpr
+  intro s hs u hu
+  filter_upwards [h s hs] with i hi
+  intro x hx
+  change (x, P i x) ∈ u
+  rw [hi x hx]
+  exact mem_uniformity_of_eq hu rfl
+
+private theorem fixed_on_earlier_range {X Y E : Type*}
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup Y] [Module ℂ Y] [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] (i : X →ₗ[ℂ] E) (j : Y →ₗ[ℂ] E) (k : X →ₗ[ℂ] Y)
+    (h : j.comp k = i) (P : E →L[ℂ] E) (hp : P.toLinearMap.comp j = j) {x : E}
+    (hx : x ∈ i.range) : P x = x := by
+  obtain ⟨y,rfl⟩ := hx
+  have hy := DFunLike.congr_fun h y
+  exact (congrArg P hy.symm).trans ((DFunLike.congr_fun hp (k y)).trans hy)
+
+private theorem subset_range_of_factored_image {X Y E : Type*}
+    [AddCommGroup Y] [Module ℂ Y] [AddCommGroup E] [Module ℂ E]
+    (j : Y →ₗ[ℂ] E) (k : X → Y) (i : X → E) (hk : ∀ y, j (k y) = i y)
+    {C : Set X} {B : Set E} (hB : i '' C = B) : B ⊆ j.range := by
+  rw [← hB]
+  exact Set.image_subset_iff.mpr fun y _ ↦ ⟨k y, hk y⟩
+
+private theorem bounded_subset_of_stage_factors {G ι : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    {X : ι → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
+    [∀ i, TopologicalSpace (X i)] (j : (i : ι) → X i →ₗ[ℂ] SchwartzBruhat G)
+    (h : ∀ (a : BruhatStructuralPair G) (p : ElementaryLCAPresentation a.quotient),
+      ∃ (i : ι) (k : SchwartzBruhatStage p →L[ℂ] X i), ∀ y, j i (k y) = schwartzBruhatStageInclusion a p y)
+    {B : Set (SchwartzBruhat G)} (hb : IsVonNBounded ℂ B) : ∃ i, B ⊆ (j i).range := by
+  have b := schwartzBruhat_bounded_image_stage (G := G) hb
+  have l := h b.choose b.choose_spec.choose
+  exact ⟨l.choose, subset_range_of_factored_image (j l.choose) l.choose_spec.choose
+    (schwartzBruhatStageInclusion b.choose b.choose_spec.choose) l.choose_spec.choose_spec
+    b.choose_spec.choose_spec.choose_spec.2⟩
+
+
+private theorem uniform_limit_of_stage_projections {ι E : Type*} [Preorder ι] [Nonempty ι]
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    {X : ι → Type*} [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)]
+    (j : (i : ι) → X i →ₗ[ℂ] E) (B : Set (Set E)) (hB : ∀ s ∈ B, ∃ i, s ⊆ (j i).range)
+    (k : {i t : ι} → i ≤ t → X i →ₗ[ℂ] X t)
+    (hk : ∀ {i t} (h : i ≤ t), (j t).comp (k h) = j i)
+    (P : ι → E →L[ℂ] E) (hP : ∀ i, (P i).toLinearMap.comp (j i) = j i) :
+    let e := UniformConvergenceCLM.ofFun (RingHom.id ℂ) E B
+    Tendsto (fun i ↦ e (P i)) atTop (𝓝 (e (ContinuousLinearMap.id ℂ E))) := by
+  apply uniform_limit_of_eventual_fix P B
+  intro s hs
+  obtain ⟨i, hi⟩ := hB s hs
+  filter_upwards [eventually_ge_atTop i] with t ht
+  exact fun x hx ↦ fixed_on_earlier_range (j i) (j t) (k ht) (hk ht) (P t) (hP t) (hi hx)
 
 /-- Paper: Corollary 2.1.4.4, p. 74. Any net of continuous projections onto the
 S-adelic images tends to the identity in the topology of uniform convergence
@@ -3841,7 +6010,12 @@ theorem sAdeleSchwartz_projections_tendsto
     let E := ℬ(𝔸[F])
     let B := {s : Set E | IsVonNBounded ℂ s}
     let e := UniformConvergenceCLM.ofFun (RingHom.id ℂ) E B
-    Tendsto (fun S ↦ e (P S)) atTop (𝓝 (e (ContinuousLinearMap.id ℂ E))) := by sorry
+    Tendsto (fun S ↦ e (P S)) atTop (𝓝 (e (ContinuousLinearMap.id ℂ E))) := by
+  intro E B e
+  exact uniform_limit_of_stage_projections (X := fun S ↦ 𝒮(S)) (sAdeleSchwartzToGlobal F) B
+    (fun _ hs ↦ bounded_subset_of_stage_factors (G := Multiplicative 𝔸[F]) (X := fun S ↦ 𝒮(S))
+      (sAdeleSchwartzToGlobal F) (schwartzBruhatStage_factors_sAdele F) hs)
+    (fun h ↦ sAdeleSchwartzTransition F h) (fun h ↦ sAdeleSchwartzToGlobal_comp F h) P hFix
 
 end SAdeles
 
