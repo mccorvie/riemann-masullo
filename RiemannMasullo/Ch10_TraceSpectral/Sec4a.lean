@@ -246,7 +246,9 @@ theorem spectralProjection_convolution_nuclear (φ : BruhatCompactSupport C𝔽)
 Deviation: Quotient nuclearity is explicit, as for the untruncated operator. -/
 theorem spectralTruncatedConvolution_nuclear (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (φ : BruhatCompactSupport C𝔽)
     (_hquot : quotientNuclear(φ)) :
-    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) := by sorry
+    IsNuclearOperator (spectralTruncatedConvolution a hα hs hρ φ) := by
+  exact mul_mem_nuclearEndomorphisms_left (M(hρ))
+    ⟨(Pspec).comp (A(φ)), spectralProjection_convolution_nuclear a hα hs φ _hquot⟩
 
 /-- Paper: Theorem 10.4.2.1, p. 459. Geometric truncation of convolution is nuclear.
 Deviation: Quotient nuclearity is explicit, as for spectral truncation. -/
