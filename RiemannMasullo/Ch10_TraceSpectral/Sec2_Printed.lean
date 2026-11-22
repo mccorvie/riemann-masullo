@@ -228,7 +228,12 @@ def Printed.spectralStripJet_memLp : Prop :=
 the trivial character, s = 1, α = b = 0 and a+it the first nontrivial
 Riemann zeta zero with positive ordinate. The printed cutoff includes k = 0.
 Its squared norm has a 1/|x| tail in log coordinates. -/
-theorem Printed.spectralStripJet_memLp_false : ¬ Printed.spectralStripJet_memLp := by sorry
+theorem Printed.spectralStripJet_memLp_false : ¬ Printed.spectralStripJet_memLp := by
+  intro hall
+  apply Printed.spectralLineJet_memLp_false
+  intro F _ _ χ hχ a s hs ω t k hk
+  apply hall F χ hχ a 0 s le_rfl (zero_lt_one.trans hs).le ω 0 t k
+  exact Or.inl ⟨Or.inr rfl, by simpa using hk⟩
 
 /-- Paper: Proposition 10.2.2.2, pp. 446–447. The annulus uses the
 reciprocal strip norm and the final open ball uses the negative line norm.
