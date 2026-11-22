@@ -372,7 +372,10 @@ include hH hν hS hb hu in
 continuous quotient function commutes almost everywhere with the kernel lift after
 pullback of the multiplier. -/
 theorem diagonalIndentationLift_mul (ρ : C_c(Q × Q, ℂ)) :
-    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by sorry
+    Ψ (fun p ↦ ρ p * u p) =ᵐ[μ.prod μ] fun p ↦ ρ (q₂ p) * Ψ u p := by
+  apply ae_of_all
+  intro p
+  exact mul_left_comm _ _ _
 
 -- TODO(paper-gap): The continuous multiplier step on p. 511 applies Corollary
 -- A.5.4.3 at every regular point. The printed equivalence fails (ERRATA R8).
