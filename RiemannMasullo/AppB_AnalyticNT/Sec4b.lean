@@ -490,7 +490,17 @@ adds a multiple of evaluation at one to the multiplicative principal value. -/
 theorem finiteConnesWeilPrincipalValue_changeCharacter (v : Primes(F))
     (a : (v.adicCompletion F)ˣ) (f : 𝒟((v.adicCompletion F)ˣ)) :
     finiteConnesWeilPrincipalValue v a f = finiteConnesWeilPrincipalValue v 1 f +
-      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * f.val 1 := by sorry
+      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * f.val 1 := by
+  let A := (exists_finiteWeilTestMap v).choose
+  have hunit := Units.val_injective.extend_apply f.val (fun _ ↦ 0)
+    (1 : (v.adicCompletion F)ˣ)
+  have hzero : addTest(A f) 0 = f.val 1 := by
+    have h := (exists_finiteWeilTestMap v).choose_spec f 0
+    simp only [add_zero, norm_one, Real.sqrt_one, Complex.ofReal_one, div_one] at h
+    exact h.trans hunit
+  exact (finiteConnesPrincipalValue_changeCharacter v a (A f)).trans
+    (congrArg (fun z : ℂ ↦ finiteConnesWeilPrincipalValue v 1 f +
+      ((V𝔭(v) * Real.log ‖a.val‖ / Real.log q(v) : ℝ) : ℂ) * z) hzero)
 
 -- TODO(paper-gap): In the proof on p. 623 (footnote 24), the annihilator of
 -- the maximal ideal is the inverse maximal ideal times the inverse different.
