@@ -1339,6 +1339,28 @@ local notation "expUnit" => fun s : ℝ ↦ Homeomorph.symm (Nonneg.unitsHomeomo
 local notation "orbitDeriv" => fun (f : ℬₛ) (x : Multiplicative Aₛ) ↦
   deriv (fun s : ℝ ↦ f (Multiplicative.ofAdd (Units.val (γ (expUnit s)) * Multiplicative.toAdd x))) 0
 
+/-- A continuous linear equivalence from an inductive tensor product of Schwartz–Bruhat
+spaces that multiplies the values of pure tensors has a slice map: contraction of the second
+factor with the evaluation at a point `o` gives, for each `g`, a function `t` with
+`t a = g b` at all points `a`, `b` where pure tensors evaluate to `f a * c o`. -/
+private theorem sAdeleSchwartz_exists_zeroTailRestriction_aux {G H K : Type*}
+    [CommGroup G] [TopologicalSpace G] [CommGroup H] [TopologicalSpace H]
+    [CommGroup K] [TopologicalSpace K]
+    (e : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) ≃L[ℂ] SchwartzBruhat K) (o : H)
+    (g : SchwartzBruhat K) :
+    ∃ t : SchwartzBruhat G, ∀ (a : G) (b : K),
+      (∀ f c, e (TensorProduct.tmul ℂ f c) b = f a * c o) → t a = g b := by
+  let φ : SchwartzBruhat H →ₗ[ℂ] ℂ := (LinearMap.proj o).comp (schwartzBruhatSubmodule H).subtype
+  let L : InductiveTensor (SchwartzBruhat G) (SchwartzBruhat H) →ₗ[ℂ] SchwartzBruhat G :=
+    (TensorProduct.rid ℂ (SchwartzBruhat G)).toLinearMap.comp (TensorProduct.map LinearMap.id φ)
+  refine ⟨L (e.symm g), fun a b h ↦ ?_⟩
+  let p : SchwartzBruhat G →ₗ[ℂ] ℂ := (LinearMap.proj a).comp (schwartzBruhatSubmodule G).subtype
+  let q : SchwartzBruhat K →ₗ[ℂ] ℂ := (LinearMap.proj b).comp (schwartzBruhatSubmodule K).subtype
+  have hL : p.comp L = q.comp e.toLinearEquiv.toLinearMap :=
+    TensorProduct.ext' fun f c ↦ ((congrArg p (TensorProduct.rid_tmul f (φ c))).trans
+      ((map_smul p (φ c) f).trans (mul_comm _ _))).trans (h f c).symm
+  exact (LinearMap.congr_fun hL (e.symm g)).trans (congrArg q (e.apply_symm_apply g))
+
 open scoped NumberField.AdeleRing in
 /-- Paper: Corollary 2.1.4.2, p. 72. Restricting a global Schwartz–Bruhat function to
 adeles whose omitted coordinates are zero gives an S-local Schwartz–Bruhat function.
@@ -1348,7 +1370,9 @@ theorem sAdeleSchwartz_exists_zeroTailRestriction
     (g : SchwartzBruhat (Multiplicative 𝔸[F])) :
     ∃ h : ℬₛ, ∀ x : 𝔸[F], finiteAdeleTailProjection F S x.2 = 0 →
       h (Multiplicative.ofAdd (adeleProjection F S x)) = g (Multiplicative.ofAdd x) := by
-  sorry
+  obtain ⟨e, he⟩ := sAdeleTailSchwartz_inductiveTensor_equiv F S
+  obtain ⟨t, ht⟩ := sAdeleSchwartz_exists_zeroTailRestriction_aux e (Multiplicative.ofAdd 0) g
+  exact ⟨t, fun x hx ↦ ht _ _ fun f c ↦ (he f c x).trans (by rw [hx])⟩
 
 open scoped NumberField.AdeleRing in
 /-- Paper: Lemma 2.3.2.1, p. 105. Pointwise differentiation along the

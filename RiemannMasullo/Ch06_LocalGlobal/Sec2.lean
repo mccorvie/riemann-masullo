@@ -4,6 +4,9 @@ public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Topology.Algebra.IsOpenUnits
+
 /-! # Structure Theorem V: isotypic exhaustiveness
 
 Masullo, §6.2, pp. 295–302. Finite sets of places index only the finite factors.
@@ -93,7 +96,38 @@ maps over the compact norm-one quotient. -/
 theorem sLocalThetaAction_tendstoUniformly {ι : Type*} (l : Filter ι)
     (f : ι → Θₛ(S)) (x : Θₛ(S)) (hf : Tendsto f l (𝓝 x)) :
     ∀ U ∈ 𝓝 (0 : Θₛ(S)), ∀ᶠ i in l, ∀ g : J₁(S),
-      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by sorry
+      ρₛ(S) g.val (f i) - ρₛ(S) g.val x ∈ U := by
+  have uniform {G X : Type _} [TopologicalSpace G] [AddCommGroup X] [TopologicalSpace X]
+      [IsTopologicalAddGroup X] {K : Set G} (hK : IsCompact K)
+      (A : G → X → X) (hA : Continuous (fun p : G × X ↦ A p.1 p.2))
+      (u : ι → X) (v : X) (hu : Tendsto u l (𝓝 v)) (U : Set X) (hU : U ∈ 𝓝 0) :
+      ∀ᶠ i in l, ∀ g ∈ K, A g (u i) - A g v ∈ U := by
+    have hd : Continuous (fun p : X × G ↦ A p.2 p.1 - A p.2 v) :=
+      (hA.comp (continuous_snd.prodMk continuous_fst)).sub
+        (hA.comp (continuous_snd.prodMk continuous_const))
+    exact hu.eventually (hK.eventually_forall_of_forall_eventually (P := fun y g ↦ A g y - A g v ∈ U)
+      fun g _ ↦
+        hd.continuousAt (x := (v, g)) (by simpa only [sub_self] using hU))
+  let : PolynormableSpace ℂ (Θₛ(S)) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (Θₛ(S)) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  have hc := (isProperMap_sIdeleQuotientNorm F S).isCompact_preimage
+    (isCompact_singleton (x := (1 : ℝ≥0ˣ)))
+  have hA := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1
+  intro U hU
+  have h := uniform (G := Jₛ(S)) (X := Θₛ(S)) hc (fun g y ↦ ρₛ(S) g y) hA f x hf U hU
+  exact h.mono fun i hi g ↦ hi g.val g.property
+
+/-- Multiplication by scalars of norm at most one keeps uniform convergence of differences. -/
+private theorem smul_sub_eventually_mem_of_norm_le_one {E ι κ : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [ContinuousSMul ℂ E] (l : Filter ι) (u : ι → κ → E)
+    (w : κ → E) (c : κ → ℂ) (hc : ∀ k, ‖c k‖ ≤ 1)
+    (h : ∀ U ∈ 𝓝 (0 : E), ∀ᶠ i in l, ∀ k, u i k - w k ∈ U) :
+    ∀ U ∈ 𝓝 (0 : E), ∀ᶠ i in l, ∀ k, c k • u i k - c k • w k ∈ U := by
+  intro U hU
+  obtain ⟨W, ⟨hW, hWb⟩, hWU⟩ := (nhds_basis_balanced ℂ E).mem_iff.mp hU
+  filter_upwards [h W hW] with i hi k
+  rw [← smul_sub]
+  exact hWU (hWb.smul_mem (hc k) (hi k))
 
 /-- Paper: Lemma 6.2.1.3(2), p. 296.
 Uniform convergence over the norm-one quotient also holds after twisting the action
@@ -101,7 +135,9 @@ by a unitary character. -/
 theorem sLocalThetaAction_twist_tendstoUniformly {ι : Type*} (l : Filter ι)
     (f : ι → Θₛ(S)) (x : Θₛ(S)) (hf : Tendsto f l (𝓝 x)) (χ : PontryaginDual J₁(S)) :
     ∀ U ∈ 𝓝 (0 : Θₛ(S)), ∀ᶠ i in l, ∀ g : J₁(S),
-      (χ g : ℂ) • ρₛ(S) g.val (f i) - (χ g : ℂ) • ρₛ(S) g.val x ∈ U := by sorry
+      (χ g : ℂ) • ρₛ(S) g.val (f i) - (χ g : ℂ) • ρₛ(S) g.val x ∈ U :=
+  smul_sub_eventually_mem_of_norm_le_one l _ _ (fun g ↦ (χ g : ℂ))
+    (fun g ↦ (Circle.norm_coe (χ g)).le) (sLocalThetaAction_tendstoUniformly l f x hf)
 
 end Exhaustiveness
 
@@ -252,7 +288,23 @@ theorem sLocalStandardThetaTensor_apply (c : QuasiCharacter Jₛ(S)) (f : ℬ∞
     (x : SAdeleRing F S) :
     sLocalStandardThetaTensor c f (Multiplicative.ofAdd x) =
       f (Multiplicative.ofAdd x.1) * ∏ v : S, finiteStandardGaussian v.val
-        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by sorry
+        (sLocalFiniteRestriction v c) (Multiplicative.ofAdd (x.2 v)) := by
+  let factors (v : S) : ℬ(L(v.val)) :=
+    finiteStandardGaussian (F := F) v.val (sLocalFiniteRestriction (F := F) v c)
+  let W := FinestLocallyConvex (⨂[ℂ] v : S, ℬ(L(v.val)))
+  let b : W := ⨂ₜ[ℂ] v : S, factors v
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have slice {X Y Z : Type _} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+      [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+      (E : InductiveTensor X Y ≃L[ℂ] Z) (a : X) (b : Y) (p : Z → ℂ) (r : ℂ)
+      (h : p (E (a ⊗ₜ[ℂ] b)) = r) :
+      p (E.toLinearMap.comp ((TensorProduct.mk ℂ X Y).flip b) a) = r := h
+  have hx := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec f factors x
+  unfold sLocalStandardThetaTensor
+  with_reducible_and_instances
+    exact slice (X := ℬ∞) (Y := W) (Z := ℬₛ(S)) e f b
+      (fun φ : ℬₛ(S) ↦ φ (Multiplicative.ofAdd x)) _ hx
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 For trivial S-integer Picard group, the archimedean test space maps continuously,
@@ -311,7 +363,8 @@ theorem infiniteStandardThetaAverage_apply (χ : PontryaginDual Iₛ(S))
     infiniteStandardThetaAverage χ r f x = ∑ k, ∫ g : N∞,
       let a := archPart(S) (r k).val * archPart((∅ : Finset V)) g.val
       f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
-      ∂sNormOneIdeleTamagawaMeasure F ∅ := by sorry
+      ∂sNormOneIdeleTamagawaMeasure F ∅ :=
+  (exists_infiniteStandardThetaAverage χ r).choose_spec f x
 
 -- In §5.3.1 the punctured-field tests are additive tests vanishing at zero.
 -- Local constancy makes these vanish on a neighborhood of zero.
@@ -357,7 +410,9 @@ against the local character. -/
 theorem finiteStandardThetaAverage_one (v : V) (χ : PontryaginDual (L(v))ˣ)
     (f : ℬ₀(v)) :
     finiteStandardThetaAverage v χ f 1 =
-      ∫ g : (L(v))ˣ, f.val (Multiplicative.ofAdd (g⁻¹).val) * (χ g : ℂ) ∂μ(v) := by sorry
+      ∫ g : (L(v))ˣ, f.val (Multiplicative.ofAdd (g⁻¹).val) * (χ g : ℂ) ∂μ(v) := by
+  have h := (exists_finiteStandardThetaAverage v χ).choose_spec f 1
+  simpa [finiteStandardThetaAverage] using h
 
 /-- Paper: (6.2.2.11), p. 301.
 The finite convolution is the character times the Mellin integral with the inverse character.
@@ -365,18 +420,44 @@ Deviation: On the test χ times the unit indicator, the coefficient is the integ
 theorem finiteStandardThetaAverage_eq_character_mul_integral (v : V)
     (χ : PontryaginDual (L(v))ˣ) (f : ℬ₀(v)) (x : (L(v))ˣ) :
     finiteStandardThetaAverage v χ f x = (χ x : ℂ) *
-      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by sorry
+      ∫ y : (L(v))ˣ, f.val (Multiplicative.ofAdd y.val) * (χ y : ℂ)⁻¹ ∂μ(v) := by
+  let : BorelSpace (L(v))ˣ := ⟨rfl⟩
+  let : (μ(v)).IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let : ProperSpace (L(v)) := properSpace_adicCompletion v
+  let : LocallyCompactSpace (L(v))ˣ :=
+    (IsOpenUnits.isOpenEmbedding_unitsVal (M := L(v))).locallyCompactSpace
+  have : (μ(v)).IsInvInvariant := by
+    constructor
+    unfold finiteLocalMultiplicativeTamagawaMeasure
+    rw [Measure.inv_def, Measure.map_smul, Measure.map_inv_eq_self]
+    exact measurable_inv.aemeasurable
+  have factor {G : Type _} [CommGroup G] [MeasurableSpace G] [MeasurableMul G] [MeasurableInv G]
+      (ν : Measure G) [ν.IsInvInvariant] [ν.IsMulLeftInvariant]
+      (φ : G → ℂ) (c : G →* Circle) (x : G) :
+      (∫ g, φ (g⁻¹ * x) * (c g : ℂ) ∂ν) = (c x : ℂ) * ∫ y, φ y * (c y : ℂ)⁻¹ ∂ν := by
+    let k (g : G) := φ (g⁻¹ * x) * (c g : ℂ)
+    refine (integral_div_left_eq_self k ν x).symm.trans ?_
+    rw [← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards with y
+    change φ ((x / y)⁻¹ * x) * (c (x / y) : ℂ) = _
+    rw [inv_div, div_mul_cancel, map_div, Circle.coe_div, div_eq_mul_inv]
+    ring
+  exact ((exists_finiteStandardThetaAverage v χ).choose_spec f x).trans
+    (factor (μ(v)) (fun y ↦ f.val (Multiplicative.ofAdd y.val)) χ.toMonoidHom x)
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 The kernel of the archimedean operator is closed in the archimedean test space. -/
 theorem infiniteStandardThetaAverage_isClosed_ker (χ : PontryaginDual Iₛ(S))
     (r : Fin (classNumber F) → Nₛ(S)) :
-    IsClosed ((infiniteStandardThetaAverage χ r).ker : Set ℬ∞) := by sorry
+    IsClosed ((infiniteStandardThetaAverage χ r).ker : Set ℬ∞) :=
+  ContinuousLinearMap.isClosed_ker _
 
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 The kernel of the finite convolution is closed in the multiplicative test space. -/
 theorem finiteStandardThetaAverage_isClosed_ker (v : V) (χ : PontryaginDual (L(v))ˣ) :
-    IsClosed ((finiteStandardThetaAverage v χ).ker : Set (ℬ₀(v))) := by sorry
+    IsClosed ((finiteStandardThetaAverage v χ).ker : Set (ℬ₀(v))) :=
+  ContinuousLinearMap.isClosed_ker _
 
 -- TODO(paper-gap): The tensor agreement in Theorem 6.2.2.1(1), p. 299, fails.
 -- For ℚ at S = {∞, p} with trivial character, take a finite test 1_{pℤₚˣ}

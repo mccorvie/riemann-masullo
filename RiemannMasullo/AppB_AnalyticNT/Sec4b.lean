@@ -964,7 +964,97 @@ theorem finiteConnesWeilPrincipalValue_of_apply_one_zero (v : Primes(F))
     (f : 𝒟((v.adicCompletion F)ˣ)) (_hf : f.val 1 = 0) :
     Integrable (finiteWeilIntegrand(v, f.val)) μ𝔭(v) ∧
       finiteConnesWeilPrincipalValue v 1 f =
-        ∫ u, finiteWeilIntegrand(v, f.val) u ∂μ𝔭(v) := by sorry
+        ∫ u, finiteWeilIntegrand(v, f.val) u ∂μ𝔭(v) := by
+  let K := v.adicCompletion F
+  let : BorelSpace K := ⟨rfl⟩
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).measurableEmbedding
+  let c : ENNReal := (↑v.asIdeal.absNorm / (↑v.asIdeal.absNorm - 1) : ENNReal)
+  let d : K → ENNReal := fun x ↦ (↑‖x‖₊ : ENNReal)⁻¹
+  have hd : Measurable d := by fun_prop
+  have hdlt : ∀ᵐ y ∂(ν𝔭(v).restrict (range (Units.val : Kˣ → K))), d y < ⊤ := by
+    refine ae_restrict_of_forall_mem hval.measurableSet_range fun y ⟨u, hu⟩ ↦ ?_
+    exact ENNReal.inv_lt_top.mpr (by simp [← hu])
+  have hdy (y : K) : (d y).toReal = ‖y‖⁻¹ := by
+    rw [ENNReal.toReal_inv, ENNReal.coe_toReal, coe_nnNorm]
+  have hq : (1 : ENNReal) < v.asIdeal.absNorm := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hc0 : c ≠ 0 :=
+    (ENNReal.div_pos (zero_lt_one.trans hq).ne' (ENNReal.sub_ne_top (ENNReal.natCast_ne_top _))).ne'
+  have hct : c ≠ ⊤ :=
+    (ENNReal.div_lt_top (ENNReal.natCast_ne_top _) (tsub_pos_of_lt hq).ne').ne
+  have := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  have hsupp (g : K → ℂ) : support (fun y ↦ ‖y‖⁻¹ • g y) ⊆ range (Units.val : Kˣ → K) := by
+    intro y hy
+    have : y ≠ 0 := by rintro rfl; simp at hy
+    exact ⟨Units.mk0 y this, rfl⟩
+  -- Multiplicative integration is additive integration against `c / ‖y‖`.
+  have key (g : K → ℂ) :
+      (Integrable (fun u : Kˣ ↦ g u.val) μ𝔭(v) ↔ Integrable (fun y ↦ ‖y‖⁻¹ • g y) ν𝔭(v)) ∧
+        ∫ u : Kˣ, g u.val ∂μ𝔭(v) = c.toReal • ∫ y, ‖y‖⁻¹ • g y ∂ν𝔭(v) := by
+    rw [finiteLocalMultiplicativeTamagawaMeasure_eq_withDensity]
+    refine ⟨?_, ?_⟩
+    · rw [integrable_smul_measure hc0 hct, show (fun u : Kˣ ↦ g u.val) = g ∘ Units.val from rfl,
+        ← hval.integrable_map_iff (g := g), hval.map_comap,
+        restrict_withDensity hval.measurableSet_range,
+        integrable_withDensity_iff_integrable_smul' hd hdlt,
+        ← integrableOn_iff_integrable_of_support_subset (hsupp g)]
+      simp_rw [hdy]
+      rfl
+    · rw [integral_smul_measure]
+      congr 1
+      rw [← hval.integral_map (g := g), hval.map_comap,
+        setIntegral_withDensity_eq_setIntegral_toReal_smul hd ?_ _ hval.measurableSet_range,
+        ← setIntegral_eq_integral_of_forall_compl_eq_zero (s := range Units.val)
+          (fun y hy ↦ Function.notMem_support.mp (fun h ↦ hy (hsupp g h)))]
+      · simp_rw [hdy]
+      · exact hdlt
+  let A := (exists_finiteWeilTestMap v).choose
+  have hA := (exists_finiteWeilTestMap v).choose_spec f
+  let Fz : K → ℂ := Function.extend Units.val (f.val : _ → ℂ) (fun _ ↦ 0)
+  have hFu (u : Kˣ) : Fz u.val = f.val u := Units.val_injective.extend_apply _ _ u
+  have h0 : addTest(A f) 0 = 0 := by
+    rw [hA]
+    change Fz (1 + 0) / _ = 0
+    rw [add_zero, ← Units.val_one, hFu, _hf, zero_div]
+  let Q : K → ℂ := fun y ↦ Fz y * (Real.sqrt ‖y‖ : ℂ) / ((‖1 - y‖ : ℝ) : ℂ)
+  have hQ (u : Kˣ) : Q u.val = finiteWeilIntegrand(v, f.val) u := by
+    change Fz u.val * _ / _ = _
+    rw [hFu]
+  let H : K → ℂ := fun y ↦ ‖y‖⁻¹ • Q y
+  -- After the translation `y = 1 + x`, the two weighted integrands agree.
+  have hPH (x : K) : ‖x‖⁻¹ • addTest(A f) x = H (1 + x) := by
+    rw [hA]
+    change ‖x‖⁻¹ • (Fz (1 + x) / (Real.sqrt ‖1 + x‖ : ℂ)) =
+      ‖1 + x‖⁻¹ • (Fz (1 + x) * (Real.sqrt ‖1 + x‖ : ℂ) / ((‖1 - (1 + x)‖ : ℝ) : ℂ))
+    rw [sub_add_cancel_left, norm_neg, Complex.real_smul, Complex.real_smul]
+    rcases (norm_nonneg (1 + x)).eq_or_lt with hn | hn
+    · simp [← hn]
+    have hs : (Real.sqrt ‖1 + x‖ : ℂ) ≠ 0 := by exact_mod_cast (Real.sqrt_pos.mpr hn).ne'
+    have hsq : (‖1 + x‖ : ℂ) = (Real.sqrt ‖1 + x‖ : ℂ) * (Real.sqrt ‖1 + x‖ : ℂ) := by
+      exact_mod_cast (Real.mul_self_sqrt hn.le).symm
+    push_cast
+    rw [hsq]
+    field_simp
+  have hPI := (finiteLogFourier_eq_neg_haar v (A f) h0).2.1
+  have hPH' : (fun x ↦ ‖x‖⁻¹ • addTest(A f) x) = fun x ↦ H (1 + x) := funext hPH
+  have hHI : Integrable H ν𝔭(v) := by
+    have h1 := (key addTest(A f)).1.mp hPI
+    rw [hPH'] at h1
+    refine (h1.comp_add_left (-1)).congr (ae_of_all _ fun x ↦ ?_)
+    exact congrArg H (add_neg_cancel_left 1 x)
+  have e1 : finiteConnesWeilPrincipalValue v 1 f = ∫ u : Kˣ, addTest(A f) u.val ∂μ𝔭(v) :=
+    finiteConnesPrincipalValue_one_of_apply_zero v (A f) h0
+  have e2 : ∫ u : Kˣ, addTest(A f) u.val ∂μ𝔭(v) = ∫ u : Kˣ, Q u.val ∂μ𝔭(v) :=
+    calc ∫ u : Kˣ, addTest(A f) u.val ∂μ𝔭(v)
+        = c.toReal • ∫ y, ‖y‖⁻¹ • addTest(A f) y ∂ν𝔭(v) := (key addTest(A f)).2
+      _ = c.toReal • ∫ y, H (1 + y) ∂ν𝔭(v) :=
+        congrArg (c.toReal • ·) (congrArg (fun φ ↦ ∫ y, φ y ∂ν𝔭(v)) hPH')
+      _ = c.toReal • ∫ y, H y ∂ν𝔭(v) := congrArg _ (integral_add_left_eq_self H 1)
+      _ = ∫ u : Kˣ, Q u.val ∂μ𝔭(v) := ((key Q).2).symm
+  have e3 : ∫ u : Kˣ, Q u.val ∂μ𝔭(v) = ∫ u, finiteWeilIntegrand(v, f.val) u ∂μ𝔭(v) :=
+    integral_congr_ae (ae_of_all _ hQ)
+  exact ⟨((key Q).1.mpr hHI).congr (ae_of_all _ hQ), e1.trans (e2.trans e3)⟩
 
 -- TODO(paper-gap): Equation (B.4.4.6) gives the wrong sign and scale for
 -- the restriction of T, and Fourier transformation requires an additive test space.

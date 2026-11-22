@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+
 /-! # Third Structure Theorem: strong duals and eigendistributions
 
 Masullo, §5.5, pp. 277–285. The finite set in the S-local notation lists only
@@ -60,12 +62,14 @@ theorem mem_sLocalEigendistributions (c : QuasiCharacter Jₛ) (T : D(ℬ(Aₛ))
 /-- Paper: Definition 5.5.1.1(1), p. 277.
 The S-local weight subspace is closed for the strong topology. -/
 theorem sLocalEigendistributions_isClosed (c : QuasiCharacter Jₛ) :
-    IsClosed (sLocalEigendistributions c : Set D(ℬ(Aₛ))) := by sorry
+    IsClosed (sLocalEigendistributions c : Set D(ℬ(Aₛ))) :=
+  schwartzBruhatEigendistributions_isClosed _
 
 /-- Paper: Definition 5.5.1.1(2), p. 278.
 The global weight subspace of §3.4 is closed for the strong topology. -/
 theorem adelicEigendistributions_isClosed (c : QuasiCharacter C𝔽) :
-    IsClosed (adelicEigendistributions c : Set D(ℬ(𝔸[F]))) := by sorry
+    IsClosed (adelicEigendistributions c : Set D(ℬ(𝔸[F]))) :=
+  schwartzBruhatEigendistributions_isClosed _
 
 end Eigendistributions
 
@@ -148,7 +152,21 @@ theorem sLocalEigendistribution_descends (c : QuasiCharacter Jₛ) (T : D(ℬ(A�
 /-- Paper: Equation (5.5.1.12), p. 279.
 The normalized S-local eigendistribution annihilates the theta kernel. -/
 theorem sLocalThetaKernel_le_eigendistribution (c : QuasiCharacter Jₛ) :
-    Kₛ ≤ (sLocalNormalizedEigendistribution c).ker := by sorry
+    Kₛ ≤ (sLocalNormalizedEigendistribution c).ker := by
+  have annihilates {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (W : Submodule ℂ (StrongDual ℂ M)) (T : StrongDual ℂ M)
+      (hW : W = Submodule.span ℂ {T})
+      (hd : ∀ D ∈ W, ∃! U : StrongDual ℂ (M ⧸ K), pull(K) U = D) : K ≤ T.ker := by
+    have hT : T ∈ W := hW ▸ Submodule.subset_span (Set.mem_singleton T)
+    obtain ⟨U, rfl⟩ := (hd T hT).exists
+    intro f hf
+    change U (Submodule.Quotient.mk f) = 0
+    exact (congrArg U ((Submodule.Quotient.mk_eq_zero K).mpr hf)).trans (map_zero U)
+  with_reducible_and_instances
+    exact annihilates (M := ℬ(Aₛ)) (Kₛ) (sLocalEigendistributions (F := F) (S := S) c)
+      (sLocalNormalizedEigendistribution (F := F) (S := S) c)
+      (sLocalEigendistributions_eq_span (F := F) (S := S) c)
+      (sLocalEigendistribution_descends (F := F) (S := S) c)
 
 /-- Paper: Theorem 5.5.1.2(2), p. 278.
 The generator on the S-local theta quotient is the continuous descent of the
@@ -201,13 +219,41 @@ theorem adelicNormalizedEigendistribution_gaussian (χ : PontryaginDual C𝔽) (
 /-- Paper: Theorem 5.5.1.3(1), p. 279.
 The normalized global distribution spans the eigenspace of its weight. -/
 theorem adelicEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
-    adelicEigendistributions c = Submodule.span ℂ {adelicNormalizedEigendistribution c} := by sorry
+    adelicEigendistributions c = Submodule.span ℂ {adelicNormalizedEigendistribution c} := by
+  have spans {V : Type _} {I : Type _} [AddCommGroup V] [Module ℂ V]
+      (E : Submodule ℂ V) (T : V) (test : I → V → ℂ) (hzero : ∀ i, test i 0 = 0)
+      (hr : Module.finrank ℂ E = 1) (hT : T ∈ E) (hn : ∀ i, test i T = 1)
+      (unique : ∀ U ∈ E, (∀ i, test i U = 1) → U = T) : E = Submodule.span ℂ {T} := by
+    apply eq_span_singleton_of_mem_of_finrank_eq_one hr hT
+    intro hz
+    -- If zero were normalized, there could be no tests, so every vector would qualify.
+    have noTest (i : I) : False :=
+      zero_ne_one (((hzero i).symm.trans (congrArg (test i) hz).symm).trans (hn i))
+    have : Nontrivial E := Module.nontrivial_of_finrank_eq_succ hr
+    obtain ⟨U, hU⟩ := exists_ne (0 : E)
+    exact hU (Subtype.ext ((unique U U.property (fun i ↦ (noTest i).elim)).trans hz))
+  let Charts := {p : PontryaginDual C𝔽 × ℂ // ideleClassNormTwist p.1 p.2 = c}
+  have hT := (existsUnique_adelicNormalizedEigendistribution (F := F) c).exists.choose_spec
+  refine spans (V := D(ℬ(𝔸[F]))) (I := Charts) (adelicEigendistributions (F := F) c)
+    (adelicNormalizedEigendistribution (F := F) c)
+    (fun (p : Charts) (U : D(ℬ(𝔸[F]))) ↦ U (adelicStandardGaussian (F := F) p.val.1)) (fun _ ↦ rfl)
+    (Module.rank_eq_one_iff_finrank_eq_one.mp (adelicEigendistributions_rank (F := F) c)) hT.1
+    (fun p ↦ hT.2 p.val.1 p.val.2 p.property) ?_
+  intro U hU hn
+  exact (existsUnique_adelicNormalizedEigendistribution (F := F) c).unique
+    ⟨hU, fun χ s hc ↦ hn ⟨(χ, s), hc⟩⟩ hT
 
 /-- Paper: Theorem 5.5.1.3(1), p. 279.
 The normalized global distributions form a holomorphic family on each norm chart. -/
 theorem adelicNormalizedEigendistribution_holomorphic (χ : PontryaginDual C𝔽) :
     VectorHolomorphicOn (fun s ↦ adelicNormalizedEigendistribution (ideleClassNormTwist χ s))
-      univ := by sorry
+      univ := by
+  let D := (adelicEigendistribution_normalized χ).choose
+  have h := (adelicEigendistribution_normalized χ).choose_spec
+  have he (s : ℂ) : adelicNormalizedEigendistribution (ideleClassNormTwist χ s) = D s := by
+    have hs := (existsUnique_adelicNormalizedEigendistribution (ideleClassNormTwist χ s)).exists.choose_spec
+    exact (h.2.1 s _).mpr ⟨hs.1, hs.2 χ s rfl⟩
+  exact (congrArg (fun G : ℂ → D(ℬ(𝔸[F])) ↦ VectorHolomorphicOn G univ) (funext he)).mpr h.1
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 Each global eigendistribution descends uniquely to the theta quotient. The pullback
@@ -220,7 +266,17 @@ theorem adelicEigendistribution_descends (c : QuasiCharacter C𝔽) (T : D(ℬ(�
 The normalized adelic eigendistribution annihilates the global theta kernel,
 so its descent is a continuous linear quotient lift. -/
 theorem globalThetaKernel_le_eigendistribution (c : QuasiCharacter C𝔽) :
-    K𝔽 ≤ (adelicNormalizedEigendistribution c).ker := by sorry
+    K𝔽 ≤ (adelicNormalizedEigendistribution c).ker := by
+  have annihilates {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (T : StrongDual ℂ M)
+      (h : ∃ U : StrongDual ℂ (M ⧸ K), pull(K) U = T) : K ≤ T.ker := by
+    obtain ⟨U, rfl⟩ := h
+    intro f hf
+    change U (Submodule.Quotient.mk f) = 0
+    exact (congrArg U ((Submodule.Quotient.mk_eq_zero K).mpr hf)).trans (map_zero U)
+  exact annihilates (M := ℬ(𝔸[F])) (K𝔽) (adelicNormalizedEigendistribution (F := F) c)
+    (adelicEigendistribution_descends (F := F) c _
+      (existsUnique_adelicNormalizedEigendistribution (F := F) c).exists.choose_spec.1).exists
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 The generator on the global theta quotient is the continuous descent of the
@@ -239,7 +295,27 @@ The eigenspace in the global theta dual is the line through the descended genera
 with the weight condition tested on the pullback. -/
 theorem globalThetaEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
     (adelicEigendistributions c).comap (pull(K𝔽)).toLinearMap =
-      Submodule.span ℂ {globalThetaEigendistribution c} := by sorry
+      Submodule.span ℂ {globalThetaEigendistribution c} := by
+  have quotientLine {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (W : Submodule ℂ (StrongDual ℂ M))
+      (T : StrongDual ℂ M) (U : StrongDual ℂ (M ⧸ K)) (hW : W = Submodule.span ℂ {T})
+      (hU : ∀ f, U (K.mkQL f) = T f) :
+      W.comap (pull(K)).toLinearMap = Submodule.span ℂ {U} := by
+    let L := (pull(K)).toLinearMap
+    have hinj : Injective L := by
+      intro a b h
+      apply ContinuousLinearMap.ext
+      intro x
+      obtain ⟨f, rfl⟩ := K.mkQ_surjective x
+      exact congrArg (fun t : StrongDual ℂ M ↦ t f) h
+    have he : L U = T := ContinuousLinearMap.ext hU
+    have hm : (Submodule.span ℂ {U}).map L = W := by
+      rw [Submodule.map_span, Set.image_singleton, he, hW]
+    exact (congrArg (fun p : Submodule ℂ (StrongDual ℂ M) ↦ p.comap L) hm.symm).trans
+      (Submodule.comap_map_eq_of_injective hinj _)
+  exact quotientLine (M := ℬ(𝔸[F])) (K𝔽) (adelicEigendistributions (F := F) c)
+    (adelicNormalizedEigendistribution (F := F) c) (globalThetaEigendistribution (F := F) c)
+    (adelicEigendistributions_eq_span (F := F) c) (globalThetaEigendistribution_mk (F := F) c)
 
 /-- Paper: Theorem 5.5.1.3(2), p. 279.
 The normalized global family in the strong dual of the theta quotient is holomorphic. -/
@@ -441,7 +517,29 @@ of all normalized S-local eigendistributions pulled back from the theta quotient
 theorem sLocalThetaTranspose_closure_range :
     closure (Set.range (pull(Kₛ))) =
       closure (Submodule.span ℂ (Set.range (sLocalNormalizedEigendistribution (F := F) (S := S))) :
-        Set D(ℬ(Aₛ))) := by sorry
+        Set D(ℬ(Aₛ))) := by
+  have denseImage {X Y I : Type _} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (L : X →L[ℂ] Y)
+      (D : I → X) (G : I → Y) (hd : Dense (Submodule.span ℂ (range D) : Set X))
+      (hG : ∀ i, L (D i) = G i) :
+      closure (range L) = closure (Submodule.span ℂ (range G) : Set Y) := by
+    have hs : L.toLinearMap '' range D = range G :=
+      (Set.range_comp L.toLinearMap D).symm.trans (congrArg Set.range (funext hG))
+    have hi := congrArg (fun p : Submodule ℂ Y ↦ (p : Set Y))
+      ((Submodule.map_span L.toLinearMap (range D)).trans (congrArg (Submodule.span ℂ) hs))
+    change L '' (Submodule.span ℂ (range D) : Set X) = _ at hi
+    rw [← hi]
+    exact le_antisymm (closure_minimal (L.continuous.range_subset_closure_image_dense hd) isClosed_closure)
+      (closure_mono (Set.image_subset_range _ _))
+  have pullEq {M : Type _} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+      (K : Submodule ℂ M) (U : StrongDual ℂ (M ⧸ K)) (T : StrongDual ℂ M)
+      (h : ∀ f, U (K.mkQL f) = T f) : pull(K) U = T :=
+    ContinuousLinearMap.ext h
+  with_reducible_and_instances
+    exact denseImage (X := D(SLocalAdelicThetaSpace F S)) (Y := D(ℬ(Aₛ))) (I := QuasiCharacter Jₛ)
+      (pull(Kₛ)) (sLocalThetaEigendistribution (F := F) (S := S))
+      (sLocalNormalizedEigendistribution (F := F) (S := S)) (sLocalThetaEigendistributions_dense_span (F := F) (S := S))
+      (fun c ↦ pullEq (M := ℬ(Aₛ)) (Kₛ) _ _ (sLocalThetaEigendistribution_mk (F := F) (S := S) c))
 
 -- TODO(paper-gap): Remark 5.5.3.3, p. 285, claims that one connected subset of weights
 -- with an interval in it detects the whole theta space. A subset of a single component
@@ -451,7 +549,30 @@ theorem sLocalThetaTranspose_closure_range :
 The S-local eigendistributions over all weights separate points of the S-local theta space.
 Deviation: Weights range over all components of the character space. -/
 theorem sLocalThetaEigendistributions_separate (x : SLocalAdelicThetaSpace F S)
-    (hx : ∀ c : QuasiCharacter Jₛ, sLocalThetaEigendistribution c x = 0) : x = 0 := by sorry
+    (hx : ∀ c : QuasiCharacter Jₛ, sLocalThetaEigendistribution c x = 0) : x = 0 := by
+  have detect {E I : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [SeparatingDual ℂ E]
+      (D : I → StrongDual ℂ E) (hd : Dense (Submodule.span ℂ (range D) : Set (StrongDual ℂ E)))
+      (y : E) (hy : ∀ i, D i y = 0) : y = 0 := by
+    let ev : StrongDual ℂ E →L[ℂ] ℂ :=
+      { toFun := fun T ↦ T y
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl
+        cont := continuous_eval_const y }
+    have hs : Submodule.span ℂ (range D) ≤ ev.ker :=
+      Submodule.span_le.mpr (by rintro _ ⟨i, rfl⟩; exact hy i)
+    exact SeparatingDual.eq_zero_of_forall_dual_eq_zero (R := ℂ)
+      (fun T ↦ closure_minimal hs ev.isClosed_ker (hd T))
+  let : T2Space (SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
+    sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : IsTopologicalAddGroup (SLocalAdelicThetaSpace F S) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : SeparatingDual ℂ (SLocalAdelicThetaSpace F S) := polynormableSpace_separatingDual ℂ _
+  with_reducible_and_instances
+    exact detect (E := SLocalAdelicThetaSpace F S) (I := QuasiCharacter Jₛ)
+      (sLocalThetaEigendistribution (F := F) (S := S))
+      (sLocalThetaEigendistributions_dense_span (F := F) (S := S)) x hx
 
 /-- Paper: Remark 5.5.3.3, p. 285.
 The eigendistributions with weights in a set that has an accumulation point in every

@@ -851,7 +851,7 @@ and since $\chi(-1)\ne 0$, we deduce from (3.3.1.14) that (3.3.1.9) holds. It fo
 (3) : We fix a real number $\sigma>0$. Upon choosing an enumeration for the finitely many places of $F$ contained in $S$, i.e. $S=\{v_1,\dots,v_N\}$, we have, as meromorphic functions of $s\in\mathbf{C}$:
 
 $$
-\frac{\partial^k}{\partial s^k}\rho_S(\chi\lvert\cdot\rvert_{F,S}^s)=\sum_{(i_1,\dots,i_N)\in\mathbf{N}^N,k=i_1+\dots+i_N}\binom{k}{i_1,\dots,i_N}\prod_{1\le j\le N}\frac{\partial^{i_j}}{\partial s^{i_j}}\rho_{v_j}(\chi_{v_j}\lvert\cdot\rvert_{v_j}^s) \tag{3.3.1.15}
+\frac{\partial^k}{\partial s^k}\rho_S(\chi\lvert\cdot\rvert_{F,S}^s)=\sum_{(i_1,\dots,i_N)\in\mathbf{N}^N,k=i_1+\ldots+i_N}\binom{k}{i_1,\dots,i_N}\prod_{1\le j\le N}\frac{\partial^{i_j}}{\partial s^{i_j}}\rho_{v_j}(\chi_{v_j}\lvert\cdot\rvert_{v_j}^s) \tag{3.3.1.15}
 $$
 
 the sum in (3.3.1.15) being finite.
@@ -1171,7 +1171,7 @@ $$
 (1) *If $v$ is real:*
 
 $$
-\operatorname{Res}_{c=c_{a,m}}Z_v(\cdot,c)=A_{v,a,m}D^{a+m}\delta_0,\; a\in\{0,1\},\; m\in 2\mathbf{N} \tag{3.3.2.6}
+\mathop{\mathrm{Res}}\limits_{c=c_{a,m}}Z_v(\cdot,c)=A_{v,a,m}D^{a+m}\delta_0,\; a\in\{0,1\},\; m\in 2\mathbf{N} \tag{3.3.2.6}
 $$
 
 *where $D:\mathcal{S}(F_v)\to\mathcal{S}(F_v)$ is the differential operator $\frac{1}{2\pi i}\partial_x$ on $\mathcal{S}(\mathbf{R})$, where $A_{v,a,m}\in\mathbf{C}^{\times}$ is a constant depending only on the quasi-character, given by the following formula:*
@@ -1183,13 +1183,13 @@ $$
 (2) *If $v$ is complex, for $r\ge 0$, and:*
 
 $$
-\operatorname{Res}_{c=c_{r,m}}Z_v(\cdot,c)=A_{v,r,m}\overline{D}^{\,r+m}D^{m}\delta_0 \tag{3.3.2.8}
+\mathop{\mathrm{Res}}\limits_{c=c_{r,m}}Z_v(\cdot,c)=A_{v,r,m}\overline{D}^{\,r+m}D^{m}\delta_0 \tag{3.3.2.8}
 $$
 
 *and:*
 
 $$
-\operatorname{Res}_{c=c_{-r,m}}Z_v(\cdot,c)=A_{v,r,m}D^{r+m}\overline{D}^{\,m}\delta_0 \tag{3.3.2.9}
+\mathop{\mathrm{Res}}\limits_{c=c_{-r,m}}Z_v(\cdot,c)=A_{v,r,m}D^{r+m}\overline{D}^{\,m}\delta_0 \tag{3.3.2.9}
 $$
 
 ## PDF page 139
@@ -1317,19 +1317,15 @@ $$
 **3.4. EIGENDISTRIBUTIONS AND WEIL'S IDENTITY** · **141**
 
 and upon choosing an isomorphism of topological fields $F_v\simeq\mathbf{C}$, we have:
-(3.3.2.21)
-
 $$
-\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^{r+m}z^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_{\bar{z}}^{r+m}\partial_z^m\delta_0)(f)
+\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)\bar{z}^{r+m}z^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_{\bar{z}}^{r+m}\partial_z^m\delta_0)(f) \tag{3.3.2.21}
 $$
 
 which reads $(\overline{D}^{r+m}D^m\delta_0)(f)$.
 
 For $c=c_{-r,m}$ we have:
-(3.3.2.22)
-
 $$
-\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{-r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)z^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)z^{r+m}\bar{z}^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_z^{r+m}\partial_{\bar{z}}^m\delta_0)(f)
+\int_{F_v^{\times}}\widehat{f}(g)\widehat{c_{-r,m}}(g)\,\mathrm{d}\mu_v(g)=\int_{\mathbf{C}}\widehat{f}(z)z^r\lvert z\rvert_v^{1+m}\frac{\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert}{\lvert z\rvert_v}=\int_{\mathbf{C}}\widehat{f}(z)z^{r+m}\bar{z}^m\lvert\mathrm{d}z\wedge\mathrm{d}\bar{z}\rvert=\frac{1}{(2\pi i)^{2m+r}}(\partial_z^{r+m}\partial_{\bar{z}}^m\delta_0)(f) \tag{3.3.2.22}
 $$
 
 which reads $(D^{r+m}\overline{D}^m\delta_0)(f)$. $\square$
@@ -1696,64 +1692,50 @@ with $p_N$ any entire polynomial function on $\mathbf{C}$ whose zeros are locate
 
 The identity from (3.4.2.7) then implies that the Asymptotic Residue Theorem applies to $Z(f,\lvert\cdot\rvert_F^s)$. We obtain, for every fixed real number $\sigma>1$, and every integer $N>0$:
 
-(3.4.2.8)
-
 $$
-\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)-\bar{\mu}_1(C_F)f(0)+\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s.
+\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)-\bar{\mu}_1(C_F)f(0)+\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s. \tag{3.4.2.8}
 $$
 
 The leftmost side of (3.4.2.8) reads $\Phi_{F,\omega=1}(f)(\tau(t))$ by Fourier-Mellin inversion. We therefore deduce from (3.4.2.8) that the following identity holds:
 
-(3.4.2.9)
-
 $$
-\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)=\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s.
+\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)=\frac{1}{2\pi i}\int_{-N-i\infty}^{-N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s. \tag{3.4.2.9}
 $$
 
 The following estimate therefore holds:
 
-(3.4.2.10)
-
 $$
-\lvert\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega=1}(f)(\tau(t))-t^{-1}\bar{\mu}_1(C_F)\widehat{f}(0)+\bar{\mu}_1(C_F)f(0)\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.10}
 $$
 
 as $t\to 0^+$ (the only regime in which the bound is useful). Note that the estimate in (3.4.2.10) does not depend on $\sigma$.
 
 We now apply the Asymptotic Residue Theorem (see Theorem B.3.2.1) one more time, to obtain, for every integer $N>1$ and for every real number $\sigma\in(1,N)$:
 
-(3.4.2.11)
-
 $$
-\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=\frac{1}{2\pi i}\int_{N-i\infty}^{N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s
+\frac{1}{2\pi i}\int_{\sigma-i\infty}^{\sigma+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s=\frac{1}{2\pi i}\int_{N-i\infty}^{N+i\infty}M(\Phi_{F,\omega=1}(f)\circ\tau)(s)t^{-s}\,\mathrm{d}s \tag{3.4.2.11}
 $$
 
 since $Z(f,\lvert\cdot\rvert_F^s)$ has no poles in the vertical strip $\mathbf{C}_{(\sigma-\varepsilon,N+\varepsilon)}$ for all small enough $\varepsilon>0$ and hence the same can be said about $Z(f,\lvert\cdot\rvert_F^s)t^{-s}$.
 
 The leftmost side of (3.4.2.11) is $\Phi_{F,\omega=1}(f)(\tau(t))$ by Mellin inversion (see Theorem B.2.1.7 and Proposition B.2.1.8), and the rightmost side is bounded above by $\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}$, leading to the estimate:
 
-(3.4.2.12)
-
 $$
-\lvert\Phi_{F,\omega=1}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega=1}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega=1}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.12}
 $$
 
 as $t\to+\infty$. Once again we observe that the estimate in (3.4.2.12) does not depend on $\sigma$.
 
 For $\omega\ne 1$, the meromorphic function $Z(f,c)$ restricted to $\Omega(C_F)(\omega)$ has no poles, and the same argument as in the foregoing shows that the Asymptotic Residue Theorem applies to it, leading to the estimates, for each integer $N>1$:
 
-(3.4.2.13)
-
 $$
-\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.13}
 $$
 
 as $t\to+\infty$, and, for every integer $N>0$:
 
-(3.4.2.14)
-
 $$
-\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)}
+\lvert\Phi_{F,\omega}(f)(\tau(t))\rvert\le\frac{t^N}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(-N+ix)\rVert_{L^1(\mathbf{R},\mathrm{d}x)} \tag{3.4.2.14}
 $$
 
 as $t\to 0^+$. We established the Theorem for $N>1$, so we are done. $\square$
@@ -1762,10 +1744,8 @@ REMARK 3.4.2.4. Using compatibility of the global $\theta$-function operator $\P
 
 This reads, for any fixed integer $N\ge 0$, for any $f\in\mathcal{S}(\mathbf{A}_F)$:
 
-(3.4.2.15)
-
 $$
-\lvert\Phi_{F,\omega}(f)(g)\rvert\le C_N\lvert g\rvert_F^{-N}
+\lvert\Phi_{F,\omega}(f)(g)\rvert\le C_N\lvert g\rvert_F^{-N} \tag{3.4.2.15}
 $$
 
 ## PDF page 150
@@ -1774,10 +1754,8 @@ $$
 
 as $\lvert g\rvert_F\to+\infty$ for some real number $C_N>0$, and
 
-(3.4.2.16)
-
 $$
-\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le C_N\lvert g\rvert_F^N
+\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le C_N\lvert g\rvert_F^N \tag{3.4.2.16}
 $$
 
 for some real number $C_N>0$ and as $\lvert g\rvert_F\to 0^+$, where
@@ -1808,18 +1786,14 @@ are integrable with respect to the Plancherel measure to the Haar measure $\bar{
 
 We observe that it implies (3.4.2.15) and (3.4.2.16). Indeed, from (3.4.2.10), (3.4.2.12), (3.4.2.13) and (3.4.2.14), and using the Hausdorff-Young inequality applied to the Fourier transform on $C_F^1$, we obtain the estimates
 
-(3.4.2.17)
-
 $$
-\lvert\Phi_F(f)(g)\rvert\le\frac{\lvert g\rvert_F^N}{2\pi}\lVert M(\Phi_{F,\bar{\omega}}(\widehat{f})\circ\tau)(1+N-ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}
+\lvert\Phi_F(f)(g)\rvert\le\frac{\lvert g\rvert_F^N}{2\pi}\lVert M(\Phi_{F,\bar{\omega}}(\widehat{f})\circ\tau)(1+N-ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)} \tag{3.4.2.17}
 $$
 
 as $\lvert g\rvert_F<1$, and
 
-(3.4.2.18)
-
 $$
-\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le\frac{\lvert g\rvert_F^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}.
+\lvert\Phi_F(f)(g)-(\lvert g\rvert_F^{-1}\widehat{f}(0)-f(0))\delta(g)\rvert\le\frac{\lvert g\rvert_F^{-N}}{2\pi}\lVert M(\Phi_{F,\omega}(f)\circ\tau)(N+ix)\rVert_{L^1(\mathbf{R}\times\widehat{C_F^1},\mathrm{d}x\otimes\mathrm{d}\widehat{\overline{\mu}}_1)}. \tag{3.4.2.18}
 $$
 
 as $\lvert g\rvert_F>1$.
@@ -1856,20 +1830,16 @@ DEFINITION 3.4.3.1. Let $F$ be a number field, $v$ a place of $F$, $F_v$ the com
 
 (1) Let $c\in\Omega(F_v^{\times})$ be a quasi-character. We say $T\in\mathcal{S}(F_v)'_{\beta}$ is an *eigendistribution of weight $c$* if and only if:
 
-(3.4.3.1)
-
 $$
-\rho_v'(g,T)=c(g)T
+\rho_v'(g,T)=c(g)T \tag{3.4.3.1}
 $$
 
 for all $g\in F_v^{\times}$, where $\rho_v'$ is the dual of the continuous right-translation action $\rho_v:F_v^{\times}\times\mathcal{S}(F_v)\to\mathcal{S}(F_v)$; i.e., $(\rho_v'(g,T))(f)=T(f\circ m_g)$ where $m_g$ is $g$-multiplication on $F_v$. We denote by $\mathcal{S}(F_v)'_{\beta}(c)$ the closed subspace of $\mathcal{S}(F_v)'_{\beta}$ of eigendistributions on $F_v$ of weight $c$.
 
 (2) For $c\in\Omega(C_F)$ an idelic quasi-character, say $T\in\mathcal{S}(\mathbf{A}_F)'_{\beta}$ is a *global eigendistribution of weight $c$* if
 
-(3.4.3.2)
-
 $$
-\rho_F'(g,T)=c(g)T
+\rho_F'(g,T)=c(g)T \tag{3.4.3.2}
 $$
 
 for all $g\in\mathrm{GL}_1(\mathbf{A}_F)$, where $\rho_F'$ is the dual of the continuous right-translation action $\rho_F:\mathrm{GL}_1(\mathbf{A}_F)\times\mathcal{S}(\mathbf{A}_F)\to\mathcal{S}(\mathbf{A}_F)$.
@@ -1892,60 +1862,46 @@ We define Schwartz-Bruhat functions $E_{\omega_v,v}$ on $F_v$, for each place $v
 
 (a) if $\omega_v=1$
 
-(3.4.3.3)
-
 $$
-E_{1,v}(x):=e^{-\pi x^2}.
+E_{1,v}(x):=e^{-\pi x^2}. \tag{3.4.3.3}
 $$
 
 (b) if $\omega_v=\mathrm{sgn}$, the sign character
 
-(3.4.3.4)
-
 $$
-E_{\mathrm{sgn},v}(x):=xe^{-\pi x^2}.
+E_{\mathrm{sgn},v}(x):=xe^{-\pi x^2}. \tag{3.4.3.4}
 $$
 
 (2) For $v$ complex Archimedean, if $\omega_v=\omega_{t,m}:re^{i\theta}\mapsto r^te^{im\theta}$
 
 (a) for $m\ge 0$
 
-(3.4.3.5)
-
 $$
-E_{m,v}(z):=\frac{1}{2\pi}z^me^{-2\pi z\bar{z}}.
+E_{m,v}(z):=\frac{1}{2\pi}z^me^{-2\pi z\bar{z}}. \tag{3.4.3.5}
 $$
 
 (b) For $m<0$
 
-(3.4.3.6)
-
 $$
-E_{m,v}(z):=\frac{1}{2\pi}\bar{z}^{-m}e^{-2\pi z\bar{z}}
+E_{m,v}(z):=\frac{1}{2\pi}\bar{z}^{-m}e^{-2\pi z\bar{z}} \tag{3.4.3.6}
 $$
 
 (3) For $v$ non-Archimedean:
 
-(3.4.3.7)
-
 $$
-E_v(x):=1_{\mathcal{O}_{F_v}}.
+E_v(x):=1_{\mathcal{O}_{F_v}}. \tag{3.4.3.7}
 $$
 
 For $S_{\omega}$ the finite set of finite places of $F$ at which $\omega$ is ramified, we further define for $v\in S_{\omega}$:
 
-(3.4.3.8)
-
 $$
-E_{\omega_v,v}(x):=\omega_v^{-1}1_{\mathcal{O}_{F_v}^{\times}}.
+E_{\omega_v,v}(x):=\omega_v^{-1}1_{\mathcal{O}_{F_v}^{\times}}. \tag{3.4.3.8}
 $$
 
 For $c\in\Omega(C_F)$ a fixed quasi-character we denote by $E_{c,v}$, abbreviating to $E_v$ if no confusion can arise, the local Schwartz-Bruhat function defined above associated to the character $c|_{C_F^1}$ of $C_F^1$. We define the global Schwartz-Bruhat function:
 
-(3.4.3.9)
-
 $$
-E_c:=\bigotimes_{v\in\Sigma_F}E_{c_v,v}.
+E_c:=\bigotimes_{v\in\Sigma_F}E_{c_v,v}. \tag{3.4.3.9}
 $$
 
 We abbreviate the notation for $E_c$ to $E$ when no confusion can arise.
@@ -1966,52 +1922,40 @@ THEOREM 3.4.3.3 (Weil's Identity - II). *Let $F$ be a number field, $v$ a place 
 
 (1) *If $v$ is non-Archimedean and $c$ is unramified at $v$:*
 
-(3.4.3.10)
-
 $$
-\langle\Delta_v'(c),E_v\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),E_v\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.10}
 $$
 
 (2) *If $v$ is non-Archimedean and $c$ is ramified at $v$:*
 
-(3.4.3.11)
-
 $$
-\langle\Delta_v'(c),c^{-1}1_{\mathcal{O}_{F_v}^{\times}}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),c^{-1}1_{\mathcal{O}_{F_v}^{\times}}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.11}
 $$
 
 (3) *If $v$ is Archimedean:*
 
-(3.4.3.12)
-
 $$
-\langle\Delta_v'(c),E_{c_v,v}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1.
+\langle\Delta_v'(c),E_{c_v,v}\rangle_{\mathcal{S}(F_v)'_{\beta},\mathcal{S}(F_v)}=1. \tag{3.4.3.12}
 $$
 
 *For any place $v$ of $F$, the function $c\mapsto\Delta_v'(c)$ is a holomorphic function $\Omega(F_v^{\times})\to\mathcal{S}(F_v)'_{\beta}$. The following identity holds, as meromorphic $\mathcal{S}(F_v)'_{\beta}$-valued functions on $\Omega(F_v^{\times})$:*
 
-(3.4.3.13)
-
 $$
-Z_v(\cdot,c)=L_v(c)\Delta_v'(c)
+Z_v(\cdot,c)=L_v(c)\Delta_v'(c) \tag{3.4.3.13}
 $$
 
 *where $L_v$ is the local factor at $v$ of the completed Hecke $L$-function.*
 
 *(2) For every $c\in\Omega(C_F)$, we have $\dim_{\mathbf{C}}\mathcal{S}(\mathbf{A}_F)'(c)=1$. The following tempered distribution in $\mathcal{S}(\mathbf{A}_F)'$*
 
-(3.4.3.14)
-
 $$
-\Delta'(c):=\bigotimes_{v\in\Sigma_F}\Delta_v'(c)
+\Delta'(c):=\bigotimes_{v\in\Sigma_F}\Delta_v'(c) \tag{3.4.3.14}
 $$
 
 *is a global eigendistribution of weight $c$ (see Remark 3.4.3.4 for the meaning of the right side as a continuous linear functional on $\mathcal{S}(\mathbf{A}_F)$). The function $c\mapsto\Delta'(c)$ is a holomorphic function $\Omega(C_F)\to\mathcal{S}(\mathbf{A}_F)'_{\beta}$. The following identity holds, as meromorphic $\mathcal{S}(\mathbf{A}_F)'_{\beta}$-valued functions on $\Omega(C_F)$:*
 
-(3.4.3.15)
-
 $$
-Z(\cdot,c)=L(c)\Delta'(c)
+Z(\cdot,c)=L(c)\Delta'(c) \tag{3.4.3.15}
 $$
 
 *where $c\mapsto L(c)$ is the completed Hecke $L$-function.*

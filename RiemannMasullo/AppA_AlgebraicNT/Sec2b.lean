@@ -2949,7 +2949,58 @@ local notation "Eₛ" => sLocalIdeleFundamentalDomain F v₀ σ S bₛ
 diagonal S-unit, namely the identity. -/
 theorem unit_mem_sLocalIdeleFundamentalDomain (u : Oₛ(F, S)ˣ) :
     unitAtS u ∈ Subgroup.subtype Nₛ '' Eₛ ↔ u = 1 := by
-  sorry
+  constructor
+  · rintro ⟨g, ⟨⟨t, ht, hlog⟩, hsector⟩, hg⟩
+    change g.val = unitAtS u at hg
+    change sIdeleLog F S g.val = _ at hlog
+    change inTorsionSector F v₀ σ (atPlace (Units.map (RingHom.fst (InfiniteAdeleRing F)
+      ((v : S) → v.val.adicCompletion F)).toMonoidHom g.val)) at hsector
+    rw [hg] at hlog hsector
+    obtain ⟨L, hL⟩ := sUnitLogHom_exists F S
+    have hk : CommGroup.torsion Oₛ(F, S)ˣ ≤ L.ker := by
+      intro w hw
+      exact (hL w).trans ((sIdeleLog_unit_eq_zero F S w).2 hw)
+    let f := (QuotientGroup.lift _ L hk).toAdditiveLeft.toIntLinearMap
+    have hf (w : Oₛ(F, S)ˣ) :
+        f (Additive.ofMul (QuotientGroup.mk w)) = sIdeleLog F S (unitAtS w) := hL w
+    have hb (i) : f (bₛ i) = sIdeleLog F S (unitAtS (bₛ i).toMul.out) := by
+      have h := hf (bₛ i).toMul.out
+      rw [show QuotientGroup.mk (bₛ i).toMul.out = (bₛ i).toMul from Quotient.out_eq' _] at h
+      exact h
+    have hsum (k : Fin sRank(F, S) → ℤ) : f (∑ i, k i • bₛ i) =
+        ∑ i, (k i : ℝ) • sIdeleLog F S (unitAtS (bₛ i).toMul.out) := by
+      simp only [map_sum, map_zsmul, hb, Int.cast_smul_eq_zsmul]
+    let c := Additive.ofMul (QuotientGroup.mk (s := CommGroup.torsion Oₛ(F, S)ˣ) u)
+    have hu : ∑ i, (bₛ.repr c i : ℝ) • sIdeleLog F S (unitAtS (bₛ i).toMul.out) =
+        sIdeleLog F S (unitAtS u) :=
+      (hsum _).symm.trans (by rw [bₛ.sum_repr]; exact hf u)
+    have he : (fun i ↦ (bₛ.repr c i : ℝ)) = t :=
+      (sUnitLog_basis_linearIndependent F S bₛ).fintypeLinearCombination_injective
+        (by simp only [Fintype.linearCombination_apply]; exact hu.trans hlog)
+    have hk0 (i) : bₛ.repr c i = 0 := by
+      have hi := ht i
+      rw [← congrFun he i] at hi
+      have h1 : (0 : ℤ) ≤ bₛ.repr c i := by exact_mod_cast hi.1
+      have h2 : bₛ.repr c i < 1 := by exact_mod_cast hi.2
+      omega
+    have htors : u ∈ CommGroup.torsion Oₛ(F, S)ˣ := by
+      apply (sIdeleLog_unit_eq_zero F S u).mp
+      rw [← hu]
+      simp [hk0]
+    rw [← sUnit_torsion_eq_image] at htors
+    obtain ⟨ζ, hζ, rfl⟩ := htors
+    rw [torsionUnit_eq_one_of_inTorsionSector F v₀ σ ζ hζ hsector, map_one]
+  · rintro rfl
+    rw [map_one]
+    refine ⟨1, ⟨⟨fun _ ↦ 0, fun _ ↦ ⟨le_rfl, zero_lt_one⟩, ?_⟩, ?_⟩, rfl⟩
+    · have h0 := (sIdeleLog_unit_eq_zero F S 1).2 (one_mem _)
+      rw [map_one] at h0
+      change sIdeleLog F S 1 = _
+      rw [h0]
+      simp
+    · change inTorsionSector F v₀ σ (atPlace (1 : 𝕀∞))
+      simp [inTorsionSector, Set.mem_Ico, div_pos Real.two_pi_pos
+        (Nat.cast_pos.mpr (Units.torsionOrder_pos F))]
 
 local notation "outsideNormOne(" F ", " S ")" => MonoidHom.ker (MonoidHom.comp (ideleNorm F)
   (Units.map (RingHom.toMonoidHom (Subring.subtype (integralAdelesOutside F S)))))

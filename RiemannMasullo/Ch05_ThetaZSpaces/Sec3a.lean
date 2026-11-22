@@ -34,7 +34,12 @@ local notation "vval(" v ")" => (Valued.v : Valuation Fᵥ(v) (WithZero (Multipl
 /-- Paper: Lemma 5.3.1.1, p. 240.
 The difference of a local test function and its inverse-unit pullback is linear. -/
 theorem finitePlaceDifference_isLinear (v : V) (π : Fᵥ(v)ˣ) :
-    IsLinearMap ℂ (fun f : ℬ(Fᵥ(v)) ↦ f - schwartzBruhatUnitTranslate π f) := by sorry
+    IsLinearMap ℂ (fun f : ℬ(Fᵥ(v)) ↦ f - schwartzBruhatUnitTranslate π f) := by
+  have hT : IsLinearMap ℂ (fun f : ℬ(Fᵥ(v)) ↦ schwartzBruhatUnitTranslate π f) := by
+    refine ⟨fun f g ↦ ?_, fun c f ↦ ?_⟩
+    · exact Subtype.ext (funext fun x ↦ rfl)
+    · exact Subtype.ext (funext fun x ↦ rfl)
+  exact (LinearMap.id - hT.mk' _).isLinear
 
 /-- Paper: Lemma 5.3.1.1, p. 240.
 The local difference subtracts pullback by multiplication by the inverse of the chosen unit
@@ -143,7 +148,23 @@ local notation "pvBundle(" v ", " π ")" =>
 /-- Paper: Lemma 5.3.1.3, p. 241.
 The bundled local averaging formula is linear. -/
 theorem finitePlacePrincipalValue_isLinear (v : V) (π : Fᵥ(v)ˣ) :
-    IsLinearMap ℂ (pvBundle(v, π)) := by sorry
+    IsLinearMap ℂ (pvBundle(v, π)) := by
+  refine ⟨fun f g ↦ ?_, fun c f ↦ ?_⟩
+  · refine Subtype.ext (funext fun x ↦ ?_)
+    have hf := (finitePlacePrincipalValue_integrable v π f x).2
+    have hg := (finitePlacePrincipalValue_integrable v π g x).2
+    change finitePlacePrincipalValueFun v π (f + g) x =
+      finitePlacePrincipalValueFun v π f x + finitePlacePrincipalValueFun v π g x
+    unfold finitePlacePrincipalValueFun
+    simp only [show ∀ y, (f + g) y = f y + g y from fun _ ↦ rfl]
+    rw [integral_add hf hg]
+    ring
+  · refine Subtype.ext (funext fun x ↦ ?_)
+    change finitePlacePrincipalValueFun v π (c • f) x = c * finitePlacePrincipalValueFun v π f x
+    unfold finitePlacePrincipalValueFun
+    simp only [show ∀ y, (c • f) y = c * f y from fun _ ↦ rfl]
+    rw [integral_const_mul]
+    ring
 
 /-- Paper: Lemma 5.3.1.3, p. 241.
 The local principal value formula is continuous. -/
@@ -288,13 +309,15 @@ def globalThetaPrincipalValue (S₀ : Finset V) : Θ𝔽 →ₗ[ℂ] Θ𝔽 :=
 On a class represented by a test function the S-local operator gives the class of its image. -/
 theorem sLocalThetaPrincipalValue_mk {S S₀ : Finset V} (h₀ : S₀ ⊆ S) (f : ℬₛ(S)) :
     sLocalThetaPrincipalValue F h₀ (Submodule.Quotient.mk f) =
-      Submodule.Quotient.mk (sAdelePrincipalValue F h₀ f) := by sorry
+      Submodule.Quotient.mk (sAdelePrincipalValue F h₀ f) := by
+  rfl
 
 /-- Paper: (5.3.1.10), p. 242.
 On a class represented by a test function the global operator gives the class of its image. -/
 theorem globalThetaPrincipalValue_mk (S₀ : Finset V) (f : ℬ(𝔸[F])) :
     globalThetaPrincipalValue F S₀ (Submodule.Quotient.mk f) =
-      Submodule.Quotient.mk (adelePrincipalValue F S₀ f) := by sorry
+      Submodule.Quotient.mk (adelePrincipalValue F S₀ f) := by
+  rfl
 
 /-- Paper: (5.3.1.9), p. 242.
 The S-local operator descends continuously for every set of selected places. -/
@@ -400,7 +423,13 @@ def DistributionOrderLE (T : 𝒟(E) → ℂ) (N : ℕ) : Prop :=
 /-- Paper: Theorem 5.3.2.1, p. 243.
 Point evaluation on compactly supported tests has order at most zero. -/
 theorem distributionOrderLE_eval (x : E) :
-    DistributionOrderLE (fun f : 𝒟(E) ↦ f x) 0 := by sorry
+    DistributionOrderLE (fun f : 𝒟(E) ↦ f x) 0 := by
+  intro K
+  refine ⟨1, zero_le_one, fun f _ B _ h ↦ ?_⟩
+  have hx := h 0 le_rfl x
+  rw [norm_iteratedFDeriv_zero] at hx
+  rw [one_mul]
+  exact hx
 
 /-- Paper: Theorem 5.3.2.1, p. 243.
 The distributional support of a tempered distribution is contained in the origin. -/
@@ -423,7 +452,34 @@ theorem temperedSupport_eq_bruhatSupport_preimage
     (he : ∀ (f : 𝓢(E, ℂ)) (x : E), e f (Multiplicative.ofAdd x) = f x)
     (T : StrongDual ℂ 𝓢(E, ℂ)) :
     Distribution.dsupport (⇑T) = Multiplicative.ofAdd ⁻¹'
-      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by sorry
+      schwartzBruhatDistributionSupport (T.comp e.symm.toContinuousLinearMap) := by
+  let a : E ≃ₜ Multiplicative E := Homeomorph.refl E
+  have hs (f : 𝓢(E, ℂ)) :
+      tsupport (f : E → ℂ) = a ⁻¹' tsupport (e f : Multiplicative E → ℂ) := by
+    have h : (e f : Multiplicative E → ℂ) ∘ a = (f : E → ℂ) := funext (he f)
+    rw [← tsupport_comp_eq_preimage _ a, h]
+  ext x
+  change x ∈ Distribution.dsupport (⇑T) ↔ a x ∈ schwartzBruhatDistributionSupport _
+  apply not_iff_not.mp
+  refine (Distribution.notMem_dsupport_iff (f := (T : 𝓢(E, ℂ) → ℂ)) x).trans ?_
+  simp only [schwartzBruhatDistributionSupport, Set.mem_compl_iff, not_not,
+    schwartzBruhatVanishingLocus, Set.mem_sUnion, Set.mem_setOf_eq]
+  constructor
+  · rintro ⟨U, hU, ho, hx⟩
+    refine ⟨a '' U, ⟨a.isOpenMap U ho, ?_⟩, ⟨x, hx, rfl⟩⟩
+    intro g hg
+    change T (e.symm g) = 0
+    apply hU
+    rw [hs, e.apply_symm_apply]
+    exact (Set.preimage_mono hg).trans (by rw [Set.preimage_image_eq _ a.injective])
+  · rintro ⟨U, ⟨ho, hU⟩, hx⟩
+    refine ⟨a ⁻¹' U, ?_, ho.preimage a.continuous, hx⟩
+    intro f hf
+    have h := hU (e f) (fun y hy ↦ by
+      obtain ⟨z, rfl⟩ := a.surjective y
+      exact hf (by rwa [hs]))
+    change T (e.symm (e f)) = 0 at h
+    simpa only [e.symm_apply_apply] using h
 
 end DistributionOrder
 
@@ -443,7 +499,9 @@ def realDiracDerivative (k : ℕ) : StrongDual ℂ 𝓢(ℝ, ℂ) :=
 /-- Paper: Theorem 5.3.2.1, p. 243.
 The first derivative of the real Dirac distribution evaluates to minus the derivative at zero. -/
 theorem realDiracDerivative_one (f : 𝓢(ℝ, ℂ)) :
-    realDiracDerivative 1 f = -deriv (f : ℝ → ℂ) 0 := by sorry
+    realDiracDerivative 1 f = -deriv (f : ℝ → ℂ) 0 := by
+  change (-1 : ℂ) ^ 1 • (((SchwartzMap.derivCLM ℂ ℂ) ^ 1) f) 0 = _
+  rw [pow_one, pow_one, SchwartzMap.derivCLM_apply, neg_one_smul]
 
 /-- Paper: Theorem 5.3.2.1, p. 243.
 Every real tempered distribution supported at zero is a finite linear combination of
@@ -463,7 +521,20 @@ A real Schwartz function lies in the flat subspace exactly when every derivative
 vanishes. -/
 theorem mem_realSchwartzFlatAtOrigin_iff (f : 𝓢(ℝ, ℂ)) :
     f ∈ realSchwartzFlatAtOrigin ↔
-      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by sorry
+      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by
+  have hd (k : ℕ) : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k f := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
+      rw [ih]
+  rw [realSchwartzFlatAtOrigin, Submodule.mem_iInf]
+  apply forall_congr'
+  intro k
+  change (-1 : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ ^ k) f) 0 = 0 ↔ _
+  rw [congrFun (hd k) 0, mul_eq_zero]
+  simp
 
 /-- Paper: Theorem 5.3.2.1(1), p. 243.
 The flat real Schwartz subspace is closed. -/
@@ -530,13 +601,35 @@ def coordinateDerivative {ι A : Type*} [Fintype ι] [Monoid A] (derivative : ι
     (α : ι → ℕ) : A :=
   ((Finset.univ.toList : List ι).map (fun i ↦ derivative i ^ α i)).prod
 
+/-- The coordinate derivative of the zero multi-index is the identity. -/
+theorem coordinateDerivative_zero {ι A : Type*} [Fintype ι] [Monoid A] (derivative : ι → A) :
+    coordinateDerivative derivative (0 : ι → ℕ) = 1 := by
+  simp [coordinateDerivative]
+
 open Classical in
 /-- Paper: Theorem 5.3.2.3, p. 245.
 A multi-index supported in one coordinate acts by the corresponding power
 of that coordinate's derivative. -/
 theorem coordinateDerivative_single {ι A : Type*} [Fintype ι] [Monoid A] (derivative : ι → A)
     (i : ι) (k : ℕ) :
-    coordinateDerivative derivative (Pi.single i k) = derivative i ^ k := by sorry
+    coordinateDerivative derivative (Pi.single i k) = derivative i ^ k := by
+  have key : ∀ l : List ι, l.Nodup →
+      (l.map fun j ↦ derivative j ^ (Pi.single i k : ι → ℕ) j).prod =
+        if i ∈ l then derivative i ^ k else 1 := by
+    intro l hl
+    induction l with
+    | nil => simp
+    | cons a t ih =>
+      rw [List.nodup_cons] at hl
+      by_cases h : a = i
+      · subst h
+        simp [hl.1, ih hl.2]
+      · rw [List.map_cons, List.prod_cons, ih hl.2, Pi.single_apply, if_neg h,
+          pow_zero, one_mul]
+        simp [Ne.symm h]
+  unfold coordinateDerivative
+  rw [key _ (Finset.nodup_toList _)]
+  simp
 
 open Classical in
 local notation "eᵣ" i => WithLp.toLp 2 (Pi.single i (1 : ℝ))
@@ -620,7 +713,10 @@ def coordinatePlaneDiracTensor (β : ι → ℕ) (U : 𝒟'(κ)) : 𝒟'(ι ⊕ 
 At derivative order zero the tensor restricts the test to the coordinate plane and applies
 the tangential distribution. -/
 theorem coordinatePlaneDiracTensor_zero (U : 𝒟'(κ)) (f : 𝒟(ι ⊕ κ)) :
-    coordinatePlaneDiracTensor (0 : ι → ℕ) U f = U (R𝒟 f) := by sorry
+    coordinatePlaneDiracTensor (0 : ι → ℕ) U f = U (R𝒟 f) := by
+  have h0 : Sum.elim (0 : ι → ℕ) (0 : κ → ℕ) = 0 := by
+    ext i; cases i <;> rfl
+  simp [coordinatePlaneDiracTensor, h0, coordinateDerivative_zero]
 
 open Classical in
 /-- Paper: Theorem 5.3.2.3(4), p. 245.
@@ -723,14 +819,22 @@ theorem schwartzWirtinger_apply (f : 𝓢(ℂ, ℂ)) (z : ℂ) :
 /-- Paper: Theorem 5.3.2.5, p. 246.
 The sum of the Wirtinger derivatives recovers the real directional derivative. -/
 theorem schwartzWirtingerZ_add_zBar (f : 𝓢(ℂ, ℂ)) (z : ℂ) :
-    schwartzWirtingerZ f z + schwartzWirtingerZBar f z = fderiv ℝ (f : ℂ → ℂ) z 1 := by sorry
+    schwartzWirtingerZ f z + schwartzWirtingerZBar f z = fderiv ℝ (f : ℂ → ℂ) z 1 := by
+  let a := fderiv ℝ (f : ℂ → ℂ) z 1
+  let b := Complex.I * fderiv ℝ (f : ℂ → ℂ) z Complex.I
+  change (2 : ℂ)⁻¹ * (a - b) + (2 : ℂ)⁻¹ * (a + b) = a
+  ring
 
 /-- Paper: Theorem 5.3.2.5, p. 246.
 The difference of the Wirtinger derivatives recovers the imaginary directional derivative
 times i. -/
 theorem schwartzWirtingerZBar_sub_z (f : 𝓢(ℂ, ℂ)) (z : ℂ) :
     schwartzWirtingerZBar f z - schwartzWirtingerZ f z =
-      Complex.I * fderiv ℝ (f : ℂ → ℂ) z Complex.I := by sorry
+      Complex.I * fderiv ℝ (f : ℂ → ℂ) z Complex.I := by
+  let a := fderiv ℝ (f : ℂ → ℂ) z 1
+  let b := Complex.I * fderiv ℝ (f : ℂ → ℂ) z Complex.I
+  change (2 : ℂ)⁻¹ * (a + b) - (2 : ℂ)⁻¹ * (a - b) = b
+  ring
 
 /-- Paper: Theorem 5.3.2.5, p. 246.
 A mixed Wirtinger derivative of the Dirac distribution at zero uses the negative transpose
@@ -744,7 +848,9 @@ def complexDiracDerivative (k l : ℕ) : StrongDual ℂ 𝓢(ℂ, ℂ) :=
 The first holomorphic derivative of the Dirac distribution is minus the test function's
 holomorphic Wirtinger derivative at zero. -/
 theorem complexDiracDerivative_one_zero (f : 𝓢(ℂ, ℂ)) :
-    complexDiracDerivative 1 0 f = -schwartzWirtingerZ f 0 := by sorry
+    complexDiracDerivative 1 0 f = -schwartzWirtingerZ f 0 := by
+  change (-1 : ℂ) ^ (1 + 0) • ((schwartzWirtingerZ ^ 1) ((schwartzWirtingerZBar ^ 0) f)) 0 = _
+  simp
 
 -- TODO(paper-gap): In (5.3.2.15)–(16) only the sum of tangential
 -- derivatives for each normal index is determined. For a point support,
@@ -768,7 +874,12 @@ def complexSchwartzFlatAtOrigin : Submodule ℂ 𝓢(ℂ, ℂ) :=
 Membership in the flat complex subspace means all mixed Wirtinger derivatives vanish at zero. -/
 theorem mem_complexSchwartzFlatAtOrigin_iff (f : 𝓢(ℂ, ℂ)) :
     f ∈ complexSchwartzFlatAtOrigin ↔
-      ∀ k l : ℕ, (schwartzWirtingerZ^k) ((schwartzWirtingerZBar^l) f) 0 = 0 := by sorry
+      ∀ k l : ℕ, (schwartzWirtingerZ^k) ((schwartzWirtingerZBar^l) f) 0 = 0 := by
+  simp only [complexSchwartzFlatAtOrigin, Submodule.mem_iInf, LinearMap.mem_ker]
+  refine forall₂_congr fun k l ↦ ?_
+  change (-1 : ℂ) ^ (k + l) • ((schwartzWirtingerZ ^ k) ((schwartzWirtingerZBar ^ l) f)) 0 = 0 ↔ _
+  rw [smul_eq_zero]
+  exact or_iff_right (pow_ne_zero _ (neg_ne_zero.mpr one_ne_zero))
 
 /-- Paper: Theorem 5.3.2.5(1), p. 246.
 The flat complex Schwartz subspace is closed. -/

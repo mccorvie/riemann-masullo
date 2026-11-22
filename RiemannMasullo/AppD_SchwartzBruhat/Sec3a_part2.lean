@@ -4,6 +4,7 @@ public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import all RiemannMasullo.AppC_LCTVS.Sec1
+import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
@@ -12,6 +13,7 @@ import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
+import Mathlib.Analysis.Distribution.SchwartzSpace.CompactSupport
 import Mathlib.Analysis.LocallyConvex.ContinuousOfBounded
 import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 import Mathlib.Topology.ContinuousMap.SecondCountableSpace
@@ -741,40 +743,6 @@ theorem modulatedExponentialDecay_strip_coordinates
 
 local notation "T" => InductiveTensor (SchwartzBruhat K) P
 
-include hSC hm hInt hne hτ in
-/-- Paper: Theorem D.3.3.7(1), p. 806. Multiplication in split coordinates
-extends to a continuous linear map from the completed inductive tensor product
-to the decay space. -/
-private theorem modulatedExponentialDecay_completedTensor_mul :
-    ∃ L : Completion T →L[ℂ] E,
-      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
-        (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-          h u * f.val (Real.log (t.val : ℝ)) := by
-  sorry
-
-include hSC hm hInt hne hτ in
-/-- Paper: (D.3.3.3), p. 806. Multiplication from the completed tensor product
-reaches every decay function. The quotient-stage isomorphisms give preimages
-for functions in the individual compact-subgroup stages. -/
-private theorem modulatedExponentialDecay_completedTensor_mul_surjective
-    (L : Completion T →L[ℂ] E)
-    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
-      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-          h u * f.val (Real.log (t.val : ℝ))) :
-    Surjective L := by
-  sorry
-
-include hSC hm hInt hne hτ in
-/-- Paper: (D.3.3.3), p. 806. Pulling back the decay-space topology by
-multiplication gives the topology of the completed inductive tensor product. -/
-private theorem modulatedExponentialDecay_completedTensor_mul_isInducing
-    (L : Completion T →L[ℂ] E)
-    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
-      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-          h u * f.val (Real.log (t.val : ℝ))) :
-    IsInducing L := by
-  sorry
-
 /-- A surjective inducing continuous linear map out of a separated space
 can be bundled as a continuous linear equivalence with the same evaluations. -/
 private theorem bundle_inducing_surjection
@@ -790,23 +758,6 @@ private theorem bundle_inducing_surjection
     ⟨(hi F hF).isEmbedding, hs F hF⟩
   exact ⟨ContinuousLinearEquiv.ofIsHomeomorph
       (LinearEquiv.ofBijective F.toLinearMap hh.bijective) hh, hF⟩
-
-include hSC hm hInt hne hτ in
-/-- Paper: Theorem D.3.3.7(1), p. 806. The splitting of the modulation induces
-the completed inductive tensor isomorphism, given by multiplication in split coordinates. -/
-theorem modulatedExponentialDecay_tensor_equiv :
-    ∃ e : Completion T ≃L[ℂ] E,
-      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
-        (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-          h u * f.val (Real.log (t.val : ℝ)) := by
-  exact bundle_inducing_surjection (A := Completion T) (B := E)
-    (fun L ↦ ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
-      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
-        h u * f.val (Real.log (t.val : ℝ)))
-    (modulatedExponentialDecay_completedTensor_mul m I hm hInt hne τ hτ)
-    (modulatedExponentialDecay_completedTensor_mul_surjective m I hm hInt hne τ hτ)
-    (modulatedExponentialDecay_completedTensor_mul_isInducing m I hm hInt hne τ hτ)
-
 
 open scoped SchwartzMap in
 /-- Paper: Remark D.3.2.2, p. 801. Translation in logarithmic coordinates acts on each
@@ -1128,13 +1079,6 @@ theorem modulatedExponentialDecay_stage_tensor_comparison (k : GoodCompact) :
   let : MetrizableSpace Q := hQ.choose_spec.2.1
   let : MetrizableSpace P := hP.choose_spec.2.1
   exact completedInductiveTensor_to_projectiveTensor_of_frechet hQ hP
-
-include hSC hm hInt hne hτ in
-/-- Paper: Theorem D.3.3.7(1), p. 806. A bounded family in the full decay
-space is the image of a bounded family in one compact-subgroup stage. -/
-theorem modulatedExponentialDecay_bounded_image_stage {B : Set E} (hB : IsVonNBounded ℂ B) :
-    ∃ (k : GoodCompact) (C : Set (ModulatedExponentialDecayStage m I k)),
-      IsVonNBounded ℂ C ∧ modulatedExponentialDecayStageInclusion m I k '' C = B := by sorry
 
 include hSC hm hInt hne hτ
 
@@ -1521,9 +1465,10 @@ theorem modulatedExponentialDecay_continuous_inclusion (h0 : 0 ∈ I) :
 
 /-- One bounded Schwartz–Bruhat coordinate supplies a common compact subgroup of
 invariance. Normalized averaging then bounds the other coordinates on that quotient. -/
-private theorem decay_bounded_of_twists (B : Set E)
+private theorem bounded_stage_of_twists (B : Set E)
     (hB : ∀ a : I, IsVonNBounded ℂ (modulatedExponentialDecayTwist m I a '' B)) :
-    IsVonNBounded ℂ B := by
+    ∃ (k : GoodCompact) (C : Set (ModulatedExponentialDecayStage m I k)),
+      IsVonNBounded ℂ C ∧ modulatedExponentialDecayStageInclusion m I k '' C = B := by
   let a : I := ⟨hne.choose, hne.choose_spec⟩
   let tw := modulatedExponentialDecayTwist m I
   have hs := schwartzBruhat_bounded_image_stage (hB a)
@@ -1573,10 +1518,26 @@ private theorem decay_bounded_of_twists (B : Set E)
     have hmem := mem_image_of_mem A (mem_image_of_mem (tw t) (show i v ∈ B from hv))
     exact (congrArg (fun z : SchwartzBruhat (G ⧸ k.val) ↦ p.val z < r)
       (hmatch v t)).mp (hb _ hmem)
+  exact ⟨k, C', hstage, hcover⟩
+
+/-- Paper: Theorem D.3.3.7(1), p. 806. A bounded family in the full decay
+space is the image of a bounded family in one compact-subgroup stage. -/
+theorem modulatedExponentialDecay_bounded_image_stage {B : Set E} (hB : IsVonNBounded ℂ B) :
+    ∃ (k : GoodCompact) (C : Set (ModulatedExponentialDecayStage m I k)),
+      IsVonNBounded ℂ C ∧ modulatedExponentialDecayStageInclusion m I k '' C = B := by
+  apply bounded_stage_of_twists m I hm hInt hne τ hτ B
+  exact fun a ↦ hB.image (⟨modulatedExponentialDecayTwist m I a, continuous_decay_twist m I a⟩ :
+    E →L[ℂ] SchwartzBruhat G)
+
+/-- Bounded stage inclusions carry bounded families back to the full decay space. -/
+private theorem decay_bounded_of_twists (B : Set E)
+    (hB : ∀ a : I, IsVonNBounded ℂ (modulatedExponentialDecayTwist m I a '' B)) :
+    IsVonNBounded ℂ B := by
+  refine (bounded_stage_of_twists m I hm hInt hne τ hτ B hB).elim fun k hk ↦ hk.elim fun C hC ↦ ?_
+  let i : ModulatedExponentialDecayStage m I k →ₗ[ℂ] E := modulatedExponentialDecayStageInclusion m I k
   let j : ModulatedExponentialDecayStage m I k →L[ℂ] E := ⟨i,
     (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp i fun q ↦ q.property k⟩
-  exact (congrArg (IsVonNBounded ℂ) hcover).mp (hstage.image j)
-
+  exact (congrArg (fun S : Set E ↦ IsVonNBounded ℂ S) hC.2).mp (hC.1.image j)
 
 omit hSC hm hInt hne hτ in
 open scoped ContDiff in
@@ -1650,16 +1611,573 @@ theorem modulatedExponentialDecay_compact_projective_topology (hI : IsCompact I)
   exact Function.LeftInverse.isEmbedding (f := fun z : I → SchwartzBruhat G ↦ R (z a + z b))
     hR.2 (hcont.comp ((continuous_apply a).add (continuous_apply b))) (continuous_pi (continuous_decay_twist m I))
 
-end Structure
+omit hSC hm hInt hne hτ
 
-section BoundedSets
+/-- The ordinary split Schwartz product has logarithmic scalar coordinate. -/
+private theorem split_schwartz_product {H : Type*} [CommGroup H] [TopologicalSpace H]
+    [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    (d : H × ℝ≥0ˣ ≃ₜ* G) :
+    ∃ M : InductiveTensor (SchwartzBruhat H) (SchwartzMap ℝ ℂ) →L[ℂ] SchwartzBruhat G,
+      ∀ (h : SchwartzBruhat H) (f : SchwartzMap ℝ ℂ) (u : H) (t : ℝ≥0ˣ),
+         M (h ⊗ₜ[ℂ] f) (d (u,t)) = h u * f (Real.log (t.val : ℝ)) := by
+  let : PolynormableSpace ℂ (SchwartzMap ℝ ℂ) := (schwartz_withSeminorms ℂ ℝ ℂ).toPolynormableSpace
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : T2Space (SchwartzBruhat H) := schwartzBruhat_t2
+  let : T2Space (SchwartzBruhat ℝ≥0ˣ) := schwartzBruhat_t2
+  refine (schwartzBruhat_realCoordinate_equiv positiveRealLogEquiv).elim fun s hs ↦ ?_
+  refine (schwartzBruhat_kernel_equiv (G := H) (H := ℝ≥0ˣ)).elim fun v hv ↦ ?_
+  refine (schwartzBruhat_congr d).elim fun w hw ↦ ?_
+  let A := InductiveTensor (SchwartzBruhat H) (SchwartzMap ℝ ℂ)
+  let J := InductiveTensor (SchwartzBruhat H) (SchwartzBruhat ℝ≥0ˣ)
+  let i := ContinuousLinearMap.id ℂ (SchwartzBruhat H)
+  let L : A →L[ℂ] J := ⟨inductiveTensorMap i.toLinearMap s.toLinearMap,
+    inductiveTensorMap_continuous i s.toContinuousLinearMap⟩
+  let M := w.toContinuousLinearMap.comp (v.toContinuousLinearMap.comp
+    ((Completion.toComplL : J →L[ℂ] Completion J).comp L))
+  refine ⟨M, fun h f u t ↦ ?_⟩
+  have hp := (hw _ (u,t)).trans (hv h (s f) u t)
+  exact hp.trans (congrArg (h u * ·) ((hs f t).trans (congrArg f (positiveRealLogEquiv_apply t))))
 
-variable [hSC : SecondCountableTopology G]
-variable (hm : IsModulation m) (hInt : OrdConnected I) (hne : I.Nonempty)
-variable (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+include hSC hm hInt hne hτ in
+/-- A map from a bornological space into a decay space is continuous if all its
+weighted profiles are continuous. -/
+private theorem continuous_decay_of_twisted_maps {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X]
+    (hX : ∀ p : Seminorm ℂ X, (∀ B : Set X, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p)
+    (D : X →ₗ[ℂ] E)
+    (hD : ∀ a : I, Continuous ((modulatedExponentialDecayTwist m I a).comp D)) :
+    Continuous D := by
+  refine continuous_linear_of_bornological (X := X) (Y := E) hX D fun B hB ↦ ?_
+  refine decay_bounded_of_twists m I hm hInt hne τ hτ (D '' B) fun a ↦ ?_
+  let L : X →L[ℂ] SchwartzBruhat G := ⟨(modulatedExponentialDecayTwist m I a).comp D, hD a⟩
+  exact (congrArg (IsVonNBounded ℂ) (image_image (modulatedExponentialDecayTwist m I a) D B)).mpr
+    (hB.image L)
 
--- Remark D.3.3.8 is the cofinality assertion in modulatedExponentialDecay_stageLimit.
--- Remark D.3.3.9 applies schwartzBruhat_acyclic on the norm-one subgroup.
+/-- Separate continuity can be tested on the defining coordinates of the target.
+When the target is complete, the resulting tensor map extends to the completion. -/
+private theorem complete_inductiveTensor_of_coordinates {X Y Z V ι A B : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    [AddCommGroup Z] [Module ℂ Z] [UniformSpace Z] [IsUniformAddGroup Z] [ContinuousSMul ℂ Z]
+    [PolynormableSpace ℂ Z] [CompleteSpace Z] [T2Space Z]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V] [PolynormableSpace ℂ V] [T2Space V]
+    (t : ι → Z →ₗ[ℂ] V)
+    (hX : ∀ D : X →ₗ[ℂ] Z, (∀ a, Continuous ((t a).comp D)) → Continuous D)
+    (hY : ∀ D : Y →ₗ[ℂ] Z, (∀ a, Continuous ((t a).comp D)) → Continuous D)
+    (D : X →ₗ[ℂ] Y →ₗ[ℂ] Z) (W : ι → InductiveTensor X Y →L[ℂ] V)
+    (he : ∀ a x y, t a (D x y) = W a (x ⊗ₜ[ℂ] y)) 
+    (ev : Z → A → B → ℂ) (u : X → A → ℂ) (v : Y → B → ℂ)
+    (hval : ∀ x y a b, ev (D x y) a b = u x a * v y b) :
+    ∃ L : Completion (InductiveTensor X Y) →L[ℂ] Z, ∀ x y a b,
+      ev (L (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y))) a b = u x a * v y b := by
+  have hW (a : ι) := (continuous_inductiveTensor_iff («E» := X) (F := Y) (G := V)
+    (W a).toLinearMap).mp (W a).continuous
+  let F : InductiveTensor X Y →L[ℂ] Z := ⟨TensorProduct.lift D,
+    (continuous_inductiveTensor_iff («E» := X) (F := Y) (G := Z) _).mpr
+      ⟨fun x ↦ hY (D x) fun a ↦ ((hW a).1 x).congr fun y ↦ (he a x y).symm,
+       fun y ↦ hX (D.flip y) fun a ↦ ((hW a).2 y).congr fun x ↦ (he a x y).symm⟩⟩
+  exact ⟨F.fromCompletion, fun x y a b ↦
+    (congrArg (fun z ↦ ev z a b) (F.fromCompletion_apply_coe (x ⊗ₜ[ℂ] y))).trans (hval x y a b)⟩
+
+include hne hτ in
+/-- Lift the ordinary products of all scalar twists to one bilinear map into the decay space. -/
+private theorem decay_product_data [T2Space (SchwartzBruhat K)] [T2Space P]
+    (d : K × ℝ≥0ˣ ≃ₜ* G) (hd : ∀ p, d p = (p.1 : G) * τ p.2)
+    (M : InductiveTensor (SchwartzBruhat K) (SchwartzMap ℝ ℂ) →L[ℂ] SchwartzBruhat G)
+    (hM : ∀ (h : SchwartzBruhat K) (f : SchwartzMap ℝ ℂ) (u : K) (t : ℝ≥0ˣ),
+      M (h ⊗ₜ[ℂ] f) (d (u,t)) = h u * f (Real.log (t.val : ℝ))) :
+    ∃ (D : SchwartzBruhat K →ₗ[ℂ] P →ₗ[ℂ] E) (W : I → T →L[ℂ] SchwartzBruhat G),
+      (∀ (a : I) (h : SchwartzBruhat K) (f : P),
+        modulatedExponentialDecayTwist m I a (D h f) = W a (h ⊗ₜ[ℂ] f)) ∧
+      (∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (D h f).val ((u : G) * τ t) = h u * f.val (Real.log (t.val : ℝ))) := by
+  let : PolynormableSpace ℂ (SchwartzMap ℝ ℂ) := (schwartz_withSeminorms ℂ ℝ ℂ).toPolynormableSpace
+  let tw (a : I) : P →L[ℂ] SchwartzMap ℝ ℂ := ⟨logExponentialDecayTwist I a,
+    (continuous_apply a).comp (positiveRealExponentialDecay_isEmbedding I hne).continuous⟩
+  let i := ContinuousLinearMap.id ℂ (SchwartzBruhat K)
+  let W (a : I) : T →L[ℂ] SchwartzBruhat G := M.comp
+    ⟨inductiveTensorMap i.toLinearMap (tw a).toLinearMap, inductiveTensorMap_continuous i (tw a)⟩
+  let w (a : I) (x : G) : ℂ := ((((m x).val : ℝ) ^ a.val : ℝ) : ℂ)
+  have hcoord (a : I) (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ) :
+      W a (h ⊗ₜ[ℂ] f) (d (u,t)) = w a (d (u,t)) * (h u * f.val (Real.log (t.val : ℝ))) := by
+    have hmt : m (d (u,t)) = t := (congrArg m (hd (u,t))).trans (by
+      rw [map_mul, show m u.val = 1 from u.property, one_mul, hτ])
+    have hWa : W a (h ⊗ₜ[ℂ] f) = M (h ⊗ₜ[ℂ] tw a f) :=
+      congrArg M (inductiveTensorMap_tmul i (tw a) h f)
+    refine (congrArg (fun z : SchwartzBruhat G ↦ z (d (u,t))) hWa).trans ((hM h (tw a f) u t).trans ?_)
+    change h u * logExponentialDecayTwist I a f _ = _ * _
+    dsimp only [w]
+    rw [logExponentialDecayTwist_apply I a f (Real.log (t.val : ℝ)), hmt,
+      identityWeight_log a.val t, positiveRealLogEquiv_apply t]
+    exact mul_left_comm _ _ _
+  let prod (h : SchwartzBruhat K) (f : P) (x : G) :=
+    h (d.symm x).1 * f.val (Real.log ((d.symm x).2.val : ℝ))
+  have hprod (h : SchwartzBruhat K) (f : P) (a : I) :
+      modulationWeight m a (prod h f) = (W a (h ⊗ₜ[ℂ] f)).val := by
+    funext x
+    let q := d.symm x
+    have hx : d (q.1, q.2) = x := d.apply_symm_apply x
+    exact (congrArg (fun y : G ↦ w a y * prod h f x = (W a (h ⊗ₜ[ℂ] f)).val y) hx).mp
+      (hcoord a h f q.1 q.2).symm
+  let D₂ : SchwartzBruhat K →ₗ[ℂ] P →ₗ[ℂ] E := LinearMap.mk₂ ℂ
+    (fun h f ↦ ⟨prod h f, (Submodule.mem_iInf _).mpr fun a ↦ Submodule.mem_comap.mpr
+      ((congrArg (fun g : G → ℂ ↦ g ∈ schwartzBruhatSubmodule G) (hprod h f a)).mpr
+        (W a (h ⊗ₜ[ℂ] f)).property)⟩)
+    (fun h k f ↦ Subtype.ext (funext fun x ↦ add_mul _ _ _))
+    (fun c h f ↦ Subtype.ext (funext fun x ↦ mul_assoc _ _ _))
+    (fun h f g ↦ Subtype.ext (funext fun x ↦ mul_add _ _ _))
+    (fun c h f ↦ Subtype.ext (funext fun x ↦ mul_left_comm _ _ _))
+  have hD (a : I) (h : SchwartzBruhat K) (f : P) :
+      modulatedExponentialDecayTwist m I a (D₂ h f) = W a (h ⊗ₜ[ℂ] f) :=
+    Subtype.ext (hprod h f a)
+  have hval (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ) :
+      (D₂ h f).val ((u : G) * τ t) = h u * f.val (Real.log (t.val : ℝ)) := by
+    have hy : d.symm ((u : G) * τ t) = (u,t) :=
+      (congrArg d.symm (hd (u,t)).symm).trans (d.symm_apply_apply _)
+    exact congrArg (fun q : K × ℝ≥0ˣ ↦ h q.1 * f.val (Real.log (q.2.val : ℝ))) hy
+  exact ⟨D₂, W, hD, hval⟩
+
+include hSC hm hInt hne hτ in
+/-- Complete the separately continuous product after testing its slices by all twists. -/
+private theorem finish_split_product (D : SchwartzBruhat K →ₗ[ℂ] P →ₗ[ℂ] E)
+    (W : I → T →L[ℂ] SchwartzBruhat G)
+    (hw : (∀ (a : I) (h : SchwartzBruhat K) (f : P),
+        modulatedExponentialDecayTwist m I a (D h f) = W a (h ⊗ₜ[ℂ] f)) ∧
+      (∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (D h f).val ((u : G) * τ t) = h u * f.val (Real.log (t.val : ℝ)))) :
+    ∃ L : Completion T →L[ℂ] E,
+      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ)) := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_t2
+  let : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+  let : MetrizableSpace P := (positiveRealExponentialDecay_frechet I hInt hne).choose_spec.2.1
+  let : T2Space E := (modulatedExponentialDecay_strictLF m I hm hInt hne τ hτ).1
+  let : CompleteSpace E := modulatedExponentialDecay_complete m I hm hInt hne τ hτ
+  let t (a : I) : E →ₗ[ℂ] SchwartzBruhat G := modulatedExponentialDecayTwist m I a
+  have hX (D : SchwartzBruhat K →ₗ[ℂ] E) : (∀ a, Continuous ((t a).comp D)) → Continuous D :=
+    continuous_decay_of_twisted_maps (X := SchwartzBruhat K) m I hm hInt hne τ hτ
+      (schwartzBruhat_bornological (G := K)) D
+  have hY (D : P →ₗ[ℂ] E) : (∀ a, Continuous ((t a).comp D)) → Continuous D :=
+    continuous_decay_of_twisted_maps (X := P) m I hm hInt hne τ hτ
+      (fun p ↦ continuous_seminorm_of_bounded_images (X := P) p) D
+  let value (b : E) (u : K) (t : ℝ≥0ˣ) := b.val (u.val * τ t)
+  let kernel (h : SchwartzBruhat K) (u : K) := h u
+  let profile (f : P) (t : ℝ≥0ˣ) := f.val (Real.log (t.val : ℝ))
+  with_reducible_and_instances
+    exact complete_inductiveTensor_of_coordinates (X := SchwartzBruhat K) (Y := P) (Z := E)
+      (V := SchwartzBruhat G) (A := K) (B := ℝ≥0ˣ) t hX hY D W hw.1
+      value kernel profile hw.2
+
+include hSC hm hInt hne hτ in
+/-- Paper: Theorem D.3.3.7(1), p. 806. Multiplication in split coordinates
+extends to a continuous linear map from the completed inductive tensor product
+to the decay space. -/
+private theorem modulatedExponentialDecay_completedTensor_mul :
+    ∃ L : Completion T →L[ℂ] E,
+      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ)) := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_t2
+  let : T2Space P := (positiveRealExponentialDecay_isEmbedding I hne).t2Space
+  refine (hm.exists_sectionEquiv τ hτ).elim fun d hd ↦ ?_
+  refine (split_schwartz_product d).elim fun M hM ↦ ?_
+  refine (decay_product_data m I hne τ hτ d hd M hM).elim fun D h ↦ h.elim fun W hW ↦ ?_
+  with_reducible_and_instances
+    exact finish_split_product m I hm hInt hne τ hτ D W hW
+
+/-- The Schwartz kernel theorem transported to the coordinates of a splitting. -/
+private theorem split_schwartz_kernel {H Q : Type*}
+    [CommGroup H] [TopologicalSpace H] [IsTopologicalGroup H] [T2Space H]
+    [LocallyCompactSpace H] [SecondCountableTopology H]
+    [CommGroup Q] [TopologicalSpace Q] [IsTopologicalGroup Q] [T2Space Q]
+    [LocallyCompactSpace Q] [SecondCountableTopology Q] (d : H × Q ≃ₜ* G) :
+    ∃ e : Completion (InductiveTensor (SchwartzBruhat H) (SchwartzBruhat Q)) ≃L[ℂ] SchwartzBruhat G,
+      ∀ (h : SchwartzBruhat H) (f : SchwartzBruhat Q) (u : H) (t : Q),
+        e (Completion.coe' (α := InductiveTensor (SchwartzBruhat H) (SchwartzBruhat Q))
+          (h ⊗ₜ[ℂ] f)) (d (u,t)) = h u * f t := by
+  refine (schwartzBruhat_kernel_equiv (G := H) (H := Q)).elim fun v hv ↦ ?_
+  refine (schwartzBruhat_congr d).elim fun w hw ↦ ?_
+  refine ⟨v.trans w, fun h f u t ↦ ?_⟩
+  change w (v _) (d (u,t)) = _
+  with_reducible_and_instances exact (hw _ (u,t)).trans (hv h f u t)
+
+/-- To test density in an induced product topology, finitely many coordinates
+can be reconstructed from a single dense image. -/
+private theorem dense_of_finite_coordinates {X Y Z ι : Type*}
+    [TopologicalSpace X] [TopologicalSpace Y] [TopologicalSpace Z]
+    (t : X → ι → Y) (ht : IsInducing t) (M : Set X)
+    (h : ∀ s : Finset ι, ∃ J : X → Z, Dense (J '' M) ∧
+      ∀ i ∈ s, ∃ R : Z → Y, Continuous R ∧ ∀ x, R (J x) = t x i) :
+    Dense M := by
+  rw [dense_iff_inter_open]
+  intro O hO hne
+  obtain ⟨U, hU, rfl⟩ := ht.isOpen_iff.mp hO
+  obtain ⟨x, hx⟩ := hne
+  obtain ⟨s, V, hV, hs⟩ := isOpen_pi_iff.mp hU (t x) hx
+  obtain ⟨J, hJ, hR⟩ := h s
+  choose R hRc hRt using fun i : s ↦ hR i.val i.property
+  let W := ⋂ i : s, R i ⁻¹' V i.val
+  have hW : IsOpen W := isOpen_iInter_of_finite fun i ↦ (hV _ i.property).1.preimage (hRc i)
+  have hxW : J x ∈ W := mem_iInter.mpr fun i ↦ (congrArg (· ∈ V i.val) (hRt i x)).mpr (hV _ i.property).2
+  obtain ⟨y, hyW, z, hz, hyz⟩ := hJ.inter_open_nonempty W hW ⟨_, hxW⟩
+  refine ⟨z, hs (fun i hi ↦ ?_), hz⟩
+  have hy := mem_iInter.mp hyW (⟨i,hi⟩ : s)
+  exact (congrArg (· ∈ V i) (hRt ⟨i,hi⟩ z)).mp ((congrArg (fun v ↦ R ⟨i,hi⟩ v ∈ V i) hyz).mpr hy)
+
+/-- A closed subspace containing the images of pure tensors from a dense subset
+of the right factor contains the full image of a completed tensor equivalence. -/
+private theorem dense_of_split_products {X Y Z : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [IsTopologicalAddGroup Z] [ContinuousConstSMul ℂ Z]
+    (e : Completion (InductiveTensor X Y) ≃L[ℂ] Z) (S : Submodule ℂ Z) {D : Set Y} (hd : Dense D)
+    (hp : ∀ x y, y ∈ D → e (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y)) ∈ S) :
+    Dense (S : Set Z) := by
+  let Ts := InductiveTensor X Y
+  let L := e.toContinuousLinearMap.comp (Completion.toComplL : Ts →L[ℂ] Completion Ts)
+  let C := S.topologicalClosure
+  have hC : IsClosed (C : Set Z) := S.isClosed_topologicalClosure
+  have hA (x : X) (y : Y) : L (x ⊗ₜ[ℂ] y) ∈ C := by
+    let ps := fun p : {p : Seminorm ℂ (X ⊗[ℂ] Y) //
+      (∀ x : X, Continuous (fun y : Y ↦ p (x ⊗ₜ[ℂ] y))) ∧
+      (∀ y : Y, Continuous (fun x : X ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val
+    have hc : @Continuous Y Ts _ _ (fun b ↦ x ⊗ₜ[ℂ] b) :=
+      (withGeneratingSeminorms_spec _ ps).continuous_of_continuous_comp (TensorProduct.mk ℂ X Y x)
+        fun p ↦ p.property.1 x
+    exact closure_minimal (t := {b : Y | L (x ⊗ₜ[ℂ] b) ∈ C})
+      (fun b hb ↦ S.le_topologicalClosure (hp x b hb)) (hC.preimage (L.continuous.comp hc)) (hd y)
+  have hL (z : Ts) : L z ∈ C := TensorProduct.inductionOn (motive := fun a ↦ L a ∈ C) z hA
+    (fun _ _ hx hy ↦ (C.comap L.toLinearMap).add_mem hx hy)
+  intro z
+  exact e.surjective z |>.elim fun w hw ↦ (congrArg (fun v ↦ v ∈ C) hw).mp
+    (Completion.induction_on (p := fun v ↦ e v ∈ C) w (hC.preimage e.continuous) hL)
+
+open scoped ContDiff in
+/-- A compactly supported scalar Schwartz function is the sum of the two
+given twists of a single compactly supported smooth decay profile. -/
+private theorem compact_profile_sum_twists (a b : ℝ) (f : SchwartzMap ℝ ℂ)
+    (hf : HasCompactSupport (f : ℝ → ℂ)) :
+    ∃ g : P, ∀ x : ℝ, (Real.exp (a*x) + Real.exp (b*x) : ℝ) * g.val x = f x := by
+  let w (x : ℝ) : ℂ := ((Real.exp (a*x) + Real.exp (b*x) : ℝ) : ℂ)
+  have hw (x : ℝ) : w x ≠ 0 := Complex.ofReal_ne_zero.mpr (add_pos (Real.exp_pos _) (Real.exp_pos _)).ne'
+  have hs : ContDiff ℝ ∞ w := Complex.ofRealCLM.contDiff.comp
+    ((Real.contDiff_exp.comp (contDiff_const.mul contDiff_id)).add
+      (Real.contDiff_exp.comp (contDiff_const.mul contDiff_id)))
+  let g (x : ℝ) := (w x)⁻¹ * f x
+  have hg : g ∈ logExponentialDecaySubmodule I :=
+    mem_logExponentialDecaySubmodule_of_hasCompactSupport I (hf.mul_left) ((hs.inv hw).mul (f.smooth ⊤))
+  exact ⟨⟨g, hg⟩, fun x ↦ mul_inv_cancel_left₀ (hw x) (f x)⟩
+
+/-- An intermediate twist factors continuously through the sum of the endpoint twists. -/
+private theorem decay_coordinate_of_sum (a b c : I) (ha : a ≤ c) (hb : c ≤ b) :
+    ∃ M : SchwartzBruhat G →L[ℂ] SchwartzBruhat G, ∀ f : modulatedExponentialDecaySubmodule m I,
+      M (modulatedExponentialDecayTwist m I a f + modulatedExponentialDecayTwist m I b f) =
+        modulatedExponentialDecayTwist m I c f := by
+  let φ (t : ℝ) : ℂ := ((Real.exp (-(c.val - a.val) * t) + Real.exp ((b.val - c.val) * t))⁻¹ : ℝ)
+  have hφ := twoSidedExpWeight_bounds_of_nonneg (sub_nonneg.mpr ha) (sub_nonneg.mpr hb)
+  refine (logModulation_mul_schwartzBruhat_continuousLinear (φ := φ) m hφ.1 hφ.2).elim fun M hM ↦ ?_
+  refine ⟨M, fun f ↦ Subtype.ext (funext fun x ↦ ?_)⟩
+  exact (hM _ x).trans (congrFun (modulationWeight_between_eq m f.val a c b) x).symm
+
+/-- On split coordinates, the sum of two twists of a pure function is the
+ordinary product with the sum of the two weighted scalar profiles. -/
+private theorem decay_sum_on_product {H : Type*} (d : H × ℝ≥0ˣ → G)
+    (hd : ∀ u t, m (d (u,t)) = t) (a b : I)
+    (x : modulatedExponentialDecaySubmodule m I) (h : H → ℂ) (g : P) (f : SchwartzMap ℝ ℂ)
+    (hx : ∀ u (t : ℝ≥0ˣ), x.val (d (u,t)) = h u * g.val (Real.log (t.val : ℝ)))
+    (hg : ∀ y : ℝ, ((Real.exp (a.val*y) + Real.exp (b.val*y) : ℝ) : ℂ) * g.val y = f y)
+    (u : H) (t : ℝ≥0ˣ) :
+    (modulatedExponentialDecayTwist m I a x + modulatedExponentialDecayTwist m I b x).val (d (u,t)) =
+      h u * f (Real.log (t.val : ℝ)) := by
+  change _ * x.val _ + _ * x.val _ = _
+  rw [← add_mul]
+  dsimp only
+  rw [hd u t, hx u t, identityWeight_log a.val t, identityWeight_log b.val t,
+    positiveRealLogEquiv_apply t, mul_left_comm, ← Complex.ofReal_add, hg]
+
+include hne in
+/-- On a quotient stage, approximate finitely many twists simultaneously using compactly
+supported scalar factors and the sum of the two extreme weights. -/
+private theorem dense_decay_stage_of_products {H : Type*} [CommGroup H] [TopologicalSpace H]
+    [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    (k : GoodCompact) [IsClosed (k.val : Set G)] (d : H × ℝ≥0ˣ ≃ₜ* (G ⧸ k.val))
+    (hd : ∀ u t, quotientModulation m k.val k.property.1 (d (u,t)) = t)
+    (S : Submodule ℂ (ModulatedExponentialDecayStage m I k))
+    (hS : ∀ (h : SchwartzBruhat H) (g : P), ∃ z ∈ S, ∀ (u : H) (t : ℝ≥0ˣ),
+      z.val (d (u,t)) = h u * g.val (Real.log (t.val : ℝ))) : Dense (S : Set (ModulatedExponentialDecayStage m I k)) := by
+  classical
+  let Q := G ⧸ k.val
+  let n := quotientModulation m k.val k.property.1
+  let A := ModulatedExponentialDecayStage m I k
+  let Y := SchwartzBruhat Q
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  refine (split_schwartz_kernel d).elim fun e he ↦ ?_
+  refine (schwartzBruhat_realCoordinate_equiv positiveRealLogEquiv).elim fun v hv ↦ ?_
+  let tw (a : I) : A →ₗ[ℂ] Y := modulatedExponentialDecayTwist n I a
+  refine dense_of_finite_coordinates (Z := Y) (fun x a ↦ tw a x)
+    (modulatedExponentialDecayStage_twists_isInducing m I k) (S : Set A) fun F ↦ ?_
+  let c₀ : I := ⟨hne.some, hne.some_mem⟩
+  let U := insert c₀ F
+  have hU : U.Nonempty := Finset.insert_nonempty c₀ F
+  let a := U.min' hU
+  let b := U.max' hU
+  let J := tw a + tw b
+  refine ⟨J, ?_, fun c hc ↦ ?_⟩
+  · let D := {f : SchwartzMap ℝ ℂ | HasCompactSupport (f : ℝ → ℂ)}
+    have hD : Dense (v '' D) := v.surjective.denseRange.dense_image v.continuous SchwartzMap.dense_hasCompactSupport
+    refine dense_of_split_products e (S.map J) hD fun h q hq ↦ ?_
+    refine hq.elim fun f hf ↦ ?_
+    refine (compact_profile_sum_twists I a b f hf.1).elim fun g hg ↦ ?_
+    refine (hS h g).elim fun z hz ↦ ?_
+    refine ⟨z, hz.1, Subtype.ext (funext fun y ↦ ?_)⟩
+    let p := d.symm y
+    have hyp := d.apply_symm_apply y
+    let L := e (Completion.coe' (α := InductiveTensor (SchwartzBruhat H) (SchwartzBruhat ℝ≥0ˣ)) (h ⊗ₜ[ℂ] q))
+    refine (congrArg (fun y : Q ↦ (J z).val y = L y) hyp).mp ?_
+    refine (decay_sum_on_product n I d hd a b z (fun u ↦ h u) g f hz.2 hg p.1 p.2).trans ?_
+    have hr : q p.2 = f (Real.log (p.2.val : ℝ)) :=
+      (congrArg (fun w : SchwartzBruhat ℝ≥0ˣ ↦ w p.2) hf.2.symm).trans
+        ((hv f p.2).trans (congrArg f (positiveRealLogEquiv_apply p.2)))
+    exact (congrArg (h p.1 * ·) hr.symm).trans (he h q p.1 p.2).symm
+  · have hc' : c ∈ U := Finset.mem_insert_of_mem hc
+    exact (decay_coordinate_of_sum n I a b c (U.min'_le c hc') (U.le_max' c hc')).elim
+      fun M hM ↦ ⟨M, M.continuous, hM⟩
+
+/-- The kernel of the quotient modulation is the quotient of the original kernel. -/
+private theorem decay_quotient_kernel_equiv (k : GoodCompact) [CompactSpace K]
+    [IsClosed (k.val : Set G)] :
+    let n := quotientModulation m k.val k.property.1
+    let k₁ := k.val.comap (Subgroup.subtype K)
+    ∃ d : (K ⧸ k₁) ≃ₜ* n.toMonoidHom.ker,
+      ∀ u : K, ((d (u : K ⧸ k₁)) : G ⧸ k.val) = ((u : G) : G ⧸ k.val) := by
+  let n := quotientModulation m k.val k.property.1
+  let k₁ := k.val.comap (Subgroup.subtype K)
+  let g : K →* G ⧸ k.val := (QuotientGroup.mk' k.val).comp (Subgroup.subtype K)
+  let f := g.codRestrict n.toMonoidHom.ker (fun u ↦ u.property)
+  have hker : k₁ = f.ker := by
+    ext u
+    have he := QuotientGroup.eq_one_iff (N := k.val) (u : G)
+    exact ⟨fun h ↦ Subtype.ext (he.mpr h), fun h ↦ he.mp (congrArg Subtype.val (show f u = 1 from h))⟩
+  let v := QuotientGroup.lift k₁ f hker.le
+  have hinj : Injective v := (QuotientGroup.injective_lift_iff _ _ _).mpr hker
+  have hsurj : Surjective v := by
+    intro z
+    obtain ⟨x, hx⟩ := QuotientGroup.mk_surjective z.val
+    have hu : x ∈ K := (congrArg n hx).trans z.property
+    exact ⟨((⟨x, hu⟩ : K) : K ⧸ k₁), Subtype.ext hx⟩
+  let e := MulEquiv.ofBijective v ⟨hinj, hsurj⟩
+  have hc : Continuous e := (QuotientGroup.isQuotientMap_mk k₁).continuous_iff.mpr
+    ((QuotientGroup.continuous_mk.comp continuous_subtype_val).subtype_mk _)
+  let d : (K ⧸ k₁) ≃ₜ* n.toMonoidHom.ker := { e with
+    continuous_toFun := hc
+    continuous_invFun := (hc.homeoOfEquivCompactToT2 (f := e.toEquiv)).continuous_symm }
+  exact ⟨d, fun _ ↦ rfl⟩
+
+/-- A split evaluation determines the original function. -/
+private theorem split_decay_eval_injective (d : K × ℝ≥0ˣ ≃ₜ* G)
+    (hd : ∀ p : K × ℝ≥0ˣ, d p = p.1.val * τ p.2) :
+    Injective (fun (v : E) (u : K) (t : ℝ≥0ˣ) ↦ v.val (u.val * τ t)) := by
+  intro f g h
+  apply Subtype.ext
+  funext x
+  obtain ⟨p, hp⟩ := d.surjective x
+  have hpt := (hd p).symm.trans hp
+  exact (congrArg (fun y ↦ f.val y = g.val y) hpt).mp (congrFun (congrFun h p.1) p.2)
+
+/-- Pulling back a pure product in split coordinates puts its stage
+realization in any subspace containing all global pure products. -/
+private theorem stage_product_preimage {A B X Y V H κ σ : Type*}
+    (i : A → B) (e : B → κ → σ → ℂ) (he : Injective e) (v : A → H → σ → ℂ)
+    (r : κ → H) (hi : ∀ a k t, e (i a) k t = v a (r k) t)
+    (g : X → H → ℂ) (h : Y → κ → ℂ) (f : V → σ → ℂ)
+    (j : X → Y) (hj : ∀ x k, h (j x) k = g x (r k))
+    (S : Set B) (hS : ∀ y w, ∃ b ∈ S, ∀ k t, e b k t = h y k * f w t)
+    (hA : ∀ x w, ∃ a, ∀ u t, v a u t = g x u * f w t) :
+    ∀ x w, ∃ a ∈ i ⁻¹' S, ∀ u t, v a u t = g x u * f w t := by
+  intro x w
+  obtain ⟨a, ha⟩ := hA x w
+  obtain ⟨b, hb, hval⟩ := hS (j x) w
+  have hab : i a = b := he (funext fun k ↦ funext fun t ↦ (hi a k t).trans
+    ((ha (r k) t).trans ((congrArg (· * f w t) (hj x k).symm).trans (hval k t).symm)))
+  exact ⟨a, (congrArg (· ∈ S) hab).mpr hb, ha⟩
+
+private theorem stage_subspace_contains {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (i : X →ₗ[ℂ] Y)
+    (S : Submodule ℂ Y) (hs : IsClosed (S : Set Y)) (hi : Continuous i)
+    (hD : Dense ((S.comap i : Submodule ℂ X) : Set X)) : ∀ z, i z ∈ S :=
+  fun z ↦ (hs.preimage hi).closure_eq.le (hD z)
+
+include hSC hm hInt hne hτ in
+/-- Each split pure product defines a decay function on the entire interval. -/
+private theorem split_pure_decay_mem (h : SchwartzBruhat K) (f : P) :
+    ∃ z : E, ∀ (u : K) (t : ℝ≥0ˣ), z.val (u.val * τ t) = h u * f.val (Real.log (t.val : ℝ)) := by
+  refine (modulatedExponentialDecay_completedTensor_mul m I hm hInt hne τ hτ).elim fun M hM ↦ ?_
+  exact ⟨M (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f)), hM h f⟩
+
+include hSC in
+/-- A Schwartz test function on the quotient kernel pulls back to the original kernel. -/
+private theorem pull_quotient_kernel_test (k : GoodCompact) [CompactSpace K]
+    [IsClosed (k.val : Set G)] [CompactSpace (quotientModulation m k.val k.property.1).toMonoidHom.ker] :
+    let n := quotientModulation m k.val k.property.1
+    ∃ j : SchwartzBruhat n.toMonoidHom.ker → SchwartzBruhat K, ∀ h u,
+      j h u = h ⟨((u.val : G) : G ⧸ k.val), u.property⟩ := by
+  let K₁ := k.val.comap (Subgroup.subtype K)
+  let n := quotientModulation m k.val k.property.1
+  let : IsClosed (K₁ : Set K) := k.property.1.isClosed.preimage continuous_subtype_val
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : SecondCountableTopology (K ⧸ K₁) := QuotientGroup.isOpenQuotientMap_mk.secondCountableTopology
+  let : SecondCountableTopology (G ⧸ k.val) := QuotientGroup.isOpenQuotientMap_mk.secondCountableTopology
+  let : SecondCountableTopology n.toMonoidHom.ker := TopologicalSpace.Subtype.secondCountableTopology _
+  refine (decay_quotient_kernel_equiv m k).elim fun r hr ↦ ?_
+  refine (schwartzBruhat_congr r.symm).elim fun U hU ↦ ?_
+  have hk₁ : IsCompact (K₁ : Set K) := IsClosed.isCompact (s := (K₁ : Set K)) inferInstance
+  refine (continuous_schwartzBruhat_compactQuotient_pullback K₁ hk₁).elim fun J hJ ↦ ?_
+  refine ⟨fun h ↦ J (U h), fun h u ↦ ?_⟩
+  let x := (u : K ⧸ K₁)
+  have hx : r x = (⟨((u.val : G) : G ⧸ k.val), u.property⟩ : n.toMonoidHom.ker) := Subtype.ext (hr u)
+  exact (hJ (U h) u).trans ((congrArg (U h).val (r.symm_apply_apply x).symm).trans
+    ((hU h (r x)).trans (congrArg h hx)))
+
+include hSC hm hInt hne hτ in
+/-- Quotient pure products pull back into any subspace containing the global split products. -/
+private theorem split_products_on_quotient (k : GoodCompact) (S : Submodule ℂ E)
+    (hS : ∀ (h : SchwartzBruhat K) (f : P), ∃ b ∈ S, ∀ (u : K) (t : ℝ≥0ˣ),
+      b.val (u.val * τ t) = h u * f.val (Real.log (t.val : ℝ))) :
+  let n := quotientModulation m k.val k.property.1
+  ∃ (d : n.toMonoidHom.ker × ℝ≥0ˣ ≃ₜ* (G ⧸ k.val)),
+    (∀ u t, n (d (u,t)) = t) ∧
+    ∀ (x : SchwartzBruhat n.toMonoidHom.ker) (w : P),
+      ∃ z : ModulatedExponentialDecayStage m I k, modulatedExponentialDecayStageInclusion m I k z ∈ S ∧
+        ∀ u t, z.val (d (u,t)) = x u * w.val (Real.log (t.val : ℝ)) := by
+  let K₁ := k.val.comap (Subgroup.subtype K)
+  let Q := G ⧸ k.val
+  let n := quotientModulation m k.val k.property.1
+  let q : G →ₜ* Q := ⟨QuotientGroup.mk' k.val, QuotientGroup.continuous_mk⟩
+  let s := q.comp τ
+  have hs : RightInverse s n := hτ
+  have hn : IsModulation n := ⟨isProperMap_of_comp_of_surj q.continuous n.continuous hm.1
+    (QuotientGroup.mk'_surjective k.val), hm.2.elim fun g hg ↦ ⟨q g, hg⟩⟩
+  let : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : IsClosed (K₁ : Set K) := k.property.1.isClosed.preimage continuous_subtype_val
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : SecondCountableTopology Q := QuotientGroup.isOpenQuotientMap_mk.secondCountableTopology
+  let : CompactSpace n.toMonoidHom.ker := isCompact_iff_compactSpace.mp hn.isCompact_ker
+  let : SecondCountableTopology (K ⧸ K₁) := QuotientGroup.isOpenQuotientMap_mk.secondCountableTopology
+  let : SecondCountableTopology n.toMonoidHom.ker := TopologicalSpace.Subtype.secondCountableTopology _
+  refine (hn.exists_sectionEquiv s hs).elim fun d hd ↦ ?_
+  have hmd (u : n.toMonoidHom.ker) (t : ℝ≥0ˣ) : n (d (u,t)) = t := (congrArg n (hd (u,t))).trans
+    (by rw [map_mul, show n u.val = 1 from u.property, one_mul, hs])
+  let i : ModulatedExponentialDecayStage m I k →ₗ[ℂ] E := modulatedExponentialDecayStageInclusion m I k
+  let A := ModulatedExponentialDecayStage m I k
+  let H := n.toMonoidHom.ker
+  let ev (b : E) (u : K) (t : ℝ≥0ˣ) := b.val (u.val * τ t)
+  let v (a : A) (u : H) (t : ℝ≥0ˣ) := a.val (d (u,t))
+  let g (h : SchwartzBruhat H) (u : H) := h u
+  let c (h : SchwartzBruhat K) (u : K) := h u
+  let f (w : P) (t : ℝ≥0ˣ) := w.val (Real.log (t.val : ℝ))
+  refine (hm.exists_sectionEquiv τ hτ).elim fun dG hdG ↦ ?_
+  have hev : Injective ev := split_decay_eval_injective m I τ dG hdG
+  let r₀ (u : K) : H := ⟨q u.val, u.property⟩
+  have hi (a : A) (u : K) (t : ℝ≥0ˣ) : ev (i a) u t = v a (r₀ u) t := by
+    change a.val (q (u.val * τ t)) = a.val (d (r₀ u,t))
+    exact congrArg a.val ((map_mul q u.val (τ t)).trans (hd (r₀ u,t)).symm)
+  refine (pull_quotient_kernel_test m k).elim fun j hj ↦ ?_
+  have ha (x : SchwartzBruhat H) (w : P) : ∃ a : A, ∀ u t, v a u t = g x u * f w t := by
+    refine (split_pure_decay_mem n I hn hInt hne s hs x w).elim fun z hz ↦ ?_
+    let a : A := ⟨z.val, z.property⟩
+    refine ⟨a, fun u t ↦ ?_⟩
+    exact (congrArg z.val (hd (u,t))).trans (hz u t)
+  have hj' (x : SchwartzBruhat H) (u : K) : c (j x) u = g x (r₀ u) := hj x u
+  have hS' (x : SchwartzBruhat K) (w : P) : ∃ b ∈ S, ∀ u t, ev b u t = c x u * f w t := hS x w
+  have hp := stage_product_preimage (A := A) (B := E) i ev hev v r₀ hi g c f j hj' (S : Set E) hS' ha
+  refine ⟨d, hmd, fun x w ↦ ?_⟩
+  refine (hp x w).elim fun a hmem ↦ ⟨a, hmem.1, fun u t ↦ ?_⟩
+  exact hmem.2 u t
+
+include hne in
+/-- Closed subspaces containing the split products on a single quotient
+contain that whole stage. -/
+private theorem closed_contains_quotient_stage {H : Type*} [CommGroup H] [TopologicalSpace H]
+    [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [SecondCountableTopology H]
+    (k : GoodCompact) [IsClosed (k.val : Set G)] (d : H × ℝ≥0ˣ ≃ₜ* (G ⧸ k.val))
+    (hd : ∀ u t, quotientModulation m k.val k.property.1 (d (u,t)) = t)
+    (S : Submodule ℂ E) (hS : IsClosed (S : Set E))
+    (hp : ∀ (x : SchwartzBruhat H) (w : P),
+      ∃ z : ModulatedExponentialDecayStage m I k, modulatedExponentialDecayStageInclusion m I k z ∈ S ∧
+        ∀ u t, z.val (d (u,t)) = x u * w.val (Real.log (t.val : ℝ))) :
+    ∀ a : ModulatedExponentialDecayStage m I k, modulatedExponentialDecayStageInclusion m I k a ∈ S := by
+  let A := ModulatedExponentialDecayStage m I k
+  let i : A →ₗ[ℂ] E := modulatedExponentialDecayStageInclusion m I k
+  let V : Submodule ℂ A := S.comap i
+  have hc : @Continuous A E _ _ i := (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp i
+    fun p ↦ p.property k
+  have hprod (x : SchwartzBruhat H) (w : P) :
+      ∃ z ∈ V, ∀ u t, z.val (d (u,t)) = x u * w.val (Real.log (t.val : ℝ)) := hp x w
+  have hD := dense_decay_stage_of_products m I hne k d hd V hprod
+  intro a
+  exact stage_subspace_contains (X := A) (Y := E) i S hS hc hD a
+
+include hSC hm hInt hne hτ in
+/-- A closed subspace containing all split products contains every quotient stage. -/
+private theorem contains_stage_of_split_products (k : GoodCompact) (S : Submodule ℂ E)
+    (hsC : IsClosed (S : Set E))
+    (hS : ∀ (h : SchwartzBruhat K) (f : P), ∃ b ∈ S, ∀ (u : K) (t : ℝ≥0ˣ),
+      b.val (u.val * τ t) = h u * f.val (Real.log (t.val : ℝ))) :
+    ∀ a : ModulatedExponentialDecayStage m I k, modulatedExponentialDecayStageInclusion m I k a ∈ S := by
+  let : IsClosed (k.val : Set G) := k.property.1.isClosed
+  let n := quotientModulation m k.val k.property.1
+  let Q := G ⧸ k.val
+  let : SecondCountableTopology Q := QuotientGroup.isOpenQuotientMap_mk.secondCountableTopology
+  have hnc : IsClosed (n.toMonoidHom.ker : Set Q) := isClosed_singleton.preimage n.continuous
+  let : LocallyCompactSpace n.toMonoidHom.ker := hnc.locallyCompactSpace
+  let : SecondCountableTopology n.toMonoidHom.ker := TopologicalSpace.Subtype.secondCountableTopology _
+  refine (split_products_on_quotient m I hm hInt hne τ hτ k S hS).elim fun d hd ↦ ?_
+  exact closed_contains_quotient_stage (H := n.toMonoidHom.ker) m I hne k d hd.1 S hsC hd.2
+/-- The closure of a linear image is the whole space if the image contains
+the pure products and these generate every quotient stage densely. -/
+private theorem dense_of_stage_span {X Y ι A B κ σ : Type*} {Z : ι → Type*}
+    [TopologicalSpace X] [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace Y] [AddCommGroup Y] [Module ℂ Y] [IsTopologicalAddGroup Y] [ContinuousConstSMul ℂ Y]
+    (L : X →L[ℂ] Y)
+    (j : ∀ k, Z k → Y) (hc : ∀ y, ∃ k, y ∈ range (j k))
+    (v : Y → κ → σ → ℂ) (g : A → κ → ℂ) (f : B → σ → ℂ) (pure : A → B → X)
+    (hp : ∀ a b u t, v (L (pure a b)) u t = g a u * f b t)
+    (hs : ∀ (k : ι) (S : Submodule ℂ Y), IsClosed (S : Set Y) →
+      (∀ a b, ∃ y ∈ S, ∀ u t, v y u t = g a u * f b t) → ∀ z, j k z ∈ S) :
+    DenseRange L := by
+  let R := L.toLinearMap.range
+  let S := R.topologicalClosure
+  have hP (a : A) (b : B) : ∃ y ∈ S, ∀ u t, v y u t = g a u * f b t :=
+    ⟨L (pure a b), R.le_topologicalClosure ⟨_,rfl⟩, hp a b⟩
+  intro y
+  obtain ⟨k, z, hz⟩ := hc y
+  exact (congrArg (· ∈ S) hz).mp (hs k S R.isClosed_topologicalClosure hP z)
+
+include hSC hm hInt hne hτ in
+/-- Split products have dense span in the full decay topology. -/
+private theorem dense_split_decay_product
+    (L : Completion T →L[ℂ] E)
+    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ))) :
+    DenseRange L := by
+  let j (k : GoodCompact) : ModulatedExponentialDecayStage m I k → E := modulatedExponentialDecayStageInclusion m I k
+  let v (b : E) (u : K) (t : ℝ≥0ˣ) := b.val (u.val * τ t)
+  let g (h : SchwartzBruhat K) (u : K) := h u
+  let f (w : P) (t : ℝ≥0ˣ) := w.val (Real.log (t.val : ℝ))
+  let pure (h : SchwartzBruhat K) (w : P) := Completion.coe' (α := T) (h ⊗ₜ[ℂ] w)
+  have hc : ∀ y : E, ∃ k, y ∈ range (j k) := modulatedExponentialDecay_exists_stage m I hm hτ.surjective hInt hne
+  with_reducible_and_instances
+    exact dense_of_stage_span (X := Completion T) (Y := E) (Z := ModulatedExponentialDecayStage m I)
+      L j hc v g f pure hL (contains_stage_of_split_products m I hm hInt hne τ hτ)
+
+section
 
 local notation "TI" => InductiveTensor P (SchwartzBruhat K)
 local notation "TP" => ProjectiveTensor P (SchwartzBruhat K)
@@ -1679,13 +2197,13 @@ omit hSC hm hInt hne hτ in
 private theorem continuous_inductiveTensor_flip (A B : Type*) [AddCommGroup A] [Module ℂ A]
     [TopologicalSpace A] [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] :
     @Continuous (InductiveTensor A B) (InductiveTensor B A) _ _ (TensorProduct.comm ℂ A B) := by
-  let T : InductiveTensor A B →ₗ[ℂ] InductiveTensor B A := (TensorProduct.comm ℂ A B).toLinearMap
+  let flipMap : InductiveTensor A B →ₗ[ℂ] InductiveTensor B A := (TensorProduct.comm ℂ A B).toLinearMap
   let ps := (fun p : {p : Seminorm ℂ (A ⊗[ℂ] B) //
     (∀ x : A, Continuous (fun y : B ↦ p (x ⊗ₜ[ℂ] y))) ∧
     (∀ y : B, Continuous (fun x : A ↦ p (x ⊗ₜ[ℂ] y)))} ↦ p.val)
-  refine (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp T fun q ↦ ?_
+  refine (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp flipMap fun q ↦ ?_
   exact (withGeneratingSeminorms_spec _ ps).continuous_seminorm
-    ⟨q.val.comp T, fun x ↦ q.property.2 x, fun y ↦ q.property.1 y⟩
+    ⟨q.val.comp flipMap, fun x ↦ q.property.2 x, fun y ↦ q.property.1 y⟩
 
 omit hSC hm hInt hne hτ in
 /-- Flipping the two factors preserves the separately continuous seminorms that
@@ -1696,22 +2214,299 @@ private theorem completedInductiveTensor_swap (X Y : Type*)
     ∃ e : Completion (InductiveTensor X Y) ≃L[ℂ] Completion (InductiveTensor Y X),
       ∀ x y, e (Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y)) =
         Completion.coe' (α := InductiveTensor Y X) (y ⊗ₜ[ℂ] x) := by
-  let T : InductiveTensor X Y →L[ℂ] InductiveTensor Y X := ⟨(TensorProduct.comm ℂ X Y).toLinearMap, continuous_inductiveTensor_flip X Y⟩
+  let flipMap : InductiveTensor X Y →L[ℂ] InductiveTensor Y X := ⟨(TensorProduct.comm ℂ X Y).toLinearMap, continuous_inductiveTensor_flip X Y⟩
   let U : InductiveTensor Y X →L[ℂ] InductiveTensor X Y := ⟨(TensorProduct.comm ℂ Y X).toLinearMap, continuous_inductiveTensor_flip Y X⟩
-  have hT (x : Completion (InductiveTensor X Y)) : U.completion (T.completion x) = x := by
-    refine Completion.induction_on (p := fun z ↦ U.completion (T.completion z) = z) x
-      (isClosed_eq (U.completion.continuous.comp T.completion.continuous) continuous_id) ?_
+  have hT (x : Completion (InductiveTensor X Y)) : U.completion (flipMap.completion x) = x := by
+    refine Completion.induction_on (p := fun z ↦ U.completion (flipMap.completion z) = z) x
+      (isClosed_eq (U.completion.continuous.comp flipMap.completion.continuous) continuous_id) ?_
     intro z
     rw [ContinuousLinearMap.completion_apply_coe, ContinuousLinearMap.completion_apply_coe]
     exact congrArg Completion.coe' ((TensorProduct.comm ℂ X Y).symm_apply_apply z)
-  have hU (x : Completion (InductiveTensor Y X)) : T.completion (U.completion x) = x := by
-    refine Completion.induction_on (p := fun z ↦ T.completion (U.completion z) = z) x
-      (isClosed_eq (T.completion.continuous.comp U.completion.continuous) continuous_id) ?_
+  have hU (x : Completion (InductiveTensor Y X)) : flipMap.completion (U.completion x) = x := by
+    refine Completion.induction_on (p := fun z ↦ flipMap.completion (U.completion z) = z) x
+      (isClosed_eq (flipMap.completion.continuous.comp U.completion.continuous) continuous_id) ?_
     intro z
     rw [ContinuousLinearMap.completion_apply_coe, ContinuousLinearMap.completion_apply_coe]
     exact congrArg Completion.coe' ((TensorProduct.comm ℂ Y X).symm_apply_apply z)
-  exact ⟨ContinuousLinearEquiv.equivOfInverse T.completion U.completion hT hU,
-    fun x y ↦ T.completion_apply_coe (x ⊗ₜ[ℂ] y)⟩
+  exact ⟨ContinuousLinearEquiv.equivOfInverse flipMap.completion U.completion hT hU,
+    fun x y ↦ flipMap.completion_apply_coe (x ⊗ₜ[ℂ] y)⟩
+
+end
+
+/-- If a nuclear factor embeds into a product, its coordinate tensor maps into
+the completed injective tensors embed the full projective completion. -/
+private theorem projective_tensor_coordinates {A B X ι : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    (t : A →L[ℂ] (ι → X)) (ht : IsEmbedding t)
+    (hN : @IsInducing (ProjectiveTensor A B) (InjectiveTensor A B) _ _ id) :
+    ∃ J : Completion (ProjectiveTensor A B) →L[ℂ] (ι → Completion (InjectiveTensor X B)),
+      IsEmbedding J ∧ ∀ a b i, J (Completion.coe' (α := ProjectiveTensor A B) (a ⊗ₜ[ℂ] b)) i =
+        Completion.coe' (α := InjectiveTensor X B) (t a i ⊗ₜ[ℂ] b) := by
+  let unit : B →L[ℂ] (Unit → B) := ContinuousLinearMap.pi fun _ ↦ ContinuousLinearMap.id ℂ B
+  have hu : IsEmbedding unit := ⟨IsInducing.of_comp unit.continuous (continuous_apply ()) IsInducing.id,
+    fun _ _ he ↦ congrFun he ()⟩
+  let A₁ := InjectiveTensor A B
+  let A₂ := InjectiveTensor (ι → X) (Unit → B)
+  let B₂ := InjectiveTensor X B
+  let H : A₁ →ₗ[ℂ] A₂ := injectiveTensorMap t.toLinearMap unit.toLinearMap
+  have hH : IsInducing H := (injectiveTensorMap_isEmbedding t unit ht hu).isInducing
+  let v (i : ι × Unit) : A₂ →ₗ[ℂ] B₂ := injectiveTensorMap (LinearMap.proj i.1) (LinearMap.proj i.2)
+  have hv : IsInducing (fun z : A₂ ↦ fun i ↦ v i z) :=
+    (injectiveTensor_products_isUniformInducing (fun _ : ι ↦ X) (fun _ : Unit ↦ B)).isInducing
+  let inc := (Completion.toComplL : B₂ →L[ℂ] Completion B₂)
+  have hi := IsInducing.piMap (fun _ : ι × Unit ↦ (Completion.isDenseInducing_coe (α := B₂)).isInducing)
+  let P₀ := ProjectiveTensor A B
+  let M : P₀ →ₗ[ℂ] (ι → Completion B₂) :=
+    LinearMap.pi fun i ↦ (inc.toLinearMap.comp (v (i,()))).comp (show P₀ →ₗ[ℂ] A₂ from H)
+  let dup (z : ι → Completion B₂) (p : ι × Unit) := z p.1
+  have hd : Continuous dup := continuous_pi fun p ↦ continuous_apply p.1
+  have hcomp : IsInducing (dup ∘ M) := hi.comp (hv.comp (hH.comp hN))
+  have hc : Continuous M := continuous_pi fun i ↦ (continuous_apply (i,())).comp hcomp.continuous
+  let D : P₀ →L[ℂ] (ι → Completion B₂) := ⟨M,hc⟩
+  have him : IsInducing D := IsInducing.of_comp hc hd hcomp
+  have hU := AddMonoidHom.isUniformInducing_of_isInducing (f := D.toAddMonoidHom) him
+  let J := D.fromCompletion
+  have hJ : IsUniformInducing J := Completion.isUniformInducing_extension hU
+  exact ⟨J, hJ.isInducing.isEmbedding, fun a b i ↦ congrFun (D.fromCompletion_apply_coe (a ⊗ₜ[ℂ] b)) i⟩
+
+/-- A bounded inverse on a comparison space gives a continuous inverse on a
+bornological function space when the comparison embeds by weighted coordinates. -/
+private theorem inducing_of_bounded_comparison {A Y W V : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [AddCommGroup W] [Module ℂ W] [UniformSpace W] [IsUniformAddGroup W] [CompleteSpace W]
+    [AddCommGroup V] [Module ℂ V] [UniformSpace V] [IsUniformAddGroup V] [T2Space V]
+    (L : A →L[ℂ] Y) (hd : DenseRange L)
+    (C : A →L[ℂ] W) (hC : Bijective C) (hb : ∀ B : Set A, IsVonNBounded ℂ (C '' B) → IsVonNBounded ℂ B)
+    (J : W →L[ℂ] V) (hJ : IsEmbedding J) (F : Y →L[ℂ] V) (hF : ∀ a, F (L a) = J (C a))
+    (hY : ∀ p : Seminorm ℂ Y, (∀ B : Set Y, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p) :
+    IsInducing L := by
+  let e := LinearEquiv.ofBijective C.toLinearMap hC
+  let jr := LinearEquiv.ofInjective J.toLinearMap hJ.injective
+  have hclosed : IsClosed (range J) :=
+    (AddMonoidHom.isUniformInducing_of_isInducing (f := J.toAddMonoidHom) hJ.isInducing).isComplete_range.isClosed
+  have hmem (y : Y) : F y ∈ J.range := closure_minimal (s := range L) (t := F ⁻¹' range J)
+    (fun _ ⟨a,ha⟩ ↦ ⟨C a, (hF a).symm.trans (congrArg F ha)⟩) (hclosed.preimage F.continuous) (hd y)
+  let r := jr.symm.toLinearMap.comp (F.toLinearMap.codRestrict J.range hmem)
+  have hr (y : Y) : J (r y) = F y := congrArg Subtype.val (jr.apply_symm_apply _)
+  have hc : Continuous r := hJ.isInducing.continuous_iff.mpr (by
+    have heq : J ∘ r = F := funext hr
+    rw [heq]
+    exact F.continuous)
+  let R := e.symm.toLinearMap.comp r
+  have hCR (y : Y) : C (R y) = r y := e.apply_symm_apply _
+  have hR : Continuous R := continuous_linear_of_bornological (X := Y) (Y := A) hY R fun B hB ↦ by
+    apply hb
+    rw [image_image, show (fun x ↦ C (R x)) = r from funext hCR]
+    exact hB.image (⟨r,hc⟩ : Y →L[ℂ] W)
+  have hRL : R ∘ L = id := funext fun a ↦ hC.1 ((hCR (L a)).trans (hJ.injective ((hr (L a)).trans (hF a))))
+  exact IsInducing.of_comp L.continuous hR (hRL.symm ▸ IsInducing.id)
+
+/-- Identify multiplication as an inducing map by embedding its projective
+comparison in the product of its ordinary weighted kernel coordinates. -/
+private theorem split_mul_inducing {A B X Y V ι : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [PolynormableSpace ℂ B] [T2Space B]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (t : A →L[ℂ] (ι → X)) (ht : IsEmbedding t)
+    (hN : @IsInducing (ProjectiveTensor A B) (InjectiveTensor A B) _ _ id)
+    (L : Completion (InductiveTensor B A) →L[ℂ] Y) (hd : DenseRange L)
+    (hcompare : ∃ C : Completion (InductiveTensor A B) →L[ℂ] Completion (ProjectiveTensor A B),
+      ⇑C = @Completion.map (InductiveTensor A B) _ (ProjectiveTensor A B) _ id ∧
+      Bijective C ∧ ∀ S, IsVonNBounded ℂ (C '' S) ↔ IsVonNBounded ℂ S)
+    (e : Completion (InductiveTensor B X) ≃L[ℂ] V) (w : ι → Y →L[ℂ] V)
+    (hw : ∀ a b i, w i (L (Completion.coe' (α := InductiveTensor B A) (b ⊗ₜ[ℂ] a))) =
+      e (Completion.coe' (α := InductiveTensor B X) (b ⊗ₜ[ℂ] t a i)))
+    (hY : ∀ p : Seminorm ℂ Y, (∀ S : Set Y, IsVonNBounded ℂ S → BddAbove (p '' S)) → Continuous p) :
+    IsInducing L := by
+  obtain ⟨C, heq, hC, hCb⟩ := hcompare
+  let TI := InductiveTensor B A
+  let TT := InductiveTensor A B
+  let TP := ProjectiveTensor A B
+  let D := InjectiveTensor X B
+  let : PolynormableSpace ℂ (Completion TI) := polynormableSpace_completion
+  refine (projective_tensor_coordinates t ht hN).elim fun J hJ ↦ ?_
+  refine (completedInductiveTensor_swap B A).elim fun r hr ↦ ?_
+  let C' := C.comp r.toContinuousLinearMap
+  have hb (S : Set (Completion TI)) (hS : IsVonNBounded ℂ (C' '' S)) : IsVonNBounded ℂ S := by
+    have hB := (hCb (r '' S)).mp ((congrArg (IsVonNBounded ℂ) (image_image C r S)).mpr hS)
+    have he : r.symm '' (r '' S) = S := r.toEquiv.symm_image_image S
+    exact (congrArg (IsVonNBounded ℂ) he).mp (hB.image r.symm.toContinuousLinearMap)
+  let Q : InductiveTensor X B →L[ℂ] D := ⟨LinearMap.id, (continuous_projectiveTensor_to_injectiveTensor X B).comp
+    (continuous_inductiveTensor_to_projectiveTensor («E» := X) (F := B))⟩
+  refine (completedInductiveTensor_swap B X).elim fun sw hsw ↦ ?_
+  let coord := Q.completion.comp (sw.toContinuousLinearMap.comp e.symm.toContinuousLinearMap)
+  let F := ContinuousLinearMap.pi fun i ↦ coord.comp (w i)
+  let left := F.comp L
+  let right := J.comp C'
+  let inc := (Completion.toComplL : TI →L[ℂ] Completion TI)
+  let c : TT →L[ℂ] TP := ⟨LinearMap.id, continuous_inductiveTensor_to_projectiveTensor⟩
+  have hU : @UniformContinuous TT TP _ _ id := c.uniformContinuous
+  have hmap (b : B) (a : A) : C' (Completion.coe' (α := TI) (b ⊗ₜ[ℂ] a)) =
+      Completion.coe' (α := TP) (a ⊗ₜ[ℂ] b) := (congrArg C (hr b a)).trans
+    ((congrFun heq _).trans (Completion.map_coe hU _))
+  have he : (left.comp inc).toLinearMap = (right.comp inc).toLinearMap := by
+    refine TensorProduct.ext' fun b a ↦ funext fun i ↦ ?_
+    let z := Completion.coe' (α := InductiveTensor B X) (b ⊗ₜ[ℂ] t a i)
+    have hcoord : coord (e z) = Completion.coe' (α := D) (t a i ⊗ₜ[ℂ] b) :=
+      (congrArg (fun d ↦ Q.completion (sw d)) (e.symm_apply_apply z)).trans
+        ((congrArg Q.completion (hsw b (t a i))).trans (Q.completion_apply_coe (t a i ⊗ₜ[ℂ] b)))
+    exact (congrArg coord (hw a b i)).trans (hcoord.trans
+      ((hJ.2 a b i).symm.trans (congrArg (fun u ↦ J u i) (hmap b a).symm)))
+  have hF (z : Completion TI) : left z = right z := Completion.induction_on
+    (p := fun y ↦ left y = right y) z (isClosed_eq left.continuous right.continuous)
+    (fun a ↦ LinearMap.congr_fun he a)
+  exact inducing_of_bounded_comparison L hd C' (hC.comp r.bijective) hb J hJ.1 F hF hY
+
+include hne in
+/-- All scalar twists together embed the scalar decay profiles in a product of
+ordinary Schwartz spaces on the multiplicative positive reals. -/
+private theorem scalar_twist_embedding :
+    ∃ t : P →L[ℂ] (I → SchwartzBruhat ℝ≥0ˣ), IsEmbedding t ∧
+      ∀ (f : P) (a : I) (v : ℝ≥0ˣ), t f a v = logExponentialDecayTwist I a f (Real.log (v.val : ℝ)) := by
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  refine (schwartzBruhat_realCoordinate_equiv positiveRealLogEquiv).elim fun s hs ↦ ?_
+  let t₀ (a : I) : P →L[ℂ] SchwartzMap ℝ ℂ := ⟨logExponentialDecayTwist I a,
+    (continuous_apply a).comp (positiveRealExponentialDecay_isEmbedding I hne).continuous⟩
+  let t := ContinuousLinearMap.pi fun a ↦ s.toContinuousLinearMap.comp (t₀ a)
+  have hEmb : IsEmbedding t := (IsEmbedding.piMap (fun _ : I ↦ s.toHomeomorph.isEmbedding)).comp
+    (positiveRealExponentialDecay_isEmbedding I hne)
+  exact ⟨t,hEmb,fun f a v ↦ (hs (t₀ a f) v).trans (congrArg (t₀ a f) (positiveRealLogEquiv_apply v))⟩
+
+include hτ in
+private theorem split_twist_pure_values (D : E) (f : P) (h : SchwartzBruhat K)
+    (hD : ∀ (u : K) (t : ℝ≥0ˣ), D.val (u.val * τ t) = h u * f.val (Real.log (t.val : ℝ)))
+    (a : I) (u : K) (t : ℝ≥0ˣ) :
+    modulatedExponentialDecayTwist m I a D (u.val * τ t) =
+      h u * logExponentialDecayTwist I a f (Real.log (t.val : ℝ)) := by
+  have hmt : m (u.val * τ t) = t := by rw [map_mul, show m u.val = 1 from u.property, one_mul, hτ]
+  change ((((m (u.val * τ t)).val : ℝ) ^ (a : ℝ) : ℝ) : ℂ) * D.val (u.val * τ t) = _
+  rw [hmt, identityWeight_log, positiveRealLogEquiv_apply, hD]
+  exact (mul_left_comm _ _ _).trans (congrArg (h u * ·) (logExponentialDecayTwist_apply I a f _).symm)
+
+include hτ in
+/-- The ordinary Schwartz representative of a weighted pure product is
+determined by its values in split coordinates. -/
+private theorem split_decay_twist_eq (d : K × ℝ≥0ˣ ≃ₜ* G) (hd : ∀ p, d p = p.1.val * τ p.2)
+    (y : E) (f : P) (h : SchwartzBruhat K)
+    (hy : ∀ (u : K) (t : ℝ≥0ˣ), y.val (u.val * τ t) = h u * f.val (Real.log (t.val : ℝ)))
+    (a : I) (z : SchwartzBruhat G) (hz : ∀ u t, z (d (u,t)) =
+      h u * logExponentialDecayTwist I a f (Real.log (t.val : ℝ))) :
+    modulatedExponentialDecayTwist m I a y = z := by
+  let A := modulatedExponentialDecayTwist m I a y
+  refine Subtype.ext (funext fun x ↦ ?_)
+  let p := d.symm x
+  exact (congrArg (fun w : G ↦ A w = z w) (d.apply_symm_apply x)).mp
+    ((congrArg A (hd p)).trans ((split_twist_pure_values m I τ hτ y f h hy a p.1 p.2).trans (hz p.1 p.2).symm))
+
+include hSC hm hInt hne in
+private theorem decay_projective_to_injective :
+    @IsInducing (ProjectiveTensor P (SchwartzBruhat K)) (InjectiveTensor P (SchwartzBruhat K)) _ _ id := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_t2
+  exact
+    ((positiveRealExponentialDecay_nuclear I hInt hne).2.2 (SchwartzBruhat K)
+      inferInstance inferInstance inferInstance inferInstance inferInstance).isEmbedding.isInducing
+
+include hSC hm hInt hne hτ in
+/-- Paper: (D.3.3.3), p. 806. Pulling back the decay-space topology by
+multiplication gives the topology of the completed inductive tensor product. -/
+private theorem modulatedExponentialDecay_completedTensor_mul_isInducing
+    (L : Completion T →L[ℂ] E)
+    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ))) :
+    IsInducing L := by
+  have hDense : DenseRange L := dense_split_decay_product m I hm hInt hne τ hτ L hL
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_t2
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : T2Space (SchwartzBruhat ℝ≥0ˣ) := schwartzBruhat_t2
+  let : T2Space P := (positiveRealExponentialDecay_isEmbedding I hne).t2Space
+  have hN := decay_projective_to_injective m I hm hInt hne
+  refine (hm.exists_sectionEquiv τ hτ).elim fun d hd ↦ ?_
+  refine (split_schwartz_kernel d).elim fun e he ↦ ?_
+  refine (scalar_twist_embedding I hne).elim fun t ht ↦ ?_
+  have hC := modulatedExponentialDecay_tensor_comparison_bounded m I hm hInt hne τ hτ
+  let w (a : I) : E →L[ℂ] SchwartzBruhat G := ⟨modulatedExponentialDecayTwist m I a, continuous_decay_twist m I a⟩
+  have hw (f : P) (h : SchwartzBruhat K) (a : I) :
+      w a (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))) =
+        e (Completion.coe' (α := InductiveTensor (SchwartzBruhat K) (SchwartzBruhat ℝ≥0ˣ)) (h ⊗ₜ[ℂ] t f a)) := by
+    let y := L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))
+    let z := e (Completion.coe' (α := InductiveTensor (SchwartzBruhat K) (SchwartzBruhat ℝ≥0ˣ))
+      (h ⊗ₜ[ℂ] t f a))
+    have hz (u : K) (v : ℝ≥0ˣ) : z (d (u,v)) =
+        h u * logExponentialDecayTwist I a f (Real.log (v.val : ℝ)) :=
+      (he h (t f a) u v).trans (congrArg (h u * ·) (ht.2 f a v))
+    exact split_decay_twist_eq m I τ hτ d hd y f h (hL h f) a z hz
+  have hY := modulatedExponentialDecay_bornological m I hm hInt hne τ hτ
+  with_reducible_and_instances
+    exact split_mul_inducing (A := P) (B := SchwartzBruhat K) (X := SchwartzBruhat ℝ≥0ˣ) (Y := E)
+      (V := SchwartzBruhat G) t ht.1 hN L hDense hC e w hw hY
+
+/-- An inducing linear map with dense range from a complete space onto a
+Hausdorff target is surjective. -/
+private theorem surjective_of_inducing_dense {X Y : Type*}
+    [UniformSpace X] [AddCommGroup X] [IsUniformAddGroup X] [Module ℂ X] [CompleteSpace X]
+    [UniformSpace Y] [AddCommGroup Y] [IsUniformAddGroup Y] [Module ℂ Y] [T2Space Y]
+    (L : X →L[ℂ] Y) (hi : IsInducing L) (hd : DenseRange L) : Surjective L :=
+  fun y ↦ (AddMonoidHom.isUniformInducing_of_isInducing (f := L.toAddMonoidHom) hi).isComplete_range.isClosed.closure_eq.le (hd y)
+
+include hSC hm hInt hne hτ in
+/-- Paper: (D.3.3.3), p. 806. Multiplication from the completed tensor product
+reaches every decay function. The quotient-stage isomorphisms give preimages
+for functions in the individual compact-subgroup stages. -/
+private theorem modulatedExponentialDecay_completedTensor_mul_surjective
+    (L : Completion T →L[ℂ] E)
+    (hL : ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ))) :
+    Surjective L := by
+  let : T2Space E := (modulatedExponentialDecay_strictLF m I hm hInt hne τ hτ).1
+  have hi := modulatedExponentialDecay_completedTensor_mul_isInducing m I hm hInt hne τ hτ L hL
+  have hd := dense_split_decay_product m I hm hInt hne τ hτ L hL
+  with_reducible_and_instances
+    exact surjective_of_inducing_dense (X := Completion T) (Y := E) L hi hd
+
+include hSC hm hInt hne hτ in
+/-- Paper: Theorem D.3.3.7(1), p. 806. The splitting of the modulation induces
+the completed inductive tensor isomorphism, given by multiplication in split coordinates. -/
+theorem modulatedExponentialDecay_tensor_equiv :
+    ∃ e : Completion T ≃L[ℂ] E,
+      ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+        (e (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+          h u * f.val (Real.log (t.val : ℝ)) := by
+  exact bundle_inducing_surjection (A := Completion T) (B := E)
+    (fun L ↦ ∀ (h : SchwartzBruhat K) (f : P) (u : K) (t : ℝ≥0ˣ),
+      (L (Completion.coe' (α := T) (h ⊗ₜ[ℂ] f))).val ((u : G) * τ t) =
+        h u * f.val (Real.log (t.val : ℝ)))
+    (modulatedExponentialDecay_completedTensor_mul m I hm hInt hne τ hτ)
+    (modulatedExponentialDecay_completedTensor_mul_surjective m I hm hInt hne τ hτ)
+    (modulatedExponentialDecay_completedTensor_mul_isInducing m I hm hInt hne τ hτ)
+
+end Structure
+
+section BoundedSets
+
+variable [hSC : SecondCountableTopology G]
+variable (hm : IsModulation m) (hInt : OrdConnected I) (hne : I.Nonempty)
+variable (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+
+-- Remark D.3.3.8 is the cofinality assertion in modulatedExponentialDecay_stageLimit.
+-- Remark D.3.3.9 applies schwartzBruhat_acyclic on the norm-one subgroup.
+
+local notation "TI" => InductiveTensor P (SchwartzBruhat K)
+local notation "TP" => ProjectiveTensor P (SchwartzBruhat K)
+local notation "compareTensors" => @Completion.map TI _ TP _ id
+
+include hSC hm hInt hne hτ
+
 omit hm hτ hInt hne hSC in
 private theorem stage_tensor_swap (k : GoodCompact) :
     let k₁ := k.val.comap (Subgroup.subtype K)
@@ -1941,11 +2736,218 @@ theorem modulatedExponentialDecay_tensor_bornologification :
   exact topology_eq_induced_bounded_seminorms compareTensors hC.choose hC.choose_spec.1
     hC.choose_spec.2.1 hC.choose_spec.2.2 hb
 
+omit hSC hm hInt hne hτ in
+/-- A family of functionals that vanishes eventually on every bounded set of the
+second factor gives a continuous inductive tensor seminorm by taking the supremum
+of the norms of the paired functionals. -/
+private theorem tensor_diagonal_seminorm {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [ContinuousSMul ℂ X] [FirstCountableTopology X] [PolynormableSpace ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [ContinuousSMul ℂ Y]
+    [PolynormableSpace ℂ Y]
+    (hY : ∀ p : Seminorm ℂ Y, (∀ B : Set Y, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p)
+    (v : ℕ → StrongDual ℂ X) (w : ℕ → StrongDual ℂ Y)
+    (hvan : ∀ B : Set Y, IsVonNBounded ℂ B → ∃ N, ∀ n ≥ N, ∀ y ∈ B, w n y = 0) :
+    ∃ p : Seminorm ℂ (InductiveTensor X Y), Continuous p ∧
+      ∀ n x y, ‖v n x‖ * ‖w n y‖ ≤ p (x ⊗ₜ[ℂ] y) := by
+  let t (n : ℕ) := tensorDualForm (v n) (w n)
+  let q (n : ℕ) := (normSeminorm ℂ ℂ).comp (t n)
+  have hz (z : X ⊗[ℂ] Y) : ∃ N, ∀ n ≥ N, t n z = 0 := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      obtain ⟨N, hN⟩ := hvan {y} (isVonNBounded_singleton _)
+      exact ⟨N, fun n hn ↦ by
+        change tensorDualForm (v n) (w n) _ = 0
+        rw [tensorDualForm_tmul, hN n hn y rfl, mul_zero]⟩
+    | add a b ha hb =>
+      obtain ⟨i, hi⟩ := ha
+      obtain ⟨j, hj⟩ := hb
+      exact ⟨max i j, fun n hn ↦ by rw [map_add, hi n ((le_max_left ..).trans hn),
+        hj n ((le_max_right ..).trans hn), zero_add]⟩
+  have hb : BddAbove (range q) := Seminorm.bddAbove_range_iff.mpr fun z ↦ by
+    obtain ⟨N, hN⟩ := hz z
+    refine ⟨∑ j ∈ Finset.range N, q j z, forall_mem_range.mpr fun n ↦ ?_⟩
+    by_cases h : n < N
+    · exact Finset.single_le_sum (fun j _ ↦ apply_nonneg (q j) z) (Finset.mem_range.mpr h)
+    · change ‖t n z‖ ≤ _
+      rw [hN n (Nat.le_of_not_gt h), norm_zero]
+      exact Finset.sum_nonneg fun j _ ↦ apply_nonneg (q j) z
+  let p := ⨆ n, q n
+  have hrect (A : Set X) (B : Set Y) (hA : IsVonNBounded ℂ A) (hB : IsVonNBounded ℂ B) :
+      ∃ C, ∀ x ∈ A, ∀ y ∈ B, p (x ⊗ₜ[ℂ] y) ≤ C := by
+    choose a ha using fun n ↦ (NormedSpace.image_isVonNBounded_iff ℂ).mp (hA.image (v n))
+    choose b hb' using fun n ↦ (NormedSpace.image_isVonNBounded_iff ℂ).mp (hB.image (w n))
+    obtain ⟨N, hN⟩ := hvan B hB
+    let c (n : ℕ) := |a n| * |b n|
+    have hc (n : ℕ) : 0 ≤ c n := mul_nonneg (abs_nonneg _) (abs_nonneg _)
+    refine ⟨∑ n ∈ Finset.range N, c n, fun x hx y hy ↦ ?_⟩
+    rw [show p = ⨆ n, q n from rfl, Seminorm.iSup_apply hb]
+    apply ciSup_le
+    intro n
+    change ‖tensorDualForm (v n) (w n) (x ⊗ₜ[ℂ] y)‖ ≤ _
+    rw [tensorDualForm_tmul, norm_mul]
+    by_cases hn : n < N
+    · exact (mul_le_mul ((ha n x hx).trans (le_abs_self _)) ((hb' n y hy).trans (le_abs_self _))
+        (norm_nonneg _) (abs_nonneg _)).trans (Finset.single_le_sum (fun j _ ↦ hc j) (Finset.mem_range.mpr hn))
+    · rw [hN n (Nat.le_of_not_gt hn) y hy, norm_zero, mul_zero]
+      exact Finset.sum_nonneg fun j _ ↦ hc j
+  have hleft (y : Y) : Continuous (p.comp ((TensorProduct.mk ℂ X Y).flip y)) := by
+    apply continuous_seminorm_of_bounded_images
+    intro A hA
+    obtain ⟨C, hC⟩ := hrect A {y} hA (isVonNBounded_singleton _)
+    exact ⟨C, forall_mem_image.mpr fun x hx ↦ hC x hx y rfl⟩
+  have hright (x : X) : Continuous (p.comp (TensorProduct.mk ℂ X Y x)) := by
+    apply hY
+    intro B hB
+    obtain ⟨C, hC⟩ := hrect {x} B (isVonNBounded_singleton _) hB
+    exact ⟨C, forall_mem_image.mpr fun y hy ↦ hC x rfl y hy⟩
+  let ps := fun r : {r : Seminorm ℂ (X ⊗[ℂ] Y) //
+    (∀ x : X, Continuous (fun y : Y ↦ r (x ⊗ₜ[ℂ] y))) ∧
+    (∀ y : Y, Continuous (fun x : X ↦ r (x ⊗ₜ[ℂ] y)))} ↦ r.val
+  refine ⟨p, (withGeneratingSeminorms_spec _ ps).continuous_seminorm ⟨p, hright, hleft⟩, fun n x y ↦ ?_⟩
+  have he : q n (x ⊗ₜ[ℂ] y) = ‖v n x‖ * ‖w n y‖ := norm_mul _ _
+  exact he.ge.trans ((le_ciSup hb n : q n ≤ p) (x ⊗ₜ[ℂ] y))
+
+omit hSC hm hInt hne hτ in
+/-- Joint continuity on pure tensors would bound a functional that was chosen to
+be unbounded on a member of the neighborhood basis of the first factor. -/
+private theorem tensor_diagonal_not_homeomorph {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [ContinuousSMul ℂ X] [FirstCountableTopology X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [ContinuousSMul ℂ Y] [PolynormableSpace ℂ Y] [T2Space Y]
+    (hX : ∀ U ∈ 𝓝 (0 : X), ¬ IsVonNBounded ℂ U)
+    (hY : ∀ p : Seminorm ℂ Y, (∀ B : Set Y, IsVonNBounded ℂ B → BddAbove (p '' B)) → Continuous p)
+    (w : ℕ → StrongDual ℂ Y) (hw : ∀ n, ∃ y, w n y ≠ 0)
+    (hvan : ∀ B : Set Y, IsVonNBounded ℂ B → ∃ N, ∀ n ≥ N, ∀ y ∈ B, w n y = 0) :
+    ¬ IsHomeomorph (@Completion.map (InductiveTensor X Y) _ (ProjectiveTensor X Y) _ id) := by
+  intro h
+  obtain ⟨U, hU⟩ := (𝓝 (0 : X)).exists_antitone_basis
+  have hv (n : ℕ) : ∃ v : StrongDual ℂ X, ¬IsBounded (v '' U n) := by
+    simpa only [isVonNBounded_iff_dual_image, not_forall] using hX (U n) (hU.mem n)
+  choose v hv using hv
+  obtain ⟨p, hp, hle⟩ := tensor_diagonal_seminorm hY v w hvan
+  let A := InductiveTensor X Y
+  let B := ProjectiveTensor X Y
+  let C : A →L[ℂ] B := ⟨LinearMap.id, continuous_inductiveTensor_to_projectiveTensor⟩
+  have ht : @Continuous (X × Y) B _ _ (fun z ↦ z.1 ⊗ₜ[ℂ] z.2) :=
+    (continuous_projectiveTensor_iff (LinearMap.id : B →ₗ[ℂ] B)).mp continuous_id
+  have ht' : @Continuous (X × Y) A _ _ (fun z ↦ z.1 ⊗ₜ[ℂ] z.2) := by
+    apply (Completion.isDenseInducing_coe (α := A)).isInducing.continuous_iff.mpr
+    apply h.isInducing.continuous_iff.mpr
+    exact ((Completion.continuous_coe B).comp ht).congr fun z ↦ (C.completion_apply_coe _).symm
+  have hz : p ((0 : X) ⊗ₜ[ℂ] (0 : Y)) < 1 := by
+    rw [TensorProduct.zero_tmul]
+    exact (map_zero p).trans_lt zero_lt_one
+  have hsmall := (hp.comp ht').continuousAt (x := ((0 : X), (0 : Y))) |>.preimage_mem_nhds
+    (Iio_mem_nhds hz)
+  obtain ⟨O, hO, V, hV, hOV⟩ := mem_nhds_prod_iff.mp hsmall
+  obtain ⟨n, _, hn⟩ := hU.1.mem_iff.mp hO
+  obtain ⟨y, hy⟩ := hw n
+  obtain ⟨c, hc, hcV⟩ : ∃ c : ℂ, c ≠ 0 ∧ c • y ∈ V := by
+    have he := (Filter.tendsto_id.smul_const y : Filter.Tendsto (fun c : ℂ ↦ c • y) (𝓝 0) (𝓝 ((0 : ℂ) • y)))
+    rw [zero_smul] at he
+    exact ((eventually_mem_nhdsWithin (s := ({0}ᶜ : Set ℂ)) (a := 0)).and
+      (he.mono_left nhdsWithin_le_nhds hV)).exists
+  have hnz : 0 < ‖w n (c • y)‖ := norm_pos_iff.mpr (by
+    rw [map_smul, smul_eq_mul]
+    exact mul_ne_zero hc hy)
+  apply hv n
+  refine isBounded_iff_forall_norm_le.mpr ⟨1 / ‖w n (c • y)‖, forall_mem_image.mpr fun x hx ↦ ?_⟩
+  exact (le_div_iff₀ hnz).mpr ((hle n x (c • y)).trans
+    (show p (x ⊗ₜ[ℂ] (c • y)) < 1 from @hOV (x, c • y) ⟨hn hx, hcV⟩).le)
+
+omit hSC hm hτ in
+/-- Translates of a bump with disjoint supports give an infinite independent family
+of scalar decay profiles. Montel compactness therefore rules out a bounded neighborhood. -/
+private theorem decay_profile_unbounded_nhds (U : Set P) (hU : U ∈ 𝓝 0) :
+    ¬ IsVonNBounded ℂ U := by
+  intro hB
+  let : MetrizableSpace P := (positiveRealExponentialDecay_frechet I hInt hne).choose_spec.2.1
+  let : MontelSpace ℂ P := (positiveRealExponentialDecay_montel I hInt hne).2
+  have hc := MontelSpace.isCompact_of_isClosed_of_isVonNBounded ℂ isClosed_closure hB.closure
+  let : LocallyCompactSpace P := hc.locallyCompactSpace_of_mem_nhds_of_addGroup
+    (Filter.mem_of_superset hU subset_closure)
+  let : FiniteDimensional ℂ P := FiniteDimensional.of_locallyCompactSpace ℂ
+  let b (n : ℕ) : ContDiffBump (n : ℝ) := ⟨1/2, 1, by norm_num, by norm_num⟩
+  let f (n : ℕ) : P := ⟨fun x ↦ ((b n x : ℝ) : ℂ), mem_logExponentialDecaySubmodule_of_hasCompactSupport I
+    ((b n).hasCompactSupport.comp_left (by simp : (Complex.ofReal 0) = 0))
+    (Complex.ofRealCLM.contDiff.comp (b n).contDiff)⟩
+  let ev (n : ℕ) : P →ₗ[ℂ] ℂ := (LinearMap.proj (n : ℝ)).comp (logExponentialDecaySubmodule I).subtype
+  have hlin : LinearIndependent ℂ f := LinearIndependent.of_pairwise_dual_eq_zero_one f ev (by
+    intro i j hij
+    have hd : 1 ≤ dist (i : ℝ) (j : ℝ) := by
+      rw [Real.dist_eq]
+      rcases lt_or_gt_of_ne hij with h | h
+      · rw [abs_of_nonpos (sub_nonpos.mpr (by exact_mod_cast h.le))]
+        have hij : (i : ℝ) + 1 ≤ j := by exact_mod_cast h
+        linarith
+      · rw [abs_of_nonneg (sub_nonneg.mpr (by exact_mod_cast h.le))]
+        have hij : (j : ℝ) + 1 ≤ i := by exact_mod_cast h
+        linarith
+    change ((b j (i : ℝ) : ℝ) : ℂ) = 0
+    exact_mod_cast (b j).zero_of_le_dist hd) (fun i ↦ by
+      change ((b i (i : ℝ) : ℝ) : ℂ) = 1
+      rw [(b i).one_of_mem_closedBall (Metric.mem_closedBall_self (b i).rIn_pos.le), Complex.ofReal_one])
+  let : Finite ℕ := hlin.finite
+  exact _root_.not_finite ℕ
+
+omit hSC hm hInt hne hτ in
+/-- On a compact kernel with non-compactly-generated dual, evaluation differences
+detect nontrivial points while vanishing eventually on every bounded Schwartz family. -/
+private theorem compact_kernel_differences {A : Type*} [CommGroup A] [TopologicalSpace A]
+    [IsTopologicalGroup A] [T2Space A] [CompactSpace A] [SecondCountableTopology A]
+    (h : ¬IsCompactlyGeneratedGroup (PontryaginDual A)) :
+    ∃ w : ℕ → StrongDual ℂ (SchwartzBruhat A), (∀ n, ∃ f, w n f ≠ 0) ∧
+      ∀ B : Set (SchwartzBruhat A), IsVonNBounded ℂ B → ∃ N, ∀ n ≥ N, ∀ f ∈ B, w n f = 0 := by
+  refine (exists_antitone_goodCompact (G := A)).elim fun k hk ↦ ?_
+  have hanti := hk.1
+  have hcof := hk.2
+  have hnontriv (n : ℕ) : (k n).val ≠ ⊥ := by
+    intro he
+    have hg : IsBruhatGoodSubgroup (k n).val := ⟨(k n).property.1.isClosed,
+      isOpen_lcaAnnihilator _ (k n).property.1, (k n).property.2⟩
+    exact h (isCompactlyGeneratedGroup_dual_of_isLocallyEuclidean
+      (isBruhatGoodSubgroup_bot_iff.mp ((congrArg IsBruhatGoodSubgroup he).mp hg)))
+  choose u hu using fun n ↦ Subgroup.ne_bot_iff_exists_ne_one.mp (hnontriv n)
+  let ev (a : A) : StrongDual ℂ (SchwartzBruhat A) :=
+    ⟨(LinearMap.proj a).comp (schwartzBruhatSubmodule A).subtype, continuous_schwartzBruhat_eval a⟩
+  refine ⟨fun n ↦ ev (u n).val - ev 1, fun n ↦ ?_, fun B hB ↦ ?_⟩
+  · refine (schwartzBruhat_exists_test (1 : A) (u n).val).elim fun f hf ↦ ?_
+    exact ⟨f, sub_ne_zero.mpr (hf.2 (fun he ↦ hu n (Subtype.ext he)))⟩
+  · refine (schwartzBruhat_bounded_image_stage hB).elim fun b hb ↦
+      hb.elim fun e he ↦ he.elim fun C hC ↦ ?_
+    let k₀ := OrderDual.ofDual b.val.2
+    refine (hcof ⟨k₀, isCompact_of_isBruhatGoodSubgroup_aux k₀ b.property.2.2.1,
+      b.property.2.2.1.2.2⟩).elim fun N hN ↦ ?_
+    refine ⟨N, fun n hn f hf ↦ ?_⟩
+    refine (hC.2.ge hf).elim fun s hs ↦ ?_
+    refine (congrArg (fun z : SchwartzBruhat A ↦ (ev (u n).val - ev 1) z = 0) hs.2).mp ?_
+    refine sub_eq_zero.mpr ?_
+    let g := schwartzBruhatStageRealization b e s
+    exact (congrArg g (mul_one (u n).val).symm).trans
+      (stage_realization_mul_kernel b e s (hN (hanti hn (u n).property)) 1)
+
 /-- Paper: Remark D.3.3.11, p. 811. The comparison between the completed
 tensor products is a topological isomorphism exactly when the norm-one dual
 is compactly generated. -/
 theorem modulatedExponentialDecay_tensor_comparison_homeomorph_iff :
-    IsHomeomorph compareTensors ↔ IsCompactlyGeneratedGroup (PontryaginDual K) := by sorry
+    IsHomeomorph compareTensors ↔ IsCompactlyGeneratedGroup (PontryaginDual K) := by
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_t2
+  have hP := positiveRealExponentialDecay_frechet I hInt hne
+  let : MetrizableSpace P := hP.choose_spec.2.1
+  constructor
+  · intro h
+    by_contra hK
+    refine (compact_kernel_differences hK).elim fun w hw ↦ ?_
+    exact tensor_diagonal_not_homeomorph (X := P) (Y := SchwartzBruhat K) (decay_profile_unbounded_nhds I hInt hne)
+      (schwartzBruhat_bornological (G := K)) w hw.1 hw.2 h
+  · intro hK
+    have hQ := schwartzBruhat_frechet_of_elementary (Q := K) isCompactlyGeneratedGroup_of_compact
+      (isLocallyEuclidean_of_isCompactlyGeneratedGroup_dual hK)
+    exact completedInductiveTensor_to_projectiveTensor_of_frechet hP hQ
 
 end BoundedSets
 

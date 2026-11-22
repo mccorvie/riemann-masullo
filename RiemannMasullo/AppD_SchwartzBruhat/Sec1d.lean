@@ -12,8 +12,10 @@ public import Mathlib.Analysis.InnerProductSpace.Calculus
 import Mathlib.Algebra.BigOperators.Group.Finset.Powerset
 import Mathlib.Algebra.Category.Grp.Injective
 import Mathlib.Topology.Covering.Quotient
+import Mathlib.MeasureTheory.Function.LpSeminorm.Count
 import Mathlib.MeasureTheory.Integral.Marginal
 import Mathlib.MeasureTheory.Integral.Pi
+import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
@@ -2957,11 +2959,63 @@ theorem latticeSchwartz_sup_generates (r : ℕ) :
       ⨆ a, (‖latticeSchwartzMonomial γ f a‖₊ : ℝ≥0∞)) :=
   latticeSchwartz_sup_generates_aux r
 
+/-- For counting measure, bound the monomial Lᵖ norm by its absolute sum and then by
+the rapid-decay bound of the same total degree. -/
+private theorem latticeSchwartz_lp_le_bound {r : ℕ} (p : ℕ) (hp : 1 ≤ p)
+    (γ : Fin r → ℕ) (f : RapidDecaySequence r) :
+    eLpNorm (latticeSchwartzMonomial γ f) p Measure.count ≤
+      rapidDecaySequenceBound (∑ i, γ i) f.val := by
+  let g := latticeSchwartzMonomial γ f
+  let S := ∑' a, ‖g a‖ₑ
+  have hS : S ≤ rapidDecaySequenceBound (∑ i, γ i) f.val :=
+    tsum_le_tsum (latticeSchwartzMonomial_enorm_le γ f)
+  refine le_trans ?_ hS
+  obtain ⟨n, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (by omega : p ≠ 0)
+  have hm : AEStronglyMeasurable g Measure.count := (measurable_of_countable g).aestronglyMeasurable
+  rw [eLpNorm_eq_lintegral_rpow_eNorm_toReal (by positivity) (by simp) hm, lintegral_count,
+    ENNReal.toReal_natCast, one_div, ENNReal.rpow_inv_le_iff (by positivity)]
+  simp only [ENNReal.rpow_natCast, pow_succ]
+  calc
+    ∑' a, ‖g a‖ₑ ^ n * ‖g a‖ₑ ≤ ∑' a, S ^ n * ‖g a‖ₑ := by
+      gcongr with a
+      exact le_tsum (fun b ↦ ‖g b‖ₑ) a
+    _ = S ^ n * S := ENNReal.tsum_mul_left
+
 /-- Paper: Example D.1.10.5, p. 786. The counting-measure Lᵖ seminorms of
 the monomial-weighted sequences generate the rapidly decreasing sequence topology. -/
 theorem latticeSchwartz_lp_generates (r p : ℕ) (hp : 1 ≤ p) :
     GeneratesLpSeminorms (Measure.count : Measure (Fin r → ℤ)) (p : ℝ≥0∞)
-      (latticeSchwartzMonomial (r := r)) := by sorry
+      (latticeSchwartzMonomial (r := r)) := by
+  classical
+  let : Fact (1 ≤ (p : ℝ≥0∞)) := ⟨by exact_mod_cast hp⟩
+  let μ : Measure (Fin r → ℤ) := Measure.count
+  have hm (γ : Fin r → ℕ) (f : RapidDecaySequence r) : MemLp (latticeSchwartzMonomial γ f) p μ :=
+    (latticeSchwartz_lp_le_bound p hp γ f).trans_lt (f.property _)
+  let T (γ : Fin r → ℕ) : RapidDecaySequence r →ₗ[ℂ] Lp ℂ p μ :=
+    { toFun := fun f ↦ (hm γ f).toLp _
+      map_add' := fun f g ↦ (hm γ (f + g)).toLp_congr ((hm γ f).add (hm γ g))
+        (ae_of_all _ (latticeSchwartzMonomial_add γ f g))
+      map_smul' := fun c f ↦ (hm γ (c • f)).toLp_congr ((hm γ f).const_smul c)
+        (ae_of_all _ (latticeSchwartzMonomial_smul γ c f)) }
+  let Q (γ : Fin r → ℕ) := (normSeminorm ℂ (Lp ℂ p μ)).comp (T γ)
+  have hQ (γ : Fin r → ℕ) (f : RapidDecaySequence r) :
+      ENNReal.ofReal (Q γ f) = eLpNorm (latticeSchwartzMonomial γ f) p μ := by
+    exact (congrArg ENNReal.ofReal (Lp.norm_toLp _ (hm γ f))).trans (ENNReal.ofReal_toReal (hm γ f).eLpNorm_ne_top)
+  obtain ⟨P, hP, hval⟩ := latticeSchwartz_sup_generates r
+  have hval' γ f := congrArg ENNReal.toReal (hval γ f)
+  simp only [ENNReal.toReal_ofReal (apply_nonneg _ _)] at hval'
+  have hPQ (γ : Fin r → ℕ) : P γ ≤ Q γ := by
+    intro f
+    apply (ENNReal.ofReal_le_ofReal_iff (apply_nonneg _ _)).mp
+    rw [hval, hQ]
+    exact iSup_le fun a ↦ eNorm_le_eLpNorm_count (p := (p : ℝ≥0∞)) (latticeSchwartzMonomial γ f) a (by exact_mod_cast (by omega : p ≠ 0))
+  refine ⟨hm, Q, hP.congr (Seminorm.IsBounded.of_real fun γ ↦ ?_)
+    (Seminorm.IsBounded.of_real fun γ ↦ ?_), hQ⟩
+  · obtain ⟨C, _, t, ht⟩ := rapidDecay_controlled_by_sup (∑ i, γ i) P hval'
+    refine ⟨t, C, fun f ↦ le_trans ?_ (ht f)⟩
+    have h := ENNReal.toReal_mono (f.property _).ne (latticeSchwartz_lp_le_bound p hp γ f)
+    rwa [← hQ, ENNReal.toReal_ofReal (apply_nonneg _ _)] at h
+  · exact ⟨{γ}, 1, fun f ↦ by simpa using hPQ γ f⟩
 
 end SchwartzTopologies
 
@@ -3935,6 +3989,123 @@ private theorem weighted_mul_symbol (W : bruhatDiffAlgebra (PontryaginDual G)) (
     ((bruhatSymbolHom (b x)).map_mul W i.2).trans (congrArg (· * bruhatSymbolHom (b x) i.2) (hW x))
   exact (congrArg (· * _) heq).trans (mul_assoc _ _ _)
 
+/-- The continuous action of the generators on Schwartz functions extends to their algebra. -/
+private theorem bruhatDiff_continuousLift (D : bruhatDiffAlgebra G) :
+    ∃ A : SchwartzBruhat G →L[ℂ] SchwartzBruhat G, ∀ f,
+      smoothIncl (G := G) (A f) = D.val (smoothIncl (G := G) f) := by
+  refine Algebra.adjoin_induction (s := range (bruhatFirstOrder (G := G)))
+    (p := fun B _ ↦ ∃ A : SchwartzBruhat G →L[ℂ] SchwartzBruhat G, ∀ f,
+      smoothIncl (G := G) (A f) = B (smoothIncl (G := G) f)) ?_ ?_ ?_ ?_ D.property
+  · rintro _ ⟨a, rfl⟩
+    let h := bruhatFirstOrder_schwartz (G := G) a
+    exact ⟨h.choose, fun f ↦ Subtype.ext (funext (h.choose_spec f))⟩
+  · exact fun c ↦ ⟨c • ContinuousLinearMap.id ℂ _, fun _ ↦ rfl⟩
+  · rintro B C _ _ ⟨A, hA⟩ ⟨A', hA'⟩
+    exact ⟨A + A', fun f ↦ ((smoothIncl (G := G)).map_add _ _).trans (congrArg₂ (· + ·) (hA f) (hA' f))⟩
+  · rintro B C _ _ ⟨A, hA⟩ ⟨A', hA'⟩
+    exact ⟨A.comp A', fun f ↦ (hA (A' f)).trans (congrArg B (hA' f))⟩
+
+/-- Barrelledness makes the supremum of the pointwise bounded family of weighted
+evaluation seminorms continuous. -/
+private theorem bruhatWeighted_sup_seminorm (e : ElementaryLCAPresentation G)
+    (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x)
+    (D : bruhatDiffAlgebra G) (E : bruhatDiffAlgebra (PontryaginDual G)) :
+    ∃ q : Seminorm ℂ (SchwartzBruhat G), Continuous q ∧ ∀ f,
+      ENNReal.ofReal (q f) = ⨆ x, (‖bruhatWeightedLinear b D E f x‖₊ : ℝ≥0∞) := by
+  let : BarrelledSpace ℂ (SchwartzBruhat G) := schwartzBruhat_barrelled_of_stages
+  let U := bruhatWeightedLinear b D E
+  let p (x : G) := (normSeminorm ℂ ℂ).comp ((LinearMap.proj x).comp U)
+  let lift := bruhatDiff_continuousLift (G := G) D
+  let A := lift.choose
+  have hA := lift.choose_spec
+  let chart := elementarySchwartz_equiv_schwartzBruhat e
+  let I := chart.choose
+  have hI := chart.choose_spec
+  have heval (x : G) : Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+    have h := elementarySchwartz_continuousEval.comp
+      (I.symm.continuous.prodMk (continuous_const (y := (e.equiv x).toAdd)))
+    exact h.congr fun f ↦ (hI (I.symm f) x).symm.trans
+      (congrArg (fun g : SchwartzBruhat G ↦ g x) (I.apply_symm_apply f))
+  have hpc (x : G) : Continuous (p x) := by
+    apply (continuous_const.mul ((heval x).comp A.continuous)).norm.congr
+    intro f
+    exact congrArg (fun z : ℂ ↦ ‖bruhatDiffSymbol E (b x) * z‖)
+      (congrArg (fun g : bruhatSmoothSubmodule (G := G) ↦ g.val x) (hA f))
+  have hbdd (f : SchwartzBruhat G) : Continuous (U f) ∧ ∃ C : ℝ, ∀ x, ‖U f x‖ ≤ C :=
+    (mem_schwartzBruhat_iff_bruhatDiff_bounded e b hb (smoothIncl (G := G) f)).1 f.property D E
+  have hB : BddAbove (range p) := Seminorm.bddAbove_range_iff.mpr fun f ↦
+    ⟨(hbdd f).2.choose, forall_mem_range.mpr (fun x ↦ (hbdd f).2.choose_spec x)⟩
+  refine ⟨⨆ x, p x, (congrArg (fun q : SchwartzBruhat G → ℝ ↦ Continuous q) (Seminorm.coe_iSup_eq hB)).mpr
+    (Seminorm.continuous_iSup p hpc hB), fun f ↦ ?_⟩
+  let g := BoundedContinuousFunction.ofNormedAddCommGroup (U f) (hbdd f).1
+    (hbdd f).2.choose (hbdd f).2.choose_spec
+  have hv : (⨆ x, p x) f = ‖g‖ := (Seminorm.iSup_apply hB).trans g.norm_eq_iSup_norm.symm
+  exact (congrArg ENNReal.ofReal hv).trans ((ofReal_norm g).trans g.eNorm_eq_iSup_eNorm)
+
+/-- Each coordinate seminorm of the elementary presentation occurs among the symbol-weighted
+operator suprema, by lifting its mixed partial and its coordinate monomial separately. -/
+private theorem elementarySchwartz_coordinate_le_operator (e : ElementaryLCAPresentation G)
+    (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x)
+    (I : SchwartzBruhatStage e ≃L[ℂ] SchwartzBruhat G)
+    (hI : ∀ f (x : G), I f x = f (e.equiv x).toAdd)
+    (i : ElementarySchwartzIndex e.realDim e.torusDim e.latticeRank) :
+    ∃ (D : bruhatDiffAlgebra G) (E : bruhatDiffAlgebra (PontryaginDual G)),
+      ∀ f : SchwartzBruhatStage e, elementarySchwartzBound f.val i ≤
+        ⨆ x, (‖bruhatWeightedLinear b D E (I f) x‖₊ : ℝ≥0∞) := by
+  let dirs := (List.ofFn fun j ↦ List.replicate (i.2.1 j)
+    ((EuclideanSpace.single j (1 : ℝ), 0) :
+      EuclideanSpace ℝ (Fin e.realDim) × EuclideanSpace ℝ (Fin e.torusDim))).flatten ++
+    (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten
+  let diff := exists_diff_cover_word e dirs
+  let D := diff.choose
+  have hD := diff.choose_spec
+  let wt := exists_elementary_weight e b hb i.1 i.2.2.2
+  let E := wt.choose
+  have hE := wt.choose_spec
+  refine ⟨D, E, fun f ↦ iSup_le fun u ↦ iSup_le fun z ↦ iSup_le fun t ↦ ?_⟩
+  let y := elementaryCover u z t
+  let x := e.equiv.symm (.ofAdd y)
+  apply le_iSup_of_le x
+  have hd := hD (smoothIncl (G := G) (I f)) u z t
+  have he (w) : (smoothIncl (G := G) (I f)).val (e.equiv.symm (.ofAdd (elementaryCover w z t))) =
+      f (elementaryCover w z t) := by
+    change I f _ = _
+    rw [hI, e.equiv.apply_symm_apply]
+    rfl
+  simp only [he] at hd
+  change _ ≤ (‖bruhatDiffSymbol E (b x) * (D.val (smoothIncl (G := G) (I f))).val x‖₊ : ℝ≥0∞)
+  exact (congrArg (fun v : ℂ ↦ (‖v‖₊ : ℝ≥0∞)) (congrArg₂ (· * ·) (hE y) hd)).symm.le
+
+private theorem bruhatWeighted_sup_generates (e : ElementaryLCAPresentation G)
+    (b : G ≃ₜ* PontryaginDual (PontryaginDual G)) (hb : ∀ x χ, b x χ = χ x) :
+    GeneratesSeminormTopology (fun i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G) ↦
+      fun f : SchwartzBruhat G ↦ ⨆ x, (‖bruhatDiffSymbolWeightedApply b i.1 i.2 f x‖₊ : ℝ≥0∞)) := by
+  classical
+  choose Q hQ hv using fun i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G) ↦
+    bruhatWeighted_sup_seminorm e b hb i.1 i.2
+  let chart := elementarySchwartz_equiv_schwartzBruhat e
+  let I := chart.choose
+  have hI := chart.choose_spec
+  have hP := I.symm.toHomeomorph.isInducing.withSeminorms
+    (f := I.symm.toLinearMap) elementarySchwartz_withSeminorms
+  refine ⟨Q, hP.congr (fun i ↦ ?_) (fun i ↦ ?_), hv⟩
+  · let h := Seminorm.bound_of_continuous hP (Q i) (hQ i)
+    exact ⟨h.choose, h.choose_spec.choose, h.choose_spec.choose_spec.2⟩
+  · let ub := elementarySchwartz_coordinate_le_operator e b hb I hI i
+    let D := ub.choose
+    let E := ub.choose_spec.choose
+    have h := ub.choose_spec.choose_spec
+    have heq : (1 : ℝ≥0) • ({(D, E)} : Finset _).sup Q = Q (D, E) :=
+      (one_smul _ _).trans (Finset.sup_singleton : _)
+    refine ⟨{(D, E)}, 1, le_trans ?_ heq.ge⟩
+    intro f
+    change (elementarySchwartzBound (I.symm f).val i).toReal ≤ Q (D, E) f
+    have hb := h (I.symm f)
+    have he := congrArg (fun g : SchwartzBruhat G ↦ ⨆ x, (‖bruhatWeightedLinear b D E g x‖₊ : ℝ≥0∞))
+      (I.apply_symm_apply f)
+    exact (ENNReal.toReal_mono ENNReal.ofReal_ne_top (hb.trans_eq (he.trans (hv (D, E) f).symm))).trans_eq
+      (ENNReal.toReal_ofReal (apply_nonneg _ _))
+
 end ElementaryLpProof
 
 
@@ -3961,7 +4132,9 @@ theorem elementarySchwartz_basisSup_generates :
     GeneratesSeminormTopology (fun i : (Fin d → ℕ) × (Fin d' → ℕ) ↦
       fun f : SchwartzBruhat G ↦ ⨆ x,
         (‖bruhatDiffSymbolWeightedApply b (bruhatDiffMonomial a i.1)
-          (bruhatDiffMonomial a' i.2) f x‖₊ : ℝ≥0∞)) := by sorry
+          (bruhatDiffMonomial a' i.2) f x‖₊ : ℝ≥0∞)) := by
+  exact generatesSupSeminorms_of_span_eq _ _ (bruhatWeightedLinear_monomial_span b a a' hspan hspan')
+    (bruhatWeighted_sup_generates e b hb)
 
 omit ha hspan ha' hspan' in
 /-- Paper: Proposition D.1.10.6(1), p. 787. The sup norms of the symbol-weighted
@@ -3993,11 +4166,10 @@ theorem elementarySchwartz_operatorSup_generates :
   exact generatesSupSeminorms_of_span_eq U T (bruhatWeightedLinear_monomial_span b a a' ha.2 ha'.2).symm hU
 
 omit ha hspan ha' hspan' in
-/-- Paper: Proposition D.1.10.6(2), p. 787. For each integer q at least one,
-the Lᵠ norms of the symbol-weighted derivatives generate the Schwartz topology. -/
-theorem elementarySchwartz_operatorLp_generates [MeasurableSpace G] [BorelSpace G]
-    (μ : Measure G) [μ.IsHaarMeasure] (q : ℕ) (hq : 1 ≤ q) :
-    GeneratesLpSeminorms μ (q : ℝ≥0∞)
+/-- The cube estimate applies to every finite real exponent at least one. -/
+private theorem elementarySchwartz_operatorLp_finite [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (p : ℝ≥0∞) (hp : 1 ≤ p) (hfin : p ≠ ⊤) :
+    GeneratesLpSeminorms μ p
       (fun i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G) ↦
         bruhatDiffSymbolWeightedApply b i.1 i.2) := by
   classical
@@ -4007,14 +4179,24 @@ theorem elementarySchwartz_operatorLp_generates [MeasurableSpace G] [BorelSpace 
   let V (L : weightedSpan b) (f : SchwartzBruhat G) := L.val f
   have hCts (L : weightedSpan b) (f : SchwartzBruhat G) : Continuous (V L f) :=
     weightedSpan_continuous b e hb L f
-  have hp : 1 ≤ (q : ℝ≥0∞) := by exact_mod_cast hq
-  let h := elementary_decay_symbol b e μ q hq
+  let h := elementary_decay_symbol b e μ 1 le_rfl
   let W := h.choose
   let w := h.choose_spec.choose
   have hW := h.choose_spec.choose_spec.1
   have hw := h.choose_spec.choose_spec.2
+  have h1 : MemLp (fun x ↦ (w x)⁻¹) 1 μ := by simpa using hw.2
+  have hi : Integrable (fun x ↦ (w x)⁻¹) μ := memLp_one_iff_integrable.mp h1
+  have hwLp : MemLp (fun x ↦ (w x)⁻¹) p μ := by
+    apply (integrable_norm_rpow_iff h1.aestronglyMeasurable (zero_lt_one.trans_le hp).ne' hfin).mp
+    apply hi.mono' ((h1.aestronglyMeasurable.norm.aemeasurable.pow_const _).aestronglyMeasurable)
+    refine ae_of_all _ fun x ↦ ?_
+    have hn := inv_nonneg.mpr (zero_le_one.trans (hw.1 x))
+    rw [Real.norm_eq_abs, abs_of_nonneg (Real.rpow_nonneg (norm_nonneg _) _),
+      Real.norm_eq_abs, abs_of_nonneg hn]
+    exact Real.rpow_le_self_of_le_one hn (inv_le_one_of_one_le₀ (hw.1 x))
+      (by simpa using ENNReal.toReal_mono hfin hp)
   refine generatesLp_of_weight_and_points U hp (elementarySchwartz_operatorSup_generates e b hb)
-    (fun i f ↦ (hCts (gen i) f).aestronglyMeasurable) w hw.1 hw.2 (weighted_mul_symbol b W w hW) (fun i ↦ ?_)
+    (fun i f ↦ (hCts (gen i) f).aestronglyMeasurable) w hw.1 hwLp (weighted_mul_symbol b W w hW) (fun i ↦ ?_)
   let ρ := elementaryCubeCover e
   let cube := cube_estimate ρ V hCts (weightedSpan_hasDerivAt b) (gen i)
   let k := cube.choose
@@ -4023,11 +4205,20 @@ theorem elementarySchwartz_operatorLp_generates [MeasurableSpace G] [BorelSpace 
   let bound := elementaryCubeCover_bound e μ
   let C := bound.choose
   have hC := bound.choose_spec
-  refine ⟨k, L, C ^ (1 / (q : ℝ≥0∞)).toReal, fun f x ↦ (hL f x).trans ?_⟩
+  refine ⟨k, L, C ^ (1 / p).toReal, fun f x ↦ (hL f x).trans ?_⟩
   apply Finset.sum_le_sum fun j _ ↦ ?_
-  exact cube_integral_le_eLpNorm μ hp (by simp) _
+  exact cube_integral_le_eLpNorm μ hp hfin _
     (continuous_const.mul (ρ.continuous.comp continuous_ofAdd)).measurable C (hC x) _ (hCts _ f).measurable
 
+omit ha hspan ha' hspan' in
+/-- Paper: Proposition D.1.10.6(2), p. 787. For each integer q at least one,
+the Lᵠ norms of the symbol-weighted derivatives generate the Schwartz topology. -/
+theorem elementarySchwartz_operatorLp_generates [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (q : ℕ) (hq : 1 ≤ q) :
+    GeneratesLpSeminorms μ (q : ℝ≥0∞)
+      (fun i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G) ↦
+        bruhatDiffSymbolWeightedApply b i.1 i.2) := by
+  exact elementarySchwartz_operatorLp_finite e b hb μ q (by exact_mod_cast hq) (by simp)
 
 /-- Paper: Proposition D.1.10.6(4), p. 787. The monomials in any pair of real
 first-order bases suffice for each finite integer Lᵠ family. -/
@@ -4374,67 +4565,6 @@ private theorem ideleClassStages_mono {G : Type*} [CommGroup G] [TopologicalSpac
   exact ⟨k₀, hc, hg, fun k hk hck hgk p hp ↦ hPQ k p hp (hs k hk hck hgk p hp)⟩
 
 end LogWeights
-
-section Global
-local instance : MeasurableSpace C[F] := borel _
-
-variable (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
-variable (γ : Fin d[F] → LCATopologicalLie C₁[F])
-variable
-  (hγ : LinearIndependent ℝ (fun j ↦ bruhatFirstOrder (γ j)))
-  (hspan : Submodule.span ℝ (range (fun j ↦ bruhatFirstOrder (γ j))) =
-    bruhatDiffDegreeOneReal (G := C₁[F]))
-
-include hτ hγ hspan
-
-local notation "μ₁[" F "]" => positiveRealHaar.prod (normOneIdeleClassTamagawaMeasure F)
-
-/-- Paper: Proposition D.1.10.9(1), p. 790. For sufficiently small compact
-good subgroups, the weighted Lᵖ norms using one plus powers of the absolute
-log norm generate the topology on the fixed subspace.
-Deviation: The norm-one directions are specified by their real basis property
-and the integration measure is the product in (D.1.10.17). -/
-theorem ideleClass_weightedLp_generates :
-    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
-      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
-        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
-          (fun i : ℕ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
-            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
-              (fun t ↦ 1 + t ^ i.1) f.val) := by sorry
-
-/-- Paper: Proposition D.1.10.9(2), p. 790. Powers of the absolute log norm
-alone give an Lᵖ seminorm family generating the same fixed-subspace topology.
-Deviation: The norm-one directions are specified by their real basis property. -/
-theorem ideleClass_logPowerLp_generates :
-    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
-      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
-        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
-          (fun i : ℕ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
-            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
-              (fun t ↦ t ^ i.1) f.val) := by
-  exact ideleClassStages_mono (G := C[F]) (fun k p hp ↦
-    ideleClassStage_logPower (n := ideleClassNorm F) (τ := τ) (γ := γ) (k := k)
-      (μ := μ₁[F]) (p := ENNReal.ofReal p)
-      (by simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hp))
-    (ideleClass_weightedLp_generates F τ hτ γ hγ hspan)
-
-/-- Paper: Proposition D.1.10.9(3), p. 790. Absolute values of arbitrary complex
-polynomials in the absolute log norm give a generating Lᵖ family on the fixed stage.
-Deviation: The norm-one directions are specified by their real basis property. -/
-theorem ideleClass_logPolynomialLp_generates :
-    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
-      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
-        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
-          (fun i : Polynomial ℂ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
-            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
-              (fun t ↦ ‖i.1.eval (t : ℂ)‖) f.val) := by
-  exact ideleClassStages_mono (G := C[F]) (fun k p hp ↦
-    ideleClassStage_logPolynomial (n := ideleClassNorm F) (τ := τ) (γ := γ) (k := k)
-      (μ := μ₁[F]) (p := ENNReal.ofReal p)
-      (by simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hp))
-    (ideleClass_logPowerLp_generates F τ hτ γ hγ hspan)
-
-end Global
 
 section OpenGood
 variable {G H : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
@@ -5496,6 +5626,28 @@ private theorem generatesSup_shiftedPowers {E X I : Type*} [AddCommGroup E] [Mod
   change (‖((1 + |t x| ^ i.1 : ℝ) : ℂ) * _‖₊ : ℝ≥0∞) = (‖(1 + ((|t x| : ℝ) : ℂ) ^ i.1) * _‖₊ : ℝ≥0∞)
   simp
 
+/-- On a compact-by-real elementary group, the weighted operator span is generated
+by powers of the real coordinate times monomials in any spanning set of directions. -/
+private theorem split_monomial_weight_span (b : G ≃ₜ* PontryaginDual (PontryaginDual G))
+    (l : G →ₜ* Multiplicative ℝ) (r : LCATopologicalLie G) (hr : RightInverse r l)
+    (hker : IsCompact (l.toMonoidHom.ker : Set G)) {d : ℕ} (a : Fin d → LCATopologicalLie G)
+    (hs : Submodule.span ℝ (range fun i ↦ bruhatFirstOrder (a i)) = bruhatDiffDegreeOneReal) :
+    Submodule.span ℂ (range fun i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G) ↦
+      bruhatWeightedLinear b i.1 i.2) =
+    Submodule.span ℂ (range fun i : ℕ × (Fin d → ℕ) ↦
+      mulWeight (diffApplyLinear (bruhatDiffMonomial a i.2)) (fun x ↦ ((l x).toAdd : ℂ) ^ i.1)) := by
+  let V (i : ℕ × (Fin d → ℕ)) := mulWeight (diffApplyLinear (bruhatDiffMonomial a i.2))
+    (fun x ↦ ((l x).toAdd : ℂ) ^ i.1)
+  have hD : Submodule.span ℂ (range (id : bruhatDiffAlgebra G → _)) =
+      Submodule.span ℂ (range (bruhatDiffMonomial a)) := by
+    apply le_antisymm (Submodule.span_le.mpr (fun D _ ↦ bruhatDiffMonomial_mem_span a hs D))
+    exact Submodule.span_mono (by simp)
+  have h := span_pairs_congr (diffApplyWithWeights (G := G)) id
+    (fun E x ↦ bruhatSymbolHom (b x) E) (bruhatDiffMonomial a)
+    (fun k x ↦ ((l x).toAdd : ℂ) ^ k) hD (split_symbol_span b l r hr hker)
+  refine h.trans (congrArg (Submodule.span ℂ) ?_)
+  exact (Equiv.prodComm (Fin d → ℕ) ℕ).surjective.range_comp V
+
 private theorem elementary_splitSup (e : ElementaryLCAPresentation G) (l : G →ₜ* Multiplicative ℝ)
     (r : LCATopologicalLie G) (hr : RightInverse r l) (hker : IsCompact (l.toMonoidHom.ker : Set G))
     {d : ℕ} (a : Fin d → LCATopologicalLie G)
@@ -5509,16 +5661,49 @@ private theorem elementary_splitSup (e : ElementaryLCAPresentation G) (l : G →
   let U (i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G)) := bruhatWeightedLinear b i.1 i.2
   let V (i : ℕ × (Fin d → ℕ)) := mulWeight (diffApplyLinear (bruhatDiffMonomial a i.2))
     (fun x ↦ ((l x).toAdd : ℂ) ^ i.1)
-  apply generatesSupSeminorms_of_span_eq U V _ (elementarySchwartz_operatorSup_generates e b hb)
-  have hD : Submodule.span ℂ (range (id : bruhatDiffAlgebra G → _)) =
-      Submodule.span ℂ (range (bruhatDiffMonomial a)) := by
-    apply le_antisymm (Submodule.span_le.mpr (fun D _ ↦ bruhatDiffMonomial_mem_span a hs D))
-    exact Submodule.span_mono (by simp)
-  have h := span_pairs_congr (diffApplyWithWeights (G := G)) id
-    (fun E x ↦ bruhatSymbolHom (b x) E) (bruhatDiffMonomial a)
-    (fun k x ↦ ((l x).toAdd : ℂ) ^ k) hD (split_symbol_span b l r hr hker)
-  refine h.trans (congrArg (Submodule.span ℂ) ?_)
-  exact (Equiv.prodComm (Fin d → ℕ) ℕ).surjective.range_comp V
+  exact generatesSupSeminorms_of_span_eq U V (split_monomial_weight_span b l r hr hker a hs)
+    (elementarySchwartz_operatorSup_generates e b hb)
+
+private theorem elementary_splitLp (e : ElementaryLCAPresentation G) (l : G →ₜ* Multiplicative ℝ)
+    (r : LCATopologicalLie G) (hr : RightInverse r l) (hker : IsCompact (l.toMonoidHom.ker : Set G))
+    {d : ℕ} (a : Fin d → LCATopologicalLie G)
+    (hs : Submodule.span ℝ (range fun i ↦ bruhatFirstOrder (a i)) = bruhatDiffDegreeOneReal)
+    [MeasurableSpace G] [BorelSpace G] (μ : Measure G) [μ.IsHaarMeasure]
+    (p : ℝ≥0∞) (hp : 1 ≤ p) (hfin : p ≠ ⊤) :
+    GeneratesLpSeminorms μ p (fun i : ℕ × (Fin d → ℕ) ↦ fun f : SchwartzBruhat G ↦
+      fun x ↦ ((1 + |(l x).toAdd|^i.1 : ℝ) : ℂ) * diffApplyLinear (bruhatDiffMonomial a i.2) f x) := by
+  let hb₀ := pontryaginDual_bidual (G := G)
+  let b := hb₀.choose
+  have hb := hb₀.choose_spec
+  let U (i : bruhatDiffAlgebra G × bruhatDiffAlgebra (PontryaginDual G)) := bruhatWeightedLinear b i.1 i.2
+  let V (i : ℕ × (Fin d → ℕ)) := mulWeight (diffApplyLinear (bruhatDiffMonomial a i.2))
+    (fun x ↦ ((l x).toAdd : ℂ) ^ i.1)
+  have hV := generatesLpSeminorms_of_span_eq (μ := μ) hp U V
+    (split_monomial_weight_span b l r hr hker a hs) (elementarySchwartz_operatorLp_finite e b hb μ p hp hfin)
+  let u (α : Fin d → ℕ) := diffApplyLinear (bruhatDiffMonomial a α)
+  let t (x : G) : ℂ := (|(l x).toAdd| : ℝ)
+  let W (i : ℕ × (Fin d → ℕ)) := mulWeight (u i.2) (t ^ i.1)
+  have hm (i : ℕ × (Fin d → ℕ)) (f : SchwartzBruhat G) : AEStronglyMeasurable (W i f) μ := by
+    have h0 := (hV.1 (0,i.2) f).aestronglyMeasurable
+    have hu : AEStronglyMeasurable (u i.2 f) μ := by
+      simpa [V, u, mulWeight, Pi.mul_def] using h0
+    have ht : Continuous t := Complex.continuous_ofReal.comp
+      (continuous_abs.comp (continuous_toAdd.comp l.continuous))
+    exact (ht.pow i.1).aestronglyMeasurable.mul hu
+  have he (i : ℕ × (Fin d → ℕ)) (f : SchwartzBruhat G) (x : G) : ‖V i f x‖ = ‖W i f x‖ := by
+    change ‖(((l x).toAdd : ℂ) ^ i.1) * u i.2 f x‖ =
+      ‖((|(l x).toAdd| : ℝ) : ℂ) ^ i.1 * u i.2 f x‖
+    simp only [norm_mul, norm_pow, Complex.norm_real, Real.norm_eq_abs, abs_abs]
+  have hW : GeneratesLpSeminorms μ p (fun i ↦ W i) :=
+    ⟨fun i f ↦ (hV.1 i f).congr_norm (hm i f) (.of_forall (he i f)),
+      hV.2.choose, hV.2.choose_spec.1, fun i f ↦ (hV.2.choose_spec.2 i f).trans
+        (eLpNorm_congr_norm_ae (hV.1 i f).aestronglyMeasurable (hm i f) (.of_forall (he i f)))⟩
+  have h := generatesLpSeminorms_of_span_eq hp W _ (mulWeight_shiftedPowers_span u t).symm hW
+  convert h using 1
+  funext i f x
+  change ((1 + |(l x).toAdd| ^ i.1 : ℝ) : ℂ) * _ =
+    (1 + ((|(l x).toAdd| : ℝ) : ℂ) ^ i.1) * _
+  simp [u]
 
 end SplitSupTopology
 
@@ -5699,6 +5884,122 @@ private theorem component_fixed_stage {d : ℕ} (n : X →* ℝ≥0ˣ) (hn : Con
   exact component_stage_of_presentation n τ _ K q QuotientGroup.mk_surjective E hF.2.choose_spec.1
     hF.2.choose_spec.2 l' (fun x ↦ (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n x)))).symm) ht
 
+private theorem generatesLp_pullback_chart {X Y E T I J : Type*}
+    [MeasurableSpace X] [MeasurableSpace Y] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T] {μ : Measure X} {p : ℝ≥0∞}
+    (φ : X → Y) (hφ : Measurable φ) (A : E →ₗ[ℂ] T) (hA : IsInducing A) (j : I ≃ J)
+    (U : J → T → Y → ℂ) (V : I → E → X → ℂ)
+    (heq : ∀ i f, V i f = (U (j i) (A f)) ∘ φ)
+    (hu : GeneratesLpSeminorms (μ.map φ) p U) : GeneratesLpSeminorms μ p V := by
+  obtain ⟨hm, P, hP, hval⟩ := hu
+  refine ⟨fun i f ↦ heq i f ▸ (hm (j i) (A f)).comp_of_map hφ.aemeasurable,
+    _, (hA.withSeminorms hP).congr_equiv j, fun i f ↦ ?_⟩
+  change ENNReal.ofReal (P (j i) (A f)) = eLpNorm (V i f) p μ
+  rw [heq]
+  exact (hval (j i) (A f)).trans (eLpNorm_map_measure (hm _ _).aestronglyMeasurable hφ.aemeasurable)
+
+private theorem directions_span_of_firstOrder {I : Type*} (v : I → LCATopologicalLie X)
+    (hs : Submodule.span ℝ (range (fun i ↦ bruhatFirstOrder (v i))) = bruhatDiffDegreeOneReal) :
+    Submodule.span ℝ (range (fun i ↦ Additive.ofMul (v i))) = ⊤ := by
+  let M := bruhatDiffDegreeOneReal (G := X)
+  let L := M.subtype.comp (firstOrderLinear (Y := X))
+  have hinj : Injective L := M.injective_subtype.comp directionOperator_bijective.1
+  apply Submodule.map_injective_of_injective hinj
+  rw [Submodule.map_span, ← Set.range_comp, Submodule.map_top]
+  change _ = LinearMap.range (M.subtype.comp firstOrderLinear)
+  rw [LinearMap.range_comp_of_range_eq_top _
+    (LinearMap.range_eq_top.mpr directionOperator_bijective.2), Submodule.range_subtype]
+  exact hs
+
+/-- The splitting product maps properly onto the elementary quotient. Its logarithmic
+coordinate recovers the first projection, whose fibers are compact. -/
+private theorem splitQuotient_productHaar (n : X →* ℝ≥0ˣ) (hn : Continuous n)
+    (τ : ℝ≥0ˣ →ₜ* X) (hτ : RightInverse τ n) [CompactSpace n.ker]
+    (K : Subgroup X) (hk : IsCompact (K : Set X))
+    [MeasurableSpace n.ker] [BorelSpace n.ker] [SecondCountableTopology n.ker]
+    (ν : Measure n.ker) [ν.IsHaarMeasure] :
+    letI : MeasurableSpace (X ⧸ K) := borel _
+    ((positiveRealHaar.prod ν).map (fun z : ℝ≥0ˣ × n.ker ↦
+      (QuotientGroup.mk (τ z.1 * z.2.val) : X ⧸ K))).IsHaarMeasure := by
+  let Q := X ⧸ K
+  let : MeasurableSpace Q := borel _
+  have : BorelSpace Q := ⟨rfl⟩
+  have : T2Space Q := quotient_t2_of_compact K hk
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have : positiveRealHaar.IsHaarMeasure := positiveRealHaar_isHaarMeasure
+  let q : X →ₜ* Q := ⟨QuotientGroup.mk' K, QuotientGroup.continuous_mk⟩
+  let φ := q.comp (τ.coprod (kernelIncl n))
+  have hs : Surjective φ := by
+    intro y
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective y
+    have hx : x / τ (n x) ∈ n.ker := by simp [MonoidHom.mem_ker, hτ (n x)]
+    exact ⟨(n x, ⟨_, hx⟩), congrArg q ((mul_comm _ _).trans (div_mul_cancel _ _))⟩
+  let l := quotientLog K hk (logNormHom n hn)
+  have he : l ∘ φ = posExpEquiv.symm ∘ Prod.fst := by
+    funext z
+    change posExpEquiv.symm (n (τ z.1 * z.2.val)) = _
+    rw [map_mul, hτ z.1, z.2.property, mul_one]
+    rfl
+  have hproper : IsProperMap φ := isProperMap_of_comp_of_t2 φ.continuous l.continuous
+    (he ▸ (posExpEquiv.symm.toHomeomorph.isProperMap.comp isProperMap_fst_of_compactSpace))
+  exact Measure.isHaarMeasure_map (positiveRealHaar.prod ν) φ.toMonoidHom φ.continuous hs
+    (isProperMap_iff_tendsto_cocompact.mp hproper).2
+
+/-- Pull the logarithmically weighted Lᵖ family on the elementary quotient back to
+the fixed subspace in the norm splitting. -/
+private theorem split_fixed_stage_lp {d : ℕ} (n : X →* ℝ≥0ˣ) (hn : Continuous n)
+    (τ : ℝ≥0ˣ →ₜ* X) (hτ : RightInverse τ n) [CompactSpace n.ker]
+    [MeasurableSpace n.ker] [BorelSpace n.ker] [SecondCountableTopology n.ker]
+    (ν : Measure n.ker) [ν.IsHaarMeasure] (γ : Fin d → LCATopologicalLie n.ker)
+    (hspan : Submodule.span ℝ (range (fun j ↦ bruhatFirstOrder (γ j))) = bruhatDiffDegreeOneReal)
+    (K : Subgroup X) (hk : IsCompact (K : Set X)) (hg : IsBruhatGoodSubgroup K)
+    (p : ℝ≥0∞) (hp : 1 ≤ p) (hfin : p ≠ ⊤) :
+    GeneratesLpSeminorms (positiveRealHaar.prod ν) p
+      (fun i : ℕ × ℕ × (Fin d → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule K ↦
+        ideleClassProductWeightedDeriv n τ γ i.2.1 i.2.2 (fun t ↦ 1 + t ^ i.1) f.val) := by
+  let Q := X ⧸ K
+  let : MeasurableSpace Q := borel _
+  have : BorelSpace Q := ⟨rfl⟩
+  have : T2Space Q := quotient_t2_of_compact K hk
+  have hker : IsCompact (n.ker : Set X) := isCompact_iff_compactSpace.mpr inferInstance
+  let hF := fixedStage_quotient (compactlyGenerated_of_split n τ hτ hker) K hk hg
+  let e := hF.1.some
+  let E := hF.2.choose
+  let q : X →ₜ* Q := ⟨QuotientGroup.mk' K, QuotientGroup.continuous_mk⟩
+  let split := τ.coprod (kernelIncl n)
+  let φ := q.comp split
+  let l := logNormHom n hn
+  let l' := quotientLog K hk l
+  let r := τ.comp positiveRealExpHom
+  have hr : RightInverse (q.comp r) l' := fun t ↦
+    (congrArg posExpEquiv.symm (hτ (positiveRealExpHom t))).trans (posExpEquiv.symm_apply_apply t)
+  let a := combinedDirections n τ γ
+  have hs := image_firstOrder_span a (combinedDirections_span n hn τ hτ (fun j ↦ Additive.ofMul (γ j))
+    (directions_span_of_firstOrder γ hspan)) q (oneParameterMap_quotient_surjective K hk)
+  let μ := positiveRealHaar.prod ν
+  have : (μ.map φ).IsHaarMeasure := splitQuotient_productHaar n hn τ hτ K hk ν
+  have h := elementary_splitLp e l' (q.comp r) hr (quotientLog_compact K hk l (logNorm_compact_kernel n hn hker))
+    (fun j ↦ q.comp (a j)) hs (μ.map φ) p hp hfin
+  have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  have : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let A := Equiv.prodCongr (Equiv.refl ℕ) (Fin.consEquiv (fun _ : Fin (d + 1) ↦ ℕ))
+  apply generatesLp_pullback_chart φ φ.continuous.measurable E hF.2.choose_spec.1 A _ _ _ h
+  intro i f
+  funext z
+  have hnorm : n (split z) = z.1 := by
+    change n (τ z.1 * z.2.val) = _
+    rw [map_mul, hτ z.1, z.2.property, mul_one]
+  let w (t : ℝ) := 1 + t ^ i.1
+  change ideleClassWeightedDeriv n τ γ i.2.1 i.2.2 w f.val z.1 (split z) = _
+  have hd := weightedDeriv_as_monomial n τ γ i.2.1 i.2.2 w f.val (split z)
+  refine (congrArg (fun t ↦ ideleClassWeightedDeriv n τ γ i.2.1 i.2.2 w f.val t (split z)) hnorm.symm).trans
+    (hd.trans (congrArg₂ (· * ·) ?_ ?_))
+  · apply congrArg (fun t : ℝ ↦ (w |t| : ℂ))
+    exact Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (n (split z))))
+  · exact (monomial_pullback q QuotientGroup.mk_surjective a (Fin.cons i.2.1 i.2.2)
+      f.val (E f) (hF.2.choose_spec.2 f) (split z)).symm
+
 end ComponentStage
 
 section ComponentStages
@@ -5752,6 +6053,86 @@ theorem ideleClassComponent_weightedSup_generates
   exact component_stages_of_rank n hn τ hτ hker (Module.finrank ℚ F) h.2
 
 end ComponentDirections
+
+section Global
+local instance : MeasurableSpace C[F] := borel _
+
+variable (τ : ℝ≥0ˣ →ₜ* C[F]) (hτ : RightInverse τ (ideleClassNorm F))
+variable (γ : Fin d[F] → LCATopologicalLie C₁[F])
+variable
+  (hγ : LinearIndependent ℝ (fun j ↦ bruhatFirstOrder (γ j)))
+  (hspan : Submodule.span ℝ (range (fun j ↦ bruhatFirstOrder (γ j))) =
+    bruhatDiffDegreeOneReal (G := C₁[F]))
+
+include hτ hγ hspan
+
+local notation "μ₁[" F "]" => positiveRealHaar.prod (normOneIdeleClassTamagawaMeasure F)
+
+/-- Paper: Proposition D.1.10.9(1), p. 790. For sufficiently small compact
+good subgroups, the weighted Lᵖ norms using one plus powers of the absolute
+log norm generate the topology on the fixed subspace.
+Deviation: The norm-one directions are specified by their real basis property
+and the integration measure is the product in (D.1.10.17). -/
+theorem ideleClass_weightedLp_generates :
+    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
+      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
+        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
+          (fun i : ℕ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
+            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
+              (fun t ↦ 1 + t ^ i.1) f.val) := by
+  let n := ideleClassNorm F
+  have hn : Continuous n := (ideleGroup_quotient.{u, 0} F).2.2.2.2.2.2.2.2.1
+  have : CompactSpace n.ker := (ideleClassGroup_finiteness F).2.1
+  have : SecondCountableTopology (IdeleGroup (𝓞 F) F) := idele_secondCountable F
+  have : SecondCountableTopology C[F] := inferInstanceAs (SecondCountableTopology
+    ((IdeleGroup (𝓞 F) F) ⧸ (IdeleGroup.unitEmbedding (𝓞 F) F).range))
+  have : SecondCountableTopology n.ker := IsInducing.subtypeVal.secondCountableTopology
+  have : BorelSpace C[F] := ⟨rfl⟩
+  have : BorelSpace n.ker := inferInstanceAs (BorelSpace (ideleClassNorm F).ker)
+  have : (normOneIdeleClassTamagawaMeasure F).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let k₀ := (exists_bruhatGoodSubgroup (G := C[F])).choose
+  have hk₀ := (exists_bruhatGoodSubgroup (G := C[F])).choose_spec
+  have hkc : IsCompact (k₀ : Set C[F]) := by
+    rw [← lcaDualAnnihilator_annihilator k₀ hk₀.1]
+    exact isCompact_lcaDualAnnihilator _ hk₀.2.1
+  exact ⟨k₀, hkc, hk₀, fun k _ hk hg p hp ↦ split_fixed_stage_lp n hn τ hτ
+    (normOneIdeleClassTamagawaMeasure F) γ hspan k hk hg (ENNReal.ofReal p)
+    (by simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hp) ENNReal.ofReal_ne_top⟩
+
+/-- Paper: Proposition D.1.10.9(2), p. 790. Powers of the absolute log norm
+alone give an Lᵖ seminorm family generating the same fixed-subspace topology.
+Deviation: The norm-one directions are specified by their real basis property. -/
+theorem ideleClass_logPowerLp_generates :
+    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
+      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
+        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
+          (fun i : ℕ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
+            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
+              (fun t ↦ t ^ i.1) f.val) := by
+  exact ideleClassStages_mono (G := C[F]) (fun k p hp ↦
+    ideleClassStage_logPower (n := ideleClassNorm F) (τ := τ) (γ := γ) (k := k)
+      (μ := μ₁[F]) (p := ENNReal.ofReal p)
+      (by simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hp))
+    (ideleClass_weightedLp_generates F τ hτ γ hγ hspan)
+
+/-- Paper: Proposition D.1.10.9(3), p. 790. Absolute values of arbitrary complex
+polynomials in the absolute log norm give a generating Lᵖ family on the fixed stage.
+Deviation: The norm-one directions are specified by their real basis property. -/
+theorem ideleClass_logPolynomialLp_generates :
+    ∃ k₀ : Subgroup C[F], IsCompact (k₀ : Set C[F]) ∧ IsBruhatGoodSubgroup k₀ ∧
+      ∀ k : Subgroup C[F], k ≤ k₀ → IsCompact (k : Set C[F]) → IsBruhatGoodSubgroup k →
+        ∀ p : ℝ, 1 ≤ p → GeneratesLpSeminorms μ₁[F] (ENNReal.ofReal p)
+          (fun i : Polynomial ℂ × ℕ × (Fin d[F] → ℕ) ↦ fun f : schwartzBruhatInvariantSubmodule k ↦
+            ideleClassProductWeightedDeriv (ideleClassNorm F) τ γ i.2.1 i.2.2
+              (fun t ↦ ‖i.1.eval (t : ℂ)‖) f.val) := by
+  exact ideleClassStages_mono (G := C[F]) (fun k p hp ↦
+    ideleClassStage_logPolynomial (n := ideleClassNorm F) (τ := τ) (γ := γ) (k := k)
+      (μ := μ₁[F]) (p := ENNReal.ofReal p)
+      (by simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hp))
+    (ideleClass_logPowerLp_generates F τ hτ γ hγ hspan)
+
+end Global
 
 section SLocal
 

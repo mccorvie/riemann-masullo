@@ -194,9 +194,8 @@ C.1.2.1. *Local convexity and fundamental families of continuous seminorms.* An 
 
 The linear span of every absorbing convex circled subset $A \subset E$ is equipped with a real-valued function
 
-(C.1.2.1)
 $$
-p_A(x) := \inf_{x \in \lambda A, \lambda \in \mathbf{R}_{> 0}} \lambda
+p_A(x) := \inf_{x \in \lambda A, \lambda \in \mathbf{R}_{> 0}} \lambda \tag{C.1.2.1}
 $$
 
 called its *Minkowski functional* (or gauge functional). Under the above assumptions on $A$, $p_A$ is a seminorm [Scha, Ch. II, 1.4]. The Minkowski functional can be used to translate the datum of a neighborhood base at $0$ of open, or closed, circled convex subsets into a family of seminorms, and conversely [Scha, Ch. II, 1.5-1.6, §4]. For instance, continuity of a seminorm $p$ is equivalent to $\{p < 1\}$ being a neighborhood of $0$.
@@ -327,9 +326,8 @@ If $\{E_{\alpha}, f_{\alpha\beta}\}$ is an inductive system of locally convex to
 
 For an arbitrary algebraic direct sum $E = \oplus E_{\alpha}$ of locally convex $E_{\alpha}$'s, a locally convex topology on $E$ having the categorical mapping property for a direct sum is the one with a base of $0$-neighborhoods given by the sets
 
-(C.1.5.1)
 $$
-U = \left\{ \sum \lambda_{\alpha} x_{\alpha} : x_{\alpha} \in U_{\alpha}, \sum |\lambda_{\alpha}| \le 1 \right\}
+U = \left\{ \sum \lambda_{\alpha} x_{\alpha} : x_{\alpha} \in U_{\alpha}, \sum |\lambda_{\alpha}| \le 1 \right\} \tag{C.1.5.1}
 $$
 
 where $U_{\alpha}$ is a convex circled $0$-neighborhood in $E_{\alpha}$ (in each sum $\sum \lambda_{\alpha} x_{\alpha}$ all but finitely many $x_{\alpha}$'s vanish and so only the corresponding $\lambda_{\alpha}$'s matter; i.e., $\sum |\lambda_{\alpha}|$ may be assumed to have only finitely many non-zero terms). Since each $U_{\alpha}$ is circled, it is equivalent to require the $\lambda_{\alpha}$'s to be real numbers in $[0, 1]$, which is to say $U$ is the convex hull of choices of convex circled $0$-neighborhoods $U_{\alpha} \subset E_{\alpha}$ over all $\alpha$. Note that each $E_{\alpha_0} \to \oplus E_{\alpha}$ is a topological embedding.

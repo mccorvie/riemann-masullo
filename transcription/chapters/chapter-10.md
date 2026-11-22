@@ -1057,7 +1057,7 @@ $$
 \begin{bmatrix}
 \widehat\varphi(it_{k,j}) & 0 & 0 & 0 & 0 & \cdots & 0 \\
 \widehat\varphi^{(1)}(it_{k,j}) & \widehat\varphi(it_{k,j}) & 0 & 0 & 0 & \cdots & 0 \\
-\widehat\varphi^{(2)}(it_{k,j}) & \binom{2}{1}\widehat\varphi^{(1)}(it_{k,j}) & \widehat\varphi(it_{k,j}) & 0 & 0 & \cdots & 0 \\
+\widehat\varphi^{(2)}(it_{k,j}) & \binom{2}{1}\widehat\varphi^{(1)}(it_{k,j}) & \widehat\varphi(it_{k,j}) & 0 & 0 & \ldots & 0 \\
 \widehat\varphi^{(3)}(it_{k,j}) & \binom{3}{2}\widehat\varphi^{(2)}(it_{k,j}) & \binom{3}{1}\widehat\varphi^{(1)}(it_{k,j}) & \widehat\varphi(it_{k}) & 0 & \cdots & 0 \\
 \cdots & \cdots & \cdots & \cdots & \cdots & \cdots & \cdots \\
 \widehat\varphi^{(N-1)}(it_{k,j}) & \binom{N-1}{N-2}\widehat\varphi^{(N-2)}(it_{k,j}) & \binom{N-1}{N-3}\widehat\varphi^{(N-3)}(it_{k,j}) & \binom{N-1}{N-4}\widehat\varphi^{(N-4)}(it_{k,j}) & \binom{N-1}{N-5}\widehat\varphi^{(N-5)}(it_{k,j}) & \cdots & \widehat\varphi(it_{k,j})
@@ -1186,9 +1186,9 @@ Let $\widehat{\bar\mu}_1$ be the Plancherel measure of $\bar\mu_1$, and $\wideha
 
 Since $\varphi\in\mathcal{D}(C_F)\subset\mathcal{S}(C_F)$, the Fourier transform $\widehat{\varphi}$ is Schwartz-Bruhat over $\widehat{C_F}$, hence in particular absolutely integrable, and so:
 
-(10.3.1.26)
-
-$$\sum_{(\omega,t)\in\widehat{C_F^1}\times\{\tau\in\mathbf{R}:L(a+i\tau,\chi)=0\}}|\Phi(\tau,\omega)|$$
+$$
+\sum_{(\omega,t)\in\widehat{C_F^1}\times\{\tau\in\mathbf{R}:L(a+i\tau,\chi)=0\}}|\Phi(\tau,\omega)| \tag{10.3.1.26}
+$$
 
 is convergent, because it is comparable to the integral $\int_{\mathbf{R}_{>0}}\int_{\widehat{C_F^1}}|\Phi(x,\omega)|\,\mathrm{d}(\lambda\otimes\widehat{\bar\mu}_1)(x,\omega)$.
 
@@ -1214,9 +1214,9 @@ $$\chi|\cdot|^z_F,\quad(\chi,z)\in\widetilde{C_F^1}\times\mathbf{C}$$
 
 (1) *For any choice of enumeration $\{\eta_{\chi_k,t_{k,j},b_{k,j},m_{k,j}}\}$, with $(k,j)\in\mathbf{N}\times\mathbf{N}$ and $0\le m_{k,j}\le N_s(\rho_{\chi_k,t_{k,j},b_{k,j}})-1$, for the set of elements $\{\eta_{\chi,t,b,m}\}\subset W_I^{-s}(C_F)$ from Theorem 10.2.2.1, the sequence of finite rank operators:*
 
-(10.3.2.1)
-
-$$\sum_{0\le k\le N_1}\ \sum_{0\le j\le N_2}\ \sum_{0\le m_{k,j}\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}\langle A(\varphi)'\eta_{\chi_k,t_{k,j},b_{k,j},m_{k,j}},\cdot\rangle_{I,s}\,\psi_{\chi_k,t_{k,j},b_{k,j},m_{k,j}}$$
+$$
+\sum_{0\le k\le N_1}\ \sum_{0\le j\le N_2}\ \sum_{0\le m_{k,j}\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}\langle A(\varphi)'\eta_{\chi_k,t_{k,j},b_{k,j},m_{k,j}},\cdot\rangle_{I,s}\,\psi_{\chi_k,t_{k,j},b_{k,j},m_{k,j}} \tag{10.3.2.1}
+$$
 
 *in $\mathscr{L}_\beta(\mathscr{H}^s_{F,a})$ converges in $S_p(\mathscr{H}^s_{F,a,I})$ for every $p\ge 1$.*
 
@@ -1226,37 +1226,37 @@ $$\sum_{0\le k\le N_1}\ \sum_{0\le j\le N_2}\ \sum_{0\le m_{k,j}\le N_{I,s}(\rho
 
 (2) *The $\mathcal{D}(C_F)$-module structure:*
 
-(10.3.2.2)
-
-$$A:\mathcal{D}(C_F)\to\mathscr{L}_\beta(\mathscr{H}^s_{F,a,I})$$
+$$
+A:\mathcal{D}(C_F)\to\mathscr{L}_\beta(\mathscr{H}^s_{F,a,I}) \tag{10.3.2.2}
+$$
 
 *is valued in the Banach space of nuclear operators $S_1(\mathscr{H}^s_{F,a,I})$ on $\mathscr{H}^s_{F,a,I}$, and is continuous with respect to the Hausdorff locally convex topology on the source, and the trace-norm topology on the target. In particular, the composition of $A$ and the trace functional on $S_1(\mathscr{H}^s_{F,a,I})$ is a distribution on $C_F$, whose value at $\varphi\in\mathcal{D}(C_F)$ is:*
 
-(10.3.2.3)
-
-$$\mathrm{Trace}\,A(\varphi)=\sum_{\chi\in\widetilde{C_F^1}}\ \sum_{t\in\mathbf{R},\,b\in[-\alpha,\alpha]:\,L(a+b+it,\chi)=0}N_{I,s}(\rho_{\chi,t,b})\int_{C_F}\varphi(g)\chi|g|_F^{b+it}\,\mathrm{d}\bar\mu(g)$$
+$$
+\mathrm{Trace}\,A(\varphi)=\sum_{\chi\in\widetilde{C_F^1}}\ \sum_{t\in\mathbf{R},\,b\in[-\alpha,\alpha]:\,L(a+b+it,\chi)=0}N_{I,s}(\rho_{\chi,t,b})\int_{C_F}\varphi(g)\chi|g|_F^{b+it}\,\mathrm{d}\bar\mu(g) \tag{10.3.2.3}
+$$
 
 *where $N_{I,s}$ is the counting function:*
 
-(10.3.2.4)
-
-$$N_{I,s}(\rho_{\chi,t,b})=\min\left\{N(\rho_{\chi,t,b}),\left[\frac{s-1}{2}+1\right]\right\},\quad b=\pm\alpha,\qquad N_{I,s}(\rho_{\chi,t,b})=N(\rho_{\chi,t,b}),\quad b\in(-\alpha,\alpha)$$
+$$
+N_{I,s}(\rho_{\chi,t,b})=\min\left\{N(\rho_{\chi,t,b}),\left[\frac{s-1}{2}+1\right]\right\},\quad b=\pm\alpha,\qquad N_{I,s}(\rho_{\chi,t,b})=N(\rho_{\chi,t,b}),\quad b\in(-\alpha,\alpha) \tag{10.3.2.4}
+$$
 
 *where $[x]$ is the largest integer $N\ge 0$ satisfying $N\le x$.*
 
 (3) *If $\varphi$ is homogeneous of weight $\bar\omega\in\widehat{C_F^1}$ under the continuous left-translation action of $C_F$ on $\mathcal{D}(C_F)$, then $A(\varphi)$ is valued in the linear subspace $\mathscr{S}(\mathscr{H}^s_{F,a,I}(\omega))$ of strongly nuclear operators on the isotype $\mathscr{H}^s_{F,a,I}(\omega)$, and its trace is:*
 
-(10.3.2.5)
-
-$$\mathrm{Trace}\,A(\varphi)=\sum_{t\in\mathbf{R},\,b\in[-\alpha,\alpha]:\,L(a+b+it,\chi)=0}N_{I,s}(\rho_{\chi,t,b})\int_{C_F}\varphi(g)\chi|g|_F^{b+it}\,\mathrm{d}\bar\mu(g)$$
+$$
+\mathrm{Trace}\,A(\varphi)=\sum_{t\in\mathbf{R},\,b\in[-\alpha,\alpha]:\,L(a+b+it,\chi)=0}N_{I,s}(\rho_{\chi,t,b})\int_{C_F}\varphi(g)\chi|g|_F^{b+it}\,\mathrm{d}\bar\mu(g) \tag{10.3.2.5}
+$$
 
 *for $\chi\in\widetilde{C_F^1}$ the unique element of $\widetilde{C_F^1}$ such that $\chi|_{C_F^1}=\omega$, i.e. where $\chi$ is the base-point of $\Omega(C_F)(\omega)$ for the chosen holomorphic parametrization of $\Omega(C_F)$ from* (10.2.1.4).
 
 Proof. The argument for Theorem 10.3.2.1 follows the same method as in the proof of Theorem 10.3.1.1 upon replacing $N_s(\rho)$ defined in (10.3.1.4) with the truncated multiplicity function $N_{I,s}(\rho)$ defined in (10.2.2.5) and (10.2.2.6), noting that $N_{I,s}$, contrary to $N_s$, is unbounded if $\alpha>0$. In this case, we need to refine the estimate on:
 
-(10.3.2.6)
-
-$$\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_s(\rho_{\chi_k,t_{k,j}})-1}|M(\varphi)^{(i)}(it_{k,j})|\right)^{p}$$
+$$
+\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_s(\rho_{\chi_k,t_{k,j}})-1}|M(\varphi)^{(i)}(it_{k,j})|\right)^{p} \tag{10.3.2.6}
+$$
 
 is convergent for every $p\ge 1$, which is used in the proof of Theorem 10.3.1.1 to infer that the sequence from (10.3.1.1) of finite rank operators converges in the $S_1$-norm topology.
 
@@ -1264,9 +1264,9 @@ We aim at deducing that the sequence of finite rank operators in (10.3.2.1) also
 
 The sum that replaces (10.3.2.6) is:
 
-(10.3.2.7)
-
-$$\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}|M(\varphi)^{(i)}(b_{k,j}+it_{k,j})|\right)^{p}.$$
+$$
+\sum_{k\ge 0}\sum_{j\ge 0}\left(\sum_{0\le i\le N_{I,s}(\rho_{\chi_k,t_{k,j},b_{k,j}})-1}|M(\varphi)^{(i)}(b_{k,j}+it_{k,j})|\right)^{p}. \tag{10.3.2.7}
+$$
 
 In order to prove that it converges for every $p>1$, we proceed as follows. We let $N>1$ be a fixed integer, to be chosen later.
 

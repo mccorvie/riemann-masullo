@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
 public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
+import Mathlib.Analysis.Complex.LocallyUniformLimit
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
@@ -56,11 +57,35 @@ def rationalPrimeSplitsCompletely (F : Type*) [Field F] [NumberField F] (p : Rat
 Every rational prime splits completely in the base field.
 Deviation: States a sanity check for the definition of complete splitting. -/
 theorem rationalPrimeSplitsCompletely_rat (p : RatPrimes) :
-    rationalPrimeSplitsCompletely ℚ p := by sorry
+    rationalPrimeSplitsCompletely ℚ p := by
+  intro v _
+  let q := v.asIdeal
+  let : q.IsPrime := v.isPrime
+  let : q.IsMaximal := v.isMaximal
+  let : q.LiesOver q := ⟨(Ideal.comap_id q).symm⟩
+  refine ⟨Ideal.ramificationIdx_eq_one q (𝓞 ℚ), ?_⟩
+  exact (Ideal.inertiaDeg_eq_of_isMaximal q q).trans (Module.finrank_self (𝓞 ℚ ⧸ q))
 
 local notation "overₚ(" T "," p ")" =>
   @Finset.filter Primes (fun v : Primes ↦ HeightOneSpectrum.under (𝓞 ℚ) v = p)
     (Classical.decPred _) T
+
+/-- The local value of a unitary character at an unramified place has norm one. -/
+private theorem reciprocalEulerProduct_over_prime_zero_norm (χ : U𝔽) (v : Primes)
+    (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v) :
+    ‖(ideleClassNormTwist χ 0).localValue v‖ = 1 := by
+  obtain ⟨π, hπ⟩ :=
+    (Valued.v : Valuation (v.adicCompletion F) _).exists_isUniformizer_of_isCyclic_of_nontrivial
+  have hπ0 : (π : v.adicCompletion F) ≠ 0 := by
+    intro h
+    have h' := hπ
+    rw [Valuation.IsUniformizer, h, map_zero] at h'
+    exact (Units.ne_zero _) h'.symm
+  rw [hv.localValue_eq π hπ, show (π : v.adicCompletion F) =
+    ((Units.mk0 _ hπ0 : (v.adicCompletion F)ˣ) : v.adicCompletion F) from rfl,
+    HeckeCharacter.restrict, MulChar.ofUnitHom_coe]
+  change ‖(χ _ : ℂ) * (((ideleClassNorm F _ : ℝ≥0) : ℝ) : ℂ) ^ (0 : ℂ)‖ = 1
+  rw [Complex.cpow_zero, mul_one, Circle.norm_coe]
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 A zero of the reciprocal Euler product over a rational prime belongs to the phase lattice
@@ -74,7 +99,162 @@ theorem reciprocalEulerProduct_over_prime_zero (χ : U𝔽) (S₀ : Finset Prime
         let period := 2 * Real.pi / Real.log (q : ℝ)
         t ∈ Ico 0 period ∧
         (ideleClassNormTwist χ 0).localValue v = (q : ℂ) ^ (-(t : ℂ) * Complex.I) ∧
-        s = (((k : ℝ) * period - t : ℝ) : ℂ) * Complex.I := by sorry
+        s = (((k : ℝ) * period - t : ℝ) : ℂ) * Complex.I := by
+  obtain ⟨v, hvS, hv0⟩ := Finset.prod_eq_zero_iff.mp hs
+  by_cases hun : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  swap
+  · rw [finiteHeckeEulerFactor, ite_eq_right hun, inv_one] at hv0
+    exact absurd hv0 one_ne_zero
+  refine ⟨v, hvS, hun, ?_⟩
+  rw [finiteHeckeEulerFactor, ite_eq_left hun, inv_inv] at hv0
+  set q : ℕ := v.asIdeal.absNorm with hqdef
+  have hq1 : 1 < (q : ℝ) := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq0 : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq1).ne'
+  set ℓ := Real.log (q : ℝ) with hℓdef
+  have hℓ : 0 < ℓ := Real.log_pos hq1
+  have hP : 0 < 2 * Real.pi / ℓ := div_pos Real.two_pi_pos hℓ
+  set a := (ideleClassNormTwist χ 0).localValue v with hadef
+  have ha1 : ‖a‖ = 1 := reciprocalEulerProduct_over_prime_zero_norm χ v hun
+  have hlog : Complex.log (q : ℂ) = (ℓ : ℂ) := by rw [hℓdef, Complex.natCast_log]
+  have hcpow (t : ℝ) : (q : ℂ) ^ (-(t : ℂ) * Complex.I) =
+      Complex.exp (((-t * ℓ : ℝ) : ℂ) * Complex.I) := by
+    rw [Complex.cpow_def_of_ne_zero hq0, hlog]
+    congr 1
+    push_cast
+    ring
+  set t₀ : ℝ := -Complex.arg a / ℓ
+  set t : ℝ := toIcoMod hP 0 t₀
+  have ht : t ∈ Ico 0 (2 * Real.pi / ℓ) := by simpa using toIcoMod_mem_Ico hP 0 t₀
+  have hta : a = (q : ℂ) ^ (-(t : ℂ) * Complex.I) := by
+    rw [hcpow]
+    have hm := toIcoMod_add_toIcoDiv_zsmul hP 0 t₀
+    set m := toIcoDiv hP 0 t₀
+    have : -t * ℓ = Complex.arg a + (m : ℝ) * (2 * Real.pi) := by
+      have h1 : t = t₀ - m * (2 * Real.pi / ℓ) := by rw [zsmul_eq_mul] at hm; linarith
+      rw [h1]
+      simp only [t₀]
+      field_simp
+      ring
+    rw [this]
+    push_cast
+    rw [add_mul, Complex.exp_add, show (m : ℂ) * (2 * Real.pi) * Complex.I =
+      m * (2 * Real.pi * Complex.I) by ring, Complex.exp_int_mul_two_pi_mul_I, mul_one]
+    conv_lhs => rw [← Complex.norm_mul_exp_arg_mul_I a, ha1]
+    simp
+  rw [hta, sub_eq_zero, ← Complex.cpow_add _ _ hq0, eq_comm,
+    Complex.cpow_def_of_ne_zero hq0, hlog, Complex.exp_eq_one_iff] at hv0
+  obtain ⟨n, hn⟩ := hv0
+  have hℓ0 : (ℓ : ℂ) ≠ 0 := by exact_mod_cast hℓ.ne'
+  refine ⟨-n, t, ht, hta, ?_⟩
+  push_cast
+  rw [hlog]
+  field_simp
+  linear_combination -hn
+
+
+/-- The places over a rational prime in a finite set inject into the primes over it, and
+bijectively when the set contains all of them. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_map (p : RatPrimes) (T : Finset Primes) :
+    ∃ e : overₚ(T, p) → p.asIdeal.primesOver (𝓞 F), (∀ v, (e v).1 = v.1.asIdeal) ∧ Injective e ∧
+      ((∀ v : Primes, v.under (𝓞 ℚ) = p → v ∈ T) → Surjective e) := by
+  classical
+  refine ⟨fun v ↦ ⟨v.1.asIdeal, v.1.isPrime,
+    ⟨(congrArg HeightOneSpectrum.asIdeal (Finset.mem_filter.mp v.2).2).symm⟩⟩, fun _ ↦ rfl, ?_, ?_⟩
+  · intro a b h
+    exact Subtype.ext (HeightOneSpectrum.ext (congrArg Subtype.val h))
+  · intro hT q
+    have hq0 : q.1 ≠ ⊥ := by
+      intro h
+      have := q.2.2.over
+      rw [h, Ideal.under_bot] at this
+      exact p.ne_bot this
+    let w : Primes := ⟨q.1, q.2.1, hq0⟩
+    have hw : w.under (𝓞 ℚ) = p := HeightOneSpectrum.ext q.2.2.over.symm
+    exact ⟨⟨w, Finset.mem_filter.mpr ⟨hT w hw, hw⟩⟩, rfl⟩
+
+/-- The fundamental identity for the places of `F` over a rational prime. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_sum (p : RatPrimes) :
+    ∑ q : p.asIdeal.primesOver (𝓞 F), q.1.ramificationIdx (𝓞 ℚ) * q.1.inertiaDeg (𝓞 ℚ) =
+      degree := by
+  rw [Ideal.sum_ramification_inertia_eq_finrank, IsFractionRing.finrank_eq (𝓞 ℚ) ℚ (𝓞 F) F]
+
+/-- A rational prime has at most `[F : ℚ]` primes of `F` above it. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_card_le (p : RatPrimes) :
+    Fintype.card (p.asIdeal.primesOver (𝓞 F)) ≤ degree := by
+  rw [← reciprocalEulerProduct_over_prime_order_le_sum p, Fintype.card_eq_sum_ones]
+  refine Finset.sum_le_sum fun q _ ↦ ?_
+  have := q.2.1
+  have := q.2.2
+  exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero
+    (Ideal.ramificationIdx_pos (𝓞 ℚ) q.1).ne' (Ideal.inertiaDeg_pos q.1 (𝓞 ℚ)).ne')
+
+/-- Each reciprocal finite Euler factor is entire with zeros of order at most one. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_factor (χ : U𝔽) (v : Primes) (s : ℂ) :
+    AnalyticAt ℂ (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) s ∧
+      analyticOrderAt (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) s ≤ 1 := by
+  classical
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · have hq1 : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+      exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+    set L := Complex.log (v.asIdeal.absNorm : ℂ)
+    have hL : L ≠ 0 := by
+      simp only [L, ← Complex.natCast_log]
+      exact_mod_cast (Real.log_pos hq1).ne'
+    set a := (ideleClassNormTwist χ 0).localValue v
+    have hfun : (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) =
+        fun z ↦ 1 - a * Complex.exp (-(L * z)) := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv, Complex.cpow_def_of_ne_zero hN0]
+      congr 3
+      ring
+    rw [hfun]
+    refine ⟨by fun_prop, ?_⟩
+    by_cases h0 : 1 - a * Complex.exp (-(L * s)) = 0
+    · have hd : HasDerivAt (fun z ↦ 1 - a * Complex.exp (-(L * z)))
+          (-(a * (Complex.exp (-(L * s)) * -(L * 1)))) s :=
+        ((((hasDerivAt_id s).const_mul L).neg.cexp).const_mul a).const_sub 1
+      have ha : a ≠ 0 := by intro ha; rw [ha] at h0; simp at h0
+      exact (AnalyticAt.analyticOrderAt_eq_one_of_zero_deriv_ne_zero
+        (f := fun z ↦ 1 - a * Complex.exp (-(L * z))) (by fun_prop) h0
+        (by rw [hd.deriv]; simp [ha, hL, Complex.exp_ne_zero])).le
+    · rw [(analyticOrderAt_eq_zero (f := fun z ↦ 1 - a * Complex.exp (-(L * z))) (z₀ := s)).mpr
+        (Or.inr h0)]
+      exact zero_le_one
+  · have hfun : (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) = fun _ ↦ 1 := by
+      funext z
+      rw [finiteHeckeEulerFactor, ite_eq_right hv, inv_one]
+    rw [hfun]
+    refine ⟨analyticAt_const, ?_⟩
+    rw [(analyticOrderAt_eq_zero (f := fun _ : ℂ ↦ (1 : ℂ)) (z₀ := s)).mpr (Or.inr one_ne_zero)]
+    exact zero_le_one
+
+/-- A reciprocal partial Euler product is analytic with zero order at most the number of
+places in it. -/
+private theorem reciprocalEulerProduct_over_prime_order_le_prod
+    (χ : U𝔽) (T : Finset Primes) (s : ℂ) :
+    AnalyticAt ℂ (reciprocalPartialHeckeEulerProduct χ T) s ∧
+      analyticOrderAt (reciprocalPartialHeckeEulerProduct χ T) s ≤ T.card := by
+  classical
+  induction T using Finset.induction with
+  | empty =>
+    have : reciprocalPartialHeckeEulerProduct χ ∅ = fun _ ↦ 1 := by
+      funext z; simp [reciprocalPartialHeckeEulerProduct]
+    rw [this, (analyticOrderAt_eq_zero (f := fun _ : ℂ ↦ (1 : ℂ)) (z₀ := s)).mpr
+      (Or.inr one_ne_zero)]
+    exact ⟨analyticAt_const, by simp⟩
+  | insert v T hvT ih =>
+    have hsplit : reciprocalPartialHeckeEulerProduct χ (insert v T) =
+        (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) * reciprocalPartialHeckeEulerProduct χ T := by
+      funext z
+      simp [reciprocalPartialHeckeEulerProduct, Finset.prod_insert hvT]
+    obtain ⟨hfa, hfo⟩ := reciprocalEulerProduct_over_prime_order_le_factor χ v s
+    rw [hsplit, analyticOrderAt_mul hfa ih.1, Finset.card_insert_of_notMem hvT]
+    refine ⟨hfa.mul ih.1, ?_⟩
+    push_cast
+    rw [add_comm]
+    exact add_le_add ih.2 hfo
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 The zero multiplicity of a reciprocal Euler product over a single rational prime is
@@ -82,7 +262,12 @@ bounded by the degree of the number field. -/
 theorem reciprocalEulerProduct_over_prime_order_le (χ : U𝔽) (S₀ : Finset Primes)
     (p : RatPrimes) (s : ℂ) :
     analyticOrderAt (reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p)) s ≤
-      (degree : ℕ∞) := by sorry
+      (degree : ℕ∞) := by
+  obtain ⟨e, -, he, -⟩ := reciprocalEulerProduct_over_prime_order_le_map p S₀
+  refine (reciprocalEulerProduct_over_prime_order_le_prod χ _ s).2.trans ?_
+  have h1 := Fintype.card_le_of_injective e he
+  rw [Fintype.card_coe] at h1
+  exact_mod_cast h1.trans (reciprocalEulerProduct_over_prime_order_le_card_le p)
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 At a completely split rational prime, the product of the reciprocal unramified factors
@@ -94,7 +279,27 @@ theorem reciprocalEulerProduct_over_split_prime (χ : U𝔽) (S₀ : Finset Prim
       (ideleClassNormTwist χ 0).IsUnramifiedAt v ∧ (ideleClassNormTwist χ 0).localValue v = 1)
     (s : ℂ) :
     reciprocalPartialHeckeEulerProduct χ overₚ(S₀, p) s =
-      (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ degree := by sorry
+      (1 - (p.asIdeal.absNorm : ℂ) ^ (-s)) ^ degree := by
+  classical
+  have hfac : ∀ v ∈ overₚ(S₀, p),
+      (finiteHeckeEulerFactor χ v s)⁻¹ = 1 - (p.asIdeal.absNorm : ℂ) ^ (-s) := by
+    intro v hv
+    have hvp := (Finset.mem_filter.mp hv).2
+    obtain ⟨hun, h1⟩ := hχ v hvp
+    have hN : v.asIdeal.absNorm = p.asIdeal.absNorm := by
+      have : v.asIdeal.LiesOver p.asIdeal := ⟨(congrArg HeightOneSpectrum.asIdeal hvp).symm⟩
+      rw [← Ideal.absNorm_pow_inertiaDeg p.asIdeal v.asIdeal, (hp v hvp).2, pow_one]
+    rw [finiteHeckeEulerFactor, ite_eq_left hun, inv_inv, h1, one_mul, hN]
+  rw [reciprocalPartialHeckeEulerProduct, Finset.prod_congr rfl hfac, Finset.prod_const]
+  congr 1
+  obtain ⟨e, hev, he, hsurj⟩ := reciprocalEulerProduct_over_prime_order_le_map p S₀
+  rw [← Fintype.card_coe, Fintype.card_of_bijective ⟨he, hsurj hS₀⟩,
+    ← reciprocalEulerProduct_over_prime_order_le_sum p,
+    Fintype.card_eq_sum_ones]
+  refine Finset.sum_congr rfl fun q _ ↦ ?_
+  obtain ⟨⟨w, hw⟩, rfl⟩ := hsurj hS₀ q
+  obtain ⟨he1, hf1⟩ := hp w (Finset.mem_filter.mp hw).2
+  rw [hev, he1, hf1]
 
 /-- Paper: Remark 7.1.3.1, p. 323.
 There are infinitely many completely split rational primes at which the character
@@ -146,7 +351,17 @@ def sLocalRhoPoleOrder (c : QuasiCharacter (SIdeleQuotient F S)) : ℕ :=
 /-- Paper: Lemma 7.1.2.2, p. 317. The pole order is the negative of the
 order bound used in the target space of the S-local Mellin transform of §5.1. -/
 theorem sLocalIdelicOrderBound_eq_neg_poleOrder (c : QuasiCharacter (SIdeleQuotient F S)) :
-    sLocalIdelicOrderBound c = ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) := by sorry
+    sLocalIdelicOrderBound c = ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) := by
+  have hle : sLocalIdelicOrderBound c ≤ 0 := min_le_left _ _
+  unfold sLocalRhoPoleOrder
+  generalize sLocalIdelicOrderBound c = b at hle ⊢
+  induction b using WithTop.recTopCoe with
+  | top => exact absurd hle (by simp)
+  | coe n =>
+    have hn : n ≤ 0 := by exact_mod_cast hle
+    simp only [WithTop.untop₀_coe]
+    norm_cast
+    omega
 
 /-- Paper: Theorem 7.1.3.2, p. 324.
 A simple pole of the correcting factor has multiplicity one in a unitary chart.
@@ -154,7 +369,59 @@ Deviation: States a sanity check comparing the centered and uncentered coordinat
 theorem sLocalRhoPoleOrder_eq_one_iff (χ : U𝔽)
     (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S) (s : ℂ) :
     sLocalRhoPoleOrder (chartₛ(χ, hχ) s) = 1 ↔
-      meromorphicOrderAt rhoChart(χ, hχ) s = -1 := by sorry
+      meromorphicOrderAt rhoChart(χ, hχ) s = -1 := by
+  have hcomp : (fun z ↦ sLocalRhoFactor (F := F) (S := S)
+        (quasiCharacterNormTwist (G := Jₛ) mₛ
+          (IsProperMap.continuous (isProperMap_sIdeleQuotientNorm F S)) (chartₛ(χ, hχ) s) z)) =
+      (fun z ↦ sLocalRhoFactor (chartₛ(χ, hχ) z)) ∘ (· + s) := by
+    funext z
+    simp only [Function.comp]
+    congr 1
+    ext1 g
+    simp only [quasiCharacterNormTwist]
+    have hn : (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ≠ 0 := by simp
+    change ((_ : ℂ) * _) * _ = (_ : ℂ) * _
+    rw [mul_assoc]
+    congr 1
+    change (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ s * (((mₛ g : ℝ≥0ˣ) : ℝ≥0) : ℂ) ^ z = _
+    rw [← Complex.cpow_add _ _ hn, add_comm]
+    rfl
+  have key : meromorphicOrderAt (fun z ↦ sLocalRhoFactor (F := F) (S := S)
+        (quasiCharacterNormTwist (G := Jₛ) mₛ
+          (IsProperMap.continuous (isProperMap_sIdeleQuotientNorm F S)) (chartₛ(χ, hχ) s) z)) 0
+      = meromorphicOrderAt rhoChart(χ, hχ) s := by
+    rw [hcomp, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+  unfold sLocalRhoPoleOrder sLocalIdelicOrderBound
+  rw [key]
+  generalize meromorphicOrderAt rhoChart(χ, hχ) s = o
+  induction o using WithTop.recTopCoe with
+  | top =>
+    have h0 : (-WithTop.untop₀ (0 : WithTop ℤ)).toNat = 0 := by
+      rw [← WithTop.coe_zero, WithTop.untop₀_coe]; rfl
+    simp only [min_eq_left le_top, h0]
+    have : (⊤ : WithTop ℤ) ≠ -1 := by
+      first
+        | exact WithTop.top_ne_coe
+        | simp
+        | decide
+    simp [this]
+  | coe n =>
+    rw [← WithTop.coe_zero, ← WithTop.coe_min]
+    simp only [WithTop.untop₀_coe]
+    constructor
+    · intro h
+      have : (-(min 0 n)).toNat = 1 := h
+      have : n = -1 := by omega
+      subst this
+      rfl
+    · intro h
+      have : n = -1 := by
+        first
+          | exact_mod_cast h
+          | exact WithTop.coe_injective h
+          | simpa using h
+      subst this
+      rfl
 
 variable (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
   (hχ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S)
@@ -162,6 +429,95 @@ variable (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
 -- TODO(paper-gap): The common-pole observation preceding Theorem 7.1.3.2 needs
 -- distinct residue characteristics. For the trivial character of ℚ(i), both
 -- Euler factors over 5 have a pole at 2πi/log 5.
+
+/-- The absolute norm of a finite place is a positive power of the rational prime below it. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_norm (v : Primes) :
+    ∃ ℓ : ℕ, ℓ.Prime ∧ v.asIdeal.under ℤ = Ideal.span {(ℓ : ℤ)} ∧
+      ∃ f : ℕ, 0 < f ∧ v.asIdeal.absNorm = ℓ ^ f := by
+  set P := v.asIdeal.under ℤ with hPdef
+  have hP : P.IsPrime := Ideal.IsPrime.under ℤ v.asIdeal
+  have hP0 : P ≠ ⊥ := mt Ideal.eq_bot_of_under_eq_bot v.ne_bot
+  obtain ⟨g, hg⟩ := (IsPrincipalIdealRing.principal P).principal
+  have hg' : P = Ideal.span {g} := hg
+  have hg0 : g ≠ 0 := by rintro rfl; exact hP0 (by rw [hg']; simp)
+  have hgp : Prime g := (Ideal.span_singleton_prime hg0).mp (hg' ▸ hP)
+  refine ⟨g.natAbs, Int.prime_iff_natAbs_prime.mp hgp, by rw [hg', Int.span_natAbs], ?_⟩
+  have : v.asIdeal.LiesOver P := ⟨rfl⟩
+  refine ⟨v.asIdeal.inertiaDeg ℤ, Ideal.inertiaDeg_pos v.asIdeal ℤ, ?_⟩
+  rw [← Ideal.absNorm_pow_inertiaDeg P v.asIdeal, hg', Ideal.absNorm_span_singleton]
+  simp
+
+/-- The rationals have a single prime above each nonzero prime of the integers. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_unique
+    (P : Ideal ℤ) [P.IsMaximal] (a b : HeightOneSpectrum (𝓞 ℚ))
+    (ha : a.asIdeal.under ℤ = P) (hb : b.asIdeal.under ℤ = P) : a = b := by
+  have hsum := Ideal.sum_ramification_inertia_eq_finrank P (𝓞 ℚ)
+  rw [RingOfIntegers.rank, Module.finrank_self] at hsum
+  have hcard : Fintype.card (P.primesOver (𝓞 ℚ)) ≤ 1 := by
+    rw [← hsum, Fintype.card_eq_sum_ones]
+    refine Finset.sum_le_sum fun q _ ↦ ?_
+    have := q.2.1
+    have := q.2.2
+    exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero
+      (Ideal.ramificationIdx_pos ℤ q.1).ne' (Ideal.inertiaDeg_pos q.1 ℤ).ne')
+  let ea : P.primesOver (𝓞 ℚ) := ⟨a.asIdeal, a.isPrime, ⟨ha.symm⟩⟩
+  let eb : P.primesOver (𝓞 ℚ) := ⟨b.asIdeal, b.isPrime, ⟨hb.symm⟩⟩
+  have := Fintype.card_le_one_iff.mp hcard ea eb
+  exact HeightOneSpectrum.ext (congrArg Subtype.val this)
+
+/-- Places with multiplicatively dependent absolute norms lie over the same rational prime. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_eq
+    (v w : Primes) {m n : ℕ} (hm : 0 < m) (_hn : 0 < n)
+    (h : v.asIdeal.absNorm ^ m = w.asIdeal.absNorm ^ n) : v.under (𝓞 ℚ) = w.under (𝓞 ℚ) := by
+  obtain ⟨ℓ, hℓ, hvP, f, hf, hvN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm v
+  obtain ⟨ℓ', hℓ', hwP, g, hg, hwN⟩ := finiteHeckeEulerFactors_common_pole_subsingleton_norm w
+  rw [hvN, hwN, ← pow_mul, ← pow_mul] at h
+  have hdvd : ℓ ∣ ℓ' := hℓ.dvd_of_dvd_pow (h ▸ dvd_pow_self ℓ (by positivity))
+  have hll : ℓ = ℓ' := (Nat.prime_dvd_prime_iff_eq hℓ hℓ').mp hdvd
+  subst hll
+  have hpr : (Ideal.span {(ℓ : ℤ)}).IsPrime := hvP ▸ Ideal.IsPrime.under ℤ v.asIdeal
+  have : (Ideal.span {(ℓ : ℤ)}).IsMaximal := hpr.isMaximal (by
+    rw [Ne, Ideal.span_singleton_eq_bot]; exact_mod_cast hℓ.ne_zero)
+  apply finiteHeckeEulerFactors_common_pole_subsingleton_unique (Ideal.span {(ℓ : ℤ)})
+  · change (v.asIdeal.under (𝓞 ℚ)).under ℤ = _
+    rw [Ideal.under_under, hvP]
+  · change (w.asIdeal.under (𝓞 ℚ)).under ℤ = _
+    rw [Ideal.under_under, hwP]
+
+/-- Any two poles of an unramified Euler factor differ by a multiple of `2πi / log q`. -/
+private theorem finiteHeckeEulerFactors_common_pole_subsingleton_pole
+    (χ : U𝔽) (v : Primes) (hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    {s : ℂ} (hs : meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0) :
+    ∀ s' : ℂ, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s' < 0 →
+      ∃ k : ℤ, (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) * (s' - s) =
+        k * (2 * Real.pi * Complex.I) := by
+  classical
+  have hN0 : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+    exact_mod_cast (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)).ne'
+  set L := Complex.log (v.asIdeal.absNorm : ℂ) with hLdef
+  have hL : (Real.log (v.asIdeal.absNorm : ℝ) : ℂ) = L := by rw [hLdef, Complex.natCast_log]
+  set a := (ideleClassNormTwist χ 0).localValue v
+  have hfun : finiteHeckeEulerFactor χ v = fun z ↦ (1 - a * Complex.exp (-(L * z)))⁻¹ := by
+    funext z
+    rw [finiteHeckeEulerFactor, ite_eq_left hv, Complex.cpow_def_of_ne_zero hN0]
+    congr 4
+    ring
+  have hzero (z : ℂ) (hz : meromorphicOrderAt (finiteHeckeEulerFactor χ v) z < 0) :
+      a * Complex.exp (-(L * z)) = 1 := by
+    by_contra h
+    have h0 : 1 - a * Complex.exp (-(L * z)) ≠ 0 := sub_ne_zero.mpr (Ne.symm h)
+    have han : AnalyticAt ℂ (finiteHeckeEulerFactor χ v) z := by
+      rw [hfun]
+      exact (by fun_prop : AnalyticAt ℂ (fun z ↦ 1 - a * Complex.exp (-(L * z))) z).inv h0
+    exact absurd hz (not_lt.mpr han.meromorphicOrderAt_nonneg)
+  intro s' hs'
+  have e1 := hzero s hs
+  have e2 := hzero s' hs'
+  have ha : a ≠ 0 := by intro ha; rw [ha, zero_mul] at e1; exact zero_ne_one e1
+  have : Complex.exp (-(L * s')) = Complex.exp (-(L * s)) :=
+    mul_left_cancel₀ ha (e2.trans e1.symm)
+  obtain ⟨k, hk⟩ := Complex.exp_eq_exp_iff_exists_int.mp this
+  exact ⟨-k, by rw [hL]; push_cast; linear_combination -hk⟩
 
 /-- Paper: Theorem 7.1.3.2(1), p. 324.
 Two unramified finite places above different rational primes have at most one shared
@@ -172,7 +528,54 @@ theorem finiteHeckeEulerFactors_common_pole_subsingleton
     (hw : (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt w.val)
     (hp : (v.val : Primes).under (𝓞 ℚ) ≠ w.val.under (𝓞 ℚ)) :
     {s : ℂ | meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ v.val) s < 0 ∧
-      meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ w.val) s < 0}.Subsingleton := by sorry
+      meromorphicOrderAt (finiteHeckeEulerFactor (F := F) χ w.val) s < 0}.Subsingleton := by
+  intro s₁ hs₁ s₂ hs₂
+  by_contra hne
+  have hkv := finiteHeckeEulerFactors_common_pole_subsingleton_pole χ v.val hv hs₁.1
+  have hkw := finiteHeckeEulerFactors_common_pole_subsingleton_pole χ w.val hw hs₁.2
+  obtain ⟨m, hm⟩ := hkv s₂ hs₂.1
+  obtain ⟨n, hn⟩ := hkw s₂ hs₂.2
+  set lv := Real.log (v.val.asIdeal.absNorm : ℝ)
+  set lw := Real.log (w.val.asIdeal.absNorm : ℝ)
+  have hqv : 1 < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hqw : 1 < (w.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm w.val
+  have hlv : 0 < lv := Real.log_pos hqv
+  have hlw : 0 < lw := Real.log_pos hqw
+  have h2pi : (2 * Real.pi * Complex.I : ℂ) ≠ 0 := by
+    simp [Real.pi_ne_zero, Complex.I_ne_zero]
+  have hreal : lw * m = lv * n := by
+    have : ((lw * m - lv * n : ℝ) : ℂ) * (2 * Real.pi * Complex.I) = 0 := by
+      push_cast
+      linear_combination -(lw : ℂ) * hm + (lv : ℂ) * hn
+    have := (mul_eq_zero.mp this).resolve_right h2pi
+    exact_mod_cast sub_eq_zero.mp (by exact_mod_cast this)
+  have hm0 : m ≠ 0 := by
+    rintro rfl
+    apply hne
+    have : (lv : ℂ) * (s₂ - s₁) = 0 := by simpa using hm
+    have hlv0 : (lv : ℂ) ≠ 0 := by exact_mod_cast hlv.ne'
+    exact (sub_eq_zero.mp ((mul_eq_zero.mp this).resolve_left hlv0)).symm
+  have hn0 : n ≠ 0 := by
+    rintro rfl
+    simp only [Int.cast_zero, mul_zero, mul_eq_zero, hlw.ne', false_or] at hreal
+    exact hm0 (by exact_mod_cast hreal)
+  have habs : (m.natAbs : ℝ) * lw = (n.natAbs : ℝ) * lv := by
+    have := congrArg abs hreal
+    rw [abs_mul, abs_mul, abs_of_pos hlw, abs_of_pos hlv] at this
+    rw [Nat.cast_natAbs, Nat.cast_natAbs]
+    push_cast
+    linarith
+  have hpow : ((v.val.asIdeal.absNorm ^ n.natAbs : ℕ) : ℝ) =
+      ((w.val.asIdeal.absNorm ^ m.natAbs : ℕ) : ℝ) := by
+    push_cast
+    apply Real.log_injOn_pos (Set.mem_Ioi.mpr (by positivity)) (Set.mem_Ioi.mpr (by positivity))
+    rw [Real.log_pow, Real.log_pow]
+    linarith
+  exact hp (finiteHeckeEulerFactors_common_pole_subsingleton_eq v.val w.val
+    (Int.natAbs_pos.mpr hn0) (Int.natAbs_pos.mpr hm0)
+    (by exact_mod_cast hpow))
 
 /-- Paper: Theorem 7.1.3.2(2)–(3), p. 324.
 The pole order is bounded by the number of places in S, including all infinite places.
@@ -320,7 +723,18 @@ Complex conjugation is excluded from the algebra of entire functions.
 Deviation: States a sanity check distinguishing the entire subalgebra from the ambient space. -/
 theorem conj_not_mem_entireContinuousMapSubalgebra :
     (⟨starRingEnd ℂ, Complex.continuous_conj⟩ : C(ℂ, ℂ)) ∉ entireContinuousMapSubalgebra :=
-  by sorry
+  by
+  intro h
+  change Differentiable ℂ (starRingEnd ℂ : ℂ → ℂ) at h
+  let D := fderiv ℂ (starRingEnd ℂ : ℂ → ℂ) 0
+  have hD : D.restrictScalars ℝ = Complex.conjCLE.toContinuousLinearMap :=
+    ((h 0).hasFDerivAt.restrictScalars ℝ).unique Complex.conjCLE.hasFDerivAt
+  have hval (z : ℂ) : D z = (starRingEnd ℂ) z := DFunLike.congr_fun hD z
+  have he : D Complex.I = Complex.I * D 1 := by
+    simpa only [smul_eq_mul, mul_one] using D.map_smul Complex.I (1 : ℂ)
+  rw [hval, hval] at he
+  have hIm := congrArg Complex.im he
+  norm_num at hIm
 
 local notation "Entire" => Subtype (fun f : C(ℂ, ℂ) ↦ f ∈ entireContinuousMapSubalgebra)
 
@@ -335,7 +749,62 @@ theorem regularizedCompletedHeckeL_differentiable (χ : U𝔽) (τ : ℝ≥0ˣ �
     let δ : ℕ := open Classical in
       if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
     Differentiable ℂ (toMeromorphicNFOn (fun s ↦ (s + b) ^ δ * (1 - s - b) ^ δ * L s) univ) :=
-  by sorry
+  by
+    classical
+    have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+    let x := hphase.exists.choose
+    let b := (x : ℂ) * Complex.I
+    by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · simp only [ite_eq_left hχ, pow_one]
+      let P (s : ℂ) := (s + b) * (1 - s - b)
+      change Differentiable ℂ (toMeromorphicNFOn (P * L) univ)
+      obtain ⟨t, ⟨hchar, hzero, hone, haway⟩, _⟩ :=
+        completedHeckeL_continuation_simplePoles χ L _hL _hEq hχ
+      have hx : -t = x := by
+        refine hphase.unique ?_ hphase.exists.choose_spec
+        intro u
+        have he := DFunLike.congr_fun hchar (QuotientGroup.mk (τ u))
+        change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+          1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+        rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+        rw [Complex.ofReal_neg, show -(t : ℂ) * Complex.I = -Complex.I * (t : ℂ) by ring]
+        exact he
+      have hb : b = -(Complex.I * (t : ℂ)) := by
+        dsimp only [b]
+        rw [← hx, Complex.ofReal_neg]
+        ring
+      have hP (s : ℂ) : AnalyticAt ℂ P s := by
+        dsimp only [P]
+        fun_prop
+      have hmer : MeromorphicOn (P * L) univ :=
+        fun s hs ↦ (hP s).meromorphicAt.mul (_hL hs).meromorphicAt
+      have hcancel (s : ℂ) (hz : P s = 0) (hp : meromorphicOrderAt L s = -1) :
+          0 ≤ meromorphicOrderAt (P * L) s := by
+        rw [meromorphicOrderAt_mul (hP s).meromorphicAt (_hL (mem_univ s)).meromorphicAt, hp]
+        have hpos : 0 < meromorphicOrderAt P s := by
+          apply (tendsto_zero_iff_meromorphicOrderAt_pos (hP s).meromorphicAt).mp
+          rw [← hz]
+          exact (hP s).continuousAt.continuousWithinAt
+        generalize meromorphicOrderAt P s = w at hpos ⊢
+        cases w with
+        | top => simp
+        | coe k =>
+          have hk : (0 : ℤ) < k := WithTop.coe_lt_coe.mp hpos
+          exact WithTop.coe_le_coe.mpr (show (0 : ℤ) ≤ k + (-1) by omega)
+      intro s
+      apply AnalyticAt.differentiableAt
+      have hNF := meromorphicNFOn_toMeromorphicNFOn (P * L) univ (mem_univ s)
+      apply hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      rw [meromorphicOrderAt_toMeromorphicNFOn hmer (mem_univ s)]
+      by_cases hs₀ : s = Complex.I * (t : ℂ)
+      · subst s
+        exact hcancel _ (by dsimp only [P]; rw [hb]; ring) hzero
+      by_cases hs₁ : s = 1 + Complex.I * (t : ℂ)
+      · subst s
+        exact hcancel _ (by dsimp only [P]; rw [hb]; ring) hone
+      exact ((hP s).mul (haway s (by simp [hs₀, hs₁]))).meromorphicOrderAt_nonneg
+    · simpa only [ite_eq_right hχ, pow_zero, one_mul, toMeromorphicNFOn_eq_self.mpr _hL] using
+        completedHeckeL_continuation_entire χ L _hL _hEq hχ
 
 /-- Paper: Theorem 7.1.4.2(1), p. 326.
 The generator of the spectral ideal is the completed Hecke continuation multiplied by
@@ -361,7 +830,49 @@ theorem regularizedCompletedHeckeL_ne_zero_at_canceled_poles
     let x₀ := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
     let b := (x₀ : ℂ) * Complex.I
     let Λ := regularizedCompletedHeckeL χ τ hτ L hL hEq
-    Λ.val (-b) ≠ 0 ∧ Λ.val (1 - b) ≠ 0 := by sorry
+    Λ.val (-b) ≠ 0 ∧ Λ.val (1 - b) ≠ 0 := by
+  classical
+  have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+  let x := hphase.exists.choose
+  let b := (x : ℂ) * Complex.I
+  obtain ⟨t, ⟨hchar, hzero, hone, _⟩, _⟩ :=
+    completedHeckeL_continuation_simplePoles χ L hL hEq hχ
+  have hx : -t = x := by
+    refine hphase.unique ?_ hphase.exists.choose_spec
+    intro u
+    have he := DFunLike.congr_fun hchar (QuotientGroup.mk (τ u))
+    change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+      1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+    rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+    rw [Complex.ofReal_neg, show -(t : ℂ) * Complex.I = -Complex.I * (t : ℂ) by ring]
+    exact he
+  have hb : b = -(Complex.I * (t : ℂ)) := by
+    dsimp only [b]
+    rw [← hx, Complex.ofReal_neg]
+    ring
+  let P (z : ℂ) := (z + b) * (1 - z - b)
+  have hP (s : ℂ) : AnalyticAt ℂ P s := by
+    dsimp only [P]
+    fun_prop
+  have hD (s : ℂ) : HasDerivAt P ((1 - s - b) - (s + b)) s := by
+    simpa [P, sub_eq_add_neg] using ((hasDerivAt_id s).add_const b).fun_mul
+      (((hasDerivAt_const s (1 : ℂ)).fun_sub (hasDerivAt_id s)).sub_const b)
+  have hmer : MeromorphicOn (P * L) univ :=
+    fun s hs ↦ (hP s).meromorphicAt.mul (hL hs).meromorphicAt
+  have cancel (s : ℂ) (hz : P s = 0) (hd : (1 - s - b) - (s + b) ≠ 0)
+      (hord : meromorphicOrderAt L s = -1) : toMeromorphicNFOn (P * L) univ s ≠ 0 := by
+    have h1 := (hP s).analyticOrderAt_eq_one_of_zero_deriv_ne_zero hz (by rwa [(hD s).deriv])
+    apply (meromorphicNFOn_toMeromorphicNFOn (P * L) univ (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hmer (mem_univ s),
+      meromorphicOrderAt_mul (hP s).meromorphicAt (hL (mem_univ s)).meromorphicAt,
+      (hP s).meromorphicOrderAt_eq, h1, hord]
+    norm_num
+  change toMeromorphicNFOn _ univ (-b) ≠ 0 ∧ toMeromorphicNFOn _ univ (1 - b) ≠ 0
+  simp only [ite_eq_left hχ, pow_one]
+  refine ⟨cancel _ (by dsimp only [P]; ring) (by ring_nf <;> norm_num) ?_,
+    cancel _ (by dsimp only [P]; ring) (by ring_nf <;> norm_num) ?_⟩
+  · simpa [hb] using hzero
+  · simpa [hb] using hone
 
 /-- Paper: Equation (7.1.4.4), p. 326.
 Evaluation of the m-th complex derivative at a point defines a continuous linear
@@ -369,7 +880,27 @@ functional in the compact-open topology. -/
 theorem entireJet_properties (ρ : ℂ) (m : ℕ) :
     let jet (f : Entire) := iteratedDeriv m (f.val : ℂ → ℂ) ρ
     (∀ f g : Entire, jet (f + g) = jet f + jet g) ∧
-      (∀ (a : ℂ) (f : Entire), jet (a • f) = a • jet f) ∧ Continuous jet := by sorry
+      (∀ (a : ℂ) (f : Entire), jet (a • f) = a • jet f) ∧ Continuous jet := by
+  dsimp only
+  have hd (f : Entire) : Differentiable ℂ (f.val : ℂ → ℂ) := f.property
+  refine ⟨fun f g ↦ iteratedDeriv_add (hd f).contDiff.contDiffAt (hd g).contDiff.contDiffAt,
+    fun a f ↦ iteratedDeriv_const_smul_field a (f.val : ℂ → ℂ), ?_⟩
+  apply continuous_iff_continuousAt.mpr
+  intro f
+  have hlim (n : ℕ) : TendstoLocallyUniformlyOn
+      (fun g : Entire ↦ iteratedDeriv n (g.val : ℂ → ℂ))
+      (iteratedDeriv n (f.val : ℂ → ℂ)) (𝓝 f) univ := by
+    induction n with
+    | zero =>
+      exact tendstoLocallyUniformlyOn_univ.mpr
+        (ContinuousMap.tendsto_iff_tendstoLocallyUniformly.mp
+          (show Tendsto (fun g : Entire ↦ g.val) (𝓝 f) (𝓝 f.val) from
+            continuous_subtype_val.continuousAt))
+    | succ n ih =>
+      simpa only [iteratedDeriv_succ, Function.comp_def] using
+        ih.deriv (Filter.Eventually.of_forall fun g ↦
+          ((hd g).contDiff.differentiable_iteratedDeriv' n).differentiableOn) isOpen_univ
+  exact (hlim m).tendsto_at (mem_univ ρ)
 
 /-- Paper: Equation (7.1.4.4), p. 326.
 The jet functional takes the m-th derivative of an entire function at the indicated point. -/
@@ -395,7 +926,25 @@ def entireJetSpace (ρ : ℂ) (n : ℕ) : Submodule ℂ (StrongDual ℂ Entire) 
 There are exactly n independent jet coordinates at a point for order n.
 Deviation: States the dimension check for the span used in the definition. -/
 theorem entireJetSpace_finrank (ρ : ℂ) (n : ℕ) :
-    Module.finrank ℂ (entireJetSpace ρ n) = n := by sorry
+    Module.finrank ℂ (entireJetSpace ρ n) = n := by
+  classical
+  let J (i : Fin n) := entireJet ρ i.val
+  have hJ : LinearIndependent ℂ J := by
+    apply Fintype.linearIndependent_iff.mpr
+    intro c hc i
+    let p : Entire := ⟨⟨fun z ↦ (z - ρ) ^ i.val, by fun_prop⟩,
+      (differentiable_id.sub (differentiable_const ρ)).pow _⟩
+    have hp (j : Fin n) : J j p = if j = i then (i.val.factorial : ℂ) else 0 := by
+      change iteratedDeriv j.val (fun z : ℂ ↦ (z - ρ) ^ i.val) ρ = _
+      simp only [iteratedDeriv_comp_sub_const (f := fun z : ℂ ↦ z ^ i.val), sub_self,
+        iteratedDeriv_fun_pow_zero, Fin.val_inj, apply_ite Nat.cast, Nat.cast_zero]
+    have h := congrArg (fun ℓ : StrongDual ℂ Entire ↦ ℓ p) hc
+    simp only [sum_apply, smul_apply,
+      hp, zero_apply, smul_eq_mul, mul_ite, mul_zero,
+      Finset.sum_ite_eq', Finset.mem_univ, ite_true] at h
+    exact (mul_eq_zero.mp h).resolve_right (by exact_mod_cast Nat.factorial_ne_zero i.val)
+  change Module.finrank ℂ (Submodule.span ℂ (range J)) = n
+  exact (finrank_span_eq_card hJ).trans (Fintype.card_fin n)
 
 /-- Paper: Theorem 7.1.4.2(1), p. 326.
 The annihilator of a principal ideal consists of the continuous linear functionals
@@ -536,7 +1085,20 @@ reciprocal factors of the selected places, with factor one at ramified places. -
 theorem orbitalHeckeGenerator_differentiable (S₀ : Finset Primes) :
     Differentiable ℂ (fun s ↦
       reciprocalPartialHeckeEulerProduct χ S₀ s *
-        (regularizedCompletedHeckeL χ τ hτ L hL hEq).val s) := by sorry
+        (regularizedCompletedHeckeL χ τ hτ L hL hEq).val s) := by
+  classical
+  refine Differentiable.mul ?_ (regularizedCompletedHeckeL χ τ hτ L hL hEq).property
+  unfold reciprocalPartialHeckeEulerProduct
+  apply Differentiable.fun_finsetProd
+  intro v _
+  by_cases hv : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · simp only [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv]
+    have hq : (v.asIdeal.absNorm : ℂ) ≠ 0 := by
+      exact_mod_cast (Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot)
+    exact (differentiable_const _).sub ((differentiable_const _).mul
+      (differentiable_id.neg.const_cpow (.inl hq)))
+  · simp only [finiteHeckeEulerFactor, ite_eq_right hv, inv_one]
+    exact differentiable_const _
 
 /-- Paper: Theorem 7.1.4.3(1), p. 331.
 The entire generator of the orbital ideal is the finite Euler correction of the regularized

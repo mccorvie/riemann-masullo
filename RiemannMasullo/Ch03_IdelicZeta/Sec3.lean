@@ -3031,7 +3031,56 @@ radial integral agrees with the quotient theta Mellin integral. -/
 theorem sLocalRadialMellinIntegral_eq_theta
     (τ : ℝ≥0ˣ →ₜ* Iₛ) (hτ : RightInverse τ (sIdeleNorm F S))
     (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) (s : ℂ) (hs : s ∈ rightHalf) :
-    sLocalRadialMellinIntegral τ f χ s = sLocalThetaMellinIntegral f (chartₛ(χ) s) := by sorry
+    sLocalRadialMellinIntegral τ f χ s = sLocalThetaMellinIntegral f (chartₛ(χ) s) := by
+  let c := chartₛ(χ) s
+  let G (g : Jₛ) := sLocalAdelicThetaOnClasses F S f g * c g
+  have hG : Integrable G μJ := sLocalThetaMellinIntegral_integrable f c ⟨χ, s, hs, rfl⟩
+  have hmap := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).2 τ hτ
+  rw [← hmap] at hG
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let e : ℝ ≃ₜ ℝ≥0ˣ :=
+    Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (x : ℝ) : e x = Units.mk0 (Real.exp x).toNNReal (by positivity) := by
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  let : SigmaFinite positiveRealHaar := by
+    unfold positiveRealHaar
+    rw [← funext he]
+    exact e.toMeasurableEquiv.sigmaFinite_map
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Iₛ := (sIdeleGroup_description F S).1.secondCountableTopology
+  let : SecondCountableTopology Jₛ := inferInstance
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  have hm : Measurable (normProduct(τ)) :=
+    (continuous_subtype_val.measurable.comp measurable_fst).mul
+      ((QuotientGroup.continuous_mk.comp τ.continuous).measurable.comp measurable_snd)
+  have hprod := hG.comp_aemeasurable hm.aemeasurable
+  change (∫ t, radial[τ, f, χ, s] t ∂positiveRealHaar) = ∫ g, G g ∂μJ
+  refine (congrArg (fun μ ↦ ∫ g, G g ∂μ) hmap).symm.trans ?_ |>.symm
+  refine (integral_map hm.aemeasurable hG.aestronglyMeasurable).trans ?_
+  refine (integral_prod_symm _ hprod).trans ?_
+  refine integral_congr_ae (.of_forall fun t ↦ ?_)
+  change (∫ h : J₁, G (h.val * classOf (τ t)) ∂μJ₁) = radial[τ, f, χ, s] t
+  simp only [sLocalHomogeneousAdelicTheta, IsLinearMap.mk'_apply, ContinuousMap.coe_mk]
+  rw [← integral_mul_const]
+  refine integral_congr_ae (.of_forall fun h ↦ ?_)
+  have hker : c h.val = (χ h.val : ℂ) := by
+    change (χ h.val : ℂ) * modℂ[mₛ, h.val] ^ s = (χ h.val : ℂ)
+    rw [MonoidHom.mem_ker.mp h.property]
+    simp
+  change sLocalAdelicThetaOnClasses F S f (h.val * classOf (τ t)) *
+      c (h.val * classOf (τ t)) =
+    (sLocalAdelicThetaOnClasses F S f (classOf (τ t) * h.val) * (χ h.val : ℂ)) *
+      c (classOf (τ t))
+  rw [map_mul c, hker, mul_assoc, mul_comm h.val]
 
 /-- Paper: Theorem 3.3.1.1(3), p. 129. The radial Mellin integrand is
 absolutely integrable for each positive abscissa. -/

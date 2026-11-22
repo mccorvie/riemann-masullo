@@ -547,10 +547,8 @@ In the special case $X$ is itself a Hausdorff locally compact abelian group, and
 Assume that there exists a non-empty connected subset $D\subset X$ with non-empty interior, such that
 
 $$
-\bigcup_{g\in G}\theta(g,D)=X, \tag{12.2.1.12}
+\bigcup_{g\in G}\theta(g,D)=X,\quad D\cap\theta(g,D)=\varnothing \tag{12.2.1.12}
 $$
-
-$$D\cap\theta(g,D)=\varnothing$$
 
 the last condition being assumed to hold for every $g\in G$ with $g\ne 1$. Assume that for every $g\in G$, with $g\ne 1$, the intersection:
 

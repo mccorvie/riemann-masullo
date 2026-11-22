@@ -5,6 +5,10 @@ public import RiemannMasullo.ForMathlib.RingTheory.DedekindDomain.Ideal.Lemmas
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Basic
 public import Mathlib.Analysis.Calculus.LogDeriv
 public import Mathlib.NumberTheory.ArithmeticFunction.VonMangoldt
+import Mathlib.RingTheory.Ideal.Int
+import Mathlib.RingTheory.RamificationInertia.Basic
+import Mathlib.Analysis.Complex.LocallyUniformLimit
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.ForMathlib.NumberTheory.EulerProduct.Basic
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.HeckeLFunction
@@ -545,6 +549,129 @@ theorem heckeIdealVonMangoldt_prime_pow (χ : 𝒳[F]) (v : HeightOneSpectrum (�
   rw [heckeIdealVonMangoldt, heckeIdealValue_prime_pow χ v hk, ite_eq_left hv,
     idealVonMangoldt_prime_pow v hk]
 
+/-- A positive prime power has twisted weight of norm at most the logarithm of its norm.
+The weight vanishes on all other ideals. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_weight (χ : U[F])
+    (I : Ideal (𝓞 F)) :
+    ‖heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I‖ ≤ Real.log I.absNorm := by
+  classical
+  by_cases h : ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ I = v.asIdeal ^ k
+  · obtain ⟨v, k, hk, rfl⟩ := h
+    have hq : (1 : ℝ) ≤ v.asIdeal.absNorm := by
+      exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).le
+    rw [heckeIdealVonMangoldt, heckeIdealValue_prime_pow _ v hk, idealVonMangoldt_prime_pow v hk,
+      norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.log_nonneg hq), map_pow, Nat.cast_pow]
+    split_ifs <;> simp only [norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow, one_mul,
+      norm_zero, zero_mul]
+    · exact Real.log_le_log (zero_lt_one.trans_le hq) (le_self_pow₀ hq hk.ne')
+    · exact Real.log_nonneg (one_le_pow₀ hq)
+  · simp [heckeIdealVonMangoldt, idealVonMangoldt, h, Real.log_natCast_nonneg]
+
+/-- The logarithmic weight is absorbed by the difference between two exponents greater than one. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_summable (χ : U[F]) (s : halfPlane) :
+    Summable (fun I : {I : Ideal (𝓞 F) // I ≠ ⊥} ↦
+      -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ) ^ (s : ℂ)) := by
+  obtain ⟨r, hr, hrs⟩ := exists_between (show 1 < (s : ℂ).re from s.property)
+  let ε := (s : ℂ).re - r
+  have hε : 0 < ε := sub_pos.mpr hrs
+  have hs := ((summable_absNorm_rpow F hr).subtype (fun I ↦ I ≠ ⊥)).div_const ε
+  apply hs.of_norm_bounded
+  intro I
+  let q : ℝ := I.val.absNorm
+  have hq : 0 < q := by
+    dsimp [q]
+    exact_mod_cast Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr I.property)
+  change ‖-heckeIdealVonMangoldt _ I.val / (q : ℂ) ^ (s : ℂ)‖ ≤ q ^ (-r) / ε
+  rw [norm_div, norm_neg, Complex.norm_cpow_eq_rpow_re_of_pos hq]
+  calc
+    _ ≤ (q ^ ε / ε) / q ^ (s : ℂ).re := by
+      apply div_le_div_of_nonneg_right _ (Real.rpow_nonneg hq.le _)
+      exact (finiteHeckeL_logDeriv_hasSum_ideals_weight χ I.val).trans
+        (Real.log_le_rpow_div hq.le hε)
+    _ = q ^ (-r) / ε := by
+      rw [div_right_comm, ← Real.rpow_sub hq]
+      congr 2
+      dsimp [ε]
+      ring
+
+/-- At one finite place, the logarithmic derivative sums the weights of its positive powers. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_local (χ : U[F])
+    (v : HeightOneSpectrum (𝓞 F)) (s : halfPlane) :
+    DifferentiableAt ℂ (finiteHeckeEulerFactor χ v) s ∧ finiteHeckeEulerFactor χ v s ≠ 0 ∧
+      HasSum (fun k : ℕ ↦ -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) (v.asIdeal ^ (k + 1)) /
+        ((v.asIdeal ^ (k + 1)).absNorm : ℂ) ^ (s : ℂ)) (logDeriv (finiteHeckeEulerFactor χ v) s) := by
+  classical
+  let ψ := ideleClassNormTwist χ 0
+  let a := if ψ.IsUnramifiedAt v then ψ.localValue v else 0
+  let q := v.asIdeal.absNorm
+  let z (w : ℂ) := a * (q : ℂ) ^ (-w)
+  have hq : (1 : ℝ) < q := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ : (q : ℂ) ≠ 0 := by exact_mod_cast (zero_lt_one.trans hq).ne'
+  have ha : ‖a‖ ≤ 1 := by
+    by_cases h : ψ.IsUnramifiedAt v <;> simp [a, h, ψ, norm_ideleClassNormTwist_zero_localValue]
+  have hz : ‖z s‖ < 1 := by
+    change ‖a * ((q : ℝ) : ℂ) ^ (-(s : ℂ))‖ < 1
+    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hq), Complex.neg_re]
+    exact (mul_le_of_le_one_left (Real.rpow_nonneg (Nat.cast_nonneg _) _) ha).trans_lt
+      (Real.rpow_lt_one_of_one_lt_of_neg hq (neg_lt_zero.mpr (zero_lt_one.trans s.property)))
+  have hden : 1 - z s ≠ 0 := fun h ↦ hz.ne (by rw [← sub_eq_zero.mp h, norm_one])
+  have hfactor : finiteHeckeEulerFactor χ v = fun w ↦ (1 - z w)⁻¹ := by
+    funext w
+    by_cases h : (ideleClassNormTwist χ 0).IsUnramifiedAt v <;>
+      simp [finiteHeckeEulerFactor, z, a, q, ψ, h]
+  rw [hfactor]
+  have dz := ((hasDerivAt_id (s : ℂ)).neg.const_cpow (Or.inl hq₀)).const_mul a
+  change HasDerivAt z _ (s : ℂ) at dz
+  have df := (dz.const_sub 1).inv hden
+  change HasDerivAt (fun w ↦ (1 - z w)⁻¹) _ (s : ℂ) at df
+  refine ⟨df.differentiableAt, inv_ne_zero hden, ?_⟩
+  have hlog : logDeriv (fun w ↦ (1 - z w)⁻¹) s =
+      (-Complex.log q * z s) * (1 - z s)⁻¹ := by
+    rw [logDeriv_apply, df.deriv]
+    change _ / (1 - z s)⁻¹ = _
+    field_simp [hden]
+    dsimp [z]
+    ring
+  rw [hlog]
+  apply ((hasSum_geometric_of_norm_lt_one hz).mul_left (-Complex.log q * z s)).congr_fun
+  intro k
+  have hv : heckeIdealValue ψ (v.asIdeal ^ (k + 1)) = a ^ (k + 1) := by
+    rw [heckeIdealValue_prime_pow _ v (Nat.succ_pos k)]
+    by_cases h : ψ.IsUnramifiedAt v <;> simp [a, h]
+  rw [heckeIdealVonMangoldt, hv, idealVonMangoldt_prime_pow v (Nat.succ_pos k),
+    map_pow, Nat.cast_pow, ← Complex.natCast_cpow_natCast_mul, Complex.cpow_nat_mul,
+    Complex.natCast_log]
+  change -(a ^ (k + 1) * Complex.log q) / ((q : ℂ) ^ (s : ℂ)) ^ (k + 1) =
+    (-Complex.log q * z s) * z s ^ k
+  rw [mul_assoc (-Complex.log q), ← pow_succ',
+    show z s = a * ((q : ℂ) ^ (s : ℂ))⁻¹ by simp [z, Complex.cpow_neg],
+    mul_pow, inv_pow, div_eq_mul_inv]
+  ring
+
+/-- On the right half-plane, the logarithmic derivatives of the local Euler factors sum
+to the logarithmic derivative of the continuation. -/
+private theorem finiteHeckeL_logDeriv_hasSum_ideals_places (χ : U[F]) (L : ℂ → ℂ)
+    (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) (s : halfPlane) :
+    L s ≠ 0 ∧ HasSum (fun v ↦ logDeriv (finiteHeckeEulerFactor χ v) s) (logDeriv L s) := by
+  have hlocal := finiteHeckeL_logDeriv_hasSum_ideals_local χ
+  have hn : L s ≠ 0 := by
+    rw [hSeries s]
+    exact finiteHeckeL_ne_zero_of_one_lt_re χ s
+  refine ⟨hn, ?_⟩
+  obtain ⟨r, hr, hrs⟩ := exists_between (show 1 < (s : ℂ).re from s.property)
+  let D := Complex.re ⁻¹' Ioi r
+  have hD : IsOpen D := isOpen_Ioi.preimage Complex.continuous_re
+  have hconv := (finiteHeckeEulerProduct_tendstoUniformlyOn_halfPlane χ hr).mono
+    (show D ⊆ {w : ℂ | r ≤ w.re} from fun w (hw : r < w.re) ↦ show r ≤ w.re from hw.le)
+  have hconvL := hconv.congr_right
+    (show EqOn _ L D from fun w hw ↦ (hSeries ⟨w, hr.trans hw⟩).symm)
+  have hd (v : HeightOneSpectrum (𝓞 F)) : DifferentiableOn ℂ (finiteHeckeEulerFactor χ v) D :=
+    fun w hw ↦ (hlocal v ⟨w, hr.trans hw⟩).1.differentiableWithinAt
+  apply (Complex.logDeriv_tendsto hD hrs hconvL.tendstoLocallyUniformlyOn
+    (.of_forall fun S ↦ DifferentiableOn.fun_finsetProd fun v _ ↦ hd v) hn).congr
+  intro S
+  exact logDeriv_fun_prod (fun v _ ↦ (hlocal v s).2.1) (fun v _ ↦ (hlocal v s).1)
+
 /-- Paper: Equation (B.6.1.12), p. 638. To the right of one, the negative of
 the Dirichlet series weighted by the ideal von Mangoldt function converges
 absolutely to the logarithmic derivative of the finite Hecke L-function. -/
@@ -555,7 +682,30 @@ theorem finiteHeckeL_logDeriv_hasSum_ideals (χ : U[F]) (L : ℂ → ℂ)
       HasSum (fun I : {I : Ideal (𝓞 F) // I ≠ ⊥} ↦
         -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val /
           (I.val.absNorm : ℂ) ^ (s : ℂ)) (logDeriv L s) := by
-  sorry
+  obtain ⟨hne, hplaces⟩ := finiteHeckeL_logDeriv_hasSum_ideals_places χ L hSeries s
+  have hNF := hL (mem_univ (s : ℂ))
+  refine ⟨hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    (hNF.meromorphicOrderAt_eq_zero_iff.mpr hne).ge, hne, ?_⟩
+  let P (p : HeightOneSpectrum (𝓞 F) × ℕ) : {I : Ideal (𝓞 F) // I ≠ ⊥} :=
+    ⟨p.1.asIdeal ^ (p.2 + 1), pow_ne_zero _ p.1.ne_bot⟩
+  have hP : Injective P := by
+    rintro ⟨v, k⟩ ⟨w, j⟩ he
+    have heq : v.asIdeal ^ (k + 1) = w.asIdeal ^ (j + 1) := congrArg Subtype.val he
+    obtain rfl := HeightOneSpectrum.eq_of_dvd_pow ((dvd_pow_self _ k.succ_ne_zero).trans heq.dvd)
+    exact Prod.ext rfl (Nat.succ.inj (pow_injective_of_not_isUnit v.prime.not_isUnit v.ne_bot heq))
+  let f (I : {I : Ideal (𝓞 F) // I ≠ ⊥}) :=
+    -heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I.val / (I.val.absNorm : ℂ) ^ (s : ℂ)
+  have hout (I) (hI : I ∉ range P) : f I = 0 := by
+    have h : ¬ ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ I.val = v.asIdeal ^ k := by
+      rintro ⟨v, _ | k, hk, he⟩
+      · exact hk.false
+      · exact hI ⟨(v, k), Subtype.ext he.symm⟩
+    simp [f, heckeIdealVonMangoldt, idealVonMangoldt, h]
+  have hsum : Summable (f ∘ P) :=
+    (finiteHeckeL_logDeriv_hasSum_ideals_summable χ s).comp_injective hP
+  have hvalue := hsum.hasSum.prod_fiberwise fun v ↦
+    (finiteHeckeL_logDeriv_hasSum_ideals_local χ v s).2.2
+  exact (hP.hasSum_iff hout).mp (hvalue.unique hplaces ▸ hsum.hasSum)
 
 /-- Paper: Equation (B.6.1.14), p. 638. The coefficient `Aₘ` sums the
 character-weighted von Mangoldt values over nonzero ideals of norm `m`.
@@ -650,6 +800,137 @@ theorem heckeLogDerivCoefficient_trivial_rat (m : ℕ) :
     rw [heckeIdealVonMangoldt, heckeIdealValue_of_forall_eq_one _ hχ ((hmem _).mpr rfl).1,
       idealVonMangoldt_ratSpan, one_mul]
 
+/-- A unitary character twisted by the trivial norm power has values of norm at most one,
+so the twisted von Mangoldt weight is bounded by the ideal von Mangoldt weight. -/
+private theorem heckeLogDerivCoefficient_bound_norm_le (χ : U[F]) (I : Ideal (𝓞 F)) :
+    ‖heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I‖ ≤ idealVonMangoldt I := by
+  classical
+  have hΛ : 0 ≤ idealVonMangoldt I := by
+    unfold idealVonMangoldt
+    split_ifs
+    exacts [Real.log_natCast_nonneg _, le_rfl]
+  have hval : ‖heckeIdealValue (ideleClassNormTwist χ 0) I‖ ≤ 1 := by
+    unfold heckeIdealValue
+    split_ifs
+    · simp
+    · refine finprod_induction (fun z : ℂ ↦ ‖z‖ ≤ 1) (by simp)
+        (fun x y hx hy ↦ (norm_mul_le x y).trans (by nlinarith [norm_nonneg x, norm_nonneg y]))
+        fun v ↦ ?_
+      rw [norm_pow]
+      refine pow_le_one₀ (norm_nonneg _) ?_
+      split_ifs
+      · exact (norm_ideleClassNormTwist_zero_localValue χ v).le
+      · simp
+  rw [heckeIdealVonMangoldt, norm_mul, Complex.norm_real, Real.norm_of_nonneg hΛ]
+  exact mul_le_of_le_one_left hΛ hval
+
+/-- A nonzero prime ideal lies over a rational prime `q`, and its norm is a positive
+power of `q`. -/
+private theorem heckeLogDerivCoefficient_bound_liesOver (v : HeightOneSpectrum (𝓞 F)) :
+    ∃ q f : ℕ, q.Prime ∧ 0 < f ∧ v.asIdeal.LiesOver (Ideal.span {(q : ℤ)}) ∧
+      v.asIdeal.absNorm = q ^ f := by
+  have : NeZero v.asIdeal := ⟨v.ne_bot⟩
+  set q := Ideal.absNorm (v.asIdeal.under ℤ)
+  have hl : v.asIdeal.LiesOver (Ideal.span {(q : ℤ)}) := Int.liesOver_span_absNorm _
+  refine ⟨q, v.asIdeal.inertiaDeg ℤ, Nat.absNorm_under_prime v.asIdeal,
+    Ideal.inertiaDeg_pos _ _, hl, ?_⟩
+  rw [← Ideal.natAbs_pow_inertiaDeg (q : ℤ) v.asIdeal, Int.natAbs_natCast]
+
+/-- At most `[F : ℚ]` positive prime-ideal powers have a given norm `m ≥ 2`, and each
+has von Mangoldt weight at most `log m`. -/
+private theorem heckeLogDerivCoefficient_bound_finsum_le {m : ℕ} (hm : 2 ≤ m) :
+    ∑ᶠ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}, idealVonMangoldt I.val ≤
+      Module.finrank ℚ F * Real.log m := by
+  classical
+  set p := m.minFac
+  have hp : p.Prime := Nat.minFac_prime (by omega)
+  have : Fact p.Prime := ⟨hp⟩
+  set P : Ideal ℤ := Ideal.span {(p : ℤ)}
+  have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = m}.Finite :=
+    (Ring.HasFiniteQuotients.finite_absNorm_eq (S := 𝓞 F) m).subset fun _ h ↦ h.2
+  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := hfin.to_subtype
+  have : Fintype {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := Fintype.ofFinite _
+  have : Fintype (P.primesOver (𝓞 F)) := (primesOver_finite P (𝓞 F)).fintype
+  -- The ideals with nonzero weight are positive powers of primes over `p`.
+  have hpow : ∀ I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m}, idealVonMangoldt I.val ≠ 0 →
+      ∃ v : HeightOneSpectrum (𝓞 F), ∃ k, 0 < k ∧ I.val = v.asIdeal ^ k := by
+    intro I hI
+    by_contra h
+    exact hI (by rw [idealVonMangoldt, dite_eq_right_iff.mpr fun h' ↦ absurd h' h])
+  have hover : ∀ (v : HeightOneSpectrum (𝓞 F)) (k : ℕ), 0 < k →
+      (v.asIdeal ^ k).absNorm = m → v.asIdeal ∈ P.primesOver (𝓞 F) := by
+    intro v k hk hvk
+    obtain ⟨q, f, hq, hf, hlies, hnorm⟩ := heckeLogDerivCoefficient_bound_liesOver v
+    rw [map_pow, hnorm, ← pow_mul] at hvk
+    have hqp : q = p := by
+      have h : m.minFac = q := by rw [← hvk, hq.pow_minFac (Nat.mul_ne_zero hf.ne' hk.ne')]
+      exact h.symm
+    subst hqp
+    exact ⟨v.isPrime, hlies⟩
+  have hle : ∀ (v : HeightOneSpectrum (𝓞 F)) (k : ℕ), 0 < k →
+      (v.asIdeal ^ k).absNorm = m → Real.log (v.asIdeal.absNorm : ℝ) ≤ Real.log m := by
+    intro v k hk hvk
+    have h0 : 0 < v.asIdeal.absNorm :=
+      Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot)
+    refine Real.log_le_log (by exact_mod_cast h0) ?_
+    rw [← hvk, map_pow]
+    exact_mod_cast Nat.le_self_pow hk.ne' _
+  -- Weighted ideals inject into the primes over `p` through their radicals.
+  set s := Finset.univ.filter fun I : {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} ↦
+    idealVonMangoldt I.val ≠ 0
+  have hrad : ∀ I ∈ s, ∃ v : HeightOneSpectrum (𝓞 F), ∃ k, 0 < k ∧ I.val = v.asIdeal ^ k ∧
+      I.val.radical = v.asIdeal := by
+    intro I hI
+    obtain ⟨v, k, hk, hI'⟩ := hpow I (Finset.mem_filter.mp hI).2
+    exact ⟨v, k, hk, hI', by rw [hI', Ideal.radical_pow v.asIdeal hk.ne', v.isPrime.radical]⟩
+  have hcard : s.card ≤ Fintype.card (P.primesOver (𝓞 F)) := by
+    rw [← Fintype.card_coe s]
+    refine Fintype.card_le_of_injective (fun I ↦ ⟨I.1.1.radical, ?_⟩) ?_
+    · obtain ⟨v, k, hk, hI, hr⟩ := hrad I.1 I.2
+      rw [hr]
+      exact hover v k hk (hI ▸ I.1.2.2)
+    · rintro ⟨I, hI⟩ ⟨J, hJ⟩ hIJ
+      obtain ⟨v, k, hk, hI', hrI⟩ := hrad I hI
+      obtain ⟨w, j, hj, hJ', hrJ⟩ := hrad J hJ
+      have hvw : v.asIdeal = w.asIdeal := by
+        have := congrArg Subtype.val hIJ
+        simp only at this
+        rw [← hrI, ← hrJ, this]
+      have h2 : 2 ≤ v.asIdeal.absNorm := by
+        have h0 := Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot
+        have h1 : v.asIdeal.absNorm ≠ 1 := by
+          rw [Ne, Ideal.absNorm_eq_one_iff]
+          exact v.isPrime.ne_top
+        omega
+      have hkj : k = j := by
+        have hI2 := I.2.2
+        have hJ2 := J.2.2
+        rw [hI', map_pow] at hI2
+        rw [hJ', ← hvw, map_pow] at hJ2
+        exact Nat.pow_right_injective h2 (hI2.trans hJ2.symm)
+      have : I = J := Subtype.ext (by rw [hI', hJ', hvw, hkj])
+      subst this
+      rfl
+  have hprimes : Fintype.card (P.primesOver (𝓞 F)) ≤ Module.finrank ℚ F := by
+    rw [← RingOfIntegers.rank, ← Ideal.sum_ramification_inertia_eq_finrank P (𝓞 F),
+      Fintype.card_eq_sum_ones]
+    refine Finset.sum_le_sum fun q _ ↦ ?_
+    have : q.1.IsPrime := q.2.1
+    have : q.1.LiesOver P := q.2.2
+    exact Nat.one_le_iff_ne_zero.mpr (Nat.mul_ne_zero
+      (Ideal.ramificationIdx_pos ℤ q.1).ne' (Ideal.inertiaDeg_pos q.1 ℤ).ne')
+  rw [finsum_eq_sum_of_fintype, ← Finset.sum_filter_ne_zero]
+  have hlogm : 0 ≤ Real.log m := Real.log_natCast_nonneg m
+  calc ∑ I ∈ s, idealVonMangoldt I.val ≤ ∑ _I ∈ s, Real.log m := by
+        refine Finset.sum_le_sum fun I hI ↦ ?_
+        obtain ⟨v, k, hk, hI', -⟩ := hrad I hI
+        rw [hI', idealVonMangoldt_prime_pow v hk]
+        exact hle v k hk (hI' ▸ I.2.2)
+    _ = s.card * Real.log m := by rw [Finset.sum_const, nsmul_eq_mul]
+    _ ≤ Module.finrank ℚ F * Real.log m := by
+        gcongr
+        exact_mod_cast hcard.trans hprimes
+
 /-- Paper: Lemma B.6.1.4, p. 638. The logarithmic-derivative coefficients are
 bounded by a constant times `log m`, with the constant depending only on the field degree. -/
 theorem heckeLogDerivCoefficient_bound (d : ℕ) :
@@ -657,7 +938,22 @@ theorem heckeLogDerivCoefficient_bound (d : ℕ) :
       ∀ (F : Type*) [Field F] [NumberField F], Module.finrank ℚ F = d →
         ∀ᶠ m : ℕ in atTop, ∀ χ : U[F],
           ‖heckeLogDerivCoefficient (ideleClassNormTwist χ 0) m‖ ≤ C * Real.log (m : ℝ) := by
-  sorry
+  refine ⟨d + 1, by positivity, fun F _ _ hd ↦ ?_⟩
+  subst hd
+  filter_upwards [eventually_ge_atTop 2] with m hm χ
+  classical
+  have hfin : {I : Ideal (𝓞 F) | I ≠ ⊥ ∧ I.absNorm = m}.Finite :=
+    (Ring.HasFiniteQuotients.finite_absNorm_eq (S := 𝓞 F) m).subset fun _ h ↦ h.2
+  have : Finite {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := hfin.to_subtype
+  have : Fintype {I : Ideal (𝓞 F) // I ≠ ⊥ ∧ I.absNorm = m} := Fintype.ofFinite _
+  have hsum := heckeLogDerivCoefficient_bound_finsum_le (F := F) hm
+  rw [finsum_eq_sum_of_fintype] at hsum
+  unfold heckeLogDerivCoefficient
+  rw [finsum_eq_sum_of_fintype]
+  refine (norm_sum_le _ _).trans ((Finset.sum_le_sum fun I _ ↦
+    heckeLogDerivCoefficient_bound_norm_le χ I.val).trans (hsum.trans ?_))
+  gcongr
+  linarith
 
 -- TODO(paper-gap): In (B.6.1.16) a pure norm twist can have a pole in Ω.
 -- Restrict the logarithm to heights above the pole. After (B.6.1.19) the
