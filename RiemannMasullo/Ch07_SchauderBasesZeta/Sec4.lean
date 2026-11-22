@@ -214,7 +214,12 @@ local notation "Aθ(" φ ")" => (exists_polarThetaNuclearityAction χ τ hτ φ)
 /-- Paper: Equation (7.4.0.2), p. 366.
 The finite places of a number field lying above one rational prime form a finite set. -/
 theorem finite_nuclearityPlacesAbove (p : HeightOneSpectrum (𝓞 ℚ)) :
-    {v : V | v.under (𝓞 ℚ) = p}.Finite := by sorry
+    {v : V | v.under (𝓞 ℚ) = p}.Finite := by
+  apply Set.Finite.of_finite_image (f := HeightOneSpectrum.asIdeal)
+    (hi := HeightOneSpectrum.asIdeal_injective.injOn)
+  apply (IsDedekindDomain.primesOver_finite p.asIdeal (𝓞 F)).subset
+  rintro _ ⟨w, hw, rfl⟩
+  exact ⟨w.isPrime, ⟨congrArg HeightOneSpectrum.asIdeal (show w.under (𝓞 ℚ) = p from hw).symm⟩⟩
 
 local notation "Sₚ(" p ")" => (finite_nuclearityPlacesAbove (F := F) p).toFinset
 
