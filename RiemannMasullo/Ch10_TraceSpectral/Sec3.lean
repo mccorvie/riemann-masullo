@@ -6,6 +6,8 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 public import Mathlib.Analysis.InnerProductSpace.ProdL2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
+import all RiemannMasullo.Ch09_HardySobolev.Sec3
+
 /-!
 # Spectral nuclearity
 
@@ -253,7 +255,13 @@ the unweighted integral against the twisted base character. -/
 theorem spectralConvolution_mellin_integrable (φ : BruhatCompactSupport C𝔽)
     (χ : PontryaginDual C𝔽) (z : ℂ) :
     Integrable (fun g ↦ φ.val g * ideleClassNormTwist (F := F) χ z g) μ𝔽 ∧
-      M(φ, χ, z) = ∫ g, φ.val g * ideleClassNormTwist (F := F) χ z g ∂μ𝔽 := by sorry
+      M(φ, χ, z) = ∫ g, φ.val g * ideleClassNormTwist (F := F) χ z g ∂μ𝔽 := by
+  have hc : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  constructor
+  · exact (hc.mul (ideleClassNormTwist χ z).continuous).integrable_of_hasCompactSupport
+      (show HasCompactSupport φ.val from φ.property.2).mul_right
+  · exact Set.indicator_of_mem (Set.mem_univ _) _
 
 section Line
 
