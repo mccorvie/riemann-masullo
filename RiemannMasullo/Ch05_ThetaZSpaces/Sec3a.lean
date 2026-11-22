@@ -468,7 +468,9 @@ theorem mem_realSchwartzFlatAtOrigin_iff (f : 𝓢(ℝ, ℂ)) :
 /-- Paper: Theorem 5.3.2.1(1), p. 243.
 The flat real Schwartz subspace is closed. -/
 theorem realSchwartzFlatAtOrigin_isClosed :
-    IsClosed (realSchwartzFlatAtOrigin : Set 𝓢(ℝ, ℂ)) := by sorry
+    IsClosed (realSchwartzFlatAtOrigin : Set 𝓢(ℝ, ℂ)) := by
+  rw [realSchwartzFlatAtOrigin, Submodule.coe_iInf]
+  exact isClosed_iInter fun k ↦ (realDiracDerivative k).isClosed_ker
 
 -- TODO(paper-gap): The coefficient seminorms in (5.3.2.2) give the coefficientwise
 -- topology on the whole polynomial space and do not give its finest locally convex topology.
