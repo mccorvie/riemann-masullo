@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
+import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import all RiemannMasullo.Ch02_AdelicTheta.Sec4
 
 /-! # Chapter 6.2: statements that are false as printed -/
 
@@ -193,12 +195,129 @@ def Printed.infiniteStandardThetaAverage_schwartz_logProfile : Prop :=
           (FiniteAdeleRing (𝓞 F) F)).toMonoidHom (canonicalIdeleNormSection F u)
         φ t = infiniteStandardThetaAverage χ r f x
 
+private theorem infiniteStandardThetaAverage_ratGaussian : ∃ f : ℬ∞(ℚ), ∀ x : InfiniteAdeleRing ℚ,
+    f (Multiplicative.ofAdd x) = (Real.exp (-Real.pi * ‖x Rat.infinitePlace‖ ^ 2) : ℂ) := by
+  let e : Multiplicative (InfiniteAdeleRing ℚ) ≃ₜ* Multiplicative Rat.infinitePlace.Completion :=
+    { Homeomorph.piUnique InfinitePlace.Completion with map_mul' := fun _ _ ↦ rfl }
+  let s := infiniteStandardGaussian Rat.infinitePlace 1
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing ℚ)) :=
+    inferInstanceAs (LocallyCompactSpace (InfiniteAdeleRing ℚ))
+  let : LocallyCompactSpace (Multiplicative Rat.infinitePlace.Completion) :=
+    inferInstanceAs (LocallyCompactSpace Rat.infinitePlace.Completion)
+  let : T2Space (Multiplicative (InfiniteAdeleRing ℚ)) :=
+    inferInstanceAs (T2Space ((v : InfinitePlace ℚ) → v.Completion))
+  let : T2Space (Multiplicative Rat.infinitePlace.Completion) :=
+    inferInstanceAs (T2Space Rat.infinitePlace.Completion)
+  refine ⟨⟨_, schwartzBruhat_mem_comp_equiv e s.property⟩, fun x ↦ ?_⟩
+  change infiniteStandardGaussianValue Rat.infinitePlace 1 (x Rat.infinitePlace) = _
+  have hi := InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+  have hn := hi.norm_map_of_map_zero (map_zero _) (x Rat.infinitePlace)
+  simp [infiniteStandardGaussianValue, Rat.isReal_infinitePlace,
+    ← hn, Real.norm_eq_abs, sq_abs]
+
+private theorem infiniteStandardThetaAverage_ratNormOne (g : Nₛ(ℚ, ∅)) :
+    ‖g.val.val.1 Rat.infinitePlace‖ = 1 := by
+  simpa [MonoidHom.mem_ker.mp g.property] using (rat_sIdeleNorm_eq ∅ g.val).symm
+
+private theorem infiniteStandardThetaAverage_ratFinite : Finite Nₛ(ℚ, ∅) := by
+  classical
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+  let c (g : Nₛ(ℚ, ∅)) := e (g.val.val.1 Rat.infinitePlace)
+  have hi := InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal Rat.isReal_infinitePlace
+  have hc (g : Nₛ(ℚ, ∅)) : |c g| = 1 :=
+    (hi.norm_map_of_map_zero (map_zero _) _).trans (infiniteStandardThetaAverage_ratNormOne g)
+  let signs : Finset ℝ := {1, -1}
+  have hmem (g : Nₛ(ℚ, ∅)) : c g ∈ signs := by
+    simpa [signs] using (abs_eq (zero_le_one : (0 : ℝ) ≤ 1)).mp (hc g)
+  apply Finite.of_injective (fun g : Nₛ(ℚ, ∅) ↦ (⟨c g, hmem g⟩ : signs))
+  intro g h eq
+  apply Subtype.ext
+  apply Units.ext
+  apply Prod.ext _ (Subsingleton.elim _ _)
+  funext v
+  obtain rfl := Subsingleton.elim v Rat.infinitePlace
+  exact e.injective (congrArg Subtype.val eq)
+
+private theorem infiniteStandardThetaAverage_ratGaussian_apply (f : ℬ∞(ℚ))
+    (hf : ∀ x : InfiniteAdeleRing ℚ, f (Multiplicative.ofAdd x) =
+      (Real.exp (-Real.pi * ‖x Rat.infinitePlace‖ ^ 2) : ℂ))
+    (x : (InfiniteAdeleRing ℚ)ˣ) :
+    infiniteStandardThetaAverage (F := ℚ) (S := ∅) 1 (fun _ ↦ 1) f x =
+      (sNormOneIdeleTamagawaMeasure ℚ ∅).real Set.univ •
+        (Real.exp (-Real.pi * ‖x.val Rat.infinitePlace‖ ^ 2) : ℂ) := by
+  classical
+  have : Subsingleton (Fin (classNumber ℚ)) := by
+    rw [Rat.classNumber_eq]
+    infer_instance
+  rw [infiniteStandardThetaAverage_apply, Fintype.sum_subsingleton _ ⟨0, classNumber_pos ℚ⟩,
+    ← integral_const]
+  apply integral_congr_ae
+  apply Filter.Eventually.of_forall
+  intro g
+  simp only [Subgroup.coe_one, map_one, one_mul, PontryaginDual.one_apply, Circle.coe_one,
+    mul_one, hf]
+  let v := Units.map (Pi.evalRingHom InfinitePlace.Completion Rat.infinitePlace).toMonoidHom
+  let a := Units.map (RingHom.fst (InfiniteAdeleRing ℚ)
+    (∀ p : (∅ : Finset Places(ℚ)), L(ℚ, p.val))).toMonoidHom g.val
+  have harg : ‖(a⁻¹ * x).val Rat.infinitePlace‖ = ‖x.val Rat.infinitePlace‖ := by
+    change ‖(v (a⁻¹ * x)).val‖ = _
+    rw [map_mul, map_inv, Units.val_mul, Units.val_inv_eq_inv_val, norm_mul, norm_inv]
+    change ‖g.val.val.1 Rat.infinitePlace‖⁻¹ * ‖x.val Rat.infinitePlace‖ = _
+    rw [infiniteStandardThetaAverage_ratNormOne, inv_one, one_mul]
+  rw [harg]
+
+private theorem infiniteStandardThetaAverage_ratSection_norm (u : ℝ≥0ˣ) :
+    ‖(canonicalIdeleNormSection ℚ u).val.1 Rat.infinitePlace‖ = (u.val : ℝ) := by
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding Rat.infinitePlace
+  have hn := hi.norm_map_of_map_zero (map_zero _) ((canonicalIdeleNormSection ℚ u).val.1 Rat.infinitePlace)
+  rw [← hn, canonicalIdeleNormSection_infinite]
+  simp
+
 /-- Paper: Theorem 6.2.2.1(2), pp. 299, 302. Over ℚ at the archimedean stage, take the
 trivial character, the identity representative and the real Gaussian `exp(-πx²)`. Its unweighted
 logarithmic profile is a positive constant times `exp(-π exp(2t))`, which has a nonzero limit
 as t tends to negative infinity. -/
 theorem Printed.infiniteStandardThetaAverage_schwartz_logProfile_false :
-    ¬ Printed.infiniteStandardThetaAverage_schwartz_logProfile := by sorry
+    ¬ Printed.infiniteStandardThetaAverage_schwartz_logProfile := by
+  classical
+  intro h
+  have hω : NormOneCharacterUnramifiedOutside (F := ℚ) 1 ∅ :=
+    ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
+  have hchar : sLocalNormOneCharacter (F := ℚ) ∅ 1 hω = 1 := by
+    let hu := (normOneCharacterUnramifiedOutside_iff (F := ℚ) 1).mp hω
+    exact hu.unique hu.exists.choose_spec (fun _ _ _ _ _ ↦ rfl)
+  have : IsPrincipalIdealRing (𝓞 ℚ) := classNumber_eq_one_iff.mp Rat.classNumber_eq
+  have hPic : Subsingleton Picₛ(ℚ, (∅ : Finset Places(ℚ))) := by
+    rw [Finset.coe_empty, integer_empty]
+    let e := Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)
+    let := IsPrincipalIdealRing.of_surjective e.symm e.symm.surjective
+    infer_instance
+  have : Subsingleton (Fin (classNumber ℚ)) := by
+    rw [Rat.classNumber_eq]
+    infer_instance
+  have : Nonempty (Fin (classNumber ℚ)) := ⟨⟨0, classNumber_pos ℚ⟩⟩
+  obtain ⟨f, hf⟩ := infiniteStandardThetaAverage_ratGaussian
+  obtain ⟨φ, hφ⟩ := h ℚ ∅ hPic 1 hω 1 (by simp [hchar]) (fun _ ↦ 1)
+    ⟨rfl, bijective_of_subsingleton' _⟩ f
+  let μ := sNormOneIdeleTamagawaMeasure ℚ ∅
+  have haar := (sNormOneIdeleTamagawaMeasure_existsUnique ℚ ∅).exists.choose_spec.1
+  have : Finite Nₛ(ℚ, ∅) := infiniteStandardThetaAverage_ratFinite
+  have : CompactSpace Nₛ(ℚ, ∅) := Finite.compactSpace
+  have hm : (μ.real Set.univ : ℂ) ≠ 0 := by
+    apply Complex.ofReal_ne_zero.mpr
+    exact (ENNReal.toReal_pos (haar.open_pos Set.univ isOpen_univ Set.univ_nonempty)
+      (haar.lt_top_of_isCompact isCompact_univ).ne).ne'
+  have hval (t : ℝ) : φ t =
+      (μ.real Set.univ : ℂ) * (Real.exp (-Real.pi * Real.exp t ^ 2) : ℂ) := by
+    rw [hφ, infiniteStandardThetaAverage_ratGaussian_apply f hf]
+    simp [infiniteStandardThetaAverage_ratSection_norm, Units.coe_map,
+      Real.toNNReal_of_nonneg (Real.exp_pos t).le, Algebra.smul_def, μ]
+  have hlim : Filter.Tendsto φ Filter.atBot (𝓝 (μ.real Set.univ : ℂ)) := by
+    have hc : Continuous (fun s : ℝ ↦ (μ.real Set.univ : ℂ) *
+        (Real.exp (-Real.pi * s ^ 2) : ℂ)) := by fun_prop
+    rw [funext hval]
+    simpa [Function.comp_def] using (hc.tendsto 0).comp Real.tendsto_exp_atBot
+  exact hm (tendsto_nhds_unique hlim (φ.tendsto_cocompact.mono_left atBot_le_cocompact))
 
 end StandardFunctions
 
