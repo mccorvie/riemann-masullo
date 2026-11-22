@@ -212,7 +212,13 @@ using the strong $(2,2)$ inequality from (A.5.3.18)), the argument for (1) is no
 
 (2) : We first assume $\rho\in C_c(G)$. Since $\rho(x)k(x,y)$ is a representative function for the Hilbert-Schmidt kernel of $M_\rho\circ T$ on $L^2(G,\lambda)$, and $\widetilde{k}(x,y)$ equals $k(x,y)$ on $(\mu_G\otimes\mu_G)$-almost every point, we have $k(x,y) = \widetilde{k}(x,y)$ also $(\lambda\otimes\lambda)$-almost everywhere, since $\lambda$ and $\mu_G$ have the same null sets (indeed, both $\lambda$ and $\mu_G$ are $\sigma$-finite Radon measures on $G$ since $G$ is second countable, and $f$ is the Radon-Nikodym derivative of $\lambda$ with respect to $\mu_G$. Since it is nowhere vanishing, $\lambda$ and $\mu_G$ are equivalent: a subset $A\subset G$ is $\mu_G$-measurable if and only if it is $\lambda$-measurable, and $\mu_G(A) = \int_A f(x)\,\mu_G(x) = 0$ if and only if $1_A(x)f(x) = 0$ for $\mu_G$-almost all $x\in A$, which forces $\mu_G(A) = 0$).
 
-It follows that we have $\rho(x)\int_G \widetilde{k}(x,y)\phi(y)\,\mathrm{d}\lambda(y) = \rho(x)\int_G k(x,y)\phi(y)\,\mathrm{d}\lambda(y) = (M_\rho\circ T\phi)(x)$ for $\lambda$-almost all $x\in G$, which shows that $\rho(x)\widetilde{k}(x,y)$ is another representative function for the Hilbert-Schmidt kernel of $M_\rho\circ T$. We write $k_\rho(x,y) := \rho(x)k(x,y)$, and compute $\widetilde{k}_\rho(x,y)$. Upon showing that we have, for $\mu_G$-almost all $x\in G$, $\widetilde{k}_\rho(x,x) = \rho(x)\widetilde{k}(x,x)$, then the same identity holds for $\lambda$-almost all $x\in G$, and then (12.1.1.3) follows from (12.1.1.2) of (1).
+It follows that we have
+
+$$
+\rho(x)\int_G \widetilde{k}(x,y)\phi(y)\,\mathrm{d}\lambda(y) = \rho(x)\int_G k(x,y)\phi(y)\,\mathrm{d}\lambda(y) = (M_\rho\circ T\phi)(x)
+$$
+
+for $\lambda$-almost all $x\in G$, which shows that $\rho(x)\widetilde{k}(x,y)$ is another representative function for the Hilbert-Schmidt kernel of $M_\rho\circ T$. We write $k_\rho(x,y) := \rho(x)k(x,y)$, and compute $\widetilde{k}_\rho(x,y)$. Upon showing that we have, for $\mu_G$-almost all $x\in G$, $\widetilde{k}_\rho(x,x) = \rho(x)\widetilde{k}(x,x)$, then the same identity holds for $\lambda$-almost all $x\in G$, and then (12.1.1.3) follows from (12.1.1.2) of (1).
 
 We have, for $(\mu_G\otimes\mu_G)$-almost every $(x,y)\in G$ (in fact, for any regular point $(x,y)\in G\times G$ for $k$):
 
@@ -600,28 +606,28 @@ $$
 
 *is valued in measurable complex-valued functions over $G\times G$.*
 
-*If $\mu_{G/H}$-almost every point $(x,x)\in G/H\times G/H$ is regular for $u$, then $\tilde u(x,x)$ is $\mu_{G/H}$-measurable, defined $\mu_{G/H}$-almost everywhere. If it is absolutely $\mu_{G/H}$-integrable as a function on $G/H$, then the functions $\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)$ and $\Psi^\Delta_{u_0}(\tilde u)(x,h^{-1}x)$, defined for all $h\in H$, $\mu_G$-almost all $x\in G$, and $(\mu_H\otimes\mu_G)$-measurable as functions of $(x,h)\in G\times H$, satisfy the following condition: the following two-fold integrals*
+*If $\mu_{G/H}$-almost every point $(x,x)\in G/H\times G/H$ is regular for $u$, then $\widetilde u(x,x)$ is $\mu_{G/H}$-measurable, defined $\mu_{G/H}$-almost everywhere. If it is absolutely $\mu_{G/H}$-integrable as a function on $G/H$, then the functions $\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)$ and $\Psi^\Delta_{u_0}(\widetilde u)(x,h^{-1}x)$, defined for all $h\in H$, $\mu_G$-almost all $x\in G$, and $(\mu_H\otimes\mu_G)$-measurable as functions of $(x,h)\in G\times H$, satisfy the following condition: the following two-fold integrals*
 
 $$
-\int_D\int_H\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x),\quad \int_H\int_D\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.3}
+\int_D\int_H\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x),\quad \int_H\int_D\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.3}
 $$
 
 *are both absolutely convergent, and the following identities hold:*
 
 $$
-\int_{G/H}\tilde u(x,x)\,\mathrm{d}\mu_{G/H}(x)=\int_D\int_H\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.4}
+\int_{G/H}\widetilde u(x,x)\,\mathrm{d}\mu_{G/H}(x)=\int_D\int_H\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.4}
 $$
 
 $$
-=\int_H\int_D\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.5}
+=\int_H\int_D\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.5}
 $$
 
 $$
-=\int_H\int_D\Psi^\Delta_{u_0}(\tilde u)(x,h^{-1}x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.6}
+=\int_H\int_D\Psi^\Delta_{u_0}(\widetilde u)(x,h^{-1}x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.6}
 $$
 
 $$
-=\int_D\int_H\Psi^\Delta_{u_0}(\tilde u)(x,h^{-1}x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x). \tag{12.2.2.7}
+=\int_D\int_H\Psi^\Delta_{u_0}(\widetilde u)(x,h^{-1}x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x). \tag{12.2.2.7}
 $$
 
 *(3) Let $\rho\in C_c(G/H\times G/H)$. Then:*
@@ -639,7 +645,7 @@ $$
 *(4) We have, for $(\mu_G\otimes\mu_G)$-almost all $(x,y)\in G\times G$:*
 
 $$
-\Psi^\Delta_{u_0}(\tilde u)(x,y)=\lim_{k\to +\infty}\frac{1}{\mu_G(U_k)^2}\int_{xU_k\times yU_k}\Psi^\Delta_{u_0}(u)(y_1,y_2)\,\mathrm{d}(\mu_G\otimes\mu_G)(y_1,y_2). \tag{12.2.2.9}
+\Psi^\Delta_{u_0}(\widetilde u)(x,y)=\lim_{k\to +\infty}\frac{1}{\mu_G(U_k)^2}\int_{xU_k\times yU_k}\Psi^\Delta_{u_0}(u)(y_1,y_2)\,\mathrm{d}(\mu_G\otimes\mu_G)(y_1,y_2). \tag{12.2.2.9}
 $$
 
 *The point $(x,y)\in G\times G$ is regular for $\Psi^\Delta_{u_0}(u)$ if and only if $(\pi(x),\pi(y))\in G/H\times G/H$ is regular for $u$.*
@@ -670,17 +676,17 @@ The integral in (12.2.2.1) therefore converges by [Bou-II, Ch.VII,§2,n.1,Prop.1
 
 By [Bou-II, Ch.VII,§2,n.3,Prop.6(a),INT VII.33], the pre-image under $\pi\times\pi$ of a $(\mu_{G/H}\otimes\mu_{G/H})$-negligible subset is $(\mu_G\otimes\mu_G)$-negligible, and hence $u\circ (\pi\times\pi)$ is defined $(\mu_G\otimes\mu_G)$-almost everywhere.
 
-By the same token, since $\tilde u(x,x)$ is $\mu_{G/H}$-measurable as a function of $x\in G/H$, which is the case by Theorem A.5.4.1(2), being $\{A_{\bar U_k\times\bar U_k}(u)(x,x)\}_{k\ge 0}$ a sequence of (uniformly) continuous functions on $G/H\times G/H$ by Theorem A.5.4.1(1), then $u(\pi(x),\pi(x))$ is $\mu_G$-measurable as a function on $G$.
+By the same token, since $\widetilde u(x,x)$ is $\mu_{G/H}$-measurable as a function of $x\in G/H$, which is the case by Theorem A.5.4.1(2), being $\{A_{\bar U_k\times\bar U_k}(u)(x,x)\}_{k\ge 0}$ a sequence of (uniformly) continuous functions on $G/H\times G/H$ by Theorem A.5.4.1(1), then $u(\pi(x),\pi(x))$ is $\mu_G$-measurable as a function on $G$.
 
-Indeed, since $G$ is Hausdorff and $H\subset G$ is a closed subgroup, the diagonal maps $\delta_G:G\to G\times G$ and $\delta_{G/H}:G/H\to G/H\times G/H$ are homeomorphisms onto their closed images, and since $\tilde u(x,x)=\tilde u\circ \delta_{G/H}$ is $\mu_{G/H}$-measurable on $G/H$, its pre-composition with $\pi:G\to G/H$ is $\mu_G$-measurable on $G$ by [Bou-II, Ch.VII,§2,n.3,Prop.6(b),INT VII.34].
+Indeed, since $G$ is Hausdorff and $H\subset G$ is a closed subgroup, the diagonal maps $\delta_G:G\to G\times G$ and $\delta_{G/H}:G/H\to G/H\times G/H$ are homeomorphisms onto their closed images, and since $\widetilde u(x,x)=\widetilde u\circ \delta_{G/H}$ is $\mu_{G/H}$-measurable on $G/H$, its pre-composition with $\pi:G\to G/H$ is $\mu_G$-measurable on $G$ by [Bou-II, Ch.VII,§2,n.3,Prop.6(b),INT VII.34].
 
-Pre-composition of $\tilde u\circ \delta_{G/H}\circ \pi$ with $\delta_G^{-1}$ gives, set-theoretically at every point $(x',x')\in G\times G$ such that $(\pi(x'),\pi(x'))$ is a point of definition of $\tilde u$, i.e. a regular point for $u$ on $G/H\times G/H$, $\tilde u\circ (\pi\times\pi)$, and this latter function is $(\delta_G)_*\mu_G$-measurable since $\delta_G$ is a homeomorphism onto its image. Note that the function
+Pre-composition of $\widetilde u\circ \delta_{G/H}\circ \pi$ with $\delta_G^{-1}$ gives, set-theoretically at every point $(x',x')\in G\times G$ such that $(\pi(x'),\pi(x'))$ is a point of definition of $\widetilde u$, i.e. a regular point for $u$ on $G/H\times G/H$, $\widetilde u\circ (\pi\times\pi)$, and this latter function is $(\delta_G)_*\mu_G$-measurable since $\delta_G$ is a homeomorphism onto its image. Note that the function
 
 ## PDF page 510
 
 **510** · **CHAPTER 12. TRACE FORMULA: GEOMETRIC SIDE**
 
-$\tilde u\circ \delta_{G/H}\circ \pi$ is defined $\mu_G$-almost everywhere by [Bou-II, Ch.VII,§2,No.3,Prop.6(a),INT VII.33] (see also [Bou-I, Ch.V,§6,No.6,Cor.1(a),INT V.72]), i.e. the pre-image under $\pi$ of the set of points of $G/H$ at which $\tilde u\circ \delta_{G/H}$ is undefined, a $\mu_{G/H}$-null set, is locally $\mu_G$-negligible in $G$, and since $G$ is second countable, it is $\mu_G$-negligible (see Lemma A.5.3.3).
+$\widetilde u\circ \delta_{G/H}\circ \pi$ is defined $\mu_G$-almost everywhere by [Bou-II, Ch.VII,§2,No.3,Prop.6(a),INT VII.33] (see also [Bou-I, Ch.V,§6,No.6,Cor.1(a),INT V.72]), i.e. the pre-image under $\pi$ of the set of points of $G/H$ at which $\widetilde u\circ \delta_{G/H}$ is undefined, a $\mu_{G/H}$-null set, is locally $\mu_G$-negligible in $G$, and since $G$ is second countable, it is $\mu_G$-negligible (see Lemma A.5.3.3).
 
 We will be omitting mention of $\delta_G$ and $\delta_{G/H}$ from the notation.
 
@@ -693,15 +699,15 @@ We now prove that (12.2.2.3) holds.
 We have:
 
 $$
-\int_D\int_H\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_D\int_H u^\Delta_0(h^{-1}x,x)\cdot\tilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.12}
+\int_D\int_H\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_D\int_H u^\Delta_0(h^{-1}x,x)\cdot\widetilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.12}
 $$
 
 $$
-=\int_D\int_{h\in H}\int_{h'\in H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\tilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_H(h')\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.13}
+=\int_D\int_{h\in H}\int_{h'\in H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\widetilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_H(h')\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.13}
 $$
 
 $$
-=\int_D\int_{(h,h')\in H\times H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\tilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_{H\times H}(h,h')\,\mathrm{d}\mu_G(x) \tag{12.2.2.14}
+=\int_D\int_{(h,h')\in H\times H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\widetilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_{H\times H}(h,h')\,\mathrm{d}\mu_G(x) \tag{12.2.2.14}
 $$
 
 where $\mu_{H\times H}:=\mu_H\otimes\mu_H$ (note that we are choosing $\mu_{H\times H}$ to be $\mu_H\otimes\mu_H$, likewise as we are choosing $\mu_G\otimes\mu_G$ to be the Haar measure on $G\times G$, so as to also have $\mu_{G/H}\otimes\mu_{G/H}$ as the Haar measure on $G/H$ uniquely determined as per Theorem D.1.2.1. We require the latter two be the Haar measures on $G/H\times G/H$, respectively $G\times G$, so as to use the $D'$-sequences $\{\bar U_k\times\bar U_k\}_{k\ge 0}$, respectively $\{U_k\times U_k\}_{k\ge 0}$, to define smoothenings of locally $(\mu_{G/H}\otimes\mu_{G/H})$-integrable functions on $G/H\times G/H$, respectively locally $(\mu_G\otimes\mu_G)$-integrable functions on $G\times G$).
@@ -709,27 +715,27 @@ where $\mu_{H\times H}:=\mu_H\otimes\mu_H$ (note that we are choosing $\mu_{H\ti
 The innermost integral in (12.2.2.14) reads:
 
 $$
-\tilde u(\pi(x),\pi(x))\int_{(h,h')\in H\times H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\,\mathrm{d}\mu_{H\times H}(h,h') \tag{12.2.2.15}
+\widetilde u(\pi(x),\pi(x))\int_{(h,h')\in H\times H}u_0(h^{-1}(h')^{-1}x)u_0((h')^{-1}x)\,\mathrm{d}\mu_{H\times H}(h,h') \tag{12.2.2.15}
 $$
 
 which turns, under the "shearing" change of variables $(h,h')\mapsto (h(h')^{-1},h')$, into:
 
 $$
-\tilde u(\pi(x),\pi(x))\int_{(h,h')\in H\times H}u_0(h^{-1}x)u_0((h')^{-1}x)\,\mathrm{d}\mu_{H\times H}(h(h')^{-1},h')=\tilde u(\pi(x),\pi(x)) \tag{12.2.2.16}
+\widetilde u(\pi(x),\pi(x))\int_{(h,h')\in H\times H}u_0(h^{-1}x)u_0((h')^{-1}x)\,\mathrm{d}\mu_{H\times H}(h(h')^{-1},h')=\widetilde u(\pi(x),\pi(x)) \tag{12.2.2.16}
 $$
 
-where we are using $H$-invariance of the Haar measure $\mu_H$, and the identity $\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h)=1$, which holds since $u_0$ is an $H$-indentation on $G$ (see Lemma 12.2.1.1(3)). The identity in (12.2.2.16) holds for any $x\in G$ at which $\tilde u(\pi(x),\pi(x))$ is defined, since $u_0$ is continuous. It follows that it holds $\mu_G$-almost everywhere on $G$.
+where we are using $H$-invariance of the Haar measure $\mu_H$, and the identity $\int_H u_0(h^{-1}x)\,\mathrm{d}\mu_H(h)=1$, which holds since $u_0$ is an $H$-indentation on $G$ (see Lemma 12.2.1.1(3)). The identity in (12.2.2.16) holds for any $x\in G$ at which $\widetilde u(\pi(x),\pi(x))$ is defined, since $u_0$ is continuous. It follows that it holds $\mu_G$-almost everywhere on $G$.
 
 We therefore deduce that the last integral in (12.2.2.14) equals:
 
 $$
-\int_D\tilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_G(x). \tag{12.2.2.17}
+\int_D\widetilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_G(x). \tag{12.2.2.17}
 $$
 
-By [Bou-II, Ch.VII,§2,n.3,Prop.5(c),INT VII.33], the integral in (12.2.2.17) equals $\int_{G/H}\tilde u(x,x)\,\mathrm{d}\mu_{G/H}(x)$. Indeed, we call, using the notation of loc.cit., $\mathbf{f}:=1_D(x)\cdot |\tilde u(\pi(x),\pi(x))|$, and observe that since $D$ is a fundamental domain, $\mathbf{f}^\flat=|\tilde u|$, and formula [Bou-II, Ch.VII,§2,n.3,Prop.5(c),(12),INT VII.33] (which applies by [Bou-II, Ch.VII,§2,n.3,Prop.5(d),(12),INT VII.33]) implies that the following identity:
+By [Bou-II, Ch.VII,§2,n.3,Prop.5(c),INT VII.33], the integral in (12.2.2.17) equals $\int_{G/H}\widetilde u(x,x)\,\mathrm{d}\mu_{G/H}(x)$. Indeed, we call, using the notation of loc.cit., $\mathbf{f}:=1_D(x)\cdot |\widetilde u(\pi(x),\pi(x))|$, and observe that since $D$ is a fundamental domain, $\mathbf{f}^\flat=|\widetilde u|$, and formula [Bou-II, Ch.VII,§2,n.3,Prop.5(c),(12),INT VII.33] (which applies by [Bou-II, Ch.VII,§2,n.3,Prop.5(d),(12),INT VII.33]) implies that the following identity:
 
 $$
-\int_D\tilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_G(x)=\int_{G/H}\tilde u(x,x)\,\mathrm{d}\mu_{G/H}(x) \tag{12.2.2.18}
+\int_D\widetilde u(\pi(x),\pi(x))\,\mathrm{d}\mu_G(x)=\int_{G/H}\widetilde u(x,x)\,\mathrm{d}\mu_{G/H}(x) \tag{12.2.2.18}
 $$
 
 ## PDF page 511
@@ -741,26 +747,26 @@ holds. We deduce from (12.2.2.18) that the first identity in (12.2.2.4) holds.
 We observe that we have, for every such $u$ and for all $h\in H$ and $\mu_G$-almost all $x\in G$:
 
 $$
-|\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)|=|u^\Delta_0(h^{-1}x,x)\cdot (\tilde u(\pi(h^{-1}x),\pi(x))|=u^\Delta_0(h^{-1}x,x)\cdot |\tilde u(\pi(h^{-1}x),\pi(x))|=\Psi^\Delta_{u_0}(|\tilde u|)(h^{-1}x,x) \tag{12.2.2.19}
+|\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)|=|u^\Delta_0(h^{-1}x,x)\cdot (\widetilde u(\pi(h^{-1}x),\pi(x))|=u^\Delta_0(h^{-1}x,x)\cdot |\widetilde u(\pi(h^{-1}x),\pi(x))|=\Psi^\Delta_{u_0}(|\widetilde u|)(h^{-1}x,x) \tag{12.2.2.19}
 $$
 
-since $u_0$, and hence both $u_0\otimes u_0$ and $u^\Delta_0$, are real-valued and nonnegative (the latter because $\mu_H$ is a positive Radon measure). By assumption, $|\tilde u|$ is defined $\mu_{G/H}$-almost everywhere on the diagonal in $G/H\times G/H$, $\mu_{G/H}$-measurable and $\mu_{G/H}$-integrable over the diagonal in $G/H\times G/H$.
+since $u_0$, and hence both $u_0\otimes u_0$ and $u^\Delta_0$, are real-valued and nonnegative (the latter because $\mu_H$ is a positive Radon measure). By assumption, $|\widetilde u|$ is defined $\mu_{G/H}$-almost everywhere on the diagonal in $G/H\times G/H$, $\mu_{G/H}$-measurable and $\mu_{G/H}$-integrable over the diagonal in $G/H\times G/H$.
 
 By the first identity in (12.2.2.4), we deduce that we have:
 
 $$
-\int_{G/H}|\tilde u(x,x)|\,\mathrm{d}\mu_{G/H}(x)=\int_D\int_H\Psi^\Delta_{u_0}(|\tilde u|)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_D\int_H|\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)|\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.20}
+\int_{G/H}|\widetilde u(x,x)|\,\mathrm{d}\mu_{G/H}(x)=\int_D\int_H\Psi^\Delta_{u_0}(|\widetilde u|)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_D\int_H|\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)|\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x) \tag{12.2.2.20}
 $$
 
-and hence the function $\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)$ of $(x,h)\in D\times H$ is $\mu_H\otimes\mu_G$ absolutely integrable over $D\times H$ by Tonelli's Theorem (see [Fol, Thm.2.37(a)]) applied to $f:=|\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)|$. By [Fol, Thm.7.27], which applies since $G$ is second countable, and hence so are $D$ and $H$, and $\mu_G$ and $\mu_H$ are Radon measures, hence $\sigma$-finite, we deduce that the identity:
+and hence the function $\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)$ of $(x,h)\in D\times H$ is $\mu_H\otimes\mu_G$ absolutely integrable over $D\times H$ by Tonelli's Theorem (see [Fol, Thm.2.37(a)]) applied to $f:=|\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)|$. By [Fol, Thm.7.27], which applies since $G$ is second countable, and hence so are $D$ and $H$, and $\mu_G$ and $\mu_H$ are Radon measures, hence $\sigma$-finite, we deduce that the identity:
 
 $$
-\int_D\int_H\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_H\int_D\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.21}
+\int_D\int_H\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_H(h)\,\mathrm{d}\mu_G(x)=\int_H\int_D\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)\,\mathrm{d}\mu_G(x)\,\mathrm{d}\mu_H(h) \tag{12.2.2.21}
 $$
 
 holds.
 
-By invariance of $u^\Delta_0$ with respect to the diagonal action of $H$ on $G\times G$, we deduce that we have $\Psi^\Delta_{u_0}(\tilde u)(h^{-1}x,x)=\Psi^\Delta_{u_0}(\tilde u)(x,h^{-1}x)$ for all $h\in H$ and $\mu_G$-almost all $x\in G$, and hence the remaining identities in (12.2.2.4) follow from (12.2.2.21).
+By invariance of $u^\Delta_0$ with respect to the diagonal action of $H$ on $G\times G$, we deduce that we have $\Psi^\Delta_{u_0}(\widetilde u)(h^{-1}x,x)=\Psi^\Delta_{u_0}(\widetilde u)(x,h^{-1}x)$ for all $h\in H$ and $\mu_G$-almost all $x\in G$, and hence the remaining identities in (12.2.2.4) follow from (12.2.2.21).
 
 (3) : Let $\rho\in C_c(G/H\times G/H)$. Then $\rho\circ (\pi\times\pi)$ is a continuous function on $G\times G$, invariant under the continuous left-translation action of $H\times H$ on $G\times G$. For $u:G/H\times G/H\to\mathbf C$ a $(\mu_{G/H}\otimes\mu_{G/H})$-measurable and locally $(\mu_{G/H}\otimes\mu_{G/H})$-integrable function, $\rho\cdot u$ is also $(\mu_{G/H}\otimes\mu_{G/H})$-measurable and locally $(\mu_{G/H}\otimes\mu_{G/H})$-integrable function. We have:
 
@@ -789,7 +795,7 @@ $$
 and since $U_k\subset D$ for every $k\ge 0$ by assumption, another application of [Bou-II, Ch.VII,§2,n.3,Prop.5(c),(12),INT VII.33] gives $\mu_G(U_k)=\mu_{G/H}(\bar U_k)$, and hence:
 
 $$
-\lim_{k\to +\infty}\frac{1}{\mu_G(U_k)^2}\int_{xU_k\times yU_k}u(\pi(y_1),\pi(y_2))\,\mathrm{d}(\mu_G\otimes\mu_G)(y_1,y_2)=\tilde u(\pi(x),\pi(y)). \tag{12.2.2.25}
+\lim_{k\to +\infty}\frac{1}{\mu_G(U_k)^2}\int_{xU_k\times yU_k}u(\pi(y_1),\pi(y_2))\,\mathrm{d}(\mu_G\otimes\mu_G)(y_1,y_2)=\widetilde u(\pi(x),\pi(y)). \tag{12.2.2.25}
 $$
 
 ## PDF page 512
@@ -820,12 +826,12 @@ PROPOSITION 12.2.2.4. *Let $G$ be a second countable Hausdorff locally compact a
 
 *We denote by $\alpha_k$ the indicator function of $G_k$ in $G$, and by $\beta_k$ the indicator function of the clopen subset $G-G_k$.*
 
-*Let $u:G/H\times G/H\to\mathbf C$ be a measurable function, locally $(\mu_{G/H}\otimes\mu_{G/H})$-integrable, such that $\mu_{G/H}$-almost every point $(x,x)\in G/H\times G/H$ is regular for $u$, and $\tilde u(x,x)$ is absolutely $\mu_{G/H}$-integrable.*
+*Let $u:G/H\times G/H\to\mathbf C$ be a measurable function, locally $(\mu_{G/H}\otimes\mu_{G/H})$-integrable, such that $\mu_{G/H}$-almost every point $(x,x)\in G/H\times G/H$ is regular for $u$, and $\widetilde u(x,x)$ is absolutely $\mu_{G/H}$-integrable.*
 
 *Then, there exists an $H$-indentation $u_0$ on $G$ such that $\alpha_k\cdot u_0$ is an $H_k$-indentation on $G_k$ for every $k\ge 0$, and, writing:*
 
 $$
-u_k(x,y):=\Psi^\Delta_{u_0}(\tilde u)(x,y)\beta_k(y),\quad (x,y)\in G\times G \tag{12.2.2.26}
+u_k(x,y):=\Psi^\Delta_{u_0}(\widetilde u)(x,y)\beta_k(y),\quad (x,y)\in G\times G \tag{12.2.2.26}
 $$
 
 *we have:*

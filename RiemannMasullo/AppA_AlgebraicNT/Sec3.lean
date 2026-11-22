@@ -3172,6 +3172,125 @@ private theorem tamagawaFourier_ratAdeleGaussian :
     by_contra hn
     exact hne (mul_left_cancel₀ hn (hJ.symm.trans (mul_one _).symm))
 
+/-- Multiplication followed by the rational adelic character gives a continuous pairing. -/
+private def ratAdelePairing :
+    Multiplicative 𝔸[ℚ] →ₜ* PontryaginDual (Multiplicative 𝔸[ℚ]) := by
+  let G := Multiplicative 𝔸[ℚ]
+  let ψ : G →* Circle :=
+    { toFun := fun x ↦ ratAdeleStandardCharacter x.toAdd
+      map_one' := by
+        change ratAdeleStandardCharacter 0 = 1
+        simpa only [map_zero] using ratAdeleStandardCharacter_algebraMap 0
+      map_mul' := fun _ _ ↦ ratAdeleStandardCharacter_add _ _ }
+  have hψ : Continuous ψ := by
+    apply continuous_of_continuousAt_one
+    change ContinuousAt ratAdeleStandardCharacter 0
+    have hr : Continuous ratRealPart :=
+      (isometryEquivRealOfIsReal Rat.isReal_infinitePlace).continuous.comp
+        ((continuous_apply _).comp continuous_fst)
+    apply (Circle.exp.continuous.comp (continuous_const.mul hr)).continuousAt.congr_of_eventuallyEq
+    filter_upwards [isOpen_ratIntegralAdeles.mem_nhds (integralAdelesOutside ℚ ∅).zero_mem] with x hx
+    exact ratAdeleStandardCharacter_of_integral x hx
+  let χ (x : G) : PontryaginDual G :=
+    ⟨ψ.comp (AddMonoidHom.mulLeft x.toAdd).toMultiplicative,
+      hψ.comp (show Continuous (fun y : 𝔸[ℚ] ↦ x.toAdd * y) from continuous_const.mul continuous_id)⟩
+  refine
+    { toFun := χ
+      map_one' := PontryaginDual.ext (fun y ↦ ?_)
+      map_mul' := fun x y ↦ PontryaginDual.ext (fun z ↦ ?_)
+      continuous_toFun := ContinuousMonoidHom.continuous_of_continuous_uncurry χ (hψ.comp
+        (show Continuous (fun p : 𝔸[ℚ] × 𝔸[ℚ] ↦ p.1 * p.2) from continuous_mul)) }
+  · change ratAdeleStandardCharacter (0 * y.toAdd) = 1
+    rw [zero_mul]
+    exact map_one ψ
+  · change ratAdeleStandardCharacter ((x.toAdd + y.toAdd) * z.toAdd) = _
+    rw [add_mul, ratAdeleStandardCharacter_add]
+    rfl
+
+/-- A symmetric nondegenerate pairing has dense image by Pontryagin biduality. -/
+private theorem denseRange_of_symmetric_pairing {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (e : G →ₜ* PontryaginDual G) (hsymm : ∀ x y, e x y = e y x)
+    (hker : ∀ x, e x = 1 → x = 1) : DenseRange e := by
+  let H := e.toMonoidHom.range.topologicalClosure
+  let : T1Space (PontryaginDual G ⧸ H) := QuotientGroup.t1Space_iff.mpr
+    e.toMonoidHom.range.isClosed_topologicalClosure
+  let q : PontryaginDual G →ₜ* (PontryaginDual G ⧸ H) :=
+    ⟨QuotientGroup.mk' H, QuotientGroup.continuous_mk⟩
+  obtain ⟨b, hb⟩ := pontryaginDual_bidual (G := G)
+  intro χ
+  change χ ∈ H
+  apply (QuotientGroup.eq_one_iff _).mp
+  apply (pontryaginDual_pairing_separates (G := PontryaginDual G ⧸ H)).1
+  funext η
+  let x := b.symm (PontryaginDual.map q η)
+  have hx (γ : PontryaginDual G) : η (q γ) = γ x := by
+    rw [← hb, show b x = PontryaginDual.map q η from b.apply_symm_apply _]
+    rfl
+  have hx1 : e x = 1 := by
+    refine PontryaginDual.ext fun y ↦ (hsymm x y).trans ((hx (e y)).symm.trans ?_)
+    have hy : q (e y) = 1 := (QuotientGroup.eq_one_iff _).mpr
+      (e.toMonoidHom.range.le_topologicalClosure ⟨y, rfl⟩)
+    rw [hy, map_one]
+    rfl
+  change η (q χ) = η 1
+  rw [hx, hker x hx1, map_one, map_one]
+
+/-- The Gaussian superlevel set above `exp (-π)` lies in the product of the local unit balls.
+This compact box contains no nonzero ideal of the adele ring. -/
+private theorem ratAdeleGaussian_compact_test :
+    ∃ K : Set 𝔸[ℚ], IsCompact K ∧
+      (∀ x, Real.exp (-Real.pi) < ‖ratAdeleGaussian x‖ → x ∈ K) ∧
+      ∀ x : 𝔸[ℚ], (∀ a, a * x ∈ K) → x = 0 := by
+  let arch := univ.pi (fun v : InfinitePlace ℚ ↦ Metric.closedBall (0 : v.Completion) 1)
+  let K : Set 𝔸[ℚ] := arch ×ˢ integralFiniteAdeles ℚ
+  have hc : IsCompact arch := by
+    apply isCompact_univ_pi
+    intro v
+    obtain rfl := Subsingleton.elim v Rat.infinitePlace
+    let e := isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+    apply e.isometry.isEmbedding.isCompact_iff.mpr
+    rw [e.image_closedBall]
+    exact isCompact_closedBall _ _
+  refine ⟨K, hc.prod (finiteAdeleInteger_isCompact ℚ), ?_, ?_⟩
+  · intro x hx
+    by_cases hi : x ∈ ratIntegralAdeles
+    · rw [ratAdeleGaussian, indicator_of_mem hi, Complex.norm_real,
+        Real.norm_of_nonneg (Real.exp_pos _).le, Real.exp_lt_exp] at hx
+      refine ⟨fun v _ ↦ ?_, (mem_ratIntegralAdeles x).mp hi⟩
+      obtain rfl := Subsingleton.elim v Rat.infinitePlace
+      rw [Metric.mem_closedBall, dist_zero_right, ← (isometry_extensionEmbeddingOfIsReal
+        Rat.isReal_infinitePlace).norm_map_of_map_zero (map_zero _) _, Real.norm_eq_abs]
+      change |ratRealPart x| ≤ 1
+      have hs : (ratRealPart x) ^ 2 < 1 :=
+        (mul_lt_mul_left_of_neg (neg_lt_zero.mpr Real.pi_pos)).mp (by simpa using hx)
+      exact abs_le.mpr ⟨by nlinarith, by nlinarith⟩
+    · rw [ratAdeleGaussian, indicator_of_notMem hi, norm_zero] at hx
+      exact (not_lt_of_ge (Real.exp_pos _).le hx).elim
+  · intro x hx
+    apply Prod.ext
+    · funext v
+      by_contra hn
+      have hne : x.1 v ≠ 0 := hn
+      let a : 𝔸[ℚ] := (fun w ↦ 2 / x.1 w, 0)
+      have h := (hx a).1 v (mem_univ _)
+      change dist (2 / x.1 v * x.1 v) 0 ≤ 1 at h
+      rw [div_mul_cancel₀ _ hne, dist_zero_right] at h
+      obtain rfl := Subsingleton.elim v Rat.infinitePlace
+      rw [← (isometry_extensionEmbeddingOfIsReal Rat.isReal_infinitePlace).norm_map_of_map_zero
+        (map_zero _) _, map_ofNat] at h
+      norm_num at h
+    · apply finiteAdele_eq_zero_of_forall_nat_mul ℚ
+      intro n hn
+      let d := algebraMap ℚ 𝔸[ℚ]
+      let a := d (n : ℚ)⁻¹
+      refine ⟨(a * x).2, (mem_finiteIntegralAdeles_iff ℚ _).mpr (hx a).2, ?_⟩
+      have he : x = (n : 𝔸[ℚ]) * (a * x) := by
+        rw [← mul_assoc, ← map_natCast d, ← map_mul, mul_inv_cancel₀ (Nat.cast_ne_zero.mpr hn),
+          map_one, one_mul]
+      exact congrArg Prod.snd he
+
+open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Example A.3.1.8, p. 558. The product character pairing identifies
 the additive rational adeles with their Pontryagin dual as topological groups.
 The local integer rings are their own annihilators for the finite-place pairings. -/
@@ -3179,7 +3298,89 @@ theorem exists_ratAdeleDualEquiv :
     ∃ e : Multiplicative 𝔸[ℚ] ≃ₜ* PontryaginDual (Multiplicative 𝔸[ℚ]),
       ∀ x y : 𝔸[ℚ], e (Multiplicative.ofAdd x) (Multiplicative.ofAdd y) =
         ratAdeleStandardCharacter (x * y) := by
-  sorry
+  let G := Multiplicative 𝔸[ℚ]
+  let e := ratAdelePairing
+  let (v : Primes(ℚ)) : CompactSpace (v.adicCompletionIntegers ℚ) :=
+    compactSpace_adicCompletionIntegers v
+  let : Fact (∀ v : Primes(ℚ), IsOpen (v.adicCompletionIntegers ℚ : Set (v.adicCompletion ℚ))) :=
+    ⟨fun v ↦ Valued.isOpen_valuationSubring _⟩
+  let : LocallyCompactSpace G := by
+    change LocallyCompactSpace (InfiniteAdeleRing ℚ ×
+      (Πʳ v : Primes(ℚ), [v.adicCompletion ℚ, v.adicCompletionIntegers ℚ]))
+    infer_instance
+  let : T2Space G := by
+    change T2Space (((v : InfinitePlace ℚ) → v.Completion) ×
+      (Πʳ v : Primes(ℚ), [v.adicCompletion ℚ, v.adicCompletionIntegers ℚ]))
+    infer_instance
+  let : SigmaCompactSpace G := adeleHaar_sigmaCompactSpace ℚ
+  let : BorelSpace G := ⟨rfl⟩
+  let μ : Measure G := additiveTamagawaMeasure ℚ
+  have hμ := (additiveTamagawaMeasure_existsUnique ℚ).exists.choose_spec
+  let : μ.IsHaarMeasure :=
+    { toIsFiniteMeasureOnCompacts := hμ.1.toIsFiniteMeasureOnCompacts
+      toIsOpenPosMeasure := hμ.1.toIsOpenPosMeasure
+      map_mul_left_eq_self := fun x ↦ hμ.1.map_add_left_eq_self x.toAdd }
+  let : μ.Regular := hμ.2.1
+  obtain ⟨f, hf⟩ := lcaFourier_zeroAtInfty (G := G) μ
+    (f := fun x ↦ ratAdeleGaussian x.toAdd) ratAdeleGaussian_integrable_memLp.1
+  have hfe (x : G) : f (e x) = ratAdeleGaussian x.toAdd := by
+    calc
+      f (e x) = lcaFourier μ (fun z ↦ ratAdeleGaussian z.toAdd) (e x) := hf _
+      _ = tamagawaFourier (additiveTamagawaMeasure ℚ) ratAdeleStandardCharacter
+          ratAdeleGaussian x.toAdd := (tamagawaFourier_eq_lcaFourier _ _ _ _ _ (fun y ↦
+            congrArg ratAdeleStandardCharacter (mul_comm x.toAdd y))).symm
+      _ = ratAdeleGaussian x.toAdd := congrFun tamagawaFourier_ratAdeleGaussian x.toAdd
+  let V := {χ : PontryaginDual G | Real.exp (-Real.pi) < ‖f χ‖}
+  have hV : IsOpen V := isOpen_lt continuous_const f.continuous.norm
+  have h1 : 1 ∈ V := by
+    change Real.exp (-Real.pi) < ‖f 1‖
+    rw [← map_one e, hfe]
+    change Real.exp (-Real.pi) < ‖ratAdeleGaussian 0‖
+    have hr : ratRealPart 0 = 0 := map_zero (extensionEmbeddingOfIsReal Rat.isReal_infinitePlace)
+    have hg : ratAdeleGaussian 0 = 1 := by
+      simp [ratAdeleGaussian, (integralAdelesOutside ℚ ∅).zero_mem, hr]
+    rw [hg, norm_one]
+    exact Real.exp_lt_one_iff.mpr (neg_lt_zero.mpr Real.pi_pos)
+  obtain ⟨K, hK, hbox, htriv⟩ := ratAdeleGaussian_compact_test
+  have hpre (x : G) (hx : e x ∈ V) : x.toAdd ∈ K :=
+    hbox _ (hfe x ▸ hx : Real.exp (-Real.pi) < ‖ratAdeleGaussian x.toAdd‖)
+  -- The kernel is an ideal, and the only ideal contained in the compact box is zero.
+  have hker (x : G) (hx : e x = 1) : x = 1 := by
+    apply htriv x.toAdd
+    intro a
+    apply hpre (Multiplicative.ofAdd (a * x.toAdd))
+    have he : e (Multiplicative.ofAdd (a * x.toAdd)) = 1 := by
+      apply PontryaginDual.ext
+      intro y
+      have hz := DFunLike.congr_fun hx (Multiplicative.ofAdd (a * y.toAdd))
+      change ratAdeleStandardCharacter ((a * x.toAdd) * y.toAdd) = 1
+      rw [mul_comm a x.toAdd, mul_assoc]
+      exact hz
+    exact he ▸ h1
+  have hdense := denseRange_of_symmetric_pairing e
+    (fun x y ↦ congrArg ratAdeleStandardCharacter (mul_comm x.toAdd y.toAdd)) hker
+  -- On V the dense image is contained in the closed image of K.
+  let H := e.toMonoidHom.range
+  have hclosed : IsClosed (e '' (K : Set G)) := (hK.image e.continuous).isClosed
+  have hsub : V ∩ range e ⊆ e '' (K : Set G) := by
+    rintro _ ⟨hx, x, rfl⟩
+    exact ⟨x, hpre x hx, rfl⟩
+  have hVsub : V ⊆ (H : Set (PontryaginDual G)) :=
+    ((hdense.open_subset_closure_inter hV).trans (closure_minimal hsub hclosed)).trans
+      (image_subset_range ..)
+  have hopen := H.isOpen_of_mem_nhds (Filter.mem_of_superset (hV.mem_nhds h1) hVsub)
+  have hsurj : Surjective e := by
+    intro χ
+    change χ ∈ (H : Set (PontryaginDual G))
+    rw [← (H.isClosed_of_isOpen hopen).closure_eq]
+    exact hdense χ
+  let equiv := MulEquiv.ofBijective e.toMonoidHom ⟨(injective_iff_map_eq_one e).mpr hker, hsurj⟩
+  let E : G ≃ₜ* PontryaginDual G :=
+    { equiv with
+      continuous_toFun := e.continuous
+      continuous_invFun := equiv.toEquiv.continuous_symm_iff.mpr
+        (e.toMonoidHom.isOpenMap_of_sigmaCompact hsurj e.continuous) }
+  exact ⟨E, fun _ _ ↦ rfl⟩
 
 open scoped IsDedekindDomain.FiniteAdeleRing RestrictedProduct in
 /-- Paper: Example A.3.1.8, p. 558. The additive Tamagawa measure on the rational

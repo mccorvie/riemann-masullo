@@ -1302,7 +1302,118 @@ theorem finiteLocalIdelicZetaIntegral_tendstoUniformlyOn (v : Primes)
     (hK : IsCompact K) (hKpos : K ⊆ rightHalf) :
     TendstoUniformlyOn (fun (n : ℕ) (s : ℂ) ↦
       ∫ g in normBand[m𝔭(v), n], test(f) g.val * chart𝔭[v, χ] s g ∂μ𝔭(v))
-      (fun s ↦ localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s)) atTop K := by sorry
+      (fun s ↦ localIdelicZetaIntegral μ𝔭(v) test(f) (chart𝔭[v, χ] s)) atTop K := by
+  let L := v.adicCompletion F
+  have : ProperSpace L := properSpace_adicCompletion v
+  have : BorelSpace Lˣ := ⟨rfl⟩
+  rcases K.eq_empty_or_nonempty with rfl | hne
+  · exact tendstoUniformlyOn_empty
+  -- The real parts of the exponents lie in a compact interval of positive numbers.
+  obtain ⟨s₁, hs₁, hmin⟩ := hK.exists_isMinOn hne Complex.continuous_re.continuousOn
+  obtain ⟨s₂, -, hmax⟩ := hK.exists_isMaxOn hne Complex.continuous_re.continuousOn
+  let a := s₁.re
+  let b := s₂.re
+  have ha : 0 < a := hKpos hs₁
+  have hb : 0 < b := ha.trans_le (hmax hs₁)
+  -- The test function is bounded and vanishes outside a ball.
+  have hstage (p : BruhatStructuralPair (Multiplicative L)) :
+      ∃ C : Set L, IsCompact C ∧ ∀ x ∈ p.val.1, Multiplicative.toAdd x ∈ C := by
+    obtain ⟨V, _, hV, hgen⟩ := p.property.2.1
+    have hc : Continuous fun x : p.val.1 ↦ Multiplicative.toAdd (x : Multiplicative L) :=
+      continuous_toAdd.comp continuous_subtype_val
+    obtain ⟨r, hr⟩ := hV.exists_bound_of_continuousOn hc.continuousOn
+    let ρ := max r 0
+    let H : Subgroup (Multiplicative L) :=
+      { carrier := {x | ‖Multiplicative.toAdd x‖ ≤ ρ}
+        one_mem' := by simp [ρ]
+        mul_mem' := fun hx hy ↦
+          (IsUltrametricDist.norm_add_le_max _ _).trans (max_le hx hy)
+        inv_mem' := fun {x} hx ↦ by
+          change ‖Multiplicative.toAdd x⁻¹‖ ≤ ρ
+          rw [toAdd_inv, norm_neg]
+          exact hx }
+    have hle : Subgroup.closure V ≤ H.comap p.val.1.subtype :=
+      (Subgroup.closure_le _).2 fun x hx ↦ (hr x hx).trans (le_max_left _ _)
+    rw [hgen] at hle
+    refine ⟨Metric.closedBall 0 ρ, isCompact_closedBall _ _, fun x hx ↦ ?_⟩
+    have h := Subgroup.mem_subgroupOf.mp (hle (Subgroup.mem_top (x := (⟨x, hx⟩ : p.val.1))))
+    change ‖Multiplicative.toAdd x‖ ≤ ρ at h
+    rwa [Metric.mem_closedBall, dist_zero_right]
+  obtain ⟨C, hC, hsupp, hbd⟩ := schwartzBruhat_exists_coordinate_bounds
+    (G := Multiplicative L) (fun x ↦ Multiplicative.toAdd x)
+    (fun x ↦ ‖((1 : Multiplicative L →* Multiplicative ℝ) x).toAdd‖) (fun _ ↦ norm_nonneg _)
+    hstage (fun p e st N ↦ stage_exists_decay p e st N 1 continuous_const (by simp)) f
+  obtain ⟨B, hB, hB'⟩ := hbd 0
+  obtain ⟨R, hR⟩ := hC.exists_bound_of_continuousOn continuous_norm.continuousOn
+  -- A majorant that works for every exponent in the compact set.
+  let ind (σ : ℝ) := {u : Lˣ | ‖(u : L)‖ ≤ R}.indicator (fun u ↦ ‖(u : L)‖ ^ σ)
+  let M : Lˣ → ℝ := fun u ↦ B * (ind a u + ind b u)
+  have hM : Integrable M μ𝔭(v) :=
+    ((finiteLocalTamagawa_integrable_norm_rpow v ha R).2.add
+      (finiteLocalTamagawa_integrable_norm_rpow v hb R).2).const_mul B
+  have hchart (s : ℂ) (g : Lˣ) : ‖chart𝔭[v, χ] s g‖ = ‖(g : L)‖ ^ s.re := by
+    change ‖(χ g : ℂ) * ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) : ℂ) ^ s‖ = _
+    rw [norm_mul, Circle.norm_coe, one_mul,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _))]
+    rfl
+  have hdom (s : ℂ) (hs : s ∈ K) (g : Lˣ) :
+      ‖test(f) g.val * chart𝔭[v, χ] s g‖ ≤ M g := by
+    rw [norm_mul, hchart]
+    change ‖f (Multiplicative.ofAdd (g : L))‖ * ‖(g : L)‖ ^ s.re ≤ M g
+    by_cases hg : (g : L) ∈ C
+    · have hRg : ‖(g : L)‖ ≤ R := by simpa using hR _ hg
+      have hmem : g ∈ {u : Lˣ | ‖(u : L)‖ ≤ R} := hRg
+      have hpos : 0 < ‖(g : L)‖ := norm_pos_iff.mpr g.ne_zero
+      have hpow : ‖(g : L)‖ ^ s.re ≤ ind a g + ind b g := by
+        simp only [ind, indicator_of_mem hmem]
+        rcases le_total ‖(g : L)‖ 1 with h1 | h1
+        · exact (Real.rpow_le_rpow_of_exponent_ge hpos h1 (hmin hs)).trans
+            (le_add_of_nonneg_right (by positivity))
+        · exact (Real.rpow_le_rpow_of_exponent_le h1 (hmax hs)).trans
+            (le_add_of_nonneg_left (by positivity))
+      have h := hB' (Multiplicative.ofAdd (g : L))
+      rw [pow_zero, mul_one] at h
+      exact mul_le_mul h hpow (by positivity) hB
+    · have h0 : f (Multiplicative.ofAdd (g : L)) = 0 := hsupp _ hg
+      rw [h0, norm_zero, zero_mul]
+      exact mul_nonneg hB (add_nonneg (Set.indicator_nonneg (fun _ _ ↦ by positivity) _)
+        (Set.indicator_nonneg (fun _ _ ↦ by positivity) _))
+  -- The bands are measurable, increase, and exhaust the units.
+  let band (n : ℕ) : Set Lˣ := normBand[m𝔭(v), n]
+  have hcont : Continuous fun g : Lˣ ↦ (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (continuous_finiteLocalModule v))
+  have hbandm (n : ℕ) : MeasurableSet (band n) := hcont.measurable measurableSet_Icc
+  have hmono : Monotone band := by
+    intro n k hnk g hg
+    have h : (n + 1 : ℝ) ≤ k + 1 := by exact_mod_cast Nat.succ_le_succ hnk
+    exact ⟨(inv_anti₀ (by positivity) h).trans hg.1, hg.2.trans h⟩
+  have hunion : (⋃ n, band n) = univ := by
+    refine eq_univ_of_forall fun g ↦ mem_iUnion.mpr ?_
+    have hpos : 0 < (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    obtain ⟨n, hn⟩ := exists_nat_ge (max (((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ)
+      ((((m𝔭(v) g : ℝ≥0ˣ) : ℝ≥0) : ℝ))⁻¹)
+    refine ⟨n, ?_, ?_⟩
+    · rw [inv_le_comm₀ (by positivity) hpos]
+      exact (le_max_right _ _).trans (hn.trans (by linarith))
+    · exact (le_max_left _ _).trans (hn.trans (by linarith))
+  -- The tails of the majorant tend to zero.
+  have htail : Tendsto (fun n ↦ ∫ g in (band n)ᶜ, M g ∂μ𝔭(v)) atTop (𝓝 0) := by
+    have h := tendsto_setIntegral_of_monotone (μ := μ𝔭(v)) hbandm hmono
+      (by rw [hunion]; exact hM.integrableOn)
+    rw [hunion, Measure.restrict_univ] at h
+    have heq (n : ℕ) : ∫ g in (band n)ᶜ, M g ∂μ𝔭(v) =
+        ∫ g, M g ∂μ𝔭(v) - ∫ g in band n, M g ∂μ𝔭(v) := by
+      rw [← integral_add_compl (hbandm n) hM, add_sub_cancel_left]
+    simp_rw [heq]
+    simpa using (tendsto_const_nhds (x := ∫ g, M g ∂μ𝔭(v))).sub h
+  rw [Metric.tendstoUniformlyOn_iff]
+  intro ε hε
+  filter_upwards [(tendsto_order.1 htail).2 ε hε] with n hn s hs
+  have hint := finiteLocalIdelicZetaIntegral_integrable v f χ (hKpos hs)
+  rw [dist_eq_norm, localIdelicZetaIntegral, ← integral_add_compl (hbandm n) hint,
+    add_sub_cancel_left]
+  refine lt_of_le_of_lt (norm_integral_le_of_norm_le hM.integrableOn
+    (ae_of_all _ fun g ↦ hdom s hs g)) hn
 
 /-- Paper: §3.3.2, p. 137. The archimedean integral (3.3.2.1) has a unique
 meromorphic continuation, in normal form in every norm-twist chart. -/

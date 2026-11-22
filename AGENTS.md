@@ -110,6 +110,7 @@ garbled, does occur. The PDF decides. Before you formalize a formula, look at th
 
 ```sh
 lake build RiemannMasullo.Ch02_AdelicTheta.Sec1   # one module
+lake lean RiemannMasullo/Ch02_AdelicTheta/Sec1.lean   # one file, or a scratch copy, with the project's options
 lake build                                        # everything; must pass before you hand in
 scripts/lint.sh
 scripts/signatures.sh > after.txt                 # one line per declaration: name and statement hash
@@ -125,7 +126,9 @@ helpers in a `section` of their own, with their own variables, and the hashes re
 they were.
 
 To check axioms, put `#print axioms RiemannMasullo.your_theorem` in a scratch file under `.agent/`
-(which git ignores) and run `lake env lean .agent/Check.lean`.
+(which git ignores) and run `lake lean .agent/Check.lean`. Use `lake lean`, not `lake env lean`:
+only the former applies the options in `lakefile.toml`, and without them some files compile
+dozens of times more slowly (a linter the project turns off) and `autoImplicit` is on.
 
 ## Your issue, and handing in work
 

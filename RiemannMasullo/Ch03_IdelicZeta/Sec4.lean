@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 public import RiemannMasullo.AppC_LCTVS.Sec5b
 public import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
@@ -98,7 +99,80 @@ theorem weilModifiedFiniteIntegral_integrable (v : V) (π : (v.adicCompletion F)
       else f
     Integrable (fun g : (v.adicCompletion F)ˣ ↦ test g.val * finitePlaceRestriction F v c g)
       (μv v) := by
-  sorry
+  intro f test
+  let L := v.adicCompletion F
+  have : BorelSpace Lˣ := ⟨rfl⟩
+  -- The character has modulus a positive power of the local norm.
+  obtain ⟨-, -, -, -, -, hC₂, hClc, -⟩ := ideleGroup_quotient.{_, 0} F
+  let σ := quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+    (ideleClassNorm_ne_one (F := F)) c
+  have hσ : 0 < σ := hc
+  have hnorm (g : Lˣ) : ‖finitePlaceRestriction F v c g‖ = ‖(g : L)‖ ^ σ := by
+    change ‖c (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v g)‖ = _
+    rw [norm_quasiCharacter_eq_rpow_abscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) c]
+    change (((ideleClassNorm F (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v g) : ℝ≥0ˣ) : ℝ≥0) : ℝ) ^
+      σ = _
+    rw [ideleClassNorm_ofAdicCompletion]
+    rfl
+  -- The test function is bounded by two and vanishes outside a ball.
+  obtain ⟨R₀, hR₀⟩ := hK.exists_bound_of_continuousOn continuous_norm.continuousOn
+  let R := max R₀ (‖(π : L)‖ * R₀)
+  have hsupp (x : L) (hx : test x ≠ 0) : ‖x‖ ≤ R := by
+    have hcases : x ∈ K ∨ (↑π⁻¹ : L) * x ∈ K := by
+      by_contra h
+      push Not at h
+      apply hx
+      by_cases hu : c.IsUnramifiedAt v
+      · simp only [test, f, hu, ite_true]
+        rw [indicator_of_notMem h.1, indicator_of_notMem h.2, sub_self]
+      · simp only [test, f, hu, ite_false]
+        rw [indicator_of_notMem h.1]
+    rcases hcases with h | h
+    · exact (by simpa using hR₀ x h : ‖x‖ ≤ R₀).trans (le_max_left _ _)
+    · have h' : ‖(↑π⁻¹ : L) * x‖ ≤ R₀ := by simpa using hR₀ _ h
+      have hx : x = (π : L) * ((↑π⁻¹ : L) * x) := by
+        rw [← mul_assoc, Units.mul_inv, one_mul]
+      refine le_trans ?_ (le_max_right _ _)
+      rw [hx, norm_mul]
+      exact mul_le_mul_of_nonneg_left h' (norm_nonneg _)
+  have hbound (x : L) : ‖test x‖ ≤ 2 := by
+    have h1 (y : L) : ‖f y‖ ≤ 1 := by
+      by_cases hy : y ∈ K <;> simp [f, hy]
+    by_cases hu : c.IsUnramifiedAt v
+    · simp only [test, hu, ite_true]
+      exact (norm_sub_le _ _).trans (by linarith [h1 x, h1 ((↑π⁻¹ : L) * x)])
+    · simp only [test, hu, ite_false]
+      linarith [h1 x]
+  -- Measurability: the test function is a difference of indicators of open sets of units.
+  have hmeasf (a : L) : Measurable fun g : Lˣ ↦ f (a * g.val) := by
+    have hopen : IsOpen {g : Lˣ | a * g.val ∈ K} :=
+      hKo.preimage ((continuous_const.mul Units.continuous_val))
+    have heq : (fun g : Lˣ ↦ f (a * g.val)) = {g : Lˣ | a * g.val ∈ K}.indicator 1 := by
+      funext g
+      by_cases hg : a * g.val ∈ K <;> simp [f, hg]
+    rw [heq]
+    exact measurable_one.indicator hopen.measurableSet
+  have hmeas : Measurable fun g : Lˣ ↦ test g.val := by
+    by_cases hu : c.IsUnramifiedAt v
+    · simp only [test, hu, ite_true]
+      have h1 := hmeasf 1
+      simp only [one_mul] at h1
+      exact h1.sub (hmeasf _)
+    · simp only [test, hu, ite_false]
+      have h1 := hmeasf 1
+      simpa only [one_mul] using h1
+  -- Dominate by the truncated norm power.
+  have hb := finiteLocalTamagawa_integrable_norm_rpow v hσ R
+  refine (hb.2.const_mul 2).mono'
+    (hmeas.aestronglyMeasurable.mul (finitePlaceRestriction F v c).continuous.aestronglyMeasurable)
+    (ae_of_all _ fun g ↦ ?_)
+  rw [norm_mul, hnorm]
+  by_cases hg : test (g : L) = 0
+  · rw [hg, norm_zero, zero_mul]
+    exact mul_nonneg zero_le_two (Set.indicator_nonneg (fun _ _ ↦ by positivity) _)
+  · rw [indicator_of_mem (show g ∈ {u : Lˣ | ‖(u : L)‖ ≤ R} from hsupp _ hg)]
+    exact mul_le_mul_of_nonneg_right (hbound _) (by positivity)
 
 /-- Paper: Theorem 3.4.1.1, p. 144. At an unramified place the modified
 integer-ring indicator integrates to the Tamagawa mass of the integer units. -/
@@ -214,7 +288,19 @@ theorem weilModifiedZeta_integerRings (fArch : ℬ(AArch))
     (hK : ∀ v : V, K v = v.adicCompletionIntegers F) (c : X)
     (hc : ∀ v, c.IsUnramifiedAt v) :
     weilModifiedZeta fArch K uniformizer c = weilArchimedeanIntegral fArch c *
-      ∏ᶠ v : V, (((μv v) (v.adicCompletionIntegers F).units).toReal : ℂ) := by sorry
+      ∏ᶠ v : V, (((μv v) (v.adicCompletionIntegers F).units).toReal : ℂ) := by
+  have hfactor (v : V) :
+      weilModifiedFiniteIntegral v (uniformizer v) ((K v).indicator (fun _ ↦ 1)) c =
+        (((μv v) (v.adicCompletionIntegers F).units).toReal : ℂ) := by
+    rw [hK v]
+    exact weilModifiedFiniteIntegral_integerRing v _ (hπ v) c (hc v)
+  unfold weilModifiedZeta
+  rw [tprod_congr hfactor]
+  congr 1
+  refine tprod_eq_finprod ((finiteLocalTamagawaMass_finite (F := F)).subset fun v hv h ↦ hv ?_)
+  change ((((μv v) (v.adicCompletionIntegers F).units).toReal : ℝ) : ℂ) = 1
+  rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, h, ENNReal.toReal_one,
+    Complex.ofReal_one]
 
 /-- Paper: Theorem 3.4.1.1, p. 143. The finite-place factors of the modified
 zeta product differ from one by an absolutely summable family. -/
@@ -409,7 +495,11 @@ theorem thetaPolarCutoff_polarTerm (ω : PontryaginDual C₁) (f : ℬ(𝔸[F]))
         (thetaPolarCutoff ω g *
           ((normℝ g)⁻¹ • adeleSchwartzFourier f (Multiplicative.ofAdd (0 : 𝔸[F])) -
             f (Multiplicative.ofAdd (0 : 𝔸[F])))) =
-      homogeneousAdelicTheta_polarTerm ω f g := by sorry
+      homogeneousAdelicTheta_polarTerm ω f g := by
+  unfold thetaPolarCutoff homogeneousAdelicTheta_polarTerm
+  by_cases hω : ω = 1
+  · rw [ite_eq_left ⟨hω, hg⟩, ite_eq_left hω, one_mul]
+  · rw [ite_eq_right fun h ↦ hω h.1, ite_eq_right hω, zero_mul, smul_zero]
 
 -- TODO(paper-gap): Equation (3.4.2.7) counts each modified finite factor
 -- twice. The line below it also divides by the local Euler denominator,
@@ -628,11 +718,161 @@ def finiteStandardGaussianValue (v : V) (c : QuasiCharacter (v.adicCompletion F)
     (Units.val '' integerUnits(v)).indicator
       (fun y ↦ if hy : y ≠ 0 then (c (Units.mk0 y hy))⁻¹ else 0) x
 
+/-- A complex number all of whose powers lie within `r < 1` of one is one. Otherwise the real
+parts of the geometric sums `∑ n < N, z ^ n` would grow linearly in `N`, while the sums
+themselves, equal to `(z ^ N - 1) / (z - 1)`, stay bounded. -/
+private theorem eq_one_of_forall_norm_pow_sub_one_le {z : ℂ} {r : ℝ} (hr : r < 1)
+    (h : ∀ n : ℕ, ‖z ^ n - 1‖ ≤ r) : z = 1 := by
+  by_contra hz
+  have hz1 : 0 < ‖z - 1‖ := norm_pos_iff.mpr (sub_ne_zero.mpr hz)
+  have hpos : 0 < (1 - r) * ‖z - 1‖ := mul_pos (sub_pos.mpr hr) hz1
+  obtain ⟨N, hN⟩ := exists_nat_gt (r / ((1 - r) * ‖z - 1‖))
+  rw [div_lt_iff₀ hpos] at hN
+  have hre : (N : ℝ) * (1 - r) ≤ (∑ n ∈ Finset.range N, z ^ n).re := by
+    rw [Complex.re_sum]
+    have hle : ∀ n ∈ Finset.range N, 1 - r ≤ (z ^ n).re := fun n _ ↦ by
+      have h1 := (abs_le.mp ((Complex.abs_re_le_norm (z ^ n - 1)).trans (h n))).1
+      rw [Complex.sub_re, Complex.one_re] at h1
+      linarith
+    simpa using Finset.card_nsmul_le_sum _ _ _ hle
+  have hbound : (∑ n ∈ Finset.range N, z ^ n).re * ‖z - 1‖ ≤ r :=
+    calc _ ≤ ‖∑ n ∈ Finset.range N, z ^ n‖ * ‖z - 1‖ :=
+          mul_le_mul_of_nonneg_right (Complex.re_le_norm _) hz1.le
+      _ = ‖z ^ N - 1‖ := by rw [← norm_mul, geom_sum_mul]
+      _ ≤ r := h N
+  nlinarith [mul_le_mul_of_nonneg_right hre hz1.le]
+
+/-- A continuous character of the units of a nonarchimedean normed field is trivial near one.
+If `‖t - 1‖ < δ ≤ 1`, every power of `t` also lies within `δ` of one, so all powers of the
+character value stay near one in `ℂ`, which forces the value to be one. -/
+private theorem exists_forall_norm_sub_one_lt_map_eq_one {K : Type*} [NormedField K]
+    [IsUltrametricDist K] (c : Kˣ →ₜ* ℂ) :
+    ∃ δ > 0, δ ≤ 1 ∧ ∀ t : Kˣ, ‖(t : K) - 1‖ < δ → c t = 1 := by
+  have hc : Tendsto c (nhds 1) (nhds 1) := by
+    simpa only [map_one] using (map_continuous c).tendsto 1
+  have hU := hc (Metric.ball_mem_nhds (1 : ℂ) (by norm_num : (0 : ℝ) < 1 / 2))
+  rw [Units.isEmbedding_val₀.nhds_eq_comap, mem_map, mem_comap] at hU
+  obtain ⟨s, hs, hsU⟩ := hU
+  obtain ⟨ε, hε, hball⟩ := Metric.mem_nhds_iff.mp hs
+  refine ⟨min ε 1, lt_min hε one_pos, min_le_right _ _, fun t ht ↦ ?_⟩
+  have ht1' : ‖(t : K) - 1‖ < 1 := ht.trans_le (min_le_right _ _)
+  have ht1 : ‖(t : K)‖ = 1 := by
+    have hne : ‖(1 : K)‖ ≠ ‖(t : K) - 1‖ := by rw [norm_one]; exact ht1'.ne'
+    have := IsUltrametricDist.norm_add_eq_max_of_norm_ne_norm hne
+    rwa [add_sub_cancel, norm_one, max_eq_left ht1'.le] at this
+  have hpow (n : ℕ) : ‖((t ^ n : Kˣ) : K) - 1‖ < min ε 1 := by
+    induction n with
+    | zero => simpa using lt_min hε one_pos
+    | succ n ih =>
+      rw [Units.val_pow_eq_pow_val] at ih ⊢
+      have he : (t : K) ^ (n + 1) - 1 = (t : K) ^ n * ((t : K) - 1) + ((t : K) ^ n - 1) := by
+        ring
+      rw [he]
+      refine (IsUltrametricDist.norm_add_le_max _ _).trans_lt (max_lt ?_ ih)
+      rwa [norm_mul, norm_pow, ht1, one_pow, one_mul]
+  refine eq_one_of_forall_norm_pow_sub_one_le (r := 1 / 2) (by norm_num) fun n ↦ ?_
+  have hmem : ((t ^ n : Kˣ) : K) ∈ s := hball (by
+    rw [Metric.mem_ball, dist_eq_norm, Units.val_one]
+    exact (hpow n).trans_le (min_le_left _ _))
+  have hlt := Metric.mem_ball.mp (hsU hmem)
+  rw [dist_eq_norm, map_pow] at hlt
+  exact hlt.le
+
+/-- An element of a finite completion is the image of an integral unit exactly when its norm
+is one. -/
+private theorem mem_integerUnits_iff_norm_eq_one (v : V) (x : v.adicCompletion F) :
+    x ∈ Units.val '' integerUnits(v) ↔ ‖x‖ = 1 := by
+  have he1 : (Ideal.absNorm v.asIdeal : ℝ≥0) ≠ 1 :=
+    (NumberField.HeightOneSpectrum.one_lt_absNorm_nnreal v).ne'
+  rw [NumberField.FinitePlace.norm_def, NNReal.coe_eq_one,
+    WithZeroMulInt.toNNReal_eq_one_iff _ _ he1]
+  constructor
+  · rintro ⟨a, ha, rfl⟩
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp ha
+  · intro hx
+    have hx0 : x ≠ 0 := by
+      rintro rfl
+      simp at hx
+    exact ⟨Units.mk0 x hx0,
+      HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mpr hx, rfl⟩
+
 /-- Paper: Definition 3.4.3.2(3), p. 152. Both finite Gaussian formulas
 give Schwartz–Bruhat test functions on the completion. -/
 theorem finiteStandardGaussian_mem (v : V) (c : QuasiCharacter (v.adicCompletion F)ˣ) :
     (fun x : Multiplicative (v.adicCompletion F) ↦ finiteStandardGaussianValue v c x.toAdd) ∈
-      schwartzBruhatSubmodule (Multiplicative (v.adicCompletion F)) := by sorry
+      schwartzBruhatSubmodule (Multiplicative (v.adicCompletion F)) := by
+  -- At a finite place, Schwartz–Bruhat means locally constant with compact support.
+  classical
+  set O : Set (v.adicCompletion F) := ↑(v.adicCompletionIntegers F) with hO
+  have hOc : IsCompact O :=
+    isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers (K := F) v)
+  have hOo : IsOpen O := Valued.isOpen_valuationSubring _
+  have hOcl : IsClosed O := Valued.isClosed_valuationSubring _
+  have hlc : IsLocallyConstant (finiteStandardGaussianValue v c) ∧
+      HasCompactSupport (finiteStandardGaussianValue v c) := by
+    by_cases hu : unramified(v, c)
+    · -- Unramified: the indicator of the compact open integer ring.
+      have hf : finiteStandardGaussianValue v c = O.indicator (fun _ ↦ 1) := by
+        funext x
+        unfold finiteStandardGaussianValue
+        rw [ite_eq_left hu]
+      rw [hf]
+      refine ⟨(IsLocallyConstant.iff_exists_open _).mpr fun x ↦ ?_,
+        HasCompactSupport.intro hOc fun x hx ↦ indicator_of_notMem hx _⟩
+      by_cases hx : x ∈ O
+      · exact ⟨O, hOo, hx, fun y hy ↦ by rw [indicator_of_mem hy, indicator_of_mem hx]⟩
+      · exact ⟨Oᶜ, hOcl.isOpen_compl, hx, fun y hy ↦ by
+          rw [indicator_of_notMem hy, indicator_of_notMem hx]⟩
+    · -- Ramified: the inverse character on the integral units, which form the unit sphere.
+      set U₀ : Set (v.adicCompletion F) := Units.val '' integerUnits(v) with hU₀
+      have hU₀O : U₀ ⊆ O := by
+        rintro _ ⟨a, ha, rfl⟩
+        exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp ha).le
+      have hf : finiteStandardGaussianValue v c = U₀.indicator
+          (fun y ↦ if hy : y ≠ 0 then (c (Units.mk0 y hy))⁻¹ else 0) := by
+        funext x
+        unfold finiteStandardGaussianValue
+        rw [ite_eq_right hu]
+      rw [hf]
+      refine ⟨(IsLocallyConstant.iff_exists_open _).mpr fun x ↦ ?_,
+        HasCompactSupport.intro hOc fun x hx ↦ indicator_of_notMem (fun h ↦ hx (hU₀O h)) _⟩
+      by_cases hx : x ∈ U₀
+      · obtain ⟨δ, hδ, hδ1, hδc⟩ := exists_forall_norm_sub_one_lt_map_eq_one c
+        have hx1 : ‖x‖ = 1 := (mem_integerUnits_iff_norm_eq_one v x).mp hx
+        have hx0 : x ≠ 0 := by
+          rintro rfl
+          simp at hx1
+        refine ⟨Metric.ball x δ, Metric.isOpen_ball, Metric.mem_ball_self hδ, fun y hy ↦ ?_⟩
+        rw [Metric.mem_ball, dist_eq_norm] at hy
+        have hy1 : ‖y‖ = 1 := by
+          have hne : ‖x‖ ≠ ‖y - x‖ := by rw [hx1]; exact (hy.trans_le hδ1).ne'
+          have := IsUltrametricDist.norm_add_eq_max_of_norm_ne_norm hne
+          rwa [add_sub_cancel, hx1, max_eq_left (hy.trans_le hδ1).le] at this
+        have hy0 : y ≠ 0 := by
+          rintro rfl
+          simp at hy1
+        have hyU : y ∈ U₀ := (mem_integerUnits_iff_norm_eq_one v y).mpr hy1
+        rw [indicator_of_mem hyU, indicator_of_mem hx, dite_eq_left hy0, dite_eq_left hx0]
+        have ht : Units.mk0 y hy0 = Units.mk0 x hx0 * Units.mk0 (y / x) (div_ne_zero hy0 hx0) :=
+          Units.ext (by simp [mul_div_cancel₀ _ hx0])
+        have hsmall : ‖((Units.mk0 (y / x) (div_ne_zero hy0 hx0) : (v.adicCompletion F)ˣ) :
+            v.adicCompletion F) - 1‖ < δ := by
+          rw [Units.val_mk0, show y / x - 1 = (y - x) / x by field_simp, norm_div, hx1, div_one]
+          exact hy
+        rw [ht, map_mul, hδc _ hsmall, mul_one]
+      · refine ⟨U₀ᶜ, ?_, hx, fun y hy ↦ by rw [indicator_of_notMem hy, indicator_of_notMem hx]⟩
+        have hsphere : U₀ = Metric.sphere 0 1 := by
+          ext y
+          rw [mem_sphere_zero_iff_norm]
+          exact mem_integerUnits_iff_norm_eq_one v y
+        rw [hsphere]
+        exact Metric.isClosed_sphere.isOpen_compl
+  obtain ⟨g, hg⟩ := (mem_finitePlaceSchwartz_iff F v (finiteStandardGaussianValue v c)).mpr hlc
+  have heq : (fun x : Multiplicative (v.adicCompletion F) ↦
+      finiteStandardGaussianValue v c x.toAdd) = (g : Multiplicative (v.adicCompletion F) → ℂ) :=
+    funext fun x ↦ (hg x.toAdd).symm
+  rw [heq]
+  exact g.property
 
 /-- Paper: Definition 3.4.3.2(3), p. 152. The finite-place standard
 Gaussian is the bundled test function given by the local indicator formula. -/
@@ -644,7 +884,15 @@ def finiteStandardGaussian (v : V) (c : QuasiCharacter (v.adicCompletion F)ˣ) :
 the local Gaussian takes the reciprocal of the character value. -/
 theorem finiteStandardGaussian_integerUnit (v : V) (c : QuasiCharacter (v.adicCompletion F)ˣ)
     (u : (v.adicCompletion F)ˣ) (hu : u ∈ integerUnits(v)) :
-    finiteStandardGaussian v c (Multiplicative.ofAdd u.val) = (c u)⁻¹ := by sorry
+    finiteStandardGaussian v c (Multiplicative.ofAdd u.val) = (c u)⁻¹ := by
+  classical
+  change finiteStandardGaussianValue v c u.val = (c u)⁻¹
+  unfold finiteStandardGaussianValue
+  split_ifs with hc
+  · rw [indicator_of_mem (show u.val ∈ (v.adicCompletionIntegers F : Set _) from hu.1),
+      hc u hu, inv_one]
+  · rw [indicator_of_mem (mem_image_of_mem _ hu)]
+    simp [u.ne_zero]
 
 local notation "infiniteUnitaryRestriction(" χ "," w ")" =>
   ((χ).comp ⟨IdeleClassGroup.ofCompletion (𝓞 F) F w, continuous_ideleClass_ofCompletion F w⟩)
@@ -734,7 +982,11 @@ is the global zeta integral of the Gaussian. -/
 theorem gaussianCompletedHeckeL_eq_integral (χ : PontryaginDual C_F) (s : ℂ)
     (hs : 1 < s.re) :
     gaussianCompletedHeckeL χ s =
-      globalIdelicZetaIntegral (adelicStandardGaussian χ) (ideleClassNormTwist χ s) := by sorry
+      globalIdelicZetaIntegral (adelicStandardGaussian χ) (ideleClassNormTwist χ s) := by
+  refine globalIdelicZFunction_eq_integral (adelicStandardGaussian χ) ?_
+  change 1 < quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+    (ideleClassNorm_ne_one (F := F)) (ideleClassNormTwist χ s)
+  rwa [quasiCharacterAbscissa_ideleClassNormTwist]
 
 /-- Paper: Paragraph after Equation (3.4.3.9), p. 152. In the half-plane of
 absolute convergence the Gaussian zeta function gives the completed Euler product of §3.2

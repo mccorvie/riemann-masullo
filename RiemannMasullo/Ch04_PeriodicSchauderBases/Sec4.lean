@@ -700,12 +700,81 @@ variable (ν : Measure (G ⧸ Subgroup.zpowers γ)) [hHaar : ν.IsHaarMeasure]
 
 local notation "coeff⟦" j "⟧" => (fun f : S ↦ (L * μ₁.real univ)⁻¹ * lcaFourier ν f (ξ j))
 
+/-- A linear functional on the Schwartz–Bruhat space that is bounded by a multiple of the
+supremum norm is continuous, because the supremum norm is a continuous seminorm on every
+elementary stage. -/
+private theorem schwartzBruhat_continuous_of_sup_bound {A : Type*} [CommGroup A]
+    [TopologicalSpace A] (Λ : SchwartzBruhat A →ₗ[ℂ] ℂ) (C : ℝ≥0)
+    (hΛ : ∀ (f : SchwartzBruhat A) (M : ℝ), (∀ x, ‖f x‖ ≤ M) → ‖Λ f‖ ≤ C * M) :
+    Continuous Λ := by
+  classical
+  let p := (normSeminorm ℂ ℂ).comp Λ
+  have hp : ∀ (b : BruhatStructuralPair A) (s : ElementaryLCAPresentation b.quotient),
+      Continuous (p ∘ schwartzBruhatStageInclusion b s) := by
+    intro b s
+    let q := (normSeminorm ℂ ℂ).comp (Λ.comp (schwartzBruhatStageInclusion b s))
+    change Continuous q
+    let p₀ : Seminorm ℂ (SchwartzBruhatStage s) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hp₀ : Continuous p₀ :=
+      (withGeneratingSeminorms_spec _ _).continuous_seminorm (0, 0, 0, 0)
+    have hpt (f : SchwartzBruhatStage s) (x : A) :
+        ‖schwartzBruhatStageRealization b s f x‖ ≤ p₀ f := by
+      let := s.finiteGroup
+      have he := schwartzBruhatStageRealization_apply b s f x
+      by_cases hx : x ∈ b.val.1
+      · rw [dite_eq_left hx] at he
+        rw [he]
+        let y := Multiplicative.toAdd (s.equiv (QuotientGroup.mk ⟨x, hx⟩))
+        change (‖f y‖₊ : ENNReal).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+        have hb : (‖f y‖₊ : ENNReal) ≤ elementarySchwartzBound f.val (0, 0, 0, 0) :=
+          (le_iSup (fun g ↦ (‖f.val g‖₊ : ENNReal)) y).trans_eq
+            (elementarySchwartzBound_zero f.val).symm
+        exact ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne hb
+      · rw [dite_eq_right hx] at he
+        exact ((congrArg norm he).trans (norm_zero : ‖(0 : ℂ)‖ = 0)).le.trans
+          (apply_nonneg p₀ f)
+    have hC : Continuous (C • p₀) := hp₀.const_smul C
+    exact Seminorm.continuous_of_le hC fun f ↦
+      hΛ (schwartzBruhatStageInclusion b s f) (p₀ f) (hpt f)
+  let i : {q : Seminorm ℂ (schwartzBruhatSubmodule A) //
+      ∀ (b : BruhatStructuralPair A) (s : ElementaryLCAPresentation b.quotient),
+        Continuous (q ∘ schwartzBruhatStageInclusion b s)} := ⟨p, hp⟩
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp Λ fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm i
+
 include hm hHaar₁ hHaar in
 /-- Paper: Equation (4.4.2.6), p. 193. With Haar measure on the compact quotient,
 the Fourier coefficient formula is linear and continuous in the test function. -/
 theorem modulatedCyclicFourierCoeff_linearContinuous (j : J) :
-    IsLinearMap ℂ (coeff⟦j⟧) ∧ Continuous (coeff⟦j⟧) := by sorry
-
+    IsLinearMap ℂ (coeff⟦j⟧) ∧ Continuous (coeff⟦j⟧) := by
+  classical
+  have := modulatedCyclicQuotient_compact m γ hm hγ
+  have hξ : Continuous (fun z : Q ↦ ((ξ j z : Circle) : ℂ)) :=
+    continuous_subtype_val.comp (ξ j).continuous
+  have hint (f : S) : Integrable (fun z ↦ f z * star ((ξ j z : Circle) : ℂ)) ν :=
+    ((schwartzBruhat_continuous f).mul hξ.star).integrable_of_hasCompactSupport
+      (HasCompactSupport.of_compactSpace _)
+  have hlin : IsLinearMap ℂ (coeff⟦j⟧) := by
+    refine ⟨fun f g ↦ ?_, fun c f ↦ ?_⟩
+    · change _ * (∫ z, (f z + g z) * star ((ξ j z : Circle) : ℂ) ∂ν) =
+        _ * (∫ z, f z * star ((ξ j z : Circle) : ℂ) ∂ν) +
+          _ * ∫ z, g z * star ((ξ j z : Circle) : ℂ) ∂ν
+      simp_rw [add_mul]
+      rw [integral_add (hint f) (hint g), mul_add]
+    · change _ * (∫ z, (c * f z) * star ((ξ j z : Circle) : ℂ) ∂ν) =
+        c * (_ * ∫ z, f z * star ((ξ j z : Circle) : ℂ) ∂ν)
+      simp_rw [mul_assoc c]
+      rw [integral_const_mul, mul_left_comm]
+  refine ⟨hlin, ?_⟩
+  let C : ℝ≥0 := ⟨‖(((L * μ₁.real univ)⁻¹ : ℝ) : ℂ)‖ * ν.real univ, by positivity⟩
+  refine schwartzBruhat_continuous_of_sup_bound (IsLinearMap.mk' _ hlin) C fun f M hM ↦ ?_
+  change ‖(((L * μ₁.real univ)⁻¹ : ℝ) : ℂ) * ∫ z, f z * star ((ξ j z : Circle) : ℂ) ∂ν‖ ≤
+    ‖(((L * μ₁.real univ)⁻¹ : ℝ) : ℂ)‖ * ν.real univ * M
+  rw [norm_mul, mul_assoc, mul_comm (ν.real univ)]
+  refine mul_le_mul_of_nonneg_left (norm_integral_le_of_norm_le_const
+    (.of_forall fun z ↦ ?_)) (norm_nonneg _)
+  rw [norm_mul, norm_star, Circle.norm_coe, mul_one]
+  exact hM z
 -- TODO(paper-gap): The exponent in (4.4.2.6) uses log γ, which is undefined
 -- for a general group element. The conjugate of (4.4.2.5) uses log|γ|_G.
 
@@ -723,7 +792,13 @@ local notation "a" => modulatedCyclicFourierCoeff m γ hm hγ χ t₀ ht₀ μ�
 Schwartz–Bruhat function against the conjugate exponential with the stated normalization. -/
 theorem modulatedCyclicFourierCoeff_apply (j : J) (f : S) :
     Integrable (fun z ↦ f z * star (e j z)) ν ∧
-    a j f = (L * μ₁.real univ)⁻¹ * ∫ z, f z * star (e j z) ∂ν := by sorry
+    a j f = (L * μ₁.real univ)⁻¹ * ∫ z, f z * star (e j z) ∂ν := by
+  have := modulatedCyclicQuotient_compact m γ hm hγ
+  refine ⟨?_, rfl⟩
+  have hξ : Continuous (fun z : Q ↦ ((ξ j z : Circle) : ℂ)) :=
+    continuous_subtype_val.comp (ξ j).continuous
+  exact ((schwartzBruhat_continuous f).mul hξ.star).integrable_of_hasCompactSupport
+    (HasCompactSupport.of_compactSpace _)
 
 variable [SecondCountableTopology G]
 variable (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
@@ -954,8 +1029,43 @@ theorem modulatedCyclicQuotient_canonicalHaar :
 /-- Paper: Remark 4.4.2.9, p. 194. Multiplication by a unitary character
 preserves the Schwartz–Bruhat space of the original group. -/
 theorem pontryaginDual_mul_schwartzBruhat (η : PontryaginDual G) (f : SchwartzBruhat G) :
-    (fun x ↦ (η x : ℂ) * f x) ∈ schwartzBruhatSubmodule G := by sorry
-
+    (fun x ↦ (η x : ℂ) * f x) ∈ schwartzBruhatSubmodule G := by
+  -- The Fourier transform turns multiplication by `η` into translation on the dual group.
+  let μ : Measure G := Measure.haar
+  have : μ.IsHaarMeasure := inferInstanceAs ((Measure.haar (G := G)).IsHaarMeasure)
+  have : μ.Regular := inferInstanceAs ((Measure.haar (G := G)).Regular)
+  obtain ⟨F, hF⟩ := schwartzBruhat_fourier_equiv (G := G) μ
+  obtain ⟨Φ, hΦ, hinj, -⟩ := lcaFourier_L1 (G := G) μ
+  let v : SchwartzBruhat G := F.symm (schwartzBruhatTranslate η (F f))
+  let u : G → ℂ := v
+  let g (y : G) := (η y : ℂ) * f y
+  have hη : Continuous (fun y : G ↦ (η y : ℂ)) := continuous_subtype_val.comp η.continuous
+  have hg : Integrable g μ := by
+    simpa only [g, mul_comm] using
+      (hF f).1.mul_bdd (c := 1) hη.aestronglyMeasurable (.of_forall fun y ↦ by simp)
+  have hu : Integrable u μ := (hF v).1
+  have htransform (χ : PontryaginDual G) : lcaFourier μ u χ = lcaFourier μ g χ := by
+    rw [← (hF v).2 χ]
+    have hv : F v = schwartzBruhatTranslate η (F f) := F.apply_symm_apply _
+    rw [hv]
+    change F f (η⁻¹ * χ) = _
+    rw [(hF f).2]
+    apply integral_congr_ae
+    exact Filter.Eventually.of_forall fun y ↦ by
+      change f y * star (((η y)⁻¹ * χ y : Circle) : ℂ) = g y * star (χ y : ℂ)
+      rw [Circle.coe_mul, Circle.coe_inv_eq_conj, ← Complex.star_def, star_mul, star_star]
+      dsimp only [g]
+      ring
+  have hcoe (w : G → ℂ) (hw : Integrable w μ) (χ : PontryaginDual G) :
+      Φ (hw.toL1 w) χ = lcaFourier μ w χ := by
+    rw [hΦ]
+    exact integral_congr_ae (hw.coeFn_toL1.mono fun y hy ↦ congrArg (· * star (χ y : ℂ)) hy)
+  have hL1 : hu.toL1 u = hg.toL1 g :=
+    hinj (ZeroAtInftyContinuousMap.ext fun χ ↦ by rw [hcoe, hcoe, htransform])
+  have hae : u =ᵐ[μ] g := (Integrable.toL1_eq_toL1_iff u g hu hg).mp hL1
+  have heq : u = g := ((schwartzBruhat_continuous v).ae_eq_iff_eq μ
+    (hη.mul (schwartzBruhat_continuous f))).mp hae
+  exact (congrArg (· ∈ schwartzBruhatSubmodule G) heq).mp v.property
 /-- Paper: Remark 4.4.2.9, p. 194. At a fixed compact character the values of a
 continuous seminorm on the cyclic exponentials have polynomial growth.
 Deviation: The polynomial bound is expressed with a nonnegative constant and

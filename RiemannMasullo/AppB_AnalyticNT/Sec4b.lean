@@ -9,6 +9,7 @@ public import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
 public import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 public import Mathlib.Analysis.Meromorphic.Divisor
 public import Mathlib.NumberTheory.Harmonic.EulerMascheroni
+import Mathlib.Analysis.SpecialFunctions.FrullaniIntegral
 
 /-!
 # Explicit formulas for Hecke L-functions
@@ -90,7 +91,8 @@ def heckeLogDiscriminantConductor (χ : U[F]) : ℝ :=
 discriminant contribution. -/
 theorem heckeLogDiscriminantConductor_one :
     heckeLogDiscriminantConductor (1 : U[F]) =
-      Real.log (Int.natAbs (NumberField.discr F)) := by sorry
+      Real.log (Int.natAbs (NumberField.discr F)) := by
+  simp [heckeLogDiscriminantConductor]
 
 /-- Paper: Equation (B.4.2.3), p. 614. The reflected logarithmic derivative
 and the discriminant–conductor term give the logarithmic derivative of the continuation.
@@ -118,13 +120,206 @@ def heckeArchimedeanDigammaKernel (k : ℝ) (zPlus zMinus : ℂ) (f : ℝ → �
     (f (k * t) * Complex.exp (-zPlus * (t : ℂ)) +
       f (-(k * t)) * Complex.exp (-zMinus * (t : ℂ))) / (1 - (Real.exp (-t) : ℂ)))
 
+section GaussDigamma
+
+open Real
+
+/-- The factor `1 / t - 1 / (1 - e^{-t})` lies in `[-1, 0]` for positive `t`. -/
+private lemma digamma_remainder_bounds {t : ℝ} (ht : 0 < t) :
+    -1 ≤ 1 / t - 1 / (1 - exp (-t)) ∧ 1 / t - 1 / (1 - exp (-t)) ≤ 0 := by
+  have hq : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+  have hd : 0 < 1 - exp (-t) := by linarith
+  have h1 : 1 - exp (-t) ≤ t := by linarith [add_one_le_exp (-t)]
+  have h2 : t * exp (-t) ≤ 1 - exp (-t) := by
+    have h := add_one_le_exp t
+    have he : exp t * exp (-t) = 1 := by rw [← exp_add]; simp
+    nlinarith [exp_pos (-t)]
+  constructor
+  · rw [div_sub_div _ _ ht.ne' hd.ne', le_div_iff₀ (mul_pos ht hd)]
+    nlinarith
+  · rw [sub_nonpos]
+    exact one_div_le_one_div_of_le hd h1
+
+/-- The real Gauss kernel `e^{-t}/t - e^{-t}/(1 - e^{-t})` of `ψ(1)`. -/
+private noncomputable def gaussDigammaKernel (t : ℝ) : ℝ :=
+  exp (-t) / t - exp (-t) / (1 - exp (-t))
+
+private lemma exp_neg_natCast_mul (m : ℕ) (t : ℝ) : exp (-((m : ℝ) * t)) = exp (-t) ^ m := by
+  rw [← exp_nat_mul]
+  ring_nf
+
+/-- Splitting off the first `n` terms of the geometric series. -/
+private lemma gaussDigammaKernel_eq (n : ℕ) {t : ℝ} (ht : 0 < t) :
+    gaussDigammaKernel t =
+      t⁻¹ * (exp (-(1 * t)) - exp (-(((n + 1 : ℕ) : ℝ) * t))) -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t))) := by
+  have hq : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+  have hd : 1 - exp (-t) ≠ 0 := by linarith
+  simp only [exp_neg_natCast_mul, one_mul, gaussDigammaKernel]
+  set q := exp (-t)
+  have hgeom : (∑ i ∈ Finset.range n, q ^ (i + 1)) * (1 - q) = q - q ^ (n + 1) := by
+    induction n with
+    | zero => simp
+    | succ n ih => rw [Finset.sum_range_succ, add_mul, ih]; ring
+  have hsum : ∑ i ∈ Finset.range n, q ^ (i + 1) = (q - q ^ (n + 1)) / (1 - q) := by
+    rw [← hgeom, mul_div_cancel_right₀ _ hd]
+  rw [hsum]
+  field_simp
+  ring
+
+private lemma integrableOn_exp_neg_natCast_mul (m : ℕ) (hm : 0 < m) :
+    IntegrableOn (fun t : ℝ ↦ exp (-((m : ℝ) * t))) (Ioi 0) := by
+  simpa [neg_mul] using integrableOn_exp_mul_Ioi (a := -(m : ℝ)) (by simp [hm]) 0
+
+private lemma integral_exp_neg_natCast_mul (m : ℕ) (hm : 0 < m) :
+    ∫ t in Ioi (0 : ℝ), exp (-((m : ℝ) * t)) = 1 / m := by
+  have := integral_exp_mul_Ioi (a := -(m : ℝ)) (by simp [hm]) 0
+  simp only [neg_mul, mul_zero, exp_zero] at this
+  rw [this]
+  field_simp
+
+private lemma integrableOn_gaussDigammaKernel : IntegrableOn gaussDigammaKernel (Ioi 0) := by
+  refine Integrable.mono' (integrableOn_exp_neg_Ioi 0) ?_ ?_
+  · refine ContinuousOn.aestronglyMeasurable ?_ measurableSet_Ioi
+    intro t ht
+    have ht : (0 : ℝ) < t := ht
+    have hd : 1 - exp (-t) ≠ 0 := by
+      have : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+      linarith
+    have ht' : t ≠ 0 := ht.ne'
+    unfold gaussDigammaKernel
+    apply ContinuousAt.continuousWithinAt
+    fun_prop (disch := assumption)
+  · refine (ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_)
+    have ht : (0 : ℝ) < t := ht
+    obtain ⟨h1, h2⟩ := digamma_remainder_bounds ht
+    have : gaussDigammaKernel t = exp (-t) * (1 / t - 1 / (1 - exp (-t))) := by
+      unfold gaussDigammaKernel; ring
+    rw [this, norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+    have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+    nlinarith [exp_pos (-t)]
+
+private lemma integral_gaussDigammaKernel :
+    ∫ t in Ioi (0 : ℝ), gaussDigammaKernel t = -eulerMascheroniConstant := by
+  set I := ∫ t in Ioi (0 : ℝ), gaussDigammaKernel t
+  -- The remainder after `n` geometric terms.
+  let R : ℕ → ℝ := fun n ↦
+    ∫ t in Ioi (0 : ℝ), exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))
+  have hRint : ∀ n : ℕ, IntegrableOn
+      (fun t ↦ exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) (Ioi 0) := by
+    intro n
+    refine Integrable.mono' (integrableOn_exp_neg_natCast_mul (n + 1) n.succ_pos) ?_ ?_
+    · refine ContinuousOn.aestronglyMeasurable ?_ measurableSet_Ioi
+      intro t ht
+      have ht : (0 : ℝ) < t := ht
+      have hd : 1 - exp (-t) ≠ 0 := by
+        have : exp (-t) < 1 := exp_lt_one_iff.mpr (by linarith)
+        linarith
+      have ht' : t ≠ 0 := ht.ne'
+      apply ContinuousAt.continuousWithinAt
+      fun_prop (disch := assumption)
+    · refine (ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_)
+      obtain ⟨h1, h2⟩ := digamma_remainder_bounds (show (0 : ℝ) < t from ht)
+      rw [norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+      have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+      nlinarith [exp_pos (-(((n + 1 : ℕ) : ℝ) * t))]
+  have hRle : ∀ n : ℕ, ‖R n‖ ≤ 1 / ((n : ℝ) + 1) := by
+    intro n
+    calc ‖R n‖ ≤ ∫ t in Ioi (0 : ℝ), exp (-(((n + 1 : ℕ) : ℝ) * t)) := by
+          refine norm_integral_le_of_norm_le (integrableOn_exp_neg_natCast_mul (n + 1) n.succ_pos)
+            ((ae_restrict_iff' measurableSet_Ioi).mpr (Eventually.of_forall fun t ht ↦ ?_))
+          obtain ⟨h1, h2⟩ := digamma_remainder_bounds (show (0 : ℝ) < t from ht)
+          rw [norm_mul, Real.norm_of_nonneg (exp_pos _).le, Real.norm_eq_abs]
+          have : |1 / t - 1 / (1 - exp (-t))| ≤ 1 := abs_le.mpr ⟨h1, by linarith⟩
+          nlinarith [exp_pos (-(((n + 1 : ℕ) : ℝ) * t))]
+      _ = 1 / ((n : ℝ) + 1) := by
+          rw [integral_exp_neg_natCast_mul (n + 1) n.succ_pos]; push_cast; rfl
+  -- The finite expansion of the integral.
+  have hexp : ∀ n : ℕ, I = -(harmonic n - log ((n : ℝ) + 1)) + R n := by
+    intro n
+    have hsumint : ∀ i ∈ Finset.range n,
+        IntegrableOn (fun t : ℝ ↦ exp (-(((i + 1 : ℕ) : ℝ) * t))) (Ioi 0) :=
+      fun i _ ↦ integrableOn_exp_neg_natCast_mul (i + 1) i.succ_pos
+    have hsumint' : IntegrableOn
+        (fun t : ℝ ↦ ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) (Ioi 0) :=
+      integrable_finsetSum _ hsumint
+    let Fr : ℝ → ℝ := fun t ↦ t⁻¹ * (exp (-(1 * t)) - exp (-(((n + 1 : ℕ) : ℝ) * t)))
+    have hFr : EqOn Fr (fun t ↦ gaussDigammaKernel t +
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) -
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) (Ioi 0) := by
+      intro t ht
+      simp only [Fr, gaussDigammaKernel_eq n (show (0 : ℝ) < t from ht)]
+      ring
+    have hFrint : IntegrableOn Fr (Ioi 0) :=
+      ((integrableOn_gaussDigammaKernel.add hsumint').sub (hRint n)).congr_fun hFr.symm
+        measurableSet_Ioi
+    have hFrval : ∫ t in Ioi (0 : ℝ), Fr t = log ((n : ℝ) + 1) := by
+      have hc : Continuous fun x : ℝ ↦ exp (-x) := by fun_prop
+      have hL : Tendsto (fun x : ℝ ↦ exp (-x)) (𝓝[>] 0) (𝓝 1) := by
+        have := (hc.tendsto 0).mono_left (nhdsWithin_le_nhds (s := Ioi 0))
+        simpa using this
+      have := Frullani.integral_Ioi_eq (f := fun x : ℝ ↦ exp (-x)) (a := 1)
+        (b := ((n + 1 : ℕ) : ℝ)) (hc.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+        one_pos (by positivity) hL tendsto_exp_neg_atTop_nhds_zero hFrint
+      simpa [Fr] using this
+    have hsumval : ∫ t in Ioi (0 : ℝ), ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)) =
+        harmonic n := by
+      rw [integral_finsetSum _ hsumint, harmonic, Rat.cast_sum]
+      refine Finset.sum_congr rfl fun i _ ↦ ?_
+      rw [integral_exp_neg_natCast_mul (i + 1) i.succ_pos]
+      push_cast
+      ring
+    have hI : I = ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) :=
+      setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ gaussDigammaKernel_eq n ht
+    have e1 : ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))) +
+        exp (-(((n + 1 : ℕ) : ℝ) * t)) * (1 / t - 1 / (1 - exp (-t)))) =
+        (∫ t in Ioi (0 : ℝ), (Fr t -
+          (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t))))) + R n :=
+      integral_add (hFrint.sub hsumint') (hRint n)
+    have e2 : ∫ t in Ioi (0 : ℝ), (Fr t -
+        (∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)))) =
+        (∫ t in Ioi (0 : ℝ), Fr t) -
+          ∫ t in Ioi (0 : ℝ), ∑ i ∈ Finset.range n, exp (-(((i + 1 : ℕ) : ℝ) * t)) :=
+      integral_sub hFrint hsumint'
+    rw [hI, e1, e2, hFrval, hsumval]
+    ring
+  -- Let `n → ∞`.
+  have hR0 : Tendsto R atTop (𝓝 0) :=
+    squeeze_zero_norm hRle tendsto_one_div_add_atTop_nhds_zero_nat
+  have hlim : Tendsto (fun n : ℕ ↦ -(harmonic n - log ((n : ℝ) + 1)) + R n) atTop
+      (𝓝 (-eulerMascheroniConstant + 0)) :=
+    tendsto_harmonic_sub_log_add_one.neg.add hR0
+  rw [add_zero] at hlim
+  refine tendsto_nhds_unique ?_ hlim
+  simp_rw [← hexp]
+  exact tendsto_const_nhds
+
+end GaussDigamma
+
 /-- Paper: Proposition B.4.2.1, p. 616. At unit scale and unit gamma
 arguments the integrable kernel for the constant test gives twice the digamma value at one.
 Deviation: This is a sanity check for the corrected kernel. -/
 theorem heckeArchimedeanDigammaKernel_one :
     let K := heckeArchimedeanDigammaKernel 1 1 1 (fun _ ↦ 1)
     IntegrableOn K (Ioi 0) ∧
-      (∫ t in Ioi (0 : ℝ), K t) = -2 * (Real.eulerMascheroniConstant : ℂ) := by sorry
+      (∫ t in Ioi (0 : ℝ), K t) = -2 * (Real.eulerMascheroniConstant : ℂ) := by
+  intro K
+  have hK : K = fun t ↦ ((2 * gaussDigammaKernel t : ℝ) : ℂ) := by
+    funext t
+    simp only [K, heckeArchimedeanDigammaKernel, gaussDigammaKernel]
+    push_cast
+    simp only [neg_mul, one_mul]
+    ring
+  rw [hK]
+  simp only []
+  refine ⟨(integrableOn_gaussDigammaKernel.const_mul 2).ofReal, ?_⟩
+  rw [integral_complex_ofReal, integral_const_mul, integral_gaussDigammaKernel]
+  push_cast
+  ring
 
 local notation "circleToComplex" =>
   (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ)
@@ -525,7 +720,62 @@ theorem finiteConnesWeilPrincipalValue_integerUnits (v : Primes(F)) :
 /-- Paper: Remark B.4.4.6, p. 623. A finite local test agrees with its value at
 one on a neighborhood of one, so the unit-subtracted integrand vanishes there. -/
 theorem finiteWeilTest_eventually_eq_at_one (v : Primes(F)) (f : 𝒟((v.adicCompletion F)ˣ)) :
-    ∀ᶠ u in 𝓝 (1 : (v.adicCompletion F)ˣ), f.val u = f.val 1 := by sorry
+    ∀ᶠ u in 𝓝 (1 : (v.adicCompletion F)ˣ), f.val u = f.val 1 := by
+  let G := (v.adicCompletion F)ˣ
+  have hf : IsBruhatSmooth f.val := (mem_bruhatSmoothSubmodule_iff _).mp f.property.1
+  obtain ⟨k, hk, hInv, _⟩ := hf 0
+  let A : OpenCompactlyGeneratedSubgroups (PontryaginDual G) := ⟨lcaAnnihilator k, hk.2⟩
+  obtain ⟨γ, _, hγ, hker, _⟩ := lca_dualSubgroup_quotient A
+  let Q := PontryaginDual A.val
+  let : LocallyCompactSpace A.val := A.property.1.isOpenEmbedding_subtypeVal.locallyCompactSpace
+  obtain ⟨n, ⟨charts⟩⟩ := isCompactlyGeneratedGroup_iff_dual_locallyEuclidean.mp A.property.2
+  let : ChartedSpace (EuclideanSpace ℝ (Fin n)) Q := charts
+  let : LocallyConnectedSpace Q := ChartedSpace.locallyConnectedSpace (EuclideanSpace ℝ (Fin n)) Q
+  let B : OpenSubgroup G :=
+    ⟨(v.adicCompletionIntegers F).units, Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)⟩
+  let : CompactSpace B.toSubgroup := isCompact_iff_compactSpace.mp
+    (Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)))
+  let j : B.toSubgroup → v.adicCompletion F := Units.val ∘ Subtype.val
+  have hj : Topology.IsEmbedding j :=
+    (Units.isEmbedding_val₀ (G₀ := v.adicCompletion F)).comp Topology.IsEmbedding.subtypeVal
+  let η : B.toSubgroup →ₜ* Q := γ.comp ⟨B.toSubgroup.subtype, continuous_subtype_val⟩
+  have hη : Continuous η := η.continuous
+  have hηOpen : IsOpenMap η := hγ.isOpenMap.comp B.isOpen.isOpenEmbedding_subtypeVal.isOpenMap
+  have hSmall (U : Set Q) (hU : U ∈ 𝓝 (1 : Q)) : ∃ V : OpenSubgroup Q, (V : Set Q) ⊆ U := by
+    have hpre : η ⁻¹' U ∈ 𝓝 (1 : B.toSubgroup) :=
+      hη.continuousAt.preimage_mem_nhds (by simpa only [map_one] using hU)
+    rw [hj.isInducing.nhds_eq_comap] at hpre
+    obtain ⟨S, hS, hSsub⟩ := mem_comap.mp hpre
+    let ν : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ)) := Valued.v
+    obtain ⟨r, hr⟩ := (Valued.mem_nhds (Γ₀ := WithZero (Multiplicative ℤ))).mp hS
+    let W := (fun x : B.toSubgroup ↦ j x - j 1) ⁻¹' {y | ν.restrict y < r.val}
+    have hW : IsClopen W :=
+      (Valued.isClopen_ball (v.adicCompletion F) r.val).preimage
+        (hj.continuous.sub continuous_const)
+    have h1W : (1 : B.toSubgroup) ∈ W := by
+      change ν.restrict (j 1 - j 1) < r.val
+      rw [sub_self, map_zero]
+      exact pos_iff_ne_zero.mpr r.ne_zero
+    obtain ⟨V, hV⟩ := IsTopologicalGroup.exist_openSubgroup_sub_clopen_nhds_of_one hW h1W
+    refine ⟨⟨V.toSubgroup.map η.toMonoidHom, hηOpen _ V.isOpen⟩, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    exact hSsub (hr (hV hx))
+  have hComponent : connectedComponent (1 : Q) = {1} := by
+    refine subset_antisymm ?_ (singleton_subset_iff.mpr mem_connectedComponent)
+    intro y hy
+    by_contra hne
+    have h1y : (1 : Q) ∈ ({y} : Set Q)ᶜ :=
+      fun h ↦ hne (mem_singleton_iff.mpr (mem_singleton_iff.mp h).symm)
+    obtain ⟨V, hV⟩ := hSmall _ (isOpen_compl_singleton.mem_nhds h1y)
+    have hyV := isPreconnected_connectedComponent.subset_isClopen V.isClopen
+      ⟨1, mem_connectedComponent, V.one_mem⟩ hy
+    exact (hV hyV) (mem_singleton y)
+  have hOne : IsOpen ({1} : Set Q) := hComponent ▸ isOpen_connectedComponent
+  have hkOpen : IsOpen (k : Set G) := by
+    rw [← lcaDualAnnihilator_annihilator k hk.1, ← hker]
+    exact hOne.preimage γ.continuous
+  filter_upwards [hkOpen.mem_nhds k.one_mem] with u hu
+  simpa only [mul_one] using hInv ⟨u, hu⟩ 1
 
 end PrincipalValues
 
@@ -540,7 +790,8 @@ def explicitFormulaCompletedHeckeL (χ : U[F]) : ℂ → ℂ :=
 meromorphic normal form and agrees with the completed Euler product on the right half-plane. -/
 theorem explicitFormulaCompletedHeckeL_spec (χ : U[F]) :
     MeromorphicNFOn (explicitFormulaCompletedHeckeL χ) univ ∧
-      ∀ s : halfPlane, explicitFormulaCompletedHeckeL χ s = completedHeckeL χ s := by sorry
+      ∀ s : halfPlane, explicitFormulaCompletedHeckeL χ s = completedHeckeL χ s :=
+  (completedHeckeL_exists_continuation χ).choose_spec
 
 local notation "chartZeros(" τ ")" =>
   {z : {χ : U[F] // ∀ t : ℝ≥0ˣ, χ (τ t) = 1} × ℂ //

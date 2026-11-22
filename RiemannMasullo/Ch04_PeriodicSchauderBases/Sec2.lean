@@ -7,6 +7,7 @@ import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeVariables
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.TranslationDifference
+import Mathlib.Analysis.Fourier.PoissonSummation
 import Mathlib.Analysis.InnerProductSpace.ProdL2
 import Mathlib.Analysis.PSeries
 import Mathlib.Analysis.SpecialFunctions.SmoothTransition
@@ -14,6 +15,7 @@ import Mathlib.Topology.Baire.CompleteMetrizable
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PaleyWiener
 import RiemannMasullo.ForMathlib.Analysis.Fourier.PoissonSummation
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import RiemannMasullo.ForMathlib.Topology.MetricSpace.CompactQuotient
 
 /-!
@@ -851,12 +853,121 @@ theorem cyclicPeriodization_continuous : Continuous (cyclicPeriodization γ hγ)
     continuous_pi_iff.mp (positiveRealExponentialDecay_isEmbedding (univ : Set ℝ) univ_nonempty).continuous a
   exact (cyclicSchwartzPeriodization γ hγ).continuous.comp h
 
+/-- An integer sequence that is zero up to `A` and one from `A + n` on has consecutive
+differences summing to one: the finite telescoping sum is all that is left. -/
+private theorem hasSum_int_sub_of_zero_of_one {a : ℤ → ℝ} (A : ℤ) (n : ℕ)
+    (h0 : ∀ k ≤ A, a k = 0) (h1 : ∀ k, A + n ≤ k → a k = 1) :
+    HasSum (fun k ↦ a (k + 1) - a k) 1 := by
+  have hs : ∀ k ∉ (Finset.range n).image (fun i : ℕ ↦ A + i), a (k + 1) - a k = 0 := by
+    intro k hk
+    simp only [Finset.mem_image, Finset.mem_range, not_exists, not_and] at hk
+    by_cases hkA : k < A
+    · rw [h0 k hkA.le, h0 (k + 1) (by omega), sub_zero]
+    · have hk' : A + n ≤ k := by
+        by_contra hlt
+        exact hk (k - A).toNat (by omega) (by omega)
+      rw [h1 k hk', h1 (k + 1) (by omega), sub_self]
+  convert hasSum_sum_of_ne_finset_zero (L := SummationFilter.unconditional ℤ) hs using 1
+  have ht := Finset.sum_range_sub (fun i : ℕ ↦ a (A + i)) n
+  simp only [Nat.cast_add, Nat.cast_one, Nat.cast_zero, add_zero, ← add_assoc] at ht
+  rw [Finset.sum_image (fun i _ j _ h ↦ by simpa using h), ht, h1 _ le_rfl, h0 _ le_rfl,
+    sub_zero]
+
+/-- The differences of the smooth step `smoothTransition` along integer translates form a
+partition of unity: for every `u`, the sum over `k : ℤ` of
+`smoothTransition (u + k + 1) - smoothTransition (u + k)` is one. -/
+private theorem hasSum_smoothTransition_sub (u : ℝ) :
+    HasSum (fun k : ℤ ↦ Real.smoothTransition (u + k + 1) - Real.smoothTransition (u + k)) 1 := by
+  have h := hasSum_int_sub_of_zero_of_one (a := fun k : ℤ ↦ Real.smoothTransition (u + k))
+    ⌊-u⌋ (⌈1 - u⌉ - ⌊-u⌋).toNat (fun k hk ↦ ?_) (fun k hk ↦ ?_)
+  · simpa only [Int.cast_add, Int.cast_one, ← add_assoc] using h
+  · apply Real.smoothTransition.zero_of_nonpos
+    have hk' : (k : ℝ) ≤ ⌊-u⌋ := by exact_mod_cast hk
+    linarith [Int.floor_le (-u)]
+  · apply Real.smoothTransition.one_of_one_le
+    have hk' : (⌈1 - u⌉ : ℝ) ≤ k := by exact_mod_cast (show ⌈1 - u⌉ ≤ k by omega)
+    linarith [Int.le_ceil (1 - u)]
+
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Every smooth quotient function has an
 exponentially decaying lift under periodization. -/
-theorem cyclicPeriodization_surjective : Surjective (cyclicPeriodization γ hγ) := by sorry
+theorem cyclicPeriodization_surjective : Surjective (cyclicPeriodization γ hγ) := by
+  -- Cut the periodic lift of `g` off with a smooth bump whose translates by `log γ` sum
+  -- to one; the result has compact support, and its periodization is `g` again.
+  intro g
+  set L := Real.log γ
+  have hL : 0 < L := Real.log_pos hγ
+  let F (u : ℝ) : ℂ := ((Real.smoothTransition (u + 1) - Real.smoothTransition u : ℝ) : ℂ)
+  let φ (x : ℝ) : ℂ := F (x / L) * cyclicLift g (x / L)
+  have hcoe : ContDiff ℝ ∞ ((↑) : ℝ → ℂ) := Complex.ofRealCLM.contDiff
+  have hst : ContDiff ℝ ∞ Real.smoothTransition := Real.smoothTransition.contDiff
+  have hdiv : ContDiff ℝ ∞ (fun x : ℝ ↦ x / L) := contDiff_id.div_const L
+  have hF : ContDiff ℝ ∞ F :=
+    hcoe.comp ((hst.comp (contDiff_id.add contDiff_const)).sub hst)
+  have hφd : ContDiff ℝ ∞ φ := (hF.comp hdiv).mul ((cyclicLift_contDiff g).comp hdiv)
+  have hφs : HasCompactSupport φ := by
+    refine HasCompactSupport.intro (isCompact_Icc (a := -L) (b := L)) fun x hx ↦ ?_
+    have hF0 : F (x / L) = 0 := by
+      rw [mem_Icc, not_and_or, not_le, not_le] at hx
+      simp only [F, Complex.ofReal_eq_zero, sub_eq_zero]
+      rcases hx with hx | hx
+      · have hu : x / L < -1 := by rw [div_lt_iff₀ hL]; linarith
+        rw [Real.smoothTransition.zero_of_nonpos (by linarith),
+          Real.smoothTransition.zero_of_nonpos (by linarith)]
+      · have hu : 1 < x / L := by rw [lt_div_iff₀ hL]; linarith
+        rw [Real.smoothTransition.one_of_one_le (by linarith),
+          Real.smoothTransition.one_of_one_le (by linarith)]
+    simp only [φ, hF0, zero_mul]
+  have hmem := mem_logExponentialDecaySubmodule_of_hasCompactSupport univ hφs hφd
+  refine ⟨⟨φ, hmem⟩, ?_⟩
+  apply Subtype.ext
+  funext y
+  -- Every point of the circle group is the image of a real logarithmic coordinate.
+  obtain ⟨u, hu⟩ := QuotientAddGroup.mk_surjective (y.2.1 0)
+  have hy : y = point (u : T) := by
+    refine Prod.ext (Subsingleton.elim _ _) (Prod.ext ?_ (Subsingleton.elim _ _))
+    funext j
+    have : j = 0 := Subsingleton.elim _ _
+    subst j
+    exact hu.symm
+  subst hy
+  have h1 := cyclicPeriodization_hasSum γ hγ ⟨φ, hmem⟩ (u * L)
+  rw [mul_div_cancel_right₀ u hL.ne'] at h1
+  have h2 : HasSum (fun k : ℤ ↦ φ (u * L + (k : ℝ) * L)) (g (point (u : T))) := by
+    have hsum := (Complex.hasSum_ofReal.mpr (hasSum_smoothTransition_sub u)).mul_right
+      (cyclicLift g u)
+    rw [Complex.ofReal_one, one_mul] at hsum
+    refine hsum.congr_fun fun k ↦ ?_
+    have hk : (u * L + (k : ℝ) * L) / L = u + k := by field_simp
+    have hper : cyclicLift g (u + k) = cyclicLift g u := by
+      simpa only [mul_one] using (cyclicLift_periodic g).int_mul k u
+    simp only [φ, F, hk, hper, add_assoc]
+  exact h1.unique h2
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Periodization sends open sets to open sets. -/
-theorem cyclicPeriodization_isOpenMap : IsOpenMap (cyclicPeriodization γ hγ) := by sorry
+theorem cyclicPeriodization_isOpenMap : IsOpenMap (cyclicPeriodization γ hγ) := by
+  -- Open mapping theorem: a continuous linear surjection from a Fréchet space onto a Fréchet
+  -- space is open, because the range, being everything, is not meagre in the Baire target.
+  obtain ⟨hTE, -, hME, hCE⟩ :=
+    positiveRealExponentialDecay_frechet univ ordConnected_univ univ_nonempty
+  obtain ⟨hTS, -, hMS, hCS⟩ := elementarySchwartz_isFrechet (m := 0) (n := 1) (r := 0) (F := PUnit)
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : UniformSpace S := IsTopologicalAddGroup.rightUniformSpace S
+  have : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  have : IsUniformAddGroup S := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace E := hCE
+  have : CompleteSpace S := hCS
+  have : MetrizableSpace E := hME
+  have : MetrizableSpace S := hMS
+  have : T2Space S := elementarySchwartz_t2
+  have : (uniformity S).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero S]
+    infer_instance
+  have : BaireSpace S := BaireSpace.of_completelyPseudoMetrizable
+  let A : E →L[ℂ] S := ⟨cyclicPeriodization γ hγ, cyclicPeriodization_continuous γ hγ⟩
+  refine isOpenMap_of_not_isMeagre_range A ?_
+  change ¬ IsMeagre (range (cyclicPeriodization γ hγ))
+  rw [(cyclicPeriodization_surjective γ hγ).range_eq]
+  exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
 
 /-- Paper: Lemma 4.2.1.5(2), p. 165. Bundle the periodization and its continuity
 as a continuous linear map. -/
@@ -990,7 +1101,61 @@ def cyclicQuotientMellinCoeff (m : ℤ) : StrongDual ℂ Q :=
 is the Mellin integral with exponent −2πim/log γ. -/
 theorem cyclicQuotientMellinCoeff_mk (m : ℤ) (f : E) :
     cyclicQuotientMellinCoeff γ hγ m (Submodule.mkQL Mγ f) =
-      mellin (fun t ↦ f.val (Real.log t)) (-phase[γ, m]) := by sorry
+      mellin (fun t ↦ f.val (Real.log t)) (-phase[γ, m]) := by
+  let L := Real.log γ
+  have hL : 0 < L := Real.log_pos hγ
+  -- Rescale the logarithmic profile so its periodization has period one.
+  let e := ContinuousLinearEquiv.unitsEquivAut ℝ (Units.mk0 L hL.ne')
+  let g := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ e
+    (logExponentialDecayTwist univ ⟨0, mem_univ _⟩ f)
+  let u : C(ℝ, ℂ) := ⟨g, g.continuous⟩
+  have hu (x : ℝ) : u x = f.val (x * L) := by
+    change logExponentialDecayTwist univ ⟨0, mem_univ _⟩
+      (show logExponentialDecaySubmodule univ from f) (x * L) = _
+    rw [logExponentialDecayTwist_apply]
+    simp
+  have hs (K : Compacts ℝ) :
+      Summable fun n : ℤ ↦ ‖(u.comp (ContinuousMap.addRight n)).restrict K‖ := by
+    have h := isBigO_norm_restrict_cocompact u (by norm_num) (g.isBigO_cocompact_rpow (-2)) K
+    exact summable_of_isBigO (Real.summable_abs_int_rpow one_lt_two)
+      (h.comp_tendsto Int.tendsto_coe_cofinite)
+  have hperiod : (fun z : T ↦ Φ f (point z)) = (u.periodic_tsum_comp_add_zsmul 1).lift := by
+    funext z
+    obtain ⟨x, rfl⟩ := QuotientAddGroup.mk_surjective z
+    rw [Function.Periodic.lift_coe]
+    simp only [zsmul_one]
+    rw [← ContinuousMap.tsum_apply (ContinuousMap.summable_of_locally_summable_norm hs)]
+    have hsum := (cyclicPeriodization_hasSum γ hγ f (x * L)).tsum_eq.symm
+    rw [show x * L / Real.log γ = x from mul_div_cancel_right₀ x hL.ne'] at hsum
+    refine hsum.trans (tsum_congr fun n ↦ ?_)
+    change f.val (x * L + (n : ℝ) * L) = u (x + n)
+    rw [hu, add_mul]
+  -- Logarithmic substitution in the Mellin integral and dilation in the Fourier integral
+  -- give the same integral, with the Jacobian of the dilation as the only factor.
+  let phase := -(2 * (Real.pi : ℂ) * Complex.I * (m : ℂ) / (L : ℂ))
+  let w (x : ℝ) := Complex.exp (phase * (x : ℂ)) * f.val x
+  have hmellin : mellin (fun t ↦ f.val (Real.log t)) phase = ∫ x, w x := by
+    rw [mellin, ← integral_comp_exp]
+    apply integral_congr_ae
+    filter_upwards with x
+    change Real.exp x • (((Real.exp x : ℝ) : ℂ) ^ (phase - 1) • f.val (Real.log (Real.exp x))) = _
+    rw [Real.log_exp, Complex.real_smul, smul_eq_mul,
+      Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp, Complex.ofReal_exp,
+      ← mul_assoc, ← Complex.exp_add, show (x : ℂ) + x * (phase - 1) = phase * x by ring]
+  have hFourier : FourierTransform.fourier (u : ℝ → ℂ) (m : ℝ) = |L⁻¹| • ∫ x, w x := by
+    rw [← Measure.integral_comp_mul_left w, Real.fourier_real_eq_integral_exp_smul]
+    apply integral_congr_ae
+    filter_upwards with x
+    simp only [hu, w, smul_eq_mul, mul_comm L x, Complex.ofReal_mul, Complex.ofReal_neg,
+      Complex.ofReal_ofNat, Complex.ofReal_intCast]
+    congr 2
+    dsimp [phase]
+    field_simp [Complex.ofReal_ne_zero.mpr hL.ne']
+  change (L : ℂ) * fourierCoeff (fun z : T ↦ Φ f (point z)) m = _
+  rw [hperiod, Real.fourierCoeff_tsum_comp_add hs, hFourier, hmellin, abs_of_pos (inv_pos.mpr hL),
+    Complex.real_smul, Complex.ofReal_inv, ← mul_assoc,
+    mul_inv_cancel₀ (Complex.ofReal_ne_zero.mpr hL.ne'), one_mul]
 
 -- TODO(paper-gap): In the continuity proof, (4.2.1.14) cannot hold for fixed T
 -- and arbitrary ε. At t = T γⁿ the term k = -n alone equals T⁻ᴺ.
@@ -1121,7 +1286,17 @@ theorem cyclicFourierCoeff_absolute :
 /-- Paper: Corollary 4.2.1.7, p. 169. The Fourier coefficient functionals
 are bounded in the strong dual. -/
 theorem cyclicFourierCoeff_bounded :
-    IsVonNBounded ℂ (range cyclicFourierCoeff) := by sorry
+    IsVonNBounded ℂ (range cyclicFourierCoeff) := by
+  apply ContinuousLinearMap.isVonNBounded_iff.mpr
+  intro B hB
+  obtain ⟨C, _, hC⟩ := elementarySchwartz_withSeminorms.isVonNBounded_iff_seminorm_bounded.mp
+    hB (0, 0, fun _ ↦ 0, 0)
+  apply (NormedSpace.isVonNBounded_iff' ℂ).mpr
+  refine ⟨C, ?_⟩
+  rintro _ ⟨_, ⟨m, rfl⟩, f, hf, rfl⟩
+  have h := norm_fourierCoeffOn_iteratedDeriv_cyclic f m 0
+  rw [iteratedDeriv_zero, ← cyclicFourierCoeff_eq_on] at h
+  exact h.trans (hC f hf).le
 
 /-- Paper: Corollary 4.2.1.7, p. 169. The Fourier coefficient functionals are
 equicontinuous as maps on the circle Schwartz space. -/
