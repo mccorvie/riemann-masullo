@@ -187,7 +187,37 @@ theorem IsSpectralBasepointChoice.existsUnique_normTwist
     {χ : PontryaginDual C₁ → PontryaginDual C𝔽} (_hχ : IsSpectralBasepointChoice χ)
     (ω : PontryaginDual C₁) (c : QuasiCharacter C𝔽)
     (_hc : ∀ g : C₁, c g.val = (ω g : ℂ)) :
-    ∃! z : ℂ, c = ideleClassNormTwist (χ ω) z := by sorry
+    ∃! z : ℂ, c = ideleClassNormTwist (χ ω) z := by
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : Function.RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let j : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let d := c * j.comp (χ ω)⁻¹
+  have hd (g : C𝔽) : d g = c g / (χ ω g : ℂ) := by
+    change c g * (((χ ω g)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv, div_eq_mul_inv]
+  have hk (g : C₁) : d g = 1 := by
+    have hres : χ ω (g : C𝔽) = ω g := DFunLike.congr_fun (_hχ ω) g
+    rw [hd, _hc g, hres, div_self (Circle.coe_ne_zero _)]
+  obtain ⟨z, hz, huniq⟩ := existsUnique_complexPower (d.comp σ)
+  refine ⟨z, ?_, fun w hw ↦ ?_⟩
+  · ext g : 1
+    let t := ideleClassNorm F g
+    have hg : g / σ t ∈ (ideleClassNorm F).ker := by
+      change ideleClassNorm F (g / σ t) = 1
+      rw [map_div, hσ t, div_self']
+    have hr : d g = (((t : ℝ≥0) : ℝ) : ℂ) ^ z := calc
+      d g = d (g / σ t) * d (σ t) := by rw [← map_mul, div_mul_cancel]
+      _ = _ := by rw [hk ⟨_, hg⟩, one_mul]; exact hz t
+    change c g = (χ ω g : ℂ) * _
+    exact ((div_eq_iff (Circle.coe_ne_zero _)).mp ((hd g).symm.trans hr)).trans (mul_comm _ _)
+  · apply huniq
+    intro t
+    change d (σ t) = _
+    rw [hd, hw]
+    change ((χ ω (σ t) : ℂ) * (((ideleClassNorm F (σ t)).val : ℝ) : ℂ) ^ w) / _ = _
+    rw [hσ t, mul_div_cancel_left₀ _ (Circle.coe_ne_zero _)]
 
 local notation "shift(" b ", " t ")" => ((b : ℝ) : ℂ) + (t : ℂ) * Complex.I
 local notation "vanishingOrder(" χ ", " z ")" =>
