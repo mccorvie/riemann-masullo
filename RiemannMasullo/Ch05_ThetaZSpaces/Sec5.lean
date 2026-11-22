@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
+
 /-! # Third Structure Theorem: strong duals and eigendistributions
 
 Masullo, §5.5, pp. 277–285. The finite set in the S-local notation lists only
@@ -459,7 +461,30 @@ theorem sLocalThetaTranspose_closure_range :
 The S-local eigendistributions over all weights separate points of the S-local theta space.
 Deviation: Weights range over all components of the character space. -/
 theorem sLocalThetaEigendistributions_separate (x : SLocalAdelicThetaSpace F S)
-    (hx : ∀ c : QuasiCharacter Jₛ, sLocalThetaEigendistribution c x = 0) : x = 0 := by sorry
+    (hx : ∀ c : QuasiCharacter Jₛ, sLocalThetaEigendistribution c x = 0) : x = 0 := by
+  have detect {E I : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [SeparatingDual ℂ E]
+      (D : I → StrongDual ℂ E) (hd : Dense (Submodule.span ℂ (range D) : Set (StrongDual ℂ E)))
+      (y : E) (hy : ∀ i, D i y = 0) : y = 0 := by
+    let ev : StrongDual ℂ E →L[ℂ] ℂ :=
+      { toFun := fun T ↦ T y
+        map_add' := fun _ _ ↦ rfl
+        map_smul' := fun _ _ ↦ rfl
+        cont := continuous_eval_const y }
+    have hs : Submodule.span ℂ (range D) ≤ ev.ker :=
+      Submodule.span_le.mpr (by rintro _ ⟨i, rfl⟩; exact hy i)
+    exact SeparatingDual.eq_zero_of_forall_dual_eq_zero (R := ℂ)
+      (fun T ↦ closure_minimal hs ev.isClosed_ker (hd T))
+  let : T2Space (SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) :=
+    sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : IsTopologicalAddGroup (SLocalAdelicThetaSpace F S) := PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : SeparatingDual ℂ (SLocalAdelicThetaSpace F S) := polynormableSpace_separatingDual ℂ _
+  with_reducible_and_instances
+    exact detect (E := SLocalAdelicThetaSpace F S) (I := QuasiCharacter Jₛ)
+      (sLocalThetaEigendistribution (F := F) (S := S))
+      (sLocalThetaEigendistributions_dense_span (F := F) (S := S)) x hx
 
 /-- Paper: Remark 5.5.3.3, p. 285.
 The eigendistributions with weights in a set that has an accumulation point in every
