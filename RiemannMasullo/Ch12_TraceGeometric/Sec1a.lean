@@ -318,6 +318,51 @@ theorem weightedL2Duality_conj (μ : Measure G) (u v : Lp ℂ 2 μ)
     _ = inner ℂ u u := (L2.inner_def u u).symm
     _ = _ := by simp [inner_self_eq_norm_sq_to_K]
 
+private theorem weightedL2Duality_equiv_absCont (μ : Measure G) {g : G → ℝ≥0}
+    (hg : Measurable g) (hpos : ∀ x, 0 < g x) :
+    μ ≪ μ.withDensity (fun x ↦ (g x : ℝ≥0∞)) :=
+  withDensity_absolutelyContinuous' hg.coe_nnreal_ennreal.aemeasurable
+    (Filter.Eventually.of_forall fun x ↦ by simpa using (hpos x).ne')
+
+private theorem weightedL2Duality_equiv_rep (μ : Measure G) {g : G → ℝ≥0}
+    (hg : Measurable g) (hpos : ∀ x, 0 < g x)
+    {ν₁ ν₂ : Measure G} (h₁ : ν₁ = μ.withDensity (fun x ↦ (g x : ℝ≥0∞)))
+    (h₂ : ν₂ = μ.withDensity (fun x ↦ (((g x)⁻¹ : ℝ≥0) : ℝ≥0∞))) (v : Lp ℂ 2 ν₂) :
+    ∃ W : Lp ℂ 2 ν₁,
+      (W : G → ℂ) =ᵐ[μ] (fun x ↦ conj (v x) / (g x : ℂ)) ∧
+      ∀ u : Lp ℂ 2 ν₁,
+        Integrable (fun x ↦ u x * v x) μ ∧ ∫ x, u x * v x ∂μ = inner ℂ W u := by
+  subst h₁ h₂
+  have hgi : Measurable fun x ↦ (g x)⁻¹ := hg.inv
+  have hac1 := weightedL2Duality_equiv_absCont μ hg hpos
+  let w : G → ℂ := fun x ↦ conj (v x) / (g x : ℂ)
+  have hwm : StronglyMeasurable w :=
+    (Complex.continuous_conj.comp_stronglyMeasurable (Lp.stronglyMeasurable v)).div
+      (Complex.measurable_ofReal.comp (measurable_coe_nnreal_real.comp hg)).stronglyMeasurable
+  have hmem : MemLp w 2 (μ.withDensity (fun x ↦ (g x : ℝ≥0∞))) := by
+    rw [memLp_two_iff_integrable_sq_norm hwm.aestronglyMeasurable,
+      integrable_withDensity_iff_integrable_smul hg]
+    have hv2 := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable v)).mp (Lp.memLp v)
+    rw [integrable_withDensity_iff_integrable_smul hgi] at hv2
+    refine hv2.congr (Filter.Eventually.of_forall fun x ↦ ?_)
+    have hx := (hpos x).ne'
+    simp only [w, NNReal.smul_def, smul_eq_mul, norm_div, Complex.norm_conj, NNReal.coe_inv,
+      Complex.norm_real, Real.norm_eq_abs, NNReal.abs_eq]
+    field_simp
+  refine ⟨hmem.toLp w, hac1.ae_le hmem.coeFn_toLp, fun u ↦ ?_⟩
+  have hpt : (fun x ↦ g x • inner ℂ ((hmem.toLp w) x) (u x)) =ᵐ[μ] fun x ↦ u x * v x := by
+    filter_upwards [hac1.ae_le hmem.coeFn_toLp] with x hx
+    rw [hx]
+    have hx0 : (g x : ℂ) ≠ 0 := by exact_mod_cast (hpos x).ne'
+    simp only [w, NNReal.smul_def, RCLike.inner_apply, map_div₀, Complex.conj_conj,
+      Complex.conj_ofReal, Complex.real_smul]
+    field_simp
+  have hint := L2.integrable_inner (𝕜 := ℂ) (hmem.toLp w) u
+  rw [integrable_withDensity_iff_integrable_smul hg] at hint
+  refine ⟨hint.congr hpt, ?_⟩
+  rw [L2.inner_def, integral_withDensity_eq_integral_smul hg]
+  exact (integral_congr_ae hpt).symm
+
 /-- Paper: (12.1.1.4)–(12.1.1.5), p. 499. Each continuous linear functional on
 the weighted L² space has a unique representing vector for the reciprocal weight.
 Deviation: The isometry implicit in the pairing is explicit here so it can
@@ -328,7 +373,81 @@ theorem weightedL2Duality_equiv (μ : Measure G) {ν νdual : Measure G} {f : G 
     (hνdual : νdual = μ.withDensity (fun x ↦ ↑((f x)⁻¹))) :
     ∃! J : StrongDual ℂ (Lp ℂ 2 ν) ≃ₗᵢ[ℂ] Lp ℂ 2 νdual, ∀ ℓ u,
       Integrable (fun x ↦ u x * J ℓ x) μ ∧
-        weightedL2Duality μ hf hf_pos hν hνdual u (J ℓ) = ℓ u := by sorry
+        weightedL2Duality μ hf hf_pos hν hνdual u (J ℓ) = ℓ u := by
+  have hfi_pos : ∀ x, 0 < (f x)⁻¹ := fun x ↦ inv_pos.mpr (hf_pos x)
+  have hfi : Measurable fun x ↦ (f x)⁻¹ := hf.inv
+  choose M hMae hM using weightedL2Duality_equiv_rep μ hf hf_pos hν hνdual
+  subst hν hνdual
+  have hac2 := weightedL2Duality_equiv_absCont μ hfi hfi_pos
+  have hνac := withDensity_absolutelyContinuous μ (fun x ↦ (f x : ℝ≥0∞))
+  have hnorm : ∀ v, ‖M v‖ = ‖v‖ := by
+    intro v
+    have h1 : inner ℂ (M v) (M v) = inner ℂ v v := by
+      rw [← (hM v (M v)).2, L2.inner_def, integral_withDensity_eq_integral_smul hfi]
+      refine integral_congr_ae ?_
+      filter_upwards [hMae v] with x hx
+      rw [hx]
+      have hx0 : (f x : ℂ) ≠ 0 := by exact_mod_cast (hf_pos x).ne'
+      simp only [NNReal.smul_def, RCLike.inner_apply, NNReal.coe_inv, Complex.real_smul,
+        Complex.ofReal_inv]
+      field_simp
+    rw [inner_self_eq_norm_sq_to_K, inner_self_eq_norm_sq_to_K] at h1
+    have h3 : ‖M v‖ ^ 2 = ‖v‖ ^ 2 := by exact_mod_cast h1
+    exact (sq_eq_sq₀ (norm_nonneg _) (norm_nonneg _)).mp h3
+  let R : Lp ℂ 2 (μ.withDensity fun x ↦ ↑((f x)⁻¹)) →ₗ[ℂ]
+      StrongDual ℂ (Lp ℂ 2 (μ.withDensity fun x ↦ ↑(f x))) :=
+    { toFun := fun v ↦ InnerProductSpace.toDual ℂ _ (M v)
+      map_add' := fun v₁ v₂ ↦ by
+        ext u
+        rw [add_apply]
+        simp only [InnerProductSpace.toDual_apply_apply]
+        rw [← (hM _ u).2, ← (hM v₁ u).2, ← (hM v₂ u).2, ← integral_add (hM v₁ u).1 (hM v₂ u).1]
+        refine integral_congr_ae ?_
+        filter_upwards [hac2.ae_le (Lp.coeFn_add v₁ v₂)] with x hx
+        rw [hx, Pi.add_apply, mul_add]
+      map_smul' := fun c v ↦ by
+        ext u
+        rw [RingHom.id_apply, smul_apply]
+        simp only [InnerProductSpace.toDual_apply_apply]
+        rw [← (hM _ u).2, ← (hM v u).2, smul_eq_mul, ← integral_const_mul]
+        refine integral_congr_ae ?_
+        filter_upwards [hac2.ae_le (Lp.coeFn_smul c v)] with x hx
+        rw [hx, Pi.smul_apply, smul_eq_mul]
+        ring }
+  have hR : ∀ v u, R v u = ∫ x, u x * v x ∂μ := fun v u ↦ (hM v u).2.symm
+  let Ri : Lp ℂ 2 (μ.withDensity fun x ↦ ↑((f x)⁻¹)) →ₗᵢ[ℂ]
+      StrongDual ℂ (Lp ℂ 2 (μ.withDensity fun x ↦ ↑(f x))) :=
+    { toLinearMap := R
+      norm_map' := fun v ↦ by
+        change ‖InnerProductSpace.toDual ℂ _ (M v)‖ = ‖v‖
+        rw [LinearIsometryEquiv.norm_map, hnorm] }
+  have hsurj : Function.Surjective Ri := by
+    intro ℓ
+    let y := (InnerProductSpace.toDual ℂ _).symm ℓ
+    obtain ⟨V, hVae, -⟩ := weightedL2Duality_equiv_rep μ (g := fun x ↦ (f x)⁻¹) hfi hfi_pos rfl (by simp) y
+    refine ⟨V, ?_⟩
+    have hMV : M V = y := by
+      refine Lp.ext (hνac.ae_le ?_)
+      filter_upwards [hMae V, hVae] with x h1 h2
+      rw [h1, h2]
+      have hx0 : (f x : ℂ) ≠ 0 := by exact_mod_cast (hf_pos x).ne'
+      simp only [map_div₀, Complex.conj_conj, NNReal.coe_inv, Complex.ofReal_inv, map_inv₀,
+        Complex.conj_ofReal]
+      field_simp
+    change InnerProductSpace.toDual ℂ _ (M V) = ℓ
+    rw [hMV, LinearIsometryEquiv.apply_symm_apply]
+  let J := (LinearIsometryEquiv.ofSurjective Ri hsurj).symm
+  have hJ : ∀ ℓ, Ri (J ℓ) = ℓ := fun ℓ ↦
+    (LinearIsometryEquiv.ofSurjective Ri hsurj).apply_symm_apply ℓ
+  refine ⟨J, fun ℓ u ↦ ⟨(hM _ u).1, ?_⟩, fun J' hJ' ↦ ?_⟩
+  · change ∫ x, u x * J ℓ x ∂μ = ℓ u
+    rw [← hR]
+    exact DFunLike.congr_fun (hJ ℓ) u
+  · refine LinearIsometryEquiv.ext fun ℓ ↦ Ri.injective ?_
+    rw [hJ ℓ]
+    ext u
+    change R (J' ℓ) u = ℓ u
+    exact (hR _ _).trans (hJ' ℓ u).2
 
 /-- Paper: (12.1.1.6), p. 499. The partial kernel is the sum through index
 `N` of the basis vector in the target variable times the transposed dual
