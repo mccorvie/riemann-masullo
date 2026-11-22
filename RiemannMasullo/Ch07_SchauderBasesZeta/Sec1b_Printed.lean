@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+import Mathlib.Algebra.Field.ULift
 
 /-! # §7.1.3–7.1.4 Statements that are false as printed -/
 
@@ -80,13 +82,99 @@ def Printed.sLocalRhoPoleOrder_le_of_re_neg_odd : Prop :=
       (∃ j : ℕ, m = (p.2.natAbs : ℝ) / 2 - j) →
         sLocalRhoPoleOrder (chart ((m : ℂ) - p.1)) ≤ r₂)
 
+/-- At a singleton finite stage, a unitary character detects the idele with
+value minus one at the chosen infinite place and one everywhere else. -/
+private theorem Printed.sLocalRhoPoleOrder_le_of_re_neg_odd_false_exists_character
+    (F : Type u) [Field F] [NumberField F] (v : Places(F)) (w : InfinitePlace F) :
+    ∃ η : PontryaginDual Jₛ(F, {v}),
+      sLocalInfiniteRestriction w ((circleToComplex).comp η) (-1) ≠ 1 := by
+  classical
+  let S : Finset Places(F) := {v}
+  let signs : (t : InfinitePlace F) → t.Completionˣ := Pi.mulSingle w (-1)
+  let g : (SAdeleRing F S)ˣ :=
+    (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F) ((i : S) → i.val.adicCompletion F)).symm
+      (ContinuousMulEquiv.piUnits.symm signs, 1)
+  -- Its finite coordinate forces a diagonal representative to be one.
+  have hg : (QuotientGroup.mk g : Jₛ(F, S)) ≠ 1 := by
+    intro he
+    obtain ⟨u, hu⟩ := (sIdeleQuotient_mk_eq_one F S g).mp he
+    let i : S := ⟨v, Finset.mem_singleton_self _⟩
+    have hf := congrArg (fun a : (SAdeleRing F S)ˣ ↦ a.val.2 i) hu
+    change 1 = algebraMap F (v.adicCompletion F) (u.val : F) at hf
+    have hu1 : (u.val : F) = 1 := (algebraMap F (v.adicCompletion F)).injective
+      (hf.symm.trans (map_one _).symm)
+    have ha := congrArg (fun a : (SAdeleRing F S)ˣ ↦ a.val.1 w) hu
+    change (signs w : w.Completion) = algebraMap F w.Completion (u.val : F) at ha
+    have : CharZero w.Completion := charZero_of_injective_algebraMap (algebraMap F _).injective
+    norm_num [signs, hu1] at ha
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  obtain ⟨η, hη⟩ := exists_pontryaginDual_apply_ne_one hg
+  exact ⟨η, fun h ↦ hη (Subtype.ext h)⟩
+
+/-- Over a degree-one field the first pole of an odd real factor contradicts
+the bound by the number of complex places. -/
+private theorem Printed.sLocalRhoPoleOrder_le_of_re_neg_odd_false_of_degree_one
+    (F : Type u) [Field F] [NumberField F] (hd : Module.finrank ℚ F = 1)
+    (h : Printed.sLocalRhoPoleOrder_le_of_re_neg_odd.{u}) : False := by
+  classical
+  have hcard := InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd
+  let w : InfinitePlace F := Classical.arbitrary _
+  have hw := (nrComplexPlaces_eq_zero_iff.mp hcard).isReal w
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 F)
+  let v : Places(F) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  let S : Finset Places(F) := {v}
+  obtain ⟨η, hsign⟩ :=
+    Printed.sLocalRhoPoleOrder_le_of_re_neg_odd_false_exists_character F v w
+  let c := (circleToComplex).comp η
+  let chart := twistₛ(F, S) c
+  have hzero : chart 0 = c := by
+    ext1 g
+    change c g * _ ^ (0 : ℂ) = c g
+    simp
+  obtain ⟨χ, hχ, hext, -⟩ := sLocal_character_extension η
+  have hbase : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hχ⟩ = c := hext.trans hzero
+  let p := (realLocalEulerParameters w hw (sLocalInfiniteRestriction w (chart 0))).exists.choose
+  have hp : p.2.val = 1 := by
+    have he := (realLocalEulerParameters w hw
+      (sLocalInfiniteRestriction w (chart 0))).exists.choose_spec (-1 : ℝˣ)
+    have hneg : Units.map (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toMonoidHom
+        (-1 : ℝˣ) = -1 := Units.ext (by simp)
+    by_contra hne
+    have hp0 : p.2.val = 0 := by
+      have := p.2.isLt
+      omega
+    change _ = _ * _ ^ p.2.val at he
+    rw [hneg, hp0, hzero] at he
+    exact hsign (by simpa using he)
+  let s : ℂ := -1 - p.1
+  have hpole : meromorphicOrderAt (fun z ↦ sLocalRhoFactor (chart z)) s < 0 := by
+    apply (sLocalRhoFactor_poles_iff η s).2
+    refine Or.inl ⟨w, hw, 0, ?_⟩
+    change s = -p.1 - ((2 * 0 + p.2.val : ℕ) : ℂ)
+    rw [hp]
+    dsimp [s]
+    ring
+  have bound := (h F S χ hχ w 0).1 hw
+  simp only [hbase] at bound
+  specialize bound hp
+  have hbound : sLocalRhoPoleOrder (chart s) ≤ 0 := by
+    simpa [s, p, chart, S, ← Fintype.card_subtype, hcard] using bound
+  have hord := sLocalIdelicOrderBound_eq_neg_poleOrder (chart s)
+  rw [Nat.le_zero.mp hbound] at hord
+  rw [sLocalOrderBound_chart η s, min_eq_right hpole.le] at hord
+  simp [hord] at hpole
+
 /-- Paper: Theorem 7.1.3.2(2), p. 324.
-Use ℚ, its real place and its place above 2, and the odd Dirichlet character
-modulo 4. Its real factor Γℝ(s + 1) gives a pole at −1 with a regular nonzero
-denominator. The finite factor is ramified and does not cancel it. There are
-zero complex places. -/
+Over ℚ the odd Dirichlet character modulo 4 has real factor Γℝ(s + 1)
+and a pole at −1, while there are zero complex places. The proof obtains an
+odd character by separating the sign idele with any one finite place included. -/
 theorem Printed.sLocalRhoPoleOrder_le_of_re_neg_odd_false :
-    ¬ Printed.sLocalRhoPoleOrder_le_of_re_neg_odd := by sorry
+    ¬ Printed.sLocalRhoPoleOrder_le_of_re_neg_odd := by
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  exact Printed.sLocalRhoPoleOrder_le_of_re_neg_odd_false_of_degree_one (ULift ℚ) (by simp) h
 
 /-- Paper: Corollary 7.1.3.3, p. 326.
 As printed: There is a highest positive pole order and a highest positive order
