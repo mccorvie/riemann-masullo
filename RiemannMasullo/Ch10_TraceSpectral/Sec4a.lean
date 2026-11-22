@@ -6,6 +6,8 @@ public import Mathlib.Analysis.Normed.Module.DoubleDual
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch10_TraceSpectral.Sec3
 
+import all RiemannMasullo.Ch09_HardySobolev.Sec3
+
 /-!
 # Spectral and geometric truncations
 
@@ -413,7 +415,18 @@ theorem exists_hilbertBasisLift_closedSpan_equiv {E : Type*} [NormedAddCommGroup
 obtained by spectral projection, convolution and cutoff is nuclear. -/
 theorem spectralRestriction_nuclear (hρ : IsModulatedCutoff m𝔽 Λ ε ρ) (_hband : innerBand)
     (φ : BruhatCompactSupport C𝔽) :
-    IsNuclearOperator (spectralRestriction a hα hs hρ φ) := by sorry
+    IsNuclearOperator (spectralRestriction a hα hs hρ φ) := by
+  have hφs : IsBruhatSmooth φ.val := (mem_bruhatSmoothSubmodule_iff _).mp φ.property.1
+  have hc := continuous_of_bruhatSmooth hφs
+  have hb := hc.bounded_above_of_compact_support (show HasCompactSupport φ.val from φ.property.2)
+  have hm : IsModulation m𝔽 := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hsur : Function.Surjective m𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
+  obtain ⟨hT, _, _⟩ := truncatedHardySobolevConvolution_trace μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ.val
+    hc.aemeasurable φ.property.2 hb hm hsur hφs hρ _hband
+  have hconv := hardySobolevConvolution_eq_testAction μ𝔽 m𝔽 (-α) α s (hStrip(hα)) hs φ hc.aemeasurable hb
+  have hn : IsNuclearOperator ((M(hρ)).comp (A(φ))) :=
+    (congrArg (fun U : W₀ →L[ℂ] W₀ ↦ IsNuclearOperator ((M(hρ)).comp U)) hconv).mp hT
+  exact mul_mem_nuclearEndomorphisms_right (H := W₀) Pspec ⟨_, hn⟩
 
 -- In (10.4.2.21)–(10.4.2.24), use SpectralStripJetIndex and spectralZeroJet:
 -- the zero is at a + b + it and the jet exponent is b + it. Proposition
