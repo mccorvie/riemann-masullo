@@ -465,7 +465,27 @@ On the half-plane of absolute convergence the generator equals the Euler product
 times the pole-removing factor. -/
 theorem archRegularizedFiniteHeckeL_apply (s : {s : ℂ // 1 < s.re}) :
     (archRegularizedFiniteHeckeL χ τ hτ).val s.val =
-      poleFactor(χ, τ, hτ, s.val) * finiteHeckeL χ s := by sorry
+      poleFactor(χ, τ, hτ, s.val) * finiteHeckeL χ s := by
+  let pole : ℂ → ℂ := fun z ↦ poleFactor(χ, τ, hτ, z)
+  have hP (z : ℂ) : AnalyticAt ℂ pole z := by
+    dsimp only [pole]
+    fun_prop
+  have hne : pole s ≠ 0 := by
+    apply pow_ne_zero
+    intro h
+    have hr := congrArg Complex.re h
+    have hs := s.property
+    simp at hr
+    linarith
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hm : MeromorphicOn (fun z ↦ pole z * finiteL(χ) z) univ :=
+    fun z hz ↦ (hP z).meromorphicAt.mul (hL.1 hz).meromorphicAt
+  have hNF : MeromorphicNFAt (fun z ↦ pole z * finiteL(χ) z) s :=
+    (meromorphicNFAt_mul_iff_right (hP s) hne).2 (hL.1 (mem_univ _))
+  change toMeromorphicNFOn (fun z ↦ pole z * finiteL(χ) z) univ s = pole s * finiteHeckeL χ s
+  rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ _),
+    toMeromorphicNFAt_eq_self.mpr hNF]
+  exact congrArg (pole s * ·) (hL.2 s)
 
 -- TODO(paper-gap): Before (7.4.3.12) on p. 371, not every numerator class
 -- comes from a flat test. For ℚ, S = {∞}, χ = 1, finite PV is the identity.
