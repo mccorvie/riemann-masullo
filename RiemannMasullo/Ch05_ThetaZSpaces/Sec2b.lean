@@ -113,7 +113,9 @@ theorem sLocalNormOneCharacter_apply (ω : PontryaginDual C₁)
     (hx : x.val = QuotientGroup.mk (integralIdeleInsertion F S u))
     (hy : y.val = QuotientGroup.mk (Units.map (adeleProjection F S).toMonoidHom
       (integralIdeleInsertion F S u))) :
-    sLocalNormOneCharacter (F := F) S ω hω y = ω x := by sorry
+    sLocalNormOneCharacter (F := F) S ω hω y = ω x :=
+  ((normOneCharacterUnramifiedOutside_iff (F := F) (S := S) ω).mp hω).exists.choose_spec
+    u x y hx hy
 
 /-- Paper: Remark 5.2.3.3, p. 236.
 The descended character agrees on norm-one classes with the S-idelic restriction
@@ -128,7 +130,9 @@ theorem sLocalNormOneCharacter_eq_sIdeleRestriction
 Unramifiedness outside S implies unramifiedness outside every larger set of places. -/
 theorem NormOneCharacterUnramifiedOutside.mono {ω : PontryaginDual C₁}
     (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
-    NormOneCharacterUnramifiedOutside (F := F) ω T := by sorry
+    NormOneCharacterUnramifiedOutside (F := F) ω T := by
+  obtain ⟨c, hc⟩ := hω
+  exact ⟨⟨c.val, fun v hv ↦ c.property v fun h ↦ hv (hST h)⟩, hc⟩
 
 variable {ω : PontryaginDual (ideleClassNorm F).ker}
 
@@ -161,7 +165,12 @@ theorem sLocalHomogeneousThetaTransition_spec
       π.comp (Kₛω(S, ωₛ(S, hω))).mkQ =
         (Kₛω(T, ωₛ(T, hT))).mkQ.comp (sAdeleSchwartzTransition F hST)
     descends (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) ∧
-      ∀ π, descends π → π = sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST := by sorry
+      ∀ π, descends π → π = sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST := by
+  intro hT descends
+  have h : descends (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) :=
+    Submodule.mapQ_mkQ _ _ _
+      (h := sLocalHomogeneousThetaTransition_preserves_kernel (F := F) (ω := ω) hω hST)
+  exact ⟨h, fun π hπ ↦ Submodule.linearMap_qext _ (Eq.trans hπ (Eq.symm h))⟩
 
 /-- Paper: Theorem 5.2.3.1(1), p. 233.
 Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
@@ -213,7 +222,8 @@ The global homogeneous insertion agrees with test function insertion on represen
 theorem sLocalHomogeneousThetaToGlobal_mk (hω : NormOneCharacterUnramifiedOutside (F := F) ω S)
     (f : ℬₛ(S)) :
     sLocalHomogeneousThetaToGlobal (F := F) (ω := ω) hω ((Kₛω(S, ωₛ(S, hω))).mkQ f) =
-      (K𝔽ω(ω)).mkQ (sAdeleSchwartzToGlobal F S f) := by sorry
+      (K𝔽ω(ω)).mkQ (sAdeleSchwartzToGlobal F S f) :=
+  rfl
 
 /-- Paper: Theorem 5.2.3.1(1), pp. 233–234.
 The stages form a strict system under the transition maps and identify the global

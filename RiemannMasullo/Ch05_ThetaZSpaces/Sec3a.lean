@@ -473,7 +473,20 @@ A real Schwartz function lies in the flat subspace exactly when every derivative
 vanishes. -/
 theorem mem_realSchwartzFlatAtOrigin_iff (f : 𝓢(ℝ, ℂ)) :
     f ∈ realSchwartzFlatAtOrigin ↔
-      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by sorry
+      ∀ k : ℕ, iteratedDeriv k (f : ℝ → ℂ) 0 = 0 := by
+  have hd (k : ℕ) : ⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f) = iteratedDeriv k f := by
+    induction k with
+    | zero => rfl
+    | succ k ih =>
+      rw [pow_succ', iteratedDeriv_succ]
+      change deriv (⇑((SchwartzMap.derivCLM ℂ ℂ ^ k) f)) = _
+      rw [ih]
+  rw [realSchwartzFlatAtOrigin, Submodule.mem_iInf]
+  apply forall_congr'
+  intro k
+  change (-1 : ℂ) ^ k * ((SchwartzMap.derivCLM ℂ ℂ ^ k) f) 0 = 0 ↔ _
+  rw [congrFun (hd k) 0, mul_eq_zero]
+  simp
 
 /-- Paper: Theorem 5.3.2.1(1), p. 243.
 The flat real Schwartz subspace is closed. -/
@@ -539,6 +552,11 @@ in each coordinate. The factors can be ordered arbitrarily on smooth tests. -/
 def coordinateDerivative {ι A : Type*} [Fintype ι] [Monoid A] (derivative : ι → A)
     (α : ι → ℕ) : A :=
   ((Finset.univ.toList : List ι).map (fun i ↦ derivative i ^ α i)).prod
+
+/-- The coordinate derivative of the zero multi-index is the identity. -/
+theorem coordinateDerivative_zero {ι A : Type*} [Fintype ι] [Monoid A] (derivative : ι → A) :
+    coordinateDerivative derivative (0 : ι → ℕ) = 1 := by
+  simp [coordinateDerivative]
 
 open Classical in
 /-- Paper: Theorem 5.3.2.3, p. 245.
@@ -630,7 +648,10 @@ def coordinatePlaneDiracTensor (β : ι → ℕ) (U : 𝒟'(κ)) : 𝒟'(ι ⊕ 
 At derivative order zero the tensor restricts the test to the coordinate plane and applies
 the tangential distribution. -/
 theorem coordinatePlaneDiracTensor_zero (U : 𝒟'(κ)) (f : 𝒟(ι ⊕ κ)) :
-    coordinatePlaneDiracTensor (0 : ι → ℕ) U f = U (R𝒟 f) := by sorry
+    coordinatePlaneDiracTensor (0 : ι → ℕ) U f = U (R𝒟 f) := by
+  have h0 : Sum.elim (0 : ι → ℕ) (0 : κ → ℕ) = 0 := by
+    ext i; cases i <;> rfl
+  simp [coordinatePlaneDiracTensor, h0, coordinateDerivative_zero]
 
 open Classical in
 /-- Paper: Theorem 5.3.2.3(4), p. 245.

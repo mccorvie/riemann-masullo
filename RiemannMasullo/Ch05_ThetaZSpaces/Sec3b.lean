@@ -39,7 +39,17 @@ local notation "normPower(" K ", " d ")" =>
 Natural powers of the norm on the multiplicative group are continuous as
 maps to the positive reals. -/
 theorem continuous_archimedeanUnitModulation (K : Type*) [NormedField K] (d : ℕ) :
-    Continuous (normPower(K, d)) := by sorry
+    Continuous (normPower(K, d)) := by
+  rw [Units.continuous_iff]
+  have h1 : Continuous fun x : Kˣ ↦ (‖(x : K)‖₊ : ℝ≥0) ^ d :=
+    (continuous_nnnorm.comp Units.continuous_val).pow d
+  have h2 : Continuous fun x : Kˣ ↦ (‖((x⁻¹ : Kˣ) : K)‖₊ : ℝ≥0) ^ d :=
+    (continuous_nnnorm.comp Units.continuous_val |>.comp continuous_inv).pow d
+  refine ⟨?_, ?_⟩
+  · convert h1 using 2 with x
+    simp
+  · convert h2 using 2 with x
+    simp [map_inv₀]
 
 /-- Paper: Proposition 5.3.3.2, p. 249.
 The real multiplicative group uses the norm, and the complex multiplicative group
@@ -341,7 +351,15 @@ theorem archimedeanFlatSchwartz_one_complex :
 Schwartz functions supported away from every coordinate hyperplane are flat along them. -/
 theorem mem_archimedeanFlatSchwartz_of_tsupport (f : 𝓢(archAdd(ι, κ), ℂ))
     (_hf : Disjoint (tsupport f) {x : archAdd(ι, κ) | meetsWall(x)}) :
-    f ∈ archimedeanFlatSchwartz := by sorry
+    f ∈ archimedeanFlatSchwartz := by
+  simp only [archimedeanFlatSchwartz, Submodule.mem_iInf, LinearMap.mem_ker]
+  intro x n v
+  have hx : x.val ∉ tsupport f := fun h ↦ Set.disjoint_left.mp _hf h x.2
+  have hev : (f : archAdd(ι, κ) → ℂ) =ᶠ[nhds x.val] 0 := notMem_tsupport_iff_eventuallyEq.mp hx
+  have h0 : iteratedFDeriv ℝ n (f : archAdd(ι, κ) → ℂ) x.val =
+      iteratedFDeriv ℝ n (0 : archAdd(ι, κ) → ℂ) x.val :=
+    (hev.iteratedFDeriv ℝ n).self_of_nhds
+  simp [IsLinearMap.mk', h0]
 
 /-- Paper: Lemma 5.3.3.3(3), p. 252.
 The subspace of Schwartz functions with all jets zero on the coordinate hyperplanes is closed. -/
@@ -405,7 +423,8 @@ def realArchimedeanMellin (f : 𝓢(ℝ, ℂ)) (ε : Fin 2) : ℂ → ℂ :=
 The positive half-plane gives the defining integral for the real Mellin transform. -/
 theorem realArchimedeanMellin_eq_integral (f : 𝓢(ℝ, ℂ)) (ε : Fin 2)
     (s : ℂ) (_hs : 0 < s.re) :
-    realArchimedeanMellin f ε s = mellin (realProfile(f, ε)) s := by sorry
+    realArchimedeanMellin f ε s = mellin (realProfile(f, ε)) s :=
+  ((realArchimedeanMellin_existsUnique f ε).exists.choose_spec.2 s _hs).2.symm
 
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The complex Mellin integral converges on the right half-plane and has a unique
@@ -428,7 +447,8 @@ The positive half-plane gives the defining integral for the complex Mellin trans
 Deviation: The angular measure is normalized as in §3.3. -/
 theorem complexArchimedeanMellin_eq_integral (f : 𝓢(ℂ, ℂ)) (n : ℤ)
     (s : ℂ) (_hs : 0 < s.re) :
-    complexArchimedeanMellin f n s = mellin (complexProfile(f, n)) s := by sorry
+    complexArchimedeanMellin f n s = mellin (complexProfile(f, n)) s :=
+  ((complexArchimedeanMellin_existsUnique f n).exists.choose_spec.2 s _hs).2.symm
 
 /-- Paper: Proposition 5.3.3.4, p. 258.
 In the real field model the local zeta function of §3.3 is the two-sign Mellin transform
@@ -575,7 +595,8 @@ def sAdeleFiniteZeroSchwartz (S T : Finset V) : Submodule ℂ ℬ(SAdeleRing F S
 Passing from a Schwartz function in archimedean coordinates to its underlying
 function is complex-linear. -/
 theorem archimedeanSchwartz_coe_isLinear :
-    IsLinearMap ℂ (fun f : 𝓢(ArchCoordinates, ℂ) ↦ (f : ArchCoordinates → ℂ)) := by sorry
+    IsLinearMap ℂ (fun f : 𝓢(ArchCoordinates, ℂ) ↦ (f : ArchCoordinates → ℂ)) :=
+  ⟨fun _ _ ↦ rfl, fun _ _ ↦ rfl⟩
 
 /-- Paper: Definition 5.3.4.1, p. 259.
 The polar-free subspace imposes flatness on every archimedean slice and vanishing
@@ -720,7 +741,9 @@ archimedean Euler factor. -/
 theorem sLocalArchimedeanPoleMultiplicity_pos_iff (χ : PontryaginDual Jₛ) (s : ℂ) :
     0 < sLocalArchimedeanPoleMultiplicity χ s ↔
       ∃ w : InfinitePlace F, meromorphicOrderAt (fun z ↦ infiniteLocalEulerFactor w
-        (sLocalInfiniteRestriction w (chartₛ(χ) z))) s < 0 := by sorry
+        (sLocalInfiniteRestriction w (chartₛ(χ) z))) s < 0 := by
+  rw [sLocalArchimedeanPoleMultiplicity, Finset.card_pos]
+  simp [Finset.Nonempty]
 
 /-- Paper: Proposition 5.3.4.5(2), p. 264.
 The negative of the allowed pole multiplicity is the sum of the negative parts

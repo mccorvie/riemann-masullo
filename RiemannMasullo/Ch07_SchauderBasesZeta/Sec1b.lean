@@ -336,7 +336,62 @@ theorem regularizedCompletedHeckeL_differentiable (χ : U𝔽) (τ : ℝ≥0ˣ �
     let δ : ℕ := open Classical in
       if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
     Differentiable ℂ (toMeromorphicNFOn (fun s ↦ (s + b) ^ δ * (1 - s - b) ^ δ * L s) univ) :=
-  by sorry
+  by
+    classical
+    have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+    let x := hphase.exists.choose
+    let b := (x : ℂ) * Complex.I
+    by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · simp only [ite_eq_left hχ, pow_one]
+      let P (s : ℂ) := (s + b) * (1 - s - b)
+      change Differentiable ℂ (toMeromorphicNFOn (P * L) univ)
+      obtain ⟨t, ⟨hchar, hzero, hone, haway⟩, _⟩ :=
+        completedHeckeL_continuation_simplePoles χ L _hL _hEq hχ
+      have hx : -t = x := by
+        refine hphase.unique ?_ hphase.exists.choose_spec
+        intro u
+        have he := DFunLike.congr_fun hchar (QuotientGroup.mk (τ u))
+        change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+          1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ (-Complex.I * (t : ℂ))) at he
+        rw [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+        rw [Complex.ofReal_neg, show -(t : ℂ) * Complex.I = -Complex.I * (t : ℂ) by ring]
+        exact he
+      have hb : b = -(Complex.I * (t : ℂ)) := by
+        dsimp only [b]
+        rw [← hx, Complex.ofReal_neg]
+        ring
+      have hP (s : ℂ) : AnalyticAt ℂ P s := by
+        dsimp only [P]
+        fun_prop
+      have hmer : MeromorphicOn (P * L) univ :=
+        fun s hs ↦ (hP s).meromorphicAt.mul (_hL hs).meromorphicAt
+      have hcancel (s : ℂ) (hz : P s = 0) (hp : meromorphicOrderAt L s = -1) :
+          0 ≤ meromorphicOrderAt (P * L) s := by
+        rw [meromorphicOrderAt_mul (hP s).meromorphicAt (_hL (mem_univ s)).meromorphicAt, hp]
+        have hpos : 0 < meromorphicOrderAt P s := by
+          apply (tendsto_zero_iff_meromorphicOrderAt_pos (hP s).meromorphicAt).mp
+          rw [← hz]
+          exact (hP s).continuousAt.continuousWithinAt
+        generalize meromorphicOrderAt P s = w at hpos ⊢
+        cases w with
+        | top => simp
+        | coe k =>
+          have hk : (0 : ℤ) < k := WithTop.coe_lt_coe.mp hpos
+          exact WithTop.coe_le_coe.mpr (show (0 : ℤ) ≤ k + (-1) by omega)
+      intro s
+      apply AnalyticAt.differentiableAt
+      have hNF := meromorphicNFOn_toMeromorphicNFOn (P * L) univ (mem_univ s)
+      apply hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
+      rw [meromorphicOrderAt_toMeromorphicNFOn hmer (mem_univ s)]
+      by_cases hs₀ : s = Complex.I * (t : ℂ)
+      · subst s
+        exact hcancel _ (by dsimp only [P]; rw [hb]; ring) hzero
+      by_cases hs₁ : s = 1 + Complex.I * (t : ℂ)
+      · subst s
+        exact hcancel _ (by dsimp only [P]; rw [hb]; ring) hone
+      exact ((hP s).mul (haway s (by simp [hs₀, hs₁]))).meromorphicOrderAt_nonneg
+    · simpa only [ite_eq_right hχ, pow_zero, one_mul, toMeromorphicNFOn_eq_self.mpr _hL] using
+        completedHeckeL_continuation_entire χ L _hL _hEq hχ
 
 /-- Paper: Theorem 7.1.4.2(1), p. 326.
 The generator of the spectral ideal is the completed Hecke continuation multiplied by
