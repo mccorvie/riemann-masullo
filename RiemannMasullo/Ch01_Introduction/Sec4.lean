@@ -326,7 +326,11 @@ theorem introTraceApprox_rat_spectral_tendsto_atBot (h ρ : ℕ → ℝ → ℝ)
 where every cutoff test vanishes. -/
 theorem introTraceApprox_primePower_inv_zero (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) (v : V) (m : ℕ) (_hm : 0 < m) :
-    approx(h, ρ, n, z) ((q(v) ^ m)⁻¹) = 0 := by sorry
+    approx(h, ρ, n, z) ((q(v) ^ m)⁻¹) = 0 := by
+  have hq : 1 ≤ q(v) := by exact_mod_cast (NumberField.HeightOneSpectrum.one_lt_absNorm v).le
+  have hle : (q(v) ^ m)⁻¹ ≤ 1 := inv_le_one_of_one_le₀ (one_le_pow₀ hq)
+  apply image_eq_zero_of_notMem_tsupport
+  exact fun ht ↦ hle.not_gt (introTraceApprox_support h ρ _hA n z ht)
 
 /-- Paper: §1.4.4, p. 29. The finite terms converge locally uniformly to
 the negative logarithmic derivative of the finite Hecke L-function.
