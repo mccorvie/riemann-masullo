@@ -8,6 +8,8 @@ public import Mathlib.RepresentationTheory.Invariants
 public import Mathlib.Topology.ContinuousMap.CompactlySupported
 public import Mathlib.MeasureTheory.Integral.Pi
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+
 /-! # Structure Theorem IV: local within global
 
 Masullo, §6.1, pp. 287–295. The finite sets index finite places. The
@@ -45,6 +47,19 @@ local notation "U(" w ")" =>
 
 section Ranges
 
+private theorem mem_ker_adeleProjection_units_iff (T : Finset (HeightOneSpectrum (𝓞 F)))
+    (g : IdeleGroup (𝓞 F) F) :
+    g ∈ (Units.map (adeleProjection F T).toMonoidHom).ker ↔
+      g.val.1 = 1 ∧ ∀ w : T, g.val.2 w.val = 1 := by
+  rw [MonoidHom.mem_ker, Units.ext_iff]
+  simp only [Units.coe_map, Units.val_one]
+  rw [Prod.ext_iff]
+  constructor
+  · rintro ⟨h1, h2⟩
+    exact ⟨h1, fun w ↦ congrFun h2 w⟩
+  · rintro ⟨h1, h2⟩
+    exact ⟨h1, funext fun w ↦ h2 w⟩
+
 variable (F S) in
 /-- Paper: (6.1.2.2), p. 288.
 The complementary integral ideles are the ideles integral and invertible outside S
@@ -60,7 +75,17 @@ are one and its other coordinates are local integer units. -/
 theorem mem_outsideIntegralIdeleUnits_iff (g : IdeleGroup (𝓞 F) F) :
     g ∈ outsideIntegralIdeleUnits F S ↔
       g.val.1 = 1 ∧ (∀ w ∈ S, g.val.2 w = 1) ∧
-        ∀ w ∉ S, g.val.2 w ∈ O(w) ∧ (g⁻¹).val.2 w ∈ O(w) := by sorry
+        ∀ w ∉ S, g.val.2 w ∈ O(w) ∧ (g⁻¹).val.2 w ∈ O(w) := by
+  unfold outsideIntegralIdeleUnits
+  rw [Subgroup.mem_inf, mem_ker_adeleProjection_units_iff,
+    show g ∈ (integralIdeleInsertion F S).range ↔ g ∈ Set.range (integralIdeleInsertion F S) from
+      Iff.rfl,
+    mem_range_integralIdeleInsertion]
+  constructor
+  · rintro ⟨h2, h1, h3⟩
+    exact ⟨h1, fun w hw ↦ h3 ⟨w, hw⟩, h2⟩
+  · rintro ⟨h1, h3, h2⟩
+    exact ⟨h2, h1, fun w ↦ h3 w.1 w.2⟩
 
 variable (F S T) in
 /-- Paper: (6.1.2.1), p. 288.
@@ -75,7 +100,57 @@ arbitrary integer-unit coordinates on T minus S. -/
 theorem mem_relativeIntegralIdeleUnits_iff (g : (SAdeleRing F T)ˣ) :
     g ∈ relativeIntegralIdeleUnits F S T ↔
       g.val.1 = 1 ∧ (∀ w : T, w.val ∈ S → g.val.2 w = 1) ∧
-        ∀ w : T, w.val ∉ S → g.val.2 w ∈ O(w.val) ∧ (g⁻¹).val.2 w ∈ O(w.val) := by sorry
+        ∀ w : T, w.val ∉ S → g.val.2 w ∈ O(w.val) ∧ (g⁻¹).val.2 w ∈ O(w.val) := by
+  classical
+  unfold relativeIntegralIdeleUnits
+  rw [Subgroup.mem_map]
+  constructor
+  · rintro ⟨h, hh, rfl⟩
+    obtain ⟨h1, h2, h3⟩ := (mem_outsideIntegralIdeleUnits_iff h).1 hh
+    refine ⟨h1, fun w hw ↦ h2 w.val hw, fun w hw ↦ h3 w.val hw⟩
+  · rintro ⟨h1, h2, h3⟩
+    let e (x : (w : T) → HeightOneSpectrum.adicCompletion F w.val) :
+        RestrictedProduct (fun w : HeightOneSpectrum (𝓞 F) ↦ HeightOneSpectrum.adicCompletion F w)
+          (fun w ↦ HeightOneSpectrum.adicCompletionIntegers F w) Filter.cofinite :=
+      RestrictedProduct.mk
+        (fun w : HeightOneSpectrum (𝓞 F) ↦ if hw : w ∈ T then x ⟨w, hw⟩ else 1)
+        (by
+          filter_upwards [T.eventually_cofinite_notMem] with w hw
+          simp only [hw, dite_false]
+          exact one_mem _)
+    have he (x) (w : HeightOneSpectrum (𝓞 F)) (hw : w ∈ T) : e x w = x ⟨w, hw⟩ := by
+      exact dif_pos hw
+    have he' (x) (w : HeightOneSpectrum (𝓞 F)) (hw : w ∉ T) : e x w = 1 := by
+      exact dif_neg hw
+    have hmul : ∀ w : T, g.val.2 w * (g⁻¹).val.2 w = 1 := fun w ↦
+      congrFun (congrArg Prod.snd g.val_inv) w
+    have hmul' : ∀ w : T, (g⁻¹).val.2 w * g.val.2 w = 1 := fun w ↦
+      congrFun (congrArg Prod.snd g.inv_val) w
+    have hm1 : e g.val.2 * e (g⁻¹).val.2 = 1 := Subtype.ext (funext fun w ↦ by
+      by_cases hw : w ∈ T
+      · change e _ w * e _ w = 1
+        rw [he _ _ hw, he _ _ hw]; exact hmul ⟨w, hw⟩
+      · change e _ w * e _ w = 1
+        rw [he' _ _ hw, he' _ _ hw]; exact mul_one _)
+    have hm2 : e (g⁻¹).val.2 * e g.val.2 = 1 := Subtype.ext (funext fun w ↦ by
+      by_cases hw : w ∈ T
+      · change e _ w * e _ w = 1
+        rw [he _ _ hw, he _ _ hw]; exact hmul' ⟨w, hw⟩
+      · change e _ w * e _ w = 1
+        rw [he' _ _ hw, he' _ _ hw]; exact mul_one _)
+    let h : IdeleGroup (𝓞 F) F :=
+      ⟨(1, e g.val.2), (1, e (g⁻¹).val.2), Prod.ext (mul_one 1) hm1, Prod.ext (mul_one 1) hm2⟩
+    refine ⟨h, ?_, ?_⟩
+    · rw [mem_outsideIntegralIdeleUnits_iff]
+      refine ⟨rfl, fun w hw ↦ ?_, fun w hw ↦ ?_⟩
+      · by_cases hT : w ∈ T
+        · exact (he _ _ hT).trans (h2 ⟨w, hT⟩ hw)
+        · exact he' _ _ hT
+      · by_cases hT : w ∈ T
+        · exact ⟨(he _ _ hT).symm ▸ (h3 ⟨w, hT⟩ hw).1, (he _ _ hT).symm ▸ (h3 ⟨w, hT⟩ hw).2⟩
+        · exact ⟨(he' _ _ hT).symm ▸ one_mem _, (he' _ _ hT).symm ▸ one_mem _⟩
+    · refine Units.ext (Prod.ext h1.symm (funext fun w ↦ ?_))
+      exact he _ _ w.2
 
 /-- Paper: (6.1.2.2), p. 288.
 The group of integral idelic units outside S is compact in the global ideles. -/
@@ -163,6 +238,56 @@ local notation "ρ(" w ")" =>
 
 section Laurent
 
+open scoped ENNReal in
+/-- Point evaluation is continuous in the Schwartz–Bruhat topology since its
+norm is bounded on each stage by the zeroth Schwartz seminorm. -/
+private theorem schwartzBruhat_eval_continuous {G : Type*} [CommGroup G] [TopologicalSpace G]
+    (x : G) : Continuous (fun f : SchwartzBruhat G ↦ f x) := by
+  classical
+  let L : SchwartzBruhat G →ₗ[ℂ] ℂ :=
+    (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+  let p := (normSeminorm ℂ ℂ).comp L
+  have hstage (a : BruhatStructuralPair G) (e : ElementaryLCAPresentation a.quotient) :
+      Continuous (p ∘ schwartzBruhatStageInclusion a e) := by
+    let _ := e.finiteGroup
+    let q : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm (0, 0, 0, 0)
+    have hq : Continuous q := elementarySchwartz_withSeminorms.continuous_seminorm (0, 0, 0, 0)
+    change Continuous (p.comp (schwartzBruhatStageInclusion a e))
+    refine Seminorm.continuous_of_le hq ?_
+    intro f
+    change ‖schwartzBruhatStageRealization a e f x‖ ≤ q f
+    rw [schwartzBruhatStageRealization_apply]
+    split_ifs with hx
+    · let y := Multiplicative.toAdd (e.equiv (QuotientGroup.mk ⟨x, hx⟩))
+      change (‖f y‖₊ : ℝ≥0∞).toReal ≤ (elementarySchwartzBound f.val (0, 0, 0, 0)).toReal
+      refine ENNReal.toReal_mono (f.property.2 (0, 0, 0, 0)).ne ?_
+      rw [elementarySchwartzBound_zero]
+      exact le_iSup (fun z ↦ (‖f z‖₊ : ℝ≥0∞)) y
+    · simpa only [norm_zero] using apply_nonneg q f
+  exact (norm_withSeminorms ℂ ℂ).continuous_of_continuous_comp L fun _ ↦
+    (withGeneratingSeminorms_spec _ Subtype.val).continuous_seminorm ⟨p, hstage⟩
+
+private theorem unitInvariants_isClosed {R : Type*} [CommRing R] [TopologicalSpace R]
+    [IsTopologicalRing R] (H : Subgroup Rˣ) :
+    IsClosed (SetLike.coe (Representation.invariants
+      ((schwartzBruhatUnitRepresentation (R := R)).comp H.subtype)) : Set ℬ(R)) := by
+  have : (SetLike.coe (Representation.invariants
+      ((schwartzBruhatUnitRepresentation (R := R)).comp H.subtype)) : Set ℬ(R)) =
+      ⋂ g : H, ⋂ x : R, {f | f (Multiplicative.ofAdd (((g⁻¹ : H) : Rˣ).val * x)) =
+        f (Multiplicative.ofAdd x)} := by
+    ext f
+    simp only [SetLike.mem_coe, Representation.mem_invariants, Set.mem_iInter, Set.mem_setOf_eq]
+    refine forall_congr' fun g ↦ ?_
+    constructor
+    · intro h x
+      exact congrArg (fun φ : ℬ(R) ↦ φ.val (Multiplicative.ofAdd x)) h
+    · intro h
+      exact Subtype.ext (funext fun x ↦ h x.toAdd)
+  rw [this]
+  exact isClosed_iInter fun g ↦ isClosed_iInter fun x ↦
+    isClosed_eq (schwartzBruhat_eval_continuous (Multiplicative.ofAdd _))
+      (schwartzBruhat_eval_continuous (Multiplicative.ofAdd _))
+
 open Classical in
 /-- Paper: Lemma 6.1.2.2(1), p. 288.
 The monomial of exponent n corresponds to the indicator of the integral ball
@@ -178,7 +303,26 @@ theorem finitePlaceBallIndicator_at_power (w : Places) (π : (L(w))ˣ)
     (_hπ : Valuation.IsUniformizer
       (Valued.v : Valuation (L(w)) (WithZero (Multiplicative ℤ))) π.val)
     (m n : ℤ) :
-    finitePlaceBallIndicator w π n (π ^ m).val = (if n ≤ m then 1 else 0) := by sorry
+    finitePlaceBallIndicator w π n (π ^ m).val = (if n ≤ m then 1 else 0) := by
+  have hv : Valued.v (π.val) = (WithZero.exp (-1 : ℤ)) := _hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (w.valuedAdicCompletion_surjective F)))
+  have h1 : (π ^ (-n)).val * (π ^ m).val = ((π ^ (m - n)).val) := by
+    rw [← Units.val_mul, ← zpow_add]; congr 2; ring
+  have h2 : Valued.v ((π ^ (m - n)).val) = WithZero.exp (-(m - n)) := by
+    rw [Units.val_zpow_eq_zpow_val, map_zpow₀, hv, ← WithZero.exp_zsmul]; simp
+  unfold finitePlaceBallIndicator
+  rw [h1]
+  by_cases h : n ≤ m
+  · rw [if_pos h, Set.indicator_of_mem]
+    show _ ∈ O(w)
+    rw [HeightOneSpectrum.mem_adicCompletionIntegers, h2]
+    rw [← WithZero.exp_zero, WithZero.exp_le_exp]; omega
+  · rw [if_neg h, Set.indicator_of_notMem]
+    show _ ∉ O(w)
+    rw [HeightOneSpectrum.mem_adicCompletionIntegers, h2]
+    rw [not_le, ← WithZero.exp_zero, WithZero.exp_lt_exp]; omega
+
 
 /-- Paper: Lemma 6.1.2.2(1)(1), p. 288.
 The integer-unit invariants form a free Laurent module on the integer-ball indicator.
@@ -196,7 +340,8 @@ theorem finitePlaceSchwartz_invariants_laurent_free (w : Places)
 /-- Paper: Lemma 6.1.2.2(1)(2), p. 288.
 The integer-unit invariants are closed in the local Schwartz–Bruhat space. -/
 theorem finitePlaceSchwartz_invariants_isClosed (w : Places) :
-    IsClosed (SetLike.coe (Representation.invariants (V := ℬᵥ(w)) (ρ(w))) : Set ℬᵥ(w)) := by sorry
+    IsClosed (SetLike.coe (Representation.invariants (V := ℬᵥ(w)) (ρ(w))) : Set ℬᵥ(w)) :=
+  unitInvariants_isClosed _
 
 /-- Paper: Lemma 6.1.2.2(1)(2), p. 288.
 With the finest locally convex topology on Laurent polynomials, the monomial-to-ball
@@ -255,6 +400,31 @@ local instance instLocalUnitMeasurableSpaceCh06Sec1 (w : Places) :
 
 local notation "μ(" w ")" => finiteLocalMultiplicativeTamagawaMeasure F w
 
+private theorem unitsMass_ne_top (w : Places) :
+    μ(w) (U(w) : Set (L(w))ˣ) ≠ ⊤ := by
+  rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits F w, ne_eq, ENNReal.inv_eq_top,
+    ENNReal.ofReal_eq_zero, not_le]
+  exact Real.sqrt_pos.2
+    (pow_pos (Nat.cast_pos.2 (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm w))) _)
+
+private theorem units_isCompact (w : Places) : IsCompact (U(w) : Set (L(w))ˣ) :=
+  Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w))
+
+private theorem units_isOpen (w : Places) : IsOpen (U(w) : Set (L(w))ˣ) :=
+  Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+
+private instance unitsRestrict_isFinite (w : Places) :
+    IsFiniteMeasure ((μ(w)).restrict (U(w) : Set (L(w))ˣ)) :=
+  ⟨by rw [Measure.restrict_apply_univ]; exact (unitsMass_ne_top w).lt_top⟩
+
+private local instance instProperSpaceCh06Sec1 (w : Places) : ProperSpace (L(w)) :=
+  properSpace_adicCompletion w
+private local instance instSecondCountableUnitsCh06Sec1 (w : Places) :
+    SecondCountableTopology (L(w))ˣ :=
+  Units.isEmbedding_val₀.secondCountableTopology
+local instance instBorelUnitsCh06Sec1 (w : Places) : BorelSpace (L(w))ˣ := ⟨rfl⟩
+
 /-- Paper: Lemma 6.1.2.4(1), p. 291.
 The span of integer-unit translation differences is closed.
 Consequently the algebraic and continuous coinvariant quotients use the same relations.
@@ -280,7 +450,14 @@ theorem finitePlaceUnitAverage_zero (w : Places) (f : ℬᵥ(w)) :
 Each integrand of the local averaging formula is integrable on the integer units. -/
 theorem finitePlaceUnitAverage_integrable (w : Places) (f : ℬᵥ(w)) (x : L(w)) :
     IntegrableOn (fun u : (L(w))ˣ ↦ f (Multiplicative.ofAdd (x * u.val)))
-      (U(w) : Set (L(w))ˣ) (μ(w)) := by sorry
+      (U(w) : Set (L(w))ˣ) (μ(w)) := by
+  have hc : Continuous (fun u : (L(w))ˣ ↦ f (Multiplicative.ofAdd (x * u.val))) :=
+    (schwartzBruhat_continuous f).comp
+      (continuous_ofAdd.comp (continuous_const.mul Units.continuous_val))
+  obtain ⟨C, hC⟩ := (units_isCompact w).exists_bound_of_continuousOn hc.continuousOn
+  exact Integrable.of_bound hc.aestronglyMeasurable C
+    ((ae_restrict_iff' (units_isOpen w).measurableSet).2 (Filter.Eventually.of_forall hC))
+
 
 /-- Paper: Lemma 6.1.2.4(2), (6.1.2.13)–(6.1.2.14), p. 292.
 Local unit averaging defines a linear map to compactly supported continuous functions
@@ -340,7 +517,16 @@ of the local integer-unit masses. -/
 theorem finiteProductUnitAverage_zero (D : Finset Places) (f : ℬ(K(D))) :
     finiteProductUnitAverage D f 0 =
       (∏ w : D, ((μ(w.val) (U(w.val) : Set (L(w.val))ˣ)).toReal : ℂ)) *
-        f (Multiplicative.ofAdd 0) := by sorry
+        f (Multiplicative.ofAdd 0) := by
+  unfold finiteProductUnitAverage
+  simp only [Pi.zero_apply, zero_mul, integral_const]
+  rw [Measure.real, Measure.pi_univ, ENNReal.toReal_prod, Complex.real_smul, Complex.ofReal_prod]
+  simp only [Measure.restrict_apply_univ]
+  rfl
+
+private local instance (w : HeightOneSpectrum (𝓞 F)) : ProperSpace (L(w)) := properSpace_adicCompletion w
+private local instance (w : HeightOneSpectrum (𝓞 F)) : SecondCountableTopology (L(w))ˣ :=
+  Units.isEmbedding_val₀.secondCountableTopology
 
 /-- Paper: Lemma 6.1.2.4(3), p. 292.
 The product orbit integral is integrable against the finite product of the restricted measures. -/
@@ -348,13 +534,31 @@ theorem finiteProductUnitAverage_integrable (D : Finset Places) (f : ℬ(K(D))) 
     Integrable
       (fun u : ∀ v : D, (L(v.val))ˣ ↦
         f (Multiplicative.ofAdd (fun v ↦ x v * (u v).val)))
-      (Measure.pi fun v : D ↦ (μ(v.val)).restrict (U(v.val))) := by sorry
+      (Measure.pi fun v : D ↦ (μ(v.val)).restrict (U(v.val))) := by
+  have hc : Continuous (fun u : ∀ v : D, (L(v.val))ˣ ↦
+        f (Multiplicative.ofAdd (fun v ↦ x v * (u v).val))) :=
+    (schwartzBruhat_continuous f).comp
+      (continuous_ofAdd.comp (continuous_pi fun v ↦
+        continuous_const.mul (Units.continuous_val.comp (continuous_apply v))))
+  obtain ⟨C, hC⟩ := (isCompact_univ_pi fun v : D ↦ units_isCompact v.val).exists_bound_of_continuousOn
+    hc.continuousOn
+  refine Integrable.of_bound hc.aestronglyMeasurable C ?_
+  have hae : ∀ᵐ u ∂(Measure.pi fun v : D ↦ (μ(v.val)).restrict (U(v.val))),
+      ∀ v : D, u v ∈ (U(v.val) : Set (L(v.val))ˣ) := by
+    rw [ae_all_iff]
+    intro v
+    exact (Measure.tendsto_eval_ae_ae (μ := fun v : D ↦ (μ(v.val)).restrict (U(v.val))) (i := v)).eventually
+      (ae_restrict_mem (units_isOpen v.val).measurableSet)
+  filter_upwards [hae] with u hu
+  exact hC u (Set.mem_univ_pi.2 hu)
+
 
 /-- Paper: Lemma 6.1.2.4(3), p. 292.
 The integer-unit invariants are closed in the Schwartz–Bruhat space on the finite product.
 Deviation: The place set is written directly as the finite set of additional places. -/
 theorem finiteProductSchwartz_unitInvariants_isClosed (D : Finset Places) (_hD : D.Nonempty) :
-    IsClosed ((Representation.invariants (ρΠ(D))) : Set ℬ(K(D))) := by sorry
+    IsClosed ((Representation.invariants (ρΠ(D))) : Set ℬ(K(D))) :=
+  unitInvariants_isClosed _
 
 /-- Paper: Lemma 6.1.2.4(3), (6.1.2.16), p. 292.
 The product of the local unit averages induces a linear homeomorphism from

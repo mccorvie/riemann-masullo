@@ -3,7 +3,14 @@ module
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec5
 
+import Mathlib.Algebra.Polynomial.Taylor
+import all RiemannMasullo.AppC_LCTVS.Sec2b
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.ContinuousLinearMap.Quotient
+import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
+import RiemannMasullo.ForMathlib.MeasureTheory.Function.L1Space.Continuous
 
 /-!
 # Periodic Schauder bases in the presence of multiplicity
@@ -232,18 +239,433 @@ section IsotypicQuotient
 variable (S₀ : List G) (hS₀ : ∀ g ∈ S₀, 1 < (m g).val)
 variable (hγ : 1 < (m γ).val)
 
+section
+
+set_option linter.unusedSectionVars false
+
+private theorem metrizable_separable_of_subset_range {X Y : Type*}
+    [TopologicalSpace X] [TopologicalSpace Y] (S : Set Y) (i : X → Y) (hi : IsEmbedding i)
+    (hsub : S ⊆ range i) (hM : MetrizableSpace X) (hS : SeparableSpace X) :
+    MetrizableSpace S ∧ SeparableSpace S := by
+  have he := hi.toHomeomorph.symm.isEmbedding.comp (IsEmbedding.inclusion hsub)
+  have : SecondCountableTopology X := by
+    let := pseudoMetrizableSpaceUniformity X
+    have := pseudoMetrizableSpaceUniformity_countably_generated X
+    exact UniformSpace.secondCountable_of_separable X
+  have : SecondCountableTopology S := he.secondCountableTopology
+  exact ⟨he.metrizableSpace, inferInstance⟩
+
+private theorem isotype_le_stage_of_trivial
+    (k : {k : Subgroup G // IsCompact (k : Set G) ∧ IsCompactlyGeneratedGroup (lcaAnnihilator k)})
+    (htriv : ∀ v : K, v.val ∈ k.val → ω v = 1) :
+    (H₀[ω] : Set E) ⊆ range (modulatedExponentialDecayStageInclusion m univ k) := by
+  intro f hf
+  apply ((modulatedExponentialDecayStageInclusion_range m univ k).2 f).mpr
+  intro x u
+  let v : K := ⟨u.val, compactSubgroup_le_modulation_ker m k.val k.property.1 u.property⟩
+  have h := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) f).mp hf v⁻¹ x
+  have hx : ((v⁻¹ : K).val)⁻¹ * x = x * u.val := by
+    change ((u.val)⁻¹)⁻¹ * x = _
+    rw [inv_inv, mul_comm]
+  have hv : (ω v⁻¹ : ℂ) = 1 := by rw [map_inv, htriv v u.property, inv_one, Circle.coe_one]
+  exact (congrArg f.val hx.symm).trans (h.trans ((congrArg (· * f.val x) hv).trans (one_mul _)))
+
+include hm hms in
+private theorem exists_surjectiveModulation_section :
+    ∃ τ : ℝ≥0ˣ →ₜ* G, RightInverse τ m := by
+  let τ₀ := hm.exists_section.choose
+  let τ : ℝ≥0ˣ →ₜ* G := τ₀.comp
+    ⟨(MonoidHom.id ℝ≥0ˣ).codRestrict _ fun t ↦ MonoidHom.mem_range.mpr (hms t),
+      continuous_id.subtype_mk _⟩
+  exact ⟨τ, fun _ ↦ hm.exists_section.choose_spec _⟩
+
+include hm hms in
+private theorem exists_goodCompact_trivial (k₀ : {k : Subgroup G //
+    IsCompact (k : Set G) ∧ IsCompactlyGeneratedGroup (lcaAnnihilator k)}) :
+    ∃ l : {k : Subgroup G // IsCompact (k : Set G) ∧ IsCompactlyGeneratedGroup (lcaAnnihilator k)},
+      ∀ v : K, v.val ∈ l.val → ω v = 1 := by
+  let τ := (exists_surjectiveModulation_section m hm hms).choose
+  have hτ (t : ℝ≥0ˣ) : m (τ t) = t := (exists_surjectiveModulation_section m hm hms).choose_spec t
+  -- The compact character is trivial on one of the subgroups indexing the stages.
+  let two : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  obtain ⟨χ, _, _, hχ, -⟩ := exists_modulatedCyclicCharacter_lifts m (τ two) τ hτ
+    (by rw [hτ]; change (1 : ℝ≥0) < 2; norm_num)
+  obtain ⟨l, η, -, hη⟩ := goodCompact_refine_unitaryCharacter k₀ (χ ω)
+  refine ⟨l, fun v hv ↦ ?_⟩
+  exact (hχ ω v).symm.trans ((hη v.val).symm.trans
+    ((congrArg η ((QuotientGroup.eq_one_iff _).mpr hv)).trans (map_one η)))
+include hm hms in
+private theorem isotype_stage_metrizable_separable (k)
+    (hk : IsEmbedding (show ModulatedExponentialDecayStage m univ k → E from modulatedExponentialDecayStageInclusion m univ k))
+    (hs : (H₀[ω] : Set E) ⊆ range (modulatedExponentialDecayStageInclusion m univ k)) :
+    MetrizableSpace H₀[ω] ∧ SeparableSpace H₀[ω] := by
+  exact metrizable_separable_of_subset_range (H₀[ω] : Set E) _ hk hs
+    (modulatedExponentialDecayStage_frechet m hm hms univ ordConnected_univ univ_nonempty k).2.2.1
+    (modulatedExponentialDecayStage_separable m hm hms univ ordConnected_univ univ_nonempty k)
+include hm hms in
+private theorem isotype_metrizable_separable : MetrizableSpace H₀[ω] ∧ SeparableSpace H₀[ω] := by
+  refine (modulatedExponentialDecay_stageLimit m univ hm hms ordConnected_univ univ_nonempty).elim fun k h ↦ ?_
+  refine (exists_goodCompact_trivial m hm hms ω (k 0)).elim fun l hl ↦ ?_
+  refine (h.2.1 l).elim fun n hn ↦ ?_
+  exact isotype_stage_metrizable_separable m hm hms ω (k n) (h.2.2.1 n)
+    (isotype_le_stage_of_trivial m ω (k n) (fun v hv ↦ hl v (hn hv)))
+
+include hm hms in
+private theorem isotype_complete : CompleteSpace H₀[ω] := by
+  let τ := (exists_surjectiveModulation_section m hm hms).choose
+  have hτ (t : ℝ≥0ˣ) : m (τ t) = t := (exists_surjectiveModulation_section m hm hms).choose_spec t
+  have : CompleteSpace E :=
+    modulatedExponentialDecay_complete m univ hm ordConnected_univ univ_nonempty τ hτ
+  let : MeasurableSpace G := borel G
+  have : BorelSpace G := ⟨rfl⟩
+  have : T2Space (SchwartzBruhat G) := schwartzBruhat_t2
+  have hclosed : IsClosed (H₀[ω] : Set E) := (isClosed_actionIsotype ρK ω).preimage
+    (modulatedExponentialDecay_zeroTwist_continuous m hm hms univ ordConnected_univ (mem_univ _))
+  exact completeSpace_coe_iff_isComplete.mpr hclosed.isComplete
+
+include hm hms in
+private theorem isotype_nuclear : IsNuclearTVS H₀[ω] := by
+  let sections := exists_surjectiveModulation_section m hm hms
+  exact isNuclearTVS_submodule (modulatedExponentialDecay_nuclear m univ hm
+    ordConnected_univ univ_nonempty sections.choose sections.choose_spec) H₀[ω]
+
+private theorem frechet_of_complete_metrizable (X : Type*) [AddCommGroup X] [Module ℂ X]
+    [UniformSpace X] [IsUniformAddGroup X] [CompleteSpace X]
+    (hP : PolynormableSpace ℂ X) (hM : MetrizableSpace X) : IsFrechetTVS X := by
+  refine ⟨inferInstance, hP, hM, ?_⟩
+  rw [IsUniformAddGroup.rightUniformSpace_eq (G := X)]
+  infer_instance
+
+include hm hms in
+private theorem isotype_frechet : IsFrechetTVS H₀[ω] := by
+  have : CompleteSpace H₀[ω] := isotype_complete m hm hms ω
+  have : IsUniformAddGroup H₀[ω] := (H₀[ω]).toAddSubgroup.isUniformAddGroup
+  exact frechet_of_complete_metrizable H₀[ω] (isotype_nuclear.{_, 0} m hm hms ω).2.1
+    (isotype_metrizable_separable m hm hms ω).1
+section
+universe v
+private theorem isotype_quotient_properties {X : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] (hS : SeparableSpace X) (hN : IsNuclearTVS.{v} X) (hF : IsFrechetTVS X)
+    (M : Submodule ℂ X) (hc : IsClosed (M : Set X)) :
+    SeparableSpace (X ⧸ M) ∧ IsNuclearTVS.{v} (X ⧸ M) ∧ IsFrechetTVS (X ⧸ M) := by
+  have hQ := isFrechetTVS_quotient hF M hc
+  have : MetrizableSpace (X ⧸ M) := hQ.2.2.1
+  exact ⟨M.isQuotientMap_mkQL.separableSpace, isNuclearTVS_quotient hN M, hQ⟩
+
+end
+
+end
+
+section
+
+set_option linter.unusedSectionVars false
+
+private theorem cyclicDifference_injective (g : G) (hg : 1 < (m g).val) :
+    Injective (modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty) := by
+  apply LinearMap.ker_eq_bot.mp
+  apply le_antisymm _ bot_le
+  intro f hf
+  change modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty f = 0 at hf
+  have hper (x : G) : f.val (g * x) = f.val x := by
+    apply (sub_eq_zero.mp _).symm
+    exact (modulatedCyclicDifference_apply m g hm hms univ ordConnected_univ univ_nonempty f x).symm.trans
+      (congrArg (fun v : E ↦ v.val x) hf)
+  change f = 0
+  refine Subtype.ext (funext fun x ↦ ?_)
+  have hn (n : ℕ) : f.val (g ^ n * x) = f.val x := by
+    induction n with
+    | zero => simp
+    | succ n ih => rw [pow_succ', mul_assoc, hper, ih]
+  have hs := (modulatedPeriodization_hasSum m g hm hms hg f x).summable.comp_injective
+    (Nat.cast_injective : Injective (fun n : ℕ ↦ (n : ℤ)))
+  change Summable (fun n : ℕ ↦ f.val (g ^ (n : ℤ) * x)) at hs
+  change f.val x = 0
+  simpa only [Function.comp_apply, Int.ofNat_eq_natCast, zpow_natCast, hn, summable_const_iff] using hs
+
+private theorem frechet_closedEmbedding_of_injective {X : Type*} [AddCommGroup X]
+    [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    (hX : IsFrechetTVS X) (A : X →L[ℂ] X) (hi : Injective A) (hc : IsClosed (range A)) :
+    IsClosedEmbedding A := by
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : MetrizableSpace X := hX.2.2.1
+  have : CompleteSpace X := hX.2.2.2
+  have : CompleteSpace A.range := completeSpace_coe_iff_isComplete.mpr hc.isComplete
+  have : IsUniformAddGroup A.range := A.range.toAddSubgroup.isUniformAddGroup
+  have : FirstCountableTopology A.range := inferInstanceAs (FirstCountableTopology (A.range : Set X))
+  have : (uniformity A.range).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : BaireSpace A.range := BaireSpace.of_completelyPseudoMetrizable
+  let F := A.rangeRestrict
+  have hs : Surjective F := fun ⟨_, x, hx⟩ ↦ ⟨x, Subtype.ext hx⟩
+  have ho : IsOpenMap F := by
+    apply isOpenMap_of_not_isMeagre_range F
+    rw [hs.range_eq]
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+  have he : IsEmbedding F := (IsOpenEmbedding.of_continuous_injective_isOpenMap
+    F.continuous (fun _ _ h ↦ hi (congrArg Subtype.val h)) ho).isEmbedding
+  exact ⟨IsEmbedding.subtypeVal.comp he, hc⟩
+
+private theorem isClosed_range_submodule_restriction {X : Type*} [AddCommGroup X]
+    [Module ℂ X] [TopologicalSpace X] (H : Submodule ℂ X) (A : X →L[ℂ] X) (B : H →L[ℂ] H)
+    (he : ∀ x : H, (B x).val = A x.val)
+    (hh : A.range ⊓ H = H.map A.toLinearMap) (hc : IsClosed (range A)) : IsClosed (range B) := by
+  have hr : range B = Subtype.val ⁻¹' range A := by
+    ext y
+    constructor
+    · rintro ⟨x, rfl⟩
+      exact ⟨x.val, (he x).symm⟩
+    · intro hy
+      have hx : y.val ∈ H.map A.toLinearMap := (le_of_eq hh) ⟨hy, y.property⟩
+      obtain ⟨x, hx, hxy⟩ := hx
+      exact ⟨⟨x, hx⟩, Subtype.ext ((he ⟨x, hx⟩).trans hxy)⟩
+  exact (congrArg IsClosed hr).mpr (hc.preimage continuous_subtype_val)
+
+local notation "δ[" g "]" => modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty
+
+private theorem cyclicDifference_range_inf_isotype (g : G) :
+    (δ[g]).range ⊓ H₀[ω] = (H₀[ω]).map (δ[g]).toLinearMap := by
+  have h := modulatedCyclicDifference_range_isotype m g hm hms ω
+  unfold modulatedDecayIsotype
+  unfold modulatedCyclicDifference at h ⊢
+  exact h
+
+private theorem isotypicDifference_closedEmbedding (g : G) (hg : 1 < (m g).val)
+    (hF : IsFrechetTVS H₀[ω]) : IsClosedEmbedding (P[ω, [g]]) := by
+  have he (x : H₀[ω]) : (P[ω, [g]] x).val = δ[g] x.val := by
+    unfold modulatedIsotypicDifferenceProduct modulatedDifferenceProduct modulatedCyclicDifference
+    rfl
+  have hi := cyclicDifference_injective m hm hms g hg
+  have hinj : Injective (P[ω, [g]]) := by
+    intro x y h
+    exact Subtype.ext (hi ((he x).symm.trans ((congrArg Subtype.val h).trans (he y))))
+  have hc : IsClosed (range δ[g]) := modulatedCyclicDifference_isClosed_range m g hm hms
+  have hh := cyclicDifference_range_inf_isotype m hm hms ω g
+  have hclosed := isClosed_range_submodule_restriction (X := E) H₀[ω] δ[g] (P[ω, [g]]) he hh hc
+  exact frechet_closedEmbedding_of_injective hF (P[ω, [g]]) hinj hclosed
+
+private theorem isotypicDifferenceProduct_nil_fun :
+    (P[ω, []] : H₀[ω] → H₀[ω]) = id := by
+  unfold modulatedIsotypicDifferenceProduct modulatedDifferenceProduct
+  rfl
+
+private theorem isotypicDifferenceProduct_cons_fun (g : G) (s : List G) :
+    (P[ω, g :: s] : H₀[ω] → H₀[ω]) = (P[ω, [g]]) ∘ (P[ω, s]) := by
+  unfold modulatedIsotypicDifferenceProduct modulatedDifferenceProduct
+  rfl
+
+
+private theorem list_closedEmbedding {L X : Type*} [TopologicalSpace X] (P : List L → X → X)
+    (hn : P [] = id) (hc : ∀ g s, P (g :: s) = P [g] ∘ P s) (ok : L → Prop)
+    (h : ∀ g, ok g → IsClosedEmbedding (P [g])) (s : List L) (hs : ∀ g ∈ s, ok g) :
+    IsClosedEmbedding (P s) := by
+  induction s with
+  | nil => exact (congrArg IsClosedEmbedding hn).mpr IsClosedEmbedding.id
+  | cons g s ih =>
+    exact (congrArg IsClosedEmbedding (hc g s)).mpr
+      ((h g (hs g (.head _))).comp (ih fun a ha ↦ hs a (.tail _ ha)))
+
+private theorem list_closedRange {L X : Type*} [TopologicalSpace X] (P : List L → X → X)
+    (hn : P [] = id) (hc : ∀ g s, P (g :: s) = P [g] ∘ P s) (ok : L → Prop)
+    (h : ∀ g, ok g → IsClosedEmbedding (P [g])) (s : List L) (hs : ∀ g ∈ s, ok g) :
+    IsClosed (range (P s)) := (list_closedEmbedding P hn hc ok h s hs).isClosed_range
+
+
+end
+
 include hS₀ in
 /-- Paper: Lemma 4.6.1.3(1), p. 210. The product of expanding cyclic
 differences has closed range in the norm-one isotype of the decay space. -/
 theorem modulatedIsotypicDifferenceProduct_isClosed_range :
-    IsClosed (range (P[ω, S₀])) := by sorry
+    IsClosed (range (P[ω, S₀])) := by
+  exact list_closedRange (fun l ↦ (P[ω, l] : H₀[ω] → H₀[ω]))
+    (isotypicDifferenceProduct_nil_fun m hm hms ω)
+    (isotypicDifferenceProduct_cons_fun m hm hms ω) (fun g ↦ 1 < (m g).val)
+    (fun g hg ↦ isotypicDifference_closedEmbedding m hm hms ω g hg (isotype_frechet m hm hms ω))
+    S₀ hS₀
 
 include hS₀ in
 /-- Paper: Lemma 4.6.1.3(2), p. 210. The isotypic quotient by the difference
 product is a separable nuclear Fréchet space. -/
 theorem modulatedIsotypicDifferenceProduct_quotient :
     let U := H₀[ω] ⧸ (P[ω, S₀]).range
-    SeparableSpace U ∧ IsNuclearTVS U ∧ IsFrechetTVS U := by sorry
+    SeparableSpace U ∧ IsNuclearTVS U ∧ IsFrechetTVS U := by
+  exact isotype_quotient_properties (isotype_metrizable_separable m hm hms ω).2
+    (isotype_nuclear m hm hms ω) (isotype_frechet m hm hms ω) (P[ω, S₀]).range
+    (modulatedIsotypicDifferenceProduct_isClosed_range m hm hms ω S₀ hS₀)
+
+section
+
+set_option linter.unusedSectionVars false
+
+private theorem range_quotient_actions {X L : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X] [TopologicalSpace L]
+    (A : X →L[ℂ] X) (N : Submodule ℂ X) (M : Submodule ℂ A.range)
+    (F : (X ⧸ N) ≃L[ℂ] (A.range ⧸ M))
+    (hF : ∀ x, F (N.mkQ x) = M.mkQ (A.rangeRestrict x))
+    (t : L → X →L[ℂ] X) (hc : Continuous fun u : L × X ↦ t u.1 u.2)
+    (hN : ∀ g x, x ∈ N → t g x ∈ N) (hA : ∀ g x, A (t g x) = t g (A x)) :
+    ∃ (ρ : L × (X ⧸ N) → X ⧸ N) (τ : L × (A.range ⧸ M) → A.range ⧸ M),
+      Continuous ρ ∧ Continuous τ ∧ (∀ g x, ρ (g, N.mkQ x) = N.mkQ (t g x)) ∧
+      (∀ (g : L) (u : A.range), ∃ u' : A.range, u'.val = t g u.val ∧ τ (g, M.mkQ u) = M.mkQ u') ∧
+      ∀ g v, F (ρ (g, v)) = τ (g, F v) := by
+  obtain ⟨ρ, hρ, hρq⟩ := N.exists_continuous_quotient_family t hc hN
+  let τ (p : L × (A.range ⧸ M)) := F (ρ (p.1, F.symm p.2))
+  refine ⟨ρ, τ, hρ, F.continuous.comp (hρ.comp
+    (continuous_fst.prodMk (F.symm.continuous.comp continuous_snd))), hρq, ?_, ?_⟩
+  · intro g u
+    obtain ⟨x, hx⟩ := u.property
+    have hu : A.rangeRestrict x = u := Subtype.ext hx
+    refine ⟨A.rangeRestrict (t g x), (hA g x).trans (congrArg (t g) hx), ?_⟩
+    have hrep : F (N.mkQ x) = M.mkQ u := (hF x).trans (congrArg M.mkQ hu)
+    have hi : F.symm (M.mkQ u) = N.mkQ x := F.symm_apply_eq.mpr hrep.symm
+    exact (congrArg (fun y ↦ F (ρ (g, y))) hi).trans
+      ((congrArg F (hρq g x)).trans (hF (t g x)))
+  · intro g v
+    exact (congrArg (fun y ↦ F (ρ (g, y))) (F.symm_apply_apply v)).symm
+
+private theorem restrict_family_continuous {X L : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [TopologicalSpace L] (H : Submodule ℂ X)
+    (A : L → X →L[ℂ] X) (ha : Continuous fun p : L × X ↦ A p.1 p.2)
+    (h : ∀ g, ∀ x ∈ H, A g x ∈ H) :
+    Continuous (fun p : L × H ↦ (A p.1).restrict (h p.1) p.2) :=
+  (ha.comp (continuous_fst.prodMk (continuous_subtype_val.comp continuous_snd))).subtype_mk _
+
+private theorem translation_preserves_decayIsotype (ρ : G → (E →L[ℂ] E))
+    (hρ : ∀ g f x, (ρ g f).val x = f.val (g⁻¹ * x))
+    (g : G) (f : E) (hf : f ∈ H₀[ω]) : ρ g f ∈ H₀[ω] := by
+  refine (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) _).mpr fun k x ↦ ?_
+  have h := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) f).mp hf k (g⁻¹ * x)
+  exact (hρ g f _).trans ((congrArg f.val (mul_left_comm _ _ _)).trans
+    (h.trans (congrArg ((ω k : ℂ) * ·) (hρ g f x).symm)))
+
+include hm hms in
+private theorem isotype_translation_family :
+    ∃ t : G → (H₀[ω] →L[ℂ] H₀[ω]), (Continuous fun p : G × H₀[ω] ↦ t p.1 p.2) ∧
+      ∀ g f x, (t g f).val.val x = f.val.val (g⁻¹ * x) := by
+  refine (exists_modulatedExponentialDecay_translationAction m univ hm hms
+    ordConnected_univ univ_nonempty).elim fun ρ h ↦ ?_
+  have hi := translation_preserves_decayIsotype m ω (fun g ↦ ρ g) h.1
+  let t (g : G) : H₀[ω] →L[ℂ] H₀[ω] := (ρ g).restrict (hi g)
+  have he (g : G) (f : H₀[ω]) (x : G) : (t g f).val.val x = f.val.val (g⁻¹ * x) := h.1 g f.val x
+  have hc := restrict_family_continuous (X := E) H₀[ω] (fun g ↦ ρ g) h.2 hi
+  exact ⟨t, hc, he⟩
+
+private theorem isotype_product_translate (s : List G) (g : G) (f f' : H₀[ω])
+    (ht : ∀ x, f'.val.val x = f.val.val (g⁻¹ * x)) :
+    ∀ x, (P[ω, s] f').val.val x = (P[ω, s] f).val.val (g⁻¹ * x) := by
+  induction s with
+  | nil => exact ht
+  | cons d s ih =>
+    intro x
+    have h1 := modulatedCyclicDifference_apply m d hm hms univ ordConnected_univ univ_nonempty
+      (P[ω, s] f').val x
+    have h2 := modulatedCyclicDifference_apply m d hm hms univ ordConnected_univ univ_nonempty
+      (P[ω, s] f).val (g⁻¹ * x)
+    exact h1.trans ((congrArg₂ (· - ·) (ih x)
+      ((ih (d * x)).trans (congrArg (P[ω, s] f).val.val (mul_left_comm _ _ _)))).trans h2.symm)
+
+private theorem isotype_product_commute_single (s : List G) (g : G) :
+    ∀ f : H₀[ω], P[ω, s ++ [g]] f = P[ω, [g]] (P[ω, s] f) := by
+  induction s with
+  | nil => exact fun _ ↦ rfl
+  | cons d s ih =>
+    intro f
+    have eval (c : G) (u : H₀[ω]) (x : G) :
+        (P[ω, [c]] u).val.val x = u.val.val x - u.val.val (c * x) :=
+      modulatedCyclicDifference_apply m c hm hms univ ordConnected_univ univ_nonempty _ x
+    have hcomm (u : H₀[ω]) (x : G) :
+        (P[ω, [d]] (P[ω, [g]] u)).val.val x = (P[ω, [g]] (P[ω, [d]] u)).val.val x := by
+      have h1 := eval d (P[ω, [g]] u) x
+      have h2 := eval g (P[ω, [d]] u) x
+      have h3 := eval g u x
+      have h4 := eval g u (d * x)
+      have h5 := eval d u x
+      have h6 := eval d u (g * x)
+      have hx := congrArg u.val.val (mul_left_comm g d x)
+      have hcalc (a b c k : ℂ) : (a - b) - (c - k) = (a - c) - (b - k) := by ring
+      exact h1.trans ((congrArg₂ (· - ·) h3 h4).trans ((hcalc _ _ _ _).trans
+        ((congrArg (fun k ↦ (_ - _) - (_ - k)) hx).trans ((congrArg₂ (· - ·) h5 h6).symm.trans h2.symm))))
+    exact (congrArg (P[ω, [d]]) (ih f)).trans
+      (Subtype.ext (Subtype.ext (funext (hcomm (P[ω, s] f)))))
+
+section
+universe v
+
+private theorem separable_nuclear_frechet_of_equiv {X Y : Type*} [AddCommGroup X]
+    [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X] [AddCommGroup Y]
+    [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y] (F : X ≃L[ℂ] Y)
+    (h : SeparableSpace X ∧ IsNuclearTVS.{v} X ∧ IsFrechetTVS X) :
+    SeparableSpace Y ∧ IsNuclearTVS.{v} Y ∧ IsFrechetTVS Y := by
+  have : SeparableSpace X := h.1
+  have : MetrizableSpace X := h.2.2.2.2.1
+  have : PolynormableSpace ℂ X := h.2.1.2.1
+  have : PolynormableSpace ℂ Y := F.symm.PolynormableSpace
+  have hn := nuclear_of_equiv F h.2.1
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  let U : X ≃ᵤ Y := { __ := F.toEquiv, uniformContinuous_toFun := F.toContinuousLinearMap.uniformContinuous,
+                       uniformContinuous_invFun := F.symm.toContinuousLinearMap.uniformContinuous }
+  exact ⟨F.surjective.denseRange.separableSpace F.continuous, hn,
+    ⟨inferInstance, hn.2.1, F.symm.toHomeomorph.isEmbedding.metrizableSpace,
+      U.completeSpace_iff.mp h.2.2.2.2.2⟩⟩
+
+end
+
+section
+universe v
+
+private theorem cancel_comm_submodule {L Z : Type*} [TopologicalSpace L] [CommGroup L]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [IsTopologicalAddGroup Z]
+    (H : Submodule ℂ Z)
+    (A B C : H →L[ℂ] H) (ha : IsClosedEmbedding A) (hp : ∀ x, C x = A (B x))
+    (eval : H → L → ℂ) (hinj : Injective eval)
+    (ht : ∃ t : L → H →L[ℂ] H, (Continuous fun p : L × H ↦ t p.1 p.2) ∧
+      ∀ g f x, eval (t g f) x = eval f (g⁻¹ * x))
+    (hA : ∀ g f f', (∀ x, eval f' x = eval f (g⁻¹ * x)) → ∀ x, eval (A f') x = eval (A f) (g⁻¹ * x))
+    (hB : ∀ g f f', (∀ x, eval f' x = eval f (g⁻¹ * x)) → ∀ x, eval (B f') x = eval (B f) (g⁻¹ * x))
+    (hX : SeparableSpace (H ⧸ B.range) ∧ IsNuclearTVS.{v} (H ⧸ B.range) ∧ IsFrechetTVS (H ⧸ B.range)) :
+    let a := A
+    let R := a.range
+    let N := B.range
+    let M := C.range.comap R.subtype
+    let U := H ⧸ N
+    let V := R ⧸ M
+    ∃ F : U ≃L[ℂ] V, (∀ f, F (N.mkQ f) = M.mkQ (a.rangeRestrict f)) ∧
+      (∃ (ρ : L × U → U) (τ : L × V → V), Continuous ρ ∧ Continuous τ ∧
+        (∀ g f, ∃ f', (∀ x, eval f' x = eval f (g⁻¹ * x)) ∧ ρ (g, N.mkQ f) = N.mkQ f') ∧
+        (∀ g (u : R), ∃ u' : R, (∀ x, eval u'.val x = eval u.val (g⁻¹ * x)) ∧ τ (g, M.mkQ u) = M.mkQ u') ∧
+        ∀ g w, F (ρ (g, w)) = τ (g, F w)) ∧
+      SeparableSpace (R ⧸ M) ∧ IsNuclearTVS.{v} (R ⧸ M) ∧ IsFrechetTVS (R ⧸ M) := by
+  obtain ⟨t, hc, ht⟩ := ht
+  have hca (g : L) (f : H) : A (t g f) = t g (A f) :=
+    hinj (funext fun x ↦ (hA g f (t g f) (ht g f) x).trans (ht g (A f) x).symm)
+  have hcb (g : L) (f : H) : B (t g f) = t g (B f) :=
+    hinj (funext fun x ↦ (hB g f (t g f) (ht g f) x).trans (ht g (B f) x).symm)
+
+  dsimp only
+  let R := A.range
+  let N := B.range
+  let M := C.range.comap R.subtype
+  have hM (x : H) : A.rangeRestrict x ∈ M ↔ x ∈ N := by
+    constructor
+    · rintro ⟨y, hy⟩
+      exact ⟨y, ha.injective ((hp y).symm.trans hy)⟩
+    · rintro ⟨y, hy⟩
+      exact ⟨y, (hp y).trans (congrArg A hy)⟩
+  obtain ⟨F, hF⟩ := A.exists_quotient_range_equiv ha.isEmbedding N M hM
+  have hN (g : L) (x : H) : x ∈ N → t g x ∈ N := fun ⟨y, hy⟩ ↦
+    ⟨t g y, (hcb g y).trans (congrArg (t g) hy)⟩
+  obtain ⟨ρ, τ, hρ, hτ, hρq, hτq, he⟩ := range_quotient_actions A N M F hF t hc hN hca
+  refine ⟨F, hF, ⟨ρ, τ, hρ, hτ, fun g f ↦ ⟨t g f, ht g f, hρq g f⟩, ?_, he⟩,
+    separable_nuclear_frechet_of_equiv F hX⟩
+  intro g u
+  obtain ⟨u', hu', hq⟩ := hτq g u
+  exact ⟨u', fun x ↦ (congrArg (fun y ↦ eval y x) hu').trans (ht g u.val x), hq⟩
+end
+
+end
 
 include hS₀ hγ in
 /-- Paper: Lemma 4.6.1.3(3), pp. 210–211. Applying the last cyclic difference
@@ -265,7 +687,17 @@ theorem modulatedIsotypicDifferenceProduct_cancel_equiv :
         (∀ g (u : R), ∃ u' : R,
           (∀ x, u'.val.val.val x = u.val.val.val (g⁻¹ * x)) ∧ τ (g, M.mkQ u) = M.mkQ u') ∧
         ∀ g v, F (ρ (g, v)) = τ (g, F v)) ∧
-      SeparableSpace (R ⧸ M) ∧ IsNuclearTVS (R ⧸ M) ∧ IsFrechetTVS (R ⧸ M) := by sorry
+      SeparableSpace (R ⧸ M) ∧ IsNuclearTVS (R ⧸ M) ∧ IsFrechetTVS (R ⧸ M) := by
+  have ha := isotypicDifference_closedEmbedding m hm hms ω γ hγ (isotype_frechet m hm hms ω)
+  have hp := isotype_product_commute_single m hm hms ω S₀ γ
+  let ev (x : H₀[ω]) : G → ℂ := x.val.val
+  have hi : Injective ev := fun _ _ h ↦ Subtype.ext (Subtype.ext h)
+  have ht := isotype_translation_family m hm hms ω
+  have hA := isotype_product_translate m hm hms ω [γ]
+  have hB := isotype_product_translate m hm hms ω S₀
+  with_reducible_and_instances
+    exact cancel_comm_submodule (L := G) (Z := E) H₀[ω] (P[ω, [γ]]) (P[ω, S₀]) (P[ω, S₀ ++ [γ]])
+      ha hp ev hi ht hA hB (modulatedIsotypicDifferenceProduct_quotient m hm hms ω S₀ hS₀)
 
 end IsotypicQuotient
 
@@ -483,6 +915,71 @@ variable (μ : Measure G) [hμHaar : μ.IsHaarMeasure]
 local notation "integrand[" ξ "," r "," f "]" =>
   (fun g : G ↦ (f : H₀[ω]).val.val g * (ξ g : ℂ) * (period g : ℂ) ^ (r : ℕ))
 
+section
+
+set_option linter.unusedSectionVars false
+
+private theorem frechet_barrelled (X : Type*) [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    (hF : IsFrechetTVS X) : BarrelledSpace ℂ X := by
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have : MetrizableSpace X := hF.2.2.1
+  have : CompleteSpace X := hF.2.2.2
+  have : (uniformity X).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : BaireSpace X := BaireSpace.of_completelyPseudoMetrizable
+  infer_instance
+
+private theorem integrable_logMoment (ξ : PontryaginDual G) (r : ℕ) (f : H₀[ω]) :
+    Integrable (integrand[ξ, r, f]) μ := by
+  let v := f.val.val
+  let t (x : G) : ℝ := (m x).val
+  have ht (x : G) : 0 < t x := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have htw (c : ℝ) : Integrable (fun x ↦ ((t x ^ c : ℝ) : ℂ) * v x) μ := by
+    let w := modulatedExponentialDecayTwist m univ ⟨c, mem_univ _⟩ f.val
+    exact ((schwartzBruhat_fourier_equiv μ).choose_spec w).1
+  have h0 : Integrable v μ := (htw 0).congr (ae_of_all μ fun x ↦ by
+    simp only [Real.rpow_zero, Complex.ofReal_one, one_mul])
+  have hchar : Continuous (fun x : G ↦ (ξ x : ℂ)) := continuous_subtype_val.comp ξ.continuous
+  have hlog : Continuous (fun x ↦ (Real.log (t x) : ℂ)) :=
+    Complex.continuous_ofReal.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp m.continuous)).log fun x ↦ (ht x).ne')
+  have hmeas := (h0.aestronglyMeasurable.mul hchar.aestronglyMeasurable).mul
+    (hlog.pow r).aestronglyMeasurable
+  have hmajor := (((htw 1).norm.add (htw (-1)).norm).const_mul (r.factorial : ℝ))
+  apply hmajor.mono' hmeas
+  refine ae_of_all μ fun x ↦ ?_
+  have ht' := ht x
+  have hbound : |Real.log (t x)| ^ r ≤ r.factorial * (t x + (t x)⁻¹) := by
+    have h := (div_le_iff₀ (show 0 < (r.factorial : ℝ) by positivity)).mp
+      (Real.pow_div_factorial_le_exp _ (abs_nonneg (Real.log (t x))) r)
+    have he : Real.exp |Real.log (t x)| ≤ t x + (t x)⁻¹ := by
+      rcases le_total 0 (Real.log (t x)) with hp | hn
+      · rw [abs_of_nonneg hp, Real.exp_log ht']
+        exact le_add_of_nonneg_right (inv_nonneg.mpr ht'.le)
+      · rw [abs_of_nonpos hn, Real.exp_neg, Real.exp_log ht']
+        exact le_add_of_nonneg_left ht'.le
+    exact h.trans ((mul_le_mul_of_nonneg_right he (by positivity)).trans_eq (mul_comm _ _))
+  change ‖v x * (ξ x : ℂ) * (Real.log (t x) : ℂ) ^ r‖ ≤
+    (r.factorial : ℝ) * (‖((t x ^ (1 : ℝ) : ℝ) : ℂ) * v x‖ +
+      ‖((t x ^ (-1 : ℝ) : ℝ) : ℂ) * v x‖)
+  simpa only [norm_mul, Circle.norm_coe, mul_one, norm_pow, Complex.norm_real, Real.norm_eq_abs,
+    Real.rpow_one, Real.rpow_neg_one, abs_of_pos ht', abs_of_pos (inv_pos.mpr ht')] using
+    (mul_le_mul_of_nonneg_left hbound (norm_nonneg (v x))).trans_eq (by ring)
+
+include hm hms in
+private theorem isotype_eval_continuous (x : G) : Continuous (fun f : H₀[ω] ↦ f.val.val x) := by
+  let Z := modulatedExponentialDecayTwist m univ ⟨0, mem_univ _⟩
+  have hv : Continuous fun f : H₀[ω] ↦ Z f.val x :=
+    (continuous_schwartzBruhat_eval x).comp ((modulatedExponentialDecay_zeroTwist_continuous
+      m hm hms univ ordConnected_univ (mem_univ _)).comp continuous_subtype_val)
+  have hzero (t : ℝ) (z : ℂ) : ((t ^ (0 : ℝ) : ℝ) : ℂ) * z = z := by simp
+  have he (f : H₀[ω]) : Z f.val x = f.val.val x :=
+    (modulatedExponentialDecayTwist_apply m univ ⟨0, mem_univ _⟩ f.val x).trans (hzero _ _)
+  exact hv.congr he
+
+end
+
 include hm hms hμHaar in
 /-- Paper: Equation (4.6.1.14), p. 212. Every log-moment is integrable and
 its integral defines a continuous linear functional on the isotype.
@@ -491,7 +988,24 @@ all natural log-powers. Descent to the quotient imposes the multiplicity bound. 
 theorem modulatedLogMoment_linearContinuous (ξ : PontryaginDual G) (r : ℕ) :
     (∀ f : H₀[ω], Integrable (integrand[ξ, r, f]) μ) ∧
       IsLinearMap ℂ (fun f : H₀[ω] ↦ ∫ g, integrand[ξ, r, f] g ∂μ) ∧
-      Continuous (fun f : H₀[ω] ↦ ∫ g, integrand[ξ, r, f] g ∂μ) := by sorry
+      Continuous (fun f : H₀[ω] ↦ ∫ g, integrand[ξ, r, f] g ∂μ) := by
+  have hi := integrable_logMoment m ω μ ξ r
+  have lin : IsLinearMap ℂ (fun f : H₀[ω] ↦ integrand[ξ, r, f]) := by
+    constructor
+    · intro f h
+      funext x
+      exact (congrArg (· * (period x : ℂ) ^ r) (add_mul (f.val.val x) (h.val.val x) (ξ x : ℂ))).trans
+        (add_mul _ _ _)
+    · intro c f
+      funext x
+      exact (congrArg (· * (period x : ℂ) ^ r) (mul_assoc c (f.val.val x) (ξ x : ℂ))).trans
+        (mul_assoc _ _ _)
+  have hc (x : G) : Continuous (fun f : H₀[ω] ↦ integrand[ξ, r, f] x) :=
+    ((isotype_eval_continuous m hm hms ω x).mul continuous_const).mul continuous_const
+  have hF := isotype_frechet m hm hms ω
+  have : MetrizableSpace H₀[ω] := hF.2.2.1
+  have : BarrelledSpace ℂ H₀[ω] := frechet_barrelled H₀[ω] hF
+  exact ⟨hi, MeasureTheory.linearContinuous_integral_of_continuous_eval μ (fun f : H₀[ω] ↦ integrand[ξ, r, f]) lin hi hc⟩
 
 /-- Paper: Equation (4.6.1.14), p. 212. The log-moment integrates the test
 function against a unitary character times the indicated power of the log-module. -/
@@ -531,12 +1045,100 @@ local notation "S" => List.ofFn γs
 local notation "R" => (P[ω, S]).range
 local notation "U" => (H₀[ω] ⧸ R)
 
+open Polynomial in
+private theorem integral_difference_polynomial (ξ : PontryaginDual G) (g : G)
+    (v : G → ℂ) (hv : ∀ r : ℕ, Integrable (fun x ↦ v x * (ξ x : ℂ) * (period x : ℂ) ^ r) μ)
+    (p : ℂ[X]) :
+    let w (q : ℂ[X]) (x : G) := (ξ x : ℂ) * q.eval (period x : ℂ)
+    let q := p - C (ξ g⁻¹ : ℂ) * taylor (-(period g : ℂ)) p
+    (∫ x, (v x - v (g * x)) * w p x ∂μ) =
+      ∫ x, v x * w q x ∂μ := by
+  intro w q
+  have hi (a : ℂ[X]) : Integrable (fun x ↦ v x * w a x) μ := by
+    induction a using Polynomial.induction_on' with
+    | add a b ha hb =>
+      exact (ha.add hb).congr (Filter.Eventually.of_forall fun x ↦ by
+        simp only [Pi.add_apply, w, eval_add, mul_add])
+    | monomial n c =>
+      have h := hv n
+      exact (h.const_mul c).congr (Filter.Eventually.of_forall fun x ↦ by
+        change c * (v x * (ξ x : ℂ) * _) = _
+        simp only [w, eval_monomial]; ring)
+  let b := C (ξ g⁻¹ : ℂ) * taylor (-(period g : ℂ)) p
+  have hshift (x : G) : w b (g * x) = w p x := by
+    have hg : 0 < ((m g).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have hx : 0 < ((m x).val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have hlog : (period (g * x) : ℂ) = (period g : ℂ) + (period x : ℂ) := by
+      rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul hg.ne' hx.ne', Complex.ofReal_add]
+    simp only [b, w, eval_mul, eval_C, taylor_eval, hlog, add_neg_cancel_comm,
+      map_mul ξ, Circle.coe_mul, map_inv ξ, Circle.coe_inv]
+    have hne : (ξ g : ℂ) ≠ 0 := Circle.coe_ne_zero _
+    field_simp
+  have hb := (hi b).comp_mul_left g
+  have hpow (x : G) : v x * w q x = v x * w p x - v x * w b x := by
+    simp only [q, b, w, eval_sub, mul_sub]
+  have hsplit (x : G) : (v x - v (g * x)) * w p x =
+      v x * w p x - v (g * x) * w b (g * x) := by rw [sub_mul, hshift]
+  simp_rw [hsplit, hpow]
+  rw [integral_sub (hi p) hb, integral_sub (hi p) (hi b)]
+  exact congrArg (_ - ·) (integral_mul_left_eq_self (fun x ↦ v x * w b x) g)
+
+open scoped Classical in
+open Polynomial in
+private theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
+    (v : List G → G → ℂ)
+    (hdiff : ∀ g l x, v (g :: l) x = v l x - v l (g * x))
+    (hint : ∀ l r, Integrable (fun x ↦ v l x * (ξ x : ℂ) * (period x : ℂ) ^ (r : ℕ)) μ)
+    (l : List G) (p : ℂ[X])
+    (hdeg : p.degree < (l.countP (fun g ↦ decide (ξ ∈ modulatedCyclicAnnihilatorFiber m ω g)) : ℕ)) :
+    ∫ x, v l x * ((ξ x : ℂ) * p.eval (period x : ℂ)) ∂μ = 0 := by
+  classical
+  induction l generalizing p with
+  | nil =>
+    have hp : p = 0 := by
+      by_contra hn
+      simp [Polynomial.degree_eq_natDegree hn] at hdeg
+    subst p
+    simp only [eval_zero, mul_zero, integral_zero]
+  | cons g l ih =>
+    by_cases hp : p = 0
+    · subst p
+      simp only [eval_zero, mul_zero, integral_zero]
+    let q := p - C (ξ g⁻¹ : ℂ) * taylor (-(period g : ℂ)) p
+    have hd : q.degree < (l.countP (fun g ↦ decide (ξ ∈ modulatedCyclicAnnihilatorFiber m ω g)) : ℕ) := by
+      by_cases h : ξ ∈ modulatedCyclicAnnihilatorFiber m ω g
+      · have hg := ((mem_modulatedCyclicAnnihilatorFiber_iff m ω g ξ).mp h).1
+        have hq : q.degree < p.degree := by
+          simp only [q, map_inv, hg, inv_one, Circle.coe_one, C_1, one_mul]
+          exact degree_sub_lt_left (by simp) hp (by simp)
+        rw [degree_eq_natDegree hp] at hdeg hq
+        simp [h] at hdeg
+        have hnat : p.natDegree < l.countP (fun g ↦ decide (ξ ∈ modulatedCyclicAnnihilatorFiber m ω g)) + 1 := by exact_mod_cast hdeg
+        exact hq.trans_le (by exact_mod_cast Nat.le_of_lt_succ hnat)
+      · simp [h] at hdeg
+        exact (degree_sub_le _ _).trans_lt (by
+          rw [degree_C_mul (Circle.coe_ne_zero _), degree_taylor, max_self]; exact hdeg)
+    refine (integral_congr_ae (ae_of_all μ fun x ↦ congrArg (· * _) (hdiff g l x))).trans ?_
+    exact (integral_difference_polynomial m μ ξ g (v l) (hint l) p).trans (ih q hd)
+
 include hγs in
 /-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.15), p. 212.
 Log-moments of order strictly below the multiplicity vanish on the
 isotypic difference product, so they descend to the quotient. -/
 theorem modulatedLogMoment_range_le_ker (j : J) :
-    R ≤ (modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) j.val.1 j.val.2).ker := by sorry
+    R ≤ (modulatedLogMoment (m := m) (hm := hm) (hms := hms) (ω := ω) (μ := μ) j.val.1 j.val.2).ker := by
+  classical
+  rintro _ ⟨f, rfl⟩
+  let v (l : List G) := (P[ω, l] f).val.val
+  have h := integral_differenceProduct_polynomial m ω μ j.val.1 v
+    (fun g l x ↦ modulatedCyclicDifference_apply m g hm hms univ ordConnected_univ univ_nonempty _ x)
+    (fun l r ↦ (modulatedLogMoment_linearContinuous m hm hms ω μ j.val.1 r).1 (P[ω, l] f))
+    S (Polynomial.X ^ j.val.2) (by
+      simpa [List.countP_ofFn, modulatedPeriodicMultiplicity] using j.property)
+  have heval (x : G) : (Polynomial.X ^ j.val.2 : Polynomial ℂ).eval (period x : ℂ) =
+      (period x : ℂ) ^ j.val.2 := by rw [Polynomial.eval_pow, Polynomial.eval_X]
+  exact (integral_congr_ae (ae_of_all μ fun x ↦ (mul_assoc _ _ _).trans
+    (congrArg (fun t ↦ v S x * ((j.val.1 x : ℂ) * t)) (heval x).symm))).trans h
 
 /-- Paper: Equation (4.6.1.15), p. 212. Each allowed log-moment is viewed
 as a member of the strong dual of the difference quotient. -/
@@ -552,7 +1154,7 @@ local notation "D" =>
 /-- Paper: Equations (4.6.1.14)–(4.6.1.15), p. 212. On a quotient
 representative the descended moment is the original log-moment integral. -/
 theorem modulatedQuotientLogMoment_mkQ (j : J) (f : H₀[ω]) :
-    D j ((R).mkQ f) = ∫ g, integrand[j.val.1, j.val.2, f] g ∂μ := by sorry
+    D j ((R).mkQ f) = ∫ g, integrand[j.val.1, j.val.2, f] g ∂μ := rfl
 
 -- TODO(paper-gap): Theorem 4.6.1.5 as printed assumes commensurability of the
 -- logarithms of the periods. A unit period and a Liouville period satisfy that
@@ -765,6 +1367,76 @@ local notation "Mellin" => positiveRealFourierMellin univ isOpen_univ ordConnect
 local notation "factor[" z "]" => (1 - Complex.exp (-((Real.log (a.val : ℝ) : ℂ) * z)))
 
 include ha in
+private theorem cyclicMellin_model (hmId : IsModulation mPos) (hsId : Surjective mPos) :
+    letI : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+    let Δ := modulatedCyclicDifference mPos a hmId hsId univ ordConnected_univ univ_nonempty
+    ∃ (e : PositiveRealExponentialDecay univ ≃L[ℂ] ModulatedExponentialDecay mPos univ)
+      (T : A →L[ℂ] A), (∀ f t, (e f).val t = f.val (Real.log (t.val : ℝ))) ∧
+      (∀ f z, (T f).val z = factor[z] * f.val z) ∧
+      (∀ f, Mellin (e.symm (Δ f)) = T (Mellin (e.symm f))) ∧ IsClosedEmbedding T := by
+  intro Δ
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let e := (identityModulationExponentialDecay_equiv univ ordConnected_univ univ_nonempty).choose
+  have he := (identityModulationExponentialDecay_equiv univ ordConnected_univ univ_nonempty).choose_spec
+  let U := e.symm.trans Mellin
+  let T : A →L[ℂ] A := U.toContinuousLinearMap.comp (Δ.comp U.symm.toContinuousLinearMap)
+  have hT (f : ModulatedExponentialDecay mPos univ) : U (Δ f) = T (U f) := by
+    change U (Δ f) = U (Δ (U.symm (U f)))
+    exact congrArg (fun v ↦ U (Δ v)) (U.symm_apply_apply f).symm
+  have hmul (H : A) (z : ℂ) : (T H).val z = factor[z] * H.val z := by
+    let f := U.symm H
+    let p := e.symm f
+    let p' := p - e.symm (Δ f)
+    have hs (x : ℝ) : p'.val x = p.val (Real.log (a.val : ℝ) + x) := by
+      let t : ℝ≥0ˣ := Units.mk0 ⟨Real.exp x, (Real.exp_pos x).le⟩ (by
+        exact ne_of_gt (show 0 < (⟨Real.exp x, (Real.exp_pos x).le⟩ : ℝ≥0) from Real.exp_pos x))
+      have ht : Real.log (t.val : ℝ) = x := Real.log_exp x
+      have hlog : Real.log ((a * t).val : ℝ) = Real.log (a.val : ℝ) + x := by
+        rw [Units.val_mul, NNReal.coe_mul, Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt a)).ne'
+          (NNReal.coe_pos.mpr (Units.zero_lt t)).ne', ht]
+      have hh (v : ModulatedExponentialDecay mPos univ) (u : ℝ≥0ˣ) :
+          (e.symm v).val (Real.log (u.val : ℝ)) = v.val u :=
+        (he _ u).symm.trans (congrArg (fun y : ModulatedExponentialDecay mPos univ ↦ y.val u)
+          (e.apply_symm_apply v))
+      change p.val x - (e.symm (Δ f)).val x = _
+      calc
+        _ = f.val t - (Δ f).val t :=
+          congrArg₂ (· - ·)
+            ((congrArg p.val ht.symm).trans (hh f t))
+            ((congrArg (e.symm (Δ f)).val ht.symm).trans (hh (Δ f) t))
+        _ = f.val (a * t) :=
+          (congrArg (f.val t - ·) (modulatedCyclicDifference_apply mPos a hmId hsId univ
+            ordConnected_univ univ_nonempty f t)).trans (sub_sub_cancel _ _)
+        _ = _ := (hh f (a * t)).symm.trans (congrArg p.val hlog)
+    let : MeasurableSpace ℝ≥0ˣ := borel _
+    have : BorelSpace ℝ≥0ˣ := ⟨rfl⟩
+    have hshift := modulatedMellin_profile_translate mPos a univ isOpen_univ ordConnected_univ
+      univ_nonempty mPos (1 : PontryaginDual ℝ≥0ˣ) p p'
+      (fun x ↦ (hs x).trans (one_mul _).symm) z (mem_univ _)
+    have ha' : 0 < (a.val : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+    have hpow : ((a.val : ℝ) : ℂ) ^ (-z) = Complex.exp (-((Real.log (a.val : ℝ) : ℂ) * z)) := by
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr ha'.ne'),
+        ← Complex.ofReal_log ha'.le, mul_neg]
+    have hz := congrArg (fun F : A ↦ F.val z) ((Mellin).map_sub p (e.symm (Δ f)))
+    have hH : Mellin p = H := U.apply_symm_apply H
+    have heval := congrArg (fun F : A ↦ F.val z) hH
+    have hcalc {u v w s : ℂ} (h₁ : u = v - w) (h₂ : u = s * v) :
+        w = (1 - s) * v := by linear_combination h₁ - h₂
+    exact (hcalc hz (hshift.trans (congrArg (· * (Mellin p).val z)
+      ((one_mul _).trans hpow)))).trans (congrArg (factor[z] * ·) heval)
+  have hcl : IsClosedEmbedding T := by
+    have hc := modulatedCyclicDifference_isClosed_range mPos a hmId hsId
+    have hi := cyclicDifference_injective mPos hmId hsId a ha
+    apply frechet_closedEmbedding_of_injective (schwartzBergman_frechet univ isOpen_univ
+      ordConnected_univ univ_nonempty)
+    · exact U.injective.comp (hi.comp U.symm.injective)
+    · change IsClosed (range (U ∘ Δ ∘ U.symm))
+      rw [← Function.comp_assoc, U.symm.surjective.range_comp, range_comp]
+      exact U.toHomeomorph.isClosedMap _ hc
+
+  exact ⟨e, T, he, hmul, hT, hcl⟩
+
+include ha in
 /-- Paper: Example 4.6.1.6, p. 217. In logarithmic coordinates Mellin
 transform carries the cyclic difference to multiplication by the given
 entire factor. Its square has closed range and represents the repeated difference. -/
@@ -778,7 +1450,17 @@ theorem repeatedCyclicDifference_mellin (hmId : IsModulation mPos) (hsId : Surje
       (∀ f z, (T f).val z = factor[z] * f.val z) ∧
       (∀ f, Mellin (e.symm (Δ f)) = T (Mellin (e.symm f))) ∧
       (∀ f, Mellin (e.symm (Δ₂ f)) = T (T (Mellin (e.symm f)))) ∧
-      IsClosed (range (T.comp T)) := by sorry
+      IsClosed (range (T.comp T)) := by
+  intro EPos Δ Δ₂
+  have model := cyclicMellin_model a ha hmId hsId
+  let e := model.choose
+  let T := model.choose_spec.choose
+  have h := model.choose_spec.choose_spec
+  have ht := h.2.2.1
+  refine ⟨e, T, h.1, h.2.1, ?_, ?_, (h.2.2.2.comp h.2.2.2).isClosed_range⟩
+  · exact ht
+  · intro f
+    exact (ht _).trans (congrArg T (ht f))
 
 variable (T : SchwartzBergman univ →L[ℂ] SchwartzBergman univ)
 variable (hT : ∀ f z, (T f).val z =
@@ -789,6 +1471,15 @@ local notation "R₂" => (T.comp T).range
 local notation "N₂" => (R₂).comap (R₁).subtype
 
 include ha hT in
+private theorem cyclicMellinMultiplier_isClosedEmbedding : IsClosedEmbedding T := by
+  have model := cyclicMellin_model a ha ⟨isProperMap_id, exists_ne 1⟩ surjective_id
+  let T' := model.choose_spec.choose
+  have h := model.choose_spec.choose_spec
+  have he : T' = T := ContinuousLinearMap.ext fun f ↦
+    Subtype.ext (funext fun z ↦ (h.2.1 f z).trans (hT f z).symm)
+  exact he ▸ h.2.2.2
+
+include ha hT in
 /-- Paper: Example 4.6.1.6 and Equation (4.6.1.29), p. 217.
 The first and second multiplier images give a short exact sequence.
 Its left inclusion is a closed topological embedding. -/
@@ -796,7 +1487,9 @@ theorem repeatedCyclicDifference_mellin_exact :
     ∃ (i : ((R₁) ⧸ N₂) →L[ℂ] (A ⧸ R₂)) (q : (A ⧸ R₂) →L[ℂ] (A ⧸ R₁)),
       (∀ f : R₁, i ((N₂).mkQ f) = (R₂).mkQ f.val) ∧
       (∀ f : A, q ((R₂).mkQ f) = (R₁).mkQ f) ∧
-      IsClosedEmbedding i ∧ Function.Exact i q ∧ Surjective q := by sorry
+      IsClosedEmbedding i ∧ Function.Exact i q ∧ Surjective q := by
+  exact Submodule.exists_exact_quotient_maps R₂ R₁
+    (fun _ ⟨f, hf⟩ ↦ ⟨T f, hf⟩) (cyclicMellinMultiplier_isClosedEmbedding a ha T hT).isClosed_range
 
 include ha hT in
 /-- Paper: Example 4.6.1.6 and Equation (4.6.1.30), p. 218.
@@ -805,7 +1498,12 @@ quotient by the single factor. The rule is specified on products so it
 applies also at the zeros of the factor. -/
 theorem repeatedCyclicDifference_mellin_division :
     ∃ F : ((R₁) ⧸ N₂) ≃L[ℂ] (A ⧸ R₁),
-      ∀ f : A, F ((N₂).mkQ (T.rangeRestrict f)) = (R₁).mkQ f := by sorry
+      ∀ f : A, F ((N₂).mkQ (T.rangeRestrict f)) = (R₁).mkQ f := by
+  have he := cyclicMellinMultiplier_isClosedEmbedding a ha T hT
+  have hi := he.injective
+  obtain ⟨F, hF⟩ := T.exists_quotient_range_equiv he.isEmbedding R₁ N₂
+    (fun x ↦ ⟨fun ⟨y, hy⟩ ↦ ⟨y, hi hy⟩, fun ⟨y, hy⟩ ↦ ⟨y, congrArg T hy⟩⟩)
+  exact ⟨F.symm, fun x ↦ F.symm_apply_eq.mpr (hF x).symm⟩
 
 include ha hT in
 /-- Paper: Example 4.6.1.6, p. 218. Evaluation of the analytic quotient at
@@ -962,6 +1660,392 @@ theorem schwartzBruhatDifferenceProduct_mem_isotype :
         (hP u (g * x)))).trans
       ((mul_sub _ _ _).symm.trans (congrArg ((ω u : ℂ) * ·) h2.symm)))
 
+section
+set_option linter.unusedSectionVars false
+
+private theorem compare_single_quotients {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (i : X →L[ℂ] Y) (A : X →L[ℂ] X)
+    (B : Y →L[ℂ] Y) (F : (X ⧸ A.range) ≃L[ℂ] (Y ⧸ B.range))
+    (hF : ∀ x, F (A.range.mkQ x) = B.range.mkQ (i x)) :
+    (∀ x, i x ∈ B.range → x ∈ A.range) ∧ ∀ y, ∃ x v, y = i x + B v := by
+  constructor
+  · intro x hx
+    apply (Submodule.Quotient.mk_eq_zero _).mp
+    apply F.injective
+    exact (hF x).trans (((Submodule.Quotient.mk_eq_zero _).mpr hx).trans F.map_zero.symm)
+  · intro y
+    obtain ⟨x, hx⟩ := A.range.mkQ_surjective (F.symm (B.range.mkQ y))
+    have he := (hF x).symm.trans ((congrArg F hx).trans (F.apply_symm_apply _))
+    obtain ⟨v, hv⟩ := (Submodule.Quotient.eq _).mp he.symm
+    exact ⟨x, v, (show y = i x + (y - i x) by abel).trans (congrArg (i x + ·) hv.symm)⟩
+
+private theorem compare_product_ranges {L X Y : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (i : X →L[ℂ] Y) (A : L → X →L[ℂ] X) (B : L → Y →L[ℂ] Y) (s : List L)
+    (hc : ∀ g ∈ s, ∀ x, i (A g x) = B g (i x))
+    (hi : ∀ g ∈ s, Injective (B g))
+    (h1 : ∀ g ∈ s, (∀ x, i x ∈ (B g).range → x ∈ (A g).range) ∧
+      ∀ y, ∃ x v, y = i x + B g v) :
+    (∀ x, i x ∈ (s.map B).prod.range ↔ x ∈ (s.map A).prod.range) ∧
+      ∀ y, ∃ x v, y = i x + (s.map B).prod v := by
+  induction s with
+  | nil =>
+    exact ⟨fun x ↦ ⟨fun _ ↦ ⟨x, rfl⟩, fun _ ↦ ⟨i x, rfl⟩⟩,
+      fun y ↦ ⟨0, y, by simp⟩⟩
+  | cons g l ih =>
+    obtain ⟨hp, hs⟩ := ih (fun a ha ↦ hc a (.tail _ ha)) (fun a ha ↦ hi a (.tail _ ha))
+      (fun a ha ↦ h1 a (.tail _ ha))
+    have hg := h1 g (.head _)
+    have comm := hc g (.head _)
+    refine ⟨fun x ↦ ⟨?_, ?_⟩, ?_⟩
+    · rintro ⟨z, hz⟩
+      obtain ⟨u, hu⟩ := hg.1 x ⟨(l.map B).prod z, hz⟩
+      have hz' := (hi g (.head _) (hz.trans ((congrArg i hu).symm.trans (comm u))))
+      obtain ⟨v, hv⟩ := (hp u).mp ⟨z, hz'⟩
+      exact ⟨v, (congrArg (A g) hv).trans hu⟩
+    · rintro ⟨v, hv⟩
+      obtain ⟨z, hz⟩ := (hp ((l.map A).prod v)).mpr ⟨v, rfl⟩
+      exact ⟨z, (congrArg (B g) hz).trans ((comm _).symm.trans (congrArg i hv))⟩
+    · intro y
+      obtain ⟨u, w, hu⟩ := hg.2 y
+      obtain ⟨v, z, hv⟩ := hs w
+      refine ⟨u + A g v, z, ?_⟩
+      calc
+        y = i u + B g (i v + (l.map B).prod z) := hu.trans (congrArg (fun w ↦ i u + B g w) hv)
+        _ = i (u + A g v) + B g ((l.map B).prod z) := by rw [map_add, i.map_add, comm, add_assoc]
+
+private theorem lf_open_surjection {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] [ContinuousSMul ℂ X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (hX : IsLFSpace X) (hY : IsLFSpace Y) (q : X →L[ℂ] Y) (hq : Surjective q) : IsOpenMap q := by
+  obtain ⟨hT, V, _, _, _, hV, j, i, h⟩ := hX
+  refine isOpenMap_of_surjective_toLF hY hV i ?_ h.exhaustive q hq
+  rintro n _ ⟨v, rfl⟩
+  exact ⟨j n v, DFunLike.congr_fun (h.compatible n) v⟩
+
+private theorem lf_compare_quotients {X Y Z : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [IsTopologicalAddGroup X] [ContinuousSMul ℂ X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [IsTopologicalAddGroup Y] [ContinuousSMul ℂ Y] [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [IsTopologicalAddGroup Z] [ContinuousSMul ℂ Z]
+    (hX : IsLFSpace X) (hZ : IsLFSpace Z) (e : Z ≃L[ℂ] Y) (i : X →L[ℂ] Y)
+    (N : Submodule ℂ X) (M : Submodule ℂ Y) (hclosed : IsClosed (M : Set Y))
+    (hker : ∀ x, i x ∈ M ↔ x ∈ N) (hs : ∀ y, ∃ x, y - i x ∈ M) :
+    ∃ F : (X ⧸ N) ≃L[ℂ] (Y ⧸ M), ∀ x, F (N.mkQ x) = M.mkQ (i x) := by
+  let M' := M.comap e.toLinearMap
+  have hM : M'.map e.toLinearMap = M := Submodule.map_comap_eq_of_surjective e.surjective M
+  let eQ := e.quotientMapEquiv M' M hM
+  have hZ' := (lfSpace_quotient_properties («E» := Z)).2 hZ M' (hclosed.preimage e.continuous)
+  let q := M.mkQL.comp i
+  have hq : Surjective q := by
+    intro w
+    obtain ⟨y, rfl⟩ := M.mkQ_surjective w
+    obtain ⟨x, hx⟩ := hs y
+    exact ⟨x, ((Submodule.Quotient.eq M).mpr hx).symm⟩
+  have ho := lf_open_surjection hX hZ' (eQ.symm.toContinuousLinearMap.comp q) (eQ.symm.surjective.comp hq)
+  have hqo : IsOpenMap q := by
+    have h := eQ.toHomeomorph.isOpenMap.comp ho
+    exact (congrArg IsOpenMap (funext (fun x ↦ eQ.apply_symm_apply (q x)) :
+      eQ.toHomeomorph ∘ (eQ.symm.toContinuousLinearMap.comp q) = q)).mp h
+  let f := N.liftQL q fun x hx ↦ (Submodule.Quotient.mk_eq_zero M).mpr ((hker x).mpr hx)
+  have hf (x : X) : f (N.mkQ x) = q x := rfl
+  have hf' : Bijective f := by
+    constructor
+    · apply LinearMap.ker_eq_bot.mp
+      apply le_antisymm _ bot_le
+      intro z hz
+      obtain ⟨x, rfl⟩ := N.mkQ_surjective z
+      exact (Submodule.Quotient.mk_eq_zero N).mpr ((hker x).mp ((Submodule.Quotient.mk_eq_zero M).mp hz))
+    · intro z
+      obtain ⟨x, hx⟩ := hq z
+      exact ⟨N.mkQ x, (hf x).trans hx⟩
+  let F := LinearEquiv.ofBijective f.toLinearMap hf'
+  have hcont : Continuous F.symm := (IsOpenQuotientMap.isQuotientMap (show IsOpenQuotientMap q from ⟨hq, q.continuous, hqo⟩)).continuous_iff.mpr
+    (N.mkQL.continuous.congr (fun x ↦ (F.symm_apply_eq.mpr (hf x).symm).symm))
+  exact ⟨{ __ := F, continuous_toFun := f.continuous, continuous_invFun := hcont }, hf⟩
+
+private theorem compare_factor_on_representatives {L X Y Z : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    (ex : X → L → ℂ) (ey : Y → L → ℂ) (hy : Injective ey) (i : X →L[ℂ] Y) (j : Y →L[ℂ] Z)
+    (j₀ : Y → Z) (hj : ∀ y, j y = j₀ y)
+    (hi : ∀ x t, ey (i x) t = ex x t) (A : X →L[ℂ] X) (B : Y →L[ℂ] Y) (C : Z →L[ℂ] Z)
+    (h : ∃ (i' : X →L[ℂ] Y) (F : (X ⧸ A.range) ≃L[ℂ] (Y ⧸ B.range))
+      (J : (Y ⧸ B.range) ≃L[ℂ] (Z ⧸ C.range)),
+      (∀ x t, ey (i' x) t = ex x t) ∧ (∀ x, F (A.range.mkQ x) = B.range.mkQ (i' x)) ∧
+        ∀ y, J (B.range.mkQ y) = C.range.mkQ (j₀ y)) :
+    ((∀ x, i x ∈ B.range → x ∈ A.range) ∧ ∀ y, ∃ x v, y = i x + B v) ∧
+      (∀ y, j y ∈ C.range → y ∈ B.range) ∧ ∀ z, ∃ y v, z = j y + C v := by
+  obtain ⟨i', F, J, hi', hF, hJ⟩ := h
+  have h' : i' = i := ContinuousLinearMap.ext fun x ↦ hy (funext fun t ↦ (hi' x t).trans (hi x t).symm)
+  subst i'
+  exact ⟨compare_single_quotients i A B F hF, compare_single_quotients j B C J (fun y ↦ (hJ y).trans (congrArg C.range.mkQ (hj y).symm))⟩
+
+private theorem commute_difference_of_evaluation {L X Y : Type*} [Mul L] [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (ex : X → L → ℂ) (ey : Y → L → ℂ) (hy : Injective ey) (i : X →L[ℂ] Y)
+    (hi : ∀ x t, ey (i x) t = ex x t) (A : L → X →L[ℂ] X) (B : L → Y →L[ℂ] Y)
+    (ha : ∀ g f t, ex (A g f) t = ex f t - ex f (g * t))
+    (hb : ∀ g f t, ey (B g f) t = ey f t - ey f (g * t)) (g : L) (f : X) :
+    i (A g f) = B g (i f) :=
+  hy (funext fun t ↦ (hi _ t).trans ((ha _ _ _).trans
+    ((congrArg₂ (· - ·) (hi f t).symm (hi f (g * t)).symm).trans (hb _ _ _).symm)))
+
+private theorem comparison_equiv_of_product {L X Y Z : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [IsTopologicalAddGroup X] [ContinuousSMul ℂ X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y] [ContinuousSMul ℂ Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [IsTopologicalAddGroup Z] [ContinuousSMul ℂ Z]
+    (hX : IsLFSpace X) (hZ : IsLFSpace Z) (e : Z ≃L[ℂ] Y)
+    (i : X →L[ℂ] Y) (A : L → X →L[ℂ] X) (B : L → Y →L[ℂ] Y) (s : List L)
+    (hc : ∀ g ∈ s, ∀ x, i (A g x) = B g (i x))
+    (hi : ∀ g ∈ s, Injective (B g))
+    (h1 : ∀ g ∈ s, (∀ x, i x ∈ (B g).range → x ∈ (A g).range) ∧ ∀ y, ∃ x v, y = i x + B g v)
+    (hclosed : IsClosed ((s.map B).prod.range : Set Y)) :
+    let N := (s.map A).prod.range
+    let M := (s.map B).prod.range
+    IsClosed (N : Set X) ∧ ∃ F : (X ⧸ N) ≃L[ℂ] (Y ⧸ M), ∀ x, F (N.mkQ x) = M.mkQ (i x) := by
+  intro N M
+  obtain ⟨hker, hs⟩ := compare_product_ranges i A B s hc hi h1
+  have heq : (N : Set X) = i ⁻¹' M := Set.ext fun x ↦ (hker x).symm
+  refine ⟨(congrArg IsClosed heq).mpr (hclosed.preimage i.continuous), ?_⟩
+  apply lf_compare_quotients hX hZ e i N M hclosed hker
+  intro y
+  obtain ⟨x, v, hv⟩ := hs y
+  exact ⟨x, v, by rw [hv]; abel⟩
+
+private theorem retract_quotient_maps {X : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (H : Submodule ℂ X) (D P : X →L[ℂ] X)
+    (hp : ∀ x, P x ∈ H) (hfix : ∀ x ∈ H, P x = x) (hc : ∀ x, P (D x) = D (P x)) :
+    let N := (H.map D.toLinearMap).comap H.subtype
+    ∃ (a : (H ⧸ N) →L[ℂ] (X ⧸ D.range)) (b : (X ⧸ D.range) →L[ℂ] (H ⧸ N)),
+      LeftInverse b a ∧ (∀ x : H, a (N.mkQ x) = D.range.mkQ x.val) ∧
+      ∀ x, b (D.range.mkQ x) = N.mkQ ⟨P x, hp x⟩ := by
+  intro N
+  let a := N.liftQL (D.range.mkQL.comp H.subtypeL) (by
+    rintro x ⟨y, hy, he⟩
+    exact (Submodule.Quotient.mk_eq_zero _).mpr ⟨y, he⟩)
+  let r := P.codRestrict H hp
+  let b := D.range.liftQL (N.mkQL.comp r) (by
+    rintro x ⟨y, hy⟩
+    exact (Submodule.Quotient.mk_eq_zero _).mpr
+      ⟨P y, hp y, (hc y).symm.trans (congrArg P hy)⟩)
+  refine ⟨a, b, ?_, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  intro z
+  obtain ⟨x, rfl⟩ := N.mkQ_surjective z
+  exact congrArg N.mkQ (Subtype.ext (hfix x.val x.property))
+
+private theorem quotient_equiv_on_retracts {X Y U V : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup U] [Module ℂ U] [TopologicalSpace U] [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    (F : X ≃L[ℂ] Y) (a : U →L[ℂ] X) (b : X →L[ℂ] U) (c : V →L[ℂ] Y) (d : Y →L[ℂ] V)
+    (hba : LeftInverse b a) (hdc : LeftInverse d c) (h : F '' range a = range c) :
+    ∃ J : U ≃L[ℂ] V, ∀ x, c (J x) = F (a x) := by
+  let j := (d.comp F.toContinuousLinearMap).comp a
+  let k := (b.comp F.symm.toContinuousLinearMap).comp c
+  have hj (x : U) : c (j x) = F (a x) := by
+    obtain ⟨y, hy⟩ := h ▸ (mem_image_of_mem F (mem_range_self x) : F (a x) ∈ F '' range a)
+    exact (congrArg (fun v ↦ c (d v)) hy.symm).trans ((congrArg c (hdc y)).trans hy)
+  have hk (y : V) : a (k y) = F.symm (c y) := by
+    obtain ⟨_, ⟨x, rfl⟩, hx⟩ := h.symm ▸ (mem_range_self y : c y ∈ range c)
+    have hv := F.symm_apply_eq.mpr hx.symm
+    exact (congrArg (fun v ↦ a (b v)) hv).trans ((congrArg a (hba x)).trans hv.symm)
+  refine ⟨{ __ := j.toLinearMap
+            invFun := k
+            continuous_toFun := j.continuous
+            continuous_invFun := k.continuous
+            left_inv := ?_
+            right_inv := ?_ }, hj⟩
+  · intro x
+    exact hba.injective ((hk (j x)).trans ((congrArg F.symm (hj x)).trans (F.symm_apply_apply _)))
+  · intro y
+    exact hdc.injective ((hj (k y)).trans ((congrArg F (hk y)).trans (F.apply_symm_apply _)))
+
+private theorem compared_isotype_images {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (D : X →L[ℂ] X) (B : Y →L[ℂ] Y) (H : Submodule ℂ X) (S : Submodule ℂ Y) (i : X →L[ℂ] Y)
+    (F : (X ⧸ D.range) ≃L[ℂ] (Y ⧸ B.range)) (hF : ∀ x, F (D.range.mkQ x) = B.range.mkQ (i x))
+    (P : X →L[ℂ] X) (Q : Y →L[ℂ] Y) (hp : ∀ x, P x ∈ H) (hS : ∀ y ∈ S, Q y = y)
+    (hiH : ∀ x ∈ H, i x ∈ S) (hq : ∀ y, Q (B y) = B (Q y)) (hcomm : ∀ x, i (P x) = Q (i x)) :
+    F '' (D.range.mkQ '' (H : Set X)) = B.range.mkQ '' (S : Set Y) := by
+  ext w
+  constructor
+  · rintro ⟨_, ⟨x, hx, rfl⟩, rfl⟩
+    exact ⟨i x, hiH x hx, (hF x).symm⟩
+  · rintro ⟨y, hy, rfl⟩
+    obtain ⟨x, hx⟩ := D.range.mkQ_surjective (F.symm (B.range.mkQ y))
+    have he := (hF x).symm.trans ((congrArg F hx).trans (F.apply_symm_apply _))
+    obtain ⟨v, hv⟩ := (Submodule.Quotient.eq _).mp he
+    refine ⟨_, ⟨P x, hp x, rfl⟩, (hF _).trans ((Submodule.Quotient.eq _).mpr ⟨Q v, ?_⟩)⟩
+    have eq := (hq v).symm.trans ((congrArg Q hv).trans (Q.map_sub _ _))
+    exact eq.trans (congrArg₂ (· - ·) (hcomm x).symm (hS y hy))
+
+
+private theorem range_quotient_isotype_inclusion {X : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (H : Submodule ℂ X) (B : Submodule ℂ X) (N : Submodule ℂ H)
+    (a : (H ⧸ N) →L[ℂ] (X ⧸ B)) (ha : ∀ x : H, a (N.mkQ x) = B.mkQ x.val) :
+    range a = B.mkQ '' (H : Set X) := by
+  ext z
+  constructor
+  · rintro ⟨w, rfl⟩
+    obtain ⟨x,rfl⟩ := N.mkQ_surjective w
+    exact ⟨x.val, x.property, (ha x).symm⟩
+  · rintro ⟨x, hx, rfl⟩
+    exact ⟨N.mkQ ⟨x,hx⟩, ha _⟩
+
+private def IsotypicProjectionLift {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (z : X → Y) (P : Y →L[ℂ] Y) (H : Submodule ℂ X) : Prop :=
+  ∃ Q : X →L[ℂ] X, (∀ f, z (Q f) = P (z f)) ∧ (∀ f, Q f ∈ H) ∧ ∀ f ∈ H, Q f = f
+
+private theorem compare_from_projectors {X Y T : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T]
+    {z : X → T} {w : Y → T} {P : T →L[ℂ] T} {H : Submodule ℂ X} {S : Submodule ℂ Y}
+    (C : T →L[ℂ] T) (hpc : ∀ v, P (C v) = C (P v))
+    (px : IsotypicProjectionLift z P H) (py : IsotypicProjectionLift w P S)
+    (A : X →L[ℂ] X) (B : Y →L[ℂ] Y) (i : X →L[ℂ] Y)
+    (hz : Injective z) (hw : Injective w) (hi : ∀ x, w (i x) = z x)
+    (hA : ∀ x, z (A x) = C (z x)) (hB : ∀ y, w (B y) = C (w y))
+    (F : (X ⧸ A.range) ≃L[ℂ] (Y ⧸ B.range)) (hF : ∀ x, F (A.range.mkQ x) = B.range.mkQ (i x)) :
+    let N := (H.map A.toLinearMap).comap H.subtype
+    let M := (S.map B.toLinearMap).comap S.subtype
+    F '' (A.range.mkQ '' (H : Set X)) = B.range.mkQ '' (S : Set Y) ∧
+    ∃ J : (H ⧸ N) ≃L[ℂ] (S ⧸ M), ∀ x : H, ∃ y : S, y.val = i x.val ∧ J (N.mkQ x) = M.mkQ y := by
+  intro N M
+  obtain ⟨Q,hQ,hQm,hQf⟩ := px
+  obtain ⟨R,hR,hRm,hRf⟩ := py
+  have hQc x : Q (A x) = A (Q x) := hz ((hQ _).trans ((congrArg P (hA x)).trans ((hpc _).trans
+    ((congrArg C (hQ x).symm).trans (hA _).symm))))
+  have hRc y : R (B y) = B (R y) := hw ((hR _).trans ((congrArg P (hB y)).trans ((hpc _).trans
+    ((congrArg C (hR y).symm).trans (hB _).symm))))
+  have hIQ x : i (Q x) = R (i x) := hw ((hi _).trans ((hQ x).trans ((congrArg P (hi x).symm).trans (hR _).symm)))
+  have him (x : X) (hx : x ∈ H) : i x ∈ S := by
+    have he := (hIQ x).symm.trans (congrArg i (hQf x hx))
+    exact he ▸ hRm (i x)
+  have hI := compared_isotype_images A B H S i F hF Q R hQm hRf him hRc hIQ
+  refine ⟨hI, ?_⟩
+  obtain ⟨a,b,hab,ha,-⟩ := retract_quotient_maps H A Q hQm hQf hQc
+  obtain ⟨c,d,hcd,hc,-⟩ := retract_quotient_maps S B R hRm hRf hRc
+  have hr : F '' range a = range c := by rw [range_quotient_isotype_inclusion H A.range N a ha,
+    range_quotient_isotype_inclusion S B.range M c hc, hI]
+  obtain ⟨J,hJ⟩ := quotient_equiv_on_retracts F a b c d hab hcd hr
+  refine ⟨J, fun x ↦ ⟨⟨i x.val, him x.val x.property⟩, rfl, hcd.injective ?_⟩⟩
+  exact (hJ (N.mkQ x)).trans ((congrArg F (ha x)).trans ((hF x.val).trans (hc ⟨i x.val, him x.val x.property⟩).symm))
+end
+
+section
+set_option linter.unusedSectionVars false
+variable [MeasurableSpace G] [BorelSpace G] (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure]
+variable (ω : PontryaginDual m.toMonoidHom.ker)
+
+private theorem project_endomorphism {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (z : X → Y) (P : Y →L[ℂ] Y)
+    (H : Submodule ℂ X) (A : X →ₗ[ℂ] H) (hc : Continuous A) (hA : ∀ f, z (A f).val = P (z f)) :
+    ∃ Q : X →L[ℂ] X, ∀ f, z (Q f) = P (z f) :=
+  ⟨H.subtypeL.comp ⟨A, hc⟩, hA⟩
+
+private theorem project_endomorphism_of_family {X Y J : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (z : J → X → Y) (j : J) (P : Y →L[ℂ] Y)
+    (H : Submodule ℂ X) (hu : ∃! A : X →ₗ[ℂ] H, ∀ f a, z a (A f).val = P (z a f))
+    (hc : ∀ A : X →ₗ[ℂ] H, (∀ f a, z a (A f).val = P (z a f)) → Continuous A) :
+    ∃ Q : X →L[ℂ] X, ∀ f, z j (Q f) = P (z j f) := by
+  obtain ⟨A, hA, -⟩ := hu
+  exact project_endomorphism (z j) P H A (hc A hA) (fun f ↦ hA f j)
+
+private theorem mem_of_quotient_projector {X : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (A : X →L[ℂ] X) (H : Submodule ℂ X)
+    (hq : ∃ e : (X ⧸ A.ker) ≃L[ℂ] H, ∀ f, (e (A.ker.mkQ f)).val = A f) (f : X) : A f ∈ H := by
+  obtain ⟨e, he⟩ := hq
+  exact (he f) ▸ (e (A.ker.mkQ f)).property
+
+private theorem ordinary_isotypicProjector_mem (f : SchwartzBruhat G) :
+    schwartzBruhatIsotypicProjector m hm μ₁ ω f ∈ actionIsotype ρK ω :=
+  mem_of_quotient_projector (schwartzBruhatIsotypicProjector m hm μ₁ ω) (actionIsotype ρK ω)
+    (schwartzBruhatIsotypicProjector_quotient_equiv m hm μ₁ ω) f
+
+private theorem ordinary_projector_difference (g : G) (f : SchwartzBruhat G) :
+    schwartzBruhatIsotypicProjector m hm μ₁ ω (schwartzBruhatCyclicDifference g f) =
+      schwartzBruhatCyclicDifference g (schwartzBruhatIsotypicProjector m hm μ₁ ω f) := by
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  let t := schwartzBruhatTranslationAction (G := G) g⁻¹
+  have ht (u : SchwartzBruhat G) (x : G) : t u x = u (g * x) :=
+    (schwartzBruhatTranslationAction_apply g⁻¹ x u).trans (congrArg (fun a ↦ u (a * x)) (inv_inv g))
+  have hpt : P (t f) = t (P f) := by
+    apply Subtype.ext
+    funext x
+    change P (t f) x = t (P f) x
+    have h1 := (schwartzBruhatIsotypicProjector_apply m hm μ₁ ω (t f) x).2
+    have h2 := (schwartzBruhatIsotypicProjector_apply m hm μ₁ ω f (g * x)).2
+    have h3 := integral_congr_ae (μ := μ₁) (ae_of_all _ fun k : K ↦
+      congrArg (star (ω k : ℂ) * ·) ((ht f (k.val⁻¹*x)).trans (congrArg (fun u ↦ f u) (mul_left_comm g k.val⁻¹ x))))
+    exact h1.trans ((congrArg ((μ₁.real univ)⁻¹ • ·) h3).trans (h2.symm.trans (ht (P f) x).symm))
+  have eq := (P.map_sub f (t f)).trans (congrArg (P f - ·) hpt)
+  unfold schwartzBruhatCyclicDifference
+  exact eq
+
+private theorem map_commutes_prod {X Y L : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (p : X → Y) (A : L → X →L[ℂ] X)
+    (B : L → Y →L[ℂ] Y) (h : ∀ g x, p (A g x) = B g (p x)) (s : List L) :
+    ∀ x, p ((s.map A).prod x) = (s.map B).prod (p x) := by
+  induction s with
+  | nil => exact fun _ ↦ rfl
+  | cons g s ih => exact fun x ↦ (h g ((s.map A).prod x)).trans (congrArg (B g) (ih x))
+
+private theorem ordinary_projector_product (s : List G) (f : SchwartzBruhat G) :
+    schwartzBruhatIsotypicProjector m hm μ₁ ω (schwartzBruhatDifferenceProduct s f) =
+      schwartzBruhatDifferenceProduct s (schwartzBruhatIsotypicProjector m hm μ₁ ω f) :=
+  map_commutes_prod (schwartzBruhatIsotypicProjector m hm μ₁ ω) schwartzBruhatCyclicDifference
+    schwartzBruhatCyclicDifference (ordinary_projector_difference m hm μ₁ ω) s f
+
+variable (I : Set ℝ) (hI : OrdConnected I) (h0 : 0 ∈ I)
+local notation "V" => ModulatedExponentialDecay m I
+local notation "z₀" => modulatedExponentialDecayTwist m I ⟨0,h0⟩
+include hms hI in
+private theorem decay_square_for_action (ρ : G →* V →L[ℂ] V)
+    (hρ : ∀ g f x, (ρ g f).val x = f.val (g⁻¹ * x)) :
+    ∃ Q : V →L[ℂ] V, ∀ f, z₀ (Q f) = schwartzBruhatIsotypicProjector m hm μ₁ ω (z₀ f) := by
+  have hu := existsUnique_modulatedExponentialDecay_isotypicProjector m I hm hms hI ⟨0,h0⟩ μ₁ ρ hρ ω
+  have hc := modulatedExponentialDecay_isotypicProjector_continuous m I hm hms hI ⟨0,h0⟩ μ₁ ρ hρ ω
+  let eval (a : I) (f : V) : SchwartzBruhat G := modulatedExponentialDecayTwist m I a f
+  let atZero : I := ⟨0, h0⟩
+  let H := actionIsotype (ρ.comp m.toMonoidHom.ker.subtype) ω
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ ω
+  with_reducible_and_instances
+    exact project_endomorphism_of_family (X := V) (Y := SchwartzBruhat G) (J := I)
+      eval atZero P H hu hc
+
+include hms hI in
+private theorem exists_decay_projector_commuting_zeroTwist :
+    ∃ Q : V →L[ℂ] V, ∀ f, z₀ (Q f) = schwartzBruhatIsotypicProjector m hm μ₁ ω (z₀ f) := by
+  have acts := exists_modulatedExponentialDecay_translationAction m I hm hms hI ⟨0,h0⟩
+  have sq := decay_square_for_action m hm hms μ₁ ω I hI h0
+  with_reducible_and_instances
+    exact acts.elim fun act h ↦ sq act h.1
+
+private theorem decay_projector_mem_of_square (Q : V →L[ℂ] V) (f : V)
+    (hq : z₀ (Q f) = schwartzBruhatIsotypicProjector m hm μ₁ ω (z₀ f)) :
+    Q f ∈ modulatedDecayIsotype m I h0 ω := by
+  change z₀ (Q f) ∈ actionIsotype ρK ω
+  have hmemb := ordinary_isotypicProjector_mem m hm μ₁ ω (z₀ f)
+  exact (congrArg (fun y : SchwartzBruhat G ↦ y ∈ actionIsotype ρK ω) hq).mpr hmemb
+
+private theorem decay_projector_fix_of_square (Q : V →L[ℂ] V) (f : V)
+    (hq : z₀ (Q f) = schwartzBruhatIsotypicProjector m hm μ₁ ω (z₀ f))
+    (hf : f ∈ modulatedDecayIsotype m I h0 ω) : Q f = f := by
+  change z₀ f ∈ actionIsotype ρK ω at hf
+  have hz := hq.trans (schwartzBruhatIsotypicProjector_apply_isotype m hm μ₁ ω (z₀ f) hf)
+  have ev (p : V) (x : G) : z₀ p x = p.val x := (modulatedExponentialDecay_zeroTwist_injective m I h0).2 p x
+  exact Subtype.ext (funext fun x ↦ (ev (Q f) x).symm.trans ((congrArg (fun p : SchwartzBruhat G ↦ p x) hz).trans (ev f x)))
+
+include hms hI in
+private theorem decay_projection_data :
+    IsotypicProjectionLift (X := V) (Y := SchwartzBruhat G) (fun f : V ↦ z₀ f)
+      (schwartzBruhatIsotypicProjector m hm μ₁ ω) (modulatedDecayIsotype m I h0 ω) := by
+  unfold IsotypicProjectionLift
+  have sq := exists_decay_projector_commuting_zeroTwist m hm hms μ₁ ω I hI h0
+  have mem := decay_projector_mem_of_square m hm μ₁ ω I h0
+  have fix := decay_projector_fix_of_square m hm μ₁ ω I h0
+  with_reducible_and_instances
+    exact sq.elim fun q h ↦ ⟨q, h, fun f ↦ mem q f (h f), fun f hf ↦ fix q f (h f) hf⟩
+end
+
 variable (I : Set ℝ) (hOpen : IsOpen I) (hInt : OrdConnected I) (h0 : 0 ∈ I)
 
 local notation "V" => ModulatedExponentialDecay m I
@@ -974,6 +2058,342 @@ local notation "j₀" => modulatedExponentialDecayTwist m I ⟨0, h0⟩
 -- TODO(paper-gap): In (4.6.3.2), the middle denominator must be P_S S_I(G).
 -- The injection into P_γ E / P_S E has source E / P_{S₀} E.
 -- The closedness argument needs higher moments at repeated frequencies.
+
+section
+
+set_option linter.unusedSectionVars false
+
+/-- Test a difference product on a retract. Each single difference has closed image
+on the retract by pullback, so on a Fréchet retract their product is a closed embedding. -/
+private theorem closed_stage_test {L X Y : Type*} [AddCommGroup X] [Module ℂ X]
+    [TopologicalSpace X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [IsTopologicalAddGroup Y] [ContinuousSMul ℂ Y]
+    (hY : IsFrechetTVS Y) (i : Y →L[ℂ] X) (r : X →L[ℂ] Y) (hri : LeftInverse r i)
+    (D : L → X →L[ℂ] X) (s : List L)
+    (hd : ∀ g ∈ s, Injective (D g) ∧ IsClosed (range (D g)))
+    (hp : ∀ g ∈ s, ∀ x, i (r (D g x)) = D g (i (r x)))
+    (x : X) (hx : x ∈ closure (range ((s.map D).prod : X →L[ℂ] X))) (hfix : i (r x) = x) :
+    x ∈ range ((s.map D).prod : X →L[ℂ] X) := by
+  let C (g : L) := (r.comp (D g)).comp i
+  have hir (g : L) (hg : g ∈ s) (y : Y) : i (C g y) = D g (i y) :=
+    (hp g hg (i y)).trans (congrArg (fun v ↦ D g (i v)) (hri y))
+  have hrc (g : L) (hg : g ∈ s) (u : X) : r (D g u) = C g (r u) :=
+    (hri.injective ((hp g hg u).trans (hir g hg (r u)).symm))
+  have hc (g : L) (hg : g ∈ s) : IsClosedEmbedding (C g) := by
+    have hi : Injective (C g) := fun y z h ↦ hri.injective ((hd g hg).1
+      ((hir g hg y).symm.trans ((congrArg i h).trans (hir g hg z))))
+    have hr : range (C g) = i ⁻¹' range (D g) := by
+      ext y
+      constructor
+      · rintro ⟨v, rfl⟩
+        exact ⟨i v, (hir g hg v).symm⟩
+      · rintro ⟨u, hu⟩
+        exact ⟨r u, (hrc g hg u).symm.trans ((congrArg r hu).trans (hri y))⟩
+    exact frechet_closedEmbedding_of_injective hY (C g) hi
+      ((congrArg IsClosed hr).mpr ((hd g hg).2.preimage i.continuous))
+  have hprod (l : List L) (hl : ∀ g ∈ l, g ∈ s) :
+      IsClosedEmbedding ((l.map C).prod : Y →L[ℂ] Y) ∧
+      (∀ y, i ((l.map C).prod y) = (l.map D).prod (i y)) ∧
+      ∀ u, r ((l.map D).prod u) = (l.map C).prod (r u) := by
+    induction l with
+    | nil => exact ⟨IsClosedEmbedding.id, fun _ ↦ rfl, fun _ ↦ rfl⟩
+    | cons g l ih =>
+      have hg := hl g (.head _)
+      obtain ⟨he, hi, hr⟩ := ih (fun a ha ↦ hl a (.tail _ ha))
+      exact ⟨(hc g hg).comp he, fun y ↦ (hir g hg _).trans (congrArg (D g) (hi y)),
+        fun u ↦ (hrc g hg _).trans (congrArg (C g) (hr u))⟩
+  obtain ⟨he, hi, hr⟩ := hprod s fun _ h ↦ h
+  have hsub : range ((s.map D).prod : X →L[ℂ] X) ⊆ r ⁻¹' range ((s.map C).prod : Y →L[ℂ] Y) :=
+    fun _ ⟨u, hu⟩ ↦ ⟨r u, (hr u).symm.trans (congrArg r hu)⟩
+  obtain ⟨v, hv⟩ := (closure_minimal hsub (he.isClosed_range.preimage r.continuous)) hx
+  exact ⟨i v, (hi v).symm.trans ((congrArg i hv).trans hfix)⟩
+
+private theorem schwartzBruhat_exists_full_stage (hgen : IsCompactlyGeneratedGroup G)
+    (f : SchwartzBruhat G) : ∃ (a : BruhatStructuralPair G)
+      (e : ElementaryLCAPresentation a.quotient), (∀ x : G, x ∈ a.val.1) ∧
+      f ∈ range (show SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G from schwartzBruhatStageInclusion a e) := by
+  refine ((mem_schwartzBruhatSubmodule_iff f.val).mp f.property).elim fun b h ↦ ?_
+  refine h.elim fun d h ↦ ?_
+  refine h.elim fun s hs ↦ ?_
+  let top : (⊤ : Subgroup G) ≃ₜ* G :=
+    { Subgroup.topEquiv with
+      continuous_toFun := continuous_subtype_val
+      continuous_invFun := continuous_id.subtype_mk _ }
+  let a : BruhatStructuralPair G := ⟨(⊤, b.val.2), isOpen_univ,
+    isCompactlyGeneratedGroup_of_continuousMulEquiv top.symm hgen, b.property.2.2.1, le_top⟩
+  let e := Classical.choice a.elementary
+  have hba : b ≤ a := ⟨le_top, le_rfl⟩
+  refine (schwartzBruhatStage_transition hba d e).elim fun j hj ↦ ?_
+  exact ⟨a, e, fun _ ↦ trivial, j s, Subtype.ext ((hj.1 s).trans hs)⟩
+
+
+
+private theorem schwartzBruhatStage_average_translate (a : BruhatStructuralPair G)
+    (ha : ∀ x : G, x ∈ a.val.1) (g : G) (u v : G → ℂ) (ht : ∀ x, u x = v (g * x)) (x : G) :
+    schwartzBruhatStageAverage a u x = schwartzBruhatStageAverage a v (g * x) := by
+  unfold schwartzBruhatStageAverage
+  rw [ite_eq_left (ha _), ite_eq_left (ha _)]
+  apply integral_congr_ae
+  exact ae_of_all _ fun h ↦ (ht _).trans (congrArg v (mul_left_comm g _ x))
+
+
+private theorem schwartzBruhatStage_average_difference (a : BruhatStructuralPair G)
+    (e : ElementaryLCAPresentation a.quotient) (ha : ∀ x : G, x ∈ a.val.1)
+    (i : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat G) (hi : ∀ y x, i y x = schwartzBruhatStageRealization a e y x)
+    (r : SchwartzBruhat G →L[ℂ] SchwartzBruhatStage e)
+    (hr : ∀ f x, schwartzBruhatStageRealization a e (r f) x = schwartzBruhatStageAverage a f x)
+    (g : G) (f : SchwartzBruhat G) :
+    i (r (schwartzBruhatCyclicDifference g f)) = schwartzBruhatCyclicDifference g (i (r f)) := by
+  let translate : SchwartzBruhat G →L[ℂ] SchwartzBruhat G := schwartzBruhatTranslationAction (G := G) g⁻¹
+  have ht (u : SchwartzBruhat G) (x : G) : translate u x = u (g * x) :=
+    (schwartzBruhatTranslationAction_apply g⁻¹ x u).trans (congrArg (fun t ↦ u (t * x)) (inv_inv g))
+  have ht' : i (r (translate f)) = translate (i (r f)) := by
+    refine Subtype.ext (funext fun x ↦ ?_)
+    exact (hi _ x).trans ((hr _ x).trans ((schwartzBruhatStage_average_translate a ha g (translate f) f (ht f) x).trans
+      ((hr f (g * x)).symm.trans ((hi _ _).symm.trans (ht _ x).symm))))
+  have H : i (r (f - translate f)) = i (r f) - translate (i (r f)) :=
+    (congrArg i (r.map_sub f (translate f))).trans ((i.map_sub _ _).trans (congrArg (i (r f) - ·) ht'))
+  unfold schwartzBruhatCyclicDifference
+  exact H
+
+include hm hms in
+private theorem schwartzBruhat_single_difference (g : G) (hg : 1 < (m g).val) :
+    Injective (schwartzBruhatCyclicDifference g) ∧ IsClosed (range (schwartzBruhatCyclicDifference g)) := by
+  let : MeasurableSpace G := borel G
+  have : BorelSpace G := ⟨rfl⟩
+  have : IsClosed ((Subgroup.zpowers g : Subgroup G) : Set G) := modulatedCyclicSubgroup_closed m g hg
+  have : T2Space (SchwartzBruhat (G ⧸ Subgroup.zpowers g)) := schwartzBruhat_t2
+  have hclosed := (schwartzBruhatCyclicPeriodization m g hg).isClosed_ker
+  have hk := schwartzBruhatCyclicPeriodization_ker_eq_range m g hm hms hg
+  refine ⟨LinearMap.ker_eq_bot.mp (le_antisymm ?_ bot_le), ?_⟩
+  · intro f hf
+    change schwartzBruhatCyclicDifference g f = 0 at hf
+    have hper (x : G) : f (g * x) = f x := (sub_eq_zero.mp ((schwartzBruhatCyclicDifference_apply g f x).symm.trans
+      (congrArg (fun v : SchwartzBruhat G ↦ v x) hf))).symm
+    refine Subtype.ext (funext fun x ↦ ?_)
+    have hn (n : ℕ) : f (g ^ n * x) = f x := by
+      induction n with
+      | zero => simp
+      | succ n ih => rw [pow_succ', mul_assoc, hper, ih]
+    have hs := (schwartzBruhatCyclicPeriodization_hasSum m g hg f x).summable.comp_injective
+      (Nat.cast_injective : Injective (fun n : ℕ ↦ (n : ℤ)))
+    change Summable (fun n : ℕ ↦ f (g ^ (n : ℤ) * x)) at hs
+    change f x = 0
+    simpa only [zpow_natCast, hn, summable_const_iff] using hs
+  · exact (congrArg (fun p : Submodule ℂ (SchwartzBruhat G) ↦ IsClosed (p : Set (SchwartzBruhat G))) hk).mp hclosed
+
+
+end
+
+include hm hms hS hγS in
+private theorem ordinary_product_range_closed :
+    IsClosed ((ΔT).range : Set (SchwartzBruhat G)) := by
+  apply isClosed_of_closure_subset
+  intro f hf
+  refine (schwartzBruhat_exists_full_stage (compactlyGenerated_of_surjective_modulation m hm hms)
+    f).elim fun a h ↦ ?_
+  refine h.elim fun e he ↦ ?_
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  have hFr : IsFrechetTVS (SchwartzBruhatStage e) :=
+    elementarySchwartz_isFrechet (m := e.realDim) (n := e.torusDim) (r := e.latticeRank) (F := e.finiteFactor)
+  let i : SchwartzBruhatStage e →L[ℂ] SchwartzBruhat G :=
+    ⟨schwartzBruhatStageInclusion a e, (schwartzBruhatStage_isEmbedding a e).continuous⟩
+  have hi (y : SchwartzBruhatStage e) (x : G) : i y x = schwartzBruhatStageRealization a e y x := rfl
+  refine (schwartzBruhatStage_average_retraction a e).elim fun r hr ↦ ?_
+  have hri : LeftInverse r i := hr.1
+  have hfix : i (r f) = f := by
+    refine he.2.elim fun y hy ↦ ?_
+    exact (congrArg (fun u ↦ i (r u)) hy.symm).trans ((congrArg i (hri y)).trans hy)
+  exact closed_stage_test hFr i r hri schwartzBruhatCyclicDifference S
+    (fun g hg ↦ schwartzBruhat_single_difference m hm hms g (hγS g hg))
+    (fun g _ ↦ schwartzBruhatStage_average_difference a e he.1 i hi r hr.2 g) f hf hfix
+
+section
+set_option linter.unusedSectionVars false
+
+local notation "de" => (fun g ↦ modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty)
+local notation "di" => (fun g ↦ modulatedCyclicDifference m g hm hms I hInt ⟨0, h0⟩)
+local notation "dt" => (schwartzBruhatCyclicDifference (G := G))
+local notation "z₀" => modulatedExponentialDecayTwist m I ⟨0, h0⟩
+
+include hm hms in
+private theorem decay_lf (U : Set ℝ) (hU : OrdConnected U) (hn : U.Nonempty) :
+    IsLFSpace (ModulatedExponentialDecay m U) := by
+  let t := exists_surjectiveModulation_section m hm hms
+  exact lfSpace_quotient_properties.1 (modulatedExponentialDecay_strictLF m U hm hU hn t.choose t.choose_spec)
+
+variable [MeasurableSpace G] [BorelSpace G]
+
+include hOpen hm hms hInt in
+private theorem cyclic_comparison_data (i : E →L[ℂ] V) (hi : ∀ f x, (i f).val x = f.val x)
+    (j : V →L[ℂ] T) (hj : ∀ f, j f = z₀ f) (g : G) (hg : 1 < (m g).val) :
+    ((∀ x, i x ∈ (di g).range → x ∈ (de g).range) ∧ ∀ y, ∃ x v, y = i x + di g v) ∧
+      (∀ y, j y ∈ (dt g).range → y ∈ (di g).range) ∧ ∀ z, ∃ y v, z = j y + dt g v := by
+  let evE : E → G → ℂ := fun x ↦ x.val
+  let evV : V → G → ℂ := fun x ↦ x.val
+  let z : V → T := fun f ↦ z₀ f
+  have hinj : Injective evV := Subtype.val_injective
+  have ex := modulatedIntervalDifference_quotient_equivs m g hm hms hg I hOpen hInt h0
+  let p := compare_factor_on_representatives (L := G) (X := E) (Y := V) (Z := T)
+    evE evV hinj i j z hj hi (de g) (di g) (dt g)
+  with_reducible_and_instances
+    exact p ex
+private theorem decay_comparison_commute (i : E →L[ℂ] V) (hi : ∀ f x, (i f).val x = f.val x) :
+    ∀ g f, i (de g f) = di g (i f) :=
+  commute_difference_of_evaluation (fun x : E ↦ x.val) (fun y : V ↦ y.val) Subtype.val_injective
+    i hi de di (fun g ↦ modulatedCyclicDifference_apply m g hm hms univ ordConnected_univ univ_nonempty)
+    (fun g ↦ modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩)
+
+private theorem schwartz_comparison_commute (j : V →L[ℂ] T) (hj : ∀ f x, j f x = f.val x) :
+    ∀ g f, j (di g f) = dt g (j f) :=
+  commute_difference_of_evaluation (fun x : V ↦ x.val) (fun y : T ↦ y.val) Subtype.val_injective
+    j hj di dt (fun g ↦ modulatedCyclicDifference_apply m g hm hms I hInt ⟨0, h0⟩)
+    (fun g ↦ schwartzBruhatCyclicDifference_apply g)
+
+include hS hγS hOpen in
+private theorem ambient_given_inclusion (i : E →L[ℂ] V) (hi : ∀ f x, (i f).val x = f.val x) :
+    let N := (S.map de).prod.range
+    let M := (S.map di).prod.range
+    let R := (S.map dt).prod.range
+    ∃ (F : (E ⧸ N) ≃L[ℂ] (V ⧸ M)) (J : (V ⧸ M) ≃L[ℂ] (T ⧸ R)),
+      (∀ f, F (N.mkQ f) = M.mkQ (i f)) ∧
+      ∀ f, J (M.mkQ f) = R.mkQ (z₀ f) := by
+  intro N M R
+  let j : V →L[ℂ] T := ⟨z₀, modulatedExponentialDecay_zeroTwist_continuous m hm hms I hInt h0⟩
+  have hj := (modulatedExponentialDecay_zeroTwist_injective m I h0).2
+  have hc := cyclic_comparison_data m hm hms I hOpen hInt h0 i hi j (fun _ ↦ rfl)
+  have commute := schwartz_comparison_commute m hm hms I hInt h0 j hj
+  have hinj : Injective j := (modulatedExponentialDecay_zeroTwist_injective m I h0).1
+  let e := (modulatedExponentialDecay_singleton_schwartz m hm hms 0).choose
+  have hV := decay_lf m hm hms I hInt ⟨0, h0⟩
+  have htinj (g : G) (hg : g ∈ S) := (schwartzBruhat_single_difference m hm hms g (hγS g hg)).1
+  have hIinj (g : G) (hg : g ∈ S) : Injective (di g) := fun x y he ↦
+    hinj (htinj g hg ((commute g x).symm.trans ((congrArg j he).trans (commute g y))))
+  have hJ := comparison_equiv_of_product hV
+    (decay_lf m hm hms {0} ordConnected_singleton (singleton_nonempty _)) e j di dt S
+    (fun a _ ↦ commute a) htinj (fun a ha ↦ (hc a (hγS a ha)).2)
+    (ordinary_product_range_closed m hm hms S hS hγS)
+  have hF := comparison_equiv_of_product (decay_lf m hm hms univ ordConnected_univ univ_nonempty)
+    hV (ContinuousLinearEquiv.refl ℂ V) i de di S
+    (fun a _ ↦ decay_comparison_commute m hm hms I hInt h0 i hi a) hIinj
+    (fun a ha ↦ (hc a (hγS a ha)).1) hJ.1
+  with_reducible_and_instances
+    exact hF.2.elim fun F hf ↦ hJ.2.elim fun J hj ↦ ⟨F, J, hf, hj⟩
+
+include hS hγS hOpen hm hms hInt h0 in
+private theorem comparison_inclusion_exists : ∃ i : E →L[ℂ] V, ∀ f x, (i f).val x = f.val x := by
+  let g := (S.exists_mem_of_ne_nil hS).choose
+  have hg := hγS g (S.exists_mem_of_ne_nil hS).choose_spec
+  have h := modulatedIntervalDifference_quotient_equivs m g hm hms hg I hOpen hInt h0
+  with_reducible_and_instances
+    exact h.elim fun i rest ↦ rest.elim fun F rest ↦ rest.elim fun J data ↦ ⟨i, data.1⟩
+
+include hS hγS hOpen in
+private theorem ambient_difference_quotient_equivalences :
+    let N := (S.map de).prod.range
+    let M := (S.map di).prod.range
+    let R := (S.map dt).prod.range
+    ∃ (i : E →L[ℂ] V) (F : (E ⧸ N) ≃L[ℂ] (V ⧸ M)) (J : (V ⧸ M) ≃L[ℂ] (T ⧸ R)),
+      (∀ f x, (i f).val x = f.val x) ∧ (∀ f, F (N.mkQ f) = M.mkQ (i f)) ∧
+      ∀ f, J (M.mkQ f) = R.mkQ (z₀ f) := by
+  have inc := comparison_inclusion_exists m hm hms S hS hγS I hOpen hInt h0
+  have build := ambient_given_inclusion m hm hms S hS hγS I hOpen hInt h0
+  with_reducible_and_instances
+    exact inc.elim fun i hi ↦ (build i hi).elim fun F rest ↦ rest.elim fun J data ↦ ⟨i,F,J,hi,data⟩
+
+private theorem zeroTwist_asFunction_injective : Injective (fun f : V ↦ z₀ f) := by
+  have ev (p : V) (x : G) : z₀ p x = p.val x := (modulatedExponentialDecay_zeroTwist_injective m I h0).2 p x
+  exact fun x y h ↦ Subtype.ext (funext fun a ↦ (ev x a).symm.trans
+    ((congrArg (fun p : T ↦ p a) h).trans (ev y a)))
+
+private theorem zeroTwist_product (s : List G) (f : V) :
+    z₀ ((s.map di).prod f) = (s.map dt).prod (z₀ f) := by
+  let j : V →L[ℂ] T := ⟨z₀, modulatedExponentialDecay_zeroTwist_continuous m hm hms I hInt h0⟩
+  have hj (v : V) (x : G) : j v x = v.val x := (modulatedExponentialDecay_zeroTwist_injective m I h0).2 v x
+  have comm := schwartz_comparison_commute m hm hms I hInt h0 j hj
+  exact map_commutes_prod (X := V) (Y := T) j di dt comm s f
+
+private theorem zeroTwist_inclusion_eq (i : E →L[ℂ] V) (h : ∀ f x, (i f).val x = f.val x) (f : E) :
+    z₀ (i f) = modulatedExponentialDecayTwist m univ ⟨0, mem_univ _⟩ f := by
+  refine Subtype.ext (funext fun x ↦ ?_)
+  exact ((modulatedExponentialDecay_zeroTwist_injective m I h0).2 (i f) x).trans
+    ((h f x).trans ((modulatedExponentialDecay_zeroTwist_injective m univ (mem_univ _)).2 f x).symm)
+
+local notation "D₀" => (S.map de).prod
+local notation "D₁" => (S.map di).prod
+local notation "D₂" => (S.map dt).prod
+local notation "zE" => modulatedExponentialDecayTwist m univ ⟨0, mem_univ (0 : ℝ)⟩
+variable (μ₁ : Measure m.toMonoidHom.ker) [μ₁.IsHaarMeasure]
+variable (η : PontryaginDual m.toMonoidHom.ker)
+local notation "H₁" => modulatedDecayIsotype m I h0 η
+local notation "H₂" => actionIsotype ρK η
+
+include μ₁ in
+private theorem compare_full_interval_isotypes (i : E →L[ℂ] V) (hi : ∀ f x, (i f).val x = f.val x)
+    (F : (E ⧸ (D₀).range) ≃L[ℂ] (V ⧸ (D₁).range))
+    (hF : ∀ f, F ((D₀).range.mkQ f) = (D₁).range.mkQ (i f)) :
+    let N := ((H₀[η]).map (D₀).toLinearMap).comap (H₀[η]).subtype
+    let M := ((H₁).map (D₁).toLinearMap).comap (H₁).subtype
+    F '' ((D₀).range.mkQ '' (H₀[η] : Set E)) = (D₁).range.mkQ '' (H₁ : Set V) ∧
+      ∃ J : (H₀[η] ⧸ N) ≃L[ℂ] (H₁ ⧸ M), ∀ f : H₀[η], ∃ g : H₁,
+        g.val = i f.val ∧ J (N.mkQ f) = M.mkQ g := by
+  let z : E → T := fun f ↦ zE f
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ η
+  have hz := zeroTwist_asFunction_injective m univ (mem_univ (0 : ℝ))
+  have hw := zeroTwist_asFunction_injective m I h0
+  have hiw := zeroTwist_inclusion_eq m I h0 i hi
+  let ze : E →L[ℂ] T := ⟨zE, modulatedExponentialDecay_zeroTwist_continuous m hm hms univ ordConnected_univ (mem_univ _)⟩
+  have je (f : E) (t : G) : ze f t = f.val t := (modulatedExponentialDecay_zeroTwist_injective m univ (mem_univ _)).2 f t
+  have com (g : G) (f : E) : ze (de g f) = dt g (ze f) := by
+    refine Subtype.ext (funext fun t ↦ ?_)
+    exact (je _ t).trans ((modulatedCyclicDifference_apply m g hm hms univ ordConnected_univ univ_nonempty f t).trans
+      ((congrArg₂ (· - ·) (je f t).symm (je f (g*t)).symm).trans (schwartzBruhatCyclicDifference_apply g (ze f) t).symm))
+  have hA (f : E) : z (D₀ f) = D₂ (z f) := map_commutes_prod (X := E) (Y := T) ze de dt com S f
+  have hB := zeroTwist_product m hm hms I hInt h0 S
+  have pc := ordinary_projector_product m hm μ₁ η S
+  unfold schwartzBruhatDifferenceProduct at pc
+  have px := decay_projection_data m hm hms μ₁ η univ ordConnected_univ (mem_univ _)
+  have py := decay_projection_data m hm hms μ₁ η I hInt h0
+  let A := D₀
+  let B := D₁
+  let C := D₂
+  with_reducible_and_instances
+    have comp := compare_from_projectors (P := P) C pc px py
+    have q := comp A B i hz hw hiw hA hB
+    exact q F hF
+
+include μ₁ in
+private theorem compare_interval_ordinary_isotypes (J : (V ⧸ (D₁).range) ≃L[ℂ] (T ⧸ (D₂).range))
+    (hJ : ∀ f, J ((D₁).range.mkQ f) = (D₂).range.mkQ (z₀ f)) :
+    let N := ((H₁).map (D₁).toLinearMap).comap (H₁).subtype
+    let M := ((H₂).map (D₂).toLinearMap).comap (H₂).subtype
+    J '' ((D₁).range.mkQ '' (H₁ : Set V)) = (D₂).range.mkQ '' (H₂ : Set T) ∧
+      ∃ F : (H₁ ⧸ N) ≃L[ℂ] (H₂ ⧸ M), ∀ f : H₁, ∃ g : H₂,
+        g.val = z₀ f.val ∧ F (N.mkQ f) = M.mkQ g := by
+  let z : V → T := fun f ↦ z₀ f
+  let j : V →L[ℂ] T := ⟨z₀, modulatedExponentialDecay_zeroTwist_continuous m hm hms I hInt h0⟩
+  let P := schwartzBruhatIsotypicProjector m hm μ₁ η
+  have hz := zeroTwist_asFunction_injective m I h0
+  have hB := zeroTwist_product m hm hms I hInt h0 S
+  have hi (f : V) : id (j f) = z f := rfl
+  have hp := ordinary_isotypicProjector_mem m hm μ₁ η
+  have hf := schwartzBruhatIsotypicProjector_apply_isotype m hm μ₁ η
+  have pc := ordinary_projector_product m hm μ₁ η S
+  unfold schwartzBruhatDifferenceProduct at pc
+  have px := decay_projection_data m hm hms μ₁ η I hInt h0
+  have py : IsotypicProjectionLift (X := T) (Y := T) id P H₂ := ⟨P, fun _ ↦ rfl, hp, hf⟩
+  let B := D₁
+  let C := D₂
+  have hC (y : T) : id (C y) = C (id y) := rfl
+  with_reducible_and_instances
+    have comp := compare_from_projectors (P := P) C pc px py
+    have q := comp B C j hz injective_id hi hB hC
+    exact q J hJ
+
+end
 
 include hS hγS hOpen in
 /-- Paper: Corollary 4.6.3.1, pp. 219–220. The two canonical inclusions
@@ -993,13 +2413,28 @@ theorem modulatedDifferenceProduct_quotient_equivs :
         let H₁ := modulatedDecayIsotype m I h0 η
         let H₂ := actionIsotype ρK η
         F '' (R₀.mkQ '' (H₀[η] : Set E)) = R₁.mkQ '' (H₁ : Set V) ∧
-          J '' (R₁.mkQ '' (H₁ : Set V)) = R₂.mkQ '' (H₂ : Set T) := by sorry
+          J '' (R₁.mkQ '' (H₁ : Set V)) = R₂.mkQ '' (H₂ : Set T) := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  have : CompactSpace K := isCompact_iff_compactSpace.mp
+    (hm.1.isCompact_preimage (isCompact_singleton (x := 1)))
+  let μ₁ : Measure K := Measure.haar
+  have : μ₁.IsHaarMeasure := inferInstanceAs (Measure.haar (G := K)).IsHaarMeasure
+  have aq := ambient_difference_quotient_equivalences m hm hms S hS hγS I hOpen hInt h0
+  have cmpE := compare_full_interval_isotypes m hm hms S I hInt h0 μ₁
+  have cmpI := compare_interval_ordinary_isotypes m hm hms S I hInt h0 μ₁
+  unfold modulatedDifferenceProduct schwartzBruhatDifferenceProduct
+  with_reducible_and_instances
+    refine aq.elim fun i qi ↦ qi.elim fun F qF ↦ qF.elim fun J h ↦ ?_
+    exact ⟨i, F, J, h.1, h.2.1, h.2.2, fun η ↦
+      ⟨(cmpE η i h.1 F h.2.1).1, (cmpI η J h.2.2).1⟩⟩
 
 include hm hms hS hγS in
 /-- Paper: Corollary 4.6.3.1, p. 220. The ordinary product range is closed.
 The two equivalences in (4.6.3.1) therefore identify Hausdorff quotients. -/
 theorem schwartzBruhatDifferenceProduct_isClosed_range :
-    IsClosed ((ΔT).range : Set (SchwartzBruhat G)) := by sorry
+    IsClosed ((ΔT).range : Set (SchwartzBruhat G)) := by
+  exact ordinary_product_range_closed m hm hms S hS hγS
 
 include hS hγS hOpen in
 /-- Paper: Corollary 4.6.3.1, pp. 219–220. On each norm-one isotype the
@@ -1013,6 +2448,26 @@ theorem modulatedIsotypicDifferenceProduct_quotient_equivs :
     let R₂ := (H₂.map (ΔT).toLinearMap).comap H₂.subtype
     ∃ (F : (H ⧸ R₀) ≃L[ℂ] (H₁ ⧸ R₁)) (J : (H₁ ⧸ R₁) ≃L[ℂ] (H₂ ⧸ R₂)),
       (∀ f : H, ∃ g : H₁, (∀ x, g.val.val x = f.val.val x) ∧ F (R₀.mkQ f) = R₁.mkQ g) ∧
-      ∀ g : H₁, ∃ h : H₂, (∀ x, h.val x = g.val.val x) ∧ J (R₁.mkQ g) = R₂.mkQ h := by sorry
+      ∀ g : H₁, ∃ h : H₂, (∀ x, h.val x = g.val.val x) ∧ J (R₁.mkQ g) = R₂.mkQ h := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  have : CompactSpace K := isCompact_iff_compactSpace.mp
+    (hm.1.isCompact_preimage (isCompact_singleton (x := 1)))
+  let μ₁ : Measure K := Measure.haar
+  have : μ₁.IsHaarMeasure := inferInstanceAs (Measure.haar (G := K)).IsHaarMeasure
+  have aq := ambient_difference_quotient_equivalences m hm hms S hS hγS I hOpen hInt h0
+  have cmpE := compare_full_interval_isotypes m hm hms S I hInt h0 μ₁ ω
+  have cmpI := compare_interval_ordinary_isotypes m hm hms S I hInt h0 μ₁ ω
+  let evalV : V → G → ℂ := fun v ↦ v.val
+  have ev (v : V) (x : G) : j₀ v x = v.val x :=
+    (modulatedExponentialDecay_zeroTwist_injective m I h0).2 v x
+  unfold modulatedDifferenceProduct schwartzBruhatDifferenceProduct
+  with_reducible_and_instances
+    refine aq.elim fun i qi ↦ qi.elim fun F qF ↦ qF.elim fun J h ↦ ?_
+    refine (cmpE i h.1 F h.2.1).2.elim fun A ha ↦ (cmpI J h.2.2).2.elim fun B hb ↦ ?_
+    refine ⟨A, B, fun f ↦ (ha f).elim fun g hg ↦ ⟨g, fun x ↦ ?_, hg.2⟩,
+      fun g ↦ (hb g).elim fun t ht ↦ ⟨t, fun x ↦ ?_, ht.2⟩⟩
+    · exact (congrArg (fun v : V ↦ evalV v x) hg.1).trans (h.1 f.val x)
+    · exact (congrArg (fun v : T ↦ v x) ht.1).trans (ev g.val x)
 
 end RiemannMasullo

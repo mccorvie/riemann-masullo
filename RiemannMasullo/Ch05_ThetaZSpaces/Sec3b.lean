@@ -346,7 +346,16 @@ theorem mem_archimedeanFlatSchwartz_of_tsupport (f : 𝓢(archAdd(ι, κ), ℂ))
 /-- Paper: Lemma 5.3.3.3(3), p. 252.
 The subspace of Schwartz functions with all jets zero on the coordinate hyperplanes is closed. -/
 theorem archimedeanFlatSchwartz_isClosed :
-    IsClosed (↑(archimedeanFlatSchwartz (ι := ι) (κ := κ)) : Set 𝓢(archAdd(ι, κ), ℂ)) := by sorry
+    IsClosed (↑(archimedeanFlatSchwartz (ι := ι) (κ := κ)) : Set 𝓢(archAdd(ι, κ), ℂ)) := by
+  simp only [archimedeanFlatSchwartz, Submodule.coe_iInf]
+  refine isClosed_iInter fun x ↦ isClosed_iInter fun n ↦ isClosed_iInter fun v ↦ ?_
+  let J := (TemperedDistribution.delta x.val).comp
+    (LineDeriv.iteratedLineDerivOpCLM ℂ 𝓢(archAdd(ι, κ), ℂ) v)
+  have hJ : (archimedeanSchwartzJet_isLinear n x.val v).mk' _ = J.toLinearMap := by
+    ext f
+    exact SchwartzMap.iteratedLineDerivOp_eq_iteratedFDeriv.symm
+  rw [hJ]
+  exact J.isClosed_ker
 
 -- TODO(paper-gap): The estimates (5.3.3.21)–(5.3.3.23) fail for bumps
 -- supported close to, but away from, the origin.
