@@ -3,6 +3,8 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.AppC_LCTVS.Sec3b
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+
+import all RiemannMasullo.Ch09_HardySobolev.Sec3
 import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
 public import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
 
@@ -398,7 +400,11 @@ theorem geometricLineTruncatedKernel_hilbertSchmidt (_ha : 0 < a)
 
 /-- Paper: Definition 10.4.3.2, p. 470. The two line representatives are measurable. -/
 theorem globalLineKernels_measurable :
-    Measurable (kLine : C𝔽 × C𝔽 → ℂ) ∧ Measurable geomLine := by sorry
+    Measurable (kLine : C𝔽 × C𝔽 → ℂ) ∧ Measurable geomLine := by
+  have hk : Measurable (kLine : C𝔽 × C𝔽 → ℂ) := (Lp.stronglyMeasurable kLine).measurable
+  have hφ : Continuous φ.val :=
+    continuous_of_bruhatSmooth ((mem_bruhatSmoothSubmodule_iff _).mp φ.property.1)
+  exact ⟨hk, (hφ.comp (continuous_fst.mul continuous_snd.inv)).measurable.sub hk⟩
 
 end LineRepresentatives
 
