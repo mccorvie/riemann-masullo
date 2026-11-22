@@ -978,7 +978,10 @@ theorem modulatedExponentialDecay_tensor_equivariant
 
 include hSC hm hInt hne hτ in
 /-- Paper: Theorem D.3.3.7(1), p. 806. The tensor isomorphism on a quotient
-stage commutes with the two inclusions into the full spaces.
+stage commutes with the two inclusions into the full spaces, and the inclusion of the stage is
+continuous for the locally convex topology of the full decay space. (The inclusion is declared
+with the bare submodule as its target, so the topology is named explicitly here: without that,
+Lean takes the topology of pointwise convergence.)
 Deviation: The subgroup on the norm-one factor is the restriction of k to that factor. -/
 theorem modulatedExponentialDecay_tensor_stage
     (e : Completion T ≃L[ℂ] E)
@@ -994,8 +997,8 @@ theorem modulatedExponentialDecay_tensor_stage
       (∀ (h : SchwartzBruhat (K ⧸ k₁)) (f : P) (u : K) (t : ℝ≥0ˣ),
         (eₖ (Completion.coe' (α := Tₖ) (h ⊗ₜ[ℂ] f))).val
           (((u : G) * τ t : G) : G ⧸ k.val) = h (u : K ⧸ k₁) * f.val (Real.log (t.val : ℝ))) ∧
-      Continuous (modulatedExponentialDecayStageInclusion m I k :
-        ModulatedExponentialDecayStage m I k → E) ∧
+      @Continuous (ModulatedExponentialDecayStage m I k) E _ _
+        (modulatedExponentialDecayStageInclusion m I k) ∧
       ∀ z : Completion Tₖ,
         modulatedExponentialDecayStageInclusion m I k (eₖ z) =
           e (Completion.map (inductiveTensorMap j.toLinearMap
