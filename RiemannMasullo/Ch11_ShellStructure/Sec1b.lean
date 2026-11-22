@@ -233,7 +233,8 @@ theorem sLocalCutoffCarving_le {S : Finset V} (χ : PontryaginDual C𝔽)
     let J := J(twoSided, Λ)
     let hJ : MeasurableSet J := hJ(twoSided, Λ)
     sLocalCutoffCarving s (ωOf(χ)) i'.val J hJ ≤
-      sLocalCutoffCarving s (ωOf(χ)) i.val J hJ := by sorry
+      sLocalCutoffCarving s (ωOf(χ)) i.val J hJ := by
+  exact sLocalCutoffCarving_antitone s (ωOf(χ)) _ _ _hii'
 
 -- TODO(paper-gap): In (11.1.2.16) eventual equality gives equality at all
 -- earlier radii by applying their nested cutoffs. The representatives can vary
