@@ -279,7 +279,63 @@ place of `ℚ`, take the trivial local character, `a = 2`, and a smooth
 logarithmic bump supported in `(-1,1)` with value one at zero. On `x > 1`
 the two samples vanish, so the upper truncation is exactly `log R` for `R > 1`. -/
 theorem Printed.heckeArchimedean_integral_convergesAtTop_false :
-    ¬ Printed.heckeArchimedean_integral_convergesAtTop := by sorry
+    ¬ Printed.heckeArchimedean_integral_convergesAtTop := by
+  intro h
+  let β : ContDiffBump (0 : ℝ) := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
+  have hβ1 : β 0 = 1 := β.one_of_mem_closedBall (Metric.mem_closedBall_self (by norm_num))
+  have hcs : HasCompactSupport (fun x ↦ (β x : ℂ)) :=
+    β.hasCompactSupport.comp_left Complex.ofReal_zero
+  let f : 𝓢(ℝ, ℂ) := hcs.toSchwartzMap (Complex.ofRealCLM.contDiff.comp β.contDiff)
+  have hf : ∀ x, f x = β x := fun _ ↦ rfl
+  have hts : tsupport (f : ℝ → ℂ) ⊆ Metric.closedBall 0 (1 / 2) := by
+    refine (tsupport_comp_subset Complex.ofReal_zero _).trans ?_
+    rw [β.tsupport_eq]
+  have hout : ∀ x : ℝ, 1 / 2 < |x| → x ∉ tsupport (f : ℝ → ℂ) := by
+    intro x hx hmem
+    have := hts hmem
+    rw [Metric.mem_closedBall, Real.dist_eq, sub_zero] at this
+    linarith
+  have hzero : ∀ x : ℝ, 1 / 2 < |x| → f x = 0 := fun x hx ↦
+    image_eq_zero_of_notMem_tsupport (hout x hx)
+  have hder : ∀ (j : ℕ) (x : ℝ), 1 / 2 < |x| → iteratedDeriv j (f : ℝ → ℂ) x = 0 := by
+    intro j x hx
+    rw [iteratedDeriv_eq_iteratedFDeriv,
+      image_eq_zero_of_notMem_tsupport (fun hm ↦ hout x hx (tsupport_iteratedFDeriv_subset j hm))]
+    rfl
+  have hdec : ExponentialDecay f := by
+    refine ⟨fun j A _ ↦ ?_, fun j A _ ↦ ?_⟩
+    · refine EventuallyEq.trans_isBigO ?_ (Asymptotics.isBigO_zero _ _)
+      filter_upwards [eventually_gt_atTop (1 / 2 : ℝ)] with x hx
+      exact hder j x (by rw [abs_of_pos (by linarith)]; exact hx)
+    · refine EventuallyEq.trans_isBigO ?_ (Asymptotics.isBigO_zero _ _)
+      filter_upwards [eventually_lt_atBot (-(1 / 2) : ℝ)] with x hx
+      exact hder j x (by rw [abs_of_neg (by linarith)]; linarith)
+  obtain ⟨tail, ht⟩ :=
+    h ℚ Rat.infinitePlace 1 0 ⟨by simp, fun t ht ↦ by simp⟩ 2 (by norm_num) f hdec
+  have hN : (InfinitePlace.mult Rat.infinitePlace : ℝ) = 1 := by
+    simp [InfinitePlace.mult, Rat.isReal_infinitePlace]
+  have hlog : ∀ R : ℝ, 1 ≤ R → (∫ x in Ioc 1 R,
+      ((InfinitePlace.mult Rat.infinitePlace : ℝ) : ℂ) * f 0 / (x : ℂ) -
+        (f x * Complex.exp (0 * (x : ℂ)) + f (-x) * Complex.exp (-0 * (x : ℂ))) *
+          (Real.exp ((2 / (InfinitePlace.mult Rat.infinitePlace : ℝ) - 1 / 2) * x) : ℂ) /
+            (1 - (Real.exp (-(2 / (InfinitePlace.mult Rat.infinitePlace : ℝ) * x)) : ℂ))) =
+      (Real.log R : ℂ) := by
+    intro R hR
+    rw [setIntegral_congr_fun measurableSet_Ioc (g := fun x : ℝ ↦ ((x⁻¹ : ℝ) : ℂ))
+      (fun x hx ↦ by
+        have hx1 : 1 / 2 < |x| := by rw [abs_of_pos (by linarith [hx.1])]; linarith [hx.1]
+        have hx2 : 1 / 2 < |-x| := by rwa [abs_neg]
+        rw [hzero x hx1, hzero (-x) hx2, hN, hf, hβ1]
+        push_cast
+        ring)]
+    rw [integral_complex_ofReal, ← intervalIntegral.integral_of_le hR,
+      integral_inv_of_pos one_pos (by linarith), div_one]
+  have hre := (Complex.continuous_re.tendsto _).comp ht
+  refine not_tendsto_nhds_of_tendsto_atTop Real.tendsto_log_atTop _
+    (hre.congr' ?_)
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with R hR
+  simp only [Function.comp_apply]
+  rw [hlog R hR, Complex.ofReal_re]
 
 local notation "𝒮ₐ(" K ")" => SchwartzBruhat (Multiplicative K)
 local notation "𝒟(" G ")" => BruhatCompactSupport G
