@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec2
+
+import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 
 /-! # §10.2 assertions that are false as printed -/
@@ -268,7 +270,22 @@ def Printed.spectralStripJet_not_subset_ball_singleton : Prop :=
 I = {0}. On that strip every Hecke L-function is zero-free, so the empty
 family is contained in every open ball. -/
 theorem Printed.spectralStripJet_not_subset_ball_singleton_false :
-    ¬ Printed.spectralStripJet_not_subset_ball_singleton := by sorry
+    ¬ Printed.spectralStripJet_not_subset_ball_singleton := by
+  intro hall
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice ℚ
+  obtain ⟨_, _, hn⟩ := hall ℚ χ hχ 2 2 (by norm_num)
+  apply hn
+  intro ω t k hk
+  let z := shift((2 : ℝ), t)
+  have hz : 1 < z.re := by norm_num [z]
+  have hval : continuedCompletedHeckeL (χ ω) z ≠ 0 := by
+    rw [show continuedCompletedHeckeL (χ ω) z = completedHeckeL (χ ω) ⟨z, hz⟩ from
+      (continuedCompletedHeckeL_spec (χ ω)).2 ⟨z, hz⟩]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos (χ ω) (zero_lt_one.trans hz))
+      (finiteHeckeL_ne_zero_of_one_lt_re (χ ω) ⟨z, hz⟩)
+  have horder := ((continuedCompletedHeckeL_spec (χ ω)).1 (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hval
+  simp [z] at horder
+  simp [horder] at hk
 
 /-- Paper: Corollary 10.2.2.3, p. 447. The printed index requires an
 ordinate from the a-line. The conclusion identifies the normalized family
