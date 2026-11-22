@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
+import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 
 /-! # Structure Theorem V: isotypic exhaustiveness
 
@@ -464,6 +465,28 @@ theorem infiniteStandardThetaAverage_logBound (χ : PontryaginDual Iₛ(S))
 
 end StandardFunctions
 
+/-- Pullback along the unique real coordinate identifies real Schwartz functions with
+the rational adelic test functions at the stage with no finite places. -/
+private theorem ratTrivialHomogeneousTheta_quotient_realEquiv :
+    ∃ E : SchwartzMap ℝ ℂ ≃L[ℂ] ℬ(SAdeleRing ℚ ∅),
+      ∀ (f : SchwartzMap ℝ ℂ) (x : SAdeleRing ℚ ∅),
+        E f (Multiplicative.ofAdd x) = f (InfinitePlace.Completion.ringEquivRealOfIsReal
+          Rat.isReal_infinitePlace (x.1 Rat.infinitePlace)) := by
+  let D : Type := (v : (∅ : Finset (HeightOneSpectrum (𝓞 ℚ)))) → v.val.adicCompletion ℚ
+  let _ : Unique D := uniqueOfSubsingleton 0
+  let real : Rat.infinitePlace.Completion ≃ᵢ ℝ :=
+    InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  let coord : SAdeleRing ℚ ∅ ≃ₜ ℝ := (Homeomorph.prodUnique (InfiniteAdeleRing ℚ) D).trans
+    ((Homeomorph.piUnique (fun v : InfinitePlace ℚ ↦ v.Completion)).trans real.toHomeomorph)
+  let e : Multiplicative (SAdeleRing ℚ ∅) ≃ₜ* Multiplicative ℝ :=
+    ContinuousMulEquiv.mk' coord fun x y ↦
+      (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace).map_add
+        (x.toAdd.1 Rat.infinitePlace) (y.toAdd.1 Rat.infinitePlace)
+  with_reducible refine realSchwartzBruhat_equiv.elim fun R hR ↦ ?_
+  refine ⟨R.trans (schwartzBruhatPullbackEquiv e), ?_⟩
+  intro f x
+  exact hR f (coord x)
+
 /-- Paper: Example 6.2.2.2, p. 299.
 The trivial homogeneous theta space over the rationals is a topological linear
 quotient of real Schwartz functions, inserted with the integer indicator at every finite place. -/
@@ -475,6 +498,37 @@ theorem ratTrivialHomogeneousTheta_quotient :
           f (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
             (x Rat.infinitePlace))) →
         q f = (LinearMap.ker (homogeneousAdelicThetaLinearMap ℚ 1)).mkQ
-          (sAdeleSchwartzToGlobal ℚ ∅ (sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g)) := by sorry
+          (sAdeleSchwartzToGlobal ℚ ∅ (sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g)) := by
+  have hω : NormOneCharacterUnramifiedOutside (F := ℚ) 1 ∅ := by
+    refine ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ ?_⟩
+    rfl
+  with_reducible refine ratTrivialHomogeneousTheta_quotient_realEquiv.elim fun E hE ↦ ?_
+  with_reducible refine (sLocalHomogeneousThetaToGlobal_equiv_of_unramified
+    (F := ℚ) (S := ∅) (ω := 1) ?_ hω).elim fun T hT ↦ ?_
+  · rw [Finset.coe_empty, integer_empty]
+    let e := (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)).toRingEquiv
+    let i := Rat.ringOfIntegersEquiv.symm.trans e.symm
+    let := IsPrincipalIdealRing.of_surjective i i.surjective
+    infer_instance
+  let K := (sLocalHomogeneousAdelicThetaLinearMap ℚ ∅
+    (sLocalNormOneCharacter (F := ℚ) ∅ 1 hω)).ker
+  refine ⟨T.toContinuousLinearMap.comp (K.mkQL.comp E.toContinuousLinearMap), ?_, ?_⟩
+  · change IsOpenQuotientMap (T.toHomeomorph ∘ (K.mkQL ∘ E.toHomeomorph))
+    exact T.toHomeomorph.isOpenQuotientMap.comp
+      (K.isOpenQuotientMap_mkQL.comp E.toHomeomorph.isOpenQuotientMap)
+  intro f g hg
+  have hfg : E f = sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g := by
+    refine Subtype.ext (funext fun (x : Multiplicative (SAdeleRing ℚ ∅)) ↦ ?_)
+    have h := sLocalStandardThetaTensor_apply (F := ℚ) (S := ∅) 1 g x.toAdd
+    have ht : sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g x =
+        g (Multiplicative.ofAdd x.toAdd.1) :=
+      h.trans ((congrArg (g (Multiplicative.ofAdd x.toAdd.1) * ·)
+        (Fintype.prod_empty _)).trans (mul_one _))
+    exact ((hE f x.toAdd).trans (hg x.toAdd.1).symm).trans ht.symm
+  let t := sLocalStandardThetaTensor (F := ℚ) (S := ∅) 1 g
+  change T.toLinearMap (K.mkQ (E f)) = _
+  have hrep := sLocalHomogeneousThetaToGlobal_mk (F := ℚ) (S := ∅) (ω := 1) hω t
+  have hglobal := LinearMap.congr_fun hT (K.mkQ t)
+  with_reducible exact (congrArg (fun b ↦ T.toLinearMap (K.mkQ b)) hfg).trans (hglobal.trans hrep)
 
 end RiemannMasullo
