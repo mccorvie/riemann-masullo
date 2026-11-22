@@ -172,7 +172,29 @@ theorem tendsto_dSequenceKernelSmoothening_diagonal_weak :
     let d := fun x ↦ dSequenceKernelSmoothening μ U κ (x, x)
     (∀ n, Integrable (ds n) ν) ∧ Integrable d ν ∧
       ∀ ρ : Lp ℂ ∞ ν, Tendsto (fun n ↦ ∫ x, ρ x * ds n x ∂ν) atTop
-        (𝓝 (∫ x, ρ x * d x ∂ν)) := by sorry
+        (𝓝 (∫ x, ρ x * d x ∂ν)) := by
+  refine ⟨fun n ↦ (integral_dSequenceKernelSmoothening_diagonal
+    (hκs n) hU hBorel hf hf_pos hν (hSn n)).1,
+    (integral_dSequenceKernelSmoothening_diagonal hκ hU hBorel hf hf_pos hν hT).1, ?_⟩
+  intro ρ
+  let M := (ContinuousLinearMap.mul ℂ ℂ).holderL ν ∞ 2 2 ρ
+  let left (A : nuclearEndomorphisms (Lp ℂ 2 ν)) : nuclearEndomorphisms (Lp ℂ 2 ν) :=
+    ⟨M * A.val, mul_mem_nuclearEndomorphisms_left M A⟩
+  let Ts (n : ℕ) : nuclearEndomorphisms (Lp ℂ 2 ν) := ⟨(integralKernelOperator ν (ks n)).val, hSn n⟩
+  let T : nuclearEndomorphisms (Lp ℂ 2 ν) := ⟨(integralKernelOperator ν k).val, hT⟩
+  have hleft (n : ℕ) : left (Ts n) - left T = left (Ts n - T) := Subtype.ext (mul_sub ..).symm
+  obtain ⟨tr, htr⟩ := hilbertTrace_linear (H := Lp ℂ 2 ν)
+  have hlim : Tendsto (fun n ↦ hilbertTrace (left (Ts n))) atTop (𝓝 (hilbertTrace (left T))) := by
+    apply tendsto_iff_norm_sub_tendsto_zero.mpr
+    simp only [← htr, ← map_sub, hleft]
+    simp only [htr]
+    apply squeeze_zero (fun _ ↦ norm_nonneg _) (fun n ↦
+      (norm_hilbertTrace_le _).trans (traceNorm_mul_left_le M (Ts n - T)))
+    simpa only [mul_zero] using hS1.const_mul ‖M‖
+  have hn (n : ℕ) := (integral_mul_dSequenceKernelSmoothening_diagonal
+    (hκs n) hU hBorel hf hf_pos hν (hSn n) ρ).2
+  have h := (integral_mul_dSequenceKernelSmoothening_diagonal hκ hU hBorel hf hf_pos hν hT ρ).2
+  simpa only [hn, h] using hlim
 
 end FiniteRank
 
