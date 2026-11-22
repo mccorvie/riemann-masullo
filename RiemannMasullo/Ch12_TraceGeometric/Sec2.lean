@@ -102,7 +102,19 @@ def indentationAverage : C_c(G, ℂ) →ₗ[ℂ] C_c(Q, ℂ) where
 representative by integrating its inverse subgroup translates. -/
 theorem indentationAverage_apply (f : C_c(G, ℂ)) (x : G) :
     Integrable (fun h : H ↦ f ((h : G)⁻¹ * x)) μH ∧
-      indentationAverage H hH μH f (π x) = ∫ h : H, f ((h : G)⁻¹ * x) ∂μH := by sorry
+      indentationAverage H hH μH f (π x) = ∫ h : H, f ((h : G)⁻¹ * x) ∂μH := by
+  let : LocallyCompactSpace H := hH.locallyCompactSpace
+  let : TopologicalSpace.PseudoMetrizableSpace H :=
+    hH.isClosedEmbedding_subtypeVal.isInducing.pseudoMetrizableSpace
+  let e := TopologicalGroup.IsSES.ofClosedSubgroup H hH
+  have hinv (h : H) : e.pullback f x h⁻¹ = f ((h : G)⁻¹ * x) := by
+    rw [e.pullback_def]
+    simp [mul_comm]
+  constructor
+  · simpa only [hinv] using ((e.pullback f x).integrable (μ := μH)).comp_inv
+  · change e.pushforward μH f (π x) = _
+    rw [e.pushforward_apply_apply]
+    simpa only [hinv] using (integral_inv_eq_self (e.pullback f x) μH).symm
 
 /-- Paper: (12.2.1.6), p. 506. A regular positive measure upstairs lifts a quotient
 measure if its integrals on compactly supported continuous tests agree with the
