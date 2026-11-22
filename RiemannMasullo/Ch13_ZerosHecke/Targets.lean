@@ -45,7 +45,8 @@ on the half-plane of absolute convergence. -/
 theorem finiteHeckeL_unitaryHeckeCharacter (χ : HeckeCharacter (𝓞 K) K)
     (hχ : ∀ x, ‖χ x‖ = 1) (s : halfPlane) :
     finiteHeckeL (unitaryHeckeCharacterToPontryaginDual χ hχ) s = χ.LSeries s := by
-  sorry
+  unfold finiteHeckeL
+  rw [ideleClassNormTwist_unitaryHeckeCharacter_zero]
 
 /-- Two meromorphic functions agreeing to the right of one have the same
 meromorphic germ at every point, expressed as equality on a punctured neighborhood. -/
