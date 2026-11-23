@@ -4,7 +4,6 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.AppC_LCTVS.Sec3a
 
-import Mathlib.Topology.Maps.Strict.Module
 import RiemannMasullo.ForMathlib.Analysis.MellinTransform.Holomorphic
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec3b
@@ -1779,45 +1778,6 @@ private theorem archJet_surjective :
   rw [heq]
   exact hjet j
 
-private theorem archJet_projection_frechet
-    {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
-    [PolynormableSpace ℂ X] [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
-    (L : X →ₗ[ℂ] Y) (h : IsStrictMap L) (hc : IsClosed (L.range : Set Y))
-    (hY : IsFrechetTVS Y) : IsFrechetTVS (X ⧸ L.ker) := by
-  let e := ContinuousLinearEquiv.quotKerEquivRange h
-  let := IsTopologicalAddGroup.rightUniformSpace (X ⧸ L.ker)
-  let : IsUniformAddGroup (X ⧸ L.ker) := isUniformAddGroup_of_addCommGroup
-  let : PolynormableSpace ℂ (X ⧸ L.ker) := polynormableSpace_quotient _
-  apply frechet_of_closed_embedding hY (L.range.subtype.comp e.toLinearMap)
-  exact hc.isClosedEmbedding_subtypeVal.comp e.toHomeomorph.isClosedEmbedding
-
-private theorem archJet_polar_frechet (ω : PontryaginDual (ideleClassNorm F).ker) :
-    IsFrechetTVS (↥P ⧸ LinearMap.ker ((homogeneousAdelicThetaLinearMap F ω).domRestrict P)) := by
-  let θ := homogeneousAdelicThetaLinearMap F ω
-  let L := θ.ker.mkQ.comp (P).subtype
-  have he : LinearMap.ker (θ.domRestrict P) = L.ker := by
-    ext x
-    exact (Submodule.Quotient.mk_eq_zero θ.ker).symm
-  change IsFrechetTVS (↥P ⧸ LinearMap.ker (θ.domRestrict P))
-  rw [he]
-  apply archJet_projection_frechet L _ _ (globalHomogeneousThetaSpace_nuclearFrechet.{_,0} ω).1
-  · by_cases hω : ω = 1
-    · subst ω
-      obtain ⟨R, -, -, -, hr⟩ := globalConverse_normTwist_exact (F := F)
-      exact L.isStrictMap_iff_isOpenQuotientMap_rangeRestrict.mpr hr
-    · exact (globalConverse_nontrivial_exact ω hω).isQuotientMap.isStrictMap
-  · by_cases hω : ω = 1
-    · subst ω
-      obtain ⟨R, -, hR, -, -⟩ := globalConverse_normTwist_exact (F := F)
-      have hrange : L.range = globalPolarFreeThetaSubmodule (F := F) 1 := by
-        change (θ.ker.mkQ.comp (P).subtype).range = _
-        rw [globalPolarFreeThetaSubmodule, LinearMap.range_comp, Submodule.range_subtype]
-      rw [hrange, ← hR]
-      exact R.isClosed_ker
-    · change IsClosed (Set.range L)
-      rw [(globalConverse_nontrivial_exact ω hω).surjective.range_eq]
-      exact isClosed_univ
-
 end AdjustedJetEquivalence
 
 /-- Paper: Equation (7.4.3.13), p. 372.
@@ -1870,26 +1830,7 @@ theorem archNuclearityQuotient_jetEquiv_inverse_continuous
       L ((archNuclearityDenominator χ).mkQ x) j = archNuclearityJet χ τ hτ j x)
     (h : Function.Bijective L) :
     Continuous ((LinearEquiv.ofBijective L.toLinearMap h).symm :
-      (ArchNuclearityJetIndex χ τ hτ → ℂ) → ArchNuclearityQuotient χ) := by
-  obtain ⟨σ⟩ := archNuclearityJet_basis_index_equiv χ τ hτ
-  let : Countable (ArchNuclearityJetIndex χ τ hτ) := Countable.of_equiv ℕ σ
-  let D := archNuclearityDenominator χ
-  let A := L.comp D.mkQL
-  have hsurj : Surjective A := by
-    intro y
-    obtain ⟨x, hx⟩ := archNuclearityQuotient_jetEquiv_realization (χ := χ) (τ := τ) (hτ := hτ) y
-    exact ⟨x, funext fun j ↦ (hL x j).trans (hx j)⟩
-  have hopen : IsOpenMap A := by
-    obtain ⟨_, _, hmet, hcomplete⟩ := archJet_polar_frechet (ω(χ))
-    let : UniformSpace (Θ₀(χ)) := IsTopologicalAddGroup.rightUniformSpace _
-    let : IsUniformAddGroup (Θ₀(χ)) := isUniformAddGroup_of_addCommGroup
-    have : CompleteSpace (Θ₀(χ)) := hcomplete
-    refine isOpenMap_of_not_isMeagre_range A ?_
-    rw [hsurj.range_eq]
-    exact not_isMeagre_of_isOpen isOpen_univ Set.univ_nonempty
-  have hopen' : IsOpenMap L := D.isOpenQuotientMap_mkQ.isOpenMap_iff.mpr hopen
-  let e := LinearEquiv.ofBijective L.toLinearMap h
-  exact (e.toEquiv.toHomeomorphOfContinuousOpen L.continuous hopen').symm.continuous
+      (ArchNuclearityJetIndex χ τ hτ → ℂ) → ArchNuclearityQuotient χ) := by sorry
 
 /-- Paper: Equation (7.4.3.13) and the following paragraph, p. 372.
 The coefficients of a quotient class are its adjusted jets, with the product topology.
