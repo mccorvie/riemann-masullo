@@ -4,6 +4,8 @@ public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
 /-! # False assertions in §10.4.3 -/
 
@@ -153,17 +155,516 @@ def Printed.spectralLineKernel_extraWeight : Prop :=
           represents(F, 0, s, B, (fun p ↦ ((w(F, 0, s) p.2)⁻¹ : ℝ) • l p)) ↔
             l = printedClass(F, 0, s, h₀, hs₀(hs), K)
 
-/-- Paper: (10.4.3.25), p. 470. Take F = ℚ, s = 4 and a equal to the
-abscissa of the first positive-ordinate nontrivial zeta zero. A nonnegative
-smooth test supported in a sufficiently small log-norm band about zero has
-nonzero Mellin value there after shifting by a. The order-zero jet shows
-spectral projection after convolution is nonzero. Let h be its output-first
-Haar kernel. The displayed weighted integral would give
-h(x,y) = h(y,x)/w(y) locally almost everywhere. Swapping x,y forces h to
-vanish unless w(x)w(y)=1, a product-null set. Missing existence of a tensor
-would itself falsify the asserted existence and uniqueness. -/
+section ExtraKernelWeight
+
+open scoped ENNReal
+
+local notation "C" => C𝔽(ℚ)
+local notation "mQ" => m𝔽(ℚ)
+local notation "μC" => μ(ℚ)
+local notation "logQ" => logNorm(ℚ)
+local notation "d" => w(ℚ, 0, 2)
+local notation "νp" => ν(ℚ, 0, 2)
+local notation "νm" => ν'(ℚ, 0, 2)
+local notation "W₂" => W(ℚ, 0, 2)
+local notation "hs₂" => (show (0 : ℝ) ≤ 2 by norm_num)
+
+private theorem extraWeight_density (g : C) : d g = 1 + logQ g ^ 2 := by
+  norm_num [intervalSobolevDensity]
+
+private theorem extraWeight_log_continuous : Continuous logQ := by
+  have hn : Continuous (fun g : C ↦ (((ideleClassNorm ℚ g).val : ℝ≥0) : ℝ)) :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (mQ).continuous)
+  exact hn.log fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+
+private theorem extraWeight_density_continuous : Continuous d := by
+  rw [funext extraWeight_density]
+  exact continuous_const.add (extraWeight_log_continuous.pow 2)
+
+private theorem extraWeight_one_le (g : C) : 1 ≤ d g := by
+  rw [extraWeight_density]
+  exact le_add_of_nonneg_right (sq_nonneg _)
+
+private theorem extraWeight_pos (g : C) : 0 < d g := zero_lt_one.trans_le (extraWeight_one_le g)
+
+private theorem extraWeight_haar_ac : μC ≪ νp ∧ μC ≪ νm := by
+  refine ⟨?_, ?_⟩
+  · exact withDensity_absolutelyContinuous'
+      extraWeight_density_continuous.measurable.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun g ↦ (ENNReal.ofReal_pos.mpr (extraWeight_pos g)).ne')
+  · exact withDensity_absolutelyContinuous'
+      extraWeight_density_continuous.measurable.inv.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun g ↦ (ENNReal.ofReal_pos.mpr (inv_pos.mpr (extraWeight_pos g))).ne')
+
+private theorem extraWeight_inverse_le (g : C) : (d g)⁻¹ ≤ 1 :=
+  inv_le_one_of_one_le₀ (extraWeight_one_le g)
+
+private theorem extraWeight_measure_le : νm ≤ νp := by
+  apply withDensity_mono
+  exact ae_of_all _ fun g ↦ ENNReal.ofReal_le_ofReal
+    ((extraWeight_inverse_le g).trans (extraWeight_one_le g))
+
+private def extraWeight_nnreal (x : C) : ℝ≥0 := ⟨d x, (extraWeight_pos x).le⟩
+
+local notation "wp" => extraWeight_nnreal
+local notation "wm" => (wp⁻¹)
+
+private theorem extraWeight_density_measurable : Measurable wp :=
+  (extraWeight_density_continuous.subtype_mk _).measurable
+
+private theorem extraWeight_measure_plus : νp = (μC).withDensity (fun g ↦ (wp g : ℝ≥0∞)) :=
+  congrArg (μC).withDensity (funext fun g ↦ ENNReal.ofReal_eq_coe_nnreal (extraWeight_pos g).le)
+
+private theorem extraWeight_measure_minus : νm = (μC).withDensity (fun g ↦ (wm g : ℝ≥0∞)) :=
+  congrArg (μC).withDensity (funext fun g ↦ ENNReal.ofReal_eq_coe_nnreal (inv_pos.mpr (extraWeight_pos g)).le)
+
+/-- Multiplying an L² input for the reciprocal measure by the reciprocal
+density turns it into an input for the positive measure. -/
+private theorem extraWeight_test_memLp (u : Lp ℂ 2 νm) :
+    MemLp (fun y ↦ (d y)⁻¹ • u y) 2 νp := by
+  have hac : νp ≪ νm := (withDensity_absolutelyContinuous μC _).trans extraWeight_haar_ac.2
+  have hm := ((extraWeight_density_continuous.inv₀ (fun x ↦ (extraWeight_pos x).ne')).aestronglyMeasurable (μ := νp)).smul
+    (AEStronglyMeasurable.mono_ac hac (Lp.aestronglyMeasurable u))
+  apply (memLp_two_iff_integrable_sq_norm hm).2
+  have hi := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable u)).1 (Lp.memLp u)
+  have hi' : Integrable (fun x ↦ ‖u x‖ ^ 2)
+      ((μC).withDensity fun y ↦ (wm y : ℝ≥0∞)) :=
+    (congrArg (fun η ↦ Integrable (fun x ↦ ‖u x‖ ^ 2) η) extraWeight_measure_minus).mp hi
+  have hi'' := (integrable_withDensity_iff_integrable_smul (μ := μC) extraWeight_density_measurable.inv).mp hi'
+  rw [extraWeight_measure_plus, integrable_withDensity_iff_integrable_smul extraWeight_density_measurable]
+  refine hi''.congr (ae_of_all _ fun y ↦ ?_)
+  change (d y)⁻¹ * ‖u y‖ ^ 2 = d y * ‖(d y)⁻¹ • u y‖ ^ 2
+  rw [norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr (extraWeight_pos y).le)]
+  field_simp [(extraWeight_pos y).ne']
+
+/-- On the product of the two reciprocal measures, L² kernels are unique for
+the Haar row integrals on the positive Sobolev space. -/
+private theorem extraWeight_kernel_unique
+    (B : W₂ →L[ℂ] W₂) (k h : C × C → ℂ)
+    (hk : MemLp k 2 ((νm).prod (νm))) (hh : MemLp h 2 ((νm).prod (νm)))
+    (hBk : represents(ℚ, 0, 2, B, k)) (hBh : represents(ℚ, 0, 2, B, h)) :
+    k =ᵐ[(νm).prod (νm)] h := by
+  let : IsLocallyFiniteMeasure νm := by
+    rw [extraWeight_measure_minus]
+    exact IsLocallyFiniteMeasure.withDensity_coe
+      (show Continuous wm from
+        (show Continuous wp from extraWeight_density_continuous.subtype_mk _).inv₀
+          (fun x hx ↦ (extraWeight_pos x).ne' (congrArg NNReal.toReal hx)))
+  have hnorm (g : C → ℂ) : (∫ y, g y ∂νm) = ∫ y, (d y)⁻¹ • g y ∂μC := by
+    rw [extraWeight_measure_minus]
+    exact integral_withDensity_eq_integral_smul extraWeight_density_measurable.inv g
+  let T := integralKernelOperator νm
+  have hT : T (hk.toLp k) = T (hh.toLp h) := by
+    apply Subtype.ext
+    apply ContinuousLinearMap.ext
+    intro u
+    let f : W₂ := (extraWeight_test_memLp u).toLp (fun y ↦ (d y)⁻¹ • u y)
+    have hf := extraWeight_haar_ac.1.ae_le (extraWeight_test_memLp u).coeFn_toLp
+    have he (j : C × C → ℂ) (hj : MemLp j 2 ((νm).prod (νm)))
+        (hB : represents(ℚ, 0, 2, B, j)) :
+        ∀ᵐ x ∂νm, (T (hj.toLp j)).val u x = B f x := by
+      have hac : νm ≪ μC := withDensity_absolutelyContinuous _ _
+      have hback := hac.ae_le (hB f)
+      filter_upwards [integralKernelOperator_apply νm (hj.toLp j) u,
+        Measure.ae_ae_of_ae_prod hj.coeFn_toLp, hback] with x hx hrow hBx
+      rw [hx.2, hBx.2]
+      calc
+        _ = ∫ y, j (x, y) * u y ∂νm :=
+          integral_congr_ae (hrow.mono fun y hy ↦ congrArg (· * u y) hy)
+        _ = ∫ y, j (x, y) * f y ∂μC := by
+          rw [hnorm]
+          apply integral_congr_ae
+          filter_upwards [hf] with y hy
+          change f y = (d y)⁻¹ • u y at hy
+          rw [hy, mul_smul_comm]
+    apply Lp.ext
+    filter_upwards [he k hk hBk, he h hh hBh] with x hx hy
+    exact hx.trans hy.symm
+  have he := (bijective_integralKernelOperator νm).injective hT
+  exact hk.coeFn_toLp.symm.trans (he ▸ hh.coeFn_toLp)
+
+/-- The logarithmic norm pushes Haar measure to a locally finite translation-invariant
+measure. In particular its zero fiber is null. -/
+private theorem extraWeight_log_ne_zero : ∀ᵐ x ∂μC, logQ x ≠ 0 := by
+  let e : ℝ≥0ˣ ≃ₜ ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he : (e ∘ mQ) = logQ := funext fun g ↦
+    (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (ideleClassNorm ℚ g)))).symm
+  let n : C →* Multiplicative ℝ :=
+    { toFun := fun g ↦ Multiplicative.ofAdd (logQ g)
+      map_one' := by change logQ 1 = 0; simp
+      map_mul' := fun x y ↦ by
+        change logQ (x * y) = logQ x + logQ y
+        simp only [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+          (NNReal.coe_pos.mpr (Units.zero_lt _)).ne' (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'] }
+  have hn : IsProperMap n := by
+    change IsProperMap logQ
+    rw [← he]
+    exact e.isProperMap.comp (isProperMap_ideleClassNorm ℚ)
+  have hsurj : Surjective n := by
+    change Surjective logQ
+    rw [← he]
+    refine e.surjective.comp ?_
+    intro t
+    exact ⟨QuotientGroup.mk (canonicalIdeleNormSection ℚ t), canonicalIdeleNormSection_rightInverse ℚ t⟩
+  let η : Measure (Multiplicative ℝ) := (μC).map (n : C → Multiplicative ℝ)
+  have hm : Measurable (n : C → Multiplicative ℝ) := extraWeight_log_continuous.measurable
+  let : η.IsMulLeftInvariant := by
+    change ((μC).map (n : C → Multiplicative ℝ)).IsMulLeftInvariant
+    exact isMulLeftInvariant_map (μ := μC) n.toMulHom hm hsurj
+  let : IsFiniteMeasureOnCompacts η := ⟨fun K hK ↦ by
+    rw [Measure.map_apply hm hK.isClosed.measurableSet]
+    exact (hn.isCompact_preimage hK).measure_lt_top⟩
+  let o : Multiplicative ℝ := Multiplicative.ofAdd 0
+  have hnull : η {o} = 0 := by
+    by_contra h
+    let I : Set ℝ := Icc 0 1
+    have hI : IsCompact I := isCompact_Icc
+    have hIinf : I.Infinite := Icc_infinite (show (0 : ℝ) < 1 from zero_lt_one)
+    let K : Set (Multiplicative ℝ) := I
+    have hK : IsCompact K := hI
+    have hInf : K.Infinite := hIinf
+    have hpoints (x : Multiplicative ℝ) : η {x} = η {o} := by
+      have hp : (x * ·) ⁻¹' {x} = {o} := by
+        ext y
+        change x * y = x ↔ y = o
+        constructor
+        · intro hy
+          exact mul_left_cancel (hy.trans (mul_one x).symm)
+        · rintro rfl
+          exact mul_one x
+      conv_lhs => rw [← map_mul_left_eq_self η x]
+      rw [Measure.map_apply (measurable_const_mul x) (measurableSet_singleton x), hp]
+    exact hK.measure_lt_top.ne (hInf.meas_eq_top ⟨η {o}, h, fun x _ ↦ (hpoints x).ge⟩)
+  rw [Measure.map_apply hm (measurableSet_singleton o)] at hnull
+  apply ae_iff.mpr
+  have heq : {x : C | ¬ logQ x ≠ 0} = n ⁻¹' {o} := by
+    ext x
+    change (¬ logQ x ≠ 0) ↔ logQ x = 0
+    exact not_not
+  rwa [heq]
+
+private theorem extraWeight_haar_repr_zero
+    (B : W₂ →L[ℂ] W₂) {k : C × C → ℂ}
+    (hzero : k =ᵐ[(μC).prod (μC)] 0) (hB : represents(ℚ, 0, 2, B, k)) : B = 0 := by
+  apply ContinuousLinearMap.ext
+  intro u
+  rw [zero_apply]
+  apply Lp.ext
+  have hB0 : ∀ᵐ x ∂μC, B u x = 0 := by
+    filter_upwards [hB u, Measure.ae_ae_of_ae_prod hzero] with x hx hy
+    rw [hx.2]
+    apply integral_eq_zero_of_ae
+    filter_upwards [hy] with y hy
+    change k (x, y) = 0 at hy
+    rw [hy, zero_mul, Pi.zero_apply]
+  have hac : νp ≪ μC := withDensity_absolutelyContinuous _ _
+  have h := hac.ae_le hB0
+  filter_upwards [h, Lp.coeFn_zero ℂ 2 νp] with x hx hz
+  exact hx.trans hz.symm
+
+local notation "kH(" K ")" => sobolevProjectiveKernelClass (F := ℚ) h₀ hs₂ K
+local notation "kS(" K ")" =>
+  Lp.compMeasurePreserving Prod.swap
+    (Measure.measurePreserving_swap (μ := νm) (ν := νp)) kH(K)
+local notation "tilted(" k ")" => (fun p : C × C ↦ ((d p.2)⁻¹ : ℝ) • k p)
+
+/-- The weighted transpose of a nonzero mixed-Haar kernel cannot represent
+the same operator. -/
+private theorem extraWeight_printed_operator_zero (K : tensor(ℚ, 0, 2))
+    (B : W₂ →L[ℂ] W₂)
+    (hK : sobolevProjectiveKernelOperator (F := ℚ) h₀ hs₂ K = B)
+    (hS : represents(ℚ, 0, 2, B, tilted(kS(K)))) : B = 0 := by
+  let k := kH(K)
+  let l := kS(K)
+  have hrep := (sobolevProjectiveKernelClass_spec (F := ℚ) h₀ hs₂ K k).2 rfl
+  rw [hK] at hrep
+  have hk := (Lp.memLp k).mono_measure (Measure.prod_mono extraWeight_measure_le le_rfl)
+  have hl := (Lp.memLp l).mono_measure (Measure.prod_mono le_rfl extraWeight_measure_le)
+  have hltilt : MemLp tilted(l) 2 ((νm).prod (νm)) := by
+    have hm : Continuous (fun p : C × C ↦ (d p.2)⁻¹) :=
+      (extraWeight_density_continuous.inv₀ (fun x ↦ (extraWeight_pos x).ne')).comp continuous_snd
+    refine hl.norm.mono' (hm.aestronglyMeasurable.smul hl.aestronglyMeasurable) ?_
+    exact ae_of_all _ fun p ↦ by
+      rw [norm_smul, Real.norm_of_nonneg (inv_nonneg.mpr (extraWeight_pos _).le)]
+      exact mul_le_of_le_one_left (norm_nonneg _) (extraWeight_inverse_le _)
+  have hkg := extraWeight_kernel_unique B k tilted(l) hk hltilt hrep hS
+  have hac : (μC).prod (μC) ≪ (νm).prod (νm) := extraWeight_haar_ac.2.prod extraWeight_haar_ac.2
+  have hau : (μC).prod (μC) ≪ (νm).prod (νp) := extraWeight_haar_ac.2.prod extraWeight_haar_ac.1
+  have hswap := hau.ae_le (Lp.coeFn_compMeasurePreserving k
+    (Measure.measurePreserving_swap (μ := νm) (ν := νp)))
+  have he : ∀ᵐ p ∂(μC).prod (μC), k p = (d p.2)⁻¹ • k p.swap := by
+    filter_upwards [hac.ae_le hkg, hswap] with p hp hs
+    change l p = k p.swap at hs
+    change k p = (d p.2)⁻¹ • l p at hp
+    rwa [hs] at hp
+  have hf := (Measure.measurePreserving_swap (μ := μC) (ν := μC)).quasiMeasurePreserving.ae he
+  have hfirst : ∀ᵐ p ∂(μC).prod (μC), logQ p.1 ≠ 0 := by
+    have hm : MeasurableSet {p : C × C | logQ p.1 ≠ 0} :=
+      ((measurableSet_singleton 0).preimage
+        (extraWeight_log_continuous.measurable.comp measurable_fst)).compl
+    exact (Measure.ae_prod_iff_ae_ae hm).2
+      (extraWeight_log_ne_zero.mono fun _ hx ↦ ae_of_all _ fun _ ↦ hx)
+  apply extraWeight_haar_repr_zero B ?_ hrep
+  filter_upwards [he, hf, hfirst] with p hp hq hnon
+  change k p.swap = (d p.1)⁻¹ • k p at hq
+  rw [hq, smul_smul] at hp
+  have hlt : 1 < d p.1 := by rw [extraWeight_density]; nlinarith [sq_pos_of_ne_zero hnon]
+  have hi : (d p.2)⁻¹ * (d p.1)⁻¹ < 1 :=
+    (mul_le_of_le_one_left (inv_nonneg.mpr (extraWeight_pos p.1).le) (extraWeight_inverse_le p.2)).trans_lt
+      (inv_lt_one_of_one_lt₀ hlt)
+  have hz : (1 - (d p.2)⁻¹ * (d p.1)⁻¹) • k p = 0 := by rw [sub_smul, one_smul, ← hp, sub_self]
+  exact (smul_eq_zero.mp hz).resolve_left (sub_ne_zero.mpr hi.ne')
+
+section
+
+local notation "hs" => (show (1 : ℝ) < 2 from one_lt_two)
+local notation "Θ₂(" F ")" => globalThetaSobolev F (1/2) h₀ hs₂
+local notation "Q₂(" F ")" => spectralSobolevQuotient F (1/2) h₀ hs₂
+local notation "W₂(" F ")" => CompactIntervalSobolev (μ(F))
+  (fun g ↦ Real.log ((ideleClassNorm F g).val : ℝ)) 0 0 2
+local notation "τ₂(" F ")" => hardySobolevTranslation (μ(F)) (m𝔽(F)) 0 0 2 h₀ hs₂
+local notation "A₂(" F ", " φ ")" =>
+  hardySobolevTestAction (μ(F)) m𝔽(F) 0 0 2 h₀ hs₂ φ
+local notation "U₂(" F ", " φ ")" => spectralConvolution (F := F) (1/2) h₀ hs₂ φ
+local notation "zetaPoint(" t ")" => ((1 : ℂ) / 2 + (t : ℂ) * Complex.I)
+local notation "η(" χ ", " j ")" => ideleClassNormTwist (χ (Subtype.val j).1) (((Subtype.val j).2.1 : ℂ) * Complex.I)
+
+/-- The strict Sobolev cutoff at weight two admits only order-zero evaluations. -/
+private theorem extraWeight_jet_order_zero {F : Type} [Field F] [NumberField F]
+    {χ : PontryaginDual C₁(F) → PontryaginDual C𝔽(F)}
+    (j : SpectralLineJetIndex χ (1/2) 2) : j.val.2.2 = 0 := by
+  have h := ((lt_spectralBoundaryMultiplicity _ _ _).mp j.property).2
+  by_contra hz
+  have hb : 1 ≤ j.val.2.2 := Nat.one_le_iff_ne_zero.mpr hz
+  have hb' : (1 : ℝ) ≤ (j.val.2.2 : ℝ) := by exact_mod_cast hb
+  linarith
+
+/-- Thomas Lince’s certified critical-line bracket gives a zero of the completed
+Hecke function of the trivial rational character, using the rational comparison
+as in the singleton Fourier-band refutation in §10.2. -/
+private theorem extraWeight_critical_line_point :
+    ∃ γ : ℝ, 0 < (meromorphicOrderAt
+      (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) zetaPoint(γ)).untop₀.toNat := by
+  obtain ⟨γ, -, hγ⟩ := HardyFirstZero.first_zero_on_line
+  let z : ℂ := zetaPoint(γ)
+  have hre : z.re = 1 / 2 := by simp [z]
+  have hne : z ≠ 1 := fun h ↦ by norm_num [h] at hre
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  refine ⟨γ, ?_⟩
+  change 0 < (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) z).untop₀.toNat
+  rw [← meromorphicOrderAt_finiteHeckeL_continuation _ hm (fun s ↦
+    (dedekindZeta_rat_eq_riemannZeta s.property).symm.trans
+      (finiteHeckeL_one_eq_dedekindZeta (K := ℚ) s).symm) (by rw [hre]; norm_num)]
+  have hnot (u : ℂ) : meromorphicOrderAt riemannZeta u ≠ ⊤ := by
+    refine hm.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ (mem_univ (2 : ℂ))
+      (mem_univ u) ?_
+    exact (meromorphicOrderAt_ne_top_iff_eventually_ne_zero (hm 2 (mem_univ _))).2
+      (((differentiableAt_riemannZeta (by norm_num : (2 : ℂ) ≠ 1)).continuousAt.eventually_ne
+        (riemannZeta_ne_zero_of_one_lt_re (by norm_num))).filter_mono nhdsWithin_le_nhds)
+  have hpos : 0 < meromorphicOrderAt riemannZeta z := by
+    apply (tendsto_zero_iff_meromorphicOrderAt_pos (hm z (mem_univ z))).mp
+    change riemannZeta z = 0 at hγ
+    rw [← hγ]
+    exact (differentiableAt_riemannZeta hne).continuousAt.continuousWithinAt
+  rw [← Int.pos_iff_toNat_pos]
+  exact (WithTop.coe_lt_coe.mp (by simpa only [WithTop.coe_untop₀_of_ne_top (hnot z), WithTop.coe_zero] using hpos))
+
+
+
+private theorem extraWeight_test_nonzero {F : Type} [Field F] [NumberField F] (η : QuasiCharacter C𝔽(F)) :
+    ∃ φ : BruhatCompactSupport C𝔽(F), Continuous φ.val ∧ (∫ g, φ.val g * η g ∂μ(F)) ≠ 0 := by
+  let m := m𝔽(F)
+  let hm : IsModulation m := ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+  have hms : Surjective m := by
+    intro q
+    exact ⟨QuotientGroup.mk (canonicalIdeleNormSection F q),
+      canonicalIdeleNormSection_rightInverse F q⟩
+  obtain ⟨b, hb⟩ := exists_smoothModulatedCutoff_radius_two m hm hms
+  have hbc : HasCompactSupport b := by
+    let e := Nonneg.unitsHomeomorphPos ℝ
+    have hS : IsCompact ((Subtype.val : Ioi (0 : ℝ) → ℝ) ⁻¹' Icc (2⁻¹ : ℝ) 2) := by
+      rw [Subtype.isCompact_iff, Subtype.image_preimage_coe, inter_eq_right.mpr]
+      · exact isCompact_Icc
+      · intro r hr
+        exact (by norm_num : (0 : ℝ) < 2⁻¹).trans_le hr.1
+    exact (hm.1.isCompact_preimage (e.isCompact_preimage.mpr hS)).of_isClosed_subset
+      (isClosed_tsupport b) hb.1.support_subset
+  have hbC : HasCompactSupport (fun g ↦ (b g : ℂ)) :=
+    hbc.comp_left Complex.ofReal_zero
+  let b₀ : BruhatCompactSupport C𝔽(F) :=
+    ⟨_, (mem_bruhatSmoothSubmodule_iff _).mpr hb.2, hbC⟩
+  let B := bruhatCompactSupportToModulatedExponentialDecay m univ hm hms b₀
+  let ηInv := η.comp (ContinuousMonoidHom.inv _)
+  obtain ⟨E, hE⟩ := modulatedExponentialDecay_mul_quasiCharacter m hm hms ηInv
+  have hEB (g : C𝔽(F)) : (E B).val g = (η g)⁻¹ * (b g : ℂ) :=
+    (hE B g).trans (by change η g⁻¹ * (b g : ℂ) = _; rw [map_inv])
+  have hBs : HasCompactSupport (E B).val := by
+    rw [funext hEB]
+    exact hbC.mul_left (f := fun g ↦ (η g)⁻¹)
+  let φ : BruhatCompactSupport C𝔽(F) :=
+    ⟨_, modulatedExponentialDecay_mem_bruhatSmooth m univ univ_nonempty (E B), hBs⟩
+  have hηne (g : C𝔽(F)) : η g ≠ 0 := ((Group.isUnit g).map η).ne_zero
+  have hprod (g : C𝔽(F)) : φ.val g * η g = (b g : ℂ) := by
+    change (E B).val g * η g = _
+    rw [hEB, mul_right_comm, inv_mul_cancel₀ (hηne g), one_mul]
+  refine ⟨φ, ?_, ?_⟩
+  · change Continuous (E B).val
+    rw [funext hEB]
+    exact (η.continuous.inv₀ hηne).mul (Complex.continuous_ofReal.comp hb.continuous)
+  simp_rw [hprod]
+  rw [integral_complex_ofReal]
+  exact Complex.ofReal_ne_zero.mpr (hb.continuous.integral_pos_of_hasCompactSupport_nonneg_ne_zero hbc hb.1.nonneg
+    (show b 1 ≠ 0 from (IsModulatedCutoff.apply_one (m := m) (ρ := b) hb.1 (by norm_num) (by norm_num)).trans_ne one_ne_zero)).ne'
+
+private theorem extraWeight_basepoint_jet :
+    ∃ (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ)), IsSpectralBasepointChoice χ ∧
+      Nonempty (SpectralLineJetIndex χ (1/2) 2) := by
+  classical
+  obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice ℚ
+  let χ := Function.update χ₀ 1 (1 : PontryaginDual C𝔽(ℚ))
+  have hχ1 : χ 1 = 1 := Function.update_self ..
+  have hχ : IsSpectralBasepointChoice χ := by
+    intro ω₁
+    by_cases h : ω₁ = 1
+    · subst ω₁
+      rw [hχ1]
+      rfl
+    · simpa [χ, Function.update_of_ne h] using hχ₀ ω₁
+  obtain ⟨γ, hγ⟩ := extraWeight_critical_line_point
+  let ι := SpectralLineJetIndex χ (1 / 2) 2
+  let j₀ : ι := ⟨(1, γ, 0), by
+    rw [lt_spectralBoundaryMultiplicity]
+    refine ⟨?_, by norm_num⟩
+    change 0 < (meromorphicOrderAt (continuedCompletedHeckeL (χ 1))
+      (((1/2 : ℝ) : ℂ) + (γ : ℂ) * Complex.I)).untop₀.toNat
+    simpa only [hχ1, Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_ofNat] using hγ⟩
+  exact ⟨χ, hχ, ⟨j₀⟩⟩
+
+/-- The order-zero eigenvalue calculation follows the conjugate-weight refutation in §10.3. -/
+private theorem extraWeight_convolution_eigen {F : Type} [Field F] [NumberField F]
+     (η : QuasiCharacter C𝔽(F)) (Λ : StrongDual ℂ W₂(F))
+    (hΛ : ∀ f : W₂(F), Λ f = ∫ g, f g * η g ∂μ(F)) :
+    (∀ k : C𝔽(F), ∀ f : W₂(F), Λ (τ₂(F) k f) = η k * Λ f) ∧
+    ∀ φ : BruhatCompactSupport C𝔽(F), ∀ f : W₂(F),
+      Λ (hardySobolevTestAction (μ(F)) m𝔽(F) 0 0 2 h₀ hs₂ φ f) =
+        (∫ g, φ.val g * η g ∂μ(F)) * Λ f := by
+  have eig (k : C𝔽(F)) (f : W₂(F)) : Λ (τ₂(F) k f) = η k * Λ f := by
+    have htr := hardySobolevTranslation_apply (μ(F)) m𝔽(F) 0 0 2 h₀ hs₂ k f
+    rw [hΛ, hΛ, integral_congr_ae (htr.mono fun g hg ↦ congrArg (· * η g) hg)]
+    calc
+      _ = ∫ g, f g * η (k * g) ∂μ(F) := by
+        rw [← integral_mul_left_eq_self (fun g ↦ f (k⁻¹ * g) * η g) k]
+        simp only [inv_mul_cancel_left]
+      _ = η k * ∫ g, f g * η g ∂μ(F) := by
+        rw [← integral_const_mul]
+        congr with g
+        rw [map_mul]
+        ring
+  refine ⟨eig, fun φ f ↦ ?_⟩
+  let τ := τ₂(F)
+  have hτ := (exists_hardySobolevTranslation (μ(F)) m𝔽(F) 0 0 2 h₀ hs₂).choose_spec.2
+  have hp := bruhatRegularizedAction_apply (μ(F)) τ hτ φ f
+  have he := congrArg (fun z : PettisWeakCompletion W₂(F) ↦
+    (show Module.Dual ℂ (StrongDual ℂ W₂(F)) from z) Λ) hp.2
+  change Λ (hardySobolevTestAction (μ(F)) m𝔽(F) 0 0 2 h₀ hs₂ φ f) =
+    ∫ g, Λ (φ.val g • τ g f) ∂μ(F) at he
+  rw [he, ← integral_mul_const]
+  refine integral_congr_ae (.of_forall fun g ↦ ?_)
+  change Λ (φ.val g • τ₂(F) g f) = φ.val g * η g * Λ f
+  rw [map_smul, eig]
+  simp only [smul_eq_mul, mul_assoc]
+
+
+private theorem extraWeight_test_vector (φ : BruhatCompactSupport C𝔽(ℚ)) (hφ : Continuous φ.val) :
+    ∃ f : W₂(ℚ), (f : C𝔽(ℚ) → ℂ) =ᵐ[μ(ℚ)] φ.val := by
+  let ν := (μ(ℚ)).withDensity fun g ↦ ENNReal.ofReal
+    (intervalSobolevDensity 0 0 2 (logNorm(ℚ) g))
+  let : IsLocallyFiniteMeasure ν := by
+    simpa only [neg_zero] using sobolevKernelWeight_locallyFinite (F := ℚ) 0 2
+  have hmem : MemLp φ.val 2 ν := hφ.memLp_of_hasCompactSupport φ.property.2
+  have hac : μ(ℚ) ≪ ν := by simpa only [neg_zero] using extraWeight_haar_ac.1
+  exact ⟨hmem.toLp _, hac.ae_eq hmem.coeFn_toLp⟩
+
+
+private theorem extraWeight_jet_pair (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ))
+    (j : SpectralLineJetIndex χ (1/2) 2) (f : W₂(ℚ)) :
+    spectralSobolevPairing (F := ℚ) f ((spectralLineJet_memLp χ hs j).toLp _) =
+      ∫ g, f g * η(χ, j) g ∂μ(ℚ) := by
+  change (∫ g, f g * ((spectralLineJet_memLp χ hs j).toLp _ : C𝔽(ℚ) → ℂ) g ∂μ(ℚ)) = _
+  have hac : μ(ℚ) ≪ (μ(ℚ)).withDensity (fun g ↦ ENNReal.ofReal
+      ((intervalSobolevDensity 0 0 2 (logNorm(ℚ) g))⁻¹)) := by
+    simpa only [neg_zero] using extraWeight_haar_ac.2
+  apply integral_congr_ae
+  filter_upwards [hac.ae_le (MemLp.coeFn_toLp (spectralLineJet_memLp χ hs j))] with g hg
+  rw [hg]
+  simp only [spectralZeroJet, extraWeight_jet_order_zero j, pow_zero, mul_one, Complex.ofReal_zero, zero_add]
+
+private theorem extraWeight_mem_of_projected_zero {E : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℂ E] (N : Submodule ℂ E)
+    [N.HasOrthogonalProjection] (B : E →L[ℂ] E)
+    (h : N.orthogonal.starProjection.comp B = 0) (f : E) : B f ∈ N := by
+  have hz : N.orthogonal.starProjection (B f) = 0 := DFunLike.congr_fun h f
+  have hn := (N.orthogonal.starProjection_apply_eq_zero_iff).mp hz
+  rwa [N.orthogonal_orthogonal] at hn
+
+private theorem extraWeight_pair_vanish
+    (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ)) (hχ : IsSpectralBasepointChoice χ)
+    (j : SpectralLineJetIndex χ (1/2) 2) (v : W₂(ℚ)) (hv : v ∈ Θ₂(ℚ)) :
+    (∫ g, v g * η(χ, j) g ∂μ(ℚ)) = 0 :=
+  (extraWeight_jet_pair χ j v).symm.trans
+    (((spectralLineJet_commonKernel (a := (1/2 : ℝ)) χ hχ hs v).mp hv) j)
+
+private theorem extraWeight_nonzero_line (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ))
+    (hχ : IsSpectralBasepointChoice χ) (j : SpectralLineJetIndex χ (1/2) 2) :
+    ∃ φ : BruhatCompactSupport C𝔽(ℚ), (Θ₂(ℚ)).orthogonal.starProjection.comp (A₂(ℚ, φ)) ≠ 0 := by
+  let θ := η(χ,j)
+  with_reducible refine (extraWeight_test_nonzero (F := ℚ) θ).elim fun φ htest ↦ ?_
+  have hφ := htest.2
+  with_reducible refine (extraWeight_test_vector φ htest.1).elim fun f hf ↦ ?_
+  with_reducible refine (spectralLineJet_functional (a := (1/2 : ℝ)) χ hs j).elim fun Λ hL ↦ ?_
+  have hΛ := hL.1
+  have hΛeval (v : W₂(ℚ)) : Λ v = ∫ g, v g * θ g ∂μ(ℚ) := by
+    simpa only [spectralZeroJet, extraWeight_jet_order_zero j, pow_zero, mul_one,
+      Complex.ofReal_zero, zero_add, θ] using (hΛ v).2
+  have hn : Λ f ≠ 0 := by
+    rw [hΛeval, integral_congr_ae (hf.mono fun g hg ↦ congrArg (· * θ g) hg)]
+    exact hφ
+  refine ⟨φ, fun h ↦ ?_⟩
+  have hΘ : A₂(ℚ, φ) f ∈ Θ₂(ℚ) := extraWeight_mem_of_projected_zero (Θ₂(ℚ)) (A₂(ℚ, φ)) h f
+  have hzero := extraWeight_pair_vanish χ hχ j (A₂(ℚ, φ) f) hΘ
+  have heq : Λ (A₂(ℚ, φ) f) = (∫ g, φ.val g * θ g ∂μ(ℚ)) * Λ f :=
+    (extraWeight_convolution_eigen (F := ℚ) θ Λ hΛeval).2 φ f
+  apply (mul_ne_zero hφ hn)
+  exact heq.symm.trans ((hΛeval (A₂(ℚ, φ) f)).trans hzero)
+
+private theorem extraWeight_projected_nonzero :
+    ∃ φ : BruhatCompactSupport C𝔽(ℚ),
+      (spectralProjection (F := ℚ) (1/2) h₀ hs₂).comp (A(ℚ, h₀, hs₂, φ)) ≠ 0 := by
+  refine extraWeight_basepoint_jet.elim fun χ hχ ↦ ?_
+  with_reducible refine (extraWeight_nonzero_line χ hχ.1 hχ.2.some).elim fun φ hφ ↦ ?_
+  have h (l : ℝ) (hl : l ≤ 0) (he : l = 0) :
+      (globalThetaSobolev ℚ (1/2) hl hs₂).orthogonal.starProjection.comp
+        (hardySobolevTestAction (μ(ℚ)) m𝔽(ℚ) l 0 2 hl hs₂ φ) ≠ 0 := by subst l; exact hφ
+  exact ⟨φ, h (-0) (hStrip(h₀)) neg_zero⟩
+
+end
+
+/-- Paper: (10.4.3.25), p. 470. Over the rationals at Sobolev exponent two,
+the first certified positive zeta ordinate and a compact Bruhat test give
+a nonzero spectral convolution. A kernel and its printed weighted transpose
+cannot represent the same nonzero operator: swapping the variables twice
+would fix the kernel while multiplying it by two reciprocal weights whose
+product is strictly less than one almost everywhere. -/
 theorem Printed.spectralLineKernel_extraWeight_false :
-    ¬ Printed.spectralLineKernel_extraWeight := by sorry
+    ¬ Printed.spectralLineKernel_extraWeight := by
+  intro hall
+  obtain ⟨φ, hφ⟩ := extraWeight_projected_nonzero
+  obtain ⟨K, hK, hrep⟩ := hall ℚ (1 / 2) 2 (by norm_num) (by norm_num) φ
+  exact hφ (extraWeight_printed_operator_zero K _ hK ((hrep kS(K)).2 rfl))
+
+end ExtraKernelWeight
 
 /-- Paper: Theorem 10.4.3.4(2), pp. 470–471, second formula. The cutoff
 spectral function is claimed to represent the geometric truncation.
