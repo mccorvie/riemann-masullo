@@ -180,7 +180,52 @@ Deviation: The cutoff is greater than two so the reciprocal logarithms
 in the tail have nonzero denominators. -/
 theorem summable_heckePrimePowerTailOscillationTerm (t₀ x t : ℝ) (hx : 2 < x) (ht : t ≠ t₀) :
     Summable (heckePrimePowerTailOscillationTerm t₀ x ⟨1, t⟩) := by
-  sorry
+  have hz0 : 0 < |t₀ - t| := abs_pos.mpr (sub_ne_zero.mpr (Ne.symm ht))
+  have hnz : ‖(⟨1, t₀⟩ : ℂ) - ⟨1, t⟩‖ = |t₀ - t| := by
+    have hz : (⟨1, t₀⟩ : ℂ) - ⟨1, t⟩ = ((t₀ - t : ℝ) : ℂ) * Complex.I := by
+      apply Complex.ext <;> simp
+    rw [hz, norm_mul, Complex.norm_I, mul_one, Complex.norm_real, Real.norm_eq_abs]
+  have hg (k : ℕ) (hk : 0 < k) :
+      ‖heckePrimePowerTailOscillation t₀ k ⟨1, t⟩‖ ≤ 2 / |t₀ - t| := by
+    have hne : (⟨1, t⟩ : ℂ) ≠ ⟨1, t₀⟩ := fun h ↦ ht (congrArg Complex.im h)
+    have hre : ((⟨1, t₀⟩ : ℂ) - ⟨1, t⟩).re = 0 := by simp
+    delta heckePrimePowerTailOscillation
+    simp only [hne, ↓reduceIte]
+    rw [norm_div, hnz]
+    gcongr
+    refine (norm_sub_le _ _).trans ?_
+    rw [Complex.norm_natCast_cpow_of_pos hk, hre, Real.rpow_zero, norm_one]
+    norm_num
+  let e : ℕ → ℝ := fun m ↦ (Real.log ((m + 2 : ℕ) : ℝ))⁻¹
+  have he (m : ℕ) : e m = (Real.log ((m + 2 : ℕ) : ℝ))⁻¹ := rfl
+  have he1 (m : ℕ) : e (m + 1) = (Real.log ((m + 3 : ℕ) : ℝ))⁻¹ := rfl
+  have he0 (m : ℕ) : 0 ≤ e m :=
+    inv_nonneg.mpr (Real.log_nonneg (by norm_cast; omega))
+  have hanti' (m : ℕ) :
+      (Real.log ((m + 3 : ℕ) : ℝ))⁻¹ ≤ (Real.log ((m + 2 : ℕ) : ℝ))⁻¹ := by
+    apply inv_anti₀ (Real.log_pos (by norm_cast; omega))
+    exact Real.log_le_log (by positivity) (by norm_cast; omega)
+  have hanti (m : ℕ) : e (m + 1) ≤ e m := by
+    rw [he1, he]
+    exact hanti' m
+  have hd : Summable fun m ↦ e m - e (m + 1) := by
+    refine summable_of_sum_range_le (c := e 0) (fun m ↦ sub_nonneg.mpr (hanti m))
+      fun n ↦ ?_
+    rw [Finset.sum_range_sub']
+    linarith [he0 n]
+  rw [← summable_nat_add_iff 3]
+  refine Summable.of_norm_bounded (hd.mul_left (2 / |t₀ - t|)) fun m ↦ ?_
+  have hc : ‖((Real.log ((m + 3 : ℕ) : ℝ) : ℂ))⁻¹ - ((Real.log ((m + 3 - 1 : ℕ) : ℝ) : ℂ))⁻¹‖ =
+      e m - e (m + 1) := by
+    rw [show m + 3 - 1 = m + 2 by omega, he, he1, ← Complex.ofReal_inv, ← Complex.ofReal_inv,
+      ← Complex.ofReal_sub, Complex.norm_real, Real.norm_eq_abs, abs_sub_comm,
+      abs_of_nonneg (sub_nonneg.mpr (hanti' m))]
+  delta heckePrimePowerTailOscillationTerm
+  split_ifs
+  · rw [norm_mul, hc]
+    exact mul_le_mul_of_nonneg_right (hg _ (by omega)) (sub_nonneg.mpr (hanti m))
+  · rw [norm_zero]
+    exact mul_nonneg (by positivity) (sub_nonneg.mpr (hanti m))
 
 /-- Paper: Theorem B.7.2.1(1), pp. 649–651. For a pure norm character,
 the grouped logarithmic tail converges uniformly on compact sets away from
