@@ -4,6 +4,7 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 public import Mathlib.Algebra.Exact.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
+import RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 
 /-! # Second Structure Theorem and the S-local Čech sequence
@@ -2286,6 +2287,62 @@ theorem existsUnique_sLocalCechStripMellin (x : ℝ) :
   · exact (hM f s hs).trans (hform f s hs).symm
   · exact ((M f).property.1 hs).trans (((P.trans A) f).property.1 hs).symm
 
+/-- A homogeneous function times its character is constant on norm fibers. -/
+private theorem sLocalCech_left_commutes_invariant {G H : Type*} [CommGroup G] [Group H]
+    (m : G →* H) (χ : G →* ℂ) (θ : G → ℂ)
+    (hθ : ∀ (k : m.ker) g, θ (k.val⁻¹ * g) = χ k.val * θ g)
+    (a b : G) (hab : m a = m b) : θ a * χ a = θ b * χ b := by
+  let k : m.ker := ⟨b * a⁻¹, by simp only [MonoidHom.mem_ker, map_mul, map_inv, hab, mul_inv_cancel]⟩
+  have harg : k.val⁻¹ * b = a := by dsimp [k]; simp [mul_comm]
+  have hc : χ k.val * χ a = χ b := by rw [← map_mul]; congr 1; dsimp [k]; simp
+  calc
+    θ a * χ a = (χ k.val * θ b) * χ a := congrArg (· * χ a) ((congrArg θ harg).symm.trans (hθ k b))
+    _ = θ b * (χ k.val * χ a) := by ring
+    _ = θ b * χ b := congrArg (θ b * ·) hc
+
+/-- Compare an arbitrary quotient norm section with the canonical idelic section. -/
+private theorem sLocalCech_left_commutes_mellin (χ : PontryaginDual Jₛ)
+    (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ)
+    (x : ℝ) (hx : ∀ t : ℝ≥0ˣ, (χ (τ t) : ℂ) = (normℝ(t) : ℂ) ^ ((x : ℂ) * Complex.I))
+    (f : ℬₛ) (s : ℂ) (hs : 0 < s.re) :
+    (∫ t : ℝ≥0ˣ, (φω(restrict₁(χ)) f) (τ t) *
+      (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) ∂positiveRealHaar) =
+        Zₛ f (normChart(χ) s) := by
+  let : MeasurableSpace J₁ := borel J₁
+  let μ := sLocalNormOneQuotientMeasure F S
+  let : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let σ : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hσ : RightInverse σ (sIdeleNorm F S) := thetaSection_rightInverse F S
+  let q : (SAdeleRing F S)ˣ →ₜ* Jₛ := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  have hq (t : ℝ≥0ˣ) : mₛ (q (σ t)) = t := hσ t
+  have hi : (∫ t : ℝ≥0ˣ, (φω(restrict₁(χ)) f) (τ t) *
+      (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) ∂positiveRealHaar) =
+      sLocalRadialMellinIntegral σ f χ s := by
+    apply integral_congr_ae
+    filter_upwards [] with t
+    have hn : (normℝ(t) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)
+    have heq := sLocalCech_left_commutes_invariant mₛ (Circle.coeHom.comp χ.toMonoidHom)
+      (φω(restrict₁(χ)) f) (fun k g ↦
+        sLocalHomogeneousAdelicTheta_homogeneous F S μ restrict₁(χ) f k g)
+      (τ t) (q (σ t)) ((hτ t).trans (hq t).symm)
+    change (φω(restrict₁(χ)) f) (τ t) * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) =
+      (φω(restrict₁(χ)) f) (q (σ t)) * normChart(χ) s (q (σ t))
+    rw [Complex.cpow_add _ _ hn]
+    change _ = (φω(restrict₁(χ)) f) (q (σ t)) *
+      ((χ (q (σ t)) : ℂ) * ((((mₛ (q (σ t))).val : ℝ) : ℂ) ^ s))
+    rw [hq]
+    calc
+      _ = ((φω(restrict₁(χ)) f) (τ t) * (χ (τ t) : ℂ)) * (normℝ(t) : ℂ) ^ s := by rw [hx]; ring
+      _ = ((φω(restrict₁(χ)) f) (q (σ t)) * (χ (q (σ t)) : ℂ)) * (normℝ(t) : ℂ) ^ s := congrArg (· * (normℝ(t) : ℂ) ^ s) heq
+      _ = _ := by ring
+  have hr : ∃ (ψ : PontryaginDual Jₛ) (z : ℂ), 0 < z.re ∧ normChart(χ) s = normChart(ψ) z := ⟨χ, s, hs, rfl⟩
+  exact hi.trans ((sLocalRadialMellinIntegral_eq_theta σ hσ f χ s hs).trans
+    ((sLocalThetaMellinIntegral_eq_zeta f hr).trans (sLocalIdelicZFunction_eq_integral f hr).symm))
+
 /-- Paper: (5.4.2.6), p. 276.
 Applying the two shifted Mellin transforms to the upper left arrow gives the
 lower zeta pair on every theta class.
@@ -2304,7 +2361,28 @@ theorem sLocalCech_left_commutes (χ : PontryaginDual Jₛ)
     (f : ℬₛ) :
     let p : upperMiddle(χ) := cechThetaPair(χ) (Submodule.Quotient.mk f)
     EqOn (M₁ p.1).val (fun s ↦ Zₛ f (normChart(χ) s)) rightHalf ∧
-    EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by sorry
+    EqOn (M₂ p.2).val (fun s ↦ Zₛ (Fourierₛ f) (normChart(χ⁻¹) s)) rightHalf := by
+  let p : upperMiddle(χ) := cechThetaPair(χ) (Submodule.Quotient.mk f)
+  have hp := (existsUnique_sLocalCechThetaPair (F := F) (S := S) χ).exists.choose_spec f
+  have hx' (t : ℝ≥0ˣ) : (χ⁻¹ (τ t) : ℂ) =
+      (normℝ(t) : ℂ) ^ (((-x : ℝ) : ℂ) * Complex.I) := by
+    change (χ (τ t) : ℂ)⁻¹ = _
+    rw [_hx, Complex.ofReal_neg, neg_mul, Complex.cpow_neg]
+  constructor
+  · intro s hs
+    refine (_h₁ p.1 s hs).trans ?_
+    refine Eq.trans (integral_congr_ae (.of_forall fun t ↦ ?_))
+      (sLocalCech_left_commutes_mellin χ τ _hτ x _hx f s hs)
+    exact congrArg (· * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I))
+      (congrFun hp.1 (τ t))
+  · intro s hs
+    refine (_h₂ p.2 s hs).trans ?_
+    have h := sLocalCech_left_commutes_mellin χ⁻¹ τ _hτ (-x) hx' (Fourierₛ f) s hs
+    simp only [Complex.ofReal_neg, neg_mul, ← sub_eq_add_neg] at h
+    refine Eq.trans (integral_congr_ae (.of_forall fun t ↦ ?_)) h
+    exact congrArg (· * (normℝ(t) : ℂ) ^ (s - (x : ℂ) * Complex.I))
+      (congrFun hp.2 (τ t))
+
 
 /-- Evaluation is continuous by the Schwartz line description of Appendix D. -/
 private theorem decayFourier_bergman_eval (I : Set ℝ) (ho : IsOpen I)
