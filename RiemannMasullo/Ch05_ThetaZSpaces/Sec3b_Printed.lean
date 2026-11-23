@@ -1,8 +1,11 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b_PolarFreeExamples
 import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 import Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
 
@@ -555,14 +558,75 @@ def Printed.sAdelePolarFree_inclusion : Prop :=
             (c w').val.symm (x.2 w')
         h (Multiplicative.ofAdd (xArch, y)) = f.val x * ∏ v : S, zeroExtension(g v) (y v)
 
-/-- Paper: Definition 5.3.4.1, p. 259. Take ℚ with its real and 3-adic places. Take a
-nonzero smooth real bump supported in (1, 2) and the 3-adic multiplicative test
-g(3ᵏu) = 3⁻ᵏ for k ≥ 0 and zero for k < 0, where u is an integer unit. Its shell sequence
-is Schwartz. At any real point where the bump is nonzero, the finite slice of the prescribed
-product vanishes at zero and is nonzero at every 3ᵏ for k ≥ 0, violating local constancy. -/
+/-- Paper: Definition 5.3.4.1, p. 259. Take ℚ with its real and 3-adic places.
+Use a flat bump with value one at the archimedean identity and a multiplicative test
+with value q⁻ⁿ on the nonnegative valuation shells, where q is the residue field cardinality.
+At the archimedean identity the finite slice vanishes at zero and takes a nonzero value
+at every nonnegative power of a uniformizer, violating local constancy. -/
 theorem Printed.sAdelePolarFree_inclusion_false :
     ¬ Printed.sAdelePolarFree_inclusion := by
-  sorry
+  classical
+  intro H
+  let v : V(ℚ) := (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm ⟨3, Nat.prime_three⟩
+  let S : Finset V(ℚ) := {v}
+  let w : S := ⟨v, Finset.mem_singleton_self v⟩
+  have hw (u : S) : u = w := Subtype.ext (Finset.mem_singleton.mp u.property)
+  let : Unique S := ⟨⟨w⟩, hw⟩
+  let r (u : RealPlaces(ℚ)) : {e : u.val.Completion ≃+* ℝ // IsHomeomorph (e : u.val.Completion → ℝ)} :=
+    ⟨InfinitePlace.Completion.ringEquivRealOfIsReal u.property,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal u.property).toHomeomorph.isHomeomorph⟩
+  let c (u : ComplexPlaces(ℚ)) : {e : u.val.Completion ≃+* ℂ // IsHomeomorph (e : u.val.Completion → ℂ)} :=
+    ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex u.property,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex u.property).toHomeomorph.isHomeomorph⟩
+  obtain ⟨f, hf⟩ := exists_archimedeanFlatSchwartz_one (RealPlaces(ℚ)) (ComplexPlaces(ℚ))
+  obtain ⟨π, g₀, hπ, hg₀⟩ := exists_polarFree_geometric_shell_test v
+  let g (u : S) : SchwartzBruhat (u.val.adicCompletion ℚ)ˣ := (hw u).symm ▸ g₀
+  have hg : g w = g₀ := by dsimp only [g]
+  obtain ⟨h, hh⟩ := H ℚ S r c f g
+  have hslice (y : (u : S) → u.val.adicCompletion ℚ) :
+      h (Multiplicative.ofAdd ((1, y) : SAdeleRing ℚ S)) = zeroExtension(g₀) (y w) := by
+    have h₁ : (fun a : InfinitePlace ℚ ↦
+        if ha : a.IsReal then (r ⟨a, ha⟩).val.symm ((1 : RealPlaces(ℚ) → ℝ) ⟨a, ha⟩)
+        else
+          let a' : ComplexPlaces(ℚ) := ⟨a, InfinitePlace.not_isReal_iff_isComplex.mp ha⟩
+          (c a').val.symm ((1 : ComplexPlaces(ℚ) → ℂ) a')) = (1 : InfiniteAdeleRing ℚ) := by
+      funext a
+      split <;> exact map_one _
+    have hv := hh (1, 1) y
+    dsimp only at hv
+    rw [h₁, hf, one_mul, Fintype.prod_subsingleton _ w, hg] at hv
+    exact hv
+  have hzero : h (Multiplicative.ofAdd ((1, 0) : SAdeleRing ℚ S)) = 0 := by
+    simp [hslice]
+  have hq : 1 < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+  have hπsmall : ‖π.val‖ < 1 := hπ ▸ inv_lt_one_of_one_lt₀ hq
+  let addSingle := AddMonoidHom.single (fun u : S ↦ u.val.adicCompletion ℚ) w
+  let j : Multiplicative (w.val.adicCompletion ℚ) →* Multiplicative (SAdeleRing ℚ S) :=
+    ((AddMonoidHom.inr (InfiniteAdeleRing ℚ) _).comp addSingle).toMultiplicative
+  have hj : Continuous j := by
+    change Continuous (fun y : Multiplicative (w.val.adicCompletion ℚ) ↦
+      Multiplicative.ofAdd ((0, Pi.single w y.toAdd) : SAdeleRing ℚ S))
+    exact continuous_ofAdd.comp ((continuous_const.prodMk (continuous_single w)).comp continuous_toAdd)
+  let (u : S) : ProperSpace (u.val.adicCompletion ℚ) := properSpace_adicCompletion u.val
+  let : LocallyCompactSpace (Multiplicative (SAdeleRing ℚ S)) :=
+    inferInstanceAs (LocallyCompactSpace
+      (((a : InfinitePlace ℚ) → a.Completion) × ((u : S) → u.val.adicCompletion ℚ)))
+  have hperiod := schwartzBruhat_eventually_mul_eq_of_nonarchimedean j hj h
+  have hlim := tendsto_pow_atTop_nhds_zero_of_norm_lt_one hπsmall
+  obtain ⟨n, hn⟩ := (hlim.eventually hperiod).exists
+  have hpow := hn (Multiplicative.ofAdd ((1, 0) : SAdeleRing ℚ S))
+  change h (Multiplicative.ofAdd
+    ((0 + 1, Pi.single w (π.val ^ n) + 0) : SAdeleRing ℚ S)) = _ at hpow
+  rw [zero_add, add_zero, hzero, hslice, Pi.single_eq_same] at hpow
+  have hn₀ : π.val ^ n ≠ 0 := pow_ne_zero n π.ne_zero
+  have hqpos : 0 < v.asIdeal.absNorm := by exact_mod_cast zero_lt_one.trans hq
+  have hq₀ : (v.asIdeal.absNorm : ℂ) ≠ 0 := by exact_mod_cast hqpos.ne'
+  have hval : zeroExtension(g₀) (π.val ^ n) = g₀ (π ^ n) := by
+    change (if h : π.val ^ n ≠ 0 then g₀ (Units.mk0 (π.val ^ n) h) else 0) = g₀ (π ^ n)
+    rw [dite_eq_left hn₀]
+    exact congrArg (fun u : (v.adicCompletion ℚ)ˣ ↦ g₀ u) (Units.ext (by simp))
+  exact pow_ne_zero n (inv_ne_zero hq₀) ((hg₀ n).symm.trans (hval.symm.trans hpow))
 
 /-- Paper: Lemma 5.3.4.2(2), proof, p. 260. As printed: For every number field, finite set
 of places containing the archimedean places and place in the set, restriction of S-idele
