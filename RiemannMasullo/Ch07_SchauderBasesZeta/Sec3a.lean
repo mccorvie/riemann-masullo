@@ -1785,6 +1785,83 @@ local notation "rhoCoeff(" c ", " r ")" =>
   complexResidue (fun z : ℂ ↦ sLocalRhoFactor (twistₛ (c) z) *
     z ^ ((sLocalRhoPoleOrder (c) : ℤ) - ((r : ℕ) : ℤ) - 1)) 0
 
+open Classical in
+/-- Paper: Theorem 7.3.1.6(1), p. 345.
+Each primary polar functional vanishes on the primary principal-value image, so it descends
+to a continuous functional on the p-primary orbital quotient. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_descend
+    (p : Vℚ) (ω : PontryaginDual J₁) :
+    ∃ D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)),
+      ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x := by
+  refine ⟨fun j ↦ (Rₚ(p, ω)).liftQL
+      (sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j)
+      (sLocalOrbitalPrincipalPart_range_le_ker (F := F) (S := S) p ω j), fun j x ↦ ?_⟩
+  rfl
+
+open Classical in
+/-- Paper: Theorem 7.3.1.2(2), p. 341.
+The selected primary coefficients have a biorthogonal family in the p-primary orbital
+quotient. This is the biorthogonality used in Theorem 7.3.1.6(3), obtained from the
+biorthogonal family of the primary principal-value operator. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_biorthogonal
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial) :
+    ∃ ψ : Idx(p, ω) → Q(p, ω),
+      ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+          if i = j then 1 else 0 :=
+  sLocalOrbitalPrincipalValue_biorthogonal (F := F) (S := S) (T := Sₚ(p)) (hₚ(p))
+    _hp _hS _hPic ω
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(3), p. 345.
+With a biorthogonal family in the primary quotient, the enumeration of that family is an
+absolute Schauder basis of the quotient. This is the absolute-basis clause of Theorem
+7.3.1.6(3) for the polar system; it is the half of that theorem which rests on the
+identification (7.3.1.19) with the modulated quotient of Theorem 4.6.1.5.
+Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
+theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal
+    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0) :
+    let e := ψ ∘ σ
+    let d := D ∘ σ
+    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by sorry
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(2), p. 345.
+With a biorthogonal family in the primary quotient, the enumeration of the polar
+functionals is an unconditional Schauder basis of the strong dual. This is the
+strong-dual clause of Theorem 7.3.1.6(2) for the polar system.
+Deviation: Keeps the Laurent-ratio bound of Theorem 7.3.1.6 as stated on p. 345. -/
+theorem sLocalPolarOrbital_bases_of_laurent_bounds_dual
+    (p : Vℚ) (ω : PontryaginDual J₁) (σ : ℕ ≃ Idx(p, ω))
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0) :
+    let d := D ∘ σ
+    let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n))
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by sorry
+
 /-- Paper: Theorem 7.3.1.6(2)–(3), p. 345.
 Any enumeration of the polar functionals gives an unconditional basis of the strong dual.
 With the same enumeration, its biorthogonal vectors are an absolute basis of the quotient.
@@ -1806,7 +1883,23 @@ theorem sLocalPolarOrbital_bases_of_laurent_bounds
       let e := ψ ∘ σ
       let d := D ∘ σ
       IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev ∧
-        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by sorry
+        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  classical
+  obtain ⟨D, hD⟩ : ∃ D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)),
+      ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x :=
+    sLocalPolarOrbital_bases_of_laurent_bounds_descend (F := F) (S := S) p ω
+  obtain ⟨ψ, hψ⟩ : ∃ ψ : Idx(p, ω) → Q(p, ω),
+      ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+        sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+          if i = j then 1 else 0 :=
+    sLocalPolarOrbital_bases_of_laurent_bounds_biorthogonal (F := F) (S := S) p ω _hS _hp _hPic
+  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal (F := F) (S := S)
+    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
+  have hdual := sLocalPolarOrbital_bases_of_laurent_bounds_dual (F := F) (S := S)
+    p ω σ _hS _hp _hPic _hcoeff D hD ψ hψ
+  exact ⟨D, ψ, fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n)),
+    fun n ℓ ↦ rfl, hD, hdual.1, hdual.2, hprimal.1, hprimal.2⟩
 
 -- TODO(paper-gap): In (7.3.1.19) use the inverse uniformizers at the unramified
 -- places above p for the generators of Chapter 4. At a ramified place Weil's
@@ -1911,9 +2004,19 @@ private theorem sLocalOrbitalFourierJet_lattice_schwartz_rapidSamples (G : ℂ �
     _ ≤ _ := mul_le_mul_of_nonneg_left (bound y) (pow_pos hM _).le
 
 open Classical in
-/-- Reflection evaluates each Fourier derivative on the vertical line of real part one. -/
+/-- Helper for `sLocalOrbitalFourierJet_lattice_schwartz`.
+Paper: Theorem 7.3.1.6(5), p. 345.
+Scalar form of the rapid decay: the Fourier jet value at a fixed order, along the local
+pole lattice through the chosen phase, is bounded by an arbitrary negative power of
+`1 + |n|`. The paper only alludes to this estimate, on p. 361, as following from the
+exponential decay of the Mellin transforms of the tests; it is what makes the sequence
+Schwartz.
+Deviation: The sequence is extended by zero where the place is not a pole of `c` or the
+order is outside the primary multiplicity, as in the statement. -/
 private theorem sLocalOrbitalFourierJet_lattice_schwartz_valueDecay
-    (p : Vℚ) (χ : PontryaginDual Jₛ) (v : S) (t : ℝ)
+    (p : Vℚ) (χ : PontryaginDual Jₛ) (v : S) (u : (v.val.adicCompletion F)ˣ) (t : ℝ)
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hv : v.val ∈ Sₚ(p)) (_hu : uniformizerNorm(v, u)) (_ht : phase(χ, v, u, t))
     (f : ℬₛ) (k N : ℕ) :
     ∃ C : ℝ, 0 < C ∧ ∀ n : ℤ,
       ‖(if v ∈ sLocalFinitePolePlaces (F := F) (S := S) (lattice(χ, v, t, n)) ∧
@@ -1982,9 +2085,12 @@ private theorem sLocalOrbitalFourierJet_lattice_schwartz_rapidSequence (g : ℤ 
       rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ by positivity) (hs j)]
       exact ENNReal.ofReal_lt_top
 
-/-- The maximal elementary stage of the discrete group ℤ realizes its rapidly decreasing sequences. -/
-private theorem sLocalOrbitalFourierJet_lattice_schwartz_integerSchwartz (g : ℤ → ℂ)
-    (hg : ∀ N : ℕ, ∃ C > (0 : ℝ), ∀ n : ℤ, ‖g n‖ ≤ C / (1 + |(n : ℝ)|)^N) :
+/-- Helper for `sLocalOrbitalFourierJet_lattice_schwartz`.
+A complex sequence on the integer lattice that decays faster than every reciprocal power is
+the restriction of a Schwartz-Bruhat function on the integers. This carries no analytic
+input: the rapid decay of the coefficients is the whole hypothesis. -/
+private theorem sLocalOrbitalFourierJet_lattice_schwartz_bridge (g : ℤ → ℂ)
+    (hg : ∀ N : ℕ, ∃ C : ℝ, 0 < C ∧ ∀ n : ℤ, ‖g n‖ ≤ C / (1 + |(n : ℝ)|) ^ N) :
     ∃ a : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, a (Multiplicative.ofAdd n) = g n := by
   obtain ⟨s, hs⟩ := sLocalOrbitalFourierJet_lattice_schwartz_rapidSequence g hg
 
@@ -2044,8 +2150,14 @@ theorem sLocalOrbitalFourierJet_lattice_schwartz
           k < sLocalPrimaryPoleMultiplicity (F := F) (S := S) p c then
           iteratedDeriv k (fourierZeta(c) f) 0
         else 0 := by
-  apply sLocalOrbitalFourierJet_lattice_schwartz_integerSchwartz
-  exact sLocalOrbitalFourierJet_lattice_schwartz_valueDecay p χ v t f k
+  obtain ⟨a, ha⟩ := sLocalOrbitalFourierJet_lattice_schwartz_bridge
+    (fun n : ℤ ↦ if v ∈ sLocalFinitePolePlaces (F := F) (S := S) (lattice(χ, v, t, n)) ∧
+        k < sLocalPrimaryPoleMultiplicity (F := F) (S := S) p (lattice(χ, v, t, n)) then
+        iteratedDeriv k (fourierZeta(lattice(χ, v, t, n)) f) 0
+      else 0)
+    (fun N ↦ sLocalOrbitalFourierJet_lattice_schwartz_valueDecay
+      (F := F) (S := S) p χ v u t _hS _hp _hPic _hv _hu _ht f k N)
+  exact ⟨a, fun n ↦ ha n⟩
 
 end LatticeEstimates
 

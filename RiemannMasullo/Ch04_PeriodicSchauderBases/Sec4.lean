@@ -141,6 +141,22 @@ theorem modulatedMellin_split (f : D) (s : ℂ) (hs : s.re ∈ I) :
     rw [hμ, integral_map hφ.measurable.aemeasurable hc.aestronglyMeasurable]
     exact (integral_prod_symm (H ∘ φ) hprod).trans (integral_congr_ae (.of_forall hfiber))
 
+include hms hτ in
+private theorem splitCharacter_mem_relativeVerticalStrip (c : QuasiCharacter G)
+    (ω : PontryaginDual K) (s : ℂ) (hs : s.re ∈ I)
+    (hc : ∀ (k : K) (t : ℝ≥0ˣ),
+      c (k.val * τ t) = (ω k : ℂ) * ((t.val : ℝ) : ℂ) ^ s) :
+    c ∈ relativeVerticalStrip m.toMonoidHom hm.1 hm.2 I := by
+  let t : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  have ht : (t.val : ℝ) = 2 := by norm_num [t]
+  obtain ⟨g, hg⟩ := hms t
+  have hz : c (τ (m g)) = (((m g).val : ℝ) : ℂ) ^ s := by simpa using hc 1 (m g)
+  have hn := norm_quasiCharacter_eq_rpow_abscissa m.toMonoidHom hm.1 hm.2 c (τ (m g))
+  change ‖c (τ (m g))‖ = ((m (τ (m g))).val : ℝ) ^ _ at hn
+  rw [hz, hτ, hg, ht, Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num : (0 : ℝ) < 2)] at hn
+  change quasiCharacterAbscissa _ _ _ c ∈ I
+  rwa [← (Real.rpow_right_inj (by norm_num : (0 : ℝ) < 2) (by norm_num)).mp hn]
+
 include hOpen hInt hne hms hτ hμ in
 /-- Paper: Equation (4.4.1.2), p. 190. The Mellin transform identifies the decay
 space with the completed inductive tensor of the compact dual's Schwartz–Bruhat
@@ -156,7 +172,61 @@ theorem modulatedMellin_tensor_equiv :
       ∀ (f : D) (c : QuasiCharacter G) (ω : PontryaginDual K) (s : ℂ), s.re ∈ I →
         (∀ (k : K) (t : ℝ≥0ˣ),
           c (k.val * τ t) = (ω k : ℂ) * ((t.val : ℝ) : ℂ) ^ s) →
-        modulatedFourierMellin m I hm μ f.val c = (j (F f) ω).val s := by sorry
+        modulatedFourierMellin m I hm μ f.val c = (j (F f) ω).val s := by
+  classical
+  intro U
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SFinite positiveRealHaar := by unfold positiveRealHaar; infer_instance
+  let mass : ℝ≥0 := (μ₁ univ).toNNReal
+  have hm0 : mass ≠ 0 := by
+    exact (ENNReal.toNNReal_pos (NeZero.ne (μ₁ univ)) (measure_ne_top _ _)).ne'
+  have hmass : (mass : ℝ≥0∞) = μ₁ univ := ENNReal.coe_toNNReal (measure_ne_top _ _)
+  let ν₁ : Measure K := mass⁻¹ • μ₁
+  let ν : Measure G := mass⁻¹ • μ
+  let : ν₁.IsHaarMeasure := Measure.IsHaarMeasure.nnreal_smul _ (inv_ne_zero hm0)
+  let : ν.IsHaarMeasure := Measure.IsHaarMeasure.nnreal_smul _ (inv_ne_zero hm0)
+  have hprob : ν₁ univ = 1 := by
+    change (mass⁻¹ : ℝ≥0) • μ₁ univ = 1
+    rw [← hmass, ← ENNReal.coe_smul, smul_eq_mul, inv_mul_cancel₀ hm0, ENNReal.coe_one]
+  have hν : ν = (ν₁.prod positiveRealHaar).map (fun z : K × ℝ≥0ˣ ↦ z.1.val * τ z.2) := by
+    have hcont : Continuous (fun z : K × ℝ≥0ˣ ↦ z.1.val * τ z.2) :=
+      (continuous_subtype_val.comp continuous_fst).mul (τ.continuous.comp continuous_snd)
+    rw [show ν₁ = mass⁻¹ • μ₁ from rfl, Measure.prod_smul_left,
+      Measure.map_smul _ hcont.measurable.aemeasurable, ← hμ]
+  refine (modulatedExponentialDecay_tensor_equiv m I hm hInt hne τ hτ).elim fun e he ↦ ?_
+  let tensor := modulatedFourierMellin_tensor m I hm hInt hne τ hτ ν hOpen ν₁ hprob hν e he
+  refine tensor.elim fun _ hf ↦ ?_
+  refine hf.elim fun F hF ↦ ?_
+  refine hF.elim fun j hj ↦ ?_
+  have hinj := hj.2.2.1
+  have hpure := hj.2.2.2.1
+  have hcoord := hj.2.2.2.2
+  let c₀ : ℂ := (mass : ℝ)
+  have hc₀ : c₀ ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr hm0)
+  let scale : D ≃L[ℂ] D := {
+    LinearEquiv.smulOfNeZero ℂ D c₀ hc₀ with
+    continuous_toFun := continuous_const_smul _
+    continuous_invFun := continuous_const_smul _ }
+  with_reducible_and_instances refine ⟨scale.trans (e.symm.trans F), j, hinj, hpure, ?_⟩
+  intro f c ω s hs hc
+  have hstrip := splitCharacter_mem_relativeVerticalStrip m hm hms I τ hτ c ω s hs hc
+  have hco := hcoord (e.symm (scale f)) ⟨c,hstrip⟩ ω ⟨s,hs⟩ hc
+  let obs (v : D) := modulatedFourierMellin m I hm ν v.val c
+  have hv := congrArg obs (e.apply_symm_apply (scale f))
+  simp only [ContinuousLinearEquiv.trans_apply]
+  dsimp only [obs] at hv
+  have hintegral : modulatedFourierMellin m I hm μ f.val c =
+      modulatedFourierMellin m I hm ν (scale f).val c := by
+    simp only [modulatedFourierMellin, indicator_of_mem hstrip]
+    change (∫ g, f.val g * c g ∂μ) = ∫ g, (c₀ * f.val g) * c g ∂(mass⁻¹ • μ)
+    simp_rw [mul_assoc]
+    rw [integral_const_mul, integral_smul_nnreal_measure]
+    change _ = ((mass : ℝ) : ℂ) * ((((mass⁻¹ : ℝ≥0) : ℝ) : ℂ) * _)
+    rw [← mul_assoc, ← Complex.ofReal_mul, ← NNReal.coe_mul, mul_inv_cancel₀ hm0]
+    simp
+  exact hintegral.trans (hv.symm.trans hco)
 
 /-- Paper: Discussion 4.4.1.1, p. 191. A unitary character has a unique real
 frequency along the fixed positive-real section. -/

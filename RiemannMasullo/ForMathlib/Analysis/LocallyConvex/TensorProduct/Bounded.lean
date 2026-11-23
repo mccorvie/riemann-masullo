@@ -9,7 +9,7 @@ import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.Completion
 
 public section
 
-open Set Topology TopologicalSpace Bornology UniformSpace TensorProduct
+open Set Filter Topology TopologicalSpace Bornology UniformSpace TensorProduct
 open scoped TensorProduct
 
 namespace RiemannMasullo
@@ -127,6 +127,154 @@ lemma IsNuclearTVS.tensorComparison.{u, v} {X : Type u} {Y : Type v}
     rfl
   exact (⟨Equiv.refl (X ⊗[ℂ] Y), continuous_projectiveTensor_to_injectiveTensor X Y, hback⟩ :
     ProjectiveTensor X Y ≃ₜ InjectiveTensor X Y).isHomeomorph
+
+/-- A nuclear right factor also identifies the projective and injective tensor topologies. -/
+lemma IsNuclearTVS.tensorComparison_right.{u, v} {X : Type u} {Y : Type v}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] (hY : IsNuclearTVS.{u} Y) :
+    @IsHomeomorph (ProjectiveTensor X Y) (InjectiveTensor X Y) _ _ id := by
+  let := hY.1
+  let := hY.2.1
+  have hc : @Continuous (InjectiveTensor Y X) (ProjectiveTensor Y X) _ _ id :=
+    hY.tensorComparison.isInducing.continuous_iff.mpr (@continuous_id (InjectiveTensor Y X) _)
+  let S : ProjectiveTensor Y X →ₗ[ℂ] ProjectiveTensor X Y := (TensorProduct.comm ℂ Y X).toLinearMap
+  have hpoly : PolynormableSpace ℂ (ProjectiveTensor X Y) :=
+    (projectiveTensor_withSeminorms X Y).toPolynormableSpace
+  have hswap : @Continuous (ProjectiveTensor Y X) (ProjectiveTensor X Y) _ _
+      (TensorProduct.comm ℂ Y X) := by
+    change Continuous S
+    apply (continuous_projectiveTensor_iff (E := Y) (F := X) (G := ProjectiveTensor X Y) S).mpr
+    exact (continuous_projectiveTensor_tmul (E := X) (F := Y)).comp continuous_swap
+  have hback : @Continuous (InjectiveTensor X Y) (ProjectiveTensor X Y) _ _ id :=
+    (hswap.comp (hc.comp (continuous_injectiveTensor_comm X Y))).congr fun z ↦
+      (TensorProduct.comm ℂ X Y).symm_apply_apply z
+  exact (⟨Equiv.refl (X ⊗[ℂ] Y), continuous_projectiveTensor_to_injectiveTensor X Y, hback⟩ :
+    ProjectiveTensor X Y ≃ₜ InjectiveTensor X Y).isHomeomorph
+
+private theorem norm_le_seminorm_of_ball_subset {X : Type*} [AddCommGroup X] [Module ℂ X]
+    (q : Seminorm ℂ X) (L : X →ₗ[ℂ] ℂ) {r : ℝ} (hr : 0 < r)
+    (h : ∀ x, q x < r → ‖L x‖ ≤ 1) (x : X) :
+    ‖L x‖ ≤ q x / r := by
+  refine le_of_forall_pos_le_add fun ε hε ↦ ?_
+  let v := q x / r + ε
+  have hv : 0 < v := add_pos_of_nonneg_of_pos (div_nonneg (apply_nonneg q x) hr.le) hε
+  let c : ℂ := (v⁻¹ : ℝ)
+  have hcn : ‖c‖ = v⁻¹ := Complex.norm_of_nonneg (inv_nonneg.mpr hv.le)
+  have hq : q (c • x) < r := by
+    rw [map_smul_eq_mul, hcn, inv_mul_eq_div, div_lt_iff₀ hv]
+    dsimp only [v]
+    rw [mul_add, mul_div_cancel₀ _ hr.ne']
+    exact lt_add_of_pos_right _ (mul_pos hr hε)
+  have hx := h _ hq
+  rw [map_smul, norm_smul, hcn, inv_mul_eq_div, div_le_iff₀ hv, one_mul] at hx
+  exact hx
+
+private theorem tensorDualForm_commute {E F : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F] [T2Space F]
+    (u : StrongDual ℂ E) (v : StrongDual ℂ F) (z : E ⊗[ℂ] F) :
+    tensorDualForm u v z = tensorDualForm v u (TensorProduct.comm ℂ E F z) := by
+  induction z using TensorProduct.inductionOn with
+  | tmul x y => rw [TensorProduct.comm_tmul, tensorDualForm_tmul, tensorDualForm_tmul, mul_comm]
+  | add z w hz hw => simp only [map_add, hz, hw]
+
+/-- The injective topology uses only the evaluations that represent the
+generating seminorms of both factors. -/
+theorem injectiveTensor_isEmbedding_of_generating_evaluations {E F H I J : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F] [T2Space F]
+    [AddCommGroup H] [Module ℂ H] [TopologicalSpace H] [IsTopologicalAddGroup H]
+    {p : SeminormFamily ℂ E I} {q : SeminormFamily ℂ F J}
+    (hp : WithSeminorms p) (hq : WithSeminorms q)
+    {A : I → Type*} {B : J → Type*}
+    (a : ∀ i, A i → StrongDual ℂ E) (b : ∀ j, B j → StrongDual ℂ F)
+    (ha : ∀ i x {M : ℝ}, 0 ≤ M → (∀ s, ‖a i s x‖ ≤ M) → p i x ≤ M)
+    (hb : ∀ j y {M : ℝ}, 0 ≤ M → (∀ t, ‖b j t y‖ ≤ M) → q j y ≤ M)
+    (φ : InjectiveTensor E F →ₗ[ℂ] H) (hφ : Continuous φ)
+    (hbound : ∀ i j, ∃ r : Seminorm ℂ H, Continuous r ∧ ∀ s t z,
+      ‖tensorDualForm (a i s) (b j t) z‖ ≤ r (φ z)) :
+    IsEmbedding φ := by
+  classical
+  choose r hr hrt using hbound
+  let T := InjectiveTensor E F
+  have := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have := PolynormableSpace.isTopologicalAddGroup ℂ F
+  have : T2Space T := injectiveTensor_t2
+  have : IsTopologicalAddGroup T := inferInstance
+  have hi : IsInducing φ := by
+    apply (IsTopologicalAddGroup.isInducing_iff_nhds_zero (f := φ)).mpr
+    refine le_antisymm (hφ.continuousAt.tendsto.mono_right ?_ |> tendsto_iff_comap.mp) ?_
+    · rw [map_zero]
+    let pn (UV : {U : Set E // U ∈ 𝓝 0} × {V : Set F // V ∈ 𝓝 0}) :
+        Seminorm ℂ T := injectiveTensorSeminorm UV.1 UV.2
+    rw [((SeminormFamily.withSeminorms_iff_nhds_eq_iInf pn).mp (withGeneratingSeminorms_spec _ _))]
+    refine le_iInf fun ⟨U, V⟩ ↦ ?_
+    refine ((Metric.nhds_basis_ball (x := (0 : ℝ))).comap (pn (U, V))).ge_iff.mpr fun ε hε ↦ ?_
+    obtain ⟨⟨s, ρ⟩, hρ, hs⟩ := hp.hasBasis_zero_ball.mem_iff.mp U.property
+    obtain ⟨⟨t, σ⟩, hσ, ht⟩ := hq.hasBasis_zero_ball.mem_iff.mp V.property
+    let R : Seminorm ℂ H := (s ×ˢ t).sup (fun ij ↦ r ij.1 ij.2)
+    have hR : Continuous R := by
+      exact Seminorm.continuous_finsetSup fun ij _ ↦ hr ij.1 ij.2
+    have hN := R.ball_mem_nhds hR (show 0 < ε * ρ * σ by positivity)
+    refine Filter.mem_of_superset (Filter.preimage_mem_comap hN) fun z hz ↦ ?_
+    have hzR : R (φ z) < ε * ρ * σ := R.mem_ball_zero.mp hz
+    have hM : 0 ≤ R (φ z) := apply_nonneg _ _
+    change E ⊗[ℂ] F at z
+    change injectiveTensorSeminorm U V z ∈ Metric.ball 0 ε
+    rw [Metric.mem_ball, dist_zero_right, Real.norm_of_nonneg (apply_nonneg (injectiveTensorSeminorm U V) z)]
+    suffices hh : injectiveTensorSeminorm U V z ≤ R (φ z) / ρ / σ by
+      apply hh.trans_lt
+      exact (div_lt_iff₀ hσ).mpr ((div_lt_iff₀ hρ).mpr (by simpa [mul_right_comm] using hzR))
+    rw [injectiveTensorSeminorm_apply]
+    let : Nonempty (StrongDual.polar ℂ U.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    let : Nonempty (StrongDual.polar ℂ V.val) := (StrongDual.polar_nonempty ℂ _).to_subtype
+    apply ciSup_le
+    intro L
+    apply ciSup_le
+    intro M
+    have hL (x : E) : ‖L.val x‖ ≤ (s.sup p) x / ρ :=
+      norm_le_seminorm_of_ball_subset _ L.val.toLinearMap hρ
+        (fun x hx ↦ L.property x (hs ((s.sup p).mem_ball_zero.mpr hx))) x
+    have hM' (y : F) : ‖M.val y‖ ≤ (t.sup q) y / σ :=
+      norm_le_seminorm_of_ball_subset _ M.val.toLinearMap hσ
+        (fun y hy ↦ M.property y (ht ((t.sup q).mem_ball_zero.mpr hy))) y
+    have hEval (i) (hi : i ∈ s) (j) (hj : j ∈ t) (u : A i) (v : B j) :
+        ‖tensorDualForm (a i u) (b j v) z‖ ≤ R (φ z) :=
+      (hrt i j u v z).trans (Seminorm.le_finset_sup_apply (p := fun ij : I × J ↦ r ij.1 ij.2)
+        (x := φ z) (i := (i, j)) (Finset.mem_product.mpr ⟨hi, hj⟩))
+    rw [← tensorDualOperator_eval]
+    refine (hM' _).trans (div_le_div_of_nonneg_right ?_ hσ.le)
+    apply Seminorm.finset_sup_apply_le
+    · positivity
+    · intro j hj
+      refine hb j _ (by positivity) fun v ↦ ?_
+      rw [tensorDualOperator_eval, tensorDualForm_commute, ← tensorDualOperator_eval]
+      refine (hL _).trans (div_le_div_of_nonneg_right ?_ hρ.le)
+      apply Seminorm.finset_sup_apply_le hM
+      intro i hi
+      refine ha i _ hM fun u ↦ ?_
+      rw [tensorDualOperator_eval, ← tensorDualForm_commute]
+      exact hEval i hi j hj u v
+  exact ⟨hi, hi.injective⟩
+
+/-- When both projective tensor topologies agree with the injective ones,
+tensoring a pair of embeddings remains an embedding. -/
+theorem projectiveTensorMap_isEmbedding_of_comparisons {E F G H : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup F] [Module ℂ F] [TopologicalSpace F] [PolynormableSpace ℂ F] [T2Space F]
+    [AddCommGroup G] [Module ℂ G] [TopologicalSpace G] [PolynormableSpace ℂ G] [T2Space G]
+    [AddCommGroup H] [Module ℂ H] [TopologicalSpace H] [PolynormableSpace ℂ H] [T2Space H]
+    (f : E →L[ℂ] G) (g : F →L[ℂ] H) (hf : IsEmbedding f) (hg : IsEmbedding g)
+    (h₁ : @IsHomeomorph (ProjectiveTensor E F) (InjectiveTensor E F) _ _ id)
+    (h₂ : @IsHomeomorph (ProjectiveTensor G H) (InjectiveTensor G H) _ _ id) :
+    IsEmbedding (projectiveTensorMap f.toLinearMap g.toLinearMap) := by
+  have h := h₂.homeomorph.symm.isEmbedding.comp
+    ((injectiveTensorMap_isEmbedding f g hf hg).comp h₁.isEmbedding)
+  have he : (h₂.homeomorph.symm ∘ injectiveTensorMap f.toLinearMap g.toLinearMap ∘ id :
+      ProjectiveTensor E F → ProjectiveTensor G H) = projectiveTensorMap f.toLinearMap g.toLinearMap :=
+    funext fun z ↦ h₂.homeomorph.symm_apply_apply (projectiveTensorMap f.toLinearMap g.toLinearMap z)
+  rw [← he]
+  exact h
 
 section Stages
 
