@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.AppC_LCTVS.Sec2a_part2
+public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.Analysis.InnerProductSpace.PiL2
@@ -11,6 +12,12 @@ public import Mathlib.Topology.Algebra.PontryaginDual
 public import Mathlib.Topology.ContinuousMap.ZeroAtInfty
 public import Mathlib.Topology.ContinuousMap.CompactlySupported
 import RiemannMasullo.ForMathlib.Analysis.Calculus.FDeriv.Symmetric
+import RiemannMasullo.ForMathlib.Analysis.Calculus.IteratedDeriv.UnitCube
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.TensorProduct.Bounded
+import Mathlib.Data.Set.Finite.List
+import Mathlib.LinearAlgebra.TensorProduct.Pi
+import Mathlib.Topology.Algebra.Module.Equiv.Pi
 import RiemannMasullo.ForMathlib.Analysis.InnerProductSpace.PiL2
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SmoothFamily
 import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Separation
@@ -2905,7 +2912,11 @@ variable (ν : Measure (G ⧸ H)) (hν : IsWeilQuotientMeasure H μ Measure.coun
 set_option linter.unusedSectionVars false in
 include hH hΔ hbij hν in
 /-- Paper: Proposition D.1.2.4, p. 748. Borel measurability on the quotient
-can be tested on the pullback restricted to a Borel fundamental domain. -/
+can be tested on the pullback restricted to a Borel fundamental domain.
+Deviation: The page states the equivalence for measurability with respect to the quotient
+measure and the Haar measure of the group. This is the form for Borel measurability, which
+is what the printed proof establishes; the form for the two completed measures is not
+stated here. -/
 theorem weilFundamentalDomain_measurable_iff (f : G ⧸ H → ℂ) :
     Measurable f ↔ Measurable (Δ.indicator (fun x ↦ f (QuotientGroup.mk x))) := by
   let : BorelSpace (G ⧸ H) := ⟨rfl⟩
@@ -5321,6 +5332,450 @@ theorem elementarySchwartz_isFrechet : IsFrechetTVS (ElementarySchwartz m n r F)
 
 end Elementary
 
+section ElementarySchwartzNuclearity
+
+universe v
+
+/-- The product of the one-dimensional summable lattice weights is summable
+over every finite product of integer lattices. -/
+theorem summable_lattice_product {J : Type*} [Fintype J] :
+    Summable (fun k : J → ℤ ↦ ∏ j, (1 + (k j : ℝ)^2)⁻¹) := by
+  classical
+  have h₁ : Summable (fun k : ℤ ↦ (1 + (k : ℝ)^2)⁻¹) := by
+    have h := (Real.summable_one_div_int_pow (p := 2)).mpr (by norm_num)
+    apply (summable_of_ne_finset_zero (s := ({0} : Finset ℤ)) (f := fun k : ℤ ↦ if k = 0 then (1:ℝ) else 0)
+      (by simp)).add h |>.of_nonneg_of_le (fun _ ↦ by positivity)
+    intro k
+    by_cases hk : k = 0
+    · simp [hk]
+    · simp only [ite_eq_right hk, zero_add, one_div]
+      exact inv_anti₀ (sq_pos_of_ne_zero (Int.cast_ne_zero.mpr hk)) (by linarith)
+  have hFin (n : ℕ) : Summable (fun k : Fin n → ℤ ↦ ∏ i, (1 + (k i : ℝ)^2)⁻¹) := by
+    induction n with
+    | zero => exact .of_finite
+    | succ n ih =>
+      have h := h₁.mul_of_nonneg ih (fun _ ↦ by positivity) (fun _ ↦ Finset.prod_nonneg fun _ _ ↦ by positivity)
+      apply (Fin.consEquiv (fun _ : Fin (n+1) ↦ ℤ)).summable_iff.mp
+      simpa [Function.comp_def, Fin.prod_univ_succ, mul_comm] using h
+  let e := Fintype.equivFin J
+  let t := Equiv.arrowCongr e (Equiv.refl ℤ)
+  apply (t.summable_iff.mpr (hFin (Fintype.card J))).congr
+  intro k
+  change (∏ i, (1 + (k (e.symm i) : ℝ)^2)⁻¹) = _
+  exact e.symm.prod_comp (fun i ↦ (1 + (k i : ℝ)^2)⁻¹)
+
+private def schwartzCubeWeight {J : Type*} [Fintype J] (d : J → ℕ) (k : J → ℤ) : ℝ :=
+  ∏ j, ((2 * (1 + (k j : ℝ)^2))^(d j) * (1 + (k j : ℝ)^2))
+
+private def schwartzCubePolynomial {J : Type*} [Fintype J] (d : J → ℕ) : MvPolynomial J ℂ :=
+  ∏ j, (8 * (1 + MvPolynomial.X j ^ 2))^(d j + 1)
+
+/-- A single positive polynomial controls the lattice weight throughout the unit cube. -/
+private theorem schwartzCubeWeight_le {J : Type*} [Fintype J] (d : J → ℕ) (k : J → ℤ)
+    (x : J → ℝ) (hx : ∀ j, (k j : ℝ) ≤ x j ∧ x j ≤ k j + 1) :
+    schwartzCubeWeight d k ≤ ‖MvPolynomial.eval (fun j ↦ (x j : ℂ)) (schwartzCubePolynomial d)‖ := by
+  unfold schwartzCubeWeight schwartzCubePolynomial
+  rw [map_prod, norm_prod]
+  apply Finset.prod_le_prod₀ (fun j _ ↦ by positivity) (fun j _ ↦ ?_)
+  have hpos : 0 ≤ 8 * (1 + x j ^ 2) := by positivity
+  have he : MvPolynomial.eval (fun j ↦ (x j : ℂ)) (8 * (1 + MvPolynomial.X j ^ 2)) =
+      ((8 * (1 + x j ^ 2) : ℝ) : ℂ) := by simp
+  rw [map_pow, he, norm_pow, Complex.norm_real, Real.norm_of_nonneg hpos, pow_succ]
+  have hsmall : (k j : ℝ)^2 ≤ 2*x j^2 + 2 := by
+    have hl := mul_nonneg (sub_nonneg.mpr (hx j).1) (sub_nonneg.mpr (hx j).2)
+    nlinarith [sq_nonneg (x j - ((k j : ℝ) - x j))]
+  have h₁ : 0 ≤ 2 * (1 + (k j : ℝ)^2) := by positivity
+  have h₂ : 2 * (1+(k j : ℝ)^2) ≤ 8*(1+x j^2) := by linarith [sq_nonneg (x j)]
+  exact mul_le_mul (pow_le_pow_left₀ h₁ h₂ (d j)) (by linarith [sq_nonneg (k j : ℝ)]) (by exact add_nonneg zero_le_one (sq_nonneg (k j : ℝ))) (pow_nonneg hpos _)
+
+/-- Multiplying by a coordinate monomial spends only the polynomial part of the
+weight, leaving a summable factor on the cube labels. -/
+private theorem schwartzCube_monomial_weight {J : Type*} [Fintype J] (d : J → ℕ) (k : J → ℤ)
+    (x : J → ℝ) (hx : ∀ j, (k j : ℝ) ≤ x j ∧ x j ≤ k j + 1) :
+    (∏ j, |x j|^d j) ≤ (∏ j, (1 + (k j : ℝ)^2)⁻¹) * schwartzCubeWeight d k := by
+  rw [schwartzCubeWeight, ← Finset.prod_mul_distrib]
+  apply Finset.prod_le_prod₀ (fun _ _ ↦ by positivity) (fun j _ ↦ ?_)
+  rw [mul_left_comm, inv_mul_cancel₀ (by positivity), mul_one]
+  apply pow_le_pow_left₀ (abs_nonneg _) (abs_le.mpr ⟨?_,?_⟩)
+  · linarith [(hx j).1, sq_nonneg ((k j : ℝ)+1), sq_nonneg (k j : ℝ)]
+  · linarith [(hx j).2, sq_nonneg ((k j : ℝ)-1), sq_nonneg (k j : ℝ)]
+
+/-- Evaluation of a higher derivative on fixed vectors is a fixed finite
+linear combination of coordinate partials. -/
+theorem elementary_iterated_expansion {m n r k : ℕ} {F : Type*}
+    (v : Fin k → EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
+    ∃ (s : Finset ((Fin m → ℕ) × (Fin n → ℕ))) (c : ((Fin m → ℕ) × (Fin n → ℕ)) → ℝ),
+      ∀ (f : ElementaryLieGroup m n r F → ℂ) a b,
+      ContDiff ℝ ∞ (fun x ↦ f (elementaryCover x a b)) → ∀ x,
+        iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b)) x v =
+          ∑ p ∈ s, c p • elementaryPartial f p.1 p.2 x a b := by
+  classical
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let J := Fin m ⊕ Fin n
+  let B : Module.Basis J ℝ X :=
+    (EuclideanSpace.basisFun (Fin m) ℝ).toBasis.prod (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
+  let dirs (b : Fin m → ℕ) (g : Fin n → ℕ) : List J :=
+    (List.ofFn fun i ↦ List.replicate (b i) (Sum.inl i)).flatten ++
+      (List.ofFn fun i ↦ List.replicate (g i) (Sum.inr i)).flatten
+  have hdirs (b : Fin m → ℕ) (g : Fin n → ℕ) :
+      (dirs b g).map B =
+        (List.ofFn fun i ↦ List.replicate (b i) (EuclideanSpace.single i 1, 0)).flatten ++
+        (List.ofFn fun i ↦ List.replicate (g i) (0, EuclideanSpace.single i 1)).flatten := by
+    have hInl (i : Fin m) : B (.inl i) = (EuclideanSpace.single i 1, 0) := by
+      dsimp only [B]
+      rw [Module.Basis.prod_apply]
+      simp only [Sum.elim_inl, Function.comp_apply, OrthonormalBasis.coe_toBasis,
+        EuclideanSpace.basisFun_apply, LinearMap.inl_apply]
+    have hInr (i : Fin n) : B (.inr i) = (0, EuclideanSpace.single i 1) := by
+      dsimp only [B]
+      rw [Module.Basis.prod_apply]
+      simp only [Sum.elim_inr, Function.comp_apply, OrthonormalBasis.coe_toBasis,
+        EuclideanSpace.basisFun_apply, LinearMap.inr_apply]
+    simp only [dirs, List.map_append, List.map_flatten, List.map_ofFn, Function.comp_def,
+      List.map_replicate, hInl, hInr]
+  have hpartial (f : ElementaryLieGroup m n r F → ℂ) (a : Fin r → ℤ) (b : F)
+      (d : Fin m → ℕ) (e : Fin n → ℕ) (x : X) :
+      elementaryPartial f d e x a b =
+        iteratedFDeriv ℝ (dirs d e).length (fun z ↦ f (elementaryCover z a b)) x
+          (fun i ↦ B ((dirs d e).get i)) := by
+    dsimp only [elementaryPartial]
+    rw [← hdirs d e]
+    have hlength (k : ℕ) (hk : k = (dirs d e).length) :
+        iteratedFDeriv ℝ k (fun z ↦ f (elementaryCover z a b)) x
+          (fun i ↦ B ((dirs d e).get (Fin.cast hk i))) =
+          iteratedFDeriv ℝ (dirs d e).length (fun z ↦ f (elementaryCover z a b)) x
+            (fun i ↦ B ((dirs d e).get i)) := by
+      subst k
+      rfl
+    have hlen : ((dirs d e).map B).length = (dirs d e).length := List.length_map B
+    have hget : ((dirs d e).map B).get =
+        fun i ↦ B ((dirs d e).get (Fin.cast hlen i)) := by
+      funext i
+      simp only [List.get_eq_getElem, List.getElem_map, Fin.val_cast]
+    rw [hget]
+    exact hlength _ hlen
+  let T := Fin k → J
+  let indices (t : T) : (Fin m → ℕ) × (Fin n → ℕ) :=
+    (fun i ↦ (List.ofFn t).count (.inl i), fun j ↦ (List.ofFn t).count (.inr j))
+  let coeff (t : T) := ∏ i, B.repr (v i) (t i)
+  let s := Finset.univ.image indices
+  refine ⟨s, fun p ↦ ∑ t ∈ Finset.univ.filter (fun t ↦ indices t = p), coeff t, ?_⟩
+  intro f a' b' hf x
+  let f₀ : X → ℂ := fun z ↦ f (elementaryCover z a' b')
+  let D := iteratedFDeriv ℝ k f₀ x
+  have hPerm (t : T) : (List.ofFn t).Perm (dirs (indices t).1 (indices t).2) := by
+    apply List.perm_iff_count.mpr
+    intro j
+    cases j with
+    | inl i =>
+      simp [dirs, indices, List.count_flatten, List.map_ofFn, List.count_replicate, List.sum_ofFn]
+      rw [Finset.sum_eq_single i]
+      · simp
+      · intro j _ hj
+        exact ite_eq_right (fun h ↦ hj (Sum.inl.inj h))
+      · simp
+    | inr i =>
+      simp [dirs, indices, List.count_flatten, List.map_ofFn, List.count_replicate, List.sum_ofFn]
+      rw [Finset.sum_eq_single i]
+      · simp
+      · intro j _ hj
+        exact ite_eq_right (fun h ↦ hj (Sum.inr.inj h))
+      · simp
+  have hterm (t : T) : D (fun i ↦ B (t i)) =
+      elementaryPartial f (indices t).1 (indices t).2 x a' b' := by
+    rw [hpartial]
+    have hlength (n : ℕ) (hk : n = k) :
+        iteratedFDeriv ℝ n f₀ x (fun i ↦ B (t (Fin.cast hk i))) =
+          D (fun i ↦ B (t i)) := by
+      subst n
+      rfl
+    rw [← hlength _ List.length_ofFn]
+    simpa only [f₀, List.get_ofFn] using
+      iteratedFDeriv_apply_list_perm hf B (hPerm t) x
+  change D.toMultilinearMap v = _
+  conv_lhs => rw [show v = (fun i ↦ ∑ j, B.repr (v i) j • B j) from
+    funext fun i ↦ (B.sum_repr (v i)).symm]
+  rw [D.toMultilinearMap.map_sum]
+  simp_rw [D.toMultilinearMap.map_smul_univ, ContinuousMultilinearMap.coe_coe,
+    hterm, Finset.sum_smul]
+  rw [← Finset.sum_fiberwise_of_maps_to (t := s)
+    (fun t _ ↦ Finset.mem_image_of_mem indices (Finset.mem_univ t))]
+  refine Finset.sum_congr rfl fun p _ ↦ Finset.sum_congr rfl fun t ht ↦ ?_
+  rw [(Finset.mem_filter.mp ht).2]
+  rfl
+
+/-- Choosing the opposite phase at each value of a functional realizes the sum
+of their norms as the norm of one signed sum. -/
+private theorem sum_norm_linear_signed {E : Type*} [AddCommGroup E] [Module ℂ E]
+    (L : E →ₗ[ℂ] ℂ) {n : ℕ} (f : Fin n → E) :
+    ∃ c : Fin n → ℂ, (∀ i, ‖c i‖ ≤ 1) ∧ ∑ i, ‖L (f i)‖ = ‖L (∑ i, c i • f i)‖ := by
+  let c (i) : ℂ := (‖L (f i)‖ : ℂ) / L (f i)
+  have hc (i) : ‖c i‖ ≤ 1 := by
+    change ‖(‖L (f i)‖ : ℂ) / L (f i)‖ ≤ 1
+    rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _)]
+    exact div_self_le_one _
+  have he (i) : c i * L (f i) = (‖L (f i)‖ : ℂ) := by
+    by_cases h : L (f i) = 0
+    · simp [c,h]
+    · exact div_mul_cancel₀ _ h
+  refine ⟨c,hc,?_⟩
+  simp only [map_sum, map_smul, smul_eq_mul, he, ← Complex.ofReal_sum, Complex.norm_real,
+    Real.norm_of_nonneg (Finset.sum_nonneg fun i _ ↦ norm_nonneg _)]
+
+/-- Each polynomially weighted directional derivative admits a neighborhood
+bound for the sum of absolute evaluations at a common point. -/
+private theorem elementary_signed_point_bound {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (p : MvPolynomial (Fin m ⊕ Fin r) ℂ)
+    (v : List (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n))) :
+    ∃ U ∈ 𝓝 (0 : ElementarySchwartz m n r F), ∀ (N : ℕ) (f : Fin N → ElementarySchwartz m n r F),
+      (∀ c : Fin N → ℂ, (∀ i, ‖c i‖ ≤ 1) → ∑ i, c i • f i ∈ U) →
+      ∀ x a b, ‖MvPolynomial.eval (Sum.elim (fun i ↦ (x.1 i : ℂ)) (fun j ↦ (a j : ℂ))) p‖ *
+        ∑ i, ‖listDerivative (fun y ↦ f i (elementaryCover y a b)) v x‖ ≤ 1 := by
+  classical
+  let E := ElementarySchwartz m n r F
+  obtain ⟨T, c, hT⟩ := elementary_iterated_expansion (r := r) (F := F) v.get
+  choose q hq hqp using fun t : (Fin m → ℕ) × (Fin n → ℕ) ↦
+    elementarySchwartz_polynomial_weight_continuous_seminorm (F := F) p t.1 t.2
+  let Q : Seminorm ℂ E := ∑ t ∈ T, ‖c t‖₊ • q t
+  have hQ : Continuous Q := Seminorm.continuous_finsetSum fun t _ ↦ (hq t).const_smul _
+  refine ⟨Q.ball 0 1, Q.ball_mem_nhds hQ zero_lt_one, fun N f hcomb x a b ↦ ?_⟩
+  let w := MvPolynomial.eval (Sum.elim (fun i ↦ (x.1 i : ℂ)) (fun j ↦ (a j : ℂ))) p
+  choose L hL using fun t : (Fin m → ℕ) × (Fin n → ℕ) ↦
+    elementaryPartial_evaluation_continuousLinear (F := F) t.1 t.2 x a b
+  let D : E →ₗ[ℂ] ℂ := ∑ t ∈ T, (c t : ℂ) • (L t).toLinearMap
+  have hD (s : E) : D s = listDerivative (fun y ↦ s (elementaryCover y a b)) v x := by
+    rw [listDerivative, hT s.val a b (s.property.1 a b) x]
+    simp [D, hL, Complex.real_smul]
+  have hle (s : E) : ‖w‖ * ‖D s‖ ≤ Q s := by
+    have hqv (t) : ‖w‖ * ‖L t s‖ ≤ q t s := by
+      rw [hL]
+      apply (ENNReal.ofReal_le_ofReal_iff (apply_nonneg _ _)).mp
+      rw [hqp]
+      exact le_iSup_of_le x (le_iSup_of_le a (le_iSup_of_le b le_rfl))
+    change _ ≤ FunLike.coeAddMonoidHom _ _ _ (∑ t ∈ T, ‖c t‖₊ • q t) s
+    rw [map_sum, Finset.sum_apply]
+    simp only [D, LinearMap.sum_apply, LinearMap.smul_apply, ContinuousLinearMap.coe_coe]
+    apply (mul_le_mul_of_nonneg_left (norm_sum_le _ _) (norm_nonneg w)).trans
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum fun t ht ↦ ?_
+    rw [norm_smul, Complex.norm_real, mul_left_comm]
+    exact mul_le_mul_of_nonneg_left (hqv t) (norm_nonneg _)
+  obtain ⟨c', hc', hsum⟩ := sum_norm_linear_signed D f
+  change ‖w‖ * _ ≤ _
+  simp_rw [← hD, hsum]
+  exact (hle _).trans (Q.mem_ball_zero.mp (hcomb c' hc')).le
+
+/-- Assemble the real and torus coordinates of one unit cube. -/
+private def schwartzCubeMap (m n : ℕ) : ((Fin m ⊕ Fin n) → ℝ) →L[ℝ]
+    EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) :=
+  let getR := ContinuousLinearMap.pi (fun i : Fin m ↦ ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : Fin m ⊕ Fin n ↦ ℝ) (.inl i))
+  let getT := ContinuousLinearMap.pi (fun j : Fin n ↦ ContinuousLinearMap.proj (R := ℝ) (φ := fun _ : Fin m ⊕ Fin n ↦ ℝ) (.inr j))
+  (((EuclideanSpace.equiv (Fin m) ℝ).symm.toContinuousLinearMap).comp getR).prod
+    (((EuclideanSpace.equiv (Fin n) ℝ).symm.toContinuousLinearMap).comp getT)
+
+private def schwartzCubeOrigin {m n r : ℕ} (k : (Fin m ⊕ Fin r) → ℤ) :
+    EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n) :=
+  (WithLp.toLp 2 (fun i ↦ (k (.inl i) : ℝ)),0)
+
+/-- On each real cube and lattice fibre a fixed extra polynomial weight
+controls the sum of mixed partials even at independently chosen points. -/
+private theorem elementary_signed_cube_bound {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (d : (Fin m ⊕ Fin r) → ℕ) (v : List (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n))) :
+    ∃ U ∈ 𝓝 (0 : ElementarySchwartz m n r F), ∀ (N : ℕ) (f : Fin N → ElementarySchwartz m n r F),
+      (∀ c : Fin N → ℂ, (∀ i, ‖c i‖ ≤ 1) → ∑ i, c i • f i ∈ U) →
+      ∀ (k : (Fin m ⊕ Fin r) → ℤ) b (u : Fin N → (Fin m ⊕ Fin n) → ℝ), (∀ i j, u i j ∈ Icc 0 1) →
+      ∑ i, ‖listDerivative (fun x ↦ f i (elementaryCover x (fun j ↦ k (.inr j)) b)) v
+        (schwartzCubeOrigin k + schwartzCubeMap m n (u i))‖ ≤ 2^Fintype.card (Fin m ⊕ Fin n) / schwartzCubeWeight d k := by
+  classical
+  let J := Fin m ⊕ Fin n
+  let A := schwartzCubeMap m n
+  let p := schwartzCubePolynomial d
+  choose U hU he using fun l : List J ↦ elementary_signed_point_bound (F := F) p (l.map (fun j ↦ A (Pi.single j 1)) ++ v)
+  let T := {l : List J | l.length ≤ Fintype.card J}
+  refine ⟨⋂ l ∈ T, U l, (Filter.biInter_mem (List.finite_length_le J _)).mpr fun l _ ↦ hU l, fun N f hc k b u hu ↦ ?_⟩
+  let origin := schwartzCubeOrigin (n := n) k
+  let z (j : Fin r) := k (.inr j)
+  have hW : 0 < schwartzCubeWeight d k := Finset.prod_pos fun _ _ ↦ by positivity
+  rw [div_eq_mul_inv]
+  apply sum_norm_of_cube_bounds A origin _ (fun i ↦ (f i).property.1 z b) v _ _ u hu
+  intro l hl x hx
+  let y := origin + A x
+  let coord := Sum.elim (fun i : Fin m ↦ y.1 i) (fun j : Fin r ↦ (z j : ℝ))
+  have hcoord (j) : (k j : ℝ) ≤ coord j ∧ coord j ≤ k j + 1 := by
+    cases j with
+    | inl i =>
+      change (k (.inl i) : ℝ) ≤ (k (.inl i) : ℝ) + x (.inl i) ∧ (k (.inl i) : ℝ) + x (.inl i) ≤ k (.inl i) + 1
+      constructor <;> linarith [(hx (.inl i)).1,(hx (.inl i)).2]
+    | inr j => change (k (.inr j) : ℝ) ≤ k (.inr j) ∧ (k (.inr j) : ℝ) ≤ k (.inr j) + 1; exact ⟨le_rfl, by linarith⟩
+  have hC := he l N f (fun c hc' ↦ mem_iInter₂.mp (hc c hc') l hl) y z b
+  have hw := schwartzCubeWeight_le d k coord hcoord
+  have hz : (fun j ↦ (coord j : ℂ)) = Sum.elim (fun i ↦ (y.1 i : ℂ)) (fun j ↦ (z j : ℂ)) := by
+    funext j
+    cases j with
+    | inl i => rfl
+    | inr i => exact Complex.ofReal_intCast _
+  rw [hz] at hw
+  rw [← mul_one (schwartzCubeWeight d k)⁻¹]
+  apply (le_inv_mul_iff₀ hW).mpr
+  exact (mul_le_mul_of_nonneg_right hw (Finset.sum_nonneg fun _ _ ↦ norm_nonneg _)).trans hC
+
+/-- Each elementary seminorm can be estimated at one lifted point up to a
+factor of two. The zero seminorm value permits any point. -/
+private theorem elementary_some_weighted_value {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (i : ElementarySchwartzIndex m n r) (f : ElementarySchwartz m n r F) :
+    ∃ x a b, elementarySchwartzSeminorm i f ≤ 2 * ‖((∏ j, (x.1 j : ℂ)^i.1 j) *
+      (∏ j, (a j : ℂ)^i.2.2.2 j)) * elementaryPartial f i.2.1 i.2.2.1 x a b‖ := by
+  let q := elementarySchwartzSeminorm i f
+  by_cases h : q = 0
+  · refine ⟨0,0,0,?_⟩
+    change q ≤ _
+    rw [h]
+    positivity
+  by_contra! hu
+  have hle : elementarySchwartzBound f.val i ≤ ENNReal.ofReal (q/2) := by
+    refine iSup_le fun x ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+    rw [← ENNReal.ofReal_coe_nnreal]
+    apply ENNReal.ofReal_le_ofReal
+    rw [le_div_iff₀ (by norm_num : (0:ℝ)<2), mul_comm]
+    exact (hu x a b).le
+  have hq := ENNReal.toReal_mono ENNReal.ofReal_ne_top hle
+  have hqpos : 0 ≤ q / 2 := div_nonneg (apply_nonneg _ _) (by norm_num)
+  rw [ENNReal.toReal_ofReal hqpos] at hq
+  change q ≤ q / 2 at hq
+  exact h (le_antisymm (by linarith) (apply_nonneg _ _))
+
+/-- Regroup a finite sum by labels and dominate it by a summable majorant. -/
+private theorem sum_le_tsum_of_label {N : ℕ} {T : Type*} [DecidableEq T] (label : Fin N → T) (f : Fin N → ℝ)
+    (g : T → ℝ) (hg : Summable g) (hpos : ∀ t, 0 ≤ g t)
+    (h : ∀ t, ∑ i ∈ Finset.univ.filter (fun i ↦ label i = t), f i ≤ g t) :
+    ∑ i, f i ≤ ∑' t, g t := by
+  classical
+  let S := Finset.univ.image label
+  rw [← Finset.sum_fiberwise_of_maps_to (t := S) (fun i hi ↦ Finset.mem_image_of_mem label hi)]
+  exact (Finset.sum_le_sum fun t _ ↦ h t).trans (hg.sum_le_tsum S (fun t _ ↦ hpos t))
+
+/-- Each seminorm of an elementary Schwartz space satisfies the absolute
+summability estimate on a suitable neighborhood of signed sums. -/
+private theorem elementary_seminorm_signed_bound {m n r : ℕ} {F : Type*}
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (idx : ElementarySchwartzIndex m n r) :
+    ∃ U ∈ 𝓝 (0 : ElementarySchwartz m n r F), ∃ C : ℝ, 0 ≤ C ∧
+      ∀ (N : ℕ) (f : Fin N → ElementarySchwartz m n r F),
+        (∀ c : Fin N → ℂ, (∀ i, ‖c i‖ ≤ 1) → ∑ i, c i • f i ∈ U) →
+          ∑ i, elementarySchwartzSeminorm idx (f i) ≤ C := by
+  classical
+  let J := Fin m ⊕ Fin n
+  let K := Fin m ⊕ Fin r
+  let X := EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)
+  let d : K → ℕ := Sum.elim idx.1 idx.2.2.2
+  let v : List X := (List.ofFn fun j ↦ List.replicate (idx.2.1 j) (EuclideanSpace.single j 1,0)).flatten ++
+    (List.ofFn fun j ↦ List.replicate (idx.2.2.1 j) (0,EuclideanSpace.single j 1)).flatten
+  let dec (k : K → ℤ) := ∏ j, (1 + (k j : ℝ)^2)⁻¹
+  have hdec : Summable dec := summable_lattice_product
+  have hdec0 (k) : 0 ≤ dec k := Finset.prod_nonneg fun _ _ ↦ by positivity
+  let B : ℝ := 2^Fintype.card J
+  let g (w : (K → ℤ) × F) := (2*B) * dec w.1
+  have hg : Summable g := by
+    have hs := hdec.mul_of_nonneg (show Summable (fun _ : F ↦ (1:ℝ)) from .of_finite) hdec0 (fun _ ↦ zero_le_one)
+    simpa only [g,mul_one] using hs.mul_left (2*B)
+  have hpos (w) : 0 ≤ g w := mul_nonneg (by positivity) (hdec0 w.1)
+  obtain ⟨U,hU,hC⟩ := elementary_signed_cube_bound (F := F) d v
+  refine ⟨U,hU,∑' w, g w, tsum_nonneg hpos, fun N f hc ↦ ?_⟩
+  choose x a b hv using fun i ↦ elementary_some_weighted_value idx (f i)
+  let k (i : Fin N) : K → ℤ := Sum.elim (fun j ↦ ⌊(x i).1 j⌋) (a i)
+  let u (i : Fin N) : J → ℝ := Sum.elim (fun j ↦ Int.fract ((x i).1 j)) (fun j ↦ Int.fract ((x i).2 j))
+  have hu (i j) : u i j ∈ Icc 0 1 := by
+    cases j <;> exact ⟨Int.fract_nonneg _,(Int.fract_lt_one _).le⟩
+  let y (i : Fin N) := schwartzCubeOrigin (n := n) (k i) + schwartzCubeMap m n (u i)
+  have hyR (i j) : (y i).1 j = (x i).1 j := by
+    change (⌊(x i).1 j⌋ : ℝ) + Int.fract ((x i).1 j) = _
+    exact Int.floor_add_fract _
+  have hycover (i) : elementaryCover (x i) (a i) (b i) = elementaryCover (y i) (a i) (b i) := by
+    refine Prod.ext (by ext j; exact (hyR i j).symm) (Prod.ext (funext fun j ↦ ?_) rfl)
+    change (((x i).2 j : ℝ) : AddCircle (1:ℝ)) = ((0 + Int.fract ((x i).2 j) : ℝ) : AddCircle (1:ℝ))
+    simp
+  let D (w : (K → ℤ) × F) (i : Fin N) := ‖listDerivative
+    (fun t ↦ f i (elementaryCover t (fun j ↦ w.1 (.inr j)) w.2)) v
+    (schwartzCubeOrigin w.1 + schwartzCubeMap m n (u i))‖
+  let label (i : Fin N) := (k i,b i)
+  have htest (i) : elementarySchwartzSeminorm idx (f i) ≤ 2 * (dec (k i) * schwartzCubeWeight d (k i)) * D (label i) i := by
+    have hpartial := (elementaryPartial_descends (f i).val idx.2.1 idx.2.2.1 (a i) (b i)
+      ((f i).property.1 (a i) (b i))).2 _ _ (hycover i)
+    have hmul : ‖(∏ j, ((x i).1 j : ℂ)^idx.1 j) * (∏ j, (a i j : ℂ)^idx.2.2.2 j)‖ ≤
+        dec (k i) * schwartzCubeWeight d (k i) := by
+      let z : K → ℝ := Sum.elim (fun j ↦ (x i).1 j) (fun j ↦ (a i j : ℝ))
+      have hz (j) : (k i j : ℝ) ≤ z j ∧ z j ≤ k i j + 1 := by
+        cases j with
+        | inl j => exact ⟨Int.floor_le _, (Int.lt_floor_add_one _).le⟩
+        | inr j => exact ⟨le_rfl, le_add_of_nonneg_right zero_le_one⟩
+      have h := schwartzCube_monomial_weight d (k i) z hz
+      rw [Fintype.prod_sum_type] at h
+      simpa [norm_mul, norm_prod, norm_pow, Complex.norm_real, Complex.norm_intCast, Real.norm_eq_abs, d,z,dec] using h
+    have hv' := hv i
+    change elementarySchwartzSeminorm idx (f i) ≤ 2 * ‖_ * elementaryPartial (f i).val idx.2.1 idx.2.2.1 (x i) (a i) (b i)‖ at hv'
+    rw [norm_mul, hpartial, ← mul_assoc] at hv'
+    exact hv'.trans (mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_left hmul (by norm_num)) (norm_nonneg _))
+  refine sum_le_tsum_of_label label _ g hg hpos (fun w ↦ ?_)
+  let S := Finset.univ.filter (fun i ↦ label i = w)
+  have hW : 0 < schwartzCubeWeight d w.1 := Finset.prod_pos fun _ _ ↦ by positivity
+  have hle : ∑ i ∈ S, elementarySchwartzSeminorm idx (f i) ≤ ∑ i ∈ S, (2*(dec w.1 * schwartzCubeWeight d w.1)) * D w i := by
+    refine Finset.sum_le_sum fun i hi ↦ ?_
+    have he := (Finset.mem_filter.mp hi).2
+    have hk : k i = w.1 := congrArg Prod.fst he
+    calc
+      _ ≤ 2 * (dec (k i) * schwartzCubeWeight d (k i)) * D (label i) i := htest i
+      _ = _ := congrArg₂ (· * ·) (congrArg (fun k ↦ 2 * (dec k * schwartzCubeWeight d k)) hk) (congrArg (fun w ↦ D w i) he)
+  rw [← Finset.mul_sum] at hle
+  have hnn : 0 ≤ 2 * (dec w.1 * schwartzCubeWeight d w.1) := mul_nonneg (by norm_num) (mul_nonneg (hdec0 _) hW.le)
+  have hsub : ∑ i ∈ S, D w i ≤ ∑ i, D w i := Finset.sum_le_univ_sum_of_nonneg fun i ↦ norm_nonneg _
+  refine hle.trans ((mul_le_mul_of_nonneg_left hsub hnn).trans ?_)
+  have hs : ∑ i, D w i ≤ B / schwartzCubeWeight d w.1 := hC N f hc w.1 w.2 u hu
+  refine (mul_le_mul_of_nonneg_left hs hnn).trans_eq ?_
+  change _ = 2 * B * dec w.1
+  field_simp
+
+/-- It suffices to check the signed-sum criterion on a generating family of
+seminorms: the bounds are stable under sums, nonnegative multiples and domination. -/
+private theorem nuclear_of_generating_signed_bounds {E I : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [T2Space E] [PolynormableSpace ℂ E] (p : I → Seminorm ℂ E)
+    (hp : WithSeminorms p) (h : ∀ i, ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧
+      ∀ (N : ℕ) (f : Fin N → E), (∀ c : Fin N → ℂ, (∀ i, ‖c i‖ ≤ 1) → ∑ i, c i • f i ∈ U) →
+        ∑ j, p i (f j) ≤ C) : IsNuclearTVS.{v} E := by
+  let P (q : Seminorm ℂ E) := ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧
+    ∀ (N : ℕ) (f : Fin N → E), (∀ c : Fin N → ℂ, (∀ i, ‖c i‖ ≤ 1) → ∑ i, c i • f i ∈ U) →
+        ∑ j, q (f j) ≤ C
+  apply isNuclearTVS_of_signedSum_bound
+  intro q hq
+  apply hp.induction_add_of_continuous (motive := P) h _ _ _ _ hq
+  · exact ⟨univ,univ_mem,0,le_rfl,by simp⟩
+  · intro p q hp hq
+    obtain ⟨U,hU,C,hC,hu⟩ := hp
+    obtain ⟨V,hV,D,hD,hv⟩ := hq
+    refine ⟨U ∩ V,inter_mem hU hV,C+D,add_nonneg hC hD,fun N f h ↦ ?_⟩
+    simpa only [add_apply, Finset.sum_add_distrib] using add_le_add
+      (hu N f fun c hc ↦ (h c hc).1) (hv N f fun c hc ↦ (h c hc).2)
+  · rintro p q hp ⟨U,hU,C,hC,h⟩
+    exact ⟨U,hU,C,hC,fun N f hc ↦ (Finset.sum_le_sum (fun i _ ↦ hp (f i))).trans (h N f hc)⟩
+  · rintro p t ⟨U,hU,C,hC,h⟩
+    refine ⟨U,hU,t*C,mul_nonneg t.property hC,fun N f hc ↦ ?_⟩
+    change (∑ j, (t : ℝ) * p (f j)) ≤ _
+    rw [← Finset.mul_sum]
+    exact mul_le_mul_of_nonneg_left (h N f hc) t.property
+
+/-- Smoothness controls independent evaluations on each unit cube, and rapid
+decay makes the resulting cube bounds summable. -/
+theorem elementarySchwartz_nuclear_of_finite {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
+    IsNuclearTVS.{v} (ElementarySchwartz m n r F) := by
+  let : T2Space (ElementarySchwartz m n r F) := elementarySchwartz_t2
+  exact nuclear_of_generating_signed_bounds elementarySchwartzSeminorm elementarySchwartz_withSeminorms
+    elementary_seminorm_signed_bound
+
+end ElementarySchwartzNuclearity
+
 section ElementaryTensor
 
 variable {m n r : ℕ} {F : Type*}
@@ -5467,8 +5922,9 @@ theorem rapidDecaySequenceSeminorm_zero (s : RapidDecaySequence r) :
   rw [rapidDecaySequenceBound, ENNReal.tsum_toReal_eq (fun a ↦ by simp)]
   simp
 
-/-- Paper: Remark D.1.3.6, p. 753. The weighted sums generate the topology
-and give a Fréchet space. -/
+/-- Paper: Remark D.1.3.6 and its sequel, pp. 752–753. The weighted sum seminorms
+generate the topology of the rapidly decaying sequence space. Its Fréchet property is stated
+separately in `rapidDecaySequence_isFrechet`. -/
 theorem rapidDecaySequence_withSeminorms :
     WithSeminorms (E := RapidDecaySequence r) rapidDecaySequenceSeminorm :=
   withGeneratingSeminorms_spec _ _
@@ -5899,6 +6355,481 @@ def elementarySchwartzTmul (u : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ)
     ElementarySchwartzTensor m n r F :=
   (u ⊗ₜ[ℂ] v) ⊗ₜ[ℂ] (s ⊗ₜ[ℂ] c)
 
+section ElementarySchwartzTensorProof
+
+open TensorProduct
+
+/-- Reading a Euclidean Schwartz function in the real coordinate gives a
+continuous linear equivalence with the corresponding elementary Schwartz space. -/
+private theorem elementarySchwartz_tensorRealFactor_equiv (m : ℕ) :
+    ∃ e : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ ≃L[ℂ] ElementarySchwartz m 0 0 PUnit.{1},
+      ∀ f g, e f g = f g.1 := by
+  let X := EuclideanSpace ℝ (Fin m)
+  let S := SchwartzMap X ℂ
+  let E := ElementarySchwartz m 0 0 PUnit.{1}
+  let A : S →ₗ[ℂ] E :=
+    { toFun := fun f ↦ ⟨fun g ↦ f g.1, (elementarySchwartzSubmodule_real_iff f).mpr ⟨f, rfl⟩⟩
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  have hA (f : S) (g : ElementaryLieGroup m 0 0 PUnit.{1}) : A f g = f g.1 := rfl
+  have hbij : Function.Bijective A := by
+    refine ⟨fun f g h ↦ SchwartzMap.ext fun x ↦
+      congrArg (fun u : E ↦ u (x, 0, 0, PUnit.unit)) h, fun f ↦ ?_⟩
+    let u (x : X) := f (x, 0, 0, PUnit.unit)
+    have h (g : ElementaryLieGroup m 0 0 PUnit.{1}) : u g.1 = f g :=
+      congrArg f.val (Prod.ext rfl (Subsingleton.elim _ _))
+    obtain ⟨s, hs⟩ := (elementarySchwartzSubmodule_real_iff u).mp
+      ((funext h).symm ▸ f.property)
+    exact ⟨s, Subtype.ext (funext fun g ↦ (congrFun hs g.1).trans (h g))⟩
+  let : CompleteSpace S := completeSpace_schwartzMap
+  have : (uniformity S).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero S]
+    infer_instance
+  have hS : IsFrechetTVS S := by
+    refine ⟨inferInstance, (schwartz_withSeminorms ℂ X ℂ).toPolynormableSpace,
+      UniformSpace.metrizableSpace, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  let : BarrelledSpace ℂ S := isFrechetTVS_barrelled hS
+  let : T2Space E := elementarySchwartz_t2
+  have hcont : Continuous A := by
+    apply continuous_toElementarySchwartz_of_eval
+    intro g
+    let L : S →ₗ[ℂ] ℂ :=
+      { toFun := fun f ↦ f g.1, map_add' := fun _ _ ↦ rfl, map_smul' := fun _ _ ↦ rfl }
+    have hL : Continuous L :=
+      (continuous_eval_const (F := BoundedContinuousFunction X ℂ) g.1).comp (SchwartzMap.toBoundedContinuousFunctionCLM ℂ X ℂ).continuous
+    exact ⟨⟨L, hL⟩, fun _ ↦ rfl⟩
+  let A' : S →L[ℂ] E := ⟨A, hcont⟩
+  have hE : IsFrechetTVS E := elementarySchwartz_isFrechet
+  obtain ⟨k, B, hBA⟩ := frechet_factorization (fun _ ↦ hS) (fun _ ↦ A')
+    (fun _ ↦ hbij.1) (fun _ ↦ le_rfl) (fun x ↦ ⟨0, hbij.2 x⟩) hE (ContinuousLinearMap.id ℂ E)
+  let e := LinearEquiv.ofBijective A hbij
+  have hB (x : E) : e.symm x = B x :=
+    hbij.1 ((e.apply_symm_apply x).trans (DFunLike.congr_fun hBA x).symm)
+  exact ⟨{ e with continuous_toFun := hcont, continuous_invFun := B.continuous.congr (fun x ↦ (hB x).symm) }, hA⟩
+
+/-- Separating the finite coordinate identifies its elementary Schwartz space
+with a finite product of elementary Schwartz spaces. -/
+private theorem elementarySchwartz_finiteFamily (m n r : ℕ) (F : Type*) [Finite F] :
+    ∃ e : (F → ElementarySchwartz m n r PUnit.{1}) ≃L[ℂ] ElementarySchwartz m n r F,
+      ∀ u x, e u x = u x.2.2.2 (x.1, x.2.1, x.2.2.1, PUnit.unit) := by
+  classical
+  let := Fintype.ofFinite F
+  let G := ElementaryLieGroup m n r F
+  let G₁ := ElementaryLieGroup m n r PUnit.{1}
+  let E := ElementarySchwartz m n r F
+  let E₁ := ElementarySchwartz m n r PUnit.{1}
+  let mk (u : F → G₁ → ℂ) (x : G) := u x.2.2.2 (x.1,x.2.1,x.2.2.1,PUnit.unit)
+  let sl (f : G → ℂ) (b : F) (x : G₁) := f (x.1,x.2.1,x.2.2.1,b)
+  have hmk (u : F → G₁ → ℂ) (i : ElementarySchwartzIndex m n r) :
+      elementarySchwartzBound (mk u) i ≤ ∑ b, elementarySchwartzBound (u b) i := by
+    apply iSup_le; intro x; apply iSup_le; intro a; apply iSup_le; intro b
+    apply le_trans _ (Finset.single_le_sum (f := fun b ↦ elementarySchwartzBound (u b) i)
+      (fun _ _ ↦ zero_le) (Finset.mem_univ b))
+    exact le_iSup_of_le x (le_iSup_of_le a (le_iSup_of_le PUnit.unit le_rfl))
+  have hsl (f : G → ℂ) (b : F) (i : ElementarySchwartzIndex m n r) :
+      elementarySchwartzBound (sl f b) i ≤ elementarySchwartzBound f i := by
+    apply iSup_le; intro x; apply iSup_le; intro a; apply iSup_le; intro _
+    exact le_iSup_of_le x (le_iSup_of_le a (le_iSup_of_le b le_rfl))
+  let forward (u : F → E₁) : E := by
+    refine (⟨mk (fun b ↦ (u b).val), ?_, ?_⟩ : elementarySchwartzSubmodule m n r F)
+    · intro a b
+      exact (u b).property.1 a PUnit.unit
+    · intro i
+      exact (hmk (fun b ↦ (u b).val) i).trans_lt
+        (ENNReal.sum_lt_top.mpr fun b _ ↦ (u b).property.2 i)
+  let back (f : E) (b : F) : E₁ := by
+    refine (⟨sl f.val b, ?_, ?_⟩ : elementarySchwartzSubmodule m n r PUnit.{1})
+    · intro a _
+      exact f.property.1 a b
+    · intro i
+      exact (hsl f.val b i).trans_lt (f.property.2 i)
+  let e : (F → E₁) ≃ₗ[ℂ] E :=
+    { toFun := forward
+      invFun := back
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      left_inv := fun u ↦ funext fun b ↦ Subtype.ext (funext fun ⟨x,t,a,b'⟩ ↦
+        congrArg (fun z ↦ (u b).val (x,t,a,z)) (Subsingleton.elim _ b'))
+      right_inv := fun _ ↦ rfl }
+  have hE : WithSeminorms (E := E) elementarySchwartzSeminorm := withGeneratingSeminorms_spec _ _
+  have hE₁ : WithSeminorms (E := E₁) elementarySchwartzSeminorm := withGeneratingSeminorms_spec _ _
+  have hfor : Continuous e := by
+    apply hE.continuous_of_continuous_comp e.toLinearMap
+    intro i
+    let p (b : F) : Seminorm ℂ (F → E₁) := (elementarySchwartzSeminorm i).comp (LinearMap.proj b)
+    apply Seminorm.continuous_of_le (q := ∑ b, p b)
+    · exact Seminorm.continuous_finsetSum fun b _ ↦
+        (hE₁.continuous_seminorm i).comp (continuous_apply b)
+    · intro u
+      have h := ENNReal.toReal_mono (ENNReal.sum_ne_top.mpr fun b _ ↦ ((u b).property.2 i).ne)
+        (hmk (fun b ↦ (u b).val) i)
+      rw [ENNReal.toReal_sum (fun b _ ↦ ((u b).property.2 i).ne)] at h
+      change _ ≤ FunLike.coeAddMonoidHom (Seminorm ℂ (F → E₁)) (F → E₁) ℝ (∑ b, p b) u
+      rw [map_sum, Finset.sum_apply]
+      exact h
+  have hback : Continuous e.symm := by
+    apply continuous_pi
+    intro b
+    let L : E →ₗ[ℂ] E₁ := (LinearMap.proj b).comp e.symm.toLinearMap
+    apply hE₁.continuous_of_continuous_comp L
+    intro i
+    apply Seminorm.continuous_of_le (hE.continuous_seminorm i)
+    intro f
+    exact ENNReal.toReal_mono (f.property.2 i).ne (hsl f.val b i)
+  exact ⟨⟨e, hfor, hback⟩, fun _ _ ↦ rfl⟩
+
+private theorem projectiveTensor_finiteFamily {E : Type*} [AddCommGroup E] [Module ℂ E]
+    [TopologicalSpace E] [PolynormableSpace ℂ E] [T2Space E] (F : Type*) [Finite F] :
+    ∃ e : ProjectiveTensor E (F → ℂ) ≃L[ℂ] (F → E),
+      ∀ u c b, e (u ⊗ₜ[ℂ] c) b = c b • u := by
+  classical
+  let := Fintype.ofFinite F
+  let := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let := PolynormableSpace.continuousSMul ℂ E
+  let : PolynormableSpace ℂ (F → ℂ) := (norm_withSeminorms ℂ _).toPolynormableSpace
+  let e : ProjectiveTensor E (F → ℂ) ≃ₗ[ℂ] (F → E) := TensorProduct.piScalarRight ℂ ℂ E F
+  have hfor : Continuous e := by
+    apply (continuous_projectiveTensor_iff (E := E) (F := F → ℂ) (G := F → E) e.toLinearMap).mpr
+    apply continuous_pi
+    intro b
+    exact ((continuous_apply b).comp continuous_snd).smul continuous_fst
+  let P := ProjectiveTensor E (F → ℂ)
+  let : IsTopologicalAddGroup P := inferInstanceAs (IsTopologicalAddGroup (ProjectiveTensor E (F → ℂ)))
+  let : PolynormableSpace ℂ P := inferInstanceAs (PolynormableSpace ℂ (ProjectiveTensor E (F → ℂ)))
+  have htm : @Continuous (E × (F → ℂ)) P _ _ (fun p ↦ p.1 ⊗ₜ[ℂ] p.2) :=
+    (continuous_projectiveTensor_iff (E := E) (F := F → ℂ) (G := ProjectiveTensor E (F → ℂ))
+      LinearMap.id).mp continuous_id
+  have hback : Continuous e.symm := by
+    have hs (u : F → E) : e.symm u = ∑ b, (u b ⊗ₜ[ℂ] Pi.single b (1 : ℂ)) := by
+      conv_lhs => rw [← Finset.univ_sum_single u, map_sum]
+      exact Finset.sum_congr rfl fun b _ ↦ TensorProduct.piScalarRight_symm_single ℂ ℂ E F (u b) b
+    have hs' (b : F) : @Continuous (F → E) P _ _ (fun u ↦ u b ⊗ₜ[ℂ] Pi.single b (1 : ℂ)) :=
+      htm.comp (Continuous.prodMk (continuous_apply b)
+        (continuous_const (y := (Pi.single b 1 : F → ℂ))))
+    exact (continuous_finsetSum _ fun b _ ↦ hs' b).congr fun u ↦ (hs u).symm
+  exact ⟨⟨e,hfor,hback⟩, fun _ _ _ ↦ rfl⟩
+
+private theorem elementarySchwartz_latticeFinite_equiv (r : ℕ) (F : Type*) [Finite F] :
+    ∃ e : ProjectiveTensor (RapidDecaySequence r) (F → ℂ) ≃L[ℂ] ElementarySchwartz 0 0 r F,
+      ∀ s c (g : ElementaryLieGroup 0 0 r F), e (s ⊗ₜ[ℂ] c) g = s g.2.2.1 * c g.2.2.2 := by
+  obtain ⟨A, hA⟩ := rapidDecaySequence_equiv_elementarySchwartz.{0} (r := r)
+  let : T2Space (ElementarySchwartz 0 0 r PUnit.{1}) := elementarySchwartz_t2
+  let : T2Space (RapidDecaySequence r) := A.toHomeomorph.isEmbedding.t2Space
+  obtain ⟨B, hB⟩ := projectiveTensor_finiteFamily (E := RapidDecaySequence r) F
+  obtain ⟨D, hD⟩ := elementarySchwartz_finiteFamily 0 0 r F
+  let C := ContinuousLinearEquiv.piCongrRight (fun _ : F ↦ A)
+  refine ⟨(B.trans C).trans D, fun s c g ↦ ?_⟩
+  calc
+    _ = _ := hD (C (B (s ⊗ₜ[ℂ] c))) g
+    _ = _ := hA (B (s ⊗ₜ[ℂ] c) g.2.2.2) (g.1, g.2.1, g.2.2.1, PUnit.unit)
+    _ = _ := congrArg (fun v : RapidDecaySequence r ↦ v g.2.2.1) (hB s c g.2.2.2)
+    _ = _ := mul_comm _ _
+
+/-- A point on the cover together with its discrete fibre. -/
+private abbrev ElementaryCoverPoint (m n r : ℕ) (F : Type*) :=
+  (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) × (Fin r → ℤ) × F
+
+/-- The weighted derivative defining each elementary Schwartz seminorm. -/
+private def elementaryWeightedJet {m n r : ℕ} {F : Type*}
+    (f : ElementaryLieGroup m n r F → ℂ) (i : ElementarySchwartzIndex m n r)
+    (p : ElementaryCoverPoint m n r F) : ℂ :=
+  elementarySchwartzMonomial i.1 i.2.2.2 p.1.1 p.2.1 *
+    elementaryPartial f i.2.1 i.2.2.1 p.1 p.2.1 p.2.2
+
+/-- Each weighted derivative evaluation is a continuous linear functional. -/
+private theorem exists_elementaryWeightedJetCLM {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (i : ElementarySchwartzIndex m n r) (p : ElementaryCoverPoint m n r F) :
+    ∃ L : StrongDual ℂ (ElementarySchwartz m n r F), ∀ f, L f = elementaryWeightedJet f i p := by
+  obtain ⟨L, hL⟩ := elementaryPartial_evaluation_continuousLinear i.2.1 i.2.2.1 p.1 p.2.1 p.2.2
+  exact ⟨elementarySchwartzMonomial i.1 i.2.2.2 p.1.1 p.2.1 • L,
+    fun f ↦ congrArg (_ * ·) (hL f)⟩
+
+/-- A bound on all weighted derivative evaluations bounds the defining seminorm. -/
+private theorem elementarySchwartzSeminorm_le_of_weightedJet {m n r : ℕ} {F : Type*}
+    (f : ElementarySchwartz m n r F) (i : ElementarySchwartzIndex m n r)
+    {M : ℝ} (hM : 0 ≤ M) (h : ∀ p, ‖elementaryWeightedJet f i p‖ ≤ M) :
+    elementarySchwartzSeminorm i f ≤ M := by
+  change (elementarySchwartzBound f.val i).toReal ≤ M
+  rw [← ENNReal.ofReal_le_ofReal_iff hM, ENNReal.ofReal_toReal (f.property.2 i).ne]
+  refine iSup_le fun x ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+  change (‖elementaryWeightedJet f i (x, a, b)‖₊ : ℝ≥0∞) ≤ _
+  rw [← ENNReal.ofReal_coe_nnreal, coe_nnNorm]
+  exact ENNReal.ofReal_le_ofReal (h (x, a, b))
+
+/-- Each weighted derivative evaluation is bounded by its defining seminorm. -/
+private theorem norm_elementaryWeightedJet_le {m n r : ℕ} {F : Type*}
+    (f : ElementarySchwartz m n r F) (i : ElementarySchwartzIndex m n r)
+    (p : ElementaryCoverPoint m n r F) :
+    ‖elementaryWeightedJet f i p‖ ≤ elementarySchwartzSeminorm i f := by
+  change (‖elementaryWeightedJet f i p‖₊ : ℝ≥0∞).toReal ≤ _
+  exact ENNReal.toReal_mono (f.property.2 i).ne
+    (le_iSup_of_le p.1 (le_iSup_of_le p.2.1 (le_iSup_of_le p.2.2 le_rfl)))
+
+/-- If derivatives and weights separate into two factors, pointwise multiplication
+induces an embedding from the injective tensor of the factor spaces. -/
+private theorem elementary_product_tensor {m₁ n₁ r₁ m₂ n₂ r₂ m n r : ℕ}
+    {F₁ F₂ F : Type*} [AddCommGroup F₁] [TopologicalSpace F₁] [DiscreteTopology F₁] [Finite F₁]
+    [AddCommGroup F₂] [TopologicalSpace F₂] [DiscreteTopology F₂] [Finite F₂]
+    [AddCommGroup F] [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (pr : ElementaryLieGroup m n r F → ElementaryLieGroup m₁ n₁ r₁ F₁ × ElementaryLieGroup m₂ n₂ r₂ F₂)
+    (π : ElementaryCoverPoint m n r F → ElementaryCoverPoint m₁ n₁ r₁ F₁ × ElementaryCoverPoint m₂ n₂ r₂ F₂)
+    (idx : ElementarySchwartzIndex m n r → ElementarySchwartzIndex m₁ n₁ r₁ × ElementarySchwartzIndex m₂ n₂ r₂)
+    (hπ : Function.Surjective π) (hi : Function.Surjective idx)
+    (hsmooth : ∀ (f : ElementarySchwartz m₁ n₁ r₁ F₁) (g : ElementarySchwartz m₂ n₂ r₂ F₂) a b,
+      ContDiff ℝ ∞ (fun x ↦ f (pr (elementaryCover x a b)).1 * g (pr (elementaryCover x a b)).2))
+    (hjet : ∀ (f : ElementarySchwartz m₁ n₁ r₁ F₁) (g : ElementarySchwartz m₂ n₂ r₂ F₂) i p,
+      elementaryWeightedJet (fun v ↦ f (pr v).1 * g (pr v).2) i p =
+        elementaryWeightedJet f (idx i).1 (π p).1 * elementaryWeightedJet g (idx i).2 (π p).2)
+    (hcomp : @IsHomeomorph (ProjectiveTensor (ElementarySchwartz m₁ n₁ r₁ F₁)
+      (ElementarySchwartz m₂ n₂ r₂ F₂))
+      (InjectiveTensor (ElementarySchwartz m₁ n₁ r₁ F₁) (ElementarySchwartz m₂ n₂ r₂ F₂)) _ _ id) :
+    ∃ φ : ProjectiveTensor (ElementarySchwartz m₁ n₁ r₁ F₁) (ElementarySchwartz m₂ n₂ r₂ F₂)
+        →ₗ[ℂ] ElementarySchwartz m n r F,
+      IsEmbedding φ ∧ ∀ f g x, φ (f ⊗ₜ[ℂ] g) x = f (pr x).1 * g (pr x).2 := by
+  classical
+  let E := ElementarySchwartz m₁ n₁ r₁ F₁
+  let D := ElementarySchwartz m₂ n₂ r₂ F₂
+  let H := ElementarySchwartz m n r F
+  let : PolynormableSpace ℂ E := elementarySchwartz_withSeminorms.toPolynormableSpace
+  let : PolynormableSpace ℂ D := elementarySchwartz_withSeminorms.toPolynormableSpace
+  let : T2Space E := elementarySchwartz_t2
+  let : T2Space D := elementarySchwartz_t2
+  let : IsTopologicalAddGroup H := elementarySchwartz_withSeminorms.isTopologicalAddGroup
+  let p : SeminormFamily ℂ E _ := elementarySchwartzSeminorm
+  let q : SeminormFamily ℂ D _ := elementarySchwartzSeminorm
+  let r : SeminormFamily ℂ H _ := elementarySchwartzSeminorm
+  let hp : WithSeminorms p := elementarySchwartz_withSeminorms
+  let hq : WithSeminorms q := elementarySchwartz_withSeminorms
+  let hr : WithSeminorms r := elementarySchwartz_withSeminorms
+  have hpt (f : E) (g : D) (i : ElementarySchwartzIndex m n _) (x : ElementaryCoverPoint m n _ F) :
+      ‖elementaryWeightedJet (fun v ↦ f (pr v).1 * g (pr v).2) i x‖ ≤
+        p (idx i).1 f * q (idx i).2 g := by
+    rw [hjet, norm_mul]
+    exact mul_le_mul (norm_elementaryWeightedJet_le _ _ _)
+      (norm_elementaryWeightedJet_le _ _ _) (norm_nonneg _) (apply_nonneg _ _)
+  have hfin (f : E) (g : D) :
+      (fun v ↦ f (pr v).1 * g (pr v).2) ∈ elementarySchwartzSubmodule m n _ F := by
+    refine ⟨hsmooth f g, fun i ↦ lt_of_le_of_lt (b := ENNReal.ofReal (p (idx i).1 f * q (idx i).2 g))
+      ?_ ENNReal.ofReal_lt_top⟩
+    refine iSup_le fun x ↦ iSup_le fun a ↦ iSup_le fun b ↦ ?_
+    change (‖elementaryWeightedJet (fun v ↦ f (pr v).1 * g (pr v).2) i (x, a, b)‖₊ : ℝ≥0∞) ≤ _
+    rw [← ENNReal.ofReal_coe_nnreal, coe_nnNorm]
+    exact ENNReal.ofReal_le_ofReal (hpt f g i (x, a, b))
+  let mul : E →ₗ[ℂ] D →ₗ[ℂ] H :=
+    LinearMap.mk₂ ℂ (fun f g ↦ ⟨fun v ↦ f (pr v).1 * g (pr v).2, hfin f g⟩)
+      (fun f g h ↦ Subtype.ext (funext fun x ↦ add_mul (f (pr x).1) (g (pr x).1) (h (pr x).2)))
+      (fun c f g ↦ Subtype.ext (funext fun x ↦ mul_assoc c (f (pr x).1) (g (pr x).2)))
+      (fun f g h ↦ Subtype.ext (funext fun x ↦ mul_add (f (pr x).1) (g (pr x).2) (h (pr x).2)))
+      (fun c f g ↦ Subtype.ext (funext fun x ↦ mul_left_comm (f (pr x).1) c (g (pr x).2)))
+  let φ : ProjectiveTensor E D →ₗ[ℂ] H := TensorProduct.lift mul
+  have hφ' (f : E) (g : D) : φ (f ⊗ₜ[ℂ] g) = mul f g := TensorProduct.lift.tmul _ _
+  have hφ : Continuous φ := by
+    apply hr.continuous_of_continuous_comp
+    intro i
+    let R : Seminorm ℂ (E ⊗[ℂ] D) := (r i).comp φ
+    have hR : ContinuousAt (fun v : E × D ↦ R (v.1 ⊗ₜ[ℂ] v.2)) 0 := by
+      change Tendsto _ (𝓝 0) (𝓝 (R (0 ⊗ₜ[ℂ] 0)))
+      rw [zero_tmul, map_zero]
+      have hLeft : Tendsto (fun v : E × D ↦ p (idx i).1 v.1) (𝓝 0) (𝓝 0) := by
+        have h := ((hp.continuous_seminorm (idx i).1).comp continuous_fst).tendsto (0 : E × D)
+        change Tendsto (fun v : E × D ↦ p (idx i).1 v.1) _ (𝓝 (p (idx i).1 (0 : E × D).1)) at h
+        simpa only [Prod.fst_zero, map_zero] using h
+      have hRight : Tendsto (fun v : E × D ↦ q (idx i).2 v.2) (𝓝 0) (𝓝 0) := by
+        have h := ((hq.continuous_seminorm (idx i).2).comp continuous_snd).tendsto (0 : E × D)
+        change Tendsto (fun v : E × D ↦ q (idx i).2 v.2) _ (𝓝 (q (idx i).2 (0 : E × D).2)) at h
+        simpa only [Prod.snd_zero, map_zero] using h
+      have hUpper :
+          Tendsto (fun v : E × D ↦ p (idx i).1 v.1 * q (idx i).2 v.2) (𝓝 0) (𝓝 0) := by
+        simpa only [zero_mul] using hLeft.mul hRight
+      refine squeeze_zero (fun _ ↦ apply_nonneg _ _) (fun v ↦ ?_) hUpper
+      change r i (φ (v.1 ⊗ₜ[ℂ] v.2)) ≤ _
+      rw [hφ']
+      exact elementarySchwartzSeminorm_le_of_weightedJet _ _ (by positivity) (hpt v.1 v.2 i)
+    let P := fun s : {s : Seminorm ℂ (E ⊗[ℂ] D) //
+      ContinuousAt (fun v : E × D ↦ s (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ s.val
+    exact (withGeneratingSeminorms_spec _ P).continuous_seminorm ⟨R, hR⟩
+  let φ₀ : InjectiveTensor E D →ₗ[ℂ] H := φ
+  have hback : @Continuous (InjectiveTensor E D) (ProjectiveTensor E D) _ _ id :=
+    hcomp.isInducing.continuous_iff.mpr (@continuous_id (InjectiveTensor E D) _)
+  have hφ₀ : Continuous φ₀ := hφ.comp hback
+  choose u hu using fun i (x : ElementaryCoverPoint m₁ n₁ r₁ F₁) ↦ exists_elementaryWeightedJetCLM i x
+  choose v hv using fun j (y : ElementaryCoverPoint m₂ n₂ r₂ F₂) ↦ exists_elementaryWeightedJetCLM j y
+  choose w hw using fun i (x : ElementaryCoverPoint m n _ F) ↦ exists_elementaryWeightedJetCLM i x
+  have hemb : IsEmbedding φ₀ := by
+    apply injectiveTensor_isEmbedding_of_generating_evaluations hp hq u v
+      (fun i x _ hM ha ↦ elementarySchwartzSeminorm_le_of_weightedJet x i hM (fun a ↦ by rw [← hu i a x]; exact ha a))
+      (fun j y _ hM hb ↦ elementarySchwartzSeminorm_le_of_weightedJet y j hM (fun b ↦ by rw [← hv j b y]; exact hb b))
+      φ₀ hφ₀
+    intro i j
+    obtain ⟨k, hk⟩ := hi (i, j)
+    refine ⟨r k, hr.continuous_seminorm _, fun x y z ↦ ?_⟩
+    obtain ⟨c, hc⟩ := hπ (x, y)
+    have he : tensorDualForm (u i x) (v j y) z = w k c (φ₀ z) := by
+      suffices tensorDualForm (u i x) (v j y) = (w k c).toLinearMap.comp φ₀ from
+        DFunLike.congr_fun this z
+      apply TensorProduct.ext'
+      intro f g
+      rw [tensorDualForm_tmul, hu, hv]
+      change _ = w k c (φ₀ (f ⊗ₜ[ℂ] g))
+      rw [show φ₀ (f ⊗ₜ[ℂ] g) = mul f g from hφ' f g, hw]
+      change _ = elementaryWeightedJet (fun z ↦ f (pr z).1 * g (pr z).2) k c
+      rw [hjet, hk, hc]
+    rw [he, hw]
+    exact norm_elementaryWeightedJet_le _ _ _
+  exact ⟨φ, hemb.comp hcomp.isEmbedding, fun f g x ↦ congrArg (fun h : H ↦ h x) (hφ' f g)⟩
+
+universe ut
+
+/-- Multiplying a Euclidean slice and a torus slice multiplies their independent
+derivatives and the real weight. -/
+private theorem elementary_real_torus_product {m n : ℕ}
+    (hcomp : @IsHomeomorph (ProjectiveTensor (ElementarySchwartz m 0 0 PUnit.{1})
+      (ElementarySchwartz 0 n 0 PUnit.{ut+1})) (InjectiveTensor (ElementarySchwartz m 0 0 PUnit.{1})
+      (ElementarySchwartz 0 n 0 PUnit.{ut+1})) _ _ id) :
+    ∃ φ : ProjectiveTensor (ElementarySchwartz m 0 0 PUnit.{1}) (ElementarySchwartz 0 n 0 PUnit.{ut+1})
+        →ₗ[ℂ] ElementarySchwartz m n 0 PUnit.{1},
+      IsEmbedding φ ∧ ∀ f g (h : ElementaryLieGroup m n 0 PUnit.{1}),
+        φ (f ⊗ₜ[ℂ] g) h = f (h.1, 0, 0, PUnit.unit) * g (0, h.2.1, 0, PUnit.unit) := by
+  let X := EuclideanSpace ℝ (Fin m)
+  let Y := EuclideanSpace ℝ (Fin n)
+  let O := EuclideanSpace ℝ (Fin 0)
+  let pr (h : ElementaryLieGroup m n 0 PUnit.{1}) :
+      ElementaryLieGroup m 0 0 PUnit.{1} × ElementaryLieGroup 0 n 0 PUnit.{ut+1} :=
+    ((h.1, 0, 0, PUnit.unit), (0, h.2.1, 0, PUnit.unit))
+  let π (p : ElementaryCoverPoint m n 0 PUnit.{1}) :
+      ElementaryCoverPoint m 0 0 PUnit.{1} × ElementaryCoverPoint 0 n 0 PUnit.{ut+1} :=
+    (((p.1.1, 0), 0, PUnit.unit), ((0, p.1.2), 0, PUnit.unit))
+  let idx (i : ElementarySchwartzIndex m n 0) :
+      ElementarySchwartzIndex m 0 0 × ElementarySchwartzIndex 0 n 0 :=
+    ((i.1, i.2.1, 0, 0), (0, 0, i.2.2.1, 0))
+  have hπ : Function.Surjective π := by
+    rintro ⟨⟨⟨x, t₀⟩, a₀, b₀⟩, ⟨⟨x₀, t⟩, a₁, b₁⟩⟩
+    refine ⟨((x,t), 0, PUnit.unit), ?_⟩
+    exact Prod.ext (Prod.ext (Prod.ext rfl (Subsingleton.elim _ _)) (Subsingleton.elim _ _))
+      (Prod.ext (Prod.ext (Subsingleton.elim _ _) rfl) (Subsingleton.elim _ _))
+  have hi : Function.Surjective idx := by
+    rintro ⟨⟨α, β, γ₀, δ₀⟩, ⟨α₁, β₁, γ, δ₁⟩⟩
+    refine ⟨(α, β, γ, 0), ?_⟩
+    exact Prod.ext (Prod.ext rfl (Prod.ext rfl (Subsingleton.elim _ _)))
+      (Prod.ext (Subsingleton.elim _ _) (Prod.ext (Subsingleton.elim _ _) (Prod.ext rfl (Subsingleton.elim _ _))))
+  let L : X →L[ℝ] X × O := ContinuousLinearMap.inl ℝ X O
+  let R : Y →L[ℝ] O × Y := ContinuousLinearMap.inr ℝ O Y
+  let f₀ (f : ElementarySchwartz m 0 0 PUnit.{1}) (x : X) := f (elementaryCover (L x) 0 PUnit.unit)
+  let g₀ (g : ElementarySchwartz 0 n 0 PUnit.{ut+1}) (y : Y) := g (elementaryCover (R y) 0 PUnit.unit)
+  have hf₀ (f : ElementarySchwartz m 0 0 PUnit.{1}) : ContDiff ℝ ∞ (f₀ f) :=
+    (f.property.1 0 PUnit.unit).comp L.contDiff
+  have hg₀ (g : ElementarySchwartz 0 n 0 PUnit.{ut+1}) : ContDiff ℝ ∞ (g₀ g) :=
+    (g.property.1 0 PUnit.unit).comp R.contDiff
+  have he (f : ElementarySchwartz m 0 0 PUnit.{1}) (g : ElementarySchwartz 0 n 0 PUnit.{ut+1})
+      (a : Fin 0 → ℤ) (b : PUnit.{1}) (x : X × Y) :
+      f (pr (elementaryCover x a b)).1 * g (pr (elementaryCover x a b)).2 = f₀ f x.1 * g₀ g x.2 := by
+    change f (x.1, _, 0, PUnit.unit) * g (0, _, 0, PUnit.unit) =
+      f (elementaryCover (L x.1) 0 PUnit.unit) * g (elementaryCover (R x.2) 0 PUnit.unit)
+    congr 1
+  refine elementary_product_tensor pr π idx hπ hi (fun f g a b ↦ ?_) (fun f g i p ↦ ?_) hcomp
+  · simpa only [he, Function.comp_apply] using ((hf₀ f).comp contDiff_fst).mul ((hg₀ g).comp contDiff_snd)
+  rcases p with ⟨⟨x, t⟩, a, b⟩
+  let l : List X := (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1)).flatten
+  let d : List Y := (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (EuclideanSpace.single j 1)).flatten
+  have hm (f : ElementarySchwartz m 0 0 PUnit.{1}) :
+      elementaryPartial f i.2.1 0 (x, 0) 0 PUnit.unit = listDerivative (f₀ f) l x := by
+    rw [show f₀ f = (fun q ↦ f (elementaryCover q 0 PUnit.unit)) ∘ L from rfl,
+      listDerivative_comp_linear L (f.property.1 _ _)]
+    have hL (j : Fin m) : L (EuclideanSpace.single j 1) = (EuclideanSpace.single j 1, 0) := rfl
+    have hmap : l.map L =
+        (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1, 0)).flatten := by
+      simp only [l, List.map_flatten, List.map_ofFn, Function.comp_def, List.map_replicate, hL]
+    rw [hmap]
+    let eval (v : List (X × O)) := listDerivative (fun u ↦ f (elementaryCover u 0 PUnit.unit)) v (x, 0)
+    change eval (_ ++ _) = eval _
+    rw [List.ofFn_zero, List.flatten_nil, List.append_nil]
+  have hn (g : ElementarySchwartz 0 n 0 PUnit.{ut+1}) :
+      elementaryPartial g 0 i.2.2.1 (0, t) 0 PUnit.unit = listDerivative (g₀ g) d t := by
+    rw [show g₀ g = (fun q ↦ g (elementaryCover q 0 PUnit.unit)) ∘ R from rfl,
+      listDerivative_comp_linear R (g.property.1 _ _)]
+    have hR (j : Fin n) : R (EuclideanSpace.single j 1) = (0, EuclideanSpace.single j 1) := rfl
+    have hmap : d.map R =
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten := by
+      simp only [d, List.map_flatten, List.map_ofFn, Function.comp_def, List.map_replicate, hR]
+    rw [hmap]
+    let eval (v : List (O × Y)) := listDerivative (fun u ↦ g (elementaryCover u 0 PUnit.unit)) v (0, t)
+    change eval (_ ++ _) = eval _
+    rw [List.ofFn_zero, List.flatten_nil, List.nil_append]
+  have hmul :
+      elementaryPartial (fun v ↦ f (pr v).1 * g (pr v).2) i.2.1 i.2.2.1 (x, t) a b =
+        elementaryPartial f i.2.1 0 (x, 0) 0 PUnit.unit *
+          elementaryPartial g 0 i.2.2.1 (0, t) 0 PUnit.unit := by
+    rw [hm f, hn g]
+    have h := listDerivative_prod (hf₀ f) (hg₀ g) l d x t
+    have hl : l.map (fun q ↦ (q, (0 : Y))) =
+        (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1, 0)).flatten := by
+      simp only [l, List.map_flatten, List.map_ofFn, Function.comp_def, List.map_replicate]
+    have hd : d.map (fun q ↦ ((0 : X), q)) =
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten := by
+      simp only [d, List.map_flatten, List.map_ofFn, Function.comp_def, List.map_replicate]
+    rw [hl, hd] at h
+    simpa only [elementaryPartial, listDerivative, he] using h
+  dsimp only [elementaryWeightedJet, idx, π, Prod.fst, Prod.snd]
+  rw [hmul]
+  simp [elementarySchwartzMonomial, mul_assoc]
+
+/-- Multiplication by a discrete slice scales every real and torus derivative
+by that slice's value. -/
+private theorem elementary_cont_discrete_product {m n r : ℕ} {F : Type*} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F]
+    (hcomp : @IsHomeomorph (ProjectiveTensor (ElementarySchwartz m n 0 PUnit.{1})
+      (ElementarySchwartz 0 0 r F)) (InjectiveTensor (ElementarySchwartz m n 0 PUnit.{1})
+      (ElementarySchwartz 0 0 r F)) _ _ id) :
+    ∃ φ : ProjectiveTensor (ElementarySchwartz m n 0 PUnit.{1}) (ElementarySchwartz 0 0 r F)
+        →ₗ[ℂ] ElementarySchwartz m n r F,
+      IsEmbedding φ ∧ ∀ f g (h : ElementaryLieGroup m n r F),
+        φ (f ⊗ₜ[ℂ] g) h = f (h.1, h.2.1, 0, PUnit.unit) * g (0, 0, h.2.2) := by
+  let pr (h : ElementaryLieGroup m n r F) :
+      ElementaryLieGroup m n 0 PUnit.{1} × ElementaryLieGroup 0 0 r F :=
+    ((h.1, h.2.1, 0, PUnit.unit), (0, 0, h.2.2))
+  let π (p : ElementaryCoverPoint m n r F) :
+      ElementaryCoverPoint m n 0 PUnit.{1} × ElementaryCoverPoint 0 0 r F :=
+    ((p.1, 0, PUnit.unit), ((0, 0), p.2))
+  let idx (i : ElementarySchwartzIndex m n r) :
+      ElementarySchwartzIndex m n 0 × ElementarySchwartzIndex 0 0 r :=
+    ((i.1, i.2.1, i.2.2.1, 0), (0, 0, 0, i.2.2.2))
+  have hπ : Function.Surjective π := by
+    rintro ⟨⟨x, a₀, b₀⟩, ⟨t, a, b⟩⟩
+    exact ⟨(x, a, b), Prod.ext (Prod.ext rfl (Subsingleton.elim _ _))
+      (Prod.ext (Subsingleton.elim _ _) rfl)⟩
+  have hi : Function.Surjective idx := by
+    rintro ⟨⟨α, β, γ, δ₀⟩, ⟨α₁, β₁, γ₁, δ⟩⟩
+    exact ⟨(α, β, γ, δ), Prod.ext (Prod.ext rfl (Prod.ext rfl (Prod.ext rfl (Subsingleton.elim _ _))))
+      (Prod.ext (Subsingleton.elim _ _) (Prod.ext (Subsingleton.elim _ _) (Prod.ext (Subsingleton.elim _ _) rfl)))⟩
+  refine elementary_product_tensor pr π idx hπ hi (fun f g a b ↦ ?_) (fun f g i p ↦ ?_) hcomp
+  · exact (f.property.1 0 PUnit.unit).mul (contDiff_const (c := g (0, 0, a, b)))
+  rcases p with ⟨x, a, b⟩
+  dsimp only [elementaryWeightedJet, idx, π, Prod.fst, Prod.snd]
+  rw [elementaryPartial_zero]
+  have hd : g (elementaryCover (0, 0) a b) = g (0, 0, a, b) :=
+    congrArg g.val (Prod.ext rfl (Prod.ext (Subsingleton.elim _ _) rfl))
+  rw [hd]
+  have hf :
+      elementaryPartial (fun v ↦ f (pr v).1 * g (pr v).2) i.2.1 i.2.2.1 x a b =
+        elementaryPartial f i.2.1 i.2.2.1 x 0 PUnit.unit * g (0, 0, a, b) := by
+    let v : List (EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :=
+      (List.ofFn fun j ↦ List.replicate (i.2.1 j) (EuclideanSpace.single j 1, 0)).flatten ++
+        (List.ofFn fun j ↦ List.replicate (i.2.2.1 j) (0, EuclideanSpace.single j 1)).flatten
+    change iteratedFDeriv ℝ v.length (fun u ↦ f (elementaryCover u 0 PUnit.unit) • g (0, 0, a, b)) x v.get = _
+    have hs : ContDiffAt ℝ (v.length : ℕ∞ω) (fun u ↦ f (elementaryCover u 0 PUnit.unit)) x :=
+      (f.property.1 0 PUnit.unit).contDiffAt.of_le (by
+        exact_mod_cast (le_top : (v.length : ℕ∞) ≤ ⊤))
+    rw [iteratedFDeriv_smul_const_apply hs]
+    rfl
+  rw [hf]
+  simp only [elementarySchwartzMonomial, Pi.zero_apply, pow_zero, Finset.prod_const_one, mul_one, one_mul]
+  ring
+
+end ElementarySchwartzTensorProof
+
 variable [hF : Finite F]
 
 include hF in
@@ -5910,7 +6841,67 @@ theorem elementarySchwartzTensor_isEmbedding :
         ∀ (u : SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ) (v : ElementarySchwartz 0 n 0 PUnit)
           (s : RapidDecaySequence r) (c : F → ℂ) (g : ElementaryLieGroup m n r F),
           φ (elementarySchwartzTmul u v s c) g =
-            u g.1 * v (0, g.2.1, 0, PUnit.unit) * s g.2.2.1 * c g.2.2.2 := by sorry
+            u g.1 * v (0, g.2.1, 0, PUnit.unit) * s g.2.2.1 * c g.2.2.2 := by
+  classical
+  cases isEmpty_or_nonempty F with
+  | inl h =>
+    let : IsEmpty F := h
+    have : Subsingleton (ElementarySchwartzTensor m n r F) := by
+      change Subsingleton ((_ ⊗[ℂ] _) ⊗[ℂ] (RapidDecaySequence r ⊗[ℂ] (F → ℂ)))
+      infer_instance
+    exact ⟨0, IsEmbedding.of_subsingleton _, fun _ _ _ _ g ↦ isEmptyElim g.2.2.2⟩
+  | inr h =>
+    let := Fintype.ofFinite F
+    let : NeZero (Fintype.card F) := ⟨Fintype.card_ne_zero⟩
+    let : AddCommGroup F := (Fintype.equivFin F).addCommGroup
+    let : TopologicalSpace F := ⊥
+    let : DiscreteTopology F := discreteTopology_bot F
+    let R := ElementarySchwartz m 0 0 PUnit.{1}
+    let T := ElementarySchwartz 0 n 0 PUnit
+    let RT := ElementarySchwartz m n 0 PUnit.{1}
+    let D := ElementarySchwartz 0 0 r F
+    let S := SchwartzMap (EuclideanSpace ℝ (Fin m)) ℂ
+    let S₁ := ProjectiveTensor S T
+    let S₂ := ProjectiveTensor (RapidDecaySequence r) (F → ℂ)
+    let : PolynormableSpace ℂ R := elementarySchwartz_withSeminorms.toPolynormableSpace
+    let : PolynormableSpace ℂ T := elementarySchwartz_withSeminorms.toPolynormableSpace
+    let : PolynormableSpace ℂ RT := elementarySchwartz_withSeminorms.toPolynormableSpace
+    let : PolynormableSpace ℂ D := elementarySchwartz_withSeminorms.toPolynormableSpace
+    let : PolynormableSpace ℂ S := (schwartz_withSeminorms ℂ _ _).toPolynormableSpace
+    let : PolynormableSpace ℂ S₂ := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+    let : T2Space R := elementarySchwartz_t2
+    let : T2Space T := elementarySchwartz_t2
+    let : T2Space RT := elementarySchwartz_t2
+    let : T2Space D := elementarySchwartz_t2
+    obtain ⟨eR, heR⟩ := elementarySchwartz_tensorRealFactor_equiv m
+    obtain ⟨eD, heD⟩ := elementarySchwartz_latticeFinite_equiv r F
+    let : T2Space S₂ := eD.toHomeomorph.symm.t2Space
+    have hRT : @IsHomeomorph (ProjectiveTensor R T) (InjectiveTensor R T) _ _ id :=
+      (elementarySchwartz_nuclear_of_finite : IsNuclearTVS T).tensorComparison_right
+    obtain ⟨L, hL, hLt⟩ := elementary_real_torus_product hRT
+    let iT := ContinuousLinearMap.id ℂ T
+    let A : S₁ →ₗ[ℂ] RT := L.comp (projectiveTensorMap eR.toLinearMap iT.toLinearMap)
+    have hA : IsEmbedding A :=
+      hL.comp (projectiveTensorMap_isEmbedding_of_comparisons eR.toContinuousLinearMap iT
+        eR.toHomeomorph.isEmbedding IsEmbedding.id
+        (elementarySchwartz_nuclear_of_finite : IsNuclearTVS T).tensorComparison_right hRT)
+    have hRD : @IsHomeomorph (ProjectiveTensor RT D) (InjectiveTensor RT D) _ _ id :=
+      (elementarySchwartz_nuclear_of_finite : IsNuclearTVS D).tensorComparison_right
+    obtain ⟨M, hM, hMt⟩ := elementary_cont_discrete_product hRD
+    have hS₂ : IsNuclearTVS S₂ :=
+      nuclear_of_equiv eD.symm (elementarySchwartz_nuclear_of_finite : IsNuclearTVS D)
+    let C : S₁ →L[ℂ] RT := ⟨A, hA.continuous⟩
+    have hCD :=
+      projectiveTensorMap_isEmbedding_of_comparisons C eD.toContinuousLinearMap hA
+        eD.toHomeomorph.isEmbedding hS₂.tensorComparison_right hRD
+    let φ : ElementarySchwartzTensor m n r F →ₗ[ℂ] ElementarySchwartz m n r F :=
+      M.comp (projectiveTensorMap C.toLinearMap eD.toLinearMap)
+    refine ⟨φ, hM.comp hCD, fun u v s c g ↦ ?_⟩
+    change M (A (u ⊗ₜ[ℂ] v) ⊗ₜ[ℂ] eD (s ⊗ₜ[ℂ] c)) g = _
+    rw [hMt, heD]
+    change L (eR u ⊗ₜ[ℂ] v) (g.1, g.2.1, 0, PUnit.unit) * _ = _
+    rw [hLt, heR]
+    exact (mul_assoc _ _ _).symm
 
 section ElementaryMontel
 

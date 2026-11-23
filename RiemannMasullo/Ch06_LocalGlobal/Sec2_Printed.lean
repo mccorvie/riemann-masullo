@@ -3,6 +3,12 @@ module
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec4
+
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Gaussian
+import RiemannMasullo.ForMathlib.RingTheory.PicardGroup
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.NumberTheory.NumberField.ClassNumber
+import Mathlib.NumberTheory.Padics.HeightOneSpectrum
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.External.AlgebraicNumberTheoryLean.Chebotarev.DirichletHecke
 import Mathlib.NumberTheory.MulChar.Duality
@@ -450,13 +456,292 @@ def Printed.sLocalStandardThetaTensor_factorization : Prop :=
             (fv v).val (Multiplicative.ofAdd ((g⁻¹).val * x.val.2 v)) * (χ (ins v g) : ℂ)
             ∂μ(F, v.val)
 
+/-- Over ℚ every ring of S-integers has trivial Picard group: it is a localization of `𝓞 ℚ`,
+which is a principal ideal domain. -/
+private theorem sLocalStandardThetaTensor_factorization_false_pic (S : Finset (Places(ℚ))) :
+    Subsingleton Picₛ(ℚ, S) := by
+  have : IsPrincipalIdealRing (𝓞 ℚ) := classNumber_eq_one_iff.mp Rat.classNumber_eq
+  have hs := picMapAlgebra_surjective_of_isLocalization
+    (Localization.submonoid (S : Set (Places(ℚ)))) (R := 𝓞 ℚ)
+    (A := (S : Set (Places(ℚ))).integer ℚ)
+  refine ⟨fun a b ↦ ?_⟩
+  obtain ⟨a', rfl⟩ := hs a
+  obtain ⟨b', rfl⟩ := hs b
+  rw [Subsingleton.elim a' b']
+
+/-- The trivial norm-one character is unramified outside any set of places. -/
+private theorem sLocalStandardThetaTensor_factorization_false_unramified
+    (S : Finset (Places(ℚ))) :
+    NormOneCharacterUnramifiedOutside (1 : PontryaginDual C₁(ℚ)) S :=
+  ⟨⟨1, (mem_unramifiedOutside_iff ℚ S 1).mpr fun _ _ _ ↦ rfl⟩, fun _ ↦ rfl⟩
+
+/-- The descent of the trivial norm-one character is trivial. -/
+private theorem sLocalStandardThetaTensor_factorization_false_descent
+    (S : Finset (Places(ℚ))) (hω : NormOneCharacterUnramifiedOutside (1 : PontryaginDual C₁(ℚ)) S) :
+    sLocalNormOneCharacter S (1 : PontryaginDual C₁(ℚ)) hω = 1 :=
+  ((normOneCharacterUnramifiedOutside_iff (F := ℚ) (S := S) 1).mp hω).unique
+    ((normOneCharacterUnramifiedOutside_iff (F := ℚ) (S := S) 1).mp hω).exists.choose_spec
+    (fun _ _ _ _ _ ↦ rfl)
+
+/-- Over ℚ the constant family `1` lists representatives of the (trivial) class group. -/
+private theorem sLocalStandardThetaTensor_factorization_false_classes (S : Finset (Places(ℚ))) :
+    ClassRepresentatives(ℚ, S, fun _ : Fin (classNumber ℚ) ↦ (1 : Nₛ(ℚ, S))) := by
+  have : IsPrincipalIdealRing (𝓞 ℚ) := classNumber_eq_one_iff.mp Rat.classNumber_eq
+  refine ⟨rfl, ⟨fun a b _ ↦ ?_, fun c ↦ ⟨⟨0, classNumber_pos ℚ⟩, Subsingleton.elim _ _⟩⟩⟩
+  have ha := a.isLt
+  have hb := b.isLt
+  have hc := Rat.classNumber_eq
+  exact Fin.ext (by omega)
+
+/-- The archimedean test `(q² - t²) exp(-t²)` on the infinite adeles of ℚ, written in terms of
+the norm of the real coordinate. -/
+private theorem sLocalStandardThetaTensor_factorization_false_arch (q : ℝ) :
+    ∃ f : ℬ∞(ℚ), ∀ x : InfiniteAdeleRing ℚ, f (Multiplicative.ofAdd x) =
+      (((q ^ 2 - ‖x Rat.infinitePlace‖ ^ 2) * Real.exp (-‖x Rat.infinitePlace‖ ^ 2) : ℝ) : ℂ) := by
+  let g0 : SchwartzMap ℝ ℝ := SchwartzMap.gaussian 1 zero_lt_one
+  let g : SchwartzMap ℝ ℂ := SchwartzMap.postcompCLM Complex.ofRealCLM g0
+  let h1 : SchwartzMap ℝ ℂ := SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)) g
+  let h2 : SchwartzMap ℝ ℂ := SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)) h1
+  let b : SchwartzMap ℝ ℂ := ((q : ℂ) ^ 2) • g - h2
+  have hg : ∀ x : ℝ, g x = (Real.exp (-(x ^ 2)) : ℂ) := by
+    intro x
+    simp [g, g0, SchwartzMap.postcompCLM_apply, SchwartzMap.gaussian_apply]
+  have hb : ∀ x : ℝ, b x = (((q ^ 2 - x ^ 2) * Real.exp (-x ^ 2) : ℝ) : ℂ) := by
+    intro x
+    have e1 : h1 x = (x : ℂ) * g x := by
+      change SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)) g x = _
+      rw [SchwartzMap.smulLeftCLM_apply_apply Complex.hasTemperateGrowth_ofReal]
+      rfl
+    have e2 : h2 x = (x : ℂ) * h1 x := by
+      change SchwartzMap.smulLeftCLM ℂ (fun x : ℝ ↦ (x : ℂ)) h1 x = _
+      rw [SchwartzMap.smulLeftCLM_apply_apply Complex.hasTemperateGrowth_ofReal]
+      rfl
+    change ((q : ℂ) ^ 2) * g x - h2 x = _
+    rw [e2, e1, hg]
+    push_cast
+    ring_nf
+  obtain ⟨T, hT⟩ := realSchwartzBruhat_equiv
+  let realEquiv := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+  let realIso := InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  let : Unique (InfinitePlace ℚ) := ⟨⟨Rat.infinitePlace⟩, fun _ ↦ Subsingleton.elim _ _⟩
+  let eInfHomeo : InfiniteAdeleRing ℚ ≃ₜ ℝ :=
+    (Homeomorph.piUnique fun w : InfinitePlace ℚ ↦ w.Completion).trans realIso.toHomeomorph
+  let eArch : Multiplicative (InfiniteAdeleRing ℚ) ≃ₜ* Multiplicative ℝ :=
+    { toEquiv :=
+        { toFun := fun x ↦ Multiplicative.ofAdd (realEquiv (x.toAdd Rat.infinitePlace))
+          invFun := fun y ↦ Multiplicative.ofAdd (eInfHomeo.symm y.toAdd)
+          left_inv := fun x ↦ by
+            apply congrArg Multiplicative.ofAdd
+            exact eInfHomeo.symm_apply_apply x.toAdd
+          right_inv := fun y ↦ by
+            apply congrArg Multiplicative.ofAdd
+            exact eInfHomeo.apply_symm_apply y.toAdd }
+      map_mul' := fun x y ↦ congrArg Multiplicative.ofAdd (map_add realEquiv _ _)
+      continuous_toFun := eInfHomeo.continuous
+      continuous_invFun := eInfHomeo.symm.continuous }
+  have : T2Space (Multiplicative (InfiniteAdeleRing ℚ)) := eArch.isEmbedding.t2Space
+  have : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing ℚ)) :=
+    eArch.isOpenEmbedding.locallyCompactSpace
+  have : T2Space (Multiplicative ℝ) := inferInstanceAs (T2Space ℝ)
+  have : LocallyCompactSpace (Multiplicative ℝ) := inferInstanceAs (LocallyCompactSpace ℝ)
+  refine ⟨⟨(T b).val ∘ eArch, schwartzBruhat_mem_comp_equiv eArch (T b).property⟩, fun x ↦ ?_⟩
+  have hnorm : ‖realEquiv (x Rat.infinitePlace)‖ = ‖x Rat.infinitePlace‖ :=
+    realIso.isometry.norm_map_of_map_zero (map_zero realEquiv) _
+  change (T b) (Multiplicative.ofAdd (realEquiv (x Rat.infinitePlace))) = _
+  rw [hT b, hb, ← hnorm, Real.norm_eq_abs, sq_abs]
+
+/-- The indicator of the sphere of radius `‖π‖ = q⁻¹` is a punctured finite test. -/
+private theorem sLocalStandardThetaTensor_factorization_false_fin (v : Places(ℚ)) (r : ℝ)
+    (hr : r ≠ 0) :
+    ∃ fv : finitePuncturedThetaTestSpace v, ∀ z : L(ℚ, v),
+      fv.val (Multiplicative.ofAdd z) = if ‖z‖ = r then 1 else 0 := by
+  classical
+  let : ProperSpace (L(ℚ, v)) := properSpace_adicCompletion v
+  have hloc : IsLocallyConstant (fun z : L(ℚ, v) ↦ if ‖z‖ = r then (1 : ℂ) else 0) := by
+    have hs : IsClopen (Metric.sphere (0 : L(ℚ, v)) r) := IsUltrametricDist.isClopen_sphere (0 : L(ℚ, v)) hr
+    have hlc :=
+      (LocallyConstant.indicator (LocallyConstant.const (L(ℚ, v)) (1 : ℂ)) hs).isLocallyConstant
+    convert hlc using 1
+    funext z
+    change _ = Set.indicator _ _ z
+    simp [Set.indicator_apply, mem_sphere_iff_norm]
+  have hcpt : HasCompactSupport (fun z : L(ℚ, v) ↦ if ‖z‖ = r then (1 : ℂ) else 0) := by
+    refine HasCompactSupport.intro (isCompact_closedBall (0 : L(ℚ, v)) |r|) fun z hz ↦ ?_
+    refine ite_eq_right_iff.mpr fun h ↦ absurd ?_ hz
+    simpa [h] using le_abs_self r
+  obtain ⟨g, hg⟩ := (mem_finitePlaceSchwartz_iff ℚ v _).mpr ⟨hloc, hcpt⟩
+  refine ⟨⟨g, ?_⟩, hg⟩
+  rw [mem_finitePuncturedThetaTestSpace, hg, norm_zero]
+  exact ite_eq_right_iff.mpr fun h ↦ absurd h.symm hr
+
+/-- Norm-one condition at the archimedean stage of ℚ. -/
+private theorem sLocalStandardThetaTensor_factorization_false_normEmpty
+    (y : Iₛ(ℚ, (∅ : Finset (Places(ℚ))))) (hy : sIdeleNorm ℚ ∅ y = 1) :
+    ‖y.val.1 Rat.infinitePlace‖ = 1 := by
+  have h := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) hy
+  rwa [sIdeleNorm, Finset.univ_eq_empty (α := (∅ : Finset (Places(ℚ)))),
+    Finset.prod_empty, mul_one, Fintype.prod_subsingleton _ Rat.infinitePlace,
+    Rat.isReal_infinitePlace.mult_eq_one, pow_one] at h
+
+/-- Norm-one condition at the stage with one finite place over ℚ. -/
+private theorem sLocalStandardThetaTensor_factorization_false_normSingle (v : Places(ℚ))
+    (y : Iₛ(ℚ, ({v} : Finset (Places(ℚ))))) (hy : sIdeleNorm ℚ {v} y = 1) :
+    ‖y.val.1 Rat.infinitePlace‖ * ‖y.val.2 ⟨v, Finset.mem_singleton_self v⟩‖ = 1 := by
+  have : Subsingleton ({v} : Finset (Places(ℚ))) :=
+    ⟨fun a b ↦ Subtype.ext ((Finset.mem_singleton.mp a.2).trans (Finset.mem_singleton.mp b.2).symm)⟩
+  have h := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) hy
+  rwa [sIdeleNorm, Fintype.prod_subsingleton _ Rat.infinitePlace,
+    Rat.isReal_infinitePlace.mult_eq_one, pow_one,
+    Fintype.prod_subsingleton _ ⟨v, Finset.mem_singleton_self v⟩] at h
+
+/-- The norm-one archimedean ideles of ℚ are `±1`, a finite group. -/
+private theorem sLocalStandardThetaTensor_factorization_false_finite :
+    Finite Nₛ(ℚ, (∅ : Finset (Places(ℚ)))) := by
+  let realEquiv := InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+  let realIso := InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace
+  have hmem (g : Nₛ(ℚ, (∅ : Finset (Places(ℚ))))) :
+      realEquiv (g.val.val.1 Rat.infinitePlace) ∈ ({1, -1} : Set ℝ) := by
+    have hn := sLocalStandardThetaTensor_factorization_false_normEmpty g.val
+      (MonoidHom.mem_ker.mp g.property)
+    have hnorm : ‖realEquiv (g.val.val.1 Rat.infinitePlace)‖ = ‖g.val.val.1 Rat.infinitePlace‖ :=
+      realIso.isometry.norm_map_of_map_zero (map_zero realEquiv) _
+    rw [hn, Real.norm_eq_abs] at hnorm
+    rcases eq_or_eq_neg_of_abs_eq hnorm with h | h
+    · exact Or.inl h
+    · exact Or.inr h
+  refine Finite.of_injective (β := ({1, -1} : Set ℝ)) (fun g ↦ ⟨_, hmem g⟩) fun a b hab ↦ ?_
+  have h1 : a.val.val.1 Rat.infinitePlace = b.val.val.1 Rat.infinitePlace :=
+    realEquiv.injective (congrArg Subtype.val hab)
+  have h2 : a.val.val.1 = b.val.val.1 := funext fun w ↦ by
+    rw [Subsingleton.elim w Rat.infinitePlace]
+    exact h1
+  have h3 : a.val.val.2 = b.val.val.2 := funext fun w ↦ absurd w.2 (Finset.notMem_empty _)
+  exact Subtype.ext (Units.ext (Prod.ext h2 h3))
+
+/-- A Haar measure on a finite group has finite positive total mass. -/
+private theorem sLocalStandardThetaTensor_factorization_false_mass {G : Type*} [Group G]
+    [TopologicalSpace G] [Finite G] {m : MeasurableSpace G} (ν : Measure G)
+    (hH : @Measure.IsHaarMeasure G _ _ m ν) : ν.real Set.univ ≠ 0 := by
+  have : CompactSpace G := Finite.compactSpace
+  have : IsFiniteMeasure ν := CompactSpace.isFiniteMeasure
+  exact ENNReal.toReal_ne_zero.mpr
+    ⟨Measure.measure_univ_ne_zero.mpr (NeZero.ne ν), measure_ne_top ν _⟩
+
 /-- Paper: Theorem 6.2.2.1(1), (6.2.2.7)–(6.2.2.10), pp. 299–301. Over ℚ take S with one finite
 prime p, the trivial character, the identity class representative, and x = 1. Use the finite
 indicator of `pℤₚˣ` and an even nonnegative smooth compactly supported function positive at ±1
 and supported away from ±p. The norm-one integral is zero since the finite support forces the
 inverse real component to have absolute value p. The separate factors are both positive. -/
 theorem Printed.sLocalStandardThetaTensor_factorization_false :
-    ¬ Printed.sLocalStandardThetaTensor_factorization := by sorry
+    ¬ Printed.sLocalStandardThetaTensor_factorization := by
+  classical
+  intro h
+  let v : Places(ℚ) := Rat.HeightOneSpectrum.primesEquiv.symm ⟨2, Nat.prime_two⟩
+  let S : Finset (Places(ℚ)) := {v}
+  let v' : S := ⟨v, Finset.mem_singleton_self v⟩
+  have : Subsingleton S :=
+    ⟨fun a b ↦ Subtype.ext ((Finset.mem_singleton.mp a.2).trans (Finset.mem_singleton.mp b.2).symm)⟩
+  let q : ℝ := (v.asIdeal.absNorm : ℝ)
+  have hq : 2 ≤ q := by
+    have h0 : v.asIdeal.absNorm ≠ 0 := fun h0 ↦ v.ne_bot (Ideal.absNorm_eq_zero_iff.mp h0)
+    have h1 : v.asIdeal.absNorm ≠ 1 := fun h1 ↦ v.isPrime.ne_top (Ideal.absNorm_eq_one_iff.mp h1)
+    have h2 : 2 ≤ v.asIdeal.absNorm := by omega
+    have h3 := (Nat.cast_le (α := ℝ)).mpr h2
+    rwa [Nat.cast_ofNat] at h3
+  obtain ⟨f, hf⟩ := sLocalStandardThetaTensor_factorization_false_arch q
+  have hq0 : q⁻¹ ≠ 0 := inv_ne_zero (by linarith)
+  let G : ∀ w : Places(ℚ), finitePuncturedThetaTestSpace w := fun w ↦
+    (sLocalStandardThetaTensor_factorization_false_fin w q⁻¹ hq0).choose
+  have hfv₀ := (sLocalStandardThetaTensor_factorization_false_fin v q⁻¹ hq0).choose_spec
+  have hω := sLocalStandardThetaTensor_factorization_false_unramified S
+  have hdesc := sLocalStandardThetaTensor_factorization_false_descent S hω
+  have key := h ℚ S (sLocalStandardThetaTensor_factorization_false_pic S) 1 hω 1
+    (fun g y _ ↦ by rw [hdesc]; rfl) (fun _ ↦ 1)
+    (sLocalStandardThetaTensor_factorization_false_classes S) f (fun w ↦ G w.val) 1
+  dsimp only at key
+  have hL : ∀ g : Nₛ(ℚ, S), f (Multiplicative.ofAdd (g.val⁻¹ * 1).val.1) *
+      (∏ w : S, (G w.val).val (Multiplicative.ofAdd ((g.val⁻¹ * 1).val.2 w))) *
+      ((1 : PontryaginDual Iₛ(ℚ, S)) g.val : ℂ) = 0 := by
+    intro g
+    have hy : sIdeleNorm ℚ S (g.val⁻¹ * 1) = 1 := by
+      rw [mul_one, map_inv, MonoidHom.mem_ker.mp g.property, inv_one]
+    have hn := sLocalStandardThetaTensor_factorization_false_normSingle v _ hy
+    rw [Fintype.prod_subsingleton _ v', hfv₀]
+    split_ifs with hz
+    · have h1 : ‖(g.val⁻¹ * 1).val.1 Rat.infinitePlace‖ = q := by
+        have hz' : ‖(g.val⁻¹ * 1).val.2 ⟨v, Finset.mem_singleton_self v⟩‖ = q⁻¹ := hz
+        rw [hz'] at hn
+        have hq0 : q ≠ 0 := by linarith
+        field_simp at hn
+        linarith
+      rw [hf, h1]
+      simp
+    · simp
+  simp only [hL, integral_zero] at key
+  refine absurd key (Ne.symm (mul_ne_zero ?_ ?_))
+  · -- the archimedean average is a positive multiple of the norm-one mass
+    let ν := sNormOneIdeleTamagawaMeasure ℚ ∅
+    let c : ℂ := (((q ^ 2 - 1) * Real.exp (-1) : ℝ) : ℂ)
+    refine ne_of_eq_of_ne (?_ : _ = ∑ _k : Fin (classNumber ℚ), ∫ _g, c ∂ν) ?_
+    · rw [infiniteStandardThetaAverage_apply]
+      refine Finset.sum_congr rfl fun k _ ↦ integral_congr_ae
+        (Filter.Eventually.of_forall fun g ↦ ?_)
+      dsimp only
+      have hy : sIdeleNorm ℚ ∅ g.val⁻¹ = 1 := by
+        rw [map_inv, MonoidHom.mem_ker.mp g.property, inv_one]
+      have hn := sLocalStandardThetaTensor_factorization_false_normEmpty _ hy
+      rw [hf]
+      simp only [OneMemClass.coe_one, map_one, one_mul, mul_one, ← map_inv, Units.coe_map,
+        PontryaginDual.one_apply, Circle.coe_one]
+      rw [show ‖((RingHom.fst (InfiniteAdeleRing ℚ)
+          ((w : (∅ : Finset (Places(ℚ)))) → L(ℚ, w.val))).toMonoidHom ((g.val)⁻¹ : Iₛ(ℚ, ∅)).val)
+          Rat.infinitePlace‖ = 1 from hn]
+      simp [c]
+    · rw [integral_const, Finset.sum_const, Finset.card_univ, Fintype.card_fin,
+        Rat.classNumber_eq, one_smul]
+      have : Finite Nₛ(ℚ, (∅ : Finset (Places(ℚ)))) :=
+        sLocalStandardThetaTensor_factorization_false_finite
+      refine smul_ne_zero ?_ ?_
+      · exact sLocalStandardThetaTensor_factorization_false_mass ν
+          (sNormOneIdeleTamagawaMeasure_existsUnique ℚ ∅).exists.choose_spec.1
+      · refine Complex.ofReal_ne_zero.mpr (mul_ne_zero ?_ (Real.exp_pos _).ne')
+        nlinarith
+  · -- the finite factor is the mass of the elements of norm `q`
+    rw [Fintype.prod_subsingleton _ v']
+    let μ := finiteLocalMultiplicativeTamagawaMeasure ℚ v
+    let T : Set (L(ℚ, v))ˣ := {g | ‖g.val‖ = q}
+    have : BorelSpace (L(ℚ, v))ˣ := ⟨rfl⟩
+    have hTm : MeasurableSet T :=
+      (isClosed_eq (continuous_norm.comp Units.continuous_val) continuous_const).measurableSet
+    refine ne_of_eq_of_ne (?_ : _ = ∫ g, T.indicator (fun _ ↦ (1 : ℂ)) g ∂μ) ?_
+    · refine integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)
+      change (G v).val (Multiplicative.ofAdd ((g⁻¹).val * (1 : Iₛ(ℚ, S)).val.2 v')) * _ = _
+      rw [Units.val_one, Prod.snd_one, Pi.one_apply, mul_one, hfv₀]
+      simp only [PontryaginDual.one_apply, Circle.coe_one, mul_one, Set.indicator_apply, T,
+        Set.mem_ofPred_eq, Units.val_inv_eq_inv_val, norm_inv, inv_inj]
+    · have : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := ℚ) v
+      obtain ⟨π, hπ⟩ :=
+        (Valued.v (R := L(ℚ, v))).exists_isUniformizer_of_isCyclic_of_nontrivial
+      have hπn : ‖π‖ = q⁻¹ := norm_uniformizer_adicCompletion (K := ℚ) v π hπ
+      let u : (L(ℚ, v))ˣ := Units.mk0 π hπ.ne_zero
+      have hT : T = (fun h ↦ u * h) ⁻¹' ((v.adicCompletionIntegers ℚ).units : Set (L(ℚ, v))ˣ) := by
+        ext h
+        change ‖h.val‖ = q ↔ u * h ∈ (v.adicCompletionIntegers ℚ).units
+        rw [HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one,
+          ← Valued.toNormedField.norm_eq_one_iff, Units.val_mul, norm_mul]
+        change ‖h.val‖ = q ↔ ‖π‖ * ‖h.val‖ = 1
+        rw [hπn]
+        have hq0 : q ≠ 0 := by linarith
+        constructor
+        · intro e; rw [e, inv_mul_cancel₀ hq0]
+        · intro e; field_simp at e; linarith
+      rw [integral_indicator_const _ hTm, Measure.real, hT, measure_preimage_mul,
+        finiteLocalMultiplicativeTamagawaMeasure_integerUnits]
+      refine smul_ne_zero (ENNReal.toReal_ne_zero.mpr ⟨?_, ?_⟩) one_ne_zero
+      · exact ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top
+      · refine ENNReal.inv_ne_top.mpr (ENNReal.ofReal_pos.mpr (Real.sqrt_pos.mpr ?_)).ne'
+        have h0 : v.asIdeal.absNorm ≠ 0 := fun h0 ↦ v.ne_bot (Ideal.absNorm_eq_zero_iff.mp h0)
+        positivity
 
 /-- Paper: Theorem 6.2.2.1(1), (6.2.2.5), p. 299. As printed: the insertion with the fixed
 standard finite tests induces a linear homeomorphism from the quotient by the kernel of the

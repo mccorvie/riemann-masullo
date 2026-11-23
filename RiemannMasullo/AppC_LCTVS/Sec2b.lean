@@ -583,9 +583,12 @@ def IsAbsolutelySummingLocalBanachMap {p q : Seminorm ℂ E} (h : q ≤ p) : Pro
       ∑ i, ‖localBanachMap p q h (x i)‖ ≤ C * M
 
 omit [T2Space E] in
-/-- Paper: Theorem C.2.4.2(2), p. 686. In a nuclear space, each local Banach
-space admits a comparison from a smaller neighborhood with an absolute
-summability bound. -/
+/-- Paper: Theorem C.2.4.2(2), p. 686. In a nuclear space, for each balanced convex
+zero-neighborhood there is a smaller balanced convex zero-neighborhood whose local Banach space
+maps to that of the original neighborhood with an absolute summability bound.
+
+Deviation: This intermediate result establishes the absolute summability bound used to
+derive the nuclear comparison map. -/
 theorem exists_localBanachMap_absolutelySumming (h : IsNuclearTVS.{v, u} E)
     (U : Set E) (hU : U ∈ 𝓝 0) (bU : Balanced ℂ U) (cU : Convex ℝ U) :
     ∃ (V : Set E) (hV : V ∈ 𝓝 0) (bV : Balanced ℂ V) (cV : Convex ℝ V) (hVU : V ⊆ U),
@@ -3263,7 +3266,7 @@ theorem isNuclearTVS_projectiveTensor {F : Type w}
 
 /-- The local absolute summability criterion can be checked on finite families whose
 linear combinations with coefficients in the unit disk stay in one zero-neighborhood. -/
-private theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
+theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
     (h : ∀ (q : Seminorm ℂ E), Continuous q →
       ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
         (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ U) →
@@ -5086,7 +5089,7 @@ private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [
     ((isNuclearTVS_iff_localBanach_integral X).mp hX)
 
 /-- Nuclearity is invariant under continuous linear equivalence, across carrier universes. -/
-private theorem nuclear_of_equiv {X : Type u} {Y : Type w}
+theorem nuclear_of_equiv {X : Type u} {Y : Type w}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y]
     (e : X ≃L[ℂ] Y) (hX : IsNuclearTVS.{v} X) : IsNuclearTVS.{v} Y := by

@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 public import RiemannMasullo.Ch11_ShellStructure.Sec1b
 
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
+import Mathlib.NumberTheory.NumberField.CanonicalEmbedding.Basic
 import RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 /-!
@@ -84,16 +87,378 @@ def Printed.sLocalCarvingLimit_eq_rawClosedSpan : Prop :=
           (Submodule.span ℂ {u : IdeleClassZeroLineSobolev F s |
             ∃ f : sAdelePolarSubspace F S, (u : C[F] → ℂ) =ᵐ[ν] raw f.val}).topologicalClosure
 
-/-- Paper: Theorem 11.1.2.1(3), p. 480, (11.1.2.7).
-Take F = ℚ, the even quadratic character modulo 5, S with finite part {5},
-s = 2 and the two-sided cutoff with radius 2. Take the local test with 5-adic
-factor 1_{ℤ₅} and an even real bump supported at absolute values in (3/4, 5/4),
-positive near 1. Subtract an even bump at absolute values in (1/4, 1/3)
-to cancel the additive integral. The resulting raw theta is norm-one invariant
-and is nonzero near norm 1, where the only contributing rationals are ±1.
-It cannot belong to the nontrivial isotype of the left side. -/
+/-- A rational number is integral in the completion at `v` exactly when the prime of `v`
+does not divide its denominator. -/
+private theorem sec1b_rawCarving_integral (v : HeightOneSpectrum (𝓞 ℚ)) (x : ℚ) :
+    algebraMap ℚ (v.adicCompletion ℚ) x ∈ v.adicCompletionIntegers ℚ ↔
+      ¬ (Rat.HeightOneSpectrum.primesEquiv v).1 ∣ x.den := by
+  have : Fact (Rat.HeightOneSpectrum.primesEquiv v).1.Prime :=
+    ⟨(Rat.HeightOneSpectrum.primesEquiv v).2⟩
+  rw [HeightOneSpectrum.mem_adicCompletionIntegers, HeightOneSpectrum.algebraMap_adicCompletion,
+    Function.comp_apply, Algebra.algebraMap_self, RingHom.id_apply,
+    HeightOneSpectrum.valuedAdicCompletion_eq_valuation',
+    ((Rat.HeightOneSpectrum.valuation_equiv_padicValuation v).le_one_iff_le_one),
+    Rat.padicValuation_le_one_iff]
+
+/-- A rational S-integer for `S = {v}` that is integral at `v` has denominator one. -/
+private theorem sec1b_rawCarving_den (v : HeightOneSpectrum (𝓞 ℚ)) (x : ℚ)
+    (hx : x ∈ ({v} : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ)
+    (hv : ¬ (Rat.HeightOneSpectrum.primesEquiv v).1 ∣ x.den) : x.den = 1 := by
+  by_contra hne
+  obtain ⟨q, hq, hqd⟩ := Nat.exists_prime_and_dvd hne
+  let w := (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm ⟨q, hq⟩
+  have hw : (Rat.HeightOneSpectrum.primesEquiv w).1 = q :=
+    congrArg Subtype.val ((Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).apply_symm_apply ⟨q, hq⟩)
+  by_cases hwv : w = v
+  · exact hv (hwv ▸ hw ▸ hqd)
+  · have h1 : w.valuation ℚ x ≤ 1 := hx w hwv
+    have : Fact (Rat.HeightOneSpectrum.primesEquiv w).1.Prime :=
+      ⟨(Rat.HeightOneSpectrum.primesEquiv w).2⟩
+    rw [(Rat.HeightOneSpectrum.valuation_equiv_padicValuation w).le_one_iff_le_one,
+      Rat.padicValuation_le_one_iff, hw] at h1
+    exact h1 hqd
+
+
+open scoped ContDiff in
+/-- An archimedean test with value one at one that vanishes at every rational at
+distance at least `1/2` from one. -/
+private theorem sec1b_rawCarving_arch :
+    ∃ fA : SchwartzBruhat (Multiplicative (InfiniteAdeleRing ℚ)),
+      fA (Multiplicative.ofAdd 1) = 1 ∧
+      ∀ ξ : ℚ, fA (Multiplicative.ofAdd (algebraMap ℚ (InfiniteAdeleRing ℚ) ξ)) ≠ 0 →
+        |(ξ : ℝ) - 1| < 1 / 2 := by
+  classical
+  let c := InfiniteAdeleRing.ringEquiv_mixedSpace ℚ 1
+  let b : ContDiffBump c := ⟨1 / 4, 1 / 2, by norm_num, by norm_num⟩
+  let bC : mixedEmbedding.mixedSpace ℚ → ℂ := fun y ↦ (b y : ℂ)
+  have hsupp : HasCompactSupport bC := b.hasCompactSupport.comp_left Complex.ofReal_zero
+  have hsmooth : ContDiff ℝ (∞) bC := Complex.ofRealCLM.contDiff.comp b.contDiff
+  let G := hsupp.toSchwartzMap hsmooth
+  have hG : (fun x : Multiplicative (InfiniteAdeleRing ℚ) ↦
+      G (InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x.toAdd)) ∈
+      schwartzBruhatSubmodule (Multiplicative (InfiniteAdeleRing ℚ)) :=
+    (mem_archimedeanSchwartzBruhat_iff (F := ℚ)
+      (fun x ↦ G (InfiniteAdeleRing.ringEquiv_mixedSpace ℚ x))).mpr ⟨G, fun _ ↦ rfl⟩
+  refine ⟨⟨_, hG⟩, ?_, fun ξ hξ ↦ ?_⟩
+  · change ((b c : ℝ) : ℂ) = 1
+    rw [b.one_of_mem_closedBall (Metric.mem_closedBall_self (by norm_num)), Complex.ofReal_one]
+  · have hs : InfiniteAdeleRing.ringEquiv_mixedSpace ℚ (algebraMap ℚ (InfiniteAdeleRing ℚ) ξ) ∈
+        Function.support b := fun h0 ↦ hξ (by
+          change ((b _ : ℝ) : ℂ) = 0
+          exact (congrArg (fun r : ℝ ↦ (r : ℂ)) h0).trans Complex.ofReal_zero)
+    have hc : c = InfiniteAdeleRing.ringEquiv_mixedSpace ℚ (algebraMap ℚ (InfiniteAdeleRing ℚ) 1) := by
+      rw [map_one]
+    rw [b.support_eq, Metric.mem_ball, dist_eq_norm] at hs
+    change _ < 1 / 2 at hs
+    rw [hc, ← map_sub, ← map_sub, ← InfiniteAdeleRing.mixedEmbedding_eq_algebraMap_comp] at hs
+    let w : {w : InfinitePlace ℚ // w.IsReal} := ⟨Rat.infinitePlace, Rat.isReal_infinitePlace⟩
+    have h1 := (norm_le_pi_norm (mixedEmbedding ℚ (ξ - 1)).1 w).trans (norm_fst_le _)
+    rw [mixedEmbedding.mixedEmbedding_apply_isReal, eq_ratCast, Real.norm_eq_abs] at h1
+    push_cast at h1
+    exact h1.trans_lt hs
+
+/-- The indicator of `1 + 5𝒪` at a finite place of `ℚ`. -/
+private theorem sec1b_rawCarving_fin
+    (w : HeightOneSpectrum (𝓞 ℚ)) :
+    ∃ g : SchwartzBruhat (Multiplicative (w.adicCompletion ℚ)), ∀ y : w.adicCompletion ℚ,
+      g (Multiplicative.ofAdd y) =
+        (w.adicCompletionIntegers ℚ : Set (w.adicCompletion ℚ)).indicator (fun _ ↦ 1)
+          ((5 : w.adicCompletion ℚ)⁻¹ * (y - 1)) := by
+  have : LocallyCompactSpace (Multiplicative (w.adicCompletion ℚ)) :=
+    locallyCompactSpace_adicCompletion (K := ℚ) w
+  have h5 : (5 : w.adicCompletion ℚ) ≠ 0 := by
+    simpa using (map_ne_zero (algebraMap ℚ (w.adicCompletion ℚ))).mpr (by norm_num : (5 : ℚ) ≠ 0)
+  refine ⟨schwartzBruhatTranslate (Multiplicative.ofAdd (1 : w.adicCompletion ℚ))
+    (schwartzBruhatUnitTranslate (Units.mk0 5 h5) (finiteStandardGaussian w 1)), fun y ↦ ?_⟩
+  change finiteStandardGaussianValue w 1
+    (((Units.mk0 (5 : w.adicCompletion ℚ) h5)⁻¹ : (w.adicCompletion ℚ)ˣ) * (-1 + y)) = _
+  rw [finiteStandardGaussianValue]
+  split_ifs with hc
+  · rw [neg_add_eq_sub, Units.val_inv_eq_inv_val, Units.val_mk0]
+  · exact absurd (fun _ _ ↦ rfl) hc
+
+/-- An S-integer whose twisted 5-adic coordinate lies in `1 + 5𝒪` and whose real coordinate
+is near one is one. -/
+private theorem sec1b_rawCarving_term
+    (v : HeightOneSpectrum (𝓞 ℚ)) (hv : (Rat.HeightOneSpectrum.primesEquiv v).1 = 5)
+    (ξ : ℚ) (hξ : ξ ∈ ({v} : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ)
+    (hreal : |(ξ : ℝ) - 1| < 1 / 2) (ε : ℚ) (hε : ε = 1 ∨ ε = -1)
+    (hmem : (5 : v.adicCompletion ℚ)⁻¹ * (algebraMap ℚ (v.adicCompletion ℚ) (ε * ξ) - 1) ∈
+      v.adicCompletionIntegers ℚ) :
+    ξ = 1 ∧ ε = 1 := by
+  have ht : (5 : v.adicCompletion ℚ)⁻¹ * (algebraMap ℚ (v.adicCompletion ℚ) (ε * ξ) - 1) =
+      algebraMap ℚ (v.adicCompletion ℚ) ((ε * ξ - 1) / 5) := by
+    rw [map_div₀, map_sub, map_one, map_ofNat, div_eq_inv_mul]
+  rw [ht] at hmem
+  have hint : algebraMap ℚ (v.adicCompletion ℚ) (ε * ξ) ∈ v.adicCompletionIntegers ℚ := by
+    have h5 : (5 : v.adicCompletion ℚ) ∈ v.adicCompletionIntegers ℚ := by
+      simp
+    have : ε * ξ = 5 * ((ε * ξ - 1) / 5) + 1 := by ring
+    rw [this, map_add, map_mul, map_ofNat, map_one]
+    exact add_mem (mul_mem h5 hmem) (one_mem _)
+  rw [sec1b_rawCarving_integral, hv] at hint hmem
+  have hεξ : ε * ξ ∈ ({v} : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ := by
+    rcases hε with rfl | rfl
+    · simpa using hξ
+    · simpa using neg_mem hξ
+  have hden := sec1b_rawCarving_den v (ε * ξ) hεξ (hv ▸ hint)
+  have hden' : ξ.den = 1 := by rcases hε with rfl | rfl <;> simpa using hden
+  have hξ1 : ξ = 1 := by
+    have hn : ξ = (ξ.num : ℚ) := ((Rat.den_eq_one_iff ξ).mp hden').symm
+    rw [hn] at hreal ⊢
+    push_cast at hreal
+    rw [abs_lt] at hreal
+    have h2 : ξ.num < 2 := by exact_mod_cast (show (ξ.num : ℝ) < 2 by linarith)
+    have h0 : 0 < ξ.num := by exact_mod_cast (show (0 : ℝ) < ξ.num by linarith)
+    have : ξ.num = 1 := by omega
+    rw [this]; rfl
+  refine ⟨hξ1, ?_⟩
+  rcases hε with rfl | rfl
+  · rfl
+  · exfalso
+    subst hξ1
+    exact hmem (by norm_num)
+
+/-- The concrete test adapts the two local factors used in the counterexample to
+separation by one norm chart in Chapter 5. The finite sign involution cancels
+the additive integral and changes the sign of the theta values. -/
+private theorem sec1b_rawCarving_witness :
+    ∃ (S : Finset V[ℚ]) (u : (SAdeleRing ℚ S)ˣ) (f : sAdelePolarSubspace ℚ S),
+      u⁻¹ = u ∧ sIdeleNorm ℚ S u = 1 ∧
+      sLocalAdelicTheta ℚ S f.val 1 = 1 ∧ sLocalAdelicTheta ℚ S f.val u = -1 := by
+  let v : HeightOneSpectrum (𝓞 ℚ) :=
+    (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm ⟨5, Nat.prime_five⟩
+  have hv : (Rat.HeightOneSpectrum.primesEquiv v).1 = 5 :=
+    congrArg Subtype.val ((Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).apply_symm_apply _)
+  let S : Finset (HeightOneSpectrum (𝓞 ℚ)) := {v}
+  let w₀ : S := ⟨v, Finset.mem_singleton_self v⟩
+  have hS (w : S) : w = w₀ := Subtype.ext (Finset.mem_singleton.mp w.2)
+  have hA := sec1b_rawCarving_arch
+  let fA := hA.choose
+  have hfA1 : fA (Multiplicative.ofAdd 1) = 1 := hA.choose_spec.1
+  have hfA := hA.choose_spec.2
+  have hF := fun w ↦ sec1b_rawCarving_fin w
+  let g := fun w : S ↦ (hF w.val).choose
+  have hg (w : S) := (hF w.val).choose_spec
+  have hE := sAdeleSchwartz_inductiveTensor_equiv ℚ S
+  let h := hE.choose (fA ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))
+  let ind := fun y : v.adicCompletion ℚ ↦
+    (v.adicCompletionIntegers ℚ : Set (v.adicCompletion ℚ)).indicator (fun _ ↦ (1 : ℂ))
+      ((5 : v.adicCompletion ℚ)⁻¹ * (y - 1))
+  have hval (y : SAdeleRing ℚ S) :
+      h (Multiplicative.ofAdd y) = fA (Multiplicative.ofAdd y.1) * ind (y.2 w₀) := by
+    rw [hE.choose_spec fA g y, Fintype.prod_eq_single w₀ (fun w hw ↦ absurd (hS w) hw), hg w₀]
+  let u : (SAdeleRing ℚ S)ˣ := ⟨(1, -1), (1, -1), by ext <;> simp, by ext <;> simp⟩
+  let f := h - schwartzBruhatUnitTranslate u h
+  have hfval (y : SAdeleRing ℚ S) : f (Multiplicative.ofAdd y) =
+      fA (Multiplicative.ofAdd y.1) * ind (y.2 w₀) -
+        fA (Multiplicative.ofAdd y.1) * ind (-y.2 w₀) := by
+    change h (Multiplicative.ofAdd y) - h (Multiplicative.ofAdd ((1, -1) * y)) = _
+    rw [hval, hval]
+    simp
+  have hSv : (S : Set (HeightOneSpectrum (𝓞 ℚ))) = {v} := Finset.coe_singleton v
+  have hind (q : ℚ) (hq : q ∈ ({v} : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ)
+      (hreal : |(q : ℝ) - 1| < 1 / 2) (ε : ℚ) (hε : ε = 1 ∨ ε = -1) (hne : ¬ (q = 1 ∧ ε = 1)) :
+      ind (algebraMap ℚ (v.adicCompletion ℚ) (ε * q)) = 0 :=
+    Set.indicator_of_notMem (fun hm ↦ hne
+      (sec1b_rawCarving_term v hv q hq hreal ε hε hm)) _
+  have hterm (ξ : ((S : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ)ˣ) (y : SAdeleRing ℚ S)
+      (hy1 : y.1 = algebraMap ℚ (InfiniteAdeleRing ℚ) ξ.val.val)
+      (hy2 : y.2 w₀ = algebraMap ℚ (v.adicCompletion ℚ) ξ.val.val) :
+      f (Multiplicative.ofAdd y) = if ξ = 1 then 1 else 0 := by
+    have hq : ξ.val.val ∈ ({v} : Set (HeightOneSpectrum (𝓞 ℚ))).integer ℚ :=
+      hSv ▸ ξ.val.2
+    have hξ1 : ξ = 1 ↔ ξ.val.val = 1 :=
+      ⟨fun h ↦ by rw [h]; rfl, fun h ↦ Units.ext (Subtype.ext h)⟩
+    rw [hfval, hy1, hy2]
+    have hneg : -algebraMap ℚ (v.adicCompletion ℚ) ξ.val.val =
+        algebraMap ℚ (v.adicCompletion ℚ) ((-1) * ξ.val.val) := by simp
+    have hpos : algebraMap ℚ (v.adicCompletion ℚ) ξ.val.val =
+        algebraMap ℚ (v.adicCompletion ℚ) (1 * ξ.val.val) := by simp
+    by_cases hA0 : fA (Multiplicative.ofAdd
+        (algebraMap ℚ (InfiniteAdeleRing ℚ) ξ.val.val)) = 0
+    · have h : ¬ ξ = 1 := fun h ↦ by
+        rw [hξ1.mp h, map_one, hfA1] at hA0
+        exact one_ne_zero hA0
+      rw [hA0, zero_mul, zero_mul, sub_zero]
+      simp [h]
+    · have hreal := hfA _ hA0
+      rw [hneg, hind _ hq hreal (-1) (Or.inr rfl) (by norm_num), mul_zero, sub_zero]
+      by_cases h : ξ = 1
+      · rw [hξ1.mp h, map_one, hfA1, one_mul, map_one]
+        simp [ind, h]
+      · rw [hpos, hind _ hq hreal 1 (Or.inl rfl) (fun h' ↦ h (hξ1.mpr h'.1)), mul_zero]
+        simp [h]
+  have hui : u⁻¹ = u := rfl
+  have hnorm : sIdeleNorm ℚ S u = 1 := by
+    apply Units.ext
+    simp [sIdeleNorm, u]
+    exact nnNorm_one
+  have hanti (y : SAdeleRing ℚ S) : f (Multiplicative.ofAdd (u.val * y)) =
+      - f (Multiplicative.ofAdd y) := by
+    rw [hfval, hfval]
+    change fA (Multiplicative.ofAdd (1 * y.1)) * ind ((-1) * y.2 w₀) -
+      fA (Multiplicative.ofAdd (1 * y.1)) * ind (-((-1) * y.2 w₀)) = _
+    simp only [one_mul, neg_mul, neg_neg, neg_sub]
+  have hf0 : f (Multiplicative.ofAdd 0) = 0 := by
+    have hh := hanti 0
+    rw [mul_zero] at hh
+    exact CharZero.eq_neg_self_iff.mp hh
+  have hfFourier : sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0 := by
+    rw [sAdeleSchwartzFourier_apply_zero]
+    let (w : InfinitePlace ℚ) : MeasurableSpace w.Completion := borel _
+    let (w : InfinitePlace ℚ) : BorelSpace w.Completion := ⟨rfl⟩
+    let (w : S) : MeasurableSpace (w.val.adicCompletion ℚ) := borel _
+    let (w : S) : BorelSpace (w.val.adicCompletion ℚ) := ⟨rfl⟩
+    let (w : S) : ProperSpace (w.val.adicCompletion ℚ) := properSpace_adicCompletion w.val
+    let (w : InfinitePlace ℚ) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (w : InfinitePlace ℚ) : (infiniteLocalAdditiveTamagawaMeasure ℚ w).IsAddHaarMeasure := by
+      have hw : w.IsReal := (Subsingleton.elim Rat.infinitePlace w) ▸ Rat.isReal_infinitePlace
+      rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left hw]
+      exact (InfinitePlace.Completion.ringEquivRealOfIsReal hw).symm.toAddEquiv.isAddHaarMeasure_map
+        volume (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.continuous
+        (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).continuous
+    let (w : S) : (finiteLocalAdditiveTamagawaMeasure ℚ w.val).IsAddHaarMeasure :=
+      finiteLocalAdditiveTamagawaMeasure_isAddHaar ℚ w.val
+    let μA := Measure.pi (infiniteLocalAdditiveTamagawaMeasure ℚ)
+    let μS := Measure.pi (fun w : S ↦ finiteLocalAdditiveTamagawaMeasure ℚ w.val)
+    let : μA.IsAddHaarMeasure := Measure.pi.isAddHaarMeasure _
+    let : μS.IsAddHaarMeasure := Measure.pi.isAddHaarMeasure _
+    let e := (MeasurableEquiv.refl ((w : InfinitePlace ℚ) → w.Completion)).prodCongr
+      (Homeomorph.neg ((w : S) → w.val.adicCompletion ℚ)).toMeasurableEquiv
+    have hpres : MeasurePreserving e (μA.prod μS) (μA.prod μS) :=
+      (MeasurePreserving.id μA).prod (Measure.measurePreserving_neg μS)
+    have hi := hpres.integral_comp' (fun x ↦ f (Multiplicative.ofAdd x))
+    have he (x : SAdeleRing ℚ S) : (e x : SAdeleRing ℚ S) = u.val * x := by
+      apply Prod.ext
+      · change x.1 = 1 * x.1
+        rw [one_mul]
+      · change -x.2 = -1 * x.2
+        rw [neg_one_mul]
+    have heval (x : SAdeleRing ℚ S) :
+        f (Multiplicative.ofAdd (e x)) = -f (Multiplicative.ofAdd x) :=
+      (congrArg (fun y ↦ f (Multiplicative.ofAdd y)) (he x)).trans (hanti x)
+    simp_rw [heval, integral_neg] at hi
+    exact CharZero.eq_neg_self_iff.mp hi.symm
+  let d := (Units.map ((adeleProjection ℚ S).comp (integralAdelesOutside ℚ S).subtype).toMonoidHom).comp
+    (Units.map (integralAdeleDiagonal ℚ S).toMonoidHom)
+  have hsum (z : (SAdeleRing ℚ S)ˣ) : sLocalAdelicTheta ℚ S f z =
+      ∑' ξ, f (Multiplicative.ofAdd ((d ξ * z).val)) := sLocalAdelicTheta_apply ℚ S f z
+  have hθ1 : sLocalAdelicTheta ℚ S f 1 = 1 := by
+    rw [hsum, tsum_eq_single 1]
+    · rw [mul_one, hterm 1 _ rfl rfl, ite_eq_left rfl]
+    · intro ξ hξ
+      rw [mul_one, hterm ξ _ rfl rfl, ite_eq_right hξ]
+  have hθu : sLocalAdelicTheta ℚ S f u = -1 := by
+    rw [← hθ1, hsum, hsum, ← tsum_neg]
+    refine tsum_congr fun ξ ↦ ?_
+    rw [mul_one, mul_comm (d ξ) u, Units.val_mul, hanti]
+  exact ⟨S, u, ⟨f, (mem_sAdelePolarSubspace f).mpr ⟨hf0, hfFourier⟩⟩, hui, hnorm, hθ1, hθu⟩
+
+/-- Paper: Theorem 11.1.2.1(3), p. 480, (11.1.2.7). Over the rationals
+take the trivial character, the place at 5, Sobolev exponent 2, and the
+two-sided radius 2 cutoff. The raw theta of a polar-free test takes different
+values at the identity and a norm-one translate, so the cutoff cannot be
+in the trivial isotype. -/
 theorem Printed.sLocalCarvingLimit_eq_rawClosedSpan_false :
-    ¬ Printed.sLocalCarvingLimit_eq_rawClosedSpan := by sorry
+    ¬ Printed.sLocalCarvingLimit_eq_rawClosedSpan := by
+  intro hall
+  obtain ⟨S, a, f, hai, han, hθ₁, hθa⟩ := sec1b_rawCarving_witness
+  let μ := ideleClassTamagawaMeasure ℚ
+  let m : C[ℚ] →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩
+  let ν := μ.withDensity (fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 2 (Real.log (norm[ℚ] g))))
+  let W := IdeleClassZeroLineSobolev ℚ 2
+  let J := band[true, 2]
+  let hJ := bandMeasurable[true, 2]
+  let E := norm[ℚ] ⁻¹' J
+  let θ := sLocalCarvingTheta S f.val
+  let raw := E.indicator θ
+  let : T2Space C[ℚ] := (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.1
+  let : LocallyCompactSpace C[ℚ] := (ideleGroup_quotient.{_, 0} ℚ).2.2.2.2.2.2.1
+  let : μ.IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil ℚ).1
+  let classOf := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 ℚ) ℚ)
+  let h₀ := classOf (sIdeleInsertion ℚ S a)
+  have hnorm : ideleClassNorm ℚ h₀ = 1 := by
+    change ideleNorm ℚ (sIdeleInsertion ℚ S a) = 1
+    rw [ideleNorm_sIdeleInsertion, han]
+  let h : (ideleClassNorm ℚ).ker := ⟨h₀, hnorm⟩
+  have hh : h₀⁻¹ = h₀ := by
+    dsimp only [h₀]
+    rw [← map_inv, ← map_inv, hai]
+  have hθ0 : θ h₀ = -1 := (sLocalCarvingTheta_sIdeleInsertion S f.val a).trans hθa
+  have hθ1 : θ 1 = 1 := by
+    simpa only [map_one] using (sLocalCarvingTheta_sIdeleInsertion S f.val 1).trans hθ₁
+  have hχ : ideleClassNormTwist (1 : PontryaginDual C[ℚ]) 0 ∈ unramifiedOutside ℚ S := by
+    have h1 : ideleClassNormTwist (1 : PontryaginDual C[ℚ]) 0 = 1 := by
+      ext g
+      change (1 : ℂ) * (((ideleClassNorm ℚ g).val : ℝ) : ℂ) ^ (0 : ℂ) = 1
+      simp
+    rw [h1]
+    exact (mem_unramifiedOutside_iff ℚ S 1).mpr fun _ _ _ ↦ rfl
+  have hPic : Subsingleton (CommRing.Pic (Set.integer (R := 𝓞 ℚ) (S : Set V[ℚ]) ℚ)) := by
+    have : Subsingleton (CommRing.Pic (Set.integer (R := 𝓞 ℚ)
+        ((∅ : Finset V[ℚ]) : Set V[ℚ]) ℚ)) := by
+      rw [Finset.coe_empty, integer_empty]
+      let e := (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)).toRingEquiv
+      let i := Rat.ringOfIntegersEquiv.symm.trans e.symm
+      let := IsPrincipalIdealRing.of_surjective i i.surjective
+      infer_instance
+    obtain ⟨_, _, _, hsurj, _⟩ := picard_localization_exact ℚ ∅ S (Finset.empty_subset S)
+    exact hsurj.subsingleton
+  have hs : 2 * (Module.finrank ℚ ℚ : ℝ) ≤ (2 : ℝ) := by simp
+  have hΛ : 0 < (2 : ℝ) := by norm_num
+  obtain ⟨hmem, hspan⟩ := hall ℚ 1 S hχ hPic 2 hs true 2 hΛ
+  let u : W := (hmem f).toLp raw
+  have hu : (u : C[ℚ] → ℂ) =ᵐ[ν] raw := MemLp.coeFn_toLp _
+  have hulim : u ∈ sLocalCarvingLimit 2 (ω[ℚ, (1 : PontryaginDual C[ℚ])]) S J hJ := by
+    rw [hspan]
+    exact (Submodule.le_topologicalClosure _) (Submodule.subset_span ⟨f, hu⟩)
+  have hvE : (fun g ↦ u (h₀⁻¹ * g)) =ᵐ[μ] (u : C[ℚ] → ℂ) :=
+    sLocalCarvingLimit_trivial_ae_translate hχ hPic 2 hs true 2 hΛ hulim h
+  have hn : Continuous norm[ℚ] :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)
+  have hd : intervalSobolevDensity 0 0 2 = fun x ↦ 1 + x ^ 2 := by
+    funext x
+    norm_num [intervalSobolevDensity]
+  have hμν : μ ≪ ν := by
+    apply withDensity_absolutelyContinuous'
+    · rw [hd]
+      exact (((measurable_const.add ((Real.measurable_log.comp hn.measurable).pow_const 2)).ennreal_ofReal)).aemeasurable
+    · exact ae_of_all μ fun g ↦ (ENNReal.ofReal_pos.mpr (by rw [hd]; positivity)).ne'
+  have huA := hμν.ae_le hu
+  have hq := (measurePreserving_mul_left μ h₀⁻¹).quasiMeasurePreserving
+  have huB := hq.ae_eq_comp huA
+  let G := norm[ℚ] ⁻¹' Ioo (2 : ℝ)⁻¹ 2
+  have hgE {g : C[ℚ]} (hg : g ∈ G) : g ∈ E := ⟨hg.1.le, hg.2.le⟩
+  have hEg {g : C[ℚ]} (hg : g ∈ E) : h₀⁻¹ * g ∈ E := by
+    change ((ideleClassNorm ℚ (h₀⁻¹ * g)).val : ℝ) ∈ J
+    rw [map_mul, map_inv, hnorm, inv_one, one_mul]
+    exact hg
+  have hlocal : ∀ᵐ g ∂μ, g ∈ G → θ g = θ (h₀⁻¹ * g) := by
+    filter_upwards [huA, huB, hvE] with g hA hB hv hg
+    have h1 := hgE hg
+    have h2 := hEg h1
+    change u (h₀⁻¹ * g) = raw (h₀⁻¹ * g) at hB
+    rw [show raw g = θ g from Set.indicator_of_mem h1 _] at hA
+    rw [show raw (h₀⁻¹ * g) = θ (h₀⁻¹ * g) from Set.indicator_of_mem h2 _] at hB
+    exact hA.symm.trans (hv.symm.trans hB)
+  let U := G ∩ {g | θ g ≠ θ (h₀⁻¹ * g)}
+  have hcont : Continuous θ := continuous_sLocalCarvingTheta S f.val
+  have hU : IsOpen U :=
+    (isOpen_Ioo.preimage hn).inter (isOpen_ne_fun hcont
+      (hcont.comp (continuous_const_mul h₀⁻¹)))
+  have hU1 : (1 : C[ℚ]) ∈ U := by
+    refine ⟨?_, ?_⟩
+    · change ((ideleClassNorm ℚ 1).val : ℝ) ∈ Ioo (2 : ℝ)⁻¹ 2
+      rw [map_one]
+      norm_num
+    · change θ 1 ≠ θ (h₀⁻¹ * 1)
+      rw [mul_one, hh, hθ1, hθ0]
+      norm_num
+  have hzero : ∀ᵐ g ∂μ, g ∉ U := hlocal.mono fun _ hg hU' ↦ hU'.2 (hg hU'.1)
+  have hnull : μ U = 0 := by simpa only [ae_iff, not_not, ofPred_mem_eq] using hzero
+  exact (hU.measure_pos μ ⟨1, hU1⟩).ne' hnull
 
 /-- Paper: (11.1.2.9), p. 481. The printed lower-half-line integral is
 claimed to compute the cutoff norm for both choices of cutoff. -/
