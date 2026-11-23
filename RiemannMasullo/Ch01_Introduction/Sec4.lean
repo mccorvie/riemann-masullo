@@ -528,7 +528,80 @@ theorem introTrace_logDeriv_analytic_of_extensions (χ : U𝔽)
       EqOn H (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
         if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1)) :
     AnalyticOnNhd ℂ (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2))
-      {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)} := by sorry
+      {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)} := by
+  let L := finiteL(χ)
+  have hL : MeromorphicNFOn L univ := (finiteHeckeL_exists_continuation χ).choose_spec.1
+  have hfinite (w : ℂ) : meromorphicOrderAt L w ≠ ⊤ := by
+    apply hL.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+      isPreconnected_univ (x := 2) (mem_univ _) (mem_univ w)
+    have htwo : L 2 ≠ 0 := by
+      rw [show L 2 = finiteHeckeL χ ⟨2, by norm_num⟩ from
+        (finiteHeckeL_exists_continuation χ).choose_spec.2 ⟨2, by norm_num⟩]
+      exact finiteHeckeL_ne_zero_of_one_lt_re χ ⟨2, by norm_num⟩
+    rw [(hL (mem_univ (2 : ℂ))).meromorphicOrderAt_eq_zero_iff.mpr htwo]
+    exact WithTop.zero_ne_top
+  intro z hz
+  obtain ⟨H, hH, hEq⟩ := _h (z.re / 2) (half_pos hz.1)
+  let R : ℂ → ℂ := fun w ↦
+    if χ = 1 then 1 / (w + 1 / 2) + 1 / (w - 1 / 2) else 0
+  let D : ℂ → ℂ := fun w ↦ logDeriv L (w + 1 / 2)
+  have hD : Meromorphic D := by
+    intro w
+    exact meromorphicAt_comp_add_const_iff_meromorphicAt.mpr
+      (hL (mem_univ (w + 1 / 2))).meromorphicAt.logDeriv
+  have hR : Meromorphic R := by
+    intro w
+    dsimp only [R]
+    split_ifs <;> fun_prop
+  let A := H - R
+  have hA : MeromorphicOn A right(z.re / 2) :=
+    hH.meromorphicOn.sub (fun w _ ↦ hR w)
+  -- Continue equality of punctured germs, without assuming regularity at zeros or poles.
+  let q : ℂ := (max (z.re / 2) 1 + 1 : ℝ)
+  have hq : max (z.re / 2) 1 < q.re := by simp [q]
+  have hbase : meromorphicOrderAt (D - A) q = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hnear : ∀ᶠ w : ℂ in 𝓝 q, max (z.re / 2) 1 < w.re :=
+      Complex.continuous_re.continuousAt.eventually (eventually_gt_nhds hq)
+    filter_upwards [hnear.filter_mono nhdsWithin_le_nhds] with w hw
+    have he : H w = D w + R w := hEq hw
+    change D w - (H w - R w) = 0
+    rw [he]
+    ring
+  have hzhalf : z ∈ right(z.re / 2) := by change z.re / 2 < z.re; linarith [hz.1]
+  have hqhalf : q ∈ right(z.re / 2) := (le_max_left _ _).trans_lt hq
+  have hDm : MeromorphicOn D right(z.re / 2) := fun w _ ↦ hD w
+  have horder := (hDm.sub hA).meromorphicOrderAt_eq_top_of_isPreconnected
+    (convex_halfSpace_re_gt _).isPreconnected hqhalf hzhalf hbase
+  have hnear : D =ᶠ[𝓝[≠] z] A :=
+    (meromorphicOrderAt_eq_top_iff.mp horder).mono fun w hw ↦ sub_eq_zero.mp hw
+  have hRz : AnalyticAt ℂ R z := by
+    dsimp only [R]
+    split_ifs with hχ
+    · have hp : z + 1 / 2 ≠ 0 := by
+        intro hzero
+        have hre := congrArg Complex.re hzero
+        norm_num at hre
+        linarith [hz.1]
+      have hm : z - 1 / 2 ≠ 0 := sub_ne_zero.mpr (hz.2.resolve_left (not_not.mpr hχ))
+      have hpa : AnalyticAt ℂ (fun w : ℂ ↦ w + 1 / 2) z := by fun_prop
+      have hma : AnalyticAt ℂ (fun w : ℂ ↦ w - 1 / 2) z := by fun_prop
+      exact (analyticAt_const.div hpa hp).add (analyticAt_const.div hma hm)
+    · exact analyticAt_const
+  have hnonneg : 0 ≤ meromorphicOrderAt D z := by
+    rw [meromorphicOrderAt_congr hnear]
+    exact ((hH z hzhalf).sub hRz).meromorphicOrderAt_nonneg
+  change 0 ≤ meromorphicOrderAt (logDeriv L ∘ (· + (1 / 2 : ℂ))) z at hnonneg
+  rw [meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt] at hnonneg
+  -- A zero or pole of L would give its logarithmic derivative a simple pole.
+  have hzero : meromorphicOrderAt L (z + 1 / 2) = 0 := by
+    by_contra hzero
+    rw [meromorphicOrderAt_logDeriv_eq_neg_one hzero (hfinite _)] at hnonneg
+    exact (by decide : ¬ (0 : WithTop ℤ) ≤ -1) hnonneg
+  have hnormal := hL (mem_univ (z + 1 / 2))
+  have ha := hnormal.meromorphicOrderAt_nonneg_iff_analyticAt.mp (le_of_eq hzero.symm)
+  exact (ha.deriv.div ha (hnormal.meromorphicOrderAt_eq_zero_iff.mp hzero)).comp
+    (f := fun w : ℂ ↦ w + 1 / 2) (x := z) (by fun_prop)
 
 /-- Paper: §1.4.5, p. 30. A holomorphic shifted logarithmic derivative
 excludes finite Hecke zeros to the right of one half. The exceptional point
