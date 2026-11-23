@@ -755,7 +755,7 @@ private theorem exists_normTest (g : ℝ → ℂ) (hg : ContDiff ℝ (∞) g) (h
 
 /-- A unitary character times a smooth compactly supported function of the logarithm of
 the norm is a test function. -/
-private theorem exists_characterNormTest (ψ : PontryaginDual C𝔽) (g : ℝ → ℂ) (hg : ContDiff ℝ (∞) g)
+theorem exists_characterNormTest (ψ : PontryaginDual C𝔽) (g : ℝ → ℂ) (hg : ContDiff ℝ (∞) g)
     (hgc : HasCompactSupport g) :
     ∃ φ : BruhatCompactSupport C𝔽,
       ∀ x, φ.val x = (ψ x : ℂ) * g (Real.log ((ideleClassNorm F x : ℝ≥0) : ℝ)) := by
