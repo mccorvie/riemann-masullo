@@ -89,6 +89,26 @@ theorem nuclearityTestMellin_integrable (χ : U) (φ : 𝒟) :
     change φ.val g * (1 * _ ^ (0 : ℂ)) = φ.val g
     simp
 
+/-- Absolute convergence on every norm line makes the Mellin multiplier entire. -/
+private theorem nuclearityTestMellin_differentiable
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (φ : 𝒟) :
+    Differentiable ℂ (nuclearityTestMellin χ φ) := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let n := fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)
+  let f := fun g : C𝔽 ↦ φ.val g * (χ g : ℂ)
+  have hn : Continuous n :=
+    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
+  have heq (s : ℂ) (g : C𝔽) : f g * (n g : ℂ) ^ s = testIntegrand(χ, φ, s) g :=
+    mul_assoc _ _ _
+  have h := analyticOnNhd_integral_mul_cpow_of_integrable μ𝔽 f n hn.measurable
+    (fun g ↦ NNReal.coe_pos.mpr (Units.zero_lt _)) isOpen_univ
+    (fun s _ ↦ by simpa only [heq] using (nuclearityTestMellin_integrable χ φ).1 s)
+  have hfun : nuclearityTestMellin χ φ = fun s ↦ ∫ g, f g * (n g : ℂ) ^ s ∂μ𝔽 := by
+    funext s
+    simp only [heq, nuclearityTestMellin]
+  rw [hfun]
+  exact fun s ↦ (h s (mem_univ _)).differentiableAt
+
 /-- Paper: Theorem 7.4.1.1(2), pp. 366–367.
 An operator of order zero admits a nuclear presentation with rapidly decreasing
 coefficients. The presentation includes equicontinuity and a common Banach disc. -/
@@ -611,11 +631,161 @@ theorem finiteNuclearityQuotient_mk_eq_zero (p : HeightOneSpectrum (𝓞 ℚ)) (
       (nuclearityPrincipalValue_mem_polar (F := F) p) f
     with_reducible exact hz
 
+/-- The polar Mellin transform separates homogeneous theta classes by the two
+global converse theorems, using their respective kernels. -/
+private theorem finiteNuclearity_mellin_injective : Injective (Z(χ, τ, hτ)) := by
+  apply LinearMap.ker_eq_bot.mp
+  refine (Submodule.eq_bot_iff _).mpr fun x hx ↦ ?_
+  obtain ⟨f, rfl⟩ := Submodule.Quotient.mk_surjective (Π(χ)) x
+  have hZ : (Z(χ, τ, hτ)) (mkΘ(χ, f)) = 0 := hx
+  have hf (s : ℂ) : globalIdelicZFunction f.val (ideleClassNormTwist χ s) = 0 := by
+    rw [← ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f s).2, hZ]
+    rfl
+  apply (Submodule.Quotient.mk_eq_zero (Π(χ))).mpr
+  by_cases hω : ω(χ) = 1
+  · obtain ⟨t, ht⟩ := (globalConverse_existsUnique_normTwist χ hω).exists
+    obtain ⟨M, _, _, hM, _, hker⟩ := globalConverse_normTwist χ t ht
+    have hm : f ∈ M.ker := specDenom_B_ext (M f) 0 (fun s ↦ (hM f s).trans (hf s))
+    have hK := congrArg (fun ψ ↦ (homogeneousAdelicThetaLinearMap F ψ).ker.comap (P).subtype) hω
+    exact (hK.trans hker.symm).ge hm
+  · obtain ⟨M, hM, hval, _⟩ := globalConverse_nontrivial χ hω
+    let K := (homogeneousAdelicThetaLinearMap F (ω(χ))).ker
+    have hfM : M (K.mkQ f.val) = 0 :=
+      specDenom_B_ext _ 0 (fun s ↦ (hval f.val s).trans (hf s))
+    change f.val ∈ K
+    exact (Submodule.Quotient.mk_eq_zero K).mp (hM.injective (hfM.trans M.map_zero.symm))
+
+local notation "orbitalGenerator(" S ")" => orbitalHeckeGenerator χ τ hτ
+  (continuedCompletedHeckeL χ) (continuedCompletedHeckeL_spec χ).1
+  (continuedCompletedHeckeL_spec χ).2 S
+
+/-- A surjective choice of representatives carries a Mellin range equality
+to a pointwise description on those representatives. -/
+private theorem finiteNuclearity_values_of_range {X Y C : Type*} (q : X → Y)
+    (hq : Surjective q) (M : Y → C) (ev : C → ℂ → ℂ) (g : ℂ → ℂ)
+    (hM : Set.range M = {b | ∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, ev b s = g s * u s})
+    (hev : Injective ev) (val : X → ℂ → ℂ) (hval : ∀ x s, ev (M (q x)) s = val x s) (b : C) :
+    (∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, ev b s = g s * u s) ↔
+      ∃ x, ∀ s, ev b s = val x s := by
+  have hr : b ∈ Set.range M ↔ ∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, ev b s = g s * u s :=
+    Set.ext_iff.mp hM b
+  refine hr.symm.trans ?_
+  constructor
+  · rintro ⟨y, rfl⟩
+    obtain ⟨x, rfl⟩ := hq y
+    exact ⟨x, hval x⟩
+  · rintro ⟨x, hx⟩
+    exact ⟨q x, hev (funext fun s ↦ (hval x s).trans (hx s).symm)⟩
+
+open Classical in
+private theorem finiteNuclearity_mellin_values_normTwist (S : Finset V) (b : B)
+    (hω : ω(χ) = 1) :
+    (∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, b.val s = (orbitalGenerator(S)).val s * u s) ↔
+      ∃ f : P, ∀ s : ℂ, b.val s =
+        globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s) := by
+  let L := fun s : ℂ ↦ (orbitalGenerator(S)).val s
+  let ev := fun b : B ↦ b.val
+  let val (f : P) (s : ℂ) :=
+    globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s)
+  have hev : Injective ev := Subtype.val_injective
+  change (∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, b.val s = L s * u s) ↔ ∃ f, ∀ s, ev b s = val f s
+  obtain ⟨t, ht⟩ := (globalConverse_existsUnique_normTwist χ hω).exists
+  obtain ⟨M, _, _, hM, hRange, _⟩ := globalPrincipalValueConverse_normTwist S χ t ht
+  let W := (P).map (adelePrincipalValue F S)
+  let q : P → W := fun f ↦ ⟨adelePrincipalValue F S f.val, Submodule.mem_map_of_mem f.property⟩
+  have hq : Surjective q := by
+    intro y
+    obtain ⟨f, hf, hfy⟩ := y.property
+    exact ⟨⟨f, hf⟩, Subtype.ext hfy⟩
+  have hL : L = fun s ↦ reciprocalPartialHeckeEulerProduct χ S s *
+      toMeromorphicNFOn (fun s ↦ ((s + (t : ℂ) * Complex.I) *
+        (1 - s - (t : ℂ) * Complex.I)) * continuedCompletedHeckeL χ s) univ s := by
+    funext s
+    change reciprocalPartialHeckeEulerProduct χ S s *
+      (regularizedCompletedHeckeL χ τ hτ (continuedCompletedHeckeL χ)
+        (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2).val s = _
+    rw [congrFun (specDenom_L1 χ τ hτ t hω ht) s]
+  rw [hL]
+  have heq (f : P) (s : ℂ) : (M (q f)).val s =
+      globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s) :=
+    hM (q f) s
+  with_reducible exact finiteNuclearity_values_of_range q hq M ev _ hRange hev val heq b
+
+open Classical in
+private theorem finiteNuclearity_mellin_values_nontrivial (S : Finset V) (b : B)
+    (hω : ω(χ) ≠ 1) :
+    (∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, b.val s = (orbitalGenerator(S)).val s * u s) ↔
+      ∃ f : P, ∀ s : ℂ, b.val s =
+        globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s) := by
+  let L := fun s : ℂ ↦ (orbitalGenerator(S)).val s
+  let ev := fun b : B ↦ b.val
+  let val (f : P) (s : ℂ) :=
+    globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s)
+  have hev : Injective ev := Subtype.val_injective
+  change (∃ u : ℂ → ℂ, Differentiable ℂ u ∧ ∀ s, b.val s = L s * u s) ↔ ∃ f, ∀ s, ev b s = val f s
+  let K := (homogeneousAdelicThetaLinearMap F (ω(χ))).ker
+  let A := K.mkQ.comp (adelePrincipalValue F S)
+  let q : P → A.range := fun f ↦ A.rangeRestrict f.val
+  obtain ⟨M, _, hM, hRange⟩ := globalPrincipalValueConverse_nontrivial S χ hω
+  have hq : Surjective q := (globalPrincipalValueConverse_nontrivial_exact S (ω(χ)) hω).surjective
+  have hL : L = fun s ↦ reciprocalPartialHeckeEulerProduct χ S s *
+      continuedCompletedHeckeL χ s := by
+    funext s
+    change reciprocalPartialHeckeEulerProduct χ S s *
+      (regularizedCompletedHeckeL χ τ hτ (continuedCompletedHeckeL χ)
+        (continuedCompletedHeckeL_spec χ).1 (continuedCompletedHeckeL_spec χ).2).val s = _
+    rw [congrFun (specDenom_L0 χ τ hτ (specDenom_hδ χ hω)) s]
+  rw [hL]
+  have heq (f : P) (s : ℂ) : (M (q f)).val s =
+      globalIdelicZFunction (adelePrincipalValue F S f.val) (ideleClassNormTwist χ s) :=
+    hM f.val s
+  with_reducible exact finiteNuclearity_values_of_range q hq M ev _ hRange hev val heq b
+
+open Classical in
+/-- The polar principal-value image has precisely the Mellin transforms
+divisible by the regularized completed function with the Euler factors removed. -/
+private theorem finiteNuclearity_mellin_values (p : HeightOneSpectrum (𝓞 ℚ)) (b : B) :
+    b ∈ schwartzBergmanDivisible (orbitalGenerator(Sₚ(p))) ↔
+      ∃ f : P, ∀ s : ℂ, b.val s =
+        globalIdelicZFunction (adelePrincipalValue F (Sₚ(p)) f.val) (ideleClassNormTwist χ s) := by
+  refine (specDenom_mem_div (orbitalGenerator(Sₚ(p))) b).trans ?_
+  by_cases hω : ω(χ) = 1
+  · exact finiteNuclearity_mellin_values_normTwist χ τ hτ (Sₚ(p)) b hω
+  · exact finiteNuclearity_mellin_values_nontrivial χ τ hτ (Sₚ(p)) b hω
+
+private theorem finiteNuclearity_mellin_mem (p : HeightOneSpectrum (𝓞 ℚ)) (x : Θ₀(χ)) :
+    x ∈ finiteNuclearityDenominator χ p ↔
+      (Z(χ, τ, hτ)) x ∈ schwartzBergmanDivisible (orbitalGenerator(Sₚ(p))) := by
+  obtain ⟨g, rfl⟩ := Submodule.Quotient.mk_surjective (Π(χ)) x
+  rw [← Submodule.Quotient.mk_eq_zero (finiteNuclearityDenominator χ p),
+    ← Submodule.mkQ_apply, finiteNuclearityQuotient_mk_eq_zero,
+    finiteNuclearity_mellin_values χ τ hτ p]
+  refine exists_congr fun f ↦ ?_
+  let fv : P := ⟨adelePrincipalValue F (Sₚ(p)) f.val, nuclearityPrincipalValue_mem_polar p f⟩
+  have hv (s : ℂ) := ((exists_globalPolarThetaMellin χ τ hτ).choose_spec fv s).2
+  exact ⟨fun h s ↦ (congrArg (fun y : Θ₀(χ) ↦ ((Z(χ, τ, hτ)) y).val s) h).trans (hv s),
+    fun h ↦ finiteNuclearity_mellin_injective χ τ hτ
+      (specDenom_B_ext _ _ fun s ↦ (h s).trans (hv s).symm)⟩
+
 /-- Paper: Theorem 7.4.2.1(1), p. 367.
 The finite-place denominator is closed and is stable under each regularized action. -/
 theorem finiteNuclearityDenominator_closed_invariant (p : HeightOneSpectrum (𝓞 ℚ)) (φ : 𝒟) :
     let D := finiteNuclearityDenominator χ p
-    IsClosed (D : Set (Θ₀(χ))) ∧ Set.MapsTo (Aθ(φ)) (D : Set (Θ₀(χ))) D := by sorry
+    IsClosed (D : Set (Θ₀(χ))) ∧ Set.MapsTo (Aθ(φ)) (D : Set (Θ₀(χ))) D := by
+  let G := orbitalGenerator(Sₚ(p))
+  constructor
+  · rw [show (finiteNuclearityDenominator χ p : Set (Θ₀(χ))) =
+      (Z(χ, τ, hτ)) ⁻¹' (schwartzBergmanDivisible G : Set B) from
+        Set.ext (finiteNuclearity_mellin_mem χ τ hτ p)]
+    exact (schwartzBergmanDivisible_isClosed G).preimage (Z(χ, τ, hτ)).continuous
+  · intro x hx
+    have hmem (y : Θ₀(χ)) := (finiteNuclearity_mellin_mem χ τ hτ p y).trans
+      (specDenom_mem_div G ((Z(χ, τ, hτ)) y))
+    obtain ⟨u, hu, hv⟩ := (hmem x).mp hx
+    refine (hmem _).mpr ⟨fun s ↦ nuclearityTestMellin χ φ s * u s, ?_, fun s ↦ ?_⟩
+    · exact (nuclearityTestMellin_differentiable χ φ).mul hu
+    · rw [(exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x s, hv s]
+      ring
 
 -- TODO(paper-gap): The cited §7.1.4.3 concerns the entire comparison space.
 -- To apply the rapid-decay argument on this quotient, one needs bounds in its
@@ -1252,26 +1422,6 @@ theorem archNuclearityStrongDual_finest :
 
 local notation "Aθ(" φ ")" => (exists_polarThetaNuclearityAction χ τ hτ φ).choose
 
-/-- Absolute convergence on every norm line makes the Mellin multiplier entire. -/
-private theorem archNuclearityDenominator_closed_invariant_multiplier
-    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (φ : 𝒟) :
-    Differentiable ℂ (nuclearityTestMellin χ φ) := by
-  let : BorelSpace C𝔽 := ⟨rfl⟩
-  let n := fun g : C𝔽 ↦ ((ideleClassNorm F g).val : ℝ)
-  let f := fun g : C𝔽 ↦ φ.val g * (χ g : ℂ)
-  have hn : Continuous n :=
-    NNReal.continuous_coe.comp (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)
-  have heq (s : ℂ) (g : C𝔽) : f g * (n g : ℂ) ^ s = testIntegrand(χ, φ, s) g :=
-    mul_assoc _ _ _
-  have h := analyticOnNhd_integral_mul_cpow_of_integrable μ𝔽 f n hn.measurable
-    (fun g ↦ NNReal.coe_pos.mpr (Units.zero_lt _)) isOpen_univ
-    (fun s _ ↦ by simpa only [heq] using (nuclearityTestMellin_integrable χ φ).1 s)
-  have hfun : nuclearityTestMellin χ φ = fun s ↦ ∫ g, f g * (n g : ℂ) ^ s ∂μ𝔽 := by
-    funext s
-    simp only [heq, nuclearityTestMellin]
-  rw [hfun]
-  exact fun s ↦ (h s (mem_univ _)).differentiableAt
-
 /-- Paper: Theorem 7.4.3.2(1), p. 372.
 The archimedean-flat theta denominator is a closed subspace stable under the
 regularized action of every Bruhat test. -/
@@ -1312,7 +1462,7 @@ theorem archNuclearityDenominator_closed_invariant (φ : 𝒟) :
     have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
       funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
     rw [hjet, hprod, iteratedDeriv_mul
-      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
+      ((nuclearityTestMellin_differentiable χ φ).contDiff.contDiffAt)
       hv.contDiff.contDiffAt]
     apply Finset.sum_eq_zero
     intro i _
@@ -1725,7 +1875,7 @@ theorem archNuclearityAction_nuclear_iff (φ : 𝒟) :
     have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
       funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
     rw [hT x, he, hjet, hprod, iteratedDeriv_mul
-      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
+      ((nuclearityTestMellin_differentiable χ φ).contDiff.contDiffAt)
       hv.contDiff.contDiffAt]
     refine Finset.sum_congr rfl fun i _ ↦ ?_
     rw [he, hjet]
