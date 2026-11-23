@@ -90,7 +90,7 @@ theorem nuclearityTestMellin_integrable (χ : U) (φ : 𝒟) :
     simp
 
 /-- Absolute convergence on every norm line makes the Mellin multiplier entire. -/
-private theorem nuclearityTestMellin_differentiable
+private theorem archNuclearityDenominator_closed_invariant_multiplier
     (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (φ : 𝒟) :
     Differentiable ℂ (nuclearityTestMellin χ φ) := by
   let : BorelSpace C𝔽 := ⟨rfl⟩
@@ -783,7 +783,7 @@ theorem finiteNuclearityDenominator_closed_invariant (p : HeightOneSpectrum (�
       (specDenom_mem_div G ((Z(χ, τ, hτ)) y))
     obtain ⟨u, hu, hv⟩ := (hmem x).mp hx
     refine (hmem _).mpr ⟨fun s ↦ nuclearityTestMellin χ φ s * u s, ?_, fun s ↦ ?_⟩
-    · exact (nuclearityTestMellin_differentiable χ φ).mul hu
+    · exact (archNuclearityDenominator_closed_invariant_multiplier χ φ).mul hu
     · rw [(exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x s, hv s]
       ring
 
@@ -1462,7 +1462,7 @@ theorem archNuclearityDenominator_closed_invariant (φ : 𝒟) :
     have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
       funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
     rw [hjet, hprod, iteratedDeriv_mul
-      ((nuclearityTestMellin_differentiable χ φ).contDiff.contDiffAt)
+      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
       hv.contDiff.contDiffAt]
     apply Finset.sum_eq_zero
     intro i _
@@ -1875,7 +1875,7 @@ theorem archNuclearityAction_nuclear_iff (φ : 𝒟) :
     have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
       funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
     rw [hT x, he, hjet, hprod, iteratedDeriv_mul
-      ((nuclearityTestMellin_differentiable χ φ).contDiff.contDiffAt)
+      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
       hv.contDiff.contDiffAt]
     refine Finset.sum_congr rfl fun i _ ↦ ?_
     rw [he, hjet]
