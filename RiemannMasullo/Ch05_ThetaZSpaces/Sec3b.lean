@@ -3201,7 +3201,8 @@ theorem archimedeanWeightedSchwartz_tensor {I : Set ℝ} (_ho : IsOpen I)
     rintro w ⟨f, g, h⟩
     exact ⟨(⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j), Subtype.ext (funext fun u ↦ (hL f g u).trans (h u).symm)⟩
   have hP : IsEmbedding P := ⟨hM, hLi⟩
-  let : MetrizableSpace 𝓦(I) := archimedeanWeightedSchwartz_metrizable _ho _hi _hne
+  let : T2Space 𝓦(I) := (show IsNuclearTVS.{0} 𝓦(I) from
+    archimedeanWeightedSchwartz_nuclear _ho _hi _hne).1
   let : CompleteSpace 𝓦(I) := archimedeanWeightedSchwartz_complete _ho _hi _hne
   exact ⟨P, hP, hL, archimedeanWeightedSchwartz_tensor_completion P hP hd⟩
 
