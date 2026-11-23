@@ -225,12 +225,6 @@ def Printed.introTraceApprox_primeSum_tendsto : Prop :=
         (fun n z ↦ ∑' p : V[F] × ℕ, printedPrime[F](χ, approx(h, ρ, n, z), π, p))
         (fun z ↦ logDeriv finiteL[F](χ) (z + 1 / 2)) atTop right(1)
 
-/-- Paper: §1.4.4, p. 29. At parameter two the trivial rational character's
-prime-power limit is strictly positive, with the prime two contributing a
-positive term. The printed target `ζ'(5/2)/ζ(5/2)` is strictly negative. -/
-theorem Printed.introTraceApprox_primeSum_tendsto_false :
-    ¬ Printed.introTraceApprox_primeSum_tendsto := by sorry
-
 open Classical in
 /-- Paper: §1.4.5, pp. 29–30. Subtracting the two polar terms when the
 character is trivial on the norm-one classes gives a holomorphic function
@@ -268,6 +262,61 @@ private theorem introTrace_regularized_logDeriv_neg (x : ℝ) (hx : 1 < x) :
     simpa only [logDeriv_apply, neg_div] using
       ArithmeticFunction.LSeries_vonMangoldt_eq_deriv_riemannZeta_div hx] at hpos
   exact (Complex.lt_def.mp (neg_pos.mp hpos)).1
+
+open scoped ComplexOrder in
+private theorem introTraceApprox_primeSum_approx_nonneg (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) (t : ℝ) :
+    0 ≤ approx(h, ρ, n, (2 : ℂ)) t := by
+  obtain ⟨ε, _, hρ⟩ := hA.2.2.2
+  apply mul_nonneg (Complex.zero_le_real.mpr ((hA.1 n).2.2.2 t).1)
+  apply integral_nonneg
+  intro u
+  apply mul_nonneg (Complex.zero_le_real.mpr ((hρ n).2.2.1 u))
+  unfold introTracePower
+  split_ifs with ht
+  · rw [Complex.cpow_neg, Complex.cpow_ofNat]
+    simpa only [Complex.ofReal_inv, Complex.ofReal_pow] using
+      (Complex.zero_le_real.mpr (inv_nonneg.mpr (sq_nonneg (t - u))))
+  · simpa only [Complex.ofReal_div, Complex.ofReal_one, Complex.ofReal_ofNat] using
+      (Complex.zero_le_real.mpr (show 0 ≤ (1 / 2 : ℝ) by norm_num))
+  · exact le_rfl
+
+open scoped ComplexOrder in
+/-- Paper: §1.4.4, p. 29. At parameter two the trivial rational character's
+prime-power limit is strictly positive, with the prime two contributing a
+positive term. The printed target `ζ'(5/2)/ζ(5/2)` is strictly negative. -/
+theorem Printed.introTraceApprox_primeSum_tendsto_false :
+    ¬ Printed.introTraceApprox_primeSum_tendsto := by
+  classical
+  intro hall
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  have hunif (v : V[ℚ]) : ∃ π : (v.adicCompletion ℚ)ˣ, isUniformizer[ℚ](v, π) := by
+    obtain ⟨p, hp⟩ :=
+      (Valued.v (R := v.adicCompletion ℚ)).exists_isUniformizer_of_isCyclic_of_nontrivial
+    exact ⟨Units.mk0 _ hp.ne_zero, hp⟩
+  choose π hπ using hunif
+  have hlim := (hall ℚ 1 π (fun _ ↦ rfl) hπ h ρ hA).tendsto_at
+    (show (2 : ℂ) ∈ right(1) by norm_num)
+  have hsum : 0 ≤ logDeriv (finiteHeckeL_exists_continuation (1 : U[ℚ])).choose (2 + 1 / 2) := by
+    apply ge_of_tendsto hlim
+    filter_upwards with n
+    apply tsum_nonneg
+    rintro ⟨v, k⟩
+    simp only [PontryaginDual.one_apply, Circle.coe_one, one_pow, star_one, one_mul]
+    have hq : 1 < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
+    rw [div_eq_mul_inv]
+    apply mul_nonneg
+    · exact mul_nonneg (Complex.zero_le_real.mpr (Real.log_nonneg hq.le))
+        (add_nonneg (introTraceApprox_primeSum_approx_nonneg h ρ hA n _)
+          (introTraceApprox_primeSum_approx_nonneg h ρ hA n _))
+    · have hnorm := (Complex.inv_natCast_cpow_ofReal_pos
+          (zero_lt_one.trans (NumberField.HeightOneSpectrum.one_lt_absNorm v)).ne'
+          (((k + 1 : ℕ) : ℝ) / 2)).le
+      push_cast at hnorm ⊢
+      exact hnorm
+  have hneg := introTrace_regularized_logDeriv_neg (2 + 1 / 2) (by norm_num)
+  push_cast at hneg
+  exact hneg.not_ge (Complex.le_def.mp hsum).1
 
 /-- Paper: §1.4.5, p. 30. With the trivial rational character and
 half-width one quarter, the shifted log derivative has residue minus one
