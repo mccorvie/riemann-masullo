@@ -4391,20 +4391,11 @@ private theorem introTraceApprox_mellin_sub_le_of_translated {h ρ : ℝ → ℝ
            exact mul_le_mul_of_nonneg_left (hbound u hu) (hρ u)
        _ = B := by rw [integral_mul_const, h1, one_mul]
 
-/-- Paper: §1.4.3, p. 29. One admissible family realizes the multiplicity-weighted
-resolvent series for every character, every centered window of half-width `a ≥ 0`,
-and every holomorphic reference map `w` from `Re z > a` into itself. At each cutoff
-first sum the smoothed Mellin differences at `z` and `w z` over the entire window.
-The cutoff limit is locally uniform on `Re z > a`. The same family gives the rational
-real-place limit for the shift by two on `Re z > -1/2`.
-Deviation: On each compact set `K`, estimate both parameters on `K ∪ w '' K`. Their
-powers agree at one, which controls the lower transition of the matched cutoffs. -/
-theorem introTraceApprox_exists_reference_spectral_limit :
+/-- The explicit spectral family has matched supports at the lower cutoff. This
+same family can therefore be used in the archimedean limit. -/
+private theorem introTraceApprox_exists_reference_spectral_matched :
     ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
-      TendstoLocallyUniformlyOn (fun n z ↦
-        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, z) Rat.infinitePlace -
-        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (z + 2)) Rat.infinitePlace)
-        (fun z ↦ 1 / (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) ∧
+      (∀ n t u, h n t ≠ 0 → ρ n u ≠ 0 → |u| ≤ 1 ∧ |u| ≤ t - 1) ∧
       ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ w : ℂ → ℂ, MapsTo w right(a) right(a) →
         DifferentiableOn ℂ w right(a) →
         TendstoLocallyUniformlyOn (fun n z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a -
@@ -4425,7 +4416,7 @@ theorem introTraceApprox_exists_reference_spectral_limit :
     have hu' : |u| ≤ 1 / (2 * R n) := hρ n u hu
     have hsmall := one_div_lt_one_div_of_lt (hp n) (show R n < 2 * R n by linarith [hp n])
     exact ⟨hu'.trans ((div_le_one (by positivity)).2 (by linarith [hR n])), by linarith⟩
-  refine ⟨h, ρ, ha, introTraceApprox_rat_sub_shiftTwo_matched h ρ ha hmatch, ?_⟩
+  refine ⟨h, ρ, ha, hmatch, ?_⟩
   intro χ a ha₀ w hw hdw
   apply introTrace_spectral_referenceSub_of_bound χ a w hw hdw h ρ ha
   intro K hsub hK
@@ -4464,6 +4455,29 @@ theorem introTraceApprox_exists_reference_spectral_limit :
   have hre : (r.val - 1 / 2).re ≤ a := by simpa using (abs_lt.mp r.property.2).2.le
   simpa only [Pi.mul_def, h, Complex.sub_im, Complex.div_ofNat_im, Complex.one_im, zero_div, sub_zero] using
     introTraceMellin_le_of_weighted_deriv (by linarith [hR n]) hsm' (hs'.trans hsub') h0 h2 _ hre
+
+/-- Paper: §1.4.3, p. 29. One admissible family realizes the multiplicity-weighted
+resolvent series for every character, every centered window of half-width `a ≥ 0`,
+and every holomorphic reference map `w` from `Re z > a` into itself. At each cutoff
+first sum the smoothed Mellin differences at `z` and `w z` over the entire window.
+The cutoff limit is locally uniform on `Re z > a`. The same family gives the rational
+real-place limit for the shift by two on `Re z > -1/2`.
+Deviation: On each compact set `K`, estimate both parameters on `K ∪ w '' K`. Their
+powers agree at one, which controls the lower transition of the matched cutoffs. -/
+theorem introTraceApprox_exists_reference_spectral_limit :
+    ∃ (h ρ : ℕ → ℝ → ℝ), IsIntroTraceApproximation h ρ ∧
+      TendstoLocallyUniformlyOn (fun n z ↦
+        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, z) Rat.infinitePlace -
+        introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (z + 2)) Rat.infinitePlace)
+        (fun z ↦ 1 / (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) ∧
+      ∀ (χ : U𝔽) (a : ℝ), 0 ≤ a → ∀ w : ℂ → ℂ, MapsTo w right(a) right(a) →
+        DifferentiableOn ℂ w right(a) →
+        TendstoLocallyUniformlyOn (fun n z ↦ introTraceSpectralSum χ approx(h, ρ, n, z) a -
+          introTraceSpectralSum χ approx(h, ρ, n, (w z)) a)
+          (fun z ↦ ∑' r : windowZeros(χ, a), (zeroOrder(χ, r.val) : ℂ) *
+            (1 / (z - (r.val - 1 / 2)) - 1 / (w z - (r.val - 1 / 2)))) atTop right(a) := by
+  obtain ⟨h, ρ, hA, hmatch, hs⟩ := introTraceApprox_exists_reference_spectral_matched (F := F)
+  exact ⟨h, ρ, hA, introTraceApprox_rat_sub_shiftTwo_matched h ρ hA hmatch, hs⟩
 
 /-- Paper: §1.4.3, p. 29. Subtract the value at `z+2` at each cutoff. For one
 admissible smooth family, the differences of the full spectral sums converge
@@ -5289,6 +5303,47 @@ theorem introTraceApprox_exists_rat_spectral_sub_shiftTwo_atBot :
   change (S n 2 - S n 4).re ≤ M
   simp only [Complex.sub_re, Complex.add_re] at hn ha' ⊢
   linarith
+
+open Classical in
+/-- Paper: §§1.4.3–1.4.5, pp. 29–30. For a chart character and a full centered window,
+the multiplicity-weighted resolvent difference equals the difference of the
+polar-corrected logarithmic derivatives at `z` and `z+2`, minus the finite sum of
+the regularized local archimedean integrals, on `Re z > max(a,1)`.
+Deviation: Use one matched family for the spectral and archimedean limits.
+The critical strip makes the exterior-zero sum vanish in every window of half-width
+at least one half. The combined trace limit uses the idelic explicit formula. -/
+theorem introTrace_shiftTwo_resolvent_eq_logDeriv_sub_archimedean
+    (τ : ℝ≥0ˣ →ₜ* IdeleClassGroup (𝓞 F) F) (hτ : RightInverse τ (ideleClassNorm F))
+    (χ : U𝔽) (hχ : ∀ t, χ (τ t) = 1) (a : ℝ) (ha : 1 / 2 ≤ a) :
+    let L := fun z : ℂ ↦ logDeriv finiteL(χ) (z + 1 / 2) +
+      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0
+    ∀ z : ℂ, max a 1 < z.re →
+      (∑' r : windowZeros(χ, a), (zeroOrder(χ, r.val) : ℂ) *
+        (1 / (z - (r.val - 1 / 2)) - 1 / (z + 2 - (r.val - 1 / 2)))) =
+      L z - L (z + 2) - ∑ v : InfinitePlace F,
+        introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v := by
+  classical
+  intro L z hz
+  obtain ⟨h, ρ, hA, hmatch, hspec⟩ := introTraceApprox_exists_reference_spectral_matched (F := F)
+  have hshift : MapsTo (fun z : ℂ ↦ z + 2) right(a) right(a) := by
+    intro x hx
+    change a < x.re at hx
+    change a < (x + 2).re
+    simpa using (show a < x.re + 2 by linarith)
+  have hs := (hspec χ a (by linarith) _ hshift (by fun_prop)).tendsto_at ((le_max_left a 1).trans_lt hz)
+  have harch := (introTraceApprox_archimedean_sub_shiftTwo_matched_sum χ h ρ hA hmatch).tendsto_at (a := z)
+    (show -(1 / 2 : ℝ) < z.re by linarith [le_max_right a 1])
+  have hc := introTrace_combined_limit_of_exteriorZeros τ hτ χ hχ (a := a) (fun φ _ ↦ by
+    simpa only [modulatedFourierMellin, relativeVerticalStrip, Set.preimage_univ, Set.indicator_univ] using
+      traceFormula_exteriorZeros_of_half_le τ φ ha) h ρ hA
+  have hz' : z + 2 ∈ right(max a 1) := by
+    change max a 1 < (z + 2).re
+    simpa using (show max a 1 < z.re + 2 by linarith)
+  have hlim := ((hc.tendsto_at hz).sub (hc.tendsto_at hz')).sub harch
+  apply tendsto_nhds_unique hs
+  apply hlim.congr
+  intro n
+  ring
 
 /-- Paper: §§1.4.3–1.4.5, pp. 29–30. In every full window for the trivial rational
 character, the multiplicity-weighted shift-two resolvent series agrees on the
