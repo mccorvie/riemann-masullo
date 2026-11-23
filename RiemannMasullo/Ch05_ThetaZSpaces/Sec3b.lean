@@ -4224,6 +4224,453 @@ theorem sLocalIdelicZFunction_entire_iff_eq_polarFree (r : RealModels) (c : Comp
       ∃ f₀ : sAdelePolarFree S r c, ∀ s : ℂ,
         sLocalIdelicZFunction f (chartₛ(χ) s) = sLocalIdelicZFunction f₀.val (chartₛ(χ) s) := by sorry
 
+/-- Multiplication of a test by a character of the idele quotient factors that character
+out of the S-unit sum, since every projected diagonal S-unit has class one. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_twist_sum (b : Xₛ)
+    (f f' : ℬₛ) (h : ∀ z : Aₛˣ, f' (Multiplicative.ofAdd z.val) =
+      b (QuotientGroup.mk z) * f (Multiplicative.ofAdd z.val)) (x : Jₛ) :
+    sLocalAdelicThetaOnClasses F S f' x = b x * sLocalAdelicThetaOnClasses F S f x := by
+  obtain ⟨z, rfl⟩ := QuotientGroup.mk_surjective x
+  rw [sLocalAdelicThetaOnClasses_mk, sLocalAdelicThetaOnClasses_mk,
+    sLocalAdelicTheta_apply, sLocalAdelicTheta_apply, ← tsum_mul_left]
+  let d := (Units.map ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom).comp
+    (Units.map (integralAdeleDiagonal F S).toMonoidHom)
+  apply tsum_congr
+  intro u
+  have hu : (QuotientGroup.mk (d u) : Jₛ) = 1 := (sIdeleQuotient_mk_eq_one F S _).mpr ⟨u, rfl⟩
+  have hz : (QuotientGroup.mk (d u * z) : Jₛ) = QuotientGroup.mk z := by
+    exact (QuotientGroup.mk_mul _ (d u) z).trans ((congrArg (· * (QuotientGroup.mk z : Jₛ)) hu).trans (one_mul (QuotientGroup.mk z : Jₛ)))
+  exact (h (d u * z)).trans (congrArg (fun a : Jₛ ↦ b a * f (Multiplicative.ofAdd (d u * z).val)) hz)
+
+/-- Twisting a test by the inverse of a unitary character transports its trivial homogeneous
+theta function to the restricted character isotype. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_twist (ψ : PontryaginDual J₁)
+    (χ : PontryaginDual Jₛ) (hχ : ∀ u : J₁, χ u.val = ψ u) (f f' : ℬₛ)
+    (h : ∀ z : Aₛˣ, f' (Multiplicative.ofAdd z.val) =
+      ((circleToComplex).comp χ⁻¹) (QuotientGroup.mk z) * f (Multiplicative.ofAdd z.val))
+    (g : Jₛ) : sLocalHomogeneousAdelicThetaLinearMap F S ψ f' g =
+      (χ g : ℂ)⁻¹ * sLocalHomogeneousAdelicThetaLinearMap F S 1 f g := by
+  let : MeasurableSpace J₁ := borel _
+  let μ := sLocalNormOneQuotientMeasure F S
+  let b := (circleToComplex).comp χ⁻¹
+  have hfactor (u : J₁) : b (g * u.val) * (ψ u : ℂ) = (χ g : ℂ)⁻¹ := by
+    change (((χ (g * u.val))⁻¹ : Circle) : ℂ) * (ψ u : ℂ) = _
+    rw [map_mul, Circle.coe_inv, Circle.coe_mul, hχ]
+    field_simp [Circle.coe_ne_zero]
+  have hint (u : J₁) :
+      sLocalAdelicThetaOnClasses F S f' (g * u.val) * (ψ u : ℂ) =
+      (χ g : ℂ)⁻¹ * (sLocalAdelicThetaOnClasses F S f (g * u.val) * ((1 : PontryaginDual J₁) u : ℂ)) := by
+    rw [sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_twist_sum b f f' h, mul_right_comm, hfactor]
+    change _ = _ * (_ * ((1 : Circle) : ℂ))
+    rw [Circle.coe_one, mul_one]
+  exact (sLocalHomogeneousAdelicThetaLinearMap_apply ψ f' g).trans
+    ((MeasureTheory.integral_congr_ae (μ := μ) (.of_forall hint)).trans
+      ((MeasureTheory.integral_const_mul _ _).trans
+        (congrArg ((χ g : ℂ)⁻¹ * ·) (sLocalHomogeneousAdelicThetaLinearMap_apply (F := F) (S := S) (1 : PontryaginDual J₁) f g).symm)))
+
+/-- An idelic norm section through one archimedean place gives the radial integration
+formula for the S-local zeta integral. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_section :
+    ∃ τ : ℝ≥0ˣ →ₜ* Aₛˣ, RightInverse τ (sIdeleNorm F S) := by
+  obtain ⟨w⟩ := (inferInstance : Nonempty (InfinitePlace F))
+  let s := singlePlaceIdeleNormSection F w
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ₀ : ℝ≥0ˣ →ₜ* Aₛˣ := ⟨p.comp s, hp.comp (singlePlaceIdeleNormSection_continuous F w)⟩
+  have hτ₀ : RightInverse τ₀ (sIdeleNorm F S) := by
+    intro t
+    let A := integralAdelesOutside F S
+    have hmem (u : ℝ≥0ˣ) : (s u).val ∈ A := by
+      simp only [A, integralAdelesOutside, Subring.mem_iInf]
+      intro v _
+      exact (v.adicCompletionIntegers F).one_mem
+    have ht : s t ∈ A.toSubmonoid.units :=
+      ⟨hmem t, by
+        change ((s t)⁻¹).val ∈ A
+        rw [← map_inv]
+        exact hmem t⁻¹⟩
+    let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
+    exact ((sIdeleNorm_spec F S).1 g).symm.trans (singlePlaceIdeleNormSection_rightInverse F w t)
+  exact ⟨τ₀, hτ₀⟩
+
+/-- The logarithm identifies the positive-real Haar integral with the usual Mellin integral. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_mellin (p : ℝ → ℂ) (s : ℂ) :
+    (∫ t : ℝ≥0ˣ, p (Real.log (t.val : ℝ)) * (((t.val : ℝ) : ℂ) ^ s) ∂positiveRealHaar) =
+      mellin (fun t ↦ p (Real.log t)) s := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (x : ℝ) : (e x).val = (Real.exp x).toNNReal := by
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  have hm : positiveRealHaar = volume.map e := by
+    apply congrArg (fun a : ℝ → ℝ≥0ˣ ↦ volume.map a)
+    funext x
+    exact Units.ext (he x).symm
+  rw [hm, e.measurableEmbedding.integral_map, mellin, ← integral_comp_exp]
+  apply integral_congr_ae (.of_forall fun x ↦ ?_)
+  simp only [he, Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp, Complex.real_smul, smul_eq_mul]
+  rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    Complex.cpow_def_of_ne_zero (by exact_mod_cast (Real.exp_pos x).ne'),
+    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+  simp only [Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add]
+  rw [mul_comm (p x)]
+  congr 2
+  ring
+
+/-- A homogeneous theta function with a scalar logarithmic profile has that profile’s
+Mellin transform on the right half-plane. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial
+    (χ : PontryaginDual Jₛ) (f : ℬₛ) (p : ℝ → ℂ)
+    (hp : ∀ g : Jₛ, thetaAt(χ₁(χ)) f g = (χ g : ℂ)⁻¹ * p (Real.log ((mₛ g).val : ℝ)))
+    (s : ℂ) (hs : 0 < s.re) :
+    sLocalIdelicZFunction f (chartₛ(χ) s) = mellin (fun t ↦ p (Real.log t)) s := by
+  obtain ⟨τ, hτ⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_section (F := F) (S := S)
+  have hpos : ∃ (ψ : PontryaginDual Jₛ) (z : ℂ), 0 < z.re ∧ chartₛ(χ) s = chartₛ(ψ) z :=
+    ⟨χ, s, hs, rfl⟩
+  rw [sLocalIdelicZFunction_eq_integral _ hpos, ← sLocalThetaMellinIntegral_eq_zeta _ hpos,
+    ← sLocalRadialMellinIntegral_eq_theta τ hτ _ χ s hs]
+  rw [← sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_mellin]
+  apply integral_congr_ae (.of_forall fun t ↦ ?_)
+  let g : Jₛ := QuotientGroup.mk (τ t)
+  have ht : mₛ g = t := hτ t
+  change thetaAt(χ₁(χ)) f g * ((χ g : ℂ) * (((mₛ g).val : ℝ) : ℂ) ^ s) = _
+  rw [hp, ht]
+  field_simp [Circle.coe_ne_zero]
+
+/-- Schwartz–Bruhat membership of a function depending only on the norm can be checked
+on the positive-real norm quotient. The projector to the trivial character fixes
+such a function. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_quotient
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (u : ℝ≥0ˣ → ℂ) :
+    (fun g ↦ u (m g)) ∈ schwartzBruhatSubmodule G ↔ u ∈ schwartzBruhatSubmodule ℝ≥0ˣ := by
+  let K := m.toMonoidHom.ker
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : MeasurableSpace G := borel _
+  let : BorelSpace G := ⟨rfl⟩
+  let μ : Measure K := Measure.haarMeasure ⊤
+  let P := schwartzBruhatIsotypicProjector m hm μ 1
+  obtain ⟨w, e, hw, he⟩ := schwartzBruhat_positiveReal_isotype_equiv m hm μ τ hτ 1
+  have hw' (f : SchwartzBruhat ℝ≥0ˣ) (g : G) : w f g = f (m g) := by
+    let k : K := ⟨g / τ (m g), by change m (g / τ (m g)) = 1; rw [map_div, hτ, div_self']⟩
+    have h := hw f k (m g)
+    simpa only [show (k : G) * τ (m g) = g from div_mul_cancel _ _, PontryaginDual.one_apply,
+      Circle.coe_one, star_one, one_mul] using h
+  have fix (f : SchwartzBruhat G) (v : ℝ≥0ˣ → ℂ) (hv : ∀ g, f g = v (m g)) : P f = f := by
+    apply schwartzBruhatIsotypicProjector_apply_isotype
+    apply (mem_actionIsotype _ _ _).mpr
+    intro k
+    apply Subtype.ext
+    funext g
+    change schwartzBruhatTranslationAction (G := G) (k : G) f g = ((1 : PontryaginDual K) k : ℂ) * f g
+    rw [schwartzBruhatTranslationAction_apply, hv, map_mul, map_inv, show m k.val = 1 from k.property, inv_one, one_mul,
+      PontryaginDual.one_apply, Circle.coe_one, one_mul, hv]
+  constructor
+  · intro h
+    let f : SchwartzBruhat G := ⟨_, h⟩
+    obtain ⟨g, hg⟩ := e.surjective (P.ker.mkQ f)
+    have hclass : P.ker.mkQ (w g) = P.ker.mkQ f := (he g).symm.trans hg
+    have hP : P (w g) = P f := by
+      exact sub_eq_zero.mp ((map_sub P (w g) f).symm.trans (LinearMap.mem_ker.mp ((Submodule.Quotient.eq P.ker).mp hclass)))
+    rw [fix _ _ (hw' g), fix f u (fun _ ↦ rfl)] at hP
+    have hu : g.val = u := by
+      funext t
+      calc
+        _ = g (m (τ t)) := congrArg g (hτ t).symm
+        _ = w g (τ t) := (hw' g _).symm
+        _ = f (τ t) := congrArg (fun H : SchwartzBruhat G ↦ H (τ t)) hP
+        _ = u t := congrArg u (hτ t)
+    exact hu ▸ g.property
+  · intro h
+    let f : SchwartzBruhat ℝ≥0ˣ := ⟨u, h⟩
+    exact (show (w f).val = (fun g ↦ u (m g)) from funext (hw' f)) ▸ (w f).property
+
+/-- Unitary character multiplication preserves ordinary Schwartz–Bruhat membership
+in each direction. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_unitary
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] (χ : PontryaginDual G) (f : G → ℂ) :
+    (fun g ↦ (χ g : ℂ) * f g) ∈ schwartzBruhatSubmodule G ↔ f ∈ schwartzBruhatSubmodule G := by
+  have mul (η : PontryaginDual G) (h : SchwartzBruhat G) :
+      (fun g ↦ (η g : ℂ) * h g) ∈ schwartzBruhatSubmodule G := by
+    obtain ⟨M, hM⟩ := schwartzBruhat_mul_unitaryCharacter η
+    exact (show (M h).val = _ from funext (hM h)) ▸ (M h).property
+  refine ⟨fun h ↦ ?_, fun h ↦ mul χ ⟨f, h⟩⟩
+  have hi := mul χ⁻¹ ⟨_, h⟩
+  change (fun g ↦ ((χ⁻¹ g : Circle) : ℂ) * ((χ g : ℂ) * f g)) ∈ _ at hi
+  convert hi using 1
+  funext g
+  change f g = ((χ g)⁻¹ : Circle) * ((χ g : ℂ) * f g)
+  rw [Circle.coe_inv, inv_mul_cancel_left₀ (Circle.coe_ne_zero _)]
+
+/-- A character-homogeneous function has all-exponent decay exactly when its radial
+logarithmic profile, after removing the unitary character, does. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_profile
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (χ : PontryaginDual G) (f : G → ℂ) (p : ℝ → ℂ)
+    (hp : ∀ g, (χ g : ℂ) * f g = p (Real.log ((m g).val : ℝ))) :
+    f ∈ modulatedExponentialDecaySubmodule m univ ↔ p ∈ logExponentialDecaySubmodule univ := by
+  let idM := ContinuousMonoidHom.id ℝ≥0ˣ
+  let u (t : ℝ≥0ˣ) := p (Real.log (t.val : ℝ))
+  have hweight (a : ℝ) :
+      modulationWeight m a f ∈ schwartzBruhatSubmodule G ↔
+        modulationWeight idM a u ∈ schwartzBruhatSubmodule ℝ≥0ˣ := by
+    rw [← sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_unitary χ]
+    have he (g : G) : (χ g : ℂ) * modulationWeight m a f g = modulationWeight idM a u (m g) := by
+      change (χ g : ℂ) * (((((m g).val : ℝ) ^ a : ℝ) : ℂ) * f g) =
+        ((((m g).val : ℝ) ^ a : ℝ) : ℂ) * p (Real.log ((m g).val : ℝ))
+      rw [mul_left_comm, hp]
+    rw [funext he]
+    exact sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_quotient m hm τ hτ _
+  have hmem : f ∈ modulatedExponentialDecaySubmodule m univ ↔
+      u ∈ modulatedExponentialDecaySubmodule idM univ := by
+    simp only [modulatedExponentialDecaySubmodule, Submodule.mem_iInf, Submodule.mem_comap]
+    exact forall_congr' fun a ↦ hweight a.val
+  rw [hmem]
+  obtain ⟨e, he⟩ := positiveRealExponentialDecay_log_equiv univ ordConnected_univ univ_nonempty
+  constructor
+  · intro hu
+    let U : ModulatedExponentialDecay idM univ := ⟨u, hu⟩
+    let b := e.symm U
+    have hlog (t : ℝ≥0ˣ) : b.val (Real.log (t.val : ℝ)) = u t :=
+      (he b t).symm.trans (congrArg (fun w : ModulatedExponentialDecay idM univ ↦ w.val t) (e.apply_symm_apply U))
+    have hval : b.val = p := by
+      funext x
+      let t : ℝ≥0ˣ := Units.mk0 (Real.exp x).toNNReal (by positivity)
+      have ht : Real.log (t.val : ℝ) = x := by
+        change Real.log ((Real.exp x).toNNReal : ℝ) = x
+        rw [Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp]
+      exact ht ▸ hlog t
+    exact hval ▸ b.property
+  · intro h
+    let b : PositiveRealExponentialDecay univ := ⟨p, h⟩
+    exact (show (e b).val = u from funext (he b)) ▸ (e b).property
+
+/-- Multiplication of a polar-free representative by an S-idelic real norm power
+translates its entire zeta chart. On the common half-plane this follows on the
+integrands, and the identity theorem extends it to the whole plane. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_shift
+    (r : RealModels) (c : ComplexModels) (χ : PontryaginDual Jₛ)
+    (f : sAdelePolarFree S r c) (d : ℝ) :
+    ∃ b : sAdelePolarFree S r c, ∀ s : ℂ,
+      sLocalIdelicZFunction b.val (chartₛ(χ) s) =
+        sLocalIdelicZFunction f.val (chartₛ(χ) (s + d)) := by
+  let η := chartₛ((1 : PontryaginDual Jₛ)) (d : ℂ)
+  obtain ⟨M, hM⟩ := sAdelePolarFree_quasiCharacter_mul r c η
+  let b := M f
+  have he (s : ℂ) (hs : 0 < s.re) (hd : 0 < (s + d).re) :
+      sLocalIdelicZFunction b.val (chartₛ(χ) s) =
+        sLocalIdelicZFunction f.val (chartₛ(χ) (s + d)) := by
+    rw [sLocalIdelicZFunction_eq_integral _ ⟨χ, s, hs, rfl⟩,
+      sLocalIdelicZFunction_eq_integral _ ⟨χ, s + d, hd, rfl⟩]
+    apply integral_congr_ae (.of_forall fun x ↦ ?_)
+    let g : Jₛ := QuotientGroup.mk x
+    let N : ℂ := ((mₛ g).val : ℝ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)
+    change b.val (Multiplicative.ofAdd x.val) * (chartₛ(χ) s) g =
+      f.val (Multiplicative.ofAdd x.val) * (chartₛ(χ) (s + d)) g
+    rw [hM]
+    change ((1 : ℂ) * N ^ (d : ℂ) * _) * ((χ g : ℂ) * N ^ s) =
+      _ * ((χ g : ℂ) * N ^ (s + d))
+    rw [Complex.cpow_add _ _ hN]
+    ring
+  have h1 := sLocalIdelicZFunction_entire_of_polarFree r c b.val b.property χ
+  have h2 := sLocalIdelicZFunction_entire_of_polarFree r c f.val f.property χ
+  have h2' : AnalyticOnNhd ℂ (fun s : ℂ ↦ sLocalIdelicZFunction f.val (chartₛ(χ) (s+d))) univ :=
+    fun z _ ↦ (h2 _ (mem_univ _)).comp (analyticAt_id.add analyticAt_const)
+  let t : ℝ := |d| + 1
+  have hne : ∀ᶠ z : ℂ in 𝓝 (t : ℂ), 0 < z.re ∧ 0 < (z+d).re := by
+    apply Filter.Eventually.and
+    · apply (isOpen_lt continuous_const Complex.continuous_re).mem_nhds
+      change 0 < |d| + 1
+      positivity
+    · apply (isOpen_lt continuous_const (Complex.continuous_re.comp (continuous_id.add continuous_const))).mem_nhds
+      change 0 < (|d| + 1) + d
+      linarith [neg_abs_le d]
+  exact ⟨b, fun z ↦ h1.eqOn_of_preconnected_of_eventuallyEq h2' isPreconnected_univ
+    (mem_univ (t : ℂ)) (hne.mono fun s hs ↦ he s hs.1 hs.2) (mem_univ z)⟩
+
+/-- The zeta transform of a polar-free representative is Schwartz on every closed
+vertical strip. Translate that strip into the positive half-plane using a norm power. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_bergman
+    (r : RealModels) (c : ComplexModels) (χ : PontryaginDual Jₛ) (f : sAdelePolarFree S r c) :
+    (fun z ↦ sLocalIdelicZFunction f.val (chartₛ(χ) z)) ∈ schwartzBergmanSubmodule univ := by
+  let Z := fun z ↦ sLocalIdelicZFunction f.val (chartₛ(χ) z)
+  have hZ := sLocalIdelicZFunction_entire_of_polarFree r c f.val f.property χ
+  refine ⟨fun z hz ↦ (hz (mem_univ _)).elim, hZ.differentiableOn, ?_⟩
+  intro a b hab _ N
+  let d := a - 1
+  obtain ⟨g, hg⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_shift r c χ f d
+  let G := fun z ↦ sLocalIdelicZFunction g.val (chartₛ(χ) z)
+  have hstrip : UniformlySchwartzOnStrip G (1/2) (b-d+1) := by
+    simpa only [iteratedDeriv_zero] using sLocalIdelicZFunction_schwartzOnStrip g.val χ
+      (1/2) (b-d+1) (by norm_num) (by dsimp [d]; linarith) 0
+  obtain ⟨C, hC, htail⟩ := hstrip.2.2 (1/4) (by norm_num) (by dsimp [d]; linarith) (N+1) (by omega)
+  obtain ⟨T, hT⟩ := eventually_atTop.mp (eventually_comap.mp htail)
+  let A := max |a| |b|
+  let M := max T (max 1 A)
+  let K := Complex.reProdIm (Icc a b) (Icc (-M) M)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  have hc : ContinuousOn (fun z : ℂ ↦ ‖z ^ N * Z z‖) K :=
+    ((continuous_id.pow N).continuousOn.mul (hZ.differentiableOn.continuousOn.mono (subset_univ K))).norm
+  obtain ⟨B, hB⟩ := hK.bddAbove_image hc
+  refine ⟨max B (2 ^ N * C), ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  by_cases hy : |z.im| ≤ M
+  · exact (hB ⟨z, ⟨hz, abs_le.mp hy⟩, rfl⟩).trans (le_max_left _ _)
+  have hy' := (lt_of_not_ge hy).le
+  have hy1 : 1 ≤ |z.im| := (le_max_left _ _).trans ((le_max_right _ _).trans hy')
+  have hy0 : 0 < |z.im| := zero_lt_one.trans_le hy1
+  have hz' : z.re ∈ Icc a b := hz
+  have hdec := hT |z.im| ((le_max_left _ _).trans hy') z.im rfl (z.re-d)
+    (show z.re-d ∈ Icc (1/2+1/4) (b-d+1-1/4) from ⟨by dsimp [d]; linarith [hz'.1], by linarith [hz'.2]⟩)
+  have eqZ : G (((z.re - d : ℝ) : ℂ) + z.im * Complex.I) = Z z := by
+    rw [show G _ = _ from hg _, show (((z.re - d : ℝ) : ℂ) + z.im * Complex.I) + d = z by
+      push_cast; rw [sub_add_eq_add_sub, sub_add_cancel, Complex.re_add_im]]
+  rw [eqZ] at hdec
+  have hnorm : ‖z‖ ≤ 2 * |z.im| := by
+    apply (Complex.norm_le_abs_re_add_abs_im z).trans
+    have hA : |z.re| ≤ A := abs_le.mpr
+      ⟨by dsimp [A]; linarith [le_abs_self (-a), abs_neg a, le_max_left |a| |b|, hz'.1],
+        hz'.2.trans ((le_abs_self b).trans (le_max_right _ _))⟩
+    linarith [hA.trans ((le_max_right 1 A).trans ((le_max_right T _).trans hy'))]
+  have hpow : |z.im| ^ N ≤ |z.im| ^ (N + 1) := pow_le_pow_right₀ hy1 (by omega)
+  apply le_trans _ (le_max_right _ _)
+  change ‖z ^ N * Z z‖ ≤ _
+  rw [norm_mul, norm_pow]
+  calc
+    _ ≤ (2 * |z.im|) ^ N * (C / |z.im| ^ N) :=
+      mul_le_mul (pow_le_pow_left₀ (norm_nonneg _) hnorm _) (hdec.trans
+        (div_le_div_of_nonneg_left hC.le (pow_pos hy0 _) hpow)) (norm_nonneg _) (by positivity)
+    _ = 2 ^ N * C := by rw [mul_pow]; field_simp
+
+/-- Agreement of two zeta functions on one chart gives agreement of their homogeneous
+theta functions by Lemma 5.1.2.2. The chart covers every quasicharacter with the
+prescribed restriction to the norm-one subgroup. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_eq_theta
+    (χ : PontryaginDual Jₛ) (f b : ℬₛ)
+    (h : ∀ z : ℂ, sLocalIdelicZFunction f (chartₛ(χ) z) = sLocalIdelicZFunction b (chartₛ(χ) z)) :
+    thetaAt(χ₁(χ)) f = thetaAt(χ₁(χ)) b := by
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F S
+  apply sub_eq_zero.mp
+  rw [← map_sub]
+  apply LinearMap.mem_ker.mp
+  apply (mem_sLocalHomogeneousAdelicTheta_ker_iff (χ₁(χ)) (f-b)).mpr
+  intro d hd
+  let η := d.val * (circleToComplex).comp χ⁻¹
+  obtain ⟨z, hz, _⟩ := existsUnique_complexPower (η.comp τ)
+  have eqChart : chartₛ(χ) z = d.val := by
+    apply ContinuousMonoidHom.ext
+    intro g
+    let t := mₛ g
+    let k : J₁ := ⟨g / τ t, by change mₛ (g / τ t) = 1; rw [map_div, hτ]; exact div_self' _⟩
+    have hg : k.val * τ t = g := div_mul_cancel _ _
+    have hk : d.val k.val = (χ k.val : ℂ) := hd k
+    have hdt : d.val (τ t) * (χ (τ t) : ℂ)⁻¹ = (((t.val : ℝ) : ℂ) ^ z) := by
+      have ht := hz t
+      change d.val (τ t) * ((((χ (τ t))⁻¹ : Circle) : ℂ)) = _ at ht
+      rwa [Circle.coe_inv] at ht
+    change (χ g : ℂ) * (((t.val : ℝ) : ℂ) ^ z) = d.val g
+    rw [← hdt, ← hg, map_mul, map_mul, Circle.coe_mul, hk]
+    field_simp [Circle.coe_ne_zero]
+  rw [map_sub]
+  change sLocalIdelicZFunction f d.val - sLocalIdelicZFunction b d.val = 0
+  rw [← eqChart]
+  exact sub_eq_zero.mpr (h z)
+
+/-- Removing the unitary character from a homogeneous theta function leaves a function
+of the logarithmic norm. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_exists_profile
+    (χ : PontryaginDual Jₛ) (f : ℬₛ) (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ) :
+    ∃ p : ℝ → ℂ, ∀ g : Jₛ,
+      (χ g : ℂ) * thetaAt(χ₁(χ)) f g = p (Real.log ((mₛ g).val : ℝ)) := by
+  let E : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (t : ℝ≥0ˣ) : E (Real.log (t.val : ℝ)) = t :=
+    Units.ext (NNReal.eq (Real.exp_log (by exact_mod_cast Units.zero_lt t)))
+  refine ⟨fun x ↦ (χ (τ (E x)) : ℂ) * thetaAt(χ₁(χ)) f (τ (E x)), fun g ↦ ?_⟩
+  dsimp only
+  rw [he (mₛ g)]
+  let t := mₛ g
+  let k : J₁ := ⟨g / τ t, by change mₛ (g / τ t) = 1; rw [map_div, hτ]; exact div_self' _⟩
+  have hk : k.val⁻¹ * g = τ t := (inv_mul_eq_iff_eq_mul).mpr (div_mul_cancel g (τ t)).symm
+  let := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hc := sLocalHomogeneousAdelicTheta_homogeneous F S (sLocalNormOneQuotientMeasure F S) (χ₁(χ)) f k g
+  change thetaAt(χ₁(χ)) f (k.val⁻¹ * g) = (χ k.val : ℂ) * thetaAt(χ₁(χ)) f g at hc
+  rw [hk] at hc
+  change _ = (χ (τ t) : ℂ) * thetaAt(χ₁(χ)) f (τ t)
+  rw [hc, ← mul_assoc, ← Circle.coe_mul, ← map_mul]
+  congr 3
+  change g = τ t * (g / τ t)
+  exact (div_mul_cancel g (τ t)).symm.trans (mul_comm (g / τ t) (τ t))
+/-- Two functions in meromorphic normal form on the plane that agree on the right
+half-plane agree everywhere. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_continue {G H : ℂ → ℂ}
+    (hG : MeromorphicNFOn G univ) (hH : MeromorphicNFOn H univ)
+    (h : ∀ z : ℂ, 0 < z.re → G z = H z) (s : ℂ) : G s = H s := by
+  have hAt : meromorphicOrderAt (G - H) (1 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (h z hz)
+  have hOrd := (hG.meromorphicOn.sub hH.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (1 : ℂ)) (mem_univ s) hAt
+  have hNear : G =ᶠ[𝓝[≠] s] H :=
+    (meromorphicOrderAt_eq_top_iff.mp hOrd).mono fun _ h ↦ sub_eq_zero.mp h
+  exact (((hG (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hH (mem_univ s))).mp
+    hNear).eq_of_nhds
+
+/-- The inverse Mellin profile of an entire Schwartz–Bergman function lifts through the
+trivial theta map and can then be twisted to the chosen component. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_lift
+    (r : RealModels) (c : ComplexModels) (χ : PontryaginDual Jₛ) (p : PositiveRealExponentialDecay univ) :
+    ∃ f : sAdelePolarFree S r c, ∀ g : Jₛ, thetaAt(χ₁(χ)) f.val g =
+      (χ g : ℂ)⁻¹ * p.val (Real.log ((mₛ g).val : ℝ)) := by
+  obtain ⟨a, ha⟩ := sLocalHomogeneousTheta_trivial_exists_polarFree (S := S) r c p
+  obtain ⟨T, hT⟩ := sAdelePolarFree_quasiCharacter_mul r c ((circleToComplex).comp χ⁻¹)
+  refine ⟨T a, fun g ↦ ?_⟩
+  rw [sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_twist (χ₁(χ)) χ (fun _ ↦ rfl) a.val
+    (T a).val (hT a), ha]
+
+/-- The S-idele quotient has the separation and countability properties used by
+the Schwartz–Bruhat projector on a split locally compact group. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_group :
+    T2Space Jₛ ∧ SecondCountableTopology Jₛ ∧ LocallyCompactSpace Jₛ := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (v : S) : SecondCountableTopology (v.val.adicCompletion F) := secondCountable_of_proper
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (InfiniteAdeleRing F) := inferInstanceAs
+    (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+  let : SecondCountableTopology ((v : S) → v.val.adicCompletion F) := inferInstance
+  let : SecondCountableTopology Aₛ := inferInstanceAs
+    (SecondCountableTopology (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Aₛˣ := (sIdeleGroup_description F S).1.secondCountableTopology
+  let : LocallyCompactSpace Aₛˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  exact ⟨inferInstance, inferInstance, inferInstance⟩
+
+/-- Apply the split-group decay criterion to the S-idele quotient with its proper norm. -/
+private theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial_mem
+    (χ : PontryaginDual Jₛ) (f : ℬₛ) (τ : ℝ≥0ˣ →ₜ* Jₛ) (hτ : RightInverse τ mₛ) (p : ℝ → ℂ)
+    (hp : ∀ g : Jₛ, (χ g : ℂ) * thetaAt(χ₁(χ)) f g = p (Real.log ((mₛ g).val : ℝ))) :
+    (⇑(thetaAt(χ₁(χ)) f) : Jₛ → ℂ) ∈ modulatedExponentialDecaySubmodule
+      ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ univ ↔ p ∈ logExponentialDecaySubmodule univ := by
+  obtain ⟨ht₂, hsc, hlc⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_group (F := F) (S := S)
+  let m : Jₛ →ₜ* ℝ≥0ˣ := ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩
+  obtain ⟨t₀, ht₀⟩ := exists_ne (1 : ℝ≥0ˣ)
+  have hm : IsModulation m := ⟨isProperMap_sIdeleQuotientNorm F S, τ t₀, (hτ t₀).trans_ne ht₀⟩
+  let v : Jₛ → ℂ := thetaAt(χ₁(χ)) f
+  have hτ' : RightInverse τ m := hτ
+  have hp' : ∀ g, (χ g : ℂ) * v g = p (Real.log ((m g).val : ℝ)) := hp
+  change v ∈ modulatedExponentialDecaySubmodule m univ ↔ p ∈ logExponentialDecaySubmodule univ
+  with_reducible
+    exact sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_profile (G := Jₛ) m hm τ hτ' χ v p hp'
+
 /-- Paper: Proposition 5.3.4.4(1) and (3), p. 264.
 On the component of χ, a zeta transform is entire exactly when the homogeneous theta
 function has exponential decay at every real exponent. Its covariance is the
@@ -4231,7 +4678,54 @@ norm-one isotype property already supplied by §2.3. -/
 theorem sLocalIdelicZFunction_entire_iff_theta_exponentialDecay (χ : PontryaginDual Jₛ) (f : ℬₛ) :
     AnalyticOnNhd ℂ (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s)) univ ↔
       (⇑(thetaAt(χ₁(χ)) f) : Jₛ → ℂ) ∈ modulatedExponentialDecaySubmodule
-        ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ univ := by sorry
+        ⟨mₛ, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ univ := by
+  let r (w : {w : InfinitePlace F // w.IsReal}) :
+      {e : w.val.Completion ≃+* ℝ // IsHomeomorph (e : w.val.Completion → ℝ)} :=
+    ⟨InfinitePlace.Completion.ringEquivRealOfIsReal w.property,
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal w.property).toHomeomorph.isHomeomorph⟩
+  let c (w : {w : InfinitePlace F // w.IsComplex}) :
+      {e : w.val.Completion ≃+* ℂ // IsHomeomorph (e : w.val.Completion → ℂ)} :=
+    ⟨InfinitePlace.Completion.ringEquivComplexOfIsComplex w.property,
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex w.property).toHomeomorph.isHomeomorph⟩
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨M, hM, _⟩ := existsUnique_positiveRealFourierMellin univ isOpen_univ
+    (ordConnected_univ : OrdConnected (univ : Set ℝ)) univ_nonempty
+  constructor
+  · intro ha
+    obtain ⟨a, ha'⟩ := (sLocalIdelicZFunction_entire_iff_eq_polarFree r c χ f).mp ha
+    let B : SchwartzBergman univ := ⟨_, sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_bergman r c χ a⟩
+    let p := M.symm B
+    obtain ⟨b, hb⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_lift r c χ p
+    have hchart (z : ℂ) : sLocalIdelicZFunction f (chartₛ(χ) z) = sLocalIdelicZFunction b.val (chartₛ(χ) z) := by
+      apply sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_continue
+        (sLocalIdelicZFunction_meromorphic f χ) (sLocalIdelicZFunction_meromorphic b.val χ) _ z
+      intro s hs
+      calc
+        _ = B.val s := ha' s
+        _ = (M p).val s := congrArg (fun v : SchwartzBergman univ ↦ v.val s) (M.apply_symm_apply B).symm
+        _ = _ := hM p s (mem_univ _)
+        _ = _ := (sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial χ b.val p.val hb s hs).symm
+    rw [sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_eq_theta χ f b.val hchart]
+    refine (sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial_mem χ b.val τ hτ p.val ?_).mpr p.property
+    intro g
+    rw [hb, mul_inv_cancel_left₀ (Circle.coe_ne_zero _)]
+  · intro hd
+    obtain ⟨p, hp⟩ := sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_exists_profile χ f τ hτ
+    have hmem := (sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial_mem χ f τ hτ p hp).mp hd
+    let v : PositiveRealExponentialDecay univ := ⟨p, hmem⟩
+    have hrad : ∀ g : Jₛ, thetaAt(χ₁(χ)) f g = (χ g : ℂ)⁻¹ * p (Real.log ((mₛ g).val : ℝ)) := by
+      intro g
+      rw [← hp, inv_mul_cancel_left₀ (Circle.coe_ne_zero _)]
+    have hdiff : Differentiable ℂ (M v).val := by
+      simpa only [preimage_univ, differentiableOn_univ] using (M v).property.2.1
+    have eqB : (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s)) = (M v).val := by
+      funext z
+      apply sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_continue
+        (sLocalIdelicZFunction_meromorphic f χ) (fun z _ ↦ (hdiff.analyticAt z).meromorphicNFAt) _ z
+      exact fun s hs ↦ (sLocalIdelicZFunction_entire_iff_theta_exponentialDecay_radial χ f p hrad s hs).trans
+        (hM v s (mem_univ _)).symm
+    rw [eqB]
+    exact fun z _ ↦ hdiff.analyticAt z
 
 /-- Mellin integration turns a compact unit average followed by dilation into the
 average of the character times the scalar dilation. -/

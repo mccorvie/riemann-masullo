@@ -1,7 +1,12 @@
 module
 
 public import RiemannMasullo.Ch01_Introduction.Sec4
+import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
+import Mathlib.NumberTheory.Padics.HeightOneSpectrum
+import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
 import Mathlib.NumberTheory.NumberField.Cyclotomic.Basic
+import Mathlib.Topology.Algebra.IsOpenUnits
+import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
 import RiemannMasullo.Ch13_ZerosHecke.Targets
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
@@ -726,33 +731,123 @@ def Printed.introTraceApprox_conjugateWeight : Prop :=
       (χ (g * u.val) : ℂ) * approx(h, ρ, n, z) (N[F](g * u.val)) =
         star (χ u.val : ℂ) * ((χ g : ℂ) * approx(h, ρ, n, z) (N[F](g)))
 
+private theorem printedTrace_localResidue_continuous (p : ℕ) [Fact p.Prime] :
+    Continuous (PadicInt.toZMod : ℤ_[p] →+* ZMod p) := by
+  apply continuous_of_continuousAt_zero (PadicInt.toZMod : ℤ_[p] →+* ZMod p)
+  refine (tendsto_pure.mpr ?_).mono_right (pure_le_nhds _)
+  filter_upwards [Metric.ball_mem_nhds (0 : ℤ_[p]) one_pos] with x hx
+  rw [map_zero, ← RingHom.mem_ker, PadicInt.ker_toZMod, IsLocalRing.mem_maximalIdeal,
+    PadicInt.mem_nonunits]
+  simpa using hx
+
+private theorem printedTrace_local_five_character :
+    ∃ (v : HeightOneSpectrum (𝓞 ℚ)) (c : (v.adicCompletionIntegers ℚ)ˣ →ₜ* Circle)
+      (a : (v.adicCompletionIntegers ℚ)ˣ), c a ^ 2 ≠ 1 := by
+  classical
+  let p : Nat.Primes := ⟨5, by decide⟩
+  let : Fact (Nat.Prime (p : ℕ)) := ⟨p.property⟩
+  let v : HeightOneSpectrum (𝓞 ℚ) := (Rat.HeightOneSpectrum.primesEquiv (R := 𝓞 ℚ)).symm p
+  let E := PadicInt.adicCompletionIntegersEquiv (𝓞 ℚ) p
+  let φ : v.adicCompletionIntegers ℚ →+* ZMod 5 :=
+    (PadicInt.toZMod : ℤ_[p] →+* ZMod p).comp E.symm.toRingEquiv.toRingHom
+  have hφ : Continuous φ := (printedTrace_localResidue_continuous p).comp E.symm.continuous
+  let r : (ZMod 5)ˣ := Units.mk0 2 (by decide)
+  have hr : (Additive.ofMul (r ^ 2)) ≠ 0  := by
+    intro he
+    have hh := congrArg (fun u : (ZMod 5)ˣ ↦ (u : ZMod 5)) (show r^2 = 1 from he)
+    exact (by decide : (2 : ZMod 5)^2 ≠ 1) hh
+  obtain ⟨ψ₀, hψ₀⟩ := AddChar.exists_apply_ne_zero.mpr hr
+  let ψ : (ZMod 5)ˣ →* Circle := (AddChar.circleEquivComplex.symm ψ₀).toMonoidHom
+  have hψ : ψ (r ^ 2) ≠ 1 := fun h ↦ hψ₀ (congrArg (fun z : Circle ↦ (z : ℂ)) h)
+  have hunit : IsUnit (2 : ℤ_[p]) := by
+    apply IsLocalRing.notMem_maximalIdeal.mp
+    rw [← PadicInt.ker_toZMod, RingHom.mem_ker]
+    change PadicInt.toZMod (2 : ℤ_[5]) ≠ 0
+    rw [show PadicInt.toZMod (2 : ℤ_[5]) = (2 : ZMod 5) from map_ofNat _ _]
+    decide
+  let a := Units.map E.toRingEquiv.toMonoidHom hunit.unit
+  have ha : Units.map φ.toMonoidHom a = r := by
+    apply Units.ext
+    change PadicInt.toZMod (E.symm (E (hunit.unit : ℤ_[p]))) = 2
+    rw [E.symm_apply_apply, hunit.unit_spec]
+    exact map_ofNat _ _
+  let c := ψ.comp (Units.map φ.toMonoidHom)
+  have hc : Continuous c :=
+    (continuous_of_discreteTopology (f := (ψ : (ZMod 5)ˣ → Circle))).comp (hφ.units_map _)
+  refine ⟨v, ⟨c, hc⟩, a, ?_⟩
+  change ψ (Units.map φ.toMonoidHom a) ^ 2 ≠ 1
+  rw [ha, ← map_pow]
+  exact hψ
+
+private theorem printedTrace_ratIdeleClasses_norm_on_integral_units
+    (e : (ℝ≥0ˣ × ((v : HeightOneSpectrum (𝓞 ℚ)) → (v.adicCompletionIntegers ℚ)ˣ)) ≃ₜ*
+      IdeleClassGroup (𝓞 ℚ) ℚ) :
+    ∀ u, ideleClassNorm ℚ (e (1, u)) = 1 := by
+  let U := (v : HeightOneSpectrum (𝓞 ℚ)) → (v.adicCompletionIntegers ℚ)ˣ
+  let (v : HeightOneSpectrum (𝓞 ℚ)) : CompactSpace (v.adicCompletionIntegers ℚ) :=
+    compactSpace_adicCompletionIntegers v
+  let : CompactSpace U := by dsimp [U]; infer_instance
+  let j : U →ₜ* IdeleClassGroup (𝓞 ℚ) ℚ :=
+    ⟨e.toMonoidHom.comp (MonoidHom.inr ℝ≥0ˣ U), e.continuous.comp (continuous_const.prodMk continuous_id)⟩
+  let n : IdeleClassGroup (𝓞 ℚ) ℚ →ₜ* ℝ≥0ˣ :=
+    ⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩
+  have h := compactSubgroup_le_modulation_ker (n.comp j) ⊤
+    (by simpa using (isCompact_univ : IsCompact (Set.univ : Set U)))
+  exact fun u ↦ h (Subgroup.mem_top u)
+
+private theorem printedTrace_exists_rat_quartic_twist :
+    ∃ (χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) (u : (ideleClassNorm ℚ).ker),
+      χ u.val ^ 2 ≠ 1 := by
+  classical
+  obtain ⟨v, c, a, ha⟩ := printedTrace_local_five_character
+  obtain ⟨e, _⟩ := ratIdeleClassGroup_decomposition
+  let units : (w : HeightOneSpectrum (𝓞 ℚ)) → (w.adicCompletionIntegers ℚ)ˣ := Pi.mulSingle v a
+  let u : (ideleClassNorm ℚ).ker := ⟨e (1, units), printedTrace_ratIdeleClasses_norm_on_integral_units e units⟩
+  let χh := c.toMonoidHom.comp ((Pi.evalMonoidHom _ v).comp ((MonoidHom.snd _ _).comp e.symm.toMonoidHom))
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ) :=
+    ⟨χh, c.continuous.comp ((continuous_apply v).comp (continuous_snd.comp e.symm.continuous))⟩
+  have hχu : χ u.val = c a := calc
+    χ u.val = c ((e.symm (e (1, units))).2 v) := rfl
+    _ = c (units v) := by rw [e.symm_apply_apply]
+    _ = c a := by simp [units]
+  exact ⟨χ, u, hχu ▸ ha⟩
+
 /-- Paper: §§1.4.2–1.4.3, pp. 28–29. Use an order-four character modulo
 five over the rationals with value `i` at two and let `u` have local unit
 two at five and components one elsewhere. At norm two and parameter two,
 the radial value is nonzero for all sufficiently late approximants.
 Right translation by `u` multiplies the displayed test by `i`, while the
 asserted conjugate weight would multiply it by `-i`. -/
--- `ContDiff ℝ ⊤` in `IsIntroTraceApproximation` is analyticity. An analytic cutoff vanishing
--- below one vanishes everywhere, so it cannot tend to one at two (#5645).
-private theorem introTraceApprox_conjugateWeight_false_cutoffs (h ρ : ℕ → ℝ → ℝ)
-    (ha : IsIntroTraceApproximation h ρ) : False := by
-  have hzero (n : ℕ) : h n 2 = 0 := by
-    have han : AnalyticOnNhd ℝ (h n) univ := (ha.1 n).1.analyticOnNhd
-    have hnear : h n =ᶠ[𝓝 0] 0 := by
-      filter_upwards [gt_mem_nhds (show (0 : ℝ) < 1 by norm_num)] with x hx
-      apply image_eq_zero_of_notMem_tsupport
-      exact fun hmem ↦ hx.not_gt ((ha.1 n).2.2.1 hmem)
-    exact han.eqOn_zero_of_preconnected_of_eventuallyEq_zero isPreconnected_univ
-      (mem_univ 0) hnear (mem_univ 2)
-  have hlim := ha.2.2.1 2 (by norm_num)
-  simp only [hzero] at hlim
-  exact zero_ne_one (tendsto_nhds_unique tendsto_const_nhds hlim)
-
 theorem Printed.introTraceApprox_conjugateWeight_false :
     ¬ Printed.introTraceApprox_conjugateWeight := by
   intro hall
-  obtain ⟨h, ρ, ha, _⟩ := hall ℚ 1 (fun _ ↦ rfl)
-  exact introTraceApprox_conjugateWeight_false_cutoffs h ρ ha
+  obtain ⟨χ, u, hu⟩ := printedTrace_exists_rat_quartic_twist
+  have hb : (∀ v : (ideleClassNorm ℚ).ker, χ v.val = 1) → χ = 1 := by
+    intro ht
+    exact (hu (by simp [ht u])).elim
+  obtain ⟨h, ρ, hA, heq⟩ := hall ℚ χ hb
+  have ht := introTraceApprox_tendsto h ρ hA 2 2 (by norm_num) (by norm_num)
+  have hval : introTracePower 2 2 ≠ 0 := by rw [introTracePower_two.1]; norm_num
+  obtain ⟨n, hn⟩ := (ht.eventually_ne hval).exists
+  let two : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  have hsurj : Surjective (ideleClassNorm ℚ) := (ideleGroup_quotient.{0, 0} ℚ).2.2.2.2.2.2.2.2.2.1
+  obtain ⟨g, hg⟩ := hsurj two
+  have hgu : ideleClassNorm ℚ (g * u.val) = two := by rw [map_mul, u.property, mul_one, hg]
+  have he := heq n 2 g u
+  rw [hgu, hg] at he
+  change (χ (g * u.val) : ℂ) * introTraceApprox (h n) (ρ n) 2 2 =
+    star (χ u.val : ℂ) * ((χ g : ℂ) * introTraceApprox (h n) (ρ n) 2 2) at he
+  rw [map_mul, Circle.coe_mul] at he
+  have hc : (χ u.val : ℂ) = star (χ u.val : ℂ) := by
+    apply mul_left_cancel₀ (Circle.coe_ne_zero (χ g))
+    apply mul_right_cancel₀ hn
+    calc
+      _ = _ := he
+      _ = _ := by ring
+  have hci : χ u.val = (χ u.val)⁻¹ := Subtype.ext (hc.trans (Circle.coe_inv_eq_conj _).symm)
+  apply hu
+  calc χ u.val ^ 2 = χ u.val * χ u.val := sq _
+       _ = 1 := by nth_rw 2 [hci]; simp
 
 open Classical in
 /-- Paper: §1.4.3, p. 29. The printed real and complex archimedean
@@ -765,13 +860,184 @@ def Printed.introTraceApprox_archimedean_bounded : Prop :=
           ‖printedReal[F](χ, printedFamily[F](χ, h, ρ, n, z))‖ ≤ C ∧
           ‖printedComplex[F](χ, printedFamily[F](χ, h, ρ, n, z))‖ ≤ C
 
+/-- The closed disc around two lies in the right half-plane used in §1.4.3. -/
+private theorem printedTrace_disk :
+    Metric.closedBall (2 : ℂ) (1 / 4) ⊆ right(1) ∧
+      (2 : ℂ) ∈ interior (Metric.closedBall (2 : ℂ) (1 / 4)) ∩ right(1) := by
+  refine ⟨fun z hz ↦ ?_, Metric.ball_subset_interior_closedBall (Metric.mem_ball_self (by norm_num)),
+    by change (1 : ℝ) < (2 : ℂ).re; norm_num⟩
+  have hd := (Complex.abs_re_le_norm (z - 2)).trans (mem_closedBall_iff_norm.mp hz)
+  rw [Complex.sub_re, Complex.re_ofNat] at hd
+  change (1 : ℝ) < z.re
+  linarith [(abs_le.mp hd).1]
+
+/-- At parameter two the radial approximant has real values between zero and one.
+Its support lies in a compact interval strictly above one. -/
+private theorem printedTrace_rat_two_profile (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (n : ℕ) : ∃ (g : ℝ → ℝ) (c R : ℝ), 1 < c ∧ Measurable g ∧
+      (∀ t, g t ∈ Icc 0 1) ∧ (∀ t, g t ≠ 0 → t ∈ Icc c R) ∧
+      (∀ t, approx(h, ρ, n, (2 : ℂ)) t = (g t : ℂ)) := by
+  let p (t : ℝ) := if 1 < t then (t ^ 2)⁻¹ else if t = 1 then 1 / 2 else 0
+  have hp (t : ℝ) : p t ∈ Icc 0 1 := by
+    unfold p
+    split_ifs with h₁ h₂
+    · exact ⟨by positivity, inv_le_one_of_one_le₀ (one_le_pow₀ h₁.le)⟩
+    · norm_num
+    · norm_num
+  have hm : Measurable p :=
+    Measurable.ite measurableSet_Ioi (by fun_prop)
+      (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+  have hpow (t : ℝ) : introTracePower 2 t = (p t : ℂ) := by
+    unfold introTracePower p
+    split_ifs <;> norm_num [Complex.cpow_neg]
+  obtain ⟨hh, -, -, ε, _, hρ⟩ := hA
+  let g (t : ℝ) := h n t * ∫ u, ρ n u * p (t - u)
+  have hκ : Integrable (ρ n) := (hρ n).2.1.continuous.integrable_of_hasCompactSupport
+    (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) (hρ n).2.2.2.1)
+  have hmem (t : ℝ) (ht : g t ≠ 0) : t ∈ tsupport (h n) := subset_tsupport _ (left_ne_zero_of_mul ht)
+  have hK := (hh n).2.1
+  obtain ⟨c, hc, hmin⟩ : ∃ c : ℝ, 1 < c ∧ ∀ t ∈ tsupport (h n), c ≤ t := by
+    rcases (tsupport (h n)).eq_empty_or_nonempty with he | hn
+    · exact ⟨2, by norm_num, by simp [he]⟩
+    · obtain ⟨c, hc, hlo⟩ := hK.exists_isMinOn hn continuousOn_id
+      exact ⟨c, (hh n).2.2.1 hc, fun t ht ↦ hlo ht⟩
+  obtain ⟨R, hmax⟩ := hK.bddAbove
+  refine ⟨g, c, R, hc, ?_, ?_, fun t ht ↦ ⟨hmin _ (hmem _ ht), hmax (hmem _ ht)⟩, ?_⟩
+  · have hk : Measurable (fun q : ℝ × ℝ ↦ ρ n q.2 * p (q.1 - q.2)) :=
+      ((hρ n).2.1.continuous.measurable.comp measurable_snd).mul
+        (hm.comp (measurable_fst.sub measurable_snd))
+    exact (hh n).1.continuous.measurable.mul hk.stronglyMeasurable.integral_prod_right'.measurable
+  · intro t
+    have hi : Integrable (fun u ↦ ρ n u * p (t - u)) := hκ.mono
+      (((hρ n).2.1.continuous.measurable.mul (hm.comp (measurable_const.sub measurable_id))).aestronglyMeasurable)
+      (Eventually.of_forall fun u ↦ by
+        rw [norm_mul, Real.norm_of_nonneg (hp _).1]
+        exact mul_le_of_le_one_right (norm_nonneg _) (hp _).2)
+    have hlo : 0 ≤ ∫ u, ρ n u * p (t - u) := integral_nonneg fun u ↦ mul_nonneg ((hρ n).2.2.1 u) (hp _).1
+    have hhi : (∫ u, ρ n u * p (t - u)) ≤ 1 := by
+      rw [← (hρ n).2.2.2.2]
+      exact integral_mono hi hκ fun u ↦ mul_le_of_le_one_right ((hρ n).2.2.1 u) (hp _).2
+    exact ⟨mul_nonneg ((hh n).2.2.2 t).1 hlo,
+      (mul_le_of_le_one_right ((hh n).2.2.2 t).1 hhi).trans ((hh n).2.2.2 t).2⟩
+  · intro t
+    simp only [introTraceApprox, hpow, g, ← Complex.ofReal_mul, integral_complex_ofReal]
+
+/-- On the support of a nonnegative radial test the printed denominator is bounded away
+from zero and is at most the denominator of the corrected real-place integrand. -/
+private theorem printedTrace_rat_integral_le {K : Type*} [NormedField K] [ProperSpace K]
+    [MeasurableSpace Kˣ] [BorelSpace Kˣ] (μ : Measure Kˣ) [IsFiniteMeasureOnCompacts μ]
+    {g : ℝ → ℝ} {c R : ℝ} (hc : 1 < c) (hg : Measurable g) (hb : ∀ t, g t ∈ Icc 0 1)
+    (hs : ∀ t, g t ≠ 0 → t ∈ Icc c R) :
+    (∫ u : Kˣ, g ‖u.val‖ * Real.sqrt ‖u.val‖ / ‖1 - u.val‖ ∂μ) ≤
+      ∫ u : Kˣ, g ‖u.val‖ * Real.sqrt ‖u.val‖ / |1 - ‖u.val‖| ∂μ := by
+  let f (u : Kˣ) := g ‖u.val‖ * Real.sqrt ‖u.val‖ / |1 - ‖u.val‖|
+  let d (u : Kˣ) := g ‖u.val‖ * Real.sqrt ‖u.val‖ / ‖1 - u.val‖
+  have hn : Continuous (fun u : Kˣ ↦ ‖u.val‖) := continuous_norm.comp Units.continuous_val
+  have hf : Measurable f := ((hg.comp hn.measurable).mul (Real.continuous_sqrt.comp hn).measurable).div
+    (continuous_abs.comp (continuous_const.sub hn)).measurable
+  have hd : Measurable d := ((hg.comp hn.measurable).mul (Real.continuous_sqrt.comp hn).measurable).div
+    ((continuous_const.sub Units.continuous_val).norm.measurable)
+  have hf₀ (u : Kˣ) : 0 ≤ f u := div_nonneg (mul_nonneg (hb _).1 (Real.sqrt_nonneg _)) (abs_nonneg _)
+  have hd₀ (u : Kˣ) : 0 ≤ d u := div_nonneg (mul_nonneg (hb _).1 (Real.sqrt_nonneg _)) (norm_nonneg _)
+  have hdf (u : Kˣ) : d u ≤ f u := by
+    by_cases hz : g ‖u.val‖ = 0
+    · simp [d, f, hz]
+    have ht := hc.trans_le (hs _ hz).1
+    have he : |1 - ‖u.val‖| ≤ ‖1 - u.val‖ := by
+      simpa only [norm_one] using abs_norm_sub_norm_le (1 : K) u.val
+    exact div_le_div_of_nonneg_left (mul_nonneg (hb _).1 (Real.sqrt_nonneg _))
+      (abs_pos.mpr (sub_ne_zero.mpr ht.ne)) he
+  let m : Kˣ →* ℝ≥0ˣ := Units.map nnNormHom.toMonoidHom
+  let upper : ℝ≥0ˣ := Units.mk0 (⟨max R 2, by positivity⟩ : ℝ≥0) (by
+    intro h
+    have h' := congrArg ((↑) : ℝ≥0 → ℝ) h
+    change max R 2 = 0 at h'
+    linarith [le_max_right R (2 : ℝ)])
+  let S := m ⁻¹' Icc 1 upper
+  have hm : IsProperMap m := by simpa [m] using (isProperMap_units_nnNorm_pow (K := K) 1 one_ne_zero)
+  have hI : IsCompact (Icc (1 : ℝ≥0ˣ) upper) := by
+    apply (IsOpenUnits.isOpenEmbedding_unitsVal (M := ℝ≥0)).isEmbedding.isInducing.isCompact_iff.mpr
+    have himage : Units.val '' Icc (1 : ℝ≥0ˣ) upper = Icc (1 : ℝ≥0) upper.val := by
+      ext t
+      constructor
+      · rintro ⟨u, hu, rfl⟩
+        exact hu
+      · intro ht
+        exact ⟨Units.mk0 t (zero_lt_one.trans_le ht.1).ne', ht, rfl⟩
+    rw [himage]
+    exact isCompact_Icc
+  have hS : IsCompact S := hm.isCompact_preimage hI
+  have hne (u : Kˣ) (hnz : g ‖u.val‖ ≠ 0) : u ∈ S := by
+    have h := hs _ hnz
+    exact ⟨show (1 : ℝ) ≤ ‖u.val‖ from hc.le.trans h.1,
+      show ‖u.val‖ ≤ max R 2 from h.2.trans (le_max_left _ _)⟩
+  let B := Real.sqrt (max R 2) / (c - 1)
+  have hB : 0 ≤ B := div_nonneg (Real.sqrt_nonneg _) (sub_nonneg.mpr hc.le)
+  have hFI : Integrable f μ := by
+    have ht : Integrable (S.indicator (fun _ : Kˣ ↦ B)) μ :=
+      (integrableOn_const hS.measure_lt_top.ne).integrable_indicator hS.measurableSet
+    apply ht.mono' hf.aestronglyMeasurable
+    filter_upwards with u
+    rw [Real.norm_of_nonneg (hf₀ u)]
+    by_cases hz : g ‖u.val‖ = 0
+    · simp only [f, hz, zero_mul, zero_div]
+      exact indicator_nonneg (fun _ _ ↦ hB) u
+    rw [indicator_of_mem (hne u hz)]
+    have hs' := hs _ hz
+    dsimp only [f, B]
+    rw [abs_of_neg (sub_neg.mpr (hc.trans_le hs'.1)), neg_sub]
+    exact div_le_div₀ (Real.sqrt_nonneg _)
+      ((mul_le_of_le_one_left (Real.sqrt_nonneg _) (hb _).2).trans
+        (Real.sqrt_le_sqrt (hs'.2.trans (le_max_left _ _)))) (sub_pos.mpr hc) (by linarith [hs'.1])
+  have hDI : Integrable d μ := hFI.mono' hd.aestronglyMeasurable
+    (Eventually.of_forall fun u ↦ by rw [Real.norm_of_nonneg (hd₀ u)]; exact hdf u)
+  exact integral_mono hDI hFI hdf
+
+open Classical in
+/-- For the trivial rational character the actual real-place kernel gives a lower bound
+on the printed real-place term at parameter two. -/
+private theorem printedTrace_rat_real_lower (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (n : ℕ) :
+    (∑ w : InfinitePlace ℚ, introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) w).re ≤
+      (printedReal[ℚ]((1 : U[ℚ]), printedFamily[ℚ]((1 : U[ℚ]), h, ρ, n, (2 : ℂ)))).re := by
+  classical
+  obtain ⟨g, c, R, hc, hg, hb, hs, hval⟩ := printedTrace_rat_two_profile h ρ hA n
+  have hw := Rat.isReal_infinitePlace
+  have hN (u : Rat.infinitePlace.Completionˣ) :
+      N[ℚ](archClass[ℚ](Rat.infinitePlace) u) = ‖u.val‖ := by
+    rw [ideleClassNorm_ofCompletion, hw.mult_eq_one, pow_one]
+    rfl
+  let : MeasurableSpace Rat.infinitePlace.Completion :=
+    instMeasurableSpaceCompletion_riemannMasullo ℚ Rat.infinitePlace
+  let : BorelSpace Rat.infinitePlace.Completion := ⟨rfl⟩
+  let : BorelSpace Rat.infinitePlace.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding Rat.infinitePlace
+  let : ProperSpace Rat.infinitePlace.Completion :=
+    LipschitzWith.properSpace hi.isClosedEmbedding.isProperMap hi.lipschitzWith
+  let μ := infiniteLocalMultiplicativeTamagawaMeasure ℚ Rat.infinitePlace
+  let : μ.IsHaarMeasure := infiniteLocalMultiplicativeTamagawaMeasure_isHaarMeasure Rat.infinitePlace
+  have hcompare := printedTrace_rat_integral_le (K := Rat.infinitePlace.Completion) μ hc hg hb hs
+  simp only [Fintype.sum_subsingleton _ Rat.infinitePlace, introTraceArchimedean, ite_eq_left hw,
+    introTraceTest, PontryaginDual.one_apply, Circle.coe_one, star_one, one_mul, hw.mult_eq_one,
+    pow_one, hN, hval, ← Complex.ofReal_mul, ← Complex.ofReal_div, integral_complex_ofReal,
+    show (1 / 2 : ℂ) = ((1 / 2 : ℝ) : ℂ) by norm_num, Complex.ofReal_re]
+  exact mul_le_mul_of_nonneg_left hcompare (by norm_num : (0 : ℝ) ≤ 1 / 2)
+
 /-- Paper: §1.4.3, p. 29. Over the rationals take the trivial character,
 half-width one, and the closed disk of radius one quarter about two. On
 `1 < t < 2`, the positive real branch at parameter two dominates one half
 of the integral of the approximant against `t^(-1/2)/(t-1) dt`. Fatou's
 lemma gives divergence since the approximant tends to `t^(-2)`. -/
 theorem Printed.introTraceApprox_archimedean_bounded_false :
-    ¬ Printed.introTraceApprox_archimedean_bounded := by sorry
+    ¬ Printed.introTraceApprox_archimedean_bounded := by
+  classical
+  intro hall
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  obtain ⟨C, _, hC⟩ := hall ℚ 1 1 (fun _ ↦ rfl) one_pos _ (isCompact_closedBall _ _)
+    printedTrace_disk.1 ⟨2, printedTrace_disk.2⟩
+  obtain ⟨n, hn⟩ := ((introTraceApprox_rat_archimedean_tendsto_atTop h ρ hA).eventually_gt_atTop C).exists
+  exact (not_lt_of_ge ((printedTrace_rat_real_lower h ρ hA n).trans ((Complex.re_le_norm _).trans
+    (hC h ρ hA n 2 (interior_subset printedTrace_disk.2.1)).1))) hn
 
 open Classical in
 /-- Paper: §1.4.3, p. 29. The two printed archimedean families have
@@ -792,20 +1058,15 @@ one and the closed disk of radius one quarter about two, the real term at
 the interior point two diverges along every cutoff subsequence. -/
 theorem Printed.introTraceApprox_archimedean_montel_false :
     ¬ Printed.introTraceApprox_archimedean_montel := by
+  classical
   intro hall
-  have hK : Metric.closedBall (2 : ℂ) (1 / 4) ⊆ right(1) := by
-    intro z hz
-    have := (Complex.abs_re_le_norm (z - 2)).trans (mem_closedBall_iff_norm.mp hz)
-    change 1 < z.re
-    rw [Complex.sub_re, Complex.re_ofNat] at this
-    linarith [(abs_le.mp this).1]
-  have hint : (2 : ℂ) ∈ interior (Metric.closedBall (2 : ℂ) (1 / 4)) ∩ right(1) := by
-    refine ⟨?_, show (1 : ℝ) < (2 : ℂ).re by norm_num⟩
-    rw [interior_closedBall _ (by norm_num)]
-    exact Metric.mem_ball_self (by norm_num)
-  obtain ⟨h, ρ, -, -, ha, -⟩ := hall ℚ 1 1 (fun _ ↦ rfl) one_pos _
-    (isCompact_closedBall _ _) hK ⟨2, hint⟩
-  exact introTraceApprox_conjugateWeight_false_cutoffs h ρ ha
+  obtain ⟨h, ρ, A, B, hA, hConv, _, _, _⟩ :=
+    hall ℚ 1 1 (fun _ ↦ rfl) one_pos _ (isCompact_closedBall _ _)
+      printedTrace_disk.1 ⟨2, printedTrace_disk.2⟩
+  have ht := tendsto_atTop_mono (fun n ↦ printedTrace_rat_real_lower h ρ hA n)
+    (introTraceApprox_rat_archimedean_tendsto_atTop h ρ hA)
+  exact not_tendsto_nhds_of_tendsto_atTop ht _
+    (Complex.continuous_re.continuousAt.tendsto.comp (hConv.tendsto_at printedTrace_disk.2.1))
 
 /-- Paper: §1.4.3, p. 29. The spectral sums of the cutoff family converge
 to a holomorphic function on the interior of the compact set outside the
