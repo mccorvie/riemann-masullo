@@ -1818,39 +1818,76 @@ private theorem archJet_polar_frechet (ω : PontryaginDual (ideleClassNorm F).ke
       rw [(globalConverse_nontrivial_exact ω hω).surjective.range_eq]
       exact isClosed_univ
 
-private theorem archJet_equiv_of_kernel_surjective
-    (χ : U) (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
-    (hindex : Nonempty (ℕ ≃ ArchNuclearityJetIndex χ τ hτ))
-    (hKer : ∀ x : Θ₀(χ), x ∈ archNuclearityDenominator χ ↔ ∀ j, archNuclearityJet χ τ hτ j x = 0)
-    (hSurj : Surjective (fun (x : Θ₀(χ)) j ↦ archNuclearityJet χ τ hτ j x)) :
-    ∃ e : ArchNuclearityQuotient χ ≃L[ℂ] (ArchNuclearityJetIndex χ τ hτ → ℂ),
-      ∀ (x : Θ₀(χ)) j, e ((archNuclearityDenominator χ).mkQ x) j = archNuclearityJet χ τ hτ j x := by
-  obtain ⟨σ⟩ := hindex
+/-- Paper: Equation (7.4.3.13), p. 372.
+Each adjusted jet annihilates the archimedean orbital denominator, so the jets are
+well defined on the quotient by it. -/
+theorem archNuclearityQuotient_jetEquiv_annihilate (j : ArchNuclearityJetIndex χ τ hτ)
+    (x : archNuclearityDenominator χ) :
+    archNuclearityJet χ τ hτ j x.val = 0 := by
+  exact (archJet_mem_denominator_direct χ τ hτ x.val).mp x.property j
+
+/-- Paper: Equation (7.4.3.13), p. 372.
+The adjusted jets assemble into a single continuous linear map from the archimedean
+orbital quotient to the product of the coefficient spaces. -/
+theorem archNuclearityQuotient_jetEquiv_coefficients :
+    ∃ L : ArchNuclearityQuotient χ →L[ℂ] (ArchNuclearityJetIndex χ τ hτ → ℂ),
+      ∀ (x : Θ₀(χ)) (j : ArchNuclearityJetIndex χ τ hτ),
+        L ((archNuclearityDenominator χ).mkQ x) j = archNuclearityJet χ τ hτ j x := by
+  have hker : ∀ j : ArchNuclearityJetIndex χ τ hτ,
+      archNuclearityDenominator χ ≤ (archNuclearityJet χ τ hτ j).ker :=
+    fun j _ hy ↦ archNuclearityQuotient_jetEquiv_annihilate (χ := χ) (τ := τ) (hτ := hτ) j ⟨_, hy⟩
+  refine ⟨ContinuousLinearMap.pi fun j ↦ (archNuclearityDenominator χ).liftQL
+    (archNuclearityJet χ τ hτ j) (hker j), ?_⟩
+  intro x j
+  exact Submodule.liftQ_apply (p := archNuclearityDenominator χ)
+    (f := (archNuclearityJet χ τ hτ j).toLinearMap) (h := hker j) (x := x)
+
+/-- Paper: Equation (7.4.3.13), p. 372.
+The adjusted jets separate the classes of the archimedean orbital quotient: a class
+on which every jet vanishes is the class of a flat test, that is, it lies in the
+denominator. -/
+theorem archNuclearityQuotient_jetEquiv_separating (x : Θ₀(χ))
+    (hx : ∀ j, archNuclearityJet χ τ hτ j x = 0) : x ∈ archNuclearityDenominator χ := by
+  exact (archJet_mem_denominator_direct χ τ hτ x).mpr hx
+
+/-- Paper: Equation (7.4.3.13), p. 372.
+Every family of coefficient values is realized by a class of the archimedean
+orbital quotient: the coefficient map is onto the whole product. -/
+theorem archNuclearityQuotient_jetEquiv_realization
+    (y : ArchNuclearityJetIndex χ τ hτ → ℂ) :
+    ∃ x : Θ₀(χ), ∀ j, archNuclearityJet χ τ hτ j x = y j := by
+  obtain ⟨x, hx⟩ := archJet_surjective χ τ hτ y
+  exact ⟨x, congrFun hx⟩
+
+/-- Paper: Equation (7.4.3.13), p. 372.
+The coefficient map of the archimedean orbital quotient is a topological isomorphism:
+the inverse of the bijective coefficient map is continuous. -/
+theorem archNuclearityQuotient_jetEquiv_inverse_continuous
+    (L : ArchNuclearityQuotient χ →L[ℂ] (ArchNuclearityJetIndex χ τ hτ → ℂ))
+    (hL : ∀ (x : Θ₀(χ)) (j : ArchNuclearityJetIndex χ τ hτ),
+      L ((archNuclearityDenominator χ).mkQ x) j = archNuclearityJet χ τ hτ j x)
+    (h : Function.Bijective L) :
+    Continuous ((LinearEquiv.ofBijective L.toLinearMap h).symm :
+      (ArchNuclearityJetIndex χ τ hτ → ℂ) → ArchNuclearityQuotient χ) := by
+  obtain ⟨σ⟩ := archNuclearityJet_basis_index_equiv χ τ hτ
   let : Countable (ArchNuclearityJetIndex χ τ hτ) := Countable.of_equiv ℕ σ
-  let A : Θ₀(χ) →L[ℂ] (ArchNuclearityJetIndex χ τ hτ → ℂ) :=
-    ContinuousLinearMap.pi (archNuclearityJet χ τ hτ)
+  let D := archNuclearityDenominator χ
+  let A := L.comp D.mkQL
+  have hsurj : Surjective A := by
+    intro y
+    obtain ⟨x, hx⟩ := archNuclearityQuotient_jetEquiv_realization (χ := χ) (τ := τ) (hτ := hτ) y
+    exact ⟨x, funext fun j ↦ (hL x j).trans (hx j)⟩
   have hopen : IsOpenMap A := by
     obtain ⟨_, _, hmet, hcomplete⟩ := archJet_polar_frechet (ω(χ))
     let : UniformSpace (Θ₀(χ)) := IsTopologicalAddGroup.rightUniformSpace _
     let : IsUniformAddGroup (Θ₀(χ)) := isUniformAddGroup_of_addCommGroup
     have : CompleteSpace (Θ₀(χ)) := hcomplete
     refine isOpenMap_of_not_isMeagre_range A ?_
-    rw [(show Surjective A from hSurj).range_eq]
+    rw [hsurj.range_eq]
     exact not_isMeagre_of_isOpen isOpen_univ Set.univ_nonempty
-  let D := archNuclearityDenominator χ
-  have hle : D ≤ LinearMap.ker A.toLinearMap := fun x hx ↦ funext ((hKer x).mp hx)
-  let L := D.liftQ A.toLinearMap hle
-  have hcont : Continuous L := D.isQuotientMap_mkQ.continuous_iff.mpr A.continuous
-  have hinj : Injective L := by
-    rw [← LinearMap.ker_eq_bot]
-    exact Submodule.ker_liftQ_eq_bot _ _ _ fun x hx ↦ (hKer x).mpr (fun j ↦ congrFun hx j)
-  have hsurj : Surjective L := fun v ↦ by
-    obtain ⟨x, hx⟩ := hSurj v
-    exact ⟨D.mkQ x,hx⟩
   have hopen' : IsOpenMap L := D.isOpenQuotientMap_mkQ.isOpenMap_iff.mpr hopen
-  let e := LinearEquiv.ofBijective L ⟨hinj,hsurj⟩
-  let h := e.toEquiv.toHomeomorphOfContinuousOpen hcont hopen'
-  exact ⟨{ e with continuous_toFun := hcont, continuous_invFun := h.symm.continuous }, fun _ _ ↦ rfl⟩
+  let e := LinearEquiv.ofBijective L.toLinearMap h
+  exact (e.toEquiv.toHomeomorphOfContinuousOpen L.continuous hopen').symm.continuous
 
 /-- Paper: Equation (7.4.3.13) and the following paragraph, p. 372.
 The coefficients of a quotient class are its adjusted jets, with the product topology.
@@ -1859,8 +1896,27 @@ theorem archNuclearityQuotient_jetEquiv :
     ∃ e : ArchNuclearityQuotient χ ≃L[ℂ] (ArchNuclearityJetIndex χ τ hτ → ℂ),
       ∀ (x : Θ₀(χ)) j, e ((archNuclearityDenominator χ).mkQ x) j =
         archNuclearityJet χ τ hτ j x := by
-  exact archJet_equiv_of_kernel_surjective χ τ hτ (archNuclearityJet_basis_index_equiv χ τ hτ)
-    (archJet_mem_denominator_direct χ τ hτ) (archJet_surjective χ τ hτ)
+  obtain ⟨L, hL⟩ := archNuclearityQuotient_jetEquiv_coefficients (χ := χ) (τ := τ) (hτ := hτ)
+  have hinj : Function.Injective L := by
+    intro a b hab
+    obtain ⟨x, rfl⟩ := Submodule.mkQ_surjective (archNuclearityDenominator χ) a
+    obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (archNuclearityDenominator χ) b
+    have hzero : x - y ∈ archNuclearityDenominator χ := by
+      refine archNuclearityQuotient_jetEquiv_separating (χ := χ) (τ := τ) (hτ := hτ)
+        (x - y) fun j ↦ ?_
+      rw [map_sub, ← hL x j, ← hL y j]
+      exact sub_eq_zero.mpr (congrArg (fun f : (ArchNuclearityJetIndex χ τ hτ → ℂ) ↦ f j) hab)
+    have hsub : (archNuclearityDenominator χ).mkQ x - (archNuclearityDenominator χ).mkQ y = 0 := by
+      rw [← map_sub, Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+      exact hzero
+    exact sub_eq_zero.mp hsub
+  have hsurj : Function.Surjective L := by
+    intro y
+    obtain ⟨x, hx⟩ := archNuclearityQuotient_jetEquiv_realization (χ := χ) (τ := τ) (hτ := hτ) y
+    exact ⟨(archNuclearityDenominator χ).mkQ x, funext fun j ↦ (hL x j).trans (hx j)⟩
+  refine ⟨⟨LinearEquiv.ofBijective L.toLinearMap ⟨hinj, hsurj⟩, L.continuous, ?_⟩, hL⟩
+  exact archNuclearityQuotient_jetEquiv_inverse_continuous (χ := χ) (τ := τ) (hτ := hτ)
+    L hL ⟨hinj, hsurj⟩
 
 end AdjustedJetEquivalence
 
