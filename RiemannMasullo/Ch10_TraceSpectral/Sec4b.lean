@@ -238,7 +238,36 @@ theorem spectralLineAmbientKernel_tendsto (_ha : 0 < a)
     (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
     (_horder : Order₀(χ, e)) (_hb : Bases₀(χ, x, f)) (φ : BruhatCompactSupport C𝔽) :
     ∃ K, Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
-      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K) := by sorry
+      (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K) := by
+  have lift {Z J E G X Y : Type _} [NormedAddCommGroup E] [NormedSpace ℂ E]
+      [NormedAddCommGroup G] [NormedSpace ℂ G] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+      (d : E →L[ℂ] X) (j : G →L[ℂ] Y) (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+      (i : (z : Z) → Fin (N z) → J) (u : J → E) (v : J → G)
+      (h : ∃ K, Tendsto (spectralKernelRectangle e N i u v) atTop (𝓝 K)) :
+      ∃ K, Tendsto (spectralKernelRectangle e N i (fun z ↦ d (u z)) (fun z ↦ j (v z))) atTop (𝓝 K) := by
+    let L : ProjectiveTensor E G →L[ℂ] ProjectiveTensor X Y :=
+      ⟨projectiveTensorMap d.toLinearMap j.toLinearMap, projectiveTensorMap_continuous d j⟩
+    obtain ⟨K, hK⟩ := h
+    refine ⟨L.completion K, (L.completion.continuous.continuousAt.tendsto.comp hK).congr ?_⟩
+    intro ij
+    unfold Function.comp spectralKernelRectangle
+    rw [ContinuousLinearMap.completion_apply_coe]
+    apply congrArg ((↑) : ProjectiveTensor X Y → Π(X, Y))
+    change projectiveTensorMap d.toLinearMap j.toLinearMap _ = _
+    rw [map_sum]
+    apply Finset.sum_congr rfl
+    intro z _
+    exact (map_sum (TensorProduct.map d.toLinearMap j.toLinearMap)
+      (fun m : Fin (N z) ↦ u (i z m) ⊗ₜ[ℂ] v (i z m)) Finset.univ).trans
+      (Finset.sum_congr rfl fun m _ ↦ TensorProduct.map_tmul _ _ _ _)
+  let E := H(a, (le_refl (0 : ℝ)), hs₀(hs))
+  let θ := Θ(a, (le_refl (0 : ℝ)), hs₀(hs))
+  let d : StrongDual ℂ E →L[ℂ] W'(0, s) := ⟨D₀,
+    (spectralSobolevDualEmbedding_isometry_range (F := F) a (hStrip((le_refl (0 : ℝ)))) hs₀(hs)).1.continuous⟩
+  let j : E →L[ℂ] W(0, s) := θ.orthogonal.subtypeL.comp
+    θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  exact lift d j e _ _ _ _ (spectralLineQuotientKernel_tendsto (F := F) a hs _ha χ eχ e x f _hχ _he _horder _hb φ)
 
 /-- Paper: Theorem 10.4.3.1(3), p. 467. The limit of the ambient kernels
 represents spectral projection after convolution. -/
