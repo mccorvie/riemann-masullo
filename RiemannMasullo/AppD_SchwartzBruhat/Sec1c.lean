@@ -3218,7 +3218,11 @@ theorem isCompactlyGeneratedGroup_of_surjective {X : Type*} [CommGroup X] [Topol
 /-- Paper: Theorem D.1.7.1, p. 776. The images of the two subgroups of a structural
 pair in the quotient by a closed subgroup form a structural pair of the quotient.
 The image of the good subgroup is compact, and its annihilator is a closed subgroup
-of the compactly generated annihilator of the good subgroup. -/
+of the compactly generated annihilator of the good subgroup.
+
+Deviation: The first proof paragraph on p. 776 prints $k'k/k'$ as the compact subgroup in the
+pair for $G/k$. We use the image $k'k/k$ of $k'$.
+-/
 theorem BruhatStructuralPair.exists_quotient (hK : IsClosed (K : Set G))
     (a : BruhatStructuralPair G) :
     ∃ b : BruhatStructuralPair (G ⧸ K),
@@ -3308,7 +3312,11 @@ theorem BruhatStructuralPair.exists_quotient (hK : IsClosed (K : Set G))
 /-- Paper: Theorem D.1.7.1, p. 776. When the structural pair `b` of the quotient by `K`
 is the image of the structural pair `a`, the quotient map of `G` induces a continuous,
 open and surjective homomorphism from the elementary quotient of `a` to that of `b`.
-Its kernel is the image of `K ∩ a.val.1`. -/
+Its kernel is the image of `K ∩ a.val.1`.
+
+Deviation: The displayed map on p. 776 averages over $k'k/k'$. The kernel on the source stage
+$\Gamma'/k'$ is the image $(k\cap\Gamma')k'/k'$.
+-/
 theorem BruhatStructuralPair.exists_quotient_hom (a : BruhatStructuralPair G)
     (b : BruhatStructuralPair (G ⧸ K))
     (hb₁ : b.val.1 = a.val.1.map (QuotientGroup.mk' K))

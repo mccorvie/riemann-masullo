@@ -57,13 +57,242 @@ section MellinExplicitFormula
 -- TODO(paper-gap): The unnumbered residue identity on p. 614 reverses the
 -- signs in (B.4.2.2). Poles are present only for norm characters and may be shifted.
 
+/-- Helper for `hasSlowGrowthNearPoles_completedHeckeL_logDeriv`: a function analytic at
+every point of a closed horizontal segment is differentiable on a thin open strip around it. -/
+private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_tube {f : ℂ → ℂ} {a b t : ℝ}
+    (h : ∀ σ ∈ Icc a b, AnalyticAt ℂ f ((σ : ℂ) + (t : ℂ) * Complex.I)) :
+    ∃ δ > (0 : ℝ), DifferentiableOn ℂ f
+      (Complex.re ⁻¹' Ioo a b ∩ Complex.im ⁻¹' Ioo (t - δ) (t + δ)) := by
+  let K : Set ℂ := (fun σ : ℝ ↦ (σ : ℂ) + (t : ℂ) * Complex.I) '' Icc a b
+  have hK : IsCompact K := isCompact_Icc.image (by fun_prop)
+  have hKt : K ⊆ {z | AnalyticAt ℂ f z} := by
+    rintro _ ⟨σ, hσ, rfl⟩
+    exact h σ hσ
+  obtain ⟨δ, hδ, hsub⟩ := hK.exists_thickening_subset_open (isOpen_analyticAt ℂ f) hKt
+  refine ⟨δ, hδ, fun z hz ↦ ?_⟩
+  have hmem : z ∈ Metric.thickening δ K := by
+    rw [Metric.mem_thickening_iff]
+    refine ⟨(z.re : ℂ) + (t : ℂ) * Complex.I, ⟨z.re, Ioo_subset_Icc_self hz.1, rfl⟩, ?_⟩
+    rw [Complex.dist_eq]
+    have he : z - ((z.re : ℂ) + (t : ℂ) * Complex.I) = (((z.im - t : ℝ)) : ℂ) * Complex.I := by
+      apply Complex.ext <;> simp
+    rw [he, norm_mul, Complex.norm_I, mul_one, Complex.norm_real, Real.norm_eq_abs, abs_lt]
+    have := hz.2
+    simp only [mem_preimage, mem_Ioo] at this
+    constructor <;> linarith
+  exact (hsub hmem : AnalyticAt ℂ f z).differentiableAt.differentiableWithinAt
+
+/-- Helper for `hasSlowGrowthNearPoles_completedHeckeL_logDeriv`: good heights near the
+integers on both tails, together with the vertical-line clause, give a witness.
+The finitely many indices near zero are sent to good heights by a monotone clamp. -/
+private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_assemble {f : ℂ → ℂ} {a b : ℝ}
+    (hab : a < b) (hf : MeromorphicOn f (Complex.re ⁻¹' Ioo a b)) (T : ℤ → ℝ)
+    (hT : Monotone T) (A β : ℝ) (hA : 0 < A) (hβ : 0 < β)
+    (hgood : ∀ᶠ k : ℤ in comap abs atTop, |T k - k| ≤ 1 ∧
+      ∀ σ ∈ Icc a b, AnalyticAt ℂ f ((σ : ℂ) + (T k : ℂ) * Complex.I) ∧
+        ‖f ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ ≤ A * |T k| ^ β)
+    (hvert : ∃ ε₁ ε₂ : ℝ, 0 < ε₁ ∧ ε₁ < ε₂ ∧ ε₂ < (b - a) / 2 ∧
+      ∀ σ ∈ ({a + ε₁, b - ε₂} : Set ℝ),
+        Continuous (fun y : ℝ ↦ f ((σ : ℂ) + (y : ℂ) * Complex.I)) ∧
+          ∃ γ > (0 : ℝ), (fun y : ℝ ↦ f ((σ : ℂ) + (y : ℂ) * Complex.I)) =O[comap abs atTop]
+            (fun y : ℝ ↦ |y| ^ γ)) :
+    HasSlowGrowthNearPoles f a b := by
+  obtain ⟨N₀, hN₀⟩ := (atTop_basis.comap (abs : ℤ → ℤ)).eventually_iff.mp hgood
+  simp only [mem_preimage, mem_Ici, true_and] at hN₀
+  set N : ℤ := max N₀ 1 with hNdef
+  have hN1 : 1 ≤ N := le_max_right _ _
+  have hP : ∀ k : ℤ, N ≤ |k| → _ := fun k hk ↦ hN₀ (le_trans (le_max_left _ _) hk)
+  let c : ℤ → ℤ := fun k ↦ if 0 ≤ k then max k N else min k (-(N + 2))
+  have hc_abs : ∀ k, N ≤ |c k| := by
+    intro k
+    simp only [c]
+    split_ifs with h
+    · rw [abs_of_nonneg (show 0 ≤ max k N by omega)]; omega
+    · rw [abs_of_neg (show min k (-(N + 2)) < 0 by omega)]; omega
+  have hc_ge : ∀ k, |k| ≤ |c k| := by
+    intro k
+    simp only [c]
+    split_ifs with h
+    · rw [abs_of_nonneg h, abs_of_nonneg (show 0 ≤ max k N by omega)]; omega
+    · rw [abs_of_neg (show k < 0 by omega),
+        abs_of_neg (show min k (-(N + 2)) < 0 by omega)]; omega
+  have hc_le : ∀ k, |c k| ≤ max |k| (N + 2) := by
+    intro k
+    simp only [c]
+    split_ifs with h
+    · rw [abs_of_nonneg h, abs_of_nonneg (show 0 ≤ max k N by omega)]; omega
+    · rw [abs_of_neg (show k < 0 by omega),
+        abs_of_neg (show min k (-(N + 2)) < 0 by omega)]; omega
+  have hc_mono : Monotone c := by
+    intro i j hij
+    simp only [c]
+    split_ifs <;> omega
+  have hc_eq : ∀ k, N + 2 ≤ |k| → c k = k := by
+    intro k hk
+    simp only [c]
+    split_ifs with h
+    · rw [abs_of_nonneg h] at hk; omega
+    · rw [abs_of_neg (by omega)] at hk; omega
+  set T' : ℤ → ℝ := fun k ↦ T (c k) with hT'
+  have hnear : ∀ k, |T' k - c k| ≤ 1 := fun k ↦ (hP (c k) (hc_abs k)).1
+  have hnear' : ∀ k, (c k : ℝ) - 1 ≤ T' k ∧ T' k ≤ c k + 1 := fun k ↦ by
+    have := abs_le.mp (hnear k); constructor <;> linarith [this.1, this.2]
+  have hT'mono : Monotone T' := hT.comp hc_mono
+  have hpos : ∀ n : ℕ, 0 ≤ T' n := by
+    intro n
+    have h1 : c n = max (n : ℤ) N := by simp [c]
+    have h2 : (N : ℝ) ≤ c n := by rw [h1]; exact_mod_cast le_max_right _ _
+    have h3 : (1 : ℝ) ≤ N := by exact_mod_cast hN1
+    linarith [(hnear' n).1]
+  have hneg : ∀ n : ℕ, 1 ≤ n → T' (-(n : ℤ)) ≤ -(N + 1) := by
+    intro n hn
+    have h1 : c (-(n : ℤ)) = min (-(n : ℤ)) (-(N + 2)) := by
+      simp only [c]; rw [ite_eq_right_iff.mpr (by omega)]
+    have h2 : (c (-(n : ℤ)) : ℝ) ≤ -(N + 2) := by
+      rw [h1]; exact_mod_cast min_le_right _ _
+    linarith [(hnear' (-(n : ℤ))).2]
+  refine ⟨T', hab, hf, ?_, ?_, ?_, ?_, ?_, ?_, ?_, hvert⟩
+  · -- positive tail
+    intro m n hmn
+    simp only
+    rw [abs_of_nonneg (hpos m), abs_of_nonneg (hpos n)]
+    exact hT'mono (by exact_mod_cast hmn)
+  · -- negative tail
+    intro m n hmn
+    simp only
+    rcases Nat.eq_zero_or_pos m with rfl | hm
+    · rcases Nat.eq_zero_or_pos n with rfl | hn
+      · exact le_rfl
+      · have h0 : T' (-((0 : ℕ) : ℤ)) ≤ N + 1 := by
+          have h1 : c (-((0 : ℕ) : ℤ)) = N := by simp [c]; omega
+          have := (hnear' (-((0 : ℕ) : ℤ))).2
+          rw [h1] at this; exact this
+        have h0' : 0 ≤ T' (-((0 : ℕ) : ℤ)) := by simpa using hpos 0
+        have hNr : (1 : ℝ) ≤ N := by exact_mod_cast hN1
+        rw [abs_of_nonneg h0', abs_of_neg (show T' (-(n : ℤ)) < 0 by linarith [hneg n hn])]
+        linarith [hneg n hn]
+    · have hn : 1 ≤ n := le_trans hm hmn
+      have hNr : (1 : ℝ) ≤ N := by exact_mod_cast hN1
+      rw [abs_of_neg (show T' (-(m : ℤ)) < 0 by linarith [hneg m hm]),
+        abs_of_neg (show T' (-(n : ℤ)) < 0 by linarith [hneg n hn])]
+      have : T' (-(n : ℤ)) ≤ T' (-(m : ℤ)) := hT'mono (by omega)
+      linarith
+  · -- divergence
+    have hlow : ∀ k : ℤ, |(k : ℝ)| - 1 ≤ |T' k| := fun k ↦ by
+      have h1 : |(k : ℝ)| ≤ |(c k : ℝ)| := by
+        rw [← Int.cast_abs, ← Int.cast_abs]; exact_mod_cast hc_ge k
+      have h3 := abs_sub_abs_le_abs_sub (c k : ℝ) (T' k)
+      rw [abs_sub_comm] at h3
+      linarith [hnear k]
+    have h1 : Tendsto (fun k : ℤ ↦ |(k : ℝ)| - 1) (comap abs atTop) atTop := by
+      have h0 := (tendsto_intCast_atTop_atTop (R := ℝ)).comp
+        (Filter.tendsto_comap (f := (abs : ℤ → ℤ)) (x := atTop))
+      have h2 : Tendsto (fun k : ℤ ↦ |(k : ℝ)|) (comap abs atTop) atTop :=
+        h0.congr fun k ↦ by simp
+      simpa [sub_eq_add_neg] using tendsto_atTop_add_const_right _ (-1 : ℝ) h2
+    exact tendsto_atTop_mono hlow h1
+  · refine ⟨1, one_pos, Asymptotics.IsBigO.of_bound 2 ?_⟩
+    filter_upwards [(atTop_basis.comap (abs : ℤ → ℤ)).eventually_iff.mpr
+      ⟨N + 2, trivial, fun k hk ↦ hk⟩] with k hk
+    simp only [mem_preimage, mem_Ici] at hk
+    rw [Real.rpow_one, Real.norm_eq_abs, Real.norm_eq_abs, abs_abs]
+    have hck := hc_eq k hk
+    have h := hnear k
+    rw [hck] at h
+    have hk1 : (1 : ℝ) ≤ |(k : ℝ)| := by
+      rw [← Int.cast_abs]; exact_mod_cast (by omega : (1 : ℤ) ≤ |k|)
+    have h3 := abs_sub_abs_le_abs_sub (T' k) (k : ℝ)
+    linarith
+  · refine ⟨1 / 2, 1, by norm_num, one_pos, ?_⟩
+    filter_upwards [(atTop_basis.comap (abs : ℤ → ℤ)).eventually_iff.mpr
+      ⟨N + 2, trivial, fun k hk ↦ hk⟩] with k hk
+    simp only [mem_preimage, mem_Ici] at hk
+    rw [Real.rpow_one]
+    have h := hnear k
+    rw [hc_eq k hk] at h
+    have hk1 : (2 : ℝ) ≤ |(k : ℝ)| := by
+      rw [← Int.cast_abs]; exact_mod_cast (by omega : (2 : ℤ) ≤ |k|)
+    have h3 := abs_sub_abs_le_abs_sub (k : ℝ) (T' k)
+    rw [abs_sub_comm] at h3
+    linarith
+  · intro k
+    exact hasSlowGrowthNearPoles_completedHeckeL_logDeriv_tube
+      (fun σ hσ ↦ ((hP (c k) (hc_abs k)).2 σ hσ).1)
+  · refine ⟨β, A * ((N : ℝ) + 3) ^ β, hβ, by positivity, fun k hk σ hσ ↦ ?_⟩
+    have h := ((hP (c k) (hc_abs k)).2 σ (Ioo_subset_Icc_self hσ)).2
+    refine h.trans ?_
+    have hk1 : (1 : ℝ) ≤ |(k : ℝ)| := by
+      rw [← Int.cast_abs]; exact_mod_cast Int.one_le_abs hk
+    have hcl : |(c k : ℝ)| ≤ max |(k : ℝ)| ((N : ℝ) + 2) := by
+      rw [← Int.cast_abs, ← Int.cast_abs]; exact_mod_cast hc_le k
+    have h3 := abs_sub_abs_le_abs_sub (T' k) (c k : ℝ)
+    have hT1 : |T' k| ≤ ((N : ℝ) + 3) * |(k : ℝ)| := by
+      have hN : (0 : ℝ) ≤ N := by exact_mod_cast (by omega : (0 : ℤ) ≤ N)
+      have : max |(k : ℝ)| ((N : ℝ) + 2) ≤ ((N : ℝ) + 2) * |(k : ℝ)| := by
+        apply max_le <;> nlinarith
+      nlinarith [hnear k]
+    rw [mul_assoc, ← Real.mul_rpow (by positivity) (abs_nonneg _)]
+    gcongr
+
+/-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII, Prop. 2.3, Cor. 2.5, Prop. 2.7).
+The logarithmic derivative of the completed function is polynomially bounded on
+horizontal segments of the strip at a monotone sequence of heights, one within distance
+one of each large integer, and is analytic along those segments.
+Deviation: The heights are the horizontal part of Definition B.3.1.1, stated on both tails
+at once; the segments are closed and run from `1 - a` to `a`. -/
+private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_heights (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (a : ℝ) (ha : 1 < a) (haMax : a ≤ 2) :
+    ∃ T : ℤ → ℝ, Monotone T ∧ ∃ A β : ℝ, 0 < A ∧ 0 < β ∧
+      ∀ᶠ k : ℤ in comap abs atTop, |T k - k| ≤ 1 ∧
+        ∀ σ ∈ Icc (1 - a) a,
+          AnalyticAt ℂ (logDeriv L) ((σ : ℂ) + (T k : ℂ) * Complex.I) ∧
+            ‖logDeriv L ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ ≤ A * |T k| ^ β := by
+  sorry
+
+/-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII). On a vertical line to the right
+of `Re(s) = 1` the logarithmic derivative of the completed function is continuous and
+grows at most polynomially in the height.
+Deviation: One of the two interior lines of Definition B.3.1.1, for `1 < σ ≤ 2`. -/
+private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_right (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (σ : ℝ) (hσ : 1 < σ) (hσ2 : σ ≤ 2) :
+    Continuous (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) ∧
+      ∃ γ > (0 : ℝ), (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) =O[comap abs atTop]
+        (fun y : ℝ ↦ |y| ^ γ) := by
+  sorry
+
+/-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII, and (B.4.2.3)). On a vertical line
+to the left of `Re(s) = 0` the logarithmic derivative of the completed function is
+continuous and grows at most polynomially in the height.
+Deviation: One of the two interior lines of Definition B.3.1.1, for `-1 ≤ σ < 0`.
+By the functional equation it reduces to the dual character on the line `1 - σ`. -/
+private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_left (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
+    (σ : ℝ) (hσ : -1 ≤ σ) (hσ0 : σ < 0) :
+    Continuous (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) ∧
+      ∃ γ > (0 : ℝ), (fun y : ℝ ↦ logDeriv L ((σ : ℂ) + (y : ℂ) * Complex.I)) =O[comap abs atTop]
+        (fun y : ℝ ↦ |y| ^ γ) := by
+  sorry
+
 /-- Paper: §B.4.2.1, p. 614. The logarithmic derivative of the completed
 function has slow growth near its poles on the strip used for the residue formula.
 Deviation: Uses the repaired height bounds of Definition B.3.1.1. -/
 theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv (χ : U[F]) (L : ℂ → ℂ)
     (_hL : MeromorphicNFOn L univ) (_hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s)
     (a : ℝ) (_ha : 1 < a) (_haMax : a ≤ 2) :
-    HasSlowGrowthNearPoles (logDeriv L) (1 - a) a := by sorry
+    HasSlowGrowthNearPoles (logDeriv L) (1 - a) a := by
+  obtain ⟨T, hT, A, β, hA, hβ, hgood⟩ :=
+    hasSlowGrowthNearPoles_completedHeckeL_logDeriv_heights χ L _hL _hAgree a _ha _haMax
+  refine hasSlowGrowthNearPoles_completedHeckeL_logDeriv_assemble (by linarith)
+    ((_hL.meromorphicOn.logDeriv).mono_set (subset_univ _)) T hT A β hA hβ hgood
+    ⟨(a - 1) / 3, (a - 1) / 2, by linarith, by linarith, by linarith, ?_⟩
+  intro σ hσ
+  rcases hσ with rfl | rfl
+  · exact hasSlowGrowthNearPoles_completedHeckeL_logDeriv_left χ L _hL _hAgree _
+      (by linarith) (by linarith)
+  · exact hasSlowGrowthNearPoles_completedHeckeL_logDeriv_right χ L _hL _hAgree _
+      (by linarith) (by linarith)
 
 /-- Paper: Equation (B.4.2.2), p. 614. The right vertical integral minus the
 left vertical integral is the signed divisor sum of Mellin values.

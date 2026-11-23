@@ -1552,145 +1552,57 @@ local notation "onClosedPrimeQuotient(" hs ", " ω ", " body ")" =>
    body)
 
 /-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
-Convolution by any compactly supported Bruhat test on the prime quotient is trace class.
-Deviation: Use the quotient by the closed principal-value image. -/
-theorem primeOrbitalSobolevConvolution_nuclear (φ : BruhatCompactSupport C𝔽) :
-    onClosedPrimeQuotient(hs₁, ω(χ),
-      letI : PolynormableSpace ℂ OrbQ := (norm_withSeminorms ℂ OrbQ).toPolynormableSpace
-      IsNuclearOperator (OrbA(φ))) := by sorry
-
-omit _hdeg _hχ in
-/-- Descending a continuous linear family of endomorphisms, first to an invariant
-submodule and then to its quotient, preserves linear dependence and operator-norm continuity. -/
-private theorem primeOrbitalSobolevConvolution_traceNorm_continuous_descend
-    {X E : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
-    [NormedAddCommGroup E] [NormedSpace ℂ E] (D : Submodule ℂ E) (N : Submodule ℂ D)
-    (A : X →ₗ[ℂ] E →L[ℂ] E) (hA : Continuous A) (R : X → D →L[ℂ] D)
-    (hR : ∀ x (u : D), (R x u).val = A x u.val)
-    (B : X → (D ⧸ N) →L[ℂ] (D ⧸ N))
-    (hB : ∀ x (u : D), B x (N.mkQ u) = N.mkQ (R x u)) :
-    IsLinearMap ℂ B ∧ Continuous B := by
-  have hlin : IsLinearMap ℂ B := by
-    constructor
-    · intro x y
-      apply ContinuousLinearMap.ext
-      intro q
-      obtain ⟨u, rfl⟩ := N.mkQ_surjective q
-      simp only [add_apply, hB, ← map_add N.mkQ]
-      exact congrArg N.mkQ (Subtype.ext (by simp [hR]))
-    · intro c x
-      apply ContinuousLinearMap.ext
-      intro q
-      obtain ⟨u, rfl⟩ := N.mkQ_surjective q
-      simp only [smul_apply, hB, ← map_smul N.mkQ]
-      exact congrArg N.mkQ (Subtype.ext (by simp [hR]))
-  refine ⟨hlin, continuous_of_continuousAt_zero (hlin.mk' B) ?_⟩
-  have hbound (x : X) : ‖B x‖ ≤ ‖A x‖ := by
-    refine (B x).opNorm_le_bound (norm_nonneg _) fun q ↦ ?_
-    refine le_of_forall_pos_le_add fun ε hε ↦ ?_
-    obtain ⟨u, hu, hnorm⟩ := Submodule.Quotient.norm_mk_lt (S := N) q
-      (div_pos hε (show 0 < ‖A x‖ + 1 by positivity))
-    calc
-      ‖B x q‖ = ‖N.mkQ (R x u)‖ := by rw [← hu]; exact congrArg norm (hB x u)
-      _ ≤ ‖(R x u).val‖ := Submodule.Quotient.norm_mk_le N _
-      _ = ‖A x u.val‖ := by rw [hR]
-      _ ≤ ‖A x‖ * (‖q‖ + ε / (‖A x‖ + 1)) :=
-        ((A x).le_opNorm u.val).trans (mul_le_mul_of_nonneg_left hnorm.le (norm_nonneg _))
-      _ ≤ ‖A x‖ * ‖q‖ + ε := by
-        have hn : ‖A x‖ / (‖A x‖ + 1) ≤ 1 :=
-          (div_le_one (by positivity)).2 (le_add_of_nonneg_right zero_le_one)
-        calc
-          _ = ‖A x‖ * ‖q‖ + ε * (‖A x‖ / (‖A x‖ + 1)) := by ring
-          _ ≤ _ := by gcongr; exact mul_le_of_le_one_right hε.le hn
-  change Tendsto B (𝓝 0) (𝓝 (B 0))
-  rw [hlin.map_zero]
-  apply squeeze_zero_norm hbound
-  simpa using hA.continuousAt.norm.tendsto (x := 0)
-
-omit _hdeg _hχ in
-/-- The trace norm of a nuclear family is lower semicontinuous in the operator norm
-because it is the supremum of the finite sums of its approximation numbers. -/
-private theorem primeOrbitalSobolevConvolution_traceNorm_continuous_lsc
-    {X H : Type*} [TopologicalSpace X] [NormedAddCommGroup H] [InnerProductSpace ℂ H]
-    [CompleteSpace H] (T : X → nuclearEndomorphisms H) (h : Continuous fun x ↦ (T x).val) :
-    LowerSemicontinuous (fun x ↦ traceNorm (T x)) := by
-  let p (I : Finset ℕ) (x : X) := ∑ n ∈ I, approximationNumber (T x).val n
-  have nn (x : X) (n : ℕ) : 0 ≤ approximationNumber (T x).val n :=
-    Real.sInf_nonneg fun _ ⟨_, _, he⟩ ↦ he ▸ norm_nonneg _
-  have hs (x : X) : HasSum (approximationNumber (T x).val) (traceNorm (T x)) := by
-    have hmem := (mem_traceClassOperators_iff_isNuclearOperator (T x).val).2 (T x).property
-    have hsum : Summable (approximationNumber (T x).val) := by simpa using hmem.2
-    have he := schattenNorm_one_eq_traceNorm (T x)
-    simp only [schattenNorm, Real.rpow_one, div_one] at he
-    exact he ▸ hsum.hasSum
-  have hle (I : Finset ℕ) (x : X) : p I x ≤ traceNorm (T x) :=
-    ((hs x).summable.sum_le_tsum I (fun n _ ↦ nn x n)).trans_eq (hs x).tsum_eq
-  have hbound (x : X) : BddAbove (range fun I ↦ p I x) :=
-    ⟨traceNorm (T x), fun z ⟨I, he⟩ ↦ he ▸ hle I x⟩
-  have he (x : X) : traceNorm (T x) = ⨆ I, p I x := by
-    apply le_antisymm ?_ (ciSup_le (hle · x))
-    exact le_of_tendsto (hs x) (.of_forall (fun I ↦ le_ciSup (hbound x) I))
-  simp_rw [he]
-  refine lowerSemicontinuous_ciSup hbound fun I ↦ Continuous.lowerSemicontinuous ?_
-  apply continuous_finsetSum _ fun n _ ↦ ?_
-  have hc : Continuous (fun D : H →L[ℂ] H ↦ approximationNumber D n) :=
-    (LipschitzWith.of_dist_le' (K := 1) (fun D E ↦ by
-      simpa only [dist_eq_norm, Real.norm_eq_abs, one_mul] using abs_approximationNumber_sub_le D E n)).continuous
-  exact hc.comp h
-
-omit _hdeg _hχ in
-/-- On the strict LF test space the trace-norm seminorm is continuous on each
-Fréchet stage and hence on their locally convex inductive limit. -/
-private theorem primeOrbitalSobolevConvolution_traceNorm_continuous_lift
-    {X H : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
-    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H] (hX : IsStrictLFSpace X)
-    (B : X → H →L[ℂ] H) (hB : IsLinearMap ℂ B ∧ Continuous B)
-    (hn : ∀ x, IsNuclearOperator (B x)) :
-    ∃ L : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (L x).val = B x) ∧
-      Tendsto (fun x ↦ traceNorm (L x)) (𝓝 0) (𝓝 0) := by
-  let L := (hB.1.mk' B).codRestrict (nuclearEndomorphisms H) hn
-  refine ⟨L, fun _ ↦ rfl, ?_⟩
-  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
-  let c := traceNorm_normedSpaceCore (H := H)
-  let p : Seminorm ℂ X :=
-    { toFun := fun x ↦ traceNorm (L x)
-      map_zero' := by rw [map_zero]; exact (c.norm_eq_zero_iff _).2 rfl
-      add_le' := fun x y ↦ by rw [map_add]; exact c.norm_triangle _ _
-      neg' := fun x ↦ by simpa only [map_neg, ← neg_one_smul ℂ (L x), norm_neg, norm_one, one_mul]
-          using c.norm_smul (-1 : ℂ) (L x)
-      smul' := fun k x ↦ by rw [map_smul]; exact c.norm_smul _ _ }
-  have hl : LowerSemicontinuous p :=
-    primeOrbitalSobolevConvolution_traceNorm_continuous_lsc (fun x ↦ L x) hB.2
-  obtain ⟨_, S, _, hS, _, ht⟩ := hX
-  have hT : WithSeminorms
-      (Subtype.val : {q : Seminorm ℂ X // ∀ k, Continuous (q ∘ (S k).subtype)} → Seminorm ℂ X) := ⟨ht⟩
-  have hc : Continuous p := hT.continuous_seminorm ⟨p, fun k ↦ by
-    let : BarrelledSpace ℂ (S k) := isFrechetTVS_barrelled (hS k)
-    exact (p.comp (S k).subtype).continuous_of_lowerSemicontinuous
-      (hl.comp (S k).subtypeL.continuous)⟩
-  exact hc.tendsto' 0 0 p.map_zero'
-
-/-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
 The convolution action lifts linearly to the trace class and is continuous in trace norm.
 Deviation: Use the quotient by the closed principal-value image. -/
 theorem primeOrbitalSobolevConvolution_traceNorm_continuous :
     onClosedPrimeQuotient(hs₁, ω(χ),
       ∃ L : BruhatCompactSupport C𝔽 →ₗ[ℂ] nuclearEndomorphisms OrbQ,
         (∀ φ, (L φ).val = OrbA(φ)) ∧ Tendsto (fun φ ↦ traceNorm (L φ)) (𝓝 0) (𝓝 0)) :=
-  by
+  by sorry
+
+section PrimeOrbitalNuclearHelpers
+
+omit _hdeg _hχ
+
+/-- Polynormable structures with the same topology have only proof fields. -/
+private theorem primeOrbitalSobolevConvolution_nuclear_polynormable_independent
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (p₁ p₂ : PolynormableSpace ℂ H) (A : H →L[ℂ] H) :
+    @IsNuclearOperator H H _ _ _ p₁ _ _ _ A ↔ @IsNuclearOperator H H _ _ _ p₂ _ _ _ A := by
+  have hp : p₁ = p₂ := by cases p₁; cases p₂; rfl
+  cases hp
+  rfl
+
+/-- Extract nuclearity before specializing to the quotient instance tower. -/
+private theorem primeOrbitalSobolevConvolution_nuclear_of_lift
+    (H X : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (A : X → H →L[ℂ] H)
+    (h : ∃ L : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (L x).val = A x) ∧
+      Tendsto (fun x ↦ traceNorm (L x)) (𝓝 0) (𝓝 0)) (x : X) :
+    letI : PolynormableSpace ℂ H := (norm_withSeminorms ℂ H).toPolynormableSpace
+    IsNuclearOperator (A x) := by
+  obtain ⟨L, hL, _⟩ := h
+  have hn := (L x).property
+  rw [hL x] at hn
+  exact (primeOrbitalSobolevConvolution_nuclear_polynormable_independent H
+    (inferInstance : PolynormableSpace ℂ H)
+    ((norm_withSeminorms ℂ H).toPolynormableSpace) (A x)).mp hn
+
+end PrimeOrbitalNuclearHelpers
+
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
+Convolution by any compactly supported Bruhat test on the prime quotient is trace class.
+Deviation: Use the quotient by the closed principal-value image. -/
+theorem primeOrbitalSobolevConvolution_nuclear (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      letI : PolynormableSpace ℂ OrbQ := (norm_withSeminorms ℂ OrbQ).toPolynormableSpace
+      IsNuclearOperator (OrbA(φ))) := by
+  have hn := primeOrbitalSobolevConvolution_traceNorm_continuous (F := F) (p := p)
+    (χ := χ) (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ)
   exact onClosedPrimeQuotient(hs₁, ω(χ), by
-    apply primeOrbitalSobolevConvolution_traceNorm_continuous_lift (X := BruhatCompactSupport C𝔽)
-      (H := OrbQ) bruhatCompactSupport_strictLF (fun φ ↦ OrbA(φ))
-    · exact primeOrbitalSobolevConvolution_traceNorm_continuous_descend
-          (X := BruhatCompactSupport C𝔽) (E := W(s)) Wω(hs₁, ω(χ)) N(p, hs₁, ω(χ))
-          (hardySobolevTestAction μ𝔽 m𝔽 0 0 s h₀ hs₁)
-          (continuous_hardySobolevTestAction μ𝔽 m𝔽 0 0 s h₀ hs₁)
-          (fun φ ↦ ContinuousLinearMap.restrict (A(hs₁, φ))
-            (hardySobolevTestAction_preserves_spectralIsotype (F := F) h₀ hs₁ (ω(χ)) φ))
-          (fun _ _ ↦ rfl) (fun φ ↦ OrbA(φ))
-          (fun φ u ↦ primeOrbitalSobolevConvolution_mkQ (F := F) p hs₁ (ω(χ)) φ u)
-    · exact fun φ ↦ primeOrbitalSobolevConvolution_nuclear (F := F) (p := p)
-        (χ := χ) (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ) φ)
+    apply primeOrbitalSobolevConvolution_nuclear_of_lift OrbQ (BruhatCompactSupport C𝔽)
+      (fun ψ ↦ OrbA(ψ)) hn φ)
 
 /-- Paper: Theorem 11.2.2.1, p. 490.
 Taking the trace of prime orbital convolution gives a distribution on the compactly

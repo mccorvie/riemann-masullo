@@ -752,6 +752,42 @@ theorem globalThetaPrincipalValue_sobolevBound (S : Finset V) {s : ℝ} (hs : 0 
       _ ≤ K₁ * (hsingle.choose * ‖j(0, hs) (theta(f))‖) := mul_le_mul_of_nonneg_left (h₂ f) hK₁
       _ = K₁ * hsingle.choose * ‖j(0, hs) (theta(f))‖ := (mul_assoc _ _ _).symm
 
+/-- The polar-free theta test classes as a linear map into the global completion. -/
+private def globalThetaSobolevTestClass (a : ℝ) {s : ℝ} (hs : 0 ≤ s) :
+    ℬ₀ →ₗ[ℂ] H(a, hs) :=
+  (j(a, hs)).toLinearMap.comp (Submodule.mkQ
+    ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype))
+
+/-- Paper: Proposition 11.2.0.1(2), pp. 484–485. The principal value is bounded and well
+defined on the polar-free theta test classes of the completion: on their span it is a
+continuous linear map sending a test class to the class of its principal value. -/
+private theorem globalThetaPrincipalValue_clm_onTests (S : Finset V) (a : ℝ) {s : ℝ}
+    (hs : 0 ≤ s) :
+    ∃ g : (LinearMap.range (globalThetaSobolevTestClass (F := F) a hs)) →L[ℂ] H(a, hs),
+      ∀ f : ℬ₀,
+        g ⟨globalThetaSobolevTestClass (F := F) a hs f, LinearMap.mem_range_self _ f⟩ =
+          j(a, hs) (theta(pvTest(S, f))) := by
+  -- Well defined: the principal value kills the kernel of the test class map, because the
+  -- theta class of a test depends only on its theta function. Bounded: the estimates of
+  -- `globalThetaPrincipalValue_sobolevBound` and of its local form bound the norm of the
+  -- principal value by that of the test class.
+  sorry
+
+/-- Paper: Proposition 11.2.0.1(2) and (11.2.0.4), pp. 484–485. A continuous linear map on
+the test classes of the completion which agrees with the principal value extends uniquely to
+the whole completion, the test classes being dense in it. -/
+private theorem globalThetaPrincipalValue_extension (S : Finset V) (a : ℝ) {s : ℝ}
+    (hs : 0 ≤ s)
+    (g : (LinearMap.range (globalThetaSobolevTestClass (F := F) a hs)) →L[ℂ] H(a, hs))
+    (hg : ∀ f : ℬ₀,
+      g ⟨globalThetaSobolevTestClass (F := F) a hs f, LinearMap.mem_range_self _ f⟩ =
+        j(a, hs) (theta(pvTest(S, f)))) :
+    ∃! P : H(a, hs) →L[ℂ] H(a, hs), ∀ f : ℬ₀,
+      P (j(a, hs) (theta(f))) = j(a, hs) (theta(pvTest(S, f))) := by
+  -- Extend `g` along the dense inclusion of its span, which is isometric, and use that two
+  -- continuous maps agreeing on a dense set of a Hausdorff space agree everywhere.
+  sorry
+
 /-- Paper: Proposition 11.2.0.1(2) and (11.2.0.4), pp. 484–485.
 The principal value has a unique bounded extension to the global theta completion.
 Deviation: Continuity, without closed range, is stated here for every
@@ -759,7 +795,9 @@ nonnegative degree and every norm twist as in the paragraph before the propositi
 theorem existsUnique_globalThetaSobolevPrincipalValue (S : Finset V) (a : ℝ)
     {s : ℝ} (hs : 0 ≤ s) :
     ∃! P : H(a, hs) →L[ℂ] H(a, hs), ∀ f : ℬ₀,
-      P (j(a, hs) (theta(f))) = j(a, hs) (theta(pvTest(S, f))) := by sorry
+      P (j(a, hs) (theta(f))) = j(a, hs) (theta(pvTest(S, f))) := by
+  obtain ⟨g, hg⟩ := globalThetaPrincipalValue_clm_onTests (F := F) S a hs
+  exact globalThetaPrincipalValue_extension S a hs g hg
 
 variable (F) in
 /-- Paper: (11.2.0.4), p. 484. The completed principal-value map is the
