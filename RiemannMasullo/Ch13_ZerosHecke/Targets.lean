@@ -244,7 +244,72 @@ private theorem DirichletCharacter.IsPrimitive.exists_finiteHeckeL_eq_ram {N : �
     {χ : DirichletCharacter ℂ N} (hχ : χ.IsPrimitive) (v : Pl) (hv : pr v ∣ N) :
     ¬ HeckeCharacter.IsUnramifiedAt
         ((⟨Units.coeHom ℂ, Units.continuous_val⟩ : ℂˣ →ₜ* ℂ).comp (ratDirichletChar N χ)) v := by
-  sorry
+  intro hun
+  have hp : (pr v).Prime := pr_prime v
+  have hN0 : 0 < N := Nat.pos_of_ne_zero (NeZero.ne N)
+  have hdvd : N / pr v ∣ N := Nat.div_dvd_of_dvd hv
+  suffices hfac : χ.FactorsThrough (N / pr v) by
+    have hle : χ.conductor ≤ N / pr v := Nat.sInf_le hfac
+    rw [(DirichletCharacter.isPrimitive_def χ).mp hχ] at hle
+    have hlt : N / pr v < N := Nat.div_lt_self hN0 hp.one_lt
+    omega
+  refine (χ.factorsThrough_iff_ker_unitsMap hdvd).mpr fun a ha ↦ ?_
+  rw [MonoidHom.mem_ker] at ha ⊢
+  -- The class of `a` modulo `N / p` is one.
+  have ha' : ZMod.castHom hdvd (ZMod (N / pr v)) (a : ZMod N) = 1 :=
+    congrArg Units.val ha
+  let n : ℕ := (a : ZMod N).val
+  have hcop : n.Coprime N := ZMod.val_coe_unit_coprime a
+  have hnp : ¬ pr v ∣ n := fun h ↦
+    (Nat.Prime.coprime_iff_not_dvd hp).mp (Nat.coprime_comm.mp (hcop.coprime_dvd_right hv)) h
+  have hval : Valued.v ((n : ℕ) : v.adicCompletion ℚ) = 1 := by
+    rw [← Rat.cast_natCast, valued_ratCast, ← map_natCast (algebraMap (𝓞 ℚ) ℚ) n,
+      IsDedekindDomain.HeightOneSpectrum.valuation_eq_one_iff_notMem, natCast_mem_asIdeal_iff]
+    exact hnp
+  have hu0 : ((n : ℕ) : v.adicCompletion ℚ) ≠ 0 := fun h ↦ by
+    rw [h, map_zero] at hval
+    exact zero_ne_one hval
+  let u : (v.adicCompletion ℚ)ˣ := Units.mk0 _ hu0
+  -- The residue of the inserted unit modulo `N` is `a`.
+  have hr : resMod N (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u) = (a : ZMod N) := by
+    have hu1 : Valued.v (u : v.adicCompletion ℚ) = WithZero.exp (-(0 : ℤ)) := by
+      rw [neg_zero, WithZero.exp_zero]
+      exact hval
+    have hq : ratPart (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u) = 1 := by
+      rw [ratPart_ofAdicCompletion v u 0 hu1, zpow_zero]
+    have hU : unitPart (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u) =
+        IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u := by
+      rw [unitPart_apply, hq, map_one, inv_one, mul_one]
+    rw [resMod_apply, resModFun, hU]
+    refine (ZMod.equivPi N (NeZero.ne N)).symm_apply_eq.mpr (funext fun q ↦ ?_)
+    have hqN : (q : ℕ) ^ N.factorization q ∣ N := Nat.ordProj_dvd N q
+    have hcomp : ZMod.equivPi N (NeZero.ne N) (a : ZMod N) q =
+        ZMod.castHom hqN (ZMod ((q : ℕ) ^ N.factorization q)) (a : ZMod N) :=
+      RingHom.congr_fun (Subsingleton.elim ((Pi.evalRingHom _ q).comp
+        (ZMod.equivPi N (NeZero.ne N)).toRingHom) (ZMod.castHom hqN _)) (a : ZMod N)
+    rw [hcomp]
+    by_cases hqv : placeP N q = v
+    · subst hqv
+      rw [compV_ofAdicCompletion_self]
+      change redP _ _ _ ((n : ℕ) : _) = _
+      rw [redP_natCast, ZMod.castHom_apply, ZMod.natCast_val]
+    · rw [compV_ofAdicCompletion_ne hqv, Units.val_one, redP_one]
+      have hq : (q : ℕ).Prime := Nat.prime_of_mem_primeFactors q.2
+      have hne : (q : ℕ) ≠ pr v := fun h ↦ hqv ((eq_placeOf_iff v q hq).mpr h.symm).symm
+      have hcq : ((q : ℕ) ^ N.factorization q).Coprime (pr v) :=
+        Nat.Coprime.pow_left _ ((Nat.coprime_primes hq hp).mpr hne)
+      have hqd : (q : ℕ) ^ N.factorization q ∣ N / pr v :=
+        hcq.dvd_of_dvd_mul_right (by rw [Nat.div_mul_cancel hv]; exact hqN)
+      have hsub := RingHom.congr_fun (Subsingleton.elim
+        ((ZMod.castHom hqd (ZMod ((q : ℕ) ^ N.factorization q))).comp
+          (ZMod.castHom hdvd (ZMod (N / pr v)))) (ZMod.castHom hqN _)) (a : ZMod N)
+      rw [← hsub, RingHom.comp_apply, ha', map_one]
+  have hres := hun.restrict_apply_eq_one ((n : ℕ) : v.adicCompletion ℚ) hval
+  change HeckeCharacter.restrict _ v (u : v.adicCompletion ℚ) = 1 at hres
+  rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at hres
+  change ((ideleChar N χ (IdeleGroup.ofAdicCompletion (𝓞 ℚ) ℚ v u) : ℂˣ) : ℂ) = 1 at hres
+  rw [coe_ideleChar, inv_eq_one, MulChar.coe_toUnitHom, MonoidHom.coe_toHomUnits, hr] at hres
+  exact Units.ext (by rw [MulChar.coe_toUnitHom, Units.val_one]; exact hres)
 
 /-- A primitive Dirichlet character has a finite-order idelic character over
 the rationals whose finite Hecke L-function agrees with its Dirichlet series. -/
