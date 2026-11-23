@@ -11,6 +11,7 @@ import RiemannMasullo.ForMathlib.Analysis.Fourier.CompactGroup
 import Mathlib.LinearAlgebra.Eigenspace.Basic
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
 import Mathlib.Topology.Algebra.IsOpenUnits
 
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
@@ -1049,6 +1050,734 @@ local notation "sumProperties(" D ")" =>
     CompleteSpace (StrongDual ℂ D) ∧ IsNuclearTVS (StrongDual ℂ D) ∧
     BarrelledSpace ℂ (StrongDual ℂ D) ∧ MontelSpace ℂ (StrongDual ℂ D)
 
+/-- A finite product of Fréchet spaces is Fréchet. -/
+private theorem sLocalThetaIsotypeSum_inherited_isFrechet_pi {κ : Type*} [Fintype κ]
+    {Y : κ → Type*} [∀ k, AddCommGroup (Y k)] [∀ k, Module ℂ (Y k)]
+    [∀ k, TopologicalSpace (Y k)] (hY : ∀ k, IsFrechetTVS (Y k)) :
+    IsFrechetTVS (∀ k, Y k) := by
+  let : ∀ k, IsTopologicalAddGroup (Y k) := fun k ↦ (hY k).choose
+  let : ∀ k, PolynormableSpace ℂ (Y k) := fun k ↦ (hY k).choose_spec.1
+  let : ∀ k, TopologicalSpace.MetrizableSpace (Y k) := fun k ↦ (hY k).choose_spec.2.1
+  let : ∀ k, UniformSpace (Y k) := fun k ↦ IsTopologicalAddGroup.rightUniformSpace (Y k)
+  let : ∀ k, IsUniformAddGroup (Y k) := fun _ ↦ isUniformAddGroup_of_addCommGroup
+  let : ∀ k, CompleteSpace (Y k) := fun k ↦ (hY k).choose_spec.2.2
+  refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+  have hu : (Pi.uniformSpace Y : UniformSpace (∀ k, Y k)) =
+      IsTopologicalAddGroup.rightUniformSpace (∀ k, Y k) :=
+    (@IsUniformAddGroup.rightUniformSpace_eq (∀ k, Y k) (Pi.uniformSpace Y) _ inferInstance).symm
+  rw [← hu]
+  infer_instance
+
+/-- Iterated transition maps in a countable inductive system. -/
+private theorem sLocalThetaIsotypeSum_inherited_iter {E : Type*} {Y : ℕ → Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [∀ n, AddCommGroup (Y n)] [∀ n, Module ℂ (Y n)] [∀ n, TopologicalSpace (Y n)]
+    (j : ∀ n, Y n →L[ℂ] Y (n + 1)) (i : ∀ n, Y n →L[ℂ] E)
+    (hcomp : ∀ n, (i (n + 1)).comp (j n) = i n) {n m : ℕ} (hnm : n ≤ m) :
+    ∃ f : Y n →L[ℂ] Y m, (i m).comp f = i n := by
+  induction m with
+  | zero =>
+    have h0 : n = 0 := Nat.le_zero.mp hnm
+    subst h0
+    exact ⟨ContinuousLinearMap.id ℂ (Y 0), by ext x; rfl⟩
+  | succ m ih =>
+    rcases Nat.eq_or_lt_of_le hnm with rfl | hlt
+    · exact ⟨ContinuousLinearMap.id ℂ (Y (m + 1)), by ext x; rfl⟩
+    · obtain ⟨f, hf⟩ := ih (Nat.lt_succ_iff.mp hlt)
+      refine ⟨(j m).comp f, ?_⟩
+      rw [← ContinuousLinearMap.comp_assoc, hcomp m, hf]
+
+/-- A finite locally convex direct sum of LF-spaces is an LF-space. -/
+private theorem sLocalThetaIsotypeSum_inherited_isLFSpace_finite.{u} {I : Type u} [Finite I]
+    [DecidableEq I] {X : I → Type u} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] (hX : ∀ a, IsLFSpace (X a))
+    (hP : ∀ a, PolynormableSpace ℂ (X a)) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+    IsLFSpace (⨁ a, X a) := by
+  classical
+  let : Fintype I := Fintype.ofFinite I
+  let D := ⨁ a, X a
+  let lof := DirectSum.lof ℂ I X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD : WithSeminorms (E := D)
+      (Subtype.val : {p : Seminorm ℂ D // ∀ a, Continuous (p ∘ lof a)} → Seminorm ℂ D) := ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  have hT2X : ∀ a, T2Space (X a) := fun a ↦ (hX a).1
+  have hAddX : ∀ a, IsTopologicalAddGroup (X a) := fun a ↦
+    (PolynormableSpace.withSeminorms ℂ (X a)).isTopologicalAddGroup
+  have hlofCont (a : I) : Continuous (lof a) :=
+    hD.continuous_of_continuous_comp (lof a) fun p ↦ p.property a
+  let lofL (a : I) : X a →L[ℂ] D := ⟨lof a, hlofCont a⟩
+  have hcompCont (a : I) : Continuous (DirectSum.component ℂ I X a) := by
+    refine (PolynormableSpace.withSeminorms ℂ (X a)).continuous_of_continuous_comp
+      (DirectSum.component ℂ I X a) fun ⟨p, hp⟩ ↦ ?_
+    refine hD.continuous_seminorm ⟨p.comp (DirectSum.component ℂ I X a), fun b ↦ ?_⟩
+    by_cases hab : b = a
+    · subst hab
+      have hfun : (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X b)) (lof b x)) = p := by
+        funext x; simp [Seminorm.comp_apply, lof]
+      change Continuous (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X b)) (lof b x))
+      rw [hfun]; exact hp
+    · have hfun : (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X a)) (lof b x)) = fun _ ↦ 0 := by
+        funext x; simp [Seminorm.comp_apply, lof, DirectSum.component.of, hab]
+      change Continuous (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X a)) (lof b x))
+      rw [hfun]; exact continuous_const
+  have hT2D : T2Space D := T2Space.of_injective_continuous (f := fun x : D ↦ fun a ↦ x a)
+    (fun _ _ h ↦ DFinsupp.ext (congrFun h))
+    (continuous_pi fun a ↦ (hcompCont a).congr fun x ↦ (DirectSum.apply_eq_component (R := ℂ) x a).symm)
+  choose Y hAddY hModY hTopY hFY jY iY hlimY using fun a ↦ (hX a).2
+  let : ∀ a n, AddCommGroup (Y a n) := hAddY
+  let : ∀ a n, Module ℂ (Y a n) := hModY
+  let : ∀ a n, TopologicalSpace (Y a n) := hTopY
+  let Z (m : ℕ) : Type u := (a : I) → Y a m
+  let jZ (m : ℕ) : Z m →L[ℂ] Z (m + 1) :=
+    ContinuousLinearMap.pi fun a ↦ (jY a m).comp (ContinuousLinearMap.proj (R := ℂ) a)
+  let iZ (m : ℕ) : Z m →L[ℂ] D :=
+    ∑ a : I, (lofL a).comp ((iY a m).comp (ContinuousLinearMap.proj (R := ℂ) a))
+  have hiZ_apply (m : ℕ) (z : Z m) (a : I) : (iZ m z) a = iY a m (z a) := by
+    have hsum : iZ m z = ∑ b : I, lof b (iY b m (z b)) := by
+      simp only [iZ, FunLike.coe_sum, Finset.sum_apply, ContinuousLinearMap.comp_apply]
+      rfl
+    rw [hsum, DirectSum.apply_eq_component (R := ℂ), map_sum, Finset.sum_eq_single a]
+    · simp [lof]
+    · intro b _ hba; simp [lof, DirectSum.component.of, hba]
+    · intro h; exact (h (Finset.mem_univ a)).elim
+  refine ⟨hT2D, Z, fun _ ↦ inferInstance, fun _ ↦ inferInstance, fun _ ↦ inferInstance,
+    fun m ↦ sLocalThetaIsotypeSum_inherited_isFrechet_pi (fun a ↦ hFY a m), jZ, iZ, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro m z₁ z₂ hz
+    funext a
+    exact (hlimY a).injective m (by rw [← hiZ_apply m z₁ a, ← hiZ_apply m z₂ a, hz])
+  · intro m
+    ext z a
+    change (iZ (m + 1) (jZ m z)) a = (iZ m z) a
+    rw [hiZ_apply, hiZ_apply]
+    exact DFunLike.congr_fun ((hlimY a).compatible m) (z a)
+  · intro d
+    have hex (a : I) : ∃ n y, iY a n y = d a := (hlimY a).exhaustive (d a)
+    choose n y hy using hex
+    let m : ℕ := Finset.univ.sup n
+    have hlift (a : I) : ∃ w : Y a m, iY a m w = d a := by
+      obtain ⟨f, hf⟩ := sLocalThetaIsotypeSum_inherited_iter (jY a) (iY a)
+        (hlimY a).compatible (Finset.le_sup (Finset.mem_univ a))
+      exact ⟨f (y a), (DFunLike.congr_fun hf (y a)).trans (hy a)⟩
+    choose w hw using hlift
+    refine ⟨m, w, DFinsupp.ext fun a ↦ (hiZ_apply m w a).trans (hw a)⟩
+  · have hpred : (fun p : Seminorm ℂ D ↦ ∀ a, Continuous (p ∘ lof a)) =
+        (fun p : Seminorm ℂ D ↦ ∀ m, Continuous (p ∘ (iZ m).toLinearMap)) := by
+      funext p
+      apply propext
+      constructor
+      · intro hp m
+        exact (hD.continuous_seminorm ⟨p, hp⟩).comp (iZ m).continuous
+      · intro hp a
+        have hXa : WithSeminorms (E := X a)
+            (Subtype.val : {q : Seminorm ℂ (X a) // ∀ n, Continuous (q ∘ (iY a n).toLinearMap)} →
+              Seminorm ℂ (X a)) := ⟨(hlimY a).topology_eq⟩
+        refine hXa.continuous_seminorm ⟨p.comp (lof a), fun n ↦ ?_⟩
+        let ins : Y a n →L[ℂ] Z n := ContinuousLinearMap.single (R := ℂ) (φ := fun b ↦ Y b n) a
+        have hcomp : (p ∘ (iZ n).toLinearMap) ∘ ins = p ∘ lof a ∘ (iY a n).toLinearMap := by
+          funext x
+          change p (iZ n (Pi.single a x)) = p (lof a (iY a n x))
+          congr 1
+          apply DFinsupp.ext
+          intro b
+          rw [hiZ_apply]
+          by_cases hba : b = a
+          · subst hba; simp [lof]
+          · simp [lof, Pi.single_eq_of_ne hba, DirectSum.lof_eq_of, DirectSum.of_eq_of_ne _ _ _ hba]
+        change Continuous (p ∘ lof a ∘ (iY a n).toLinearMap)
+        rw [← hcomp]
+        exact (hp n).comp ins.continuous
+    change (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ D // ∀ a, Continuous (p ∘ lof a)} → Seminorm ℂ D)).topology =
+      (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ D // ∀ m, Continuous (p ∘ (iZ m).toLinearMap)} →
+        Seminorm ℂ D)).topology
+    rw [hpred]
+
+/-- A countably infinite locally convex direct sum of LF-spaces is an LF-space. -/
+private theorem sLocalThetaIsotypeSum_inherited_isLFSpace_infinite.{u} {I : Type u} [Countable I]
+    [Infinite I] [DecidableEq I] {X : I → Type u} [∀ a, AddCommGroup (X a)] [∀ a, Module ℂ (X a)]
+    [∀ a, TopologicalSpace (X a)] (hX : ∀ a, IsLFSpace (X a))
+    (hP : ∀ a, PolynormableSpace ℂ (X a)) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+    IsLFSpace (⨁ a, X a) := by
+  classical
+  let : Encodable I := Encodable.ofCountable I
+  let : Denumerable I := Denumerable.ofEncodableOfInfinite I
+  let e : ℕ ≃ I := (Denumerable.eqv I).symm
+  let D := ⨁ a, X a
+  let lof := DirectSum.lof ℂ I X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hD : WithSeminorms (E := D)
+      (Subtype.val : {p : Seminorm ℂ D // ∀ a, Continuous (p ∘ lof a)} → Seminorm ℂ D) := ⟨rfl⟩
+  let : IsTopologicalAddGroup D := hD.isTopologicalAddGroup
+  let : PolynormableSpace ℂ D := hD.toPolynormableSpace
+  have hT2X : ∀ a, T2Space (X a) := fun a ↦ (hX a).1
+  have hAddX : ∀ a, IsTopologicalAddGroup (X a) := fun a ↦
+    (PolynormableSpace.withSeminorms ℂ (X a)).isTopologicalAddGroup
+  have hlofCont (a : I) : Continuous (lof a) :=
+    hD.continuous_of_continuous_comp (lof a) fun p ↦ p.property a
+  let lofL (a : I) : X a →L[ℂ] D := ⟨lof a, hlofCont a⟩
+  have hcompCont (a : I) : Continuous (DirectSum.component ℂ I X a) := by
+    refine (PolynormableSpace.withSeminorms ℂ (X a)).continuous_of_continuous_comp
+      (DirectSum.component ℂ I X a) fun ⟨p, hp⟩ ↦ ?_
+    refine hD.continuous_seminorm ⟨p.comp (DirectSum.component ℂ I X a), fun b ↦ ?_⟩
+    by_cases hab : b = a
+    · subst hab
+      have hfun : (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X b)) (lof b x)) = p := by
+        funext x; simp [Seminorm.comp_apply, lof]
+      change Continuous (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X b)) (lof b x))
+      rw [hfun]; exact hp
+    · have hfun : (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X a)) (lof b x)) = fun _ ↦ 0 := by
+        funext x; simp [Seminorm.comp_apply, lof, DirectSum.component.of, hab]
+      change Continuous (fun x : X b ↦ (p.comp (DirectSum.component ℂ I X a)) (lof b x))
+      rw [hfun]; exact continuous_const
+  have hT2D : T2Space D := T2Space.of_injective_continuous (f := fun x : D ↦ fun a ↦ x a)
+    (fun _ _ h ↦ DFinsupp.ext (congrFun h))
+    (continuous_pi fun a ↦ (hcompCont a).congr fun x ↦ (DirectSum.apply_eq_component (R := ℂ) x a).symm)
+  choose Y hAddY hModY hTopY hFY jY iY hlimY using fun a ↦ (hX a).2
+  let : ∀ a n, AddCommGroup (Y a n) := hAddY
+  let : ∀ a n, Module ℂ (Y a n) := hModY
+  let : ∀ a n, TopologicalSpace (Y a n) := hTopY
+  let Z (m : ℕ) : Type u := (k : Fin m) → Y (e k.val) m
+  let jZ (m : ℕ) : Z m →L[ℂ] Z (m + 1) :=
+    ContinuousLinearMap.pi fun k : Fin (m + 1) ↦
+      if hk : k.val < m then
+        (jY (e k.val) m).comp (ContinuousLinearMap.proj (R := ℂ) (⟨k.val, hk⟩ : Fin m))
+      else 0
+  let iZ (m : ℕ) : Z m →L[ℂ] D :=
+    ∑ k : Fin m, (lofL (e k.val)).comp ((iY (e k.val) m).comp (ContinuousLinearMap.proj (R := ℂ) k))
+  have hiZ_apply (m : ℕ) (z : Z m) (a : I) :
+      (iZ m z) a = if h : e.symm a < m then
+        e.apply_symm_apply a ▸ iY (e (e.symm a)) m (z ⟨e.symm a, h⟩) else 0 := by
+    have hsum : iZ m z = ∑ k : Fin m, lof (e k.val) (iY (e k.val) m (z k)) := by
+      simp only [iZ, FunLike.coe_sum, Finset.sum_apply, ContinuousLinearMap.comp_apply]
+      rfl
+    rw [hsum, DirectSum.apply_eq_component (R := ℂ), map_sum]
+    split_ifs with h
+    · rw [Finset.sum_eq_single (⟨e.symm a, h⟩ : Fin m)]
+      · generalize iY (e (e.symm a)) m (z ⟨e.symm a, h⟩) = y
+        generalize e.apply_symm_apply a = heq
+        generalize e (e.symm a) = b at y heq
+        subst heq
+        simp [lof]
+      · intro k _ hk
+        have hne : e k.val ≠ a := fun h' ↦ hk (Fin.ext (by
+          have := congrArg e.symm h'; simpa using this))
+        simp [lof, DirectSum.component.of, hne]
+      · intro h'; exact (h' (Finset.mem_univ _)).elim
+    · apply Finset.sum_eq_zero
+      intro k _
+      have hne : e k.val ≠ a := fun h' ↦ h (by
+        have := congrArg e.symm h'; simp at this; rw [← this]; exact k.isLt)
+      simp [lof, DirectSum.component.of, hne]
+  have hiZ_apply_e (m : ℕ) (z : Z m) (k : Fin m) : (iZ m z) (e k.val) = iY (e k.val) m (z k) := by
+    have hsum : iZ m z = ∑ r : Fin m, lof (e r.val) (iY (e r.val) m (z r)) := by
+      simp only [iZ, FunLike.coe_sum, Finset.sum_apply, ContinuousLinearMap.comp_apply]
+      rfl
+    rw [hsum, DirectSum.apply_eq_component (R := ℂ), map_sum, Finset.sum_eq_single k]
+    · simp [lof]
+    · intro r _ hrk
+      have hne : e r.val ≠ e k.val := fun h ↦ hrk (Fin.ext (e.injective h))
+      simp [lof, DirectSum.component.of, hne]
+    · intro h; exact (h (Finset.mem_univ k)).elim
+  refine ⟨hT2D, Z, fun _ ↦ inferInstance, fun _ ↦ inferInstance, fun _ ↦ inferInstance,
+    fun m ↦ sLocalThetaIsotypeSum_inherited_isFrechet_pi (fun k ↦ hFY (e k.val) m), jZ, iZ, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro m z₁ z₂ hz
+    funext k
+    exact (hlimY (e k.val)).injective m (by rw [← hiZ_apply_e m z₁ k, ← hiZ_apply_e m z₂ k, hz])
+  · intro m
+    ext z a
+    change (iZ (m + 1) (jZ m z)) a = (iZ m z) a
+    obtain ⟨r, rfl⟩ := e.surjective a
+    by_cases hr : r < m
+    · have h1 := hiZ_apply_e (m + 1) (jZ m z) ⟨r, Nat.lt_succ_of_lt hr⟩
+      have h2 := hiZ_apply_e m z ⟨r, hr⟩
+      rw [h1, h2]
+      have hj : jZ m z ⟨r, Nat.lt_succ_of_lt hr⟩ = jY (e r) m (z ⟨r, hr⟩) := by
+        change (if hk : r < m then
+          (jY (e r) m).comp (ContinuousLinearMap.proj (R := ℂ) (⟨r, hk⟩ : Fin m)) else 0) z = _
+        rw [dite_eq_left hr]
+        rfl
+      rw [hj]
+      exact DFunLike.congr_fun ((hlimY (e r)).compatible m) (z ⟨r, hr⟩)
+    · have h2 : (iZ m z) (e r) = 0 := by
+        rw [hiZ_apply]; simp [hr]
+      rw [h2]
+      by_cases hr' : r < m + 1
+      · have h1 := hiZ_apply_e (m + 1) (jZ m z) ⟨r, hr'⟩
+        rw [h1]
+        have hj : jZ m z ⟨r, hr'⟩ = 0 := by
+          change (if hk : r < m then
+            (jY (e r) m).comp (ContinuousLinearMap.proj (R := ℂ) (⟨r, hk⟩ : Fin m)) else 0) z = _
+          rw [dite_eq_right hr]
+          rfl
+        rw [hj, map_zero]
+      · rw [hiZ_apply]; simp [hr']
+  · intro d
+    have hex (a : I) : ∃ n y, iY a n y = d a := (hlimY a).exhaustive (d a)
+    choose n y hy using hex
+    let m : ℕ := max (d.support.sup (fun a ↦ e.symm a + 1)) (d.support.sup n)
+    have hlift (k : Fin m) : ∃ w : Y (e k.val) m, iY (e k.val) m w = d (e k.val) := by
+      by_cases hmem : e k.val ∈ d.support
+      · have hle : n (e k.val) ≤ m := le_trans (Finset.le_sup hmem) (le_max_right _ _)
+        obtain ⟨f, hf⟩ := sLocalThetaIsotypeSum_inherited_iter (jY (e k.val)) (iY (e k.val))
+          (hlimY (e k.val)).compatible hle
+        exact ⟨f (y (e k.val)), (DFunLike.congr_fun hf (y (e k.val))).trans (hy (e k.val))⟩
+      · exact ⟨0, by rw [map_zero, DFinsupp.notMem_support_iff.mp hmem]⟩
+    choose w hw using hlift
+    refine ⟨m, w, DFinsupp.ext fun a ↦ ?_⟩
+    obtain ⟨r, rfl⟩ := e.surjective a
+    by_cases hrm : r < m
+    · exact (hiZ_apply_e m w ⟨r, hrm⟩).trans (hw ⟨r, hrm⟩)
+    · have hnot : e r ∉ d.support := by
+        intro hmem
+        have hlt : e.symm (e r) + 1 ≤ m :=
+          le_trans (Finset.le_sup (f := fun a ↦ e.symm a + 1) hmem) (le_max_left _ _)
+        simp only [Equiv.symm_apply_apply] at hlt
+        omega
+      rw [hiZ_apply, DFinsupp.notMem_support_iff.mp hnot]
+      simp [hrm]
+  · have hpred : (fun p : Seminorm ℂ D ↦ ∀ a, Continuous (p ∘ lof a)) =
+        (fun p : Seminorm ℂ D ↦ ∀ m, Continuous (p ∘ (iZ m).toLinearMap)) := by
+      funext p
+      apply propext
+      constructor
+      · intro hp m
+        exact (hD.continuous_seminorm ⟨p, hp⟩).comp (iZ m).continuous
+      · intro hp a
+        have hXa : WithSeminorms (E := X a)
+            (Subtype.val : {q : Seminorm ℂ (X a) // ∀ n, Continuous (q ∘ (iY a n).toLinearMap)} →
+              Seminorm ℂ (X a)) := ⟨(hlimY a).topology_eq⟩
+        refine hXa.continuous_seminorm ⟨p.comp (lof a), fun n ↦ ?_⟩
+        obtain ⟨r, rfl⟩ := e.surjective a
+        let m := max (r + 1) n
+        have hrm : r < m := Nat.lt_of_succ_le (le_max_left _ _)
+        have hnm : n ≤ m := le_max_right _ _
+        obtain ⟨f, hf⟩ := sLocalThetaIsotypeSum_inherited_iter (jY (e r)) (iY (e r))
+          (hlimY (e r)).compatible hnm
+        let ins : Y (e r) m →L[ℂ] Z m :=
+          ContinuousLinearMap.single (R := ℂ) (φ := fun k : Fin m ↦ Y (e k.val) m) ⟨r, hrm⟩
+        have hcomp : (p ∘ (iZ m).toLinearMap) ∘ (ins.comp f) =
+            p ∘ lof (e r) ∘ (iY (e r) n).toLinearMap := by
+          funext x
+          change p (iZ m (Pi.single (⟨r, hrm⟩ : Fin m) (f x))) = p (lof (e r) (iY (e r) n x))
+          congr 1
+          apply DFinsupp.ext
+          intro b
+          obtain ⟨k, rfl⟩ := e.surjective b
+          by_cases hkm : k < m
+          · rw [hiZ_apply_e m _ ⟨k, hkm⟩]
+            by_cases hkr : k = r
+            · subst hkr
+              simp only [Pi.single_eq_same, lof, DirectSum.lof_eq_of, DirectSum.of_eq_same]
+              exact DFunLike.congr_fun hf x
+            · have hne : (⟨k, hkm⟩ : Fin m) ≠ ⟨r, hrm⟩ := fun h ↦ hkr (congrArg Fin.val h)
+              have hne' : e k ≠ e r := fun h ↦ hkr (e.injective h)
+              rw [Pi.single_eq_of_ne hne, map_zero]
+              simp [lof, DirectSum.lof_eq_of, DirectSum.of_eq_of_ne _ _ _ hne']
+          · have hne' : e k ≠ e r := fun h ↦ hkm (by rw [e.injective h]; exact hrm)
+            rw [hiZ_apply]
+            simp [hkm, lof, DirectSum.lof_eq_of, DirectSum.of_eq_of_ne _ _ _ hne']
+        change Continuous (p ∘ lof (e r) ∘ (iY (e r) n).toLinearMap)
+        rw [← hcomp]
+        exact (hp m).comp (ins.comp f).continuous
+    change (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ D // ∀ a, Continuous (p ∘ lof a)} → Seminorm ℂ D)).topology =
+      (SeminormFamily.moduleFilterBasis
+      (Subtype.val : {p : Seminorm ℂ D // ∀ m, Continuous (p ∘ (iZ m).toLinearMap)} →
+        Seminorm ℂ D)).topology
+    rw [hpred]
+
+/-- Transfer `IsLFSpace` across a continuous linear equivalence. -/
+private theorem sLocalThetaIsotypeSum_inherited_lf_of_equiv.{u} {A B : Type u}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [tB₀ : TopologicalSpace B]
+    (e : A ≃L[ℂ] B) (hA : IsLFSpace A) : IsLFSpace B := by
+  obtain ⟨hT2, Y, hAdd, hMod, hTop, hF, j, i, hlim⟩ := hA
+  let : ∀ k, AddCommGroup (Y k) := hAdd
+  let : ∀ k, Module ℂ (Y k) := hMod
+  let : ∀ k, TopologicalSpace (Y k) := hTop
+  refine ⟨e.toHomeomorph.t2Space, Y, hAdd, hMod, hTop, hF, j,
+    fun k ↦ e.toContinuousLinearMap.comp (i k), ?_⟩
+  refine ⟨fun k ↦ e.injective.comp (hlim.injective k),
+    fun k ↦ by ext x; exact congrArg e (DFunLike.congr_fun (hlim.compatible k) x),
+    fun b ↦ by obtain ⟨k, y, hy⟩ := hlim.exhaustive (e.symm b); exact ⟨k, y, by simp [hy]⟩, ?_⟩
+  have hA_ws : WithSeminorms (E := A)
+      (Subtype.val : {p : Seminorm ℂ A // ∀ k, Continuous (p ∘ (i k).toLinearMap)} →
+        Seminorm ℂ A) := ⟨hlim.topology_eq⟩
+  let : IsTopologicalAddGroup A := hA_ws.isTopologicalAddGroup
+  let eL : A ≃ₗ[ℂ] B := e.toLinearEquiv
+  have he_cont : @Continuous A B inferInstance tB₀ eL := e.continuous
+  have hes_cont : @Continuous B A tB₀ inferInstance eL.symm := e.symm.continuous
+  have hB_add : @IsTopologicalAddGroup B tB₀ _ :=
+    @IsTopologicalAddGroup.mk B tB₀ _ ⟨by
+      have := continuous_add (M := A)
+      exact (he_cont.comp (this.comp (hes_cont.prodMap hes_cont))).congr fun p ↦ by simp⟩
+      ⟨(he_cont.comp (continuous_neg.comp hes_cont)).congr fun b ↦ by simp⟩
+  let f (k : ℕ) : Y k →ₗ[ℂ] B := eL.toLinearMap.comp (i k).toLinearMap
+  have h_eq (tB : TopologicalSpace B) (htB : tB = locallyConvexFinalTopology f) : tB₀ = tB := by
+    have hB_ws : @WithSeminorms ℂ B _ _ _ _
+        (Subtype.val : {p : Seminorm ℂ B // ∀ k, Continuous (p ∘ f k)} → Seminorm ℂ B) tB := ⟨htB⟩
+    have h1 : @Continuous B B tB₀ tB id :=
+      @WithSeminorms.continuous_of_continuous_comp ℂ ℂ B B _ _ _ _ _ _ _ _ _ _
+        tB₀ hB_add tB hB_ws LinearMap.id fun ⟨p, hp⟩ ↦ by
+          have hpe : Continuous (p ∘ eL) := hA_ws.continuous_seminorm ⟨p.comp eL.toLinearMap, hp⟩
+          exact @Continuous.congr B ℝ tB₀ _ _ _
+            (@Continuous.comp B A ℝ tB₀ _ _ _ _ hpe hes_cont) fun b ↦ by simp
+    have h2 : @Continuous B B tB tB₀ id := by
+      have hcontA : @Continuous B A tB inferInstance eL.symm :=
+        @WithSeminorms.continuous_of_continuous_comp ℂ ℂ B A _ _ _ _ _ _ _ _ _ _
+          tB hB_ws.isTopologicalAddGroup inferInstance hA_ws
+          eL.symm.toLinearMap fun ⟨p, hp⟩ ↦
+            hB_ws.continuous_seminorm ⟨p.comp eL.symm.toLinearMap, fun k ↦ by
+              have hfun : (p.comp eL.symm.toLinearMap) ∘ f k = p ∘ (i k).toLinearMap := by
+                funext x; simp [f, Seminorm.comp_apply]
+              rw [hfun]; exact hp k⟩
+      exact @Continuous.congr B B tB tB₀ _ _
+        (@Continuous.comp B A B tB _ tB₀ _ _ he_cont hcontA) fun b ↦ by simp
+    exact le_antisymm (continuous_id_iff_le.mp h1) (continuous_id_iff_le.mp h2)
+  exact h_eq _ rfl
+
+/-- Transfer `BarrelledSpace` across a continuous linear equivalence. -/
+private theorem sLocalThetaIsotypeSum_inherited_barrelled_of_equiv {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B]
+    (e : A ≃L[ℂ] B) [BarrelledSpace ℂ A] : BarrelledSpace ℂ B := by
+  constructor
+  intro p hp
+  have hpa : Continuous (p.comp e.toLinearMap) :=
+    (p.comp e.toLinearMap).continuous_of_lowerSemicontinuous (hp.comp e.continuous)
+  exact (hpa.comp e.symm.continuous).congr fun b ↦ by simp [Seminorm.comp_apply]
+
+/-- The Pontryagin dual of a compact second-countable Hausdorff abelian group is countable. -/
+private theorem sLocalThetaIsotypeSum_inherited_countable_dual {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [CompactSpace G] [T2Space G]
+    [SecondCountableTopology G] : Countable (PontryaginDual G) := by
+  classical
+  let pts : Fin 8 → ℂ := ![⟨1, 0⟩, ⟨-1, 0⟩, ⟨0, 1⟩, ⟨0, -1⟩,
+    ⟨7 / 10, 7 / 10⟩, ⟨7 / 10, -7 / 10⟩, ⟨-7 / 10, 7 / 10⟩, ⟨-7 / 10, -7 / 10⟩]
+  have hcover_quad (x y : ℝ) (hx : 0 ≤ x) (hy : 0 ≤ y) (hxy : x ^ 2 + y ^ 2 = 1) :
+      (x - 1) ^ 2 + y ^ 2 < (1 / 2 : ℝ) ^ 2 ∨
+      x ^ 2 + (y - 1) ^ 2 < (1 / 2 : ℝ) ^ 2 ∨
+      (x - 7 / 10) ^ 2 + (y - 7 / 10) ^ 2 < (1 / 2 : ℝ) ^ 2 := by
+    by_cases hx9 : 9 / 10 ≤ x
+    · left; nlinarith
+    · by_cases hy9 : 9 / 10 ≤ y
+      · right; left; nlinarith
+      · right; right
+        have hx4 : 4 / 10 ≤ x := by nlinarith
+        have hy4 : 4 / 10 ≤ y := by nlinarith
+        have h7 : 7 / 10 ≤ x ∨ 7 / 10 ≤ y := by
+          by_contra h
+          push Not at h
+          nlinarith
+        have hprod : 28 / 100 ≤ x * y := by
+          rcases h7 with hx7 | hy7 <;> nlinarith
+        have hsum : 124 / 100 < x + y := by nlinarith
+        nlinarith
+  have hcover (z : Circle) : ∃ k : Fin 8, dist (z : ℂ) (pts k) < 1 / 2 := by
+    have hnorm : (z : ℂ).re ^ 2 + (z : ℂ).im ^ 2 = 1 := by
+      have h1 : ‖(z : ℂ)‖ = 1 := Circle.norm_coe z
+      have h2 : Complex.normSq (z : ℂ) = 1 := by rw [← Complex.sq_norm, h1, one_pow]
+      simpa [Complex.normSq_apply, sq] using h2
+    have hdist_sq (k : Fin 8) :
+        ((z : ℂ).re - (pts k).re) ^ 2 + ((z : ℂ).im - (pts k).im) ^ 2 < (1 / 2 : ℝ) ^ 2 →
+        dist (z : ℂ) (pts k) < 1 / 2 := by
+      intro hlt
+      rw [Complex.dist_eq]
+      have hns : Complex.normSq ((z : ℂ) - pts k) < (1 / 2 : ℝ) ^ 2 := by
+        simpa [Complex.normSq_apply, sq] using hlt
+      rw [← Complex.sq_norm] at hns
+      nlinarith [norm_nonneg ((z : ℂ) - pts k)]
+    rcases le_total 0 (z : ℂ).re with hx | hx <;> rcases le_total 0 (z : ℂ).im with hy | hy
+    · rcases hcover_quad (z : ℂ).re (z : ℂ).im hx hy hnorm with h | h | h
+      · exact ⟨0, hdist_sq 0 (by simpa [pts] using h)⟩
+      · exact ⟨2, hdist_sq 2 (by simpa [pts] using h)⟩
+      · exact ⟨4, hdist_sq 4 (by simpa [pts] using h)⟩
+    · rcases hcover_quad (z : ℂ).re (-(z : ℂ).im) hx (neg_nonneg.mpr hy)
+        (by nlinarith) with h | h | h
+      · exact ⟨0, hdist_sq 0 (by simp [pts]; nlinarith)⟩
+      · exact ⟨3, hdist_sq 3 (by simp [pts]; nlinarith)⟩
+      · exact ⟨5, hdist_sq 5 (by simp [pts]; nlinarith)⟩
+    · rcases hcover_quad (-(z : ℂ).re) (z : ℂ).im (neg_nonneg.mpr hx) hy
+        (by nlinarith) with h | h | h
+      · exact ⟨1, hdist_sq 1 (by simp [pts]; nlinarith)⟩
+      · exact ⟨2, hdist_sq 2 (by simp [pts]; nlinarith)⟩
+      · exact ⟨6, hdist_sq 6 (by simp [pts]; nlinarith)⟩
+    · rcases hcover_quad (-(z : ℂ).re) (-(z : ℂ).im) (neg_nonneg.mpr hx) (neg_nonneg.mpr hy)
+        (by nlinarith) with h | h | h
+      · exact ⟨1, hdist_sq 1 (by simp [pts]; nlinarith)⟩
+      · exact ⟨3, hdist_sq 3 (by simp [pts]; nlinarith)⟩
+      · exact ⟨7, hdist_sq 7 (by simp [pts]; nlinarith)⟩
+  have hcircle_triv (z : Circle) (hpow : ∀ m : ℕ, dist ((z ^ m : Circle) : ℂ) 1 < 1) : z = 1 := by
+    have hre (m : ℕ) : (1 / 2 : ℝ) < ((z ^ m : Circle) : ℂ).re := by
+      have h1 : ‖((z ^ m : Circle) : ℂ) - 1‖ < 1 := by simpa [Complex.dist_eq] using hpow m
+      have hns : Complex.normSq (((z ^ m : Circle) : ℂ) - 1) < 1 := by
+        rw [← Complex.sq_norm]; nlinarith [norm_nonneg (((z ^ m : Circle) : ℂ) - 1)]
+      have hnorm : ((z ^ m : Circle) : ℂ).re ^ 2 + ((z ^ m : Circle) : ℂ).im ^ 2 = 1 := by
+        have hc : ‖((z ^ m : Circle) : ℂ)‖ = 1 := Circle.norm_coe (z ^ m)
+        have h2 : Complex.normSq ((z ^ m : Circle) : ℂ) = 1 := by rw [← Complex.sq_norm, hc, one_pow]
+        simpa [Complex.normSq_apply, sq] using h2
+      simp only [Complex.normSq_apply, Complex.sub_re, Complex.one_re,
+        Complex.sub_im, Complex.one_im, sub_zero] at hns
+      nlinarith
+    have hstep (k : ℕ) : (3 : ℝ) ^ k * (1 - (z : ℂ).re) ≤ 1 - ((z ^ (2 ^ k) : Circle) : ℂ).re := by
+      induction k with
+      | zero => simp
+      | succ k ih =>
+        have hsq : ((z ^ (2 ^ (k + 1)) : Circle) : ℂ) = ((z ^ (2 ^ k) : Circle) : ℂ) ^ 2 := by
+          rw [pow_succ, pow_mul, sq, sq, Circle.coe_mul]
+        have hnorm : ((z ^ (2 ^ k) : Circle) : ℂ).re ^ 2 + ((z ^ (2 ^ k) : Circle) : ℂ).im ^ 2 = 1 := by
+          have hc : ‖((z ^ (2 ^ k) : Circle) : ℂ)‖ = 1 := Circle.norm_coe (z ^ (2 ^ k))
+          have h2 : Complex.normSq ((z ^ (2 ^ k) : Circle) : ℂ) = 1 := by rw [← Complex.sq_norm, hc, one_pow]
+          simpa [Complex.normSq_apply, sq] using h2
+        have hre_sq : ((z ^ (2 ^ (k + 1)) : Circle) : ℂ).re =
+            2 * ((z ^ (2 ^ k) : Circle) : ℂ).re ^ 2 - 1 := by
+          rw [hsq, sq, Complex.mul_re]; linarith
+        have hgt := hre (2 ^ k)
+        have hle1 : ((z ^ (2 ^ k) : Circle) : ℂ).re ≤ 1 := by nlinarith
+        calc (3 : ℝ) ^ (k + 1) * (1 - (z : ℂ).re)
+            = 3 * ((3 : ℝ) ^ k * (1 - (z : ℂ).re)) := by ring
+          _ ≤ 3 * (1 - ((z ^ (2 ^ k) : Circle) : ℂ).re) := by linarith
+          _ ≤ 2 * (1 + ((z ^ (2 ^ k) : Circle) : ℂ).re) * (1 - ((z ^ (2 ^ k) : Circle) : ℂ).re) := by
+              nlinarith
+          _ = 1 - ((z ^ (2 ^ (k + 1)) : Circle) : ℂ).re := by rw [hre_sq]; ring
+    have hre1 : (z : ℂ).re = 1 := by
+      have hnorm : (z : ℂ).re ^ 2 + (z : ℂ).im ^ 2 = 1 := by
+        have hc : ‖(z : ℂ)‖ = 1 := Circle.norm_coe z
+        have h2 : Complex.normSq (z : ℂ) = 1 := by rw [← Complex.sq_norm, hc, one_pow]
+        simpa [Complex.normSq_apply, sq] using h2
+      have hle1 : (z : ℂ).re ≤ 1 := by nlinarith
+      by_contra hne
+      have hpos : 0 < 1 - (z : ℂ).re := by linarith [lt_of_le_of_ne hle1 hne]
+      obtain ⟨k, hk⟩ := exists_nat_gt ((1 / 2 : ℝ) / (1 - (z : ℂ).re))
+      have h3k : ∀ n : ℕ, (n : ℝ) < (3 : ℝ) ^ n := fun n ↦ by
+        induction n with
+        | zero => norm_num
+        | succ n ih =>
+          push_cast
+          have h1 : (1 : ℝ) ≤ (3 : ℝ) ^ n := one_le_pow₀ (by norm_num)
+          rw [pow_succ]
+          linarith
+      have hlt1 : 1 / 2 < (3 : ℝ) ^ k * (1 - (z : ℂ).re) := by
+        have := (div_lt_iff₀ hpos).mp (lt_trans hk (h3k k))
+        linarith
+      have := hstep k
+      have := hre (2 ^ k)
+      linarith
+    apply Subtype.ext
+    change (z : ℂ) = 1
+    apply Complex.ext
+    · exact hre1
+    · change (z : ℂ).im = 0
+      have hc : ‖(z : ℂ)‖ = 1 := Circle.norm_coe z
+      have h2 : Complex.normSq (z : ℂ) = 1 := by rw [← Complex.sq_norm, hc, one_pow]
+      simp only [Complex.normSq_apply, hre1, mul_one] at h2
+      nlinarith
+  let B := TopologicalSpace.countableBasis G
+  let : Countable B := (TopologicalSpace.countable_countableBasis G).to_subtype
+  have hfin (χ : PontryaginDual G) : ∃ s : Finset (B × Fin 8),
+      (∀ x : G, ∃ p ∈ s, x ∈ p.1.val) ∧
+      (∀ p ∈ s, ∀ y ∈ p.1.val, dist (χ y : ℂ) (pts p.2) < 1 / 2) := by
+    have hpt (x : G) : ∃ p : B × Fin 8, x ∈ p.1.val ∧
+        ∀ y ∈ p.1.val, dist (χ y : ℂ) (pts p.2) < 1 / 2 := by
+      obtain ⟨k, hk⟩ := hcover (χ x)
+      have hopen : IsOpen ((fun y : G ↦ (χ y : ℂ)) ⁻¹' Metric.ball (pts k) (1 / 2)) :=
+        Metric.isOpen_ball.preimage (continuous_subtype_val.comp χ.continuous)
+      obtain ⟨U, hUB, hxU, hUsub⟩ := (TopologicalSpace.isBasis_countableBasis G).isOpen_iff.mp
+        hopen x hk
+      exact ⟨(⟨U, hUB⟩, k), hxU, fun y hy ↦ hUsub hy⟩
+    choose p hp_mem hp_dist using hpt
+    have hcov : (Set.univ : Set G) ⊆ ⋃ x : G, (p x).1.val :=
+      fun x _ ↦ Set.mem_iUnion.mpr ⟨x, hp_mem x⟩
+    obtain ⟨t, ht⟩ := isCompact_univ.elim_finite_subcover (fun x : G ↦ (p x).1.val)
+      (fun x ↦ TopologicalSpace.isOpen_of_mem_countableBasis (p x).1.property) hcov
+    refine ⟨t.image p, fun x ↦ ?_, fun q hq ↦ ?_⟩
+    · obtain ⟨x₀, hx₀, hxmem⟩ := Set.mem_iUnion₂.mp (ht (Set.mem_univ x))
+      exact ⟨p x₀, Finset.mem_image_of_mem p hx₀, hxmem⟩
+    · obtain ⟨x₀, _, rfl⟩ := Finset.mem_image.mp hq
+      exact hp_dist x₀
+  choose Φ hΦ_cov hΦ_dist using hfin
+  refine Function.Injective.countable (f := Φ) fun χ ψ hEq ↦ ?_
+  have hdist (y : G) : dist ((χ⁻¹ * ψ) y : ℂ) 1 < 1 := by
+    obtain ⟨p, hp, hyp⟩ := hΦ_cov χ y
+    have h1 := hΦ_dist χ p hp y hyp
+    have h2 := hΦ_dist ψ p (hEq ▸ hp) y hyp
+    have hlt : dist (ψ y : ℂ) (χ y : ℂ) < 1 := by
+      calc dist (ψ y : ℂ) (χ y : ℂ)
+          ≤ dist (ψ y : ℂ) (pts p.2) + dist (pts p.2) (χ y : ℂ) := dist_triangle _ _ _
+        _ = dist (ψ y : ℂ) (pts p.2) + dist (χ y : ℂ) (pts p.2) := by rw [dist_comm (pts p.2)]
+        _ < 1 / 2 + 1 / 2 := add_lt_add h2 h1
+        _ = 1 := by norm_num
+    have hnorm_eq : ‖(((χ⁻¹ * ψ) y : Circle) : ℂ) - 1‖ = ‖(ψ y : ℂ) - (χ y : ℂ)‖ := by
+      have hmul : (((χ⁻¹ * ψ) y : Circle) : ℂ) - 1 =
+          (starRingEnd ℂ (χ y : ℂ)) * ((ψ y : ℂ) - (χ y : ℂ)) := by
+        change ((χ y)⁻¹ * ψ y : Circle) - (1 : ℂ) = _
+        rw [Circle.coe_mul, mul_sub, Circle.coe_inv_eq_conj]
+        have hunit : (starRingEnd ℂ) (χ y : ℂ) * (χ y : ℂ) = 1 := by
+          rw [mul_comm, Complex.mul_conj, ← Complex.sq_norm, Circle.norm_coe, one_pow,
+            Complex.ofReal_one]
+        rw [hunit]
+      rw [hmul, norm_mul, Complex.norm_conj, Circle.norm_coe, one_mul]
+    simpa [Complex.dist_eq, hnorm_eq] using hlt
+  have htriv : χ⁻¹ * ψ = 1 := by
+    ext y
+    exact congrArg Subtype.val (hcircle_triv ((χ⁻¹ * ψ) y) fun m ↦ by
+      rw [← map_pow]; exact hdist (y ^ m))
+  exact inv_mul_eq_one.mp htriv
+
+/-- The rational adele ring is second countable. -/
+private theorem sLocalThetaIsotypeSum_inherited_ratAdele_secondCountable :
+    SecondCountableTopology (Multiplicative 𝔸[ℚ]) := by
+  let I := HeightOneSpectrum (𝓞 ℚ)
+  let K (v : I) := v.adicCompletion ℚ
+  let O (v : I) : Set (K v) := v.adicCompletionIntegers ℚ
+  let : Countable I := Rat.HeightOneSpectrum.primesEquiv.injective.countable
+  let (v : I) : SecondCountableTopology (K v) := by
+    let p := Rat.HeightOneSpectrum.primesEquiv v
+    let : Fact p.val.Prime := ⟨p.property⟩
+    let : TopologicalSpace.SeparableSpace ℚ_[p.val] :=
+      ⟨⟨Set.range ((↑) : ℚ → ℚ_[p.val]), Set.countable_range _, Padic.denseRange_ratCast _⟩⟩
+    exact (Rat.HeightOneSpectrum.adicCompletion.padicEquiv v).toHomeomorph.isEmbedding
+      |>.secondCountableTopology
+  let Vset := fun s : Finset I ↦ {a : FiniteAdeleRing (𝓞 ℚ) ℚ | ∀ v ∉ s, a v ∈ O v}
+  have hopen (v : I) : IsOpen (O v) := Valued.isOpen_integer (K v)
+  let (s : Finset I) : SecondCountableTopology (Vset s) := by
+    have hs : Filter.cofinite ≤ Filter.principal (s : Set I)ᶜ :=
+      Filter.le_principal_iff.mpr s.finite_toSet.compl_mem_cofinite
+    have he := RestrictedProduct.isOpenEmbedding_inclusion_principal (R := K) (A := O) hopen hs
+    let : SecondCountableTopology (RestrictedProduct K O (Filter.principal (s : Set I)ᶜ)) :=
+      (RestrictedProduct.isEmbedding_coe_of_principal (R := K) (A := O)).secondCountableTopology
+    have hrange : Set.range (RestrictedProduct.inclusion K O hs) = Vset s := by
+      rw [RestrictedProduct.range_inclusion]; rfl
+    exact hrange ▸ he.toIsEmbedding.toHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (FiniteAdeleRing (𝓞 ℚ) ℚ) := by
+    refine TopologicalSpace.secondCountableTopology_of_countable_cover («U» := Vset)
+      (fun _ ↦ RestrictedProduct.isOpen_forall_imp_mem hopen) (Set.eq_univ_of_forall fun a ↦ ?_)
+    have he := Filter.eventually_cofinite.mp a.2
+    exact Set.mem_iUnion.mpr ⟨he.toFinset, fun v hv ↦ by
+      by_contra h
+      exact hv (he.mem_toFinset.mpr h)⟩
+  let (v : InfinitePlace ℚ) : SecondCountableTopology v.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  change SecondCountableTopology (((v : InfinitePlace ℚ) → v.Completion) × FiniteAdeleRing (𝓞 ℚ) ℚ)
+  infer_instance
+
+/-- The Pontryagin dual of the norm-one S-idele quotient is countable. -/
+private theorem sLocalThetaIsotypeSum_inherited_countable_J1
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    Countable (PontryaginDual (sIdeleQuotientNorm F S).ker) := by
+  have hclosed := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (SIdeleQuotient F S) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space (sIdeleQuotientNorm F S).ker :=
+    inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (SIdeleQuotient F S)))
+  let : CompactSpace (sIdeleQuotientNorm F S).ker := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (SAdeleRing F S) := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology (SAdeleRing F S)ˣ :=
+    (sIdeleGroup_description F S).1.secondCountableTopology
+  let : SecondCountableTopology (SIdeleQuotient F S) := inferInstanceAs (SecondCountableTopology (_ ⧸ _))
+  let : SecondCountableTopology (sIdeleQuotientNorm F S).ker :=
+    TopologicalSpace.Subtype.secondCountableTopology _
+  exact sLocalThetaIsotypeSum_inherited_countable_dual
+
+/-- The Pontryagin dual of the norm-one idele class group is countable. -/
+private theorem sLocalThetaIsotypeSum_inherited_countable_C1
+    (F : Type*) [Field F] [NumberField F] :
+    Countable (PontryaginDual (ideleClassNorm F).ker) := by
+  let : T2Space (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace (ideleClassNorm F).ker := (ideleClassGroup_finiteness F).2.1
+  let : SecondCountableTopology (Multiplicative 𝔸[ℚ]) :=
+    sLocalThetaIsotypeSum_inherited_ratAdele_secondCountable
+  obtain ⟨u, _, _⟩ := exists_adeleTrace_dualCoordinates F
+  let : SecondCountableTopology 𝔸[F] := u.symm.toHomeomorph.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology 𝔸[F]ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (IdeleGroup (𝓞 F) F) :=
+    Units.isEmbedding_embedProduct.secondCountableTopology
+  let : SecondCountableTopology (IdeleClassGroup (𝓞 F) F) :=
+    inferInstanceAs (SecondCountableTopology (_ ⧸ _))
+  let : SecondCountableTopology (ideleClassNorm F).ker :=
+    TopologicalSpace.Subtype.secondCountableTopology _
+  exact sLocalThetaIsotypeSum_inherited_countable_dual
+
+/-- A countable locally convex direct sum of spaces equivalent to nuclear barrelled
+LF-spaces with Hausdorff complete direct sum is an LF-space, nuclear, barrelled and Montel. -/
+private theorem sLocalThetaIsotypeSum_inherited_space_main.{v, u}
+    {I : Type u} [Countable I] [DecidableEq I]
+    {Y X : I → Type u}
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    [∀ i, AddCommGroup (X i)] [∀ i, Module ℂ (X i)] [∀ i, TopologicalSpace (X i)]
+    (he : ∀ i, Nonempty (Y i ≃L[ℂ] X i))
+    (hLFY : ∀ i, IsLFSpace (Y i))
+    (hNucY : ∀ i, IsNuclearTVS.{max v u, u} (Y i))
+    (hBarY : ∀ i, BarrelledSpace ℂ (Y i))
+    (hDComp : letI := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+      T2Space (⨁ i, X i) ∧ PolynormableSpace ℂ (⨁ i, X i) ∧
+        ∀ (u₀ : UniformSpace (⨁ i, X i)),
+          u₀.toTopologicalSpace = (inferInstance : TopologicalSpace (⨁ i, X i)) →
+          @IsUniformAddGroup (⨁ i, X i) u₀ _ → @CompleteSpace (⨁ i, X i) u₀) :
+    letI := locallyConvexFinalTopology (DirectSum.lof ℂ I X)
+    IsLFSpace (⨁ i, X i) ∧ IsNuclearTVS.{v, u} (⨁ i, X i) ∧
+      BarrelledSpace ℂ (⨁ i, X i) ∧ MontelSpace ℂ (⨁ i, X i) := by
+  let eqv (i : I) : Y i ≃L[ℂ] X i := (he i).some
+  let : ∀ i, PolynormableSpace ℂ (Y i) := fun i ↦ (hNucY i).2.1
+  let : ∀ i, IsTopologicalAddGroup (Y i) := fun i ↦
+    (PolynormableSpace.withSeminorms ℂ (Y i)).isTopologicalAddGroup
+  let : ∀ i, ContinuousSMul ℂ (Y i) := fun i ↦ PolynormableSpace.continuousSMul ℂ (Y i)
+  have hLF : ∀ i, IsLFSpace (X i) := fun i ↦
+    sLocalThetaIsotypeSum_inherited_lf_of_equiv (eqv i) (hLFY i)
+  let : ∀ i, PolynormableSpace ℂ (X i) := fun i ↦
+    (eqv i).symm.toHomeomorph.isEmbedding.isInducing.polynormableSpace (f := (eqv i).symm.toLinearMap)
+  let : ∀ i, IsTopologicalAddGroup (X i) := fun i ↦
+    (PolynormableSpace.withSeminorms ℂ (X i)).isTopologicalAddGroup
+  let : ∀ i, ContinuousSMul ℂ (X i) := fun i ↦ PolynormableSpace.continuousSMul ℂ (X i)
+  have hNuc : ∀ i, IsNuclearTVS.{max v u, u} (X i) := fun i ↦
+    nuclear_of_equiv (eqv i) (hNucY i)
+  have hBar : ∀ i, BarrelledSpace ℂ (X i) := fun i ↦ by
+    let : BarrelledSpace ℂ (Y i) := hBarY i
+    exact sLocalThetaIsotypeSum_inherited_barrelled_of_equiv (eqv i)
+  let D := ⨁ i, X i
+  let lof := DirectSum.lof ℂ I X
+  let : TopologicalSpace D := locallyConvexFinalTopology lof
+  have hDws : WithSeminorms (E := D)
+      (Subtype.val : {p : Seminorm ℂ D // ∀ i, Continuous (p ∘ lof i)} → Seminorm ℂ D) := ⟨rfl⟩
+  let : ∀ i, T2Space (X i) := fun i ↦ (hNuc i).1
+  let : T2Space D := hDComp.1
+  let : PolynormableSpace ℂ D := hDComp.2.1
+  let : IsTopologicalAddGroup D := hDws.isTopologicalAddGroup
+  let : ContinuousSMul ℂ D := PolynormableSpace.continuousSMul ℂ D
+  let : UniformSpace D := IsTopologicalAddGroup.rightUniformSpace D
+  let : IsUniformAddGroup D := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace D := hDComp.2.2 _ rfl inferInstance
+  have hLF_D : IsLFSpace D := by
+    by_cases hfin : Finite I
+    · exact sLocalThetaIsotypeSum_inherited_isLFSpace_finite hLF inferInstance
+    · have : Infinite I := not_finite_iff_infinite.mp hfin
+      exact sLocalThetaIsotypeSum_inherited_isLFSpace_infinite hLF inferInstance
+  have hNuc_D : IsNuclearTVS.{v, u} D := isNuclearTVS_directSum hNuc
+  have hBar_D : BarrelledSpace ℂ D := by
+    constructor
+    intro p hp
+    refine hDws.continuous_seminorm ⟨p, fun i ↦ ?_⟩
+    have hlofCont : Continuous (lof i) :=
+      hDws.continuous_of_continuous_comp (lof i) fun q ↦ q.property i
+    have : BarrelledSpace ℂ (X i) := hBar i
+    exact (p.comp (lof i)).continuous_of_lowerSemicontinuous (hp.comp hlofCont)
+  have hMontel_D : MontelSpace ℂ D := by
+    refine ⟨fun B hc hb ↦ ?_⟩
+    simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS D hNuc_D hb
+  exact ⟨hLF_D, hNuc_D, hBar_D, hMontel_D⟩
+
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the S-local isotypes is an LF-space and is nuclear. This is the
 first half of the space part of Theorem 5.2.3.1(2) for that sum. -/
@@ -1057,7 +1786,18 @@ theorem sLocalThetaIsotypeSum_isLFSpace_nuclear :
     letI := Classical.decEq (PontryaginDual J₁(S))
     let D := ⨁ χ, X χ
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    IsLFSpace D ∧ IsNuclearTVS D := by sorry
+    IsLFSpace D ∧ IsNuclearTVS D := by 
+  let : DecidableEq (PontryaginDual J₁(S)) := Classical.decEq _
+  let : Countable (PontryaginDual J₁(S)) := sLocalThetaIsotypeSum_inherited_countable_J1 F S
+  have h := sLocalThetaIsotypeSum_inherited_space_main
+    (Y := fun χ : PontryaginDual J₁(S) ↦ Θₛω(S, χ))
+    (X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ)))
+    (fun χ ↦ ⟨(sLocalThetaIsotypicAverage_equiv (F := F) (S := S) χ).2.choose⟩)
+    (fun χ ↦ sLocalHomogeneousThetaSpace_lf (F := F) (S := S) χ)
+    (fun χ ↦ sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) χ)
+    (fun χ ↦ (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) χ).1)
+    (sLocalThetaIsotypeSum_complete (F := F) (S := S))
+  with_reducible_and_instances exact ⟨h.1, h.2.1⟩
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the S-local isotypes is barrelled and Montel. This is the second
@@ -1068,7 +1808,18 @@ theorem sLocalThetaIsotypeSum_barrelled_montel :
     letI := Classical.decEq (PontryaginDual J₁(S))
     let D := ⨁ χ, X χ
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by 
+  let : DecidableEq (PontryaginDual J₁(S)) := Classical.decEq _
+  let : Countable (PontryaginDual J₁(S)) := sLocalThetaIsotypeSum_inherited_countable_J1 F S
+  have h := sLocalThetaIsotypeSum_inherited_space_main.{0, _}
+    (Y := fun χ : PontryaginDual J₁(S) ↦ Θₛω(S, χ))
+    (X := fun χ : PontryaginDual J₁(S) ↦ ↥(Eₛ(χ)))
+    (fun χ ↦ ⟨(sLocalThetaIsotypicAverage_equiv (F := F) (S := S) χ).2.choose⟩)
+    (fun χ ↦ sLocalHomogeneousThetaSpace_lf (F := F) (S := S) χ)
+    (fun χ ↦ sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) χ)
+    (fun χ ↦ (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) χ).1)
+    (sLocalThetaIsotypeSum_complete (F := F) (S := S))
+  with_reducible_and_instances exact ⟨h.2.2.1, h.2.2.2⟩
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The strong dual of the locally convex sum of the S-local isotypes is complete, nuclear,
@@ -1104,7 +1855,18 @@ theorem globalThetaIsotypeSum_isLFSpace_nuclear :
     letI := Classical.decEq (PontryaginDual C₁)
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    IsLFSpace D ∧ IsNuclearTVS D := by sorry
+    IsLFSpace D ∧ IsNuclearTVS D := by 
+  let : DecidableEq (PontryaginDual C₁) := Classical.decEq _
+  let : Countable (PontryaginDual C₁) := sLocalThetaIsotypeSum_inherited_countable_C1 F
+  have h := sLocalThetaIsotypeSum_inherited_space_main
+    (Y := fun ω : PontryaginDual C₁ ↦ Θ𝔽ω(ω))
+    (X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω)))
+    (fun ω ↦ ⟨(globalThetaIsotypicAverage_equiv (F := F) ω).2.choose⟩)
+    (fun ω ↦ globalHomogeneousThetaSpace_lf (F := F) (ω := ω))
+    (fun ω ↦ globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω))
+    (fun ω ↦ (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).1)
+    (globalThetaIsotypeSum_complete (F := F))
+  with_reducible_and_instances exact ⟨h.1, h.2.1⟩
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The locally convex sum of the global isotypes is barrelled and Montel. This is the second
@@ -1115,7 +1877,18 @@ theorem globalThetaIsotypeSum_barrelled_montel :
     letI := Classical.decEq (PontryaginDual C₁)
     let D := ⨁ ω, X ω
     letI := locallyConvexFinalTopology (DirectSum.lof ℂ _ X)
-    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by sorry
+    BarrelledSpace ℂ D ∧ MontelSpace ℂ D := by 
+  let : DecidableEq (PontryaginDual C₁) := Classical.decEq _
+  let : Countable (PontryaginDual C₁) := sLocalThetaIsotypeSum_inherited_countable_C1 F
+  have h := sLocalThetaIsotypeSum_inherited_space_main.{0, _}
+    (Y := fun ω : PontryaginDual C₁ ↦ Θ𝔽ω(ω))
+    (X := fun ω : PontryaginDual C₁ ↦ ↥(E𝔽(ω)))
+    (fun ω ↦ ⟨(globalThetaIsotypicAverage_equiv (F := F) ω).2.choose⟩)
+    (fun ω ↦ globalHomogeneousThetaSpace_lf (F := F) (ω := ω))
+    (fun ω ↦ globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω))
+    (fun ω ↦ (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).1)
+    (globalThetaIsotypeSum_complete (F := F))
+  with_reducible_and_instances exact ⟨h.2.2.1, h.2.2.2⟩
 
 /-- Paper: Remark 6.2.1.4(1), p. 297.
 The strong dual of the locally convex sum of the global isotypes is complete, nuclear,
@@ -1148,12 +1921,510 @@ theorem globalThetaIsotypeSum_inherited_properties :
 -- theta quotients is the whole product. The remark conflates that product
 -- with the product of the meromorphic Mellin target spaces.
 
+/-- Every number field has infinitely many finite places, by lying-over on rational primes. -/
+private theorem globalThetaToHomogeneousProduct_infinite_places :
+    Infinite (HeightOneSpectrum (𝓞 F)) := by
+  have hmap : ∀ p : Nat.Primes, ∃ v : HeightOneSpectrum (𝓞 F),
+      Ideal.comap (algebraMap ℤ (𝓞 F)) v.asIdeal = Ideal.span {(p.val : ℤ)} := by
+    intro p
+    have hp : Prime (p.val : ℤ) := Nat.prime_iff_prime_int.mp p.property
+    have hPprime : (Ideal.span {(p.val : ℤ)}).IsPrime :=
+      Ideal.span_singleton_prime hp.ne_zero |>.mpr hp
+    obtain ⟨Q, _, hQprime, hQover⟩ :=
+      Ideal.exists_ideal_over_prime_of_isIntegral (Ideal.span {(p.val : ℤ)}) (⊥ : Ideal (𝓞 F))
+        (fun x hx ↦ by
+          have hx0 : algebraMap ℤ (𝓞 F) x = 0 := hx
+          have : x = 0 := RingHom.injective_int (algebraMap ℤ (𝓞 F)) (hx0.trans (map_zero _).symm)
+          rw [this]; exact zero_mem _)
+    have hQne : Q ≠ ⊥ := by
+      intro hbot
+      have h0 : (p.val : ℤ) ∈ Ideal.span {(p.val : ℤ)} := Ideal.subset_span rfl
+      rw [← hQover, hbot, Ideal.mem_comap, Ideal.mem_bot] at h0
+      exact hp.ne_zero (RingHom.injective_int (algebraMap ℤ (𝓞 F)) (h0.trans (map_zero _).symm))
+    exact ⟨⟨Q, hQprime, hQne⟩, hQover⟩
+  choose f hf using hmap
+  refine Infinite.of_injective f fun p q hpq ↦ Subtype.ext ?_
+  have hspan : Ideal.span {(p.val : ℤ)} = Ideal.span {(q.val : ℤ)} := by
+    rw [← hf p, ← hf q, hpq]
+  have hdvd1 : (p.val : ℤ) ∣ (q.val : ℤ) := Ideal.mem_span_singleton.mp (hspan ▸ Ideal.subset_span rfl)
+  have hdvd2 : (q.val : ℤ) ∣ (p.val : ℤ) := Ideal.mem_span_singleton.mp (hspan.symm ▸ Ideal.subset_span rfl)
+  exact Nat.dvd_antisymm (Int.ofNat_dvd.mp hdvd1) (Int.ofNat_dvd.mp hdvd2)
+
+/-- Elementary product lower bound: `1 - ∑ ‖c_i - 1‖ ≤ ∏ ‖c_i‖` when `∑ ‖c_i - 1‖ ≤ 1`. -/
+private theorem globalThetaToHomogeneousProduct_one_sub_sum_le_prod_norm {ι : Type*}
+    (s : Finset ι) (c : ι → ℂ) (hsum : ∑ i ∈ s, ‖c i - 1‖ ≤ 1) :
+    1 - ∑ i ∈ s, ‖c i - 1‖ ≤ ∏ i ∈ s, ‖c i‖ := by
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp
+  | @insert a t ha ih =>
+    rw [Finset.sum_insert ha] at hsum ⊢
+    rw [Finset.prod_insert ha]
+    have ht0 : 0 ≤ ∑ i ∈ t, ‖c i - 1‖ := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+    have ha0 : 0 ≤ ‖c a - 1‖ := norm_nonneg _
+    have hih : 1 - ∑ i ∈ t, ‖c i - 1‖ ≤ ∏ i ∈ t, ‖c i‖ := ih (by linarith)
+    have hca : 1 - ‖c a - 1‖ ≤ ‖c a‖ := by
+      have ht := norm_sub_norm_le (1 : ℂ) (1 - c a)
+      rw [norm_one, sub_sub_cancel, norm_sub_rev] at ht
+      linarith
+    have hca0 : 0 ≤ 1 - ‖c a - 1‖ := by linarith
+    have ht1 : 0 ≤ 1 - ∑ i ∈ t, ‖c i - 1‖ := by linarith
+    have h1 : (1 - ‖c a - 1‖) * (1 - ∑ i ∈ t, ‖c i - 1‖) ≤ ‖c a‖ * ∏ i ∈ t, ‖c i‖ :=
+      mul_le_mul hca hih ht1 (norm_nonneg _)
+    nlinarith
+
+/-- Every global homogeneous theta space is nontrivial. -/
+private theorem globalThetaToHomogeneousProduct_nontrivial (ω : PontryaginDual C₁) :
+    ∃ z : Θ𝔽ω(ω), z ≠ 0 := by
+  classical
+  let τ : ℝ≥0ˣ →* IdeleClassGroup (𝓞 F) F :=
+    (QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 F) F)).comp (canonicalIdeleNormSection F)
+  have hτ (t : ℝ≥0ˣ) : ideleClassNorm F (τ t) = t := canonicalIdeleNormSection_rightInverse F t
+  have hτc : Continuous τ :=
+    QuotientGroup.continuous_mk.comp (canonicalIdeleNormSection_continuous F)
+  let D₀ : IdeleClassGroup (𝓞 F) F →* IdeleClassGroup (𝓞 F) F :=
+    MonoidHom.id _ / τ.comp (ideleClassNorm F)
+  have hD (x : IdeleClassGroup (𝓞 F) F) : D₀ x ∈ C₁ := by
+    rw [MonoidHom.mem_ker]; simp [D₀, hτ]
+  let D : IdeleClassGroup (𝓞 F) F →ₜ* C₁ := ⟨D₀.codRestrict _ hD,
+    (continuous_id.div' (hτc.comp (isProperMap_ideleClassNorm F).continuous)).subtype_mk _⟩
+  have hD1 (x : C₁) : D x.val = x := by
+    apply Subtype.ext
+    have hx : ideleClassNorm F x.val = 1 := x.property
+    change x.val / τ (ideleClassNorm F x.val) = x.val
+    rw [hx, map_one, div_one]
+  let χ : PontryaginDual (IdeleClassGroup (𝓞 F) F) := ω.comp D
+  have hsum2 : Summable fun v : HeightOneSpectrum (𝓞 F) ↦ (v.asIdeal.absNorm : ℝ) ^ (-(2 : ℝ)) :=
+    (summable_absNorm_rpow F (by norm_num : (1 : ℝ) < 2)).comp_injective
+      (fun _ _ he ↦ HeightOneSpectrum.ext he)
+  let S2 : ℝ := ∑' v : HeightOneSpectrum (𝓞 F), (v.asIdeal.absNorm : ℝ) ^ (-(2 : ℝ))
+  have hS2 : 0 ≤ S2 := tsum_nonneg fun v ↦ by positivity
+  let shift (v : InfinitePlace F) : ℝ :=
+    if hv : v.IsReal then
+      |(realHeckeCharacter_parameters χ v hv).exists.choose.1.re|
+    else
+      |(complexHeckeCharacter_parameters χ v
+        (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1.re|
+  let B : ℝ := Finset.univ.sup' Finset.univ_nonempty shift
+  obtain ⟨N : ℕ, hN⟩ := exists_nat_gt (max (max 2 (B + 1)) (4 * S2 + 3))
+  let r : ℝ := (N : ℝ) + 2
+  have hr1 : 1 < r := by
+    have : (2 : ℝ) < N := (le_max_left _ _).trans_lt ((le_max_left _ _).trans_lt hN)
+    linarith
+  have hr2 : 2 ≤ r := by
+    have : (2 : ℝ) < N := (le_max_left _ _).trans_lt ((le_max_left _ _).trans_lt hN)
+    linarith
+  have hgamma : heckeGammaFactor χ (r : ℂ) ≠ 0 := by
+    unfold heckeGammaFactor
+    refine Finset.prod_ne_zero_iff.mpr fun v _ ↦ ?_
+    split_ifs with hv
+    · have hB : shift v ≤ B := Finset.le_sup' shift (Finset.mem_univ v)
+      have hB' : B + 1 < N := (le_max_right _ _).trans_lt ((le_max_left _ _).trans_lt hN)
+      have hre : 0 < ((r : ℂ) + (realHeckeCharacter_parameters χ v hv).exists.choose.1 +
+          ((realHeckeCharacter_parameters χ v hv).exists.choose.2.val : ℂ)).re := by
+        simp only [Complex.add_re, Complex.ofReal_re, Complex.natCast_re]
+        have habs : -shift v ≤ (realHeckeCharacter_parameters χ v hv).exists.choose.1.re := by
+          simp only [shift, dite_eq_left hv]; exact neg_abs_le _
+        have hnat : (0 : ℝ) ≤ ((realHeckeCharacter_parameters χ v hv).exists.choose.2.val : ℝ) :=
+          Nat.cast_nonneg _
+        linarith
+      exact Complex.Gammaℝ_ne_zero_of_re_pos hre
+    · have hB : shift v ≤ B := Finset.le_sup' shift (Finset.mem_univ v)
+      have hB' : B + 1 < N := (le_max_right _ _).trans_lt ((le_max_left _ _).trans_lt hN)
+      have hre : 0 < ((r : ℂ) + (complexHeckeCharacter_parameters χ v
+          (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1 +
+          ((complexHeckeCharacter_parameters χ v
+            (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.2.natAbs : ℂ) / 2).re := by
+        simp only [Complex.add_re, Complex.ofReal_re, Complex.div_ofNat_re, Complex.natCast_re]
+        have habs : -shift v ≤ (complexHeckeCharacter_parameters χ v
+            (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1.re := by
+          simp only [shift, dite_eq_right hv]; exact neg_abs_le _
+        have hnat : (0 : ℝ) ≤ ((complexHeckeCharacter_parameters χ v
+            (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.2.natAbs : ℝ) :=
+          Nat.cast_nonneg _
+        linarith
+      dsimp only
+      rw [Complex.Gammaℂ_def]
+      refine div_ne_zero (mul_ne_zero (mul_ne_zero two_ne_zero ?_)
+        (Complex.Gamma_ne_zero_of_re_pos hre)) two_ne_zero
+      exact Complex.cpow_ne_zero_iff.mpr (Or.inl (mul_ne_zero two_ne_zero
+        (Complex.ofReal_ne_zero.mpr Real.pi_ne_zero)))
+  have hfac (v : HeightOneSpectrum (𝓞 F)) :
+      ‖finiteHeckeEulerFactor χ v (r : ℂ) - 1‖ ≤
+        2 * (2 : ℝ) ^ (-(r - 2)) * (v.asIdeal.absNorm : ℝ) ^ (-(2 : ℝ)) := by
+    let q : ℝ := v.asIdeal.absNorm
+    have hq2nat : 2 ≤ v.asIdeal.absNorm := NumberField.HeightOneSpectrum.one_lt_absNorm v
+    have hq2 : (2 : ℝ) ≤ q := by
+      change (2 : ℝ) ≤ (v.asIdeal.absNorm : ℝ); exact_mod_cast hq2nat
+    have hqpos : 0 < q := by linarith
+    have hbound : ‖finiteHeckeEulerFactor χ v (r : ℂ) - 1‖ ≤ 2 * q ^ (-r) := by
+      unfold finiteHeckeEulerFactor
+      split_ifs with h
+      · set z : ℂ := (ideleClassNormTwist χ 0).localValue v * (q : ℂ) ^ (-(r : ℂ))
+        have hnorm_a : ‖(HeckeCharacter.localValue
+            (ideleClassNormTwist χ 0) v : ℂ)‖ ≤ 1 :=
+          (norm_ideleClassNormTwist_zero_localValue χ v).le
+        have hqr : ‖(q : ℂ) ^ (-(r : ℂ))‖ = q ^ (-r) := by
+          rw [Complex.norm_cpow_eq_rpow_re_of_pos hqpos]; simp
+        have hz : ‖z‖ ≤ q ^ (-r) := by
+          rw [norm_mul, hqr]
+          exact mul_le_of_le_one_left (by positivity) hnorm_a
+        have hqle : q ^ (-r) ≤ 1 / 2 := by
+          calc q ^ (-r) ≤ (2 : ℝ) ^ (-r) := Real.rpow_le_rpow_of_nonpos zero_lt_two hq2 (by linarith)
+            _ ≤ (2 : ℝ) ^ (-(1 : ℝ)) := Real.rpow_le_rpow_of_exponent_le (by norm_num) (by linarith)
+            _ = 1 / 2 := by norm_num
+        have hd : 1 / 2 ≤ ‖1 - z‖ := by
+          have ht := norm_sub_norm_le (1 : ℂ) z
+          rw [norm_one] at ht; linarith
+        have hn : 1 - z ≠ 0 := norm_ne_zero_iff.mp (by linarith)
+        have hzq : (ideleClassNormTwist χ 0).localValue v *
+            (v.asIdeal.absNorm : ℂ) ^ (-(r : ℂ)) = z := by
+          simp [z, q]
+        rw [hzq, show (1 - z)⁻¹ - 1 = z / (1 - z) by field_simp; ring, norm_div]
+        exact (div_le_iff₀ (by linarith)).mpr (by nlinarith [norm_nonneg z])
+      · simp only [sub_self, norm_zero]; positivity
+    refine hbound.trans ?_
+    have hsplit : q ^ (-r) = q ^ (-(r - 2)) * q ^ (-(2 : ℝ)) := by
+      rw [← Real.rpow_add hqpos]; congr 1; ring
+    have hle : q ^ (-(r - 2)) ≤ (2 : ℝ) ^ (-(r - 2)) :=
+      Real.rpow_le_rpow_of_nonpos zero_lt_two hq2 (by linarith)
+    rw [hsplit, mul_assoc]
+    exact mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_right hle (by positivity)) zero_le_two
+  have h2pow : (2 : ℝ) ^ (-(r - 2)) * S2 ≤ 1 / 4 := by
+    have hNbig : 4 * S2 + 3 < (N : ℝ) := (le_max_right _ _).trans_lt hN
+    have hpow : (N : ℝ) ≤ (2 : ℝ) ^ (N : ℝ) := by
+      rw [Real.rpow_natCast]
+      exact_mod_cast (Nat.lt_two_pow_self (n := N)).le
+    have h2pos : (0 : ℝ) < (2 : ℝ) ^ (N : ℝ) := by positivity
+    have hrm : r - 2 = (N : ℝ) := by simp [r]
+    rw [hrm, Real.rpow_neg zero_le_two, inv_mul_le_iff₀ h2pos]
+    nlinarith
+  have hLne : (ideleClassNormTwist χ 0).LSeries (r : ℂ) ≠ 0 := by
+    have htend := (finiteHeckeEulerProduct_tendstoUniformlyOn_halfPlane χ (a := 2) (by norm_num)).tendsto_at
+      (show (r : ℂ) ∈ {s : ℂ | (2 : ℝ) ≤ s.re} by simpa using hr2)
+    have hge : 1 / 2 ≤ ‖(ideleClassNormTwist χ 0).LSeries (r : ℂ)‖ := by
+      refine ge_of_tendsto htend.norm (Filter.Eventually.of_forall fun s ↦ ?_)
+      rw [norm_prod]
+      have hsum_le : ∑ v ∈ s, ‖finiteHeckeEulerFactor χ v (r : ℂ) - 1‖ ≤ 1 / 2 := by
+        calc ∑ v ∈ s, ‖finiteHeckeEulerFactor χ v (r : ℂ) - 1‖
+            ≤ ∑ v ∈ s, (2 * (2 : ℝ) ^ (-(r - 2)) * (v.asIdeal.absNorm : ℝ) ^ (-(2 : ℝ))) :=
+              Finset.sum_le_sum fun v _ ↦ hfac v
+          _ = 2 * (2 : ℝ) ^ (-(r - 2)) * ∑ v ∈ s, (v.asIdeal.absNorm : ℝ) ^ (-(2 : ℝ)) := by
+              rw [Finset.mul_sum]
+          _ ≤ 2 * (2 : ℝ) ^ (-(r - 2)) * S2 :=
+              mul_le_mul_of_nonneg_left (hsum2.sum_le_tsum s fun v _ ↦ by positivity) (by positivity)
+          _ = 2 * ((2 : ℝ) ^ (-(r - 2)) * S2) := by ring
+          _ ≤ 2 * (1 / 4) := by linarith
+          _ = 1 / 2 := by norm_num
+      calc (1 / 2 : ℝ) ≤ 1 - ∑ v ∈ s, ‖finiteHeckeEulerFactor χ v (r : ℂ) - 1‖ := by linarith
+        _ ≤ ∏ v ∈ s, ‖finiteHeckeEulerFactor χ v (r : ℂ)‖ :=
+          globalThetaToHomogeneousProduct_one_sub_sum_le_prod_norm s
+            (fun v ↦ finiteHeckeEulerFactor χ v (r : ℂ)) (by linarith)
+    exact norm_ne_zero_iff.mp (by linarith)
+  have hcomp_ne : completedHeckeL χ ⟨(r : ℂ), by simpa using hr1⟩ ≠ 0 :=
+    mul_ne_zero hgamma hLne
+  obtain ⟨f, hf⟩ := exists_globalIdelicZetaIntegral_eq_completedHeckeL χ
+  refine ⟨(LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ f, ?_⟩
+  intro hzero
+  rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero] at hzero
+  let c := ideleClassNormTwist χ (r : ℂ)
+  have hord : 0 ≤ globalIdelicOrderBound c := by
+    have hnot : ¬ (c = 1 ∨ c = ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 1) := by
+      obtain ⟨g, hg⟩ :=
+        (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1 (Units.mk0 (2 : ℝ≥0) two_ne_zero)
+      have hnormc : ‖c g‖ = (2 : ℝ) ^ r := by
+        change ‖(χ g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (r : ℂ)‖ = _
+        rw [norm_mul, Circle.norm_coe, one_mul, hg, Units.val_mk0, NNReal.coe_ofNat,
+          Complex.norm_cpow_eq_rpow_re_of_pos zero_lt_two, Complex.ofReal_re]
+      rintro (h1 | h2)
+      · have := congrArg (fun u : QuasiCharacter (IdeleClassGroup (𝓞 F) F) ↦ ‖u g‖) h1
+        rw [hnormc, show (1 : QuasiCharacter (IdeleClassGroup (𝓞 F) F)) g = 1 from rfl,
+          norm_one] at this
+        have hgt : (1 : ℝ) < (2 : ℝ) ^ r := Real.one_lt_rpow one_lt_two (by linarith)
+        linarith
+      · have := congrArg (fun u : QuasiCharacter (IdeleClassGroup (𝓞 F) F) ↦ ‖u g‖) h2
+        rw [hnormc] at this
+        have h1g : ‖ideleClassNormTwist (1 : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 1 g‖ = 2 := by
+          change ‖((1 : PontryaginDual _) g : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (1 : ℂ)‖ = _
+          rw [norm_mul, Circle.norm_coe, one_mul, hg, Units.val_mk0, NNReal.coe_ofNat,
+            Complex.cpow_one]
+          norm_num
+        rw [h1g] at this
+        have hgt : (2 : ℝ) ^ (1 : ℝ) < (2 : ℝ) ^ r :=
+          Real.rpow_lt_rpow_of_exponent_lt one_lt_two hr1
+        rw [Real.rpow_one] at hgt
+        linarith
+    unfold globalIdelicOrderBound
+    rw [ite_eq_right hnot]
+  have hrest : ∀ h : C₁, normOneRestriction (ideleClassNorm F) c h = (ω h : ℂ) := by
+    intro h
+    change (χ h.val : ℂ) * (((ideleClassNorm F h.val : ℝ≥0) : ℝ) : ℂ) ^ (r : ℂ) = (ω h : ℂ)
+    have hh : ideleClassNorm F h.val = 1 := h.property
+    rw [hh, Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    exact congrArg (fun u : Circle ↦ (u : ℂ)) (congrArg ω (hD1 h))
+  have hval := (mem_homogeneousAdelicTheta_ker_iff (F := F) ω f).mp hzero ⟨c, hord⟩ hrest
+  change globalIdelicZFunction f c = 0 at hval
+  have hc_mem : c ∈ (relativeRightHalfPlane (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) 1 : Set (QuasiCharacter (IdeleClassGroup (𝓞 F) F))) := by
+    change 1 < quasiCharacterAbscissa (ideleClassNorm F) (isProperMap_ideleClassNorm F)
+      (ideleClassNorm_ne_one (F := F)) (ideleClassNormTwist χ (r : ℂ))
+    rw [quasiCharacterAbscissa_ideleClassNormTwist]
+    simpa using hr1
+  have heq : globalIdelicZFunction f c = globalIdelicZetaIntegral f c :=
+    globalIdelicZFunction_eq_integral f hc_mem
+  rw [heq, hf ⟨(r : ℂ), by simpa using hr1⟩] at hval
+  exact hcomp_ne hval
+
+/-- Abstract helper avoiding `isDefEq` unfolding of `SchwartzBruhat` quotients. -/
+private theorem globalThetaToHomogeneousProduct_pi_smul {X I : Type*} {Y : I → Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    (L : X →L[ℂ] (∀ i, Y i)) (a : ℂ) (x : X) (i : I) :
+    L (a • x) i = a • L x i :=
+  congrFun (L.map_smul a x) i
+
+/-- Abstract helper for finite sums of coordinates of a product-valued CLM. -/
+private theorem globalThetaToHomogeneousProduct_pi_sum {X I : Type*} {Y : I → Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [∀ i, AddCommGroup (Y i)] [∀ i, Module ℂ (Y i)] [∀ i, TopologicalSpace (Y i)]
+    (L : X →L[ℂ] (∀ i, Y i)) (s : Finset I) (x : I → X) (i : I) :
+    L (∑ j ∈ s, x j) i = ∑ j ∈ s, L (x j) i :=
+  (congrFun (map_sum L x s) i).trans (Finset.sum_apply i s (fun j ↦ L (x j)))
+
+/-- The product map intertwines the norm-one action with scalar multiplication by the character. -/
+private theorem globalThetaToHomogeneousProduct_action (ω : PontryaginDual C₁)
+    (c : C₁) (x : Θ𝔽) :
+    let P := (exists_globalThetaToHomogeneousProduct (F := F)).choose
+    P (ρ𝔽 c.val x) ω = (ω c : ℂ) • P x ω := by
+  intro P
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective c.val
+  refine Submodule.Quotient.induction_on (LinearMap.ker (adelicThetaLinearMap F)) x fun f ↦ ?_
+  have hact := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 g f
+  have hP1 := (exists_globalThetaToHomogeneousProduct (F := F)).choose_spec.2
+    (schwartzBruhatUnitTranslate g f) ω
+  have hP2 := (exists_globalThetaToHomogeneousProduct (F := F)).choose_spec.2 f ω
+  have hker : schwartzBruhatUnitTranslate g f - (ω c : ℂ) • f ∈
+      LinearMap.ker (homogeneousAdelicThetaLinearMap F ω) := by
+    apply (mem_homogeneousAdelicTheta_ker_iff (F := F) ω _).mpr
+    intro d hd
+    rw [map_sub, map_smul, Submodule.coe_sub, Submodule.coe_smul_of_tower,
+      ContinuousMap.sub_apply, ContinuousMap.smul_apply, smul_eq_mul,
+      globalIdelicMellin_unitTranslate g f d]
+    have hdc : d.val (QuotientGroup.mk g) = (ω c : ℂ) := by rw [hg]; exact hd c
+    rw [hdc, sub_self]
+  have hq : (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ
+      (schwartzBruhatUnitTranslate g f) =
+      (ω c : ℂ) • (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ f :=
+    sub_eq_zero.mp ((map_sub _ _ _).symm.trans ((Submodule.Quotient.mk_eq_zero _).mpr hker))
+  have hstep0 : ρ𝔽 c.val ((LinearMap.ker (adelicThetaLinearMap F)).mkQ f) =
+      (LinearMap.ker (adelicThetaLinearMap F)).mkQ (schwartzBruhatUnitTranslate g f) := by
+    rw [← hg]; exact hact
+  change P (ρ𝔽 c.val ((LinearMap.ker (adelicThetaLinearMap F)).mkQ f)) ω =
+    (ω c : ℂ) • P ((LinearMap.ker (adelicThetaLinearMap F)).mkQ f) ω
+  with_reducible
+    exact (congrArg (fun z ↦ P z ω) hstep0).trans
+      (hP1.trans (hq.trans (congrArg ((ω c : ℂ) • ·) hP2.symm)))
+
+/-- On an isotypic average, the product map evaluates to a nonzero scalar multiple of the class. -/
+private theorem globalThetaToHomogeneousProduct_single (ω : PontryaginDual C₁) (w : Θ𝔽ω(ω)) :
+    let P := (exists_globalThetaToHomogeneousProduct (F := F)).choose
+    ∃ x : Θ𝔽, P x ω = w ∧ ∀ ω' : PontryaginDual C₁, ω' ≠ ω → P x ω' = 0 := by
+  intro P
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : MeasurableSpace (IdeleClassGroup (𝓞 F) F) := borel _
+  let : BorelSpace (IdeleClassGroup (𝓞 F) F) := ⟨rfl⟩
+  let μ := normOneIdeleClassTamagawaMeasure F
+  let : μ.IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hμpos : 0 < μ.real Set.univ :=
+    ENNReal.toReal_pos (isOpen_univ.measure_pos _ Set.univ_nonempty).ne'
+      isCompact_univ.measure_lt_top.ne
+  have hμne : (μ.real Set.univ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr hμpos.ne'
+  obtain ⟨_, e, he⟩ := globalThetaIsotypicAverage_equiv (F := F) ω
+  let x₀ : E𝔽(ω) := e w
+  let x : Θ𝔽 := (μ.real Set.univ : ℂ)⁻¹ • x₀.val
+  refine ⟨x, ?_, ?_⟩
+  · obtain ⟨f, rfl⟩ := (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ_surjective w
+    obtain ⟨Z, hZinj, hZ⟩ := exists_globalHomogeneousThetaMellin (F := F) ω
+    apply hZinj
+    apply Subtype.ext
+    apply ContinuousMap.ext
+    intro d
+    have hx₀ : x₀.val = (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose
+        ((LinearMap.ker (adelicThetaLinearMap F)).mkQ f) := he f
+    have hP_mellin (y : Θ𝔽) :
+        (Z (P y ω)).val d = (globalThetaMellin (F := F) y).val ⟨d.val.val, d.property⟩ := by
+      refine Submodule.Quotient.induction_on (LinearMap.ker (adelicThetaLinearMap F)) y fun h ↦ ?_
+      have h1 := (exists_globalThetaToHomogeneousProduct (F := F)).choose_spec.2 h ω
+      have h2 := hZ h d
+      exact (congrArg (fun u ↦ (Z u).val d) h1).trans h2
+    have hPx : P x ω = (μ.real Set.univ : ℂ)⁻¹ • P x₀.val ω := by
+      with_reducible exact globalThetaToHomogeneousProduct_pi_smul P (μ.real Set.univ : ℂ)⁻¹ x₀.val ω
+    have hsmul : (Z (P x ω)).val d = (μ.real Set.univ : ℂ)⁻¹ * (Z (P x₀.val ω)).val d :=
+      congrArg (fun u ↦ u.val d) ((congrArg Z hPx).trans (Z.map_smul _ _))
+    have havg := globalThetaMellin_isotypicAverage (F := F) ω
+      ((LinearMap.ker (adelicThetaLinearMap F)).mkQ f) ⟨d.val.val, d.property⟩ d.val.property
+    have hmain : (Z (P x₀.val ω)).val d =
+        (μ.real Set.univ : ℂ) *
+          (Z ((LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ f)).val d :=
+      (hP_mellin x₀.val).trans
+        ((congrArg (fun y ↦ (globalThetaMellin (F := F) y).val ⟨d.val.val, d.property⟩) hx₀).trans
+          (havg.trans (congrArg ((μ.real Set.univ : ℂ) * ·) (hZ f d).symm)))
+    exact hsmul.trans ((congrArg ((μ.real Set.univ : ℂ)⁻¹ * ·) hmain).trans (by
+      rw [← mul_assoc, inv_mul_cancel₀ hμne, one_mul]))
+  · intro ω' hne
+    have hex : ∃ c : C₁, ω c ≠ ω' c := by
+      by_contra hall
+      push Not at hall
+      exact hne (DFunLike.ext _ _ fun c ↦ (hall c).symm)
+    obtain ⟨c, hc⟩ := hex
+    have h1 : P (ρ𝔽 c.val x) ω' = (ω' c : ℂ) • P x ω' :=
+      globalThetaToHomogeneousProduct_action ω' c x
+    have h2 : ρ𝔽 c.val x = (ω c : ℂ) • x := by
+      have hx₀mem : ρ𝔽 c.val x₀.val = (ω c : ℂ) • x₀.val :=
+        (mem_actionIsotype _ ω x₀.val).mp x₀.property c
+      exact ((ρ𝔽 c.val).map_smul (μ.real Set.univ : ℂ)⁻¹ x₀.val).trans
+        ((congrArg ((μ.real Set.univ : ℂ)⁻¹ • ·) hx₀mem).trans (smul_comm _ _ _))
+    have hP2 : P (ρ𝔽 c.val x) ω' = (ω c : ℂ) • P x ω' := by
+      have ha : P (ρ𝔽 c.val x) ω' = P ((ω c : ℂ) • x) ω' := congrArg (fun u ↦ P u ω') h2
+      have hb : P ((ω c : ℂ) • x) ω' = (ω c : ℂ) • P x ω' := by
+        with_reducible exact globalThetaToHomogeneousProduct_pi_smul P (ω c : ℂ) x ω'
+      exact ha.trans hb
+    have h3 : (ω c : ℂ) • P x ω' = (ω' c : ℂ) • P x ω' := hP2.symm.trans h1
+    have hsub : ((ω c : ℂ) - (ω' c : ℂ)) • P x ω' = 0 := by
+      rw [sub_smul, h3, sub_self]
+    have hdiff : (ω c : ℂ) - (ω' c : ℂ) ≠ 0 :=
+      sub_ne_zero.mpr fun h ↦ hc (Subtype.ext h)
+    exact (smul_eq_zero.mp hsub).resolve_left hdiff
+
 /-- Paper: Remark 6.2.1.4(2), p. 298.
 The global theta quotient has nonclosed image in the product of its homogeneous
 quotients.
 Deviation: The earlier continuous injection in (5.2.3.13) identifies the product map. -/
 theorem globalThetaToHomogeneousProduct_not_isClosed_range :
-    ¬ IsClosed (Set.range (exists_globalThetaToHomogeneousProduct (F := F)).choose) := by sorry
+    ¬ IsClosed (Set.range (exists_globalThetaToHomogeneousProduct (F := F)).choose) := by
+  classical
+  let P := (exists_globalThetaToHomogeneousProduct (F := F)).choose
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have hdense : Dense (Set.range P) := by
+    rw [dense_iff_inter_open]
+    intro U hU hUne
+    obtain ⟨w, hw⟩ := hUne
+    rw [isOpen_pi_iff] at hU
+    obtain ⟨I, W, hW, hIV⟩ := hU w hw
+    choose x hx_self hx_other using fun ω : PontryaginDual C₁ ↦
+      globalThetaToHomogeneousProduct_single (F := F) ω (w ω)
+    refine ⟨P (∑ ω ∈ I, x ω), ?_, ⟨∑ ω ∈ I, x ω, rfl⟩⟩
+    apply hIV
+    intro ω hω
+    have heval : P (∑ ψ ∈ I, x ψ) ω = w ω := by
+      have hpt : P (∑ ψ ∈ I, x ψ) ω = ∑ ψ ∈ I, P (x ψ) ω := by
+        with_reducible exact globalThetaToHomogeneousProduct_pi_sum P I x ω
+      exact hpt.trans ((Finset.sum_eq_single ω (fun ψ _ hψ ↦ hx_other ψ ω (Ne.symm hψ))
+        (fun h ↦ (h hω).elim)).trans (hx_self ω))
+    rw [heval]
+    exact (hW ω hω).2
+  choose z hz using fun ω : PontryaginDual C₁ ↦
+    globalThetaToHomogeneousProduct_nontrivial (F := F) ω
+  have hnotmem : z ∉ Set.range P := by
+    rintro ⟨x, hx⟩
+    obtain ⟨S, y, rfl⟩ := sLocalThetaToGlobal_exhaustive (F := F) x
+    have : Infinite (HeightOneSpectrum (𝓞 F)) := globalThetaToHomogeneousProduct_infinite_places
+    obtain ⟨v, hv⟩ := S.finite_toSet.infinite_compl.nonempty
+    let g : IdeleGroup (𝓞 F) F := IdeleGroup.ofAdicCompletion (𝓞 F) F v (-1 : (v.adicCompletion F)ˣ)
+    have hginv : g⁻¹ = g := by
+      rw [← map_inv]
+      exact congrArg (IdeleGroup.ofAdicCompletion (𝓞 F) F v) (Units.ext (by simp))
+    have hg_out : g ∈ outsideIntegralIdeleUnits F S := by
+      rw [mem_outsideIntegralIdeleUnits_iff]
+      refine ⟨rfl, fun w hw ↦ ?_, fun w _ ↦ ?_⟩
+      · have hne : w ≠ v := fun h ↦ hv (h ▸ hw)
+        exact RestrictedProduct.mulSingle_eq_of_ne _ _ hne
+      · by_cases hwv : w = v
+        · subst hwv
+          have hval : g.val.2 w = -1 := RestrictedProduct.mulSingle_eq_same _ _ _
+          rw [hginv]
+          exact ⟨hval.symm ▸ neg_mem (one_mem _), hval.symm ▸ neg_mem (one_mem _)⟩
+        · have hval : g.val.2 w = 1 := RestrictedProduct.mulSingle_eq_of_ne _ _ hwv
+          rw [hginv]
+          exact ⟨hval.symm ▸ one_mem _, hval.symm ▸ one_mem _⟩
+    have hg_norm : ideleNorm F g = 1 := by
+      obtain ⟨u, hu⟩ := hg_out.1
+      have h := (sIdeleNorm_spec F S).1 u
+      change ideleNorm F (integralIdeleInsertion F S u) =
+        sIdeleNorm F S (Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)) at h
+      rwa [hu, hg_out.2, map_one] at h
+    let c : C₁ := ⟨QuotientGroup.mk g, hg_norm⟩
+    have hc_ne : c ≠ 1 := by
+      intro hc1
+      have hg1 : (QuotientGroup.mk g : IdeleClassGroup (𝓞 F) F) = 1 := congrArg Subtype.val hc1
+      obtain ⟨a, ha⟩ := (QuotientGroup.eq_one_iff g).mp hg1
+      obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      have ha1 : algebraMap F w₀.Completion (a : F) = 1 :=
+        congrFun (congrArg (fun z : IdeleGroup (𝓞 F) F ↦ z.val.1) ha) w₀
+      have ha_eq : (a : F) = 1 := (algebraMap F w₀.Completion).injective (ha1.trans (map_one _).symm)
+      have hv_eq : g.val.2 v = 1 := by
+        have hv' := congrArg (fun z : IdeleGroup (𝓞 F) F ↦ z.val.2 v) ha.symm
+        change g.val.2 v = algebraMap F (v.adicCompletion F) (a : F) at hv'
+        rw [hv', ha_eq, map_one]
+      have hv_neg : g.val.2 v = -1 := RestrictedProduct.mulSingle_eq_same _ _ _
+      have h2 : (2 : v.adicCompletion F) = 0 := by linear_combination -(hv_neg.symm.trans hv_eq)
+      have : CharZero (v.adicCompletion F) :=
+        charZero_of_injective_algebraMap (algebraMap F (v.adicCompletion F)).injective
+      exact two_ne_zero h2
+    obtain ⟨ω, hω⟩ : ∃ ω : PontryaginDual C₁, ω c ≠ 1 := by
+      by_contra hall
+      push Not at hall
+      exact hc_ne ((pontryaginDual_pairing_separates (G := C₁)).1
+        (funext fun ω ↦ (hall ω).trans (map_one ω).symm))
+    have hfix : ρ𝔽 c.val (sLocalThetaToGlobal F S y) = sLocalThetaToGlobal F S y := by
+      obtain ⟨u, hu⟩ := hg_out.1
+      refine Submodule.Quotient.induction_on (LinearMap.ker (sLocalAdelicTheta F S)) y fun f ↦ ?_
+      change ρ𝔽 c.val (sLocalThetaToGlobal F S ((LinearMap.ker (sLocalAdelicTheta F S)).mkQ f)) =
+        sLocalThetaToGlobal F S ((LinearMap.ker (sLocalAdelicTheta F S)).mkQ f)
+      have h1 := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 g
+        (sAdeleSchwartzToGlobal F S f)
+      have h2 := sLocalThetaToGlobal_equivariant (F := F) (S := S) u f
+      have h3 := sLocalThetaToGlobal_mk (F := F) (S := S) f
+      have hp : Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u) = 1 :=
+        hu.symm ▸ hg_out.2
+      have htr : schwartzBruhatUnitTranslate
+          (Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)) f = f := by
+        rw [hp]
+        exact Subtype.ext (funext fun x ↦ by
+          change f (Multiplicative.ofAdd ((1 : (SAdeleRing F S)ˣ).inv * x.toAdd)) = f x
+          simp)
+      have hstep : sLocalThetaToGlobal F S ((LinearMap.ker (sLocalAdelicTheta F S)).mkQ f) =
+          (LinearMap.ker (adelicThetaLinearMap F)).mkQ (schwartzBruhatUnitTranslate g
+            (sAdeleSchwartzToGlobal F S f)) := by
+        have h2' : sLocalThetaToGlobal F S
+            ((LinearMap.ker (sLocalAdelicTheta F S)).mkQ
+              (schwartzBruhatUnitTranslate
+                (Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)) f)) =
+            (LinearMap.ker (adelicThetaLinearMap F)).mkQ
+              (schwartzBruhatUnitTranslate (integralIdeleInsertion F S u)
+                (sAdeleSchwartzToGlobal F S f)) := h2
+        rw [htr, hu] at h2'
+        exact h2'
+      have h1' : ρ𝔽 c.val ((LinearMap.ker (adelicThetaLinearMap F)).mkQ
+          (sAdeleSchwartzToGlobal F S f)) =
+          (LinearMap.ker (adelicThetaLinearMap F)).mkQ (schwartzBruhatUnitTranslate g
+            (sAdeleSchwartzToGlobal F S f)) := h1
+      have h3' : sLocalThetaToGlobal F S ((LinearMap.ker (sLocalAdelicTheta F S)).mkQ f) =
+          (LinearMap.ker (adelicThetaLinearMap F)).mkQ (sAdeleSchwartzToGlobal F S f) := h3
+      with_reducible exact (congrArg (ρ𝔽 c.val) h3').trans (h1'.trans hstep.symm)
+    have hact := globalThetaToHomogeneousProduct_action ω c (sLocalThetaToGlobal F S y)
+    rw [hfix] at hact
+    have hsub : (1 - (ω c : ℂ)) • P (sLocalThetaToGlobal F S y) ω = 0 := by
+      rw [sub_smul, one_smul, ← hact, sub_self]
+    have hdiff : (1 : ℂ) - (ω c : ℂ) ≠ 0 :=
+      sub_ne_zero.mpr fun h ↦ hω (Subtype.ext h.symm)
+    have hzero : P (sLocalThetaToGlobal F S y) ω = 0 := (smul_eq_zero.mp hsub).resolve_left hdiff
+    exact hz ω ((congrFun hx ω).symm.trans hzero)
+  intro hclosed
+  exact hnotmem (by rw [← hclosed.closure_eq, hdense.closure_eq]; trivial)
 
 /-- Paper: Remark 6.2.1.4(2), p. 298.
 The topology on the global theta quotient induced by the product of homogeneous
@@ -1289,6 +2560,820 @@ local notation "archPart(" D ")" => Units.map (RingHom.fst (InfiniteAdeleRing F)
 local notation "archInsert(" D ")" =>
   Units.map (MonoidHom.inl (InfiniteAdeleRing F) (∀ v : D, L(v.val)))
 
+open scoped Classical in
+/-- Each archimedean coordinate norm is bounded above by the mixed-space norm. -/
+private theorem infiniteStandardThetaAverage_norm_le_mixed
+    (x : InfiniteAdeleRing F) (v : InfinitePlace F) :
+    ‖x v‖ ≤ ‖InfiniteAdeleRing.ringEquiv_mixedSpace F x‖ := by
+  rw [mixedEmbedding.norm_eq_sup'_normAtPlace]
+  apply Finset.le_sup'_of_le _ (Finset.mem_univ v)
+  by_cases hv : v.IsReal
+  · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact ((InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero
+      (map_zero _) _).symm.le
+  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+    rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc, InfiniteAdeleRing.ringEquiv_mixedSpace_apply]
+    exact ((InfinitePlace.Completion.isometry_extensionEmbedding v).norm_map_of_map_zero
+      (map_zero _) _).symm.le
+
+/-- On the zero-sum hyperplane of archimedean places, some coordinate is at least the sup norm
+divided by the number of archimedean places. -/
+private theorem infiniteStandardThetaAverage_hyperplane_max
+    (l : InfinitePlace F → ℝ) (hsum : ∑ v : InfinitePlace F, l v = 0) :
+    ∃ v : InfinitePlace F, ‖l‖ / (Fintype.card (InfinitePlace F) : ℝ) ≤ l v := by
+  classical
+  let r : ℕ := Fintype.card (InfinitePlace F)
+  have hrpos : (0 : ℝ) < (r : ℝ) := by
+    exact_mod_cast Fintype.card_pos (α := InfinitePlace F)
+  have hr1 : (1 : ℝ) ≤ (r : ℝ) := by
+    exact_mod_cast (Fintype.card_pos (α := InfinitePlace F) : 1 ≤ r)
+  by_cases hl : ‖l‖ = 0
+  · obtain ⟨v₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+    have hv₀ : l v₀ = 0 := by
+      have h0 : l = 0 := norm_eq_zero.mp hl
+      simp [h0]
+    exact ⟨v₀, by simp [hl, hv₀]⟩
+  · have hlpos : 0 < ‖l‖ := lt_of_le_of_ne (norm_nonneg l) (Ne.symm hl)
+    obtain ⟨v₀, -, hv₀⟩ := Finset.exists_max_image Finset.univ (fun v ↦ ‖l v‖) Finset.univ_nonempty
+    have hnorm_eq : ‖l‖ = |l v₀| := by
+      apply le_antisymm
+      · exact (pi_norm_le_iff_of_nonneg (norm_nonneg (l v₀))).mpr fun v ↦ hv₀ v (Finset.mem_univ v)
+      · exact norm_le_pi_norm l v₀
+    by_cases hsign : 0 ≤ l v₀
+    · refine ⟨v₀, ?_⟩
+      rw [hnorm_eq, abs_of_nonneg hsign]
+      exact div_le_self hsign hr1
+    · have hneg : -l v₀ = ‖l‖ := by
+        rw [hnorm_eq, abs_of_neg (lt_of_not_ge hsign)]
+      have hrest : ∑ v ∈ Finset.univ.erase v₀, l v = ‖l‖ := by
+        have h := Finset.add_sum_erase Finset.univ l (Finset.mem_univ v₀)
+        linarith
+      by_contra hcontra
+      push Not at hcontra
+      have hne : (Finset.univ.erase v₀).Nonempty := by
+        by_contra hempty
+        rw [Finset.not_nonempty_iff_eq_empty.mp hempty, Finset.sum_empty] at hrest
+        linarith
+      have hlt : ∑ v ∈ Finset.univ.erase v₀, l v <
+          ∑ _v ∈ Finset.univ.erase v₀, (‖l‖ / (r : ℝ)) :=
+        Finset.sum_lt_sum_of_nonempty hne fun v _ ↦ hcontra v
+      rw [hrest, Finset.sum_const, nsmul_eq_mul] at hlt
+      have hcard : ((Finset.univ.erase v₀).card : ℝ) ≤ (r : ℝ) := by
+        exact_mod_cast Finset.card_erase_le
+      have hmul : ((Finset.univ.erase v₀).card : ℝ) * (‖l‖ / (r : ℝ)) ≤ ‖l‖ := by
+        calc
+          _ ≤ (r : ℝ) * (‖l‖ / (r : ℝ)) :=
+            mul_le_mul_of_nonneg_right hcard (div_nonneg hlpos.le hrpos.le)
+          _ = ‖l‖ := mul_div_cancel₀ _ hrpos.ne'
+      linarith
+
+/-- On a finite-dimensional real normed space with an additive Haar measure, a radial function
+bounded by `A₀` inside radius `R` and decaying as `A₁ * exp(-α * (‖x‖ - R))` outside radius `R`
+is integrable, with integral bounded by `C * (A₀ + A₁) * (1 + R) ^ finrank ℝ E`. -/
+private theorem infiniteStandardThetaAverage_radial_shell_bound
+    {E : Type _} [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E] (μ : Measure E) [μ.IsAddHaarMeasure]
+    {α : ℝ} (hα : 0 < α) :
+    ∃ C : ℝ, 0 < C ∧ ∀ (A₀ A₁ R : ℝ), 0 ≤ A₀ → 0 ≤ A₁ → 0 ≤ R →
+      let g : E → ℝ := fun x ↦ if ‖x‖ < R then A₀ else A₁ * Real.exp (-α * (‖x‖ - R))
+      Integrable g μ ∧ (∫ x, g x ∂μ) ≤ C * (A₀ + A₁) * (1 + R) ^ Module.finrank ℝ E := by
+  let d : ℕ := Module.finrank ℝ E
+  let m (n : ℕ) : ℝ := ((n : ℝ) + 1) ^ d * Real.exp (-α * (n : ℝ))
+  have hm0 (n : ℕ) : 0 ≤ m n := by dsimp [m]; positivity
+  have hm : Summable m := by
+    let a (j : ℕ) : ℝ := (j : ℝ) ^ d * Real.exp (-α * (j : ℝ))
+    have ha : Summable a := Real.summable_pow_mul_exp_neg_nat_mul d hα
+    have hs := ((summable_nat_add_iff (f := a) 1).mpr ha).mul_left (Real.exp α)
+    have he (j : ℕ) : Real.exp α * a (j + 1) = m j := by
+      dsimp [a, m]
+      rw [Nat.cast_add, Nat.cast_one, mul_left_comm, ← Real.exp_add]
+      congr 2
+      ring
+    simpa only [he] using hs
+  let V₁ : ℝ := μ.real (Metric.closedBall (0 : E) 1)
+  have hV₁_pos : 0 < V₁ := by
+    dsimp [V₁]
+    rw [measureReal_def]
+    exact ENNReal.toReal_pos
+      (lt_of_lt_of_le (Metric.isOpen_ball.measure_pos μ ⟨0, Metric.mem_ball_self zero_lt_one⟩)
+        (measure_mono Metric.ball_subset_closedBall)).ne'
+      (isCompact_closedBall (0 : E) 1).measure_lt_top.ne
+  have hV₁_ne_top : μ (Metric.closedBall (0 : E) 1) ≠ ⊤ :=
+    (isCompact_closedBall (0 : E) 1).measure_lt_top.ne
+  let Ssum : ℝ := 1 + ∑' n : ℕ, m n
+  have hS_pos : 0 < Ssum := by
+    have hnn : 0 ≤ ∑' n : ℕ, m n := tsum_nonneg hm0
+    linarith
+  refine ⟨V₁ * Ssum, mul_pos hV₁_pos hS_pos, fun A₀ A₁ R hA₀ hA₁ hR ↦ ?_⟩
+  let g : E → ℝ := fun x ↦ if ‖x‖ < R then A₀ else A₁ * Real.exp (-α * (‖x‖ - R))
+  have hg_nonneg (x : E) : 0 ≤ g x := by
+    dsimp [g]
+    split_ifs <;> positivity
+  have hg_meas : Measurable g := by
+    have hset : MeasurableSet {x : E | ‖x‖ < R} :=
+      (isOpen_lt continuous_norm continuous_const).measurableSet
+    exact Measurable.ite hset measurable_const
+      (measurable_const.mul ((measurable_const.mul (continuous_norm.measurable.sub measurable_const)).exp))
+  let B : Set E := {x : E | ‖x‖ < R}
+  have hB_meas : MeasurableSet B := (isOpen_lt continuous_norm continuous_const).measurableSet
+  have hB_sub : B ⊆ Metric.closedBall (0 : E) R := fun x hx ↦ by
+    simpa [Metric.mem_closedBall, dist_zero_right] using le_of_lt hx
+  have hinner : ∫⁻ x in B, ENNReal.ofReal (g x) ∂μ ≤
+      ENNReal.ofReal (V₁ * A₀ * (1 + R) ^ d) := by
+    calc
+      ∫⁻ x in B, ENNReal.ofReal (g x) ∂μ
+          = ∫⁻ _x in B, ENNReal.ofReal A₀ ∂μ :=
+            setLIntegral_congr_fun hB_meas fun x hx ↦ by simp [g, show ‖x‖ < R from hx]
+      _ = ENNReal.ofReal A₀ * μ B := by simp
+      _ ≤ ENNReal.ofReal A₀ * μ (Metric.closedBall (0 : E) R) := by
+            gcongr
+      _ = ENNReal.ofReal A₀ * (ENNReal.ofReal (R ^ d) * μ (Metric.closedBall (0 : E) 1)) := by
+            rw [Measure.addHaar_closedBall' μ (0 : E) hR]
+      _ ≤ ENNReal.ofReal A₀ * (ENNReal.ofReal ((1 + R) ^ d) * μ (Metric.closedBall (0 : E) 1)) := by
+            gcongr
+            linarith
+      _ = ENNReal.ofReal (V₁ * A₀ * (1 + R) ^ d) := by
+            rw [← ENNReal.ofReal_toReal hV₁_ne_top]
+            change ENNReal.ofReal A₀ * (ENNReal.ofReal ((1 + R) ^ d) * ENNReal.ofReal V₁) = _
+            rw [← ENNReal.ofReal_mul (by positivity), ← ENNReal.ofReal_mul hA₀]
+            congr 1
+            ring
+  let shell (n : ℕ) : Set E := {x : E | R + (n : ℝ) ≤ ‖x‖ ∧ ‖x‖ < R + (n : ℝ) + 1}
+  have hcover : Bᶜ ⊆ ⋃ n : ℕ, shell n := by
+    intro x hx
+    have hxR : R ≤ ‖x‖ := not_lt.mp hx
+    refine Set.mem_iUnion.mpr ⟨⌊‖x‖ - R⌋₊, ?_, ?_⟩
+    · have hfl := Nat.floor_le (sub_nonneg.mpr hxR)
+      linarith
+    · have hlt := Nat.lt_floor_add_one (‖x‖ - R)
+      linarith
+  have hshell_sub (n : ℕ) : shell n ⊆ Metric.closedBall (0 : E) (R + (n : ℝ) + 1) := fun x hx ↦ by
+    simpa [Metric.mem_closedBall, dist_zero_right] using le_of_lt hx.2
+  have hshell_int (n : ℕ) :
+      ∫⁻ x in shell n, ENNReal.ofReal (g x) ∂μ ≤
+        ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * m n) := by
+    have hpt : ∀ x ∈ shell n, ENNReal.ofReal (g x) ≤ ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) := by
+      intro x hx
+      have hxge : R ≤ ‖x‖ := by linarith [hx.1, (Nat.cast_nonneg (α := ℝ) n)]
+      have hgval : g x = A₁ * Real.exp (-α * (‖x‖ - R)) :=
+        ite_eq_right (fun h ↦ (not_lt.mpr hxge h).elim)
+      rw [hgval]
+      apply ENNReal.ofReal_le_ofReal
+      apply mul_le_mul_of_nonneg_left _ hA₁
+      apply Real.exp_le_exp.mpr
+      have hsub : (n : ℝ) ≤ ‖x‖ - R := by linarith [hx.1]
+      nlinarith
+    calc
+      ∫⁻ x in shell n, ENNReal.ofReal (g x) ∂μ
+          ≤ ∫⁻ _x in shell n, ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) ∂μ :=
+            setLIntegral_mono' (by
+              have h1 : MeasurableSet {x : E | R + (n : ℝ) ≤ ‖x‖} :=
+                (isClosed_le continuous_const continuous_norm).measurableSet
+              have h2 : MeasurableSet {x : E | ‖x‖ < R + (n : ℝ) + 1} :=
+                (isOpen_lt continuous_norm continuous_const).measurableSet
+              exact h1.inter h2) hpt
+      _ = ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) * μ (shell n) := by simp
+      _ ≤ ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) *
+            μ (Metric.closedBall (0 : E) (R + (n : ℝ) + 1)) := by
+            gcongr
+            exact hshell_sub n
+      _ = ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) *
+            (ENNReal.ofReal ((R + (n : ℝ) + 1) ^ d) * μ (Metric.closedBall (0 : E) 1)) := by
+            rw [Measure.addHaar_closedBall' μ (0 : E) (by positivity)]
+      _ ≤ ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) *
+            (ENNReal.ofReal (((1 + R) * ((n : ℝ) + 1)) ^ d) * μ (Metric.closedBall (0 : E) 1)) := by
+            gcongr
+            nlinarith [mul_nonneg hR (Nat.cast_nonneg (α := ℝ) n)]
+      _ = ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * m n) := by
+            rw [← ENNReal.ofReal_toReal hV₁_ne_top]
+            change ENNReal.ofReal (A₁ * Real.exp (-α * (n : ℝ))) *
+              (ENNReal.ofReal (((1 + R) * ((n : ℝ) + 1)) ^ d) * ENNReal.ofReal V₁) = _
+            rw [← ENNReal.ofReal_mul (by positivity), ← ENNReal.ofReal_mul (by positivity)]
+            congr 1
+            dsimp [m]
+            rw [mul_pow]
+            ring
+  have houter : ∫⁻ x in Bᶜ, ENNReal.ofReal (g x) ∂μ ≤
+      ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * ∑' n : ℕ, m n) := by
+    calc
+      ∫⁻ x in Bᶜ, ENNReal.ofReal (g x) ∂μ
+          ≤ ∫⁻ x in ⋃ n : ℕ, shell n, ENNReal.ofReal (g x) ∂μ := lintegral_mono_set hcover
+      _ ≤ ∑' n : ℕ, ∫⁻ x in shell n, ENNReal.ofReal (g x) ∂μ := lintegral_iUnion_le _ _
+      _ ≤ ∑' n : ℕ, ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * m n) :=
+            tsum_le_tsum hshell_int
+      _ = ENNReal.ofReal (∑' n : ℕ, V₁ * A₁ * (1 + R) ^ d * m n) :=
+            (ENNReal.ofReal_tsum_of_nonneg (fun n ↦ by positivity)
+              (hm.mul_left (V₁ * A₁ * (1 + R) ^ d))).symm
+      _ = ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * ∑' n : ℕ, m n) := by
+            rw [tsum_mul_left]
+  have htotal : ∫⁻ x, ENNReal.ofReal (g x) ∂μ ≤
+      ENNReal.ofReal (V₁ * Ssum * (A₀ + A₁) * (1 + R) ^ d) := by
+    calc
+      ∫⁻ x, ENNReal.ofReal (g x) ∂μ
+          = (∫⁻ x in B, ENNReal.ofReal (g x) ∂μ) + (∫⁻ x in Bᶜ, ENNReal.ofReal (g x) ∂μ) :=
+            (lintegral_add_compl _ hB_meas).symm
+      _ ≤ ENNReal.ofReal (V₁ * A₀ * (1 + R) ^ d) +
+            ENNReal.ofReal (V₁ * A₁ * (1 + R) ^ d * ∑' n : ℕ, m n) :=
+            add_le_add hinner houter
+      _ = ENNReal.ofReal (V₁ * A₀ * (1 + R) ^ d + V₁ * A₁ * (1 + R) ^ d * ∑' n : ℕ, m n) :=
+            (ENNReal.ofReal_add (by positivity) (by positivity)).symm
+      _ ≤ ENNReal.ofReal (V₁ * Ssum * (A₀ + A₁) * (1 + R) ^ d) := by
+            apply ENNReal.ofReal_le_ofReal
+            dsimp [Ssum]
+            have hnn : 0 ≤ ∑' n : ℕ, m n := tsum_nonneg hm0
+            nlinarith [mul_nonneg (mul_nonneg hV₁_pos.le hA₀) (pow_nonneg (by linarith : 0 ≤ 1 + R) d),
+              mul_nonneg (mul_nonneg hV₁_pos.le hA₁) (pow_nonneg (by linarith : 0 ≤ 1 + R) d)]
+  have hfin : HasFiniteIntegral g μ := by
+    rw [hasFiniteIntegral_iff_ofReal (Eventually.of_forall hg_nonneg)]
+    exact lt_of_le_of_lt htotal ENNReal.ofReal_lt_top
+  refine ⟨⟨hg_meas.aestronglyMeasurable, hfin⟩, ?_⟩
+  rw [integral_eq_lintegral_of_nonneg_ae (Eventually.of_forall hg_nonneg) hg_meas.aestronglyMeasurable]
+  exact ((ENNReal.toReal_le_toReal (lt_of_le_of_lt htotal ENNReal.ofReal_lt_top).ne
+    ENNReal.ofReal_ne_top).mpr htotal).trans_eq (ENNReal.toReal_ofReal (by positivity))
+
+open scoped Classical in
+/-- Log-polar decomposition of the norm-one archimedean ideles and their Tamagawa measure:
+`N∞` is homeomorphic to the product of the compact unit-modulus subgroup `U` and the zero-sum
+log hyperplane `H` of dimension `|S∞| - 1`, carrying `sNormOneIdeleTamagawaMeasure F ∅` to a
+scalar multiple of the product of a finite measure on `U` and an additive Haar measure on `H`. -/
+private theorem infiniteStandardThetaAverage_polar :
+    let _ (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    let _ (v : V) : MeasurableSpace (v.adicCompletion F) := borel _
+    let _ : MeasurableSpace (SAdeleRing F (∅ : Finset V)) := inferInstanceAs
+      (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+        ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+    let sumLin : (InfinitePlace F → ℝ) →ₗ[ℝ] ℝ :=
+      { toFun := fun l ↦ ∑ v, l v
+        map_add' := fun _ _ ↦ Finset.sum_add_distrib
+        map_smul' := fun c l ↦ by simp [Finset.mul_sum] }
+    let H : Submodule ℝ (InfinitePlace F → ℝ) := LinearMap.ker sumLin
+    let U : Subgroup I∞ :=
+      { carrier := {u : I∞ | ∀ v : InfinitePlace F, ‖u.val v‖ = 1}
+        mul_mem' := fun {a b} ha hb v ↦ by
+          change ‖a.val v * b.val v‖ = 1
+          rw [norm_mul, ha v, hb v, mul_one]
+        one_mem' := fun v ↦ by
+          change ‖(1 : v.Completion)‖ = 1
+          exact norm_one
+        inv_mem' := fun {a} ha v ↦ by
+          have hmul : a.val v * (a⁻¹).val v = 1 :=
+            congrFun (congrArg (Units.val : I∞ → InfiniteAdeleRing F) (mul_inv_cancel a)) v
+          have hnorm := congrArg norm hmul
+          rw [norm_mul, ha v, one_mul, norm_one] at hnorm
+          exact hnorm }
+    ∃ (_ : CompactSpace U) (_ : MeasurableSpace U) (_ : BorelSpace U)
+      (μU : Measure U) (_ : IsFiniteMeasure μU)
+      (μH : Measure H) (_ : μH.IsAddHaarMeasure)
+      (c : ℝ≥0) (e : U × H ≃ₜ N∞),
+      Module.finrank ℝ H = Fintype.card (InfinitePlace F) - 1 ∧
+      (∀ l : H, ∑ v : InfinitePlace F, l.val v = 0) ∧
+      (∀ (u : U) (l : H) (v : InfinitePlace F),
+        ‖(archPart((∅ : Finset V)) (e (u, l)).val).val v‖ = Real.exp (l.val v / v.mult)) ∧
+      sNormOneIdeleTamagawaMeasure F ∅ = c • Measure.map e (μU.prod μH) := by
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : V) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : V) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let : MeasurableSpace (SAdeleRing F (∅ : Finset V)) := inferInstanceAs
+    (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+  let : BorelSpace (SAdeleRing F (∅ : Finset V)) := inferInstanceAs
+    (BorelSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+  let : SecondCountableTopology (SAdeleRing F (∅ : Finset V)) := inferInstanceAs
+    (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+  let : BorelSpace Iₛ((∅ : Finset V)) := by
+    refine ⟨?_⟩
+    rw [(sIdeleGroup_description F ∅).1.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+    rfl
+  let : SecondCountableTopology Iₛ((∅ : Finset V)) :=
+    (sIdeleGroup_description F ∅).1.secondCountableTopology
+  let : LocallyCompactSpace Iₛ((∅ : Finset V)) := (sIdeleGroup_description F ∅).2.2.1
+  have hn : Continuous (sIdeleNorm F (∅ : Finset V)) :=
+    (isProperMap_sIdeleQuotientNorm F ∅).continuous.comp continuous_quotient_mk'
+  have hK : IsClosed (N∞ : Set Iₛ((∅ : Finset V))) := isClosed_eq hn continuous_const
+  let : LocallyCompactSpace N∞ := hK.locallyCompactSpace
+  let : SecondCountableTopology N∞ := Topology.IsEmbedding.subtypeVal.secondCountableTopology
+  let : BorelSpace N∞ := Subtype.borelSpace _
+  let ν := sNormOneIdeleTamagawaMeasure F (∅ : Finset V)
+  let : ν.IsHaarMeasure := (sNormOneIdeleTamagawaMeasure_existsUnique F ∅).exists.choose_spec.1
+  let sumLin : (InfinitePlace F → ℝ) →ₗ[ℝ] ℝ :=
+    { toFun := fun l ↦ ∑ v, l v
+      map_add' := fun _ _ ↦ Finset.sum_add_distrib
+      map_smul' := fun c l ↦ by simp [Finset.mul_sum] }
+  let H : Submodule ℝ (InfinitePlace F → ℝ) := LinearMap.ker sumLin
+  let U : Subgroup I∞ :=
+    { carrier := {u : I∞ | ∀ v : InfinitePlace F, ‖u.val v‖ = 1}
+      mul_mem' := fun {a b} ha hb v ↦ by
+        change ‖a.val v * b.val v‖ = 1
+        rw [norm_mul, ha v, hb v, mul_one]
+      one_mem' := fun v ↦ by
+        change ‖(1 : v.Completion)‖ = 1
+        exact norm_one
+      inv_mem' := fun {a} ha v ↦ by
+        have hmul : a.val v * (a⁻¹).val v = 1 :=
+          congrFun (congrArg (Units.val : I∞ → InfiniteAdeleRing F) (mul_inv_cancel a)) v
+        have hnorm := congrArg norm hmul
+        rw [norm_mul, ha v, one_mul, norm_one] at hnorm
+        exact hnorm }
+  -- Compactness of U
+  let : T2Space (InfiniteAdeleRing F) := inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let arch := InfiniteAdeleRing.ringEquiv_mixedSpace F
+  have harch_cont : Continuous arch := continuous_infiniteAdeleRingEquivMixedSpace F
+  have harch_symm_cont : Continuous arch.symm := continuous_infiniteAdeleRingEquivMixedSpace_symm F
+  have hU_compact : IsCompact (U : Set I∞) := by
+    let S₁ : Set (InfiniteAdeleRing F) := {x | ∀ v : InfinitePlace F, ‖x v‖ = 1}
+    have hS₁_closed : IsClosed S₁ := by
+      have heq : S₁ = ⋂ v : InfinitePlace F, {x : InfiniteAdeleRing F | ‖x v‖ = 1} := by
+        ext x; simp [S₁]
+      rw [heq]
+      exact isClosed_iInter fun v ↦ isClosed_eq ((continuous_apply v).norm) continuous_const
+    have hS₁_bdd : Bornology.IsBounded (arch '' S₁) := by
+      refine (Metric.isBounded_closedBall (x := (0 : mixedEmbedding.mixedSpace F)) (r := 1)).subset ?_
+      rintro _ ⟨x, hx, rfl⟩
+      rw [Metric.mem_closedBall, dist_zero_right, mixedEmbedding.norm_eq_sup'_normAtPlace]
+      apply Finset.sup'_le
+      intro v _
+      by_cases hv : v.IsReal
+      · rw [mixedEmbedding.normAtPlace_apply_of_isReal hv, InfiniteAdeleRing.ringEquiv_mixedSpace_apply,
+          (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero
+            (map_zero _) _, hx v]
+      · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+        rw [mixedEmbedding.normAtPlace_apply_of_isComplex hc, InfiniteAdeleRing.ringEquiv_mixedSpace_apply,
+          (InfinitePlace.Completion.isometry_extensionEmbedding v).norm_map_of_map_zero
+            (map_zero _) _, hx v]
+    have hS₁_img_closed : IsClosed (arch '' S₁) := by
+      have himg : arch '' S₁ = arch.symm ⁻¹' S₁ := by
+        ext z
+        exact ⟨fun ⟨x, hx, hxz⟩ ↦ by simpa [← hxz] using hx,
+          fun hz ↦ ⟨arch.symm z, hz, arch.apply_symm_apply z⟩⟩
+      rw [himg]
+      exact hS₁_closed.preimage harch_symm_cont
+    have hS₁_comp : IsCompact S₁ := by
+      have hc : IsCompact (arch '' S₁) :=
+        Metric.isCompact_of_isClosed_isBounded hS₁_img_closed hS₁_bdd
+      have hpre := hc.image harch_symm_cont
+      rwa [Set.image_image, Set.image_congr (fun x _ ↦ arch.symm_apply_apply x), Set.image_id'] at hpre
+    let P : Set (InfiniteAdeleRing F × (InfiniteAdeleRing F)ᵐᵒᵖ) :=
+      (S₁ ×ˢ (MulOpposite.unop ⁻¹' S₁)) ∩ {p | p.1 * MulOpposite.unop p.2 = 1}
+    have hS₁_op_comp : IsCompact (MulOpposite.unop ⁻¹' S₁ : Set (InfiniteAdeleRing F)ᵐᵒᵖ) := by
+      have heq : (MulOpposite.unop ⁻¹' S₁ : Set (InfiniteAdeleRing F)ᵐᵒᵖ) = MulOpposite.op '' S₁ := by
+        ext x
+        exact ⟨fun hx ↦ ⟨MulOpposite.unop x, hx, MulOpposite.op_unop x⟩,
+          fun ⟨y, hy, hyx⟩ ↦ hyx ▸ hy⟩
+      rw [heq]
+      exact hS₁_comp.image MulOpposite.continuous_op
+    have hP_comp : IsCompact P :=
+      (hS₁_comp.prod hS₁_op_comp).inter_right
+        (isClosed_eq (continuous_fst.mul (MulOpposite.continuous_unop.comp continuous_snd)) continuous_const)
+    have hU_eq : Units.embedProduct (InfiniteAdeleRing F) '' (U : Set I∞) = P := by
+      ext ⟨a, b⟩
+      constructor
+      · rintro ⟨u, hu, h⟩
+        have ha : a = u.val := (congrArg Prod.fst h).symm
+        have hb : MulOpposite.unop b = (u⁻¹).val := by
+          have h2 : b = MulOpposite.op (u⁻¹).val := (congrArg Prod.snd h).symm
+          rw [h2]; rfl
+        refine ⟨⟨fun v ↦ ha ▸ hu v, fun v ↦ hb ▸ U.inv_mem hu v⟩, ?_⟩
+        change a * MulOpposite.unop b = 1
+        rw [ha, hb]
+        exact congrArg (Units.val : I∞ → InfiniteAdeleRing F) (mul_inv_cancel u)
+      · rintro ⟨⟨ha, hb⟩, hab⟩
+        have hba : MulOpposite.unop b * a = 1 := (mul_comm _ _).trans hab
+        refine ⟨⟨a, MulOpposite.unop b, hab, hba⟩, ha, ?_⟩
+        ext <;> rfl
+    rw [Units.isEmbedding_embedProduct.isCompact_iff, hU_eq]
+    exact hP_comp
+  let : CompactSpace U := isCompact_iff_compactSpace.mp hU_compact
+  let : T2Space I∞ := Units.isEmbedding_embedProduct.t2Space
+  let : T2Space U := inferInstance
+  let : LocallyCompactSpace U := inferInstance
+  let : SecondCountableTopology (InfiniteAdeleRing F) :=
+    inferInstanceAs (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+  let : SecondCountableTopology (InfiniteAdeleRing F)ᵐᵒᵖ :=
+    MulOpposite.opHomeomorph.symm.isEmbedding.secondCountableTopology
+  let : SecondCountableTopology I∞ :=
+    Units.isEmbedding_embedProduct.secondCountableTopology
+  let : SecondCountableTopology U := Topology.IsEmbedding.subtypeVal.secondCountableTopology
+  let : MeasurableSpace U := borel U
+  let : BorelSpace U := ⟨rfl⟩
+  -- Exponential map into I∞ via mixedSpace
+  let expMixed (l : InfinitePlace F → ℝ) : mixedEmbedding.mixedSpace F :=
+    (fun v ↦ Real.exp (l v.1 / v.1.mult), fun v ↦ (Real.exp (l v.1 / v.1.mult) : ℂ))
+  have hexpMixed_mul (l₁ l₂ : InfinitePlace F → ℝ) :
+      expMixed (l₁ + l₂) = expMixed l₁ * expMixed l₂ := by
+    ext v
+    · change Real.exp ((l₁ v.1 + l₂ v.1) / v.1.mult) =
+        Real.exp (l₁ v.1 / v.1.mult) * Real.exp (l₂ v.1 / v.1.mult)
+      rw [add_div, Real.exp_add]
+    · change (Real.exp ((l₁ v.1 + l₂ v.1) / v.1.mult) : ℂ) =
+        (Real.exp (l₁ v.1 / v.1.mult) : ℂ) * (Real.exp (l₂ v.1 / v.1.mult) : ℂ)
+      rw [add_div, Real.exp_add, Complex.ofReal_mul]
+  have hexpMixed_zero : expMixed 0 = 1 := by
+    ext v
+    · change Real.exp (0 / (v.1.mult : ℝ)) = 1; simp
+    · change (Real.exp (0 / (v.1.mult : ℝ)) : ℂ) = 1; simp
+  have hexpMixed_cont : Continuous expMixed :=
+    (continuous_pi fun v ↦ Real.continuous_exp.comp ((continuous_apply v.1).div_const _)).prodMk
+      (continuous_pi fun v ↦ Complex.continuous_ofReal.comp
+        (Real.continuous_exp.comp ((continuous_apply v.1).div_const _)))
+  let expArch (l : InfinitePlace F → ℝ) : I∞ :=
+    ⟨arch.symm (expMixed l), arch.symm (expMixed (-l)),
+      by rw [← map_mul, ← hexpMixed_mul, add_neg_cancel, hexpMixed_zero, map_one],
+      by rw [← map_mul, ← hexpMixed_mul, neg_add_cancel, hexpMixed_zero, map_one]⟩
+  have hexpArch_mul (l₁ l₂ : InfinitePlace F → ℝ) :
+      expArch (l₁ + l₂) = expArch l₁ * expArch l₂ := by
+    apply Units.ext
+    change arch.symm (expMixed (l₁ + l₂)) = arch.symm (expMixed l₁) * arch.symm (expMixed l₂)
+    rw [hexpMixed_mul, map_mul]
+  have hexpArch_zero : expArch 0 = 1 := by
+    apply Units.ext
+    change arch.symm (expMixed 0) = 1
+    rw [hexpMixed_zero, map_one]
+  have hexpArch_cont : Continuous expArch :=
+    Units.isEmbedding_embedProduct.continuous_iff.mpr
+      ((harch_symm_cont.comp hexpMixed_cont).prodMk
+        (MulOpposite.continuous_op.comp (harch_symm_cont.comp (hexpMixed_cont.comp continuous_neg))))
+  have hexpArch_norm (l : InfinitePlace F → ℝ) (v : InfinitePlace F) :
+      ‖(expArch l).val v‖ = Real.exp (l v / v.mult) := by
+    have ha : arch (expArch l).val = expMixed l := arch.apply_symm_apply (expMixed l)
+    by_cases hv : v.IsReal
+    · have h1 := congrArg (fun z : mixedEmbedding.mixedSpace F ↦ z.1 ⟨v, hv⟩) ha
+      rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply] at h1
+      change InfinitePlace.Completion.extensionEmbeddingOfIsReal hv ((expArch l).val v) =
+        Real.exp (l v / v.mult) at h1
+      rw [← (InfinitePlace.Completion.isometry_extensionEmbeddingOfIsReal hv).norm_map_of_map_zero
+        (map_zero _) _, h1, Real.norm_eq_abs, abs_of_pos (Real.exp_pos _)]
+    · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      have h1 := congrArg (fun z : mixedEmbedding.mixedSpace F ↦ z.2 ⟨v, hc⟩) ha
+      rw [InfiniteAdeleRing.ringEquiv_mixedSpace_apply] at h1
+      change InfinitePlace.Completion.extensionEmbedding v ((expArch l).val v) =
+        (Real.exp (l v / v.mult) : ℂ) at h1
+      rw [← (InfinitePlace.Completion.isometry_extensionEmbedding v).norm_map_of_map_zero
+        (map_zero _) _, h1, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (Real.exp_pos _)]
+  have hexpArch_log (l : InfinitePlace F → ℝ) : infiniteIdeleLog F (expArch l) = l := by
+    funext v
+    change (v.mult : ℝ) * Real.log ‖(expArch l).val v‖ = l v
+    rw [hexpArch_norm, Real.log_exp, mul_div_cancel₀ _ InfinitePlace.mult_coe_ne_zero]
+  -- Norm agreement between sIdeleNorm F ∅ and infiniteIdeleNorm F
+  have hnorm_empty (g : Iₛ((∅ : Finset V))) :
+      sIdeleNorm F (∅ : Finset V) g = infiniteIdeleNorm F (archPart((∅ : Finset V)) g) := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    simp only [sIdeleNorm, infiniteIdeleNorm, MonoidHom.finsetProd_apply,
+      MonoidHom.pow_apply, Units.coe_prod, Units.val_pow_eq_pow_val,
+      Finset.univ_eq_empty, Finset.prod_empty, mul_one]
+    rfl
+  have hnorm_insert (x : I∞) :
+      sIdeleNorm F (∅ : Finset V) (archInsert((∅ : Finset V)) x) = infiniteIdeleNorm F x := by
+    rw [hnorm_empty]
+    congr 1
+  have hpart_insert (x : I∞) : archPart((∅ : Finset V)) (archInsert((∅ : Finset V)) x) = x := by
+    apply Units.ext; rfl
+  have hinsert_part (g : Iₛ((∅ : Finset V))) :
+      archInsert((∅ : Finset V)) (archPart((∅ : Finset V)) g) = g := by
+    apply Units.ext
+    apply Prod.ext
+    · rfl
+    · funext v; exact (Finset.notMem_empty v.val v.property).elim
+  -- Build ContinuousMulEquiv : U × Multiplicative H ≃ₜ* N∞
+  have hmem_N (u : U) (l : H) : archInsert((∅ : Finset V)) (u.val * expArch l.val) ∈ N∞ := by
+    rw [MonoidHom.mem_ker, hnorm_insert]
+    apply Units.ext
+    apply NNReal.coe_injective
+    simp only [infiniteIdeleNorm, MonoidHom.finsetProd_apply, MonoidHom.pow_apply,
+      Units.coe_prod, Units.val_pow_eq_pow_val, Units.val_one, NNReal.coe_one, NNReal.coe_prod,
+      NNReal.coe_pow]
+    change ∏ v : InfinitePlace F, ‖(u.val * expArch l.val).val v‖ ^ v.mult = 1
+    have hterm (v : InfinitePlace F) :
+        ‖(u.val * expArch l.val).val v‖ ^ v.mult = Real.exp (l.val v) := by
+      change ‖u.val.val v * (expArch l.val).val v‖ ^ v.mult = _
+      rw [norm_mul, u.property v, one_mul, hexpArch_norm, ← Real.exp_nat_mul,
+        mul_div_cancel₀ _ InfinitePlace.mult_coe_ne_zero]
+    simp_rw [hterm, ← Real.exp_sum]
+    have hzero : ∑ v : InfinitePlace F, l.val v = 0 := l.property
+    rw [hzero, Real.exp_zero]
+  have hinv_H (g : N∞) : infiniteIdeleLog F (archPart((∅ : Finset V)) g.val) ∈ H := by
+    change ∑ v : InfinitePlace F, infiniteIdeleLog F (archPart((∅ : Finset V)) g.val) v = 0
+    have hnorm1 : infiniteIdeleNorm F (archPart((∅ : Finset V)) g.val) = 1 :=
+      (hnorm_empty g.val).symm.trans g.property
+    exact infiniteIdeleLog_sum_zero F ⟨archPart((∅ : Finset V)) g.val, hnorm1⟩
+  have hinv_U (g : N∞) :
+      archPart((∅ : Finset V)) g.val *
+        (expArch (infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)))⁻¹ ∈ U := by
+    intro v
+    have hnz : (archPart((∅ : Finset V)) g.val).val v ≠ 0 :=
+      (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom
+        (archPart((∅ : Finset V)) g.val)).ne_zero
+    have hinv_eq : (expArch (infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)))⁻¹ =
+        expArch (-(infiniteIdeleLog F (archPart((∅ : Finset V)) g.val))) := by
+      apply inv_eq_of_mul_eq_one_right
+      rw [← hexpArch_mul, add_neg_cancel, hexpArch_zero]
+    rw [hinv_eq]
+    change ‖(archPart((∅ : Finset V)) g.val).val v *
+      (expArch (-(infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)))).val v‖ = 1
+    rw [norm_mul, hexpArch_norm]
+    change ‖(archPart((∅ : Finset V)) g.val).val v‖ *
+      Real.exp (-((v.mult : ℝ) * Real.log ‖(archPart((∅ : Finset V)) g.val).val v‖) / (v.mult : ℝ)) = 1
+    rw [neg_div, mul_div_cancel_left₀ _ InfinitePlace.mult_coe_ne_zero, Real.exp_neg,
+      Real.exp_log (norm_pos_iff.mpr hnz), mul_inv_cancel₀ (norm_ne_zero_iff.mpr hnz)]
+  let φ : U × Multiplicative H ≃ₜ* N∞ :=
+    { toFun := fun p ↦
+        ⟨archInsert((∅ : Finset V)) (p.1.val * expArch (Multiplicative.toAdd p.2).val),
+          hmem_N p.1 (Multiplicative.toAdd p.2)⟩
+      invFun := fun g ↦
+        (⟨archPart((∅ : Finset V)) g.val *
+            (expArch (infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)))⁻¹, hinv_U g⟩,
+          Multiplicative.ofAdd ⟨infiniteIdeleLog F (archPart((∅ : Finset V)) g.val), hinv_H g⟩)
+      left_inv := fun ⟨u, l⟩ ↦ by
+        apply Prod.ext
+        · apply Subtype.ext
+          change archPart((∅ : Finset V))
+              (archInsert((∅ : Finset V)) (u.val * expArch (Multiplicative.toAdd l).val)) *
+            (expArch (infiniteIdeleLog F (archPart((∅ : Finset V))
+              (archInsert((∅ : Finset V)) (u.val * expArch (Multiplicative.toAdd l).val)))))⁻¹ = u.val
+          rw [hpart_insert, infiniteIdeleLog_mul]
+          have hu_log : infiniteIdeleLog F u.val = 0 := by
+            funext v
+            change (v.mult : ℝ) * Real.log ‖u.val.val v‖ = 0
+            rw [u.property v, Real.log_one, mul_zero]
+          rw [hu_log, zero_add, hexpArch_log, mul_inv_cancel_right]
+        · apply Multiplicative.toAdd.injective
+          apply Subtype.ext
+          change infiniteIdeleLog F (archPart((∅ : Finset V))
+            (archInsert((∅ : Finset V)) (u.val * expArch (Multiplicative.toAdd l).val))) =
+            (Multiplicative.toAdd l).val
+          rw [hpart_insert, infiniteIdeleLog_mul]
+          have hu_log : infiniteIdeleLog F u.val = 0 := by
+            funext v
+            change (v.mult : ℝ) * Real.log ‖u.val.val v‖ = 0
+            rw [u.property v, Real.log_one, mul_zero]
+          rw [hu_log, zero_add, hexpArch_log]
+      right_inv := fun g ↦ by
+        apply Subtype.ext
+        change archInsert((∅ : Finset V)) (archPart((∅ : Finset V)) g.val *
+          (expArch (infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)))⁻¹ *
+          expArch (infiniteIdeleLog F (archPart((∅ : Finset V)) g.val))) = g.val
+        rw [inv_mul_cancel_right, hinsert_part]
+      map_mul' := fun ⟨u₁, l₁⟩ ⟨u₂, l₂⟩ ↦ by
+        apply Subtype.ext
+        change archInsert((∅ : Finset V)) ((u₁.val * u₂.val) *
+            expArch ((Multiplicative.toAdd l₁).val + (Multiplicative.toAdd l₂).val)) =
+          archInsert((∅ : Finset V)) (u₁.val * expArch (Multiplicative.toAdd l₁).val) *
+            archInsert((∅ : Finset V)) (u₂.val * expArch (Multiplicative.toAdd l₂).val)
+        rw [← map_mul, hexpArch_mul]
+        congr 1
+        ac_rfl
+      continuous_toFun := by
+        apply Continuous.subtype_mk
+        have hins : Continuous (archInsert((∅ : Finset V))) :=
+          (continuous_id.prodMk continuous_const :
+            Continuous (MonoidHom.inl (InfiniteAdeleRing F) (∀ v : (∅ : Finset V), L(v.val)))).units_map _
+        exact hins.comp ((continuous_subtype_val.comp continuous_fst).mul
+          (hexpArch_cont.comp (continuous_subtype_val.comp (continuous_toAdd.comp continuous_snd))))
+      continuous_invFun := by
+        have hpart : Continuous (archPart((∅ : Finset V))) :=
+          (continuous_fst : Continuous (RingHom.fst (InfiniteAdeleRing F)
+            (∀ v : (∅ : Finset V), L(v.val)))).units_map _
+        have hgpart : Continuous (fun g : N∞ ↦ archPart((∅ : Finset V)) g.val) :=
+          hpart.comp continuous_subtype_val
+        have hlog : Continuous (fun g : N∞ ↦ infiniteIdeleLog F (archPart((∅ : Finset V)) g.val)) :=
+          (infiniteIdeleLog_continuous F).comp hgpart
+        exact Continuous.prodMk
+          (Continuous.subtype_mk (hgpart.mul (continuous_inv.comp (hexpArch_cont.comp hlog))) _)
+          (continuous_ofAdd.comp (Continuous.subtype_mk hlog _)) }
+  -- Measures on U, H, Multiplicative H, and uniqueness of Haar measure
+  let μU : Measure U := Measure.haar
+  let : IsFiniteMeasure μU := ⟨isCompact_univ.measure_lt_top⟩
+  let μH : Measure H := Measure.addHaar
+  let hofAdd_homeo : H ≃ₜ Multiplicative H :=
+    { toFun := Multiplicative.ofAdd
+      invFun := Multiplicative.toAdd
+      left_inv := fun _ ↦ rfl
+      right_inv := fun _ ↦ rfl
+      continuous_toFun := continuous_ofAdd
+      continuous_invFun := continuous_toAdd }
+  let : MeasurableSpace (Multiplicative H) := borel (Multiplicative H)
+  let : BorelSpace (Multiplicative H) := ⟨rfl⟩
+  let : SecondCountableTopology (Multiplicative H) :=
+    hofAdd_homeo.symm.isEmbedding.secondCountableTopology
+  let : LocallyCompactSpace (Multiplicative H) :=
+    hofAdd_homeo.symm.isClosedEmbedding.locallyCompactSpace
+  let μH_mul : Measure (Multiplicative H) := Measure.map hofAdd_homeo μH
+  have hμH_mul_inv : μH_mul.IsMulLeftInvariant := by
+    constructor
+    intro a
+    change Measure.map (a * ·) (Measure.map hofAdd_homeo μH) = Measure.map hofAdd_homeo μH
+    have hcomp : (fun x : Multiplicative H ↦ a * x) ∘ (hofAdd_homeo : H → Multiplicative H) =
+        (hofAdd_homeo : H → Multiplicative H) ∘ (fun y : H ↦ Multiplicative.toAdd a + y) := rfl
+    calc
+      Measure.map (a * ·) (Measure.map hofAdd_homeo μH)
+          = Measure.map ((fun x : Multiplicative H ↦ a * x) ∘ hofAdd_homeo) μH :=
+            Measure.map_map (continuous_const.mul continuous_id).measurable
+              hofAdd_homeo.continuous.measurable
+      _ = Measure.map (hofAdd_homeo ∘ (fun y : H ↦ Multiplicative.toAdd a + y)) μH := by
+            rw [hcomp]
+      _ = Measure.map hofAdd_homeo (Measure.map (fun y : H ↦ Multiplicative.toAdd a + y) μH) :=
+            (Measure.map_map hofAdd_homeo.continuous.measurable
+              (continuous_const.add continuous_id).measurable).symm
+      _ = Measure.map hofAdd_homeo μH :=
+            congrArg (Measure.map hofAdd_homeo) (map_add_left_eq_self μH (Multiplicative.toAdd a))
+  have hμH_mul_open : μH_mul.IsOpenPosMeasure := by
+    constructor
+    intro s hs hne
+    change Measure.map hofAdd_homeo μH s ≠ 0
+    rw [Measure.map_apply hofAdd_homeo.continuous.measurable hs.measurableSet]
+    exact ((hs.preimage hofAdd_homeo.continuous).measure_pos μH
+      (hne.preimage hofAdd_homeo.surjective)).ne'
+  have hμH_mul_comp : IsFiniteMeasureOnCompacts μH_mul := by
+    constructor
+    intro K hK
+    change Measure.map hofAdd_homeo μH K < ⊤
+    rw [Measure.map_apply hofAdd_homeo.continuous.measurable hK.isClosed.measurableSet]
+    exact (hofAdd_homeo.isCompact_preimage.mpr hK).measure_lt_top
+  let : μH_mul.IsHaarMeasure := ⟨⟩
+  let : (μU.prod μH_mul).IsHaarMeasure := Measure.prod.instIsHaarMeasure μU μH_mul
+  let : ((μU.prod μH_mul).map φ).IsHaarMeasure := φ.isHaarMeasure_map (μU.prod μH_mul)
+  let c : ℝ≥0 := ν.haarScalarFactor ((μU.prod μH_mul).map φ)
+  have hscale : ν = c • ((μU.prod μH_mul).map φ) :=
+    Measure.isMulLeftInvariant_eq_smul ν ((μU.prod μH_mul).map φ)
+  -- Homeomorphism U × H ≃ₜ N∞ via U × H ≃ₜ U × Multiplicative H ≃ₜ N∞
+  let ψ : U × H ≃ₜ U × Multiplicative H := Homeomorph.prodCongr (Homeomorph.refl U) hofAdd_homeo
+  let e : U × H ≃ₜ N∞ := ψ.trans φ.toHomeomorph
+  have hmap : Measure.map e (μU.prod μH) = Measure.map φ (μU.prod μH_mul) := by
+    have he_eq : (e : U × H → N∞) = (φ : U × Multiplicative H → N∞) ∘ (ψ : U × H → U × Multiplicative H) := rfl
+    rw [he_eq]
+    refine (Measure.map_map φ.continuous.measurable ψ.continuous.measurable).symm.trans ?_
+    congr 1
+    have hprod_map : Measure.map ψ (μU.prod μH) =
+        (Measure.map id μU).prod (Measure.map hofAdd_homeo μH) :=
+      (Measure.map_prod_map μU μH measurable_id hofAdd_homeo.continuous.measurable).symm
+    simpa [Measure.map_id, μH_mul] using hprod_map
+  have hfinrank : Module.finrank ℝ H = Fintype.card (InfinitePlace F) - 1 := by
+    have hsurj : Surjective sumLin := by
+      obtain ⟨w₀⟩ := (inferInstance : Nonempty (InfinitePlace F))
+      intro r
+      exact ⟨Pi.single w₀ r, by simp [sumLin]⟩
+    have hrk := LinearMap.finrank_range_add_finrank_ker sumLin
+    rw [LinearMap.range_eq_top.mpr hsurj, finrank_top, Module.finrank_pi_fintype,
+      Finset.sum_const, Finset.card_univ, smul_eq_mul] at hrk
+    simp only [Module.finrank_self, mul_one] at hrk
+    change 1 + Module.finrank ℝ H = Fintype.card (InfinitePlace F) at hrk
+    omega
+  refine ⟨inferInstance, inferInstance, inferInstance, μU, inferInstance, μH, inferInstance,
+    c, e, hfinrank, fun l ↦ l.property, fun u l v ↦ ?_, by rw [hmap]; exact hscale⟩
+  change ‖(archPart((∅ : Finset V))
+    (archInsert((∅ : Finset V)) (u.val * expArch l.val))).val v‖ = Real.exp (l.val v / v.mult)
+  rw [hpart_insert]
+  change ‖u.val.val v * (expArch l.val).val v‖ = Real.exp (l.val v / v.mult)
+  rw [norm_mul, u.property v, one_mul, hexpArch_norm]
+
+open scoped Classical in
+/-- On any compact set `K ⊂ I∞`, the archimedean translates of an archimedean Schwartz–Bruhat
+function have a single integrable dominating function on `N∞`. -/
+private theorem infiniteStandardThetaAverage_dominated_on_compact
+    (f : ℬ∞) (a : I∞) {K : Set I∞} (hK : IsCompact K) :
+    ∃ bound : N∞ → ℝ, Integrable bound (sNormOneIdeleTamagawaMeasure F ∅) ∧
+      ∀ x ∈ K, ∀ g : N∞,
+        ‖f (Multiplicative.ofAdd ((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val)‖ ≤ bound g := by
+  obtain ⟨G, hG⟩ := (mem_archimedeanSchwartzBruhat_iff (F := F)
+    (fun y ↦ f (Multiplicative.ofAdd y))).mp f.property
+  let A₁ : ℝ := SchwartzMap.seminorm ℂ 1 0 G
+  have hdecay (y : InfiniteAdeleRing F) :
+      ‖f (Multiplicative.ofAdd y)‖ * ‖InfiniteAdeleRing.ringEquiv_mixedSpace F y‖ ≤ A₁ := by
+    rw [← hG y]
+    have h := SchwartzMap.le_seminorm ℂ 1 0 G (InfiniteAdeleRing.ringEquiv_mixedSpace F y)
+    simpa only [pow_one, norm_iteratedFDeriv_zero, mul_comm] using h
+  -- Uniform positive lower bound on ‖(a⁻¹ * x).val v‖ for x ∈ K and all v
+  have hmin_v (v : InfinitePlace F) : ∃ m : ℝ, 0 < m ∧ ∀ x ∈ K, m ≤ ‖(a⁻¹ * x).val v‖ := by
+    by_cases hKne : K.Nonempty
+    · have hcont : Continuous (fun x : I∞ ↦ ‖(a⁻¹ * x).val v‖) :=
+        ((continuous_apply v).comp (Units.continuous_val.comp (continuous_const.mul continuous_id))).norm
+      obtain ⟨x₀, hx₀, hmin⟩ := hK.exists_isMinOn hKne hcont.continuousOn
+      have hnz : (a⁻¹ * x₀).val v ≠ 0 :=
+        (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom (a⁻¹ * x₀)).ne_zero
+      exact ⟨‖(a⁻¹ * x₀).val v‖, norm_pos_iff.mpr hnz, fun x hx ↦ hmin hx⟩
+    · rw [Set.not_nonempty_iff_eq_empty] at hKne
+      exact ⟨1, zero_lt_one, fun x hx ↦ (hKne ▸ hx).elim⟩
+  choose mv hmv_pos hmv using hmin_v
+  obtain ⟨v₀, -, hv₀⟩ := Finset.exists_min_image Finset.univ mv Finset.univ_nonempty
+  let cK : ℝ := mv v₀
+  have hcK : 0 < cK := hmv_pos v₀
+  have hK_lower (x : I∞) (hx : x ∈ K) (v : InfinitePlace F) : cK ≤ ‖(a⁻¹ * x).val v‖ :=
+    (hv₀ v (Finset.mem_univ v)).trans (hmv v x hx)
+  -- Unpack log-polar decomposition
+  obtain ⟨hUcomp, hUmeas, hUbor, μU, hUfin, μH, hHhaar, c, e, -, hHsum, hnorm_e, hν_eq⟩ :=
+    infiniteStandardThetaAverage_polar (F := F)
+  let r : ℕ := Fintype.card (InfinitePlace F)
+  have hrpos : (0 : ℝ) < (r : ℝ) := by exact_mod_cast Fintype.card_pos (α := InfinitePlace F)
+  let α : ℝ := (2 * (r : ℝ))⁻¹
+  have hα : 0 < α := by positivity
+  obtain ⟨_, _, hshell⟩ := infiniteStandardThetaAverage_radial_shell_bound μH hα
+  have hexp_int : Integrable (fun l ↦ Real.exp (-α * ‖l‖)) μH := by
+    have h0 := (hshell 0 1 0 le_rfl zero_le_one le_rfl).1
+    refine h0.congr (Eventually.of_forall fun l ↦ ?_)
+    simp
+  let bound : N∞ → ℝ := fun g ↦ (A₁ / cK) * Real.exp (-α * ‖(e.symm g).2‖)
+  refine ⟨bound, ?_, ?_⟩
+  · -- Integrability of bound wrt sNormOneIdeleTamagawaMeasure F ∅
+    let D : Finset V := ∅
+    let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    let (v : V) : MeasurableSpace (v.adicCompletion F) := borel _
+    let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+    let (v : V) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+    let : MeasurableSpace (SAdeleRing F D) := inferInstanceAs
+      (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+    let : BorelSpace (SAdeleRing F D) := inferInstanceAs
+      (BorelSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+    let : BorelSpace Iₛ(D) := by
+      refine ⟨?_⟩
+      rw [(sIdeleGroup_description F D).1.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+      rfl
+    let : BorelSpace N∞ := Subtype.borelSpace _
+    rw [hν_eq]
+    apply Integrable.smul_measure_nnreal
+    have hprod_int : Integrable (fun p ↦ (A₁ / cK) * Real.exp (-α * ‖p.2‖)) (μU.prod μH) :=
+      (hexp_int.comp_snd μU).const_mul (A₁ / cK)
+    have he_meas : AEMeasurable e (μU.prod μH) := e.continuous.measurable.aemeasurable
+    have hbound_cont : Continuous bound :=
+      continuous_const.mul (Real.continuous_exp.comp
+        (continuous_const.mul (continuous_norm.comp (continuous_snd.comp e.symm.continuous))))
+    refine (integrable_map_measure hbound_cont.aestronglyMeasurable he_meas).mpr ?_
+    refine hprod_int.congr (Eventually.of_forall fun p ↦ ?_)
+    simp [bound, e.symm_apply_apply]
+  · -- Pointwise bound for x ∈ K and g : N∞
+    intro x hx g
+    let p := e.symm g
+    have hp : e p = g := e.apply_symm_apply g
+    have hneg_sum : ∑ v : InfinitePlace F, (-p.2.val) v = 0 := by
+      simp [Finset.sum_neg_distrib, hHsum p.2]
+    obtain ⟨v, hv⟩ := infiniteStandardThetaAverage_hyperplane_max (-p.2.val) hneg_sum
+    have hnorm_neg : ‖(-p.2.val : InfinitePlace F → ℝ)‖ = ‖p.2‖ := norm_neg _
+    rw [hnorm_neg] at hv
+    have hv_nonneg : 0 ≤ (-p.2.val) v := le_trans (div_nonneg (norm_nonneg _) hrpos.le) hv
+    have hmult_le : (v.mult : ℝ) ≤ 2 := by
+      by_cases hvr : v.IsReal
+      · simp [hvr.mult_eq_one]
+      · simp [(InfinitePlace.not_isReal_iff_isComplex.mp hvr).mult_eq_two]
+    have hmult_pos : (0 : ℝ) < (v.mult : ℝ) := by
+      by_cases hvr : v.IsReal
+      · simp [hvr.mult_eq_one]
+      · simp [(InfinitePlace.not_isReal_iff_isComplex.mp hvr).mult_eq_two]
+    have hexp_ge : α * ‖p.2‖ ≤ (-p.2.val v) / (v.mult : ℝ) := by
+      dsimp [α]
+      calc
+        (2 * (r : ℝ))⁻¹ * ‖p.2‖ = (‖p.2‖ / (r : ℝ)) / 2 := by ring
+        _ ≤ (-p.2.val v) / 2 := div_le_div_of_nonneg_right hv zero_le_two
+        _ ≤ (-p.2.val v) / (v.mult : ℝ) :=
+            div_le_div_of_nonneg_left hv_nonneg hmult_pos hmult_le
+    -- Compute norm of ((a * archPart(∅) g)⁻¹ * x).val v
+    have hcoord : ‖((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val v‖ =
+        ‖(a⁻¹ * x).val v‖ * Real.exp ((-p.2.val v) / (v.mult : ℝ)) := by
+      have heq : (a * archPart((∅ : Finset V)) g.val)⁻¹ * x =
+          (a⁻¹ * x) * (archPart((∅ : Finset V)) g.val)⁻¹ := by
+        rw [mul_inv_rev]; ac_rfl
+      rw [heq]
+      change ‖(a⁻¹ * x).val v * ((archPart((∅ : Finset V)) g.val)⁻¹).val v‖ = _
+      rw [norm_mul]
+      congr 1
+      have hmul : (archPart((∅ : Finset V)) g.val).val v *
+          ((archPart((∅ : Finset V)) g.val)⁻¹).val v = 1 :=
+        congrFun (congrArg (Units.val : I∞ → InfiniteAdeleRing F)
+          (mul_inv_cancel (archPart((∅ : Finset V)) g.val))) v
+      have hnorm1 := congrArg norm hmul
+      rw [norm_mul, norm_one] at hnorm1
+      have hgn : ‖(archPart((∅ : Finset V)) g.val).val v‖ = Real.exp (p.2.val v / v.mult) := by
+        rw [← hp]
+        exact hnorm_e p.1 p.2 v
+      rw [hgn] at hnorm1
+      have hinv := eq_inv_of_mul_eq_one_right hnorm1
+      rw [hinv, ← Real.exp_neg, neg_div]
+    have harch_ge : cK * Real.exp (α * ‖p.2‖) ≤
+        ‖InfiniteAdeleRing.ringEquiv_mixedSpace F ((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val‖ := by
+      calc
+        cK * Real.exp (α * ‖p.2‖)
+            ≤ ‖(a⁻¹ * x).val v‖ * Real.exp ((-p.2.val v) / (v.mult : ℝ)) :=
+              mul_le_mul (hK_lower x hx v) (Real.exp_le_exp.mpr hexp_ge)
+                (Real.exp_nonneg _) (norm_nonneg _)
+        _ = ‖((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val v‖ := hcoord.symm
+        _ ≤ _ := infiniteStandardThetaAverage_norm_le_mixed _ v
+    have hpos_den : 0 < cK * Real.exp (α * ‖p.2‖) := mul_pos hcK (Real.exp_pos _)
+    have hmul_le : ‖f (Multiplicative.ofAdd ((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val)‖ *
+        (cK * Real.exp (α * ‖p.2‖)) ≤ A₁ :=
+      (mul_le_mul_of_nonneg_left harch_ge (norm_nonneg _)).trans (hdecay _)
+    calc
+      ‖f (Multiplicative.ofAdd ((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val)‖
+          ≤ A₁ / (cK * Real.exp (α * ‖p.2‖)) := (le_div_iff₀ hpos_den).mpr hmul_le
+      _ = (A₁ / cK) * Real.exp (-α * ‖p.2‖) := by
+          rw [neg_mul, Real.exp_neg, div_mul_eq_div_div, div_eq_mul_inv]
+
 /-- Paper: (6.2.2.3), p. 298.
 Every term of the archimedean integral is absolutely integrable. The norm-one
 archimedean measure is the Tamagawa measure for the stage with no finite places. -/
@@ -1297,7 +3382,41 @@ theorem infiniteStandardThetaAverage_integrable (χ : PontryaginDual Iₛ(S))
     Integrable (fun g : N∞ ↦
       f (Multiplicative.ofAdd ((a * archPart((∅ : Finset V)) g.val)⁻¹ * x).val) *
         (χ (archInsert(S) (a * archPart((∅ : Finset V)) g.val)) : ℂ))
-      (sNormOneIdeleTamagawaMeasure F ∅) := by sorry
+      (sNormOneIdeleTamagawaMeasure F ∅) := by
+  let D : Finset V := ∅
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : V) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : V) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let : MeasurableSpace (SAdeleRing F D) := inferInstanceAs
+    (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+  let : BorelSpace (SAdeleRing F D) := inferInstanceAs
+    (BorelSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+  let : BorelSpace Iₛ(D) := by
+    refine ⟨?_⟩
+    rw [(sIdeleGroup_description F D).1.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+    rfl
+  let : BorelSpace N∞ := Subtype.borelSpace _
+  obtain ⟨bound, hbound_int, hbound_le⟩ :=
+    infiniteStandardThetaAverage_dominated_on_compact f a (isCompact_singleton (x := x))
+  have hpart : Continuous (archPart(D)) :=
+    (continuous_fst : Continuous (RingHom.fst (InfiniteAdeleRing F) (∀ v : D, L(v.val)))).units_map _
+  have hins : Continuous (archInsert(S)) :=
+    (continuous_id.prodMk continuous_const :
+      Continuous (MonoidHom.inl (InfiniteAdeleRing F) (∀ v : S, L(v.val)))).units_map _
+  have hcont_f : Continuous (fun g : N∞ ↦
+      f (Multiplicative.ofAdd ((a * archPart(D) g.val)⁻¹ * x).val)) :=
+    (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp (Units.continuous_val.comp
+      ((continuous_inv.comp (continuous_const.mul (hpart.comp continuous_subtype_val))).mul continuous_const)))
+  have hcont_χ : Continuous (fun g : N∞ ↦ (χ (archInsert(S) (a * archPart(D) g.val)) : ℂ)) :=
+    continuous_subtype_val.comp (χ.continuous.comp
+      (hins.comp (continuous_const.mul (hpart.comp continuous_subtype_val))))
+  refine hbound_int.mono' (hcont_f.mul hcont_χ).aestronglyMeasurable (Eventually.of_forall fun g ↦ ?_)
+  rw [norm_mul, Circle.norm_coe, mul_one]
+  exact hbound_le x rfl g
 
 /-- Paper: (6.2.2.3), p. 298.
 The sum of archimedean integrals specifies a continuous linear map into the
@@ -1591,6 +3710,2298 @@ theorem infiniteStandardThetaMellinAverage_apply (χ : PontryaginDual Iₛ(S)) (
       ∂sNormOneIdeleTamagawaMeasure F ∅ :=
   (exists_infiniteStandardThetaMellinAverage χ).choose_spec f x
 
+/-- Inverse left translation by an archimedean idele is continuous on archimedean tests. -/
+private theorem sLocalStandardThetaTensor_continuous_unitTranslate
+    {F : Type*} [Field F] [NumberField F] (a : (InfiniteAdeleRing F)ˣ) :
+    Continuous (schwartzBruhatUnitTranslate (R := InfiniteAdeleRing F) a) := by
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let d : Multiplicative (InfiniteAdeleRing F) ≃ₜ* Multiplicative (InfiniteAdeleRing F) :=
+    { toFun := fun x ↦ Multiplicative.ofAdd (a.inv * x.toAdd)
+      invFun := fun x ↦ Multiplicative.ofAdd (a.val * x.toAdd)
+      left_inv := fun x ↦ congrArg Multiplicative.ofAdd (by
+        change a.val * (a.inv * x.toAdd) = x.toAdd
+        rw [← mul_assoc, a.val_inv, one_mul])
+      right_inv := fun x ↦ congrArg Multiplicative.ofAdd (by
+        change a.inv * (a.val * x.toAdd) = x.toAdd
+        rw [← mul_assoc, a.inv_val, one_mul])
+      map_mul' := fun x y ↦ congrArg Multiplicative.ofAdd (mul_add a.inv x.toAdd y.toAdd)
+      continuous_toFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd)
+      continuous_invFun := continuous_ofAdd.comp (continuous_const.mul continuous_toAdd) }
+  exact (schwartzBruhatPullbackEquiv d).continuous.congr fun f ↦
+    Subtype.ext (funext fun x ↦ (schwartzBruhatUnitTranslate_apply a f x.toAdd).symm)
+
+/-- The canonical norm section lands in the archimedean ideles and splits every S-idelic norm. -/
+private theorem sLocalStandardThetaTensor_archSection (F : Type*) [Field F] [NumberField F] :
+    ∃ tau : ℝ≥0ˣ →ₜ* (InfiniteAdeleRing F)ˣ,
+      ∀ (D : Finset (HeightOneSpectrum (𝓞 F))) (t : ℝ≥0ˣ),
+        sIdeleNorm F D (Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+          (∀ v : D, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)) (tau t)) = t := by
+  let fst : IdeleGroup (𝓞 F) F →* (InfiniteAdeleRing F)ˣ :=
+    Units.map (RingHom.fst (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).toMonoidHom
+  have hfst : Continuous fst := continuous_fst.units_map _
+  refine ⟨⟨fst.comp (canonicalIdeleNormSection F),
+    hfst.comp (canonicalIdeleNormSection_continuous F)⟩, fun D t ↦ ?_⟩
+  let g := canonicalIdeleNormSection F t
+  have hfin : g.val.2 = 1 := canonicalIdeleNormSection_finite F t
+  have hfinInv : (g⁻¹).val.2 = 1 := by
+    have hg : g⁻¹ = canonicalIdeleNormSection F t⁻¹ := (map_inv (canonicalIdeleNormSection F) t).symm
+    rw [hg]
+    exact canonicalIdeleNormSection_finite F t⁻¹
+  have hmem : g ∈ Set.range (integralIdeleInsertion F D) := by
+    rw [mem_range_integralIdeleInsertion]
+    intro v _
+    refine ⟨?_, ?_⟩
+    · rw [hfin]; exact one_mem _
+    · change (g⁻¹).val.2 v ∈ _; rw [hfinInv]; exact one_mem _
+  obtain ⟨u, hu⟩ := hmem
+  have hproj : Units.map (adeleProjection F D).toMonoidHom (integralIdeleInsertion F D u) =
+      Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+        (∀ v : D, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)) (fst g) := by
+    rw [hu]
+    apply Units.ext
+    refine Prod.ext rfl (funext fun v ↦ ?_)
+    change g.val.2 v.val = 1
+    rw [hfin]
+    rfl
+  change sIdeleNorm F D (Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+    (∀ v : D, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)) (fst g)) = t
+  rw [← hproj]
+  exact ((sIdeleNorm_spec F D).1 u).symm.trans
+    ((congrArg (ideleNorm F) hu).trans (canonicalIdeleNormSection_rightInverse F t))
+
+/-- Every norm-one character on `J₁(S)` lifts to a unitary character on `Jₛ(S)` trivial on
+a chosen continuous norm section. -/
+private theorem sLocalStandardThetaTensor_unitaryLift
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (χS : PontryaginDual (sIdeleQuotientNorm F S).ker)
+    (τ : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ) (hτ : ∀ t, sIdeleNorm F S (τ t) = t) :
+    ∃ ψ : PontryaginDual (SIdeleQuotient F S),
+      (∀ u : (sIdeleQuotientNorm F S).ker, ψ u.val = χS u) ∧
+      ∀ t : ℝ≥0ˣ, ψ (QuotientGroup.mk (τ t)) = 1 := by
+  let σ : ℝ≥0ˣ →ₜ* SIdeleQuotient F S :=
+    ⟨(QuotientGroup.mk' _).comp τ.toMonoidHom, QuotientGroup.continuous_mk.comp τ.continuous⟩
+  have hσ (t : ℝ≥0ˣ) : sIdeleQuotientNorm F S (σ t) = t := by
+    change sIdeleQuotientNorm F S (QuotientGroup.mk (τ t)) = t
+    rw [sIdeleQuotientNorm_mk, hτ t]
+  have hk (g : SIdeleQuotient F S) : g / σ (sIdeleQuotientNorm F S g) ∈ (sIdeleQuotientNorm F S).ker := by
+    simp [MonoidHom.mem_ker, hσ]
+  let p : SIdeleQuotient F S →ₜ* (sIdeleQuotientNorm F S).ker :=
+    { toFun := fun g ↦ ⟨g / σ (sIdeleQuotientNorm F S g), hk g⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' := fun g h ↦ Subtype.ext (by simp [mul_div_mul_comm])
+      continuous_toFun :=
+        (continuous_id.div' (σ.continuous.comp (isProperMap_sIdeleQuotientNorm F S).continuous)).subtype_mk hk }
+  refine ⟨χS.comp p, fun u ↦ ?_, fun t ↦ ?_⟩
+  · have hp : p u.val = u := Subtype.ext (by
+      change u.val / σ (sIdeleQuotientNorm F S u.val) = u.val
+      rw [u.property, map_one, div_one])
+    exact congrArg χS hp
+  · have hp : p (σ t) = 1 := Subtype.ext (by
+      change σ t / σ (sIdeleQuotientNorm F S (σ t)) = 1
+      rw [hσ, div_self'])
+    change χS (p (σ t)) = 1
+    rw [hp, map_one]
+
+/-- Any two unitary lifts of the same norm-one character differ by a character pulled back
+along the norm. -/
+private theorem sLocalStandardThetaTensor_unitaryLift_ratio
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (χS : PontryaginDual (sIdeleQuotientNorm F S).ker)
+    (τ : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ) (hτ : ∀ t, sIdeleNorm F S (τ t) = t)
+    (ψ ψ' : PontryaginDual (SIdeleQuotient F S))
+    (hψ : ∀ u : (sIdeleQuotientNorm F S).ker, ψ u.val = χS u)
+    (hψτ : ∀ t : ℝ≥0ˣ, ψ (QuotientGroup.mk (τ t)) = 1)
+    (hψ' : ∀ u : (sIdeleQuotientNorm F S).ker, ψ' u.val = χS u)
+    (g : SIdeleQuotient F S) :
+    ψ' g = ψ g * ψ' (QuotientGroup.mk (τ (sIdeleQuotientNorm F S g))) := by
+  let t := sIdeleQuotientNorm F S g
+  let s : SIdeleQuotient F S := QuotientGroup.mk (τ t)
+  have hs : sIdeleQuotientNorm F S s = t := by
+    change sIdeleQuotientNorm F S (QuotientGroup.mk (τ t)) = t
+    rw [sIdeleQuotientNorm_mk, hτ t]
+  let u : (sIdeleQuotientNorm F S).ker :=
+    ⟨g / s, by rw [MonoidHom.mem_ker, map_div, hs, div_self']⟩
+  have hgu : g = u.val * s := (div_mul_cancel g s).symm
+  have hnorm : sIdeleQuotientNorm F S (u.val * s) = t := by
+    rw [map_mul, u.property, one_mul, hs]
+  conv_lhs => rw [hgu, map_mul]
+  rw [hψ' u]
+  conv_rhs => rw [hgu, map_mul, hψ u, hψτ t, mul_one, hnorm]
+
+/-- Two normalized meromorphic functions on `ℂ` agreeing on `{z | 0 < z.re}` agree everywhere. -/
+private theorem sLocalStandardThetaTensor_meromorphic_eq_of_rightHalf
+    {f₁ f₂ : ℂ → ℂ} (h₁ : MeromorphicNFOn f₁ Set.univ) (h₂ : MeromorphicNFOn f₂ Set.univ)
+    (h : ∀ z : ℂ, 0 < z.re → f₁ z = f₂ z) : f₁ = f₂ := by
+  have hb : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+    (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+  have ho : meromorphicOrderAt (f₁ - f₂) 1 = ⊤ :=
+    meromorphicOrderAt_eq_top_iff.mpr ((hb.filter_mono nhdsWithin_le_nhds).mono
+      fun z hz ↦ sub_eq_zero.mpr (h z hz))
+  funext z
+  have hz := (h₁.meromorphicOn.sub h₂.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (Set.mem_univ (1 : ℂ)) (Set.mem_univ z) ho
+  exact (((h₁ (Set.mem_univ z)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    (h₂ (Set.mem_univ z))).mp (Filter.eventuallyEq_iff_sub.mpr
+      (meromorphicOrderAt_eq_top_iff.mp hz))).eq_of_nhds
+
+/-- Every S-local quasi-character lies on a norm-twist chart of a unitary character. -/
+private theorem sLocalStandardThetaTensor_exists_normTwist
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (c : QuasiCharacter (SIdeleQuotient F S)) :
+    ∃ (ψ : PontryaginDual (SIdeleQuotient F S)) (s : ℂ),
+      quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ) s = c := by
+  let mₛ := sIdeleQuotientNorm F S
+  have hmₛ := isProperMap_sIdeleQuotientNorm F S
+  let : LocallyCompactSpace (SAdeleRing F S)ˣ := (sIdeleGroup_description F S).2.2.1
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨t, ht⟩ := exists_ne (1 : ℝ≥0ˣ)
+  have hne : ∃ x, mₛ x ≠ 1 := ⟨σ t, (hσ t).trans_ne ht⟩
+  have hpos (g : SIdeleQuotient F S) : 0 < ((mₛ g : ℝ≥0) : ℝ) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hneC (g : SIdeleQuotient F S) : (((mₛ g : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (hpos g).ne'
+  let s := quasiCharacterAbscissa mₛ hmₛ hne c
+  let d := quasiCharacterNormTwist mₛ hmₛ.continuous c (-(s : ℂ))
+  have hd (g : SIdeleQuotient F S) : ‖d g‖ = 1 := by
+    change ‖c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ))‖ = 1
+    rw [norm_mul, norm_quasiCharacter_eq_rpow_abscissa mₛ hmₛ hne,
+      Complex.norm_cpow_eq_rpow_re_of_pos (hpos g), Complex.neg_re, Complex.ofReal_re]
+    change ((mₛ g : ℝ≥0) : ℝ) ^ s * ((mₛ g : ℝ≥0) : ℝ) ^ (-s) = 1
+    rw [← Real.rpow_add (hpos g), add_neg_cancel, Real.rpow_zero]
+  let ψ : PontryaginDual (SIdeleQuotient F S) :=
+    { toFun := fun g ↦ ⟨d g, mem_sphere_zero_iff_norm.mpr (hd g)⟩
+      map_one' := Circle.ext (map_one d)
+      map_mul' := fun g h ↦ Circle.ext (map_mul d g h)
+      continuous_toFun := d.continuous.subtype_mk _ }
+  refine ⟨ψ, s, ?_⟩
+  ext1 g
+  change (c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (-(s : ℂ))) * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ (s : ℂ) = c g
+  rw [mul_assoc, ← Complex.cpow_add _ _ (hneC g), neg_add_cancel, Complex.cpow_zero, mul_one]
+
+/-- On the right half-plane `0 < s.re`, the S-local order bound is nonnegative. -/
+private theorem sLocalStandardThetaTensor_orderBound_pos
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (ψ : PontryaginDual (SIdeleQuotient F S)) {s : ℂ} (hs : 0 < s.re) :
+    0 ≤ sLocalIdelicOrderBound (F := F) (S := S)
+      (quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ) s) := by
+  let mₛ := sIdeleQuotientNorm F S
+  let hmₛ := (isProperMap_sIdeleQuotientNorm F S).continuous
+  let u : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let c := quasiCharacterNormTwist mₛ hmₛ (u.comp ψ) s
+  have htwist (z : ℂ) : quasiCharacterNormTwist mₛ hmₛ c z =
+      quasiCharacterNormTwist mₛ hmₛ (u.comp ψ) (z + s) := by
+    ext1 g
+    let N : ℂ := (((mₛ g : ℝ≥0) : ℝ) : ℂ)
+    change (ψ g : ℂ) * N ^ s * N ^ z = (ψ g : ℂ) * N ^ (z + s)
+    rw [add_comm, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr
+      (NNReal.coe_ne_zero.mpr (mₛ g).ne_zero)), mul_assoc]
+  rw [sLocalIdelicOrderBound, le_min_iff]
+  refine ⟨le_rfl, ?_⟩
+  have hfun : (fun z ↦ sLocalRhoFactor (F := F) (S := S) (quasiCharacterNormTwist mₛ hmₛ c z)) =
+      fun z ↦ sLocalRhoFactor (F := F) (S := S) (quasiCharacterNormTwist mₛ hmₛ (u.comp ψ) (z + s)) :=
+    funext fun z ↦ congrArg (sLocalRhoFactor (F := F) (S := S)) (htwist z)
+  rw [hfun]
+  have hρ := sLocalRhoFactor_iteratedDeriv_analyticOn (F := F) (S := S) ψ 0 s hs
+  rw [iteratedDeriv_zero] at hρ
+  have hcomp : AnalyticAt ℂ
+      (fun z : ℂ ↦ sLocalRhoFactor (F := F) (S := S) (quasiCharacterNormTwist mₛ hmₛ (u.comp ψ) (z + s))) 0 :=
+    hρ.comp_of_eq (analyticAt_id.add analyticAt_const) (zero_add s)
+  exact hcomp.meromorphicOrderAt_nonneg
+
+/-- Local zeta integral of the integer-ring indicator `J = finiteStandardGaussian v 1` against
+a finite-place quasi-character `d` with `0 < s.re`: it is integrable, satisfies the Euler-factor
+identity `(1 - d π) * Z_v(J, d) = μ(Oˣ)` when `d` is trivial on `Oˣ`, and vanishes when `d` is
+nontrivial on `Oˣ`. -/
+private theorem sLocalStandardThetaTensor_finiteLocal_J_zeta
+    {F : Type*} [Field F] [NumberField F] (v : HeightOneSpectrum (𝓞 F))
+    (ψ : PontryaginDual (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ)
+    (η : ℝ≥0ˣ →* ℂ) (s : ℂ) (hs : 0 < s.re) (hηnorm : ∀ r : ℝ≥0ˣ, ‖η r‖ = 1)
+    (d : QuasiCharacter (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ)
+    (hd_apply : ∀ g : (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ,
+      d g = (ψ g : ℂ) * η (Units.map nnNormHom.toMonoidHom g) * ((‖g.val‖ : ℝ) : ℂ) ^ s)
+    (π : (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ)
+    (hπnorm : ‖π.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹) :
+    let K := HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v
+    let O := HeightOneSpectrum.adicCompletionIntegers (R := 𝓞 F) F v
+    let U : Set Kˣ := O.units
+    let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+    let J := finiteStandardGaussian v 1
+    Integrable (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val) * d x) μ ∧
+    ((∀ u ∈ U, d u = 1) →
+      (1 - d π) * localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d =
+        ((μ U).toReal : ℂ)) ∧
+    ((∃ u ∈ U, d u ≠ 1) →
+      localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d = 0) := by
+  classical
+  let K := HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v
+  let O := HeightOneSpectrum.adicCompletionIntegers (R := 𝓞 F) F v
+  let U : Set Kˣ := O.units
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let J := finiteStandardGaussian v 1
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : CompactSpace O := compactSpace_adicCompletionIntegers v
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  have hUopen : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUcompact : IsCompact U := Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr inferInstance)
+  have hUmeas : MeasurableSet U := hUopen.measurableSet
+  obtain ⟨e, heπ, heι⟩ := finitePlace_unitDecomposition v π hπnorm
+  let ι : Oˣ →* Kˣ := Units.map O.subtype.toMonoidHom
+  have hι_mem (u : Oˣ) : ι u ∈ U := ⟨u.val.property, u.inv.property⟩
+  have hU_eq : U = Set.range ι := by
+    ext x
+    constructor
+    · intro hx; exact ⟨O.toSubmonoid.unitsEquivUnitsType ⟨x, hx⟩, rfl⟩
+    · rintro ⟨u, rfl⟩; exact hι_mem u
+  have hU_iff (x : Kˣ) : x ∈ U ↔ (e x).1 = 1 := by
+    constructor
+    · intro hx; rw [hU_eq] at hx; obtain ⟨u, rfl⟩ := hx; rw [heι]
+    · intro h1
+      have hx : x = ι (e x).2 := by apply e.injective; rw [heι]; exact Prod.ext h1 rfl
+      rw [hx]; exact hι_mem _
+  let shell (k : ℤ) : Set Kˣ := {x : Kˣ | (e x).1 = Multiplicative.ofAdd k}
+  have hshell_meas (k : ℤ) : MeasurableSet (shell k) :=
+    ((isOpen_discrete ({Multiplicative.ofAdd k} : Set (Multiplicative ℤ))).preimage
+      (continuous_fst.comp e.continuous)).measurableSet
+  have hshell_disj : Pairwise (Disjoint on shell) := fun k l hkl ↦
+    Set.disjoint_left.mpr fun x hk hl ↦ hkl (Multiplicative.ofAdd.injective (hk.symm.trans hl))
+  have h1k (k : ℤ) : (Multiplicative.ofAdd (1 : ℤ)) ^ k = Multiplicative.ofAdd k := by
+    simp [← ofAdd_zsmul]
+  have hshell_pre (k : ℤ) : (fun u : Kˣ ↦ π ^ k * u) ⁻¹' shell k = U := by
+    ext u
+    change (e (π ^ k * u)).1 = Multiplicative.ofAdd k ↔ u ∈ U
+    rw [map_mul, map_zpow, heπ, Prod.fst_mul,
+      show ((Multiplicative.ofAdd (1 : ℤ), (1 : Oˣ)) ^ k).1 = (Multiplicative.ofAdd (1 : ℤ)) ^ k from rfl,
+      h1k, hU_iff]
+    exact mul_eq_left
+  have hq_pos : (0 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)
+  have hq_gt_one : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  let qU : ℝ≥0ˣ := Units.mk0 (v.asIdeal.absNorm : ℝ≥0) (by exact_mod_cast hq_pos.ne')
+  let r (k : ℤ) : ℝ≥0ˣ := (qU⁻¹) ^ k
+  have hnorm_u (u : Kˣ) (hu : u ∈ U) : ‖u.val‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)
+  have hnorm_πk (k : ℤ) : ‖(π ^ k).val‖ = ((r k).val : ℝ) := by
+    rw [Units.val_zpow_eq_zpow_val, norm_zpow, hπnorm]
+    simp [r, qU]
+  have hnorm_shell (k : ℤ) (x : Kˣ) (hx : x ∈ shell k) : ‖x.val‖ = ((r k).val : ℝ) := by
+    have hxu : π ^ (-k) * x ∈ U := by
+      rw [hU_iff, map_mul, map_zpow, heπ, Prod.fst_mul,
+        show ((Multiplicative.ofAdd (1 : ℤ), (1 : Oˣ)) ^ (-k)).1 =
+          (Multiplicative.ofAdd (1 : ℤ)) ^ (-k) from rfl, h1k, hx]
+      rw [← ofAdd_add, neg_add_cancel]; rfl
+    have hx' : x = π ^ k * (π ^ (-k) * x) := by rw [← mul_assoc, ← zpow_add]; simp
+    conv_lhs => rw [hx']
+    rw [Units.val_mul, norm_mul, hnorm_πk, hnorm_u _ hxu, mul_one]
+  have hO_iff (x : Kˣ) : x.val ∈ (O : Set K) ↔ 0 ≤ (e x).1.toAdd := by
+    have hx : x ∈ shell (e x).1.toAdd := by simp [shell]
+    have hnx := hnorm_shell (e x).1.toAdd x hx
+    rw [show x.val ∈ (O : Set K) ↔ ‖x.val‖ ≤ 1 from by
+      change x.val ∈ v.adicCompletionIntegers F ↔ _
+      rw [v.mem_adicCompletionIntegers (𝓞 F) F]
+      exact Valued.toNormedField.norm_le_one_iff.symm]
+    rw [hnx]
+    simp only [r, qU, Units.val_zpow_eq_zpow_val, Units.val_inv_eq_inv_val, Units.val_mk0,
+      NNReal.coe_zpow, NNReal.coe_inv, NNReal.coe_natCast, inv_zpow', zpow_neg]
+    rw [inv_le_one₀ (zpow_pos hq_pos _)]
+    exact one_le_zpow_iff_right₀ hq_gt_one
+  have hJ_apply (x : K) : J (Multiplicative.ofAdd x) = (O : Set K).indicator (fun _ ↦ 1) x := by
+    change finiteStandardGaussianValue v 1 x = _
+    exact ite_eq_left fun _ _ ↦ rfl
+  have hnorm_d_shell (k : ℤ) (x : Kˣ) (hx : x ∈ shell k) : ‖d x‖ = ((r k).val : ℝ) ^ s.re := by
+    rw [hd_apply, norm_mul, norm_mul, Circle.norm_coe, hηnorm, one_mul, one_mul,
+      hnorm_shell k x hx, Complex.norm_cpow_eq_rpow_re_of_pos
+        (NNReal.coe_pos.mpr (Units.zero_lt (r k)))]
+  have hOopen : IsOpen {x : Kˣ | x.val ∈ (O : Set K)} :=
+    (Valued.isOpen_valuationSubring _).preimage Units.continuous_val
+  have hJmeas : Measurable (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val)) := by
+    have heq : (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val)) =
+        {x : Kˣ | x.val ∈ (O : Set K)}.indicator (fun _ ↦ 1) := by
+      funext x
+      rw [hJ_apply]
+      by_cases hx : x.val ∈ (O : Set K)
+      · rw [Set.indicator_of_mem hx, Set.indicator_of_mem (show x ∈ {x : Kˣ | x.val ∈ (O : Set K)} from hx)]
+      · rw [Set.indicator_of_notMem hx, Set.indicator_of_notMem (show x ∉ {x : Kˣ | x.val ∈ (O : Set K)} from hx)]
+    rw [heq]
+    exact measurable_const.indicator hOopen.measurableSet
+  have hJ_int : Integrable (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val) * d x) μ := by
+    refine ⟨hJmeas.aestronglyMeasurable.mul d.continuous.aestronglyMeasurable, ?_⟩
+    rw [HasFiniteIntegral]
+    have hsupp : ∀ x : Kˣ, x ∉ ⋃ n : ℕ, shell (n : ℤ) →
+        ‖J (Multiplicative.ofAdd x.val) * d x‖ₑ = 0 := by
+      intro x hx
+      have hnotO : x.val ∉ (O : Set K) := by
+        rw [hO_iff]
+        intro hge
+        apply hx
+        refine Set.mem_iUnion.mpr ⟨(e x).1.toAdd.toNat, ?_⟩
+        change (e x).1 = Multiplicative.ofAdd ((e x).1.toAdd.toNat : ℤ)
+        rw [Int.toNat_of_nonneg hge]; rfl
+      rw [hJ_apply, Set.indicator_of_notMem hnotO, zero_mul, eNorm_zero]
+    rw [← setLIntegral_eq_of_support_subset (s := ⋃ n : ℕ, shell (n : ℤ)) (fun x hx ↦ by
+      by_contra hnot; exact hx (hsupp x hnot))]
+    rw [lintegral_iUnion (s := fun n : ℕ ↦ shell (n : ℤ)) (fun n ↦ hshell_meas n)
+      (fun m n hmn ↦ hshell_disj (by exact_mod_cast hmn))]
+    have hterm (n : ℕ) : (∫⁻ x in shell (n : ℤ), ‖J (Multiplicative.ofAdd x.val) * d x‖ₑ ∂μ) =
+        μ U * (ENNReal.ofReal (((v.asIdeal.absNorm : ℝ)⁻¹) ^ s.re)) ^ n := by
+      have hμshell : μ (shell (n : ℤ)) = μ U := by
+        have hp := (measurePreserving_mul_left μ (π ^ (n : ℤ))).measure_preimage (hshell_meas n).nullMeasurableSet
+        rw [hshell_pre] at hp
+        exact hp.symm
+      have heq : ∀ x ∈ shell (n : ℤ), ‖J (Multiplicative.ofAdd x.val) * d x‖ₑ =
+          (ENNReal.ofReal (((v.asIdeal.absNorm : ℝ)⁻¹) ^ s.re)) ^ n := by
+        intro x hx
+        have hxO : x.val ∈ (O : Set K) := by rw [hO_iff, hx]; exact Nat.cast_nonneg n
+        rw [hJ_apply, Set.indicator_of_mem hxO, one_mul, ← ofReal_norm, hnorm_d_shell n x hx]
+        have hrn : ((r (n : ℤ)).val : ℝ) ^ s.re = (((v.asIdeal.absNorm : ℝ)⁻¹) ^ s.re) ^ n := by
+          simp only [r, qU, zpow_natCast, Units.val_pow_eq_pow_val, Units.val_inv_eq_inv_val,
+            Units.val_mk0, NNReal.coe_pow, NNReal.coe_inv, NNReal.coe_natCast]
+          rw [← Real.rpow_natCast ((v.asIdeal.absNorm : ℝ)⁻¹) n,
+            ← Real.rpow_natCast (((v.asIdeal.absNorm : ℝ)⁻¹) ^ s.re) n,
+            ← Real.rpow_mul (inv_nonneg.mpr hq_pos.le), ← Real.rpow_mul (inv_nonneg.mpr hq_pos.le),
+            mul_comm]
+        rw [hrn, ENNReal.ofReal_pow (Real.rpow_nonneg (inv_nonneg.mpr hq_pos.le) _)]
+      rw [setLIntegral_congr_fun (hshell_meas n) heq, setLIntegral_const, hμshell, mul_comm]
+    rw [tsum_congr hterm, ENNReal.tsum_mul_left]
+    refine ENNReal.mul_lt_top hUcompact.measure_lt_top ?_
+    rw [ENNReal.tsum_geometric]
+    refine ENNReal.inv_lt_top.mpr (tsub_pos_iff_lt.mpr ?_)
+    rw [← ENNReal.ofReal_one]
+    exact (ENNReal.ofReal_lt_ofReal_iff zero_lt_one).mpr
+      (Real.rpow_lt_one (inv_nonneg.mpr hq_pos.le) (inv_lt_one_of_one_lt₀ hq_gt_one) hs)
+  refine ⟨hJ_int, fun hdu ↦ ?_, fun hram ↦ ?_⟩
+  · -- Unramified Euler factor `(1 - d π) * Z_v(J, d) = μ(U)`.
+    have hshift : (∫ x : Kˣ, J (Multiplicative.ofAdd ((π⁻¹ * x).val)) * d x ∂μ) =
+        d π * ∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ := by
+      have h1 := integral_mul_left_eq_self (μ := μ)
+        (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val) * d x) π⁻¹
+      rw [← h1, ← integral_const_mul]
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      dsimp only
+      rw [map_mul, map_inv]
+      have hdne : d π ≠ 0 := ((Group.isUnit π).map d).ne_zero
+      have hcancel (u w z : ℂ) (hz : z ≠ 0) : u * w = z * (u * (z⁻¹ * w)) := by field_simp
+      exact hcancel _ _ _ hdne
+    have hshift_int : Integrable (fun x : Kˣ ↦ J (Multiplicative.ofAdd ((π⁻¹ * x).val)) * d x) μ := by
+      refine hJ_int.norm.mono'
+        ((hJmeas.comp (continuous_const.mul continuous_id).measurable).aestronglyMeasurable.mul
+          d.continuous.aestronglyMeasurable) (ae_of_all _ fun x ↦ ?_)
+      rw [norm_mul, norm_mul, hJ_apply, hJ_apply]
+      gcongr
+      by_cases hx : (π⁻¹ * x).val ∈ (O : Set K)
+      · have hxO : x.val ∈ (O : Set K) := by
+          rw [hO_iff] at hx ⊢
+          rw [map_mul, map_inv, heπ] at hx
+          change 0 ≤ (-1 : ℤ) + (e x).1.toAdd at hx
+          omega
+        rw [Set.indicator_of_mem hx, Set.indicator_of_mem hxO]
+      · rw [Set.indicator_of_notMem hx, norm_zero]
+        exact norm_nonneg _
+    have hdiff : (1 - d π) * (∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ) =
+        ∫ x : Kˣ, (J (Multiplicative.ofAdd x.val) - J (Multiplicative.ofAdd (π⁻¹ * x).val)) * d x ∂μ := by
+      rw [sub_mul, one_mul, ← hshift, ← integral_sub hJ_int hshift_int]
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_); ring
+    rw [show localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d =
+        ∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ from rfl, hdiff]
+    have hind : (fun x : Kˣ ↦ (J (Multiplicative.ofAdd x.val) -
+        J (Multiplicative.ofAdd (π⁻¹ * x).val)) * d x) = U.indicator (fun _ ↦ 1) := by
+      funext x
+      rw [hJ_apply, hJ_apply]
+      have h1 : (π⁻¹ * x).val ∈ (O : Set K) ↔ 1 ≤ (e x).1.toAdd := by
+        rw [hO_iff, map_mul, map_inv, heπ]
+        change 0 ≤ (-1 : ℤ) + (e x).1.toAdd ↔ _
+        omega
+      by_cases hxU : x ∈ U
+      · have hx0 : (e x).1.toAdd = 0 := by rw [(hU_iff x).mp hxU]; rfl
+        rw [Set.indicator_of_mem ((hO_iff x).mpr (by omega)),
+          Set.indicator_of_notMem (mt h1.mp (by omega)), sub_zero, one_mul,
+          hdu x hxU, Set.indicator_of_mem hxU]
+      · rw [Set.indicator_of_notMem hxU]
+        have hne0 : (e x).1.toAdd ≠ 0 := fun h ↦ hxU ((hU_iff x).mpr (Multiplicative.toAdd.injective h))
+        by_cases hpos : 0 ≤ (e x).1.toAdd
+        · rw [Set.indicator_of_mem ((hO_iff x).mpr hpos),
+            Set.indicator_of_mem (h1.mpr (by omega)), sub_self, zero_mul]
+        · rw [Set.indicator_of_notMem (mt (hO_iff x).mp hpos),
+            Set.indicator_of_notMem (mt h1.mp (by omega)), sub_self, zero_mul]
+    rw [hind, integral_indicator hUmeas, setIntegral_const]
+    simp [measureReal_def]
+    rfl
+  · -- Ramified vanishing `Z_v(J, d) = 0`.
+    obtain ⟨u₀, hu₀, hdu₀⟩ := hram
+    have hinv : (∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ) =
+        d u₀ * ∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ := by
+      have h1 := integral_mul_left_eq_self (μ := μ)
+        (fun x : Kˣ ↦ J (Multiplicative.ofAdd x.val) * d x) u₀
+      conv_lhs => rw [← h1]
+      rw [← integral_const_mul]
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      dsimp only
+      rw [map_mul, hJ_apply, hJ_apply]
+      have hmem : (u₀ * x).val ∈ (O : Set K) ↔ x.val ∈ (O : Set K) := by
+        rw [hO_iff, hO_iff, map_mul, Prod.fst_mul, (hU_iff u₀).mp hu₀, one_mul]
+      by_cases hx : x.val ∈ (O : Set K)
+      · rw [Set.indicator_of_mem (hmem.mpr hx), Set.indicator_of_mem hx]; ring
+      · rw [Set.indicator_of_notMem (mt hmem.mp hx), Set.indicator_of_notMem hx]; ring
+    have h0 : (1 - d u₀) * (∫ x : Kˣ, J (Multiplicative.ofAdd x.val) * d x ∂μ) = 0 := by
+      rw [sub_mul, one_mul, ← hinv, sub_self]
+    exact (mul_eq_zero.mp h0).resolve_left (sub_ne_zero.mpr hdu₀.symm)
+
+/-- At each finite place `v`, every local test function has a linear Laurent-polynomial
+representation in `MonoidAlgebra ℂ ℝ≥0ˣ` matching its local zeta integral against the
+standard finite Gaussian, sending the standard Gaussian to `1`. -/
+private theorem sLocalStandardThetaTensor_finiteLocal_shells
+    {F : Type*} [Field F] [NumberField F] (v : HeightOneSpectrum (𝓞 F))
+    (c : QuasiCharacter (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ)
+    (ψ : PontryaginDual (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ)
+    (hcψ : ∀ u ∈ ((HeightOneSpectrum.adicCompletionIntegers (R := 𝓞 F) F v).units :
+      Set (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v)ˣ), c u = (ψ u : ℂ)) :
+    let K := HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v
+    let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+    let ρ := finiteStandardGaussian v c
+    ∃ Φ : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] MonoidAlgebra ℂ ℝ≥0ˣ,
+      Φ ρ = 1 ∧
+      ∀ (η : ℝ≥0ˣ →* ℂ) (s : ℂ), 0 < s.re → (∀ r : ℝ≥0ˣ, ‖η r‖ = 1) →
+        ∀ (d : QuasiCharacter Kˣ),
+          (∀ g : Kˣ, d g = (ψ g : ℂ) * η (Units.map nnNormHom.toMonoidHom g) *
+            ((‖g.val‖ : ℝ) : ℂ) ^ s) →
+        localIdelicZetaIntegral μ (fun x ↦ ρ (Multiplicative.ofAdd x)) d ≠ 0 ∧
+        ∀ g : SchwartzBruhat (Multiplicative K),
+          let χr : ℝ≥0ˣ →* ℂ :=
+            { toFun := fun r ↦ η r * ((r.val : ℝ) : ℂ) ^ s
+              map_one' := by simp
+              map_mul' := fun r₁ r₂ ↦ by
+                rw [map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul,
+                  Complex.mul_cpow_ofReal_nonneg (NNReal.coe_nonneg _) (NNReal.coe_nonneg _)]
+                ring }
+          localIdelicZetaIntegral μ (fun x ↦ g (Multiplicative.ofAdd x)) d =
+            MonoidAlgebra.lift ℂ ℂ ℝ≥0ˣ χr (Φ g) *
+            localIdelicZetaIntegral μ (fun x ↦ ρ (Multiplicative.ofAdd x)) d := by
+  classical
+  let K := HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v
+  let O := HeightOneSpectrum.adicCompletionIntegers (R := 𝓞 F) F v
+  let U : Set Kˣ := O.units
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let ρ := finiteStandardGaussian v c
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : CompactSpace O := compactSpace_adicCompletionIntegers v
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  have hUopen : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUcompact : IsCompact U := Submonoid.units_isCompact (isCompact_iff_compactSpace.mpr inferInstance)
+  have hUmeas : MeasurableSet U := hUopen.measurableSet
+  have hm_pos : 0 < (μ U).toReal :=
+    ENNReal.toReal_pos (hUopen.measure_pos μ ⟨1, O.units.one_mem⟩).ne' hUcompact.measure_ne_top
+  let m : ℂ := ((μ U).toReal : ℂ)
+  have hm_ne : m ≠ 0 := Complex.ofReal_ne_zero.mpr hm_pos.ne'
+  -- Uniformizer and unit-group splitting `Kˣ ≃ₜ* Multiplicative ℤ × Oˣ`.
+  let val : Valuation K (WithZero (Multiplicative ℤ)) := Valued.v
+  obtain ⟨π₀, hπ₀⟩ := val.exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : Kˣ := Units.mk0 π₀ hπ₀.ne_zero
+  have hπnorm : ‖π.val‖ = (v.asIdeal.absNorm : ℝ)⁻¹ := by
+    rw [Units.val_mk0]
+    exact norm_uniformizer_adicCompletion (K := F) v π₀ hπ₀
+  obtain ⟨e, heπ, heι⟩ := finitePlace_unitDecomposition v π hπnorm
+  let ι : Oˣ →* Kˣ := Units.map O.subtype.toMonoidHom
+  have hι_mem (u : Oˣ) : ι u ∈ U := ⟨u.val.property, u.inv.property⟩
+  have hU_eq : U = Set.range ι := by
+    ext x
+    constructor
+    · intro hx
+      exact ⟨O.toSubmonoid.unitsEquivUnitsType ⟨x, hx⟩, rfl⟩
+    · rintro ⟨u, rfl⟩
+      exact hι_mem u
+  have hU_iff (x : Kˣ) : x ∈ U ↔ (e x).1 = 1 := by
+    constructor
+    · intro hx
+      rw [hU_eq] at hx
+      obtain ⟨u, rfl⟩ := hx
+      rw [heι]
+    · intro h1
+      have hx : x = ι (e x).2 := by
+        apply e.injective
+        rw [heι]
+        exact Prod.ext h1 rfl
+      rw [hx]
+      exact hι_mem _
+  -- Valuation shells `shell k = π ^ k • U`.
+  let shell (k : ℤ) : Set Kˣ := {x : Kˣ | (e x).1 = Multiplicative.ofAdd k}
+  have hshell_open (k : ℤ) : IsOpen (shell k) :=
+    (isOpen_discrete ({Multiplicative.ofAdd k} : Set (Multiplicative ℤ))).preimage
+      (continuous_fst.comp e.continuous)
+  have hshell_meas (k : ℤ) : MeasurableSet (shell k) := (hshell_open k).measurableSet
+  have hshell_disj : Pairwise (Disjoint on shell) := fun k l hkl ↦
+    Set.disjoint_left.mpr fun x hk hl ↦ hkl (Multiplicative.ofAdd.injective (hk.symm.trans hl))
+  have h1k (k : ℤ) : (Multiplicative.ofAdd (1 : ℤ)) ^ k = Multiplicative.ofAdd k := by
+    simp [← ofAdd_zsmul]
+  have hshell_pre (k : ℤ) : (fun u : Kˣ ↦ π ^ k * u) ⁻¹' shell k = U := by
+    ext u
+    change (e (π ^ k * u)).1 = Multiplicative.ofAdd k ↔ u ∈ U
+    rw [map_mul, map_zpow, heπ, Prod.fst_mul,
+      show ((Multiplicative.ofAdd (1 : ℤ), (1 : Oˣ)) ^ k).1 = (Multiplicative.ofAdd (1 : ℤ)) ^ k from rfl,
+      h1k, hU_iff]
+    exact mul_eq_left
+  have hshell_mem (k : ℤ) (u : Kˣ) (hu : u ∈ U) : π ^ k * u ∈ shell k := by
+    rw [← Set.mem_preimage, hshell_pre]
+    exact hu
+  -- Norm of `π ^ k` and `u ∈ U`.
+  have hq_pos : (0 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v)
+  have hq_gt_one : (1 : ℝ) < (v.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  let qU : ℝ≥0ˣ := Units.mk0 (v.asIdeal.absNorm : ℝ≥0) (by
+    exact_mod_cast hq_pos.ne')
+  let r (k : ℤ) : ℝ≥0ˣ := (qU⁻¹) ^ k
+  have hr_one : r 0 = 1 := zpow_zero _
+  have hr_add (k l : ℤ) : r (k + l) = r k * r l := zpow_add _ k l
+  have hnorm_u (u : Kˣ) (hu : u ∈ U) : ‖u.val‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)
+  have hnorm_πk (k : ℤ) : ‖(π ^ k).val‖ = ((r k).val : ℝ) := by
+    rw [Units.val_zpow_eq_zpow_val, norm_zpow, hπnorm]
+    simp [r, qU]
+  have hnnnorm_πk (k : ℤ) : Units.map nnNormHom.toMonoidHom (π ^ k) = r k := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    exact hnorm_πk k
+  have hnnnorm_u (u : Kˣ) (hu : u ∈ U) : Units.map nnNormHom.toMonoidHom u = 1 := by
+    apply Units.ext
+    apply NNReal.coe_injective
+    exact hnorm_u u hu
+  have hnorm_shell (k : ℤ) (x : Kˣ) (hx : x ∈ shell k) : ‖x.val‖ = ((r k).val : ℝ) := by
+    have hxu : π ^ (-k) * x ∈ U := by
+      rw [hU_iff, map_mul, map_zpow, heπ, Prod.fst_mul,
+        show ((Multiplicative.ofAdd (1 : ℤ), (1 : Oˣ)) ^ (-k)).1 =
+          (Multiplicative.ofAdd (1 : ℤ)) ^ (-k) from rfl, h1k, hx]
+      rw [← ofAdd_add, neg_add_cancel]
+      rfl
+    have hx' : x = π ^ k * (π ^ (-k) * x) := by rw [← mul_assoc, ← zpow_add]; simp
+    conv_lhs => rw [hx']
+    rw [Units.val_mul, norm_mul, hnorm_πk, hnorm_u _ hxu, mul_one]
+  -- Integer-ring membership in terms of shells.
+  have hO_iff (x : Kˣ) : x.val ∈ (O : Set K) ↔ 0 ≤ (e x).1.toAdd := by
+    have hx : x ∈ shell (e x).1.toAdd := by simp [shell]
+    have hnx := hnorm_shell (e x).1.toAdd x hx
+    rw [show x.val ∈ (O : Set K) ↔ ‖x.val‖ ≤ 1 from by
+      change x.val ∈ v.adicCompletionIntegers F ↔ _
+      rw [v.mem_adicCompletionIntegers (𝓞 F) F]
+      exact Valued.toNormedField.norm_le_one_iff.symm]
+    rw [hnx]
+    simp only [r, qU, Units.val_zpow_eq_zpow_val, Units.val_inv_eq_inv_val, Units.val_mk0,
+      NNReal.coe_zpow, NNReal.coe_inv, NNReal.coe_natCast, inv_zpow', zpow_neg]
+    rw [inv_le_one₀ (zpow_pos hq_pos _)]
+    exact one_le_zpow_iff_right₀ hq_gt_one
+  -- `J = finiteStandardGaussian v 1 = 1_O`.
+  let J : SchwartzBruhat (Multiplicative K) := finiteStandardGaussian v 1
+  have hJ_apply (x : K) : J (Multiplicative.ofAdd x) = (O : Set K).indicator (fun _ ↦ 1) x := by
+    change finiteStandardGaussianValue v 1 x = _
+    exact ite_eq_left fun _ _ ↦ rfl
+  have hJ_zero : J (Multiplicative.ofAdd 0) = 1 := by
+    rw [hJ_apply, Set.indicator_of_mem O.zero_mem]
+  -- Subtract the value at 0 to get a punctured test `g₀ g`.
+  let g₀ : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] SchwartzBruhat (Multiplicative K) :=
+    LinearMap.id - ((LinearMap.proj (Multiplicative.ofAdd 0)).comp
+      (schwartzBruhatSubmodule (Multiplicative K)).subtype).smulRight J
+  have hg₀_zero (g : SchwartzBruhat (Multiplicative K)) :
+      g₀ g (Multiplicative.ofAdd 0) = 0 := by
+    change g (Multiplicative.ofAdd 0) - g (Multiplicative.ofAdd 0) * J (Multiplicative.ofAdd 0) = 0
+    rw [hJ_zero, mul_one, sub_self]
+  -- Compact support of `g₀ g` in `Kˣ` implies finite shell support.
+  have hg₀_shells (g : SchwartzBruhat (Multiplicative K)) :
+      ∃ S₀ : Finset ℤ, ∀ (k : ℤ) (x : Kˣ), x ∈ shell k → k ∉ S₀ →
+        g₀ g (Multiplicative.ofAdd x.val) = 0 := by
+    obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F v
+      (fun x ↦ g₀ g (Multiplicative.ofAdd x))).mp ⟨g₀ g, fun _ ↦ rfl⟩
+    have hzero : g₀ g (Multiplicative.ofAdd 0) = 0 := hg₀_zero g
+    have h0not : (0 : K) ∉ tsupport (fun x : K ↦ g₀ g (Multiplicative.ofAdd x)) := by
+      rw [notMem_tsupport_iff_eventuallyEq]
+      filter_upwards [hlc.eventually_eq 0] with y hy
+      exact hy.trans hzero
+    have hrange : tsupport (fun x : K ↦ g₀ g (Multiplicative.ofAdd x)) ⊆ Set.range Units.val := by
+      intro y hy
+      have hy0 : y ≠ 0 := fun h ↦ h0not (h ▸ hy)
+      exact ⟨Units.mk0 y hy0, rfl⟩
+    have hpre : IsCompact (Units.val ⁻¹' tsupport (fun x : K ↦ g₀ g (Multiplicative.ofAdd x)) : Set Kˣ) := by
+      rw [(Units.isEmbedding_val₀ (G₀ := K)).isCompact_iff, Set.image_preimage_eq_of_subset hrange]
+      exact hcs
+    have himg : IsCompact ((fun x : Kˣ ↦ (e x).1.toAdd) ''
+        (Units.val ⁻¹' tsupport (fun x : K ↦ g₀ g (Multiplicative.ofAdd x)))) :=
+      hpre.image (continuous_toAdd.comp (continuous_fst.comp e.continuous))
+    obtain ⟨S₀, hS₀⟩ := himg.finite_of_discrete.exists_finset_coe
+    refine ⟨S₀, fun k x hx hk ↦ ?_⟩
+    by_contra hne
+    have hmem : x ∈ Units.val ⁻¹' tsupport (fun y : K ↦ g₀ g (Multiplicative.ofAdd y)) :=
+      subset_tsupport _ hne
+    have hkmem : k ∈ (S₀ : Set ℤ) := by
+      rw [hS₀]
+      refine ⟨x, hmem, ?_⟩
+      change (e x).1.toAdd = k
+      rw [hx]
+      rfl
+    exact hk hkmem
+  -- Shell coefficient `I g k` as a linear map into `ℤ →₀ ℂ`.
+  let a : ℂ := (ψ π : ℂ)
+  let shellCoeff (g : SchwartzBruhat (Multiplicative K)) (k : ℤ) : ℂ :=
+    m⁻¹ * a ^ k * ∫ u in U, g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ
+  have hshell_fin (g : SchwartzBruhat (Multiplicative K)) :
+      (Function.support (shellCoeff g)).Finite := by
+    obtain ⟨S₀, hS₀⟩ := hg₀_shells g
+    refine S₀.finite_toSet.subset fun k hk ↦ ?_
+    by_contra hnot
+    apply hk
+    have hzero : ∫ u in U, g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ = 0 := by
+      refine setIntegral_eq_zero_of_forall_eq_zero fun u hu ↦ ?_
+      rw [hS₀ k (π ^ k * u) (hshell_mem k u hu) hnot, zero_mul]
+    simp only [shellCoeff, hzero, mul_zero]
+  have hshell_int (g : SchwartzBruhat (Multiplicative K)) (k : ℤ) :
+      IntegrableOn (fun u : Kˣ ↦ g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ)) U μ := by
+    obtain ⟨hlc, _⟩ := (mem_finitePlaceSchwartz_iff F v
+      (fun x ↦ g₀ g (Multiplicative.ofAdd x))).mp ⟨g₀ g, fun _ ↦ rfl⟩
+    have hc : Continuous (fun u : Kˣ ↦ g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ)) :=
+      (hlc.continuous.comp (Units.continuous_val.comp (continuous_const.mul continuous_id))).mul
+        (continuous_subtype_val.comp ψ.continuous)
+    exact hc.continuousOn.integrableOn_compact hUcompact
+  let I : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] (ℤ →₀ ℂ) :=
+    { toFun := fun g ↦ Finsupp.ofSupportFinite (shellCoeff g) (hshell_fin g)
+      map_add' := fun g₁ g₂ ↦ by
+        ext k
+        simp only [Finsupp.coe_add, Pi.add_apply, Finsupp.ofSupportFinite_coe, shellCoeff]
+        have hadd : (∫ u in U, g₀ (g₁ + g₂) (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ) =
+            (∫ u in U, g₀ g₁ (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ) +
+            (∫ u in U, g₀ g₂ (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ) := by
+          rw [← integral_add (hshell_int g₁ k) (hshell_int g₂ k)]
+          refine setIntegral_congr_fun hUmeas fun u _ ↦ ?_
+          rw [map_add]
+          exact add_mul _ _ _
+        rw [hadd, mul_add]
+      map_smul' := fun t g ↦ by
+        ext k
+        simp only [Finsupp.coe_smul, Pi.smul_apply, smul_eq_mul, RingHom.id_apply,
+          Finsupp.ofSupportFinite_coe, shellCoeff]
+        have hsmul : (∫ u in U, g₀ (t • g) (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ) =
+            t * ∫ u in U, g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ := by
+          rw [← integral_const_mul]
+          refine setIntegral_congr_fun hUmeas fun u _ ↦ ?_
+          rw [map_smul]
+          exact mul_assoc _ _ _
+        rw [hsmul]
+        ring }
+  -- Define `coeff : ℬ(K) →ₗ[ℂ] (ℤ →₀ ℂ)` in the unramified and ramified cases.
+  let ev0 : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] ℂ :=
+    (LinearMap.proj (Multiplicative.ofAdd 0)).comp (schwartzBruhatSubmodule (Multiplicative K)).subtype
+  let coeff : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] (ℤ →₀ ℂ) :=
+    if ∀ u ∈ O.units, c u = 1 then
+      (Finsupp.lsingle (0 : ℤ)).comp ev0 + I -
+        (Finsupp.lmapDomain ℂ ℂ (fun k : ℤ ↦ k + 1)).comp (a • I)
+    else
+      I
+  -- Push along `r : ℤ → ℝ≥0ˣ` to `MonoidAlgebra ℂ ℝ≥0ˣ`.
+  let pushR : (ℤ →₀ ℂ) →ₗ[ℂ] MonoidAlgebra ℂ ℝ≥0ˣ :=
+    Finsupp.lsum ℂ fun k : ℤ ↦ MonoidAlgebra.lsingle (R := ℂ) (r k)
+  let Φ : SchwartzBruhat (Multiplicative K) →ₗ[ℂ] MonoidAlgebra ℂ ℝ≥0ˣ :=
+    pushR.comp coeff
+  -- Helper: check `Φ ρ = 1`.
+  have hΦρ : Φ ρ = 1 := by
+    have hsingle : pushR (Finsupp.single (0 : ℤ) (1 : ℂ)) = (1 : MonoidAlgebra ℂ ℝ≥0ˣ) := by
+      simp only [pushR, Finsupp.lsum_single, MonoidAlgebra.lsingle_apply, hr_one]
+      rfl
+    change pushR (coeff ρ) = 1
+    rw [← hsingle]
+    congr 1
+    by_cases hU : ∀ u ∈ O.units, c u = 1
+    · simp only [coeff, ite_eq_left hU, LinearMap.sub_apply, LinearMap.add_apply,
+        LinearMap.comp_apply, LinearMap.smul_apply, Finsupp.lsingle_apply]
+      have hρJ : ρ = J := by
+        apply Subtype.ext
+        funext x
+        change finiteStandardGaussianValue v c x.toAdd = finiteStandardGaussianValue v 1 x.toAdd
+        unfold finiteStandardGaussianValue
+        rw [ite_eq_left hU, ite_eq_left (fun u _ ↦ show (1 : QuasiCharacter Kˣ) u = 1 from rfl)]
+      have hg₀ρ : g₀ ρ = 0 := by
+        rw [hρJ]
+        apply Subtype.ext
+        funext x
+        change J x - J (Multiplicative.ofAdd 0) * J x = 0
+        rw [hJ_zero, one_mul, sub_self]
+      have hIρ : I ρ = 0 := by
+        ext k
+        simp [I, shellCoeff, hg₀ρ]
+      have hev0ρ : ev0 ρ = 1 := by
+        change ρ (Multiplicative.ofAdd 0) = 1
+        rw [hρJ, hJ_zero]
+      rw [hev0ρ, hIρ, smul_zero, map_zero, add_zero, sub_zero]
+    · simp only [coeff, ite_eq_right hU]
+      have hρ0 : ρ (Multiplicative.ofAdd 0) = 0 := by
+        change finiteStandardGaussianValue v c 0 = 0
+        unfold finiteStandardGaussianValue
+        rw [ite_eq_right hU, Set.indicator_of_notMem]
+        rintro ⟨u, _, hu⟩
+        exact u.ne_zero hu
+      have hg₀ρ : g₀ ρ = ρ := by
+        apply Subtype.ext
+        funext x
+        change ρ x - ρ (Multiplicative.ofAdd 0) * J x = ρ x
+        rw [hρ0, zero_mul, sub_zero]
+      ext k
+      simp only [I, LinearMap.coe_mk, AddHom.coe_mk, Finsupp.ofSupportFinite_coe,
+        Finsupp.single_apply, shellCoeff, hg₀ρ]
+      by_cases hk : 0 = k
+      · subst hk
+        rw [ite_eq_left rfl, zpow_zero, zpow_zero, mul_one]
+        have hint : (∫ u in U, ρ (Multiplicative.ofAdd (1 * u).val) * (ψ u : ℂ) ∂μ) = m := by
+          have heq : Set.EqOn (fun u : Kˣ ↦ ρ (Multiplicative.ofAdd (1 * u).val) * (ψ u : ℂ))
+              (fun _ ↦ (1 : ℂ)) U := fun u hu ↦ by
+            dsimp only
+            rw [one_mul, finiteStandardGaussian_integerUnit v c u hu, hcψ u hu,
+              inv_mul_cancel₀ (Circle.coe_ne_zero _)]
+          rw [setIntegral_congr_fun hUmeas heq, setIntegral_const]
+          simp [m, measureReal_def]
+        rw [hint, inv_mul_cancel₀ hm_ne]
+      · rw [ite_eq_right hk]
+        have hzero : (∫ u in U, ρ (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ) ∂μ) = 0 := by
+          refine setIntegral_eq_zero_of_forall_eq_zero fun u hu ↦ ?_
+          have hnot : (π ^ k * u).val ∉ Units.val '' (O.units : Set Kˣ) := by
+            rintro ⟨w, hw, hweq⟩
+            have hmem : π ^ k * u ∈ U := (Units.ext hweq) ▸ hw
+            have h1 : (e (π ^ k * u)).1 = 1 := (hU_iff _).mp hmem
+            have h2 : (e (π ^ k * u)).1 = Multiplicative.ofAdd k := hshell_mem k u hu
+            exact hk (Multiplicative.ofAdd.injective (h1.symm.trans h2))
+          have hρz : ρ (Multiplicative.ofAdd (π ^ k * u).val) = 0 := by
+            change finiteStandardGaussianValue v c (π ^ k * u).val = 0
+            unfold finiteStandardGaussianValue
+            rw [ite_eq_right hU, Set.indicator_of_notMem hnot]
+          rw [hρz, zero_mul]
+        rw [hzero, mul_zero]
+  refine ⟨Φ, hΦρ, fun η s hs hηnorm d hd_apply ↦ ?_⟩
+  -- Basic properties of `d`.
+  have hd_u (u : Kˣ) (hu : u ∈ U) : d u = (ψ u : ℂ) := by
+    rw [hd_apply, hnnnorm_u u hu, map_one, mul_one, hnorm_u u hu, Complex.ofReal_one,
+      Complex.one_cpow, mul_one]
+  have hd_πk (k : ℤ) : d (π ^ k) = a ^ k * (η (r k) * ((r k).val : ℂ) ^ s) := by
+    rw [hd_apply, map_zpow, Circle.coe_zpow, hnnnorm_πk, hnorm_πk]
+    ring
+  -- Integrability and Euler-factor / vanishing of `J * d`.
+  obtain ⟨hJ_int, hJ_unram, hJ_ram⟩ :=
+    sLocalStandardThetaTensor_finiteLocal_J_zeta v ψ η s hs hηnorm d hd_apply π hπnorm
+  -- Zeta integral of `g₀ g`.
+  have hg₀_zeta (g : SchwartzBruhat (Multiplicative K)) :
+      Integrable (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x) μ ∧
+      localIdelicZetaIntegral μ (fun x ↦ g₀ g (Multiplicative.ofAdd x)) d =
+        m * (I g).sum (fun k b ↦ b * (η (r k) * ((r k).val : ℂ) ^ s)) := by
+    obtain ⟨S₀, hS₀⟩ := hg₀_shells g
+    let T := S₀ ∪ (I g).support
+    have hT (k : ℤ) (x : Kˣ) (hx : x ∈ shell k) (hk : k ∉ T) :
+        g₀ g (Multiplicative.ofAdd x.val) = 0 :=
+      hS₀ k x hx (fun h ↦ hk (Finset.mem_union_left _ h))
+    have hmeas_int (k : ℤ) :
+        IntegrableOn (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x) (shell k) μ := by
+      have hp := (measurePreserving_mul_left μ (π ^ k))
+      have hemb : MeasurableEmbedding (fun u : Kˣ ↦ π ^ k * u) :=
+        (Homeomorph.mulLeft (π ^ k)).toMeasurableEquiv.measurableEmbedding
+      have hcomp : IntegrableOn (fun u : Kˣ ↦ g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * d (π ^ k * u)) U μ := by
+        have heq : Set.EqOn (fun u : Kˣ ↦ d (π ^ k) * (g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ)))
+            (fun u : Kˣ ↦ g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * d (π ^ k * u)) U := by
+          intro u hu
+          dsimp only
+          rw [map_mul, hd_u u hu]
+          ring
+        exact IntegrableOn.congr_fun ((hshell_int g k).const_mul (d (π ^ k))) heq hUmeas
+      rw [← hshell_pre k] at hcomp
+      exact (hp.integrableOn_comp_preimage hemb).mp hcomp
+    have hUnion_int : IntegrableOn (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x)
+        (⋃ k ∈ T, shell k) μ :=
+      (integrableOn_finset_iUnion).mpr fun k _ ↦ hmeas_int k
+    have hsupp : Function.support (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x) ⊆
+        ⋃ k ∈ T, shell k := by
+      intro x hx
+      by_contra hnot
+      apply hx
+      dsimp only
+      have hk : (e x).1.toAdd ∉ T := fun h ↦ hnot (Set.mem_biUnion h (by simp [shell]))
+      rw [hT _ x (by simp [shell]) hk, zero_mul]
+    have hfull_int : Integrable (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x) μ := by
+      rw [← integrableOn_univ]
+      have hU_meas : MeasurableSet (⋃ k ∈ T, shell k) :=
+        Finset.measurableSet_biUnion T fun k _ ↦ hshell_meas k
+      have hcompl_int : IntegrableOn (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x)
+          (⋃ k ∈ T, shell k)ᶜ μ :=
+        IntegrableOn.congr_fun (integrableOn_zero (s := (⋃ k ∈ T, shell k)ᶜ) (μ := μ))
+          (fun x hx ↦ by dsimp only; by_contra hne; exact hx (hsupp (Ne.symm hne))) hU_meas.compl
+      have hunion := hUnion_int.union hcompl_int
+      rwa [Set.union_compl_self] at hunion
+    refine ⟨hfull_int, ?_⟩
+    change (∫ x : Kˣ, g₀ g (Multiplicative.ofAdd x.val) * d x ∂μ) = _
+    rw [← setIntegral_eq_integral_of_forall_compl_eq_zero (s := ⋃ k ∈ T, shell k) fun x hx ↦ by
+      by_contra hne; exact hx (hsupp hne)]
+    rw [integral_biUnion_finset T (fun k _ ↦ hshell_meas k)
+      (fun k _ l _ hkl ↦ hshell_disj hkl) (fun k _ ↦ hmeas_int k)]
+    have hterm (k : ℤ) :
+        (∫ x in shell k, g₀ g (Multiplicative.ofAdd x.val) * d x ∂μ) =
+          m * (I g k * (η (r k) * ((r k).val : ℂ) ^ s)) := by
+      have hI := (measurePreserving_mul_left μ (π ^ k)).setIntegral_preimage_emb
+        (Homeomorph.mulLeft (π ^ k)).toMeasurableEquiv.measurableEmbedding
+        (fun x : Kˣ ↦ g₀ g (Multiplicative.ofAdd x.val) * d x) (shell k)
+      rw [hshell_pre k] at hI
+      rw [← hI]
+      have heq : Set.EqOn (fun u : Kˣ ↦ g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * d (π ^ k * u))
+          (fun u : Kˣ ↦ d (π ^ k) * (g₀ g (Multiplicative.ofAdd (π ^ k * u).val) * (ψ u : ℂ))) U := by
+        intro u hu
+        dsimp only
+        rw [map_mul, hd_u u hu]
+        ring
+      rw [setIntegral_congr_fun hUmeas heq, integral_const_mul, hd_πk]
+      change (a ^ k * (η (r k) * ((r k).val : ℂ) ^ s)) * _ =
+        m * (m⁻¹ * a ^ k * _ * (η (r k) * ((r k).val : ℂ) ^ s))
+      field_simp [hm_ne]
+      rfl
+    rw [Finset.sum_congr rfl (fun k _ ↦ hterm k), ← Finset.mul_sum]
+    congr 1
+    rw [Finsupp.sum]
+    exact (Finset.sum_subset (Finset.subset_union_right (s₁ := S₀)) fun k _ hk ↦ by
+      rw [Finsupp.notMem_support_iff.mp hk, zero_mul]).symm
+  -- Helper: `MonoidAlgebra.lift ... (Φ g) = (coeff g).sum ...`.
+  let χr : ℝ≥0ˣ →* ℂ :=
+    { toFun := fun t ↦ η t * ((t.val : ℝ) : ℂ) ^ s
+      map_one' := by simp
+      map_mul' := fun r₁ r₂ ↦ by
+        rw [map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul,
+          Complex.mul_cpow_ofReal_nonneg (NNReal.coe_nonneg _) (NNReal.coe_nonneg _)]
+        ring }
+  have hΦ_sum (g : SchwartzBruhat (Multiplicative K)) :
+      MonoidAlgebra.lift ℂ ℂ ℝ≥0ˣ χr (Φ g) =
+        (coeff g).sum fun k b ↦ b * (η (r k) * ((r k).val : ℂ) ^ s) := by
+    change MonoidAlgebra.lift ℂ ℂ ℝ≥0ˣ χr
+        ((coeff g).sum fun k b ↦ MonoidAlgebra.single (r k) b) = _
+    rw [map_finsuppSum]
+    refine Finsupp.sum_congr fun k _ ↦ ?_
+    rw [MonoidAlgebra.lift_single]
+    rfl
+  -- Split into unramified vs ramified cases.
+  by_cases hU : ∀ u ∈ O.units, c u = 1
+  · -- Unramified case: `ρ = J = 1_O`.
+    have hρJ : ρ = J := by
+      apply Subtype.ext
+      funext x
+      change finiteStandardGaussianValue v c x.toAdd = finiteStandardGaussianValue v 1 x.toAdd
+      unfold finiteStandardGaussianValue
+      rw [ite_eq_left hU, ite_eq_left (fun u _ ↦ show (1 : QuasiCharacter Kˣ) u = 1 from rfl)]
+    -- Compute `(1 - d π) * Z_v(J, d) = m`.
+    have hEuler : (1 - a * (η (r 1) * ((r 1).val : ℂ) ^ s)) *
+        localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d = m := by
+      have hdπ : d π = a * (η (r 1) * ((r 1).val : ℂ) ^ s) := by
+        simpa only [zpow_one] using hd_πk 1
+      rw [← hdπ]
+      exact hJ_unram fun u hu ↦ (hd_u u hu).trans ((hcψ u hu).symm.trans (hU u hu))
+    have hZρ_ne : localIdelicZetaIntegral μ (fun x ↦ ρ (Multiplicative.ofAdd x)) d ≠ 0 := by
+      rw [hρJ]
+      exact right_ne_zero_of_mul (hEuler.trans_ne hm_ne)
+    refine ⟨hZρ_ne, fun g ↦ ?_⟩
+    dsimp only
+    rw [hΦ_sum]
+    have hdecomp : g = g (Multiplicative.ofAdd 0) • J + g₀ g := by
+      apply Subtype.ext
+      funext x
+      change g x = g (Multiplicative.ofAdd 0) * J x + (g x - g (Multiplicative.ofAdd 0) * J x)
+      ring
+    have hZg : localIdelicZetaIntegral μ (fun x ↦ g (Multiplicative.ofAdd x)) d =
+        g (Multiplicative.ofAdd 0) * localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d +
+        localIdelicZetaIntegral μ (fun x ↦ g₀ g (Multiplicative.ofAdd x)) d := by
+      change (∫ x : Kˣ, g (Multiplicative.ofAdd x.val) * d x ∂μ) = _
+      conv_lhs => rw [hdecomp]
+      have h1 : (fun x : Kˣ ↦ (g (Multiplicative.ofAdd 0) • J + g₀ g) (Multiplicative.ofAdd x.val) * d x) =
+          fun x : Kˣ ↦ g (Multiplicative.ofAdd 0) * (J (Multiplicative.ofAdd x.val) * d x) +
+            g₀ g (Multiplicative.ofAdd x.val) * d x := by
+        funext x
+        change (g (Multiplicative.ofAdd 0) * J (Multiplicative.ofAdd x.val) +
+          g₀ g (Multiplicative.ofAdd x.val)) * d x = _
+        ring
+      rw [h1, integral_add (hJ_int.const_mul _) (hg₀_zeta g).1, integral_const_mul]
+      rfl
+    rw [hZg, (hg₀_zeta g).2, ← hEuler]
+    rw [show finiteStandardGaussian v c = J from hρJ]
+    simp only [coeff, ite_eq_left hU, LinearMap.sub_apply, LinearMap.add_apply,
+      LinearMap.comp_apply, LinearMap.smul_apply, Finsupp.lsingle_apply]
+    let f : ℤ → ℂ → ℂ := fun k b ↦ b * (η (r k) * ((r k).val : ℂ) ^ s)
+    have hf0 (k : ℤ) : f k 0 = 0 := zero_mul _
+    have hfadd (k : ℤ) (b₁ b₂ : ℂ) : f k (b₁ + b₂) = f k b₁ + f k b₂ := add_mul _ _ _
+    have hfsub (k : ℤ) (b₁ b₂ : ℂ) : f k (b₁ - b₂) = f k b₁ - f k b₂ := sub_mul _ _ _
+    change _ = ((Finsupp.single (0 : ℤ) (ev0 g) + I g -
+        Finsupp.mapDomain (fun k : ℤ ↦ k + 1) (a • I g)).sum f) * _
+    rw [Finsupp.sum_sub_index hfsub, Finsupp.sum_add_index' hf0 hfadd,
+      Finsupp.sum_single_index (hf0 0), Finsupp.sum_mapDomain_index hf0 hfadd]
+    have hshiftSum : (a • I g).sum (fun k b ↦ f (k + 1) b) =
+        a * (η (r 1) * ((r 1).val : ℂ) ^ s) * (I g).sum f := by
+      rw [Finsupp.sum_smul_index' (fun _ ↦ hf0 _), Finsupp.mul_sum]
+      refine Finsupp.sum_congr fun k _ ↦ ?_
+      change a * I g k * (η (r (k + 1)) * ((r (k + 1)).val : ℂ) ^ s) =
+        a * (η (r 1) * ((r 1).val : ℂ) ^ s) * (I g k * (η (r k) * ((r k).val : ℂ) ^ s))
+      rw [hr_add k 1, map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul,
+        Complex.mul_cpow_ofReal_nonneg (NNReal.coe_nonneg _) (NNReal.coe_nonneg _)]
+      ring
+    rw [hshiftSum]
+    have h0term : f 0 (ev0 g) = g (Multiplicative.ofAdd 0) := by
+      change g (Multiplicative.ofAdd 0) * (η (r 0) * ((r 0).val : ℂ) ^ s) = _
+      rw [hr_one, map_one, Units.val_one, NNReal.coe_one, Complex.ofReal_one,
+        Complex.one_cpow, mul_one, mul_one]
+    rw [h0term]
+    ring
+  · -- Ramified case.
+    have hram : ∃ u ∈ U, c u ≠ 1 := by
+      push Not at hU
+      exact hU
+    have hZρ : localIdelicZetaIntegral μ (fun x ↦ ρ (Multiplicative.ofAdd x)) d = m := by
+      have h := (finiteStandardGaussian_zeta_of_ramified v c d hram).2
+      have hmatch : ∀ u ∈ U, d u = c u := fun u hu ↦ (hd_u u hu).trans (hcψ u hu).symm
+      rw [ite_eq_left hmatch] at h
+      exact h
+    have hZρ_ne : localIdelicZetaIntegral μ (fun x ↦ ρ (Multiplicative.ofAdd x)) d ≠ 0 :=
+      hZρ.symm ▸ hm_ne
+    -- `Z_v(J, d) = 0` by `U`-invariance of `O` and nontriviality of `c` on `U`.
+    have hZJ : localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d = 0 := by
+      obtain ⟨u₀, hu₀, hcu₀⟩ := hram
+      exact hJ_ram ⟨u₀, hu₀, by rwa [hd_u u₀ hu₀, ← hcψ u₀ hu₀]⟩
+    refine ⟨hZρ_ne, fun g ↦ ?_⟩
+    dsimp only
+    rw [hΦ_sum, hZρ]
+    simp only [coeff, ite_eq_right hU]
+    have hdecomp : g = g (Multiplicative.ofAdd 0) • J + g₀ g := by
+      apply Subtype.ext
+      funext x
+      change g x = g (Multiplicative.ofAdd 0) * J x + (g x - g (Multiplicative.ofAdd 0) * J x)
+      ring
+    have hZg : localIdelicZetaIntegral μ (fun x ↦ g (Multiplicative.ofAdd x)) d =
+        g (Multiplicative.ofAdd 0) * localIdelicZetaIntegral μ (fun x ↦ J (Multiplicative.ofAdd x)) d +
+        localIdelicZetaIntegral μ (fun x ↦ g₀ g (Multiplicative.ofAdd x)) d := by
+      change (∫ x : Kˣ, g (Multiplicative.ofAdd x.val) * d x ∂μ) = _
+      conv_lhs => rw [hdecomp]
+      have h1 : (fun x : Kˣ ↦ (g (Multiplicative.ofAdd 0) • J + g₀ g) (Multiplicative.ofAdd x.val) * d x) =
+          fun x : Kˣ ↦ g (Multiplicative.ofAdd 0) * (J (Multiplicative.ofAdd x.val) * d x) +
+            g₀ g (Multiplicative.ofAdd x.val) * d x := by
+        funext x
+        change (g (Multiplicative.ofAdd 0) * J (Multiplicative.ofAdd x.val) +
+          g₀ g (Multiplicative.ofAdd x.val)) * d x = _
+        ring
+      rw [h1, integral_add (hJ_int.const_mul _) (hg₀_zeta g).1, integral_const_mul]
+      rfl
+    rw [hZg, hZJ, mul_zero, zero_add, (hg₀_zeta g).2, mul_comm]
+
+/-- Fubini factorization of the S-local zeta integral on a tensor of an archimedean test
+with finite local tests. -/
+private theorem sLocalStandardThetaTensor_zeta_prod
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (d : QuasiCharacter (SIdeleQuotient F S))
+    (hd : ∃ (ψ : PontryaginDual (SIdeleQuotient F S)) (s : ℂ), 0 < s.re ∧
+      d = quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+        (isProperMap_sIdeleQuotientNorm F S).continuous
+        ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ) s)
+    (h : SchwartzBruhat (Multiplicative (SAdeleRing F S)))
+    (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)))
+    (g : ∀ v : S, SchwartzBruhat (Multiplicative (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)))
+    (hh : ∀ x : SAdeleRing F S, h (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd x.1) * ∏ v : S, g v (Multiplicative.ofAdd (x.2 v))) :
+    letI (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    letI (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+    letI : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+      inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+        ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+    sLocalIdelicZetaIntegral h d =
+      (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+        f (Multiplicative.ofAdd x.val.1) *
+          d (QuotientGroup.mk (Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+            (∀ v : S, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+            (Units.map (RingHom.fst (InfiniteAdeleRing F)
+              (∀ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
+                HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom x)))
+        ∂sMultiplicativeTamagawaMeasure F ∅) *
+      ∏ v : S, localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+        (fun y ↦ g v (Multiplicative.ofAdd y)) (sLocalFiniteRestriction v d) := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (w : InfinitePlace F) : BorelSpace w.Completionˣ := ⟨by
+    change (borel w.Completion).comap Units.val = _
+    rw [← borel_comap, ← (Units.isEmbedding_val₀ (G₀ := w.Completion)).eq_induced]⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completionˣ :=
+    (Units.isEmbedding_val₀ (G₀ := w.Completion)).secondCountableTopology
+  let (v : HeightOneSpectrum (𝓞 F)) : SecondCountableTopology (v.adicCompletion F)ˣ :=
+    (Units.isEmbedding_val₀ (G₀ := v.adicCompletion F)).secondCountableTopology
+  let : MeasurableSpace (SAdeleRing F S) := inferInstanceAs
+    (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) := inferInstanceAs
+    (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+  let : BorelSpace (SAdeleRing F S)ˣ := sIdeleGroup_borelSpace
+  let : BorelSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ := sIdeleGroup_borelSpace
+  let μa := infiniteLocalMultiplicativeTamagawaMeasure F
+  let μb := fun v : S ↦ finiteLocalMultiplicativeTamagawaMeasure F v.val
+  let (w : InfinitePlace F) : (μa w).IsHaarMeasure :=
+    infiniteLocalMultiplicativeTamagawaMeasure_isHaarMeasure w
+  let (v : S) : (μb v).IsHaarMeasure :=
+    finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v.val
+  let eProd := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((v : S) → v.val.adicCompletion F)
+  let eArch := ContinuousMulEquiv.piUnits (M := fun w : InfinitePlace F ↦ w.Completion)
+  let eFin := ContinuousMulEquiv.piUnits (M := fun v : S ↦ v.val.adicCompletion F)
+  let E := eProd.toHomeomorph.trans (eArch.toHomeomorph.prodCongr eFin.toHomeomorph)
+  let eProd0 := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)
+  let eFin0 := ContinuousMulEquiv.piUnits
+    (M := fun v : (∅ : Finset (HeightOneSpectrum (𝓞 F))) ↦ v.val.adicCompletion F)
+  let E0 := eProd0.toHomeomorph.trans (eArch.toHomeomorph.prodCongr eFin0.toHomeomorph)
+  let ins : (InfiniteAdeleRing F)ˣ →* (SAdeleRing F S)ˣ :=
+    Units.map (MonoidHom.inl (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F))
+  let fst0 : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ →* (InfiniteAdeleRing F)ˣ :=
+    Units.map (RingHom.fst (InfiniteAdeleRing F) _).toMonoidHom
+  -- Character factorization into archimedean × finite parts.
+  have hd_fac (a : (w : InfinitePlace F) → w.Completionˣ) (b : (v : S) → (v.val.adicCompletion F)ˣ) :
+      d (QuotientGroup.mk (E.symm (a, b))) =
+        d (QuotientGroup.mk (ins (eArch.symm a))) *
+        ∏ v : S, sLocalFiniteRestriction v d (b v) := by
+    obtain ⟨A, B, hA, hB, h⟩ := sIdeleQuotientCharacter_eq_prod_restrictions F S d
+    have hsplit : E.symm (a, b) = ins (eArch.symm a) * E.symm (1, b) := by
+      apply eProd.injective
+      apply Prod.ext
+      · change eArch.symm a = eArch.symm a * eArch.symm 1
+        rw [map_one, mul_one]
+      · change eFin.symm b = 1 * eFin.symm b
+        rw [one_mul]
+    rw [hsplit, QuotientGroup.mk_mul, map_mul]
+    congr 1
+    have h' := h (E.symm (1, b))
+    have he1 : eProd (E.symm (1, b)) = (eArch.symm 1, eFin.symm b) := eProd.apply_symm_apply _
+    rw [he1, eArch.apply_symm_apply, eFin.apply_symm_apply] at h'
+    have hA1 : (∏ w : InfinitePlace F, A w ((1 : (w : InfinitePlace F) → w.Completionˣ) w)) = 1 :=
+      Finset.prod_eq_one fun w _ ↦ map_one (A w)
+    rw [hA1, one_mul] at h'
+    refine h'.trans (Finset.prod_congr rfl fun v _ ↦ (hB v (b v)).trans ?_)
+    apply congrArg (fun u ↦ d (QuotientGroup.mk (eProd.symm (1, eFin.symm u))))
+    congr 1
+    exact Subsingleton.elim _ _
+  -- Evaluate LHS as integral over `(Measure.pi μa).prod (Measure.pi μb)`.
+  let ΦA (a : (w : InfinitePlace F) → w.Completionˣ) : ℂ :=
+    f (Multiplicative.ofAdd (eArch.symm a).val) * d (QuotientGroup.mk (ins (eArch.symm a)))
+  let ΦB (v : S) (u : (v.val.adicCompletion F)ˣ) : ℂ :=
+    g v (Multiplicative.ofAdd u.val) * sLocalFiniteRestriction v d u
+  have hi : Integrable (fun x : (SAdeleRing F S)ˣ ↦
+      h (Multiplicative.ofAdd x.val) * d (QuotientGroup.mk x)) (sMultiplicativeTamagawaMeasure F S) :=
+    sLocalIdelicZetaIntegral_integrable h d hd
+  have hLHS : sLocalIdelicZetaIntegral h d =
+      (∫ a, ΦA a ∂Measure.pi μa) * ∏ v : S, ∫ u, ΦB v u ∂μb v := by
+    change (∫ x, h (Multiplicative.ofAdd x.val) * d (QuotientGroup.mk x)
+      ∂(((Measure.pi μa).prod (Measure.pi μb)).map E.symm)) = _
+    rw [integral_map E.symm.measurable.aemeasurable hi.aestronglyMeasurable]
+    have hfun (p : ((w : InfinitePlace F) → w.Completionˣ) × ((v : S) → (v.val.adicCompletion F)ˣ)) :
+        h (Multiplicative.ofAdd (E.symm p).val) * d (QuotientGroup.mk (E.symm p)) =
+          ΦA p.1 * ∏ v : S, ΦB v (p.2 v) := by
+      rcases p with ⟨a, b⟩
+      rw [hh, hd_fac]
+      change (f (Multiplicative.ofAdd (eArch.symm a).val) *
+        ∏ v : S, g v (Multiplicative.ofAdd (b v).val)) * _ = _
+      simp only [ΦA, ΦB, Finset.prod_mul_distrib]
+      ring
+    simp_rw [hfun]
+    exact (integral_prod_mul (μ := Measure.pi μa) (ν := Measure.pi μb)
+      ΦA (fun b ↦ ∏ v : S, ΦB v (b v))).trans
+      (congrArg (fun z ↦ (∫ a, ΦA a ∂Measure.pi μa) * z) (integral_fintype_prod_eq_prod ΦB))
+  -- Evaluate the archimedean integral over `Iₛ(∅)` as `∫ a, ΦA a ∂Measure.pi μa`.
+  have hArch : (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+      f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+      ∂sMultiplicativeTamagawaMeasure F ∅) = ∫ a, ΦA a ∂Measure.pi μa := by
+    let μb0 : (v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → Measure (v.val.adicCompletion F)ˣ :=
+      fun v ↦ finiteLocalMultiplicativeTamagawaMeasure F v.val
+    let (v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) : (μb0 v).IsHaarMeasure :=
+      finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v.val
+    have hcont : Continuous (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+        f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))) := by
+      have hfcont : Continuous (fun x : InfiniteAdeleRing F ↦ f (Multiplicative.ofAdd x)) :=
+        (schwartzBruhat_continuous f).comp continuous_ofAdd
+      have hins : Continuous ins := (continuous_id.prodMk continuous_const).units_map _
+      have hfst0 : Continuous fst0 := continuous_fst.units_map _
+      exact (hfcont.comp (continuous_fst.comp Units.continuous_val)).mul
+        (d.continuous.comp (QuotientGroup.continuous_mk.comp (hins.comp hfst0)))
+    change (∫ x, f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+      ∂(((Measure.pi μa).prod (Measure.pi μb0)).map E0.symm)) = _
+    rw [integral_map E0.symm.measurable.aemeasurable hcont.aestronglyMeasurable]
+    have hfun0 (p : ((w : InfinitePlace F) → w.Completionˣ) ×
+        ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → (v.val.adicCompletion F)ˣ)) :
+        f (Multiplicative.ofAdd (E0.symm p).val.1) * d (QuotientGroup.mk (ins (fst0 (E0.symm p)))) =
+          ΦA p.1 * (1 : ℂ) := by
+      rw [mul_one]
+      rfl
+    simp_rw [hfun0]
+    rw [integral_prod_mul (μ := Measure.pi μa) (ν := Measure.pi μb0) ΦA (fun _ ↦ (1 : ℂ)),
+      integral_const]
+    have hpi0 : (Measure.pi μb0).real Set.univ = 1 := by
+      rw [Measure.real, Measure.pi_univ, Finset.univ_eq_empty, Finset.prod_empty, ENNReal.toReal_one]
+    rw [hpi0, one_smul, mul_one]
+  rw [hLHS, ← hArch]
+  rfl
+
+/-- Left translation of an archimedean test scales its archimedean zeta integral by `d(a, 1)`. -/
+private theorem sLocalStandardThetaTensor_archZeta_translate
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (d : QuasiCharacter (SIdeleQuotient F S)) (a : (InfiniteAdeleRing F)ˣ)
+    (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :
+    letI (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    letI (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+    letI : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+      inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+        ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+    let ins := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+      (∀ v : S, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+    let fst0 := Units.map (RingHom.fst (InfiniteAdeleRing F)
+      (∀ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
+        HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom
+    (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+      schwartzBruhatUnitTranslate a f (Multiplicative.ofAdd x.val.1) *
+        d (QuotientGroup.mk (ins (fst0 x))) ∂sMultiplicativeTamagawaMeasure F ∅) =
+      d (QuotientGroup.mk (ins a)) *
+      ∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+        f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+        ∂sMultiplicativeTamagawaMeasure F ∅ := by
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+    inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+  let : BorelSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ := sIdeleGroup_borelSpace
+  let : (sMultiplicativeTamagawaMeasure F (∅ : Finset (HeightOneSpectrum (𝓞 F)))).IsHaarMeasure :=
+    sMultiplicativeTamagawaMeasure_isHaarMeasure
+  let a0 : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ :=
+    Units.map (MonoidHom.inl (InfiniteAdeleRing F) _) a
+  let ins := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+    (∀ v : S, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+  let fst0 := Units.map (RingHom.fst (InfiniteAdeleRing F)
+    (∀ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
+      HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom
+  have h1 := integral_mul_left_eq_self (μ := sMultiplicativeTamagawaMeasure F ∅)
+    (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+      f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))) a0⁻¹
+  change (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+    schwartzBruhatUnitTranslate a f (Multiplicative.ofAdd x.val.1) *
+      d (QuotientGroup.mk (ins (fst0 x))) ∂sMultiplicativeTamagawaMeasure F ∅) =
+    d (QuotientGroup.mk (ins a)) *
+    ∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+      f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+      ∂sMultiplicativeTamagawaMeasure F ∅
+  rw [← h1, ← integral_const_mul]
+  refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  have hf : schwartzBruhatUnitTranslate a f (Multiplicative.ofAdd x.val.1) =
+      f (Multiplicative.ofAdd (a0⁻¹ * x).val.1) :=
+    schwartzBruhatUnitTranslate_apply a f x.val.1
+  have hd : d (QuotientGroup.mk (ins (fst0 x))) =
+      d (QuotientGroup.mk (ins a)) * d (QuotientGroup.mk (ins (fst0 (a0⁻¹ * x)))) := by
+    rw [map_mul, map_inv, map_mul, map_inv, QuotientGroup.mk_mul, QuotientGroup.mk_inv,
+      map_mul, map_inv]
+    have ha : fst0 a0 = a := Units.ext rfl
+    rw [ha]
+    have hne : d (QuotientGroup.mk (ins a)) ≠ 0 :=
+      ((Group.isUnit (QuotientGroup.mk (ins a))).map d).ne_zero
+    rw [← mul_assoc, mul_inv_cancel₀ hne, one_mul]
+  dsimp only
+  rw [hf, hd]
+  ring
+
+/-- Abstract inductive-tensor retraction builder: given a continuous linear isomorphism
+`E : InductiveTensor X (FinestLocallyConvex (⨂ i, M i)) ≃L[ℂ] Z` and a bilinear retraction
+`B : X →ₗ[ℂ] FinestLocallyConvex (⨂ i, M i) →ₗ[ℂ] X` that is continuous in `X`, acts as the
+identity at `⨂ₜ b₀`, and agrees modulo `q` on pure tensors, builds a continuous linear retraction
+`R : Z →L[ℂ] X` satisfying `R ∘ T = id` and `q ∘ T ∘ R = q`. -/
+private theorem sLocalStandardThetaTensor_retraction_of_tensor
+    {ι : Type*} [Fintype ι] {M : ι → Type*}
+    [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    {X Z Q : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [PolynormableSpace ℂ X] [T2Space X]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z]
+    [AddCommGroup Q] [Module ℂ Q]
+    (E : InductiveTensor X (FinestLocallyConvex (⨂[ℂ] i : ι, M i)) ≃L[ℂ] Z)
+    (q : Z →ₗ[ℂ] Q)
+    (b₀ : ∀ i, M i)
+    (B : X →ₗ[ℂ] FinestLocallyConvex (⨂[ℂ] i : ι, M i) →ₗ[ℂ] X)
+    (hB_cont_right : ∀ w, Continuous (fun x : X ↦ B x w))
+    (hB_b₀ : ∀ x : X, B x (⨂ₜ[ℂ] i : ι, b₀ i) = x)
+    (hB_pure : ∀ (x : X) (g : ∀ i, M i),
+      q (E.toLinearMap.comp
+        ((TensorProduct.mk ℂ X (FinestLocallyConvex (⨂[ℂ] i : ι, M i))).flip
+          (⨂ₜ[ℂ] i : ι, b₀ i)) (B x (⨂ₜ[ℂ] i : ι, g i))) =
+      q (E (x ⊗ₜ[ℂ] (⨂ₜ[ℂ] i : ι, g i)))) :
+    ∃ R : Z →L[ℂ] X,
+      (∀ x : X, R (E.toLinearMap.comp
+        ((TensorProduct.mk ℂ X (FinestLocallyConvex (⨂[ℂ] i : ι, M i))).flip
+          (⨂ₜ[ℂ] i : ι, b₀ i)) x) = x) ∧
+      (∀ z : Z, q (E.toLinearMap.comp
+        ((TensorProduct.mk ℂ X (FinestLocallyConvex (⨂[ℂ] i : ι, M i))).flip
+          (⨂ₜ[ℂ] i : ι, b₀ i)) (R z)) = q z) := by
+  let W := FinestLocallyConvex (⨂[ℂ] i : ι, M i)
+  let w₀ : W := ⨂ₜ[ℂ] i : ι, b₀ i
+  let T : X →ₗ[ℂ] Z := E.toLinearMap.comp ((TensorProduct.mk ℂ X W).flip w₀)
+  let R_lin : InductiveTensor X W →ₗ[ℂ] X := TensorProduct.lift B
+  have hR_cont : Continuous R_lin := by
+    let : T2Space W := finestLocallyConvex_t2 _
+    refine (continuous_inductiveTensor_iff R_lin).mpr ⟨fun x ↦ ?_, fun w ↦ ?_⟩
+    · exact continuous_of_finestLocallyConvex _ (B x)
+    · exact hB_cont_right w
+  let R : Z →L[ℂ] X :=
+    (⟨R_lin, hR_cont⟩ : InductiveTensor X W →L[ℂ] X).comp E.symm.toContinuousLinearMap
+  have hR_tmul (x : X) (w : W) : R (E (x ⊗ₜ[ℂ] w)) = B x w := by
+    have hsymm : E.symm (E (x ⊗ₜ[ℂ] w)) = (x ⊗ₜ[ℂ] w : InductiveTensor X W) :=
+      E.symm_apply_apply (x ⊗ₜ[ℂ] w)
+    change R_lin (E.symm (E (x ⊗ₜ[ℂ] w))) = B x w
+    rw [hsymm]
+    exact TensorProduct.lift.tmul x w
+  refine ⟨R, fun x ↦ ?_, fun z ↦ ?_⟩
+  · change R (E (x ⊗ₜ[ℂ] w₀)) = x
+    rw [hR_tmul, hB_b₀]
+  · obtain ⟨t, rfl⟩ := E.surjective z
+    have hadd (t₁ t₂ : InductiveTensor X W)
+        (h₁ : q (T (R (E t₁))) = q (E t₁)) (h₂ : q (T (R (E t₂))) = q (E t₂)) :
+        q (T (R (E (t₁ + t₂)))) = q (E (t₁ + t₂)) := by
+      rw [map_add, map_add, map_add, map_add, map_add, h₁, h₂]
+    have hsmul (a : ℂ) (t' : InductiveTensor X W)
+        (h' : q (T (R (E t'))) = q (E t')) :
+        q (T (R (E (a • t')))) = q (E (a • t')) := by
+      rw [map_smul, map_smul, map_smul, map_smul, map_smul, h']
+    refine TensorProduct.inductionOn (z := (t : X ⊗[ℂ] W)) (fun x w ↦ ?_) hadd
+    refine PiTensorProduct.induction_on' (w : ⨂[ℂ] i : ι, M i) (fun a g ↦ ?_)
+      (fun w₁ w₂ hw₁ hw₂ ↦ by
+        have htm : (x ⊗ₜ[ℂ] (w₁ + w₂) : InductiveTensor X W) =
+            (x ⊗ₜ[ℂ] w₁ : InductiveTensor X W) + (x ⊗ₜ[ℂ] w₂ : InductiveTensor X W) :=
+          TensorProduct.tmul_add x w₁ w₂
+        change q (T (R (E (x ⊗ₜ[ℂ] (w₁ + w₂))))) = q (E (x ⊗ₜ[ℂ] (w₁ + w₂)))
+        rw [htm]
+        exact hadd _ _ hw₁ hw₂)
+    have htc : (PiTensorProduct.tprodCoeff ℂ a g : W) = a • (⨂ₜ[ℂ] i : ι, g i : W) :=
+      PiTensorProduct.tprodCoeff_eq_smul_tprod a g
+    have htm : (x ⊗ₜ[ℂ] (PiTensorProduct.tprodCoeff ℂ a g : W) : InductiveTensor X W) =
+        a • (x ⊗ₜ[ℂ] (⨂ₜ[ℂ] i : ι, g i : W) : InductiveTensor X W) := by
+      rw [htc]
+      exact TensorProduct.tmul_smul a x _
+    change q (T (R (E (x ⊗ₜ[ℂ] (PiTensorProduct.tprodCoeff ℂ a g : W))))) =
+      q (E (x ⊗ₜ[ℂ] (PiTensorProduct.tprodCoeff ℂ a g : W)))
+    rw [htm]
+    refine hsmul a _ ?_
+    change q (T (R (E (x ⊗ₜ[ℂ] (⨂ₜ[ℂ] i : ι, g i : W))))) =
+      q (E (x ⊗ₜ[ℂ] (⨂ₜ[ℂ] i : ι, g i : W)))
+    exact (congrArg (fun u ↦ q (T u)) (hR_tmul x (⨂ₜ[ℂ] i : ι, g i : W))).trans (hB_pure x g)
+
+/-- The standard finite tensor insertion admits a continuous linear retraction from `ℬₛ(S)`
+to `ℬ∞` that preserves classes in the S-local homogeneous theta quotient. -/
+private theorem sLocalStandardThetaTensor_exists_retraction
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    {ω : PontryaginDual (ideleClassNorm F).ker}
+    (hω : NormOneCharacterUnramifiedOutside ω S) :
+    let c := sIdeleRestriction F S hω.choose
+    let χS := sLocalNormOneCharacter S ω hω
+    ∃ R : SchwartzBruhat (Multiplicative (SAdeleRing F S)) →L[ℂ]
+        SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)),
+      (∀ f, R (sLocalStandardThetaTensor c f) = f) ∧
+      ∀ h, (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χS)).mkQ
+          (sLocalStandardThetaTensor c (R h)) =
+        (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χS)).mkQ h := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+    inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+  let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+  let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+    inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+  let c := sIdeleRestriction F S hω.choose
+  let χS := sLocalNormOneCharacter S ω hω
+  let ins : (InfiniteAdeleRing F)ˣ →* (SAdeleRing F S)ˣ :=
+    Units.map (MonoidHom.inl (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F))
+  have hins_cont : Continuous ins := (continuous_id.prodMk continuous_const).units_map _
+  obtain ⟨tauInf, htauInf⟩ := sLocalStandardThetaTensor_archSection F
+  let τS : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ := ⟨ins.comp tauInf.toMonoidHom, hins_cont.comp tauInf.continuous⟩
+  have hτS (t : ℝ≥0ˣ) : sIdeleNorm F S (τS t) = t := htauInf S t
+  obtain ⟨ψ, hψ, hψτ⟩ := sLocalStandardThetaTensor_unitaryLift χS τS hτS
+  -- Restriction of `ψ` to each finite place `v : S`.
+  let eProd := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((w : S) → w.val.adicCompletion F)
+  let eFin := ContinuousMulEquiv.piUnits (M := fun w : S ↦ w.val.adicCompletion F)
+  let finAt (v : S) : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F S :=
+    let f : (v.val.adicCompletion F)ˣ →* (SAdeleRing F S)ˣ :=
+      eProd.symm.toMonoidHom.comp ((MonoidHom.inr _ _).comp
+        (eFin.symm.toMonoidHom.comp (MonoidHom.mulSingle (fun w : S ↦ (w.val.adicCompletion F)ˣ) v)))
+    ⟨(QuotientGroup.mk' _).comp f, QuotientGroup.continuous_mk.comp
+      (eProd.symm.continuous.comp (continuous_const.prodMk
+        (eFin.symm.continuous.comp (continuous_mulSingle (A := fun w : S ↦ (w.val.adicCompletion F)ˣ) v))))⟩
+  have hfin_eq (v : S) (d : QuasiCharacter (SIdeleQuotient F S)) (u : (v.val.adicCompletion F)ˣ) :
+      sLocalFiniteRestriction v d u = d (finAt v u) := by
+    unfold sLocalFiniteRestriction
+    apply congrArg (fun x ↦ d (QuotientGroup.mk (eProd.symm (1, eFin.symm x))))
+    congr 1
+    exact Subsingleton.elim _ _
+  let ψv (v : S) : PontryaginDual (v.val.adicCompletion F)ˣ := ψ.comp (finAt v)
+  -- Verify `sLocalFiniteRestriction v c` agrees with `ψv v` on `U(v)`.
+  have hfinNorm (v : S) (u : (v.val.adicCompletion F)ˣ) :
+      sIdeleQuotientNorm F S (finAt v u) = Units.map nnNormHom.toMonoidHom u := by
+    have h1 := sLocalFiniteRestriction_norm (F := F) (S := S) v u
+    rw [hfin_eq] at h1
+    change ((1 : PontryaginDual (SIdeleQuotient F S)) (finAt v u) : ℂ) *
+        (((sIdeleQuotientNorm F S (finAt v u) : ℝ≥0) : ℝ) : ℂ) ^ (1 : ℂ) = _ at h1
+    simp only [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one] at h1
+    apply Units.ext
+    apply NNReal.coe_injective
+    exact Complex.ofReal_injective h1
+  have hcψ (v : S) (u : (v.val.adicCompletion F)ˣ)
+      (hu : u ∈ ((v.val.adicCompletionIntegers F).units : Set (v.val.adicCompletion F)ˣ)) :
+      sLocalFiniteRestriction v c u = (ψv v u : ℂ) := by
+    rw [hfin_eq]
+    have hnu : sIdeleQuotientNorm F S (finAt v u) = 1 := by
+      rw [hfinNorm]
+      apply Units.ext
+      apply NNReal.coe_injective
+      exact Valued.toNormedField.norm_eq_one_iff.mpr
+        (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)
+    let y : (sIdeleQuotientNorm F S).ker := ⟨finAt v u, hnu⟩
+    have h1 : (χS y : ℂ) = c y.val :=
+      sLocalNormOneCharacter_eq_sIdeleRestriction ω hω.choose hω.choose_spec y
+    change c y.val = (ψ y.val : ℂ)
+    rw [← h1, hψ y]
+  -- Choose the local Laurent-polynomial linear maps `Φv v`.
+  choose Φv hΦv1 hΦvZ using fun v : S ↦
+    sLocalStandardThetaTensor_finiteLocal_shells v.val (sLocalFiniteRestriction v c) (ψv v) (hcψ v)
+  -- Combine `Φv` across `v : S` via `PiTensorProduct.lift`.
+  let mult := (MultilinearMap.mkPiAlgebra ℂ S (MonoidAlgebra ℂ ℝ≥0ˣ)).compLinearMap Φv
+  let ΦS : (⨂[ℂ] v : S, SchwartzBruhat (Multiplicative (v.val.adicCompletion F))) →ₗ[ℂ]
+      MonoidAlgebra ℂ ℝ≥0ˣ :=
+    PiTensorProduct.lift mult
+  have hΦS_pure (g : ∀ v : S, SchwartzBruhat (Multiplicative (v.val.adicCompletion F))) :
+      ΦS (⨂ₜ[ℂ] v : S, g v) = ∏ v : S, Φv v (g v) := by
+    change PiTensorProduct.lift mult (PiTensorProduct.tprod ℂ g) = ∏ v : S, Φv v (g v)
+    rw [PiTensorProduct.lift.tprod]
+    rfl
+  let ρv (v : S) : SchwartzBruhat (Multiplicative (v.val.adicCompletion F)) :=
+    finiteStandardGaussian v.val (sLocalFiniteRestriction v c)
+  have hΦS_std : ΦS (⨂ₜ[ℂ] v : S, ρv v) = 1 := by
+    rw [hΦS_pure]
+    exact Finset.prod_eq_one fun v _ ↦ hΦv1 v
+  -- Action of `MonoidAlgebra ℂ ℝ≥0ˣ` on `ℬ∞` by `tauInf`-translates.
+  let transEnd : ℝ≥0ˣ →* Module.End ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+    { toFun := fun r ↦
+        { toFun := schwartzBruhatUnitTranslate (tauInf r)
+          map_add' := fun _ _ ↦ rfl
+          map_smul' := fun _ _ ↦ rfl }
+      map_one' := LinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ by
+        change schwartzBruhatUnitTranslate (tauInf 1) f (Multiplicative.ofAdd x.toAdd) =
+          f (Multiplicative.ofAdd x.toAdd)
+        rw [schwartzBruhatUnitTranslate_apply, map_one, inv_one, Units.val_one, one_mul])
+      map_mul' := fun r₁ r₂ ↦ LinearMap.ext fun f ↦ Subtype.ext (funext fun x ↦ by
+        change schwartzBruhatUnitTranslate (tauInf (r₁ * r₂)) f (Multiplicative.ofAdd x.toAdd) =
+          schwartzBruhatUnitTranslate (tauInf r₁) (schwartzBruhatUnitTranslate (tauInf r₂) f)
+            (Multiplicative.ofAdd x.toAdd)
+        rw [schwartzBruhatUnitTranslate_apply, schwartzBruhatUnitTranslate_apply,
+          schwartzBruhatUnitTranslate_apply, map_mul tauInf r₁ r₂, mul_inv_rev, Units.val_mul, mul_assoc]) }
+  let actAlg : MonoidAlgebra ℂ ℝ≥0ˣ →ₐ[ℂ]
+      Module.End ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+    MonoidAlgebra.lift ℂ _ ℝ≥0ˣ transEnd
+  let act : MonoidAlgebra ℂ ℝ≥0ˣ →ₗ[ℂ]
+      (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →ₗ[ℂ]
+       SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+    actAlg.toLinearMap
+  have hMA_ind (P : MonoidAlgebra ℂ ℝ≥0ˣ → Prop)
+      (h0 : P 0) (hs : ∀ r b, P (MonoidAlgebra.single r b))
+      (ha : ∀ p₁ p₂, P p₁ → P p₂ → P (p₁ + p₂)) (p : MonoidAlgebra ℂ ℝ≥0ˣ) : P p := by
+    have hc := Finsupp.induction_linear (motive := fun c ↦ P (MonoidAlgebra.ofCoeff c))
+      p.coeff h0 (fun c₁ c₂ h₁ h₂ ↦ ha _ _ h₁ h₂) (fun r b ↦ hs r b)
+    simpa using hc
+  have hact_single (r : ℝ≥0ˣ) (b : ℂ)
+      (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :
+      act (MonoidAlgebra.single r b) f = b • schwartzBruhatUnitTranslate (tauInf r) f := by
+    change (actAlg (MonoidAlgebra.single r b)) f = _
+    rw [MonoidAlgebra.lift_single]
+    rfl
+  have hact_one (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) : act 1 f = f := by
+    change (actAlg 1) f = f
+    rw [map_one]
+    rfl
+  have hact_cont (p : MonoidAlgebra ℂ ℝ≥0ˣ) : Continuous (act p) := by
+    let : IsTopologicalAddGroup (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+      PolynormableSpace.isTopologicalAddGroup ℂ _
+    let : ContinuousSMul ℂ (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :=
+      PolynormableSpace.continuousSMul ℂ _
+    refine hMA_ind (fun q ↦ Continuous (act q)) ?_ ?_ ?_ p
+    · rw [map_zero]
+      exact continuous_const
+    · intro r b
+      have heq : (act (MonoidAlgebra.single r b) :
+          SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) → _) =
+          fun f ↦ b • schwartzBruhatUnitTranslate (tauInf r) f :=
+        funext (hact_single r b)
+      rw [heq]
+      exact (continuous_const_smul b).comp (sLocalStandardThetaTensor_continuous_unitTranslate (tauInf r))
+    · intro p₁ p₂ hp₁ hp₂
+      rw [map_add]
+      exact hp₁.add hp₂
+  -- Apply the polymorphic inductive-tensor retraction builder.
+  let : T2Space (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) := schwartzBruhat_t2
+  let : MeasurableSpace (sIdeleQuotientNorm F S).ker := borel _
+  let : (sLocalNormOneQuotientMeasure F S).IsHaarMeasure :=
+    (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let K := LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χS)
+  refine sLocalStandardThetaTensor_retraction_of_tensor e K.mkQ ρv (act.comp ΦS).flip
+    (fun w ↦ hact_cont (ΦS w))
+    (fun f ↦ by change act (ΦS (⨂ₜ[ℂ] v : S, ρv v)) f = f; rw [hΦS_std, hact_one])
+    (fun f g ↦ ?_)
+  -- Pure tensor case: show `T (act p f) - h₀ ∈ K` via `mem_sLocalHomogeneousAdelicTheta_ker_iff`.
+  let T : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) →ₗ[ℂ]
+      SchwartzBruhat (Multiplicative (SAdeleRing F S)) := sLocalStandardThetaTensor c
+  let p := ΦS (⨂ₜ[ℂ] v : S, g v)
+  let h₀ := e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v : S, g v))
+  have hh₀_apply (x : SAdeleRing F S) : h₀ (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd x.1) * ∏ v : S, g v (Multiplicative.ofAdd (x.2 v)) :=
+    (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec f g x
+  change Submodule.Quotient.mk (p := K) (T (act p f)) = Submodule.Quotient.mk (p := K) h₀
+  rw [Submodule.Quotient.eq K]
+  change T (act p f) - h₀ ∈
+    LinearMap.ker (sLocalHomogeneousAdelicTheta F S (sLocalNormOneQuotientMeasure F S) χS)
+  rw [mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) χS]
+  intro d₀ hd₀
+  change sLocalIdelicZFunction (T (act p f) - h₀) d₀.val = 0
+  obtain ⟨ψ', s₀, hψ'eq⟩ := sLocalStandardThetaTensor_exists_normTwist d₀.val
+  let mₛ := sIdeleQuotientNorm F S
+  let hmₛ := (isProperMap_sIdeleQuotientNorm F S).continuous
+  let uC : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  have hψ'res (u : (sIdeleQuotientNorm F S).ker) : ψ' u.val = χS u := by
+    apply Circle.ext
+    have h1 := hd₀ u
+    rw [← hψ'eq] at h1
+    change (ψ' u.val : ℂ) * (((mₛ u.val : ℝ≥0) : ℝ) : ℂ) ^ s₀ = (χS u : ℂ) at h1
+    rw [u.property] at h1
+    simpa using h1
+  -- Show `Z(T(act p f)) = Z(h₀)` on the entire chart `normChart(ψ') s` via right half-plane.
+  rw [← hψ'eq]
+  have heqChart := sLocalStandardThetaTensor_meromorphic_eq_of_rightHalf
+    (f₂ := fun _ ↦ (0 : ℂ))
+    (sLocalIdelicZFunction_meromorphic (T (act p f) - h₀) ψ')
+    (fun _ _ ↦ analyticAt_const.meromorphicNFAt) (fun s hs ↦ ?_)
+  · exact congrFun heqChart s₀
+  · let d := quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ') s
+    have hd_pos : ∃ (ψ'' : PontryaginDual (SIdeleQuotient F S)) (t : ℂ), 0 < t.re ∧
+        d = quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ'') t := ⟨ψ', s, hs, rfl⟩
+    change sLocalIdelicZFunction (T (act p f) - h₀) d = 0
+    rw [sLocalIdelicZFunction_eq_integral _ hd_pos]
+    have hsub : sLocalIdelicZetaIntegral (T (act p f) - h₀) d =
+        sLocalIdelicZetaIntegral (T (act p f)) d - sLocalIdelicZetaIntegral h₀ d := by
+      let : MeasurableSpace (SAdeleRing F S) := inferInstanceAs
+        (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+      change (∫ x, (T (act p f) - h₀) (Multiplicative.ofAdd x.val) * d (QuotientGroup.mk x) ∂_) = _
+      have h1 : (fun x : (SAdeleRing F S)ˣ ↦ (T (act p f) - h₀) (Multiplicative.ofAdd x.val) *
+          d (QuotientGroup.mk x)) = fun x ↦ T (act p f) (Multiplicative.ofAdd x.val) *
+          d (QuotientGroup.mk x) - h₀ (Multiplicative.ofAdd x.val) * d (QuotientGroup.mk x) :=
+        funext fun x ↦ sub_mul _ _ _
+      rw [h1, integral_sub (sLocalIdelicZetaIntegral_integrable _ d hd_pos)
+        (sLocalIdelicZetaIntegral_integrable _ d hd_pos)]
+      rfl
+    rw [hsub, sub_eq_zero]
+    -- Define the monoid hom `η : ℝ≥0ˣ →* ℂ` from `ψ' ∘ τS`.
+    let η : ℝ≥0ˣ →* ℂ :=
+      { toFun := fun r ↦ (ψ' (QuotientGroup.mk (τS r)) : ℂ)
+        map_one' := by simp
+        map_mul' := fun r₁ r₂ ↦ by simp [map_mul] }
+    have hηnorm (r : ℝ≥0ˣ) : ‖η r‖ = 1 := Circle.norm_coe _
+    -- Define the algebra hom `eval : MonoidAlgebra ℂ ℝ≥0ˣ →ₐ[ℂ] ℂ` sending `r ↦ η r * r^s`.
+    let χr : ℝ≥0ˣ →* ℂ :=
+      { toFun := fun r ↦ η r * ((r.val : ℝ) : ℂ) ^ s
+        map_one' := by simp
+        map_mul' := fun r₁ r₂ ↦ by
+          rw [map_mul, Units.val_mul, NNReal.coe_mul, Complex.ofReal_mul,
+            Complex.mul_cpow_ofReal_nonneg (NNReal.coe_nonneg _) (NNReal.coe_nonneg _)]
+          ring }
+    let eval : MonoidAlgebra ℂ ℝ≥0ˣ →ₐ[ℂ] ℂ := MonoidAlgebra.lift ℂ ℂ ℝ≥0ˣ χr
+    have heval_single (r : ℝ≥0ˣ) (b : ℂ) :
+        eval (MonoidAlgebra.single r b) = b * (η r * ((r.val : ℝ) : ℂ) ^ s) := by
+      rw [MonoidAlgebra.lift_single]
+      rfl
+    -- Check that `sLocalFiniteRestriction v d` matches the `d` in `hΦvZ v`.
+    have hdv (v : S) (u : (v.val.adicCompletion F)ˣ) :
+        sLocalFiniteRestriction v d u =
+          (ψv v u : ℂ) * η (Units.map nnNormHom.toMonoidHom u) * ((‖u.val‖ : ℝ) : ℂ) ^ s := by
+      rw [hfin_eq]
+      change (ψ' (finAt v u) : ℂ) * (((mₛ (finAt v u) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+      rw [sLocalStandardThetaTensor_unitaryLift_ratio χS τS hτS ψ ψ' hψ hψτ hψ'res (finAt v u),
+        Circle.coe_mul, hfinNorm v u]
+      rfl
+    have hZv (v : S) :
+        localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (fun y ↦ g v (Multiplicative.ofAdd y)) (sLocalFiniteRestriction v d) =
+        eval (Φv v (g v)) *
+        localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (fun y ↦ ρv v (Multiplicative.ofAdd y)) (sLocalFiniteRestriction v d) :=
+      (hΦvZ v η s hs hηnorm (sLocalFiniteRestriction v d) (hdv v)).2 (g v)
+    -- Evaluate `d (QuotientGroup.mk (ins (tauInf r))) = η r * r ^ s`.
+    have hdτ (r : ℝ≥0ˣ) : d (QuotientGroup.mk (ins (tauInf r))) = η r * ((r.val : ℝ) : ℂ) ^ s := by
+      change (ψ' (QuotientGroup.mk (τS r)) : ℂ) *
+        (((sIdeleQuotientNorm F S (QuotientGroup.mk (τS r)) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+      rw [sIdeleQuotientNorm_mk, hτS r]
+      rfl
+    -- Factor both sides via `sLocalStandardThetaTensor_zeta_prod`.
+    rw [sLocalStandardThetaTensor_zeta_prod d hd_pos (T (act p f)) (act p f) ρv
+        (fun x ↦ sLocalStandardThetaTensor_apply c (act p f) x),
+      sLocalStandardThetaTensor_zeta_prod d hd_pos h₀ f g hh₀_apply]
+    -- Rewrite the finite product on the RHS using `hZv`.
+    simp_rw [hZv, Finset.prod_mul_distrib]
+    -- Compute the archimedean integral of `act p f`.
+    have hArchInt :
+        (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+          (act p f) (Multiplicative.ofAdd x.val.1) *
+            d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+          ∂sMultiplicativeTamagawaMeasure F ∅) =
+        eval p *
+        (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+          f (Multiplicative.ofAdd x.val.1) *
+            d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+          ∂sMultiplicativeTamagawaMeasure F ∅) := by
+      -- Integrability of each `tauInf r`-translate of `f`.
+      have hterm_int (r : ℝ≥0ˣ) :
+          Integrable (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+            schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x.val.1) *
+              d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))))
+            (sMultiplicativeTamagawaMeasure F ∅) := by
+        let f₀ := sLocalStandardThetaTensor (F := F) (S := ∅) 1 (schwartzBruhatUnitTranslate (tauInf r) f)
+        have hf₀ (x : SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :
+            f₀ (Multiplicative.ofAdd x) =
+              schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x.1) := by
+          rw [sLocalStandardThetaTensor_apply, Finset.univ_eq_empty, Finset.prod_empty, mul_one]
+        let d0 := quasiCharacterNormTwist (sIdeleQuotientNorm F ∅)
+          (isProperMap_sIdeleQuotientNorm F ∅).continuous
+          ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp 1) (s.re : ℂ)
+        have hi0 := sLocalIdelicZetaIntegral_integrable (F := F) (S := ∅) f₀ d0
+          ⟨1, (s.re : ℂ), by simpa using hs, rfl⟩
+        have hcont : Continuous (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+            schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x.val.1) *
+              d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))) := by
+          have hc1 : Continuous (fun x : InfiniteAdeleRing F ↦
+              schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x)) :=
+            (schwartzBruhat_continuous (schwartzBruhatUnitTranslate (tauInf r) f)).comp continuous_ofAdd
+          exact (hc1.comp (continuous_fst.comp Units.continuous_val)).mul
+            (d.continuous.comp (QuotientGroup.continuous_mk.comp
+              (hins_cont.comp (continuous_fst.units_map _))))
+        let : BorelSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ :=
+          sIdeleGroup_borelSpace
+        refine hi0.norm.mono' hcont.aestronglyMeasurable (ae_of_all _ fun x ↦ ?_)
+        rw [hf₀, norm_mul, norm_mul]
+        have hnorm_eq : ‖d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))‖ =
+            ‖d0 (QuotientGroup.mk x)‖ := by
+          have hsn : sIdeleNorm F S (ins (Units.map (RingHom.fst _ _).toMonoidHom x)) =
+              sIdeleNorm F ∅ x := by
+            apply Units.ext
+            apply NNReal.coe_injective
+            simp only [sIdeleNorm, MonoidHom.mul_apply, MonoidHom.finsetProd_apply,
+              MonoidHom.pow_apply, MonoidHom.comp_apply, Units.val_mul, Units.coe_prod,
+              Units.val_pow_eq_pow_val, Units.coe_map, NNReal.coe_mul, NNReal.coe_prod,
+              NNReal.coe_pow]
+            have h1 : ∏ v : S, ((‖(ins (Units.map (RingHom.fst _ _).toMonoidHom x)).val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+              Finset.prod_eq_one fun v _ ↦ by change (‖(1 : v.val.adicCompletion F)‖₊ : ℝ) = 1; simp
+            have h2 : ∏ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))), ((‖x.val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+              Finset.prod_eq_one fun v _ ↦ (Finset.notMem_empty v.val v.property).elim
+            change _ * (∏ v : S, ((‖(ins (Units.map (RingHom.fst _ _).toMonoidHom x)).val.2 v‖₊ : ℝ≥0) : ℝ)) =
+              _ * (∏ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))), ((‖x.val.2 v‖₊ : ℝ≥0) : ℝ))
+            rw [h1, h2, mul_one, mul_one]
+            rfl
+          let qS : SIdeleQuotient F S :=
+            QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))
+          let q0 : SIdeleQuotient F ∅ := QuotientGroup.mk x
+          change ‖(ψ' qS : ℂ) * (((sIdeleQuotientNorm F S qS : ℝ≥0) : ℝ) : ℂ) ^ s‖ =
+            ‖((1 : PontryaginDual (SIdeleQuotient F ∅)) q0 : ℂ) *
+              (((sIdeleQuotientNorm F ∅ q0 : ℝ≥0) : ℝ) : ℂ) ^ (s.re : ℂ)‖
+          rw [norm_mul, norm_mul, Circle.norm_coe, Circle.norm_coe, one_mul, one_mul,
+            sIdeleQuotientNorm_mk, sIdeleQuotientNorm_mk, hsn,
+            Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+            Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+            Complex.ofReal_re]
+        rw [hnorm_eq]
+      have hArch_ind (q : MonoidAlgebra ℂ ℝ≥0ˣ) :
+          Integrable (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+            (act q f) (Multiplicative.ofAdd x.val.1) *
+              d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))))
+            (sMultiplicativeTamagawaMeasure F ∅) ∧
+          (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+            (act q f) (Multiplicative.ofAdd x.val.1) *
+              d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+            ∂sMultiplicativeTamagawaMeasure F ∅) =
+          eval q *
+          (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+            f (Multiplicative.ofAdd x.val.1) *
+              d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+            ∂sMultiplicativeTamagawaMeasure F ∅) := by
+        refine hMA_ind (fun q ↦
+            Integrable (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+              (act q f) (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))))
+              (sMultiplicativeTamagawaMeasure F ∅) ∧
+            (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+              (act q f) (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+              ∂sMultiplicativeTamagawaMeasure F ∅) =
+            eval q *
+            (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+              f (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))
+              ∂sMultiplicativeTamagawaMeasure F ∅)) ?_ ?_ ?_ q
+        · have h0fun : (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+              (act 0 f) (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))) = 0 := by
+            funext x
+            rw [map_zero, LinearMap.zero_apply]
+            change (0 : ℂ) * _ = 0
+            exact zero_mul _
+          rw [h0fun, map_zero, zero_mul]
+          exact ⟨integrable_zero _ _ _, integral_zero _ _⟩
+        · intro r b
+          have hfun : (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+              (act (MonoidAlgebra.single r b) f) (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))) =
+              fun x ↦ b * (schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))) := by
+            funext x
+            rw [hact_single]
+            change (b * schwartzBruhatUnitTranslate (tauInf r) f (Multiplicative.ofAdd x.val.1)) * _ = _
+            rw [mul_assoc]
+          rw [hfun]
+          refine ⟨(hterm_int r).const_mul b, ?_⟩
+          rw [integral_const_mul, sLocalStandardThetaTensor_archZeta_translate d, hdτ, heval_single]
+          ring
+        · intro q₁ q₂ hq₁ hq₂
+          have hfun : (fun x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ ↦
+              (act (q₁ + q₂) f) (Multiplicative.ofAdd x.val.1) *
+                d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x)))) =
+              fun x ↦
+                (act q₁ f) (Multiplicative.ofAdd x.val.1) *
+                  d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))) +
+                (act q₂ f) (Multiplicative.ofAdd x.val.1) *
+                  d (QuotientGroup.mk (ins (Units.map (RingHom.fst _ _).toMonoidHom x))) := by
+            funext x
+            rw [map_add, LinearMap.add_apply]
+            exact add_mul _ _ _
+          rw [hfun]
+          refine ⟨hq₁.1.add hq₂.1, ?_⟩
+          rw [integral_add hq₁.1 hq₂.1, hq₁.2, hq₂.2, map_add, add_mul]
+      exact (hArch_ind p).2
+    rw [hArchInt]
+    have hprod_eval : eval p = ∏ v : S, eval (Φv v (g v)) := by
+      rw [show p = ∏ v : S, Φv v (g v) from hΦS_pure g, map_prod]
+    rw [hprod_eval]
+    ring
+
+/-- Abstract topology lemma: if `R : Y → X` and `T : X → Y` are continuous with `R ∘ T = id`
+and `π ∘ T ∘ R = π` where `π : Y → Z` is an open quotient map, then `π ∘ T : X → Z` is an
+open quotient map. -/
+private theorem sLocalStandardThetaTensor_openQuotient_of_retraction
+    {X Y Z : Type*} [TopologicalSpace X] [TopologicalSpace Y] [TopologicalSpace Z]
+    {T : X → Y} {R : Y → X} {π : Y → Z}
+    (hT : Continuous T) (hR : Continuous R) (hπ : IsOpenQuotientMap π)
+    (hRT : ∀ x, R (T x) = x) (hπTR : ∀ y, π (T (R y)) = π y) :
+    IsOpenQuotientMap (π ∘ T) := by
+  refine ⟨?_, hπ.continuous.comp hT, ?_⟩
+  · intro z
+    obtain ⟨y, rfl⟩ := hπ.surjective z
+    exact ⟨R y, hπTR y⟩
+  · intro U hU
+    have himg : (π ∘ T) '' U = π '' (R ⁻¹' U) := by
+      ext z
+      constructor
+      · rintro ⟨x, hx, rfl⟩
+        exact ⟨T x, by simpa only [Set.mem_preimage, hRT x] using hx, rfl⟩
+      · rintro ⟨y, hy, rfl⟩
+        exact ⟨R y, hy, hπTR y⟩
+    rw [himg]
+    exact hπ.isOpenMap _ (hU.preimage hR)
+
+/-- The standard finite tensor insertion maps `ℬ∞` openly and surjectively onto `Θₛω(S, χS)`. -/
+private theorem sLocalStandardThetaTensor_openQuotient
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    {ω : PontryaginDual (ideleClassNorm F).ker}
+    (hω : NormOneCharacterUnramifiedOutside ω S) :
+    let c := sIdeleRestriction F S hω.choose
+    let χ := sLocalNormOneCharacter S ω hω
+    IsOpenQuotientMap (fun f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) ↦
+      (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χ)).mkQ
+        (sLocalStandardThetaTensor (F := F) (S := S) c f)) := by
+  let c := sIdeleRestriction F S hω.choose
+  let χ := sLocalNormOneCharacter S ω hω
+  let W := FinestLocallyConvex (⨂[ℂ] v : S,
+    SchwartzBruhat (Multiplicative (HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)))
+  let g : W := ⨂ₜ[ℂ] v : S, finiteStandardGaussian v.val (sLocalFiniteRestriction v c)
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have hT_cont : Continuous (sLocalStandardThetaTensor (F := F) (S := S) c) := by
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+    let : SecondCountableTopology (Multiplicative (InfiniteAdeleRing F)) :=
+      inferInstanceAs (SecondCountableTopology ((w : InfinitePlace F) → w.Completion))
+    let : T2Space (Multiplicative (InfiniteAdeleRing F)) :=
+      inferInstanceAs (T2Space ((w : InfinitePlace F) → w.Completion))
+    let : LocallyCompactSpace (Multiplicative (InfiniteAdeleRing F)) :=
+      inferInstanceAs (LocallyCompactSpace ((w : InfinitePlace F) → w.Completion))
+    let : SecondCountableTopology (Multiplicative (SAdeleRing F S)) :=
+      inferInstanceAs (SecondCountableTopology
+        (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+    let : T2Space (Multiplicative (SAdeleRing F S)) :=
+      inferInstanceAs (T2Space
+        (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+    let : LocallyCompactSpace (Multiplicative (SAdeleRing F S)) :=
+      inferInstanceAs (LocallyCompactSpace
+        (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+    let : T2Space (SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) := schwartzBruhat_t2
+    let : T2Space W := finestLocallyConvex_t2 _
+    let : T2Space (SchwartzBruhat (Multiplicative (SAdeleRing F S))) := schwartzBruhat_t2
+    exact ((continuous_inductiveTensor_iff e.toLinearMap).mp e.continuous).2 g
+  obtain ⟨R, hRT, hπTR⟩ := sLocalStandardThetaTensor_exists_retraction (F := F) (S := S) hω
+  exact sLocalStandardThetaTensor_openQuotient_of_retraction hT_cont R.continuous
+    (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χ)).isOpenQuotientMap_mkQ hRT hπTR
+
+/-- An integrable function on `ℝ` with vanishing Fourier transform vanishes almost everywhere. -/
+private theorem sLocalStandardThetaTensor_ae_zero_of_fourier_zero
+    {h : ℝ → ℂ} (hh : Integrable h) (hF : ∀ y : ℝ, FourierTransform.fourier h y = 0) :
+    h =ᵐ[volume] 0 := by
+  refine ae_eq_zero_of_integral_contDiff_smul_eq_zero hh.locallyIntegrable fun g hg hgc ↦ ?_
+  have hg₁ : HasCompactSupport (Complex.ofRealCLM ∘ g) := hgc.comp_left rfl
+  let ψ : SchwartzMap ℝ ℂ := hg₁.toSchwartzMap (Complex.ofRealCLM.contDiff.comp hg)
+  let φ : SchwartzMap ℝ ℂ := FourierTransform.fourierInv ψ
+  have hφ : FourierTransform.fourier φ = ψ := FourierTransform.fourier_fourierInv_eq ψ
+  have key : ∫ ξ, FourierTransform.fourier (φ : ℝ → ℂ) ξ • h ξ =
+      ∫ x, φ x • FourierTransform.fourier h x := by
+    simpa using! VectorFourier.integral_bilin_fourierIntegral_eq_flip
+      (ContinuousLinearMap.lsmul ℂ ℂ) (L := innerₗ ℝ) Real.continuous_fourierChar
+      continuous_inner φ.integrable hh
+  calc ∫ x, g x • h x = ∫ x, ψ x • h x :=
+        integral_congr_ae (ae_of_all _ fun x ↦ (Complex.coe_smul (g x) (h x)).symm)
+    _ = ∫ ξ, FourierTransform.fourier (φ : ℝ → ℂ) ξ • h ξ := by
+        rw [← SchwartzMap.fourier_coe, hφ]
+    _ = ∫ x, φ x • FourierTransform.fourier h x := key
+    _ = 0 := by simp [hF]
+
+/-- Weil's quotient formula at the archimedean stage expresses the archimedean zeta integral as
+the radial Mellin integral of `infiniteStandardThetaMellinAverage`. -/
+private theorem sLocalStandardThetaTensor_archZeta_eq_radial
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    {ω : PontryaginDual (ideleClassNorm F).ker}
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual (SAdeleRing F S)ˣ)
+    (hχ : ∀ (g : (sIdeleNorm F S).ker) (y : (sIdeleQuotientNorm F S).ker),
+      y.val = QuotientGroup.mk g.val → χ g.val = sLocalNormOneCharacter S ω hω y)
+    (tauInf : ℝ≥0ˣ →ₜ* (InfiniteAdeleRing F)ˣ)
+    (htauInf : ∀ (D : Finset (HeightOneSpectrum (𝓞 F))) (t : ℝ≥0ˣ),
+      sIdeleNorm F D (Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+        (∀ v : D, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)) (tauInf t)) = t)
+    (ψ' : PontryaginDual (SIdeleQuotient F S))
+    (hψ' : ∀ u : (sIdeleQuotientNorm F S).ker, ψ' u.val = sLocalNormOneCharacter S ω hω u)
+    (s : ℂ) (hs : 0 < s.re) (f : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :
+    letI (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    letI (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+    letI : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+      inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+        ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+    let ins := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+      (∀ v : S, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+    let fst0 := Units.map (RingHom.fst (InfiniteAdeleRing F)
+      (∀ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
+        HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom
+    let d := quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ') s
+    Integrable (fun t : ℝ≥0ˣ ↦ infiniteStandardThetaMellinAverage χ f (tauInf t) *
+      d (QuotientGroup.mk (ins (tauInf t)))) positiveRealHaar ∧
+    (∫ x : (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ,
+      f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+      ∂sMultiplicativeTamagawaMeasure F ∅) =
+    ∫ t : ℝ≥0ˣ, infiniteStandardThetaMellinAverage χ f (tauInf t) *
+      d (QuotientGroup.mk (ins (tauInf t))) ∂positiveRealHaar := by
+  let D0 : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (SAdeleRing F D0) := inferInstanceAs
+    (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : D0) → v.val.adicCompletion F)))
+  let ins := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+    (∀ v : S, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+  let ins0 := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+    (∀ v : D0, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+  let fst0 := Units.map (RingHom.fst (InfiniteAdeleRing F)
+    (∀ v : D0, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom
+  have hins_cont : Continuous ins := (continuous_id.prodMk continuous_const).units_map _
+  have hins0_cont : Continuous ins0 := (continuous_id.prodMk continuous_const).units_map _
+  have hfst0_cont : Continuous fst0 := continuous_fst.units_map _
+  let d := quasiCharacterNormTwist (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous
+    ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ψ') s
+  let μ0 := sMultiplicativeTamagawaMeasure F D0
+  let μ1 := sNormOneIdeleTamagawaMeasure F D0
+  let : T2Space (SAdeleRing F D0)ˣ := (sIdeleGroup_description F D0).2.1
+  let : LocallyCompactSpace (SAdeleRing F D0)ˣ := (sIdeleGroup_description F D0).2.2.1
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology (SAdeleRing F D0) := inferInstanceAs
+    (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) × ((v : D0) → v.val.adicCompletion F)))
+  let : SecondCountableTopology (SAdeleRing F D0)ˣ :=
+    (sIdeleGroup_description F D0).1.secondCountableTopology
+  let : BorelSpace (SAdeleRing F D0)ˣ := sIdeleGroup_borelSpace
+  let : μ0.IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
+  have hn0 : Continuous (sIdeleNorm F D0) :=
+    (isProperMap_sIdeleQuotientNorm F D0).continuous.comp QuotientGroup.continuous_mk
+  have hN0_closed : IsClosed ((sIdeleNorm F D0).ker : Set (SAdeleRing F D0)ˣ) :=
+    isClosed_eq hn0 continuous_const
+  let : LocallyCompactSpace (sIdeleNorm F D0).ker := hN0_closed.locallyCompactSpace
+  let : μ1.IsHaarMeasure := (sNormOneIdeleTamagawaMeasure_existsUnique F D0).exists.choose_spec.1
+  let : μ1.Regular := (sNormOneIdeleTamagawaMeasure_existsUnique F D0).exists.choose_spec.2.1
+  let : BorelSpace ℝ≥0ˣ := ⟨by
+    change MeasurableSpace.comap Units.val inferInstance = borel ℝ≥0ˣ
+    rw [BorelSpace.measurable_eq (α := ℝ≥0), ← borel_comap,
+      ← (Units.isEmbedding_val₀ (G₀ := ℝ≥0)).eq_induced]⟩
+  let : MeasurableSpace ((SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker) := borel _
+  let : BorelSpace ((SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker) := ⟨rfl⟩
+  -- Integrability of `φ x = f x.1 * d (ins (fst0 x))` wrt `μ0`.
+  let φ (x : (SAdeleRing F D0)ˣ) : ℂ :=
+    f (Multiplicative.ofAdd x.val.1) * d (QuotientGroup.mk (ins (fst0 x)))
+  have hφ_int : Integrable φ μ0 := by
+    let f₀ := sLocalStandardThetaTensor (F := F) (S := D0) 1 f
+    have hf₀ (x : SAdeleRing F D0) : f₀ (Multiplicative.ofAdd x) = f (Multiplicative.ofAdd x.1) := by
+      rw [sLocalStandardThetaTensor_apply, Finset.univ_eq_empty, Finset.prod_empty, mul_one]
+    let d0 := quasiCharacterNormTwist (sIdeleQuotientNorm F D0)
+      (isProperMap_sIdeleQuotientNorm F D0).continuous
+      ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp 1) (s.re : ℂ)
+    have hi0 := sLocalIdelicZetaIntegral_integrable (F := F) (S := D0) f₀ d0
+      ⟨1, (s.re : ℂ), by simpa using hs, rfl⟩
+    have hcont : Continuous φ :=
+      (((schwartzBruhat_continuous f).comp continuous_ofAdd).comp
+        (continuous_fst.comp Units.continuous_val)).mul
+        (d.continuous.comp (QuotientGroup.continuous_mk.comp (hins_cont.comp hfst0_cont)))
+    refine hi0.norm.mono' hcont.aestronglyMeasurable (ae_of_all _ fun x ↦ ?_)
+    rw [hf₀, norm_mul, norm_mul]
+    have hsn : sIdeleNorm F S (ins (fst0 x)) = sIdeleNorm F D0 x := by
+      apply Units.ext; apply NNReal.coe_injective
+      simp only [sIdeleNorm, MonoidHom.mul_apply, MonoidHom.finsetProd_apply,
+        MonoidHom.pow_apply, MonoidHom.comp_apply, Units.val_mul, Units.coe_prod,
+        Units.val_pow_eq_pow_val, Units.coe_map, NNReal.coe_mul, NNReal.coe_prod, NNReal.coe_pow]
+      have h1 : ∏ v : S, ((‖(ins (fst0 x)).val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+        Finset.prod_eq_one fun v _ ↦ by change (‖(1 : v.val.adicCompletion F)‖₊ : ℝ) = 1; simp
+      have h2 : ∏ v : D0, ((‖x.val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+        Finset.prod_eq_one fun v _ ↦ (Finset.notMem_empty v.val v.property).elim
+      change _ * (∏ v : S, ((‖(ins (fst0 x)).val.2 v‖₊ : ℝ≥0) : ℝ)) =
+        _ * (∏ v : D0, ((‖x.val.2 v‖₊ : ℝ≥0) : ℝ))
+      rw [h1, h2, mul_one, mul_one]; rfl
+    let qS : SIdeleQuotient F S := QuotientGroup.mk (ins (fst0 x))
+    let q0 : SIdeleQuotient F D0 := QuotientGroup.mk x
+    change ‖f (Multiplicative.ofAdd x.val.1)‖ *
+        ‖(ψ' qS : ℂ) * (((sIdeleQuotientNorm F S qS : ℝ≥0) : ℝ) : ℂ) ^ s‖ ≤
+      ‖f (Multiplicative.ofAdd x.val.1)‖ *
+        ‖((1 : PontryaginDual (SIdeleQuotient F D0)) q0 : ℂ) *
+          (((sIdeleQuotientNorm F D0 q0 : ℝ≥0) : ℝ) : ℂ) ^ (s.re : ℂ)‖
+    rw [norm_mul, norm_mul, Circle.norm_coe, Circle.norm_coe, one_mul, one_mul,
+      sIdeleQuotientNorm_mk, sIdeleQuotientNorm_mk, hsn,
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+      Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr (Units.zero_lt _)),
+      Complex.ofReal_re]
+  -- Apply Weil's quotient formula at `D0 = ∅`.
+  let ν : Measure ((SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker) :=
+    positiveRealHaar.comap (QuotientGroup.kerLift (sIdeleNorm F D0))
+  have hW := weilQuotientIntegral_L1 (sIdeleNorm F D0).ker hN0_closed μ0 μ1 ν
+    (sNormOneIdeleTamagawaMeasure_isWeil F D0) hφ_int
+  -- Identify the coset integral at every `q : Iₛ(∅) ⧸ N∞`.
+  have hcoset (q : (SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker) :
+      lcaCosetIntegral (sIdeleNorm F D0).ker μ1 φ q =
+        infiniteStandardThetaMellinAverage χ f (tauInf (QuotientGroup.kerLift (sIdeleNorm F D0) q)) *
+        d (QuotientGroup.mk (ins (tauInf (QuotientGroup.kerLift (sIdeleNorm F D0) q)))) := by
+    let t := QuotientGroup.kerLift (sIdeleNorm F D0) q
+    have hq_norm : sIdeleNorm F D0 q.out = t := by
+      change QuotientGroup.kerLift (sIdeleNorm F D0) (QuotientGroup.mk q.out) = t
+      rw [QuotientGroup.out_eq']
+    let u0 : (sIdeleNorm F D0).ker :=
+      ⟨(ins0 (tauInf t))⁻¹ * q.out, by
+        rw [MonoidHom.mem_ker, map_mul, map_inv, htauInf D0 t, hq_norm, inv_mul_cancel]⟩
+    have hq_eq : q.out = ins0 (tauInf t) * u0.val := by
+      change q.out = ins0 (tauInf t) * ((ins0 (tauInf t))⁻¹ * q.out)
+      rw [mul_inv_cancel_left]
+    change (∫ g : (sIdeleNorm F D0).ker, φ (q.out * g.val) ∂μ1) = _
+    have hshift := integral_mul_left_eq_self (μ := μ1)
+      (fun g : (sIdeleNorm F D0).ker ↦ φ (ins0 (tauInf t) * g.val)) u0
+    have heq1 : (fun g : (sIdeleNorm F D0).ker ↦ φ (q.out * g.val)) =
+        fun g : (sIdeleNorm F D0).ker ↦ φ (ins0 (tauInf t) * (u0 * g).val) :=
+      funext fun g ↦ congrArg φ (by rw [hq_eq, Submonoid.coe_mul, mul_assoc])
+    rw [heq1, hshift, infiniteStandardThetaMellinAverage_apply, ← integral_mul_const]
+    refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+    let h := fst0 g.val
+    have hnorm_h : sIdeleNorm F S (ins h) = 1 := by
+      have hsn : sIdeleNorm F S (ins h) = sIdeleNorm F D0 g.val := by
+        apply Units.ext; apply NNReal.coe_injective
+        simp only [sIdeleNorm, MonoidHom.mul_apply, MonoidHom.finsetProd_apply,
+          MonoidHom.pow_apply, MonoidHom.comp_apply, Units.val_mul, Units.coe_prod,
+          Units.val_pow_eq_pow_val, Units.coe_map, NNReal.coe_mul, NNReal.coe_prod, NNReal.coe_pow]
+        have h1 : ∏ v : S, ((‖(ins h).val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+          Finset.prod_eq_one fun v _ ↦ by change (‖(1 : v.val.adicCompletion F)‖₊ : ℝ) = 1; simp
+        have h2 : ∏ v : D0, ((‖g.val.val.2 v‖₊ : ℝ≥0) : ℝ) = 1 :=
+          Finset.prod_eq_one fun v _ ↦ (Finset.notMem_empty v.val v.property).elim
+        change _ * (∏ v : S, ((‖(ins h).val.2 v‖₊ : ℝ≥0) : ℝ)) =
+          _ * (∏ v : D0, ((‖g.val.val.2 v‖₊ : ℝ≥0) : ℝ))
+        rw [h1, h2, mul_one, mul_one]; rfl
+      exact hsn.trans g.property
+    have hd_h : d (QuotientGroup.mk (ins h)) = (χ (ins h) : ℂ) := by
+      let y : (sIdeleQuotientNorm F S).ker := ⟨QuotientGroup.mk (ins h), by
+        rw [MonoidHom.mem_ker, sIdeleQuotientNorm_mk, hnorm_h]⟩
+      have h1 : d y.val = (ψ' y.val : ℂ) := by
+        change (ψ' y.val : ℂ) * (((sIdeleQuotientNorm F S y.val : ℝ≥0) : ℝ) : ℂ) ^ s = _
+        rw [y.property]; simp
+      have h2 := hχ ⟨ins h, hnorm_h⟩ y rfl
+      exact h1.trans (congrArg (fun z : Circle ↦ (z : ℂ)) ((hψ' y).trans h2.symm))
+    have hfst_prod : fst0 (ins0 (tauInf t) * g.val) = h * tauInf t := by
+      rw [map_mul, show fst0 (ins0 (tauInf t)) = tauInf t from Units.ext rfl, mul_comm]
+    have hval1 : (ins0 (tauInf t) * g.val).val.1 = (h * tauInf t).val := by
+      change (fst0 (ins0 (tauInf t) * g.val)).val = (h * tauInf t).val
+      rw [hfst_prod]
+    change f (Multiplicative.ofAdd (ins0 (tauInf t) * g.val).val.1) *
+        d (QuotientGroup.mk (ins (fst0 (ins0 (tauInf t) * g.val)))) = _
+    rw [hval1, hfst_prod, map_mul, QuotientGroup.mk_mul, map_mul, hd_h]
+    ring
+  -- Transport along the topological equivalence `kerLift : Iₛ(∅) ⧸ N∞ ≃ₜ ℝ≥0ˣ`.
+  let kL := QuotientGroup.kerLift (sIdeleNorm F D0)
+  let kInv : ℝ≥0ˣ → (SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker :=
+    fun t ↦ QuotientGroup.mk (ins0 (tauInf t))
+  have hkL_right : RightInverse kInv kL := fun t ↦ htauInf D0 t
+  have hkL_left : LeftInverse kInv kL := fun q ↦ by
+    refine QuotientGroup.kerLift_injective (sIdeleNorm F D0) (hkL_right (kL q))
+  have hkL_cont : Continuous kL :=
+    (QuotientGroup.isOpenQuotientMap_mk (N := (sIdeleNorm F D0).ker)).isQuotientMap.continuous_iff.mpr hn0
+  have hkInv_cont : Continuous kInv :=
+    QuotientGroup.continuous_mk.comp (hins0_cont.comp tauInf.continuous)
+  let eQ : ((SAdeleRing F D0)ˣ ⧸ (sIdeleNorm F D0).ker) ≃ₜ ℝ≥0ˣ :=
+    ⟨⟨kL, kInv, hkL_left, hkL_right⟩, hkL_cont, hkInv_cont⟩
+  have hν_map : ν = positiveRealHaar.map eQ.symm := by
+    have hme : MeasurableEmbedding eQ := eQ.toMeasurableEquiv.measurableEmbedding
+    ext A hA
+    change positiveRealHaar.comap eQ A = positiveRealHaar.map eQ.symm A
+    rw [Measure.comap_apply eQ eQ.injective (fun s hs ↦ hme.measurableSet_image.mpr hs) positiveRealHaar hA,
+      Measure.map_apply eQ.symm.measurable hA]
+    congr 1
+    ext t
+    exact ⟨by rintro ⟨x, hx, rfl⟩; simpa using hx, fun ht ↦ ⟨eQ.symm t, ht, eQ.apply_symm_apply t⟩⟩
+  let F_rad (t : ℝ≥0ˣ) : ℂ :=
+    infiniteStandardThetaMellinAverage χ f (tauInf t) * d (QuotientGroup.mk (ins (tauInf t)))
+  have hcoset_eq : lcaCosetIntegral (sIdeleNorm F D0).ker μ1 φ = F_rad ∘ eQ :=
+    funext hcoset
+  have hIntQ : Integrable (F_rad ∘ eQ) (positiveRealHaar.map eQ.symm) := by
+    rw [← hν_map, ← hcoset_eq]
+    exact hW.2.1
+  have hIntR : Integrable F_rad positiveRealHaar := by
+    have h := (integrable_map_measure hIntQ.aestronglyMeasurable
+      eQ.symm.measurable.aemeasurable).mp hIntQ
+    refine h.congr (ae_of_all _ fun t ↦ ?_)
+    simp [Function.comp_apply]
+  refine ⟨hIntR, ?_⟩
+  rw [hW.2.2, hcoset_eq, hν_map, integral_map eQ.symm.measurable.aemeasurable
+    hIntQ.aestronglyMeasurable]
+  refine integral_congr_ae (ae_of_all _ fun t ↦ ?_)
+  simp [Function.comp_apply, F_rad, d, ins]
+
+/-- The kernel of `sLocalStandardThetaTensor c` into `Θₛω(S, χS)` equals the kernel of
+`infiniteStandardThetaMellinAverage χ`. -/
+private theorem sLocalStandardThetaTensor_ker_eq
+    {F : Type*} [Field F] [NumberField F] {S : Finset (HeightOneSpectrum (𝓞 F))}
+    {ω : PontryaginDual (ideleClassNorm F).ker}
+    (hω : NormOneCharacterUnramifiedOutside ω S) (χ : PontryaginDual (SAdeleRing F S)ˣ)
+    (hχ : ∀ (g : (sIdeleNorm F S).ker) (y : (sIdeleQuotientNorm F S).ker),
+      y.val = QuotientGroup.mk g.val → χ g.val = sLocalNormOneCharacter S ω hω y) :
+    let c := sIdeleRestriction F S hω.choose
+    let χS := sLocalNormOneCharacter S ω hω
+    ((LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χS)).mkQ.comp
+      (sLocalStandardThetaTensor (F := F) (S := S) c)).ker =
+    (infiniteStandardThetaMellinAverage χ).ker := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let : MeasurableSpace (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F)))) :=
+    inferInstanceAs (MeasurableSpace (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset (HeightOneSpectrum (𝓞 F)))) → v.val.adicCompletion F)))
+  let c := sIdeleRestriction F S hω.choose
+  let χS := sLocalNormOneCharacter S ω hω
+  let ins : (InfiniteAdeleRing F)ˣ →* (SAdeleRing F S)ˣ :=
+    Units.map (MonoidHom.inl (InfiniteAdeleRing F) ((v : S) → v.val.adicCompletion F))
+  have hins_cont : Continuous ins := (continuous_id.prodMk continuous_const).units_map _
+  obtain ⟨tauInf, htauInf⟩ := sLocalStandardThetaTensor_archSection F
+  let τS : ℝ≥0ˣ →ₜ* (SAdeleRing F S)ˣ := ⟨ins.comp tauInf.toMonoidHom, hins_cont.comp tauInf.continuous⟩
+  have hτS (t : ℝ≥0ˣ) : sIdeleNorm F S (τS t) = t := htauInf S t
+  obtain ⟨ψ, hψ, hψτ⟩ := sLocalStandardThetaTensor_unitaryLift χS τS hτS
+  let mₛ := sIdeleQuotientNorm F S
+  let hmₛ := (isProperMap_sIdeleQuotientNorm F S).continuous
+  let uC : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let ρv (v : S) := finiteStandardGaussian v.val (sLocalFiniteRestriction v c)
+  -- Local finite shell nonvanishing for `ψ`.
+  let eProd := ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((w : S) → w.val.adicCompletion F)
+  let eFin := ContinuousMulEquiv.piUnits (M := fun w : S ↦ w.val.adicCompletion F)
+  let finAt (v : S) : (v.val.adicCompletion F)ˣ →ₜ* SIdeleQuotient F S :=
+    let f : (v.val.adicCompletion F)ˣ →* (SAdeleRing F S)ˣ :=
+      eProd.symm.toMonoidHom.comp ((MonoidHom.inr _ _).comp
+        (eFin.symm.toMonoidHom.comp (MonoidHom.mulSingle (fun w : S ↦ (w.val.adicCompletion F)ˣ) v)))
+    ⟨(QuotientGroup.mk' _).comp f, QuotientGroup.continuous_mk.comp
+      (eProd.symm.continuous.comp (continuous_const.prodMk
+        (eFin.symm.continuous.comp (continuous_mulSingle (A := fun w : S ↦ (w.val.adicCompletion F)ˣ) v))))⟩
+  have hfin_eq (v : S) (d : QuasiCharacter (SIdeleQuotient F S)) (u : (v.val.adicCompletion F)ˣ) :
+      sLocalFiniteRestriction v d u = d (finAt v u) := by
+    unfold sLocalFiniteRestriction
+    apply congrArg (fun x ↦ d (QuotientGroup.mk (eProd.symm (1, eFin.symm x))))
+    congr 1
+    exact Subsingleton.elim _ _
+  let ψv (v : S) : PontryaginDual (v.val.adicCompletion F)ˣ := ψ.comp (finAt v)
+  have hfinNorm (v : S) (u : (v.val.adicCompletion F)ˣ) :
+      sIdeleQuotientNorm F S (finAt v u) = Units.map nnNormHom.toMonoidHom u := by
+    have h1 := sLocalFiniteRestriction_norm (F := F) (S := S) v u
+    rw [hfin_eq] at h1
+    change ((1 : PontryaginDual (SIdeleQuotient F S)) (finAt v u) : ℂ) *
+        (((mₛ (finAt v u) : ℝ≥0) : ℝ) : ℂ) ^ (1 : ℂ) = _ at h1
+    simp only [PontryaginDual.one_apply, Circle.coe_one, one_mul, Complex.cpow_one] at h1
+    apply Units.ext; apply NNReal.coe_injective; exact Complex.ofReal_injective h1
+  have hcψ (v : S) (u : (v.val.adicCompletion F)ˣ)
+      (hu : u ∈ ((v.val.adicCompletionIntegers F).units : Set (v.val.adicCompletion F)ˣ)) :
+      sLocalFiniteRestriction v c u = (ψv v u : ℂ) := by
+    rw [hfin_eq]
+    have hnu : mₛ (finAt v u) = 1 := by
+      rw [hfinNorm]; apply Units.ext; apply NNReal.coe_injective
+      exact Valued.toNormedField.norm_eq_one_iff.mpr
+        (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hu)
+    let y : mₛ.ker := ⟨finAt v u, hnu⟩
+    have h1 : (χS y : ℂ) = c y.val :=
+      sLocalNormOneCharacter_eq_sIdeleRestriction ω hω.choose hω.choose_spec y
+    change c y.val = (ψ y.val : ℂ)
+    rw [← h1, hψ y]
+  choose Φv _ hΦvZ using fun v : S ↦
+    sLocalStandardThetaTensor_finiteLocal_shells v.val (sLocalFiniteRestriction v c) (ψv v) (hcψ v)
+  let : BorelSpace ℝ≥0ˣ := ⟨by
+    change MeasurableSpace.comap Units.val inferInstance = borel ℝ≥0ˣ
+    rw [BorelSpace.measurable_eq (α := ℝ≥0), ← borel_comap,
+      ← (Units.isEmbedding_val₀ (G₀ := ℝ≥0)).eq_induced]⟩
+  ext f
+  simp only [LinearMap.mem_ker, LinearMap.comp_apply, Submodule.mkQ_apply,
+    Submodule.Quotient.mk_eq_zero]
+  change sLocalStandardThetaTensor c f ∈ LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S χS) ↔
+    infiniteStandardThetaMellinAverage χ f = 0
+  constructor
+  · -- `sLocalStandardThetaTensor c f ∈ Kₛω(S, χS) → infiniteStandardThetaMellinAverage χ f = 0`.
+    intro hfK
+    -- Step 1: For every `y : ℝ`, the radial Mellin integral at `s = 2 - 2πi y` vanishes.
+    have hrad_zero (y : ℝ) :
+        let s : ℂ := (2 : ℂ) + ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I
+        ∫ t : ℝ≥0ˣ, infiniteStandardThetaMellinAverage χ f (tauInf t) *
+          ((t.val : ℝ) : ℂ) ^ s ∂positiveRealHaar = 0 := by
+      intro s
+      have hs : 0 < s.re := by simp [s]
+      let d := quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ) s
+      have hd_pos : ∃ (ψ'' : PontryaginDual (SIdeleQuotient F S)) (t : ℂ), 0 < t.re ∧
+          d = quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ'') t := ⟨ψ, s, hs, rfl⟩
+      have hd_res (u : mₛ.ker) : normOneRestriction mₛ d u = (χS u : ℂ) := by
+        change (ψ u.val : ℂ) * (((mₛ u.val : ℝ≥0) : ℝ) : ℂ) ^ s = (χS u : ℂ)
+        rw [u.property, hψ u]; simp
+      have hZf : sLocalIdelicZFunction (sLocalStandardThetaTensor c f) d = 0 :=
+        (mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) χS _).mp hfK
+          ⟨d, sLocalStandardThetaTensor_orderBound_pos ψ hs⟩ hd_res
+      rw [sLocalIdelicZFunction_eq_integral _ hd_pos] at hZf
+      rw [sLocalStandardThetaTensor_zeta_prod d hd_pos (sLocalStandardThetaTensor c f) f ρv
+        (fun x ↦ sLocalStandardThetaTensor_apply c f x)] at hZf
+      -- Finite product is nonzero.
+      have hfin_ne : (∏ v : S, localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (fun z ↦ ρv v (Multiplicative.ofAdd z)) (sLocalFiniteRestriction v d)) ≠ 0 := by
+        refine Finset.prod_ne_zero_iff.mpr fun v _ ↦ ?_
+        refine (hΦvZ v 1 s hs (fun _ ↦ by simp) (sLocalFiniteRestriction v d) fun u ↦ ?_).1
+        rw [hfin_eq]
+        change (ψ (finAt v u) : ℂ) * (((mₛ (finAt v u) : ℝ≥0) : ℝ) : ℂ) ^ s =
+          (ψv v u : ℂ) * (1 : ℂ) * ((‖u.val‖ : ℝ) : ℂ) ^ s
+        rw [hfinNorm v u, mul_one]; rfl
+      have hArch0 := (mul_eq_zero.mp hZf).resolve_right hfin_ne
+      have hrad := (sLocalStandardThetaTensor_archZeta_eq_radial hω χ hχ tauInf htauInf ψ hψ s hs f).2
+      rw [hrad] at hArch0
+      refine Eq.trans ?_ hArch0
+      refine integral_congr_ae (ae_of_all _ fun t ↦ ?_)
+      change infiniteStandardThetaMellinAverage χ f (tauInf t) * ((t.val : ℝ) : ℂ) ^ s =
+        infiniteStandardThetaMellinAverage χ f (tauInf t) * d (QuotientGroup.mk (ins (tauInf t)))
+      have hdt : d (QuotientGroup.mk (ins (tauInf t))) = ((t.val : ℝ) : ℂ) ^ s := by
+        change (ψ (QuotientGroup.mk (τS t)) : ℂ) *
+          (((mₛ (QuotientGroup.mk (τS t)) : ℝ≥0) : ℝ) : ℂ) ^ s = _
+        rw [hψτ t, Circle.coe_one, one_mul, sIdeleQuotientNorm_mk, hτS t]
+      rw [hdt]
+    -- Step 2: Pull back along `exp : ℝ → ℝ≥0ˣ` and apply Fourier uniqueness on `ℝ`.
+    let eR : ℝ → ℝ≥0ˣ := fun x ↦
+      Units.mk0 (Real.exp x).toNNReal
+        (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos x)))
+    have heR_cont : Continuous eR :=
+      Units.isEmbedding_val₀.continuous_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp)
+    have heR_val (x : ℝ) : ((eR x).val : ℝ) = Real.exp x :=
+      Real.coe_toNNReal (Real.exp x) (Real.exp_pos x).le
+    let hfun (x : ℝ) : ℂ :=
+      infiniteStandardThetaMellinAverage χ f (tauInf (eR x)) * (Real.exp (2 * x) : ℂ)
+    have hh_cont : Continuous hfun :=
+      ((infiniteStandardThetaMellinAverage χ f).continuous.comp (tauInf.continuous.comp heR_cont)).mul
+        (Complex.continuous_ofReal.comp (Real.continuous_exp.comp (continuous_const.mul continuous_id)))
+    have hrad_int := (sLocalStandardThetaTensor_archZeta_eq_radial hω χ hχ tauInf htauInf ψ hψ (2 : ℂ)
+      (by norm_num) f).1
+    have hrad_int' : Integrable (fun t : ℝ≥0ˣ ↦ infiniteStandardThetaMellinAverage χ f (tauInf t) *
+        ((t.val : ℝ) : ℂ) ^ (2 : ℂ)) positiveRealHaar := by
+      refine hrad_int.congr (ae_of_all _ fun t ↦ ?_)
+      change infiniteStandardThetaMellinAverage χ f (tauInf t) *
+          quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ) (2 : ℂ) (QuotientGroup.mk (ins (tauInf t))) = _
+      have hdt : quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ) (2 : ℂ) (QuotientGroup.mk (ins (tauInf t))) =
+          ((t.val : ℝ) : ℂ) ^ (2 : ℂ) := by
+        change (ψ (QuotientGroup.mk (τS t)) : ℂ) *
+          (((mₛ (QuotientGroup.mk (τS t)) : ℝ≥0) : ℝ) : ℂ) ^ (2 : ℂ) = _
+        rw [hψτ t, Circle.coe_one, one_mul, sIdeleQuotientNorm_mk, hτS t]
+      rw [hdt]
+    have hh_int : Integrable hfun volume := by
+      have h1 := (integrable_map_measure hrad_int'.aestronglyMeasurable heR_cont.measurable.aemeasurable).mp
+        hrad_int'
+      refine h1.congr (ae_of_all _ fun x ↦ ?_)
+      simp only [Function.comp_apply, hfun]
+      congr 1
+      change (((eR x).val : ℝ) : ℂ) ^ (2 : ℂ) = (Real.exp (2 * x) : ℂ)
+      rw [heR_val, show (2 : ℂ) = ((2 : ℕ) : ℂ) by norm_num, Complex.cpow_natCast,
+        ← Complex.ofReal_pow, ← Real.exp_nat_mul]
+      push_cast; rfl
+    have hF_zero (y : ℝ) : FourierTransform.fourier hfun y = 0 := by
+      rw [Real.fourier_eq]
+      let s : ℂ := (2 : ℂ) + ((-2 * Real.pi * y : ℝ) : ℂ) * Complex.I
+      have h0 := hrad_zero y
+      change (∫ t : ℝ≥0ˣ, infiniteStandardThetaMellinAverage χ f (tauInf t) * ((t.val : ℝ) : ℂ) ^ s
+        ∂volume.map eR) = 0 at h0
+      have hcont_s : Continuous (fun t : ℝ≥0ˣ ↦ infiniteStandardThetaMellinAverage χ f (tauInf t) *
+          ((t.val : ℝ) : ℂ) ^ s) :=
+        ((infiniteStandardThetaMellinAverage χ f).continuous.comp tauInf.continuous).mul
+          ((Complex.continuous_ofReal.comp (NNReal.continuous_coe.comp Units.continuous_val)).cpow
+            continuous_const fun t ↦ Or.inl (by simp [NNReal.coe_pos.mpr (Units.zero_lt t)]))
+      rw [integral_map heR_cont.measurable.aemeasurable hcont_s.aestronglyMeasurable] at h0
+      refine Eq.trans ?_ h0
+      refine integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+      simp only [hfun, heR_val, Circle.smul_def, smul_eq_mul, Real.fourierChar_apply,
+        RCLike.inner_apply, conj_trivial, s]
+      rw [Complex.ofReal_exp (2 * x), Complex.ofReal_exp x, Complex.cpow_def_of_ne_zero
+        (Complex.exp_ne_zero _),
+        Complex.log_exp (by simp [Real.pi_pos]) (by rw [Complex.ofReal_im]; exact Real.pi_pos.le)]
+      rw [← mul_assoc (Complex.exp _), mul_comm (Complex.exp _), mul_assoc, ← Complex.exp_add]
+      congr 2
+      push_cast
+      ring
+    have hae := sLocalStandardThetaTensor_ae_zero_of_fourier_zero hh_int hF_zero
+    have heq0 : hfun = 0 := Measure.eq_of_ae_eq hae hh_cont continuous_const
+    have hτ_zero (t : ℝ≥0ˣ) : infiniteStandardThetaMellinAverage χ f (tauInf t) = 0 := by
+      let x := Real.log (t.val : ℝ)
+      have htx : eR x = t := by
+        apply Units.ext; apply NNReal.coe_injective
+        rw [heR_val, Real.exp_log (NNReal.coe_pos.mpr (Units.zero_lt t))]
+      have hx0 := congrFun heq0 x
+      simp only [hfun, htx, Pi.zero_apply] at hx0
+      exact (mul_eq_zero.mp hx0).resolve_right (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne')
+    -- Step 3: Extend from `tauInf t` to all `x : I∞` by `N∞`-equivariance.
+    ext x
+    let D0 : Finset (HeightOneSpectrum (𝓞 F)) := ∅
+    let ins0 := Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+      (∀ v : D0, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val))
+    let fst0 := Units.map (RingHom.fst (InfiniteAdeleRing F)
+      (∀ v : D0, HeightOneSpectrum.adicCompletion (R := 𝓞 F) F v.val)).toMonoidHom
+    let t := sIdeleNorm F D0 (ins0 x)
+    let h0 : (sIdeleNorm F D0).ker :=
+      ⟨ins0 (x * (tauInf t)⁻¹), by
+        rw [MonoidHom.mem_ker, map_mul, map_inv, map_mul, map_inv, htauInf D0 t, mul_inv_cancel]⟩
+    have hx_eq : x = fst0 h0.val * tauInf t := by
+      have hh0 : fst0 h0.val = x * (tauInf t)⁻¹ := Units.ext rfl
+      rw [hh0, inv_mul_cancel_right]
+    let μ1 := sNormOneIdeleTamagawaMeasure F D0
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let : SecondCountableTopology (SAdeleRing F D0) := inferInstanceAs
+      (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) × ((v : D0) → v.val.adicCompletion F)))
+    let : SecondCountableTopology (SAdeleRing F D0)ˣ :=
+      (sIdeleGroup_description F D0).1.secondCountableTopology
+    let : BorelSpace (SAdeleRing F D0)ˣ := sIdeleGroup_borelSpace
+    let : μ1.IsHaarMeasure := (sNormOneIdeleTamagawaMeasure_existsUnique F D0).exists.choose_spec.1
+    change infiniteStandardThetaMellinAverage χ f x = 0
+    rw [infiniteStandardThetaMellinAverage_apply]
+    have hshift := integral_mul_right_eq_self (μ := μ1)
+      (fun g : (sIdeleNorm F D0).ker ↦
+        f (Multiplicative.ofAdd (fst0 g.val * tauInf t).val) * (χ (ins (fst0 g.val)) : ℂ)) h0
+    have hrel : (∫ g : (sIdeleNorm F D0).ker,
+        f (Multiplicative.ofAdd (fst0 g.val * x).val) * (χ (ins (fst0 g.val)) : ℂ) ∂μ1) =
+        (χ (ins (fst0 h0.val)) : ℂ)⁻¹ *
+        ∫ g : (sIdeleNorm F D0).ker,
+          f (Multiplicative.ofAdd (fst0 g.val * tauInf t).val) * (χ (ins (fst0 g.val)) : ℂ) ∂μ1 := by
+      rw [← hshift, ← integral_const_mul]
+      refine integral_congr_ae (ae_of_all _ fun g ↦ ?_)
+      dsimp only
+      have harg : fst0 (g * h0).val * tauInf t = fst0 g.val * x := by
+        rw [Submonoid.coe_mul, map_mul, mul_assoc, ← hx_eq]
+      rw [harg, Submonoid.coe_mul, map_mul, map_mul, map_mul, Circle.coe_mul]
+      have hne : (χ (ins (fst0 h0.val)) : ℂ) ≠ 0 := Circle.coe_ne_zero _
+      have hcancel (a b c : ℂ) (hc : c ≠ 0) : a * b = c⁻¹ * (a * (b * c)) := by
+        field_simp
+      exact hcancel _ _ _ hne
+    rw [hrel, ← infiniteStandardThetaMellinAverage_apply, hτ_zero t, mul_zero]
+  · -- `infiniteStandardThetaMellinAverage χ f = 0 → sLocalStandardThetaTensor c f ∈ Kₛω(S, χS)`.
+    intro hfM
+    let : MeasurableSpace (sIdeleQuotientNorm F S).ker := borel _
+    let : (sLocalNormOneQuotientMeasure F S).IsHaarMeasure :=
+      (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+    change sLocalStandardThetaTensor c f ∈
+      LinearMap.ker (sLocalHomogeneousAdelicTheta F S (sLocalNormOneQuotientMeasure F S) χS)
+    rw [mem_sLocalHomogeneousAdelicTheta_ker_iff (F := F) (S := S) χS]
+    intro d₀ hd₀
+    change sLocalIdelicZFunction (sLocalStandardThetaTensor c f) d₀.val = 0
+    obtain ⟨ψ', s₀, hψ'eq⟩ := sLocalStandardThetaTensor_exists_normTwist d₀.val
+    have hψ'res (u : mₛ.ker) : ψ' u.val = χS u := by
+      apply Circle.ext
+      have h1 := hd₀ u
+      rw [← hψ'eq] at h1
+      change (ψ' u.val : ℂ) * (((mₛ u.val : ℝ≥0) : ℝ) : ℂ) ^ s₀ = (χS u : ℂ) at h1
+      rw [u.property] at h1
+      simpa using h1
+    rw [← hψ'eq]
+    have heqChart := sLocalStandardThetaTensor_meromorphic_eq_of_rightHalf
+      (f₂ := fun _ ↦ (0 : ℂ))
+      (sLocalIdelicZFunction_meromorphic (sLocalStandardThetaTensor c f) ψ')
+      (fun _ _ ↦ analyticAt_const.meromorphicNFAt) (fun s hs ↦ ?_)
+    · exact congrFun heqChart s₀
+    · let d := quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ') s
+      have hd_pos : ∃ (ψ'' : PontryaginDual (SIdeleQuotient F S)) (t : ℂ), 0 < t.re ∧
+          d = quasiCharacterNormTwist mₛ hmₛ (uC.comp ψ'') t := ⟨ψ', s, hs, rfl⟩
+      change sLocalIdelicZFunction (sLocalStandardThetaTensor c f) d = 0
+      rw [sLocalIdelicZFunction_eq_integral _ hd_pos,
+        sLocalStandardThetaTensor_zeta_prod d hd_pos (sLocalStandardThetaTensor c f) f ρv
+          (fun x ↦ sLocalStandardThetaTensor_apply c f x),
+        (sLocalStandardThetaTensor_archZeta_eq_radial hω χ hχ tauInf htauInf ψ' hψ'res s hs f).2]
+      simp [hfM]
+
+/-- Abstract quotient-equivalence constructor: an open quotient map `q : X →ₗ[ℂ] Y` with
+`q.ker = K` induces a topological linear isomorphism `(X ⧸ K) ≃L[ℂ] Y`. -/
+private theorem sLocalStandardThetaTensor_quotient_equiv_of_openQuotient
+    {X Y : Type*} [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (q : X →ₗ[ℂ] Y) (hq : IsOpenQuotientMap q) (K : Submodule ℂ X) (hker : q.ker = K) :
+    ∃ e : (X ⧸ K) ≃L[ℂ] Y, ∀ f : X, e (K.mkQ f) = q f := by
+  let e : (X ⧸ K) ≃ₗ[ℂ] Y :=
+    (Submodule.quotEquivOfEq K q.ker hker.symm).trans (q.quotKerEquivOfSurjective hq.surjective)
+  have he (f : X) : e (K.mkQ f) = q f :=
+    q.quotKerEquivOfSurjective_apply_mk hq.surjective f
+  have hcont : Continuous e := K.isQuotientMap_mkQ.continuous_iff.mpr
+    (hq.continuous.congr fun f ↦ (he f).symm)
+  have hinv : Continuous e.symm := hq.isQuotientMap.continuous_iff.mpr
+    (K.mkQL.continuous.congr fun f ↦ (e.symm_apply_eq.mpr (he f).symm).symm)
+  exact ⟨⟨e, hcont, hinv⟩, he⟩
+
 /-- Paper: Theorem 6.2.2.1(1), p. 299.
 Tensoring with the standard finite test identifies the local homogeneous quotient with
 the archimedean quotient by the kernel of the archimedean Mellin average.
@@ -1605,7 +6016,15 @@ theorem sLocalStandardThetaTensor_quotient_equiv
     let χS := sLocalNormOneCharacter S ω hω
     let K := (infiniteStandardThetaMellinAverage χ).ker
     ∃ e : (ℬ∞ ⧸ K) ≃L[ℂ] Θₛω(S, χS), ∀ f : ℬ∞,
-      e (K.mkQ f) = (Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f) := by sorry
+      e (K.mkQ f) = (Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f) := by 
+  let c := sIdeleRestriction F S hω.choose
+  let χS := sLocalNormOneCharacter S ω hω
+  let q : ℬ∞ →ₗ[ℂ] Θₛω(S, χS) := (Kₛω(S, χS)).mkQ.comp (sLocalStandardThetaTensor c)
+  with_reducible_and_instances
+    exact sLocalStandardThetaTensor_quotient_equiv_of_openQuotient q
+      (sLocalStandardThetaTensor_openQuotient hω)
+      (infiniteStandardThetaMellinAverage χ).ker
+      (sLocalStandardThetaTensor_ker_eq hω χ _hχ)
 
 /-- Paper: Theorem 6.2.2.1, p. 298.
 For trivial S-integer Picard group, the archimedean test space maps continuously,
@@ -2217,6 +6636,286 @@ theorem infiniteStandardThetaAverage_forwardDecay (χ : PontryaginDual Iₛ(S))
 
 end StandardThetaForwardDecay
 
+open scoped Classical in
+/-- For any archimedean Schwartz–Bruhat function `f`, the single norm-one integral is bounded for
+ALL `y : I∞` by `C * (1 + |log ‖y‖|) ^ (|S∞| - 1)`, and for `‖y‖ ≥ 1` decays faster than any power
+`‖y‖ ^ (-N)`. -/
+private theorem infiniteStandardThetaAverage_norm_bounds (f : ℬ∞) :
+    (∃ C : ℝ, 0 < C ∧ ∀ y : I∞,
+      (∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+        ∂sNormOneIdeleTamagawaMeasure F ∅) ≤
+        C * (1 + |Real.log ((infiniteIdeleNorm F y).val : ℝ)|) ^
+          (Fintype.card (InfinitePlace F) - 1)) ∧
+    (∀ N : ℕ, ∃ C : ℝ, 0 < C ∧ ∀ y : I∞, (1 : ℝ) ≤ ((infiniteIdeleNorm F y).val : ℝ) →
+      (∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+        ∂sNormOneIdeleTamagawaMeasure F ∅) ≤
+        C * Real.exp (-(N : ℝ) * Real.log ((infiniteIdeleNorm F y).val : ℝ))) := by
+  obtain ⟨G, hG⟩ := (mem_archimedeanSchwartzBruhat_iff (F := F)
+    (fun z ↦ f (Multiplicative.ofAdd z))).mp f.property
+  have hdecay (k : ℕ) (z : InfiniteAdeleRing F) :
+      ‖f (Multiplicative.ofAdd z)‖ * ‖InfiniteAdeleRing.ringEquiv_mixedSpace F z‖ ^ k ≤
+        SchwartzMap.seminorm ℂ k 0 G := by
+    rw [← hG z]
+    have h := SchwartzMap.le_seminorm ℂ k 0 G (InfiniteAdeleRing.ringEquiv_mixedSpace F z)
+    simpa only [norm_iteratedFDeriv_zero, mul_comm] using h
+  obtain ⟨hUcomp, hUmeas, hUbor, μU, hUfin, μH, hHhaar, c, e, hfinrank, hHsum, hnorm_e, hν_eq⟩ :=
+    infiniteStandardThetaAverage_polar (F := F)
+  let : IsFiniteMeasure μU := hUfin
+  let : μH.IsAddHaarMeasure := hHhaar
+  let r : ℕ := Fintype.card (InfinitePlace F)
+  have hrpos : (0 : ℝ) < (r : ℝ) := by exact_mod_cast Fintype.card_pos (α := InfinitePlace F)
+  let α : ℝ := (2 * (r : ℝ))⁻¹
+  have hα : 0 < α := by positivity
+  -- Helper: define the shifted log vector t(y) ∈ H
+  let tOf (y : I∞) :=
+    (⟨fun v ↦ infiniteIdeleLog F y v - Real.log ((infiniteIdeleNorm F y).val : ℝ) / (r : ℝ), by
+      change ∑ v : InfinitePlace F,
+        (infiniteIdeleLog F y v - Real.log ((infiniteIdeleNorm F y).val : ℝ) / (r : ℝ)) = 0
+      have hsum_log : ∑ v : InfinitePlace F, infiniteIdeleLog F y v =
+          Real.log ((infiniteIdeleNorm F y).val : ℝ) := by
+        have hne (v : InfinitePlace F) : y.val v ≠ 0 :=
+          (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom y).ne_zero
+        have hprod : ((infiniteIdeleNorm F y).val : ℝ) =
+            ∏ v : InfinitePlace F, ‖y.val v‖ ^ v.mult := by
+          simp [infiniteIdeleNorm, Units.coe_prod]; rfl
+        rw [show Real.log ((infiniteIdeleNorm F y).val : ℝ) =
+            Real.log (∏ v : InfinitePlace F, ‖y.val v‖ ^ v.mult) from congrArg Real.log hprod,
+          Real.log_prod (fun v _ ↦ pow_ne_zero v.mult (norm_ne_zero_iff.mpr (hne v)))]
+        simp [infiniteIdeleLog, Real.log_pow]
+      rw [Finset.sum_sub_distrib, hsum_log, Finset.sum_const, Finset.card_univ, nsmul_eq_mul,
+        mul_div_cancel₀ _ hrpos.ne', sub_self]⟩ :
+      (LinearMap.ker (show (InfinitePlace F → ℝ) →ₗ[ℝ] ℝ from
+        { toFun := fun l ↦ ∑ v, l v
+          map_add' := fun _ _ ↦ Finset.sum_add_distrib
+          map_smul' := fun c l ↦ by simp [Finset.mul_sum] })))
+  -- Helper: express integral of ‖f ((archPart g)⁻¹ * y)‖ in terms of shifted H-coordinate l' = tOf y - l
+  have hshift_le : ∀ (y : I∞) (B : _ → ℝ), Integrable B μH →
+      (∀ (u : _) (l' : _),
+        ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val)‖ ≤ B l') →
+      (∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+        ∂sNormOneIdeleTamagawaMeasure F ∅) ≤
+        (c : ℝ) * μU.real Set.univ * ∫ l', B l' ∂μH := by
+    intro y B hB_int hB_le
+    let t := tOf y
+    have hcont_fn : Continuous (fun g : N∞ ↦
+        ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖) := by
+      have hpart : Continuous (archPart((∅ : Finset V))) :=
+        (continuous_fst : Continuous (RingHom.fst (InfiniteAdeleRing F)
+          (∀ v : (∅ : Finset V), L(v.val)))).units_map _
+      exact ((schwartzBruhat_continuous f).comp (continuous_ofAdd.comp (Units.continuous_val.comp
+        ((continuous_inv.comp (hpart.comp continuous_subtype_val)).mul continuous_const)))).norm
+    let D : Finset V := ∅
+    let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+    let (v : V) : MeasurableSpace (v.adicCompletion F) := borel _
+    let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+    let (v : V) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+    let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+      (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+    let (v : V) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+    let : MeasurableSpace (SAdeleRing F D) := inferInstanceAs
+      (MeasurableSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+    let : BorelSpace (SAdeleRing F D) := inferInstanceAs
+      (BorelSpace (((w : InfinitePlace F) → w.Completion) × ((v : D) → v.val.adicCompletion F)))
+    let : BorelSpace Iₛ(D) := by
+      refine ⟨?_⟩
+      rw [(sIdeleGroup_description F D).1.eq_induced, borel_comap, ← BorelSpace.measurable_eq]
+      rfl
+    let : BorelSpace N∞ := Subtype.borelSpace _
+    rw [hν_eq, integral_smul_nnreal_measure,
+      integral_map e.continuous.measurable.aemeasurable hcont_fn.aestronglyMeasurable]
+    have hB_shift : Integrable (fun l ↦ B (t - l)) μH := by
+      simpa only [sub_eq_add_neg] using (hB_int.comp_sub_left t)
+    have hprod_bound : Integrable (fun p : _ × _ ↦ B (t - p.2)) (μU.prod μH) :=
+      hB_shift.comp_snd μU
+    have hprod_le : ∀ p, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e p).val)⁻¹ * y).val)‖ ≤
+        B (t - p.2) := by
+      rintro ⟨u, l⟩
+      have hsub : tOf y - (t - l) = l := sub_sub_cancel (tOf y) l
+      simpa only [hsub] using hB_le u (t - l)
+    have hprod_int : Integrable (fun p ↦
+        ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e p).val)⁻¹ * y).val)‖) (μU.prod μH) :=
+      hprod_bound.mono' (hcont_fn.comp e.continuous).aestronglyMeasurable
+        (Eventually.of_forall fun p ↦ by rw [Real.norm_of_nonneg (norm_nonneg _)]; exact hprod_le p)
+    have hint_le : (∫ p, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e p).val)⁻¹ * y).val)‖
+        ∂(μU.prod μH)) ≤ ∫ p, B (t - p.2) ∂(μU.prod μH) :=
+      integral_mono hprod_int hprod_bound hprod_le
+    have hprod_eval : (∫ p, B (t - p.2) ∂(μU.prod μH)) = μU.real Set.univ * ∫ l', B l' ∂μH := by
+      have hprod_abs {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+          (μ : Measure α) (ν : Measure β) [IsFiniteMeasure μ] [SFinite ν]
+          (g : β → ℝ) (hg : Integrable (fun p : α × β ↦ g p.2) (μ.prod ν)) :
+          (∫ p, g p.2 ∂(μ.prod ν)) = μ.real Set.univ * ∫ y, g y ∂ν := by
+        rw [integral_prod _ hg]
+        simp only [integral_const, smul_eq_mul]
+      rw [hprod_abs μU μH (fun l ↦ B (t - l)) hprod_bound, integral_sub_left_eq_self B μH t]
+    rw [NNReal.smul_def, smul_eq_mul, mul_assoc]
+    exact mul_le_mul_of_nonneg_left (hint_le.trans_eq hprod_eval) (NNReal.coe_nonneg c)
+  -- Key lower bound on mixed-space norm at (u, tOf y - l')
+  have harch_shifted : ∀ (y : I∞) (u : _) (l' : _),
+      0 ≤ ‖l'‖ + Real.log ((infiniteIdeleNorm F y).val : ℝ) →
+      Real.exp (α * (‖l'‖ + Real.log ((infiniteIdeleNorm F y).val : ℝ))) ≤
+        ‖InfiniteAdeleRing.ringEquiv_mixedSpace F
+          ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val‖ := by
+    intro y u l' hnonneg
+    let T : ℝ := Real.log ((infiniteIdeleNorm F y).val : ℝ)
+    let t := tOf y
+    obtain ⟨v, hv⟩ := infiniteStandardThetaAverage_hyperplane_max l'.val (hHsum l')
+    have hv' : ‖l'‖ / (r : ℝ) ≤ l'.val v := hv
+    have hsum_ge : (‖l'‖ + T) / (r : ℝ) ≤ l'.val v + T / (r : ℝ) := by
+      rw [add_div]
+      linarith
+    have hnum_nonneg : 0 ≤ l'.val v + T / (r : ℝ) :=
+      le_trans (div_nonneg hnonneg hrpos.le) hsum_ge
+    have hmult_le : (v.mult : ℝ) ≤ 2 := by
+      by_cases hvr : v.IsReal
+      · simp [hvr.mult_eq_one]
+      · simp [(InfinitePlace.not_isReal_iff_isComplex.mp hvr).mult_eq_two]
+    have hmult_pos : (0 : ℝ) < (v.mult : ℝ) := by
+      by_cases hvr : v.IsReal
+      · simp [hvr.mult_eq_one]
+      · simp [(InfinitePlace.not_isReal_iff_isComplex.mp hvr).mult_eq_two]
+    have hexp_ge : α * (‖l'‖ + T) ≤ (l'.val v + T / (r : ℝ)) / (v.mult : ℝ) := by
+      dsimp [α]
+      calc
+        (2 * (r : ℝ))⁻¹ * (‖l'‖ + T) = ((‖l'‖ + T) / (r : ℝ)) / 2 := by ring
+        _ ≤ (l'.val v + T / (r : ℝ)) / 2 := div_le_div_of_nonneg_right hsum_ge zero_le_two
+        _ ≤ (l'.val v + T / (r : ℝ)) / (v.mult : ℝ) :=
+            div_le_div_of_nonneg_left hnum_nonneg hmult_pos hmult_le
+    have hcoord : ‖((archPart((∅ : Finset V)) (e (u, t - l')).val)⁻¹ * y).val v‖ =
+        Real.exp ((l'.val v + T / (r : ℝ)) / (v.mult : ℝ)) := by
+      have hne : y.val v ≠ 0 :=
+        (Units.map (Pi.evalRingHom InfinitePlace.Completion v).toMonoidHom y).ne_zero
+      change ‖((archPart((∅ : Finset V)) (e (u, t - l')).val)⁻¹).val v * y.val v‖ = _
+      rw [norm_mul]
+      have hmul : (archPart((∅ : Finset V)) (e (u, t - l')).val).val v *
+          ((archPart((∅ : Finset V)) (e (u, t - l')).val)⁻¹).val v = 1 :=
+        congrFun (congrArg (Units.val : I∞ → InfiniteAdeleRing F)
+          (mul_inv_cancel (archPart((∅ : Finset V)) (e (u, t - l')).val))) v
+      have hnorm1 := congrArg norm hmul
+      rw [norm_mul, norm_one, hnorm_e u (t - l') v] at hnorm1
+      have hinv := eq_inv_of_mul_eq_one_right hnorm1
+      rw [hinv, ← Real.exp_neg, ← Real.exp_log (norm_pos_iff.mpr hne), ← Real.exp_add]
+      congr 1
+      have hlog_eq : Real.log ‖y.val v‖ = infiniteIdeleLog F y v / (v.mult : ℝ) := by
+        change Real.log ‖y.val v‖ = ((v.mult : ℝ) * Real.log ‖y.val v‖) / (v.mult : ℝ)
+        rw [mul_div_cancel_left₀ _ InfinitePlace.mult_coe_ne_zero]
+      have htl : (t - l').val v = infiniteIdeleLog F y v - T / (r : ℝ) - l'.val v := rfl
+      rw [hlog_eq, htl]
+      ring
+    exact (Real.exp_le_exp.mpr hexp_ge).trans
+      (hcoord.symm.le.trans (infiniteStandardThetaAverage_norm_le_mixed _ v))
+  constructor
+  · -- Part 1: Log bound for ALL y : I∞
+    let A₀ : ℝ := SchwartzMap.seminorm ℂ 0 0 G
+    let A₁ : ℝ := SchwartzMap.seminorm ℂ 1 0 G
+    have hA₀ : 0 ≤ A₀ := apply_nonneg _ _
+    have hA₁ : 0 ≤ A₁ := apply_nonneg _ _
+    obtain ⟨Cs, hCs, hshell⟩ := infiniteStandardThetaAverage_radial_shell_bound μH hα
+    let C : ℝ := (c : ℝ) * μU.real Set.univ * (Cs * (A₀ + A₁)) + 1
+    refine ⟨C, by positivity, fun y ↦ ?_⟩
+    let T : ℝ := Real.log ((infiniteIdeleNorm F y).val : ℝ)
+    let R : ℝ := max 0 (-T)
+    have hR : 0 ≤ R := le_max_left _ _
+    obtain ⟨hB_int, hB_bound⟩ := hshell A₀ A₁ R hA₀ hA₁ hR
+    have hpt : ∀ u l',
+        ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val)‖ ≤
+          (if ‖l'‖ < R then A₀ else A₁ * Real.exp (-α * (‖l'‖ - R))) := by
+      intro u l'
+      split_ifs with hlt
+      · simpa only [pow_zero, mul_one] using hdecay 0 _
+      · have hge : R ≤ ‖l'‖ := not_lt.mp hlt
+        have hnonneg : 0 ≤ ‖l'‖ + T := by linarith [le_max_right (0 : ℝ) (-T)]
+        have harch := harch_shifted y u l' hnonneg
+        have hdec1 := hdecay 1 ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val
+        rw [pow_one] at hdec1
+        have hle1 : ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val)‖ ≤
+            A₁ * Real.exp (-α * (‖l'‖ + T)) := by
+          have hmul := (mul_le_mul_of_nonneg_left harch (norm_nonneg _)).trans hdec1
+          have hdiv := (le_div_iff₀ (Real.exp_pos _)).mpr hmul
+          rwa [div_eq_mul_inv, ← Real.exp_neg, ← neg_mul] at hdiv
+        refine hle1.trans (mul_le_mul_of_nonneg_left (Real.exp_le_exp.mpr ?_) hA₁)
+        have hTR : -T ≤ R := le_max_right _ _
+        nlinarith
+    have hR_le : R ≤ |T| := max_le (abs_nonneg T) (neg_le_abs T)
+    calc
+      (∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+          ∂sNormOneIdeleTamagawaMeasure F ∅)
+          ≤ (c : ℝ) * μU.real Set.univ *
+              ∫ l', (if ‖l'‖ < R then A₀ else A₁ * Real.exp (-α * (‖l'‖ - R))) ∂μH :=
+            hshift_le y _ hB_int hpt
+      _ ≤ (c : ℝ) * μU.real Set.univ * (Cs * (A₀ + A₁) * (1 + R) ^ Module.finrank ℝ _) :=
+          mul_le_mul_of_nonneg_left hB_bound (by positivity)
+      _ ≤ (c : ℝ) * μU.real Set.univ * (Cs * (A₀ + A₁) * (1 + |T|) ^ (r - 1)) := by
+          rw [hfinrank]
+          gcongr
+      _ ≤ C * (1 + |T|) ^ (r - 1) := by
+          have hpow1 : (1 : ℝ) ≤ (1 + |T|) ^ (r - 1) := one_le_pow₀ (by linarith [abs_nonneg T])
+          dsimp [C]
+          have hmul_assoc : (c : ℝ) * μU.real Set.univ * (Cs * (A₀ + A₁) * (1 + |T|) ^ (r - 1)) =
+              ((c : ℝ) * μU.real Set.univ * (Cs * (A₀ + A₁))) * (1 + |T|) ^ (r - 1) := by ring
+          rw [hmul_assoc]
+          linarith
+  · -- Part 2: Large-norm super-exponential decay for ‖y‖ ≥ 1
+    intro N
+    let k : ℕ := max 1 (2 * r * N)
+    have hk_pos : (0 : ℝ) < (k : ℝ) := by
+      exact_mod_cast (lt_of_lt_of_le Nat.zero_lt_one (le_max_left 1 (2 * r * N)))
+    have hk_ge : (N : ℝ) ≤ (k : ℝ) * α := by
+      dsimp [α]
+      have hk2 : (2 * r * N : ℝ) ≤ (k : ℝ) := by exact_mod_cast le_max_right 1 (2 * r * N)
+      have h2r : (0 : ℝ) < 2 * (r : ℝ) := by positivity
+      calc
+        (N : ℝ) = (2 * (r : ℝ) * (N : ℝ)) * (2 * (r : ℝ))⁻¹ := by field_simp [h2r.ne']
+        _ ≤ (k : ℝ) * (2 * (r : ℝ))⁻¹ := mul_le_mul_of_nonneg_right hk2 (by positivity)
+    let Ak : ℝ := SchwartzMap.seminorm ℂ k 0 G
+    have hAk : 0 ≤ Ak := apply_nonneg _ _
+    obtain ⟨_, _, hshell⟩ := infiniteStandardThetaAverage_radial_shell_bound μH (mul_pos hk_pos hα)
+    obtain ⟨hB0_int, _⟩ := hshell 0 1 0 le_rfl zero_le_one le_rfl
+    have hI_int : Integrable (fun l' ↦ Real.exp (-((k : ℝ) * α) * ‖l'‖)) μH :=
+      hB0_int.congr (Eventually.of_forall fun l' ↦ by simp)
+    let Ival : ℝ := ∫ l', Real.exp (-((k : ℝ) * α) * ‖l'‖) ∂μH
+    have hI_nonneg : 0 ≤ Ival := integral_nonneg fun _ ↦ Real.exp_nonneg _
+    let C : ℝ := (c : ℝ) * μU.real Set.univ * Ak * Ival + 1
+    refine ⟨C, by positivity, fun y hy ↦ ?_⟩
+    let T : ℝ := Real.log ((infiniteIdeleNorm F y).val : ℝ)
+    have hT : 0 ≤ T := Real.log_nonneg hy
+    have hB_int : Integrable (fun l' ↦
+        Ak * Real.exp (-((k : ℝ) * α) * T) * Real.exp (-((k : ℝ) * α) * ‖l'‖)) μH :=
+      hI_int.const_mul _
+    have hpt : ∀ u l',
+        ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val)‖ ≤
+          Ak * Real.exp (-((k : ℝ) * α) * T) * Real.exp (-((k : ℝ) * α) * ‖l'‖) := by
+      intro u l'
+      have harch := harch_shifted y u l' (add_nonneg (norm_nonneg l') hT)
+      have hpow : Real.exp ((k : ℝ) * (α * (‖l'‖ + T))) ≤
+          ‖InfiniteAdeleRing.ringEquiv_mixedSpace F
+            ((archPart((∅ : Finset V)) (e (u, tOf y - l')).val)⁻¹ * y).val‖ ^ k := by
+        rw [Real.exp_nat_mul]
+        exact pow_le_pow_left₀ (Real.exp_nonneg _) harch k
+      have hmul := (mul_le_mul_of_nonneg_left hpow (norm_nonneg _)).trans (hdecay k _)
+      have hdiv := (le_div_iff₀ (Real.exp_pos _)).mpr hmul
+      refine hdiv.trans_eq ?_
+      rw [div_eq_mul_inv, ← Real.exp_neg, mul_assoc, ← Real.exp_add]
+      congr 2
+      ring
+    have hmain := hshift_le y _ hB_int hpt
+    have hB_eq : (∫ l', Ak * Real.exp (-((k : ℝ) * α) * T) * Real.exp (-((k : ℝ) * α) * ‖l'‖) ∂μH) =
+        Ak * Real.exp (-((k : ℝ) * α) * T) * Ival :=
+      integral_const_mul _ _
+    rw [hB_eq] at hmain
+    have hexp_le : Real.exp (-((k : ℝ) * α) * T) ≤ Real.exp (-(N : ℝ) * T) :=
+      Real.exp_le_exp.mpr (by nlinarith)
+    calc
+      (∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+          ∂sNormOneIdeleTamagawaMeasure F ∅)
+          ≤ (c : ℝ) * μU.real Set.univ * (Ak * Real.exp (-((k : ℝ) * α) * T) * Ival) := hmain
+      _ = ((c : ℝ) * μU.real Set.univ * Ak * Ival) * Real.exp (-((k : ℝ) * α) * T) := by ring
+      _ ≤ ((c : ℝ) * μU.real Set.univ * Ak * Ival) * Real.exp (-(N : ℝ) * T) :=
+          mul_le_mul_of_nonneg_left hexp_le (by positivity)
+      _ ≤ C * Real.exp (-(N : ℝ) * T) := by
+          dsimp [C]
+          nlinarith [Real.exp_pos (-(N : ℝ) * T)]
+
+
 /-- Paper: (6.2.2.12), p. 302.
 Near norm zero, the archimedean operator grows at most as the logarithm to the
 power of the number of archimedean places minus one. -/
@@ -2225,7 +6924,100 @@ theorem infiniteStandardThetaAverage_logBound (χ : PontryaginDual Iₛ(S))
     ∃ C ε : ℝ, 0 < C ∧ 0 < ε ∧ ∀ x : I∞,
       ((infiniteIdeleNorm F x).val : ℝ) < ε →
       ‖infiniteStandardThetaAverage χ r f x‖ ≤
-        C * |Real.log (infiniteIdeleNorm F x).val| ^ (Fintype.card (InfinitePlace F) - 1) := by sorry
+        C * |Real.log (infiniteIdeleNorm F x).val| ^ (Fintype.card (InfinitePlace F) - 1) := by
+  obtain ⟨C₀, hC₀, hbound⟩ := (infiniteStandardThetaAverage_norm_bounds f).1
+  let d : ℕ := Fintype.card (InfinitePlace F) - 1
+  let ak (k : Fin (classNumber F)) : I∞ := archPart(S) (r k).val
+  let M : ℝ := ∑ k : Fin (classNumber F), |Real.log ((infiniteIdeleNorm F (ak k)).val : ℝ)|
+  have hM : 0 ≤ M := Finset.sum_nonneg fun _ _ ↦ abs_nonneg _
+  have hlog2 : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  let K : ℝ := (1 + M) / Real.log 2 + 1
+  have hK : 0 < K := by positivity
+  refine ⟨(classNumber F : ℝ) * C₀ * K ^ d + 1, 1 / 2, by positivity, by norm_num, fun x hx ↦ ?_⟩
+  have hx_pos : 0 < ((infiniteIdeleNorm F x).val : ℝ) :=
+    NNReal.coe_pos.mpr (Units.zero_lt (infiniteIdeleNorm F x))
+  have hlog_neg : Real.log ((infiniteIdeleNorm F x).val : ℝ) < -Real.log 2 := by
+    have hlt : Real.log ((infiniteIdeleNorm F x).val : ℝ) < Real.log (1 / 2) :=
+      Real.log_lt_log hx_pos hx
+    simpa [Real.log_div] using hlt
+  have habs_ge : Real.log 2 ≤ |Real.log ((infiniteIdeleNorm F x).val : ℝ)| := by
+    rw [abs_of_neg (by linarith)]
+    linarith
+  have hterm (k : Fin (classNumber F)) :
+      ‖∫ g : N∞,
+        let a := ak k * archPart((∅ : Finset V)) g.val
+        f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
+        ∂sNormOneIdeleTamagawaMeasure F ∅‖ ≤
+      C₀ * K ^ d * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d := by
+    let y : I∞ := (ak k)⁻¹ * x
+    have hrew (g : N∞) :
+        ((ak k * archPart((∅ : Finset V)) g.val)⁻¹ * x) =
+          (archPart((∅ : Finset V)) g.val)⁻¹ * y := by
+      dsimp [y]; rw [mul_inv_rev]; ac_rfl
+    have hnorm_int :
+        ‖∫ g : N∞,
+          let a := ak k * archPart((∅ : Finset V)) g.val
+          f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
+          ∂sNormOneIdeleTamagawaMeasure F ∅‖ ≤
+        ∫ g : N∞, ‖f (Multiplicative.ofAdd ((archPart((∅ : Finset V)) g.val)⁻¹ * y).val)‖
+          ∂sNormOneIdeleTamagawaMeasure F ∅ := by
+      refine (norm_integral_le_integral_norm _).trans_eq ?_
+      refine integral_congr_ae (Eventually.of_forall fun g ↦ ?_)
+      simp only [hrew g, norm_mul, Circle.norm_coe, mul_one]
+    have hlog_y : Real.log ((infiniteIdeleNorm F y).val : ℝ) =
+        Real.log ((infiniteIdeleNorm F x).val : ℝ) -
+          Real.log ((infiniteIdeleNorm F (ak k)).val : ℝ) := by
+      have ha_pos : 0 < ((infiniteIdeleNorm F (ak k)).val : ℝ) :=
+        NNReal.coe_pos.mpr (Units.zero_lt (infiniteIdeleNorm F (ak k)))
+      have hny : ((infiniteIdeleNorm F y).val : ℝ) =
+          ((infiniteIdeleNorm F x).val : ℝ) / ((infiniteIdeleNorm F (ak k)).val : ℝ) := by
+        dsimp [y]
+        rw [map_mul, map_inv, Units.val_mul, Units.val_inv_eq_inv_val, NNReal.coe_mul,
+          NNReal.coe_inv, mul_comm, div_eq_mul_inv]
+      rw [hny, Real.log_div hx_pos.ne' ha_pos.ne']
+    have hbase : 1 + |Real.log ((infiniteIdeleNorm F y).val : ℝ)| ≤
+        K * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| := by
+      have hMk : |Real.log ((infiniteIdeleNorm F (ak k)).val : ℝ)| ≤ M :=
+        Finset.single_le_sum (f := fun j : Fin (classNumber F) ↦
+          |Real.log ((infiniteIdeleNorm F (ak j)).val : ℝ)|)
+          (fun _ _ ↦ abs_nonneg _) (Finset.mem_univ k)
+      have h1 : 1 + M ≤ ((1 + M) / Real.log 2) * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| := by
+        calc
+          1 + M = ((1 + M) / Real.log 2) * Real.log 2 := by field_simp [hlog2.ne']
+          _ ≤ _ := mul_le_mul_of_nonneg_left habs_ge (by positivity)
+      have htri : |Real.log ((infiniteIdeleNorm F y).val : ℝ)| ≤
+          |Real.log ((infiniteIdeleNorm F x).val : ℝ)| +
+            |Real.log ((infiniteIdeleNorm F (ak k)).val : ℝ)| := by
+        rw [hlog_y]
+        exact abs_sub _ _
+      dsimp [K]
+      linarith
+    calc
+      _ ≤ C₀ * (1 + |Real.log ((infiniteIdeleNorm F y).val : ℝ)|) ^ d :=
+          hnorm_int.trans (hbound y)
+      _ ≤ C₀ * (K * |Real.log ((infiniteIdeleNorm F x).val : ℝ)|) ^ d :=
+          mul_le_mul_of_nonneg_left
+            (pow_le_pow_left₀ (by positivity) hbase d) hC₀.le
+      _ = C₀ * K ^ d * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d := by
+          rw [mul_pow]; ring
+  rw [infiniteStandardThetaAverage_apply]
+  calc
+    ‖∑ k : Fin (classNumber F), ∫ g : N∞,
+        let a := archPart(S) (r k).val * archPart((∅ : Finset V)) g.val
+        f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
+        ∂sNormOneIdeleTamagawaMeasure F ∅‖
+        ≤ ∑ k : Fin (classNumber F), ‖∫ g : N∞,
+            let a := ak k * archPart((∅ : Finset V)) g.val
+            f (Multiplicative.ofAdd (a⁻¹ * x).val) * (χ (archInsert(S) a) : ℂ)
+            ∂sNormOneIdeleTamagawaMeasure F ∅‖ := norm_sum_le _ _
+    _ ≤ ∑ _k : Fin (classNumber F), C₀ * K ^ d * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d :=
+        Finset.sum_le_sum fun k _ ↦ hterm k
+    _ = (classNumber F : ℝ) * C₀ * K ^ d * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d := by
+        rw [Finset.sum_const, Finset.card_univ, Fintype.card_fin, nsmul_eq_mul]; ring
+    _ ≤ ((classNumber F : ℝ) * C₀ * K ^ d + 1) * |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d := by
+        have hpow_nonneg : 0 ≤ |Real.log ((infiniteIdeleNorm F x).val : ℝ)| ^ d :=
+          pow_nonneg (abs_nonneg _) d
+        linarith
 
 end StandardFunctions
 
