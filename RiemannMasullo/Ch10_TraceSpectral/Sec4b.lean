@@ -1225,7 +1225,9 @@ theorem spectralStripQuotientKernel_tendsto (_ha : 0 < a)
     (_hχ : IsSpectralBasepointChoice χ) (_he : ∀ z, (e z).1 = eχ z.val.1)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) :
     ∃ K, Tendsto (rectangle(χ, e)
-      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by sorry
+      (fun j ↦ (f j).comp (Aq(a, hα, hs₀(hs), φ))) x) atTop (𝓝 K) := by
+  exact spectralLineQuotientKernel_tendsto_of_traceCauchy (Aq(a, hα, hs₀(hs), φ)) x f e _ _
+    (spectralStripConvolution_traceCauchy (F := F) a χ _hχ hα hs φ eχ e _he x f _hb.1 _hb.2)
 
 /-- Paper: Theorem 10.4.3.5(2), pp. 472–473, equation (10.4.3.43).
 The printed ambient rectangles with convolution transposed onto the input

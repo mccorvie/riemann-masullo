@@ -3266,7 +3266,7 @@ theorem isNuclearTVS_projectiveTensor {F : Type w}
 
 /-- The local absolute summability criterion can be checked on finite families whose
 linear combinations with coefficients in the unit disk stay in one zero-neighborhood. -/
-private theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
+theorem isNuclearTVS_of_signedSum_bound [PolynormableSpace ℂ E] [T2Space E]
     (h : ∀ (q : Seminorm ℂ E), Continuous q →
       ∃ U ∈ 𝓝 (0 : E), ∃ C : ℝ, 0 ≤ C ∧ ∀ (n : ℕ) (x : Fin n → E),
         (∀ a : Fin n → ℂ, (∀ i, ‖a i‖ ≤ 1) → (∑ i, a i • x i) ∈ U) →
@@ -5089,7 +5089,7 @@ private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [
     ((isNuclearTVS_iff_localBanach_integral X).mp hX)
 
 /-- Nuclearity is invariant under continuous linear equivalence, across carrier universes. -/
-private theorem nuclear_of_equiv {X : Type u} {Y : Type w}
+theorem nuclear_of_equiv {X : Type u} {Y : Type w}
     [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
     [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ Y]
     (e : X ≃L[ℂ] Y) (hX : IsNuclearTVS.{v} X) : IsNuclearTVS.{v} Y := by
