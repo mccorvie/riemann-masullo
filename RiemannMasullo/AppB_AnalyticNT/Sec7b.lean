@@ -117,12 +117,12 @@ theorem summable_heckePrimePowerTailOscillationTerm (t₀ x t : ℝ) (hx : 2 < x
 the grouped logarithmic tail converges uniformly on compact sets away from
 the pole. The oscillatory terms give the displayed main term and the continuous
 error is bounded uniformly by `2 ε / log x`.
-Deviation: The cutoff threshold is chosen greater than two so that `log (M - 1)`
-is nonzero. -/
+Deviation: The formula holds for all sufficiently large real cutoffs. Partial summation
+uses only integer endpoints, including `M - 1`. The threshold exceeds two. -/
 theorem heckePrimePowerLogTail_normTwist (χ : U[F]) (t₀ : ℝ)
     (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀))
-    (K : Set ℝ) (hK : IsCompact K) (hpole : t₀ ∉ K) {b ε : ℝ} (hb : 0 < b) (hε : 0 < ε) :
-    ∃ x₀ : ℝ, 2 < x₀ ∧ ∀ x ≥ x₀, b ≤ |x - (round x : ℝ)| →
+    (K : Set ℝ) (hK : IsCompact K) (hpole : t₀ ∉ K) {ε : ℝ} (hε : 0 < ε) :
+    ∃ x₀ : ℝ, 2 < x₀ ∧ ∀ x ≥ x₀,
       TendstoUniformlyOn
         (fun N : ℕ ↦ fun t : ℝ ↦
           ∑ n ∈ Finset.range N, heckePrimePowerLogTailTerm χ x ⟨1, t⟩ n)

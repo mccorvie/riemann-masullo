@@ -20,12 +20,13 @@ local notation "halfPlane" => Complex.re ⁻¹' Ioi (1 : ℝ)
 /-- Paper: Paragraph after Equation (B.7.2.12), p. 650. At the pole ordinate
 the printed value of the normalized oscillatory term is minus one. -/
 def Printed.heckePrimePowerTailOscillation_at_pole : Prop :=
-  ∀ t₀ : ℝ, ∀ᶠ n : ℕ in atTop,
-    heckePrimePowerTailOscillation t₀ n ⟨1, t₀⟩ / (Real.log n : ℂ) = -1
+  ∀ (t₀ : ℝ) (n : ℕ), 2 ≤ n →
+    Tendsto (fun t : ℝ ↦ heckePrimePowerTailOscillation t₀ n ⟨1, t⟩ / (Real.log n : ℂ))
+      (𝓝[≠] t₀) (𝓝 (-1))
 
 /-- Paper: Paragraph after Equation (B.7.2.12), p. 650. With `t₀ = 0` and
-any integer `n ≥ 2`, the removable value at `s = 1` is `log n`, giving
-normalized value one for arbitrarily large `n`. -/
+`n = 2`, the quotient off the pole has limit `log 2` at `s = 1`, giving
+normalized value one. -/
 theorem Printed.heckePrimePowerTailOscillation_at_pole_false :
     ¬ Printed.heckePrimePowerTailOscillation_at_pole := by
   sorry
@@ -57,19 +58,25 @@ theorem Printed.reciprocalHeckeEulerProductBelow_mul_normTwist_false :
     ¬ Printed.reciprocalHeckeEulerProductBelow_mul_normTwist := by
   sorry
 
-/-- Paper: Equation (B.7.2.23), p. 653. This is the second equality of
-the printed chain in the claimed domain of absolute convergence. It subtracts
-`H_x` from the prime-power tail to obtain the log tail over primes of norm at least `x`. -/
+open Classical in
+/-- Paper: Equation (B.7.2.23), p. 653. On and to the right of the 1-line,
+excluding the pole of a pure norm character, the printed second equality
+subtracts `H_x` from the ordered prime-power tail. Its left side sums over
+primes in norm order, taking all positive powers at each prime. -/
 def Printed.heckePrimePowerLogTail_sub_correction : Prop :=
-  ∀ (F : Type*) [Field F] [NumberField F] (χ : U[F]) (x : ℕ), 1 < x → ∀ (s : halfPlane),
-    (∑' a : {a : V[F] × ℕ // x ≤ a.1.asIdeal.absNorm},
-      heckePrimePowerLogTerm χ a.val.1 a.val.2 s) =
-        heckePrimePowerLogTail χ x s - heckeEulerProductLogCorrection χ x s
+  ∀ (F : Type*) [Field F] [NumberField F] (χ : U[F]) (x : ℕ), 1 < x → ∀ s : ℂ, 1 ≤ s.re →
+    (∀ t₀ : ℝ, ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[F]) (-Complex.I * t₀) →
+      s ≠ ⟨1, t₀⟩) →
+    Summable (heckePrimePowerLogTailTerm χ x s) (SummationFilter.conditional ℕ) ∧
+      Tendsto (fun y : ℝ ↦
+        ∑ v ∈ heckePrimesBelow F y \ heckePrimesBelow F x,
+          ∑' k : ℕ, heckePrimePowerLogTerm χ v k s) atTop
+        (𝓝 (heckePrimePowerLogTail χ x s - heckeEulerProductLogCorrection χ x s))
 
-/-- Paper: Equation (B.7.2.23), p. 653. Over `ℚ` with the trivial
-character, take `x = 3` and `s = 2`. The log tail over primes of norm at
-least three omits the positive terms from powers of two. The grouped tail
-includes those terms, and subtracting `H₃` adds them a second time. -/
+/-- Paper: Equation (B.7.2.23), p. 653. Over `ℚ` take the trivial character,
+`x = 3`, and ordinate `2π / log 2` on the 1-line. The grouped tail includes
+all powers of two with exponent at least two, whose sum is `log 2 - 1/2 > 0`.
+The prime tail omits them and the printed subtraction counts them twice. -/
 theorem Printed.heckePrimePowerLogTail_sub_correction_false :
     ¬ Printed.heckePrimePowerLogTail_sub_correction := by
   sorry
