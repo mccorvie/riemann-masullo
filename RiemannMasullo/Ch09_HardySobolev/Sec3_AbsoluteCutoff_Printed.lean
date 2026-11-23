@@ -95,7 +95,7 @@ theorem Printed.modulatedAbsoluteCutoffOperator_injective_false :
     exact absurd (lt_of_le_of_lt h1 h2) (not_lt.mpr (mem_Ici.mp hge))
   apply hu
   apply hinj
-  rw [map_zero, modulatedAbsoluteCutoffOperator_eq_hardySobolevCutoff, hardySobolevCutoff]
+  rw [map_zero, modulatedAbsoluteCutoffOperator_eq_hardySobolevCutoff]
   refine Lp.ext ((MemLp.coeFn_toLp _).trans ?_)
   filter_upwards [indicatorConstLp_coeFn (p := 2) (hs := hS) (hμs := hfin) (c := (1 : ℂ)),
     Lp.coeFn_zero ℂ 2 ν] with x h2 h3
