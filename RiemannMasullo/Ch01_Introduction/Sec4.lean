@@ -389,7 +389,39 @@ theorem introTrace_logDeriv_extension_of_limit (τ : ℝ≥0ˣ →ₜ* C𝔽)
       (fun n z ↦ archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a)
       H atTop right(max a 1)) :
     EqOn H (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
-      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by sorry
+      if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by
+  classical
+  intro z hz
+  have hz₁ : 1 < z.re := (le_max_right a 1).trans_lt hz
+  have hp : (1 / 2 : ℂ).re < z.re := by norm_num; linarith
+  have hm : (-1 / 2 : ℂ).re < z.re := by norm_num; linarith
+  have hprime := (introTraceApprox_primeSum_tendsto χ h ρ _hA).tendsto_at
+    (a := z) (show 1 / 2 < z.re by linarith)
+  let P (n : ℕ) := if χ = 1 then introTraceMellin approx(h, ρ, n, z) (1 / 2) +
+    introTraceMellin approx(h, ρ, n, z) (-1 / 2) else 0
+  have he (n : ℕ) : archSum(χ, approx(h, ρ, n, z)) +
+      introTraceSpectralSum χ approx(h, ρ, n, z) a = P n - primeSum(χ, approx(h, ρ, n, z)) := by
+    obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat χ h ρ _hA n z
+    have hzero : approx(h, ρ, n, z) 1 = 0 :=
+      image_eq_zero_of_notMem_tsupport (fun hu ↦ lt_irrefl _ (introTraceApprox_support h ρ _hA n z hu))
+    have hsum := (introTrace_characterTrace τ _hτ χ _hχ _ hzero φ hφ a _ha).2.2.tsum_eq
+    change introTraceSpectralSum χ approx(h, ρ, n, z) a =
+      P n - archSum(χ, approx(h, ρ, n, z)) - primeSum(χ, approx(h, ρ, n, z)) at hsum
+    rw [hsum]
+    ring
+  have hpolar : Tendsto P atTop
+      (𝓝 (if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0)) := by
+    by_cases htriv : χ = 1
+    · simp only [P, ite_eq_left htriv]
+      have h₁ := (introTraceApprox_mellin_tendsto h ρ _hA (1 / 2)).tendsto_at hp
+      have h₂ := (introTraceApprox_mellin_tendsto h ρ _hA (-1 / 2)).tendsto_at hm
+      rw [(introTracePower_mellin z _ hp).2] at h₁
+      rw [(introTracePower_mellin z _ hm).2] at h₂
+      simpa [sub_neg_eq_add, neg_div, add_comm] using h₁.add h₂
+    · simp [P, htriv]
+  have hlim := _hlim.tendsto_at hz
+  simp_rw [he] at hlim
+  simpa only [sub_neg_eq_add, add_comm] using tendsto_nhds_unique hlim (hpolar.sub hprime)
 
 -- TODO(paper-gap): The reference to §5.1 on p. 29 (also p. 55) supplies no
 -- continuation argument. The corrected cutoff identity does not itself bound
