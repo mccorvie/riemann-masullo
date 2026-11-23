@@ -6,6 +6,14 @@ import Mathlib.SetTheory.Cardinal.Aleph
 import Mathlib.SetTheory.Cardinal.Cofinality.Club
 import Mathlib.SetTheory.Cardinal.Regular
 import Mathlib.SetTheory.Ordinal.Topology
+import Mathlib.Topology.ContinuousMap.LocallyConvex
+import Mathlib.Topology.InductiveDimension.Classes
+import Mathlib.Topology.Compactness.Lindelof
+import Mathlib.Data.Set.FiniteExhaustion
+import Mathlib.Topology.Algebra.Indicator
+import Mathlib.Topology.Algebra.UniformConvergence
+import Mathlib.Analysis.LocallyConvex.AbsConvexOpen
+import Mathlib.Analysis.RCLike.Lemmas
 
 /-! # Appendix C.2.3: printed claims on tensor operators, limits and bornological spaces -/
 
@@ -1097,11 +1105,656 @@ private theorem completedInductiveTensor_bornological_false_fromBad
   exact hbad <| completedInductiveTensor_bornological_false_transfer eC <|
     H E (ULift.{v} ℂ) hE hF
 
+open Filter
+
+section
+
+variable {X : Type*} [TopologicalSpace X]
+private def clopenNull (p : Seminorm ℂ C(X, ℂ)) (U : Set X) : Prop :=
+  ∀ f : C(X, ℂ), (∀ x ∉ U, f x = 0) → p f = 0
+
+private theorem clopenNull_mono {p : Seminorm ℂ C(X, ℂ)} {U V : Set X}
+    (h : clopenNull p V) (hUV : U ⊆ V) : clopenNull p U :=
+  fun f hf => h f (fun x hx => hf x (mt (@hUV x) hx))
+
+private theorem clopenNull_union {p : Seminorm ℂ C(X, ℂ)} {U V : Set X}
+    (hU : IsClopen U) (h1 : clopenNull p U) (h2 : clopenNull p V) :
+    clopenNull p (U ∪ V) := by
+  classical
+  intro f hf
+  let g : C(X, ℂ) := ⟨U.indicator f, hU.continuous_indicator f.continuous⟩
+  have hg : p g = 0 := h1 g fun x hx => indicator_of_notMem hx _
+  have hh : p (f - g) = 0 := by
+    apply h2
+    intro x hx
+    by_cases h : x ∈ U
+    · simp [g, h]
+    · simp [g, h, hf x (fun hUV => hUV.elim h hx)]
+  have hb := map_add_le_add p (f - g) g
+  simpa [hg, hh] using le_antisymm (by simpa [hg, hh] using hb) (apply_nonneg p f)
+
+private theorem clopenNull_fin {ι : Type*} (p : Seminorm ℂ C(X, ℂ)) (V : ι → Set X)
+    (s : Finset ι) (hV : ∀ i ∈ s, IsClopen (V i)) (hN : ∀ i ∈ s, clopenNull p (V i)) :
+    clopenNull p (⋃ i ∈ s, V i) := by
+  classical
+  induction s using Finset.induction_on with
+  | empty =>
+    simp only [Finset.notMem_empty, iUnion_of_empty, iUnion_empty]
+    intro f hf
+    have : f = 0 := ContinuousMap.ext fun x => hf x (notMem_empty x)
+    simp [this]
+  | insert a s ha ih =>
+    simp only [Finset.set_biUnion_insert]
+    exact clopenNull_union (hV _ (Finset.mem_insert_self ..)) (hN _ (Finset.mem_insert_self ..))
+      (ih (fun i hi => hV i (Finset.mem_insert_of_mem hi))
+        (fun i hi => hN i (Finset.mem_insert_of_mem hi)))
+
+private theorem seminorm_null_finite_complement [LindelofSpace X]
+    (p : Seminorm ℂ C(X, ℂ))
+    (hp : ∀ s : Set C(X, ℂ), IsVonNBounded ℂ s → BddAbove (p '' s))
+    (U : X → Set X) (hU : ∀ x, IsClopen (U x)) (hxU : ∀ x, x ∈ U x) :
+    ∃ a : Finset X, clopenNull p (⋃ x ∈ a, U x)ᶜ := by
+  classical
+  obtain ⟨t, ht, htU⟩ := countable_cover_nhds (fun x => (hU x).isOpen.mem_nhds (hxU x))
+  let e := ht.finiteExhaustion
+  let V (n : ℕ) := ⋃ x ∈ e n, U x
+  have hopen (n : ℕ) : IsOpen (V n) := isOpen_iUnion fun x => isOpen_iUnion fun _ => (hU x).isOpen
+  have hmono : Monotone V := fun n m hnm => iUnion₂_mono' fun x hx =>
+    ⟨x, (OrderHomClass.mono e hnm hx), Subset.rfl⟩
+  have hcov : ⋃ n, V n = univ := by
+    ext y
+    simp only [mem_iUnion, mem_univ, iff_true, V]
+    obtain ⟨x, hx, hy⟩ : ∃ x ∈ t, y ∈ U x := by simpa [← htU] using (mem_univ y)
+    obtain ⟨n, hn⟩ : ∃ n, x ∈ e n := by rwa [← mem_iUnion, e.iUnion_eq]
+    exact ⟨n, x, hn, hy⟩
+  by_contra! h
+  have hbad (n : ℕ) : ∃ f : C(X, ℂ), (∀ x ∈ V n, f x = 0) ∧ n < p f := by
+    have H := h ((e.finite n).toFinset)
+    simp only [Set.Finite.mem_toFinset, clopenNull, mem_compl_iff, not_not] at H
+    push Not at H
+    obtain ⟨g, hg, hpg⟩ := H
+    have hpos := lt_of_le_of_ne (apply_nonneg p g) (Ne.symm hpg)
+    let a : ℝ := (n + 1) / p g
+    have ha : 0 < a := div_pos (by positivity) hpos
+    refine ⟨(a : ℂ) • g, fun x hx => by simp [hg x hx], ?_⟩
+    rw [map_smul_eq_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos ha]
+    dsimp [a]
+    rw [div_mul_cancel₀ _ hpg]
+    linarith
+  choose f hf hpf using hbad
+  have hconv : Tendsto f atTop (𝓝 0) := by
+    apply ContinuousMap.tendsto_nhds_compactOpen.mpr
+    intro K hK W _ hW
+    obtain ⟨a, ha⟩ := hK.elim_finite_subcover V hopen (by rw [hcov]; exact subset_univ _)
+    filter_upwards [eventually_ge_atTop (a.sup id)] with n hn
+    intro x hx
+    obtain ⟨i, hi, hxi⟩ := mem_iUnion₂.mp (ha hx)
+    rw [hf n x (hmono (le_trans (Finset.le_sup (f := id) hi) hn) hxi)]
+    exact hW hx
+  obtain ⟨M, hM⟩ := hp _ (hconv.isVonNBounded_range ℂ)
+  obtain ⟨n, hn⟩ := exists_nat_gt M
+  exact ((hpf n).trans_le (hM ⟨f n, mem_range_self _, rfl⟩)).not_ge hn.le
+
+private def seminormSupport (p : Seminorm ℂ C(X, ℂ)) : Set X :=
+  {x | ∀ U : Set X, IsClopen U → x ∈ U → ¬ clopenNull p U}
+
+private theorem seminorm_support_finite [LindelofSpace X]
+    (p : Seminorm ℂ C(X, ℂ))
+    (hp : ∀ s : Set C(X, ℂ), IsVonNBounded ℂ s → BddAbove (p '' s))
+    (U : X → Set X) (hU : ∀ x ∈ seminormSupport p, IsClopen (U x) ∧ x ∈ U x) :
+    ∃ a : Finset X, (∀ x ∈ a, x ∈ seminormSupport p) ∧
+      clopenNull p (⋃ x ∈ a, U x)ᶜ ∧ seminormSupport p ⊆ ⋃ x ∈ a, U x := by
+  classical
+  have hloc (x : X) : ∃ V : Set X, IsClopen V ∧ x ∈ V ∧
+      (x ∈ seminormSupport p → V = U x) ∧ (x ∉ seminormSupport p → clopenNull p V) := by
+    by_cases h : x ∈ seminormSupport p
+    · exact ⟨U x, (hU x h).1, (hU x h).2, fun _ => rfl, fun hn => (hn h).elim⟩
+    · have h' := h
+      simp only [seminormSupport, mem_ofPred_eq, not_forall] at h'
+      obtain ⟨V, hV, hx, hnull⟩ := h'
+      exact ⟨V, hV, hx, fun hx => (h hx).elim, fun _ => not_not.mp hnull⟩
+  choose V hV hxV hVU hVN using hloc
+  obtain ⟨b, hb⟩ := seminorm_null_finite_complement p hp V hV hxV
+  let a := b.filter (· ∈ seminormSupport p)
+  let d := b.filter (· ∉ seminormSupport p)
+  have ha (x : X) (hx : x ∈ a) : x ∈ seminormSupport p := (Finset.mem_filter.mp hx).2
+  have hnull := clopenNull_fin p V d (fun x _ => hV x) (fun x hx => hVN x (Finset.mem_filter.mp hx).2)
+  have hbig := clopenNull_union (isClopen_biUnion_finset (fun x (_ : x ∈ b) => hV x)).compl hb hnull
+  have hcomp : clopenNull p (⋃ x ∈ a, U x)ᶜ := by
+    apply clopenNull_mono hbig
+    intro y hy
+    by_cases h : y ∈ ⋃ x ∈ b, V x
+    · obtain ⟨x, hx, hyx⟩ := mem_iUnion₂.mp h
+      have hx' : x ∉ seminormSupport p := by
+        intro hk
+        apply hy
+        exact mem_iUnion₂.mpr ⟨x, Finset.mem_filter.mpr ⟨hx, hk⟩, hVU x hk ▸ hyx⟩
+      exact Or.inr (mem_iUnion₂.mpr ⟨x, Finset.mem_filter.mpr ⟨hx, hx'⟩, hyx⟩)
+    · exact Or.inl h
+  refine ⟨a, ha, hcomp, fun y hy => ?_⟩
+  by_contra h
+  exact hy _ (isClopen_biUnion_finset (fun x hx => (hU x (ha x hx)).1)).compl h hcomp
+
+private theorem seminormSupport_compact [ZeroDimensionalSpace X] [LindelofSpace X]
+    (p : Seminorm ℂ C(X, ℂ))
+    (hp : ∀ s : Set C(X, ℂ), IsVonNBounded ℂ s → BddAbove (p '' s)) :
+    IsCompact (seminormSupport p) := by
+  classical
+  refine isCompact_of_finite_subcover fun {ι} W hW hcov => ?_
+  cases isEmpty_or_nonempty ι with
+  | inl hi => exact ⟨∅, by simpa using hcov⟩
+  | inr hi =>
+    have hchoice (x : X) : ∃ (i : ι) (U : Set X),
+        x ∈ seminormSupport p → IsClopen U ∧ x ∈ U ∧ U ⊆ W i := by
+      by_cases h : x ∈ seminormSupport p
+      · obtain ⟨i, hi⟩ := mem_iUnion.mp (hcov h)
+        obtain ⟨U, hU⟩ := exists_isClopen_mem_of_isOpen (hW i) hi
+        exact ⟨i, U, fun _ => hU⟩
+      · exact ⟨Classical.choice ‹Nonempty ι›, ∅, fun hx => (h hx).elim⟩
+    choose i U hU using hchoice
+    obtain ⟨a, ha, _, hca⟩ := seminorm_support_finite p hp U
+      (fun x hx => ⟨(hU x hx).1, (hU x hx).2.1⟩)
+    refine ⟨a.image i, fun y hy => ?_⟩
+    obtain ⟨x, hx, hyx⟩ := mem_iUnion₂.mp (hca hy)
+    exact mem_iUnion₂.mpr ⟨i x, Finset.mem_image_of_mem i hx, (hU x (ha x hx)).2.2 hyx⟩
+
+private theorem uniformUnitBall_bounded :
+    IsVonNBounded ℂ {f : C(X, ℂ) | ∀ x, ‖f x‖ ≤ 1} := by
+  apply isVonNBounded_of_smul_tendsto_zero (l := 𝓝[≠] (0 : ℂ)) (ε := id) self_mem_nhdsWithin
+  intro g hg
+  apply ContinuousMap.tendsto_nhds_compactOpen.mpr
+  intro K _ W hW hKW
+  rcases K.eq_empty_or_nonempty with rfl | ⟨x, hx⟩
+  · exact .of_forall fun _ => mapsTo_empty _ _
+  have hz : (0 : ℂ) ∈ W := hKW hx
+  obtain ⟨r, hr, hball⟩ := Metric.mem_nhds_iff.mp (hW.mem_nhds hz)
+  filter_upwards [mem_nhdsWithin_of_mem_nhds (Metric.ball_mem_nhds (0 : ℂ) hr)] with c hc
+  intro y _
+  apply hball
+  simp only [Metric.mem_ball, dist_zero_right] at hc ⊢
+  change ‖c * g c y‖ < r
+  exact (norm_mul_le _ _).trans_lt ((mul_le_of_le_one_right (norm_nonneg c) (hg c y)).trans_lt hc)
+
+/-- A seminorm on the compact-open space of a zero-dimensional Lindelöf domain, bounded on
+each von Neumann bounded set, is controlled by its compact support. -/
+private theorem bornological_continuousMap_zeroDimensional_lindelof (X : Type*) [TopologicalSpace X]
+    [ZeroDimensionalSpace X] [LindelofSpace X] : Printed.IsBornologicalTVS C(X, ℂ) := by
+  classical
+  intro p hp
+  obtain ⟨M, hM⟩ := hp _ (uniformUnitBall_bounded (X := X))
+  let K := seminormSupport p
+  have hK : IsCompact K := seminormSupport_compact p hp
+  apply p.continuous' (r := max M 0 + 1)
+  have hnh := ContinuousMap.eventually_mapsTo (f := (0 : C(X, ℂ))) hK
+    (Metric.isOpen_ball (x := (0 : ℂ)) (ε := 1)) (fun x _ => Metric.mem_ball_self zero_lt_one)
+  filter_upwards [hnh] with f hf
+  have hloc (x : X) : ∃ U : Set X, x ∈ K → IsClopen U ∧ x ∈ U ∧
+      U ⊆ f ⁻¹' Metric.ball (0 : ℂ) 1 := by
+    by_cases hx : x ∈ K
+    · obtain ⟨V, hV⟩ := exists_isClopen_mem_of_isOpen
+        (Metric.isOpen_ball.preimage f.continuous) (hf hx)
+      exact ⟨V, fun _ => hV⟩
+    · exact ⟨∅, fun h => (hx h).elim⟩
+  choose U hU using hloc
+  obtain ⟨a, ha, hnull, _⟩ := seminorm_support_finite p hp U
+      (fun x hx => ⟨(hU x hx).1, (hU x hx).2.1⟩)
+  let W := ⋃ x ∈ a, U x
+  have hW : IsClopen W := isClopen_biUnion_finset (fun x hx => (hU x (ha x hx)).1)
+  let g : C(X, ℂ) := ⟨W.indicator f, hW.continuous_indicator f.continuous⟩
+  have hg : ∀ x, ‖g x‖ ≤ 1 := by
+    intro x
+    by_cases hx : x ∈ W
+    · obtain ⟨y, hy, hxy⟩ := mem_iUnion₂.mp hx
+      have ht := (hU y (ha y hy)).2.2 hxy
+      simpa [g, hx, Metric.mem_ball] using (show ‖f x‖ ≤ 1 by simpa [Metric.mem_ball] using (le_of_lt (show dist (f x) 0 < 1 from ht)))
+    · simp [g, hx]
+  have hdiff : p (f - g) = 0 := hnull _ (fun x hx => by
+    have hx' : x ∈ W := not_not.mp hx
+    simp [g, hx'])
+  have hle : p f ≤ p g := by simpa [hdiff] using map_add_le_add p (f - g) g
+  rw [Seminorm.mem_closedBall_zero]
+  exact hle.trans ((hM ⟨g, hg, rfl⟩).trans ((le_max_left M 0).trans (le_of_lt (lt_add_one _))))
+
+end
+
+private def omegaOne : Ordinal.{0} := Ordinal.omega 1
+local notation "OmegaOne" => Iio omegaOne
+
+private theorem omegaOne_noMax : NoMaxOrder OmegaOne :=
+  (Cardinal.isSuccLimit_omega 1).isSuccPrelimit.noMaxOrder_Iio
+
+/-- The value on a final segment is uniquely specified. -/
+private theorem stationaryTail_unique {S : Set OmegaOne} (hS : IsStationary S)
+    {f : S → ℂ} {a b : OmegaOne} {c d : ℂ}
+    (hc : ∀ x : S, a < x.1 → f x = c)
+    (hd : ∀ x : S, b < x.1 → f x = d) : c = d := by
+  let := omegaOne_noMax
+  obtain ⟨y, hy⟩ := exists_gt (max a b)
+  obtain ⟨z, hz, he⟩ := hS.isCofinal y
+  exact (hc ⟨z, hz⟩ ((le_max_left a b).trans_lt (hy.trans_le he))).symm.trans
+    (hd ⟨z, hz⟩ ((le_max_right a b).trans_lt (hy.trans_le he)))
+
+private theorem stationaryTail_exists {S : Set OmegaOne} (hS : IsStationary S)
+    (f : C(S, ℂ)) : ∃ c : ℂ, ∃ b : OmegaOne, ∀ x : S, b < x.1 → f x = c := by
+  obtain ⟨b, c, hc⟩ := completedInductiveTensor_bornological_false_constantTail S hS f f.continuous
+  exact ⟨c, b, fun x hx ↦ hc x.1 x.2 hx⟩
+
+/-- Evaluation at the eventual constant value on a stationary set. -/
+private def stationaryTail {S : Set OmegaOne} (hS : IsStationary S) : C(S, ℂ) →ₗ[ℂ] ℂ where
+  toFun f := (stationaryTail_exists hS f).choose
+  map_add' f g := by
+    obtain ⟨a, ha⟩ := (stationaryTail_exists hS f).choose_spec
+    obtain ⟨b, hb⟩ := (stationaryTail_exists hS g).choose_spec
+    obtain ⟨c, hc⟩ := (stationaryTail_exists hS (f + g)).choose_spec
+    apply stationaryTail_unique hS hc (b := max a b)
+    intro x hx
+    change f x + g x = _
+    rw [ha x ((le_max_left a b).trans_lt hx), hb x ((le_max_right a b).trans_lt hx)]
+  map_smul' r f := by
+    obtain ⟨a, ha⟩ := (stationaryTail_exists hS f).choose_spec
+    obtain ⟨b, hb⟩ := (stationaryTail_exists hS (r • f)).choose_spec
+    apply stationaryTail_unique hS hb (b := a)
+    intro x hx
+    change r • f x = _
+    rw [ha x hx]
+    rfl
+
+private theorem stationaryTail_spec {S : Set OmegaOne} (hS : IsStationary S)
+    (f : C(S, ℂ)) : ∃ b : OmegaOne, ∀ x : S, b < x.1 → f x = stationaryTail hS f :=
+  (stationaryTail_exists hS f).choose_spec
+
+private theorem stationaryTail_bounded {S : Set OmegaOne} (hS : IsStationary S)
+    {B : Set C(S, ℂ)} (hB : IsVonNBounded ℂ B) :
+    BddAbove (((normSeminorm ℂ ℂ).comp (stationaryTail hS)) '' B) := by
+  classical
+  by_contra hb
+  have hlarge (n : ℕ) : ∃ f ∈ B, (n : ℝ) < ‖stationaryTail hS f‖ := by
+    by_contra hn
+    push Not at hn
+    exact hb ⟨n, by rintro _ ⟨f, hf, rfl⟩; exact hn f hf⟩
+  choose f hf hnorm using hlarge
+  choose b hb' using fun n ↦ stationaryTail_spec hS (f n)
+  have hsup : (⨆ n, (b n).1) < Ordinal.omega 1 :=
+    Ordinal.iSup_lt_omega_one fun n ↦ (b n).2
+  let := omegaOne_noMax
+  obtain ⟨y, hy⟩ := exists_gt (⟨_, hsup⟩ : OmegaOne)
+  obtain ⟨z, hz, he⟩ := hS.isCofinal y
+  let x : S := ⟨z, hz⟩
+  let ev : C(S, ℂ) →L[ℂ] ℂ :=
+    { toFun := fun g ↦ g x
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      cont := continuous_eval_const x }
+  obtain ⟨M, hM⟩ := (NormedSpace.isVonNBounded_iff' (𝕜 := ℂ)).mp (hB.image ev)
+  obtain ⟨n, hn⟩ := exists_nat_gt M
+  have hle : b n ≤ (⟨_, hsup⟩ : OmegaOne) :=
+    Ordinal.le_iSup (fun n ↦ (b n).1) n
+  have hx : b n < x.1 := hle.trans_lt (hy.trans_le he)
+  apply (hM (ev (f n)) ⟨f n, hf n, rfl⟩).not_gt
+  change M < ‖f n x‖
+  rw [hb' n x hx]
+  exact hn.trans (hnorm n)
+
+private theorem stationaryTail_discontinuous {S : Set OmegaOne} (hS : IsStationary S) :
+    ¬ Continuous ((normSeminorm ℂ ℂ).comp (stationaryTail hS) : C(S, ℂ) → ℝ) := by
+  classical
+  intro h
+  let p := (normSeminorm ℂ ℂ).comp (stationaryTail hS)
+  have hn : {f : C(S, ℂ) | p f < 1} ∈ 𝓝 (0 : C(S, ℂ)) :=
+    (isOpen_lt h continuous_const).mem_nhds (by change p 0 < 1; simp)
+  change _ ∈ 𝓝 (ContinuousMap.const S (0 : ℂ)) at hn
+  obtain ⟨⟨K, ε⟩, ⟨hK, hε⟩, hsub⟩ := Metric.nhds_basis_ball.nhds_continuousMapConst.mem_iff.mp hn
+  let := omegaOne_noMax
+  have : Nonempty OmegaOne := ⟨⟨0, lt_of_le_of_lt (bot_le : (⊥ : Ordinal) ≤ Ordinal.omega 0)
+    (Ordinal.omega_lt_omega.mpr zero_lt_one)⟩⟩
+  obtain ⟨b, hb⟩ := hK.bddAbove_image (f := (Subtype.val : S → OmegaOne)) continuous_subtype_val.continuousOn
+  let U : Set S := {x | b.1 < x.1.1}
+  have hval : Continuous (fun x : S ↦ x.1.1) := continuous_subtype_val.comp continuous_subtype_val
+  have hU : IsClopen U := by
+    change IsClopen ((fun x : S ↦ x.1.1) ⁻¹' Ioi b.1)
+    have hClosed : IsClosed (Ioi b.1) := by
+      rw [← compl_Iic]
+      exact SuccOrder.isOpen_Iic.isClosed_compl
+    exact ⟨hClosed.preimage hval, isOpen_Ioi.preimage hval⟩
+  let f : C(S, ℂ) := ⟨U.piecewise (fun _ ↦ 1) (fun _ ↦ 0),
+    Continuous.piecewise (by simp [hU.frontier_eq]) continuous_const continuous_const⟩
+  have hfx : ∀ x ∈ K, f x = 0 := by
+    intro x hx
+    have hxb : x.1 ≤ b := hb ⟨x, hx, rfl⟩
+    change U.piecewise (fun _ ↦ (1 : ℂ)) (fun _ ↦ 0) x = 0
+    exact piecewise_eq_of_notMem U _ _ ((not_lt_of_ge hxb) : x ∉ U)
+  have hf : p f < 1 := hsub (by
+    intro x hx
+    rw [hfx x hx]
+    exact Metric.mem_ball_self hε)
+  obtain ⟨a, ha⟩ := stationaryTail_spec hS f
+  have heq : stationaryTail hS f = 1 := stationaryTail_unique hS ha (b := b)
+    (fun x hx ↦ by
+      change U.piecewise (fun _ ↦ (1 : ℂ)) (fun _ ↦ 0) x = 1
+      exact piecewise_eq_of_mem U _ _ (show x ∈ U from hx))
+  change ‖stationaryTail hS f‖ < 1 at hf
+  simp [heq] at hf
+
+/-- A stationary subspace of the countable ordinals, with the first uncountable ordinal added. -/
+private def stationaryWithEndpoint (S : Set OmegaOne) : Set Ordinal.{0} :=
+  insert omegaOne (Subtype.val '' S)
+
+private def stationaryEndpoint (S : Set OmegaOne) : stationaryWithEndpoint S :=
+  ⟨omegaOne, mem_insert _ _⟩
+
+private def stationaryIncl (S : Set OmegaOne) : C(S, stationaryWithEndpoint S) :=
+  ⟨fun x ↦ ⟨x.1.1, mem_insert_of_mem _ ⟨x.1, x.2, rfl⟩⟩,
+    (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _⟩
+
+private theorem stationaryIncl_cases (S : Set OmegaOne) (x : stationaryWithEndpoint S) :
+    x = stationaryEndpoint S ∨ ∃ y : S, stationaryIncl S y = x := by
+  rcases x.2 with hx | ⟨y, hy, e⟩
+  · exact Or.inl (Subtype.ext hx)
+  · exact Or.inr ⟨⟨y, hy⟩, Subtype.ext e⟩
+
+/-- The initial intervals of ordinals are clopen. -/
+private theorem ordinal_isClopen_Iic (a : Ordinal.{0}) : IsClopen (Iic a) :=
+  ⟨isClosed_Iic, SuccOrder.isOpen_Iic⟩
+
+private theorem stationaryWithEndpoint_zeroDimensional (S : Set OmegaOne) :
+    ZeroDimensionalSpace (stationaryWithEndpoint S) := by
+  rw [zeroDimensionalSpace_iff_nhds_hasBasis_isClopen]
+  intro x
+  refine ⟨fun U ↦ ⟨fun hU ↦ ?_, ?_⟩⟩
+  · rw [mem_nhds_subtype] at hU
+    obtain ⟨V, hV, hsub⟩ := hU
+    by_cases hx : (x : Ordinal) = ⊥
+    · exact ⟨Subtype.val ⁻¹' ({⊥} : Set Ordinal),
+        ⟨⟨isClosed_singleton.preimage continuous_subtype_val,
+          SuccOrder.isOpen_singleton_bot.preimage continuous_subtype_val⟩, hx⟩,
+        fun y hy ↦ hsub (by simpa [show (y : Ordinal) = ⊥ from hy, hx]
+          using mem_of_mem_nhds hV)⟩
+    · obtain ⟨a, ha, hI⟩ := exists_Ioc_subset_of_mem_nhds hV ⟨⊥, bot_lt_iff_ne_bot.mpr hx⟩
+      have he : Ioc a (x : Ordinal) = (Iic (x : Ordinal)) \ Iic a := by
+        ext y
+        simp [and_comm]
+      have hcl : IsClopen (Ioc a (x : Ordinal)) :=
+        he ▸ (ordinal_isClopen_Iic _).diff (ordinal_isClopen_Iic _)
+      exact ⟨Subtype.val ⁻¹' Ioc a (x : Ordinal), ⟨hcl.preimage continuous_subtype_val,
+        ⟨ha, le_rfl⟩⟩, fun _ hy ↦ hsub (hI hy)⟩
+  · rintro ⟨V, ⟨hcl, hx⟩, hVU⟩
+    exact Filter.mem_of_superset (hcl.isOpen.mem_nhds hx) hVU
+
+private theorem omegaOne_pos : (⊥ : Ordinal) < omegaOne :=
+  lt_of_le_of_lt bot_le (Ordinal.omega_lt_omega.mpr zero_lt_one)
+
+/-- One member of an open cover covers a tail, and only countably many points precede it. -/
+private theorem stationaryWithEndpoint_lindelof (S : Set OmegaOne) :
+    LindelofSpace (stationaryWithEndpoint S) := by
+  refine ⟨isLindelof_of_countable_subcover fun U hU hcover ↦ ?_⟩
+  obtain ⟨i, hi⟩ := mem_iUnion.mp (hcover (mem_univ (stationaryEndpoint S)))
+  have hN := (hU i).mem_nhds hi
+  rw [mem_nhds_subtype] at hN
+  obtain ⟨V, hV, hsub⟩ := hN
+  have hV' : V ∈ 𝓝 omegaOne := hV
+  obtain ⟨a, ha, hI⟩ := exists_Ioc_subset_of_mem_nhds hV' ⟨⊥, omegaOne_pos⟩
+  have hcount : (Iic a).Countable := by
+    have ha' : Order.succ a < omegaOne := (Cardinal.isSuccLimit_omega 1).succ_lt ha
+    exact (Cardinal.countable_Iio_of_lt_omega_one ha').mono
+      (fun _ hb ↦ (show _ < Order.succ a from (lt_succ_of_le_of_not_isMax hb (not_isMax_of_lt ha))))
+  have hL : IsLindelof ((Subtype.val : stationaryWithEndpoint S → Ordinal) ⁻¹' Iic a) :=
+    (hcount.preimage (fun _ _ e ↦ Subtype.ext e)).isLindelof
+  obtain ⟨t, ht, htcover⟩ := hL.elim_countable_subcover U hU
+    (subset_univ _ |>.trans hcover)
+  refine ⟨insert i t, ht.insert _, fun x _ ↦ ?_⟩
+  by_cases hx : (x : Ordinal) ≤ a
+  · obtain ⟨j, hj, hxj⟩ := mem_iUnion₂.mp (htcover hx)
+    exact mem_iUnion₂.mpr ⟨j, mem_insert_of_mem _ hj, hxj⟩
+  · have hxle : (x : Ordinal) ≤ omegaOne := by
+      rcases x.2 with hx' | ⟨z, _, hz⟩
+      · exact le_of_eq hx'
+      · exact hz ▸ z.2.le
+    exact mem_iUnion₂.mpr ⟨i, mem_insert _ _, hsub (hI ⟨lt_of_not_ge hx, hxle⟩)⟩
+
+/-- A compact set in the space with the endpoint has bounded intersection with the countable
+ordinals, since a closed cofinal intersection would be a club contained in S. -/
+private theorem stationaryCompact_bounded (S : Set OmegaOne) (hSc : IsStationary Sᶜ)
+    {K : Set (stationaryWithEndpoint S)} (hK : IsCompact K) :
+    BddAbove ((Subtype.val : S → OmegaOne) '' ((stationaryIncl S) ⁻¹' K)) := by
+  let J : Set Ordinal := Subtype.val '' K
+  let T : Set OmegaOne := Subtype.val ⁻¹' J
+  have hJ : IsClosed J := (hK.image continuous_subtype_val).isClosed
+  have hsub : T ⊆ S := by
+    rintro x ⟨y, _, he⟩
+    rcases y.2 with e | ⟨z, hz, hz'⟩
+    · exact False.elim (x.2.ne (he.symm.trans e))
+    · exact (Subtype.ext (hz'.trans he) : z = x) ▸ hz
+  have hT : BddAbove T := by
+    by_contra hn
+    let := omegaOne_noMax
+    have hclub : IsClub T := by
+      refine ⟨?_, not_bddAbove_iff_isCofinal.mp hn⟩
+      intro U hUT hUne _ a ha
+      have ha' : IsLUB (Subtype.val '' U) (a : Ordinal) := by
+        refine ⟨?_, ?_⟩
+        · rintro _ ⟨z, hz, rfl⟩
+          exact ha.1 hz
+        · intro b hb
+          by_cases hba : b < omegaOne
+          · exact ha.2 (show (⟨b, hba⟩ : OmegaOne) ∈ upperBounds U from
+              fun z hz ↦ hb ⟨z, hz, rfl⟩)
+          · exact a.2.le.trans (le_of_not_gt hba)
+      have hmem := ha'.mem_closure (hUne.image Subtype.val)
+      exact closure_subset_iff_isClosed.mpr hJ (closure_mono (by
+        rintro _ ⟨z, hz, rfl⟩
+        exact hUT hz) hmem)
+    obtain ⟨x, hxSc, hxT⟩ := hSc hclub
+    exact hxSc (hsub hxT)
+  refine hT.mono ?_
+  rintro _ ⟨x, hx, rfl⟩
+  exact ⟨stationaryIncl S x, hx, rfl⟩
+
+private theorem firstCountable_omegaOne : FirstCountableTopology (Iio (Ordinal.omega (1 : Ordinal.{0}))) := by
+  constructor
+  intro x
+  have h : (𝓝 (x : Ordinal)).IsCountablyGenerated := by
+    by_cases hm : IsMin (x : Ordinal)
+    · rw [SuccOrder.nhds_of_isMin hm]
+      infer_instance
+    · exact HasCountableBasis.isCountablyGenerated
+        ⟨SuccOrder.hasBasis_nhds_Ioc_of_exists_lt (not_isMin_iff.mp hm),
+          Cardinal.countable_Iio_of_lt_omega_one x.2⟩
+  rw [nhds_subtype]
+  infer_instance
+
+private theorem firstCountable_omegaOne_subset (S : Set (Iio (Ordinal.omega (1 : Ordinal.{0})))) :
+    FirstCountableTopology S := by
+  let := firstCountable_omegaOne
+  infer_instance
+
+private theorem small_omegaOne_endpoint (S : Set (Iio (Ordinal.omega (1 : Ordinal.{0})))) :
+    Small.{u} ↥(insert (Ordinal.omega 1) (Subtype.val '' S) : Set Ordinal.{0}) := by
+  let X : Set Ordinal.{0} := insert (Ordinal.omega 1) (Subtype.val '' S)
+  have h : X ⊆ Iic (Ordinal.omega 1) := by
+    rintro z (rfl | ⟨w, _, rfl⟩)
+    · exact mem_Iic.mpr le_rfl
+    · exact mem_Iic.mpr (mem_Iio.mp w.2).le
+  let : Small.{0} X := small_subset h
+  exact small_of_injective (equivShrink.{0} X).injective
+private theorem stationaryIncl_inducing (S : Set OmegaOne) :
+    IsInducing (stationaryIncl S) := by
+  apply (IsInducing.of_comp_iff (f := stationaryIncl S) (g := Subtype.val) IsInducing.subtypeVal).mp
+  change IsInducing ((Subtype.val : OmegaOne → Ordinal) ∘ (Subtype.val : S → OmegaOne))
+  exact IsInducing.subtypeVal.comp IsInducing.subtypeVal
+
+/-- Restriction to the stationary set and evaluation at the endpoint. -/
+private def stationaryRestriction (S : Set OmegaOne) :
+    C(stationaryWithEndpoint S, ℂ) →L[ℂ] C(S, ℂ) × ℂ :=
+  (ContinuousMap.compCLM ℂ ℂ (stationaryIncl S)).prod
+    (ContinuousMap.evalCLM ℂ (stationaryEndpoint S))
+
+private theorem stationaryRestriction_inducing (S : Set OmegaOne) (hSc : IsStationary Sᶜ) :
+    IsInducing (stationaryRestriction S) := by
+  rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+  apply le_antisymm ((stationaryRestriction S).continuous.tendsto' _ _ (map_zero _)).le_comap
+  rw [Filter.le_def]
+  intro V hV
+  change V ∈ 𝓝 (ContinuousMap.const _ (0 : ℂ)) at hV
+  obtain ⟨⟨K, ε⟩, ⟨hK, hε⟩, hsub⟩ := Metric.nhds_basis_ball.nhds_continuousMapConst.mem_iff.mp hV
+  obtain ⟨b, hb⟩ := stationaryCompact_bounded S hSc hK
+  let L : Set S := stationaryIncl S ⁻¹' (K ∩ Subtype.val ⁻¹' Iic b.1)
+  have hkr : K ∩ (Subtype.val : stationaryWithEndpoint S → Ordinal) ⁻¹' Iic b.1 ⊆
+      range (stationaryIncl S) := by
+    intro x hx
+    rcases stationaryIncl_cases S x with rfl | ⟨y, rfl⟩
+    · exact False.elim ((show b.1 < omegaOne from b.2).not_ge (show omegaOne ≤ b.1 from hx.2))
+    · exact mem_range_self y
+  have hL : IsCompact L := (stationaryIncl_inducing S).isCompact_preimage'
+    (hK.inter_right (isClosed_Iic.preimage continuous_subtype_val)) hkr
+  let W : Set C(S, ℂ) := {f | MapsTo f L (Metric.ball 0 ε)}
+  have hW : W ∈ 𝓝 (0 : C(S, ℂ)) :=
+    Metric.nhds_basis_ball.nhds_continuousMapConst.mem_of_mem (i := (L, ε)) ⟨hL, hε⟩
+  have hp : W ×ˢ Metric.ball 0 ε ∈ 𝓝 (0 : C(S, ℂ) × ℂ) := by
+    change W ×ˢ Metric.ball 0 ε ∈ 𝓝 ((0 : C(S, ℂ)), (0 : ℂ))
+    rw [nhds_prod_eq]
+    exact Filter.prod_mem_prod hW (Metric.ball_mem_nhds _ hε)
+  refine Filter.mem_of_superset (Filter.preimage_mem_comap hp) fun f hf ↦ hsub ?_
+  intro x hx
+  rcases stationaryIncl_cases S x with rfl | ⟨y, rfl⟩
+  · exact hf.2
+  · have hy : y.1 ≤ b := hb ⟨y, hx, rfl⟩
+    exact hf.1 ⟨hx, hy⟩
+
+/-- Extend a function on an initial clopen interval by a constant on the complementary tail. -/
+private def stationaryExtend (S : Set OmegaOne) (b : OmegaOne) (f : C(S, ℂ)) (c : ℂ) :
+    C(stationaryWithEndpoint S, ℂ) := by
+  classical
+  let A : Set (stationaryWithEndpoint S) := Subtype.val ⁻¹' Iic b.1
+  have hA : IsClopen A := (ordinal_isClopen_Iic _).preimage continuous_subtype_val
+  let k (x : A) : S :=
+    ⟨⟨x.1.1, (show x.1.1 ≤ b.1 from x.2).trans_lt b.2⟩, by
+      rcases x.1.2 with e | ⟨z, hz, e⟩
+      · have hx : x.1.1 ≤ b.1 := x.2
+        rw [e] at hx
+        exact False.elim ((show b.1 < omegaOne from b.2).not_ge hx)
+      · have hz' : (⟨x.1.1, (show x.1.1 ≤ b.1 from x.2).trans_lt b.2⟩ : OmegaOne) = z :=
+          Subtype.ext e.symm
+        exact hz' ▸ hz⟩
+  have hk : Continuous k :=
+    ((continuous_subtype_val.comp continuous_subtype_val).subtype_mk _).subtype_mk _
+  let g (x : stationaryWithEndpoint S) := if h : x ∈ A then f (k ⟨x, h⟩) else c
+  have h₁ : ContinuousOn g A := by
+    rw [continuousOn_iff_continuous_domRestrict]
+    apply (f.continuous.comp hk).congr
+    intro x
+    change f (k x) = g x.1
+    simp [g, x.2]
+  have h₂ : ContinuousOn g Aᶜ :=
+    continuousOn_const.congr (fun _ hx ↦ dite_eq_right hx)
+  refine ⟨g, ?_⟩
+  simpa [continuousOn_univ] using h₁.union_of_isOpen h₂ hA.isOpen hA.isClosed.isOpen_compl
+
+private theorem stationaryExtend_endpoint (S : Set OmegaOne) (b : OmegaOne)
+    (f : C(S, ℂ)) (c : ℂ) : stationaryExtend S b f c (stationaryEndpoint S) = c := by
+  classical
+  unfold stationaryExtend
+  exact dite_eq_right ((show b.1 < omegaOne from b.2).not_ge)
+
+private theorem stationaryExtend_incl (S : Set OmegaOne) (b : OmegaOne)
+    (f : C(S, ℂ)) (c : ℂ) (x : S) (hx : x.1 ≤ b) :
+    stationaryExtend S b f c (stationaryIncl S x) = f x := by
+  classical
+  unfold stationaryExtend
+  exact dite_eq_left hx
+
+private theorem stationaryRestriction_dense (S : Set OmegaOne) :
+    DenseRange (stationaryRestriction S) := by
+  intro ⟨f, c⟩
+  have : Nonempty OmegaOne := ⟨⟨⊥, omegaOne_pos⟩⟩
+  have h₁ (K : Set S) (hK : IsCompact K) (U : Set ℂ) (_ : IsOpen U) (hU : MapsTo f K U) :
+      ∀ᶠ b : OmegaOne in Filter.atTop,
+        MapsTo (fun x ↦ stationaryExtend S b f c (stationaryIncl S x)) K U := by
+    obtain ⟨a, ha⟩ := hK.bddAbove_image (f := (Subtype.val : S → OmegaOne))
+      continuous_subtype_val.continuousOn
+    filter_upwards [Filter.eventually_ge_atTop a] with b hab x hx
+    change stationaryExtend S b f c (stationaryIncl S x) ∈ U
+    rw [stationaryExtend_incl S b f c x ((ha ⟨x, hx, rfl⟩).trans hab)]
+    exact hU hx
+  have ht₁ :
+      Filter.Tendsto (fun b : OmegaOne ↦ (stationaryRestriction S (stationaryExtend S b f c)).1)
+        Filter.atTop (𝓝 f) :=
+    ContinuousMap.tendsto_nhds_compactOpen.mpr h₁
+  have ht₂ :
+      Filter.Tendsto (fun b : OmegaOne ↦ (stationaryRestriction S (stationaryExtend S b f c)).2)
+        Filter.atTop (𝓝 c) := by
+    convert (tendsto_const_nhds : Filter.Tendsto (fun _ : OmegaOne ↦ c) Filter.atTop (𝓝 c))
+      using 2
+    exact stationaryExtend_endpoint S _ f c
+  exact mem_closure_of_tendsto (ht₁.prodMk_nhds ht₂) (.of_forall fun b ↦
+    mem_range_self (stationaryExtend S b f c))
+
+/-- A dense linear uniform embedding into a Hausdorff complete space exhibits a completion. -/
+private theorem completionEquivOfDenseInducing
+    {E F : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E]
+    [UniformContinuousConstSMul ℂ E] [AddCommGroup F] [Module ℂ F] [UniformSpace F]
+    [IsUniformAddGroup F] [UniformContinuousConstSMul ℂ F] [T2Space F] [CompleteSpace F]
+    (f : E →L[ℂ] F) (hi : IsInducing f) (hd : DenseRange f) :
+    Nonempty (Completion E ≃L[ℂ] F) := by
+  have hu : IsUniformInducing f := AddMonoidHom.isUniformInducing_of_isInducing hi
+  have he : IsUniformInducing f.fromCompletion :=
+    Completion.isUniformInducing_extension hu
+  have hd' : DenseRange f.fromCompletion := hd.mono (by
+    rintro _ ⟨x, rfl⟩
+    exact ⟨(x : Completion E), f.fromCompletion_apply_coe x⟩)
+  have hs : Surjective f.fromCompletion :=
+    range_eq_univ.mp (he.isComplete_range.isClosed.closure_eq ▸ hd'.closure_range)
+  let e := LinearEquiv.ofBijective f.fromCompletion.toLinearMap ⟨he.isInducing.injective, hs⟩
+  exact ⟨{e with continuous_toFun := f.fromCompletion.continuous
+                 continuous_invFun := he.isInducing.continuous_iff.mpr
+                   (continuous_id.congr fun x ↦ (e.apply_symm_apply x).symm) }⟩
+
+/-- The eventual-value seminorm, pulled back by the first projection, obstructs bornologicity
+of the product with the endpoint coordinate. -/
+private theorem stationaryProduct_not_bornological (S : Set OmegaOne) (hS : IsStationary S) :
+    ¬ Printed.IsBornologicalTVS (C(S, ℂ) × ℂ) := by
+  intro h
+  let p := (normSeminorm ℂ ℂ).comp (stationaryTail hS)
+  let fst := ContinuousLinearMap.fst ℂ C(S, ℂ) ℂ
+  have hcont : Continuous (p.comp fst.toLinearMap) := h _ (fun B hB ↦ by
+    obtain ⟨M, hM⟩ := stationaryTail_bounded hS (hB.image fst)
+    refine ⟨M, ?_⟩
+    rintro _ ⟨x, hx, rfl⟩
+    exact hM ⟨fst x, ⟨x, hx, rfl⟩, rfl⟩)
+  have hcomp := hcont.comp (continuous_id.prodMk (continuous_const (y := (0 : ℂ))))
+  exact stationaryTail_discontinuous hS hcomp
+
+/-- A homeomorphism of the domains identifies their spaces of continuous functions. -/
+private def continuousMapEquivOfHomeomorph {X Y : Type*} [TopologicalSpace X]
+    [TopologicalSpace Y] (e : X ≃ₜ Y) : C(Y, ℂ) ≃L[ℂ] C(X, ℂ) :=
+  ContinuousLinearEquiv.equivOfInverse
+    (ContinuousMap.compCLM ℂ ℂ ⟨e, e.continuous⟩)
+    (ContinuousMap.compCLM ℂ ℂ ⟨e.symm, e.symm.continuous⟩)
+    (fun f ↦ ContinuousMap.ext fun x ↦ congrArg f (e.apply_symm_apply x))
+    (fun f ↦ ContinuousMap.ext fun x ↦ congrArg f (e.symm_apply_apply x))
+
+
+/-- The compact-convergence uniformity is compatible with pointwise addition. -/
+private theorem compactConvergence_isUniformAddGroup (X : Type*) [TopologicalSpace X] :
+    IsUniformAddGroup C(X, ℂ) := by
+  let i : C(X, ℂ) →+ UniformOnFun X ℂ {K | IsCompact K} :=
+    { toFun := ContinuousMap.toUniformOnFunIsCompact
+      map_zero' := rfl
+      map_add' := fun _ _ ↦ rfl }
+  exact IsUniformInducing.isUniformAddGroup i (show IsUniformInducing ContinuousMap.toUniformOnFunIsCompact from
+      ContinuousMap.isUniformEmbedding_toUniformOnFunIsCompact.isUniformInducing)
+
+open scoped ComplexOrder in
+private theorem continuousMap_polynormable (X : Type*) [TopologicalSpace X] :
+    PolynormableSpace ℂ C(X, ℂ) := by
+  let : LocallyConvexSpace ℂ ℂ := LocallyConvexSpace.ofBasisZero ℂ ℂ _ _
+    Metric.nhds_basis_ball (fun r _ ↦
+      convex_RCLike_iff_convex_real.mpr (convex_ball (0 : ℂ) r))
+  infer_instance
+
 /-- A Hausdorff polynormable complex space that is bornological, with a right-uniform
-completion that is not. The pressing-down step is
-`completedInductiveTensor_bornological_false_constantTail`. What remains is Nachbin–Shirota
-for `C(S ∪ {ω₁}, ℂ)` under compact convergence, and that the eventual-value seminorm on the
-completion is bounded on von Neumann bounded sets and discontinuous. -/
+completion that is not. The space is the compact-open space of functions on a stationary
+subset with the endpoint adjoined. The eventual-value seminorm obstructs bornologicity
+of its completion. -/
 private theorem completedInductiveTensor_bornological_false_badCompletion :
     ∃ (E : Type u) (hA : AddCommGroup E) (hM : Module ℂ E) (hT : TopologicalSpace E)
       (hP : PolynormableSpace ℂ E) (h2 : T2Space E),
@@ -1114,15 +1767,55 @@ private theorem completedInductiveTensor_bornological_false_badCompletion :
       letI : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
       letI : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
       Printed.IsBornologicalTVS E ∧ ¬ Printed.IsBornologicalTVS (Completion E) := by
-  sorry
+  obtain ⟨S, hS, hSc⟩ := completedInductiveTensor_bornological_false_split
+  let X := stationaryWithEndpoint S
+  let : Small.{u} X := small_omegaOne_endpoint S
+  let Y := Shrink.{u} X
+  let e₀ : Y ≃ X := (equivShrink X).symm
+  let : TopologicalSpace Y := TopologicalSpace.induced e₀ inferInstance
+  let e : Y ≃ₜ X :=
+    { e₀ with
+      continuous_toFun := continuous_induced_dom
+      continuous_invFun := continuous_induced_rng.mpr <|
+        (continuous_id (X := X)).congr fun x ↦ (e₀.apply_symm_apply x).symm }
+  let E := C(Y, ℂ)
+  let hA : AddCommGroup E := inferInstanceAs (AddCommGroup C(Y, ℂ))
+  let hM : Module ℂ E := inferInstanceAs (Module ℂ C(Y, ℂ))
+  let hT : TopologicalSpace E := inferInstanceAs (TopologicalSpace C(Y, ℂ))
+  let hP : PolynormableSpace ℂ E := continuousMap_polynormable Y
+  let h2 : T2Space E := inferInstanceAs (T2Space C(Y, ℂ))
+  refine ⟨E, hA, hM, hT, hP, h2, ?_⟩
+  let : ZeroDimensionalSpace X := stationaryWithEndpoint_zeroDimensional S
+  let : LindelofSpace X := stationaryWithEndpoint_lindelof S
+  let eL : C(X, ℂ) ≃L[ℂ] E := continuousMapEquivOfHomeomorph e
+  have hE := completedInductiveTensor_bornological_false_transfer eL
+    (bornological_continuousMap_zeroDimensional_lindelof X)
+  refine ⟨hE, ?_⟩
+  let : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : FirstCountableTopology S := firstCountable_omegaOne_subset S
+  let R := stationaryRestriction S
+  let f : E →L[ℂ] C(S, ℂ) × ℂ := R.comp eL.symm.toContinuousLinearMap
+  have hi : IsInducing f := (stationaryRestriction_inducing S hSc).comp
+    eL.symm.toHomeomorph.isInducing
+  have hd : DenseRange f := (stationaryRestriction_dense S).mono (by
+    rintro _ ⟨g, rfl⟩
+    exact ⟨eL g, congrArg R (eL.symm_apply_apply g)⟩)
+  let : IsUniformAddGroup C(S, ℂ) := compactConvergence_isUniformAddGroup S
+  let : UniformContinuousConstSMul ℂ C(S, ℂ) := uniformContinuousConstSMul_of_continuousConstSMul _ _
+  obtain ⟨F⟩ := completionEquivOfDenseInducing f hi hd
+  intro h
+  exact stationaryProduct_not_bornological S hS
+    (completedInductiveTensor_bornological_false_transfer F h)
 
 end completedInductiveTensor_bornological_false_aux
 
 /-- Paper: Proposition C.2.3.13(3), p. 683. Let S be stationary in ω₁ with stationary
 complement and let X = S ∪ {ω₁} have the subspace topology from ω₁ + 1. Take E = C(X, ℂ)
-with compact convergence and F = ℂ. The Lindelöf space X is realcompact, so E is
-bornological by the Nachbin–Shirota theorem. Its completion is C(S, ℂ) × ℂ with
-compact convergence on S. Each continuous function on S is eventually constant.
+with compact convergence and F = ℂ. The space X is zero-dimensional and Lindelöf,
+so every seminorm bounded on bounded sets is controlled by a compact support. Its completion
+is C(S, ℂ) × ℂ with compact convergence on S. Each continuous function on S is eventually constant.
 The norm of its eventual value is a seminorm bounded on bounded sets, since countably
 many stabilization ordinals have a countable supremum. It is discontinuous, since
 one can set the function to zero on any prescribed compact set and to one on a tail. -/

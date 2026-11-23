@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
+import all RiemannMasullo.Ch09_HardySobolev.Sec3
+import all RiemannMasullo.AppD_SchwartzBruhat.Sec1a
 public import RiemannMasullo.Ch12_TraceGeometric.Sec1a
 public import Mathlib.Topology.Algebra.Module.Spaces.PointwiseConvergenceCLM
 import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
@@ -368,17 +370,280 @@ def Printed.singletonDecay_approximation_isotype_band : Prop :=
       (ContinuousLinearMap.id ℂ W : W →Lₚₜ[ℂ] W) ∈
         closure (range (fun i : ℕ × PontryaginDual K ↦ (A (φ i.1 i.2) : W →Lₚₜ[ℂ] W)))
 
-/-- Paper: Lemma 9.3.2.1(2)–(4), pp. 422–424. Take G = ℝ_{>0} × ℤ/3 with
-module the first projection, product Haar measure, and b = s = 0. Use the
-convolution from `existsUnique_schwartzBruhat_zeroLineAction`. For either
-nontrivial ω, the left-isotype condition puts the Fourier support over ω⁻¹.
-The printed band is over ω, which is distinct, so those kernels must vanish.
-The remaining trivial-channel kernels kill vectors in the two nontrivial
-isotypes. For example, take a nonzero smooth compact radial profile times a
-nontrivial character of ℤ/3. Strong closure still kills that vector. -/
+/-- A left-isotypic Schwartz kernel in the printed Fourier band vanishes when the character value is not its inverse. -/
+private theorem singletonDecay_approximation_isotype_band_false_fourier_zero
+    (G : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ)
+    (ω : PontryaginDual m.toMonoidHom.ker) (χ : PontryaginDual G)
+    (hχ : ∀ k : m.toMonoidHom.ker, χ k.val = ω k)
+    (k : m.toMonoidHom.ker) (hk : (ω k) ^ 2 ≠ 1)
+    (f : SchwartzBruhat G) (hf : ∀ x, f (k.val⁻¹ * x) = (ω k : ℂ) * f x)
+    (a b : ℝ) (hband : tsupport (lcaFourier μ f) ⊆ modulatedFrequencyBand m χ a b) :
+    f = 0 := by
+  have hz (γ : PontryaginDual G) : lcaFourier μ f γ = 0 := by
+    by_contra hne
+    obtain ⟨t, ht, hγ⟩ := hband (subset_tsupport _ (mem_support.mpr hne))
+    have hγk : γ k.val = ω k := by
+      simpa only [show m k.val = 1 from k.property, Units.val_one, NNReal.coe_one,
+        Real.log_one, mul_zero, Circle.exp_zero, mul_one, hχ] using hγ k.val
+    have hscale : lcaFourier μ (fun x ↦ (ω k : ℂ) * f x) γ =
+        (ω k : ℂ) * lcaFourier μ f γ := by
+      unfold lcaFourier
+      rw [← integral_const_mul]
+      congr 1
+      funext x
+      ring
+    have hh := lcaFourier_translate μ (f : G → ℂ) k.val⁻¹ γ
+    rw [funext hf, hscale, map_inv, hγk, Circle.coe_inv] at hh
+    have heq : (ω k : ℂ) = (ω k : ℂ)⁻¹ := mul_right_cancel₀ hne hh
+    apply hk
+    apply Subtype.ext
+    change (ω k : ℂ) ^ 2 = 1
+    have hωne : (ω k : ℂ) ≠ 0 := fun h ↦ by simpa [h] using Circle.norm_coe (ω k)
+    calc
+      (ω k : ℂ) ^ 2 = (ω k : ℂ)⁻¹ * (ω k : ℂ) := by simpa only [pow_two] using congrArg (fun z : ℂ ↦ z * (ω k : ℂ)) heq
+      _ = 1 := inv_mul_cancel₀ hωne
+  have hae := ae_eq_zero_of_lcaFourier_eq_zero μ (SchwartzBruhat.integrable μ f) hz
+  have heq : (f : G → ℂ) = 0 :=
+    Measure.eq_of_ae_eq hae (schwartzBruhat_continuous f) continuous_const
+  exact Subtype.ext heq
+/-- Pettis convolution by a kernel of one isotype kills a vector of a different isotype. -/
+private theorem singletonDecay_approximation_isotype_band_false_convolution_zero
+    (G E : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure]
+    [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    (ρ : G →* (E →L[ℂ] E)) (k : G) (c d : ℂ) (hcd : c ≠ d)
+    (f : G → ℂ) (hf : ∀ g, f (k⁻¹ * g) = c * f g)
+    (u a : E) (hu : ρ k u = d • u)
+    (ha : HasPettisIntegral (.positive μ) (fun g ↦ f g • ρ g u) a) : a = 0 := by
+  have hz (δ : StrongDual ℂ E) : δ a = 0 := by
+    have he : δ (ρ k a) = ∫ g, δ (ρ k (f g • ρ g u)) ∂μ :=
+      eval_pettis_positive μ ha (δ.comp (ρ k))
+    have hl : δ (ρ k a) = c * δ a := by
+      rw [he, ← integral_mul_left_eq_self (μ := μ) (fun g ↦ δ (ρ k (f g • ρ g u))) k⁻¹]
+      calc
+        (∫ g, δ (ρ k (f (k⁻¹ * g) • ρ (k⁻¹ * g) u)) ∂μ) = ∫ g, c * δ (f g • ρ g u) ∂μ := by
+          apply integral_congr_ae
+          filter_upwards with g
+          have hv : ρ k (ρ (k⁻¹ * g) u) = ρ g u := by
+            rw [← mul_apply_eq_comp, ← map_mul, mul_inv_cancel_left]
+          rw [map_smul, hv, hf, map_smul, map_smul, smul_eq_mul]
+          ring
+        _ = c * δ a := by rw [integral_const_mul, ← eval_pettis_positive μ ha δ]
+    have hr : δ (ρ k a) = d * δ a := by
+      rw [he]
+      calc
+        (∫ g, δ (ρ k (f g • ρ g u)) ∂μ) = ∫ g, d * δ (f g • ρ g u) ∂μ := by
+          apply integral_congr_ae
+          filter_upwards with g
+          have hv : ρ k (ρ g u) = d • ρ g u := by
+            rw [← mul_apply_eq_comp, ← map_mul, mul_comm k g, map_mul,
+              mul_apply_eq_comp, hu, map_smul]
+          rw [map_smul, hv, smul_smul, map_smul, map_smul, smul_eq_mul]
+          ring
+        _ = d * δ a := by rw [integral_const_mul, ← eval_pettis_positive μ ha δ]
+    exact (mul_eq_mul_right_iff.mp (hl.symm.trans hr)).resolve_left hcd
+  apply ext_inner_left ℂ
+  intro z
+  simpa only [innerSL_apply_apply, inner_zero_right] using hz (innerSL ℂ z)
+/-- The printed kernel conditions cannot strongly approximate the identity on a nonzero mismatched eigenspace. -/
+private theorem singletonDecay_approximation_isotype_band_false_strong_obstruction
+    (G E : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ)
+    [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+    (T : G →* (E →L[ℂ] E)) (A : SchwartzBruhat G →L[ℂ] (E →L[ℂ] E))
+    (hA : ∀ f u, HasPettisIntegral (.positive μ) (fun g ↦ f.val g • T g u) (A f u))
+    (χ : PontryaginDual m.toMonoidHom.ker → PontryaginDual G)
+    (hχ : ∀ ω k, χ ω k.val = ω k) (k : m.toMonoidHom.ker)
+    (z : Circle) (hz : z ^ 2 ≠ 1) (u : E) (hu : u ≠ 0) (heigen : T k.val u = (z : ℂ) • u)
+    (φ : ℕ → PontryaginDual m.toMonoidHom.ker → SchwartzBruhat G)
+    (hφ : ∀ n ω x, φ n ω (k.val⁻¹ * x) = (ω k : ℂ) * φ n ω x)
+    (hband : ∀ n ω, tsupport (lcaFourier μ (φ n ω)) ⊆ modulatedFrequencyBand m (χ ω) (-(n : ℝ)) n) :
+    (ContinuousLinearMap.id ℂ E : E →Lₚₜ[ℂ] E) ∉
+      @closure (E →Lₚₜ[ℂ] E) inferInstance (range (fun i : ℕ × PontryaginDual m.toMonoidHom.ker ↦ (A (φ i.1 i.2) : E →Lₚₜ[ℂ] E))) := by
+  have hkill (n : ℕ) (ω : PontryaginDual m.toMonoidHom.ker) : A (φ n ω) u = 0 := by
+    by_cases he : (ω k : ℂ) = (z : ℂ)
+    · have hw : (ω k) ^ 2 ≠ 1 := by simpa only [show ω k = z from Subtype.ext he] using hz
+      have hf := singletonDecay_approximation_isotype_band_false_fourier_zero G μ m ω (χ ω) (hχ ω) k hw (φ n ω) (hφ n ω) _ _ (hband n ω)
+      rw [hf, map_zero, ContinuousLinearMap.zero_apply]
+    · exact singletonDecay_approximation_isotype_band_false_convolution_zero G E μ T k (ω k : ℂ) (z : ℂ) he
+        (φ n ω) (hφ n ω) u (A (φ n ω) u) heigen (hA (φ n ω) u)
+  have hc : IsClosed {B : E →Lₚₜ[ℂ] E | B u = 0} := isClosed_eq (PointwiseConvergenceCLM.evalCLM (σ := RingHom.id ℂ) (E := E) (F := E) u).continuous continuous_const
+  have hs : @closure (E →Lₚₜ[ℂ] E) inferInstance (range (fun i : ℕ × PontryaginDual m.toMonoidHom.ker ↦
+      (A (φ i.1 i.2) : E →Lₚₜ[ℂ] E))) ⊆ {B : E →Lₚₜ[ℂ] E | B u = 0} := by
+    apply closure_minimal _ hc
+    rintro B ⟨⟨n, ω⟩, rfl⟩
+    exact hkill n ω
+  intro hid
+  have hh := hs (a := (ContinuousLinearMap.id ℂ E : E →Lₚₜ[ℂ] E)) hid
+  exact hu hh
+/-- A proper modulus has a compact positive-mass log band invariant under its kernel. -/
+private theorem singletonDecay_approximation_isotype_band_false_band
+    (G : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (hm : IsProperMap m) :
+    ∃ A : Set G, MeasurableSet A ∧ μ A ≠ 0 ∧ μ A ≠ ⊤ ∧
+      ∀ k : G, m k = 1 → ∀ x : G, (k⁻¹ * x ∈ A ↔ x ∈ A) := by
+  let e : ℝ≥0ˣ ≃ₜ ℝ := (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
+  have he (t : ℝ≥0ˣ) : e t = Real.log (t.val : ℝ) := (Real.log_of_pos (NNReal.coe_pos.mpr t.zero_lt)).symm
+  let l : G → ℝ := fun x ↦ Real.log ((m x).val : ℝ)
+  let A : Set G := l ⁻¹' Icc (-1) 1
+  have hl : Continuous l := by simpa [l, Function.comp_def, he] using e.continuous.comp m.continuous
+  have hcompact : IsCompact A := by
+    have hh := (e.isProperMap.comp hm).isCompact_preimage (isCompact_Icc (a := (-1 : ℝ)) (b := 1))
+    simpa only [Function.comp_def, he] using hh
+  have hA : MeasurableSet A := hcompact.measurableSet
+  have hmass : μ A ≠ 0 := by
+    have hU : IsOpen (l ⁻¹' Ioo (-1) 1) := isOpen_Ioo.preimage hl
+    have hnonempty : (l ⁻¹' Ioo (-1) 1).Nonempty := ⟨1, by simp [l]⟩
+    intro hzero
+    exact hU.measure_ne_zero μ hnonempty (measure_mono_null (preimage_mono Ioo_subset_Icc_self) hzero)
+  refine ⟨A, hA, hmass, hcompact.measure_lt_top.ne, ?_⟩
+  intro k hk x
+  simp only [A, l, mem_preimage, map_mul, map_inv, hk, inv_one, one_mul]
+/-- A unitary character gives a nonzero weighted-free L² eigenvector for kernel translations. -/
+private theorem singletonDecay_approximation_isotype_band_false_eigenvector
+    (G : Type*) [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G] [MeasurableSpace G] [BorelSpace G]
+    (μ : Measure G) [μ.IsHaarMeasure] (m : G →ₜ* ℝ≥0ˣ) (hm : IsProperMap m)
+    (ξ : PontryaginDual G) (k : G) (hk : m k = 1)
+    (T : G →* (Lp ℂ 2 μ →L[ℂ] Lp ℂ 2 μ))
+    (hT : ∀ g u, (T g u : G → ℂ) =ᵐ[μ] fun x ↦ u (g⁻¹ * x)) :
+    ∃ u : Lp ℂ 2 μ, u ≠ 0 ∧ T k u = (ξ k : ℂ) • u := by
+  classical
+  obtain ⟨A, hA, hpos, hfinite, hinv⟩ := singletonDecay_approximation_isotype_band_false_band G μ m hm
+  have hξ : MemLp (fun x ↦ star (ξ x : ℂ)) ⊤ μ :=
+    memLp_top_of_bound (((continuous_subtype_val : Continuous (fun z : Circle ↦ (z : ℂ))).comp ξ.continuous).star).measurable.aestronglyMeasurable 1
+      (.of_forall fun x ↦ by simp)
+  have hI : MemLp (A.indicator (fun _ ↦ (1 : ℂ))) 2 μ :=
+    memLp_indicator_const 2 hA.nullMeasurableSet 1 (Or.inr hfinite)
+  let f (x : G) := star (ξ x : ℂ) * A.indicator (fun _ ↦ (1 : ℂ)) x
+  have hf : MemLp f 2 μ := hξ.mul hI
+  let u : Lp ℂ 2 μ := hf.toLp f
+  have hu : (u : G → ℂ) =ᵐ[μ] f := MemLp.coeFn_toLp hf
+  have hune : u ≠ 0 := by
+    intro hz
+    have hz' : f =ᵐ[μ] 0 := hu.symm.trans (hz ▸ Lp.coeFn_zero ℂ 2 μ)
+    have hnot : ∀ᵐ x ∂μ, x ∉ A := by
+      filter_upwards [hz'] with x hx
+      intro hmem
+      have hh := congrArg norm hx
+      simp only [f, indicator_of_mem hmem, mul_one, norm_star, Circle.norm_coe, Pi.zero_apply, norm_zero] at hh
+      norm_num at hh
+    exact hpos (by simpa only [ae_iff, not_not, setOf_mem_eq] using hnot)
+  refine ⟨u, hune, ?_⟩
+  have hpoint (x : G) : f (k⁻¹ * x) = (ξ k : ℂ) * f x := by
+    have he : A.indicator (fun _ ↦ (1 : ℂ)) (k⁻¹ * x) = A.indicator (fun _ ↦ (1 : ℂ)) x := by
+      simp only [indicator_apply, hinv k hk x]
+    dsimp only [f]
+    rw [he, map_mul, map_inv, Circle.coe_mul, Circle.coe_inv_eq_conj, star_mul,
+      Complex.star_def, Complex.conj_conj]
+    ring
+  apply Lp.ext
+  filter_upwards [hT k u, (measurePreserving_mul_left μ k⁻¹).quasiMeasurePreserving.ae_eq_comp hu,
+    hu, Lp.coeFn_smul (ξ k : ℂ) u] with x hx hraw hux hscalar
+  change u (k⁻¹ * x) = f (k⁻¹ * x) at hraw
+  rw [hx, hraw, hpoint, hscalar]
+  change (ξ k : ℂ) * f x = (ξ k : ℂ) * u x
+  rw [hux]
+
+/-- Paper: Lemma 9.3.2.1(2)–(4), pp. 422–424. Take the positive reals times
+Circle, module the first projection, Haar measure, and b = s = 0. At an element
+with circle coordinate i, the printed Fourier band forces a kernel with
+character value i to vanish. Kernels with other character values kill a nonzero
+L² vector in the i-eigenspace. Their strong closure therefore excludes the
+identity. The proof also transports the operator-norm closure inferred by the
+current statement to pointwise closure; neither closure contains the identity. -/
 theorem Printed.singletonDecay_approximation_isotype_band_false :
     ¬ Printed.singletonDecay_approximation_isotype_band := by
-  sorry
+  classical
+  intro hall
+  letI : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  letI : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  letI : MeasurableSpace Circle := borel _
+  letI : BorelSpace Circle := ⟨rfl⟩
+  letI : SecondCountableTopology Circle := inferInstanceAs (SecondCountableTopology (Metric.sphere (0 : ℂ) 1))
+  let G := ℝ≥0ˣ × Circle
+  let m : G →ₜ* ℝ≥0ˣ := ⟨MonoidHom.fst _ _, continuous_fst⟩
+  have hm : IsModulation m := by
+    refine ⟨isProperMap_fst_of_compactSpace, ⟨(Units.mk0 2 (by norm_num), 1), ?_⟩⟩
+    intro he
+    have hh := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) he
+    change (2 : ℝ) = 1 at hh
+    norm_num at hh
+  have hsur : Surjective m := fun t ↦ ⟨(t, 1), rfl⟩
+  let μ : Measure G := Measure.haar
+  let q : G →ₜ* m.toMonoidHom.ker :=
+    { toFun := fun x ↦ ⟨(1, x.2), rfl⟩
+      map_one' := Subtype.ext rfl
+      map_mul' := fun _ _ ↦ Subtype.ext (Prod.ext (one_mul 1).symm rfl)
+      continuous_toFun := (continuous_const.prodMk continuous_snd).subtype_mk _ }
+  let χ (ω : PontryaginDual m.toMonoidHom.ker) : PontryaginDual G := ω.comp q
+  have hχ (ω : PontryaginDual m.toMonoidHom.ker) (k : m.toMonoidHom.ker) : χ ω k.val = ω k := by
+    apply congrArg ω
+    apply Subtype.ext
+    exact Prod.ext k.property.symm rfl
+  let z : Circle := ⟨Complex.I, by exact mem_sphere_zero_iff_norm.mpr Complex.norm_I⟩
+  have hz : z ^ 2 ≠ 1 := by
+    intro he
+    have hh := congrArg (fun t : Circle ↦ (t : ℂ)) he
+    rw [Circle.coe_pow, Circle.coe_one] at hh
+    change Complex.I ^ 2 = 1 at hh
+    norm_num [Complex.I_sq] at hh
+  let k : m.toMonoidHom.ker := ⟨(1, z), rfl⟩
+  let ξ : PontryaginDual G := ⟨MonoidHom.snd _ _, continuous_snd⟩
+  let ν : Measure G := μ.withDensity (fun x ↦ ENNReal.ofReal
+    (intervalSobolevDensity 0 0 0 (Real.log ((m x).val : ℝ))))
+  have hν : ν = μ := by simp [ν, intervalSobolevDensity]
+  letI : ν.IsHaarMeasure := by rw [hν]; infer_instance
+  let T : G →* (Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) := by
+    with_unfolding_all exact hardySobolevTranslation μ m 0 0 0 le_rfl le_rfl
+  have hT (g : G) (u : Lp ℂ 2 ν) : (T g u : G → ℂ) =ᵐ[ν] fun x ↦ u (g⁻¹ * x) := by
+    with_unfolding_all
+      exact (withDensity_absolutelyContinuous μ _).ae_eq
+        (hardySobolevTranslation_apply μ m 0 0 0 le_rfl le_rfl g u)
+  obtain ⟨u, hu, heigen⟩ := singletonDecay_approximation_isotype_band_false_eigenvector G ν m hm.1 ξ k.val k.property T hT
+  have heigen' : T k.val u = (z : ℂ) • u := heigen
+  have hAct : ∃ A : SchwartzBruhat G →L[ℂ] (Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν),
+      ∀ f u, HasPettisIntegral (.positive μ) (fun g ↦ f.val g • T g u) (A f u) := by
+    with_unfolding_all exact (existsUnique_schwartzBruhat_zeroLineAction μ m 0 le_rfl).exists
+  obtain ⟨A, hA⟩ := hAct
+  have hExt (d : BruhatCompactSupport G) (f : SchwartzBruhat G) (hf : f.val = d.val) :
+      A f = hardySobolevTestAction μ m 0 0 0 le_rfl le_rfl d := by
+    apply ContinuousLinearMap.ext
+    intro v
+    have ha := hA f v
+    rw [hf] at ha
+    apply ha.unique
+    have hd : HasPettisIntegral (.positive μ) (fun g ↦ d.val g • T g v)
+        (hardySobolevTestAction μ m 0 0 0 le_rfl le_rfl d v) := by
+      with_unfolding_all
+        exact bruhatRegularizedAction_apply μ
+          (hardySobolevTranslation μ m 0 0 0 le_rfl le_rfl)
+          (exists_hardySobolevTranslation μ m 0 0 0 le_rfl le_rfl).choose_spec.2 d v
+    exact hd
+  obtain ⟨φ, htwist, hiso, hband, hclosure⟩ := hall G μ m hm hsur 0 0 le_rfl χ hχ A hExt
+  have hpointwise : (ContinuousLinearMap.id ℂ (Lp ℂ 2 ν) : (Lp ℂ 2 ν) →Lₚₜ[ℂ] (Lp ℂ 2 ν)) ∈
+      @closure ((Lp ℂ 2 ν) →Lₚₜ[ℂ] (Lp ℂ 2 ν)) inferInstance
+        (range (fun i : ℕ × PontryaginDual m.toMonoidHom.ker ↦ (A (φ i.1 i.2) : (Lp ℂ 2 ν) →Lₚₜ[ℂ] (Lp ℂ 2 ν)))) := by
+    let J := ContinuousLinearMap.toPointwiseConvergenceCLM ℂ (RingHom.id ℂ) (Lp ℂ 2 ν) (Lp ℂ 2 ν)
+    have hh := mem_closure_image J.continuous.continuousAt hclosure
+    have hid : J (ContinuousLinearMap.id ℂ (CompactIntervalSobolev μ (fun x ↦ Real.log ((m x).val : ℝ)) 0 0 0)) =
+        (ContinuousLinearMap.id ℂ (Lp ℂ 2 ν) : (Lp ℂ 2 ν) →Lₚₜ[ℂ] (Lp ℂ 2 ν)) := by
+      ext v
+      rfl
+    rw [hid] at hh
+    have hset : J '' range (fun i : ℕ × PontryaginDual m.toMonoidHom.ker ↦ A (φ i.1 i.2)) =
+        range (fun i : ℕ × PontryaginDual m.toMonoidHom.ker ↦ (A (φ i.1 i.2) : (Lp ℂ 2 ν) →Lₚₜ[ℂ] (Lp ℂ 2 ν))) := by
+      rw [← Set.range_comp]
+      congr 1
+    rw [hset] at hh
+    exact hh
+  exact singletonDecay_approximation_isotype_band_false_strong_obstruction G (Lp ℂ 2 ν) μ m T A hA χ hχ k z hz u hu heigen' φ
+    (fun n ω x ↦ hiso n ω k x) (fun n ω ↦ by simpa only [modulationWeight_zero] using hband n ω) hpointwise
 
 /-- Paper: Theorem 9.3.2.6, (9.3.2.10), p. 426. As the cutoff height grows,
 the orthogonal projections onto the common kernels of all indicated Mellin

@@ -4,7 +4,9 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 public import RiemannMasullo.Ch06_LocalGlobal.Sec2
 
+import Mathlib.Analysis.Complex.AbsMax
 import Mathlib.Analysis.LocallyConvex.StrongTopology
+import Mathlib.Tactic.TFAE
 import RiemannMasullo.ForMathlib.Topology.Algebra.Module.OpenMapping
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec4
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
@@ -16,7 +18,9 @@ import all RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import RiemannMasullo.Ch06_LocalGlobal.Sec3
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1a
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Pow.Complex
 
 /-!
 # §7.2 Poles of the S-idelic zeta functions
@@ -733,7 +737,9 @@ theorem sLocalThetaPoleBound_isClosed (ω : PontryaginDual J₁) (m : Xₛ → �
       fun hx c hc hp k hk ↦ hx ⟨(c, k), hc, hp, hk⟩⟩
   exact (congrArg IsClosed h).mpr (isClosed_iInter fun i ↦ (T i).isClosed_ker)
 
-private theorem sLocalThetaPoleBound_annihilator_of_kernels {E : Type*} [AddCommGroup E]
+/-- In a Hausdorff polynormable Montel space, the annihilator of the common kernel
+of a family of functionals is their closed linear span in the strong dual. -/
+theorem strongDual_annihilator_eq_closedSpan_of_kernels {E : Type*} [AddCommGroup E]
     [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
     [T2Space E] [PolynormableSpace ℂ E] [MontelSpace ℂ E] (P : Submodule ℂ E)
     (A : Set (StrongDual ℂ E)) (hP : ∀ x : E, x ∈ P ↔ ∀ T ∈ A, T x = 0) :
@@ -773,7 +779,7 @@ theorem sLocalThetaPoleBound_annihilator (ω : PontryaginDual J₁) (m : Xₛ �
   let : T2Space (Θₛ(ω)) := hN.1
   let : PolynormableSpace ℂ (Θₛ(ω)) := hN.2.1
   let : MontelSpace ℂ (Θₛ(ω)) := (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) ω).2
-  apply sLocalThetaPoleBound_annihilator_of_kernels
+  apply strongDual_annihilator_eq_closedSpan_of_kernels
   intro x
   rw [mem_sLocalThetaPoleBound_iff]
   constructor
@@ -2348,20 +2354,1109 @@ local notation "localChart(" χ ", " h ")" =>
   twistₛ (sIdeleRestriction F S ⟨globalUnitary(χ), h⟩)
 local notation "outsideS(" h₀ ", " hχ ")" => (fun v hv ↦ hχ v (fun hv₀ ↦ hv (h₀ hv₀)))
 
--- TODO(paper-gap): The exact zero orders in Proposition 7.2.2.1(2) and
--- Corollary 7.2.2.2(2) fail even for the zero test. The pole cutoffs give
--- lower bounds. The proof of Proposition 7.2.2.1 also uses a factorization
--- with missing outside Fourier factors. Division by the reciprocal partial
--- Hecke Euler product in (2) implies (4) can retain both simple Tate poles
--- (at the trivial and norm characters). The meromorphic range characterization
--- in §6.3.2.1 is globalConverse_normTwist_meromorphic_exact in Ch06_LocalGlobal.Sec3.
--- For the restricted image, globalPrincipalValueConverse_normTwist_divided_exact
--- in that module detects the original two polar evaluations after division.
--- The range pullback in (4) implies (3) uses the isomorphism of §6.2.1.1(2)
--- and the principal-value commutation of §5.3.1. In the corollary, insertion scales
--- evaluation of the Fourier transform at zero by the nonzero outside additive
--- mass. Together with the unchanged value at zero this identifies the polar
--- subspaces on the trivial component. The two evaluations kill nontrivial isotypes.
+-- ERRATA.md I223–I225 describe the corrections used below. Use Weil's
+-- insertion identity for the orders, the meromorphic converse for the global
+-- range, and the isomorphism of §6.2.1.1(2) for the local range pullback.
+
+local notation "chartₛ(" η ")" => twistₛ ((circleToComplex).comp η)
+local notation "gChart(" χ ", " f ")" =>
+  (fun z : ℂ ↦ globalIdelicZFunction (f : ℬ𝔽) (ideleClassNormTwist χ z))
+
+/-- Selected top coefficients vanish exactly when the centered germ has the reduced pole bound. -/
+private theorem sLocalPrincipalValue_coeff_order (f : ℬₛ) (c : Xₛ) (n : ℕ) :
+    (∀ k : ℕ, sLocalRhoPoleOrder c - n < k → k ≤ sLocalRhoPoleOrder c →
+      sLocalPrincipalPartCoeff c k f = 0) ↔
+      (-(sLocalRhoPoleOrder c - n : ℕ) : ℤ) ≤
+        meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ c z)) 0 := by
+  let Z (z : ℂ) := sLocalIdelicZFunction f (twistₛ c z)
+  let m := sLocalRhoPoleOrder c
+  let d := m - n
+  have hmer : MeromorphicAt Z 0 := (sLocalZ_centered f c).1
+  have hm : (-(m : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt Z 0 :=
+    (sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans (sLocalZ_centered f c).2.1
+  constructor
+  · intro hz
+    change ((-(d : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt Z 0
+    by_contra! hbad
+    have hN : d < (-(meromorphicOrderAt Z 0).untop₀).toNat := by
+      cases h : meromorphicOrderAt Z 0 with
+      | top => simp [h] at hbad
+      | coe j =>
+        have h' : j < -(d : ℤ) := WithTop.coe_lt_coe.mp (h ▸ hbad)
+        rw [WithTop.untop₀_coe]
+        omega
+    let k := (-(meromorphicOrderAt Z 0).untop₀).toNat
+    have hk : k ≤ m := by
+      cases h : meromorphicOrderAt Z 0 with
+      | top => simp [k, h]
+      | coe j =>
+        have h' : -(m : ℤ) ≤ j := WithTop.coe_le_coe.mp (h ▸ hm)
+        simp only [k, h, WithTop.untop₀_coe]
+        omega
+    apply mem_sLocalThetaPoleBound_iff_leading hmer (show 0 < k from Nat.zero_lt_of_lt hN) rfl
+    exact hz k hN hk
+  · intro hz k hk _
+    apply sLocalPrincipalPartCoeff_ne_zero_imp_pole_vanish hmer k (Nat.zero_lt_of_lt hk)
+    cases h : meromorphicOrderAt Z 0 with
+    | top => simpa [h] using Nat.zero_lt_of_lt hk
+    | coe j =>
+      have hj : -(d : ℤ) ≤ j := WithTop.coe_le_coe.mp (h ▸ hz)
+      simp only [WithTop.untop₀_coe]
+      omega
+
+/-- The local restriction is a unitary base point, and its norm chart covers its component. -/
+private theorem sLocalPrincipalValue_chart (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) :
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S (globalNormOne(χ)) hω
+    ∃ η : PontryaginDual Jₛ,
+      (∀ z, localChart(χ, hS) z = chartₛ(η) z) ∧
+      (∀ z, onComponent(localChart(χ, hS) z, ωₛ)) ∧
+      (∀ c : Xₛ, onComponent(c, ωₛ) → ∃ z, localChart(χ, hS) z = c) := by
+  intro hω ωₛ
+  let c₀ := sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩
+  have hn (x : Jₛ) : ‖c₀ x‖ = 1 := by
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective x
+    rw [show c₀ (QuotientGroup.mk g) =
+      globalUnitary(χ) (QuotientGroup.mk (sIdeleInsertion F S g)) from sIdeleRestriction_mk F S _ g]
+    exact Circle.norm_coe _
+  let η : PontryaginDual Jₛ :=
+    { toFun := fun x ↦ ⟨c₀ x, mem_sphere_zero_iff_norm.mpr (hn x)⟩
+      map_one' := Subtype.ext (map_one c₀)
+      map_mul' x y := Subtype.ext (map_mul c₀ x y)
+      continuous_toFun := c₀.continuous.subtype_mk _ }
+  have hη : c₀ = (circleToComplex).comp η := ContinuousMonoidHom.ext fun _ ↦ rfl
+  have hrest (x : J₁) : c₀ x.val = (ωₛ x : ℂ) :=
+    (sLocalNormOneCharacter_eq_sIdeleRestriction (globalNormOne(χ))
+      ⟨globalUnitary(χ), hS⟩ (fun _ ↦ rfl) x).symm
+  refine ⟨η, fun z ↦ congrArg (fun c : Xₛ ↦ twistₛ c z) hη, ?_, ?_⟩
+  · intro z
+    apply ContinuousMonoidHom.ext
+    intro x
+    change c₀ x.val * ((((mₛ x.val).val : ℝ) : ℂ) ^ z) = (ωₛ x : ℂ)
+    rw [show mₛ x.val = 1 from x.property, Units.val_one, NNReal.coe_one,
+      Complex.ofReal_one, Complex.one_cpow, mul_one, hrest]
+  · intro c hc
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    obtain ⟨z, hz, -⟩ := existsUnique_complexPower (c.comp σ)
+    obtain ⟨w, hw, -⟩ := existsUnique_complexPower (c₀.comp σ)
+    refine ⟨z - w, ContinuousMonoidHom.ext fun g ↦ ?_⟩
+    let t := mₛ g
+    let k : J₁ := ⟨g / σ t, by change mₛ (g / σ t) = 1; rw [map_div, hσ]; exact div_self' _⟩
+    have hg : k.val * σ t = g := div_mul_cancel _ _
+    have hk : c k.val = c₀ k.val := (DFunLike.congr_fun hc k).trans (hrest k).symm
+    let N : ℂ := ((t.val : ℝ) : ℂ)
+    have hN : N ≠ 0 := Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr t.ne_zero)
+    have hval : c₀ (σ t) * N ^ (z - w) = c (σ t) := by
+      rw [show c₀ (σ t) = N ^ w from hw t, show c (σ t) = N ^ z from hz t,
+        ← Complex.cpow_add _ _ hN, show w + (z - w) = z by ring]
+    change c₀ g * N ^ (z - w) = c g
+    calc
+      c₀ g * N ^ (z - w) = c₀ k.val * (c₀ (σ t) * N ^ (z - w)) := by
+        rw [← mul_assoc, ← map_mul, hg]
+      _ = c g := by rw [hval, ← hk, ← map_mul, hg]
+
+
+private theorem sLocalPrincipalValue_euler_form (χ : PontryaginDual C𝔽) (v : Places) :
+    (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) = (1 : ℂ → ℂ) ∨
+    ∃ ℓ : ℝ, 0 < ℓ ∧ ∃ θ : ℝ,
+      (fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹) =
+        fun z ↦ 1 - Complex.exp (((-ℓ : ℝ) : ℂ) * z + (θ : ℂ) * Complex.I) := by
+  classical
+  by_cases hχ : (ideleClassNormTwist χ 0).IsUnramifiedAt v
+  · right
+    let hu := (Valued.v : Valuation (v.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+    let π : (v.adicCompletion F)ˣ := Units.mk0 hu.choose hu.choose_spec.ne_zero
+    obtain ⟨t, ⟨-, ht, -⟩, -⟩ :=
+      unramifiedHeckeCharacter_existsUnique_phase χ v hχ π hu.choose_spec
+    have hval := hχ.localValue_eq π.val hu.choose_spec
+    rw [HeckeCharacter.restrict, MulChar.ofUnitHom_coe] at hval
+    have ht' : (ideleClassNormTwist χ 0).localValue v =
+        (v.asIdeal.absNorm : ℂ) ^ (-(t : ℂ) * Complex.I) := hval.trans ht
+    have hq : (1 : ℝ) < v.asIdeal.absNorm := by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+    let ℓ := Real.log (v.asIdeal.absNorm : ℝ)
+    refine ⟨ℓ, Real.log_pos hq, -ℓ * t, funext fun z ↦ ?_⟩
+    rw [finiteHeckeEulerFactor_inv_eq_phase χ v hχ t ht']
+    rw [Complex.cpow_def_of_ne_zero (by exact_mod_cast (zero_lt_one.trans hq).ne')]
+    have hlog : Complex.log (v.asIdeal.absNorm : ℂ) = (ℓ : ℂ) := by
+      simpa only [ℓ, Complex.ofReal_natCast] using (Complex.ofReal_log (zero_lt_one.trans hq).le).symm
+    rw [hlog]
+    congr 2
+    push_cast
+    dsimp [ℓ]
+    ring
+  · left
+    funext z
+    rw [finiteHeckeEulerFactor, ite_eq_right hχ, inv_one]
+    rfl
+
+/-- Euler multipliers have simple roots on the imaginary axis and no other zeros. -/
+private theorem sLocalPrincipalValue_exp_order (ℓ θ : ℝ) (hℓ : 0 < ℓ) (s : ℂ) :
+    let E := fun z : ℂ ↦ 1 - Complex.exp (((-ℓ : ℝ) : ℂ) * z + (θ : ℂ) * Complex.I)
+    AnalyticAt ℂ E s ∧ meromorphicOrderAt E s = (if E s = 0 then 1 else 0) ∧ (E s = 0 → s.re = 0) := by
+  classical
+  intro E
+  let g (z : ℂ) := ((-ℓ : ℝ) : ℂ) * z + (θ : ℂ) * Complex.I
+  have hg : HasDerivAt g ((-ℓ : ℝ) : ℂ) s := by
+    simpa only [g, id_eq, mul_one] using
+      (((hasDerivAt_id s).const_mul ((-ℓ : ℝ) : ℂ)).add_const ((θ : ℂ) * Complex.I))
+  have hE : HasDerivAt E (-(Complex.exp (g s) * ((-ℓ : ℝ) : ℂ))) s := by
+    change HasDerivAt ((fun _ : ℂ ↦ (1 : ℂ)) - fun z ↦ Complex.exp (g z)) _ s
+    simpa only [zero_sub] using (hasDerivAt_const s (1 : ℂ)).sub hg.cexp
+  have he : AnalyticAt ℂ E s := by dsimp [E]; fun_prop
+  refine ⟨he, ?_, ?_⟩
+  · by_cases hz : E s = 0
+    · rw [ite_eq_left hz, he.meromorphicOrderAt_eq,
+        he.analyticOrderAt_eq_one_of_zero_deriv_ne_zero hz]
+      · rfl
+      · rw [hE.deriv]
+        exact neg_ne_zero.mpr (mul_ne_zero (Complex.exp_ne_zero _) (by exact_mod_cast (neg_ne_zero.mpr hℓ.ne')))
+    · rw [ite_eq_right hz, he.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr hz]
+  · intro hz
+    have h := congrArg norm ((sub_eq_zero.mp (show 1 - Complex.exp (g s) = 0 from hz)).symm)
+    rw [Complex.norm_exp, norm_one, ← Real.exp_zero] at h
+    have hn := Real.exp_injective h
+    simp [g, Complex.mul_re, Complex.add_re] at hn
+    exact hn.resolve_left hℓ.ne'
+
+open Classical in
+/-- On the imaginary axis the completed global factor is a meromorphic unit,
+except for its simple pole at the trivial quasi-character. -/
+private theorem sLocalPrincipalValue_global_euler_order (χ : PontryaginDual C𝔽)
+    (s : ℂ) (hs : s.re = 0) :
+    meromorphicOrderAt (continuedCompletedHeckeL χ) s =
+      ((if ideleClassNormTwist χ s = 1 then (-1 : ℤ) else 0) : WithTop ℤ) := by
+  classical
+  let L := continuedCompletedHeckeL χ
+  let D := continuedCompletedHeckeL χ⁻¹
+  obtain ⟨hL, hLe⟩ := continuedCompletedHeckeL_spec χ
+  obtain ⟨hD, hDe⟩ := continuedCompletedHeckeL_spec χ⁻¹
+  obtain ⟨ε, hε, hε0, hFE⟩ := completedHeckeL_continuation_functionalEquation χ L D hL hLe hD hDe
+  have hrefl : meromorphicOrderAt L s = meromorphicOrderAt D (1 - s) := by
+    rw [← meromorphicOrderAt_comp_of_deriv_ne_zero (f := D) (g := fun z : ℂ ↦ 1 - z)
+      (x := s) (by fun_prop) (by simp)]
+    rw [show D ∘ (fun z : ℂ ↦ 1 - z) = ε * L from funext hFE]
+    exact (meromorphicOrderAt_mul_of_ne_zero (hε.analyticAt s) (hε0 s)).symm
+  have hnonpos : meromorphicOrderAt L s ≤ 0 := by
+    rw [hrefl]
+    by_contra! hbad
+    have hre : (1 - s).re = 1 := by simp [hs]
+    simpa only [hre, lt_self_iff_false] using
+      completedHeckeL_continuation_zeros χ⁻¹ D hD hDe (by rw [hre]; exact zero_lt_one) hbad
+  have hone : ideleClassNormTwist (1 : PontryaginDual C𝔽) 0 = 1 := by
+    ext x
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  by_cases hk : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · obtain ⟨t, ⟨ht, h0, -, hhol⟩, -⟩ := completedHeckeL_continuation_simplePoles χ L hL hLe hk
+    let b := Complex.I * (t : ℂ)
+    have hbχ : ideleClassNormTwist χ b = 1 := by
+      have h := ideleClassNormTwist_add_of_eq ht b
+      simpa [b, hone] using h
+    by_cases hsb : s = b
+    · rw [hsb, ite_eq_left hbχ]
+      exact h0
+    · have htriv : ideleClassNormTwist χ s ≠ 1 :=
+        fun h ↦ hsb (globalUnitaryChart_injective χ (h.trans hbχ.symm))
+      rw [ite_eq_right htriv]
+      apply le_antisymm hnonpos
+      have hsb1 : s ≠ 1 + b := by
+        intro he
+        have := congrArg Complex.re he
+        simp [hs, b, Complex.mul_re] at this
+      exact (hhol s (by simp [b] at hsb hsb1 ⊢; exact ⟨hsb, hsb1⟩)).meromorphicOrderAt_nonneg
+  · have htriv : ideleClassNormTwist χ s ≠ 1 := by
+      intro hc
+      apply hk
+      ext x
+      have h := DFunLike.congr_fun hc x.val
+      change (χ x.val : ℂ) * (((m𝔽 x.val).val : ℝ) : ℂ) ^ s = 1 at h
+      rw [show m𝔽 x.val = 1 from x.property, Units.val_one, NNReal.coe_one,
+        Complex.ofReal_one, Complex.one_cpow, mul_one] at h
+      exact h
+    rw [ite_eq_right htriv]
+    exact le_antisymm hnonpos ((completedHeckeL_continuation_entire χ L hL hLe hk).analyticAt s).meromorphicOrderAt_nonneg
+
+private theorem sLocalPrincipalValue_centered_order (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) (H : Xₛ → ℂ) :
+    meromorphicOrderAt (fun w ↦ H (twistₛ (localChart(χ, hS) s) w)) 0 =
+      meromorphicOrderAt (fun w ↦ H (localChart(χ, hS) w)) s := by
+  have h : (fun w ↦ H (twistₛ (localChart(χ, hS) s) w)) =
+      (fun w ↦ H (localChart(χ, hS) w)) ∘ (· + s) := by
+    funext z
+    dsimp only [Function.comp_apply]
+    rw [normTwist_normTwist]
+  rw [h, meromorphicOrderAt_comp_add_const_eq_meromorphicOrderAt, zero_add]
+
+private theorem sLocalPrincipalValue_chart_apply (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) (g : (SAdeleRing F S)ˣ) :
+    localChart(χ, hS) s (QuotientGroup.mk g) =
+      ideleClassNormTwist χ s (QuotientGroup.mk (sIdeleInsertion F S g)) := by
+  change sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩ (QuotientGroup.mk g) *
+      _ ^ s = _
+  rw [sIdeleRestriction_mk]
+  simp only [sIdeleQuotientNorm_mk, ← ideleNorm_sIdeleInsertion]
+  rfl
+
+private theorem sLocalPrincipalValue_chart_finite (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) (v : S) :
+    finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (localChart(χ, hS) s)) =
+      finiteHeckeEulerFactor χ v.val s := by
+  classical
+  rw [← finiteLocalEulerFactor_eq_finiteHeckeEulerFactor]
+  congr 1
+  apply ContinuousMonoidHom.ext
+  intro x
+  let g := (ContinuousMulEquiv.prodUnits (InfiniteAdeleRing F)
+    ((v : S) → v.val.adicCompletion F)).symm
+    (1, ContinuousMulEquiv.piUnits.symm (@Pi.mulSingle _ _ _ (Classical.decEq _) v x))
+  change localChart(χ, hS) s (QuotientGroup.mk g) =
+    ideleClassNormTwist χ s (QuotientGroup.mk (IdeleGroup.ofAdicCompletion (𝓞 F) F v.val x))
+  rw [sLocalPrincipalValue_chart_apply, show sIdeleInsertion F S g = _ from sIdeleInsertion_finiteUnit v x]
+
+private theorem sLocalPrincipalValue_factor_order (χ : PontryaginDual C𝔽)
+    (v : Places) (s : ℂ) :
+    let E := fun z ↦ (finiteHeckeEulerFactor χ v z)⁻¹
+    AnalyticAt ℂ E s ∧
+      meromorphicOrderAt E s = (if E s = 0 then 1 else 0) ∧ (E s = 0 → s.re = 0) := by
+  classical
+  rcases sLocalPrincipalValue_euler_form χ v with h | ⟨ℓ, hℓ, θ, h⟩
+  · rw [h]
+    refine ⟨analyticAt_const, ?_, ?_⟩
+    · have h1 : (1 : ℂ → ℂ) s ≠ 0 := one_ne_zero
+      rw [ite_eq_right h1]
+      exact analyticAt_const.meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr h1
+    · exact fun he ↦ (one_ne_zero he).elim
+  · rw [h]
+    exact sLocalPrincipalValue_exp_order ℓ θ hℓ s
+
+open Classical in
+private theorem sLocalPrincipalValue_multiplier_order {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (s : ℂ) :
+    let E := reciprocalPartialHeckeEulerProduct χ T
+    let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+    AnalyticAt ℂ E s ∧ meromorphicOrderAt E s = (n : WithTop ℤ) ∧
+      (0 < n → s.re = 0) := by
+  intro E n
+  let e (v : Places) (z : ℂ) := (finiteHeckeEulerFactor χ v z)⁻¹
+  let U := T.filter fun v ↦ e v s = 0
+  have hU : U.card = n := by
+    change U.card = ((sLocalFinitePolePlaces (localChart(χ, hS) s)).filter fun v ↦ v.val ∈ T).card
+    rw [Finset.card_bij (fun (v : S) _ ↦ v.val) (t := U)]
+    · intro v hv
+      refine Finset.mem_filter.mpr ⟨(Finset.mem_filter.mp hv).2, ?_⟩
+      have hp := (Finset.mem_filter.mp
+        (show v ∈ sLocalFinitePolePlaces (localChart(χ, hS) s) from (Finset.mem_filter.mp hv).1)).2
+      rw [sLocalPrincipalValue_centered_order χ hS s
+          (fun c ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c))] at hp
+      have eq : (fun z ↦ finiteLocalEulerFactor v.val (sLocalFiniteRestriction v (localChart(χ, hS) z))) =
+          (e v.val)⁻¹ := funext fun z ↦ (sLocalPrincipalValue_chart_finite χ hS z v).trans (inv_inv _).symm
+      rw [eq, meromorphicOrderAt_inv, (sLocalPrincipalValue_factor_order χ v.val s).2.1] at hp
+      by_contra hp0
+      simp [e, hp0] at hp
+    · intro _ _ _ _ huv
+      exact Subtype.ext huv
+    · intro v hv
+      obtain ⟨hvT, hv0⟩ := Finset.mem_filter.mp hv
+      let w : S := ⟨v, hT hvT⟩
+      refine ⟨w, Finset.mem_filter.mpr ⟨?_, hvT⟩, rfl⟩
+      refine Finset.mem_filter.mpr ⟨Finset.mem_univ _, ?_⟩
+      rw [sLocalPrincipalValue_centered_order χ hS s
+        (fun c ↦ finiteLocalEulerFactor w.val (sLocalFiniteRestriction w c))]
+      have eq : (fun z ↦ finiteLocalEulerFactor w.val (sLocalFiniteRestriction w (localChart(χ, hS) z))) =
+          (e v)⁻¹ := funext fun z ↦ (sLocalPrincipalValue_chart_finite χ hS z w).trans (inv_inv _).symm
+      rw [eq, meromorphicOrderAt_inv, (sLocalPrincipalValue_factor_order χ v s).2.1]
+      simp [e, hv0]
+      decide
+  have he (v : Places) : AnalyticAt ℂ (e v) s := (sLocalPrincipalValue_factor_order χ v s).1
+  have ho : meromorphicOrderAt E s = (n : WithTop ℤ) := by
+    change meromorphicOrderAt (fun z ↦ ∏ v ∈ T, e v z) s = (n : WithTop ℤ)
+    rw [meromorphicOrderAt_fun_prod (fun v _ ↦ (he v).meromorphicAt), ← hU, Finset.card_filter]
+    push_cast
+    apply Finset.sum_congr rfl
+    intro v _
+    simpa [e] using (sLocalPrincipalValue_factor_order χ v s).2.1
+  refine ⟨T.analyticAt_fun_prod (fun v _ ↦ he v), ho, fun hn ↦ ?_⟩
+  obtain ⟨v, hv⟩ := Finset.card_pos.mp (hU.symm ▸ hn)
+  exact (sLocalPrincipalValue_factor_order χ v s).2.2 (Finset.mem_filter.mp hv).2
+
+private theorem sLocalPrincipalValue_global_chart_zero (χ : PontryaginDual C𝔽) :
+    ideleClassNormTwist χ 0 = globalUnitary(χ) := by
+  ext x
+  change (χ x : ℂ) * _ ^ (0 : ℂ) = (χ x : ℂ)
+  simp
+
+private theorem sLocalPrincipalValue_multiplicity_le (T : Finset Places) (c : Xₛ) :
+    sLocalFinitePoleMultiplicity T c ≤ sLocalRhoPoleOrder c := by
+  classical
+  rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+  exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+
+private theorem sLocalPrincipalValue_chart_hecke_meromorphic (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) :
+    Meromorphic (fun s ↦ sLocalHeckeL (localChart(χ, hS) s)) := by
+  classical
+  have hS₀ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S :=
+    sLocalPrincipalValue_global_chart_zero χ ▸ hS
+  have heq : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS₀⟩ =
+      sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩ :=
+    congrArg (sIdeleRestriction F S) (Subtype.ext (sLocalPrincipalValue_global_chart_zero χ))
+  obtain ⟨η, hη, -, -⟩ := sLocalPrincipalValue_chart χ hS
+  have h₀ : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS₀⟩ = chartₛ(η) 0 := by
+    rw [heq, ← hη 0]
+    ext x
+    change sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩ x =
+      sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩ x * ((((mₛ x).val : ℝ) : ℂ) ^ (0 : ℂ))
+    simp
+  have hfun : (fun s ↦ sLocalHeckeL (localChart(χ, hS) s)) =
+      fun s ↦ heckeGammaFactor χ s * ∏ v : S, finiteHeckeEulerFactor χ v.val s := by
+    funext s
+    rw [hη]
+    exact sLocalHeckeL_eq_partialEulerProduct η χ hS₀ h₀ s
+  rw [hfun]
+  intro s
+  apply (meromorphic_heckeGammaFactor χ s).mul
+  apply MeromorphicAt.fun_prod
+  intro v _
+  have h := (sLocalPrincipalValue_factor_order χ v.val s).1.meromorphicAt.inv
+  have he : (fun z ↦ (finiteHeckeEulerFactor χ v.val z)⁻¹)⁻¹ = finiteHeckeEulerFactor χ v.val :=
+    funext fun z ↦ inv_inv _
+  exact he ▸ h
+
+private theorem sLocalPrincipalValue_inserted_factor (χ : PontryaginDual C𝔽)
+    (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
+    ∃ A : ℂ, A ≠ 0 ∧
+      gChart(χ, sAdeleSchwartzToGlobal F S f) =ᶠ[codiscrete ℂ] (fun s ↦
+        A * sLocalIdelicZFunction f (localChart(χ, hS) s) *
+          (continuedCompletedHeckeL χ s / sLocalHeckeL (localChart(χ, hS) s))) := by
+  classical
+  let A := ∏ᶠ v : {v : Places // v ∉ S},
+    (((finiteLocalMultiplicativeTamagawaMeasure F v.val) (v.val.adicCompletionIntegers F).units).toReal : ℂ)
+  refine ⟨A, ?_, ?_⟩
+  · apply finprod_ne_zero
+    intro v
+    apply Complex.ofReal_ne_zero.mpr
+    rw [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, ENNReal.toReal_ne_zero]
+    refine ⟨ENNReal.inv_ne_zero.mpr ENNReal.ofReal_ne_top, ENNReal.inv_ne_top.mpr ?_⟩
+    apply (ENNReal.ofReal_pos.mpr (Real.sqrt_pos.mpr (pow_pos ?_ _))).ne'
+    exact_mod_cast (HeightOneSpectrum.one_lt_absNorm v.val).trans' zero_lt_one
+  · have hS₀ : ideleClassNormTwist χ 0 ∈ unramifiedOutside F S :=
+      sLocalPrincipalValue_global_chart_zero χ ▸ hS
+    have heq : sIdeleRestriction F S ⟨ideleClassNormTwist χ 0, hS₀⟩ =
+        sIdeleRestriction F S ⟨globalUnitary(χ), hS⟩ :=
+      congrArg (sIdeleRestriction F S) (Subtype.ext (sLocalPrincipalValue_global_chart_zero χ))
+    obtain ⟨L, hL, hLe⟩ := finiteHeckeL_exists_continuation χ
+    have hW := weilIdentity_unramifiedOutside_meromorphic S f χ hS₀ L hL
+      (fun z hz ↦ hLe ⟨z, hz⟩)
+    dsimp only at hW
+    rw [heq] at hW
+    let Y (s : ℂ) := continuedCompletedHeckeL χ s / sLocalHeckeL (localChart(χ, hS) s)
+    have hY : MeromorphicOn Y univ := (continuedCompletedHeckeL_spec χ).1.meromorphicOn.div
+      (sLocalPrincipalValue_chart_hecke_meromorphic χ hS).meromorphicOn
+    have hN : heckeEulerProductOutside S χ hS₀ = toMeromorphicNFOn Y univ := by
+      unfold heckeEulerProductOutside
+      dsimp only
+      rw [heq]
+    have hE : MeromorphicOn (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z) univ := by
+      intro s hs
+      apply MeromorphicAt.mul _ ((hL hs).meromorphicAt)
+      apply MeromorphicAt.fun_prod
+      intro v _
+      exact (sLocalPrincipalValue_factor_order χ v s).1.meromorphicAt
+    have hYE : (fun z ↦ reciprocalPartialHeckeEulerProduct χ S z * L z) =ᶠ[codiscrete ℂ] Y := by
+      refine (toMeromorphicNFOn_eqOn_codiscrete hE).trans ?_
+      rw [← heckeEulerProductOutside_eq_finite S χ hS₀ L hL hLe, hN]
+      exact (toMeromorphicNFOn_eqOn_codiscrete hY).symm
+    filter_upwards [hW, hYE] with z hz hq
+    change globalIdelicZFunction (sAdeleSchwartzToGlobal F S f) (ideleClassNormTwist χ z) =
+      A * sLocalIdelicZFunction f (localChart(χ, hS) z) * Y z
+    rw [hz, ← hq]
+    dsimp only [A, reciprocalPartialHeckeEulerProduct]
+    ring
+
+private theorem sLocalPrincipalValue_insertion_order {T : Finset Places}
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ)
+    (s : ℂ) (hn : 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)) :
+    let m := sLocalRhoPoleOrder (localChart(χ, hS) s)
+    meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f)) s =
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (localChart(χ, hS) z)) s +
+        (meromorphicOrderAt (continuedCompletedHeckeL χ) s + (m : WithTop ℤ)) := by
+  intro m
+  obtain ⟨η, hη, -, -⟩ := sLocalPrincipalValue_chart χ hS
+  have hL := sLocalHeckeL_poleOrder_eq S η s
+  simp_rw [← hη] at hL
+  rw [← sLocalPrincipalValue_centered_order χ hS s sLocalRhoFactor] at hL
+  have hm : (0 : ℕ) < m := hn.trans_le (sLocalPrincipalValue_multiplicity_le T _)
+  have he : min 0 (meromorphicOrderAt (fun z ↦ sLocalRhoFactor
+      (twistₛ (localChart(χ, hS) s) z)) 0) = ((-(m : ℤ) : ℤ) : WithTop ℤ) :=
+    sLocalIdelicOrderBound_eq_neg_poleOrder _
+  have hneg : (((-(m : ℤ) : ℤ) : WithTop ℤ)) < 0 := by exact_mod_cast neg_neg_of_pos (Int.natCast_pos.mpr hm)
+  have hLL : meromorphicOrderAt (fun z ↦ sLocalHeckeL (localChart(χ, hS) z)) s =
+      ((-(m : ℤ) : ℤ) : WithTop ℤ) := by
+    rw [he] at hL
+    have ho : ¬ 0 ≤ meromorphicOrderAt (fun z ↦ sLocalHeckeL (localChart(χ, hS) z)) s := by
+      intro ha
+      rw [min_eq_left ha] at hL
+      exact (ne_of_gt hneg) hL
+    rwa [min_eq_right (le_of_not_ge ho)] at hL
+  obtain ⟨A, ha, hA⟩ := sLocalPrincipalValue_inserted_factor χ hS f
+  rw [meromorphicOrderAt_congr (nhdsNE_le_codiscrete _ hA)]
+  have hZ : MeromorphicAt (fun z ↦ sLocalIdelicZFunction f (localChart(χ, hS) z)) s := by
+    simp_rw [hη]
+    exact (sLocalIdelicZFunction_meromorphic f η (mem_univ s)).meromorphicAt
+  have hc := ((continuedCompletedHeckeL_spec χ).1 (mem_univ s)).meromorphicAt
+  have hd := sLocalPrincipalValue_chart_hecke_meromorphic χ hS s
+  change meromorphicOrderAt (((fun _ : ℂ ↦ A) * (fun z ↦ sLocalIdelicZFunction f (localChart(χ, hS) z))) *
+    (continuedCompletedHeckeL χ / fun z ↦ sLocalHeckeL (localChart(χ, hS) z))) s = _
+  rw [meromorphicOrderAt_mul (analyticAt_const.meromorphicAt.mul hZ) (hc.div hd),
+    meromorphicOrderAt_mul_of_ne_zero analyticAt_const ha, meromorphicOrderAt_div hc hd, hLL]
+  rw [sub_eq_add_neg]
+  have hneg' : -((-(m : ℤ) : ℤ) : WithTop ℤ) = (m : WithTop ℤ) := by
+    change ((-(-(m : ℤ)) : ℤ) : WithTop ℤ) = ((m : ℤ) : WithTop ℤ)
+    rw [neg_neg]
+  rw [hneg']
+
+private theorem sLocalPrincipalValue_bound_shift (o : WithTop ℤ) (m n : ℕ)
+    (hn : 0 < n) (hm : n ≤ m) (e : Prop) [Decidable e] :
+    ((-(m - n : ℕ) : ℤ) : WithTop ℤ) ≤ o ↔
+      ((if e then n - 1 else n : ℕ) : WithTop ℤ) ≤
+        o + (((if e then (-1 : ℤ) else 0) : WithTop ℤ) + (m : WithTop ℤ)) := by
+  cases o using WithTop.recTopCoe with
+  | top => simp
+  | coe j =>
+    by_cases h : e
+    · rw [ite_eq_left h, ite_eq_left h]
+      change ((-(m - n : ℕ) : ℤ) : WithTop ℤ) ≤ (j : WithTop ℤ) ↔
+        (((n - 1 : ℕ) : ℤ) : WithTop ℤ) ≤
+          ((j : ℤ) : WithTop ℤ) + (((-1 : ℤ) : WithTop ℤ) + (((m : ℤ) : WithTop ℤ)))
+      simp only [← WithTop.coe_add, WithTop.coe_le_coe]
+      omega
+    · rw [ite_eq_right h, ite_eq_right h, zero_add]
+      change ((-(m - n : ℕ) : ℤ) : WithTop ℤ) ≤ (j : WithTop ℤ) ↔
+        (((n : ℤ) : WithTop ℤ)) ≤ (j : WithTop ℤ) + (((m : ℤ) : WithTop ℤ))
+      simp only [← WithTop.coe_add, WithTop.coe_le_coe]
+      omega
+
+open Classical in
+private theorem sLocalPrincipalValue_tfae_one_two {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S (globalNormOne(χ)) hω
+    (∀ c : Xₛ, onComponent(c, ωₛ) → 0 < sLocalFinitePoleMultiplicity T c →
+      ∀ k : ℕ, sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity T c < k →
+      k ≤ sLocalRhoPoleOrder c → sLocalPrincipalPartCoeff c k f = 0) ↔
+    (∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+      ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f)) s) := by
+  intro hω ωₛ
+  obtain ⟨_, _, hcov, hsurj⟩ := sLocalPrincipalValue_chart χ hS
+  have horder (s : ℂ) (hn : 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)) :
+      let c := localChart(χ, hS) s
+      let n := sLocalFinitePoleMultiplicity T c
+      let m := sLocalRhoPoleOrder c
+      (∀ k : ℕ, m - n < k → k ≤ m → sLocalPrincipalPartCoeff c k f = 0) ↔
+        ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+          meromorphicOrderAt (gChart(χ, sAdeleSchwartzToGlobal F S f)) s := by
+    intro c n m
+    have hre := (sLocalPrincipalValue_multiplier_order hT χ hS s).2.2 hn
+    rw [sLocalPrincipalValue_coeff_order, sLocalPrincipalValue_centered_order χ hS s (sLocalIdelicZFunction f),
+      sLocalPrincipalValue_insertion_order χ hS f s hn,
+      sLocalPrincipalValue_global_euler_order χ s hre]
+    exact sLocalPrincipalValue_bound_shift _ m n hn (sLocalPrincipalValue_multiplicity_le T c) _
+  constructor
+  · intro h s hn
+    exact (horder s hn).mp (h _ (hcov s) hn)
+  · intro h c hc hn
+    obtain ⟨s, rfl⟩ := hsurj c hc
+    exact (horder s hn).mpr (h s hn)
+
+/-- Equality on the chart's half-plane of convergence determines the entire meromorphic chart. -/
+private theorem sLocalPrincipalValue_chart_unique {Z W : ℂ → ℂ}
+    (hZ : MeromorphicNFOn Z univ) (hW : MeromorphicNFOn W univ)
+    (h : ∀ s : ℂ, 1 < s.re → Z s = W s) : Z = W := by
+  have htop : meromorphicOrderAt (Z - W) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ s : ℂ in 𝓝 (2 : ℂ), 1 < s.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun s hs ↦ sub_eq_zero.mpr (h s hs)
+  funext s
+  have ho := (hZ.meromorphicOn.sub hW.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ _) (mem_univ s) htop
+  have hEq : Z =ᶠ[𝓝[≠] s] W := (meromorphicOrderAt_eq_top_iff.mp ho).mono fun _ h ↦ sub_eq_zero.mp h
+  exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hW (mem_univ s))).mp hEq).eq_of_nhds
+
+/-- A homogeneous class determines its entire meromorphic chart. -/
+private theorem sLocalPrincipalValue_chart_eq_of_class (χ : PontryaginDual C𝔽)
+    (f g : ℬ𝔽) (h : (K𝔽(globalNormOne(χ))).mkQ f = (K𝔽(globalNormOne(χ))).mkQ g) :
+    gChart(χ, f) = gChart(χ, g) := by
+  apply sLocalPrincipalValue_chart_unique (globalIdelicZFunction_meromorphic f χ)
+    (globalIdelicZFunction_meromorphic g χ)
+  intro s hs
+  let z : {c : QuasiCharacter C𝔽 // 0 ≤ globalIdelicOrderBound c} :=
+    ⟨ideleClassNormTwist χ s, globalOrderBound_rightHalf χ hs⟩
+  have hk : f - g ∈ K𝔽(globalNormOne(χ)) := by
+    apply (Submodule.Quotient.mk_eq_zero _).mp
+    change (K𝔽(globalNormOne(χ))).mkQ (f - g) = 0
+    rw [map_sub, h, sub_self]
+  have hrest (u : (m𝔽).ker) :
+      normOneRestriction m𝔽 z.val u = (globalNormOne(χ) u : ℂ) := by
+    change (χ u.val : ℂ) * ((((m𝔽 u.val).val : ℝ) : ℂ) ^ s) = (χ u.val : ℂ)
+    rw [show m𝔽 u.val = 1 from u.property, Units.val_one, NNReal.coe_one, Complex.ofReal_one,
+      Complex.one_cpow, mul_one]
+  have hz := (mem_homogeneousAdelicTheta_ker_iff (globalNormOne(χ)) (f - g)).mp hk z hrest
+  rw [map_sub] at hz
+  change gChart(χ, f) s - gChart(χ, g) s = 0 at hz
+  exact sub_eq_zero.mp hz
+
+private theorem sLocalPrincipalValue_chart_ne_norm (χ : PontryaginDual C𝔽) (s : ℂ)
+    (hs : s.re = 0) : ideleClassNormTwist χ s ≠ ideleClassNormTwist (1 : PontryaginDual C𝔽) 1 := by
+  intro h
+  let t : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  let g : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F t)
+  have hg : m𝔽 g = t := canonicalIdeleNormSection_rightInverse F t
+  have he := congrArg norm (DFunLike.congr_fun h g)
+  rw [ideleClassNormTwist_one_one] at he
+  change ‖(χ g : ℂ) * ((((m𝔽 g).val : ℝ) : ℂ) ^ s)‖ = ‖(((m𝔽 g).val : ℝ) : ℂ)‖ at he
+  rw [hg, norm_mul, Circle.norm_coe, one_mul,
+    Complex.norm_cpow_eq_rpow_re_of_pos (NNReal.coe_pos.mpr t.zero_lt), hs, Real.rpow_zero] at he
+  norm_num [t] at he
+
+open Classical in
+private theorem sLocalPrincipalValue_four_two {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬ𝔽)
+    (hg : ∃ g : ℬ𝔽, (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g) =
+      (K𝔽(globalNormOne(χ))).mkQ f) (s : ℂ) :
+    let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+    0 < n → ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+      meromorphicOrderAt (gChart(χ, f)) s := by
+  intro n hn
+  obtain ⟨g, hg⟩ := hg
+  obtain ⟨hE, hEord, haxis⟩ := sLocalPrincipalValue_multiplier_order hT χ hS s
+  rw [← sLocalPrincipalValue_chart_eq_of_class χ _ _ hg]
+  rw [meromorphicOrderAt_congr (nhdsNE_le_codiscrete s (globalPrincipalValueConverse_mellin T χ g))]
+  change _ ≤ meromorphicOrderAt (reciprocalPartialHeckeEulerProduct χ T * gChart(χ, g)) s
+  rw [meromorphicOrderAt_mul hE.meromorphicAt
+    ((globalIdelicZFunction_meromorphic g χ (mem_univ s)).meromorphicAt), hEord]
+  by_cases htriv : ideleClassNormTwist χ s = 1
+  · rw [ite_eq_left htriv]
+    have he : ((n - 1 : ℕ) : WithTop ℤ) = (n : WithTop ℤ) + (-1 : WithTop ℤ) := by
+      change (((n - 1 : ℕ) : ℤ) : WithTop ℤ) = ((n : ℤ) : WithTop ℤ) + ((-1 : ℤ) : WithTop ℤ)
+      rw [← WithTop.coe_add]
+      congr 1
+      omega
+    rw [he]
+    exact add_le_add_right ((globalIdelicZFunction_poles g χ).2 s) (n : WithTop ℤ)
+  · rw [ite_eq_right htriv]
+    have hA := (globalIdelicZFunction_poles g χ).1 s
+      ⟨htriv, sLocalPrincipalValue_chart_ne_norm χ s (haxis hn)⟩
+    simpa only [add_zero] using
+      add_le_add_right hA.meromorphicOrderAt_nonneg (n : WithTop ℤ)
+
+
+section
+open Complex
+/-- Division by one vertical periodic Euler factor preserves rapid decay on
+closed strips once the quotient is entire. -/
+private theorem schwartzBergman_univ_div_exp (B : SchwartzBergman (univ : Set ℝ))
+    (u : ℂ → ℂ) (hu : Differentiable ℂ u) {ℓ θ : ℝ} (hℓ : 0 < ℓ)
+    (h : ∀ z, B.val z = (1 - Complex.exp (((-ℓ : ℝ) : ℂ) * z + (θ : ℂ) * Complex.I)) * u z) :
+    u ∈ schwartzBergmanSubmodule (univ : Set ℝ) := by
+  refine ⟨fun _ hz ↦ (hz (mem_univ _)).elim, hu.differentiableOn, fun a b _ _ N ↦ ?_⟩
+  let L := min a 0 - 1
+  let R := max b 0 + 1
+  have hL : L < 0 := by dsimp [L]; linarith [min_le_right a 0]
+  have hR : 0 < R := by dsimp [R]; linarith [le_max_right b 0]
+  have hLR := hL.trans hR
+  let T (j : ℤ) := (θ - Real.pi - (j : ℝ) * (2 * Real.pi)) / ℓ
+  let e (w : ℂ) := ((-ℓ : ℝ) : ℂ) * w + (θ : ℂ) * Complex.I
+  have hre (w : ℂ) : (e w).re = -ℓ * w.re := by simp [e, Complex.mul_re]
+  have him (w : ℂ) : (e w).im = θ - ℓ * w.im := by simp [e, Complex.mul_im]; ring
+  let δ := min 1 (min (Real.exp (-ℓ * L) - 1) (1 - Real.exp (-ℓ * R)))
+  have hδ : 0 < δ := by
+    refine lt_min zero_lt_one (lt_min (sub_pos.mpr (Real.one_lt_exp_iff.mpr ?_))
+      (sub_pos.mpr (Real.exp_lt_one_iff.mpr ?_)))
+    · exact mul_pos_of_neg_of_neg (neg_neg_of_pos hℓ) hL
+    · exact mul_neg_of_neg_of_pos (neg_neg_of_pos hℓ) hR
+  have hhor (w : ℂ) (j : ℤ) (hw : w.im = T j) : δ ≤ ‖1 - Complex.exp (e w)‖ := by
+    have hphase : (e w).im = Real.pi + (j : ℝ) * (2 * Real.pi) := by
+      rw [him, hw]
+      dsimp [T]
+      field_simp
+      ring
+    have hreal : (1 - Complex.exp (e w)).re = 1 + Real.exp ((e w).re) := by
+      rw [Complex.sub_re, Complex.one_re, Complex.exp_re, hphase,
+        Real.cos_add_int_mul_two_pi, Real.cos_pi]
+      ring
+    exact (min_le_left _ _).trans ((le_add_of_nonneg_right (Real.exp_pos _).le).trans
+      (hreal ▸ Complex.re_le_norm (1 - Complex.exp (e w))))
+  have hvert (w : ℂ) (hw : w.re = L ∨ w.re = R) : δ ≤ ‖1 - Complex.exp (e w)‖ := by
+    rcases hw with hw | hw
+    · have he := norm_sub_norm_le (Complex.exp (e w)) (1 : ℂ)
+      rw [Complex.norm_exp, hre, hw, norm_one, norm_sub_rev] at he
+      exact ((min_le_right _ _).trans (min_le_left _ _)).trans he
+    · have he := norm_sub_norm_le (1 : ℂ) (Complex.exp (e w))
+      rw [Complex.norm_exp, hre, hw, norm_one] at he
+      exact ((min_le_right _ _).trans (min_le_right _ _)).trans he
+  obtain ⟨M, hM⟩ := B.property.2.2 L R hLR.le (subset_univ _) N
+  refine ⟨M / δ, ?_⟩
+  rintro _ ⟨z, hz, rfl⟩
+  have hzRe : z.re ∈ Icc L R :=
+    ⟨(by dsimp [L]; linarith [min_le_left a 0, hz.1]), (by dsimp [R]; linarith [le_max_left b 0, hz.2])⟩
+  let q := (θ - Real.pi - ℓ * z.im) / (2 * Real.pi)
+  obtain ⟨j, hj⟩ := exists_int_gt q
+  obtain ⟨k, hk⟩ := exists_int_lt q
+  have hπ : 0 < 2 * Real.pi := by positivity
+  have hj' : T j < z.im := by
+    have hj' := (div_lt_iff₀ hπ).mp hj
+    exact (div_lt_iff₀ hℓ).mpr (by linarith)
+  have hk' : z.im < T k := by
+    have hk' := (lt_div_iff₀ hπ).mp hk
+    exact (lt_div_iff₀ hℓ).mpr (by linarith)
+  have hjk := hj'.trans hk'
+  have hcl := Complex.closure_reProdIm (Ioo L R) (Ioo (T j) (T k))
+  rw [closure_Ioo hLR.ne, closure_Ioo hjk.ne] at hcl
+  apply Complex.norm_le_of_forall_mem_frontier_norm_le
+    ((Metric.isBounded_Ioo L R).reProdIm (Metric.isBounded_Ioo (T j) (T k)))
+    (((differentiable_pow N).mul hu).diffContOnCl)
+  · intro w hw
+    have hwRe : w.re ∈ Icc L R := (hcl ▸ frontier_subset_closure hw).1
+    rw [Complex.frontier_reProdIm, closure_Ioo hLR.ne, closure_Ioo hjk.ne,
+      frontier_Ioo hLR, frontier_Ioo hjk] at hw
+    have hden : δ ≤ ‖1 - Complex.exp (e w)‖ := by
+      rcases hw with hw | hw
+      · rcases show w.im = T j ∨ w.im = T k from hw.2 with hj | hk
+        exacts [hhor w j hj, hhor w k hk]
+      · exact hvert w hw.1
+    have hprod : ‖w ^ N * u w‖ * ‖1 - Complex.exp (e w)‖ ≤ M := by
+      have he := hM ⟨w, hwRe, rfl⟩
+      change ‖w ^ N * B.val w‖ ≤ M at he
+      have heq : w ^ N * B.val w = (w ^ N * u w) * (1 - Complex.exp (e w)) := by
+        rw [h w]; dsimp [e]; ring
+      rwa [heq, norm_mul] at he
+    exact (le_div_iff₀ hδ).mpr ((mul_le_mul_of_nonneg_left hden (norm_nonneg _)).trans hprod)
+  · rw [hcl]
+    exact ⟨hzRe, hj'.le, hk'.le⟩
+
+/-- An entire quotient of a Schwartz–Bergman function by a finite product of
+vertical periodic Euler factors still decays rapidly on closed strips. -/
+private theorem schwartzBergman_univ_div_prod_exp {ι : Type*} (S : Finset ι) (A : ι → ℂ → ℂ)
+    (hA : ∀ i ∈ S, A i = 1 ∨ ∃ ℓ : ℝ, 0 < ℓ ∧ ∃ θ : ℝ,
+      A i = fun z ↦ 1 - Complex.exp (((-ℓ : ℝ) : ℂ) * z + (θ : ℂ) * Complex.I))
+    (B : SchwartzBergman (univ : Set ℝ)) (u : ℂ → ℂ)
+    (hu : Differentiable ℂ u) (h : ∀ z, B.val z = (∏ i ∈ S, A i z) * u z) :
+    u ∈ schwartzBergmanSubmodule (univ : Set ℝ) := by
+  classical
+  induction S using Finset.induction_on generalizing B with
+  | empty =>
+    have he : B.val = u := funext fun z ↦ by simpa using h z
+    exact he ▸ B.property
+  | @insert i S hi ih =>
+    have hAS := fun j (hj : j ∈ S) ↦ hA j (Finset.mem_insert_of_mem hj)
+    let v (z : ℂ) := (∏ j ∈ S, A j z) * u z
+    have hdiv (z : ℂ) : B.val z = A i z * v z := by
+      simpa only [Finset.prod_insert hi, mul_assoc, v] using h z
+    rcases hA i (Finset.mem_insert_self _ _) with hOne | ⟨ℓ, hℓ, θ, hθ⟩
+    · apply ih hAS B
+      simpa only [hOne, Pi.one_apply, one_mul, v] using hdiv
+    · have hd (j : ι) (hj : j ∈ S) : Differentiable ℂ (A j) := by
+        rcases hAS j hj with he | ⟨_, _, _, he⟩ <;> rw [he] <;> fun_prop
+      have hv : Differentiable ℂ v := (Differentiable.fun_finsetProd hd).mul hu
+      have hSB := schwartzBergman_univ_div_exp B v hv hℓ (hθ ▸ hdiv)
+      exact ih hAS (⟨v, hSB⟩ : SchwartzBergman (univ : Set ℝ)) (fun _ ↦ rfl)
+
+
+end
+
+open Classical in
+private theorem sLocalPrincipalValue_regularized_global (χ : PontryaginDual C𝔽) (t : ℝ)
+    (ht : ideleClassNormTwist χ 0 = ideleClassNormTwist 1 ((t : ℂ) * Complex.I))
+    (haxis : ∀ s : ℂ, s.re = 0 → meromorphicOrderAt (continuedCompletedHeckeL χ) s =
+      ((if ideleClassNormTwist χ s = 1 then (-1 : ℤ) else 0) : WithTop ℤ)) :
+    let b := (t : ℂ) * Complex.I
+    let p (s : ℂ) := (s + b) * (1 - s - b)
+    let G := toMeromorphicNFOn (p * continuedCompletedHeckeL χ) univ
+    Differentiable ℂ G ∧
+      (∀ s : ℂ, s.re = 0 → meromorphicOrderAt p s =
+        if ideleClassNormTwist χ s = 1 then (1 : WithTop ℤ) else 0) ∧
+      ∀ s : ℂ, s.re = 0 → meromorphicOrderAt G s = 0 := by
+  classical
+  let b := (t : ℂ) * Complex.I
+  let p (s : ℂ) := (s + b) * (1 - s - b)
+  let L := continuedCompletedHeckeL χ
+  let G := toMeromorphicNFOn (p * L) univ
+  change Differentiable ℂ G ∧ (∀ s : ℂ, s.re = 0 → meromorphicOrderAt p s = _) ∧ _
+  obtain ⟨hL, hLe⟩ := continuedCompletedHeckeL_spec χ
+  have hone : ideleClassNormTwist (1 : PontryaginDual C𝔽) 0 = 1 := by
+    ext x
+    change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hbχ : ideleClassNormTwist χ (-b) = 1 := by
+    simpa [b, hone] using ideleClassNormTwist_add_of_eq ht (-b)
+  have hp (s : ℂ) : AnalyticAt ℂ p s := by dsimp [p]; fun_prop
+  constructor
+  · let τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F :=
+      ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+    have hτ : Function.RightInverse τ (ideleNorm F) := canonicalIdeleNormSection_rightInverse F
+    have hphase := existsUnique_ideleNormSection_character_phase χ τ hτ
+    have hx : hphase.exists.choose = t := by
+      refine hphase.unique hphase.exists.choose_spec ?_
+      intro u
+      have he := DFunLike.congr_fun ht (QuotientGroup.mk (τ u))
+      change (χ (QuotientGroup.mk (τ u)) : ℂ) * _ ^ (0 : ℂ) =
+        1 * ((((ideleNorm F (τ u)).val : ℝ) : ℂ) ^ ((t : ℂ) * Complex.I)) at he
+      rwa [Complex.cpow_zero, mul_one, one_mul, hτ u] at he
+    have hk : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 := by
+      ext x
+      have he := DFunLike.congr_fun hbχ x.val
+      change (χ x.val : ℂ) * ((((ideleClassNorm F x.val).val : ℝ) : ℂ) ^ (-b)) = 1 at he
+      rw [show ideleClassNorm F x.val = 1 from x.property, Units.val_one, NNReal.coe_one,
+        Complex.ofReal_one, Complex.one_cpow, mul_one] at he
+      exact he
+    have h := regularizedCompletedHeckeL_differentiable χ τ hτ L hL hLe
+    simpa only [G, p, b, Pi.mul_def, hx, ite_eq_left hk, pow_one] using h
+  have horder (s : ℂ) (hs : s.re = 0) : meromorphicOrderAt p s =
+      if ideleClassNormTwist χ s = 1 then (1 : WithTop ℤ) else 0 := by
+    by_cases hs₀ : s = -b
+    · subst s
+      rw [ite_eq_left hbχ, (hp _).meromorphicOrderAt_eq]
+      have hd (z : ℂ) : HasDerivAt p ((1 - z - b) - (z + b)) z := by
+        simpa [p, sub_eq_add_neg] using ((hasDerivAt_id z).add_const b).fun_mul
+          (((hasDerivAt_const z (1 : ℂ)).fun_sub (hasDerivAt_id z)).sub_const b)
+      rw [(hp _).analyticOrderAt_eq_one_of_zero_deriv_ne_zero (by simp [p])
+        (by rw [(hd _).deriv]; ring_nf; norm_num)]
+      norm_num
+    · have hχ : ideleClassNormTwist χ s ≠ 1 :=
+        fun h ↦ hs₀ (globalUnitaryChart_injective χ (h.trans hbχ.symm))
+      rw [ite_eq_right hχ]
+      apply (hp s).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr
+      refine mul_ne_zero (fun he ↦ hs₀ (eq_neg_of_add_eq_zero_left he)) ?_
+      intro he
+      have h := congrArg Complex.re he
+      simp [hs, b, Complex.mul_re] at h
+  refine ⟨horder, ?_⟩
+  intro s hs
+  have hmer : MeromorphicOn (p * L) univ :=
+    fun z hz ↦ (hp z).meromorphicAt.mul (hL hz).meromorphicAt
+  rw [meromorphicOrderAt_toMeromorphicNFOn hmer (mem_univ s),
+    meromorphicOrderAt_mul (hp s).meromorphicAt (hL (mem_univ s)).meromorphicAt,
+    horder s hs, haxis s hs]
+  split_ifs <;> norm_num
+
+/-- Meromorphic normal form gives an entire quotient when the denominator has
+finite order everywhere and the numerator has at least that order. -/
+private theorem sLocalPrincipalValue_divide_entire {u E : ℂ → ℂ}
+    (hu : Differentiable ℂ u) (hE : Differentiable ℂ E)
+    (hfin : ∀ s, meromorphicOrderAt E s ≠ ⊤)
+    (hord : ∀ s, meromorphicOrderAt E s ≤ meromorphicOrderAt u s) :
+    ∃ v : ℂ → ℂ, Differentiable ℂ v ∧ ∀ s, u s = E s * v s := by
+  let Q := u / E
+  have hQ : MeromorphicOn Q univ := fun s _ ↦
+    (hu.analyticAt s).meromorphicAt.div (hE.analyticAt s).meromorphicAt
+  let v := toMeromorphicNFOn Q univ
+  have hv : Differentiable ℂ v := by
+    intro s
+    apply AnalyticAt.differentiableAt
+    apply (meromorphicNFOn_toMeromorphicNFOn Q univ (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hQ (mem_univ s),
+      meromorphicOrderAt_div (hu.analyticAt s).meromorphicAt (hE.analyticAt s).meromorphicAt]
+    have hle := hord s
+    have ht := hfin s
+    generalize meromorphicOrderAt E s = a at hle ht ⊢
+    cases a using WithTop.recTopCoe with
+    | top => contradiction
+    | coe a =>
+      cases b : meromorphicOrderAt u s using WithTop.recTopCoe with
+      | top => simp
+      | coe b =>
+        rw [b] at hle
+        exact WithTop.coe_le_coe.mpr (sub_nonneg.mpr (WithTop.coe_le_coe.mp hle))
+  refine ⟨v, hv, fun s ↦ ?_⟩
+  by_cases h : E s = 0
+  · have hne : meromorphicOrderAt E s ≠ 0 :=
+      fun ho ↦ ((hE.analyticAt s).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mp ho) h
+    have hp : 0 < meromorphicOrderAt u s :=
+      (lt_of_le_of_ne (hE.analyticAt s).meromorphicOrderAt_nonneg hne.symm).trans_le (hord s)
+    have hzero : u s = 0 := by
+      by_contra h'
+      exact hp.ne' ((hu.analyticAt s).meromorphicNFAt.meromorphicOrderAt_eq_zero_iff.mpr h')
+    rw [h, hzero, zero_mul]
+  · dsimp only [v]
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hQ (mem_univ s),
+      toMeromorphicNFAt_eq_self.mpr ((hu.analyticAt s).div (hE.analyticAt s) h).meromorphicNFAt]
+    exact (mul_div_cancel₀ _ h).symm
+
+private theorem sLocalPrincipalValue_chart_unit_normOne (χ : PontryaginDual C𝔽) (s : ℂ)
+    (hs : ideleClassNormTwist χ s = 1) : globalNormOne(χ) = 1 := by
+  apply PontryaginDual.ext
+  intro u
+  apply Subtype.ext
+  have he := DFunLike.congr_fun hs u.val
+  change (χ u.val : ℂ) * ((((m𝔽 u.val).val : ℝ) : ℂ) ^ s) = 1 at he
+  rw [show m𝔽 u.val = 1 from u.property, Units.val_one, NNReal.coe_one, Complex.ofReal_one,
+    Complex.one_cpow, mul_one] at he
+  exact he
+
+private theorem sLocalPrincipalValue_nontrivial_range {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (hω : globalNormOne(χ) ≠ 1) (f : ℬ𝔽)
+    (hf : ∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      (sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, f)) s) :
+    ∃ g : ℬ𝔽, (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g) =
+      (K𝔽(globalNormOne(χ))).mkQ f := by
+  obtain ⟨M, hM, hev, hrange⟩ := globalConverse_nontrivial χ hω
+  obtain ⟨P, _, hpval, hPrange⟩ := globalPrincipalValueConverse_nontrivial T χ hω
+  let q := (K𝔽(globalNormOne(χ))).mkQ
+  have hr : M (q f) ∈ range M := ⟨q f, rfl⟩
+  rw [hrange] at hr
+  obtain ⟨u, hu, he⟩ := hr
+  let L := continuedCompletedHeckeL χ
+  let E := reciprocalPartialHeckeEulerProduct χ T
+  have H (s : ℂ) := sLocalPrincipalValue_multiplier_order hT χ hS s
+  have hchart : gChart(χ, f) = L * u := funext fun s ↦ (hev f s).symm.trans (he s)
+  have hord (s : ℂ) : meromorphicOrderAt E s ≤ meromorphicOrderAt u s := by
+    let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+    rw [(H s).2.1]
+    by_cases hn : 0 < n
+    · have hunit := sLocalPrincipalValue_global_euler_order χ s ((H s).2.2 hn)
+      have hx : ideleClassNormTwist χ s ≠ 1 :=
+        fun h ↦ hω (sLocalPrincipalValue_chart_unit_normOne χ s h)
+      rw [ite_eq_right hx] at hunit
+      have hm := hf s hn
+      rw [hchart, meromorphicOrderAt_mul ((continuedCompletedHeckeL_spec χ).1 (mem_univ s)).meromorphicAt
+        (hu.analyticAt s).meromorphicAt, hunit, zero_add] at hm
+      exact hm
+    · simpa [n, Nat.eq_zero_of_not_pos hn] using (hu.analyticAt s).meromorphicOrderAt_nonneg
+  obtain ⟨v, hv, hdiv⟩ := sLocalPrincipalValue_divide_entire hu (fun s ↦ (H s).1.differentiableAt)
+    (fun s ↦ by rw [(H s).2.1]; simp) hord
+  have hP : M (q f) ∈ range P := by
+    rw [hPrange]
+    refine ⟨v, hv, fun s ↦ ?_⟩
+    rw [he, hdiv]
+    exact (mul_left_comm _ _ _).symm.trans (mul_assoc _ _ _).symm
+  obtain ⟨⟨_, ⟨g, rfl⟩⟩, hg⟩ := hP
+  refine ⟨g, hM.injective ?_⟩
+  apply Subtype.ext
+  funext s
+  exact (hev _ s).trans ((hpval g s).symm.trans (congrArg (fun b : SchwartzBergman (univ : Set ℝ) ↦ b.val s) hg))
+
+private theorem sLocalPrincipalValue_normal_form_eq {Z W : ℂ → ℂ}
+    (hZ : MeromorphicNFOn Z univ) (hW : MeromorphicNFOn W univ)
+    (h : Z =ᶠ[codiscrete ℂ] W) : Z = W := by
+  funext s
+  exact (((hZ (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hW (mem_univ s))).mp
+    (nhdsNE_le_codiscrete s h)).eq_of_nhds
+
+local notation "PVPoly(" t ")" =>
+  (fun z : ℂ ↦ (z + (t : ℂ) * Complex.I) * (1 - z - (t : ℂ) * Complex.I))
+local notation "PVGen(" χ ", " t ")" =>
+  toMeromorphicNFOn (PVPoly(t) * continuedCompletedHeckeL χ) univ
+
+open Classical in
+private theorem sLocalPrincipalValue_trivial_range {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (t : ℝ) (ht : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : PontryaginDual C𝔽) ((t : ℂ) * Complex.I))
+    (hGdiff : Differentiable ℂ (PVGen(χ, t)))
+    (hGord : ∀ s : ℂ, s.re = 0 → meromorphicOrderAt (PVGen(χ, t)) s = 0)
+    (hpord : ∀ s : ℂ, s.re = 0 → meromorphicOrderAt (PVPoly(t)) s =
+      (if ideleClassNormTwist χ s = 1 then 1 else 0))
+    (f : ℬ𝔽)
+    (hf : ∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+      ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, f)) s) :
+    ∃ g : ℬ𝔽, (K𝔽(1)).mkQ (adelePrincipalValue F T g) = (K𝔽(1)).mkQ f := by
+  obtain ⟨_, M, _, hM_homeo, hM_eval, -, -, hM_range, -⟩ :=
+    globalConverse_normTwist_meromorphic_exact χ t ht
+  let q := (K𝔽(1)).mkQ
+  let a : ℂ := (t : ℂ) * Complex.I
+  let regular := ({-a, 1 - a} : Set ℂ)ᶜ
+  let p : ℂ → ℂ := PVPoly(t)
+  let G : ℂ → ℂ := PVGen(χ, t)
+  let E := reciprocalPartialHeckeEulerProduct χ T
+  have hM : M (q f) ∈ range M := ⟨q f, rfl⟩
+  obtain ⟨B, ⟨u, hu, huval⟩, hBval⟩ := (hM_range _).mp hM
+  have hB (s : regular) : B.val s.val = p s.val * gChart(χ, f) s.val :=
+    (hBval s).trans (congrArg (p s.val * ·) (hM_eval f s))
+  have hregular : regular ∈ codiscrete ℂ :=
+    ((finite_singleton (1 - a)).insert (-a)).compl_mem_codiscrete
+  have hB_eq : B.val =ᶠ[codiscrete ℂ] p * gChart(χ, f) := by
+    filter_upwards [hregular] with s hs using hB ⟨s, hs⟩
+  have hpdiff : Differentiable ℂ p := by dsimp [p]; fun_prop
+  have H (s : ℂ) := sLocalPrincipalValue_multiplier_order hT χ hS s
+  have hord (s : ℂ) : meromorphicOrderAt E s ≤ meromorphicOrderAt u s := by
+    let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+    rw [(H s).2.1]
+    by_cases hn : 0 < n
+    · have hs := (H s).2.2 hn
+      have hbo : meromorphicOrderAt B.val s = meromorphicOrderAt p s +
+          meromorphicOrderAt (gChart(χ, f)) s := by
+        rw [meromorphicOrderAt_congr (nhdsNE_le_codiscrete s hB_eq),
+          meromorphicOrderAt_mul (hpdiff.analyticAt s).meromorphicAt
+            ((globalIdelicZFunction_meromorphic f χ (mem_univ s)).meromorphicAt)]
+      have huord : meromorphicOrderAt B.val s = meromorphicOrderAt u s := by
+        rw [show B.val = G * u from funext huval,
+          meromorphicOrderAt_mul (hGdiff.analyticAt s).meromorphicAt (hu.analyticAt s).meromorphicAt,
+          hGord s hs, zero_add]
+      rw [← huord, hbo, hpord s hs]
+      have hbound : ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+          meromorphicOrderAt (gChart(χ, f)) s := hf s hn
+      by_cases htriv : ideleClassNormTwist χ s = 1
+      · rw [ite_eq_left htriv]
+        rw [ite_eq_left htriv] at hbound
+        have he : (n : WithTop ℤ) = (1 : WithTop ℤ) + ((n - 1 : ℕ) : WithTop ℤ) := by
+          change ((n : ℤ) : WithTop ℤ) = ((1 : ℤ) : WithTop ℤ) + (((n - 1 : ℕ) : ℤ) : WithTop ℤ)
+          rw [← WithTop.coe_add]
+          congr 1
+          omega
+        rw [he]
+        exact add_le_add_right hbound _
+      · rw [ite_eq_right htriv, zero_add]
+        simpa only [ite_eq_right htriv] using hbound
+    · simpa [n, Nat.eq_zero_of_not_pos hn] using (hu.analyticAt s).meromorphicOrderAt_nonneg
+  obtain ⟨v, hv, huv⟩ := sLocalPrincipalValue_divide_entire hu (fun s ↦ (H s).1.differentiableAt)
+    (fun s ↦ by rw [(H s).2.1]; simp) hord
+  have hfact (s : ℂ) : B.val s = E s * (G s * v s) := by
+    have he : B.val s = G s * u s := huval s
+    have he' : u s = E s * v s := huv s
+    rw [he, he', mul_left_comm]
+  let B' : SchwartzBergman (univ : Set ℝ) :=
+    ⟨G * v, schwartzBergman_univ_div_prod_exp T
+      (fun w z ↦ (finiteHeckeEulerFactor χ w z)⁻¹) (fun w _ ↦ sLocalPrincipalValue_euler_form χ w)
+      B (G * v) (hGdiff.mul hv) hfact⟩
+  have hp_ne (z : regular) : p z.val ≠ 0 := by
+    have hz : z.val ≠ -a ∧ z.val ≠ 1 - a := by
+      simpa only [regular, mem_compl_iff, mem_insert_iff, mem_singleton_iff, not_or] using z.property
+    apply mul_ne_zero
+    · intro h
+      apply hz.1
+      change z.val + a = 0 at h
+      linear_combination h
+    · intro h
+      apply hz.2
+      change 1 - z.val - a = 0 at h
+      linear_combination -h
+  let W (z : regular) := B'.val z.val / p z.val
+  have hW : W ∈ range M := by
+    apply (hM_range W).mpr
+    refine ⟨B', ⟨v, hv, fun _ ↦ rfl⟩, fun z ↦ ?_⟩
+    exact (mul_div_cancel₀ _ (hp_ne z)).symm
+  obtain ⟨x, hx⟩ := hW
+  obtain ⟨g, rfl⟩ := (K𝔽(1)).mkQ_surjective x
+  have hZ_eq : gChart(χ, adelePrincipalValue F T g) = gChart(χ, f) := by
+    apply sLocalPrincipalValue_normal_form_eq (globalIdelicZFunction_meromorphic _ χ)
+      (globalIdelicZFunction_meromorphic f χ)
+    filter_upwards [globalPrincipalValueConverse_mellin T χ g, hregular] with s hs hr
+    let z : regular := ⟨s, hr⟩
+    have hgv : gChart(χ, g) s = B'.val s / p s :=
+      (hM_eval g z).symm.trans (congrFun hx z)
+    have hB' : B'.val s = p s * gChart(χ, g) s := by
+      rw [hgv, mul_div_cancel₀ _ (hp_ne z)]
+    refine hs.trans (mul_left_cancel₀ (hp_ne z) ?_)
+    change p s * (E s * gChart(χ, g) s) = p s * gChart(χ, f) s
+    calc
+      _ = E s * B'.val s := by rw [hB']; ring
+      _ = B.val s := (hfact s).symm
+      _ = _ := hB z
+  have hM_inj : Function.Injective M := by
+    let : TopologicalSpace M.range := TopologicalSpace.coinduced (⇑M.rangeRestrict) inferInstance
+    intro x y hxy
+    exact hM_homeo.injective (Subtype.ext hxy)
+  refine ⟨g, hM_inj ?_⟩
+  funext z
+  exact (hM_eval _ z).trans ((congrFun hZ_eq z.val).trans (hM_eval f z).symm)
+
+open Classical in
+private theorem sLocalPrincipalValue_two_four {T : Finset Places} (hT : T ⊆ S)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S)
+    (f : ℬ𝔽) :
+    (∀ s : ℂ, 0 < sLocalFinitePoleMultiplicity T (localChart(χ, hS) s) →
+      let n := sLocalFinitePoleMultiplicity T (localChart(χ, hS) s)
+      ((if ideleClassNormTwist χ s = 1 then n - 1 else n : ℕ) : WithTop ℤ) ≤
+        meromorphicOrderAt (gChart(χ, f)) s) ↔
+    ∃ g : ℬ𝔽, (K𝔽(globalNormOne(χ))).mkQ (adelePrincipalValue F T g) =
+      (K𝔽(globalNormOne(χ))).mkQ f := by
+  constructor
+  · intro hf
+    by_cases hω : globalNormOne(χ) = 1
+    · obtain ⟨t, ht, -⟩ := globalConverse_existsUnique_normTwist χ hω
+      obtain ⟨hGdiff, hpord, hGord⟩ := sLocalPrincipalValue_regularized_global χ t ht
+        (sLocalPrincipalValue_global_euler_order χ)
+      generalize globalNormOne(χ) = ω at hω ⊢
+      subst ω
+      exact sLocalPrincipalValue_trivial_range hT χ hS t ht hGdiff hGord hpord f hf
+    · refine sLocalPrincipalValue_nontrivial_range hT χ hS hω f fun s hn ↦ ?_
+      have hn1 : ideleClassNormTwist χ s ≠ 1 := fun h ↦ hω
+        (sLocalPrincipalValue_chart_unit_normOne χ s h)
+      simpa only [ite_eq_right hn1] using hf s hn
+  · exact sLocalPrincipalValue_four_two hT χ hS f
+
+/-- Principal value depends only on the global homogeneous theta class of its input. -/
+private theorem sLocalPrincipalValue_global_congr {S₀ : Finset Places}
+    (ω : PontryaginDual (m𝔽).ker) (a b : ℬ𝔽) (hab : (K𝔽(ω)).mkQ a = (K𝔽(ω)).mkQ b) :
+    (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ a) = (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ b) := by
+  obtain ⟨e, he⟩ := (globalThetaIsotypicAverage_equiv (F := F) ω).2
+  let Q := (LinearMap.ker (adelicThetaLinearMap F)).mkQ
+  let A := (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose
+  have hA : A (Q a) = A (Q b) := (he a).symm.trans
+    ((congrArg (fun z => (e z).val) hab).trans (he b))
+  apply e.injective
+  apply Subtype.ext
+  refine (he _).trans (Eq.trans ?_ (he _).symm)
+  exact (globalThetaPrincipalValue_isotypicAverage (F := F) S₀ ω (Q a)).symm.trans
+    ((congrArg (globalThetaPrincipalValue F S₀) hA).trans
+      (globalThetaPrincipalValue_isotypicAverage (F := F) S₀ ω (Q b)))
+
+/-- Inserting a local principal value and applying principal value after insertion
+give equal homogeneous classes. -/
+private theorem sLocalPrincipalValue_homogeneous_comm {S₀ : Finset Places}
+    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) (ω : PontryaginDual (m𝔽).ker) (g : ℬₛ) :
+    (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S (sAdelePrincipalValue F h₀ g)) =
+      (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ (sAdeleSchwartzToGlobal F S g)) := by
+  let Q := (LinearMap.ker (sLocalAdelicTheta F S)).mkQ
+  let P := (exists_globalThetaToHomogeneousProduct (F := F)).choose
+  have h := LinearMap.congr_fun (sLocalThetaPrincipalValue_toGlobal (F := F) h₀ hn) (Q g)
+  exact ((exists_globalThetaToHomogeneousProduct (F := F)).choose_spec.2 _ ω).symm.trans
+    ((congrArg (fun z => P z ω) h).trans
+      ((exists_globalThetaToHomogeneousProduct (F := F)).choose_spec.2 _ ω))
+
+private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
+    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F)))
+    (χ : PontryaginDual C𝔽) (hχ : globalUnitary(χ) ∈ unramifiedOutside F S₀) (f : ℬₛ) :
+    let hS : globalUnitary(χ) ∈ unramifiedOutside F S := outsideS(h₀, hχ)
+    let ω := globalNormOne(χ)
+    let hω : NormOneCharacterUnramifiedOutside ω S := ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S ω hω
+    let x := (Kₛ(ωₛ)).mkQ f
+    let π := sLocalHomogeneousThetaToGlobal hω
+    x ∈ (sLocalHomogeneousThetaPrincipalValue h₀ ωₛ).range ↔
+      ∃ g : ℬ𝔽, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g) = π x := by
+  intro hS ω hω ωₛ x π
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified hPic hω
+  have heπ (z) : e z = π z := LinearMap.congr_fun he z
+  let L := sAdeleSchwartzToGlobal F S
+  let Q := (Kₛ(ωₛ)).mkQ
+  have hcomm (g : ℬₛ) :
+      π (sLocalHomogeneousThetaPrincipalValue h₀ ωₛ (Q g)) =
+        (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ (L g)) :=
+    sLocalPrincipalValue_homogeneous_comm h₀ hn ω g
+  constructor
+  · rintro ⟨z, hz⟩
+    obtain ⟨g, rfl⟩ := (Kₛ(ωₛ)).mkQ_surjective z
+    exact ⟨L g, (hcomm g).symm.trans (congrArg π hz)⟩
+  · rintro ⟨g, hg⟩
+    obtain ⟨z, hz⟩ := e.surjective ((K𝔽(ω)).mkQ g)
+    obtain ⟨u, rfl⟩ := (Kₛ(ωₛ)).mkQ_surjective z
+    have hu : (K𝔽(ω)).mkQ (L u) = (K𝔽(ω)).mkQ g :=
+      (heπ (Q u)).symm.trans hz
+    refine ⟨Q u, e.injective ?_⟩
+    exact (heπ _).trans ((hcomm u).trans
+      ((sLocalPrincipalValue_global_congr ω (L u) g hu).trans (hg.trans (heπ x).symm)))
 
 open Classical in
 /-- Paper: Proposition 7.2.2.1, p. 339.
@@ -2390,7 +3485,16 @@ theorem sLocalPrincipalValue_tfae {S₀ : Finset Places} (h₀ : S₀ ⊆ S) (_h
           meromorphicOrderAt Z s),
       x ∈ (sLocalHomogeneousThetaPrincipalValue h₀ ωₛ).range,
       (∃ g : ℬ𝔽, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g) = π x)
-    ] := by sorry
+    ] := by
+  intro hS ω hω ωₛ x π Z
+  tfae_have 1 ↔ 2 := sLocalPrincipalValue_tfae_one_two h₀ χ hS f
+  tfae_have 3 ↔ 4 := sLocalPrincipalValue_tfae_three_four h₀ _hn _hPic χ hχ f
+  tfae_have 2 ↔ 4 := by
+    have hπ : π x = (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S f) :=
+      sLocalHomogeneousThetaToGlobal_mk hω f
+    rw [hπ]
+    exact sLocalPrincipalValue_two_four h₀ χ hS (sAdeleSchwartzToGlobal F S f)
+  tfae_finish
 
 local notation "polarValuesₛ" =>
   (fun f : ℬₛ ↦ (f (Multiplicative.ofAdd 0), sAdeleSchwartzFourier f (Multiplicative.ofAdd 0)))
@@ -2419,6 +3523,11 @@ Insertion with integer indicators outside S preserves the two zero evaluations
 that define the polar subspaces. -/
 theorem sAdeleSchwartzToGlobal_mem_polarSubspace (f : sAdelePolarSubspace F S) :
     sAdeleSchwartzToGlobal F S f.val ∈ adelePolarSubspace F := by sorry
+
+-- For the restricted range pullback (I225), insertion preserves evaluation at
+-- zero and scales Fourier evaluation at zero by the nonzero outside additive
+-- mass. The divided transform's two polar evaluations are described in
+-- `globalPrincipalValueConverse_normTwist_divided_exact`.
 
 open Classical in
 /-- Paper: Corollary 7.2.2.2, p. 340.
