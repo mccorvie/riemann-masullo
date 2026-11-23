@@ -12,6 +12,7 @@ public import Mathlib.RingTheory.PowerSeries.PiTopology
 public import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.Complete
 public import RiemannMasullo.ForMathlib.Topology.Algebra.Module.StrongDualQuotient
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import Mathlib.Analysis.Fourier.FiniteAbelian.PontryaginDuality
 
 /-! # Non-archimedean principal values and distributions supported at the origin
 
@@ -718,6 +719,219 @@ theorem finitePlacePrincipalValue_spec (v : V) (π : Fᵥ(v)ˣ)
     h.choose_spec.ne_zero) π h.choose_spec hπ f x
 
 open Classical in
+/-- The principal value acts as the local difference on unit-invariant tests and as the
+identity on the other integer-unit isotypes. -/
+private theorem finitePlacePrincipalValue_unique_obeys (v : V) (π : Fᵥ(v)ˣ)
+    (hπ : vval(v).IsUniformizer π.val)
+    (χ : PontryaginDual Uᵥ(v)) (f : ℬ(Fᵥ(v)))
+    (hf : ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val f = (χ u : ℂ) • f) :
+    finitePlacePrincipalValue v f = if χ = 1 then finitePlaceDifference v π f else f := by
+  have : BorelSpace Fᵥ(v)ˣ := ⟨rfl⟩
+  have : μᵥ(v).IsMulLeftInvariant := by
+    unfold finiteLocalMultiplicativeTamagawaMeasure
+    infer_instance
+  have hU : MeasurableSet (Uᵥ(v) : Set Fᵥ(v)ˣ) :=
+    (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet
+  have hpt : ∀ (u : Fᵥ(v)ˣ) (hu : u ∈ Uᵥ(v)) (y : Fᵥ(v)),
+      f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * y)) =
+        (χ ⟨u, hu⟩ : ℂ) * f (Multiplicative.ofAdd y) := by
+    intro u hu y
+    have h := congrArg (fun g : ℬ(Fᵥ(v)) ↦ g (Multiplicative.ofAdd y)) (hf ⟨u, hu⟩)
+    simp only at h
+    rw [schwartzBruhatUnitTranslate_apply] at h
+    exact h
+  have hm : (μᵥ(v).real Uᵥ(v) : ℂ) ≠ 0 := by
+    exact_mod_cast (finitePlacePrincipalValue_integrable v π f 1).1.ne'
+  refine SchwartzBruhat.ext fun x ↦ ?_
+  rw [finitePlacePrincipalValue_spec v π hπ]
+  unfold finitePlacePrincipalValueFun
+  split_ifs with h1
+  · subst h1
+    rw [setIntegral_congr_fun hU
+      (g := fun _ ↦ f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x.toAdd)))
+      (fun u hu ↦ by rw [hpt u hu]; simp), setIntegral_const, Complex.real_smul]
+    change _ = f x - f (Multiplicative.ofAdd ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))
+    field_simp
+  · obtain ⟨u0, hu0⟩ : ∃ u0 : Uᵥ(v), χ u0 ≠ 1 := by
+      by_contra! h
+      exact h1 (ContinuousMonoidHom.ext fun u ↦ h u)
+    have hI : ∫ u in Uᵥ(v), f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) *
+        ((↑π⁻¹ : Fᵥ(v)) * x.toAdd))) ∂μᵥ(v) = 0 := by
+      set y := (↑π⁻¹ : Fᵥ(v)) * x.toAdd
+      set I := ∫ u in Uᵥ(v), f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * y)) ∂μᵥ(v) with hIdef
+      have hII : I = (χ u0 : ℂ) * I := by
+        conv_lhs => rw [hIdef, ← finitePlacePrincipalValue_spec_setIntegral_mul_left μᵥ(v) _ hU
+          (fun u : Fᵥ(v)ˣ ↦ f (Multiplicative.ofAdd ((↑u⁻¹ : Fᵥ(v)) * y))) u0.val
+          (fun u ↦ Subgroup.mul_mem_cancel_left _ u0.property)]
+        rw [hIdef, ← integral_const_mul]
+        refine setIntegral_congr_fun hU fun u hu ↦ ?_
+        simp only
+        rw [mul_inv_rev, Units.val_mul, mul_assoc, ← hpt u0.val u0.property]
+        rw [mul_left_comm (↑u⁻¹ : Fᵥ(v)) (↑(u0.val)⁻¹ : Fᵥ(v)) y]
+      have h2 : (1 - (χ u0 : ℂ)) * I = 0 := by rw [sub_mul, one_mul, ← hII, sub_self]
+      have h3 : (1 - (χ u0 : ℂ)) ≠ 0 := by
+        intro h0
+        apply hu0
+        exact Circle.ext (by rw [Circle.coe_one]; linear_combination -h0)
+      exact (mul_eq_zero.mp h2).resolve_left h3
+    rw [hI, mul_zero, sub_zero]
+
+/-- Every local test is fixed by an open subgroup of the integer units. -/
+private theorem finitePlacePrincipalValue_unique_stab (v : V) (f : ℬ(Fᵥ(v))) :
+    ∃ N : Subgroup Uᵥ(v), IsOpen (N : Set Uᵥ(v)) ∧
+      ∀ n ∈ N, schwartzBruhatUnitTranslate (n : Uᵥ(v)).val f = f := by
+  let φ0 : Fᵥ(v) → ℂ := fun y ↦ f (Multiplicative.ofAdd y)
+  obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F v φ0).mp ⟨f, fun _ ↦ rfl⟩
+  have hinv : Continuous fun u : Fᵥ(v)ˣ ↦ (↑u⁻¹ : Fᵥ(v)) := Units.continuous_val.comp continuous_inv
+  have hΦ : IsLocallyConstant fun p : Fᵥ(v)ˣ × Fᵥ(v) ↦ (φ0 ((↑p.1⁻¹ : Fᵥ(v)) * p.2), φ0 p.2) :=
+    (hlc.comp_continuous ((hinv.comp continuous_fst).mul continuous_snd)).prodMk
+      (hlc.comp_continuous continuous_snd)
+  obtain ⟨B, A, hB, -, h1B, hA, hBA⟩ := generalized_tube_lemma isCompact_singleton
+    hcs.isCompact (hΦ {q | q.1 = q.2}) (fun p hp ↦ by
+      obtain ⟨hp1, -⟩ := hp
+      rw [Set.mem_singleton_iff] at hp1
+      change φ0 _ = φ0 _
+      rw [hp1, inv_one, Units.val_one, one_mul])
+  have hkey : ∀ u : Fᵥ(v)ˣ, u ∈ B → u⁻¹ ∈ B → ∀ y, φ0 ((↑u⁻¹ : Fᵥ(v)) * y) = φ0 y := by
+    intro u hu hu' y
+    by_cases hy : y ∈ tsupport φ0
+    · have h := hBA (Set.mk_mem_prod hu (hA hy))
+      rw [Set.mem_preimage, Set.mem_ofPred_eq] at h
+      exact h
+    · by_cases hy' : (↑u⁻¹ : Fᵥ(v)) * y ∈ tsupport φ0
+      · have h := hBA (Set.mk_mem_prod hu' (hA hy'))
+        rw [Set.mem_preimage, Set.mem_ofPred_eq] at h
+        simp only [inv_inv, Units.mul_inv_cancel_left] at h
+        exact h.symm
+      · rw [image_eq_zero_of_notMem_tsupport hy, image_eq_zero_of_notMem_tsupport hy']
+  let N : Subgroup Uᵥ(v) :=
+    { carrier := {n | ∀ y, φ0 (((n.val⁻¹ : Fᵥ(v)ˣ) : Fᵥ(v)) * y) = φ0 y}
+      one_mem' := fun y ↦ by
+        change φ0 (((1 : Fᵥ(v)ˣ)⁻¹ : Fᵥ(v)ˣ) * y) = φ0 y
+        rw [inv_one, Units.val_one, one_mul]
+      mul_mem' := fun {a b} ha hb y ↦ by
+        change φ0 ((((a.val * b.val)⁻¹ : Fᵥ(v)ˣ) : Fᵥ(v)) * y) = φ0 y
+        rw [mul_inv_rev, Units.val_mul, mul_assoc, hb, ha]
+      inv_mem' := fun {a} ha y ↦ by
+        change φ0 (((a.val⁻¹⁻¹ : Fᵥ(v)ˣ) : Fᵥ(v)) * y) = φ0 y
+        have h := ha ((a.val : Fᵥ(v)) * y)
+        rw [Units.inv_mul_cancel_left] at h
+        rw [inv_inv]
+        exact h.symm }
+  have hsub : {n : Uᵥ(v) | n.val ∈ B ∧ n.val⁻¹ ∈ B} ⊆ (N : Set Uᵥ(v)) := by
+    rintro n ⟨hn, hn'⟩
+    exact fun y ↦ hkey n.val hn hn' y
+  have hopen : IsOpen {n : Uᵥ(v) | n.val ∈ B ∧ n.val⁻¹ ∈ B} :=
+    (hB.preimage continuous_subtype_val).inter
+      (hB.preimage (continuous_inv.comp continuous_subtype_val))
+  have h1 : (1 : Uᵥ(v)) ∈ {n : Uᵥ(v) | n.val ∈ B ∧ n.val⁻¹ ∈ B} := by
+    refine ⟨h1B rfl, ?_⟩
+    rw [OneMemClass.coe_one, inv_one]
+    exact h1B rfl
+  refine ⟨N, Subgroup.isOpen_of_mem_nhds N (Filter.mem_of_superset (hopen.mem_nhds h1) hsub),
+    fun n hn ↦ ?_⟩
+  refine SchwartzBruhat.ext fun x ↦ ?_
+  rw [← ofAdd_toAdd x, schwartzBruhatUnitTranslate_apply]
+  exact hn x.toAdd
+
+open Classical in
+/-- The integer-unit isotypic tests span the local test space: average over the finite
+quotient of the units by the stabilizer, with its characters. -/
+private theorem finitePlacePrincipalValue_unique_span (v : V) (f : ℬ(Fᵥ(v))) :
+    f ∈ Submodule.span ℂ {g : ℬ(Fᵥ(v)) | ∃ χ : PontryaginDual Uᵥ(v),
+      ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val g = (χ u : ℂ) • g} := by
+  obtain ⟨N, hNo, hN⟩ := finitePlacePrincipalValue_unique_stab v f
+  have : CompactSpace Uᵥ(v) := isCompact_iff_compactSpace.mp (Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v)))
+  have : Finite (Uᵥ(v) ⧸ N) := Subgroup.quotient_finite_of_isOpen N hNo
+  have : DiscreteTopology (Uᵥ(v) ⧸ N) := QuotientGroup.discreteTopology hNo
+  have : Fintype (Additive (Uᵥ(v) ⧸ N)) := Fintype.ofFinite _
+  let L : Uᵥ(v) → ℬ(Fᵥ(v)) →ₗ[ℂ] ℬ(Fᵥ(v)) := fun u ↦
+    { toFun := schwartzBruhatUnitTranslate u.val
+      map_add' := fun _ _ ↦ Subtype.ext (funext fun _ ↦ rfl)
+      map_smul' := fun _ _ ↦ Subtype.ext (funext fun _ ↦ rfl) }
+  have hcomp : ∀ (a b : Uᵥ(v)) (g : ℬ(Fᵥ(v))), schwartzBruhatUnitTranslate a.val
+      (schwartzBruhatUnitTranslate b.val g) = schwartzBruhatUnitTranslate (a * b).val g := by
+    intro a b g
+    refine SchwartzBruhat.ext fun x ↦ ?_
+    rw [← ofAdd_toAdd x]
+    simp only [schwartzBruhatUnitTranslate_apply]
+    rw [Subgroup.coe_mul, mul_inv_rev, Units.val_mul, mul_assoc]
+  let T : Uᵥ(v) → ℬ(Fᵥ(v)) := fun u ↦ schwartzBruhatUnitTranslate u.val f
+  have hT : ∀ (u : Uᵥ(v)) (n : N), T (u * n) = T u := by
+    intro u n
+    simp only [T]
+    rw [← hcomp, hN n n.property]
+  let r : Uᵥ(v) ⧸ N → Uᵥ(v) := fun g ↦ g.out
+  have hr : ∀ u : Uᵥ(v), T (r (QuotientGroup.mk u)) = T u := by
+    intro u
+    obtain ⟨n, hn⟩ := QuotientGroup.mk_out_eq_mul N u
+    simp only [r]
+    rw [hn, hT]
+  have hrmk : ∀ g : Uᵥ(v) ⧸ N, (QuotientGroup.mk (r g) : Uᵥ(v) ⧸ N) = g :=
+    fun g ↦ QuotientGroup.out_eq' g
+  let S : Additive (Uᵥ(v) ⧸ N) → ℬ(Fᵥ(v)) := fun a ↦ T (r (Additive.toMul a))
+  have hS : ∀ (u : Uᵥ(v)) (a : Additive (Uᵥ(v) ⧸ N)), schwartzBruhatUnitTranslate u.val (S a) =
+      S (Additive.ofMul (QuotientGroup.mk u) + a) := by
+    intro u a
+    simp only [S, T]
+    rw [hcomp]
+    change T (u * r (Additive.toMul a)) =
+      T (r (Additive.toMul (Additive.ofMul (QuotientGroup.mk u) + a)))
+    rw [← hr (u * r (Additive.toMul a)), toMul_add, toMul_ofMul, QuotientGroup.mk_mul, hrmk]
+  let comp : AddChar (Additive (Uᵥ(v) ⧸ N)) ℂ → ℬ(Fᵥ(v)) := fun ψ ↦ ∑ a, ψ (-a) • S a
+  have hiso : ∀ ψ : AddChar (Additive (Uᵥ(v) ⧸ N)) ℂ, ∃ χ : PontryaginDual Uᵥ(v),
+      ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val (comp ψ) = (χ u : ℂ) • comp ψ := by
+    intro ψ
+    let ψc : Uᵥ(v) ⧸ N → Circle := fun g ↦
+      ⟨ψ (Additive.ofMul g), mem_sphere_zero_iff_norm.2 (ψ.norm_apply _)⟩
+    let χm : Uᵥ(v) →* Circle :=
+      { toFun := fun u ↦ ψc (QuotientGroup.mk u)
+        map_one' := by
+          apply Circle.ext
+          change ψ (Additive.ofMul (QuotientGroup.mk 1)) = 1
+          rw [QuotientGroup.mk_one, ofMul_one, AddChar.map_zero_eq_one]
+        map_mul' := fun a b ↦ by
+          apply Circle.ext
+          change ψ (Additive.ofMul (QuotientGroup.mk (a * b))) =
+            ψ (Additive.ofMul (QuotientGroup.mk a)) * ψ (Additive.ofMul (QuotientGroup.mk b))
+          rw [QuotientGroup.mk_mul, ofMul_mul, AddChar.map_add_eq_mul] }
+    have hχc : Continuous χm :=
+      (continuous_of_discreteTopology (f := ψc)).comp QuotientGroup.continuous_mk
+    refine ⟨⟨χm, hχc⟩, fun u ↦ ?_⟩
+    set c := Additive.ofMul (QuotientGroup.mk u : Uᵥ(v) ⧸ N)
+    change L u (comp ψ) = ψ c • comp ψ
+    simp only [comp, map_sum, map_smul]
+    change ∑ a, ψ (-a) • schwartzBruhatUnitTranslate u.val (S a) = _
+    simp only [hS]
+    rw [Fintype.sum_equiv (Equiv.addLeft c) (fun a ↦ ψ (-a) • S (c + a))
+      (fun b ↦ ψ (c + -b) • S b) (fun a ↦ by
+        simp only [Equiv.coe_addLeft]
+        rw [show c + -(c + a) = -a by abel]), Finset.smul_sum]
+    refine Finset.sum_congr rfl fun b _ ↦ ?_
+    rw [AddChar.map_add_eq_mul, mul_smul]
+  have hsum : ∑ ψ : AddChar (Additive (Uᵥ(v) ⧸ N)) ℂ, comp ψ =
+      (Fintype.card (Additive (Uᵥ(v) ⧸ N)) : ℂ) • f := by
+    simp only [comp]
+    rw [Finset.sum_comm]
+    simp only [← Finset.sum_smul, AddChar.sum_apply_eq_ite, neg_eq_zero, ite_smul, zero_smul,
+      Finset.sum_ite_eq', Finset.mem_univ, ite_true]
+    congr 1
+    change T (r (Additive.toMul 0)) = f
+    rw [toMul_zero, ← QuotientGroup.mk_one, hr]
+    change schwartzBruhatUnitTranslate (1 : Uᵥ(v)).val f = f
+    refine SchwartzBruhat.ext fun x ↦ ?_
+    rw [← ofAdd_toAdd x, schwartzBruhatUnitTranslate_apply, OneMemClass.coe_one, inv_one,
+      Units.val_one, one_mul]
+  have hc : (Fintype.card (Additive (Uᵥ(v) ⧸ N)) : ℂ) ≠ 0 :=
+    Nat.cast_ne_zero.mpr Fintype.card_ne_zero
+  have hf : f = (Fintype.card (Additive (Uᵥ(v) ⧸ N)) : ℂ)⁻¹ •
+      ∑ ψ : AddChar (Additive (Uᵥ(v) ⧸ N)) ℂ, comp ψ := by
+    rw [hsum, smul_smul, inv_mul_cancel₀ hc, one_smul]
+  rw [hf]
+  exact Submodule.smul_mem _ _ (Submodule.sum_mem _ fun ψ _ ↦ Submodule.subset_span (hiso ψ))
+
+open Classical in
 /-- Paper: Definition 5.3.1.2 and Lemma 5.3.1.3, p. 241.
 Weil's operator is uniquely specified by acting as the local difference on the trivial isotype
 and as the identity on every nontrivial integer-unit isotype. Both formulas preserve the
@@ -729,7 +943,19 @@ theorem finitePlacePrincipalValue_unique (v : V) (π : Fᵥ(v)ˣ)
         (∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val f = (χ u : ℂ) • f) →
         P f = if χ = 1 then finitePlaceDifference v π f else f
     obeys (finitePlacePrincipalValue v) ∧
-      ∀ P, obeys P → P = finitePlacePrincipalValue v := by sorry
+      ∀ P, obeys P → P = finitePlacePrincipalValue v := by
+  intro obeys
+  have hobeys : obeys (finitePlacePrincipalValue v) := fun χ f hf ↦
+    finitePlacePrincipalValue_unique_obeys v π hπ χ f hf
+  refine ⟨hobeys, fun P hP ↦ ?_⟩
+  have heq : Set.EqOn P.toLinearMap (finitePlacePrincipalValue v).toLinearMap
+      {g : ℬ(Fᵥ(v)) | ∃ χ : PontryaginDual Uᵥ(v),
+        ∀ u : Uᵥ(v), schwartzBruhatUnitTranslate u.val g = (χ u : ℂ) • g} := by
+    rintro g ⟨χ, hχ⟩
+    change P g = finitePlacePrincipalValue v g
+    rw [hP χ g hχ, hobeys χ g hχ]
+  ext1 f
+  exact LinearMap.eqOn_span' heq (finitePlacePrincipalValue_unique_span v f)
 
 /-- The principal value is injective: a test in its kernel is invariant under the integer
 units and under the uniformizer, so it vanishes. -/
