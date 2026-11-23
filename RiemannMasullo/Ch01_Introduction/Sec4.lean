@@ -250,7 +250,37 @@ theorem introTraceApprox_support (h ρ : ℕ → ℝ → ℝ)
 the printed pointwise limit. -/
 theorem introTraceApprox_tendsto (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (z : ℂ) (t : ℝ) (_ht : 0 < t) (_ht₁ : t ≠ 1) :
-    Tendsto (fun n ↦ introTraceApprox (h n) (ρ n) z t) atTop (𝓝 (introTracePower z t)) := by sorry
+    Tendsto (fun n ↦ introTraceApprox (h n) (ρ n) z t) atTop (𝓝 (introTracePower z t)) := by
+  obtain ⟨hh, -, hhlim, ε, hε, hρ⟩ := _hA
+  rcases lt_or_gt_of_ne _ht₁ with ht | ht
+  · have hzero (n : ℕ) : h n t = 0 := by
+      by_contra hn
+      exact (not_lt.mpr ht.le) ((hh n).2.2.1 (subset_tsupport _ hn))
+    simp [introTraceApprox, hzero, introTracePower, ht.not_gt, ht.ne]
+  · have hcont : ContinuousAt (introTracePower z) t := by
+      apply (Complex.continuousAt_ofReal_cpow_const t (-z) (Or.inr _ht.ne')).congr_of_eventuallyEq
+      filter_upwards [lt_mem_nhds ht] with x hx
+      simp [introTracePower, hx]
+    have hmeas : Measurable (introTracePower z) :=
+      Measurable.ite measurableSet_Ioi (by fun_prop)
+        (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+    have hsmall : Tendsto (fun n ↦ support (ρ n)) atTop (𝓝 0).smallSets := by
+      rw [Metric.nhds_basis_ball.smallSets.tendsto_right_iff]
+      intro r hr
+      filter_upwards [hε.eventually_lt_const hr] with n hn
+      intro x hx
+      have hmem := (hρ n).2.2.2.1 (subset_tsupport _ hx)
+      simpa only [Metric.mem_ball, Real.dist_0_eq_abs, abs_lt] using
+        (show -r < x ∧ x < r from ⟨lt_of_lt_of_le (neg_lt_neg hn) hmem.1, hmem.2.trans_lt hn⟩)
+    have hconv := convolution_tendsto_right (μ := volume)
+      (g := fun _ : ℕ ↦ introTracePower z) (k := fun _ ↦ t)
+      (Eventually.of_forall fun n ↦ (hρ n).2.2.1)
+      (Eventually.of_forall fun n ↦ (hρ n).2.2.2.2) hsmall
+      (Eventually.of_forall fun _ ↦ hmeas.aestronglyMeasurable)
+      (hcont.tendsto.comp tendsto_snd) tendsto_const_nhds
+    have hcut := Complex.continuous_ofReal.continuousAt.tendsto.comp (hhlim t ht)
+    simpa only [introTraceApprox, convolution, ContinuousLinearMap.lsmul_apply,
+      Complex.real_smul, Complex.ofReal_one, one_mul, Function.comp_def] using hcut.mul hconv
 
 /-- Paper: §1.4.2, pp. 28–29. At any fixed norm, the mollified cutoff
 depends holomorphically on the complex parameter. -/
