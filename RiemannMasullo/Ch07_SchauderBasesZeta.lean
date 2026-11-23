@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Chapter 7. Schauder Bases of Idelic Zeta functions
 

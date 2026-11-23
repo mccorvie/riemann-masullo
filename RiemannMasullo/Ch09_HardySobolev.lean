@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Chapter 9. Hardy-Sobolev topologies
 

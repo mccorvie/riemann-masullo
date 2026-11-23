@@ -1259,17 +1259,6 @@ theorem iteratedDeriv_exponentialDecay (m : ℕ) (a : ℝ) :
     refine (hB (A f) x).trans ?_
     exact iteratedDeriv_exponentialDecay_succ m (A f).val zeroExtension(f.val) (hA f) x
 
--- TODO(paper-gap): The first Wirtinger operator in the printed weighted shift is
--- missing the exponent m. The proof uses m derivatives for both operators.
-
-/-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
-Either iterated Wirtinger derivative gives a continuous operator into the indicated decay space.
-Deviation: Both derivatives have order m, as in the proof. The stated target with shift m is
-retained, although the squared norm permits a shift of m/2. -/
-theorem iteratedWirtinger_exponentialDecay (conjugate : Bool) (m : ℕ) {a : ℝ} (_ha : a < 0) :
-    ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi (a + m)),
-      ∀ f z, (D f).val z = ((wirtinger(conjugate))^[m] zeroExtension(f.val)) z.val := by sorry
-
 /-- Every output weight of the derivative comes from the input weight one lower;
 the initial topology of all twists makes this a continuous endomorphism. -/
 private theorem iteratedDeriv_allExponentialDecay_step :
@@ -1428,41 +1417,50 @@ private theorem ext_unit (f : 𝓔(ℂ, 2, univ)) (u : ℂˣ) : extZero f u.val 
   simp [extZero, u.ne_zero]
 
 /-- Combine a phase multiplier and differentiability on the punctured plane with the two orbit operators. -/
+private theorem onWeightIn {S : Set ℝ}
+    (hreg : ∀ (f : 𝓔(ℂ, 2, S)) (z : ℂˣ), DifferentiableAt ℝ zeroExtension(f.val) z.val)
+    (s : Bool) (c : ℝ) (hc : c - 1/2 ∈ S) (M : SchwartzBruhat ℂˣ →L[ℂ] SchwartzBruhat ℂˣ)
+    (hM : ∀ (g : SchwartzBruhat ℂˣ) (z : ℂˣ), M g z =
+      ((‖z.val‖ : ℝ) : ℂ) / (if s then star z.val else z.val) * g z) :
+    ∃ U : 𝓔(ℂ, 2, S) →L[ℂ] SchwartzBruhat ℂˣ, ∀ f (z : ℂˣ),
+      U f z = twist c ((if s then wirtingerConjDeriv else wirtingerDeriv) zeroExtension(f.val)) z.val := by
+  let b := c - 1/2
+  let n := archimedeanUnitModulation ℂ 2
+  let W : 𝓔(ℂ, 2, S) →L[ℂ] SchwartzBruhat ℂˣ :=
+    ⟨modulatedExponentialDecayTwist n S ⟨b, hc⟩, continuous_decay_twist n S _⟩
+  have hw (f : 𝓔(ℂ, 2, S)) (z : ℂˣ) : W f z = twist b zeroExtension(f.val) z.val := by
+    change (((((archimedeanUnitModulation ℂ 2 z).val : ℝ) ^ b : ℝ) : ℂ) * f.val z) = _
+    rw [archimedeanUnitModulation_apply, twist, dite_eq_left z.ne_zero, show Units.mk0 z.val z.ne_zero = z from Units.ext rfl]
+  obtain ⟨R,hR⟩ := bruhatFirstOrder_schwartz (flow 1)
+  obtain ⟨A,hA⟩ := bruhatFirstOrder_schwartz (flow I)
+  let B := R + (if s then I else -I) • A - (2 * (b : ℂ)) • ContinuousLinearMap.id ℂ _
+  refine ⟨((1/2 : ℂ) • M).comp (B.comp W), fun f z ↦ ?_⟩
+  have hd := hreg f z
+  have horbit (v : ℂ) : bruhatDirectionalDeriv (flow v) (W f) z =
+      deriv (fun t : ℝ ↦ twist b zeroExtension(f.val) (z.val * exp ((t : ℂ) * v))) 0 := by
+    unfold bruhatDirectionalDeriv
+    congr 1
+    funext t
+    exact hw f _
+  change (1/2 : ℂ) * M (B (W f)) z = _
+  rw [hM]
+  change _ * (_ * (R (W f) z + _ * A (W f) z - (2 * (b : ℂ)) * W f z)) = _
+  rw [hR, hA, horbit, horbit, hw]
+  have h := shifted s b zeroExtension(f.val) z.val z.ne_zero hd
+  rw [show b + 1/2 = c by dsimp [b]; ring] at h
+  simp only [mul_one] at *
+  rw [h]
+  ring
+
+/-- Specialize the input twist to the space of all exponents. -/
 private theorem onWeight
     (hreg : ∀ (f : 𝓔(ℂ, 2, univ)) (z : ℂˣ), DifferentiableAt ℝ (extZero f) z.val)
     (s : Bool) (c : ℝ) (M : SchwartzBruhat ℂˣ →L[ℂ] SchwartzBruhat ℂˣ)
     (hM : ∀ (g : SchwartzBruhat ℂˣ) (z : ℂˣ), M g z =
       ((‖z.val‖ : ℝ) : ℂ) / (if s then star z.val else z.val) * g z) :
     ∃ U : 𝓔(ℂ, 2, univ) →L[ℂ] SchwartzBruhat ℂˣ, ∀ f (z : ℂˣ),
-      U f z = twist c ((if s then wirtingerConjDeriv else wirtingerDeriv) (extZero f)) z.val := by
-  let b := c - 1/2
-  let n := archimedeanUnitModulation ℂ 2
-  let W (a : ℝ) : 𝓔(ℂ, 2, univ) →L[ℂ] SchwartzBruhat ℂˣ :=
-    ⟨modulatedExponentialDecayTwist n Set.univ ⟨a, Set.mem_univ _⟩,
-      continuous_decay_twist n Set.univ _⟩
-  have hw (a : ℝ) (f : 𝓔(ℂ, 2, univ)) (z : ℂˣ) : W a f z = twist a (extZero f) z.val := by
-    change (((((archimedeanUnitModulation ℂ 2 z).val : ℝ) ^ a : ℝ) : ℂ) * f.val z) = _
-    rw [archimedeanUnitModulation_apply, twist, ext_unit]
-  obtain ⟨R,hR⟩ := bruhatFirstOrder_schwartz (flow 1)
-  obtain ⟨A,hA⟩ := bruhatFirstOrder_schwartz (flow I)
-  let B := R + (if s then I else -I) • A - (2 * (b : ℂ)) • ContinuousLinearMap.id ℂ _
-  refine ⟨((1/2 : ℂ) • M).comp (B.comp (W b)), fun f z ↦ ?_⟩
-  have hd := hreg f z
-  have horbit (v : ℂ) : bruhatDirectionalDeriv (flow v) (W b f) z =
-      deriv (fun t : ℝ ↦ twist b (extZero f) (z.val * exp ((t : ℂ) * v))) 0 := by
-    unfold bruhatDirectionalDeriv
-    congr 1
-    funext t
-    exact hw b f _
-  change (1/2 : ℂ) * M (B (W b f)) z = _
-  rw [hM]
-  change _ * (_ * (R (W b f) z + _ * A (W b f) z - (2 * (b : ℂ)) * W b f z)) = _
-  rw [hR, hA, horbit, horbit, hw]
-  have h := shifted s b (extZero f) z.val z.ne_zero hd
-  rw [show b + 1/2 = c by dsimp [b]; ring] at h
-  simp only [mul_one] at *
-  rw [h]
-  ring
+      U f z = twist c ((if s then wirtingerConjDeriv else wirtingerDeriv) (extZero f)) z.val :=
+  onWeightIn hreg s c (mem_univ _) M hM
 
 private def phase (s : Bool) : PontryaginDual ℂˣ where
   toFun z := ⟨(‖z.val‖ : ℂ) / (if s then star z.val else z.val), by
@@ -1845,14 +1843,14 @@ private theorem complexExponentialDecay_contDiffOn_unitsChart {K : Type*} [Norme
 
 /-- Dividing a positive weighted Schwartz–Bruhat twist by its smooth nonzero
 weight recovers the original function on the punctured field. -/
-private theorem complexExponentialDecay_contDiffOn_of_weight {K : Type*} [NormedField K]
+private theorem complexExponentialDecay_contDiffOn_of_weightIn {S : Set ℝ} {K : Type*} [NormedField K]
     [NormedAlgebra ℝ K] [CompleteSpace K] [LocallyCompactSpace K] [DecidableEq K]
-    (m : Kˣ →ₜ* ℝ≥0ˣ) (a : ℝ) (ha : a ∈ Ioi (0 : ℝ))
-    (f : ModulatedExponentialDecay m (Ioi (0 : ℝ)))
+    (m : Kˣ →ₜ* ℝ≥0ˣ) (a : ℝ) (ha : a ∈ S)
+    (f : ModulatedExponentialDecay m S)
     (w : K → ℂ) (hw : ContDiff ℝ (∞ : ℕ∞ω) w)
     (hwu : ∀ u : Kˣ, w u.val = (((m u).val : ℝ) ^ a : ℝ)) :
     ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set K) := by
-  let g := modulatedExponentialDecayTwist m (Ioi (0 : ℝ)) ⟨a, ha⟩ f
+  let g := modulatedExponentialDecayTwist m S ⟨a, ha⟩ f
   have hn (x : K) (hx : x ≠ 0) : w x ≠ 0 := by
     change w (Units.mk0 x hx).val ≠ 0
     rw [hwu]
@@ -1868,6 +1866,15 @@ private theorem complexExponentialDecay_contDiffOn_of_weight {K : Type*} [Normed
     (modulatedExponentialDecayTwist_apply m _ _ f u).trans (by rw [← hwu]; rfl)
   change f.val u = g.val u * (w x)⁻¹
   rw [hg, mul_right_comm, mul_inv_cancel₀ (hn x hx0), one_mul]
+
+private theorem complexExponentialDecay_contDiffOn_of_weight {K : Type*} [NormedField K]
+    [NormedAlgebra ℝ K] [CompleteSpace K] [LocallyCompactSpace K] [DecidableEq K]
+    (m : Kˣ →ₜ* ℝ≥0ˣ) (a : ℝ) (ha : a ∈ Ioi (0 : ℝ))
+    (f : ModulatedExponentialDecay m (Ioi (0 : ℝ)))
+    (w : K → ℂ) (hw : ContDiff ℝ (∞ : ℕ∞ω) w)
+    (hwu : ∀ u : Kˣ, w u.val = (((m u).val : ℝ) ^ a : ℝ)) :
+    ContDiffOn ℝ (∞ : ℕ∞ω) zeroExtension(f.val) ({0}ᶜ : Set K) :=
+  complexExponentialDecay_contDiffOn_of_weightIn m a ha f w hw hwu
 
 /-- Paper: Proposition 5.3.3.2(2)(1), p. 250.
 Weighted Schwartz–Bruhat functions are smooth on the punctured real line. -/
@@ -1894,6 +1901,107 @@ theorem complexExponentialDecay_contDiffOn (f : 𝓔(ℂ, 2, Ioi 0)) :
     (Complex.ofRealCLM.contDiff.comp hn)
   intro u
   rw [archimedeanUnitModulation_apply, Real.rpow_one, Complex.normSq_eq_norm_sq]
+
+namespace IteratedWirtinger
+
+open Complex
+
+/-- Recover local differentiability by taking one positive integral power of the
+squared norm whose exponent belongs to the input interval. -/
+private theorem intervalDifferentiable (a : ℝ) (f : 𝓔(ℂ, 2, Ioi a)) (z : ℂˣ) :
+    DifferentiableAt ℝ zeroExtension(f.val) z.val := by
+  obtain ⟨k, hk⟩ := exists_nat_gt a
+  have hn : ContDiff ℝ (∞ : ℕ∞ω) (fun y : ℂ ↦ normSq y) := by
+    simp only [normSq_apply]
+    exact (reCLM.contDiff.mul reCLM.contDiff).add (imCLM.contDiff.mul imCLM.contDiff)
+  have hc := complexExponentialDecay_contDiffOn_of_weightIn (archimedeanUnitModulation ℂ 2)
+    (k : ℝ) (show (k : ℝ) ∈ Ioi a from hk) f (fun y ↦ ((normSq y)^k : ℝ))
+    (ofRealCLM.contDiff.comp (hn.pow k)) (fun u ↦ by
+      rw [archimedeanUnitModulation_apply, normSq_eq_norm_sq, Real.rpow_natCast])
+  exact (hc.contDiffAt (isOpen_compl_singleton.mem_nhds z.ne_zero)).differentiableAt (by decide)
+
+/-- At each output weight the derivative uses the input weight one half lower.
+Untwist at one such weight to construct the underlying linear map. -/
+private theorem intervalStep (s : Bool) (a : ℝ) :
+    ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi (a + 1)), ∀ f (z : ℂˣ),
+      (D f).val z = (wirtinger(s)) zeroExtension(f.val) z.val := by
+  let n := archimedeanUnitModulation ℂ 2
+  let J := Ioi (a + 1)
+  let E := ModulatedExponentialDecay n (Ioi a)
+  let d (f : E) (z : ℂˣ) := (wirtinger(s)) zeroExtension(f.val) z.val
+  obtain ⟨M, hM⟩ := phaseMultiplier s
+  have htwist (c : J) : ∃ U : E →L[ℂ] SchwartzBruhat ℂˣ,
+      ∀ f, (U f).val = modulationWeight n c (d f) := by
+    have hc : c.val - 1/2 ∈ Ioi a := by
+      have hc' : a + 1 < c.val := c.property
+      change a < _
+      linarith
+    obtain ⟨U, hU⟩ := onWeightIn (intervalDifferentiable a) s c hc M hM
+    refine ⟨U, fun f ↦ funext fun z ↦ (hU f z).trans ?_⟩
+    change _ = (((((archimedeanUnitModulation ℂ 2 z).val : ℝ) ^ (c : ℝ) : ℝ) : ℂ) * d f z)
+    rw [archimedeanUnitModulation_apply]
+    rfl
+  let c₀ : J := ⟨a + 1 + 1, lt_add_one _⟩
+  let U := (htwist c₀).choose
+  let L : E →ₗ[ℂ] (ℂˣ → ℂ) := (modulationWeight n (-c₀.val)).comp
+    ((schwartzBruhatSubmodule ℂˣ).subtype.comp U.toLinearMap)
+  have hL (f : E) : L f = d f := by
+    funext z
+    change modulationWeight n (-c₀.val) (U f).val z = _
+    rw [(htwist c₀).choose_spec f]
+    change (((((n z).val : ℝ) ^ (-c₀.val) : ℝ) : ℂ) *
+      (((((n z).val : ℝ) ^ c₀.val : ℝ) : ℂ) * d f z)) = _
+    rw [← mul_assoc, ← ofReal_mul, ← Real.rpow_add (NNReal.coe_pos.mpr (Units.zero_lt _)),
+      neg_add_cancel, Real.rpow_zero, ofReal_one, one_mul]
+  let D := L.codRestrict (modulatedExponentialDecaySubmodule n J) fun f ↦
+    (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr (by
+      change modulationWeight n c (L f) ∈ schwartzBruhatSubmodule ℂˣ
+      rw [hL f, ← (htwist c).choose_spec f]
+      exact ((htwist c).choose f).property)
+  let iso := (stdOrthonormalBasis ℝ ℂ).repr
+  have hk : IsBruhatGoodSubgroup (⊥ : Subgroup ℂˣ) :=
+    isBruhatGoodSubgroup_bot_iff.mpr ⟨_, ⟨(iso.toHomeomorph.isOpenEmbedding.comp
+      (Units.isOpenEmbedding_val (R := ℂ))).singletonChartedSpace⟩⟩
+  refine ⟨⟨D, (iteratedDeriv_exponentialDecay_inducing_of_bot n J hk.2.2).continuous_iff.mpr
+    (continuous_pi fun c ↦ ?_)⟩, fun f ↦ congrFun (hL f)⟩
+  exact (htwist c).choose.continuous.congr fun f ↦ Subtype.ext
+    (((htwist c).choose_spec f).trans (congrArg (modulationWeight n c) (hL f).symm))
+
+end IteratedWirtinger
+
+-- TODO(paper-gap): The first Wirtinger operator in the printed weighted shift is
+-- missing the exponent m. The proof uses m derivatives for both operators.
+
+/-- Paper: Proposition 5.3.3.2(2)(2), p. 250.
+Either iterated Wirtinger derivative gives a continuous operator into the indicated decay space.
+Deviation: Both derivatives have order m, as in the proof. The stated target with shift m is
+retained, although the squared norm permits a shift of m/2. -/
+theorem iteratedWirtinger_exponentialDecay (conjugate : Bool) (m : ℕ) {a : ℝ} (_ha : a < 0) :
+    ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi (a + m)),
+      ∀ f z, (D f).val z = ((wirtinger(conjugate))^[m] zeroExtension(f.val)) z.val := by
+  let W := wirtinger(conjugate)
+  let P (k : ℕ) (b : ℝ) := ∃ D : 𝓔(ℂ, 2, Ioi a) →L[ℂ] 𝓔(ℂ, 2, Ioi b),
+    ∀ f (z : ℂˣ), (D f).val z = (W^[k] zeroExtension(f.val)) z.val
+  change P m (a + m)
+  induction m with
+  | zero =>
+    rw [Nat.cast_zero, add_zero]
+    refine ⟨ContinuousLinearMap.id ℂ _, fun f z ↦ ?_⟩
+    change f.val z = zeroExtension(f.val) z.val
+    simp only [dite_eq_left z.ne_zero]
+    exact congrArg f.val (Units.ext rfl)
+  | succ m ih =>
+    rw [Nat.cast_succ, ← add_assoc]
+    obtain ⟨A, hA⟩ := ih
+    obtain ⟨B, hB⟩ := IteratedWirtinger.intervalStep conjugate (a + m)
+    refine ⟨B.comp A, fun f z ↦ (hB (A f) z).trans ?_⟩
+    change W zeroExtension((A f).val) z.val = (W^[m+1] zeroExtension(f.val)) z.val
+    rw [Function.iterate_succ_apply']
+    have he : zeroExtension((A f).val) =ᶠ[𝓝 z.val] W^[m] zeroExtension(f.val) := by
+      filter_upwards [isOpen_compl_singleton.mem_nhds (show z.val ∈ ({0}ᶜ : Set ℂ) from z.ne_zero)] with y hy
+      exact (dite_eq_left (show y ≠ 0 from hy)).trans (hA f (Units.mk0 y hy))
+    have hd := he.fderiv_eq (𝕜 := ℝ)
+    cases conjugate <;> simp [W, wirtingerConjDeriv, wirtingerDeriv] at hd ⊢ <;> rw [hd]
 
 end PuncturedLine
 

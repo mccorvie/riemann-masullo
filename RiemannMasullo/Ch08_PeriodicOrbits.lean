@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Chapter 8. Periodic Orbits and Fixed Points
 

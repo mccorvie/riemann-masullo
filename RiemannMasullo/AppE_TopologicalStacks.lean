@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Appendix E. Topological stacks
 

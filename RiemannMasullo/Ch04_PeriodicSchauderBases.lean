@@ -1,5 +1,3 @@
-import Mathlib
-
 /-!
 # Chapter 4. Periodic Schauder Bases on modulated groups
 

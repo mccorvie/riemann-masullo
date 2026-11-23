@@ -1876,15 +1876,6 @@ theorem sLocalThetaPrincipalValue_toGlobal {S₀ S : Finset V}
   apply sLocalThetaPrincipalValue_transition_mapQ
   exact sLocalThetaPrincipalValue_toGlobal_tests h₀
 
-/-- Paper: Lemma 5.3.1.5, p. 242.
-The S-local principal value commutes with each S-idele translation on theta classes. -/
-theorem sLocalThetaPrincipalValue_equivariant {S₀ S : Finset V}
-    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) (g : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
-    Submodule.Quotient.mk
-        (sAdelePrincipalValue F h₀ (schwartzBruhatUnitTranslate g f)) =
-      (Submodule.Quotient.mk
-        (schwartzBruhatUnitTranslate g (sAdelePrincipalValue F h₀ f)) : Θₛ(S)) := by sorry
-
 /-- Weil's local principal value commutes with multiplicative translation, since both only
 rescale the argument. -/
 private theorem globalThetaPrincipalValue_equivariant_local (v : V) (c : (v.adicCompletion F)ˣ)
@@ -1993,6 +1984,68 @@ private theorem globalThetaPrincipalValue_equivariant_stage {S₀ : Finset V}
     (D := fun w : S₀ ↦ ℬ(w.val.adicCompletion F)) e' (P ∘ₗ T) (T ∘ₗ P)
     (by with_reducible exact hyp) k
 
+open Classical in
+/-- The S-local principal value commutes with translation by an S-idele, for any set of
+selected places: the selected factors are invariant by the local commutation and the
+remaining factors act by the identity on both sides. -/
+private theorem sLocalThetaPrincipalValue_equivariant_stage {S₀ S : Finset V} (h₀ : S₀ ⊆ S)
+    (gS : (SAdeleRing F S)ˣ) (k : ℬₛ(S)) :
+    sAdelePrincipalValue F h₀ (schwartzBruhatUnitTranslate gS k) =
+      schwartzBruhatUnitTranslate gS (sAdelePrincipalValue F h₀ k) := by
+  let e' := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  have he' := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec
+  let P := sAdelePrincipalValue F h₀
+  let T : ℬₛ(S) →ₗ[ℂ] ℬₛ(S) :=
+    { toFun := schwartzBruhatUnitTranslate gS
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let gInf : (InfiniteAdeleRing F)ˣ := Units.map (RingHom.fst _ _).toMonoidHom gS
+  let gw (w : S) : (w.val.adicCompletion F)ˣ :=
+    Units.map ((Pi.evalRingHom _ w).comp (RingHom.snd _ _)).toMonoidHom gS
+  have hT (a : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      T (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) = e' (schwartzBruhatUnitTranslate gInf a ⊗ₜ[ℂ]
+        (⨂ₜ[ℂ] w, schwartzBruhatUnitTranslate (gw w) (g w))) := by
+    apply Subtype.ext
+    funext x
+    refine (he' a g ((↑gS⁻¹ : SAdeleRing F S) * x.toAdd)).trans (Eq.trans ?_
+      (he' (schwartzBruhatUnitTranslate gInf a)
+        (fun w ↦ schwartzBruhatUnitTranslate (gw w) (g w)) x.toAdd).symm)
+    rfl
+  have hyp : ∀ (a : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F)),
+      (P ∘ₗ T) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) = (T ∘ₗ P) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) := by
+    intro a g
+    have h1 := sAdelePrincipalValue_tmul (F := F) h₀ (schwartzBruhatUnitTranslate gInf a)
+      (fun w ↦ schwartzBruhatUnitTranslate (gw w) (g w))
+    have h2 := sAdelePrincipalValue_tmul (F := F) h₀ a g
+    refine (congrArg P (hT a g)).trans (h1.trans ?_)
+    refine Eq.trans ?_ (congrArg T h2).symm
+    refine Eq.trans ?_ (hT a _).symm
+    have hfun : (fun w : S ↦ if w.val ∈ S₀ then
+          finitePlacePrincipalValue w.val (schwartzBruhatUnitTranslate (gw w) (g w))
+        else schwartzBruhatUnitTranslate (gw w) (g w)) =
+        fun w ↦ schwartzBruhatUnitTranslate (gw w)
+          (if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w) := by
+      funext w
+      by_cases hw : w.val ∈ S₀
+      · simp only [hw, ite_true]
+        exact globalThetaPrincipalValue_equivariant_local w.val (gw w) (g w)
+      · simp only [hw, ite_false]
+    exact congrArg (fun φ : ∀ w : S, ℬ(w.val.adicCompletion F) ↦
+      e' (schwartzBruhatUnitTranslate gInf a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, φ w))) hfun
+  exact globalThetaPrincipalValue_equivariant_ext
+    (D := fun w : S ↦ ℬ(w.val.adicCompletion F)) e' (P ∘ₗ T) (T ∘ₗ P)
+    (by with_reducible exact hyp) k
+
+/-- Paper: Lemma 5.3.1.5, p. 242.
+The S-local principal value commutes with each S-idele translation on theta classes. -/
+theorem sLocalThetaPrincipalValue_equivariant {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty) (g : (SAdeleRing F S)ˣ) (f : ℬₛ(S)) :
+    Submodule.Quotient.mk
+        (sAdelePrincipalValue F h₀ (schwartzBruhatUnitTranslate g f)) =
+      (Submodule.Quotient.mk
+        (schwartzBruhatUnitTranslate g (sAdelePrincipalValue F h₀ f)) : Θₛ(S)) :=
+  congrArg Submodule.Quotient.mk (sLocalThetaPrincipalValue_equivariant_stage h₀ g f)
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The global principal value commutes with each idele translation on theta classes. -/
 theorem globalThetaPrincipalValue_equivariant {S₀ : Finset V}
@@ -2045,13 +2098,6 @@ theorem globalThetaPrincipalValue_equivariant {S₀ : Finset V}
   refine Eq.trans ?_ (hT _ b).symm
   exact congrArg (fun z ↦ e (z ⊗ₜ[ℂ] schwartzBruhatUnitTranslate gt b))
     (globalThetaPrincipalValue_equivariant_stage gS k)
-
-/-- Paper: Lemma 5.3.1.5, p. 242.
-The S-local principal value commutes with the norm-one character average of §5.2.3. -/
-theorem sLocalThetaPrincipalValue_isotypicAverage {S₀ S : Finset V}
-    (h₀ : S₀ ⊆ S) (χ : PontryaginDual (sIdeleQuotientNorm F S).ker) (x : Θₛ(S)) :
-    let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) χ).exists.choose
-    sLocalThetaPrincipalValue F h₀ (A x) = A (sLocalThetaPrincipalValue F h₀ x) := by sorry
 
 private theorem globalThetaPrincipalValue_isotypicAverage_tensor
     {M N Y : Type*} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
@@ -2142,6 +2188,46 @@ private theorem globalThetaPrincipalValue_isotypicAverage_commutes
     exact LinearMap.congr_fun he (φ.comp P)
   simp only [map_smul, hP] at h
   exact h.unique (hA (P x))
+
+private theorem sLocalThetaPrincipalValue_isotypicAverage_action {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (q : SIdeleQuotient F S) (y : Θₛ(S)) :
+    let ρ := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
+    sLocalThetaPrincipalValue F h₀ (ρ q y) = ρ q (sLocalThetaPrincipalValue F h₀ y) := by
+  intro ρ
+  with_reducible_and_instances
+    exact globalThetaPrincipalValue_isotypicAverage_onReps
+      (QuotientGroup.mk : (SAdeleRing F S)ˣ → SIdeleQuotient F S)
+      (Submodule.Quotient.mk (p := Kₛ(S))) QuotientGroup.mk_surjective
+      (Submodule.Quotient.mk_surjective _)
+      (sAdelePrincipalValue F h₀) schwartzBruhatUnitTranslate (sLocalThetaPrincipalValue F h₀)
+      (fun g y ↦ ρ g y) (sLocalThetaPrincipalValue_mk h₀)
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.2
+      (fun g f ↦ congrArg (Submodule.Quotient.mk (p := Kₛ(S)))
+        (sLocalThetaPrincipalValue_equivariant_stage h₀ g f)) q y
+
+/-- Paper: Lemma 5.3.1.5, p. 242.
+The S-local principal value commutes with the norm-one character average of §5.2.3. -/
+theorem sLocalThetaPrincipalValue_isotypicAverage {S₀ S : Finset V}
+    (h₀ : S₀ ⊆ S) (χ : PontryaginDual (sIdeleQuotientNorm F S).ker) (x : Θₛ(S)) :
+    let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) χ).exists.choose
+    sLocalThetaPrincipalValue F h₀ (A x) = A (sLocalThetaPrincipalValue F h₀ x) := by
+  intro A
+  let P : Θₛ(S) →L[ℂ] Θₛ(S) :=
+    ⟨sLocalThetaPrincipalValue F h₀, sLocalThetaPrincipalValue_continuous h₀⟩
+  let ρ₀ := (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
+  let : T2Space Θₛ(S) := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ Θₛ(S) := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : IsTopologicalAddGroup Θₛ(S) := PolynormableSpace.isTopologicalAddGroup ℂ Θₛ(S)
+  let : ContinuousSMul ℂ Θₛ(S) := (PolynormableSpace.withSeminorms ℂ Θₛ(S)).continuousSMul
+  let : MeasurableSpace (MonoidHom.ker (sIdeleQuotientNorm F S)) := borel _
+  with_reducible_and_instances
+    refine globalThetaPrincipalValue_isotypicAverage_commutes
+      (μ := sLocalNormOneQuotientMeasure F S)
+      (ρ := ρ₀.comp (MonoidHom.ker (sIdeleQuotientNorm F S)).subtype) (χ := χ) (A := A)
+      (P := P) (existsUnique_sLocalThetaIsotypicAverage (F := F) χ).exists.choose_spec ?_ x
+  intro g y
+  exact sLocalThetaPrincipalValue_isotypicAverage_action h₀ g.val y
 
 private theorem globalThetaPrincipalValue_isotypicAverage_nonempty (S₀ : Finset V) (hn : S₀.Nonempty)
     (χ : PontryaginDual (ideleClassNorm F).ker) (x : Θ𝔽) :
