@@ -200,15 +200,8 @@ private theorem truncatedKernel_theta_top :
     let θ := χ j.val.1
     have hz : 1 < z.re := by norm_num [z, Complex.mul_re]
     obtain ⟨hL, hEq⟩ := continuedCompletedHeckeL_spec θ
-    have he : continuedCompletedHeckeL θ z = completedHeckeL θ ⟨z, hz⟩ := hEq ⟨z, hz⟩
-    have hne : continuedCompletedHeckeL θ z ≠ 0 := by
-      rw [he]
-      exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos θ (zero_lt_one.trans hz))
-        (finiteHeckeL_ne_zero_of_one_lt_re θ ⟨z, hz⟩)
-    have ho := (hL (mem_univ z)).meromorphicOrderAt_eq_zero_iff.mpr hne
     have hp : 0 < meromorphicOrderAt (continuedCompletedHeckeL θ) z := j.order_pos
-    rw [ho] at hp
-    exact (lt_irrefl _) hp
+    exact hz.not_gt (completedHeckeL_continuation_zeros θ _ hL hEq (zero_lt_one.trans hz) hp)
   have htop (l : ℝ) (hl : l ≤ 0) (he : l = 0) :
       globalThetaSobolev ℚ 2 hl hs₂ = ⊤ := by
     subst l
