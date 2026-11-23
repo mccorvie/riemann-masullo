@@ -6604,41 +6604,6 @@ private theorem stage_kernel_contains_small_powers (a : BruhatStructuralPair G)
   obtain ⟨z, hz, hzy⟩ := hx k
   exact (Subtype.ext hzy : z = y ^ k) ▸ hz
 
-omit hT2 in
-/-- A Schwartz–Bruhat function has a common period near zero along the image of a
-continuous additive nonarchimedean direction. -/
-theorem schwartzBruhat_eventually_mul_eq_of_nonarchimedean {H : Type*} [AddGroup H]
-    [TopologicalSpace H] [NonarchimedeanAddGroup H] (j : Multiplicative H →* G)
-    (hj : Continuous j) (f : SchwartzBruhat G) :
-    ∀ᶠ y : H in 𝓝 0, ∀ x, f (j (Multiplicative.ofAdd y) * x) = f x := by
-  let P : Submodule ℂ (G → ℂ) :=
-    { carrier := {f | ∀ᶠ y : H in 𝓝 0, ∀ x, f (j (Multiplicative.ofAdd y) * x) = f x}
-      zero_mem' := Eventually.of_forall fun _ _ ↦ rfl
-      add_mem' := by
-        intro f g hf hg
-        filter_upwards [hf, hg] with y hfy hgy x
-        exact congrArg₂ (· + ·) (hfy x) (hgy x)
-      smul_mem' := by
-        intro c f hf
-        filter_upwards [hf] with y hy x
-        exact congrArg (c • ·) (hy x) }
-  have hP : schwartzBruhatSubmodule G ≤ P := by
-    refine iSup_le fun a ↦ iSup_le fun e ↦ ?_
-    rintro _ ⟨s, rfl⟩
-    change ∀ᶠ y : H in 𝓝 0, ∀ x, _
-    obtain ⟨U, hU, hker⟩ := stage_kernel_contains_small_powers a e
-    have hJ : (j ∘ Multiplicative.ofAdd) ⁻¹' U ∈ 𝓝 (0 : H) :=
-      (hj.comp continuous_ofAdd).continuousAt.preimage_mem_nhds (by simpa using hU)
-    obtain ⟨V, hV⟩ := NonarchimedeanAddGroup.is_nonarchimedean _ hJ
-    filter_upwards [V.isOpen.mem_nhds V.zero_mem] with y hy x
-    apply stage_realization_mul_kernel a e s _ x
-    apply hker
-    intro k
-    have h := hV (V.nsmul_mem hy k)
-    change j (Multiplicative.ofAdd (k • y)) ∈ U at h
-    simpa only [ofAdd_nsmul, map_pow] using h
-  exact hP f.property
-
 /-- A sequence of nonidentity points generating arbitrarily small cyclic groups
 obstructs metrizability, since bounded tests must share a single stage kernel. -/
 private theorem schwartzBruhat_not_metrizable_of_small_powers (y : ℕ → G)
