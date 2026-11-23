@@ -411,12 +411,6 @@ theorem realCoordinate_mul_exponentialDecay (a : ℝ) :
     (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp j (fun p ↦ p.property k)
   exact ⟨(⟨j, hj⟩ : _ →L[ℂ] E).comp ⟨T, hT⟩, fun _ _ ↦ rfl⟩
 
-/-- Paper: Proposition 5.3.3.2(1), p. 249.
-Multiplication by z or its conjugate is continuous for decay on a closed upper half-line. -/
-theorem complexCoordinate_mul_exponentialDecay (conjugate : Bool) (a : ℝ) :
-    ∃ M : 𝓔(ℂ, 2, Ici a) →L[ℂ] 𝓔(ℂ, 2, Ici a),
-      ∀ f z, (M f).val z = complexCoordinate(conjugate) z.val * f.val z := by sorry
-
 /-- The real absolute value on the units is a surjective modulation. -/
 private theorem realCoordinate_mul_allExponentialDecay_modulation
     [SecondCountableTopology ℝˣ] :
@@ -462,6 +456,44 @@ private theorem complexCoordinate_mul_allExponentialDecay_modulation
     refine ⟨Units.mk0 _ ht, Units.ext (NNReal.eq ?_)⟩
     rw [archimedeanUnitModulation_apply, Units.val_mk0, Complex.norm_real, Real.norm_eq_abs,
       sq_abs, Real.sq_sqrt (NNReal.coe_nonneg _)]
+
+/-- Paper: Proposition 5.3.3.2(1), p. 249.
+Multiplication by z or its conjugate is continuous for decay on a closed upper half-line. -/
+theorem complexCoordinate_mul_exponentialDecay (conjugate : Bool) (a : ℝ) :
+    ∃ M : 𝓔(ℂ, 2, Ici a) →L[ℂ] 𝓔(ℂ, 2, Ici a),
+      ∀ f z, (M f).val z = complexCoordinate(conjugate) z.val * f.val z := by
+  let _ : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let m := archimedeanUnitModulation ℂ 2
+  obtain ⟨hm, hms⟩ := complexCoordinate_mul_allExponentialDecay_modulation
+  let d : QuasiCharacter ℂˣ := if conjugate then
+    ⟨(starRingEnd ℂ).toMonoidHom.comp (Units.coeHom ℂ), Complex.continuous_conj.comp Units.continuous_val⟩
+    else ⟨Units.coeHom ℂ, Units.continuous_val⟩
+  have hd (g : ℂˣ) : d g = complexCoordinate(conjugate) g.val := by cases conjugate <;> rfl
+  have hnorm (g : ℂˣ) : ‖d g‖ = ‖g.val‖ := by rw [hd]; cases conjugate <;> simp
+  have hn (g : ℂˣ) : d g ≠ 0 := ((Group.isUnit g).map d).ne_zero
+  let unit (g : ℂˣ) := d g / (‖d g‖ : ℂ)
+  let η : PontryaginDual ℂˣ :=
+    { toFun := fun g ↦ ⟨unit g, mem_sphere_zero_iff_norm.mpr (by
+        simp only [unit, norm_div, Complex.norm_real, Real.norm_of_nonneg (norm_nonneg _),
+          div_self (norm_ne_zero_iff.mpr (hn g))])⟩
+      map_one' := Circle.ext (by simp [unit])
+      map_mul' := fun g k ↦ Circle.ext (by
+        change unit (g * k) = unit g * unit k
+        simp only [unit, map_mul, norm_mul, Complex.ofReal_mul, mul_div_mul_comm])
+      continuous_toFun := (d.continuous.div (Complex.continuous_ofReal.comp d.continuous.norm)
+        (fun g ↦ Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (hn g)))).subtype_mk _ }
+  obtain ⟨U, hU⟩ := modulatedExponentialDecay_mul_unitaryCharacter m (Ici a) hm hms
+    ordConnected_Ici nonempty_Ici η
+  have hshift (b : ℝ) (hb : b ∈ Ici a) : b + 1 / 2 ∈ Ici a :=
+    hb.trans (le_add_of_nonneg_right (by norm_num))
+  obtain ⟨W, hW⟩ := modulatedExponentialDecay_exists_weightMap m (Ici a) (Ici a) (1 / 2) hshift
+  refine ⟨U.comp W, fun f g ↦ ?_⟩
+  change (U (W f)).val g = _
+  rw [hU, hW]
+  have hw : ((m g).val : ℝ) ^ (1 / 2 : ℝ) = ‖d g‖ := by
+    rw [hnorm, archimedeanUnitModulation_apply, ← Real.sqrt_eq_rpow, Real.sqrt_sq (norm_nonneg _)]
+  change (d g / (‖d g‖ : ℂ)) * (((((m g).val : ℝ) ^ (1 / 2 : ℝ) : ℝ) : ℂ) * f.val g) = _
+  rw [hw, ← mul_assoc, div_mul_cancel₀ _ (Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (hn g))), hd]
 
 /-- Paper: Proposition 5.3.3.2(1), p. 249.
 Multiplication by z or its conjugate is continuously invertible for decay at all exponents. -/
