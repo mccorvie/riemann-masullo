@@ -3741,7 +3741,8 @@ private theorem schwartzBruhat_realCoordinate_equiv {G : Type*} [CommGroup G] [T
     dite_eq_left (hm x), hT]
   exact congrArg f (hw x)
 
-private def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
+/-- The logarithm identifies positive real units with the additive reals. -/
+def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
   let e : ℝ≥0ˣ ≃ₜ Multiplicative ℝ :=
     (Nonneg.unitsHomeomorphPos ℝ).trans Real.expOrderIso.symm.toHomeomorph
   have he (t : ℝ≥0ˣ) : (e t).toAdd = Real.log (t.val : ℝ) :=
@@ -3752,7 +3753,8 @@ private def positiveRealLogEquiv : ℝ≥0ˣ ≃ₜ* Multiplicative ℝ := by
     Real.log_mul (NNReal.coe_pos.mpr (Units.zero_lt s)).ne'
       (NNReal.coe_pos.mpr (Units.zero_lt t)).ne']
 
-private theorem positiveRealLogEquiv_apply (t : ℝ≥0ˣ) :
+/-- On positive real units, the log equivalence applies the real logarithm. -/
+theorem positiveRealLogEquiv_apply (t : ℝ≥0ˣ) :
     (positiveRealLogEquiv t).toAdd = Real.log (t.val : ℝ) :=
   (Real.log_of_pos (NNReal.coe_pos.mpr (Units.zero_lt t))).symm
 

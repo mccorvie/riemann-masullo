@@ -426,6 +426,12 @@ private theorem absolutePWProjection_tendsto_preservesIsotype (a : ℝ) (ω : Po
     (fun g x ↦ absolutePWProjection_tendsto_norm (F := F) hs g x) ω u
   with_unfolding_all exact hmem
 
+/-- The geometric projection preserves each norm-one isotype on the line. -/
+theorem geometricProjection_preserves_normOneIsotype (a : ℝ) (ω : PontryaginDual C₁)
+    (u : GeoIsotype(ω)) :
+    ((ambientGeom(a)).comp (GeoIsotype(ω)).subtypeL) u ∈ GeoIsotype(ω) :=
+  absolutePWProjection_tendsto_preservesIsotype (F := F) hs a ω u
+
 /-- A polar-free homogeneous theta function agrees in the weighted space with the image of
 its class under the inclusion of §10.1. -/
 private theorem absolutePWProjection_tendsto_theta (a : ℝ) (ω : PontryaginDual C₁) (f : Zₛ) :
