@@ -6,6 +6,7 @@ import RiemannMasullo.ForMathlib.Topology.Algebra.PontryaginDual.Real
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import Mathlib.Analysis.Complex.ExponentialBounds
 import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyTenZeros.TenZeros
 import RiemannMasullo.External.ZetaLab.RHHeight.Main
 
 /-! # Further assertions in the proofs of §10.3 that are false as printed -/
@@ -48,7 +49,12 @@ for the interval counterexample. This is a finite consequence of Hardy's theorem
 private theorem spectralLineSelection_three_zeta_zeros :
     ∃ u v w : ℝ, u < v ∧ v < w ∧ riemannZeta (shift(1 / 2, u)) = 0 ∧
       riemannZeta (shift(1 / 2, v)) = 0 ∧ riemannZeta (shift(1 / 2, w)) = 0 := by
-  sorry
+  obtain ⟨ts, hmono, hts⟩ := HardyTenZeros.ten_zeros_on_line_below_fifty
+  have hz (k : Fin 10) : riemannZeta (shift(1 / 2, ts k)) = 0 := by
+    have h := (hts k).2.2
+    push_cast
+    exact h
+  exact ⟨ts 0, ts 1, ts 2, hmono (by decide), hmono (by decide), hz 0, hz 1, hz 2⟩
 
 /-- A critical-line zero of ordinary zeta has positive order for the completed
 L-function of the trivial rational character. -/

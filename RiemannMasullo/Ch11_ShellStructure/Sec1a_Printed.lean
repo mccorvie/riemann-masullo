@@ -65,16 +65,8 @@ def Printed.cond_adelicTheta_pointwiseConvergence : Prop :=
     ∃ Θ : C[F] → ℂ, (∀ g, Θ (classOf[F] g) = ideleThetaSum f g) ∧
       ∀ c, Tendsto (fun k ↦ adelicTheta (φ k) c) atTop (𝓝 (Θ c))
 
-/-- Paper: Corollary 11.1.1.4, p. 478. Over ℚ let the archimedean factor be
-B(x − (k + 1)), for a nonnegative smooth bump bounded by 1, supported in
-(−1/4, 1/4), with B(0) = 1. The finite factor is the indicator of the
-finite integral adeles. These functions tend pointwise to zero. On the standard
-section times the domain, the finite factor restricts the sum to nonzero
-integers and the archimedean coordinates are spaced by the norm t > 0.
-Use the unit ideal and the orbit majorant supported at index 1 with value
-2 + 1/t. The theta series at the identity is 1 for every k. -/
-theorem Printed.cond_adelicTheta_pointwiseConvergence_false :
-    ¬ Printed.cond_adelicTheta_pointwiseConvergence := by sorry
+-- The refutation of `Printed.cond_adelicTheta_pointwiseConvergence` is stated at the
+-- end of `section CondHomogeneousThetaFalse`, which supplies the bump sequence used there.
 
 /-- Paper: Corollary 11.1.1.5, p. 479. As printed, a slice-integrable
 majorant on the total absolute orbit sums is assumed to imply pointwise
@@ -622,6 +614,116 @@ theorem Printed.cond_homogeneousTheta_pointwiseConvergence_false :
   have huniv := hD.measure_zero_of_invariant Set.univ (fun _ ↦ Set.smul_set_univ)
     (by rw [Set.univ_inter]; exact hμ0)
   exact (isOpen_univ.measure_ne_zero (normOneIdeleTamagawaMeasure ℚ) Set.univ_nonempty) huniv
+
+/-- The orbit majorant of the counterexample to Corollary 11.1.1.4: the unit ideal, with
+all of the mass `2 + 1/t` at the unit and zero elsewhere. On the standard section times
+the fundamental domain the orbit sums are at most `2 + 1/t`. -/
+private theorem cond_adelicTheta_majorant
+    (b : Module.Basis (Fin (Units.rank ℚ)) ℤ (Additive ((𝓞 ℚ)ˣ ⧸ Units.torsion ℚ)))
+    (σ : ℂ ≃ₐ[ℝ] ℂ) (e : (ℝ≥0ˣ × N[ℚ]) ≃ₜ* 𝕀[ℚ])
+    (he : ∀ t g, e (t, g) = canonicalIdeleNormSection ℚ t * g.val)
+    (φ : ℕ → ℬ[ℚ])
+    (hsupp : ∀ (k : ℕ) (x : 𝔸[ℚ]), φ k (Multiplicative.ofAdd x) ≠ 0 →
+      |condHT_inf x - ((k : ℝ) + 1)| < 1 / 4 ∧ x ∈ integralAdelesOutside ℚ ∅)
+    (hbnd : ∀ (k : ℕ) (y : 𝔸[ℚ]), ‖φ k y‖ ≤ 1) :
+    ∀ g : 𝕀[ℚ], ∃ (α : ℚˣ → ℝ≥0) (I : Frac[ℚ]),
+      Summable (fun ξ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ I} ↦ (α ξ.val : ℝ)) ∧
+      (g ∈ e '' ((Set.univ : Set ℝ≥0ˣ) ×ˢ
+          ideleFundamentalDomain ℚ b Rat.infinitePlace σ (fun _ ↦ (1 : N[ℚ]))) →
+        ∀ k, (∑' ξ : ℚˣ, ‖φ k (Multiplicative.ofAdd (principal[ℚ] ξ * g).val)‖) ≤
+          ∑' ξ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ I}, (α ξ.val : ℝ)) := by
+  intro g
+  have hone1 : ((1 : ℚˣ) : ℚ) ∈ (1 : Frac[ℚ]) := by
+    rw [Units.val_one]
+    exact FractionalIdeal.one_mem_one _
+  by_cases hgZ : g ∈ e '' ((Set.univ : Set ℝ≥0ˣ) ×ˢ
+      ideleFundamentalDomain ℚ b Rat.infinitePlace σ (fun _ ↦ (1 : N[ℚ])))
+  · obtain ⟨z1, -, z3⟩ := condHT_Z e he b σ g hgZ
+    have hpos : 0 < condHT_inf g.val :=
+      z1 ▸ NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (ideleNorm ℚ g).ne_zero)
+    let α : ℚˣ → ℝ≥0 :=
+      fun ξ ↦ if ξ = 1 then (2 + (condHT_inf g.val)⁻¹).toNNReal else 0
+    have hα1 : (α 1 : ℝ) = 2 + (condHT_inf g.val)⁻¹ := by
+      simp only [α, ite_true]
+      exact Real.coe_toNNReal _ (by positivity)
+    have hα0 : ∀ ξ : ℚˣ, ξ ≠ 1 → (α ξ : ℝ) = 0 := fun ξ hξ ↦ by simp [α, hξ]
+    have hzero : ∀ x : {ξ : ℚˣ // (ξ.val : ℚ) ∈ (1 : Frac[ℚ])},
+        x ≠ ⟨1, hone1⟩ → (α x.val : ℝ) = 0 :=
+      fun x hx ↦ hα0 x.val fun h ↦ hx (Subtype.ext h)
+    refine ⟨α, 1, ?_, ?_⟩
+    · refine summable_of_ne_finset_zero
+        (s := {(⟨1, hone1⟩ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ (1 : Frac[ℚ])})}) (fun x hx ↦ ?_)
+      exact hzero x fun he ↦ hx (he ▸ Finset.mem_singleton_self _)
+    · intro _ k
+      have htsum : (∑' x : {ξ : ℚˣ // (ξ.val : ℚ) ∈ (1 : Frac[ℚ])}, (α x.val : ℝ)) =
+          2 + (condHT_inf g.val)⁻¹ := by
+        rw [tsum_eq_single (⟨1, hone1⟩ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ (1 : Frac[ℚ])})]
+        · simpa using hα1
+        · intro x hx
+          exact hzero x hx
+      rw [htsum]
+      exact condHT_count (φ k) k (hsupp k) (hbnd k) g hpos z3
+  · exact ⟨fun _ ↦ 0, 1, by simp, fun h ↦ absurd h hgZ⟩
+
+/-- Paper: Corollary 11.1.1.4, p. 478. Over ℚ let the archimedean factor be
+B(x − (k + 1)), for a nonnegative smooth bump bounded by 1, supported in
+(−1/4, 1/4), with B(0) = 1. The finite factor is the indicator of the
+finite integral adeles. These functions tend pointwise to zero. On the standard
+section times the domain, the finite factor restricts the sum to nonzero
+integers and the archimedean coordinates are spaced by the norm t > 0.
+Use the unit ideal and the orbit majorant supported at index 1 with value
+2 + 1/t. The theta series at the identity is 1 for every k. -/
+theorem Printed.cond_adelicTheta_pointwiseConvergence_false :
+    ¬ Printed.cond_adelicTheta_pointwiseConvergence := by
+  intro H
+  let : BorelSpace 𝕀[ℚ] := ⟨rfl⟩
+  let : Countable ℚˣ := Units.val_injective.countable
+  have : Subsingleton (CommRing.Pic (𝓞 ℚ)) := condHT_pic
+  obtain ⟨e, he⟩ := ideleNormSection_product ℚ (canonicalIdeleNormSection ℚ)
+    (canonicalIdeleNormSection_continuous ℚ) (canonicalIdeleNormSection_rightInverse ℚ)
+  let σ : ℂ ≃ₐ[ℝ] ℂ := AlgEquiv.refl
+  let b := Units.basisModTorsion ℚ
+  let rep : CommRing.Pic (𝓞 ℚ) → N[ℚ] := fun _ ↦ 1
+  have hrep : ∀ c, ideleIdealClass ℚ (rep c).val = c := fun _ ↦ Subsingleton.elim _ _
+  have he_norm : ∀ t h, ideleNorm ℚ (e (t, h)) = t := fun t h ↦ by
+    rw [he, map_mul, canonicalIdeleNormSection_rightInverse ℚ t,
+      MonoidHom.mem_ker.mp h.property, mul_one]
+  have he_one : ∀ h, e (1, h) = h.val := fun h ↦ by rw [he, map_one, one_mul]
+  obtain ⟨φ, hφ⟩ := condHT_seq b σ
+  have hsupp : ∀ (k : ℕ) (x : 𝔸[ℚ]), φ k (Multiplicative.ofAdd x) ≠ 0 →
+      |condHT_inf x - ((k : ℝ) + 1)| < 1 / 4 ∧ x ∈ integralAdelesOutside ℚ ∅ :=
+    fun k ↦ (hφ k).1
+  have hbnd : ∀ (k : ℕ) (y : 𝔸[ℚ]), ‖φ k y‖ ≤ 1 := fun k ↦ (hφ k).2.1
+  have hone : ∀ (k : ℕ), ∀ h ∈ ideleFundamentalDomain ℚ b Rat.infinitePlace σ rep,
+      φ k (Multiplicative.ofAdd (algebraMap ℚ 𝔸[ℚ] ((k : ℚ) + 1) * h.val.val)) = 1 :=
+    fun k ↦ (hφ k).2.2
+  have hmajor : ∀ g : 𝕀[ℚ], ∃ (α : ℚˣ → ℝ≥0) (I : Frac[ℚ]),
+      Summable (fun ξ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ I} ↦ (α ξ.val : ℝ)) ∧
+      (g ∈ e '' ((Set.univ : Set ℝ≥0ˣ) ×ˢ
+          ideleFundamentalDomain ℚ b Rat.infinitePlace σ rep) →
+        ∀ (_ξ : ℚˣ) k, (∑' ξ : ℚˣ, ‖ideleValue[ℚ] (φ k) (principal[ℚ] ξ * g)‖) ≤
+          ∑' ξ : {ξ : ℚˣ // (ξ.val : ℚ) ∈ I}, (α ξ.val : ℝ)) := by
+    intro g
+    obtain ⟨α, I, hsum, hbd⟩ := cond_adelicTheta_majorant b σ e he φ hsupp hbnd g
+    exact ⟨α, I, hsum, fun hg _ k ↦ hbd hg k⟩
+  have hlim : ∀ g : 𝕀[ℚ], Tendsto (fun k ↦ ideleValue[ℚ] (φ k) g) atTop
+      (𝓝 ((fun _ : 𝕀[ℚ] ↦ (0 : ℂ)) g)) := fun g ↦
+    condHT_lim φ (fun k x hx ↦ (hsupp k x hx).1) g
+  obtain ⟨-, Θ, hΘ, hconv⟩ := H ℚ e Rat.infinitePlace σ b rep φ (fun _ ↦ (0 : ℂ)) he_norm
+    he_one rfl hrep hlim hmajor
+  obtain ⟨h₀, hh₀⟩ := ideleFundamentalDomain_interior ℚ b Rat.infinitePlace σ rep rfl hrep
+  have h₀mem : h₀ ∈ ideleFundamentalDomain ℚ b Rat.infinitePlace σ rep := interior_subset hh₀
+  have htheta (k : ℕ) : adelicTheta (φ k) (classOf[ℚ] h₀.val) = 1 := by
+    rw [← ideleThetaSum_schwartzBruhat (φ k) h₀.val]
+    exact condHT_theta_E1 b σ (φ k) k (hsupp k) h₀ h₀mem (hone k h₀ h₀mem)
+  have hzero : Θ (classOf[ℚ] h₀.val) = 0 := by
+    rw [hΘ h₀.val]
+    simp [ideleThetaSum]
+  have h1 : (1 : ℂ) = 0 := by
+    have hconst : Tendsto (fun _ : ℕ ↦ (1 : ℂ)) atTop (𝓝 1) := tendsto_const_nhds
+    refine tendsto_nhds_unique hconst ?_
+    simpa only [htheta, hzero] using hconv (classOf[ℚ] h₀.val)
+  norm_num at h1
 
 end CondHomogeneousThetaFalse
 
