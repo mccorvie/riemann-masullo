@@ -2,6 +2,8 @@ module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.InfiniteAdeleRing
+import RiemannMasullo.Ch01_Introduction.Sec4
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.WithSeminorms
 
 /-! # False claims printed in §7.4 -/
 
@@ -67,6 +69,172 @@ between 2 and 3 has positive Mellin derivative at 1/2. The first-derivative
 functional there vanishes on the printed closed span, yet takes this positive
 value on the ambient image of its zeroth biorthogonal vector. -/
 theorem Printed.spectralNuclearity_trace_false : ¬ Printed.spectralNuclearity_trace := by sorry
+
+section FactorialNormalization
+
+open Filter
+
+/-- Paper: Theorem 7.4.1.1(2), proof following (7.4.1.2), p. 367. The printed
+factorial normalization makes the retained primal biorthogonals bounded, while the
+full multiplicity factorial grows at most linearly in the absolute zero height.
+Here the completed divisor indexes the zeros of the character. -/
+def Printed.spectralNuclearity_factorialNormalization : Prop :=
+  ∀ (F : Type) [Field F] [NumberField F] (χ : U[F])
+    (τ : ℝ≥0ˣ →ₜ* I[F]) (hτ : RightInverse τ (ideleNorm F)) (a : ℝ) (N : ℕ), 0 < N →
+    let m := MeromorphicOn.divisor (continuedCompletedHeckeL χ) univ
+    let Z := {z : ℂ // 0 < m z}
+    let J := Σ z : Z, Fin (min N (m z.val).toNat)
+    let D := spectralNuclearityDenominator χ τ hτ a
+    let Q := SpectralNuclearityQuotient χ τ hτ a
+    ∃ (d : J → StrongDual ℂ Q) (b : J → Q),
+      (∀ i f, d i (D.mkQ f) = iteratedDeriv i.2.val f.val (i.1.val - (a : ℂ))) ∧
+      (∀ i j, d i (b j) = if i = j then 1 else 0) ∧
+      Bornology.IsVonNBounded ℂ (range fun i : J ↦ (((m i.1.val).toNat.factorial : ℂ)⁻¹) • b i) ∧
+      ∃ C T : ℝ, 0 < C ∧ ∀ z : Z, T ≤ |z.val.im| →
+        ((m z.val).toNat.factorial : ℝ) ≤ C * |z.val.im|
+
+local notation "ratZeroOrder" => MeromorphicOn.divisor (continuedCompletedHeckeL (F := ℚ) 1) univ
+local notation "ratWindow" => {z : ℂ // 0 < ratZeroOrder z ∧ |z.re - 1 / 2| < 1}
+
+/-- Paper: §1.4.3, p. 29. The completed L-function of the trivial rational character
+has infinitely many distinct positive-divisor zeros. Otherwise its smoothed spectral
+sum in the unit window would have a finite limit at parameter two, since each
+individual Mellin moment converges there. -/
+private theorem factorialNormalization_window_infinite : Infinite ratWindow := by
+  classical
+  let m := ratZeroOrder
+  let Z := ratWindow
+  by_contra hn
+  let : Finite Z := not_infinite_iff_finite.mp hn
+  let : Fintype Z := Fintype.ofFinite Z
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  let f (n : ℕ) := introTraceApprox (h n) (ρ n) 2
+  let s (r : Z) := r.val - 1 / 2
+  have hlim (r : Z) : Tendsto (fun n ↦ (m r.val : ℂ) * introTraceMellin (f n) (s r)) atTop
+      (𝓝 ((m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r))) := by
+    apply Filter.Tendsto.const_mul
+    apply (introTraceApprox_mellin_tendsto h ρ hA (s r)).tendsto_at
+    change (s r).re < (2 : ℂ).re
+    have hs := (abs_lt.mp r.property.2).2
+    dsimp [s]
+    norm_num
+    linarith
+  have hsum := tendsto_finsetSum Finset.univ (fun r _ ↦ hlim r)
+  let q := ∑ r : Z, (m r.val : ℂ) * introTraceMellin (introTracePower 2) (s r)
+  apply not_tendsto_nhds_of_tendsto_atBot (introTraceApprox_rat_spectral_tendsto_atBot h ρ hA) q.re
+  have hspec : Tendsto (fun n ↦ introTraceSpectralSum (F := ℚ) 1 (f n) 1) atTop (𝓝 q) := by
+    simpa only [introTraceSpectralSum, tsum_fintype] using hsum
+  exact Complex.continuous_re.continuousAt.tendsto.comp hspec
+
+
+
+/-- A compact rectangle contains only finitely many points of the completed divisor. -/
+private theorem factorialNormalization_unbounded_height (M : ℝ) :
+    ∃ z : ratWindow, M < |z.val.im| := by
+  classical
+  by_contra! h
+  let R := |M| + 3
+  let D := Metric.closedBall (0 : ℂ) R
+  let L := continuedCompletedHeckeL (F := ℚ) 1
+  have hmer := (continuedCompletedHeckeL_spec (F := ℚ) 1).1.meromorphicOn
+  have hD : (MeromorphicOn.divisor L D).support.Finite :=
+    (MeromorphicOn.divisor L D).finiteSupport (isCompact_closedBall _ _)
+  let : Finite (MeromorphicOn.divisor L D).support := hD.to_subtype
+  have hmem (z : ratWindow) : z.val ∈ D := by
+    change z.val ∈ Metric.closedBall 0 R
+    rw [Metric.mem_closedBall, dist_zero_right]
+    have hs := abs_lt.mp z.property.2
+    have hre : |z.val.re| ≤ 2 := abs_le.mpr ⟨by linarith [hs.1], by linarith [hs.2]⟩
+    exact (Complex.norm_le_abs_re_add_abs_im _).trans (by dsimp [R]; linarith [h z, le_abs_self M])
+  let e (z : ratWindow) : (MeromorphicOn.divisor L D).support := ⟨z.val, by
+    have hz := z.property.1.ne'
+    change MeromorphicOn.divisor L D z.val ≠ 0
+    rw [MeromorphicOn.divisor_apply (show MeromorphicOn L D from fun x _ ↦ hmer x (mem_univ _)) (hmem z)]
+    rwa [MeromorphicOn.divisor_apply hmer (mem_univ _)] at hz⟩
+  let : Infinite ratWindow := factorialNormalization_window_infinite
+  let : Finite ratWindow := Finite.of_injective e fun _ _ he ↦
+    Subtype.ext (congrArg (fun t : (MeromorphicOn.divisor L D).support ↦ t.val) he)
+  exact not_finite ratWindow
+
+/-- On a quotient of the entire Schwartz–Bergman space a height-square weighted family
+of point evaluations in a fixed strip is bounded on every bounded set. -/
+private theorem factorialNormalization_pairing {Q ι : Type*} [AddCommGroup Q] [Module ℂ Q]
+    [TopologicalSpace Q] [PolynormableSpace ℂ Q]
+    (π : B →L[ℂ] Q) (hπ : Topology.IsQuotientMap π) (z : ι → ℂ)
+    (d : ι → StrongDual ℂ Q) (hz : ∀ i, (z i).re ∈ Icc (-1) 2)
+    (heval : ∀ i f, d i (π f) = f.val (z i)) (S : Set Q) (hS : Bornology.IsVonNBounded ℂ S) :
+    ∃ A : ℝ, ∀ i x, x ∈ S → ‖(z i)^2 * d i x‖ ≤ A := by
+  let : BarrelledSpace ℂ B := isFrechetTVS_barrelled
+    (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty)
+  let : BarrelledSpace ℂ Q := by
+    constructor
+    intro q hq
+    exact hπ.continuous_iff.mpr ((q.comp π.toLinearMap).continuous_of_lowerSemicontinuous
+      (hq.comp π.continuous))
+  let L (i : ι) := (z i)^2 • d i
+  let s (i : ι) := (normSeminorm ℂ ℂ).comp (L i).toLinearMap
+  have hb : BddAbove (range s) := Seminorm.bddAbove_range_iff.mpr fun x ↦ by
+    obtain ⟨f, rfl⟩ := hπ.surjective x
+    obtain ⟨A, hA⟩ := f.property.2.2 (-1) 2 (by norm_num) (subset_univ _) 2
+    exact ⟨A, forall_mem_range.mpr fun i ↦ by
+      change ‖(z i)^2 * d i (π f)‖ ≤ A
+      rw [heval]
+      exact hA ⟨z i, hz i, rfl⟩⟩
+  have hc : Continuous (⨆ i, s i : Seminorm ℂ Q) := by
+    rw [Seminorm.coe_iSup_eq hb]
+    exact Seminorm.continuous_iSup s (fun i ↦ (L i).continuous.norm) hb
+  obtain ⟨A, _, hA⟩ := (PolynormableSpace.withSeminorms ℂ Q).isVonNBounded_iff_seminorm_bounded.mp
+    hS ⟨⨆ i, s i, hc⟩
+  exact ⟨A, fun i x hx ↦ ((le_ciSup hb i : s i ≤ ⨆ j, s j) x).trans (hA x hx).le⟩
+
+/-- Paper: Theorem 7.4.1.1(2), p. 367. Over ℚ take the trivial character, zero twist
+and only the evaluation at each zero. Bounded rescaled biorthogonals would give a
+quadratic lower bound on the factorials at unbounded heights; the printed bound is linear. -/
+theorem Printed.spectralNuclearity_factorialNormalization_false :
+    ¬ Printed.spectralNuclearity_factorialNormalization := by
+  intro h
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨canonicalIdeleNormSection ℚ, canonicalIdeleNormSection_continuous ℚ⟩
+  let hτ := canonicalIdeleNormSection_rightInverse ℚ
+  let D := spectralNuclearityDenominator (1 : U[ℚ]) τ hτ 0
+  let Q := SpectralNuclearityQuotient (1 : U[ℚ]) τ hτ 0
+  let Z := {z : ℂ // 0 < ratZeroOrder z}
+  let J := Σ z : Z, Fin (min 1 (ratZeroOrder z.val).toNat)
+  obtain ⟨d,b,he,hb,hS,C,T,hC,hfac⟩ := h ℚ 1 τ hτ 0 1 one_pos
+  let j (z : ratWindow) : J := ⟨⟨z.val, z.property.1⟩, 0, by
+    change 0 < min 1 (ratZeroOrder z.val).toNat
+    have := z.property.1
+    exact lt_min one_pos (by omega)⟩
+  let S := range fun i : J ↦ ((ratZeroOrder i.1.val).toNat.factorial : ℂ)⁻¹ • b i
+  let : PolynormableSpace ℂ B := (schwartzBergman_frechet univ isOpen_univ inferInstance univ_nonempty).2.1
+  let : PolynormableSpace ℂ Q := polynormableSpace_quotient D
+  obtain ⟨A,hA⟩ := factorialNormalization_pairing D.mkQL (Submodule.isQuotientMap_mkQ D)
+    (fun z : ratWindow ↦ z.val) (fun z ↦ d (j z))
+    (fun z ↦ by
+      obtain ⟨h₁,h₂⟩ := abs_lt.mp z.property.2
+      exact ⟨by linarith, by linarith⟩)
+    (fun z f ↦ by simpa [j] using he (j z) f) S hS
+  obtain ⟨z,hz⟩ := factorialNormalization_unbounded_height (max T (max 1 (max A 0 * C)))
+  have hT := (le_max_left _ _).trans_lt hz
+  have hbig := (le_max_right _ _).trans_lt hz
+  have hpos : 0 < |z.val.im| := zero_lt_one.trans ((le_max_left _ _).trans_lt hbig)
+  have hzbig := (le_max_right _ _).trans_lt hbig
+  let m := (ratZeroOrder z.val).toNat.factorial
+  have hdiag : d (j z) (b (j z)) = 1 := by simp [hb]
+  have hzero : 0 < (m : ℝ) := by dsimp [m]; positivity
+  have ha := hA z _ (mem_range_self (j z))
+  change ‖z.val^2 * d (j z) ((m : ℂ)⁻¹ • b (j z))‖ ≤ A at ha
+  rw [map_smul, hdiag, smul_eq_mul, mul_one, norm_mul, norm_pow, norm_inv,
+    Complex.norm_natCast, ← div_eq_mul_inv, div_le_iff₀ hzero] at ha
+  have hest : |z.val.im|^2 ≤ (max A 0 * C) * |z.val.im| := calc
+    _ ≤ ‖z.val‖^2 := pow_le_pow_left₀ (abs_nonneg _) (Complex.abs_im_le_norm _) 2
+    _ ≤ A * m := ha
+    _ ≤ max A 0 * m := by gcongr; exact le_max_left _ _
+    _ ≤ max A 0 * (C * |z.val.im|) := mul_le_mul_of_nonneg_left
+      (hfac ⟨z.val,z.property.1⟩ hT.le) (le_max_right _ _)
+    _ = _ := by ring
+  exact hzbig.not_ge ((mul_le_mul_iff_left₀ hpos).mp (by simpa [pow_two] using hest))
+
+end FactorialNormalization
 
 open scoped TensorProduct in
 /-- Paper: Equation (7.4.3.1), p. 368.
