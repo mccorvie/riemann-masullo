@@ -1131,13 +1131,166 @@ theorem sLocalThetaPrincipalValue_equivariant {S₀ S : Finset V}
       (Submodule.Quotient.mk
         (schwartzBruhatUnitTranslate g (sAdelePrincipalValue F h₀ f)) : Θₛ(S)) := by sorry
 
+/-- Weil's local principal value commutes with multiplicative translation, since both only
+rescale the argument. -/
+private theorem globalThetaPrincipalValue_equivariant_local (v : V) (c : (v.adicCompletion F)ˣ)
+    (h : ℬ(v.adicCompletion F)) :
+    finitePlacePrincipalValue v (schwartzBruhatUnitTranslate c h) =
+      schwartzBruhatUnitTranslate c (finitePlacePrincipalValue v h) := by
+  let hπ0 := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π := Units.mk0 (hπ0.choose : v.adicCompletion F) hπ0.choose_spec.ne_zero
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  apply Subtype.ext
+  funext x
+  change finitePlacePrincipalValue v (schwartzBruhatUnitTranslate c h)
+      (Multiplicative.ofAdd x.toAdd) =
+    schwartzBruhatUnitTranslate c (finitePlacePrincipalValue v h) (Multiplicative.ofAdd x.toAdd)
+  rw [schwartzBruhatUnitTranslate_apply, finitePlacePrincipalValue_spec v π hπ0.choose_spec,
+    finitePlacePrincipalValue_spec v π hπ0.choose_spec]
+  unfold finitePlacePrincipalValueFun
+  simp only [schwartzBruhatUnitTranslate_apply, toAdd_ofAdd]
+  congr 2
+  refine setIntegral_congr_fun ?_ fun u _ ↦ ?_
+  · exact (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet
+  · exact congrArg (fun y ↦ h (Multiplicative.ofAdd y)) (by ring)
+
+/-- Two linear maps agree once they agree on the pure tensors of an inductive tensor product
+with a projective tensor power. -/
+private theorem globalThetaPrincipalValue_equivariant_ext {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (L₁ L₂ : B →ₗ[ℂ] B)
+    (h : ∀ (a : A) (g : ∀ i, D i), L₁ (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i))) =
+      L₂ (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i)))) (x : B) :
+    L₁ x = L₂ x := by
+  obtain ⟨t, rfl⟩ := e.surjective x
+  let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+  let M₁ : A ⊗[ℂ] W →ₗ[ℂ] B := L₁ ∘ₗ (e.toLinearMap : InductiveTensor A W →ₗ[ℂ] B)
+  let M₂ : A ⊗[ℂ] W →ₗ[ℂ] B := L₂ ∘ₗ (e.toLinearMap : InductiveTensor A W →ₗ[ℂ] B)
+  have hM : M₁ = M₂ := by
+    refine TensorProduct.ext' fun a z ↦ ?_
+    refine PiTensorProduct.induction_on (motive := fun z : ⨂[ℂ] i, D i ↦
+      M₁ (a ⊗ₜ[ℂ] (z : W)) = M₂ (a ⊗ₜ[ℂ] (z : W))) z ?_ ?_
+    · intro r g
+      have ht : (a ⊗ₜ[ℂ] (((r • (⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i)) : W) : A ⊗[ℂ] W) =
+          r • (a ⊗ₜ[ℂ] (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)) :=
+        (TensorProduct.mk ℂ A W a).map_smul r (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)
+      have hp : M₁ (a ⊗ₜ[ℂ] (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)) =
+          M₂ (a ⊗ₜ[ℂ] (((⨂ₜ[ℂ] i, g i) : ⨂[ℂ] i, D i) : W)) := h a g
+      exact (congrArg M₁ ht).trans ((map_smul M₁ r _).trans ((congrArg (r • ·) hp).trans
+        ((map_smul M₂ r _).symm.trans (congrArg M₂ ht.symm))))
+    · intro z₁ z₂ h₁ h₂
+      have ht : (a ⊗ₜ[ℂ] (((z₁ + z₂ : ⨂[ℂ] i, D i)) : W) : A ⊗[ℂ] W) =
+          a ⊗ₜ[ℂ] (z₁ : W) + a ⊗ₜ[ℂ] (z₂ : W) :=
+        (TensorProduct.mk ℂ A W a).map_add (z₁ : W) (z₂ : W)
+      exact (congrArg M₁ ht).trans ((map_add M₁ _ _).trans ((congrArg₂ (· + ·) h₁ h₂).trans
+        ((map_add M₂ _ _).symm.trans (congrArg M₂ ht.symm))))
+  exact LinearMap.congr_fun hM t
+
+open Classical in
+/-- The S-local principal value commutes with translation by an S-idele. -/
+private theorem globalThetaPrincipalValue_equivariant_stage {S₀ : Finset V}
+    (gS : (SAdeleRing F S₀)ˣ) (k : ℬₛ(S₀)) :
+    sAdelePrincipalValue F (Finset.Subset.refl S₀) (schwartzBruhatUnitTranslate gS k) =
+      schwartzBruhatUnitTranslate gS (sAdelePrincipalValue F (Finset.Subset.refl S₀) k) := by
+  let e' := (sAdeleSchwartz_inductiveTensor_equiv F S₀).choose
+  have he' := (sAdeleSchwartz_inductiveTensor_equiv F S₀).choose_spec
+  let P := sAdelePrincipalValue F (Finset.Subset.refl S₀)
+  let T : ℬₛ(S₀) →ₗ[ℂ] ℬₛ(S₀) :=
+    { toFun := schwartzBruhatUnitTranslate gS
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let gInf : (InfiniteAdeleRing F)ˣ := Units.map (RingHom.fst _ _).toMonoidHom gS
+  let gw (w : S₀) : (w.val.adicCompletion F)ˣ :=
+    Units.map ((Pi.evalRingHom _ w).comp (RingHom.snd _ _)).toMonoidHom gS
+  have hT (a : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S₀, ℬ(w.val.adicCompletion F)) :
+      T (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) = e' (schwartzBruhatUnitTranslate gInf a ⊗ₜ[ℂ]
+        (⨂ₜ[ℂ] w, schwartzBruhatUnitTranslate (gw w) (g w))) := by
+    apply Subtype.ext
+    funext x
+    refine (he' a g ((↑gS⁻¹ : SAdeleRing F S₀) * x.toAdd)).trans (Eq.trans ?_
+      (he' (schwartzBruhatUnitTranslate gInf a)
+        (fun w ↦ schwartzBruhatUnitTranslate (gw w) (g w)) x.toAdd).symm)
+    rfl
+  have hyp : ∀ (a : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S₀, ℬ(w.val.adicCompletion F)),
+      (P ∘ₗ T) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) = (T ∘ₗ P) (e' (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) := by
+    intro a g
+    have h1 := sAdelePrincipalValue_tmul (Finset.Subset.refl S₀) (schwartzBruhatUnitTranslate gInf a)
+      (fun w ↦ schwartzBruhatUnitTranslate (gw w) (g w))
+    have h2 := sAdelePrincipalValue_tmul (Finset.Subset.refl S₀) a g
+    refine (congrArg P (hT a g)).trans (h1.trans ?_)
+    refine Eq.trans ?_ (congrArg T h2).symm
+    refine Eq.trans ?_ (hT a _).symm
+    have hfun : (fun w : S₀ ↦ if w.val ∈ S₀ then
+          finitePlacePrincipalValue w.val (schwartzBruhatUnitTranslate (gw w) (g w))
+        else schwartzBruhatUnitTranslate (gw w) (g w)) =
+        fun w ↦ schwartzBruhatUnitTranslate (gw w)
+          (if w.val ∈ S₀ then finitePlacePrincipalValue w.val (g w) else g w) := by
+      funext w
+      simp only [w.property, ite_true]
+      exact globalThetaPrincipalValue_equivariant_local w.val (gw w) (g w)
+    exact congrArg (fun φ : ∀ w : S₀, ℬ(w.val.adicCompletion F) ↦
+      e' (schwartzBruhatUnitTranslate gInf a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, φ w))) hfun
+  exact globalThetaPrincipalValue_equivariant_ext
+    (D := fun w : S₀ ↦ ℬ(w.val.adicCompletion F)) e' (P ∘ₗ T) (T ∘ₗ P)
+    (by with_reducible exact hyp) k
+
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The global principal value commutes with each idele translation on theta classes. -/
 theorem globalThetaPrincipalValue_equivariant {S₀ : Finset V}
     (hn : S₀.Nonempty) (g : IdeleGroup (𝓞 F) F) (f : ℬ(𝔸[F])) :
     Submodule.Quotient.mk (adelePrincipalValue F S₀ (schwartzBruhatUnitTranslate g f)) =
       (Submodule.Quotient.mk
-        (schwartzBruhatUnitTranslate g (adelePrincipalValue F S₀ f)) : Θ𝔽) := by sorry
+        (schwartzBruhatUnitTranslate g (adelePrincipalValue F S₀ f)) : Θ𝔽) := by
+  apply congrArg
+  have : Fact (∀ w : {w : V // w ∉ S₀},
+      IsOpen (w.val.adicCompletionIntegers F : Set (w.val.adicCompletion F))) :=
+    ⟨fun w ↦ Valued.isOpen_valuationSubring (w.val.adicCompletion F)⟩
+  let : IsTopologicalRing (FiniteAdeleTail F S₀) :=
+    RestrictedProduct.isTopologicalRing (fun w : {w : V // w ∉ S₀} ↦ w.val.adicCompletion F)
+  let Tl := ℬ(FiniteAdeleTail F S₀)
+  let e := (sAdeleTailSchwartz_inductiveTensor_equiv F S₀).choose
+  have he := (sAdeleTailSchwartz_inductiveTensor_equiv F S₀).choose_spec
+  let P := adelePrincipalValue F S₀
+  let T : ℬ(𝔸[F]) →ₗ[ℂ] ℬ(𝔸[F]) :=
+    { toFun := schwartzBruhatUnitTranslate g
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  let gS : (SAdeleRing F S₀)ˣ := Units.map (adeleProjection F S₀).toMonoidHom g
+  have hval : finiteAdeleTailProjection F S₀ g.val.2 * finiteAdeleTailProjection F S₀ g.inv.2 = 1 := by
+    apply RestrictedProduct.ext
+    intro w
+    exact congrArg (fun z : AdeleRing (𝓞 F) F ↦ z.2 w.val) g.val_inv
+  have hinv : finiteAdeleTailProjection F S₀ g.inv.2 * finiteAdeleTailProjection F S₀ g.val.2 = 1 := by
+    apply RestrictedProduct.ext
+    intro w
+    exact congrArg (fun z : AdeleRing (𝓞 F) F ↦ z.2 w.val) g.inv_val
+  let gt : (FiniteAdeleTail F S₀)ˣ := ⟨_, _, hval, hinv⟩
+  have hT (k : ℬₛ(S₀)) (b : Tl) : T (e (k ⊗ₜ[ℂ] b)) =
+      e (schwartzBruhatUnitTranslate gS k ⊗ₜ[ℂ] schwartzBruhatUnitTranslate gt b) := by
+    apply Subtype.ext
+    funext x
+    refine (he k b ((↑g⁻¹ : AdeleRing (𝓞 F) F) * x.toAdd)).trans (Eq.trans ?_
+      (he (schwartzBruhatUnitTranslate gS k) (schwartzBruhatUnitTranslate gt b) x.toAdd).symm)
+    rfl
+  obtain ⟨t, rfl⟩ := e.surjective f
+  suffices h : P ∘ₗ T ∘ₗ (e.toLinearMap : InductiveTensor ℬₛ(S₀) Tl →ₗ[ℂ] _) =
+      T ∘ₗ P ∘ₗ (e.toLinearMap : InductiveTensor ℬₛ(S₀) Tl →ₗ[ℂ] _) from
+    LinearMap.congr_fun h t
+  refine TensorProduct.ext' fun k b ↦ ?_
+  have h1 := adelePrincipalValue_tmul (F := F) (Finset.Subset.refl S₀)
+    (schwartzBruhatUnitTranslate gS k) (schwartzBruhatUnitTranslate gt b)
+  have h2 := adelePrincipalValue_tmul (F := F) (Finset.Subset.refl S₀) k b
+  change P (T (e (k ⊗ₜ[ℂ] b))) = T (P (e (k ⊗ₜ[ℂ] b)))
+  refine (congrArg P (hT k b)).trans (h1.trans ?_)
+  refine Eq.trans ?_ (congrArg T h2).symm
+  refine Eq.trans ?_ (hT _ b).symm
+  exact congrArg (fun z ↦ e (z ⊗ₜ[ℂ] schwartzBruhatUnitTranslate gt b))
+    (globalThetaPrincipalValue_equivariant_stage gS k)
 
 /-- Paper: Lemma 5.3.1.5, p. 242.
 The S-local principal value commutes with the norm-one character average of §5.2.3. -/
