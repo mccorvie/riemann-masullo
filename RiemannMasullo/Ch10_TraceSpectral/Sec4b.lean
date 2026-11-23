@@ -388,7 +388,39 @@ operator has a unique mixed-weight kernel. Existence also follows from the
 nuclearity and factorization of quotient convolution in §§10.3–10.4.2.
 Deviation: That factorization applies to every real twist. -/
 theorem spectralLineKernel_existsUnique :
-    ∃! k : L²line, lineKernelFor(k) := by sorry
+    ∃! k : L²line, lineKernelFor(k) := by
+  have hasTensor {E : Type _} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+      (op : E →L[ℂ] E) (hn : IsNuclearOperator (E := E) (F := E) op) :
+      ∃ w : Completion (ProjectiveTensor (StrongDual ℂ E) E),
+        completedProjectiveTensorToOperators (E := E) (F := E) w = op :=
+    (isBanachNuclear_iff_mem_range (E := E) (F := E) op).mp
+      ((isNuclearOperator_iff_isBanachNuclear (E := E) (F := E) op).mp hn)
+  have transport {Y X E : Type _} [NormedAddCommGroup Y] [NormedSpace ℂ Y] [NormedAddCommGroup X] [NormedSpace ℂ X]
+      [NormedAddCommGroup E] [NormedSpace ℂ E]
+      (e : Y ≃ₗᵢ[ℂ] X) :
+      let f := e.symm.toContinuousLinearEquiv.toContinuousLinearMap
+      let i : ProjectiveTensor X E →L[ℂ] ProjectiveTensor Y E :=
+        ⟨projectiveTensorMap f.toLinearMap (LinearMap.id : E →ₗ[ℂ] E),
+          projectiveTensorMap_continuous f (ContinuousLinearMap.id ℂ E)⟩
+      Surjective i.completion := by
+    intro f i
+    exact completedProjectiveTensorMap_surjective f (ContinuousLinearMap.id ℂ E)
+      e.symm.toHomeomorph.isQuotientMap Topology.IsQuotientMap.id
+  let lineOp : W(0, s) →L[ℂ] W(0, s) := Bline
+  have hB : IsNuclearOperator (E := W(0, s)) (F := W(0, s)) lineOp := spectralProjection_convolution_nuclear (F := F) a hline hs₀(hs) φ
+    (spectralStripConvolution_nuclear (F := F) a hline hs φ)
+  let e : StrongDual ℂ W(0, s) ≃ₗᵢ[ℂ] W'(0, s) := (modulatedIntervalSobolev_dual m𝔽
+    ⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩
+    μ𝔽 (-(0 : ℝ)) 0 s (hStrip(hline)) hs₀(hs)).exists.choose
+  have hrep := hasTensor (E := W(0, s)) lineOp hB
+  have hlift := transport (Y := StrongDual ℂ W(0, s)) (E := W(0, s)) (X := W'(0, s)) e hrep.choose
+  let K := hlift.choose
+  have hEq : sobolevProjectiveKernelOperator (F := F) hline hs₀(hs) K = Bline :=
+    (congrArg (completedProjectiveTensorToOperators (E := W(0, s)) (F := W(0, s))) hlift.choose_spec).trans hrep.choose_spec
+  let property (op : W(0, s) →L[ℂ] W(0, s)) := ∃! k : L²line,
+    ∀ u : W(0, s), ∀ᵐ x ∂μ𝔽, Integrable (fun y ↦ k (x, y) * u y) μ𝔽 ∧
+      op u x = ∫ y, k (x, y) * u y ∂μ𝔽
+  exact (congrArg property hEq).mp (sobolevProjectiveKernel_existsUnique_l2 (F := F) hline hs₀(hs) K)
 
 /-- Paper: Definition 10.4.3.2(1), p. 470. The global line spectral kernel
 is the representative of the unique kernel of projection after convolution.
