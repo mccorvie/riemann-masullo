@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3b
+import RiemannMasullo.Ch02_AdelicTheta.Sec2a
+import RiemannMasullo.ForMathlib.Analysis.SpecialFunctions.Gaussian.Schwartz
 import Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
 
 /-!
@@ -150,13 +152,188 @@ def Printed.archimedeanWeightedSchwartz_tensor : Prop :=
         (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u =
           (∏ i, (f i).val (u.1 i)) * ∏ j, (g j).val (u.2 j)
 
+private theorem archimedeanWeightedSchwartzSubmodule_anti
+    {ι κ : Type*} [Fintype ι] [Fintype κ] {I J : Set ℝ}
+    (h : insert 0 I ⊆ insert 0 J) :
+    archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) J ≤
+      archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I := by
+  intro f hf
+  rw [archimedeanWeightedSchwartzSubmodule] at hf ⊢
+  exact (Submodule.mem_iInf _).2 fun a ↦
+    (Submodule.mem_iInf _).1 hf ⟨fun i ↦ ⟨(a.1 i).val, h (a.1 i).property⟩,
+      fun j ↦ ⟨(a.2 j).val, h (a.2 j).property⟩⟩
+
+private theorem isCompact_lcaDualAnnihilator_of_isOpen {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (H : Subgroup (PontryaginDual G))
+    (hH : IsOpen (H : Set (PontryaginDual G))) :
+    IsCompact (lcaDualAnnihilator H : Set G) := by
+  have hCompact := isCompact_lcaAnnihilator H hH
+  convert (isClosedEmbedding_pontryaginDual_eval (G := G)).isCompact_preimage hCompact using 1
+  ext x
+  exact (mem_lcaDualAnnihilator_iff H x).trans
+    (mem_lcaAnnihilator_iff H (pontryaginDual_eval x)).symm
+
+private theorem compact_bruhat_kernel_aux {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    (a : BruhatStructuralPair G) :
+    IsCompact ((OrderDual.ofDual a.val.2 : Subgroup G) : Set G) := by
+  let k := OrderDual.ofDual a.val.2
+  change IsCompact (k : Set G)
+  rw [← lcaDualAnnihilator_annihilator k a.property.2.2.1.1]
+  exact isCompact_lcaDualAnnihilator_of_isOpen _ a.property.2.2.1.2.1
+
+private def slicePoint (t : ℝ) : (Unit → ℝˣ) × (Empty → ℂˣ) :=
+  (fun _ ↦ Units.mk0 (Real.exp t) (Real.exp_pos t).ne', fun j ↦ Empty.elim j)
+
+private def unitNormModulation : ((Unit → ℝˣ) × (Empty → ℂˣ)) →ₜ* ℝ≥0ˣ :=
+  { toFun := fun y ↦ archimedeanUnitModulation ℝ 1 (y.1 ())
+    map_one' := by simp
+    map_mul' := by intro y z; simp [map_mul]
+    continuous_toFun :=
+      (continuous_archimedeanUnitModulation ℝ 1).comp
+        ((continuous_apply ()).comp (continuous_fst :
+          Continuous (Prod.fst : ((Unit → ℝˣ) × (Empty → ℂˣ)) → (Unit → ℝˣ)))) }
+
+private def unitLogNorm : ((Unit → ℝˣ) × (Empty → ℂˣ)) →* Multiplicative ℝ :=
+  { toFun := fun y ↦ Multiplicative.ofAdd (Real.log ‖(y.1 ()).val‖)
+    map_one' := by simp
+    map_mul' := by
+      intro y z
+      simp only [Prod.fst_mul, Pi.mul_apply, Units.val_mul, norm_mul]
+      rw [Real.log_mul (norm_ne_zero_iff.mpr (Units.ne_zero (y.1 ())))
+        (norm_ne_zero_iff.mpr (Units.ne_zero (z.1 ())))]
+      simp }
+
+private theorem continuous_unitLogNorm : Continuous unitLogNorm := by
+  show Continuous (fun y : (Unit → ℝˣ) × (Empty → ℂˣ) ↦
+    Multiplicative.ofAdd (Real.log ‖(y.1 ()).val‖))
+  have hg : Continuous (fun y : (Unit → ℝˣ) × (Empty → ℂˣ) ↦ ‖(y.1 ()).val‖) :=
+    continuous_norm.comp (Units.continuous_val.comp
+      ((continuous_apply ()).comp (continuous_fst :
+        Continuous (Prod.fst : ((Unit → ℝˣ) × (Empty → ℂˣ)) → (Unit → ℝˣ)))))
+  have hmem : ∀ y : (Unit → ℝˣ) × (Empty → ℂˣ), ‖(y.1 ()).val‖ ∈ ({0} : Set ℝ)ᶜ :=
+    fun y ↦ norm_ne_zero_iff.mpr (Units.ne_zero (y.1 ()))
+  have hlog : Continuous (fun y : (Unit → ℝˣ) × (Empty → ℂˣ) ↦ Real.log ‖(y.1 ()).val‖) := by
+    simpa only [Function.comp_def] using Real.continuousOn_log.comp_continuous hg hmem
+  exact continuous_ofAdd.comp hlog
+
+private lemma unitLogNorm_slicePoint (t : ℝ) : (unitLogNorm (slicePoint t)).toAdd = t := by
+  show Real.log ‖((slicePoint t).1 ()).val‖ = t
+  rw [slicePoint, Units.val_mk0, Real.norm_of_nonneg (Real.exp_pos t).le, Real.log_exp]
+
+private lemma norm_le_div_of_decay
+    {f : ((Unit → ℝˣ) × (Empty → ℂˣ)) → ℂ} {C : ℝ}
+    (hC : ∀ y, ‖f y‖ * ‖(unitLogNorm y).toAdd‖ ^ 1 ≤ C)
+    (t : ℝ) (ht : t < 0) :
+    ‖f (slicePoint t)‖ ≤ C / |t| := by
+  have h := hC (slicePoint t)
+  rw [unitLogNorm_slicePoint t, pow_one, Real.norm_eq_abs] at h
+  exact (le_div_iff₀ (abs_pos.mpr ht.ne)).mpr h
+
+private lemma tendsto_zero_of_nonneg_le_div {f : ℝ → ℝ} {C : ℝ}
+    (hf : ∀ t, 0 ≤ f t)
+    (hft : ∀ᶠ t in atBot, f t ≤ C / |t|) :
+    Tendsto f atBot (𝓝 0) := by
+  have hdiv : Tendsto (fun x : ℝ ↦ C / x) atTop (𝓝 0) := by
+    have h := (tendsto_const_nhds (x := C)).mul (tendsto_inv_atTop_zero (𝕜 := ℝ))
+    simpa [div_eq_mul_inv] using h
+  exact squeeze_zero' (Eventually.of_forall hf) hft (hdiv.comp tendsto_abs_atBot_atTop)
+
+private theorem schwartzBruhat_slice_exp_tendsto_zero
+    (F : SchwartzBruhat ((Unit → ℝˣ) × (Empty → ℂˣ))) :
+    Tendsto (fun t : ℝ ↦ F (slicePoint t)) atBot (𝓝 0) := by
+  obtain ⟨a, e, s, hs⟩ :=
+    (mem_schwartzBruhatSubmodule_iff (F : (Unit → ℝˣ) × (Empty → ℂˣ) → ℂ)).1 F.property
+  rw [tendsto_zero_iff_norm_tendsto_zero]
+  have hk : IsCompact ((OrderDual.ofDual a.val.2 : Subgroup ((Unit → ℝˣ) × (Empty → ℂˣ))) :
+      Set ((Unit → ℝˣ) × (Empty → ℂˣ))) := compact_bruhat_kernel_aux a
+  have hker : ∀ u ∈ OrderDual.ofDual a.val.2, unitLogNorm u = 1 := by
+    intro u hu
+    have hμ : unitNormModulation u = 1 :=
+      (compactSubgroup_le_modulation_ker (m := unitNormModulation)
+        (OrderDual.ofDual a.val.2) hk) hu
+    have hnorm : ‖(u.1 ()).val‖ = 1 := by
+      change archimedeanUnitModulation ℝ 1 (u.1 ()) = 1 at hμ
+      have h := congrArg (fun t : ℝ≥0ˣ ↦ (t.val : ℝ)) hμ
+      have h2 := archimedeanUnitModulation_apply ℝ 1 (u.1 ())
+      rw [h2, pow_one] at h
+      simpa using h
+    show Multiplicative.ofAdd (Real.log ‖(u.1 ()).val‖) = 1
+    rw [hnorm, Real.log_one]
+    rfl
+  obtain ⟨C, -, hC⟩ :=
+    schwartzBruhatStage_exists_norm_decay a e s unitLogNorm continuous_unitLogNorm hker 1
+  have hbound (t : ℝ) (ht : t < 0) : ‖F (slicePoint t)‖ ≤ C / |t| := by
+    rw [congrFun hs.symm (slicePoint t)]
+    exact norm_le_div_of_decay hC t ht
+  refine tendsto_zero_of_nonneg_le_div (f := fun t : ℝ ↦ ‖F (slicePoint t)‖) (C := C)
+    (fun t ↦ norm_nonneg _) ?_
+  filter_upwards [eventually_lt_atBot (0 : ℝ)] with t ht
+  exact hbound t ht
+
 /-- Paper: Lemma 5.3.3.3(2), p. 252. Take one real factor, no complex factors, and
 I = (0, ∞). The restriction of the Gaussian exp(−πx²) to ℝˣ meets every positive twist.
 Its product with the empty tensor has logarithmic profile tending to one at −∞, contrary
 to the unweighted Schwartz condition of (5.3.3.6). -/
 theorem Printed.archimedeanWeightedSchwartz_tensor_false :
     ¬ Printed.archimedeanWeightedSchwartz_tensor := by
-  sorry
+  intro h
+  obtain ⟨R, -, hRval⟩ := realSchwartz_restrict_positiveDecay
+  obtain ⟨g, hg⟩ := exists_gaussian_schwartz (E := ℝ) Real.pi Real.pi_pos
+  let f : Unit → ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) (Ioi 0) :=
+    fun _ ↦ R g
+  let gC : Empty → ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) (Ioi 0) :=
+    fun j ↦ Empty.elim j
+  obtain ⟨L, -, hL⟩ := h Unit Empty (Ioi 0) isOpen_Ioi ordConnected_Ioi ⟨1, by norm_num⟩
+  let H : (Unit → ℝˣ) × (Empty → ℂˣ) → ℂ := fun u ↦ g ((u.1 ()).val)
+  let pure :
+      ProjectiveTensor
+        (FiniteProjectiveTensor fun _ : Unit ↦
+          ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) (Ioi 0))
+        (FiniteProjectiveTensor fun _ : Empty ↦
+          ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) (Ioi 0)) :=
+    (⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, gC j)
+  have hval : (L pure).val = H := by
+    funext u
+    rw [hL f gC u]
+    simp [f, gC, H, hRval g (u.1 ())]
+  have hle : archimedeanWeightedSchwartzSubmodule (ι := Unit) (κ := Empty) (Ioi 0) ≤
+      schwartzBruhatSubmodule ((Unit → ℝˣ) × (Empty → ℂˣ)) := by
+    rw [← archimedeanWeightedSchwartzSubmodule_singleton_zero (ι := Unit) (κ := Empty)]
+    exact archimedeanWeightedSchwartzSubmodule_anti (I := ({0} : Set ℝ)) (J := Ioi 0) (by
+      intro x hx
+      simp only [Set.mem_insert_iff, Set.mem_singleton_iff] at hx ⊢
+      rcases hx with rfl | rfl
+      · exact Or.inl rfl
+      · exact Or.inl rfl)
+  have hmem : H ∈ schwartzBruhatSubmodule ((Unit → ℝˣ) × (Empty → ℂˣ)) := by
+    have hLmem : (L pure).val ∈
+        archimedeanWeightedSchwartzSubmodule (ι := Unit) (κ := Empty) (Ioi 0) :=
+      (L pure).property
+    rw [hval] at hLmem
+    exact hle hLmem
+  have hlim0 : Tendsto (fun t : ℝ ↦ H (slicePoint t)) atBot (𝓝 0) :=
+    schwartzBruhat_slice_exp_tendsto_zero ⟨H, hmem⟩
+  have hlim1 : Tendsto (fun t : ℝ ↦ H (slicePoint t)) atBot (𝓝 1) := by
+    have hH : (fun t : ℝ ↦ H (slicePoint t)) =
+        fun t : ℝ ↦ (Real.exp (-Real.pi * ‖Real.exp t‖ ^ 2) : ℂ) := by
+      funext t
+      simp [H, slicePoint, Units.val_mk0, hg]
+    rw [hH]
+    have hsq : Tendsto (fun t : ℝ ↦ ‖Real.exp t‖ ^ 2) atBot (𝓝 0) := by
+      simpa using (Real.tendsto_exp_atBot.norm.pow 2)
+    have harg : Tendsto (fun t : ℝ ↦ -Real.pi * ‖Real.exp t‖ ^ 2) atBot (𝓝 0) := by
+      have h := (tendsto_const_nhds (x := (-Real.pi : ℝ))).mul hsq
+      simpa [neg_mul] using h
+    have hexp : Tendsto (fun t : ℝ ↦ Real.exp (-Real.pi * ‖Real.exp t‖ ^ 2))
+        atBot (𝓝 1) := by
+      have := (Real.continuous_exp.tendsto 0).comp harg
+      simpa [Function.comp_def] using this
+    have h := (Complex.continuous_ofReal.tendsto (1 : ℝ)).comp hexp
+    simpa only [Function.comp_def, Complex.ofReal_one] using h
+  have hone : (0 : ℂ) = 1 := tendsto_nhds_unique hlim0 hlim1
+  norm_num at hone
 
 /-- Paper: Proposition 5.3.3.4(1), p. 258. As printed: For every real Schwartz test and
 sign parity, shifting the Mellin exponent by n and the sign parity by n modulo two keeps
