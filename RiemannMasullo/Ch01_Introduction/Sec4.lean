@@ -430,7 +430,34 @@ for the trivial character is a pole of the finite L-function. -/
 theorem introTrace_finiteL_no_right_zeros (χ : U𝔽)
     (_h : AnalyticOnNhd ℂ (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2))
       {z : ℂ | 0 < z.re ∧ (χ ≠ 1 ∨ z ≠ 1 / 2)}) (s : ℂ) (_hs : 1 / 2 < s.re) :
-    meromorphicOrderAt finiteL(χ) s ≤ 0 := by sorry
+    meromorphicOrderAt finiteL(χ) s ≤ 0 := by
+  let L := finiteL(χ)
+  have hL := (finiteHeckeL_exists_continuation χ).choose_spec
+  have hr (z : ℂ) (hz : 1 ≤ z.re) : meromorphicOrderAt L z ≤ 0 := by
+    obtain ⟨A, hA, h⟩ := finiteHeckeL_zeroFreeRegion
+    obtain ⟨B, hB, hzero⟩ := h F χ
+    have hl : 0 ≤ Real.log (B * (|z.im| + 3)) := Real.log_nonneg (by
+      have := mul_nonneg (show 0 ≤ B by linarith) (abs_nonneg z.im)
+      nlinarith)
+    exact hzero L hL.1 hL.2 z ((sub_le_self _ (div_nonneg hA.le
+      (mul_nonneg (by positivity) hl))).trans hz)
+  by_cases he : s = 1
+  · exact hr s (by simp [he])
+  have hne : meromorphicOrderAt L s ≠ ⊤ := hL.1.meromorphicOn.meromorphicOrderAt_ne_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s)
+    ((hr 2 (by norm_num)).trans_lt (show (0 : WithTop ℤ) < ⊤ by simp)).ne
+  have hs : 0 < (s - 1 / 2).re := by
+    simp only [Complex.sub_re, Complex.div_ofNat_re, Complex.one_re]
+    linarith
+  have hx : s - 1 / 2 ≠ 1 / 2 := fun h ↦ he (by linear_combination h)
+  have han := (_h (s - 1 / 2) ⟨hs, Or.inr hx⟩).comp (f := fun z : ℂ ↦ z - 1 / 2)
+    (analyticAt_id.sub analyticAt_const)
+  have ha : AnalyticAt ℂ (logDeriv L) s := by simpa [Function.comp_def, L] using han
+  by_contra! hp
+  have hn := ha.meromorphicOrderAt_nonneg
+  rw [meromorphicOrderAt_logDeriv_eq_neg_one hp.ne' hne] at hn
+  have hi : (0 : ℤ) ≤ -1 := WithTop.coe_le_coe.mp hn
+  omega
 
 /-- Paper: §1.4.5, p. 30. Right-hand nonvanishing for the finite continuations
 in the section-normalized characters implies right-hand nonvanishing for every
