@@ -6340,7 +6340,7 @@ private theorem elementary_operator_tensor :
   let : CompleteSpace (StrongDual ℂ SX) := elementarySchwartz_strongDual_complete
   let : BarrelledSpace ℂ (StrongDual ℂ SX) := elementarySchwartz_strongDual_barrelled
   obtain ⟨e,he⟩ := elementarySchwartz_reflexive (m := m₁) (n := n₁) (r := r₁) (F := F₁)
-  exact tensor_of_reflexive_nuclear (A := SX) (B := SY) e he elementarySchwartz_nuclear
+  exact tensor_of_reflexive_nuclear (A := SX) (B := SY) e he elementarySchwartz_nuclear_of_finite
 
 private theorem elementary_kernel_value (e : X × Y ≃ₜ+ Z)
     (L : Completion (ProjectiveTensor SX SY) →L[ℂ] SZ)
@@ -7193,9 +7193,9 @@ private theorem kernel_stage_properties
   · exact (completeSpace_iff_isComplete_range (AddMonoidHom.isUniformInducing_of_isInducing
       (f := res.toLinearMap.toAddMonoidHom) hr.isInducing)).mpr hr.isClosed_range.isComplete
   · exact nuclear_of_injective_frechet_sequence (fun _ ↦ elementarySchwartz_isFrechet)
-      (fun _ ↦ elementarySchwartz_nuclear) j i hlim (fun n ↦ (hj n).isEmbedding)
+      (fun _ ↦ elementarySchwartz_nuclear_of_finite) j i hlim (fun n ↦ (hj n).isEmbedding)
   · exact schwartzBruhat_nuclear_of_embedding res.toLinearMap hr.isEmbedding
-      (isNuclearTVS_pi fun n ↦ (isNuclearTVS_strongDual_iff elementarySchwartz_isFrechet).mpr elementarySchwartz_nuclear)
+      (isNuclearTVS_pi fun n ↦ (isNuclearTVS_strongDual_iff elementarySchwartz_isFrechet).mpr elementarySchwartz_nuclear_of_finite)
 
 /-- Analytic properties of the countable strict elementary presentation. -/
 private theorem kernel_space_properties :
@@ -7259,7 +7259,7 @@ theorem schwartzBruhat_strongDual_kernel_equiv [SecondCountableTopology G]
       (l := fun n ↦ schwartzBruhatStageCLM (b n) (f n)) hj.2.2.2.2 hk.2.2.2.2
       (fun n ↦ (hj.2.2.2.1 n).isEmbedding) (fun n ↦ (hk.2.2.2.1 n).isEmbedding)
       (fun _ ↦ elementarySchwartz_isFrechet) (fun _ ↦ elementarySchwartz_isFrechet)
-      (fun _ ↦ elementarySchwartz_nuclear) hcB
+      (fun _ ↦ elementarySchwartz_nuclear_of_finite) hcB
 
 -- TODO(paper-gap): The proof after (D.1.8.3) cites part (1) for the strong-dual
 -- tensor identification at the Fréchet stages. That step uses the nuclear Fréchet result.

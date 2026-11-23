@@ -1326,6 +1326,56 @@ theorem modulatedPeriodicMomentIndex_enumerable (hN : 0 < N) :
 variable (hcomm : ∃ a : ℝ, 0 < a ∧ ∀ k, ∃ r : ℚ, Real.log ((m (γs k)).val : ℝ) = (r : ℝ) * a)
 
 include hcomm in
+/-- Paper: Theorem 4.6.1.5, p. 212. There is a family of vectors of the difference quotient on
+which the descended log-moments take the values of the Kronecker delta. The vectors are chosen
+by induction from the density of the span of the descended moments in the strong dual; the
+lattice Schwartz decay of (4.6.1.15) provides the surjectivity used at each step. -/
+private theorem modulatedQuotientLogMoment_bases_biorthogonal :
+    ∃ ψ : J → U, (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0 := by
+  sorry
+
+include hγs in
+/-- Paper: Theorem 4.1.2.6(2), p. 161, applied to Theorem 4.6.1.5, p. 212. The difference quotient
+is a separable nuclear Frechet space (by `modulatedIsotypicDifferenceProduct_quotient`), and every
+Schauder basis of a nuclear Frechet space is absolute. -/
+private theorem modulatedQuotientLogMoment_bases_absolute (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ)) :
+    SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ) := by
+  have hS₀ : ∀ g ∈ List.ofFn γs, 1 < (m g).val := by
+    intro g hg
+    obtain ⟨k, rfl⟩ := List.mem_ofFn.mp hg
+    exact hγs k
+  obtain ⟨-, hN, hF⟩ := modulatedIsotypicDifferenceProduct_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (List.ofFn γs) hS₀
+  exact SchauderBasis.isAbsolute_of_nuclear_frechet.{_, 0} hN hF hb
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.15), p. 212. Under every enumeration of the
+moment family, the biorthogonal vectors are a Schauder basis of the difference quotient with
+the descended log-moments as coefficient functionals. This is the expansion step: the coordinate
+series of a quotient representative converges to it because the coefficients decay faster than
+any power of the lattice frequency. Absoluteness is
+`modulatedQuotientLogMoment_bases_absolute`. -/
+private theorem modulatedQuotientLogMoment_bases_quotient (σ : ℕ ≃ J) (ψ : J → U)
+    (hbi : (∀ j, D j (ψ j) = 1) ∧ ∀ j k, j ≠ k → D j (ψ k) = 0) :
+    IsSchauderBasis (ψ ∘ σ) (D ∘ σ) := by
+  sorry
+
+include hcomm in
+/-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.16), p. 212, via Lemma 4.1.2.4, p. 159. Once
+the descended log-moments are the coefficient functionals of an absolute Schauder basis of the
+difference quotient, they form an unconditional Schauder basis of the strong dual, whose
+coordinates are the evaluations at the basis vectors. -/
+private theorem modulatedQuotientLogMoment_bases_dual (σ : ℕ ≃ J) (ψ : J → U)
+    (hb : IsSchauderBasis (ψ ∘ σ) (D ∘ σ))
+    (ha : SchauderBasis.IsAbsolute (ψ ∘ σ) (D ∘ σ)) :
+    let d := D ∘ σ
+    let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
+      fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) ((ψ ∘ σ) n)
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  sorry
+
+include hcomm in
 /-- Paper: Theorem 4.6.1.5 and Equations (4.6.1.15)–(4.6.1.16), p. 212.
 Every enumeration of the moment family is an unconditional basis of the
 strong dual. The biorthogonal vectors are an absolute basis of the quotient.
@@ -1338,7 +1388,15 @@ theorem modulatedQuotientLogMoment_bases (σ : ℕ ≃ J) :
       let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
         fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
       IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d ∧
-        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by sorry
+        IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  obtain ⟨ψ, hbi⟩ := modulatedQuotientLogMoment_bases_biorthogonal (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm)
+  obtain hb := modulatedQuotientLogMoment_bases_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hbi
+  have ha := modulatedQuotientLogMoment_bases_absolute (m := m) (hm := hm) (hms := hms)
+    (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) σ ψ hb
+  exact ⟨ψ, hb, ha, modulatedQuotientLogMoment_bases_dual (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (γs := γs) (hγs := hγs) (μ := μ) (hcomm := hcomm) σ ψ hb ha⟩
 
 include hχ hcomm in
 /-- Paper: Theorem 4.6.1.5(1), p. 212. A continuous seminorm of the

@@ -475,7 +475,54 @@ theorem criticalTraceGeometric_converges_functional (τ : ℝ≥0ˣ →ₜ* C�
       restrictsAtInfinity(a, φ) → restrictsAtFinite(b, φ) →
       L φ = mellinAt(φ, 1, -1 / 2) + mellinAt(φ, 1, 1 / 2) -
         (∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) -
-        ∑' v : V, finiteTerm(v, b v) := by sorry
+        ∑' v : V, finiteTerm(v, b v) := by
+  classical
+  obtain ⟨_, poles, arch, fin, _, hpoles, harch, hfin, _, _, hsum, _⟩ :=
+    idelicExplicitFormula τ hτ
+  let vol : ℝ := (normOneIdeleClassTamagawaMeasure F univ).toReal
+  have hvol : 0 < vol := by
+    dsimp [vol]
+    rw [normOneIdeleClassTamagawaMeasure_volume]
+    have := NumberField.classNumber_pos F
+    have := NumberField.Units.regulator_pos F
+    have := NumberField.Units.torsionOrder_pos F
+    have := Int.natAbs_pos.mpr (NumberField.discr_ne_zero F)
+    rw [ENNReal.toReal_ofReal (by positivity)]
+    positivity
+  -- The printed finite-place coefficients change the dual series only at the different.
+  let printed (v : V) : StrongDual ℂ D𝔽 := finiteUnitMass(v) • fin v
+  have hmass : ∀ᶠ v : V in Filter.cofinite, finiteLocalMultiplicativeTamagawaMeasure F v
+      (v.adicCompletionIntegers F).units = 1 := by
+    simpa only [finiteLocalMultiplicativeTamagawaMeasure_integerUnits, Filter.eventually_cofinite]
+      using finiteLocalTamagawaMass_finite F
+  have hprinted : Summable printed := hsum.congr_cofinite (hmass.mono fun v hv ↦ by
+    simp [printed, hv])
+  refine ⟨(vol : ℂ) • poles - (∑ w, arch w) - (∑' v, printed v), ?_⟩
+  intro φ a b ha hb
+  let ev : StrongDual ℂ D𝔽 →+ ℂ :=
+    { toFun := fun L ↦ L φ, map_zero' := rfl, map_add' := fun _ _ ↦ rfl }
+  have hp : (vol : ℂ) * poles φ = mellinAt(φ, 1, -1 / 2) + mellinAt(φ, 1, 1 / 2) := by
+    have htwist (s : ℂ) (g : C𝔽) : ideleClassNormTwist (1 : U𝔽) s g =
+        (((ideleClassNorm F g).val : ℝ) : ℂ) ^ s := by
+      exact one_mul ((((ideleClassNorm F g).val : ℝ) : ℂ) ^ s)
+    simp only [htwist, hpoles]
+    exact mul_div_cancel₀ _ (Complex.ofReal_ne_zero.mpr hvol.ne')
+  have hinf : ev (∑ w, arch w) = ∑ w, infiniteConnesWeilPrincipalValue w (a w) := by
+    rw [map_sum]
+    refine Finset.sum_congr rfl fun w _ ↦ ?_
+    obtain ⟨t, ht, he⟩ := harch w φ
+    have ht' : t = a w := Subtype.ext (funext fun u ↦ (ht u).trans (ha w u).symm)
+    exact ht' ▸ he
+  have hfinite : ev (∑' v, printed v) = ∑' v : V, finiteTerm(v, b v) := by
+    have heval : Continuous ev := continuous_eval_const φ
+    refine (hprinted.hasSum.map ev heval).tsum_eq.symm.trans (tsum_congr fun v ↦ ?_)
+    obtain ⟨t, ht, he⟩ := hfin v φ
+    have ht' : t = b v := Subtype.ext (funext fun u ↦ (ht u).trans (hb v u).symm)
+    change finiteUnitMass(v) * fin v φ = _
+    rw [he, ht', Complex.ofReal_div, ← mul_assoc, mul_div_cancel₀ _
+      (criticalTraceGeometric_converges_unitMass_ne_zero (F := F) v)]
+  change (vol : ℂ) * poles φ - ev (∑ w, arch w) - ev (∑' v, printed v) = _
+  rw [hp, hinf, hfinite]
 
 /-- Paper: Theorem 13.3.1.1, (13.3.1.3)–(13.3.1.5), p. 522. The finite-place
 series converges, and the polar terms minus the local principal values form a
@@ -508,6 +555,47 @@ theorem criticalTraceGeometric_converges (τ : ℝ≥0ˣ →ₜ* C𝔽)
     ring
   exact h2 ▸ hsum.hasSum
 
+private theorem hasSum_fullDivisor_on_criticalTraceTests_vol :
+    (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ) ≠ 0 := by
+  have hvol := normOneIdeleClassTamagawaMeasure_volume (F := F)
+  have hc0 : normOneIdeleClassTamagawaMeasure F univ ≠ 0 := by
+    rw [hvol, ne_eq, ENNReal.ofReal_eq_zero, not_le]
+    have := NumberField.Units.regulator_pos F
+    have := NumberField.classNumber_pos F
+    have := NumberField.Units.torsionOrder_pos F
+    have : (0 : ℝ) < Real.sqrt (Int.natAbs (NumberField.discr F) : ℝ) :=
+      Real.sqrt_pos.mpr (by exact_mod_cast Int.natAbs_pos.mpr (NumberField.discr_ne_zero F))
+    positivity
+  have hct : normOneIdeleClassTamagawaMeasure F univ ≠ ⊤ := by
+    rw [hvol]; exact ENNReal.ofReal_ne_top
+  exact Complex.ofReal_ne_zero.mpr (ENNReal.toReal_ne_zero.mpr ⟨hc0, hct⟩)
+
+private theorem hasSum_fullDivisor_on_criticalTraceTests_cpow (p a x s : ℂ) (hx : x ≠ 0) :
+    p * (a * x ^ s) * x ^ (-1 / 2 : ℂ) = p * (a * x ^ (s - 1 / 2)) := by
+  rw [sub_eq_add_neg, Complex.cpow_add _ _ hx]
+  ring_nf
+
+private theorem hasSum_fullDivisor_on_criticalTraceTests_hasSum_congr {ι : Type*}
+    {f g : ι → ℂ} {a : ℂ} (h : HasSum f a) (hfg : ∀ i, f i = g i) : HasSum g a :=
+  (funext hfg) ▸ h
+
+private theorem hasSum_fullDivisor_on_criticalTraceTests_mul_div (v m I : ℂ) (hv : v ≠ 0) :
+    v * (m / v * I) = m * I := by
+  field_simp
+
+private theorem hasSum_fullDivisor_on_criticalTraceTests_val {v x p A Fs P1 P2 M1 M2 A' F' : ℂ}
+    (hv : v ≠ 0) (hx : x = p - A - Fs) (hp : p = (P1 + P2) / v) (hA : A = A') (hF : Fs = F')
+    (h1 : M1 = P1) (h2 : M2 = P2) :
+    v * x = M1 + M2 - v * (A' + F') := by
+  subst hx hp hA hF h1 h2
+  field_simp
+  ring
+
+private theorem hasSum_fullDivisor_on_criticalTraceTests_scale (a b : ℝ) (x : ℂ) :
+    ((a / b : ℝ) : ℂ) * x = (a : ℂ) * x / (b : ℂ) := by
+  rw [div_eq_mul_inv, div_eq_mul_inv, Complex.ofReal_mul, Complex.ofReal_inv]
+  ring
+
 /-- Paper: Theorem 13.3.1.1, (13.3.1.3)–(13.3.1.5), p. 522. On the Mellin-jet
 test subspace the full zero divisor pairs against the test by the idelic explicit formula.
 Deviation: This is the restriction of `idelicExplicitFormula` to the jet subspace.
@@ -524,7 +612,65 @@ theorem hasSum_fullDivisor_on_criticalTraceTests (τ : ℝ≥0ˣ →ₜ* C𝔽)
           mellinAt(φ.val, z.val.1.val, z.val.2 - 1 / 2))
         (mellinAt(φ.val, 1, -1 / 2) + mellinAt(φ.val, 1, 1 / 2) - classVolume *
           ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
-            ∑' v : V, finiteTerm(v, b v) / finiteUnitMass(v))) := by sorry
+            ∑' v : V, finiteTerm(v, b v) / finiteUnitMass(v))) := by
+  obtain ⟨spectral, poles, arch, finite, hspec, hpoles, harch, hfin, _, hsupp, hsum, hHas⟩ :=
+    idelicExplicitFormula τ _hτ
+  choose a ha haPV using fun w => harch w φ.val
+  choose b hb hbPV using fun v => hfin v φ.val
+  let E : StrongDual ℂ D𝔽 →+ ℂ :=
+    { toFun := fun L => L φ.val, map_zero' := rfl, map_add' := fun _ _ => rfl }
+  have hEc : Continuous E := continuous_eval_const φ.val
+  have hT := hsum.hasSum.map E hEc
+  have hS := hHas.map E hEc
+  have hvol : (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ) ≠ 0 :=
+    hasSum_fullDivisor_on_criticalTraceTests_vol
+  have hone (r : ℂ) : mellinAt(φ.val, 1, r) =
+      ∫ g, (φ.val : D𝔽).val g * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ r ∂μ𝔽 := by
+    refine integral_congr_ae (Filter.Eventually.of_forall fun g => ?_)
+    change (φ.val : D𝔽).val g * ((1 : ℂ) * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ r) =
+      (φ.val : D𝔽).val g * (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ r
+    rw [one_mul]
+  refine ⟨a, b, ha, hb, ?_, ?_⟩
+  · have hf : Summable (fun v : V => finite v φ.val) := hT.summable
+    refine hf.congr fun v => ?_
+    rw [hbPV v, hasSum_fullDivisor_on_criticalTraceTests_scale]
+  · have hA : E (∑ w : InfinitePlace F, arch w) =
+        ∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w) :=
+      (map_sum E arch Finset.univ).trans (Finset.sum_congr rfl fun w _ => haPV w)
+    have hF : E (∑' v : V, finite v) = ∑' v : V, finiteTerm(v, b v) / finiteUnitMass(v) :=
+      hT.tsum_eq.symm.trans (tsum_congr fun v => by
+        rw [show (⇑E ∘ finite) v = (finite v) φ.val from rfl, hbPV v,
+          hasSum_fullDivisor_on_criticalTraceTests_scale])
+    have hx : E (poles - (∑ w, arch w) - (∑' v, finite v)) =
+        E poles - E (∑ w, arch w) - E (∑' v, finite v) :=
+      (map_sub E _ _).trans (congrArg (· - E _) (map_sub E _ _))
+    have hval : (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ) *
+        E (poles - (∑ w, arch w) - (∑' v, finite v)) =
+        mellinAt(φ.val, 1, -1 / 2) + mellinAt(φ.val, 1, 1 / 2) -
+          (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ) *
+            ((∑ w : InfinitePlace F, infiniteConnesWeilPrincipalValue w (a w)) +
+              ∑' v : V, finiteTerm(v, b v) / finiteUnitMass(v)) :=
+      hasSum_fullDivisor_on_criticalTraceTests_val hvol hx (hpoles φ.val) hA hF
+        (hone (-1 / 2)) (hone (1 / 2))
+    have hZ := hS.mul_left (((normOneIdeleClassTamagawaMeasure F) univ).toReal : ℂ)
+    rw [hval] at hZ
+    refine hasSum_fullDivisor_on_criticalTraceTests_hasSum_congr hZ fun z => ?_
+    rw [show (⇑E ∘ spectral) z = (spectral z) φ.val from rfl, hspec z φ.val]
+    refine (hasSum_fullDivisor_on_criticalTraceTests_mul_div _ _ _ hvol).trans ?_
+    have hI : (∫ g, (φ.val : D𝔽).val g *
+        (ideleClassNormTwist (F := F) z.val.1.val z.val.2) g *
+          (((ideleClassNorm F g : ℝ≥0) : ℝ) : ℂ) ^ (-1 / 2 : ℂ) ∂μ𝔽) =
+        mellinAt(φ.val, z.val.1.val, z.val.2 - 1 / 2) := by
+      refine integral_congr_ae (Filter.Eventually.of_forall fun g => ?_)
+      have hn : ((((ideleClassNorm F g : ℝ≥0) : ℝ)) : ℂ) ≠ 0 :=
+        Complex.ofReal_ne_zero.mpr (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+      change (φ.val : D𝔽).val g * (_ * ((((ideleClassNorm F g : ℝ≥0) : ℝ)) : ℂ) ^ z.val.2) *
+          ((((ideleClassNorm F g : ℝ≥0) : ℝ)) : ℂ) ^ (-1 / 2 : ℂ) =
+        (φ.val : D𝔽).val g *
+          (_ * ((((ideleClassNorm F g : ℝ≥0) : ℝ)) : ℂ) ^ (z.val.2 - 1 / 2))
+      exact hasSum_fullDivisor_on_criticalTraceTests_cpow _ _ _ _ hn
+    rw [hI]
+    rfl
 
 -- TODO(paper-gap): The inference to the divisor statement cites “Theorem ??”
 -- without identifying the theorem to be combined with Theorem 13.3.1.1.

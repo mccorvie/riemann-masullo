@@ -5,6 +5,8 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 public import RiemannMasullo.Ch06_LocalGlobal.Sec3
 public import RiemannMasullo.Ch09_HardySobolev.Sec3
 
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
@@ -2026,6 +2028,212 @@ theorem existsUnique_globalThetaSobolevAverage (ω : PontryaginDual C₁) :
 local notation "P(" ω ")" =>
   (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose
 
+section
+
+/-- A map from polar-free classes extends across the two finite-dimensional polar coordinates. -/
+private theorem thetaSobolev_extend_polar {E Y : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+    (p : E →ₗ[ℂ] ℂ × ℂ) (hp : Continuous p) (hs : Surjective p)
+    (K : Submodule ℂ E) (hK : K ≤ p.ker)
+    (i : (p.ker ⧸ K.comap p.ker.subtype) →L[ℂ] Y) :
+    ∃ c : (E ⧸ K) →L[ℂ] Y, ∀ x : p.ker, c (K.mkQ x.val) = i (Submodule.Quotient.mk x) := by
+  obtain ⟨s, hs⟩ := p.exists_rightInverse_of_surjective (LinearMap.range_eq_top.mpr hs)
+  have hs' (v : ℂ × ℂ) : p (s v) = v := LinearMap.congr_fun hs v
+  let p' : E →L[ℂ] ℂ × ℂ := ⟨p, hp⟩
+  let s' : (ℂ × ℂ) →L[ℂ] E := ⟨s, s.continuous_of_finiteDimensional⟩
+  let r₀ := ContinuousLinearMap.id ℂ E - s'.comp p'
+  have hmem (v : E) : r₀ v ∈ p.ker := by
+    change p (v - s (p v)) = 0
+    rw [map_sub, hs', sub_self]
+  let r := r₀.codRestrict p.ker hmem
+  have hfix (v : p.ker) : r v.val = v := by
+    apply Subtype.ext
+    change v.val - s (p v.val) = v.val
+    rw [show p v.val = 0 from v.property, map_zero, sub_zero]
+  let q := (K.comap p.ker.subtype).mkQL
+  let M := (i.comp q).comp r
+  have hk : K ≤ M.ker := by
+    intro v hv
+    change i (q (r v)) = 0
+    rw [hfix ⟨v, hK hv⟩, show q ⟨v, hK hv⟩ = 0 from
+      (Submodule.Quotient.mk_eq_zero _).2 hv, map_zero]
+  refine ⟨K.liftQL M hk, fun v ↦ ?_⟩
+  change i (q (r v.val)) = i (q v)
+  rw [hfix]
+
+/-- Testing the two Pettis averages on functionals only requires intertwining the orbit of the input. -/
+private theorem thetaSobolev_average_orbit {G E Y : Type*}
+    [Monoid G] [TopologicalSpace G] [MeasurableSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [NormedAddCommGroup Y] [NormedSpace ℂ Y]
+    (μ : Measure G) (ω : PontryaginDual G) (ρ : G →* (E →L[ℂ] E))
+    (σ : G →* (Y →L[ℂ] Y)) (A : E →L[ℂ] E) (B : Y →L[ℂ] Y)
+    (hA : IsPettisIsotypicAverageOn μ univ ρ ω A)
+    (hB : IsPettisIsotypicAverageOn μ univ σ ω B)
+    (c : E →L[ℂ] Y) (x : E) (hi : ∀ g, σ g (c x) = c (ρ g x)) :
+    c (A x) = B (c x) := by
+  apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+  intro φ
+  have h₁ := LinearMap.congr_fun (hA x).2 (φ.comp c)
+  have h₂ := LinearMap.congr_fun (hB (c x)).2 φ
+  change φ (c (A x)) = ∫ g, φ (c (star (ω g : ℂ) • ρ g x)) ∂μ.restrict univ at h₁
+  change φ (B (c x)) = ∫ g, φ (star (ω g : ℂ) • σ g (c x)) ∂μ.restrict univ at h₂
+  rw [h₁, h₂]
+  simp only [map_smul, hi]
+
+/-- The average of polar-free classes still has both polar coordinates zero. -/
+private theorem thetaSobolev_average_polar {G E : Type*}
+    [Monoid G] [TopologicalSpace G] [MeasurableSpace G]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (μ : Measure G) (ω : PontryaginDual G) (ρ : G →* (E →L[ℂ] E)) (A : E →L[ℂ] E)
+    (hA : IsPettisIsotypicAverageOn μ univ ρ ω A) (p : E →L[ℂ] ℂ × ℂ)
+    (hi : ∀ g y, p (ρ g y) = p y) {x : E} (hx : p x = 0) : p (A x) = 0 := by
+  have hl (L : (ℂ × ℂ) →L[ℂ] ℂ) : L (p (A x)) = 0 := by
+    have h := LinearMap.congr_fun (hA x).2 (L.comp p)
+    change L (p (A x)) = ∫ g, L (p (star (ω g : ℂ) • ρ g x)) ∂μ.restrict univ at h
+    simpa only [map_smul, hi, hx, map_zero, smul_zero, integral_zero] using h
+  exact Prod.ext (hl (ContinuousLinearMap.fst ℂ ℂ ℂ)) (hl (ContinuousLinearMap.snd ℂ ℂ ℂ))
+
+/-- Restrict the ordinary isotype equivalence to polar classes, then use the dense Sobolev embedding. -/
+private theorem thetaSobolev_polar_assemble {X E T Yspace : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup T] [Module ℂ T] [TopologicalSpace T]
+    [NormedAddCommGroup Yspace] [NormedSpace ℂ Yspace]
+    (D : Submodule ℂ T) (V : Submodule ℂ E) (W : Submodule ℂ Yspace)
+    (e : T ≃L[ℂ] V) (A : E →L[ℂ] E) (c : E →L[ℂ] Yspace) (B : Yspace →L[ℂ] W)
+    (r : X → E) (t : X → D) (i : X → Yspace) (ht : Surjective t) (hi : DenseRange i)
+    (hB : Surjective B) (he : ∀ f, (e (t f).val).val = A (r f))
+    (hA : ∀ f, ∃ g, r g = A (r f)) (hci : ∀ f, c (r f) = i f)
+    (hfaith : ∀ f g, i f = i g → r f = r g)
+    (hcomm : ∀ f, c (A (r f)) = (B (i f)).val) :
+    ∃ j : D →L[ℂ] W, Injective j ∧ DenseRange j ∧ ∀ f, j (t f) = B (i f) := by
+  let L := c.comp (V.subtypeL.comp (e.toContinuousLinearMap.comp D.subtypeL))
+  have hL (f) : L (t f) = (B (i f)).val := by
+    change c (e (t f).val).val = _
+    rw [he, hcomm]
+  have hmem (v) : L v ∈ W := by
+    obtain ⟨f, rfl⟩ := ht v
+    rw [hL]
+    exact (B (i f)).property
+  let j := L.codRestrict W hmem
+  have hj (f) : j (t f) = B (i f) := Subtype.ext (hL f)
+  refine ⟨j, ?_, ?_, hj⟩
+  · rintro a b hab
+    obtain ⟨f, rfl⟩ := ht a
+    obtain ⟨g, rfl⟩ := ht b
+    apply Subtype.ext
+    apply e.injective
+    apply Subtype.ext
+    rw [he, he]
+    obtain ⟨f', hf'⟩ := hA f
+    obtain ⟨g', hg'⟩ := hA g
+    rw [← hf', ← hg']
+    apply hfaith
+    rw [← hci, ← hci, hf', hg', hcomm, hcomm]
+    exact congrArg Subtype.val ((hj f).symm.trans (hab.trans (hj g)))
+  · have h := hB.denseRange.comp hi B.continuous
+    have heq : B ∘ i = j ∘ t := funext fun f ↦ (hj f).symm
+    rw [heq] at h
+    exact h.of_comp
+
+/-- Lift a norm-one group element and compare the two actions on translated tests. -/
+private theorem thetaSobolev_polar_lift_orbit {G Z C P X E Yspace : Type*}
+    [NormedAddCommGroup Yspace] [NormedSpace ℝ Yspace]
+    (π : G → C) (hπ : Surjective π) (ι : Z → C) (d : P → X) (q : X → E) (i : P → Yspace)
+    (c : E → Yspace) (ρ : C → E → E) (σ : C → Yspace → Yspace) (w : C → ℝ) (T : G → X → X)
+    (hc : ∀ f, c (q (d f)) = i f) (hw : ∀ z, w (ι z) = 1)
+    (hρ : ∀ g f, ρ (π g) (q f) = q (T g f))
+    (hσ : ∀ g f, ∃ f', d f' = T g (d f) ∧ σ (π g) (i f) = w (π g) • i f')
+    (z : Z) (f : P) : σ (ι z) (c (q (d f))) = c (ρ (ι z) (q (d f))) := by
+  obtain ⟨g, hg⟩ := hπ (ι z)
+  obtain ⟨f', hf', h⟩ := hσ g f
+  have hm : w (π g) = 1 := (congrArg w hg).trans (hw z)
+  rw [hc, ← hg, h, hm, one_smul, hρ, ← hf', hc]
+
+end
+
+section GlobalPolarInclusion
+
+local notation "ℬ" => SchwartzBruhat (Multiplicative 𝔸[F])
+local notation "Q" => GlobalAdelicThetaSpace F
+local notation "μ" => normOneIdeleClassTamagawaMeasure F
+local notation "Qmk" => (Submodule.Quotient.mk : ℬ → Q)
+local notation "ρ" => (existsUnique_globalThetaAction (F := F)).exists.choose
+local notation "ρ₀" => (ρ).comp (ideleClassNorm F).ker.subtype
+local notation "A(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose
+local notation "H(" a ", " h ", " s ")" => ↥(globalThetaSobolev F a h s)
+local notation "J(" a ", " h ", " s ")" => globalThetaSobolevInclusion F a h s
+local notation "R(" a ", " h ", " s ")" => (exists_globalThetaSobolevAction (F := F) a h s).choose
+local notation "R₀(" a ", " h ", " s ")" => (R(a, h, s)).comp (ideleClassNorm F).ker.subtype
+local notation "B(" a ", " h ", " s ", " ω ")" => (existsUnique_globalThetaSobolevAverage (F := F) (a := a) h s ω).exists.choose
+
+section
+
+/-- The representatives of the ordinary compact average have precisely the homogeneous theta function. -/
+private theorem thetaSobolev_global_average_theta
+    (hc : ∀ t : C𝔽, Continuous (fun f : ℬ ↦ adelicTheta f t))
+    (ω : PontryaginDual C₁) (f f' : ℬ) (hf : Qmk f' = A(ω) (Qmk f)) :
+    adelicTheta f' = homogeneousAdelicTheta ω f := by
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : (μ).IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  ext t
+  let ev := thetaQuotientEval (adelicThetaLinearMap F) t (hc t)
+  have h := LinearMap.congr_fun ((existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec (Qmk f)).2 ev
+  change ev (A(ω) (Qmk f)) = ∫ g, ev (star (ω g : ℂ) • ρ₀ g (Qmk f)) ∂(μ).restrict univ at h
+  have hθ (g : C₁) : ev (ρ₀ g (Qmk f)) = adelicTheta f (g.val⁻¹ * t) :=
+    globalThetaAction_eval ρ (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 f t g.val (hc t)
+  rw [← hf] at h
+  change ev (Qmk f') = ∫ g : C₁, adelicTheta f (g.val * t) * (ω g : ℂ) ∂μ
+  refine h.trans ?_
+  simp only [Measure.restrict_univ, map_smul, smul_eq_mul, hθ]
+  refine (integral_congr_ae (.of_forall fun g ↦ ?_)).trans
+    (integral_inv_eq_self (fun g : C₁ ↦ adelicTheta f (g.val * t) * (ω g : ℂ)) μ)
+  rw [map_inv, Circle.coe_inv_eq_conj, mul_comm]
+  rfl
+
+/-- An ordinary isotypic average of a polar representative admits a polar representative. -/
+private theorem thetaSobolev_global_average_rep (ω : PontryaginDual C₁) (f : ℬ₀) :
+    ∃ f' : ℬ₀, Qmk f'.val = A(ω) (Qmk f.val) := by
+  let P := globalThetaPolarValues (F := F)
+  have hnorm (g : C₁) (v : Q) : P (ρ₀ g v) = P v := by
+    apply Prod.ext
+    · exact globalThetaPolarValues_fst_translate g.val v
+    · have h := globalThetaPolarValues_snd_translate g.val v
+      change (globalThetaPolarValues (F := F) (ρ g.val v)).2 = (globalThetaPolarValues (F := F) v).2
+      simpa only [show ideleClassNorm F g.val = 1 from g.property, Units.val_one,
+        NNReal.coe_one, Complex.ofReal_one, one_mul] using h
+  have hf : P (Qmk f.val) = 0 := f.property
+  have h := thetaSobolev_average_polar μ ω ρ₀ (A(ω))
+    (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec P hnorm hf
+  obtain ⟨f', hf'⟩ := (adelicThetaLinearMap F).ker.mkQ_surjective (A(ω) (Qmk f.val))
+  refine ⟨⟨f', ?_⟩, hf'⟩
+  exact (congrArg P hf').trans h
+
+/-- On a norm-one orbit the scalar in the global Sobolev action is one. -/
+private theorem thetaSobolev_global_polar_orbit (a : ℝ) {α β s : ℝ} (hI : α ≤ β) (hs : 0 ≤ s)
+    (c : Q →L[ℂ] H(a, hI, hs))
+    (hc : ∀ f : ℬ₀, c (Qmk f.val) = J(a, hI, hs) (Submodule.Quotient.mk f))
+    (g : C₁) (f : ℬ₀) :
+    R₀(a, hI, hs) g (c (Qmk f.val)) = c (ρ₀ g (Qmk f.val)) := by
+  have hw (g : C₁) : ((m𝔽 g.val).val : ℝ) ^ (-a) = 1 := by
+    have h : m𝔽 g.val = 1 := g.property
+    rw [h]
+    simp
+  change R(a, hI, hs) g.val (c (Qmk f.val)) = c (ρ g.val (Qmk f.val))
+  with_reducible_and_instances
+    exact thetaSobolev_polar_lift_orbit
+      (QuotientGroup.mk : IdeleGroup (𝓞 F) F → C𝔽) QuotientGroup.mk_surjective (fun k : C₁ ↦ k.val)
+      (fun b : ℬ₀ ↦ b.val) Qmk (fun b : ℬ₀ ↦ J(a, hI, hs) (Submodule.Quotient.mk b))
+      c (fun k v ↦ ρ k v) (fun k v ↦ R(a, hI, hs) k v)
+      (fun k ↦ ((m𝔽 k).val : ℝ) ^ (-a)) schwartzBruhatUnitTranslate hc hw
+      (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2
+      (exists_globalThetaSobolevAction (F := F) a hI hs).choose_spec.2.2 g f
+
+end
+
 /-- Paper: Proposition 10.1.1.5(1), pp. 436–437. The global isotype completes
 the polar-free homogeneous classes of §6.3 with their weighted function norm.
 On representatives its inclusion is the unnormalized homogeneous theta function.
@@ -2037,7 +2245,63 @@ theorem exists_globalHomogeneousThetaSobolevInclusion (ω : PontryaginDual C₁)
         x.val = Submodule.Quotient.mk f.val →
           j x = P(ω) (j𝔽(a, hI, hs) (Submodule.Quotient.mk f)) ∧
           ((j x).val.val : C𝔽 → ℂ) =ᵐ[μ𝔽]
-            modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) := by sorry
+            modulationWeight m𝔽 a (homogeneousAdelicTheta ω f.val) := by
+  have hEval (t : C𝔽) : Continuous (fun f : ℬ ↦ adelicTheta f t) := adelicTheta_eval_continuous t
+  let i (f : ℬ₀) := J(a, hI, hs) (Submodule.Quotient.mk f)
+  let t (f : ℬ₀) : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f.val, ⟨f.val, f.property, rfl⟩⟩
+  have ht : Surjective t := by
+    rintro ⟨x, f, hf, hfx⟩
+    exact ⟨⟨f, hf⟩, Subtype.ext hfx⟩
+  let K := (adelicThetaLinearMap F).ker
+  let q := (K.comap (adelePolarSubspace F).subtype).mkQ
+  have hi : DenseRange i :=
+    (globalThetaSobolev_dense (F := F) a hI hs).comp
+      (K.comap (adelePolarSubspace F).subtype).mkQ_surjective.denseRange (J(a, hI, hs)).continuous
+  have hext := thetaSobolev_extend_polar (adelePolarValues (F := F))
+    adelePolarValues_continuous adelePolarValues_surjective K globalThetaKernel_le_adelePolarSubspace
+    (J(a, hI, hs))
+  let c := hext.choose
+  have hc := hext.choose_spec
+  have hspec := (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose_spec
+  let W := actionIsotype R₀(a, hI, hs) ω
+  have hcomm (f : ℬ₀) : c (A(ω) (Qmk f.val)) = (B(a, hI, hs, ω) (i f)).val := by
+    have h := thetaSobolev_average_orbit μ ω ρ₀ R₀(a, hI, hs) (A(ω))
+      (W.subtypeL.comp (B(a, hI, hs, ω)))
+      (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec hspec.1
+      c (Qmk f.val) (fun g ↦ thetaSobolev_global_polar_orbit a hI hs c hc g f)
+    exact h.trans (congrArg (fun v : H(a, hI, hs) ↦ (B(a, hI, hs, ω) v).val) (hc f))
+  have hfaith (f g : ℬ₀) (hfg : i f = i g) : Qmk f.val = Qmk g.val := by
+    have hq : q f = q g := (existsUnique_globalThetaSobolevEmbedding (F := F) a α β s hI hs).exists.choose_spec.1
+      (congrArg Subtype.val hfg)
+    exact (Submodule.Quotient.eq K).2 ((Submodule.Quotient.eq (K.comap (adelePolarSubspace F).subtype)).1 hq)
+  have hequiv := (globalThetaIsotypicAverage_equiv (F := F) ω).2
+  let e := hequiv.choose
+  have he := hequiv.choose_spec
+  have hIncl := thetaSobolev_polar_assemble (globalPolarFreeThetaSubmodule (F := F) ω)
+    (actionIsotype ρ₀ ω) W e (A(ω)) c (B(a, hI, hs, ω)) (fun f : ℬ₀ ↦ Qmk f.val) t i
+    ht hi hspec.2.1 (fun f ↦ he f.val) (thetaSobolev_global_average_rep ω) hc hfaith hcomm
+  let j := hIncl.choose
+  have hr := hIncl.choose_spec.2.2
+  refine ⟨j, hIncl.choose_spec.1, hIncl.choose_spec.2.1, ?_⟩
+  intro f x hx
+  have hxt : x = t f := Subtype.ext hx
+  have hrep := (congrArg j hxt).trans (hr f)
+  refine ⟨hrep, ?_⟩
+  have hrep' := thetaSobolev_global_average_rep ω f
+  let f' := hrep'.choose
+  have hf' := hrep'.choose_spec
+  have hval : (j x).val = i f' := (congrArg Subtype.val hrep).trans
+    ((hcomm f).symm.trans ((congrArg c hf').symm.trans (hc f')))
+  have hw := (existsUnique_globalThetaSobolevEmbedding (F := F) a α β s hI hs).exists.choose_spec.2 f'
+  have hθ := thetaSobolev_global_average_theta hEval ω f.val f'.val hf'
+  let weighted (v : H(a, hI, hs)) (ψ : C(C𝔽, ℂ)) :=
+    (v.val : C𝔽 → ℂ) =ᵐ[μ𝔽] modulationWeight m𝔽 a ψ
+  exact (congrArg (fun v ↦ weighted v (homogeneousAdelicTheta ω f.val)) hval).mpr
+    ((congrArg (weighted (i f')) hθ).mp hw)
+
+end GlobalPolarInclusion
+
 
 section
 
