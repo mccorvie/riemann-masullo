@@ -3,10 +3,12 @@ module
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
+import RiemannMasullo.AppB_AnalyticNT.Sec1
 public import RiemannMasullo.AppB_AnalyticNT.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec4a
 public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
+import RiemannMasullo.ForMathlib.Analysis.Complex.LandauLemma
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
@@ -234,6 +236,258 @@ private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_assemble {f : �
     rw [mul_assoc, ← Real.mul_rpow (by positivity) (abs_nonneg _)]
     gcongr
 
+section HorizontalHeights
+
+open Metric
+
+/-- A unit interval contains a point separated from the imaginary parts of a finite set. -/
+private theorem completedHeckeL_height_avoid (S : Finset ℂ) (k W : ℝ)
+    (hW : (S.card : ℝ) ≤ W) :
+    ∃ t ∈ Icc (k - 1 / 2) (k + 1 / 2), ∀ ρ ∈ S, 1 / (4 * (W + 1)) ≤ |t - ρ.im| := by
+  let δ := 1 / (4 * (W + 1))
+  let J (ρ : ℂ) := Ioo (ρ.im - δ) (ρ.im + δ)
+  let K := Icc (k - 1 / 2) (k + 1 / 2)
+  have hW₀ : 0 ≤ W := (Nat.cast_nonneg _).trans hW
+  have hδ : 0 < δ := by positivity
+  by_contra! h
+  have hK : K ⊆ ⋃ ρ ∈ S, J ρ := by
+    intro t ht
+    obtain ⟨ρ, hρ, ha⟩ := h t ht
+    refine mem_iUnion₂.mpr ⟨ρ, hρ, ?_⟩
+    have he := abs_lt.mp ha
+    change ρ.im - δ < t ∧ t < ρ.im + δ
+    constructor <;> linarith
+  have hvol (ρ : ℂ) : volume (J ρ) = ENNReal.ofReal (2 * δ) := by
+    change volume (Ioo (ρ.im - δ) (ρ.im + δ)) = _
+    rw [Real.volume_Ioo]
+    congr 1
+    ring
+  have h₁ := (measure_mono (μ := volume) hK).trans (measure_biUnion_finset_le S J)
+  have hKvol : volume K = ENNReal.ofReal 1 := by
+    change volume (Icc (k - 1 / 2) (k + 1 / 2)) = _
+    rw [Real.volume_Icc]
+    congr 1
+    ring
+  rw [hKvol, Finset.sum_congr rfl (fun ρ _ ↦ hvol ρ), Finset.sum_const,
+    ← ENNReal.ofReal_nsmul, nsmul_eq_mul] at h₁
+  have h₂ : 1 ≤ (S.card : ℝ) * (2 * δ) :=
+    (ENNReal.ofReal_le_ofReal_iff (by positivity)).mp h₁
+  have h₃ := h₂.trans (mul_le_mul_of_nonneg_right hW (by positivity : 0 ≤ 2 * δ))
+  dsimp [δ] at h₃
+  have h₄ : W * (2 * (1 / (4 * (W + 1)))) = W / (2 * (W + 1)) := by
+    have hp : W + 1 ≠ 0 := by positivity
+    field_simp
+    ring
+  rw [h₄, le_div_iff₀ (by positivity)] at h₃
+  linarith
+
+/-- At the nearby heights, polynomial control of the normalized logarithmic maximum
+on discs gives a uniform bound across the closed strip. -/
+private theorem completedHeckeL_height_local {f : ℂ → ℂ} (k B : ℝ)
+    (hB : 1 < B)
+    (hf : AnalyticOnNhd ℂ f (closedBall ⟨2, k⟩ 6)) (hc : f ⟨2, k⟩ ≠ 0)
+    (hbound : ∀ u ∈ closedBall ⟨2, k⟩ 6, ‖f u / f ⟨2, k⟩‖ ≤ B) :
+    ∃ t ∈ Icc (k - 1 / 2) (k + 1 / 2),
+      ∀ σ ∈ Icc (-1 : ℝ) 2,
+        AnalyticAt ℂ (logDeriv f) ⟨σ, t⟩ ∧
+          ‖logDeriv f ⟨σ, t⟩‖ ≤
+            landauConstant 4 5 (11 / 2) 6 * Real.log B +
+              4 * (Real.log B / Real.log (6 / 5)) * (Real.log B / Real.log (6 / 5) + 1) := by
+  classical
+  let c : ℂ := ⟨2, k⟩
+  have hf' : AnalyticOnNhd ℂ f (closedBall c 5) :=
+    hf.mono (closedBall_subset_closedBall (by norm_num))
+  let S := (finite_zeros_closedBall (by norm_num) hf' hc).toFinset
+  have hS (ρ : ℂ) : ρ ∈ S ↔ ρ ∈ closedBall c 5 ∧ f ρ = 0 := by simp [S]
+  have hnonzero {ρ : ℂ} (hρ : f ρ ≠ 0) : analyticOrderNatAt f ρ = 0 := by
+    simp [analyticOrderNatAt, analyticOrderAt_eq_zero.mpr (Or.inr hρ)]
+  have hpositive (ρ : ℂ) (hρ : ρ ∈ S) : 1 ≤ analyticOrderNatAt f ρ := by
+    obtain ⟨hb, hz⟩ := (hS ρ).mp hρ
+    have ht := hf'.analyticOrderAt_ne_top_of_isPreconnected (convex_closedBall c 5).isPreconnected
+      (x := c) (mem_closedBall_self (by norm_num)) hb (by
+        have he : analyticOrderAt f c = 0 := analyticOrderAt_eq_zero.mpr (Or.inr hc)
+        simp [he])
+    have hzero : analyticOrderAt f ρ ≠ 0 := by
+      rw [ne_eq, analyticOrderAt_eq_zero]
+      exact not_or_intro (not_not_intro (hf' ρ hb)) (not_not_intro hz)
+    have he := ENat.natCast_toNat ht
+    change ((analyticOrderNatAt f ρ : ℕ) : ℕ∞) = analyticOrderAt f ρ at he
+    by_contra! hn
+    have hn' : analyticOrderNatAt f ρ = 0 := by omega
+    rw [hn'] at he
+    exact hzero (by simpa using he.symm)
+  have hsum {M : Type} [AddCommMonoid M] (φ : ℂ → M)
+      (hφ : ∀ ρ, analyticOrderNatAt f ρ = 0 → φ ρ = 0) :
+      ∑ᶠ ρ ∈ closedBall c 5, φ ρ = ∑ ρ ∈ S, φ ρ := by
+    rw [← finsum_mem_coe_finset]
+    refine finsum_mem_inter_support_eq' _ _ _ fun ρ hρ ↦ ?_
+    have hn : f ρ = 0 := by
+      by_contra h
+      exact hρ (hφ ρ (hnonzero h))
+    simp [hS, hn]
+  let W := Real.log B / Real.log (6 / 5)
+  have hW : (∑ ρ ∈ S, (analyticOrderNatAt f ρ : ℝ)) ≤ W := by
+    rw [← hsum (fun ρ ↦ (analyticOrderNatAt f ρ : ℝ)) (fun _ ho ↦ by simp [ho])]
+    exact landau_sum_analyticOrderNatAt_le (by norm_num) (by norm_num) hf hc hbound
+  have hcard : (S.card : ℝ) ≤ W := by
+    refine le_trans ?_ hW
+    calc
+      (S.card : ℝ) = ∑ _ρ ∈ S, (1 : ℝ) := by simp
+      _ ≤ _ := Finset.sum_le_sum (fun ρ hρ ↦ by exact_mod_cast hpositive ρ hρ)
+  obtain ⟨t, ht, havoid⟩ := completedHeckeL_height_avoid S k W hcard
+  let δ := 1 / (4 * (W + 1))
+  have hW₀ : 0 ≤ W := (Nat.cast_nonneg _).trans hcard
+  have hδ : 0 < δ := by positivity
+  refine ⟨t, ht, fun σ hσ ↦ ?_⟩
+  let z : ℂ := ⟨σ, t⟩
+  have hz : z ∈ closedBall c 4 := by
+    rw [mem_closedBall, Complex.dist_eq]
+    have hzr : z - c = ((σ - 2 : ℝ) : ℂ) + ((t - k : ℝ) : ℂ) * Complex.I := by
+      apply Complex.ext <;> simp [z, c, Complex.sub_re, Complex.sub_im]
+    rw [hzr]
+    refine norm_add_le _ _ |>.trans ?_
+    rw [norm_mul, Complex.norm_I, mul_one, Complex.norm_real, Complex.norm_real,
+      Real.norm_eq_abs, Real.norm_eq_abs]
+    rw [abs_of_nonpos (sub_nonpos.mpr hσ.2)]
+    have ht' : |t - k| ≤ 1 / 2 := abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+    linarith [hσ.1]
+  have hz' : z ∈ closedBall c 5 := closedBall_subset_closedBall (by norm_num) hz
+  have hsep (ρ : ℂ) (hρ : ρ ∈ S) : δ ≤ ‖z - ρ‖ :=
+    (havoid ρ hρ).trans (by simpa [z] using Complex.abs_im_le_norm (z - ρ))
+  have hfz : f z ≠ 0 := by
+    intro he
+    have h := hsep z ((hS z).mpr ⟨hz', he⟩)
+    exact (not_le_of_gt hδ) (by simpa using h)
+  refine ⟨(hf' z hz').deriv.div (hf' z hz') hfz, ?_⟩
+  have hld := landau_norm_logDeriv_sub_le hB (by norm_num : (0 : ℝ) < 4)
+    (by norm_num : (4 : ℝ) < 5) (by norm_num : (5 : ℝ) < 11 / 2)
+    (by norm_num : (11 / 2 : ℝ) < 6) hf hc hbound hz hfz
+  let P (ρ : ℂ) := (analyticOrderNatAt f ρ : ℂ) / (z - ρ)
+  rw [show (∑ᶠ ρ ∈ closedBall c 5, ((analyticOrderNatAt f ρ : ℂ) / (z - ρ))) =
+      ∑ ρ ∈ S, P ρ from hsum P (fun ρ hρ ↦ by simp [P, hρ])] at hld
+  have hP : ‖∑ ρ ∈ S, P ρ‖ ≤ 4 * W * (W + 1) := by
+    refine (norm_sum_le _ _).trans ?_
+    calc
+      _ ≤ ∑ ρ ∈ S, (analyticOrderNatAt f ρ : ℝ) / δ := by
+        refine Finset.sum_le_sum fun ρ hρ ↦ ?_
+        change ‖(analyticOrderNatAt f ρ : ℂ) / (z - ρ)‖ ≤ _
+        rw [norm_div, Complex.norm_natCast]
+        exact div_le_div_of_nonneg_left (Nat.cast_nonneg _) hδ (hsep ρ hρ)
+      _ = (∑ ρ ∈ S, (analyticOrderNatAt f ρ : ℝ)) / δ := (Finset.sum_div _ _ _).symm
+      _ ≤ W / δ := div_le_div_of_nonneg_right hW hδ.le
+      _ = _ := by rw [show δ = (4 * (W + 1))⁻¹ by simp [δ], div_inv_eq_mul]; ring
+  have h := norm_add_le (logDeriv f z - ∑ ρ ∈ S, P ρ) (∑ ρ ∈ S, P ρ)
+  rw [sub_add_cancel] at h
+  exact h.trans (add_le_add hld hP)
+
+/-- A normalized disc bound at large heights gives polynomial estimates at a
+monotone sequence within half a unit of each integer. -/
+private theorem completedHeckeL_heights_of_discs {f : ℂ → ℂ} (C : ℝ) (hC : 0 < C)
+    (h : ∀ᶠ k : ℝ in comap abs atTop,
+      AnalyticOnNhd ℂ f (closedBall ⟨2, k⟩ 6) ∧ f ⟨2, k⟩ ≠ 0 ∧
+        ∀ u ∈ closedBall (⟨2, k⟩ : ℂ) 6, ‖f u / f ⟨2, k⟩‖ ≤ Real.exp (C * (1 + |k|))) :
+    ∃ T : ℤ → ℝ, Monotone T ∧ ∃ A β : ℝ, 0 < A ∧ 0 < β ∧
+      ∀ᶠ k : ℤ in comap abs atTop, |T k - k| ≤ 1 ∧
+        ∀ σ ∈ Icc (-1 : ℝ) 2,
+          AnalyticAt ℂ (logDeriv f) ((σ : ℂ) + (T k : ℂ) * Complex.I) ∧
+            ‖logDeriv f ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ ≤ A * |T k| ^ β := by
+  classical
+  let D := landauConstant 4 5 (11 / 2) 6
+  let d := Real.log (6 / 5)
+  have hD : 0 < D := landauConstant_pos (by norm_num) (by norm_num) (by norm_num) (by norm_num)
+  have hd : 0 < d := Real.log_pos (by norm_num)
+  let Q := 3 * C / d
+  have hQ : 0 < Q := by positivity
+  let A := D * (3 * C) + 4 * Q * (Q + 1)
+  have hA : 0 < A := by positivity
+  let Good (k : ℤ) (t : ℝ) :=
+    t ∈ Icc ((k : ℝ) - 1 / 2) (k + 1 / 2) ∧ ∀ σ ∈ Icc (-1 : ℝ) 2,
+      AnalyticAt ℂ (logDeriv f) (⟨σ, t⟩ : ℂ) ∧ ‖logDeriv f ⟨σ, t⟩‖ ≤ A * |t| ^ 2
+  have htend : Tendsto (fun k : ℤ ↦ (k : ℝ)) (comap abs atTop) (comap abs atTop) := by
+    apply tendsto_comap_iff.mpr
+    exact ((tendsto_intCast_atTop_atTop (R := ℝ)).comp
+      (Filter.tendsto_comap (f := (abs : ℤ → ℤ)) (x := atTop))).congr fun k ↦ by
+        exact Int.cast_abs
+  have hGood : ∀ᶠ k : ℤ in comap abs atTop, ∃ t, Good k t := by
+    filter_upwards [htend.eventually h,
+      htend.eventually (tendsto_comap.eventually (eventually_ge_atTop (2 : ℝ)))] with k hk hk₂
+    change 2 ≤ |(k : ℝ)| at hk₂
+    let B := Real.exp (C * (1 + |(k : ℝ)|))
+    have hB : 1 < B := Real.one_lt_exp_iff.mpr (by positivity)
+    obtain ⟨t, ht, hlocal⟩ := completedHeckeL_height_local (k : ℝ) B hB hk.1 hk.2.1 hk.2.2
+    have hnear : |t - (k : ℝ)| ≤ 1 / 2 :=
+      abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+    have hheight := (abs_sub_abs_le_abs_sub (k : ℝ) t).trans (by simpa [abs_sub_comm] using hnear)
+    have ht₁ : 1 ≤ |t| := by linarith
+    have hlog : Real.log B ≤ (3 * C) * |t| := by
+      rw [show Real.log B = C * (1 + |(k : ℝ)|) by exact Real.log_exp _]
+      exact (by nlinarith : C * (1 + |(k : ℝ)|) ≤ C * (3 * |t|)).trans_eq (by ring)
+    have hdiv : Real.log B / d ≤ Q * |t| := by
+      exact (div_le_div_of_nonneg_right hlog hd.le).trans_eq (by dsimp [Q]; ring)
+    have hdiv₁ : Real.log B / d + 1 ≤ (Q + 1) * |t| := by nlinarith
+    have hdiv₀ : 0 ≤ Real.log B / d := div_nonneg (Real.log_nonneg hB.le) hd.le
+    refine ⟨t, ht, fun σ hσ ↦ ⟨(hlocal σ hσ).1, (hlocal σ hσ).2.trans ?_⟩⟩
+    change D * Real.log B + 4 * (Real.log B / d) * (Real.log B / d + 1) ≤ A * |t| ^ 2
+    calc
+      _ ≤ D * ((3 * C) * |t|) + 4 * (Q * |t|) * ((Q + 1) * |t|) := by
+        exact add_le_add (mul_le_mul_of_nonneg_left hlog hD.le)
+          (mul_le_mul (mul_le_mul_of_nonneg_left hdiv (by norm_num)) hdiv₁ (by positivity) (by positivity))
+      _ ≤ _ := by
+        have ht₂ := mul_le_mul_of_nonneg_left ht₁ (show 0 ≤ D * (3 * C) * |t| by positivity)
+        dsimp [A]
+        nlinarith
+  let T (k : ℤ) := if h : ∃ t, Good k t then h.choose else (k : ℝ)
+  have hNear (k : ℤ) : T k ∈ Icc ((k : ℝ) - 1 / 2) (k + 1 / 2) := by
+    dsimp only [T]
+    split_ifs with h
+    · exact h.choose_spec.1
+    · constructor <;> linarith
+  have hMono : Monotone T := by
+    intro i j hij
+    rcases hij.eq_or_lt with rfl | hij
+    · rfl
+    have hcast : (i : ℝ) + 1 ≤ (j : ℝ) := by exact_mod_cast (show i + 1 ≤ j by omega)
+    linarith [(hNear i).2, (hNear j).1]
+  refine ⟨T, hMono, A, 2, hA, by norm_num, ?_⟩
+  filter_upwards [hGood] with k hk
+  have hTk : Good k (T k) := by
+    dsimp only [T]
+    rw [dite_eq_left hk]
+    exact hk.choose_spec
+  refine ⟨abs_le.mpr ⟨by linarith [hTk.1.1], by linarith [hTk.1.2]⟩, fun σ hσ ↦ ?_⟩
+  have he : (σ : ℂ) + (T k : ℂ) * Complex.I = ⟨σ, T k⟩ := by
+    apply Complex.ext <;> simp
+  rw [he, Real.rpow_two]
+  exact hTk.2 σ hσ
+
+/-- The two possible poles are below a fixed absolute height. -/
+private theorem completedHeckeL_height_analytic (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hAgree : ∀ s : halfPlane, L s = completedHeckeL χ s) :
+    ∀ᶠ t : ℝ in comap abs atTop, AnalyticOnNhd ℂ L (closedBall ⟨2, t⟩ 6) := by
+  by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+  · obtain ⟨p, hp, -⟩ := completedHeckeL_continuation_simplePoles χ L hL hAgree hχ
+    filter_upwards [tendsto_comap.eventually (eventually_ge_atTop (|p| + 7))] with t ht
+    intro u hu
+    have hdist : |u.im - t| ≤ 6 := by
+      have h := Complex.abs_im_le_norm (u - (⟨2, t⟩ : ℂ))
+      rw [Complex.sub_im] at h
+      exact h.trans (by simpa [mem_closedBall, Complex.dist_eq] using hu)
+    have hdiff' := abs_sub_abs_le_abs_sub t u.im
+    rw [abs_sub_comm t u.im] at hdiff'
+    have ht' : |p| + 7 ≤ |t| := ht
+    have hne : u.im ≠ p := by
+      intro hu
+      rw [hu] at hdist hdiff'
+      linarith
+    apply hp.2.2.2 u
+    have h₁ : u ≠ Complex.I * (p : ℂ) := fun h ↦ hne (by
+      simpa [Complex.mul_im] using congrArg Complex.im h)
+    have h₂ : u ≠ 1 + Complex.I * (p : ℂ) := fun h ↦ hne (by
+      simpa [Complex.add_im, Complex.mul_im] using congrArg Complex.im h)
+    simp [h₁, h₂]
+  · have h := completedHeckeL_continuation_entire χ L hL hAgree hχ
+    exact Eventually.of_forall fun _ u _ ↦ h.differentiableOn.analyticOnNhd isOpen_univ u (mem_univ u)
+
 /-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII, Prop. 2.3, Cor. 2.5, Prop. 2.7).
 The logarithmic derivative of the completed function is polynomially bounded on
 horizontal segments of the strip at a monotone sequence of heights, one within distance
@@ -248,7 +502,15 @@ private theorem hasSlowGrowthNearPoles_completedHeckeL_logDeriv_heights (χ : U[
         ∀ σ ∈ Icc (1 - a) a,
           AnalyticAt ℂ (logDeriv L) ((σ : ℂ) + (T k : ℂ) * Complex.I) ∧
             ‖logDeriv L ((σ : ℂ) + (T k : ℂ) * Complex.I)‖ ≤ A * |T k| ^ β := by
-  sorry
+  obtain ⟨C, hC, hDisc⟩ :=
+    completedHeckeL_continuation_disc_bound χ L hL hAgree 2 6 (by norm_num) (by norm_num)
+  obtain ⟨T, hT, A, β, hA, hβ, hGood⟩ := completedHeckeL_heights_of_discs C hC
+    ((completedHeckeL_height_analytic χ L hL hAgree).and hDisc)
+  refine ⟨T, hT, A, β, hA, hβ, hGood.mono fun k hk ↦ ⟨hk.1, fun σ hσ ↦ hk.2 σ ?_⟩⟩
+  have hleft : 1 - a ∈ Icc (-1 : ℝ) 0 := ⟨by linarith only [haMax], sub_nonpos.mpr ha.le⟩
+  exact ⟨hleft.1.trans hσ.1, hσ.2.trans haMax⟩
+
+end HorizontalHeights
 
 /-- Paper: §B.4.2.1, p. 614 (citing Lang, Ch. XVII). On a vertical line to the right
 of `Re(s) = 1` the logarithmic derivative of the completed function is continuous and
