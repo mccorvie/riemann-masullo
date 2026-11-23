@@ -600,7 +600,39 @@ kernel in (10.4.3.47). The cutoff is real-valued as in §9.3. -/
 theorem spectralStripRestrictionKernel_hilbertSchmidt (_ha : 0 < a)
     (hρ : hcut) (_hband : innerBand) (hK : stripTensorExists) :
     IsSobolevHilbertSchmidtKernel (F := F) (spectralRestriction (F := F) a hα hs₀(hs) hρ φ)
-      (cut(weighted(kStrip(hK)))) := by sorry
+      (cut(weighted(kStrip(hK)))) := by
+  have mulKernel {X : Type _} [TopologicalSpace X] [T2Space X] [LocallyCompactSpace X]
+      [SecondCountableTopology X] [MeasurableSpace X] [BorelSpace X]
+      (ν : Measure X) [IsFiniteMeasureOnCompacts ν] [Measure.InnerRegular ν] [SFinite ν]
+      (r : X → ℝ) (hm : Measurable r) (hr : ∀ x, |r x| ≤ 1)
+      (M : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) (hM : ∀ f : Lp ℂ 2 ν,
+        (M f : X → ℂ) =ᵐ[ν] fun x ↦ (r x : ℂ) * f x)
+      {k : X × X → ℂ} (hk : MemLp k 2 (ν.prod ν)) :
+      ∃ ha : MemLp (fun p : X × X ↦ r p.1 • k p) 2 (ν.prod ν),
+        (integralKernelOperator ν (ha.toLp _)).val = M.comp (integralKernelOperator ν (hk.toLp k)).val := by
+    have hb : MemLp (fun p : X × X ↦ r p.1) ⊤ (ν.prod ν) :=
+      memLp_top_of_bound (hm.comp measurable_fst).aestronglyMeasurable 1
+        (.of_forall fun p ↦ hr p.1)
+    have ha : MemLp (fun p : X × X ↦ r p.1 • k p) 2 (ν.prod ν) := hb.smul hk
+    refine ⟨ha, ?_⟩
+    ext1 f
+    apply Lp.ext
+    filter_upwards [integralKernelOperator_apply ν (ha.toLp _) f,
+      integralKernelOperator_apply ν (hk.toLp _) f, Measure.ae_ae_of_ae_prod ha.coeFn_toLp,
+      Measure.ae_ae_of_ae_prod hk.coeFn_toLp, hM ((integralKernelOperator ν (hk.toLp _)).val f)]
+      with x hx hx' hax hkx hmx
+    change (integralKernelOperator ν (ha.toLp _)).val f x =
+      M ((integralKernelOperator ν (hk.toLp _)).val f) x
+    rw [hx.2, hmx, hx'.2, ← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards [hax, hkx] with y ha' hk'
+    rw [ha', hk']
+    exact mul_assoc (r x : ℂ) (k (x, y)) (f y)
+  obtain ⟨hk, hB⟩ := spectralStripKernel_hilbertSchmidt (F := F) a hα hs φ _ha hK
+  let ν := ν(α, s)
+  let M := modulatedCutoffOperator m𝔽 ν hρ
+  obtain ⟨hg, he⟩ := mulKernel ν ρ hρ.measurable hρ.abs_le_one M (modulatedCutoffOperator_apply m𝔽 ν hρ) hk
+  exact ⟨hg, he.trans (congrArg (fun U : W(α, s) →L[ℂ] W(α, s) ↦ M.comp U) hB)⟩
 
 /-- Paper: Theorem 10.4.3.6(3), p. 473. The cutoff geometric kernel,
 divided by the input weight, is the Hilbert-Schmidt representative of
