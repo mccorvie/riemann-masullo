@@ -925,7 +925,6 @@ private theorem sLocalPrincipalPartCoeff_leading_literal_test {F : Type u} [Fiel
   simp only [D, dslope_of_ne E hn, slope_def_field, E, Complex.cpow_zero, sub_zero,
     zpow_neg_one, smul_eq_mul]
   field_simp
-  <;> ring
 
 /-- Residues depend only on the punctured germ of the integrand. -/
 private theorem sLocalPrincipalPartCoeff_leading_literal_residue {A B : ℂ → ℂ}
