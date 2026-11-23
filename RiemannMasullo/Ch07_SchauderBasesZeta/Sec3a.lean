@@ -155,7 +155,36 @@ theorem mem_sLocalOrbitalPrincipalValue_iff {T : Finset V} (h₀ : T ⊆ S) (_hn
     (_hsat : IsSaturatedPlaceSet S) (_hclass : PicTrivial)
     (χ : PontryaginDual J₁) (x : Θₛ(χ)) :
     x ∈ PV(T, h₀, χ) ↔ ∀ j : I(T, χ),
-      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := χ) j x = 0 := by sorry
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := χ) j x = 0 := by
+  classical
+  have hb := sLocalThetaRemovedPrincipalParts_ker (F := F) (S := S) χ ∅ T
+  simp only [sLocalSelectedPoleMultiplicity_finite] at hb
+  rw [sLocalOrbitalPrincipalValue_eq_poleBound h₀ _hne _hsat _hclass χ, ← hb,
+    LinearMap.mem_ker]
+  have hle (c : Xₛ) : sLocalFinitePoleMultiplicity T c ≤ sLocalRhoPoleOrder c := by
+    rw [sLocalRhoPoleOrder_eq_card_polePlaces]
+    unfold sLocalFinitePoleMultiplicity
+    exact (Finset.card_filter_le _ _).trans (Nat.le_add_left _ _)
+  constructor
+  · intro h j
+    have hj := j.property.2
+    have hm := hle j.val.1
+    let k := sLocalRhoPoleOrder j.val.1 - j.val.2
+    exact congrFun h ⟨(j.val.1, k), j.property.1, by
+      rw [sLocalSelectedPoleMultiplicity_finite]; dsimp [k]; omega, Nat.sub_le _ _⟩
+  · intro h
+    funext i
+    have hi := i.property.2.1
+    rw [sLocalSelectedPoleMultiplicity_finite] at hi
+    have hk := i.property.2.2
+    let r := sLocalRhoPoleOrder i.val.1 - i.val.2
+    have hr : r < sLocalFinitePoleMultiplicity T i.val.1 := by
+      dsimp [r]; have := hle i.val.1; omega
+    have hj := h ⟨(i.val.1, r), i.property.1, hr⟩
+    change sLocalThetaPrincipalPartCoeff χ i.val.1 i.property.1
+      (sLocalRhoPoleOrder i.val.1 - r) x = 0 at hj
+    change sLocalThetaPrincipalPartCoeff χ i.val.1 i.property.1 i.val.2 x = 0
+    rwa [show sLocalRhoPoleOrder i.val.1 - r = i.val.2 by dsimp [r]; omega] at hj
 
 /-- Paper: Theorem 7.3.1.2(1), p. 341.
 The finite principal-value image is closed in the homogeneous theta space.
