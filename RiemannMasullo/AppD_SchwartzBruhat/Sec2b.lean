@@ -1033,7 +1033,7 @@ local notation "HS" => InductiveTensor (SchwartzBruhat X) (SchwartzBruhat Y)
 local notation "S" => SchwartzBruhat G
 
 /-- Point evaluations separate Schwartz–Bruhat functions. -/
-private theorem schwartzBruhat_eval_t2 {A : Type*} [CommGroup A] [TopologicalSpace A] :
+theorem schwartzBruhat_eval_t2 {A : Type*} [CommGroup A] [TopologicalSpace A] :
     T2Space (SchwartzBruhat A) :=
   T2Space.of_injective_continuous
     (f := fun f : SchwartzBruhat A ↦ (f : A → ℂ)) (fun _ _ h ↦ Subtype.ext h)
@@ -1141,7 +1141,7 @@ theorem schwartzBruhat_modulation_tensor (τ : Γ →ₜ* G)
 
 omit hm in
 /-- The constant function one is a Schwartz–Bruhat function on a compact group. -/
-private theorem compact_schwartzBruhat_one {H : Type*} [CommGroup H] [TopologicalSpace H]
+theorem compact_schwartzBruhat_one {H : Type*} [CommGroup H] [TopologicalSpace H]
     [IsTopologicalGroup H] [T2Space H] [LocallyCompactSpace H] [CompactSpace H] :
     ∃ c : SchwartzBruhat H, ∀ k, c k = 1 := by
   have hcompact : IsCompact ((⊤ : Subgroup H) : Set H) := isCompact_univ
@@ -1185,7 +1185,7 @@ private theorem compact_schwartzBruhat_one {H : Type*} [CommGroup H] [Topologica
 omit hm in
 /-- Contracting the first tensor factor by a continuous functional gives a map to the
 complete second factor. Its scalar evaluations are determined on pure tensors. -/
-private theorem exists_tensor_restriction {U V W ι : Type*}
+theorem exists_tensor_restriction {U V W ι : Type*}
     [AddCommGroup U] [Module ℂ U] [TopologicalSpace U] [PolynormableSpace ℂ U] [T2Space U]
     [AddCommGroup V] [Module ℂ V] [UniformSpace V] [IsUniformAddGroup V]
     [PolynormableSpace ℂ V] [T2Space V] [ContinuousSMul ℂ V] [CompleteSpace V]

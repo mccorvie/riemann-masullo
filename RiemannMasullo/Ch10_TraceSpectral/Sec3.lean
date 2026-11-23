@@ -962,13 +962,135 @@ theorem spectralLineConvolution_nuclear {s : ℝ} (hs : 1 < s) (φ : BruhatCompa
     r e he x Λ hb hj 1 le_rfl
   exact (mem_traceClassOperators_iff_isNuclearOperator _).mp hA
 
+/-- A descended endomorphism has operator norm bounded by the ambient operator norm. -/
+private theorem spectralConvolution_norm_le_of_quotient {E : Type*} [NormedAddCommGroup E]
+    [NormedSpace ℂ E] (S : Submodule ℂ E) (A : E →L[ℂ] E) (B : (E ⧸ S) →L[ℂ] (E ⧸ S))
+    (h : ∀ x, B (S.mkQ x) = S.mkQ (A x)) : ‖B‖ ≤ ‖A‖ := by
+  refine B.opNorm_le_bound (norm_nonneg _) fun x ↦ ?_
+  refine le_of_forall_pos_le_add fun ε hε ↦ ?_
+  obtain ⟨u, hu, hnorm⟩ := Submodule.Quotient.norm_mk_lt (S := S) x
+    (div_pos hε (show 0 < ‖A‖ + 1 by positivity))
+  calc
+    ‖B x‖ = ‖S.mkQ (A u)‖ := by rw [← hu]; exact congrArg norm (h u)
+    _ ≤ ‖A u‖ := Submodule.Quotient.norm_mk_le S _
+    _ ≤ ‖A‖ * (‖x‖ + ε / (‖A‖ + 1)) :=
+      (A.le_opNorm u).trans (mul_le_mul_of_nonneg_left hnorm.le (norm_nonneg A))
+    _ = ‖A‖ * ‖x‖ + ε * (‖A‖ / (‖A‖ + 1)) := by ring
+    _ ≤ ‖A‖ * ‖x‖ + ε := by
+      have hscale : ‖A‖ / (‖A‖ + 1) ≤ 1 :=
+        (div_le_one (by positivity)).mpr (le_add_of_nonneg_right zero_le_one)
+      exact add_le_add_right (mul_le_of_le_one_right hε.le hscale) _
+
+/-- The Hardy–Sobolev action is continuous in operator norm, and passing to
+the quotient can only decrease the norm. -/
+private theorem spectralConvolution_opNorm_continuous {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s) :
+    Continuous (spectralConvolution (F := F) a hI hs) := by
+  let A := (spectralConvolution_isLinear (F := F) a hI hs).mk' (spectralConvolution (F := F) a hI hs)
+  let B (φ : BruhatCompactSupport C𝔽) : W(l, r, s) →L[ℂ] W(l, r, s) :=
+    (testAction(l, r, s, hI, hs) φ : W(l, r, s) →L[ℂ] W(l, r, s))
+  have htest : Continuous B := continuous_hardySobolevTestAction μ𝔽 m𝔽 l r s hI hs
+  have hn (φ : BruhatCompactSupport C𝔽) : ‖A φ‖ ≤ ‖B φ‖ :=
+    spectralConvolution_norm_le_of_quotient (Θ(a, hI, hs)) _ _
+      (spectralConvolution_mkQ (F := F) a hI hs φ)
+  have hB0 : B 0 = 0 := map_zero (testAction(l, r, s, hI, hs))
+  change Continuous A
+  apply continuous_of_tendsto_nhds_zero A
+  apply tendsto_zero_iff_norm_tendsto_zero.mpr
+  refine squeeze_zero (fun _ ↦ norm_nonneg _) hn ?_
+  have hc : Tendsto (fun φ ↦ ‖B φ‖) (𝓝 0) (𝓝 ‖B 0‖) := htest.norm.continuousAt
+  rwa [hB0, norm_zero] at hc
+
+/-- The trace norm is a supremum of continuous finite sums of approximation numbers
+on any operator-norm continuous family of trace-class operators. -/
+private theorem spectralConvolution_traceNorm_lowerSemicontinuous {X H : Type*}
+    [TopologicalSpace X] [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (T : X → nuclearEndomorphisms H) (hT : Continuous (fun x ↦ (T x).val)) :
+    LowerSemicontinuous (fun x ↦ traceNorm (T x)) := by
+  let p (I : Finset ℕ) (x : X) := ∑ n ∈ I, approximationNumber (T x).val n
+  have hbound (x : X) : BddAbove (range (fun I ↦ p I x)) :=
+    ⟨traceNorm (T x), fun _ ⟨I, h⟩ ↦ h ▸
+      spectralConvolutionFiniteSum_limit_of_traceCauchy_bound (T x) I⟩
+  have hsum (x : X) : traceNorm (T x) = ⨆ I, p I x := by
+    apply le_antisymm ?_ (ciSup_le fun I ↦ spectralConvolutionFiniteSum_limit_of_traceCauchy_bound (T x) I)
+    have he := schattenNorm_one_eq_traceNorm (T x)
+    simp only [schattenNorm, Real.rpow_one, div_one] at he
+    rw [← he]
+    exact Real.tsum_le_of_sum_le (spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg _)
+      (fun I ↦ le_ciSup (hbound x) I)
+  simp_rw [hsum]
+  refine lowerSemicontinuous_ciSup hbound fun I ↦ Continuous.lowerSemicontinuous ?_
+  apply continuous_finsetSum _ fun n _ ↦ ?_
+  have hcont : Continuous (fun D : H →L[ℂ] H ↦ approximationNumber D n) :=
+    (LipschitzWith.of_dist_le' (K := 1) (fun D E ↦ by
+      simpa only [dist_eq_norm, Real.norm_eq_abs, one_mul] using abs_approximationNumber_sub_le D E n)).continuous
+  exact hcont.comp hT
+
+/-- A lower semicontinuous seminorm restricts continuously to each Fréchet stage of a
+strict LF-space, whose topology is final locally convex. This is the Fréchet-stage
+argument of `IsLFSpace.barrelled` from Appendix C. -/
+private theorem spectralConvolution_continuous_of_lsc_seminorm {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (hE : IsStrictLFSpace E) (p : Seminorm ℂ E)
+    (hp : LowerSemicontinuous p) : Continuous p := by
+  obtain ⟨_, S, _, hS, _, htop⟩ := hE
+  have hP : WithSeminorms
+      (Subtype.val : {q : Seminorm ℂ E // ∀ k, Continuous (q ∘ (S k).subtype)} → Seminorm ℂ E) :=
+    ⟨htop⟩
+  apply hP.continuous_seminorm (i := ⟨p, ?_⟩)
+  intro k
+  obtain ⟨hadd, hpoly, hmetric, hcomplete⟩ := hS k
+  let : UniformSpace (S k) := IsTopologicalAddGroup.rightUniformSpace (S k)
+  let : IsUniformAddGroup (S k) := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace (S k) := hcomplete
+  let : ContinuousSMul ℂ (S k) := PolynormableSpace.continuousSMul ℂ (S k)
+  have : (uniformity (S k)).IsCountablyGenerated := by
+    rw [uniformity_eq_comap_nhds_zero (S k)]
+    infer_instance
+  have : BaireSpace (S k) := by
+    let := UniformSpace.metricSpace (S k)
+    infer_instance
+  exact (p.comp (S k).subtype).continuous_of_lowerSemicontinuous (hp.comp continuous_subtype_val)
+
+/-- A linear operator-norm continuous family of nuclear endomorphisms has a
+trace-norm continuous lift when its domain is a strict LF-space. -/
+private theorem spectralConvolution_traceNorm_lift {E H : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (hE : IsStrictLFSpace E) (A : E →ₗ[ℂ] (H →L[ℂ] H)) (hA : Continuous A)
+    (hn : ∀ x, IsNuclearOperator (A x)) :
+    ∃ T : E →ₗ[ℂ] nuclearEndomorphisms H,
+      (∀ x, (T x).val = A x) ∧ Tendsto (fun x ↦ traceNorm (T x)) (𝓝 0) (𝓝 0) := by
+  let T := A.codRestrict (nuclearEndomorphisms H) hn
+  refine ⟨T, fun _ ↦ rfl, ?_⟩
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  let hcore := traceNorm_normedSpaceCore (H := H)
+  let p : Seminorm ℂ E :=
+    { toFun := fun x ↦ traceNorm (T x)
+      map_zero' := by rw [map_zero]; exact (hcore.norm_eq_zero_iff _).mpr rfl
+      add_le' := fun x y ↦ by rw [map_add]; exact hcore.norm_triangle _ _
+      neg' := fun x ↦ by
+        rw [map_neg, ← neg_one_smul ℂ (T x)]
+        have h := hcore.norm_smul (-1 : ℂ) (T x)
+        simpa only [norm_neg, norm_one, one_mul] using h
+      smul' := fun c x ↦ by rw [map_smul]; exact hcore.norm_smul _ _ }
+  have hp : LowerSemicontinuous p := spectralConvolution_traceNorm_lowerSemicontinuous T hA
+  have hc := spectralConvolution_continuous_of_lsc_seminorm hE p hp
+  change Tendsto p (𝓝 0) (𝓝 0)
+  exact hc.tendsto' 0 0 p.map_zero'
+
 /-- Paper: Theorem 10.3.1.1(2) and (10.3.1.2), p. 448. The convolution
 action lifts to a linear map into the trace class, continuous at zero in trace norm. -/
 theorem spectralLineConvolution_traceNorm_continuous {s : ℝ} (hs : 1 < s) :
     let H := Q(a, h₀, hs₀(hs))
     ∃ T : BruhatCompactSupport C𝔽 →ₗ[ℂ] nuclearEndomorphisms H,
       (∀ φ, (T φ).val = spectralConvolution (F := F) a h₀ hs₀(hs) φ) ∧
-      Tendsto (fun φ : BruhatCompactSupport C𝔽 ↦ traceNorm (H := H) (T φ)) (𝓝 0) (𝓝 0) := by sorry
+      Tendsto (fun φ : BruhatCompactSupport C𝔽 ↦ traceNorm (H := H) (T φ)) (𝓝 0) (𝓝 0) := by
+  intro H
+  let A : BruhatCompactSupport C𝔽 →ₗ[ℂ] (H →L[ℂ] H) :=
+    (spectralConvolution_isLinear (F := F) a h₀ hs₀(hs)).mk'
+      (spectralConvolution (F := F) a h₀ hs₀(hs))
+  exact spectralConvolution_traceNorm_lift bruhatCompactSupport_strictLF A
+    (spectralConvolution_opNorm_continuous (F := F) a h₀ hs₀(hs))
+    (spectralLineConvolution_nuclear (F := F) a hs)
 
 /-- Paper: Theorem 10.3.1.1(2), p. 448. Taking the trace of convolution gives
 a distribution on the Bruhat compactly supported test space. -/

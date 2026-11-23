@@ -1570,6 +1570,130 @@ theorem archNuclearityQuotient_nuclear_iff_finiteRank :
   obtain ⟨e⟩ := archNuclearityStrongDual_finest_sequenceEquiv χ
   exact archNuclearityQuotient_nuclear_iff_finiteRank_sequence (E := ArchNuclearityQuotient χ) e
 
+/-- In block coordinates, an operator acting on each block by a lower-triangular
+Toeplitz matrix with entries `d i z` has values zero on the blocks where all those
+entries vanish. -/
+private theorem archNuclearityAction_nuclear_iff_vanish {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩)
+    (q : Q) (j : {j : ℂ × ℕ // j.2 < m j.1})
+    (hj : j.val.1 ∉ {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}) :
+    e (T q) j = 0 := by
+  rw [hT]
+  refine Finset.sum_eq_zero fun i hi ↦ ?_
+  have hi' : i < m j.val.1 :=
+    (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)).trans_lt j.property
+  have h0 : d i j.val.1 = 0 := by
+    by_contra h
+    exact hj ⟨⟨i, hi'⟩, h⟩
+  rw [h0, mul_zero, zero_mul]
+
+/-- Applying the operator to the first basis vector of the block at `z` gives the
+column of entries `d k z` in that block, and zero in the other blocks. -/
+private theorem archNuclearityAction_nuclear_iff_column {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩)
+    (z : ℂ) (hz : 0 < m z) (j : {j : ℂ × ℕ // j.2 < m j.1}) :
+    e (T (e.symm (Pi.single ⟨(z, 0), hz⟩ 1))) j = if j.val.1 = z then d j.val.2 z else 0 := by
+  classical
+  rw [hT]
+  simp only [LinearEquiv.apply_symm_apply]
+  split_ifs with hjz
+  · rw [Finset.sum_eq_single j.val.2]
+    · have : (⟨(j.val.1, j.val.2 - j.val.2), (Nat.sub_le _ _).trans_lt j.property⟩ :
+          {j : ℂ × ℕ // j.2 < m j.1}) = ⟨(z, 0), hz⟩ := Subtype.ext (by simp [hjz])
+      rw [this, Pi.single_eq_same, mul_one, Nat.choose_self, Nat.cast_one, one_mul, hjz]
+    · intro i hi hne
+      have hlt : i < j.val.2 :=
+        lt_of_le_of_ne (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)) hne
+      rw [Pi.single_eq_of_ne, mul_zero]
+      intro h
+      have := congrArg (fun x : {j : ℂ × ℕ // j.2 < m j.1} ↦ x.val.2) h
+      simp only at this
+      omega
+    · intro h
+      exact absurd (Finset.mem_range.mpr (Nat.lt_succ_self _)) h
+  · refine Finset.sum_eq_zero fun i _ ↦ ?_
+    rw [Pi.single_eq_of_ne, mul_zero]
+    intro h
+    exact hjz (congrArg (fun x : {j : ℂ × ℕ // j.2 < m j.1} ↦ x.val.1) h)
+
+/-- Linear-algebra core of Remark 7.4.3.3: a block lower-triangular operator on the
+product of the jet blocks has finite rank exactly when only finitely many blocks
+carry a nonzero entry. -/
+private theorem archNuclearityAction_nuclear_iff_blocks {Q : Type*} [AddCommGroup Q]
+    [Module ℂ Q] (m : ℂ → ℕ) (d : ℕ → ℂ → ℂ)
+    (e : Q ≃ₗ[ℂ] ({j : ℂ × ℕ // j.2 < m j.1} → ℂ)) (T : Q →ₗ[ℂ] Q)
+    (hT : ∀ q (j : {j : ℂ × ℕ // j.2 < m j.1}), e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+      (j.val.2.choose i : ℂ) * d i j.val.1 *
+        e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩) :
+    FiniteDimensional ℂ (LinearMap.range T) ↔
+      {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}.Finite := by
+  classical
+  let J := {j : ℂ × ℕ // j.2 < m j.1}
+  let Z := {z : ℂ | ∃ k : Fin (m z), d k.val z ≠ 0}
+  constructor
+  · intro hfin
+    choose k hk using fun z : Z ↦ z.property
+    have hpos (z : Z) : 0 < m z.val := (Nat.zero_le _).trans_lt (k z).isLt
+    let w (z : Z) : LinearMap.range T :=
+      ⟨T (e.symm (Pi.single ⟨(z.val, 0), hpos z⟩ 1)), LinearMap.mem_range_self _ _⟩
+    let Φ : (J → ℂ) →ₗ[ℂ] (Z → ℂ) :=
+      LinearMap.pi fun z ↦ LinearMap.proj (⟨(z.val, (k z).val), (k z).isLt⟩ : J)
+    let L : LinearMap.range T →ₗ[ℂ] (Z → ℂ) :=
+      Φ.comp (e.toLinearMap.comp (LinearMap.range T).subtype)
+    have hL (z : Z) : L (w z) = Pi.single z (d (k z).val z.val) := by
+      funext z'
+      change e (T (e.symm (Pi.single ⟨(z.val, 0), hpos z⟩ 1)))
+        ⟨(z'.val, (k z').val), (k z').isLt⟩ = _
+      rw [archNuclearityAction_nuclear_iff_column m d e T hT z.val (hpos z)]
+      by_cases h : z' = z
+      · subst h
+        simp
+      · have h' : z'.val ≠ z.val := fun he ↦ h (Subtype.ext he)
+        simp [h', Pi.single_eq_of_ne h]
+    have hli : LinearIndependent ℂ (L ∘ w) := by
+      have : L ∘ w = fun z ↦ Pi.single z (d (k z).val z.val) := funext hL
+      rw [this]
+      exact Pi.linearIndependent_single_of_ne_zero hk
+    have := (LinearIndependent.of_comp L hli).finite_of_isNoetherian
+    exact Set.toFinite Z
+  · intro hZ
+    have : Finite Z := hZ.to_subtype
+    let JZ := {j : J // j.val.1 ∈ Z}
+    have : Finite JZ := by
+      refine Finite.of_injective (β := Σ z : Z, Fin (m z.val))
+        (fun j ↦ ⟨⟨j.val.val.1, j.property⟩, ⟨j.val.val.2, j.val.property⟩⟩) ?_
+      intro a b h
+      simp only [Sigma.mk.inj_iff] at h
+      obtain ⟨h1, h2⟩ := h
+      have h1' : a.val.val.1 = b.val.val.1 := congrArg Subtype.val h1
+      apply Subtype.ext
+      apply Subtype.ext
+      refine Prod.ext h1' ?_
+      have := (Fin.heq_ext_iff (by rw [h1'])).mp h2
+      exact this
+    let R : LinearMap.range T →ₗ[ℂ] (JZ → ℂ) :=
+      (LinearMap.pi fun j : JZ ↦ LinearMap.proj (R := ℂ) (φ := fun _ : J ↦ ℂ) j.val).comp
+        (e.toLinearMap.comp (LinearMap.range T).subtype)
+    refine Module.Finite.of_injective R ?_
+    rw [← LinearMap.ker_eq_bot, LinearMap.ker_eq_bot']
+    rintro ⟨_, q, rfl⟩ hx
+    apply Subtype.ext
+    change T q = 0
+    apply e.injective
+    funext j
+    rw [map_zero, Pi.zero_apply]
+    by_cases hj : j.val.1 ∈ Z
+    · exact congrFun hx ⟨j, hj⟩
+    · exact archNuclearityAction_nuclear_iff_vanish m d e T hT q j hj
+
 /-- Paper: Remark 7.4.3.3, p. 373.
 The quotient action is nuclear exactly when it is nonzero on finitely many jet blocks.
 Deviation: A block of length m vanishes when all multiplier derivatives of orders
@@ -1581,7 +1705,33 @@ theorem archNuclearityAction_nuclear_iff (φ : 𝒟) :
     ∀ T : Q →L[ℂ] Q, (∀ x : Θ₀(χ), T (D.mkQ x) = D.mkQ (Aθ(φ) x)) →
       (Nonempty (NuclearPresentation T) ↔
         {z : ℂ | ∃ k : Fin (archNuclearityMultiplicity χ τ hτ z),
-          iteratedDeriv k.val (nuclearityTestMellin χ φ) z ≠ 0}.Finite) := by sorry
+          iteratedDeriv k.val (nuclearityTestMellin χ φ) z ≠ 0}.Finite) := by
+  intro D Q T hT
+  obtain ⟨e, he⟩ := archNuclearityQuotient_jetEquiv χ τ hτ
+  have hjet (x : Θ₀(χ)) (j : ArchNuclearityJetIndex χ τ hτ) :
+      archNuclearityJet χ τ hτ j x = iteratedDeriv j.val.2 ((Z(χ, τ, hτ)) x).val j.val.1 := by
+    unfold archNuclearityJet
+    rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply]
+    exact congrArg (fun g : ℂ → ℂ ↦ iteratedDeriv j.val.2 g j.val.1)
+      (funext (schwartzBergmanEntireInclusion_apply _))
+  have hblock (q : Q) (j : ArchNuclearityJetIndex χ τ hτ) :
+      e (T q) j = ∑ i ∈ Finset.range (j.val.2 + 1),
+        (j.val.2.choose i : ℂ) * iteratedDeriv i (nuclearityTestMellin χ φ) j.val.1 *
+          e q ⟨(j.val.1, j.val.2 - i), (Nat.sub_le _ _).trans_lt j.property⟩ := by
+    obtain ⟨x, rfl⟩ := D.mkQ_surjective q
+    let v := (Z(χ, τ, hτ)) x
+    have hv : Differentiable ℂ v.val := fun z ↦
+      (v.property.2.1 z (mem_univ _)).differentiableAt (Filter.univ_mem' fun _ ↦ mem_univ _)
+    have hprod : ((Z(χ, τ, hτ)) (Aθ(φ) x)).val = nuclearityTestMellin χ φ * v.val :=
+      funext ((exists_polarThetaNuclearityAction χ τ hτ φ).choose_spec.1 x)
+    rw [hT x, he, hjet, hprod, iteratedDeriv_mul
+      ((archNuclearityDenominator_closed_invariant_multiplier χ φ).contDiff.contDiffAt)
+      hv.contDiff.contDiffAt]
+    refine Finset.sum_congr rfl fun i _ ↦ ?_
+    rw [he, hjet]
+  rw [archNuclearityQuotient_nuclear_iff_finiteRank χ T]
+  exact archNuclearityAction_nuclear_iff_blocks (archNuclearityMultiplicity χ τ hτ)
+    (fun i z ↦ iteratedDeriv i (nuclearityTestMellin χ φ) z) e.toLinearEquiv T.toLinearMap hblock
 
 end Archimedean
 

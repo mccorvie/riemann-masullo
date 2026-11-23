@@ -9,7 +9,7 @@ public import RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3b
 import RiemannMasullo.ForMathlib.Analysis.Fourier.Log
 import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.WeightedIntegral
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec2a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
@@ -2210,6 +2210,805 @@ theorem realLogFourier_finitePart (w : InfinitePlace F) (_hw : w.IsReal)
   have scale_limit (x y : ℂ) : 2 * (-x - y) = -2 * (x + y) := by ring
   simpa only [scale, scale_limit, Complex.ofReal_add] using hlim.const_mul (2 : ℂ)
 
+open Real in
+open scoped FourierTransform in
+/-- Mean-value bound for the difference of two decaying exponentials. -/
+private theorem complexLogFourier_finitePart_exp_sub_bound {α β y : ℝ} (hα : 0 < α) (hβ : 0 < β) (hy : 0 ≤ y) :
+    |exp (-α * y) - exp (-β * y)| ≤ |β - α| * y * exp (-(min α β) * y) := by
+  wlog h : α ≤ β generalizing α β
+  · have := this hβ hα (le_of_not_ge h)
+    rwa [abs_sub_comm α β, min_comm, abs_sub_comm (exp (-β * y))] at this
+  rw [min_eq_left h, abs_of_nonneg (sub_nonneg.mpr h)]
+  have h1 : exp (-β * y) ≤ exp (-α * y) := exp_le_exp.mpr (by nlinarith)
+  rw [abs_of_nonneg (sub_nonneg.mpr h1)]
+  -- exp(-αy) - exp(-βy) = exp(-αy) (1 - exp(-(β-α)y)) ≤ exp(-αy) (β-α) y
+  have h2 : 1 - exp (-((β - α) * y)) ≤ (β - α) * y := by
+    have := add_one_le_exp (-((β - α) * y)); linarith
+  have h3 : exp (-β * y) = exp (-α * y) * exp (-((β - α) * y)) := by
+    rw [← exp_add]; ring_nf
+  rw [h3]
+  have := exp_pos (-α * y)
+  nlinarith
+
+open Real in
+open scoped FourierTransform in
+/-- Frullani's integral for two decaying exponentials. -/
+private theorem complexLogFourier_finitePart_frullani_exp {α β : ℝ} (hα : 0 < α) (hβ : 0 < β) :
+    IntegrableOn (fun y ↦ y⁻¹ * (exp (-α * y) - exp (-β * y))) (Ioi 0) ∧
+      ∫ y in Ioi 0, y⁻¹ * (exp (-α * y) - exp (-β * y)) = log (β / α) := by
+  have hint : IntegrableOn (fun y ↦ y⁻¹ * (exp (-α * y) - exp (-β * y))) (Ioi 0) := by
+    have hm : 0 < min α β := lt_min hα hβ
+    have hdom : IntegrableOn (fun y ↦ |β - α| * exp (-(min α β) * y)) (Ioi 0) :=
+      (exp_neg_integrableOn_Ioi 0 hm).const_mul _
+    refine hdom.mono' (by fun_prop) ?_
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with y (hy : 0 < y)
+    rw [norm_mul, norm_inv, Real.norm_eq_abs, Real.norm_eq_abs, abs_of_pos hy]
+    have := complexLogFourier_finitePart_exp_sub_bound hα hβ hy.le
+    rw [inv_mul_le_iff₀ hy]
+    nlinarith [this]
+  refine ⟨hint, ?_⟩
+  have h := Frullani.integral_Ioi_eq (f := fun x : ℝ ↦ exp (-x)) (L := 1) (R := 0)
+    ((by fun_prop : Continuous fun x : ℝ ↦ exp (-x)).locallyIntegrable.locallyIntegrableOn _) hα hβ
+    (by simpa using ((by fun_prop : Continuous fun x : ℝ ↦ exp (-x)).tendsto 0).mono_left nhdsWithin_le_nhds)
+    (by simpa using tendsto_exp_neg_atTop_nhds_zero)
+    (by simpa [smul_eq_mul, neg_mul] using hint)
+  simpa [smul_eq_mul, neg_mul] using h
+
+open Real in
+open scoped FourierTransform in
+/-- The Frullani integrand for exponentials has constant sign. -/
+private theorem complexLogFourier_finitePart_frullani_abs {α β : ℝ} (hα : 0 < α) (hβ : 0 < β) :
+    ∫ y in Ioi 0, |y⁻¹ * (exp (-α * y) - exp (-β * y))| = |log (β / α)| := by
+  obtain ⟨hi, hv⟩ := complexLogFourier_finitePart_frullani_exp hα hβ
+  rcases le_total α β with h | h
+  · have hnn : ∀ y ∈ Ioi (0 : ℝ), 0 ≤ y⁻¹ * (exp (-α * y) - exp (-β * y)) := by
+      intro y (hy : 0 < y)
+      exact mul_nonneg (inv_nonneg.mpr hy.le)
+        (sub_nonneg.mpr (exp_le_exp.mpr (by nlinarith)))
+    rw [setIntegral_congr_fun measurableSet_Ioi (fun y hy ↦ abs_of_nonneg (hnn y hy)), hv,
+      abs_of_nonneg (log_nonneg ((one_le_div hα).mpr h))]
+  · have hnp : ∀ y ∈ Ioi (0 : ℝ), y⁻¹ * (exp (-α * y) - exp (-β * y)) ≤ 0 := by
+      intro y (hy : 0 < y)
+      exact mul_nonpos_of_nonneg_of_nonpos (inv_nonneg.mpr hy.le)
+        (sub_nonpos.mpr (exp_le_exp.mpr (by nlinarith)))
+    rw [setIntegral_congr_fun measurableSet_Ioi (fun y hy ↦ abs_of_nonpos (hnp y hy)),
+      integral_neg, hv, abs_of_nonpos (log_nonpos (div_nonneg hβ.le hα.le) ((div_le_one hα).mpr h))]
+
+open Real in
+open scoped FourierTransform in
+/-- The substitution `x ↦ x⁻¹` preserves the measure `dx / x` on the positive reals. -/
+private theorem complexLogFourier_finitePart_inv_sub (g : ℝ → ℝ) :
+    (IntegrableOn (fun x ↦ x⁻¹ * g x⁻¹) (Ioi 0) ↔ IntegrableOn (fun x ↦ x⁻¹ * g x) (Ioi 0)) ∧
+      ∫ x in Ioi 0, x⁻¹ * g x⁻¹ = ∫ x in Ioi 0, x⁻¹ * g x := by
+  have hp : (-1 : ℝ) ≠ 0 := by norm_num
+  have hc : EqOn (fun x : ℝ ↦ (|(-1 : ℝ)| * x ^ ((-1 : ℝ) - 1)) • ((x ^ (-1 : ℝ))⁻¹ * g (x ^ (-1 : ℝ))))
+      (fun x ↦ x⁻¹ * g x⁻¹) (Ioi 0) := by
+    intro x (hx : 0 < x)
+    simp only [rpow_neg_one, inv_inv, smul_eq_mul, abs_neg, abs_one, one_mul]
+    rw [show (-1 : ℝ) - 1 = -2 by norm_num, rpow_neg hx.le, show (2 : ℝ) = ((2 : ℕ) : ℝ) by norm_num,
+      rpow_natCast]
+    field_simp
+  constructor
+  · rw [← integrableOn_Ioi_comp_rpow_iff (fun y ↦ y⁻¹ * g y) hp,
+      integrableOn_congr_fun hc measurableSet_Ioi]
+  · rw [← integral_comp_rpow_Ioi (fun y ↦ y⁻¹ * g y) hp, setIntegral_congr_fun measurableSet_Ioi hc]
+
+open Real in
+open scoped FourierTransform in
+/-- The substitution `x ↦ x⁻¹` for complex-valued integrands against `dx / x`. -/
+private theorem complexLogFourier_finitePart_inv_subC (g : ℝ → ℂ) :
+    ∫ x in Ioi 0, ((x⁻¹ : ℝ) : ℂ) * g x⁻¹ = ∫ x in Ioi 0, ((x⁻¹ : ℝ) : ℂ) * g x := by
+  have hp : (-1 : ℝ) ≠ 0 := by norm_num
+  have hc : EqOn (fun x : ℝ ↦ (|(-1 : ℝ)| * x ^ ((-1 : ℝ) - 1)) •
+      ((((x ^ (-1 : ℝ))⁻¹ : ℝ) : ℂ) * g (x ^ (-1 : ℝ))))
+      (fun x ↦ ((x⁻¹ : ℝ) : ℂ) * g x⁻¹) (Ioi 0) := by
+    intro x (hx : 0 < x)
+    simp only [rpow_neg_one, inv_inv, abs_neg, abs_one, one_mul, Complex.real_smul]
+    rw [show (-1 : ℝ) - 1 = -2 by norm_num, rpow_neg hx.le, show (2 : ℝ) = ((2 : ℕ) : ℝ) by norm_num,
+      rpow_natCast]
+    have : (x : ℂ) ≠ 0 := by exact_mod_cast hx.ne'
+    push_cast
+    field_simp
+  rw [← integral_comp_rpow_Ioi (fun y ↦ ((y⁻¹ : ℝ) : ℂ) * g y) hp,
+    setIntegral_congr_fun measurableSet_Ioi hc]
+
+open Real in
+open scoped FourierTransform in
+/-- The logarithm is integrable against `e^{-t}` on the positive reals. -/
+private theorem complexLogFourier_finitePart_log_exp_integrable :
+    IntegrableOn (fun t ↦ log t * exp (-t)) (Ioi 0) := by
+  have h1 := GammaIntegral_convergent (show (0 : ℝ) < 1 / 2 by norm_num)
+  have h2 := GammaIntegral_convergent (show (0 : ℝ) < 3 / 2 by norm_num)
+  refine ((h1.add h2).const_mul 2).mono' (by fun_prop) ?_
+  filter_upwards [ae_restrict_mem measurableSet_Ioi] with t (ht : 0 < t)
+  rw [norm_mul, Real.norm_eq_abs, Real.norm_of_nonneg (exp_pos _).le]
+  have e1 : t ^ ((1 / 2 : ℝ) - 1) = t⁻¹ ^ (1 / 2 : ℝ) := by
+    rw [inv_rpow ht.le, ← rpow_neg ht.le]; norm_num
+  have e2 : t ^ ((3 / 2 : ℝ) - 1) = t ^ (1 / 2 : ℝ) := by norm_num
+  show |log t| * exp (-t) ≤ 2 * (exp (-t) * t ^ ((1 / 2 : ℝ) - 1) + exp (-t) * t ^ ((3 / 2 : ℝ) - 1))
+  rw [e1, e2]
+  have h1 := log_le_rpow_div ht.le (show (0 : ℝ) < 1 / 2 by norm_num)
+  have h2 := log_le_rpow_div (inv_pos.mpr ht).le (show (0 : ℝ) < 1 / 2 by norm_num)
+  rw [log_inv] at h2
+  have p1 : 0 ≤ t ^ (1 / 2 : ℝ) := rpow_nonneg ht.le _
+  have p2 : 0 ≤ t⁻¹ ^ (1 / 2 : ℝ) := rpow_nonneg (inv_pos.mpr ht).le _
+  have hl : |log t| ≤ 2 * (t⁻¹ ^ (1 / 2 : ℝ) + t ^ (1 / 2 : ℝ)) := by
+    rw [abs_le]; constructor <;> linarith
+  have := exp_pos (-t)
+  calc |log t| * exp (-t) ≤ 2 * (t⁻¹ ^ (1 / 2 : ℝ) + t ^ (1 / 2 : ℝ)) * exp (-t) := by gcongr
+    _ = _ := by ring
+
+open Real in
+open scoped FourierTransform in
+/-- Bounds for `e^{-t} - 1/(1+t)` on the positive reals. -/
+private theorem complexLogFourier_finitePart_psi_bound {t : ℝ} (ht : 0 < t) :
+    |exp (-t) - (1 + t)⁻¹| ≤ min t t⁻¹ ∧ t⁻¹ * |exp (-t) - (1 + t)⁻¹| ≤ 2 * ((1 + t) ^ 2)⁻¹ := by
+  have h1 : exp (-t) ≤ (1 + t)⁻¹ := by
+    rw [exp_neg]; exact inv_anti₀ (by linarith) (by linarith [add_one_le_exp t])
+  have h2 : 1 - t ≤ exp (-t) := by linarith [add_one_le_exp (-t)]
+  have hpos := exp_pos (-t)
+  rw [abs_of_nonpos (by linarith), neg_sub]
+  -- |ψ| = (1+t)⁻¹ - e^{-t} ≤ (1+t)⁻¹ - (1 - t) = t²/(1+t), and ≤ (1+t)⁻¹
+  have hA : (1 + t)⁻¹ - exp (-t) ≤ t ^ 2 * (1 + t)⁻¹ := by
+    have : (1 + t)⁻¹ - (1 - t) = t ^ 2 * (1 + t)⁻¹ := by field_simp; ring
+    linarith
+  have hB : (1 + t)⁻¹ - exp (-t) ≤ (1 + t)⁻¹ := by linarith
+  have hti : 0 < t⁻¹ := inv_pos.mpr ht
+  constructor
+  · refine le_min ?_ ?_
+    · refine hA.trans ?_
+      rw [← div_eq_mul_inv, div_le_iff₀ (by linarith)]; nlinarith
+    · refine hB.trans ?_
+      exact inv_anti₀ ht (by linarith)
+  · rcases le_total t 1 with h | h
+    · calc t⁻¹ * ((1 + t)⁻¹ - exp (-t)) ≤ t⁻¹ * (t ^ 2 * (1 + t)⁻¹) := by gcongr
+        _ = t * (1 + t)⁻¹ := by field_simp
+        _ ≤ 2 * ((1 + t) ^ 2)⁻¹ := by
+          rw [← div_eq_mul_inv, ← div_eq_mul_inv, div_le_div_iff₀ (by linarith) (by positivity)]
+          nlinarith
+    · calc t⁻¹ * ((1 + t)⁻¹ - exp (-t)) ≤ t⁻¹ * (1 + t)⁻¹ := by gcongr
+        _ ≤ 2 * ((1 + t) ^ 2)⁻¹ := by
+          rw [← mul_inv, inv_eq_one_div, ← div_eq_mul_inv, div_le_div_iff₀ (by positivity) (by positivity)]
+          nlinarith
+
+open Real in
+open scoped FourierTransform in
+/-- `(e^{-t} - 1/(1+t)) / t` is integrable on the positive reals. -/
+private theorem complexLogFourier_finitePart_psi_integrable :
+    IntegrableOn (fun t ↦ t⁻¹ * (exp (-t) - (1 + t)⁻¹)) (Ioi 0) := by
+  have hd : IntegrableOn (fun t : ℝ ↦ 2 * ((1 + t) ^ 2)⁻¹) (Ioi 0) := by
+    have h := (integrable_one_add_norm (E := ℝ) (μ := volume) (r := 2)
+      (by simp)).integrableOn (s := Ioi 0)
+    refine IntegrableOn.congr_fun (h.const_mul 2) (fun t (ht : 0 < t) ↦ ?_) measurableSet_Ioi
+    simp only [Real.norm_eq_abs, abs_of_pos ht]
+    rw [rpow_neg (by linarith), show (2 : ℝ) = ((2 : ℕ) : ℝ) by norm_num, rpow_natCast]
+  refine hd.mono' (by fun_prop) ?_
+  filter_upwards [ae_restrict_mem measurableSet_Ioi] with t (ht : 0 < t)
+  rw [norm_mul, norm_inv, Real.norm_eq_abs, Real.norm_eq_abs, abs_of_pos ht]
+  exact (complexLogFourier_finitePart_psi_bound ht).2
+
+open Real in
+open scoped FourierTransform in
+/-- The symmetric splitting of `e^{-1/s} - 1 + e^{-s}`. -/
+private theorem complexLogFourier_finitePart_phi_split {s : ℝ} (hs : 0 < s) :
+    exp (-s⁻¹) - 1 + exp (-s) = (exp (-s) - (1 + s)⁻¹) + (exp (-s⁻¹) - (1 + s⁻¹)⁻¹) := by
+  have : (1 + s)⁻¹ + (1 + s⁻¹)⁻¹ = 1 := by field_simp; ring
+  linarith
+
+open Real in
+open scoped FourierTransform in
+/-- `|e^{-1/s} - 1 + e^{-s}| ≤ 2 min(s, 1/s)` on the positive reals. -/
+private theorem complexLogFourier_finitePart_phi_bound {s : ℝ} (hs : 0 < s) : |exp (-s⁻¹) - 1 + exp (-s)| ≤ 2 * min s s⁻¹ := by
+  rw [complexLogFourier_finitePart_phi_split hs]
+  have h1 := (complexLogFourier_finitePart_psi_bound hs).1
+  have h2 := (complexLogFourier_finitePart_psi_bound (inv_pos.mpr hs)).1
+  rw [inv_inv, min_comm] at h2
+  linarith [abs_add_le (exp (-s) - (1 + s)⁻¹) (exp (-s⁻¹) - (1 + s⁻¹)⁻¹)]
+
+open Real in
+open scoped FourierTransform in
+/-- `∫₀^∞ (e^{-1/s} - 1 + e^{-s}) ds / s = -2γ`, by integration by parts against the logarithm. -/
+private theorem complexLogFourier_finitePart_k0 : IntegrableOn (fun s ↦ s⁻¹ * (exp (-s⁻¹) - 1 + exp (-s))) (Ioi 0) ∧
+    ∫ s in Ioi 0, s⁻¹ * (exp (-s⁻¹) - 1 + exp (-s)) = -2 * eulerMascheroniConstant := by
+  let ψ : ℝ → ℝ := fun t ↦ exp (-t) - (1 + t)⁻¹
+  have hint : IntegrableOn (fun s ↦ s⁻¹ * (exp (-s⁻¹) - 1 + exp (-s))) (Ioi 0) := by
+    have h2 : IntegrableOn (fun s ↦ s⁻¹ * ψ s⁻¹) (Ioi 0) := (complexLogFourier_finitePart_inv_sub ψ).1.mpr complexLogFourier_finitePart_psi_integrable
+    refine (complexLogFourier_finitePart_psi_integrable.add h2).congr_fun (fun s (hs : 0 < s) ↦ ?_) measurableSet_Ioi
+    simp only [ψ, Pi.add_apply]
+    rw [complexLogFourier_finitePart_phi_split hs, mul_add]
+  refine ⟨hint, ?_⟩
+  -- integration by parts against the logarithm
+  let g : ℝ → ℝ := fun t ↦ -(t * log t * exp (-t))
+  have hg1 : EqOn (fun x : ℝ ↦ x⁻¹ * g x⁻¹) (fun x ↦ log x * ((x ^ 2)⁻¹ * exp (-x⁻¹))) (Ioi 0) := by
+    intro x (hx : 0 < x)
+    simp only [g, log_inv]
+    field_simp
+  have hg2 : EqOn (fun x : ℝ ↦ x⁻¹ * g x) (fun x ↦ -(log x * exp (-x))) (Ioi 0) := by
+    intro x (hx : 0 < x)
+    simp only [g]
+    field_simp
+  have hLint := complexLogFourier_finitePart_log_exp_integrable
+  have hA : IntegrableOn (fun x ↦ log x * ((x ^ 2)⁻¹ * exp (-x⁻¹))) (Ioi 0) := by
+    rw [← integrableOn_congr_fun hg1 measurableSet_Ioi, (complexLogFourier_finitePart_inv_sub g).1,
+      integrableOn_congr_fun hg2 measurableSet_Ioi]
+    exact hLint.neg
+  have hAval : ∫ x in Ioi 0, log x * ((x ^ 2)⁻¹ * exp (-x⁻¹)) = -∫ x in Ioi 0, log x * exp (-x) := by
+    rw [← setIntegral_congr_fun measurableSet_Ioi hg1, (complexLogFourier_finitePart_inv_sub g).2,
+      setIntegral_congr_fun measurableSet_Ioi hg2, integral_neg]
+  have hu : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt log x⁻¹ x := fun x hx ↦ hasDerivAt_log (ne_of_gt hx)
+  have hv : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt (fun s ↦ exp (-s⁻¹) - 1 + exp (-s))
+      ((x ^ 2)⁻¹ * exp (-x⁻¹) - exp (-x)) x := by
+    intro x hx
+    have h1 : HasDerivAt (fun s ↦ exp (-s⁻¹)) (exp (-x⁻¹) * (-(-(x ^ 2)⁻¹))) x :=
+      ((hasDerivAt_inv (ne_of_gt hx)).neg).exp
+    have h2 : HasDerivAt (fun s ↦ exp (-s)) (exp (-x) * (-1)) x := (hasDerivAt_neg x).exp
+    convert (h1.sub_const 1).add h2 using 1
+    ring
+  have huv' : IntegrableOn (log * fun x ↦ (x ^ 2)⁻¹ * exp (-x⁻¹) - exp (-x)) (Ioi 0) := by
+    refine (hA.sub hLint).congr_fun (fun x _ ↦ ?_) measurableSet_Ioi
+    simp only [Pi.mul_apply, Pi.sub_apply]; ring
+  have hu'v : IntegrableOn ((fun x : ℝ ↦ x⁻¹) * fun s ↦ exp (-s⁻¹) - 1 + exp (-s)) (Ioi 0) := hint
+  have hlim_top : Tendsto (log * fun s ↦ exp (-s⁻¹) - 1 + exp (-s)) atTop (𝓝 0) := by
+    have hl : Tendsto (fun s ↦ 2 * (log s / s)) atTop (𝓝 0) := by
+      simpa using (tendsto_pow_log_div_mul_add_atTop 1 0 1 one_ne_zero).const_mul 2
+    refine squeeze_zero_norm' ?_ hl
+    filter_upwards [eventually_gt_atTop 1] with s hs
+    have hs0 : 0 < s := by linarith
+    rw [Pi.mul_apply, norm_mul, Real.norm_eq_abs, Real.norm_eq_abs, abs_of_pos (log_pos hs)]
+    have hb := complexLogFourier_finitePart_phi_bound hs0
+    have hm : min s s⁻¹ ≤ s⁻¹ := min_le_right _ _
+    have := log_pos hs
+    calc log s * |exp (-s⁻¹) - 1 + exp (-s)| ≤ log s * (2 * s⁻¹) := by gcongr; linarith
+      _ = 2 * (log s / s) := by ring
+  have hlim_zero : Tendsto (log * fun s ↦ exp (-s⁻¹) - 1 + exp (-s)) (𝓝[>] 0) (𝓝 0) := by
+    have hl : Tendsto (fun s : ℝ ↦ 2 * (log s⁻¹ / s⁻¹)) (𝓝[>] 0) (𝓝 0) := by
+      have : Tendsto (fun s ↦ 2 * (log s / s)) atTop (𝓝 0) := by
+        simpa using (tendsto_pow_log_div_mul_add_atTop 1 0 1 one_ne_zero).const_mul 2
+      exact this.comp tendsto_inv_nhdsGT_zero
+    refine squeeze_zero_norm' ?_ hl
+    filter_upwards [Ioo_mem_nhdsGT (show (0 : ℝ) < 1 by norm_num)] with s hs
+    obtain ⟨hs0, hs1⟩ := hs
+    rw [Pi.mul_apply, norm_mul, Real.norm_eq_abs, Real.norm_eq_abs,
+      abs_of_neg (log_neg hs0 hs1)]
+    have hb := complexLogFourier_finitePart_phi_bound hs0
+    have hm : min s s⁻¹ ≤ s := min_le_left _ _
+    have := log_neg hs0 hs1
+    calc -log s * |exp (-s⁻¹) - 1 + exp (-s)| ≤ -log s * (2 * s) :=
+          mul_le_mul_of_nonneg_left (by linarith) (by linarith)
+      _ = 2 * (log s⁻¹ / s⁻¹) := by rw [log_inv]; field_simp
+  have hibp := integral_Ioi_mul_deriv_eq_deriv_mul hu hv huv' hu'v hlim_zero hlim_top
+  simp only [sub_zero, zero_sub] at hibp
+  have hsplit : ∫ x in Ioi 0, log x * ((x ^ 2)⁻¹ * exp (-x⁻¹) - exp (-x)) =
+      (∫ x in Ioi 0, log x * ((x ^ 2)⁻¹ * exp (-x⁻¹))) - ∫ x in Ioi 0, log x * exp (-x) := by
+    rw [← integral_sub hA hLint]; congr 1; funext x; ring
+  rw [hsplit, hAval] at hibp
+  rw [eulerMascheroniConstant_eq_neg_integral_log]
+  linarith
+
+open Real in
+open scoped FourierTransform in
+/-- `∫₀^∞ (e^{-a/s} - 1 + e^{-bs}) ds / s = -2γ - log(ab)`. -/
+private theorem complexLogFourier_finitePart_cconst {a b : ℝ} (ha : 0 < a) (hb : 0 < b) :
+    IntegrableOn (fun s ↦ s⁻¹ * (exp (-(a * s⁻¹)) - 1 + exp (-(b * s)))) (Ioi 0) ∧
+      ∫ s in Ioi 0, s⁻¹ * (exp (-(a * s⁻¹)) - 1 + exp (-(b * s))) =
+        -2 * eulerMascheroniConstant - log (a * b) := by
+  obtain ⟨hf1, vf1⟩ := complexLogFourier_finitePart_frullani_exp hb one_pos
+  obtain ⟨hf2, vf2⟩ := complexLogFourier_finitePart_frullani_exp ha one_pos
+  let g : ℝ → ℝ := fun t ↦ exp (-a * t) - exp (-1 * t)
+  have h2 : IntegrableOn (fun s ↦ s⁻¹ * g s⁻¹) (Ioi 0) := (complexLogFourier_finitePart_inv_sub g).1.mpr hf2
+  have v2 : ∫ s in Ioi 0, s⁻¹ * g s⁻¹ = log (1 / a) := (complexLogFourier_finitePart_inv_sub g).2.trans vf2
+  obtain ⟨hk, vk⟩ := complexLogFourier_finitePart_k0
+  have he : EqOn (fun s ↦ s⁻¹ * (exp (-(a * s⁻¹)) - 1 + exp (-(b * s))))
+      ((fun y ↦ y⁻¹ * (exp (-b * y) - exp (-1 * y))) + (fun s ↦ s⁻¹ * g s⁻¹) +
+        fun s ↦ s⁻¹ * (exp (-s⁻¹) - 1 + exp (-s))) (Ioi 0) := by
+    intro s _
+    simp only [g, Pi.add_apply, neg_mul, one_mul]
+    ring
+  have hsum := (hf1.add h2).add hk
+  refine ⟨hsum.congr_fun he.symm measurableSet_Ioi, ?_⟩
+  rw [setIntegral_congr_fun measurableSet_Ioi he, integral_add' (hf1.add h2) hk,
+    integral_add' hf1 h2, vf1, v2, vk, log_mul ha.ne' hb.ne', one_div, one_div, log_inv, log_inv]
+  ring
+
+open Real in
+open scoped FourierTransform in
+/-- The Gaussian integral over a disc in the complex plane. -/
+private theorem complexLogFourier_finitePart_ball_gauss {s ε : ℝ} (hs : 0 < s) (hε : 0 < ε) :
+    ∫ x in {x : ℂ | ‖x‖ ^ 2 < ε}, exp (-(s * ‖x‖ ^ 2)) = π / s * (1 - exp (-(s * ε))) := by
+  have hmeas : MeasurableSet {x : ℂ | ‖x‖ ^ 2 < ε} := measurableSet_lt (by fun_prop) (by fun_prop)
+  let f : ℝ → ℝ := fun r ↦ if r ^ 2 < ε then exp (-(s * r ^ 2)) else 0
+  have h1 : ∫ x in {x : ℂ | ‖x‖ ^ 2 < ε}, exp (-(s * ‖x‖ ^ 2)) = ∫ x : ℂ, f ‖x‖ := by
+    rw [← integral_indicator hmeas]
+    congr 1
+  rw [h1, integral_fun_norm_addHaar volume f, Complex.finrank_real_complex]
+  have hball : (volume : Measure ℂ).real (Metric.ball 0 1) = π := by
+    simp [Measure.real]
+  rw [hball]
+  have h2 : ∫ y in Ioi (0 : ℝ), y ^ (2 - 1) • f y = ∫ y in (0 : ℝ)..√ε, y * exp (-(s * y ^ 2)) := by
+    rw [intervalIntegral.integral_of_le (sqrt_nonneg _), integral_Ioc_eq_integral_Ioo,
+      ← integral_indicator measurableSet_Ioi, ← integral_indicator measurableSet_Ioo]
+    congr 1; funext y
+    simp only [indicator, mem_Ioi, mem_Ioo, f, smul_eq_mul]
+    by_cases hy : 0 < y
+    · have : y ^ 2 < ε ↔ y < √ε := by
+        rw [lt_sqrt hy.le]
+      by_cases hy2 : y ^ 2 < ε
+      · simp [hy, hy2, this.mp hy2]
+      · simp [hy, hy2, mt this.mpr hy2]
+    · simp [hy]
+  have h3 : ∫ y in (0 : ℝ)..√ε, y * exp (-(s * y ^ 2)) = (1 - exp (-(s * ε))) / (2 * s) := by
+    have hd : ∀ y ∈ uIcc (0 : ℝ) √ε, HasDerivAt (fun y ↦ -exp (-(s * y ^ 2)) / (2 * s))
+        (y * exp (-(s * y ^ 2))) y := by
+      intro y _
+      have := (((hasDerivAt_pow 2 y).const_mul s).neg.exp).neg.div_const (2 * s)
+      convert this using 1
+      simp only [Pi.neg_apply]
+      field_simp
+      ring_nf
+    rw [intervalIntegral.integral_eq_sub_of_hasDerivAt hd
+      ((by fun_prop : Continuous fun y : ℝ ↦ y * exp (-(s * y ^ 2))).intervalIntegrable _ _), sq_sqrt hε.le]
+    simp only [ne_eq, OfNat.ofNat_ne_zero, not_false_eq_true, zero_pow, mul_zero, neg_zero,
+      exp_zero]
+    field_simp
+    ring
+  rw [h2, h3, smul_eq_mul, nsmul_eq_mul]
+  push_cast
+  field_simp
+
+open Real in
+open scoped FourierTransform in
+/-- The Laplace transform of the constant one. -/
+private theorem complexLogFourier_finitePart_exp_Ioi {r : ℝ} (hr : 0 < r) :
+    IntegrableOn (fun s ↦ exp (-(r * s))) (Ioi 0) ∧ ∫ s in Ioi (0 : ℝ), exp (-(r * s)) = r⁻¹ := by
+  have h := exp_neg_integrableOn_Ioi 0 hr
+  simp only [neg_mul] at h
+  refine ⟨h, ?_⟩
+  have := integral_exp_mul_Ioi (show -r < 0 by linarith) 0
+  simp only [neg_mul, mul_zero, exp_zero] at this
+  rw [this]; field_simp
+
+open Real in
+open scoped FourierTransform in
+/-- Writing `1 / ‖x‖²` as a Laplace integral and exchanging the integrations. -/
+private theorem complexLogFourier_finitePart_fubini_gen {w : ℂ → ℂ} (hw : Measurable w) {S : Set ℂ}
+    (h0 : ∀ᵐ x ∂(volume.restrict S), x ≠ 0)
+    (hi : IntegrableOn (fun x ↦ w x / ((‖x‖ ^ 2 : ℝ) : ℂ)) S) :
+    IntegrableOn (fun s ↦ ∫ x in S, w x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) (Ioi 0) ∧
+      ∫ s in Ioi (0 : ℝ), ∫ x in S, w x * (exp (-(s * ‖x‖ ^ 2)) : ℂ) =
+        ∫ x in S, w x / ((‖x‖ ^ 2 : ℝ) : ℂ) := by
+  let Fk : ℂ → ℝ → ℂ := fun x s ↦ w x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)
+  have hF : Measurable (Function.uncurry Fk) := by
+    unfold Fk Function.uncurry
+    exact (hw.comp measurable_fst).mul (by fun_prop)
+  have hx (x : ℂ) (hx : x ≠ 0) :
+      Integrable (Fk x) (volume.restrict (Ioi 0)) ∧
+        ∫ s in Ioi (0 : ℝ), ‖Fk x s‖ = ‖w x / ((‖x‖ ^ 2 : ℝ) : ℂ)‖ ∧
+        ∫ s in Ioi (0 : ℝ), Fk x s = w x / ((‖x‖ ^ 2 : ℝ) : ℂ) := by
+    have hr : 0 < ‖x‖ ^ 2 := by positivity
+    obtain ⟨hI, hV⟩ := complexLogFourier_finitePart_exp_Ioi hr
+    have hI' : IntegrableOn (fun s ↦ exp (-(s * ‖x‖ ^ 2))) (Ioi 0) := by
+      simpa only [mul_comm] using hI
+    have hV' : ∫ s in Ioi (0 : ℝ), exp (-(s * ‖x‖ ^ 2)) = (‖x‖ ^ 2)⁻¹ := by
+      simpa only [mul_comm] using hV
+    refine ⟨hI'.ofReal.const_mul (w x), ?_, ?_⟩
+    · simp only [Fk, norm_mul, Complex.norm_real, Real.norm_of_nonneg (exp_pos _).le]
+      rw [integral_const_mul, hV', norm_div, Complex.norm_real, Real.norm_of_nonneg hr.le,
+        div_eq_mul_inv]
+    · simp only [Fk]
+      have hc : ∫ s in Ioi (0 : ℝ), (exp (-(s * ‖x‖ ^ 2)) : ℂ) =
+          ((∫ s in Ioi (0 : ℝ), exp (-(s * ‖x‖ ^ 2)) : ℝ) : ℂ) := integral_ofReal
+      rw [integral_const_mul, hc, hV', Complex.ofReal_inv, div_eq_mul_inv]
+  have hint : Integrable (Function.uncurry Fk) ((volume.restrict S).prod (volume.restrict (Ioi 0))) := by
+    refine (integrable_prod_iff hF.aestronglyMeasurable).2 ⟨?_, ?_⟩
+    · filter_upwards [h0] with x hx0 using (hx x hx0).1
+    · refine hi.norm.congr ?_
+      filter_upwards [h0] with x hx0 using ((hx x hx0).2.1).symm
+  refine ⟨hint.integral_prod_right, ?_⟩
+  rw [← integral_integral_swap hint]
+  refine integral_congr_ae ?_
+  filter_upwards [h0] with x hx0 using (hx x hx0).2.2
+
+open Real in
+open scoped FourierTransform in
+/-- `1 / ‖x‖` is integrable on discs in the plane. -/
+private theorem complexLogFourier_finitePart_inv_norm_ball {r : ℝ} : IntegrableOn (fun x : ℂ ↦ ‖x‖⁻¹) (Metric.ball 0 r) := by
+  rw [integrableOn_fun_norm_addHaar (μ := volume) (f := fun y : ℝ ↦ y⁻¹), Complex.finrank_real_complex]
+  refine (integrableOn_const (C := (1 : ℝ)) (by simp)).congr_fun (fun y (hy : y ∈ Ioo 0 r) ↦ ?_)
+    measurableSet_Ioo
+  simp [smul_eq_mul, hy.1.ne']
+
+open Real in
+open scoped FourierTransform in
+/-- The remainder of a Lipschitz-at-zero function over a shrinking disc tends to zero. -/
+private theorem complexLogFourier_finitePart_disc_tendsto {g : ℂ → ℂ} (hg : Continuous g) {C : ℝ} (hC : ∀ x, ‖g x - g 0‖ ≤ C * ‖x‖) :
+    Tendsto (fun ε : ℝ ↦ ∫ x in {x : ℂ | ‖x‖ ^ 2 < ε}, (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ))
+      (𝓝[>] 0) (𝓝 0) := by
+  have hm (ε : ℝ) : MeasurableSet {x : ℂ | ‖x‖ ^ 2 < ε} := measurableSet_lt (by fun_prop) (by fun_prop)
+  simp_rw [← integral_indicator (hm _)]
+  suffices key : Tendsto (fun ε : ℝ ↦ ∫ x : ℂ, {x : ℂ | ‖x‖ ^ 2 < ε}.indicator
+      (fun x ↦ (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ)) x) (𝓝[>] 0) (𝓝 (∫ x : ℂ, (0 : ℂ))) by
+    rwa [integral_zero] at key
+  refine tendsto_integral_filter_of_dominated_convergence
+    ((Metric.ball (0 : ℂ) 1).indicator fun x ↦ |C| * ‖x‖⁻¹) ?_ ?_ ?_ ?_
+  · filter_upwards with ε
+    refine (Measurable.indicator ?_ (hm ε)).aestronglyMeasurable
+    exact ((hg.sub continuous_const).measurable).div (by fun_prop)
+  · filter_upwards [Ioo_mem_nhdsGT (show (0 : ℝ) < 1 by norm_num)] with ε hε
+    refine ae_of_all _ fun x ↦ ?_
+    by_cases hx : ‖x‖ ^ 2 < ε
+    · have hx1 : x ∈ Metric.ball (0 : ℂ) 1 := by
+        rw [mem_ball_zero_iff]
+        nlinarith [norm_nonneg x, hε.2]
+      rw [indicator_of_mem (show x ∈ {x : ℂ | ‖x‖ ^ 2 < ε} from hx), indicator_of_mem hx1]
+      rcases eq_or_ne x 0 with rfl | h0
+      · simp
+      have hn : 0 < ‖x‖ := norm_pos_iff.mpr h0
+      rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (by positivity)]
+      calc ‖g x - g 0‖ / ‖x‖ ^ 2 ≤ C * ‖x‖ / ‖x‖ ^ 2 := by gcongr; exact hC x
+        _ ≤ |C| * ‖x‖ / ‖x‖ ^ 2 := by gcongr; exact le_abs_self C
+        _ = |C| * ‖x‖⁻¹ := by field_simp
+    · rw [indicator_of_notMem (show x ∉ {x : ℂ | ‖x‖ ^ 2 < ε} from hx), norm_zero]
+      exact indicator_nonneg (fun _ _ ↦ by positivity) _
+  · exact (integrable_indicator_iff measurableSet_ball).mpr (complexLogFourier_finitePart_inv_norm_ball.const_mul _)
+  · filter_upwards [Measure.ae_ne volume (0 : ℂ)] with x hx
+    have hn : 0 < ‖x‖ ^ 2 := by positivity
+    refine tendsto_const_nhds.congr' ?_
+    filter_upwards [Ioo_mem_nhdsGT hn] with ε hε
+    rw [indicator_of_notMem]
+    simp only [mem_ofPred_eq, not_lt]; exact hε.2.le
+
+open Real in
+open scoped FourierTransform in
+/-- The logarithmic Fourier pairing as an integral over Gaussian scales. -/
+private theorem complexLogFourier_finitePart_fourier_side {g : ℂ → ℂ} (hg : Continuous g) (hgi : Integrable g) (hf : Integrable (𝓕 g))
+    (hfc : Continuous (𝓕 g))
+    (hlog : Integrable (fun ξ : ℂ ↦ (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ)) :
+    ∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ =
+      ∫ y in Ioi (0 : ℝ), ((y⁻¹ : ℝ) : ℂ) * ((exp (-(π ^ 2) * y) : ℂ) * g 0 -
+        ((π * y)⁻¹ : ℂ) * ∫ x, g x * Complex.exp (-(‖x‖ ^ 2 / y : ℝ))) := by
+  have hπ : 0 < π ^ 2 := by positivity
+  let Fk : ℂ → ℝ → ℂ := fun ξ y ↦ ((y⁻¹ * (exp (-(π ^ 2) * y) - exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y)) : ℝ) : ℂ) * 𝓕 g ξ
+  have hF : Measurable (Function.uncurry Fk) := by
+    unfold Fk Function.uncurry
+    refine Measurable.mul (by fun_prop) ?_
+    exact hfc.measurable.comp measurable_fst
+  have hx (ξ : ℂ) (hξ : ξ ≠ 0) :
+      Integrable (Fk ξ) (volume.restrict (Ioi 0)) ∧
+        ∫ y in Ioi (0 : ℝ), ‖Fk ξ y‖ = ‖(log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ‖ ∧
+        ∫ y in Ioi (0 : ℝ), Fk ξ y = (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ := by
+    have hβ : 0 < π ^ 2 * ‖ξ‖ ^ 2 := by positivity
+    obtain ⟨hI, hV⟩ := complexLogFourier_finitePart_frullani_exp hπ hβ
+    have hA := complexLogFourier_finitePart_frullani_abs hπ hβ
+    have hq : π ^ 2 * ‖ξ‖ ^ 2 / π ^ 2 = ‖ξ‖ ^ 2 := by field_simp
+    rw [hq] at hV hA
+    refine ⟨hI.ofReal.mul_const _, ?_, ?_⟩
+    · have e : ∀ y, ‖Fk ξ y‖ = |y⁻¹ * (exp (-π ^ 2 * y) - exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y))| * ‖𝓕 g ξ‖ :=
+        fun y ↦ by rw [norm_mul, Complex.norm_real, Real.norm_eq_abs]
+      simp_rw [e]
+      rw [integral_mul_const, hA, norm_mul, Complex.norm_real, Real.norm_eq_abs]
+    · have hc : ∫ y in Ioi (0 : ℝ), ((y⁻¹ * (exp (-π ^ 2 * y) - exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y)) : ℝ) : ℂ) =
+          ((∫ y in Ioi (0 : ℝ), y⁻¹ * (exp (-π ^ 2 * y) - exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y)) : ℝ) : ℂ) :=
+        integral_ofReal
+      simp only [Fk]
+      rw [integral_mul_const, hc, hV]
+  have hint : Integrable (Function.uncurry Fk) (volume.prod (volume.restrict (Ioi 0))) := by
+    refine (integrable_prod_iff hF.aestronglyMeasurable).2 ⟨?_, ?_⟩
+    · filter_upwards [Measure.ae_ne volume (0 : ℂ)] with ξ hξ using (hx ξ hξ).1
+    · refine hlog.norm.congr ?_
+      filter_upwards [Measure.ae_ne volume (0 : ℂ)] with ξ hξ using ((hx ξ hξ).2.1).symm
+  have hL : ∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ = ∫ ξ, ∫ y in Ioi (0 : ℝ), Fk ξ y := by
+    refine integral_congr_ae ?_
+    filter_upwards [Measure.ae_ne volume (0 : ℂ)] with ξ hξ using ((hx ξ hξ).2.2).symm
+  rw [hL, integral_integral_swap hint]
+  refine setIntegral_congr_fun measurableSet_Ioi fun y (hy : 0 < y) ↦ ?_
+  -- the inner integral at a fixed scale
+  have hmass : ∫ ξ, 𝓕 g ξ = g 0 := by
+    have hinv := congrFun (hg.fourierInv_fourier_eq hgi hf) 0
+    rw [Real.fourierInv_eq'] at hinv
+    simpa using hinv
+  have hb : 0 < ((π ^ 2 * y : ℝ) : ℂ).re := by
+    rw [Complex.ofReal_re]; exact mul_pos hπ hy
+  set b : ℂ := ((π ^ 2 * y : ℝ) : ℂ) with hbdef
+  have hGi : Integrable (fun v : ℂ ↦ Complex.exp (-b * ‖v‖ ^ 2)) := by
+    simpa using GaussianFourier.integrable_cexp_neg_mul_sq_norm_add (V := ℂ) hb 0 0
+  have hFG (x : ℂ) : 𝓕 (fun v : ℂ ↦ Complex.exp (-b * ‖v‖ ^ 2)) x =
+      ((π * y)⁻¹ : ℂ) * Complex.exp (-(‖x‖ ^ 2 / y : ℝ)) := by
+    rw [fourier_gaussian_innerProductSpace hb, Complex.finrank_real_complex]
+    have hy' : (y : ℂ) ≠ 0 := by exact_mod_cast hy.ne'
+    have hπ' : (π : ℂ) ≠ 0 := by exact_mod_cast pi_ne_zero
+    rw [show ((2 : ℕ) : ℂ) / 2 = 1 by norm_num, Complex.cpow_one, hbdef]
+    push_cast
+    congr 1
+    · field_simp
+    · congr 1; field_simp
+  have hgauss : ∫ ξ, Complex.exp (-b * ‖ξ‖ ^ 2) * 𝓕 g ξ =
+      ((π * y)⁻¹ : ℂ) * ∫ x, g x * Complex.exp (-(‖x‖ ^ 2 / y : ℝ)) := by
+    have he := VectorFourier.integral_fourierIntegral_smul_eq_flip (L := innerₗ ℂ)
+      Real.continuous_fourierChar continuous_inner hgi hGi
+    rw [flip_innerₗ] at he
+    change (∫ ξ, 𝓕 g ξ • Complex.exp (-b * ‖ξ‖ ^ 2)) =
+      ∫ x, g x • 𝓕 (fun v : ℂ ↦ Complex.exp (-b * ‖v‖ ^ 2)) x at he
+    simp only [smul_eq_mul, hFG] at he
+    rw [← integral_const_mul]
+    simp only [mul_comm (Complex.exp _) (𝓕 g _)]
+    rw [he]
+    congr 1; funext x
+    ring
+  have hGi2 : Integrable (fun ξ : ℂ ↦ Complex.exp (-b * ‖ξ‖ ^ 2) * 𝓕 g ξ) := by
+    refine hf.bdd_mul (c := 1) (by fun_prop) (ae_of_all _ fun ξ ↦ ?_)
+    have e : -b * (‖ξ‖ : ℂ) ^ 2 = ((-(π ^ 2 * y) * ‖ξ‖ ^ 2 : ℝ) : ℂ) := by
+      rw [hbdef]; push_cast; ring
+    rw [e, Complex.norm_exp, Complex.ofReal_re, exp_le_one_iff]
+    have := mul_pos hπ hy
+    nlinarith [sq_nonneg ‖ξ‖]
+  have hpt (ξ : ℂ) : ((y⁻¹ * (exp (-π ^ 2 * y) - exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y)) : ℝ) : ℂ) * 𝓕 g ξ =
+      ((y⁻¹ : ℝ) : ℂ) * ((exp (-π ^ 2 * y) : ℂ) * 𝓕 g ξ - Complex.exp (-b * ‖ξ‖ ^ 2) * 𝓕 g ξ) := by
+    have e : Complex.exp (-b * ‖ξ‖ ^ 2) = ((exp (-(π ^ 2 * ‖ξ‖ ^ 2) * y) : ℝ) : ℂ) := by
+      rw [Complex.ofReal_exp, hbdef]; push_cast; ring_nf
+    rw [e]; push_cast; ring
+  simp only [Fk, hpt]
+  rw [integral_const_mul, integral_sub (hf.const_mul _) hGi2, integral_const_mul, hmass, hgauss]
+
+open Real in
+open scoped FourierTransform in
+/-- The planar finite-part identity for the logarithm, for Lebesgue measure and the standard
+Fourier transform. -/
+private theorem complexLogFourier_finitePart_core {g : ℂ → ℂ} (hg : Continuous g) (hgi : Integrable g) (hf : Integrable (𝓕 g))
+    (hfc : Continuous (𝓕 g))
+    (hlog : Integrable (fun ξ : ℂ ↦ (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ))
+    {C : ℝ} (hC : ∀ x, ‖g x - g 0‖ ≤ C * ‖x‖) :
+    (∀ ε > (0 : ℝ), IntegrableOn (fun x ↦ g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) {x | ε ≤ ‖x‖ ^ 2}) ∧
+    Tendsto (fun ε : ℝ ↦ (∫ x in {x : ℂ | ε ≤ ‖x‖ ^ 2}, g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) +
+        (π : ℂ) * g 0 * (log ε : ℂ)) (𝓝[>] 0)
+      (𝓝 (-(π : ℂ) * ((∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ) +
+        2 * ((log π + eulerMascheroniConstant : ℝ) : ℂ) * g 0))) := by
+  have hπ0 : 0 < π := pi_pos
+  have hπC : (π : ℂ) ≠ 0 := by exact_mod_cast pi_ne_zero
+  have hmA (ε : ℝ) : MeasurableSet {x : ℂ | ε ≤ ‖x‖ ^ 2} := measurableSet_le (by fun_prop) (by fun_prop)
+  have hmB (ε : ℝ) : MeasurableSet {x : ℂ | ‖x‖ ^ 2 < ε} := measurableSet_lt (by fun_prop) (by fun_prop)
+  -- integrability on the outer region
+  have hA (ε : ℝ) (hε : 0 < ε) : IntegrableOn (fun x ↦ g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) {x | ε ≤ ‖x‖ ^ 2} := by
+    refine (hgi.integrableOn.norm.const_mul ε⁻¹).mono' ?_ ?_
+    · exact (hg.measurable.div (by fun_prop)).aestronglyMeasurable
+    · filter_upwards [ae_restrict_mem (hmA ε)] with x (hx : ε ≤ ‖x‖ ^ 2)
+      rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (by positivity), div_eq_mul_inv, mul_comm]
+      gcongr
+  refine ⟨hA, ?_⟩
+  set I := ∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 g ξ with hIdef
+  -- Gaussian averages of the test
+  let G : ℝ → ℂ := fun s ↦ ∫ x, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)
+  -- the Fourier side after the substitution s = 1/y
+  have hIs : I = ∫ s in Ioi (0 : ℝ), (((s⁻¹ * exp (-(π ^ 2 * s⁻¹)) : ℝ) : ℂ) * g 0 -
+      (π : ℂ)⁻¹ * G s) := by
+    rw [hIdef, complexLogFourier_finitePart_fourier_side hg hgi hf hfc hlog]
+    rw [← complexLogFourier_finitePart_inv_subC]
+    refine setIntegral_congr_fun measurableSet_Ioi fun s (hs : 0 < s) ↦ ?_
+    simp only [G]
+    have hsC : (s : ℂ) ≠ 0 := by exact_mod_cast hs.ne'
+    have e : ∀ x : ℂ, Complex.exp (-(‖x‖ ^ 2 / s⁻¹ : ℝ)) = (exp (-(s * ‖x‖ ^ 2)) : ℂ) := by
+      intro x; rw [Complex.ofReal_exp]; congr 1; push_cast; field_simp
+    simp only [e]
+    push_cast
+    field_simp
+  have key (ε : ℝ) (hε : 0 < ε) :
+      (∫ x in {x : ℂ | ε ≤ ‖x‖ ^ 2}, g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) + (π : ℂ) * g 0 * (log ε : ℂ) =
+        -(π : ℂ) * (I + 2 * ((log π + eulerMascheroniConstant : ℝ) : ℂ) * g 0) -
+          ∫ x in {x : ℂ | ‖x‖ ^ 2 < ε}, (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ) := by
+    set A := {x : ℂ | ε ≤ ‖x‖ ^ 2}
+    set B := {x : ℂ | ‖x‖ ^ 2 < ε}
+    have hAB : Aᶜ = B := by ext x; simp [A, B, not_le]
+    have h0A : ∀ᵐ x ∂(volume.restrict A), x ≠ 0 := by
+      filter_upwards [ae_restrict_mem (hmA ε)] with x (hx : ε ≤ ‖x‖ ^ 2)
+      rintro rfl; simp at hx; linarith
+    have h0B : ∀ᵐ x ∂(volume.restrict B), x ≠ 0 := ae_restrict_of_ae (Measure.ae_ne volume 0)
+    have hBball : B ⊆ Metric.ball (0 : ℂ) (√ε + 1) := by
+      intro x (hx : ‖x‖ ^ 2 < ε)
+      rw [mem_ball_zero_iff]
+      have : ‖x‖ < √ε := by rw [lt_sqrt (norm_nonneg _)]; exact hx
+      linarith
+    have hiB : IntegrableOn (fun x ↦ (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ)) B := by
+      refine ((complexLogFourier_finitePart_inv_norm_ball (r := √ε + 1)).mono_set hBball |>.const_mul |C|).mono' ?_ ?_
+      · exact ((hg.measurable.sub_const _).div (by fun_prop)).aestronglyMeasurable
+      · filter_upwards [h0B] with x hx
+        have hn : 0 < ‖x‖ := norm_pos_iff.mpr hx
+        rw [norm_div, Complex.norm_real, Real.norm_of_nonneg (by positivity)]
+        calc ‖g x - g 0‖ / ‖x‖ ^ 2 ≤ C * ‖x‖ / ‖x‖ ^ 2 := by gcongr; exact hC x
+          _ ≤ |C| * ‖x‖ / ‖x‖ ^ 2 := by gcongr; exact le_abs_self C
+          _ = |C| * ‖x‖⁻¹ := by field_simp
+    obtain ⟨hQi, hQv⟩ := complexLogFourier_finitePart_fubini_gen (w := g) hg.measurable h0A (hA ε hε)
+    obtain ⟨hEi, hEv⟩ := complexLogFourier_finitePart_fubini_gen (w := fun x ↦ g x - g 0) (hg.measurable.sub_const _) h0B hiB
+    obtain ⟨hci, hcv⟩ := complexLogFourier_finitePart_cconst (a := π ^ 2) (b := ε) (by positivity) hε
+    have hG (s : ℝ) (hs : 0 < s) : G s = (∫ x in A, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) +
+        (∫ x in B, (g x - g 0) * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) +
+        g 0 * ((π / s * (1 - exp (-(s * ε))) : ℝ) : ℂ) := by
+      have hint : Integrable (fun x ↦ g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) := by
+        refine hgi.mul_bdd (c := 1) (by fun_prop) (ae_of_all _ fun x ↦ ?_)
+        rw [Complex.norm_real, Real.norm_of_nonneg (exp_pos _).le, exp_le_one_iff]
+        have := sq_nonneg ‖x‖; nlinarith
+      have hBe : IntegrableOn (fun x : ℂ ↦ (exp (-(s * ‖x‖ ^ 2)) : ℂ)) B := by
+        refine Measure.integrableOn_of_bounded (M := 1) ?_ (by fun_prop) (ae_of_all _ fun x ↦ ?_)
+        · exact ((measure_mono hBball).trans_lt measure_ball_lt_top).ne
+        · rw [Complex.norm_real, Real.norm_of_nonneg (exp_pos _).le, exp_le_one_iff]
+          have := sq_nonneg ‖x‖; nlinarith
+      have hsplit : (∫ x in B, (g x - g 0) * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) =
+          (∫ x in B, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) - g 0 * ∫ x in B, (exp (-(s * ‖x‖ ^ 2)) : ℂ) := by
+        simp only [sub_mul]
+        rw [integral_sub hint.integrableOn (hBe.const_mul _), integral_const_mul]
+      have hball : ∫ x in B, (exp (-(s * ‖x‖ ^ 2)) : ℂ) = ((π / s * (1 - exp (-(s * ε))) : ℝ) : ℂ) := by
+        have hc : ∫ x in B, (exp (-(s * ‖x‖ ^ 2)) : ℂ) = ((∫ x in B, exp (-(s * ‖x‖ ^ 2)) : ℝ) : ℂ) :=
+          integral_ofReal
+        rw [hc, complexLogFourier_finitePart_ball_gauss hs hε]
+      rw [hsplit, hball]
+      simp only [G]
+      rw [← integral_add_compl (hmA ε) hint, hAB]
+      ring
+    have hpt : EqOn (fun s ↦ ((s⁻¹ * exp (-(π ^ 2 * s⁻¹)) : ℝ) : ℂ) * g 0 - (π : ℂ)⁻¹ * G s)
+        (fun s ↦ g 0 * ((s⁻¹ * (exp (-(π ^ 2 * s⁻¹)) - 1 + exp (-(ε * s))) : ℝ) : ℂ) -
+          (π : ℂ)⁻¹ * ((∫ x in A, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) +
+            ∫ x in B, (g x - g 0) * (exp (-(s * ‖x‖ ^ 2)) : ℂ))) (Ioi 0) := by
+      intro s (hs : 0 < s)
+      simp only
+      rw [hG s hs, mul_comm ε s]
+      have hsC : (s : ℂ) ≠ 0 := by exact_mod_cast hs.ne'
+      push_cast
+      field_simp
+      ring
+    have hc : ∫ s in Ioi (0 : ℝ), ((s⁻¹ * (exp (-(π ^ 2 * s⁻¹)) - 1 + exp (-(ε * s))) : ℝ) : ℂ) =
+        ((∫ s in Ioi (0 : ℝ), s⁻¹ * (exp (-(π ^ 2 * s⁻¹)) - 1 + exp (-(ε * s))) : ℝ) : ℂ) :=
+      integral_ofReal
+    have h1 : IntegrableOn (fun s ↦ g 0 *
+        ((s⁻¹ * (exp (-(π ^ 2 * s⁻¹)) - 1 + exp (-(ε * s))) : ℝ) : ℂ)) (Ioi 0) :=
+      (hci.ofReal (𝕜 := ℂ)).const_mul (g 0)
+    have h2 : IntegrableOn (fun s ↦ (π : ℂ)⁻¹ * ((∫ x in A, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) +
+        ∫ x in B, (g x - g 0) * (exp (-(s * ‖x‖ ^ 2)) : ℂ))) (Ioi 0) :=
+      (hQi.add hEi).const_mul _
+    have hsum : ∫ s in Ioi (0 : ℝ), ((∫ x in A, g x * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) +
+        ∫ x in B, (g x - g 0) * (exp (-(s * ‖x‖ ^ 2)) : ℂ)) =
+        (∫ x in A, g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) + ∫ x in B, (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ) := by
+      rw [integral_add hQi hEi, hQv, hEv]
+    rw [setIntegral_congr_fun measurableSet_Ioi hpt, integral_sub h1 h2, integral_const_mul,
+      integral_const_mul, hsum, hc, hcv] at hIs
+    have hlog2 : log (π ^ 2 * ε) = 2 * log π + log ε := by
+      rw [log_mul (by positivity) hε.ne', log_pow]; push_cast; ring
+    rw [hlog2] at hIs
+    have hπI : (π : ℂ) * I = (π : ℂ) * (g 0 * ((-2 * eulerMascheroniConstant - (2 * log π + log ε) : ℝ) : ℂ)) -
+        ((∫ x in A, g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) + ∫ x in B, (g x - g 0) / ((‖x‖ ^ 2 : ℝ) : ℂ)) := by
+      rw [hIs]; field_simp
+    push_cast at hπI ⊢
+    linear_combination hπI
+  have hT := (tendsto_const_nhds (x := -(π : ℂ) * (I + 2 * ((log π + eulerMascheroniConstant : ℝ) : ℂ) * g 0))).sub
+    (complexLogFourier_finitePart_disc_tendsto hg hC)
+  rw [sub_zero] at hT
+  refine hT.congr' ?_
+  filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+  exact (key ε hε).symm
+
+open Real in
+open scoped FourierTransform in
+/-- Fourier inversion at the origin. -/
+private theorem complexLogFourier_finitePart_mass (g : 𝓢(ℂ, ℂ)) : ∫ ξ, 𝓕 (g : ℂ → ℂ) ξ = g 0 := by
+  have hf : Integrable (𝓕 (g : ℂ → ℂ)) := by
+    simpa only [SchwartzMap.fourier_coe] using (𝓕 g).integrable
+  have hinv := congrFun (g.continuous.fourierInv_fourier_eq g.integrable hf) 0
+  rw [Real.fourierInv_eq'] at hinv
+  simpa using hinv
+
+open Real in
+open scoped FourierTransform in
+/-- The logarithm of the squared norm is integrable against Schwartz functions on the plane. -/
+private theorem complexLogFourier_finitePart_logint (g : 𝓢(ℂ, ℂ)) : Integrable (fun ξ : ℂ ↦ (log (‖ξ‖ ^ 2) : ℂ) * g ξ) := by
+  have h := integrable_abs_log_norm_div_one_add_norm_pow (volume : Measure ℂ) (by simp)
+  simp only [Complex.finrank_real_complex] at h
+  obtain ⟨Λ, hΛ⟩ := RiemannMasullo.SchwartzMap.exists_strongDual_integral_mul (volume : Measure ℂ)
+    (fun t ↦ (log (‖t‖ ^ 2) : ℂ))
+    ((Complex.measurable_ofReal.comp (measurable_norm.pow_const 2).log).aestronglyMeasurable) 4
+    ((h.const_mul 2).congr (ae_of_all _ fun t ↦ by
+      simp only [Complex.norm_real, Real.norm_eq_abs, Real.log_pow]
+      push_cast
+      rw [abs_mul, abs_two]; ring))
+  exact (hΛ g).1
+
+open Real in
+open scoped FourierTransform in
+/-- The logarithmic pairing in the normalization of the complex completion, after the
+change of variables `ξ = 2 conj t`. -/
+private theorem complexLogFourier_finitePart_pairing (g : 𝓢(ℂ, ℂ)) :
+    Integrable (fun t : ℂ ↦ (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t))) ∧
+    ∫ t, (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t)) ∂(2 • volume) =
+      (∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) - (log 4 : ℂ) * g 0 := by
+  have hf : Integrable (𝓕 (g : ℂ → ℂ)) := by
+    simpa only [SchwartzMap.fourier_coe] using (𝓕 g).integrable
+  have hlog : Integrable (fun ξ : ℂ ↦ (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) := by
+    simpa only [SchwartzMap.fourier_coe] using complexLogFourier_finitePart_logint (𝓕 g)
+  let h : ℂ → ℂ := fun ξ ↦ (log (‖ξ‖ ^ 2 / 4) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ
+  have hh (t : ℂ) : (log (‖t‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t) = h ((2 : ℝ) • star t) := by
+    simp only [h, norm_smul, Real.norm_two, norm_star]
+    congr 3; ring
+  have hconj := (Complex.conjLIE.measurePreserving).integral_comp
+    Complex.conjLIE.toHomeomorph.measurableEmbedding (fun u ↦ h ((2 : ℝ) • u))
+  have hsc := Measure.integral_comp_smul (volume : Measure ℂ) h 2
+  have hval : ∫ ξ, h ξ = (∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) - (log 4 : ℂ) * g 0 := by
+    rw [← complexLogFourier_finitePart_mass g, ← integral_const_mul, ← integral_sub hlog (hf.const_mul _)]
+    refine integral_congr_ae ?_
+    filter_upwards [Measure.ae_ne volume (0 : ℂ)] with ξ hξ
+    simp only [h]
+    rw [log_div (by positivity) (by norm_num)]
+    push_cast; ring
+  have hhi : Integrable h := by
+    refine (hlog.sub (hf.const_mul (log 4 : ℂ))).congr ?_
+    filter_upwards [Measure.ae_ne volume (0 : ℂ)] with ξ hξ
+    simp only [h, Pi.sub_apply]
+    rw [log_div (by positivity) (by norm_num)]
+    push_cast; ring
+  have hcj (t : ℂ) : h ((2 : ℝ) • Complex.conjLIE t) = h ((2 : ℝ) • star t) := by
+    rw [Complex.conjLIE_apply]; rfl
+  have hi : Integrable (fun t : ℂ ↦ (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t))) := by
+    have h1 : Integrable (fun u : ℂ ↦ h ((2 : ℝ) • u)) := hhi.comp_smul two_ne_zero
+    have h2 : Integrable ((fun u : ℂ ↦ h ((2 : ℝ) • u)) ∘ Complex.conjLIE) :=
+      ((Complex.conjLIE.measurePreserving).integrable_comp_emb (g := fun u : ℂ ↦ h ((2 : ℝ) • u))
+        Complex.conjLIE.toHomeomorph.measurableEmbedding).mpr h1
+    refine (h2.const_mul 2).congr (ae_of_all _ fun t ↦ ?_)
+    change 2 * h ((2 : ℝ) • Complex.conjLIE t) = _
+    rw [hcj, ← hh t]; ring
+  refine ⟨hi, ?_⟩
+  rw [show (2 • volume : Measure ℂ) = volume + volume from two_smul ℕ _,
+    integral_add_measure hi hi]
+  have hone : ∫ t, (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t)) =
+      2 * ∫ t, h ((2 : ℝ) • Complex.conjLIE t) := by
+    rw [← integral_const_mul]; congr 1; funext t
+    rw [hcj, ← hh t]; ring
+  rw [hone, hconj, hsc, ← hval, Complex.finrank_real_complex]
+  norm_num
+  ring
+
+open Real in
+open scoped FourierTransform in
+/-- The planar finite-part identity in the normalization of the complex completion. -/
+private theorem complexLogFourier_finitePart_final (g : 𝓢(ℂ, ℂ)) :
+    Integrable (fun t : ℂ ↦ (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t)))
+      (2 • volume) ∧
+    (∀ ε > (0 : ℝ), IntegrableOn (fun x ↦ g x / ((‖x‖ ^ 2 : ℝ) : ℂ)) {x | ε ≤ ‖x‖ ^ 2}
+      (2 • volume)) ∧
+    Tendsto (fun ε : ℝ ↦ (∫ x in {x : ℂ | ε ≤ ‖x‖ ^ 2}, g x / ((‖x‖ ^ 2 : ℝ) : ℂ) ∂(2 • volume)) +
+        ((2 * π : ℝ) : ℂ) * g 0 * (log ε : ℂ)) (𝓝[>] 0)
+      (𝓝 (-((2 * π : ℝ) : ℂ) * ((∫ t, (log (‖t‖ ^ 2) : ℂ) * (2 * 𝓕 (g : ℂ → ℂ) ((2 : ℝ) • star t))
+        ∂(2 • volume)) + ((2 * (log (2 * π) + eulerMascheroniConstant) : ℝ) : ℂ) * g 0))) := by
+  have hf : Integrable (𝓕 (g : ℂ → ℂ)) := by
+    simpa only [SchwartzMap.fourier_coe] using (𝓕 g).integrable
+  have hfc : Continuous (𝓕 (g : ℂ → ℂ)) := by
+    simpa only [SchwartzMap.fourier_coe] using (𝓕 g).continuous
+  have hlog : Integrable (fun ξ : ℂ ↦ (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) := by
+    simpa only [SchwartzMap.fourier_coe] using complexLogFourier_finitePart_logint (𝓕 g)
+  obtain ⟨C, -, hC⟩ := g.decay 0 1
+  have hC' (x : ℂ) : ‖g x - g 0‖ ≤ C * ‖x‖ := by
+    have := convex_univ.norm_image_sub_le_of_norm_fderiv_le (f := (g : ℂ → ℂ))
+      (fun y _ ↦ g.differentiableAt) (fun y _ ↦ by
+        have := hC y
+        simpa [norm_iteratedFDeriv_one] using this) (mem_univ 0) (mem_univ x)
+    simpa using this
+  obtain ⟨hA, hT⟩ := complexLogFourier_finitePart_core g.continuous g.integrable hf hfc hlog hC'
+  -- the measure 2 • volume
+  have h2 : (2 • (volume : Measure ℂ)) = volume + volume := two_smul ℕ _
+  -- the change of variables in the logarithmic pairing
+  obtain ⟨hi, hJ⟩ := complexLogFourier_finitePart_pairing g
+  have h2v : (2 • volume : Measure ℂ) = volume + volume := two_smul ℕ _
+  refine ⟨by rw [h2v]; exact hi.add_measure hi, fun ε hε ↦ ?_, ?_⟩
+  · rw [h2v]; exact (hA ε hε).add_measure (hA ε hε)
+  rw [hJ]
+  have l4 : log 4 = 2 * log 2 := by
+    rw [show (4 : ℝ) = 2 ^ 2 by norm_num, log_pow]; push_cast; ring
+  have l2π : log (2 * π) = log 2 + log π := log_mul two_ne_zero pi_ne_zero
+  have hlim : -((2 * π : ℝ) : ℂ) * (((∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) - (log 4 : ℂ) * g 0) +
+      ((2 * (log (2 * π) + eulerMascheroniConstant) : ℝ) : ℂ) * g 0) =
+      2 * (-(π : ℂ) * ((∫ ξ, (log (‖ξ‖ ^ 2) : ℂ) * 𝓕 (g : ℂ → ℂ) ξ) +
+        2 * ((log π + eulerMascheroniConstant : ℝ) : ℂ) * g 0)) := by
+    rw [l4, l2π]; push_cast; ring
+  rw [hlim]
+  refine (hT.const_mul (2 : ℂ)).congr' ?_
+  filter_upwards [self_mem_nhdsWithin] with ε (hε : 0 < ε)
+  rw [h2v, Measure.restrict_add, integral_add_measure (hA ε hε) (hA ε hε)]
+  push_cast; ring
+
 /-- Paper: Proposition B.4.3.2(2), p. 619. The complex Fourier pairing
 equals minus the finite part divided by 2π, with the squared module in the cutoff.
 Deviation: Divides the printed distribution by 2π. -/
@@ -2223,7 +3022,33 @@ theorem complexLogFourier_finitePart (w : InfinitePlace F) (_hw : w.IsComplex)
         addTest(f) x / ((‖x‖ ^ 2 : ℝ) : ℂ) ∂ν∞(w)) +
         (2 * Real.pi : ℝ) * addTest(f) 0 * (Real.log ε : ℂ))
         (𝓝[>] 0) (𝓝 (-(2 * Real.pi : ℝ) *
-          ((∫ y, K y ∂ν∞(w)) + (2 * eulerLogConstant : ℝ) * addTest(f) 0))) := by sorry
+          ((∫ y, K y ∂ν∞(w)) + (2 * eulerLogConstant : ℝ) * addTest(f) 0))) := by
+  intro K
+  let : BorelSpace w.Completion := ⟨rfl⟩
+  let e := InfinitePlace.Completion.ringEquivComplexOfIsComplex _hw
+  let j := InfinitePlace.Completion.isometryEquivComplexOfIsComplex _hw
+  let m := j.symm.toHomeomorph.toMeasurableEquiv
+  have hμ : ν∞(w) = (2 • (volume : Measure ℂ)).map m :=
+    dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr _hw)
+  have hem (t : ℂ) : e (m t) = t := e.apply_symm_apply t
+  have hnorm (t : ℂ) : ‖m t‖ = ‖t‖ := by
+    change ‖j.symm t‖ = ‖t‖
+    rw [← dist_zero_right, ← dist_zero_right t, ← j.symm.dist_eq t 0,
+      show j.symm 0 = 0 from map_zero e.symm]
+  obtain ⟨g, hg⟩ := complexModelSchwartz w _hw f
+  have hf : addTest(f) = fun x ↦ g (e x) := by
+    funext x
+    rw [hg]
+    exact congrArg (fun y ↦ addTest(f) y) (e.symm_apply_apply x).symm
+  have hK (t : ℂ) : K (m t) =
+      (Real.log (‖t‖ ^ 2) : ℂ) * (2 * FourierTransform.fourier (g : ℂ → ℂ) ((2 : ℝ) • star t)) := by
+    change (Real.log (‖m t‖ ^ w.mult) : ℂ) * tamagawaFourier ν∞(w) ψ∞(w) addTest(f) (m t) = _
+    rw [_hw.mult_eq_two, hnorm, hf, complexModelFourier w _hw, hem]
+  have hf' (x : w.Completion) : f (Multiplicative.ofAdd x) = g (e x) := congrFun hf x
+  obtain ⟨hint, hcut, hlim⟩ := complexLogFourier_finitePart_final g
+  simp only [hμ, integrable_map_equiv, integrableOn_map_equiv, setIntegral_map_equiv,
+    integral_map_equiv, Function.comp_def, preimage_ofPred_eq, hK, hnorm, hf', hem, map_zero]
+  exact ⟨hint, hcut, hlim⟩
 
 end LocalFourier
 

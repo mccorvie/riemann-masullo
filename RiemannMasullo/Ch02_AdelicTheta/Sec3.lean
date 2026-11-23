@@ -4,7 +4,7 @@ public import RiemannMasullo.Ch02_AdelicTheta.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec1
 
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
-import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2a
 import Mathlib.Algebra.Module.ZLattice.Summable
 import Mathlib.Analysis.Calculus.SmoothSeries

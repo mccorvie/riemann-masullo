@@ -2,7 +2,9 @@ module
 
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import Mathlib.Analysis.Complex.ExponentialBounds
 import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.RHHeight.Main
 
 /-! # Further assertions in the proofs of §10.3 that are false as printed -/
 
@@ -118,14 +120,244 @@ def Printed.spectralLineBand_jetCount_le : Prop :=
       ((∑ t ∈ K, min ((orderAt(χ ω, shift(a, t))).untop₀.toNat) floorCut(s) : ℕ) : ℝ) ≤
         (floorCut(s) : ℝ) * Real.log (max |l| |r|)
 
+/-- **At least ten zeros on the critical line below height 50**: ten distinct ordinates
+`0 < t_0 < t_1 < ⋯ < t_9 < 50` with `ζ(1/2 + i t_k) = 0`. Each `t_k` lies in the two-decimal
+interval of the corresponding `zero_in_*` theorem. Adapted from Thomas Lince’s
+`HardyTenZeros.ten_zeros_on_line_below_fifty` (MIT), retaining the bounds at 22. -/
+private theorem spectralLineBand_jetCount_le_false_brackets :
+    ∃ ts : Fin 10 → ℝ, ts 1 < 22 ∧ 22 < ts 2 ∧ StrictMono ts ∧
+      ∀ k, 0 < ts k ∧ ts k < 50 ∧ riemannZeta (1 / 2 + ts k * Complex.I) = 0 := by
+  obtain ⟨t0, h0, z0⟩ := HardyFirstZero.first_zero_on_line
+  obtain ⟨t1, h1, z1⟩ := HardyTenZeros.zero_in_2102
+  obtain ⟨t2, h2, z2⟩ := HardyTenZeros.zero_in_2501
+  obtain ⟨t3, h3, z3⟩ := HardyTenZeros.zero_in_3042
+  obtain ⟨t4, h4, z4⟩ := HardyTenZeros.zero_in_3293
+  obtain ⟨t5, h5, z5⟩ := HardyTenZeros.zero_in_3758
+  obtain ⟨t6, h6, z6⟩ := HardyTenZeros.zero_in_4091
+  obtain ⟨t7, h7, z7⟩ := HardyTenZeros.zero_in_4332
+  obtain ⟨t8, h8, z8⟩ := HardyTenZeros.zero_in_4800
+  obtain ⟨t9, h9, z9⟩ := HardyTenZeros.zero_in_4977
+  obtain ⟨l0, u0⟩ := h0
+  obtain ⟨l1, u1⟩ := h1
+  obtain ⟨l2, u2⟩ := h2
+  obtain ⟨l3, u3⟩ := h3
+  obtain ⟨l4, u4⟩ := h4
+  obtain ⟨l5, u5⟩ := h5
+  obtain ⟨l6, u6⟩ := h6
+  obtain ⟨l7, u7⟩ := h7
+  obtain ⟨l8, u8⟩ := h8
+  obtain ⟨l9, u9⟩ := h9
+  refine ⟨![t0, t1, t2, t3, t4, t5, t6, t7, t8, t9], ?_, ?_, ?_, ?_⟩
+  · change t1 < 22
+    linarith
+  · change 22 < t2
+    linarith
+  · refine Fin.strictMono_iff_lt_succ.mpr fun i => ?_
+    fin_cases i <;> simp <;> linarith
+  · intro k
+    simp only [one_div] at z0 z1 z2 z3 z4 z5 z6 z7 z8 z9
+    fin_cases k <;> simp <;> refine ⟨by linarith, by linarith, by assumption⟩
+
+/-- The ten certified ordinates exhaust the count to height fifty. Only the first
+two have height at most twenty-two. -/
+private theorem spectralLineBand_jetCount_le_false_positive
+    (ts : Fin 10 → ℝ) (hmono : StrictMono ts)
+    (hts : ∀ i, 0 < ts i ∧ ts i < 50 ∧ riemannZeta (1 / 2 + ts i * Complex.I) = 0)
+    (hthird : 22 < ts 2) (hcount : RHHeight.ZeroCountUpTo 50 10)
+    (hsimple : RHHeight.RHHeight50) {t : ℝ} (ht : 0 < t) (ht' : t ≤ 22) :
+    analyticOrderAt riemannZeta (1 / 2 + t * Complex.I) =
+      if t = ts 0 ∨ t = ts 1 then 1 else 0 := by
+  classical
+  let point (i : Fin 10) : ℂ := 1 / 2 + ts i * Complex.I
+  have hinj : Function.Injective point := by
+    intro i j h
+    apply hmono.injective
+    simpa [point] using congrArg Complex.im h
+  have hsub : Set.range point ⊆ RHHeight.stripZerosUpTo 50 := by
+    rintro _ ⟨i, rfl⟩
+    refine ⟨(hts i).2.2, by norm_num [point], by norm_num [point], ?_, ?_⟩
+    · simpa [point] using (hts i).1
+    · simpa [point] using (hts i).2.1.le
+  have hc : (RHHeight.stripZerosUpTo 50).ncard = 10 := hcount
+  have heq := Set.eq_of_subset_of_ncard_le hsub
+    (by simp [Set.ncard_range_of_injective hinj, hc])
+    (Set.finite_of_ncard_ne_zero (by omega))
+  let z : ℂ := 1 / 2 + t * Complex.I
+  have hEq : riemannZeta z = 0 ↔ t = ts 0 ∨ t = ts 1 := by
+    constructor
+    · intro hz
+      have hzmem : z ∈ RHHeight.stripZerosUpTo 50 :=
+        ⟨hz, by norm_num [z], by norm_num [z], by simpa [z] using ht,
+          by simpa [z] using (show t ≤ 50 by linarith)⟩
+      rw [← heq] at hzmem
+      obtain ⟨i, hi⟩ := hzmem
+      have hit : ts i = t := by simpa [z, point] using congrArg Complex.im hi
+      have hlt : i < 2 := by
+        by_contra! hge
+        have := hmono.monotone hge
+        linarith
+      have : i = 0 ∨ i = 1 := by omega
+      rcases this with rfl | rfl
+      · exact Or.inl hit.symm
+      · exact Or.inr hit.symm
+    · rintro (rfl | rfl)
+      · exact (hts 0).2.2
+      · exact (hts 1).2.2
+  split_ifs with h
+  · exact (hsimple z (hEq.mpr h) (by norm_num [z]) (by norm_num [z])
+      (by simpa [z] using ht) (by simpa [z] using (show t ≤ 50 by linarith))).2
+  · apply AnalyticAt.analyticOrderAt_eq_zero _ |>.mpr
+    · exact fun hz ↦ h (hEq.mp hz)
+    · apply analyticOn_riemannZeta
+      intro hz
+      have := congrArg Complex.re (show z = 1 from hz)
+      norm_num [z] at this
+
+/-- The first Euler–Maclaurin block at the central point excludes a real zero.
+Take the boundary limit of the quarter-plane error bound. -/
+private theorem spectralLineBand_jetCount_le_false_center
+    (herr : ∀ z : ℂ, 0 < z.re → 0 < z.im →
+      ‖riemannZeta z - (z + 2) * (z + 3) / (12 * (z - 1))‖ ≤
+        ‖z * (z + 1) * (z + 2) * (z + 3)‖ * (1 + 1 / (z.re + 3)) / 720) :
+    riemannZeta (1 / 2 : ℂ) ≠ 0 := by
+  let z (t : ℝ) : ℂ := 1 / 2 + t * Complex.I
+  have hz : ContinuousAt z 0 := by dsimp [z]; fun_prop
+  have hzeta := (differentiableAt_riemannZeta (s := z 0) (by norm_num [z])).continuousAt.comp hz
+  have h₁ : ContinuousAt (fun t ↦ ‖riemannZeta (z t) -
+      (z t + 2) * (z t + 3) / (12 * (z t - 1))‖) 0 := by
+    fun_prop (disch := norm_num [z])
+  have h₂ : ContinuousAt (fun t ↦ ‖z t * (z t + 1) * (z t + 2) * (z t + 3)‖ *
+      (1 + 1 / ((z t).re + 3)) / 720) 0 := by
+    fun_prop (disch := norm_num [z])
+  have hle := le_of_tendsto_of_tendsto
+    (h₁.tendsto.mono_left (nhdsWithin_le_nhds (s := Set.Ioi 0)))
+    (h₂.tendsto.mono_left nhdsWithin_le_nhds)
+    (by filter_upwards [self_mem_nhdsWithin] with t (ht : 0 < t)
+        exact herr (z t) (by norm_num [z]) (by simpa [z] using ht))
+  intro hzero
+  norm_num [z, hzero, norm_div, norm_mul, Complex.norm_real, ← Complex.ofReal_add,
+    ← Complex.ofReal_sub, ← Complex.ofReal_div] at hle
+
+/-- The first two positive zeta ordinates and their conjugates are the only
+zeros of the rational completed zeta function at heights in `[-22, 22]`.
+All four are simple. This is the finite analytic input to the counterexample. -/
+private theorem spectralLineBand_jetCount_le_false_low_zeros :
+    ∃ u v : ℝ, 0 < u ∧ u < v ∧ v < 22 ∧
+      ∀ t ∈ Icc (-22 : ℝ) 22,
+        orderAt((1 : PontryaginDual C𝔽(ℚ)), shift((1 / 2 : ℝ), t)) =
+          if t = -v ∨ t = -u ∨ t = u ∨ t = v then 1 else 0 := by
+  classical
+  obtain ⟨ts, hsecond, hthird, hmono, hts⟩ :=
+    spectralLineBand_jetCount_le_false_brackets
+  refine ⟨ts 0, ts 1, (hts 0).1, hmono (by decide), hsecond, ?_⟩
+  intro t ht
+  let z (r : ℝ) : ℂ := 1 / 2 + r * Complex.I
+  have hne (r : ℝ) : z r ≠ 1 := by
+    intro h
+    have := congrArg Complex.re h
+    norm_num [z] at this
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  have hbridge := meromorphicOrderAt_finiteHeckeL_continuation (1 : PontryaginDual C𝔽(ℚ))
+    hm (fun s ↦ by
+      rw [finiteHeckeL_one_eq_dedekindZeta, dedekindZeta_rat_eq_riemannZeta s.property])
+    (s := z t) (by norm_num [z])
+  push_cast
+  change meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) (z t) = _
+  rw [← hbridge, (analyticOn_riemannZeta _ (hne t)).meromorphicOrderAt_eq]
+  have hpos {r : ℝ} (hr : 0 < r) (hr' : r ≤ 22) := spectralLineBand_jetCount_le_false_positive
+    ts hmono hts hthird RHHeight.zero_count_fifty RHHeight.rh_height_fifty hr hr'
+  have hu := (hts 0).1
+  have hv := (hts 1).1
+  rcases lt_trichotomy t 0 with hneg | rfl | hgt
+  · have hconj : (starRingEnd ℂ) (z t) = z (-t) := by norm_num [z, map_ofNat]
+    have horder := Zeta23.analyticOrderAt_zeta_conj (hne t)
+    rw [hconj] at horder
+    rw [← horder, hpos (neg_pos.mpr hneg) (by linarith [ht.1])]
+    have htu : t ≠ ts 0 := by linarith
+    have htv : t ≠ ts 1 := by linarith
+    simp only [htu, htv, or_false, neg_eq_iff_eq_neg]
+    by_cases h0 : t = -ts 0 <;> by_cases h1 : t = -ts 1 <;> simp [h0, h1]
+  · have hz0 : riemannZeta (z 0) ≠ 0 := by
+      simpa [z] using spectralLineBand_jetCount_le_false_center
+        (fun w hw ht' ↦ RHHeight.norm_zeta_sub_main_one_le (s := w) ⟨hw, ht'⟩)
+    rw [(analyticOn_riemannZeta _ (hne 0)).analyticOrderAt_eq_zero.mpr hz0]
+    simp [hu.ne', hv.ne', hu.ne, hv.ne]
+  · rw [hpos hgt ht.2]
+    have htu : t ≠ -ts 0 := by linarith
+    have htv : t ≠ -ts 1 := by linarith
+    simp only [htu, htv, false_or]
+    split <;> simp
+
 /-- Paper: Theorem 10.3.1.1, count following (10.3.1.16), p. 450.
-Use F = ℚ, the trivial base character, a = 1/2 and s = 2. Select every distinct positive
-critical-line zeta ordinate at most T, for large T, and enlarge by an isolating ε < 1.
-The floor cutoff is one. Riemann–von Mangoldt and the positive proportion of simple
-critical-line zeros (Bui–Conrey–Young, Theorem 1.1) give ≫ T log T jets from the simple
-zeros alone. The printed upper bound is O(log T). -/
+With cutoff one, the four lowest nonreal zeta zeros give four jets in
+the band from −22 to 22, while the stated bound is log 22 < 4. -/
 theorem Printed.spectralLineBand_jetCount_le_false :
-    ¬ Printed.spectralLineBand_jetCount_le := by sorry
+    ¬ Printed.spectralLineBand_jetCount_le := by
+  classical
+  intro h
+  obtain ⟨u, v, hu, huv, hv, hzeros⟩ := spectralLineBand_jetCount_le_false_low_zeros
+  obtain ⟨χ₀, hχ₀⟩ := exists_spectralBasepointChoice ℚ
+  let χ := Function.update χ₀ 1 1
+  have hχ : IsSpectralBasepointChoice χ := by
+    intro ω
+    by_cases hω : ω = 1
+    · subst ω
+      simp only [χ, Function.update_self]
+      rfl
+    · simpa only [χ, Function.update_of_ne hω] using hχ₀ ω
+  let K : Finset ℝ := {-v, -u, u, v}
+  have hK : K.Nonempty := ⟨v, by simp [K]⟩
+  have hmin : K.min' hK = -v := by
+    apply le_antisymm (Finset.min'_le _ _ (by simp [K]))
+    apply Finset.le_min'
+    intro t ht
+    simp only [K, Finset.mem_insert, Finset.mem_singleton] at ht
+    rcases ht with rfl | rfl | rfl | rfl <;> linarith
+  have hmax : K.max' hK = v := by
+    apply le_antisymm _ (Finset.le_max' _ _ (by simp [K]))
+    apply Finset.max'_le
+    intro t ht
+    simp only [K, Finset.mem_insert, Finset.mem_singleton] at ht
+    rcases ht with rfl | rfl | rfl | rfl <;> linarith
+  have hlo : K.min' hK - (22 - v) = -22 := by rw [hmin]; ring
+  have hhi : K.max' hK + (22 - v) = 22 := by rw [hmax]; ring
+  have hmem {t : ℝ} (ht : t ∈ K) : t ∈ Icc (-22 : ℝ) 22 := by
+    have h₁ := Finset.min'_le K t ht
+    have h₂ := Finset.le_max' K t ht
+    rw [hmin] at h₁
+    rw [hmax] at h₂
+    constructor <;> linarith
+  have hband : Icc (-22 : ℝ) 22 ∩ lineZeros(χ 1, (1 / 2 : ℝ)) = (K : Set ℝ) := by
+    ext t
+    change (t ∈ Icc (-22 : ℝ) 22 ∧ 0 < orderAt(χ 1, shift((1 / 2 : ℝ), t))) ↔ t ∈ K
+    by_cases ht : t ∈ Icc (-22 : ℝ) 22
+    · simp only [χ, Function.update_self, hzeros t ht, ht, true_and]
+      by_cases hc : t = -v ∨ t = -u ∨ t = u ∨ t = v <;> simp [K, hc]
+    · exact ⟨fun h ↦ (ht h.1).elim, fun hk ↦ (ht (hmem hk)).elim⟩
+  have hbound := h ℚ χ hχ (1 / 2) 2 (by norm_num) 1 K hK (22 - v)
+    (by linarith) (by simpa only [hlo, hhi] using hband)
+  have hcut : floorCut((2 : ℝ)) = 1 := (Nat.floor_eq_iff (by norm_num)).2 (by norm_num)
+  have hterm (t : ℝ) (ht : t ∈ K) :
+      min (orderAt(χ 1, shift((1 / 2 : ℝ), t))).untop₀.toNat floorCut((2 : ℝ)) = 1 := by
+    have hcases : t = -v ∨ t = -u ∨ t = u ∨ t = v := by simpa [K] using ht
+    simp only [χ, Function.update_self, hzeros t (hmem ht), ite_eq_left hcases]
+    norm_num
+  have hcard : K.card = 4 := by
+    have huv' : 0 < v := lt_trans hu huv
+    simp [K, Finset.card_insert_of_notMem, ne_of_lt huv,
+      show -v ≠ -u by linarith, show -v ≠ u by linarith, show -v ≠ v by linarith,
+      show -u ≠ u by linarith, show -u ≠ v by linarith]
+  rw [Finset.sum_congr rfl hterm, hlo, hhi, hcut] at hbound
+  norm_num [hcard] at hbound
+  have hexp : (22 : ℝ) < Real.exp 4 := by
+    have he : (5 / 2 : ℝ) < Real.exp 1 := by linarith [Real.exp_one_gt_d9]
+    calc
+      (22 : ℝ) < (5 / 2 : ℝ) ^ 4 := by norm_num
+      _ < Real.exp 1 ^ 4 := by gcongr
+      _ = Real.exp 4 := by simp
+  exact (not_lt_of_ge hbound) ((Real.log_lt_iff_lt_exp (by norm_num)).2 hexp)
 
 section Plancherel
 

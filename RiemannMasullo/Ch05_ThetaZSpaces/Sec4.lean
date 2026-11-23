@@ -1222,6 +1222,307 @@ theorem sLocalDecayFourier_eq_weightedFourier (χ : PontryaginDual Jₛ) (I : Se
       ((((weightedFourier (j f.val)).val : L²ₛ) : Jₛ → ℂ)) =ᵐ[μweighted] (e f).val.val :=
   by sorry
 
+/-- A modulated decay space with a norm section maps continuously to the decay space of the
+positive reals by restriction to the section, and back by tensoring with the conjugate of a
+compact-kernel character. -/
+private theorem existsUnique_sLocalCechRadialReflection_section {G : Type*} [CommGroup G]
+    [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [SecondCountableTopology G] (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (I : Set ℝ)
+    (hInt : OrdConnected I) (hne : I.Nonempty) (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
+    (ω : PontryaginDual m.toMonoidHom.ker) :
+    ∃ (R : ModulatedExponentialDecay m I →L[ℂ] PositiveRealExponentialDecay I)
+      (X : PositiveRealExponentialDecay I →L[ℂ] ModulatedExponentialDecay m I),
+      (∀ f t, (R f).val (Real.log (t.val : ℝ)) = f.val (τ t)) ∧
+      (∀ p (k : m.toMonoidHom.ker) t,
+        (X p).val (k.val * τ t) = star (ω k : ℂ) * p.val (Real.log (t.val : ℝ))) := by
+  let K := m.toMonoidHom.ker
+  let P := PositiveRealExponentialDecay I
+  let E := ModulatedExponentialDecay m I
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology _
+  obtain ⟨e, he⟩ := modulatedExponentialDecay_tensor_equiv m I hm hInt hne τ hτ
+  -- Point evaluations on the positive-real decay space.
+  obtain ⟨a, ha⟩ := hne
+  have hPE := positiveRealExponentialDecay_isEmbedding I ⟨a, ha⟩
+  have hevP (x : ℝ) : Continuous (fun p : P ↦ p.val x) := by
+    have h1 : Continuous (fun p : P ↦ logExponentialDecayTwist I ⟨a, ha⟩ p x) :=
+      ((continuous_eval_const x).comp
+        (SchwartzMap.toBoundedContinuousFunctionCLM ℂ ℝ ℂ).continuous).comp
+        ((continuous_apply _).comp hPE.continuous)
+    refine (h1.const_mul ((Real.exp (a * x) : ℂ)⁻¹)).congr fun p ↦ ?_
+    exact (congrArg ((Real.exp (a * x) : ℂ)⁻¹ * ·) (logExponentialDecayTwist_apply I ⟨a, ha⟩ p x)).trans
+      (inv_mul_cancel_left₀ (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne') _)
+  let evP (t : ℝ≥0ˣ) : P →L[ℂ] ℂ :=
+    { toFun := fun p ↦ p.val (Real.log (t.val : ℝ))
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      cont := hevP _ }
+  let resE (t : ℝ≥0ˣ) : E →L[ℂ] ℂ :=
+    { toFun := fun f ↦ f.val (τ t)
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      cont := continuous_modulatedExponentialDecay_eval m I ⟨a, ha⟩ (τ t) }
+  let ev1 : SchwartzBruhat K →L[ℂ] ℂ :=
+    { toFun := fun h ↦ h 1
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl
+      cont := continuous_schwartzBruhat_eval (A := K) 1 }
+  let T := InductiveTensor (SchwartzBruhat K) P
+  let : T2Space P := hPE.t2Space
+  let : CompleteSpace P := positiveRealExponentialDecay_complete I ⟨a, ha⟩
+  let : UniformContinuousConstSMul ℂ T := uniformContinuousConstSMul_of_continuousConstSMul ℂ T
+  let : T2Space (SchwartzBruhat K) := schwartzBruhat_eval_t2 (A := K)
+  obtain ⟨R, hR⟩ := exists_tensor_restriction ev1 evP resE e (fun u v t ↦ by
+    have h := he u v 1 t
+    rw [OneMemClass.coe_one, one_mul] at h
+    exact h)
+  -- The conjugate character of the compact kernel as a test function.
+  obtain ⟨one, hone⟩ := compact_schwartzBruhat_one (H := K)
+  obtain ⟨M, hM⟩ := schwartzBruhat_mul_unitaryCharacter (A := K) ω⁻¹
+  let hbar := M one
+  have hhbar (k : K) : hbar k = star (ω k : ℂ) := by
+    change M one k = _
+    rw [hM, hone, mul_one]
+    change (((ω k)⁻¹ : Circle) : ℂ) = _
+    rw [Circle.coe_inv_eq_conj, Complex.star_def]
+  let tm : P →ₗ[ℂ] T := TensorProduct.mk ℂ (SchwartzBruhat K) P hbar
+  have htm : Continuous tm :=
+    (withGeneratingSeminorms_spec _ _).continuous_of_continuous_comp tm fun q ↦ q.property.1 hbar
+  let X : P →L[ℂ] E := e.toContinuousLinearMap.comp (((UniformSpace.Completion.toComplL : T →L[ℂ] UniformSpace.Completion T)).comp ⟨tm, htm⟩)
+  refine ⟨R, X, fun f t ↦ hR f t, fun p k t ↦ ?_⟩
+  have h := he hbar p k t
+  rw [hhbar] at h
+  exact h
+
+/-- The positive real with logarithm `x`. -/
+private theorem existsUnique_sLocalCechRadialReflection_exp (x : ℝ) :
+    ∃ t : ℝ≥0ˣ, Real.log normℝ(t) = x := by
+  refine ⟨Units.mk0 (Real.exp x).toNNReal (Real.toNNReal_pos.mpr (Real.exp_pos x)).ne', ?_⟩
+  change Real.log ((Real.exp x).toNNReal : ℝ) = x
+  rw [Real.coe_toNNReal _ (Real.exp_pos x).le, Real.log_exp]
+
+/-- Two continuous linear maps that are inverse to each other on a submodule give a
+continuous linear equivalence of that submodule. -/
+private theorem existsUnique_sLocalCechRadialReflection_equiv {E P : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] [AddCommGroup P] [Module ℂ P] [TopologicalSpace P]
+    (V : Submodule ℂ E) (R : E →L[ℂ] P) (X : P →L[ℂ] E) (hX : ∀ p, X p ∈ V)
+    (hRX : ∀ p, R (X p) = p) (hXR : ∀ f ∈ V, X (R f) = f) :
+    ∃ Φ : V ≃L[ℂ] P, (∀ f, Φ f = R (f : E)) ∧ ∀ p, (Φ.symm p : E) = X p := by
+  let Φ : V ≃L[ℂ] P :=
+    { toFun := fun f ↦ R (f : E)
+      invFun := fun p ↦ ⟨X p, hX p⟩
+      map_add' := fun f g ↦ map_add R (f : E) g
+      map_smul' := fun c f ↦ map_smul R c (f : E)
+      left_inv := fun f ↦ Subtype.ext (hXR f f.property)
+      right_inv := hRX
+      continuous_toFun := R.continuous.comp continuous_subtype_val
+      continuous_invFun := X.continuous.subtype_mk _ }
+  exact ⟨Φ, fun _ ↦ rfl, fun _ ↦ rfl⟩
+
+/-- On the S-idele classes, restriction to a norm section and the conjugate-character lift
+are continuous linear maps between the decay space and the decay space of the positive reals. -/
+private theorem existsUnique_sLocalCechRadialReflection_maps (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (I : Set ℝ) (hInt : OrdConnected I) (hne : I.Nonempty)
+    (ω : PontryaginDual J₁) :
+    ∃ (R : Ẽ(I) →L[ℂ] PositiveRealExponentialDecay I) (X : PositiveRealExponentialDecay I →L[ℂ] Ẽ(I)),
+      (∀ f t, (R f).val (Real.log normℝ(t)) = f.val (τ t)) ∧
+      (∀ p t (k : J₁), (X p).val (τ t * k.val) = star (ω k : ℂ) * p.val (Real.log normℝ(t))) := by
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Aₛˣ := (sIdeleGroup_description F S).1.secondCountableTopology
+  let : SecondCountableTopology Jₛ := inferInstance
+  have h1 : IsTopologicalGroup Jₛ := inferInstance
+  have h2 : T2Space Jₛ := inferInstance
+  have h3 : LocallyCompactSpace Jₛ := inferInstance
+  let m : Jₛ →ₜ* ℝ≥0ˣ := ⟨mₛ, hmₛ⟩
+  have hτ' : RightInverse τ m := hτ
+  have hm : IsModulation m := by
+    refine ⟨isProperMap_sIdeleQuotientNorm F S, τ (Units.mk0 2 two_ne_zero), ?_⟩
+    rw [hτ' _]
+    intro h
+    have := congrArg (fun u : ℝ≥0ˣ ↦ (u.val : ℝ)) h
+    norm_num at this
+  obtain ⟨R, X, hR, hX⟩ :=
+    existsUnique_sLocalCechRadialReflection_section m hm I hInt hne τ hτ' ω
+  exact ⟨R, X, hR, fun p t k ↦ (congrArg (fun g : Jₛ ↦ (X p).val g) (mul_comm _ _)).trans
+    (hX p k t)⟩
+
+/-- Every idele class is a norm-one class times a point of the norm section. -/
+private theorem existsUnique_sLocalCechRadialReflection_split (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (g : Jₛ) : ∃ (k : J₁) (t : ℝ≥0ˣ), g = τ t * k.val :=
+  ⟨⟨g / τ (mₛ g), by
+    change mₛ (g / τ (mₛ g)) = 1
+    rw [map_div, hτ (mₛ g), div_self']⟩, mₛ g, (mul_div_cancel _ _).symm⟩
+
+private theorem existsUnique_sLocalCechRadialReflection_star (ω : PontryaginDual J₁) (u : J₁) :
+    star (ω u⁻¹ : ℂ) = (ω u : ℂ) := by
+  rw [map_inv, Circle.coe_inv_eq_conj, ← Complex.star_def, star_star]
+
+/-- A function on the idele classes given on the section by the conjugate character lies
+in the isotype. -/
+private theorem existsUnique_sLocalCechRadialReflection_mem (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (I : Set ℝ) (ω : PontryaginDual J₁) (φ : Ẽ(I)) (c : ℝ≥0ˣ → ℂ)
+    (hφ : ∀ t (k : J₁), φ.val (τ t * k.val) = star (ω k : ℂ) * c t) :
+    φ ∈ sLocalDecayIsotype (F := F) (S := S) I ω := by
+  refine (mem_sLocalDecayIsotype I ω φ).mpr fun u g ↦ ?_
+  obtain ⟨k, t, rfl⟩ := existsUnique_sLocalCechRadialReflection_split τ hτ g
+  have hg : u.val⁻¹ * (τ t * k.val) = τ t * (u⁻¹ * k).val := by
+    rw [Subgroup.coe_mul, Subgroup.coe_inv, mul_left_comm]
+  refine (congrArg (fun x : Jₛ ↦ φ.val x) hg).trans ?_
+  refine (hφ t _).trans (Eq.trans ?_ (congrArg (fun z ↦ (ω u : ℂ) * z) (hφ t k)).symm)
+  rw [map_mul, Circle.coe_mul, star_mul', existsUnique_sLocalCechRadialReflection_star]
+  ring
+
+/-- An isotypic function is determined by its values on the section. -/
+private theorem existsUnique_sLocalCechRadialReflection_eq (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (I : Set ℝ) (ω : PontryaginDual J₁) (φ ψ : Ẽ(I))
+    (hφ : φ ∈ sLocalDecayIsotype (F := F) (S := S) I ω) (c : ℝ≥0ˣ → ℂ)
+    (hc : ∀ t, φ.val (τ t) = c t)
+    (hψ : ∀ t (k : J₁), ψ.val (τ t * k.val) = star (ω k : ℂ) * c t) : ψ = φ := by
+  apply Subtype.ext
+  funext g
+  obtain ⟨k, t, rfl⟩ := existsUnique_sLocalCechRadialReflection_split τ hτ g
+  have hiso := (mem_sLocalDecayIsotype I ω φ).mp hφ k⁻¹ (τ t)
+  have hk : ((k⁻¹ : J₁) : Jₛ)⁻¹ * τ t = τ t * k.val := by
+    rw [Subgroup.coe_inv, inv_inv]
+    exact mul_comm _ _
+  refine (hψ t k).trans (Eq.trans ?_ ((congrArg (fun x : Jₛ ↦ φ.val x) hk).symm.trans hiso).symm)
+  rw [hc, map_inv, Circle.coe_inv_eq_conj, Complex.star_def]
+
+/-- Restriction to a norm section identifies a norm-one isotype of the S-local decay space
+with the decay space of the positive reals. -/
+private theorem existsUnique_sLocalCechRadialReflection_isotypeEquiv (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (I : Set ℝ) (hInt : OrdConnected I) (hne : I.Nonempty)
+    (ω : PontryaginDual J₁) :
+    ∃ Φ : Eω(I, ω) ≃L[ℂ] PositiveRealExponentialDecay I,
+      (∀ f t, (Φ f).val (Real.log normℝ(t)) = f.val.val (τ t)) ∧
+      (∀ p t (k : J₁), (Φ.symm p).val.val (τ t * k.val) =
+        star (ω k : ℂ) * p.val (Real.log normℝ(t))) := by
+  have hmaps := existsUnique_sLocalCechRadialReflection_maps τ hτ I hInt hne ω
+  obtain ⟨R, X, hR, hX⟩ := hmaps
+  have hXmem (p : PositiveRealExponentialDecay I) :
+      X p ∈ sLocalDecayIsotype (F := F) (S := S) I ω :=
+    existsUnique_sLocalCechRadialReflection_mem τ hτ I ω (X p) _ (hX p)
+  have hRX (p : PositiveRealExponentialDecay I) : R (X p) = p := by
+    apply Subtype.ext
+    funext x
+    obtain ⟨t, rfl⟩ := existsUnique_sLocalCechRadialReflection_exp x
+    refine (hR (X p) t).trans ?_
+    have h := hX p t 1
+    have h1 : τ t * ((1 : J₁) : Jₛ) = τ t := mul_one (τ t)
+    refine (congrArg (fun g : Jₛ ↦ (X p).val g) h1.symm).trans (h.trans ?_)
+    rw [map_one, Circle.coe_one, star_one, one_mul]
+  have hXR (f : Ẽ(I)) (hf : f ∈ sLocalDecayIsotype (F := F) (S := S) I ω) : X (R f) = f :=
+    existsUnique_sLocalCechRadialReflection_eq τ hτ I ω f (X (R f)) hf _ (fun t ↦ (hR f t).symm)
+      (hX (R f))
+  have hE := existsUnique_sLocalCechRadialReflection_equiv (E := Ẽ(I))
+    (P := PositiveRealExponentialDecay I) (sLocalDecayIsotype (F := F) (S := S) I ω) R X hXmem hRX hXR
+  obtain ⟨Φ, hΦ, hΦs⟩ := hE
+  refine ⟨Φ, fun f t ↦ ?_, fun p t k ↦ ?_⟩
+  · exact (congrArg (fun q : PositiveRealExponentialDecay I ↦ q.val (Real.log normℝ(t)))
+      (hΦ f)).trans (hR f.val t)
+  · exact (congrArg (fun q : Ẽ(I) ↦ q.val (τ t * k.val)) (hΦs p)).trans (hX p t k)
+
+/-- Reflection `p ↦ (u ↦ exp(-u) p(-u))` between decay spaces whose exponent intervals are
+exchanged by `a ↦ 1 - a`. -/
+private theorem existsUnique_sLocalCechRadialReflection_refl (I J : Set ℝ) (hJ : J.Nonempty)
+    (h : ∀ a ∈ J, 1 - a ∈ I) :
+    ∃ T : PositiveRealExponentialDecay I →L[ℂ] PositiveRealExponentialDecay J,
+      ∀ p u, (T p).val u = (Real.exp (-u) : ℂ) * p.val (-u) := by
+  let N : ℝ ≃L[ℝ] ℝ := ContinuousLinearEquiv.neg ℝ
+  let C : SchwartzMap ℝ ℂ →L[ℂ] SchwartzMap ℝ ℂ := SchwartzMap.compCLMOfContinuousLinearEquiv ℂ N
+  have hI : I.Nonempty := ⟨1 - hJ.some, h _ hJ.some_mem⟩
+  let a' (a : J) : I := ⟨1 - a, h a a.2⟩
+  have hval (p : PositiveRealExponentialDecay I) (a : J) (u : ℝ) :
+      C (logExponentialDecayTwist I (a' a) p) u =
+        (Real.exp ((a : ℝ) * u) : ℂ) * ((Real.exp (-u) : ℂ) * p.val (-u)) := by
+    refine (logExponentialDecayTwist_apply I (a' a) p (N u)).trans ?_
+    change (Real.exp ((1 - (a : ℝ)) * -u) : ℂ) * p.val (-u) = _
+    rw [← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add]
+    congr 3
+    ring
+  have hmem (p : PositiveRealExponentialDecay I) :
+      (fun u ↦ (Real.exp (-u) : ℂ) * p.val (-u)) ∈ logExponentialDecaySubmodule J := by
+    apply (Submodule.mem_iInf _).2
+    intro a
+    exact ⟨C (logExponentialDecayTwist I (a' a) p), funext fun u ↦ hval p a u⟩
+  let T : PositiveRealExponentialDecay I →ₗ[ℂ] PositiveRealExponentialDecay J :=
+    { toFun := fun p ↦ (⟨_, hmem p⟩ : logExponentialDecaySubmodule J)
+      map_add' := fun p q ↦ Subtype.ext (funext fun u ↦ by
+        change (Real.exp (-u) : ℂ) * (p.val (-u) + q.val (-u)) =
+          (Real.exp (-u) : ℂ) * p.val (-u) + (Real.exp (-u) : ℂ) * q.val (-u)
+        ring)
+      map_smul' := fun c p ↦ Subtype.ext (funext fun u ↦ by
+        change (Real.exp (-u) : ℂ) * (c * p.val (-u)) = c * ((Real.exp (-u) : ℂ) * p.val (-u))
+        ring) }
+  have hIE := positiveRealExponentialDecay_isEmbedding I hI
+  have hJE := positiveRealExponentialDecay_isEmbedding J hJ
+  have htw (p : PositiveRealExponentialDecay I) (a : J) :
+      logExponentialDecayTwist J a (T p) = C (logExponentialDecayTwist I (a' a) p) := by
+    ext u
+    refine (logExponentialDecayTwist_apply J a (T p) u).trans (hval p a u).symm
+  have hT : Continuous T := by
+    apply hJE.continuous_iff.mpr
+    apply continuous_pi
+    intro a
+    exact (C.continuous.comp ((continuous_apply (a' a)).comp hIE.continuous)).congr
+      fun p ↦ (htw p a).symm
+  exact ⟨⟨T, hT⟩, fun _ _ ↦ rfl⟩
+
+/-- An isotypic function on the S-idele classes, on the norm-one translate of a section point. -/
+private theorem existsUnique_sLocalCechRadialReflection_iso (I : Set ℝ) (ω : PontryaginDual J₁)
+    (φ : Ẽ(I)) (hφ : φ ∈ sLocalDecayIsotype (F := F) (S := S) I ω) (g : Jₛ) (k : J₁) :
+    φ.val (g * k.val) = star (ω k : ℂ) * φ.val g := by
+  have hiso := (mem_sLocalDecayIsotype I ω φ).mp hφ k⁻¹ g
+  have hk : ((k⁻¹ : J₁) : Jₛ)⁻¹ * g = g * k.val := by
+    rw [Subgroup.coe_inv, inv_inv]
+    exact mul_comm _ _
+  refine (congrArg (fun x : Jₛ ↦ φ.val x) hk).symm.trans (hiso.trans ?_)
+  rw [map_inv, Circle.coe_inv_eq_conj, Complex.star_def]
+
+/-- Two functions on the S-idele classes that agree on every norm-one translate of the section
+agree. -/
+private theorem existsUnique_sLocalCechRadialReflection_ext (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (hτ : RightInverse τ mₛ) (I : Set ℝ) (ω : PontryaginDual J₁) (φ ψ : Eω(I, ω))
+    (h : ∀ t (k : J₁), φ.val.val (τ t * k.val) = ψ.val.val (τ t * k.val)) : φ = ψ := by
+  apply Subtype.ext
+  apply Subtype.ext
+  funext g
+  obtain ⟨k, t, rfl⟩ := existsUnique_sLocalCechRadialReflection_split τ hτ g
+  exact h t k
+
+/-- The value of the composite of the section equivalences and the profile reflection. -/
+private theorem existsUnique_sLocalCechRadialReflection_value (τ : ℝ≥0ˣ →ₜ* Jₛ)
+    (ω : PontryaginDual J₁)
+    (Φp : Eω(rightInterval, ω) ≃L[ℂ] PositiveRealExponentialDecay rightInterval)
+    (hΦp : ∀ f t, (Φp f).val (Real.log normℝ(t)) = f.val.val (τ t))
+    (Φm : Eω(leftInterval, ω) ≃L[ℂ] PositiveRealExponentialDecay leftInterval)
+    (hΦm : ∀ p t (k : J₁), (Φm.symm p).val.val (τ t * k.val) =
+      star (ω k : ℂ) * p.val (Real.log normℝ(t)))
+    (R : PositiveRealExponentialDecay rightInterval ≃L[ℂ] PositiveRealExponentialDecay leftInterval)
+    (hR : ∀ p u, (R p).val u = (Real.exp (-u) : ℂ) * p.val (-u))
+    (f : Eω(rightInterval, ω)) (t : ℝ≥0ˣ) (k : J₁) :
+    (Φm.symm (R (Φp f))).val.val (τ t * k.val) =
+      ((normℝ(t) : ℂ)⁻¹) * f.val.val (τ t⁻¹ * k.val) := by
+  have hpos : 0 < normℝ(t) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hlog : -Real.log normℝ(t) = Real.log normℝ(t⁻¹) := by
+    rw [Units.val_inv_eq_inv_val, NNReal.coe_inv, Real.log_inv]
+  refine (hΦm _ t k).trans ?_
+  refine (congrArg (star (ω k : ℂ) * ·) (hR (Φp f) _)).trans ?_
+  refine Eq.trans ?_ (congrArg ((normℝ(t) : ℂ)⁻¹ * ·)
+    (existsUnique_sLocalCechRadialReflection_iso rightInterval ω f.val f.property (τ t⁻¹) k)).symm
+  have h1 : (Φp f).val (-Real.log normℝ(t)) = f.val.val (τ t⁻¹) :=
+    (congrArg (fun u : ℝ ↦ (Φp f).val u) hlog).trans (hΦp f t⁻¹)
+  have h2 : (Real.exp (-Real.log normℝ(t)) : ℂ) = (normℝ(t) : ℂ)⁻¹ := by
+    rw [Real.exp_neg, Real.exp_log hpos, Complex.ofReal_inv]
+  refine (congrArg (fun z : ℂ ↦ star (ω k : ℂ) * ((Real.exp (-Real.log normℝ(t)) : ℂ) * z))
+    h1).trans ?_
+  rw [h2]
+  ring
+
 -- TODO(paper-gap): Theorem 5.4.2.2(2) prints incompatible intervals for J_τ.
 -- In (3) the asserted half-plane map has poles, already at zero for the trivial
 -- character over ℚ with no finite places. In (4) the printed operator omits
@@ -1237,7 +1538,42 @@ theorem existsUnique_sLocalCechRadialReflection (τ : ℝ≥0ˣ →ₜ* Jₛ)
     ∃! J : Eω(rightInterval, ω) ≃L[ℂ] Eω(leftInterval, ω),
       ∀ (f : Eω(rightInterval, ω)) (t : ℝ≥0ˣ) (k : J₁),
         (J f).val.val (τ t * k.val) =
-          ((normℝ(t) : ℂ)⁻¹) * f.val.val (τ t⁻¹ * k.val) := by sorry
+          ((normℝ(t) : ℂ)⁻¹) * f.val.val (τ t⁻¹ * k.val) := by
+  have hp := existsUnique_sLocalCechRadialReflection_isotypeEquiv τ _hτ rightInterval
+    ordConnected_Ioi ⟨1, one_pos⟩ ω
+  obtain ⟨Φp, hΦp, -⟩ := hp
+  have hm := existsUnique_sLocalCechRadialReflection_isotypeEquiv τ _hτ leftInterval
+    ordConnected_Iio ⟨0, zero_lt_one⟩ ω
+  obtain ⟨Φm, -, hΦm⟩ := hm
+  have hT := existsUnique_sLocalCechRadialReflection_refl rightInterval leftInterval
+    ⟨0, zero_lt_one⟩ fun a (ha : a < 1) ↦ show (0 : ℝ) < 1 - a by linarith
+  obtain ⟨T, hT⟩ := hT
+  have hT' := existsUnique_sLocalCechRadialReflection_refl leftInterval rightInterval
+    ⟨1, one_pos⟩ fun a (ha : 0 < a) ↦ show 1 - a < (1 : ℝ) by linarith
+  obtain ⟨T', hT'⟩ := hT'
+  have hback (u : ℝ) (z : ℂ) : (Real.exp (-u) : ℂ) * ((Real.exp u : ℂ) * z) = z := by
+    rw [← mul_assoc, ← Complex.ofReal_mul, ← Real.exp_add, neg_add_cancel, Real.exp_zero,
+      Complex.ofReal_one, one_mul]
+  have h1 (p : PositiveRealExponentialDecay rightInterval) : T' (T p) = p :=
+    Subtype.ext (funext fun u ↦ by rw [hT', hT, neg_neg, hback])
+  have h2 (p : PositiveRealExponentialDecay leftInterval) : T (T' p) = p :=
+    Subtype.ext (funext fun u ↦ by rw [hT, hT', neg_neg, hback])
+  let R := ContinuousLinearEquiv.equivOfInverse T T' h1 h2
+  have hR (p : PositiveRealExponentialDecay rightInterval) (u : ℝ) :
+      (R p).val u = (Real.exp (-u) : ℂ) * p.val (-u) := hT p u
+  have hval (f : Eω(rightInterval, ω)) (t : ℝ≥0ˣ) (k : J₁) :=
+    existsUnique_sLocalCechRadialReflection_value τ ω Φp hΦp Φm hΦm R hR f t k
+  have happ (f : Eω(rightInterval, ω)) :
+      (Φp.trans (R.trans Φm.symm)) f = Φm.symm (R (Φp f)) :=
+    (ContinuousLinearEquiv.trans_apply _ _ f).trans (ContinuousLinearEquiv.trans_apply _ _ _)
+  refine ⟨Φp.trans (R.trans Φm.symm), fun f t k ↦ ?_, fun J hJ ↦ ?_⟩
+  · exact (congrArg (fun q : Eω(leftInterval, ω) ↦ q.val.val (τ t * k.val)) (happ f)).trans
+      (hval f t k)
+  · apply ContinuousLinearEquiv.ext
+    funext f
+    refine existsUnique_sLocalCechRadialReflection_ext τ _hτ leftInterval ω _ _ fun t k ↦ ?_
+    exact (hJ f t k).trans ((congrArg (fun q : Eω(leftInterval, ω) ↦ q.val.val (τ t * k.val))
+      (happ f)).trans (hval f t k)).symm
 
 local notation "upperMiddle(" χ ")" => Eω(rightInterval, restrict₁(χ)) × Eω(rightInterval, restrict₁(χ⁻¹))
 
@@ -1293,8 +1629,184 @@ theorem existsUnique_sLocalCechFrequency (χ : PontryaginDual Jₛ) (τ : ℝ≥
     have he := huniq ((x : ℂ) * Complex.I) ⟨by simp, hx⟩
     simpa using congrArg Complex.im he
 
+/-- On an open exponent interval, twisting the logarithmic profile by the frequency `x`
+followed by the Mellin equivalence gives the vertically shifted Mellin transform. -/
+private theorem existsUnique_sLocalDecayMellin_shift (I : Set ℝ) (hOpen : IsOpen I)
+    (hInt : OrdConnected I) (hne : I.Nonempty) (x : ℝ) :
+    ∃ M : PositiveRealExponentialDecay I ≃L[ℂ] SchwartzBergman I,
+      ∀ f s, s ∈ Complex.re ⁻¹' I → (M f).val s =
+        mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+  -- The unimodular multiplier u ↦ exp(i y u), as a Schwartz multiplier.
+  let g (y : ℝ) (u : ℝ) : ℂ := Complex.exp (((y * u : ℝ) : ℂ) * Complex.I)
+  have hg (y : ℝ) : (g y).HasTemperateGrowth := by
+    have h1 : (fun u : ℝ ↦ y * u).HasTemperateGrowth :=
+      (y • ContinuousLinearMap.id ℝ ℝ).hasTemperateGrowth
+    exact Complex.hasTemperateGrowth_exp_mul_I.comp h1
+  have hmem (y : ℝ) (f : logExponentialDecaySubmodule I) :
+      (fun u ↦ g y u * f.val u) ∈ logExponentialDecaySubmodule I := by
+    apply (Submodule.mem_iInf _).2
+    intro a
+    refine ⟨SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f), ?_⟩
+    funext u
+    change SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) u =
+      (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u)
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), logExponentialDecayTwist_apply, smul_eq_mul]
+    ring
+  let mod (y : ℝ) : PositiveRealExponentialDecay I →ₗ[ℂ] PositiveRealExponentialDecay I :=
+    { toFun := fun f ↦ (⟨_, hmem y f⟩ : logExponentialDecaySubmodule I)
+      map_add' := fun f h ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (f.val u + h.val u) = g y u * f.val u + g y u * h.val u
+        ring)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (c * f.val u) = c * (g y u * f.val u)
+        ring) }
+  have hmod (y : ℝ) (f : PositiveRealExponentialDecay I) (u : ℝ) :
+      (mod y f).val u = g y u * f.val u := rfl
+  have hE := positiveRealExponentialDecay_isEmbedding I hne
+  have htw (y : ℝ) (a : I) (f : PositiveRealExponentialDecay I) :
+      logExponentialDecayTwist I a (mod y f) =
+        SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) := by
+    ext u
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), smul_eq_mul]
+    refine (logExponentialDecayTwist_apply I a (mod y f) u).trans ?_
+    refine Eq.trans ?_ (congrArg (g y u * ·) (logExponentialDecayTwist_apply I a f u)).symm
+    change (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u) = _
+    ring
+  have hcont (y : ℝ) : Continuous (mod y) := by
+    apply hE.continuous_iff.mpr
+    apply continuous_pi
+    intro a
+    exact ((SchwartzMap.smulLeftCLM ℂ (g y)).continuous.comp
+      ((continuous_apply a).comp hE.continuous)).congr fun f ↦ (htw y a f).symm
+  have hinv (y : ℝ) (f : PositiveRealExponentialDecay I) : mod (-y) (mod y f) = f := by
+    apply Subtype.ext
+    funext u
+    change g (-y) u * (g y u * f.val u) = f.val u
+    simp only [g]
+    rw [← mul_assoc, ← Complex.exp_add]
+    push_cast
+    ring_nf
+    simp
+  let P : PositiveRealExponentialDecay I ≃L[ℂ] PositiveRealExponentialDecay I :=
+    { toLinearMap := mod x
+      invFun := mod (-x)
+      left_inv := hinv x
+      right_inv := fun f ↦ by simpa using hinv (-x) f
+      continuous_toFun := hcont x
+      continuous_invFun := hcont (-x) }
+  have hspec := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose_spec
+  let A := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose
+  have hform : ∀ (f : PositiveRealExponentialDecay I) (s : ℂ), s ∈ Complex.re ⁻¹' I →
+      ((P.trans A) f).val s = mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+    intro f s hs
+    change (A (mod x f)).val s = _
+    rw [hspec (mod x f) s hs]
+    unfold mellin
+    refine setIntegral_congr_fun measurableSet_Ioi fun t (ht : 0 < t) ↦ ?_
+    have ht0 : (t : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ht.ne'
+    change (t : ℂ) ^ (s - 1) • (g x (Real.log t) * f.val (Real.log t)) =
+      (t : ℂ) ^ (s + x * Complex.I - 1) • f.val (Real.log t)
+    have hpow : (t : ℂ) ^ (s + x * Complex.I - 1) = (t : ℂ) ^ (s - 1) * g x (Real.log t) := by
+      rw [show s + x * Complex.I - 1 = (s - 1) + x * Complex.I by ring,
+        Complex.cpow_add _ _ ht0]
+      congr 1
+      rw [Complex.cpow_def_of_ne_zero ht0, ← Complex.ofReal_log ht.le]
+      simp only [g]
+      push_cast
+      ring_nf
+    rw [hpow, smul_eq_mul, smul_eq_mul]
+    ring
+  exact ⟨P.trans A, hform⟩
+
+/-- For a decay profile and an exponent in its strip, the Haar integral of the profile against
+`t ^ z` converges and equals the Mellin transform of the profile. -/
+private theorem existsUnique_sLocalDecayMellin_integral (I : Set ℝ)
+    (p : PositiveRealExponentialDecay I) (z : ℂ) (hz : z.re ∈ I) :
+    Integrable (fun t : ℝ≥0ˣ ↦ p.val (Real.log normℝ(t)) * (normℝ(t) : ℂ) ^ z)
+        positiveRealHaar ∧
+      ∫ t, p.val (Real.log normℝ(t)) * (normℝ(t) : ℂ) ^ z ∂positiveRealHaar =
+        mellin (fun t ↦ p.val (Real.log t)) z := by
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ _
+  let E : ℝ → ℝ≥0ˣ := fun x ↦
+    Units.mk0 (Real.exp x).toNNReal (Real.toNNReal_pos.mpr (Real.exp_pos x)).ne'
+  have hE : Measurable E :=
+    measurable_comap_iff.mpr (continuous_real_toNNReal.comp Real.continuous_exp).measurable
+  have hHaar : positiveRealHaar = Measure.map E volume := rfl
+  have hEv (x : ℝ) : normℝ(E x) = Real.exp x := Real.coe_toNNReal _ (Real.exp_pos x).le
+  let w := logExponentialDecayTwist I ⟨z.re, hz⟩ p
+  have hw (x : ℝ) : w x = (Real.exp (z.re * x) : ℂ) * p.val x :=
+    logExponentialDecayTwist_apply I ⟨z.re, hz⟩ p x
+  have hp (x : ℝ) : p.val x = (Real.exp (z.re * x) : ℂ)⁻¹ * w x := by
+    rw [hw, inv_mul_cancel_left₀ (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne')]
+  have hpc : Continuous p.val := by
+    have hc : Continuous (fun x : ℝ ↦ (Real.exp (z.re * x) : ℂ)⁻¹ * w x) := by
+      refine (Continuous.inv₀ ?_ fun x ↦ Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne').mul
+        w.continuous
+      fun_prop
+    exact hc.congr fun x ↦ (hp x).symm
+  let g : ℝ → ℂ := fun x ↦ p.val x * Complex.exp (z * x)
+  have hcpow (x : ℝ) : ((Real.exp x : ℝ) : ℂ) ^ z = Complex.exp (z * x) := by
+    rw [Complex.ofReal_exp, Complex.cpow_def_of_ne_zero (Complex.exp_ne_zero _),
+      Complex.log_exp (by simp [Real.pi_pos]) (by simp [Real.pi_pos.le]), mul_comm]
+  have hkE (x : ℝ) : p.val (Real.log normℝ(E x)) * (normℝ(E x) : ℂ) ^ z = g x := by
+    rw [hEv, Real.log_exp, hcpow]
+  have hpos (t : ℝ≥0ˣ) : 0 < normℝ(t) := NNReal.coe_pos.mpr (Units.zero_lt t)
+  have hn : Continuous (fun t : ℝ≥0ˣ ↦ normℝ(t)) :=
+    NNReal.continuous_coe.comp Units.continuous_val
+  have hkc : Continuous (fun t : ℝ≥0ˣ ↦ p.val (Real.log normℝ(t)) * (normℝ(t) : ℂ) ^ z) := by
+    refine (hpc.comp (hn.log fun t ↦ (hpos t).ne')).mul ?_
+    exact (Complex.continuous_ofReal.comp hn).cpow continuous_const
+      fun t ↦ Complex.ofReal_mem_slitPlane.mpr (hpos t)
+  have hgc : Continuous g := hpc.mul (by fun_prop)
+  have hg : Integrable g := by
+    refine w.integrable.norm.mono' hgc.aestronglyMeasurable (.of_forall fun x ↦ ?_)
+    rw [hw, norm_mul, norm_mul, Complex.norm_exp, Complex.norm_real, Real.norm_eq_abs,
+      abs_of_pos (Real.exp_pos _)]
+    simp only [Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, mul_zero, sub_zero]
+    rw [mul_comm]
+  constructor
+  · rw [hHaar, integrable_map_measure (hHaar ▸ hkc.aestronglyMeasurable) hE.aemeasurable]
+    exact hg.congr (.of_forall fun x ↦ (hkE x).symm)
+  · rw [hHaar, integral_map hE.aemeasurable (hHaar ▸ hkc.aestronglyMeasurable)]
+    simp only [hkE]
+    rw [← integral_comp_log_Ioi_zero g, mellin]
+    refine setIntegral_congr_fun measurableSet_Ioi fun t (ht : 0 < t) ↦ ?_
+    have ht0 : (t : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ht.ne'
+    simp only [g, Complex.real_smul, smul_eq_mul]
+    rw [Complex.cpow_sub _ _ ht0, Complex.cpow_one, Complex.cpow_def_of_ne_zero ht0,
+      ← Complex.ofReal_log ht.le, Complex.ofReal_inv]
+    field_simp
+
 local notation "mellinIntegrand(" τ ", " φ ", " z ")" =>
   (fun t : ℝ≥0ˣ ↦ (φ) ((τ) t) * (normℝ(t) : ℂ) ^ (z))
+
+/-- The Mellin formula for the composite of the section equivalence and the shifted Mellin
+equivalence, with absolute convergence. -/
+private theorem existsUnique_sLocalDecayMellin_formula (τ : ℝ≥0ˣ →ₜ* Jₛ) (I : Set ℝ)
+    (ω : PontryaginDual J₁) (x : ℝ) (Φ : Eω(I, ω) ≃L[ℂ] PositiveRealExponentialDecay I)
+    (hΦ : ∀ f t, (Φ f).val (Real.log normℝ(t)) = f.val.val (τ t))
+    (M' : PositiveRealExponentialDecay I ≃L[ℂ] SchwartzBergman I)
+    (hM' : ∀ f s, s ∈ Complex.re ⁻¹' I → (M' f).val s =
+      mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I))
+    (f : Eω(I, ω)) (s : ℂ) (hs : s.re ∈ I) :
+    Integrable (mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I)) positiveRealHaar ∧
+      ((Φ.trans M') f).val s =
+        ∫ t, mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I) t ∂positiveRealHaar := by
+  have hz : (s + (x : ℂ) * Complex.I).re ∈ I := by simpa using hs
+  have hk : mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I) = fun t : ℝ≥0ˣ ↦
+      (Φ f).val (Real.log normℝ(t)) * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I) := by
+    funext t
+    exact congrArg (fun z : ℂ ↦ z * (normℝ(t) : ℂ) ^ (s + (x : ℂ) * Complex.I)) (hΦ f t).symm
+  have hint := existsUnique_sLocalDecayMellin_integral I (Φ f) _ hz
+  have h1 : Integrable (mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I)) positiveRealHaar := by
+    rw [hk]
+    exact hint.1
+  have h2 : ∫ t, mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I) t ∂positiveRealHaar =
+      mellin (fun t ↦ (Φ f).val (Real.log t)) (s + (x : ℂ) * Complex.I) :=
+    (congrArg (fun F : ℝ≥0ˣ → ℂ ↦ ∫ t, F t ∂positiveRealHaar) hk).trans hint.2
+  refine ⟨h1, ?_⟩
+  exact ((congrArg (fun q : SchwartzBergman I ↦ q.val s)
+    (ContinuousLinearEquiv.trans_apply Φ M' f)).trans (hM' (Φ f) s hs)).trans h2.symm
 
 /-- Paper: Theorem 5.4.2.2(1), p. 276.
 On a norm-one isotype, restriction to the norm section followed by the
@@ -1305,7 +1817,21 @@ theorem existsUnique_sLocalDecayMellin (τ : ℝ≥0ˣ →ₜ* Jₛ) (_hτ : Rig
     (ω : PontryaginDual J₁) (x : ℝ) :
     ∃! M : Eω(I, ω) ≃L[ℂ] SchwartzBergman I, ∀ (f : Eω(I, ω)) (s : ℂ), s.re ∈ I →
       let k := mellinIntegrand(τ, f.val.val, s + (x : ℂ) * Complex.I)
-      Integrable k positiveRealHaar ∧ (M f).val s = ∫ t, k t ∂positiveRealHaar := by sorry
+      Integrable k positiveRealHaar ∧ (M f).val s = ∫ t, k t ∂positiveRealHaar := by
+  have hiso := existsUnique_sLocalCechRadialReflection_isotypeEquiv τ _hτ I _hInt _hne ω
+  obtain ⟨Φ, hΦ, -⟩ := hiso
+  have hshift := existsUnique_sLocalDecayMellin_shift I _hOpen _hInt _hne x
+  obtain ⟨M', hM'⟩ := hshift
+  have hform (f : Eω(I, ω)) (s : ℂ) (hs : s.re ∈ I) :=
+    existsUnique_sLocalDecayMellin_formula τ I ω x Φ hΦ M' hM' f s hs
+  refine ⟨Φ.trans M', hform, fun M hM ↦ ?_⟩
+  apply ContinuousLinearEquiv.ext
+  funext f
+  apply Subtype.ext
+  funext s
+  by_cases hs : s ∈ Complex.re ⁻¹' I
+  · exact ((hM f s hs).2).trans (hform f s hs).2.symm
+  · exact ((M f).property.1 hs).trans (((Φ.trans M') f).property.1 hs).symm
 
 /-- Paper: Theorem 5.4.2.2(6), p. 277.
 The right vertical arrow is the Mellin equivalence on the overlap followed by
