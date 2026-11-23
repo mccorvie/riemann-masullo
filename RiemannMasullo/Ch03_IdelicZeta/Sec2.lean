@@ -4679,9 +4679,9 @@ private theorem scaledArchGamma_reflection_bound (q d : ℝ) (hq : 0 < q) (hd : 
     _ ≤ _ := mul_le_mul_of_nonneg_right
       (mul_le_mul_of_nonneg_left (hweight.trans (le_max_right _ _)) hC.le) (Real.rpow_nonneg hspos.le _)
 
-/-- Multiply the local estimates, adding the exponents with the multiplicities of
-the infinite places. Their sum is the degree of the number field. -/
-private theorem heckeGamma_reflection_bound (χ : U[F]) (a b : ℝ) :
+/-- On a closed vertical strip at large absolute height, the reflected Hecke gamma
+ratio has polynomial bound with exponent `[F : ℚ] * (1 / 2 - Re(s))`. -/
+theorem heckeGamma_reflection_bound (χ : U[F]) (a b : ℝ) :
     ∃ C T : ℝ, 0 < C ∧ 0 < T ∧ ∀ s : ℂ, a ≤ s.re → s.re ≤ b → T ≤ |s.im| →
       ‖heckeGammaFactor χ⁻¹ (1 - s) / heckeGammaFactor χ s‖ ≤
         C * |s.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - s.re)) := by

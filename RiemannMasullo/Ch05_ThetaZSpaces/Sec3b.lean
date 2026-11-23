@@ -3393,6 +3393,294 @@ theorem sLocalHomogeneousTheta_trivial_exists_polarFree (r : RealModels) (c : Co
     ∃ f : sAdelePolarFree S r c, ∀ g : Jₛ,
       thetaAt(1) f.val g = φ.val (Real.log ((mₛ g).val : ℝ)) := by sorry
 
+section EulerFactors
+
+open Complex Metric
+
+/-- A nonzero analytic function is bounded away from zero on a sufficiently small
+circle around each point, even if it vanishes at the center. -/
+private theorem exists_pos_norm_on_sphere {p : ℂ → ℂ} (hp : AnalyticOnNhd ℂ p univ)
+    (hne : ∃ z, p z ≠ 0) (c : ℂ) :
+    ∃ r : ℝ, 0 < r ∧ r ≤ 1 ∧ ∃ d > (0 : ℝ), ∀ w ∈ sphere c r, d ≤ ‖p w‖ := by
+  have hcod := (hp.eqOn_zero_or_eventually_ne_zero_of_preconnected isPreconnected_univ).resolve_left
+    (fun h ↦ let ⟨z, hz⟩ := hne; hz (h (mem_univ z)))
+  obtain ⟨R, hR, hnonzero⟩ := Metric.mem_nhdsWithin_iff.mp (nhdsNE_le_codiscrete c hcod)
+  let r := min (R / 2) 1
+  have hr : 0 < r := lt_min (half_pos hR) zero_lt_one
+  have hrR : r < R := (min_le_left _ _).trans_lt (half_lt_self hR)
+  have hex : (sphere c r).Nonempty := NormedSpace.sphere_nonempty.mpr hr.le
+  obtain ⟨w, hw, hmin⟩ := (isCompact_sphere c r).exists_isMinOn hex
+    (fun z _ ↦ (hp z trivial).continuousAt.continuousWithinAt.norm)
+  have hw' : w ∈ ball c R ∩ {c}ᶜ := by
+    rw [mem_sphere] at hw
+    exact ⟨mem_ball.mpr (hw.trans_lt hrR), by
+      rintro rfl
+      exact hr.ne' (by simpa only [dist_self] using hw.symm)⟩
+  exact ⟨r, hr, min_le_right _ _, ‖p w‖, norm_pos_iff.mpr (hnonzero hw'), fun z hz ↦ hmin hz⟩
+
+/-- Removing an analytic multiplier periodic in height preserves boundedness on
+closed vertical strips when the quotient is entire. -/
+private theorem bounded_strip_of_periodic_mul {p f : ℂ → ℂ} {T : ℝ} (hT : 0 < T)
+    (hperiod : Periodic p ((T : ℂ) * I)) (hp : AnalyticOnNhd ℂ p univ) (hne : ∃ z, p z ≠ 0)
+    (hf : Differentiable ℂ f) {a b : ℝ}
+    (hbound : ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc (a - 1) (b + 1) → ‖p z * f z‖ ≤ C) :
+    ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖f z‖ ≤ C := by
+  classical
+  let K := Complex.reProdIm (Icc a b) (Icc 0 T)
+  have hK : IsCompact K := isCompact_Icc.reProdIm isCompact_Icc
+  choose r hr hr₁ d hd hnorm using exists_pos_norm_on_sphere hp hne
+  have hcover : K ⊆ ⋃ c : K, ball c.val (r c.val) := fun c hc ↦
+    mem_iUnion.mpr ⟨⟨c, hc⟩, mem_ball_self (hr c)⟩
+  obtain ⟨s, hs⟩ := hK.elim_finite_subcover (fun c : K ↦ ball c.val (r c.val))
+    (fun _ ↦ isOpen_ball) hcover
+  obtain ⟨C, hC⟩ := hbound
+  let M := 1 + ∑ c ∈ s, max C 0 / d c.val
+  refine ⟨M, fun z hz ↦ ?_⟩
+  let n := ⌊z.im / T⌋
+  let v := (n : ℂ) * ((T : ℂ) * I)
+  have hvre : v.re = 0 := by simp [v, Complex.mul_re, Complex.mul_im]
+  have hvim : v.im = (n : ℝ) * T := by simp [v, Complex.mul_re, Complex.mul_im]
+  have hzK : z - v ∈ K := by
+    have hfloor := (le_div_iff₀ hT).mp (Int.floor_le (z.im / T))
+    have hceil := (div_lt_iff₀ hT).mp (Int.lt_floor_add_one (z.im / T))
+    change (z - v).re ∈ Icc a b ∧ (z - v).im ∈ Icc 0 T
+    rw [Complex.sub_re, hvre, sub_zero, Complex.sub_im, hvim]
+    exact ⟨hz, ⟨by dsimp [n]; linarith, by dsimp [n]; linarith⟩⟩
+  obtain ⟨c, hc, hzc⟩ := mem_iUnion₂.mp (hs hzK)
+  have hz' : z ∈ ball (c.val + v) (r c.val) := by
+    simpa only [mem_ball, dist_eq_norm, sub_add_eq_sub_sub, add_comm c.val] using hzc
+  have hc' : c.val.re ∈ Icc a b := c.property.1
+  have hsph (w : ℂ) (hw : w ∈ sphere (c.val + v) (r c.val)) : ‖f w‖ ≤ M := by
+    have hw₀ : w - v ∈ sphere c.val (r c.val) := by
+      simpa only [mem_sphere, dist_eq_norm, sub_add_eq_sub_sub, add_comm c.val] using hw
+    have hre : |w.re - c.val.re| ≤ 1 := by
+      have h := Complex.abs_re_le_norm (w - (c.val + v))
+      rw [Complex.sub_re, Complex.add_re, hvre, add_zero, ← dist_eq_norm, mem_sphere.mp hw] at h
+      exact h.trans (hr₁ c.val)
+    have hwstrip : w.re ∈ Icc (a - 1) (b + 1) := by
+      obtain ⟨hlo, hhi⟩ := abs_le.mp hre
+      exact ⟨by linarith [hc'.1], by linarith [hc'.2]⟩
+    have hper : p w = p (w - v) := by
+      simpa only [v, zsmul_eq_mul, sub_add_cancel] using (hperiod.zsmul n (w - v))
+    have hpw : d c.val ≤ ‖p w‖ := by rw [hper]; exact hnorm c.val (w - v) hw₀
+    have hmul := hC w hwstrip
+    rw [norm_mul] at hmul
+    calc
+      ‖f w‖ ≤ max C 0 / d c.val :=
+        (le_div_iff₀ (hd c.val)).2 ((mul_le_mul_of_nonneg_left hpw (norm_nonneg _)).trans
+          (by rw [mul_comm]; exact hmul.trans (le_max_left _ _)))
+      _ ≤ M := by
+        have hsum := Finset.single_le_sum
+          (f := fun d' : K ↦ max C 0 / d d'.val)
+          (fun i _ ↦ div_nonneg (le_max_right _ _) (hd i.val).le) hc
+        dsimp [M]
+        linarith
+  refine Complex.norm_le_of_forall_mem_frontier_norm_le isBounded_ball hf.diffContOnCl ?_
+    (subset_closure hz')
+  exact fun w hw ↦ hsph w (frontier_ball_subset_sphere hw)
+
+/-- The inverse Euler factor at a finite place is periodic with respect to an
+imaginary translation. It is entire and not identically zero. -/
+private theorem inv_finiteHeckeEulerFactor_periodic {F : Type*} [Field F] [NumberField F]
+    (η : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (v : HeightOneSpectrum (𝓞 F)) :
+    ∃ T : ℝ, 0 < T ∧
+      Periodic (fun z ↦ (finiteHeckeEulerFactor η v z)⁻¹) ((T : ℂ) * I) ∧
+      AnalyticOnNhd ℂ (fun z ↦ (finiteHeckeEulerFactor η v z)⁻¹) univ ∧
+      ∃ z, (finiteHeckeEulerFactor η v z)⁻¹ ≠ 0 := by
+  classical
+  let q := (Ideal.absNorm v.asIdeal : ℝ)
+  have hq : 1 < q := by
+    dsimp only [q]
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hq₀ : 0 < q := zero_lt_one.trans hq
+  let T := (2 * Real.pi) / Real.log q
+  have hT : 0 < T := div_pos (by positivity) (Real.log_pos hq)
+  refine ⟨T, hT, ?_⟩
+  unfold finiteHeckeEulerFactor
+  split_ifs with h
+  · simp only [inv_inv]
+    let a := (ideleClassNormTwist η 0).localValue v
+    have hperiod : (q : ℂ) ^ (-((T : ℂ) * I)) = 1 := by
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr hq₀.ne'),
+        ← Complex.ofReal_log hq₀.le]
+      have hprod : (Real.log q : ℂ) * (-((T : ℂ) * I)) = -(2 * (Real.pi : ℂ) * I) := by
+        dsimp only [T]
+        push_cast
+        field_simp [(Real.log_pos hq).ne']
+      rw [hprod, Complex.exp_neg, Complex.exp_two_pi_mul_I, inv_one]
+    have hregular : Differentiable ℂ (fun z : ℂ ↦ (q : ℂ) ^ (-z)) :=
+      differentiable_neg.const_cpow (Or.inl (Complex.ofReal_ne_zero.mpr hq₀.ne'))
+    refine ⟨fun z ↦ ?_, fun z _ ↦ ?_, ?_⟩
+    · change 1 - a * (q : ℂ) ^ (-(z + (T : ℂ) * I)) = 1 - a * (q : ℂ) ^ (-z)
+      rw [neg_add, Complex.cpow_add _ _ (Complex.ofReal_ne_zero.mpr hq₀.ne'), hperiod, mul_one]
+    · exact ((hregular.const_mul a).const_sub 1).analyticAt z
+    · by_cases ha : a = 1
+      · refine ⟨1, ?_⟩
+        change 1 - a * (q : ℂ) ^ (-(1 : ℂ)) ≠ 0
+        rw [ha, one_mul, sub_ne_zero]
+        intro hzero
+        have hnorm := congrArg norm hzero
+        rw [norm_one, Complex.norm_cpow_eq_rpow_re_of_pos hq₀, Complex.neg_re,
+          Complex.one_re, Real.rpow_neg_one] at hnorm
+        exact (inv_lt_one_of_one_lt₀ hq).ne' hnorm
+      · refine ⟨0, ?_⟩
+        change 1 - a * (q : ℂ) ^ (-(0 : ℂ)) ≠ 0
+        simpa only [neg_zero, Complex.cpow_zero, mul_one] using sub_ne_zero.mpr (Ne.symm ha)
+  · simp only [inv_one]
+    exact ⟨fun _ ↦ rfl, fun _ _ ↦ analyticAt_const, 0, one_ne_zero⟩
+
+/-- If multiplying an entire function by a finite Euler denominator produces
+rapid decay on all strips, the original function has that same strip property. -/
+private theorem schwartzBergman_of_finiteEulerFactors {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))}
+    (η : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (f : ℂ → ℂ)
+    (hf : AnalyticOnNhd ℂ f univ)
+    (h : ∀ (a b : ℝ) (N : ℕ), ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc a b →
+      ‖z ^ N * ((∏ v : S, (finiteHeckeEulerFactor η v.val z)⁻¹) * f z)‖ ≤ C) :
+    f ∈ schwartzBergmanSubmodule univ := by
+  classical
+  let p (v : S) (z : ℂ) := (finiteHeckeEulerFactor η v.val z)⁻¹
+  have hstep (s : Finset S) (N : ℕ)
+      (hbound : ∀ a b : ℝ, ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc a b →
+        ‖z ^ N * ((∏ v ∈ s, p v z) * f z)‖ ≤ C) :
+      ∀ a b : ℝ, ∃ C : ℝ, ∀ z : ℂ, z.re ∈ Icc a b → ‖z ^ N * f z‖ ≤ C := by
+    induction s using Finset.induction_on with
+    | empty => simpa only [Finset.prod_empty, one_mul] using hbound
+    | insert v s hv ih =>
+      obtain ⟨T, hT, hperiod, hp, hne⟩ := inv_finiteHeckeEulerFactor_periodic η v.val
+      apply ih
+      intro a b
+      let g (z : ℂ) := z ^ N * ((∏ v ∈ s, p v z) * f z)
+      have hdiff (v : S) : Differentiable ℂ (p v) := by
+        obtain ⟨_, _, _, hA, _⟩ := inv_finiteHeckeEulerFactor_periodic η v.val
+        exact fun z ↦ (hA z (mem_univ z)).differentiableAt
+      have hg : Differentiable ℂ g := (differentiable_id.pow N).mul
+        ((Differentiable.fun_finsetProd fun v _ ↦ hdiff v).mul
+          (fun z ↦ (hf z (mem_univ z)).differentiableAt))
+      refine bounded_strip_of_periodic_mul hT hperiod hp hne hg ?_
+      obtain ⟨C, hC⟩ := hbound (a - 1) (b + 1)
+      refine ⟨C, fun z hz ↦ ?_⟩
+      change ‖p v z * g z‖ ≤ C
+      have hw := hC z hz
+      rw [Finset.prod_insert hv] at hw
+      dsimp only [g]
+      convert hw using 1
+      congr 1
+      ac_rfl
+  refine ⟨by simp, hf.differentiableOn.mono (subset_univ _), fun a b _ _ N ↦ ?_⟩
+  obtain ⟨C, hC⟩ := hstep Finset.univ N (fun a b ↦ h a b N) a b
+  exact ⟨C, by rintro _ ⟨z, hz, rfl⟩; exact hC z hz⟩
+
+end EulerFactors
+
+/-- Project the canonical norm section to the S-ideles. -/
+private theorem polarFree_exists_normSection :
+    ∃ τ : ℝ≥0ˣ →ₜ* Aₛˣ, RightInverse τ (sIdeleNorm F S) := by
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let s := canonicalIdeleNormSection F
+  refine ⟨⟨p.comp s, hp.comp (canonicalIdeleNormSection_continuous F)⟩, fun t ↦ ?_⟩
+  let A := integralAdelesOutside F S
+  have hmem (u : ℝ≥0ˣ) : (s u).val ∈ A := by
+    simp only [A, integralAdelesOutside, Subring.mem_iInf]
+    intro v _
+    change (canonicalIdeleNormSection F u).val.2 v ∈ v.adicCompletionIntegers F
+    rw [canonicalIdeleNormSection_finite F u]
+    exact (v.adicCompletionIntegers F).one_mem
+  have ht : s t ∈ A.toSubmonoid.units := by
+    refine ⟨hmem t, ?_⟩
+    change ((s t)⁻¹).val ∈ A
+    rw [← map_inv]
+    exact hmem t⁻¹
+  let g := A.toSubmonoid.unitsEquivUnitsType ⟨s t, ht⟩
+  exact ((sIdeleNorm_spec F S).1 g).symm.trans (canonicalIdeleNormSection_rightInverse F t)
+
+/-- A polar-free test with trivial homogeneous theta given by a log profile has
+trivial-component zeta transform equal to the profile's Mellin transform. -/
+private theorem polarFree_zeta_of_radial (f : ℬₛ) (φ : ℝ → ℂ)
+    (hφ : ∀ g : Jₛ, thetaAt(1) f g = φ (Real.log ((mₛ g).val : ℝ)))
+    (z : ℂ) (hz : 0 < z.re) :
+    sLocalIdelicZFunction f (chartₛ(1) z) = mellin (fun t ↦ φ (Real.log t)) z := by
+  obtain ⟨τ, hτ⟩ := polarFree_exists_normSection (F := F) (S := S)
+  let c : QuasiCharacter Jₛ := chartₛ(1) z
+  have hc : ∃ (χ : PontryaginDual Jₛ) (s : ℂ), 0 < s.re ∧ c = chartₛ(χ) s :=
+    ⟨1, z, hz, rfl⟩
+  change sLocalIdelicZFunction f c = _
+  refine (sLocalIdelicZFunction_eq_integral f hc).trans
+    ((sLocalThetaMellinIntegral_eq_zeta f hc).symm.trans
+      ((sLocalRadialMellinIntegral_eq_theta τ hτ f 1 z hz).symm.trans ?_))
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  have hmeasure : positiveRealHaar = volume.map e := by
+    apply congrArg (fun h : ℝ → ℝ≥0ˣ ↦ volume.map h)
+    funext x
+    apply Units.ext
+    apply NNReal.eq
+    exact Real.coe_toNNReal _ (Real.exp_pos x).le
+  simp only [sLocalRadialMellinIntegral, hmeasure]
+  rw [e.measurableEmbedding.integral_map, mellin, ← integral_comp_exp]
+  apply integral_congr_ae
+  filter_upwards with x
+  have ht (t : ℝ≥0ˣ) : mₛ (QuotientGroup.mk (τ t)) = t :=
+    (sIdeleQuotientNorm_mk F S (τ t)).trans (hτ t)
+  have he : (((e x).val : ℝ≥0) : ℝ) = Real.exp x := rfl
+  have hp : (Real.exp x : ℂ) ^ z = Complex.exp ((x : ℂ) * z) := by
+    rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos x).ne'),
+      ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+  change thetaAt(1) f (QuotientGroup.mk (τ (e x))) *
+      (1 * ((((mₛ (QuotientGroup.mk (τ (e x)))).val : ℝ) : ℂ) ^ z)) = _
+  rw [hφ, ht, he, one_mul, hp]
+  simp only [Real.log_exp, Complex.real_smul, Complex.ofReal_exp]
+  rw [Complex.cpow_def_of_ne_zero (Complex.exp_ne_zero _), ← Complex.ofReal_exp,
+    ← Complex.ofReal_log (Real.exp_pos x).le, Real.log_exp]
+  rw [smul_eq_mul, Complex.ofReal_exp, ← mul_assoc, ← Complex.exp_add, mul_comm (φ x)]
+  congr 2
+  ring
+
+/-- Twisting the test by the inverse character cancels the unitary part of the zeta integral. -/
+private theorem polarFree_zeta_twist (f g : ℬₛ) (χ : PontryaginDual Jₛ)
+    (h : ∀ u : Aₛˣ, g (Multiplicative.ofAdd u.val) =
+      ((circleToComplex).comp χ⁻¹) (QuotientGroup.mk u) * f (Multiplicative.ofAdd u.val))
+    (z : ℂ) (hz : 0 < z.re) :
+    sLocalIdelicZFunction g (chartₛ(χ) z) = sLocalIdelicZFunction f (chartₛ(1) z) := by
+  refine (sLocalIdelicZFunction_eq_integral g ⟨χ, z, hz, rfl⟩).trans
+    (Eq.trans ?_ (sLocalIdelicZFunction_eq_integral f ⟨1, z, hz, rfl⟩).symm)
+  unfold sLocalIdelicZetaIntegral
+  apply integral_congr_ae
+  filter_upwards with u
+  let q : Jₛ := QuotientGroup.mk u
+  let p := ((((mₛ q).val : ℝ) : ℂ) ^ z)
+  rw [h]
+  change (((χ⁻¹ q : Circle) : ℂ) * f (Multiplicative.ofAdd u.val)) * ((χ q : ℂ) * p) =
+    f (Multiplicative.ofAdd u.val) * (1 * p)
+  change (((χ q)⁻¹ : Circle) : ℂ) * _ * _ = _
+  rw [Circle.coe_inv, one_mul]
+  rw [show ((χ q : ℂ)⁻¹ * f (Multiplicative.ofAdd u.val)) * ((χ q : ℂ) * p) =
+      ((χ q : ℂ)⁻¹ * (χ q : ℂ)) * (f (Multiplicative.ofAdd u.val) * p) by ac_rfl,
+    inv_mul_cancel₀ (Circle.coe_ne_zero _), one_mul]
+/-- Invert the scalar Fourier–Mellin transform, lift its profile, and twist the lift. -/
+private theorem polarFree_exists_of_schwartzBergman (r : RealModels) (c : ComplexModels)
+    (χ : PontryaginDual Jₛ) (f : ℬₛ)
+    (h : (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s)) ∈ schwartzBergmanSubmodule univ) :
+    ∃ f₀ : sAdelePolarFree S r c, ∀ s : ℂ,
+      sLocalIdelicZFunction f (chartₛ(χ) s) = sLocalIdelicZFunction f₀.val (chartₛ(χ) s) := by
+  let M := positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty
+  let Z : SchwartzBergman univ := ⟨_, h⟩
+  let φ : PositiveRealExponentialDecay univ := M.symm Z
+  obtain ⟨g, hg⟩ := sLocalHomogeneousTheta_trivial_exists_polarFree r c φ
+  obtain ⟨A, hA⟩ := sAdelePolarFree_quasiCharacter_mul r c ((circleToComplex).comp χ⁻¹)
+  refine ⟨A g, fun s ↦ ?_⟩
+  apply realArchimedeanMellin_existsUnique_eqNF
+    (sLocalIdelicZFunction_meromorphic f χ) (sLocalIdelicZFunction_meromorphic (A g).val χ) _ s
+  intro z hz
+  have hM := positiveRealFourierMellin_apply univ isOpen_univ ordConnected_univ univ_nonempty
+    φ z (mem_univ z)
+  change (M φ).val z = _ at hM
+  rw [show M φ = Z from M.apply_symm_apply Z] at hM
+  exact hM.trans ((polarFree_zeta_of_radial g.val φ.val hg z hz).symm.trans
+    (polarFree_zeta_twist g.val (A g).val χ (hA g) z hz).symm)
+
 /-- Paper: Proposition 5.3.4.4(1)–(2), p. 264.
 On the component of χ, a zeta transform is entire exactly when it agrees there
 with the transform of a polar-free test. -/
@@ -3400,7 +3688,15 @@ theorem sLocalIdelicZFunction_entire_iff_eq_polarFree (r : RealModels) (c : Comp
     (χ : PontryaginDual Jₛ) (f : ℬₛ) :
     AnalyticOnNhd ℂ (fun s ↦ sLocalIdelicZFunction f (chartₛ(χ) s)) univ ↔
       ∃ f₀ : sAdelePolarFree S r c, ∀ s : ℂ,
-        sLocalIdelicZFunction f (chartₛ(χ) s) = sLocalIdelicZFunction f₀.val (chartₛ(χ) s) := by sorry
+        sLocalIdelicZFunction f (chartₛ(χ) s) = sLocalIdelicZFunction f₀.val (chartₛ(χ) s) := by
+  constructor
+  · intro h
+    obtain ⟨η, hη⟩ := sLocalIdelicZFunction_cleared_strips χ f h
+    exact polarFree_exists_of_schwartzBergman r c χ f
+      (schwartzBergman_of_finiteEulerFactors η _ h hη)
+  · rintro ⟨f₀, hf₀⟩
+    exact (sLocalIdelicZFunction_entire_of_polarFree r c f₀.val f₀.property χ).congr
+      isOpen_univ fun z _ ↦ (hf₀ z).symm
 
 /-- Paper: Proposition 5.3.4.4(1) and (3), p. 264.
 On the component of χ, a zeta transform is entire exactly when the homogeneous theta
