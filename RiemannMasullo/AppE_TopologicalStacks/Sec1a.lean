@@ -105,13 +105,15 @@ def HasCompactHausdorffContinuityTest.{probe, target, carrier} (X : Type carrier
     Continuous f ↔ ∀ (K : CompHaus.{probe}) (g : C(K, X)), Continuous (f ∘ g)
 
 /-- Paper: Lemma E.1.1.3(2), p. 828.
-There is a set of compact Hausdorff sources such that continuity can be tested on all
-continuous maps from every member of the set.
-Deviation: Source and target carriers lie in universes `u` and `v`, respectively. -/
+There is a small family of compact Hausdorff sources such that continuity can be tested on
+all continuous maps from every member of the family.
+Deviation: Source and target carriers have fixed universes. The index is small in the
+common universe of the source carriers and the tested space. -/
 def HasCompactHausdorffContinuityTestFamily.{probe, target, carrier} (X : Type carrier)
     [TopologicalSpace X] : Prop :=
-  ∃ S : Set (CompHaus.{probe}), ∀ (Y : Type target) [TopologicalSpace Y] (f : X → Y),
-    Continuous f ↔ ∀ K ∈ S, ∀ g : C(K, X), Continuous (f ∘ g)
+  ∃ (I : Type (max probe carrier)) (K : I → CompHaus.{probe}),
+    ∀ (Y : Type target) [TopologicalSpace Y] (f : X → Y),
+      Continuous f ↔ ∀ i, ∀ g : C(K i, X), Continuous (f ∘ g)
 
 /-- Paper: Lemma E.1.1.3(3), p. 829.
 Openness in the space is equivalent to openness of preimages along all compact Hausdorff probes.
@@ -121,10 +123,10 @@ def HasCompactHausdorffOpennessTest (X : Type w) [TopologicalSpace X] : Prop :=
 
 /-- Paper: Lemma E.1.1.3(4), p. 829.
 The space admits a quotient map from a coproduct of compact Hausdorff spaces.
-Deviation: The summands lie in universe `u` and the index universe fits all pairs of a
-source and a continuous map to `X`. -/
+Deviation: The summands lie in universe `u` and the index is small in the common
+universe of their carriers and `X`. -/
 def HasCompactHausdorffQuotientPresentation (X : Type w) [TopologicalSpace X] : Prop :=
-  ∃ (I : Type (max (u + 1) w)) (K : I → CompHaus.{u}) (q : (Σ i, K i) → X),
+  ∃ (I : Type (max u w)) (K : I → CompHaus.{u}) (q : (Σ i, K i) → X),
     IsQuotientMap q
 
 /-- Paper: Lemma E.1.1.3, pp. 828–829.
@@ -269,9 +271,8 @@ theorem exists_homeomorph_connectedComponent_traitBouquet (x : X)
 end CompactGeneration
 
 -- TODO(paper-gap): On p. 831 the witnessing ordinals form an unbounded class. The
--- minimum exists by minimizing below a witnessing stage. The union in (E.1.1.3)
--- can be empty for the empty space. The final argument for (2) can keep all maps
--- over each source rather than selecting one map per source.
+-- minimum exists by minimizing below a witnessing stage. For (2) retain all maps
+-- over each source. The discrete case on p. 830 includes the empty space.
 
 /-- Paper: Lemma E.1.1.3, equations (E.1.1.2)–(E.1.1.3), p. 831.
 Each nonempty class has a least witnessing stage. The supremum of those stages meets
