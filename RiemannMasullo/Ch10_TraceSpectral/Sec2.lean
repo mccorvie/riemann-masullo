@@ -3,6 +3,9 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec1
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a_part2
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec1
+import Mathlib.LinearAlgebra.Eigenspace.Pi
+import Mathlib.Algebra.Polynomial.Basis
+import Mathlib.Algebra.Polynomial.Roots
 import all RiemannMasullo.Ch09_HardySobolev.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
 
@@ -685,24 +688,6 @@ local notation "lineHs(" hs ")" => le_of_lt (zero_lt_one.trans hs)
 local notation "lineU(" χ ", " hs ")" =>
   (fun j ↦ (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)))
 
-/-- Paper: Theorem 10.2.1.1, pp. 440–443. The weighted theta closure is
-the common kernel of the admitted line jets.
-Gap: The proof on p. 443 does not identify this closure in the line norm. -/
-theorem spectralLineJet_commonKernel (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let u : SpectralLineJetIndex χ a s → W'(0, 0, s) := lineU(χ, hs)
-    JetKernel(a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by sorry
-
-/-- Paper: Theorem 10.2.1.1, pp. 440–443. Single-jet interpolants have
-representatives whose images span a dense subspace of the line quotient.
-Gap: The asserted finite-band adjoint range does not supply these interpolants
-and their density. -/
-theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let u : J → W'(0, 0, s) := lineU(χ, hs)
-    JetInterpolation(J, a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by sorry
-
 /-- Paper: Theorem 10.2.1.1, p. 440. The norm-one dual and the discrete
 zero sets in its charts give countably many admitted line jets. -/
 theorem spectralLineJet_countable (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (a s : ℝ) :
@@ -740,21 +725,6 @@ theorem spectralLineJet_countable (χ : PontryaginDual C₁ → PontryaginDual C
   have hω := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.1) hij
   have hk := congrArg (fun p : PontryaginDual C₁ × W × ℕ ↦ p.2.2) hij
   exact Subtype.ext (Prod.ext hω (Prod.ext (by simpa [e] using him) hk))
-
-/-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
-jets represent quotient functionals and admit a Markushevich biorthogonal family.
-Deviation: Index directly by the admitted jets, so reindexing permits any
-enumeration, including finite and empty families. Apply the strict cutoff. -/
-theorem spectralLineMarkushevichBasis (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
-    (hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    Countable J ∧ ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
-      ∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)) := by
-  exact ⟨spectralLineJet_countable χ a s, spectralSobolevQuotient_basis_of_interpolation a
-    (le_rfl (a := (0 : ℝ))) (lineHs(hs)) (lineU(χ, hs))
-    (spectralLineJet_commonKernel χ hχ hs) (spectralLineJet_denseInterpolants χ hχ hs)⟩
 
 section TestDuality
 
@@ -1506,26 +1476,6 @@ theorem spectralFamily_singleton_normalized {E : Type*} [NormedAddCommGroup E] (
     (_hx : x ≠ 0) : IsNormalizedSpectralFamily (fun _ : Unit ↦ x) := by
   exact ⟨⟨‖x‖, fun _ ↦ le_rfl⟩, ‖x‖, norm_pos_iff.mpr _hx, fun _ ↦ le_rfl⟩
 
-/-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
-is normalized in the norm of its realization in the negative space.
-Deviation: Apply the strict cutoff and allow finite or empty index types. -/
-theorem spectralLineMarkushevichBasis_normalized
-    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ)
-    {a s : ℝ} (hs : 1 < s) :
-    let J := SpectralLineJetIndex χ a s
-    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
-    ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
-      (∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j))) ∧
-      IsNormalizedSpectralFamily (fun j ↦ D (Λ j)) := by
-  obtain ⟨x, Λ, hB, hD⟩ := (spectralLineMarkushevichBasis (a := a) χ _hχ hs).2
-  obtain ⟨C, hC, hbound⟩ := spectralLineJet_annulus (a := a) χ _hχ hs
-  refine ⟨x, Λ, hB, hD, ⟨C, ?_⟩, ⟨C⁻¹, inv_pos.mpr hC, ?_⟩⟩
-  · intro j
-    simpa only [hD j] using (hbound j).2
-  · intro j
-    simpa only [hD j] using (hbound j).1
-
 -- TODO(paper-gap): The general claim about the Schauder property on p. 444
 -- lacks a proof. The primal normalization invoked again on p. 451 is false:
 -- close simple critical-line zeta zeros give jets at distance tending to zero,
@@ -2069,6 +2019,211 @@ theorem spectralStripJet_memLp (χ : PontryaginDual C₁ → PontryaginDual C�
     ENNReal.toReal_ofReal (inv_nonneg.mpr (symmIntervalSobolevDensity_pos _hα s (logNorm g)).le),
     stripJet_integrand_eq _hα]
 
+section
+
+open Polynomial
+open scoped Polynomial
+
+/-- Multiplying distinct powers of an additive coordinate by one character preserves
+linear independence when the coordinate has infinite range. -/
+private theorem jetPowers_independent {G : Type*} [Group G] (χ : G →* ℂ)
+    (L : G → ℂ) (hL : (range L).Infinite) :
+    LinearIndependent ℂ (fun n : ℕ ↦ fun g ↦ χ g * (L g) ^ n) := by
+  let E : ℂ[X] →ₗ[ℂ] (G → ℂ) :=
+    { toFun := fun p g ↦ χ g * p.eval (L g)
+      map_add' := fun p q ↦ funext fun g ↦ by simp [mul_add]
+      map_smul' := fun r p ↦ funext fun g ↦ by simp [smul_eq_mul, mul_left_comm] }
+  have einj : Injective E := by
+    intro p q h
+    apply Polynomial.eq_of_infinite_eval_eq
+    refine hL.mono ?_
+    rintro _ ⟨g, rfl⟩
+    exact mul_left_cancel₀ ((Group.isUnit g).map χ).ne_zero (congrFun h g)
+  have h := (Polynomial.basisMonomials ℂ).linearIndependent.map' E (LinearMap.ker_eq_bot.mpr einj)
+  simpa only [Function.comp_def, Polynomial.coe_basisMonomials, E, LinearMap.coe_mk, AddHom.coe_mk,
+    Polynomial.eval_monomial, one_mul] using h
+
+/-- Translations put the character times the mth power of an additive coordinate in
+the simultaneous generalized eigenspace of that character. -/
+private theorem jetPowers_mem_weight {G : Type*} [CommGroup G] (χ : G →* ℂ) (L : G → ℂ)
+    (hL : ∀ g y, L (g * y) = L g + L y)
+    (τ : G → Module.End ℂ (G → ℂ)) (hτ : ∀ g f y, τ g f y = f (g * y)) (m : ℕ) :
+    (fun g ↦ χ g * (L g) ^ m) ∈ ⨅ g, (τ g).maxGenEigenspace (χ g) := by
+  apply (Submodule.mem_iInf _).mpr
+  intro g
+  let v (i : ℕ) (y : G) := χ y * (L y) ^ i
+  let δ := τ g - χ g • (1 : Module.End ℂ (G → ℂ))
+  change v m ∈ (τ g).maxGenEigenspace (χ g)
+  induction m using Nat.strong_induction_on with | ind m ih => ?_
+  let c (i : ℕ) := χ g * (L g) ^ (m - i) * (m.choose i : ℂ)
+  have diff : δ (v m) = ∑ i ∈ Finset.range m, c i • v i := by
+    funext y
+    change τ g (v m) y - χ g * v m y = _
+    rw [hτ]
+    have hsum : v m (g * y) = ∑ i ∈ Finset.range (m+1), c i * v i y := by
+      simp only [v, map_mul, hL]
+      rw [add_comm (L g), add_pow, Finset.mul_sum]
+      refine Finset.sum_congr rfl fun i hi ↦ ?_
+      dsimp only [c]
+      ring
+    rw [hsum, Finset.sum_range_succ]
+    simp [c, Finset.sum_apply]
+  have hmem : δ (v m) ∈ (τ g).maxGenEigenspace (χ g) := by
+    rw [diff]
+    exact Submodule.sum_mem _ fun i hi ↦ Submodule.smul_mem _ _ (ih i (Finset.mem_range.mp hi))
+  obtain ⟨k, hk⟩ := (Module.End.mem_maxGenEigenspace _ _ _).mp hmem
+  apply (Module.End.mem_maxGenEigenspace _ _ _).mpr
+  exact ⟨k+1, by simpa only [pow_succ, mul_apply_eq_comp] using hk⟩
+
+/-- Exponential polynomials attached to distinct characters have independent coefficients. -/
+private theorem jetPowers_all_independent {G Z : Type*} [CommGroup G]
+    (χ : Z → G →* ℂ) (hc : Injective χ) (L : G → ℂ)
+    (hL : ∀ g y, L (g * y) = L g + L y) (hi : (range L).Infinite) :
+    LinearIndependent ℂ (fun zn : (_ : Z) × ℕ ↦ fun g ↦ χ zn.1 g * (L g) ^ zn.2) := by
+  let τ (g : G) : Module.End ℂ (G → ℂ) :=
+    { toFun := fun f y ↦ f (g * y), map_add' := by intros; rfl, map_smul' := by intros; rfl }
+  have ht (g f y) : τ g f y = f (g * y) := rfl
+  have hcomm (a b : G) : Commute (τ a) (τ b) := by
+    apply LinearMap.ext
+    intro f
+    funext y
+    change f (b * (a * y)) = f (a * (b * y))
+    rw [mul_left_comm]
+  have hind : iSupIndep (fun ψ : G → ℂ ↦ ⨅ g, (τ g).maxGenEigenspace (ψ g)) :=
+    Module.End.independent_iInf_maxGenEigenspace_of_forall_mapsTo τ
+    (fun i j p ↦ Module.End.mapsTo_maxGenEigenspace_of_comm (hcomm j i) p)
+  let V (z : Z) (n : ℕ) := fun g ↦ χ z g * (L g) ^ n
+  have hiχ : Injective (fun z g ↦ χ z g) := fun _ _ h ↦ hc (MonoidHom.ext (congrFun h))
+  have hspaces : iSupIndep fun z ↦ Submodule.span ℂ (range (V z)) :=
+    (hind.comp hiχ).mono (by
+      intro z
+      apply Submodule.span_le.mpr
+      rintro _ ⟨n, rfl⟩
+      exact jetPowers_mem_weight (χ z) L hL τ ht n)
+  apply linearIndependent_iUnion_finite (f := V) (fun z ↦ jetPowers_independent (χ z) L hi)
+  exact fun _ _ _ hz ↦ hspaces.disjoint_biSup hz
+
+section StripJetIndependence
+
+private theorem spectralStripJet_twist_injective
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) :
+    Injective (fun p : PontryaginDual C₁ × ℂ ↦ (ideleClassNormTwist (χ p.1) p.2).toMonoidHom) := by
+  have hres (ω : PontryaginDual C₁) (z : ℂ) (g : C₁) :
+      ideleClassNormTwist (χ ω) z g.val = (ω g : ℂ) := by
+    change (χ ω g.val : ℂ) * ((((ideleClassNorm F g.val).val : ℝ) : ℂ) ^ z) = _
+    rw [show ideleClassNorm F g.val = 1 from g.property]
+    simp only [Units.val_one, NNReal.coe_one, Complex.ofReal_one, Complex.one_cpow, mul_one]
+    exact congrArg ((↑) : Circle → ℂ) (DFunLike.congr_fun (hχ ω) g)
+  rintro ⟨ω, z⟩ ⟨η, w⟩ he
+  have htw : ideleClassNormTwist (χ ω) z = ideleClassNormTwist (χ η) w :=
+    ContinuousMonoidHom.ext fun g ↦ DFunLike.congr_fun he g
+  have hω : ω = η := by
+    ext g : 1
+    apply Subtype.ext
+    exact (hres ω z g).symm.trans ((DFunLike.congr_fun htw g.val).trans (hres η w g))
+  subst η
+  have hu := hχ.existsUnique_normTwist ω (ideleClassNormTwist (χ ω) z) (hres ω z)
+  exact Prod.ext rfl (hu.unique rfl htw)
+
+/-- Distinct choices of base character, both real coordinates of a norm twist, or
+logarithmic degree give linearly independent functions on the idele class group. -/
+private theorem spectralAdelicJet_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) :
+    LinearIndependent ℂ (fun j : PontryaginDual C₁ × ℝ × ℝ × ℕ ↦
+      spectralZeroJet (χ j.1) j.2.1 j.2.2.1 j.2.2.2) := by
+  let L (g : C𝔽) : ℂ := logNorm g
+  have hadd (g y : C𝔽) : L (g * y) = L g + L y := by
+    dsimp only [L]
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+      (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add]
+  have hinf : (range L).Infinite := by
+    refine (Set.infinite_range_of_injective Complex.ofReal_injective).mono ?_
+    rintro _ ⟨r, rfl⟩
+    let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+    let g : C𝔽 := QuotientGroup.mk (canonicalIdeleNormSection F (e r))
+    have hg : ideleClassNorm F g = e r := canonicalIdeleNormSection_rightInverse F _
+    refine ⟨g, ?_⟩
+    change (Real.log ((ideleClassNorm F g).val : ℝ) : ℂ) = r
+    rw [hg]
+    exact congrArg ((↑) : ℝ → ℂ) (Real.log_exp r)
+  let char (p : PontryaginDual C₁ × ℂ) := (ideleClassNormTwist (χ p.1) p.2).toMonoidHom
+  let key (j : PontryaginDual C₁ × ℝ × ℝ × ℕ) : (_ : PontryaginDual C₁ × ℂ) × ℕ :=
+    ⟨(j.1, shift(j.2.1, j.2.2.1)), j.2.2.2⟩
+  have hk : Injective key := by
+    intro i j he
+    have hω := congrArg (fun p ↦ p.1.1) he
+    have hre := congrArg (fun p ↦ p.1.2.re) he
+    have him := congrArg (fun p ↦ p.1.2.im) he
+    have hn : i.2.2.2 = j.2.2.2 := eq_of_heq (Sigma.mk.inj he).2
+    exact Prod.ext hω (Prod.ext (by simpa [key] using hre) (Prod.ext (by simpa [key] using him) hn))
+  exact (jetPowers_all_independent char (spectralStripJet_twist_injective χ hχ) L hadd hinf).comp key hk
+
+private theorem spectralStripJet_raw_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ) (a α s : ℝ) :
+    LinearIndependent ℂ (fun j : SpectralStripJetIndex χ a α s ↦
+      spectralZeroJet (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2) :=
+  (spectralAdelicJet_linearIndependent χ hχ).comp Subtype.val Subtype.val_injective
+
+open Filter MeasureTheory
+
+/-- Continuous representatives remain linearly independent in L² when a measure positive
+on open sets is absolutely continuous with respect to the L² measure. -/
+private theorem jetFunctions_toLp_independent {X I : Type*} [TopologicalSpace X]
+    [MeasurableSpace X] (μ ν : Measure X) [μ.IsOpenPosMeasure] (hμ : μ ≪ ν)
+    (f : I → X → ℂ) (hc : ∀ i, Continuous (f i)) (hm : ∀ i, MemLp (f i) 2 ν)
+    (hi : LinearIndependent ℂ f) :
+    LinearIndependent ℂ (fun i ↦ (hm i).toLp (f i)) := by
+  rw [linearIndependent_iff'] at hi ⊢
+  intro t c hz
+  apply hi t c
+  have he (i : I) : ((c i • (hm i).toLp (f i) : Lp ℂ 2 ν) : X → ℂ) =ᵐ[ν] c i • f i :=
+    (Lp.coeFn_smul _ _).trans ((hm i).coeFn_toLp.const_smul _)
+  have hsum : (⇑(∑ i ∈ t, c i • (hm i).toLp (f i)) : X → ℂ) =ᵐ[ν] ∑ i ∈ t, c i • f i :=
+    (Lp.coeFn_finsetSum _ _).trans (eventuallyEq_sum fun i _ ↦ he i)
+  rw [hz] at hsum
+  apply MeasureTheory.Measure.eq_of_ae_eq (hμ.ae_le (hsum.symm.trans (Lp.coeFn_zero _ _ _)))
+  · have hfun : (∑ i ∈ t, c i • f i) = fun x ↦ ∑ i ∈ t, (c i • f i) x := by
+      funext x
+      exact Finset.sum_apply _ _ _
+    rw [hfun]
+    exact continuous_finsetSum t fun i _ ↦ (hc i).const_smul (c i)
+  · exact continuous_zero
+
+/-- Paper: Theorem 10.2.2.1, p. 446. The surviving strip jets form a linearly
+independent family in reciprocal-weight L². This holds already for finite
+linear combinations, before passing to any quotient or choosing interpolants. -/
+theorem spectralStripJet_toLp_linearIndependent
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (hχ : IsSpectralBasepointChoice χ)
+    (a : ℝ) {α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s) :
+    LinearIndependent ℂ (fun j : SpectralStripJetIndex χ a α s ↦
+      (spectralStripJet_memLp χ hα hs j).toLp (spectralZeroJet
+        (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2)) := by
+  let μ := ideleClassTamagawaMeasure F
+  let w (g : C𝔽) := intervalSobolevDensity (-α) α s (logNorm g)
+  let ν := μ.withDensity (fun g ↦ ENNReal.ofReal (w g)⁻¹)
+  have hw : Measurable w := by
+    have hD : Continuous (intervalSobolevDensity (-α) α s) := by
+      unfold intervalSobolevDensity
+      fun_prop
+    exact hD.measurable.comp ((NNReal.continuous_coe.comp
+      (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).measurable.log)
+  have habs : μ ≪ ν := by
+    refine withDensity_absolutelyContinuous' hw.inv.ennreal_ofReal.aemeasurable (.of_forall fun g ↦ ?_)
+    refine ENNReal.ofReal_ne_zero_iff.mpr (inv_pos.mpr ?_)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hlog : Continuous logNorm := (NNReal.continuous_coe.comp
+    (Units.continuous_val.comp (isProperMap_ideleClassNorm F).continuous)).log
+      (fun g ↦ NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
+  apply jetFunctions_toLp_independent μ ν habs _ (fun j ↦ ?_) _
+    (spectralStripJet_raw_linearIndependent χ hχ a α s)
+  exact (ideleClassNormTwist (χ j.val.1) (shift(j.val.2.1, j.val.2.2.1))).continuous.mul
+    ((Complex.continuous_ofReal.comp hlog).pow _)
+
+end StripJetIndependence
+
+end
+
 local notation "stripI(" hα ")" => (neg_nonpos.mpr hα |>.trans hα)
 local notation "stripU(" χ ", " hα ", " hs ")" =>
   (fun j ↦ (spectralStripJet_memLp χ hα hs j).toLp (stripJet(χ, j)))
@@ -2092,6 +2247,118 @@ theorem spectralStripJet_denseInterpolants (χ : PontryaginDual C₁ → Pontrya
     let J := SpectralStripJetIndex χ a α s
     let u : J → W'(-α, α, s) := stripU(χ, hα, hs)
     JetInterpolation(J, a, stripI(hα), hs, u) := by sorry
+
+/-- At width zero the real offset of each strip jet is zero, and its remaining
+indices give exactly one line jet with the same function representative. -/
+private theorem spectralLineJet_zeroWidth_indices (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (a s : ℝ) :
+    ∃ e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s,
+      ∀ i, stripJet(χ, e i) = lineJet(χ, i) := by
+  let L := SpectralLineJetIndex χ a s
+  let Z := SpectralStripJetIndex χ a 0 s
+  have hoff (j : Z) : j.val.2.1 = 0 := by
+    simpa using (SpectralStripJetIndex.mem_strip_order_pos (le_refl (0 : ℝ)) j).1
+  have hmult (n : ℕ) : spectralStripMultiplicity 0 s 0 n = spectralBoundaryMultiplicity s n :=
+    spectralStripMultiplicity_boundary le_rfl (Or.inr rfl) s n
+  let e : L ≃ Z :=
+    { toFun := fun i ↦ ⟨(i.val.1, 0, i.val.2.1, i.val.2.2), by
+        simpa only [add_zero, hmult] using i.property⟩
+      invFun := fun j ↦ ⟨(j.val.1, j.val.2.2.1, j.val.2.2.2), by
+        simpa only [hoff j, add_zero, hmult] using j.property⟩
+      left_inv := fun _ ↦ Subtype.ext rfl
+      right_inv := fun j ↦ Subtype.ext (Prod.ext rfl (Prod.ext (hoff j).symm rfl)) }
+  exact ⟨e, fun _ ↦ rfl⟩
+
+/-- Transport a statement about the reindexed reciprocal-weight vectors from
+the interval [−0, 0] to the identical line Sobolev space. -/
+private theorem spectralLineJet_zeroWidth_transport (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (a : ℝ) {s : ℝ} (hs : 1 < s)
+    (P : ∀ {l : ℝ}, l ≤ 0 → (SpectralLineJetIndex χ a s → W'(l, 0, s)) → Prop)
+    (h : ∀ (e : SpectralLineJetIndex χ a s ≃ SpectralStripJetIndex χ a 0 s),
+      P (stripI(le_refl (0 : ℝ))) (fun i ↦ stripU(χ, le_refl (0 : ℝ), lineHs(hs)) (e i))) :
+    P (le_refl (0 : ℝ)) (lineU(χ, hs)) := by
+  obtain ⟨e, he⟩ := spectralLineJet_zeroWidth_indices χ a s
+  let claim (l : ℝ) (hl : l ≤ 0) := ∀ hm : ∀ i : SpectralLineJetIndex χ a s,
+    MemLp (lineJet(χ, i)) 2 L2μ'(l, 0, s), P hl (fun i ↦ (hm i).toLp (lineJet(χ, i)))
+  have hstrip : claim (-0) (stripI(le_refl (0 : ℝ))) := by
+    intro hm
+    have eqv : (fun i ↦ stripU(χ, le_refl (0 : ℝ), lineHs(hs)) (e i)) =
+        fun i ↦ (hm i).toLp (lineJet(χ, i)) := by
+      funext i
+      exact MemLp.toLp_congr _ _ (Filter.Eventually.of_forall (congrFun (he i)))
+    exact eqv ▸ h e
+  have transport (l : ℝ) (hl : l ≤ 0) (hl0 : l = 0) : claim l hl → claim 0 le_rfl := by
+    subst l
+    exact id
+  exact transport (-0) _ neg_zero hstrip (spectralLineJet_memLp χ hs)
+
+/-- Paper: Theorem 10.2.1.1, pp. 440–443. The weighted theta closure is
+the common kernel of the admitted line jets.
+Gap: The line approximation required on p. 443 is the width-zero case of the strip common-kernel assertion. -/
+theorem spectralLineJet_commonKernel (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let u : SpectralLineJetIndex χ a s → W'(0, 0, s) := lineU(χ, hs)
+    JetKernel(a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by
+  apply spectralLineJet_zeroWidth_transport χ a hs
+    (fun hl u ↦ JetKernel(a, hl, lineHs(hs), u))
+  intro e y
+  refine (spectralStripJet_commonKernel (a := a) χ _hχ (le_refl (0 : ℝ)) (lineHs(hs)) y).trans ?_
+  exact e.surjective.forall
+
+/-- Paper: Theorem 10.2.1.1, pp. 440–443. Single-jet interpolants have
+representatives whose images span a dense subspace of the line quotient.
+Gap: The interpolation and density asserted on p. 443 follow from the corresponding
+strip assertion at width zero. -/
+theorem spectralLineJet_denseInterpolants (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let u : J → W'(0, 0, s) := lineU(χ, hs)
+    JetInterpolation(J, a, le_rfl (a := (0 : ℝ)), lineHs(hs), u) := by
+  apply spectralLineJet_zeroWidth_transport χ a hs
+    (fun hl u ↦ JetInterpolation(SpectralLineJetIndex χ a s, a, hl, lineHs(hs), u))
+  intro e
+  obtain ⟨v, hv, hc, hd⟩ :=
+    spectralStripJet_denseInterpolants (a := a) χ _hχ (le_refl (0 : ℝ)) (lineHs(hs))
+  refine ⟨v ∘ e, fun i ↦ hv (e i), fun i j hij ↦ hc (e i) (e j) (e.injective.ne hij), ?_⟩
+  let q := (Θ(a, stripI(le_refl (0 : ℝ)), lineHs(hs))).mkQ
+  change Dense (Submodule.span ℂ (range ((fun j ↦ q (v j)) ∘ e)) :
+    Set (spectralSobolevQuotient F a (stripI(le_refl (0 : ℝ))) (lineHs(hs))))
+  rwa [e.surjective.range_comp]
+
+/-- Paper: Theorem 10.2.1.1 and Terminology 10.2.1.1, p. 440. The a-line
+jets represent quotient functionals and admit a Markushevich biorthogonal family.
+Deviation: Index directly by the admitted jets, so reindexing permits any
+enumeration, including finite and empty families. Apply the strict cutoff. -/
+theorem spectralLineMarkushevichBasis (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (hχ : IsSpectralBasepointChoice χ) {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    Countable J ∧ ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
+      ∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j)) := by
+  exact ⟨spectralLineJet_countable χ a s, spectralSobolevQuotient_basis_of_interpolation a
+    (le_rfl (a := (0 : ℝ))) (lineHs(hs)) (lineU(χ, hs))
+    (spectralLineJet_commonKernel χ hχ hs) (spectralLineJet_denseInterpolants χ hχ hs)⟩
+
+/-- Paper: Corollary 10.2.1.4, p. 444. The a-line basis in the quotient dual
+is normalized in the norm of its realization in the negative space.
+Deviation: Apply the strict cutoff and allow finite or empty index types. -/
+theorem spectralLineMarkushevichBasis_normalized
+    (χ : PontryaginDual C₁ → PontryaginDual C𝔽) (_hχ : IsSpectralBasepointChoice χ)
+    {a s : ℝ} (hs : 1 < s) :
+    let J := SpectralLineJetIndex χ a s
+    let Q := spectralSobolevQuotient F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    let D := spectralSobolevDualEmbedding F a (le_rfl (a := (0 : ℝ))) (le_of_lt (zero_lt_one.trans hs))
+    ∃ (x : J → Q) (Λ : J → StrongDual ℂ Q), IsSpectralMarkushevichBasis x Λ ∧
+      (∀ j, D (Λ j) = (spectralLineJet_memLp χ hs j).toLp (lineJet(χ, j))) ∧
+      IsNormalizedSpectralFamily (fun j ↦ D (Λ j)) := by
+  obtain ⟨x, Λ, hB, hD⟩ := (spectralLineMarkushevichBasis (a := a) χ _hχ hs).2
+  obtain ⟨C, hC, hbound⟩ := spectralLineJet_annulus (a := a) χ _hχ hs
+  refine ⟨x, Λ, hB, hD, ⟨C, ?_⟩, ⟨C⁻¹, inv_pos.mpr hC, ?_⟩⟩
+  · intro j
+    simpa only [hD j] using (hbound j).2
+  · intro j
+    simpa only [hD j] using (hbound j).1
 
 /-- Paper: Theorem 10.2.2.1, p. 446. The discrete divisor in each norm
 chart gives countably many strip jets over the countable norm-one dual. -/

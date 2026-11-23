@@ -82,13 +82,13 @@ theorem regularL2_separable : SeparableSpace (RegularL2 ν) := by
   have : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by simp⟩
   infer_instance
 
-/-- Paper: (4.3.1.4), p. 175. Left translation on Haar L² precomposes with
-multiplication by the inverse group element. -/
+/-- Paper: Lemma 4.3.1.5(2), p. 176. Left translation on Haar L² is precomposition
+with multiplication by the inverse group element, extending the action in (4.3.1.4), p. 175. -/
 def regularTranslate (g : G) (f : RegularL2 ν) : RegularL2 ν :=
   DomMulAct.mk g⁻¹ • f
 
-/-- Paper: (4.3.1.4), p. 175. Left translation has the stated representative
-almost everywhere. -/
+/-- Paper: Lemma 4.3.1.5(2), p. 176. The representative of the L² left translate
+agrees almost everywhere with the inverse-translation formula in (4.3.1.4), p. 175. -/
 theorem regularTranslate_ae_eq (g : G) (f : RegularL2 ν) :
     (regularTranslate ν g f : G → ℂ) =ᵐ[ν] fun x ↦ f (g⁻¹ * x) := by
   exact DomMulAct.smul_Lp_ae_eq (DomMulAct.mk g⁻¹) f
@@ -149,8 +149,9 @@ theorem regularL2Action_apply (g : G) (f : RegularL2 ν) :
   exact eq_regularTranslate_of_compactlySupported ν g _
     ((existsUnique_regularL2_action ν).exists.choose_spec.2 g) f
 
-/-- Paper: Lemma 4.3.1.5(2), p. 176. Left translations preserve the
-Hermitian inner product and their inverses are the opposite translations. -/
+/-- Paper: Lemma 4.3.1.5(2), p. 176. Left translations preserve the Hermitian
+inner product as in (4.3.1.5). The inverse translation formula follows separately from
+the group action law for `regularL2Action`. -/
 theorem regularL2Action_inner (g : G) (f h : RegularL2 ν) :
     ⟪regularL2Action ν g f, regularL2Action ν g h⟫_ℂ = ⟪f, h⟫_ℂ := by
   rw [regularL2Action_apply, regularL2Action_apply]
@@ -318,8 +319,9 @@ variable (τ : ℝ≥0ˣ →ₜ* G) (hτ : RightInverse τ m)
 include hτ
 
 omit hm hν hν₁ hτ in
-/-- Paper: Definition A.3.2.1, p. 559. The exponential pushforward of Lebesgue measure
-is a multiplicative Haar measure on the positive reals. -/
+/-- Paper: Text following (4.3.2.1), p. 178. The exponential pushforward of
+Lebesgue measure is a multiplicative Haar measure on the positive reals. This justifies the
+canonical Haar measure convention dt/t used there. -/
 theorem positiveRealHaar_isHaarMeasure : positiveRealHaar.IsHaarMeasure := by
   have : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
   let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)

@@ -706,7 +706,12 @@ end IsotypicQuotient
 
 /-- Paper: Lemma 4.6.1.4, p. 211. Logarithmic commensurability of the bases
 is equivalent to finiteness of all mutual cyclic phases.
-Deviation: Part (1) uses log bₖ as in both directions of the proof. -/
+Deviation: Part (1) uses log bₖ as in both directions of the proof.
+
+Deviation: Part (1) on p. 211 and the opening assumption of its proof put the bases themselves
+in $\mathbb Q\cdot\log(b)$. We use their logarithms, as the subsequent reasoning in both
+directions does.
+-/
 theorem finite_cyclicPhases_iff {N : ℕ} (hN : 0 < N) (b : Fin N → ℝ) (hb : ∀ k, 1 < b k) :
     (∃ a : ℝ, 1 < a ∧ ∀ k, ∃ r : ℚ, Real.log (b k) = (r : ℝ) * Real.log a) ↔
       (range fun p : Fin N × Fin N × ℤ ↦
@@ -837,7 +842,12 @@ include hm hms hχ in
 /-- Paper: Situation 4.6.1.1(5) and Theorem 4.6.1.5, pp. 209, 212.
 The integer frequency parametrizes each cyclic fiber bijectively.
 Deviation: Frequencies have denominator log |γₖ| and use the normalized phase.
-The character is the inverse of the pulled-back basis character of §4.4. -/
+The character is the inverse of the pulled-back basis character of §4.4.
+
+Deviation: Part (4) on p. 209 leaves the restriction equation unfinished. We require
+$\chi\vert_{G^1}=\omega$. The phase equation in part (5) determines the phase modulo $2\pi/L_k$.
+We choose it in $[0,2\pi/L_k)$, where $L_k=\log\lvert\gamma_k\rvert_G$, as on pp. 192 and 215.
+-/
 theorem modulatedPeriodicFrequency_bijective (k : Fin N) :
     Injective (fun n : ℤ ↦ freq[k, n]) ∧
       range (fun n : ℤ ↦ freq[k, n]) = modulatedCyclicAnnihilatorFiber m ω (γs k) := by
@@ -1347,7 +1357,9 @@ include hχ in
 /-- Paper: Theorem 4.6.1.5(2), p. 212. At each fixed moment order, the
 coefficients on each cyclic lattice give a Schwartz sequence.
 Deviation: The sequence is extended by zero at indices where the moment
-order is at least the multiplicity, consistent with (4.6.1.15).
+order is at least the multiplicity, consistent with (4.6.1.15). The page prints
+"multiplicity at least m", which includes the indices where the order equals the
+multiplicity; the moment of the test function at those indices is not covered here.
 The decay estimate does not require commensurability. -/
 theorem modulatedLogMoment_lattice_schwartz (f : H₀[ω]) (r : Fin N) (k : Fin N) :
     ∃ v : SchwartzBruhat (Multiplicative ℤ), ∀ n : ℤ, v (Multiplicative.ofAdd n) =

@@ -1653,14 +1653,6 @@ local notation "onClosedPrimeQuotient(" hs ", " ω ", " body ")" =>
    body)
 
 /-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
-Convolution by any compactly supported Bruhat test on the prime quotient is trace class.
-Deviation: Use the quotient by the closed principal-value image. -/
-theorem primeOrbitalSobolevConvolution_nuclear (φ : BruhatCompactSupport C𝔽) :
-    onClosedPrimeQuotient(hs₁, ω(χ),
-      letI : PolynormableSpace ℂ OrbQ := (norm_withSeminorms ℂ OrbQ).toPolynormableSpace
-      IsNuclearOperator (OrbA(φ))) := by sorry
-
-/-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
 The convolution action lifts linearly to the trace class and is continuous in trace norm.
 Deviation: Use the quotient by the closed principal-value image. -/
 theorem primeOrbitalSobolevConvolution_traceNorm_continuous :
@@ -1668,6 +1660,50 @@ theorem primeOrbitalSobolevConvolution_traceNorm_continuous :
       ∃ L : BruhatCompactSupport C𝔽 →ₗ[ℂ] nuclearEndomorphisms OrbQ,
         (∀ φ, (L φ).val = OrbA(φ)) ∧ Tendsto (fun φ ↦ traceNorm (L φ)) (𝓝 0) (𝓝 0)) :=
   by sorry
+
+section PrimeOrbitalNuclearHelpers
+
+omit _hdeg _hχ
+
+/-- Polynormable structures with the same topology have only proof fields. -/
+private theorem primeOrbitalSobolevConvolution_nuclear_polynormable_independent
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H]
+    (p₁ p₂ : PolynormableSpace ℂ H) (A : H →L[ℂ] H) :
+    @IsNuclearOperator H H _ _ _ p₁ _ _ _ A ↔ @IsNuclearOperator H H _ _ _ p₂ _ _ _ A := by
+  have hp : p₁ = p₂ := by cases p₁; cases p₂; rfl
+  cases hp
+  rfl
+
+/-- Extract nuclearity before specializing to the quotient instance tower. -/
+private theorem primeOrbitalSobolevConvolution_nuclear_of_lift
+    (H X : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    (A : X → H →L[ℂ] H)
+    (h : ∃ L : X →ₗ[ℂ] nuclearEndomorphisms H, (∀ x, (L x).val = A x) ∧
+      Tendsto (fun x ↦ traceNorm (L x)) (𝓝 0) (𝓝 0)) (x : X) :
+    letI : PolynormableSpace ℂ H := (norm_withSeminorms ℂ H).toPolynormableSpace
+    IsNuclearOperator (A x) := by
+  obtain ⟨L, hL, _⟩ := h
+  have hn := (L x).property
+  rw [hL x] at hn
+  exact (primeOrbitalSobolevConvolution_nuclear_polynormable_independent H
+    (inferInstance : PolynormableSpace ℂ H)
+    ((norm_withSeminorms ℂ H).toPolynormableSpace) (A x)).mp hn
+
+end PrimeOrbitalNuclearHelpers
+
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.3), p. 490.
+Convolution by any compactly supported Bruhat test on the prime quotient is trace class.
+Deviation: Use the quotient by the closed principal-value image. -/
+theorem primeOrbitalSobolevConvolution_nuclear (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      letI : PolynormableSpace ℂ OrbQ := (norm_withSeminorms ℂ OrbQ).toPolynormableSpace
+      IsNuclearOperator (OrbA(φ))) := by
+  have hn := primeOrbitalSobolevConvolution_traceNorm_continuous (F := F) (p := p)
+    (χ := χ) (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ)
+  exact onClosedPrimeQuotient(hs₁, ω(χ), by
+    apply primeOrbitalSobolevConvolution_nuclear_of_lift OrbQ (BruhatCompactSupport C𝔽)
+      (fun ψ ↦ OrbA(ψ)) hn φ)
 
 /-- Paper: Theorem 11.2.2.1, p. 490.
 Taking the trace of prime orbital convolution gives a distribution on the compactly
@@ -1706,6 +1742,25 @@ theorem primeOrbitalSobolevConvolution_trace_distribution :
 local notation "zeros" => {z : ℂ // reciprocalPartialHeckeEulerProduct χ (Sₚ(p)) z = 0}
 local notation "mult(" z ")" => orbitalEulerMultiplicity χ (Sₚ(p)) z
 
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490. The Mellin values of the
+test at the zeros of the reciprocal partial Euler product over the places above p, weighted
+by the admissible multiplicity, form an absolutely summable family. -/
+theorem primeOrbitalSobolevConvolution_trace_summable (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
+        let term (z : zeros) :=
+          (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
+        Summable (fun z ↦ ‖term z‖)) := by sorry
+
+/-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490. The sum of those weighted
+Mellin values is the trace of the convolution, for any nuclear presentation of it. -/
+theorem primeOrbitalSobolevConvolution_trace_hasSum (φ : BruhatCompactSupport C𝔽) :
+    onClosedPrimeQuotient(hs₁, ω(χ),
+      ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
+        let term (z : zeros) :=
+          (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
+        HasSum term (hilbertTrace T)) := by sorry
+
 /-- Paper: Theorem 11.2.2.1 and (11.2.2.4)–(11.2.2.5), p. 490.
 The trace is the absolutely convergent sum of Mellin values at the zeros of the
 reciprocal Euler product over the places above p, weighted by admissible multiplicity.
@@ -1716,7 +1771,12 @@ theorem primeOrbitalSobolevConvolution_trace (φ : BruhatCompactSupport C𝔽) :
       ∀ (T : nuclearEndomorphisms OrbQ), T.val = OrbA(φ) →
         let term (z : zeros) :=
           (spectralBoundaryMultiplicity s (mult(z.val)) : ℂ) * nuclearityTestMellin χ φ z.val
-        Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace T)) := by sorry
+        Summable (fun z ↦ ‖term z‖) ∧ HasSum term (hilbertTrace T)) :=
+  fun T hT => And.intro
+    (primeOrbitalSobolevConvolution_trace_summable (F := F) (p := p) (s := s) (χ := χ)
+      (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ) φ T hT)
+    (primeOrbitalSobolevConvolution_trace_hasSum (F := F) (p := p) (s := s) (χ := χ)
+      (h₁ := h₁) (_hdeg := _hdeg) (_hχ := _hχ) φ T hT)
 
 include h₁ in
 /-- Paper: Remark 11.2.2.2, p. 491.
