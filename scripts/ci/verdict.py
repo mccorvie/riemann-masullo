@@ -256,6 +256,8 @@ class Check:
         return not any(b"doc.verso" in path.read_bytes() for path in sources if path.is_file())
 
     def base_state(self, supplied):
+        if supplied:
+            validate_base_signatures(supplied)
         result = run([str(TOOLS / "scripts/lint.sh"), str(self.work)])
         if result.returncode:
             raise Stop("error", ["main itself does not pass the lint"], result.stdout)
@@ -279,6 +281,7 @@ class Check:
         dump, out = self.signatures()
         if dump is None:
             raise Stop("error", ["the signature dump of main failed"], out)
+        validate_base_signatures(dump)
         return dump, log, sizes
 
     def merge(self, entries):
@@ -330,25 +333,36 @@ def grown_synonyms(base, head):
     return sorted(n for n, size in head.items() if size >= LARGE_SYNONYM and size > base.get(n, 0))
 
 
+def signature_table(text):
+    rows, bad = {}, []
+    for line in text.split("\n"):
+        if not line:
+            continue
+        m = SIGNATURE_LINE.fullmatch(line)
+        if m:
+            rows.setdefault(m.group(2), []).append(line)
+        else:
+            bad.append(line)
+    return rows, bad
+
+
+def validate_base_signatures(dump):
+    rows, bad = signature_table(dump)
+    if bad:
+        raise Stop("error", ["the signature dump of main has lines that could not be read"], dump)
+    if not rows:
+        raise Stop("error", ["the signature dump of main contains no declarations"], dump)
+
+
 def compare(base, head):
     """(changed, removed, added other than theorems, malformed lines) between two dumps.
 
     The dumps are made with `--all`, so they list private definitions too; the caller treats
     those apart (names beginning `_private.`).
     """
-    def table(text):
-        rows, bad = {}, []
-        for line in text.split("\n"):
-            if not line:
-                continue
-            m = SIGNATURE_LINE.fullmatch(line)
-            if m:
-                rows.setdefault(m.group(2), []).append(line)
-            else:
-                bad.append(line)
-        return rows, bad
-    old, _ = table(base)
-    new, bad = table(head)
+    # base_state validates the baseline before the pull request is merged or built.
+    old, _ = signature_table(base)
+    new, bad = signature_table(head)
     changed = sorted(n for n in old if n in new and old[n] != new[n])
     removed = sorted(n for n in old if n not in new)
     added = sorted(n for n in new if n not in old and any(not l.startswith("theorem ") for l in new[n]))
