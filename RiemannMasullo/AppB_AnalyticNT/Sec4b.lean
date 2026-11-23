@@ -258,40 +258,47 @@ private theorem completedHeckeL_logDeriv_abscissa (χ : U[F]) {z : ℂ} (hz : 1 
   exact (finiteHeckeL_seriesSummable χ ⟨(r : ℂ), by simpa using hr⟩).abscissaOfAbsConv_le.trans_lt
     (by exact_mod_cast hrz)
 
-private theorem completedHeckeL_logDeriv_finite_reciprocal (χ : U[F]) (σ : ℝ) (hσ : 1 < σ)
+/-- A positive lower bound from the Euler product, uniform on a line to the right of one. -/
+private theorem completedHeckeL_logDeriv_finite_lower (χ : U[F]) (σ : ℝ) (hσ : 1 < σ)
     (z : ℂ) (hz : z.re = σ) :
-    ‖(finiteSeries(χ) z)⁻¹‖ ≤
-      Real.exp (∑' v : Primes(F), q(v) ^ (-σ)) := by
+    Real.exp (-(∑' v : Primes(F), q(v) ^ (-σ))) ≤ ‖finiteSeries(χ) z‖ := by
   have hz' : 1 < z.re := hz ▸ hσ
   let E (v : Primes(F)) := finiteHeckeEulerFactor χ v z
-  have hn : finiteSeries(χ) z ≠ 0 := finiteHeckeL_ne_zero_of_one_lt_re χ ⟨z, hz'⟩
+  let r (v : Primes(F)) := q(v) ^ (-σ)
   have hp : HasProd E (finiteSeries(χ) z) := finiteHeckeL_hasProd χ ⟨z, hz'⟩
-  have hsum : Summable (fun v : Primes(F) ↦ q(v) ^ (-σ)) :=
+  have hsum : Summable r :=
     (summable_absNorm_rpow F hσ).comp_injective (fun _ _ he ↦ HeightOneSpectrum.ext he)
-  have hlocal (v : Primes(F)) : ‖(E v)⁻¹‖ ≤ 1 + q(v) ^ (-σ) := by
+  have hnonneg (v : Primes(F)) : 0 ≤ r v := by positivity
+  have hlocal (v : Primes(F)) : Real.exp (-r v) ≤ ‖E v‖ := by
     have hv : (1 : ℝ) < q(v) := by exact_mod_cast NumberField.HeightOneSpectrum.one_lt_absNorm v
     unfold E finiteHeckeEulerFactor
     split_ifs
-    · rw [inv_inv]
-      refine (norm_sub_le _ _).trans_eq ?_
-      rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul, ← Complex.ofReal_natCast,
-        Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hv), Complex.neg_re, hz]
-    · simp only [inv_one, norm_one]
-      exact le_add_of_nonneg_right (Real.rpow_nonneg (zero_lt_one.trans hv).le _)
-  have ht : Tendsto (fun T : Finset (Primes(F)) ↦ ‖(∏ v ∈ T, E v)⁻¹‖) atTop
-      (𝓝 ‖(finiteSeries(χ) z)⁻¹‖) :=
-    ((show Tendsto (fun T : Finset (Primes(F)) ↦ ∏ v ∈ T, E v) atTop
-      (𝓝 (finiteSeries(χ) z)) from hp).inv₀ hn).norm
-  apply le_of_tendsto' ht
+    · let u := (χ₀(χ)).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z)
+      change Real.exp (-r v) ≤ ‖(1 - u)⁻¹‖
+      have hu : ‖u‖ = r v := by
+        dsimp only [u, r]
+        rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul, ← Complex.ofReal_natCast,
+          Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hv), Complex.neg_re, hz]
+      have hu' : ‖u‖ < 1 := by
+        rw [hu]
+        exact Real.rpow_lt_one_of_one_lt_of_neg hv (by linarith)
+      have hne : 1 - u ≠ 0 := fun h ↦ hu'.ne (by rw [← sub_eq_zero.mp h, norm_one])
+      rw [norm_inv, Real.exp_neg]
+      apply (inv_le_inv₀ (Real.exp_pos _) (norm_pos_iff.mpr hne)).2
+      calc
+        ‖1 - u‖ ≤ ‖(1 : ℂ)‖ + ‖u‖ := norm_sub_le _ _
+        _ ≤ Real.exp (r v) := by rw [norm_one, hu, add_comm]; exact Real.add_one_le_exp _
+    · rw [norm_one]
+      exact Real.exp_le_one_iff.mpr (neg_nonpos.mpr (hnonneg v))
+  apply ge_of_tendsto' hp.norm
   intro T
-  rw [← Finset.prod_inv_distrib, norm_prod]
+  rw [norm_prod]
   calc
-    _ ≤ ∏ v ∈ T, Real.exp (q(v) ^ (-σ)) :=
-      Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _) (fun v _ ↦
-        (hlocal v).trans ((add_comm _ _).trans_le (Real.add_one_le_exp _)))
-    _ ≤ _ := by
-      rw [← Real.exp_sum]
-      exact Real.exp_le_exp.mpr (hsum.sum_le_tsum T fun _ _ ↦ by positivity)
+    _ ≤ Real.exp (∑ v ∈ T, -r v) := by
+      rw [Finset.sum_neg_distrib]
+      exact Real.exp_le_exp.mpr (neg_le_neg (hsum.sum_le_tsum T fun v _ ↦ hnonneg v))
+    _ = ∏ v ∈ T, Real.exp (-r v) := Real.exp_sum _ _
+    _ ≤ _ := Finset.prod_le_prod₀ (fun _ _ ↦ (Real.exp_pos _).le) (fun v _ ↦ hlocal v)
 
 private theorem completedHeckeL_logDeriv_finite_bound (χ : U[F]) (σ : ℝ) (hσ : 1 < σ) :
     ∃ C ≥ (0 : ℝ), ∀ z : ℂ, z.re = σ → ‖logDeriv (finiteSeries(χ)) z‖ ≤ C := by
@@ -311,7 +318,13 @@ private theorem completedHeckeL_logDeriv_finite_bound (χ : U[F]) (σ : ℝ) (h�
   have hA : ‖LSeries (LSeries.logMul c) z‖ ≤ a :=
     (norm_tsum_le_tsum_norm hs).trans
       (hs.tsum_le_tsum (LSeries.norm_term_le_of_re_le_re (LSeries.logMul c) (by simpa using hz.ge)) hsσ)
-  have hB := completedHeckeL_logDeriv_finite_reciprocal χ σ hσ z hz
+  have hLower := completedHeckeL_logDeriv_finite_lower χ σ hσ z hz
+  have hB : ‖(finiteSeries(χ) z)⁻¹‖ ≤ b := by
+    rw [norm_inv]
+    calc
+      _ ≤ (Real.exp (-(∑' v : Primes(F), q(v) ^ (-σ))))⁻¹ :=
+        (inv_le_inv₀ ((Real.exp_pos _).trans_le hLower) (Real.exp_pos _)).2 hLower
+      _ = b := by rw [Real.exp_neg, inv_inv]
   rw [logDeriv_apply, LSeries_deriv hc, div_eq_mul_inv, norm_mul, norm_neg]
   exact mul_le_mul hA hB (norm_nonneg _) ha
 
@@ -510,7 +523,9 @@ private theorem completedHeckeL_logDeriv_right_local (χ : U[F]) (L : ℂ → �
     filter_upwards [hopen.mem_nhds (show z ∈ halfPlane from hz)] with w hw
     exact hAgree ⟨w, hw⟩
   have hG₀ := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans hz)
-  have hF₀ : finiteSeries(χ) z ≠ 0 := finiteHeckeL_ne_zero_of_one_lt_re χ ⟨z, hz⟩
+  have hF₀ : finiteSeries(χ) z ≠ 0 :=
+    norm_pos_iff.mp ((Real.exp_pos _).trans_le
+      (completedHeckeL_logDeriv_finite_lower χ z.re hz z rfl))
   have hL₀ : L z ≠ 0 := hEq.eq_of_nhds ▸ mul_ne_zero hG₀ hF₀
   have hNF : MeromorphicNFAt L z := hL (mem_univ z)
   have hA := hNF.meromorphicOrderAt_nonneg_iff_analyticAt.mp
