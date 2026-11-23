@@ -58,7 +58,12 @@ strictly below the cutoff have full weight and the last term has half weight. -/
 theorem perronHalfWeightedSum_nat (a : ℕ → ℂ) (s : ℂ) {m : ℕ} (hm : 0 < m) :
     perronHalfWeightedSum a s m =
       (∑ n ∈ Finset.Ico 1 m, LSeries.term a s n) + LSeries.term a s m / 2 := by
-  sorry
+  show (∑ n ∈ Finset.Icc 1 ⌊(m : ℝ)⌋₊,
+      if (n : ℝ) = m then LSeries.term a s n / 2 else LSeries.term a s n) = _
+  rw [Nat.floor_natCast, Finset.Icc_eq_cons_Ico hm, Finset.sum_cons, ite_eq_left rfl, add_comm]
+  congr 1
+  refine Finset.sum_congr rfl fun n hn ↦ ite_eq_right ?_
+  exact_mod_cast (Finset.mem_Ico.mp hn).2.ne
 
 /-- Paper: Equations (B.7.1.6)–(B.7.1.7), pp. 644–645. The truncated Perron
 error is bounded by a sum weighted by the inverse logarithmic distance from
