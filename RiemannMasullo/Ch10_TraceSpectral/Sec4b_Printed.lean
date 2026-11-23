@@ -3,7 +3,10 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
+import RiemannMasullo.AppD_SchwartzBruhat.Sec1c
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch13_ZerosHecke.Targets
+import RiemannMasullo.External.ZetaLab.HardyFirstZero.FirstZero
 
 /-! # False assertions in §10.4.3 -/
 
@@ -126,13 +129,258 @@ def Printed.spectralSchwartzBiorthogonal_unique : Prop :=
       (∫ g, (ψ j').val.val g * ideleClassNormTwist χ ((a : ℂ) + j.val.1) g *
         (logNorm(F) g : ℂ) ^ j.val.2 ∂(μ(F))) = if j = j' then 1 else 0
 
-/-- Paper: (10.4.3.5), p. 466. For F = ℚ, χ = 1 and a = 0, add the
-theta function of the rational test with finite factor 1_{ℤ̂} and archimedean
-factor exp(−πx²) − 3 exp(−4πx²) + 2 exp(−16πx²) to any claimed biorthogonal
-vector. This nonzero test has zero values under every zeta jet by divisibility
-of its Mellin transform. Its theta function is nonzero at large norm. -/
+/-- Haar translation acts on the Mellin moments through the binomial expansion
+of the shifted logarithm. -/
+private theorem translated_mellin_moment {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [MeasurableSpace G] [IsTopologicalGroup G] [BorelSpace G]
+    (μ : Measure G) [μ.IsMulLeftInvariant] (L : G → ℂ)
+    (hL : ∀ x y, L (x * y) = L x + L y) (c : G →ₜ* ℂ) (f : G → ℂ)
+    (hf : ∀ i : ℕ, Integrable (fun x ↦ f x * c x * (L x) ^ i) μ)
+    (y : G) (k : ℕ) :
+    (∫ x, f (y⁻¹ * x) * c x * (L x) ^ k ∂μ) =
+      c y * ∑ i ∈ Finset.range (k + 1), (L y) ^ (k - i) * (k.choose i : ℂ) *
+        (∫ x, f x * c x * (L x) ^ i ∂μ) := by
+  let A (i : ℕ) := (L y) ^ (k - i) * (k.choose i : ℂ)
+  let P (i : ℕ) (x : G) := f x * c x * (L x) ^ i
+  have hchange :
+      (∫ x, f (y⁻¹ * x) * c x * (L x) ^ k ∂μ) =
+        ∫ x, f x * (c y * c x) * (L x + L y) ^ k ∂μ := by
+    rw [← integral_mul_left_eq_self (μ := μ) (fun x ↦ f (y⁻¹ * x) * c x * (L x) ^ k) y]
+    exact integral_congr_ae (ae_of_all _ fun x ↦ by
+      dsimp only
+      rw [inv_mul_cancel_left, map_mul, hL, add_comm (L y)])
+  rw [hchange]
+  change _ = c y * ∑ i ∈ Finset.range (k + 1), A i * (∫ x, P i x ∂μ)
+  simp_rw [← integral_const_mul]
+  rw [← integral_finsetSum _ (fun i _ ↦ (hf i).const_mul (A i)), ← integral_const_mul]
+  apply integral_congr_ae (ae_of_all _ fun x ↦ ?_)
+  rw [add_pow, Finset.mul_sum, Finset.mul_sum]
+  exact Finset.sum_congr rfl fun i _ ↦ by dsimp [A, P]; ring
+
+/-- The two real twists at abscissas one unit to either side dominate
+every fixed logarithmic moment of a rational decay test. -/
+private theorem rational_decay_moment_integrable (f : ModulatedExponentialDecay m𝔽(ℚ) univ) (z : ℂ) (k : ℕ) :
+    Integrable (fun x ↦ f.val x * ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) z x *
+      (logNorm(ℚ) x : ℂ) ^ k) μ(ℚ) := by
+  let m := m𝔽(ℚ)
+  let c := ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) z
+  let L (x : C𝔽(ℚ)) : ℂ := logNorm(ℚ) x
+  let T (a : ℝ) := modulatedExponentialDecayTwist m univ ⟨a, mem_univ a⟩ f
+  have h₁ := (SchwartzBruhat.integrable μ(ℚ) (T (z.re + 1))).norm
+  have h₂ := (SchwartzBruhat.integrable μ(ℚ) (T (z.re - 1))).norm
+  have hf0 : AEStronglyMeasurable f.val μ(ℚ) :=
+    (SchwartzBruhat.integrable μ(ℚ) (T 0)).aestronglyMeasurable.congr (ae_of_all _ fun x ↦
+      (modulatedExponentialDecayTwist_apply m univ ⟨0, mem_univ _⟩ f x).trans (by simp))
+  have hL : Continuous L := by
+    apply Complex.continuous_ofReal.comp
+    exact (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+      fun x ↦ NNReal.coe_ne_zero.mpr (m x).ne_zero
+  refine ((h₁.add h₂).const_mul (k.factorial : ℝ)).mono'
+    ((hf0.mul (c).continuous.aestronglyMeasurable).mul (hL.pow k).aestronglyMeasurable)
+    (ae_of_all _ fun x ↦ ?_)
+  let r : ℝ := (m x).val
+  have hr : 0 < r := NNReal.coe_pos.mpr (Units.zero_lt (m x))
+  have hTw (a : ℝ) : ‖(T a).val x‖ = r ^ a * ‖f.val x‖ := by
+    refine (congrArg norm (modulatedExponentialDecayTwist_apply m univ ⟨a, mem_univ _⟩ f x)).trans ?_
+    rw [norm_mul, Complex.norm_real,
+      Real.norm_of_nonneg (Real.rpow_nonneg hr.le _)]
+  have hc : ‖c x‖ = r ^ z.re := by
+    change ‖(1 : ℂ) * (r : ℂ) ^ z‖ = _
+    rw [one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hr]
+  have hp : |Real.log r| ^ k ≤ (k.factorial : ℝ) * (r + r⁻¹) := by
+    have h := Real.pow_div_factorial_le_exp |Real.log r| (abs_nonneg _) k
+    have hk : (0 : ℝ) < k.factorial := by exact_mod_cast Nat.factorial_pos k
+    rw [div_le_iff₀ hk] at h
+    have he : Real.exp |Real.log r| ≤ r + r⁻¹ := by
+      rcases le_total 0 (Real.log r) with h | h
+      · rw [abs_of_nonneg h, Real.exp_log hr]
+        exact le_add_of_nonneg_right (inv_nonneg.mpr hr.le)
+      · rw [abs_of_nonpos h, Real.exp_neg, Real.exp_log hr]
+        exact le_add_of_nonneg_left hr.le
+    exact h.trans ((mul_le_mul_of_nonneg_right he hk.le).trans_eq (mul_comm _ _))
+  change ‖f.val x * c x * (L x) ^ k‖ ≤
+    (k.factorial : ℝ) * (‖(T (z.re + 1)).val x‖ + ‖(T (z.re - 1)).val x‖)
+  rw [norm_mul, norm_mul, hc, norm_pow, Complex.norm_real, Real.norm_eq_abs, hTw, hTw,
+    Real.rpow_add hr, Real.rpow_sub hr, Real.rpow_one]
+  calc
+    ‖f.val x‖ * r ^ z.re * |Real.log r| ^ k ≤
+      ‖f.val x‖ * r ^ z.re * ((k.factorial : ℝ) * (r + r⁻¹)) :=
+        mul_le_mul_of_nonneg_left hp (by positivity)
+    _ = _ := by ring
+
+/-- The rational order comparison is the one used for the strip index in
+the proof of the ambient pairing refutation in Sec4a. -/
+private theorem rational_biorthogonal_zero :
+    ∃ z : ℂ, 0 < (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) z).untop₀.toNat := by
+  obtain ⟨t, _, ht⟩ := HardyFirstZero.first_zero_on_line
+  let z : ℂ := 1 / 2 + t * Complex.I
+  have hne : z ≠ 1 := by
+    intro he
+    have := congrArg Complex.re he
+    norm_num [z] at this
+  have ha := analyticOn_riemannZeta z hne
+  have hm : MeromorphicOn riemannZeta univ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      meromorphic_dirichletLFunction (1 : DirichletCharacter ℂ 1)
+  have he := meromorphicOrderAt_finiteHeckeL_continuation (1 : PontryaginDual C𝔽(ℚ))
+    hm (fun s ↦ by rw [finiteHeckeL_one_eq_dedekindZeta, dedekindZeta_rat_eq_riemannZeta s.property])
+    (s := z) (by norm_num [z])
+  have hz2 : meromorphicOrderAt riemannZeta (2 : ℂ) = 0 := by
+    have h := analyticOn_riemannZeta 2 (by norm_num : (2 : ℂ) ≠ 1)
+    rw [h.meromorphicOrderAt_eq, h.analyticOrderAt_eq_zero.mpr
+      (riemannZeta_ne_zero_of_one_lt_re (by norm_num))]
+    rfl
+  have hfin := hm.meromorphicOrderAt_ne_top_of_isPreconnected isPreconnected_univ
+    (mem_univ (2 : ℂ)) (mem_univ z) (by rw [hz2]; simp)
+  have hpos : analyticOrderAt riemannZeta z ≠ 0 := ha.analyticOrderAt_ne_zero.mpr ht
+  refine ⟨z, ?_⟩
+  rw [← he, ha.meromorphicOrderAt_eq]
+  rw [ha.meromorphicOrderAt_eq] at hfin
+  generalize analyticOrderAt riemannZeta z = k at hfin hpos ⊢
+  cases k using ENat.recTopCoe with
+  | top => simp at hfin
+  | coe n =>
+    have hn : n ≠ 0 := by simpa using hpos
+    simpa using Nat.pos_of_ne_zero hn
+
+private theorem rational_norm_haar_univ : μ(ℚ) univ = ⊤ := by
+  let m := m𝔽(ℚ)
+  let L := logNorm(ℚ)
+  have hc : Continuous L := by
+    exact (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous)).log
+      fun x ↦ NNReal.coe_ne_zero.mpr (m x).ne_zero
+  have hs : Surjective L := by
+    intro r
+    let a : ℝ≥0 := ⟨Real.exp r, (Real.exp_pos r).le⟩
+    let u := Units.mk0 a (NNReal.coe_ne_zero.mp (Real.exp_pos r).ne')
+    obtain ⟨x, hx⟩ := ratIdeleNormSection_class_rightInverse.surjective u
+    refine ⟨x, ?_⟩
+    change Real.log (((ideleClassNorm ℚ x).val : ℝ)) = r
+    rw [hx]
+    exact Real.log_exp r
+  have : NoncompactSpace C𝔽(ℚ) := ⟨fun h ↦
+    NoncompactSpace.noncompact_univ (X := ℝ)
+      (by simpa only [image_univ, hs.range_eq] using h.image hc)⟩
+  exact measure_univ_of_isMulLeftInvariant μ(ℚ)
+
+/-- Paper: (10.4.3.5), p. 466. A normalized translate of the test for the
+highest jet at a certified rational zeta zero has the same biorthogonal
+pairings. Uniqueness would make the test times its norm character a constant
+integrable function on the noncompact idele class group, contrary to the
+nonzero pairing at the highest jet. -/
 theorem Printed.spectralSchwartzBiorthogonal_unique_false :
-    ¬ Printed.spectralSchwartzBiorthogonal_unique := by sorry
+    ¬ Printed.spectralSchwartzBiorthogonal_unique := by
+  classical
+  intro h
+  obtain ⟨z, hz⟩ := rational_biorthogonal_zero
+  let m := m𝔽(ℚ)
+  let χ := ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ))
+  let L (x : C𝔽(ℚ)) : ℂ := logNorm(ℚ) x
+  let N (w : ℂ) := (meromorphicOrderAt (continuedCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ))) (0 + w)).untop₀.toNat
+  let J := {j : ℂ × ℕ // j.2 < N j.1}
+  let n := N z - 1
+  have hzN : 0 < N z := by simpa [N] using hz
+  let j₀ : J := ⟨(z, n), by change n < N z; dsimp [n]; omega⟩
+  let ι : (ideleClassNorm ℚ).ker →ₜ* C𝔽(ℚ) := ⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩
+  let ω := (1 : PontryaginDual C𝔽(ℚ)).comp ι
+  let E := ↥(modulatedDecayIsotype m univ (mem_univ 0) ω)
+  let M (f : C𝔽(ℚ) → ℂ) (w : ℂ) (k : ℕ) := ∫ g, f g * χ w g * (L g) ^ k ∂μ(ℚ)
+  let P (ψ : J → E) := ∀ j j' : J, M (ψ j').val.val j.val.1 j.val.2 = if j = j' then 1 else 0
+  have hex := h ℚ (1 : PontryaginDual C𝔽(ℚ)) 0
+  simp only [Complex.ofReal_zero, zero_add] at hex
+  change ∃! ψ : J → E, P ψ at hex
+  obtain ⟨ψ, hψ, huniq⟩ := hex
+  let f := (ψ j₀).val
+  let c := χ z
+  have hL (x y : C𝔽(ℚ)) : L (x * y) = L x + L y := by
+    change (Real.log ((m (x * y)).val : ℝ) : ℂ) = _
+    rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul, Complex.ofReal_add]
+    · exact NNReal.coe_ne_zero.mpr (m x).ne_zero
+    · exact NNReal.coe_ne_zero.mpr (m y).ne_zero
+  have hc (w : ℂ) (y : C𝔽(ℚ)) : χ w y ≠ 0 :=
+    ((Group.isUnit y).map (χ w)).ne_zero
+  have hMtrans (y : C𝔽(ℚ)) (j : J) :
+      M (fun x ↦ f.val (y⁻¹ * x)) j.val.1 j.val.2 = c y * (if j = j₀ then 1 else 0) := by
+    rw [show M (fun x ↦ f.val (y⁻¹ * x)) j.val.1 j.val.2 =
+        χ j.val.1 y * ∑ i ∈ Finset.range (j.val.2 + 1),
+          (L y) ^ (j.val.2 - i) * (j.val.2.choose i : ℂ) * M f.val j.val.1 i
+      from translated_mellin_moment μ(ℚ) L hL (χ j.val.1) f.val
+        (rational_decay_moment_integrable f j.val.1) y j.val.2]
+    have hlow (i : ℕ) (hi : i ∈ Finset.range (j.val.2 + 1)) :
+        M f.val j.val.1 i =
+          if (⟨(j.val.1, i), (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)).trans_lt j.property⟩ : J) =
+            j₀ then 1 else 0 :=
+      hψ ⟨(j.val.1, i), (Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)).trans_lt j.property⟩ j₀
+    by_cases hEq : j = j₀
+    · subst j
+      rw [ite_eq_left rfl]
+      have hsum : (∑ i ∈ Finset.range (n + 1), (L y) ^ (n - i) *
+          (n.choose i : ℂ) * M f.val z i) = 1 := by
+        rw [Finset.sum_eq_single n]
+        · have hn := hψ j₀ j₀
+          change M f.val z n = _ at hn
+          simp [hn]
+        · intro i hi hni
+          have hl := hlow i hi
+          change M f.val z i = _ at hl
+          rw [hl, ite_eq_right (fun he ↦ hni (congrArg (fun l : J ↦ l.val.2) he)), mul_zero]
+        · simp
+      change c y * (∑ i ∈ Finset.range (n + 1), (L y) ^ (n - i) *
+        (n.choose i : ℂ) * M f.val z i) = c y * 1
+      rw [hsum]
+    · rw [ite_eq_right hEq, mul_zero]
+      apply mul_eq_zero_of_right
+      refine Finset.sum_eq_zero fun i hi ↦ ?_
+      rw [hlow i hi, ite_eq_right ?_, mul_zero]
+      intro he
+      have hz' : j.val.1 = z := congrArg (fun l : J ↦ l.val.1) he
+      have hi' : i = n := congrArg (fun l : J ↦ l.val.2) he
+      have hj' : j.val.2 < N z := hz' ▸ j.property
+      have hij := Nat.lt_succ_iff.mp (Finset.mem_range.mp hi)
+      apply hEq
+      have hn : j.val.2 = n := by
+        apply le_antisymm _ (hi' ▸ hij)
+        exact Nat.le_pred_of_lt hj'
+      exact Subtype.ext (Prod.ext hz' hn)
+  have himp (y : C𝔽(ℚ)) : f.val y * c y = f.val 1 := by
+    have hm : IsModulation m := ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+    let f' : ModulatedExponentialDecay m univ := ⟨fun x ↦ f.val (y⁻¹ * x),
+      modulatedExponentialDecaySubmodule_translate m univ hm
+        ratIdeleNormSection_class_rightInverse.surjective y f⟩
+    have hf' : f' ∈ modulatedDecayIsotype m univ (mem_univ 0) ω := by
+      apply (mem_modulatedDecayIsotype_iff m ω univ (mem_univ 0) f').mpr
+      have hmem := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ 0) f).mp (ψ j₀).property
+      intro u x
+      change f.val (y⁻¹ * (u.val⁻¹ * x)) = _ * f.val (y⁻¹ * x)
+      rw [mul_left_comm, hmem]
+    let v : E := (c y)⁻¹ • (⟨f', hf'⟩ : E)
+    let ψ' : J → E := Function.update ψ j₀ v
+    have hψ' : P ψ' := by
+      intro j j'
+      by_cases hj : j' = j₀
+      · subst j'
+        rw [show ψ' j₀ = v from Function.update_self ..]
+        change (∫ x, ((c y)⁻¹ * f.val (y⁻¹ * x)) * χ j.val.1 x * L x ^ j.val.2 ∂μ(ℚ)) = _
+        simp_rw [mul_assoc ((c y)⁻¹), integral_const_mul]
+        change (c y)⁻¹ * M (fun x ↦ f.val (y⁻¹ * x)) j.val.1 j.val.2 = _
+        rw [hMtrans, ← mul_assoc, inv_mul_cancel₀ (hc z y), one_mul]
+      · simpa only [ψ', Function.update_of_ne hj] using hψ j j'
+    have heq := congrArg (fun φ : J → E ↦ (φ j₀).val.val y) (huniq ψ' hψ')
+    rw [show ψ' j₀ = v from Function.update_self ..] at heq
+    change (c y)⁻¹ * f.val (y⁻¹ * y) = f.val y at heq
+    rw [inv_mul_cancel] at heq
+    rw [← heq, mul_comm _ (c y), ← mul_assoc, mul_inv_cancel₀ (hc z y), one_mul]
+  have hfi : Integrable (fun x : C𝔽(ℚ) ↦ f.val 1) μ(ℚ) := by
+    exact (rational_decay_moment_integrable f z 0).congr
+      (ae_of_all μ(ℚ) fun x ↦ by
+        change f.val x * c x * L x ^ 0 = _
+        simpa only [pow_zero, mul_one] using himp x)
+  have h1 : f.val 1 = 0 := (integrable_const_iff.mp hfi).resolve_right
+    (fun hfinite ↦ (measure_lt_top μ(ℚ) univ).ne rational_norm_haar_univ)
+  have hzero (x : C𝔽(ℚ)) : f.val x = 0 := (mul_eq_zero.mp ((himp x).trans h1)).resolve_right (hc z x)
+  have hval := hψ j₀ j₀
+  change M f.val z n = _ at hval
+  simp [M, hzero] at hval
 
 local notation "represents(" F ", " α ", " s ", " B ", " k ")" =>
   (∀ u : W(F, α, s), ∀ᵐ x ∂(μ(F)),
