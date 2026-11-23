@@ -8,6 +8,8 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 public import RiemannMasullo.Ch03_IdelicZeta.Sec4
 public import Mathlib.Analysis.Distribution.Support
 
+import RiemannMasullo.AppD_SchwartzBruhat.Sec2b
+
 import Mathlib.Analysis.Calculus.FDeriv.Symmetric
 public import Mathlib.Analysis.Calculus.BumpFunction.FiniteDimension
 public import Mathlib.Algebra.MvPolynomial.Degrees
@@ -917,10 +919,54 @@ theorem adelePrincipalValue_tmul {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     adelePrincipalValue F S₀ (e (f ⊗ₜ[ℂ] g)) = e (sAdelePrincipalValue F h₀ f ⊗ₜ[ℂ] g) :=
   by sorry
 
+private theorem tensorFamily_isClosedEmbedding {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A] [PolynormableSpace ℂ A] [T2Space A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] [T2Space B]
+    {ι : Type*} {D : ι → Type*} [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (T : ∀ i, D i →ₗ[ℂ] D i) (hinj : ∀ i, Function.Injective (T i)) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map T
+    IsClosedEmbedding (e.toLinearMap.comp ((TensorProduct.map
+      (LinearMap.id (R := ℂ) (M := A)) P).comp e.symm.toLinearMap)) := by
+  classical
+  intro W P
+  choose L hL using fun i ↦ (T i).exists_leftInverse_of_injective
+    (LinearMap.ker_eq_bot.mpr (hinj i))
+  let J : W →ₗ[ℂ] W := PiTensorProduct.map L
+  have hJP : J.comp P = LinearMap.id :=
+    (PiTensorProduct.map_comp L T).symm.trans ((congrArg (PiTensorProduct.map (R := ℂ))
+      (funext hL)).trans PiTensorProduct.map_id)
+  let : T2Space W := finestLocallyConvex_t2 _
+  let lift (p : W →ₗ[ℂ] W) : InductiveTensor A W →L[ℂ] InductiveTensor A W :=
+    ⟨inductiveTensorMap LinearMap.id p, inductiveTensorMap_continuous (ContinuousLinearMap.id ℂ A)
+      (⟨p, continuous_of_finestLocallyConvex _ p⟩ : W →L[ℂ] W)⟩
+  let f := e.toContinuousLinearMap.comp ((lift P).comp e.symm.toContinuousLinearMap)
+  let j := e.toContinuousLinearMap.comp ((lift J).comp e.symm.toContinuousLinearMap)
+  have hleft : Function.LeftInverse j f := by
+    intro x
+    change e (lift J (e.symm (e (lift P (e.symm x))))) = x
+    rw [e.symm_apply_apply]
+    have hmaps (z : A ⊗[ℂ] W) :
+        TensorProduct.map (LinearMap.id (M := A)) J (TensorProduct.map LinearMap.id P z) = z := by
+      rw [TensorProduct.map_map, hJP, LinearMap.id_comp, TensorProduct.map_id, LinearMap.id_apply]
+    exact (congrArg e (hmaps (e.symm x))).trans (e.apply_symm_apply x)
+  exact hleft.isClosedEmbedding j.continuous f.continuous
+
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 The S-local principal value is a topological embedding with closed range. -/
 theorem sAdelePrincipalValue_isClosedEmbedding {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    IsClosedEmbedding (sAdelePrincipalValue F h₀) := by sorry
+    IsClosedEmbedding (sAdelePrincipalValue F h₀) := by
+  classical
+  let : T2Space (ℬ(InfiniteAdeleRing F)) := schwartzBruhat_eval_t2
+  let : T2Space (ℬₛ(S)) := schwartzBruhat_eval_t2
+  unfold sAdelePrincipalValue
+  with_reducible_and_instances
+    apply tensorFamily_isClosedEmbedding
+  intro w
+  split
+  · exact fun _ _ h ↦ (finitePlacePrincipalValue_isClosedEmbedding w.val).injective h
+  · exact Function.injective_id
 
 /-- Paper: Definition 5.3.1.4(2), p. 242.
 The global principal value is a topological embedding with closed range. -/
