@@ -6,6 +6,7 @@ public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
 import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
+import all RiemannMasullo.Ch11_ShellStructure.Sec2a
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec1b
 
@@ -739,11 +740,95 @@ variable (p : HeightOneSpectrum (𝓞 ℚ)) {s : ℝ} (hs : 0 ≤ s)
 local notation "Aω(" φ ")" => ContinuousLinearMap.restrict (A(hs, φ))
   (hardySobolevTestAction_preserves_spectralIsotype (F := F) h₀ hs ω φ)
 
+/-- At degree zero the completed principal value commutes with translation by every idele
+class, since the factor |g|^(-a) in the theta action is one for every g, not only norm one. -/
+private theorem primeOrbitalSobolevSubmodule_convolution_invariant_comm (S : Finset V)
+    {s : ℝ} (hs : 0 ≤ s) (g : C𝔽) (u : globalThetaSobolev F 0 h₀ hs) :
+    globalThetaSobolevPrincipalValue F S 0 hs
+        ((exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose g u) =
+      (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose g
+        (globalThetaSobolevPrincipalValue F S 0 hs u) := by
+  have hq : Surjective (fun f : ↥(adelePolarSubspace F) ↦
+      (Submodule.Quotient.mk f : GlobalPolarFreeThetaSpace F)) := Submodule.mkQ_surjective
+    ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype)
+  have hdense : DenseRange (fun f : ↥(adelePolarSubspace F) ↦ globalThetaSobolevInclusion F 0 h₀ hs
+      (Submodule.Quotient.mk f : GlobalPolarFreeThetaSpace F)) :=
+    (globalThetaSobolev_dense (F := F) 0 h₀ hs).comp hq.denseRange
+      (globalThetaSobolevInclusion F 0 h₀ hs).continuous
+  refine Exists.elim (QuotientGroup.mk_surjective g) fun g' hg ↦ ?_
+  have hc : (((m𝔽 (QuotientGroup.mk g')).val : ℝ) ^ (-(0 : ℝ)) : ℝ) = 1 := by
+    rw [neg_zero, Real.rpow_zero]
+  exact globalThetaSobolevPrincipalValue_equivariant_aux Subtype.val
+    (globalThetaSobolevInclusion F 0 h₀ hs)
+    (fun f : ↥(adelePolarSubspace F) ↦ (Submodule.Quotient.mk f : GlobalPolarFreeThetaSpace F))
+    hdense (globalThetaSobolevPrincipalValue F S 0 hs)
+    (fun c v ↦ (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose c v)
+    (globalThetaSobolevPrincipalValue F S 0 hs).continuous g (QuotientGroup.mk g') hg
+    ((exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose (QuotientGroup.mk g')).continuous
+    (fun f ↦ ⟨adelePrincipalValue F S f.val, adelePrincipalValue_mem_polarSubspace S f⟩)
+    (globalThetaSobolevPrincipalValue_apply S 0 hs)
+    _ hc
+    (fun f' ↦ schwartzBruhatUnitTranslate g' f')
+    ((exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose_spec.2.2 g')
+    (fun z ↦ one_smul ℝ z)
+    (if hn : S.Nonempty then
+      globalThetaSobolevPrincipalValue_equivariant_hcomm S hn g'
+    else
+      globalThetaSobolevPrincipalValue_equivariant_hcomm_empty S hn g')
+    u
+
+/-- A Pettis integral of translates of a vector in a closed invariant subspace of a
+Hilbert space stays in that subspace, since every vector orthogonal to it kills the integrand. -/
+private theorem primeOrbitalSobolevSubmodule_convolution_invariant_pettis {X E : Type*}
+    [Group X] [MeasurableSpace X] (μ : Measure X) [NormedAddCommGroup E]
+    [InnerProductSpace ℂ E] [CompleteSpace E] (K : Submodule ℂ E) (hK : IsClosed (K : Set E))
+    (τ : X →* (E →L[ℂ] E)) (hτ : ∀ g, ∀ v ∈ K, τ g v ∈ K) {ψ : X → ℂ} {u b : E}
+    (hu : u ∈ K) (hb : HasPettisIntegral (.positive μ) (fun g ↦ ψ g • τ g u) b) : b ∈ K := by
+  have : CompleteSpace K := hK.completeSpace_coe
+  rw [← K.orthogonal_orthogonal]
+  intro w hw
+  have hδ := congrArg
+    (fun z : PettisWeakCompletion E ↦ (show Module.Dual ℂ (StrongDual ℂ E) from z)
+      (innerSL ℂ w)) hb.2
+  change innerSL ℂ w b = ∫ g, innerSL ℂ w (ψ g • τ g u) ∂μ at hδ
+  rw [innerSL_apply_apply] at hδ
+  rw [hδ]
+  refine integral_eq_zero_of_ae (.of_forall fun g ↦ ?_)
+  change innerSL ℂ w (ψ g • τ g u) = 0
+  rw [innerSL_apply_apply]
+  exact (K.mem_orthogonal' w).mp hw _ (K.smul_mem _ (hτ g u hu))
+
 /-- Paper: (11.2.2.1)–(11.2.2.3), pp. 489–490.
 Convolution preserves the closed principal-value subspace of the zero-line isotype.
 Deviation: Use the closure of the principal-value image. -/
 theorem primeOrbitalSobolevSubmodule_convolution_invariant (φ : BruhatCompactSupport C𝔽) :
-    N(p, hs, ω) ≤ ((N(p, hs, ω)).mkQL.comp (Aω(φ))).ker := by sorry
+    N(p, hs, ω) ≤ ((N(p, hs, ω)).mkQL.comp (Aω(φ))).ker := by
+  intro v hv
+  let R := (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose
+  have hR := (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose_spec.1
+  let τ := hardySobolevTranslation μ𝔽 m𝔽 0 0 s h₀ hs
+  let M := ((globalThetaSobolev F 0 h₀ hs).subtype.comp
+    (globalThetaSobolevPrincipalValue F Sₚ(p) 0 hs).toLinearMap).range.topologicalClosure
+  have hrange : ∀ g, ∀ x ∈ ((globalThetaSobolev F 0 h₀ hs).subtype.comp
+      (globalThetaSobolevPrincipalValue F Sₚ(p) 0 hs).toLinearMap).range, τ g x ∈ M := by
+    rintro g _ ⟨u, rfl⟩
+    refine Submodule.le_topologicalClosure _ ⟨R g u, ?_⟩
+    change ((globalThetaSobolevPrincipalValue F Sₚ(p) 0 hs (R g u) : globalThetaSobolev F 0 h₀ hs) :
+      W(s)) = τ g ((globalThetaSobolevPrincipalValue F Sₚ(p) 0 hs u : globalThetaSobolev F 0 h₀ hs))
+    rw [primeOrbitalSobolevSubmodule_convolution_invariant_comm Sₚ(p) hs g u]
+    exact hR g _
+  have hinv : ∀ g, ∀ x ∈ M, τ g x ∈ M := fun g x hx ↦ by
+    have hsub : closure (((globalThetaSobolev F 0 h₀ hs).subtype.comp
+        (globalThetaSobolevPrincipalValue F Sₚ(p) 0 hs).toLinearMap).range : Set W(s)) ⊆
+        τ g ⁻¹' M :=
+      closure_minimal (fun y hy ↦ hrange g y hy)
+        ((Submodule.isClosed_topologicalClosure _).preimage (τ g).continuous)
+    exact hsub hx
+  have hmem := primeOrbitalSobolevSubmodule_convolution_invariant_pettis μ𝔽 M
+    (Submodule.isClosed_topologicalClosure _) τ hinv (show v.val ∈ M from hv)
+    (bruhatRegularizedAction_apply μ𝔽 τ
+      (exists_hardySobolevTranslation μ𝔽 m𝔽 0 0 s h₀ hs).choose_spec.2 φ v.val)
+  exact (Submodule.Quotient.mk_eq_zero (N(p, hs, ω))).mpr (show (Aω(φ) v).val ∈ M from hmem)
 
 /-- An operator whose composite with the quotient map kills the denominator descends uniquely. -/
 private theorem existsUnique_primeOrbitalSobolevConvolution_lift
