@@ -8,7 +8,7 @@ public import RiemannMasullo.Ch09_HardySobolev.Sec3
 import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec3
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
-import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec5
 
 import Mathlib.MeasureTheory.Measure.SeparableMeasure
 
@@ -539,12 +539,19 @@ private theorem exists_globalThetaSobolevAction_restrict {G W : Type*} [Group G]
 Fourier value at zero is multiplied by the idelic norm. -/
 private theorem exists_globalThetaSobolevAction_polar (g : IdeleGroup (𝓞 F) F) (f : ℬ₀) :
     schwartzBruhatUnitTranslate g f.val ∈ adelePolarSubspace F := by
-  have h := (mem_adelePolarSubspace f.val).mp f.property
+  have hf := (mem_adelePolarSubspace f.val).mp f.property
   refine (mem_adelePolarSubspace _).mpr ⟨?_, ?_⟩
   · change f.val (Multiplicative.ofAdd (g.inv * 0)) = 0
     rw [mul_zero]
-    exact h.1
-  · rw [adeleSchwartzFourier_zero_unitTranslate, h.2, mul_zero]
+    exact hf.1
+  · have hρ := (existsUnique_globalThetaAction (F := F)).exists.choose_spec.2 g f.val
+    have h := globalThetaPolarValues_snd_translate (F := F) (QuotientGroup.mk g)
+      (Submodule.Quotient.mk f.val)
+    rw [hρ] at h
+    have hleft := congrArg Prod.snd (globalThetaPolarValues_mk (F := F) (schwartzBruhatUnitTranslate g f.val))
+    have hright := congrArg Prod.snd (globalThetaPolarValues_mk (F := F) f.val)
+    have hz : (globalThetaPolarValues (F := F) (Submodule.Quotient.mk f.val)).2 = 0 := hright.trans hf.2
+    exact hleft.symm.trans (h.trans (by rw [hz, mul_zero]))
 
 /-- The weighted theta function at an inversely translated class is the norm factor times
 the weighted theta function of the translated test. -/
@@ -553,12 +560,19 @@ private theorem exists_globalThetaSobolevAction_weight (a : ℝ) (g : IdeleGroup
     modulationWeight m𝔽 a (θ𝔽(f)) ((QuotientGroup.mk g)⁻¹ * x) =
       ((((m𝔽 (QuotientGroup.mk g)).val : ℝ) ^ (-a) : ℝ) : ℂ) *
         modulationWeight m𝔽 a (adelicTheta (schwartzBruhatUnitTranslate g f.val)) x := by
+  have hθ : adelicTheta (schwartzBruhatUnitTranslate g f.val) x =
+      adelicTheta f.val ((QuotientGroup.mk g)⁻¹ * x) := by
+    induction x using QuotientGroup.induction_on with | H y => ?_
+    change _ = adelicTheta f.val (QuotientGroup.mk (g⁻¹ * y))
+    rw [adelicTheta_mk (schwartzBruhatUnitTranslate g f.val) y, adelicTheta_mk f.val (g⁻¹ * y)]
+    exact tsum_congr fun t ↦ congrArg (fun z ↦ f.val (Multiplicative.ofAdd z))
+      (mul_left_comm g.inv (algebraMap F 𝔸[F] (t : F)) y.val)
   change ((((m𝔽 ((QuotientGroup.mk g)⁻¹ * x)).val : ℝ) ^ a : ℝ) : ℂ) *
       adelicTheta f.val ((QuotientGroup.mk g)⁻¹ * x) =
     _ * (((((m𝔽 x).val : ℝ) ^ a : ℝ) : ℂ) * adelicTheta (schwartzBruhatUnitTranslate g f.val) x)
   have hc : (0 : ℝ) ≤ ((m𝔽 (QuotientGroup.mk g)).val : ℝ) := NNReal.coe_nonneg _
   have hx : (0 : ℝ) ≤ ((m𝔽 x).val : ℝ) := NNReal.coe_nonneg _
-  rw [globalTheta_unitTranslate_apply, map_mul, map_inv, Units.val_mul, Units.val_inv_eq_inv_val,
+  rw [hθ, map_mul, map_inv, Units.val_mul, Units.val_inv_eq_inv_val,
     NNReal.coe_mul, NNReal.coe_inv, Real.mul_rpow (inv_nonneg.mpr hc) hx, Real.inv_rpow hc,
     ← Real.rpow_neg hc]
   push_cast
