@@ -1869,7 +1869,7 @@ open scoped TensorProduct
 section
 /-- The product of finitely many local tests belongs to the Schwartz–Bruhat space
 of the product group. -/
-private theorem schwartzBruhat_pi_test {ι : Type*} [Fintype ι] (G : ι → Type*)
+theorem schwartzBruhat_pi_test {ι : Type*} [Fintype ι] (G : ι → Type*)
     [∀ i, CommGroup (G i)] [∀ i, TopologicalSpace (G i)] [∀ i, IsTopologicalGroup (G i)]
     [∀ i, T2Space (G i)] [∀ i, LocallyCompactSpace (G i)] [∀ i, SecondCountableTopology (G i)]
     (f : ∀ i, SchwartzBruhat (G i)) : ∃ g : SchwartzBruhat (∀ i, G i),
