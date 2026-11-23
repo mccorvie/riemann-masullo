@@ -3341,7 +3341,9 @@ private theorem archimedeanMellin_translate_strip_identity {L D G : ℂ → ℂ}
   intro x
   have ht : Tendsto (fun z : ℂ ↦ z + d) (𝓝[≠] x) (𝓝[≠] (x + d)) :=
     ((Homeomorph.addRight d).map_punctured_nhds_eq x).le
-  exact ht.eventually ((nhdsNE_le_codiscrete (x + d) hzero).mono fun _ h ↦ sub_eq_zero.mp h)
+  have heq : L =ᶠ[codiscrete ℂ] fun z ↦ ε * (G (z + a) / G (1 - z + a)) * D (1 - z) :=
+    hzero.mono fun _ h ↦ sub_eq_zero.mp h
+  exact ht.eventually (heq.filter_mono (nhdsNE_le_codiscrete (x + d)))
 
 /-- On the fundamental strip the real Tate factor has the phase and gamma quotient
 of (5.3.3.24), for the ordinary Euclidean Fourier transform. -/
