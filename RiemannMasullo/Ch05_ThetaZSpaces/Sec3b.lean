@@ -2337,13 +2337,283 @@ private theorem archimedeanWeightedSchwartz_tensor_twists {I : Set ℝ} (ho : Is
       (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u = separateValue(f, g, u)) :
     IsInducing (fun z a ↦ archimedeanSchwartzTwist I a (L z)) := by sorry
 
+/-- The sum of two twists of a decay function has dense range in the unweighted
+Schwartz space, even when the allowed exponents are disconnected. In logarithmic
+coordinates divide compact test profiles by the sum of the two exponential weights. -/
+private theorem archimedeanWeightedSchwartz_dense_factor {G : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (m : G →ₜ* ℝ≥0ˣ) (hm : IsModulation m) (hs : Surjective m) (J : Set ℝ) (a b : J) :
+    DenseRange (modulatedExponentialDecayTwist m J a + modulatedExponentialDecayTwist m J b) := by
+  classical
+  let K := m.toMonoidHom.ker
+  let : CompactSpace K := isCompact_iff_compactSpace.mp hm.isCompact_ker
+  let : SecondCountableTopology K := TopologicalSpace.Subtype.secondCountableTopology (K : Set G)
+  let : SecondCountableTopology ℝ≥0ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let σ := hm.exists_section.choose
+  let τ : ℝ≥0ˣ →ₜ* G := σ.comp
+    ⟨MonoidHom.codRestrict (MonoidHom.id _) m.toMonoidHom.range (fun t ↦ hs t), continuous_id.subtype_mk _⟩
+  have hτ : RightInverse τ m := fun t ↦ hm.exists_section.choose_spec ⟨t, hs t⟩
+  obtain ⟨d, hd⟩ := hm.exists_sectionEquiv τ hτ
+  obtain ⟨e, he⟩ := split_schwartz_kernel d
+  obtain ⟨v, hv⟩ := schwartzBruhat_realCoordinate_equiv positiveRealLogEquiv
+  let D := {f : SchwartzMap ℝ ℂ | HasCompactSupport (f : ℝ → ℂ)}
+  have hD : Dense (v '' D) := v.surjective.denseRange.dense_image v.continuous SchwartzMap.dense_hasCompactSupport
+  let T := modulatedExponentialDecayTwist m J a + modulatedExponentialDecayTwist m J b
+  refine dense_of_split_products e T.range hD ?_
+  rintro h _ ⟨f,hf,rfl⟩
+  let au : (univ : Set ℝ) := ⟨a, mem_univ _⟩
+  let bu : (univ : Set ℝ) := ⟨b, mem_univ _⟩
+  obtain ⟨g, hg⟩ := compact_profile_sum_twists univ au bu f hf
+  obtain ⟨z,hz⟩ := split_pure_decay_mem m univ hm ordConnected_univ univ_nonempty τ hτ h g
+  let y : modulatedExponentialDecaySubmodule m J := ⟨z.val,
+    (Submodule.mem_iInf _).mpr fun c ↦ Submodule.mem_comap.mpr
+      (modulationWeight_mem_schwartzBruhat m univ ⟨c, mem_univ _⟩ z)⟩
+  refine ⟨y, Subtype.ext (funext fun u ↦ ?_)⟩
+  obtain ⟨⟨k,t⟩,rfl⟩ := d.surjective u
+  have hmt (k : K) (t : ℝ≥0ˣ) : m (d (k,t)) = t := by
+    rw [hd, map_mul, show m k.val = 1 from k.property, hτ, one_mul]
+  have hz' : z.val (d (k,t)) = h k * g.val (Real.log (t.val : ℝ)) := (congrArg z.val (hd _)).trans (hz k t)
+  change modulatedExponentialDecayTwist m J a y (d (k,t)) + modulatedExponentialDecayTwist m J b y (d (k,t)) = _
+  rw [modulatedExponentialDecayTwist_apply, modulatedExponentialDecayTwist_apply, hmt, he, hv]
+  change _ * z.val (d (k,t)) + _ * z.val (d (k,t)) = h k * f (positiveRealLogEquiv t).toAdd
+  rw [hz', ← add_mul, mul_left_comm, ← Complex.ofReal_add, identityWeight_log, identityWeight_log,
+    positiveRealLogEquiv_apply]
+  exact congrArg (h k * ·) (hg _)
+
+/-- A finite box of requested weights factors through the sum of the corner
+twists. Its pointwise multiplier is the product of sums of the endpoint weights. -/
+private theorem archimedeanWeightedSchwartz_endpoint_box {δ G E : Type*} [Fintype δ]
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G]
+    [AddCommGroup E] [Module ℂ E] (J : Set ℝ) (m : δ → G →ₜ* ℝ≥0ˣ)
+    (t : (δ → J) → E →ₗ[ℂ] SchwartzBruhat G) (v : E → G → ℂ)
+    (ht : ∀ a f x, t a f x = (∏ i, (((m i x).val : ℝ) ^ (a i : ℝ) : ℝ) : ℂ) * v f x)
+    (a b : δ → J) :
+    let w (i : δ) (k : J) (x : G) : ℂ := (((m i x).val : ℝ) ^ (k : ℝ) : ℝ)
+    ∃ L : E →ₗ[ℂ] SchwartzBruhat G,
+      (∀ f x, L f x = (∏ i, (w i (a i) x + w i (b i) x)) * v f x) ∧
+      ∀ c : δ → J, (∀ i, a i ≤ c i) → (∀ i, c i ≤ b i) →
+        ∃ R : SchwartzBruhat G →L[ℂ] SchwartzBruhat G, ∀ f, R (L f) = t c f := by
+  classical
+  intro w
+  let p (i : δ) (j : Bool) := if j then b i else a i
+  let L : E →ₗ[ℂ] SchwartzBruhat G := ∑ s : δ → Bool, t (fun i ↦ p i (s i))
+  have hL (f : E) (x : G) : L f x = (∏ i, (w i (a i) x + w i (b i) x)) * v f x := by
+    let ev : SchwartzBruhat G →ₗ[ℂ] ℂ := (LinearMap.proj x).comp (schwartzBruhatSubmodule G).subtype
+    change ev (L f) = _
+    simp only [L, LinearMap.sum_apply, map_sum]
+    change (∑ s : δ → Bool, t (fun i ↦ p i (s i)) f x) = _
+    simp_rw [ht]
+    rw [← Finset.sum_mul]
+    congr 1
+    change (∑ s : δ → Bool, ∏ i, w i (p i (s i)) x) = _
+    rw [← Fintype.prod_sum (fun i (j : Bool) ↦ w i (p i j) x)]
+    simp [p, add_comm]
+  refine ⟨L, hL, fun c hac hcb ↦ ?_⟩
+  let φ (i : δ) (z : ℝ) : ℂ :=
+    ((Real.exp (-((c i : ℝ) - a i) * z) + Real.exp (((b i : ℝ) - c i) * z))⁻¹ : ℝ)
+  let r (i : δ) (x : G) := φ i (Real.log ((m i x).val : ℝ))
+  have hsingle (i : δ) := twoSidedExpWeight_bounds_of_nonneg (sub_nonneg.mpr (hac i) : 0 ≤ (c i : ℝ) - a i)
+    (sub_nonneg.mpr (hcb i) : 0 ≤ (b i : ℝ) - c i)
+  have hm (i : δ) := logModulation_mul_schwartzBruhat_continuousLinear (φ := φ i) (m i)
+    (hsingle i).1 (hsingle i).2
+  have hprod (s : Finset δ) : ∃ M : SchwartzBruhat G →L[ℂ] SchwartzBruhat G, ∀ f x,
+      M f x = (∏ i ∈ s, r i x) * f x := by
+    induction s using Finset.induction_on with
+    | empty => exact ⟨.id ℂ _, fun _ _ ↦ by simp⟩
+    | @insert i s hi ih =>
+      obtain ⟨M,hM⟩ := ih
+      obtain ⟨P,hP⟩ := hm i
+      exact ⟨P.comp M, fun f x ↦ by
+        rw [ContinuousLinearMap.comp_apply, hP, hM, Finset.prod_insert hi, mul_assoc]⟩
+  obtain ⟨M,hM⟩ := hprod Finset.univ
+  refine ⟨M, fun f ↦ Subtype.ext (funext fun x ↦ ?_)⟩
+  change M (L f) x = t c f x
+  rw [hM, hL, ht, ← mul_assoc, ← Finset.prod_mul_distrib]
+  congr 1
+  apply Finset.prod_congr rfl
+  intro i _
+  have hv := congrFun (modulationWeight_between_eq (m i) (fun _ ↦ 1) (a i) (c i) (b i)) x
+  change w i (c i) x * 1 = r i x * (w i (a i) x * 1 + w i (b i) x * 1) at hv
+  simpa only [mul_one] using hv.symm
+
+/-- Tensoring two sets with dense linear spans again gives a set with dense linear
+span. The two density arguments use separate continuity of the product. -/
+private theorem archimedeanWeightedSchwartz_dense_binary {X Y Z : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    [AddCommGroup Z] [Module ℂ Z] [TopologicalSpace Z] [IsTopologicalAddGroup Z] [ContinuousConstSMul ℂ Z]
+    (e : UniformSpace.Completion (InductiveTensor X Y) ≃L[ℂ] Z)
+    {A : Set X} {B : Set Y} (hA : Dense (Submodule.span ℂ A : Set X)) (hB : Dense (Submodule.span ℂ B : Set Y))
+    (S : Submodule ℂ Z)
+    (hp : ∀ x ∈ A, ∀ y ∈ B, e (UniformSpace.Completion.coe' (α := InductiveTensor X Y) (x ⊗ₜ[ℂ] y)) ∈ S) :
+    Dense (S : Set Z) := by
+  let T := InductiveTensor X Y
+  let L := e.toContinuousLinearMap.comp (UniformSpace.Completion.toComplL : T →L[ℂ] UniformSpace.Completion T)
+  let P := (TensorProduct.mk ℂ X Y).compr₂ L.toLinearMap
+  let p := fun q : {q : Seminorm ℂ (X ⊗[ℂ] Y) //
+    (∀ x : X, Continuous (fun y : Y ↦ q (x ⊗ₜ[ℂ] y))) ∧ (∀ y : Y, Continuous (fun x : X ↦ q (x ⊗ₜ[ℂ] y)))} ↦ q.val
+  have hgen := withGeneratingSeminorms_spec (X ⊗[ℂ] Y) p
+  have right (x : X) : Continuous (P x) := L.continuous.comp
+    (hgen.continuous_of_continuous_comp (TensorProduct.mk ℂ X Y x) fun q ↦ q.property.1 x)
+  have left (y : Y) : Continuous (P.flip y) := L.continuous.comp
+    (hgen.continuous_of_continuous_comp ((TensorProduct.mk ℂ X Y).flip y) fun q ↦ q.property.2 y)
+  let C := S.topologicalClosure
+  have hxy (x : X) (y : Y) : P x y ∈ C := by
+    have ha : Submodule.span ℂ A ≤ C.comap (P.flip y) := by
+      apply Submodule.span_le.mpr
+      intro u hu
+      have hb : Submodule.span ℂ B ≤ C.comap (P u) :=
+        Submodule.span_le.mpr (fun v hv ↦ S.le_topologicalClosure (hp u hu v hv))
+      exact closure_minimal hb (S.isClosed_topologicalClosure.preimage (right u)) (hB y)
+    exact closure_minimal ha (S.isClosed_topologicalClosure.preimage (left y)) (hA x)
+  have hL (z : T) : L z ∈ C := TensorProduct.inductionOn (motive := fun z ↦ L z ∈ C) z hxy
+    (fun _ _ hx hy ↦ (C.comap L.toLinearMap).add_mem hx hy)
+  intro z
+  obtain ⟨v, rfl⟩ := e.surjective z
+  exact UniformSpace.Completion.induction_on (p := fun x ↦ e x ∈ C) v
+    (S.isClosed_topologicalClosure.preimage e.continuous) hL
+
+
+/-- Separate products of one-variable dense sets generate the unweighted
+Schwartz space of a finite product, including the empty product. -/
+private theorem archimedeanWeightedSchwartz_dense_pi {ι G : Type*} [Fintype ι]
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]
+    [LocallyCompactSpace G] [SecondCountableTopology G]
+    (A : ι → Set (SchwartzBruhat G)) (hA : ∀ i, Dense (A i)) :
+    Dense (Submodule.span ℂ {z : SchwartzBruhat (ι → G) | ∃ f : ι → SchwartzBruhat G,
+      (∀ i, f i ∈ A i) ∧ ∀ x, z x = ∏ i, f i (x i)} : Set (SchwartzBruhat (ι → G))) := by
+  classical
+  let S := Submodule.span ℂ {z : SchwartzBruhat (ι → G) | ∃ f : ι → SchwartzBruhat G,
+    (∀ i, f i ∈ A i) ∧ ∀ x, z x = ∏ i, f i (x i)}
+  cases isEmpty_or_nonempty ι with
+  | inl _ =>
+    let : CompactSpace (ι → G) := Finite.compactSpace
+    obtain ⟨one, hone⟩ := compact_schwartzBruhat_one (H := ι → G)
+    have h1 : one ∈ S := Submodule.subset_span ⟨isEmptyElim, fun i ↦ isEmptyElim i, fun x ↦ by simp [hone]⟩
+    intro f
+    apply subset_closure
+    have hf : f = f 1 • one := Subtype.ext (funext fun x ↦ by
+      change f x = f 1 * one x
+      rw [hone, mul_one, Subsingleton.elim x 1])
+    exact hf ▸ S.smul_mem _ h1
+  | inr hn =>
+    obtain ⟨i⟩ := hn
+    let J := {j : ι // j ≠ i}
+    let d : (ι → G) ≃ₜ* (G × (J → G)) := { Homeomorph.piSplitAt i (fun _ ↦ G) with map_mul' := fun _ _ ↦ rfl }
+    obtain ⟨e,he⟩ := split_schwartz_kernel d.symm
+    have hy := archimedeanWeightedSchwartz_dense_pi (fun j : J ↦ A j.val) (fun j ↦ hA j.val)
+    apply archimedeanWeightedSchwartz_dense_binary e ((hA i).mono Submodule.subset_span) hy S
+    rintro f hf g ⟨v,hv,hg⟩
+    let q (j : ι) : SchwartzBruhat G := if h : j = i then f else v ⟨j,h⟩
+    have hq (j : ι) : q j ∈ A j := by
+      by_cases h : j = i
+      · subst j; simpa [q] using hf
+      · simpa [q, h] using hv ⟨j,h⟩
+    refine Submodule.subset_span ⟨q, hq, fun x ↦ ?_⟩
+    have hx := he f g (d x).1 (d x).2
+    rw [Prod.mk.eta, d.symm_apply_apply] at hx
+    rw [hx, hg, Fintype.prod_eq_mul_prod_compl i]
+    change f (x i) * (∏ j : J, v j (x j.val)) = q i (x i) * _
+    rw [show q i = f by simp [q]]
+    congr 1
+    refine Eq.trans ?_ (Finset.prod_subtype (F := inferInstanceAs (Fintype J)) (p := fun j ↦ j ≠ i) _ (fun j ↦ by simp) (fun j ↦ q j (x j))).symm
+    apply Finset.prod_congr rfl
+    intro j _
+    simp [q,j.property]
+termination_by Fintype.card ι
+decreasing_by
+  classical
+  exact Fintype.card_subtype_lt (x := i) (not_not_intro rfl)
+
 /-- The approximation estimate in Lemma 5.3.3.3(2), p. 252: finite sums of
 separate products approximate every weighted test simultaneously in the partial
 Schwartz seminorms. This assertion involves only the function spaces. -/
 private theorem archimedeanWeightedSchwartz_tensor_dense {I : Set ℝ} (ho : IsOpen I)
     (hi : OrdConnected I) (hne : I.Nonempty) :
     Dense (Submodule.span ℂ {w : 𝓦(I) | ∃ (f : ι → realFactors(I)) (g : κ → complexFactors(I)),
-      ∀ u : archMul(ι, κ), w.val u = separateValue(f, g, u)} : Set 𝓦(I)) := by sorry
+      ∀ u : archMul(ι, κ), w.val u = separateValue(f, g, u)} : Set 𝓦(I)) := by
+  classical
+  let G := archMul(ι, κ)
+  let J := (insert 0 I : Set ℝ)
+  let W := weights(ι, κ, I)
+  let S := Submodule.span ℂ {w : 𝓦(I) | ∃ (f : ι → realFactors(I)) (g : κ → complexFactors(I)),
+    ∀ u, w.val u = separateValue(f, g, u)}
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let mr := archimedeanUnitModulation ℝ 1
+  let mc := archimedeanUnitModulation ℂ 2
+  let mr' (i : ι) : G →ₜ* ℝ≥0ˣ :=
+    { toFun := fun u ↦ mr (u.1 i)
+      map_one' := mr.map_one
+      map_mul' := fun u v ↦ mr.map_mul (u.1 i) (v.1 i)
+      continuous_toFun := mr.continuous.comp ((continuous_apply i).comp continuous_fst) }
+  let mc' (j : κ) : G →ₜ* ℝ≥0ˣ :=
+    { toFun := fun u ↦ mc (u.2 j)
+      map_one' := mc.map_one
+      map_mul' := fun u v ↦ mc.map_mul (u.2 j) (v.2 j)
+      continuous_toFun := mc.continuous.comp ((continuous_apply j).comp continuous_snd) }
+  let m := Sum.elim mr' mc'
+  let t (c : ι ⊕ κ → J) : 𝓦(I) →ₗ[ℂ] SchwartzBruhat G :=
+    archimedeanSchwartzTwist I (c ∘ Sum.inl, c ∘ Sum.inr)
+  have ht (c : ι ⊕ κ → J) (f : 𝓦(I)) (u : G) : t c f u =
+      (∏ i, (((m i u).val : ℝ) ^ (c i : ℝ) : ℝ) : ℂ) * f.val u := by
+    refine (archimedeanSchwartzTwist_apply I (c ∘ Sum.inl, c ∘ Sum.inr) f u).trans ?_
+    rw [Fintype.prod_sum_type]
+    have hr (i : ι) : ((m (.inl i) u).val : ℝ) = ‖(u.1 i).val‖ := by
+      change (((archimedeanUnitModulation ℝ 1 (u.1 i)).val : ℝ) = _)
+      rw [archimedeanUnitModulation_apply, pow_one]
+    have hc (j : κ) : ((m (.inr j) u).val : ℝ) = ‖(u.2 j).val‖ ^ 2 := by
+      change (((archimedeanUnitModulation ℂ 2 (u.2 j)).val : ℝ) = _)
+      exact archimedeanUnitModulation_apply ℂ 2 (u.2 j)
+    simp only [Function.comp_apply, Complex.ofReal_prod, hr, hc]
+  refine dense_of_finite_coordinates (Z := SchwartzBruhat G) (fun (f : 𝓦(I)) (c : W) ↦
+    archimedeanSchwartzTwist I c f) (archimedeanSchwartzTwists_isEmbedding I).isInducing
+    (S : Set 𝓦(I)) fun F ↦ ?_
+  let V (i : ι ⊕ κ) : Finset J := insert ⟨0, Set.mem_insert _ _⟩ (F.image fun c ↦ Sum.elim c.1 c.2 i)
+  have hn (i) : (V i).Nonempty := Finset.insert_nonempty _ _
+  let a (i) := (V i).min' (hn i)
+  let b (i) := (V i).max' (hn i)
+  obtain ⟨L,hL,hc⟩ := archimedeanWeightedSchwartz_endpoint_box J m t (fun f ↦ f.val) ht a b
+  refine ⟨L, ?_, fun c hcF ↦ ?_⟩
+  · let A (i : ι) := modulatedExponentialDecayTwist mr J (a (.inl i)) + modulatedExponentialDecayTwist mr J (b (.inl i))
+    let B (j : κ) := modulatedExponentialDecayTwist mc J (a (.inr j)) + modulatedExponentialDecayTwist mc J (b (.inr j))
+    have hA (i : ι) : Dense (range (A i)) := archimedeanWeightedSchwartz_dense_factor mr
+      realCoordinate_mul_allExponentialDecay_modulation.1 realCoordinate_mul_allExponentialDecay_modulation.2 J _ _
+    have hB (j : κ) : Dense (range (B j)) := archimedeanWeightedSchwartz_dense_factor mc
+      complexCoordinate_mul_allExponentialDecay_modulation.1 complexCoordinate_mul_allExponentialDecay_modulation.2 J _ _
+    obtain ⟨e,he⟩ := schwartzBruhat_kernel_equiv (G := ι → ℝˣ) (H := κ → ℂˣ)
+    change Dense ((S.map L) : Set (SchwartzBruhat G))
+    apply archimedeanWeightedSchwartz_dense_binary e
+      (archimedeanWeightedSchwartz_dense_pi _ hA) (archimedeanWeightedSchwartz_dense_pi _ hB)
+    rintro p ⟨F,hF,hp⟩ q ⟨Q,hQ,hq⟩
+    choose f hf using hF
+    choose g hg using hQ
+    let z : 𝓦(I) := ⟨_, archimedeanWeightedSchwartz_tensor_pure I f g⟩
+    refine ⟨z, Submodule.subset_span ⟨f,g,fun _ ↦ rfl⟩, Subtype.ext (funext fun u ↦ ?_)⟩
+    obtain ⟨ur,uc⟩ := u
+    change L z (ur,uc) = _
+    rw [hL, Fintype.prod_sum_type, he, hp, hq]
+    simp_rw [← hf, ← hg]
+    change (_ * _) * ((∏ i, (f i).val (ur i)) * ∏ j, (g j).val (uc j)) =
+      (∏ i, A i (f i) (ur i)) * ∏ j, B j (g j) (uc j)
+    have hreal (i : ι) : A i (f i) (ur i) =
+        (((((mr (ur i)).val : ℝ) ^ (a (.inl i) : ℝ) : ℝ) : ℂ) +
+        ((((mr (ur i)).val : ℝ) ^ (b (.inl i) : ℝ) : ℝ) : ℂ)) * (f i).val (ur i) := by
+      exact (add_mul _ _ _).symm
+    have hcomplex (j : κ) : B j (g j) (uc j) =
+        (((((mc (uc j)).val : ℝ) ^ (a (.inr j) : ℝ) : ℝ) : ℂ) +
+        ((((mc (uc j)).val : ℝ) ^ (b (.inr j) : ℝ) : ℝ) : ℂ)) * (g j).val (uc j) := by
+      exact (add_mul _ _ _).symm
+    have hr (i : ι) : m (.inl i) (ur,uc) = mr (ur i) := rfl
+    have hc (j : κ) : m (.inr j) (ur,uc) = mc (uc j) := rfl
+    simp_rw [hreal, hcomplex, Finset.prod_mul_distrib, hr, hc]
+    ring
+  · let c' := Sum.elim c.1 c.2
+    have hmem (i) : c' i ∈ V i := Finset.mem_insert_of_mem (Finset.mem_image.mpr ⟨c,hcF,rfl⟩)
+    obtain ⟨R,hR⟩ := hc c' (fun i ↦ (V i).min'_le _ (hmem i)) (fun i ↦ (V i).le_max' _ (hmem i))
+    exact ⟨R, R.continuous, hR⟩
+
 end WeightedTensorEstimates
 
 end
