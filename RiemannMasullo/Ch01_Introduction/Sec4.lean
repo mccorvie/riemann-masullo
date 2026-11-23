@@ -2,6 +2,7 @@ module
 
 public import RiemannMasullo.Ch13_ZerosHecke.Sec3
 public import RiemannMasullo.AppB_AnalyticNT.Sec6
+import RiemannMasullo.External.TauCeti.Analysis.Complex.Conformal.Montel.Basic
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
 import all RiemannMasullo.AppB_AnalyticNT.Sec4b
 
@@ -656,7 +657,19 @@ theorem introTrace_montel_of_bounded (K : Set ℂ) (_hK : IsCompact K)
     ∃ (k : ℕ → ℕ) (L₁ L₂ : ℂ → ℂ), StrictMono k ∧
       TendstoLocallyUniformlyOn (A ∘ k) L₁ atTop (interior K) ∧
       TendstoLocallyUniformlyOn (B ∘ k) L₂ atTop (interior K) ∧
-      AnalyticOnNhd ℂ L₁ (interior K) ∧ AnalyticOnNhd ℂ L₂ (interior K) := by sorry
+      AnalyticOnNhd ℂ L₁ (interior K) ∧ AnalyticOnNhd ℂ L₂ (interior K) := by
+  rcases _hbound with ⟨C, _, hC⟩
+  have hdiff : ∀ n, DifferentiableOn ℂ (fun z ↦ (A n z, B n z)) (interior K) :=
+    fun n ↦ (_hA n).prodMk (_hB n)
+  have hbounded : External.TauCeti.IsLocallyBoundedOn
+      (fun n z ↦ (A n z, B n z)) (interior K) :=
+    External.TauCeti.isLocallyBoundedOn_of_forall_norm_le fun n z hz ↦
+      norm_prod_le_iff.mpr (hC n z (interior_subset hz))
+  obtain ⟨k, L, hk, hL, hconv⟩ := External.TauCeti.montel isOpen_interior hdiff hbounded
+  exact ⟨k, Prod.fst ∘ L, Prod.snd ∘ L, hk,
+    uniformContinuous_fst.comp_tendstoLocallyUniformlyOn hconv,
+    uniformContinuous_snd.comp_tendstoLocallyUniformlyOn hconv,
+    hL.fst.analyticOnNhd isOpen_interior, hL.snd.analyticOnNhd isOpen_interior⟩
 
 -- TODO(paper-gap): Pointwise convergence of the individual Mellin terms
 -- leaves the infinite zero sum uncontrolled. At the trivial rational character and
