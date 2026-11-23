@@ -671,12 +671,86 @@ private theorem sLocalCarvingTheta_classOf (S : Finset V) (f : ℬₛ(S)) (g : I
   change IdeleGroup.unitEmbedding (𝓞 F) F ξ * (g * IdeleGroup.unitEmbedding (𝓞 F) F η) = _
   rw [mul_comm g, mul_assoc]
 
+/-- Outside `S`, the valuation of a principal translate is the valuation of the field element
+times the valuation of the idele. -/
+private theorem sLocalCarvingTheta_spec_valuation (g : I𝔽) (ξ : Fˣ) (v : V) :
+    Valued.v ((IdeleGroup.unitEmbedding (𝓞 F) F ξ * g).val.2 v) =
+      v.valuation F (ξ : F) * Valued.v (g.val.2 v) := by
+  change Valued.v ((algebraMap F (FiniteAdeleRing (𝓞 F) F) (ξ : F)) v * g.val.2 v) = _
+  rw [Valuation.map_mul]
+  congr 1
+  exact HeightOneSpectrum.valuedAdicCompletion_eq_valuation' v (ξ : F)
+
+/-- If one principal translate of `g` is a unit outside `S`, then another one is exactly when
+the ratio of the field elements is an S-unit. -/
+private theorem sLocalCarvingTheta_spec_mem (S : Finset V) (g : I𝔽) (ξ₀ ξ : Fˣ)
+    (h₀ : IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}) :
+    IdeleGroup.unitEmbedding (𝓞 F) F ξ * g ∈ {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1} ↔
+      ξ * ξ₀⁻¹ ∈ (S : Set V).unit F := by
+  refine forall₂_congr fun v hv ↦ ?_
+  have h0 := h₀ v hv
+  rw [sLocalCarvingTheta_spec_valuation] at h0 ⊢
+  have hξ₀ : v.valuation F (ξ₀ : F) ≠ 0 := by simp
+  change _ ↔ v.valuation F ((ξ : F) * ((ξ₀⁻¹ : Fˣ) : F)) = 1
+  rw [map_mul, Units.val_inv_eq_inv_val, map_inv₀]
+  constructor
+  · intro h
+    rw [← h0] at h
+    exact (mul_inv_eq_one₀ hξ₀).mpr (mul_right_cancel₀ (by
+      intro h'; rw [h', mul_zero] at h0; exact zero_ne_one h0) h)
+  · intro h
+    rw [(mul_inv_eq_one₀ hξ₀).mp h]
+    exact h0
+
+/-- The orbit series of the extended local test is absolutely summable: its nonzero terms lie on
+one coset of the S-units, where they form the S-local theta series at an S-idele. -/
+private theorem sLocalCarvingTheta_spec_summable (S : Finset V) (f : ℬₛ(S)) (g : I𝔽) :
+    Summable (fun ξ : Fˣ ↦ sLocalCarvingIdeleTest S f
+      (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g)) := by
+  by_cases hex : ∃ ξ₀ : Fˣ, IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1}
+  swap
+  · push Not at hex
+    refine summable_zero.congr fun ξ ↦ ?_
+    unfold sLocalCarvingIdeleTest
+    rw [Set.indicator_of_notMem (hex ξ)]
+  obtain ⟨ξ₀, h₀⟩ := hex
+  let P : Set Fˣ := ((S : Set V).unit F : Set Fˣ)
+  let h : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd (adeleProjection F S
+    (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g).val))
+  have hterm (ξ : Fˣ) : sLocalCarvingIdeleTest S f (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g) =
+      P.indicator (fun ξ ↦ h (ξ * ξ₀)) (ξ * ξ₀⁻¹) := by
+    unfold sLocalCarvingIdeleTest
+    by_cases hξ : ξ * ξ₀⁻¹ ∈ P
+    · rw [Set.indicator_of_mem ((sLocalCarvingTheta_spec_mem S g ξ₀ ξ h₀).mpr hξ),
+        Set.indicator_of_mem hξ, inv_mul_cancel_right]
+    · rw [Set.indicator_of_notMem (mt (sLocalCarvingTheta_spec_mem S g ξ₀ ξ h₀).mp hξ),
+        Set.indicator_of_notMem hξ]
+  refine (summable_congr hterm).mpr ?_
+  refine ((Equiv.mulRight ξ₀⁻¹).summable_iff (f := P.indicator fun ξ ↦ h (ξ * ξ₀))).mpr ?_
+  refine summable_subtype_iff_indicator.mp ?_
+  let g'' : (SAdeleRing F S)ˣ :=
+    Units.map (adeleProjection F S).toMonoidHom (IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g)
+  have hS := ((sLocalAdelicTheta_hasSumUniformlyOn F S f {g''} isCompact_singleton).hasSum
+    (Set.mem_singleton g'')).summable
+  have hG : Summable (fun u : ((S : Set V).integer F)ˣ ↦
+      h (((Set.unitEquivUnitsInteger (S : Set V) F).symm u : Fˣ) * ξ₀)) := by
+    refine hS.congr fun u ↦ congrArg f (congrArg Multiplicative.ofAdd ?_)
+    simp only [map_mul, Units.val_mul]
+    rw [mul_assoc]
+    rfl
+  refine (((Set.unitEquivUnitsInteger (S : Set V) F).toEquiv.summable_iff).mpr hG).congr
+    fun x ↦ ?_
+  simp
+
 /-- Paper: (11.1.2.7), p. 480. At any representative of the class the displayed
 orbit series is absolutely convergent and gives the raw theta generator. -/
 theorem sLocalCarvingTheta_spec (S : Finset V) (f : ℬₛ(S)) (g : I𝔽) :
     Summable (fun ξ : Fˣ ↦ sLocalCarvingIdeleTest S f
       (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g)) ∧
-    sLocalCarvingTheta S f (classOf g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g := by sorry
+    sLocalCarvingTheta S f (classOf g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g :=
+  ⟨sLocalCarvingTheta_spec_summable S f g, sLocalCarvingTheta_classOf S f g⟩
 
 /-- The S-component of an inserted S-idele is the S-idele itself. -/
 private theorem sLocalCarvingTheta_sIdeleInsertion_proj (S : Finset V) (g : (SAdeleRing F S)ˣ) :
