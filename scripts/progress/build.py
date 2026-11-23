@@ -985,8 +985,82 @@ def build_model(repo, section_issues, proof_issues, rows, files, warnings, head)
         pagesTotal=max((c["end"] for c in toc_chapters.values()), default=0))
     chapters = [dict(key=k, label=chapter_label(k) if k != "other" else "Other",
                      title=toc_chapters.get(k, {}).get("title", "")) for k in lanes]
+    errata = errata_model(out_groups, out_decls, notes)
     return dict(meta=meta, totals=totals, timeline=timeline, chapters=chapters, groups=out_groups,
-                waves=out_waves, files=file_list, decls=out_decls, notes=notes)
+                waves=out_waves, files=file_list, decls=out_decls, notes=notes, errata=errata)
+
+
+ERRATA_ROW = re.compile(r"^\|\s*([FIMR]\d+)\s*\|")
+
+
+def errata_model(groups, decls, notes):
+    """The problems listed in ERRATA.md, each placed in the section its page falls in.
+
+    Entries: [id, kind, checked, page, where, summary, group index or -1, [declaration indices
+    of the `Printed.…` statements it names], no repair known]. Withdrawn and moved rows are
+    left out. Gaps: the table of places where no repair is known."""
+    path = ROOT / "ERRATA.md"
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    by_name = {d[0]: i for i, d in enumerate(decls)}
+    spans = [(i, g["pages"]) for i, g in enumerate(groups) if g["id"] is not None and g["pages"]]
+    # The numbers a section covers: those in its title (§5.2, §C.2.1–C.2.3) and its subsections.
+    prefixes = {i: [n for n in re.findall(NUMBER.pattern, g["num"])] + [b[0] for b in g.get("bands", [])]
+                for i, g in enumerate(groups)}
+
+    def group_of(page, where=""):
+        if page is None:
+            return -1
+        hits = [(sum(b - a + 1 for a, b in pp), i) for i, pp in spans
+                if any(a <= page <= b for a, b in pp)]
+        if len(hits) > 1:
+            # Sections share their first and last pages: prefer the one the item's number is in.
+            item = NUMBER.search(where)
+            named = [h for h in hits if item and any(
+                item.group(0) == n or item.group(0).startswith(n + ".") for n in prefixes[h[1]])]
+            hits = named or hits
+        return min(hits)[1] if hits else -1
+
+    def first_page(s):
+        m = re.search(r"\bpp?\.\s*(\d+)", s)
+        return int(m.group(1)) if m else None
+
+    clean = lambda s: excerpt(re.sub(r"\*\*|`", "", s), 240)
+    cells_of = lambda line: [c.strip() for c in line.strip().strip("|").split("|")]
+    entries, gaps, no_repair = [], [], set()
+    for part in re.split(r"^## ", text, flags=re.M)[1:]:
+        title, _, body = part.partition("\n")
+        if title.startswith("Where no repair is known"):
+            for line in body.splitlines():
+                c = cells_of(line)
+                if not line.startswith("| ") or len(c) < 4 or c[0] in ("Item", "") or set(c[0]) <= set("-: "):
+                    continue
+                ids = re.findall(r"\b[FIMR]\d+\b", c[1])
+                no_repair.update(ids)
+                page = first_page(c[0])
+                gaps.append(dict(item=clean(c[0]), ids=ids, missing=clean(c[2]), later=c[-1],
+                                 page=page, group=group_of(page, c[0])))
+            continue
+        for line in body.splitlines():
+            if not ERRATA_ROW.match(line):
+                continue
+            c = cells_of(line)
+            eid, where, checked = c[0], c[1], c[-1]
+            if checked in ("withdrawn", "moved") or len(c) < 5:
+                continue
+            kind = eid[0]
+            lean = c[-3] if kind in "FI" and len(c) >= 6 else ""
+            names = re.findall(r"`(Printed\.[\w.'₀-₉]+)`", lean)
+            refs = [by_name[n] for n in names if n in by_name]
+            page = first_page(where)
+            entries.append([eid, kind, checked, page, clean(where), clean(c[2]), group_of(page, where),
+                            refs, False])
+    for e in entries:
+        e[8] = e[0] in no_repair
+    if not entries:
+        note(notes, "ERRATA.md has no rows the page could read; the problems view is empty.")
+    return dict(entries=entries, gaps=gaps)
 
 
 def validate(model):
