@@ -881,7 +881,100 @@ translation of the spectral argument by the section's imaginary frequency. -/
 theorem existsUnique_sLocalCechStripMellin (x : ℝ) :
     ∃! M : PositiveRealExponentialDecay overlapInterval ≃L[ℂ] B⁰,
       ∀ f s, s ∈ overlap → (M f).val s =
-        mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by sorry
+        mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+  let I : Set ℝ := Ioo 0 1
+  have hne : I.Nonempty := ⟨1 / 2, by norm_num [I]⟩
+  -- The unimodular multiplier u ↦ exp(i y u), as a Schwartz multiplier.
+  let g (y : ℝ) (u : ℝ) : ℂ := Complex.exp (((y * u : ℝ) : ℂ) * Complex.I)
+  have hg (y : ℝ) : (g y).HasTemperateGrowth := by
+    have h1 : (fun u : ℝ ↦ y * u).HasTemperateGrowth :=
+      (y • ContinuousLinearMap.id ℝ ℝ).hasTemperateGrowth
+    exact Complex.hasTemperateGrowth_exp_mul_I.comp h1
+  have hmem (y : ℝ) (f : logExponentialDecaySubmodule I) :
+      (fun u ↦ g y u * f.val u) ∈ logExponentialDecaySubmodule I := by
+    apply (Submodule.mem_iInf _).2
+    intro a
+    refine ⟨SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f), ?_⟩
+    funext u
+    change SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) u =
+      (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u)
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), logExponentialDecayTwist_apply, smul_eq_mul]
+    ring
+  let mod (y : ℝ) : PositiveRealExponentialDecay I →ₗ[ℂ] PositiveRealExponentialDecay I :=
+    { toFun := fun f ↦ (⟨_, hmem y f⟩ : logExponentialDecaySubmodule I)
+      map_add' := fun f h ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (f.val u + h.val u) = g y u * f.val u + g y u * h.val u
+        ring)
+      map_smul' := fun c f ↦ Subtype.ext (funext fun u ↦ by
+        change g y u * (c * f.val u) = c * (g y u * f.val u)
+        ring) }
+  have hmod (y : ℝ) (f : PositiveRealExponentialDecay I) (u : ℝ) :
+      (mod y f).val u = g y u * f.val u := rfl
+  have hE := positiveRealExponentialDecay_isEmbedding I hne
+  have htw (y : ℝ) (a : I) (f : PositiveRealExponentialDecay I) :
+      logExponentialDecayTwist I a (mod y f) =
+        SchwartzMap.smulLeftCLM ℂ (g y) (logExponentialDecayTwist I a f) := by
+    ext u
+    rw [SchwartzMap.smulLeftCLM_apply_apply (hg y), smul_eq_mul]
+    refine (logExponentialDecayTwist_apply I a (mod y f) u).trans ?_
+    refine Eq.trans ?_ (congrArg (g y u * ·) (logExponentialDecayTwist_apply I a f u)).symm
+    change (Real.exp ((a : ℝ) * u) : ℂ) * (g y u * f.val u) = _
+    ring
+  have hcont (y : ℝ) : Continuous (mod y) := by
+    apply hE.continuous_iff.mpr
+    apply continuous_pi
+    intro a
+    exact ((SchwartzMap.smulLeftCLM ℂ (g y)).continuous.comp
+      ((continuous_apply a).comp hE.continuous)).congr fun f ↦ (htw y a f).symm
+  have hinv (y : ℝ) (f : PositiveRealExponentialDecay I) : mod (-y) (mod y f) = f := by
+    apply Subtype.ext
+    funext u
+    change g (-y) u * (g y u * f.val u) = f.val u
+    simp only [g]
+    rw [← mul_assoc, ← Complex.exp_add]
+    push_cast
+    ring_nf
+    simp
+  let P : PositiveRealExponentialDecay I ≃L[ℂ] PositiveRealExponentialDecay I :=
+    { toLinearMap := mod x
+      invFun := mod (-x)
+      left_inv := hinv x
+      right_inv := fun f ↦ by simpa using hinv (-x) f
+      continuous_toFun := hcont x
+      continuous_invFun := hcont (-x) }
+  have hOpen : IsOpen I := isOpen_Ioo
+  have hInt : OrdConnected I := ordConnected_Ioo
+  have hspec := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose_spec
+  let A := (existsUnique_positiveRealFourierMellin I hOpen hInt hne).exists.choose
+  have hform : ∀ (f : PositiveRealExponentialDecay I) (s : ℂ), s ∈ Complex.re ⁻¹' I →
+      ((P.trans A) f).val s = mellin (fun t ↦ f.val (Real.log t)) (s + (x : ℂ) * Complex.I) := by
+    intro f s hs
+    change (A (mod x f)).val s = _
+    rw [hspec (mod x f) s hs]
+    unfold mellin
+    refine setIntegral_congr_fun measurableSet_Ioi fun t (ht : 0 < t) ↦ ?_
+    have ht0 : (t : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr ht.ne'
+    change (t : ℂ) ^ (s - 1) • (g x (Real.log t) * f.val (Real.log t)) =
+      (t : ℂ) ^ (s + x * Complex.I - 1) • f.val (Real.log t)
+    have hpow : (t : ℂ) ^ (s + x * Complex.I - 1) = (t : ℂ) ^ (s - 1) * g x (Real.log t) := by
+      rw [show s + x * Complex.I - 1 = (s - 1) + x * Complex.I by ring,
+        Complex.cpow_add _ _ ht0]
+      congr 1
+      rw [Complex.cpow_def_of_ne_zero ht0, ← Complex.ofReal_log ht.le]
+      simp only [g]
+      push_cast
+      ring_nf
+    rw [hpow, smul_eq_mul, smul_eq_mul]
+    ring
+  refine ⟨P.trans A, hform, ?_⟩
+  intro M hM
+  apply ContinuousLinearEquiv.ext
+  funext f
+  apply Subtype.ext
+  funext s
+  by_cases hs : s ∈ Complex.re ⁻¹' I
+  · exact (hM f s hs).trans (hform f s hs).symm
+  · exact ((M f).property.1 hs).trans (((P.trans A) f).property.1 hs).symm
 
 /-- Paper: (5.4.2.6), p. 276.
 Applying the two shifted Mellin transforms to the upper left arrow gives the
