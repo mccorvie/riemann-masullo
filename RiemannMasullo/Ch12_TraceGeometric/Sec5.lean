@@ -4,8 +4,8 @@ public import RiemannMasullo.Ch12_TraceGeometric.Sec4
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4b
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
-import all RiemannMasullo.Ch12_TraceGeometric.Sec1b
-import all RiemannMasullo.Ch10_TraceSpectral.Sec4a
+import RiemannMasullo.Ch12_TraceGeometric.Sec1b
+import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 import all RiemannMasullo.Ch02_AdelicTheta.Sec2b
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 import all RiemannMasullo.Ch09_HardySobolev.Sec3
