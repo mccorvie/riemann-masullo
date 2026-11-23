@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import all RiemannMasullo.Ch11_ShellStructure.Sec2a
 
 /-! # §11.2.0 assertions that are false as printed -/
 
@@ -176,11 +177,86 @@ def Printed.orbitalJet_memLp : Prop :=
         let u := h.toLp (jet(χ, t, m))
         ∀ k : C₁(F), (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ(F)] fun g ↦ (χ⁻¹ k.val : ℂ) * u g
 
+/-- The reciprocal of the square root of `1 + x²` is not integrable on the line: on `(1, ∞)` it
+dominates `x⁻¹ / 2`. -/
+private theorem Printed.orbitalJet_memLp_false_line :
+    ∫⁻ x : ℝ, ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹ = ⊤ := by
+  by_contra hfin
+  have hmeas : Measurable fun x : ℝ ↦ ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹ := by
+    fun_prop
+  have hint := integrable_toReal_of_lintegral_ne_top hmeas.aemeasurable hfin
+  have hint' : IntegrableOn (fun x : ℝ ↦ 2 * ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹) (Ioi 1) := by
+    refine IntegrableOn.congr_fun ((hint.const_mul 2).integrableOn (s := Ioi 1))
+      (fun x _ ↦ ?_) measurableSet_Ioi
+    change 2 * (ENNReal.ofReal _).toReal = _
+    rw [ENNReal.toReal_ofReal (inv_nonneg.mpr (Real.rpow_nonneg (by positivity) _))]
+  apply not_integrableOn_Ioi_inv (a := 1)
+  refine hint'.mono' (by fun_prop) ?_
+  refine (ae_restrict_mem measurableSet_Ioi).mono fun x hx ↦ ?_
+  have hx1 : (1 : ℝ) < x := hx
+  have hx0 : 0 < x := by linarith
+  rw [Real.norm_of_nonneg (inv_nonneg.mpr hx0.le)]
+  have hsq : (1 + x ^ 2) ^ ((1 : ℝ) / 2) ≤ 2 * x := by
+    rw [← Real.sqrt_eq_rpow, Real.sqrt_le_left (by linarith)]
+    nlinarith
+  have hpos : 0 < (1 + x ^ 2) ^ ((1 : ℝ) / 2) := Real.rpow_pos_of_pos (by positivity) _
+  rw [le_mul_inv_iff₀ hpos, inv_mul_eq_div, div_le_iff₀ hx0]
+  linarith
+
+/-- Over ℚ the reciprocal Sobolev measure of degree one has infinite total mass. -/
+private theorem Printed.orbitalJet_memLp_false_mass : (μ'(ℚ, 1)) univ = ⊤ := by
+  have hm : IsModulation (⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩ :
+      C𝔽(ℚ) →ₜ* ℝ≥0ˣ) := ⟨isProperMap_ideleClassNorm ℚ, ideleClassNorm_ne_one (F := ℚ)⟩
+  let ν : Measure C𝔽(ℚ) := canonicalModulatedHaar _ hm
+  let : ν.IsHaarMeasure := (existsUnique_canonicalModulatedHaar _ hm).exists.choose_spec.1
+  let φ : ℝ → ENNReal := fun x ↦ ENNReal.ofReal ((1 + x ^ 2) ^ ((1 : ℝ) / 2))⁻¹
+  have hφ : Measurable φ := by fun_prop
+  have hdens (g : C𝔽(ℚ)) : ENNReal.ofReal (intervalSobolevDensity 0 0 1 (logNorm(ℚ) g))⁻¹ =
+      φ (logNorm(ℚ) g) := by
+    simp only [φ, intervalSobolevDensity, mul_zero, zero_mul, Real.exp_zero, max_self, one_mul]
+  rw [withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ, lintegral_congr hdens,
+    Measure.isMulLeftInvariant_eq_smul (μ(ℚ)) ν, lintegral_smul_measure,
+    (orbitalJet_logNorm_measurePreserving (F := ℚ)).lintegral_comp hφ,
+    Printed.orbitalJet_memLp_false_line]
+  exact ENNReal.mul_top (by exact_mod_cast (Measure.haarScalarFactor_pos_of_isHaarMeasure _ _).ne')
+
 /-- Paper: Theorem 11.2.0.2 and (11.2.0.6), p. 485. Over ℚ with the trivial
 character and S₀ = {2}, the factor 1 − 2⁻ᶻ has a simple zero at 0. At degree
 1 the printed floor admits the constant jet. Its squared norm diverges
 because the reciprocal weight is asymptotic to 1/|x|. -/
-theorem Printed.orbitalJet_memLp_false : ¬ Printed.orbitalJet_memLp := by sorry
+theorem Printed.orbitalJet_memLp_false : ¬ Printed.orbitalJet_memLp := by
+  intro h
+  classical
+  obtain ⟨v, -, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_twoPlaces
+  obtain ⟨hv, -⟩ := Printed.orbitalEulerProduct_eq_primary_false_trivial v
+  have hf0 : frequency((0 : ℝ)) = 0 := by simp
+  have hfac : (finiteHeckeEulerFactor (1 : PontryaginDual C𝔽(ℚ)) v 0)⁻¹ = 0 := by
+    have hπ := (Valued.v : Valuation (v.adicCompletion ℚ)
+      (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial.choose_spec
+    rw [finiteHeckeEulerFactor, ite_eq_left hv, inv_inv]
+    have h1 : ideleClassNormTwist (1 : PontryaginDual C𝔽(ℚ)) 0 = 1 := by
+      ext g
+      change (1 : ℂ) * _ ^ (0 : ℂ) = 1
+      simp
+    rw [h1]
+    simp [HeckeCharacter.localValue, hπ.ne_zero]
+  have hz : reciprocalPartialHeckeEulerProduct (1 : PontryaginDual C𝔽(ℚ)) {v}
+      (frequency((0 : ℝ))) = 0 := by
+    rw [hf0, reciprocalPartialHeckeEulerProduct, Finset.prod_singleton, hfac]
+  have hmult : orbitalEulerMultiplicity (1 : PontryaginDual C𝔽(ℚ)) {v} (frequency((0 : ℝ))) = 1 := by
+    rw [orbitalEulerMultiplicity_eq_card, hf0, Finset.filter_singleton, if_pos hfac,
+      Finset.card_singleton]
+  obtain ⟨hmem, -⟩ := h ℚ 1 {v} (by simpa using hv) 1 zero_le_one 0 0 hz (by
+    rw [hmult]; norm_num)
+  have hjet : (jet((1 : PontryaginDual C𝔽(ℚ)), 0, 0) : C𝔽(ℚ) → ℂ) = fun _ ↦ 1 := by
+    funext g
+    rw [spectralZeroJet_zero]
+    rfl
+  rw [hjet] at hmem
+  have hne := hmem.eLpNorm_lt_top
+  rw [eLpNorm_const' _ two_ne_zero ENNReal.ofNat_ne_top, Printed.orbitalJet_memLp_false_mass]
+    at hne
+  simp at hne
 
 /-- Paper: Theorem 11.2.0.2, p. 485. The jet vectors form a Markushevich
 basis of the PV annihilator taken in the full negative space with its subspace topology. -/
