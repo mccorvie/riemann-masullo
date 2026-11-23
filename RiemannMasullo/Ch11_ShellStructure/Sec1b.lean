@@ -1370,12 +1370,125 @@ theorem sLocalCarvingTheta_sIdeleInsertion (S : Finset V) (f : ℬₛ(S)) (g : (
   rw [Units.val_mul, Units.val_mul, map_mul, sLocalCarvingTheta_sIdeleInsertion_proj]
   rfl
 
+/-- The ideles that are units at every finite place outside `S` form an open set: they are
+the range of the open insertion of the units of the adeles integral outside `S`. -/
+private theorem integrable_sLocalCarvingTheta_normOne_isOpen (S : Finset V) :
+    IsOpen {g : I𝔽 | ∀ v ∉ S, Valued.v (g.val.2 v) = 1} := by
+  convert (integralIdeleInsertion_isOpenEmbedding F S).isOpen_range using 1
+  ext g
+  rw [Set.mem_setOf_eq, mem_range_integralIdeleInsertion]
+  refine forall₂_congr fun v _ ↦ ?_
+  have h1 : g.val.2 v * g.inv.2 v = 1 :=
+    congrArg (fun x : AdeleRing (𝓞 F) F ↦ x.2 v) g.val_inv
+  have h2 : g.inv.2 v * g.val.2 v = 1 :=
+    congrArg (fun x : AdeleRing (𝓞 F) F ↦ x.2 v) g.inv_val
+  exact (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+    (a := ⟨g.val.2 v, g.inv.2 v, h1, h2⟩)).symm
+
+/-- At an idele that is a unit outside `S`, the raw theta series is the S-local theta of
+its projection. -/
+private theorem integrable_sLocalCarvingTheta_normOne_eq (S : Finset V) (f : ℬₛ(S)) (g : I𝔽)
+    (hg : ∀ v ∉ S, Valued.v (g.val.2 v) = 1) :
+    ideleThetaSum (sLocalCarvingIdeleTest S f) g =
+      sLocalAdelicTheta F S f (Units.map (adeleProjection F S).toMonoidHom g) := by
+  rw [sLocalAdelicTheta_apply]
+  unfold ideleThetaSum
+  let P : Set Fˣ := ((S : Set V).unit F : Set Fˣ)
+  let h : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd (adeleProjection F S
+    (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g).val))
+  have h₀ : IdeleGroup.unitEmbedding (𝓞 F) F 1 * g ∈
+      {g' : I𝔽 | ∀ v ∉ S, Valued.v (g'.val.2 v) = 1} := by
+    rw [map_one, one_mul]
+    exact hg
+  have hterm (ξ : Fˣ) : sLocalCarvingIdeleTest S f (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g) =
+      P.indicator h ξ := by
+    have hmem := sLocalCarvingTheta_spec_mem S g 1 ξ h₀
+    rw [inv_one, mul_one] at hmem
+    unfold sLocalCarvingIdeleTest
+    by_cases hξ : ξ ∈ P
+    · rw [Set.indicator_of_mem (hmem.mpr hξ), Set.indicator_of_mem hξ]
+    · rw [Set.indicator_of_notMem (mt hmem.mp hξ), Set.indicator_of_notMem hξ]
+  rw [tsum_congr hterm, ← tsum_subtype P h]
+  refine Eq.trans ?_ ((Set.unitEquivUnitsInteger (S : Set V) F).toEquiv.tsum_eq _)
+  refine tsum_congr fun x ↦ congrArg f (congrArg Multiplicative.ofAdd ?_)
+  rw [Units.val_mul, map_mul]
+  rfl
+
+/-- The raw theta series is continuous on the ideles: near an idele with a principal
+translate that is a unit outside `S` it is the S-local theta of the projected translate, and
+near any other idele it vanishes. -/
+private theorem integrable_sLocalCarvingTheta_normOne_continuous (S : Finset V) (f : ℬₛ(S)) :
+    Continuous (ideleThetaSum (sLocalCarvingIdeleTest S f)) := by
+  let U := {g : I𝔽 | ∀ v ∉ S, Valued.v (g.val.2 v) = 1}
+  have hU : IsOpen U := integrable_sLocalCarvingTheta_normOne_isOpen S
+  have hUmul (a b : I𝔽) (ha : a ∈ U) (hb : b ∈ U) : a * b ∈ U := fun v hv ↦ by
+    change Valued.v (a.val.2 v * b.val.2 v) = 1
+    rw [Valuation.map_mul, ha v hv, hb v hv, one_mul]
+  have hUinv (a : I𝔽) (ha : a ∈ U) : a⁻¹ ∈ U := fun v hv ↦ by
+    have h := congrArg (fun x : AdeleRing (𝓞 F) F ↦ Valued.v (x.2 v)) a.inv_val
+    change Valued.v (a.inv.2 v * a.val.2 v) = Valued.v (1 : v.adicCompletion F) at h
+    rw [Valuation.map_mul, ha v hv, mul_one, map_one] at h
+    exact h
+  have hU1 : (1 : I𝔽) ∈ U := fun v _ ↦ map_one _
+  have hshift (ξ : Fˣ) (g : I𝔽) : ideleThetaSum (sLocalCarvingIdeleTest S f)
+      (IdeleGroup.unitEmbedding (𝓞 F) F ξ * g) = ideleThetaSum (sLocalCarvingIdeleTest S f) g := by
+    rw [← sLocalCarvingTheta_classOf, ← sLocalCarvingTheta_classOf]
+    congr 1
+    rw [map_mul, QuotientGroup.mk'_apply,
+      (QuotientGroup.eq_one_iff (N := IdeleGroup.principalSubgroup (𝓞 F) F)
+        (IdeleGroup.unitEmbedding (𝓞 F) F ξ)).mpr ⟨ξ, rfl⟩, one_mul]
+  have hproj : Continuous (Units.map (adeleProjection F S).toMonoidHom) :=
+    Continuous.units_map _ (continuous_adeleProjection F S)
+  rw [continuous_iff_continuousAt]
+  intro g₀
+  by_cases h : ∃ ξ₀ : Fˣ, IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g₀ ∈ U
+  · obtain ⟨ξ₀, h₀⟩ := h
+    have hmul : Continuous fun g : I𝔽 ↦ IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g :=
+      continuous_const.mul continuous_id
+    have hnhds : ∀ᶠ g in 𝓝 g₀, IdeleGroup.unitEmbedding (𝓞 F) F ξ₀ * g ∈ U :=
+      (hU.preimage hmul).mem_nhds h₀
+    refine ((sLocalAdelicTheta F S f).continuous.comp (hproj.comp hmul)).continuousAt.congr
+      (hnhds.mono fun g hg ↦ ?_)
+    exact (integrable_sLocalCarvingTheta_normOne_eq S f _ hg).symm.trans (hshift ξ₀ g)
+  · push_neg at h
+    have hmul : Continuous fun g : I𝔽 ↦ g₀⁻¹ * g := continuous_const.mul continuous_id
+    have hnhds : ∀ᶠ g in 𝓝 g₀, g₀⁻¹ * g ∈ U :=
+      (hU.preimage hmul).mem_nhds (by simpa using hU1)
+    refine (continuousAt_const (y := (0 : ℂ))).congr (hnhds.mono fun g hg ↦ ?_)
+    symm
+    unfold ideleThetaSum
+    refine (tsum_congr fun ξ ↦ ?_).trans tsum_zero
+    unfold sLocalCarvingIdeleTest
+    refine Set.indicator_of_notMem (fun hmem ↦ h ξ ?_) _
+    have := hUmul _ _ hmem (hUinv _ hg)
+    convert this using 1
+    group
+
+/-- The raw theta generator is continuous on the idele classes. -/
+private theorem integrable_sLocalCarvingTheta_normOne_classContinuous (S : Finset V)
+    (f : ℬₛ(S)) : Continuous (sLocalCarvingTheta S f) := by
+  rw [(QuotientGroup.isQuotientMap_mk (IdeleGroup.principalSubgroup (𝓞 F) F)).continuous_iff]
+  have h : sLocalCarvingTheta S f ∘ QuotientGroup.mk =
+      ideleThetaSum (sLocalCarvingIdeleTest S f) :=
+    funext fun g ↦ sLocalCarvingTheta_classOf S f g
+  rw [h]
+  exact integrable_sLocalCarvingTheta_normOne_continuous S f
+
 /-- Paper: (11.1.2.7), p. 480. The raw theta is integrable on each norm-one
 coset against a continuous norm-one character.
 Deviation: This is the integrability needed for the character projection. -/
 theorem integrable_sLocalCarvingTheta_normOne (S : Finset V) (ω : PontryaginDual C₁)
     (f : ℬₛ(S)) (g : C𝔽) :
-    Integrable (fun h : C₁ ↦ sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ)) μ₁ := by sorry
+    Integrable (fun h : C₁ ↦ sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ)) μ₁ := by
+  have : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : (μ₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hc : Continuous (fun h : C₁ ↦ sLocalCarvingTheta S f (h.val * g) * (ω h : ℂ)) :=
+    ((integrable_sLocalCarvingTheta_normOne_classContinuous S f).comp
+      (continuous_subtype_val.mul continuous_const)).mul
+      (continuous_subtype_val.comp ω.continuous)
+  exact hc.integrable_of_hasCompactSupport
+    (isCompact_univ.of_isClosed_subset (isClosed_tsupport _) (Set.subset_univ _))
 
 /-- Paper: (11.1.2.7), p. 480. Average the raw theta generator against the
 norm-one character and then apply the cutoff.
