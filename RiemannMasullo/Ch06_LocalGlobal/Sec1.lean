@@ -532,6 +532,136 @@ theorem finitePlaceBallIndicator_at_power (w : Places) (π : (L(w))ˣ)
     rw [not_le, ← WithZero.exp_zero, WithZero.exp_lt_exp]; omega
 
 
+private theorem finitePlaceSchwartz_invariants_laurent_free_tele (g : ℤ → ℂ) (A B : ℤ) (hA : ∀ m < A, g m = 0)
+    (hB : ∀ m, B ≤ m → g m = g B) (m : ℤ) :
+    ∑ n ∈ Finset.Icc A B, (g n - g (n - 1)) * (if n ≤ m then 1 else 0) = g m := by
+  have hlow : ∀ m < A,
+      ∑ n ∈ Finset.Icc A B, (g n - g (n - 1)) * (if n ≤ m then 1 else 0) = g m := by
+    intro m hm
+    rw [hA m hm]
+    refine Finset.sum_eq_zero fun n hn ↦ ?_
+    rw [Finset.mem_Icc] at hn
+    rw [ite_eq_right (by omega), mul_zero]
+  have hstep : ∀ m : ℤ,
+      ∑ n ∈ Finset.Icc A B, (g n - g (n - 1)) * (if n ≤ m + 1 then 1 else 0) =
+        ∑ n ∈ Finset.Icc A B, (g n - g (n - 1)) * (if n ≤ m then 1 else 0) +
+          (if m + 1 ∈ Finset.Icc A B then g (m + 1) - g (m + 1 - 1) else 0) := by
+    intro m
+    rw [← Finset.sum_ite_eq' (Finset.Icc A B) (m + 1) (fun n ↦ g n - g (n - 1)),
+      ← Finset.sum_add_distrib]
+    refine Finset.sum_congr rfl fun n _ ↦ ?_
+    split_ifs <;> first | (exfalso; omega) | ring1
+  rcases lt_or_ge m A with hm | hm
+  · exact hlow m hm
+  obtain ⟨k, rfl⟩ : ∃ k : ℕ, m = A - 1 + (k + 1) := ⟨(m - A).toNat, by omega⟩
+  induction k with
+  | zero =>
+    rw [show A - 1 + ((0 : ℕ) + 1 : ℤ) = A - 1 + 1 by push_cast; ring, hstep,
+      hlow (A - 1) (by omega), sub_add_cancel]
+    rcases le_or_gt A B with hAB | hAB
+    · rw [ite_eq_left (Finset.mem_Icc.mpr ⟨le_rfl, hAB⟩), hA (A - 1) (by omega)]
+      ring
+    · rw [ite_eq_right (by rw [Finset.mem_Icc]; omega), add_zero,
+        hB _ (by omega), hB A (by omega)]
+  | succ k ih =>
+    have e : A - 1 + (((k + 1 : ℕ) : ℤ) + 1) = (A - 1 + ((k : ℤ) + 1)) + 1 := by push_cast; ring
+    rw [e, hstep, ih (by omega)]
+    by_cases hmem : A - 1 + ((k : ℤ) + 1) + 1 ∈ Finset.Icc A B
+    · rw [ite_eq_left hmem]; ring_nf
+    · rw [ite_eq_right hmem, add_zero]
+      rw [Finset.mem_Icc] at hmem
+      rw [hB (A - 1 + ((k : ℤ) + 1)) (by omega), hB (A - 1 + ((k : ℤ) + 1) + 1) (by omega)]
+
+
+open Classical in
+private theorem finitePlaceSchwartz_invariants_laurent_free_ball_mem (w : Places) (π : (L(w))ˣ) (n : ℤ) :
+    ∃ g : ℬᵥ(w), ∀ x, g (Multiplicative.ofAdd x) = finitePlaceBallIndicator w π n x := by
+  have hc : IsCompact (O(w) : Set L(w)) :=
+    isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers w)
+  have hO : IsClopen (O(w) : Set L(w)) :=
+    ⟨hc.isClosed, Valued.isOpen_valuationSubring _⟩
+  refine (mem_finitePlaceSchwartz_iff F w _).mpr ⟨?_, ?_⟩
+  · have h : IsLocallyConstant ((O(w) : Set L(w)).indicator (1 : L(w) → ℂ)) := by
+      rw [← LocallyConstant.coe_charFn ℂ hO]
+      exact (LocallyConstant.charFn ℂ hO).isLocallyConstant
+    exact h.comp_continuous (continuous_const_mul (π ^ (-n)).val)
+  · refine HasCompactSupport.intro (hc.image (continuous_const_mul (π ^ n).val)) fun x hx ↦ ?_
+    unfold finitePlaceBallIndicator
+    refine Set.indicator_of_notMem (fun h ↦ hx ⟨_, h, ?_⟩) _
+    show (π ^ n).val * ((π ^ (-n)).val * x) = x
+    rw [← mul_assoc, ← Units.val_mul, ← zpow_add, add_neg_cancel, zpow_zero, Units.val_one,
+      one_mul]
+
+private theorem finitePlaceSchwartz_invariants_laurent_free_ball_invariant (w : Places) (π : (L(w))ˣ) (a : ℤ) (x t u : L(w))
+    (htu : t*u = 1) (ht : t ∈ O(w)) (hu : u ∈ O(w)) :
+    finitePlaceBallIndicator w π a (t*x) = finitePlaceBallIndicator w π a x := by
+  classical
+  let v := (π ^ (-a)).val * x
+  have he : (π ^ (-a)).val * (t*x) = t*v := by dsimp [v]; ring
+  have h : t*v ∈ O(w) ↔ v ∈ O(w) := by
+    refine ⟨fun hv ↦ ?_, fun hv ↦ mul_mem ht hv⟩
+    have h' : (t*v)*u ∈ O(w) := mul_mem hv hu
+    rwa [mul_right_comm, htu, one_mul] at h'
+  unfold finitePlaceBallIndicator
+  rw [he]; by_cases hv : v ∈ O(w)
+  · exact (Set.indicator_of_mem (h.mpr hv) _).trans (Set.indicator_of_mem hv (fun _ ↦ (1 : ℂ))).symm
+  · exact (Set.indicator_of_notMem (mt h.mp hv) _).trans (Set.indicator_of_notMem hv _).symm
+
+private theorem finitePlaceSchwartz_invariants_laurent_free_ball_inv (w : Places) (π : (L(w))ˣ) (n : ℤ) (b : ℬᵥ(w))
+    (hb : ∀ x, b (Multiplicative.ofAdd x) = finitePlaceBallIndicator w π n x) :
+    b ∈ Representation.invariants (ρ(w)) := by
+  rw [Representation.mem_invariants]
+  intro g
+  rw [MonoidHom.comp_apply, Subgroup.coe_subtype, schwartzBruhatUnitRepresentation_apply]
+  refine Subtype.ext (funext fun x ↦ ?_)
+  change schwartzBruhatUnitTranslate g.val b (Multiplicative.ofAdd x.toAdd) = b (Multiplicative.ofAdd x.toAdd)
+  rw [schwartzBruhatUnitTranslate_apply, hb, hb]
+  have hg := g.property
+  rw [Submonoid.mem_units_iff] at hg
+  exact finitePlaceSchwartz_invariants_laurent_free_ball_invariant w π n _ _ _ (by rw [← Units.val_mul, inv_mul_cancel, Units.val_one]) hg.2 hg.1
+
+open Classical in
+private theorem finitePlaceSchwartz_invariants_laurent_free_pow_zero (w : Places) (π : (L(w))ˣ)
+    (hπ : Valuation.IsUniformizer (Valued.v : Valuation (L(w)) (WithZero (Multiplicative ℤ))) π.val) :
+    Filter.Tendsto (fun n : ℕ ↦ π.val ^ n) Filter.atTop (𝓝 0) := by
+  apply Valued.tendsto_zero_pow_of_le_exp_neg_one
+  exact (hπ.trans (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+      (w.valuedAdicCompletion_surjective F)))).le
+
+private theorem finitePlaceSchwartz_invariants_laurent_free_lower {K : Type*} [NormedField K] (p : Kˣ)
+    (hp : Filter.Tendsto (fun n : ℕ ↦ p.val ^ n) Filter.atTop (𝓝 0)) {s : Set K} (hs : IsCompact s) :
+    ∃ l : ℤ, ∀ m : ℤ, (p ^ m).val ∈ s → l ≤ m := by
+  obtain ⟨r,hr⟩ := (Metric.isBounded_iff_subset_closedBall 0).mp hs.isBounded
+  have hn := tendsto_pow_atTop_nhds_zero_iff_norm_lt_one.mp hp
+  have hpos : 0 < ‖p.val‖ := norm_pos_iff.mpr p.ne_zero
+  obtain ⟨N,hN⟩ := Filter.eventually_atTop.mp ((tendsto_pow_atTop_atTop_of_one_lt ((one_lt_inv₀ hpos).mpr hn)).eventually_gt_atTop r)
+  refine ⟨-(N : ℤ),fun m hm ↦ ?_⟩
+  by_contra! hh
+  let n := (-m).toNat
+  have he : m = -(n : ℤ) := by dsimp [n]; omega
+  have hnN : n ≥ N := by omega
+  have hle := Metric.mem_closedBall.mp (hr hm)
+  rw [dist_zero_right, Units.val_zpow_eq_zpow_val,he,zpow_neg,zpow_natCast,norm_inv,norm_pow,← inv_pow] at hle
+  exact (hN n hnN).not_ge hle
+
+open Classical in
+private theorem finitePlaceSchwartz_invariants_laurent_free_orbit (w : Places) (π : (L(w))ˣ)
+    (hπ : Valuation.IsUniformizer (Valued.v : Valuation (L(w)) (WithZero (Multiplicative ℤ))) π.val)
+    {y : L(w)} (hy : y ≠ 0) : ∃ (u : (L(w))ˣ) (m : ℤ), u.val ∈ O(w) ∧ (u⁻¹).val ∈ O(w) ∧
+      y = u.val * (π ^ m).val := by
+  let v : Valuation (L(w)) (WithZero (Multiplicative ℤ)) := Valued.v
+  have hp : v π.val = WithZero.exp (-1 : ℤ) := hπ.trans
+    (congrArg Units.val (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective (w.valuedAdicCompletion_surjective F)))
+  let m := -(v y).log
+  have hpow : v (π ^ m).val = v y := by
+    rw [Units.val_zpow_eq_zpow_val,map_zpow₀,hp,← WithZero.exp_zsmul]
+    simpa [m] using WithZero.exp_log ((map_ne_zero v).mpr hy)
+  let u := Units.mk0 y hy / π ^ m
+  have hv : v u.val = 1 := by rw [show u.val = y / (π ^ m).val from Units.val_div_eq_div_val _ _,map_div₀,hpow,div_self ((map_ne_zero v).mpr hy)]
+  refine ⟨u,m,(HeightOneSpectrum.mem_adicCompletionIntegers _ _ _).mpr hv.le,?_,?_⟩
+  · rw [HeightOneSpectrum.mem_adicCompletionIntegers]; rw [Units.val_inv_eq_inv_val,map_inv₀,show Valued.v u.val = 1 from hv,inv_one]
+  · exact (congrArg Units.val (div_mul_cancel (Units.mk0 y hy) (π ^ m))).symm
+
 /-- Paper: Lemma 6.1.2.2(1)(1), p. 288.
 The integer-unit invariants form a free Laurent module on the integer-ball indicator.
 Deviation: A complex linear equivalence spells out the Laurent action by the generator
@@ -543,7 +673,128 @@ theorem finitePlaceSchwartz_invariants_laurent_free (w : Places)
     ∃ e : LaurentPolynomial ℂ ≃ₗ[ℂ] (Representation.invariants (ρ(w))),
       (∀ x, (e 1).val (Multiplicative.ofAdd x) = finitePlaceBallIndicator w π 0 x) ∧
       ∀ P, (e (LaurentPolynomial.T 1 * P)).val =
-        schwartzBruhatUnitTranslate π (e P).val := by sorry
+        schwartzBruhatUnitTranslate π (e P).val := by
+  classical
+  choose b hb using finitePlaceSchwartz_invariants_laurent_free_ball_mem w π
+  let S := Representation.invariants (ρ(w))
+  let v : ℤ → S := fun n ↦ ⟨b n, finitePlaceSchwartz_invariants_laurent_free_ball_inv w π n (b n) (hb n)⟩
+  have hev : ∀ (s : Finset ℤ) (c : ℤ → ℂ) (x : L(w)),
+      ((∑ n ∈ s, c n • v n : S) : ℬᵥ(w)) (Multiplicative.ofAdd x) =
+        ∑ n ∈ s, c n * finitePlaceBallIndicator w π n x := by
+    intro s c x
+    let ev : S →ₗ[ℂ] ℂ :=
+      { toFun := fun f ↦ (f : ℬᵥ(w)) (Multiplicative.ofAdd x)
+        map_add' := fun f g ↦ rfl
+        map_smul' := fun c f ↦ rfl }
+    change ev (∑ n ∈ s, c n • v n) = _
+    rw [map_sum]
+    refine Finset.sum_congr rfl fun n _ ↦ ?_
+    rw [map_smul, smul_eq_mul]
+    exact congrArg (c n * ·) (hb n x)
+  have hli : LinearIndependent ℂ v := by
+    rw [linearIndependent_iff']
+    intro s c hs i hi
+    have hz : ∀ m : ℤ, ∑ n ∈ s, c n * (if n ≤ m then 1 else 0) = 0 := by
+      intro m
+      have h := congrArg (fun f : S ↦ (f : ℬᵥ(w)) (Multiplicative.ofAdd (π ^ m).val)) hs
+      simp only at h
+      rw [hev] at h
+      simp only [finitePlaceBallIndicator_at_power w π _hπ] at h
+      exact h
+    calc c i = ∑ n ∈ s, c n * ((if n ≤ i then 1 else 0) - (if n ≤ i - 1 then 1 else 0)) := by
+          rw [Finset.sum_eq_single i]
+          · rw [ite_eq_left le_rfl, ite_eq_right (by omega)]; ring
+          · intro n _ hne
+            rw [show ((if n ≤ i then (1 : ℂ) else 0) - if n ≤ i - 1 then 1 else 0) = 0 by
+              split_ifs <;> first | (exfalso; omega) | ring1]
+            ring
+          · intro h; exact absurd hi h
+      _ = 0 := by simp only [mul_sub, Finset.sum_sub_distrib, hz, sub_zero]
+  have hsp : ⊤ ≤ Submodule.span ℂ (Set.range v) := by
+    rintro f -
+    let φ : L(w) → ℂ := fun y ↦ (f : ℬᵥ(w)) (Multiplicative.ofAdd y)
+    have hfinv : ∀ (u : (L(w))ˣ), u.val ∈ O(w) → (u⁻¹).val ∈ O(w) → ∀ y,
+        φ (u.val * y) = φ y := by
+      intro u hu hu' y
+      have hU : u⁻¹ ∈ U(w) := by
+        rw [Submonoid.mem_units_iff]
+        exact ⟨hu', by rw [inv_inv]; exact hu⟩
+      have h := (Representation.mem_invariants _ _).mp f.property ⟨u⁻¹, hU⟩
+      have h2 := congrArg (fun g : ℬᵥ(w) ↦ g (Multiplicative.ofAdd y)) h
+      simp only [MonoidHom.comp_apply, Subgroup.coe_subtype,
+        schwartzBruhatUnitRepresentation_apply] at h2
+      rw [schwartzBruhatUnitTranslate_apply, inv_inv] at h2
+      exact h2
+    obtain ⟨hlc, hcs⟩ := (mem_finitePlaceSchwartz_iff F w φ).mp ⟨f.val, fun _ ↦ rfl⟩
+    obtain ⟨l, hl⟩ := finitePlaceSchwartz_invariants_laurent_free_lower π (finitePlaceSchwartz_invariants_laurent_free_pow_zero w π _hπ) hcs
+    have hfib : IsOpen (φ ⁻¹' {φ 0}) := hlc.isOpen_fiber _
+    obtain ⟨N, hN⟩ := Filter.eventually_atTop.mp
+      ((finitePlaceSchwartz_invariants_laurent_free_pow_zero w π _hπ).eventually (hfib.mem_nhds rfl))
+    let g : ℤ → ℂ := fun m ↦ φ (π ^ m).val
+    have hgN : ∀ m : ℤ, (N : ℤ) ≤ m → g m = φ 0 := by
+      intro m hm
+      obtain ⟨k, rfl⟩ : ∃ k : ℕ, m = k := ⟨m.toNat, by omega⟩
+      have := hN k (by omega)
+      simp only [Set.mem_singleton_iff] at this
+      simp only [g, zpow_natCast, Units.val_pow_eq_pow_val]
+      exact this
+    let A := min l (N : ℤ)
+    have hA : ∀ m < A, g m = 0 := fun m hm ↦
+      image_eq_zero_of_notMem_tsupport (f := φ) fun h ↦ absurd (hl m h) (by omega)
+    have hB : ∀ m, (N : ℤ) ≤ m → g m = g N := fun m hm ↦
+      (hgN m hm).trans (hgN N le_rfl).symm
+    have hfeq : f = ∑ n ∈ Finset.Icc A (N : ℤ), (g n - g (n - 1)) • v n := by
+      refine Subtype.ext (SchwartzBruhat.ext fun x ↦ ?_)
+      rw [← ofAdd_toAdd x]
+      generalize x.toAdd = y
+      rw [hev]
+      change φ y = _
+      by_cases hy : y = 0
+      · subst hy
+        rw [Finset.sum_congr rfl (g := fun n ↦ (g n - g (n - 1)) * if n ≤ (N : ℤ) then 1 else 0)
+          fun n hn ↦ ?_, finitePlaceSchwartz_invariants_laurent_free_tele g A N hA hB N, hgN N le_rfl]
+        rw [Finset.mem_Icc] at hn
+        rw [ite_eq_left hn.2]
+        unfold finitePlaceBallIndicator
+        rw [mul_zero, Set.indicator_of_mem (zero_mem _)]
+      · obtain ⟨u, m, hu, hu', rfl⟩ := finitePlaceSchwartz_invariants_laurent_free_orbit w π _hπ hy
+        rw [hfinv u hu hu']
+        rw [Finset.sum_congr rfl (g := fun n ↦ (g n - g (n - 1)) * if n ≤ m then 1 else 0)
+          fun n _ ↦ ?_, finitePlaceSchwartz_invariants_laurent_free_tele g A N hA hB m]
+        rw [finitePlaceSchwartz_invariants_laurent_free_ball_invariant w π n _ _ (u⁻¹).val (by rw [← Units.val_mul, mul_inv_cancel,
+          Units.val_one]) hu hu', finitePlaceBallIndicator_at_power w π _hπ m n]
+    rw [hfeq]
+    exact Submodule.sum_mem _ fun n _ ↦ Submodule.smul_mem _ _ (Submodule.subset_span ⟨n, rfl⟩)
+  have hTb : ∀ n, AddMonoidAlgebra.basis ℤ ℂ n = LaurentPolynomial.T n := fun n ↦ rfl
+  obtain ⟨e, he⟩ : ∃ e : LaurentPolynomial ℂ ≃ₗ[ℂ] S, ∀ n, e (LaurentPolynomial.T n) = v n := by
+    refine ⟨(AddMonoidAlgebra.basis ℤ ℂ).equiv (Module.Basis.mk hli hsp) (Equiv.refl ℤ), fun n ↦ ?_⟩
+    rw [← hTb, Module.Basis.equiv_apply, Equiv.refl_apply, Module.Basis.mk_apply]
+  refine ⟨e, fun x ↦ ?_, ?_⟩
+  · rw [← LaurentPolynomial.T_zero, he]
+    exact hb 0 x
+  · have hL : S.subtype ∘ₗ e.toLinearMap ∘ₗ
+        LinearMap.mulLeft ℂ (LaurentPolynomial.T 1 : LaurentPolynomial ℂ) =
+        (schwartzBruhatUnitRepresentation (R := L(w)) π) ∘ₗ S.subtype ∘ₗ e.toLinearMap := by
+      refine (AddMonoidAlgebra.basis ℤ ℂ).ext fun n ↦ ?_
+      simp only [LinearMap.comp_apply, LinearMap.mulLeft_apply, Submodule.subtype_apply,
+        LinearEquiv.coe_coe, hTb]
+      rw [← LaurentPolynomial.T_add, he, he, schwartzBruhatUnitRepresentation_apply]
+      refine SchwartzBruhat.ext fun x ↦ ?_
+      rw [← ofAdd_toAdd x]
+      generalize x.toAdd = y
+      rw [schwartzBruhatUnitTranslate_apply]
+      change b (1 + n) _ = b n _
+      rw [hb, hb]
+      unfold finitePlaceBallIndicator
+      congr 1
+      rw [← mul_assoc, ← Units.val_mul, ← zpow_neg_one, ← zpow_add]
+      congr 3
+      ring
+    intro P
+    have h := LinearMap.congr_fun hL P
+    simp only [LinearMap.comp_apply, LinearMap.mulLeft_apply, Submodule.subtype_apply,
+      LinearEquiv.coe_coe, schwartzBruhatUnitRepresentation_apply] at h
+    exact h
 
 /-- Paper: Lemma 6.1.2.2(1)(2), p. 288.
 The integer-unit invariants are closed in the local Schwartz–Bruhat space. -/
