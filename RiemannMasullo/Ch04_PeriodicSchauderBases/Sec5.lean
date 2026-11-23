@@ -1313,7 +1313,11 @@ private theorem periodization_on_isotype (η : PontryaginDual G) (ω : Pontryagi
 
 include hχ in
 /-- Paper: Corollary 4.5.1.6 and Equation (4.5.1.12), p. 204. The normalized
-quotient map agrees with ordinary periodization on the matching isotype. -/
+quotient map agrees with ordinary periodization on the matching isotype.
+
+Deviation: Corollary 4.5.1.6 uses ordinary periodization on quotient classes. Here ordinary
+periodization is evaluated on a lift in the matching isotype.
+-/
 theorem modulatedIsotypicPeriodizationQuotient_mkQ (ω : PontryaginDual K)
     (f : E) (hf : f ∈ H[ω]) :
     T[ω] ((Pχ[ω]).ker.mkQ f) = P f := by
@@ -1326,7 +1330,11 @@ theorem modulatedIsotypicPeriodizationQuotient_mkQ (ω : PontryaginDual K)
 include hχ in
 /-- Paper: Equations (4.5.1.7)–(4.5.1.9) and (4.5.1.12), pp. 201, 204.
 On every lift the normalized quotient map applies the quotient projector after
-ordinary periodization. The unnormalized map of §4.4 multiplies this by the kernel mass. -/
+ordinary periodization. The unnormalized map of §4.4 multiplies this by the kernel mass.
+
+Deviation: Corollary 4.5.1.6 uses ordinary periodization on quotient classes. On an arbitrary
+lift the normalized quotient map applies the isotype projector after ordinary periodization.
+-/
 theorem modulatedIsotypicPeriodizationQuotient_projector (ω : PontryaginDual K) (f : E) :
     T[ω] ((Pχ[ω]).ker.mkQ f) = Ψ[ω] (P f) ∧
       Pχ[ω] f = (μ₁.real univ : ℂ) • Ψ[ω] (P f) := by
@@ -3215,8 +3223,10 @@ private theorem cyclicDifference_homogeneous_iff {A : Type*} [CommGroup A] (γ :
     rw [h x, mul_left_comm γ k, h, mul_sub]
 
 include hOpen in
-/-- Paper: Corollary 4.5.3.1(1), pp. 208–209. The difference range in the
-interval decay space is closed and restricts to the difference range on each isotype. -/
+/-- Paper: Corollary 4.5.3.1(1), pp. 208–209. The intersection of the periodization
+kernel with an isotype equals the image of that isotype under the difference map. Global
+closedness follows from `modulatedIntervalPeriodization_ker_eq_range` and continuity
+of periodization. -/
 theorem modulatedIntervalDifference_range_isotype (ω : PontryaginDual K) :
     let H := (actionIsotype ((ρG).comp (K).subtype) ω).comap j₀
     (PI).ker ⊓ H = H.map (ΔI).toLinearMap := by
