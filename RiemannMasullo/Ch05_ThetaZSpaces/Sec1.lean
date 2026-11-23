@@ -1045,7 +1045,7 @@ private theorem schwartzBruhat_eval_continuous {G : Type*} [CommGroup G] [Topolo
 /-- At a fixed idele class, global theta is continuous in the test function. It is the
 pointwise limit of the finite partial sums of point evaluations, and the global
 Schwartz–Bruhat space is barrelled, so the Banach–Steinhaus theorem applies. -/
-private theorem adelicTheta_eval_continuous (c : C𝔽) :
+theorem adelicTheta_eval_continuous (c : C𝔽) :
     Continuous (fun f : ℬ𝔽 ↦ adelicTheta f c) := by
   induction c using QuotientGroup.induction_on with | H g => ?_
   let : BarrelledSpace ℂ ℬ𝔽 := (adeleSchwartz_montel (F := F)).2.1
