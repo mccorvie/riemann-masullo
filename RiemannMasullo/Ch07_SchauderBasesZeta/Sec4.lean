@@ -1354,6 +1354,47 @@ theorem archNuclearityQuotient_jetEquiv_realization
     (y : ArchNuclearityJetIndex χ τ hτ → ℂ) :
     ∃ x : Θ₀(χ), ∀ j, archNuclearityJet χ τ hτ j x = y j := by sorry
 
+/-- A continuous bijection from a quotient of a closed part of a strict LF-space onto
+a countable product of scalar lines is open. Intersect each Fréchet stage with the closed
+part to obtain the increasing family of images used by the open mapping theorem. -/
+private theorem archNuclearityQuotient_jetEquiv_inverse_continuous_open
+    {A Y ι : Type*} [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [IsTopologicalAddGroup A] [ContinuousSMul ℂ A] [AddCommGroup Y] [Module ℂ Y]
+    [TopologicalSpace Y] [IsTopologicalAddGroup Y] [ContinuousSMul ℂ Y] [Countable ι]
+    (hA : IsStrictLFSpace A) (B₀ : Submodule ℂ A) (hB : IsClosed (B₀ : Set A))
+    (q : B₀ →L[ℂ] Y) (hq : Surjective q) (T : Y →L[ℂ] (ι → ℂ)) (hT : Bijective T) :
+    IsOpenMap T := by
+  let : T2Space Y := T2Space.of_injective_continuous hT.1 T.continuous
+  obtain ⟨_, stage, hmono, hV, hcover, _⟩ := hA
+  let slice (n : ℕ) := B₀.comap (stage n).subtype
+  let j (n : ℕ) : slice n →L[ℂ] B₀ :=
+    ((stage n).subtypeL.comp (slice n).subtypeL).codRestrict B₀ (fun z ↦ z.property)
+  have hW (n : ℕ) : IsFrechetTVS (slice n) := by
+    obtain ⟨hadd, hpoly, hmet, hcomp⟩ := hV n
+    let : UniformSpace (stage n) := IsTopologicalAddGroup.rightUniformSpace _
+    let : IsUniformAddGroup (stage n) := isUniformAddGroup_of_addCommGroup
+    let : CompleteSpace (stage n) := hcomp
+    have hc : IsClosed (slice n : Set (stage n)) := hB.preimage continuous_subtype_val
+    let : UniformSpace (slice n) := UniformSpace.comap Subtype.val inferInstance
+    let : IsUniformAddGroup (slice n) := (slice n).toAddSubgroup.isUniformAddGroup
+    let : TopologicalSpace.MetrizableSpace (slice n) := IsEmbedding.subtypeVal.metrizableSpace
+    let : CompleteSpace (slice n) := hc.completeSpace_coe
+    refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  have hPi : IsFrechetTVS (ι → ℂ) := by
+    refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  apply isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hPi) hW
+    (fun n ↦ q.comp (j n)) _ _ T hT.2
+  · rintro n _ ⟨y, rfl⟩
+    exact ⟨⟨⟨y.val.val, hmono (Nat.le_succ n) y.val.property⟩, y.property⟩, rfl⟩
+  · intro x
+    obtain ⟨y, rfl⟩ := hq x
+    obtain ⟨n, hn⟩ := hcover y.val
+    exact ⟨n, ⟨⟨⟨y.val, hn⟩, y.property⟩, rfl⟩⟩
+
 /-- Paper: Equation (7.4.3.13), p. 372.
 The coefficient map of the archimedean orbital quotient is a topological isomorphism:
 the inverse of the bijective coefficient map is continuous. -/
@@ -1363,7 +1404,18 @@ theorem archNuclearityQuotient_jetEquiv_inverse_continuous
       L ((archNuclearityDenominator χ).mkQ x) j = archNuclearityJet χ τ hτ j x)
     (h : Function.Bijective L) :
     Continuous ((LinearEquiv.ofBijective L.toLinearMap h).symm :
-      (ArchNuclearityJetIndex χ τ hτ → ℂ) → ArchNuclearityQuotient χ) := by sorry
+      (ArchNuclearityJetIndex χ τ hτ → ℂ) → ArchNuclearityQuotient χ) := by
+  -- Openness follows from the LF structure for any coordinate map with this bijectivity.
+  have _ := hL
+  obtain ⟨e⟩ := archNuclearityJet_basis_index_equiv χ τ hτ
+  let : Countable (ArchNuclearityJetIndex χ τ hτ) := e.symm.injective.countable
+  let q : P →L[ℂ] ArchNuclearityQuotient χ :=
+    (archNuclearityDenominator χ).mkQL.comp (Π(χ)).mkQL
+  have hq : Surjective q :=
+    (archNuclearityDenominator χ).mkQ_surjective.comp (Π(χ)).mkQ_surjective
+  have hopen := archNuclearityQuotient_jetEquiv_inverse_continuous_open
+    (adeleSchwartz_strictLF (F := F)).2 P (adelePolarSubspace_closed (F := F)) q hq L h
+  exact (LinearEquiv.ofBijective L.toLinearMap h).toEquiv.continuous_symm_iff.mpr hopen
 
 /-- Paper: Equation (7.4.3.13) and the following paragraph, p. 372.
 The coefficients of a quotient class are its adjusted jets, with the product topology.
