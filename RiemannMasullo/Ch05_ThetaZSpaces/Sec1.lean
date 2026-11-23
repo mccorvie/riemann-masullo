@@ -729,7 +729,7 @@ theorem sLocalAdelicThetaSpace_mk_eq_iff (f g : ℬₛ) :
       ((DFunLike.congr_fun h _).trans (sLocalAdelicThetaOnClasses_mk F S g x))
 
 /-- Two normalized meromorphic functions agreeing on a right half-plane agree everywhere. -/
-private theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
+theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
     (hV : MeromorphicNFOn V Set.univ) (a : ℝ) (h : ∀ z : ℂ, a < z.re → U z = V z) : U = V := by
   let b : ℂ := (a + 1 : ℝ)
   have hb : ∀ᶠ z : ℂ in 𝓝 b, a < z.re :=
@@ -974,7 +974,8 @@ theorem globalThetaMellin_injective : Injective (globalThetaMellin (F := F)) := 
     adelicTheta f g * ((χ g : ℂ) * _ ^ (2 : ℂ))
   rw [one_mul, mul_right_comm, mul_assoc]
 
-private theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
+/-- Positive real part gives a regular S-local order bound on the unitary chart. -/
+theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
     0 ≤ sLocalIdelicOrderBound (unitaryₛ(χ) s) := by
   rw [sLocalOrderBound_chart, le_min_iff]
   have h := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0 s hs
@@ -1267,7 +1268,8 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
 local notation "unitaryChart(" χ ")" => quasiCharacterNormTwist m hm
   ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
 
-private theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
+/-- Norm twists of a unitary character agree on the norm-one subgroup. -/
+theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
     normOneRestriction m (unitaryChart(χ) s) u = (χ u.val : ℂ) := by
   change (χ u.val : ℂ) * (((m u.val : ℝ≥0) : ℝ) : ℂ) ^ s = _
   rw [u.prop]

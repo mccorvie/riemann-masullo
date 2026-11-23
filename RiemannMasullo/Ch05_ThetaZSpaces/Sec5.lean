@@ -1,6 +1,8 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
+
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
@@ -1250,6 +1252,116 @@ theorem sLocalHomogeneousThetaTranspose_homogeneous (ω : PontryaginDual (mₛ).
     exact pull_ker_eq_smul_of_map_eq (E := ℬ(Aₛ)) (sLocalHomogeneousAdelicThetaLinearMap F S ω)
       T (ω g : ℂ) h
 
+/-- In a Montel space, a family with common kernel `K` generates the same strongly
+closed subspace as the transpose of the quotient by `K`. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_of_kernel
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (K : Submodule ℂ E) (T : I → StrongDual ℂ E)
+    (hK : ∀ x, x ∈ K ↔ ∀ i, T i x = 0) :
+    closure (Set.range (ContinuousLinearMap.precomp
+      (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ K.mkQL)) =
+      closure (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  let D := StrongDual ℂ E
+  let L : StrongDual ℂ (E ⧸ K) →L[ℂ] D := ContinuousLinearMap.precomp ℂ K.mkQL
+  let W := Submodule.span ℂ (Set.range T)
+  have hT (i : I) : T i ∈ L.toLinearMap.range := by
+    refine ⟨K.liftQL (T i) (fun x hx ↦ (hK x).mp hx i), ?_⟩
+    exact ContinuousLinearMap.ext fun _ ↦ rfl
+  have hW : W ≤ L.toLinearMap.range := Submodule.span_le.mpr (by
+    rintro _ ⟨i, rfl⟩
+    exact hT i)
+  refine le_antisymm (closure_minimal ?_ isClosed_closure) (closure_mono hW)
+  rintro _ ⟨l, rfl⟩
+  by_contra hl
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem W.topologicalClosure
+    W.isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x ∈ K := (hK x).mpr (fun i ↦ hv (T i)
+    (W.le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  have hq : K.mkQL x = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hx
+  exact hφ (by change l (K.mkQL x) = 0; rw [hq, map_zero])
+
+/-- Norm twisting does not change the norm-one restriction. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_restriction
+    (χ : PontryaginDual Jₛ) (s t : ℂ) :
+    normOneRestriction mₛ (chartₛ(χ) s) = normOneRestriction mₛ (chartₛ(χ) t) := by
+  ext u
+  exact (normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ s u).trans
+    (normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ t u).symm
+
+/-- Along one norm chart, zero normalized evaluations imply zero convergent integrals
+at every positive exponent, including the discrete exceptional Euler-factor points. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_integral
+    (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ)
+    (hf : ∀ z, sLocalNormalizedEigendistribution (chartₛ(χ) z) f = 0)
+    (a : ℂ) (ha : 0 < a.re) : sLocalIdelicZetaIntegral f (chartₛ(χ) a) = 0 := by
+  have hN (z : ℂ) : sLocalNormalizedZFunction f (chartₛ(χ) z) = 0 := by
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    rw [show (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose f = 0
+      from hf z] at h
+    exact h.symm.trans (mul_zero _)
+  have hpos : ∀ᶠ z : ℂ in 𝓝[≠] a, 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds ha)
+  have hz : ∀ᶠ z : ℂ in 𝓝[≠] a, sLocalIdelicZetaIntegral f (chartₛ(χ) z) = 0 := by
+    filter_upwards [hpos, nhdsNE_le_codiscrete _
+      (sLocalNormalizedEigendistribution_gaussian_heckeL_ne_zero χ)] with z hz hL
+    have h := hN z
+    rw [sLocalNormalizedZFunction_eq_div f χ hz, div_eq_zero_iff] at h
+    exact h.resolve_right hL
+  have hc := ((sLocalIdelicZetaIntegral_analyticOn f χ) a ha).continuousAt
+  exact tendsto_nhds_unique (hc.tendsto.mono_left nhdsWithin_le_nhds)
+    (tendsto_const_nhds.congr' (hz.mono fun z hz ↦ hz.symm))
+
+/-- The homogeneous theta kernel is the common kernel of the normalized
+functionals in its norm-one character component. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_kernel
+    (ω : PontryaginDual (mₛ).ker) (f : ℬ(Aₛ)) :
+    f ∈ Kₛω(ω) ↔ ∀ c : {c : QuasiCharacter Jₛ // restricts(c, mₛ, ω)},
+      sLocalNormalizedEigendistribution c.val f = 0 := by
+  constructor
+  · intro hf c
+    obtain ⟨χ, s, hs⟩ := sLocalNormalizedEigendistribution_chart (F := F) (S := S) c.val
+    have hr (z : ℂ) : restricts(chartₛ(χ) z, mₛ, ω) :=
+      (sLocalHomogeneousThetaTranspose_closure_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction mₛ) hs).trans c.property)
+    have hZ (z : ℂ) (hz : 0 < z.re) : sLocalIdelicZFunction f (chartₛ(χ) z) = 0 :=
+      (mem_sLocalHomogeneousAdelicTheta_ker_iff ω f).mp hf
+        ⟨chartₛ(χ) z, sLocalOrderBound_positive χ hz⟩ (fun u ↦ DFunLike.congr_fun (hr z) u)
+    have hN (z : ℂ) (hz : 0 < z.re) : sLocalNormalizedZFunction f (chartₛ(χ) z) = 0 := by
+      rw [sLocalNormalizedZFunction_eq_div f χ hz,
+        ← sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩, hZ z hz, zero_div]
+    have hpos : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+      ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num))
+    have hAll := (sLocalNormalizedZFunction_entire f χ).eq_of_frequently_eq
+      (z₀ := 1) analyticOnNhd_const (hpos.mono fun z hz ↦ hN z hz).frequently
+    have hv : sLocalNormalizedZFunction f c.val = 0 := by
+      rw [← hs]
+      exact congrFun hAll s
+    have h := (existsUnique_sLocalNormalizedEigendistribution c.val).exists.choose_spec f
+    exact (mul_eq_zero.mp (h.trans hv)).resolve_left sLocalNormalizedEigendistribution_mass_ne_zero
+  · intro hf
+    apply (mem_sLocalHomogeneousAdelicTheta_ker_iff ω f).mpr
+    intro c hc
+    have hc' : restricts(c.val, mₛ, ω) := ContinuousMonoidHom.ext hc
+    obtain ⟨χ, s, hs⟩ := sLocalNormalizedEigendistribution_chart (F := F) (S := S) c.val
+    have hr (z : ℂ) : restricts(chartₛ(χ) z, mₛ, ω) :=
+      (sLocalHomogeneousThetaTranspose_closure_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction mₛ) hs).trans hc')
+    have hz (z : ℂ) (hz : 0 < z.re) : sLocalIdelicZFunction f (chartₛ(χ) z) = 0 := by
+      rw [sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩]
+      exact sLocalHomogeneousThetaTranspose_closure_range_integral f χ
+        (fun t ↦ hf ⟨chartₛ(χ) t, hr t⟩) z hz
+    have hAll := eq_of_agree_rightHalf (sLocalIdelicZFunction_meromorphic f χ)
+      (V := 0) (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 0 hz
+    change sLocalIdelicZFunction f c.val = 0
+    rw [← hs]
+    exact congrFun hAll s
+
 /-- Paper: Theorem 5.5.3.2(1), p. 282.
 The strong closure of the homogeneous S-local theta transpose range is the closed
 span of the normalized eigendistributions whose weights restrict to the given character.
@@ -1258,7 +1370,28 @@ theorem sLocalHomogeneousThetaTranspose_closure_range (ω : PontryaginDual (mₛ
     closure (Set.range (pull(Kₛω(ω)))) =
       closure (Submodule.span ℂ
         (sLocalNormalizedEigendistribution '' {c : QuasiCharacter Jₛ | restricts(c, mₛ, ω)}) :
-          Set D(ℬ(Aₛ))) := by sorry
+          Set D(ℬ(Aₛ))) := by
+  let E := ℬ(Aₛ)
+  have hN : IsNuclearTVS.{0} E := sAdeleSchwartz_nuclear F S
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (sAdeleSchwartz_montel (F := F) S).2
+  have hD : IsNuclearTVS.{0} (StrongDual ℂ E) := sAdeleSchwartz_strongDual_nuclear F S
+  let : PolynormableSpace ℂ (StrongDual ℂ E) := hD.2.1
+  let I := {c : QuasiCharacter Jₛ // restricts(c, mₛ, ω)}
+  have hi : Set.range (fun c : I ↦ sLocalNormalizedEigendistribution c.val) =
+      sLocalNormalizedEigendistribution '' {c : QuasiCharacter Jₛ | restricts(c, mₛ, ω)} := by
+    ext T
+    constructor
+    · rintro ⟨c, rfl⟩
+      exact ⟨c.val, c.property, rfl⟩
+    · rintro ⟨c, hc, rfl⟩
+      exact ⟨⟨c, hc⟩, rfl⟩
+  rw [← hi]
+  with_reducible_and_instances
+    exact sLocalHomogeneousThetaTranspose_closure_range_of_kernel (E := E) (Kₛω(ω))
+      (fun c : I ↦ sLocalNormalizedEigendistribution c.val)
+      (sLocalHomogeneousThetaTranspose_closure_range_kernel ω)
 
 /-- Paper: Theorem 5.5.3.2(2), p. 282.
 Pullback along the ordinary S-local theta quotient is injective on strong duals. -/
