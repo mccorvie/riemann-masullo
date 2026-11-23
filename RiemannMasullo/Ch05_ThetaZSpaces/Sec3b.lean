@@ -1883,6 +1883,174 @@ theorem realArchimedeanMellin_eq_integral (f : 𝓢(ℝ, ℂ)) (ε : Fin 2)
     realArchimedeanMellin f ε s = mellin (realProfile(f, ε)) s :=
   ((realArchimedeanMellin_existsUnique f ε).exists.choose_spec.2 s _hs).2.symm
 
+section ComplexArchimedeanMellin
+
+private theorem complexArchimedeanMellin_continuous_eval_iteratedFDeriv (f : 𝓢(ℂ, ℂ)) (j : ℕ) :
+    Continuous (fun p : ℝ × ℝ ↦
+      iteratedFDeriv ℝ j (f : ℂ → ℂ) ((p.1 : ℂ) * unitAngle(p.2)) (fun _ ↦ unitAngle(p.2))) := by
+  have hcont : Continuous (fun p : ℝ × ℝ ↦ iteratedFDeriv ℝ j (f : ℂ → ℂ) ((p.1 : ℂ) * unitAngle(p.2))) :=
+    (f.smooth ⊤).continuous_iteratedFDeriv (mod_cast le_top) |>.comp (by fun_prop)
+  have hev : Continuous (fun q : ContinuousMultilinearMap ℝ (fun _ : Fin j ↦ ℂ) ℂ × (Fin j → ℂ) ↦ q.1 q.2) :=
+    continuous_eval
+  exact hev.comp (hcont.prodMk (continuous_pi fun _ ↦ by fun_prop))
+
+private theorem complexArchimedeanMellin_iteratedDeriv_integral (f : 𝓢(ℂ, ℂ)) (n : ℤ) (j : ℕ) (r : ℝ) :
+    iteratedDeriv j (fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+        (unitAngle(θ)) ^ n * f ((x : ℂ) * unitAngle(θ))) r =
+      ∫ θ in (0 : ℝ)..(2 * Real.pi),
+        (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+          ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ)) := by
+  induction j generalizing r with
+  | zero =>
+    simp only [iteratedDeriv_zero, iteratedFDeriv_zero_apply]
+  | succ j ih =>
+    rw [iteratedDeriv_succ]
+    have hfun : (iteratedDeriv j fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+          (unitAngle(θ)) ^ n * f ((x : ℂ) * unitAngle(θ))) =
+        fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+          (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+            ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ)) := funext ih
+    rw [hfun]
+    let Φ : ℝ → ℝ → ℂ := fun x θ ↦
+      (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+        ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))
+    let Φ' : ℝ → ℝ → ℂ := fun x θ ↦
+      (unitAngle(θ)) ^ n * iteratedFDeriv ℝ (j + 1) (f : ℂ → ℂ)
+        ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))
+    have hzpow : Continuous (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) := by
+      have heq : (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) =
+          fun p ↦ Complex.exp ((n : ℂ) * ((p.2 : ℂ) * Complex.I)) :=
+        funext fun p ↦ (Complex.exp_int_mul _ n).symm
+      rw [heq]
+      fun_prop
+    have hΦcont : Continuous Φ.uncurry :=
+      hzpow.mul (complexArchimedeanMellin_continuous_eval_iteratedFDeriv f j)
+    have hΦ'cont : Continuous Φ'.uncurry :=
+      hzpow.mul (complexArchimedeanMellin_continuous_eval_iteratedFDeriv f (j + 1))
+    have hderiv (θ : ℝ) (x : ℝ) : HasDerivAt (fun y : ℝ ↦ Φ y θ) (Φ' x θ) x := by
+      let g : ℝ →L[ℝ] ℂ := ContinuousLinearMap.smulRight (1 : ℝ →L[ℝ] ℝ) (unitAngle(θ))
+      have hg (y : ℝ) : g y = (y : ℂ) * unitAngle(θ) := by simp [g, Complex.real_smul]
+      have hd1 : DifferentiableAt ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x) :=
+        ((f.smooth ⊤).differentiable_iteratedFDeriv (mod_cast WithTop.coe_lt_top j)) (g x)
+      let ev : (ContinuousMultilinearMap ℝ (fun _ : Fin j ↦ ℂ) ℂ) →L[ℝ] ℂ :=
+        { toFun := fun L ↦ L (fun _ ↦ unitAngle(θ))
+          map_add' := fun _ _ ↦ rfl
+          map_smul' := fun _ _ ↦ rfl
+          cont := continuous_eval.comp (continuous_id.prodMk continuous_const) }
+      have hf' : HasFDerivAt (fun z : ℂ ↦ iteratedFDeriv ℝ j (f : ℂ → ℂ) z (fun _ ↦ unitAngle(θ)))
+          (ev.comp (fderiv ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x))) (g x) :=
+        ev.hasFDerivAt.comp (g x) hd1.hasFDerivAt
+      have hcomp := (hf'.comp x g.hasFDerivAt).hasDerivAt
+      have hval : (ev.comp (fderiv ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x))) (g 1) =
+          iteratedFDeriv ℝ (j + 1) (f : ℂ → ℂ) (g x) (fun _ ↦ unitAngle(θ)) := by
+        have hg1 : g 1 = unitAngle(θ) := by simp [g]
+        rw [ContinuousLinearMap.comp_apply, hg1]
+        exact (iteratedFDeriv_succ_apply_left (𝕜 := ℝ) (f := (f : ℂ → ℂ)) (x := g x)
+          (fun _ : Fin (j + 1) ↦ unitAngle(θ))).symm
+      rw [ContinuousLinearMap.comp_apply] at hcomp
+      rw [hval, hg x] at hcomp
+      dsimp only [Function.comp_def, hg] at hcomp
+      simpa only [Φ, Φ', hg, Pi.mul_def, zero_mul, zero_add] using
+        (hasDerivAt_const x ((unitAngle(θ)) ^ n)).mul hcomp
+    have hfderiv_cont : Continuous (fun p : ℝ × ℝ ↦ fderiv ℝ (fun y ↦ Φ y p.2) p.1) := by
+      have heq : (fun p : ℝ × ℝ ↦ fderiv ℝ (fun y ↦ Φ y p.2) p.1) =
+          fun p : ℝ × ℝ ↦ ContinuousLinearMap.smulRight (1 : ℝ →L[ℝ] ℝ) (Φ' p.1 p.2) := by
+        funext p
+        rw [(hderiv p.2 p.1).hasFDerivAt.fderiv]
+        ext
+        simp
+      rw [heq]
+      exact (ContinuousLinearMap.smulRightL ℝ ℝ ℂ (1 : ℝ →L[ℝ] ℝ)).continuous.comp hΦ'cont
+    have hF := intervalIntegral.hasFDerivAt_integral_of_continuousOn_fderiv (𝕜 := ℝ)
+      (μ := volume) (f := Φ) (x₀ := r) (u := univ) (a := 0) (b := 2 * Real.pi)
+      univ_mem hΦcont.continuousOn (fun θ _ ↦ fun x _ ↦ (hderiv θ x).differentiableAt.differentiableWithinAt)
+      hfderiv_cont.continuousOn
+    have hD : HasDerivAt (fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi), Φ x θ)
+        (∫ θ in (0 : ℝ)..(2 * Real.pi), Φ' r θ) r := by
+      have hD' := hF.hasDerivAt
+      refine hD'.congr_deriv ?_
+      change (∫ θ in (0 : ℝ)..(2 * Real.pi), fderiv ℝ (fun y ↦ Φ y θ) r) (1 : ℝ) = _
+      have hint : IntervalIntegrable (fun θ ↦ fderiv ℝ (fun y ↦ Φ y θ) r) volume 0 (2 * Real.pi) :=
+        (hfderiv_cont.comp (continuous_const.prodMk continuous_id)).intervalIntegrable 0 (2 * Real.pi)
+      rw [intervalIntegral.integral_of_le Real.two_pi_pos.le]
+      rw [intervalIntegral.integral_of_le Real.two_pi_pos.le]
+      have hint' : MeasureTheory.Integrable (fun θ ↦ fderiv ℝ (fun y ↦ Φ y θ) r)
+          (volume.restrict (Ioc 0 (2 * Real.pi))) :=
+        (intervalIntegrable_iff_integrableOn_Ioc_of_le Real.two_pi_pos.le).mp hint
+      change (ContinuousLinearMap.apply ℝ ℂ (1 : ℝ))
+          (∫ θ in Ioc 0 (2 * Real.pi), fderiv ℝ (fun y ↦ Φ y θ) r) =
+        ∫ θ in Ioc 0 (2 * Real.pi), Φ' r θ
+      rw [← (ContinuousLinearMap.apply ℝ ℂ (1 : ℝ)).integral_comp_comm hint']
+      refine MeasureTheory.setIntegral_congr_fun measurableSet_Ioc fun θ _ ↦ ?_
+      simp [(hderiv θ r).hasFDerivAt.fderiv]
+    exact hD.deriv
+
+private theorem exists_angularAverage_schwartz (f : 𝓢(ℂ, ℂ)) (n : ℤ) :
+    ∃ G : 𝓢(ℝ, ℂ), ∀ r : ℝ, G r = ∫ θ in (0 : ℝ)..(2 * Real.pi),
+      (unitAngle(θ)) ^ n * f ((r : ℂ) * unitAngle(θ)) := by
+  let A : ℝ → ℂ := fun r ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+    (unitAngle(θ)) ^ n * f ((r : ℂ) * unitAngle(θ))
+  have hsmooth : ContDiff ℝ (⊤ : ℕ∞) A := by
+    have h1 : ContDiff ℝ (⊤ : ℕ∞) (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) := by
+      have heq : (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) =
+          fun p ↦ Complex.exp ((n : ℂ) * ((p.2 : ℂ) * Complex.I)) :=
+        funext fun p ↦ (Complex.exp_int_mul _ n).symm
+      rw [heq]
+      exact Complex.contDiff_exp.comp
+        (contDiff_const.mul ((Complex.ofRealCLM.contDiff.comp contDiff_snd).mul contDiff_const))
+    have h2 : ContDiff ℝ (⊤ : ℕ∞) (fun p : ℝ × ℝ ↦ f ((p.1 : ℂ) * unitAngle(p.2))) :=
+      (f.smooth (⊤ : ℕ∞)).comp ((Complex.ofRealCLM.contDiff.comp contDiff_fst).mul
+        (Complex.contDiff_exp.comp ((Complex.ofRealCLM.contDiff.comp contDiff_snd).mul contDiff_const)))
+    exact (h1.mul h2).parametric_intervalIntegral
+  have hdecay : ∀ k j : ℕ, ∃ C : ℝ, ∀ r : ℝ, ‖r‖ ^ k * ‖iteratedFDeriv ℝ j A r‖ ≤ C := by
+    intro k j
+    obtain ⟨C, hC⟩ := f.decay' k j
+    have hC0 : 0 ≤ C := by
+      have h0 := hC 0
+      exact le_trans (mul_nonneg (pow_nonneg (norm_nonneg _) _) (norm_nonneg _)) h0
+    refine ⟨2 * Real.pi * C, fun r ↦ ?_⟩
+    rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+    rw [complexArchimedeanMellin_iteratedDeriv_integral f n j r]
+    by_cases hpow : ‖r‖ ^ k = 0
+    · rw [hpow, zero_mul]
+      positivity
+    · have hpos : 0 < ‖r‖ ^ k := lt_of_le_of_ne (pow_nonneg (norm_nonneg _) _) (Ne.symm hpow)
+      have hbound : ∀ θ ∈ Set.uIoc (0 : ℝ) (2 * Real.pi),
+          ‖(unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+              ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖ ≤
+            C / ‖r‖ ^ k := by
+        intro θ _
+        have hu : ‖unitAngle(θ)‖ = 1 := Complex.norm_exp_ofReal_mul_I θ
+        have hun : ‖(unitAngle(θ)) ^ n‖ = 1 := by rw [norm_zpow, hu, one_zpow]
+        have harg : ‖(r : ℂ) * unitAngle(θ)‖ = ‖r‖ := by
+          rw [norm_mul, hu, mul_one, Complex.norm_real]
+        have hnorm : ‖iteratedFDeriv ℝ j (f : ℂ → ℂ)
+              ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖ ≤
+            ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ := by
+          calc
+            _ ≤ ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ *
+                ∏ _i : Fin j, ‖unitAngle(θ)‖ :=
+              ContinuousMultilinearMap.le_opNorm _ _
+            _ = ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ := by
+              simp [hu]
+        have hdec : ‖r‖ ^ k * ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ ≤ C := by
+          rw [← harg]
+          exact hC ((r : ℂ) * unitAngle(θ))
+        rw [norm_mul, hun, one_mul]
+        exact hnorm.trans ((le_div_iff₀ hpos).mpr (by rw [mul_comm]; exact hdec))
+      have hint := intervalIntegral.norm_integral_le_of_norm_le_const hbound
+      rw [sub_zero, abs_of_pos Real.two_pi_pos] at hint
+      calc
+        ‖r‖ ^ k * ‖∫ θ in (0 : ℝ)..(2 * Real.pi), (unitAngle(θ)) ^ n *
+            iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖
+          ≤ ‖r‖ ^ k * (C / ‖r‖ ^ k * (2 * Real.pi)) :=
+            mul_le_mul_of_nonneg_left hint hpos.le
+        _ = 2 * Real.pi * C := by
+            field_simp [hpow]
+  exact ⟨⟨A, hsmooth, hdecay⟩, fun _ ↦ rfl⟩
+
+end ComplexArchimedeanMellin
+
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The complex Mellin integral converges on the right half-plane and has a unique
 meromorphic continuation for each integral angular weight.
@@ -1890,7 +2058,46 @@ Deviation: The angular measure is dθ in the norm coordinate t = |z|², as in §
 The printed 2 dθ would double the Tamagawa integral. -/
 theorem complexArchimedeanMellin_existsUnique (f : 𝓢(ℂ, ℂ)) (n : ℤ) :
     ∃! L : ℂ → ℂ, MeromorphicNFOn L univ ∧
-      ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by sorry
+      ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by
+  obtain ⟨G, hG⟩ := exists_angularAverage_schwartz f n
+  obtain ⟨K, ⟨hK, hKm⟩, _⟩ := realArchimedeanMellin_existsUnique_schwartz G
+  let L : ℂ → ℂ := fun s ↦ (2 : ℂ) * K (2 * s)
+  have hL : MeromorphicNFOn L univ := by
+    intro s _
+    have h2 : MeromorphicNFAt (fun z : ℂ ↦ K (2 * z)) s := (hK (mem_univ (2 * s))).comp_analyticAt
+      (show AnalyticAt ℂ (fun z : ℂ ↦ 2 * z) s by fun_prop)
+    have h3 : MeromorphicNFAt ((2 : ℂ) • fun z : ℂ ↦ K (2 * z)) s := h2.smul_const (s := (2 : ℂ))
+    convert h3 using 1
+  have hLm : ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by
+    intro s hs
+    have h2s : 0 < (2 * s).re := by
+      simpa using mul_pos (by norm_num : (0 : ℝ) < 2) hs
+    have hG2 := hKm (2 * s) h2s
+    have heq : EqOn (complexProfile(f, n)) (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) (Ioi 0) := by
+      intro t _
+      change (∫ θ in (0 : ℝ)..(2 * Real.pi), (unitAngle(θ)) ^ n *
+          f ((Real.sqrt t : ℂ) * unitAngle(θ))) = G (t ^ (1 / 2 : ℝ))
+      rw [hG, ← Real.sqrt_eq_rpow]
+    have hconv : MellinConvergent (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) s := by
+      rw [MellinConvergent.comp_rpow (one_div_ne_zero (by norm_num : (2 : ℝ) ≠ 0))]
+      convert hG2.1 using 2
+      push_cast
+      ring
+    have hmell : mellin (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) s = L s := by
+      rw [mellin_comp_rpow _ s (1 / 2 : ℝ)]
+      have hdiv : s / ((1 / 2 : ℝ) : ℂ) = 2 * s := by push_cast; ring
+      have habs : |1 / (2 : ℝ)|⁻¹ = (2 : ℝ) := by norm_num
+      rw [hdiv, habs, hG2.2, Complex.real_smul]
+      simp [L]
+    refine ⟨?_, ?_⟩
+    · exact hconv.congr_fun (fun t ht ↦ by simp [heq ht]) measurableSet_Ioi
+    · refine (setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_).trans hmell
+      simp [heq ht]
+  refine ⟨L, ⟨hL, hLm⟩, ?_⟩
+  rintro H ⟨hH, hHm⟩
+  funext s
+  exact realArchimedeanMellin_existsUnique_eqNF hH hL
+    (fun z hz ↦ (hHm z hz).2.symm.trans (hLm z hz).2) s
 
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The complex local Mellin transform is the meromorphic continuation of the angular
