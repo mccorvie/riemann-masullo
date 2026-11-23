@@ -70,6 +70,54 @@ local notation "θ𝔽(" f ")" => adelicTheta (f : ℬ₀).val
 local notation "θₛ(" f ")" => sLocalAdelicThetaOnClasses F S f
 local notation "ρₛ" => (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose
 
+/-- A function whose derivative along every orbit of a one-parameter subgroup is again given
+by the same recipe is smooth along the orbit, and every iterated derivative at time zero is
+continuous in the base point. Stated for abstract types so that the induction does not unfold
+the Schwartz–Bruhat model. -/
+private theorem globalPolarFreeTheta_directionallySmooth_orbit.{uG, uX} {G : Type uG} {X : Type uX} [Group G] [TopologicalSpace G]
+    [IsTopologicalGroup G]
+    (γ : Multiplicative ℝ →ₜ* G) (F : X → G → ℂ) (J : X → X)
+    (hderiv : ∀ (i : X) (g : G) (t : ℝ),
+      HasDerivAt (fun s : ℝ ↦ F i (γ (Multiplicative.ofAdd s) * g))
+        (F (J i) (γ (Multiplicative.ofAdd t) * g)) t)
+    (hcont : ∀ i : X, Continuous (F i)) :
+    (∀ (i : X) (g : G) (k : ℕ),
+      ContDiff ℝ k (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g))) ∧
+    ∀ (i : X) (n : ℕ), Continuous (fun g : G ↦
+      iteratedDeriv n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) 0) := by
+  have hderivfun (i : X) (g : G) :
+      deriv (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) =
+        fun t : ℝ ↦ F (J i) (γ (Multiplicative.ofAdd t) * g) := by
+    funext t
+    exact (hderiv i g t).deriv
+  have hcd (i : X) (g : G) (n : ℕ) :
+      ContDiff ℝ n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) := by
+    induction n generalizing i with
+    | zero =>
+      refine contDiff_zero.mpr ?_
+      exact (hcont i).comp ((γ.continuous.comp continuous_ofAdd).mul_const g)
+    | succ n ih =>
+      refine (contDiff_succ_iff_deriv (n := (n : WithTop ℕ∞))).mpr
+        ⟨fun s ↦ (hderiv i g s).differentiableAt, by simp, ?_⟩
+      rw [hderivfun i g]
+      exact ih (J i)
+  have hiter (m : ℕ) (i : X) (g : G) :
+      iteratedDeriv m (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) =
+        fun t : ℝ ↦ F ((J^[m]) i) (γ (Multiplicative.ofAdd t) * g) := by
+    induction m generalizing i with
+    | zero => simp [iteratedDeriv_zero]
+    | succ m ih =>
+      rw [iteratedDeriv_succ, ih, hderivfun, Function.iterate_succ_apply']
+  refine ⟨hcd, fun i n ↦ ?_⟩
+  have hfun : (fun g : G ↦
+      iteratedDeriv n (fun t : ℝ ↦ F i (γ (Multiplicative.ofAdd t) * g)) 0) =
+      fun g : G ↦ F ((J^[n]) i) g := by
+    funext g
+    rw [hiter n i g]
+    simp
+  rw [hfun]
+  exact hcont _
+
 /-- Paper: (10.1.1.1), p. 434. Weighted global polar-free theta functions are
 continuous and have continuous derivatives of every order along every continuous
 real one-parameter subgroup. The function realization is injective. -/
@@ -80,7 +128,63 @@ theorem globalPolarFreeTheta_directionallySmooth (a : ℝ) :
         ∀ γ : Multiplicative ℝ →ₜ* C𝔽,
           (∀ (g : C𝔽) (k : ℕ), ContDiff ℝ k (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g))) ∧
           ∀ n : ℕ, Continuous (fun g : C𝔽 ↦
-            iteratedDeriv n (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g)) 0) := by sorry
+            iteratedDeriv n (fun t : ℝ ↦ E u (γ (Multiplicative.ofAdd t) * g)) 0) := by
+  classical
+  let Q := adelePolarSubspace F
+  let K : Submodule ℂ Q := (LinearMap.ker (adelicThetaLinearMap F)).comap Q.subtype
+  let φ : Q →ₗ[ℂ] (C𝔽 → ℂ) :=
+    (modulationWeight m𝔽 a).comp
+      ((ContinuousMap.coeFnLinearMap ℂ).comp ((adelicThetaLinearMap F).comp Q.subtype))
+  have hK : K ≤ LinearMap.ker φ := by
+    intro i hi
+    simp only [K, Submodule.mem_comap, LinearMap.mem_ker] at hi
+    simp only [φ, LinearMap.mem_ker, LinearMap.comp_apply, hi, map_zero]
+  let E : (Q ⧸ K) →ₗ[ℂ] (C𝔽 → ℂ) := K.liftQ φ hK
+  have hE (i : Q) : E (Submodule.Quotient.mk i) = φ i := K.liftQ_apply φ i
+  have hw (g : C𝔽) : (((m𝔽 g).val : ℝ) ^ a : ℝ) ≠ 0 :=
+    (Real.rpow_pos_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m𝔽 g))) a).ne'
+  have htwist (i : Q) :
+      E (Submodule.Quotient.mk i) = thetaTwist (F := F) a i.val := by
+    rw [hE i]
+    funext g
+    simp only [φ, LinearMap.comp_apply, modulationWeight, LinearMap.mulLeft_apply,
+      thetaTwist, thetaLog_apply]
+    change ((((m𝔽 g).val : ℝ) ^ a : ℝ) : ℂ) * adelicTheta (F := F) i.val g =
+      (Real.exp (a * Real.log ((m𝔽 g).val : ℝ)) : ℂ) * adelicTheta (F := F) i.val g
+    rw [Real.rpow_def_of_pos (NNReal.coe_pos.mpr (Units.zero_lt (m𝔽 g)))]
+    congr 1
+    rw [mul_comm]
+  refine ⟨E, ?_, ?_, ?_⟩
+  · apply LinearMap.ker_eq_bot.mp (K.ker_liftQ_eq_bot φ hK ?_)
+    intro i hi
+    change (adelicThetaLinearMap F) i.val = 0
+    ext g
+    have hv := congrFun (LinearMap.mem_ker.mp hi) g
+    change ((((m𝔽 g).val : ℝ) ^ a : ℝ) : ℂ) * adelicTheta (F := F) i.val g = 0 at hv
+    exact (mul_eq_zero.mp hv).resolve_left (Complex.ofReal_ne_zero.mpr (hw g))
+  · intro f
+    exact hE f
+  · intro u
+    obtain ⟨i, rfl⟩ := (Submodule.Quotient.mk_surjective (p := K)) u
+    rw [htwist i]
+    refine ⟨thetaTwist_continuous a i.val, ?_⟩
+    intro γ
+    let J : Q → Q := fun j ↦ (theta_class_derivative (F := F) a γ j).choose
+    have hJt (j : Q) (g : C𝔽) (t₀ : ℝ) :
+        HasDerivAt (fun t : ℝ ↦ thetaTwist (F := F) a j.val
+          (γ (Multiplicative.ofAdd t) * g))
+          (thetaTwist (F := F) a (J j).val (γ (Multiplicative.ofAdd t₀) * g)) t₀ := by
+      have h := (theta_class_derivative (F := F) a γ j).choose_spec
+        (γ (Multiplicative.ofAdd t₀) * g)
+      have hγt (t : ℝ) :
+          γ (Multiplicative.ofAdd (t - t₀)) * (γ (Multiplicative.ofAdd t₀) * g) =
+            γ (Multiplicative.ofAdd t) * g := by
+        rw [← mul_assoc, ← map_mul, ← ofAdd_add, sub_add_cancel]
+      exact hasDerivAt_of_shift h (fun t ↦
+        (congrArg (fun y ↦ thetaTwist (F := F) a j.val y) (hγt t)).symm)
+    have hsm := globalPolarFreeTheta_directionallySmooth_orbit γ (fun j (g : C𝔽) ↦ thetaTwist (F := F) a j.val g)
+      J hJt (fun j ↦ thetaTwist_continuous (F := F) a j.val)
+    exact ⟨fun g k ↦ hsm.1 i g k, fun n ↦ hsm.2 i n⟩
 
 -- TODO(paper-gap): The assertion preceding (10.1.1.2) on p. 434 and the open
 -- half-line on p. 435 require care. Every compact subinterval gives a finite norm.
@@ -2778,6 +2882,28 @@ theorem sLocalThetaSobolevAverage_quotient_equiv (ω : PontryaginDual J₁) :
     exact thetaSobolevAverage_quotient_equiv_of_compact μₛ₁ ρ₁ hρ ω (P(ω))
       (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose_spec.1
 
+/-- The compact Hilbert-sum coordinates for a subgroup acting on a closed subspace of a
+compact-interval Sobolev space. The instances are spelled as the S-local statement elaborates
+them, so that the statement is matched syntactically. -/
+private theorem sLocalThetaSobolev_isotypeDecomposition_aux {A X : Type*}
+    [Group A] [TopologicalSpace A] [IsTopologicalGroup A] [T2Space A]
+    (hA : ∀ a b : A, a * b = b * a) (K : Subgroup A)
+    [CompactSpace K] [SecondCountableTopology K]
+    {mK : MeasurableSpace K} [BorelSpace K] (μ : Measure K) [μ.IsHaarMeasure]
+    (mX : MeasurableSpace X) {ν : Measure X} {f : X → ℝ} {α β s : ℝ}
+    (V : Submodule ℂ (CompactIntervalSobolev ν f α β s)) [CompleteSpace V]
+    (ρ : @MonoidHom K (V →L[ℂ] V) (@MulOneClass.toMulOne K Monoid.toMulOneClass) _)
+    (hc : Continuous fun p : K × V ↦ ρ p.1 p.2)
+    (hle : ∀ g x, ‖ρ g x‖ ≤ ‖x‖) (P : (ω : PontryaginDual K) → V →L[ℂ] actionIsotype ρ ω)
+    (hP : ∀ ω, IsPettisIsotypicAverageOn μ univ ρ ω ((actionIsotype ρ ω).subtypeL.comp (P ω))) :
+    ∃ (p : V →L[ℂ] (∀ ω : PontryaginDual K, actionIsotype ρ ω))
+      (T : V ≃ₗᵢ[ℂ] lp (fun ω : PontryaginDual K ↦ ↥(actionIsotype ρ ω)) 2),
+      Injective p ∧ ∀ (x : V) (ω : PontryaginDual K),
+        p x ω = T x ω ∧ T x ω = (μ.real univ)⁻¹ • P ω x := by
+  let : CommGroup K :=
+    { (inferInstance : Group K) with mul_comm := fun a b ↦ Subtype.ext (hA a.1 b.1) }
+  exact globalThetaSobolev_isotypeDecomposition_compact (E := V) μ ρ hc hle P hP
+
 /-- Paper: Proposition 10.1.1.5(2), p. 437. The S-local coordinate map is a
 continuous injection into the product and factors through the isometric Hilbert sum.
 Deviation: Divide each raw average by the mass of the norm-one quotient measure.
@@ -2786,7 +2912,30 @@ theorem sLocalThetaSobolev_isotypeDecomposition :
     ∃ (Pprod : H →L[ℂ] (∀ ω : PontryaginDual J₁, Hω(ω)))
       (T : H ≃ₗᵢ[ℂ] lp (fun ω : PontryaginDual J₁ ↦ ↥(Hω(ω))) 2),
       Injective Pprod ∧ ∀ (u : H) (ω : PontryaginDual J₁),
-        Pprod u ω = T u ω ∧ T u ω = (Measure.real μₛ₁ univ)⁻¹ • P(ω) u := by sorry
+        Pprod u ω = T u ω ∧ T u ω = (Measure.real μₛ₁ univ)⁻¹ • P(ω) u := by
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : (μₛ₁).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : SecondCountableTopology J₁ := Topology.IsInducing.subtypeVal.secondCountableTopology
+  let : CompleteSpace H := (sLocalThetaSobolev_closed_complete_separable ha hI hs hp).2.1
+  have hR := (exists_sLocalThetaSobolevAction (F := F) (S := S) ha hI hs hp).choose_spec
+  have hc : Continuous (fun p : J₁ × H ↦ ρ₁ p.1 p.2) :=
+    hR.2.1.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+  have hn (g : J₁) (x : H) : ‖ρ₁ g x‖ ≤ ‖x‖ := by
+    have hg : mₛ g.val = 1 := Units.ext (congrArg Units.val g.property)
+    change ‖Rₛ(ha, hI, hs, hp) g.val x‖ ≤ ‖x‖
+    with_reducible_and_instances
+      exact globalThetaSobolev_isotypeDecomposition_bound μₛ mₛ α β s hI hs
+        Hₛ(ha, hI, hs, hp) (Rₛ(ha, hI, hs, hp)) hR.1 g.val hg x
+  have key := sLocalThetaSobolev_isotypeDecomposition_aux mul_comm (sIdeleQuotientNorm F S).ker μₛ₁
+    (borel _) (Hₛ(ha, hI, hs, hp)) ρ₁ hc hn (fun ω ↦ P(ω)) (fun ω ↦
+      (existsUnique_sLocalThetaSobolevAverage (F := F) (S := S) ha hI hs hα ω).exists.choose_spec.1)
+  -- The statement mixes this file's Borel structure with the one of the quotient measure: unfold
+  -- both, after which `key` is the statement verbatim (a defeq check on these terms never ends).
+  revert key
+  delta instSIdeleQuotientMeasurableSpaceSec1 instMeasurableSpaceSIdeleQuotient
+  exact fun h ↦ h
 
 end SLocalIsotypes
 

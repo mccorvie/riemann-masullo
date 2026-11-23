@@ -2124,6 +2124,92 @@ local notation "N(" χ ", " α ", " s ", " z ")" => spectralStripMultiplicity α
 -- p. 455 also replaces log powers of unbounded order by a fixed Sobolev
 -- weight and concludes only p > 1 for the displayed scalar sum.
 
+/-- For included jets the finite section has exactly the convolution coordinate.
+Consequently the difference of two sufficiently large sections lies in the orthogonal
+complement of any fixed finite span of Riesz vectors. Finite diagonal sums for a
+single section after this orthogonal projection bound its trace norm. -/
+private theorem spectralStripConvolution_traceCauchy_of_compressed_diagonal
+    {H J κ : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (A : H →L[ℂ] H) (B : ℕ × ℕ → H →L[ℂ] H) (Λ : J → StrongDual ℂ H)
+    (b : HilbertBasis κ ℂ H) (hnuc : ∀ j, B j ∈ nuclearEndomorphisms H)
+    (hcoord : ∀ k, ∀ᶠ j in atTop, ∀ v, Λ k (B j v) = Λ k (A v))
+    (ht : ∀ ε > (0 : ℝ), ∃ S : Finset J, ∀ᶠ j in atTop, ∀ t : Finset κ,
+      let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
+      ∑ n ∈ t, (inner ℂ (b n) (CFC.sqrt ((B j).adjoint * Vᗮ.starProjection * B j) (b n))).re ≤ ε) :
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  intro ε hε
+  obtain ⟨S, hS⟩ := ht (ε / 3) (by positivity)
+  let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ H).symm (Λ k)) '' (S : Set J))
+  let P := Vᗮ.starProjection
+  let D (j : ℕ × ℕ) : nuclearEndomorphisms H :=
+    ⟨P * B j, mul_mem_nuclearEndomorphisms_left P ⟨B j, hnuc j⟩⟩
+  have hgram (j : ℕ × ℕ) : (D j).val.adjoint * (D j).val = (B j).adjoint * P * B j := by
+    change star (P * B j) * (P * B j) = star (B j) * P * B j
+    have hP : IsStarProjection P := isStarProjection_starProjection
+    rw [star_mul, hP.isSelfAdjoint.star_eq, ← mul_assoc, mul_assoc (star (B j)), hP.isIdempotentElem.eq]
+  have hnorm : ∀ᶠ j in atTop, traceNorm (D j) ≤ ε / 3 := by
+    filter_upwards [hS] with j hj
+    apply le_of_tendsto' (hasSum_traceNorm_diagonal b (D j))
+    intro t
+    simpa only [hgram] using hj t
+  have hScoord : ∀ᶠ j in atTop, ∀ k ∈ S, ∀ v, Λ k (B j v) = Λ k (A v) :=
+    S.eventually_all.mpr fun k _ ↦ hcoord k
+  obtain ⟨j₀, hj₀⟩ := eventually_atTop.mp (hnorm.and hScoord)
+  refine ⟨j₀, fun j k hj hk ↦ ⟨D j - D k, ?_, ?_⟩⟩
+  · ext v
+    change P (B j v) - P (B k v) = B j v - B k v
+    rw [← map_sub]
+    apply Submodule.starProjection_eq_self_iff.mpr
+    intro u hu
+    induction hu using Submodule.span_induction with
+    | mem y hy =>
+      obtain ⟨r, hr, rfl⟩ := hy
+      rw [InnerProductSpace.toDual_symm_apply, map_sub, (hj₀ j hj).2 r hr v, (hj₀ k hk).2 r hr v,
+        sub_self]
+    | zero => exact inner_zero_left _
+    | add x y _ _ hx hy => rw [inner_add_left, hx, hy, add_zero]
+    | smul c x _ hx => rw [inner_smul_left, hx, mul_zero]
+  · let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+    have hc := traceNorm_normedSpaceCore (H := H)
+    have hneg : traceNorm (-(D k)) = traceNorm (D k) := by
+      rw [← neg_one_smul ℂ (D k)]
+      simpa only [norm_neg, norm_one, one_mul] using hc.norm_smul (-1 : ℂ) (D k)
+    have htr := hc.norm_triangle (D j) (-(D k))
+    change traceNorm (D j + -(D k)) ≤ traceNorm (D j) + traceNorm (-(D k)) at htr
+    rw [← sub_eq_add_neg, hneg] at htr
+    linarith [(hj₀ j hj).1, (hj₀ k hk).1]
+
+/-- Paper: Theorem 10.3.2.1(1), pp. 453–455, after (10.3.2.7). For a fixed test,
+discard the output directions of finitely many jets. The positive square root of
+the remaining Gram operator should have uniformly small finite diagonal sums.
+Gap: The scalar Mellin estimates on p. 455 do not control this sum for an
+individual rectangle, in particular when its boundary separates nearby zeros. -/
+private theorem spectralStripConvolution_traceCauchy_compressed_diagonal (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
+    (_hχ : IsSpectralBasepointChoice (F := F) (fun ω ↦ χ ω))
+    {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s) (φ : BruhatCompactSupport C𝔽)
+    (eχ : PontryaginDual C₁ ↪ ℕ) (e : Z(χ, α) ↪ ℕ × ℕ) (_he : ∀ z, (e z).1 = eχ z.val.1)
+    (x : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → Q(a, hStrip(hα), hs₀(hs)))
+    (Λ : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s → StrongDual ℂ Q(a, hStrip(hα), hs₀(hs)))
+    (_hb : IsSpectralMarkushevichBasis x Λ)
+    (_hj : ∀ j, spectralSobolevDualEmbedding F a hStrip(hα) hs₀(hs) (Λ j) =
+      (spectralStripJet_memLp (F := F) (fun ω ↦ χ ω) hα hs₀(hs) j).toLp
+        (spectralZeroJet (F := F) (χ j.val.1) j.val.2.1 j.val.2.2.1 j.val.2.2.2))
+    {κ : Type*} (b : HilbertBasis κ ℂ Q(a, hStrip(hα), hs₀(hs))) :
+    let H := Q(a, hStrip(hα), hs₀(hs))
+    let A : H →L[ℂ] H := spectralConvolution (F := F) a hStrip(hα) hs₀(hs) φ
+    let B (ij : ℕ × ℕ) : H →L[ℂ] H :=
+      spectralConvolutionFiniteSum A x Λ
+        (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
+        (fun z ↦ N(χ, α, s, z))
+        (fun z m ↦ ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩)
+    let diagonal {E : Type _} [NormedAddCommGroup E] [InnerProductSpace ℂ E] [CompleteSpace E]
+        {J : Type _} (forms : J → StrongDual ℂ E) (S : Finset J) (D : E →L[ℂ] E) (v : E) :=
+      let V := Submodule.span ℂ ((fun k ↦ (InnerProductSpace.toDual ℂ E).symm (forms k)) '' (S : Set J))
+      (inner ℂ v (CFC.sqrt (D.adjoint * Vᗮ.starProjection * D) v)).re
+    ∀ ε > (0 : ℝ), ∃ S : Finset (SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s),
+      ∀ᶠ j in atTop, ∀ t : Finset κ, ∑ n ∈ t, diagonal Λ S (B j) (b n) ≤ ε := by sorry
+
 /-- Paper: Theorem 10.3.2.1(1), p. 453. The rectangular sums have Cauchy tails in trace norm.
 Gap: Trace-norm tails must control close zeros and high jet orders in the strip norm.
 A strip component with bounded central-line frequency support vanishes by holomorphy. -/
@@ -2144,7 +2230,28 @@ theorem spectralStripConvolution_traceCauchy (χ : PontryaginDual C₁ → Pontr
         (((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn)
         (fun z ↦ N(χ, α, s, z))
         (fun z m ↦ ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩)
-    SpectralRectanglesTraceCauchy B := by sorry
+    SpectralRectanglesTraceCauchy B := by
+  classical
+  intro H A B
+  let count (z : Z(χ, α)) := N(χ, α, s, z)
+  let jet (z : Z(χ, α)) (m : Fin (count z)) : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  let index (j : SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s) : (z : Z(χ, α)) × Fin (count z) :=
+    ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩, ⟨j.val.2.2.2, j.property⟩⟩
+  let eqv : ((z : Z(χ, α)) × Fin (count z)) ≃ SpectralStripJetIndex (F := F) (fun ω ↦ χ ω) a α s :=
+    ⟨fun zm ↦ jet zm.1 zm.2, index, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  let b := (exists_hilbertBasis (𝕜 := ℂ) (E := H)).choose_spec.choose
+  apply spectralStripConvolution_traceCauchy_of_compressed_diagonal A B Λ b
+  · intro j
+    exact (nuclearEndomorphisms H).sum_mem fun z _ ↦
+      (nuclearEndomorphisms H).sum_mem fun m _ ↦ smulRight_mem_nuclearEndomorphisms _ _
+  · intro r
+    obtain ⟨⟨z, m⟩, rfl⟩ := eqv.surjective r
+    filter_upwards [eventually_ge_atTop (e z)] with j hj
+    exact spectralConvolutionFiniteSum_limit_of_traceCauchy_coordinate A x Λ _ count jet _hb eqv.injective
+      z (by simpa using (show (e z).1 ≤ j.1 ∧ (e z).2 ≤ j.2 from hj)) m
+  · exact spectralStripConvolution_traceCauchy_compressed_diagonal (F := F) a χ _hχ hα hs φ
+      eχ e _he x Λ _hb _hj b
 
 /-- Paper: Theorem 10.3.2.1(1) and (10.3.2.1), p. 453. The rectangular
 finite-rank sums over any enumeration of the strip zeros converge to convolution

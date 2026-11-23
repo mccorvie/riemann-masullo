@@ -20,7 +20,7 @@ All archimedean places are implicit in the finite-place base set.
 @[expose] public noncomputable section
 
 open Function IsDedekindDomain MeasureTheory NumberField Set
-open scoped Classical NNReal NumberField.AdeleRing
+open scoped Classical NNReal NumberField.AdeleRing Topology
 
 namespace RiemannMasullo
 
@@ -269,6 +269,88 @@ theorem divisorialIndicator_mul_thetaRepresentative (S T : Finset V) (_hST : Dis
     divisorialIndicator T g * sAdeleSchwartzToGlobal F S f (Multiplicative.ofAdd g.val) =
       adelePrincipalValue F T (sAdeleSchwartzToGlobal F S f) (Multiplicative.ofAdd g.val) := by sorry
 
+/-- The primary primes of §11.3.1.1 are distinct: they are the values of `Nat.nth`
+on a set of rational primes. -/
+private theorem primaryDivisorialZeta_succ_prime_injective (S : Finset V) :
+    Function.Injective (primaryDivisorialPrime (F := F) S) := by
+  intro j l hjl
+  have hgen : Rat.HeightOneSpectrum.natGenerator (primaryDivisorialPrime S j) =
+      Rat.HeightOneSpectrum.natGenerator (primaryDivisorialPrime S l) := by rw [hjl]
+  rw [(primaryDivisorialPrime_eq_iff S j _).1 rfl,
+    (primaryDivisorialPrime_eq_iff S l _).1 rfl] at hgen
+  exact Nat.nth_injective (primaryDivisorial_infinite S) hgen
+
+/-- The places over the next primary prime are new: they are disjoint from the
+places over the earlier ones. -/
+private theorem primaryDivisorialZeta_succ_disjoint (S : Finset V) (k : ℕ) :
+    Disjoint (primaryDivisorialPlaces F S k) (above(primaryDivisorialPrime S k)) := by
+  rw [Finset.disjoint_left]
+  intro w hw hw'
+  simp only [primaryDivisorialPlaces, Finset.mem_biUnion, Finset.mem_range] at hw
+  obtain ⟨j, hj, hwj⟩ := hw
+  have h1 : w.under (𝓞 ℚ) = primaryDivisorialPrime S j := by
+    simpa [Set.Finite.mem_toFinset] using hwj
+  have h2 : w.under (𝓞 ℚ) = primaryDivisorialPrime S k := by
+    simpa [Set.Finite.mem_toFinset] using hw'
+  have hjk : j = k := primaryDivisorialZeta_succ_prime_injective S (h1.symm.trans h2)
+  omega
+
+/-- The reciprocal Euler product over the new places is the quotient of the
+products over the enlarged and the old primary sets. -/
+private theorem primaryDivisorialZeta_succ_factor (S : Finset V) (k : ℕ)
+    (χ : PontryaginDual C𝔽) (w : ℂ) :
+    reciprocalPartialHeckeEulerProduct χ (primaryDivisorialPlaces F S (k + 1)) w =
+      reciprocalPartialHeckeEulerProduct χ (primaryDivisorialPlaces F S k) w *
+        reciprocalPartialHeckeEulerProduct χ (above(primaryDivisorialPrime S k)) w := by
+  simp only [primaryDivisorialPlaces_succ, reciprocalPartialHeckeEulerProduct,
+    Finset.prod_union (primaryDivisorialZeta_succ_disjoint S k)]
+
+/-- The norm-twist of a unitary idele-class character is not the trivial character on
+the half-plane of absolute convergence: test it on the canonical norm section, where
+unitarity of the character forces the norm power to be one. -/
+private theorem primaryDivisorialZeta_succ_twist_ne_one (χ : PontryaginDual C𝔽) {z : ℂ}
+    (hz : 0 < z.re) : ideleClassNormTwist χ z ≠ 1 := by
+  intro h
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let u : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  have hu : ((u : ℝ≥0) : ℝ) = 2 := rfl
+  have hnorm := congrArg (fun w : ℂ ↦ ‖w‖) (DFunLike.congr_fun h (σ u))
+  have hR : ‖((1 : HeckeCharacter (𝓞 F) F) (σ u))‖ = 1 := by simp
+  rw [hR] at hnorm
+  change ‖(χ (σ u) : ℂ) * (((ideleClassNorm F (σ u) : ℝ≥0) : ℝ) : ℂ) ^ z‖ = 1 at hnorm
+  rw [norm_mul, Circle.norm_coe, one_mul, hσ u, hu,
+    Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num : (0 : ℝ) < 2)] at hnorm
+  have := Real.one_lt_rpow (by norm_num : (1 : ℝ) < 2) hz
+  linarith
+
+/-- On the half-plane `1 < re z` the norm twist of a unitary character is not the
+norm character: again test on the canonical norm section. -/
+private theorem primaryDivisorialZeta_succ_twist_ne_norm (χ : PontryaginDual C𝔽) {z : ℂ}
+    (hz : 1 < z.re) :
+    ideleClassNormTwist χ z ≠ ideleClassNormTwist (1 : PontryaginDual C𝔽) (1 : ℂ) := by
+  intro h
+  let q : IdeleGroup (𝓞 F) F →ₜ* C𝔽 := ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let σ : ℝ≥0ˣ →ₜ* C𝔽 := q.comp
+    ⟨canonicalIdeleNormSection F, canonicalIdeleNormSection_continuous F⟩
+  have hσ : RightInverse σ (ideleClassNorm F) := canonicalIdeleNormSection_rightInverse F
+  let u : ℝ≥0ˣ := Units.mk0 2 (by norm_num)
+  have hu : ((u : ℝ≥0) : ℝ) = 2 := rfl
+  have hnorm := congrArg (fun w : ℂ ↦ ‖w‖) (DFunLike.congr_fun h (σ u))
+  rw [ideleClassNormTwist_one_one] at hnorm
+  change ‖(χ (σ u) : ℂ) * (((ideleClassNorm F (σ u) : ℝ≥0) : ℝ) : ℂ) ^ z‖ =
+    ‖((((ideleClassNorm F (σ u) : ℝ≥0) : ℝ)) : ℂ)‖ at hnorm
+  rw [norm_mul, Circle.norm_coe, one_mul, hσ u, hu,
+    Complex.norm_cpow_eq_rpow_re_of_pos (by norm_num : (0 : ℝ) < 2),
+    show ‖(((2 : ℝ)) : ℂ)‖ = (2 : ℝ) from by norm_num] at hnorm
+  have h1 : (2 : ℝ) ^ z.re = (2 : ℝ) ^ (1 : ℝ) := by
+    rw [Real.rpow_one]; exact hnorm
+  have := (Real.rpow_right_inj (by norm_num : (0 : ℝ) < 2)
+    (by norm_num : (2 : ℝ) ≠ 1)).mp h1
+  linarith
+
 /-- Paper: §11.3.1.1, p. 493. Removing the next prime's integer factors
 multiplies the zeta transform of the depleted test by the reciprocal Euler
 product over that prime.
@@ -279,8 +361,45 @@ theorem primaryDivisorialZeta_succ (S : Finset V) (k : ℕ) (χ : PontryaginDual
     let c := ideleClassNormTwist χ z
     let Z := fun j ↦ globalIdelicZFunction
       (adelePrincipalValue F (primaryDivisorialPlaces F S j) (sAdeleSchwartzToGlobal F S f)) c
-    Z (k + 1) = reciprocalPartialHeckeEulerProduct χ above(primaryDivisorialPrime S k) z * Z k :=
-  by sorry
+    Z (k + 1) = reciprocalPartialHeckeEulerProduct χ above(primaryDivisorialPrime S k) z * Z k := by
+  let Fg : SchwartzBruhat (Multiplicative 𝔸[F]) := sAdeleSchwartzToGlobal F S f
+  have hpunct : (fun t ↦ globalIdelicZFunction
+        (adelePrincipalValue F (primaryDivisorialPlaces F S (k + 1)) Fg)
+          (ideleClassNormTwist χ t)) =ᶠ[𝓝[≠] z]
+      (fun t ↦ reciprocalPartialHeckeEulerProduct χ (above(primaryDivisorialPrime S k)) t *
+        globalIdelicZFunction (adelePrincipalValue F (primaryDivisorialPlaces F S k) Fg)
+          (ideleClassNormTwist χ t)) := by
+    have h₁ := globalPrincipalValueConverse_mellin (F := F)
+      (primaryDivisorialPlaces F S (k + 1)) χ Fg
+    have h₂ := globalPrincipalValueConverse_mellin (F := F)
+      (primaryDivisorialPlaces F S k) χ Fg
+    filter_upwards [h₁.filter_mono (nhdsNE_le_codiscrete z),
+      h₂.filter_mono (nhdsNE_le_codiscrete z)] with t ht1 ht2
+    rw [ht1, ht2, primaryDivisorialZeta_succ_factor S k χ t]
+    ring
+  have hNF₁ : MeromorphicNFAt (fun t ↦ globalIdelicZFunction
+      (adelePrincipalValue F (primaryDivisorialPlaces F S (k + 1)) Fg)
+        (ideleClassNormTwist χ t)) z :=
+    globalIdelicZFunction_meromorphic _ χ (mem_univ z)
+  have hZan : AnalyticAt ℂ (fun t ↦ globalIdelicZFunction
+      (adelePrincipalValue F (primaryDivisorialPlaces F S k) Fg)
+        (ideleClassNormTwist χ t)) z :=
+    (globalIdelicZFunction_poles (adelePrincipalValue F (primaryDivisorialPlaces F S k) Fg)
+      χ).1 z ⟨primaryDivisorialZeta_succ_twist_ne_one (F := F) χ (by linarith),
+        primaryDivisorialZeta_succ_twist_ne_norm (F := F) χ _hz⟩
+  have hAn : AnalyticAt ℂ (fun t ↦
+      reciprocalPartialHeckeEulerProduct χ (above(primaryDivisorialPrime S k)) t *
+        globalIdelicZFunction (adelePrincipalValue F (primaryDivisorialPlaces F S k) Fg)
+          (ideleClassNormTwist χ t)) z :=
+    ((strongCoprimalityJetMatrix_det_ne_zero_euler χ
+      (above(primaryDivisorialPrime S k))).1 z).mul hZan
+  have hNF₂ : MeromorphicNFAt (fun t ↦
+      reciprocalPartialHeckeEulerProduct χ (above(primaryDivisorialPrime S k)) t *
+        globalIdelicZFunction (adelePrincipalValue F (primaryDivisorialPlaces F S k) Fg)
+          (ideleClassNormTwist χ t)) z := hAn.meromorphicNFAt
+  have hval := ((hNF₁.eventuallyEq_nhdsNE_iff_eventuallyEq_nhds hNF₂).mp hpunct).eq_of_nhds
+  dsimp only
+  exact hval
 
 /-- Paper: §11.3.1.1, p. 493. For a test whose global extension has both polar
 values zero the depletion identity holds at every exponent, in particular at the

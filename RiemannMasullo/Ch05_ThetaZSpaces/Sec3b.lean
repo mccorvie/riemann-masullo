@@ -94,13 +94,6 @@ local notation "wirtinger(" conjugate ")" =>
   (if conjugate then wirtingerConjDeriv else wirtingerDeriv)
 
 /-- Paper: §5.3.3, p. 249.
-Restriction gives a continuous linear injection of additive real Schwartz functions into
-the space with all positive weights. -/
-theorem realSchwartz_restrict_positiveDecay :
-    ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
-      ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by sorry
-
-/-- Paper: §5.3.3, p. 249.
 Restriction of an additive complex Schwartz function to the units gives a continuous
 linear injection into the space with all positive squared-norm weights. -/
 theorem complexSchwartz_restrict_positiveDecay :
@@ -933,6 +926,151 @@ private theorem iteratedDeriv_exponentialDecay_inducing (I : Set ℝ) :
     IsInducing (fun (f : ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) I) (a : I) ↦
       modulatedExponentialDecayTwist (archimedeanUnitModulation ℝ 1) I a f) :=
   iteratedDeriv_exponentialDecay_inducing_of_bot _ _ iteratedDeriv_exponentialDecay_goodBot
+
+/-- A positive weight controls powers of the logarithmic coordinate near zero.
+At infinity one additional integer Schwartz weight controls the same powers. -/
+private theorem realSchwartz_logWeight_bound (b : ℝ) (hb : 0 < b) (k : ℕ) :
+    ∃ (N : ℕ) (C : ℝ≥0), ∀ (f : 𝓢(ℝ, ℂ)) (x : ℝ),
+      |x| ^ k * Real.exp (b * x) * ‖f (Real.exp x)‖ ≤
+        C * (SchwartzMap.seminorm ℂ 0 0 f + SchwartzMap.seminorm ℂ N 0 f) := by
+  let δ := min b 1
+  have hδ : 0 < δ := lt_min hb zero_lt_one
+  obtain ⟨N, hN⟩ := exists_nat_ge (b + δ)
+  let C : ℝ≥0 := ⟨(k.factorial : ℝ) / δ ^ k, by positivity⟩
+  have hpow (y : ℝ) (hy : 0 ≤ y) : y ^ k ≤ (C : ℝ) * Real.exp (δ * y) := by
+    have h := (div_le_iff₀ (show 0 < (k.factorial : ℝ) by positivity)).mp
+      (Real.pow_div_factorial_le_exp (δ * y) (mul_nonneg hδ.le hy) k)
+    change _ ≤ _ / _ * _
+    rw [div_mul_eq_mul_div, le_div_iff₀ (pow_pos hδ k)]
+    simpa only [mul_pow, mul_comm] using h
+  refine ⟨N, C, fun f x ↦ ?_⟩
+  have h := mul_le_mul_of_nonneg_right (hpow |x| (abs_nonneg _)) (Real.exp_pos (b*x)).le
+  rw [mul_assoc, ← Real.exp_add] at h
+  have hbnd (a d : ℝ) (ha : δ * |x| + b*x ≤ a)
+      (hd : Real.exp a * ‖f (Real.exp x)‖ ≤ d) :
+      |x| ^ k * Real.exp (b*x) * ‖f (Real.exp x)‖ ≤ C * d := by
+    refine (mul_le_mul_of_nonneg_right h (norm_nonneg _)).trans ?_
+    rw [mul_assoc]
+    exact mul_le_mul_of_nonneg_left
+      ((mul_le_mul_of_nonneg_right (Real.exp_le_exp.mpr ha) (norm_nonneg _)).trans hd) C.property
+  by_cases hx : 0 ≤ x
+  · apply hbnd ((N : ℝ) * x)
+    · rw [abs_of_nonneg hx]
+      simpa only [add_mul, add_comm] using mul_le_mul_of_nonneg_right hN hx
+    · rw [Real.exp_nat_mul]
+      have hf := SchwartzMap.norm_pow_mul_le_seminorm ℂ f N (Real.exp x)
+      rw [Real.norm_of_nonneg (Real.exp_pos _).le] at hf
+      exact hf.trans (le_add_of_nonneg_left (apply_nonneg _ _))
+  · apply hbnd 0
+    · rw [abs_of_nonpos (le_of_not_ge hx)]
+      have hδb : δ ≤ b := min_le_left _ _
+      nlinarith [mul_nonpos_of_nonneg_of_nonpos (sub_nonneg.mpr hδb) (le_of_not_ge hx)]
+    · rw [Real.exp_zero, one_mul]
+      exact (SchwartzMap.norm_le_seminorm ℂ f _).trans
+        (le_add_of_nonneg_right (apply_nonneg _ _))
+
+/-- In exponential coordinates the derivative of the weighted profile is the
+weighted profile of the Euler derivative plus the weight times the input. -/
+private theorem realSchwartz_weightedExpProfile (b : ℝ) (hb : 0 < b) :
+    ∃ L : 𝓢(ℝ, ℂ) →L[ℂ] 𝓢(ℝ, ℂ), ∀ f x,
+      L f x = (Real.exp (b*x) : ℂ) * f (Real.exp x) := by
+  let X := 𝓢(ℝ, ℂ)
+  let T : X →L[ℂ] X := (b : ℂ) • ContinuousLinearMap.id ℂ X +
+    (SchwartzMap.smulLeftCLM ℂ (fun y : ℝ ↦ (y : ℂ))).comp (SchwartzMap.derivCLM ℂ ℂ)
+  let g (f : X) (x : ℝ) := (Real.exp (b*x) : ℂ) * f (Real.exp x)
+  have hT (f : X) (y : ℝ) : T f y = (b : ℂ) * f y + (y : ℂ) * deriv f y := by
+    change (b : ℂ) * f y + SchwartzMap.smulLeftCLM ℂ (fun t : ℝ ↦ (t : ℂ))
+      (SchwartzMap.derivCLM ℂ ℂ f) y = _
+    rw [SchwartzMap.smulLeftCLM_apply_apply (by fun_prop)]
+    rfl
+  have hd (f : X) : deriv (g f) = g (T f) := by
+    funext x
+    have h1 := (((hasDerivAt_id x).const_mul b).exp).ofReal_comp
+    have h2 := f.differentiableAt.hasDerivAt.scomp x (Real.hasDerivAt_exp x)
+    rw [show deriv (g f) x = _ from (h1.fun_mul h2).deriv]
+    change _ = (Real.exp (b*x) : ℂ) * T f (Real.exp x)
+    rw [hT]
+    simp only [id_eq, Function.comp_apply, mul_one, Complex.ofReal_mul, Complex.real_smul]
+    ring
+  have hi (f : X) (n : ℕ) : iteratedDeriv n (g f) = g ((T ^ n) f) := by
+    induction n with
+    | zero => rfl
+    | succ n ih =>
+      rw [iteratedDeriv_succ, ih, hd, pow_succ', mul_apply_eq_comp]
+  choose N C hbnd using realSchwartz_logWeight_bound b hb
+  let q (k n : ℕ) : Seminorm ℂ X := C k •
+    ((SchwartzMap.seminorm ℂ 0 0 + SchwartzMap.seminorm ℂ (N k) 0).comp (T ^ n).toLinearMap)
+  have hbound (k n : ℕ) (f : X) (x : ℝ) : |x| ^ k * ‖iteratedDeriv n (g f) x‖ ≤ q k n f := by
+    rw [hi]
+    change |x| ^ k * ‖(Real.exp (b*x) : ℂ) * _‖ ≤ _
+    rw [norm_mul, Complex.norm_of_nonneg (Real.exp_pos _).le, ← mul_assoc]
+    exact hbnd k ((T ^ n) f) x
+  have hsmooth (f : X) : ContDiff ℝ (∞) (g f) :=
+    (Complex.ofRealCLM.contDiff.comp (Real.contDiff_exp.comp (contDiff_const.mul contDiff_id))).mul
+      ((f.smooth (⊤ : ℕ∞)).comp Real.contDiff_exp)
+  have hdec (f : X) (k n : ℕ) : ∃ c : ℝ, ∀ x : ℝ,
+      ‖x‖ ^ k * ‖iteratedFDeriv ℝ n (g f) x‖ ≤ c := by
+    refine ⟨q k n f, fun x ↦ ?_⟩
+    simpa only [Real.norm_eq_abs, norm_iteratedFDeriv_eq_norm_iteratedDeriv] using hbound k n f x
+  let L : X →ₗ[ℂ] X :=
+    { toFun := fun f ↦ ⟨g f, hsmooth f, hdec f⟩
+      map_add' := fun f h ↦ SchwartzMap.ext fun x ↦ mul_add _ _ _
+      map_smul' := fun c f ↦ SchwartzMap.ext fun x ↦ mul_left_comm _ _ _ }
+  refine ⟨⟨L, (schwartz_withSeminorms ℂ ℝ ℂ).continuous_of_continuous_comp L fun i ↦ ?_⟩,
+    fun _ _ ↦ rfl⟩
+  have hp (j : ℕ) : Continuous (SchwartzMap.seminorm ℂ j 0 : X → ℝ) :=
+    (schwartz_withSeminorms ℂ ℝ ℂ).continuous_seminorm (j, 0)
+  have hc : Continuous (q i.1 i.2) := continuous_const.mul
+    (((hp 0).add (hp (N i.1))).comp (T ^ i.2).continuous)
+  apply Seminorm.continuous_of_le hc
+  intro f
+  exact SchwartzMap.seminorm_le_bound' ℂ i.1 i.2 (L f) (apply_nonneg _ _) (hbound i.1 i.2 f)
+
+/-- Paper: §5.3.3, p. 249.
+Restriction gives a continuous linear injection of additive real Schwartz functions into
+the space with all positive weights. -/
+theorem realSchwartz_restrict_positiveDecay :
+    ∃ R : 𝓢(ℝ, ℂ) →L[ℂ] 𝓔(ℝ, 1, Ioi 0), Injective R ∧
+      ∀ (f : 𝓢(ℝ, ℂ)) (u : ℝˣ), (R f).val u = f u.val := by
+  let X := 𝓢(ℝ, ℂ)
+  let m := archimedeanUnitModulation ℝ 1
+  let I : Set ℝ := Ioi 0
+  let r : X →ₗ[ℂ] (ℝˣ → ℂ) :=
+    { toFun := fun f u ↦ f u.val
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  obtain ⟨J, hJ⟩ := iteratedDeriv_exponentialDecay_assemble
+  let negX : X →L[ℂ] X :=
+    SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (ContinuousLinearEquiv.neg ℝ : ℝ ≃L[ℝ] ℝ)
+  have ht (b : I) : ∃ B : X →L[ℂ] SchwartzBruhat ℝˣ, ∀ f,
+      (B f).val = modulationWeight m b (r f) := by
+    obtain ⟨L, hL⟩ := realSchwartz_weightedExpProfile b.val b.property
+    refine ⟨J.comp (L.prod (L.comp negX)), fun f ↦ funext fun u ↦ ?_⟩
+    change J (L f, L (negX f)) u = _
+    rw [hJ]
+    have hu := abs_pos.mpr u.ne_zero
+    change _ = (((((m u).val : ℝ) ^ (b : ℝ) : ℝ)) : ℂ) * f u.val
+    rw [archimedeanUnitModulation_apply, pow_one, Real.norm_eq_abs, Real.rpow_def_of_pos hu,
+      Real.log_abs, mul_comm (Real.log u.val)]
+    by_cases hpos : 0 < u.val
+    · simp only [ite_eq_left hpos, hL, Real.exp_log hpos]
+    · simp only [ite_eq_right hpos, hL, Real.exp_log_eq_abs u.ne_zero,
+        abs_of_nonpos (le_of_not_gt hpos)]
+      change _ * f (- -u.val) = _
+      rw [neg_neg]
+  let R : X →ₗ[ℂ] 𝓔(ℝ, 1, I) := r.codRestrict (modulatedExponentialDecaySubmodule m I) fun f ↦
+    (Submodule.mem_iInf _).mpr fun b ↦ Submodule.mem_comap.mpr (by
+      rw [← (ht b).choose_spec f]
+      exact ((ht b).choose f).property)
+  have hR : Continuous (R : X → 𝓔(ℝ, 1, I)) := by
+    apply (iteratedDeriv_exponentialDecay_inducing I).continuous_iff.mpr
+    refine continuous_pi fun b ↦ (ht b).choose.continuous.congr fun f ↦ ?_
+    exact Subtype.ext ((ht b).choose_spec f)
+  refine ⟨⟨R, hR⟩, fun f g hfg ↦ ?_, fun _ _ ↦ rfl⟩
+  apply DFunLike.coe_injective
+  apply Continuous.ext_on (dense_compl_singleton (0 : ℝ)) f.continuous g.continuous
+  intro x hx
+  exact congrArg (fun v : 𝓔(ℝ, 1, Ioi 0) ↦ v.val (Units.mk0 x hx)) hfg
 
 private theorem iteratedDeriv_exponentialDecay_logDeriv (f : ℝ → ℂ) (g : 𝓢(ℝ, ℂ))
     (b x : ℝ) (hx : x ≠ 0) (hg : ∀ᶠ y in 𝓝 x,
@@ -4059,6 +4197,174 @@ theorem realArchimedeanMellin_eq_integral (f : 𝓢(ℝ, ℂ)) (ε : Fin 2)
     realArchimedeanMellin f ε s = mellin (realProfile(f, ε)) s :=
   ((realArchimedeanMellin_existsUnique f ε).exists.choose_spec.2 s _hs).2.symm
 
+section ComplexArchimedeanMellin
+
+private theorem complexArchimedeanMellin_continuous_eval_iteratedFDeriv (f : 𝓢(ℂ, ℂ)) (j : ℕ) :
+    Continuous (fun p : ℝ × ℝ ↦
+      iteratedFDeriv ℝ j (f : ℂ → ℂ) ((p.1 : ℂ) * unitAngle(p.2)) (fun _ ↦ unitAngle(p.2))) := by
+  have hcont : Continuous (fun p : ℝ × ℝ ↦ iteratedFDeriv ℝ j (f : ℂ → ℂ) ((p.1 : ℂ) * unitAngle(p.2))) :=
+    (f.smooth ⊤).continuous_iteratedFDeriv (mod_cast le_top) |>.comp (by fun_prop)
+  have hev : Continuous (fun q : ContinuousMultilinearMap ℝ (fun _ : Fin j ↦ ℂ) ℂ × (Fin j → ℂ) ↦ q.1 q.2) :=
+    continuous_eval
+  exact hev.comp (hcont.prodMk (continuous_pi fun _ ↦ by fun_prop))
+
+private theorem complexArchimedeanMellin_iteratedDeriv_integral (f : 𝓢(ℂ, ℂ)) (n : ℤ) (j : ℕ) (r : ℝ) :
+    iteratedDeriv j (fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+        (unitAngle(θ)) ^ n * f ((x : ℂ) * unitAngle(θ))) r =
+      ∫ θ in (0 : ℝ)..(2 * Real.pi),
+        (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+          ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ)) := by
+  induction j generalizing r with
+  | zero =>
+    simp only [iteratedDeriv_zero, iteratedFDeriv_zero_apply]
+  | succ j ih =>
+    rw [iteratedDeriv_succ]
+    have hfun : (iteratedDeriv j fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+          (unitAngle(θ)) ^ n * f ((x : ℂ) * unitAngle(θ))) =
+        fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+          (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+            ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ)) := funext ih
+    rw [hfun]
+    let Φ : ℝ → ℝ → ℂ := fun x θ ↦
+      (unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+        ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))
+    let Φ' : ℝ → ℝ → ℂ := fun x θ ↦
+      (unitAngle(θ)) ^ n * iteratedFDeriv ℝ (j + 1) (f : ℂ → ℂ)
+        ((x : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))
+    have hzpow : Continuous (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) := by
+      have heq : (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) =
+          fun p ↦ Complex.exp ((n : ℂ) * ((p.2 : ℂ) * Complex.I)) :=
+        funext fun p ↦ (Complex.exp_int_mul _ n).symm
+      rw [heq]
+      fun_prop
+    have hΦcont : Continuous Φ.uncurry :=
+      hzpow.mul (complexArchimedeanMellin_continuous_eval_iteratedFDeriv f j)
+    have hΦ'cont : Continuous Φ'.uncurry :=
+      hzpow.mul (complexArchimedeanMellin_continuous_eval_iteratedFDeriv f (j + 1))
+    have hderiv (θ : ℝ) (x : ℝ) : HasDerivAt (fun y : ℝ ↦ Φ y θ) (Φ' x θ) x := by
+      let g : ℝ →L[ℝ] ℂ := ContinuousLinearMap.smulRight (1 : ℝ →L[ℝ] ℝ) (unitAngle(θ))
+      have hg (y : ℝ) : g y = (y : ℂ) * unitAngle(θ) := by simp [g, Complex.real_smul]
+      have hd1 : DifferentiableAt ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x) :=
+        ((f.smooth ⊤).differentiable_iteratedFDeriv (mod_cast WithTop.coe_lt_top j)) (g x)
+      let ev : (ContinuousMultilinearMap ℝ (fun _ : Fin j ↦ ℂ) ℂ) →L[ℝ] ℂ :=
+        { toFun := fun L ↦ L (fun _ ↦ unitAngle(θ))
+          map_add' := fun _ _ ↦ rfl
+          map_smul' := fun _ _ ↦ rfl
+          cont := continuous_eval.comp (continuous_id.prodMk continuous_const) }
+      have hf' : HasFDerivAt (fun z : ℂ ↦ iteratedFDeriv ℝ j (f : ℂ → ℂ) z (fun _ ↦ unitAngle(θ)))
+          (ev.comp (fderiv ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x))) (g x) :=
+        ev.hasFDerivAt.comp (g x) hd1.hasFDerivAt
+      have hcomp := (hf'.comp x g.hasFDerivAt).hasDerivAt
+      have hval : (ev.comp (fderiv ℝ (iteratedFDeriv ℝ j (f : ℂ → ℂ)) (g x))) (g 1) =
+          iteratedFDeriv ℝ (j + 1) (f : ℂ → ℂ) (g x) (fun _ ↦ unitAngle(θ)) := by
+        have hg1 : g 1 = unitAngle(θ) := by simp [g]
+        rw [ContinuousLinearMap.comp_apply, hg1]
+        exact (iteratedFDeriv_succ_apply_left (𝕜 := ℝ) (f := (f : ℂ → ℂ)) (x := g x)
+          (fun _ : Fin (j + 1) ↦ unitAngle(θ))).symm
+      rw [ContinuousLinearMap.comp_apply] at hcomp
+      rw [hval, hg x] at hcomp
+      dsimp only [Function.comp_def, hg] at hcomp
+      simpa only [Φ, Φ', hg, Pi.mul_def, zero_mul, zero_add] using
+        (hasDerivAt_const x ((unitAngle(θ)) ^ n)).mul hcomp
+    have hfderiv_cont : Continuous (fun p : ℝ × ℝ ↦ fderiv ℝ (fun y ↦ Φ y p.2) p.1) := by
+      have heq : (fun p : ℝ × ℝ ↦ fderiv ℝ (fun y ↦ Φ y p.2) p.1) =
+          fun p : ℝ × ℝ ↦ ContinuousLinearMap.smulRight (1 : ℝ →L[ℝ] ℝ) (Φ' p.1 p.2) := by
+        funext p
+        rw [(hderiv p.2 p.1).hasFDerivAt.fderiv]
+        ext
+        simp
+      rw [heq]
+      exact (ContinuousLinearMap.smulRightL ℝ ℝ ℂ (1 : ℝ →L[ℝ] ℝ)).continuous.comp hΦ'cont
+    have hF := intervalIntegral.hasFDerivAt_integral_of_continuousOn_fderiv (𝕜 := ℝ)
+      (μ := volume) (f := Φ) (x₀ := r) (u := univ) (a := 0) (b := 2 * Real.pi)
+      univ_mem hΦcont.continuousOn (fun θ _ ↦ fun x _ ↦ (hderiv θ x).differentiableAt.differentiableWithinAt)
+      hfderiv_cont.continuousOn
+    have hD : HasDerivAt (fun x : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi), Φ x θ)
+        (∫ θ in (0 : ℝ)..(2 * Real.pi), Φ' r θ) r := by
+      have hD' := hF.hasDerivAt
+      refine hD'.congr_deriv ?_
+      change (∫ θ in (0 : ℝ)..(2 * Real.pi), fderiv ℝ (fun y ↦ Φ y θ) r) (1 : ℝ) = _
+      have hint : IntervalIntegrable (fun θ ↦ fderiv ℝ (fun y ↦ Φ y θ) r) volume 0 (2 * Real.pi) :=
+        (hfderiv_cont.comp (continuous_const.prodMk continuous_id)).intervalIntegrable 0 (2 * Real.pi)
+      rw [intervalIntegral.integral_of_le Real.two_pi_pos.le]
+      rw [intervalIntegral.integral_of_le Real.two_pi_pos.le]
+      have hint' : MeasureTheory.Integrable (fun θ ↦ fderiv ℝ (fun y ↦ Φ y θ) r)
+          (volume.restrict (Ioc 0 (2 * Real.pi))) :=
+        (intervalIntegrable_iff_integrableOn_Ioc_of_le Real.two_pi_pos.le).mp hint
+      change (ContinuousLinearMap.apply ℝ ℂ (1 : ℝ))
+          (∫ θ in Ioc 0 (2 * Real.pi), fderiv ℝ (fun y ↦ Φ y θ) r) =
+        ∫ θ in Ioc 0 (2 * Real.pi), Φ' r θ
+      rw [← (ContinuousLinearMap.apply ℝ ℂ (1 : ℝ)).integral_comp_comm hint']
+      refine MeasureTheory.setIntegral_congr_fun measurableSet_Ioc fun θ _ ↦ ?_
+      simp [(hderiv θ r).hasFDerivAt.fderiv]
+    exact hD.deriv
+
+private theorem exists_angularAverage_schwartz (f : 𝓢(ℂ, ℂ)) (n : ℤ) :
+    ∃ G : 𝓢(ℝ, ℂ), ∀ r : ℝ, G r = ∫ θ in (0 : ℝ)..(2 * Real.pi),
+      (unitAngle(θ)) ^ n * f ((r : ℂ) * unitAngle(θ)) := by
+  let A : ℝ → ℂ := fun r ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
+    (unitAngle(θ)) ^ n * f ((r : ℂ) * unitAngle(θ))
+  have hsmooth : ContDiff ℝ (⊤ : ℕ∞) A := by
+    have h1 : ContDiff ℝ (⊤ : ℕ∞) (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) := by
+      have heq : (fun p : ℝ × ℝ ↦ (unitAngle(p.2)) ^ n) =
+          fun p ↦ Complex.exp ((n : ℂ) * ((p.2 : ℂ) * Complex.I)) :=
+        funext fun p ↦ (Complex.exp_int_mul _ n).symm
+      rw [heq]
+      exact Complex.contDiff_exp.comp
+        (contDiff_const.mul ((Complex.ofRealCLM.contDiff.comp contDiff_snd).mul contDiff_const))
+    have h2 : ContDiff ℝ (⊤ : ℕ∞) (fun p : ℝ × ℝ ↦ f ((p.1 : ℂ) * unitAngle(p.2))) :=
+      (f.smooth (⊤ : ℕ∞)).comp ((Complex.ofRealCLM.contDiff.comp contDiff_fst).mul
+        (Complex.contDiff_exp.comp ((Complex.ofRealCLM.contDiff.comp contDiff_snd).mul contDiff_const)))
+    exact (h1.mul h2).parametric_intervalIntegral
+  have hdecay : ∀ k j : ℕ, ∃ C : ℝ, ∀ r : ℝ, ‖r‖ ^ k * ‖iteratedFDeriv ℝ j A r‖ ≤ C := by
+    intro k j
+    obtain ⟨C, hC⟩ := f.decay' k j
+    have hC0 : 0 ≤ C := by
+      have h0 := hC 0
+      exact le_trans (mul_nonneg (pow_nonneg (norm_nonneg _) _) (norm_nonneg _)) h0
+    refine ⟨2 * Real.pi * C, fun r ↦ ?_⟩
+    rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv]
+    rw [complexArchimedeanMellin_iteratedDeriv_integral f n j r]
+    by_cases hpow : ‖r‖ ^ k = 0
+    · rw [hpow, zero_mul]
+      positivity
+    · have hpos : 0 < ‖r‖ ^ k := lt_of_le_of_ne (pow_nonneg (norm_nonneg _) _) (Ne.symm hpow)
+      have hbound : ∀ θ ∈ Set.uIoc (0 : ℝ) (2 * Real.pi),
+          ‖(unitAngle(θ)) ^ n * iteratedFDeriv ℝ j (f : ℂ → ℂ)
+              ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖ ≤
+            C / ‖r‖ ^ k := by
+        intro θ _
+        have hu : ‖unitAngle(θ)‖ = 1 := Complex.norm_exp_ofReal_mul_I θ
+        have hun : ‖(unitAngle(θ)) ^ n‖ = 1 := by rw [norm_zpow, hu, one_zpow]
+        have harg : ‖(r : ℂ) * unitAngle(θ)‖ = ‖r‖ := by
+          rw [norm_mul, hu, mul_one, Complex.norm_real]
+        have hnorm : ‖iteratedFDeriv ℝ j (f : ℂ → ℂ)
+              ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖ ≤
+            ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ := by
+          calc
+            _ ≤ ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ *
+                ∏ _i : Fin j, ‖unitAngle(θ)‖ :=
+              ContinuousMultilinearMap.le_opNorm _ _
+            _ = ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ := by
+              simp [hu]
+        have hdec : ‖r‖ ^ k * ‖iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ))‖ ≤ C := by
+          rw [← harg]
+          exact hC ((r : ℂ) * unitAngle(θ))
+        rw [norm_mul, hun, one_mul]
+        exact hnorm.trans ((le_div_iff₀ hpos).mpr (by rw [mul_comm]; exact hdec))
+      have hint := intervalIntegral.norm_integral_le_of_norm_le_const hbound
+      rw [sub_zero, abs_of_pos Real.two_pi_pos] at hint
+      calc
+        ‖r‖ ^ k * ‖∫ θ in (0 : ℝ)..(2 * Real.pi), (unitAngle(θ)) ^ n *
+            iteratedFDeriv ℝ j (f : ℂ → ℂ) ((r : ℂ) * unitAngle(θ)) (fun _ ↦ unitAngle(θ))‖
+          ≤ ‖r‖ ^ k * (C / ‖r‖ ^ k * (2 * Real.pi)) :=
+            mul_le_mul_of_nonneg_left hint hpos.le
+        _ = 2 * Real.pi * C := by
+            field_simp [hpow]
+  exact ⟨⟨A, hsmooth, hdecay⟩, fun _ ↦ rfl⟩
+
+end ComplexArchimedeanMellin
+
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The complex Mellin integral converges on the right half-plane and has a unique
 meromorphic continuation for each integral angular weight.
@@ -4066,7 +4372,46 @@ Deviation: The angular measure is dθ in the norm coordinate t = |z|², as in §
 The printed 2 dθ would double the Tamagawa integral. -/
 theorem complexArchimedeanMellin_existsUnique (f : 𝓢(ℂ, ℂ)) (n : ℤ) :
     ∃! L : ℂ → ℂ, MeromorphicNFOn L univ ∧
-      ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by sorry
+      ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by
+  obtain ⟨G, hG⟩ := exists_angularAverage_schwartz f n
+  obtain ⟨K, ⟨hK, hKm⟩, _⟩ := realArchimedeanMellin_existsUnique_schwartz G
+  let L : ℂ → ℂ := fun s ↦ (2 : ℂ) * K (2 * s)
+  have hL : MeromorphicNFOn L univ := by
+    intro s _
+    have h2 : MeromorphicNFAt (fun z : ℂ ↦ K (2 * z)) s := (hK (mem_univ (2 * s))).comp_analyticAt
+      (show AnalyticAt ℂ (fun z : ℂ ↦ 2 * z) s by fun_prop)
+    have h3 : MeromorphicNFAt ((2 : ℂ) • fun z : ℂ ↦ K (2 * z)) s := h2.smul_const (s := (2 : ℂ))
+    convert h3 using 1
+  have hLm : ∀ s : ℂ, 0 < s.re → HasMellin (complexProfile(f, n)) s (L s) := by
+    intro s hs
+    have h2s : 0 < (2 * s).re := by
+      simpa using mul_pos (by norm_num : (0 : ℝ) < 2) hs
+    have hG2 := hKm (2 * s) h2s
+    have heq : EqOn (complexProfile(f, n)) (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) (Ioi 0) := by
+      intro t _
+      change (∫ θ in (0 : ℝ)..(2 * Real.pi), (unitAngle(θ)) ^ n *
+          f ((Real.sqrt t : ℂ) * unitAngle(θ))) = G (t ^ (1 / 2 : ℝ))
+      rw [hG, ← Real.sqrt_eq_rpow]
+    have hconv : MellinConvergent (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) s := by
+      rw [MellinConvergent.comp_rpow (one_div_ne_zero (by norm_num : (2 : ℝ) ≠ 0))]
+      convert hG2.1 using 2
+      push_cast
+      ring
+    have hmell : mellin (fun t : ℝ ↦ (G : ℝ → ℂ) (t ^ (1 / 2 : ℝ))) s = L s := by
+      rw [mellin_comp_rpow _ s (1 / 2 : ℝ)]
+      have hdiv : s / ((1 / 2 : ℝ) : ℂ) = 2 * s := by push_cast; ring
+      have habs : |1 / (2 : ℝ)|⁻¹ = (2 : ℝ) := by norm_num
+      rw [hdiv, habs, hG2.2, Complex.real_smul]
+      simp [L]
+    refine ⟨?_, ?_⟩
+    · exact hconv.congr_fun (fun t ht ↦ by simp [heq ht]) measurableSet_Ioi
+    · refine (setIntegral_congr_fun measurableSet_Ioi fun t ht ↦ ?_).trans hmell
+      simp [heq ht]
+  refine ⟨L, ⟨hL, hLm⟩, ?_⟩
+  rintro H ⟨hH, hHm⟩
+  funext s
+  exact realArchimedeanMellin_existsUnique_eqNF hH hL
+    (fun z hz ↦ (hHm z hz).2.symm.trans (hLm z hz).2) s
 
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The complex local Mellin transform is the meromorphic continuation of the angular

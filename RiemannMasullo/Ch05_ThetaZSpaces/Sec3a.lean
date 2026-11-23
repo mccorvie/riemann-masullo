@@ -993,10 +993,118 @@ theorem adelePrincipalValue_tmul {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     adelePrincipalValue F S₀ (e (f ⊗ₜ[ℂ] g)) = e (sAdelePrincipalValue F h₀ f ⊗ₜ[ℂ] g) :=
   by sorry
 
+section PrincipalValueInjectivity
+
+/-- A tensor product of injective endomorphisms of finitely many factors is injective: an
+injective linear map over a field has a left inverse, and a left inverse of each factor composes
+to a left inverse of the tensor product. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_piTensor {ι : Type*}
+    [Fintype ι] {D : ι → Type*} [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)]
+    (T : ∀ i, D i →ₗ[ℂ] D i) (hT : ∀ i, Function.Injective (T i)) :
+    Function.Injective (PiTensorProduct.map (R := ℂ) T) := by
+  classical
+  choose g hg using fun i ↦
+    LinearMap.exists_leftInverse_of_injective (T i) (LinearMap.ker_eq_bot.mpr (hT i))
+  have hcomp : (PiTensorProduct.map (R := ℂ) g) ∘ₗ (PiTensorProduct.map (R := ℂ) T) =
+      LinearMap.id := by
+    rw [← PiTensorProduct.map_comp (f := T) (g := g), funext hg, PiTensorProduct.map_id]
+  intro x y hxy
+  have hx : (PiTensorProduct.map (R := ℂ) g) ((PiTensorProduct.map (R := ℂ) T) x) = x := by
+    simpa using congrArg (fun L => L x) hcomp
+  have hy : (PiTensorProduct.map (R := ℂ) g) ((PiTensorProduct.map (R := ℂ) T) y) = y := by
+    simpa using congrArg (fun L => L y) hcomp
+  rw [← hx, ← hy, hxy]
+
+/-- A tensor product of two injective linear maps over a field is injective, by the left inverse
+of each factor. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_tensorProduct
+    {A A' B B' : Type*} [AddCommGroup A] [Module ℂ A] [AddCommGroup A'] [Module ℂ A']
+    [AddCommGroup B] [Module ℂ B] [AddCommGroup B'] [Module ℂ B']
+    (f : A →ₗ[ℂ] A') (g : B →ₗ[ℂ] B') (hf : Function.Injective f)
+    (hg : Function.Injective g) : Function.Injective (TensorProduct.map f g) := by
+  obtain ⟨f', hf'⟩ := LinearMap.exists_leftInverse_of_injective f (LinearMap.ker_eq_bot.mpr hf)
+  obtain ⟨g', hg'⟩ := LinearMap.exists_leftInverse_of_injective g (LinearMap.ker_eq_bot.mpr hg)
+  have hcomp : TensorProduct.map f' g' ∘ₗ TensorProduct.map f g = LinearMap.id := by
+    rw [← TensorProduct.map_comp f' g' f g, hf', hg', TensorProduct.map_id]
+  intro x y hxy
+  have hx : TensorProduct.map f' g' (TensorProduct.map f g x) = x := by
+    simpa using congrArg (fun L => L x) hcomp
+  have hy : TensorProduct.map f' g' (TensorProduct.map f g y) = y := by
+    simpa using congrArg (fun L => L y) hcomp
+  rw [← hx, ← hy, hxy]
+
+/-- An operator given by the identity on the archimedean factor and by a tensor product of
+endomorphisms of the finite factors, conjugated by a linear homeomorphism, is injective as soon
+as those endomorphisms are. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective_aux {A B : Type*}
+    [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B] {ι : Type*} [Fintype ι] {D : ι → Type*}
+    [∀ i, AddCommGroup (D i)] [∀ i, Module ℂ (D i)] [∀ i, TopologicalSpace (D i)]
+    (e : InductiveTensor A (FinestLocallyConvex (⨂[ℂ] i, D i)) ≃L[ℂ] B)
+    (p : ι → Prop) [DecidablePred p] (T : ∀ i, D i →L[ℂ] D i)
+    (hT : ∀ i, Function.Injective (T i)) :
+    let W := FinestLocallyConvex (⨂[ℂ] i, D i)
+    let P : W →ₗ[ℂ] W := PiTensorProduct.map fun i ↦
+      if p i then (T i).toLinearMap else LinearMap.id
+    let I : A →ₗ[ℂ] A := LinearMap.id
+    Function.Injective (e.toLinearMap.comp ((TensorProduct.map I P).comp e.symm.toLinearMap)) := by
+  classical
+  intro W P I
+  have hP : Function.Injective P := by
+    refine sAdelePrincipalValue_isClosedEmbedding_injective_piTensor
+      (fun i => if p i then (T i).toLinearMap else LinearMap.id) ?_
+    intro i
+    by_cases h : p i
+    · simpa [h] using hT i
+    · simpa [h] using (show Function.Injective (LinearMap.id : D i →ₗ[ℂ] D i)
+        from fun a b hab => hab)
+  have hI : Function.Injective I := fun a b hab => hab
+  have hTens : Function.Injective (TensorProduct.map I P) :=
+    sAdelePrincipalValue_isClosedEmbedding_injective_tensorProduct I P hI hP
+  intro x y hxy
+  have hxy' : e (TensorProduct.map I P (e.symm x)) =
+      e (TensorProduct.map I P (e.symm y)) := hxy
+  exact e.symm.injective (hTens (e.injective hxy'))
+
+end PrincipalValueInjectivity
+
+/-- Paper: Definition 5.3.1.4(1) and Lemma 5.3.1.3, p. 242.
+The S-local principal value has trivial kernel: on a selected finite place it is the local
+principal value of Lemma 5.3.1.3, whose kernel is trivial, and on every other factor of the
+tensor decomposition it is the identity. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_injective {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : Function.Injective (sAdelePrincipalValue F h₀) := by
+  classical
+  unfold sAdelePrincipalValue
+  with_reducible
+    exact sAdelePrincipalValue_isClosedEmbedding_injective_aux
+      (sAdeleSchwartz_inductiveTensor_equiv F S).choose (fun w : S ↦ w.val ∈ S₀)
+      (fun w ↦ finitePlacePrincipalValue w.val)
+      (fun w ↦ (finitePlacePrincipalValue_isClosedEmbedding w.val).injective)
+
+/-- Paper: Definition 5.3.1.4(1), p. 242.
+The S-local principal value induces the topology of the S-local test space: it is the identity
+on the archimedean factor and a tensor product of endomorphisms of the finite factors, so it is
+a linear self-map of a space whose topology is transported from that tensor decomposition. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_isInducing {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : IsInducing (sAdelePrincipalValue F h₀) := by
+  sorry
+
+/-- Paper: Definition 5.3.1.4(1) and Lemma 5.3.1.3, p. 242.
+The image of the S-local principal value is closed: it is the image of the whole archimedean
+factor and of the image of the local principal value in each selected finite place, that is, of
+tests vanishing at the origin there, which is the zero set of a continuous functional. -/
+private theorem sAdelePrincipalValue_isClosedEmbedding_isClosed {S S₀ : Finset V}
+    (h₀ : S₀ ⊆ S) : IsClosed (Set.range (sAdelePrincipalValue F h₀)) := by
+  sorry
+
 /-- Paper: Definition 5.3.1.4(1), p. 242.
 The S-local principal value is a topological embedding with closed range. -/
 theorem sAdelePrincipalValue_isClosedEmbedding {S S₀ : Finset V} (h₀ : S₀ ⊆ S) :
-    IsClosedEmbedding (sAdelePrincipalValue F h₀) := by sorry
+    IsClosedEmbedding (sAdelePrincipalValue F h₀) :=
+  ⟨⟨sAdelePrincipalValue_isClosedEmbedding_isInducing h₀,
+    sAdelePrincipalValue_isClosedEmbedding_injective h₀⟩,
+    sAdelePrincipalValue_isClosedEmbedding_isClosed h₀⟩
 
 /-- Paper: Definition 5.3.1.4(2), p. 242.
 The global principal value is a topological embedding with closed range. -/
@@ -1193,14 +1301,6 @@ The S-local principal value on theta classes is a closed topological embedding. 
 theorem sLocalThetaPrincipalValue_isClosedEmbedding {S S₀ : Finset V} (h₀ : S₀ ⊆ S)
     (hn : S₀.Nonempty) :
     IsClosedEmbedding (sLocalThetaPrincipalValue F h₀) := by sorry
-
--- TODO(paper-gap): The proof of global closed range claims that the image is contained in
--- any fixed S-stage. This does not follow from stage compatibility and fails at larger stages.
-
-/-- Paper: Lemma 5.3.1.5, p. 242.
-The global principal value on theta classes is a closed topological embedding. -/
-theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀.Nonempty) :
-    IsClosedEmbedding (globalThetaPrincipalValue F S₀) := by sorry
 
 private theorem sLocalThetaPrincipalValue_transition_ext {ι A X Y : Type*} {M : ι → Type*}
     [TopologicalSpace A] [AddCommGroup A] [Module ℂ A] [TopologicalSpace X]
@@ -1730,6 +1830,350 @@ theorem globalThetaPrincipalValue_isotypicAverage (S₀ : Finset V)
       (fun S y ↦ globalThetaPrincipalValue F S y) A
       (globalThetaPrincipalValue_isotypicAverage_empty (F := F))
       (fun S hn y ↦ globalThetaPrincipalValue_isotypicAverage_nonempty (F := F) S hn χ y) S₀ x
+
+/-- Through an inducing linear map into a polynormable space, every continuous seminorm of the
+source is bounded by a continuous seminorm of the target. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_bound {X E : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [PolynormableSpace ℂ E]
+    (f : X →ₗ[ℂ] E) (hf : IsInducing f) (s : Seminorm ℂ X) (hs : Continuous s) :
+    ∃ t : Seminorm ℂ E, Continuous t ∧ ∀ z, s z ≤ t (f z) := by
+  have : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  obtain ⟨F, C, -, hle⟩ :=
+    Seminorm.bound_of_continuous (hf.withSeminorms (PolynormableSpace.withSeminorms ℂ E)) s hs
+  refine ⟨C • F.sup (fun p : {p : Seminorm ℂ E // Continuous p} ↦ p.1),
+    (Seminorm.continuous_finsetSup fun t _ ↦ t.2).const_smul _, fun z ↦ (hle z).trans ?_⟩
+  simp only [smul_apply, Seminorm.finset_sup_apply, SeminormFamily.comp_apply,
+    Seminorm.comp_apply, le_refl]
+
+/-- An endomorphism of a space exhausted by closed embedded stages is a closed embedding when it
+restricts to a closed embedding on each stage and commutes with continuous projections onto the
+stages that fix every earlier stage. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_ofProjections {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [hE : PolynormableSpace ℂ E]
+    {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)] [∀ n, TopologicalSpace (X n)]
+    (ι : ∀ n, X n →L[ℂ] E) (hι : ∀ n, IsClosedEmbedding (ι n))
+    (P : E →L[ℂ] E) (Pn : ∀ n, X n →L[ℂ] X n) (hPn : ∀ n, IsClosedEmbedding (Pn n))
+    (hP : ∀ n z, P (ι n z) = ι n (Pn n z))
+    (pr : ℕ → E →L[ℂ] E) (hmem : ∀ n x, pr n x ∈ range (ι n))
+    (hfix : ∀ n m, n ≤ m → ∀ z, pr m (ι n z) = ι n z)
+    (hprP : ∀ n x, pr n (P x) = P (pr n x))
+    (hexh : ∀ x, ∃ n z, ι n z = x)
+    (hfin : ∀ q : Seminorm ℂ E, (∀ n, Continuous (q ∘ ι n)) → Continuous q) :
+    IsClosedEmbedding P := by
+  have : IsTopologicalAddGroup E := PolynormableSpace.isTopologicalAddGroup ℂ E
+  have hPι (n : ℕ) : IsClosedEmbedding (fun z ↦ P (ι n z)) := by
+    have h : (fun z ↦ P (ι n z)) = ι n ∘ Pn n := funext (hP n)
+    rw [h]
+    exact (hι n).comp (hPn n)
+  -- Injectivity is checked on a stage containing the vector.
+  have hinj : Injective P := by
+    refine (injective_iff_map_eq_zero P).mpr fun x hx ↦ ?_
+    obtain ⟨n, z, rfl⟩ := hexh x
+    have hz : z = 0 := (hPι n).injective (by simpa using hx)
+    rw [hz, map_zero]
+  -- A limit point of the range is fixed by the projection of its stage, which maps the
+  -- range into the closed range of the stage.
+  have hclosed : IsClosed (range P) := by
+    refine isClosed_of_closure_subset fun y hy ↦ ?_
+    obtain ⟨m, z, rfl⟩ := hexh y
+    have hmaps : MapsTo (pr m) (range P) (range fun w ↦ P (ι m w)) := by
+      rintro _ ⟨x, rfl⟩
+      obtain ⟨w, hw⟩ := hmem m x
+      exact ⟨w, by rw [hprP, ← hw]⟩
+    have h := map_mem_closure (pr m).continuous hy hmaps
+    rw [(hPι m).isClosed_range.closure_eq, hfix m m le_rfl] at h
+    obtain ⟨w, hw⟩ := h
+    exact ⟨ι m w, hw⟩
+  -- The successive differences of the projections split each vector into finitely many
+  -- stage pieces, on each of which the stage estimate applies.
+  let D : ℕ → E →L[ℂ] E := fun n ↦ Nat.casesOn n (pr 0) fun k ↦ pr (k + 1) - pr k
+  have hDsum (m : ℕ) (x : E) : ∑ n ∈ Finset.range (m + 1), D n x = pr m x := by
+    induction m with
+    | zero => simp [D]
+    | succ m ih =>
+      rw [Finset.sum_range_succ, ih]
+      simp [D]
+  have hDzero (m : ℕ) (z : X m) (n : ℕ) (hn : m < n) : D n (ι m z) = 0 := by
+    obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
+    simp only [D, sub_apply]
+    rw [hfix m (k + 1) (by omega), hfix m k (by omega), sub_self]
+  have hDmem (n : ℕ) (x : E) : ∃ w, ι n w = D n x := by
+    cases n with
+    | zero => exact hmem 0 x
+    | succ k =>
+      obtain ⟨a, ha⟩ := hmem (k + 1) x
+      obtain ⟨b, hb⟩ := hmem k x
+      obtain ⟨c, hc⟩ := hmem (k + 1) (ι k b)
+      rw [hfix k (k + 1) (Nat.le_succ k)] at hc
+      exact ⟨a - c, by simp [D, ha, hb, hc]⟩
+  have hDP (n : ℕ) (x : E) : D n (P x) = P (D n x) := by
+    cases n with
+    | zero => exact hprP 0 x
+    | succ k => simp [D, hprP]
+  have key (p : Seminorm ℂ E) (hp : Continuous p) :
+      ∃ q : Seminorm ℂ E, Continuous q ∧ ∀ x, p x ≤ q (P x) := by
+    have hb (n : ℕ) : ∃ t : Seminorm ℂ E, Continuous t ∧ ∀ z, p (ι n z) ≤ t (P (ι n z)) := by
+      obtain ⟨t, ht, hle⟩ := globalThetaPrincipalValue_isClosedEmbedding_bound
+        ((P : E →ₗ[ℂ] E).comp (ι n : X n →ₗ[ℂ] E)) (hPι n).isInducing
+        (p.comp (ι n : X n →ₗ[ℂ] E)) (hp.comp (ι n).continuous)
+      exact ⟨t, ht, hle⟩
+    choose t ht htle using hb
+    have hsupp (x : E) : ∃ m, ∀ n, m < n → D n x = 0 := by
+      obtain ⟨m, z, rfl⟩ := hexh x
+      exact ⟨m, hDzero m z⟩
+    have hsumm (x : E) : Summable fun n ↦ t n (D n x) := by
+      obtain ⟨m, hm⟩ := hsupp x
+      refine summable_of_ne_finset_zero (s := Finset.range (m + 1)) fun n hn ↦ ?_
+      rw [Finset.mem_range, not_lt] at hn
+      rw [hm n (by omega), map_zero]
+    let q : Seminorm ℂ E := Seminorm.of (fun x ↦ ∑' n, t n (D n x))
+      (fun x y ↦ by
+        have h := (hsumm x).add (hsumm y)
+        calc ∑' n, t n (D n (x + y)) ≤ ∑' n, (t n (D n x) + t n (D n y)) :=
+              (hsumm (x + y)).tsum_le_tsum (fun n ↦ by rw [map_add]; exact map_add_le_add _ _ _) h
+          _ = _ := (hsumm x).tsum_add (hsumm y))
+      (fun a x ↦ by
+        simp only [map_smul, map_smul_eq_mul]
+        exact tsum_mul_left)
+    have hq : Continuous q := by
+      refine hfin q fun k ↦ ?_
+      have h : (fun z ↦ q (ι k z)) = fun z ↦ ∑ n ∈ Finset.range (k + 1), t n (D n (ι k z)) := by
+        funext z
+        refine tsum_eq_sum fun n hn ↦ ?_
+        rw [Finset.mem_range, not_lt] at hn
+        rw [hDzero k z n (by omega), map_zero]
+      change Continuous (fun z ↦ q (ι k z))
+      rw [h]
+      exact continuous_finsetSum _ fun n _ ↦ (ht n).comp ((D n).continuous.comp (ι k).continuous)
+    refine ⟨q, hq, fun x ↦ ?_⟩
+    obtain ⟨m, z, rfl⟩ := hexh x
+    calc p (ι m z) = p (∑ n ∈ Finset.range (m + 1), D n (ι m z)) := by
+          rw [hDsum, hfix m m le_rfl]
+      _ ≤ ∑ n ∈ Finset.range (m + 1), p (D n (ι m z)) :=
+          Finset.le_sum_of_subadditive p (map_zero p).le (map_add_le_add p) _ _
+      _ ≤ ∑ n ∈ Finset.range (m + 1), t n (D n (P (ι m z))) := by
+          refine Finset.sum_le_sum fun n _ ↦ ?_
+          obtain ⟨w, hw⟩ := hDmem n (ι m z)
+          rw [hDP, ← hw]
+          exact htle n w
+      _ ≤ ∑' n, t n (D n (P (ι m z))) :=
+          (hsumm _).sum_le_tsum _ fun n _ ↦ apply_nonneg _ _
+  have hind : IsInducing P := by
+    rw [IsTopologicalAddGroup.isInducing_iff_nhds_zero]
+    refine le_antisymm ?_ (fun U hU ↦ ?_)
+    · have h := P.continuous.tendsto 0
+      rw [map_zero] at h
+      exact h.le_comap
+    · obtain ⟨p, hp, hpU⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+      obtain ⟨q, hq, hpq⟩ := key p hp
+      refine ⟨q.ball 0 1, Seminorm.ball_mem_nhds hq one_pos, fun x hx ↦ hpU ?_⟩
+      rw [mem_preimage, Seminorm.mem_ball_zero] at hx
+      exact (Seminorm.mem_ball_zero p).mpr ((hpq x).trans_lt hx)
+  exact ⟨⟨hind, hinj⟩, hclosed⟩
+
+/-- Continuous linear left inverses of the steps of a chain of stages, commuting with operators
+compatible with the stage maps, assemble into continuous projections onto the stages that fix
+the earlier stages and commute with the operator on the limit. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_projections {E : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    {X : ℕ → Type*} [∀ n, AddCommGroup (X n)] [∀ n, Module ℂ (X n)] [∀ n, TopologicalSpace (X n)]
+    [hX : ∀ n, PolynormableSpace ℂ (X n)]
+    (ι : ∀ n, X n →L[ℂ] E) (hι : ∀ n, Injective (ι n))
+    (j : ∀ n, X n →L[ℂ] X (n + 1)) (hj : ∀ n z, ι (n + 1) (j n z) = ι n z)
+    (r : ∀ n, X (n + 1) →L[ℂ] X n) (hr : ∀ n z, r n (j n z) = z)
+    (P : E →L[ℂ] E) (Pn : ∀ n, X n →L[ℂ] X n) (hP : ∀ n z, P (ι n z) = ι n (Pn n z))
+    (hrP : ∀ n z, r n (Pn (n + 1) z) = Pn n (r n z))
+    (hexh : ∀ x, ∃ n z, ι n z = x)
+    (hfin : ∀ (N : ℕ) (q : Seminorm ℂ E), (∀ d, Continuous (q ∘ ι (N + d))) → Continuous q) :
+    ∃ pr : ℕ → E →L[ℂ] E, (∀ n x, pr n x ∈ range (ι n)) ∧
+      (∀ n m, n ≤ m → ∀ z, pr m (ι n z) = ι n z) ∧ (∀ n x, pr n (P x) = P (pr n x)) := by
+  have hnest (a b : ℕ) (hab : a ≤ b) (z : X a) : ∃ w : X b, ι b w = ι a z := by
+    induction b, hab using Nat.le_induction with
+    | base => exact ⟨z, rfl⟩
+    | succ b _ ih =>
+      obtain ⟨w, hw⟩ := ih
+      exact ⟨j b w, (hj b w).trans hw⟩
+  -- The composite of the left inverses from stage `n + d` down to stage `n`.
+  let R (n : ℕ) : ∀ d, X (n + d) →L[ℂ] X n := fun d ↦
+    Nat.rec (motive := fun d ↦ X (n + d) →L[ℂ] X n) (ContinuousLinearMap.id ℂ (X n))
+      (fun d R ↦ R.comp (r (n + d))) d
+  have hRsucc (n d : ℕ) (z : X (n + (d + 1))) : R n (d + 1) z = R n d (r (n + d) z) := rfl
+  have hRP (n d : ℕ) (z : X (n + d)) : R n d (Pn (n + d) z) = Pn n (R n d z) := by
+    induction d with
+    | zero => rfl
+    | succ d ih =>
+      have h := hrP (n + d) z
+      exact (congrArg (R n d) h).trans (ih (r (n + d) z))
+  -- The composite only depends on the vector of the limit that a stage vector represents.
+  have hcons (n d : ℕ) (z : X (n + d)) (d' : ℕ) (hd : d ≤ d') :
+      ∀ z' : X (n + d'), ι (n + d') z' = ι (n + d) z → R n d' z' = R n d z := by
+    induction d', hd using Nat.le_induction with
+    | base => exact fun z' h ↦ congrArg (R n d) (hι _ h)
+    | succ d' hdd' ih =>
+      intro z' h
+      obtain ⟨w, hw⟩ := hnest (n + d) (n + d') (by omega) z
+      have hz' : z' = j (n + d') w := hι (n + d' + 1) (h.trans (hw.symm.trans (hj _ w).symm))
+      rw [hz']
+      exact (congrArg (R n d') (hr (n + d') w)).trans (ih w hw)
+  have hcons' (n d d' : ℕ) (z : X (n + d)) (z' : X (n + d'))
+      (h : ι (n + d') z' = ι (n + d) z) : R n d' z' = R n d z := by
+    rcases le_total d d' with hd | hd
+    · exact hcons n d z d' hd z' h
+    · exact (hcons n d' z' d hd z h.symm).symm
+  have hrep (n : ℕ) (x : E) : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := by
+    obtain ⟨k, z, rfl⟩ := hexh x
+    obtain ⟨w, hw⟩ := hnest k (n + k) (by omega) z
+    exact ⟨k, w, hw⟩
+  have hcommon (n : ℕ) (x y : E) :
+      ∃ d, ∃ a b : X (n + d), ι (n + d) a = x ∧ ι (n + d) b = y := by
+    obtain ⟨d₁, z₁, rfl⟩ := hrep n x
+    obtain ⟨d₂, z₂, rfl⟩ := hrep n y
+    obtain ⟨a, ha⟩ := hnest (n + d₁) (n + max d₁ d₂) (by omega) z₁
+    obtain ⟨b, hb⟩ := hnest (n + d₂) (n + max d₁ d₂) (by omega) z₂
+    exact ⟨max d₁ d₂, a, b, ha, hb⟩
+  choose dx zx hzx using hrep
+  have hQ (n d : ℕ) (z : X (n + d)) : R n (dx n (ι (n + d) z)) (zx n (ι (n + d) z)) = R n d z :=
+    hcons' n d _ z _ (hzx n _)
+  let Q (n : ℕ) : E →ₗ[ℂ] X n :=
+    { toFun := fun x ↦ R n (dx n x) (zx n x)
+      map_add' := fun x y ↦ by
+        obtain ⟨d, a, b, rfl, rfl⟩ := hcommon n x y
+        have h := hQ n d (a + b)
+        rw [map_add] at h
+        rw [h, hQ, hQ, map_add]
+      map_smul' := fun c x ↦ by
+        obtain ⟨d, z, rfl⟩ : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := ⟨dx n x, zx n x, hzx n x⟩
+        have h := hQ n d (c • z)
+        rw [map_smul] at h
+        rw [h, hQ, map_smul]
+        rfl }
+  have hQapp (n d : ℕ) (z : X (n + d)) : Q n (ι (n + d) z) = R n d z := hQ n d z
+  have hQc (n : ℕ) : Continuous (Q n) := by
+    refine (PolynormableSpace.withSeminorms ℂ (X n)).continuous_of_continuous_comp (Q n)
+      fun s ↦ hfin n ((s.1).comp (Q n)) fun d ↦ ?_
+    have h : ⇑((s.1).comp (Q n)) ∘ ι (n + d) = s.1 ∘ R n d :=
+      funext fun z ↦ congrArg s.1 (hQapp n d z)
+    rw [h]
+    exact s.2.comp (R n d).continuous
+  refine ⟨fun n ↦ (ι n).comp ⟨Q n, hQc n⟩, fun n x ↦ ⟨_, rfl⟩, fun n m hnm z ↦ ?_,
+    fun n x ↦ ?_⟩
+  · obtain ⟨w, hw⟩ := hnest n m hnm z
+    change ι m (Q m (ι n z)) = ι n z
+    rw [← hw]
+    exact congrArg (ι m) (hQapp m 0 w)
+  · obtain ⟨d, z, rfl⟩ : ∃ d, ∃ z : X (n + d), ι (n + d) z = x := ⟨dx n x, zx n x, hzx n x⟩
+    change ι n (Q n (P (ι (n + d) z))) = P (ι n (Q n (ι (n + d) z)))
+    rw [hP (n + d), hP n, hQapp, hQapp, hRP]
+
+/-- The finite places of a number field form a countable set, since their ideals are finitely
+generated over the countable ring of integers. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_countable : Countable V := by
+  let : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  let : Countable (𝓞 F) := (RingOfIntegers.coe_injective (K := F)).countable
+  have h : Function.Surjective (fun s : Finset (𝓞 F) ↦ Ideal.span (s : Set (𝓞 F))) :=
+    fun I ↦ IsNoetherian.noetherian I
+  let : Countable (Ideal (𝓞 F)) := h.countable
+  exact (show Function.Injective (HeightOneSpectrum.asIdeal (R := 𝓞 F)) from fun _ _ h ↦
+    HeightOneSpectrum.ext h).countable
+
+open Classical in
+/-- Paper: Lemma 5.3.1.5, proof, p. 242.
+At a stage `S` containing the selected places `S₀`, the transition of theta classes to the stage
+`T = insert v S` with one more finite place `v` has a continuous linear left inverse that
+commutes with the principal value.
+
+`sLocalThetaTransition_exists_leftInverse_insert` gives a continuous left inverse: it reads the
+theta function of a class at the S-ideles completed at `v` by a unit, and by a unit times a fixed
+`c` with `Valued.v c = WithZero.exp 1`, and averages the difference over the units at `v`. On the
+class of a test `f ⊗ h`, with `f` on the stage `S` and `h` at `v`, this is a finite combination of
+the classes of translates of `f` by `(S ∪ {v})`-units. The principal value acts as the identity at
+`v` and commutes with translation by S-ideles, so it commutes with this left inverse.
+With the closed embeddings on the stages, these left inverses give the global closed embedding
+`globalThetaPrincipalValue_isClosedEmbedding`. They replace the printed step that the global
+range is the image of the range at one fixed stage.
+The larger stage `T` is an argument with `hT : T = insert v S`, so that the lemma applies to
+stages that equal `insert v S` without being written that way. -/
+private theorem globalThetaPrincipalValue_isClosedEmbedding_retraction {S₀ S T : Finset V}
+    (h₀ : S₀ ⊆ S) (hST : S ⊆ T) (v : V) (hv : v ∉ S) (hT : T = insert v S) :
+    ∃ r : Θₛ(T) →L[ℂ] Θₛ(S),
+      Function.LeftInverse r (sLocalThetaTransition (F := F) hST) ∧
+      ∀ x, r (sLocalThetaPrincipalValue F (h₀.trans hST) x) =
+        sLocalThetaPrincipalValue F h₀ (r x) := by sorry
+
+-- TODO(paper-gap): The proof of global closed range claims that the image is contained in
+-- any fixed S-stage. This does not follow from stage compatibility and fails at larger stages.
+
+/-- Paper: Lemma 5.3.1.5, p. 242.
+The global principal value on theta classes is a closed topological embedding. -/
+theorem globalThetaPrincipalValue_isClosedEmbedding {S₀ : Finset V} (hn : S₀.Nonempty) :
+    IsClosedEmbedding (globalThetaPrincipalValue F S₀) := by
+  classical
+  have : Countable V := globalThetaPrincipalValue_isClosedEmbedding_countable (F := F)
+  have : Nonempty V := ⟨hn.choose⟩
+  obtain ⟨e, he⟩ := exists_surjective_nat V
+  -- A cofinal chain of stages that starts at `S₀` and adds one place at a time.
+  let S : ℕ → Finset V := fun n ↦
+    Nat.rec (motive := fun _ ↦ Finset V) S₀ (fun k T ↦ insert (e k) T) n
+  have hstep (n : ℕ) : S n ⊆ S (n + 1) := Finset.subset_insert (e n) (S n)
+  have hmono : Monotone S := monotone_nat_of_le_succ hstep
+  have h₀ (n : ℕ) : S₀ ⊆ S n := hmono (Nat.zero_le n)
+  have hcof (T : Finset V) (N : ℕ) : ∃ d, T ⊆ S (N + d) := by
+    choose k hk using he
+    refine ⟨T.sup fun v ↦ k v + 1, fun v hv ↦ ?_⟩
+    have hle : k v + 1 ≤ N + T.sup fun v ↦ k v + 1 :=
+      (Finset.le_sup (f := fun v ↦ k v + 1) hv).trans (Nat.le_add_left _ _)
+    have hv' : e (k v) ∈ S (k v + 1) := Finset.mem_insert_self (e (k v)) (S (k v))
+    rw [hk v] at hv'
+    exact hmono hle hv'
+  let ι (n : ℕ) : Θₛ(S n) →L[ℂ] Θ𝔽 :=
+    ⟨sLocalThetaToGlobal F (S n), sLocalThetaToGlobal_continuous⟩
+  let j (n : ℕ) : Θₛ(S n) →L[ℂ] Θₛ(S (n + 1)) :=
+    ⟨sLocalThetaTransition (hstep n), sLocalThetaTransition_continuous (hstep n)⟩
+  let Pn (n : ℕ) : Θₛ(S n) →L[ℂ] Θₛ(S n) :=
+    ⟨sLocalThetaPrincipalValue F (h₀ n), sLocalThetaPrincipalValue_continuous (h₀ n)⟩
+  let P : Θ𝔽 →L[ℂ] Θ𝔽 := ⟨globalThetaPrincipalValue F S₀, globalThetaPrincipalValue_continuous S₀⟩
+  have hret (n : ℕ) : ∃ r : Θₛ(S (n + 1)) →L[ℂ] Θₛ(S n),
+      Function.LeftInverse r (sLocalThetaTransition (F := F) (hstep n)) ∧
+      ∀ z, r (sLocalThetaPrincipalValue F ((h₀ n).trans (hstep n)) z) =
+        sLocalThetaPrincipalValue F (h₀ n) (r z) := by
+    by_cases hv : e n ∈ S n
+    · -- The step adds no place, and the transition back is a left inverse.
+      have hsub : S (n + 1) ⊆ S n := Finset.insert_subset hv subset_rfl
+      refine ⟨⟨sLocalThetaTransition hsub, sLocalThetaTransition_continuous hsub⟩,
+        fun z ↦ sLocalThetaToGlobal_injective (F := F) (S := S n) ?_,
+        fun z ↦ LinearMap.congr_fun (sLocalThetaPrincipalValue_transition (h₀ (n + 1)) hsub hn) z⟩
+      exact (LinearMap.congr_fun (sLocalThetaToGlobal_comp hsub) _).trans
+        (LinearMap.congr_fun (sLocalThetaToGlobal_comp (hstep n)) z)
+    · exact globalThetaPrincipalValue_isClosedEmbedding_retraction (h₀ n) (hstep n) (e n) hv rfl
+  choose r hr hrP using hret
+  have hexh (x : Θ𝔽) : ∃ n, ∃ z : Θₛ(S n), ι n z = x := by
+    obtain ⟨T, y, rfl⟩ := sLocalThetaToGlobal_exhaustive x
+    obtain ⟨d, hd⟩ := hcof T 0
+    exact ⟨0 + d, sLocalThetaTransition hd y, LinearMap.congr_fun (sLocalThetaToGlobal_comp hd) y⟩
+  -- Seminorms continuous on every stage are continuous on the global quotient.
+  have hW : WithSeminorms (Subtype.val : {p : Seminorm ℂ Θ𝔽 //
+      ∀ T, Continuous (p ∘ sLocalThetaToGlobal F T)} → Seminorm ℂ Θ𝔽) :=
+    ⟨sLocalThetaToGlobal_finalTopology⟩
+  have hfin (N : ℕ) (q : Seminorm ℂ Θ𝔽) (hq : ∀ d, Continuous (q ∘ ι (N + d))) : Continuous q := by
+    refine hW.continuous_seminorm ⟨q, fun T ↦ ?_⟩
+    obtain ⟨d, hd⟩ := hcof T N
+    have h : q ∘ sLocalThetaToGlobal F T = (q ∘ ι (N + d)) ∘ sLocalThetaTransition hd :=
+      funext fun y ↦ congrArg q (LinearMap.congr_fun (sLocalThetaToGlobal_comp hd) y).symm
+    rw [h]
+    exact (hq d).comp (sLocalThetaTransition_continuous hd)
+  have hP (n : ℕ) (z : Θₛ(S n)) : P (ι n z) = ι n (Pn n z) :=
+    (LinearMap.congr_fun (sLocalThetaPrincipalValue_toGlobal (h₀ n) hn) z).symm
+  obtain ⟨pr, hmem, hfix, hprP⟩ := globalThetaPrincipalValue_isClosedEmbedding_projections
+    (hX := fun n ↦ sLocalAdelicThetaSpace_polynormable) ι
+    (fun n ↦ sLocalThetaToGlobal_injective) j
+    (fun n z ↦ LinearMap.congr_fun (sLocalThetaToGlobal_comp (hstep n)) z) r hr P Pn hP hrP hexh
+    hfin
+  exact globalThetaPrincipalValue_isClosedEmbedding_ofProjections
+    (hE := globalAdelicThetaSpace_polynormable) ι
+    (fun n ↦ ⟨sLocalThetaToGlobal_isEmbedding, sLocalThetaToGlobal_isClosed_range⟩) P Pn
+    (fun n ↦ sLocalThetaPrincipalValue_isClosedEmbedding (h₀ n) hn) hP pr hmem hfix hprP hexh
+    fun q hq ↦ hfin 0 q fun d ↦ hq (0 + d)
 
 end AdelicPrincipalValue
 

@@ -376,15 +376,6 @@ theorem map_mul_indentationMeasureLift {ν₀ : Measure Q} [ν₀.Regular] {μ�
   simpa only [integral_complex_ofReal] using
     (show (∫ x, (f (L x) : ℂ) ∂μ₀) = ∫ x, (f x : ℂ) ∂μ₀ from hint)
 
-/-- Paper: Corollary 12.2.1.2(2), p. 506. Fibre integration extends to a surjective
-continuous complex-linear map of L¹ spaces, agreeing with the original map on compact tests. -/
-theorem exists_indentationAverageL1 {ν₀ : Measure Q} [ν₀.Regular] {μ₀ : Measure G}
-    (hμ₀ : IsIndentationMeasureLift H hH μH ν₀ μ₀) :
-    ∃ A : Lp ℂ 1 μ₀ →L[ℂ] Lp ℂ 1 ν₀,
-      Function.Surjective A ∧
-        ∀ (f : C_c(G, ℂ)) (F : Lp ℂ 1 μ₀), (F : G → ℂ) =ᵐ[μ₀] f →
-          (A F : Q → ℂ) =ᵐ[ν₀] indentationAverage H hH μH f := by sorry
-
 include hH in
 omit [T2Space G] [BorelSpace G] [μH.IsHaarMeasure] in
 private theorem exists_indentationLiftL1_compact {b : G → ℝ} (hb : IsIndentation H μH b)
@@ -541,6 +532,115 @@ theorem exists_indentationLiftL1 {ν₀ : Measure Q} [ν₀.Regular] {μ₀ : Me
     have hLF : ⇑(L u) =ᵐ[μ₀] F := hF ▸ hrep u f huf
     exact (hA F (L u) hLF).trans (havg ▸ huf.symm)
   exact fun u ↦ congrFun heq u
+
+include hH in
+/-- Fibre averaging of a compactly supported test does not increase the L¹ norm. -/
+private theorem exists_indentationAverageL1_norm {ν₀ : Measure Q} [ν₀.Regular] {μ₀ : Measure G}
+    (hμ₀ : IsIndentationMeasureLift H hH μH ν₀ μ₀) (f : C_c(G, ℂ)) :
+    ∫ q, ‖indentationAverage H hH μH f q‖ ∂ν₀ ≤ ∫ x, ‖f x‖ ∂μ₀ := by
+  have : BorelSpace Q := ⟨rfl⟩
+  let : μ₀.Regular := hμ₀.1
+  let fn : C_c(G, ℂ) := ⟨⟨fun x ↦ (‖f x‖ : ℂ), Complex.continuous_ofReal.comp f.continuous.norm⟩,
+    f.hasCompactSupport.comp_left (g := fun z : ℂ ↦ (‖z‖ : ℂ)) (by simp)⟩
+  have hint := hμ₀.2 fn
+  have hpt (q : Q) : ‖indentationAverage H hH μH f q‖ ≤ (indentationAverage H hH μH fn q).re := by
+    obtain ⟨x, rfl⟩ := QuotientGroup.mk_surjective q
+    obtain ⟨-, h1⟩ := indentationAverage_apply H hH μH f x
+    obtain ⟨-, h2⟩ := indentationAverage_apply H hH μH fn x
+    change ‖indentationAverage H hH μH f (π x)‖ ≤ (indentationAverage H hH μH fn (π x)).re
+    rw [h1, h2]
+    change _ ≤ (∫ h : H, ((‖f ((h : G)⁻¹ * x)‖ : ℝ) : ℂ) ∂μH).re
+    rw [integral_complex_ofReal, Complex.ofReal_re]
+    exact norm_integral_le_integral_norm _
+  calc ∫ q, ‖indentationAverage H hH μH f q‖ ∂ν₀
+      ≤ ∫ q, (indentationAverage H hH μH fn q).re ∂ν₀ :=
+        integral_mono (indentationAverage H hH μH f).integrable.norm
+          (indentationAverage H hH μH fn).integrable.re hpt
+    _ = (∫ q, indentationAverage H hH μH fn q ∂ν₀).re :=
+        integral_re (indentationAverage H hH μH fn).integrable
+    _ = (∫ x, fn x ∂μ₀).re := by rw [hint]
+    _ = ∫ x, ‖f x‖ ∂μ₀ := by
+        refine (show (∫ x, fn x ∂μ₀).re = ∫ x, (fn x).re ∂μ₀ from
+          (integral_re fn.integrable).symm).trans ?_
+        rfl
+
+/-- Paper: Corollary 12.2.1.2(2), p. 506. Fibre integration extends to a surjective
+continuous complex-linear map of L¹ spaces, agreeing with the original map on compact tests. -/
+theorem exists_indentationAverageL1 {ν₀ : Measure Q} [ν₀.Regular] {μ₀ : Measure G}
+    (hμ₀ : IsIndentationMeasureLift H hH μH ν₀ μ₀) :
+    ∃ A : Lp ℂ 1 μ₀ →L[ℂ] Lp ℂ 1 ν₀,
+      Function.Surjective A ∧
+        ∀ (f : C_c(G, ℂ)) (F : Lp ℂ 1 μ₀), (F : G → ℂ) =ᵐ[μ₀] f →
+          (A F : Q → ℂ) =ᵐ[ν₀] indentationAverage H hH μH f := by
+  have : BorelSpace Q := ⟨rfl⟩
+  let : μ₀.Regular := hμ₀.1
+  let S : C_c(G, ℂ) →ₗ[ℂ] Lp ℂ 1 μ₀ :=
+    { toFun := fun f ↦ (f.integrable (μ := μ₀)).toL1 f
+      map_add' := fun f g ↦ Integrable.toL1_add _ _ f.integrable g.integrable
+      map_smul' := fun c f ↦ Integrable.toL1_smul _ f.integrable c }
+  let T : C_c(G, ℂ) →ₗ[ℂ] Lp ℂ 1 ν₀ :=
+    { toFun := fun f ↦ ((indentationAverage H hH μH f).integrable (μ := ν₀)).toL1 _
+      map_add' := fun f g ↦ by
+        simp only [map_add]
+        exact Integrable.toL1_add _ _ (indentationAverage H hH μH f).integrable
+          (indentationAverage H hH μH g).integrable
+      map_smul' := fun c f ↦ by
+        simp only [map_smul]
+        exact Integrable.toL1_smul _ (indentationAverage H hH μH f).integrable c }
+  have hS (f : C_c(G, ℂ)) : ‖S f‖ = ∫ x, ‖f x‖ ∂μ₀ :=
+    L1.norm_of_fun_eq_integral_norm f.integrable
+  have hT (f : C_c(G, ℂ)) : ‖T f‖ = ∫ q, ‖indentationAverage H hH μH f q‖ ∂ν₀ :=
+    L1.norm_of_fun_eq_integral_norm (indentationAverage H hH μH f).integrable
+  have hle (f : C_c(G, ℂ)) : ‖T f‖ ≤ ‖S f‖ := by
+    rw [hS, hT]
+    exact exists_indentationAverageL1_norm H hH μH hμ₀ f
+  have hker : LinearMap.ker S ≤ LinearMap.ker T := fun f hf ↦ by
+    rw [LinearMap.mem_ker] at hf ⊢
+    exact norm_le_zero_iff.mp ((hle f).trans (by rw [hf, norm_zero]))
+  let A₀ : LinearMap.range S →ₗ[ℂ] Lp ℂ 1 ν₀ :=
+    ((LinearMap.ker S).liftQ T hker).comp S.quotKerEquivRange.symm.toLinearMap
+  have hA₀ (f : C_c(G, ℂ)) : A₀ ⟨S f, f, rfl⟩ = T f := by
+    have : S.quotKerEquivRange.symm ⟨S f, f, rfl⟩ = (LinearMap.ker S).mkQ f :=
+      S.quotKerEquivRange.symm_apply_eq.mpr rfl
+    simp only [A₀, LinearMap.comp_apply, LinearEquiv.coe_coe, this]
+    exact Submodule.liftQ_apply _ _ _
+  have hbound (v : LinearMap.range S) : ‖A₀ v‖ ≤ 1 * ‖v‖ := by
+    obtain ⟨_, f, rfl⟩ := v
+    rw [hA₀, one_mul]
+    exact hle f
+  let A₀c : LinearMap.range S →L[ℂ] Lp ℂ 1 ν₀ := A₀.mkContinuous 1 hbound
+  have hD : Dense (LinearMap.range S : Set (Lp ℂ 1 μ₀)) := by
+    rw [Metric.dense_iff]
+    intro F r hr
+    obtain ⟨v, hvs, hv, hvc, -⟩ := (Lp.memLp F).exists_hasCompactSupport_eLpNorm_sub_le
+      ENNReal.one_ne_top (ENNReal.ofReal_pos.mpr (half_pos hr)).ne'
+    let f : C_c(G, ℂ) := ⟨⟨v, hvc⟩, hvs⟩
+    refine ⟨S f, ?_, f, rfl⟩
+    rw [Metric.mem_ball, dist_comm, dist_eq_norm, Lp.norm_def]
+    have hae : ⇑(F - S f) =ᵐ[μ₀] ⇑F - v :=
+      (Lp.coeFn_sub F (S f)).trans ((Integrable.coeFn_toL1 f.integrable).mono fun x hx ↦ by
+        change F x - (S f) x = F x - v x
+        rw [show (S f) x = v x from hx])
+    rw [eLpNorm_congr_ae hae]
+    calc (eLpNorm (⇑F - v) 1 μ₀).toReal ≤ (ENNReal.ofReal (r / 2)).toReal :=
+          ENNReal.toReal_mono ENNReal.ofReal_ne_top hv
+      _ = r / 2 := ENNReal.toReal_ofReal (half_pos hr).le
+      _ < r := half_lt_self hr
+  have hdense : DenseRange (LinearMap.range S).subtypeL := hD.denseRange_val
+  let A := A₀c.extend (LinearMap.range S).subtypeL
+  have hAS (f : C_c(G, ℂ)) : A (S f) = T f := by
+    have := A₀c.extend_eq hdense isUniformEmbedding_subtype_val.isUniformInducing ⟨S f, f, rfl⟩
+    exact this.trans (hA₀ f)
+  have hAF : ∀ (f : C_c(G, ℂ)) (F : Lp ℂ 1 μ₀), (F : G → ℂ) =ᵐ[μ₀] f →
+      (A F : Q → ℂ) =ᵐ[ν₀] indentationAverage H hH μH f := by
+    intro f F hF
+    have hFS : F = S f := Lp.ext (hF.trans (Integrable.coeFn_toL1 f.integrable).symm)
+    rw [hFS, hAS]
+    exact Integrable.coeFn_toL1 (indentationAverage H hH μH f).integrable
+  obtain ⟨b, hb⟩ := exists_indentation H hH μH
+  obtain ⟨L, -, hL, -⟩ := exists_indentationLiftL1 H hH μH hμ₀ A hAF hb
+  exact ⟨A, hL.surjective, hAF⟩
+
 
 end Indentations
 

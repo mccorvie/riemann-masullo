@@ -1554,6 +1554,173 @@ local notation "weightedTest(" hs ", " χ ", " f ")" =>
   ((existsUnique_globalThetaSobolevAverage (F := F) (a := 0) h₀ hs (ω(χ))).exists.choose
     (globalThetaSobolevInclusion F 0 h₀ hs (Submodule.Quotient.mk (f : P)))).val
 
+/-- A dense map and a dense image of the denominator give the quotient seminorm
+by taking the distance to representatives in the test denominator. -/
+private theorem primeOrbitalSobolevQuotient_completion_norm
+    {X W : Type*} [AddCommGroup X] [Module ℂ X] [NormedAddCommGroup W] [NormedSpace ℂ W]
+    (i : X →ₗ[ℂ] W) (D : Submodule ℂ X) (N : Submodule ℂ W)
+    (hi : DenseRange i) (hN : (D.map i).topologicalClosure = N) :
+    ∃ j : (X ⧸ D) →ₗ[ℂ] W ⧸ N, (∀ x, j (D.mkQ x) = N.mkQ (i x)) ∧
+      (∀ x, ‖j (D.mkQ x)‖ = ⨅ v : D, ‖i x - i v.val‖) ∧ DenseRange j := by
+  have hle : D.map i ≤ N := hN ▸ Submodule.le_topologicalClosure _
+  let j := D.liftQ (N.mkQ.comp i) (fun x hx ↦ (Submodule.Quotient.mk_eq_zero N).2
+    (hle (Submodule.mem_map_of_mem hx)))
+  refine ⟨j, fun _ ↦ rfl, fun x ↦ ?_, ?_⟩
+  · change ‖(Submodule.Quotient.mk (i x) : W ⧸ N)‖ = _
+    rw [show ‖(Submodule.Quotient.mk (i x) : W ⧸ N)‖ = Metric.infDist (i x) (N : Set W) from
+      QuotientAddGroup.norm_mk _]
+    rw [← hN, Submodule.topologicalClosure_coe, Metric.infDist_closure, Metric.infDist_eq_iInf]
+    change sInf (range fun y : D.map i ↦ dist (i x) y.val) = _
+    apply congrArg sInf
+    ext r
+    constructor
+    · rintro ⟨y, rfl⟩
+      obtain ⟨v, hv, he⟩ := y.property
+      exact ⟨⟨v, hv⟩, by change ‖i x - i v‖ = dist (i x) y.val; rw [he, dist_eq_norm]⟩
+    · rintro ⟨v, rfl⟩
+      exact ⟨⟨i v.val, Submodule.mem_map_of_mem v.property⟩, dist_eq_norm _ _⟩
+  · have hd := N.mkQ_surjective.denseRange.comp hi N.mkQL.continuous
+    exact hd.mono (by rintro _ ⟨x, rfl⟩; exact ⟨D.mkQ x, rfl⟩)
+
+/-- A continuous averaging map which is scalar multiplication on its isotype
+takes a dense family in an invariant subspace onto a family spanning a dense
+subspace of the isotypic intersection. -/
+private theorem primeOrbitalSobolevQuotient_completion_projection
+    {X W Y : Type*} [NormedAddCommGroup W] [NormedSpace ℂ W]
+    [NormedAddCommGroup Y] [NormedSpace ℂ Y] (I : Y →L[ℂ] W) (π : W →L[ℂ] Y)
+    (c : ℂ) (hc : c ≠ 0) (hfix : ∀ y, π (I y) = c • y)
+    (A : Submodule ℂ W) (hA : IsClosed (A : Set W)) (z : X → W)
+    (hz : closure (range z) = (A : Set W)) (hin : ∀ x, I (π (z x)) ∈ A) :
+    (Submodule.span ℂ (range fun x ↦ π (z x))).topologicalClosure = A.comap I.toLinearMap := by
+  let D := Submodule.span ℂ (range fun x ↦ π (z x))
+  apply le_antisymm
+  · apply Submodule.topologicalClosure_minimal _ _ (hA.preimage I.continuous)
+    exact Submodule.span_le.mpr (by rintro _ ⟨x, rfl⟩; exact hin x)
+  · intro y hy
+    have hm : I y ∈ closure (range z) := hz.symm ▸ hy
+    have him : π (I y) ∈ D.topologicalClosure := by
+      exact closure_minimal (s := range z) (t := π ⁻¹' (D.topologicalClosure : Set Y))
+        (fun _ ⟨x, he⟩ ↦ he ▸ D.le_topologicalClosure (Submodule.subset_span ⟨x, rfl⟩))
+        (D.isClosed_topologicalClosure.preimage π.continuous) hm
+    have h := D.topologicalClosure.smul_mem c⁻¹ him
+    simpa only [hfix, smul_smul, inv_mul_cancel₀ hc, one_smul] using h
+
+/-- Scalar tests of the Pettis average give both its value on an isotype and
+its commutation with any operator intertwining the compact group action. -/
+private theorem primeOrbitalSobolevQuotient_completion_average
+    {G E : Type*} [Monoid G] [TopologicalSpace G] [MeasurableSpace G]
+    [NormedAddCommGroup E] [NormedSpace ℂ E] (μ : Measure G) [IsFiniteMeasure μ]
+    (ω : PontryaginDual G) (ρ : G →* (E →L[ℂ] E))
+    (A : E →L[ℂ] actionIsotype ρ ω)
+    (hA : IsPettisIsotypicAverageOn μ univ ρ ω ((actionIsotype ρ ω).subtypeL.comp A))
+    (M : E →L[ℂ] E) (hM : ∀ g x, M (ρ g x) = ρ g (M x)) :
+    (∀ y : actionIsotype ρ ω, A y.val = (μ.real univ : ℂ) • y) ∧
+      ∀ x, (A (M x)).val = M (A x).val := by
+  have hcoeff (x : E) (f : StrongDual ℂ E) :
+      f (A x).val = ∫ g, star (ω g : ℂ) * f (ρ g x) ∂μ := by
+    obtain ⟨_, hv⟩ := hA x
+    have h := LinearMap.congr_fun hv f
+    change f (A x).val = ∫ g, f (star (ω g : ℂ) • ρ g x) ∂μ.restrict univ at h
+    simpa only [Measure.restrict_univ, map_smul, smul_eq_mul] using h
+  constructor
+  · intro y
+    apply Subtype.ext
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+    intro f
+    rw [hcoeff]
+    simp [(mem_actionIsotype ..).1 y.property, ← Circle.coe_inv_eq_conj, Complex.real_smul]
+  · intro x
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).2
+    intro f
+    rw [hcoeff]
+    have h := hcoeff x (f.comp M)
+    simpa only [ContinuousLinearMap.comp_apply, hM] using h.symm
+
+/-- Projecting a dense family of tests descends to the test quotient. Commutation of
+the projection and the principal-value operator identifies the closed denominator. -/
+private theorem primeOrbitalSobolevQuotient_completion_assemble
+    {G Z W : Type*} [Monoid G] [TopologicalSpace G] [AddCommGroup Z] [Module ℂ Z]
+    [NormedAddCommGroup W] [NormedSpace ℂ W] (U : Submodule ℂ W) (hV : ∀ w, w ∈ U)
+    (ρ : G →* (U →L[ℂ] U)) (σ : G →* (W →L[ℂ] W)) (ω : PontryaginDual G)
+    (hρ : ∀ g (u : U), (ρ g u).val = σ g u.val)
+    (A : U →L[ℂ] actionIsotype ρ ω) (M : U →L[ℂ] U)
+    (c : ℂ) (hc : c ≠ 0) (hfix : ∀ y : actionIsotype ρ ω, A y.val = c • y)
+    (hcomm : ∀ x, (A (M x)).val = M (A x).val)
+    (T : Z →ₗ[ℂ] U) (hd : DenseRange T) (K : Submodule ℂ Z) (hk : ∀ z ∈ K, A (T z) = 0)
+    (m : Z → Z) (hm : ∀ z, M (T z) = T (m z)) (D : Submodule ℂ (Z ⧸ K))
+    (hD : D = Submodule.span ℂ (range fun z ↦ K.mkQ (m z))) (N : Submodule ℂ (actionIsotype σ ω))
+    (hNdef : N = ((U.subtype.comp M.toLinearMap).range.topologicalClosure).comap (actionIsotype σ ω).subtype) :
+    ∃ (i : (Z ⧸ K) →ₗ[ℂ] actionIsotype σ ω) (j : ((Z ⧸ K) ⧸ D) →ₗ[ℂ] (actionIsotype σ ω ⧸ N)),
+      (∀ z, (i (K.mkQ z)).val = (A (T z)).val.val) ∧
+      (∀ z, j (D.mkQ (K.mkQ z)) = N.mkQ (i (K.mkQ z))) ∧
+      (∀ u, ‖j (D.mkQ u)‖ = ⨅ v : D, ‖i u - i v.val‖) ∧ DenseRange j := by
+  let localIso := actionIsotype ρ ω
+  let ambientIso := actionIsotype σ ω
+  let up : localIso →L[ℂ] ambientIso :=
+    (U.subtypeL.comp localIso.subtypeL).codRestrict ambientIso fun u ↦ by
+      apply (mem_actionIsotype ..).2
+      intro g
+      change σ g u.val.val = _
+      rw [← hρ g u.val, (mem_actionIsotype ..).1 u.property g]
+      rfl
+  let down : W →L[ℂ] U := (ContinuousLinearMap.id ℂ W).codRestrict U hV
+  let proj := up.comp (A.comp down)
+  have hidentity (y : ambientIso) : proj y.val = c • y := by
+    let y' : localIso := ⟨down y.val, (mem_actionIsotype ..).2 fun g ↦ Subtype.ext (by
+      change (ρ g (down y.val)).val = (ω g : ℂ) • y.val
+      rw [hρ]; exact (mem_actionIsotype ..).1 y.property g)⟩
+    change up (A y'.val) = c • y
+    rw [hfix, map_smul]
+    rfl
+  let i := K.liftQ (up.toLinearMap.comp (A.toLinearMap.comp T)) fun z hz ↦ by
+    change up (A (T z)) = 0
+    rw [hk z hz, map_zero]
+  have hsurj : Surjective (up.comp A) := by
+    intro y
+    refine ⟨c⁻¹ • down y.val, ?_⟩
+    rw [map_smul]
+    change c⁻¹ • proj y.val = y
+    rw [hidentity, smul_smul, inv_mul_cancel₀ hc, one_smul]
+  have hi : DenseRange i := (hsurj.denseRange.comp hd (up.comp A).continuous).mono
+    (by rintro _ ⟨z, rfl⟩; exact ⟨K.mkQ z, rfl⟩)
+  let R := (U.subtype.comp M.toLinearMap).range
+  let f := U.subtypeL.comp M
+  let z := fun z ↦ f (T z)
+  have hz : closure (range z) = (R.topologicalClosure : Set W) := by
+    change closure (range (f ∘ T)) = closure (range f)
+    rw [Set.range_comp]
+    exact le_antisymm (closure_mono (image_subset_range _ _))
+      (closure_minimal (f.continuous.range_subset_closure_image_dense hd) isClosed_closure)
+  have hN : (D.map i).topologicalClosure = N := by
+    have hspan : D.map i = Submodule.span ℂ (range fun x ↦ proj (z x)) := by
+      rw [hD, Submodule.map_span, ← Set.range_comp]
+      apply congrArg (Submodule.span ℂ)
+      apply congrArg range
+      funext x
+      change up (A (T (m x))) = up (A (M (T x)))
+      rw [hm]
+    rw [hspan, hNdef]
+    apply primeOrbitalSobolevQuotient_completion_projection ambientIso.subtypeL proj c hc hidentity
+      R.topologicalClosure R.isClosed_topologicalClosure z hz
+    intro x
+    apply R.le_topologicalClosure
+    exact ⟨(A (T x)).val, (congrArg Subtype.val (hcomm (T x))).symm⟩
+  obtain ⟨j, hj, hjnorm, hjdense⟩ := primeOrbitalSobolevQuotient_completion_norm i D N hi hN
+  exact ⟨i, j, fun _ ↦ rfl, fun z ↦ hj (K.mkQ z), hjnorm, hjdense⟩
+
+/-- On a test in the restricted homogeneous theta kernel the weighted average vanishes,
+since its homogeneous class is the zero polar-free class. -/
+private theorem primeOrbitalSobolevQuotient_completion_kernel (χ : PontryaginDual C𝔽)
+    {s : ℝ} (hs : 0 ≤ s) (f : P) (hf : f ∈ testQuot(χ)) :
+    (existsUnique_globalThetaSobolevAverage (F := F) (a := 0) h₀ hs (ω(χ))).exists.choose
+      (globalThetaSobolevInclusion F 0 h₀ hs (Submodule.Quotient.mk f)) = 0 := by
+  let h := exists_globalHomogeneousThetaSobolevInclusion (F := F) (a := 0) h₀ hs (ω(χ))
+  have he : (Submodule.Quotient.mk f.val : _ ⧸ (homogeneousAdelicThetaLinearMap F (ω(χ))).ker) = 0 :=
+    (Submodule.Quotient.mk_eq_zero _).2 hf
+  have hv := (h.choose_spec.2.2 f 0 he.symm).1
+  exact hv.symm.trans h.choose.map_zero
+
+
 /-- Paper: Paragraph after (11.2.2.1), p. 490.
 The §7.4 test quotient maps densely into the Sobolev quotient. Its pulled-back norm
 is the quotient seminorm of the weighted tests modulo the test principal-value image.
@@ -1568,7 +1735,62 @@ theorem primeOrbitalSobolevQuotient_completion (χ : PontryaginDual C𝔽)
           (N(p, hs, ω(χ))).mkQ (i ((testQuot(χ)).mkQ f))) ∧
       (∀ u : P ⧸ testQuot(χ),
         ‖j ((finiteNuclearityDenominator χ p).mkQ u)‖ =
-          ⨅ v : finiteNuclearityDenominator χ p, ‖i u - i v.val‖) ∧ DenseRange j := by sorry
+          ⨅ v : finiteNuclearityDenominator χ p, ‖i u - i v.val‖) ∧ DenseRange j := by
+  let U := globalThetaSobolev F 0 h₀ hs
+  let J := globalThetaSobolevInclusion F 0 h₀ hs
+  let K₀ := (LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype
+  let T := J.toLinearMap.comp K₀.mkQ
+  let R := (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose
+  let ρ := R.comp (ideleClassNorm F).ker.subtype
+  let σ := (hardySobolevTranslation μ𝔽 m𝔽 0 0 s h₀ hs).comp (ideleClassNorm F).ker.subtype
+  let A := (existsUnique_globalThetaSobolevAverage (F := F) (a := 0) h₀ hs (ω(χ))).exists.choose
+  let M := globalThetaSobolevPrincipalValue F (Sₚ(p)) 0 hs
+  let m (f : P) : P := ⟨adelePrincipalValue F (Sₚ(p)) f.val, nuclearityPrincipalValue_mem_polar p f⟩
+  let μ₁ := normOneIdeleClassTamagawaMeasure F
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : μ₁.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  have hmass : (μ₁.real univ : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos.ne')
+  have hA : IsPettisIsotypicAverageOn μ₁ univ ρ (ω(χ)) ((actionIsotype ρ (ω(χ))).subtypeL.comp A) :=
+    (existsUnique_globalThetaSobolevAverage (F := F) (a := 0) h₀ hs (ω(χ))).exists.choose_spec.1
+  have hM (g : C₁) (y : U) : M (ρ g y) = ρ g (M y) :=
+    globalThetaSobolevPrincipalValue_equivariant (Sₚ(p)) 0 hs g y
+  have hraw := primeOrbitalSobolevQuotient_completion_average (G := C₁) (E := ↥U) μ₁ (ω(χ)) ρ A hA M hM
+  have hU (w : W(s)) : w ∈ U := by
+    exact closure_minimal (s := range fun x : GlobalPolarFreeThetaSpace F ↦ (J x).val)
+      (t := (U : Set W(s))) (by rintro _ ⟨x, rfl⟩; exact (J x).property)
+      (globalThetaSobolev_closed_complete_separable (F := F) 0 h₀ hs).1
+      (denseRange_globalTheta_zeroLine (F := F) hs w)
+  have hρ (g : C₁) (y : U) : (ρ g y).val = σ g y.val :=
+    (exists_globalThetaSobolevAction (F := F) 0 h₀ hs).choose_spec.1 g.val y
+  have hd : DenseRange T := (globalThetaSobolev_dense (F := F) 0 h₀ hs).comp
+    K₀.mkQ_surjective.denseRange J.continuous
+  have hm (f : P) : M (T f) = T (m f) :=
+    globalThetaSobolevPrincipalValue_apply (Sₚ(p)) 0 hs f
+  have hk (f : P) (hf : f ∈ testQuot(χ)) : A (T f) = 0 := by
+    dsimp only [A, T, J, K₀, LinearMap.comp_apply, ContinuousLinearMap.coe_coe, Submodule.mkQ_apply]
+    exact primeOrbitalSobolevQuotient_completion_kernel χ hs f hf
+  have hD : finiteNuclearityDenominator χ p =
+      Submodule.span ℂ (range fun z : P ↦ (testQuot(χ)).mkQ (m z)) := by
+    unfold finiteNuclearityDenominator
+    simp only [m, Submodule.mkQ_apply]
+  have hN : N(p, hs, ω(χ)) =
+      ((U.subtype.comp M.toLinearMap).range.topologicalClosure).comap (actionIsotype σ (ω(χ))).subtype := by
+    unfold orbitalSobolevSubmodule
+    dsimp only [U, M, σ]
+  have hresult := primeOrbitalSobolevQuotient_completion_assemble (G := C₁) (Z := ↥P) (W := W(s))
+    U hU ρ σ (ω(χ)) hρ A M _ hmass hraw.1 hraw.2 T hd (testQuot(χ)) hk m hm
+    (finiteNuclearityDenominator χ p) hD (N(p, hs, ω(χ))) hN
+  obtain ⟨i, j, hi, hj, hnorm, hjdense⟩ := hresult
+  let toTestQuotient : FiniteNuclearityQuotient χ p →ₗ[ℂ]
+      ((P ⧸ testQuot(χ)) ⧸ finiteNuclearityDenominator χ p) :=
+    { toFun := fun x ↦ x
+      map_add' := fun _ _ ↦ rfl
+      map_smul' := fun _ _ ↦ rfl }
+  refine ⟨i, j.comp toTestQuotient, ?_, ?_, ?_, ?_⟩
+  · exact hi
+  · exact hj
+  · exact hnorm
+  · exact hjdense
 
 variable (p : HeightOneSpectrum (𝓞 ℚ)) {s : ℝ} (hs : 0 ≤ s)
   (ω : PontryaginDual (ideleClassNorm F).ker)

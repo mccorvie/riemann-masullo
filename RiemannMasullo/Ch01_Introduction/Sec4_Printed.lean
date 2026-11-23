@@ -1083,6 +1083,18 @@ def Printed.introTraceApprox_spectral_limit : Prop :=
           ∀ z ∈ interior K, (∀ n, Summable (term n z)) ∧
             Tendsto (fun n ↦ ∑' r, term n z r) atTop (𝓝 (H z))
 
+/-- For the trivial rational character, the printed moment of a radial approximant is its
+radial Mellin transform multiplied by the norm-one Tamagawa volume. -/
+private theorem printedTrace_rat_moment (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (n : ℕ) (s : ℂ) :
+    moment[ℚ]((fun g : C[ℚ] ↦ approx(h, ρ, n, (2 : ℂ)) (N[ℚ](g))), (1 : U[ℚ]), s) =
+      (((normOneIdeleClassTamagawaMeasure ℚ) univ).toReal : ℂ) *
+        introTraceMellin approx(h, ρ, n, (2 : ℂ)) s := by
+  obtain ⟨φ, hφ⟩ := introTraceApprox_exists_bruhat (F := ℚ) 1 h ρ hA n 2
+  rw [← (introTraceTest_mellin (F := ℚ) 1 _ φ hφ s).2]
+  refine integral_congr_ae (Eventually.of_forall fun g ↦ ?_)
+  simp [hφ, introTraceTest]
+
 /-- Paper: §1.4.3, p. 29. Take the trivial rational character, half-width
 one, and the closed disk of radius one quarter about two. This window
 contains the full zeta zero divisor. At two the full explicit formula
@@ -1090,7 +1102,50 @@ expresses the zero sum as the two bounded polar moments minus the bounded
 prime-power sum and the real-place term tending to positive infinity.
 Its real part tends to negative infinity, also along every subsequence. -/
 theorem Printed.introTraceApprox_spectral_limit_false :
-    ¬ Printed.introTraceApprox_spectral_limit := by sorry
+    ¬ Printed.introTraceApprox_spectral_limit := by
+  classical
+  intro hall
+  have hdisk :
+      Metric.closedBall (2 : ℂ) (1 / 4) ⊆ right(1) ∧
+        (2 : ℂ) ∈ interior (Metric.closedBall (2 : ℂ) (1 / 4)) ∩ right(1) := by
+    refine ⟨fun z hz ↦ ?_, Metric.ball_subset_interior_closedBall (Metric.mem_ball_self (by norm_num)),
+      by change (1 : ℝ) < (2 : ℂ).re; norm_num⟩
+    have hd := (Complex.abs_re_le_norm (z - 2)).trans (mem_closedBall_iff_norm.mp hz)
+    rw [Complex.sub_re, Complex.re_ofNat] at hd
+    change (1 : ℝ) < z.re
+    linarith [(abs_le.mp hd).1]
+  obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
+  obtain ⟨H, _, hlimit⟩ := hall ℚ 1 1 (fun _ ↦ rfl) one_pos _ (isCompact_closedBall _ _)
+    hdisk.1 ⟨2, hdisk.2⟩ h ρ hA
+  have hlim := (hlimit 2 hdisk.2.1).2
+  let V₁ : ℂ := ((normOneIdeleClassTamagawaMeasure ℚ) univ).toReal
+  have hV : V₁ ≠ 0 := by
+    apply Complex.ofReal_ne_zero.mpr
+    have hcl := NumberField.classNumber_pos ℚ
+    have hreg := NumberField.Units.regulator_pos ℚ
+    have htor := NumberField.Units.torsionOrder_pos ℚ
+    have hdisc := Int.natAbs_pos.mpr (NumberField.discr_ne_zero ℚ)
+    rw [normOneIdeleClassTamagawaMeasure_volume, ENNReal.toReal_ofReal (by positivity)]
+    positivity
+  let D := MeromorphicOn.divisor (continuedCompletedHeckeL (F := ℚ) 1) univ
+  let Z := {r : ℂ // 0 < D r ∧ |r.re - 1 / 2| < (1 : ℝ)}
+  have hscale (n : ℕ) :
+      (∑' r : Z, (D r.val : ℂ) *
+        moment[ℚ]((fun g : C[ℚ] ↦ approx(h, ρ, n, (2 : ℂ)) (N[ℚ](g))), (1 : U[ℚ]), (r.val - 1 / 2))) =
+        V₁ * introTraceSpectralSum (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) 1 := by
+    rw [introTraceSpectralSum, ← tsum_mul_left]
+    apply tsum_congr
+    intro r
+    rw [printedTrace_rat_moment h ρ hA]
+    dsimp [V₁]
+    ring
+  have hlim' : Tendsto (fun n ↦ V₁ * introTraceSpectralSum (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) 1)
+      atTop (𝓝 (H 2)) := hlim.congr hscale
+  have hconv : Tendsto (fun n ↦ introTraceSpectralSum (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) 1)
+      atTop (𝓝 (V₁⁻¹ * H 2)) := by
+    simpa only [← mul_assoc, inv_mul_cancel₀ hV, one_mul] using hlim'.const_mul V₁⁻¹
+  exact not_tendsto_nhds_of_tendsto_atBot (introTraceApprox_rat_spectral_tendsto_atBot h ρ hA) _
+    (Complex.continuous_re.continuousAt.tendsto.comp hconv)
 
 /-- Paper: §1.4.4, p. 29. The displayed prime-power sum converges locally
 uniformly on the right of one to the positive shifted logarithmic derivative. -/
