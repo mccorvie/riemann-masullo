@@ -1190,19 +1190,6 @@ theorem sLocalStandardThetaTensor_apply (c : QuasiCharacter Jₛ(S)) (f : ℬ∞
     exact slice (X := ℬ∞) (Y := W) (Z := ℬₛ(S)) e f b
       (fun φ : ℬₛ(S) ↦ φ (Multiplicative.ofAdd x)) _ hx
 
-/-- Paper: Theorem 6.2.2.1, p. 298.
-For trivial S-integer Picard group, the archimedean test space maps continuously,
-surjectively and openly onto the global isotype after tensoring with the standard tests.
-Deviation: The existence of the stated descent requires unramifiedness outside S.
-The fixed finite tensor factor identifies its domain with the archimedean test space. -/
-theorem sLocalStandardThetaTensor_toGlobal_openQuotient
-    (_hPic : Subsingleton Picₛ(S)) {ω : PontryaginDual C₁}
-    (hω : NormOneCharacterUnramifiedOutside ω S) :
-    let c := sIdeleRestriction F S hω.choose
-    let χ := sLocalNormOneCharacter S ω hω
-    IsOpenQuotientMap (fun f : ℬ∞ ↦ sLocalHomogeneousThetaToGlobal (ω := ω) hω
-      ((Kₛω(S, χ)).mkQ (sLocalStandardThetaTensor (F := F) (S := S) c f))) := by sorry
-
 local notation "I∞" => (InfiniteAdeleRing F)ˣ
 local notation "N∞" => Nₛ((∅ : Finset V))
 local notation "archPart(" D ")" => Units.map (RingHom.fst (InfiniteAdeleRing F)
@@ -1527,6 +1514,50 @@ theorem sLocalStandardThetaTensor_quotient_equiv
     let K := (infiniteStandardThetaMellinAverage χ).ker
     ∃ e : (ℬ∞ ⧸ K) ≃L[ℂ] Θₛω(S, χS), ∀ f : ℬ∞,
       e (K.mkQ f) = (Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f) := by sorry
+
+/-- Paper: Theorem 6.2.2.1, p. 298.
+For trivial S-integer Picard group, the archimedean test space maps continuously,
+surjectively and openly onto the global isotype after tensoring with the standard tests.
+Deviation: The existence of the stated descent requires unramifiedness outside S.
+The fixed finite tensor factor identifies its domain with the archimedean test space. -/
+theorem sLocalStandardThetaTensor_toGlobal_openQuotient
+    (_hPic : Subsingleton Picₛ(S)) {ω : PontryaginDual C₁}
+    (hω : NormOneCharacterUnramifiedOutside ω S) :
+    let c := sIdeleRestriction F S hω.choose
+    let χ := sLocalNormOneCharacter S ω hω
+    IsOpenQuotientMap (fun f : ℬ∞ ↦ sLocalHomogeneousThetaToGlobal (ω := ω) hω
+      ((Kₛω(S, χ)).mkQ (sLocalStandardThetaTensor (F := F) (S := S) c f))) := by
+  intro c χS
+  obtain ⟨τ, hτ⟩ := sIdeleQuotientNorm_exists_section F S
+  let m := sIdeleQuotientNorm F S
+  have hk (g : Jₛ(S)) : g / τ (m g) ∈ m.ker := by
+    simp [m, MonoidHom.mem_ker, hτ (m g)]
+  let p : Jₛ(S) →ₜ* J₁(S) :=
+    { toFun := fun g ↦ ⟨g / τ (m g), hk g⟩
+      map_one' := Subtype.ext (by simp)
+      map_mul' := fun g h ↦ Subtype.ext (by simp [mul_div_mul_comm])
+      continuous_toFun := (continuous_id.div' (τ.continuous.comp
+        (isProperMap_sIdeleQuotientNorm F S).continuous)).subtype_mk hk }
+  let q : Iₛ(S) →ₜ* Jₛ(S) := ⟨QuotientGroup.mk' _, QuotientGroup.continuous_mk⟩
+  let χ := (χS.comp p).comp q
+  have hχ (g : Nₛ(S)) (y : J₁(S)) (hy : y.val = QuotientGroup.mk g.val) :
+      χ g.val = χS y := by
+    change χS (p (QuotientGroup.mk g.val)) = _
+    apply congrArg χS
+    apply Subtype.ext
+    change QuotientGroup.mk g.val / τ (m (QuotientGroup.mk g.val)) = y.val
+    rw [← hy, show m y.val = 1 from y.property, map_one, div_one]
+  obtain ⟨e, he⟩ := sLocalStandardThetaTensor_quotient_equiv _hPic hω χ hχ
+  obtain ⟨E, hE⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified _hPic hω
+  let K := (infiniteStandardThetaMellinAverage χ).ker
+  have hop := E.toHomeomorph.isOpenQuotientMap.comp
+    (e.toHomeomorph.isOpenQuotientMap.comp K.isOpenQuotientMap_mkQ)
+  have happ (f : ℬ∞) : E (e (K.mkQ f)) =
+      sLocalHomogeneousThetaToGlobal (ω := ω) hω
+        ((Kₛω(S, χS)).mkQ (sLocalStandardThetaTensor c f)) := by
+    rw [he]
+    exact LinearMap.congr_fun hE _
+  exact (congrArg IsOpenQuotientMap (funext happ)).mp hop
 
 -- TODO(paper-gap): The archimedean output need not be constant on norm fibres
 -- for nontrivial characters. Use a norm section for the logarithmic profile.
