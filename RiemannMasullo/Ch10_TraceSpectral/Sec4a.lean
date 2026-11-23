@@ -1925,7 +1925,7 @@ private theorem spectralRestriction_series
     (hY' _ (mem_range_self n)) (norm_nonneg _) hL.le) (norm_nonneg _)
 
 /-- Cyclicity for a nuclear factor and an arbitrary bounded factor. -/
-private theorem spectralRestriction_cyclic
+theorem spectralRestriction_cyclic
     {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
     (A : H →L[ℂ] H) (T : nuclearEndomorphisms H) :
     hilbertTrace ⟨A * T.val, mul_mem_nuclearEndomorphisms_left A T⟩ =

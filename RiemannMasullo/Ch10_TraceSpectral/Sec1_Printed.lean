@@ -42,13 +42,281 @@ def Printed.globalThetaSobolev_closedIntervals_finite : Prop :=
       intervalSobolevENorm (ideleClassTamagawaMeasure F) (fun g ↦ Real.log ((m g).val : ℝ))
         I s (modulationWeight m a (adelicTheta f.val)) ≠ ⊤
 
-/-- Paper: Before (10.1.1.2), p. 434. Take ℚ, I = [0,∞), a = s = 0, finite
-integer indicators and the real test (3x² − 2πx⁴) exp(-πx²). It is the derivative
-of x³ exp(-πx²) and vanishes at zero. Its theta is strictly negative on [2,3].
-The integral over that shell grows at least as a positive constant times 2^(2b)
-when the subinterval is [0,b]. -/
+/-- If the interval contains the nonnegative half-line, a nonzero value
+at positive log norm forces the supremum of the weighted L² norms to be infinite. -/
+private theorem intervalSobolevENorm_eq_top_of_positive_logNorm
+    {G : Type*} [TopologicalSpace G] [MeasurableSpace G] [OpensMeasurableSpace G]
+    (μ : Measure G) [μ.IsOpenPosMeasure]
+    (I : Set ℝ) (hI : Ici 0 ⊆ I) (r : G → ℝ) (hr : Continuous r) (θ : G → ℂ) (hθ : Continuous θ)
+    (g : G) (hrg : 0 < r g) (hθg : θ g ≠ 0) :
+    intervalSobolevENorm μ r I 0 θ = ⊤ := by
+  let c := ‖θ g‖ / 2
+  have hc : 0 < c := half_pos (norm_pos_iff.mpr hθg)
+  have hcg : c < ‖θ g‖ := half_lt_self (norm_pos_iff.mpr hθg)
+  let U := {x | c < ‖θ x‖} ∩ {x | r g / 2 < r x}
+  have hUo : IsOpen U :=
+    (isOpen_lt continuous_const hθ.norm).inter (isOpen_lt continuous_const hr)
+  have hgU : g ∈ U := ⟨hcg, half_lt_self hrg⟩
+  have hUpos : μ U ≠ 0 := (hUo.measure_pos μ ⟨g, hgU⟩).ne'
+  have hε : ENNReal.ofReal c ≠ 0 := (ENNReal.ofReal_pos.mpr hc).ne'
+  have hbound : ∀ σ : ℝ, 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * r g)) * μ U ≤
+      (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
+        intervalSobolevENorm μ r I 0 θ ^ (2 : ℝ≥0∞).toReal := by
+    intro σ hσ
+    have hle : eLpNorm θ 2 (μ.withDensity fun x ↦
+        ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) ≤
+        intervalSobolevENorm μ r I 0 θ := by
+      unfold intervalSobolevENorm
+      exact le_iSup₂_of_le (⟨0, hI le_rfl⟩ : I) (⟨σ, hI hσ⟩ : I) le_rfl
+    have hdens : ∀ x ∈ U, ENNReal.ofReal (Real.exp (σ * r g)) ≤
+        ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)) := by
+      intro x hx
+      apply ENNReal.ofReal_le_ofReal
+      have he : Real.exp (σ * r g) ≤ Real.exp (2 * σ * r x) :=
+        Real.exp_le_exp.mpr (by nlinarith [mul_le_mul_of_nonneg_left hx.2.le hσ])
+      simpa only [intervalSobolevDensity, zero_div, Real.rpow_zero, mul_one] using
+        he.trans (le_max_right (Real.exp (2 * 0 * r x)) _)
+    calc ENNReal.ofReal (Real.exp (σ * r g)) * μ U
+        = ∫⁻ _ in U, ENNReal.ofReal (Real.exp (σ * r g)) ∂μ := (setLIntegral_const _ _).symm
+      _ ≤ ∫⁻ x in U, ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)) ∂μ :=
+          setLIntegral_mono' hUo.measurableSet hdens
+      _ = (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) U :=
+          (withDensity_apply _ hUo.measurableSet).symm
+      _ ≤ (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)))
+            {x | ENNReal.ofReal c ≤ ‖θ x‖ₑ} := measure_mono fun x hx ↦ by
+          rw [mem_ofPred_eq, ← ofReal_norm]
+          exact ENNReal.ofReal_le_ofReal hx.1.le
+      _ ≤ (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal * eLpNorm θ 2 (μ.withDensity fun x ↦
+            ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) ^ (2 : ℝ≥0∞).toReal :=
+          meas_ge_le_mul_pow_eLpNorm_eNorm _ two_ne_zero ENNReal.ofNat_ne_top hε
+            fun h ↦ absurd h ENNReal.ofReal_ne_top
+      _ ≤ _ := by gcongr
+  by_contra htop
+  have hBtop : (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
+      intervalSobolevENorm μ r I 0 θ ^ (2 : ℝ≥0∞).toReal ≠ ∞ :=
+    ENNReal.mul_ne_top (ENNReal.rpow_ne_top_of_nonneg (by simp) (ENNReal.inv_ne_top.mpr hε))
+      (ENNReal.rpow_ne_top_of_nonneg (by simp) htop)
+  obtain ⟨K, hK, hKle⟩ : ∃ K : ℝ≥0∞, K ≠ ∞ ∧
+      ∀ σ : ℝ, 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * r g)) ≤ K :=
+    ⟨_, ENNReal.div_ne_top hBtop hUpos, fun σ hσ ↦
+      (ENNReal.le_div_iff_mul_le (Or.inl hUpos) (Or.inr hBtop)).mpr (hbound σ hσ)⟩
+  have hlt : K.toReal < Real.exp (max 0 (K.toReal / r g) * r g) := by
+    have h := (div_le_iff₀ hrg).mp (le_max_right 0 (K.toReal / r g))
+    linarith [Real.add_one_le_exp (max 0 (K.toReal / r g) * r g)]
+  exact absurd (hKle _ (le_max_left _ _))
+    (not_le.mpr ((ENNReal.lt_ofReal_iff_toReal_lt hK).mpr hlt))
+
+open scoped Classical in
+/-- A nonnegative archimedean bump at one, times the indicator of the finite
+integers, vanishes at zero and has nonzero theta at one. -/
+private theorem globalTheta_zero_eval_theta_one (F : Type) [Field F] [NumberField F] :
+    ∃ f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)),
+      f (Multiplicative.ofAdd 0) = 0 ∧ adelicTheta f (1 : IdeleClassGroup (𝓞 F) F) ≠ 0 := by
+  let D := dist (0 : mixedEmbedding.mixedSpace F) 1
+  have hD : 0 < D := dist_pos.mpr zero_ne_one
+  let b : ContDiffBump (1 : mixedEmbedding.mixedSpace F) :=
+    ⟨D / 4, D / 2, by positivity, by linarith⟩
+  let bs : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ :=
+    HasCompactSupport.toSchwartzMap (f := fun x ↦ ((b x : ℝ) : ℂ))
+      (b.hasCompactSupport.comp_left Complex.ofReal_zero)
+      (Complex.ofRealCLM.contDiff.comp b.contDiff)
+  let arch : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
+    ⟨fun x ↦ bs (InfiniteAdeleRing.ringEquiv_mixedSpace F x.toAdd),
+      (mem_archimedeanSchwartzBruhat_iff _).mpr ⟨bs, fun _ ↦ rfl⟩⟩
+  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F (∅ : Finset (HeightOneSpectrum (𝓞 F)))
+  let gg : ∀ w : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
+      SchwartzBruhat (Multiplicative (w.val.adicCompletion F)) :=
+    fun w ↦ absurd w.2 (Finset.notMem_empty _)
+  let f := sAdeleSchwartzToGlobal F ∅ (e (arch ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, gg w)))
+  have hf : ∀ x : AdeleRing (𝓞 F) F, f (Multiplicative.ofAdd x) =
+      if ∀ v : HeightOneSpectrum (𝓞 F), x.2 v ∈ v.adicCompletionIntegers F then
+        ((b (InfiniteAdeleRing.ringEquiv_mixedSpace F x.1) : ℝ) : ℂ) else 0 := by
+    intro x
+    rw [sAdeleSchwartzToGlobal_apply, he]
+    simp only [Finset.univ_eq_empty, Finset.prod_empty, mul_one, Finset.notMem_empty,
+      not_false_eq_true, forall_const]
+    split_ifs <;> rfl
+  have hzero : f (Multiplicative.ofAdd 0) = 0 := by
+    rw [hf]
+    split_ifs
+    · rw [Prod.fst_zero, map_zero, b.zero_of_le_dist (show D / 2 ≤ D by linarith),
+        Complex.ofReal_zero]
+    · rfl
+  let T : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd
+    (algebraMap F (AdeleRing (𝓞 F) F) (ξ : F) * (1 : IdeleGroup (𝓞 F) F).val))
+  have hT : ∀ ξ, T ξ = ((‖T ξ‖ : ℝ) : ℂ) := by
+    intro ξ
+    change f _ = ((‖f _‖ : ℝ) : ℂ)
+    rw [hf]
+    split_ifs
+    · rw [Complex.norm_real, Real.norm_of_nonneg b.nonneg]
+    · simp
+  have hT1 : ‖T 1‖ = 1 := by
+    change ‖f _‖ = 1
+    rw [Units.val_one, map_one, Units.val_one, mul_one, hf, ite_eq_left (fun v ↦ by
+      change (1 : v.adicCompletion F) ∈ v.adicCompletionIntegers F
+      exact one_mem _), Prod.fst_one, map_one, b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le),
+      Complex.ofReal_one, norm_one]
+  have hs : Summable fun ξ ↦ ‖T ξ‖ := by
+    have := (adelicAverage_summableUniformlyOn f _
+      (isCompact_singleton (x := ((1 : IdeleGroup (𝓞 F) F), (0 : AdeleRing (𝓞 F) F))))).summable
+      (Set.mem_singleton _)
+    simpa only [T, add_zero, mul_comm] using this
+  refine ⟨f, hzero, ?_⟩
+  change adelicTheta f (QuotientGroup.mk (s := IdeleGroup.principalSubgroup (𝓞 F) F) 1) ≠ 0
+  rw [adelicTheta_mk]
+  change ∑' ξ, T ξ ≠ 0
+  rw [tsum_congr hT, ← Complex.ofReal_tsum]
+  have hpos : 0 < ∑' ξ, ‖T ξ‖ :=
+    lt_of_lt_of_le (by rw [hT1]; exact one_pos) (hs.le_tsum 1 (fun _ _ ↦ norm_nonneg _))
+  exact_mod_cast hpos.ne'
+
+/-- Additive Haar scaling for a unit translate, as in the norm-twist
+counterexample in `Ch06_LocalGlobal/Sec3_Printed.lean`. -/
+private theorem globalThetaSobolev_translate_integral
+    (u : IdeleGroup (𝓞 ℚ) ℚ) (k : 𝔸[ℚ] → ℂ) :
+    ∫ x, k ((↑u⁻¹ : 𝔸[ℚ]) * x) ∂additiveTamagawaMeasure ℚ =
+      (((ideleNorm ℚ u).val : ℝ) : ℂ) * ∫ x, k x ∂additiveTamagawaMeasure ℚ := by
+  let : MeasurableSpace 𝔸[ℚ] := borel _
+  let : BorelSpace 𝔸[ℚ] := ⟨rfl⟩
+  let : (additiveTamagawaMeasure ℚ).IsAddHaarMeasure :=
+    (additiveTamagawaMeasure_existsUnique ℚ).exists.choose_spec.1
+  let d : 𝔸[ℚ] ≃ₜ 𝔸[ℚ] := Homeomorph.smul (u⁻¹ : IdeleGroup (𝓞 ℚ) ℚ)
+  have hset (s : Set 𝔸[ℚ]) :
+      d ⁻¹' s = (fun a : 𝔸[ℚ] ↦ (u : 𝔸[ℚ]) * a) '' s := by
+    ext y
+    constructor
+    · intro hy
+      exact ⟨(↑u⁻¹ : 𝔸[ℚ]) * y, hy, Units.mul_inv_cancel_left u y⟩
+    · rintro ⟨a, ha, rfl⟩
+      change (↑u⁻¹ : 𝔸[ℚ]) * ((u : 𝔸[ℚ]) * a) ∈ s
+      rwa [Units.inv_mul_cancel_left]
+  have hmap : (additiveTamagawaMeasure ℚ).map d =
+      ((ideleNorm ℚ u).val : ENNReal) • additiveTamagawaMeasure ℚ := by
+    refine Measure.ext fun s hs ↦ ?_
+    rw [Measure.map_apply d.continuous.measurable hs, hset s]
+    exact adeleHaar_mul_image ℚ (additiveTamagawaMeasure ℚ) u s hs
+  have hi := (integral_map_equiv (μ := additiveTamagawaMeasure ℚ) d.toMeasurableEquiv k).symm
+  have hmap' : (additiveTamagawaMeasure ℚ).map d.toMeasurableEquiv =
+      ((ideleNorm ℚ u).val : ENNReal) • additiveTamagawaMeasure ℚ := hmap
+  rw [hmap', integral_smul_measure, ENNReal.coe_toReal, Complex.real_smul] at hi
+  exact hi
+
+/-- A rapidly decaying sequence with nonzero first value cannot have every
+term twice its successor. -/
+private theorem globalThetaSobolev_exists_difference_ne_zero (A : ℕ → ℂ)
+    (hA : A 0 ≠ 0) (C : ℝ) (hbound : ∀ n, ‖A n‖ ≤ C * (((2 : ℝ) ^ n) ^ 2)⁻¹) :
+    ∃ n, A n - 2 * A (n + 1) ≠ 0 := by
+  by_contra! h
+  have hc (n : ℕ) : (2 : ℂ) ^ n * A n = A 0 := by
+    induction n with
+    | zero => simp
+    | succ n ih =>
+      rw [pow_succ, mul_assoc, ← sub_eq_zero.mp (h n)]
+      exact ih
+  have hb (n : ℕ) : ‖(2 : ℂ) ^ n * A n‖ ≤ C * (1 / 2 : ℝ) ^ n := by
+    rw [norm_mul, norm_pow, Complex.norm_ofNat]
+    refine (mul_le_mul_of_nonneg_left (hbound n) (by positivity)).trans_eq ?_
+    rw [one_div, inv_pow]
+    field_simp
+  have hlim : Tendsto (fun n : ℕ ↦ (2 : ℂ) ^ n * A n) atTop (nhds 0) := by
+    rw [tendsto_zero_iff_norm_tendsto_zero]
+    exact squeeze_zero (fun _ ↦ norm_nonneg _) hb (by
+      simpa only [mul_zero] using
+        (tendsto_pow_atTop_nhds_zero_of_norm_lt_one (x := (1 / 2 : ℝ)) (by norm_num)).const_mul C)
+  exact hA (tendsto_nhds_unique (by simpa only [hc] using hlim) tendsto_const_nhds).symm
+
+/-- A polar-free test with nonzero theta at positive log norm. Start with a bump that
+vanishes at zero and use one dilation difference to cancel its Fourier value there. -/
+private theorem globalThetaSobolev_positive_logNorm_witness :
+    ∃ (f : adelePolarSubspace ℚ) (g : IdeleClassGroup (𝓞 ℚ) ℚ),
+      1 < ((ideleClassNorm ℚ g).val : ℝ) ∧ adelicTheta f.val g ≠ 0 := by
+  obtain ⟨E, hE₀, hEθ⟩ := globalTheta_zero_eval_theta_one ℚ
+  let t : ℝ≥0ˣ := Units.mk0 2 two_ne_zero
+  let u := canonicalIdeleNormSection ℚ t
+  let q := QuotientGroup.mk' (IdeleGroup.principalSubgroup (𝓞 ℚ) ℚ)
+  let T := schwartzBruhatUnitTranslate u
+  let d := T E - (2 : ℂ) • E
+  have hu : ideleNorm ℚ u = t := canonicalIdeleNormSection_rightInverse ℚ t
+  have hu₂ : (((ideleNorm ℚ u).val : ℝ) : ℂ) = 2 := by rw [hu]; rfl
+  have hd : d ∈ adelePolarSubspace ℚ := by
+    change adelePolarValues d = 0
+    have hT : adelePolarValues (T E) = (0, 2 * (adelePolarValues E).2) := by
+      apply Prod.ext
+      · change E (Multiplicative.ofAdd ((↑u⁻¹ : 𝔸[ℚ]) * 0)) = 0
+        simpa only [mul_zero] using hE₀
+      · change adeleSchwartzFourier _ _ = _ * adeleSchwartzFourier E _
+        rw [(adeleSchwartzFourier_apply_zero _).2, (adeleSchwartzFourier_apply_zero E).2, ← hu₂]
+        exact globalThetaSobolev_translate_integral u _
+    rw [show d = T E - (2 : ℂ) • E from rfl, map_sub, map_smul, hT]
+    refine Prod.ext ?_ (by simp [smul_eq_mul])
+    have hEval : (adelePolarValues E).1 = 0 := hE₀
+    change (0 : ℂ) - (2 : ℂ) • (adelePolarValues E).1 = 0
+    rw [hEval, smul_zero, sub_zero]
+  let A (n : ℕ) := adelicTheta E (q (u ^ n))
+  have hnorm (n : ℕ) : ((ideleNorm ℚ (u ^ n)).val : ℝ) = 2 ^ n := by
+    rw [map_pow, hu, Units.val_pow_eq_pow_val, NNReal.coe_pow]
+    rfl
+  obtain ⟨C, _, hdecay⟩ := adelicTheta_normSum_decay_large E 2
+  have hA (n : ℕ) : ‖A n‖ ≤ C * (((2 : ℝ) ^ n) ^ 2)⁻¹ := by
+    have hb := hdecay (u ^ n) (by rw [hnorm]; exact one_le_pow₀ (by norm_num))
+    rw [hnorm] at hb
+    have hs : Summable fun ξ : ℚˣ ↦ ‖E (Multiplicative.ofAdd
+        (algebraMap ℚ 𝔸[ℚ] (ξ : ℚ) * (u ^ n).val))‖ := by
+      simpa only [add_zero, mul_comm] using
+        ((adelicAverage_summableUniformlyOn E {((u ^ n), (0 : 𝔸[ℚ]))}
+          isCompact_singleton).summable rfl)
+    change ‖adelicTheta E (QuotientGroup.mk (u ^ n))‖ ≤ _
+    rw [adelicTheta_mk]
+    exact (norm_tsum_le_tsum_norm hs).trans (by simpa only [mul_comm] using hb)
+  have hA₀ : A 0 ≠ 0 := by simpa only [A, pow_zero, map_one] using hEθ
+  obtain ⟨n, hn⟩ := globalThetaSobolev_exists_difference_ne_zero A hA₀ C hA
+  have hgt : 1 < ((ideleClassNorm ℚ (q (u ^ (n + 1)))).val : ℝ) := by
+    change 1 < ((ideleNorm ℚ (u ^ (n + 1))).val : ℝ)
+    rw [hnorm]
+    exact one_lt_pow₀ (by norm_num) (Nat.succ_ne_zero _)
+  have hθ : adelicTheta (T E) (q (u ^ (n + 1))) = A n := by
+    change adelicTheta (T E) (QuotientGroup.mk (u ^ (n + 1))) =
+      adelicTheta E (QuotientGroup.mk (u ^ n))
+    rw [adelicTheta_mk, adelicTheta_mk]
+    apply tsum_congr
+    intro ξ
+    have hu' : u⁻¹ * u ^ (n + 1) = u ^ n := by
+      rw [pow_succ', ← mul_assoc, inv_mul_cancel, one_mul]
+    change E (Multiplicative.ofAdd ((↑u⁻¹ : 𝔸[ℚ]) *
+      (algebraMap ℚ 𝔸[ℚ] (ξ : ℚ) * (u ^ (n + 1)).val))) = _
+    rw [mul_left_comm (↑u⁻¹ : 𝔸[ℚ]), ← Units.val_mul, hu']
+  refine ⟨⟨d, hd⟩, q (u ^ (n + 1)), hgt, ?_⟩
+  change (adelicThetaLinearMap ℚ (T E - (2 : ℂ) • E)) (q (u ^ (n + 1))) ≠ 0
+  rw [map_sub, map_smul]
+  change adelicTheta (T E) (q (u ^ (n + 1))) - 2 * A (n + 1) ≠ 0
+  rwa [hθ]
+
+/-- Paper: Before (10.1.1.2), p. 434. At zero weight and order, take the
+closed half-line [0,∞). A norm-two dilation difference of a bump near the
+archimedean identity is polar-free and has nonzero theta at some positive
+log norm. The endpoint weights on [0,b] force the Sobolev norm to be infinite. -/
 theorem Printed.globalThetaSobolev_closedIntervals_finite_false :
-    ¬ Printed.globalThetaSobolev_closedIntervals_finite := by sorry
+    ¬ Printed.globalThetaSobolev_closedIntervals_finite := by
+  intro h
+  let C := IdeleClassGroup (𝓞 ℚ) ℚ
+  let m : C →ₜ* ℝ≥0ˣ := ⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩
+  let r : C → ℝ := fun x ↦ Real.log ((m x).val : ℝ)
+  obtain ⟨f, g, hg, hθg⟩ := globalThetaSobolev_positive_logNorm_witness
+  have hr : Continuous r :=
+    Real.continuousOn_log.comp_continuous
+      (NNReal.continuous_coe.comp (Units.continuous_val.comp m.continuous))
+      (fun _ ↦ (NNReal.coe_pos.mpr (Units.zero_lt _)).ne')
+  let : BorelSpace C := ⟨rfl⟩
+  let : (ideleClassTamagawaMeasure ℚ).IsHaarMeasure := (ideleClassTamagawaMeasure_isWeil ℚ).1
+  have htop := intervalSobolevENorm_eq_top_of_positive_logNorm (ideleClassTamagawaMeasure ℚ)
+    (Ici 0) Subset.rfl r hr (adelicTheta f.val) (adelicTheta f.val).continuous g
+    (Real.log_pos hg) hθg
+  have hi : (interior (Ici (0 : ℝ))).Nonempty := by
+    rw [interior_Ici]
+    exact nonempty_Ioi
+  have hf := h ℚ 0 0 le_rfl (Ici 0) isClosed_Ici ordConnected_Ici hi f
+  exact hf (by simpa only [m, r, modulationWeight_zero] using htop)
 
 /-- Paper: Before Lemma 10.1.1.4, p. 435. A positive twist of every local theta
 test is asserted to belong to the Sobolev space for the whole half-line (-a,∞). -/
@@ -115,71 +383,6 @@ private theorem sLocalThetaSobolev_openHalfLine_finite_false_witness :
   rw [← hx]
   exact norm_pos_iff.mp (lt_of_lt_of_le (Real.exp_pos _) hpos)
 
-/-- Paper: Before Lemma 10.1.1.4, p. 435.
-A continuous nonzero function at positive log norm has infinite whole half-line Sobolev norm. -/
-private theorem sLocalThetaSobolev_openHalfLine_finite_false_unbounded
-    {G : Type*} [TopologicalSpace G] [MeasurableSpace G] [OpensMeasurableSpace G]
-    (μ : Measure G) [μ.IsOpenPosMeasure]
-    (r : G → ℝ) (hr : Continuous r) (θ : G → ℂ) (hθ : Continuous θ)
-    (g : G) (hrg : 0 < r g) (hθg : θ g ≠ 0) :
-    intervalSobolevENorm μ r (Ioi (-1)) 0 θ = ⊤ := by
-  let c := ‖θ g‖ / 2
-  have hc : 0 < c := half_pos (norm_pos_iff.mpr hθg)
-  have hcg : c < ‖θ g‖ := half_lt_self (norm_pos_iff.mpr hθg)
-  let U := {x | c < ‖θ x‖} ∩ {x | r g / 2 < r x}
-  have hUo : IsOpen U :=
-    (isOpen_lt continuous_const hθ.norm).inter (isOpen_lt continuous_const hr)
-  have hgU : g ∈ U := ⟨hcg, half_lt_self hrg⟩
-  have hUpos : μ U ≠ 0 := (hUo.measure_pos μ ⟨g, hgU⟩).ne'
-  have hε : ENNReal.ofReal c ≠ 0 := (ENNReal.ofReal_pos.mpr hc).ne'
-  have hbound : ∀ σ : ℝ, 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * r g)) * μ U ≤
-      (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
-        intervalSobolevENorm μ r (Ioi (-1)) 0 θ ^ (2 : ℝ≥0∞).toReal := by
-    intro σ hσ
-    have hle : eLpNorm θ 2 (μ.withDensity fun x ↦
-        ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) ≤
-        intervalSobolevENorm μ r (Ioi (-1)) 0 θ := by
-      unfold intervalSobolevENorm
-      exact le_iSup₂_of_le (⟨0, by norm_num⟩ : Ioi (-1 : ℝ))
-        (⟨σ, by change -1 < σ; linarith⟩ : Ioi (-1 : ℝ)) le_rfl
-    have hdens : ∀ x ∈ U, ENNReal.ofReal (Real.exp (σ * r g)) ≤
-        ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)) := by
-      intro x hx
-      apply ENNReal.ofReal_le_ofReal
-      have he : Real.exp (σ * r g) ≤ Real.exp (2 * σ * r x) :=
-        Real.exp_le_exp.mpr (by nlinarith [mul_le_mul_of_nonneg_left hx.2.le hσ])
-      simpa only [intervalSobolevDensity, zero_div, Real.rpow_zero, mul_one] using
-        he.trans (le_max_right (Real.exp (2 * 0 * r x)) _)
-    calc ENNReal.ofReal (Real.exp (σ * r g)) * μ U
-        = ∫⁻ _ in U, ENNReal.ofReal (Real.exp (σ * r g)) ∂μ := (setLIntegral_const _ _).symm
-      _ ≤ ∫⁻ x in U, ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)) ∂μ :=
-          setLIntegral_mono' hUo.measurableSet hdens
-      _ = (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) U :=
-          (withDensity_apply _ hUo.measurableSet).symm
-      _ ≤ (μ.withDensity fun x ↦ ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x)))
-            {x | ENNReal.ofReal c ≤ ‖θ x‖ₑ} := measure_mono fun x hx ↦ by
-          rw [mem_ofPred_eq, ← ofReal_norm]
-          exact ENNReal.ofReal_le_ofReal hx.1.le
-      _ ≤ (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal * eLpNorm θ 2 (μ.withDensity fun x ↦
-            ENNReal.ofReal (intervalSobolevDensity 0 σ 0 (r x))) ^ (2 : ℝ≥0∞).toReal :=
-          meas_ge_le_mul_pow_eLpNorm_eNorm _ two_ne_zero ENNReal.ofNat_ne_top hε
-            fun h ↦ absurd h ENNReal.ofReal_ne_top
-      _ ≤ _ := by gcongr
-  by_contra htop
-  have hBtop : (ENNReal.ofReal c)⁻¹ ^ (2 : ℝ≥0∞).toReal *
-      intervalSobolevENorm μ r (Ioi (-1)) 0 θ ^ (2 : ℝ≥0∞).toReal ≠ ∞ :=
-    ENNReal.mul_ne_top (ENNReal.rpow_ne_top_of_nonneg (by simp) (ENNReal.inv_ne_top.mpr hε))
-      (ENNReal.rpow_ne_top_of_nonneg (by simp) htop)
-  obtain ⟨K, hK, hKle⟩ : ∃ K : ℝ≥0∞, K ≠ ∞ ∧
-      ∀ σ : ℝ, 0 ≤ σ → ENNReal.ofReal (Real.exp (σ * r g)) ≤ K :=
-    ⟨_, ENNReal.div_ne_top hBtop hUpos, fun σ hσ ↦
-      (ENNReal.le_div_iff_mul_le (Or.inl hUpos) (Or.inr hBtop)).mpr (hbound σ hσ)⟩
-  have hlt : K.toReal < Real.exp (max 0 (K.toReal / r g) * r g) := by
-    have h := (div_le_iff₀ hrg).mp (le_max_right 0 (K.toReal / r g))
-    linarith [Real.add_one_le_exp (max 0 (K.toReal / r g) * r g)]
-  exact absurd (hKle _ (le_max_left _ _))
-    (not_le.mpr ((ENNReal.lt_ofReal_iff_toReal_lt hK).mpr hlt))
-
 /-- Paper: Before Lemma 10.1.1.4, p. 435. For ℚ, S = {∞}, a = 1, s = 0,
 and the real Gaussian, the weighted theta is positive throughout [2,3].
 Already the intervals [0,b] give unbounded norms as b tends to infinity. -/
@@ -207,9 +410,10 @@ theorem Printed.sLocalThetaSobolev_openHalfLine_finite_false :
   have hOpen : (sLocalQuotientTamagawaMeasure ℚ ∅).IsOpenPosMeasure :=
     hHaar.toIsOpenPosMeasure
   let : BorelSpace (SIdeleQuotient ℚ ∅) := ⟨rfl⟩
-  have htop := @sLocalThetaSobolev_openHalfLine_finite_false_unbounded
+  have htop := @intervalSobolevENorm_eq_top_of_positive_logNorm
     (SIdeleQuotient ℚ ∅) inferInstance inferInstance inferInstance
-    (sLocalQuotientTamagawaMeasure ℚ ∅) hOpen r hr θ hθ g hrg hθg'
+    (sLocalQuotientTamagawaMeasure ℚ ∅) hOpen (Ioi (-1))
+    (fun _ hx ↦ lt_of_lt_of_le (by norm_num) hx) r hr θ hθ g hrg hθg'
   have hfin := h ℚ ∅ 1 0 one_pos le_rfl f
   exact hfin htop
 
@@ -804,61 +1008,6 @@ private theorem Printed.rawIsotype_contra {C : Type*} [CommGroup C] [Topological
     (eLpNorm_eq_zero_iff two_ne_zero).mp (pow_eq_zero_iff two_ne_zero |>.mp he)
   exact hg0 (congrFun ((hθ.ae_eq_iff_eq μ continuous_const).mp h0) g0)
 
-open scoped Classical in
-/-- Over every number field some adelic theta function is nonzero: take a nonnegative
-archimedean bump equal to one at the unit, times the indicator of the finite integers. -/
-private theorem Printed.rawIsotype_exists_theta_ne_zero (F : Type) [Field F] [NumberField F] :
-    ∃ (f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F)))
-      (g : IdeleClassGroup (𝓞 F) F), adelicTheta f g ≠ 0 := by
-  let b : ContDiffBump (1 : mixedEmbedding.mixedSpace F) := ⟨1, 2, one_pos, one_lt_two⟩
-  let bs : SchwartzMap (mixedEmbedding.mixedSpace F) ℂ :=
-    HasCompactSupport.toSchwartzMap (f := fun x ↦ ((b x : ℝ) : ℂ))
-      (b.hasCompactSupport.comp_left Complex.ofReal_zero)
-      (Complex.ofRealCLM.contDiff.comp b.contDiff)
-  let arch : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F)) :=
-    ⟨fun x ↦ bs (InfiniteAdeleRing.ringEquiv_mixedSpace F x.toAdd),
-      (mem_archimedeanSchwartzBruhat_iff _).mpr ⟨bs, fun _ ↦ rfl⟩⟩
-  obtain ⟨e, he⟩ := sAdeleSchwartz_inductiveTensor_equiv F (∅ : Finset (HeightOneSpectrum (𝓞 F)))
-  let gg : ∀ w : (∅ : Finset (HeightOneSpectrum (𝓞 F))),
-      SchwartzBruhat (Multiplicative (w.val.adicCompletion F)) :=
-    fun w ↦ absurd w.2 (Finset.notMem_empty _)
-  let f := sAdeleSchwartzToGlobal F ∅ (e (arch ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, gg w)))
-  have hf : ∀ x : AdeleRing (𝓞 F) F, f (Multiplicative.ofAdd x) =
-      if ∀ v : HeightOneSpectrum (𝓞 F), x.2 v ∈ v.adicCompletionIntegers F then
-        ((b (InfiniteAdeleRing.ringEquiv_mixedSpace F x.1) : ℝ) : ℂ) else 0 := by
-    intro x
-    rw [sAdeleSchwartzToGlobal_apply, he]
-    simp only [Finset.univ_eq_empty, Finset.prod_empty, mul_one, Finset.notMem_empty,
-      not_false_eq_true, forall_const]
-    split_ifs <;> rfl
-  let T : Fˣ → ℂ := fun ξ ↦ f (Multiplicative.ofAdd
-    (algebraMap F (AdeleRing (𝓞 F) F) (ξ : F) * (1 : IdeleGroup (𝓞 F) F).val))
-  have hT : ∀ ξ, T ξ = ((‖T ξ‖ : ℝ) : ℂ) := by
-    intro ξ
-    change f _ = ((‖f _‖ : ℝ) : ℂ)
-    rw [hf]
-    split_ifs
-    · rw [Complex.norm_real, Real.norm_of_nonneg b.nonneg]
-    · simp
-  have hT1 : ‖T 1‖ = 1 := by
-    change ‖f _‖ = 1
-    rw [Units.val_one, map_one, Units.val_one, mul_one, hf, if_pos (fun v ↦ by
-      change (1 : v.adicCompletion F) ∈ v.adicCompletionIntegers F
-      exact one_mem _), Prod.fst_one, map_one, b.one_of_mem_closedBall (Metric.mem_closedBall_self b.rIn_pos.le),
-      Complex.ofReal_one, norm_one]
-  have hs : Summable fun ξ ↦ ‖T ξ‖ := by
-    have := (adelicAverage_summableUniformlyOn f _
-      (isCompact_singleton (x := ((1 : IdeleGroup (𝓞 F) F), (0 : AdeleRing (𝓞 F) F))))).summable
-      (Set.mem_singleton _)
-    simpa only [T, add_zero, mul_comm] using this
-  refine ⟨f, QuotientGroup.mk (s := IdeleGroup.principalSubgroup (𝓞 F) F) 1, ?_⟩
-  rw [adelicTheta_mk]
-  change ∑' ξ, T ξ ≠ 0
-  rw [tsum_congr hT, ← Complex.ofReal_tsum]
-  have hpos : 0 < ∑' ξ, ‖T ξ‖ :=
-    lt_of_lt_of_le (by rw [hT1]; exact one_pos) (hs.le_tsum 1 (fun _ _ ↦ norm_nonneg _))
-  exact_mod_cast hpos.ne'
-
 /-- The norm-one idele classes of ℚ(ζ₃) have Tamagawa mass π/(3√3) < 1. -/
 private theorem Printed.rawIsotype_volume_lt_one :
     normOneIdeleClassTamagawaMeasure (CyclotomicField 3 ℚ) univ < 1 := by
@@ -904,7 +1053,7 @@ private theorem Printed.rawIsotype_global_aux (F : Type) [Field F] [NumberField 
           IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ) 0 (adelicTheta f))
       (fun ω f ↦ modulationWeight (⟨ideleClassNorm F, (isProperMap_ideleClassNorm F).continuous⟩ :
           IdeleClassGroup (𝓞 F) F →ₜ* ℝ≥0ˣ) 0 (homogeneousAdelicTheta ω f))) : False := by
-  obtain ⟨f, g0, hg0⟩ := Printed.rawIsotype_exists_theta_ne_zero F
+  obtain ⟨f, _, hg0⟩ := globalTheta_zero_eval_theta_one F
   have hF := Printed.rawIsotype_factorization_norm h
     (by simp [intervalSobolevDensity]) f
   simp only [modulationWeight_zero] at hF
@@ -923,7 +1072,7 @@ private theorem Printed.rawIsotype_global_aux (F : Type) [Field F] [NumberField 
   exact Printed.rawIsotype_contra (ideleClassNorm F).ker (normOneIdeleClassTamagawaMeasure F)
     (ideleClassTamagawaMeasure F) (adelicTheta f) (adelicTheta f).continuous
     (fun ω ↦ homogeneousAdelicTheta ω f) (fun ω ↦ (homogeneousAdelicTheta ω f).continuous)
-    (fun _ _ ↦ rfl) hvol g0 hg0 hF.1 hF.2
+    (fun _ _ ↦ rfl) hvol 1 hg0 hF.1 hF.2
 
 /-- Paper: Proposition 10.1.1.5(2), p. 437. Take ℚ(ζ₃), a = s = 0 and I = {0}, so the
 weight is one. The isometry gives ‖θ‖² = Σ_ω ‖θ_ω‖² for every test function. By Bessel's

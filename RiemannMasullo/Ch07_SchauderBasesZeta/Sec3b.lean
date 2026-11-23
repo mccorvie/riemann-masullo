@@ -7,6 +7,7 @@ import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.ProdPi
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 
@@ -166,6 +167,29 @@ private theorem sLocalPWTests_moments_surjective_bump
   · change (f x)⁻¹ * f x = 1
     exact inv_mul_cancel₀ hfx
 
+/-- Modulating a nonzero bump by a character can make its integral nonzero
+without enlarging its support. -/
+private theorem sLocalPWTests_moments_surjective_zero_bump_modulate
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] (μ : MeasureTheory.Measure G) [μ.IsHaarMeasure]
+    (p : SchwartzBruhat G) (hp : p ≠ 0) :
+    ∃ h : SchwartzBruhat G, tsupport h.val ⊆ tsupport p.val ∧
+      MeasureTheory.integral μ h.val ≠ 0 := by
+  obtain ⟨L, hL⟩ := schwartzBruhat_fourier_equiv μ
+  obtain ⟨χ, hχ⟩ : ∃ χ, L p χ ≠ 0 := by
+    by_contra! hall
+    exact hp (L.map_eq_zero_iff.mp (Subtype.ext (funext hall)))
+  let h : SchwartzBruhat G := ⟨_, pontryaginDual_mul_schwartzBruhat χ⁻¹ p⟩
+  refine ⟨h, tsupport_mul_subset_right, ?_⟩
+  rw [(hL p).2 χ] at hχ
+  intro he
+  apply hχ
+  refine (MeasureTheory.integral_congr_ae ?_).trans he
+  exact .of_forall fun x ↦ by
+    change p x * star (χ x : ℂ) = (((χ x)⁻¹ : Circle) : ℂ) * p x
+    rw [Circle.coe_inv_eq_conj, Complex.star_def, mul_comm]
+
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Every neighborhood of zero contains the support of a compact Schwartz–Bruhat
 bump vanishing at zero and having nonzero additive Tamagawa integral.
@@ -178,8 +202,56 @@ private theorem sLocalPWTests_moments_surjective_zero_bump
       h (Multiplicative.ofAdd 0) = 0 ∧
       MeasureTheory.integral (sAdditiveTamagawaMeasure F S)
         (fun x ↦ h (Multiplicative.ofAdd x)) ≠ 0 := by
-  sorry
+  classical
+  let A := SAdeleRing F S
+  let G := Multiplicative A
+  let w : InfinitePlace F := Classical.arbitrary _
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding w
+  let : NontriviallyNormedField w.Completion := ⟨⟨2, by
+    rw [← hi.norm_map_of_map_zero (map_zero _) (2 : w.Completion), map_ofNat]
+    norm_num⟩⟩
+  let j (z : w.Completion) : A := (Pi.single w z, 0)
+  have hj : Continuous j := (continuous_single w).prodMk continuous_const
+  have h0 : j 0 = 0 := by
+    change (Pi.single w 0, (0 : (v : S) → v.val.adicCompletion F)) = (0, 0)
+    rw [Pi.single_zero]
+  have hnear : ∀ᶠ z in 𝓝[≠] (0 : w.Completion), j z ∈ interior K :=
+    ((hj.tendsto' _ _ h0).mono_left nhdsWithin_le_nhds) (interior_mem_nhds.mpr hK)
+  obtain ⟨z, hzK, hz⟩ := (hnear.and (self_mem_nhdsWithin :
+    {0}ᶜ ∈ 𝓝[≠] (0 : w.Completion))).exists
+  have hjz : j z ≠ 0 := by
+    intro he
+    have hz0 : Pi.single w z w = (0 : w.Completion) := congrArg (fun a : A ↦ a.1 w) he
+    exact hz (Set.mem_singleton_iff.mpr ((Pi.single_eq_same w z).symm.trans hz0))
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : InfinitePlace F) : MeasurableSpace v.Completion := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((v : InfinitePlace F) → v.Completion))
+  let : MeasurableSpace A := inferInstanceAs
+    (MeasurableSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology G := inferInstanceAs (SecondCountableTopology
+    (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let μ : MeasureTheory.Measure G := sAdditiveTamagawaMeasure F S
+  obtain ⟨hT₂, hLC, hBor, hHaar, -⟩ := sAdele_fourierMeasure (F := F) (S := S)
+  let : T2Space G := hT₂
+  let : LocallyCompactSpace G := hLC
+  let : BorelSpace G := hBor
+  let : μ.IsHaarMeasure := hHaar
+  let U : Set G := (Multiplicative.toAdd ⁻¹' interior K) ∩ {Multiplicative.ofAdd (0 : A)}ᶜ
+  have hU : IsOpen U := (isOpen_interior.preimage continuous_toAdd).inter isClosed_singleton.isOpen_compl
+  obtain ⟨p, hpc, hpU, hpx⟩ := sLocalPWTests_moments_surjective_bump
+    (Multiplicative.ofAdd (j z)) U (hU.mem_nhds ⟨hzK, hjz⟩)
+  have hp : p ≠ 0 := fun he ↦ zero_ne_one ((congrArg
+    (fun f : SchwartzBruhat G ↦ f (Multiplicative.ofAdd (j z))) he).symm.trans hpx)
+  obtain ⟨h, hs, hI⟩ := sLocalPWTests_moments_surjective_zero_bump_modulate μ p hp
+  refine ⟨h, hpc.of_isClosed_subset isClosed_closure hs, fun x hx ↦
+    interior_subset (hpU (hs hx)).1, ?_, hI⟩
+  exact image_eq_zero_of_notMem_tsupport fun hx ↦ (hpU (hs hx)).2 rfl
 
+open MeasureTheory in
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Insertion of integer-ring indicators multiplies the Fourier value at zero by
 one nonzero scalar, independent of the test.
@@ -190,7 +262,59 @@ private theorem sLocalPWTests_moments_surjective_transition
     ∃ c : ℂ, c ≠ 0 ∧ ∀ g : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
       sAdeleSchwartzFourier (sAdeleSchwartzTransition F hST g) (Multiplicative.ofAdd 0) =
         c * sAdeleSchwartzFourier g (Multiplicative.ofAdd 0) := by
-  sorry
+  classical
+  obtain ⟨D, hd, rfl⟩ : ∃ D : Finset (HeightOneSpectrum (𝓞 F)),
+      Disjoint S D ∧ T = S ∪ D :=
+    ⟨T \ S, Finset.disjoint_sdiff, (Finset.union_sdiff_of_subset hST).symm⟩
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let μ := finiteLocalAdditiveTamagawaMeasure F
+  let (v : HeightOneSpectrum (𝓞 F)) : (μ v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let b (v : D) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator (fun _ ↦ (1 : ℂ))
+  refine ⟨∏ v : D, ∫ x, b v x ∂μ v, Finset.prod_ne_zero_iff.mpr ?_, fun g ↦ ?_⟩
+  · intro v _
+    let O := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+    have ho : IsOpen O := Valued.isOpen_valuationSubring _
+    have hc : IsCompact O := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val)
+    have hm : 0 < (μ v).real O := ENNReal.toReal_pos
+      (ho.measure_pos (μ v) ⟨0, (v.val.adicCompletionIntegers F).zero_mem⟩).ne'
+      (hc.measure_ne_top (μ := μ v))
+    change (∫ x, O.indicator (fun _ ↦ (1 : ℂ)) x ∂μ v) ≠ 0
+    rw [integral_indicator_const _ ho.measurableSet, Complex.real_smul, mul_one]
+    exact Complex.ofReal_ne_zero.mpr hm.ne'
+  rw [sAdeleSchwartzFourier_apply_zero, sAdeleSchwartzFourier_apply_zero, mul_comm]
+  let (w : InfinitePlace F) : SigmaFinite (infiniteLocalAdditiveTamagawaMeasure F w) := by
+    rw [infiniteLocalAdditiveTamagawaMeasure]
+    split_ifs with hw
+    · exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+    · rw [two_nsmul]
+      exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+  apply integral_prod_piFinsetUnion (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)) μ hd
+    (fun z ↦ g (Multiplicative.ofAdd z)) b
+  intro a x y
+  rw [sAdeleSchwartzTransition_apply]
+  let X (v : HeightOneSpectrum (𝓞 F)) := v.adicCompletion F
+  let t := MeasurableEquiv.piFinsetUnion X hd (x, y)
+  have hmem : (∀ w : ↥(S ∪ D), w.val ∉ S → t w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ v : D, y v ∈ v.val.adicCompletionIntegers F := by
+    constructor
+    · intro h v
+      have hv := h ⟨v.val, Finset.mem_union_right S v.property⟩
+        (fun hs ↦ Finset.disjoint_left.mp hd hs v.property)
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd v.property] using hv
+    · intro h w hw
+      have hv := (Finset.mem_union.mp w.property).resolve_left hw
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd hv] using! h ⟨w.val, hv⟩
+  change (if _ then g (Multiplicative.ofAdd (a, fun v : S ↦ t ⟨v.val, hST v.property⟩)) else 0) = _
+  have hx : (fun v : S ↦ t ⟨v.val, hST v.property⟩) = x :=
+    funext fun v ↦ MeasurableEquiv.piFinsetUnion_left X hd v.property _
+  simp only [b, indicator_apply, Fintype.prod_boole, mul_ite, mul_one, mul_zero]
+  exact if_congr hmem (congrArg (fun u ↦ g (Multiplicative.ofAdd (a, u))) hx) rfl
 
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 The two moments on the inserted test space can be specified independently whenever
@@ -920,6 +1044,68 @@ theorem sLocalInvariantPW_principalValue {S₀ : Finset (HeightOneSpectrum (𝓞
     (Y : ℝ) (_hY : 0 < Y) :
     (invPW(hST, Y, χ)).map (PV(hRT, χ)) ≤ invPW(hST, size(R) * Y, χ) := by sorry
 
+/-- Modulo an arbitrary subspace, the kernel of the two moments is still closed:
+its preimage is the inverse image of a subspace of the moment plane. -/
+private theorem sLocalPW_principalValue_diagram_closed {E : Type*} [AddCommGroup E]
+    [Module ℂ E] [TopologicalSpace E] (K : Submodule ℂ E) (m : E →ₗ[ℂ] ℂ × ℂ)
+    (hm : Continuous m) : IsClosed (m.ker.map K.mkQ : Set (E ⧸ K)) := by
+  apply K.isQuotientMap_mkQ.isCoinducing.isClosed_preimage.mp
+  change IsClosed (((m.ker.map K.mkQ).comap K.mkQ : Submodule ℂ E) : Set E)
+  rw [Submodule.comap_map_mkQ, ← Submodule.comap_map_eq m K]
+  exact (K.map m).isClosed_of_finiteDimensional.preimage hm
+
+private theorem sLocalPW_principalValue_diagram_polar (χ : PontryaginDual J₁(T)) :
+    IsClosed ((Z₀(T)).map (q(T, χ)) : Set (Θ(T, χ))) := by
+  unfold sAdelePolarSubspace
+  apply sLocalPW_principalValue_diagram_closed
+  obtain ⟨L, hL⟩ := sLocal_fourier_continuousLinear (F := F) (S := T)
+  have he := schwartzBruhat_eval_continuous (Multiplicative.ofAdd (0 : SAdeleRing F T))
+  exact he.prodMk ((he.comp L.continuous).congr fun f ↦ congrArg (fun g : B(T) ↦
+    g (Multiplicative.ofAdd 0)) (hL f))
+
+private theorem sLocalPW_principalValue_diagram_empty (h : (∅ : Finset V) ⊆ T) :
+    sAdelePrincipalValue F h = LinearMap.id := by
+  have conj {E G Y : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+      [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+      (e : InductiveTensor E G ≃L[ℂ] Y) (P : G →ₗ[ℂ] G) (hp : ∀ x, P x = x) :
+      e.toLinearMap.comp ((TensorProduct.map (LinearMap.id : E →ₗ[ℂ] E) P).comp e.symm.toLinearMap)
+        = LinearMap.id := by
+    have he : P = LinearMap.id := LinearMap.ext hp
+    subst he
+    exact LinearMap.ext fun x ↦ (congrArg e (LinearMap.congr_fun
+      (TensorProduct.map_id (R := ℂ) (M := E) (N := G)) (e.symm x))).trans (e.apply_symm_apply x)
+  unfold sAdelePrincipalValue
+  refine conj _ _ fun x ↦ ?_
+  simp only [Finset.notMem_empty, ite_false, PiTensorProduct.map_id]
+  rfl
+
+private theorem sLocalPW_principalValue_diagram_test (h : R ⊆ T) (χ : PontryaginDual J₁(T))
+    (u : (SAdeleRing F T)ˣ) (f : B(T)) :
+    q(T, χ) (sAdelePrincipalValue F h (schwartzBruhatUnitTranslate u f)) =
+      q(T, χ) (schwartzBruhatUnitTranslate u (sAdelePrincipalValue F h f)) := by
+  rcases R.eq_empty_or_nonempty with rfl | hn
+  · rw [sLocalPW_principalValue_diagram_empty h]
+    rfl
+  · apply (sLocalHomogeneousThetaSpace_mk_eq_iff χ _ _).2
+    have he := (sLocalAdelicThetaSpace_mk_eq_iff (F := F) (S := T) _ _).1
+      (sLocalThetaPrincipalValue_equivariant (F := F) h hn u f)
+    exact ContinuousMap.ext fun y ↦ by simp only [sLocalHomogeneousAdelicThetaLinearMap_apply, he]
+
+private theorem sLocalPW_principalValue_diagram_comm (h : R ⊆ T) (χ : PontryaginDual J₁(T))
+    (g : J(T)) (x : Θ(T, χ)) : PV(h, χ) (A(T, χ) g x) = A(T, χ) g (PV(h, χ) x) := by
+  let ρ := A(T, χ)
+  let U := PV(h, χ)
+  let Q := q(T, χ)
+  change U (ρ g x) = ρ g (U x)
+  have hx : Surjective (Q : B(T) → Θ(T, χ)) := Submodule.mkQ_surjective _
+  obtain ⟨u, hu⟩ := QuotientGroup.mk_surjective g
+  obtain ⟨f, hf⟩ := hx x
+  rw [← hu, ← hf]
+  have ha := (existsUnique_sLocalHomogeneousThetaAction (F := F) (S := T) χ).exists.choose_spec.2 u
+  exact ((congrArg U (ha f)).trans (sLocalPW_principalValue_diagram_test h χ u f)).trans
+    (ha (sAdelePrincipalValue F h f)).symm
+
 /-- Paper: Proposition 7.3.3.2, p. 358.
 There are inclusions along both rows of the PW diagram. The restrictions of the
 ambient principal value are continuous and commute with the translations.
@@ -943,7 +1129,22 @@ theorem sLocalPW_principalValue_diagram {S₀ : Finset (HeightOneSpectrum (𝓞 
         (∀ x : b, (P' x).val = PV(hRT, χ) x.val) ∧
         ∀ (g : J(T)), 1 ≤ ((m(T) g).val : ℝ) →
           ∀ x : (Z₀(T)).map (q(T, χ)),
-            PV(hRT, χ) (A(T, χ) g x.val) = A(T, χ) g (PV(hRT, χ) x.val) := by sorry
+            PV(hRT, χ) (A(T, χ) g x.val) = A(T, χ) g (PV(hRT, χ) x.val) := by
+  have hsize : 0 < size(R) := Finset.prod_pos fun v _ ↦
+    Nat.cast_pos.mpr (zero_lt_one.trans (HeightOneSpectrum.one_lt_absNorm v))
+  have row (l r : ℝ) (hl : 0 < l) (hlr : l ^ count(S) ≤ r) : absPW(hST, l, χ) ≤ invPW(hST, r, χ) :=
+    (sLocalAbsolutePW_le_invariant hST l hl _ χ).trans (sLocalInvariantPW_mono hST hlr _ χ)
+  have polar (r : ℝ) : invPW(hST, r, χ) ≤ (Z₀(T)).map (q(T, χ)) :=
+    Submodule.topologicalClosure_minimal _ (Submodule.map_mono inf_le_right)
+      (sLocalPW_principalValue_diagram_polar χ)
+  let p : Θ(T, χ) →L[ℂ] Θ(T, χ) := ⟨PV(hRT, χ),
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding hRT χ).continuous⟩
+  have hA := sLocalAbsolutePW_principalValue hST _hT hRT _hR _hsatR _hdis _hsat _hPic ω hu χ _hχ X _hX
+  have hB := sLocalInvariantPW_principalValue hST _hT hRT _hR _hsatR _hdis _hsat _hPic ω hu χ _hχ Y _hY
+  exact ⟨row _ _ _hX _hXY, row _ _ (mul_pos hsize _hX) _hXY', polar _, polar _,
+    (p.comp (absPW(hST, X, χ)).subtypeL).codRestrict _ (fun x ↦ hA ⟨x, x.property, rfl⟩),
+    (p.comp (invPW(hST, Y, χ)).subtypeL).codRestrict _ (fun x ↦ hB ⟨x, x.property, rfl⟩),
+    fun _ ↦ rfl, fun _ ↦ rfl, fun g _ x ↦ sLocalPW_principalValue_diagram_comm hRT χ g x.val⟩
 
 end PrincipalValues
 
