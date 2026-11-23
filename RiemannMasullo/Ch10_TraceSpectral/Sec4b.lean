@@ -301,6 +301,80 @@ theorem spectralLineAmbientKernel_tendsto (_ha : 0 < a)
     θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
   exact lift d j e _ _ _ _ (spectralLineQuotientKernel_tendsto (F := F) a hs _ha χ eχ e x f _hχ _he _horder _hb φ)
 
+/-- A rectangle eventually contains the only jet that contributes to a single coordinate. -/
+private theorem spectralLineAmbientKernel_operator_single {Z J V : Type*} [AddCommMonoid V]
+    (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (hj : Bijective (fun p : (z : Z) × Fin (N z) ↦ j p.1 p.2))
+    (i : J) (c : J → V) (hc : ∀ k, k ≠ i → c k = 0) :
+    ∀ᶠ ij : ℕ × ℕ in atTop,
+      (∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+        ∑ m : Fin (N z), c (j z m)) = c i := by
+  classical
+  obtain ⟨p, hp⟩ := hj.surjective i
+  filter_upwards [eventually_ge_atTop (e p.1)] with ij hij
+  rw [Finset.sum_sigma', Finset.sum_eq_single_of_mem p]
+  · exact congrArg c hp
+  · simp [Finset.mem_product, hij.1, hij.2]
+  · intro q _ hq
+    exact hc _ (fun h ↦ hq (hj.injective (h.trans hp.symm)))
+
+/-- Evaluation of the ambient kernel rectangle is the finite sum of its rank-one actions. -/
+private theorem spectralLineAmbientKernel_operator_eval {Z J : Type*} {α s : ℝ}
+    (a : ℝ) (hα : 0 ≤ α) (hs : 0 ≤ s) (e : Z ↪ ℕ × ℕ) (N : Z → ℕ)
+    (j : (z : Z) → Fin (N z) → J) (f : J → StrongDual ℂ H(a, hα, hs))
+    (y : J → W(α, s)) (ij : ℕ × ℕ) (v : W(α, s)) :
+    sobolevProjectiveKernelOperator (F := F) hα hs
+      (spectralKernelRectangle e N j (fun k ↦ spectralSobolevDualEmbedding F a (hStrip(hα)) hs (f k))
+        y ij) v =
+      ∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+        ∑ m : Fin (N z), f (j z m) (Q(a, hα, hs) v) • y (j z m) := by
+  let M := (((ContinuousLinearMap.apply ℂ (W(α, s)) v).comp
+    (sobolevProjectiveKernelOperator (F := F) hα hs)).comp
+    (Completion.toComplL : ProjectiveTensor W'(α, s) W(α, s) →L[ℂ] _))
+  change M _ = _
+  simp only [map_sum]
+  apply Finset.sum_congr rfl
+  intro z _
+  let term (m : Fin (N z)) : ProjectiveTensor W'(α, s) W(α, s) :=
+    spectralSobolevDualEmbedding F a (hStrip(hα)) hs (f (j z m)) ⊗ₜ[ℂ] y (j z m)
+  refine (map_sum M term Finset.univ).trans (Finset.sum_congr rfl ?_)
+  intro m _
+  apply (sobolevProjectiveKernelOperator_tmul hα hs _ _ v).trans
+  exact congrArg (fun c : ℂ ↦ c • y (j z m))
+    (spectralSobolevPairing_dual (hStrip(hα)) hs ((f (j z m)).comp (Q(a, hα, hs))) v).2.symm
+
+/-- A limit of lifted biorthogonal partial sums recovers its prescribed quotient coordinates. -/
+private theorem spectralLineAmbientKernel_operator_limit {Z J H V : Type*}
+    [NormedAddCommGroup H] [NormedSpace ℂ H] [NormedAddCommGroup V] [NormedSpace ℂ V]
+    (q : V →L[ℂ] H) (S : H →L[ℂ] V) (hq : ∀ u, q (S u) = u)
+    (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (hj : Bijective (fun p : (z : Z) × Fin (N z) ↦ j p.1 p.2))
+    (x : J → H) (f : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x f)
+    (u : H) (w : V)
+    (h : Tendsto (fun ij : ℕ × ℕ ↦
+      ∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+        ∑ m : Fin (N z), f (j z m) u • S (x (j z m))) atTop (𝓝 w)) :
+    w = S u := by
+  let b (ij : ℕ × ℕ) := ∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+    ∑ m : Fin (N z), f (j z m) u • x (j z m)
+  have hS : Tendsto (fun ij ↦ S (b ij)) atTop (𝓝 w) := by simpa only [b, map_sum, map_smul] using h
+  have hq' : Tendsto b atTop (𝓝 (q w)) := by
+    simpa only [Function.comp_def, hq] using (q.continuous.tendsto w).comp hS
+  have he : ContinuousLinearMap.apply ℂ ℂ (q w) = ContinuousLinearMap.apply ℂ ℂ u := by
+    apply ContinuousLinearMap.ext_on hb.2.2.2
+    rintro _ ⟨i, rfl⟩
+    change f i (q w) = f i u
+    apply tendsto_nhds_unique ((f i).continuous.continuousAt.tendsto.comp hq')
+    apply tendsto_const_nhds.congr'
+    have hcoord := spectralLineAmbientKernel_operator_single e N j hj i
+      (fun k ↦ f k u * f i (x k)) (fun k hk ↦ by rw [hb.2.1 k i hk, mul_zero])
+    filter_upwards [hcoord] with ij hij
+    simpa only [Function.comp_apply, b, map_sum, map_smul, smul_eq_mul, hb.1, mul_one] using hij.symm
+  have hqu : q w = u := (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    (fun ℓ ↦ DFunLike.congr_fun he ℓ)
+  rw [← hqu]
+  exact tendsto_nhds_unique hS ((S.continuous.tendsto _).comp hq')
+
 /-- Paper: Theorem 10.4.3.1(3), p. 467. The limit of the ambient kernels
 represents spectral projection after convolution. -/
 theorem spectralLineAmbientKernel_operator (_ha : 0 < a)
@@ -314,7 +388,28 @@ theorem spectralLineAmbientKernel_operator (_ha : 0 < a)
     (_hK : Tendsto (spectralKernelRectangle e (fun z ↦ N(χ, z)) jet
       (fun j ↦ D₀ ((f j).comp (Aq₀(φ)))) (fun j ↦ S₀ (x j))) atTop (𝓝 K)) :
     sobolevProjectiveKernelOperator (F := F) (le_refl (0 : ℝ)) hs₀(hs) K =
-      (Pspec(a, (le_refl (0 : ℝ)), hs₀(hs))).comp (A₀(φ)) := by sorry
+      (Pspec(a, (le_refl (0 : ℝ)), hs₀(hs))).comp (A₀(φ)) := by
+  let θ := Θ(a, (le_refl (0 : ℝ)), hs₀(hs))
+  let lift := θ.orthogonal.subtypeL.comp θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  have hsection (u) : θ.mkQL (lift u) = u :=
+    (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal u).property).symm.trans
+      (θ.quotientEquivOrthogonal.symm_apply_apply u)
+  let key (z : Z(χ)) (m : Fin N(χ, z)) : SpectralLineJetIndex χ a s :=
+    ⟨(z.val.1, z.val.2, m.val), m.isLt⟩
+  let index : ((z : Z(χ)) × Fin N(χ, z)) ≃ SpectralLineJetIndex χ a s :=
+    ⟨fun p ↦ key p.1 p.2,
+      fun j ↦ ⟨⟨(j.val.1, j.val.2.1), SpectralLineJetIndex.order_pos j⟩, ⟨j.val.2.2, j.property⟩⟩,
+      fun _ ↦ rfl, fun _ ↦ rfl⟩
+  apply Eq.trans _ (spectralProjection_convolution_factor (F := F) a (le_refl (0 : ℝ)) hs₀(hs) φ).symm
+  apply ContinuousLinearMap.ext
+  intro v
+  apply spectralLineAmbientKernel_operator_limit θ.mkQL lift hsection e (fun z ↦ N(χ, z)) key
+    index.bijective x f _hb.1 ((Aq₀(φ)) (θ.mkQL v))
+  let ev := (ContinuousLinearMap.apply ℂ (W(0, s)) v).comp
+    (sobolevProjectiveKernelOperator (F := F) (le_refl (0 : ℝ)) hs₀(hs))
+  refine ((ev.continuous.tendsto K).comp _hK).congr fun ij ↦ ?_
+  exact spectralLineAmbientKernel_operator_eval a (le_refl (0 : ℝ)) hs₀(hs) e (fun z ↦ N(χ, z)) key
+    (fun j ↦ (f j).comp (Aq₀(φ))) (fun j ↦ lift (x j)) ij v
 
 end LineTensors
 
@@ -923,6 +1018,32 @@ theorem spectralStripAmbientKernel_tendsto (_ha : 0 < a)
     ∃ K, Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
       (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K) := by sorry
 
+/-- On a lifted basis vector biorthogonality makes the rectangular net eventually constant.
+The rectangle only uses the quotient of its input, so this determines the operator everywhere. -/
+private theorem spectralStripAmbientKernel_operator_limit {Z J H V : Type*}
+    [NormedAddCommGroup H] [NormedSpace ℂ H] [NormedAddCommGroup V] [NormedSpace ℂ V]
+    (q : V →L[ℂ] H) (S : H →L[ℂ] V) (hq : ∀ u, q (S u) = u) (A T : V →L[ℂ] V)
+    (e : Z ↪ ℕ × ℕ) (N : Z → ℕ) (j : (z : Z) → Fin (N z) → J)
+    (hj : Bijective (fun p : (z : Z) × Fin (N z) ↦ j p.1 p.2))
+    (x : J → H) (f : J → StrongDual ℂ H) (hb : IsSpectralMarkushevichBasis x f)
+    (h : ∀ v, Tendsto (fun ij : ℕ × ℕ ↦
+      ∑ z ∈ ((Finset.Iic ij.1).product (Finset.Iic ij.2)).preimage e e.injective.injOn,
+        ∑ m : Fin (N z), f (j z m) (q v) • A (S (x (j z m)))) atTop (𝓝 (T v))) :
+    ∀ v, T v = A (S (q v)) := by
+  have hlift : T.comp S = A.comp S := by
+    apply ContinuousLinearMap.ext_on hb.2.2.1
+    rintro _ ⟨i, rfl⟩
+    apply tendsto_nhds_unique (h (S (x i)))
+    apply tendsto_const_nhds.congr'
+    have hc := spectralLineAmbientKernel_operator_single e N j hj i
+      (fun k ↦ f k (x i) • A (S (x k))) (fun k hk ↦ by rw [hb.2.1 i k hk.symm, zero_smul])
+    filter_upwards [hc] with ij hij
+    simpa only [hq, hb.1, one_smul, ContinuousLinearMap.comp_apply] using hij.symm
+  intro v
+  have hv := h (S (q v))
+  simp only [hq] at hv
+  exact (tendsto_nhds_unique (h v) hv).trans (DFunLike.congr_fun hlift (q v))
+
 /-- Paper: Theorem 10.4.3.5(3), p. 473. The ambient limit represents
 convolution after spectral projection.
 Deviation: The limit is taken in the ambient space of (10.4.3.43), with
@@ -937,7 +1058,29 @@ theorem spectralStripAmbientKernel_operator (_ha : 0 < a)
     (_horder : Order(χ, e)) (_hb : Bases(χ, x, f)) (K : Π(W'(α, s), W(α, s)))
     (_hK : Tendsto (rectangle(χ, e) (fun j ↦ D (f j))
       (fun j ↦ B (S(a, hα, hs₀(hs)) (x j)))) atTop (𝓝 K)) :
-    sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre := by sorry
+    sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K = Bpre := by
+  let θ := Θ(a, hα, hs₀(hs))
+  let lift := θ.orthogonal.subtypeL.comp θ.quotientEquivOrthogonal.toContinuousLinearEquiv.toContinuousLinearMap
+  have hsection (u) : θ.mkQL (lift u) = u :=
+    (θ.quotientEquivOrthogonal_symm_eq_mk _ (θ.quotientEquivOrthogonal u).property).symm.trans
+      (θ.quotientEquivOrthogonal.symm_apply_apply u)
+  let key (z : Z(χ)) (m : Fin N(χ, z)) : SpectralStripJetIndex χ a α s :=
+    ⟨(z.val.1, z.val.2.1, z.val.2.2, m.val), m.isLt⟩
+  let index : ((z : Z(χ)) × Fin N(χ, z)) ≃ SpectralStripJetIndex χ a α s :=
+    ⟨fun p ↦ key p.1 p.2,
+      fun j ↦ ⟨⟨(j.val.1, j.val.2.1, j.val.2.2.1), SpectralStripJetIndex.mem_strip_order_pos hα j⟩,
+        ⟨j.val.2.2.2, j.property⟩⟩, fun _ ↦ rfl, fun _ ↦ rfl⟩
+  let T := sobolevProjectiveKernelOperator (F := F) hα hs₀(hs) K
+  have h := spectralStripAmbientKernel_operator_limit θ.mkQL lift hsection B T e
+    (fun z ↦ N(χ, z)) key index.bijective x f _hb.1 (fun v ↦ by
+      let ev := (ContinuousLinearMap.apply ℂ (W(α, s)) v).comp
+        (sobolevProjectiveKernelOperator (F := F) hα hs₀(hs))
+      refine ((ev.continuous.tendsto K).comp _hK).congr fun ij ↦ ?_
+      exact spectralLineAmbientKernel_operator_eval a hα hs₀(hs) e (fun z ↦ N(χ, z)) key f
+        (fun j ↦ B (lift (x j))) ij v)
+  apply ContinuousLinearMap.ext
+  intro v
+  exact (h v).trans (congrArg B (spectralStripKernel_orthogonalLift (F := F) a hα hs _ha _ v rfl))
 
 end StripTensors
 

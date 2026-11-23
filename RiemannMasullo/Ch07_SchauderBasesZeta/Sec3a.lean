@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
@@ -479,7 +482,16 @@ theorem sLocalOrbitalPrincipalValue_annihilator_le {T : Finset V} (hT : T ⊆ S)
     (PV(T, hT, ω)).dualAnnihilator.comap (ContinuousLinearMap.coeLM ℂ) ≤
       (Submodule.span ℂ
         (range (sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω)))).topologicalClosure := by
-  sorry
+  let E := Θₛ(ω)
+  have hN : IsNuclearTVS.{0} E := sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) ω
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) ω).2
+  apply le_of_eq
+  apply strongDual_annihilator_eq_closedSpan_of_kernels
+  intro x
+  simpa only [Set.forall_mem_range] using
+    (mem_sLocalOrbitalPrincipalValue_iff (F := F) hT _hTne _hS _hPic ω x)
 
 /-- Each selected coefficient vanishes on the principal-value image. -/
 private theorem sLocalOrbitalPrincipalValue_annihilator_ker {T : Finset V} (hT : T ⊆ S)

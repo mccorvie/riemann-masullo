@@ -783,6 +783,65 @@ theorem orbitalPlacePoissonTerm_trivial_zero (φ : 𝒟) (v : V) (π : (v.adicCo
   simp [orbitalPlacePoissonTerm]
 
 /-- Paper: §11.3.1.1(2), p. 494, and (11.3.2.5), p. 496.
+For one unramified place, the half-shifted Mellin values at the zeros of its
+reciprocal Euler factor sum to its norm-one coset contributions.
+Deviation: Uses the angular integral and half-shift weight of the repaired formula.
+This is the analytic part of the split: decompose the Mellin integral along the
+norm fibres and apply Poisson summation in the logarithmic norm coordinate. -/
+private theorem orbitalEulerSum_eq_poisson_local (F : Type*) [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F))
+    (v : HeightOneSpectrum (𝓞 F))
+    (hχ : (ideleClassNormTwist χ 0).IsUnramifiedAt v)
+    (π : (v.adicCompletion F)ˣ)
+    (hπ : Valued.v.IsUniformizer (π : v.adicCompletion F)) :
+    HasSum (fun z : {z : ℂ // (finiteHeckeEulerFactor χ v z)⁻¹ = 0} ↦
+      nuclearityTestMellin χ φ (z.val - 1 / 2))
+      (∑' n : ℤ, orbitalPlacePoissonTerm χ φ v π n) := by
+  sorry
+
+/-- Paper: §11.3.1.1(2), p. 494.
+Adding the local zero sums counts a shared zero once for each vanishing factor,
+which is exactly its multiplicity in the reciprocal Euler product. -/
+private theorem orbitalEulerSum_eq_poisson_assemble (F : Type*) [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (φ : BruhatCompactSupport (IdeleClassGroup (𝓞 F) F))
+    (S : Finset (HeightOneSpectrum (𝓞 F)))
+    (a : HeightOneSpectrum (𝓞 F) → ℂ)
+    (hs : ∀ v ∈ S, HasSum
+      (fun z : {z : ℂ // (finiteHeckeEulerFactor χ v z)⁻¹ = 0} ↦
+        nuclearityTestMellin χ φ (z.val - 1 / 2)) (a v)) :
+    HasSum (fun z : {z : ℂ // reciprocalPartialHeckeEulerProduct χ S z = 0} ↦
+      (orbitalEulerMultiplicity χ S z.val : ℂ) *
+        nuclearityTestMellin χ φ (z.val - 1 / 2)) (∑ v ∈ S, a v) := by
+  classical
+  let f : ℂ → ℂ := fun z ↦ nuclearityTestMellin χ φ (z - 1 / 2)
+  have hv (v) (hv : v ∈ S) :
+      HasSum ({z : ℂ | (finiteHeckeEulerFactor χ v z)⁻¹ = 0}.indicator f) (a v) :=
+    hasSum_subtype_iff_indicator.mp (hs v hv)
+  have h := hasSum_sum hv
+  have he (z : ℂ) :
+      (∑ v ∈ S, {z : ℂ | (finiteHeckeEulerFactor χ v z)⁻¹ = 0}.indicator f z) =
+        (orbitalEulerMultiplicity χ S z : ℂ) * f z := by
+    rw [orbitalEulerMultiplicity_eq_card]
+    simp only [Set.indicator_apply, Set.mem_ofPred_eq]
+    rw [← Finset.sum_filter]
+    simp
+  have hglobal : HasSum (fun z : ℂ ↦ (orbitalEulerMultiplicity χ S z : ℂ) * f z)
+      (∑ v ∈ S, a v) := h.congr_fun (fun z ↦ (he z).symm)
+  apply (hasSum_subtype_iff_of_support_subset (s :=
+    {z : ℂ | reciprocalPartialHeckeEulerProduct χ S z = 0}) ?_).mpr hglobal
+  intro z hz
+  by_contra hn
+  have hnone : ∀ v ∈ S, (finiteHeckeEulerFactor χ v z)⁻¹ ≠ 0 := by
+    intro v hv hzv
+    exact hn (Finset.prod_eq_zero hv hzv)
+  have hzero : orbitalEulerMultiplicity χ S z = 0 := by
+    rw [orbitalEulerMultiplicity_eq_card, Finset.filter_eq_empty_iff.mpr hnone]
+    rfl
+  exact hz (by simp [hzero])
+
+/-- Paper: §11.3.1.1(2), p. 494, and (11.3.2.5), p. 496.
 The half-shifted Mellin values at the zeros of the reciprocal Euler product sum,
 with multiplicity, to the Poisson contributions of the places over the prime.
 Deviation: This is the Poisson evaluation of the spectral expression. A layer
@@ -794,7 +853,10 @@ theorem orbitalEulerSum_eq_poisson (χ : PontryaginDual C𝔽) (φ : 𝒟) (p : 
     let zeros := {z : ℂ // reciprocalPartialHeckeEulerProduct χ above(p) z = 0}
     HasSum (fun z : zeros ↦ (orbitalEulerMultiplicity χ above(p) z.val : ℂ) *
       nuclearityTestMellin χ φ (z.val - 1 / 2))
-      (∑ v ∈ above(p), ∑' n : ℤ, orbitalPlacePoissonTerm χ φ v (π v) n) := by sorry
+      (∑ v ∈ above(p), ∑' n : ℤ, orbitalPlacePoissonTerm χ φ v (π v) n) := by
+  exact orbitalEulerSum_eq_poisson_assemble F χ φ above(p)
+    (fun v ↦ ∑' n : ℤ, orbitalPlacePoissonTerm χ φ v (π v) n)
+    (fun v hv ↦ orbitalEulerSum_eq_poisson_local F χ φ v (_hχ v hv) (π v) (_hπ v hv))
 
 /-- Paper: §11.3.1.1(2), pp. 494–495. If the test is supported at norms
 strictly between one and the residue size, every summand at that place vanishes. -/

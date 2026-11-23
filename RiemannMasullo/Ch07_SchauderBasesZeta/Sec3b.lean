@@ -7,6 +7,7 @@ import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3a
 import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.MeasureTheory.Integral.ProdPi
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
 
@@ -166,6 +167,29 @@ private theorem sLocalPWTests_moments_surjective_bump
   · change (f x)⁻¹ * f x = 1
     exact inv_mul_cancel₀ hfx
 
+/-- Modulating a nonzero bump by a character can make its integral nonzero
+without enlarging its support. -/
+private theorem sLocalPWTests_moments_surjective_zero_bump_modulate
+    {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [T2Space G] [LocallyCompactSpace G] [SecondCountableTopology G]
+    [MeasurableSpace G] [BorelSpace G] (μ : MeasureTheory.Measure G) [μ.IsHaarMeasure]
+    (p : SchwartzBruhat G) (hp : p ≠ 0) :
+    ∃ h : SchwartzBruhat G, tsupport h.val ⊆ tsupport p.val ∧
+      MeasureTheory.integral μ h.val ≠ 0 := by
+  obtain ⟨L, hL⟩ := schwartzBruhat_fourier_equiv μ
+  obtain ⟨χ, hχ⟩ : ∃ χ, L p χ ≠ 0 := by
+    by_contra! hall
+    exact hp (L.map_eq_zero_iff.mp (Subtype.ext (funext hall)))
+  let h : SchwartzBruhat G := ⟨_, pontryaginDual_mul_schwartzBruhat χ⁻¹ p⟩
+  refine ⟨h, tsupport_mul_subset_right, ?_⟩
+  rw [(hL p).2 χ] at hχ
+  intro he
+  apply hχ
+  refine (MeasureTheory.integral_congr_ae ?_).trans he
+  exact .of_forall fun x ↦ by
+    change p x * star (χ x : ℂ) = (((χ x)⁻¹ : Circle) : ℂ) * p x
+    rw [Circle.coe_inv_eq_conj, Complex.star_def, mul_comm]
+
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Every neighborhood of zero contains the support of a compact Schwartz–Bruhat
 bump vanishing at zero and having nonzero additive Tamagawa integral.
@@ -178,8 +202,56 @@ private theorem sLocalPWTests_moments_surjective_zero_bump
       h (Multiplicative.ofAdd 0) = 0 ∧
       MeasureTheory.integral (sAdditiveTamagawaMeasure F S)
         (fun x ↦ h (Multiplicative.ofAdd x)) ≠ 0 := by
-  sorry
+  classical
+  let A := SAdeleRing F S
+  let G := Multiplicative A
+  let w : InfinitePlace F := Classical.arbitrary _
+  have hi := InfinitePlace.Completion.isometry_extensionEmbedding w
+  let : NontriviallyNormedField w.Completion := ⟨⟨2, by
+    rw [← hi.norm_map_of_map_zero (map_zero _) (2 : w.Completion), map_ofNat]
+    norm_num⟩⟩
+  let j (z : w.Completion) : A := (Pi.single w z, 0)
+  have hj : Continuous j := (continuous_single w).prodMk continuous_const
+  have h0 : j 0 = 0 := by
+    change (Pi.single w 0, (0 : (v : S) → v.val.adicCompletion F)) = (0, 0)
+    rw [Pi.single_zero]
+  have hnear : ∀ᶠ z in 𝓝[≠] (0 : w.Completion), j z ∈ interior K :=
+    ((hj.tendsto' _ _ h0).mono_left nhdsWithin_le_nhds) (interior_mem_nhds.mpr hK)
+  obtain ⟨z, hzK, hz⟩ := (hnear.and (self_mem_nhdsWithin :
+    {0}ᶜ ∈ 𝓝[≠] (0 : w.Completion))).exists
+  have hjz : j z ≠ 0 := by
+    intro he
+    have hz0 : Pi.single w z w = (0 : w.Completion) := congrArg (fun a : A ↦ a.1 w) he
+    exact hz (Set.mem_singleton_iff.mpr ((Pi.single_eq_same w z).symm.trans hz0))
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : InfinitePlace F) : MeasurableSpace v.Completion := borel _
+  let : MeasurableSpace (InfiniteAdeleRing F) :=
+    inferInstanceAs (MeasurableSpace ((v : InfinitePlace F) → v.Completion))
+  let : MeasurableSpace A := inferInstanceAs
+    (MeasurableSpace (InfiniteAdeleRing F × ((v : S) → v.val.adicCompletion F)))
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (v : InfinitePlace F) : SecondCountableTopology v.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding v).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology G := inferInstanceAs (SecondCountableTopology
+    (((v : InfinitePlace F) → v.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let μ : MeasureTheory.Measure G := sAdditiveTamagawaMeasure F S
+  obtain ⟨hT₂, hLC, hBor, hHaar, -⟩ := sAdele_fourierMeasure (F := F) (S := S)
+  let : T2Space G := hT₂
+  let : LocallyCompactSpace G := hLC
+  let : BorelSpace G := hBor
+  let : μ.IsHaarMeasure := hHaar
+  let U : Set G := (Multiplicative.toAdd ⁻¹' interior K) ∩ {Multiplicative.ofAdd (0 : A)}ᶜ
+  have hU : IsOpen U := (isOpen_interior.preimage continuous_toAdd).inter isClosed_singleton.isOpen_compl
+  obtain ⟨p, hpc, hpU, hpx⟩ := sLocalPWTests_moments_surjective_bump
+    (Multiplicative.ofAdd (j z)) U (hU.mem_nhds ⟨hzK, hjz⟩)
+  have hp : p ≠ 0 := fun he ↦ zero_ne_one ((congrArg
+    (fun f : SchwartzBruhat G ↦ f (Multiplicative.ofAdd (j z))) he).symm.trans hpx)
+  obtain ⟨h, hs, hI⟩ := sLocalPWTests_moments_surjective_zero_bump_modulate μ p hp
+  refine ⟨h, hpc.of_isClosed_subset isClosed_closure hs, fun x hx ↦
+    interior_subset (hpU (hs hx)).1, ?_, hI⟩
+  exact image_eq_zero_of_notMem_tsupport fun hx ↦ (hpU (hs hx)).2 rfl
 
+open MeasureTheory in
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 Insertion of integer-ring indicators multiplies the Fourier value at zero by
 one nonzero scalar, independent of the test.
@@ -190,7 +262,59 @@ private theorem sLocalPWTests_moments_surjective_transition
     ∃ c : ℂ, c ≠ 0 ∧ ∀ g : SchwartzBruhat (Multiplicative (SAdeleRing F S)),
       sAdeleSchwartzFourier (sAdeleSchwartzTransition F hST g) (Multiplicative.ofAdd 0) =
         c * sAdeleSchwartzFourier g (Multiplicative.ofAdd 0) := by
-  sorry
+  classical
+  obtain ⟨D, hd, rfl⟩ : ∃ D : Finset (HeightOneSpectrum (𝓞 F)),
+      Disjoint S D ∧ T = S ∪ D :=
+    ⟨T \ S, Finset.disjoint_sdiff, (Finset.union_sdiff_of_subset hST).symm⟩
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+  let (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F) := ⟨rfl⟩
+  let (v : HeightOneSpectrum (𝓞 F)) : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  let μ := finiteLocalAdditiveTamagawaMeasure F
+  let (v : HeightOneSpectrum (𝓞 F)) : (μ v).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let b (v : D) := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator (fun _ ↦ (1 : ℂ))
+  refine ⟨∏ v : D, ∫ x, b v x ∂μ v, Finset.prod_ne_zero_iff.mpr ?_, fun g ↦ ?_⟩
+  · intro v _
+    let O := (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+    have ho : IsOpen O := Valued.isOpen_valuationSubring _
+    have hc : IsCompact O := isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val)
+    have hm : 0 < (μ v).real O := ENNReal.toReal_pos
+      (ho.measure_pos (μ v) ⟨0, (v.val.adicCompletionIntegers F).zero_mem⟩).ne'
+      (hc.measure_ne_top (μ := μ v))
+    change (∫ x, O.indicator (fun _ ↦ (1 : ℂ)) x ∂μ v) ≠ 0
+    rw [integral_indicator_const _ ho.measurableSet, Complex.real_smul, mul_one]
+    exact Complex.ofReal_ne_zero.mpr hm.ne'
+  rw [sAdeleSchwartzFourier_apply_zero, sAdeleSchwartzFourier_apply_zero, mul_comm]
+  let (w : InfinitePlace F) : SigmaFinite (infiniteLocalAdditiveTamagawaMeasure F w) := by
+    rw [infiniteLocalAdditiveTamagawaMeasure]
+    split_ifs with hw
+    · exact (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+    · rw [two_nsmul]
+      exact (InfinitePlace.Completion.isometryEquivComplexOfIsComplex
+        (InfinitePlace.not_isReal_iff_isComplex.mp hw)).symm.toHomeomorph.measurableEmbedding.sigmaFinite_map
+  apply integral_prod_piFinsetUnion (Measure.pi (infiniteLocalAdditiveTamagawaMeasure F)) μ hd
+    (fun z ↦ g (Multiplicative.ofAdd z)) b
+  intro a x y
+  rw [sAdeleSchwartzTransition_apply]
+  let X (v : HeightOneSpectrum (𝓞 F)) := v.adicCompletion F
+  let t := MeasurableEquiv.piFinsetUnion X hd (x, y)
+  have hmem : (∀ w : ↥(S ∪ D), w.val ∉ S → t w ∈ w.val.adicCompletionIntegers F) ↔
+      ∀ v : D, y v ∈ v.val.adicCompletionIntegers F := by
+    constructor
+    · intro h v
+      have hv := h ⟨v.val, Finset.mem_union_right S v.property⟩
+        (fun hs ↦ Finset.disjoint_left.mp hd hs v.property)
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd v.property] using hv
+    · intro h w hw
+      have hv := (Finset.mem_union.mp w.property).resolve_left hw
+      simpa only [t, MeasurableEquiv.piFinsetUnion_right X hd hv] using! h ⟨w.val, hv⟩
+  change (if _ then g (Multiplicative.ofAdd (a, fun v : S ↦ t ⟨v.val, hST v.property⟩)) else 0) = _
+  have hx : (fun v : S ↦ t ⟨v.val, hST v.property⟩) = x :=
+    funext fun v ↦ MeasurableEquiv.piFinsetUnion_left X hd v.property _
+  simp only [b, indicator_apply, Fintype.prod_boole, mul_ite, mul_one, mul_zero]
+  exact if_congr hmem (congrArg (fun u ↦ g (Multiplicative.ofAdd (a, u))) hx) rfl
 
 /-- Paper: Definitions 7.3.2.1(1) and 7.3.2.3(1), pp. 351, 355.
 The two moments on the inserted test space can be specified independently whenever

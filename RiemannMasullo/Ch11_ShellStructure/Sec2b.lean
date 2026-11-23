@@ -598,13 +598,150 @@ theorem invariantPWCondensation_apply_of_mem (a : ℝ) (ω : PontryaginDual C₁
   have h := invariantPWProjection_apply_of_mem (F := F) (S := S) hs a ω Λ u _hu
   simp only [invariantPWCondensation, ContinuousLinearMap.comp_apply, h]
 
+/-- Projections onto levels squeezed between convergent levels and the target range converge. -/
+private theorem invariantPWProjection_tendsto_squeeze
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (I K : Submodule ℂ H) [CompleteSpace I] [CompleteSpace K]
+    (A B : ℝ → Submodule ℂ I) [∀ i, CompleteSpace (A i)] [∀ i, CompleteSpace (B i)]
+    (hlim : ∀ u : I, Tendsto (fun i ↦ (A i).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u))))
+    (g : ℝ → ℝ) (hg : Tendsto g atTop atTop) (hAB : ∀ᶠ i in atTop, A (g i) ≤ B i)
+    (hBK : ∀ (i : ℝ) (w : I), w ∈ B i → (w : H) ∈ K) (u : I) :
+    Tendsto (fun i ↦ (B i).starProjection u) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection u))) := by
+  have horth (i : ℝ) (w : I) (hw : w ∈ B i) :
+      inner ℂ (I.orthogonalProjectionOnto (K.starProjection (u : H)) - u) w = 0 := by
+    have h1 : inner ℂ (I.orthogonalProjectionOnto (K.starProjection (u : H))) w =
+        inner ℂ (u : H) (w : H) := by
+      rw [Submodule.inner_orthogonalProjectionOnto_eq_of_mem_right,
+        Submodule.inner_starProjection_left_eq_right, K.starProjection_eq_self_iff.mpr (hBK i w hw)]
+    rw [inner_sub_left, h1, Submodule.coe_inner, sub_self]
+  have hle (i : ℝ) (hi : A (g i) ≤ B i) :
+      ‖(B i).starProjection u - I.orthogonalProjectionOnto (K.starProjection (u : H))‖ ≤
+        ‖(A (g i)).starProjection u - I.orthogonalProjectionOnto (K.starProjection (u : H))‖ := by
+    have hb : (B i).starProjection u ∈ B i := (B i).starProjection_apply_mem u
+    have ha : (A (g i)).starProjection u ∈ B i := hi ((A (g i)).starProjection_apply_mem u)
+    have hw : (B i).starProjection u - (A (g i)).starProjection u ∈ B i := (B i).sub_mem hb ha
+    have h0 : inner ℂ (I.orthogonalProjectionOnto (K.starProjection (u : H)) - (B i).starProjection u)
+        ((B i).starProjection u - (A (g i)).starProjection u) = 0 := by
+      rw [show I.orthogonalProjectionOnto (K.starProjection (u : H)) - (B i).starProjection u =
+          (I.orthogonalProjectionOnto (K.starProjection (u : H)) - u) + (u - (B i).starProjection u)
+          by abel, inner_add_left, horth i _ hw,
+        Submodule.starProjection_inner_eq_zero (K := B i) u _ hw, add_zero]
+    have hp := norm_add_sq_eq_norm_sq_add_norm_sq_of_inner_eq_zero _ _ h0
+    rw [show I.orthogonalProjectionOnto (K.starProjection (u : H)) - (B i).starProjection u +
+        ((B i).starProjection u - (A (g i)).starProjection u) =
+        I.orthogonalProjectionOnto (K.starProjection (u : H)) - (A (g i)).starProjection u
+        by abel] at hp
+    rw [norm_sub_rev ((B i).starProjection u), norm_sub_rev ((A (g i)).starProjection u)]
+    nlinarith [norm_nonneg (I.orthogonalProjectionOnto (K.starProjection (u : H)) - (A (g i)).starProjection u),
+      norm_nonneg (I.orthogonalProjectionOnto (K.starProjection (u : H)) - (B i).starProjection u),
+      norm_nonneg ((B i).starProjection u - (A (g i)).starProjection u)]
+  rw [tendsto_iff_norm_sub_tendsto_zero]
+  refine squeeze_zero' (Eventually.of_forall fun _ ↦ norm_nonneg _) ?_
+    (tendsto_iff_norm_sub_tendsto_zero.mp ((hlim u).comp hg))
+  filter_upwards [hAB] with i hi using hle i hi
+
+/-- Raising the level to the reciprocal of the place count tends to infinity and stays below it. -/
+private theorem invariantPWProjection_tendsto_root (c : ℕ) :
+    let g : ℝ → ℝ := fun Λ ↦ Λ ^ (1 / ((c : ℝ) + 1))
+    Tendsto g atTop atTop ∧ ∀ᶠ Λ in atTop, 0 < g Λ ∧ g Λ ^ c ≤ Λ := by
+  intro g
+  let d : ℝ := (c : ℝ) + 1
+  have hd : 0 < d := by positivity
+  refine ⟨tendsto_rpow_atTop (one_div_pos.mpr hd), ?_⟩
+  filter_upwards [eventually_ge_atTop (1 : ℝ)] with Λ hΛ
+  have hg : 0 < g Λ := Real.rpow_pos_of_pos (by linarith : (0 : ℝ) < Λ) _
+  refine ⟨hg, ?_⟩
+  rw [← Real.rpow_natCast, ← Real.rpow_mul (by linarith)]
+  calc Λ ^ (1 / d * c) ≤ Λ ^ (1 : ℝ) :=
+        Real.rpow_le_rpow_of_exponent_le hΛ (by
+          rw [div_mul_eq_mul_div, one_mul, div_le_one hd]
+          exact le_add_of_nonneg_right zero_le_one)
+    _ = Λ := Real.rpow_one Λ
+
+/-- A box of size Λ lies in every product region of size at least Λ to the number of places. -/
+private theorem invariantPWProjection_tendsto_abs_le (a : ℝ) (ω : PontryaginDual C₁) {Λ Y : ℝ}
+    (hΛ : 0 < Λ) (hY : Λ ^ (Fintype.card (InfinitePlace F) + S.card) ≤ Y) :
+    globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ ≤
+      globalInvariantPWSobolev (F := F) (S := S) hs a ω Y := by
+  have hbox : sLocalPWBox S Λ ⊆ sLocalPWProductRegion S Y := by
+    intro x hx
+    have ha : (∏ w : InfinitePlace F, ‖x.1 w‖ ^ w.mult) ≤ Λ ^ Fintype.card (InfinitePlace F) := by
+      simpa only [Finset.prod_const, Finset.card_univ] using
+        (Finset.prod_le_prod₀ (s := Finset.univ) (g := fun _ : InfinitePlace F ↦ Λ)
+          (fun w _ ↦ pow_nonneg (norm_nonneg (x.1 w)) w.mult) (fun w _ ↦ hx.1 w))
+    have hf : (∏ v : S, ‖x.2 v‖) ≤ Λ ^ S.card := by
+      simpa only [Finset.prod_const, Finset.card_univ, Fintype.card_coe] using
+        (Finset.prod_le_prod₀ (s := Finset.univ) (g := fun _ : S ↦ Λ)
+          (fun v _ ↦ norm_nonneg (x.2 v)) (fun v _ ↦ hx.2 v))
+    change _ * _ ≤ Y
+    refine le_trans ?_ hY
+    rw [pow_add]
+    exact mul_le_mul ha hf (Finset.prod_nonneg fun v _ ↦ norm_nonneg (x.2 v))
+      (pow_nonneg hΛ.le _)
+  have htests : sLocalPWTests (S := S) (T := S) le_rfl (sLocalPWBox S Λ) ≤
+      sLocalPWTests (S := S) (T := S) le_rfl (sLocalPWProductRegion S Y) :=
+    Submodule.map_mono (Submodule.span_mono fun _ hf ↦ ⟨hf.1, hf.2.trans (Set.preimage_mono hbox)⟩)
+  refine Submodule.topologicalClosure_mono (Submodule.span_mono ?_)
+  rintro _ ⟨f, rfl⟩
+  exact ⟨⟨f.val, htests f.property⟩, rfl⟩
+
+/-- The global invariant levels lie in the weighted theta subspace. -/
+private theorem invariantPWProjection_tendsto_le_theta (a : ℝ) (ω : PontryaginDual C₁) (Λ : ℝ) :
+    globalInvariantPWSobolev (F := F) (S := S) hs a ω Λ ≤
+      (globalThetaSobolev F a hGeo hs : Submodule ℂ GeoW) := by
+  refine Submodule.topologicalClosure_minimal _ ?_ (Submodule.isClosed_topologicalClosure _)
+  rw [Submodule.span_le]
+  rintro _ ⟨f, rfl⟩
+  let f₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f.val⟩
+  let x : globalPolarFreeThetaSubmodule (F := F) ω :=
+    ⟨Submodule.Quotient.mk f₀.val, ⟨f₀.val, f₀.property, rfl⟩⟩
+  obtain ⟨j, -, -, hj⟩ := exists_globalHomogeneousThetaSobolevInclusion
+    (F := F) (a := a) hGeo hs ω
+  have he := (hj f₀ x rfl).2
+  have heq : globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f.val = (j x).val.val := by
+    apply Lp.ext
+    exact (withDensity_absolutelyContinuous _ _).ae_le
+      ((globalPWThetaSobolevMap_apply (F := F) (S := S) (s := s) a ω f.val).trans he.symm)
+  change globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f.val ∈
+    (globalThetaSobolev F a hGeo hs : Submodule ℂ GeoW)
+  rw [heq]
+  exact (j x).val.property
+
 /-- Paper: Theorem 11.2.1.4(1), p. 489.
 The invariant projections converge strongly to the isotypic geometric projection.
 Deviation: The support assumption on the test function is used in part (2). -/
 theorem invariantPWProjection_tendsto (a : ℝ) (ω : PontryaginDual C₁)
     (_hω : NormOneCharacterUnramifiedOutside ω S) (_hPic : PicTrivial) (u : GeoIsotype(ω)) :
-    Tendsto (fun Λ ↦ invariantPWProjection (F := F) (S := S) hs a ω Λ u) atTop (𝓝 (Pgeom(a, ω) u)) :=
-  by sorry
+    Tendsto (fun Λ ↦ invariantPWProjection (F := F) (S := S) hs a ω Λ u) atTop (𝓝 (Pgeom(a, ω) u)) := by
+  let c : ℕ := Fintype.card (InfinitePlace F) + S.card
+  let g : ℝ → ℝ := fun Λ ↦ Λ ^ (1 / ((c : ℝ) + 1))
+  let I : Submodule ℂ GeoW := GeoIsotype(ω)
+  let K : Submodule ℂ GeoW := globalThetaSobolev F a hGeo hs
+  let A (Λ : ℝ) : Submodule ℂ I := absLevel(a, ω, Λ)
+  let B (Λ : ℝ) : Submodule ℂ I := invLevel(a, ω, Λ)
+  letI : CompleteSpace I := (instClosedSpectralIsotypeSec2 (F := F) hGeo hs ω).completeSpace_coe
+  letI : ∀ Λ, CompleteSpace (A Λ) := fun Λ ↦
+    (show IsClosed (A Λ : Set I) from
+      (Submodule.isClosed_topologicalClosure _).preimage continuous_subtype_val).completeSpace_coe
+  letI : ∀ Λ, CompleteSpace (B Λ) := fun Λ ↦
+    (show IsClosed (B Λ : Set I) from
+      (Submodule.isClosed_topologicalClosure _).preimage continuous_subtype_val).completeSpace_coe
+  have hpow : ∀ᶠ Λ in atTop, 0 < g Λ ∧ g Λ ^ c ≤ Λ := (invariantPWProjection_tendsto_root c).2
+  have hAB : ∀ᶠ Λ in atTop, A (g Λ) ≤ B Λ := by
+    filter_upwards [hpow] with Λ hΛ
+    exact Submodule.comap_mono
+      (invariantPWProjection_tendsto_abs_le (F := F) (S := S) hs a ω hΛ.1 hΛ.2)
+  have hBK (Λ : ℝ) (w : I) (hw : w ∈ B Λ) : (w : GeoW) ∈ K :=
+    invariantPWProjection_tendsto_le_theta (F := F) (S := S) hs a ω Λ hw
+  have hlim (v : I) : Tendsto (fun Λ ↦ (A Λ).starProjection v) atTop
+      (𝓝 (I.orthogonalProjectionOnto (K.starProjection v))) := by
+    with_unfolding_all exact absolutePWProjection_tendsto (F := F) (S := S) hs a ω _hω _hPic v
+  with_unfolding_all
+    exact invariantPWProjection_tendsto_squeeze GeoW I K A B hlim g
+      (invariantPWProjection_tendsto_root c).1 hAB hBK u
 
 /-- Paper: Theorem 11.2.1.4(2) and (11.2.1.9), p. 489.
 Right multiplication of cutoff geometric convolution by the invariant projections
