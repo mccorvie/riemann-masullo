@@ -1580,12 +1580,229 @@ local notation "complexProfile(" f ", " n ")" =>
   (fun t : ℝ ↦ ∫ θ in (0 : ℝ)..(2 * Real.pi),
     (unitAngle(θ)) ^ n * f ((Real.sqrt t : ℂ) * unitAngle(θ)))
 
+/-- A Schwartz function is `O(x^(-a))` at infinity for every `a`. -/
+private theorem realArchimedeanMellin_existsUnique_isBigO_atTop (G : SchwartzMap ℝ ℂ) (a : ℝ) :
+    (G : ℝ → ℂ) =O[atTop] (· ^ (-a)) := by
+  have h := G.isBigO_cocompact_rpow (-a)
+  refine (h.mono atTop_le_cocompact).congr' (EventuallyEq.refl _ _) ?_
+  filter_upwards [eventually_gt_atTop (0 : ℝ)] with x hx
+  rw [Real.norm_eq_abs, abs_of_pos hx]
+
+/-- A Schwartz function is bounded near zero. -/
+private theorem realArchimedeanMellin_existsUnique_isBigO_zero (G : SchwartzMap ℝ ℂ) :
+    (G : ℝ → ℂ) =O[𝓝[>] 0] (· ^ (-(0 : ℝ))) := by
+  have hb : (G : ℝ → ℂ) =O[⊤] (fun _ ↦ (1 : ℝ)) := by
+    obtain ⟨C, -, hC⟩ := G.decay 0 0
+    refine Asymptotics.isBigO_iff.mpr ⟨C, .of_forall fun x ↦ ?_⟩
+    simpa using hC x
+  refine (hb.mono le_top).congr' (EventuallyEq.refl _ _) (.of_forall fun x ↦ ?_)
+  simp
+
+private theorem realArchimedeanMellin_existsUnique_convergent (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    MellinConvergent G s :=
+  mellinConvergent_of_isBigO_rpow (G.continuous.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+    (realArchimedeanMellin_existsUnique_isBigO_atTop G (s.re + 1)) (lt_add_one _) (realArchimedeanMellin_existsUnique_isBigO_zero G) (by simpa using hs)
+
+private theorem realArchimedeanMellin_existsUnique_differentiableAt (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    DifferentiableAt ℂ (mellin G) s :=
+  mellin_differentiableAt_of_isBigO_rpow
+    (G.continuous.continuousOn.locallyIntegrableOn measurableSet_Ioi)
+    (realArchimedeanMellin_existsUnique_isBigO_atTop G (s.re + 1)) (lt_add_one _) (realArchimedeanMellin_existsUnique_isBigO_zero G) (by simpa using hs)
+
+private theorem realArchimedeanMellin_existsUnique_ibp (G : SchwartzMap ℝ ℂ) {s : ℂ} (hs : 0 < s.re) :
+    mellin G s = -(1 / s) * mellin (SchwartzMap.derivCLM ℂ ℂ G) (s + 1) := by
+  have hs0 : s ≠ 0 := fun h ↦ by simp [h] at hs
+  let G' := SchwartzMap.derivCLM ℂ ℂ G
+  let u : ℝ → ℂ := fun t ↦ (t : ℂ) ^ ((s - 1) + 1) / ((s - 1) + 1)
+  have hu_eq (t : ℝ) : u t = (t : ℂ) ^ s / s := by simp [u]
+  have hu : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt u ((x : ℂ) ^ (s - 1)) x := fun x hx ↦
+    hasDerivAt_ofReal_cpow_const' (ne_of_gt hx) (fun h ↦ hs0 (by linear_combination h))
+  have hv : ∀ x ∈ Ioi (0 : ℝ), HasDerivAt (G : ℝ → ℂ) (G' x) x := fun x _ ↦
+    (G.differentiableAt).hasDerivAt
+  have hs1 : 0 < (s + 1).re := by simp; linarith
+  have hG's := realArchimedeanMellin_existsUnique_convergent G' hs1
+  have hGs := realArchimedeanMellin_existsUnique_convergent G hs
+  have huv' : IntegrableOn (u * (G' : ℝ → ℂ)) (Ioi 0) := by
+    refine IntegrableOn.congr_fun (hG's.const_mul (1 / s)) (fun t _ ↦ ?_) measurableSet_Ioi
+    simp only [Pi.mul_apply, hu_eq, smul_eq_mul, add_sub_cancel_right]
+    ring
+  have hu'v : IntegrableOn ((fun x : ℝ ↦ (x : ℂ) ^ (s - 1)) * (G : ℝ → ℂ)) (Ioi 0) := hGs
+  have h0 : Tendsto (u * (G : ℝ → ℂ)) (𝓝[>] 0) (𝓝 0) := by
+    have hc : ContinuousAt (fun t : ℝ ↦ (t : ℂ) ^ s / s * G t) 0 :=
+      ((Complex.continuousAt_ofReal_cpow_const 0 s (Or.inl hs)).div_const s).mul
+        G.continuous.continuousAt
+    have := hc.tendsto
+    simp only [Complex.ofReal_zero, Complex.zero_cpow hs0, zero_div, zero_mul] at this
+    refine tendsto_nhdsWithin_of_tendsto_nhds (this.congr fun t ↦ ?_)
+    simp only [Pi.mul_apply, hu_eq]
+  have hinf : Tendsto (u * (G : ℝ → ℂ)) atTop (𝓝 0) := by
+    have hub : u =O[atTop] (fun t : ℝ ↦ t ^ s.re) := by
+      refine Asymptotics.isBigO_iff.mpr ⟨‖s‖⁻¹, ?_⟩
+      filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
+      rw [hu_eq, norm_div, Complex.norm_cpow_eq_rpow_re_of_pos ht, Real.norm_eq_abs,
+        abs_of_pos (Real.rpow_pos_of_pos ht _), div_eq_mul_inv, mul_comm]
+    have hprod := hub.mul (realArchimedeanMellin_existsUnique_isBigO_atTop G (s.re + 1))
+    have hexp : (fun t : ℝ ↦ t ^ s.re * t ^ (-(s.re + 1))) =ᶠ[atTop] fun t ↦ t ^ (-1 : ℝ) := by
+      filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
+      rw [← Real.rpow_add ht]
+      ring_nf
+    exact (hprod.congr' (EventuallyEq.refl _ _) hexp).trans_tendsto
+      (tendsto_rpow_neg_atTop one_pos)
+  have key := integral_Ioi_mul_deriv_eq_deriv_mul hu hv huv' hu'v h0 hinf
+  simp only [sub_zero, zero_sub] at key
+  unfold mellin
+  have hL : (∫ t in Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) • G t) =
+      -∫ t in Ioi (0 : ℝ), u t * G' t := by
+    rw [key, neg_neg]
+    rfl
+  rw [hL]
+  have hR : (∫ t in Ioi (0 : ℝ), u t * G' t) =
+      (1 / s) * ∫ t in Ioi (0 : ℝ), (t : ℂ) ^ (s + 1 - 1) • G' t := by
+    rw [← MeasureTheory.integral_const_mul]
+    refine MeasureTheory.setIntegral_congr_fun measurableSet_Ioi fun t _ ↦ ?_
+    simp only [hu_eq, smul_eq_mul, add_sub_cancel_right]
+    ring
+  rw [hR]
+  ring
+
+private theorem realArchimedeanMellin_existsUnique_succ (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N)) (N : ℕ) {s : ℂ} (hs : 0 < (s + N).re) :
+    E N s = E (N + 1) s := by
+  rw [hE, hE]
+  rw [realArchimedeanMellin_existsUnique_ibp _ hs, Function.iterate_succ_apply', Finset.prod_range_succ,
+    pow_succ, Nat.cast_succ, ← add_assoc, mul_inv]
+  ring
+
+private theorem realArchimedeanMellin_existsUnique_eq (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N)) {s : ℂ} {N M : ℕ} (hN : 0 < (s + N).re) (hNM : N ≤ M) :
+    E N s = E M s := by
+  induction M, hNM using Nat.le_induction with
+  | base => rfl
+  | succ M hNM ih =>
+    refine ih.trans (realArchimedeanMellin_existsUnique_succ G E hE M ?_)
+    have : (N : ℝ) ≤ M := by exact_mod_cast hNM
+    simp only [Complex.add_re, Complex.natCast_re] at hN ⊢
+    linarith
+
+private theorem realArchimedeanMellin_existsUnique_contEq (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N))
+    (F : ℂ → ℂ) (hF : ∀ s, F s = E (⌈-s.re⌉₊ + 1) s) {s : ℂ} {N : ℕ} (hN : 0 < (s + N).re) :
+    F s = E N s := by
+  rw [hF]
+  have hn : 0 < (s + ((⌈-s.re⌉₊ + 1 : ℕ) : ℂ)).re := by
+    simp only [Complex.add_re, Complex.natCast_re, Nat.cast_add, Nat.cast_one, Complex.one_re]
+    have := Nat.le_ceil (-s.re)
+    linarith
+  rcases le_total N (⌈-s.re⌉₊ + 1) with h | h
+  · exact (realArchimedeanMellin_existsUnique_eq G E hE hN h).symm
+  · exact realArchimedeanMellin_existsUnique_eq G E hE hn h
+
+private theorem realArchimedeanMellin_existsUnique_analyticAt (G : SchwartzMap ℝ ℂ) (N : ℕ) {s : ℂ} (hs : 0 < (s + N).re) :
+    AnalyticAt ℂ (fun z ↦ mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (z + N)) s := by
+  have hU : IsOpen {z : ℂ | 0 < (z + N).re} :=
+    isOpen_lt continuous_const (Complex.continuous_re.comp (continuous_id.add continuous_const))
+  have hd : DifferentiableOn ℂ (fun z ↦ mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (z + N))
+      {z : ℂ | 0 < (z + N).re} := fun z hz ↦
+    ((realArchimedeanMellin_existsUnique_differentiableAt _ hz).comp z
+      (differentiableAt_id.add_const _)).differentiableWithinAt
+  exact hd.analyticAt (hU.mem_nhds hs)
+
+private theorem realArchimedeanMellin_existsUnique_meromorphicAt (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N))
+    (F : ℂ → ℂ) (hF : ∀ s, F s = E (⌈-s.re⌉₊ + 1) s) (s : ℂ) :
+    MeromorphicAt F s := by
+  set N := ⌈-s.re⌉₊ + 1
+  have hN : 0 < (s + N).re := by
+    simp only [N, Complex.add_re, Complex.natCast_re, Nat.cast_add, Nat.cast_one, Complex.one_re]
+    have := Nat.le_ceil (-s.re)
+    linarith
+  have hU : IsOpen {z : ℂ | 0 < (z + N).re} :=
+    isOpen_lt continuous_const (Complex.continuous_re.comp (continuous_id.add continuous_const))
+  have hP : AnalyticAt ℂ (fun z : ℂ ↦ ∏ j ∈ Finset.range N, (z + j)) s := by fun_prop
+  have hE' : MeromorphicAt (E N) s := by
+    have h0 := ((MeromorphicAt.const ((-1 : ℂ) ^ N) s).mul hP.meromorphicAt.inv).mul
+      (realArchimedeanMellin_existsUnique_analyticAt G N hN).meromorphicAt
+    exact h0.congr (Eventually.of_forall fun z ↦ (hE N z).symm)
+  refine hE'.congr ?_
+  filter_upwards [nhdsWithin_le_nhds (hU.mem_nhds hN)] with z hz
+  exact (realArchimedeanMellin_existsUnique_contEq G E hE F hF hz).symm
+
+private theorem realArchimedeanMellin_existsUnique_eqMellin (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N))
+    (F : ℂ → ℂ) (hF : ∀ s, F s = E (⌈-s.re⌉₊ + 1) s) {s : ℂ} (hs : 0 < s.re) :
+    F s = mellin G s := by
+  rw [realArchimedeanMellin_existsUnique_contEq G E hE F hF (N := 0) (by simpa using hs), hE]
+  simp
+
+private theorem realArchimedeanMellin_existsUnique_contAnalyticAt (G : SchwartzMap ℝ ℂ) (E : ℕ → ℂ → ℂ)
+    (hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N))
+    (F : ℂ → ℂ) (hF : ∀ s, F s = E (⌈-s.re⌉₊ + 1) s) {s : ℂ} (hs : 0 < s.re) :
+    AnalyticAt ℂ F s := by
+  have hU : IsOpen {z : ℂ | 0 < z.re} := isOpen_lt continuous_const Complex.continuous_re
+  have h := realArchimedeanMellin_existsUnique_analyticAt G 0 (s := s) (by simpa using hs)
+  simp only [Function.iterate_zero, id_eq, Nat.cast_zero, add_zero] at h
+  refine h.congr ?_
+  filter_upwards [hU.mem_nhds hs] with z hz
+  exact (realArchimedeanMellin_existsUnique_eqMellin G E hE F hF hz).symm
+
+/-- Two functions in meromorphic normal form on the plane that agree on the right
+half-plane agree everywhere. -/
+private theorem realArchimedeanMellin_existsUnique_eqNF {G H : ℂ → ℂ}
+    (hG : MeromorphicNFOn G univ) (hH : MeromorphicNFOn H univ)
+    (h : ∀ z : ℂ, 0 < z.re → G z = H z) (s : ℂ) : G s = H s := by
+  have hAt : meromorphicOrderAt (G - H) (1 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ z : ℂ in 𝓝 (1 : ℂ), 0 < z.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun z hz ↦ sub_eq_zero.mpr (h z hz)
+  have hOrd := (hG.meromorphicOn.sub hH.meromorphicOn).meromorphicOrderAt_eq_top_of_isPreconnected
+    isPreconnected_univ (mem_univ (1 : ℂ)) (mem_univ s) hAt
+  have hNear : G =ᶠ[𝓝[≠] s] H :=
+    (meromorphicOrderAt_eq_top_iff.mp hOrd).mono fun _ h ↦ sub_eq_zero.mp h
+  exact (((hG (mem_univ s)).eventuallyEq_nhdsNE_iff_eventuallyEq_nhds (hH (mem_univ s))).mp
+    hNear).eq_of_nhds
+
+private theorem realArchimedeanMellin_existsUnique_schwartz (G : SchwartzMap ℝ ℂ) :
+    ∃! L : ℂ → ℂ, MeromorphicNFOn L univ ∧ ∀ s : ℂ, 0 < s.re → HasMellin G s (L s) := by
+  let E : ℕ → ℂ → ℂ := fun N s ↦ (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+    mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N)
+  have hE : ∀ N s, E N s = (-1 : ℂ) ^ N * (∏ j ∈ Finset.range N, (s + j))⁻¹ *
+      mellin ((SchwartzMap.derivCLM ℂ ℂ)^[N] G) (s + N) := fun _ _ ↦ rfl
+  let F : ℂ → ℂ := fun s ↦ E (⌈-s.re⌉₊ + 1) s
+  have hF : ∀ s, F s = E (⌈-s.re⌉₊ + 1) s := fun _ ↦ rfl
+  have hm : MeromorphicOn F univ := fun s _ ↦ realArchimedeanMellin_existsUnique_meromorphicAt G E hE F hF s
+  refine ⟨toMeromorphicNFOn F univ, ⟨meromorphicNFOn_toMeromorphicNFOn _ _,
+    fun s hs ↦ ⟨realArchimedeanMellin_existsUnique_convergent G hs, ?_⟩⟩, ?_⟩
+  · rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ s),
+      toMeromorphicNFAt_eq_self.mpr (realArchimedeanMellin_existsUnique_contAnalyticAt G E hE F hF hs).meromorphicNFAt,
+      realArchimedeanMellin_existsUnique_eqMellin G E hE F hF hs]
+  · rintro L ⟨hL, hLm⟩
+    funext s
+    refine realArchimedeanMellin_existsUnique_eqNF hL (meromorphicNFOn_toMeromorphicNFOn _ _) (fun z hz ↦ ?_) s
+    rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hm (mem_univ z),
+      toMeromorphicNFAt_eq_self.mpr (realArchimedeanMellin_existsUnique_contAnalyticAt G E hE F hF hz).meromorphicNFAt,
+      realArchimedeanMellin_existsUnique_eqMellin G E hE F hF hz]
+    exact (hLm z hz).2.symm
+
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The real Mellin integral converges on the right half-plane and has a unique
 meromorphic continuation for each sign parity. -/
 theorem realArchimedeanMellin_existsUnique (f : 𝓢(ℝ, ℂ)) (ε : Fin 2) :
     ∃! L : ℂ → ℂ, MeromorphicNFOn L univ ∧
-      ∀ s : ℂ, 0 < s.re → HasMellin (realProfile(f, ε)) s (L s) := by sorry
+      ∀ s : ℂ, 0 < s.re → HasMellin (realProfile(f, ε)) s (L s) := by
+  let G : 𝓢(ℝ, ℂ) := f + ((-1 : ℂ) ^ ε.val) •
+    SchwartzMap.compCLMOfContinuousLinearEquiv ℂ (ContinuousLinearEquiv.neg ℝ) f
+  have hG : realProfile(f, ε) = ⇑G := by
+    funext t
+    simp [G]
+  rw [hG]
+  exact realArchimedeanMellin_existsUnique_schwartz G
 
 /-- Paper: Proposition 5.3.3.4, p. 258.
 The real local Mellin transform is the meromorphic continuation of the weighted
