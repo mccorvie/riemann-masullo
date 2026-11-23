@@ -3863,6 +3863,12 @@ private theorem schwartzBruhat_nuclear_of_embedding.{test, u} {X : Type u} {Y : 
   exact (⟨Equiv.refl (X ⊗[ℂ] F), hforward, hback⟩ :
     ProjectiveTensor X F ≃ₜ InjectiveTensor X F).isHomeomorph
 
+/-- Elementary Schwartz spaces on level-zero finite factors are nuclear. -/
+private theorem elementarySchwartz_nuclear {m n r : ℕ} {F : Type} [AddCommGroup F]
+    [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
+    IsNuclearTVS.{v} (ElementarySchwartz m n r F) :=
+  elementarySchwartz_nuclear_of_finite
+
 /-- A strict inductive sequence of nuclear Fréchet stages is nuclear, using
 the images of its embeddings as the increasing submodule presentation. -/
 private theorem nuclear_of_injective_frechet_sequence.{u} {E : Type u} [AddCommGroup E] [Module ℂ E]

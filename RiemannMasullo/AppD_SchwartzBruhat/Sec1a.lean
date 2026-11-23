@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.AppC_LCTVS.Sec2a_part2
+public import RiemannMasullo.AppC_LCTVS.Sec2b
 public import Mathlib.Analysis.Distribution.SchwartzSpace.Basic
 public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.Analysis.InnerProductSpace.PiL2
@@ -5333,7 +5334,7 @@ universe v
 
 /-- The product of the one-dimensional summable lattice weights is summable
 over every finite product of integer lattices. -/
-private theorem summable_lattice_product {J : Type*} [Fintype J] :
+theorem summable_lattice_product {J : Type*} [Fintype J] :
     Summable (fun k : J → ℤ ↦ ∏ j, (1 + (k j : ℝ)^2)⁻¹) := by
   classical
   have h₁ : Summable (fun k : ℤ ↦ (1 + (k : ℝ)^2)⁻¹) := by
@@ -5397,7 +5398,7 @@ private theorem schwartzCube_monomial_weight {J : Type*} [Fintype J] (d : J → 
 
 /-- Evaluation of a higher derivative on fixed vectors is a fixed finite
 linear combination of coordinate partials. -/
-private theorem elementary_iterated_expansion {m n r k : ℕ} {F : Type*}
+theorem elementary_iterated_expansion {m n r k : ℕ} {F : Type*}
     (v : Fin k → EuclideanSpace ℝ (Fin m) × EuclideanSpace ℝ (Fin n)) :
     ∃ (s : Finset ((Fin m → ℕ) × (Fin n → ℕ))) (c : ((Fin m → ℕ) × (Fin n → ℕ)) → ℝ),
       ∀ (f : ElementaryLieGroup m n r F → ℂ) a b,
@@ -5762,7 +5763,7 @@ private theorem nuclear_of_generating_signed_bounds {E I : Type*} [AddCommGroup 
 
 /-- Smoothness controls independent evaluations on each unit cube, and rapid
 decay makes the resulting cube bounds summable. -/
-private theorem elementarySchwartz_nuclear {m n r : ℕ} {F : Type*} [AddCommGroup F]
+theorem elementarySchwartz_nuclear_of_finite {m n r : ℕ} {F : Type*} [AddCommGroup F]
     [TopologicalSpace F] [DiscreteTopology F] [Finite F] :
     IsNuclearTVS.{v} (ElementarySchwartz m n r F) := by
   let : T2Space (ElementarySchwartz m n r F) := elementarySchwartz_t2
@@ -6871,19 +6872,19 @@ theorem elementarySchwartzTensor_isEmbedding :
     obtain ⟨eD, heD⟩ := elementarySchwartz_latticeFinite_equiv r F
     let : T2Space S₂ := eD.toHomeomorph.symm.t2Space
     have hRT : @IsHomeomorph (ProjectiveTensor R T) (InjectiveTensor R T) _ _ id :=
-      (elementarySchwartz_nuclear : IsNuclearTVS T).tensorComparison_right
+      (elementarySchwartz_nuclear_of_finite : IsNuclearTVS T).tensorComparison_right
     obtain ⟨L, hL, hLt⟩ := elementary_real_torus_product hRT
     let iT := ContinuousLinearMap.id ℂ T
     let A : S₁ →ₗ[ℂ] RT := L.comp (projectiveTensorMap eR.toLinearMap iT.toLinearMap)
     have hA : IsEmbedding A :=
       hL.comp (projectiveTensorMap_isEmbedding_of_comparisons eR.toContinuousLinearMap iT
         eR.toHomeomorph.isEmbedding IsEmbedding.id
-        (elementarySchwartz_nuclear : IsNuclearTVS T).tensorComparison_right hRT)
+        (elementarySchwartz_nuclear_of_finite : IsNuclearTVS T).tensorComparison_right hRT)
     have hRD : @IsHomeomorph (ProjectiveTensor RT D) (InjectiveTensor RT D) _ _ id :=
-      (elementarySchwartz_nuclear : IsNuclearTVS D).tensorComparison_right
+      (elementarySchwartz_nuclear_of_finite : IsNuclearTVS D).tensorComparison_right
     obtain ⟨M, hM, hMt⟩ := elementary_cont_discrete_product hRD
     have hS₂ : IsNuclearTVS S₂ :=
-      nuclear_of_equiv eD.symm (elementarySchwartz_nuclear : IsNuclearTVS D)
+      nuclear_of_equiv eD.symm (elementarySchwartz_nuclear_of_finite : IsNuclearTVS D)
     let C : S₁ →L[ℂ] RT := ⟨A, hA.continuous⟩
     have hCD :=
       projectiveTensorMap_isEmbedding_of_comparisons C eD.toContinuousLinearMap hA
