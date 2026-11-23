@@ -417,10 +417,8 @@ local notation "stripTensorExists(" hα ", " hs ", " φ ")" =>
 local notation "geomDiagonal(" hα ", " hs ", " φ ", " hK ", " U ")" =>
   (fun x : C𝔽 ↦ dSequenceKernelSmoothening μ𝔽 U
     (globalStripGeometricKernel (F := F) (1 / 2) hα hs₁(hs) φ hK) (x, x))
-local notation "quotientTrace(" hα ", " hs ", " φ ")" =>
-  (hilbertTrace (H := spectralSobolevQuotient F (1 / 2) (hStrip(hα)) hs₀(hs))
-    ⟨spectralConvolution (F := F) (1 / 2) (hStrip(hα)) hs₀(hs) φ,
-      spectralStripConvolution_nuclear (F := F) (1 / 2) hα hs₁(hs) φ⟩)
+local notation "stripQuotientAction(" hα ", " hs ", " φ ")" =>
+  spectralConvolution (F := F) (1 / 2) (hStrip(hα)) hs₀(hs) φ
 
 /-- A projective tensor represents a nuclear operator on the Sobolev space. -/
 private theorem stripDiagonal_projective_nuclear {α s : ℝ} (hα : 0 ≤ α) (hs : 0 ≤ s)
@@ -499,12 +497,14 @@ private theorem stripDiagonal_projective_integral (φ : BruhatCompactSupport C�
 private theorem stripDiagonal_spectral_integral (φ : BruhatCompactSupport C𝔽) {α s : ℝ}
     (hα : 0 < α) (hs : 3 ≤ s) (hK : stripTensorExists(hα.le, hs, φ))
     (U : ℕ → Set C𝔽) (hU : IsDPrimeSequence μ𝔽 U) (hBorel : ∀ n, MeasurableSet (U n)) :
-    Integrable spectralDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
-      (∫ x, spectralDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) = quotientTrace(hα.le, hs, φ) := by
+    ∃ hq : IsNuclearOperator (stripQuotientAction(hα.le, hs, φ)),
+      Integrable spectralDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
+        (∫ x, spectralDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) =
+          hilbertTrace ⟨stripQuotientAction(hα.le, hs, φ), hq⟩ := by
   have h := stripDiagonal_projective_trace (F := F) (hone_lt_three := hone_lt_three) φ hα hs hK
   have d := stripDiagonal_projective_integral (F := F) (hone_lt_three := hone_lt_three)
     φ hα hs hK h.choose U hU hBorel
-  exact ⟨d.1, d.2.trans h.choose_spec.choose_spec⟩
+  exact ⟨h.choose_spec.choose, d.1, d.2.trans h.choose_spec.choose_spec⟩
 
 /-- If the test vanishes at one, subtraction gives the negative spectral diagonal at every point. -/
 private theorem stripDiagonal_geometric_eq_neg (φ : BruhatCompactSupport C𝔽) {α s : ℝ}
@@ -520,17 +520,20 @@ private theorem stripDiagonal_trace (φ : BruhatCompactSupport C𝔽)
     (_hφ : ∀ g : C₁, φ.val g = 0) {α s : ℝ} (hα : 0 < α) (hs : 3 ≤ s)
     (hK : stripTensorExists(hα.le, hs, φ))
     (U : ℕ → Set C𝔽) (_hU : IsDPrimeSequence μ𝔽 U) (_hBorel : ∀ n, MeasurableSet (U n)) :
-    Integrable geomDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
-      (∫ x, geomDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) = -quotientTrace(hα.le, hs, φ) := by
+    ∃ hq : IsNuclearOperator (stripQuotientAction(hα.le, hs, φ)),
+      Integrable geomDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
+        (∫ x, geomDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) =
+          -hilbertTrace ⟨stripQuotientAction(hα.le, hs, φ), hq⟩ := by
   have heq := stripDiagonal_geometric_eq_neg (F := F) (hone_lt_three := hone_lt_three)
     φ hα hs hK U _hU _hBorel (_hφ 1)
   have hspec := stripDiagonal_spectral_integral (F := F) (hone_lt_three := hone_lt_three)
     φ hα hs hK U _hU _hBorel
   let f := spectralDiagonal(hα.le, hs, φ, hK, U)
   have hchange := congrArg (fun q : C𝔽 → ℂ ↦ ∫ x, q x ∂μ𝔽) heq
-  refine ⟨?_, hchange.trans ((integral_neg f).trans (congrArg Neg.neg hspec.2))⟩
+  refine ⟨hspec.choose, ?_,
+    hchange.trans ((integral_neg f).trans (congrArg Neg.neg hspec.choose_spec.2))⟩
   rw [heq]
-  exact hspec.1.neg
+  exact hspec.choose_spec.1.neg
 
 end StripDiagonalProof
 
@@ -568,9 +571,9 @@ theorem integral_smoothenedStripGeometricKernel_diagonal (φ : BruhatCompactSupp
     Integrable geomDiagonal(hα.le, hs, φ, hK, U) μ𝔽 ∧
       (∫ x, geomDiagonal(hα.le, hs, φ, hK, U) x ∂μ𝔽) = -quotientTrace(hα.le, hs, φ) := by
   -- Reuse the statement’s proof of 1 < 3 throughout the Sobolev operator types.
-  exact stripDiagonal_trace (F := F)
+  exact (stripDiagonal_trace (F := F)
     (hone_lt_three := integral_smoothenedStripGeometricKernel_diagonal._proof_1)
-    φ _hφ hα hs hK U _hU _hBorel
+    φ _hφ hα hs hK U _hU _hBorel).choose_spec
 
 end SmoothenedDiagonal
 
