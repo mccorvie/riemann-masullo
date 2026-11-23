@@ -1737,6 +1737,117 @@ local notation "rhoCoeff(" c ", " r ")" =>
   complexResidue (fun z : ℂ ↦ sLocalRhoFactor (twistₛ (c) z) *
     z ^ ((sLocalRhoPoleOrder (c) : ℤ) - ((r : ℕ) : ℤ) - 1)) 0
 
+/-- The union of the pole lattices has finite multiplicity. An inverse-square bound on
+each lattice therefore implies summability over all the selected centers and jet orders. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_lattices
+    (p : Vℚ) (ω : PontryaginDual J₁) (a : Idx(p, ω) → ℝ)
+    (ha : ∀ j, 0 ≤ a j)
+    (hlattice : ∀ (χ : PontryaginDual Jₛ) (v : S) (u : (v.val.adicCompletion F)ˣ) (t : ℝ),
+      uniformizerNorm(v, u) → phase(χ, v, u, t) → ∃ C : ℝ, 0 ≤ C ∧
+        ∀ (j : Idx(p, ω)) (n : ℤ), j.val.1 = lattice(χ, v, t, n) →
+          v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 → v.val ∈ Sₚ(p) →
+            a j ≤ C / (1 + |(n : ℝ)|) ^ 2) : Summable a := by
+  classical
+  obtain ⟨χ, -, hcover⟩ := sLocalOrbitalIndex_enumerable_or_empty_chart ω
+  choose u hu using (sLocalOrbitalIndex_enumerable_or_empty_uniformizer (F := F) (S := S))
+  choose t ht using fun v : S ↦ (existsUnique_sLocalOrbitalPhase χ v (u v) (hu v)).exists
+  choose C hC hbound using fun v : S ↦ hlattice χ v (u v) (t v) (hu v) (ht v)
+  have locate (j : Idx(p, ω)) : ∃ (v : S) (n : ℤ), j.val.1 = lattice(χ, v, t v, n) ∧
+      v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 ∧ v.val ∈ Sₚ(p) := by
+    obtain ⟨v, hv⟩ := Finset.card_pos.mp (lt_of_le_of_lt (Nat.zero_le _) j.property.2)
+    obtain ⟨s, hs⟩ := hcover j.val.1 j.property.1
+    obtain ⟨n, hn⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ v (u v) (hu v)
+      (t v) (ht v) j.val.1 ⟨s, hs.symm⟩ (Finset.mem_filter.mp hv).1).exists
+    exact ⟨v, n, hn, Finset.mem_filter.mp hv⟩
+  choose v n hcenter hplace hprimary using locate
+  let order (j : Idx(p, ω)) : Fin (Fintype.card S) :=
+    ⟨j.val.2, j.property.2.trans_le (Finset.card_le_univ _)⟩
+  let ι (j : Idx(p, ω)) : (S × Fin (Fintype.card S)) × ℤ := ((v j, order j), n j)
+  have hinj : Injective ι := by
+    intro j k hjk
+    have hv : v j = v k := congrArg (fun i ↦ i.1.1) hjk
+    have ho : order j = order k := congrArg (fun i ↦ i.1.2) hjk
+    have hn : n j = n k := congrArg Prod.snd hjk
+    apply Subtype.ext
+    apply Prod.ext _ (congrArg Fin.val ho)
+    rw [hcenter j, hcenter k, hv, hn]
+  let g (i : (S × Fin (Fintype.card S)) × ℤ) := C i.1.1 / (1 + |(i.2 : ℝ)|) ^ 2
+  have hz : Summable (fun n : ℤ ↦ 1 / (1 + |(n : ℝ)|) ^ 2) := by
+    apply Summable.of_nat_of_neg
+    all_goals
+      simpa only [Int.cast_neg, abs_neg, Int.cast_natCast, Nat.abs_cast, add_comm (1 : ℝ), Nat.cast_add_one]
+        using (summable_nat_add_iff 1).mpr (Real.summable_one_div_nat_pow.mpr (by decide : 1 < 2))
+  have hg : Summable g := by
+    refine (summable_prod_of_nonneg (f := g) (fun i ↦ div_nonneg (hC i.1.1) (sq_nonneg _))).mpr
+      ⟨fun i ↦ ?_, Summable.of_finite⟩
+    simpa only [g, mul_one_div] using hz.mul_left (C i.1)
+  exact (hg.comp_injective hinj).of_nonneg_of_le ha (fun j ↦
+    hbound (v j) j (n j) (hcenter j) (hplace j) (hprimary j))
+
+/-- In a separated biorthogonal system, summability in each continuous seminorm gives
+reconstruction: coordinatewise the sum agrees with the original vector. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_reconstruct
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] (hF : IsFrechetTVS E)
+    (e : ℕ → E) (d : ℕ → StrongDual ℂ E)
+    (horth : ∀ m n, d m (e n) = if m = n then 1 else 0)
+    (hsep : ∀ u : E, (∀ n, d n u = 0) → u = 0)
+    (hs : ∀ (q : Seminorm ℂ E), Continuous q → ∀ u : E, Summable (fun n ↦ q (d n u • e n))) :
+    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  let : PolynormableSpace ℂ E := hF.choose_spec.1
+  let : UniformSpace E := IsTopologicalAddGroup.rightUniformSpace E
+  let : IsUniformAddGroup E := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace E := hF.choose_spec.2.2
+  have hb : IsSchauderBasis e d := by
+    refine ⟨horth, fun u ↦ ?_⟩
+    let terms (n : ℕ) := d n u • e n
+    have hsum : Summable terms := by
+      rw [summable_iff_cauchySeq_finset, cauchySeq_finset_iff_sum_vanishing]
+      intro U hU
+      obtain ⟨q, hq, hsub⟩ := (PolynormableSpace.hasBasis_zero_ball ℂ E).mem_iff.mp hU
+      obtain ⟨s, h⟩ := (hs q hq u).vanishing (Metric.ball_mem_nhds (0 : ℝ) zero_lt_one)
+      refine ⟨s, fun t ht ↦ hsub (q.mem_ball_zero.mpr ?_)⟩
+      have hlt := h t ht
+      rw [Metric.mem_ball, dist_zero_right, Real.norm_eq_abs] at hlt
+      exact (Finset.le_sum_of_subadditive q (map_zero q).le (map_add_le_add q) t terms).trans_lt
+        ((le_abs_self _).trans_lt hlt)
+    have hvalue : ∑' n, terms n = u := by
+      apply sub_eq_zero.mp
+      apply hsep
+      intro i
+      rw [map_sub, sub_eq_zero]
+      have himage := (d i).hasSum hsum.hasSum
+      have heval : HasSum (fun n ↦ if n = i then d i u else 0) (d i (∑' n, terms n)) := by
+        refine himage.congr_fun fun n ↦ ?_
+        simp only [terms, map_smul, smul_eq_mul, horth]
+        by_cases h : n = i <;> simp [h, Ne.symm]
+      exact heval.unique (hasSum_ite_eq i (d i u))
+    have hfinal := hsum.hasSum
+    rw [hvalue] at hfinal
+    exact Tendsto.mono_left hfinal (SummationFilter.conditional ℕ).le_atTop
+  exact ⟨hb, (SchauderBasis.isAbsolute_iff_summable_of_frechet hF hb).2 hs⟩
+
+open Classical in
+/-- The remaining estimate in Theorem 7.3.1.6(2)–(3), p. 349. Along a single local pole
+lattice the product of the polar sample of a fixed test and the seminorm of its
+biorthogonal vector decays at least quadratically, uniformly in the selected jet order. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_local
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (hS : IsSaturatedPlaceSet S) (hp : (Sₚ(p)).Nonempty) (hPic : PicTrivial)
+    (hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart i x = if i = j then 1 else 0)
+    (f : ℬₛ) (q : Seminorm ℂ Q(p, ω)) (hq : Continuous q) :
+    ∀ (χ : PontryaginDual Jₛ) (v : S) (u : (v.val.adicCompletion F)ˣ) (t : ℝ),
+      uniformizerNorm(v, u) → phase(χ, v, u, t) → ∃ C : ℝ, 0 ≤ C ∧
+        ∀ (j : Idx(p, ω)) (n : ℤ), j.val.1 = lattice(χ, v, t, n) →
+          v ∈ sLocalFinitePolePlaces (F := F) (S := S) j.val.1 → v.val ∈ Sₚ(p) →
+            ‖sLocalOrbitalPrincipalPart j ((Kₛ(ω)).mkQ f)‖ * q (ψ j) ≤ C / (1 + |(n : ℝ)|) ^ 2 := by
+  sorry
+
 /-- Paper: Theorem 7.3.1.6(2)–(3), p. 345.
 Any enumeration of the polar functionals gives an unconditional basis of the strong dual.
 With the same enumeration, its biorthogonal vectors are an absolute basis of the quotient.
@@ -1758,7 +1869,56 @@ theorem sLocalPolarOrbital_bases_of_laurent_bounds
       let e := ψ ∘ σ
       let d := D ∘ σ
       IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev ∧
-        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by sorry
+        IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  classical
+  let R := Rₚ(p, ω)
+  let D (i : Idx(p, ω)) : StrongDual ℂ Q(p, ω) :=
+    R.liftQL (sLocalOrbitalPrincipalPart i) (sLocalOrbitalPrincipalPart_range_le_ker p ω i)
+  have hD (i : Idx(p, ω)) (x : Θₛ(ω)) : D i (π(p, ω) x) = sLocalOrbitalPrincipalPart i x := rfl
+  obtain ⟨ψ, hψ⟩ := sLocalOrbitalPrincipalValue_biorthogonal hₚ(p) _hp _hS _hPic ω
+  let e : ℕ → Q(p, ω) := ψ ∘ σ
+  let d : ℕ → StrongDual ℂ Q(p, ω) := D ∘ σ
+  let ev (n : ℕ) := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (e n)
+  refine ⟨D, ψ, ev, fun _ _ ↦ rfl, hD, ?_⟩
+  have hF : IsFrechetTVS Q(p, ω) := isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω)
+    R (sLocalOrbitalPrincipalValue_isClosed hₚ(p) _hp _hS _hPic ω)
+  let : TopologicalSpace.MetrizableSpace (Θₛ(ω) ⧸ R) := hF.choose_spec.2.1
+  have hN : IsNuclearTVS.{0} Q(p, ω) := isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) R
+  obtain ⟨hb, ha⟩ := sLocalPolarOrbital_bases_of_laurent_bounds_reconstruct hF e d
+    (fun m n ↦ by
+      obtain ⟨y, hy⟩ := R.mkQ_surjective (ψ (σ n))
+      change D (σ m) (ψ (σ n)) = _
+      rw [← hy, hD, hψ (σ m) (σ n) y hy, σ.injective.eq_iff]
+      by_cases h : m = n <;> simp only [h, ite_true, ite_false])
+    (fun u hu ↦ by
+      obtain ⟨x, rfl⟩ := R.mkQ_surjective u
+      apply (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω x).2
+      intro j
+      obtain ⟨n, rfl⟩ := σ.surjective j
+      exact hu n)
+    (fun q hq u ↦ by
+      obtain ⟨x, rfl⟩ := R.mkQ_surjective u
+      obtain ⟨f, rfl⟩ := (Kₛ(ω)).mkQ_surjective x
+      have h := sLocalPolarOrbital_bases_of_laurent_bounds_lattices p ω _
+        (fun j ↦ mul_nonneg (norm_nonneg _) (apply_nonneg q (ψ j)))
+        (sLocalPolarOrbital_bases_of_laurent_bounds_local p ω _hS _hp _hPic _hcoeff ψ hψ f q hq)
+      simp only [map_smul_eq_mul]
+      change Summable (fun n ↦ ‖sLocalOrbitalPrincipalPart (σ n) ((Kₛ(ω)).mkQ f)‖ * q (ψ (σ n)))
+      exact σ.summable_iff.mpr h)
+  let : T2Space Q(p, ω) := hN.1
+  let : BarrelledSpace ℂ Q(p, ω) := isFrechetTVS_barrelled hF
+  let : PolynormableSpace ℂ Q(p, ω) := hF.choose_spec.1
+  let : UniformSpace Q(p, ω) := IsTopologicalAddGroup.rightUniformSpace Q(p, ω)
+  let : IsUniformAddGroup Q(p, ω) := isUniformAddGroup_of_addCommGroup
+  let hComplete : CompleteSpace Q(p, ω) := hF.choose_spec.2.2
+  let : CompleteSpace Q(p, ω) := hComplete
+  let : MontelSpace ℂ Q(p, ω) := ⟨fun K hK hbounded ↦ by
+    simpa only [hK.closure_eq] using isCompact_closure_of_isNuclearTVS Q(p, ω) hN hbounded⟩
+  have hR : IsHomeomorph (ContinuousLinearMap.applyₗ (E := Q(p, ω)) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hComplete hR hb ha,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hComplete hR hb ha, hb, ha⟩
 
 -- TODO(paper-gap): In (7.3.1.19) use the inverse uniformizers at the unramified
 -- places above p for the generators of Chapter 4. At a ramified place Weil's
