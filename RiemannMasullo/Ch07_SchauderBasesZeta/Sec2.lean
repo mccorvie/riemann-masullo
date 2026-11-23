@@ -285,6 +285,233 @@ theorem sLocalThetaPrincipalPartCoeff_mk (ω : PontryaginDual J₁) (c : Xₛ)
     sLocalThetaPrincipalPartCoeff ω c hc k ((Kₛ(ω)).mkQL f) =
       sLocalZLaurentCoeff f c (-(k : ℤ)) := rfl
 
+/-- Residues at `0` only depend on the germ on a punctured neighbourhood. -/
+private theorem sLocalPrincipalPartCoeff_translate_congr {g h : ℂ → ℂ}
+    (he : g =ᶠ[𝓝[≠] (0 : ℂ)] h) : complexResidue g 0 = complexResidue h 0 := by
+  obtain ⟨δ, hδ, hEq⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp he
+  unfold complexResidue limUnder
+  refine congrArg lim (Filter.map_congr ?_)
+  filter_upwards [Ioo_mem_nhdsGT hδ] with r hr
+  rw [circleIntegral.integral_congr hr.1.le fun z hz ↦ hEq ⟨?_, ?_⟩]
+  · rw [Metric.mem_ball, Metric.mem_sphere.mp hz]
+    exact hr.2
+  · rintro rfl
+    exact hr.1.ne (by simpa using hz)
+
+/-- A germ agreeing off `0` with a function analytic at `0` has residue zero there. -/
+private theorem sLocalPrincipalPartCoeff_translate_residue_zero {W H : ℂ → ℂ}
+    (hH : AnalyticAt ℂ H 0) (he : W =ᶠ[𝓝[≠] (0 : ℂ)] H) : complexResidue W 0 = 0 := by
+  have he' : W =ᶠ[𝓝[≠] (0 : ℂ)] (fun z ↦ (z * H z) / (z - 0)) := by
+    filter_upwards [he, self_mem_nhdsWithin] with z hz hz0
+    have hz0' : z ≠ 0 := hz0
+    rw [hz, sub_zero, mul_div_cancel_left₀ _ hz0']
+  rw [sLocalPrincipalPartCoeff_translate_congr he',
+    complexResidue_div_sub (g := fun z ↦ z * H z) (analyticAt_id.mul hH), zero_mul]
+
+/-- For functions analytic on a common punctured disc, the residue at the center is additive
+and commutes with constant factors. -/
+private theorem sLocalPrincipalPartCoeff_translate_add {F G : ℂ → ℂ} {R : ℝ} (hR : 0 < R)
+    (hF : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ F z)
+    (hG : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ G z) (C : ℂ) :
+    complexResidue (fun z ↦ C * F z + G z) 0 = C * complexResidue F 0 + complexResidue G 0 := by
+  have hr : 0 < R / 2 := by positivity
+  have hrR : R / 2 < R := by linarith
+  have hc (H : ℂ → ℂ) (hH : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ H z) :
+      CircleIntegrable H 0 (R / 2) := by
+    refine ContinuousOn.circleIntegrable hr.le fun z hz ↦ ?_
+    have hz' : ‖z‖ = R / 2 := mem_sphere_zero_iff_norm.mp hz
+    have hz0 : z ≠ 0 := fun h ↦ by rw [h, norm_zero] at hz'; linarith
+    exact (hH z hz0 (by rw [hz']; exact hrR)).continuousAt.continuousWithinAt
+  have hCF : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ (fun z ↦ C * F z) z :=
+    fun z h0 h ↦ analyticAt_const.mul (hF z h0 h)
+  rw [sLocalZLaurentCoeff_continuous_linear_circle (g := fun z ↦ C * F z + G z) hr hrR
+      fun z h0 h ↦ (hCF z h0 h).add (hG z h0 h),
+    sLocalZLaurentCoeff_continuous_linear_circle hr hrR hF,
+    sLocalZLaurentCoeff_continuous_linear_circle hr hrR hG,
+    circleIntegral.integral_add (hc _ hCF) (hc G hG), circleIntegral.integral_const_mul]
+  ring
+
+/-- For functions analytic on a common punctured disc, the residue at the center of a finite
+linear combination is the linear combination of the residues. -/
+private theorem sLocalPrincipalPartCoeff_translate_sum (n : ℕ) (C : ℕ → ℂ) (G : ℕ → ℂ → ℂ)
+    {R : ℝ} (hR : 0 < R) (hG : ∀ j, ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ (G j) z) :
+    complexResidue (fun z ↦ ∑ j ∈ Finset.range n, C j * G j z) 0 =
+      ∑ j ∈ Finset.range n, C j * complexResidue (G j) 0 := by
+  induction n with
+  | zero =>
+    simp only [Finset.range_zero, Finset.sum_empty]
+    exact sLocalPrincipalPartCoeff_translate_residue_zero (H := fun _ ↦ 0) analyticAt_const
+      Filter.EventuallyEq.rfl
+  | succ n ih =>
+    have hS : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R →
+        AnalyticAt ℂ (fun z ↦ ∑ j ∈ Finset.range n, C j * G j z) z := fun z h0 h ↦ by
+      have := Finset.analyticAt_sum (Finset.range n) (f := fun j z ↦ C j * G j z) (c := z)
+        fun j _ ↦ analyticAt_const.mul (hG j z h0 h)
+      convert this using 1
+      funext w
+      rw [Finset.sum_apply]
+    simp only [Finset.sum_range_succ]
+    have e : (fun z ↦ ∑ j ∈ Finset.range n, C j * G j z + C n * G n z) =
+        fun z ↦ C n * G n z + ∑ j ∈ Finset.range n, C j * G j z := funext fun z ↦ add_comm _ _
+    rw [e, sLocalPrincipalPartCoeff_translate_add hR (hG n) hS, ih, add_comm]
+
+/-- The derivatives at `0` of a polynomial `∑ c j * z ^ j` recover its coefficients. -/
+private theorem sLocalPrincipalPartCoeff_translate_poly (c : ℕ → ℂ) (n i : ℕ) :
+    iteratedDeriv i (fun z : ℂ ↦ ∑ j ∈ Finset.range n, c j * z ^ j) 0 =
+      if i < n then c i * (i.factorial : ℂ) else 0 := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    have e : (fun z : ℂ ↦ ∑ j ∈ Finset.range (n + 1), c j * z ^ j) =
+        (fun z : ℂ ↦ ∑ j ∈ Finset.range n, c j * z ^ j) + (fun z : ℂ ↦ c n * z ^ n) := by
+      funext z
+      simp [Finset.sum_range_succ]
+    rw [e, iteratedDeriv_add (by fun_prop) (by fun_prop), ih,
+      iteratedDeriv_const_mul _ (by fun_prop), iteratedDeriv_pow]
+    rcases lt_trichotomy i n with h | rfl | h
+    · rw [if_pos h, if_pos (by omega), zero_pow (by omega), mul_zero, mul_zero, add_zero]
+    · rw [if_neg (lt_irrefl _), if_pos (by omega), Nat.sub_self, pow_zero, mul_one,
+        Nat.descFactorial_self, zero_add]
+    · rw [if_neg (by omega), if_neg (by omega), (Nat.descFactorial_eq_zero_iff_lt).mpr h]
+      simp
+
+/-- The Laurent coefficient of exponent `-k` of `exp (L z)` times a germ with a pole of order at
+most `m ≥ k` is the convolution of the Taylor coefficients of the exponential with the
+coefficients of exponents `-k, …, -m` of the germ. -/
+private theorem sLocalPrincipalPartCoeff_translate_laurent {Z : ℂ → ℂ} (hZ : MeromorphicAt Z 0)
+    {m k : ℕ} (hk : k ≤ m) (hord : ((-(m : ℤ) : ℤ) : WithTop ℤ) ≤ meromorphicOrderAt Z 0)
+    (C L : ℂ) :
+    complexResidue (fun z ↦ C * (Complex.exp (L * z) * Z z / z ^ (-(k : ℤ) + 1))) 0 =
+      C * ∑ j ∈ Finset.range (m - k + 1),
+        complexResidue (fun z ↦ Z z / z ^ (-((k + j : ℕ) : ℤ) + 1)) 0 * L ^ j /
+          (j.factorial : ℂ) := by
+  obtain ⟨R, hR, hRZ⟩ : ∃ R > (0 : ℝ), ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ Z z := by
+    obtain ⟨ε, hε, h⟩ := Metric.nhdsWithin_basis_ball.eventually_iff.mp hZ.eventually_analyticAt
+    exact ⟨ε, hε, fun z hz0 hz ↦ h ⟨mem_ball_zero_iff.mpr hz, hz0⟩⟩
+  let N := m - k
+  let c : ℕ → ℂ := fun j ↦ L ^ j / (j.factorial : ℂ)
+  let P : ℂ → ℂ := fun z ↦ ∑ j ∈ Finset.range (N + 1), c j * z ^ j
+  let D : ℂ → ℂ := fun z ↦ Complex.exp (L * z) - P z
+  let G : ℕ → ℂ → ℂ := fun j z ↦ Z z / z ^ (-((k + j : ℕ) : ℤ) + 1)
+  let Q : ℂ → ℂ := fun z ↦ D z * Z z / z ^ (-(k : ℤ) + 1)
+  have hDa : Differentiable ℂ D := by
+    have hP : Differentiable ℂ P := by
+      have := Differentiable.sum (u := Finset.range (N + 1)) (A := fun j z ↦ c j * z ^ j)
+        fun j _ ↦ by fun_prop
+      convert this using 1
+      funext w
+      rw [Finset.sum_apply]
+    exact (by fun_prop : Differentiable ℂ fun z : ℂ ↦ Complex.exp (L * z)).sub hP
+  have hG : ∀ j, ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ (G j) z := fun j z hz0 hzR ↦
+    (hRZ z hz0 hzR).div (analyticAt_id.zpow hz0) (zpow_ne_zero _ hz0)
+  have hQ : ∀ z : ℂ, z ≠ 0 → ‖z‖ < R → AnalyticAt ℂ Q z := fun z hz0 hzR ↦
+    ((hDa.analyticAt z).mul (hRZ z hz0 hzR)).div (analyticAt_id.zpow hz0) (zpow_ne_zero _ hz0)
+  have hsplit : (fun z ↦ Complex.exp (L * z) * Z z / z ^ (-(k : ℤ) + 1)) =ᶠ[𝓝[≠] (0 : ℂ)]
+      (fun z ↦ (1 : ℂ) * Q z + ∑ j ∈ Finset.range (N + 1), c j * G j z) := by
+    filter_upwards [self_mem_nhdsWithin] with z hz0
+    have hz : z ≠ 0 := hz0
+    have hterm (j : ℕ) : c j * G j z = c j * z ^ j * Z z / z ^ (-(k : ℤ) + 1) := by
+      simp only [G]
+      rw [show -((k + j : ℕ) : ℤ) + 1 = (-(k : ℤ) + 1) - (j : ℤ) by push_cast; ring,
+        zpow_sub₀ hz, zpow_natCast, div_div_eq_mul_div]
+      ring
+    rw [Finset.sum_congr rfl fun j _ ↦ hterm j, ← Finset.sum_div, ← Finset.sum_mul]
+    simp only [Q, D, P]
+    ring
+  have hQ0 : complexResidue Q 0 = 0 := by
+    have hD0 : ((N + 1 : ℕ) : ℕ∞) ≤ analyticOrderAt D 0 := by
+      refine (natCast_le_analyticOrderAt_iff_iteratedDeriv_eq_zero (hDa.analyticAt 0)).mpr
+        fun i hi ↦ ?_
+      have hsub := iteratedDeriv_sub (n := i) (x := (0 : ℂ))
+        (f := fun z : ℂ ↦ Complex.exp (L * z)) (g := P) (by fun_prop)
+        (by simp only [P]; fun_prop)
+      change iteratedDeriv i ((fun z : ℂ ↦ Complex.exp (L * z)) - P) 0 = 0
+      rw [hsub, iteratedDeriv_cexp_const_mul, sLocalPrincipalPartCoeff_translate_poly, if_pos hi]
+      show L ^ i * Complex.exp (L * 0) - L ^ i / (i.factorial : ℂ) * (i.factorial : ℂ) = 0
+      rw [mul_zero, Complex.exp_zero, mul_one, div_mul_cancel₀ _ (Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero i)), sub_self]
+    obtain ⟨g, hg, hgev⟩ := (natCast_le_analyticOrderAt (hDa.analyticAt 0)).mp hD0
+    cases ho : meromorphicOrderAt Z 0 with
+    | top =>
+      refine sLocalPrincipalPartCoeff_translate_residue_zero (H := fun _ ↦ 0) analyticAt_const ?_
+      filter_upwards [meromorphicOrderAt_eq_top_iff.mp ho] with z hz
+      simp only [Q, hz, mul_zero, zero_div]
+    | coe n =>
+      rw [ho] at hord
+      have hn : -(m : ℤ) ≤ n := WithTop.coe_le_coe.mp hord
+      obtain ⟨h, hh, -, hev⟩ := (meromorphicOrderAt_eq_int_iff hZ).mp ho
+      have he : 0 ≤ ((N + 1 : ℕ) : ℤ) + n - (-(k : ℤ) + 1) := by omega
+      refine sLocalPrincipalPartCoeff_translate_residue_zero
+        (H := fun z ↦ z ^ (((N + 1 : ℕ) : ℤ) + n - (-(k : ℤ) + 1)).toNat * (g z * h z))
+        ((analyticAt_id.pow _).mul (hg.mul hh)) ?_
+      filter_upwards [hev, hgev.filter_mono nhdsWithin_le_nhds, self_mem_nhdsWithin]
+        with z hz1 hz2 hz0
+      have hz : z ≠ 0 := hz0
+      simp only [Q]
+      have hpow : z ^ (((N + 1 : ℕ) : ℤ) + n - (-(k : ℤ) + 1)).toNat =
+          z ^ (N + 1) * z ^ n / z ^ (-(k : ℤ) + 1) := by
+        rw [← zpow_natCast, Int.toNat_of_nonneg he, zpow_sub₀ hz, zpow_add₀ hz, zpow_natCast]
+      rw [hz2, hz1, sub_zero, smul_eq_mul, smul_eq_mul, hpow]
+      ring
+  have hsplit' : (fun z ↦ C * (Complex.exp (L * z) * Z z / z ^ (-(k : ℤ) + 1))) =ᶠ[𝓝[≠] (0 : ℂ)]
+      (fun z ↦ C * Q z + ∑ j ∈ Finset.range (N + 1), (C * c j) * G j z) := by
+    filter_upwards [hsplit] with z hz
+    rw [hz, mul_add, one_mul, Finset.mul_sum]
+    exact congrArg (C * Q z + ·) (Finset.sum_congr rfl fun j _ ↦ (mul_assoc _ _ _).symm)
+  rw [sLocalPrincipalPartCoeff_translate_congr hsplit',
+    sLocalPrincipalPartCoeff_translate_add hR hQ
+      (fun z h0 h ↦ by
+        have := Finset.analyticAt_sum (Finset.range (N + 1)) (f := fun j z ↦ C * c j * G j z)
+          (c := z) fun j _ ↦ analyticAt_const.mul (hG j z h0 h)
+        convert this using 1
+        funext w
+        rw [Finset.sum_apply]),
+    hQ0, mul_zero, zero_add, sLocalPrincipalPartCoeff_translate_sum _ _ _ hR hG, Finset.mul_sum]
+  refine Finset.sum_congr rfl fun j _ ↦ ?_
+  simp only [c, G]
+  ring
+
+/-- Translating a test by a unit multiplies its zeta function by the value of the
+quasi-character at the class of the unit. -/
+private theorem sLocalPrincipalPartCoeff_translate_zeta (u : Aₛˣ) (f : ℬₛ) (d : Xₛ) :
+    sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f) d =
+      d (QuotientGroup.mk u) * sLocalIdelicZFunction f d := by
+  obtain ⟨χ, s, rfl⟩ := exists_sLocalNormTwist (F := F) (S := S) d
+  let A : ℂ → ℂ := fun z ↦ (twistₛ ((circleToComplex).comp χ) z) (QuotientGroup.mk u)
+  have hM : (((mₛ (QuotientGroup.mk u : Jₛ) : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (Units.ne_zero _))
+  have hA (z : ℂ) : AnalyticAt ℂ A z ∧ A z ≠ 0 := by
+    have e : A = fun z ↦ ((χ (QuotientGroup.mk u) : Circle) : ℂ) *
+        (((mₛ (QuotientGroup.mk u : Jₛ) : ℝ≥0) : ℝ) : ℂ) ^ z := rfl
+    rw [e]
+    refine ⟨analyticAt_const.mul ((differentiable_id.const_cpow (Or.inl hM)).analyticAt z),
+      mul_ne_zero (Circle.coe_ne_zero _) ?_⟩
+    rw [Complex.cpow_def_of_ne_zero hM]
+    exact Complex.exp_ne_zero _
+  have key := eq_of_agree_rightHalf
+    (U := fun z ↦ sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f)
+      (twistₛ ((circleToComplex).comp χ) z))
+    (V := fun z ↦ A z * sLocalIdelicZFunction f (twistₛ ((circleToComplex).comp χ) z))
+    (sLocalIdelicZFunction_meromorphic _ χ)
+    (fun z _ ↦ (meromorphicNFAt_mul_iff_right (hA z).1 (hA z).2).mpr
+      (sLocalIdelicZFunction_meromorphic f χ (Set.mem_univ z))) 0 fun z hz ↦ ?_
+  · exact congrFun key s
+  · rw [sLocalIdelicZFunction_eq_integral _ ⟨χ, z, hz, rfl⟩,
+      sLocalIdelicZFunction_eq_integral _ ⟨χ, z, hz, rfl⟩]
+    letI : MeasurableSpace (SAdeleRing F S) := instMeasurableSpaceSAdeleRing F S
+    let : BorelSpace (SAdeleRing F S)ˣ := sIdeleGroup_borelSpace
+    let := sMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) (S := S)
+    unfold sLocalIdelicZetaIntegral
+    rw [← MeasureTheory.integral_const_mul,
+      ← MeasureTheory.integral_mul_left_eq_self (μ := sMultiplicativeTamagawaMeasure F S) _ u]
+    refine MeasureTheory.integral_congr_ae (.of_forall fun x ↦ ?_)
+    change f (Multiplicative.ofAdd ((↑u⁻¹ : SAdeleRing F S) * (u * x).val)) *
+        (twistₛ ((circleToComplex).comp χ) z) (QuotientGroup.mk (u * x)) =
+      A z * (f (Multiplicative.ofAdd x.val) *
+        (twistₛ ((circleToComplex).comp χ) z) (QuotientGroup.mk x))
+    rw [Units.val_mul, ← mul_assoc, Units.inv_mul, one_mul, QuotientGroup.mk_mul, map_mul]
+    simp only [A]
+    ring
+
 /-- Paper: Theorem 7.2.1.1(2), p. 334.
 Translation acts on coefficients of nonpositive exponent by an upper triangular formula.
 Deviation: Lower coefficients also receive terms from the higher polar coefficients.
@@ -295,7 +522,28 @@ theorem sLocalPrincipalPartCoeff_translate (c : Xₛ) (k : ℕ) (hk : k ≤ sLoc
     let logNorm : ℂ := Real.log (((mₛ g : ℝ≥0) : ℝ))
     sLocalPrincipalPartCoeff c k (schwartzBruhatUnitTranslate u f) =
       c g * ∑ j ∈ Finset.range (sLocalRhoPoleOrder c - k + 1),
-        sLocalPrincipalPartCoeff c (k + j) f * logNorm ^ j / (j.factorial : ℂ) := by sorry
+        sLocalPrincipalPartCoeff c (k + j) f * logNorm ^ j / (j.factorial : ℂ) := by
+  intro g logNorm
+  have hZ := sLocalZ_centered f c
+  have hord : ((-(sLocalRhoPoleOrder c : ℤ) : ℤ) : WithTop ℤ) ≤
+      meromorphicOrderAt (fun z ↦ sLocalIdelicZFunction f (twistₛ c z)) 0 :=
+    (sLocalIdelicOrderBound_eq_neg_poleOrder c).ge.trans hZ.2.1
+  have hM : (((mₛ g : ℝ≥0) : ℝ) : ℂ) ≠ 0 :=
+    Complex.ofReal_ne_zero.mpr (NNReal.coe_ne_zero.mpr (Units.ne_zero _))
+  have hval (z : ℂ) : (twistₛ c z) g = c g * Complex.exp (logNorm * z) := by
+    change c g * (((mₛ g : ℝ≥0) : ℝ) : ℂ) ^ z = _
+    rw [Complex.cpow_def_of_ne_zero hM, ← Complex.ofReal_log (NNReal.coe_nonneg _)]
+  rw [sLocalPrincipalPartCoeff_apply]
+  change complexResidue (fun z ↦ sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f)
+    (twistₛ c z) / z ^ (-(k : ℤ) + 1)) 0 = _
+  have e : (fun z ↦ sLocalIdelicZFunction (schwartzBruhatUnitTranslate u f) (twistₛ c z) /
+      z ^ (-(k : ℤ) + 1)) = fun z ↦ c g * (Complex.exp (logNorm * z) *
+        sLocalIdelicZFunction f (twistₛ c z) / z ^ (-(k : ℤ) + 1)) := by
+    funext z
+    rw [sLocalPrincipalPartCoeff_translate_zeta, hval]
+    ring
+  rw [e, sLocalPrincipalPartCoeff_translate_laurent hZ.1 hk hord]
+  rfl
 
 -- TODO(paper-gap): The universal inequality in Theorem 7.2.1.1(3)
 -- fails on the zero test whenever the functional is nonzero and k > 0.
