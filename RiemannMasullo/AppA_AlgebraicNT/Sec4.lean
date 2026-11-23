@@ -91,7 +91,10 @@ theorem sUnit_unitBox_count_bound :
 -- TODO(paper-gap): Page 562, note 3, proposes a remark about Connes without a statement.
 -- TODO(paper-gap): Page 563, the image following (A.4.1.4) has discrete finite coordinates.
 -- TODO(paper-gap): Page 563, (A.4.1.6) omits the torsion-fibre factor in the count.
--- TODO(paper-gap): Page 563, (A.4.1.7) needs compatibility of the chosen domains and representatives.
+-- TODO(paper-gap): Page 563, (A.4.1.7) can fail as a set equality. In ℚ(√2) take
+-- the inert prime (3), the S-unit basis 3(1 + √2), 3 modulo torsion, and g₁ = 1.
+-- At parallelotope coefficients (1/2, 1/2) the finite valuation is 1. Every basic
+-- idele has finite valuation 0. Compare the domains modulo diagonal S-units.
 -- TODO(paper-gap): Page 564, (A.4.1.8) pairs the normalized Haar measure with a Euclidean covolume.
 -- TODO(paper-gap): Page 565, the proof of (A.4.1.9) assumes planar slicing preserves the face angles.
 -- TODO(paper-gap): Page 565, the final constant omits the covolume and the counting error.
@@ -100,32 +103,33 @@ local notation "PicKernel" => MonoidHom.ker (CommRing.Pic.mapAlgebra (𝓞 F) O�
 local notation "OutsideNormOne" => MonoidHom.ker (MonoidHom.comp (ideleNorm F) outsideInclusion)
 local notation "Nₛ" => MonoidHom.ker (sIdeleNorm F S)
 
-/-- Paper: Claim A.4.1.2, p. 564. For basic S-ideles of sufficiently small norm and
-every chosen norm-one class representative, the translated negative orthant in the
-sum-zero hyperplane lies in a Euclidean ball centered at zero. Its radius is a common
-constant times the absolute log norm of the basic idele.
-Deviation: The representatives are supplied via global ideles that are units outside S
-and then projected to S. A basic idele is expressed using the diagonal norm section and
-the archimedean fundamental domain, with finite components that are local integer units. -/
-theorem sIdeleLog_basic_slice_subset_closedBall
-    (b : Module.Basis (Fin (Units.rank F)) ℤ (Additive ((𝓞 F)ˣ ⧸ Units.torsion F)))
-    (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
-    (bₛ : Module.Basis (Fin sRank) ℤ (Additive (Oₛˣ ⧸ CommGroup.torsion Oₛˣ)))
-    (r : PicKernel → OutsideNormOne)
-    (hr : ∀ i, ideleIdealClass F (outsideInclusion (r i).val) = i.val ∧
-      projectS (outsideInclusion (r i).val) ∈
-        Subgroup.subtype Nₛ '' sLocalIdeleFundamentalDomain F v₀ σ S bₛ) :
-    ∃ ε C₀ : ℝ, 0 < ε ∧ 0 < C₀ ∧ ∀ (t : ℝ≥0ˣ) (g₀ : Iₛ),
-      Units.map (RingHom.fst _ _).toMonoidHom g₀ ∈
-        Subgroup.subtype (infiniteIdeleNorm F).ker '' infiniteIdeleFundamentalDomain F b v₀ σ →
-      (∀ v : S, g₀.val.2 v ∈ v.val.adicCompletionIntegers F ∧
-        g₀.inv.2 v ∈ v.val.adicCompletionIntegers F) →
-      let g := projectS (diagonalIdeleNormSection F t) * g₀
-      normℝ[g] < ε → ∀ i : PicKernel,
-        let gᵢ := projectS (outsideInclusion (r i).val)
-        {x : EuclideanSpace ℝ Vₛ | (∑ v, x v) = 0 ∧
-          ∀ v, x v + sIdeleLog F S (gᵢ * g) v ≤ 0} ⊆
-          Metric.closedBall 0 (C₀ * |Real.log (normℝ[g])|) := by
+/-- Paper: Claim A.4.1.2, p. 564. For fixed F and S there is a common radius multiplier
+for every choice of fundamental domains and class representatives. For sufficiently
+small basic ideles the translated slice lies in the ball of that radius times the
+absolute log norm, uniformly in the basic idele and the class.
+Deviation: The representatives project from global norm-one ideles that are units
+outside S. A basic idele is the diagonal section times an archimedean domain point
+with finite components in the local unit groups. -/
+theorem sIdeleLog_basic_slice_subset_closedBall :
+    ∃ C₀ : ℝ, 0 < C₀ ∧
+    ∀ (b : Module.Basis (Fin (Units.rank F)) ℤ (Additive ((𝓞 F)ˣ ⧸ Units.torsion F)))
+      (v₀ : InfinitePlace F) (σ : ℂ ≃ₐ[ℝ] ℂ)
+      (bₛ : Module.Basis (Fin sRank) ℤ (Additive (Oₛˣ ⧸ CommGroup.torsion Oₛˣ)))
+      (r : PicKernel → OutsideNormOne),
+      (∀ i, ideleIdealClass F (outsideInclusion (r i).val) = i.val ∧
+        projectS (outsideInclusion (r i).val) ∈
+          Subgroup.subtype Nₛ '' sLocalIdeleFundamentalDomain F v₀ σ S bₛ) →
+      ∃ ε : ℝ, 0 < ε ∧ ∀ (t : ℝ≥0ˣ) (g₀ : Iₛ),
+        Units.map (RingHom.fst _ _).toMonoidHom g₀ ∈
+          Subgroup.subtype (infiniteIdeleNorm F).ker '' infiniteIdeleFundamentalDomain F b v₀ σ →
+        (∀ v : S, g₀.val.2 v ∈ v.val.adicCompletionIntegers F ∧
+          g₀.inv.2 v ∈ v.val.adicCompletionIntegers F) →
+        let g := projectS (diagonalIdeleNormSection F t) * g₀
+        normℝ[g] < ε → ∀ i : PicKernel,
+          let gᵢ := projectS (outsideInclusion (r i).val)
+          {x : EuclideanSpace ℝ Vₛ | (∑ v, x v) = 0 ∧
+            ∀ v, x v + sIdeleLog F S (gᵢ * g) v ≤ 0} ⊆
+            Metric.closedBall 0 (C₀ * |Real.log (normℝ[g])|) := by
   sorry
 
 end RiemannMasullo
