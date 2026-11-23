@@ -22,19 +22,28 @@ attribute [local instance] instIdeleClassMeasurableSpaceSec1 instIdeleClassBorel
   instIdeleClassT2Sec1 instIdeleClassLocallyCompactSec1 instIdeleClassSecondCountableSec1
   instIdeleClassHaarMeasureSec1 instIdeleMeasurableSpaceSec1a instMeasurableSpaceAdicUnitsSec3a
 
-/-- Paper: §11.3.1.1, p. 493. As printed, every primary stratum is the full
-preimage of its rational stratum under the relative idelic norm. -/
+/-- Paper: §11.3.1.1, p. 493. As printed, the unit conditions at all places above
+the first k rational primes define the full preimage of the corresponding rational
+stratum under the idelic norm. The base satisfies the conditions on pp. 491–492. -/
 def Printed.primaryDivisorialStratum_eq_norm_preimage : Prop :=
-  ∀ (F : Type) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))),
+  ∀ (F : Type) [Field F] [NumberField F] (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (S : Finset (HeightOneSpectrum (𝓞 F))),
     (∀ v ∈ S, ∀ w : HeightOneSpectrum (𝓞 F), w.under (𝓞 ℚ) = v.under (𝓞 ℚ) → w ∈ S) →
-    ∀ k : ℕ, divisorialStratum F (primaryDivisorialPlaces F S k) =
-      (relativeIdeleNormRat F) ⁻¹'
-        divisorialStratum ℚ ((Finset.range k).image (primaryDivisorialPrime S))
+    (∀ v ∉ S, v.asIdeal.ramificationIdx (𝓞 ℚ) = 1) →
+    (∀ v ∉ S, (ideleClassNormTwist χ 0).IsUnramifiedAt v) →
+    Subsingleton (CommRing.Pic ((S : Set (HeightOneSpectrum (𝓞 F))).integer F)) →
+    ∀ k : ℕ,
+      let T := (Finset.range k).image fun j ↦
+        Rat.HeightOneSpectrum.primesEquiv.symm ⟨Nat.nth Nat.Prime j, Nat.prime_nth_prime j⟩
+      divisorialStratum F (T.biUnion fun p ↦ (finite_nuclearityPlacesAbove (F := F) p).toFinset) =
+        (relativeIdeleNormRat F) ⁻¹' divisorialStratum ℚ T
 
-/-- Paper: §11.3.1.1, p. 493. Take F = ℚ(i), exclude the fibre over 2 and
-use the stage with rational primes 3 and 5. At the two places over 5 take
-components 5 and 5⁻¹ respectively and put one at every other place.
-The rational norm is the identity, although neither component over 5 is a unit. -/
+/-- Paper: §11.3.1.1, p. 493. Take F = ℚ(√−7), the trivial character and the
+finite base above 7. The field has discriminant −7 and class number one.
+At k = 1 the sole rational prime is 2, outside the base. The integral generator
+(1+√−7)/2 has polynomial X²−X+2, with two distinct roots modulo 2.
+At the two places over 2 take components 2 and 2⁻¹ and put one elsewhere.
+Their local norms multiply to one, although neither component is a unit. -/
 theorem Printed.primaryDivisorialStratum_eq_norm_preimage_false :
     ¬ Printed.primaryDivisorialStratum_eq_norm_preimage := by sorry
 
@@ -75,6 +84,7 @@ shift weights the Poisson value by 2⁻¹ᐟ², which the printed sum omits. -/
 theorem Printed.orbitalEulerSum_eq_poisson_false :
     ¬ Printed.orbitalEulerSum_eq_poisson := by sorry
 
+set_option maxSynthPendingDepth 3 in
 /-- Paper: Theorem 11.3.2.1, (11.3.2.1)–(11.3.2.2), p. 495.
 The printed orbital integral uses the section weight and equates a layer
 to the term for its displayed place.
