@@ -1085,7 +1085,10 @@ private theorem integral_difference_polynomial (ξ : PontryaginDual G) (g : G)
 
 open scoped Classical in
 open Polynomial in
-private theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
+/-- A log-polynomial moment of an iterated cyclic difference vanishes whenever
+the polynomial degree is less than the number of factors on whose generator
+the character is trivial in the selected norm-one isotype. -/
+theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
     (v : List G → G → ℂ)
     (hdiff : ∀ g l x, v (g :: l) x = v l x - v l (g * x))
     (hint : ∀ l r, Integrable (fun x ↦ v l x * (ξ x : ℂ) * (period x : ℂ) ^ (r : ℕ)) μ)
