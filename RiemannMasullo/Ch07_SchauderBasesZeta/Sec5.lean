@@ -156,7 +156,23 @@ theorem fullDecayDifferenceRange_eq_span (m : G →ₜ* ℝ≥0ˣ) (hm : IsModul
     let E := ↥(modulatedDecayIsotype m univ (mem_univ (0 : ℝ)) ω)
     fullDecayDifferenceRange m hm hms ω gs = Submodule.span ℂ
       {h : E | ∃ f : E, h.val.val =
-        gs.foldr (fun a (u : G → ℂ) x ↦ u x - u (a * x)) f.val.val} := by sorry
+        gs.foldr (fun a (u : G → ℂ) x ↦ u x - u (a * x)) f.val.val} := by
+  let E := ↥(modulatedDecayIsotype m univ (mem_univ (0 : ℝ)) ω)
+  let D (l : List G) := modulatedIsotypicDifferenceProduct m hm hms ω univ
+    ordConnected_univ (mem_univ (0 : ℝ)) l
+  have eval (f : E) (l : List G) (x : G) : ((D l) f).val.val x =
+      l.foldr (fun a (u : G → ℂ) y ↦ u y - u (a * y)) f.val.val x := by
+    induction l generalizing x with
+    | nil => rfl
+    | cons a l ih =>
+      exact (modulatedCyclicDifference_apply m a hm hms univ ordConnected_univ univ_nonempty
+        ((D l) f).val x).trans (congrArg₂ (· - ·) (ih x) (ih (a * x)))
+  apply le_antisymm
+  · rintro h ⟨f, rfl⟩
+    exact Submodule.subset_span ⟨f, funext (eval f gs)⟩
+  · refine Submodule.span_le.mpr ?_
+    rintro h ⟨f, hf⟩
+    exact ⟨f, Subtype.ext (Subtype.ext ((funext (eval f gs)).trans hf.symm))⟩
 end
 
 /-- Paper: Equation (7.5.0.1), p. 374.
@@ -658,10 +674,225 @@ theorem strongCoprimalityFourierJet_toGlobal_at_pole (s : ℂ)
 -- vanishes. To use that basis in (7.5.0.14), identify a basis of the polar
 -- quotient with the shifted orders above (or use another surjectivity proof).
 
+open MeasureTheory in
+/-- Dilation by a local unit rescales additive Haar integration. -/
+private theorem sAdelePV_integral_dilate (v : V) (a : (v.adicCompletion F)ˣ) :
+    ∃ c : ℝ, ∀ p : v.adicCompletion F → ℂ,
+      ∫ y, p ((a : v.adicCompletion F) * y) ∂finiteLocalAdditiveTamagawaMeasure F v =
+        (c : ℂ) * ∫ y, p y ∂finiteLocalAdditiveTamagawaMeasure F v := by
+  let K := v.adicCompletion F
+  let : MeasurableSpace K := borel _
+  let μ := finiteLocalAdditiveTamagawaMeasure F v
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : BorelSpace K := ⟨rfl⟩
+  let : μ.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let d := DomMulAct.mk a⁻¹
+  refine ⟨Measure.addHaarScalarFactor (d • μ) μ, fun p ↦ ?_⟩
+  have h := integral_domSMul (μ := μ) d p
+  simp only [d, Equiv.symm_apply_apply, inv_inv, Units.smul_def, smul_eq_mul] at h
+  apply h.symm.trans
+  apply (congrArg (fun ν ↦ ∫ y, p y ∂ν) (Measure.isAddLeftInvariant_eq_smul (d • μ) μ)).trans
+  rw [integral_smul_nnreal_measure]
+  rfl
+
+private theorem sAdelePV_uniformizer (v : V) :
+    ∃ π : (v.adicCompletion F)ˣ,
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))).IsUniformizer π.val := by
+  let h := (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  exact ⟨Units.mk0 (h.choose : v.adicCompletion F) h.choose_spec.ne_zero, h.choose_spec⟩
+
+open MeasureTheory in
+open scoped ENNReal in
+/-- The local principal value rescales the integral by a scalar independent of the test. -/
+private theorem sAdelePV_integral_local (v : V) :
+    ∃ κ : ℂ, ∀ g : SchwartzBruhat (Multiplicative (v.adicCompletion F)),
+      ∫ y, finitePlacePrincipalValue v g (Multiplicative.ofAdd y)
+          ∂finiteLocalAdditiveTamagawaMeasure F v =
+        κ * ∫ y, g (Multiplicative.ofAdd y) ∂finiteLocalAdditiveTamagawaMeasure F v := by
+  let π := (sAdelePV_uniformizer (F := F) v).choose
+  have hπ0 := (sAdelePV_uniformizer (F := F) v).choose_spec
+  classical
+  let Fv := v.adicCompletion F
+  let : MeasurableSpace Fv := borel _
+  let : MeasurableSpace Fvˣ := borel _
+  let : BorelSpace Fv := ⟨rfl⟩
+  let : BorelSpace Fvˣ := ⟨rfl⟩
+  let : ProperSpace Fv := properSpace_adicCompletion v
+  let : SecondCountableTopology Fvˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let μ := finiteLocalAdditiveTamagawaMeasure F v
+  let : μ.IsAddHaarMeasure := finiteLocalAdditiveTamagawaMeasure_isAddHaar F v
+  let Uv : Set Fvˣ := (v.adicCompletionIntegers F).units
+  let μx := finiteLocalMultiplicativeTamagawaMeasure F v
+  choose c hc using fun u : Fvˣ ↦ sAdelePV_integral_dilate (F := F) v (u⁻¹ * π⁻¹)
+  have hUpos : 0 < μx.real Uv := (finitePlacePrincipalValue_integrable v π (finiteStandardGaussian v 1) 1).1
+  have hUfin : μx Uv ≠ ∞ := fun h ↦ by
+    simp [Measure.real, Uv, μx, h] at hUpos
+  let ν := μx.restrict Uv
+  let : IsFiniteMeasure ν := isFiniteMeasure_restrict.mpr hUfin
+  let m := μx.real Uv
+  refine ⟨1 - (m : ℂ)⁻¹ * ∫ u in Uv, (c u : ℂ) ∂μx, fun g ↦ ?_⟩
+  let p : Fv → ℂ := fun y ↦ g (Multiplicative.ofAdd y)
+  have hpm := (mem_finitePlaceSchwartz_iff F v p).mp ⟨g, fun _ ↦ rfl⟩
+  have hcs : HasCompactSupport p := hpm.2
+  have hpc : Continuous p := hpm.1.continuous
+  have hpi : Integrable p μ := hpc.integrable_of_hasCompactSupport hcs
+  let H : Fvˣ × Fv → ℂ := fun z ↦ p ((↑z.1⁻¹ : Fv) * ((↑π⁻¹ : Fv) * z.2))
+  have hHi : Integrable H (ν.prod μ) := by
+    have hHc : Continuous H := hpc.comp ((Units.continuous_val.comp
+      (continuous_inv.comp continuous_fst)).mul (continuous_const.mul continuous_snd))
+    have hUc : IsCompact Uv := Submonoid.units_isCompact
+      (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+    have hUo : IsOpen Uv := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+    let L : Set Fv := (fun z : Fvˣ × Fv ↦ (π : Fv) * (z.1 : Fv) * z.2) '' (Uv ×ˢ tsupport p)
+    have hLc : IsCompact L := (hUc.prod hcs).image (by fun_prop)
+    have hK := hUc.prod hLc
+    have hKint : IntegrableOn H (Uv ×ˢ L) (ν.prod μ) := hHc.continuousOn.integrableOn_compact hK
+    apply ((integrable_indicator_iff (μ := ν.prod μ) hK.measurableSet).2 hKint).congr
+    have hfst : ∀ᵐ z ∂(ν.prod μ), z.1 ∈ Uv :=
+      QuasiMeasurePreserving.ae Measure.quasiMeasurePreserving_fst
+        (ae_restrict_mem hUo.measurableSet)
+    filter_upwards [hfst] with z hz
+    by_cases h0 : H z = 0
+    · exact Set.indicator_apply_eq_self.mpr (fun _ ↦ h0)
+    · have hk : (↑z.1⁻¹ : Fv) * ((↑π⁻¹ : Fv) * z.2) ∈ tsupport p := subset_tsupport _ h0
+      have hzL : z.2 ∈ L := by
+        refine ⟨(z.1, (↑z.1⁻¹ : Fv) * ((↑π⁻¹ : Fv) * z.2)), ⟨hz, hk⟩, ?_⟩
+        have h1 := z.1.ne_zero
+        have h2 := π.ne_zero
+        simp only [Units.val_inv_eq_inv_val]
+        field_simp
+      exact Set.indicator_of_mem (show z ∈ Uv ×ˢ L from ⟨hz, hzL⟩) H
+  have hpv : ∀ y, finitePlacePrincipalValue v g (Multiplicative.ofAdd y) =
+      p y - (m : ℂ)⁻¹ * ∫ u, H (u, y) ∂ν := fun y ↦ by
+    rw [finitePlacePrincipalValue_spec v π hπ0 g]
+    rfl
+  have hinner : ∀ u, ∫ y, H (u, y) ∂μ = c u * ∫ y, p y ∂μ := fun u ↦ by
+    have := hc u p
+    simp only [Units.val_mul] at this
+    simp only [H, ← mul_assoc]
+    exact this
+  rw [integral_congr_ae (Filter.Eventually.of_forall hpv)]
+  rw [integral_sub hpi (hHi.integral_prod_right.const_mul _), integral_const_mul,
+    ← integral_integral_swap hHi]
+  rw [integral_congr_ae (Filter.Eventually.of_forall hinner), integral_mul_const]
+  change ∫ y, p y ∂μ - _ = (1 - (m : ℂ)⁻¹ * ∫ u, (c u : ℂ) ∂ν) * ∫ y, p y ∂μ
+  ring
+
+open scoped TensorProduct in
+private theorem sAdelePV_ext_tensor {ι : Type*} [Fintype ι] {E X M : Type*} {W : ι → Type*}
+    [AddCommGroup E] [Module ℂ E] [∀ i, AddCommGroup (W i)] [∀ i, Module ℂ (W i)]
+    [AddCommGroup X] [Module ℂ X] [AddCommGroup M] [Module ℂ M]
+    (e : E ⊗[ℂ] PiTensorProduct ℂ W →ₗ[ℂ] X) (he : Function.Surjective e) (Q : X →ₗ[ℂ] X)
+    (φ ψ : X →ₗ[ℂ] M)
+    (h : ∀ a g, φ (Q (e (a ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g))) =
+      ψ (e (a ⊗ₜ[ℂ] PiTensorProduct.tprod ℂ g))) (f : X) :
+    φ (Q f) = ψ f := by
+  obtain ⟨t, rfl⟩ := he f
+  have key : (φ ∘ₗ Q) ∘ₗ e = ψ ∘ₗ e :=
+    TensorProduct.ext (LinearMap.ext fun a ↦ PiTensorProduct.ext (MultilinearMap.ext fun g ↦ h a g))
+  exact LinearMap.congr_fun key t
+
+open Classical in
+open scoped TensorProduct in
+/-- An identity between linear maps after the S-local principal value can be checked on pure
+tensors. -/
+private theorem sAdelePV_ext {S T : Finset V} (hT : T ⊆ S) {M : Type*} [AddCommGroup M]
+    [Module ℂ M] (φ ψ : SchwartzBruhat (Multiplicative (SAdeleRing F S)) →ₗ[ℂ] M)
+    (h : ∀ (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) (g : ∀ w : S, SchwartzBruhat (Multiplicative (w.val.adicCompletion F))),
+      φ ((sAdeleSchwartz_inductiveTensor_equiv F S).choose (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w,
+        if w.val ∈ T then finitePlacePrincipalValue w.val (g w) else g w))) =
+      ψ ((sAdeleSchwartz_inductiveTensor_equiv F S).choose (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))))
+    (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) : φ (sAdelePrincipalValue F hT f) = ψ f :=
+  sAdelePV_ext_tensor (sAdeleSchwartz_inductiveTensor_equiv F S).choose.toLinearEquiv.toLinearMap
+    (sAdeleSchwartz_inductiveTensor_equiv F S).choose.surjective (sAdelePrincipalValue F hT) φ ψ
+    (fun a g ↦ (congrArg φ (sAdelePrincipalValue_tmul hT a g)).trans (h a g)) f
+
+open MeasureTheory in
+open scoped TensorProduct in
+/-- At zero the Fourier transform of a pure tensor factors into the archimedean integral
+and the product of the finite local integrals. -/
+private theorem sAdelePV_fourier_tensor {S : Finset V}
+    (a : SchwartzBruhat (Multiplicative (InfiniteAdeleRing F))) :
+    ∃ I : ℂ, ∀ g : (w : S) → SchwartzBruhat (Multiplicative (w.val.adicCompletion F)),
+    sAdeleSchwartzFourier ((sAdeleSchwartz_inductiveTensor_equiv F S).choose
+      (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) (Multiplicative.ofAdd 0) =
+      I * ∏ w, ∫ y, g w (Multiplicative.ofAdd y) ∂finiteLocalAdditiveTamagawaMeasure F w.val := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : S) : MeasurableSpace (v.val.adicCompletion F) := borel _
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
+  let (v : S) : BorelSpace (v.val.adicCompletion F) := ⟨rfl⟩
+  let (w : InfinitePlace F) : (infiniteLocalAdditiveTamagawaMeasure F w).IsAddHaarMeasure :=
+    infiniteLocalAdditiveTamagawaMeasure_haar F w
+  let (v : S) : (finiteLocalAdditiveTamagawaMeasure F v.val).IsAddHaarMeasure :=
+    finiteLocalAdditiveTamagawaMeasure_isAddHaar F v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let A (x : InfiniteAdeleRing F) := a (Multiplicative.ofAdd x)
+  refine ⟨∫ x, A x ∂Measure.pi (infiniteLocalAdditiveTamagawaMeasure F), fun g ↦ ?_⟩
+  let factor (v : S) (y : v.val.adicCompletion F) := g v (Multiplicative.ofAdd y)
+  rw [sAdeleSchwartzFourier_apply_zero]
+  simp_rw [(sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec a g]
+  exact (integral_prod_mul (μ := Measure.pi (infiniteLocalAdditiveTamagawaMeasure F))
+    (ν := Measure.pi fun v : S ↦ finiteLocalAdditiveTamagawaMeasure F v.val)
+    A (fun x ↦ ∏ v, factor v (x v))).trans
+      (congrArg (_ * ·) (integral_fintype_prod_eq_prod factor))
+
+open Classical in
+private theorem sAdelePV_zero_prod {S T : Finset V} (hT : T ⊆ S)
+    (g : (w : S) → SchwartzBruhat (Multiplicative (w.val.adicCompletion F))) :
+    let g' := fun w : S ↦ if w.val ∈ T then finitePlacePrincipalValue w.val (g w) else g w
+    (∏ w : S, g' w (Multiplicative.ofAdd 0)) =
+      (if T.Nonempty then 0 else 1) * ∏ w : S, g w (Multiplicative.ofAdd 0) := by
+  intro g'
+  by_cases h : T.Nonempty
+  · obtain ⟨v, hv⟩ := h
+    let w : S := ⟨v, hT hv⟩
+    have hw : w.val ∈ T := hv
+    have hz : finitePlacePrincipalValue w.val (g w) (Multiplicative.ofAdd 0) = 0 := by
+      have hm : finitePlacePrincipalValue w.val (g w) ∈ range (finitePlacePrincipalValue w.val) := ⟨g w, rfl⟩
+      rwa [finitePlacePrincipalValue_range] at hm
+    have hp := Finset.prod_eq_zero (s := Finset.univ) (f := fun i : S ↦ g' i (Multiplicative.ofAdd 0))
+      (Finset.mem_univ w) (show g' w (Multiplicative.ofAdd 0) = 0 by simpa only [g', ite_eq_left hw] using hz)
+    exact hp.trans (by rw [ite_eq_left ⟨v, hv⟩, zero_mul])
+  · have hg : g' = g := funext fun w ↦ ite_eq_right (fun hw ↦ h ⟨w.val, hw⟩)
+    rw [hg, ite_eq_right h, one_mul]
+
+open MeasureTheory in
+open scoped TensorProduct in
 /-- Paper: Remark 7.5.0.2 and Equation (7.5.0.16), p. 378.
 The local principal-value operator preserves the common kernel of the two local polar moments. -/
 theorem strongCoprimalityLocalPrincipalValue_mem_polar {T : Finset V} (hT : T ⊆ S) (f : Pₛ) :
-    sAdelePrincipalValue F hT f.val ∈ Pₛ := by sorry
+    sAdelePrincipalValue F hT f.val ∈ Pₛ := by
+  classical
+  let L := (sAdelePolarValues_isLinear (F := F) (S := S)).mk' _
+  let c (w : S) : ℂ := if w.val ∈ T then (sAdelePV_integral_local (F := F) w.val).choose else 1
+  let k : ℂ := if T.Nonempty then 0 else 1
+  let D := (k • (LinearMap.id : ℂ →ₗ[ℂ] ℂ)).prodMap ((∏ w, c w) • (LinearMap.id : ℂ →ₗ[ℂ] ℂ))
+  have he := sAdelePV_ext (F := F) hT L (D.comp L) (fun a g ↦ ?_) f.val
+  · change L (sAdelePrincipalValue F hT f.val) = 0
+    exact he.trans (show D (L f.val) = 0 from (congrArg D f.property).trans (map_zero D))
+  · let g' (w : S) := if w.val ∈ T then finitePlacePrincipalValue w.val (g w) else g w
+    let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+    refine Prod.ext ?_ ?_
+    · change e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g' w)) (Multiplicative.ofAdd 0) =
+        k * e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w)) (Multiplicative.ofAdd 0)
+      apply ((sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec a g' 0).trans
+      refine Eq.trans ?_ (congrArg (k * ·) ((sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec a g 0).symm)
+      exact (congrArg (_ * ·) (sAdelePV_zero_prod hT g)).trans (mul_left_comm ..)
+    · change sAdeleSchwartzFourier (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g' w))) (Multiplicative.ofAdd 0) =
+        (∏ w, c w) * sAdeleSchwartzFourier (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) (Multiplicative.ofAdd 0)
+      let hI := sAdelePV_fourier_tensor (S := S) a
+      apply (hI.choose_spec g').trans
+      refine Eq.trans ?_ (congrArg ((∏ w, c w) * ·) (hI.choose_spec g).symm)
+      have hi (w : S) : (∫ y, g' w (Multiplicative.ofAdd y) ∂finiteLocalAdditiveTamagawaMeasure F w.val) =
+          c w * ∫ y, g w (Multiplicative.ofAdd y) ∂finiteLocalAdditiveTamagawaMeasure F w.val := by
+        by_cases h : w.val ∈ T
+        · simpa only [g', c, ite_eq_left h] using (sAdelePV_integral_local (F := F) w.val).choose_spec (g w)
+        · simp only [g', c, ite_eq_right h, one_mul]
+      have hprod := (Finset.prod_congr (s₁ := Finset.univ) rfl fun w _ ↦ hi w).trans Finset.prod_mul_distrib
+      exact (congrArg (hI.choose * ·) hprod).trans (mul_left_comm ..)
 
 /-- Paper: Remark 7.5.0.2 and Equations (7.5.0.15)–(7.5.0.16), pp. 378–379.
 Insertion of the outside integer indicators gives the primary quotient isomorphism
