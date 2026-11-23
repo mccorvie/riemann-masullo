@@ -801,7 +801,7 @@ private theorem isClosed_range_logExponentialDecayTwist (I : Set ℝ) (a : I) :
 
 /-- Paper: Lemma D.3.2.3(1), p. 802. The closed embedding into the product of complete
 Schwartz spaces gives completeness for the additive uniformity. -/
-private theorem positiveRealExponentialDecay_complete (I : Set ℝ) (hne : I.Nonempty) :
+theorem positiveRealExponentialDecay_complete (I : Set ℝ) (hne : I.Nonempty) :
     CompleteSpace (PositiveRealExponentialDecay I) := by
   have : CompleteSpace 𝓢(ℝ, ℂ) := completeSpace_schwartzMap
   let T : PositiveRealExponentialDecay I →ₗ[ℂ] (I → 𝓢(ℝ, ℂ)) :=
