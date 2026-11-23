@@ -1440,6 +1440,73 @@ local notation "principalValues(" a "," b ")" =>
     ∑ v : S, ((Real.log (v.val.asIdeal.absNorm : ℝ) / finiteVolume(v.val) : ℝ) : ℂ) *
       finiteConnesWeilPrincipalValue v.val 1 (b v))
 
+/-- Summation bookkeeping for `sLocalTraceSharpMass_asymptotic`: if the masses split as the
+logarithmic term, a summable constant term and a remainder that sums to something tending
+to zero, then the summed masses have the stated asymptotic. -/
+private theorem sLocalTraceSharpMass_asymptotic_assemble {ι : Type*} (m : ι → ℝ → ℂ)
+    (y κ : ι → ℂ) (K P c : ℂ) (T : ℝ → ℂ) (hy : HasSum y c) (hκ : HasSum κ P)
+    (hT : ∀ᶠ R in atTop, HasSum (fun i ↦ m i R - K * (y i * (Real.log R : ℂ) + κ i)) (T R))
+    (hT0 : Tendsto T atTop (𝓝 0)) :
+    ∃ M : ℝ → ℂ, (∀ᶠ R in atTop, HasSum (fun i ↦ m i R) (M R)) ∧
+      Tendsto (fun R ↦ M R - K * c * (Real.log R : ℂ)) atTop (𝓝 (K * P)) := by
+  refine ⟨fun R ↦ T R + K * (c * (Real.log R : ℂ) + P), ?_, ?_⟩
+  · filter_upwards [hT] with R hR
+    have h := hR.add (((hy.mul_right (Real.log R : ℂ)).add hκ).mul_left K)
+    simpa using h
+  · have h := hT0.add_const (K * P)
+    rw [zero_add] at h
+    refine h.congr fun R ↦ ?_
+    ring
+
+/-- Paper: (12.4.1.26)–(12.4.1.28), p. 519. The restrictions of the global test to the
+local unit groups at the infinite places and at the places of S are compactly supported
+Bruhat tests. -/
+private theorem sLocalTraceSharpMass_asymptotic_restrict (φ : BruhatCompactSupport C𝔽) :
+    ∃ (a : archTest) (b : finiteTest),
+      (∀ (w : InfinitePlace F) (u : w.Completionˣ),
+        (a w).val u = φ.val (archClass(w) u)) ∧
+      (∀ (v : S) (u : (v.val.adicCompletion F)ˣ),
+        (b v).val u = φ.val (finiteClass(v.val) u)) := by sorry
+
+/-- Paper: (12.4.1.25)–(12.4.1.28), p. 519. Constant term of the summed sharp masses.
+For each S-unit ξ the constant term of the sharp mass is minus the pairing of the Fourier
+transform of the translated test with the logarithm of the S-norm. Only finitely many ξ
+contribute, and the sum is the sum of the local Connes–Weil principal values of the
+restrictions of φ to the local unit groups.
+Deviation: The printed proof does this in one display. The route is a partial Fourier
+inversion per place, discreteness of the S-units after dropping one place, the lift
+identity, and invariance of the principal values under u ↦ u⁻¹ (the last step on p. 519). -/
+private theorem sLocalTraceSharpMass_asymptotic_const
+    (φ : BruhatCompactSupport C𝔽)
+    (_hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F)))
+    (_hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (_hOutside : ∀ (a : outsideIntegralIdeleUnits F S) (c : C𝔽),
+      φ.val (QuotientGroup.mk a.val * c) = φ.val c)
+    (f : BruhatCompactSupport Iₛ)
+    (_hLift : ∀ g : Iₛ, HasSum (fun ξ : Hₛ ↦ f.val (ξ.val * g)) (φ.val (classAtS(g))))
+    (a : archTest) (b : finiteTest)
+    (_ha : ∀ (w : InfinitePlace F) (u : w.Completionˣ),
+      (a w).val u = φ.val (archClass(w) u))
+    (_hb : ∀ (v : S) (u : (v.val.adicCompletion F)ˣ),
+      (b v).val u = φ.val (finiteClass(v.val) u)) :
+    HasSum (fun ξ : Hₛ ↦ -∫ w in range (Units.val : Iₛ → Aₛ),
+        fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ)
+      principalValues(a, b) := by sorry
+
+/-- Paper: (12.4.1.25)–(12.4.1.27), p. 519. Remainder of the summed sharp masses.
+For each S-unit ξ, Fourier inversion splits the sharp mass into the logarithmic term
+`f(ξ) log R`, the constant term, and an integral over the Fourier region `|w|_S > R`.
+These remainders are summable over the S-units for large R and their sum tends to zero.
+Deviation: The paper does not treat the sum over ξ; it cites [Co, §VII, Thm 4]. -/
+private theorem sLocalTraceSharpMass_asymptotic_tail
+    (_hRamified : ∀ v : V, differentIdeal ℤ (𝓞 F) ≤ v.asIdeal → v ∈ S)
+    (f : BruhatCompactSupport Iₛ) :
+    ∃ T : ℝ → ℂ, (∀ᶠ R in atTop, HasSum (fun ξ : Hₛ ↦ sLocalTraceSharpMass f ξ R -
+        (volume₁ : ℂ) * (f.val ξ.val * (Real.log R : ℂ) +
+          -∫ w in range (Units.val : Iₛ → Aₛ),
+            fourierₛ (sLocalTraceEta f ξ) w * ((Real.log (modS(w)) : ℝ) : ℂ) ∂νₛ)) (T R)) ∧
+      Tendsto T atTop (𝓝 0) := by sorry
+
 /-- Paper: (12.4.1.25)–(12.4.1.28), p. 519. After subtraction of the logarithmic
 term the sum of sharp orbital masses tends to the norm-one volume times the local
 principal values.
@@ -1461,7 +1528,18 @@ theorem sLocalTraceSharpMass_asymptotic
         (b v).val u = φ.val (finiteClass(v.val) u)) ∧
       (∀ᶠ R in atTop, HasSum (fun ξ : Hₛ ↦ sLocalTraceSharpMass f ξ R) (M R)) ∧
       Tendsto (fun R ↦ M R - (volume₁ : ℂ) * φ.val 1 * (Real.log R : ℂ))
-        atTop (𝓝 ((volume₁ : ℂ) * principalValues(a, b))) := by sorry
+        atTop (𝓝 ((volume₁ : ℂ) * principalValues(a, b))) := by
+  obtain ⟨a, b, ha, hb⟩ := sLocalTraceSharpMass_asymptotic_restrict φ
+  have hκ := sLocalTraceSharpMass_asymptotic_const φ _hPic _hRamified _hOutside f _hLift
+    a b ha hb
+  obtain ⟨T, hT, hT0⟩ := sLocalTraceSharpMass_asymptotic_tail _hRamified f
+  have hy : HasSum (fun ξ : Hₛ ↦ f.val ξ.val) (φ.val 1) := by
+    have h := _hLift 1
+    simp only [mul_one, map_one, QuotientGroup.mk_one] at h
+    exact h
+  obtain ⟨M, hM, hlim⟩ := sLocalTraceSharpMass_asymptotic_assemble
+    (fun ξ R ↦ sLocalTraceSharpMass f ξ R) (fun ξ : Hₛ ↦ f.val ξ.val) _ _ _ _ T hy hκ hT hT0
+  exact ⟨a, b, M, ha, hb, hM, hlim⟩
 
 -- TODO(paper-gap): Theorem 12.4.1.1 needs the actual smoothed PW quotient kernel
 -- and a limit for its difference from the sharp orbital mass. Neither the cutoff

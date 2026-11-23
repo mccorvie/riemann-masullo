@@ -2090,6 +2090,26 @@ theorem sLocalPWOrbital_bases {S₀ : Finset V} (hST : S ⊆ T) (_hT : T = S ∪
             IsSchauderBasis dW ev ∧ SchauderBasis.IsUnconditional dW ev ∧
             IsSchauderBasis eW dW ∧ SchauderBasis.IsAbsolute eW dW := by sorry
 
+/-- Paper: Theorem 7.3.1.6(4), p. 345, as used on p. 361. The ambient orbital
+quotient needs the polynomial seminorm estimate when all places above the
+chosen prime are present. The base set may be unsaturated at other primes.
+The lattice is indexed from a contributing pole. -/
+private theorem sLocalPWOrbital_biorthogonal_growth_primary (hST : S ⊆ T) (_hPic : PicTrivial)
+    (p : Vℚ) (_hfull : ∀ w : V, w.under (𝓞 ℚ) = p → w ∈ T) (χ : PontryaginDual J₁(T))
+    (ψ : Iₚ(p, χ) → Qₚ(p, χ))
+    (_hψ : ∀ (i j : Iₚ(p, χ)) (x : Θ(T, χ)), (Rₚ(p, χ)).mkQ x = ψ j →
+      sLocalOrbitalFourierJet (F := F) (S := T) i x = if i = j then 1 else 0) :
+    ∀ (v : T), v.val ∈ sLocalPrimaryPlaces (F := F) T p →
+    ∀ (c₀ : QuasiCharacter J(T)),
+      (∃ j : Iₚ(p, χ), j.val.1 = c₀ ∧ v ∈ sLocalFinitePolePlaces (F := F) (S := T) c₀) →
+    ∀ q : Seminorm ℂ Qₚ(p, χ), Continuous q →
+      ∃ d : ℕ, ∃ C > (0 : ℝ), ∀ (n : ℤ) (j : Iₚ(p, χ)),
+        j.val.1 = quasiCharacterNormTwist (G := J(T)) (m(T))
+          (isProperMap_sIdeleQuotientNorm F T).continuous c₀
+          (((n : ℝ) * (2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) * Complex.I) →
+        q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by
+  sorry
+
 /-- Paper: Theorem 7.3.3.4(3), p. 361.
 Fourier-biorthogonal vectors of either sufficiently large level satisfy a polynomial
 bound for each continuous seminorm along each pole lattice, uniformly in the jet order.
@@ -2113,7 +2133,31 @@ theorem sLocalPWOrbital_biorthogonal_growth {S₀ : Finset V} (hST : S ⊆ T) (_
               j.val.1 = quasiCharacterNormTwist (m(T))
                 (isProperMap_sIdeleQuotientNorm F T).continuous c₀
                 (((n : ℝ) * (2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) * Complex.I) →
-              q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by sorry
+              q (ψ j) ≤ C * (1 + |(n : ℝ)|) ^ d := by
+  obtain ⟨B, hB, hlevel⟩ := sLocalPWOrbital_eventually_equiv hST _hT _hdis _hsat _hPic
+    p _hp _hp₀ ω hu χ _hχ _hω
+  refine ⟨B, hB, ?_⟩
+  intro X Y hX hY hXY W hW ψ hψ v hv c₀ hc₀ q hq
+  obtain ⟨e, he⟩ := hlevel X Y hX hY hXY W hW
+  have hfull (w : V) (hw : w.under (𝓞 ℚ) = p) : w ∈ T := by
+    have hvp := ((mem_sLocalPrimaryPlaces (F := F) (S := T) p v.val).mp hv).2
+    have hw₀ := _hsat (_hp₀ hv) (hw.trans hvp.symm)
+    rw [_hT]
+    exact Finset.mem_union_right _ hw₀
+  have hamb (i j : Iₚ(p, χ)) (x : Θ(T, χ)) (hx : (Rₚ(p, χ)).mkQ x = e (ψ j)) :
+      sLocalOrbitalFourierJet (F := F) (S := T) i x = if i = j then 1 else 0 := by
+    obtain ⟨u, hu⟩ := ((Rₚ₀(p, χ)).comap W.subtype).mkQ_surjective (ψ j)
+    have heq : (Rₚ(p, χ)).mkQ x = (Rₚ(p, χ)).mkQ u.val :=
+      hx.trans ((congrArg e hu.symm).trans (he u))
+    let D := (Rₚ(p, χ)).liftQ (sLocalOrbitalFourierJet (F := F) (S := T) i).toLinearMap
+      (sLocalOrbitalFourierJet_range_le_ker p χ i)
+    exact (congrArg D heq).trans (hψ i j u hu)
+  obtain ⟨d, C, hC, hbound⟩ := sLocalPWOrbital_biorthogonal_growth_primary hST _hPic p hfull χ
+    (fun j ↦ e (ψ j)) hamb v hv c₀ hc₀ (q.comp e.symm.toLinearMap) (hq.comp e.symm.continuous)
+  refine ⟨d, C, hC, fun n j hj ↦ ?_⟩
+  have hb := hbound n j hj
+  change q (e.symm (e (ψ j))) ≤ _ at hb
+  simpa only [e.symm_apply_apply] using hb
 
 open Classical in
 /-- Paper: Theorem 7.3.3.4(3), p. 361.

@@ -2048,6 +2048,22 @@ local notation "ρE" => (exists_modulatedExponentialDecay_translationAction m�
   hm𝔽 hms𝔽 ordConnected_univ univ_nonempty).choose
 local notation "Eω(" ω ")" => actionIsotype ((ρE).comp (ideleClassNorm F).ker.subtype) ω
 
+/-- Paper: (11.2.0.7), p. 486, the commutativity of the square. For every
+polar-free input `f` the homogeneous theta function of its principal-value test
+`pvTest(S, f)` is the function of a test `φ` of the isotype `Eω(ω)`, and the
+image of `φ` under the test inclusion is the extended principal value of the
+averaged theta class. This is the second half of `orbitalSobolevPairing_pullback`:
+the paper reads it off the local formula for the principal value on the
+completion, which the deviation of that statement keeps out of reach here. -/
+private theorem orbitalSobolevPairing_pullback_testLift (S : Finset V) (a : ℝ) {s : ℝ}
+    (hs : 0 ≤ s) (ω : PontryaginDual C₁) :
+    let i := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose
+    let A := (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose
+    ∀ f : ℬ₀, ∃ φ : Eω(ω),
+      (∀ g : C𝔽, φ.val.val g = homogeneousAdelicTheta ω (pvTest(S, f)).val g) ∧
+      (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by
+  sorry
+
 /-- Paper: (11.2.0.7), p. 486. The continuous transpose of the test inclusion
 evaluates by the Sobolev pairing. It gives the commutative square after
 restriction to the homogeneous principal-value tests of every polar-free input.
@@ -2062,7 +2078,12 @@ theorem orbitalSobolevPairing_pullback (S : Finset V) (a : ℝ) {s : ℝ} (hs : 
       (∀ φ : Eω(ω), Λ φ = spectralSobolevPairing (i φ).val u) ∧
       ∀ f : ℬ₀, ∃ φ : Eω(ω),
         (∀ g : C𝔽, φ.val.val g = homogeneousAdelicTheta ω (pvTest(S, f)).val g) ∧
-        (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by sorry
+        (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by
+  refine ⟨(existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec.2.2.choose
+    u, ?_, orbitalSobolevPairing_pullback_testLift (F := F) S a hs ω⟩
+  intro φ
+  exact (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec.2.2.choose_spec.1
+    u φ
 
 -- TODO(paper-gap): Proposition 11.2.0.4 prints the full multiplicity and
 -- claims noncontainment in an open ball even when S₀ is empty.

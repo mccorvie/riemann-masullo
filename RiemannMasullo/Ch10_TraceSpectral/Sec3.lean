@@ -838,6 +838,327 @@ theorem spectralConvolution_mellin_integrable (φ : BruhatCompactSupport C𝔽)
       (show HasCompactSupport φ.val from φ.property.2).mul_right
   · exact Set.indicator_of_mem (Set.mem_univ _) _
 
+section ApproximationDecay
+
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+
+omit [CompleteSpace H] in
+private theorem spectralApprox_antitone (A : H →L[ℂ] H) : Antitone (approximationNumber A) := by
+  intro m n hmn
+  unfold approximationNumber
+  refine le_csInf ⟨_, 0, by simp, rfl⟩ ?_
+  rintro _ ⟨S, hS, rfl⟩
+  exact csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩
+    ⟨S, hS.trans (Nat.cast_le.mpr hmn), rfl⟩
+
+omit [CompleteSpace H] in
+/-- Adding two rank-n approximants gives a rank-at-most-2n approximant. -/
+private theorem spectralApprox_add (A B : H →L[ℂ] H) (n : ℕ) :
+    approximationNumber (A + B) (2 * n + 1) ≤ approximationNumber A n + approximationNumber B n := by
+  refine le_add_of_forall_lt fun a ha b hb ↦ ?_
+  have nonempty (T : H →L[ℂ] H) :
+      {r : ℝ | ∃ S : H →L[ℂ] H, S.toLinearMap.rank ≤ (n : Cardinal) ∧ r = ‖S - T‖}.Nonempty :=
+    ⟨_, 0, by simp, rfl⟩
+  obtain ⟨_, ⟨S, hS, rfl⟩, hSa⟩ := exists_lt_of_csInf_lt (nonempty A) ha
+  obtain ⟨_, ⟨T, hT, rfl⟩, hTb⟩ := exists_lt_of_csInf_lt (nonempty B) hb
+  have hrank : (S + T).toLinearMap.rank ≤ ((2 * n + 1 : ℕ) : Cardinal) := by
+    refine (LinearMap.rank_add_le _ _).trans ((add_le_add hS hT).trans ?_)
+    exact_mod_cast (show n + n ≤ 2 * n + 1 by omega)
+  calc
+    approximationNumber (A + B) (2 * n + 1) ≤ ‖S + T - (A + B)‖ :=
+      csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩ ⟨S + T, hrank, rfl⟩
+    _ = ‖(S - A) + (T - B)‖ := by congr 1; abel
+    _ ≤ a + b := (norm_add_le _ _).trans (add_le_add hSa.le hTb.le)
+
+private abbrev SpectralApproxBound (A : H →L[ℂ] H) (k : ℕ) :=
+  ∃ C : ℝ, ∀ n : ℕ, ((n : ℝ) + 1) ^ k * approximationNumber A n ≤ C
+
+/-- A polynomial bound on odd approximation numbers extends to all indices by monotonicity. -/
+private theorem spectralApprox_bound_of_odd (A : H →L[ℂ] H) (k : ℕ) (C : ℝ)
+    (h : ∀ m : ℕ, ((m : ℝ) + 1) ^ k * approximationNumber A (2 * m + 1) ≤ C) :
+    SpectralApproxBound A k := by
+  refine ⟨max (approximationNumber A 0) (3 ^ k * C), fun n ↦ ?_⟩
+  cases n with
+  | zero => simp
+  | succ n =>
+    let m := n / 2
+    have hi : 2 * m + 1 ≤ n + 1 := by dsimp [m]; omega
+    have hc : ((n + 1 : ℕ) : ℝ) + 1 ≤ 3 * ((m : ℝ) + 1) := by
+      exact_mod_cast (show n + 1 + 1 ≤ 3 * (m + 1) by dsimp [m]; omega)
+    apply le_trans _ (le_max_right _ _)
+    calc
+      _ ≤ (3 * ((m : ℝ) + 1)) ^ k * approximationNumber A (2 * m + 1) :=
+        mul_le_mul (pow_le_pow_left₀ (by positivity) hc k) (spectralApprox_antitone A hi)
+          (spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg _ _) (by positivity)
+      _ = 3 ^ k * (((m : ℝ) + 1) ^ k * approximationNumber A (2 * m + 1)) := by rw [mul_pow, mul_assoc]
+      _ ≤ _ := mul_le_mul_of_nonneg_left (h m) (by positivity)
+
+/-- Trace-class operators have a uniform, one-power approximation-number bound. -/
+private theorem spectralApprox_trace (T : nuclearEndomorphisms H) : SpectralApproxBound T.val 1 := by
+  refine ⟨traceNorm T, fun n ↦ ?_⟩
+  have h := Finset.sum_le_sum (s := Finset.range (n + 1))
+    (fun i hi ↦ spectralApprox_antitone T.val (Nat.le_of_lt_succ (Finset.mem_range.mp hi)))
+  calc
+    _ = ∑ _i ∈ Finset.range (n + 1), approximationNumber T.val n := by simp
+    _ ≤ _ := h.trans (spectralConvolutionFiniteSum_limit_of_traceCauchy_bound T _)
+
+private theorem spectralApprox_bound_add (A B : H →L[ℂ] H) (k : ℕ)
+    (hA : SpectralApproxBound A k) (hB : SpectralApproxBound B k) : SpectralApproxBound (A + B) k := by
+  obtain ⟨C, hC⟩ := hA
+  obtain ⟨D, hD⟩ := hB
+  apply spectralApprox_bound_of_odd _ _ (C + D)
+  intro n
+  calc
+    _ ≤ ((n : ℝ) + 1) ^ k * (approximationNumber A n + approximationNumber B n) :=
+      mul_le_mul_of_nonneg_left (spectralApprox_add A B n) (by positivity)
+    _ ≤ _ := by rw [mul_add]; exact add_le_add (hC n) (hD n)
+
+private theorem spectralApprox_bound_comp (A B : H →L[ℂ] H) (k : ℕ)
+    (hA : SpectralApproxBound A k) (hB : SpectralApproxBound B 1) :
+    SpectralApproxBound (A.comp B) (k + 1) := by
+  obtain ⟨C, hC⟩ := hA
+  obtain ⟨D, hD⟩ := hB
+  apply spectralApprox_bound_of_odd _ _ (C * D)
+  intro n
+  have ha := spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg A n
+  have hb := spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg B n
+  have hC0 : 0 ≤ C := le_trans (mul_nonneg (by positivity) ha) (hC n)
+  calc
+    _ ≤ ((n : ℝ) + 1) ^ (k + 1) * (approximationNumber A n * approximationNumber B n) :=
+      mul_le_mul_of_nonneg_left (by simpa [two_mul] using approximationNumber_comp_le A B n n)
+        (by positivity)
+    _ = (((n : ℝ) + 1) ^ k * approximationNumber A n) *
+          (((n : ℝ) + 1) ^ 1 * approximationNumber B n) := by ring
+    _ ≤ _ := mul_le_mul (hC n) (hD n) (mul_nonneg (by positivity) hb) hC0
+
+/-- A family of trace-class operators in which every member is a finite sum of
+two-fold products of family members has rapidly decreasing approximation numbers. -/
+private theorem spectralApprox_rapid_of_factorization {ι : Type*} (A : ι → H →L[ℂ] H)
+    (htrace : ∀ i, IsNuclearOperator (A i))
+    (hfactor : ∀ i, A i ∈ AddSubmonoid.closure {T | ∃ j l, T = (A j).comp (A l)}) (i : ι) (k : ℕ) :
+    Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber (A i) n) atTop (𝓝 0) := by
+  have bounds (p : ℕ) : ∀ j, SpectralApproxBound (A j) p := by
+    induction p with
+    | zero => exact fun j ↦ ⟨approximationNumber (A j) 0, fun n ↦ by
+        simpa using spectralApprox_antitone (A j) (Nat.zero_le n)⟩
+    | succ p ih =>
+      intro j
+      apply AddSubmonoid.closure_induction (motive := fun T _ ↦ SpectralApproxBound T (p + 1))
+        _ _ _ (hfactor j)
+      · rintro T ⟨u, v, rfl⟩
+        exact spectralApprox_bound_comp _ _ _ (ih u) (spectralApprox_trace ⟨A v, htrace v⟩)
+      · refine ⟨0, fun n ↦ ?_⟩
+        have hz : approximationNumber (0 : H →L[ℂ] H) n ≤ ‖(0 : H →L[ℂ] H) - 0‖ :=
+          csInf_le ⟨0, by rintro _ ⟨_, _, rfl⟩; exact norm_nonneg _⟩ ⟨0, by simp, rfl⟩
+        exact mul_nonpos_of_nonneg_of_nonpos (by positivity) (by simpa using hz)
+      · exact fun X Y _ _ ↦ spectralApprox_bound_add X Y _
+  obtain ⟨C, hC⟩ := bounds (k + 1) i
+  have hinv : Tendsto (fun n : ℕ ↦ ((n : ℝ) + 1)⁻¹) atTop (𝓝 0) :=
+    tendsto_inv_atTop_zero.comp (tendsto_atTop_add_const_right _ 1 tendsto_natCast_atTop_atTop)
+  refine squeeze_zero (fun n : ℕ ↦ mul_nonneg (by positivity)
+    (spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg (A i) n)) ?_
+    (show Tendsto (fun n : ℕ ↦ C * ((n : ℝ) + 1)⁻¹) atTop (𝓝 0) by simpa using hinv.const_mul C)
+  intro n
+  rw [← div_eq_mul_inv, le_div_iff₀ (by positivity)]
+  calc
+    _ ≤ ((n : ℝ) + 1) ^ k * approximationNumber (A i) n * ((n : ℝ) + 1) := by
+      exact mul_le_mul_of_nonneg_right (mul_le_mul_of_nonneg_right
+        (pow_le_pow_left₀ n.cast_nonneg (by linarith) k)
+        (spectralConvolutionFiniteSum_limit_of_traceCauchy_nonneg (A i) n)) (by positivity)
+    _ = ((n : ℝ) + 1) ^ (k + 1) * approximationNumber (A i) n := by ring
+    _ ≤ C := hC n
+
+end ApproximationDecay
+
+section TestFactorization
+
+private local instance spectralApprox_isotype_polynormable (a : ℝ) {l r s : ℝ} (hI : l ≤ r)
+    (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) : PolynormableSpace ℂ Qω(a, hI, hs, ω) :=
+  (norm_withSeminorms ℂ Qω(a, hI, hs, ω)).toPolynormableSpace
+
+/-- Bounded restriction and projection preserve a Banach nuclear presentation. -/
+private theorem spectralApprox_nuclear_compression {H K : Type*}
+    [NormedAddCommGroup H] [NormedSpace ℂ H] [CompleteSpace H]
+    [NormedAddCommGroup K] [NormedSpace ℂ K] [CompleteSpace K]
+    (A : H →L[ℂ] H) (hA : IsNuclearOperator A) (J : K →L[ℂ] H) (P : H →L[ℂ] K) :
+    IsNuclearOperator (P.comp (A.comp J)) := by
+  obtain ⟨c, f, y, hc, hf, hy, hs⟩ := (isNuclearOperator_iff_isBanachNuclear _).mp hA
+  apply (isNuclearOperator_iff_isBanachNuclear _).mpr
+  refine ⟨c, fun n ↦ (f n).comp J, P ∘ y, hc, ?_,
+    (P.continuous.tendsto' 0 0 (map_zero P)).comp hy, fun x ↦ ?_⟩
+  · exact ((J.precomp ℂ).continuous.tendsto' 0 0 (map_zero _)).comp hf
+  · simpa only [Function.comp_apply, ContinuousLinearMap.comp_apply, map_smul] using
+      P.hasSum (hs (J x))
+
+/-- The quotient representative formulas identify the compression with the restricted action. -/
+private theorem spectralApprox_nuclear_representatives {H K V W : Type*}
+    [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    [NormedAddCommGroup K] [InnerProductSpace ℂ K] [CompleteSpace K]
+    [PolynormableSpace ℂ H] [PolynormableSpace ℂ K]
+    (A : H →L[ℂ] H) (D : K →L[ℂ] K) (hn : IsNuclearOperator A)
+    (S : Submodule ℂ H) [CompleteSpace S] (U : K ≃ₗᵢ[ℂ] S)
+    (q : V → K) (π : W → H) (i : V → W) (B : V → V) (C : W → W)
+    (hq : Surjective q) (hU : ∀ v, (U (q v) : H) = π (i v))
+    (hD : ∀ v, D (q v) = q (B v))
+    (hA : ∀ w, A (π w) = π (C w)) (hB : ∀ v, C (i v) = i (B v)) :
+    IsNuclearOperator D := by
+  let J := S.subtypeL.comp U.toContinuousLinearEquiv.toContinuousLinearMap
+  let P := U.symm.toContinuousLinearEquiv.toContinuousLinearMap.comp S.orthogonalProjectionOnto
+  have hPJ : LeftInverse P J := fun x ↦ by
+    change U.symm (S.orthogonalProjectionOnto (U x : H)) = x
+    rw [S.orthogonalProjectionOnto_mem_subspace_eq_self, U.symm_apply_apply]
+  have hcomp : P.comp (A.comp J) = D := by
+    ext x
+    obtain ⟨v, rfl⟩ := hq x
+    apply Eq.trans _ (hPJ (D (q v)))
+    apply congrArg P
+    change A (U (q v) : H) = (U (D (q v)) : H)
+    rw [hU, hA, hB, hD, hU]
+  rw [← hcomp]
+  exact spectralApprox_nuclear_compression A hn J P
+
+set_option maxHeartbeats 800000 in
+/-- Compress ambient convolution to the isotype using the quotient isometry and
+its orthogonal projection. -/
+private theorem spectralApprox_isotype_nuclear (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) (φ : BruhatCompactSupport C𝔽)
+    (hn : IsNuclearOperator (spectralConvolution (F := F) a hI hs φ)) :
+    let H := Qω(a, hI, hs, ω)
+    let D : H →L[ℂ] H := spectralIsotypeConvolution (F := F) a hI hs ω φ
+    IsNuclearOperator (E := H) (F := H) D := by
+  have hiso := spectralSobolevIsotypeQuotient_isometry (F := F) a hI hs ω
+  with_reducible obtain ⟨ρ, _, _, U, hU⟩ := hiso
+  let S := actionIsotype (ρ.comp (ideleClassNorm F).ker.subtype) ω
+  let _ : CompleteSpace S := (isClosed_actionIsotype _ _).completeSpace_coe
+  let E := Wω(hI, hs, ω)
+  let N := Θ(a, hI, hs)
+  let B := (testAction(l, r, s, hI, hs) φ).restrict
+    (hardySobolevTestAction_preserves_spectralIsotype (F := F) hI hs ω φ)
+  with_reducible_and_instances
+    exact spectralApprox_nuclear_representatives _ _ hn S U (N.comap E.subtype).mkQ N.mkQ
+      Subtype.val B (testAction(l, r, s, hI, hs) φ) (N.comap E.subtype).mkQ_surjective hU
+      (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω φ)
+      (spectralConvolution_mkQ (F := F) a hI hs φ) (fun _ ↦ rfl)
+
+/-- Equality of descended convolutions can be checked on representatives. -/
+private theorem spectralApprox_descend {H K V W : Type*}
+    [AddCommGroup H] [Module ℂ H] [TopologicalSpace H] [IsTopologicalAddGroup H]
+    [AddCommGroup V] [Module ℂ V] [TopologicalSpace V]
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W] [IsTopologicalAddGroup W]
+    (q : V →ₗ[ℂ] H) (hq : Surjective q) (i : V →ₗ[ℂ] W) (hi : Injective i)
+    (f : K → H →L[ℂ] H) (g : K → W →L[ℂ] W) (b : K → V → V)
+    (hf : ∀ k v, f k (q v) = q (b k v)) (hg : ∀ k v, i (b k v) = g k (i v)) :
+    (∀ t, g t = 0 → f t = 0) ∧
+    (∀ t u v, g t = g u + g v → f t = f u + f v) ∧
+    (∀ t u v, (∀ x, g t x = g u (g v x)) → f t = (f u).comp (f v)) := by
+  refine ⟨fun t ht ↦ ?_, fun t u v ht ↦ ?_, fun t u v ht ↦ ?_⟩
+  · ext x
+    obtain ⟨y, rfl⟩ := hq x
+    change f t (q y) = 0
+    rw [hf, ← q.map_zero]
+    apply congrArg q
+    apply hi
+    rw [hg, ht, map_zero]
+    rfl
+  · ext x
+    obtain ⟨y, rfl⟩ := hq x
+    rw [add_apply, hf, hf, hf, ← q.map_add]
+    apply congrArg q
+    apply hi
+    rw [map_add, hg, hg, hg, ht, add_apply]
+  · ext x
+    obtain ⟨y, rfl⟩ := hq x
+    rw [ContinuousLinearMap.comp_apply, hf, hf, hf]
+    apply congrArg q
+    apply hi
+    rw [hg, hg, hg, ht]
+
+set_option maxHeartbeats 600000 in
+private theorem spectralApprox_isotype_laws (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) :
+    let D := spectralIsotypeConvolution (F := F) a hI hs ω
+    D 0 = 0 ∧ (∀ u v, D (u + v) = D u + D v) ∧
+      ∀ t u v : BruhatCompactSupport C𝔽,
+        t.val = lcaConvolution μ𝔽 u.val v.val → D t = (D u).comp (D v) := by
+  let N := Θ(a, hI, hs)
+  let E := Wω(hI, hs, ω)
+  let q := (N.comap E.subtype).mkQ
+  let b (φ : BruhatCompactSupport C𝔽) := (testAction(l, r, s, hI, hs) φ).restrict
+    (hardySobolevTestAction_preserves_spectralIsotype (F := F) hI hs ω φ)
+  have laws := spectralApprox_descend q (N.comap E.subtype).mkQ_surjective E.subtype
+    Subtype.val_injective (spectralIsotypeConvolution (F := F) a hI hs ω)
+    (fun φ ↦ testAction(l, r, s, hI, hs) φ)
+    (fun φ v ↦ b φ v) (spectralIsotypeConvolution_mkQ (F := F) a hI hs ω) (fun _ _ ↦ rfl)
+  refine ⟨laws.1 0 (map_zero _), fun u v ↦ laws.2.1 _ u v (map_add _ _ _), ?_⟩
+  intro t u v ht
+  apply laws.2.2
+  let ρ := hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs
+  have hρ := (exists_hardySobolevTranslation μ𝔽 m𝔽 l r s hI hs).choose_spec.2
+  have hconv := bruhatRegularizedAction_convolution μ𝔽 ρ hρ u v
+  with_reducible obtain ⟨t', ht', hact⟩ := hconv
+  have heq : t' = t := Subtype.ext (ht'.trans ht.symm)
+  exact heq ▸ hact
+
+private def spectralApprox_isotype_addHom (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) :
+    BruhatCompactSupport C𝔽 →+ (Qω(a, hI, hs, ω) →L[ℂ] Qω(a, hI, hs, ω)) where
+  toFun := spectralIsotypeConvolution (F := F) a hI hs ω
+  map_zero' := (spectralApprox_isotype_laws (F := F) a hI hs ω).1
+  map_add' := (spectralApprox_isotype_laws (F := F) a hI hs ω).2.1
+
+local notation "homTest(" ω ", " φ ")" =>
+  ∀ (k : C₁) (x : C𝔽), (φ : BruhatCompactSupport C𝔽).val (k.val⁻¹ * x) =
+    (ω k : ℂ) * (φ : BruhatCompactSupport C𝔽).val x
+
+/-- Paper: Theorems 10.3.1.1(3) and 10.3.2.1(3), pp. 449 and 454. A homogeneous
+compactly supported Bruhat test is a finite sum of convolutions of pairs of tests
+of the same character. Deviation: Isolate the radial Dixmier–Malliavin
+factorization and its transport along the idelic norm. -/
+private theorem spectralHomogeneousTest_convolution_factorization (ω : PontryaginDual C₁)
+    (φ : BruhatCompactSupport C𝔽)
+    (hφ : homTest(ω, φ)) :
+    φ ∈ AddSubmonoid.closure {θ : BruhatCompactSupport C𝔽 |
+      ∃ ψ η : BruhatCompactSupport C𝔽,
+        homTest(ω, ψ) ∧ homTest(ω, η) ∧ θ.val = lcaConvolution μ𝔽 ψ.val η.val} := by
+  sorry
+
+/-- An additive convolution action transports finite factorizations to compositions. -/
+private theorem spectralApprox_map_factorization {V O : Type*}
+    [AddCommMonoid V] [AddCommMonoid O] (f : V →+ O) (p : V → Prop) (R : V → V → V → Prop)
+    (m : O → O → O) (hm : ∀ t u v, R t u v → f t = m (f u) (f v))
+    (t : V) (ht : t ∈ AddSubmonoid.closure {t | ∃ u v, p u ∧ p v ∧ R t u v}) :
+    f t ∈ AddSubmonoid.closure {z | ∃ i j : Subtype p, z = m (f i.val) (f j.val)} := by
+  induction ht using AddSubmonoid.closure_induction with
+  | mem t h =>
+    obtain ⟨u, v, hu, hv, h⟩ := h
+    exact AddSubmonoid.subset_closure ⟨⟨u, hu⟩, ⟨v, hv⟩, hm _ _ _ h⟩
+  | zero => rw [map_zero]; exact zero_mem _
+  | add _ _ _ _ hu hv => rw [map_add]; exact add_mem hu hv
+
+set_option maxHeartbeats 800000 in
+private theorem spectralApprox_isotype_rapid (a : ℝ) {l r s : ℝ} (hI : l ≤ r) (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) (φ : BruhatCompactSupport C𝔽)
+    (hφ : homTest(ω, φ))
+    (htrace : ∀ ψ : BruhatCompactSupport C𝔽, IsNuclearOperator (spectralConvolution (F := F) a hI hs ψ)) :
+    let H := Qω(a, hI, hs, ω)
+    let A : H →L[ℂ] H := spectralIsotypeConvolution (F := F) a hI hs ω φ
+    ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n) atTop (𝓝 0) := by
+  dsimp only
+  let p := fun ψ : BruhatCompactSupport C𝔽 ↦ homTest(ω, ψ)
+  let M := spectralApprox_isotype_addHom (F := F) a hI hs ω
+  let A := fun i : Subtype p ↦ M i.val
+  intro k
+  refine spectralApprox_rapid_of_factorization (H := Qω(a, hI, hs, ω)) A ?_ ?_ ⟨φ, hφ⟩ k
+  · intro i
+    exact spectralApprox_isotype_nuclear (F := F) a hI hs ω i.val (htrace i.val)
+  · intro i
+    exact spectralApprox_map_factorization M p (fun θ ψ η ↦ θ.val = lcaConvolution μ𝔽 ψ.val η.val)
+      ContinuousLinearMap.comp (spectralApprox_isotype_laws (F := F) a hI hs ω).2.2 i.val
+      (spectralHomogeneousTest_convolution_factorization (F := F) ω i.val i.property)
+
+end TestFactorization
+
 section Line
 
 variable (a : ℝ)
@@ -1608,7 +1929,8 @@ theorem spectralLineIsotypeConvolution_rapid_approximationNumbers
       IsNuclearOperator (spectralConvolution (F := F) a h₀ hs₀(hs) ψ)) :
     let H := Qω(a, h₀, hs₀(hs), ω)
     let A : H →L[ℂ] H := spectralIsotypeConvolution (F := F) a h₀ hs₀(hs) ω φ
-    ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n) atTop (𝓝 0) := by sorry
+    ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n) atTop (𝓝 0) := by
+  exact spectralApprox_isotype_rapid (F := F) a h₀ hs₀(hs) ω φ _hφ _htrace
 
 /-- Paper: Theorem 10.3.1.1(3), p. 449. Convolution by a homogeneous
 test acts by a strongly nuclear operator on the corresponding quotient isotype.
@@ -1958,7 +2280,8 @@ theorem spectralStripIsotypeConvolution_rapid_approximationNumbers
       IsNuclearOperator (spectralConvolution (F := F) a hStrip(hα) hs₀(hs) ψ)) :
     let H := Qω(a, hStrip(hα), hs₀(hs), ω)
     let A : H →L[ℂ] H := spectralIsotypeConvolution (F := F) a hStrip(hα) hs₀(hs) ω φ
-    ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n) atTop (𝓝 0) := by sorry
+    ∀ k : ℕ, Tendsto (fun n : ℕ ↦ (n : ℝ) ^ k * approximationNumber A n) atTop (𝓝 0) := by
+  exact spectralApprox_isotype_rapid (F := F) a hStrip(hα) hs₀(hs) ω φ _hφ _htrace
 
 /-- Paper: Theorem 10.3.2.1(3), p. 454. Convolution by a homogeneous
 test acts by a strongly nuclear operator on the corresponding quotient isotype.

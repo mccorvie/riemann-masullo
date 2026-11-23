@@ -1625,6 +1625,529 @@ theorem sLocalStandardThetaTensor_quotient_equiv
 -- At norm zero the paper only obtains logarithmic growth, so a Schwartz
 -- profile without a positive weight would fail even over ℚ with a Gaussian.
 
+section StandardThetaForwardDecay
+
+open Set
+open scoped ContDiff
+
+/-- A parametrized integral inherits the fibrewise derivative when the
+derivative is integrable in the product and its fibre integral is continuous. -/
+private theorem infiniteStandardThetaAverage_integral_deriv {G : Type*} [MeasurableSpace G]
+    (μ : Measure G) [SFinite μ] (f d : ℝ → G → ℂ)
+    (hf : ∀ t, Integrable (f t) μ) (hd : ∀ x y, HasDerivAt (fun t ↦ f t y) (d x y) x)
+    (hdc : ∀ y, Continuous (fun t ↦ d t y))
+    (hdi : Integrable (Function.uncurry d) (volume.prod μ))
+    (hc : Continuous (fun t ↦ ∫ y, d t y ∂μ)) (x : ℝ) :
+    HasDerivAt (fun t ↦ ∫ y, f t y ∂μ) (∫ y, d x y ∂μ) x := by
+  have hordered (a b : ℝ) (hab : a ≤ b) :
+      (∫ t in a..b, ∫ y, d t y ∂μ) = (∫ y, f b y ∂μ) - ∫ y, f a y ∂μ := by
+    rw [intervalIntegral.integral_of_le hab, ← integral_sub (hf b) (hf a)]
+    have hdi' : Integrable (Function.uncurry d) ((volume.restrict (Ioc a b)).prod μ) :=
+      hdi.mono_measure (Measure.prod_mono Measure.restrict_le_self le_rfl)
+    rw [integral_integral_swap hdi']
+    apply integral_congr_ae (ae_of_all _ fun y ↦ ?_)
+    rw [← intervalIntegral.integral_of_le hab]
+    exact intervalIntegral.integral_eq_sub_of_hasDerivAt (fun t _ ↦ hd t y)
+      ((hdc y).intervalIntegrable _ _)
+  have hFTC (a b : ℝ) :
+      (∫ t in a..b, ∫ y, d t y ∂μ) = (∫ y, f b y ∂μ) - ∫ y, f a y ∂μ := by
+    rcases le_total a b with hab | hba
+    · exact hordered a b hab
+    · rw [intervalIntegral.integral_symm b a, hordered b a hba, neg_sub]
+  have he (t : ℝ) : (∫ y, f t y ∂μ) = (∫ y, f x y ∂μ) + ∫ u in x..t, ∫ y, d u y ∂μ := by
+    rw [hFTC x t, add_sub_cancel]
+  have hmeas : StronglyMeasurableAtFilter (fun t ↦ ∫ y, d t y ∂μ) (𝓝 x) :=
+    hc.stronglyMeasurable.stronglyMeasurableAtFilter
+  have hcont := intervalIntegral.integral_hasDerivAt_right
+    (hc.intervalIntegrable x x) hmeas hc.continuousAt
+  exact (hcont.const_add (∫ y, f x y ∂μ)).congr_of_eventuallyEq (.of_forall he)
+
+/-- A smooth function with integrable derivative is bounded on the whole line. -/
+private theorem infiniteStandardThetaAverage_bounded_of_integrable_deriv (f d : ℝ → ℂ)
+    (h : ∀ x, HasDerivAt f (d x) x) (hd : Integrable d) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ x, ‖f x‖ ≤ C := by
+  refine ⟨‖f 0‖ + ∫ t, ‖d t‖, by positivity, fun x ↦ ?_⟩
+  have hI := intervalIntegral.integral_eq_sub_of_hasDerivAt (a := 0) (b := x)
+    (fun t _ ↦ h t) hd.intervalIntegrable
+  have h' := intervalIntegral.norm_integral_le_integral_norm_uIoc
+    (a := 0) (b := x) (f := d) (μ := volume)
+  rw [hI] at h'
+  calc
+    ‖f x‖ = ‖f 0 + (f x - f 0)‖ := by rw [add_sub_cancel]
+    _ ≤ ‖f 0‖ + ‖f x - f 0‖ := norm_add_le _ _
+    _ ≤ ‖f 0‖ + ∫ t in Set.uIoc 0 x, ‖d t‖ := add_le_add_right h' _
+    _ ≤ _ := add_le_add_right
+      (integral_mono_measure (Measure.restrict_le_self (s := Set.uIoc 0 x))
+        (.of_forall fun _ ↦ norm_nonneg _) hd.norm) _
+
+/-- A positive exponential margin bounds every polynomial weight. -/
+private theorem infiniteStandardThetaAverage_poly_exp (k : ℕ) (d x : ℝ)
+    (hd : 0 < d) (hx : 0 ≤ x) :
+    x ^ k * Real.exp (-(d * x)) ≤ k.factorial / d ^ k := by
+  apply (le_div_iff₀ (pow_pos hd _)).mpr
+  calc
+    _ = (d * x) ^ k * Real.exp (-(d * x)) := by rw [mul_pow]; ring
+    _ ≤ ((k.factorial : ℝ) * Real.exp (d * x)) * Real.exp (-(d * x)) :=
+      mul_le_mul_of_nonneg_right
+        ((div_le_iff₀ (by positivity : (0 : ℝ) < k.factorial)).mp
+          (Real.pow_div_factorial_le_exp (d * x) (mul_nonneg hd.le hx) k)
+          |>.trans_eq (mul_comm _ _)) (Real.exp_nonneg _)
+    _ = _ := by rw [mul_assoc, ← Real.exp_add, add_neg_cancel, Real.exp_zero, mul_one]
+
+/-- If differentiation preserves a family of profiles, and every positive
+exponential weight gives an integrable profile, then each such weight gives
+a Schwartz profile. Opposite small changes of exponent control the two tails. -/
+private theorem infiniteStandardThetaAverage_weighted_schwartz {E : Type*}
+    (A : E → ℝ → ℂ) (D' : ℝ → E → E)
+    (hW : ∀ b g t, 0 < b → HasDerivAt
+      (fun x ↦ (Real.exp (b * x) : ℂ) * A g x) ((Real.exp (b * t) : ℂ) * A (D' b g) t) t)
+    (hI : ∀ f (a : ℝ), 0 < a → Integrable (fun t ↦ (Real.exp (a * t) : ℂ) * A f t))
+    (f : E) (a : ℝ) (ha : 0 < a) :
+    ∃ g : SchwartzMap ℝ ℂ, ⇑g = fun t ↦ (Real.exp (a * t) : ℂ) * A f t := by
+  let W (b : ℝ) (g : E) (t : ℝ) := (Real.exp (b * t) : ℂ) * A g t
+  have hi (n : ℕ) : iteratedDeriv n (W a f) = W a ((D' a)^[n] f) := by
+    induction n with
+    | zero => rfl
+    | succ n ih =>
+      rw [iteratedDeriv_succ, ih, Function.iterate_succ_apply']
+      exact funext fun t ↦ (hW a _ t ha).deriv
+  have hs : ContDiff ℝ ((⊤ : ℕ∞) : WithTop ℕ∞) (W a f) := by
+    apply contDiff_of_differentiable_iteratedDeriv
+    intro n _
+    rw [hi]
+    exact fun t ↦ (hW a _ t ha).differentiableAt
+  refine ⟨⟨W a f, hs, ?_⟩, rfl⟩
+  intro k n
+  let g := (D' a)^[n] f
+  have hB (b : ℝ) (hb : 0 < b) : ∃ C : ℝ, 0 ≤ C ∧ ∀ x, ‖W b g x‖ ≤ C :=
+    infiniteStandardThetaAverage_bounded_of_integrable_deriv (W b g) (W b (D' b g))
+      (fun t ↦ hW b g t hb) (hI _ b hb)
+  obtain ⟨C, hC, hb⟩ := hB (a / 2) (by positivity)
+  obtain ⟨D, hD₀, hc⟩ := hB (a + 1) (by positivity)
+  have hfactors (b t : ℝ) : ‖W a g t‖ = Real.exp ((a - b) * t) * ‖W b g t‖ := by
+    dsimp [W]
+    simp only [norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le]
+    rw [← mul_assoc, ← Real.exp_add, show (a - b) * t + b * t = a * t by ring]
+  refine ⟨max ((k.factorial / (a/2)^k) * C) ((k.factorial : ℝ) * D), fun x ↦ ?_⟩
+  rw [norm_iteratedFDeriv_eq_norm_iteratedDeriv, hi, Real.norm_eq_abs]
+  change |x| ^ k * ‖W a g x‖ ≤ _
+  rcases le_total x 0 with hx | hx
+  · rw [hfactors (a / 2), ← mul_assoc, show (a - a/2) * x = -(a/2 * |x|) by
+      rw [abs_of_nonpos hx]; ring]
+    exact (mul_le_mul (infiniteStandardThetaAverage_poly_exp k (a/2) |x| (by positivity)
+      (abs_nonneg _)) (hb x) (norm_nonneg _) (by positivity)).trans (le_max_left _ _)
+  · rw [hfactors (a + 1), ← mul_assoc, show (a - (a + 1)) * x = -(1 * |x|) by
+      rw [abs_of_nonneg hx]; ring]
+    apply le_trans _ (le_max_right _ _)
+    exact mul_le_mul (by simpa only [one_pow, div_one] using
+      infiniteStandardThetaAverage_poly_exp k 1 |x| one_pos (abs_nonneg _))
+      (hc x) (norm_nonneg _) (by positivity)
+
+local notation "I₀" => Iₛ((∅ : Finset V))
+local notation "μ∞" => sNormOneIdeleTamagawaMeasure F (∅ : Finset V)
+local notation "μall" => sMultiplicativeTamagawaMeasure F (∅ : Finset V)
+
+private def infiniteStandardThetaAverage_exp : ℝ ≃ₜ ℝ≥0ˣ :=
+  Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+
+private theorem infiniteStandardThetaAverage_exp_val (t : ℝ) :
+    ((infiniteStandardThetaAverage_exp t).val : ℝ) = Real.exp t := rfl
+
+private theorem infiniteStandardThetaAverage_exp_add (t u : ℝ) :
+    infiniteStandardThetaAverage_exp (t + u) =
+      infiniteStandardThetaAverage_exp t * infiniteStandardThetaAverage_exp u :=
+  Units.ext (NNReal.coe_inj.mp (Real.exp_add t u))
+
+private def infiniteStandardThetaAverage_emptyEquiv :
+    Multiplicative (SAdeleRing F (∅ : Finset V)) ≃ₜ* Multiplicative (InfiniteAdeleRing F) :=
+  ContinuousMulEquiv.mk'
+    (Homeomorph.prodUnique (InfiniteAdeleRing F) (∀ v : (∅ : Finset V), v.val.adicCompletion F))
+    (fun _ _ ↦ rfl)
+
+private def infiniteStandardThetaAverage_archSection (F : Type*) [Field F] [NumberField F] :
+    ℝ≥0ˣ →ₜ* (InfiniteAdeleRing F)ˣ :=
+  ⟨(Units.map (RingHom.fst (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F)).toMonoidHom).comp
+      (canonicalIdeleNormSection F),
+    (continuous_fst.units_map _).comp (canonicalIdeleNormSection_continuous F)⟩
+
+private def infiniteStandardThetaAverage_section (F : Type*) [Field F] [NumberField F] :
+    ℝ≥0ˣ →ₜ* (SAdeleRing F (∅ : Finset (HeightOneSpectrum (𝓞 F))))ˣ :=
+  (⟨Units.map (MonoidHom.inl (InfiniteAdeleRing F)
+      (∀ v : (∅ : Finset (HeightOneSpectrum (𝓞 F))), v.val.adicCompletion F)),
+    (continuous_id.prodMk continuous_const).units_map _⟩ :
+    (InfiniteAdeleRing F)ˣ →ₜ* (SAdeleRing F ∅)ˣ).comp (infiniteStandardThetaAverage_archSection F)
+
+private theorem infiniteStandardThetaAverage_arch_section_apply (t : ℝ≥0ˣ) :
+    archPart((∅ : Finset V)) (infiniteStandardThetaAverage_section F t) =
+      infiniteStandardThetaAverage_archSection F t := by
+  apply Units.ext
+  rfl
+
+private theorem infiniteStandardThetaAverage_norm_empty (g : I₀) :
+    sIdeleNorm F (∅ : Finset V) g = infiniteIdeleNorm F (archPart((∅ : Finset V)) g) := by
+  simp only [sIdeleNorm, Finset.univ_eq_empty, Finset.prod_empty, mul_one, infiniteIdeleNorm,
+    MonoidHom.finsetProd_apply, MonoidHom.pow_apply]
+  exact Finset.prod_congr rfl fun _ _ ↦ rfl
+
+private theorem infiniteStandardThetaAverage_section_spec :
+    RightInverse (infiniteStandardThetaAverage_section F) (sIdeleNorm F (∅ : Finset V)) := by
+  intro t
+  rw [infiniteStandardThetaAverage_norm_empty, infiniteStandardThetaAverage_arch_section_apply,
+    infiniteIdeleNorm_eq_global]
+  have he : Units.map (MonoidHom.inl (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))
+      (infiniteStandardThetaAverage_archSection F t) = canonicalIdeleNormSection F t := by
+    apply Units.ext
+    exact Prod.ext rfl (canonicalIdeleNormSection_finite F t).symm
+  rw [he, canonicalIdeleNormSection_rightInverse]
+
+/-- The canonical section splits the empty-stage norm, as in the archimedean
+product decomposition of §A.2. The empty finite factor does not affect the norm. -/
+private def infiniteStandardThetaAverage_normEquiv :
+    (ℝ≥0ˣ × N∞) ≃ₜ* I₀ := by
+  let n := sIdeleNorm F (∅ : Finset V)
+  let s := infiniteStandardThetaAverage_section F
+  have hs := infiniteStandardThetaAverage_section_spec (F := F)
+  have hn : Continuous n :=
+    (isProperMap_sIdeleQuotientNorm F ∅).continuous.comp continuous_quotient_mk'
+  have hres (g : I₀) : s ((n g)⁻¹) * g ∈ n.ker := by
+    rw [MonoidHom.mem_ker, map_mul, hs ((n g)⁻¹), inv_mul_cancel]
+  exact
+    { toFun := fun p ↦ s p.1 * p.2.val
+      invFun := fun g ↦ (n g, ⟨s ((n g)⁻¹) * g, hres g⟩)
+      left_inv := by
+        rintro ⟨t, g⟩
+        have ht : n (s t * g.val) = t := by
+          rw [map_mul, hs t, MonoidHom.mem_ker.mp g.property, mul_one]
+        refine Prod.ext ht (Subtype.ext ?_)
+        change s ((n (s t * g.val))⁻¹) * (s t * g.val) = g.val
+        rw [ht, map_inv, inv_mul_cancel_left]
+      right_inv := fun g ↦ by
+        change s (n g) * (s ((n g)⁻¹) * g) = g
+        rw [map_inv, mul_inv_cancel_left]
+      map_mul' := fun p q ↦ by
+        change s (p.1 * q.1) * (p.2.val * q.2.val) = (s p.1 * p.2.val) * (s q.1 * q.2.val)
+        rw [map_mul, mul_mul_mul_comm]
+      continuous_toFun := (s.continuous.comp continuous_fst).mul
+        (continuous_subtype_val.comp continuous_snd)
+      continuous_invFun := hn.prodMk
+        (((s.continuous.comp hn.inv).mul continuous_id).subtype_mk hres) }
+
+/-- Logarithmic coordinates and inverse norm-one coordinates give a product chart. -/
+private def infiniteStandardThetaAverage_logEquiv : (Multiplicative ℝ × N∞) ≃ₜ* I₀ := by
+  let e : Multiplicative ℝ ≃ₜ* ℝ≥0ˣ :=
+    { infiniteStandardThetaAverage_exp with
+      map_mul' := fun t u ↦ infiniteStandardThetaAverage_exp_add t.toAdd u.toAdd }
+  let i : N∞ ≃ₜ* N∞ := { Homeomorph.inv N∞ with map_mul' := mul_inv }
+  let p : (Multiplicative ℝ × N∞) ≃ₜ* (ℝ≥0ˣ × N∞) :=
+    { e.toHomeomorph.prodCongr i.toHomeomorph with
+      map_mul' := fun x y ↦ Prod.ext (map_mul e x.1 y.1) (map_mul i x.2 y.2) }
+  exact p.trans infiniteStandardThetaAverage_normEquiv
+
+private theorem infiniteStandardThetaAverage_logEquiv_apply (t : ℝ) (g : N∞) :
+    infiniteStandardThetaAverage_logEquiv (Multiplicative.ofAdd t, g) =
+      infiniteStandardThetaAverage_section F (infiniteStandardThetaAverage_exp t) * g.val⁻¹ :=
+  rfl
+
+private local instance infiniteStandardThetaAverage_infiniteMeasurable (w : InfinitePlace F) :
+    MeasurableSpace w.Completion := borel _
+
+private local instance infiniteStandardThetaAverage_finiteMeasurable (v : V) :
+    MeasurableSpace (v.adicCompletion F) := borel _
+
+private local instance infiniteStandardThetaAverage_archMeasurable : MeasurableSpace (InfiniteAdeleRing F) :=
+  inferInstanceAs (MeasurableSpace ((w : InfinitePlace F) → w.Completion))
+
+private local instance infiniteStandardThetaAverage_adeleMeasurable : MeasurableSpace (SAdeleRing F ∅) :=
+  inferInstanceAs (MeasurableSpace (InfiniteAdeleRing F ×
+    ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+
+private local instance infiniteStandardThetaAverage_ideleBorel : BorelSpace I₀ := sIdeleGroup_borelSpace
+
+private local instance infiniteStandardThetaAverage_kernelHaar : (μ∞).IsHaarMeasure :=
+  (sNormOneIdeleTamagawaMeasure_existsUnique F ∅).exists.choose_spec.1
+
+private theorem infiniteStandardThetaAverage_ideleSecondCountable :
+    SecondCountableTopology I₀ := by
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let (v : (∅ : Finset V)) : ProperSpace (v.val.adicCompletion F) :=
+    properSpace_adicCompletion v.val
+  let : SecondCountableTopology (SAdeleRing F ∅) :=
+    inferInstanceAs (SecondCountableTopology (((w : InfinitePlace F) → w.Completion) ×
+      ((v : (∅ : Finset V)) → v.val.adicCompletion F)))
+  exact (sIdeleGroup_description F ∅).1.secondCountableTopology
+
+private local instance infiniteStandardThetaAverage_kernelSFinite : SFinite (μ∞) := by
+  let : LocallyCompactSpace I₀ := (sIdeleGroup_description F ∅).2.2.1
+  let : SecondCountableTopology I₀ := infiniteStandardThetaAverage_ideleSecondCountable
+  have hn : Continuous (sIdeleNorm F (∅ : Finset V)) :=
+    (isProperMap_sIdeleQuotientNorm F ∅).continuous.comp continuous_quotient_mk'
+  let : LocallyCompactSpace N∞ :=
+    (isClosed_eq hn continuous_const : IsClosed (N∞ : Set I₀)).locallyCompactSpace
+  let : SecondCountableTopology N∞ := IsEmbedding.subtypeVal.secondCountableTopology
+  let : SigmaCompactSpace N∞ := sigmaCompactSpace_of_locallyCompact_secondCountable
+  let : SigmaFinite (μ∞) := Measure.IsHaarMeasure.sigmaFinite μ∞
+  infer_instance
+
+/-- Passing to logarithmic coordinates preserves integrability with respect to
+the product measure, by uniqueness of Haar measure up to scale. -/
+private theorem infiniteStandardThetaAverage_integrable_logCoordinates (f : I₀ → ℂ)
+    (hf : Integrable f μall) :
+    Integrable (fun p : ℝ × N∞ ↦
+      f (infiniteStandardThetaAverage_logEquiv (Multiplicative.ofAdd p.1, p.2)))
+      (volume.prod μ∞) := by
+  let : T2Space I₀ := (sIdeleGroup_description F ∅).2.1
+  let : LocallyCompactSpace I₀ := (sIdeleGroup_description F ∅).2.2.1
+  let : SecondCountableTopology I₀ := infiniteStandardThetaAverage_ideleSecondCountable
+  let : (μall).IsHaarMeasure := sMultiplicativeTamagawaMeasure_isHaarMeasure
+  let μ : Measure (Multiplicative ℝ) := (volume : Measure ℝ)
+  let : μ.IsHaarMeasure := by
+    have : IsFiniteMeasureOnCompacts μ :=
+      inferInstanceAs (IsFiniteMeasureOnCompacts (volume : Measure ℝ))
+    have : Measure.IsOpenPosMeasure μ :=
+      inferInstanceAs (Measure.IsOpenPosMeasure (volume : Measure ℝ))
+    have : μ.IsMulLeftInvariant :=
+      ⟨fun t ↦ (measurePreserving_add_left (volume : Measure ℝ) t.toAdd).map_eq⟩
+    constructor
+  let ρ := μ.prod μ∞
+  let e := infiniteStandardThetaAverage_logEquiv (F := F)
+  have : (ρ.map e).IsHaarMeasure := e.isHaarMeasure_map ρ
+  have hscale := Measure.isMulLeftInvariant_eq_smul (ρ.map e) μall
+  have hi : Integrable f (ρ.map e) := hscale.symm ▸ hf.smul_measure_nnreal
+  exact (MeasurePreserving.mk e.measurable rfl).integrable_comp_of_integrable hi
+
+private def infiniteStandardThetaAverage_term (χ : PontryaginDual (SAdeleRing F S)ˣ)
+    (a : I∞) (b : ℝ) (f : ℬ∞) (t : ℝ) (g : N∞) : ℂ :=
+  (Real.exp (b * t) : ℂ) *
+    (f (Multiplicative.ofAdd ((a * archPart((∅ : Finset V)) g.val)⁻¹ *
+        infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t)).val) *
+      (χ (archInsert(S) (a * archPart((∅ : Finset V)) g.val)) : ℂ))
+
+/-- Absolute integrability in the idelic zeta half-plane applies after pulling
+back the translated archimedean test and dropping the unitary factor. -/
+private theorem infiniteStandardThetaAverage_term_integrable
+    (χ : PontryaginDual (SAdeleRing F S)ˣ) (a : I∞) (b : ℝ) (hb : 0 < b) (f : ℬ∞) :
+    Integrable (fun p : ℝ × N∞ ↦ infiniteStandardThetaAverage_term χ a b f p.1 p.2)
+      (volume.prod μ∞) := by
+  let e := infiniteStandardThetaAverage_emptyEquiv (F := F)
+  let f₀ := schwartzBruhatPullbackEquiv e (schwartzBruhatUnitTranslate a f)
+  let circle : Circle →ₜ* ℂ := ⟨Circle.coeHom, continuous_subtype_val⟩
+  let c : QuasiCharacter (SIdeleQuotient F ∅) :=
+    quasiCharacterNormTwist (sIdeleQuotientNorm F ∅)
+      (isProperMap_sIdeleQuotientNorm F ∅).continuous (circle.comp 1) (b : ℂ)
+  have hc := sLocalIdelicZetaIntegral_integrable f₀ c
+    ⟨1, (b : ℂ), by exact hb, rfl⟩
+  have h := infiniteStandardThetaAverage_integrable_logCoordinates _ hc
+  have hp : Continuous (archPart((∅ : Finset V))) := continuous_fst.units_map _
+  have hi : Continuous (archInsert(S)) := (continuous_id.prodMk continuous_const).units_map _
+  have hχ : Continuous (fun g : (SAdeleRing F S)ˣ ↦ (χ g : ℂ)) :=
+    continuous_subtype_val.comp χ.continuous
+  let v (p : ℝ × N∞) := a * archPart((∅ : Finset V)) p.2.val
+  have hv : Continuous v := continuous_const.mul (hp.comp (continuous_subtype_val.comp continuous_snd))
+  let x (p : ℝ × N∞) := infiniteStandardThetaAverage_archSection F
+    (infiniteStandardThetaAverage_exp p.1)
+  have hx : Continuous x := (infiniteStandardThetaAverage_archSection F).continuous.comp
+    (infiniteStandardThetaAverage_exp.continuous.comp continuous_fst)
+  have hf : Continuous (fun p : ℝ × N∞ ↦ f (Multiplicative.ofAdd ((v p)⁻¹ * x p).val)) :=
+    (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp (Units.continuous_val.comp (hv.inv.mul hx)))
+  refine h.mono ?_ (.of_forall fun p ↦ ?_)
+  · apply Continuous.aestronglyMeasurable
+    exact ((Complex.continuous_ofReal.comp (Real.continuous_exp.comp
+      (continuous_const.mul continuous_fst))).mul (hf.mul (hχ.comp (hi.comp hv))))
+  · rcases p with ⟨t, g⟩
+    let y := infiniteStandardThetaAverage_logEquiv (Multiplicative.ofAdd t, g)
+    change ‖infiniteStandardThetaAverage_term χ a b f t g‖ ≤
+      ‖f₀ (Multiplicative.ofAdd y.val) * c (QuotientGroup.mk y)‖
+    have hy : archPart((∅ : Finset V)) y =
+        infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t) *
+          (archPart((∅ : Finset V)) g.val)⁻¹ := by
+      dsimp only [y]
+      rw [infiniteStandardThetaAverage_logEquiv_apply, map_mul, map_inv,
+        infiniteStandardThetaAverage_arch_section_apply]
+    have hfy : f₀ (Multiplicative.ofAdd y.val) =
+        f (Multiplicative.ofAdd
+          ((a * archPart((∅ : Finset V)) g.val)⁻¹ *
+            infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t)).val) := by
+      change (schwartzBruhatUnitTranslate a f) (Multiplicative.ofAdd
+        (archPart((∅ : Finset V)) y).val) = _
+      rw [schwartzBruhatUnitTranslate_apply, hy, mul_inv]
+      exact congrArg (fun u : I∞ ↦ f (Multiplicative.ofAdd u.val))
+        (by ac_rfl : a⁻¹ * (infiniteStandardThetaAverage_archSection F
+          (infiniteStandardThetaAverage_exp t) * (archPart((∅ : Finset V)) g.val)⁻¹) =
+          a⁻¹ * (archPart((∅ : Finset V)) g.val)⁻¹ *
+            infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t))
+
+    have hyn : sIdeleQuotientNorm F ∅ (QuotientGroup.mk y) = infiniteStandardThetaAverage_exp t := by
+      rw [sIdeleQuotientNorm_mk]
+      dsimp only [y]
+      rw [infiniteStandardThetaAverage_logEquiv_apply, map_mul, map_inv,
+        infiniteStandardThetaAverage_section_spec,
+        MonoidHom.mem_ker.mp g.property, inv_one, mul_one]
+    have hcn : ‖c (QuotientGroup.mk y)‖ = Real.exp (b * t) := by
+      change ‖((1 : Circle) : ℂ) * (((sIdeleQuotientNorm F ∅
+        (QuotientGroup.mk y)).val : ℝ) : ℂ) ^ (b : ℂ)‖ = _
+      rw [hyn, infiniteStandardThetaAverage_exp_val, Circle.coe_one, one_mul,
+        Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos t).ne'),
+        ← Complex.ofReal_log (Real.exp_pos t).le, Real.log_exp, ← Complex.ofReal_mul,
+        ← Complex.ofReal_exp, Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le, mul_comm]
+    rw [norm_mul, hfy, hcn]
+    unfold infiniteStandardThetaAverage_term
+    simp only [norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.exp_pos _).le,
+      Circle.norm_coe, mul_one]
+    rw [mul_comm]
+
+/-- Transport the empty-stage directional derivative to archimedean tests. -/
+private def infiniteStandardThetaAverage_testDeriv (f : ℬ∞) : ℬ∞ :=
+  let E := schwartzBruhatPullbackEquiv (infiniteStandardThetaAverage_emptyEquiv (F := F))
+  E.symm (sAdeleDirectionalDeriv F ∅ (infiniteStandardThetaAverage_section F) (E f))
+
+/-- Taking the derivative in the logarithmic variable is the norm-orbit
+derivative of the test, as in the radial differentiation in §3.3. -/
+private theorem infiniteStandardThetaAverage_hasDerivAt (f : ℬ∞)
+    (a : I∞) (t₀ : ℝ) :
+    HasDerivAt (fun t : ℝ ↦ f (Multiplicative.ofAdd
+      ((infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t)) * a).val))
+      (infiniteStandardThetaAverage_testDeriv f (Multiplicative.ofAdd
+        ((infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t₀)) * a).val))
+      t₀ := by
+  let e := infiniteStandardThetaAverage_emptyEquiv (F := F)
+  let E := schwartzBruhatPullbackEquiv e
+  let τ := infiniteStandardThetaAverage_section F
+  let w : I₀ := archInsert((∅ : Finset V)) a
+  let θ (t : ℝ) := f (Multiplicative.ofAdd
+    ((infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t)) * a).val)
+  let y := (τ (infiniteStandardThetaAverage_exp t₀) * w).val
+  have hexp0 : infiniteStandardThetaAverage_exp 0 = 1 :=
+    Units.ext (NNReal.coe_inj.mp Real.exp_zero)
+  have hexp : Tendsto infiniteStandardThetaAverage_exp (𝓝[≠] (0 : ℝ)) (𝓝[≠] (1 : ℝ≥0ˣ)) := by
+    refine tendsto_nhdsWithin_iff.mpr
+      ⟨(infiniteStandardThetaAverage_exp.continuous.tendsto' 0 1 hexp0).mono_left
+        nhdsWithin_le_nhds, ?_⟩
+    filter_upwards [self_mem_nhdsWithin] with t ht
+    exact fun h ↦ ht (infiniteStandardThetaAverage_exp.injective (h.trans hexp0.symm))
+  have heval (t : ℝ) : E f (Multiplicative.ofAdd ((τ (infiniteStandardThetaAverage_exp t)) * w).val) =
+      θ t := by
+    change f (Multiplicative.ofAdd
+      (archPart((∅ : Finset V)) (τ (infiniteStandardThetaAverage_exp t) * w)).val) = θ t
+    rw [map_mul, infiniteStandardThetaAverage_arch_section_apply]
+    rfl
+  have hy : (E (infiniteStandardThetaAverage_testDeriv f)) (Multiplicative.ofAdd y) =
+      infiniteStandardThetaAverage_testDeriv f (Multiplicative.ofAdd
+        ((infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t₀)) * a).val) := by
+    change infiniteStandardThetaAverage_testDeriv f (Multiplicative.ofAdd
+      (archPart((∅ : Finset V)) (τ (infiniteStandardThetaAverage_exp t₀) * w)).val) = _
+    rw [map_mul, infiniteStandardThetaAverage_arch_section_apply]
+    rfl
+  have hy' : E (infiniteStandardThetaAverage_testDeriv f) = sAdeleDirectionalDeriv F ∅ τ (E f) :=
+    E.apply_symm_apply _
+  rw [hy'] at hy
+  rw [hasDerivAt_iff_tendsto_slope_zero]
+  change Tendsto (fun t : ℝ ↦ t⁻¹ • (θ (t₀ + t) - θ t₀)) _ _
+  have hθ : Tendsto (fun t : ℝ ↦ (θ (t₀ + t) - θ t₀) / ((Real.exp t : ℂ) - 1))
+      (𝓝[≠] 0) (𝓝 (sAdeleDirectionalDeriv F ∅ τ (E f) (Multiplicative.ofAdd y))) := by
+    apply ((sAdeleDirectionalDeriv_tendsto F ∅ τ (E f) y).comp hexp).congr
+    intro t
+    have hmul : τ (infiniteStandardThetaAverage_exp t) * (τ (infiniteStandardThetaAverage_exp t₀) * w) =
+        τ (infiniteStandardThetaAverage_exp (t₀ + t)) * w := by
+      rw [infiniteStandardThetaAverage_exp_add, map_mul]
+      ac_rfl
+    change (E f (Multiplicative.ofAdd ((τ (infiniteStandardThetaAverage_exp t)).val * y)) -
+      E f (Multiplicative.ofAdd y)) /
+        (((infiniteStandardThetaAverage_exp t).val : ℝ) - 1 : ℂ) = _
+    rw [← Units.val_mul, hmul, heval, heval, infiniteStandardThetaAverage_exp_val]
+  have hRatio : Tendsto (fun t : ℝ ↦ (t⁻¹ : ℝ) • ((Real.exp t : ℂ) - 1))
+      (𝓝[≠] 0) (𝓝 1) := by
+    simpa using (hasDerivAt_iff_tendsto_slope_zero.mp (Real.hasDerivAt_exp 0).ofReal_comp)
+  have hprod := hRatio.mul hθ
+  rw [one_mul, hy] at hprod
+  apply hprod.congr'
+  filter_upwards [self_mem_nhdsWithin (s := ({0} : Set ℝ)ᶜ) (a := 0)] with t ht
+  have hd : (Real.exp t : ℂ) - 1 ≠ 0 :=
+    sub_ne_zero.mpr (fun he ↦ ht (Real.exp_injective (by rw [Real.exp_zero]; exact_mod_cast he)))
+  rw [smul_mul_assoc, mul_div_left_comm, div_self hd, mul_one]
+
+private theorem infiniteStandardThetaAverage_term_hasDerivAt
+    (χ : PontryaginDual (SAdeleRing F S)ˣ) (a : I∞) (b : ℝ) (f : ℬ∞) (t : ℝ) (g : N∞) :
+    HasDerivAt (fun u ↦ infiniteStandardThetaAverage_term χ a b f u g)
+      (infiniteStandardThetaAverage_term χ a b
+        ((b : ℂ) • f + infiniteStandardThetaAverage_testDeriv f) t g) t := by
+  let v := a * archPart((∅ : Finset V)) g.val
+  have htest := infiniteStandardThetaAverage_hasDerivAt f v⁻¹ t
+  have he := ((Real.hasDerivAt_exp (b * t)).comp t ((hasDerivAt_id t).const_mul b)).ofReal_comp
+  let z (u : ℝ) := infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp u)
+  let k := (χ (archInsert(S) v) : ℂ)
+  change HasDerivAt (fun u ↦ (Real.exp (b * u) : ℂ) *
+      (f (Multiplicative.ofAdd (v⁻¹ * z u).val) * k))
+    ((Real.exp (b * t) : ℂ) * (((b : ℂ) • f + infiniteStandardThetaAverage_testDeriv f)
+      (Multiplicative.ofAdd (v⁻¹ * z t).val) * k)) t
+  simp only [mul_comm v⁻¹ (z _)]
+  apply (he.mul (htest.mul_const k)).congr_deriv
+  let x := Multiplicative.ofAdd (z t * v⁻¹).val
+  change _ = (Real.exp (b * t) : ℂ) *
+    (((b : ℂ) * f x + infiniteStandardThetaAverage_testDeriv f x) * k)
+  simp only [Complex.ofReal_mul, Complex.ofReal_one, Function.comp_apply]
+  change _ = (Real.exp (b * t) : ℂ) *
+    (((b : ℂ) * f x + infiniteStandardThetaAverage_testDeriv f x) * k)
+  dsimp only [x, z]
+  ring
+
+private def infiniteStandardThetaAverage_profile (χ : PontryaginDual (SAdeleRing F S)ˣ)
+    (r : Fin (classNumber F) → (sIdeleNorm F S).ker) (f : ℬ∞) (t : ℝ) : ℂ :=
+  infiniteStandardThetaAverage χ r f
+    (infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t))
+
+/-- The weighted profile and its derivative are integrals of the corresponding
+test functions. Differentiation passes through the fibre integral by Fubini. -/
+private theorem infiniteStandardThetaAverage_profile_weighted
+    (χ : PontryaginDual (SAdeleRing F S)ˣ)
+    (r : Fin (classNumber F) → (sIdeleNorm F S).ker) (f : ℬ∞)
+    (b : ℝ) (hb : 0 < b) :
+    Integrable (fun t ↦ (Real.exp (b * t) : ℂ) * infiniteStandardThetaAverage_profile χ r f t) ∧
+      ∀ t, HasDerivAt (fun u ↦ (Real.exp (b * u) : ℂ) *
+          infiniteStandardThetaAverage_profile χ r f u)
+        ((Real.exp (b * t) : ℂ) * infiniteStandardThetaAverage_profile χ r
+          ((b : ℂ) • f + infiniteStandardThetaAverage_testDeriv f) t) t := by
+  let a (k : Fin (classNumber F)) := archPart(S) (r k).val
+  let U (h : ℬ∞) (t : ℝ) (g : N∞) :=
+    ∑ k, infiniteStandardThetaAverage_term χ (a k) b h t g
+  have hterm (h : ℬ∞) (t : ℝ) (k : Fin (classNumber F)) :
+      Integrable (infiniteStandardThetaAverage_term χ (a k) b h t) μ∞ :=
+    (infiniteStandardThetaAverage_integrable χ h (a k)
+      (infiniteStandardThetaAverage_archSection F (infiniteStandardThetaAverage_exp t))).const_mul _
+  have hU (h : ℬ∞) (t : ℝ) : Integrable (U h t) μ∞ :=
+    integrable_finsetSum _ fun k _ ↦ hterm h t k
+  have hUV (h : ℬ∞) : Integrable (Function.uncurry (U h)) (volume.prod μ∞) :=
+    integrable_finsetSum _ fun k _ ↦ infiniteStandardThetaAverage_term_integrable χ (a k) b hb h
+  have hEq (h : ℬ∞) : (fun t ↦ ∫ g, U h t g ∂μ∞) =
+      fun t ↦ (Real.exp (b * t) : ℂ) * infiniteStandardThetaAverage_profile χ r h t := by
+    funext t
+    unfold U infiniteStandardThetaAverage_profile
+    rw [integral_finsetSum _ (fun k _ ↦ hterm h t k), infiniteStandardThetaAverage_apply,
+      Finset.mul_sum]
+    congr 1
+    funext k
+    exact integral_const_mul _ _
+  let D (h : ℬ∞) := (b : ℂ) • h + infiniteStandardThetaAverage_testDeriv h
+  have hDU (h : ℬ∞) (t : ℝ) (g : N∞) :
+      HasDerivAt (fun u ↦ U h u g) (U (D h) t g) t :=
+    HasDerivAt.fun_sum fun k _ ↦ infiniteStandardThetaAverage_term_hasDerivAt χ (a k) b h t g
+  have hcont : Continuous (fun t ↦ ∫ g, U (D f) t g ∂μ∞) := by
+    rw [hEq]
+    exact (Complex.continuous_ofReal.comp (Real.continuous_exp.comp (continuous_const.mul
+      continuous_id))).mul ((infiniteStandardThetaAverage χ r (D f)).continuous.comp
+        ((infiniteStandardThetaAverage_archSection F).continuous.comp
+          infiniteStandardThetaAverage_exp.continuous))
+  constructor
+  · rw [← hEq]
+    exact (hUV f).integral_prod_left
+  · intro t
+    have h := infiniteStandardThetaAverage_integral_deriv μ∞ (U f) (U (D f)) (hU f) (hDU f)
+      (fun g ↦ continuous_iff_continuousAt.mpr fun u ↦ (hDU (D f) u g).continuousAt)
+      (hUV (D f)) hcont t
+    change HasDerivAt _ ((Real.exp (b * t) : ℂ) * infiniteStandardThetaAverage_profile χ r (D f) t) t
+    rw [← hEq, ← congrFun (hEq (D f)) t]
+    exact h
+
 /-- Paper: Theorem 6.2.2.1(2), p. 299.
 The archimedean operator has forward semi-exponential decay along the norm
 coordinate, including all logarithmic derivatives.
@@ -1637,7 +2160,31 @@ theorem infiniteStandardThetaAverage_forwardDecay (χ : PontryaginDual Iₛ(S))
         (Real.toNNReal_eq_zero.not.mpr (not_le_of_gt (Real.exp_pos t)))
       let x := Units.map (RingHom.fst (InfiniteAdeleRing F)
         (FiniteAdeleRing (𝓞 F) F)).toMonoidHom (canonicalIdeleNormSection F u)
-      infiniteStandardThetaAverage χ r f x) ∈ logExponentialDecaySubmodule (Set.Ioi 0) := by sorry
+      infiniteStandardThetaAverage χ r f x) ∈ logExponentialDecaySubmodule (Set.Ioi 0) := by
+  apply (Submodule.mem_iInf _).2
+  intro a
+  let A := infiniteStandardThetaAverage_profile χ r
+  let D (b : ℝ) (g : ℬ∞) := (b : ℂ) • g + infiniteStandardThetaAverage_testDeriv g
+  have hW (b : ℝ) (g : ℬ∞) (t : ℝ) (hb : 0 < b) :
+      HasDerivAt (fun x ↦ (Real.exp (b * x) : ℂ) * A g x)
+        ((Real.exp (b * t) : ℂ) * A (D b g) t) t :=
+    (infiniteStandardThetaAverage_profile_weighted χ r g b hb).2 t
+  have hI (g : ℬ∞) (b : ℝ) (hb : 0 < b) :
+      Integrable (fun t ↦ (Real.exp (b * t) : ℂ) * A g t) :=
+    (infiniteStandardThetaAverage_profile_weighted χ r g b hb).1
+  obtain ⟨g, hg⟩ := infiniteStandardThetaAverage_weighted_schwartz A D hW hI f a a.property
+  refine ⟨g, ?_⟩
+  funext t
+  have hu : infiniteStandardThetaAverage_exp t =
+      Units.mk0 (Real.toNNReal (Real.exp t)) (by positivity) :=
+    Units.ext (NNReal.coe_inj.mp ((infiniteStandardThetaAverage_exp_val t).trans
+      (Real.coe_toNNReal _ (Real.exp_pos t).le).symm))
+  change g t = (Real.exp ((a : ℝ) * t) : ℂ) * infiniteStandardThetaAverage χ r f
+    (infiniteStandardThetaAverage_archSection F (Units.mk0 (Real.toNNReal (Real.exp t)) (by positivity)))
+  rw [← hu]
+  exact congrFun hg t
+
+end StandardThetaForwardDecay
 
 /-- Paper: (6.2.2.12), p. 302.
 Near norm zero, the archimedean operator grows at most as the logarithm to the

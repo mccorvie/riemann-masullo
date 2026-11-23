@@ -394,6 +394,78 @@ private theorem exists_strongCoprimalityThetaEmbedding_injective (ω : Pontryagi
 
 /-- Paper: Equation (7.5.0.2), p. 374.
 The homogeneous theta functions of zero-moment tests form a closed subspace of the
+exponentially decaying isotype: the range of any continuous linear map that sends the class
+of a zero-moment test to its homogeneous theta function is closed. -/
+private theorem exists_strongCoprimalityThetaEmbedding_isClosed_range (ω : PontryaginDual C₁)
+    (j : StrongCoprimalityThetaSpace ω →L[ℂ] StrongCoprimalityDecaySpace ω)
+    (hj : ∀ (f : P) (g : C𝔽),
+      (j ((K(ω)).mkQ f)).val.val g = homogeneousAdelicThetaLinearMap F ω f.val g) :
+    IsClosed (range j) := by sorry
+
+/-- A space with a closed linear embedding into a Fréchet space is Fréchet. -/
+private theorem exists_strongCoprimalityThetaEmbedding_frechet {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    (i : X →L[ℂ] Y) (hi : IsClosedEmbedding i) (hY : IsFrechetTVS Y) : IsFrechetTVS X := by
+  obtain ⟨_, _, _, c⟩ := hY
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Y := c
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have hu := AddMonoidHom.isUniformInducing_of_isInducing
+    (f := i.toLinearMap.toAddMonoidHom) hi.isInducing
+  exact ⟨inferInstance, hi.eq_induced ▸ PolynormableSpace.induced i.toLinearMap,
+    hi.isEmbedding.metrizableSpace, hu.completeSpace hi.isClosed_range.isComplete⟩
+
+/-- An injective continuous linear map with closed range from a quotient of a closed subspace
+of a strict LF-space into a Fréchet space is inducing, by the open mapping theorem onto its
+range. -/
+private theorem exists_strongCoprimalityThetaEmbedding_isInducing_of_isClosed {W Y : Type*}
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W] [IsTopologicalAddGroup W]
+    [ContinuousSMul ℂ W]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    (hB : IsStrictLFSpace W) (Q : Submodule ℂ W) (hQ : IsClosed (Q : Set W))
+    (K : Submodule ℂ Q) (hY : IsFrechetTVS Y)
+    (j : Q ⧸ K →L[ℂ] Y) (hinj : Injective j) (hc : IsClosed (range j)) : IsInducing j := by
+  obtain ⟨-, S, hmono, hS, hcov, -⟩ := hB
+  have hY' := hY
+  obtain ⟨_, _, hmetY, -⟩ := hY'
+  have : T2Space (Q ⧸ K) := T2Space.of_injective_continuous hinj j.continuous
+  let R : Submodule ℂ Y := LinearMap.range (j : Q ⧸ K →ₗ[ℂ] Y)
+  have hR : IsClosed (R : Set Y) := by
+    rw [LinearMap.coe_range]
+    exact hc
+  have hRF : IsFrechetTVS R :=
+    exists_strongCoprimalityThetaEmbedding_frechet R.subtypeL hR.isClosedEmbedding_subtypeVal hY
+  let j' : Q ⧸ K →L[ℂ] R := j.codRestrict R fun x ↦ ⟨x, rfl⟩
+  have hsurj : Surjective j' := by
+    rintro ⟨y, x, rfl⟩
+    exact ⟨x, rfl⟩
+  let Xk (k : ℕ) : Submodule ℂ (S k) := Q.comap (S k).subtype
+  have hXk (k : ℕ) : IsFrechetTVS (Xk k) := by
+    have hcl : IsClosed (Xk k : Set (S k)) := hQ.preimage continuous_subtype_val
+    exact exists_strongCoprimalityThetaEmbedding_frechet (Xk k).subtypeL
+      hcl.isClosedEmbedding_subtypeVal (hS k)
+  let ι (k : ℕ) : Xk k →L[ℂ] Q :=
+    ((S k).subtypeL.comp (Xk k).subtypeL).codRestrict Q fun x ↦ x.property
+  let u (k : ℕ) : Xk k →L[ℂ] Q ⧸ K := K.mkQL.comp (ι k)
+  have hr (k : ℕ) : range (u k) ⊆ range (u (k + 1)) := by
+    rintro _ ⟨x, rfl⟩
+    exact ⟨⟨⟨x.val.val, hmono (Nat.le_succ k) x.val.property⟩, x.property⟩, rfl⟩
+  have hcov' (z : Q ⧸ K) : ∃ k, z ∈ range (u k) := by
+    obtain ⟨f, rfl⟩ := K.mkQ_surjective z
+    obtain ⟨k, hk⟩ := hcov f.val
+    exact ⟨k, ⟨⟨f.val, hk⟩, f.property⟩, rfl⟩
+  have hopen : IsOpenMap j' :=
+    isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hRF) hXk u hr hcov' j' hsurj
+  have hinj' : Injective j' := fun x y h ↦ hinj (congrArg Subtype.val h)
+  let L := LinearEquiv.ofBijective (j' : Q ⧸ K →ₗ[ℂ] R) ⟨hinj', hsurj⟩
+  let H := L.toEquiv.toHomeomorphOfContinuousOpen j'.continuous hopen
+  exact IsInducing.subtypeVal.comp H.isInducing
+
+/-- Paper: Equation (7.5.0.2), p. 374.
+The homogeneous theta functions of zero-moment tests form a closed subspace of the
 exponentially decaying isotype, so the theta transform is a topological embedding.
 The paper obtains this from the Mellin model of §7.4, where the theta image is the
 closed denominator of the nuclearity quotient. -/
@@ -401,7 +473,15 @@ private theorem exists_strongCoprimalityThetaEmbedding_isInducing (ω : Pontryag
     (j : StrongCoprimalityThetaSpace ω →L[ℂ] StrongCoprimalityDecaySpace ω)
     (hj : ∀ (f : P) (g : C𝔽),
       (j ((K(ω)).mkQ f)).val.val g = homogeneousAdelicThetaLinearMap F ω f.val g) :
-    IsInducing j := by sorry
+    IsInducing j := by
+  obtain ⟨_, _, _, _, _, _, _, _, _, hsurj, _⟩ := ideleGroup_quotient.{_, 0} F
+  have hmod : IsModulation m𝔽 ∧ Surjective m𝔽 :=
+    ⟨⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩, hsurj⟩
+  exact exists_strongCoprimalityThetaEmbedding_isInducing_of_isClosed
+    (adeleSchwartz_strictLF (F := F)).2 P adelePolarSubspace_closed K(ω)
+    (isotype_frechet m𝔽 hmod.1 hmod.2 ω) j
+    (exists_strongCoprimalityThetaEmbedding_injective ω j hj)
+    (exists_strongCoprimalityThetaEmbedding_isClosed_range ω j hj)
 
 /-- Paper: Equation (7.5.0.2), p. 374.
 The topological linear embedding takes a zero-moment test class to its homogeneous theta
@@ -658,6 +738,179 @@ theorem mem_strongCoprimalityDifferenceRange (ω : PontryaginDual C₁) (S : Fin
     (strongCoprimalityDifference_add S π) (strongCoprimalityDifference_smul S π)
     (strongCoprimalityDifference_zero S π) h
 
+/-- The comparison denominator is an expanding difference-product range, whose quotient
+is separable, nuclear, and Fréchet. It repeats `strongCoprimalityPrimaryQuotient_decay`, which is
+declared after `strongCoprimality` and so is out of its reach. -/
+private theorem strongCoprimality_decayQuotient (ω : PontryaginDual C₁) (S : Finset V)
+    (π : (v : V) → (v.adicCompletion F)ˣ)
+    (hπ : ∀ v ∈ S, Valuation.IsUniformizer
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))) (π v).val) :
+    let X := StrongCoprimalityDecaySpace ω ⧸ strongCoprimalityDifferenceRange ω S π
+    TopologicalSpace.SeparableSpace X ∧ IsNuclearTVS X ∧ IsFrechetTVS X := by
+  classical
+  have hmod := strongCoprimalityNorm_isModulation_surjective (F := F)
+  let a := fun v : V ↦ (IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π v))⁻¹
+  let gs := S.toList.map a
+  have hgs : ∀ g ∈ gs, 1 < (m𝔽 g).val := by
+    rintro g hg
+    obtain ⟨v, hv, rfl⟩ := List.mem_map.mp hg
+    have hu := hπ v (Finset.mem_toList.mp hv)
+    change (1 : ℝ≥0) < ((ideleClassNorm F ((IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π v))⁻¹)).val)
+    rw [map_inv, ideleClassNorm_ofAdicCompletion]
+    rw [Units.coe_map_inv]
+    change (1 : ℝ≥0) < ‖((π v)⁻¹).val‖₊
+    apply NNReal.coe_lt_coe.mp
+    simp only [NNReal.coe_one, coe_nnNorm, Units.val_inv_eq_inv_val, norm_inv]
+    rw [norm_uniformizer_adicCompletion v _ hu, inv_inv]
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have heq : strongCoprimalityDifferenceRange ω S π =
+      fullDecayDifferenceRange m𝔽 hmod.1 hmod.2 ω gs := by
+    rw [fullDecayDifferenceRange_eq_span]
+    unfold strongCoprimalityDifferenceRange
+    congr 1
+    ext h
+    simp only [gs, List.foldr_map, a, strongCoprimalityDifference]
+  rw [heq]
+  exact modulatedIsotypicDifferenceProduct_quotient m𝔽 hmod.1 hmod.2 ω gs hgs
+
+/-- A topological linear embedding with closed range into a Fréchet space, followed by a
+quotient map onto a Fréchet space, is open when every class of the target meets the range. -/
+private theorem strongCoprimality_isOpenMap {X Y Q : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y]
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q]
+    (hY : IsFrechetTVS Y) (hQ : IsFrechetTVS Q)
+    (j : X →L[ℂ] Y) (hj : IsEmbedding j) (hc : IsClosed (range j))
+    (q : Y →L[ℂ] Q) (hq : Surjective q) (hs : ∀ y, ∃ x, q y = q (j x)) :
+    IsOpenMap (fun x ↦ q (j x)) := by
+  obtain ⟨_, hpolY, hmetY, hcompY⟩ := hY
+  obtain ⟨_, hpolQ, hmetQ, hcompQ⟩ := hQ
+  have : ContinuousSMul ℂ Y := PolynormableSpace.continuousSMul ℂ Y
+  have : ContinuousSMul ℂ Q := PolynormableSpace.continuousSMul ℂ Q
+  let : UniformSpace Y := IsTopologicalAddGroup.rightUniformSpace Y
+  have : IsUniformAddGroup Y := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Y := hcompY
+  let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+  have : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+  have : CompleteSpace Q := hcompQ
+  have : (uniformity Q).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  have : BaireSpace Q := BaireSpace.of_completelyPseudoMetrizable
+  let R : Submodule ℂ Y := LinearMap.range (j : X →ₗ[ℂ] Y)
+  have hR : IsClosed (R : Set Y) := by
+    rw [LinearMap.coe_range]
+    exact hc
+  have : CompleteSpace R := completeSpace_coe_iff_isComplete.mpr hR.isComplete
+  have : IsUniformAddGroup R := R.toAddSubgroup.isUniformAddGroup
+  have : TopologicalSpace.MetrizableSpace R :=
+    inferInstanceAs (TopologicalSpace.MetrizableSpace (R : Set Y))
+  let ψ : R →L[ℂ] Q := q.comp R.subtypeL
+  have hψ : IsOpenMap ψ := by
+    apply isOpenMap_of_not_isMeagre_range
+    have hsurj : Surjective ψ := by
+      intro z
+      obtain ⟨y, rfl⟩ := hq z
+      obtain ⟨x, hx⟩ := hs y
+      exact ⟨⟨j x, x, rfl⟩, hx.symm⟩
+    rw [hsurj.range_eq]
+    exact not_isMeagre_of_isOpen isOpen_univ univ_nonempty
+  let j' : X → R := fun x ↦ ⟨j x, x, rfl⟩
+  have hj' : IsOpenMap j' := by
+    intro W hW
+    obtain ⟨Z, hZ, rfl⟩ := hj.isInducing.isOpen_iff.mp hW
+    have himage : j' '' (j ⁻¹' Z) = Subtype.val ⁻¹' Z := by
+      ext ⟨y, x, rfl⟩
+      exact ⟨fun ⟨x', hx', hxy⟩ ↦ by
+          have h := congrArg Subtype.val hxy
+          change j x' = j x at h
+          change j x ∈ Z
+          exact h ▸ hx',
+        fun h ↦ ⟨x, h, rfl⟩⟩
+    rw [himage]
+    exact hZ.preimage continuous_subtype_val
+  exact hψ.comp hj'
+
+/-- A topological linear embedding with closed range into a Fréchet space induces a topological
+linear isomorphism of quotients, once the target quotient is Fréchet, the source denominator is
+the preimage of the target one, and every target class meets the range. -/
+private theorem strongCoprimality_quotientEquiv {X Y : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [IsTopologicalAddGroup Y]
+    (D : Submodule ℂ X) (E : Submodule ℂ Y)
+    (hY : IsFrechetTVS Y) (hQ : IsFrechetTVS (Y ⧸ E))
+    (j : X →L[ℂ] Y) (hj : IsEmbedding j) (hc : IsClosed (range j))
+    (hmem : ∀ x, j x ∈ E ↔ x ∈ D) (hs : ∀ y, ∃ x, y - j x ∈ E) :
+    ∃ e : (X ⧸ D) ≃L[ℂ] (Y ⧸ E), ∀ x : X,
+      e (Submodule.Quotient.mk x) = Submodule.Quotient.mk (j x) := by
+  let φ : X →L[ℂ] Y ⧸ E := E.mkQL.comp j
+  have hle : D ≤ LinearMap.ker (φ : X →ₗ[ℂ] Y ⧸ E) := fun x hx ↦ by
+    rw [LinearMap.mem_ker]
+    exact (Submodule.Quotient.mk_eq_zero E).mpr ((hmem x).mpr hx)
+  let J : X ⧸ D →L[ℂ] Y ⧸ E := D.liftQL φ hle
+  have hJ (x : X) : J (Submodule.Quotient.mk x) = Submodule.Quotient.mk (j x) := rfl
+  have hinj : Injective J := by
+    refine (injective_iff_map_eq_zero J).mpr fun z hz ↦ ?_
+    obtain ⟨x, rfl⟩ := D.mkQ_surjective z
+    change Submodule.Quotient.mk (j x) = (0 : Y ⧸ E) at hz
+    rw [Submodule.mkQ_apply, Submodule.Quotient.mk_eq_zero]
+    exact (hmem x).mp ((Submodule.Quotient.mk_eq_zero E).mp hz)
+  have hs' (y : Y) : ∃ x, E.mkQL y = E.mkQL (j x) := by
+    obtain ⟨x, hx⟩ := hs y
+    exact ⟨x, (Submodule.Quotient.eq E).mpr hx⟩
+  have hsurj : Surjective J := by
+    intro z
+    obtain ⟨y, rfl⟩ := E.mkQ_surjective z
+    obtain ⟨x, hx⟩ := hs' y
+    exact ⟨Submodule.Quotient.mk x, hx.symm⟩
+  have hopen0 := strongCoprimality_isOpenMap hY hQ j hj hc E.mkQL E.mkQ_surjective hs'
+  have hopen : IsOpenMap J := by
+    intro W hW
+    have himage : J '' W = (fun x ↦ E.mkQL (j x)) '' (D.mkQ ⁻¹' W) := by
+      ext z
+      constructor
+      · rintro ⟨w, hw, rfl⟩
+        obtain ⟨x, rfl⟩ := D.mkQ_surjective w
+        exact ⟨x, hw, rfl⟩
+      · rintro ⟨x, hx, rfl⟩
+        exact ⟨D.mkQ x, hx, rfl⟩
+    rw [himage]
+    exact hopen0 _ (hW.preimage D.isQuotientMap_mkQ.continuous)
+  let L := LinearEquiv.ofBijective (J : X ⧸ D →ₗ[ℂ] Y ⧸ E) ⟨hinj, hsurj⟩
+  let H := L.toEquiv.toHomeomorphOfContinuousOpen J.continuous hopen
+  exact ⟨⟨L, J.continuous, H.symm.continuous⟩, hJ⟩
+
+open Classical in
+/-- Paper: Theorem 7.5.0.1, pp. 374–376.
+A pole-free homogeneous theta class lies in the principal-value denominator over `S` exactly
+when its homogeneous theta function lies in the range of the difference product over the
+unramified places of `S`, each difference taken along the inverse class of `π v`. -/
+private theorem strongCoprimality_mem_differenceRange_iff (χ : U) (S : Finset V)
+    (π : (v : V) → (v.adicCompletion F)ˣ)
+    (hπ : ∀ v ∈ S, Valuation.IsUniformizer
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))) (π v).val)
+    (j : StrongCoprimalityThetaSpace ω(χ) →L[ℂ] StrongCoprimalityDecaySpace ω(χ))
+    (hj : ∀ (f : P) (g : C𝔽),
+      (j ((K(ω(χ))).mkQ f)).val.val g = homogeneousAdelicThetaLinearMap F ω(χ) f.val g)
+    (x : StrongCoprimalityThetaSpace ω(χ)) :
+    j x ∈ strongCoprimalityDifferenceRange ω(χ)
+        (S.filter (fun v ↦ (ideleClassNormTwist χ 0).IsUnramifiedAt v)) π ↔
+      x ∈ strongCoprimalityDenominator ω(χ) S := by sorry
+
+open Classical in
+/-- Paper: Theorem 7.5.0.1, pp. 375–376.
+Every exponentially decaying function of the isotype is the homogeneous theta function of a
+pole-free theta class, up to an element of the range of the difference product over the
+unramified places of `S`, each difference taken along the inverse class of `π v`. -/
+private theorem strongCoprimality_exists_sub_mem (χ : U) (S : Finset V)
+    (π : (v : V) → (v.adicCompletion F)ˣ)
+    (hπ : ∀ v ∈ S, Valuation.IsUniformizer
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))) (π v).val)
+    (j : StrongCoprimalityThetaSpace ω(χ) →L[ℂ] StrongCoprimalityDecaySpace ω(χ))
+    (hj : ∀ (f : P) (g : C𝔽),
+      (j ((K(ω(χ))).mkQ f)).val.val g = homogeneousAdelicThetaLinearMap F ω(χ) f.val g)
+    (y : StrongCoprimalityDecaySpace ω(χ)) :
+    ∃ x, y - j x ∈ strongCoprimalityDifferenceRange ω(χ)
+      (S.filter (fun v ↦ (ideleClassNormTwist χ 0).IsUnramifiedAt v)) π := by sorry
+
 open Classical in
 /-- Paper: Theorem 7.5.0.1, p. 374.
 The map induced by homogeneous theta is a topological linear isomorphism from the Weil
@@ -675,7 +928,18 @@ theorem strongCoprimality (χ : U) (S : Finset V)
     let E := strongCoprimalityDifferenceRange ω T π
     ∃ e : (StrongCoprimalityThetaSpace ω ⧸ D) ≃L[ℂ] (StrongCoprimalityDecaySpace ω ⧸ E),
       ∀ x : StrongCoprimalityThetaSpace ω,
-        e (Submodule.Quotient.mk x) = Submodule.Quotient.mk (j x) := by sorry
+        e (Submodule.Quotient.mk x) = Submodule.Quotient.mk (j x) := by
+  intro ω j D T E
+  have hspec := (exists_strongCoprimalityThetaEmbedding ω).choose_spec
+  have hT : ∀ v ∈ T, Valuation.IsUniformizer
+      (Valued.v : Valuation (v.adicCompletion F) (WithZero (Multiplicative ℤ))) (π v).val :=
+    fun v hv ↦ _hπ v (Finset.mem_filter.mp hv).1
+  have hmod := strongCoprimalityNorm_isModulation_surjective (F := F)
+  exact strongCoprimality_quotientEquiv D E (isotype_frechet m𝔽 hmod.1 hmod.2 ω)
+    (strongCoprimality_decayQuotient.{_, 0} ω T π hT).2.2 j hspec.1
+    (exists_strongCoprimalityThetaEmbedding_isClosed_range ω j hspec.2)
+    (strongCoprimality_mem_differenceRange_iff χ S π _hπ j hspec.2)
+    (strongCoprimality_exists_sub_mem χ S π _hπ j hspec.2)
 
 private theorem strongCoprimalityDenominator_insert_le_conj_left {E G N : Type*} [AddCommGroup E]
     [Module ℂ E] [TopologicalSpace E] [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]

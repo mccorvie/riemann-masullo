@@ -4,7 +4,10 @@ public import RiemannMasullo.Ch11_ShellStructure.Sec2a
 public import RiemannMasullo.Ch10_TraceSpectral.Sec4a
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec4
 import all RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.AppA_AlgebraicNT.Sec1
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec2b
+import RiemannMasullo.Ch06_LocalGlobal.Sec2
+import RiemannMasullo.Ch07_SchauderBasesZeta.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec3a_part2
 import RiemannMasullo.Ch09_HardySobolev.Sec3
 
@@ -457,6 +460,325 @@ private theorem absolutePWProjection_tendsto_le_theta (a : ℝ) (ω : Pontryagin
   rw [heq]
   exact hu
 
+section AbsoluteLevelDensity
+
+local notation "LocalChar(" ω ", " hω ")" => sLocalNormOneCharacter S ω hω
+local notation "LocalH(" η ")" => SLocalHomogeneousThetaSpace F S η
+local notation "GlobalH(" ω ")" => GlobalHomogeneousThetaSpace F ω
+local notation "qLocal(" η ")" => (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S η)).mkQ
+local notation "qGlobal(" ω ")" => (LinearMap.ker (homogeneousAdelicThetaLinearMap F ω)).mkQ
+local notation "PolarH(" ω ")" => globalPolarFreeThetaSubmodule (F := F) ω
+
+section
+
+open scoped WithZero
+
+local notation "Cℓ(" v ")" => (v : V).adicCompletion F
+local notation "Qℓ(" v ")" => Cℓ(v)ˣ ⧸ ((v : V).adicCompletionIntegers F).units
+
+/-- The relative local presentation of a trivial Picard group clears every finite valuation
+outside the original stage by multiplying by the inverse of a single principal idele. -/
+private theorem absLevel_idele_unit_outside (S : Finset V)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set V).integer F))) (g : IdeleGroup (𝓞 F) F) :
+    ∃ x : Fˣ, ∀ v : V, v ∉ S →
+      Valued.v ((g * IdeleGroup.unitEmbedding (𝓞 F) F x⁻¹).val.2 v) = (1 : ℤᵐ⁰) := by
+  classical
+  have hg : {v : V | Valued.v (g.val.2 v) ≠ (1 : ℤᵐ⁰)}.Finite :=
+    eventually_cofinite.mp (AdeleRing.isUnit_iff.mp g.isUnit).2.2
+  obtain ⟨T, hT, hPicT⟩ := (picard_uniformization F (S ∪ hg.toFinset)).1
+  have hST : S ⊆ T := Finset.subset_union_left.trans hT
+  let D := T \ S
+  let I (v : V) : IdeleGroup (𝓞 F) F →* Cℓ(v)ˣ :=
+    Units.map (((RestrictedProduct.evalRingHom (fun w : V ↦ Cℓ(w)) v).comp
+      (RingHom.snd (InfiniteAdeleRing F) (FiniteAdeleRing (𝓞 F) F))).toMonoidHom)
+  let u : (v : D) → Qℓ(v.val) := fun v ↦ QuotientGroup.mk (I v.val g)
+  obtain ⟨e, -⟩ := (picard_uniformization F S).2.1 T hST hPicT
+  have he : (QuotientGroup.mk u : _ ⧸ (sUnitLocalClasses F T D).range) = 1 :=
+    e.injective (hPic.elim _ _)
+  obtain ⟨x, hx⟩ := (QuotientGroup.eq_one_iff (N := (sUnitLocalClasses F T D).range) u).mp he
+  refine ⟨x.val, fun v hv ↦ ?_⟩
+  have hmul : I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹) =
+      I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹ := by
+    rw [map_mul, ← map_inv]
+    rfl
+  change Valued.v (I v (g * IdeleGroup.unitEmbedding (𝓞 F) F x.val⁻¹)).val = 1
+  rw [hmul]
+  by_cases hvT : v ∈ T
+  · let w : D := ⟨v, Finset.mem_sdiff.mpr ⟨hvT, hv⟩⟩
+    have h := congrFun hx w
+    change (QuotientGroup.mk (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val) : Qℓ(v)) =
+      QuotientGroup.mk (I v g) at h
+    have hmem : I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹ ∈
+        (v.adicCompletionIntegers F).units := by
+      apply (QuotientGroup.eq_one_iff _).mp
+      change (QuotientGroup.mk' (v.adicCompletionIntegers F).units)
+        (I v g * (Units.map (algebraMap F Cℓ(v)).toMonoidHom x.val)⁻¹) = 1
+      rw [map_mul, map_inv]
+      exact mul_inv_eq_one.mpr h.symm
+    exact HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp hmem
+  · have hg' : Valued.v (g.val.2 v) = (1 : ℤᵐ⁰) := by
+      by_contra h
+      exact hvT (hT (Finset.mem_union_right _ (hg.mem_toFinset.mpr h)))
+    have hx' : Valued.v ((x.val : F) : Cℓ(v)) = (1 : ℤᵐ⁰) := by
+      rw [HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+      exact x.property v hvT
+    rw [Units.val_mul, Units.val_inv_eq_inv_val]
+
+    change Valued.v (g.val.2 v * (((x.val : F) : Cℓ(v))⁻¹)) = 1
+    rw [map_mul, map_inv₀, hg', hx', inv_one, one_mul]
+
+end
+
+/-- A character unramified outside S is determined by its local restriction when
+the S-integer Picard group is trivial. -/
+private theorem absLevel_character_eq_one (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial)
+    (h : LocalChar(ω, hω) = 1) : ω = 1 := by
+  apply PontryaginDual.ext
+  intro x
+  obtain ⟨g, hg⟩ := QuotientGroup.mk_surjective x.val
+  obtain ⟨a, ha⟩ := absLevel_idele_unit_outside S hPic g
+  let d := IdeleGroup.unitEmbedding (𝓞 F) F
+  let t := g * d a⁻¹
+  have ht : (QuotientGroup.mk t : C𝔽) = x.val := by
+    have hd : (QuotientGroup.mk (d a⁻¹) : C𝔽) = 1 := (QuotientGroup.eq_one_iff _).mpr ⟨a⁻¹, rfl⟩
+    change (QuotientGroup.mk' _) (g * d a⁻¹) = x.val
+    rw [map_mul]
+    change (QuotientGroup.mk g : C𝔽) * QuotientGroup.mk (d a⁻¹) = x.val
+    rw [hd, mul_one, hg]
+  have htu : t ∈ range (integralIdeleInsertion F S) := by
+    apply (mem_range_integralIdeleInsertion F S t).mpr
+    intro v hv
+    have h1 : t.val.2 v * t.inv.2 v = 1 :=
+      congrArg (fun z : AdeleRing (𝓞 F) F ↦ z.2 v) t.val_inv
+    have hval : Valued.v (t.inv.2 v) = 1 := by
+      have hvp := congrArg Valued.v h1
+      rw [map_mul, ha v hv, one_mul, map_one] at hvp
+      exact hvp
+    exact ⟨(ha v hv).le, hval.le⟩
+  obtain ⟨u, hu⟩ := htu
+  let y₀ := Units.map (adeleProjection F S).toMonoidHom t
+  have hy : sIdeleQuotientNorm F S (QuotientGroup.mk y₀) = 1 := by
+    rw [sIdeleQuotientNorm_mk]
+    have hh := (sIdeleNorm_spec F S).1 u
+    change ideleNorm F (integralIdeleInsertion F S u) =
+      sIdeleNorm F S (Units.map (adeleProjection F S).toMonoidHom (integralIdeleInsertion F S u)) at hh
+    rw [hu] at hh
+    change ideleClassNorm F (QuotientGroup.mk t) = sIdeleNorm F S y₀ at hh
+    rw [ht, MonoidHom.mem_ker.mp x.property] at hh
+    exact hh.symm
+  let y : J₁ := ⟨QuotientGroup.mk y₀, hy⟩
+  have hh := sLocalNormOneCharacter_apply ω hω u x y (by rw [hu, ht])
+    (by rw [hu])
+  rw [h] at hh
+  exact hh.symm
+
+/-- The polar-free homogeneous quotient is closed in the unrestricted quotient. -/
+private theorem absLevel_isClosed_polar (ω : PontryaginDual C₁) :
+    IsClosed (PolarH(ω) : Set (GlobalH(ω))) := by
+  by_cases h : ω = 1
+  · subst ω
+    obtain ⟨R, -, hR, -, -⟩ := globalConverse_normTwist_exact (F := F)
+    rw [← hR]
+    exact R.isClosed_ker
+  · have hsurj := (globalConverse_nontrivial_exact (F := F) ω h).surjective
+    have ht : PolarH(ω) = ⊤ := by
+      apply Submodule.eq_top_iff'.mpr
+      intro x
+      obtain ⟨f, hf⟩ := hsurj x
+      exact Submodule.mem_map.mpr ⟨f.val, f.property, hf⟩
+    rw [ht, Submodule.top_coe]
+    exact isClosed_univ
+
+/-- Integer-indicator insertion is surjective on the polar-free homogeneous quotient. -/
+private theorem absLevel_exists_local_polar (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial) (x : PolarH(ω)) :
+    ∃ f : Zₛ, qGlobal(ω) (sAdeleSchwartzToGlobal F S f.val) = x.val := by
+  let η := LocalChar(ω, hω)
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified (F := F) (S := S) hPic hω
+  let y := e.symm x.val
+  have hin (f : SchwartzBruhat (Multiplicative (SAdeleRing F S))) :
+      e (qLocal(η) f) = qGlobal(ω) (sAdeleSchwartzToGlobal F S f) :=
+    (LinearMap.congr_fun he (qLocal(η) f)).trans (sLocalHomogeneousThetaToGlobal_mk hω f)
+  by_cases hw : ω = 1
+  · subst ω
+    obtain ⟨f, hf⟩ := (LinearMap.ker (sLocalHomogeneousAdelicThetaLinearMap F S η)).mkQ_surjective y
+    have hrep : qGlobal((1 : PontryaginDual C₁)) (sAdeleSchwartzToGlobal F S f) = x.val :=
+      (hin f).symm.trans ((congrArg e hf).trans (e.apply_symm_apply x.val))
+    obtain ⟨R, hR, hker, -, -⟩ := globalConverse_normTwist_exact (F := F)
+    have hx : R x.val = 0 := by
+      apply LinearMap.mem_ker.mp
+      rw [hker]
+      exact x.property
+    have hre := hR (sAdeleSchwartzToGlobal F S f)
+    rw [hrep, hx] at hre
+    let μ := normOneIdeleClassTamagawaMeasure F
+    let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+    let : μ.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+    have hm : ((μ univ).toReal : ℂ) ≠ 0 := by
+      exact_mod_cast (measureReal_univ_pos (μ := μ)).ne'
+    have hpol : sAdeleSchwartzToGlobal F S f ∈ adelePolarSubspace F := by
+      apply (mem_adelePolarSubspace _).mpr
+      exact ⟨(mul_eq_zero.mp (congrArg Prod.fst hre.symm)).resolve_left (neg_ne_zero.mpr hm),
+        (mul_eq_zero.mp (congrArg Prod.snd hre.symm)).resolve_left hm⟩
+    exact ⟨⟨f, (mem_sAdelePolarSubspace f).mpr
+      ((sAdeleSchwartzToGlobal_mem_polarSubspace_iff S f).mp hpol)⟩, hrep⟩
+  · have hη : η ≠ 1 := fun h ↦ hw (absLevel_character_eq_one ω hω hPic h)
+    have hy : y ∈ (sAdelePolarSubspace F S).map (qLocal(η)) := by
+      rw [sLocalZeroMomentTheta_eq_top η hη]
+      exact Submodule.mem_top
+    obtain ⟨f, hf, hq⟩ := Submodule.mem_map.mp hy
+    exact ⟨⟨f, hf⟩, (hin f).symm.trans ((congrArg e hq).trans (e.apply_symm_apply x.val))⟩
+
+/-- An action on a submodule has the ambient isotype whenever its inclusion
+intertwines the two actions. -/
+private theorem absLevel_mem_isotype_of_submodule {W G : Type*}
+    [NormedAddCommGroup W] [NormedSpace ℂ W] [Group G] [TopologicalSpace G]
+    (K : Submodule ℂ W) (ρ : G →* (K →L[ℂ] K)) (σ : G →* (W →L[ℂ] W))
+    (hρ : ∀ g u, (ρ g u).val = σ g u.val) (ω : PontryaginDual G) (u : K) :
+    u ∈ actionIsotype ρ ω ↔ u.val ∈ actionIsotype σ ω := by
+  constructor
+  · intro h
+    apply (mem_actionIsotype σ ω u.val).mpr
+    intro g
+    exact (hρ g u).symm.trans
+      (congrArg Subtype.val ((mem_actionIsotype ρ ω u).mp h g))
+  · intro h
+    apply (mem_actionIsotype ρ ω u).mpr
+    intro g
+    exact Subtype.ext ((hρ g u).trans ((mem_actionIsotype σ ω u.val).mp h g))
+
+/-- The isotype action inside the theta subspace agrees with the ambient action. -/
+private theorem absLevel_isotype_agree (a : ℝ) (ω : PontryaginDual C₁)
+    (u : globalThetaSobolev F a hGeo hs) :
+    u ∈ actionIsotype ((exists_globalThetaSobolevAction (F := F) a hGeo hs).choose.comp
+      (ideleClassNorm F).ker.subtype) ω ↔ u.val ∈ GeoIsotype(ω) :=
+  absLevel_mem_isotype_of_submodule _ _ _
+    (fun g u ↦ (exists_globalThetaSobolevAction (F := F) a hGeo hs).choose_spec.1 g.val u) ω u
+
+/-- Use the closed preimage of the desired Sobolev subspace to pass first through
+each level closure and then through the sequentially dense union. -/
+private theorem absLevel_dense_polar_image (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial)
+    {Y : Type*} [TopologicalSpace Y] (J : PolarH(ω) → Y) (hJ : Continuous J)
+    (C : Set Y) (hC : IsClosed C)
+    (hgen : ∀ (f : Zₛ) (Λ : ℝ)
+      (_hf : f.val ∈ sLocalPWTests (S := S) (T := S) le_rfl (sLocalPWBox S Λ)),
+      J ⟨qGlobal(ω) (sAdeleSchwartzToGlobal F S f.val),
+        Submodule.mem_map.mpr ⟨_, sAdeleSchwartzToGlobal_mem_polarSubspace f, rfl⟩⟩ ∈ C) :
+    ∀ x : PolarH(ω), J x ∈ C := by
+  classical
+  let η := LocalChar(ω, hω)
+  obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified (F := F) (S := S) hPic hω
+  let D := e ⁻¹' ((Subtype.val : PolarH(ω) → GlobalH(ω)) '' (J ⁻¹' C))
+  have hD : IsClosed D :=
+    ((absLevel_isClosed_polar ω).isClosedEmbedding_subtypeVal.isClosedMap _
+      (hC.preimage hJ)).preimage e.continuous
+  have hlevel (Λ : ℝ) :
+      (sLocalAbsolutePW (F := F) (S := S) (T := S) le_rfl Λ (sAdelePolarSubspace F S) η :
+        Set (LocalH(η))) ⊆ D := by
+    change _ ⊆ D
+    rw [sLocalAbsolutePW, Submodule.topologicalClosure_coe]
+    apply closure_minimal _ hD
+    rintro z ⟨f, hf, rfl⟩
+    refine ⟨⟨qGlobal(ω) (sAdeleSchwartzToGlobal F S f),
+      Submodule.mem_map.mpr ⟨_, sAdeleSchwartzToGlobal_mem_polarSubspace
+        (⟨f, hf.2⟩ : Zₛ), rfl⟩⟩, hgen ⟨f, hf.2⟩ Λ hf.1, ?_⟩
+    exact ((LinearMap.congr_fun he (qLocal(η) f)).trans
+      (sLocalHomogeneousThetaToGlobal_mk hω f)).symm
+  intro x
+  obtain ⟨f, hrep⟩ := absLevel_exists_local_polar ω hω hPic x
+  have hseq := sLocalAbsolutePW_seqDense (F := F) (S := S) (T := S) (S₀ := ∅)
+    le_rfl (Finset.union_empty S).symm (Finset.disjoint_empty_right S) isSaturatedPlaceSet_empty
+    hPic ω hω η rfl (sAdelePolarSubspace F S) (Or.inr rfl) (qLocal(η) f.val)
+    (Submodule.mem_map_of_mem f.property)
+  obtain ⟨u, hu, hlim⟩ := hseq
+  have hz : qLocal(η) f.val ∈ D := hD.mem_of_tendsto hlim (.of_forall fun n ↦ by
+    obtain ⟨Λ, -, hΛ⟩ := hu n
+    exact hlevel Λ hΛ)
+  obtain ⟨z, hz, hz'⟩ := hz
+  have heq : e (qLocal(η) f.val) = x.val :=
+    ((LinearMap.congr_fun he (qLocal(η) f.val)).trans
+      (sLocalHomogeneousThetaToGlobal_mk hω f.val)).trans hrep
+  rwa [show z = x from Subtype.ext (hz'.trans heq)] at hz
+
+/-- A dense family in a submodule is dense in its image under inclusion. -/
+private theorem absLevel_dense_submodule_inclusion {W X : Type*}
+    [AddCommGroup W] [Module ℂ W] [TopologicalSpace W] [TopologicalSpace X]
+    (I K : Submodule ℂ W) (H : Submodule ℂ K)
+    (hH : ∀ u : K, u ∈ H ↔ u.val ∈ I) (j : X → H)
+    (hj : Continuous j) (hjd : DenseRange j) :
+    ∃ J : X → I, Continuous J ∧ (∀ x, (J x).val = (j x).val.val) ∧
+      ∀ (C : Set I), IsClosed C → (∀ x, J x ∈ C) → ∀ u : I, u.val ∈ K → u ∈ C := by
+  let i (u : H) : I := ⟨u.val.val, (hH u.val).mp u.property⟩
+  have hi : Continuous i :=
+    (continuous_subtype_val.comp continuous_subtype_val).subtype_mk _
+  refine ⟨i ∘ j, hi.comp hj, fun x ↦ rfl, fun C hC hd u hu ↦ ?_⟩
+  let v : H := ⟨⟨u.val, hu⟩, (hH ⟨u.val, hu⟩).mpr u.property⟩
+  have hc : IsClosed (i ⁻¹' C) := hC.preimage hi
+  have hv : i v ∈ C := hc.closure_subset_iff.mpr (Set.range_subset_iff.mpr hd) (hjd v)
+  exact hv
+
+/-- The dense homogeneous inclusion, viewed in the ambient isotype, agrees with
+the level generator on every inserted polar-free test. -/
+private theorem absLevel_exists_sobolev_image (a : ℝ) (ω : PontryaginDual C₁) :
+    let I : Submodule ℂ GeoW := GeoIsotype(ω)
+    let K : Submodule ℂ GeoW := globalThetaSobolev F a hGeo hs
+    ∃ J : PolarH(ω) → I, Continuous J ∧
+      (∀ f : Zₛ, (J ⟨qGlobal(ω) (sAdeleSchwartzToGlobal F S f.val),
+        Submodule.mem_map.mpr ⟨_, sAdeleSchwartzToGlobal_mem_polarSubspace f, rfl⟩⟩).val =
+          globalPWThetaSobolevMap (F := F) (S := S) (s := s) a ω f) ∧
+      ∀ (C : Set I), IsClosed C → (∀ x, J x ∈ C) →
+        ∀ u : I, u.val ∈ K → u ∈ C := by
+  intro I K
+  let hInc := exists_globalHomogeneousThetaSobolevInclusion (F := F)
+    (a := a) (α := -(0 : ℝ)) (β := 0) (s := s) hGeo hs ω
+  let j := hInc.choose
+  have hjd := hInc.choose_spec.2.1
+  have hj := hInc.choose_spec.2.2
+  let ρ := (exists_globalThetaSobolevAction (F := F) a hGeo hs).choose.comp
+    (ideleClassNorm F).ker.subtype
+  let H : Submodule ℂ K := actionIsotype ρ ω
+  have hH (u : K) : u ∈ H ↔ u.val ∈ I := absLevel_isotype_agree (F := F) hs a ω u
+  obtain ⟨J, hJ, hJv, hJd⟩ := absLevel_dense_submodule_inclusion I K H hH j j.continuous hjd
+  refine ⟨J, hJ, fun f ↦ ?_, hJd⟩
+  let F₀ : adelePolarSubspace F := ⟨sAdeleSchwartzToGlobal F S f.val,
+    sAdeleSchwartzToGlobal_mem_polarSubspace f⟩
+  let x : PolarH(ω) := ⟨qGlobal(ω) F₀.val, Submodule.mem_map.mpr ⟨_, F₀.property, rfl⟩⟩
+  change (J x).val = _
+  refine (hJv x).trans ?_
+  apply Lp.ext
+  exact (withDensity_absolutelyContinuous _ _).ae_le
+    ((hj F₀ x rfl).2.trans (globalPWThetaSobolevMap_apply (s := s) a ω f).symm)
+
+private theorem absLevel_density (a : ℝ) (ω : PontryaginDual C₁)
+    (hω : NormOneCharacterUnramifiedOutside ω S) (hPic : PicTrivial) :
+    (globalThetaSobolev F a hGeo hs : Submodule ℂ GeoW).comap (GeoIsotype(ω)).subtype ≤
+      (⨆ Λ : ℝ, absLevel(a, ω, Λ)).topologicalClosure := by
+  let hImage := absLevel_exists_sobolev_image (F := F) (S := S) hs a ω
+  let J := hImage.choose
+  have hJ := hImage.choose_spec.1
+  have hJv := hImage.choose_spec.2.1
+  have hJd := hImage.choose_spec.2.2
+  let C : Submodule ℂ GeoIsotype(ω) := (⨆ Λ : ℝ, absLevel(a, ω, Λ)).topologicalClosure
+  have hC : IsClosed (C : Set GeoIsotype(ω)) := Submodule.isClosed_topologicalClosure _
+  have hd : ∀ x : PolarH(ω), J x ∈ C := by
+    apply absLevel_dense_polar_image ω hω hPic J hJ (C : Set GeoIsotype(ω)) hC
+    intro f Λ hf
+    let x : PolarH(ω) := ⟨qGlobal(ω) (sAdeleSchwartzToGlobal F S f.val),
+      Submodule.mem_map.mpr ⟨_, sAdeleSchwartzToGlobal_mem_polarSubspace f, rfl⟩⟩
+    have hmem : J x ∈ absLevel(a, ω, Λ) := by
+      change (J x).val ∈ globalAbsolutePWSobolev (F := F) (S := S) hs a ω Λ
+      have he := hJv f
+      change (J x).val = _ at he
+      rw [he]
+      exact globalAbsolutePWSobolev_mem hs a ω Λ f hf
+    exact Submodule.le_topologicalClosure _ ((le_iSup (fun r ↦ absLevel(a, ω, r)) Λ) hmem)
+  intro u hu
+  exact hJd (C : Set GeoIsotype(ω)) hC hd u hu
+
+end AbsoluteLevelDensity
+
 /-- Paper: Theorem 11.2.1.2(1) and Proposition 7.3.2.2(1), pp. 352, 488.
 Every vector of the isotype lying in the weighted theta subspace is a limit of vectors
 of the absolute levels.
@@ -465,7 +787,8 @@ Proposition 7.3.2.2(1) uses unit insertion and is refuted (ERRATA F123). -/
 theorem globalThetaSobolev_isotype_le_closure_absLevel (a : ℝ) (ω : PontryaginDual C₁)
     (_hω : NormOneCharacterUnramifiedOutside ω S) (_hPic : PicTrivial) :
     (globalThetaSobolev F a hGeo hs : Submodule ℂ GeoW).comap (GeoIsotype(ω)).subtype ≤
-      (⨆ Λ : ℝ, absLevel(a, ω, Λ)).topologicalClosure := by sorry
+      (⨆ Λ : ℝ, absLevel(a, ω, Λ)).topologicalClosure :=
+  absLevel_density (F := F) (S := S) hs a ω _hω _hPic
 
 /-- Paper: Theorem 11.2.1.2(1), p. 488.
 The absolute projections converge strongly to the isotypic geometric projection.

@@ -1027,12 +1027,81 @@ def Printed.spectralStripMellinJet_norm_le : Prop :=
             C * (∏ n ∈ Finset.range N, ((i : ℝ) - (n : ℝ))) / ‖shift(b, t)‖ ^ N
 
 /-- Paper: Theorem 10.3.2.1, (10.3.2.10)–(11), p. 455.
-Take F = ℚ, the trivial base character, a = 1/2, α = 1, s = 2 and N = 2. Let z = iγ
-for the first positive critical-line zeta ordinate γ. The interior multiplicity admits
-i = 0. For φ(g) = h(log |g|) exp(−iγ log |g|), with h a nonnegative smooth bump of
-positive integral, M(φ)(iγ) has positive norm. The n = 0 factor forces the right-hand
-side to vanish for every constant C. -/
+Over `F = ℚ` the pointwise bound of the theorem is asserted at every zero of the completed
+Hecke L-function in the strip. The trivial norm-one character therefore needs one zero of
+the completed zeta function at `1/2 + t * I` with `t ≠ 0`.
+
+Missing input: this is the single-instance form of Hardy's theorem, that the Riemann zeta
+function has zeros on the critical line. Nothing in this library asserts that any completed
+Hecke L-function has a zero, so the existence is not available at this base; it is the exact
+missing input of the refutation. -/
+private theorem spectralStripMellinJet_norm_le_false_exists_zero
+    (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ)) (hχ : IsSpectralBasepointChoice χ) :
+    ∃ (ω : PontryaginDual C₁(ℚ)) (t : ℝ), t ≠ 0 ∧
+      0 < orderAt(χ ω, shift(1 / 2, t)) ∧
+      0 < (orderAt(χ ω, shift(1 / 2, t))).untop₀.toNat := by
+  sorry
+
+/-- Paper: Theorem 10.3.2.1, (10.3.2.10)–(11), p. 455.
+The compact-character Mellin transform of the printed test is the quantity that the printed
+bound controls. At a prescribed frequency it does not vanish for a suitable test: take the
+test trivial on the norm-one subgroup, with norm profile a nonzero smooth bump multiplied by
+the inverse of the oscillation `r ↦ r ^ (i t)`, so that the Mellin integral at `shift(0, t)`
+becomes the integral of the bump against the multiplicative Haar measure, hence is nonzero.
+Missing input: the construction of an element of `BruhatCompactSupport` from a norm profile
+on the idele class group of `ℚ`, and the identification of `positiveRealHaar` with Lebesgue
+measure in the logarithmic coordinate. -/
+private theorem spectralStripMellinJet_norm_le_false_exists_mellin
+    (τ : ℝ≥0ˣ →ₜ* C𝔽(ℚ)) (ω : PontryaginDual C₁(ℚ)) (t : ℝ) :
+    ∃ φ : BruhatCompactSupport C𝔽(ℚ),
+      (∫ r : ℝ≥0ˣ, ((r.val : ℝ) : ℂ) ^ (shift(0, t)) *
+        (∫ k : C₁(ℚ), (ω k : ℂ) * φ.val (τ r * k.val)
+          ∂normOneIdeleClassTamagawaMeasure ℚ) ∂positiveRealHaar) ≠ 0 := by
+  sorry
+
+/-- Paper: Theorem 10.3.2.1, (10.3.2.10)–(11), p. 455.
+Take F = ℚ, any spectral basepoint choice, a = 1/2, α = 3, s = 2 and N = 2, and test the
+bound at the interior parameter b = 0 and at order i = 0. The order-zero multiplicity is at
+least one at the zero of `spectralStripMellinJet_norm_le_false_exists_zero`, and the factor
+for n = 0 in the falling factorial vanishes, so the right-hand side is zero for every
+constant C. A test as in `spectralStripMellinJet_norm_le_false_exists_mellin` has nonzero
+Mellin value there. -/
 theorem Printed.spectralStripMellinJet_norm_le_false :
-    ¬ Printed.spectralStripMellinJet_norm_le := by sorry
+    ¬ Printed.spectralStripMellinJet_norm_le := by
+  intro h
+  obtain ⟨χ, hχ⟩ := exists_spectralBasepointChoice (F := ℚ)
+  let q : IdeleGroup (𝓞 ℚ) ℚ →ₜ* C𝔽(ℚ) :=
+    ⟨QuotientGroup.mk' _, continuous_quotient_mk'⟩
+  let τ : ℝ≥0ˣ →ₜ* C𝔽(ℚ) :=
+    q.comp ⟨canonicalIdeleNormSection ℚ, canonicalIdeleNormSection_continuous ℚ⟩
+  have hτ : Function.RightInverse τ (ideleClassNorm ℚ) :=
+    canonicalIdeleNormSection_rightInverse ℚ
+  obtain ⟨ω, t, ht, hord, hmult⟩ := spectralStripMellinJet_norm_le_false_exists_zero χ hχ
+  obtain ⟨φ, hφ⟩ := spectralStripMellinJet_norm_le_false_exists_mellin τ ω t
+  obtain ⟨C, hC, hbound⟩ :=
+    h ℚ χ hχ τ hτ (1 / 2) 3 2 (by norm_num) (by norm_num) φ 2 (by norm_num)
+  have hmem : (0 : ℝ) ∈ Set.Icc (-3 : ℝ) 3 := by norm_num
+  have hshift : shift((1 : ℝ) / 2 + 0, t) = shift(1 / 2, t) := by norm_num
+  have hord' : 0 < orderAt(χ ω, shift(1 / 2 + 0, t)) := by rw [hshift]; exact hord
+  have hmult' : 0 < (orderAt(χ ω, shift(1 / 2 + 0, t))).untop₀.toNat := by
+    rw [hshift]; exact hmult
+  have hif : ¬ ((0 : ℝ) = -3 ∨ (0 : ℝ) = 3) := by norm_num
+  have hcount : 0 < (if (0 : ℝ) = -3 ∨ (0 : ℝ) = 3 then
+      min (orderAt(χ ω, shift(1 / 2 + 0, t))).untop₀.toNat (floorCut((2 : ℝ)))
+      else (orderAt(χ ω, shift(1 / 2 + 0, t))).untop₀.toNat) := by
+    simpa only [hif, ite_false] using hmult'
+  have hle := hbound ω 0 t hmem ht hord' 0 hcount
+  have hprod : (∏ n ∈ Finset.range 2, (((0 : ℕ) : ℝ) - ((n : ℕ) : ℝ))) = 0 := by
+    simp [Finset.prod_range_succ]
+  rw [hprod, mul_zero, zero_div] at hle
+  have hnorm : ‖iteratedDeriv 0 ((fun (ω : PontryaginDual C₁(ℚ)) (z : ℂ) ↦
+      ∫ r : ℝ≥0ˣ, ((r.val : ℝ) : ℂ) ^ z *
+        (∫ k : C₁(ℚ), (ω k : ℂ) * φ.val (τ r * k.val)
+          ∂normOneIdeleClassTamagawaMeasure ℚ) ∂positiveRealHaar) ω) (shift(0, t))‖ ≤ 0 := hle
+  have hzero : (∫ r : ℝ≥0ˣ, ((r.val : ℝ) : ℂ) ^ (shift(0, t)) *
+        (∫ k : C₁(ℚ), (ω k : ℂ) * φ.val (τ r * k.val)
+          ∂normOneIdeleClassTamagawaMeasure ℚ) ∂positiveRealHaar) = 0 := by
+    simpa using norm_eq_zero.mp (le_antisymm hnorm (norm_nonneg _))
+  exact hφ hzero
 
 end RiemannMasullo

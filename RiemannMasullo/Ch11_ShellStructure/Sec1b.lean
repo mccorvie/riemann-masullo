@@ -377,12 +377,13 @@ private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_zero (S : Finset 
 
 /-- Integrating the global inclusion of an S-local test multiplies its S-local integral by a
 constant, the mass of the integral tail. -/
-private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Finset V) :
-    ∃ M : ℂ, ∀ k : ℬₛ(S),
+private theorem sAdeleSchwartzToGlobal_integral_scale (S : Finset V) :
+    ∃ M : ℂ, M ≠ 0 ∧ ∀ k : ℬₛ(S),
       ∫ x, sAdeleSchwartzToGlobal F S k (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F =
         M * ∫ y, k (Multiplicative.ofAdd y) ∂sAdditiveTamagawaMeasure F S := by
-  obtain ⟨c, -, -, hm, -⟩ := sAdeleProjection_dual_masses F S
-  refine ⟨((c : ℝ) : ℂ), fun k ↦ ?_⟩
+  obtain ⟨c, hc, -, hm, -⟩ := sAdeleProjection_dual_masses F S
+  refine ⟨((c : ℝ) : ℂ), ?_, fun k ↦ ?_⟩
+  · exact_mod_cast hc
   let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
   let (w : InfinitePlace F) : BorelSpace w.Completion := ⟨rfl⟩
   let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
@@ -435,6 +436,24 @@ private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Fin
     (by rw [hm.map_eq]; exact hk.aestronglyMeasurable)
   refine h2.symm.trans ?_
   rw [hm.map_eq, integral_smul_nnreal_measure, NNReal.smul_def, Complex.real_smul]
+
+private theorem adelePrincipalValue_mem_polarSubspace_toGlobal_integral (S : Finset V) :
+    ∃ M : ℂ, ∀ k : ℬₛ(S),
+      ∫ x, sAdeleSchwartzToGlobal F S k (Multiplicative.ofAdd x) ∂additiveTamagawaMeasure F =
+        M * ∫ y, k (Multiplicative.ofAdd y) ∂sAdditiveTamagawaMeasure F S := by
+  obtain ⟨M, -, hM⟩ := sAdeleSchwartzToGlobal_integral_scale (F := F) S
+  exact ⟨M, hM⟩
+
+/-- Insertion preserves and detects both zero moments. Fourier evaluation at zero
+is multiplied by the nonzero additive mass of the integer tail. -/
+theorem sAdeleSchwartzToGlobal_mem_polarSubspace_iff (S : Finset V) (f : ℬₛ(S)) :
+    sAdeleSchwartzToGlobal F S f ∈ adelePolarSubspace F ↔
+      f (Multiplicative.ofAdd 0) = 0 ∧ sAdeleSchwartzFourier f (Multiplicative.ofAdd 0) = 0 := by
+  obtain ⟨M, hM, h⟩ := sAdeleSchwartzToGlobal_integral_scale (F := F) S
+  rw [mem_adelePolarSubspace,
+    adelePrincipalValue_mem_polarSubspace_toGlobal_zero,
+    (adeleSchwartzFourier_apply_zero _).2, h f, ← sAdeleSchwartzFourier_apply_zero,
+    mul_eq_zero, or_iff_right hM]
 
 open scoped TensorProduct in
 /-- On a pure tensor the S-local integral is the product of the archimedean integral and
