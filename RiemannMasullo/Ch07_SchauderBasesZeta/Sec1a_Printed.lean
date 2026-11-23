@@ -1011,13 +1011,278 @@ def Printed.sLocalZLaurentCoeff_finitePlace_support : Prop :=
         {x : Multiplicative (SAdeleRing F S) | x.toAdd.2 v = 0} →
       sLocalZLaurentCoeff f (chart ((((m : ℝ) * period(v.val) - t : ℝ) : ℂ) * Complex.I)) m = 0
 
+section FinitePlaceSupport
+
+variable {F : Type u} [Field F] [NumberField F]
+
+local instance printedCh07Sec1aFiniteMeasurableSpace
+    (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F) := borel _
+local instance printedCh07Sec1aFiniteUnitsMeasurableSpace
+    (v : HeightOneSpectrum (𝓞 F)) : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+local instance printedCh07Sec1aFiniteUnitsBorelSpace
+    (v : HeightOneSpectrum (𝓞 F)) : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+
+/-- With the trivial character, a compact open subgroup of the integer units gives a test
+whose local zeta is the constant mass of the subgroup, and whose support stays in the
+norm-one sphere. -/
+private theorem sLocalZLaurentCoeff_finitePlace_support_false_test (v : Places(F)) :
+    ∃ (g : SchwartzBruhat (Multiplicative (v.adicCompletion F))) (C : ℂ), C ≠ 0 ∧
+      (∀ z : ℂ, localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v)
+        (fun x ↦ g (Multiplicative.ofAdd x))
+        (quasiCharacterNormTwist (Units.map nnNormHom.toMonoidHom :
+            (v.adicCompletion F)ˣ →* ℝ≥0ˣ) (continuous_finiteLocalModule v)
+          ((circleToComplex).comp (1 : PontryaginDual (v.adicCompletion F)ˣ)) z) = C) ∧
+      tsupport (fun x : v.adicCompletion F ↦ g (Multiplicative.ofAdd x)) ⊆ {x | ‖x‖ = 1} := by
+  classical
+  let K := v.adicCompletion F
+  let U := (v.adicCompletionIntegers F).units
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : LocallyCompactSpace Kˣ := (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).locallyCompactSpace
+  let : TotallyDisconnectedSpace Kˣ := (Units.isEmbedding_val₀ (G₀ := K)).isTotallyDisconnected_range.mp
+    (isTotallyDisconnected_of_totallyDisconnectedSpace _)
+  let : (finiteLocalMultiplicativeTamagawaMeasure F v).IsHaarMeasure :=
+    finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  have ho : IsOpen (U : Set Kˣ) := Submonoid.isOpen_units (Valued.isOpen_valuationSubring K)
+  obtain ⟨H, hK, hsub⟩ :=
+    exists_compact_openSubgroup_sub_mem_nhds (G := Kˣ) (ho.mem_nhds U.one_mem)
+  let V := Units.val '' (H : Set Kˣ)
+  have hV : IsCompact V := hK.image Units.continuous_val
+  have hcl : IsClopen V :=
+    ⟨hV.isClosed, (IsOpenUnits.isOpenEmbedding_unitsVal (M := K)).isOpenMap _ H.isOpen⟩
+  obtain ⟨g, hg⟩ := (mem_finitePlaceSchwartz_iff F v (V.indicator (fun _ ↦ (1 : ℂ)))).2
+    ⟨(LocallyConstant.charFn ℂ hcl).isLocallyConstant, hV.of_isClosed_subset isClosed_closure
+      (closure_minimal support_indicator_subset hcl.1)⟩
+  have hnorm (u : ↥(H : Set Kˣ)) : ‖((u : Kˣ) : K)‖ = 1 :=
+    Valued.toNormedField.norm_eq_one_iff.mpr
+      (HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one.mp (hsub u.prop))
+  have hgf : (fun x : K ↦ g (Multiplicative.ofAdd x)) = V.indicator (fun _ ↦ (1 : ℂ)) :=
+    funext hg
+  refine ⟨g, ((finiteLocalMultiplicativeTamagawaMeasure F v) (H : Set Kˣ)).toReal,
+    Complex.ofReal_ne_zero.mpr (ENNReal.toReal_pos (H.isOpen.measure_pos _ ⟨1, H.one_mem⟩).ne'
+      hK.measure_lt_top.ne).ne', ?_, ?_⟩
+  · intro z
+    rw [hgf]
+    refine localIdelicZetaIntegral_indicator _ _ _ H.isOpen.measurableSet hK.measure_lt_top.ne ?_
+    intro u hu
+    have hn : ‖u.val‖ = 1 := hnorm ⟨u, hu⟩
+    change circleToComplex ((1 : PontryaginDual Kˣ) u) * ((‖u.val‖ : ℝ) : ℂ) ^ z = 1
+    simp [hn]
+  · rw [hgf]
+    have hsuppV : Function.support (V.indicator (fun _ ↦ (1 : ℂ)) : K → ℂ) = V := by
+      refine Set.Subset.antisymm support_indicator_subset (fun y hy ↦ ?_)
+      rw [Function.mem_support, Set.indicator_of_mem hy]
+      exact one_ne_zero
+    have htsV : tsupport (V.indicator (fun _ ↦ (1 : ℂ)) : K → ℂ) = V := by
+      rw [tsupport, hsuppV, hcl.1.closure_eq]
+    rw [htsV]
+    rintro x ⟨u, hu, rfl⟩
+    exact hnorm ⟨u, hu⟩
+
+/-- Pair a real test giving a simple pole with unit-supported finite tests with constant local
+zeta. Translating a finite test scales the numerator by a complex power of the norm, and the
+constant Laurent coefficient cannot vanish for both the unit and a uniformizer translate. -/
+private theorem sLocalZLaurentCoeff_finitePlace_support_false_contradiction
+    {F : Type u} [Field F] [NumberField F]
+    [Unique (InfinitePlace F)] (hw : ∀ w : InfinitePlace F, w.IsReal)
+    (S : Finset Places(F)) [Unique S]
+    (h : Printed.sLocalZLaurentCoeff_finitePlace_support.{u}) : False := by
+  classical
+  let w : InfinitePlace F := default
+  let v : S := default
+  let α (i : InfinitePlace F) := quasiCharacterNormTwist
+    ((Units.map nnNormHom.toMonoidHom) ^ i.mult) (continuous_infiniteLocalModule i)
+    ((circleToComplex).comp (1 : PontryaginDual i.Completionˣ))
+  let β (i : S) := quasiCharacterNormTwist (Units.map nnNormHom.toMonoidHom)
+    (continuous_finiteLocalModule i.val)
+    ((circleToComplex).comp (1 : PontryaginDual (i.val.adicCompletion F)ˣ))
+  let chart := twistₛ(F, S) ((circleToComplex).comp (1 : PontryaginDual Jₛ(F, S)))
+  have harch (i : InfinitePlace F) (s : ℂ) : sLocalInfiniteRestriction i (chart s) = α i s := by
+    ext1 x
+    rw [sLocalInfiniteRestriction_normTwist]
+    change _ = ((1 : Circle) : ℂ) * _
+    rw [Circle.coe_one, one_mul]; rfl
+  have hfin (i : S) (s : ℂ) : sLocalFiniteRestriction i (chart s) = β i s := by
+    ext1 x
+    have hn := sLocalFiniteRestriction_norm i x
+    change ((1 : Circle) : ℂ) * (_ : ℂ) ^ (1 : ℂ) = _ at hn
+    simp only [Circle.coe_one, one_mul, Complex.cpow_one] at hn
+    change ((1 : Circle) : ℂ) * _ ^ s = ((1 : Circle) : ℂ) * _ ^ s
+    rw [hn]
+  choose bfin C hnC hbC hbsupp using fun i : S ↦ sLocalZLaurentCoeff_finitePlace_support_false_test i.val
+  -- Use the even, trivial-character pole at the real place.
+  have hpole (i : InfinitePlace F) := (infiniteLocalIdelicZFunction_real_poles i (hw i) 1 0
+    (fun _ ↦ by simp; rfl) 0).2.mpr ⟨0, by simp⟩
+  choose a ha using hpole
+  let Z (z : ℂ) := infiniteLocalIdelicZFunction w (a w) (α w z)
+  have hm : Meromorphic Z := fun z ↦
+    (((infiniteLocalIdelicZFunction_existsUnique w (a w)).exists.choose_spec 1).1
+      (mem_univ z)).meromorphicAt
+  obtain ⟨H, hH, hnH, hZ⟩ := (meromorphicOrderAt_eq_int_iff (n := -1) (hm 0)).mp (ha w)
+  let B (z : ℂ) := H z * C v
+  have hB : AnalyticAt ℂ B 0 := hH.mul analyticAt_const
+  have hnB : B 0 ≠ 0 := mul_ne_zero hnH (hnC v)
+  have h0 : twistₛ(F, S) ((circleToComplex).comp (1 : PontryaginDual Jₛ(F, S))) 0 = 1 := by
+    ext x
+    change ((1 : Circle) : ℂ) * _ ^ (0 : ℂ) = 1
+    simp
+  have hv : 0 < period(v.val) := div_pos (mul_pos (by norm_num) Real.pi_pos)
+    (Real.log_pos (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val))
+  have allD (p : (i : S) → (i.val.adicCompletion F)ˣ) :
+      deriv (fun z : ℂ ↦ B z * (‖(p v).val‖ : ℂ) ^ z) 0 = 0 := by
+    let r : ℂ := ‖(p v).val‖
+    have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (p v).ne_zero)
+    have hrA := (differentiable_id.const_cpow (c := r) (Or.inl hr)).analyticAt
+    let d := fun i ↦ schwartzBruhatUnitTranslate (p i) (bfin i)
+    obtain ⟨f, hf⟩ := sLocalZLaurentCoeff_mellinResidue_false_tensor a d
+    let G (z : ℂ) := sLocalIdelicZFunction f (chart z)
+    have heq (z : ℂ) (hz : 0 < z.re) : G z = Z z * (r ^ z * C v) := by
+      have eq := sLocalIdelicZetaIntegral_pureTensor (chart z) ⟨1, z, hz, rfl⟩ f a d hf
+      rw [Fintype.prod_subsingleton _ w, Fintype.prod_subsingleton _ v, harch, hfin] at eq
+      refine (sLocalIdelicZFunction_eq_integral f ⟨1, z, hz, rfl⟩).trans (eq.trans ?_)
+      congr 1
+      · exact (infiniteLocalIdelicZFunction_eq_integral w (a w) 1 hz).symm
+      · exact (finiteZeta_dilate v.val _ (β v z) (p v)).trans
+          (congrArg₂ (· * ·) (finite_norm_chart_apply v.val z (p v)) (hbC v z))
+    -- Continue the product identity from the right half-plane to the punctured germ.
+    have hM : Meromorphic G := fun z ↦
+      ((sLocalIdelicZFunction_meromorphic f 1) (mem_univ z)).meromorphicAt
+    have he := meromorphic_eq_of_germ hM
+      (fun z ↦ (hm z).mul (((hrA z).mul analyticAt_const).meromorphicAt))
+      (z := 1) (by
+        have hh : {z : ℂ | 0 < z.re} ∈ 𝓝 (1 : ℂ) :=
+          (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by simp)
+        filter_upwards [nhdsWithin_le_nhds hh] with z hz using heq z hz)
+    have base : (circleToComplex).comp (1 : PontryaginDual Jₛ(F, S)) = 1 := by ext; rfl
+    have hG : (fun z ↦ sLocalIdelicZFunction f (twistₛ(F, S) 1 z)) =ᶠ[𝓝[≠] 0]
+        fun z ↦ (B z * r ^ z) / z := by
+      rw [← base]
+      filter_upwards [he.filter_mono (nhdsNE_le_codiscrete 0), hZ] with z hz hzz
+      change G z = _
+      change G z = Z z * (r ^ z * C v) at hz
+      rw [hz, hzz]
+      simp only [B, sub_zero, zpow_neg_one, smul_eq_mul, div_eq_mul_inv]
+      ring
+    -- The constant Laurent coefficient at the trivial center is a derivative of the numerator.
+    have hcoef : sLocalZLaurentCoeff f 1 0 = deriv (fun z : ℂ ↦ B z * r ^ z) 0 := by
+      simp only [sLocalZLaurentCoeff]
+      refine (complexResidue_congr ?_).trans (sLocalZLaurentCoeff_mellinResidue_false_residue_sq ?_)
+      · filter_upwards [hG] with z hz
+        rw [hz]
+        simp only [Int.cast_zero, zero_add, zpow_one, div_div, pow_two]
+      · exact hB.mul (hrA 0)
+    -- The printed statement forces that coefficient to vanish.
+    have hstat : sLocalZLaurentCoeff f 1 0 = 0 := by
+      have hd0 := h F S 1 v 0 0 f ⟨le_rfl, hv⟩ ?_ ?_
+      · have hc : (↑((↑(0 : ℤ) : ℝ) * period(v.val) - 0) : ℂ) * Complex.I = 0 := by
+          have h1 : (↑(0 : ℤ) : ℝ) * period(v.val) - 0 = 0 := by norm_num
+          rw [h1]; simp
+        rw [hc, h0] at hd0
+        exact hd0
+      · intro x
+        have h0c : chart 0 = 1 := h0
+        change sLocalFiniteRestriction v (chart 0) x = _
+        rw [h0c]; simp; rfl
+      · have hfpt : (fun x : Multiplicative (SAdeleRing F S) ↦ f x) =
+            fun x ↦ (∏ w' : InfinitePlace F,
+              a w' (Multiplicative.ofAdd (x.toAdd.1 w'))) *
+              (∏ i : S, d i (Multiplicative.ofAdd (x.toAdd.2 i))) := funext hf
+        have hne : ∀ y ∈ tsupport (fun y : v.val.adicCompletion F ↦
+            d v (Multiplicative.ofAdd y)), y ≠ 0 := by
+          have hsph : Function.support (fun y : v.val.adicCompletion F ↦
+              d v (Multiplicative.ofAdd y)) ⊆ {y | ‖y‖ = ‖(p v).val‖} := by
+            intro y hy
+            have h1 : bfin v (Multiplicative.ofAdd
+                ((↑(p v)⁻¹ : v.val.adicCompletion F) * y)) ≠ 0 := by
+              have hy' : d v (Multiplicative.ofAdd y) ≠ 0 := hy
+              rw [show d v (Multiplicative.ofAdd y) = bfin v (Multiplicative.ofAdd
+                ((↑(p v)⁻¹ : v.val.adicCompletion F) * y)) from
+                schwartzBruhatUnitTranslate_apply (p v) (bfin v) y] at hy'
+              exact hy'
+            have h2 : ‖(↑(p v)⁻¹ : v.val.adicCompletion F) * y‖ = 1 :=
+              hbsupp v (subset_closure h1)
+            rw [Units.val_inv_eq_inv_val, norm_mul, norm_inv] at h2
+            have hr0 : ‖(p v).val‖ ≠ 0 := norm_ne_zero_iff.mpr (p v).ne_zero
+            have h3 := congrArg (fun t : ℝ ↦ ‖(p v).val‖ * t) h2
+            rw [mul_one, ← mul_assoc, mul_inv_cancel₀ hr0, one_mul] at h3
+            exact h3
+          intro y hy h0y
+          have hy' : ‖y‖ = ‖(p v).val‖ := closure_minimal hsph
+            (isClosed_eq continuous_norm continuous_const) hy
+          rw [h0y, norm_zero] at hy'
+          exact (norm_ne_zero_iff.mpr (p v).ne_zero) hy'.symm
+        have hsupp1 : Function.support (fun x : Multiplicative (SAdeleRing F S) ↦ f x) ⊆
+            {x | (x.toAdd.2 v) ∈ tsupport (fun y : v.val.adicCompletion F ↦
+              d v (Multiplicative.ofAdd y))} := by
+          rw [hfpt]
+          intro x hx
+          have hprod : (∏ i : S, d i (Multiplicative.ofAdd (x.toAdd.2 i))) ≠ 0 := by
+            intro h0p
+            exact hx (by simp only [h0p, mul_zero])
+          refine subset_closure ?_
+          intro hdv
+          exact hprod (Finset.prod_eq_zero (Finset.mem_univ v) hdv)
+        have hcl : IsClosed {x : Multiplicative (SAdeleRing F S) |
+            (x.toAdd.2 v) ∈ tsupport (fun y : v.val.adicCompletion F ↦
+              d v (Multiplicative.ofAdd y))} :=
+          (isClosed_tsupport _).preimage ((continuous_apply v).comp continuous_snd)
+        rw [Set.disjoint_iff_inter_eq_empty, Set.eq_empty_iff_forall_notMem]
+        intro x hx
+        have hx1 : x ∈ tsupport (fun x : Multiplicative (SAdeleRing F S) ↦ f x) := hx.1
+        have hx2 : x.toAdd.2 v = 0 := hx.2
+        exact hne (x.toAdd.2 v) (closure_minimal hsupp1 hcl hx1) hx2
+    rw [← hcoef]
+    exact hstat
+  -- Compare the unit translate with the uniformizer translate.
+  have hd : deriv B 0 = 0 := by
+    simpa using allD (fun _ ↦ 1)
+  choose p hp using fun i : S ↦ exists_finite_norm_uniformizer i.val
+  have hd' := allD p
+  let r : ℂ := ‖(p v).val‖
+  have hr : r ≠ 0 := Complex.ofReal_ne_zero.mpr (norm_ne_zero_iff.mpr (p v).ne_zero)
+  change deriv (fun z ↦ B z * r ^ z) 0 = 0 at hd'
+  have hdiff : DifferentiableAt ℂ (fun z : ℂ ↦ r ^ z) 0 :=
+    (differentiable_id.const_cpow (c := r) (Or.inl hr)).differentiableAt
+  rw [deriv_fun_mul hB.differentiableAt hdiff, Complex.deriv_const_cpow_id] at hd'
+  simp only [Complex.cpow_zero, mul_one] at hd'
+  have hdiff₀ : B 0 * Complex.log r = 0 := by linear_combination hd' - hd
+  have hlog : Complex.log r = 0 := (mul_eq_zero.mp hdiff₀).resolve_left hnB
+  have hone : r = 1 := by rw [← Complex.exp_log hr, hlog, Complex.exp_zero]
+  have hlt : ‖(p v).val‖ < 1 := by
+    rw [hp]
+    exact inv_lt_one_of_one_lt₀ (by exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val)
+  exact hlt.ne (Complex.ofReal_injective (hone.trans Complex.ofReal_one.symm))
+
 /-- Paper: Discussion of Theorem 7.1.2.3, p. 321.
 Take ℚ with the real place and the place above 2, the trivial character and m = 0.
-Use a nonzero nonnegative smooth bump supported in (1,2) times the indicator of
-ℤ₂ˣ. The support avoids the zero at the finite coordinate, but the zeta integral
-is holomorphic at zero and its constant term is strictly positive. -/
+Use a test with a simple pole at the trivial archimedean center and a unit-supported
+finite factor. The support misses the zero of the finite coordinate, but the constant
+Laurent coefficient is the derivative of the pole numerator, which cannot vanish for
+both a unit translate and a uniformizer translate. -/
 theorem Printed.sLocalZLaurentCoeff_finitePlace_support_false :
-    ¬ Printed.sLocalZLaurentCoeff_finitePlace_support := by sorry
+    ¬ Printed.sLocalZLaurentCoeff_finitePlace_support := by
+  classical
+  intro h
+  have : CharZero (ULift ℚ) := ⟨fun a b hab ↦ by simpa using congrArg ULift.down hab⟩
+  have : NumberField (ULift ℚ) := ⟨⟩
+  let F := ULift ℚ
+  have hd : Module.finrank ℚ F = 1 := by
+    change Module.finrank ℚ (ULift ℚ) = 1
+    rw [finrank_ulift, Module.finrank_self]
+  have hreal := InfinitePlace.nrRealPlaces_eq_one_of_finrank_eq_one hd
+  have hcomplex := InfinitePlace.nrComplexPlaces_eq_zero_of_finrank_eq_one hd
+  have hcard : Fintype.card (InfinitePlace F) = 1 := by
+    rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces, hreal, hcomplex, add_zero]
+  let := (Fintype.card_eq_one_iff_nonempty_unique.mp hcard).some
+  obtain ⟨m, hm⟩ := Ideal.exists_maximal (𝓞 F)
+  let v : Places(F) := ⟨m, hm.isPrime, NeZero.ne m⟩
+  apply sLocalZLaurentCoeff_finitePlace_support_false_contradiction (F := F) (S := {v}) _ h
+  intro w
+  have hr : Nonempty {i : InfinitePlace F // i.IsReal} :=
+    Fintype.card_pos_iff.mp (by rw [← InfinitePlace.nrRealPlaces, hreal]; decide)
+  obtain ⟨i, hi⟩ := hr
+  exact (Subsingleton.elim i w) ▸ hi
+
+end FinitePlaceSupport
 
 /-- Paper: Proof of Theorem 7.1.2.3, p. 321.
 As printed: For every test the trivial-character zeta function has pole order equal

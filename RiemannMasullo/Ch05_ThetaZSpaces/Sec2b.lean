@@ -673,12 +673,6 @@ theorem sLocalHomogeneousThetaTransition_spec
       (h := sLocalHomogeneousThetaTransition_preserves_kernel (F := F) (ω := ω) hω hST)
   exact ⟨h, fun π hπ ↦ Submodule.linearMap_qext _ (Eq.trans hπ (Eq.symm h))⟩
 
-/-- Paper: Theorem 5.2.3.1(1), p. 233.
-Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
-theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
-    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
-    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by sorry
-
 section
 open Set TopologicalSpace
 
@@ -1344,6 +1338,23 @@ theorem sLocalHomogeneousTheta_inductiveLimit (hω : NormOneCharacterUnramifiedO
     (∀ x : Θ𝔽ω(ω), ∃ T y, i T y = x) ∧
     (inferInstance : TopologicalSpace Θ𝔽ω(ω)) = locallyConvexFinalTopology i := by sorry
 
+/-- Paper: Theorem 5.2.3.1(1), p. 233.
+Each homogeneous stage is embedded as a closed subspace of a larger stage. -/
+theorem sLocalHomogeneousThetaTransition_isClosedEmbedding
+    (hω : NormOneCharacterUnramifiedOutside (F := F) ω S) (hST : S ⊆ T) :
+    IsClosedEmbedding (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) := by
+  let I := {U : Finset (HeightOneSpectrum (𝓞 F)) // S ⊆ U}
+  let s : I := ⟨S, Finset.Subset.refl S⟩
+  let t : I := ⟨T, hST⟩
+  let i (u : I) := sLocalHomogeneousThetaToGlobal (F := F) (ω := ω) (hω.mono u.property)
+  have h := sLocalHomogeneousTheta_inductiveLimit (F := F) (S := S) (ω := ω) hω
+  have he : IsClosedEmbedding (i t) := h.1 t
+  apply he.of_comp_iff.mp
+  have hc : (i t) ∘ (sLocalHomogeneousThetaTransition (F := F) (ω := ω) hω hST) = i s :=
+    funext (LinearMap.congr_fun (h.2.1 s t hST))
+  rw [hc]
+  exact h.1 s
+
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
 A Hausdorff space admits a countable locally convex inductive presentation whose
 stages, with their own topologies, are nuclear Fréchet spaces. -/
@@ -1710,32 +1721,9 @@ theorem sLocalHomogeneousThetaSpace_strongDual_complete (χ : PontryaginDual (J�
   exact completeSpace_strongDual_quotient _
 
 /-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is nuclear. -/
-theorem globalHomogeneousThetaSpace_strongDual_nuclear :
-    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
 The strong dual of the S-local homogeneous quotient is nuclear. -/
 theorem sLocalHomogeneousThetaSpace_strongDual_nuclear (χ : PontryaginDual (J₁(S))) :
     IsNuclearTVS (StrongDual ℂ (Θₛω(S, χ))) := by sorry
-
-/-- Paper: Theorem 5.2.3.1(2), p. 233.
-The strong dual of the global homogeneous quotient is Montel. -/
-theorem globalHomogeneousThetaSpace_strongDual_montel :
-    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
-  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
-    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
-  let : T2Space Θ𝔽ω(ω) := hN.1
-  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
-  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
-  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
-  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
-    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
-  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
-  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
-  simpa only [hc.closure_eq] using
-    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
 
 private theorem sLocalHomogeneousThetaSpace_strongDual_montel_aux {E : Type*}
     [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
@@ -1861,13 +1849,60 @@ There is a unique continuous linear S-local Pettis average with the norm-one
 quotient measure and the conjugate character weight. -/
 theorem existsUnique_sLocalThetaIsotypicAverage (χ : PontryaginDual (J₁(S))) :
     ∃! P : Θₛ(S) →L[ℂ] Θₛ(S),
-      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by sorry
+      IsPettisIsotypicAverageOn (μₛ₁(S)) Set.univ (ρₛ₁(S)) χ P := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  with_reducible_and_instances
+    exact existsUnique_globalThetaIsotypicAverage_of_compact (H := Jₛ(S)) (E := E) G
+      (sLocalAdelicThetaSpace_complete (F := F) (S := S)) (μₛ₁(S)) (ρₛ(S))
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ
 
 end IsotypicAverages
 
 local notation "P𝔽(" ω ")" => (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose
 local notation "Pₛ(" S ", " χ ")" =>
   (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose
+
+/-- A normalized character average splits the inclusion of its isotype. Transposing
+the splitting realizes the strong dual of any equivalent space inside the ambient strong dual. -/
+private theorem strongDual_nuclear_of_compact_isotype.{test} {G E Q : Type*}
+    [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G] [CompactSpace G]
+    [MeasurableSpace G] [BorelSpace G] [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [T2Space E] [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E]
+    [AddCommGroup Q] [Module ℂ Q] [TopologicalSpace Q]
+    (μ : Measure G) [μ.IsHaarMeasure] (ρ : G →* (E →L[ℂ] E))
+    (ω : PontryaginDual G) (P : E →L[ℂ] E) (hP : IsPettisIsotypicAverageOn μ Set.univ ρ ω P)
+    (e : Q ≃L[ℂ] actionIsotype ρ ω) (hE : IsNuclearTVS.{test} (StrongDual ℂ E)) :
+    IsNuclearTVS.{test} (StrongDual ℂ Q) := by
+  let V := actionIsotype ρ ω
+  let c : ℂ := μ.real Set.univ
+  have hc : c ≠ 0 := Complex.ofReal_ne_zero.mpr (measureReal_univ_pos (μ := μ)).ne'
+  let A := P.codRestrict V (compactActionAverage_mem_isotype μ ρ ω P hP)
+  let q := e.symm.toContinuousLinearMap.comp A
+  let i := c⁻¹ • (V.subtypeL.comp e.toContinuousLinearMap)
+  have hretract (y : Q) : q (i y) = y := by
+    apply e.injective
+    change e (e.symm _) = e y
+    rw [e.apply_symm_apply]
+    apply Subtype.ext
+    change P (c⁻¹ • (e y : E)) = (e y : E)
+    rw [map_smul, compactActionAverage_apply_isotype μ ρ ω P hP (e y).property]
+    exact inv_smul_smul₀ hc _
+  let pull := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ q
+  let back := ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ i
+  have hleft : Function.LeftInverse back pull := fun φ ↦
+    ContinuousLinearMap.ext fun y ↦ congrArg φ (hretract y)
+  exact nuclear_of_linear_embedding pull (hleft.isEmbedding back.continuous pull.continuous) hE
 
 /-- Compose the homogeneous-to-coinvariant identification with the compact average's
 identification of its kernel quotient with the isotype. -/
@@ -1921,6 +1956,50 @@ theorem globalThetaIsotypicAverage_equiv (ω : PontryaginDual C₁) :
       ω (P𝔽(ω)) (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
       (globalHomogeneousThetaSpace_equiv_coinvariants (F := F) ω)
 
+section
+variable {ω : PontryaginDual (ideleClassNorm F).ker}
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is nuclear. -/
+theorem globalHomogeneousThetaSpace_strongDual_nuclear :
+    IsNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) := by
+  let : MeasurableSpace C𝔽 := borel _
+  let : BorelSpace C𝔽 := ⟨rfl⟩
+  let : T2Space C₁ := (ideleClassGroup_finiteness F).2.2.1
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  let : (μ𝔽₁).IsHaarMeasure :=
+    (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let : T2Space Θ𝔽 := globalAdelicThetaSpace_t2_of_isClosed (F := F) adelicTheta_ker_isClosed
+  let : PolynormableSpace ℂ Θ𝔽 := globalAdelicThetaSpace_polynormable (F := F)
+  let : Module ℝ Θ𝔽 := Module.restrictScalars ℝ ℂ _
+  let : IsScalarTower ℝ ℂ Θ𝔽 := IsScalarTower.restrictScalars ℝ ℂ _
+  let : LocallyConvexSpace ℝ Θ𝔽 := (PolynormableSpace.withSeminorms ℂ Θ𝔽).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact strongDual_nuclear_of_compact_isotype μ𝔽₁ ρ𝔽₁ ω (P𝔽(ω))
+      (existsUnique_globalThetaIsotypicAverage (F := F) ω).exists.choose_spec
+      (globalThetaIsotypicAverage_equiv (F := F) ω).2.choose
+      (globalAdelicThetaSpace_strongDual_nuclear (F := F))
+
+/-- Paper: Theorem 5.2.3.1(2), p. 233.
+The strong dual of the global homogeneous quotient is Montel. -/
+theorem globalHomogeneousThetaSpace_strongDual_montel :
+    BarrelledSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) ∧ MontelSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := by
+  have hN : IsNuclearTVS.{0} Θ𝔽ω(ω) :=
+    globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  let : T2Space Θ𝔽ω(ω) := hN.1
+  let : PolynormableSpace ℂ Θ𝔽ω(ω) := hN.2.1
+  let : MontelSpace ℂ Θ𝔽ω(ω) := (globalHomogeneousThetaSpace_montel (F := F) (ω := ω)).2
+  let : CompleteSpace (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_complete (F := F) (ω := ω)
+  have hdual : IsNuclearTVS.{0} (StrongDual ℂ Θ𝔽ω(ω)) :=
+    globalHomogeneousThetaSpace_strongDual_nuclear (F := F) (ω := ω)
+  let : PolynormableSpace ℂ (StrongDual ℂ Θ𝔽ω(ω)) := hdual.2.1
+  refine ⟨barrelled_strongDual_of_montel, ⟨fun B hc hb ↦ ?_⟩⟩
+  simpa only [hc.closure_eq] using
+    isCompact_closure_of_isNuclearTVS (StrongDual ℂ Θ𝔽ω(ω)) hdual hb
+
+end
+
 /-- Paper: Proposition 5.2.3.2(1), p. 236.
 The S-local average induces a topological linear equivalence from the homogeneous quotient
 to the closed isotype. Its map on ordinary theta classes is therefore open onto the isotype.
@@ -1928,7 +2007,29 @@ Deviation: The continuous coinvariant quotient is identified via Definition 5.2.
 theorem sLocalThetaIsotypicAverage_equiv (χ : PontryaginDual (J₁(S))) :
     IsClosed (Eₛω(S, χ) : Set (Θₛ(S))) ∧
       ∃ e : Θₛω(S, χ) ≃L[ℂ] Eₛω(S, χ), ∀ f : ℬₛ(S),
-        (e ((Kₛω(S, χ)).mkQ f) : Θₛ(S)) = Pₛ(S, χ) ((Kₛ(S)).mkQ f) := by sorry
+        (e ((Kₛω(S, χ)).mkQ f) : Θₛ(S)) = Pₛ(S, χ) ((Kₛ(S)).mkQ f) := by
+  let E := SLocalAdelicThetaSpace F S
+  let G := J₁(S)
+  have := isClosed_sProjectedDiagonal (F := F) (S := S)
+  let : T2Space (Jₛ(S)) := inferInstanceAs (T2Space (_ ⧸ _))
+  let : T2Space G := inferInstanceAs (T2Space ((sIdeleQuotientNorm F S).ker : Set (Jₛ(S))))
+  let : MeasurableSpace G := borel _
+  let : BorelSpace G := ⟨rfl⟩
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let : T2Space E := sLocalAdelicThetaSpace_t2_of_isClosed (F := F) (S := S)
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ E := sLocalAdelicThetaSpace_polynormable (F := F) (S := S)
+  let : (μₛ₁(S)).IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+  let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+  let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+  with_reducible_and_instances
+    exact globalThetaIsotypicAverage_equiv_of_coinvariants (G := Jₛ(S)) (E := E) (T := ℬₛ(S))
+      G (Kₛω(S, χ)) (Kₛ(S)).mkQ (μₛ₁(S)) (ρₛ(S))
+      (existsUnique_sLocalThetaAction (F := F) (S := S)).exists.choose_spec.1 χ (Pₛ(S, χ))
+      (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) χ).exists.choose_spec
+      (sLocalHomogeneousThetaSpace_equiv_coinvariants (F := F) (S := S) χ)
 
 -- TODO(paper-gap): The global L² argument on p. 237 fails at norm zero for
 -- the rational Gaussian. Apply character uniqueness on each compact norm-one fibre.

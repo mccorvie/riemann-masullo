@@ -559,6 +559,82 @@ private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
     ← tsum_mul_left, ← hs1.tsum_sub (hs2.mul_left _)]
   exact tsum_congr fun ξ ↦ globalThetaPrincipalValue_sobolevBound_formula_global v π _hπ f.val (x ξ)
 
+/-- Paper: Proposition 11.2.0.1, pp. 484–485. On the trivial norm-one isotype, the
+principal value at one finite place acts on the theta function by the difference
+with its uniformizer translate. -/
+theorem homogeneousAdelicTheta_one_principalValue_singleton (v : V) (π : (v.adicCompletion F)ˣ)
+    (hπ : Valued.v.IsUniformizer π.val) (f : ℬ₀) (g : C𝔽) :
+    homogeneousAdelicTheta (1 : PontryaginDual C₁) (adelePrincipalValue F {v} f.val) g =
+      homogeneousAdelicTheta 1 f.val g - homogeneousAdelicTheta 1 f.val
+        ((IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π)⁻¹ * g) := by
+  classical
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  have : SecondCountableTopology (v.adicCompletion F)ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let ν := normOneIdeleClassTamagawaMeasure F
+  let : ν.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hm : μ.real U ≠ 0 := (measureReal_ne_zero_iff hUc.measure_ne_top).mpr
+    (hUo.measure_pos μ ⟨1, Submonoid.one_mem _⟩).ne'
+  let a := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+  let y := (a π)⁻¹ * g
+  let K (k : C₁) (u : (v.adicCompletion F)ˣ) :=
+    adelicTheta f.val (a (π * u)⁻¹ * (k.val * g))
+  have hK : Continuous (uncurry K) :=
+    (adelicTheta f.val).continuous.comp (((continuous_ideleClass_ofAdicCompletion F v).comp
+      ((continuous_const.mul continuous_snd).inv)).mul
+        ((continuous_subtype_val.comp continuous_fst).mul continuous_const))
+  have hInt : Integrable (uncurry K) (ν.prod (μ.restrict U)) := by
+    have h := hK.continuousOn.integrableOn_compact (μ := ν.prod μ) (isCompact_univ.prod hUc)
+    rwa [IntegrableOn, ← Measure.prod_restrict, Measure.restrict_univ] at h
+  have hθ (b : SchwartzBruhat (Multiplicative 𝔸[F])) (x : C𝔽) :
+      homogeneousAdelicTheta (1 : PontryaginDual C₁) b x =
+        ∫ k : C₁, adelicTheta b (k.val * x) ∂ν := by
+    change (∫ k : C₁, adelicTheta b (k.val * x) * (1 : ℂ) ∂ν) = _
+    simp
+  have hθi : Integrable (fun k : C₁ ↦ adelicTheta f.val (k.val * g)) ν :=
+    ((adelicTheta f.val).continuous.comp (continuous_subtype_val.mul continuous_const)).integrable_of_hasCompactSupport
+        (HasCompactSupport.of_compactSpace _)
+  have hinner (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) :
+      ∫ k : C₁, K k u ∂ν = homogeneousAdelicTheta 1 f.val y := by
+    have hun : ideleClassNorm F (a u) = 1 := by
+      rw [ideleClassNorm_ofAdicCompletion]
+      apply Units.ext
+      apply NNReal.coe_injective
+      change ‖u.val‖ = 1
+      have h1 : ‖u.val‖ ≤ 1 := Valued.toNormedField.norm_le_one_iff.mpr hu.1
+      have h2 : ‖(u⁻¹ : (v.adicCompletion F)ˣ).val‖ ≤ 1 := Valued.toNormedField.norm_le_one_iff.mpr hu.2
+      have h3 : ‖u.val‖ * ‖(u⁻¹ : (v.adicCompletion F)ˣ).val‖ = 1 := by
+        rw [← norm_mul, Units.mul_inv, norm_one]
+      nlinarith [norm_nonneg u.val, norm_nonneg (u⁻¹ : (v.adicCompletion F)ˣ).val]
+    let k₀ : C₁ := ⟨a u, hun⟩
+    have eqk (k : C₁) : K k u = adelicTheta f.val ((k₀⁻¹ * k).val * y) := by
+      dsimp only [K, k₀, y, Subgroup.coe_mul, Subgroup.coe_inv]
+      rw [map_inv a, map_mul a]
+      congr 1
+      simp only [mul_inv_rev]
+      ac_rfl
+    rw [hθ, ← integral_mul_left_eq_self (μ := ν) (fun k : C₁ ↦ adelicTheta f.val (k.val * y)) k₀⁻¹]
+    exact integral_congr_ae (.of_forall eqk)
+  rw [hθ, hθ f.val g]
+  let b : ℂ := ((μ.real U)⁻¹ : ℝ)
+  have heq (k : C₁) : adelicTheta (adelePrincipalValue F {v} f.val) (k.val * g) =
+      adelicTheta f.val (k.val * g) - b * ∫ u in U, K k u ∂μ :=
+    globalThetaPrincipalValue_sobolevBound_formula v π hπ f _
+  simp_rw [heq]
+  have hKi : Integrable (fun k : C₁ ↦ b * ∫ u in U, K k u ∂μ) ν := hInt.integral_prod_left.const_mul b
+  have hswap := integral_integral_swap (f := K) hInt
+  rw [integral_sub hθi hKi, integral_const_mul, hswap, setIntegral_congr_fun hUo.measurableSet hinner, setIntegral_const]
+  simp [b, y, a, Complex.real_smul, hm]
+
 /-- Cauchy–Schwarz for lower Lebesgue integrals: the square of the integral is at most the
 total mass times the integral of the square. -/
 private theorem globalThetaPrincipalValue_sobolevBound_average_cs {X : Type*}
@@ -855,6 +931,187 @@ private def globalThetaSobolevTestClass (a : ℝ) {s : ℝ} (hs : 0 ≤ s) :
   (j(a, hs)).toLinearMap.comp (Submodule.mkQ
     ((LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype))
 
+/-- Abstract form of the last step of the weighted single-place bound: if `A` has L² norm at
+most `C` times that of `φ`, then `φ - K A` has L² norm at most `1 + K C` times that of `φ`. -/
+private theorem globalThetaPrincipalValue_sobolevBound_sub_abstract {X : Type*}
+    [MeasurableSpace X] (ν : Measure X) (φ A : X → ℂ) {K C : ℝ} (hK : 0 ≤ K) (hC : 0 ≤ C)
+    (hφ : MemLp φ 2 ν) (hA : eLpNorm A 2 ν ≤ ENNReal.ofReal C * eLpNorm φ 2 ν) :
+    (eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν).toReal ≤ (1 + K * C) * (eLpNorm φ 2 ν).toReal := by
+  have hle : eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν ≤
+      ENNReal.ofReal (1 + K * C) * eLpNorm φ 2 ν := by
+    calc eLpNorm (fun g ↦ φ g - (K : ℂ) * A g) 2 ν
+        ≤ eLpNorm φ 2 ν + eLpNorm (K • A) 2 ν :=
+          eLpNorm_sub_le (by norm_num : (1 : ENNReal) ≤ 2)
+      _ = eLpNorm φ 2 ν + ENNReal.ofReal K * eLpNorm A 2 ν := by
+          rw [eLpNorm_const_smul, Real.eNorm_of_nonneg hK]
+      _ ≤ eLpNorm φ 2 ν + ENNReal.ofReal K * (ENNReal.ofReal C * eLpNorm φ 2 ν) := by
+          gcongr
+      _ = ENNReal.ofReal (1 + K * C) * eLpNorm φ 2 ν := by
+          rw [ENNReal.ofReal_add zero_le_one (mul_nonneg hK hC), ENNReal.ofReal_mul hK,
+            ENNReal.ofReal_one, add_mul, one_mul, mul_assoc]
+  refine (ENNReal.toReal_mono (ENNReal.mul_ne_top ENNReal.ofReal_ne_top hφ.eLpNorm_ne_top)
+    hle).trans_eq ?_
+  rw [ENNReal.toReal_mul, ENNReal.toReal_ofReal (by positivity)]
+
+/-- Abstract form of the descent to the test classes: a linear map bounded by a constant
+times another descends to a continuous linear map on the range of the other. -/
+private theorem globalThetaPrincipalValue_clm_onTests_abstract {E W : Type*} [AddCommGroup E]
+    [Module ℂ E] [NormedAddCommGroup W] [NormedSpace ℂ W] {H : Submodule ℂ W}
+    (ι T : E →ₗ[ℂ] H) (C : ℝ) (hC : ∀ f, ‖T f‖ ≤ C * ‖ι f‖) :
+    ∃ g : LinearMap.range ι →L[ℂ] H, ∀ f, g ⟨ι f, LinearMap.mem_range_self _ f⟩ = T f := by
+  have hker : LinearMap.ker ι ≤ LinearMap.ker T := fun f hf ↦ by
+    have h1 : ‖T f‖ ≤ 0 := (hC f).trans_eq (by rw [LinearMap.mem_ker.mp hf, norm_zero, mul_zero])
+    exact LinearMap.mem_ker.mpr (norm_le_zero_iff.mp h1)
+  let L : LinearMap.range ι →ₗ[ℂ] H :=
+    (LinearMap.ker ι).liftQ T hker ∘ₗ (LinearMap.quotKerEquivRange ι).symm.toLinearMap
+  have hL (f : E) : L ⟨ι f, LinearMap.mem_range_self _ f⟩ = T f := by
+    simp only [L, LinearMap.coe_comp, LinearEquiv.coe_coe, Function.comp_apply,
+      LinearMap.quotKerEquivRange_symm_apply_image]
+    rfl
+  refine ⟨L.mkContinuous C fun x ↦ ?_, fun f ↦ ?_⟩
+  · obtain ⟨f, hf⟩ := LinearMap.mem_range.mp x.2
+    have hx : x = ⟨ι f, LinearMap.mem_range_self _ f⟩ := Subtype.ext hf.symm
+    calc ‖L x‖ = ‖T f‖ := by rw [hx, hL f]
+      _ ≤ C * ‖ι f‖ := hC f
+      _ = C * ‖x‖ := by rw [hf, Submodule.norm_coe]
+  · rw [LinearMap.mkContinuous_apply]
+    exact hL f
+
+/-- The principal value at a single finite place is bounded in the norm of the weighted
+global theta completion. Each unit translate in the average moves the idelic norm by the
+fixed factor `‖π‖⁻¹`, so weighting by `‖g‖ ^ a` turns the average of the theta function into
+`‖π‖ ^ a` times the average of the weighted theta function, which the unweighted estimate
+bounds. -/
+private theorem globalThetaPrincipalValue_sobolevBound_single_weighted_at (v : V)
+    (π : (v.adicCompletion F)ˣ) (hπ₀ : Valued.v.IsUniformizer π.val) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest({v}, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  let _ : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have _ : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  obtain ⟨C, hC, hA⟩ := globalThetaPrincipalValue_sobolevBound_average v π hs
+  let ν := (μ𝔽).withDensity fun g ↦ ENNReal.ofReal (intervalSobolevDensity 0 0 s (logNorm g))
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  let τ : (v.adicCompletion F)ˣ → C𝔽 := fun u ↦ IdeleClassGroup.ofAdicCompletion (𝓞 F) F v (π * u)⁻¹
+  let w : C𝔽 → ℝ := fun g ↦ (((ideleClassNorm F g).val : ℝ≥0) : ℝ) ^ a
+  let φ : ℬ₀ → C𝔽 → ℂ := fun h g ↦ (w g : ℂ) * adelicTheta h.val g
+  let K : ℝ := ‖(π : v.adicCompletion F)‖ ^ a
+  have hπ0 : 0 < ‖(π : v.adicCompletion F)‖ := norm_pos_iff.mpr π.ne_zero
+  have hK : 0 ≤ K := Real.rpow_nonneg hπ0.le a
+  have hw : Continuous w :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp (m𝔽).continuous)).rpow_const
+      fun g ↦ Or.inl (NNReal.coe_pos.mpr (Units.zero_lt _)).ne'
+  have hφc (h : ℬ₀) : Continuous (φ h) :=
+    (Complex.continuous_ofReal.comp hw).mul (adelicTheta h.val).continuous
+  -- The norm of a weighted theta class is the weighted L² norm of its weighted theta function.
+  have hθ (h : ℬ₀) : ((j(a, hs) (theta(h)) : W(s)) : C𝔽 → ℂ) =ᵐ[ν] φ h :=
+    (withDensity_absolutelyContinuous _ _).ae_le
+      ((existsUnique_globalThetaSobolevEmbedding (F := F) a 0 0 s hI hs).exists.choose_spec.2 h)
+  have hmem (h : ℬ₀) : MemLp (φ h) 2 ν := (Lp.memLp _).ae_eq (hθ h)
+  have hnorm (h : ℬ₀) : ‖j(a, hs) (theta(h))‖ = (eLpNorm (φ h) 2 ν).toReal :=
+    (Lp.norm_def _).trans (congrArg ENNReal.toReal (eLpNorm_congr_ae (hθ h)))
+  -- A unit translate divides the idelic norm by `‖π‖`.
+  have hnormu (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) : ‖(u : v.adicCompletion F)‖ = 1 := by
+    have h1 : ‖(u : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.1
+    have h2 : ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ ≤ 1 :=
+      (Valued.toNormedField.norm_le_one_iff).mpr hu.2
+    have h3 : ‖(u : v.adicCompletion F)‖ *
+        ‖((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)‖ = 1 := by
+      rw [← norm_mul, Units.mul_inv, norm_one]
+    nlinarith [norm_nonneg (u : v.adicCompletion F),
+      norm_nonneg ((u⁻¹ : (v.adicCompletion F)ˣ) : v.adicCompletion F)]
+  have hwτ (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) (g : C𝔽) : K * w (τ u * g) = w g := by
+    have hn' (h : C𝔽) : (((ideleClassNorm F ((τ u)⁻¹ * h)).val : ℝ≥0) : ℝ) =
+        ‖(π : v.adicCompletion F)‖ * (((ideleClassNorm F h).val : ℝ≥0) : ℝ) := by
+      simp only [τ, map_mul, map_inv, inv_inv, ideleClassNorm_ofAdicCompletion, Units.val_mul,
+        NNReal.coe_mul]
+      change ‖(π : v.adicCompletion F)‖ * ‖(u : v.adicCompletion F)‖ * _ = _
+      rw [hnormu u hu, mul_one]
+    have hn := hn' (τ u * g)
+    rw [inv_mul_cancel_left] at hn
+    simp only [w, K, hn]
+    rw [Real.mul_rpow hπ0.le (NNReal.coe_nonneg _)]
+  refine ⟨1 + K * C, by positivity, fun f ↦ ?_⟩
+  have hA' := hA _ (hφc f) (hmem f)
+  let A : C𝔽 → ℂ := fun g ↦ ((finiteLocalMultiplicativeTamagawaMeasure F v).real U)⁻¹ *
+    ∫ u in U, φ f (τ u * g) ∂(finiteLocalMultiplicativeTamagawaMeasure F v)
+  have hAm : MemLp A 2 ν := hA'.1
+  have hAle : eLpNorm A 2 ν ≤ ENNReal.ofReal C * eLpNorm (φ f) 2 ν := hA'.2
+  -- The weighted principal value is the weighted theta function minus `K` times the average.
+  have hpv : φ (pvTest({v}, f)) = fun g ↦ φ f g - (K : ℂ) * A g := by
+    funext g
+    have hint : ∫ u in U, φ f (τ u * g) ∂(finiteLocalMultiplicativeTamagawaMeasure F v) =
+        ((K⁻¹ * w g : ℝ) : ℂ) * ∫ u in U, adelicTheta f.val (τ u * g)
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v) := by
+      rw [← integral_const_mul]
+      refine setIntegral_congr_fun
+        (Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)).measurableSet fun u hu ↦ ?_
+      have hK0 : K ≠ 0 := (Real.rpow_pos_of_pos hπ0 a).ne'
+      have hw' : w (τ u * g) = K⁻¹ * w g := by
+        rw [← hwτ u hu g, ← mul_assoc, inv_mul_cancel₀ hK0, one_mul]
+      simp only [φ, hw']
+    simp only [φ, A]
+    rw [globalThetaPrincipalValue_sobolevBound_formula v π hπ₀ f g, hint]
+    have hK0 : (K : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (Real.rpow_pos_of_pos hπ0 a).ne'
+    change _ = _ - _ * (_ * (((K⁻¹ * w g : ℝ) : ℂ) * ∫ u in U, adelicTheta f.val (τ u * g)
+      ∂(finiteLocalMultiplicativeTamagawaMeasure F v)))
+    push_cast
+    rw [mul_sub]
+    congr 1
+    field_simp
+    rfl
+  rw [hnorm, hnorm, hpv]
+  exact globalThetaPrincipalValue_sobolevBound_sub_abstract ν (φ f) A hK hC (hmem f) hAle
+
+/-- The principal value at a single finite place is bounded in the norm of the weighted
+global theta completion, at some uniformizer of that place. -/
+private theorem globalThetaPrincipalValue_sobolevBound_single_weighted (v : V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest({v}, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  obtain ⟨π₀, hπ₀⟩ := (Valued.v : Valuation (v.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  exact globalThetaPrincipalValue_sobolevBound_single_weighted_at v (Units.mk0 π₀ hπ₀.ne_zero)
+    hπ₀ a hs
+
+/-- The principal value at a finite set of places is bounded in the norm of the weighted
+global theta completion: compose the single-place bounds. -/
+private theorem globalThetaPrincipalValue_sobolevBound_weighted (S : Finset V) (a : ℝ)
+    {s : ℝ} (hs : 0 ≤ s) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f : ℬ₀,
+      ‖j(a, hs) (theta(pvTest(S, f)))‖ ≤ C * ‖j(a, hs) (theta(f))‖ := by
+  classical
+  induction S using Finset.induction_on with
+  | empty =>
+    refine ⟨1, zero_le_one, fun f ↦ ?_⟩
+    have h : pvTest(∅, f) = f := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F ∅ f.val = f.val
+      rw [sLocalUncutCarving_empty_PV]
+      rfl
+    rw [h, one_mul]
+  | insert v T hvT ih =>
+    obtain ⟨K₁, hK₁, h₁⟩ := ih
+    have hsingle := globalThetaPrincipalValue_sobolevBound_single_weighted (F := F) v a hs
+    have hK₂ := hsingle.choose_spec.1
+    have h₂ := hsingle.choose_spec.2
+    refine ⟨K₁ * hsingle.choose, mul_nonneg hK₁ hK₂, fun f ↦ ?_⟩
+    have hcomp : pvTest(insert v T, f) = pvTest(T, pvTest({v}, f)) := by
+      refine Subtype.ext ?_
+      change adelePrincipalValue F (insert v T) f.val =
+        adelePrincipalValue F T (adelePrincipalValue F {v} f.val)
+      rw [sLocalCutoffCarving_antitone_PV (Finset.subset_insert v T),
+        Finset.insert_sdiff_cancel hvT]
+      rfl
+    calc ‖j(a, hs) (theta(pvTest(insert v T, f)))‖
+        = ‖j(a, hs) (theta(pvTest(T, pvTest({v}, f))))‖ :=
+          congrArg (fun h : ℬ₀ ↦ ‖j(a, hs) (theta(h))‖) hcomp
+      _ ≤ K₁ * ‖j(a, hs) (theta(pvTest({v}, f)))‖ := h₁ _
+      _ ≤ K₁ * (hsingle.choose * ‖j(a, hs) (theta(f))‖) := mul_le_mul_of_nonneg_left (h₂ f) hK₁
+      _ = K₁ * hsingle.choose * ‖j(a, hs) (theta(f))‖ := (mul_assoc _ _ _).symm
+
 /-- Paper: Proposition 11.2.0.1(2), pp. 484–485. The principal value is bounded and well
 defined on the polar-free theta test classes of the completion: on their span it is a
 continuous linear map sending a test class to the class of its principal value. -/
@@ -868,7 +1125,18 @@ private theorem globalThetaPrincipalValue_clm_onTests (S : Finset V) (a : ℝ) {
   -- theta class of a test depends only on its theta function. Bounded: the estimates of
   -- `globalThetaPrincipalValue_sobolevBound` and of its local form bound the norm of the
   -- principal value by that of the test class.
-  sorry
+  have hbound := globalThetaPrincipalValue_sobolevBound_weighted (F := F) S a hs
+  have hCb := hbound.choose_spec.2
+  let C := hbound.choose
+  let Q := (LinearMap.ker (adelicThetaLinearMap F)).comap (adelePolarSubspace F).subtype
+  let pv : ℬ₀ →ₗ[ℂ] ℬ₀ := (adelePrincipalValue F S).restrict
+    fun f hf ↦ adelePrincipalValue_mem_polarSubspace S ⟨f, hf⟩
+  let T : ℬ₀ →ₗ[ℂ] H(a, hs) := (j(a, hs)).toLinearMap ∘ₗ Q.mkQ ∘ₗ pv
+  have hT (f : ℬ₀) : T f = j(a, hs) (theta(pvTest(S, f))) := rfl
+  have hι (f : ℬ₀) : globalThetaSobolevTestClass (F := F) a hs f = j(a, hs) (theta(f)) := rfl
+  have hg := globalThetaPrincipalValue_clm_onTests_abstract
+    (globalThetaSobolevTestClass (F := F) a hs) T C fun f ↦ by rw [hT f, hι f]; exact hCb f
+  exact ⟨hg.choose, fun f ↦ (hg.choose_spec f).trans (hT f)⟩
 
 /-- Paper: Proposition 11.2.0.1(2) and (11.2.0.4), pp. 484–485. A continuous linear map on
 the test classes of the completion which agrees with the principal value extends uniquely to
@@ -1800,6 +2068,228 @@ theorem orbitalMarkushevichBasis (χ : PontryaginDual C𝔽) (S : Finset V) {s :
         Λ j ((N(S, hs, ω)).mkQ f) = spectralSobolevPairing f.val (jetLp(χ, S, hs, j)) :=
   by sorry
 
+/-- A Hilbert quotient of a closed subspace maps isometrically into the dual
+model of the ambient space, onto the functionals that kill the orthogonal
+complement of the subspace and the denominator. -/
+private theorem orbitalQuotientDual_isometry_range_hilbert
+    {H₀ Y₀ : Type*} [NormedAddCommGroup H₀] [InnerProductSpace ℂ H₀] [CompleteSpace H₀]
+    [NormedAddCommGroup Y₀] [NormedSpace ℂ Y₀]
+    (K : Submodule ℂ H₀) (hK : IsClosed (K : Set H₀))
+    (N : Submodule ℂ K) [IsClosed (N : Set K)] (B : H₀ → Y₀ → ℂ)
+    (hT : ∃ T : StrongDual ℂ H₀ ≃ₗᵢ[ℂ] Y₀, ∀ (Λ : StrongDual ℂ H₀) (x : H₀), Λ x = B x (T Λ))
+    (C : Y₀ → Prop) (hC : ∀ v, C v ↔ ∀ x ∈ Kᗮ, B x v = 0) :
+    ∃ D : StrongDual ℂ (K ⧸ N) →ₗᵢ[ℂ] Y₀,
+      range D = {u | C u ∧ ∀ f ∈ N, B f.val u = 0} ∧
+      ∀ (Λ : StrongDual ℂ (K ⧸ N)) (f : K), B f.val (D Λ) = Λ (N.mkQ f) := by
+  obtain ⟨T, hB⟩ := hT
+  have : CompleteSpace K := hK.completeSpace_coe
+  let Pr : H₀ →L[ℂ] K := K.orthogonalProjectionOnto
+  have hPK (f : K) : Pr f.val = f := K.orthogonalProjectionOnto_mem_subspace_eq_self f
+  have hPo (x : H₀) (hx : x ∈ Kᗮ) : Pr x = 0 :=
+    K.orthogonalProjectionOnto_apply_of_mem_orthogonal hx
+  let L : StrongDual ℂ (K ⧸ N) →ₗ[ℂ] StrongDual ℂ H₀ :=
+    ((N.mkQL.comp Pr).precomp ℂ).toLinearMap
+  have hL (Λ : StrongDual ℂ (K ⧸ N)) (x : H₀) : L Λ x = Λ (N.mkQ (Pr x)) := rfl
+  have hnorm (Λ : StrongDual ℂ (K ⧸ N)) : ‖L Λ‖ = ‖Λ‖ := by
+    apply le_antisymm
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg Λ)
+      intro x
+      rw [hL]
+      calc ‖Λ (N.mkQ (Pr x))‖ ≤ ‖Λ‖ * ‖N.mkQ (Pr x)‖ := Λ.le_opNorm _
+        _ ≤ ‖Λ‖ * ‖x‖ := by
+          refine mul_le_mul_of_nonneg_left ?_ (norm_nonneg Λ)
+          exact (Submodule.Quotient.norm_mk_le N (Pr x)).trans
+            (K.norm_orthogonalProjectionOnto_apply_le x)
+    · apply ContinuousLinearMap.opNorm_le_bound _ (norm_nonneg (L Λ))
+      intro q
+      let v : Nᗮ := N.quotientEquivOrthogonal q
+      have hv : N.mkQ v.val = q := by
+        change (Submodule.Quotient.mk v.val : K ⧸ N) = q
+        exact (N.quotientEquivOrthogonal_symm_eq_mk v.val v.property).symm.trans
+          (N.quotientEquivOrthogonal.symm_apply_apply q)
+      have hn : ‖v.val‖ = ‖q‖ := N.quotientEquivOrthogonal.norm_map q
+      calc
+        ‖Λ q‖ = ‖(L Λ) (v.val : H₀)‖ := by rw [hL, hPK, hv]
+        _ ≤ ‖L Λ‖ * ‖(v.val : H₀)‖ := (L Λ).le_opNorm _
+        _ = ‖L Λ‖ * ‖q‖ := by rw [← hn]; rfl
+  let D : StrongDual ℂ (K ⧸ N) →ₗᵢ[ℂ] Y₀ :=
+    { toLinearMap := T.toLinearEquiv.toLinearMap.comp L
+      norm_map' := fun Λ ↦ by
+        change ‖T (L Λ)‖ = ‖Λ‖
+        rw [T.norm_map, hnorm] }
+  have hD (Λ : StrongDual ℂ (K ⧸ N)) : D Λ = T (L Λ) := rfl
+  have hpair (Λ : StrongDual ℂ (K ⧸ N)) (x : H₀) : B x (D Λ) = Λ (N.mkQ (Pr x)) := by
+    rw [hD, ← hB, hL]
+  refine ⟨D, ?_, fun Λ f ↦ by rw [hpair, hPK]⟩
+  ext u
+  constructor
+  · rintro ⟨Λ, rfl⟩
+    refine ⟨(hC _).2 fun x hx ↦ ?_, fun f hf ↦ ?_⟩
+    · rw [hpair, hPo x hx, map_zero, map_zero]
+    · rw [hpair, hPK, Submodule.mkQ_apply, (Submodule.Quotient.mk_eq_zero N).mpr hf, map_zero]
+  · rintro ⟨hCu, hN⟩
+    let φ : StrongDual ℂ H₀ := T.symm u
+    have hφ (x : H₀) : φ x = B x u := by
+      rw [hB φ x]
+      change B x (T (T.symm u)) = B x u
+      rw [T.apply_symm_apply]
+    let ψ : StrongDual ℂ K := φ.comp K.subtypeL
+    have hψ : N ≤ ψ.ker := fun f hf ↦ by
+      change φ f.val = 0
+      rw [hφ]
+      exact hN f hf
+    refine ⟨N.liftQL ψ hψ, ?_⟩
+    have hLφ : L (N.liftQL ψ hψ) = φ := by
+      ext x
+      rw [hL]
+      change φ (Pr x : H₀) = φ x
+      have hsub : x - (Pr x : H₀) ∈ Kᗮ := K.sub_starProjection_mem_orthogonal x
+      have h0 : φ (x - (Pr x : H₀)) = 0 := by rw [hφ]; exact (hC u).1 hCu _ hsub
+      rw [map_sub, sub_eq_zero] at h0
+      exact h0.symm
+    rw [hD, hLφ]
+    exact T.apply_symm_apply u
+
+/-- The unweighted product integral against a vector of the reciprocal-weight
+space is the inner product with the conjugate vector divided by the weight. -/
+private theorem orbitalQuotientDual_isometry_range_riesz {X : Type*} [MeasurableSpace X]
+    (ν : Measure X) {ρ ρ' : X → ℝ} (hρ : Measurable ρ) (hρ' : Measurable ρ')
+    (hpos : ∀ x, 0 < ρ x) (hpos' : ∀ x, 0 < ρ' x) (hr : ∀ x, ρ x * ρ' x = 1)
+    (u : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ' x))) :
+    ∃ v : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+      (v : X → ℂ) =ᵐ[ν] (fun x ↦ (ρ' x : ℂ) * star (u x)) ∧
+      ∀ f : Lp ℂ 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)),
+        ∫ x, f x * u x ∂ν = inner ℂ v f := by
+  have hbase {ρ : X → ℝ} (hρ : Measurable ρ) (hpos : ∀ x, 0 < ρ x) :
+      ν ≪ ν.withDensity fun x ↦ ENNReal.ofReal (ρ x) :=
+    withDensity_absolutelyContinuous' hρ.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hpos x)).ne')
+  let g : X → ℂ := fun x ↦ (ρ' x : ℂ) * star (u x)
+  have hsq (x : X) : ‖g x‖ ^ 2 * ρ x = ‖u x‖ ^ 2 * ρ' x := by
+    calc
+      _ = ‖u x‖ ^ 2 * ρ' x * (ρ x * ρ' x) := by
+        dsimp only [g]
+        rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (hpos' x), norm_star]
+        ring
+      _ = _ := by rw [hr, mul_one]
+  have hmeas : AEStronglyMeasurable g (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) :=
+    (Complex.measurable_ofReal.comp hρ').aestronglyMeasurable.mul
+      (((Lp.aestronglyMeasurable u).mono_ac (hbase hρ' hpos')).mono_ac
+        (withDensity_absolutelyContinuous _ _)).star
+  have hu2 : Integrable (fun x ↦ ‖u x‖ ^ 2 * ρ' x) ν := by
+    have h1 := (memLp_two_iff_integrable_sq_norm (Lp.aestronglyMeasurable u)).1 (Lp.memLp u)
+    have h2 := (integrable_withDensity_iff hρ'.ennreal_ofReal
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).1 h1
+    refine h2.congr (ae_of_all _ fun x ↦ ?_)
+    change ‖u x‖ ^ 2 * (ENNReal.ofReal (ρ' x)).toReal = ‖u x‖ ^ 2 * ρ' x
+    rw [ENNReal.toReal_ofReal (hpos' x).le]
+  have hmem : MemLp g 2 (ν.withDensity fun x ↦ ENNReal.ofReal (ρ x)) := by
+    apply (memLp_two_iff_integrable_sq_norm hmeas).2
+    apply (integrable_withDensity_iff hρ.ennreal_ofReal
+      (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)).2
+    refine hu2.congr (ae_of_all _ fun x ↦ ?_)
+    change ‖u x‖ ^ 2 * ρ' x = ‖g x‖ ^ 2 * (ENNReal.ofReal (ρ x)).toReal
+    rw [ENNReal.toReal_ofReal (hpos x).le, hsq]
+  have hcoe : (hmem.toLp g : X → ℂ) =ᵐ[ν] g := (hbase hρ hpos).ae_eq hmem.coeFn_toLp
+  refine ⟨hmem.toLp g, hcoe, fun f ↦ ?_⟩
+  rw [L2.inner_def, integral_withDensity_eq_integral_toReal_smul hρ.ennreal_ofReal
+    (ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top)]
+  refine integral_congr_ae ?_
+  filter_upwards [hcoe] with x hx
+  rw [hx, ENNReal.toReal_ofReal (hpos x).le, RCLike.inner_apply]
+  dsimp only [g]
+  simp only [map_mul, Complex.conj_ofReal, Complex.star_def, Complex.conj_conj,
+    Complex.real_smul]
+  have hr' : (ρ x : ℂ) * ρ' x = 1 := by exact_mod_cast hr x
+  linear_combination (-(f x * u x)) * hr'
+
+/-- On the 0-line, a reciprocal-weight vector is of the conjugate isotype exactly
+when its product integral kills the orthogonal complement of the isotype. -/
+private theorem orbitalQuotientDual_isometry_range_conj {s : ℝ} (hs : 0 ≤ s)
+    (ω : PontryaginDual C₁) (u : W'(s)) :
+    (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ↔
+      ∀ x ∈ (Wω(hs, ω))ᗮ, spectralSobolevPairing x u = 0 := by
+  let w : C𝔽 → ℝ := fun g ↦ intervalSobolevDensity 0 0 s (logNorm g)
+  have hlog : Measurable logNorm :=
+    (NNReal.continuous_coe.comp (Units.continuous_val.comp
+      (isProperMap_ideleClassNorm F).continuous)).measurable.log
+  have hdens : Continuous (intervalSobolevDensity 0 0 s) := by
+    change Continuous fun x : ℝ ↦
+      max (Real.exp (2 * 0 * x)) (Real.exp (2 * 0 * x)) * (1 + x ^ 2) ^ (s / 2)
+    refine Continuous.mul (by fun_prop) (Continuous.rpow_const (by fun_prop) fun t ↦ Or.inl ?_)
+    positivity
+  have hw : Measurable w := hdens.measurable.comp hlog
+  have hwpos : ∀ x, 0 < w x := fun x ↦ by
+    change 0 < max (Real.exp (2 * 0 * logNorm x)) (Real.exp (2 * 0 * logNorm x)) *
+      (1 + (logNorm x) ^ 2) ^ (s / 2)
+    exact mul_pos (lt_max_of_lt_left (Real.exp_pos _)) (Real.rpow_pos_of_pos (by positivity) _)
+  have hwk : ∀ (k : C₁) g, w (k.val⁻¹ * g) = w g := by
+    intro k g
+    have hk : ideleClassNorm F k.val = 1 := k.2
+    simp only [w, map_mul, map_inv, hk, inv_one, one_mul]
+  have hbase : μ𝔽 ≪ (μ𝔽).withDensity (fun x ↦ ENNReal.ofReal (w x)) :=
+    withDensity_absolutelyContinuous' hw.ennreal_ofReal.aemeasurable
+      (ae_of_all _ fun x ↦ (ENNReal.ofReal_pos.mpr (hwpos x)).ne')
+  have hwd : ((μ𝔽).withDensity fun x ↦ ENNReal.ofReal (w x)) ≪ μ𝔽 :=
+    withDensity_absolutelyContinuous _ _
+  have hiso (f : W(s)) : f ∈ Wω(hs, ω) ↔
+      ∀ k : C₁, (fun g ↦ f (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω k : ℂ) * f g := by
+    rw [mem_actionIsotype]
+    refine forall_congr' fun k ↦ ?_
+    have htr := hardySobolevTranslation_apply μ𝔽 m𝔽 0 0 s hI hs k.val f
+    have hsm := hbase.ae_eq (Lp.coeFn_smul (ω k : ℂ) f)
+    change hardySobolevTranslation μ𝔽 m𝔽 0 0 s hI hs k.val f = (ω k : ℂ) • f ↔ _
+    constructor
+    · intro h
+      rw [h] at htr
+      exact htr.symm.trans hsm
+    · intro h
+      exact Lp.ext (hwd.ae_eq (htr.trans (h.trans hsm.symm)))
+  have hωinv (k : C₁) : ((ω⁻¹ k : Circle) : ℂ) = star (ω k : ℂ) := by
+    rw [show ω⁻¹ k = (ω k)⁻¹ from rfl, Circle.coe_inv_eq_conj]
+    rfl
+  have hqmp (k : C₁) := (measurePreserving_mul_left μ𝔽 k.val⁻¹).quasiMeasurePreserving
+  obtain ⟨v, hv, hpair⟩ := orbitalQuotientDual_isometry_range_riesz μ𝔽
+    (ρ := fun x ↦ if false = true then (w x)⁻¹ else w x)
+    (ρ' := fun x ↦ if true = true then (w x)⁻¹ else w x)
+    (by simpa using hw) (by simp only [↓reduceIte]; exact hw.inv) (by simpa using hwpos)
+    (by simpa using fun x ↦ inv_pos.2 (hwpos x))
+    (fun x ↦ by simpa using mul_inv_cancel₀ (hwpos x).ne') u
+  have hv' : (v : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦ ((w x)⁻¹ : ℂ) * star (u x) := by
+    filter_upwards [hv] with x hx
+    rw [hx]
+    simp only [↓reduceIte, Complex.ofReal_inv]
+  have hu' : (u : C𝔽 → ℂ) =ᵐ[μ𝔽] fun x ↦ (w x : ℂ) * star (v x) := by
+    filter_upwards [hv'] with x hx
+    rw [hx, star_mul', star_star, ← mul_assoc]
+    have h0 : (w x : ℂ) ≠ 0 := Complex.ofReal_ne_zero.2 (hwpos x).ne'
+    simp [h0]
+  have key : (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ↔
+      v ∈ Wω(hs, ω) := by
+    rw [hiso]
+    refine forall_congr' fun k ↦ ⟨fun hk ↦ ?_, fun hk ↦ ?_⟩
+    · have h1 := (hqmp k).ae_eq_comp hv'
+      filter_upwards [h1, hk, hv'] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv, star_star]
+      ring
+    · have h1 := (hqmp k).ae_eq_comp hu'
+      filter_upwards [h1, hk, hu'] with g h1 h2 h3
+      simp only [comp_apply] at h1
+      rw [h1, h2, h3, hwk, star_mul']
+      simp only [hωinv]
+      ring
+  have hK : (Wω(hs, ω)).HasOrthogonalProjection := by
+    have : CompleteSpace (Wω(hs, ω)) := (isClosed_actionIsotype _ ω).completeSpace_coe
+    infer_instance
+  rw [key]
+  conv_lhs => rw [← Submodule.orthogonal_orthogonal (Wω(hs, ω))]
+  rw [Submodule.mem_orthogonal]
+  refine forall₂_congr fun x _ ↦ ?_
+  change _ = _ ↔ ∫ g, x g * u g ∂μ𝔽 = 0
+  rw [hpair x, inner_eq_zero_symm]
+
 -- TODO(paper-gap): Remark 11.2.0.3 drops PV from the denominator of the quotient.
 
 /-- Paper: Remark 11.2.0.3, p. 485. The pairing represents the quotient
@@ -1812,7 +2302,11 @@ theorem orbitalQuotientDual_isometry_range (S : Finset V) {s : ℝ} (hs : 0 ≤ 
         (∀ k : C₁, (fun g ↦ u (k.val⁻¹ * g)) =ᵐ[μ𝔽] fun g ↦ (ω⁻¹ k : ℂ) * u g) ∧
         ∀ f ∈ N(S, hs, ω), spectralSobolevPairing f.val u = 0} ∧
       ∀ (Λ : StrongDual ℂ Q(S, hs, ω)) (f : Wω(hs, ω)),
-        spectralSobolevPairing f.val (D Λ) = Λ ((N(S, hs, ω)).mkQ f) := by sorry
+        spectralSobolevPairing f.val (D Λ) = Λ ((N(S, hs, ω)).mkQ f) :=
+  orbitalQuotientDual_isometry_range_hilbert (H₀ := W(s)) (Y₀ := W'(s)) (Wω(hs, ω))
+    (isClosed_actionIsotype _ ω) (N(S, hs, ω)) spectralSobolevPairing
+    ⟨_, fun Λ f ↦ (spectralSobolevPairing_dual hI hs Λ f).2⟩ _
+    (orbitalQuotientDual_isometry_range_conj hs ω)
 
 local notation "E" => ModulatedExponentialDecay m𝔽 (univ : Set ℝ)
 local notation "hm𝔽" => (⟨isProperMap_ideleClassNorm F, ideleClassNorm_ne_one (F := F)⟩ :
@@ -1821,6 +2315,22 @@ local notation "hms𝔽" => (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.2.2.2.1
 local notation "ρE" => (exists_modulatedExponentialDecay_translationAction m𝔽 univ
   hm𝔽 hms𝔽 ordConnected_univ univ_nonempty).choose
 local notation "Eω(" ω ")" => actionIsotype ((ρE).comp (ideleClassNorm F).ker.subtype) ω
+
+/-- Paper: (11.2.0.7), p. 486, the commutativity of the square. For every
+polar-free input `f` the homogeneous theta function of its principal-value test
+`pvTest(S, f)` is the function of a test `φ` of the isotype `Eω(ω)`, and the
+image of `φ` under the test inclusion is the extended principal value of the
+averaged theta class. This is the second half of `orbitalSobolevPairing_pullback`:
+the paper reads it off the local formula for the principal value on the
+completion, which the deviation of that statement keeps out of reach here. -/
+private theorem orbitalSobolevPairing_pullback_testLift (S : Finset V) (a : ℝ) {s : ℝ}
+    (hs : 0 ≤ s) (ω : PontryaginDual C₁) :
+    let i := (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose
+    let A := (existsUnique_globalThetaSobolevAverage (F := F) (a := a) hI hs ω).exists.choose
+    ∀ f : ℬ₀, ∃ φ : Eω(ω),
+      (∀ g : C𝔽, φ.val.val g = homogeneousAdelicTheta ω (pvTest(S, f)).val g) ∧
+      (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by
+  sorry
 
 /-- Paper: (11.2.0.7), p. 486. The continuous transpose of the test inclusion
 evaluates by the Sobolev pairing. It gives the commutative square after
@@ -1836,7 +2346,12 @@ theorem orbitalSobolevPairing_pullback (S : Finset V) (a : ℝ) {s : ℝ} (hs : 
       (∀ φ : Eω(ω), Λ φ = spectralSobolevPairing (i φ).val u) ∧
       ∀ f : ℬ₀, ∃ φ : Eω(ω),
         (∀ g : C𝔽, φ.val.val g = homogeneousAdelicTheta ω (pvTest(S, f)).val g) ∧
-        (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by sorry
+        (i φ).val = (P(S, a, hs) (A (j(a, hs) (theta(f)))).val).val := by
+  refine ⟨(existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec.2.2.choose
+    u, ?_, orbitalSobolevPairing_pullback_testLift (F := F) S a hs ω⟩
+  intro φ
+  exact (existsUnique_spectralLineTestCompletion (F := F) a hs ω).exists.choose_spec.2.2.choose_spec.1
+    u φ
 
 -- TODO(paper-gap): Proposition 11.2.0.4 prints the full multiplicity and
 -- claims noncontainment in an open ball even when S₀ is empty.

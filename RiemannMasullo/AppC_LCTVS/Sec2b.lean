@@ -5081,7 +5081,7 @@ theorem finestLocallyConvex_isStrictLFSpace (hE : Module.rank ℂ E ≤ ℵ₀) 
     exact FiniteDimensional.completeSpace ℂ (S n)⟩
 
 /-- The local integral criterion is independent of the universe of test spaces. -/
-private theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [Module ℂ X]
+theorem nuclear_changeUniverse.{a, b, c} {X : Type c} [AddCommGroup X] [Module ℂ X]
     [TopologicalSpace X] (hX : IsNuclearTVS.{a} X) : IsNuclearTVS.{b} X := by
   let := hX.1
   let := hX.2.1
