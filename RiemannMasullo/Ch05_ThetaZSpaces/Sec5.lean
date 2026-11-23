@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
+
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
+import RiemannMasullo.Ch03_IdelicZeta.Sec4
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
@@ -452,7 +455,86 @@ theorem sLocalNormalizedEigendistribution_apply_pureTensor (χ : PontryaginDual 
       (∏ w, fArch w (Multiplicative.ofAdd (x.1 w))) *
         ∏ v : S, fFin v (Multiplicative.ofAdd (x.2 v))) :
     sLocalNormalizedEigendistribution (chartₛ(χ) s) f =
-      (∏ w, TArch w (fArch w)) * ∏ v : S, TFin v (fFin v) := by sorry
+      (∏ w, TArch w (fArch w)) * ∏ v : S, TFin v (fFin v) := by
+  classical
+  let (w : InfinitePlace F) : MeasurableSpace w.Completion := borel _
+  let (v : S) : MeasurableSpace (v.val.adicCompletion F)ˣ := borel _
+  choose η hη using fun v : S ↦ sLocalNormalizedEigendistribution_gaussian_finChart χ v
+  choose DA hDAh hDA hZA using fun w ↦ infiniteEigendistribution_normalized w (χArch w)
+  choose DB hDBh hDB hZB using fun v : S ↦ finiteEigendistribution_normalized v.val (η v)
+  have heA (w : InfinitePlace F) (z : ℂ) :
+      sLocalInfiniteRestriction w (chartₛ(χ) z) =
+        quasiCharacterNormTwist _ (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp (χArch w)) z := by
+    ext1 g
+    have hn := sLocalInfiniteRestriction_normTwist (S := S) w z g
+    change (1 : ℂ) * _ = _ at hn
+    rw [one_mul] at hn
+    exact congrArg₂ (· * ·) (DFunLike.congr_fun (hχ w).symm g) hn
+  have hTA (w : InfinitePlace F) : TArch w = DA w s := by
+    apply (hDA w s _).mpr
+    exact (congrArg (fun c ↦ TArch w ∈ schwartzBruhatEigendistributions c ∧
+      TArch w (infiniteStandardGaussian w (χArch w)) = 1) (heA w s)).mp (hArch w)
+  have hTB (v : S) : TFin v = DB v s := by
+    apply (hDB v s _).mpr
+    exact (congrArg (fun c ↦ TFin v ∈ schwartzBruhatEigendistributions c ∧
+      TFin v (finiteStandardGaussian v.val c) = 1) (hη v s)).mp (hFin v)
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  let Z (z : ℂ) := sLocalNormalizedZFunction f (chartₛ(χ) z)
+  let A (z : ℂ) := ∏ w, DA w z (fArch w)
+  let B (z : ℂ) := ∏ v : S, DB v z (fFin v)
+  have ha : AnalyticOnNhd ℂ Z univ := sLocalNormalizedZFunction_entire f χ
+  have hpa : AnalyticOnNhd ℂ A univ := Finset.univ.analyticOnNhd_fun_prod fun w _ ↦
+    analytic_eval_normalized (hDAh w) (fArch w)
+  have hpb : AnalyticOnNhd ℂ B univ := Finset.univ.analyticOnNhd_fun_prod fun v _ ↦
+    analytic_eval_normalized (hDBh v) (fFin v)
+  have hpos : ∀ᶠ z in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds
+      (show (1 : ℂ) ∈ Complex.re ⁻¹' Ioi 0 by simp))
+  have harch := Filter.eventually_all.mpr hZA
+  have hZ : ∀ᶠ z in 𝓝[≠] (1 : ℂ), Z z = M * (A z * B z) := by
+    filter_upwards [hpos, nhdsNE_le_codiscrete _ harch,
+      nhdsNE_le_codiscrete _ (sLocalNormalizedEigendistribution_gaussian_heckeL_ne_zero χ)]
+      with z hz hA hL
+    let c := chartₛ(χ) z
+    have hF : ∏ v : S, finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c) ≠ 0 :=
+      right_ne_zero_of_mul hL
+    have eA (w : InfinitePlace F) :
+        localIdelicZetaIntegral (infiniteLocalMultiplicativeTamagawaMeasure F w)
+          (fun x ↦ fArch w (Multiplicative.ofAdd x)) (sLocalInfiniteRestriction w c) =
+            infiniteLocalEulerFactor w (sLocalInfiniteRestriction w c) * DA w z (fArch w) := by
+      rw [heA, ← infiniteLocalIdelicZFunction_eq_integral w _ (χArch w) hz]
+      exact hA w (fArch w)
+    have eB (v : S) :
+        localIdelicZetaIntegral (finiteLocalMultiplicativeTamagawaMeasure F v.val)
+          (fun x ↦ fFin v (Multiplicative.ofAdd x)) (sLocalFiniteRestriction v c) =
+            unitMass(v.val) * finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c) *
+              DB v z (fFin v) := by
+      have hne : quasiCharacterNormTwist _ (continuous_finiteLocalModule v.val)
+          ((circleToComplex).comp (η v)) z ≠ 1 := by
+        intro h
+        have hn := Finset.prod_ne_zero_iff.mp hF v (Finset.mem_univ v)
+        apply hn
+        rw [(hη v z).trans h]
+        simp [finiteLocalEulerFactor]
+      rw [hη, ← finiteLocalIdelicZFunction_eq_integral v.val _ (η v) hz]
+      exact hZB v z hne (fFin v)
+    change sLocalNormalizedZFunction f c = M * (A z * B z)
+    rw [sLocalNormalizedZFunction_eq_div f χ hz, div_eq_iff hL,
+      sLocalIdelicZetaIntegral_pureTensor c ⟨χ, z, hz, rfl⟩ f fArch fFin hf,
+      Finset.prod_congr (s₁ := Finset.univ) rfl (fun w _ ↦ eA w),
+      Finset.prod_congr (s₁ := Finset.univ) rfl (fun v _ ↦ eB v)]
+    simp only [M, A, B, Complex.ofReal_prod, Finset.prod_mul_distrib, sLocalHeckeL]
+    ring
+  have hAll : Z = fun z ↦ M * (A z * B z) :=
+    ha.eq_of_frequently_eq (analyticOnNhd_const.mul (hpa.mul hpb)) hZ.frequently
+  have hM : M ≠ 0 := sLocalNormalizedEigendistribution_mass_ne_zero (F := F) (S := S)
+  have hspec : M * sLocalNormalizedEigendistribution (chartₛ(χ) s) f = Z s :=
+    (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) s)).exists.choose_spec f
+  have he := mul_left_cancel₀ hM (hspec.trans (congrFun hAll s))
+  exact he.trans (congrArg₂ (· * ·)
+    (Finset.prod_congr rfl fun w _ ↦ congrArg (fun T ↦ T (fArch w)) (hTA w).symm)
+    (Finset.prod_congr rfl fun v _ ↦ congrArg (fun T ↦ T (fFin v)) (hTB v).symm))
 
 /-- Paper: Theorem 5.5.1.2(1), p. 278.
 The normalized S-local distribution spans the eigenspace of its weight. -/
@@ -577,7 +659,33 @@ theorem sLocalThetaEigendistributions_eq_span (c : QuasiCharacter Jₛ) :
 /-- Paper: Theorem 5.5.1.2(2), p. 278.
 The normalized S-local family in the strong dual of the theta quotient is holomorphic. -/
 theorem sLocalThetaEigendistribution_holomorphic (χ : PontryaginDual Jₛ) :
-    VectorHolomorphicOn (fun s ↦ sLocalThetaEigendistribution (chartₛ(χ) s)) univ := by sorry
+    VectorHolomorphicOn (fun s ↦ sLocalThetaEigendistribution (chartₛ(χ) s)) univ := by
+  let : T2Space (SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_t2_of_isClosed
+    (sLocalAdelicTheta_ker_isClosed (F := F) (S := S))
+  let : PolynormableSpace ℂ (SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_polynormable
+  let : IsTopologicalAddGroup (SLocalAdelicThetaSpace F S) :=
+    PolynormableSpace.isTopologicalAddGroup ℂ _
+  let : ContinuousSMul ℂ (SLocalAdelicThetaSpace F S) := PolynormableSpace.continuousSMul ℂ _
+  let : UniformSpace (SLocalAdelicThetaSpace F S) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (SLocalAdelicThetaSpace F S) := isUniformAddGroup_of_addCommGroup
+  let : MontelSpace ℂ (SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_montel
+  let : CompleteSpace D(SLocalAdelicThetaSpace F S) := sLocalAdelicThetaSpace_strongDual_complete
+  let : PolynormableSpace ℂ D(SLocalAdelicThetaSpace F S) :=
+    (sLocalAdelicThetaSpace_strongDual_nuclear.{_, 0} (F := F) (S := S)).2.1
+  apply sLocalNormalizedEigendistribution_holomorphic_pointwise
+  intro x
+  obtain ⟨f, rfl⟩ := (Kₛ).mkQ_surjective x
+  let M : ℂ := ↑(∏ v : S, unitMass(v.val))
+  have hM : M ≠ 0 := sLocalNormalizedEigendistribution_mass_ne_zero
+  have he : (fun z ↦ sLocalThetaEigendistribution (chartₛ(χ) z) ((Kₛ).mkQ f)) =
+      (fun z ↦ M⁻¹ * sLocalNormalizedZFunction f (chartₛ(χ) z)) := by
+    funext z
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    change M * sLocalNormalizedEigendistribution (chartₛ(χ) z) f = _ at h
+    change sLocalNormalizedEigendistribution (chartₛ(χ) z) f = _
+    rw [← h, ← mul_assoc, inv_mul_cancel₀ hM, one_mul]
+  rw [he]
+  exact (sLocalNormalizedZFunction_entire f χ).differentiableOn.const_mul M⁻¹
 
 end SLocal
 
@@ -711,7 +819,33 @@ theorem globalThetaEigendistributions_eq_span (c : QuasiCharacter C𝔽) :
 The normalized global family in the strong dual of the theta quotient is holomorphic. -/
 theorem globalThetaEigendistribution_holomorphic (χ : PontryaginDual C𝔽) :
     VectorHolomorphicOn (fun s ↦ globalThetaEigendistribution (ideleClassNormTwist χ s))
-      univ := by sorry
+      univ := by
+  have descend
+      {E G : Type _} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+      [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+      [AddCommGroup G] [Module ℂ G] [TopologicalSpace G]
+      [IsTopologicalAddGroup G] [ContinuousSMul ℂ G]
+      (L : E →L[ℂ] G) (hL : IsEmbedding L) (hclosed : IsClosed (Set.range L))
+      (f : ℂ → E) (hf : VectorHolomorphicOn (L ∘ f) univ) :
+      VectorHolomorphicOn f univ := by
+    rw [vectorHolomorphicOn_iff_tendsto isOpen_univ] at hf ⊢
+    intro z hz
+    obtain ⟨v, hv⟩ := hf z hz
+    have hmem : v ∈ Set.range L := hclosed.mem_of_tendsto hv (Filter.Eventually.of_forall
+      (fun w ↦ ⟨(w - z)⁻¹ • (f w - f z), by simp [map_smul, map_sub]⟩))
+    obtain ⟨u, rfl⟩ := hmem
+    refine ⟨u, hL.tendsto_nhds_iff.mpr ?_⟩
+    simpa only [Function.comp_def, map_smul, map_sub] using hv
+  let L := pull(K𝔽)
+  apply descend L
+    globalThetaQuotient_transpose_isEmbedding globalThetaQuotient_transpose_isClosed_range
+  have he : L ∘ (fun s ↦ globalThetaEigendistribution (ideleClassNormTwist χ s)) =
+      (fun s ↦ adelicNormalizedEigendistribution (ideleClassNormTwist χ s)) := by
+    funext s
+    ext f
+    exact globalThetaEigendistribution_mk _ f
+  rw [he]
+  exact adelicNormalizedEigendistribution_holomorphic χ
 
 /-- Paper: Remark 5.5.1.4, p. 280.
 The descended S-local eigendistributions span a strongly dense subspace of the theta dual. -/
@@ -1150,6 +1284,96 @@ end LocalGeneration
 
 section StructureTheorem
 
+/-- In a Montel space, a family with common kernel `K` generates the same strongly
+closed subspace as the transpose of the quotient by `K`. -/
+private theorem globalHomogeneousThetaTranspose_range_of_kernel
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (K : Submodule ℂ E) (T : I → StrongDual ℂ E)
+    (hK : ∀ x, x ∈ K ↔ ∀ i, T i x = 0) :
+    Set.range (ContinuousLinearMap.precomp
+      (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ K.mkQL) =
+      closure (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  have hclosed : IsClosed (Set.range (ContinuousLinearMap.precomp
+      (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ K.mkQL)) := isClosed_range_transpose_mkQL K
+  rw [← hclosed.closure_eq]
+  let D := StrongDual ℂ E
+  let L : StrongDual ℂ (E ⧸ K) →L[ℂ] D := ContinuousLinearMap.precomp ℂ K.mkQL
+  let W := Submodule.span ℂ (Set.range T)
+  have hT (i : I) : T i ∈ L.toLinearMap.range := by
+    refine ⟨K.liftQL (T i) (fun x hx ↦ (hK x).mp hx i), ?_⟩
+    exact ContinuousLinearMap.ext fun _ ↦ rfl
+  have hW : W ≤ L.toLinearMap.range := Submodule.span_le.mpr (by
+    rintro _ ⟨i, rfl⟩
+    exact hT i)
+  refine le_antisymm (closure_minimal ?_ isClosed_closure) (closure_mono hW)
+  rintro _ ⟨l, rfl⟩
+  by_contra hl
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem W.topologicalClosure
+    W.isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x ∈ K := (hK x).mpr (fun i ↦ hv (T i)
+    (W.le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  have hq : K.mkQL x = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hx
+  exact hφ (by change l (K.mkQL x) = 0; rw [hq, map_zero])
+
+/-- Specialize the common-kernel criterion to the Montel space of adelic tests. -/
+private theorem globalHomogeneousThetaTranspose_range_adelic {I : Type*}
+    (K : Submodule ℂ ℬ(𝔸[F])) (T : I → D(ℬ(𝔸[F])))
+    (hK : ∀ f, f ∈ K ↔ ∀ i, T i f = 0) :
+    Set.range (pull(K)) = closure (Submodule.span ℂ (Set.range T) : Set D(ℬ(𝔸[F]))) := by
+  let E := ℬ(𝔸[F])
+  have hN : IsNuclearTVS.{0} E := (adeleSchwartz_nuclear (F := F)).2
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (adeleSchwartz_montel (F := F)).2.2
+  have hD : IsNuclearTVS.{0} (StrongDual ℂ E) := (adeleSchwartz_strongDual_nuclear (F := F)).2
+  let : PolynormableSpace ℂ (StrongDual ℂ E) := hD.2.1
+  with_reducible_and_instances
+    exact globalHomogeneousThetaTranspose_range_of_kernel (E := E) K T hK
+
+/-- In the convergence half-plane the global zeta function is the Gaussian zeta
+factor times the globally normalized functional. -/
+private theorem globalHomogeneousThetaTranspose_range_zeta
+    (f : ℬ(𝔸[F])) (χ : PontryaginDual C𝔽) (z : ℂ) (hz : 1 < z.re) :
+    globalIdelicZFunction f (ideleClassNormTwist χ z) = gaussianCompletedHeckeL χ z *
+      adelicNormalizedEigendistribution (ideleClassNormTwist χ z) f := by
+  have he : adelicNormalizedEigendistribution (ideleClassNormTwist χ z) =
+      (adelicEigendistribution_normalized χ).choose z := by
+    have hs := (existsUnique_adelicNormalizedEigendistribution (ideleClassNormTwist χ z)).exists.choose_spec
+    exact ((adelicEigendistribution_normalized χ).choose_spec.2.1 z _).mpr
+      ⟨hs.1, hs.2 χ z rfl⟩
+  rw [he, globalIdelicZFunction_eq_integral f (globalTwist_mem_rightHalf χ hz)]
+  exact globalIntegral_normalized_ratio χ hz f
+
+/-- On a norm chart, the normalized functional vanishes on a test exactly when its
+meromorphic zeta function vanishes identically. -/
+private theorem globalHomogeneousThetaTranspose_range_chart_zero
+    (f : ℬ(𝔸[F])) (χ : PontryaginDual C𝔽) :
+    (∀ z, adelicNormalizedEigendistribution (ideleClassNormTwist χ z) f = 0) ↔
+      ∀ z, globalIdelicZFunction f (ideleClassNormTwist χ z) = 0 := by
+  constructor
+  · intro hn
+    have hz (z : ℂ) (hz : 1 < z.re) : globalIdelicZFunction f (ideleClassNormTwist χ z) = 0 := by
+      rw [globalHomogeneousThetaTranspose_range_zeta f χ z hz, hn, mul_zero]
+    exact fun z ↦ congrFun (eq_of_agree_rightHalf (globalIdelicZFunction_meromorphic f χ)
+      (V := 0) (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 1 hz) z
+  · intro hz
+    have hn (z : ℂ) (h : 1 < z.re) :
+        adelicNormalizedEigendistribution (ideleClassNormTwist χ z) f = 0 := by
+      have he := (globalHomogeneousThetaTranspose_range_zeta f χ z h).symm.trans (hz z)
+      exact (mul_eq_zero.mp he).resolve_left (normalizedGaussian_ne_zero χ z h)
+    have hpos : ∀ᶠ z : ℂ in 𝓝[≠] (2 : ℂ), 1 < z.re := nhdsWithin_le_nhds
+      ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num))
+    have ha := analytic_eval_normalized (adelicNormalizedEigendistribution_holomorphic χ) f
+    have hall := ha.eq_of_frequently_eq (z₀ := 2) analyticOnNhd_const
+      (hpos.mono fun z hz ↦ hn z hz).frequently
+    exact fun z ↦ congrFun hall z
+
 -- TODO(paper-gap): In the proof of Theorem 5.5.3.2 on pp. 283–284,
 -- vectors in a spectral interval need not be eigenvectors at a point of that interval.
 -- On L²(ℝ, dx), multiplication by x ↦ exp(itx) has no nonzero common eigenvectors.
@@ -1543,6 +1767,48 @@ theorem globalHomogeneousThetaTranspose_homogeneous (ω : PontryaginDual (m𝔽)
     exact pull_ker_eq_smul_of_map_eq (E := ℬ(𝔸[F])) (homogeneousAdelicThetaLinearMap F ω)
       T (ω g : ℂ) h
 
+/-- Norm twisting leaves the norm-one restriction of a global character unchanged. -/
+private theorem globalHomogeneousThetaTranspose_range_restriction
+    (χ : PontryaginDual C𝔽) (s t : ℂ) :
+    normOneRestriction m𝔽 (ideleClassNormTwist χ s) =
+      normOneRestriction m𝔽 (ideleClassNormTwist χ t) := by
+  ext u
+  exact (normOneRestriction_unitaryChart m𝔽 (isProperMap_ideleClassNorm F).continuous χ s u).trans
+    (normOneRestriction_unitaryChart m𝔽 (isProperMap_ideleClassNorm F).continuous χ t u).symm
+
+/-- The homogeneous global theta kernel is the common kernel of normalized
+functionals whose norm-one restriction is the prescribed character. -/
+private theorem globalHomogeneousThetaTranspose_range_kernel
+    (ω : PontryaginDual (m𝔽).ker) (f : ℬ(𝔸[F])) :
+    f ∈ K𝔽ω(ω) ↔ ∀ c : {c : QuasiCharacter C𝔽 // restricts(c, m𝔽, ω)},
+      adelicNormalizedEigendistribution c.val f = 0 := by
+  constructor
+  · intro hf c
+    obtain ⟨χ, s, hs⟩ := exists_ideleClassNormTwist (F := F) c.val
+    have hr (z : ℂ) : restricts(ideleClassNormTwist χ z, m𝔽, ω) :=
+      (globalHomogeneousThetaTranspose_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction m𝔽) hs).trans c.property)
+    have hz (z : ℂ) (hz : 1 < z.re) : globalIdelicZFunction f (ideleClassNormTwist χ z) = 0 :=
+      (mem_homogeneousAdelicTheta_ker_iff ω f).mp hf
+        ⟨ideleClassNormTwist χ z, globalOrderBound_rightHalf χ hz⟩
+        (fun u ↦ DFunLike.congr_fun (hr z) u)
+    have hall := eq_of_agree_rightHalf (globalIdelicZFunction_meromorphic f χ)
+      (V := 0) (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 1 hz
+    rw [← hs]
+    exact (globalHomogeneousThetaTranspose_range_chart_zero f χ).mpr (fun z ↦ congrFun hall z) s
+  · intro hf
+    apply (mem_homogeneousAdelicTheta_ker_iff ω f).mpr
+    intro c hc
+    have hc' : restricts(c.val, m𝔽, ω) := ContinuousMonoidHom.ext hc
+    obtain ⟨χ, s, hs⟩ := exists_ideleClassNormTwist (F := F) c.val
+    have hr (z : ℂ) : restricts(ideleClassNormTwist χ z, m𝔽, ω) :=
+      (globalHomogeneousThetaTranspose_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction m𝔽) hs).trans hc')
+    change globalIdelicZFunction f c.val = 0
+    rw [← hs]
+    exact (globalHomogeneousThetaTranspose_range_chart_zero f χ).mp
+      (fun z ↦ hf ⟨ideleClassNormTwist χ z, hr z⟩) s
+
 /-- Paper: Theorem 5.5.3.4(1), p. 285.
 The range of the global homogeneous theta transpose is strongly generated by
 the normalized eigendistributions whose weights restrict to the given character.
@@ -1551,7 +1817,20 @@ theorem globalHomogeneousThetaTranspose_range (ω : PontryaginDual (m𝔽).ker) 
     Set.range (pull(K𝔽ω(ω))) =
       closure (Submodule.span ℂ
         (adelicNormalizedEigendistribution (F := F) '' {c : QuasiCharacter C𝔽 | restricts(c, m𝔽, ω)}) :
-          Set D(ℬ(𝔸[F]))) := by sorry
+          Set D(ℬ(𝔸[F]))) := by
+  let I := {c : QuasiCharacter C𝔽 // restricts(c, m𝔽, ω)}
+  have hi : Set.range (fun c : I ↦ adelicNormalizedEigendistribution c.val) =
+      adelicNormalizedEigendistribution '' {c : QuasiCharacter C𝔽 | restricts(c, m𝔽, ω)} := by
+    ext T
+    constructor
+    · rintro ⟨c, rfl⟩
+      exact ⟨c.val, c.property, rfl⟩
+    · rintro ⟨c, hc, rfl⟩
+      exact ⟨⟨c, hc⟩, rfl⟩
+  rw [← hi]
+  exact globalHomogeneousThetaTranspose_range_adelic (K𝔽ω(ω))
+    (fun c : I ↦ adelicNormalizedEigendistribution c.val)
+    (globalHomogeneousThetaTranspose_range_kernel ω)
 
 -- The global embedding in Theorem 5.5.3.4(2) is already stated as
 -- `globalThetaQuotient_transpose_isEmbedding` in §5.2.

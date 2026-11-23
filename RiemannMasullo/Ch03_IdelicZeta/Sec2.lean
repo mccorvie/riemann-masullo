@@ -1641,10 +1641,9 @@ private theorem tate_chart_polar_model (f : ℬ[F]) (χ : U[F]) (p c : ℂ) (hp 
   exact (hAgree s hs).symm
 
 /-- Paper: Theorem 3.2.2.1(1)(a), p. 124. In each complex norm-twist chart the zeta
-integral on the half-plane `Re s > 1` extends to a function on the whole plane that is
-meromorphic and in normal form. Following Tate, the continuation is the sum of the two
-large-norm theta integrals of the test function and of its Fourier transform, plus two
-simple polar terms coming from adelic Riemann–Roch. -/
+integral on the half-plane `Re s > 1` extends to a meromorphic function in normal form on the
+whole plane. The proof normalizes the sum of the two large-norm theta integrals of the test
+function and its Fourier transform and the two simple polar terms from adelic Riemann–Roch. -/
 theorem globalIdelicZetaIntegral_exists_chartContinuation (f : ℬ[F]) (χ : U[F]) :
     ∃ G : ℂ → ℂ, MeromorphicNFOn G univ ∧
       ∀ s : ℂ, 1 < s.re → G s = globalIdelicZetaIntegral f (ideleClassNormTwist χ s) := by
@@ -2286,9 +2285,10 @@ private theorem archTest_mem (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F)) 
 
 end ArchimedeanHeckeTest
 
-/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. Choose archimedean Gaussians
+/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. There are archimedean tests
 for a unitary character and its inverse whose zeta integrals equal their gamma factors.
-The trace-pairing Fourier transform exchanges the two Gaussians up to a nonzero scalar.
+The trace-pairing Fourier transform sends the first test to a nonzero multiple of the second.
+The proof chooses products of local Gaussians.
 Deviation: The complex monomials have angular weight opposite to the character. -/
 theorem exists_archimedeanHeckeTest_fourier (χ : U[F]) :
     ∃ (f fdual : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) (c : ℂ), c ≠ 0 ∧
@@ -3343,12 +3343,14 @@ local notation "V" => HeightOneSpectrum (𝓞 F)
 local notation "Arch" => SchwartzBruhat (Multiplicative (SAdeleRing F ∅))
 local notation "Global" => SchwartzBruhat (Multiplicative (AdeleRing (𝓞 F) F))
 
-/-- Paper: Proposition 3.2.1.3(3), p. 123 and Equations (3.4.3.7)–(3.4.3.9),
-p. 152. Extend the archimedean test by integer-ring indicators at unramified finite places
-and inverse character weights on integer units at ramified places. In the right half-plane,
-the finite factors of the two zeta integrals are the Euler products for the character and
-its inverse. The Fourier-transformed finite test gives a nonzero scalar and a positive
-real scale raised to the exponent, from the different and the character conductor. -/
+/-- Paper: Equations (3.4.3.7)–(3.4.3.9), p. 152. Given two archimedean tests
+related by Fourier transform up to a nonzero scalar, there is a global test whose zeta
+integral and whose Fourier transform's zeta integral have the respective archimedean
+zeta factors and finite Euler products on the right half-plane. The equalities allow
+nonzero scalar factors and, on the Fourier side, a positive scale raised to the exponent.
+The proof tensors the first test with integer-ring indicators at unramified places and
+inverse character weights on integer units at ramified places. The different and the
+character conductor determine the Fourier-side scale. See also Proposition 3.2.1.3(3), p. 123. -/
 theorem exists_globalHeckeTest_fourier (χ : U[F])
     (fArch fArchDual : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)))
     (c : ℂ) (hc : c ≠ 0)
@@ -3426,9 +3428,9 @@ end
 
 
 
-/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. The archimedean test function
-given by the product of the local Gaussians has zeta integral equal to the gamma
-factor of the unitary character in the half-plane of absolute convergence.
+/-- Paper: Equations (3.4.3.3)–(3.4.3.6), p. 152. There is an archimedean test
+function whose zeta integral equals the gamma factor of the unitary character in the
+half-plane of absolute convergence. The proof uses a product of local Gaussians.
 Deviation: The complex monomial is chosen with angular weight opposite to the character. -/
 theorem exists_archimedeanHeckeTest (χ : U[F]) :
     ∃ f : SchwartzBruhat (Multiplicative (SAdeleRing F ∅)), ∀ s : halfPlane,
@@ -3436,9 +3438,10 @@ theorem exists_archimedeanHeckeTest (χ : U[F]) :
   obtain ⟨f, _, _, _, _, hf, _⟩ := exists_archimedeanHeckeTest_fourier χ
   exact ⟨f, hf⟩
 
-/-- Paper: Equations (3.4.3.7)–(3.4.3.9), p. 152. Tensoring an archimedean test
-with integer-ring indicators at unramified places and inverse character weights
-on integer units at ramified places contributes the finite Hecke Euler product.
+/-- Paper: Equations (3.4.3.7)–(3.4.3.9), p. 152. For a given archimedean test
+there is a global test whose zeta integral is the archimedean zeta integral times the finite
+Euler product and a nonzero constant. The proof uses a tensor with integer-ring indicators
+at unramified places and inverse character weights on integer units at ramified places.
 Deviation: The finite integer-unit Tamagawa masses give a nonzero scalar independent of `s`. -/
 theorem exists_globalHeckeTest (χ : U[F])
     (fArch : SchwartzBruhat (Multiplicative (SAdeleRing F ∅))) :
@@ -4493,8 +4496,9 @@ theorem globalIdelicZFunction_entire_of_nontrivial (f : ℬ[F]) (χ : U[F])
   simp
 
 set_option maxHeartbeats 1000000 in
-/-- Paper: §3.4.3.1, p. 152. On the half-plane of absolute convergence, the idelic
-zeta integral of a normalized adelic Gaussian gives the completed Euler product.
+/-- Paper: §3.4.3.1, p. 152. There is an adelic test function whose idelic zeta
+integral equals the completed Euler product on the half-plane of absolute convergence.
+The proof chooses a normalized adelic Gaussian.
 Deviation: The finite Tamagawa unit masses are absorbed by scaling the test function.
 The complex Gaussian uses the opposite angular weight to the character. -/
 theorem exists_globalIdelicZetaIntegral_eq_completedHeckeL (χ : U[F]) :

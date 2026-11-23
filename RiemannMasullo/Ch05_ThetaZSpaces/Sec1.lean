@@ -204,7 +204,8 @@ private theorem continuousAt_of_normTwist (hm : Continuous m) (hchart : HasNormT
 
 end NormCoordinates
 
-private theorem exists_ideleClassNormTwist (c : X𝔽) :
+/-- Every idele class quasi-character is a complex norm twist of a unitary character. -/
+theorem exists_ideleClassNormTwist (c : X𝔽) :
     ∃ (χ : PontryaginDual C𝔽) (s : ℂ), ideleClassNormTwist χ s = c := by
   let : T2Space C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.1
   let : LocallyCompactSpace C𝔽 := (ideleGroup_quotient.{_, 0} F).2.2.2.2.2.2.1
@@ -729,7 +730,7 @@ theorem sLocalAdelicThetaSpace_mk_eq_iff (f g : ℬₛ) :
       ((DFunLike.congr_fun h _).trans (sLocalAdelicThetaOnClasses_mk F S g x))
 
 /-- Two normalized meromorphic functions agreeing on a right half-plane agree everywhere. -/
-private theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
+theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn U Set.univ)
     (hV : MeromorphicNFOn V Set.univ) (a : ℝ) (h : ∀ z : ℂ, a < z.re → U z = V z) : U = V := by
   let b : ℂ := (a + 1 : ℝ)
   have hb : ∀ᶠ z : ℂ in 𝓝 b, a < z.re :=
@@ -747,7 +748,8 @@ private theorem eq_of_agree_rightHalf {U V : ℂ → ℂ} (hU : MeromorphicNFOn 
 local notation "globalRightHalf" => relativeRightHalfPlane m𝔽 (isProperMap_ideleClassNorm F)
   (ideleClassNorm_ne_one (F := F)) 1
 
-private theorem globalTwist_mem_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
+/-- The unitary norm chart lies in the global convergence region when its exponent has real part greater than one. -/
+theorem globalTwist_mem_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
     ideleClassNormTwist χ s ∈ globalRightHalf := by
   change 1 < quasiCharacterAbscissa _ _ _ _
   rwa [quasiCharacterAbscissa_ideleClassNormTwist]
@@ -927,7 +929,8 @@ private theorem eq_zero_of_weighted_integrals (μ : Measure G) [μ.IsHaarMeasure
 
 end FourierUniqueness
 
-private theorem globalOrderBound_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
+/-- The global idelic order bound is nonnegative on the half-plane of absolute convergence. -/
+theorem globalOrderBound_rightHalf (χ : PontryaginDual C𝔽) {s : ℂ} (hs : 1 < s.re) :
     0 ≤ globalIdelicOrderBound (ideleClassNormTwist χ s) := by
   have h0 : ideleClassNormTwist (1 : PontryaginDual C𝔽) 0 = 1 := by
     ext1 g
@@ -1267,7 +1270,8 @@ variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
 local notation "unitaryChart(" χ ")" => quasiCharacterNormTwist m hm
   ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)
 
-private theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
+/-- Norm twists of a unitary character agree on the norm-one subgroup. -/
+theorem normOneRestriction_unitaryChart (χ : PontryaginDual G) (s : ℂ) (u : m.ker) :
     normOneRestriction m (unitaryChart(χ) s) u = (χ u.val : ℂ) := by
   change (χ u.val : ℂ) * (((m u.val : ℝ≥0) : ℝ) : ℂ) ^ s = _
   rw [u.prop]

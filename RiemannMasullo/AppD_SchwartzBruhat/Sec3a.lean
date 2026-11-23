@@ -159,9 +159,9 @@ def schwartzBergmanSubmodule (I : Set ℝ) : Submodule ℂ (ℂ → ℂ) where
   add_mem' := (schwartzBergman_closure I).2.1
   smul_mem' := (schwartzBergman_closure I).2.2
 
-/-- Paper: Definition D.3.1.3, p. 800. The Gaussian restricted to a strip
-gives a nonzero example whenever the strip is nonempty.
-Deviation: Sanity check in the zero-extension representation. -/
+/-- Paper: Definition D.3.1.3, p. 800. The zero extension of the Gaussian restricted
+to an open strip belongs to its Schwartz–Bergman space. This is an example of membership
+in the space defined in the paper. -/
 theorem gaussian_mem_schwartzBergmanSubmodule (I : Set ℝ) (hI : IsOpen I) :
     (Complex.re ⁻¹' I).indicator (fun z : ℂ ↦ Complex.exp (z ^ 2)) ∈
       schwartzBergmanSubmodule I := by
