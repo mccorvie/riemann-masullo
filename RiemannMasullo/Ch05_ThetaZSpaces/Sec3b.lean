@@ -1665,6 +1665,270 @@ theorem finiteProjectiveTensor_empty_equiv :
 -- TODO(paper-gap): If 0 ∉ I the factors S_I need not be unweighted Schwartz–Bruhat,
 -- whereas (5.3.3.6) requires this. Include the unweighted twist on each factor.
 
+section
+
+/-- The product of finitely many local tests belongs to the Schwartz–Bruhat space
+of the product group. -/
+private theorem sLocalIdelicZFunction_principalValue_productTest {ι : Type*} [Fintype ι] (G : ι → Type*)
+    [∀ i, CommGroup (G i)] [∀ i, TopologicalSpace (G i)] [∀ i, IsTopologicalGroup (G i)]
+    [∀ i, T2Space (G i)] [∀ i, LocallyCompactSpace (G i)] [∀ i, SecondCountableTopology (G i)]
+    (f : ∀ i, SchwartzBruhat (G i)) : ∃ g : SchwartzBruhat (∀ i, G i),
+      ∀ x, g x = ∏ i, f i (x i) := by
+  classical
+  cases isEmpty_or_nonempty ι with
+  | inl _ =>
+    let : CompactSpace (∀ i, G i) := Finite.compactSpace
+    obtain ⟨g, hg⟩ := compact_schwartzBruhat_one (H := (i : ι) → G i)
+    exact ⟨g, fun x ↦ (hg x).trans (by simp)⟩
+  | inr hi =>
+    obtain ⟨i⟩ := hi
+    let J := {j : ι // j ≠ i}
+    obtain ⟨g, hg⟩ := sLocalIdelicZFunction_principalValue_productTest (ι := J) (fun j ↦ G j.val) (fun j ↦ f j.val)
+    let e : ((j : ι) → G j) ≃ₜ* (G i × ((j : J) → G j.val)) :=
+      { Homeomorph.piSplitAt i G with map_mul' := fun _ _ ↦ rfl }
+    obtain ⟨t, ht⟩ := schwartzBruhat_kernel_equiv (G := G i) (H := (j : J) → G j.val)
+    let q := t (UniformSpace.Completion.coe' (α := InductiveTensor (SchwartzBruhat (G i))
+      (SchwartzBruhat ((j : J) → G j.val))) ((f i) ⊗ₜ[ℂ] g))
+    refine ⟨⟨q.val ∘ e, schwartzBruhat_pullback_mem e q⟩, fun x ↦ ?_⟩
+    change q (x i, fun j ↦ x j.val) = _
+    rw [show q (x i, fun j ↦ x j.val) = _ from ht (f i) g _ _, hg, Fintype.prod_eq_mul_prod_compl i]
+    exact congrArg (_ * ·) (Finset.prod_subtype _ (fun j ↦ by simp) (fun j ↦ f j (x j))).symm
+termination_by Fintype.card ι
+decreasing_by
+  classical
+  exact Fintype.card_subtype_lt (x := i) (not_not_intro rfl)
+
+/-- Every separate product belongs to the simultaneously weighted Schwartz space.
+For each tuple of weights, twist each factor before applying the unweighted kernel theorem. -/
+private theorem archimedeanWeightedSchwartz_tensor_pure (I : Set ℝ)
+    (f : ι → ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) (insert 0 I))
+    (g : κ → ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) (insert 0 I)) :
+    (fun u : archMul(ι, κ) ↦ (∏ i, (f i).val (u.1 i)) * ∏ j, (g j).val (u.2 j)) ∈
+      archimedeanWeightedSchwartzSubmodule I := by
+  classical
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  apply (Submodule.mem_iInf _).mpr
+  intro a
+  let F := fun i ↦ modulatedExponentialDecayTwist (archimedeanUnitModulation ℝ 1)
+    (insert 0 I) (a.1 i) (f i)
+  let G := fun j ↦ modulatedExponentialDecayTwist (archimedeanUnitModulation ℂ 2)
+    (insert 0 I) (a.2 j) (g j)
+  obtain ⟨r, hr⟩ := sLocalIdelicZFunction_principalValue_productTest (fun _ : ι ↦ ℝˣ) F
+  obtain ⟨c, hc⟩ := sLocalIdelicZFunction_principalValue_productTest (fun _ : κ ↦ ℂˣ) G
+  obtain ⟨e, he⟩ := schwartzBruhat_kernel_equiv (G := ι → ℝˣ) (H := κ → ℂˣ)
+  let q := e (UniformSpace.Completion.coe' (α := InductiveTensor _ _) (r ⊗ₜ[ℂ] c))
+  apply Submodule.mem_comap.mpr
+  convert q.property using 1
+  funext u
+  change _ * _ = q (u.1, u.2)
+  rw [show q (u.1, u.2) = r (u.1) * c (u.2) from he r c _ _, hr, hc]
+  have hf (i : ι) : F i (u.1 i) = ((‖(u.1 i).val‖ ^ (a.1 i : ℝ) : ℝ) : ℂ) * (f i).val (u.1 i) := by
+    simpa only [archimedeanUnitModulation_apply, pow_one] using
+      modulatedExponentialDecayTwist_apply (archimedeanUnitModulation ℝ 1) _ (a.1 i) (f i) (u.1 i)
+  have hg (j : κ) : G j (u.2 j) = (((‖(u.2 j).val‖ ^ (2:ℕ)) ^ (a.2 j : ℝ) : ℝ) : ℂ) *
+      (g j).val (u.2 j) := by
+    simpa only [archimedeanUnitModulation_apply] using
+      modulatedExponentialDecayTwist_apply (archimedeanUnitModulation ℂ 2) _ (a.2 j) (g j) (u.2 j)
+  simp only [hf, hg, Finset.prod_mul_distrib, Complex.ofReal_prod]
+  ring
+
+/-- Evaluation on two independent sets of coordinates separates algebraic tensors.
+Evaluating the left coordinate recovers a vector in the right factor, and taking
+its basis coordinates recovers the coefficients of the original tensor. -/
+private theorem archimedeanWeightedSchwartz_tensor_binary_injective
+    {U V A B : Type*} [AddCommGroup A] [Module ℂ A] [AddCommGroup B] [Module ℂ B]
+    (r : A →ₗ[ℂ] (U → ℂ)) (c : B →ₗ[ℂ] (V → ℂ)) (hr : Injective r) (hc : Injective c)
+    (P : A ⊗[ℂ] B →ₗ[ℂ] (U × V → ℂ))
+    (hP : ∀ a b u v, P (a ⊗ₜ[ℂ] b) (u,v) = r a u * c b v) : Injective P := by
+  classical
+  let b := Module.Free.chooseBasis ℂ B
+  let e := TensorProduct.equivFinsuppOfBasisRight (M := A) b
+  let S (u : U) : A ⊗[ℂ] B →ₗ[ℂ] B := TensorProduct.lift
+    ((LinearMap.lsmul ℂ B).comp ((LinearMap.proj u).comp r))
+  have hs (u : U) (v : V) (z : A ⊗[ℂ] B) : c (S u z) v = P z (u,v) := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y => simp [S, hP, smul_eq_mul]
+    | add x y hx hy => simpa only [map_add, Pi.add_apply] using congrArg₂ (·+·) hx hy
+  have hb (u : U) (i) (z : A ⊗[ℂ] B) : b.repr (S u z) i = r (e z i) u := by
+    induction z using TensorProduct.inductionOn with
+    | tmul x y =>
+      simp [S, e, smul_eq_mul, mul_comm]
+    | add x y hx hy =>
+      simpa only [map_add, Finsupp.add_apply, Pi.add_apply] using congrArg₂ (·+·) hx hy
+  apply (LinearMap.ker_eq_bot.mp ?_)
+  apply LinearMap.ker_eq_bot'.mpr
+  intro z hz
+  have hzero (u : U) : S u z = 0 := by
+    apply hc
+    ext v
+    rw [hs, hz, map_zero]
+    rfl
+  apply e.injective
+  ext i
+  apply_fun r using hr
+  ext u
+  simp only [← hb, hzero, map_zero, Finsupp.zero_apply, Pi.zero_apply]
+
+/-- Separate-coordinate evaluation is injective on a finite algebraic tensor, including
+the scalar tensor on an empty family. Split off one coordinate at a time. -/
+private theorem archimedeanWeightedSchwartz_tensor_pi_injective
+    {ι U A : Type*} [Fintype ι] [AddCommGroup A] [Module ℂ A]
+    (r : A →ₗ[ℂ] (U → ℂ)) (hr : Injective r)
+    (P : (⨂[ℂ] _ : ι, A) →ₗ[ℂ] ((ι → U) → ℂ))
+    (hP : ∀ f u, P (PiTensorProduct.tprod ℂ f) u = ∏ i, r (f i) (u i)) :
+    Injective P := by
+  classical
+  cases isEmpty_or_nonempty ι with
+  | inl h =>
+    let u : ι → U := isEmptyElim
+    let e := PiTensorProduct.isEmptyEquiv (R := ℂ) (s := fun _ : ι ↦ A) ι
+    have hx (z : ⨂[ℂ] _ : ι, A) : P z u = e z := by
+      induction z using PiTensorProduct.induction_on with
+      | smul_tprod b f =>
+        have h1 : e (PiTensorProduct.tprod ℂ f) = 1 := PiTensorProduct.isEmptyEquiv_apply_tprod ι f
+        rw [map_smul, Pi.smul_apply, map_smul, hP, h1, Fintype.prod_empty]
+      | add x y hx hy => simpa only [map_add, Pi.add_apply] using congrArg₂ (·+·) hx hy
+    exact fun x y hxy ↦ e.injective ((hx x).symm.trans ((congrFun hxy u).trans (hx y)))
+  | inr h =>
+    obtain ⟨i⟩ := h
+    let J := {j : ι // j ≠ i}
+    let R : (⨂[ℂ] _ : J, A) →ₗ[ℂ] ((J → U) → ℂ) := LinearMap.pi fun u ↦
+      PiTensorProduct.lift ((MultilinearMap.mkPiAlgebra ℂ J ℂ).compLinearMap
+        (fun j ↦ (LinearMap.proj (u j)).comp r))
+    have hR (f : J → A) (u : J → U) : R (PiTensorProduct.tprod ℂ f) u = ∏ j, r (f j) (u j) := by
+      simp [R, PiTensorProduct.lift.tprod, MultilinearMap.mkPiAlgebra]
+    have hRi := archimedeanWeightedSchwartz_tensor_pi_injective r hr R hR
+    let Z := LinearMap.pi fun (u : (J → U) × U) ↦ TensorProduct.lift
+      (LinearMap.compl₁₂ (LinearMap.mul ℂ ℂ) ((LinearMap.proj u.1).comp R) ((LinearMap.proj u.2).comp r))
+    have hZ (x : ⨂[ℂ] _ : J, A) (y : A) (u : J → U) (v : U) :
+        Z (x ⊗ₜ[ℂ] y) (u,v) = R x u * r y v := by simp [Z]
+    have hZi := archimedeanWeightedSchwartz_tensor_binary_injective R r hRi hr Z hZ
+    let split : J ⊕ Unit ≃ ι := Equiv.subtypeNeSumPUnit i
+    let e : (⨂[ℂ] _ : ι, A) ≃ₗ[ℂ] (⨂[ℂ] _ : J, A) ⊗[ℂ] A :=
+      ((PiTensorProduct.reindex ℂ (s := fun _ : ι ↦ A) split.symm).trans
+        (PiTensorProduct.tmulEquiv ℂ A).symm).trans
+          (LinearEquiv.lTensor _ (PiTensorProduct.subsingletonEquiv ()))
+    have he (f : ι → A) : e (PiTensorProduct.tprod ℂ f) =
+        (⨂ₜ[ℂ] j : J, f j.val) ⊗ₜ[ℂ] f i := by
+      simp [e, PiTensorProduct.reindex_tprod, PiTensorProduct.tmulEquiv_symm_apply,
+        PiTensorProduct.subsingletonEquiv_apply_tprod, split, Equiv.subtypeNeSumPUnit]
+    have hev (z : ⨂[ℂ] _ : ι, A) (u : ι → U) : P z u = Z (e z) (fun j : J ↦ u j, u i) := by
+      induction z using PiTensorProduct.induction_on with
+      | smul_tprod b f =>
+        simp only [map_smul, Pi.smul_apply, hP, he, hZ, hR]
+        rw [Fintype.prod_eq_mul_prod_compl i]
+        congr 1
+        rw [mul_comm]
+        congr 1
+        exact Finset.prod_subtype _ (fun j ↦ by simp) _
+      | add x y hx hy => simpa only [map_add, Pi.add_apply] using congrArg₂ (·+·) hx hy
+    intro x y hxy
+    apply e.injective
+    apply hZi
+    funext ⟨u,v⟩
+    let extend (j : ι) := if h : j = i then v else u ⟨j,h⟩
+    have hrest : (fun j : J ↦ extend j.val) = u := by funext j; simp [extend, j.property]
+    simpa only [hev, hrest, show extend i = v by simp [extend]] using congrFun hxy extend
+termination_by Fintype.card ι
+decreasing_by
+  classical
+  exact Fintype.card_subtype_lt (x := i) (not_not_intro rfl)
+
+/-- Lift the coordinate product through the two finite tensors and then their binary tensor.
+The range lies in any submodule containing all separate products. -/
+private theorem archimedeanWeightedSchwartz_tensor_lift
+    {U V A B : Type*} [AddCommGroup A] [Module ℂ A] [AddCommGroup B] [Module ℂ B]
+    (r : A →ₗ[ℂ] (U → ℂ)) (c : B →ₗ[ℂ] (V → ℂ)) (hr : Injective r) (hc : Injective c)
+    (W : Submodule ℂ (((ι → U) × (κ → V)) → ℂ))
+    (hp : ∀ (f : ι → A) (g : κ → B),
+      (fun u : (ι → U) × (κ → V) ↦ (∏ i, r (f i) (u.1 i)) * ∏ j, c (g j) (u.2 j)) ∈ W) :
+    ∃ L : (⨂[ℂ] _ : ι, A) ⊗[ℂ] (⨂[ℂ] _ : κ, B) →ₗ[ℂ] W, Injective L ∧
+      ∀ (f : ι → A) (g : κ → B) (u : (ι → U) × (κ → V)),
+        (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u =
+          (∏ i, r (f i) (u.1 i)) * ∏ j, c (g j) (u.2 j) := by
+  classical
+  let R (u : ι → U) := PiTensorProduct.lift ((MultilinearMap.mkPiAlgebra ℂ ι ℂ).compLinearMap
+    (fun i ↦ (LinearMap.proj (u i)).comp r))
+  let C (v : κ → V) := PiTensorProduct.lift ((MultilinearMap.mkPiAlgebra ℂ κ ℂ).compLinearMap
+    (fun j ↦ (LinearMap.proj (v j)).comp c))
+  let L := LinearMap.pi fun (u : (ι → U) × (κ → V)) ↦
+    TensorProduct.lift (LinearMap.compl₁₂ (LinearMap.mul ℂ ℂ) (R u.1) (C u.2))
+  have hv (f : ι → A) (g : κ → B) : L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j)) =
+      fun u ↦ (∏ i, r (f i) (u.1 i)) * ∏ j, c (g j) (u.2 j) := by
+    funext u
+    simp [L, R, C, PiTensorProduct.lift.tprod, MultilinearMap.mkPiAlgebra]
+  have hW z : L z ∈ W := by
+    induction z using TensorProduct.inductionOn with
+    | add a b ha hb => simpa only [map_add] using W.add_mem ha hb
+    | tmul x y =>
+      induction x using PiTensorProduct.induction_on with
+      | add x x' hx hx' => simpa only [TensorProduct.add_tmul, map_add] using W.add_mem hx hx'
+      | smul_tprod b f =>
+        rw [← TensorProduct.smul_tmul', map_smul]
+        apply W.smul_mem
+        induction y using PiTensorProduct.induction_on with
+        | add y y' hy hy' => simpa only [TensorProduct.tmul_add, map_add] using W.add_mem hy hy'
+        | smul_tprod b' g =>
+          rw [TensorProduct.tmul_smul, map_smul, hv]
+          exact W.smul_mem _ (hp f g)
+  have hR := archimedeanWeightedSchwartz_tensor_pi_injective r hr (LinearMap.pi R)
+    (fun f u ↦ by simp [R, PiTensorProduct.lift.tprod, MultilinearMap.mkPiAlgebra])
+  have hC := archimedeanWeightedSchwartz_tensor_pi_injective c hc (LinearMap.pi C)
+    (fun g v ↦ by simp [C, PiTensorProduct.lift.tprod, MultilinearMap.mkPiAlgebra])
+  have hinj := archimedeanWeightedSchwartz_tensor_binary_injective (LinearMap.pi R) (LinearMap.pi C)
+    hR hC L (fun x y u v ↦ by simp [L])
+  exact ⟨L.codRestrict W hW, fun _ _ h ↦ hinj (congrArg Subtype.val h), fun f g u ↦ congrFun (hv f g) u⟩
+
+/-- A densely embedded algebraic tensor has precisely the completion of its image. -/
+private theorem archimedeanWeightedSchwartz_tensor_completion
+    {X Y : Type*} [AddCommGroup X] [Module ℂ X] [UniformSpace X] [IsUniformAddGroup X]
+    [ContinuousConstSMul ℂ X] [AddCommGroup Y] [Module ℂ Y] [UniformSpace Y]
+    [IsUniformAddGroup Y] [ContinuousConstSMul ℂ Y] [T2Space Y] [CompleteSpace Y]
+    (L : X →L[ℂ] Y) (hL : IsEmbedding L) (hd : DenseRange L) :
+    ∃ e : UniformSpace.Completion X ≃L[ℂ] Y, ∀ z : X, e z = L z := by
+  have hi := AddMonoidHom.isUniformInducing_of_isInducing (f := L.toLinearMap.toAddMonoidHom)
+    hL.isInducing
+  have he : IsUniformInducing L.fromCompletion := UniformSpace.Completion.isUniformInducing_extension hi
+  have hr : DenseRange L.fromCompletion := by
+    apply Dense.mono _ hd
+    rintro _ ⟨x, rfl⟩
+    exact ⟨(x : UniformSpace.Completion X), L.fromCompletion_apply_coe x⟩
+  have hs : Surjective L.fromCompletion := by
+    rw [← range_eq_univ, ← he.isComplete_range.isClosed.closure_eq, hr.closure_range]
+  have hh : IsHomeomorph L.fromCompletion :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr ⟨he.isUniformEmbedding.isEmbedding, hs⟩
+  exact ⟨.ofIsHomeomorph (.ofBijective L.fromCompletion.toLinearMap hh.bijective) hh,
+    L.fromCompletion_apply_coe⟩
+
+section WeightedTensorEstimates
+local notation "realFactors(" I ")" => ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) (insert 0 I)
+local notation "complexFactors(" I ")" => ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) (insert 0 I)
+local notation "productTensor(" I ")" => ProjectiveTensor (FiniteProjectiveTensor (fun _ : ι ↦ realFactors(I)))
+  (FiniteProjectiveTensor (fun _ : κ ↦ complexFactors(I)))
+local notation "separateValue(" f ", " g ", " u ")" =>
+  (∏ i, (f i).val ((u : archMul(ι, κ)).1 i)) * ∏ j, (g j).val (u.2 j)
+
+/-- The remaining topology estimate in Lemma 5.3.3.3(2), p. 252: the projective
+tensor topology is induced by its maps to the unweighted Schwartz space, one for
+each tuple of exponents. This is an estimate on the algebraic tensor only. -/
+private theorem archimedeanWeightedSchwartz_tensor_twists {I : Set ℝ} (ho : IsOpen I)
+    (hi : OrdConnected I) (hne : I.Nonempty) (L : productTensor(I) →ₗ[ℂ] 𝓦(I))
+    (hL : ∀ (f : ι → realFactors(I)) (g : κ → complexFactors(I)) (u : archMul(ι, κ)),
+      (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u = separateValue(f, g, u)) :
+    IsInducing (fun z a ↦ archimedeanSchwartzTwist I a (L z)) := by sorry
+
+/-- The approximation estimate in Lemma 5.3.3.3(2), p. 252: finite sums of
+separate products approximate every weighted test simultaneously in the partial
+Schwartz seminorms. This assertion involves only the function spaces. -/
+private theorem archimedeanWeightedSchwartz_tensor_dense {I : Set ℝ} (ho : IsOpen I)
+    (hi : OrdConnected I) (hne : I.Nonempty) :
+    Dense (Submodule.span ℂ {w : 𝓦(I) | ∃ (f : ι → realFactors(I)) (g : κ → complexFactors(I)),
+      ∀ u : archMul(ι, κ), w.val u = separateValue(f, g, u)} : Set 𝓦(I)) := by sorry
+end WeightedTensorEstimates
+
+end
+
 set_option maxHeartbeats 600000 in
 /-- Paper: Lemma 5.3.3.3(2), p. 252.
 The canonical map multiplies pure factors evaluated in their own coordinates and
@@ -1682,7 +1946,39 @@ theorem archimedeanWeightedSchwartz_tensor {I : Set ℝ} (_ho : IsOpen I)
       (∀ (f : ι → R) (g : κ → C) (u : archMul(ι, κ)),
         (L ((⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j))).val u =
           (∏ i, (f i).val (u.1 i)) * ∏ j, (g j).val (u.2 j)) ∧
-      ∃ e : UniformSpace.Completion T ≃L[ℂ] 𝓦(I), ∀ z : T, e z = L z := by sorry
+      ∃ e : UniformSpace.Completion T ≃L[ℂ] 𝓦(I), ∀ z : T, e z = L z := by
+  classical
+  let J := insert 0 I
+  let R := ModulatedExponentialDecay (archimedeanUnitModulation ℝ 1) J
+  let C := ModulatedExponentialDecay (archimedeanUnitModulation ℂ 2) J
+  let T := ProjectiveTensor (FiniteProjectiveTensor (fun _ : ι ↦ R)) (FiniteProjectiveTensor (fun _ : κ ↦ C))
+  let r : R →ₗ[ℂ] (ℝˣ → ℂ) := (modulatedExponentialDecaySubmodule (archimedeanUnitModulation ℝ 1) J).subtype
+  let c : C →ₗ[ℂ] (ℂˣ → ℂ) := (modulatedExponentialDecaySubmodule (archimedeanUnitModulation ℂ 2) J).subtype
+  have hr : Injective r := fun _ _ h ↦ Subtype.ext h
+  have hc : Injective c := fun _ _ h ↦ Subtype.ext h
+  have hp (f : ι → R) (g : κ → C) :
+      (fun u : archMul(ι, κ) ↦ (∏ i, r (f i) (u.1 i)) * ∏ j, c (g j) (u.2 j)) ∈
+          archimedeanWeightedSchwartzSubmodule I :=
+    archimedeanWeightedSchwartz_tensor_pure I f g
+  have hA := archimedeanWeightedSchwartz_tensor_lift (ι := ι) (κ := κ)
+    (U := ℝˣ) (V := ℂˣ) (A := R) (B := C) r c hr hc (archimedeanWeightedSchwartzSubmodule I) hp
+  let L := hA.choose
+  have hLi := hA.choose_spec.1
+  have hL := hA.choose_spec.2
+  let M : T →ₗ[ℂ] 𝓦(I) := L
+  have hM : IsInducing M := (archimedeanSchwartzTwists_isEmbedding I).isInducing.of_comp_iff.mp
+    (archimedeanWeightedSchwartz_tensor_twists _ho _hi _hne M hL)
+  let P : T →L[ℂ] 𝓦(I) := ⟨M, hM.continuous⟩
+  have hd : DenseRange P := by
+    apply Dense.mono _ (archimedeanWeightedSchwartz_tensor_dense (ι := ι) (κ := κ) _ho _hi _hne)
+    change Submodule.span ℂ _ ≤ M.range
+    apply Submodule.span_le.mpr
+    rintro w ⟨f, g, h⟩
+    exact ⟨(⨂ₜ[ℂ] i, f i) ⊗ₜ[ℂ] (⨂ₜ[ℂ] j, g j), Subtype.ext (funext fun u ↦ (hL f g u).trans (h u).symm)⟩
+  have hP : IsEmbedding P := ⟨hM, hLi⟩
+  let : MetrizableSpace 𝓦(I) := archimedeanWeightedSchwartz_metrizable _ho _hi _hne
+  let : CompleteSpace 𝓦(I) := archimedeanWeightedSchwartz_complete _ho _hi _hne
+  exact ⟨P, hP, hL, archimedeanWeightedSchwartz_tensor_completion P hP hd⟩
 
 local notation "jet(" n ", " x ", " v ")" =>
   (fun f : 𝓢(archAdd(ι, κ), ℂ) ↦ iteratedFDeriv ℝ n (f : archAdd(ι, κ) → ℂ) x v)
@@ -3550,37 +3846,6 @@ private theorem sLocalIdelicZFunction_principalValue_finite (v : S) (f : ℬ(v.v
       integral_congr_ae (.of_forall fun x ↦ congrArg (· * c x) (hev x))
     _ = (1 - (μ.real O.units : ℂ)⁻¹ * (∫ u in O.units, c u ∂μ) * c π) * Z := hI
     _ = _ := (congrArg (· * Z) hF).trans (mul_comm _ _)
-
-/-- The product of finitely many local tests belongs to the Schwartz–Bruhat space
-of the product group. -/
-private theorem sLocalIdelicZFunction_principalValue_productTest {ι : Type*} [Fintype ι] (G : ι → Type*)
-    [∀ i, CommGroup (G i)] [∀ i, TopologicalSpace (G i)] [∀ i, IsTopologicalGroup (G i)]
-    [∀ i, T2Space (G i)] [∀ i, LocallyCompactSpace (G i)] [∀ i, SecondCountableTopology (G i)]
-    (f : ∀ i, SchwartzBruhat (G i)) : ∃ g : SchwartzBruhat (∀ i, G i),
-      ∀ x, g x = ∏ i, f i (x i) := by
-  classical
-  cases isEmpty_or_nonempty ι with
-  | inl _ =>
-    let : CompactSpace (∀ i, G i) := Finite.compactSpace
-    obtain ⟨g, hg⟩ := compact_schwartzBruhat_one (H := (i : ι) → G i)
-    exact ⟨g, fun x ↦ (hg x).trans (by simp)⟩
-  | inr hi =>
-    obtain ⟨i⟩ := hi
-    let J := {j : ι // j ≠ i}
-    obtain ⟨g, hg⟩ := sLocalIdelicZFunction_principalValue_productTest (ι := J) (fun j ↦ G j.val) (fun j ↦ f j.val)
-    let e : ((j : ι) → G j) ≃ₜ* (G i × ((j : J) → G j.val)) :=
-      { Homeomorph.piSplitAt i G with map_mul' := fun _ _ ↦ rfl }
-    obtain ⟨t, ht⟩ := schwartzBruhat_kernel_equiv (G := G i) (H := (j : J) → G j.val)
-    let q := t (UniformSpace.Completion.coe' (α := InductiveTensor (SchwartzBruhat (G i))
-      (SchwartzBruhat ((j : J) → G j.val))) ((f i) ⊗ₜ[ℂ] g))
-    refine ⟨⟨q.val ∘ e, schwartzBruhat_pullback_mem e q⟩, fun x ↦ ?_⟩
-    change q (x i, fun j ↦ x j.val) = _
-    rw [show q (x i, fun j ↦ x j.val) = _ from ht (f i) g _ _, hg, Fintype.prod_eq_mul_prod_compl i]
-    exact congrArg (_ * ·) (Finset.prod_subtype _ (fun j ↦ by simp) (fun j ↦ f j (x j))).symm
-termination_by Fintype.card ι
-decreasing_by
-  classical
-  exact Fintype.card_subtype_lt (x := i) (not_not_intro rfl)
 
 /-- Assemble the archimedean product in the test space of the infinite adeles. -/
 private theorem sLocalIdelicZFunction_principalValue_archTest
