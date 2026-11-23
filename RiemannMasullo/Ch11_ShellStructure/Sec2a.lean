@@ -462,6 +462,82 @@ private theorem globalThetaPrincipalValue_sobolevBound_formula (v : V)
     ← tsum_mul_left, ← hs1.tsum_sub (hs2.mul_left _)]
   exact tsum_congr fun ξ ↦ globalThetaPrincipalValue_sobolevBound_formula_global v π _hπ f.val (x ξ)
 
+/-- Paper: Proposition 11.2.0.1, pp. 484–485. On the trivial norm-one isotype, the
+principal value at one finite place acts on the theta function by the difference
+with its uniformizer translate. -/
+theorem homogeneousAdelicTheta_one_principalValue_singleton (v : V) (π : (v.adicCompletion F)ˣ)
+    (hπ : Valued.v.IsUniformizer π.val) (f : ℬ₀) (g : C𝔽) :
+    homogeneousAdelicTheta (1 : PontryaginDual C₁) (adelePrincipalValue F {v} f.val) g =
+      homogeneousAdelicTheta 1 f.val g - homogeneousAdelicTheta 1 f.val
+        ((IdeleClassGroup.ofAdicCompletion (𝓞 F) F v π)⁻¹ * g) := by
+  classical
+  let : MeasurableSpace (v.adicCompletion F)ˣ := borel _
+  have : BorelSpace (v.adicCompletion F)ˣ := ⟨rfl⟩
+  let : CompactSpace C₁ := (ideleClassGroup_finiteness F).2.1
+  have : ProperSpace (v.adicCompletion F) := properSpace_adicCompletion v
+  have : SecondCountableTopology (v.adicCompletion F)ˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let ν := normOneIdeleClassTamagawaMeasure F
+  let : ν.IsHaarMeasure := (multiplicativeTamagawaMeasures_existsUnique F).exists.choose_spec.2.2.2.1
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v
+  let U : Set (v.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v).units : Set (v.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v))
+  have hm : μ.real U ≠ 0 := (measureReal_ne_zero_iff hUc.measure_ne_top).mpr
+    (hUo.measure_pos μ ⟨1, Submonoid.one_mem _⟩).ne'
+  let a := IdeleClassGroup.ofAdicCompletion (𝓞 F) F v
+  let y := (a π)⁻¹ * g
+  let K (k : C₁) (u : (v.adicCompletion F)ˣ) :=
+    adelicTheta f.val (a (π * u)⁻¹ * (k.val * g))
+  have hK : Continuous (uncurry K) :=
+    (adelicTheta f.val).continuous.comp (((continuous_ideleClass_ofAdicCompletion F v).comp
+      ((continuous_const.mul continuous_snd).inv)).mul
+        ((continuous_subtype_val.comp continuous_fst).mul continuous_const))
+  have hInt : Integrable (uncurry K) (ν.prod (μ.restrict U)) := by
+    have h := hK.continuousOn.integrableOn_compact (μ := ν.prod μ) (isCompact_univ.prod hUc)
+    rwa [IntegrableOn, ← Measure.prod_restrict, Measure.restrict_univ] at h
+  have hθ (b : SchwartzBruhat (Multiplicative 𝔸[F])) (x : C𝔽) :
+      homogeneousAdelicTheta (1 : PontryaginDual C₁) b x =
+        ∫ k : C₁, adelicTheta b (k.val * x) ∂ν := by
+    change (∫ k : C₁, adelicTheta b (k.val * x) * (1 : ℂ) ∂ν) = _
+    simp
+  have hθi : Integrable (fun k : C₁ ↦ adelicTheta f.val (k.val * g)) ν :=
+    ((adelicTheta f.val).continuous.comp (continuous_subtype_val.mul continuous_const)).integrable_of_hasCompactSupport
+        (HasCompactSupport.of_compactSpace _)
+  have hinner (u : (v.adicCompletion F)ˣ) (hu : u ∈ U) :
+      ∫ k : C₁, K k u ∂ν = homogeneousAdelicTheta 1 f.val y := by
+    have hun : ideleClassNorm F (a u) = 1 := by
+      rw [ideleClassNorm_ofAdicCompletion]
+      apply Units.ext
+      apply NNReal.coe_injective
+      change ‖u.val‖ = 1
+      have h1 : ‖u.val‖ ≤ 1 := Valued.toNormedField.norm_le_one_iff.mpr hu.1
+      have h2 : ‖(u⁻¹ : (v.adicCompletion F)ˣ).val‖ ≤ 1 := Valued.toNormedField.norm_le_one_iff.mpr hu.2
+      have h3 : ‖u.val‖ * ‖(u⁻¹ : (v.adicCompletion F)ˣ).val‖ = 1 := by
+        rw [← norm_mul, Units.mul_inv, norm_one]
+      nlinarith [norm_nonneg u.val, norm_nonneg (u⁻¹ : (v.adicCompletion F)ˣ).val]
+    let k₀ : C₁ := ⟨a u, hun⟩
+    have eqk (k : C₁) : K k u = adelicTheta f.val ((k₀⁻¹ * k).val * y) := by
+      dsimp only [K, k₀, y, Subgroup.coe_mul, Subgroup.coe_inv]
+      rw [map_inv a, map_mul a]
+      congr 1
+      simp only [mul_inv_rev]
+      ac_rfl
+    rw [hθ, ← integral_mul_left_eq_self (μ := ν) (fun k : C₁ ↦ adelicTheta f.val (k.val * y)) k₀⁻¹]
+    exact integral_congr_ae (.of_forall eqk)
+  rw [hθ, hθ f.val g]
+  let b : ℂ := ((μ.real U)⁻¹ : ℝ)
+  have heq (k : C₁) : adelicTheta (adelePrincipalValue F {v} f.val) (k.val * g) =
+      adelicTheta f.val (k.val * g) - b * ∫ u in U, K k u ∂μ :=
+    globalThetaPrincipalValue_sobolevBound_formula v π hπ f _
+  simp_rw [heq]
+  have hKi : Integrable (fun k : C₁ ↦ b * ∫ u in U, K k u ∂μ) ν := hInt.integral_prod_left.const_mul b
+  have hswap := integral_integral_swap (f := K) hInt
+  rw [integral_sub hθi hKi, integral_const_mul, hswap, setIntegral_congr_fun hUo.measurableSet hinner, setIntegral_const]
+  simp [b, y, a, Complex.real_smul, hm]
+
 /-- Cauchy–Schwarz for lower Lebesgue integrals: the square of the integral is at most the
 total mass times the integral of the square. -/
 private theorem globalThetaPrincipalValue_sobolevBound_average_cs {X : Type*}
