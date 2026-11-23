@@ -1075,12 +1075,134 @@ theorem integrable_diagonalIndentationLift_right :
   simpa only [hswap] using
     integrable_diagonalIndentationLift_left H hH hν hS hb hu hdiag hi
 
+/-- Summing the averaged indentation weight over the translates of the first coordinate gives
+one, since the indentation sums to one over each orbit. -/
+private theorem integral_diagonalIndentationLift_left_weight [Countable H]
+    (hb₀ : IsIndentation H Measure.count b) (x : G) :
+    Integrable (fun h : H ↦ diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x)) countH ∧
+      ∫ h : H, diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x) ∂countH = 1 := by
+  obtain ⟨hβi, hβ1⟩ := hb₀.2.2.2 x
+  let β : H → ℝ := fun h ↦ b ((h : G)⁻¹ * x)
+  have hβ0 (h : H) : 0 ≤ β h := hb₀.2.1 _
+  have hcount (f : H → ℝ) (hf : Integrable f countH) : ∫ h, f h ∂countH = ∑' h, f h := by
+    rw [integral_countable hf]
+    simp
+  have hβs : Summable β := (integrable_count_iff.mp hβi).of_norm
+  have hβsum : ∑' h, β h = 1 := (hcount β hβi).symm.trans hβ1
+  have hβle (k : H) : β k ≤ 1 := hβsum ▸ hβs.le_tsum k fun j _ ↦ hβ0 j
+  have hts (h : H) : Summable fun k ↦ β (h * k) * β k :=
+    Summable.of_nonneg_of_le (fun k ↦ mul_nonneg (hβ0 _) (hβ0 _))
+      (fun k ↦ mul_le_of_le_one_left (hβ0 k) (hβle _)) hβs
+  have hW (h : H) : diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x) =
+      ∑' k, β (h * k) * β k := by
+    have hfun : (fun k : H ↦ b ((k : G)⁻¹ * ((h : G)⁻¹ * x)) * b ((k : G)⁻¹ * x)) =
+        fun k ↦ β (h * k) * β k := by
+      funext k
+      simp only [β, Subgroup.coe_mul, mul_inv_rev, mul_assoc]
+    change (∫ k : H, b ((k : G)⁻¹ * ((h : G)⁻¹ * x)) * b ((k : G)⁻¹ * x) ∂countH) = _
+    rw [hfun]
+    exact hcount _ (integrable_count_iff.mpr ((hts h).congr fun k ↦
+      (Real.norm_of_nonneg (mul_nonneg (hβ0 _) (hβ0 _))).symm))
+  have hW0 (h : H) : 0 ≤ ∑' k, β (h * k) * β k :=
+    tsum_nonneg fun k ↦ mul_nonneg (hβ0 _) (hβ0 _)
+  have hβE : ∑' k, ENNReal.ofReal (β k) = 1 := by
+    rw [← ENNReal.ofReal_tsum_of_nonneg hβ0 hβs, hβsum, ENNReal.ofReal_one]
+  have htot : ∑' h, ENNReal.ofReal (∑' k, β (h * k) * β k) = 1 := by
+    have hE (h : H) : ENNReal.ofReal (∑' k, β (h * k) * β k) =
+        ∑' k, ENNReal.ofReal (β (h * k)) * ENNReal.ofReal (β k) := by
+      rw [ENNReal.ofReal_tsum_of_nonneg (fun k ↦ mul_nonneg (hβ0 _) (hβ0 _)) (hts h)]
+      exact tsum_congr fun k ↦ ENNReal.ofReal_mul (hβ0 _)
+    have hshift (k : H) : ∑' h, ENNReal.ofReal (β (h * k)) = 1 :=
+      ((Equiv.mulRight k).tsum_eq fun h ↦ ENNReal.ofReal (β h)).trans hβE
+    simp_rw [hE]
+    rw [ENNReal.tsum_comm]
+    simp_rw [ENNReal.tsum_mul_right, hshift, one_mul]
+    exact hβE
+  have hne (h : H) : ENNReal.ofReal (∑' k, β (h * k) * β k) ≠ ⊤ := ENNReal.ofReal_ne_top
+  have hsum : Summable fun h ↦ ∑' k, β (h * k) * β k := by
+    simpa only [ENNReal.toReal_ofReal (hW0 _)] using
+      ENNReal.summable_toReal (htot.trans_ne ENNReal.one_ne_top)
+  have hint : Integrable (fun h : H ↦ diagonalIndentationWeight H countH b ((h : G)⁻¹ * x, x))
+      countH := by
+    simp only [hW]
+    exact integrable_count_iff.mpr (hsum.congr fun h ↦ (Real.norm_of_nonneg (hW0 _)).symm)
+  refine ⟨hint, ?_⟩
+  rw [hcount _ hint]
+  simp only [hW]
+  have := ENNReal.tsum_toReal_eq hne
+  rw [htot, ENNReal.toReal_one] at this
+  simpa only [ENNReal.toReal_ofReal (hW0 _)] using this.symm
+
+/-- Two elements lie in the same orbit of the subgroup acting by left multiplication exactly
+when they have the same coset. -/
+private theorem integral_diagonalIndentationLift_left_orbit (x y : G) :
+    Quotient.mk (MulAction.orbitRel H G) x = Quotient.mk (MulAction.orbitRel H G) y ↔
+      (QuotientGroup.mk x : G ⧸ H) = QuotientGroup.mk y := by
+  rw [Quotient.eq, MulAction.orbitRel_apply, QuotientGroup.eq]
+  constructor
+  · rintro ⟨h, hh⟩
+    have hx : (h : G) * y = x := hh
+    have e : ((h : G) * y)⁻¹ * y = (h : G)⁻¹ := by
+      rw [mul_inv_rev, mul_comm y⁻¹, mul_assoc, inv_mul_cancel, mul_one]
+    rw [← hx, e]
+    exact H.inv_mem h.property
+  · intro hxy
+    refine ⟨⟨(x⁻¹ * y)⁻¹, H.inv_mem hxy⟩, ?_⟩
+    change (x⁻¹ * y)⁻¹ * y = x
+    rw [mul_inv_rev, inv_inv, mul_comm y⁻¹ x, mul_assoc, inv_mul_cancel, mul_one]
+
 include hH hν hS hb hu hdiag hi in
 /-- Paper: Proposition 12.2.2.2(2), p. 508. The integral of the smoothened quotient diagonal
 equals the integral of the first skew diagonal, integrating subgroup translates first. -/
 theorem integral_diagonalIndentationLift_left :
     (∫ q, uSmooth (q, q) ∂ν) =
-      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by sorry
+      ∫ x in D, ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH ∂μ := by
+  let : Countable H := TopologicalSpace.separableSpace_iff_countable.mp inferInstance
+  let : IsClosed (H : Set G) := hH
+  have hinner (x : G) : ∫ h : H, Ψ uSmooth ((h : G)⁻¹ * x, x) ∂countH = uSmooth (π x, π x) := by
+    have hπ (h : H) : q₂ ((h : G)⁻¹ * x, x) = (π x, π x) := by
+      have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+      simp only [Prod.map_apply, map_mul, map_inv, h1, inv_one, one_mul]
+    simp only [diagonalIndentationLift, hπ]
+    rw [integral_mul_const, integral_complex_ofReal,
+      (integral_diagonalIndentationLift_left_weight H hb x).2, Complex.ofReal_one, one_mul]
+  simp_rw [hinner]
+  obtain ⟨hD, -, -⟩ := hS
+  have hFD : IsFundamentalDomain H D μ := hD.isFundamentalDomain
+  obtain ⟨M, hMD, hMm, -⟩ := hFD.nullMeasurableSet.exists_measurable_subset_ae_eq
+  have hinjM : Set.InjOn (Quotient.mk (MulAction.orbitRel H G)) M := by
+    intro x hx y hy hxy
+    obtain ⟨h, hh⟩ := Quotient.eq.mp hxy
+    have hx' : (h : G) * y = x := hh
+    obtain ⟨a, -, ha⟩ := hD.2.1 y
+    have h1 : h = 1 := (ha h (show h • y ∈ D by
+        rw [Subgroup.smul_def, smul_eq_mul, hx']; exact hMD hx)).trans
+      (ha 1 (show (1 : H) • y ∈ D by rw [one_smul]; exact hMD hy)).symm
+    rw [← hx', h1, OneMemClass.coe_one, one_mul]
+  obtain ⟨Δ, hΔm, -, hΔb⟩ := exists_borel_orbit_transversal hMm hinjM
+  have hbij : Function.Bijective (fun x : Δ ↦ (QuotientGroup.mk x.val : G ⧸ H)) := by
+    refine ⟨fun x y hxy ↦ hΔb.injective
+      ((integral_diagonalIndentationLift_left_orbit H _ _).mpr hxy), fun q ↦ ?_⟩
+    obtain ⟨g, rfl⟩ := QuotientGroup.mk_surjective q
+    obtain ⟨x, hx⟩ := hΔb.surjective (Quotient.mk (MulAction.orbitRel H G) g)
+    exact ⟨x, (integral_diagonalIndentationLift_left_orbit H _ _).mp hx⟩
+  have hΔFD : IsFundamentalDomain H Δ μ := by
+    refine IsFundamentalDomain.mk' hΔm.nullMeasurableSet fun x ↦ ?_
+    obtain ⟨y, hy⟩ := hΔb.surjective (Quotient.mk (MulAction.orbitRel H G) x)
+    obtain ⟨h, hh⟩ := Quotient.eq.mp hy
+    have hh' : h • x = y.val := hh
+    refine ⟨h, show h • x ∈ Δ by rw [hh']; exact y.property, fun h' hh₂ ↦ ?_⟩
+    have hh₂' : h' • x ∈ Δ := hh₂
+    have hsame : (⟨h' • x, hh₂'⟩ : Δ) = y :=
+      hΔb.injective ((Quotient.sound (s := MulAction.orbitRel H G) (a := h' • x) (b := x)
+        ⟨h', rfl⟩).trans hy.symm)
+    have hxy : (h' : G) * x = (h : G) * x := (congrArg Subtype.val hsame).trans hh'.symm
+    exact Subtype.ext (mul_right_cancel hxy)
+  rw [weilFundamentalDomain_integral H hH μ hΔm hbij ν hν hi]
+  refine hΔFD.setIntegral_eq hFD fun h x ↦ ?_
+  have h1 : π (h : G) = 1 := (QuotientGroup.eq_one_iff _).mpr h.property
+  change uSmooth (π ((h : G) * x), π ((h : G) * x)) = uSmooth (π x, π x)
+  rw [map_mul, h1, one_mul]
 
 include hH hν hS hb hu hdiag hi in
 /-- Paper: (12.2.2.5), p. 508. The first skew-diagonal integral is unchanged by
