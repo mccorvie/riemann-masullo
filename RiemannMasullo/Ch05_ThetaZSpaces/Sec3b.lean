@@ -1665,7 +1665,40 @@ theorem sAdeleFiniteZeroSchwartz_tmul_iff (T : Finset V)
     (_hg : ∀ v, g v ≠ 0) :
     let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
     e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v)) ∈ sAdeleFiniteZeroSchwartz S T ↔
-      ∀ v : S, v.val ∈ T → g v (Multiplicative.ofAdd 0) = 0 := by sorry
+      ∀ v : S, v.val ∈ T → g v (Multiplicative.ofAdd 0) = 0 := by
+  classical
+  let e := (sAdeleSchwartz_inductiveTensor_equiv F S).choose
+  let u := e (f ⊗ₜ[ℂ] (⨂ₜ[ℂ] v, g v))
+  let X := {x : SAdeleRing F S // ∃ v : S, v.val ∈ T ∧ x.2 v = 0}
+  have mem : u ∈ sAdeleFiniteZeroSchwartz S T ↔ ∀ x : X, u (Multiplicative.ofAdd x.val) = 0 :=
+    Submodule.mem_iInf _
+  have he (x : SAdeleRing F S) : u (Multiplicative.ofAdd x) =
+      f (Multiplicative.ofAdd x.1) * ∏ v : S, g v (Multiplicative.ofAdd (x.2 v)) :=
+    (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec f g x
+  change u ∈ sAdeleFiniteZeroSchwartz S T ↔ _
+  rw [mem]
+  constructor
+  · intro hu v hv
+    by_contra hne
+    obtain ⟨a, ha⟩ : ∃ a : A∞, f (Multiplicative.ofAdd a) ≠ 0 := by
+      by_contra! hn
+      exact _hf (Subtype.ext (funext fun x ↦ hn x.toAdd))
+    have hnon (w : S) : ∃ y : w.val.adicCompletion F, g w (Multiplicative.ofAdd y) ≠ 0 := by
+      by_contra! hn
+      exact _hg w (Subtype.ext (funext fun x ↦ hn x.toAdd))
+    choose y hy using hnon
+    let b := Function.update y v 0
+    have hz := hu ⟨(a, b), v, hv, Function.update_self ..⟩
+    rw [he] at hz
+    apply (mul_ne_zero ha (Finset.prod_ne_zero_iff.mpr ?_)) hz
+    intro w _
+    by_cases hw : w = v
+    · subst w
+      simpa [b] using hne
+    · simpa [b, Function.update_of_ne hw] using hy w
+  · intro h x
+    obtain ⟨v, hv, hx⟩ := x.property
+    rw [he, Finset.prod_eq_zero (Finset.mem_univ v) (by rw [hx, h v hv]), mul_zero]
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 The selected finite zero-coordinate conditions cut out the span in (5.3.4.15).
