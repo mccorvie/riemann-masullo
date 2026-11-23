@@ -2183,6 +2183,10 @@ private theorem spectralStripConvolution_traceCauchy_of_compressed_diagonal
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455, after (10.3.2.7). For a fixed test,
 discard the output directions of finitely many jets. The positive square root of
 the remaining Gram operator should have uniformly small finite diagonal sums.
+By `_hb` the Riesz vectors span densely, so the complementary projections tend strongly to
+zero and compress any fixed finite-rank rectangle to zero in trace norm. In a trace-norm
+Cauchy tail, contractivity bounds each later compressed trace norm, and hence each finite
+diagonal sum, by the fixed rectangle's compressed trace norm plus the tail error.
 Gap: The scalar Mellin estimates on p. 455 do not control this sum for an
 individual rectangle, in particular when its boundary separates nearby zeros. -/
 private theorem spectralStripConvolution_traceCauchy_compressed_diagonal (χ : PontryaginDual C₁ → PontryaginDual C𝔽)
