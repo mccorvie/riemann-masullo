@@ -1021,11 +1021,163 @@ def Printed.archNuclearityJet_basis : Prop :=
     (τ : ℝ≥0ˣ →ₜ* I[F]) (hτ : RightInverse τ (ideleNorm F)),
     Printed.HasQuotientJetBasis (archNuclearityDenominator χ) (Printed.archNuclearityJet χ τ hτ)
 
+/-- The gamma factor of `|·|^i` vanishes at every point `-i - 2n` of the real pole
+progression. -/
+private theorem archNuclearityJet_basis_false_gamma_zero (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) (n : ℕ) :
+    heckeGammaFactor χ (-Complex.I - 2 * (n : ℂ)) = 0 := by
+  unfold heckeGammaFactor
+  apply Finset.prod_eq_zero (Finset.mem_univ Rat.infinitePlace)
+  rw [dite_eq_left_of_eq_true (eq_true Rat.isReal_infinitePlace)]
+  dsimp only
+  rw [archNuclearityJet_span_false_params χ hχ]
+  rw [Complex.Gammaℝ_eq_zero_iff]
+  refine ⟨n, ?_⟩
+  simp only [Fin.val_zero, Nat.cast_zero, add_zero]
+  ring
+
+/-- The reciprocal gamma factor of `|·|^i` has positive finite order at each `-i - 2n`. -/
+private theorem archNuclearityJet_basis_false_gammaOrder_pos (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I) (n : ℕ) :
+    0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ))).toNat := by
+  have han : AnalyticOnNhd ℂ (fun z ↦ (heckeGammaFactor χ z)⁻¹) univ :=
+    fun z _ ↦ (differentiable_inv_heckeGammaFactor χ).analyticAt z
+  have h0 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ)) ≠ 0 := by
+    rw [Ne, (han _ trivial).analyticOrderAt_eq_zero,
+      archNuclearityJet_basis_false_gamma_zero χ hχ n]
+    simp
+  have h1 : analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) 1 ≠ ⊤ := by
+    rw [(han _ trivial).analyticOrderAt_eq_zero.mpr
+      (inv_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by simp)))]
+    exact ENat.zero_ne_top
+  have htop := han.analyticOrderAt_ne_top_of_isPreconnected (y := -Complex.I - 2 * (n : ℂ))
+    isPreconnected_univ trivial trivial h1
+  generalize analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) (-Complex.I - 2 * (n : ℂ)) = m
+    at h0 htop ⊢
+  induction m using ENat.recTopCoe with
+  | top => exact absurd rfl htop
+  | coe m => simpa [Nat.pos_iff_ne_zero] using h0
+
+/-- The printed index contains `(-i - 2n, 0)` for every `n`: the norm-character correction
+never fires on the real pole progression. -/
+private theorem archNuclearityJet_basis_false_mult (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (τ : ℝ≥0ˣ →ₜ* I[ℚ]) (hτ : RightInverse τ (ideleNorm ℚ)) (n : ℕ) :
+    0 < Printed.archNuclearityMultiplicity χ τ hτ (-Complex.I - 2 * (n : ℂ)) := by
+  have hph := existsUnique_ideleNormSection_character_phase χ τ hτ
+  have hnorm (t : ℝ≥0ˣ) : ideleClassNorm ℚ (QuotientGroup.mk (τ t)) = t := hτ t
+  have h1 : ∀ t : ℝ≥0ˣ, (χ (QuotientGroup.mk (τ t)) : ℂ) =
+      (((t : ℝ≥0) : ℝ) : ℂ) ^ (((1 : ℝ) : ℂ) * Complex.I) := by
+    intro t
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm, Complex.ofReal_one, one_mul]
+  have hx1 : hph.exists.choose = 1 := hph.unique hph.exists.choose_spec h1
+  have hif : ¬ (ω[ℚ, χ] = 1 ∧ ideleClassNormTwist χ (-Complex.I - 2 * (n : ℂ)) =
+      ideleClassNormTwist (1 : U[ℚ]) (-((hph.exists.choose : ℂ) * Complex.I))) := by
+    rintro ⟨-, h⟩
+    rw [hx1, Complex.ofReal_one, one_mul] at h
+    let t : ℝ≥0ˣ := Units.mk0 ⟨Real.exp Real.pi, (Real.exp_pos _).le⟩
+      (fun h ↦ (Real.exp_pos Real.pi).ne' (congrArg Subtype.val h))
+    have he := DFunLike.congr_fun h (QuotientGroup.mk (τ t))
+    change (χ (QuotientGroup.mk (τ t)) : ℂ) *
+        (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^
+          (-Complex.I - 2 * (n : ℂ)) =
+      (1 : ℂ) * (((ideleClassNorm ℚ (QuotientGroup.mk (τ t)) : ℝ≥0) : ℝ) : ℂ) ^
+          (-Complex.I) at he
+    rw [archNuclearityJet_span_false_char_apply χ hχ, hnorm] at he
+    have ht : (((t : ℝ≥0) : ℝ) : ℂ) = ((Real.exp Real.pi : ℝ) : ℂ) := rfl
+    rw [ht] at he
+    have hL : ((Real.exp Real.pi : ℝ) : ℂ) ^ Complex.I *
+        ((Real.exp Real.pi : ℝ) : ℂ) ^ (-Complex.I - 2 * (n : ℂ)) =
+        ((Real.exp (-(2 * (n : ℝ) * Real.pi)) : ℝ) : ℂ) := by
+      rw [← Complex.cpow_add Complex.I (-Complex.I - 2 * (n : ℂ))
+        (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne')]
+      rw [show Complex.I + (-Complex.I - 2 * (n : ℂ)) = -2 * (n : ℂ) by ring]
+      rw [Complex.cpow_def_of_ne_zero (Complex.ofReal_ne_zero.mpr (Real.exp_pos _).ne'),
+        ← Complex.ofReal_log (Real.exp_pos _).le, Real.log_exp]
+      rw [show (Real.pi : ℂ) * (-2 * (n : ℂ)) =
+        ((-(2 * (n : ℝ) * Real.pi) : ℝ) : ℂ) by push_cast; ring]
+      rw [Complex.ofReal_exp]
+    rw [hL, one_mul, archNuclearityJet_span_false_exp_pi] at he
+    have hre := congrArg Complex.re he
+    simp only [Complex.ofReal_re, Complex.neg_re, Complex.one_re] at hre
+    have := Real.exp_pos (-(2 * (n : ℝ) * Real.pi))
+    linarith
+  unfold Printed.archNuclearityMultiplicity
+  dsimp only
+  rw [ite_eq_right_iff.mpr fun h ↦ absurd h hif, Nat.sub_zero]
+  exact archNuclearityJet_basis_false_gammaOrder_pos χ hχ n
+
+/-- The printed jet index set for `|·|^i` over `ℚ` is countably infinite: it lies over the
+discrete gamma-pole set and contains `(-i - 2n, 0)` for every `n`. -/
+private theorem archNuclearityJet_basis_false_index_equiv (χ : U[ℚ])
+    (hχ : ideleClassNormTwist χ 0 = ideleClassNormTwist (1 : U[ℚ]) Complex.I)
+    (τ : ℝ≥0ˣ →ₜ* I[ℚ]) (hτ : RightInverse τ (ideleNorm ℚ)) :
+    Nonempty (ℕ ≃ Printed.ArchNuclearityJetIndex χ τ hτ) := by
+  let S := {s : ℂ | 0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) s).toNat}
+  have hS : S.Countable := by
+    have hd := (archNuclearityPoleSet_discrete χ).2
+    have : DiscreteTopology S := hd.to_subtype
+    exact Set.countable_coe_iff.mp
+      (TopologicalSpace.separableSpace_iff_countable.mp inferInstance)
+  have hmem (j : Printed.ArchNuclearityJetIndex χ τ hτ) : j.val.1 ∈ S := by
+    have h := j.property
+    unfold Printed.archNuclearityMultiplicity at h
+    dsimp only at h
+    show 0 < (analyticOrderAt (fun z ↦ (heckeGammaFactor χ z)⁻¹) j.val.1).toNat
+    omega
+  have : Countable (Printed.ArchNuclearityJetIndex χ τ hτ) := by
+    have := hS.to_subtype
+    refine Function.Injective.countable
+      (f := fun j : Printed.ArchNuclearityJetIndex χ τ hτ ↦ ((⟨j.val.1, hmem j⟩ : S), j.val.2)) ?_
+    intro a b h
+    simp only [Prod.mk.injEq, Subtype.mk.injEq] at h
+    exact Subtype.ext (Prod.ext h.1 h.2)
+  have : Infinite (Printed.ArchNuclearityJetIndex χ τ hτ) := by
+    refine Infinite.of_injective
+      (fun n : ℕ ↦ (⟨(-Complex.I - 2 * (n : ℂ), 0),
+        archNuclearityJet_basis_false_mult χ hχ τ hτ n⟩ :
+          Printed.ArchNuclearityJetIndex χ τ hτ)) ?_
+    intro a b h
+    have h1 : (-Complex.I - 2 * (a : ℂ)) = -Complex.I - 2 * (b : ℂ) :=
+      congrArg (fun j : Printed.ArchNuclearityJetIndex χ τ hτ ↦ j.val.1) h
+    have h2 := congrArg Complex.re h1
+    simp only [Complex.sub_re, Complex.neg_re, Complex.mul_re, Complex.natCast_re,
+      Complex.natCast_im, Complex.I_re] at h2
+    norm_num at h2
+    exact_mod_cast h2
+  exact ⟨(nonempty_equiv_of_countable (α := Printed.ArchNuclearityJetIndex χ τ hτ)).some.symm⟩
+
 /-- Paper: Theorem 7.4.3.1(3), p. 368.
 The same flat test h(x) − 2 h(2x) has nonzero evaluation at the printed index
 (−i, 0) for the rational character |·|^i. A functional on the quotient vanishes
 on the class of this test. -/
-theorem Printed.archNuclearityJet_basis_false : ¬ Printed.archNuclearityJet_basis := by sorry
+theorem Printed.archNuclearityJet_basis_false : ¬ Printed.archNuclearityJet_basis := by
+  intro h
+  obtain ⟨χ, hχ⟩ := archNuclearityJet_span_false_char
+  let τ : ℝ≥0ˣ →ₜ* I[ℚ] := ⟨ratIdeleNormSection, ratIdeleNormSection_continuous⟩
+  have hτ : RightInverse τ (ideleNorm ℚ) := ratIdeleNormSection_rightInverse
+  obtain ⟨σ⟩ := archNuclearityJet_basis_false_index_equiv χ hχ τ hτ
+  obtain ⟨d, -, hd, -⟩ := h ℚ χ τ hτ σ
+  obtain ⟨f, hfD, hne⟩ := archNuclearityJet_span_false_key
+  have hω := archNuclearityJet_span_false_omega χ hχ
+  obtain ⟨n, hn⟩ := σ.surjective
+    (⟨(-Complex.I, 0), archNuclearityJet_span_false_mult χ hχ τ hτ⟩ :
+      Printed.ArchNuclearityJetIndex χ τ hτ)
+  have hD : (Submodule.Quotient.mk f : Θ₀[ℚ, χ]) ∈ archNuclearityDenominator χ :=
+    Submodule.subset_span ⟨f, by rw [eq_true hω]; exact hfD, rfl⟩
+  have h0 : (archNuclearityDenominator χ).mkQ (Submodule.Quotient.mk f) = 0 :=
+    (Submodule.Quotient.mk_eq_zero _).mpr hD
+  have hc := hd n (Submodule.Quotient.mk f)
+  rw [h0, map_zero, hn] at hc
+  unfold Printed.archNuclearityJet at hc
+  rw [ContinuousLinearMap.comp_apply, ContinuousLinearMap.comp_apply, entireJet_apply,
+    iteratedDeriv_zero, schwartzBergmanEntireInclusion_apply] at hc
+  apply hne
+  have htw : ideleClassNormTwist χ (-Complex.I) = ideleClassNormTwist (1 : U[ℚ]) 0 := by
+    have := ideleClassNormTwist_add_of_eq hχ (-Complex.I)
+    simpa using this
+  rw [← htw, ← ((exists_globalPolarThetaMellin χ τ hτ).choose_spec f (-Complex.I)).2]
+  exact hc.symm
 
 /-- Paper: Equation (7.4.3.4), p. 368.
 The unnormalized vertical integral in the printed jet formula is 2πi times the

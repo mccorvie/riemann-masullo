@@ -35,10 +35,7 @@ local notation "Jₛ" => SIdeleQuotient F S
 local notation "J₁" => MonoidHom.ker (sIdeleQuotientNorm F S)
 local notation "ℬₛ" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
 local notation "Uₛ" => (Set.integer (S : Set (HeightOneSpectrum (𝓞 F))) F)ˣ
-local notation "unitAtS" =>
-  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
-    (Subring.subtype (integralAdelesOutside F S)))))
-    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+local notation "unitAtS" => sUnitEmbedding F S
 local notation "classOf" => (QuotientGroup.mk : Iₛ → Jₛ)
 local notation "valueℝ" => fun (t : ℝ≥0ˣ) ↦ ((t : ℝ≥0) : ℝ)
 local notation "normℝ" => fun (g : Iₛ) ↦ valueℝ (sIdeleNorm F S g)
@@ -441,7 +438,7 @@ theorem sLocalAdelicTheta_factorsThrough (f : ℬₛ) :
     FactorsThrough (sLocalAdelicTheta F S f) classOf := by
   intro a b hab
   have h := QuotientGroup.eq.mp hab
-  rw [MonoidHom.map_range, MonoidHom.mem_range] at h
+  rw [sProjectedDiagonal, MonoidHom.map_range, MonoidHom.mem_range] at h
   obtain ⟨u, hu⟩ := h
   refine Eq.trans ?_ (congrArg (sLocalAdelicTheta F S f) (inv_mul_eq_iff_eq_mul.mp hu.symm)).symm
   change ∑' ξ : Uₛ, thetaTerm f ξ a = ∑' ξ : Uₛ, thetaTerm f ξ (a * unitAtS u)

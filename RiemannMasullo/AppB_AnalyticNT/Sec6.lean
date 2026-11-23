@@ -933,30 +933,6 @@ theorem heckeIdealSummatory_tendsto_zero_of_nontrivial_on_normOne (χ : U[F])
   rw [hsplit]
   ring
 
-/-- Paper: Theorem B.6.1.3, p. 637. The logarithmic derivative is bounded by
-a squared logarithm for large absolute heights, uniformly over the narrower
-region defined by `α * η`. The Dedekind zeta continuation is the one for the
-trivial character. For fixed field, character and `α`, the implied constant
-works for every admissible width. Its height threshold may depend on the width.
-Deviation: The width is represented by a real function restricted to `t ≥ 0`.
-Decreasing is expressed as nonincreasing, and the logarithm uses absolute height.
-Eventual analyticity and nonvanishing make the logarithmic derivative well-defined. -/
-theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree (χ : U[F]) (L Z : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
-    (hZ : MeromorphicNFOn Z univ) (hZSeries : ∀ s : halfPlane, Z s = dedekindZeta F s)
-    (α : ℝ) (hα₀ : 0 < α) (hα₁ : α < 1)
-    (hα : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0) :
-    ∃ C : ℝ, 0 < C ∧ ∀ η : ℝ → ℝ,
-      MapsTo η (Ici 0) (Ioc 0 (1 / 2)) →
-      DifferentiableOn ℝ η (Ici 0) → AntitoneOn η (Ici 0) →
-      Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0) →
-      ((fun t ↦ (η t)⁻¹) =O[atTop] Real.log) →
-      (∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0) →
-      let l := atHeight ⊓ 𝓟 {s : ℂ | 1 - α * η |s.im| ≤ s.re}
-      (∀ᶠ s in l, AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
-        Asymptotics.IsBigOWith C l (logDeriv L) (fun s ↦ (Real.log |s.im|) ^ 2) := by
-  sorry
-
 /-- Paper: Equation (B.6.1.13), p. 638. The ideal von Mangoldt function is
 `log (N p)` on positive powers of a nonzero prime ideal `p` and zero elsewhere. -/
 def idealVonMangoldt (I : Ideal (𝓞 F)) : ℝ :=
@@ -1404,16 +1380,6 @@ theorem heckeLogDerivCoefficient_bound (d : ℕ) :
 -- TODO(paper-gap): Substituting the radii from (B.6.1.18) into the first
 -- coefficient in (B.6.1.20) gives 4(1 + 3α) / ((1 - α)^2 η(T)).
 
-/-- Paper: Corollary B.6.1.5, p. 639. On the line `Re(s) = 1`, the logarithmic
-derivative is bounded by a squared logarithm as the absolute height grows.
-Deviation: The logarithm uses absolute height. Eventual analyticity and
-nonvanishing make the logarithmic derivative well-defined. -/
-theorem finiteHeckeL_logDeriv_isBigO_oneLine (χ : U[F]) (L : ℂ → ℂ)
-    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
-    (∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1, t⟩ ∧ L ⟨1, t⟩ ≠ 0) ∧
-      (fun t : ℝ ↦ logDeriv L ⟨1, t⟩) =O[atAbsTop] (fun t ↦ (Real.log |t|) ^ 2) := by
-  sorry
-
 open Complex in
 /-- The inequality for the three Euler factors with a common radius and a unit phase. -/
 private theorem finiteHeckeL_inv_isBigO_oneLine_one_le_norm_eulerFactor_product {r : ℝ} (hr : 0 ≤ r) (hr₁ : r < 1) {z : ℂ} (hz : ‖z‖ = 1) :
@@ -1822,8 +1788,10 @@ private theorem finiteHeckeL_zeroFreeRegion_poles (F : Type*) [Field F] [NumberF
     exact ⟨0, hgood 0 (le_trans (by decide) (hD.analyticAt 0).meromorphicOrderAt_nonneg)
       fun s _ _ ↦ hD.analyticAt s⟩
 
-/-- Comparison of Euler products with Dedekind zeta at a real point to the left. -/
-private theorem finiteHeckeL_zeroFreeRegion_euler (F : Type*) [Field F] [NumberField F]
+/-- Comparison of Euler products with Dedekind zeta at a real point to the left:
+for `1 < y ≤ Re s`, `‖L(s, ψ)‖ ≤ ‖ζ_F(y)‖` and `1 ≤ ‖L(s, ψ)‖ * ‖ζ_F(y)‖`.
+Public for the horizontal estimates of §1.4.7 (`Ch01_Introduction/Sec4.lean`). -/
+theorem finiteHeckeL_zeroFreeRegion_euler (F : Type*) [Field F] [NumberField F]
     (ψ : U[F]) (s : halfPlane) {y : ℝ} (hy : 1 < y) (hys : y ≤ (s : ℂ).re) :
     ‖finiteHeckeL ψ s‖ ≤ ‖dedekindZeta F y‖ ∧
       1 ≤ ‖finiteHeckeL ψ s‖ * ‖dedekindZeta F y‖ := by
@@ -2622,6 +2590,632 @@ theorem finiteHeckeL_zeroFreeRegion :
     rw [← hA] at h
     linarith
 
+/-- Landau's lemma on a zero-free closed disc: the logarithmic derivative on the inner disc is
+bounded by the Landau constant times the logarithm of the modulus ratio. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_landau (f : ℂ → ℂ) (c z : ℂ)
+    (r' r R' R M m : ℝ) (hr' : 0 < r') (hr'r : r' < r) (hrR' : r < R') (hR'R : R' < R)
+    (hf : ∀ u ∈ Metric.closedBall c R, AnalyticAt ℂ f u)
+    (hne : ∀ u ∈ Metric.closedBall c R, f u ≠ 0)
+    (hM : ∀ u ∈ Metric.closedBall c R, ‖f u‖ ≤ M) (hm : 0 < m) (hc : m ≤ ‖f c‖)
+    (hz : z ∈ Metric.closedBall c r') :
+    ‖logDeriv f z‖ ≤ landauConstant r' r R' R * Real.log (max (M / m) 2) := by
+  have hR : 0 < R := by linarith
+  have hcR : c ∈ Metric.closedBall c R := Metric.mem_closedBall_self hR.le
+  have hzR : z ∈ Metric.closedBall c R :=
+    Metric.closedBall_subset_closedBall (by linarith) hz
+  have hB : 1 < max (M / m) 2 := lt_of_lt_of_le one_lt_two (le_max_right _ _)
+  have hM0 : 0 ≤ M := (norm_nonneg _).trans (hM c hcR)
+  have hbound : ∀ u ∈ Metric.closedBall c R, ‖f u / f c‖ ≤ max (M / m) 2 := fun u hu ↦ by
+    rw [norm_div]
+    exact (div_le_div₀ hM0 (hM u hu) hm hc).trans (le_max_left _ _)
+  have h := landau_norm_logDeriv_sub_le hB hr' hr'r hrR' hR'R hf (hne c hcR) hbound hz (hne z hzR)
+  have hsum : ∑ᶠ ρ ∈ Metric.closedBall c r, (analyticOrderNatAt f ρ : ℂ) / (z - ρ) = 0 := by
+    apply finsum_mem_eq_zero_of_forall_eq_zero
+    intro ρ hρ
+    have hρR : ρ ∈ Metric.closedBall c R :=
+      Metric.closedBall_subset_closedBall (by linarith) hρ
+    have : analyticOrderAt f ρ = 0 := analyticOrderAt_eq_zero.mpr (Or.inr (hne ρ hρR))
+    simp [analyticOrderNatAt, this]
+  rwa [hsum, sub_zero] at h
+
+/-- Mean value estimate: once the derivative of `η` is eventually below `ε`, `η` cannot drop by
+more than `ε` times the distance. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_slack (η : ℝ → ℝ)
+    (hdiff : DifferentiableOn ℝ η (Ici 0))
+    (hderiv : Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0)) (ε : ℝ) (hε : 0 < ε) :
+    ∃ T : ℝ, 1 ≤ T ∧ ∀ t t' : ℝ, T ≤ t → t ≤ t' → η t - ε * (t' - t) ≤ η t' := by
+  have hev : ∀ᶠ x in atTop, ‖derivWithin η (Ici 0) x‖ < ε := by
+    have := (Metric.tendsto_nhds.mp hderiv) ε hε
+    simpa [dist_zero_right] using this
+  rw [eventually_atTop] at hev
+  obtain ⟨T₀, hT₀⟩ := hev
+  refine ⟨max T₀ 1, le_max_right _ _, fun t t' ht htt' ↦ ?_⟩
+  have hT1 : (1 : ℝ) ≤ t := (le_max_right _ _).trans ht
+  have hT0 : T₀ ≤ t := (le_max_left _ _).trans ht
+  have hd : ∀ x ∈ Ici t, DifferentiableAt ℝ η x := fun x hx ↦
+    hdiff.differentiableAt (Ici_mem_nhds (by linarith [mem_Ici.mp hx]))
+  have hb : ∀ x ∈ Ici t, ‖deriv η x‖ ≤ ε := fun x hx ↦ by
+    have hx' : (0 : ℝ) < x := by linarith [mem_Ici.mp hx]
+    rw [← derivWithin_of_mem_nhds (Ici_mem_nhds hx')]
+    exact (hT₀ x (hT0.trans (mem_Ici.mp hx))).le
+  have := (convex_Ici t).norm_image_sub_le_of_norm_deriv_le hd hb (mem_Ici.mpr le_rfl) (mem_Ici.mpr htt')
+  rw [Real.norm_eq_abs, Real.norm_eq_abs, abs_of_nonneg (sub_nonneg.mpr htt')] at this
+  linarith [neg_abs_le (η t' - η t)]
+
+/-- The canonical zero-free region of Proposition B.6.1.1 contains a region of width
+`c₀ / log |t|` at large height, with `c₀` depending only on the field and the character. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_canonical (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
+    ∃ c₀ T : ℝ, 0 < c₀ ∧ 3 ≤ T ∧ ∀ s : ℂ, T ≤ |s.im| →
+      1 - c₀ / Real.log |s.im| ≤ s.re → meromorphicOrderAt L s ≤ 0 := by
+  obtain ⟨A, hA, hF⟩ := finiteHeckeL_zeroFreeRegion
+  obtain ⟨B, hB, hzf⟩ := hF F χ
+  set d : ℝ := (Module.finrank ℚ F : ℝ) with hd
+  have hd1 : 1 ≤ d := by
+    rw [hd]
+    exact_mod_cast Module.finrank_pos
+  refine ⟨A / (2 * d ^ 4), max 3 (B + 3), by positivity, le_max_left _ _, fun s hs hre ↦ ?_⟩
+  apply hzf L hL hSeries s
+  have ht3 : 3 ≤ |s.im| := (le_max_left _ _).trans hs
+  have htB : B + 3 ≤ |s.im| := (le_max_right _ _).trans hs
+  have hlogt : 0 < Real.log |s.im| := Real.log_pos (by linarith)
+  have hBpos : 0 < B := by linarith
+  have hBt : 0 < B * (|s.im| + 3) := by positivity
+  have hlog2 : Real.log (B * (|s.im| + 3)) ≤ 2 * Real.log |s.im| := by
+    rw [show (2 : ℝ) * Real.log |s.im| = Real.log (|s.im| ^ 2) by rw [Real.log_pow]; norm_num]
+    apply Real.log_le_log hBt
+    nlinarith
+  have hlogB : 0 < Real.log (B * (|s.im| + 3)) := Real.log_pos (by nlinarith)
+  refine le_trans ?_ hre
+  rw [div_div]
+  have hmul := mul_le_mul_of_nonneg_left hlog2 (by positivity : (0 : ℝ) ≤ d ^ 4)
+  exact sub_le_sub_left (div_le_div_of_nonneg_left hA.le (by positivity) (by linarith)) 1
+
+/-- The trivial character twisted by the zeroth norm power is the constant one. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_twist_one (g : IdeleClassGroup (𝓞 F) F) :
+    ideleClassNormTwist (1 : U[F]) 0 g = 1 := by
+  change (1 : ℂ) * ((((ideleClassNorm F g : NNReal) : ℝ)) : ℂ) ^ (0 : ℂ) = 1
+  simp
+
+/-- The width `max (η t) (c₀ / log t)` is at most `1/2` and loses less than the factor `1 - θ`
+over a displacement of its own size, for all large `t`. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_delta (η : ℝ → ℝ)
+    (hmaps : MapsTo η (Ici 0) (Ioc 0 (1 / 2)))
+    (hdiff : DifferentiableOn ℝ η (Ici 0)) (hanti : AntitoneOn η (Ici 0))
+    (hderiv : Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0))
+    (θ c₀ : ℝ) (hθ : 0 < θ) (hθ1 : θ < 1) (hc₀ : 0 < c₀) :
+    ∃ T : ℝ, 3 ≤ T ∧ ∀ t : ℝ, T ≤ t →
+      0 < max (η t) (c₀ / Real.log t) ∧ max (η t) (c₀ / Real.log t) ≤ 1 / 2 ∧
+      ∀ t' : ℝ, |t' - t| ≤ max (η t) (c₀ / Real.log t) →
+        (1 - θ) * max (η t) (c₀ / Real.log t) < max (η t') (c₀ / Real.log t') := by
+  obtain ⟨T₁, hT₁, hslack⟩ :=
+    finiteHeckeL_logDeriv_isBigO_of_zeroFree_slack η hdiff hderiv (θ / 2) (by positivity)
+  refine ⟨max (max 3 T₁) (max (Real.exp (2 * c₀)) (Real.exp (1 / θ))),
+    (le_max_left 3 T₁).trans (le_max_left _ _), fun t ht ↦ ?_⟩
+  have ht3 : 3 ≤ t := (le_max_left 3 T₁).trans ((le_max_left _ _).trans ht)
+  have htT₁ : T₁ ≤ t := (le_max_right 3 T₁).trans ((le_max_left _ _).trans ht)
+  have hlog2c : 2 * c₀ ≤ Real.log t := by
+    rw [Real.le_log_iff_exp_le (by linarith)]
+    exact (le_max_left _ _).trans ((le_max_right _ _).trans ht)
+  have hlogθ : 1 / θ ≤ Real.log t := by
+    rw [Real.le_log_iff_exp_le (by linarith)]
+    exact (le_max_right _ _).trans ((le_max_right _ _).trans ht)
+  have hlogt : 0 < Real.log t := Real.log_pos (by linarith)
+  obtain ⟨hη0, hη2⟩ := hmaps (mem_Ici.mpr (by linarith : (0 : ℝ) ≤ t))
+  have hδ₁0 : 0 < c₀ / Real.log t := by positivity
+  have hδ₁2 : c₀ / Real.log t ≤ 1 / 2 := by
+    rw [div_le_iff₀ hlogt]
+    linarith
+  have hδ0 : 0 < max (η t) (c₀ / Real.log t) := lt_max_of_lt_left hη0
+  have hδ2 : max (η t) (c₀ / Real.log t) ≤ 1 / 2 := max_le hη2 hδ₁2
+  refine ⟨hδ0, hδ2, fun t' ht' ↦ ?_⟩
+  obtain ⟨ht'lo, ht'hi⟩ := abs_le.mp ht'
+  have ht'0 : 0 < t' := by linarith
+  have hlogt' : 0 < Real.log t' := Real.log_pos (by linarith)
+  have hlog_le : Real.log t' ≤ Real.log t + 1 / 6 := by
+    have h1 : Real.log t' - Real.log t = Real.log (t' / t) :=
+      (Real.log_div ht'0.ne' (by linarith)).symm
+    have h2 : Real.log (t' / t) ≤ t' / t - 1 := Real.log_le_sub_one_of_pos (by positivity)
+    have h3 : t' / t - 1 ≤ 1 / 6 := by
+      rw [div_sub_one (by linarith), div_le_iff₀ (by linarith)]
+      linarith
+    linarith
+  have hδ₁slack : (1 - θ / 2) * (c₀ / Real.log t) ≤ c₀ / Real.log t' := by
+    rw [← mul_div_assoc, div_le_div_iff₀ hlogt hlogt']
+    have hθlog : 1 ≤ θ * Real.log t := by
+      rw [div_le_iff₀ hθ] at hlogθ
+      linarith
+    have : (1 - θ / 2) * Real.log t' ≤ Real.log t := by nlinarith
+    nlinarith
+  have hηslack : η t - θ / 2 * max (η t) (c₀ / Real.log t) ≤ η t' := by
+    rcases le_total t' t with h | h
+    · have := hanti (mem_Ici.mpr ht'0.le) (mem_Ici.mpr (by linarith)) h
+      nlinarith
+    · have := hslack t t' htT₁ h
+      nlinarith
+  rcases le_total (c₀ / Real.log t) (η t) with h | h
+  · rw [max_eq_left h] at hηslack ⊢
+    exact lt_max_of_lt_left (by nlinarith)
+  · rw [max_eq_right h]
+    exact lt_max_of_lt_right (by nlinarith)
+
+/-- Comparison of the logarithmic-derivative series with the one of the trivial character at a
+smaller real part: `‖L'/L(s)‖ ≤ -Re L₀'/L₀(σ₀)` for `1 < σ₀ ≤ Re s`. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_series (χ : U[F]) (L L₀ : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (hL₀ : MeromorphicNFOn L₀ univ) (hS₀ : ∀ s : halfPlane, L₀ s = finiteHeckeL (1 : U[F]) s)
+    (s : ℂ) (σ₀ : ℝ) (hσ₀ : 1 < σ₀) (hs : σ₀ ≤ s.re) :
+    ‖logDeriv L s‖ ≤ -(logDeriv L₀ σ₀).re := by
+  classical
+  have hs1 : 1 < s.re := hσ₀.trans_le hs
+  have h₁ := (finiteHeckeL_logDeriv_hasSum_ideals χ L hL hSeries ⟨s, hs1⟩).2.2
+  have h₀ := (finiteHeckeL_logDeriv_hasSum_ideals (1 : U[F]) L₀ hL₀ hS₀
+    ⟨(σ₀ : ℂ), show 1 < (σ₀ : ℂ).re by simpa using hσ₀⟩).2.2
+  refine h₁.norm_le_of_bounded (Complex.hasSum_re h₀).neg fun I ↦ ?_
+  obtain ⟨I, hI⟩ := I
+  have hNpos : 0 < I.absNorm := Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr hI)
+  have hN1 : (1 : ℝ) ≤ I.absNorm := by exact_mod_cast hNpos
+  have hΛ0 : 0 ≤ idealVonMangoldt I := by
+    unfold idealVonMangoldt
+    split_ifs
+    · exact Real.log_natCast_nonneg _
+    · exact le_rfl
+  have hone : heckeIdealVonMangoldt (ideleClassNormTwist (1 : U[F]) 0) I =
+      (idealVonMangoldt I : ℂ) := by
+    rw [heckeIdealVonMangoldt, heckeIdealValue_of_forall_eq_one _
+      finiteHeckeL_logDeriv_isBigO_of_zeroFree_twist_one hI, one_mul]
+  have hnormχ : ‖heckeIdealVonMangoldt (ideleClassNormTwist χ 0) I‖ ≤ idealVonMangoldt I := by
+    by_cases h : ∃ v : HeightOneSpectrum (𝓞 F), ∃ k : ℕ, 0 < k ∧ I = v.asIdeal ^ k
+    · obtain ⟨v, k, hk, rfl⟩ := h
+      rw [heckeIdealVonMangoldt, heckeIdealValue_prime_pow _ v hk, idealVonMangoldt_prime_pow v hk,
+        norm_mul, Complex.norm_real, Real.norm_of_nonneg (Real.log_natCast_nonneg _)]
+      split_ifs
+      · rw [norm_pow, norm_ideleClassNormTwist_zero_localValue, one_pow, one_mul]
+      · simp [Real.log_natCast_nonneg]
+    · simp [heckeIdealVonMangoldt, idealVonMangoldt, h]
+  have hR : (((idealVonMangoldt I : ℝ) : ℂ) / (I.absNorm : ℂ) ^ (σ₀ : ℂ)).re =
+      idealVonMangoldt I / (I.absNorm : ℝ) ^ σ₀ := by
+    rw [show (I.absNorm : ℂ) = ((I.absNorm : ℝ) : ℂ) from (Complex.ofReal_natCast _).symm,
+      ← Complex.ofReal_cpow (Nat.cast_nonneg _), ← Complex.ofReal_div, Complex.ofReal_re]
+  simp only [norm_div, norm_neg, Complex.norm_natCast_cpow_of_pos hNpos, hone, neg_div,
+    Complex.neg_re, neg_neg, hR]
+  exact div_le_div₀ hΛ0 hnormχ (Real.rpow_pos_of_pos (by exact_mod_cast hNpos) _)
+    (Real.rpow_le_rpow_of_exponent_le hN1 hs)
+
+/-- The pointwise estimate behind Theorem B.6.1.3. At a point of large height in the region
+`Re s ≥ 1 - α η |Im s|` the continuation is analytic and nonzero, and its logarithmic
+derivative is bounded by a squared logarithm with a constant built from `α`, the polynomial
+growth exponents, the canonical width `c₀` and the pole data of `L₀`, none of which depend on
+`η`. The height thresholds are hypotheses. -/
+private theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree_pointwise (χ : U[F]) (L L₀ : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (hL₀ : MeromorphicNFOn L₀ univ) (hS₀ : ∀ s : halfPlane, L₀ s = finiteHeckeL (1 : U[F]) s)
+    (α θ : ℝ) (hα₀ : 0 < α) (hα₁ : α < 1) (hθ : θ = (1 - α) / 2)
+    (η : ℝ → ℝ) (hmaps : MapsTo η (Ici 0) (Ioc 0 (1 / 2)))
+    (hzero : ∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0)
+    (n : ℕ) (T₁ : ℝ) (hup : ∀ z : ℂ, z.re ∈ Icc (0 : ℝ) 2 → T₁ ≤ |z.im| → ‖L z‖ ≤ |z.im| ^ n)
+    (N : ℕ) (c₂ T₂ : ℝ) (hc₂ : 0 < c₂)
+    (hlow : ∀ t : ℝ, T₂ ≤ |t| → L ⟨1, t⟩ ≠ 0 ∧ ‖(L ⟨1, t⟩)⁻¹‖ ≤ c₂ * |t| ^ N)
+    (c₀ T₃ : ℝ) (hc₀ : 0 < c₀)
+    (hcanon : ∀ s : ℂ, T₃ ≤ |s.im| → 1 - c₀ / Real.log |s.im| ≤ s.re →
+      meromorphicOrderAt L s ≤ 0)
+    (p : ℂ) (hp : ∀ s : ℂ, 0 < s.re → (-1 ≤ meromorphicOrderAt L s) ∧ (s ≠ p → AnalyticAt ℂ L s))
+    (η₀ C₀ : ℝ) (hη₀ : 0 < η₀)
+    (hzeta : ∀ σ : ℝ, 1 < σ → σ ≤ 1 + η₀ → -(logDeriv L₀ σ).re ≤ 1 / (σ - 1) + C₀)
+    (T₄ : ℝ) (hdelta : ∀ t : ℝ, T₄ ≤ t →
+      0 < max (η t) (c₀ / Real.log t) ∧ max (η t) (c₀ / Real.log t) ≤ 1 / 2 ∧
+      ∀ t' : ℝ, |t' - t| ≤ max (η t) (c₀ / Real.log t) →
+        (1 - θ) * max (η t) (c₀ / Real.log t) < max (η t') (c₀ / Real.log t'))
+    (s : ℂ) (hT₁ : T₁ + 1 ≤ |s.im|) (hT₂ : T₂ ≤ |s.im|) (hT₃ : T₃ + 1 ≤ |s.im|)
+    (hT₄ : T₄ ≤ |s.im|) (hpim : |p.im| + 1 ≤ |s.im|) (hexp : Real.exp 1 ≤ |s.im|)
+    (hc₂t : c₂ ≤ |s.im|) (h3 : 3 ≤ |s.im|) (hsre : 1 - α * η |s.im| ≤ s.re) :
+    (AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
+      ‖logDeriv L s‖ ≤ (landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) *
+        ((2 * n + N + 1 : ℕ) : ℝ) / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀|) *
+          (Real.log |s.im|) ^ 2 := by
+  have hθ0 : 0 < θ := by rw [hθ]; linarith
+  have hθ1 : θ < 1 := by rw [hθ]; linarith
+  have hαθ : α + θ = 1 - θ := by rw [hθ]; ring
+  set K : ℝ := landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) with hK
+  have hK0 : 0 < K := landauConstant_pos hα₀ (by linarith) (by linarith) (by linarith)
+  set e : ℕ := 2 * n + N + 1 with he
+  obtain ⟨τ, hτ⟩ : ∃ τ : ℝ, τ = |s.im| := ⟨_, rfl⟩
+  rw [← hτ] at hT₁ hT₂ hT₃ hT₄ hpim hexp hc₂t h3 hsre ⊢
+  have hτ0 : 0 < τ := by linarith
+  have hlogτ : 1 ≤ Real.log τ := by
+    rw [Real.le_log_iff_exp_le hτ0]
+    exact hexp
+  have hlogτ0 : 0 < Real.log τ := by linarith
+  obtain ⟨hδ0, hδ2, hslack⟩ := hdelta τ hT₄
+  obtain ⟨δ, hδ⟩ : ∃ δ : ℝ, δ = max (η τ) (c₀ / Real.log τ) := ⟨_, rfl⟩
+  rw [← hδ] at hδ0 hδ2 hslack
+  obtain ⟨hη0, hη2⟩ := hmaps (mem_Ici.mpr (hτ ▸ abs_nonneg s.im))
+  have hηδ : η τ ≤ δ := hδ ▸ le_max_left _ _
+  have hδ₁ : c₀ / Real.log τ ≤ δ := hδ ▸ le_max_right _ _
+  have hc₀δ : c₀ ≤ δ * Real.log τ := by rwa [div_le_iff₀ hlogτ0] at hδ₁
+  have hinvδ : δ⁻¹ ≤ Real.log τ / c₀ := by
+    rw [inv_eq_one_div, div_le_div_iff₀ hδ0 hc₀]
+    linarith
+  have hαη : 0 < (1 - α) * η τ := mul_pos (by linarith) hη0
+  have hαη' : (1 - α) * η τ = η τ - α * η τ := by ring
+  have hαη2 : α * η τ ≤ 1 * (1 / 2) := mul_le_mul hα₁.le hη2 hη0.le zero_le_one
+  have hαηδ : α * η τ ≤ α * δ := mul_le_mul_of_nonneg_left hηδ hα₀.le
+  have hθδ : 0 < θ * δ := mul_pos hθ0 hδ0
+  have hord_s : meromorphicOrderAt L s ≤ 0 := hzero s (by rw [← hτ]; linarith)
+  have hsp : s ≠ p := fun h ↦ by
+    rw [hτ, h] at hpim
+    linarith
+  have han_s : AnalyticAt ℂ L s := (hp s (by linarith)).2 hsp
+  have hne_s : L s ≠ 0 := (hL (mem_univ s)).meromorphicOrderAt_eq_zero_iff.mp
+    (le_antisymm hord_s han_s.meromorphicOrderAt_nonneg)
+  refine ⟨⟨han_s, hne_s⟩, ?_⟩
+  have hαθ1 : (α + θ) * δ ≤ δ := by
+    rw [hαθ]
+    linarith [show (1 - θ) * δ = δ - θ * δ by ring]
+  have hdisc : ∀ u ∈ Metric.closedBall (⟨1, s.im⟩ : ℂ) ((α + θ) * δ),
+      AnalyticAt ℂ L u ∧ L u ≠ 0 ∧ ‖L u‖ ≤ (τ + 1) ^ n := by
+    intro u hu
+    rw [Metric.mem_closedBall, dist_eq_norm] at hu
+    have hre := Complex.abs_re_le_norm (u - ⟨1, s.im⟩)
+    have him := Complex.abs_im_le_norm (u - ⟨1, s.im⟩)
+    simp only [Complex.sub_re, Complex.sub_im] at hre him
+    obtain ⟨hre₁, hre₂⟩ := abs_le.mp (hre.trans hu)
+    have him' : |(|u.im|) - τ| ≤ δ := by
+      rw [hτ]
+      exact (abs_abs_sub_abs_le_abs_sub _ _).trans (him.trans (hu.trans hαθ1))
+    obtain ⟨him₁, him₂⟩ := abs_le.mp him'
+    have hure : 1 - (1 - θ) * δ ≤ u.re := by
+      rw [← hαθ]
+      linarith
+    have hord : meromorphicOrderAt L u ≤ 0 := by
+      rcases lt_max_iff.mp (hslack |u.im| him') with h | h
+      · exact hzero u (by linarith)
+      · exact hcanon u (by linarith) (by linarith)
+    have hure0 : 0 < u.re := by linarith
+    have hup_ne : u ≠ p := fun h ↦ by
+      rw [h] at him₁
+      linarith
+    have han : AnalyticAt ℂ L u := (hp u hure0).2 hup_ne
+    have hne : L u ≠ 0 := (hL (mem_univ u)).meromorphicOrderAt_eq_zero_iff.mp
+      (le_antisymm hord han.meromorphicOrderAt_nonneg)
+    refine ⟨han, hne, (hup u ⟨hure0.le, by linarith⟩ (by linarith)).trans ?_⟩
+    exact pow_le_pow_left₀ (abs_nonneg _) (by linarith) n
+  obtain ⟨hcne, hcinv⟩ := hlow s.im (by rw [← hτ]; exact hT₂)
+  rw [← hτ] at hcinv
+  have hm : 1 / (c₂ * τ ^ N) ≤ ‖L ⟨1, s.im⟩‖ := by
+    have hpos : 0 < ‖L ⟨1, s.im⟩‖ := norm_pos_iff.mpr hcne
+    rw [norm_inv] at hcinv
+    rw [one_div_le (by positivity) hpos, one_div]
+    exact hcinv
+  have hlogB : Real.log (max ((τ + 1) ^ n / (1 / (c₂ * τ ^ N))) 2) ≤ e * Real.log τ := by
+    rw [← Real.log_pow]
+    apply Real.log_le_log (lt_max_of_lt_right two_pos)
+    have hτ2 : τ + 1 ≤ τ ^ 2 := by nlinarith
+    have h1 : (τ + 1) ^ n * (c₂ * τ ^ N) ≤ τ ^ e := by
+      calc (τ + 1) ^ n * (c₂ * τ ^ N) ≤ (τ ^ 2) ^ n * (τ * τ ^ N) := by gcongr
+        _ = τ ^ e := by rw [he]; ring
+    apply max_le
+    · rwa [div_div_eq_mul_div, div_one]
+    · calc (2 : ℝ) ≤ τ := by linarith
+        _ = τ ^ 1 := (pow_one τ).symm
+        _ ≤ τ ^ e := pow_le_pow_right₀ (by linarith) (by omega)
+  have hlog2 : 0 ≤ (Real.log τ) ^ 2 := sq_nonneg _
+  have hCrest : 0 ≤ 1 / (α * c₀) + 1 / η₀ + |C₀| := by positivity
+  rcases le_or_gt s.re (1 + α * δ) with hcase | hcase
+  · have hz : s ∈ Metric.closedBall (⟨1, s.im⟩ : ℂ) (α * δ) := by
+      rw [Metric.mem_closedBall, dist_eq_norm]
+      have : s - ⟨1, s.im⟩ = ((s.re - 1 : ℝ) : ℂ) := by
+        apply Complex.ext <;> simp
+      rw [this, Complex.norm_real, Real.norm_eq_abs, abs_le]
+      constructor <;> linarith
+    have h := finiteHeckeL_logDeriv_isBigO_of_zeroFree_landau L ⟨1, s.im⟩ s (α * δ)
+      ((α + θ / 3) * δ) ((α + 2 * θ / 3) * δ) ((α + θ) * δ) ((τ + 1) ^ n) (1 / (c₂ * τ ^ N))
+      (by positivity) (mul_lt_mul_of_pos_right (by linarith) hδ0)
+      (mul_lt_mul_of_pos_right (by linarith) hδ0) (mul_lt_mul_of_pos_right (by linarith) hδ0)
+      (fun u hu ↦ (hdisc u hu).1) (fun u hu ↦ (hdisc u hu).2.1) (fun u hu ↦ (hdisc u hu).2.2)
+      (by positivity) hm hz
+    have hKδ : landauConstant (α * δ) ((α + θ / 3) * δ) ((α + 2 * θ / 3) * δ) ((α + θ) * δ) =
+        δ⁻¹ * K := by
+      have := landauConstant_div (r' := α) (r := α + θ / 3) (R' := α + 2 * θ / 3) (R := α + θ)
+        (s := δ⁻¹) (inv_pos.mpr hδ0) (by linarith) (by linarith) (by linarith)
+      simpa only [div_inv_eq_mul] using this
+    rw [hKδ] at h
+    calc ‖logDeriv L s‖ ≤ δ⁻¹ * K * (e * Real.log τ) :=
+          h.trans (mul_le_mul_of_nonneg_left hlogB (by positivity))
+      _ ≤ (Real.log τ / c₀) * K * (e * Real.log τ) := by gcongr
+      _ = K * e / c₀ * (Real.log τ) ^ 2 := by ring
+      _ ≤ (K * e / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀|) * (Real.log τ) ^ 2 := by
+        apply mul_le_mul_of_nonneg_right _ hlog2
+        linarith
+  · have hmin0 : 0 < min (α * δ) η₀ := lt_min (mul_pos hα₀ hδ0) hη₀
+    have hσ₀ : 1 < 1 + min (α * δ) η₀ := by linarith
+    have hσs : 1 + min (α * δ) η₀ ≤ s.re := by linarith [min_le_left (α * δ) η₀]
+    have h := finiteHeckeL_logDeriv_isBigO_of_zeroFree_series χ L L₀ hL hSeries hL₀ hS₀ s _
+      hσ₀ hσs
+    have hz := hzeta (1 + min (α * δ) η₀) hσ₀ (by linarith [min_le_right (α * δ) η₀])
+    have hmin : 1 / (1 + min (α * δ) η₀ - 1) ≤ 1 / (α * δ) + 1 / η₀ := by
+      rw [add_sub_cancel_left]
+      have h1 : 0 < 1 / (α * δ) := by positivity
+      have h2 : 0 < 1 / η₀ := by positivity
+      rcases min_choice (α * δ) η₀ with hm | hm <;> rw [hm] <;> linarith
+    have h1 : 1 / (α * δ) ≤ 1 / (α * c₀) * Real.log τ := by
+      rw [div_mul_eq_mul_div, one_mul, div_le_div_iff₀ (by positivity) (by positivity)]
+      have := mul_le_mul_of_nonneg_left hc₀δ hα₀.le
+      linarith [show Real.log τ * (α * δ) = α * (δ * Real.log τ) by ring]
+    have h1sq : 1 ≤ (Real.log τ) ^ 2 := one_le_pow₀ hlogτ
+    have hsq : Real.log τ ≤ (Real.log τ) ^ 2 := le_self_pow₀ hlogτ two_ne_zero
+    have hA : 1 / (α * c₀) * Real.log τ ≤ 1 / (α * c₀) * (Real.log τ) ^ 2 :=
+      mul_le_mul_of_nonneg_left hsq (by positivity)
+    have hB : 1 / η₀ ≤ 1 / η₀ * (Real.log τ) ^ 2 := le_mul_of_one_le_right (by positivity) h1sq
+    have hC : |C₀| ≤ |C₀| * (Real.log τ) ^ 2 := le_mul_of_one_le_right (abs_nonneg _) h1sq
+    have hD : 0 ≤ K * e / c₀ * (Real.log τ) ^ 2 := by positivity
+    have hexpand : (K * e / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀|) * (Real.log τ) ^ 2 =
+        K * e / c₀ * (Real.log τ) ^ 2 + 1 / (α * c₀) * (Real.log τ) ^ 2 +
+          1 / η₀ * (Real.log τ) ^ 2 + |C₀| * (Real.log τ) ^ 2 := by ring
+    calc ‖logDeriv L s‖ ≤ 1 / (1 + min (α * δ) η₀ - 1) + C₀ := h.trans hz
+      _ ≤ 1 / (α * c₀) * Real.log τ + 1 / η₀ + |C₀| := by linarith [le_abs_self C₀]
+      _ ≤ (K * e / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀|) * (Real.log τ) ^ 2 := by
+        rw [hexpand]
+        linarith
+
+/-- Paper: Theorem B.6.1.3, p. 637. The logarithmic derivative is bounded by
+a squared logarithm for large absolute heights, uniformly over the narrower
+region defined by `α * η`. The Dedekind zeta continuation is the one for the
+trivial character. For fixed field, character and `α`, the implied constant
+works for every admissible width. Its height threshold may depend on the width.
+Deviation: The width is represented by a real function restricted to `t ≥ 0`.
+Decreasing is expressed as nonincreasing, and the logarithm uses absolute height.
+Eventual analyticity and nonvanishing make the logarithmic derivative well-defined. -/
+theorem finiteHeckeL_logDeriv_isBigO_of_zeroFree (χ : U[F]) (L Z : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s)
+    (hZ : MeromorphicNFOn Z univ) (hZSeries : ∀ s : halfPlane, Z s = dedekindZeta F s)
+    (α : ℝ) (hα₀ : 0 < α) (hα₁ : α < 1)
+    (hα : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < α → meromorphicOrderAt Z z ≤ 0) :
+    ∃ C : ℝ, 0 < C ∧ ∀ η : ℝ → ℝ,
+      MapsTo η (Ici 0) (Ioc 0 (1 / 2)) →
+      DifferentiableOn ℝ η (Ici 0) → AntitoneOn η (Ici 0) →
+      Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0) →
+      ((fun t ↦ (η t)⁻¹) =O[atTop] Real.log) →
+      (∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0) →
+      let l := atHeight ⊓ 𝓟 {s : ℂ | 1 - α * η |s.im| ≤ s.re}
+      (∀ᶠ s in l, AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
+        Asymptotics.IsBigOWith C l (logDeriv L) (fun s ↦ (Real.log |s.im|) ^ 2) := by
+  obtain ⟨L₀, hL₀, hS₀⟩ := finiteHeckeL_exists_continuation (1 : U[F])
+  obtain ⟨η₀, C₀, hη₀, hzeta⟩ := finiteHeckeL_zeroFreeRegion_zeta F L₀ hL₀ hS₀
+  obtain ⟨c₀, T₃, hc₀, hT₃, hcanon⟩ :=
+    finiteHeckeL_logDeriv_isBigO_of_zeroFree_canonical χ L hL hSeries
+  obtain ⟨M₁, -, hM₁⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries 0 2 (by norm_num)
+  obtain ⟨n, T₁, hup⟩ := finiteHeckeL_inv_isBigO_oneLine_strip_bound_nat L 0 2 M₁ hM₁
+  obtain ⟨hev₁, N, -, hinv⟩ := finiteHeckeL_inv_isBigO_oneLine χ L hL hSeries
+  obtain ⟨c₂, T₂, hc₂, hlow⟩ : ∃ c₂ T₂ : ℝ, 0 < c₂ ∧ ∀ t : ℝ, T₂ ≤ |t| →
+      L ⟨1, t⟩ ≠ 0 ∧ ‖(L ⟨1, t⟩)⁻¹‖ ≤ c₂ * |t| ^ N := by
+    obtain ⟨c, hc⟩ := Asymptotics.isBigO_iff.mp hinv
+    have hboth := hev₁.and hc
+    simp only [eventually_comap, eventually_atTop] at hboth
+    obtain ⟨T₂, hT₂⟩ := hboth
+    refine ⟨max c 1, T₂, by positivity, fun t ht ↦ ?_⟩
+    obtain ⟨⟨-, hne⟩, hb⟩ := hT₂ |t| ht t rfl
+    refine ⟨hne, hb.trans ?_⟩
+    rw [Real.norm_of_nonneg (pow_nonneg (abs_nonneg _) _)]
+    exact mul_le_mul_of_nonneg_right (le_max_left _ _) (pow_nonneg (abs_nonneg _) _)
+  obtain ⟨p, hp⟩ := finiteHeckeL_zeroFreeRegion_poles F χ L hL hSeries
+  obtain ⟨θ, hθ⟩ : ∃ θ : ℝ, θ = (1 - α) / 2 := ⟨_, rfl⟩
+  have hθ0 : 0 < θ := by rw [hθ]; linarith
+  have hθ1 : θ < 1 := by rw [hθ]; linarith
+  have hK0 : 0 < landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) :=
+    landauConstant_pos hα₀ (by linarith) (by linarith) (by linarith)
+  have hC : 0 < landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) *
+      ((2 * n + N + 1 : ℕ) : ℝ) / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀| := by
+    have h1 : 0 < landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) *
+        ((2 * n + N + 1 : ℕ) : ℝ) / c₀ := div_pos (mul_pos hK0 (by positivity)) hc₀
+    linarith [abs_nonneg C₀, one_div_pos.mpr (mul_pos hα₀ hc₀), one_div_pos.mpr hη₀]
+  refine ⟨_, hC, fun η hmaps hdiff hanti hderiv _ hzero ↦ ?_⟩
+  obtain ⟨T₄, hT₄, hdelta⟩ :=
+    finiteHeckeL_logDeriv_isBigO_of_zeroFree_delta η hmaps hdiff hanti hderiv θ c₀ hθ0 hθ1 hc₀
+  have hev : ∀ᶠ s : ℂ in atHeight ⊓ 𝓟 {s : ℂ | 1 - α * η |s.im| ≤ s.re},
+      max (max (max (T₁ + 1) T₂) (max (T₃ + 1) T₄))
+        (max (max (|p.im| + 1) (Real.exp 1)) (max c₂ 3)) ≤ |s.im| ∧
+        1 - α * η |s.im| ≤ s.re := by
+    rw [eventually_inf_principal]
+    filter_upwards [(tendsto_comap (f := abs ∘ Complex.im)).eventually_ge_atTop
+      (max (max (max (T₁ + 1) T₂) (max (T₃ + 1) T₄))
+        (max (max (|p.im| + 1) (Real.exp 1)) (max c₂ 3)))] with s hs hs'
+    exact ⟨hs, hs'⟩
+  have key : ∀ s : ℂ, max (max (max (T₁ + 1) T₂) (max (T₃ + 1) T₄))
+        (max (max (|p.im| + 1) (Real.exp 1)) (max c₂ 3)) ≤ |s.im| → 1 - α * η |s.im| ≤ s.re →
+      (AnalyticAt ℂ L s ∧ L s ≠ 0) ∧
+        ‖logDeriv L s‖ ≤ (landauConstant α (α + θ / 3) (α + 2 * θ / 3) (α + θ) *
+          ((2 * n + N + 1 : ℕ) : ℝ) / c₀ + 1 / (α * c₀) + 1 / η₀ + |C₀|) *
+            (Real.log |s.im|) ^ 2 := fun s hsT hsre ↦
+    finiteHeckeL_logDeriv_isBigO_of_zeroFree_pointwise χ L L₀ hL hSeries hL₀ hS₀ α θ hα₀ hα₁ hθ
+      η hmaps hzero n T₁ hup N c₂ T₂ hc₂ hlow c₀ T₃ hc₀ hcanon p hp η₀ C₀ hη₀ hzeta T₄ hdelta s
+      ((le_max_left _ _).trans ((le_max_left _ _).trans ((le_max_left _ _).trans hsT)))
+      ((le_max_right _ _).trans ((le_max_left _ _).trans ((le_max_left _ _).trans hsT)))
+      ((le_max_left _ _).trans ((le_max_right _ _).trans ((le_max_left _ _).trans hsT)))
+      ((le_max_right _ _).trans ((le_max_right _ _).trans ((le_max_left _ _).trans hsT)))
+      ((le_max_left _ _).trans ((le_max_left _ _).trans ((le_max_right _ _).trans hsT)))
+      ((le_max_right _ _).trans ((le_max_left _ _).trans ((le_max_right _ _).trans hsT)))
+      ((le_max_left _ _).trans ((le_max_right _ _).trans ((le_max_right _ _).trans hsT)))
+      ((le_max_right _ _).trans ((le_max_right _ _).trans ((le_max_right _ _).trans hsT))) hsre
+  refine ⟨hev.mono fun s hs ↦ (key s hs.1 hs.2).1, ?_⟩
+  rw [Asymptotics.isBigOWith_iff]
+  refine hev.mono fun s hs ↦ ?_
+  rw [Real.norm_of_nonneg (sq_nonneg _)]
+  exact (key s hs.1 hs.2).2
+
+/-- On the half-plane of absolute convergence the finite L-function of the trivial character is
+the Dedekind zeta function. -/
+private theorem finiteHeckeL_logDeriv_isBigO_oneLine_zeta (s : halfPlane) :
+    finiteHeckeL (1 : U[F]) s = dedekindZeta F s := by
+  have h := completedHeckeL_one_eq_dedekindZeta (F := F) s
+  rw [← heckeGammaFactor_one] at h
+  change heckeGammaFactor (1 : U[F]) s * finiteHeckeL (1 : U[F]) s = _ at h
+  have hs : 0 < (s : ℂ).re := zero_lt_one.trans s.property
+  exact mul_left_cancel₀ (heckeGammaFactor_ne_zero_of_re_pos (1 : U[F]) hs) h
+
+/-- An explicit admissible width `A / (d⁴ log (B' (t + 3)))` with `B' ≥ B` large enough that the
+width is at most `1/2`: positive, differentiable, nonincreasing, derivative tending to zero,
+reciprocal `O(log t)`, and below the canonical width `A / (d⁴ log (B (t + 3)))`. -/
+private theorem finiteHeckeL_logDeriv_isBigO_oneLine_width (A B d : ℝ) (hA : 0 < A)
+    (hB : 1 / 3 < B) (hd : 1 ≤ d) :
+    ∃ η : ℝ → ℝ, MapsTo η (Ici 0) (Ioc 0 (1 / 2)) ∧ DifferentiableOn ℝ η (Ici 0) ∧
+      AntitoneOn η (Ici 0) ∧ Tendsto (derivWithin η (Ici 0)) atTop (𝓝 0) ∧
+      ((fun t ↦ (η t)⁻¹) =O[atTop] Real.log) ∧
+      ∀ t : ℝ, 0 ≤ t → η t ≤ A / (d ^ 4 * Real.log (B * (t + 3))) := by
+  obtain ⟨B', hB'⟩ : ∃ B' : ℝ, B' = max (max B (Real.exp (2 * A / d ^ 4))) (Real.exp 1) :=
+    ⟨_, rfl⟩
+  have hB'B : B ≤ B' := hB' ▸ (le_max_left _ _).trans (le_max_left _ _)
+  have hB'e : Real.exp (2 * A / d ^ 4) ≤ B' := hB' ▸ (le_max_right _ _).trans (le_max_left _ _)
+  have hB'1' : Real.exp 1 ≤ B' := hB' ▸ le_max_right _ _
+  have hB'1 : 1 ≤ B' := (Real.one_le_exp zero_le_one).trans hB'1'
+  have hB'0 : 0 < B' := by linarith
+  have hB0 : 0 < B := by linarith
+  have hd0 : 0 < d := by linarith
+  have hd4 : 1 ≤ d ^ 4 := one_le_pow₀ hd
+  obtain ⟨g, hg⟩ : ∃ g : ℝ → ℝ, g = fun t ↦ d ^ 4 * Real.log (B' * (t + 3)) := ⟨_, rfl⟩
+  have hpos : ∀ t : ℝ, 0 ≤ t → 0 < B' * (t + 3) := fun t ht ↦ by positivity
+  have hlog1 : ∀ t : ℝ, 0 ≤ t → 1 ≤ Real.log (B' * (t + 3)) := fun t ht ↦ by
+    rw [Real.le_log_iff_exp_le (hpos t ht)]
+    exact hB'1'.trans (le_mul_of_one_le_right hB'0.le (by linarith))
+  have hlog2 : ∀ t : ℝ, 0 ≤ t → 2 * A / d ^ 4 ≤ Real.log (B' * (t + 3)) := fun t ht ↦ by
+    rw [Real.le_log_iff_exp_le (hpos t ht)]
+    calc Real.exp (2 * A / d ^ 4) ≤ B' := hB'e
+      _ ≤ B' * (t + 3) := le_mul_of_one_le_right hB'0.le (by linarith)
+  have hgval : ∀ t : ℝ, g t = d ^ 4 * Real.log (B' * (t + 3)) := fun t ↦ by rw [hg]
+  have hg0 : ∀ t : ℝ, 0 ≤ t → 0 < g t := fun t ht ↦ by
+    rw [hgval]
+    exact mul_pos (by positivity) (by linarith [hlog1 t ht])
+  have hgd : ∀ t : ℝ, 0 ≤ t → HasDerivAt g (d ^ 4 * (B' / (B' * (t + 3)))) t := fun t ht ↦ by
+    have h1 : HasDerivAt (fun t : ℝ ↦ B' * (t + 3)) (B' * 1) t :=
+      ((hasDerivAt_id t).add_const 3).const_mul B'
+    rw [mul_one] at h1
+    rw [hg]
+    exact (h1.log (hpos t ht).ne').const_mul _
+  have hηd : ∀ t : ℝ, 0 ≤ t → HasDerivAt (fun t ↦ A / g t)
+      (A * (-(d ^ 4 * (B' / (B' * (t + 3)))) / g t ^ 2)) t := fun t ht ↦ by
+    have := ((hgd t ht).inv (hg0 t ht).ne').const_mul A
+    refine this.congr_of_eventuallyEq (Eventually.of_forall fun x ↦ ?_)
+    simp [div_eq_mul_inv]
+  refine ⟨fun t ↦ A / g t, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · intro t ht
+    have ht : 0 ≤ t := ht
+    refine ⟨div_pos hA (hg0 t ht), ?_⟩
+    rw [div_le_iff₀ (hg0 t ht), hgval]
+    have := hlog2 t ht
+    rw [div_le_iff₀ (by positivity)] at this
+    linarith
+  · exact fun t ht ↦ (hηd t ht).differentiableAt.differentiableWithinAt
+  · intro a ha b hb hab
+    have ha : 0 ≤ a := ha
+    have hb : 0 ≤ b := hb
+    apply div_le_div_of_nonneg_left hA.le (hg0 a ha)
+    rw [hgval, hgval]
+    exact mul_le_mul_of_nonneg_left (Real.log_le_log (hpos a ha) (by nlinarith)) (by positivity)
+  · have hbound : ∀ᶠ t : ℝ in atTop, ‖derivWithin (fun t ↦ A / g t) (Ici 0) t‖ ≤ A / (t + 3) := by
+      filter_upwards [eventually_gt_atTop 0] with t ht
+      rw [derivWithin_of_mem_nhds (Ici_mem_nhds ht), (hηd t ht.le).deriv]
+      have hBt : B' / (B' * (t + 3)) = 1 / (t + 3) := by
+        field_simp
+      have hL := hlog1 t ht.le
+      have hgt : d ^ 4 ≤ g t ^ 2 := by
+        rw [hgval]
+        have h1 : d ^ 4 ≤ (d ^ 4) ^ 2 := le_self_pow₀ hd4 two_ne_zero
+        have h2 : (d ^ 4) ^ 2 ≤ (d ^ 4 * Real.log (B' * (t + 3))) ^ 2 := by
+          apply pow_le_pow_left₀ (by positivity)
+          exact le_mul_of_one_le_right (by positivity) hL
+        linarith
+      have hval : A * (-(d ^ 4 * (1 / (t + 3))) / g t ^ 2) = -(A * d ^ 4 / (t + 3) / g t ^ 2) := by
+        ring
+      have hgt0 : 0 < g t ^ 2 := pow_pos (hg0 t ht.le) 2
+      have ht3 : 0 < t + 3 := by linarith
+      rw [hBt, hval, Real.norm_eq_abs, abs_neg, abs_of_nonneg (by positivity), div_div,
+        div_le_div_iff₀ (mul_pos ht3 hgt0) ht3]
+      have := mul_le_mul_of_nonneg_left hgt (by positivity : (0 : ℝ) ≤ A * (t + 3))
+      nlinarith
+    exact squeeze_zero_norm' hbound
+      (tendsto_const_nhds.div_atTop (tendsto_atTop_add_const_right _ _ tendsto_id))
+  · apply Asymptotics.IsBigO.of_bound (2 * d ^ 4 / A)
+    filter_upwards [eventually_ge_atTop (max 3 (B' + 3))] with t ht
+    have ht3 : 3 ≤ t := (le_max_left _ _).trans ht
+    have htB : B' + 3 ≤ t := (le_max_right _ _).trans ht
+    have hlogt : 0 < Real.log t := Real.log_pos (by linarith)
+    have hgt0 : 0 < g t := hg0 t (by linarith)
+    rw [inv_div, Real.norm_of_nonneg (div_pos hgt0 hA).le, Real.norm_of_nonneg hlogt.le,
+      div_le_iff₀ hA, hgval]
+    have hlog : Real.log (B' * (t + 3)) ≤ 2 * Real.log t := by
+      rw [show (2 : ℝ) * Real.log t = Real.log (t ^ 2) by rw [Real.log_pow]; norm_num]
+      apply Real.log_le_log (by positivity)
+      nlinarith
+    have := mul_le_mul_of_nonneg_left hlog (by positivity : (0 : ℝ) ≤ d ^ 4)
+    have hA' : 2 * d ^ 4 / A * Real.log t * A = d ^ 4 * (2 * Real.log t) := by
+      field_simp
+    linarith
+  · intro t ht
+    have hBt : 0 < B * (t + 3) := by positivity
+    have hlogB : 0 < Real.log (B * (t + 3)) := Real.log_pos (by nlinarith)
+    apply div_le_div_of_nonneg_left hA.le (by positivity)
+    rw [hgval]
+    exact mul_le_mul_of_nonneg_left (Real.log_le_log hBt (by nlinarith)) (by positivity)
+
+/-- Paper: Corollary B.6.1.5, p. 639. On the line `Re(s) = 1`, the logarithmic
+derivative is bounded by a squared logarithm as the absolute height grows.
+Deviation: The logarithm uses absolute height. Eventual analyticity and
+nonvanishing make the logarithmic derivative well-defined. -/
+theorem finiteHeckeL_logDeriv_isBigO_oneLine (χ : U[F]) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : halfPlane, L s = finiteHeckeL χ s) :
+    (∀ᶠ t : ℝ in atAbsTop, AnalyticAt ℂ L ⟨1, t⟩ ∧ L ⟨1, t⟩ ≠ 0) ∧
+      (fun t : ℝ ↦ logDeriv L ⟨1, t⟩) =O[atAbsTop] (fun t ↦ (Real.log |t|) ^ 2) := by
+  obtain ⟨Z, hZ, hZS⟩ := finiteHeckeL_exists_continuation (1 : U[F])
+  have hZSeries : ∀ s : halfPlane, Z s = dedekindZeta F s := fun s ↦ by
+    rw [hZS s, finiteHeckeL_logDeriv_isBigO_oneLine_zeta]
+  obtain ⟨A, hA, hF⟩ := finiteHeckeL_zeroFreeRegion
+  obtain ⟨B₁, hB₁, hzf₁⟩ := hF F (1 : U[F])
+  obtain ⟨B, hB, hzf⟩ := hF F χ
+  obtain ⟨d, hd⟩ : ∃ d : ℝ, d = (Module.finrank ℚ F : ℝ) := ⟨_, rfl⟩
+  have hd1 : 1 ≤ d := by
+    rw [hd]
+    exact_mod_cast Module.finrank_pos
+  rw [← hd] at hzf₁ hzf
+  have hB₁0 : 0 < B₁ := by linarith
+  have h4B : 1 < 4 * B₁ := by linarith
+  obtain ⟨α₀, hα₀def⟩ : ∃ α₀ : ℝ, α₀ = A / (d ^ 4 * Real.log (4 * B₁)) := ⟨_, rfl⟩
+  have hα₀ : 0 < α₀ := hα₀def ▸ div_pos hA (mul_pos (by positivity) (Real.log_pos h4B))
+  have hα0 : 0 < min α₀ (1 / 2) := lt_min hα₀ (by norm_num)
+  have hα1 : min α₀ (1 / 2) < 1 := (min_le_right _ _).trans_lt (by norm_num)
+  have hα : ∀ z : ℂ, 0 < ‖z - 1‖ → ‖z - 1‖ < min α₀ (1 / 2) → meromorphicOrderAt Z z ≤ 0 :=
+    fun z _ hz ↦ by
+    apply hzf₁ Z hZ hZS z
+    have hre := Complex.abs_re_le_norm (z - 1)
+    have him := Complex.abs_im_le_norm (z - 1)
+    simp only [Complex.sub_re, Complex.sub_im, Complex.one_re, Complex.one_im, sub_zero] at hre him
+    have hz₀ : ‖z - 1‖ < α₀ := hz.trans_le (min_le_left _ _)
+    have hz₂ : ‖z - 1‖ < 1 / 2 := hz.trans_le (min_le_right _ _)
+    have him1 : |z.im| ≤ 1 := by linarith
+    have hlog : Real.log (B₁ * (|z.im| + 3)) ≤ Real.log (4 * B₁) :=
+      Real.log_le_log (by positivity) (by nlinarith)
+    have hlogpos : 0 < Real.log (B₁ * (|z.im| + 3)) := Real.log_pos (by nlinarith [abs_nonneg z.im])
+    have : α₀ ≤ A / (d ^ 4 * Real.log (B₁ * (|z.im| + 3))) := by
+      rw [hα₀def]
+      exact div_le_div_of_nonneg_left hA.le (by positivity)
+        (mul_le_mul_of_nonneg_left hlog (by positivity))
+    linarith [(abs_le.mp (hre.trans hz₀.le)).1]
+  obtain ⟨η, hmaps, hdiff, hanti, hderiv, hO, hle⟩ :=
+    finiteHeckeL_logDeriv_isBigO_oneLine_width A B d hA hB hd1
+  have hzero : ∀ s : ℂ, 1 - η |s.im| < s.re → meromorphicOrderAt L s ≤ 0 := fun s hs ↦
+    hzf L hL hSeries s (by linarith [hle |s.im| (abs_nonneg _)])
+  obtain ⟨C, -, hmain⟩ := finiteHeckeL_logDeriv_isBigO_of_zeroFree χ L Z hL hSeries hZ hZSeries
+    (min α₀ (1 / 2)) hα0 hα1 hα
+  obtain ⟨hev, hbig⟩ := hmain η hmaps hdiff hanti hderiv hO hzero
+  have hmap : Tendsto (fun t : ℝ ↦ (⟨1, t⟩ : ℂ)) atAbsTop
+      (atHeight ⊓ 𝓟 {s : ℂ | 1 - min α₀ (1 / 2) * η |s.im| ≤ s.re}) := by
+    refine tendsto_inf.mpr ⟨?_, tendsto_principal.mpr (Eventually.of_forall fun t ↦ ?_)⟩
+    · rw [tendsto_comap_iff]
+      exact tendsto_comap
+    · show 1 - min α₀ (1 / 2) * η |t| ≤ 1
+      have := (hmaps (mem_Ici.mpr (abs_nonneg t))).1
+      nlinarith
+  exact ⟨hmap.eventually hev, hbig.isBigO.comp_tendsto hmap⟩
+
 -- TODO(paper-gap): The paragraph after (B.6.1.1) identifies two different conductors.
 -- A pure imaginary norm twist preserves the finite conductor but changes the
 -- archimedean parameter. No conductor-uniform exceptional-zero assertion is made here.
@@ -2691,6 +3285,226 @@ theorem finiteHeckeL_outside_exists_horizontal_lower_bound :
 -- At the selected heights use Cauchy's estimates on a wider fixed strip for
 -- derivatives of Loutside, then differentiate Loutside * (1 / Loutside) = 1.
 
+omit hL hSeries in
+/-- A meromorphic normal form that is polynomially bounded on a vertical strip at large height
+is analytic at every interior point of the strip above the threshold. -/
+private theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_analytic (G : ℂ → ℂ)
+    (hG : MeromorphicNFOn G univ) (a b T : ℝ) (n : ℕ)
+    (hT : ∀ z : ℂ, z.re ∈ Icc a b → T ≤ |z.im| → ‖G z‖ ≤ |z.im| ^ n)
+    (w : ℂ) (hw : w.re ∈ Ioo a b) (hwT : T < |w.im|) : AnalyticAt ℂ G w := by
+  apply (hG (mem_univ w)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+  by_contra! hp
+  have hre := (isOpen_Ioo.preimage Complex.continuous_re).mem_nhds hw
+  have him := (isOpen_Ioo.preimage Complex.continuous_im.abs).mem_nhds
+    (show w ∈ (fun z : ℂ ↦ |z.im|) ⁻¹' Ioo T (|w.im| + 1) from ⟨hwT, by linarith⟩)
+  have hb : ∀ᶠ z in 𝓝 w, ‖G z‖ ≤ (|w.im| + 1) ^ n := by
+    filter_upwards [hre, him] with z hz h'z
+    exact (hT z (Ioo_subset_Icc_self hz) h'z.1.le).trans
+      (pow_le_pow_left₀ (abs_nonneg _) h'z.2.le _)
+  have hp' := (tendsto_norm_cobounded_atTop.comp
+    (tendsto_cobounded_of_meromorphicOrderAt_neg hp)).eventually_gt_atTop ((|w.im| + 1) ^ n)
+  obtain ⟨_, h, h'⟩ := ((hb.filter_mono nhdsWithin_le_nhds).and hp').exists
+  exact h'.not_ge h
+
+omit hL hSeries in
+/-- The reciprocal Euler factors at the finitely many places of `S` form an entire function
+bounded on the half-plane `Re s ≥ -c` by a constant depending on `S` and `c`. -/
+private theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_euler (c : ℝ) :
+    Differentiable ℂ (fun s : ℂ ↦ ∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹) ∧
+      ∃ C : ℝ, 1 ≤ C ∧ ∀ s : ℂ, -c ≤ s.re →
+        ‖∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹‖ ≤ C := by
+  classical
+  have hfac : ∀ v : HeightOneSpectrum (𝓞 F), ∀ s : ℂ, (finiteHeckeEulerFactor χ v s)⁻¹ =
+      if (ideleClassNormTwist χ 0).IsUnramifiedAt v then
+        1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s) else 1 := by
+    intro v s
+    unfold finiteHeckeEulerFactor
+    split_ifs <;> simp
+  have hNpos : ∀ v : HeightOneSpectrum (𝓞 F), 0 < v.asIdeal.absNorm := fun v ↦
+    Nat.pos_of_ne_zero (Ideal.absNorm_eq_zero_iff.not.mpr v.ne_bot)
+  have hdiff : ∀ v : HeightOneSpectrum (𝓞 F),
+      Differentiable ℂ (fun s ↦ (finiteHeckeEulerFactor χ v s)⁻¹) := by
+    intro v
+    simp_rw [hfac]
+    split_ifs
+    · have hN : (v.asIdeal.absNorm : ℂ) ≠ 0 := by exact_mod_cast (hNpos v).ne'
+      exact (differentiable_const _).sub
+        ((differentiable_const _).mul (differentiable_neg.const_cpow (Or.inl hN)))
+    · exact differentiable_const _
+  have hbound : ∀ v : HeightOneSpectrum (𝓞 F), ∀ s : ℂ, -c ≤ s.re →
+      ‖(finiteHeckeEulerFactor χ v s)⁻¹‖ ≤ 1 + (v.asIdeal.absNorm : ℝ) ^ c := by
+    intro v s hs
+    rw [hfac]
+    have hN1 : (1 : ℝ) ≤ v.asIdeal.absNorm := by exact_mod_cast hNpos v
+    have hpow : 0 ≤ (v.asIdeal.absNorm : ℝ) ^ c := Real.rpow_nonneg (by positivity) _
+    split_ifs
+    · calc ‖1 - (ideleClassNormTwist χ 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-s)‖
+          ≤ ‖(1 : ℂ)‖ + ‖(ideleClassNormTwist χ 0).localValue v *
+              (v.asIdeal.absNorm : ℂ) ^ (-s)‖ := norm_sub_le _ _
+        _ = 1 + (v.asIdeal.absNorm : ℝ) ^ (-s).re := by
+          rw [norm_one, norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul,
+            Complex.norm_natCast_cpow_of_pos (hNpos v)]
+        _ ≤ 1 + (v.asIdeal.absNorm : ℝ) ^ c := by
+          have hsc : (-s).re ≤ c := by
+            rw [Complex.neg_re]
+            linarith
+          exact add_le_add_right (Real.rpow_le_rpow_of_exponent_le hN1 hsc) 1
+    · rw [norm_one]
+      linarith
+  have hprod : ∀ T : Finset (HeightOneSpectrum (𝓞 F)),
+      Differentiable ℂ (fun s : ℂ ↦ ∏ v ∈ T, (finiteHeckeEulerFactor χ v s)⁻¹) := by
+    intro T
+    induction T using Finset.induction_on with
+    | empty => simp
+    | insert a s ha ih =>
+      simp_rw [Finset.prod_insert ha]
+      exact (hdiff a).mul ih
+  refine ⟨hprod S, ∏ v ∈ S, (1 + (v.asIdeal.absNorm : ℝ) ^ c), ?_, fun s hs ↦ ?_⟩
+  · calc (1 : ℝ) = ∏ v ∈ S, (1 : ℝ) := by simp
+      _ ≤ ∏ v ∈ S, (1 + (v.asIdeal.absNorm : ℝ) ^ c) :=
+        Finset.prod_le_prod₀ (fun v _ ↦ zero_le_one) fun v _ ↦ by
+          linarith [Real.rpow_nonneg (Nat.cast_nonneg v.asIdeal.absNorm) c]
+  · rw [norm_prod]
+    exact Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _) fun v _ ↦ hbound v s hs
+
+omit hL hSeries in
+/-- Cauchy estimates for the reciprocal: if `f` is analytic and bounded by `M` on the closed disc
+of radius two around `z` and `‖f z‖ ≥ ε`, then `1 / f` is analytic at `z` and its `m`-th
+derivative there is at most `m! (2 / ε) (2 M / ε) ^ m`. -/
+private theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_cauchy (m : ℕ)
+    (f : ℂ → ℂ) (z : ℂ) (M ε : ℝ) (hε : 0 < ε)
+    (hf : ∀ w ∈ Metric.closedBall z 2, AnalyticAt ℂ f w)
+    (hM : ∀ w ∈ Metric.closedBall z 2, ‖f w‖ ≤ M) (hz : ε ≤ ‖f z‖) :
+    AnalyticAt ℂ (fun s ↦ (f s)⁻¹) z ∧
+      ‖iteratedDeriv m (fun s ↦ (f s)⁻¹) z‖ ≤ m.factorial * (2 / ε) * (2 * M / ε) ^ m := by
+  have hz2 : z ∈ Metric.closedBall z 2 := Metric.mem_closedBall_self (by norm_num)
+  have hεM : ε ≤ M := hz.trans (hM z hz2)
+  have hM0 : 0 < M := hε.trans_le hεM
+  have h12 : Metric.closedBall z 1 ⊆ Metric.closedBall z 2 :=
+    Metric.closedBall_subset_closedBall (by norm_num)
+  have hderiv : ∀ w ∈ Metric.closedBall z 1, ‖deriv f w‖ ≤ M := by
+    intro w hw
+    have hsub : Metric.closedBall w 1 ⊆ Metric.closedBall z 2 :=
+      Metric.closedBall_subset_closedBall' (by linarith [Metric.mem_closedBall.mp hw])
+    have hdiff : DiffContOnCl ℂ f (Metric.ball w 1) :=
+      (show DifferentiableOn ℂ f (Metric.closedBall w 1) from fun u hu ↦
+        (hf u (hsub hu)).differentiableAt.differentiableWithinAt).diffContOnCl_ball subset_rfl
+    have := Complex.norm_deriv_le_of_forall_mem_sphere_norm_le zero_lt_one hdiff
+      fun u hu ↦ hM u (hsub (Metric.sphere_subset_closedBall hu))
+    simpa using this
+  obtain ⟨ρ, hρ⟩ : ∃ ρ : ℝ, ρ = ε / (2 * M) := ⟨_, rfl⟩
+  have hρ0 : 0 < ρ := by rw [hρ]; positivity
+  have hρ1 : ρ ≤ 1 := by
+    rw [hρ, div_le_iff₀ (by positivity)]
+    linarith
+  have hball : Metric.closedBall z ρ ⊆ Metric.closedBall z 1 :=
+    Metric.closedBall_subset_closedBall hρ1
+  have hlow : ∀ w ∈ Metric.closedBall z ρ, ε / 2 ≤ ‖f w‖ := by
+    intro w hw
+    have hmv := (convex_closedBall z ρ).norm_image_sub_le_of_norm_deriv_le
+      (fun u hu ↦ (hf u (h12 (hball hu))).differentiableAt)
+      (fun u hu ↦ hderiv u (hball hu)) (Metric.mem_closedBall_self hρ0.le) hw
+    have hwz : ‖w - z‖ ≤ ρ := by rwa [Metric.mem_closedBall, dist_eq_norm] at hw
+    have h1 : M * ‖w - z‖ ≤ ε / 2 := by
+      calc M * ‖w - z‖ ≤ M * ρ := by gcongr
+        _ = ε / 2 := by rw [hρ]; field_simp
+    have h2 := norm_sub_norm_le (f z) (f w)
+    rw [norm_sub_rev] at h2
+    linarith
+  have hne : ∀ w ∈ Metric.closedBall z ρ, f w ≠ 0 := fun w hw ↦
+    norm_pos_iff.mp (by linarith [hlow w hw])
+  have hinv_an : ∀ w ∈ Metric.closedBall z ρ, AnalyticAt ℂ (fun s ↦ (f s)⁻¹) w := fun w hw ↦
+    (hf w (h12 (hball hw))).inv (hne w hw)
+  refine ⟨hinv_an z (Metric.mem_closedBall_self hρ0.le), ?_⟩
+  have hdiff : DiffContOnCl ℂ (fun s ↦ (f s)⁻¹) (Metric.ball z ρ) :=
+    (show DifferentiableOn ℂ (fun s ↦ (f s)⁻¹) (Metric.closedBall z ρ) from fun u hu ↦
+      (hinv_an u hu).differentiableAt.differentiableWithinAt).diffContOnCl_ball subset_rfl
+  have hC : ∀ w ∈ Metric.sphere z ρ, ‖(f w)⁻¹‖ ≤ 2 / ε := fun w hw ↦ by
+    rw [norm_inv]
+    have := hlow w (Metric.sphere_subset_closedBall hw)
+    rw [inv_le_comm₀ (by linarith) (by positivity), inv_div]
+    linarith
+  have h := Complex.norm_iteratedDeriv_le_of_forall_mem_sphere_norm_le m hρ0 hdiff hC
+  refine h.trans (le_of_eq ?_)
+  rw [hρ, div_pow, div_div_eq_mul_div, div_pow]
+  ring
+
+/-- At a height where the Euler product outside `S` has the polynomial lower bound
+`|t| ^ (-A₀)` on the segment `-1 ≤ Re s ≤ 2`, the reciprocal is analytic on the segment and its
+`m`-th derivative is bounded by a fixed power of the height, with constants independent of the
+height. -/
+private theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_good (m : ℕ) (A₀ : ℝ)
+    (hA₀ : 0 < A₀) :
+    ∃ A β T₀ : ℝ, 0 < A ∧ 0 < β ∧ ∀ t : ℝ, T₀ ≤ |t| →
+      (∀ σ ∈ Icc (-1 : ℝ) 2, |t| ^ (-A₀) < ‖Loutside ⟨σ, t⟩‖) →
+      ∀ σ ∈ Icc (-1 : ℝ) 2,
+        AnalyticAt ℂ (fun s ↦ (Loutside s)⁻¹) ⟨σ, t⟩ ∧
+          ‖iteratedDeriv m (fun s ↦ (Loutside s)⁻¹) ⟨σ, t⟩‖ ≤ A * |t| ^ β := by
+  obtain ⟨M₁, -, hM₁⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries (-4) 5 (by norm_num)
+  obtain ⟨n, T₁, hup⟩ := finiteHeckeL_inv_isBigO_oneLine_strip_bound_nat L (-4) 5 M₁ hM₁
+  obtain ⟨hPd, C, hC1, hCb⟩ :=
+    finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_euler χ S 4
+  refine ⟨m.factorial * 2 * (2 ^ (n + 1) * C) ^ m, A₀ + (n + A₀) * m, max (T₁ + 3) 2,
+    by positivity, by positivity, fun t ht hgood σ hσ ↦ ?_⟩
+  have ht2 : 2 ≤ |t| := (le_max_right _ _).trans ht
+  have htT : T₁ + 3 ≤ |t| := (le_max_left _ _).trans ht
+  have hpos : 0 < |t| := by linarith
+  obtain ⟨f, hf⟩ : ∃ f : ℂ → ℂ, f = fun s ↦ (∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹) * L s :=
+    ⟨_, rfl⟩
+  have hfval : ∀ s, f s = (∏ v ∈ S, (finiteHeckeEulerFactor χ v s)⁻¹) * L s := fun s ↦ by
+    rw [hf]
+  simp only [← hfval] at hgood ⊢
+  have hdisc : ∀ w ∈ Metric.closedBall (⟨σ, t⟩ : ℂ) 2,
+      AnalyticAt ℂ f w ∧ ‖f w‖ ≤ C * (2 * |t|) ^ n := by
+    intro w hw
+    rw [Metric.mem_closedBall, dist_eq_norm] at hw
+    have hre := Complex.abs_re_le_norm (w - ⟨σ, t⟩)
+    have him := Complex.abs_im_le_norm (w - ⟨σ, t⟩)
+    simp only [Complex.sub_re, Complex.sub_im] at hre him
+    obtain ⟨hre₁, hre₂⟩ := abs_le.mp (hre.trans hw)
+    obtain ⟨him₁, him₂⟩ := abs_le.mp (him.trans hw)
+    have hwim : |t| - 2 ≤ |w.im| ∧ |w.im| ≤ |t| + 2 := by
+      constructor <;> cases abs_cases t <;> cases abs_cases w.im <;> linarith
+    have hLw : AnalyticAt ℂ L w :=
+      finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_analytic L hL (-4) 5 T₁ n hup w
+        ⟨by linarith [hσ.1], by linarith [hσ.2]⟩ (by linarith)
+    refine ⟨?_, ?_⟩
+    · rw [hf]
+      exact (hPd.analyticAt w).mul hLw
+    · rw [hfval, norm_mul]
+      calc ‖∏ v ∈ S, (finiteHeckeEulerFactor χ v w)⁻¹‖ * ‖L w‖ ≤ C * |w.im| ^ n := by
+            gcongr
+            · exact hCb w (by linarith [hσ.1])
+            · exact hup w ⟨by linarith [hσ.1], by linarith [hσ.2]⟩ (by linarith)
+        _ ≤ C * (2 * |t|) ^ n := by
+            gcongr
+            linarith
+  have hz : |t| ^ (-A₀) ≤ ‖f ⟨σ, t⟩‖ := (hgood σ hσ).le
+  obtain ⟨han, hbd⟩ := finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_cauchy m f
+    ⟨σ, t⟩ (C * (2 * |t|) ^ n) (|t| ^ (-A₀)) (Real.rpow_pos_of_pos hpos _)
+    (fun w hw ↦ (hdisc w hw).1) (fun w hw ↦ (hdisc w hw).2) hz
+  refine ⟨han, hbd.trans (le_of_eq ?_)⟩
+  have h1 : 2 / |t| ^ (-A₀) = 2 * |t| ^ A₀ := by
+    rw [Real.rpow_neg hpos.le, div_eq_mul_inv, inv_inv]
+  have h2 : 2 * (C * (2 * |t|) ^ n) / |t| ^ (-A₀) = 2 ^ (n + 1) * C * |t| ^ ((n : ℝ) + A₀) := by
+    rw [Real.rpow_neg hpos.le, div_eq_mul_inv, inv_inv, mul_pow, Real.rpow_add hpos,
+      Real.rpow_natCast]
+    ring
+  rw [h1, h2, mul_pow, ← Real.rpow_mul_natCast hpos.le, Real.rpow_add hpos]
+  ring
+
+/-- Paper: Theorem B.6.1.7, p. 641, on the negative tail. Each sufficiently high open unit
+interval `(T, T + 1)` contains a height `t` such that the Euler product outside `S` has the
+polynomial lower bound `|t| ^ (-A)` on the whole horizontal segment from real part `-1` to `2`
+at height `-t`. The paper obtains it from the positive-tail statement for the conjugate
+character `χ⁻¹`, using `L_f(s̄, χ̄) = conj L_f(s, χ)` and the same identity for the finitely many
+Euler factors. The conjugation identities for `finiteHeckeL`, `finiteHeckeEulerFactor` and a
+meromorphic normal form are not yet available in this development. -/
+theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_neg :
+    ∃ A : ℝ, 0 < A ∧ ∀ᶠ T : ℝ in atTop, ∃ t ∈ Ioo T (T + 1),
+      ∀ σ ∈ Icc (-1 : ℝ) 2, |t| ^ (-A) < ‖Loutside ⟨σ, -t⟩‖ := by
+  sorry
+
 /-- Paper: Corollary B.6.1.8, p. 643. For each derivative order there is a
 nondecreasing sequence of heights tending to infinity in absolute value and
 growing at most linearly in the index. The derivative of the reciprocal Euler
@@ -2708,7 +3522,152 @@ theorem finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound (m : ℕ) :
       ∀ k : ℤ, ∀ σ ∈ Icc (-1 : ℝ) 2,
         AnalyticAt ℂ (fun s ↦ (Loutside s)⁻¹) ⟨σ, T k⟩ ∧
           ‖iteratedDeriv m (fun s ↦ (Loutside s)⁻¹) ⟨σ, T k⟩‖ ≤ A * |T k| ^ β := by
-  sorry
+  intro l
+  obtain ⟨A₁, hA₁, hpos⟩ := finiteHeckeL_outside_exists_horizontal_lower_bound χ L S hL hSeries
+  obtain ⟨A₂, hA₂, hneg⟩ := finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_neg χ L S hL hSeries
+  obtain ⟨A, β, T₀, hA, hβ, hgood⟩ := finiteHeckeL_outside_inv_iteratedDeriv_horizontal_bound_good
+    χ L S hL hSeries m (max A₁ A₂) (lt_max_of_lt_left hA₁)
+  rw [eventually_atTop] at hpos hneg
+  obtain ⟨Tp, hTp⟩ := hpos
+  obtain ⟨Tn, hTn⟩ := hneg
+  obtain ⟨k₀, hk₀⟩ := exists_nat_ge (max (max Tp Tn) (max T₀ 2))
+  have hk₀p : Tp ≤ k₀ := (le_max_left _ _).trans ((le_max_left _ _).trans hk₀)
+  have hk₀n : Tn ≤ k₀ := (le_max_right _ _).trans ((le_max_left _ _).trans hk₀)
+  have hk₀T : T₀ ≤ k₀ := (le_max_left _ _).trans ((le_max_right _ _).trans hk₀)
+  have hk₀2 : 2 ≤ (k₀ : ℝ) := (le_max_right _ _).trans ((le_max_right _ _).trans hk₀)
+  have hp' : ∀ j : ℕ, k₀ ≤ j → ∃ t : ℝ, t ∈ Ioo (j : ℝ) (j + 1) ∧
+      ∀ σ ∈ Icc (-1 : ℝ) 2, |t| ^ (-A₁) <
+        ‖Loutside ⟨σ, t⟩‖ := fun j hj ↦ by
+    obtain ⟨t, ht, h⟩ := hTp j (hk₀p.trans (by exact_mod_cast hj))
+    exact ⟨t, ht, h⟩
+  have hn' : ∀ j : ℕ, k₀ ≤ j → ∃ t : ℝ, t ∈ Ioo (j : ℝ) (j + 1) ∧
+      ∀ σ ∈ Icc (-1 : ℝ) 2, |t| ^ (-A₂) <
+        ‖Loutside ⟨σ, -t⟩‖ := fun j hj ↦ by
+    obtain ⟨t, ht, h⟩ := hTn j (hk₀n.trans (by exact_mod_cast hj))
+    exact ⟨t, ht, h⟩
+  choose! tp htp using hp'
+  choose! tn htn using hn'
+  have hmono : ∀ (f : ℕ → ℝ), (∀ j, k₀ ≤ j → f j ∈ Ioo (j : ℝ) (j + 1)) →
+      ∀ i j, k₀ ≤ i → i ≤ j → f i ≤ f j := by
+    intro f hf i j hi hij
+    rcases hij.eq_or_lt with rfl | hlt
+    · exact le_rfl
+    · have h1 := (hf i hi).2
+      have h2 := (hf j (hi.trans hij)).1
+      have : (i : ℝ) + 1 ≤ j := by exact_mod_cast hlt
+      linarith
+  have hexp : ∀ t : ℝ, 1 ≤ |t| → ∀ a : ℝ, a ≤ max A₁ A₂ →
+      |t| ^ (-(max A₁ A₂)) ≤ |t| ^ (-a) := fun t ht a ha ↦
+    Real.rpow_le_rpow_of_exponent_le ht (neg_le_neg ha)
+  obtain ⟨T, hT⟩ : ∃ T : ℤ → ℝ, ∀ k : ℤ,
+      T k = if 0 ≤ k then tp (max k.toNat k₀) else -(tn (max (-k).toNat k₀)) := ⟨_, fun _ ↦ rfl⟩
+  have hTpos : ∀ k : ℤ, 0 ≤ k → T k = tp (max k.toNat k₀) := fun k hk ↦ by
+    rw [hT, ite_eq_left hk]
+  have hTneg : ∀ k : ℤ, k < 0 → T k = -(tn (max (-k).toNat k₀)) := fun k hk ↦ by
+    rw [hT, ite_eq_right (not_le.mpr hk)]
+  have htp0 : ∀ j, k₀ ≤ j → 0 < tp j := fun j hj ↦ by
+    have := (htp j hj).1.1
+    have : (0 : ℝ) ≤ j := Nat.cast_nonneg _
+    linarith
+  have htn0 : ∀ j, k₀ ≤ j → 0 < tn j := fun j hj ↦ by
+    have := (htn j hj).1.1
+    have : (0 : ℝ) ≤ j := Nat.cast_nonneg _
+    linarith
+  have hcast : ∀ k : ℤ, 0 ≤ k → ((k.toNat : ℕ) : ℝ) = (k : ℝ) := fun k hk ↦ by
+    rw [← Int.cast_natCast, Int.toNat_of_nonneg hk]
+  -- the two tails
+  have hkey : ∀ k : ℤ, (k₀ : ℤ) ≤ |k| → |T k - (k : ℝ)| ≤ 1 ∧ |(k : ℝ)| ≤ |T k| := by
+    intro k hk
+    rcases le_or_gt 0 k with hk0 | hk0
+    · rw [abs_of_nonneg hk0] at hk
+      have hj : k₀ ≤ k.toNat := (Int.le_toNat hk0).mpr hk
+      rw [hTpos k hk0, max_eq_left hj]
+      obtain ⟨⟨h1, h2⟩, -⟩ := htp k.toNat hj
+      rw [hcast k hk0] at h1 h2
+      have hk0r : (0 : ℝ) ≤ k := by exact_mod_cast hk0
+      rw [abs_of_nonneg hk0r, abs_of_pos (by linarith : 0 < tp k.toNat)]
+      constructor
+      · rw [abs_le]; constructor <;> linarith
+      · linarith
+    · rw [abs_of_neg hk0] at hk
+      have hk0' : 0 ≤ -k := by linarith
+      have hj : k₀ ≤ (-k).toNat := (Int.le_toNat hk0').mpr hk
+      rw [hTneg k hk0, max_eq_left hj]
+      obtain ⟨⟨h1, h2⟩, -⟩ := htn (-k).toNat hj
+      rw [hcast (-k) hk0', Int.cast_neg] at h1 h2
+      have hkr : (k : ℝ) < 0 := by exact_mod_cast hk0
+      rw [abs_of_neg hkr, abs_neg, abs_of_pos (by linarith : 0 < tn (-k).toNat)]
+      constructor
+      · rw [abs_le]; constructor <;> linarith
+      · linarith
+  have hev : ∀ᶠ k : ℤ in l, (k₀ : ℤ) ≤ |k| :=
+    (tendsto_comap (f := (abs : ℤ → ℤ))).eventually_ge_atTop (k₀ : ℤ)
+  refine ⟨A, β, T, hA, hβ, ?_, ?_, ?_, hev.mono fun k hk ↦ (hkey k hk).1, fun k σ hσ ↦ ?_⟩
+  · -- monotone
+    intro k k' hkk'
+    rcases le_or_gt 0 k with hk | hk
+    · have hk' : 0 ≤ k' := hk.trans hkk'
+      rw [hTpos k hk, hTpos k' hk']
+      exact hmono tp (fun j hj ↦ (htp j hj).1) _ _ (le_max_right _ _)
+        (max_le_max (Int.toNat_le_toNat hkk') le_rfl)
+    · rcases le_or_gt 0 k' with hk' | hk'
+      · rw [hTneg k hk, hTpos k' hk']
+        have := htn0 _ (le_max_right (-k).toNat k₀)
+        have := htp0 _ (le_max_right k'.toNat k₀)
+        linarith
+      · rw [hTneg k hk, hTneg k' hk']
+        apply neg_le_neg
+        exact hmono tn (fun j hj ↦ (htn j hj).1) _ _ (le_max_right _ _)
+          (max_le_max (Int.toNat_le_toNat (by linarith)) le_rfl)
+  · -- tendsto
+    rw [tendsto_atTop]
+    intro b
+    filter_upwards [(tendsto_comap (f := (abs : ℤ → ℤ))).eventually_ge_atTop (max ⌈b⌉ k₀)]
+      with k hk
+    have hk₀k : (k₀ : ℤ) ≤ |k| := (le_max_right _ _).trans hk
+    have hbk : (⌈b⌉ : ℤ) ≤ |k| := (le_max_left _ _).trans hk
+    have h1 : b ≤ |(k : ℝ)| := by
+      have : ((⌈b⌉ : ℤ) : ℝ) ≤ ((|k| : ℤ) : ℝ) := by exact_mod_cast hbk
+      rw [Int.cast_abs] at this
+      linarith [Int.le_ceil b]
+    exact h1.trans (hkey k hk₀k).2
+  · -- big O
+    apply Asymptotics.IsBigO.of_bound 2
+    filter_upwards [hev] with k hk
+    obtain ⟨h1, h2⟩ := hkey k hk
+    have hk1 : (1 : ℝ) ≤ |(k : ℝ)| := by
+      have : ((1 : ℕ) : ℤ) ≤ |k| := le_trans (by exact_mod_cast (by linarith : 1 ≤ (k₀ : ℝ))) hk
+      have : ((1 : ℤ) : ℝ) ≤ ((|k| : ℤ) : ℝ) := by exact_mod_cast this
+      rwa [Int.cast_abs, Int.cast_one] at this
+    rw [Real.norm_eq_abs, Real.norm_eq_abs, abs_abs]
+    have := abs_sub_abs_le_abs_sub (T k) (k : ℝ)
+    linarith
+  · -- the bound at each index
+    rcases le_or_gt 0 k with hk | hk
+    · rw [hTpos k hk]
+      have hj : k₀ ≤ max k.toNat k₀ := le_max_right _ _
+      obtain ⟨⟨h1, -⟩, hgd⟩ := htp _ hj
+      have hjk : (k₀ : ℝ) ≤ (max k.toNat k₀ : ℕ) := by exact_mod_cast hj
+      have hpos : T₀ ≤ |tp (max k.toNat k₀)| := by
+        rw [abs_of_pos (htp0 _ hj)]
+        linarith
+      exact hgood _ hpos (fun σ hσ ↦ (hexp _ (by rw [abs_of_pos (htp0 _ hj)]; linarith) A₁
+        (le_max_left _ _)).trans_lt (hgd σ hσ)) σ hσ
+    · rw [hTneg k hk]
+      have hj : k₀ ≤ max (-k).toNat k₀ := le_max_right _ _
+      obtain ⟨⟨h1, -⟩, hgd⟩ := htn _ hj
+      have hjk : (k₀ : ℝ) ≤ (max (-k).toNat k₀ : ℕ) := by exact_mod_cast hj
+      have habs : |-(tn (max (-k).toNat k₀))| = tn (max (-k).toNat k₀) := by
+        rw [abs_neg, abs_of_pos (htn0 _ hj)]
+      have hpos : T₀ ≤ |-(tn (max (-k).toNat k₀))| := by
+        rw [habs]
+        linarith
+      refine hgood _ hpos (fun σ hσ ↦ ?_) σ hσ
+      rw [habs]
+      have := hgd σ hσ
+      rw [abs_of_pos (htn0 _ hj)] at this
+      exact (Real.rpow_le_rpow_of_exponent_le (by linarith) (neg_le_neg (le_max_right A₁ A₂))).trans_lt
+        this
 
 end OutsideEulerProduct
 
