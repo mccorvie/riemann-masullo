@@ -6,6 +6,9 @@ import all RiemannMasullo.AppA_AlgebraicNT.Sec3
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
 
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
+import all RiemannMasullo.Ch05_ThetaZSpaces.Sec5
+
 /-! # §7.5 Strong co-primality -/
 
 @[expose] public noncomputable section
@@ -65,10 +68,60 @@ theorem exists_strongCoprimalityThetaEmbedding (ω : PontryaginDual C₁) :
       IsEmbedding j ∧ ∀ (f : P) (g : C𝔽),
         (j ((K(ω)).mkQ f)).val.val g = homogeneousAdelicThetaLinearMap F ω f.val g := by sorry
 
+private theorem strongCoprimalityPrincipalValue_mem_polar_of_line
+    {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    (W : Submodule ℂ (StrongDual ℂ E)) (b l k : StrongDual ℂ E)
+    (hw : W = Submodule.span ℂ {b}) (hl : l ∈ W) (hk : k ∈ W)
+    (y x : E) (hy : l y = 1) (hx : l x = 0) : k x = 0 := by
+  rw [hw, Submodule.mem_span_singleton] at hl hk
+  obtain ⟨a, rfl⟩ := hl
+  obtain ⟨c, rfl⟩ := hk
+  change a * b y = 1 at hy
+  change a * b x = 0 at hx
+  change c * b x = 0
+  have ha : a ≠ 0 := fun h ↦ by simp [h] at hy
+  exact mul_eq_zero_of_right _ ((mul_eq_zero.mp hx).resolve_left ha)
+
 /-- Paper: Theorem 7.5.0.1 and Equation (7.5.0.3), pp. 374–375.
 The two zero moments are preserved by the finite principal-value operator. -/
 theorem strongCoprimalityPrincipalValue_mem_polar (S : Finset V) (f : P) :
-    adelePrincipalValue F S f.val ∈ P := by sorry
+    adelePrincipalValue F S f.val ∈ P := by
+  classical
+  rcases S.eq_empty_or_nonempty with rfl | hn
+  · rw [globalThetaPrincipalValue_isotypicAverage_emptyTest (F := F)]
+    exact f.property
+  let E := SchwartzBruhat (Multiplicative 𝔸[F])
+  let pv : E →L[ℂ] E :=
+    ⟨adelePrincipalValue F S, (adelePrincipalValue_isClosedEmbedding S).continuous⟩
+  let vals : E →L[ℂ] ℂ × ℂ := ⟨adelePolarValues, adelePolarValues_continuous⟩
+  obtain ⟨y, hy⟩ := adelePolarValues_surjective (F := F) ((1, 1) : ℂ × ℂ)
+  change vals y = (1, 1) at hy
+  have hx : vals f.val = 0 := f.property
+  have coord (L : ℂ × ℂ →L[ℂ] ℂ) (c : QuasiCharacter C𝔽)
+      (hL : L.comp vals ∈ adelicEigendistributions c) (h1 : L (1, 1) = 1) :
+      L (vals (pv f.val)) = 0 := by
+    let l := L.comp vals
+    have hk : l.comp pv ∈ adelicEigendistributions c := by
+      intro u t
+      have he := congrArg (fun q : GlobalAdelicThetaSpace F ↦ L (globalThetaPolarValues q))
+        (globalThetaPrincipalValue_equivariant hn u t)
+      exact he.trans (hL u (pv t))
+    exact strongCoprimalityPrincipalValue_mem_polar_of_line (adelicEigendistributions c)
+      (adelicNormalizedEigendistribution c) l (l.comp pv) (adelicEigendistributions_eq_span c) hL hk y f.val
+      ((congrArg L hy).trans h1) ((congrArg L hx).trans (map_zero L))
+  apply (mem_adelePolarSubspace _).2
+  constructor
+  · apply coord (ContinuousLinearMap.fst ℂ ℂ ℂ) 1 _ rfl
+    intro u t
+    change t (Multiplicative.ofAdd ((↑u⁻¹ : 𝔸[F]) * 0)) = 1 * t (Multiplicative.ofAdd 0)
+    rw [mul_zero, one_mul]
+  · apply coord (ContinuousLinearMap.snd ℂ ℂ ℂ) (ideleClassNormTwist (1 : U) 1) _ rfl
+    intro u t
+    change adeleSchwartzFourier (schwartzBruhatUnitTranslate u t) (Multiplicative.ofAdd 0) =
+      ((1 : ℂ) * (((ideleNorm F u).val : ℝ) : ℂ) ^ (1 : ℂ)) *
+        adeleSchwartzFourier t (Multiplicative.ofAdd 0)
+    rw [Complex.cpow_one, one_mul]
+    exact adeleSchwartzFourier_zero_unitTranslate u t
 
 /-- Paper: Equation (7.5.0.3), p. 375.
 The denominator is the image in homogeneous theta classes of principal values of
