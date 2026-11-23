@@ -1,6 +1,7 @@
 module
 
 public import RiemannMasullo.AppA_AlgebraicNT.Sec2b
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
 
 /-!
 # S-unit counting in the adelic unit box
@@ -40,15 +41,35 @@ def infiniteAdeleUnitBox : Set (InfiniteAdeleRing F) :=
 completion norm at most one at every infinite place. -/
 theorem mem_infiniteAdeleUnitBox_iff (x : InfiniteAdeleRing F) :
     x ∈ infiniteAdeleUnitBox F ↔ ∀ w : InfinitePlace F, ‖x w‖ ≤ 1 := by
-  sorry
+  change (∀ w : InfinitePlace F, ‖x w‖ ^ w.mult ≤ 1) ↔ _
+  exact forall_congr' fun w ↦ pow_le_one_iff_of_nonneg (norm_nonneg _) w.mult_ne_zero
 
 /-- Paper: Theorem A.4.1.1(1), p. 562. The archimedean unit box is compact. -/
 theorem isCompact_infiniteAdeleUnitBox : IsCompact (infiniteAdeleUnitBox F) := by
-  sorry
+  have hbox : infiniteAdeleUnitBox F =
+      (Set.univ.pi fun w : InfinitePlace F ↦ Metric.closedBall (0 : w.Completion) 1 :
+        Set (InfiniteAdeleRing F)) := by
+    ext x
+    rw [mem_infiniteAdeleUnitBox_iff]
+    exact ⟨fun h w _ ↦ mem_closedBall_zero_iff.mpr (h w),
+      fun h w ↦ mem_closedBall_zero_iff.mp (h w (Set.mem_univ _))⟩
+  rw [hbox]
+  refine isCompact_univ_pi fun w ↦ ?_
+  have he := InfinitePlace.Completion.isometry_extensionEmbedding w
+  simpa only [← he.preimage_closedBall] using
+    he.isClosedEmbedding.isCompact_preimage (isCompact_closedBall (InfinitePlace.Completion.extensionEmbedding w 0) 1)
 
 /-- Paper: Theorem A.4.1.1(1), p. 562. The archimedean unit box has nonempty interior. -/
 theorem infiniteAdeleUnitBox_interior_nonempty : (interior (infiniteAdeleUnitBox F)).Nonempty := by
-  sorry
+  let U : Set (InfiniteAdeleRing F) :=
+    Set.univ.pi fun w : InfinitePlace F ↦ Metric.ball (0 : w.Completion) 1
+  refine ⟨0, mem_interior.mpr ⟨U, fun x hx ↦ ?_, ?_, fun w _ ↦ Metric.mem_ball_self one_pos⟩⟩
+  · rw [mem_infiniteAdeleUnitBox_iff]
+    intro w
+    have hw := hx w (Set.mem_univ _)
+    rw [Metric.mem_ball, dist_zero_right] at hw
+    exact hw.le
+  · exact isOpen_set_pi Set.finite_univ fun w _ ↦ Metric.isOpen_ball
 
 /-- Paper: Theorem A.4.1.1(2), (A.4.1.2), p. 562. The test function is the indicator
 of the archimedean unit box times the product of the finite-place integer-ring indicators. -/
@@ -62,12 +83,41 @@ all coordinates have norm at most one and zero elsewhere. -/
 theorem sAdeleUnitBoxIndicator_apply (x : SAdeleRing F S) :
     sAdeleUnitBoxIndicator F S x =
       if (∀ w : InfinitePlace F, ‖x.1 w‖ ≤ 1) ∧ (∀ v : S, ‖x.2 v‖ ≤ 1) then 1 else 0 := by
-  sorry
+  have hv (v : S) : x.2 v ∈ (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)) ↔
+      ‖x.2 v‖ ≤ 1 := by
+    rw [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+      Valued.toNormedField.norm_le_one_iff]
+  change (infiniteAdeleUnitBox F).indicator (fun _ ↦ (1 : ℝ)) x.1 *
+    ∏ v : S, (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F)).indicator
+      (fun _ ↦ (1 : ℝ)) (x.2 v) = _
+  by_cases h1 : ∀ w : InfinitePlace F, ‖x.1 w‖ ≤ 1
+  · by_cases h2 : ∀ v : S, ‖x.2 v‖ ≤ 1
+    · rw [ite_eq_left ⟨h1, h2⟩, Set.indicator_of_mem ((mem_infiniteAdeleUnitBox_iff F x.1).2 h1),
+        one_mul]
+      exact Finset.prod_eq_one fun v _ ↦ Set.indicator_of_mem ((hv v).2 (h2 v)) _
+    · rw [ite_eq_right fun h ↦ h2 h.2]
+      push Not at h2
+      obtain ⟨v, hv'⟩ := h2
+      refine mul_eq_zero_of_right _ (Finset.prod_eq_zero (Finset.mem_univ v) ?_)
+      exact Set.indicator_of_notMem (fun h ↦ (not_le.mpr hv') ((hv v).1 h)) _
+  · rw [ite_eq_right fun h ↦ h1 h.1, Set.indicator_of_notMem
+      (fun h ↦ h1 ((mem_infiniteAdeleUnitBox_iff F x.1).1 h)), zero_mul]
 
 /-- Paper: Theorem A.4.1.1(2), p. 562. The product indicator has compact support. -/
 theorem hasCompactSupport_sAdeleUnitBoxIndicator :
     HasCompactSupport (sAdeleUnitBoxIndicator F S) := by
-  sorry
+  let K : Set (SAdeleRing F S) := infiniteAdeleUnitBox F ×ˢ
+    Set.univ.pi fun v : S ↦ (v.val.adicCompletionIntegers F : Set (v.val.adicCompletion F))
+  have hK : IsCompact K := (isCompact_infiniteAdeleUnitBox F).prod
+    (isCompact_univ_pi fun v ↦
+      isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers (K := F) v.val))
+  refine HasCompactSupport.intro hK fun x hx ↦ ?_
+  rw [sAdeleUnitBoxIndicator_apply, ite_eq_right]
+  rintro ⟨h1, h2⟩
+  refine hx ⟨(mem_infiniteAdeleUnitBox_iff F x.1).2 h1, fun v _ ↦ ?_⟩
+  rw [SetLike.mem_coe, HeightOneSpectrum.mem_adicCompletionIntegers,
+    ← Valued.toNormedField.norm_le_one_iff]
+  exact h2 v
 
 /-- Paper: Theorem A.4.1.1(2), p. 562. The product indicator is continuous off the
 boundary of the product box.
@@ -76,7 +126,121 @@ continuous by excluding the frontier of its support. -/
 theorem continuousAt_sAdeleUnitBoxIndicator (x : SAdeleRing F S)
     (hx : x ∉ frontier (Function.support (sAdeleUnitBoxIndicator F S))) :
     ContinuousAt (sAdeleUnitBoxIndicator F S) x := by
-  sorry
+  set f := sAdeleUnitBoxIndicator F S
+  have hcases : x ∉ closure (Function.support f) ∨ x ∈ interior (Function.support f) := by
+    by_contra h
+    push Not at h
+    exact hx ⟨h.1, h.2⟩
+  rcases hcases with hx | hx
+  · have hf : (fun _ ↦ (0 : ℝ)) =ᶠ[nhds x] f := by
+      filter_upwards [isClosed_closure.isOpen_compl.mem_nhds hx] with y hy
+      exact (Function.notMem_support.mp fun h ↦ hy (subset_closure h)).symm
+    exact continuousAt_const.congr hf
+  · have hf : (fun _ ↦ (1 : ℝ)) =ᶠ[nhds x] f := by
+      filter_upwards [isOpen_interior.mem_nhds hx] with y hy
+      have hy' : sAdeleUnitBoxIndicator F S y ≠ 0 := interior_subset hy
+      change 1 = sAdeleUnitBoxIndicator F S y
+      rw [sAdeleUnitBoxIndicator_apply] at hy' ⊢
+      split_ifs at hy' ⊢ with h
+      · rfl
+      · exact absurd rfl hy'
+    exact continuousAt_const.congr hf
+
+/-- The S-logarithm turns products of S-ideles into sums. -/
+private theorem sUnit_unitBox_count_bound_log_mul (g h : Iₛ) :
+    sIdeleLog F S (g * h) = sIdeleLog F S g + sIdeleLog F S h := by
+  funext v
+  rcases v with v | v
+  · have hne (a : Iₛ) : a.val.1 v ≠ 0 :=
+      ((a.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ v)).ne_zero
+    change (v.mult : ℝ) * Real.log ‖g.val.1 v * h.val.1 v‖ =
+      v.mult * Real.log ‖g.val.1 v‖ + v.mult * Real.log ‖h.val.1 v‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h)),
+      mul_add]
+  · have hne (a : Iₛ) : a.val.2 v ≠ 0 :=
+      ((a.isUnit.map (RingHom.snd _ _)).map (Pi.evalRingHom _ v)).ne_zero
+    change Real.log ‖g.val.2 v * h.val.2 v‖ = Real.log ‖g.val.2 v‖ + Real.log ‖h.val.2 v‖
+    rw [norm_mul, Real.log_mul (norm_ne_zero_iff.mpr (hne g)) (norm_ne_zero_iff.mpr (hne h))]
+
+/-- The S-logarithm of a diagonal S-unit has coordinate sum zero. -/
+private theorem sUnit_unitBox_count_bound_log_sum (u : Oₛˣ) :
+    ∑ v, sIdeleLog F S (unitAtS u) v = 0 := by
+  have h1 : sIdeleNorm F S (unitAtS u) = 1 :=
+    MonoidHom.mem_ker.mp ((sIdeleNorm_spec F S).2 ⟨u, rfl⟩)
+  rw [sIdeleLog_sum, h1]
+  simp
+
+/-- On S-ideles the box indicator is one exactly when every S-logarithmic coordinate is
+nonpositive, and zero otherwise. -/
+private theorem sUnit_unitBox_count_bound_indicator (h : Iₛ) :
+    sAdeleUnitBoxIndicator F S h.val = if ∀ v, sIdeleLog F S h v ≤ 0 then 1 else 0 := by
+  have hne₁ (w : InfinitePlace F) : 0 < ‖h.val.1 w‖ :=
+    norm_pos_iff.mpr ((h.isUnit.map (RingHom.fst _ _)).map (Pi.evalRingHom _ w)).ne_zero
+  have key : ((∀ w : InfinitePlace F, ‖h.val.1 w‖ ≤ 1) ∧ ∀ v : S, ‖h.val.2 v‖ ≤ 1) ↔
+      ∀ v, sIdeleLog F S h v ≤ 0 := by
+    constructor
+    · rintro ⟨h1, h2⟩ (w | v)
+      · exact mul_nonpos_of_nonneg_of_nonpos (Nat.cast_nonneg _)
+          (Real.log_nonpos (norm_nonneg _) (h1 w))
+      · exact Real.log_nonpos (norm_nonneg _) (h2 v)
+    · intro hl
+      refine ⟨fun w ↦ ?_, fun v ↦ ?_⟩
+      · have hw := hl (Sum.inl w)
+        change (w.mult : ℝ) * Real.log ‖h.val.1 w‖ ≤ 0 at hw
+        have hm : (0 : ℝ) < w.mult := by exact_mod_cast w.mult_pos
+        refine (Real.log_nonpos_iff (norm_nonneg _)).mp ?_
+        by_contra hc
+        push Not at hc
+        linarith [mul_pos hm hc]
+      · have hv := hl (Sum.inr v)
+        change Real.log ‖h.val.2 v‖ ≤ 0 at hv
+        exact (Real.log_nonpos_iff (norm_nonneg _)).mp hv
+  rw [sAdeleUnitBoxIndicator_apply]
+  by_cases hc : ∀ v, sIdeleLog F S h v ≤ 0
+  · rw [ite_eq_left (key.mpr hc), ite_eq_left hc]
+  · rw [ite_eq_right (mt key.mp hc), ite_eq_right hc]
+
+/-- Diagonal S-units whose S-logarithm lies in a small ball are finite in number. -/
+private theorem sUnit_unitBox_count_bound_finite :
+    {u : Oₛˣ | ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2}.Finite := by
+  let value (u : Oₛˣ) : F := u.val.val
+  have hinj : Function.Injective value := fun _ _ h ↦ Units.ext (Subtype.ext h)
+  let r : ℝ := Real.log 2 / 2
+  refine Set.Finite.of_finite_image ?_ hinj.injOn
+  refine (Embeddings.finite_of_norm_le F ℂ (Real.exp r)).subset ?_
+  rintro _ ⟨u, hu, rfl⟩
+  have hne : value u ≠ 0 := (u.isUnit.map (Oₛ).val).ne_zero
+  have hcoord (v : Vₛ) : sIdeleLog F S (unitAtS u) v ≤ r :=
+    (le_abs_self _).trans ((norm_le_pi_norm (sIdeleLog F S (unitAtS u)) v).trans hu)
+  refine ⟨?_, (InfinitePlace.le_iff_le (value u) (Real.exp r)).mp ?_⟩
+  · -- At the selected finite places a norm less than two is at most one.
+    have hval (v : HeightOneSpectrum (𝓞 F)) : v.valuation F (value u) ≤ 1 := by
+      by_cases hv : v ∈ S
+      · let x : v.adicCompletion F := algebraMap F _ (value u)
+        have hxne : x ≠ 0 := (map_ne_zero_iff _ (RingHom.injective _)).mpr hne
+        have hxlog : Real.log ‖x‖ ≤ r := hcoord (Sum.inr ⟨v, hv⟩)
+        have hxlt : ‖x‖ < 2 := (Real.log_lt_log_iff (norm_pos_iff.mpr hxne) (by norm_num)).mp
+          (hxlog.trans_lt (by dsimp [r]; linarith [Real.log_pos (by norm_num : (1 : ℝ) < 2)]))
+        have hx : ‖x‖ ≤ 1 := le_of_not_gt fun h ↦
+          (not_le_of_gt hxlt) (FinitePlace.two_le_norm_of_one_lt_norm (K := F) (v := v) x h)
+        rw [← HeightOneSpectrum.valuedAdicCompletion_eq_valuation']
+        exact Valued.toNormedField.norm_le_one_iff.mp hx
+      · exact u.val.property v hv
+    obtain ⟨a, ha⟩ := HeightOneSpectrum.mem_integers_of_valuation_le_one F (value u) hval
+    exact ha ▸ a.isIntegral_coe
+  · intro v
+    have hlog : (v.mult : ℝ) * Real.log (v (value u)) ≤ r := by
+      have hv := hcoord (Sum.inl v)
+      change (v.mult : ℝ) * Real.log ‖algebraMap F v.Completion (value u)‖ ≤ r at hv
+      rw [InfinitePlace.coe_apply]
+      simpa only [AbsoluteValue.Completion.algebraMap_def, AbsoluteValue.Completion.norm_coe,
+        WithAbs.algebraMap_right_apply, Algebra.algebraMap_self_apply, WithAbs.ofAbs_toAbs]
+        using hv
+    have hr : 0 ≤ r := div_nonneg (Real.log_nonneg (by norm_num)) (by norm_num)
+    have hm : (1 : ℝ) ≤ v.mult := by exact_mod_cast v.mult_pos
+    apply (Real.log_le_iff_le_exp (v.pos_iff.mpr hne)).mp
+    rw [mul_comm, ← le_div_iff₀ (lt_of_lt_of_le (by norm_num) hm)] at hlog
+    exact hlog.trans (div_le_self hr hm)
 
 /-- Paper: Theorem A.4.1.1, (A.4.1.3), p. 562. Uniformly for S-ideles of sufficiently
 small S-idelic norm, the number of diagonal S-unit multiples in the unit box is bounded
@@ -86,7 +250,148 @@ theorem sUnit_unitBox_count_bound :
     ∃ C ε : ℝ, 0 < C ∧ 0 < ε ∧ ∀ g : Iₛ, normℝ[g] < ε →
       let term := fun u : Oₛˣ ↦ sAdeleUnitBoxIndicator F S (unitAtS u * g).val
       (Function.support term).Finite ∧ ∑' u, term u ≤ C * |Real.log (normℝ[g])| ^ sRank := by
-  sorry
+  classical
+  obtain ⟨w₀⟩ : Nonempty (InfinitePlace F) := inferInstance
+  let i₀ : Vₛ := Sum.inl w₀
+  have : Nonempty Vₛ := ⟨i₀⟩
+  let n : ℕ := Fintype.card Vₛ
+  have hn : 0 < n := Fintype.card_pos
+  have hlog2 : 0 < Real.log 2 := Real.log_pos (by norm_num)
+  let δ : ℝ := Real.log 2 / 2 / n
+  have hδ : 0 < δ := by positivity
+  have hnδ : n * δ = Real.log 2 / 2 := by
+    change (n : ℝ) * (Real.log 2 / 2 / n) = _
+    field_simp
+  have hδle : δ ≤ Real.log 2 / 2 := by
+    rw [← hnδ]
+    exact le_mul_of_one_le_left hδ.le (by exact_mod_cast hn)
+  let T : Set Oₛˣ := {u | ‖sIdeleLog F S (unitAtS u)‖ ≤ Real.log 2 / 2}
+  have hT : T.Finite := sUnit_unitBox_count_bound_finite F S
+  have : Finite T := hT.to_subtype
+  have hcard : Nat.card {i : Vₛ // i ≠ i₀} = sRank := by
+    rw [Nat.card_eq_fintype_card, Fintype.card_subtype_compl, Fintype.card_subtype_eq,
+      Fintype.card_sum, Fintype.card_coe]
+  refine ⟨(1 / δ + 1) ^ sRank * Nat.card T + 1, Real.exp (-1), by positivity, Real.exp_pos _, ?_⟩
+  intro g hg term
+  obtain ⟨a, ha⟩ : ∃ a : Oₛˣ → Vₛ → ℝ, ∀ u, a u = sIdeleLog F S (unitAtS u) := ⟨_, fun _ ↦ rfl⟩
+  obtain ⟨ℓ, hℓ⟩ : ∃ ℓ : Vₛ → ℝ, ℓ = sIdeleLog F S g := ⟨_, rfl⟩
+  have hnorm : 0 < normℝ[g] := NNReal.coe_pos.mpr (pos_iff_ne_zero.mpr (Units.ne_zero _))
+  have hlt : Real.log normℝ[g] < -1 := by
+    have h := Real.log_lt_log hnorm hg
+    rwa [Real.log_exp] at h
+  obtain ⟨L, hL⟩ : ∃ L : ℝ, L = -Real.log normℝ[g] := ⟨_, rfl⟩
+  have hL1 : 1 ≤ L := by linarith
+  have habs : |Real.log normℝ[g]| = L := by rw [abs_of_neg (by linarith), hL]
+  have hℓsum : ∑ i, ℓ i = -L := by rw [hℓ, sIdeleLog_sum, hL, neg_neg]
+  have hasum (u : Oₛˣ) : ∑ i, a u i = 0 := by
+    rw [ha]
+    exact sUnit_unitBox_count_bound_log_sum F S u
+  have hadiv (u u' : Oₛˣ) : a (u * u'⁻¹) = a u - a u' := by
+    have h := sUnit_unitBox_count_bound_log_mul F S (unitAtS (u * u'⁻¹)) (unitAtS u')
+    rw [← map_mul, inv_mul_cancel_right, ← ha, ← ha, ← ha] at h
+    rw [h, add_sub_cancel_right]
+  have hterm (u : Oₛˣ) : term u = if ∀ i, a u i + ℓ i ≤ 0 then 1 else 0 := by
+    change sAdeleUnitBoxIndicator F S (unitAtS u * g).val = _
+    rw [sUnit_unitBox_count_bound_indicator, sUnit_unitBox_count_bound_log_mul, ← ha, ← hℓ]
+    rfl
+  have hsupp (u : Oₛˣ) : u ∈ Function.support term ↔ ∀ i, a u i + ℓ i ≤ 0 := by
+    rw [Function.mem_support, hterm]
+    split_ifs with h
+    · exact ⟨fun _ ↦ h, fun _ ↦ one_ne_zero⟩
+    · exact ⟨fun h0 ↦ absurd rfl h0, fun h' ↦ absurd h' h⟩
+  -- Every coordinate of a counted unit lies in an interval of length `L`.
+  have hbox (u : Oₛˣ) (hu : u ∈ Function.support term) (i : Vₛ) :
+      0 ≤ a u i + ℓ i + L ∧ a u i + ℓ i + L ≤ L := by
+    have hb := (hsupp u).mp hu
+    have hs : ∑ j, (a u j + ℓ j) = -L := by
+      rw [Finset.sum_add_distrib, hasum, hℓsum, zero_add]
+    rw [Fintype.sum_eq_add_sum_subtype_ne _ i] at hs
+    have hrest : ∑ j : {j : Vₛ // j ≠ i}, (a u j + ℓ j) ≤ 0 :=
+      Finset.sum_nonpos fun j _ ↦ hb j
+    exact ⟨by linarith, by linarith [hb i]⟩
+  let M : ℕ := ⌊L / δ⌋₊
+  let φ : Oₛˣ → {i : Vₛ // i ≠ i₀} → ℕ := fun u i ↦ ⌊(a u i + ℓ i + L) / δ⌋₊
+  have hφ (u : Oₛˣ) (hu : u ∈ Function.support term) (i : {i : Vₛ // i ≠ i₀}) :
+      φ u i < M + 1 :=
+    Nat.lt_succ_of_le (Nat.floor_le_floor (div_le_div_of_nonneg_right (hbox u hu i).2 hδ.le))
+  -- Two counted units with the same cell differ by a unit of small logarithm.
+  have hfiber (u u' : Oₛˣ) (hu : u ∈ Function.support term) (hu' : u' ∈ Function.support term)
+      (h : φ u = φ u') : u * u'⁻¹ ∈ T := by
+    have hcoord (j : Vₛ) (hj : j ≠ i₀) : |a u j - a u' j| < δ := by
+      have hk := congrFun h ⟨j, hj⟩
+      change ⌊(a u j + ℓ j + L) / δ⌋₊ = ⌊(a u' j + ℓ j + L) / δ⌋₊ at hk
+      have hy := div_nonneg (hbox u hu j).1 hδ.le
+      have hy' := div_nonneg (hbox u' hu' j).1 hδ.le
+      have h1 := Nat.floor_le hy
+      have h2 := Nat.lt_floor_add_one ((a u j + ℓ j + L) / δ)
+      have h1' := Nat.floor_le hy'
+      have h2' := Nat.lt_floor_add_one ((a u' j + ℓ j + L) / δ)
+      rw [hk] at h1 h2
+      have hd : |(a u j + ℓ j + L) / δ - (a u' j + ℓ j + L) / δ| < 1 := by
+        rw [abs_lt]
+        constructor <;> linarith
+      rwa [← sub_div, abs_div, abs_of_pos hδ, div_lt_one hδ,
+        show a u j + ℓ j + L - (a u' j + ℓ j + L) = a u j - a u' j by ring] at hd
+    change ‖sIdeleLog F S (unitAtS (u * u'⁻¹))‖ ≤ Real.log 2 / 2
+    rw [← ha, hadiv]
+    refine (pi_norm_le_iff_of_nonneg (by positivity)).mpr fun j ↦ ?_
+    rw [Real.norm_eq_abs, Pi.sub_apply]
+    by_cases hj : j = i₀
+    · have hs : ∑ k, (a u k - a u' k) = 0 := by
+        rw [Finset.sum_sub_distrib, hasum, hasum, sub_zero]
+      rw [Fintype.sum_eq_add_sum_subtype_ne _ i₀] at hs
+      have he : a u i₀ - a u' i₀ = -∑ k : {k : Vₛ // k ≠ i₀}, (a u k - a u' k) := by linarith
+      rw [hj, he, abs_neg]
+      calc |∑ k : {k : Vₛ // k ≠ i₀}, (a u k - a u' k)|
+          ≤ ∑ k : {k : Vₛ // k ≠ i₀}, |a u k - a u' k| := Finset.abs_sum_le_sum_abs _ _
+        _ ≤ ∑ _k : {k : Vₛ // k ≠ i₀}, δ := Finset.sum_le_sum fun k _ ↦ (hcoord k k.2).le
+        _ = Fintype.card {k : Vₛ // k ≠ i₀} * δ := by
+          rw [Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+        _ ≤ n * δ := mul_le_mul_of_nonneg_right
+          (by exact_mod_cast Fintype.card_subtype_le _) hδ.le
+        _ = Real.log 2 / 2 := hnδ
+    · exact (hcoord j hj).le.trans hδle
+  let base : ({i : Vₛ // i ≠ i₀} → ℕ) → Oₛˣ := Function.invFunOn φ (Function.support term)
+  have hbase (u : Oₛˣ) (hu : u ∈ Function.support term) :
+      base (φ u) ∈ Function.support term ∧ φ (base (φ u)) = φ u :=
+    Function.invFunOn_pos ⟨u, hu, rfl⟩
+  let Ψ : Function.support term → ({i : Vₛ // i ≠ i₀} → Fin (M + 1)) × T := fun u ↦
+    (fun i ↦ ⟨φ u i, hφ u u.2 i⟩,
+      ⟨u * (base (φ u))⁻¹, hfiber u (base (φ u)) u.2 (hbase u u.2).1 (hbase u u.2).2.symm⟩)
+  have hΨ : Function.Injective Ψ := by
+    intro u u' h
+    have h1 : φ u = φ u' := funext fun i ↦ congrArg Fin.val (congrFun (congrArg Prod.fst h) i)
+    have h2 : (u : Oₛˣ) * (base (φ u))⁻¹ = u' * (base (φ u'))⁻¹ :=
+      congrArg (fun p ↦ (p.2 : Oₛˣ)) h
+    rw [h1] at h2
+    exact Subtype.ext (mul_right_cancel h2)
+  have hfin : (Function.support term).Finite := by
+    have := Finite.of_injective Ψ hΨ
+    exact Set.toFinite _
+  refine ⟨hfin, ?_⟩
+  have hcount : Nat.card (Function.support term) ≤ (M + 1) ^ sRank * Nat.card T := by
+    have h := Nat.card_le_card_of_injective Ψ hΨ
+    rwa [Nat.card_prod, Nat.card_fun, Nat.card_eq_fintype_card (α := Fin (M + 1)),
+      Fintype.card_fin, hcard] at h
+  have hsum : ∑' u, term u = Nat.card (Function.support term) := by
+    rw [tsum_eq_sum (s := hfin.toFinset) fun u hu ↦ Function.notMem_support.mp
+      (fun h ↦ hu (hfin.mem_toFinset.mpr h))]
+    rw [Finset.sum_congr rfl fun u hu ↦ show term u = 1 by
+      rw [hterm, ite_eq_left ((hsupp u).mp (hfin.mem_toFinset.mp hu))]]
+    rw [Finset.sum_const, nsmul_eq_mul, mul_one, Nat.card_eq_card_finite_toFinset hfin]
+  rw [hsum, habs]
+  have hM : (M : ℝ) + 1 ≤ (1 / δ + 1) * L := by
+    have h1 : (M : ℝ) ≤ L / δ := Nat.floor_le (div_nonneg (by linarith) hδ.le)
+    rw [add_mul, one_mul, one_div_mul_eq_div]
+    linarith
+  have hLpow : 0 ≤ L ^ sRank := pow_nonneg (by linarith) _
+  calc (Nat.card (Function.support term) : ℝ)
+      ≤ ((M + 1) ^ sRank * Nat.card T : ℕ) := by exact_mod_cast hcount
+    _ = ((M : ℝ) + 1) ^ sRank * Nat.card T := by push_cast; ring
+    _ ≤ ((1 / δ + 1) * L) ^ sRank * Nat.card T := by gcongr
+    _ = ((1 / δ + 1) ^ sRank * Nat.card T) * L ^ sRank := by rw [mul_pow]; ring
+    _ ≤ ((1 / δ + 1) ^ sRank * Nat.card T + 1) * L ^ sRank :=
+        mul_le_mul_of_nonneg_right (le_add_of_nonneg_right zero_le_one) hLpow
 
 -- TODO(paper-gap): Page 562, note 3, proposes a remark about Connes without a statement.
 -- TODO(paper-gap): Page 563, the image following (A.4.1.4) has discrete finite coordinates.
