@@ -3,7 +3,7 @@ module
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3b
 import Mathlib.Analysis.Normed.Module.PiTensorProduct.ProjectiveSeminorm
-import all RiemannMasullo.AppC_LCTVS.Sec2a_part2
+import RiemannMasullo.AppC_LCTVS.Sec2a_part2
 import Mathlib.Algebra.Order.Archimedean.Real.Hom
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec1b
 import all RiemannMasullo.AppD_SchwartzBruhat.Sec2b
@@ -2426,11 +2426,24 @@ private theorem archimedeanWeightedSchwartz_tensor_finite_bound
   have hbound := archimedeanWeightedSchwartz_tensor_normed_bound p' hC h (E z)
   exact (show p' (E z) = p z from congrArg p (E.symm_apply_apply z)) ▸ hbound
 
+/-- The projective tensor universal property applied to the identity gives joint continuity of
+the pure tensor map. -/
+private theorem archimedeanWeightedSchwartz_tensor_tmul_continuous
+    (X Y : Type*) [AddCommGroup X] [Module ℂ X] [TopologicalSpace X]
+    [AddCommGroup Y] [Module ℂ Y] [TopologicalSpace Y] [PolynormableSpace ℂ X]
+    [PolynormableSpace ℂ Y] [T2Space X] [T2Space Y] :
+    @Continuous (X × Y) (ProjectiveTensor X Y) _ _ (fun v ↦ v.1 ⊗ₜ[ℂ] v.2) := by
+  let : PolynormableSpace ℂ (ProjectiveTensor X Y) :=
+    (withGeneratingSeminorms_spec _ _).toPolynormableSpace
+  exact (continuous_projectiveTensor_iff (LinearMap.id (R := ℂ) (M := ProjectiveTensor X Y))).mp
+    continuous_id
+
 /-- Splitting off one coordinate preserves the projective topology. To bound the inverse, apply the
 finite projective seminorm to the remaining coordinates. -/
 private theorem archimedeanWeightedSchwartz_tensor_split_coordinate.{uS}
     {ι : Type uS} {A : Type*} [Fintype ι] [DecidableEq ι] [AddCommGroup A] [Module ℂ A] [TopologicalSpace A]
-    [PolynormableSpace ℂ A] (i : ι)
+    [PolynormableSpace ℂ A] [T2Space A] (i : ι)
+    [T2Space (FiniteProjectiveTensor (fun _ : {j : ι // j ≠ i} ↦ A))]
     (hrest : @Continuous ({j : ι // j ≠ i} → A) (FiniteProjectiveTensor (fun _ : {j : ι // j ≠ i} ↦ A)) _ _ (PiTensorProduct.tprod ℂ)) :
     ∃ e : FiniteProjectiveTensor (fun _ : ι ↦ A) ≃L[ℂ]
         ProjectiveTensor (FiniteProjectiveTensor (fun _ : {j : ι // j ≠ i} ↦ A)) A,
@@ -2453,12 +2466,15 @@ private theorem archimedeanWeightedSchwartz_tensor_split_coordinate.{uS}
   have he (f : ι → A) : e (PiTensorProduct.tprod ℂ f) =
       (PiTensorProduct.tprod ℂ fun j : J ↦ f j.val) ⊗ₜ[ℂ] f i := he₀ f
   let : PolynormableSpace ℂ (T J) := (withGeneratingSeminorms_spec _ (fam J)).toPolynormableSpace
+  let projectiveFamily := fun p : {p : Seminorm ℂ ((T J) ⊗[ℂ] A) //
+    ContinuousAt (fun v : (T J) × A ↦ p (v.1 ⊗ₜ[ℂ] v.2)) 0} ↦ p.val
+  have hprojective := withGeneratingSeminorms_spec _ projectiveFamily
   have hpure : Continuous (fun f : ι → A ↦ e (PiTensorProduct.tprod ℂ f)) := by
-    refine ((continuous_projectiveTensor_tmul (E := T J) (F := A)).comp ((hrest.comp (continuous_pi fun j ↦ continuous_apply j.val)).prodMk
+    refine ((archimedeanWeightedSchwartz_tensor_tmul_continuous (T J) A).comp ((hrest.comp (continuous_pi fun j ↦ continuous_apply j.val)).prodMk
       (continuous_apply i))).congr fun f ↦ (he f).symm
-  have hc : Continuous e := (projectiveTensor_withSeminorms (T J) A).continuous_of_continuous_comp
+  have hc : Continuous e := hprojective.continuous_of_continuous_comp
     e.toLinearMap fun p ↦ (withGeneratingSeminorms_spec _ (fam ι)).continuous_seminorm
-      ⟨p.val.comp e.toLinearMap, ((projectiveTensor_withSeminorms (T J) A).continuous_seminorm p).comp hpure⟩
+      ⟨p.val.comp e.toLinearMap, (hprojective.continuous_seminorm p).comp hpure⟩
   have : Nonempty ι := ⟨i⟩
   have : IsTopologicalAddGroup A := PolynormableSpace.isTopologicalAddGroup ℂ A
   have hd : Continuous e.symm := by
@@ -2480,7 +2496,7 @@ private theorem archimedeanWeightedSchwartz_tensor_split_coordinate.{uS}
       rw [Fintype.prod_eq_mul_prod_compl i, hi]
       congr 1
       exact (Finset.prod_subtype ({i}ᶜ : Finset ι) (p := fun j ↦ j ≠ i) (fun j ↦ by simp) (fun j ↦ q j (g j))).trans (Finset.prod_congr rfl (fun j _ ↦ congrArg (q j.val) (congrFun hj j)))
-    refine (projectiveTensor_withSeminorms (T J) A).continuous_seminorm ⟨p.val.comp e.symm.toLinearMap, ?_⟩
+    refine hprojective.continuous_seminorm ⟨p.val.comp e.symm.toLinearMap, ?_⟩
     change ContinuousAt (fun z : T J × A ↦ p.val (e.symm (z.1 ⊗ₜ[ℂ] z.2))) 0
     have hz : p.val (e.symm (((0 : T J × A).1) ⊗ₜ[ℂ] (0 : T J × A).2)) = 0 :=
       ((congrArg (fun z ↦ p.val (e.symm z)) (TensorProduct.zero_tmul (T J) (0 : A))).trans
@@ -2536,7 +2552,19 @@ private theorem archimedeanWeightedSchwartz_tensor_kernel_coordinates
   let T : InjectiveTensor A B →ₗ[ℂ] E₁ := injectiveTensorMap t.toLinearMap u.toLinearMap
   let V (p : I × J) : E₁ →ₗ[ℂ] E₂ := injectiveTensorMap (LinearMap.proj p.1) (LinearMap.proj p.2)
   have hT := injectiveTensorMap_isEmbedding t u ht hu
-  have hV := (injectiveTensor_products_isUniformInducing (fun _ : I ↦ X) (fun _ : J ↦ Y)).isInducing
+  have hV : IsInducing (fun z : E₁ ↦ fun p : I × J ↦ V p z) := by
+    let inc (w : I × J → E₂) := fun p ↦ (w p : UniformSpace.Completion E₂)
+    have hinc : IsInducing inc := IsInducing.piMap fun _ : I × J ↦
+      (UniformSpace.Completion.isUniformInducing_coe E₂).isInducing
+    apply (IsInducing.of_comp_iff hinc).mp
+    have hfull := (completedInjectiveTensor_products (fun _ : I ↦ X) (fun _ : J ↦ Y)).isInducing.comp
+      (UniformSpace.Completion.isUniformInducing_coe E₁).isInducing
+    convert hfull using 1
+    funext z p
+    have hc : Continuous (V p) := injectiveTensorMap_continuous
+      (ContinuousLinearMap.proj p.1 : (I → X) →L[ℂ] X) (ContinuousLinearMap.proj p.2 : (J → Y) →L[ℂ] Y)
+    exact (UniformSpace.Completion.map_coe
+      ((V p).toAddMonoidHom.uniformContinuous_of_continuousAt_zero hc.continuousAt) z).symm
   let L : ProjectiveTensor A B →ₗ[ℂ] (I × J → Z) := LinearMap.pi fun p ↦
     (k.comp (V p)).comp (show ProjectiveTensor A B →ₗ[ℂ] E₁ from T)
   have hL : IsInducing L := (IsInducing.piMap (fun _ : I × J ↦ hk)).comp
@@ -2652,11 +2680,11 @@ private theorem archimedeanWeightedSchwartz_tensor_finite_coordinates.{uS}
     obtain ⟨i⟩ := h
     let J := {j : ι // j ≠ i}
     obtain ⟨hc,L,hL,hv⟩ := archimedeanWeightedSchwartz_tensor_finite_coordinates t ht hG hprod hempty J
-    obtain ⟨e,he⟩ := archimedeanWeightedSchwartz_tensor_split_coordinate i hc
     let T := FiniteProjectiveTensor (fun _ : J ↦ A)
     let : PolynormableSpace ℂ T := (withGeneratingSeminorms_spec _ _).toPolynormableSpace
     let : T2Space (SchwartzBruhat (J → G)) := schwartzBruhat_t2
     let : T2Space T := hL.t2Space
+    obtain ⟨e,he⟩ := archimedeanWeightedSchwartz_tensor_split_coordinate i hc
     have hN : IsNuclearTVS.{0} T := isNuclearTVS_of_linearEmbedding L.toLinearMap hL
       (isNuclearTVS_pi fun _ : J → W ↦ schwartzBruhat_nuclear (G := J → G))
     obtain ⟨K,hK,hKv⟩ := archimedeanWeightedSchwartz_tensor_kernel_coordinates hN.tensorComparison (hprod J) hG L t hL ht
@@ -2677,7 +2705,7 @@ private theorem archimedeanWeightedSchwartz_tensor_finite_coordinates.{uS}
     let : T2Space (SchwartzBruhat ((J → G) × G)) := schwartzBruhat_t2
     let : T2Space (FiniteProjectiveTensor (fun _ : ι ↦ A)) := (hK.comp e.toHomeomorph.isEmbedding).t2Space
     have hcp : @Continuous (ι → A) (ProjectiveTensor T A) _ _ (fun f ↦ e (PiTensorProduct.tprod ℂ f)) := by
-      exact ((continuous_projectiveTensor_tmul (E := T) (F := A)).comp
+      exact ((archimedeanWeightedSchwartz_tensor_tmul_continuous T A).comp
         ((hc.comp (continuous_pi fun j ↦ continuous_apply j.val)).prodMk (continuous_apply i))).congr fun f ↦ (he f).symm
     refine ⟨e.toHomeomorph.isInducing.continuous_iff.mpr hcp, D, hi.isEmbedding, fun f a u ↦ ?_⟩
     change K (e (PiTensorProduct.tprod ℂ f)) (w a) (d u) = _
