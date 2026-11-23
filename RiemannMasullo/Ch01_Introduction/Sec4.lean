@@ -58,14 +58,20 @@ local notation "windowZeros(" χ ", " a ")" =>
 -- The deduction here inherits the unfinished kernel comparisons in those subsections.
 -- The centered window in §1.8.4, p. 53, agrees with the shift in §1.4.3.
 
-section CharacterTrace
-
 /-- Paper: §1.4.1, p. 28. A radial profile gives a test of norm-one weight
 conjugate to the character by multiplication by that conjugate on the idele classes.
 Deviation: The conjugate is required by the stated weight and by the zero Mellin
 pairing. The product in the prose of §§1.4.2–1.4.3 uses the character itself. -/
 def introTraceTest (χ : U𝔽) (h : ℝ → ℂ) (g : C𝔽) : ℂ :=
   (star (χ g : ℂ)) * h (N(g))
+
+local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
+local notation "archIntegrand(" χ ", " h ", " w ")" =>
+  (fun u : (w : InfinitePlace F).Completionˣ ↦
+    introTraceTest χ h (archClass(w) u) * (Real.sqrt (‖u.val‖ ^ InfinitePlace.mult w) : ℂ) /
+      ((‖1 - u.val‖ ^ InfinitePlace.mult w : ℝ) : ℂ))
+
+section CharacterTrace
 
 /-- Paper: §1.4.1, p. 28. Right translation by a norm-one class multiplies the
 test by the conjugate character value on that class. -/
@@ -130,12 +136,6 @@ theorem introTraceTest_mellin (χ : U𝔽) (h : ℝ → ℂ) (φ : D𝔽)
       rw [show (ideleClassTamagawaMeasure F).map l = _ from classTamagawa_map_log_norm (F := F),
         integral_smul_nnreal_measure, hmellin]
       rfl
-
-local notation "archClass(" w ")" => IdeleClassGroup.ofCompletion (𝓞 F) F w
-local notation "archIntegrand(" χ ", " h ", " w ")" =>
-  (fun u : (w : InfinitePlace F).Completionˣ ↦
-    introTraceTest χ h (archClass(w) u) * (Real.sqrt (‖u.val‖ ^ InfinitePlace.mult w) : ℂ) /
-      ((‖1 - u.val‖ ^ InfinitePlace.mult w : ℝ) : ℂ))
 
 open Classical in
 /-- Paper: §1.4.1, p. 28. The archimedean term is the ordinary local integral
@@ -1546,6 +1546,55 @@ theorem introTraceApprox_archimedean_differentiable (χ : U𝔽) (h ρ : ℕ →
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (w : InfinitePlace F) :
     Differentiable ℂ (fun z ↦ introTraceArchimedean χ approx(h, ρ, n, z) w) := by sorry
 
+/-- The local multiplicative measure in either infinite-place coordinate has density
+the reciprocal normalized norm against its additive Tamagawa measure. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_lintegral {E : Type*} [NormedField E] [MeasurableSpace E] [BorelSpace E]
+    (v : InfinitePlace F) (e : v.Completion ≃+* E) (hi : Isometry e)
+    (ν : Measure E) (hν : ν.restrict {0}ᶜ = ν)
+    (hμ : letI := instMeasurableSpaceCompletion_riemannMasullo F v
+      infiniteLocalAdditiveTamagawaMeasure F v = ν.map e.symm)
+    (Φ : E → ENNReal) (hΦ : Measurable Φ) :
+    ∫⁻ u, Φ (e (u : v.Completion)) ∂infiniteLocalMultiplicativeTamagawaMeasure F v =
+      ∫⁻ t, Φ t * ENNReal.ofReal (‖t‖ ^ v.mult)⁻¹ ∂ν := by
+  let : MeasurableSpace v.Completion := instMeasurableSpaceCompletion_riemannMasullo F v
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let j : v.Completion ≃ᵢ E := ⟨e.toEquiv, hi⟩
+  let m := j.toHomeomorph.toMeasurableEquiv
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.Completion)).measurableEmbedding
+  have hd : Measurable (fun x : v.Completion ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹) :=
+    (measurable_coe_nnreal_ennreal.comp (measurable_nnNorm.pow_const _)).inv
+  let g : v.Completion → ENNReal := fun x ↦ Φ (e x)
+  have hg : Measurable g := hΦ.comp m.measurable
+  have hee (t : E) : e (m.symm t) = t := e.apply_symm_apply t
+  have key := hval.lintegral_map (μ := ((infiniteLocalAdditiveTamagawaMeasure F v).withDensity
+    (fun x ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹)).comap Units.val) g
+  rw [hval.map_comap, setLIntegral_withDensity_eq_setLIntegral_mul _ hd hg
+    hval.measurableSet_range] at key
+  unfold infiniteLocalMultiplicativeTamagawaMeasure
+  refine key.symm.trans ?_
+  rw [hμ]
+  change (∫⁻ x in range Units.val, _ ∂ν.map m.symm) = _
+  rw [m.symm.restrict_map, m.symm.measurableEmbedding.lintegral_map]
+  have he0 : m.symm 0 = 0 := map_zero (e).symm
+  have hrange : m.symm ⁻¹' range (Units.val : v.Completionˣ → v.Completion) = {0}ᶜ := by
+    ext t
+    simp only [mem_preimage, mem_range, mem_compl_iff, mem_singleton_iff]
+    constructor
+    · rintro ⟨x, hx⟩ rfl
+      exact x.ne_zero (hx.trans he0)
+    · intro ht
+      exact ⟨Units.mk0 (m.symm t) fun h0 ↦ ht (m.symm.injective (h0.trans he0.symm)), rfl⟩
+  have hnorm (t : E) : ‖m.symm t‖ = ‖t‖ := j.symm.isometry.norm_map_of_map_zero (map_zero e.symm) t
+  rw [hrange]
+  conv_rhs => rw [← hν]
+  refine setLIntegral_congr_fun (measurableSet_singleton (0 : E)).compl fun t ht ↦ ?_
+  have ht0 : t ≠ 0 := ht
+  change (↑(‖m.symm t‖₊ ^ v.mult) : ENNReal)⁻¹ * g (m.symm t) = _
+  simp only [g]
+  rw [hee, ← ENNReal.ofReal_coe_nnreal, NNReal.coe_pow, coe_nnNorm, hnorm, mul_comm,
+    ENNReal.ofReal_inv_of_pos (pow_pos (norm_pos_iff.mpr ht0) _)]
+
 /-- At the real place of ℚ, a lower integral against the local multiplicative Tamagawa measure
 is the Lebesgue integral with density `|t|⁻¹` in the real coordinate. -/
 private theorem introTraceApprox_rat_archimedean_tendsto_atTop_lintegral
@@ -1554,48 +1603,12 @@ private theorem introTraceApprox_rat_archimedean_tendsto_atTop_lintegral
         (u : Rat.infinitePlace.Completion))
         ∂infiniteLocalMultiplicativeTamagawaMeasure ℚ Rat.infinitePlace =
       ∫⁻ t, Φ t * ENNReal.ofReal |t|⁻¹ := by
-  let v := Rat.infinitePlace
-  have h : v.IsReal := Rat.isReal_infinitePlace
-  let : MeasurableSpace v.Completion := instMeasurableSpaceCompletion_riemannMasullo ℚ v
-  let : BorelSpace v.Completion := ⟨rfl⟩
-  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
-  let e := (InfinitePlace.Completion.isometryEquivRealOfIsReal h).toHomeomorph.toMeasurableEquiv
-  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.Completion)).measurableEmbedding
-  have hd : Measurable (fun x : v.Completion ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹) :=
-    (measurable_coe_nnreal_ennreal.comp (measurable_nnnorm.pow_const _)).inv
-  let g : v.Completion → ENNReal := fun x ↦ Φ (InfinitePlace.Completion.ringEquivRealOfIsReal h x)
-  have hg : Measurable g := hΦ.comp e.measurable
-  have hee (t : ℝ) : InfinitePlace.Completion.ringEquivRealOfIsReal h (e.symm t) = t :=
-    e.apply_symm_apply t
-  have key := hval.lintegral_map (μ := ((infiniteLocalAdditiveTamagawaMeasure ℚ v).withDensity
-    (fun x ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹)).comap Units.val) g
-  rw [hval.map_comap, setLIntegral_withDensity_eq_setLIntegral_mul _ hd hg
-    hval.measurableSet_range] at key
-  unfold infiniteLocalMultiplicativeTamagawaMeasure
-  refine key.symm.trans ?_
-  rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
-  change (∫⁻ x in range Units.val, _ ∂volume.map e.symm) = _
-  rw [e.symm.restrict_map, e.symm.measurableEmbedding.lintegral_map]
-  have he0 : e.symm 0 = 0 := map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal h).symm
-  have hrange : e.symm ⁻¹' range (Units.val : v.Completionˣ → v.Completion) = {0}ᶜ := by
-    ext t
-    simp only [mem_preimage, mem_range, mem_compl_iff, mem_singleton_iff]
-    constructor
-    · rintro ⟨x, hx⟩ rfl
-      exact x.ne_zero (hx.trans he0)
-    · intro ht
-      exact ⟨Units.mk0 (e.symm t) fun h0 ↦ ht (e.symm.injective (h0.trans he0.symm)), rfl⟩
-  have hnorm (t : ℝ) : ‖e.symm t‖ = ‖t‖ :=
-    (InfinitePlace.Completion.isometryEquivRealOfIsReal h).symm.isometry.norm_map_of_map_zero
-      (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal h).symm) t
-  rw [hrange]
-  conv_rhs => rw [← restrict_compl_singleton (μ := volume) (0 : ℝ)]
-  refine setLIntegral_congr_fun (measurableSet_singleton (0 : ℝ)).compl fun t ht ↦ ?_
-  have ht0 : t ≠ 0 := ht
-  change (↑(‖e.symm t‖₊ ^ v.mult) : ENNReal)⁻¹ * g (e.symm t) = _
-  simp only [g]
-  rw [hee, h.mult_eq_one, pow_one, ← ENNReal.ofReal_coe_nnreal, coe_nnNorm, hnorm,
-    Real.norm_eq_abs, mul_comm, ENNReal.ofReal_inv_of_pos (abs_pos.mpr ht0)]
+  simpa only [Rat.isReal_infinitePlace.mult_eq_one, pow_one, Real.norm_eq_abs] using
+    introTraceApprox_archimedean_sub_shiftTwo_lintegral Rat.infinitePlace
+      (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace)
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal Rat.isReal_infinitePlace).isometry
+      volume (restrict_compl_singleton (μ := volume) 0)
+      (dite_eq_left Rat.isReal_infinitePlace) Φ hΦ
 
 /-- Paper: §1.4.3, p. 29. For the trivial rational character at parameter two,
 the real-place term goes to positive infinity as the cutoffs are removed.
@@ -1840,6 +1853,101 @@ theorem introTraceApprox_rat_archimedean_tendsto_atTop (h ρ : ℕ → ℝ → �
   have := le_max_left M 0
   linarith
 
+open Classical in
+/-- The local character transfers to a measurable unitary multiplier in the archimedean
+coordinate. The chart preserves integrability and evaluates the local functional. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_coordinate (χ : U𝔽) {E : Type*} [NormedField E] [MeasurableSpace E] [BorelSpace E]
+    (v : InfinitePlace F) (e : v.Completion ≃+* E) (hi : Isometry e)
+    (ν : Measure E) (hν : ν.restrict {0}ᶜ = ν)
+    (hμ : letI := instMeasurableSpaceCompletion_riemannMasullo F v
+      infiniteLocalAdditiveTamagawaMeasure F v = ν.map e.symm) :
+    ∃ m : E → ℂ, Measurable m ∧ (∀ t, ‖m t‖ = 1) ∧ (χ = 1 → ∀ t, m t = 1) ∧ ∀ f : ℝ → ℂ, Measurable f →
+    (Integrable archIntegrand(χ, f, v) (infiniteLocalMultiplicativeTamagawaMeasure F v) ↔
+      Integrable (fun t : E ↦ m t * ((((‖t‖ ^ v.mult)⁻¹ : ℝ) : ℂ) *
+        (f (‖t‖ ^ v.mult) * (Real.sqrt (‖t‖ ^ v.mult) : ℂ) / ((‖1 - t‖ ^ v.mult : ℝ) : ℂ)))) ν) ∧
+    introTraceArchimedean χ f v =
+      (if v.IsReal then (1 / 2 : ℂ) else 1 / (2 * (Real.pi:ℂ))) * ∫ t : E, m t * ((((‖t‖ ^ v.mult)⁻¹ : ℝ) : ℂ) *
+        (f (‖t‖ ^ v.mult) * (Real.sqrt (‖t‖ ^ v.mult) : ℂ) / ((‖1 - t‖ ^ v.mult : ℝ) : ℂ))) ∂ν := by
+  classical
+  let j : v.Completion ≃ᵢ E := ⟨e.toEquiv, hi⟩
+  let : MeasurableSpace v.Completion := instMeasurableSpaceCompletion_riemannMasullo F v
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let φ (u : v.Completionˣ) := e (u : v.Completion)
+  have hemb : MeasurableEmbedding φ :=
+    j.toHomeomorph.toMeasurableEquiv.measurableEmbedding.comp
+      (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.Completion)).measurableEmbedding
+  let : MeasurableSpace Circle := borel Circle
+  let : BorelSpace Circle := ⟨rfl⟩
+  let ch := fun u : v.Completionˣ ↦ χ (IdeleClassGroup.ofCompletion (𝓞 F) F v u)
+  have hch : Measurable ch := (χ.continuous.comp (continuous_ideleClass_ofCompletion F v)).measurable
+  let m (t : E) := star ((Function.extend φ ch (fun _ ↦ 1) t : Circle) : ℂ)
+  have hcirc : Continuous (fun x : Circle ↦ star (x : ℂ)) := continuous_star.comp continuous_subtype_val
+  have hm : Measurable m := hcirc.measurable.comp (hemb.measurable_extend hch measurable_const)
+  refine ⟨m, hm, fun t ↦ by simp [m], ?_, ?_⟩
+  · rintro rfl t
+    by_cases ht : ∃ u, φ u = t
+    · obtain ⟨u, rfl⟩ := ht
+      simp [m, ch]
+    · simp [m, Function.extend_apply' _ _ _ ht]
+  intro f hf
+  let g (t : E) := m t * (f (‖t‖ ^ v.mult) * (Real.sqrt (‖t‖ ^ v.mult) : ℂ) / ((‖1 - t‖ ^ v.mult : ℝ) : ℂ))
+  let D (t : E) := ENNReal.ofReal (‖t‖ ^ v.mult)⁻¹
+  have hφ : Measurable φ :=
+    j.continuous.measurable.comp
+      Units.continuous_val.measurable
+  have hg : Measurable g := by dsimp [g]; fun_prop
+  have hD : Measurable D := by dsimp [D]; fun_prop
+  have hmap : (infiniteLocalMultiplicativeTamagawaMeasure F v).map φ = ν.withDensity D := by
+    apply Measure.ext_of_lintegral
+    intro Φ hΦ
+    rw [lintegral_map hΦ hφ, lintegral_withDensity_eq_lintegral_mul _ hD hΦ]
+    simpa [φ, D, mul_comm] using introTraceApprox_archimedean_sub_shiftTwo_lintegral v e hi ν hν hμ Φ hΦ
+  have hnorm (x : v.Completion) : ‖x‖ = ‖e x‖ := (hi.norm_map_of_map_zero (map_zero e) x).symm
+  have hpoint : archIntegrand(χ, f, v) = g ∘ φ := by
+    funext u
+    change _ = g (φ u)
+    have hN : (((ideleClassNorm F) (IdeleClassGroup.ofCompletion (𝓞 F) F v u)).val : ℝ) =
+        ‖(u : v.Completion)‖ ^ v.mult := by
+      rw [ideleClassNorm_ofCompletion]
+      rfl
+    simp only [introTraceTest,
+      hN, g, m, hemb.injective.extend_apply, ch, φ, hnorm, map_sub, map_one]
+    ring
+  constructor
+  · rw [hpoint, ← hemb.integrable_map_iff, hmap, integrable_withDensity_iff_integrable_smul' hD
+      (.of_forall fun _ ↦ ENNReal.ofReal_lt_top)]
+    apply integrable_congr
+    exact .of_forall fun t ↦ by
+      simp only [D, ENNReal.toReal_ofReal (inv_nonneg.mpr (pow_nonneg (norm_nonneg _) _)), Complex.real_smul, g]
+      ring
+  rw [introTraceArchimedean, hpoint]
+  congr 1
+  calc
+    _ = ∫ t, g t ∂ν.withDensity D := by
+      rw [← hmap, integral_map hφ.aemeasurable hg.aestronglyMeasurable]
+      rfl
+    _ = _ := by
+      rw [integral_withDensity_eq_integral_toReal_smul hD
+        (Eventually.of_forall fun t ↦ ENNReal.ofReal_lt_top)]
+      simp only [D, ENNReal.toReal_ofReal (inv_nonneg.mpr (pow_nonneg (norm_nonneg _) _)), Complex.real_smul, g]
+      congr 1
+      funext t
+      ring
+
+private theorem introTraceApprox_archimedean_sub_shiftTwo_realCoordinate (χ : U𝔽) (v : InfinitePlace F) (hw : v.IsReal) :
+    ∃ m : ℝ → ℂ, Measurable m ∧ (∀ t, ‖m t‖ = 1) ∧ (χ = 1 → ∀ t, m t = 1) ∧ ∀ f : ℝ → ℂ, Measurable f →
+    (Integrable archIntegrand(χ, f, v) (infiniteLocalMultiplicativeTamagawaMeasure F v) ↔
+      Integrable (fun t : ℝ ↦ m t * (((|t|⁻¹ : ℝ) : ℂ) *
+        (f |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ))))) ∧
+    introTraceArchimedean χ f v =
+      (1 / 2 : ℂ) * ∫ t : ℝ, m t * (((|t|⁻¹ : ℝ) : ℂ) *
+        (f |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ))) := by
+  simpa only [hw, ite_true, hw.mult_eq_one, pow_one, Real.norm_eq_abs] using
+    introTraceApprox_archimedean_sub_shiftTwo_coordinate χ v (InfinitePlace.Completion.ringEquivRealOfIsReal hw)
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).isometry volume
+      (restrict_compl_singleton (μ := volume) 0) (dite_eq_left hw)
+
 /-- In the rational real chart the multiplicative measure is `dt/|t|` and
 the two signs of the unit give the denominator `|1-t|`. -/
 private theorem introTraceArchimedean_rat_sub_shiftTwo_integral (f : ℝ → ℂ)
@@ -1847,46 +1955,8 @@ private theorem introTraceArchimedean_rat_sub_shiftTwo_integral (f : ℝ → ℂ
     introTraceArchimedean (F := ℚ) 1 f Rat.infinitePlace =
       (1 / 2 : ℂ) * ∫ t : ℝ, ((|t|⁻¹ : ℝ) : ℂ) *
         (f |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ)) := by
-  let v := Rat.infinitePlace
-  have hw : v.IsReal := Rat.isReal_infinitePlace
-  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
-  let : MeasurableSpace v.Completion := instMeasurableSpaceCompletion_riemannMasullo ℚ v
-  let : BorelSpace v.Completion := ⟨rfl⟩
-  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
-  let φ (u : v.Completionˣ) := e (u : v.Completion)
-  let g (t : ℝ) := f |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ)
-  let D (t : ℝ) := ENNReal.ofReal |t|⁻¹
-  have hφ : Measurable φ :=
-    (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).continuous.measurable.comp
-      Units.continuous_val.measurable
-  have hg : Measurable g := by dsimp [g]; fun_prop
-  have hD : Measurable D := by dsimp [D]; fun_prop
-  have hmap : (infiniteLocalMultiplicativeTamagawaMeasure ℚ v).map φ = volume.withDensity D := by
-    apply Measure.ext_of_lintegral
-    intro Φ hΦ
-    rw [lintegral_map hΦ hφ, lintegral_withDensity_eq_lintegral_mul _ hD hΦ]
-    simpa [φ, e, D, mul_comm] using introTraceApprox_rat_archimedean_tendsto_atTop_lintegral Φ hΦ
-  have hnorm (x : v.Completion) : ‖x‖ = |e x| :=
-    ((InfinitePlace.Completion.isometryEquivRealOfIsReal hw).isometry.norm_map_of_map_zero
-      (map_zero e) x).symm.trans (Real.norm_eq_abs _)
-  rw [introTraceArchimedean, ite_eq_left hw]
-  congr 1
-  calc
-    _ = ∫ u : v.Completionˣ, g (φ u) ∂infiniteLocalMultiplicativeTamagawaMeasure ℚ v := by
-      apply integral_congr_ae
-      refine .of_forall fun u ↦ ?_
-      have hN : (((ideleClassNorm ℚ) (IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ Rat.infinitePlace u)).val : ℝ) =
-          ‖(u : v.Completion)‖ := by
-        rw [ideleClassNorm_ofCompletion, Rat.isReal_infinitePlace.mult_eq_one, pow_one]
-        rfl
-      simp only [introTraceTest, PontryaginDual.one_apply, Circle.coe_one, star_one, one_mul,
-        Rat.isReal_infinitePlace.mult_eq_one, pow_one, hN, g, φ, hnorm, map_sub, map_one]
-    _ = ∫ t, g t ∂volume.withDensity D := by
-      rw [← hmap, integral_map hφ.aemeasurable hg.aestronglyMeasurable]
-    _ = _ := by
-      rw [integral_withDensity_eq_integral_toReal_smul hD
-        (Eventually.of_forall fun t ↦ ENNReal.ofReal_lt_top)]
-      simp only [D, ENNReal.toReal_ofReal (inv_nonneg.mpr (abs_nonneg _)), Complex.real_smul, g]
+  obtain ⟨m, _, _, hm, he⟩ := introTraceApprox_archimedean_sub_shiftTwo_realCoordinate (F := ℚ) 1 Rat.infinitePlace Rat.isReal_infinitePlace
+  simpa only [hm rfl, one_mul] using (he f hf).2
 
 /-- Above one the step-two difference cancels the real-place denominator on both
 sign branches. Their densities are the sum and difference of two integrable powers. -/
@@ -2121,6 +2191,376 @@ private theorem introTraceApprox_rat_sub_shiftTwo_density_bound (t a C : ℝ) (h
         Real.rpow_sub hx0, Real.rpow_add hx0, Real.rpow_ofNat]
       field_simp
 
+private theorem introTraceApprox_archimedean_sub_shiftTwo_complexCoordinate (χ : U𝔽) (v : InfinitePlace F) (hw : v.IsComplex) :
+    ∃ m : ℂ → ℂ, Measurable m ∧ (∀ t, ‖m t‖ = 1) ∧ ∀ f : ℝ → ℂ, Measurable f →
+    (Integrable archIntegrand(χ, f, v) (infiniteLocalMultiplicativeTamagawaMeasure F v) ↔
+      Integrable (fun t : ℂ ↦ m t * ((((‖t‖ ^ 2)⁻¹ : ℝ) : ℂ) *
+        (f (‖t‖ ^ 2) * (‖t‖ : ℂ) / ((‖1 - t‖ ^ 2 : ℝ) : ℂ)))) (2 • volume)) ∧
+    introTraceArchimedean χ f v =
+      (1 / (2 * (Real.pi : ℂ))) * ∫ t : ℂ, m t * ((((‖t‖ ^ 2)⁻¹ : ℝ) : ℂ) *
+        (f (‖t‖ ^ 2) * (‖t‖ : ℂ) / ((‖1 - t‖ ^ 2 : ℝ) : ℂ))) ∂(2 • volume) := by
+  have hν : (2 • (volume : Measure ℂ)).restrict {(0 : ℂ)}ᶜ = 2 • volume := by
+    simp [two_smul, Measure.restrict_add, restrict_compl_singleton]
+  obtain ⟨m, hm, hnm, _, he⟩ := introTraceApprox_archimedean_sub_shiftTwo_coordinate χ v (InfinitePlace.Completion.ringEquivComplexOfIsComplex hw)
+    (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hw).isometry (2 • volume) hν
+    (dite_eq_right (InfinitePlace.not_isReal_iff_isComplex.mpr hw))
+  exact ⟨m, hm, hnm, by
+    simpa only [InfinitePlace.not_isReal_iff_isComplex.mpr hw, ite_false, hw.mult_eq_two,
+      Real.sqrt_sq (norm_nonneg _)] using he⟩
+
+/-- The radial tail in the complex plane is integrable for exponents below minus two. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_complexTail {d : ℝ} (hd : d < -2) :
+    Integrable (fun u : ℂ ↦ (Ioi (2 : ℝ)).indicator (fun r ↦ r ^ d) ‖u‖) := by
+  rw [integrable_fun_norm_addHaar (μ := volume) (f := (Ioi (2 : ℝ)).indicator fun r ↦ r ^ d),
+    Complex.finrank_real_complex]
+  have hbase : Integrable ((Ioi (2 : ℝ)).indicator fun r ↦ r ^ (d + 1)) :=
+    (integrable_indicator_iff measurableSet_Ioi).2 (integrableOn_Ioi_rpow_of_lt (by linarith) (by norm_num))
+  refine hbase.integrableOn.congr_fun (fun y (hy : y ∈ Ioi (0 : ℝ)) ↦ ?_) measurableSet_Ioi
+  by_cases h : y ∈ Ioi (2 : ℝ)
+  · simp [h, smul_eq_mul, Real.rpow_add hy, mul_comm]
+  · simp [h]
+
+/-- The inverse distance to one is locally integrable in the complex plane. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_complexNear :
+    Integrable (fun u : ℂ ↦ (Metric.ball (0 : ℂ) 4).indicator (fun z ↦ ‖z‖⁻¹) (u - 1)) := by
+  have hi : IntegrableOn (fun u : ℂ ↦ ‖u‖⁻¹) (Metric.ball 0 4) := by
+    rw [integrableOn_fun_norm_addHaar (μ := volume) (f := fun y : ℝ ↦ y⁻¹), Complex.finrank_real_complex]
+    refine (integrableOn_const (C := (1 : ℝ)) (by simp)).congr_fun (fun y (hy : y ∈ Ioo 0 4) ↦ ?_)
+      measurableSet_Ioo
+    simp [smul_eq_mul, hy.1.ne']
+  have h := (integrable_indicator_iff measurableSet_ball).2 hi
+  simpa only [sub_eq_add_neg] using h.comp_add_right (-1 : ℂ)
+
+/-- For the corrected squared complex denominator, one power of the distance to one
+cancels on the inner annulus. Outside radius two the radial density decays as
+`‖u‖ ^ (-2*a-3)`. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_complexBound {a C : ℝ} (hC : 0 ≤ C) (u : ℂ) (hu : 1 < ‖u‖)
+    (q : ℂ) (hq : ‖q‖ ≤ (C * (‖u‖ ^ 2) ^ (-a)) * (8 * (‖u‖ ^ 2 - 1) / ‖u‖ ^ 2)) :
+    ‖(((‖u‖^2)⁻¹ : ℝ) : ℂ) * (q * (‖u‖ : ℂ) / ((‖1 - u‖ ^ 2 : ℝ) : ℂ))‖ ≤
+      (24 * C * (1 + 4 ^ (-a))) * ((Metric.ball (0 : ℂ) 4).indicator (fun z ↦ ‖z‖⁻¹) (u - 1)) +
+      (32 * C) * ((Ioi (2 : ℝ)).indicator (fun r ↦ r ^ (-2 * a - 3)) ‖u‖) := by
+  let r := ‖u‖
+  let b := ‖1 - u‖
+  have hr : 1 < r := hu
+  have hr₀ : 0 < r := by linarith
+  have hbr : r - 1 ≤ b := by simpa [r, b, norm_sub_rev u 1] using norm_sub_norm_le u (1 : ℂ)
+  have hb : 0 < b := by linarith
+  have hr2 : 1 ≤ r ^ 2 := one_le_pow₀ hr.le
+  have hq' : ‖q‖ ≤ C * (r ^ 2) ^ (-a) * (8 * (r ^ 2 - 1) / r ^ 2) := hq
+  rw [norm_mul, norm_div, norm_mul, Complex.norm_real, Complex.norm_real, Complex.norm_real,
+    Real.norm_of_nonneg (inv_nonneg.mpr (sq_nonneg _)), Real.norm_of_nonneg (norm_nonneg _),
+    Real.norm_of_nonneg (sq_nonneg _)]
+  change (r ^ 2)⁻¹ * (‖q‖ * r / b ^ 2) ≤ _
+  rw [show (r ^ 2)⁻¹ * (‖q‖ * r / b ^ 2) = ‖q‖ / r / b ^ 2 by field_simp]
+  by_cases hr₁ : r ≤ 2
+  · have hb4 : ‖u - 1‖ < 4 := by
+      have h := norm_sub_le u (1 : ℂ)
+      rw [norm_one] at h
+      change r ≤ 2 at hr₁
+      linarith
+    rw [indicator_of_mem (mem_ball_zero_iff.mpr hb4),
+      indicator_of_notMem (show ‖u‖ ∉ Ioi (2 : ℝ) from not_lt.mpr hr₁), mul_zero, add_zero, norm_sub_rev u 1]
+    have hpow : (r ^ 2) ^ (-a) ≤ 1 + 4 ^ (-a) := by
+      rcases le_or_gt (-a) 0 with h | h
+      · exact (Real.rpow_le_one_of_one_le_of_nonpos hr2 h).trans (le_add_of_nonneg_right (by positivity))
+      · exact (Real.rpow_le_rpow (sq_nonneg r) (by nlinarith : r ^ 2 ≤ 4) h.le).trans (by linarith)
+    have hfac : 8 * (r ^ 2 - 1) / r ^ 2 ≤ 24 * b := by
+      refine (div_le_self (by nlinarith) hr2).trans ?_
+      have h := mul_le_mul (show r - 1 ≤ b from hbr) (show r + 1 ≤ 3 by linarith)
+        (by linarith : 0 ≤ r + 1) hb.le
+      nlinarith
+    have hqle : ‖q‖ ≤ C * (1 + 4 ^ (-a)) * (24 * b) := hq'.trans (by gcongr)
+    calc ‖q‖ / r / b ^ 2 ≤ (C * (1 + 4 ^ (-a)) * (24 * b)) / b ^ 2 :=
+           div_le_div_of_nonneg_right ((div_le_self (norm_nonneg _) hr.le).trans hqle) (sq_nonneg _)
+         _ = _ := by change _ = _ * b⁻¹; field_simp
+  · have hr₁' : 2 < r := lt_of_not_ge hr₁
+    rw [indicator_of_mem (show ‖u‖ ∈ Ioi (2 : ℝ) from hr₁')]
+    have hnn : 0 ≤ (Metric.ball (0 : ℂ) 4).indicator (fun z ↦ ‖z‖⁻¹) (u - 1) :=
+      indicator_nonneg (fun _ _ ↦ by positivity) _
+    apply le_add_of_nonneg_of_le (mul_nonneg (by positivity) hnn)
+    have hfac : 8 * (r ^ 2 - 1) / r ^ 2 ≤ 8 := (div_le_iff₀ (sq_pos_of_pos hr₀)).2 (by nlinarith)
+    have hqle : ‖q‖ ≤ C * (r ^ 2) ^ (-a) * 8 := hq'.trans (by gcongr)
+    have hden : 0 < r / 2 := by positivity
+    calc ‖q‖ / r / b ^ 2 ≤ (C * (r ^ 2) ^ (-a) * 8) / r / (r / 2) ^ 2 := by
+           gcongr
+           linarith
+         _ = (32 * C) * r ^ (-2 * a - 3) := by
+           rw [← Real.rpow_natCast r 2, ← Real.rpow_mul hr₀.le,
+             show -2 * a - 3 = (2 : ℝ) * (-a) - (3:ℕ) by push_cast; ring,
+             Real.rpow_sub hr₀, Real.rpow_natCast]
+           push_cast
+           field_simp
+           ring
+
+/-- A common integrable bound for the matched smoothed kernels also bounds their
+pointwise limits. Dominated convergence applies while the complex parameter varies. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_weighted {Ω : Type*} [MeasurableSpace Ω] (μ : Measure Ω)
+    (r : Ω → ℝ) (hr : Measurable r) (K : Ω → ℂ) (hK : Measurable K)
+    (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (hdom : ∀ a : ℝ, -(1 / 2 : ℝ) < a → ∃ B : Ω → ℝ, Integrable B μ ∧
+      ∀ n (w : ℂ), a ≤ w.re → ∀ t, ‖K t * (introTraceApprox (h n) (ρ n) w (r t) -
+        introTraceApprox (h n) (ρ n) (w + 2) (r t))‖ ≤ B t) :
+    let X (n : ℕ) (w : ℂ) (t : Ω) := K t * (introTraceApprox (h n) (ρ n) w (r t) -
+        introTraceApprox (h n) (ρ n) (w + 2) (r t))
+    let Y (w : ℂ) (t : Ω) := K t * (introTracePower w (r t) - introTracePower (w + 2) (r t))
+    (∀ w ∈ right(-(1 / 2 : ℝ)), Integrable (Y w) μ) ∧
+    TendstoLocallyUniformlyOn (fun n w ↦ ∫ t, X n w t ∂μ) (fun w ↦ ∫ t, Y w t ∂μ)
+      atTop right(-(1 / 2 : ℝ)) := by
+  intro X Y
+  let f (n : ℕ) (w : ℂ) := introTraceApprox (h n) (ρ n) w
+  have hm (n : ℕ) (w : ℂ) := (introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n w).1
+  have hXm (n : ℕ) (w : ℂ) : Measurable (X n w) :=
+    hK.mul (((hm _ _).measurable.comp hr).sub ((hm _ _).measurable.comp hr))
+  have hYm (w : ℂ) : Measurable (Y w) := hK.mul (((introTraceApprox_mellin_tendsto_power_measurable _).comp hr).sub
+    ((introTraceApprox_mellin_tendsto_power_measurable _).comp hr))
+  have hzero (n : ℕ) (w : ℂ) (t : ℝ) (ht : t ≤ 1) : f n w t = 0 :=
+    image_eq_zero_of_notMem_tsupport fun hm ↦ ht.not_gt (introTraceApprox_support h ρ hA n w hm)
+  have hXlim (z : ℂ) (t : Ω) :
+      Tendsto (fun i : ℕ × ℂ ↦ X i.1 i.2 t) (atTop ×ˢ 𝓝 z) (𝓝 (Y z t)) := by
+    by_cases ht : 1 < r t
+    · have hplus : Tendsto (fun i : ℕ × ℂ ↦ (i.1, i.2 + 2)) (atTop ×ˢ 𝓝 z) (atTop ×ˢ 𝓝 (z + 2)) :=
+        tendsto_fst.prodMk (tendsto_snd.add_const _)
+      exact tendsto_const_nhds.mul ((introTraceApprox_mellin_tendsto_radial hA z ht).sub
+        ((introTraceApprox_mellin_tendsto_radial hA (z + 2) ht).comp hplus))
+    · change Tendsto (fun i : ℕ × ℂ ↦ K t * (f i.1 i.2 (r t) - f i.1 (i.2 + 2) (r t))) _ _
+      simp [Y, hzero _ _ _ (le_of_not_gt ht), introTracePower, ht]
+  have hYcont (t : Ω) : Continuous (fun z ↦ Y z t) := by
+    have h := (introTracePower_differentiable (r t)).continuous
+    exact continuous_const.mul (h.sub (h.comp (continuous_id.add_const 2)))
+  have hYb {B : Ω → ℝ} {w : ℂ} (hb : ∀ n t, ‖X n w t‖ ≤ B t) (t : Ω) : ‖Y w t‖ ≤ B t := by
+    have hseq : Tendsto (fun n : ℕ ↦ (n, w)) atTop (atTop ×ˢ 𝓝 w) := tendsto_id.prodMk tendsto_const_nhds
+    exact le_of_tendsto ((hXlim w t).comp hseq).norm (.of_forall fun n ↦ hb n t)
+  constructor
+  · intro z hz
+    obtain ⟨B, hB, hD⟩ := hdom z.re hz
+    exact hB.mono' (hYm z).aestronglyMeasurable (.of_forall (hYb (fun n ↦ hD n z le_rfl)))
+  apply (isOpen_Ioi.preimage Complex.continuous_re).tendstoLocallyUniformlyOn_iff_forall_tendsto.2
+  intro z hz
+  obtain ⟨a, ha, haz⟩ := exists_between (show -(1 / 2 : ℝ) < z.re from hz)
+  obtain ⟨B, hB, hD⟩ := hdom a ha
+  let l := (atTop : Filter ℕ) ×ˢ 𝓝 z
+  have hnear : ∀ᶠ i in l, a ≤ i.2.re :=
+    (Complex.continuous_re.continuousAt.tendsto.comp tendsto_snd).eventually (le_mem_nhds haz)
+  have h₁ : Tendsto (fun i : ℕ × ℂ ↦ ∫ t, X i.1 i.2 t ∂μ) l (𝓝 (∫ t, Y z t ∂μ)) :=
+    tendsto_integral_filter_of_dominated_convergence B (.of_forall fun _ ↦ (hXm _ _).aestronglyMeasurable)
+      (hnear.mono fun i hi ↦ .of_forall (hD _ _ hi)) hB (.of_forall (hXlim z))
+  have h₂ : Tendsto (fun i : ℕ × ℂ ↦ ∫ t, Y i.2 t ∂μ) l (𝓝 (∫ t, Y z t ∂μ)) :=
+    tendsto_integral_filter_of_dominated_convergence B (.of_forall fun _ ↦ (hYm _).aestronglyMeasurable)
+      (hnear.mono fun i hi ↦ .of_forall (hYb (fun n ↦ hD n _ hi))) hB
+      (.of_forall fun t ↦ (hYcont t).continuousAt.tendsto.comp tendsto_snd)
+  exact (h₂.prodMk_nhds h₁).mono_right (nhds_le_uniformity _)
+
+/-- Each fixed cutoff is supported away from norm one, so its individual complex
+place density is continuous and compactly supported. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_complexFixed (f : ℝ → ℂ) (hf : Continuous f)
+    (hc : HasCompactSupport f) (hs : tsupport f ⊆ Ioi 1) :
+    Integrable (fun t : ℂ ↦ (((‖t‖ ^ 2)⁻¹ : ℝ) : ℂ) *
+      (f (‖t‖ ^ 2) * (‖t‖ : ℂ) / ((‖1 - t‖ ^ 2 : ℝ) : ℂ))) := by
+  let W (t : ℂ) := (((‖t‖ ^ 2)⁻¹ : ℝ) : ℂ) * (f (‖t‖ ^ 2) * (‖t‖ : ℂ) / ((‖1 - t‖ ^ 2 : ℝ) : ℂ))
+  have hW : Continuous W := by
+    apply continuous_iff_continuousAt.mpr
+    intro x
+    by_cases hx : ‖x‖ ^ 2 ≤ 1
+    · have he := notMem_tsupport_iff_eventuallyEq.mp (fun ht ↦ (hs ht).not_ge hx)
+      apply (continuousAt_const (y := (0 : ℂ))).congr_of_eventuallyEq
+      filter_upwards [(continuous_norm.pow 2).continuousAt.tendsto.eventually he] with t ht
+      simp [W, show f (‖t‖ ^ 2) = 0 from ht]
+    · have hpos : 0 < ‖x‖ := by contrapose! hx; simp [le_antisymm hx (norm_nonneg _)]
+      have hne : 1 - x ≠ 0 := fun h ↦ hx (by rw [← sub_eq_zero.mp h]; norm_num)
+      have hden : ((‖1 - x‖ ^ 2 : ℝ) : ℂ) ≠ 0 := Complex.ofReal_ne_zero.mpr (pow_ne_zero _ (norm_ne_zero_iff.mpr hne))
+      dsimp only [W]
+      fun_prop (disch := first | exact hden | positivity)
+  obtain ⟨R, hR⟩ := hc.bddAbove
+  refine hW.integrable_of_hasCompactSupport (exists_compact_iff_hasCompactSupport.mp
+    ⟨Metric.closedBall (0 : ℂ) (R + 1), isCompact_closedBall _ _, fun t ht ↦ ?_⟩)
+  have hz : f (‖t‖ ^ 2) = 0 := by
+    by_contra hn
+    have h₁ := hR (subset_tsupport _ hn)
+    apply ht
+    rw [mem_closedBall_zero_iff]
+    nlinarith [sq_nonneg (‖t‖-1 / 2)]
+  simp [W, hz]
+
+/-- A coordinate formula that also transfers integrability gives the result for the
+actual two local archimedean terms, separately integrated at each cutoff. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_chart {Ω : Type*} [MeasurableSpace Ω] (μ : Measure Ω)
+    (r : Ω → ℝ) (hr : Measurable r) (K : Ω → ℂ) (hK : Measurable K) (c : ℂ)
+    (χ : U𝔽) (v : InfinitePlace F) (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (hcoord : ∀ f : ℝ → ℂ, Measurable f →
+      (Integrable archIntegrand(χ, f, v) (infiniteLocalMultiplicativeTamagawaMeasure F v) ↔
+        Integrable (fun t ↦ K t * f (r t)) μ) ∧
+      introTraceArchimedean χ f v = c * ∫ t, K t * f (r t) ∂μ)
+    (hfixed : ∀ n z, Integrable (fun t ↦ K t * introTraceApprox (h n) (ρ n) z (r t)) μ)
+    (hdom : ∀ a : ℝ, -(1 / 2 : ℝ) < a → ∃ B : Ω → ℝ, Integrable B μ ∧
+      ∀ n (w : ℂ), a ≤ w.re → ∀ t, ‖K t * (introTraceApprox (h n) (ρ n) w (r t) -
+        introTraceApprox (h n) (ρ n) (w + 2) (r t))‖ ≤ B t) :
+    (∀ z ∈ right(-(1 / 2 : ℝ)), Integrable
+      archIntegrand(χ, (fun t ↦ introTracePower z t - introTracePower (z + 2) t), v)
+      (infiniteLocalMultiplicativeTamagawaMeasure F v)) ∧
+    TendstoLocallyUniformlyOn (fun n z ↦
+      introTraceArchimedean χ (introTraceApprox (h n) (ρ n) z) v -
+      introTraceArchimedean χ (introTraceApprox (h n) (ρ n) (z + 2)) v)
+      (fun z ↦ introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+      atTop right(-(1 / 2 : ℝ)) := by
+  obtain ⟨hi, hlim⟩ := introTraceApprox_archimedean_sub_shiftTwo_weighted μ r hr K hK h ρ hA hdom
+  have hm (z : ℂ) := (introTraceApprox_mellin_tendsto_power_measurable z).sub
+    (introTraceApprox_mellin_tendsto_power_measurable (z + 2))
+  have hfm (n : ℕ) (z : ℂ) := (introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n z).1.measurable
+  refine ⟨fun z hz ↦ (hcoord _ (hm z)).1.mpr (hi z hz), ?_⟩
+  refine ((uniformContinuous_const_smul (M := ℂ) c).comp_tendstoLocallyUniformlyOn hlim).congr
+      (fun n z _ ↦ ?_) |>.congr_right (fun z _ ↦ (hcoord _ (hm z)).2.symm)
+  rw [(hcoord _ (hfm n z)).2, (hcoord _ (hfm n (z + 2))).2, ← mul_sub,
+      ← integral_sub (hfixed n z) (hfixed n (z + 2))]
+  change c * (∫ t, K t * (_ - _) ∂μ) = c * ∫ t, K t * _ - K t * _ ∂μ
+  congr 1
+  apply integral_congr_ae
+  exact .of_forall fun _ ↦ mul_sub _ _ _
+
+/-- The real and complex coordinate bounds apply to each actual matched family, with
+an integrable limiting density on the original group of local units. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_matched (χ : U𝔽) (v : InfinitePlace F)
+    (h ρ : ℕ → ℝ → ℝ) (hA : IsIntroTraceApproximation h ρ)
+    (hmatch : ∀ n t u, h n t ≠ 0 → ρ n u ≠ 0 → |u| ≤ 1 ∧ |u| ≤ t - 1) :
+    (∀ z ∈ right(-(1 / 2 : ℝ)), Integrable
+      archIntegrand(χ, (fun t ↦ introTracePower z t - introTracePower (z + 2) t), v)
+      (infiniteLocalMultiplicativeTamagawaMeasure F v)) ∧
+    TendstoLocallyUniformlyOn (fun n z ↦
+      introTraceArchimedean χ (introTraceApprox (h n) (ρ n) z) v -
+      introTraceArchimedean χ (introTraceApprox (h n) (ρ n) (z + 2)) v)
+      (fun z ↦ introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+      atTop right(-(1 / 2 : ℝ)) := by
+  let f (n : ℕ) (z : ℂ) := introTraceApprox (h n) (ρ n) z
+  have hf (n : ℕ) (z : ℂ) := introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n z
+  have hzero (n : ℕ) (z : ℂ) (t : ℝ) (ht : t ≤ 1) : f n z t = 0 :=
+    image_eq_zero_of_notMem_tsupport fun hm ↦ ht.not_gt (introTraceApprox_support h ρ hA n z hm)
+  by_cases hv : v.IsReal
+  · obtain ⟨m, hm, hnm, _, he⟩ := introTraceApprox_archimedean_sub_shiftTwo_realCoordinate χ v hv
+    let K (t : ℝ) := m t * (((|t|⁻¹ : ℝ) : ℂ) * ((Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ)))
+    have hK : Measurable K := by dsimp [K]; fun_prop
+    have hW (t : ℝ) (q : ℂ) : m t * (((|t|⁻¹ : ℝ) : ℂ) * (q * (Real.sqrt |t| : ℂ) /
+        ((|1 - t| : ℝ) : ℂ))) = K t * q := by dsimp [K]; ring
+    simp_rw [hW] at he
+    apply introTraceApprox_archimedean_sub_shiftTwo_chart volume (fun t : ℝ ↦ |t|) continuous_abs.measurable K hK (1 / 2) χ v h ρ hA he
+    · intro n z
+      have hb := introTraceApprox_rat_sub_shiftTwo_integrable _ (hf n z).1 (hf n z).2 (introTraceApprox_support h ρ hA n z)
+      apply hb.mono (hK.mul ((hf n z).1.measurable.comp continuous_abs.measurable)).aestronglyMeasurable
+      exact .of_forall fun t ↦ by simp only [Pi.mul_apply, Function.comp_apply]; rw [← hW, norm_mul, hnm, one_mul]
+    · intro a ha
+      let C := (1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)
+      let d := -a - 3 / 2
+      let p := (Ioi (1 : ℝ)).indicator fun t ↦ t ^ d
+      have hC : 0 ≤ C := by dsimp [C]; positivity
+      have hp : Integrable p := (integrable_indicator_iff measurableSet_Ioi).2
+        (integrableOn_Ioi_rpow_of_lt (show d < -1 by dsimp [d]; linarith) zero_lt_one)
+      refine ⟨fun t ↦ (8 * C) * (p t + p (-t)), (hp.add hp.comp_neg).const_mul _, ?_⟩
+      intro n w hw t
+      rw [← hW, norm_mul, hnm, one_mul]
+      by_cases ht : 1 < |t|
+      · have hb := introTraceApprox_rat_sub_shiftTwo_density_bound t a C hC ht _ <|
+          introTraceApprox_rat_sub_shiftTwo_bound h ρ hA hmatch n ht hw
+        have hp' : p t + p (-t) = |t| ^ d := by
+          rcases le_or_gt 0 t with hts | hts
+          · rw [abs_of_nonneg hts] at ht ⊢
+            simp [p, ht, show ¬1 < -t by linarith]
+          · rw [abs_of_neg hts] at ht ⊢
+            simp [p, ht, show ¬1 < t by linarith]
+        simpa only [hp'] using hb
+      · have hp' (x : ℝ) : 0 ≤ p x := indicator_nonneg (fun y hy ↦
+          Real.rpow_nonneg (zero_le_one.trans (mem_Ioi.mp hy).le) d) x
+        change ‖_ * (((f n w |t| - f n (w + 2) |t|) * _) / _)‖ ≤ _
+        simpa [hzero _ _ _ (le_of_not_gt ht)] using mul_nonneg (show 0 ≤ 8 * C by positivity)
+          (add_nonneg (hp' t) (hp' (-t)))
+  · obtain ⟨m, hm, hnm, he⟩ := introTraceApprox_archimedean_sub_shiftTwo_complexCoordinate χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)
+    let K (t : ℂ) := m t * ((((‖t‖^2)⁻¹ : ℝ) : ℂ) * ((‖t‖ : ℂ) / ((‖1 - t‖^2 : ℝ) : ℂ)))
+    have hK : Measurable K := by dsimp [K]; fun_prop
+    have hW (t q : ℂ) : m t * ((((‖t‖^2)⁻¹ : ℝ) : ℂ) * (q * (‖t‖ : ℂ) /
+        ((‖1 - t‖^2 : ℝ) : ℂ))) = K t * q := by dsimp [K]; ring
+    simp_rw [hW] at he
+    apply introTraceApprox_archimedean_sub_shiftTwo_chart (2 • volume) (fun t : ℂ ↦ ‖t‖^2) (by fun_prop) K hK
+      (1 / (2 * (Real.pi:ℂ))) χ v h ρ hA he
+    · intro n z
+      have hb := introTraceApprox_archimedean_sub_shiftTwo_complexFixed _ (hf n z).1 (hf n z).2 (introTraceApprox_support h ρ hA n z)
+      rw [two_smul]
+      apply Integrable.add_measure <;> apply hb.mono (hK.mul ((hf n z).1.measurable.comp (by fun_prop))).aestronglyMeasurable <;>
+        exact .of_forall fun t ↦ by simp only [Pi.mul_apply, Function.comp_apply]; rw [← hW, norm_mul, hnm, one_mul]
+    · intro a ha
+      let C := (1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)
+      have hC : 0 ≤ C := by dsimp [C]; positivity
+      let near (t : ℂ) := (Metric.ball (0 : ℂ) 4).indicator (fun z ↦ ‖z‖⁻¹) (t - 1)
+      let far (t : ℂ) := (Ioi (2 : ℝ)).indicator (fun r ↦ r ^ (-2 * a - 3)) ‖t‖
+      let B (t : ℂ) := (24 * C * (1 + 4 ^ (-a))) * near t + (32 * C) * far t
+      have hB : Integrable B := (introTraceApprox_archimedean_sub_shiftTwo_complexNear.const_mul _).add
+        ((introTraceApprox_archimedean_sub_shiftTwo_complexTail (d := -2 * a - 3) (by linarith)).const_mul _)
+      refine ⟨B, by simpa only [two_smul] using hB.add_measure hB, ?_⟩
+      intro n w hw t
+      rw [← hW, norm_mul, hnm, one_mul]
+      by_cases ht : 1 < ‖t‖^2
+      · exact introTraceApprox_archimedean_sub_shiftTwo_complexBound hC t (by contrapose! ht; exact pow_le_one₀ (norm_nonneg _) ht) _
+          (introTraceApprox_rat_sub_shiftTwo_bound h ρ hA hmatch n ht hw)
+      · have hnear : 0 ≤ near t := indicator_nonneg (fun _ _ ↦ by positivity) _
+        have hfar : 0 ≤ far t := indicator_nonneg (fun r hr ↦ Real.rpow_nonneg (by linarith [mem_Ioi.mp hr]) _) _
+        change ‖_ * (((f n w _ - f n (w + 2) _) * _) / _)‖ ≤ _
+        simpa [hzero _ _ _ (le_of_not_gt ht), B] using
+          add_nonneg (mul_nonneg (by positivity) hnear) (mul_nonneg (by positivity) hfar)
+
+/-- A single matched family realizes the full finite archimedean sum. -/
+private theorem introTraceApprox_archimedean_sub_shiftTwo_matched_sum (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ)
+    (hmatch : ∀ n t u, h n t ≠ 0 → ρ n u ≠ 0 → |u| ≤ 1 ∧ |u| ≤ t - 1) :
+      TendstoLocallyUniformlyOn (fun n z ↦
+        (∑ v : InfinitePlace F, introTraceArchimedean χ (introTraceApprox (h n) (ρ n) z) v) -
+         ∑ v : InfinitePlace F, introTraceArchimedean χ (introTraceApprox (h n) (ρ n) (z + 2)) v)
+        (fun z ↦ ∑ v : InfinitePlace F, introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+        atTop right(-(1 / 2 : ℝ)) := by
+  classical
+  have hlocal (v : InfinitePlace F) := introTraceApprox_archimedean_sub_shiftTwo_matched χ v h ρ hA hmatch
+  suffices ∀ S : Finset (InfinitePlace F), TendstoLocallyUniformlyOn (fun n z ↦
+      (∑ v ∈ S, introTraceArchimedean χ (introTraceApprox (h n) (ρ n) z) v) -
+       ∑ v ∈ S, introTraceArchimedean χ (introTraceApprox (h n) (ρ n) (z + 2)) v)
+      (fun z ↦ ∑ v ∈ S, introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+      atTop right(-(1 / 2 : ℝ)) from this Finset.univ
+  intro S
+  induction S using Finset.induction_on with
+  | empty =>
+    simpa using ((tendsto_const_nhds : Tendsto (fun _ : ℕ ↦ (0 : ℂ)) atTop (𝓝 0)
+      ).tendstoUniformlyOn_const (s := right(-(1 / 2 : ℝ)))).tendstoLocallyUniformlyOn
+  | insert v S hv ih =>
+    refine (((hlocal v).2.add ih).congr (fun n z _ ↦ ?_)).congr_right (fun z _ ↦ ?_)
+    · simp only [Finset.sum_insert hv, Pi.add_apply]
+      ring
+    · simp only [Finset.sum_insert hv, Pi.add_apply]
+
+/-- Paper: §1.4.3, p. 29. For any admissible initial family, a cofinal reindexing of
+the mollifiers makes the reference-subtracted local terms and their full archimedean
+sum converge locally uniformly on `Re z > -1/2`, for every unitary character. The
+limiting test is the difference of the powers at `z` and `z+2`, and its local
+Tamagawa integrands are integrable at every infinite place.
+Deviation: Match the additive mollifier widths to the lower cutoff before removing
+the cutoffs. The complex-place estimate uses the corrected squared denominator. -/
+theorem introTraceApprox_archimedean_sub_shiftTwo_tendsto (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) :
+    ∃ k : ℕ → ℕ, Tendsto k atTop atTop ∧ IsIntroTraceApproximation h (ρ ∘ k) ∧
+      ∀ χ : U𝔽,
+      (∀ v : InfinitePlace F, ∀ z ∈ right(-(1 / 2 : ℝ)), Integrable
+        archIntegrand(χ, (fun t ↦ introTracePower z t - introTracePower (z + 2) t), v)
+        (infiniteLocalMultiplicativeTamagawaMeasure F v)) ∧
+      (∀ v : InfinitePlace F, TendstoLocallyUniformlyOn (fun n z ↦
+        introTraceArchimedean χ (introTraceApprox (h n) (ρ (k n)) z) v -
+        introTraceArchimedean χ (introTraceApprox (h n) (ρ (k n)) (z + 2)) v)
+        (fun z ↦ introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+        atTop right(-(1 / 2 : ℝ))) ∧
+      TendstoLocallyUniformlyOn (fun n z ↦
+        (∑ v : InfinitePlace F, introTraceArchimedean χ (introTraceApprox (h n) (ρ (k n)) z) v) -
+         ∑ v : InfinitePlace F, introTraceArchimedean χ (introTraceApprox (h n) (ρ (k n)) (z + 2)) v)
+        (fun z ↦ ∑ v : InfinitePlace F, introTraceArchimedean χ (fun t ↦ introTracePower z t - introTracePower (z + 2) t) v)
+        atTop right(-(1 / 2 : ℝ)) := by
+  classical
+  obtain ⟨k, hk, hAk, hmatch⟩ := introTraceApprox_rat_sub_shiftTwo_match h ρ hA
+  refine ⟨k, hk, hAk, ?_⟩
+  intro χ
+  have hlocal (v : InfinitePlace F) := introTraceApprox_archimedean_sub_shiftTwo_matched χ v h (ρ ∘ k) hAk hmatch
+  exact ⟨fun v ↦ (hlocal v).1, fun v ↦ (hlocal v).2, introTraceApprox_archimedean_sub_shiftTwo_matched_sum χ h (ρ ∘ k) hAk hmatch⟩
+
 /-- For matched supports, the smoothed rational archimedean differences converge
 locally uniformly. Domination is applied on both real sign branches at once. -/
 private theorem introTraceApprox_rat_sub_shiftTwo_matched (h ρ : ℕ → ℝ → ℝ)
@@ -2130,99 +2570,8 @@ private theorem introTraceApprox_rat_sub_shiftTwo_matched (h ρ : ℕ → ℝ �
       introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) z) Rat.infinitePlace -
       introTraceArchimedean (F := ℚ) 1 (introTraceApprox (h n) (ρ n) (z + 2)) Rat.infinitePlace)
       (fun z ↦ 1 / (z + 1 / 2)) atTop right(-(1 / 2 : ℝ)) := by
-  let W (f : ℝ → ℂ) (t : ℝ) := ((|t|⁻¹ : ℝ) : ℂ) *
-    (f |t| * (Real.sqrt |t| : ℂ) / ((|1 - t| : ℝ) : ℂ))
-  let f (n : ℕ) (w : ℂ) := introTraceApprox (h n) (ρ n) w
-  have hm (n : ℕ) (w : ℂ) := (introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n w).1
-  have hint (n : ℕ) (w : ℂ) : Integrable (W (f n w)) := by
-    obtain ⟨hc, hK⟩ := introTraceApprox_rat_sub_shiftTwo_profile h ρ hA n w
-    exact introTraceApprox_rat_sub_shiftTwo_integrable _ hc hK (introTraceApprox_support h ρ hA n w)
-  have he (n : ℕ) (w : ℂ) :
-      introTraceArchimedean (F := ℚ) 1 (f n w) Rat.infinitePlace -
-      introTraceArchimedean (F := ℚ) 1 (f n (w + 2)) Rat.infinitePlace =
-        (1 / 2 : ℂ) * ∫ t, W (fun x ↦ f n w x - f n (w + 2) x) t := by
-    rw [introTraceArchimedean_rat_sub_shiftTwo_integral _ (hm n w).measurable,
-      introTraceArchimedean_rat_sub_shiftTwo_integral _ (hm n (w + 2)).measurable, ← mul_sub]
-    change _ * ((∫ t, W (f n w) t) - ∫ t, W (f n (w + 2)) t) = _
-    rw [← integral_sub (hint n w) (hint n (w + 2))]
-    congr 1
-    apply integral_congr_ae
-    exact .of_forall fun t ↦ by simp only [W]; ring
-  change TendstoLocallyUniformlyOn
-    (fun n w ↦ introTraceArchimedean (F := ℚ) 1 (f n w) Rat.infinitePlace -
-      introTraceArchimedean (F := ℚ) 1 (f n (w + 2)) Rat.infinitePlace) _ _ _
-  simp_rw [he]
-  apply (isOpen_Ioi.preimage Complex.continuous_re).tendstoLocallyUniformlyOn_iff_forall_tendsto.2
-  intro z hz
-  obtain ⟨a, ha, haz⟩ := exists_between (show -(1 / 2 : ℝ) < z.re from hz)
-  let l := (atTop : Filter ℕ) ×ˢ 𝓝 z
-  let C := (1 / 2 : ℝ) ^ (-a) + 2 ^ (-a)
-  let d := -a - 3 / 2
-  let p := (Ioi (1 : ℝ)).indicator fun t ↦ t ^ d
-  let bound (t : ℝ) := (8 * C) * (p t + p (-t))
-  let F (i : ℕ × ℂ) (t : ℝ) := W (fun x ↦ f i.1 i.2 x - f i.1 (i.2 + 2) x) t
-  let G (t : ℝ) := W (fun x ↦ introTracePower z x - introTracePower (z + 2) x) t
-  have hC : 0 ≤ C := by dsimp [C]; positivity
-  have hp : Integrable p := (integrable_indicator_iff measurableSet_Ioi).2
-    (integrableOn_Ioi_rpow_of_lt (show d < -1 by dsimp [d]; linarith) zero_lt_one)
-  have hbi : Integrable bound := (hp.add hp.comp_neg).const_mul _
-  have hzero (n : ℕ) (w : ℂ) (t : ℝ) (ht : t ≤ 1) : f n w t = 0 :=
-    image_eq_zero_of_notMem_tsupport fun hm ↦ ht.not_gt (introTraceApprox_support h ρ hA n w hm)
-  have hnear : ∀ᶠ i in l, a ≤ i.2.re :=
-    (Complex.continuous_re.continuousAt.tendsto.comp tendsto_snd).eventually (le_mem_nhds haz)
-  have hlim : Tendsto (fun i ↦ ∫ t, F i t) l (𝓝 (∫ t, G t)) := by
-    refine tendsto_integral_filter_of_dominated_convergence bound ?_ ?_ hbi ?_
-    · exact .of_forall fun i ↦ by
-        have hm' : Measurable fun x ↦ f i.1 i.2 x - f i.1 (i.2 + 2) x :=
-          (hm _ _).measurable.sub (hm _ _).measurable
-        apply Measurable.aestronglyMeasurable
-        exact (Complex.measurable_ofReal.comp continuous_abs.measurable.inv).mul
-          (((hm'.comp continuous_abs.measurable).mul
-            (Complex.measurable_ofReal.comp (Real.continuous_sqrt.measurable.comp continuous_abs.measurable))).div
-            (Complex.measurable_ofReal.comp (continuous_abs.measurable.comp (measurable_const.sub measurable_id))))
-    · filter_upwards [hnear] with i hi
-      apply Eventually.of_forall
-      intro t
-      by_cases ht : 1 < |t|
-      · have hb := introTraceApprox_rat_sub_shiftTwo_density_bound t a C hC ht _ <|
-          introTraceApprox_rat_sub_shiftTwo_bound h ρ hA hmatch i.1 ht hi
-        have hp' : p t + p (-t) = |t| ^ d := by
-          rcases le_or_gt 0 t with hts | hts
-          · rw [abs_of_nonneg hts] at ht ⊢
-            simp [p, ht, show ¬1 < -t by linarith]
-          · rw [abs_of_neg hts] at ht ⊢
-            simp [p, ht, show ¬1 < t by linarith]
-        simpa only [bound, hp'] using hb
-      · have ht' := le_of_not_gt ht
-        have hp' (x : ℝ) : 0 ≤ p x := by
-          by_cases h : 1 < x
-          · simpa [p, h] using Real.rpow_nonneg (zero_le_one.trans h.le) d
-          · simp [p, h]
-        simpa [F, W, hzero _ _ _ ht', bound] using
-          mul_nonneg (show 0 ≤ 8 * C by positivity) (add_nonneg (hp' t) (hp' (-t)))
-    · apply Eventually.of_forall
-      intro t
-      by_cases ht : 1 < |t|
-      · have hplus : Tendsto (fun i : ℕ × ℂ ↦ (i.1, i.2 + 2)) l (atTop ×ˢ 𝓝 (z + 2)) :=
-          tendsto_fst.prodMk (tendsto_snd.add_const _)
-        have hdif := (introTraceApprox_mellin_tendsto_radial hA z ht).sub
-          ((introTraceApprox_mellin_tendsto_radial hA (z + 2) ht).comp hplus)
-        exact tendsto_const_nhds.mul ((hdif.mul_const _).div_const _)
-      · have ht' := le_of_not_gt ht
-        simp [F, G, W, hzero _ _ _ ht', introTracePower, ht]
-  have hvalue : (1 / 2 : ℂ) * (∫ t, G t) = 1 / (z + 1 / 2) :=
-    (introTraceArchimedean_rat_sub_shiftTwo_integral _
-      ((introTraceApprox_mellin_tendsto_power_measurable z).sub
-        (introTraceApprox_mellin_tendsto_power_measurable (z + 2)))).symm.trans
-      (introTraceArchimedean_rat_sub_shiftTwo z hz)
-  have hlim' := hlim.const_mul (1 / 2 : ℂ)
-  rw [hvalue] at hlim'
-  have hne : z + 1 / 2 ≠ 0 := fun e ↦ by
-    have := congrArg Complex.re e
-    norm_num at this
-    linarith
-  have hcont : ContinuousAt (fun w : ℂ ↦ 1 / (w + 1 / 2)) z := by fun_prop (disch := exact hne)
-  exact ((hcont.tendsto.comp tendsto_snd).prodMk_nhds hlim').mono_right (nhds_le_uniformity _)
+  exact ((introTraceApprox_archimedean_sub_shiftTwo_matched (F := ℚ) 1 Rat.infinitePlace h ρ hA hmatch).2).congr_right
+    (fun z hz ↦ introTraceArchimedean_rat_sub_shiftTwo z hz)
 
 /-- Paper: §1.4.3, p. 29. For any admissible cutoff and mollifier family one can
 retain all cutoffs and select cofinal mollifier indices so that the difference
