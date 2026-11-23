@@ -1493,6 +1493,34 @@ theorem sLocalTrace_asymptotic_of_sharp_comparison
       (∀ (v : S) (u : (v.val.adicCompletion F)ˣ),
         (b v).val u = φ.val (finiteClass(v.val) u)) ∧
       Tendsto (fun p : ℝ × ℝ ↦ (∫ x, k p x x ∂μJ) / (volume₁ : ℂ) -
-        φ.val 1 * (Real.log (p.1 * p.2) : ℂ)) (atTop ×ˢ atTop) (𝓝 principalValues(a, b)) := by sorry
+        φ.val 1 * (Real.log (p.1 * p.2) : ℂ)) (atTop ×ˢ atTop) (𝓝 principalValues(a, b)) := by
+  obtain ⟨a, b, N, ha, hb, hsum, hN⟩ :=
+    sLocalTraceSharpMass_asymptotic (F := F) (S := S) φ _hPic _hRamified _hOutside f _hLift
+  refine ⟨a, b, ha, hb, ?_⟩
+  have heq : N =ᶠ[atTop] M := by
+    filter_upwards [hsum, _hSum] with R h₁ h₂ using h₁.unique h₂
+  have hM : Tendsto (fun R ↦ M R - (volume₁ : ℂ) * φ.val 1 * (Real.log R : ℂ))
+      atTop (𝓝 ((volume₁ : ℂ) * principalValues(a, b))) :=
+    hN.congr' (heq.mono fun R h ↦ by simp only [h])
+  have hp : Tendsto (fun p : ℝ × ℝ ↦ p.1 * p.2) (atTop ×ˢ atTop) atTop :=
+    tendsto_fst.atTop_mul_atTop₀ tendsto_snd
+  let G := (sIdeleQuotientNorm F S).ker
+  let : CompactSpace G := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage (isCompact_singleton (x := 1)))
+  let μ := sLocalNormOneQuotientMeasure F S
+  have : μ.IsHaarMeasure := (sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)).1
+  have hv : (volume₁ : ℂ) ≠ 0 := by
+    refine Complex.ofReal_ne_zero.mpr (ENNReal.toReal_ne_zero.mpr ⟨?_, ?_⟩)
+    · exact isOpen_univ.measure_ne_zero μ univ_nonempty
+    · exact measure_ne_top μ univ
+  have h := (_hComparison.add (hM.comp hp)).div_const (volume₁ : ℂ)
+  have hc : (0 + (volume₁ : ℂ) * principalValues(a, b)) / (volume₁ : ℂ) = principalValues(a, b) := by
+    rw [zero_add, mul_comm, mul_div_cancel_right₀ _ hv]
+  rw [hc] at h
+  refine h.congr' (Eventually.of_forall fun p ↦ ?_)
+  change ((∫ x, k p x x ∂μJ) - M (p.1 * p.2) +
+    (M (p.1 * p.2) - (volume₁ : ℂ) * φ.val 1 * (Real.log (p.1 * p.2) : ℂ))) / _ = _
+  field_simp
+  ring
 
 end RiemannMasullo
