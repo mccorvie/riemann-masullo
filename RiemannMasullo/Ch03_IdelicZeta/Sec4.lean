@@ -6655,7 +6655,8 @@ private theorem finite_twist_ne_one (χ : PontryaginDual C_F) (v : V) {z : ℂ} 
   rw [norm_one, norm_mul, Circle.norm_coe, one_mul, Complex.norm_cpow_eq_rpow_re_of_pos hpos] at hh
   exact (Real.rpow_lt_one hpos.le hlt hz).ne hh
 
-private theorem analytic_eval_normalized {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+/-- Pointwise evaluation of a holomorphic strong-dual family is entire. -/
+theorem analytic_eval_normalized {E : Type*} [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
     [ContinuousSMul ℂ E] {D : ℂ → StrongDual ℂ E} (hD : VectorHolomorphicOn D univ) (f : E) :
     AnalyticOnNhd ℂ (fun z ↦ D z f) univ := by
   let e : StrongDual ℂ E →L[ℂ] ℂ := ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) f
