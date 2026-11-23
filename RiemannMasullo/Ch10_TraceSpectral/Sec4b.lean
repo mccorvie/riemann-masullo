@@ -433,7 +433,39 @@ real-valued as in §9.3 and is viewed as a scalar on complex functions. -/
 theorem spectralLineTruncatedKernel_hilbertSchmidt (_ha : 0 < a)
     (hρ : hcut) (_hband : innerBand) :
     IsSobolevHilbertSchmidtKernel (F := F) (spectralTruncatedConvolution (F := F) a hline hs₀(hs) hρ φ)
-      (cut(weightedLine(kLine))) := by sorry
+      (cut(weightedLine(kLine))) := by
+  have mulKernel {X : Type _} [TopologicalSpace X] [T2Space X] [LocallyCompactSpace X]
+      [SecondCountableTopology X] [MeasurableSpace X] [BorelSpace X]
+      (ν : Measure X) [IsFiniteMeasureOnCompacts ν] [Measure.InnerRegular ν] [SFinite ν]
+      (r : X → ℝ) (hm : Measurable r) (hr : ∀ x, |r x| ≤ 1)
+      (M : Lp ℂ 2 ν →L[ℂ] Lp ℂ 2 ν) (hM : ∀ f : Lp ℂ 2 ν,
+        (M f : X → ℂ) =ᵐ[ν] fun x ↦ (r x : ℂ) * f x)
+      {k : X × X → ℂ} (hk : MemLp k 2 (ν.prod ν)) :
+      ∃ ha : MemLp (fun p : X × X ↦ r p.1 • k p) 2 (ν.prod ν),
+        (integralKernelOperator ν (ha.toLp _)).val = M.comp (integralKernelOperator ν (hk.toLp k)).val := by
+    have hb : MemLp (fun p : X × X ↦ r p.1) ⊤ (ν.prod ν) :=
+      memLp_top_of_bound (hm.comp measurable_fst).aestronglyMeasurable 1
+        (.of_forall fun p ↦ hr p.1)
+    have ha : MemLp (fun p : X × X ↦ r p.1 • k p) 2 (ν.prod ν) := hb.smul hk
+    refine ⟨ha, ?_⟩
+    ext1 f
+    apply Lp.ext
+    filter_upwards [integralKernelOperator_apply ν (ha.toLp _) f,
+      integralKernelOperator_apply ν (hk.toLp _) f, Measure.ae_ae_of_ae_prod ha.coeFn_toLp,
+      Measure.ae_ae_of_ae_prod hk.coeFn_toLp, hM ((integralKernelOperator ν (hk.toLp _)).val f)]
+      with x hx hx' hax hkx hmx
+    change (integralKernelOperator ν (ha.toLp _)).val f x =
+      M ((integralKernelOperator ν (hk.toLp _)).val f) x
+    rw [hx.2, hmx, hx'.2, ← integral_const_mul]
+    apply integral_congr_ae
+    filter_upwards [hax, hkx] with y ha' hk'
+    rw [ha', hk']
+    exact mul_assoc (r x : ℂ) (k (x, y)) (f y)
+  obtain ⟨hk, hB⟩ := spectralLineKernel_hilbertSchmidt (F := F) a hs φ _ha
+  let ν := ν(0, s)
+  let M := modulatedCutoffOperator m𝔽 ν hρ
+  obtain ⟨hg, he⟩ := mulKernel ν ρ hρ.measurable hρ.abs_le_one M (modulatedCutoffOperator_apply m𝔽 ν hρ) hk
+  exact ⟨hg, he.trans (congrArg (fun U : W(0, s) →L[ℂ] W(0, s) ↦ M.comp U) hB)⟩
 
 /-- Paper: Theorem 10.4.3.4(3), p. 471. Applying the cutoff in the
 output variable and the reciprocal weight in the input variable gives the
