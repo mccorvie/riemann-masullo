@@ -2096,7 +2096,21 @@ The principal value preserves the kernel of each homogeneous theta transform. -/
 theorem sAdelePrincipalValue_preserves_homogeneousThetaKernel {T : Finset V} (hT : T ⊆ S)
     (ψ : PontryaginDual J₁) :
     LinearMap.ker (thetaAt(ψ)) ≤
-      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by sorry
+      (LinearMap.ker (thetaAt(ψ))).comap (sAdelePrincipalValue F hT) := by
+  let K := LinearMap.ker (thetaAt(ψ))
+  let A := (existsUnique_sLocalThetaIsotypicAverage (F := F) (S := S) ψ).exists.choose
+  obtain ⟨e, he⟩ := (sLocalThetaIsotypicAverage_equiv (F := F) (S := S) ψ).2
+  intro f hf
+  have hz : K.mkQ f = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hf
+  have hA : A (Submodule.Quotient.mk f) = 0 := (he f).symm.trans
+    (congrArg Subtype.val ((congrArg e hz).trans e.map_zero))
+  have hcomm := sLocalThetaPrincipalValue_isotypicAverage (F := F) hT ψ (Submodule.Quotient.mk f)
+  have hzero : A (Submodule.Quotient.mk (sAdelePrincipalValue F hT f)) = 0 :=
+    hcomm.symm.trans ((congrArg (sLocalThetaPrincipalValue F hT) hA).trans (map_zero _))
+  apply (Submodule.Quotient.mk_eq_zero K).mp
+  apply e.injective
+  apply Subtype.ext
+  exact ((he _).trans hzero).trans (congrArg Subtype.val e.map_zero).symm
 
 /-- Paper: Proposition 5.3.4.5(3), p. 264.
 Weil's operator on homogeneous theta classes is induced by its action on tests. -/
