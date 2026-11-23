@@ -1814,6 +1814,80 @@ private theorem sLocalPolarOrbital_bases_of_laurent_bounds_biorthogonal
   sLocalOrbitalPrincipalValue_biorthogonal (F := F) (S := S) (T := Sₚ(p)) (hₚ(p))
     _hp _hS _hPic ω
 
+/-- Absolute summability in every continuous seminorm gives convergence of the
+coordinate series; biorthogonality and separation identify its sum. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal_of_summable
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (e : ℕ → Q(p, ω)) (d : ℕ → StrongDual ℂ (Q(p, ω)))
+    (hF : IsFrechetTVS (Q(p, ω)))
+    (hbi : ∀ m n, d m (e n) = if m = n then 1 else 0)
+    (hsep : ∀ x, (∀ n, d n x = 0) → x = 0)
+    (hsum : ∀ (q : Seminorm ℂ (Q(p, ω))), Continuous q →
+      ∀ x, Summable (fun n ↦ q (d n x • e n))) :
+    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  classical
+  have hFcopy := hF
+  obtain ⟨_, hpoly, hmet, hcomplete⟩ := hFcopy
+  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+  let P := fun q : {q : Seminorm ℂ (Q(p, ω)) // Continuous q} ↦ q.val
+  have hP : WithSeminorms P := PolynormableSpace.withSeminorms ℂ (Q(p, ω))
+  have hs (x : Q(p, ω)) : Summable (fun n ↦ d n x • e n) := by
+    apply summable_iff_cauchySeq_finset.mpr
+    rw [CauchySeq, cauchy_map_iff', uniformity_eq_comap_nhds_zero,
+      Filter.tendsto_comap_iff, hP.tendsto_nhds]
+    intro q ε hε
+    let L : Q(p, ω) →ₗ[ℂ] LocalBanach (P q) :=
+      UniformSpace.Completion.toComplL.toLinearMap.comp LinearMap.id
+    have hL (y : Q(p, ω)) : ‖L y‖ = P q y := localBanach_norm_coe (P q) y
+    have hnorm : Summable (fun n ↦ ‖L (d n x • e n)‖) := by
+      simpa only [hL] using hsum q.val q.property x
+    have hc := cauchy_map_iff'.mp
+      (summable_iff_cauchySeq_finset.mp (Summable.of_norm hnorm))
+    rw [tendsto_uniformity_iff_dist_tendsto_zero, Metric.tendsto_nhds] at hc
+    filter_upwards [hc ε hε] with z hz
+    rw [Real.dist_eq, sub_zero, abs_of_nonneg dist_nonneg, dist_eq_norm',
+      ← map_sum, ← map_sum, ← map_sub, hL] at hz
+    simpa only [sub_zero, Function.comp_apply] using hz
+  have hvalue (x : Q(p, ω)) : ∑' n, d n x • e n = x := by
+    apply sub_eq_zero.mp
+    apply hsep
+    intro m
+    have hm := (hs x).hasSum.mapL (d m)
+    simp only [map_smul, hbi, smul_eq_mul, mul_ite, mul_one, mul_zero] at hm
+    have he : d m (∑' n, d n x • e n) = d m x := by
+      simpa using hm.tsum_eq.symm
+    rw [map_sub, he, sub_self]
+  have hb : IsSchauderBasis e d := ⟨hbi, fun x ↦ by
+    have h := (hs x).hasSum
+    rw [hvalue x] at h
+    exact Tendsto.mono_left h (SummationFilter.conditional ℕ).le_atTop⟩
+  exact ⟨hb, (SchauderBasis.isAbsolute_iff_summable_of_frechet hF hb).mpr hsum⟩
+
+
+open Classical in
+/-- Paper: Theorem 7.3.1.6(3), p. 345, with its proof on pp. 346–349.
+For every quotient vector, its polar coordinate terms are summable under each continuous
+seminorm. This isolates the analytic estimate: combine rapid decay of the Laurent
+coefficients on the finitely many local pole lattices with polynomial growth of their
+biorthogonal vectors, accounting for multiplicities and overlapping lattices. -/
+private theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
+    (p : Vℚ) (ω : PontryaginDual J₁)
+    (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial)
+    (_hcoeff : ∀ χ : PontryaginDual Jₛ, ∃ d : ℕ, ∃ C : ℝ, 0 < C ∧
+      ∀ (j : Idx(p, ω)) (s : ℂ), j.val.2 ≠ 0 → j.val.1 = chart(χ) s →
+        ‖rhoCoeff(j.val.1, j.val.2)‖ ≤ C * (1 + ‖s‖) ^ d * ‖rhoCoeff(j.val.1, 0)‖)
+    (D : Idx(p, ω) → StrongDual ℂ (Q(p, ω)))
+    (_hD : ∀ (j : Idx(p, ω)) (x : Θₛ(ω)), D j (π(p, ω) x) =
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j x)
+    (ψ : Idx(p, ω) → Q(p, ω))
+    (_hψ : ∀ (i j : Idx(p, ω)) (x : Θₛ(ω)), π(p, ω) x = ψ j →
+      sLocalOrbitalPrincipalPart (F := F) (S := S) (T := Sₚ(p)) (ω := ω) i x =
+        if i = j then 1 else 0)
+    (q : Seminorm ℂ Q(p, ω)) (_hq : Continuous q) (x : Q(p, ω)) :
+    Summable (fun j : Idx(p, ω) ↦ q (D j x • ψ j)) := by
+  sorry
+
 open Classical in
 /-- Paper: Theorem 7.3.1.6(3), p. 345.
 With a biorthogonal family in the primary quotient, the enumeration of that family is an
@@ -1836,7 +1910,28 @@ theorem sLocalPolarOrbital_bases_of_laurent_bounds_primal
         if i = j then 1 else 0) :
     let e := ψ ∘ σ
     let d := D ∘ σ
-    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by sorry
+    IsSchauderBasis e d ∧ SchauderBasis.IsAbsolute e d := by
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
+      (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  apply sLocalPolarOrbital_bases_of_laurent_bounds_primal_of_summable p ω (ψ ∘ σ) (D ∘ σ) hF
+  · intro m n
+    obtain ⟨x, hx⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) (ψ (σ n))
+    have he := (_hD (σ m) x).trans (_hψ (σ m) (σ n) x hx)
+    rw [hx] at he
+    simpa only [Function.comp_apply, σ.injective.eq_iff] using he
+  · intro x hx
+    obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) x
+    apply (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω y).mpr
+    intro j
+    obtain ⟨n, rfl⟩ := σ.surjective j
+    exact (_hD (σ n) y).symm.trans (hx n)
+  · intro q hq x
+    exact σ.summable_iff.mpr
+      (sLocalPolarOrbital_bases_of_laurent_bounds_primal_summable
+        p ω _hS _hp _hPic _hcoeff D _hD ψ _hψ q hq x)
 
 open Classical in
 /-- Paper: Theorem 7.3.1.6(2), p. 345.
@@ -1860,7 +1955,30 @@ theorem sLocalPolarOrbital_bases_of_laurent_bounds_dual
     let d := D ∘ σ
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ (Q(p, ω))) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (ψ (σ n))
-    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by sorry
+    IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
+  have hprimal := sLocalPolarOrbital_bases_of_laurent_bounds_primal
+    p ω σ _hS _hp _hPic _hcoeff D _hD ψ _hψ
+  have hR : IsClosed (Rₚ(p, ω) : Set (Θₛ(ω))) :=
+    (sLocalHomogeneousThetaPrincipalValue_isClosedEmbedding
+      (F := F) (S := S) hₚ(p) ω).isClosed_range
+  have hF : IsFrechetTVS (Q(p, ω)) :=
+    isFrechetTVS_quotient (sLocalHomogeneousThetaSpace_frechet ω) _ hR
+  have hFcopy := hF
+  obtain ⟨_, hpoly, hmet, hcomp⟩ := hFcopy
+  have hN : IsNuclearTVS.{0} (Q(p, ω)) :=
+    isNuclearTVS_quotient (sLocalHomogeneousThetaSpace_nuclear ω) _
+  let : UniformSpace (Q(p, ω)) := IsTopologicalAddGroup.rightUniformSpace _
+  let : IsUniformAddGroup (Q(p, ω)) := isUniformAddGroup_of_addCommGroup
+  let : MontelSpace ℂ (Q(p, ω)) :=
+    montelSpace_of_schwartz_frechet hF (isSchwartzTVS_of_isNuclearTVS hN)
+  let : BarrelledSpace ℂ (Q(p, ω)) := isFrechetTVS_barrelled hF
+  have hrefl : IsHomeomorph (ContinuousLinearMap.applyₗ
+      (E := Q(p, ω)) ℂ (RingHom.id ℂ)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hcomp hrefl hprimal.1 hprimal.2,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute
+      hcomp hrefl hprimal.1 hprimal.2⟩
 
 /-- Paper: Theorem 7.3.1.6(2)–(3), p. 345.
 Any enumeration of the polar functionals gives an unconditional basis of the strong dual.
