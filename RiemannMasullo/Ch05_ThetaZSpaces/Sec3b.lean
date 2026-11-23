@@ -1348,17 +1348,186 @@ theorem archimedeanWeightedSchwartz_empty_equiv (I : Set ℝ) :
     fun_prop
   exact ⟨⟨e, he, he'⟩, fun _ ↦ rfl⟩
 
--- TODO(paper-gap): The proof's integer exponents need not meet I. Use a countable
--- family of exponents in I bracketing each exponent in I, together with zero.
+private theorem compactlyGenerated_pi_finite {ι : Type*} [Finite ι]
+    (H : ι → Type*) [∀ i, Group (H i)] [∀ i, TopologicalSpace (H i)]
+    (h : ∀ i, IsCompactlyGeneratedGroup (H i)) : IsCompactlyGeneratedGroup (∀ i, H i) := by
+  choose K hK hKc hKg using h
+  refine ⟨Set.univ.pi K, set_pi_mem_nhds finite_univ (fun i _ ↦ hK i), isCompact_univ_pi hKc, ?_⟩
+  rw [Subgroup.closure_pi (fun i ↦ mem_of_mem_nhds (hK i))]
+  simpa only [hKg] using Subgroup.pi_top (f := H) Set.univ
+
+/-- The product of the real and complex unit groups is compactly generated
+and locally Euclidean, so its Schwartz–Bruhat space has a full stage. -/
+private theorem schwartzBruhat_archimedean_metrizable :
+    MetrizableSpace (SchwartzBruhat (archMul(ι, κ))) := by
+  let : SecondCountableTopology ℝˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : SecondCountableTopology ℂˣ := Units.isEmbedding_val₀.secondCountableTopology
+  have hR := compactlyGenerated_of_surjective_modulation (archimedeanUnitModulation ℝ 1)
+    realCoordinate_mul_allExponentialDecay_modulation.1 realCoordinate_mul_allExponentialDecay_modulation.2
+  have hC := compactlyGenerated_of_surjective_modulation (archimedeanUnitModulation ℂ 2)
+    complexCoordinate_mul_allExponentialDecay_modulation.1 complexCoordinate_mul_allExponentialDecay_modulation.2
+  obtain ⟨K, hK, hKc, hKg⟩ := compactlyGenerated_pi_finite (fun _ : ι ↦ ℝˣ) fun _ ↦ hR
+  obtain ⟨L, hL, hLc, hLg⟩ := compactlyGenerated_pi_finite (fun _ : κ ↦ ℂˣ) fun _ ↦ hC
+  let G := archMul(ι, κ)
+  have hgen : IsCompactlyGeneratedGroup G :=
+    ⟨K ×ˢ L, prod_mem_nhds hK hL, hKc.prod hLc, by
+      rw [Subgroup.closure_prod (mem_of_mem_nhds hK) (mem_of_mem_nhds hL), hKg, hLg,
+        Subgroup.top_prod_top]⟩
+  let V := (ι → ℝ) × (κ → ℂ)
+  let n := Module.finrank ℝ V
+  let e : V ≃L[ℝ] EuclideanSpace ℝ (Fin n) := ContinuousLinearEquiv.ofFinrankEq (by simp [n])
+  have hval : IsOpenEmbedding
+      (fun u : G ↦ ((fun i ↦ (u.1 i).val, fun j ↦ (u.2 j).val) : V)) :=
+    (Topology.IsOpenEmbedding.piMap (fun _ : ι ↦ Units.isOpenEmbedding_val (R := ℝ))).prodMap
+      (Topology.IsOpenEmbedding.piMap (fun _ : κ ↦ Units.isOpenEmbedding_val (R := ℂ)))
+  have hloc : IsLocallyEuclidean G :=
+    ⟨n, ⟨(e.toHomeomorph.isOpenEmbedding.comp hval).singletonChartedSpace⟩⟩
+  exact schwartzBruhat_metrizable_of_elementary hgen hloc
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
-Metrizability half of the lemma. A weight at an exponent between two exponents of `I`
-is bounded by the larger of the two weights, so countably many exponents in `I`
-together with zero already generate the seminorm topology. This is where the printed
-proof uses integer exponents, which need not lie in an interval `I` that misses `ℤ`. -/
+Metrizability half of the lemma. Coordinatewise interpolation between rational
+exponents in `I`, together with zero for omitted coordinates, gives a countable
+family of twists that induces the topology.
+Deviation: The printed proof uses integer exponents, which need not lie in `I`. -/
 theorem archimedeanWeightedSchwartz_metrizable {I : Set ℝ} (ho : IsOpen I)
     (hi : OrdConnected I) (hne : I.Nonempty) : MetrizableSpace 𝓦(I) := by
-  sorry
+  clear hi hne
+  classical
+  let W := 𝓦(I)
+  let G := archMul(ι, κ)
+  let S := SchwartzBruhat G
+  let J := ι ⊕ κ
+  let A := (insert 0 I : Set ℝ)
+  let D := insert 0 (I ∩ range (Rat.cast : ℚ → ℝ))
+  let d : D → A := fun x ↦ ⟨x.val, by
+    rcases Set.mem_insert_iff.mp x.property with h | h
+    · exact Set.mem_insert_iff.mpr (Or.inl h)
+    · exact Set.mem_insert_of_mem _ h.1⟩
+  have hbracket (x : A) (hx : x.val ∉ D) :
+      ∃ p q : D, p.val ≤ x.val ∧ x.val ≤ q.val := by
+    have hx0 : x.val ≠ 0 := fun h ↦ hx (h ▸ mem_insert _ _)
+    have hxI := (mem_insert_iff.mp x.property).resolve_left hx0
+    obtain ⟨ε, hε, hball⟩ := Metric.isOpen_iff.mp ho _ hxI
+    obtain ⟨p, hp₁, hp₂⟩ := exists_rat_btwn (sub_lt_self x.val hε)
+    obtain ⟨q, hq₁, hq₂⟩ := exists_rat_btwn (lt_add_of_pos_right x.val hε)
+    have hp : (p : ℝ) ∈ Metric.ball x.val ε := by
+      rw [Metric.mem_ball, Real.dist_eq, abs_lt]
+      constructor <;> linarith
+    have hq : (q : ℝ) ∈ Metric.ball x.val ε := by
+      rw [Metric.mem_ball, Real.dist_eq, abs_lt]
+      constructor <;> linarith
+    exact ⟨⟨p, mem_insert_of_mem _ ⟨hball hp, mem_range_self p⟩⟩,
+      ⟨q, mem_insert_of_mem _ ⟨hball hq, mem_range_self q⟩⟩, hp₂.le, hq₁.le⟩
+  let e : (J → A) ≃ weights(ι, κ, I) := Equiv.sumArrowEquivProdArrow _ _ _
+  let twist (a : J → A) : W →ₗ[ℂ] S := archimedeanSchwartzTwist I (e a)
+  let m : J → (G →ₜ* ℝ≥0ˣ) := Sum.elim
+    (fun i ↦ (archimedeanUnitModulation ℝ 1).comp
+      ⟨(Pi.evalMonoidHom _ i).comp (MonoidHom.fst _ _), (continuous_apply i).comp continuous_fst⟩)
+    (fun j ↦ (archimedeanUnitModulation ℂ 2).comp
+      ⟨(Pi.evalMonoidHom _ j).comp (MonoidHom.snd _ _), (continuous_apply j).comp continuous_snd⟩)
+  have htw (a : J → A) (f : W) (u : G) :
+      twist a f u = (↑(∏ i, ((m i u).val : ℝ) ^ (a i : ℝ)) : ℂ) * f.val u := by
+    refine (archimedeanSchwartzTwist_apply I (e a) f u).trans ?_
+    rw [Fintype.prod_sum_type, Complex.ofReal_mul]
+    have hl (i : ι) : ((m (.inl i) u).val : ℝ) = ‖(u.1 i).val‖ := by
+      change ((archimedeanUnitModulation ℝ 1 (u.1 i)).val : ℝ) = _
+      rw [archimedeanUnitModulation_apply, pow_one]
+    have hr (j : κ) : ((m (.inr j) u).val : ℝ) = ‖(u.2 j).val‖ ^ (2 : ℕ) :=
+      archimedeanUnitModulation_apply ℂ 2 _
+    simp only [hl, hr]
+    rfl
+  let t (f : W) (j : J → D) : S := twist (d ∘ j) f
+  let Y := (J → D) → S
+  -- Replace one coordinate at a time using the Appendix D modulation interpolation.
+  have hall (a : J → A) : ∃ F : Y → S, Continuous F ∧ ∀ f, F (t f) = twist a f := by
+    suffices h : ∀ (s : Finset J) (a : J → A), (∀ i ∉ s, (a i).val ∈ D) →
+        ∃ F : Y → S, Continuous F ∧ ∀ f, F (t f) = twist a f by
+      exact h Finset.univ a (by simp)
+    intro s
+    induction s using Finset.induction_on with
+    | empty =>
+      intro a ha
+      let j : J → D := fun i ↦ ⟨a i, ha i (by simp)⟩
+      have he : d ∘ j = a := funext fun i ↦ Subtype.ext rfl
+      exact ⟨fun g ↦ g j, continuous_apply j, fun f ↦ congrArg (fun a ↦ twist a f) he⟩
+    | insert i s his ih =>
+      intro a ha
+      have hrest (j : J) (hj : j ∉ s) (hne : j ≠ i) : (a j).val ∈ D :=
+        ha j (by simpa [Finset.mem_insert, hne] using hj)
+      by_cases hi : (a i).val ∈ D
+      · exact ih a fun j hj ↦ by
+          by_cases hji : j = i
+          · simpa [hji] using hi
+          · exact hrest j hj hji
+      obtain ⟨p, q, hp, hq⟩ := hbracket (a i) hi
+      have hup (x : D) : ∃ F : Y → S, Continuous F ∧
+          ∀ f, F (t f) = twist (Function.update a i (d x)) f :=
+        ih _ fun j hj ↦ by
+          by_cases hji : j = i
+          · subst j
+            simpa only [Function.update_self, d] using x.property
+          · simpa [Function.update_of_ne hji] using hrest j hj hji
+      obtain ⟨F, hF⟩ := modulationWeight_between_continuous (m i) p.val (a i).val q.val hp hq
+      obtain ⟨Fp, hcp, hpF⟩ := hup p
+      obtain ⟨Fq, hcq, hqF⟩ := hup q
+      refine ⟨fun g ↦ F (Fp g, Fq g), F.continuous.comp (hcp.prodMk hcq), fun f ↦ ?_⟩
+      change F (Fp (t f), Fq (t f)) = twist a f
+      rw [hpF f, hqF f]
+      let g (u : G) : ℂ :=
+        (↑(∏ j ∈ Finset.univ.erase i, ((m j u).val : ℝ) ^ (a j : ℝ)) : ℂ) * f.val u
+      have hg (b : J → A) (hb : ∀ j ≠ i, b j = a j) :
+          (twist b f).val = modulationWeight (m i) (b i).val g := by
+        funext u
+        change twist b f u = _
+        rw [htw, ← Finset.mul_prod_erase _ _ (Finset.mem_univ i), Complex.ofReal_mul, mul_assoc]
+        congr 2
+        apply congrArg Complex.ofReal
+        refine Finset.prod_congr rfl fun j hj ↦ ?_
+        rw [hb j (Finset.ne_of_mem_erase hj)]
+      have hl (x : D) : (twist (Function.update a i (d x)) f).val =
+          modulationWeight (m i) x.val g := by
+        simpa only [Function.update_self] using
+          hg (Function.update a i (d x)) (fun j hj ↦ Function.update_of_ne hj _ _)
+      exact Subtype.ext ((hF g _ (hl p) (hl q)).trans (hg a (fun _ _ ↦ rfl)).symm)
+  let T : W →ₗ[ℂ] (weights(ι, κ, I) → S) := LinearMap.pi (archimedeanSchwartzTwist I)
+  have hs := withGeneratingSeminorms_spec (archimedeanWeightedSchwartzSubmodule (ι := ι) (κ := κ) I)
+    (fun i : weights(ι, κ, I) × {p : Seminorm ℂ S // Continuous p} ↦
+      i.2.val.comp (archimedeanSchwartzTwist I i.1))
+  let hSgen := PolynormableSpace.withSeminorms ℂ S
+  have hT : IsInducing T := by
+    constructor
+    refine hs.topologicalSpace_eq_iInf.trans ?_
+    refine Eq.trans ?_ (WithSeminorms.topologicalSpace_eq_iInf
+      (t := TopologicalSpace.induced T inferInstance)
+      (T.withSeminorms_induced (withSeminorms_pi fun _ : weights(ι, κ, I) ↦ hSgen))).symm
+    rw [iInf_sigma, iInf_prod]
+    rfl
+  choose F hF hfact using hall
+  let U (g : Y) (a : weights(ι, κ, I)) : S := F (e.symm a) g
+  have hU : Continuous U := continuous_pi fun a ↦ hF (e.symm a)
+  have hUt : U ∘ t = T := by
+    funext f a
+    exact (hfact (e.symm a) f).trans (congrArg (fun a ↦ archimedeanSchwartzTwist I a f)
+      (e.apply_symm_apply a))
+  have ht : IsEmbedding t := by
+    constructor
+    · have hcont : Continuous t := continuous_pi fun j ↦
+        (continuous_apply (e (d ∘ j))).comp hT.continuous
+      exact IsInducing.of_comp (f := t) (g := U) hcont hU (hUt.symm ▸ hT)
+    · intro f g h
+      let z : D := ⟨0, mem_insert _ _⟩
+      exact Subtype.ext (funext fun u ↦ by
+        have hu := congrArg (fun s : S ↦ s u) (congrFun h (fun _ ↦ z))
+        change twist (d ∘ fun _ ↦ z) f u = twist (d ∘ fun _ ↦ z) g u at hu
+        simpa [htw, d, z] using hu)
+  have hcount : D.Countable := ((countable_range (Rat.cast : ℚ → ℝ)).mono inter_subset_right).insert _
+  let : Countable D := hcount.to_subtype
+  let : Fintype J := inferInstanceAs (Fintype (ι ⊕ κ))
+  let : Countable (J → D) := inferInstance
+  let : MetrizableSpace S := schwartzBruhat_archimedean_metrizable
+  have : (uniformity S).IsCountablyGenerated := IsUniformAddGroup.uniformity_countably_generated
+  let : MetrizableSpace Y := UniformSpace.metrizableSpace
+  exact ht.metrizableSpace
 
 /-- Paper: Lemma 5.3.3.3(1), p. 252.
 Completeness half of the lemma. The partial weight maps embed the weighted space as a

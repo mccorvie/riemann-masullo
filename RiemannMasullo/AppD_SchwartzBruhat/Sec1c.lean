@@ -7484,6 +7484,62 @@ private lemma kernelStage_exists_strict_limit [SecondCountableTopology G] :
 
 end Stages
 
+/-- A largest structural pair carries the full Schwartz–Bruhat topology. -/
+private theorem schwartzBruhat_maxStage_equiv {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (a : BruhatStructuralPair G)
+    (ha : ∀ b, b ≤ a) (e : ElementaryLCAPresentation a.quotient) :
+    Nonempty (SchwartzBruhatStage e ≃L[ℂ] SchwartzBruhat G) := by
+  let J : SchwartzBruhatStage e →ₗ[ℂ] SchwartzBruhat G := schwartzBruhatStageInclusion a e
+  have hJ : Function.Injective J := schwartzBruhatStageInclusion_injective a e
+  have hfactor (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient) :
+      ∃ L : SchwartzBruhatStage d →L[ℂ] SchwartzBruhatStage e,
+        ∀ s, J (L s) = schwartzBruhatStageInclusion b d s := by
+    obtain ⟨L, hL⟩ := kernelStage_transitionMap (ha b) d e
+    exact ⟨L, fun s ↦ Subtype.ext (hL s)⟩
+  have hsurj : Function.Surjective J := by
+    have hle : schwartzBruhatSubmodule G ≤ (schwartzBruhatStageRealization a e).range := by
+      refine iSup_le fun b ↦ iSup_le fun d ↦ ?_
+      rintro _ ⟨s, rfl⟩
+      obtain ⟨L, hL⟩ := hfactor b d
+      exact ⟨L s, congrArg Subtype.val (hL s)⟩
+    intro f
+    obtain ⟨s, hs⟩ := hle f.property
+    exact ⟨s, Subtype.ext hs⟩
+  let E := LinearEquiv.ofBijective J ⟨hJ, hsurj⟩
+  have hE : Continuous E := continuous_schwartzBruhatStageInclusion a e
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  have hP := withGeneratingSeminorms_spec (schwartzBruhatSubmodule G)
+    (Subtype.val : {p : Seminorm ℂ (schwartzBruhatSubmodule G) //
+      ∀ (b : BruhatStructuralPair G) (d : ElementaryLCAPresentation b.quotient),
+        Continuous (p ∘ schwartzBruhatStageInclusion b d)} → _)
+  have hcont : Continuous E.symm := by
+    apply elementarySchwartz_withSeminorms.continuous_of_continuous_comp E.symm.toLinearMap
+    intro i
+    let p : Seminorm ℂ (SchwartzBruhatStage e) := elementarySchwartzSeminorm i
+    refine hP.continuous_seminorm ⟨p.comp E.symm.toLinearMap, fun b d ↦ ?_⟩
+    obtain ⟨L, hL⟩ := hfactor b d
+    exact ((elementarySchwartz_withSeminorms.continuous_seminorm i).comp L.continuous).congr
+      fun s ↦ congrArg p ((E.symm_apply_apply (L s)).symm.trans (congrArg E.symm (hL s)))
+  exact ⟨⟨E, hE, hcont⟩⟩
+
+/-- On a compactly generated locally Euclidean group, the full structural stage
+makes the Schwartz–Bruhat space metrizable. -/
+theorem schwartzBruhat_metrizable_of_elementary {G : Type*} [CommGroup G] [TopologicalSpace G]
+    [IsTopologicalGroup G] [T2Space G] [LocallyCompactSpace G] (hgen : IsCompactlyGeneratedGroup G)
+    (hloc : IsLocallyEuclidean G) : TopologicalSpace.MetrizableSpace (SchwartzBruhat G) := by
+  let a := fullBruhatStage hgen (isBruhatGoodSubgroup_bot_iff.mpr hloc)
+  let e := Classical.choice a.elementary
+  obtain ⟨F⟩ := schwartzBruhat_maxStage_equiv a (fun _ ↦ ⟨le_top, le_top⟩) e
+  let _ := e.finiteGroup
+  let _ := e.finiteTopology
+  let _ := e.finiteDiscrete
+  let _ := e.finiteFintype
+  let : TopologicalSpace.MetrizableSpace (SchwartzBruhatStage e) := elementarySchwartz_isFrechet.choose_spec.2.1
+  exact F.toHomeomorph.symm.isEmbedding.metrizableSpace
+
 section KernelStages
 universe v
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G] [T2Space G]

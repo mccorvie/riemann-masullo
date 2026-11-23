@@ -4475,7 +4475,7 @@ private theorem logModulation_mul_schwartzBruhat_continuousLinear {φ : ℝ → 
 
 omit hm hms in
 /-- Every twist in a closed interval is recovered continuously from the two endpoint twists. -/
-private theorem modulationWeight_between_continuous (a c b : ℝ) (hac : a ≤ c) (hcb : c ≤ b) :
+theorem modulationWeight_between_continuous (a c b : ℝ) (hac : a ≤ c) (hcb : c ≤ b) :
     ∃ F : SchwartzBruhat G × SchwartzBruhat G →L[ℂ] SchwartzBruhat G,
       ∀ (f : G → ℂ) (p : SchwartzBruhat G × SchwartzBruhat G),
         p.1.val = modulationWeight m a f → p.2.val = modulationWeight m b f →
@@ -4583,7 +4583,7 @@ theorem modulatedExponentialDecayStage_endpoints_closedEmbedding (k : GoodCompac
   exact ⟨T, ⟨⟨hT, hinj⟩, hclosedRange⟩, fun _ ↦ ⟨rfl, rfl⟩⟩
 
 /-- A proper surjective modulation pulls a compact generating neighborhood back to one. -/
-private theorem compactlyGenerated_of_surjective_modulation : IsCompactlyGeneratedGroup G := by
+theorem compactlyGenerated_of_surjective_modulation : IsCompactlyGeneratedGroup G := by
   have : ConnectedSpace (Multiplicative ℝ) := inferInstanceAs (ConnectedSpace ℝ)
   have : ConnectedSpace ℝ≥0ˣ := positiveRealLogEquiv.symm.toHomeomorph.surjective.connectedSpace
     positiveRealLogEquiv.symm.continuous
