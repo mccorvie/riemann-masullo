@@ -2573,8 +2573,12 @@ theorem infiniteLocalIdelicZFunction_real_poles (w : InfinitePlace F) (hw : w.Is
 
 /-- Paper: Lemma 3.3.2.1(2)(1), p. 138. At a real pole, the residue applied
 to a test function is twice the Taylor coefficient of the corresponding degree.
-Deviation: This evaluates the residue directly on the test function. In the
-paper's scaled differential notation the odd coefficient has phase +i. -/
+
+Deviation: The formula evaluates ordinary derivatives on the test function. With the printed
+scaling D = (2πi)⁻¹∂ₓ, the degree-one residue is +4πi times (Df)(0). For the
+distribution derivative defined by negative transpose it is −4πi times (Dδ₀)(f), as
+in (3.3.2.7). Equation (3.3.2.20) evaluates D on the test. The degree-one residue of
+the separate factor ρ for the library's Fourier convention is +4πi, as discussed in I91. -/
 theorem infiniteLocalIdelicZFunction_real_residue (w : InfinitePlace F) (hw : w.IsReal)
     (f : ℬ(w.Completion)) (χ : PontryaginDual w.Completionˣ) (a : Fin 2)
     (hχ : realShape[hw, ((circleToComplex).comp χ), 0, a]) (k : ℕ) :
