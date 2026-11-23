@@ -7,6 +7,8 @@ public import Mathlib.NumberTheory.NumberField.DirichletDensity
 public import Mathlib.RingTheory.RamificationInertia.Inertia
 public import Mathlib.RingTheory.RamificationInertia.Ramification
 import RiemannMasullo.Ch06_LocalGlobal.Sec3
+import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec2
+import RiemannMasullo.ForMathlib.Topology.ContinuousMap.LocallyConvex
 import Mathlib.Analysis.Complex.LocallyUniformLimit
 import Mathlib.Analysis.Complex.PhragmenLindelof
 import Mathlib.Analysis.MellinInversion
@@ -2424,6 +2426,132 @@ variable (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
   (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
   (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ) (hEq : ∀ s : halfPlane, L s = completedHeckeL χ s)
 
+/-- The regularized completed generator is nonzero somewhere in the right half-plane. -/
+private theorem spectralAnnihilator_directSum_nonzero
+    {F : Type*} [Field F] [NumberField F]
+    (χ : PontryaginDual (IdeleClassGroup (𝓞 F) F))
+    (τ : ℝ≥0ˣ →ₜ* IdeleGroup (𝓞 F) F) (hτ : RightInverse τ (ideleNorm F))
+    (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ)
+    (hEq : ∀ s : halfPlane, L s = completedHeckeL χ s) :
+    ∃ z, (regularizedCompletedHeckeL χ τ hτ L hL hEq).val z ≠ 0 := by
+  classical
+  let x₀ := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
+  let b := (x₀ : ℂ) * Complex.I
+  let δ : ℕ := if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
+  let φ : ℂ → ℂ := fun s ↦ (s + b) ^ δ * (1 - s - b) ^ δ * L s
+  have hreg : ((regularizedCompletedHeckeL χ τ hτ L hL hEq).val : ℂ → ℂ) =
+      toMeromorphicNFOn φ univ := rfl
+  have hφm : MeromorphicOn φ univ := fun s hs ↦
+    ((by fun_prop : AnalyticAt ℂ (fun s : ℂ ↦ (s + b) ^ δ * (1 - s - b) ^ δ) s).meromorphicAt).mul
+      (hL.meromorphicOn s hs)
+  have heq := hφm.toMeromorphicNFOn_eq_self_on_nhdsNE (mem_univ (2 : ℂ))
+  have hhalf : ∀ᶠ s in 𝓝[≠] (2 : ℂ), 1 < s.re :=
+    nhdsWithin_le_nhds ((isOpen_lt continuous_const Complex.continuous_re).mem_nhds
+      (by norm_num))
+  obtain ⟨s, hs1, hs2⟩ := (heq.and hhalf).exists
+  refine ⟨s, ?_⟩
+  rw [hreg, hs1]
+  have hb : b.re = 0 := by simp [b]
+  have hLs : L s = heckeGammaFactor χ s * finiteHeckeL χ ⟨s, hs2⟩ := hEq ⟨s, hs2⟩
+  refine mul_ne_zero (mul_ne_zero (pow_ne_zero _ ?_) (pow_ne_zero _ ?_)) ?_
+  · intro h
+    have := congrArg Complex.re h
+    simp only [Complex.add_re, hb, Complex.zero_re] at this
+    linarith
+  · intro h
+    have := congrArg Complex.re h
+    simp only [Complex.sub_re, Complex.one_re, hb, Complex.zero_re] at this
+    linarith
+  · rw [hLs]
+    exact mul_ne_zero (heckeGammaFactor_ne_zero_of_re_pos χ (by linarith))
+      (finiteHeckeL_ne_zero_of_one_lt_re χ ⟨s, hs2⟩)
+
+/-- Removing two simple poles preserves every positive order and removes exactly the
+negative orders at the two canceled points. -/
+private theorem spectralAnnihilator_directSum_regularized_orders
+    (L : ℂ → ℂ) (hL : MeromorphicNFOn L univ) (b : ℂ) (δ : ℕ)
+    (hδ : δ = 0 ∨ δ = 1) (g : Entire)
+    (hg : (g.val : ℂ → ℂ) =
+      toMeromorphicNFOn (fun z ↦ (z + b) ^ δ * (1 - z - b) ^ δ * L z) univ)
+    (hg0 : ∃ z, g.val z ≠ 0)
+    (hpoles : δ = 1 → g.val (-b) ≠ 0 ∧ g.val (1 - b) ≠ 0) :
+    ∀ z : ℂ,
+      analyticOrderAt (g.val : ℂ → ℂ) z =
+        ((meromorphicOrderAt L z).untop₀.toNat : ℕ∞) ∧
+      (0 < analyticOrderAt (g.val : ℂ → ℂ) z ↔ 0 < meromorphicOrderAt L z) := by
+  have hrel (z : ℂ) :
+      meromorphicOrderAt (g.val : ℂ → ℂ) z = meromorphicOrderAt L z ∨
+        (analyticOrderAt (g.val : ℂ → ℂ) z = 0 ∧ meromorphicOrderAt L z = -1) := by
+    rcases hδ with hδ | hδ
+    · subst δ
+      left
+      have he : (g.val : ℂ → ℂ) = L := by
+        simpa only [pow_zero, one_mul, toMeromorphicNFOn_eq_self.mpr hL] using hg
+      rw [he]
+    · subst δ
+      let P : ℂ → ℂ := fun w ↦ (w + b) * (1 - w - b)
+      have hP (w : ℂ) : AnalyticAt ℂ P w := by dsimp only [P]; fun_prop
+      have hPL : MeromorphicOn (P * L) univ := fun w hw ↦
+        (hP w).meromorphicAt.mul (hL hw).meromorphicAt
+      have hg' : (g.val : ℂ → ℂ) = toMeromorphicNFOn (P * L) univ := by
+        simpa only [P, Pi.mul_def, pow_one] using hg
+      have hord : meromorphicOrderAt (g.val : ℂ → ℂ) z =
+          meromorphicOrderAt P z + meromorphicOrderAt L z := by
+        rw [hg', meromorphicOrderAt_toMeromorphicNFOn hPL (mem_univ z),
+          meromorphicOrderAt_mul (hP z).meromorphicAt (hL (mem_univ z)).meromorphicAt]
+      by_cases hz : z = -b ∨ z = 1 - b
+      · right
+        have hgz : g.val z ≠ 0 := by
+          rcases hz with rfl | rfl
+          · exact (hpoles rfl).1
+          · exact (hpoles rfl).2
+        have hzero : analyticOrderAt (g.val : ℂ → ℂ) z = 0 :=
+          analyticOrderAt_eq_zero.mpr (.inr hgz)
+        have hPzero : P z = 0 := by rcases hz with rfl | rfl <;> dsimp only [P] <;> ring
+        have hder : HasDerivAt P ((1 - z - b) - (z + b)) z := by
+          simpa [P, sub_eq_add_neg] using ((hasDerivAt_id z).add_const b).fun_mul
+            (((hasDerivAt_const z (1 : ℂ)).fun_sub (hasDerivAt_id z)).sub_const b)
+        have hderne : deriv P z ≠ 0 := by
+          rw [hder.deriv]
+          rcases hz with rfl | rfl <;> ring_nf <;> norm_num
+        have hPone : analyticOrderAt P z = 1 :=
+          (hP z).analyticOrderAt_eq_one_of_zero_deriv_ne_zero hPzero hderne
+        rw [(entire_analyticAt g z).meromorphicOrderAt_eq, hzero,
+          (hP z).meromorphicOrderAt_eq, hPone] at hord
+        norm_num only [ENat.map_zero, ENat.map_one] at hord
+        refine ⟨hzero, ?_⟩
+        generalize meromorphicOrderAt L z = o at hord ⊢
+        cases o with
+        | top => simp at hord
+        | coe k =>
+          have hk : (0 : ℤ) = 1 + k := by exact_mod_cast hord
+          have he : k = -1 := by omega
+          rw [he]
+          norm_num
+      · left
+        have hPne : P z ≠ 0 := by
+          apply mul_ne_zero
+          · exact fun h ↦ hz (.inl (eq_neg_of_add_eq_zero_left h))
+          · intro h
+            apply hz (.inr ?_)
+            linear_combination -h
+        rw [(hP z).meromorphicOrderAt_eq,
+          analyticOrderAt_eq_zero.mpr (.inr hPne)] at hord
+        simpa only [ENat.map_zero, Nat.cast_zero, WithTop.coe_zero, zero_add] using hord
+  intro z
+  obtain ⟨n, hn⟩ := ENat.ne_top_iff_exists.mp
+    (entire_analyticOrderAt_ne_top (g.val : ℂ → ℂ) g.property hg0 z)
+  have hm := (entire_analyticAt g z).meromorphicOrderAt_eq
+  rw [← hn] at hm
+  simp only [ENat.map_natCast] at hm
+  rcases hrel z with he | ⟨hzero, hpole⟩
+  · have hLz : meromorphicOrderAt L z = ((n : ℤ) : WithTop ℤ) := he.symm.trans hm
+    rw [hLz, ← hn]
+    simp
+  · rw [hzero, hpole]
+    norm_num
+
+
 open Classical in
 /-- Paper: Theorem 7.1.4.2(1), pp. 326–328.
 The strong annihilator of the regularized Hecke ideal is the locally convex direct
@@ -2442,7 +2570,44 @@ theorem spectralAnnihilator_directSum :
     letI instJetSumTopologySec1b : TopologicalSpace (⨁ ρ : Zeros, ↥(J ρ)) :=
       locallyConvexFinalTopology inclusion
     ∃ e : (⨁ ρ : Zeros, ↥(J ρ)) ≃L[ℂ] entireIdealAnnihilator Λ,
-      ∀ (ρ : Zeros) (a : ↥(J ρ)), (e (inclusion ρ a)).val = a.val := by sorry
+      ∀ (ρ : Zeros) (a : ↥(J ρ)), (e (inclusion ρ a)).val = a.val := by
+  classical
+  let g := regularizedCompletedHeckeL χ τ hτ L hL hEq
+  let x₀ := (existsUnique_ideleNormSection_character_phase χ τ hτ).exists.choose
+  let b := (x₀ : ℂ) * Complex.I
+  let δ : ℕ := if χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 then 1 else 0
+  have hg0 : ∃ z, g.val z ≠ 0 :=
+    spectralAnnihilator_directSum_nonzero χ τ hτ L hL hEq
+  have hδ : δ = 0 ∨ δ = 1 := by
+    dsimp only [δ]
+    split_ifs <;> simp
+  have hpoles : δ = 1 → g.val (-b) ≠ 0 ∧ g.val (1 - b) ≠ 0 := by
+    intro hδ1
+    have hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1 := by
+      by_contra h
+      simp only [δ, ite_eq_right h] at hδ1
+      exact zero_ne_one hδ1
+    exact regularizedCompletedHeckeL_ne_zero_at_canceled_poles χ τ hτ L hL hEq hχ
+  have ho := spectralAnnihilator_directSum_regularized_orders L hL b δ hδ g rfl hg0 hpoles
+  have he := jetDirectSum_equiv (fun z ↦ analyticOrderAt (g.val : ℂ → ℂ) z)
+    (entire_analyticOrderAt_ne_top (g.val : ℂ → ℂ) g.property hg0)
+    (entireIdealAnnihilator g)
+    (fun i ↦ entireJet_mem_entireIdealAnnihilator g i.1.1 i.1.2 i.2)
+    (fun i c ↦ entire_jet_biorthogonal g hg0 i.1 i.2 c)
+    (entireIdealAnnihilator_le_span_jets g hg0)
+    (entire_jetIndices_finite g hg0)
+  have hpos : (fun z : ℂ ↦ 0 < analyticOrderAt (g.val : ℂ → ℂ) z) =
+      (fun z : ℂ ↦ 0 < meromorphicOrderAt L z) :=
+    funext fun z ↦ propext (ho z).2
+  have hord : analyticOrderAt (g.val : ℂ → ℂ) =
+      (fun z : ℂ ↦ ((meromorphicOrderAt L z).untop₀.toNat : ℕ∞)) :=
+    funext fun z ↦ (ho z).1
+  dsimp only at he
+  rw [hpos] at he
+  rw [hord] at he
+  simp only [ENat.toNat_natCast] at he
+  convert he using 1
+  rfl
 
 /-- On a strip, a Schwartz–Bergman function is bounded by its bounds on the two boundary
 lines (Phragmén–Lindelöf). -/
@@ -2627,6 +2792,226 @@ theorem schwartzBergmanDivisible_isClosed (g : Entire) :
     IsClosed (schwartzBergmanDivisible g : Set Aℂ) :=
   (schwartzBergmanDivisible_isClosed_span g).preimage schwartzBergmanEntireInclusion.continuous
 
+/-- Gaussian times polynomials approximate every entire function on each closed disc. -/
+private theorem exists_schwartzBergman_jetRestriction_approx (f : Entire) (R : ℝ)
+    {ε : ℝ} (hε : 0 < ε) :
+    ∃ a : SchwartzBergman (univ : Set ℝ),
+      ∀ z ∈ Metric.closedBall (0 : ℂ) R, ‖f.val z - a.val z‖ ≤ ε := by
+  rcases lt_or_ge R 0 with hR | hR
+  · exact ⟨0, fun z hz ↦ absurd (Metric.nonempty_closedBall.mp ⟨z, hz⟩) (not_le.mpr hR)⟩
+  let G : ℂ → ℂ := fun z ↦ Complex.exp (z ^ 2)
+  have hG : G ∈ schwartzBergmanSubmodule (univ : Set ℝ) := by
+    simpa only [Set.preimage_univ, Set.indicator_univ] using
+      gaussian_mem_schwartzBergmanSubmodule univ isOpen_univ
+  let w : ℂ → ℂ := fun z ↦ f.val z * Complex.exp (-(z ^ 2))
+  have hwd : Differentiable ℂ w :=
+    (show Differentiable ℂ (f.val : ℂ → ℂ) from f.property).mul (by fun_prop)
+  have hw (z : ℂ) : f.val z = G z * w z := by
+    dsimp only [G, w]
+    rw [mul_left_comm, ← Complex.exp_add, add_neg_cancel, Complex.exp_zero, mul_one]
+  let Rn : ℝ≥0 := ⟨R + 1, by linarith⟩
+  let Rm : ℝ≥0 := ⟨R + 1 / 2, by linarith⟩
+  have hps := hwd.differentiableOn.hasFPowerSeriesOnBall (c := (0 : ℂ))
+    (show (0 : ℝ≥0) < Rn by change 0 < R + 1; linarith)
+  have hu := hps.tendstoUniformlyOn (r' := Rm)
+    (ENNReal.coe_lt_coe.mpr (show Rm < Rn by change R + 1 / 2 < R + 1; linarith))
+  obtain ⟨C, hC⟩ := (isCompact_closedBall (0 : ℂ) R).exists_bound_of_continuousOn
+    (f := G) (by fun_prop)
+  have hδ : 0 < ε / (|C| + 1) := by positivity
+  obtain ⟨n, hn⟩ := (Metric.tendstoUniformlyOn_iff.mp hu _ hδ).exists
+  let p := cauchyPowerSeries w 0 Rn
+  have hpart (y : ℂ) : p.partialSum n y = ∑ k ∈ Finset.range n, y ^ k * p.coeff k := by
+    simp [FormalMultilinearSeries.partialSum]
+  have hmem : (fun z ↦ G z * ∑ k ∈ Finset.range n, z ^ k * p.coeff k) ∈
+      schwartzBergmanSubmodule (univ : Set ℝ) := by
+    have he : (fun z ↦ G z * ∑ k ∈ Finset.range n, z ^ k * p.coeff k) =
+        ∑ k ∈ Finset.range n, p.coeff k • (fun z ↦ z ^ k * G z) := by
+      funext z
+      simp only [Finset.mul_sum, Finset.sum_apply, Pi.smul_apply, smul_eq_mul]
+      apply Finset.sum_congr rfl
+      intro k hk
+      ring
+    rw [he]
+    exact Submodule.sum_mem _ fun k hk ↦ Submodule.smul_mem _ _
+      (schwartzBergman_univ_mul_pow G hG k)
+  refine ⟨⟨_, hmem⟩, fun z hz ↦ ?_⟩
+  have hzm : z ∈ Metric.ball (0 : ℂ) Rm := mem_ball_zero_iff.mpr (by
+    have hz' := mem_closedBall_zero_iff.mp hz
+    change ‖z‖ < R + 1 / 2
+    linarith)
+  change ‖f.val z - G z * ∑ k ∈ Finset.range n, z ^ k * p.coeff k‖ ≤ ε
+  rw [hw z, ← mul_sub, norm_mul]
+  have h1 := hn z hzm
+  rw [zero_add, dist_eq_norm, hpart] at h1
+  calc ‖G z‖ * ‖w z - ∑ k ∈ Finset.range n, z ^ k * p.coeff k‖
+      ≤ |C| * (ε / (|C| + 1)) :=
+        mul_le_mul ((hC z hz).trans (le_abs_self C)) h1.le (norm_nonneg _) (abs_nonneg _)
+    _ ≤ ε := by
+      rw [mul_div_assoc', div_le_iff₀ (by positivity)]
+      nlinarith [abs_nonneg C]
+
+/-- Restricting an entire functional to Schwartz–Bergman functions is injective. -/
+private theorem exists_schwartzBergman_jetRestriction_separates (ℓ : StrongDual ℂ Entire)
+    (hℓ : ∀ f : SchwartzBergman (univ : Set ℝ), ℓ (schwartzBergmanEntireInclusion f) = 0) :
+    ℓ = 0 := by
+  ext f
+  obtain ⟨K, hK, δ, hδ, hKδ⟩ := entire_strongDual_bound ℓ
+  obtain ⟨R, hR⟩ := hK.isBounded.subset_closedBall (0 : ℂ)
+  refine norm_le_zero_iff.mp (le_of_forall_pos_lt_add fun η hη ↦ ?_)
+  obtain ⟨a, ha⟩ := exists_schwartzBergman_jetRestriction_approx f R
+    (ε := η * δ / 2) (by positivity)
+  have hh : ∀ x ∈ K,
+      ‖(((η : ℂ)⁻¹) • (f - schwartzBergmanEntireInclusion a)).val x‖ < δ := by
+    intro x hx
+    have h1 := ha x (hR hx)
+    change ‖(η : ℂ)⁻¹ * (f.val x - (schwartzBergmanEntireInclusion a).val x)‖ < δ
+    rw [schwartzBergmanEntireInclusion_apply, norm_mul, norm_inv,
+      Complex.norm_of_nonneg hη.le]
+    calc η⁻¹ * ‖f.val x - a.val x‖ ≤ η⁻¹ * (η * δ / 2) :=
+        mul_le_mul_of_nonneg_left h1 (inv_nonneg.mpr hη.le)
+      _ < δ := by
+        rw [show η⁻¹ * (η * δ / 2) = δ / 2 by field_simp]
+        linarith
+  have h1 := hKδ _ hh
+  rw [map_smul, map_sub, hℓ, sub_zero, smul_eq_mul, norm_mul, norm_inv,
+    Complex.norm_of_nonneg hη.le, inv_mul_lt_iff₀ hη, mul_one] at h1
+  rwa [zero_add]
+
+/-- A continuous linear equivalence transports nuclearity between spaces in the same universe. -/
+private theorem exists_schwartzBergman_jetRestriction_nuclear_equiv
+    {Source Target : Type} [AddCommGroup Source] [Module ℂ Source]
+    [TopologicalSpace Source] [AddCommGroup Target] [Module ℂ Target]
+    [TopologicalSpace Target] [PolynormableSpace ℂ Target]
+    (e : Source ≃L[ℂ] Target) (hSource : IsNuclearTVS.{0} Source) :
+    IsNuclearTVS.{0} Target := by
+  let : T2Space Source := hSource.1
+  let : PolynormableSpace ℂ Source := hSource.2.1
+  let : T2Space Target := e.toHomeomorph.t2Space
+  refine ⟨inferInstance, inferInstance, ?_⟩
+  intro Test _ _ _ _ _
+  let comparison := (hSource.2.2 Test inferInstance inferInstance inferInstance
+    inferInstance inferInstance).homeomorph
+  have hback : Continuous (show InjectiveTensor Source Test → ProjectiveTensor Source Test from id) :=
+    comparison.continuous_symm.congr fun z ↦ comparison.apply_symm_apply z
+  let idTest := ContinuousLinearMap.id ℂ Test
+  have hroundtrip (z : TensorProduct ℂ Target Test) :
+      e.toLinearMap.rTensor Test (e.symm.toLinearMap.rTensor Test z) = z := by
+    rw [← LinearMap.rTensor_comp_apply, show e.toLinearMap.comp e.symm.toLinearMap =
+      LinearMap.id from LinearMap.ext e.apply_symm_apply, LinearMap.rTensor_id_apply]
+  have hTargetForward : Continuous (show ProjectiveTensor Target Test → InjectiveTensor Target Test from id) := by
+    refine ((injectiveTensorMap_continuous e.toContinuousLinearMap idTest).comp
+      (comparison.continuous.comp
+        (projectiveTensorMap_continuous e.symm.toContinuousLinearMap idTest))).congr fun z ↦ ?_
+    exact hroundtrip z
+  have hTarget : Continuous (show InjectiveTensor Target Test → ProjectiveTensor Target Test from id) := by
+    refine ((projectiveTensorMap_continuous e.toContinuousLinearMap idTest).comp hback |>.comp
+      (injectiveTensorMap_continuous e.symm.toContinuousLinearMap idTest)).congr fun z ↦ ?_
+    exact hroundtrip z
+  exact (⟨Equiv.refl (TensorProduct ℂ Target Test), hTargetForward, hTarget⟩ :
+      ProjectiveTensor Target Test ≃ₜ InjectiveTensor Target Test).isHomeomorph
+
+/-- The entire Schwartz–Bergman space is nuclear through the Fourier–Mellin equivalence. -/
+private theorem exists_schwartzBergman_jetRestriction_nuclear :
+    IsNuclearTVS.{0} (SchwartzBergman (univ : Set ℝ)) := by
+  let : PolynormableSpace ℂ (SchwartzBergman (univ : Set ℝ)) :=
+    (schwartzBergman_frechet univ isOpen_univ ordConnected_univ univ_nonempty).choose_spec.1
+  exact exists_schwartzBergman_jetRestriction_nuclear_equiv
+    (positiveRealFourierMellin univ isOpen_univ ordConnected_univ univ_nonempty)
+    (positiveRealExponentialDecay_nuclear univ ordConnected_univ univ_nonempty)
+
+/-- A nuclear Fréchet space has compact closed bounded subsets. -/
+private theorem exists_schwartzBergman_jetRestriction_montel
+    {Space : Type} [AddCommGroup Space] [Module ℂ Space] [TopologicalSpace Space]
+    (hN : IsNuclearTVS.{0} Space) (hF : IsFrechetTVS Space) : MontelSpace ℂ Space := by
+  let : T2Space Space := hN.1
+  let : PolynormableSpace ℂ Space := hN.2.1
+  obtain ⟨hadd, _, _, hcomplete⟩ := hF
+  let : IsTopologicalAddGroup Space := hadd
+  let : UniformSpace Space := IsTopologicalAddGroup.rightUniformSpace Space
+  let : IsUniformAddGroup Space := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace Space := hcomplete
+  refine ⟨fun bounded hc hb ↦ ?_⟩
+  simpa only [hc.closure_eq] using isCompact_closure_of_isNuclearTVS Space hN hb
+
+
+/-- Restriction along a separating inclusion descends to the preimage quotient; Montel reflexivity makes its range strongly dense. -/
+private theorem exists_schwartzBergman_jetRestriction_restriction
+    (E B : Type*) [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [AddCommGroup B] [Module ℂ B] [TopologicalSpace B]
+    [IsTopologicalAddGroup B] [ContinuousSMul ℂ B] [PolynormableSpace ℂ B] [T2Space B]
+    (i : E →L[ℂ] B) (K : Submodule ℂ B) (hK : IsClosed (K : Set B))
+    (hsep : ∀ ℓ : StrongDual ℂ B, (∀ x : E, ℓ (i x) = 0) → ℓ = 0)
+    (hemb : Topology.IsEmbedding (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ
+      (K.comap i.toLinearMap).mkQL))
+    (hMontel : MontelSpace ℂ (E ⧸ K.comap i.toLinearMap)) :
+    let P := K.comap i.toLinearMap
+    let A := K.dualAnnihilator.comap (ContinuousLinearMap.coeLM ℂ)
+    ∃ U : A →L[ℂ] StrongDual ℂ (E ⧸ P), Injective U ∧ DenseRange U ∧
+      ∀ (ℓ : A) (x : E), U ℓ (P.mkQ x) = ℓ.val (i x) := by
+  intro P A
+  have hP : IsClosed (P : Set E) := hK.preimage i.continuous
+  let : IsClosed (P : Set E) := hP
+  let Q := E ⧸ P
+  let : PolynormableSpace ℂ Q := polynormableSpace_quotient P
+  let : MontelSpace ℂ Q := hMontel
+  let V : A →ₗ[ℂ] StrongDual ℂ Q :=
+    { toFun := fun ℓ ↦ P.liftQL (ℓ.val.comp i) (fun x hx ↦
+        (Submodule.mem_dualAnnihilator ℓ.val.toLinearMap).mp ℓ.property (i x) hx)
+      map_add' := fun ℓ m ↦ by
+        ext x
+        obtain ⟨a, rfl⟩ := P.mkQ_surjective x
+        rfl
+      map_smul' := fun c ℓ ↦ by
+        ext x
+        obtain ⟨a, rfl⟩ := P.mkQ_surjective x
+        rfl }
+  have hV : Continuous V := by
+    apply hemb.isInducing.continuous_iff.mpr
+    have hc := (ContinuousLinearMap.precomp (τ := RingHom.id ℂ) ℂ i).continuous.comp
+      (continuous_subtype_val : Continuous (Subtype.val : A → StrongDual ℂ B))
+    exact hc.congr (fun ℓ ↦ by ext x; rfl)
+  let U : A →L[ℂ] StrongDual ℂ Q := ⟨V, hV⟩
+  have hU (ℓ : A) (x : E) : U ℓ (P.mkQ x) = ℓ.val (i x) := rfl
+  refine ⟨U, ?_, ?_, hU⟩
+  · intro ℓ m h
+    apply Subtype.ext
+    apply sub_eq_zero.mp
+    apply hsep (ℓ.val - m.val)
+    intro x
+    have he := congrArg (fun t : StrongDual ℂ Q ↦ t (P.mkQ x)) h
+    change ℓ.val (i x) - m.val (i x) = 0
+    exact sub_eq_zero.mpr he
+  · let : UniformSpace Q := IsTopologicalAddGroup.rightUniformSpace Q
+    let : IsUniformAddGroup Q := isUniformAddGroup_of_addCommGroup
+    let : PolynormableSpace ℂ (StrongDual ℂ Q) :=
+      uniformConvergenceCLM_polynormable (F := ℂ)
+        {S : Set Q | Bornology.IsVonNBounded ℂ S} (fun _ h ↦ h)
+        (by rw [Bornology.sUnion_isVonNBounded_eq_univ, Submodule.span_univ]; simp)
+    let : Module ℝ (StrongDual ℂ Q) := Module.restrictScalars ℝ ℂ _
+    let : IsScalarTower ℝ ℂ (StrongDual ℂ Q) := IsScalarTower.restrictScalars ℝ ℂ _
+    let : LocallyConvexSpace ℝ (StrongDual ℂ Q) :=
+      (PolynormableSpace.withSeminorms ℂ (StrongDual ℂ Q)).toLocallyConvexSpace
+    let : Module ℝ B := Module.restrictScalars ℝ ℂ B
+    let : IsScalarTower ℝ ℂ B := IsScalarTower.restrictScalars ℝ ℂ B
+    let : LocallyConvexSpace ℝ B := (PolynormableSpace.withSeminorms ℂ B).toLocallyConvexSpace
+    intro T
+    by_contra hnot
+    have hnot' : T ∉ U.toLinearMap.range.topologicalClosure := hnot
+    obtain ⟨φ, hφne, hφzero⟩ := exists_dual_eq_zero_on_submodule_of_notMem
+      U.toLinearMap.range.topologicalClosure U.toLinearMap.range.isClosed_topologicalClosure hnot'
+    obtain ⟨x, rfl⟩ := surjective_strongBidual_eval (E := Q) φ
+    obtain ⟨a, rfl⟩ := P.mkQ_surjective x
+    have ha : i a ∈ K := by
+      by_contra hanot
+      obtain ⟨ℓ, hℓne, hℓzero⟩ := exists_dual_eq_zero_on_submodule_of_notMem K hK hanot
+      let l : A := ⟨ℓ, (Submodule.mem_dualAnnihilator ℓ.toLinearMap).mpr hℓzero⟩
+      have hz := hφzero (U l) (U.toLinearMap.range.le_topologicalClosure ⟨l, rfl⟩)
+      exact hℓne hz
+    apply hφne
+    change T (P.mkQ a) = 0
+    rw [Submodule.mkQ_apply, (Submodule.Quotient.mk_eq_zero P).mpr ha, map_zero]
+
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327 and Theorem 7.1.4.3(2), p. 331.
 Restriction to Schwartz–Bergman functions induces an injective map with dense image
 in the strong dual of the quotient by the corresponding divisibility conditions.
@@ -2634,7 +3019,33 @@ Deviation: States the analytic restriction map for every entire generator. -/
 theorem exists_schwartzBergman_jetRestriction (g : Entire) :
     ∃ U : ↥(entireIdealAnnihilator g) →L[ℂ] StrongDual ℂ (Aℂ ⧸ schwartzBergmanDivisible g),
       Injective U ∧ DenseRange U ∧ ∀ (ℓ : entireIdealAnnihilator g) (f : Aℂ),
-        U ℓ (Submodule.Quotient.mk f) = ℓ.val (schwartzBergmanEntireInclusion f) := by sorry
+        U ℓ (Submodule.Quotient.mk f) = ℓ.val (schwartzBergmanEntireInclusion f) := by
+  let A := SchwartzBergman (univ : Set ℝ)
+  let K := (Ideal.span ({g} : Set Entire)).restrictScalars ℂ
+  let P := K.comap schwartzBergmanEntireInclusion.toLinearMap
+  have hN : IsNuclearTVS.{0} A := exists_schwartzBergman_jetRestriction_nuclear
+  have hF : IsFrechetTVS A :=
+    schwartzBergman_frechet univ isOpen_univ ordConnected_univ univ_nonempty
+  let : IsTopologicalAddGroup A := hF.choose
+  let : PolynormableSpace ℂ A := hN.2.1
+  let : T2Space A := hN.1
+  let : ContinuousSMul ℂ A := PolynormableSpace.continuousSMul ℂ A
+  let : PolynormableSpace ℂ C(ℂ, ℂ) := polynormableSpace_continuousMap ℂ ℂ ℂ
+  let : PolynormableSpace ℂ Entire :=
+    inferInstanceAs (PolynormableSpace ℂ entireContinuousMapSubalgebra.toSubmodule)
+  let : IsTopologicalAddGroup Entire :=
+    inferInstanceAs (IsTopologicalAddGroup entireContinuousMapSubalgebra.toSubring.toAddSubgroup)
+  let : ContinuousSMul ℂ Entire := PolynormableSpace.continuousSMul ℂ Entire
+  have hK : IsClosed (K : Set Entire) := schwartzBergmanDivisible_isClosed_span g
+  have hP : IsClosed (P : Set A) := schwartzBergmanDivisible_isClosed g
+  let : IsClosed (P : Set A) := hP
+  have hemb := quotientDual_strongEmbedding_of_nuclear P hP hN hF
+  have hMontel : MontelSpace ℂ (A ⧸ P) :=
+    exists_schwartzBergman_jetRestriction_montel (isNuclearTVS_quotient hN P)
+      (isFrechetTVS_quotient hF P hP)
+  exact exists_schwartzBergman_jetRestriction_restriction A Entire
+    schwartzBergmanEntireInclusion K hK
+    exists_schwartzBergman_jetRestriction_separates hemb hMontel
 
 /-- Paper: Theorem 7.1.4.2(2), pp. 326–327. The range identification from
 the global converse transports restriction to the dual of the theta Mellin quotient.

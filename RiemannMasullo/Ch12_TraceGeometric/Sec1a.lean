@@ -722,6 +722,70 @@ theorem integralKernelOperator_mul_dSequenceKernelSmoothening (ρ : Lp ℂ ∞ �
       with p hp hs
     exact hp.trans (congrArg (ρ p.1 * ·) hs.symm)
 
+/-- Paper: Theorem 12.1.1.2(2), p. 499. Along the diagonal, multiplication by an
+essentially bounded symbol commutes with kernel smoothening for Haar-almost every
+center. This is `dSequenceKernelSmoothening_mul_continuous_diagonal` with the
+multiplier only in `Lp ℂ ∞ ν`: the two limit statements are taken for the kernel
+`κ` and for the kernel `ρ p.1 * κ p`, whose row map is `conj (ρ x) • Φ x`. -/
+private theorem dSequenceKernelSmoothening_mul_holderL_diagonal (ρ : Lp ℂ ∞ ν) :
+    ∀ᵐ x ∂μ, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) := by
+  let : Fact (1 ≤ (2 : ℝ≥0∞)) := ⟨by norm_num⟩
+  let : Fact ((2 : ℝ≥0∞) ≠ ∞) := ⟨by simp⟩
+  have : SecondCountableTopology (Lp ℂ 2 ν) := Lp.SecondCountableTopology
+  obtain ⟨Φ, Ψ, hΦm, hΦ2, hΨm, hΨ2, hκ_eq, -, -⟩ :=
+    exists_diagonal_smoothening_factorization hκ hf hf_pos hν hT
+  have hac_μν : μ ≪ ν :=
+    hν ▸ withDensity_absolutelyContinuous'
+      hf.measurable.coe_nnreal_ennreal.aemeasurable
+      (Eventually.of_forall fun x ↦ by simpa using (hf_pos x).ne')
+  have hρm : AEStronglyMeasurable (⇑ρ) μ :=
+    AEStronglyMeasurable.mono_ac hac_μν (Lp.aestronglyMeasurable ρ)
+  obtain ⟨C, hCν⟩ : ∃ C : ℝ, ∀ᵐ x ∂ν, ‖ρ x‖ ≤ C := by
+    have hmρ := Lp.aestronglyMeasurable ρ
+    have hb := (Lp.memLp ρ).eLpNorm_lt_top
+    rw [eLpNorm_exponent_top hmρ, eLpNormEssSup_lt_top_iff_isBoundedUnder] at hb
+    obtain ⟨C, hC⟩ := hb
+    exact ⟨(C : ℝ), by
+      filter_upwards [hC] with x hx
+      exact_mod_cast hx⟩
+  have hCμ : ∀ᵐ x ∂μ, ‖ρ x‖ ≤ C := hac_μν.ae_le hCν
+  let Φρ : G → Lp ℂ 2 ν := fun x ↦ conj (ρ x) • Φ x
+  have hΦρm : AEStronglyMeasurable Φρ μ :=
+    (Complex.continuous_conj.comp_aestronglyMeasurable hρm).smul hΦm
+  have hΦρ2 : LocallyIntegrable (fun x ↦ ‖Φρ x‖ ^ 2) μ := by
+    refine (hΦ2.smul (C ^ 2)).mono (hΦρm.norm.pow 2) ?_
+    filter_upwards [hCμ] with x hx
+    have h1 : ‖Φρ x‖ = ‖ρ x‖ * ‖Φ x‖ := by
+      simp only [Φρ, norm_smul, Complex.norm_conj]
+    have h2 : ‖ρ x‖ * ‖Φ x‖ ≤ C * ‖Φ x‖ :=
+      mul_le_mul_of_nonneg_right hx (norm_nonneg _)
+    have h3 : (‖ρ x‖ * ‖Φ x‖) ^ 2 ≤ (C * ‖Φ x‖) ^ 2 :=
+      pow_le_pow_left₀ (mul_nonneg (norm_nonneg _) (norm_nonneg _)) h2 2
+    have h4 : ‖Φρ x‖ ^ 2 ≤ C ^ 2 * ‖Φ x‖ ^ 2 := by
+      rw [h1]
+      exact h3.trans_eq (by ring)
+    simpa only [Pi.pow_apply, Pi.smul_apply, smul_eq_mul, Real.norm_of_nonneg (sq_nonneg _),
+      Real.norm_of_nonneg (mul_nonneg (sq_nonneg C) (sq_nonneg _))] using h4
+  have hkρ_eq : (fun p : G × G ↦ ρ p.1 * κ p) =ᵐ[μ.prod μ]
+      fun p ↦ inner ℂ (Φρ p.1) (Ψ p.2) := by
+    filter_upwards [hκ_eq] with p hp
+    simp only [Φρ, inner_smul_left, Complex.conj_conj, hp]
+  filter_upwards [ae_tendsto_dSequenceAverage_diagonal_inner hU hΦm hΦ2 hΨm hΨ2 hκ_eq,
+    ae_tendsto_dSequenceAverage_diagonal_inner hU hΦρm hΦρ2 hΨm hΨ2 hkρ_eq] with x hx hxρ
+  have hreg : (x, x) ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n) κ := ⟨_, hx⟩
+  have hregρ : (x, x) ∈ dSequenceRegularSet (μ.prod μ) (fun n ↦ U n ×ˢ U n)
+      (fun p : G × G ↦ ρ p.1 * κ p) := ⟨_, hxρ⟩
+  have h1 : dSequenceKernelSmoothening μ U κ (x, x) = inner ℂ (Φ x) (Ψ x) := by
+    simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hreg,
+      dSequenceSmoothening] using hx.limUnder_eq
+  have h2 : dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      inner ℂ (Φρ x) (Ψ x) := by
+    simpa only [dSequenceKernelSmoothening, dSequenceSmootheningOrZero, dite_eq_left hregρ,
+      dSequenceSmoothening] using hxρ.limUnder_eq
+  rw [h2, h1]
+  simp only [Φρ, inner_smul_left, Complex.conj_conj]
+
 /-- Paper: Theorem 12.1.1.2(2), p. 499. The weighted integral of the
 smoothened diagonal against an essentially bounded symbol equals the trace
 of the operator followed by multiplication by that symbol. -/
@@ -730,7 +794,23 @@ theorem integral_mul_dSequenceKernelSmoothening_diagonal (ρ : Lp ℂ ∞ ν) :
     let T : nuclearEndomorphisms (Lp ℂ 2 ν) := ⟨(integralKernelOperator ν k).val, hT⟩
     Integrable (fun x ↦ ρ x * dSequenceKernelSmoothening μ U κ (x, x)) ν ∧
       (∫ x, ρ x * dSequenceKernelSmoothening μ U κ (x, x) ∂ν) =
-        hilbertTrace ⟨Mρ * T.val, mul_mem_nuclearEndomorphisms_left Mρ T⟩ := by sorry
+        hilbertTrace ⟨Mρ * T.val, mul_mem_nuclearEndomorphisms_left Mρ T⟩ := by
+  intro Mρ T
+  obtain ⟨K, hKop, hKκ, -⟩ :=
+    integralKernelOperator_mul_dSequenceKernelSmoothening hκ hU hBorel hf hf_pos hν hT ρ
+  have hKnuc : IsNuclearOperator (integralKernelOperator ν K).val := by
+    rw [hKop]
+    exact mul_mem_nuclearEndomorphisms_left Mρ T
+  obtain ⟨hInt, hEq⟩ :=
+    integral_dSequenceKernelSmoothening_diagonal (k := K) hKκ.symm hU hBorel hf hf_pos hν hKnuc
+  have hmul : ∀ᵐ x ∂μ, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) :=
+    dSequenceKernelSmoothening_mul_holderL_diagonal hκ hU hBorel hf hf_pos hν hT ρ
+  have hac_νμ : ν ≪ μ := hν ▸ withDensity_absolutelyContinuous _ _
+  have hmulν : ∀ᵐ x ∂ν, dSequenceKernelSmoothening μ U (fun p : G × G ↦ ρ p.1 * κ p) (x, x) =
+      ρ x * dSequenceKernelSmoothening μ U κ (x, x) := hac_νμ.ae_le hmul
+  refine ⟨hInt.congr hmulν, ?_⟩
+  exact (integral_congr_ae hmulν).symm.trans (hEq.trans (congrArg hilbertTrace (Subtype.ext hKop)))
 
 section FiniteRank
 
@@ -976,6 +1056,102 @@ theorem schauderKernelPartialSum_zero {ν νdual : Measure G} (f : G → ℝ≥0
 
 end Basis
 
+section ProjectionTrace
+
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+
+/-- An operator given by an element of the algebraic tensor product has
+finite-dimensional range, so it is a finite-rank approximation. -/
+private theorem tendsto_schauderKernelPartialSum_diagonal_weak_range_tensorToFiniteRank
+    (z : TensorProduct ℂ (StrongDual ℂ H) H) :
+    FiniteDimensional ℂ (tensorToFiniteRank z).toLinearMap.range := by
+  induction z using TensorProduct.inductionOn with
+  | tmul φ y =>
+    have := FiniteDimensional.span_of_finite ℂ (Set.finite_singleton y)
+    apply Submodule.finiteDimensional_of_le (S₂ := ℂ ∙ y)
+    rintro _ ⟨x, rfl⟩
+    exact Submodule.mem_span_singleton.mpr ⟨φ x, (tensorToFiniteRank_tmul φ y x).symm⟩
+  | add z w hz hw =>
+    rw [map_add, ContinuousLinearMap.toLinearMap_add]
+    exact Submodule.finiteDimensional_of_le (LinearMap.range_add_le _ _)
+
+/-- A uniformly bounded family of operators that tends strongly to zero kills a
+nuclear operator in trace norm. -/
+private theorem tendsto_schauderKernelPartialSum_diagonal_weak_traceNorm_null
+    (Q : ℕ → H →L[ℂ] H) (hQ : ∀ x, Tendsto (fun N ↦ Q N x) atTop (𝓝 0))
+    {C : ℝ} (hbound : ∀ N, ‖Q N‖ ≤ C) (T : nuclearEndomorphisms H) :
+    Tendsto (fun N ↦ traceNorm ⟨Q N * T.val, mul_mem_nuclearEndomorphisms_left (Q N) T⟩)
+      atTop (𝓝 0) := by
+  let product (N : ℕ) (A : nuclearEndomorphisms H) : nuclearEndomorphisms H :=
+    ⟨Q N * A.val, mul_mem_nuclearEndomorphisms_left (Q N) A⟩
+  let : Norm (nuclearEndomorphisms H) := ⟨traceNorm⟩
+  have hcore := (traceNorm_normedSpaceCore (H := H)).toCore
+  have hnonneg (A : nuclearEndomorphisms H) : 0 ≤ traceNorm A := hcore.norm_nonneg A
+  have hC : 0 ≤ C := (norm_nonneg (Q 0)).trans (hbound 0)
+  refine Metric.tendsto_nhds.mpr fun ε hε ↦ ?_
+  have hδ : 0 < ε / (2 * (C + 1)) := by
+    apply div_pos hε
+    linarith
+  obtain ⟨z, hz⟩ := exists_tensorToFiniteRank_traceNorm_sub_lt T hδ
+  let F : nuclearEndomorphisms H :=
+    ⟨tensorToFiniteRank z, tensorToFiniteRank_mem_nuclearEndomorphisms z⟩
+  obtain ⟨_, hF⟩ := tendsto_traceNorm_mul_finiteRank Q hQ F.val
+    (tendsto_schauderKernelPartialSum_diagonal_weak_range_tensorToFiniteRank z)
+  filter_upwards [Metric.tendsto_nhds.mp hF (ε / 2) (half_pos hε)] with N hN
+  have hsplit : product N T = product N (T - F) + product N F := by
+    apply Subtype.ext
+    simp [product, mul_sub]
+  have hle : traceNorm (product N (T - F)) ≤ C * traceNorm (T - F) :=
+    (traceNorm_mul_left_le (Q N) (T - F)).trans
+      (mul_le_mul_of_nonneg_right (hbound N) (hnonneg (T - F)))
+  have htriangle : traceNorm (product N T) ≤
+      traceNorm (product N (T - F)) + traceNorm (product N F) := by
+    rw [hsplit]
+    exact hcore.norm_triangle _ _
+  rw [Real.dist_eq, sub_zero, abs_of_nonneg (hnonneg (product N F))] at hN
+  rw [Real.dist_eq, sub_zero, abs_of_nonneg (hnonneg (product N T))]
+  change traceNorm (T - F) < ε / (2 * (C + 1)) at hz
+  have hsmall : C * traceNorm (T - F) ≤ ε / 2 := by
+    have hmul : C * traceNorm (T - F) ≤ C * (ε / (2 * (C + 1))) :=
+      mul_le_mul_of_nonneg_left (le_of_lt hz) hC
+    have hquot : C / (C + 1) ≤ 1 := by
+      rw [div_le_one (by linarith)]
+      linarith
+    have hε2 : (0 : ℝ) ≤ ε / 2 := by linarith
+    have hrw : C * (ε / (2 * (C + 1))) = (ε / 2) * (C / (C + 1)) := by
+      field_simp
+    calc C * traceNorm (T - F) ≤ C * (ε / (2 * (C + 1))) := hmul
+      _ = (ε / 2) * (C / (C + 1)) := hrw
+      _ ≤ (ε / 2) * 1 := by gcongr
+      _ = ε / 2 := by ring
+  linarith
+
+/-- A uniformly bounded family of operators that tends strongly to the identity
+approximates a nuclear operator in trace norm. -/
+private theorem tendsto_schauderKernelPartialSum_diagonal_weak_traceNorm
+    (P : ℕ → H →L[ℂ] H) (hP : ∀ x, Tendsto (fun N ↦ P N x) atTop (𝓝 x))
+    {C : ℝ} (hbound : ∀ N, ‖P N‖ ≤ C)
+    (T : nuclearEndomorphisms H) (Pm : ℕ → nuclearEndomorphisms H)
+    (hPm : ∀ N, (Pm N).val = P N * T.val) :
+    Tendsto (fun N ↦ traceNorm (Pm N - T)) atTop (𝓝 0) := by
+  let Q : ℕ → H →L[ℂ] H := fun N ↦ P N - 1
+  have hQnull (x : H) : Tendsto (fun N ↦ Q N x) atTop (𝓝 0) := by
+    have h := (hP x).sub (tendsto_const_nhds : Tendsto (fun _ : ℕ ↦ x) atTop (𝓝 x))
+    simpa [Q] using h
+  have hQbound (N : ℕ) : ‖Q N‖ ≤ C + 1 := by
+    have hid : ‖(1 : H →L[ℂ] H)‖ ≤ 1 := ContinuousLinearMap.norm_id_le
+    have h1 := norm_sub_le (P N) 1
+    have h2 := hbound N
+    linarith
+  refine (tendsto_schauderKernelPartialSum_diagonal_weak_traceNorm_null Q hQnull
+    hQbound T).congr fun N ↦ ?_
+  have hsub : Pm N - T =
+      ⟨Q N * T.val, mul_mem_nuclearEndomorphisms_left (Q N) T⟩ :=
+    Subtype.ext (by simp [Q, hPm N, sub_mul])
+  rw [hsub]
+
+end ProjectionTrace
+
 section SchauderApproximation
 
 variable {G : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
@@ -1096,7 +1272,105 @@ theorem tendsto_schauderKernelPartialSum_diagonal_weak :
     let d := fun x ↦ dSequenceKernelSmoothening μ U κ (x, x)
     (∀ N, Integrable (ds N) ν) ∧ Integrable d ν ∧
       ∀ ρ : Lp ℂ ∞ ν, Tendsto (fun N ↦ ∫ x, ρ x * ds N x ∂ν) atTop
-        (𝓝 (∫ x, ρ x * d x ∂ν)) := by sorry
+        (𝓝 (∫ x, ρ x * d x ∂ν)) := by
+  intro ks ds d
+  obtain ⟨hk, htend, -, -⟩ := tendsto_schauderKernelPartialSum_L2
+    (μ := μ) (ν := ν) (U := U) (f := f) (k := k) (κ := κ)
+    (hκ := hκ) (hU := hU) (hBorel := hBorel) (hf := hf) (hf_pos := hf_pos)
+    (hν := hν) (hT := hT) (νdual := νdual) (b := b) (θ := θ) (transpose := transpose)
+    (hsimple := hsimple) (hnormalized := hnormalized) (hθ := hθ) (htranspose := htranspose)
+  choose W hWae hW using fun m ↦
+    weightedL2Duality_equiv_rep μ hf.measurable hf_pos hν hνdual (transpose (θ m))
+  choose Km hKm _ using fun m ↦ L2.exists_outerProduct (b m) (W m)
+  have hνac : ν ≪ μ := hν ▸ withDensity_absolutelyContinuous _ _
+  have hKm_term (m : ℕ) :
+      (Km m : G × G → ℂ) =ᵐ[ν.prod ν] fun p ↦ (transpose (θ m) p.2 / (f p.2 : ℂ)) * b m p.1 := by
+    filter_upwards [hKm m, Measure.quasiMeasurePreserving_snd.ae (hνac.ae_le (hWae m))] with p hp hWp
+    rw [hp, RCLike.inner_apply, hWp, map_div₀, Complex.conj_conj, Complex.conj_ofReal, mul_comm]
+  let KS (N : ℕ) : Lp ℂ 2 (ν.prod ν) := ∑ m ∈ Finset.range (N + 1), Km m
+  have hKS_ae (N : ℕ) : (KS N : G × G → ℂ) =ᵐ[ν.prod ν] ks N := by
+    have hsum : ∀ n : ℕ, ((∑ m ∈ Finset.range n, Km m : Lp ℂ 2 (ν.prod ν)) : G × G → ℂ) =ᵐ[ν.prod ν]
+        fun p ↦ ∑ m ∈ Finset.range n, (transpose (θ m) p.2 / (f p.2 : ℂ)) * b m p.1 := by
+      intro n
+      induction n with
+      | zero =>
+        simp only [Finset.range_zero, Finset.sum_empty]
+        exact (Lp.coeFn_zero ℂ 2 (ν.prod ν)).trans (Eventually.of_forall fun _ ↦ rfl)
+      | succ n ih =>
+        rw [Finset.sum_range_succ]
+        filter_upwards [Lp.coeFn_add (∑ m ∈ Finset.range n, Km m) (Km n), ih, hKm_term n]
+          with p hadd hprev hlast
+        rw [hadd, Pi.add_apply, hprev, hlast, Finset.sum_range_succ]
+    exact hsum (N + 1)
+  have htoLp (N : ℕ) : (hk N).toLp (ks N) = KS N :=
+    Lp.ext ((hk N).coeFn_toLp.trans (hKS_ae N).symm)
+  have hKm_op (m : ℕ) (u : Lp ℂ 2 ν) :
+      (integralKernelOperator ν (Km m)).val u =
+        b.coord m ((integralKernelOperator ν k).val u) • b m := by
+    apply Lp.ext
+    have hcoord : inner ℂ (W m) u = b.coord m ((integralKernelOperator ν k).val u) := by
+      rw [← (hW m u).2]
+      exact (htranspose u (θ m)).symm.trans (hθ m _)
+    filter_upwards [integralKernelOperator_apply ν (Km m) u, Measure.ae_ae_of_ae_prod (hKm m),
+      Lp.coeFn_smul (b.coord m ((integralKernelOperator ν k).val u)) (b m)] with x hx hxy hsmul
+    have hrow : (fun y ↦ Km m (x, y) * u y) =ᵐ[ν] fun y ↦ b m x * inner ℂ (W m y) (u y) := by
+      filter_upwards [hxy] with y hy
+      rw [hy, RCLike.inner_apply, RCLike.inner_apply]
+      ring
+    rw [hx.2, integral_congr_ae hrow, integral_const_mul, ← L2.inner_def, hcoord, hsmul,
+      Pi.smul_apply, smul_eq_mul, mul_comm]
+  let swap := Lp.compMeasurePreservingₗ (E := ℂ) (p := 2) ℂ Prod.swap
+    (Measure.measurePreserving_swap (μ := ν) (ν := ν))
+  let A := (hilbertSchmidtOperators_equiv_Lp_prod ν ν).choose.toLinearMap.comp swap
+  have hKS_op (N : ℕ) :
+      (integralKernelOperator ν (KS N)).val = (b.proj (N + 1)).comp (integralKernelOperator ν k).val := by
+    ext1 u
+    have hmap : integralKernelOperator ν (KS N) =
+        ∑ m ∈ Finset.range (N + 1), integralKernelOperator ν (Km m) :=
+      map_sum A Km (Finset.range (N + 1))
+    rw [hmap, Submodule.coe_sum]
+    simp only [FunLike.coe_sum, Finset.sum_apply, hKm_op,
+      ContinuousLinearMap.comp_apply, _root_.SchauderBasis.proj_apply]
+  have hKS_op' (N : ℕ) :
+      (integralKernelOperator ν ((hk N).toLp (ks N))).val =
+        (b.proj (N + 1)) * (integralKernelOperator ν k).val := by
+    rw [htoLp N]
+    exact hKS_op N
+  have hSn (N : ℕ) : IsNuclearOperator (integralKernelOperator ν ((hk N).toLp (ks N))).val := by
+    rw [hKS_op' N]
+    exact mul_mem_nuclearEndomorphisms_left (b.proj (N + 1))
+      ⟨(integralKernelOperator ν k).val, hT⟩
+  have hrank (N : ℕ) : FiniteDimensional ℂ
+      (integralKernelOperator ν ((hk N).toLp (ks N))).val.toLinearMap.range := by
+    have hle : (integralKernelOperator ν ((hk N).toLp (ks N))).val.toLinearMap.range ≤
+        (b.proj (N + 1)).toLinearMap.range := by
+      rw [hKS_op' N]
+      exact LinearMap.range_comp_le_range _ _
+    have hinst : FiniteDimensional ℂ
+        (Submodule.span ℂ (b '' ↑(Finset.range (N + 1)))) :=
+      FiniteDimensional.span_of_finite ℂ ((Finset.finite_toSet _).image b)
+    rw [← b.range_proj_eq_span (N + 1)] at hinst
+    exact Submodule.finiteDimensional_of_le hle
+  obtain ⟨C, hC⟩ := hsimple
+  have hP (x : Lp ℂ 2 ν) : Tendsto (fun N ↦ b.proj (N + 1) x) atTop (𝓝 x) :=
+    (b.tendsto_proj x).comp (tendsto_add_atTop_nat 1)
+  have hS1 := tendsto_schauderKernelPartialSum_diagonal_weak_traceNorm
+    (fun N ↦ b.proj (N + 1)) hP hC ⟨(integralKernelOperator ν k).val, hT⟩
+    (fun N ↦ ⟨(integralKernelOperator ν ((hk N).toLp (ks N))).val, hSn N⟩)
+    (fun N ↦ hKS_op' N)
+  have hS2 : Tendsto (fun N ↦ schattenNorm
+      (integralKernelOperator ν ((hk N).toLp (ks N)) - integralKernelOperator ν k)) atTop (𝓝 0) := by
+    have hsub (N : ℕ) : integralKernelOperator ν ((hk N).toLp (ks N) - k) =
+        integralKernelOperator ν ((hk N).toLp (ks N)) - integralKernelOperator ν k :=
+      map_sub A ((hk N).toLp (ks N)) k
+    refine (tendsto_iff_norm_sub_tendsto_zero.mp htend).congr fun N ↦ ?_
+    rw [← hsub N, schattenNorm_integralKernelOperator]
+  exact tendsto_dSequenceKernelSmoothening_diagonal_weak
+    (μ := μ) (ν := ν) (U := U) (f := f) (k := k) (κ := κ)
+    (hκ := hκ) (hU := hU) (hBorel := hBorel) (hf := hf) (hf_pos := hf_pos) (hν := hν)
+    (hT := hT) (ks := fun N ↦ (hk N).toLp (ks N)) (κs := fun N ↦ ks N)
+    (hκs := fun N ↦ ((hk N).coeFn_toLp).symm) (hrank := hrank) (hSn := hSn)
+    (hS1 := hS1) (hS2 := hS2)
 
 end SchauderApproximation
 
