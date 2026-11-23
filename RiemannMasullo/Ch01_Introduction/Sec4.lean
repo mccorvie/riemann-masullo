@@ -680,6 +680,57 @@ theorem introTraceApprox_archimedean_differentiable (χ : U𝔽) (h ρ : ℕ →
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (w : InfinitePlace F) :
     Differentiable ℂ (fun z ↦ introTraceArchimedean χ approx(h, ρ, n, z) w) := by sorry
 
+/-- At the real place of ℚ, a lower integral against the local multiplicative Tamagawa measure
+is the Lebesgue integral with density `|t|⁻¹` in the real coordinate. -/
+private theorem introTraceApprox_rat_archimedean_tendsto_atTop_lintegral
+    (Φ : ℝ → ENNReal) (hΦ : Measurable Φ) :
+    ∫⁻ u, Φ (InfinitePlace.Completion.ringEquivRealOfIsReal Rat.isReal_infinitePlace
+        (u : Rat.infinitePlace.Completion))
+        ∂infiniteLocalMultiplicativeTamagawaMeasure ℚ Rat.infinitePlace =
+      ∫⁻ t, Φ t * ENNReal.ofReal |t|⁻¹ := by
+  let v := Rat.infinitePlace
+  have h : v.IsReal := Rat.isReal_infinitePlace
+  let : MeasurableSpace v.Completion := instMeasurableSpaceCompletion_riemannMasullo ℚ v
+  let : BorelSpace v.Completion := ⟨rfl⟩
+  let : BorelSpace v.Completionˣ := borelSpace_units_of_continuousInv₀ _
+  let e := (InfinitePlace.Completion.isometryEquivRealOfIsReal h).toHomeomorph.toMeasurableEquiv
+  have hval := (IsOpenUnits.isOpenEmbedding_unitsVal (M := v.Completion)).measurableEmbedding
+  have hd : Measurable (fun x : v.Completion ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹) :=
+    (measurable_coe_nnreal_ennreal.comp (measurable_nnnorm.pow_const _)).inv
+  let g : v.Completion → ENNReal := fun x ↦ Φ (InfinitePlace.Completion.ringEquivRealOfIsReal h x)
+  have hg : Measurable g := hΦ.comp e.measurable
+  have hee (t : ℝ) : InfinitePlace.Completion.ringEquivRealOfIsReal h (e.symm t) = t :=
+    e.apply_symm_apply t
+  have key := hval.lintegral_map (μ := ((infiniteLocalAdditiveTamagawaMeasure ℚ v).withDensity
+    (fun x ↦ (↑(‖x‖₊ ^ v.mult) : ENNReal)⁻¹)).comap Units.val) g
+  rw [hval.map_comap, setLIntegral_withDensity_eq_setLIntegral_mul _ hd hg
+    hval.measurableSet_range] at key
+  unfold infiniteLocalMultiplicativeTamagawaMeasure
+  refine key.symm.trans ?_
+  rw [infiniteLocalAdditiveTamagawaMeasure, dite_eq_left h]
+  change (∫⁻ x in range Units.val, _ ∂volume.map e.symm) = _
+  rw [e.symm.restrict_map, e.symm.measurableEmbedding.lintegral_map]
+  have he0 : e.symm 0 = 0 := map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal h).symm
+  have hrange : e.symm ⁻¹' range (Units.val : v.Completionˣ → v.Completion) = {0}ᶜ := by
+    ext t
+    simp only [mem_preimage, mem_range, mem_compl_iff, mem_singleton_iff]
+    constructor
+    · rintro ⟨x, hx⟩ rfl
+      exact x.ne_zero (hx.trans he0)
+    · intro ht
+      exact ⟨Units.mk0 (e.symm t) fun h0 ↦ ht (e.symm.injective (h0.trans he0.symm)), rfl⟩
+  have hnorm (t : ℝ) : ‖e.symm t‖ = ‖t‖ :=
+    (InfinitePlace.Completion.isometryEquivRealOfIsReal h).symm.isometry.norm_map_of_map_zero
+      (map_zero (InfinitePlace.Completion.ringEquivRealOfIsReal h).symm) t
+  rw [hrange]
+  conv_rhs => rw [← restrict_compl_singleton (μ := volume) (0 : ℝ)]
+  refine setLIntegral_congr_fun (measurableSet_singleton (0 : ℝ)).compl fun t ht ↦ ?_
+  have ht0 : t ≠ 0 := ht
+  change (↑(‖e.symm t‖₊ ^ v.mult) : ENNReal)⁻¹ * g (e.symm t) = _
+  simp only [g]
+  rw [hee, h.mult_eq_one, pow_one, ← ENNReal.ofReal_coe_nnreal, coe_nnNorm, hnorm,
+    Real.norm_eq_abs, mul_comm, ENNReal.ofReal_inv_of_pos (abs_pos.mpr ht0)]
+
 /-- Paper: §1.4.3, p. 29. For the trivial rational character at parameter two,
 the real-place term goes to positive infinity as the cutoffs are removed.
 Deviation: This replaces the printed uniform bound. It also applies to the
@@ -687,7 +738,241 @@ corrected trace formula, since the positive real branch has the same kernel. -/
 theorem introTraceApprox_rat_archimedean_tendsto_atTop (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) :
     Tendsto (fun n ↦ (∑ w : InfinitePlace ℚ,
-      introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) w).re) atTop atTop := by sorry
+      introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) w).re) atTop atTop := by
+  classical
+  obtain ⟨hh, -, hhlim, ε, hε, hρ⟩ := _hA
+  have hw : Rat.infinitePlace.IsReal := Rat.isReal_infinitePlace
+  let e := InfinitePlace.Completion.ringEquivRealOfIsReal hw
+  -- The limiting profile at parameter two is real.
+  let p : ℝ → ℝ := fun x ↦ if 1 < x then x ^ (-2 : ℝ) else if x = 1 then 1 / 2 else 0
+  have hp0 (x : ℝ) : 0 ≤ p x := by
+    simp only [p]; split_ifs with h1 <;> first | positivity | norm_num
+  have hp1 (x : ℝ) : p x ≤ 1 := by
+    simp only [p]; split_ifs with h1
+    · exact Real.rpow_le_one_of_one_le_of_nonpos h1.le (by norm_num)
+    · norm_num
+    · norm_num
+  have hpm : Measurable p :=
+    Measurable.ite measurableSet_Ioi (by fun_prop)
+      (Measurable.ite (measurableSet_singleton 1) measurable_const measurable_const)
+  have hpow (x : ℝ) : introTracePower 2 x = (p x : ℂ) := by
+    simp only [introTracePower, p]
+    split_ifs with h1 h2
+    · rw [Complex.ofReal_cpow (zero_lt_one.trans h1).le]; push_cast; rfl
+    · push_cast; rfl
+    · simp
+  -- The real approximants.
+  let b : ℕ → ℝ → ℝ := fun n t ↦ h n t * ∫ u, ρ n u * p (t - u)
+  have happrox (n : ℕ) (t : ℝ) : introTraceApprox (h n) (ρ n) 2 t = (b n t : ℂ) := by
+    simp only [introTraceApprox, hpow, b, Complex.ofReal_mul]
+    congr 1
+    rw [← integral_complex_ofReal]
+    simp only [Complex.ofReal_mul]
+  have hρint (n : ℕ) : Integrable (ρ n) volume := (hρ n).2.1.continuous.integrable_of_hasCompactSupport
+    (isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) (hρ n).2.2.2.1)
+  have hint (n : ℕ) (t : ℝ) : Integrable (fun u ↦ ρ n u * p (t - u)) volume :=
+    (hρint n).mono (((hρ n).2.1.continuous.measurable.mul
+      (hpm.comp (measurable_const.sub measurable_id))).aestronglyMeasurable)
+      (Eventually.of_forall fun u ↦ by
+        rw [norm_mul, Real.norm_of_nonneg (hp0 _)]
+        exact mul_le_of_le_one_right (norm_nonneg _) (hp1 _))
+  have hI0 (n : ℕ) (t : ℝ) : 0 ≤ ∫ u, ρ n u * p (t - u) :=
+    integral_nonneg fun u ↦ mul_nonneg ((hρ n).2.2.1 u) (hp0 _)
+  have hb0 (n : ℕ) (t : ℝ) : 0 ≤ b n t := mul_nonneg ((hh n).2.2.2 t).1 (hI0 n t)
+  have hb1 (n : ℕ) (t : ℝ) : b n t ≤ 1 := by
+    have hI : ∫ u, ρ n u * p (t - u) ≤ 1 := by
+      rw [← (hρ n).2.2.2.2]
+      exact integral_mono (hint n t) (hρint n) fun u ↦
+        mul_le_of_le_one_right ((hρ n).2.2.1 u) (hp1 _)
+    exact mul_le_one₀ ((hh n).2.2.2 t).2 (hI0 n t) hI
+  have hbm (n : ℕ) : Measurable (b n) := by
+    have hk : Measurable (fun q : ℝ × ℝ ↦ ρ n q.2 * p (q.1 - q.2)) :=
+      ((hρ n).2.1.continuous.measurable.comp measurable_snd).mul
+        (hpm.comp (measurable_fst.sub measurable_snd))
+    exact (hh n).1.continuous.measurable.mul hk.stronglyMeasurable.integral_prod_right'.measurable
+  have hbsupp (n : ℕ) (t : ℝ) (hbt : b n t ≠ 0) : t ∈ tsupport (h n) :=
+    subset_tsupport _ (left_ne_zero_of_mul hbt)
+  have hblow (n : ℕ) (t : ℝ) (hεn : ε n ≤ 1) (ht1 : 1 + ε n < t) (ht2 : t < 2) :
+      h n t / 9 ≤ b n t := by
+    have hI : (1 / 9 : ℝ) ≤ ∫ u, ρ n u * p (t - u) := by
+      calc (1 / 9 : ℝ) = ∫ u, ρ n u * (1 / 9) := by rw [integral_mul_const, (hρ n).2.2.2.2, one_mul]
+        _ ≤ _ := integral_mono ((hρint n).mul_const _) (hint n t) fun u ↦ by
+          by_cases hu : ρ n u = 0
+          · simp [hu]
+          obtain ⟨hl, hr⟩ := (hρ n).2.2.2.1 (subset_tsupport _ hu)
+          refine mul_le_mul_of_nonneg_left ?_ ((hρ n).2.2.1 u)
+          have hgt : 1 < t - u := by linarith
+          have hlt : t - u ≤ 3 := by linarith
+          simp only [p, if_pos hgt]
+          rw [Real.rpow_neg (by linarith), Real.rpow_two, show (1 / 9 : ℝ) = (3 ^ 2)⁻¹ by norm_num]
+          exact inv_anti₀ (by positivity) (pow_le_pow_left₀ (by linarith) hlt 2)
+    calc h n t / 9 = h n t * (1 / 9) := by ring
+      _ ≤ b n t := mul_le_mul_of_nonneg_left hI ((hh n).2.2.2 t).1
+  -- The integrand in the real coordinate.
+  let Φ : ℕ → ℝ → ℝ := fun n t ↦ b n |t| * √|t| / |1 - t|
+  have hΦ0 (n : ℕ) (t : ℝ) : 0 ≤ Φ n t := by
+    simp only [Φ]; have := hb0 n |t|; positivity
+  have hΦm (n : ℕ) : Measurable (Φ n) :=
+    (((hbm n).comp continuous_abs.measurable).mul (Real.continuous_sqrt.measurable.comp continuous_abs.measurable)).div
+      (continuous_abs.measurable.comp (measurable_const.sub measurable_id))
+  let X : ℕ → ENNReal := fun n ↦ ∫⁻ t, ENNReal.ofReal (Φ n t) * ENNReal.ofReal |t|⁻¹
+  have hnorm (x : Rat.infinitePlace.Completion) : ‖x‖ = |e x| :=
+    ((InfinitePlace.Completion.isometryEquivRealOfIsReal hw).isometry.norm_map_of_map_zero
+      (map_zero e) x).symm.trans (Real.norm_eq_abs _)
+  -- The real part of the archimedean term is half of `X n`.
+  have hre (n : ℕ) : (∑ w : InfinitePlace ℚ,
+      introTraceArchimedean (F := ℚ) 1 approx(h, ρ, n, (2 : ℂ)) w).re = (X n).toReal / 2 := by
+    rw [Fintype.sum_subsingleton _ Rat.infinitePlace, introTraceArchimedean, if_pos hw]
+    have hpt (u : Rat.infinitePlace.Completionˣ) :
+        introTraceTest (1 : PontryaginDual (IdeleClassGroup (𝓞 ℚ) ℚ)) approx(h, ρ, n, (2 : ℂ))
+            (IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ Rat.infinitePlace u) *
+            (Real.sqrt (‖u.val‖ ^ InfinitePlace.mult Rat.infinitePlace) : ℂ) /
+            ((‖1 - u.val‖ ^ InfinitePlace.mult Rat.infinitePlace : ℝ) : ℂ) =
+          ((Φ n (e u) : ℝ) : ℂ) := by
+      have hN : (((ideleClassNorm ℚ) (IdeleClassGroup.ofCompletion (𝓞 ℚ) ℚ Rat.infinitePlace u)).val : ℝ) =
+          ‖(u : Rat.infinitePlace.Completion)‖ := by
+        rw [ideleClassNorm_ofCompletion, hw.mult_eq_one, pow_one]
+        rfl
+      simp only [introTraceTest, PontryaginDual.one_apply, Circle.coe_one, star_one, one_mul,
+        hw.mult_eq_one, pow_one, hN, happrox, Φ]
+      rw [hnorm, hnorm, map_sub, map_one]
+      push_cast
+      rfl
+    let : MeasurableSpace Rat.infinitePlace.Completion :=
+      instMeasurableSpaceCompletion_riemannMasullo ℚ Rat.infinitePlace
+    let : BorelSpace Rat.infinitePlace.Completion := ⟨rfl⟩
+    let : BorelSpace Rat.infinitePlace.Completionˣ := borelSpace_units_of_continuousInv₀ _
+    simp_rw [hpt]
+    rw [integral_complex_ofReal]
+    have hmeas : Measurable fun u : Rat.infinitePlace.Completionˣ ↦ Φ n (e u) :=
+      (hΦm n).comp ((InfinitePlace.Completion.isometryEquivRealOfIsReal hw).continuous.measurable.comp
+        Units.continuous_val.measurable)
+    rw [integral_eq_lintegral_of_nonneg_ae (Eventually.of_forall fun u ↦ hΦ0 n _)
+      hmeas.aestronglyMeasurable,
+      introTraceApprox_rat_archimedean_tendsto_atTop_lintegral (fun t ↦ ENNReal.ofReal (Φ n t))
+        (ENNReal.measurable_ofReal.comp (hΦm n))]
+    simp only [one_div, Complex.re_mul_ofReal, Complex.inv_re, Complex.normSq_ofNat]
+    norm_num
+    ring
+  -- Each `X n` is finite: the cutoff is supported in a compact subset of `(1, ∞)`.
+  have hfin (n : ℕ) : X n ≠ ⊤ := by
+    have hK : IsCompact (tsupport (h n)) := (hh n).2.1
+    have hsub : tsupport (h n) ⊆ Ioi 1 := (hh n).2.2.1
+    obtain ⟨c, hc1, hc⟩ : ∃ c, 1 < c ∧ ∀ x ∈ tsupport (h n), c ≤ x := by
+      rcases (tsupport (h n)).eq_empty_or_nonempty with he | hne
+      · exact ⟨2, by norm_num, by simp [he]⟩
+      · obtain ⟨c, hcK, hcmin⟩ := hK.exists_isMinOn hne continuousOn_id
+        exact ⟨c, hsub hcK, fun x hx ↦ hcmin hx⟩
+    obtain ⟨R, hR⟩ := hK.bddAbove
+    let M : ℝ := √R / (c - 1) * c⁻¹
+    have hle (t : ℝ) : ENNReal.ofReal (Φ n t) * ENNReal.ofReal |t|⁻¹ ≤
+        (Icc (-R) R).indicator (fun _ ↦ ENNReal.ofReal M) t := by
+      by_cases hz : b n |t| = 0
+      · simp [Φ, hz]
+      have hmem := hbsupp n |t| hz
+      have hct : c ≤ |t| := hc _ hmem
+      have hRt : |t| ≤ R := hR hmem
+      rw [indicator_of_mem (abs_le.mp hRt), ← ENNReal.ofReal_mul (hΦ0 n t)]
+      refine ENNReal.ofReal_le_ofReal ?_
+      have h1t : c - 1 ≤ |1 - t| := by
+        have := abs_sub_abs_le_abs_sub t 1
+        rw [abs_one, abs_sub_comm] at this
+        linarith
+      have hc0 : 0 < c - 1 := by linarith
+      have htpos : 0 < |t| := by linarith
+      have hb := hb1 n |t|
+      have hb' := hb0 n |t|
+      simp only [Φ, M]
+      calc b n |t| * √|t| / |1 - t| * |t|⁻¹ ≤ 1 * √R / (c - 1) * c⁻¹ := by
+            gcongr
+        _ = √R / (c - 1) * c⁻¹ := by rw [one_mul]
+    refine ne_top_of_le_ne_top ?_ (lintegral_mono hle)
+    rw [lintegral_indicator measurableSet_Icc, setLIntegral_const, Real.volume_Icc]
+    exact ENNReal.mul_ne_top ENNReal.ofReal_ne_top ENNReal.ofReal_ne_top
+  -- The lower bounds `K n` and Fatou's lemma.
+  let K : ℕ → ℝ → ENNReal := fun n ↦
+    (Ioo (1 + ε n) 2).indicator fun t ↦ ENNReal.ofReal (h n t / (18 * (t - 1)))
+  have hKm (n : ℕ) : Measurable (K n) :=
+    (ENNReal.measurable_ofReal.comp ((hh n).1.continuous.measurable.div
+      (measurable_const.mul (measurable_id.sub measurable_const)))).indicator measurableSet_Ioo
+  have hKle : ∀ᶠ n in atTop, ∀ t, K n t ≤ ENNReal.ofReal (Φ n t) * ENNReal.ofReal |t|⁻¹ := by
+    filter_upwards [hε.eventually_le_const (zero_lt_one : (0 : ℝ) < 1)] with n hn t
+    simp only [K]
+    by_cases ht : t ∈ Ioo (1 + ε n) 2
+    · rw [indicator_of_mem ht, ← ENNReal.ofReal_mul (hΦ0 n t)]
+      refine ENNReal.ofReal_le_ofReal ?_
+      obtain ⟨ht1, ht2⟩ := ht
+      have hεpos := (hρ n).1
+      have htpos : 0 < t := by linarith
+      have ht1' : 0 < t - 1 := by linarith
+      have hbt := hblow n t hn ht1 ht2
+      have hs0 : 0 < √t := Real.sqrt_pos.mpr htpos
+      have hs2 : √t ≤ 2 := by
+        calc √t ≤ √4 := Real.sqrt_le_sqrt (by linarith)
+          _ = 2 := by rw [show (4 : ℝ) = 2 ^ 2 by norm_num, Real.sqrt_sq (by norm_num)]
+      have hst : √t * t⁻¹ = (√t)⁻¹ := by
+        calc √t * t⁻¹ = √t * (√t * √t)⁻¹ := by rw [Real.mul_self_sqrt htpos.le]
+          _ = (√t)⁻¹ := by field_simp
+      have hsq : 1 / 2 ≤ √t * t⁻¹ := by
+        rw [hst, one_div]
+        exact inv_anti₀ hs0 hs2
+      simp only [Φ]
+      rw [abs_of_pos htpos, abs_sub_comm, abs_of_pos ht1']
+      have hh0 : 0 ≤ h n t / 9 := div_nonneg ((hh n).2.2.2 t).1 (by norm_num)
+      calc h n t / (18 * (t - 1)) = (h n t / 9) * (1 / 2) / (t - 1) := by field_simp; ring
+        _ ≤ b n t * (√t * t⁻¹) / (t - 1) :=
+          div_le_div_of_nonneg_right (mul_le_mul hbt hsq (by norm_num) (hb0 n t)) ht1'.le
+        _ = b n t * √t / (t - 1) * t⁻¹ := by ring
+    · rw [indicator_of_notMem ht]
+      exact bot_le
+  have hliminf : ∀ t, (Ioo 1 2).indicator (fun t ↦ ENNReal.ofReal (1 / (18 * (t - 1)))) t ≤
+      liminf (fun n ↦ K n t) atTop := by
+    intro t
+    by_cases ht : t ∈ Ioo 1 2
+    · rw [indicator_of_mem ht]
+      have hev : ∀ᶠ n in atTop, K n t = ENNReal.ofReal (h n t / (18 * (t - 1))) := by
+        filter_upwards [hε.eventually (gt_mem_nhds (sub_pos.mpr ht.1))] with n hn
+        simp only [K]
+        exact indicator_of_mem (show t ∈ Ioo (1 + ε n) 2 from ⟨by linarith, ht.2⟩) _
+      have hlim : Tendsto (fun n ↦ K n t) atTop (𝓝 (ENNReal.ofReal (1 / (18 * (t - 1))))) :=
+        (ENNReal.tendsto_ofReal ((hhlim t ht.1).div_const _)).congr' (hev.mono fun n hn ↦ hn.symm)
+      exact hlim.liminf_eq.ge
+    · rw [indicator_of_notMem ht]
+      exact bot_le
+  have hdiv : ∫⁻ t, (Ioo 1 2).indicator (fun t ↦ ENNReal.ofReal (1 / (18 * (t - 1)))) t = ⊤ := by
+    rw [lintegral_indicator measurableSet_Ioo]
+    by_contra hne
+    have hi : IntegrableOn (fun t : ℝ ↦ 1 / (18 * (t - 1))) (Ioo (1 : ℝ) 2) := by
+      have := integrable_toReal_of_lintegral_ne_top (μ := volume.restrict (Ioo (1 : ℝ) 2))
+        (ENNReal.measurable_ofReal.comp (measurable_const.div
+          (measurable_const.mul (measurable_id.sub measurable_const)))).aemeasurable hne
+      refine this.congr ((ae_restrict_iff' measurableSet_Ioo).mpr (Eventually.of_forall fun t ht ↦ ?_))
+      have : 0 ≤ 1 / (18 * (t - 1)) := by have := ht.1; positivity
+      exact ENNReal.toReal_ofReal this
+    have hii : IntervalIntegrable (fun t : ℝ ↦ (t - 1)⁻¹) volume 1 2 := by
+      rw [intervalIntegrable_iff_integrableOn_Ioo_of_le (by norm_num)]
+      refine IntegrableOn.congr_fun (Integrable.const_mul hi 18) (fun t ht ↦ ?_) measurableSet_Ioo
+      have : t - 1 ≠ 0 := by have := ht.1; linarith
+      field_simp
+    rw [intervalIntegrable_sub_inv_iff] at hii
+    rcases hii with h12 | h1
+    · norm_num at h12
+    · exact h1 (by simp)
+  have hX : liminf X atTop = ⊤ := by
+    refine top_le_iff.mp ?_
+    calc (⊤ : ENNReal) = ∫⁻ t, (Ioo 1 2).indicator (fun t ↦ ENNReal.ofReal (1 / (18 * (t - 1)))) t :=
+          hdiv.symm
+      _ ≤ ∫⁻ t, liminf (fun n ↦ K n t) atTop := lintegral_mono hliminf
+      _ ≤ liminf (fun n ↦ ∫⁻ t, K n t) atTop := lintegral_liminf_le hKm
+      _ ≤ liminf X atTop := liminf_le_liminf (hKle.mono fun n hn ↦ lintegral_mono hn)
+  -- Conclusion.
+  simp_rw [hre]
+  refine tendsto_atTop.mpr fun M ↦ ?_
+  have hlt : ENNReal.ofReal (2 * max M 0) < liminf X atTop := by rw [hX]; exact ENNReal.ofReal_lt_top
+  filter_upwards [eventually_lt_of_lt_liminf hlt] with n hn
+  have := (ENNReal.ofReal_lt_iff_lt_toReal (by positivity) (hfin n)).mp hn
+  have := le_max_left M 0
+  linarith
 
 /-- Paper: §1.4.3, p. 29. A common subsequence of the two archimedean sums
 has holomorphic limits on the interior of the compact set if the stated
