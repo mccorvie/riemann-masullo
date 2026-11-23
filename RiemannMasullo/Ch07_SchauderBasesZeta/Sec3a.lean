@@ -1,6 +1,9 @@
 module
 
 public import RiemannMasullo.Ch07_SchauderBasesZeta.Sec2
+
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.StrongBidual
+import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
 public import RiemannMasullo.Ch04_PeriodicSchauderBases.Sec6
 
 import all RiemannMasullo.Ch03_IdelicZeta.Sec3
@@ -479,7 +482,16 @@ theorem sLocalOrbitalPrincipalValue_annihilator_le {T : Finset V} (hT : T ⊆ S)
     (PV(T, hT, ω)).dualAnnihilator.comap (ContinuousLinearMap.coeLM ℂ) ≤
       (Submodule.span ℂ
         (range (sLocalOrbitalPrincipalPart (F := F) (S := S) (T := T) (ω := ω)))).topologicalClosure := by
-  sorry
+  let E := Θₛ(ω)
+  have hN : IsNuclearTVS.{0} E := sLocalHomogeneousThetaSpace_nuclear (F := F) (S := S) ω
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (sLocalHomogeneousThetaSpace_montel (F := F) (S := S) ω).2
+  apply le_of_eq
+  apply strongDual_annihilator_eq_closedSpan_of_kernels
+  intro x
+  simpa only [Set.forall_mem_range] using
+    (mem_sLocalOrbitalPrincipalValue_iff (F := F) hT _hTne _hS _hPic ω x)
 
 /-- Each selected coefficient vanishes on the principal-value image. -/
 private theorem sLocalOrbitalPrincipalValue_annihilator_ker {T : Finset V} (hT : T ⊆ S)
@@ -1259,13 +1271,247 @@ theorem sLocalOrbitalFourierJet_range_le_ker
     Rₚ(p, ω) ≤
       (sLocalOrbitalFourierJet (F := F) (S := S) (T := Sₚ(p)) (ω := ω) j).ker := by sorry
 
+/-- a unitary chart covers exactly the chosen norm-one component. -/
+private theorem sLocalOrbitalIndex_enumerable_or_empty_chart
+    {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))} (ω : PontryaginDual (((sIdeleQuotientNorm F S)).ker)) :
+    ∃ χ : PontryaginDual (SIdeleQuotient F S),
+      (∀ z : ℂ, (normOneRestriction (sIdeleQuotientNorm F S) (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) z) = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω)) ∧
+      ∀ d : (QuasiCharacter (SIdeleQuotient F S)), (normOneRestriction (sIdeleQuotientNorm F S) d = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω) → ∃ z : ℂ, ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) z = d := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  obtain ⟨χ, hu, ht⟩ := exists_character_on_split (sIdeleQuotientNorm F S)
+    (isProperMap_sIdeleQuotientNorm F S).continuous σ hσ ω 1
+  refine ⟨χ, fun z ↦ ContinuousMonoidHom.ext fun u ↦
+    (normOneRestriction_unitaryChart (sIdeleQuotientNorm F S) (isProperMap_sIdeleQuotientNorm F S).continuous χ z u).trans
+      (congrArg Subtype.val (hu u)), ?_⟩
+  intro d hd
+  obtain ⟨z, hz, -⟩ := existsUnique_complexPower (d.comp σ)
+  refine ⟨z, ContinuousMonoidHom.ext fun g ↦ ?_⟩
+  let t := (sIdeleQuotientNorm F S) g
+  let k : (((sIdeleQuotientNorm F S)).ker) := ⟨g / σ t, by change (sIdeleQuotientNorm F S) (g / σ t) = 1; rw [map_div, hσ]; exact div_self' _⟩
+  have hg : k.val * σ t = g := div_mul_cancel _ _
+  have hχg : χ g = ω k := by
+    calc χ g = χ k.val * χ (σ t) := (congrArg χ hg.symm).trans (map_mul χ _ _)
+         _ = ω k := by rw [hu, ht]; exact mul_one _
+  have hdk : d k.val = (ω k : ℂ) := DFunLike.congr_fun hd k
+  have hdt : d (σ t) = (((t : ℝ≥0) : ℝ) : ℂ) ^ z := hz t
+  change (χ g : ℂ) * (((t : ℝ≥0) : ℝ) : ℂ) ^ z = d g
+  rw [hχg, ← hdk, ← hdt, ← map_mul, hg]
+
+/-- a local uniformizer has norm equal to the reciprocal residue cardinality. -/
+private theorem sLocalOrbitalIndex_enumerable_or_empty_uniformizer
+    {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))} (v : S) :
+    ∃ u : (v.val.adicCompletion F)ˣ,
+      ‖(u : v.val.adicCompletion F)‖ = ((v.val.asIdeal.absNorm : ℝ)⁻¹) := by
+  let hπ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  refine ⟨Units.mk0 hπ.choose hπ.choose_spec.ne_zero, ?_⟩
+  have hval : Valued.v (hπ.choose : v.val.adicCompletion F) = WithZero.exp (-1 : ℤ) :=
+    hπ.choose_spec.trans (congrArg Units.val
+      (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+        (v.val.valuedAdicCompletion_surjective F)))
+  change ‖(hπ.choose : v.val.adicCompletion F)‖ = _
+  rw [FinitePlace.norm_def, hval, WithZeroMulInt.toNNReal_neg_apply _ (by simp)]
+  simp
+
+/-- Paper: Theorem 7.3.1.6(2), p. 345.
+Primary pole centers on one norm component form a countable set. -/
+private theorem sLocalOrbitalIndex_enumerable_or_empty_countable_centers
+    {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))} (p : (HeightOneSpectrum (𝓞 ℚ))) (ω : PontryaginDual (((sIdeleQuotientNorm F S)).ker)) :
+    Countable {c : (QuasiCharacter (SIdeleQuotient F S)) // (normOneRestriction (sIdeleQuotientNorm F S) c = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω) ∧
+      0 < sLocalFinitePoleMultiplicity ((sLocalPrimaryPlaces S p)) c} := by
+  classical
+  obtain ⟨χ, hcomp, hcover⟩ := sLocalOrbitalIndex_enumerable_or_empty_chart ω
+  choose u hu using (sLocalOrbitalIndex_enumerable_or_empty_uniformizer (F := F) (S := S))
+  have phases := fun v : S ↦ (existsUnique_sLocalOrbitalPhase χ v (u v) (hu v)).exists
+  choose t ht using phases
+  let lattice : S × ℤ → (QuasiCharacter (SIdeleQuotient F S)) := fun j ↦ ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ))
+    (((j.2 : ℝ) * (2 * Real.pi / Real.log (j.1.val.asIdeal.absNorm : ℝ)) - t j.1 : ℝ) * Complex.I)
+  have hsub : {c : (QuasiCharacter (SIdeleQuotient F S)) | (normOneRestriction (sIdeleQuotientNorm F S) c = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω) ∧
+      0 < sLocalFinitePoleMultiplicity ((sLocalPrimaryPlaces S p)) c} ⊆ Set.range lattice := by
+    intro c hc
+    obtain ⟨v, hv⟩ := Finset.card_pos.mp hc.2
+    obtain ⟨s, hs⟩ := hcover c hc.1
+    obtain ⟨n, hn⟩ := (existsUnique_sLocalOrbitalLatticeIndex χ v (u v) (hu v)
+      (t v) (ht v) c ⟨s, hs.symm⟩ (Finset.mem_filter.mp hv).1).exists
+    exact ⟨(v, n), hn.symm⟩
+  exact ((Set.countable_range lattice).mono hsub).to_subtype
+
+/-- integer imaginary twists of the local period preserve the Euler factor. -/
+private theorem sLocalOrbitalIndex_enumerable_or_empty_periodic
+    {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))} (v : S) (c : (QuasiCharacter (SIdeleQuotient F S))) (n : ℕ) :
+    finiteLocalEulerFactor v.val (sLocalFiniteRestriction v
+      ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c (((n : ℝ) * (2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) * Complex.I))) =
+      finiteLocalEulerFactor v.val (sLocalFiniteRestriction v c) := by
+  classical
+  let a : ℂ := ((n : ℝ) * (2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)) : ℝ) * Complex.I
+  let ι := Units.map (v.val.adicCompletionIntegers F).subtype.toMonoidHom
+  have hunit (u : (v.val.adicCompletionIntegers F)ˣ) :
+      sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c a) (ι u) = sLocalFiniteRestriction v c (ι u) := by
+    rw [sLocalOrbitalPrincipalPart_range_le_ker_restrict]
+    have hu : ‖((ι u : (v.val.adicCompletion F)ˣ) : v.val.adicCompletion F)‖ = 1 :=
+      Valued.toNormedField.norm_eq_one_iff.mpr
+        ((HeightOneSpectrum.adicCompletionIntegers.mem_units_iff_valued_eq_one
+          (a := ι u)).mp ⟨u.val.property, u.inv.property⟩)
+    rw [hu, Complex.ofReal_one, Complex.one_cpow, mul_one]
+  have key : (∀ u, sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c a) (ι u) = 1) ↔
+      (∀ u, sLocalFiniteRestriction v c (ι u) = 1) := forall_congr' fun u ↦ by rw [hunit u]
+  let hπ := (Valued.v : Valuation (v.val.adicCompletion F)
+    (WithZero (Multiplicative ℤ))).exists_isUniformizer_of_isCyclic_of_nontrivial
+  let π : (v.val.adicCompletion F)ˣ := Units.mk0 hπ.choose hπ.choose_spec.ne_zero
+  have hπ_norm : ‖(π : v.val.adicCompletion F)‖ = ((v.val.asIdeal.absNorm : ℝ)⁻¹) := by
+    have hval : Valued.v (π : v.val.adicCompletion F) = WithZero.exp (-1 : ℤ) :=
+      hπ.choose_spec.trans (congrArg Units.val
+        (Valuation.IsRankOneDiscrete.generator_eq_exp_neg_one_of_surjective
+          (v.val.valuedAdicCompletion_surjective F)))
+    rw [FinitePlace.norm_def, hval, WithZeroMulInt.toNNReal_neg_apply _ (by simp)]
+    simp
+  have hq : (1 : ℝ) < (v.val.asIdeal.absNorm : ℝ) := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+  have hlog : Real.log (v.val.asIdeal.absNorm : ℝ) ≠ 0 := (Real.log_pos hq).ne'
+  have hpow : (((‖(π : v.val.adicCompletion F)‖ : ℝ) : ℂ)) ^ a = 1 := by
+    rw [hπ_norm, Complex.cpow_def_of_ne_zero
+      (Complex.ofReal_ne_zero.mpr (inv_ne_zero (zero_lt_one.trans hq).ne')),
+      ← Complex.ofReal_log (inv_pos.mpr (zero_lt_one.trans hq)).le, Real.log_inv]
+    have he : (↑(-Real.log (v.val.asIdeal.absNorm : ℝ)) : ℂ) * a =
+        ((-(n : ℤ) : ℤ) : ℂ) * (2 * Real.pi * Complex.I) := by
+      dsimp [a]
+      simp only [Complex.ofReal_neg, Complex.ofReal_mul, Complex.ofReal_div,
+        Complex.ofReal_ofNat, Complex.ofReal_natCast, Int.cast_neg, Int.cast_natCast]
+      calc
+        _ = -(n : ℂ) * (2 * Real.pi * Complex.I) *
+            ((Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ) /
+              (Real.log (v.val.asIdeal.absNorm : ℝ) : ℂ)) := by ring
+        _ = _ := by rw [div_self (Complex.ofReal_ne_zero.mpr hlog), mul_one]
+    rw [he]
+    exact Complex.exp_int_mul_two_pi_mul_I (-(n : ℤ))
+  have hval : sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c a) π = sLocalFiniteRestriction v c π := by
+    rw [sLocalOrbitalPrincipalPart_range_le_ker_restrict, hpow, mul_one]
+  change (if ∀ u, sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c a) (ι u) = 1 then
+      (1 - sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) c a) π)⁻¹ else 1) =
+    (if ∀ u, sLocalFiniteRestriction v c (ι u) = 1 then
+      (1 - sLocalFiniteRestriction v c π)⁻¹ else 1)
+  rw [key, hval]
+
+/-- Paper: Theorem 7.3.1.6(2), p. 345.
+Every primary pole has infinitely many distinct primary poles on the same component,
+obtained by imaginary twists preserving one contributing finite place. -/
+private theorem sLocalOrbitalIndex_enumerable_or_empty_infinite_centers
+    {F : Type*} [Field F] [NumberField F]
+    {S : Finset (HeightOneSpectrum (𝓞 F))} (p : (HeightOneSpectrum (𝓞 ℚ))) (ω : PontryaginDual (((sIdeleQuotientNorm F S)).ker)) (c : (QuasiCharacter (SIdeleQuotient F S)))
+    (hc : (normOneRestriction (sIdeleQuotientNorm F S) c = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω) ∧ 0 < sLocalFinitePoleMultiplicity ((sLocalPrimaryPlaces S p)) c) :
+    ∃ f : ℕ → {d : (QuasiCharacter (SIdeleQuotient F S)) // (normOneRestriction (sIdeleQuotientNorm F S) d = (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω) ∧
+      0 < sLocalFinitePoleMultiplicity ((sLocalPrimaryPlaces S p)) d}, Function.Injective f := by
+  classical
+  obtain ⟨χ, hcomp, hcover⟩ := sLocalOrbitalIndex_enumerable_or_empty_chart ω
+  obtain ⟨a, rfl⟩ := hcover c hc.1
+  obtain ⟨v, hv⟩ := Finset.card_pos.mp hc.2
+  obtain ⟨hv, hvp⟩ := Finset.mem_filter.mp hv
+  let per : ℝ := 2 * Real.pi / Real.log (v.val.asIdeal.absNorm : ℝ)
+  let z (n : ℕ) : ℂ := ((n : ℝ) * per : ℝ) * Complex.I
+  have hpos (n : ℕ) : 0 < sLocalFinitePoleMultiplicity ((sLocalPrimaryPlaces S p)) (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) (z n + a)) := by
+    apply Finset.card_pos.mpr
+    refine ⟨v, Finset.mem_filter.mpr ⟨?_, hvp⟩⟩
+    apply Finset.mem_filter.mpr
+    refine ⟨Finset.mem_univ _, ?_⟩
+    have he : (fun w : ℂ ↦ finiteLocalEulerFactor v.val
+        (sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) (z n + a)) w))) =
+      (fun w : ℂ ↦ finiteLocalEulerFactor v.val
+        (sLocalFiniteRestriction v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) a) w))) := by
+      funext w
+      have h := sLocalOrbitalIndex_enumerable_or_empty_periodic v ((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) a) w) n
+      simpa only [normTwist_normTwist, add_assoc, add_left_comm, add_comm] using h
+    rw [he]
+    exact (Finset.mem_filter.mp hv).2
+  have hinj : Injective (((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ))) := by
+    intro s t he
+    obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+    let P := quasiCharacterNormTwist (MonoidHom.id ℝ≥0ˣ) continuous_id 1 s
+    have hs (u : ℝ≥0ˣ) : P u = ((u.val : ℝ) : ℂ) ^ s := one_mul _
+    apply (existsUnique_complexPower P).unique hs
+    intro u
+    have h := DFunLike.congr_fun he (σ u)
+    change (χ (σ u) : ℂ) * ((((sIdeleQuotientNorm F S) (σ u) : ℝ≥0) : ℝ) : ℂ) ^ s =
+      (χ (σ u) : ℂ) * ((((sIdeleQuotientNorm F S) (σ u) : ℝ≥0) : ℝ) : ℂ) ^ t at h
+    rw [hσ u] at h
+    exact (hs u).trans (mul_left_cancel₀ (Circle.coe_ne_zero _) h)
+  refine ⟨fun n ↦ ⟨((quasiCharacterNormTwist (G := (SIdeleQuotient F S)) (sIdeleQuotientNorm F S)
+      (isProperMap_sIdeleQuotientNorm F S).continuous) ((⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp χ)) (z n + a), hcomp _, hpos n⟩, ?_⟩
+  intro n m h
+  have he := congrArg Complex.im (add_right_cancel (hinj (congrArg Subtype.val h)))
+  have hper : per ≠ 0 := by
+    have hq : (1 : ℝ) < (v.val.asIdeal.absNorm : ℝ) := by
+      exact_mod_cast HeightOneSpectrum.one_lt_absNorm v.val
+    exact (div_pos (by positivity) (Real.log_pos hq)).ne'
+  have he' : (n : ℝ) * per = (m : ℝ) * per := by
+    simpa only [z, Complex.mul_I_im, Complex.ofReal_re] using he
+  exact Nat.cast_injective (mul_right_cancel₀ hper he')
+
 /-- Paper: Theorem 7.3.1.6(2), p. 345.
 The common index set either admits an enumeration by the natural numbers or is
 empty and the corresponding primary quotient is zero. -/
 theorem sLocalOrbitalIndex_enumerable_or_empty
     (p : Vℚ) (ω : PontryaginDual J₁)
     (_hS : IsSaturatedPlaceSet S) (_hp : (Sₚ(p)).Nonempty) (_hPic : PicTrivial) :
-    Nonempty (ℕ ≃ Idx(p, ω)) ∨ (IsEmpty (Idx(p, ω)) ∧ Subsingleton (Q(p, ω))) := by sorry
+    Nonempty (ℕ ≃ Idx(p, ω)) ∨ (IsEmpty (Idx(p, ω)) ∧ Subsingleton (Q(p, ω))) := by
+  classical
+  by_cases h : Nonempty (Idx(p, ω))
+  · have : Countable {c : Xₛ // onComponent(c, ω) ∧
+        0 < sLocalFinitePoleMultiplicity (Sₚ(p)) c} :=
+      sLocalOrbitalIndex_enumerable_or_empty_countable_centers p ω
+    let centerOffset (j : Idx(p, ω)) :
+        {c : Xₛ // onComponent(c, ω) ∧
+          0 < sLocalFinitePoleMultiplicity (Sₚ(p)) c} × ℕ :=
+      (⟨j.val.1, j.property.1, lt_of_le_of_lt (Nat.zero_le _) j.property.2⟩, j.val.2)
+    have : Countable (Idx(p, ω)) := (show Function.Injective centerOffset from by
+      intro a b hab
+      apply Subtype.ext
+      exact Prod.ext (congrArg (fun x ↦ x.1.val) hab)
+        (congrArg (fun x :
+          {c : Xₛ // onComponent(c, ω) ∧
+            0 < sLocalFinitePoleMultiplicity (Sₚ(p)) c} × ℕ ↦ x.2) hab)).countable
+    obtain ⟨j⟩ := h
+    obtain ⟨f, hf⟩ := sLocalOrbitalIndex_enumerable_or_empty_infinite_centers
+      p ω j.val.1 ⟨j.property.1, lt_of_le_of_lt (Nat.zero_le _) j.property.2⟩
+    have : Infinite (Idx(p, ω)) := Infinite.of_injective
+      (fun n : ℕ ↦ (⟨((f n).val, 0), (f n).property.1, (f n).property.2⟩ : Idx(p, ω)))
+      (by
+        intro a b hab
+        apply hf
+        apply Subtype.ext
+        exact congrArg (fun j : Idx(p, ω) ↦ j.val.1) hab)
+    exact Or.inl nonempty_equiv_of_countable
+  · right
+    have hEmpty : IsEmpty (Idx(p, ω)) := ⟨fun j ↦ h ⟨j⟩⟩
+    refine ⟨hEmpty, ⟨?_⟩⟩
+    intro x y
+    obtain ⟨x, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) x
+    obtain ⟨y, rfl⟩ := Submodule.mkQ_surjective (Rₚ(p, ω)) y
+    have hx := (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω x).2
+      (fun j ↦ isEmptyElim j)
+    have hy := (sLocalPrimaryOrbitalQuotient_mk_eq_zero p _hS _hp _hPic ω y).2
+      (fun j ↦ isEmptyElim j)
+    exact hx.trans hy.symm
 
 local notation "rhoCoeff(" c ", " r ")" =>
   complexResidue (fun z : ℂ ↦ sLocalRhoFactor (twistₛ (c) z) *

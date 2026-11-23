@@ -451,12 +451,109 @@ def Printed.globalThetaSobolev_allTests_integrable : Prop :=
         intervalSobolevDensity (a + α) (a + β) s
           (Real.log ((ideleClassNorm F g).val : ℝ))) (ideleClassTamagawaMeasure F)
 
+/-- Paper: Proposition 10.1.1.5, pp. 436–437. A test with vanishing value
+at zero and Fourier value one has theta bounded below near norm zero. -/
+private theorem globalThetaSobolev_allTests_integrable_false_lower_bound :
+    ∃ f : SchwartzBruhat (Multiplicative (AdeleRing (𝓞 ℚ) ℚ)), ∃ ε : ℝ,
+      0 < ε ∧ ∀ g : IdeleClassGroup (𝓞 ℚ) ℚ,
+        ((ideleClassNorm ℚ g).val : ℝ) < ε → 1 ≤ ‖adelicTheta f g‖ := by
+  obtain ⟨f, hf⟩ := adelePolarValues_surjective (F := ℚ) (0, 1)
+  let z : Multiplicative (AdeleRing (𝓞 ℚ) ℚ) := Multiplicative.ofAdd 0
+  let t (g : IdeleClassGroup (𝓞 ℚ) ℚ) : ℝ := ((ideleClassNorm ℚ g).val : ℝ)
+  have hf₀ : f z = 0 := congrArg Prod.fst hf
+  have hF₀ : adeleSchwartzFourier f z = 1 := congrArg Prod.snd hf
+  obtain ⟨C, T, hC, hT, hsmall⟩ := adelicTheta_decay_small f 0
+  refine ⟨f, min T (1 / (C + 1)), lt_min hT (by positivity), ?_⟩
+  intro g hg
+  have ht : 0 < t g := NNReal.coe_pos.mpr (Units.zero_lt _)
+  have hgt : t g < T := lt_of_lt_of_le hg (min_le_left _ _)
+  have hgc : t g < 1 / (C + 1) := lt_of_lt_of_le hg (min_le_right _ _)
+  have hbound : ‖adelicTheta f g - (t g)⁻¹ • (1 : ℂ)‖ ≤ C := by
+    simpa only [t, z, hf₀, hF₀, add_zero, pow_zero, mul_one] using hsmall g hgt
+  have hnorm : ‖(t g)⁻¹ • (1 : ℂ)‖ = (t g)⁻¹ := by
+    simp only [norm_smul, norm_one, mul_one, Real.norm_eq_abs,
+      abs_of_pos (inv_pos.mpr ht)]
+  have htri : ‖(t g)⁻¹ • (1 : ℂ)‖ ≤
+      ‖adelicTheta f g‖ + ‖adelicTheta f g - (t g)⁻¹ • (1 : ℂ)‖ := by
+    exact norm_le_norm_add_norm_sub _ _
+  have hC1 : 0 < C + 1 := by linarith
+  have hinv : C + 1 < (t g)⁻¹ := by
+    exact (lt_inv_comm₀ ht hC1).mp (by simpa only [one_div] using hgc)
+  rw [hnorm] at htri
+  linarith
+
+/-- Paper: Proposition 10.1.1.5, pp. 436–437. Every positive radius has
+an infinite-measure small-norm region in the idele class group of ℚ. -/
+private theorem globalThetaSobolev_allTests_integrable_false_small_norm_measure
+    (ε : ℝ) (hε : 0 < ε) :
+    ideleClassTamagawaMeasure ℚ
+      {g : IdeleClassGroup (𝓞 ℚ) ℚ | ((ideleClassNorm ℚ g).val : ℝ) < ε} = ⊤ := by
+  let : BorelSpace (IdeleClassGroup (𝓞 ℚ) ℚ) := ⟨rfl⟩
+  let : (ideleClassTamagawaMeasure ℚ).IsHaarMeasure :=
+    (ideleClassTamagawaMeasure_isWeil ℚ).1
+  have hNc : Continuous (ideleClassNorm ℚ) := (isProperMap_ideleClassNorm ℚ).continuous
+  have hs : Function.Surjective (ideleClassNorm ℚ) := by
+    intro t
+    refine ⟨QuotientGroup.mk (canonicalIdeleNormSection ℚ t), ?_⟩
+    exact canonicalIdeleNormSection_rightInverse ℚ t
+  have hB := sLocalThetaSobolev_integrable_false_measure
+    (ideleClassTamagawaMeasure ℚ) (ideleClassNorm ℚ) hNc hs
+  have hε0 : (⟨ε, hε.le⟩ : ℝ≥0) ≠ 0 := by
+    intro h
+    exact hε.ne' (by simpa using congrArg Subtype.val h)
+  let t : ℝ≥0ˣ := Units.mk0 ⟨ε, hε.le⟩ hε0
+  let u : IdeleClassGroup (𝓞 ℚ) ℚ := QuotientGroup.mk (canonicalIdeleNormSection ℚ t)
+  have hu : ideleClassNorm ℚ u = t := canonicalIdeleNormSection_rightInverse ℚ t
+  have hset : {g : IdeleClassGroup (𝓞 ℚ) ℚ |
+      ((ideleClassNorm ℚ g).val : ℝ) < ε} =
+      (fun g ↦ u⁻¹ * g) ⁻¹' {g | ((ideleClassNorm ℚ g).val : ℝ) < 1} := by
+    ext g
+    simp only [Set.mem_ofPred_eq, Set.mem_preimage, map_mul, map_inv, hu,
+      Units.val_mul, Units.val_inv_eq_inv_val, NNReal.coe_mul, NNReal.coe_inv]
+    change ((ideleClassNorm ℚ g).val : ℝ) < ε ↔
+      ε⁻¹ * ((ideleClassNorm ℚ g).val : ℝ) < 1
+    simpa only [mul_one] using
+      ((inv_mul_lt_iff₀ hε).symm :
+        ((ideleClassNorm ℚ g).val : ℝ) < ε * 1 ↔
+          ε⁻¹ * ((ideleClassNorm ℚ g).val : ℝ) < 1)
+  rw [hset, measure_preimage_mul (ideleClassTamagawaMeasure ℚ) u⁻¹, hB]
+
 /-- Paper: Proposition 10.1.1.5, pp. 436–437. For ℚ, set a = s = 0
 and I = {0}. The real Gaussian times the characteristic functions of the finite
 integer rings has theta(t) = Σ_{n ≠ 0} exp(-πn²t²), asymptotic to 1/t at zero
 on each norm-one fibre, so its square is not integrable. -/
 theorem Printed.globalThetaSobolev_allTests_integrable_false :
-    ¬ Printed.globalThetaSobolev_allTests_integrable := by sorry
+    ¬ Printed.globalThetaSobolev_allTests_integrable := by
+  let : BorelSpace (IdeleClassGroup (𝓞 ℚ) ℚ) := ⟨rfl⟩
+  intro h
+  obtain ⟨f, ε, hε, hθ⟩ := globalThetaSobolev_allTests_integrable_false_lower_bound
+  have hint := h ℚ 0 0 0 0 le_rfl le_rfl f
+  have hint' : Integrable (fun g : IdeleClassGroup (𝓞 ℚ) ℚ ↦ ‖adelicTheta f g‖ ^ 2)
+      (ideleClassTamagawaMeasure ℚ) :=
+    hint.congr (Eventually.of_forall fun g ↦ by norm_num [intervalSobolevDensity])
+  let B := {g : IdeleClassGroup (𝓞 ℚ) ℚ | ((ideleClassNorm ℚ g).val : ℝ) < ε}
+  have hNc : Continuous (ideleClassNorm ℚ) := (isProperMap_ideleClassNorm ℚ).continuous
+  have hBm : MeasurableSet B :=
+    (isOpen_lt (NNReal.continuous_coe.comp (Units.continuous_val.comp hNc))
+      continuous_const).measurableSet
+  have hlow : ∀ g ∈ B, (1 : ℝ≥0∞) ≤ ‖‖adelicTheta f g‖ ^ 2‖ₑ := by
+    intro g hg
+    have hsq : (1 : ℝ) ≤ ‖adelicTheta f g‖ ^ 2 := by
+      nlinarith [hθ g hg]
+    rw [Real.eNorm_eq_ofReal (sq_nonneg _)]
+    simpa only [ENNReal.ofReal_one] using ENNReal.ofReal_le_ofReal hsq
+  have hfin : (∫⁻ g, ‖‖adelicTheta f g‖ ^ 2‖ₑ ∂ideleClassTamagawaMeasure ℚ) < ⊤ :=
+    hint'.hasFiniteIntegral
+  have hB : ideleClassTamagawaMeasure ℚ B = ⊤ :=
+    globalThetaSobolev_allTests_integrable_false_small_norm_measure ε hε
+  have hge : ⊤ ≤ ∫⁻ g, ‖‖adelicTheta f g‖ ^ 2‖ₑ ∂ideleClassTamagawaMeasure ℚ :=
+    calc (⊤ : ℝ≥0∞) = (1 : ℝ≥0∞) * ideleClassTamagawaMeasure ℚ B := by rw [hB]; simp
+      _ = ∫⁻ _ in B, (1 : ℝ≥0∞) ∂ideleClassTamagawaMeasure ℚ :=
+          (setLIntegral_const B _).symm
+      _ ≤ ∫⁻ g in B, ‖‖adelicTheta f g‖ ^ 2‖ₑ ∂ideleClassTamagawaMeasure ℚ :=
+          setLIntegral_mono' hBm hlow
+      _ ≤ _ := setLIntegral_le_lintegral B _
+  exact absurd (lt_of_le_of_lt hge hfin) (lt_irrefl _)
 
 /-- A test quotient completes in its weighted function norm when its evaluation on
 representatives gives an injective dense map to a closed subspace of the ambient L². -/

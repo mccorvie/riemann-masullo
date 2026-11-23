@@ -698,8 +698,85 @@ def Printed.absolutePWCondensation_traceNorm_tendsto : Prop :=
               (productTraceClass(T, absolutePWProjection (F := F) (S := S) hs a ω Λ) - T))
               atTop (𝓝 0)
 
+/-- A trace-norm limit of right products determines the operator value on a pointwise limit. -/
+private theorem absolutePWCondensation_traceNorm_tendsto_false_apply
+    (H : Type*) [NormedAddCommGroup H] [InnerProductSpace ℂ H] [CompleteSpace H]
+    (T : nuclearEndomorphisms H) (P : ℝ → H →L[ℂ] H) (u v : H)
+    (hP : Tendsto (fun Λ ↦ P Λ u) atTop (𝓝 v))
+    (hT : Tendsto (fun Λ ↦ traceNorm
+      ((⟨T.val * P Λ, mul_mem_nuclearEndomorphisms_right (P Λ) T⟩ : nuclearEndomorphisms H) - T))
+      atTop (𝓝 0)) : T.val v = T.val u := by
+  by_cases hu : u = 0
+  · subst u
+    simp only [map_zero] at hP ⊢
+    rw [tendsto_nhds_unique hP tendsto_const_nhds, map_zero]
+  let f := innerSL ℂ u
+  let A := f.smulRight u
+  let D (Λ : ℝ) : nuclearEndomorphisms H :=
+    ⟨T.val * P Λ, mul_mem_nuclearEndomorphisms_right (P Λ) T⟩ - T
+  have hbound (Λ : ℝ) : ‖f‖ * ‖T.val (P Λ u) - T.val u‖ ≤ ‖A‖ * traceNorm (D Λ) := by
+    have hmul : (D Λ).val * A = f.smulRight (T.val (P Λ u) - T.val u) := by
+      ext1 x
+      simp [D, A, smul_sub]
+    rw [← traceNorm_smulRight f (T.val (P Λ u) - T.val u)]
+    have hprod : (⟨(D Λ).val * A, mul_mem_nuclearEndomorphisms_right A (D Λ)⟩ :
+        nuclearEndomorphisms H) =
+        ⟨f.smulRight (T.val (P Λ u) - T.val u), smulRight_mem_nuclearEndomorphisms _ _⟩ :=
+      Subtype.ext hmul
+    rw [← hprod]
+    exact traceNorm_mul_right_le A (D Λ)
+  have hLeft : Tendsto (fun Λ ↦ ‖f‖ * ‖T.val (P Λ u) - T.val u‖) atTop
+      (𝓝 (‖f‖ * ‖T.val v - T.val u‖)) :=
+    tendsto_const_nhds.mul (((T.val.continuous.tendsto v).comp hP).sub tendsto_const_nhds).norm
+  have hRight : Tendsto (fun Λ ↦ ‖A‖ * traceNorm (D Λ)) atTop (𝓝 0) := by
+    simpa only [mul_zero] using tendsto_const_nhds.mul hT
+  have hle := le_of_tendsto_of_tendsto' hLeft hRight hbound
+  have hf : 0 < ‖f‖ := by simpa only [f, innerSL_apply_norm, norm_pos_iff] using hu
+  exact sub_eq_zero.mp (norm_eq_zero.mp (le_antisymm (nonpos_of_mul_nonpos_right hle hf) (norm_nonneg _)))
+
+open scoped nonZeroDivisors in
+/-- The rational integers have trivial Picard group. -/
+private theorem rational_empty_picTrivial :
+    Subsingleton (CommRing.Pic (((∅ : Finset V(ℚ)) : Set V(ℚ)).integer ℚ)) := by
+  rw [Finset.coe_empty, integer_empty]
+  let e := (Algebra.botEquivOfInjective (IsFractionRing.injective (𝓞 ℚ) ℚ)).toRingEquiv
+  let i := Rat.ringOfIntegersEquiv.symm.trans e.symm
+  let := IsPrincipalIdealRing.of_surjective i i.surjective
+  infer_instance
+
+/-- The restriction of the trivial rational character is unramified everywhere. -/
+private theorem rational_one_unramifiedOutside_empty :
+    NormOneCharacterUnramifiedOutside
+      ((1 : PontryaginDual C𝔽(ℚ)).comp
+        (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))) ∅ := by
+  refine ⟨⟨1, (mem_unramifiedOutside_iff ℚ ∅ 1).mpr (fun _ _ _ ↦ rfl)⟩, fun _ ↦ rfl⟩
+
+/-- A fixed-cutoff geometric convolution is nonzero on a vector orthogonal to theta
+in the trivial rational isotype. Use a critical-line ordinate γ and the log-norm
+vector `exp(-iγx)/(1+x²)`. Pair its translates with the theta vector from
+`(3u² - 2πu⁴) exp(-πu²)` and the finite integer indicators. The pairing is analytic,
+and the Cauchy kernel has a nonvanishing Fourier multiplier, so it is nonzero at some
+positive translation. A bump near that point and a large cutoff preserve the
+nonzero geometric output. -/
+private theorem rational_cutoffConv_ne_zero_of_geometricProjection_eq_zero :
+    let hs : (0 : ℝ) ≤ 2 := by norm_num
+    let ω := (1 : PontryaginDual C𝔽(ℚ)).comp
+      (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))
+    letI : CompleteSpace ↥(GeoIsotype(ℚ, hs, ω)) :=
+      (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+        hs ω).completeSpace_coe
+    ∃ (φ : BruhatCompactSupport C𝔽(ℚ)), aboveOne(ℚ, φ) ∧
+      ∃ (R ε : ℝ) (ρ : C𝔽(ℚ) → ℝ) (hρ : IsModulatedCutoff (m𝔽(ℚ)) R ε ρ)
+          (u : GeoIsotype(ℚ, hs, ω)),
+        ((GeoIsotype(ℚ, hs, ω)).orthogonalProjectionOnto.comp
+          ((geometricProjection (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs).comp
+            (GeoIsotype(ℚ, hs, ω)).subtypeL)) u = 0 ∧
+        ((GeoIsotype(ℚ, hs, ω)).orthogonalProjectionOnto.comp
+          ((geometricTruncatedConvolution (F := ℚ) (1 / 2) (le_rfl (a := (0 : ℝ))) hs hρ φ).comp
+            (GeoIsotype(ℚ, hs, ω)).subtypeL)) u ≠ 0 := by sorry
+
 /-- Paper: Theorem 11.2.1.2(2) and (11.2.1.4), p. 488.
-On the trivial rational component with S = {∞}, a = 1/2 and s = 2, let γ be
+On the trivial rational component with no finite places, a = 1/2 and s = 2, let γ be
 the first positive ordinate of a critical-line zeta zero. The vector
 v(x) = exp(-iγx)/(1+x²) is orthogonal to theta by the Mellin zero.
 Use the nonzero half-weighted theta profile G of
@@ -711,7 +788,28 @@ A nonnegative test bump near a positive t with nonzero inner product still pairs
 nontrivially, and a sufficiently large fixed symmetric cutoff preserves a nonzero
 part of its geometric projection. Every right PW projection kills v. -/
 theorem Printed.absolutePWCondensation_traceNorm_tendsto_false :
-    ¬ Printed.absolutePWCondensation_traceNorm_tendsto := by sorry
+    ¬ Printed.absolutePWCondensation_traceNorm_tendsto := by
+  intro h
+  have hs : (0 : ℝ) ≤ 2 := by norm_num
+  let ω := (1 : PontryaginDual C𝔽(ℚ)).comp
+    (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))
+  let H := ↥(GeoIsotype(ℚ, hs, ω))
+  let : CompleteSpace H :=
+    (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+      hs ω).completeSpace_coe
+  let P (Λ : ℝ) : H →L[ℂ] H := absolutePWProjection (F := ℚ) (S := ∅) hs (1 / 2) ω Λ
+  obtain ⟨φ, hφ, R, ε, ρ, hρ, u, hu, hcut⟩ :=
+    rational_cutoffConv_ne_zero_of_geometricProjection_eq_zero
+  obtain ⟨T, hT, hlim⟩ := h ℚ 1 ∅ (1 / 2) 2 hs
+    rational_one_unramifiedOutside_empty rational_empty_picTrivial φ hφ R ε ρ hρ
+  have hstrong := absolutePWProjection_tendsto (F := ℚ) (S := ∅) hs (1 / 2) ω
+    rational_one_unramifiedOutside_empty rational_empty_picTrivial u
+  have hzero : Tendsto (fun Λ ↦ P Λ u) atTop (𝓝 0) :=
+    (congrArg (fun v : H ↦ Tendsto (fun Λ ↦ P Λ u) atTop (𝓝 v)) hu).mp hstrong
+  have heq : T.val 0 = T.val u :=
+    absolutePWCondensation_traceNorm_tendsto_false_apply H T P u 0 hzero hlim
+  exact hcut ((congrArg (fun A : H →L[ℂ] H ↦ A u) hT).symm.trans
+    (heq.symm.trans (map_zero T.val)))
 
 /-- Paper: Theorem 11.2.1.4(2) and (11.2.1.9), p. 489.
 For every fixed cutoff, the trace-norm limit of invariant condensation is asserted
@@ -734,11 +832,32 @@ def Printed.invariantPWCondensation_traceNorm_tendsto : Prop :=
               atTop (𝓝 0)
 
 /-- Paper: Theorem 11.2.1.4(2) and (11.2.1.9), p. 489.
-For ℚ, S = {∞}, trivial character, a = 1/2 and s = 2, the product region is the
-same interval as the absolute box. The zeta-zero vector, positive test bump and
+For ℚ with no finite places, the trivial character, a = 1/2 and s = 2, the product
+region is the same interval as the absolute box. The zeta-zero vector, positive test bump and
 fixed symmetric cutoff of the absolute counterexample also refute this limit. -/
 theorem Printed.invariantPWCondensation_traceNorm_tendsto_false :
-    ¬ Printed.invariantPWCondensation_traceNorm_tendsto := by sorry
+    ¬ Printed.invariantPWCondensation_traceNorm_tendsto := by
+  intro h
+  have hs : (0 : ℝ) ≤ 2 := by norm_num
+  let ω := (1 : PontryaginDual C𝔽(ℚ)).comp
+    (⟨(ideleClassNorm ℚ).ker.subtype, continuous_subtype_val⟩ : C₁(ℚ) →ₜ* C𝔽(ℚ))
+  let H := ↥(GeoIsotype(ℚ, hs, ω))
+  let : CompleteSpace H :=
+    (instClosedSpectralIsotypeSec2 (F := ℚ) (neg_nonpos.mpr (le_rfl (a := (0 : ℝ))))
+      hs ω).completeSpace_coe
+  let P (Λ : ℝ) : H →L[ℂ] H := invariantPWProjection (F := ℚ) (S := ∅) hs (1 / 2) ω Λ
+  obtain ⟨φ, hφ, R, ε, ρ, hρ, u, hu, hcut⟩ :=
+    rational_cutoffConv_ne_zero_of_geometricProjection_eq_zero
+  obtain ⟨T, hT, hlim⟩ := h ℚ 1 ∅ (1 / 2) 2 hs
+    rational_one_unramifiedOutside_empty rational_empty_picTrivial φ hφ R ε ρ hρ
+  have hstrong := invariantPWProjection_tendsto (F := ℚ) (S := ∅) hs (1 / 2) ω
+    rational_one_unramifiedOutside_empty rational_empty_picTrivial u
+  have hzero : Tendsto (fun Λ ↦ P Λ u) atTop (𝓝 0) :=
+    (congrArg (fun v : H ↦ Tendsto (fun Λ ↦ P Λ u) atTop (𝓝 v)) hu).mp hstrong
+  have heq : T.val 0 = T.val u :=
+    absolutePWCondensation_traceNorm_tendsto_false_apply H T P u 0 hzero hlim
+  exact hcut ((congrArg (fun A : H →L[ℂ] H ↦ A u) hT).symm.trans
+    (heq.symm.trans (map_zero T.val)))
 
 /-- Paper: Theorem 11.2.1.2(2) and (11.2.1.5), p. 488.
 The traces at fixed cutoff are asserted to converge to the trace of the
