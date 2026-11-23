@@ -1095,7 +1095,10 @@ private theorem integral_difference_polynomial (ξ : PontryaginDual G) (g : G)
 
 open scoped Classical in
 open Polynomial in
-private theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
+/-- A log-polynomial moment of an iterated cyclic difference vanishes whenever
+the polynomial degree is less than the number of factors on whose generator
+the character is trivial in the selected norm-one isotype. -/
+theorem integral_differenceProduct_polynomial (ξ : PontryaginDual G)
     (v : List G → G → ℂ)
     (hdiff : ∀ g l x, v (g :: l) x = v l x - v l (g * x))
     (hint : ∀ l r, Integrable (fun x ↦ v l x * (ξ x : ℂ) * (period x : ℂ) ^ (r : ℕ)) μ)
@@ -1752,6 +1755,112 @@ variable (S : List G) (hS : S ≠ []) (hγS : ∀ g ∈ S, 1 < (m g).val)
 -- TODO(paper-gap): On p. 219 the window needs 2 log b′₁ > log |γ₁|. The
 -- support enlargement uses γ₁⁻¹, and the final shift must have module below one.
 
+/-- A radial cutoff gives an isotypic representative in a negative window
+modulo a single expanding difference. -/
+private theorem modulatedDifferenceProduct_supported_single (ω : PontryaginDual m.toMonoidHom.ker) (g : G) (hg : 1 < (m g).val) :
+    ∃ B : Set ℝ≥0ˣ, IsCompact B ∧ (∀ t ∈ B, t.val < 1) ∧ ∀ f : H₀[ω],
+      ∃ v a : H₀[ω], (∀ x, m x ∉ B → v.val.val x = 0) ∧ f = v + P[ω, [g]] a := by
+  obtain ⟨B, c, hB, hneg, hc, hlift⟩ := modulatedPeriodization_compact_lift m g hm hms hg
+  refine ⟨B, hB, hneg, fun f ↦ ?_⟩
+  let per := modulatedPeriodizationCLM m g hm hms hg
+  let q := QuotientGroup.mk' (Subgroup.zpowers g)
+  obtain ⟨v, hv, he⟩ := hlift (per f.val)
+  have hf := (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) f.val).mp f.property
+  have hiso : v ∈ H₀[ω] := by
+    apply (mem_modulatedDecayIsotype_iff m ω univ (mem_univ _) v).mpr
+    intro u x
+    have ha := modulatedPeriodization_hasSum m g hm hms hg f.val x
+    have hb := modulatedPeriodization_hasSum m g hm hms hg f.val (u.val⁻¹ * x)
+    have hc' : per f.val (q (u.val⁻¹ * x)) = (ω u : ℂ) * per f.val (q x) := by
+      apply hb.unique
+      refine ((ha.mul_left (ω u : ℂ)).congr_fun fun n ↦ ?_)
+      rw [mul_left_comm (g ^ n) _ x, hf]
+    have hm' : m (u.val⁻¹ * x) = m x := by rw [map_mul, map_inv, show m u.val = 1 from u.property, inv_one, one_mul]
+    rw [he, he, hm', hc']
+    change c (m x) * ((ω u : ℂ) * per f.val (q x)) = (ω u : ℂ) * (c (m x) * per f.val (q x))
+    ring
+  let v' : H₀[ω] := ⟨v, hiso⟩
+  let δ := modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty
+  have hclosed : IsClosed (δ.range : Set E) := modulatedCyclicDifference_isClosed_range m g hm hms hg
+  have hk : per.ker = δ.range :=
+    (modulatedPeriodization_ker_eq_closure m g hm hms hg).trans hclosed.submodule_topologicalClosure_eq
+  have harr : f.val - v ∈ δ.range := by
+    rw [← hk]
+    change per (f.val - v) = 0
+    rw [map_sub, hv, sub_self]
+  have hi := cyclicDifference_range_inf_isotype m hm hms ω g
+  have him : f.val - v ∈ (H₀[ω]).map δ.toLinearMap :=
+    hi ▸ (show f.val - v ∈ δ.range ⊓ H₀[ω] from ⟨harr, (H₀[ω]).sub_mem f.property hiso⟩)
+  obtain ⟨a, ha, heq⟩ := him
+  refine ⟨v', ⟨a, ha⟩, fun x hx ↦ (he x).trans (by rw [hc _ hx, zero_mul]), ?_⟩
+  apply Subtype.ext
+  change f.val = v + δ a
+  change δ a = f.val - v at heq
+  rw [heq]
+  abel
+
+/-- Induction localizes a product of differences. Applying the next expanding
+difference enlarges a window only in the direction of smaller modules. -/
+private theorem modulatedDifferenceProduct_supported_list (ω : PontryaginDual m.toMonoidHom.ker) (s : List G)
+    (hs : ∀ g ∈ s, 1 < (m g).val) :
+    ∃ B : Set ℝ≥0ˣ, IsCompact B ∧ (∀ t ∈ B, t.val < 1) ∧ ∀ f : H₀[ω],
+      ∃ v a : H₀[ω], (∀ x, m x ∉ B → v.val.val x = 0) ∧ f = v + P[ω, s] a := by
+  induction s with
+  | nil =>
+    refine ⟨∅, isCompact_empty, fun _ h ↦ False.elim h, fun f ↦ ⟨0, f, fun _ _ ↦ rfl, ?_⟩⟩
+    change f = 0 + f
+    rw [zero_add]
+  | cons g s ih =>
+    have hg := hs g List.mem_cons_self
+    obtain ⟨B, hB, hneg, hsingle⟩ := modulatedDifferenceProduct_supported_single m hm hms ω g hg
+    obtain ⟨C, hC, hCneg, htail⟩ := ih (fun x hx ↦ hs x (List.mem_cons_of_mem _ hx))
+    let tr := Homeomorph.mulLeft (m g)
+    refine ⟨B ∪ (C ∪ tr ⁻¹' C), hB.union (hC.union (tr.isCompact_preimage.mpr hC)), ?_, fun f ↦ ?_⟩
+    · rintro t (h | h | h)
+      · exact hneg _ h
+      · exact hCneg _ h
+      · have hlt := hCneg _ h
+        change (m g).val * t.val < 1 at hlt
+        exact (le_mul_of_one_le_left (by positivity : 0 ≤ t.val) hg.le).trans_lt hlt
+    obtain ⟨v, u, hv, he⟩ := hsingle f
+    obtain ⟨w, a, hw, hu⟩ := htail u
+    refine ⟨v + P[ω, [g]] w, a, fun x hx ↦ ?_, ?_⟩
+    · have h₁ := hv x fun h ↦ hx (Or.inl h)
+      have h₂ := hw x fun h ↦ hx (Or.inr (Or.inl h))
+      have h₃ := hw (g * x) fun h ↦ hx (Or.inr (Or.inr (show m g * m x ∈ C from map_mul m g x ▸ h)))
+      change v.val.val x + (modulatedCyclicDifference m g hm hms univ ordConnected_univ univ_nonempty w.val).val x = 0
+      rw [modulatedCyclicDifference_apply, h₁, h₂, h₃, sub_self, add_zero]
+    · rw [he, hu, map_add, add_assoc]
+      rfl
+
+/-- A surjection from a closed part of a Fréchet space onto a Hausdorff quotient
+identifies the target with the quotient by the restricted kernel. -/
+private theorem modulatedDifferenceProduct_supported_quotient {X : Type*} [AddCommGroup X]
+    [Module ℂ X] [TopologicalSpace X] (hX : IsFrechetTVS X) (W R : Submodule ℂ X)
+    (hW : IsClosed (W : Set X)) (hR : IsClosed (R : Set X))
+    (hs : Surjective (R.mkQ ∘ W.subtype)) :
+    ∃ F : (W ⧸ R.comap W.subtype) ≃L[ℂ] (X ⧸ R),
+      ∀ f : W, F ((R.comap W.subtype).mkQ f) = R.mkQ f.val := by
+  obtain ⟨hg, hp, hm, hc⟩ := hX
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  let : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  let : CompleteSpace X := hc
+  let : UniformSpace W := UniformSpace.comap Subtype.val inferInstance
+  let : IsUniformAddGroup W := W.toAddSubgroup.isUniformAddGroup
+  let : MetrizableSpace W := IsEmbedding.subtypeVal.metrizableSpace
+  let : CompleteSpace W := hW.completeSpace_coe
+  have hFW : IsFrechetTVS W := by
+    refine ⟨inferInstance, inferInstance, inferInstance, ?_⟩
+    rw [IsUniformAddGroup.rightUniformSpace_eq]
+    infer_instance
+  have hQ := isFrechetTVS_quotient ⟨hg, hp, hm, hc⟩ R hR
+  let A : W →L[ℂ] (X ⧸ R) := R.mkQL.comp W.subtypeL
+  have ho : IsOpenMap A := isOpenMap_of_surjective_toLF (isLFSpace_of_isFrechetTVS hQ)
+    (X := fun _ : ℕ ↦ W) (fun _ ↦ hFW) (fun _ ↦ ContinuousLinearMap.id ℂ W)
+    (fun _ ↦ subset_rfl) (fun x ↦ ⟨0, x, rfl⟩) A hs
+  apply exists_quotient_equiv_of_kernel A (ho.isQuotientMap A.continuous hs)
+  exact SetLike.ext fun f ↦ Submodule.Quotient.mk_eq_zero R
+
 include hS hγS in
 /-- Paper: Theorem 4.6.2.1, p. 218. Each isotype has a compact norm-one-stable
 support set of module below one. The supported functions surject onto the
@@ -1765,7 +1874,43 @@ theorem modulatedDifferenceProduct_compactSupport_quotient :
       let M := R.comap W.subtype
       Surjective (R.mkQ ∘ W.subtype) ∧
       ∃ F : (W ⧸ M) ≃L[ℂ] (H₀[ω] ⧸ R),
-        ∀ f : W, F (M.mkQ f) = R.mkQ f.val := by sorry
+        ∀ f : W, F (M.mkQ f) = R.mkQ f.val := by
+  let : MeasurableSpace G := borel G
+  let : BorelSpace G := ⟨rfl⟩
+  obtain ⟨B, hB, hneg, hlift⟩ := modulatedDifferenceProduct_supported_list m hm hms ω S hγS
+  refine ⟨B, hB, hneg, ?_⟩
+  let W := (modulatedCompactSupportSubmodule m B).comap (H₀[ω]).subtype
+  let R := (P[ω, S]).range
+  have hmem (f : H₀[ω]) : f ∈ W ↔ ∀ x, m x ∉ B → f.val.val x = 0 := by
+    change f.val ∈ modulatedCompactSupportSubmodule m B ↔ _
+    rw [mem_modulatedCompactSupportSubmodule_iff m B hB.isClosed]
+    constructor
+    · intro h x hx
+      exact notMem_support.mp fun h' ↦ hx (h.2 (subset_tsupport _ h'))
+    · intro h
+      have hsupp : support f.val.val ⊆ m ⁻¹' B := fun x hx ↦ by
+        by_contra hh
+        exact hx (h x hh)
+      have hk := hm.1.isCompact_preimage hB
+      exact ⟨HasCompactSupport.of_support_subset_isCompact hk hsupp,
+        closure_minimal hsupp (hB.isClosed.preimage m.continuous)⟩
+  have hs : Surjective (R.mkQ ∘ W.subtype) := by
+    intro z
+    obtain ⟨f, rfl⟩ := R.mkQ_surjective z
+    obtain ⟨v, a, hv, he⟩ := hlift f
+    refine ⟨⟨v, (hmem _).mpr hv⟩, ?_⟩
+    change R.mkQ v = R.mkQ f
+    rw [he, map_add, show R.mkQ (P[ω, S] a) = 0 from (Submodule.Quotient.mk_eq_zero R).mpr ⟨a,rfl⟩, add_zero]
+  have hW : IsClosed (W : Set H₀[ω]) := by
+    let ev (x : G) (f : H₀[ω]) := f.val.val x
+    have he : (W : Set H₀[ω]) = ⋂ x : {x : G // m x ∉ B}, (ev x.val) ⁻¹' {0} := by
+      ext f
+      rw [SetLike.mem_coe, hmem, Set.mem_iInter]
+      exact ⟨fun h x ↦ h x.val x.property, fun h x hx ↦ h ⟨x,hx⟩⟩
+    rw [he]
+    exact isClosed_iInter fun x ↦ isClosed_singleton.preimage (isotype_eval_continuous m hm hms ω x.val)
+  exact ⟨hs, modulatedDifferenceProduct_supported_quotient (isotype_frechet m hm hms ω) W R hW
+    (modulatedIsotypicDifferenceProduct_isClosed_range m hm hms ω S hγS) hs⟩
 
 /-! ## 4.6.3 The case of an interval containing zero -/
 

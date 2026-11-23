@@ -6,7 +6,11 @@ import RiemannMasullo.External.TauCeti.Analysis.Complex.Conformal.Montel.Basic
 import RiemannMasullo.ForMathlib.Analysis.Meromorphic.VerticalStripZeros
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
 import RiemannMasullo.AppB_AnalyticNT.Sec4b
+import RiemannMasullo.External.Grh.Lemmas.AnalyticGoodHeightDisk
+import RiemannMasullo.External.Grh.Lemmas.LogLossGoodHeight
+import RiemannMasullo.Ch12_TraceGeometric.Sec5
 import Mathlib.Analysis.Calculus.BumpFunction.Normed
+import Mathlib.Analysis.Calculus.ContDiff.Convolution
 
 import all RiemannMasullo.Ch07_SchauderBasesZeta.Sec5
 import all RiemannMasullo.Ch03_IdelicZeta.Sec2
@@ -1229,11 +1233,60 @@ theorem introTraceApprox_differentiable (h ρ : ℕ → ℝ → ℝ)
     hF_int hF'_meas h_bound (hρint.norm.mul_const C) h_diff
   exact (differentiableAt_const _).mul key.2.differentiableAt
 
+private theorem introTracePower_locallyIntegrable (z : ℂ) :
+    LocallyIntegrable (introTracePower z) volume := by
+  let P (t : ℝ) := ((max t 1 : ℝ) : ℂ) ^ (-z)
+  have hP : Continuous P := continuous_iff_continuousAt.mpr fun t ↦
+    (Complex.continuousAt_ofReal_cpow_const (max t 1) (-z)
+      (Or.inr (zero_lt_one.trans_le (le_max_right t 1)).ne')).comp
+        (f := fun u : ℝ ↦ max u 1) (x := t) (continuous_id.max continuous_const).continuousAt
+  have hI : LocallyIntegrable ((Ioi (1 : ℝ)).indicator P) volume :=
+    hP.locallyIntegrable.indicator measurableSet_Ioi
+  apply hI.congr
+  have he : ∀ᵐ x : ℝ ∂volume, x ≠ 1 := by
+    simp [ae_iff]
+  filter_upwards [he] with x hx
+  by_cases h : 1 < x
+  · rw [indicator_of_mem h]
+    simp [P, introTracePower, h, max_eq_left h.le]
+  · rw [indicator_of_notMem h]
+    simp [introTracePower, h, hx]
+
+private theorem introTraceApprox_logProfile (h ρ : ℕ → ℝ → ℝ)
+    (hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
+    let f := fun x ↦ introTraceApprox (h n) (ρ n) z (Real.exp x)
+    ContDiff ℝ (⊤ : ℕ∞) f ∧ HasCompactSupport f := by
+  intro f
+  obtain ⟨hh, _, _, _, _, hρ⟩ := hA
+  have hc : HasCompactSupport (fun u ↦ (ρ n u : ℂ)) := by
+    apply HasCompactSupport.comp_left (g := Complex.ofReal) _ (by simp)
+    exact isCompact_Icc.of_isClosed_subset (isClosed_tsupport _) (hρ n).2.2.2.1
+  have hm : ContDiff ℝ (⊤ : ℕ∞) (fun u ↦ (ρ n u : ℂ)) :=
+    Complex.ofRealCLM.contDiff.comp (hρ n).2.1
+  have hs : ContDiff ℝ (⊤ : ℕ∞) (introTraceApprox (h n) (ρ n) z) := by
+    exact (Complex.ofRealCLM.contDiff.comp (hh n).1).mul <|
+      hc.contDiff_convolution_left (ContinuousLinearMap.mul ℝ ℂ) hm (introTracePower_locallyIntegrable z)
+  refine ⟨hs.comp Real.contDiff_exp, ?_⟩
+  have hl : ContinuousOn Real.log (tsupport (h n)) :=
+    Real.continuousOn_log.mono fun x hx ↦ (zero_lt_one.trans ((hh n).2.2.1 hx)).ne'
+  refine exists_compact_iff_hasCompactSupport.mp
+    ⟨Real.log '' tsupport (h n), ((hh n).2.1.image_of_continuousOn hl), fun x hx ↦ ?_⟩
+  have hz : h n (Real.exp x) = 0 := by
+    by_contra hn
+    exact hx ⟨Real.exp x, subset_tsupport _ hn, Real.log_exp x⟩
+  simp [f, introTraceApprox, hz]
+
 /-- Paper: §1.4.2, pp. 28–29. After twisting by the conjugate character
 the approximant is a compactly supported Bruhat test on the idele classes. -/
 theorem introTraceApprox_exists_bruhat (χ : U𝔽) (h ρ : ℕ → ℝ → ℝ)
     (_hA : IsIntroTraceApproximation h ρ) (n : ℕ) (z : ℂ) :
-    ∃ φ : D𝔽, ∀ g, φ.val g = introTraceTest χ (introTraceApprox (h n) (ρ n) z) g := by sorry
+    ∃ φ : D𝔽, ∀ g, φ.val g = introTraceTest χ (introTraceApprox (h n) (ρ n) z) g := by
+  obtain ⟨hs, hc⟩ := introTraceApprox_logProfile h ρ _hA n z
+  obtain ⟨φ, hφ⟩ := exists_characterNormTest (F := F) χ⁻¹ _ hs hc
+  refine ⟨φ, fun g ↦ ?_⟩
+  rw [hφ, introTraceTest]
+  have hg : 0 < N(g) := NNReal.coe_pos.mpr (Units.zero_lt _)
+  simp [Real.exp_log hg, ← Circle.coe_inv_eq_conj, show χ⁻¹ g = (χ g)⁻¹ from rfl]
 
 /-- Paper: §1.4.2, pp. 28–29. The twisted approximant satisfies the second
 standing hypothesis of the trace identity, vanishing at every norm-one class. -/
@@ -3162,8 +3215,17 @@ the trivial character's `z = 1 / 2` it says only that the two poles cancel as
 a germ: the value of the raw expression at that point depends on the total
 values Lean assigns to `logDeriv` at the pole of `finiteL 1` at one and to
 `1/0`, so the extension is stated as a function agreeing on the overlap rather
-than as `AnalyticOnNhd` of the raw expression itself. -/
-private theorem introTrace_combined_limit_extension_analytic (χ : U𝔽) {a : ℝ} (_ha : 0 < a) :
+than as `AnalyticOnNhd` of the raw expression itself. The character is trivial
+on the norm section, as in the chart: a norm twist of the trivial character
+moves the pole of its finite L-function off the real axis, where the
+correction term does not cancel it.
+
+Gap: The paper asserts this continuation on p. 30 without proof. For every a > 0 it says that
+the finite Hecke L-function of a character trivial on the norm section has no zero with
+Re s > 1/2 + a. -/
+private theorem introTrace_combined_limit_extension_analytic (τ : ℝ≥0ˣ →ₜ* C𝔽)
+    (_hτ : RightInverse τ (ideleClassNorm F)) (χ : U𝔽) (_hχ : ∀ t, χ (τ t) = 1)
+    {a : ℝ} (_ha : 0 < a) :
     ∃ H : ℂ → ℂ, AnalyticOnNhd ℂ H right(a) ∧
       EqOn H (fun z ↦ logDeriv finiteL(χ) (z + 1 / 2) +
         if χ = 1 then 1 / (z + 1 / 2) + 1 / (z - 1 / 2) else 0) right(max a 1) := by sorry
@@ -3185,7 +3247,7 @@ theorem introTrace_combined_limit_extension (τ : ℝ≥0ˣ →ₜ* C𝔽)
         (fun n z ↦ archSum(χ, approx(h, ρ, n, z)) + introTraceSpectralSum χ approx(h, ρ, n, z) a)
         H atTop right(max a 1) := by
   obtain ⟨h, ρ, hA⟩ := exists_introTraceApproximation
-  obtain ⟨H, hH, hEq⟩ := introTrace_combined_limit_extension_analytic χ _ha
+  obtain ⟨H, hH, hEq⟩ := introTrace_combined_limit_extension_analytic τ _hτ χ _hχ _ha
   refine ⟨h, ρ, H, hA, hH, ?_⟩
   exact (introTrace_combined_limit_extension_overlap τ _hτ χ _hχ _ha h ρ hA).congr_right
     fun z hz ↦ (hEq hz).symm
@@ -3594,6 +3656,470 @@ theorem introTrace_transition_mellin_inv_boundaryValue (S : Finset V) (χ : U�
 -- The first and third growth inputs on p. 31 are already stated as
 -- finiteHeckeL_continuation_isBigO_rpow and finiteHeckeL_inv_isBigO_oneLine.
 
+-- Helpers for `introTrace_finiteL_inv_horizontal_growth`. The continuation times a polynomial
+-- clearing its poles is entire. Patel's disk factorization (External/Grh), rescaled by
+-- `d = |a| + |b| + 1` about `3/2 + i(H + 1/2)`, bounds its zeros and the zero-free quotient,
+-- and Patel's averaging of logarithmic losses picks a height in `(H, H + 1)`.
+
+/-- The continuation has finitely many poles, all of order at most one.
+Copied from the private helper of PR #6071 (AppB Sec6) with `S = ∅`. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_poles (χ : U𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ s : right(1), L s = finiteHeckeL χ s) :
+    ∃ Z : Finset ℂ, (∀ s ∉ Z, AnalyticAt ℂ L s) ∧
+      ∀ s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt L s := by
+  classical
+  obtain ⟨Λ, hΛ, hΛSeries⟩ := completedHeckeL_exists_continuation χ
+  let R (s : ℂ) := (heckeGammaFactor χ s)⁻¹
+  let H := Λ * R
+  have hR := differentiable_inv_heckeGammaFactor χ
+  have hH : MeromorphicOn H univ := fun s hs ↦
+    (hΛ hs).meromorphicAt.mul (hR.analyticAt s).meromorphicAt
+  have hAgree : ∀ s : right(1), (L - H) s = 0 := by
+    intro s
+    have hne := heckeGammaFactor_ne_zero_of_re_pos χ (zero_lt_one.trans s.property)
+    change L s - Λ s * (heckeGammaFactor χ s)⁻¹ = 0
+    rw [hSeries s, hΛSeries s, completedHeckeL, finiteHeckeL]
+    rw [mul_comm (heckeGammaFactor χ s), mul_assoc, mul_inv_cancel₀ hne, mul_one, sub_self]
+  have hAtTwo : meromorphicOrderAt (L - H) (2 : ℂ) = ⊤ := by
+    apply meromorphicOrderAt_eq_top_iff.mpr
+    have hn : ∀ᶠ s : ℂ in 𝓝 (2 : ℂ), 1 < s.re :=
+      (isOpen_lt continuous_const Complex.continuous_re).mem_nhds (by norm_num)
+    exact (hn.filter_mono nhdsWithin_le_nhds).mono fun s hs ↦ hAgree ⟨s, hs⟩
+  have hCompare (s : ℂ) : meromorphicOrderAt Λ s ≤ meromorphicOrderAt L s := by
+    have ho := (hL.meromorphicOn.sub hH).meromorphicOrderAt_eq_top_of_isPreconnected
+      isPreconnected_univ (mem_univ (2 : ℂ)) (mem_univ s) hAtTwo
+    have he : L =ᶠ[𝓝[≠] s] H := (meromorphicOrderAt_eq_top_iff.mp ho).mono fun z hz ↦
+      sub_eq_zero.mp hz
+    rw [meromorphicOrderAt_congr he,
+      meromorphicOrderAt_mul (hΛ (mem_univ s)).meromorphicAt (hR.analyticAt s).meromorphicAt]
+    exact le_add_of_nonneg_right (hR.analyticAt s).meromorphicOrderAt_nonneg
+  have hNeg : (-1 : WithTop ℤ) ≤ 0 := by decide
+  have hPoles : ∃ Z : Finset ℂ,
+      (∀ s ∉ Z, AnalyticAt ℂ Λ s) ∧ ∀ s, (-1 : WithTop ℤ) ≤ meromorphicOrderAt Λ s := by
+    by_cases hχ : χ.toMonoidHom.comp (ideleClassNorm F).ker.subtype = 1
+    · obtain ⟨t, ⟨_, hp, hq, ha⟩, _⟩ :=
+        completedHeckeL_continuation_simplePoles χ Λ hΛ hΛSeries hχ
+      refine ⟨{Complex.I * (t : ℂ), 1 + Complex.I * (t : ℂ)}, fun s hs ↦ ha s (by simpa using hs),
+        fun s ↦ ?_⟩
+      by_cases h : s = Complex.I * (t : ℂ)
+      · rw [h, hp]
+      by_cases h' : s = 1 + Complex.I * (t : ℂ)
+      · rw [h', hq]
+      exact hNeg.trans (ha s (by simp [h, h'])).meromorphicOrderAt_nonneg
+    · have h := completedHeckeL_continuation_entire χ Λ hΛ hΛSeries hχ
+      exact ⟨∅, fun s _ ↦ h.analyticAt s, fun s ↦
+        hNeg.trans (h.analyticAt s).meromorphicOrderAt_nonneg⟩
+  obtain ⟨Z, hAway, hLower⟩ := hPoles
+  exact ⟨Z, fun s hs ↦ (hL (mem_univ s)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    ((hAway s hs).meromorphicOrderAt_nonneg.trans (hCompare s)),
+    fun s ↦ (hLower s).trans (hCompare s)⟩
+
+/-- A polynomial clearing the finitely many poles makes the continuation entire.
+Adapted from the private helper of PR #6071 (AppB Sec6) with `S = ∅`. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_entire (χ : U𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ) (hSeries : ∀ s : right(1), L s = finiteHeckeL χ s) :
+    ∃ (f : ℂ → ℂ) (Z : Finset ℂ), AnalyticOnNhd ℂ f univ ∧
+      ∀ s ∉ Z, AnalyticAt ℂ L s ∧ f s = (∏ p ∈ Z, (s - p)) * L s := by
+  classical
+  obtain ⟨Z, hAway, hLower⟩ := introTrace_finiteL_inv_horizontal_growth_poles χ L hL hSeries
+  let Q : ℂ → ℂ := fun s ↦ ∏ p ∈ Z, (s - p)
+  let G : ℂ → ℂ := Q * L
+  have hQ : Differentiable ℂ Q := by
+    intro s; exact DifferentiableAt.fun_finsetProd fun p _ ↦ differentiableAt_id.sub_const p
+  have hG : MeromorphicOn G univ := fun s _ ↦
+    (hQ.analyticAt s).meromorphicAt.mul (hL (mem_univ s)).meromorphicAt
+  have hGan (s : ℂ) (hs : s ∉ Z) : AnalyticAt ℂ G s := (hQ.analyticAt s).mul (hAway s hs)
+  refine ⟨toMeromorphicNFOn G univ, Z, fun x _ ↦ ?_, fun s hs ↦ ⟨hAway s hs, ?_⟩⟩
+  · apply ((meromorphicNFOn_toMeromorphicNFOn G univ)
+      (mem_univ x)).meromorphicOrderAt_nonneg_iff_analyticAt.mp
+    rw [meromorphicOrderAt_toMeromorphicNFOn hG (mem_univ x)]
+    by_cases hx : x ∈ Z
+    · let Q' : ℂ → ℂ := fun s ↦ ∏ p ∈ Z.erase x, (s - p)
+      have hQ' : Differentiable ℂ Q' := by
+        intro s; exact DifferentiableAt.fun_finsetProd fun p _ ↦ differentiableAt_id.sub_const p
+      have hGeq : G = (fun s ↦ s - x) * (Q' * L) := by
+        funext s
+        simp only [G, Q, Q', Pi.mul_apply, ← mul_assoc]
+        rw [Finset.mul_prod_erase Z (fun p ↦ s - p) hx]
+      rw [hGeq, meromorphicOrderAt_mul (by fun_prop) ((hQ'.analyticAt x).meromorphicAt.mul
+          (hL (mem_univ x)).meromorphicAt),
+        meromorphicOrderAt_id_sub_const,
+        meromorphicOrderAt_mul (hQ'.analyticAt x).meromorphicAt (hL (mem_univ x)).meromorphicAt]
+      have h1 := (hQ'.analyticAt x).meromorphicOrderAt_nonneg
+      have h3 := hLower x
+      have h4 : (0 : WithTop ℤ) ≤ 1 + meromorphicOrderAt L x := by
+        have := add_le_add_right h3 (1 : WithTop ℤ)
+        exact le_of_eq_of_le (by rfl) this
+      calc (0 : WithTop ℤ) ≤ 1 + meromorphicOrderAt L x := h4
+        _ ≤ 1 + (meromorphicOrderAt Q' x + meromorphicOrderAt L x) := by
+          gcongr
+          exact le_add_of_nonneg_left h1
+    · exact (hGan x hx).meromorphicOrderAt_nonneg
+  · rw [toMeromorphicNFOn_eq_toMeromorphicNFAt hG (mem_univ s),
+      toMeromorphicNFAt_eq_self.mpr (hGan s hs).meromorphicNFAt]
+    rfl
+
+/-- Patel's disk factorization rescaled by `d ≥ 1`: some height in `(H, H + 1)` avoids the
+ordinates of the zeros, and the logarithm of `‖f‖` is bounded below on that height in the
+disk of radius `3 * d`. Adapted from the `_disk` helper of PR #6071. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_disk {f : ℂ → ℂ} {c : ℂ}
+    {d M δ H : ℝ} (hf : AnalyticOnNhd ℂ f univ) (hd : 1 ≤ d) (hδ : 0 < δ) (hfc : δ ≤ ‖f c‖)
+    (hM : 1 ≤ M)
+    (hbd : ∀ z ∈ Metric.sphere c (6 * d), ‖f z‖ ≤ M) :
+    ∃ t ∈ Ioo H (H + 1), ∀ z ∈ Metric.closedBall c (3 * d), z.im = t →
+      f z ≠ 0 ∧ Real.log δ - 8 - ((8 + 9 * (Real.log 5 / Real.log (6 / 5 : ℝ))) +
+        (2 + Real.log d) / Real.log (6 / 5 : ℝ)) * Real.log (M / δ) ≤ Real.log ‖f z‖ := by
+  have hd0 : (0 : ℝ) < d := by linarith
+  have hdC : (d : ℂ) ≠ 0 := by exact_mod_cast hd0.ne'
+  let f' : ℂ → ℂ := fun w ↦ f (c + d * w)
+  have hf' : AnalyticOnNhd ℂ f' univ := fun w _ ↦
+    (hf _ trivial).comp (analyticAt_const.add (analyticAt_const.mul analyticAt_id))
+  have hfc0 : 0 < ‖f c‖ := hδ.trans_le hfc
+  have hf'0 : f' 0 = f c := by simp [f']
+  have hbd' : ∀ z ∈ Metric.sphere (0 : ℂ) 6, ‖f' z‖ ≤ M := by
+    intro z hz
+    apply hbd
+    rw [mem_sphere_zero_iff_norm] at hz
+    rw [mem_sphere_iff_norm, add_sub_cancel_left, norm_mul, hz, Complex.norm_real,
+      Real.norm_of_nonneg hd0.le, mul_comm]
+  obtain ⟨A, n, g, hfac, hN, hg⟩ := External.Grh.exists_goodHeight_disk_factorization hf'
+    (by rw [hf'0]; exact norm_pos_iff.mp hfc0) hM hbd'
+  rw [hf'0] at hN hg
+  obtain ⟨t, ht, hne, hsum⟩ :=
+    External.Grh.exists_goodHeight_sum_posLog A (fun ρ ↦ c.im + d * ρ.im) n H
+  refine ⟨t, ht, fun z hz hzt ↦ ?_⟩
+  set w : ℂ := (z - c) / d with hw
+  have hzw : z = c + d * w := by rw [hw, mul_div_cancel₀ _ hdC]; ring
+  have hwb : w ∈ Metric.closedBall (0 : ℂ) 3 := by
+    rw [mem_closedBall_zero_iff, hw, norm_div, Complex.norm_real, Real.norm_of_nonneg hd0.le,
+      div_le_iff₀ hd0]
+    have := hz; rw [Metric.mem_closedBall, dist_eq_norm] at this; linarith
+  have hwim : w.im = (t - c.im) / d := by
+    rw [hw, Complex.div_ofReal_im, Complex.sub_im, hzt]
+  have hρ (ρ : ℂ) (hρA : ρ ∈ A) : |t - (c.im + d * ρ.im)| ≤ d * ‖w - ρ‖ := by
+    have h1 := Complex.abs_im_le_norm (w - ρ)
+    rw [Complex.sub_im, hwim] at h1
+    have : t - (c.im + d * ρ.im) = d * ((t - c.im) / d - ρ.im) := by field_simp; ring
+    rw [this, abs_mul, abs_of_pos hd0]
+    exact mul_le_mul_of_nonneg_left h1 hd0.le
+  have hpos (ρ : ℂ) (hρA : ρ ∈ A) : 0 < |t - (c.im + d * ρ.im)| :=
+    abs_pos.mpr (sub_ne_zero.mpr (hne ρ hρA))
+  have hwρ (ρ : ℂ) (hρA : ρ ∈ A) : 0 < ‖w - ρ‖ := by
+    have := (hpos ρ hρA).trans_le (hρ ρ hρA)
+    exact pos_of_mul_pos_right this hd0.le
+  obtain ⟨hgw, hgl⟩ := hg w hwb
+  have hnorm : ‖f z‖ = (∏ ρ ∈ A, ‖w - ρ‖ ^ n ρ) * ‖g w‖ := by
+    rw [hzw]
+    change ‖f' w‖ = _
+    rw [hfac w, norm_mul, norm_prod]
+    simp only [norm_pow]
+  have hprod : 0 < ∏ ρ ∈ A, ‖w - ρ‖ ^ n ρ := Finset.prod_pos fun ρ hρ ↦ pow_pos (hwρ ρ hρ) _
+  have hgw0 : 0 < ‖g w‖ := norm_pos_iff.mpr hgw
+  refine ⟨norm_pos_iff.mp (hnorm ▸ mul_pos hprod hgw0), ?_⟩
+  rw [hnorm, Real.log_mul hprod.ne' hgw0.ne',
+    Real.log_prod (fun ρ hρ ↦ (pow_pos (hwρ ρ hρ) _).ne')]
+  have hlogd : 0 ≤ Real.log d := Real.log_nonneg hd
+  have hsum' : -∑ ρ ∈ A, (n ρ : ℝ) * (max 0 (-Real.log |t - (c.im + d * ρ.im)|) + Real.log d) ≤
+      ∑ ρ ∈ A, Real.log (‖w - ρ‖ ^ n ρ) := by
+    rw [← Finset.sum_neg_distrib]
+    apply Finset.sum_le_sum
+    intro ρ hρA
+    rw [Real.log_pow, ← mul_neg]
+    apply mul_le_mul_of_nonneg_left _ (Nat.cast_nonneg _)
+    have h1 : Real.log |t - (c.im + d * ρ.im)| ≤ Real.log d + Real.log ‖w - ρ‖ := by
+      rw [← Real.log_mul hd0.ne' (hwρ ρ hρA).ne']
+      exact Real.log_le_log (hpos ρ hρA) (hρ ρ hρA)
+    have h2 : -max 0 (-Real.log |t - (c.im + d * ρ.im)|) ≤ Real.log |t - (c.im + d * ρ.im)| := by
+      rw [neg_le]; exact le_max_right _ _
+    linarith
+  have hsplit : ∑ ρ ∈ A, (n ρ : ℝ) * (max 0 (-Real.log |t - (c.im + d * ρ.im)|) + Real.log d) =
+      ∑ ρ ∈ A, (n ρ : ℝ) * max 0 (-Real.log |t - (c.im + d * ρ.im)|) +
+        (∑ ρ ∈ A, (n ρ : ℝ)) * Real.log d := by
+    rw [Finset.sum_mul, ← Finset.sum_add_distrib]
+    exact Finset.sum_congr rfl fun _ _ ↦ by ring
+  set N : ℝ := ∑ ρ ∈ A, (n ρ : ℝ)
+  have hratio : Real.log (M / ‖f c‖) ≤ Real.log (M / δ) :=
+    Real.log_le_log (by positivity) (div_le_div_of_nonneg_left (by linarith) hδ hfc)
+  have hk1 : 0 < Real.log (6 / 5 : ℝ) := Real.log_pos (by norm_num)
+  have hk2 : 0 ≤ 8 + 9 * (Real.log 5 / Real.log (6 / 5 : ℝ)) := by
+    have := Real.log_nonneg (by norm_num : (1 : ℝ) ≤ 5)
+    positivity
+  have hN' : N ≤ Real.log (M / δ) / Real.log (6 / 5 : ℝ) :=
+    hN.trans (div_le_div_of_nonneg_right hratio hk1.le)
+  have hN2 : (2 + Real.log d) * N ≤
+      (2 + Real.log d) / Real.log (6 / 5 : ℝ) * Real.log (M / δ) := by
+    rw [div_mul_eq_mul_div, mul_div_assoc]
+    exact mul_le_mul_of_nonneg_left hN' (by linarith)
+  have hlogfc : Real.log δ ≤ Real.log ‖f c‖ := Real.log_le_log hδ hfc
+  have := mul_le_mul_of_nonneg_left hratio hk2
+  nlinarith
+
+/-- The final estimate: a lower bound for `log φ` linear in `log X` bounds `q / φ` by a
+power of `1 + |t|` when `X` is comparable to `1 + |t|`. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_estimate {q φ X E t κ P A : ℝ}
+    {n m : ℕ} (hX1 : 1 ≤ X) (hq : q ≤ X ^ n) (hφ : 0 < φ)
+    (hlog : -A - Real.log X * (κ * P) ≤ Real.log φ) (hm : (n : ℝ) + κ * P ≤ m)
+    (hXt : X ≤ 2 * E * (1 + |t|)) :
+    q * φ⁻¹ ≤ Real.exp A * (2 * E) ^ m * (1 + |t|) ^ m := by
+  have hX0 : 0 < X := by linarith
+  have hfinv : φ⁻¹ ≤ Real.exp A * X ^ (κ * P) := by
+    rw [Real.rpow_def_of_pos hX0, ← Real.exp_add, ← Real.exp_log hφ, ← Real.exp_neg]
+    apply Real.exp_le_exp.mpr
+    linarith
+  calc q * φ⁻¹ ≤ X ^ n * (Real.exp A * X ^ (κ * P)) :=
+        mul_le_mul hq hfinv (inv_nonneg.mpr hφ.le) (by positivity)
+    _ = Real.exp A * X ^ ((n : ℝ) + κ * P) := by
+      rw [Real.rpow_add hX0, Real.rpow_natCast]; ring
+    _ ≤ Real.exp A * X ^ (m : ℝ) := by gcongr
+    _ = Real.exp A * X ^ m := by rw [Real.rpow_natCast]
+    _ ≤ Real.exp A * (2 * E * (1 + |t|)) ^ m := by gcongr
+    _ = Real.exp A * (2 * E) ^ m * (1 + |t|) ^ m := by rw [mul_pow]; ring
+
+/-- Every unit interval at large absolute height contains a height on which the
+continuation is analytic, nonzero and has polynomially bounded reciprocal on `[a, b]`. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_heights (χ : U𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ s : right(1), L s = finiteHeckeL χ s) (a b : ℝ) :
+    ∃ (C H₀ : ℝ) (m : ℕ), 0 < C ∧ ∀ H : ℝ, H₀ ≤ |H| → ∃ t ∈ Ioo H (H + 1), ∀ σ ∈ Icc a b,
+      AnalyticAt ℂ L ⟨σ, t⟩ ∧ L ⟨σ, t⟩ ≠ 0 ∧ ‖(L ⟨σ, t⟩)⁻¹‖ ≤ C * (1 + |t|) ^ m := by
+  classical
+  obtain ⟨f, Z, hf, hfeq⟩ := introTrace_finiteL_inv_horizontal_growth_entire χ L hL hSeries
+  set d : ℝ := |a| + |b| + 1 with hd
+  have hd1 : 1 ≤ d := by have := abs_nonneg a; have := abs_nonneg b; linarith
+  obtain ⟨M₀, hM₀, hO⟩ := finiteHeckeL_continuation_isBigO_rpow χ L hL hSeries
+    (3 / 2 - 6 * d) (3 / 2 + 6 * d) (by linarith)
+  obtain ⟨C₀, hC₀, hC₀'⟩ := Asymptotics.isBigO_iff'.mp hO
+  rw [eventually_inf_principal, eventually_comap, eventually_atTop] at hC₀'
+  obtain ⟨T₁, hT₁⟩ := hC₀'
+  have hLbd (z : ℂ) (hre : z.re ∈ Icc (3 / 2 - 6 * d) (3 / 2 + 6 * d)) (him : T₁ ≤ |z.im|) :
+      ‖L z‖ ≤ C₀ * |z.im| ^ M₀ := by
+    have h := hT₁ |z.im| him z rfl hre
+    rwa [Real.norm_of_nonneg (Real.rpow_nonneg (abs_nonneg _) _)] at h
+  set R : ℝ := ∑ p ∈ Z, ‖p‖ with hR
+  have hR0 : 0 ≤ R := Finset.sum_nonneg fun _ _ ↦ norm_nonneg _
+  have hpR (p : ℂ) (hp : p ∈ Z) : ‖p‖ ≤ R :=
+    Finset.single_le_sum (f := fun p ↦ ‖p‖) (fun _ _ ↦ norm_nonneg _) hp
+  have hQlow (z : ℂ) (hz : R + 1 ≤ |z.im|) : z ∉ Z ∧ 1 ≤ ‖∏ p ∈ Z, (z - p)‖ := by
+    have hzp (p : ℂ) (hp : p ∈ Z) : 1 ≤ ‖z - p‖ := by
+      have h1 := Complex.abs_im_le_norm (z - p)
+      have h2 := Complex.abs_im_le_norm p
+      rw [Complex.sub_im] at h1
+      have h3 := abs_sub_abs_le_abs_sub z.im p.im
+      linarith [hpR p hp]
+    refine ⟨fun hzZ ↦ ?_, ?_⟩
+    · have := hzp z hzZ
+      rw [sub_self, norm_zero] at this
+      norm_num at this
+    · rw [norm_prod]
+      exact Finset.one_le_prod₀ fun p hp ↦ hzp p hp
+  have hQup (z : ℂ) : ‖∏ p ∈ Z, (z - p)‖ ≤ (‖z‖ + R) ^ Z.card := by
+    rw [norm_prod, ← Finset.prod_const]
+    apply Finset.prod_le_prod₀ (fun _ _ ↦ norm_nonneg _)
+    intro p hp
+    exact (norm_sub_le z p).trans (by linarith [hpR p hp])
+  set n : ℕ := Z.card with hn
+  set E : ℝ := 3 + 12 * d + R with hE
+  have hE1 : 1 ≤ E := by linarith
+  set ζ : ℝ := ‖dedekindZeta F (3 / 2 : ℝ)‖ with hζ
+  have hLlow (z : ℂ) (hz : z.re = 3 / 2) : 1 ≤ ‖L z‖ * ζ := by
+    have hs : z ∈ right(1) := show 1 < z.re by rw [hz]; norm_num
+    rw [show L z = finiteHeckeL χ ⟨z, hs⟩ from hSeries ⟨z, hs⟩]
+    exact (finiteHeckeL_zeroFreeRegion_euler F χ ⟨z, hs⟩ (y := 3 / 2) (by norm_num)
+      (by rw [show ((⟨z, hs⟩ : right(1)) : ℂ) = z from rfl, hz])).2
+  have hζ0 : 0 < ζ := by
+    have h := hLlow ⟨3 / 2, 0⟩ rfl
+    rcases (norm_nonneg (dedekindZeta F (3 / 2 : ℝ))).lt_or_eq with h' | h'
+    · exact h'
+    · rw [← hζ] at h'; rw [← h', mul_zero] at h; norm_num at h
+  set δ : ℝ := 1 / ζ with hδ
+  have hδ0 : 0 < δ := by positivity
+  set C₁ : ℝ := max C₀ 1 with hC₁
+  have hC₁1 : 1 ≤ C₁ := le_max_right _ _
+  set P : ℝ := (n : ℝ) + M₀ with hP
+  have hP0 : 0 ≤ P := by positivity
+  set κ : ℝ := (8 + 9 * (Real.log 5 / Real.log (6 / 5 : ℝ))) +
+    (2 + Real.log d) / Real.log (6 / 5 : ℝ) with hκ
+  have hκ0 : 0 ≤ κ := by
+    have := Real.log_nonneg (by norm_num : (1 : ℝ) ≤ 5)
+    have := Real.log_nonneg hd1
+    have : 0 < Real.log (6 / 5 : ℝ) := Real.log_pos (by norm_num)
+    positivity
+  set m : ℕ := ⌈(n : ℝ) + κ * P⌉₊ with hm
+  refine ⟨Real.exp (8 - Real.log δ + κ * (Real.log C₁ - Real.log δ)) * (2 * E) ^ m,
+    max (T₁ + 6 * d + 1) (R + 6 * d + 2), m, by positivity,
+    fun H hH ↦ ?_⟩
+  have hHT : T₁ + 6 * d + 1 ≤ |H| := (le_max_left _ _).trans hH
+  have hHR : R + 6 * d + 2 ≤ |H| := (le_max_right _ _).trans hH
+  set X : ℝ := E * (|H| + 1) with hX
+  have hX1 : 1 ≤ X := by
+    have : 1 ≤ |H| + 1 := by linarith [abs_nonneg H]
+    nlinarith
+  have hX0 : 0 < X := by linarith
+  set c : ℂ := ⟨3 / 2, H + 1 / 2⟩ with hc
+  set M : ℝ := C₁ * X ^ P with hM
+  have hXP : 1 ≤ X ^ P := Real.one_le_rpow hX1 hP0
+  have hM1 : 1 ≤ M := one_le_mul_of_one_le_of_one_le hC₁1 hXP
+  -- norms on a neighbourhood of the centre
+  have hnormz (z : ℂ) (hre : |z.re| ≤ 3 / 2 + 6 * d) (him : |z.im - (H + 1 / 2)| ≤ 6 * d) :
+      ‖z‖ + R ≤ X ∧ |z.im| ≤ X ∧ |H| - 1 / 2 - 6 * d ≤ |z.im| := by
+    have h1 := Complex.norm_le_abs_re_add_abs_im z
+    have h2 : |z.im| ≤ |H| + 1 / 2 + 6 * d := by
+      have := abs_sub_abs_le_abs_sub z.im (H + 1 / 2)
+      have := abs_add_le H (1 / 2)
+      rw [abs_of_pos (by norm_num : (0 : ℝ) < 1 / 2)] at this
+      linarith
+    have h3 : |H| - 1 / 2 - 6 * d ≤ |z.im| := by
+      have := abs_sub_abs_le_abs_sub (H + 1 / 2) z.im
+      rw [abs_sub_comm] at this
+      have := abs_sub_abs_le_abs_sub H (-(1 / 2))
+      rw [sub_neg_eq_add, abs_neg, abs_of_pos (by norm_num : (0 : ℝ) < 1 / 2)] at this
+      linarith
+    have hEX : |H| + E ≤ X := by
+      rw [hX]; nlinarith [abs_nonneg H]
+    refine ⟨?_, ?_, h3⟩ <;> linarith
+  have hsph : ∀ z ∈ Metric.sphere c (6 * d), ‖f z‖ ≤ M := by
+    intro z hz
+    rw [mem_sphere_iff_norm] at hz
+    have hre := Complex.abs_re_le_norm (z - c)
+    have him := Complex.abs_im_le_norm (z - c)
+    rw [hz, Complex.sub_re] at hre
+    rw [hz, Complex.sub_im] at him
+    have hcre : c.re = 3 / 2 := rfl
+    have hcim : c.im = H + 1 / 2 := rfl
+    rw [hcre] at hre
+    rw [hcim] at him
+    have hre' : |z.re| ≤ 3 / 2 + 6 * d := by
+      have := abs_sub_abs_le_abs_sub z.re (3 / 2)
+      rw [abs_of_pos (by norm_num : (0 : ℝ) < 3 / 2)] at this
+      linarith
+    obtain ⟨hn1, hn2, hn3⟩ := hnormz z hre' him
+    obtain ⟨hzZ, -⟩ := hQlow z (by linarith)
+    obtain ⟨-, hfz⟩ := hfeq z hzZ
+    rw [hfz, norm_mul]
+    have hzre : z.re ∈ Icc (3 / 2 - 6 * d) (3 / 2 + 6 * d) := by
+      constructor <;> linarith [(abs_le.mp hre).1, (abs_le.mp hre).2]
+    have hLz := hLbd z hzre (by linarith)
+    have hLz' : ‖L z‖ ≤ C₁ * X ^ M₀ :=
+      hLz.trans (mul_le_mul (le_max_left _ _)
+        (Real.rpow_le_rpow (abs_nonneg _) hn2 hM₀.le) (by positivity) (by positivity))
+    have hQz : ‖∏ p ∈ Z, (z - p)‖ ≤ X ^ n :=
+      (hQup z).trans (pow_le_pow_left₀ (by positivity) hn1 n)
+    calc ‖∏ p ∈ Z, (z - p)‖ * ‖L z‖ ≤ X ^ n * (C₁ * X ^ M₀) := by gcongr
+      _ = M := by
+        rw [hM, hP, Real.rpow_add hX0, Real.rpow_natCast]; ring
+  have hfc : δ ≤ ‖f c‖ := by
+    obtain ⟨hcZ, hQc⟩ := hQlow c (by
+      have := hnormz c (by rw [show c.re = 3 / 2 from rfl, abs_of_pos (by norm_num)]; linarith)
+        (by rw [show c.im = H + 1 / 2 from rfl, sub_self, abs_zero]; linarith)
+      linarith [this.2.2])
+    obtain ⟨-, hfz⟩ := hfeq c hcZ
+    rw [hfz, norm_mul]
+    have hLc : δ ≤ ‖L c‖ := by
+      rw [hδ, div_le_iff₀ hζ0]; exact hLlow c rfl
+    calc δ = 1 * δ := (one_mul δ).symm
+      _ ≤ _ := by gcongr
+  obtain ⟨t, ht, hgood⟩ :=
+    introTrace_finiteL_inv_horizontal_growth_disk (H := H) hf hd1 hδ0 hfc hM1 hsph
+  refine ⟨t, ht, fun σ hσ ↦ ?_⟩
+  set z : ℂ := ⟨σ, t⟩ with hz
+  have hzt : z.im = t := rfl
+  have hzre : |z.re| ≤ |a| + |b| := by
+    change |σ| ≤ _
+    rcases abs_le.mp (le_refl |a|) with ⟨-, -⟩
+    have h1 := neg_abs_le a
+    have h2 := le_abs_self b
+    rw [abs_le]; constructor <;> linarith [hσ.1, hσ.2, abs_nonneg a, abs_nonneg b]
+  have htH : |t - (H + 1 / 2)| ≤ 1 / 2 := abs_le.mpr ⟨by linarith [ht.1], by linarith [ht.2]⟩
+  have hzball : z ∈ Metric.closedBall c (3 * d) := by
+    rw [Metric.mem_closedBall, dist_eq_norm]
+    refine (Complex.norm_le_abs_re_add_abs_im _).trans ?_
+    rw [Complex.sub_re, Complex.sub_im, show c.re = 3 / 2 from rfl, show c.im = H + 1 / 2 from rfl,
+      hzt]
+    have := abs_sub (z.re) (3 / 2)
+    rw [abs_of_pos (by norm_num : (0 : ℝ) < 3 / 2)] at this
+    linarith
+  obtain ⟨hfz0, hlog⟩ := hgood z hzball hzt
+  obtain ⟨hn1, hn2, hn3⟩ := hnormz z (by linarith) (by rw [hzt]; linarith)
+  obtain ⟨hzZ, -⟩ := hQlow z (by linarith)
+  obtain ⟨hLan, hfz⟩ := hfeq z hzZ
+  have hQz0 : ∏ p ∈ Z, (z - p) ≠ 0 := Finset.prod_ne_zero_iff.mpr fun p hp ↦
+    sub_ne_zero.mpr fun h ↦ hzZ (h ▸ hp)
+  have hLz0 : L z ≠ 0 := fun h ↦ hfz0 (by rw [hfz, h, mul_zero])
+  refine ⟨hLan, hLz0, ?_⟩
+  have hfpos : 0 < ‖f z‖ := norm_pos_iff.mpr hfz0
+  have hinv : ‖(L z)⁻¹‖ = ‖∏ p ∈ Z, (z - p)‖ * ‖f z‖⁻¹ := by
+    rw [hfz, norm_inv, norm_mul, mul_inv, ← mul_assoc, mul_inv_cancel₀ (norm_ne_zero_iff.mpr hQz0),
+      one_mul]
+  have hQz : ‖∏ p ∈ Z, (z - p)‖ ≤ X ^ n :=
+    (hQup z).trans (pow_le_pow_left₀ (by positivity) hn1 n)
+  -- the lower bound in exponential form
+  have hlogM : Real.log (M / δ) = Real.log C₁ - Real.log δ + P * Real.log X := by
+    rw [Real.log_div (by positivity) hδ0.ne', hM, Real.log_mul (by positivity) (by positivity),
+      Real.log_rpow hX0]
+    ring
+  have hlog' : -(8 - Real.log δ + κ * (Real.log C₁ - Real.log δ)) - Real.log X * (κ * P) ≤
+      Real.log ‖f z‖ := by
+    rw [hlogM] at hlog
+    have e : κ * (Real.log C₁ - Real.log δ + P * Real.log X) =
+        κ * (Real.log C₁ - Real.log δ) + Real.log X * (κ * P) := by ring
+    linarith
+  have hexp : (n : ℝ) + κ * P ≤ (m : ℝ) := Nat.le_ceil _
+  have hXt : X ≤ 2 * E * (1 + |t|) := by
+    have hHt : |H| ≤ |t| + 1 := by
+      have := abs_sub_abs_le_abs_sub H t
+      have : |H - t| ≤ 1 := abs_le.mpr ⟨by linarith [ht.2], by linarith [ht.1]⟩
+      linarith
+    have hEt : 0 ≤ E * |t| := mul_nonneg (by linarith) (abs_nonneg t)
+    calc X = E * (|H| + 1) := rfl
+      _ ≤ E * (|t| + 2) := mul_le_mul_of_nonneg_left (by linarith) (by linarith)
+      _ = 2 * E * (1 + |t|) - E * |t| := by ring
+      _ ≤ 2 * E * (1 + |t|) := by linarith
+  rw [hinv]
+  exact introTrace_finiteL_inv_horizontal_growth_estimate hX1 hQz hfpos hlog'
+    hexp hXt
+
+/-- The statement of `introTrace_finiteL_inv_horizontal_growth` for any continuation. -/
+private theorem introTrace_finiteL_inv_horizontal_growth_of_continuation (χ : U𝔽) (L : ℂ → ℂ)
+    (hL : MeromorphicNFOn L univ)
+    (hSeries : ∀ s : right(1), L s = finiteHeckeL χ s) (a b : ℝ) :
+    ∃ (T : ℤ → ℝ) (C : ℝ) (m : ℕ), 0 < C ∧ Tendsto T atTop atTop ∧ Tendsto T atBot atBot ∧
+      ∀ k : ℤ, ∀ σ ∈ Icc a b,
+        meromorphicOrderAt L ⟨σ, T k⟩ = 0 ∧ ‖(L ⟨σ, T k⟩)⁻¹‖ ≤ C * (1 + |T k|) ^ m := by
+  obtain ⟨C, H₀, m, hC, hgood⟩ :=
+    introTrace_finiteL_inv_horizontal_growth_heights χ L hL hSeries a b
+  obtain ⟨K₀, hK₀⟩ := exists_nat_ge H₀
+  let φ : ℤ → ℤ := fun k ↦ if (K₀ : ℤ) ≤ |k| then k else K₀
+  have hφ (k : ℤ) : H₀ ≤ |((φ k : ℤ) : ℝ)| := by
+    dsimp only [φ]
+    split_ifs with h
+    · have h' : ((K₀ : ℤ) : ℝ) ≤ ((|k| : ℤ) : ℝ) := by exact_mod_cast h
+      rw [Int.cast_abs] at h'
+      push_cast at h'
+      linarith
+    · push_cast
+      rw [abs_of_nonneg (Nat.cast_nonneg _)]
+      exact hK₀
+  have hφeq (k : ℤ) (hk : (K₀ : ℤ) ≤ |k|) : φ k = k := ite_eq_left hk
+  choose T hT hTgood using fun k ↦ hgood (φ k) (hφ k)
+  refine ⟨T, C, m, hC, ?_, ?_, fun k σ hσ ↦ ?_⟩
+  · refine tendsto_atTop_mono' atTop ?_ (tendsto_intCast_atTop_atTop (R := ℝ))
+    filter_upwards [eventually_ge_atTop (K₀ : ℤ)] with k hk
+    have h1 := (hT k).1
+    rw [hφeq k (hk.trans (le_abs_self k))] at h1
+    exact h1.le
+  · refine tendsto_atBot_mono' atBot ?_
+      (tendsto_atBot_add_const_right _ 1
+        ((tendsto_intCast_atBot_iff (R := ℝ) (f := id)).mpr tendsto_id))
+    filter_upwards [eventually_le_atBot (-(K₀ : ℤ))] with k hk
+    have h1 := (hT k).2
+    rw [hφeq k ((le_neg.mpr hk).trans (neg_le_abs k))] at h1
+    exact h1.le
+  · obtain ⟨han, hne, hbd⟩ := hTgood k σ hσ
+    refine ⟨?_, hbd⟩
+    rw [han.meromorphicOrderAt_eq, han.analyticOrderAt_eq_zero.mpr hne]
+    rfl
+
 /-- Paper: §1.4.7, p. 31. On both tails there are horizontal edges of
 growing contour boxes on which the reciprocal finite L-function is regular,
 nonzero, and polynomially bounded uniformly along the edge.
@@ -3603,7 +4129,10 @@ theorem introTrace_finiteL_inv_horizontal_growth (χ : U𝔽) (a b : ℝ) (_hab 
     ∃ (T : ℤ → ℝ) (C : ℝ) (m : ℕ), 0 < C ∧ Tendsto T atTop atTop ∧ Tendsto T atBot atBot ∧
       ∀ k : ℤ, ∀ σ ∈ Icc a b,
         meromorphicOrderAt finiteL(χ) ⟨σ, T k⟩ = 0 ∧
-          ‖(finiteL(χ) ⟨σ, T k⟩)⁻¹‖ ≤ C * (1 + |T k|) ^ m := by sorry
+          ‖(finiteL(χ) ⟨σ, T k⟩)⁻¹‖ ≤ C * (1 + |T k|) ^ m := by
+  exact introTrace_finiteL_inv_horizontal_growth_of_continuation χ _
+    (finiteHeckeL_exists_continuation χ).choose_spec.1
+    (finiteHeckeL_exists_continuation χ).choose_spec.2 a b
 
 end Boundary
 

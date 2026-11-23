@@ -224,7 +224,7 @@ def NormOneCharacterUnramifiedOutside (ω : PontryaginDual C₁)
 /-- An idele class character unramified outside `S` takes the same value at an idele that is
 a unit outside `S` and at the reinsertion of its `S`-coordinates. The two differ by a family of
 local integer units outside `S`, on which the character is trivial by continuity. -/
-private theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
+theorem normOneCharacterUnramifiedOutside_iff_reinsert (c : unramifiedOutside F S)
     (u : (integralAdelesOutside F S)ˣ) :
     c.val (QuotientGroup.mk (integralIdeleInsertion F S u)) =
       c.val (QuotientGroup.mk (sIdeleInsertion F S
@@ -2424,10 +2424,7 @@ theorem globalThetaKernel_eq_induced_closure :
       (globalThetaKernel_eq_induced_closure_translate p.1 p.2 c).symm).trans
         (adelicThetaLinearMap_apply (F := F) _).symm))
 
-local notation "unitAtₛ(" S ")" =>
-  MonoidHom.comp (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
-    (Subring.subtype (integralAdelesOutside F S)))))
-    (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S)))
+local notation "unitAtₛ(" S ")" => sUnitEmbedding F S
 
 /-- A quotient by a smaller submodule maps onto the quotient by a larger one, compatibly
 with the quotient maps. -/

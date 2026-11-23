@@ -3430,8 +3430,7 @@ private theorem sLocalPrincipalValue_homogeneous_comm {S₀ : Finset Places}
 private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     (h₀ : S₀ ⊆ S) (hn : S₀.Nonempty)
     (hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F)))
-    (χ : PontryaginDual C𝔽) (hχ : globalUnitary(χ) ∈ unramifiedOutside F S₀) (f : ℬₛ) :
-    let hS : globalUnitary(χ) ∈ unramifiedOutside F S := outsideS(h₀, hχ)
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
     let ω := globalNormOne(χ)
     let hω : NormOneCharacterUnramifiedOutside ω S := ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
     let ωₛ := sLocalNormOneCharacter S ω hω
@@ -3439,7 +3438,7 @@ private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     let π := sLocalHomogeneousThetaToGlobal hω
     x ∈ (sLocalHomogeneousThetaPrincipalValue h₀ ωₛ).range ↔
       ∃ g : ℬ𝔽, (K𝔽(ω)).mkQ (adelePrincipalValue F S₀ g) = π x := by
-  intro hS ω hω ωₛ x π
+  intro ω hω ωₛ x π
   obtain ⟨e, he⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified hPic hω
   have heπ (z) : e z = π z := LinearMap.congr_fun he z
   let L := sAdeleSchwartzToGlobal F S
@@ -3460,6 +3459,25 @@ private theorem sLocalPrincipalValue_tfae_three_four {S₀ : Finset Places}
     refine ⟨Q u, e.injective ?_⟩
     exact (heπ _).trans ((hcomm u).trans
       ((sLocalPrincipalValue_global_congr ω (L u) g hu).trans (hg.trans (heπ x).symm)))
+
+/-- Vanishing of the selected highest coefficients gives a principal-value preimage
+on the component of a character unramified outside the ambient set of places. -/
+theorem sLocalPrincipalValue_mem_range_of_coeff_eq_zero {T : Finset Places}
+    (hT : T ⊆ S) (hn : T.Nonempty)
+    (hPic : Subsingleton (CommRing.Pic ((S : Set Places).integer F)))
+    (χ : PontryaginDual C𝔽) (hS : globalUnitary(χ) ∈ unramifiedOutside F S) (f : ℬₛ) :
+    let hω : NormOneCharacterUnramifiedOutside (globalNormOne(χ)) S :=
+      ⟨⟨globalUnitary(χ), hS⟩, fun _ ↦ rfl⟩
+    let ωₛ := sLocalNormOneCharacter S (globalNormOne(χ)) hω
+    (∀ c : Xₛ, onComponent(c, ωₛ) → 0 < sLocalFinitePoleMultiplicity T c →
+      ∀ k : ℕ, sLocalRhoPoleOrder c - sLocalFinitePoleMultiplicity T c < k →
+      k ≤ sLocalRhoPoleOrder c → sLocalPrincipalPartCoeff c k f = 0) →
+    (Kₛ(ωₛ)).mkQ f ∈ (sLocalHomogeneousThetaPrincipalValue hT ωₛ).range := by
+  intro hω ωₛ hf
+  apply (sLocalPrincipalValue_tfae_three_four hT hn hPic χ hS f).mpr
+  rw [sLocalHomogeneousThetaToGlobal_mk hω f]
+  exact (sLocalPrincipalValue_two_four hT χ hS (sAdeleSchwartzToGlobal F S f)).mp
+    ((sLocalPrincipalValue_tfae_one_two hT χ hS f).mp hf)
 
 open Classical in
 /-- Paper: Proposition 7.2.2.1, p. 339.
@@ -3491,7 +3509,7 @@ theorem sLocalPrincipalValue_tfae {S₀ : Finset Places} (h₀ : S₀ ⊆ S) (_h
     ] := by
   intro hS ω hω ωₛ x π Z
   tfae_have 1 ↔ 2 := sLocalPrincipalValue_tfae_one_two h₀ χ hS f
-  tfae_have 3 ↔ 4 := sLocalPrincipalValue_tfae_three_four h₀ _hn _hPic χ hχ f
+  tfae_have 3 ↔ 4 := sLocalPrincipalValue_tfae_three_four h₀ _hn _hPic χ hS f
   tfae_have 2 ↔ 4 := by
     have hπ : π x = (K𝔽(ω)).mkQ (sAdeleSchwartzToGlobal F S f) :=
       sLocalHomogeneousThetaToGlobal_mk hω f

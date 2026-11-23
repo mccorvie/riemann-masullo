@@ -298,7 +298,7 @@ section StripDiagonalProof
 open Topology
 open scoped ENNReal Pointwise
 attribute [local instance] instSpectralQuotientPolynormableSec3
-local notation "logNorm" => (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "logNorm" => (logIdeleClassNorm F)
 
 /-- Transfer the weighted smooth diagonal integral back to Haar measure. -/
 private theorem stripDiagonal_withDensity {G : Type*} [CommGroup G] [TopologicalSpace G]

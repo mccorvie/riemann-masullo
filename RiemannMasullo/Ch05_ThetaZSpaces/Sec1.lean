@@ -979,7 +979,8 @@ theorem globalThetaMellin_injective : Injective (globalThetaMellin (F := F)) := 
     adelicTheta f g * ((χ g : ℂ) * _ ^ (2 : ℂ))
   rw [one_mul, mul_right_comm, mul_assoc]
 
-private theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
+/-- Positive real part gives a regular S-local order bound on the unitary chart. -/
+theorem sLocalOrderBound_positive (χ : PontryaginDual Jₛ) {s : ℂ} (hs : 0 < s.re) :
     0 ≤ sLocalIdelicOrderBound (unitaryₛ(χ) s) := by
   rw [sLocalOrderBound_chart, le_min_iff]
   have h := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0 s hs

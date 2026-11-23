@@ -1723,7 +1723,7 @@ private theorem dual_schwartzBruhat_basis {H : Type*} [CommGroup H] [Topological
   exact ⟨h, absolute_of_barrelled_nuclear schwartzBruhat_strongDual_nuclear h⟩
 
 /-- On the infinite cyclic group the maximal elementary stage is the integer lattice. -/
-private theorem integer_schwartz_sequence :
+theorem integer_schwartz_sequence :
     ∃ A : RapidDecaySequence 1 ≃L[ℂ] SchwartzBruhat (Multiplicative ℤ),
       ∀ s (k : ℤ), A s (Multiplicative.ofAdd k) = s (fun _ ↦ k) := by
   let H := Multiplicative ℤ

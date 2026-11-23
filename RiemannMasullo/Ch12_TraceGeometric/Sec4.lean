@@ -39,9 +39,7 @@ local notation "Aₛ" => SAdeleRing F S
 local notation "Iₛ" => (SAdeleRing F S)ˣ
 local notation "Jₛ" => SIdeleQuotient F S
 local notation "C𝔽" => IdeleClassGroup (𝓞 F) F
-local notation "Hₛ" =>
-  Subgroup.map (Units.map ((adeleProjection F S).comp (integralAdelesOutside F S).subtype).toMonoidHom)
-    (Units.map (integralAdeleDiagonal F S).toMonoidHom).range
+local notation "Hₛ" => sProjectedDiagonal F S
 local notation "classAtS(" g ")" => (QuotientGroup.mk (sIdeleInsertion F S g) : C𝔽)
 local notation "modS(" x ")" => ((∏ w : InfinitePlace F, ‖(x : Aₛ).1 w‖ ^ w.mult) *
   ∏ v : S, ‖(x : Aₛ).2 v‖)

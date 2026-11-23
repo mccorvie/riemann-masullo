@@ -1230,20 +1230,54 @@ def Printed.spectralStripMellinJet_norm_le : Prop :=
             C * (∏ n ∈ Finset.range N, ((i : ℝ) - (n : ℝ))) / ‖shift(b, t)‖ ^ N
 
 /-- Paper: Theorem 10.3.2.1, (10.3.2.10)–(11), p. 455.
-Over `F = ℚ` the pointwise bound of the theorem is asserted at every zero of the completed
-Hecke L-function in the strip. The trivial norm-one character therefore needs one zero of
-the completed zeta function at `1/2 + t * I` with `t ≠ 0`.
-
-Missing input: this is the single-instance form of Hardy's theorem, that the Riemann zeta
-function has zeros on the critical line. Nothing in this library asserts that any completed
-Hecke L-function has a zero, so the existence is not available at this base; it is the exact
-missing input of the refutation. -/
+Over ℚ, changing the basepoint of the trivial norm-one character translates its
+critical-line ordinates. At least one of the two certified simple zeros remains at a nonzero ordinate. -/
 private theorem spectralStripMellinJet_norm_le_false_exists_zero
     (χ : PontryaginDual C₁(ℚ) → PontryaginDual C𝔽(ℚ)) (hχ : IsSpectralBasepointChoice χ) :
     ∃ (ω : PontryaginDual C₁(ℚ)) (t : ℝ), t ≠ 0 ∧
       0 < orderAt(χ ω, shift(1 / 2, t)) ∧
       0 < (orderAt(χ ω, shift(1 / 2, t))).untop₀.toNat := by
-  sorry
+  obtain ⟨r, hr, -⟩ := globalConverse_existsUnique_normTwist (χ 1) (hχ 1)
+  have hgauss : adelicStandardGaussian (χ 1) = adelicStandardGaussian (1 : PontryaginDual C𝔽(ℚ)) := by
+    apply adelicStandardGaussian_eq_of_restriction
+    ext g : 1
+    have hg : (χ 1) g.val = 1 := DFunLike.congr_fun (hχ 1) g
+    change ((χ 1) g.val : ℂ) * _ ^ (0 : ℂ) = (1 : ℂ) * _ ^ (0 : ℂ)
+    simp [hg]
+  have hshift : gaussianCompletedHeckeL (χ 1) =
+      fun z ↦ gaussianCompletedHeckeL (1 : PontryaginDual C𝔽(ℚ)) (z + r * Complex.I) := by
+    funext z
+    unfold gaussianCompletedHeckeL
+    rw [hgauss]
+    exact congrArg _ (by simpa only [zero_add, add_comm ((r : ℂ) * Complex.I) z] using
+      ideleClassNormTwist_add_of_eq hr z)
+  -- Over ℚ the Gaussian normalization has discriminant factor one.
+  have horder (ψ : PontryaginDual C𝔽(ℚ)) (z : ℂ) :
+      orderAt(ψ, z) = meromorphicOrderAt (gaussianCompletedHeckeL ψ) z := by
+    have hC := continuedCompletedHeckeL_spec ψ
+    have hG := globalIdelicZFunction_meromorphic (adelicStandardGaussian ψ) ψ
+    apply meromorphicOrderAt_congr
+    apply meromorphicContinuation_eventuallyEq hC.1.meromorphicOn hG.meromorphicOn _ z
+    intro w hw
+    change continuedCompletedHeckeL ψ w = gaussianCompletedHeckeL ψ w
+    rw [hC.2 ⟨w, hw⟩, gaussianCompletedHeckeL_eq_completedHeckeL ψ w hw]
+    norm_num [Rat.numberField_discr]
+  obtain ⟨u, v, hu, huv, hv, hzeros⟩ := spectralLineBand_jetCount_le_false_low_zeros
+  obtain ⟨s, hs, hsr⟩ : ∃ s : ℝ, (s = u ∨ s = v) ∧ s ≠ r := by
+    by_cases h : u = r
+    · exact ⟨v, Or.inr rfl, by linarith⟩
+    · exact ⟨u, Or.inl rfl, h⟩
+  have hband : s ∈ Icc (-22 : ℝ) 22 := by
+    rcases hs with rfl | rfl <;> constructor <;> linarith
+  have he : shift(1 / 2, (s - r : ℝ)) + (r : ℂ) * Complex.I = shift(1 / 2, s) := by
+    push_cast
+    ring
+  have hone : orderAt(χ 1, shift(1 / 2, (s - r : ℝ))) = 1 := by
+    rw [horder, hshift, meromorphicOrderAt_fun_comp_add_const_eq_meromorphicOrderAt, he,
+      ← horder, hzeros s hband, ite_eq_left (Or.inr (Or.inr hs))]
+  refine ⟨1, s - r, sub_ne_zero.mpr hsr, ?_⟩
+  rw [hone]
+  norm_num
 
 /-- Paper: Theorem 10.3.2.1, (10.3.2.10)–(11), p. 455.
 The compact-character Mellin transform of the printed test is the quantity that the printed

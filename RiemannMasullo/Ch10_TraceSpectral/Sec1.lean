@@ -60,8 +60,8 @@ local notation "mₛ" =>
   (⟨sIdeleQuotientNorm F S, (isProperMap_sIdeleQuotientNorm F S).continuous⟩ :
     Jₛ →ₜ* ℝ≥0ˣ)
 local notation "logNorm(" m ")" => (fun g ↦ Real.log (((m) g).val : ℝ))
-local notation "W𝔽(" α ", " β ", " s ")" => CompactIntervalSobolev μ𝔽 (logNorm(m𝔽)) α β s
-local notation "Wₛ(" α ", " β ", " s ")" => CompactIntervalSobolev μₛ (logNorm(mₛ)) α β s
+local notation "W𝔽(" α ", " β ", " s ")" => CompactIntervalSobolev μ𝔽 (logIdeleClassNorm F) α β s
+local notation "Wₛ(" α ", " β ", " s ")" => CompactIntervalSobolev μₛ (logSIdeleQuotientNorm F S) α β s
 local notation "Θₛ" => SLocalAdelicThetaSpace F S
 local notation "ℬₛ" => SchwartzBruhat (Multiplicative (SAdeleRing F S))
 local notation "ℬ₀" => ↥(adelePolarSubspace F)

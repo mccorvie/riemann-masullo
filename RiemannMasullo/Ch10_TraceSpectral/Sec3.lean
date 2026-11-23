@@ -1602,7 +1602,7 @@ section StripConvolutionCoefficients
 
 variable {α s : ℝ} (hα : 0 ≤ α) (hs : 1 < s)
 
-local notation "logNorm" => (fun g : C𝔽 ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "logNorm" => (logIdeleClassNorm F)
 local notation "D" => spectralSobolevDualEmbedding F a (hStrip(hα)) hs₀(hs)
 local notation "raw(" χ ", " j ")" =>
   spectralZeroJet (F := F) (χ (j).val.1) (j).val.2.1 (j).val.2.2.1 (j).val.2.2.2
@@ -1649,7 +1649,7 @@ private theorem spectralStripConvolution_jet_translate (η : PontryaginDual C�
   let L (y : C𝔽) : ℂ := logNorm y
   let c (i : ℕ) := T g * L g ^ (m - i) * (m.choose i : ℂ)
   have hlog (y : C𝔽) : L (g * y) = L y + L g := by
-    dsimp only [L]
+    dsimp only [L, logIdeleClassNorm]
     rw [map_mul, Units.val_mul, NNReal.coe_mul, Real.log_mul
       (NNReal.coe_ne_zero.2 (ideleClassNorm F g).ne_zero)
       (NNReal.coe_ne_zero.2 (ideleClassNorm F y).ne_zero), Complex.ofReal_add, add_comm]
@@ -2183,6 +2183,10 @@ private theorem spectralStripConvolution_traceCauchy_of_compressed_diagonal
 /-- Paper: Theorem 10.3.2.1(1), pp. 453–455, after (10.3.2.7). For a fixed test,
 discard the output directions of finitely many jets. The positive square root of
 the remaining Gram operator should have uniformly small finite diagonal sums.
+By `_hb` the Riesz vectors span densely, so the complementary projections tend strongly to
+zero and compress any fixed finite-rank rectangle to zero in trace norm. In a trace-norm
+Cauchy tail, contractivity bounds each later compressed trace norm, and hence each finite
+diagonal sum, by the fixed rectangle's compressed trace norm plus the tail error.
 Gap: The scalar Mellin estimates on p. 455 do not control this sum for an
 individual rectangle, in particular when its boundary separates nearby zeros. -/
 private theorem spectralStripConvolution_traceCauchy_compressed_diagonal (χ : PontryaginDual C₁ → PontryaginDual C𝔽)

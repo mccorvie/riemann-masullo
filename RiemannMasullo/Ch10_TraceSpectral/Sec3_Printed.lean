@@ -344,7 +344,7 @@ open scoped NumberField.AdeleRing SchwartzMap Topology
 
 local notation "restrictNormOne(" F ")" =>
   (⟨(ideleClassNorm F).ker.subtype, continuous_subtype_val⟩ : C₁(F) →ₜ* C𝔽(F))
-local notation "logNorm(" F ")" => (fun g : C𝔽(F) ↦ Real.log ((ideleClassNorm F g).val : ℝ))
+local notation "logNorm(" F ")" => (logIdeleClassNorm F)
 local notation "W(" F ", " s ")" => CompactIntervalSobolev (μ𝔽(F)) logNorm(F) 0 0 s
 local notation "ρ(" F ", " hs ")" => hardySobolevTranslation (μ𝔽(F)) m𝔽(F) 0 0 _ h₀ hs
 local notation "N(" F ", " a ", " hs ")" => globalThetaSobolev F a h₀ hs

@@ -2548,14 +2548,12 @@ private theorem sLocalIdelicZetaIntegral_exists_chartContinuation (f : ℬ(Aₛ)
 unitary character, with real exponent its abscissa. -/
 private theorem sLocal_exists_chart (c : Xₛ) :
     ∃ (χ : PontryaginDual Jₛ) (s : ℂ), c = chartₛ(χ) s := by
-  have : IsClosed ((Subgroup.map (Units.map (RingHom.toMonoidHom (RingHom.comp
-      (adeleProjection F S) (Subring.subtype (integralAdelesOutside F S)))))
-      (MonoidHom.range (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S))))) :
+  have : IsClosed ((sProjectedDiagonal F S) :
         Set Iₛ) := by
     let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
     let d := p.comp (integralAdeleDiagonal F S)
     obtain ⟨hd, hc, _⟩ := sAdele_additive_quotient F S
-    rw [MonoidHom.map_range]
+    rw [sProjectedDiagonal, MonoidHom.map_range]
     exact isClosed_range_unitsMap d.toMonoidHom hd hc
   have : LocallyCompactSpace Iₛ := (sIdeleGroup_description F S).2.2.1
   have hp := isProperMap_sIdeleQuotientNorm F S
@@ -2654,10 +2652,7 @@ theorem sLocalIdelicZFunction_poles (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ) (
   rw [meromorphicOrderAt_congr heq, meromorphicOrderAt_mul (hR s) hD.meromorphicAt]
   exact (min_le_right _ _).trans (le_add_of_nonneg_right hD.meromorphicOrderAt_nonneg)
 
-local notation "diagₛ" =>
-  Subgroup.map (Units.map (RingHom.toMonoidHom (RingHom.comp (adeleProjection F S)
-    (Subring.subtype (integralAdelesOutside F S)))))
-    (MonoidHom.range (Units.map (RingHom.toMonoidHom (integralAdeleDiagonal F S))))
+local notation "diagₛ" => sProjectedDiagonal F S
 
 /-- Paper: Equation (3.1.2.1), p. 120. The projected diagonal S-units are closed in the
 S-ideles. -/
@@ -2665,7 +2660,7 @@ theorem isClosed_sProjectedDiagonal : IsClosed (diagₛ : Set Iₛ) := by
   let p := (adeleProjection F S).comp (integralAdelesOutside F S).subtype
   let d := p.comp (integralAdeleDiagonal F S)
   obtain ⟨hd, hc, _⟩ := sAdele_additive_quotient F S
-  rw [MonoidHom.map_range]
+  rw [sProjectedDiagonal, MonoidHom.map_range]
   exact isClosed_range_unitsMap d.toMonoidHom hd hc
 
 /-- Paper: Equation (3.1.2.1), p. 120. The projected diagonal S-units are discrete, since

@@ -4,6 +4,12 @@ public import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 
 import RiemannMasullo.Ch05_ThetaZSpaces.Sec1
 import RiemannMasullo.Ch03_IdelicZeta.Sec4
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec2
+import RiemannMasullo.ForMathlib.NumberTheory.NumberField.Completion.FinitePlace
+import RiemannMasullo.ForMathlib.MeasureTheory.Group.Arithmetic
+import RiemannMasullo.ForMathlib.Analysis.Normed.Field.ProperSpace
+import RiemannMasullo.ForMathlib.Analysis.Distribution.SchwartzSpace.ChangeOfVariables
+import Mathlib.Analysis.Normed.Field.ProperSpace
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 
 import RiemannMasullo.ForMathlib.Analysis.LocallyConvex.SeparatingDual
@@ -1437,13 +1443,180 @@ local notation "infiniteModule(" w ")" =>
 -- TODO(paper-gap): The proof of Proposition 5.5.3.1 identifies the weak and
 -- strong dual topologies. The needed claim is equality of closures of linear subspaces.
 
+/-- Point-separating functionals on a Montel space span its strong dual densely,
+since every separating strong-bidual functional is evaluation at a vector. -/
+private theorem finiteEigendistributions_dense_span_of_separating
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)] (T : I → StrongDual ℂ E)
+    (hsep : ∀ x : E, (∀ i, T i x = 0) → x = 0) :
+    Dense (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  let D := StrongDual ℂ E
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  let V := (Submodule.span ℂ (Set.range T)).topologicalClosure
+  rw [dense_iff_closure_eq]
+  apply Set.eq_univ_of_forall
+  intro l
+  by_contra hl
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem V
+    (Submodule.span ℂ (Set.range T)).isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x = 0 := hsep x (fun i ↦ hv (T i)
+    ((Submodule.span ℂ (Set.range T)).le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  exact hφ (by change l x = 0; rw [hx, map_zero])
+
+/-- Convergent multiplicative integrals separate finite-place tests: character
+uniqueness recovers the test off zero, and continuity recovers its value at zero. -/
+private theorem finiteEigendistributions_dense_span_separating
+    (v : HeightOneSpectrum (𝓞 F)) (f : ℬ(v.adicCompletion F))
+    (hf : ∀ T : D(ℬ(v.adicCompletion F)),
+      (∃ c : QuasiCharacter (v.adicCompletion F)ˣ, T ∈ schwartzBruhatEigendistributions c) →
+        T f = 0) : f = 0 := by
+  let K := v.adicCompletion F
+  let : NontriviallyNormedField K := Valued.toNontriviallyNormedField K _
+  let : ProperSpace K := properSpace_adicCompletion v
+  let : SecondCountableTopology Kˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : MeasurableSpace Kˣ := borel _
+  let : BorelSpace Kˣ := ⟨rfl⟩
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v
+  let : μ.IsHaarMeasure := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure v
+  let θ : C(Kˣ, ℂ) := ⟨fun u ↦ f (Multiplicative.ofAdd u.val),
+    (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp Units.continuous_val)⟩
+  let w := quasiCharacterNormTwist (finiteModule(v)) (continuous_finiteLocalModule v)
+    ((circleToComplex).comp (1 : PontryaginDual Kˣ)) 1
+  have hθ : θ = 0 := by
+    refine eq_zero_of_weighted_integrals μ θ w
+      (finiteLocalIdelicZetaIntegral_integrable v f 1 (s := 1) (by norm_num)) fun χ ↦ ?_
+    obtain ⟨D, hD, hDf⟩ := exists_finiteEigendistribution_eq_zetaIntegral v χ 1 (by norm_num)
+    have hz := (hDf f).symm.trans (hf D ⟨_, hD⟩)
+    refine (MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)).trans hz
+    change f (Multiplicative.ofAdd g.val) * (1 * _ ^ (1 : ℂ)) * (χ g : ℂ) =
+      f (Multiplicative.ofAdd g.val) * ((χ g : ℂ) * _ ^ (1 : ℂ))
+    rw [one_mul, mul_right_comm, mul_assoc]
+  have he : (fun x : K ↦ f (Multiplicative.ofAdd x)) = fun _ ↦ 0 := by
+    apply Continuous.ext_on (dense_compl_singleton (0 : K))
+      ((schwartzBruhat_continuous f).comp continuous_ofAdd) continuous_const
+    intro x hx
+    exact DFunLike.congr_fun hθ (Units.mk0 x hx)
+  apply Subtype.ext
+  exact funext fun x ↦ congrFun he x.toAdd
+
 /-- Paper: Proposition 5.5.3.1, p. 281.
 At a finite place the eigendistributions span a strongly dense subspace of the dual.
 The set of all eigenvectors gives the same span as the normalized generators of §3.4. -/
 theorem finiteEigendistributions_dense_span (v : HeightOneSpectrum (𝓞 F)) :
     Dense (Submodule.span ℂ {T : D(ℬ(v.adicCompletion F)) |
       ∃ c : QuasiCharacter (v.adicCompletion F)ˣ, T ∈ schwartzBruhatEigendistributions c} :
-      Set D(ℬ(v.adicCompletion F))) := by sorry
+      Set D(ℬ(v.adicCompletion F))) := by
+  let K := v.adicCompletion F
+  let : ProperSpace K := properSpace_adicCompletion v
+  let E := ℬ(K)
+  let : T2Space E := schwartzBruhat_t2
+  let : MontelSpace ℂ E := schwartzBruhat_montel
+  let : PolynormableSpace ℂ (StrongDual ℂ E) :=
+    (schwartzBruhat_strongDual_nuclear.{0,_} (G := Multiplicative K)).2.1
+  let I := {T : StrongDual ℂ E // ∃ c : QuasiCharacter Kˣ,
+    T ∈ schwartzBruhatEigendistributions c}
+  have hi : Set.range (fun T : I ↦ T.val) =
+      {T : StrongDual ℂ E | ∃ c : QuasiCharacter Kˣ,
+        T ∈ schwartzBruhatEigendistributions c} := Subtype.range_coe_subtype
+  rw [← hi]
+  exact finiteEigendistributions_dense_span_of_separating (fun T : I ↦ T.val)
+    (fun f hf ↦ finiteEigendistributions_dense_span_separating v f
+      (fun T hT ↦ hf ⟨T, hT⟩))
+
+/-- Point-separating functionals on a Montel space span its strong dual densely,
+since every separating strong-bidual functional is evaluation at a vector. -/
+private theorem infiniteEigendistributions_dense_span_of_separating
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)] (T : I → StrongDual ℂ E)
+    (hsep : ∀ x : E, (∀ i, T i x = 0) → x = 0) :
+    Dense (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  let D := StrongDual ℂ E
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  let V := (Submodule.span ℂ (Set.range T)).topologicalClosure
+  rw [dense_iff_closure_eq]
+  apply Set.eq_univ_of_forall
+  intro l
+  by_contra hl
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem V
+    (Submodule.span ℂ (Set.range T)).isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x = 0 := hsep x (fun i ↦ hv (T i)
+    ((Submodule.span ℂ (Set.range T)).le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  exact hφ (by change l x = 0; rw [hx, map_zero])
+
+/-- Vanishing on every infinite-place eigendistribution forces all convergent
+Mellin integrals on the line of real part one to vanish. -/
+private theorem infiniteEigendistributions_dense_span_zeta
+    (w : InfinitePlace F) (f : ℬ(w.Completion))
+    (hf : ∀ T : D(ℬ(w.Completion)),
+      (∃ c : QuasiCharacter w.Completionˣ, T ∈ schwartzBruhatEigendistributions c) → T f = 0)
+    (χ : PontryaginDual w.Completionˣ) :
+    infiniteLocalIdelicZFunction w f
+      (quasiCharacterNormTwist (infiniteModule(w)) (continuous_infiniteLocalModule w)
+        ((circleToComplex).comp χ) 1) = 0 := by
+  let D := (infiniteEigendistribution_normalized w χ).choose
+  have hD := (infiniteEigendistribution_normalized w χ).choose_spec
+  have hz (z : ℂ) : D z f = 0 := hf (D z) ⟨_, ((hD.2.1 z _).mp rfl).1⟩
+  have he : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ),
+      infiniteLocalIdelicZFunction w f
+        (quasiCharacterNormTwist (infiniteModule(w)) (continuous_infiniteLocalModule w)
+          ((circleToComplex).comp χ) z) = 0 := by
+    filter_upwards [nhdsNE_le_codiscrete (1 : ℂ) hD.2.2] with z he
+    exact (he f).trans (by rw [hz, mul_zero])
+  have hNF := ((infiniteLocalIdelicZFunction_existsUnique w f).exists.choose_spec χ).1
+    (Set.mem_univ (1 : ℂ))
+  have hzero := ((hNF.eventuallyEq_nhdsNE_iff_eventuallyEq_nhds
+    analyticAt_const.meromorphicNFAt).mp he).eq_of_nhds
+  exact hzero
+
+/-- Character uniqueness recovers an infinite-place test off zero, and continuity
+recovers its value at zero. -/
+private theorem infiniteEigendistributions_dense_span_separating
+    (w : InfinitePlace F) (f : ℬ(w.Completion))
+    (hf : ∀ T : D(ℬ(w.Completion)),
+      (∃ c : QuasiCharacter w.Completionˣ, T ∈ schwartzBruhatEigendistributions c) → T f = 0) :
+    f = 0 := by
+  let K := w.Completion
+  have htwo : 1 < ‖(2 : K)‖ := by
+    rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
+      (map_zero _) (2 : K), map_ofNat]
+    norm_num
+  let : NontriviallyNormedField K := ⟨⟨2, htwo⟩⟩
+  let : SecondCountableTopology K :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Kˣ := Units.isEmbedding_val₀.secondCountableTopology
+  let : MeasurableSpace K := borel _
+  let : BorelSpace K := ⟨rfl⟩
+  let : BorelSpace Kˣ := borelSpace_units_of_continuousInv₀ _
+  let μ := infiniteLocalMultiplicativeTamagawaMeasure F w
+  let : μ.IsHaarMeasure := infiniteLocalMultiplicativeTamagawaMeasure_haar F w
+  let θ : C(Kˣ, ℂ) := ⟨fun u ↦ f (Multiplicative.ofAdd u.val),
+    (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp Units.continuous_val)⟩
+  let c := quasiCharacterNormTwist (infiniteModule(w)) (continuous_infiniteLocalModule w)
+    ((circleToComplex).comp (1 : PontryaginDual Kˣ)) 1
+  have hθ : θ = 0 := by
+    refine eq_zero_of_weighted_integrals μ θ c
+      (infiniteLocalIdelicZetaIntegral_integrable w f 1 (s := 1) (by norm_num)) fun χ ↦ ?_
+    refine (MeasureTheory.integral_congr_ae (Filter.Eventually.of_forall fun g ↦ ?_)).trans
+      ((infiniteLocalIdelicZFunction_eq_integral w f χ (s := 1) (by norm_num)).symm.trans
+        (infiniteEigendistributions_dense_span_zeta w f hf χ))
+    change f (Multiplicative.ofAdd g.val) * (1 * _ ^ (1 : ℂ)) * (χ g : ℂ) =
+      f (Multiplicative.ofAdd g.val) * ((χ g : ℂ) * _ ^ (1 : ℂ))
+    rw [one_mul, mul_right_comm, mul_assoc]
+  have he : (fun x : K ↦ f (Multiplicative.ofAdd x)) = fun _ ↦ 0 := by
+    apply Continuous.ext_on (dense_compl_singleton (0 : K))
+      ((schwartzBruhat_continuous f).comp continuous_ofAdd) continuous_const
+    intro x hx
+    exact DFunLike.congr_fun hθ (Units.mk0 x hx)
+  apply Subtype.ext
+  exact funext fun x ↦ congrFun he x.toAdd
 
 /-- Paper: Proposition 5.5.3.1, p. 281.
 At an infinite place the eigendistributions span a strongly dense subspace of the dual.
@@ -1451,7 +1624,160 @@ The set of all eigenvectors gives the same span as the normalized generators of 
 theorem infiniteEigendistributions_dense_span (w : InfinitePlace F) :
     Dense (Submodule.span ℂ {T : D(ℬ(w.Completion)) |
       ∃ c : QuasiCharacter w.Completionˣ, T ∈ schwartzBruhatEigendistributions c} :
-      Set D(ℬ(w.Completion))) := by sorry
+      Set D(ℬ(w.Completion))) := by
+  let K := w.Completion
+  let : SecondCountableTopology K :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let E := ℬ(K)
+  let : T2Space E := schwartzBruhat_t2
+  let : MontelSpace ℂ E := schwartzBruhat_montel
+  let : PolynormableSpace ℂ (StrongDual ℂ E) :=
+    (schwartzBruhat_strongDual_nuclear.{0,_} (G := Multiplicative K)).2.1
+  let I := {T : StrongDual ℂ E // ∃ c : QuasiCharacter Kˣ,
+    T ∈ schwartzBruhatEigendistributions c}
+  have hi : Set.range (fun T : I ↦ T.val) =
+      {T : StrongDual ℂ E | ∃ c : QuasiCharacter Kˣ,
+        T ∈ schwartzBruhatEigendistributions c} := Subtype.range_coe_subtype
+  rw [← hi]
+  exact infiniteEigendistributions_dense_span_of_separating (fun T : I ↦ T.val)
+    (fun f hf ↦ infiniteEigendistributions_dense_span_separating w f
+      (fun T hT ↦ hf ⟨T, hT⟩))
+
+/-- Normalized compact averaging on tests induces a projection on functionals with
+prescribed weight. Both action conventions are recorded explicitly. -/
+private theorem finiteEigendistributions_component_closedSpan_projection
+    {G E : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [CompactSpace G] [T2Space G] [MeasurableSpace G] [BorelSpace G]
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [T2Space E]
+    [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E] [QuasiCompleteSpace ℂ E]
+    [SeparatingDual ℂ E]
+    (μ : MeasureTheory.Measure G) [μ.IsHaarMeasure]
+    (ρ : G →* (E →L[ℂ] E)) (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2)
+    (ω : PontryaginDual G) :
+    ∃ P : E →L[ℂ] E,
+      (∀ g x, P (ρ g x) = (ω g : ℂ) • P x) ∧
+      (∀ g x, ρ g (P x) = (ω g : ℂ) • P x) ∧
+      ∀ T : StrongDual ℂ E, (∀ g x, T (ρ g x) = (ω g : ℂ) * T x) → T.comp P = T := by
+  let A (g : G) := star (ω g : ℂ) • ρ g
+  have hA : Continuous (fun p : G × E ↦ A p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul hρ
+  obtain ⟨P, hP, -⟩ := existsUnique_pettisIntegral_continuousFamily μ isCompact_univ
+    (MeasureTheory.ae_of_all _ fun _ ↦ Set.mem_univ _) A hA
+  have hp : IsPettisIsotypicAverageOn μ univ ρ ω P := by
+    simpa only [IsPettisIsotypicAverageOn, MeasureTheory.Measure.restrict_univ, A, smul_apply] using hP
+  have hleft (g : G) (x : E) : ρ g (P x) = (ω g : ℂ) • P x :=
+    (mem_actionIsotype ρ ω _).mp (compactActionAverage_mem_isotype μ ρ ω P hp x) g
+  have hcomm (g : G) (x : E) : P (ρ g x) = ρ g (P x) := by
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    intro T
+    rw [compactActionAverage_dual_apply μ ρ ω P hp]
+    have h := compactActionAverage_dual_apply μ ρ ω P hp x (T.comp (ρ g))
+    refine Eq.trans ?_ h.symm
+    apply MeasureTheory.integral_congr_ae
+    filter_upwards [] with k
+    change star (ω k : ℂ) * T (ρ k (ρ g x)) = star (ω k : ℂ) * T (ρ g (ρ k x))
+    rw [← mul_apply_eq_comp, ← map_mul, mul_comm k g, map_mul, mul_apply_eq_comp]
+  let m : ℂ := μ.real univ
+  have hm : m ≠ 0 := by
+    change (μ.real univ : ℂ) ≠ 0
+    exact_mod_cast (MeasureTheory.measureReal_univ_pos (μ := μ)).ne'
+  refine ⟨m⁻¹ • P, ?_, ?_, ?_⟩
+  · intro g x
+    change m⁻¹ • P (ρ g x) = (ω g : ℂ) • (m⁻¹ • P x)
+    rw [hcomm, hleft, smul_comm]
+  · intro g x
+    change ρ g (m⁻¹ • P x) = (ω g : ℂ) • (m⁻¹ • P x)
+    rw [map_smul, hleft, smul_comm]
+  · intro T hT
+    ext x
+    have hfix : T (P x) = m * T x := by
+      rw [compactActionAverage_dual_apply μ ρ ω P hp]
+      simp [hT, ← Circle.coe_inv_eq_conj, m, Complex.real_smul]
+    change T (m⁻¹ • P x) = T x
+    rw [map_smul, hfix, smul_eq_mul, ← mul_assoc, inv_mul_cancel₀ hm, one_mul]
+
+/-- A continuous projection carries a dense generating family to a dense family
+in its closed fixed subspace. -/
+private theorem finiteEigendistributions_component_closedSpan_image
+    {D : Type*} [AddCommGroup D] [Module ℂ D] [TopologicalSpace D]
+    (A B : Set D) (R : Submodule ℂ D) (Q : D →L[ℂ] D)
+    (hd : Dense (Submodule.span ℂ A : Set D)) (hR : IsClosed (R : Set D))
+    (hB : B ⊆ R) (hQ : ∀ T ∈ A, Q T ∈ Submodule.span ℂ B)
+    (hfix : ∀ T ∈ R, Q T = T) :
+    closure (Submodule.span ℂ B : Set D) = R := by
+  have hm : Submodule.span ℂ A ≤ (Submodule.span ℂ B).comap Q.toLinearMap :=
+    Submodule.span_le.mpr hQ
+  have hrange : Set.range Q ⊆ closure (Submodule.span ℂ B : Set D) :=
+    (Q.continuous.range_subset_closure_image_dense hd).trans
+      (closure_mono (by rintro _ ⟨T, hT, rfl⟩; exact hm hT))
+  refine subset_antisymm (closure_minimal (Submodule.span_le.mpr hB) hR) ?_
+  intro T hT
+  exact (hfix T hT) ▸ hrange (Set.mem_range_self T)
+
+/-- Applying the test projection to a dense eigenfamily selects exactly the
+weights with the prescribed restriction to the subgroup. -/
+private theorem finiteEigendistributions_component_closedSpan_eigenprojection
+    {H E : Type*} [CommGroup H] [TopologicalSpace H]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    (ρ : H →* (E →L[ℂ] E)) (N : Subgroup H) (η : PontryaginDual N)
+    (P : E →L[ℂ] E)
+    (hleft : ∀ (g : N) (x : E), ρ g.val (P x) = (η g : ℂ) • P x)
+    (hfix : ∀ T : StrongDual ℂ E,
+      (∀ (g : N) (x : E), T (ρ g.val x) = (η g : ℂ) * T x) → T.comp P = T)
+    (hd : Dense (Submodule.span ℂ {T : StrongDual ℂ E | ∃ c : QuasiCharacter H,
+      ∀ (g : H) (x : E), T (ρ g x) = c g * T x} : Set (StrongDual ℂ E))) :
+    closure (Submodule.span ℂ {T : StrongDual ℂ E | ∃ c : QuasiCharacter H,
+      (∀ g : N, c g.val = (η g : ℂ)) ∧
+      (∀ (g : H) (x : E), T (ρ g x) = c g * T x)} : Set (StrongDual ℂ E)) =
+      {T | ∀ (g : N) (x : E), T (ρ g.val x) = (η g : ℂ) * T x} := by
+  classical
+  let D := StrongDual ℂ E
+  let Q : D →L[ℂ] D := ContinuousLinearMap.precomp ℂ P
+  let R : Submodule ℂ D :=
+    { carrier := {T | ∀ g : N, ∀ f : E, T (ρ g.val f) = (η g : ℂ) * T f}
+      zero_mem' := by simp
+      add_mem' := by
+        intro T U hT hU g f
+        change T (ρ g.val f) + U (ρ g.val f) = (η g : ℂ) * (T f + U f)
+        rw [hT, hU, mul_add]
+      smul_mem' := by
+        intro a T hT g f
+        change a * T (ρ g.val f) = (η g : ℂ) * (a * T f)
+        rw [hT, mul_left_comm] }
+  have hR : IsClosed (R : Set D) := by
+    change IsClosed {T : D | ∀ g : N, ∀ f : E, T (ρ g.val f) = (η g : ℂ) * T f}
+    simp only [ofPred_forall]
+    exact isClosed_iInter fun g ↦ isClosed_iInter fun f ↦ isClosed_eq
+      (continuous_eval_const (ρ g.val f)) (continuous_const.mul (continuous_eval_const f))
+  let A := {T : D | ∃ c : QuasiCharacter H, ∀ g : H, ∀ x : E, T (ρ g x) = c g * T x}
+  let B := {T : D | ∃ c : QuasiCharacter H,
+    (∀ g : N, c g.val = (η g : ℂ)) ∧ (∀ g : H, ∀ x : E, T (ρ g x) = c g * T x)}
+  have hB : B ⊆ R := by
+    rintro T ⟨c, hc, hT⟩ g f
+    exact (hT g.val f).trans (congrArg (· * T f) (hc g))
+  have hQ : ∀ T ∈ A, Q T ∈ Submodule.span ℂ B := by
+    rintro T ⟨c, hT⟩
+    by_cases hc : ∀ g : N, c g.val = (η g : ℂ)
+    · have he : Q T = T := hfix T (hB ⟨c, hc, hT⟩)
+      rw [he]
+      exact Submodule.subset_span ⟨c, hc, hT⟩
+    · push Not at hc
+      obtain ⟨g, hg⟩ := hc
+      have he : Q T = 0 := by
+        ext f
+        have hv := hT g.val (P f)
+        change T (ρ g.val (P f)) = c g.val * T (P f) at hv
+        rw [hleft, map_smul, smul_eq_mul] at hv
+        have hz : (c g.val - (η g : ℂ)) * T (P f) = 0 := by
+          rw [sub_mul, ← hv, sub_self]
+        exact (mul_eq_zero.mp hz).resolve_left (sub_ne_zero.mpr hg)
+      rw [he]
+      exact Submodule.zero_mem _
+  change closure (Submodule.span ℂ B : Set D) = (R : Set D)
+  exact finiteEigendistributions_component_closedSpan_image A B R Q
+    hd hR hB hQ (fun T hT ↦ hfix T hT)
+
 
 /-- Paper: Proposition 5.5.3.1, p. 281.
 At a finite place the closed span of eigendistributions with prescribed norm-one
@@ -1464,7 +1790,240 @@ theorem finiteEigendistributions_component_closedSpan (v : HeightOneSpectrum (�
         (∀ u : (finiteModule(v)).ker, c u.val = (ω u.val : ℂ)) ∧
           T ∈ schwartzBruhatEigendistributions c} : Set D(ℬ(v.adicCompletion F))) =
       {T | ∀ (u : (finiteModule(v)).ker) (f : ℬ(v.adicCompletion F)),
-        T (schwartzBruhatUnitTranslate u.val f) = (ω u.val : ℂ) * T f} := by sorry
+        T (schwartzBruhatUnitTranslate u.val f) = (ω u.val : ℂ) * T f} := by
+  with_reducible_and_instances
+    classical
+    let K := v.adicCompletion F
+    let H := Kˣ
+    let E := ℬ(K)
+    let D := StrongDual ℂ E
+    let N := (finiteModule(v)).ker
+    let : ProperSpace K := properSpace_adicCompletion v
+    have hp : IsProperMap (finiteModule(v)) := by
+      simpa only [pow_one] using (isProperMap_units_nnNorm_pow (K := K) 1 one_ne_zero)
+    have hc : IsCompact (N : Set H) := by
+      simpa only [N, MonoidHom.coe_ker] using hp.isCompact_preimage (isCompact_singleton (x := (1 : ℝ≥0ˣ)))
+    let : CompactSpace N := isCompact_iff_compactSpace.mp hc
+    let : MeasurableSpace N := borel _
+    let : BorelSpace N := ⟨rfl⟩
+    let : T2Space E := schwartzBruhat_t2
+    let : BarrelledSpace ℂ E := schwartzBruhat_barrelled
+    let : CompleteSpace E := schwartzBruhat_complete
+    let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+    let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+    let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+    let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+    let ρ : H →* (E →L[ℂ] E) :=
+      { toFun := fun g ↦ ⟨unitTranslateEnd g, by with_unfolding_all exact continuous_unitTranslate g⟩
+        map_one' := by
+          apply ContinuousLinearMap.ext
+          intro f
+          with_unfolding_all
+            change unitTranslateEnd (1 : H) f = f
+            rw [map_one]
+            rfl
+        map_mul' := fun g h ↦ by
+          apply ContinuousLinearMap.ext
+          intro f
+          with_unfolding_all
+            change unitTranslateEnd (g * h) f = unitTranslateEnd g (unitTranslateEnd h f)
+            rw [map_mul]
+            rfl }
+    have hρ : Continuous (fun p : H × E ↦ ρ p.1 p.2) :=
+      continuous_family_of_orbits (fun g ↦ ρ g)
+        (fun f ↦ by with_unfolding_all exact
+          (finiteTest_translate_locallyConstant v f).continuous)
+    let ρN := ρ.comp N.subtype
+    have hρN : Continuous (fun p : N × E ↦ ρN p.1 p.2) :=
+      hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+    let η : PontryaginDual N := PontryaginDual.map ⟨N.subtype, continuous_subtype_val⟩ ω
+    let μ := MeasureTheory.Measure.haar (G := N)
+    obtain ⟨P, -, hleft, hfix⟩ :=
+      finiteEigendistributions_component_closedSpan_projection μ ρN hρN η
+    with_unfolding_all
+      exact finiteEigendistributions_component_closedSpan_eigenprojection ρ N η P hleft hfix
+        (finiteEigendistributions_dense_span v)
+
+/-- A surjective continuous Schwartz parametrization transfers continuity of
+linear-change-of-variables orbits to Schwartz–Bruhat tests. -/
+private theorem infiniteEigendistributions_component_closedSpan_orbits_coordinates
+    {R V G : Type*} [CommRing R] [TopologicalSpace R] [IsTopologicalRing R]
+    [NormedCommRing V] [NormedAlgebra ℝ V] [FiniteDimensional ℝ V]
+    [TopologicalSpace G] [WeaklyLocallyCompactSpace G]
+    (M : R ≃+* V) (hM : Continuous M)
+    (Φ : SchwartzMap V ℂ →L[ℂ] SchwartzBruhat (Multiplicative R)) (hsurj : Surjective Φ)
+    (hΦ : ∀ f x, Φ f (Multiplicative.ofAdd x) = f (M x))
+    (g : G → Rˣ) (hg : Continuous g) (f : SchwartzBruhat (Multiplicative R)) :
+    Continuous fun t ↦ schwartzBruhatUnitTranslate (g t) f := by
+  obtain ⟨φ, rfl⟩ := hsurj f
+  let u (t : G) := Units.map M.toMonoidHom (g t)
+  let A (t : G) : V ≃L[ℝ] V := mulUnitLinearEquiv (u t)⁻¹
+  have hA : Continuous fun t ↦ (A t).toContinuousLinearMap :=
+    (ContinuousLinearMap.mul ℝ V).continuous.comp (hM.comp (Units.continuous_coe_inv.comp hg))
+  have hB : Continuous fun t ↦ (A t).symm.toContinuousLinearMap :=
+    (ContinuousLinearMap.mul ℝ V).continuous.comp (hM.comp (Units.continuous_val.comp hg))
+  let : MontelSpace ℂ (SchwartzMap V ℂ) := finiteDimensional_schwartz_montel
+  refine (Φ.continuous.comp (continuous_schwartz_comp_family A hA hB φ)).congr ?_
+  intro t
+  apply Subtype.ext
+  funext x
+  refine (hΦ _ x.toAdd).trans ?_
+  exact (congrArg φ (M.map_mul (g t).inv x.toAdd).symm).trans
+    (hΦ φ ((g t).inv * x.toAdd)).symm
+
+/-- Real and complex Schwartz coordinates give continuous unit-translation
+orbits at every infinite place. -/
+private theorem infiniteEigendistributions_component_closedSpan_orbits
+    (w : InfinitePlace F) (f : ℬ(w.Completion)) :
+    Continuous fun g : w.Completionˣ ↦ schwartzBruhatUnitTranslate g f := by
+  by_cases hw : w.IsReal
+  · obtain ⟨Φ, hΦ, hval⟩ := realSchwartzBruhat_surjective w hw
+    exact infiniteEigendistributions_component_closedSpan_orbits_coordinates
+      (InfinitePlace.Completion.ringEquivRealOfIsReal hw)
+      (InfinitePlace.Completion.isometryEquivRealOfIsReal hw).continuous Φ hΦ hval
+      id continuous_id f
+  · have hc := InfinitePlace.not_isReal_iff_isComplex.mp hw
+    obtain ⟨Φ, hΦ, hval⟩ := complexSchwartzBruhat_surjective w hc
+    exact infiniteEigendistributions_component_closedSpan_orbits_coordinates
+      (InfinitePlace.Completion.ringEquivComplexOfIsComplex hc)
+      (InfinitePlace.Completion.isometryEquivComplexOfIsComplex hc).continuous Φ hΦ hval
+      id continuous_id f
+
+/-- Normalized compact averaging on tests induces a projection on functionals with
+prescribed weight. Both action conventions are recorded explicitly. -/
+private theorem infiniteEigendistributions_component_closedSpan_projection
+    {G E : Type*} [CommGroup G] [TopologicalSpace G] [IsTopologicalGroup G]
+    [CompactSpace G] [T2Space G] [MeasurableSpace G] [BorelSpace G]
+    [AddCommGroup E] [Module ℂ E] [UniformSpace E] [IsUniformAddGroup E] [T2Space E]
+    [ContinuousSMul ℂ E] [LocallyConvexSpace ℝ E] [QuasiCompleteSpace ℂ E]
+    [SeparatingDual ℂ E]
+    (μ : MeasureTheory.Measure G) [μ.IsHaarMeasure]
+    (ρ : G →* (E →L[ℂ] E)) (hρ : Continuous fun p : G × E ↦ ρ p.1 p.2)
+    (ω : PontryaginDual G) :
+    ∃ P : E →L[ℂ] E,
+      (∀ g x, P (ρ g x) = (ω g : ℂ) • P x) ∧
+      (∀ g x, ρ g (P x) = (ω g : ℂ) • P x) ∧
+      ∀ T : StrongDual ℂ E, (∀ g x, T (ρ g x) = (ω g : ℂ) * T x) → T.comp P = T := by
+  let A (g : G) := star (ω g : ℂ) • ρ g
+  have hA : Continuous (fun p : G × E ↦ A p.1 p.2) :=
+    (show Continuous (fun p : G × E ↦ star (ω p.1 : ℂ)) from by fun_prop).smul hρ
+  obtain ⟨P, hP, -⟩ := existsUnique_pettisIntegral_continuousFamily μ isCompact_univ
+    (MeasureTheory.ae_of_all _ fun _ ↦ Set.mem_univ _) A hA
+  have hp : IsPettisIsotypicAverageOn μ univ ρ ω P := by
+    simpa only [IsPettisIsotypicAverageOn, MeasureTheory.Measure.restrict_univ, A, smul_apply] using hP
+  have hleft (g : G) (x : E) : ρ g (P x) = (ω g : ℂ) • P x :=
+    (mem_actionIsotype ρ ω _).mp (compactActionAverage_mem_isotype μ ρ ω P hp x) g
+  have hcomm (g : G) (x : E) : P (ρ g x) = ρ g (P x) := by
+    apply (SeparatingDual.eq_iff_forall_dual_eq (R := ℂ)).mpr
+    intro T
+    rw [compactActionAverage_dual_apply μ ρ ω P hp]
+    have h := compactActionAverage_dual_apply μ ρ ω P hp x (T.comp (ρ g))
+    refine Eq.trans ?_ h.symm
+    apply MeasureTheory.integral_congr_ae
+    filter_upwards [] with k
+    change star (ω k : ℂ) * T (ρ k (ρ g x)) = star (ω k : ℂ) * T (ρ g (ρ k x))
+    rw [← mul_apply_eq_comp, ← map_mul, mul_comm k g, map_mul, mul_apply_eq_comp]
+  let m : ℂ := μ.real univ
+  have hm : m ≠ 0 := by
+    change (μ.real univ : ℂ) ≠ 0
+    exact_mod_cast (MeasureTheory.measureReal_univ_pos (μ := μ)).ne'
+  refine ⟨m⁻¹ • P, ?_, ?_, ?_⟩
+  · intro g x
+    change m⁻¹ • P (ρ g x) = (ω g : ℂ) • (m⁻¹ • P x)
+    rw [hcomm, hleft, smul_comm]
+  · intro g x
+    change ρ g (m⁻¹ • P x) = (ω g : ℂ) • (m⁻¹ • P x)
+    rw [map_smul, hleft, smul_comm]
+  · intro T hT
+    ext x
+    have hfix : T (P x) = m * T x := by
+      rw [compactActionAverage_dual_apply μ ρ ω P hp]
+      simp [hT, ← Circle.coe_inv_eq_conj, m, Complex.real_smul]
+    change T (m⁻¹ • P x) = T x
+    rw [map_smul, hfix, smul_eq_mul, ← mul_assoc, inv_mul_cancel₀ hm, one_mul]
+
+/-- A continuous projection carries a dense generating family to a dense family
+in its closed fixed subspace. -/
+private theorem infiniteEigendistributions_component_closedSpan_image
+    {D : Type*} [AddCommGroup D] [Module ℂ D] [TopologicalSpace D]
+    (A B : Set D) (R : Submodule ℂ D) (Q : D →L[ℂ] D)
+    (hd : Dense (Submodule.span ℂ A : Set D)) (hR : IsClosed (R : Set D))
+    (hB : B ⊆ R) (hQ : ∀ T ∈ A, Q T ∈ Submodule.span ℂ B)
+    (hfix : ∀ T ∈ R, Q T = T) :
+    closure (Submodule.span ℂ B : Set D) = R := by
+  have hm : Submodule.span ℂ A ≤ (Submodule.span ℂ B).comap Q.toLinearMap :=
+    Submodule.span_le.mpr hQ
+  have hrange : Set.range Q ⊆ closure (Submodule.span ℂ B : Set D) :=
+    (Q.continuous.range_subset_closure_image_dense hd).trans
+      (closure_mono (by rintro _ ⟨T, hT, rfl⟩; exact hm hT))
+  refine subset_antisymm (closure_minimal (Submodule.span_le.mpr hB) hR) ?_
+  intro T hT
+  exact (hfix T hT) ▸ hrange (Set.mem_range_self T)
+
+/-- Applying the test projection to a dense eigenfamily selects exactly the
+weights with the prescribed restriction to the subgroup. -/
+private theorem infiniteEigendistributions_component_closedSpan_eigenprojection
+    {H E : Type*} [CommGroup H] [TopologicalSpace H]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [IsTopologicalAddGroup E] [ContinuousSMul ℂ E]
+    (ρ : H →* (E →L[ℂ] E)) (N : Subgroup H) (η : PontryaginDual N)
+    (P : E →L[ℂ] E)
+    (hleft : ∀ (g : N) (x : E), ρ g.val (P x) = (η g : ℂ) • P x)
+    (hfix : ∀ T : StrongDual ℂ E,
+      (∀ (g : N) (x : E), T (ρ g.val x) = (η g : ℂ) * T x) → T.comp P = T)
+    (hd : Dense (Submodule.span ℂ {T : StrongDual ℂ E | ∃ c : QuasiCharacter H,
+      ∀ (g : H) (x : E), T (ρ g x) = c g * T x} : Set (StrongDual ℂ E))) :
+    closure (Submodule.span ℂ {T : StrongDual ℂ E | ∃ c : QuasiCharacter H,
+      (∀ g : N, c g.val = (η g : ℂ)) ∧
+      (∀ (g : H) (x : E), T (ρ g x) = c g * T x)} : Set (StrongDual ℂ E)) =
+      {T | ∀ (g : N) (x : E), T (ρ g.val x) = (η g : ℂ) * T x} := by
+  classical
+  let D := StrongDual ℂ E
+  let Q : D →L[ℂ] D := ContinuousLinearMap.precomp ℂ P
+  let R : Submodule ℂ D :=
+    { carrier := {T | ∀ g : N, ∀ f : E, T (ρ g.val f) = (η g : ℂ) * T f}
+      zero_mem' := by simp
+      add_mem' := by
+        intro T U hT hU g f
+        change T (ρ g.val f) + U (ρ g.val f) = (η g : ℂ) * (T f + U f)
+        rw [hT, hU, mul_add]
+      smul_mem' := by
+        intro a T hT g f
+        change a * T (ρ g.val f) = (η g : ℂ) * (a * T f)
+        rw [hT, mul_left_comm] }
+  have hR : IsClosed (R : Set D) := by
+    change IsClosed {T : D | ∀ g : N, ∀ f : E, T (ρ g.val f) = (η g : ℂ) * T f}
+    simp only [ofPred_forall]
+    exact isClosed_iInter fun g ↦ isClosed_iInter fun f ↦ isClosed_eq
+      (continuous_eval_const (ρ g.val f)) (continuous_const.mul (continuous_eval_const f))
+  let A := {T : D | ∃ c : QuasiCharacter H, ∀ g : H, ∀ x : E, T (ρ g x) = c g * T x}
+  let B := {T : D | ∃ c : QuasiCharacter H,
+    (∀ g : N, c g.val = (η g : ℂ)) ∧ (∀ g : H, ∀ x : E, T (ρ g x) = c g * T x)}
+  have hB : B ⊆ R := by
+    rintro T ⟨c, hc, hT⟩ g f
+    exact (hT g.val f).trans (congrArg (· * T f) (hc g))
+  have hQ : ∀ T ∈ A, Q T ∈ Submodule.span ℂ B := by
+    rintro T ⟨c, hT⟩
+    by_cases hc : ∀ g : N, c g.val = (η g : ℂ)
+    · have he : Q T = T := hfix T (hB ⟨c, hc, hT⟩)
+      rw [he]
+      exact Submodule.subset_span ⟨c, hc, hT⟩
+    · push Not at hc
+      obtain ⟨g, hg⟩ := hc
+      have he : Q T = 0 := by
+        ext f
+        have hv := hT g.val (P f)
+        change T (ρ g.val (P f)) = c g.val * T (P f) at hv
+        rw [hleft, map_smul, smul_eq_mul] at hv
+        have hz : (c g.val - (η g : ℂ)) * T (P f) = 0 := by
+          rw [sub_mul, ← hv, sub_self]
+        exact (mul_eq_zero.mp hz).resolve_left (sub_ne_zero.mpr hg)
+      rw [he]
+      exact Submodule.zero_mem _
+  change closure (Submodule.span ℂ B : Set D) = (R : Set D)
+  exact infiniteEigendistributions_component_closedSpan_image A B R Q
+    hd hR hB hQ (fun T hT ↦ hfix T hT)
+
 
 /-- Paper: Proposition 5.5.3.1, p. 281.
 At an infinite place the closed span of eigendistributions with prescribed norm-one
@@ -1477,7 +2036,66 @@ theorem infiniteEigendistributions_component_closedSpan (w : InfinitePlace F)
         (∀ u : (infiniteModule(w)).ker, c u.val = (ω u.val : ℂ)) ∧
           T ∈ schwartzBruhatEigendistributions c} : Set D(ℬ(w.Completion))) =
       {T | ∀ (u : (infiniteModule(w)).ker) (f : ℬ(w.Completion)),
-        T (schwartzBruhatUnitTranslate u.val f) = (ω u.val : ℂ) * T f} := by sorry
+        T (schwartzBruhatUnitTranslate u.val f) = (ω u.val : ℂ) * T f} := by
+  with_reducible_and_instances
+    classical
+    let K := w.Completion
+    let H := Kˣ
+    let E := ℬ(K)
+    let D := StrongDual ℂ E
+    let N := (infiniteModule(w)).ker
+    have htwo : 1 < ‖(2 : K)‖ := by
+      rw [← (InfinitePlace.Completion.isometry_extensionEmbedding w).norm_map_of_map_zero
+        (map_zero _) (2 : K), map_ofNat]
+      norm_num
+    let : NontriviallyNormedField K := ⟨⟨2, htwo⟩⟩
+    let : ProperSpace K := .of_nontriviallyNormedField_of_weaklyLocallyCompactSpace K
+    have hp : IsProperMap (infiniteModule(w)) := by
+      exact isProperMap_units_nnNorm_pow (K := K) w.mult w.mult_ne_zero
+    have hc : IsCompact (N : Set H) := by
+      simpa only [N, MonoidHom.coe_ker] using hp.isCompact_preimage (isCompact_singleton (x := (1 : ℝ≥0ˣ)))
+    let : CompactSpace N := isCompact_iff_compactSpace.mp hc
+    let : MeasurableSpace N := borel _
+    let : BorelSpace N := ⟨rfl⟩
+    let : T2Space E := schwartzBruhat_t2
+    let : BarrelledSpace ℂ E := schwartzBruhat_barrelled
+    let : CompleteSpace E := schwartzBruhat_complete
+    let : Module ℝ E := Module.restrictScalars ℝ ℂ E
+    let : IsScalarTower ℝ ℂ E := IsScalarTower.restrictScalars ℝ ℂ E
+    let : LocallyConvexSpace ℝ E := (PolynormableSpace.withSeminorms ℂ E).toLocallyConvexSpace
+    let : SeparatingDual ℂ E := polynormableSpace_separatingDual ℂ E
+    let ρ : H →* (E →L[ℂ] E) :=
+      { toFun := fun g ↦ ⟨unitTranslateEnd g, by with_unfolding_all exact continuous_unitTranslate g⟩
+        map_one' := by
+          apply ContinuousLinearMap.ext
+          intro f
+          with_unfolding_all
+            change unitTranslateEnd (1 : H) f = f
+            rw [map_one]
+            rfl
+        map_mul' := fun g h ↦ by
+          apply ContinuousLinearMap.ext
+          intro f
+          with_unfolding_all
+            change unitTranslateEnd (g * h) f = unitTranslateEnd g (unitTranslateEnd h f)
+            rw [map_mul]
+            rfl }
+    have hρ : Continuous (fun p : H × E ↦ ρ p.1 p.2) :=
+      continuous_family_of_orbits (fun g ↦ ρ g)
+        (fun f ↦ by with_unfolding_all exact
+          infiniteEigendistributions_component_closedSpan_orbits w f)
+    let ρN := ρ.comp N.subtype
+    have hρN : Continuous (fun p : N × E ↦ ρN p.1 p.2) :=
+      hρ.comp ((continuous_subtype_val.comp continuous_fst).prodMk continuous_snd)
+    let η : PontryaginDual N := PontryaginDual.map ⟨N.subtype, continuous_subtype_val⟩ ω
+    let μ := MeasureTheory.Measure.haar (G := N)
+    obtain ⟨P, -, hleft, hfix⟩ :=
+      infiniteEigendistributions_component_closedSpan_projection μ ρN hρN η
+    with_unfolding_all
+      exact infiniteEigendistributions_component_closedSpan_eigenprojection ρ N η P hleft hfix
+        (infiniteEigendistributions_dense_span w)
+
+
 
 end LocalGeneration
 
@@ -1673,6 +2291,116 @@ theorem sLocalHomogeneousThetaTranspose_homogeneous (ω : PontryaginDual (mₛ).
     exact pull_ker_eq_smul_of_map_eq (E := ℬ(Aₛ)) (sLocalHomogeneousAdelicThetaLinearMap F S ω)
       T (ω g : ℂ) h
 
+/-- In a Montel space, a family with common kernel `K` generates the same strongly
+closed subspace as the transpose of the quotient by `K`. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_of_kernel
+    {E I : Type*} [AddCommGroup E] [Module ℂ E] [UniformSpace E]
+    [IsUniformAddGroup E] [ContinuousSMul ℂ E] [PolynormableSpace ℂ E] [T2Space E]
+    [MontelSpace ℂ E] [PolynormableSpace ℂ (StrongDual ℂ E)]
+    (K : Submodule ℂ E) (T : I → StrongDual ℂ E)
+    (hK : ∀ x, x ∈ K ↔ ∀ i, T i x = 0) :
+    closure (Set.range (ContinuousLinearMap.precomp
+      (τ := RingHom.id ℂ) (ρ := RingHom.id ℂ) ℂ K.mkQL)) =
+      closure (Submodule.span ℂ (Set.range T) : Set (StrongDual ℂ E)) := by
+  let D := StrongDual ℂ E
+  let L : StrongDual ℂ (E ⧸ K) →L[ℂ] D := ContinuousLinearMap.precomp ℂ K.mkQL
+  let W := Submodule.span ℂ (Set.range T)
+  have hT (i : I) : T i ∈ L.toLinearMap.range := by
+    refine ⟨K.liftQL (T i) (fun x hx ↦ (hK x).mp hx i), ?_⟩
+    exact ContinuousLinearMap.ext fun _ ↦ rfl
+  have hW : W ≤ L.toLinearMap.range := Submodule.span_le.mpr (by
+    rintro _ ⟨i, rfl⟩
+    exact hT i)
+  refine le_antisymm (closure_minimal ?_ isClosed_closure) (closure_mono hW)
+  rintro _ ⟨l, rfl⟩
+  by_contra hl
+  let : Module ℝ D := Module.restrictScalars ℝ ℂ D
+  let : IsScalarTower ℝ ℂ D := IsScalarTower.restrictScalars ℝ ℂ D
+  let : LocallyConvexSpace ℝ D := (PolynormableSpace.withSeminorms ℂ D).toLocallyConvexSpace
+  obtain ⟨φ, hφ, hv⟩ := exists_dual_eq_zero_on_submodule_of_notMem W.topologicalClosure
+    W.isClosed_topologicalClosure hl
+  obtain ⟨x, rfl⟩ := surjective_strongBidual_eval φ
+  have hx : x ∈ K := (hK x).mpr (fun i ↦ hv (T i)
+    (W.le_topologicalClosure (Submodule.subset_span (Set.mem_range_self i))))
+  have hq : K.mkQL x = 0 := (Submodule.Quotient.mk_eq_zero K).mpr hx
+  exact hφ (by change l (K.mkQL x) = 0; rw [hq, map_zero])
+
+/-- Norm twisting does not change the norm-one restriction. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_restriction
+    (χ : PontryaginDual Jₛ) (s t : ℂ) :
+    normOneRestriction mₛ (chartₛ(χ) s) = normOneRestriction mₛ (chartₛ(χ) t) := by
+  ext u
+  exact (normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ s u).trans
+    (normOneRestriction_unitaryChart mₛ (isProperMap_sIdeleQuotientNorm F S).continuous χ t u).symm
+
+/-- Along one norm chart, zero normalized evaluations imply zero convergent integrals
+at every positive exponent, including the discrete exceptional Euler-factor points. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_integral
+    (f : ℬ(Aₛ)) (χ : PontryaginDual Jₛ)
+    (hf : ∀ z, sLocalNormalizedEigendistribution (chartₛ(χ) z) f = 0)
+    (a : ℂ) (ha : 0 < a.re) : sLocalIdelicZetaIntegral f (chartₛ(χ) a) = 0 := by
+  have hN (z : ℂ) : sLocalNormalizedZFunction f (chartₛ(χ) z) = 0 := by
+    have h := (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose_spec f
+    rw [show (existsUnique_sLocalNormalizedEigendistribution (chartₛ(χ) z)).exists.choose f = 0
+      from hf z] at h
+    exact h.symm.trans (mul_zero _)
+  have hpos : ∀ᶠ z : ℂ in 𝓝[≠] a, 0 < z.re := nhdsWithin_le_nhds
+    ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds ha)
+  have hz : ∀ᶠ z : ℂ in 𝓝[≠] a, sLocalIdelicZetaIntegral f (chartₛ(χ) z) = 0 := by
+    filter_upwards [hpos, nhdsNE_le_codiscrete _
+      (sLocalNormalizedEigendistribution_gaussian_heckeL_ne_zero χ)] with z hz hL
+    have h := hN z
+    rw [sLocalNormalizedZFunction_eq_div f χ hz, div_eq_zero_iff] at h
+    exact h.resolve_right hL
+  have hc := ((sLocalIdelicZetaIntegral_analyticOn f χ) a ha).continuousAt
+  exact tendsto_nhds_unique (hc.tendsto.mono_left nhdsWithin_le_nhds)
+    (tendsto_const_nhds.congr' (hz.mono fun z hz ↦ hz.symm))
+
+/-- The homogeneous theta kernel is the common kernel of the normalized
+functionals in its norm-one character component. -/
+private theorem sLocalHomogeneousThetaTranspose_closure_range_kernel
+    (ω : PontryaginDual (mₛ).ker) (f : ℬ(Aₛ)) :
+    f ∈ Kₛω(ω) ↔ ∀ c : {c : QuasiCharacter Jₛ // restricts(c, mₛ, ω)},
+      sLocalNormalizedEigendistribution c.val f = 0 := by
+  constructor
+  · intro hf c
+    obtain ⟨χ, s, hs⟩ := sLocalNormalizedEigendistribution_chart (F := F) (S := S) c.val
+    have hr (z : ℂ) : restricts(chartₛ(χ) z, mₛ, ω) :=
+      (sLocalHomogeneousThetaTranspose_closure_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction mₛ) hs).trans c.property)
+    have hZ (z : ℂ) (hz : 0 < z.re) : sLocalIdelicZFunction f (chartₛ(χ) z) = 0 :=
+      (mem_sLocalHomogeneousAdelicTheta_ker_iff ω f).mp hf
+        ⟨chartₛ(χ) z, sLocalOrderBound_positive χ hz⟩ (fun u ↦ DFunLike.congr_fun (hr z) u)
+    have hN (z : ℂ) (hz : 0 < z.re) : sLocalNormalizedZFunction f (chartₛ(χ) z) = 0 := by
+      rw [sLocalNormalizedZFunction_eq_div f χ hz,
+        ← sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩, hZ z hz, zero_div]
+    have hpos : ∀ᶠ z : ℂ in 𝓝[≠] (1 : ℂ), 0 < z.re := nhdsWithin_le_nhds
+      ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds (by norm_num))
+    have hAll := (sLocalNormalizedZFunction_entire f χ).eq_of_frequently_eq
+      (z₀ := 1) analyticOnNhd_const (hpos.mono fun z hz ↦ hN z hz).frequently
+    have hv : sLocalNormalizedZFunction f c.val = 0 := by
+      rw [← hs]
+      exact congrFun hAll s
+    have h := (existsUnique_sLocalNormalizedEigendistribution c.val).exists.choose_spec f
+    exact (mul_eq_zero.mp (h.trans hv)).resolve_left sLocalNormalizedEigendistribution_mass_ne_zero
+  · intro hf
+    apply (mem_sLocalHomogeneousAdelicTheta_ker_iff ω f).mpr
+    intro c hc
+    have hc' : restricts(c.val, mₛ, ω) := ContinuousMonoidHom.ext hc
+    obtain ⟨χ, s, hs⟩ := sLocalNormalizedEigendistribution_chart (F := F) (S := S) c.val
+    have hr (z : ℂ) : restricts(chartₛ(χ) z, mₛ, ω) :=
+      (sLocalHomogeneousThetaTranspose_closure_range_restriction χ z s).trans
+        ((congrArg (normOneRestriction mₛ) hs).trans hc')
+    have hz (z : ℂ) (hz : 0 < z.re) : sLocalIdelicZFunction f (chartₛ(χ) z) = 0 := by
+      rw [sLocalIdelicZFunction_eq_integral f ⟨χ, z, hz, rfl⟩]
+      exact sLocalHomogeneousThetaTranspose_closure_range_integral f χ
+        (fun t ↦ hf ⟨chartₛ(χ) t, hr t⟩) z hz
+    have hAll := eq_of_agree_rightHalf (sLocalIdelicZFunction_meromorphic f χ)
+      (V := 0) (fun _ _ ↦ analyticAt_const.meromorphicNFAt) 0 hz
+    change sLocalIdelicZFunction f c.val = 0
+    rw [← hs]
+    exact congrFun hAll s
+
 /-- Paper: Theorem 5.5.3.2(1), p. 282.
 The strong closure of the homogeneous S-local theta transpose range is the closed
 span of the normalized eigendistributions whose weights restrict to the given character.
@@ -1681,7 +2409,28 @@ theorem sLocalHomogeneousThetaTranspose_closure_range (ω : PontryaginDual (mₛ
     closure (Set.range (pull(Kₛω(ω)))) =
       closure (Submodule.span ℂ
         (sLocalNormalizedEigendistribution '' {c : QuasiCharacter Jₛ | restricts(c, mₛ, ω)}) :
-          Set D(ℬ(Aₛ))) := by sorry
+          Set D(ℬ(Aₛ))) := by
+  let E := ℬ(Aₛ)
+  have hN : IsNuclearTVS.{0} E := sAdeleSchwartz_nuclear F S
+  let : T2Space E := hN.1
+  let : PolynormableSpace ℂ E := hN.2.1
+  let : MontelSpace ℂ E := (sAdeleSchwartz_montel (F := F) S).2
+  have hD : IsNuclearTVS.{0} (StrongDual ℂ E) := sAdeleSchwartz_strongDual_nuclear F S
+  let : PolynormableSpace ℂ (StrongDual ℂ E) := hD.2.1
+  let I := {c : QuasiCharacter Jₛ // restricts(c, mₛ, ω)}
+  have hi : Set.range (fun c : I ↦ sLocalNormalizedEigendistribution c.val) =
+      sLocalNormalizedEigendistribution '' {c : QuasiCharacter Jₛ | restricts(c, mₛ, ω)} := by
+    ext T
+    constructor
+    · rintro ⟨c, rfl⟩
+      exact ⟨c.val, c.property, rfl⟩
+    · rintro ⟨c, hc, rfl⟩
+      exact ⟨⟨c, hc⟩, rfl⟩
+  rw [← hi]
+  with_reducible_and_instances
+    exact sLocalHomogeneousThetaTranspose_closure_range_of_kernel (E := E) (Kₛω(ω))
+      (fun c : I ↦ sLocalNormalizedEigendistribution c.val)
+      (sLocalHomogeneousThetaTranspose_closure_range_kernel ω)
 
 /-- Paper: Theorem 5.5.3.2(2), p. 282.
 Pullback along the ordinary S-local theta quotient is injective on strong duals. -/

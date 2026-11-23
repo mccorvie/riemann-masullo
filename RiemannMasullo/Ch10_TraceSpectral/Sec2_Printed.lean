@@ -1634,7 +1634,7 @@ def Printed.spectralLineIsotype_bandAdjoint_contains_jets : Prop :=
               Integrable integrand μ ∧ d (N.mkQ f) = ∫ g, integrand g ∂μ
 
 local notation "C" => C𝔽(ℚ)
-local notation "logNorm" => (fun g : C ↦ Real.log ((ideleClassNorm ℚ g).val : ℝ))
+local notation "logNorm" => (logIdeleClassNorm ℚ)
 local notation "μQ" => ideleClassTamagawaMeasure ℚ
 local notation "mQ" =>
   (⟨ideleClassNorm ℚ, (isProperMap_ideleClassNorm ℚ).continuous⟩ : C →ₜ* ℝ≥0ˣ)
@@ -1647,7 +1647,7 @@ private theorem continuous_ratLogNorm : Continuous logNorm :=
 
 private def radialCharacter (r : ℝ) : PontryaginDual C where
   toFun g := Circle.exp (r * logNorm g)
-  map_one' := by simp
+  map_one' := by simp [logIdeleClassNorm]
   map_mul' g h := by
     change Circle.exp (r * Real.log (((ideleClassNorm ℚ (g * h)).val : ℝ≥0) : ℝ)) = _
     rw [map_mul (ideleClassNorm ℚ), Units.val_mul, NNReal.coe_mul, Real.log_mul
@@ -1711,7 +1711,7 @@ private theorem ratJet_nonzero_trivial_isotype (χ : PontryaginDual C)
   have hLfin := (hL.measure_lt_top (μ := μQ)).ne
   have hLpos : 0 < μQ L := by
     have hO : IsOpen (logNorm ⁻¹' Ioo (-1 : ℝ) 1) := isOpen_Ioo.preimage continuous_ratLogNorm
-    exact (hO.measure_pos μQ ⟨1, by simp⟩).trans_le (measure_mono (preimage_mono Ioo_subset_Icc_self))
+    exact (hO.measure_pos μQ ⟨1, by simp [logIdeleClassNorm]⟩).trans_le (measure_mono (preimage_mono Ioo_subset_Icc_self))
   let ρ (g : C) := ENNReal.ofReal (intervalSobolevDensity 0 0 2 (logNorm g))
   have hρ (g : C) : intervalSobolevDensity 0 0 2 (logNorm g) = 1 + (logNorm g) ^ 2 := by
     norm_num [intervalSobolevDensity]

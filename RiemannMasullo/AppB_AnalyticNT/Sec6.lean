@@ -1788,8 +1788,10 @@ private theorem finiteHeckeL_zeroFreeRegion_poles (F : Type*) [Field F] [NumberF
     exact ⟨0, hgood 0 (le_trans (by decide) (hD.analyticAt 0).meromorphicOrderAt_nonneg)
       fun s _ _ ↦ hD.analyticAt s⟩
 
-/-- Comparison of Euler products with Dedekind zeta at a real point to the left. -/
-private theorem finiteHeckeL_zeroFreeRegion_euler (F : Type*) [Field F] [NumberField F]
+/-- Comparison of Euler products with Dedekind zeta at a real point to the left:
+for `1 < y ≤ Re s`, `‖L(s, ψ)‖ ≤ ‖ζ_F(y)‖` and `1 ≤ ‖L(s, ψ)‖ * ‖ζ_F(y)‖`.
+Public for the horizontal estimates of §1.4.7 (`Ch01_Introduction/Sec4.lean`). -/
+theorem finiteHeckeL_zeroFreeRegion_euler (F : Type*) [Field F] [NumberField F]
     (ψ : U[F]) (s : halfPlane) {y : ℝ} (hy : 1 < y) (hys : y ≤ (s : ℂ).re) :
     ‖finiteHeckeL ψ s‖ ≤ ‖dedekindZeta F y‖ ∧
       1 ≤ ‖finiteHeckeL ψ s‖ * ‖dedekindZeta F y‖ := by
