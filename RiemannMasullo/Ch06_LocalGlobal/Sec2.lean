@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch06_LocalGlobal.Sec1
 public import RiemannMasullo.Ch05_ThetaZSpaces.Sec3a
 public import RiemannMasullo.AppD_SchwartzBruhat.Sec3a
+import RiemannMasullo.Ch05_ThetaZSpaces.Sec4
 import all RiemannMasullo.Ch02_AdelicTheta.Sec1
 import all RiemannMasullo.Ch04_PeriodicSchauderBases.Sec3b
 import all RiemannMasullo.AppC_LCTVS.Sec2b
@@ -623,7 +624,24 @@ theorem sLocalHomogeneousThetaToGlobal_equiv_of_unramified
 /-- Paper: Corollary 6.2.1.2, p. 295.
 Each global homogeneous theta quotient is a nuclear Fréchet space. -/
 theorem globalHomogeneousThetaSpace_nuclearFrechet (ω : PontryaginDual C₁) :
-    IsFrechetTVS Θ𝔽ω(ω) ∧ IsNuclearTVS Θ𝔽ω(ω) := by sorry
+    IsFrechetTVS Θ𝔽ω(ω) ∧ IsNuclearTVS Θ𝔽ω(ω) := by
+  obtain ⟨_, _, _, _, _, hT, hLC, _⟩ := ideleGroup_quotient.{_, 0} F
+  let cω := (⟨Circle.coeHom, continuous_subtype_val⟩ : Circle →ₜ* ℂ).comp ω
+  have hcω : cω ∈ Set.range (normOneRestriction (ideleClassNorm F)) := by
+    rw [range_normOneRestriction _ (isProperMap_ideleClassNorm F) (ideleClassNorm_ne_one (F := F))]
+    exact ⟨ω, rfl⟩
+  obtain ⟨c, hc⟩ := hcω
+  obtain ⟨U, hU⟩ : ∃ U : Finset V, c ∈ unramifiedOutside F U :=
+    Set.mem_iUnion.mp ((iUnion_unramifiedOutside F).symm ▸ Set.mem_univ c)
+  have hω : NormOneCharacterUnramifiedOutside ω U :=
+    ⟨⟨c, hU⟩, fun x ↦ DFunLike.congr_fun hc x⟩
+  obtain ⟨T, hUT, hPic⟩ := (picard_uniformization F U).1
+  have hωT := NormOneCharacterUnramifiedOutside.mono hω hUT
+  obtain ⟨e, _⟩ := sLocalHomogeneousThetaToGlobal_equiv_of_unramified hPic hωT
+  obtain ⟨_, _, hmet, _⟩ := sLocalHomogeneousThetaSpace_frechet (sLocalNormOneCharacter T ω hωT)
+  have hN : IsNuclearTVS Θ𝔽ω(ω) := globalHomogeneousThetaSpace_nuclear (F := F) (ω := ω)
+  exact ⟨⟨inferInstance, hN.2.1, e.symm.toHomeomorph.isEmbedding.metrizableSpace,
+    globalHomogeneousThetaSpace_complete (F := F) (ω := ω)⟩, hN⟩
 
 -- TODO(paper-gap): The proof of Lemma 6.2.1.3 repeats the componentwise-seminorm
 -- error in ERRATA I125. Joint continuity of the action and compactness apply.
