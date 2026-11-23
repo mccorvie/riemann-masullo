@@ -491,7 +491,8 @@ theorem continuous_sLocalZetaPair (χ : PontryaginDual Jₛ) : Continuous (sLoca
 
 /-- Paper: Lemma 5.4.1.3, p. 266.
 The two zeta restrictions determine the homogeneous theta class. -/
-theorem injective_sLocalZetaPair (χ : PontryaginDual Jₛ) : Injective (sLocalZetaPair (F := F) (S := S) χ) := by sorry
+theorem injective_sLocalZetaPair (χ : PontryaginDual Jₛ) : Injective (sLocalZetaPair (F := F) (S := S) χ) := by
+  exact (sLocalZetaPair_isClosedEmbedding (F := F) (S := S) χ).injective
 
 -- Match the choice of archimedean coordinates in §5.3.4.
 local notation "RealModels" => ((w : {v : InfinitePlace F // v.IsReal}) →
