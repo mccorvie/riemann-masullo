@@ -674,16 +674,6 @@ theorem sLocalRhoPoleOrder_le_of_re_neg_odd (n : ℕ) {s : ℂ}
       (Finset.univ.filter (fun w : InfinitePlace F ↦ w.IsComplex ∨
         w.IsReal ∧ sLocalInfiniteRestriction w (chartₛ(χ, hχ) 0) (-1) = -1)).card := by sorry
 
-open Classical in
-/-- Paper: Theorem 7.1.3.2(3), p. 324.
-Excess pole orders at finite-place poles can occur at at most the number of infinite
-places plus the number of unordered pairs of unramified finite places. -/
-theorem sLocalRhoPoleOrder_exceptions_encard_le :
-    let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
-    {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
-      ∃ v ∈ S₀, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0}.encard ≤
-        (archCount + S₀.card.choose 2 : ℕ) := by sorry
-
 -- On a radial subgroup, taking a power kills the finite-order part of the character.
 
 private theorem excess_gamma_radial_inj {a b : ℂ} {n : ℕ} (hn : 0 < n)
@@ -1131,6 +1121,111 @@ private theorem excess_order_le_of_factors (s : ℂ)
   rw [← excess_orderBound_eq, sLocalIdelicOrderBound_eq_neg_poleOrder] at hmin
   rw [hη]
   exact_mod_cast neg_le_neg_iff.mp (WithTop.coe_le_coe.mp hmin)
+
+/-- Outside the finitely many radial parameters, the archimedean product is
+holomorphic in the closed right half-plane. -/
+private theorem exists_excess_gamma_parameters (χ : U𝔽) :
+    ∃ A : InfinitePlace F → ℂ, ∀ s : ℂ, 0 ≤ s.re →
+      (∀ v, s ≠ A v) → AnalyticAt ℂ (heckeGammaFactor χ) s := by
+  classical
+  let a (v : InfinitePlace F) : ℂ := if hv : v.IsReal then
+    (realHeckeCharacter_parameters χ v hv).exists.choose.1 else
+    (complexHeckeCharacter_parameters χ v (InfinitePlace.not_isReal_iff_isComplex.mp hv)).exists.choose.1
+  refine ⟨fun v ↦ -a v, fun s hs hne ↦ ?_⟩
+  have hΓ : heckeGammaFactor χ s ≠ 0 := by
+    unfold heckeGammaFactor
+    apply Finset.prod_ne_zero_iff.mpr
+    intro v _
+    have hn : s + a v ≠ 0 := fun h ↦ hne v (eq_neg_of_add_eq_zero_left h)
+    have ha : (a v).re = 0 := by
+      dsimp only [a]
+      split_ifs with hv
+      · exact (realHeckeCharacter_parameters χ v hv).exists.choose_spec.1
+      · exact (complexHeckeCharacter_parameters χ v _).exists.choose_spec.1
+    have hz : 0 ≤ (s + a v).re := by simpa only [Complex.add_re, ha, add_zero] using hs
+    split_ifs with hv
+    · dsimp only
+      have hv' : a v = _ := dite_eq_left hv
+      rw [← hv']
+      exact_mod_cast excess_gamma_real_ne_zero (s + a v) hz hn _ (Nat.cast_nonneg _)
+    · dsimp only
+      have hc := InfinitePlace.not_isReal_iff_isComplex.mp hv
+      let k := (complexHeckeCharacter_parameters χ v hc).exists.choose.2.natAbs
+      change Complex.Gammaℂ (s + (complexHeckeCharacter_parameters χ v hc).exists.choose.1 + (k : ℂ) / 2) / 2 ≠ 0
+      rw [← show a v = _ from dite_eq_right hv]
+      apply (div_ne_zero · two_ne_zero)
+      rw [← Complex.Gammaℝ_mul_Gammaℝ_add_one]
+      refine mul_ne_zero ?_ (Complex.Gammaℝ_ne_zero_of_re_pos ?_)
+      · simpa only [Complex.ofReal_div, Complex.ofReal_ofNat, Complex.ofReal_natCast] using
+          excess_gamma_real_ne_zero (s + a v) hz hn ((k : ℝ) / 2) (by positivity)
+      · rw [Complex.add_re, Complex.add_re (s + a v), Complex.div_ofNat_re, Complex.natCast_re, Complex.one_re]
+        positivity
+  simpa only [inv_inv] using (((differentiable_inv_heckeGammaFactor χ).analyticAt s).fun_inv
+    (inv_ne_zero hΓ))
+
+open Classical in
+/-- Paper: Theorem 7.1.3.2(3), p. 324.
+Excess pole orders at finite-place poles can occur at at most the number of infinite
+places plus the number of unordered pairs of unramified finite places. -/
+theorem sLocalRhoPoleOrder_exceptions_encard_le :
+    let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
+    {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
+      ∃ v ∈ S₀, meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0}.encard ≤
+        (archCount + S₀.card.choose 2 : ℕ) := by
+  classical
+  dsimp only
+  let S₀ := S.filter (fun v ↦ (ideleClassNormTwist (F := F) χ 0).IsUnramifiedAt v)
+  let pole (v : Primes) (s : ℂ) := meromorphicOrderAt (finiteHeckeEulerFactor χ v) s < 0
+  obtain ⟨A, hA⟩ := exists_excess_gamma_parameters χ
+  let common (P : Finset Primes) (s : ℂ) := ∀ v ∈ P, pole v s
+  let B (P : Finset Primes) : ℂ := if h : ∃ s, common P s then h.choose else 0
+  let E := Finset.univ.image A ∪ (S₀.powersetCard 2).image B
+  have hsub : {s : ℂ | degree < sLocalRhoPoleOrder (chartₛ(χ, hχ) s) ∧
+      ∃ v ∈ S₀, pole v s} ⊆ (E : Set ℂ) := by
+    intro s hs
+    obtain ⟨hex, v, hv, hp⟩ := hs
+    by_cases harch : ∃ w, s = A w
+    · obtain ⟨w, hw⟩ := harch
+      exact Finset.mem_union_left _ (Finset.mem_image.mpr ⟨w, Finset.mem_univ _, hw.symm⟩)
+    have hre : 0 ≤ s.re := by
+      by_contra! hn
+      have hi := sLocalRhoPoleOrder_le_archimedean_of_re_neg χ hχ hn
+      rw [InfinitePlace.card_eq_nrRealPlaces_add_nrComplexPlaces] at hi
+      have hdeg := InfinitePlace.card_add_two_mul_card_eq_rank (K := F)
+      omega
+    have hΓ := hA s hre (fun w he ↦ harch ⟨w, he⟩)
+    have hvS := (Finset.mem_filter.mp hv).1
+    have hw : ∃ w ∈ S, pole w s ∧ w.under (𝓞 ℚ) ≠ v.under (𝓞 ℚ) := by
+      by_contra! h
+      apply (not_le.mpr hex)
+      apply excess_order_le_of_factors χ hχ s hΓ (excess_finite_product_meromorphicAt χ S s)
+      rw [show (fun z ↦ ∏ w : S, finiteHeckeEulerFactor χ w.val z) =
+          (fun z ↦ ∏ w ∈ S, finiteHeckeEulerFactor χ w z) from
+          funext fun z ↦ Finset.prod_coe_sort S (fun w ↦ finiteHeckeEulerFactor χ w z)]
+      rw [meromorphicOrderAt_fun_prod (fun w (_ : w ∈ S) ↦ excess_finite_meromorphicAt χ w s)]
+      refine (excess_finite_order_over_prime χ S (v.under (𝓞 ℚ)) s).trans ?_
+      apply Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _)
+      intro w hw hn
+      exact le_of_not_gt fun hpw ↦ hn (Finset.mem_filter.mpr ⟨hw, h w hw hpw⟩)
+    obtain ⟨w, hwS, hw, hdiff⟩ := hw
+    have hwU := ((excess_finite_pole χ w s).mp hw).1
+    let P : Finset Primes := {w, v}
+    have hne : w ≠ v := fun he ↦ hdiff (congrArg (fun u : Primes ↦ u.under (𝓞 ℚ)) he)
+    have hmem : P ∈ S₀.powersetCard 2 := Finset.mem_powersetCard.mpr
+      ⟨Finset.insert_subset (Finset.mem_filter.mpr ⟨hwS, hwU⟩) (Finset.singleton_subset_iff.mpr hv),
+        by simp [P, hne]⟩
+    have hcs : common P s := by simpa [common, P] using And.intro hw hp
+    have hexs : ∃ z, common P z := ⟨s, hcs⟩
+    have hB : common P (B P) := by simpa only [B, dite_eq_left hexs] using hexs.choose_spec
+    have he := finiteHeckeEulerFactors_common_pole_subsingleton χ hχ ⟨w, hwS⟩ ⟨v, hvS⟩
+      hwU (Finset.mem_filter.mp hv).2 hdiff
+    exact Finset.mem_union_right _ (Finset.mem_image.mpr ⟨P, hmem,
+      he ⟨hB w (by simp [P]), hB v (by simp [P])⟩ ⟨hw, hp⟩⟩)
+  refine (Set.encard_mono hsub).trans ?_
+  rw [Set.encard_coe_eq_coe_finsetCard]
+  exact_mod_cast (Finset.card_union_le _ _).trans
+    ((Nat.add_le_add (Finset.card_image_le) (Finset.card_image_le)).trans_eq
+      (by rw [Finset.card_univ, Finset.card_powersetCard]))
 
 /-- Paper: Theorem 7.1.3.2(3)(a), p. 324.
 For a finite-order character twisted by an imaginary norm power, an excess pole order
