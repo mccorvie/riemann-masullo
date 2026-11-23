@@ -2842,9 +2842,11 @@ theorem complexArchimedeanMellin_monomial (p q : ℕ) (n : ℤ) (f : 𝓢(ℂ, �
 private theorem complexArchimedeanMellin_angularProfile (f : 𝓢(ℂ, ℂ)) (k : ℤ)
     (z : ℂ) (hz : 0 < z.re) :
     complexArchimedeanMellin f k z = 2 * mellin (angularProfile f k) (2 * z) := by
-  rw [complexArchimedeanMellin_eq_integral f k z hz]
-  simpa only [angularProfile, angularWeight, Int.cast_one, one_mul] using
-    complexArchimedeanMellin_eq_infiniteLocalIdelicZFunction_change (f : ℂ → ℂ) k z
+  refine (complexArchimedeanMellin_eq_integral f k z hz).trans
+    ((complexArchimedeanMellin_eq_infiniteLocalIdelicZFunction_change (f : ℂ → ℂ) k z).trans ?_)
+  apply congrArg (fun g : ℝ → ℂ ↦ 2 * mellin g (2 * z))
+  funext t
+  simp only [angularProfile, angularWeight, Int.cast_one, one_mul]
 
 /-- Realize an integral angular weight by a unitary character on a complex completion. -/
 private theorem complexArchimedeanMellin_angularCharacter {F : Type*} [Field F] [NumberField F]
